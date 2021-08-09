@@ -365,7 +365,7 @@ template<typename T> class GVArray_For_VArray : public GVArray {
   {
   }
 
-  GVArray_For_VArray(std::unique_ptr<VArray<T>> varray)
+  GVArray_For_VArray(std::unique_ptr<const VArray<T>> varray)
       : GVArray_For_VArray(optional_ptr<const VArray<T>>(std::move(varray)))
   {
   }
@@ -437,7 +437,13 @@ template<typename T> class VArray_For_GVArray : public VArray<T> {
     BLI_assert(varray_->type().template is<T>());
   }
 
-  VArray_For_GVArray(optional_ptr<const GVArray> varray) : varray_(std::move(varray))
+  VArray_For_GVArray(optional_ptr<const GVArray> varray)
+      : VArray<T>(varray->size()), varray_(std::move(varray))
+  {
+  }
+
+  VArray_For_GVArray(GVArrayPtr varray)
+      : VArray_For_GVArray(optional_ptr<const GVArray>(std::move(varray)))
   {
   }
 

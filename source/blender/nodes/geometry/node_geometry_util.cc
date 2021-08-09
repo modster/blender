@@ -124,12 +124,33 @@ void prepare_field_inputs(bke::FieldInputs &field_inputs,
       }
       GVArrayPtr varray = std::move(attribute.varray);
       if (attribute.domain != domain) {
-        varray = component.attribute_try_adapt_domain(std::move(varray), attribute.domain, domain);
+        /* TODO: Not all boolean attributes are selections. */
+        if (varray->type().is<bool>() && component.type() == GEO_COMPONENT_TYPE_MESH) {
+          const MeshComponent &mesh_component = static_cast<const MeshComponent &>(component);
+          VArrayPtr<bool> varray_bool = std::make_unique<fn::VArray_For_GVArray<bool>>(
+              std::move(varray));
+          varray_bool = mesh_component.adapt_selection(
+              std::move(varray_bool), attribute.domain, domain);
+          if (!varray_bool) {
+            continue;
+          }
+          varray = std::make_unique<fn::GVArray_For_VArray<bool>>(std::move(varray_bool));
+        }
+        else {
+          varray = component.attribute_try_adapt_domain(
+              std::move(varray), attribute.domain, domain);
+        }
+      }
+      if (!varray) {
+        continue;
       }
       const CPPType &type = anonymous_attribute_key->type();
       if (varray->type() != type) {
         const blender::nodes::DataTypeConversions &conversions = get_implicit_type_conversions();
         varray = conversions.try_convert(std::move(varray), type);
+      }
+      if (!varray) {
+        continue;
       }
       input_value = std::make_unique<bke::GVArrayFieldInputValue>(std::move(varray));
     }

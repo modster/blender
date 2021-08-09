@@ -651,6 +651,207 @@ blender::fn::GVArrayPtr MeshComponent::attribute_try_adapt_domain(
   return {};
 }
 
+namespace blender::bke::adapt_selection_domain {
+static VArrayPtr<bool> varray_from_array(Array<bool> array)
+{
+  return std::make_unique<VArray_For_ArrayContainer<Array<bool>>>(std::move(array));
+}
+
+static VArrayPtr<bool> adapt_selection_point_to_face(const Mesh &mesh, VArrayPtr<bool> selection)
+{
+  Array<bool> new_selection(mesh.totpoly);
+  for (const int poly_index : IndexRange(mesh.totpoly)) {
+    const MPoly &poly = mesh.mpoly[poly_index];
+    bool poly_is_selected = true;
+    for (const int loop_index : IndexRange(poly.loopstart, poly.totloop)) {
+      const MLoop &loop = mesh.mloop[loop_index];
+      if (!selection->get(loop.v)) {
+        poly_is_selected = false;
+        break;
+      }
+    }
+    new_selection[poly_index] = poly_is_selected;
+  }
+  return varray_from_array(std::move(new_selection));
+}
+
+static VArrayPtr<bool> adapt_selection_point_to_corner(const Mesh &mesh, VArrayPtr<bool> selection)
+{
+  Array<bool> new_selection(mesh.totloop);
+  for (const int loop_index : IndexRange(mesh.totloop)) {
+    const MLoop &loop = mesh.mloop[loop_index];
+    new_selection[loop_index] = selection->get(loop.v);
+  }
+  return varray_from_array(std::move(new_selection));
+}
+
+static VArrayPtr<bool> adapt_selection_point_to_edge(const Mesh &mesh, VArrayPtr<bool> selection)
+{
+  Array<bool> new_selection(mesh.totedge);
+  for (const int edge_index : IndexRange(mesh.totedge)) {
+    const MEdge &edge = mesh.medge[edge_index];
+    const bool edge_is_selected = selection->get(edge.v1) && selection->get(edge.v2);
+    new_selection[edge_index] = edge_is_selected;
+  }
+  return varray_from_array(std::move(new_selection));
+}
+
+static VArrayPtr<bool> adapt_selection_edge_to_point(const Mesh &mesh, VArrayPtr<bool> selection)
+{
+  Array<bool> new_selection(mesh.totvert, false);
+  for (const int edge_index : IndexRange(mesh.totedge)) {
+    if (selection->get(edge_index)) {
+      const MEdge &edge = mesh.medge[edge_index];
+      new_selection[edge.v1] = true;
+      new_selection[edge.v2] = true;
+    }
+  }
+  return varray_from_array(std::move(new_selection));
+}
+
+static VArrayPtr<bool> adapt_selection_edge_to_face(const Mesh &mesh, VArrayPtr<bool> selection)
+{
+  Array<bool> new_selection(mesh.totpoly);
+  for (const int poly_index : IndexRange(mesh.totpoly)) {
+    const MPoly &poly = mesh.mpoly[poly_index];
+    bool poly_is_selected = true;
+    for (const int loop_index : IndexRange(poly.loopstart, poly.totloop)) {
+      const MLoop &loop = mesh.mloop[loop_index];
+      if (!selection->get(loop.e)) {
+        poly_is_selected = false;
+        break;
+      }
+    }
+    new_selection[poly_index] = poly_is_selected;
+  }
+  return varray_from_array(std::move(new_selection));
+}
+
+static VArrayPtr<bool> adapt_selection_face_to_point(const Mesh &mesh, VArrayPtr<bool> selection)
+{
+  Array<bool> new_selection(mesh.totvert, false);
+  for (const int poly_index : IndexRange(mesh.totpoly)) {
+    const MPoly &poly = mesh.mpoly[poly_index];
+    if (selection->get(poly_index)) {
+      for (const int loop_index : IndexRange(poly.loopstart, poly.totloop)) {
+        const MLoop &loop = mesh.mloop[loop_index];
+        BLI_assert(loop.v < mesh.totvert);
+        new_selection[loop.v] = true;
+      }
+    }
+  }
+  return varray_from_array(std::move(new_selection));
+}
+
+static VArrayPtr<bool> adapt_selection_face_to_edge(const Mesh &mesh, VArrayPtr<bool> selection)
+{
+  Array<bool> new_selection(mesh.totedge, false);
+  for (const int poly_index : IndexRange(mesh.totpoly)) {
+    const MPoly &poly = mesh.mpoly[poly_index];
+    if (selection->get(poly_index)) {
+      for (const int loop_index : IndexRange(poly.loopstart, poly.totloop)) {
+        const MLoop &loop = mesh.mloop[loop_index];
+        new_selection[loop.e] = true;
+      }
+    }
+  }
+  return varray_from_array(std::move(new_selection));
+}
+
+static VArrayPtr<bool> adapt_selection_face_to_corner(const Mesh &mesh, VArrayPtr<bool> selection)
+{
+  Array<bool> new_selection(mesh.totloop);
+  for (const int poly_index : IndexRange(mesh.totpoly)) {
+    const MPoly &poly = mesh.mpoly[poly_index];
+    const bool is_selected = selection->get(poly_index);
+    for (const int loop_index : IndexRange(poly.loopstart, poly.totloop)) {
+      new_selection[loop_index] = is_selected;
+    }
+  }
+  return varray_from_array(std::move(new_selection));
+}
+
+}  // namespace blender::bke::adapt_selection_domain
+
+blender::VArrayPtr<bool> MeshComponent::adapt_selection(blender::VArrayPtr<bool> selection,
+                                                        const AttributeDomain from_domain,
+                                                        const AttributeDomain to_domain) const
+{
+  using namespace blender::bke::adapt_selection_domain;
+
+  const int from_domain_size = this->attribute_domain_size(from_domain);
+  BLI_assert(selection->size() == from_domain_size);
+
+  if (from_domain == to_domain) {
+    return selection;
+  }
+  if (from_domain_size == 0) {
+    return selection;
+  }
+  if (selection->is_single()) {
+    return selection;
+  }
+
+  switch (from_domain) {
+    case ATTR_DOMAIN_CORNER: {
+      switch (to_domain) {
+        case ATTR_DOMAIN_POINT:
+          break;
+        case ATTR_DOMAIN_FACE:
+          break;
+        case ATTR_DOMAIN_EDGE:
+          break;
+        default:
+          break;
+      }
+      break;
+    }
+    case ATTR_DOMAIN_POINT: {
+      switch (to_domain) {
+        case ATTR_DOMAIN_CORNER:
+          return adapt_selection_point_to_corner(*mesh_, std::move(selection));
+        case ATTR_DOMAIN_FACE:
+          return adapt_selection_point_to_face(*mesh_, std::move(selection));
+        case ATTR_DOMAIN_EDGE:
+          return adapt_selection_point_to_edge(*mesh_, std::move(selection));
+        default:
+          break;
+      }
+      break;
+    }
+    case ATTR_DOMAIN_FACE: {
+      switch (to_domain) {
+        case ATTR_DOMAIN_POINT:
+          return adapt_selection_face_to_point(*mesh_, std::move(selection));
+        case ATTR_DOMAIN_CORNER:
+          return adapt_selection_face_to_corner(*mesh_, std::move(selection));
+        case ATTR_DOMAIN_EDGE:
+          return adapt_selection_face_to_edge(*mesh_, std::move(selection));
+        default:
+          break;
+      }
+      break;
+    }
+    case ATTR_DOMAIN_EDGE: {
+      switch (to_domain) {
+        case ATTR_DOMAIN_CORNER:
+          break;
+        case ATTR_DOMAIN_POINT:
+          return adapt_selection_edge_to_point(*mesh_, std::move(selection));
+        case ATTR_DOMAIN_FACE:
+          return adapt_selection_edge_to_face(*mesh_, std::move(selection));
+        default:
+          break;
+      }
+      break;
+    }
+    default:
+      break;
+  }
+
+  return {};
+}
+
 static Mesh *get_mesh_from_component_for_write(GeometryComponent &component)
 {
   BLI_assert(component.type() == GEO_COMPONENT_TYPE_MESH);
