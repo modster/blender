@@ -100,7 +100,9 @@ static SpaceLink *sequencer_create(const ScrArea *UNUSED(area), const Scene *sce
   sseq->mainb = SEQ_DRAW_IMG_IMBUF;
   sseq->flag = SEQ_SHOW_GPENCIL | SEQ_USE_ALPHA | SEQ_SHOW_MARKERS | SEQ_SHOW_FCURVES |
                SEQ_ZOOM_TO_FIT | SEQ_SHOW_STRIP_OVERLAY | SEQ_SHOW_STRIP_NAME |
-               SEQ_SHOW_STRIP_SOURCE | SEQ_SHOW_STRIP_DURATION | SEQ_SHOW_GRID;
+               SEQ_SHOW_STRIP_SOURCE | SEQ_SHOW_STRIP_DURATION | SEQ_SHOW_GRID |
+               SEQ_SHOW_THUMBNAILS;
+
   struct rctf temp = {0, 0, 0, 0};
   sseq->check_view_area = temp;
   /* Tool header. */
