@@ -422,6 +422,8 @@ typedef enum eRigidBodyCon_Flag {
   RBC_FLAG_USE_SPRING_ANG_X = (1 << 16),
   RBC_FLAG_USE_SPRING_ANG_Y = (1 << 17),
   RBC_FLAG_USE_SPRING_ANG_Z = (1 << 18),
+  /* Debug draw constraint limits */
+  RBC_FLAG_DRAW_CONSTRAINT_LIMITS = (1 << 19),
 } eRigidBodyCon_Flag;
 
 /* ******************************** */

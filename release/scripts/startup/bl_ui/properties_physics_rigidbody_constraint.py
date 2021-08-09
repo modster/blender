@@ -474,6 +474,30 @@ class PHYSICS_PT_rigid_body_constraint_springs_linear(PHYSICS_PT_rigidbody_const
         sub.prop(rbc, "spring_stiffness_z", text="Stiffness")
         sub.prop(rbc, "spring_damping_z", text="Damping")
 
+class PHYSICS_PT_rigid_body_constraint_debug_draw(PHYSICS_PT_rigidbody_constraint_panel, Panel):
+    bl_label = "Debug draw"
+    bl_parent_id = 'PHYSICS_PT_rigid_body_constraint'
+    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_EEVEE', 'BLENDER_WORKBENCH'}
+
+    @classmethod
+    def poll(cls, context):
+        ob = context.object
+        rbc = ob.rigid_body_constraint
+
+        return (ob and rbc
+                and (rbc.type in {'SLIDER', 'HINGE', 'PISTON'})
+                and context.engine in cls.COMPAT_ENGINES)
+
+    def draw(self, context):
+        layout = self.layout
+        layout.use_property_split = True
+        flow = layout.grid_flow(row_major=True, columns=0, even_columns=True, even_rows=False, align=True)
+
+        ob = context.object
+        rbc = ob.rigid_body_constraint
+
+        col = flow.column()
+        col.prop(rbc, "debug_draw_limits", text="Debug draw")
 
 classes = (
     PHYSICS_PT_rigid_body_constraint,
@@ -489,6 +513,7 @@ classes = (
     PHYSICS_PT_rigid_body_constraint_springs,
     PHYSICS_PT_rigid_body_constraint_springs_angular,
     PHYSICS_PT_rigid_body_constraint_springs_linear,
+    PHYSICS_PT_rigid_body_constraint_debug_draw,
 )
 
 

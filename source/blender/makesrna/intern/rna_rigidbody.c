@@ -1430,6 +1430,11 @@ static void rna_def_rigidbody_constraint(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Linear Motor", "Enable linear motor");
   RNA_def_property_update(prop, NC_OBJECT, "rna_RigidBodyOb_reset");
 
+  prop = RNA_def_property(srna, "debug_draw_limits", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "flag", RBC_FLAG_DRAW_CONSTRAINT_LIMITS);
+  RNA_def_property_ui_text(prop, "Visualise Limits", "Display the limits imposed by the constraint");
+  RNA_def_property_update(prop, NC_OBJECT, "rna_RigidBodyOb_reset");
+
   prop = RNA_def_property(srna, "use_motor_ang", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flag", RBC_FLAG_USE_MOTOR_ANG);
   RNA_def_property_boolean_funcs(prop, NULL, "rna_RigidBodyCon_use_motor_ang_set");
