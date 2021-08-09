@@ -8,7 +8,7 @@ flat out vec4 finalColor;
 const float PI = 3.141592653589;
 const float segment_angular_width = PI * 10/180;
 
-int n_segments = int(ceil(angle/segment_angular_width));
+int n_segments = int(floor(angle/segment_angular_width));
 
 int indices[74];
 
@@ -23,10 +23,10 @@ void main(void)
 
   vec4 p[37];
   p[0] = vec4(0.0, 0.0, 0.0, 1.0);
-  for (int i = 0; i <= n_segments; i++) {
+  for (int i = 0; i < n_segments; i++) {
     p[i+1] = vec4(cos((angle * i / n_segments)+ offset), sin((angle * i / n_segments)+offset), 0.0, 1.0);
   }
-  // p[n_segments] = vec4(cos((angle - (angle * (n_segments-1) / n_segments))+ offset), sin((angle - (angle * (n_segments-1) / n_segments))+ offset), 0.0, 1.0);
+   p[n_segments+1] = vec4(cos(angle + offset), sin(angle + offset), 0.0, 1.0);
 
   int ind = indices[gl_VertexID%74];
 

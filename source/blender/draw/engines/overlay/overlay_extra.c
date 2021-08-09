@@ -2344,10 +2344,18 @@ static void OVERLAY_angular_limits_arc(OVERLAY_Data *data,
     sub_v3_v3v3(ob1_pivot_dist_initial, constraint_ob->loc, ob1->loc);
 
     float constrained_axis_rot;
-    float arc_start[3] = {cosf((angle/2) + angular_offset), sinf((angle/2) + angular_offset), 0.0f};
-    mul_m3_v3(transform_mat, arc_start);
-    constrained_axis_rot = angle_signed_on_axis_v3v3_v3(arc_start, ob1_pivot_dist_initial, axis_in_w);
-    angular_offset += ( M_PI - constrained_axis_rot);
+
+    if(ob1 == rbc->ob1) {
+        float arc_start[3] = {cosf(0.0f), sinf(0.0f), 0.0f};
+        mul_m3_v3(transform_mat, arc_start);
+        constrained_axis_rot = angle_signed_on_axis_v3v3_v3(arc_start, ob1_pivot_dist_initial, axis_in_w);
+    }
+    else {
+        float arc_start1[3] = {cosf(angle + (2*angular_offset)), sinf(angle + (2*angular_offset)), 0.0f};
+        mul_m3_v3(transform_mat, arc_start1);
+        constrained_axis_rot = angle_signed_on_axis_v3v3_v3(arc_start1, ob1_pivot_dist_initial, axis_in_w);
+    }
+    angular_offset += (M_PI - constrained_axis_rot);
 
     float disk_pos[3];
     copy_v3_v3(disk_pos, real_pivot);
@@ -2355,14 +2363,8 @@ static void OVERLAY_angular_limits_arc(OVERLAY_Data *data,
 
     float final_mat[4][4] = {{0.0f}};
 
-    float ob1_initial_rot[3][3];
-    float ob1_transform_inv[4][4] = {{0.0f}};
     float ob2_initial_rot_inv[3][3];
     float ob2_transform[4][4];
-
-  /*  copy_m4_m4(ob1_transform_inv, ob2->obmat);
-    invert_m4(ob1_transform_inv);
-    BKE_object_rot_to_mat3(ob2, ob1_initial_rot, false); */
 
     BKE_object_rot_to_mat3(ob2, ob2_initial_rot_inv, false);
     invert_m3(ob2_initial_rot_inv);
@@ -2370,9 +2372,6 @@ static void OVERLAY_angular_limits_arc(OVERLAY_Data *data,
     zero_v4(ob2_transform[3]);
 
     mul_m4_m4m3(final_mat, ob2_transform, ob2_initial_rot_inv);
-  //  mul_m4_m4m4(final_mat, final_mat, ob2_transform);
-  //  mul_m4_m4m3(final_mat, final_mat, ob2_initial_rot_inv);
-
     mul_m4_m4m3(final_mat, final_mat, transform_mat);
 
     copy_v3_v3(final_mat[3], disk_pos);
@@ -2401,20 +2400,27 @@ static void OVERLAY_angular_limits(OVERLAY_Data *data,
                                      int axis) {
     float color1[4] = {0.0f, 0.0f, 1.0f, 1.0f};
     float color2[4] = {0.0f, 0.5f, 0.8f, 1.0f};
-    float angle;
-    float angular_offset;
+    float angle = 0.0f;
+    float angular_offset = 0.0f;
 
     float ob1_pivot_dist_initial[3];
     sub_v3_v3v3(ob1_pivot_dist_initial, constraint_ob->loc, ob1->loc);
-    float real_pivot[3];
-    float ob1_initial_rot_inv[3][3];
-    float ob1_rot[3][3];
+    float real_pivot[3] = {0.0f};
+    float ob1_initial_rot_inv[3][3] = {{0.0f}};
+    float ob1_rot[3][3] = {{0.0}};
     copy_m3_m4(ob1_rot, ob1->obmat);
     BKE_object_rot_to_mat3(ob1, ob1_initial_rot_inv, false);
     invert_m3(ob1_initial_rot_inv);
-    mul_v3_m3v3(real_pivot, ob1_initial_rot_inv, ob1_pivot_dist_initial);
-    mul_v3_m4v3(real_pivot, ob1->obmat, real_pivot);
-
+    if(constraint_ob == ob1) {
+        copy_v3_v3(real_pivot, ob1->rigidbody_object->pos);
+    }
+    else if(constraint_ob == ob2) {
+        copy_v3_v3(real_pivot, ob2->rigidbody_object->pos);
+    }
+    else{
+      mul_v3_m3v3(real_pivot, ob1_initial_rot_inv, ob1_pivot_dist_initial);
+      mul_v3_m4v3(real_pivot, ob1->obmat, real_pivot);
+    }
     /* Rotate arc to correct initial orientation */
     float rot1[3][3] = {{0}};
     /* Constraint object transform. */
@@ -2428,7 +2434,7 @@ static void OVERLAY_angular_limits(OVERLAY_Data *data,
     constrained_axis_w_initial[axis] = 1.0f;
 
     /* Get constrained axis rotation from constraint object. */
-    copy_m3_m4(rot2, constraint_ob->obmat);
+    BKE_object_rot_to_mat3(constraint_ob, rot2, false);
     mul_m3_v3(rot2, constrained_axis_w_initial);
     copy_v3_v3(constrained_axis_w, constrained_axis_w_initial);
 
@@ -2445,19 +2451,19 @@ static void OVERLAY_angular_limits(OVERLAY_Data *data,
     switch(axis){
        case 0:
         angle = (rbc->limit_ang_x_upper - rbc->limit_ang_x_lower);
-        angular_offset = rbc->limit_lin_x_lower;
+        angular_offset = rbc->limit_ang_x_lower;
         ax[1] = 1.0f;
         axis_angle_to_mat3(rot1, ax, M_PI_2);
         break;
        case 1:
         angle = (rbc->limit_ang_y_upper - rbc->limit_ang_y_lower);
-        angular_offset = rbc->limit_lin_y_lower;
+        angular_offset = rbc->limit_ang_y_lower;
         ax[0] = 1.0f;
         axis_angle_to_mat3(rot1, ax, M_PI_2);
         break;
        case 2:
         angle = (rbc->limit_ang_z_upper - rbc->limit_ang_z_lower);
-        angular_offset = rbc->limit_lin_z_lower;
+        angular_offset = rbc->limit_ang_z_lower;
         unit_m3(rot1);
         break;
     }
@@ -2622,7 +2628,9 @@ void OVERLAY_extra_cache_populate(OVERLAY_Data *vedata, Object *ob)
     }
 
     if(ob->rigidbody_constraint != NULL) {
-        OVERLAY_rb_constraint_limits(cb, vedata, ob);
+        if(ob->rigidbody_constraint->flag & RBC_FLAG_DRAW_CONSTRAINT_LIMITS) {
+          OVERLAY_rb_constraint_limits(cb, vedata, ob);
+        }
     }
 
     if (ob->dtx & OB_AXIS) {
