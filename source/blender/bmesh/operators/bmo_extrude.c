@@ -471,6 +471,7 @@ void bmo_extrude_face_region_exec(BMesh *bm, BMOperator *op)
   for (e = BMO_iter_new(&siter, dupeop.slots_out, "boundary_map.out", 0); e;
        e = BMO_iter_step(&siter)) {
     BMVert *f_verts[4];
+
 #ifdef USE_EDGE_REGION_FLAGS
     BMEdge *f_edges[4];
 #endif

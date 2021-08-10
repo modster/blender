@@ -547,6 +547,7 @@ geometry_node_categories = [
         NodeItem("GeometryNodeSubdivisionSurface"),
         NodeItem("GeometryNodeMeshSubdivide"),
         NodeItem("GeometryNodeExtrude"),
+        NodeItem("GeometryNodeExtrudeAndMove"),
     ]),
     GeometryNodeCategory("GEO_PRIMITIVES_MESH", "Mesh Primitives", items=[
         NodeItem("GeometryNodeMeshCircle"),

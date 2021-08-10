@@ -144,4 +144,6 @@ void BM_tag_faces(BMesh *bm, const bool *mask);
 
 void BM_get_tagged_faces(BMesh *bm, bool *selection);
 void BM_get_selected_faces(BMesh *bm, bool *selection);
+void BM_get_selected_edges(BMesh *bm, bool *selection);
+void BM_get_selected_vertices(BMesh *bm, bool *selection);
 void BM_tag_new_faces(BMesh *bm, BMOperator *b_mesh_operator);
