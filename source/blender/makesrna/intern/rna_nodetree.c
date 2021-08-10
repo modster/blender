@@ -9176,11 +9176,11 @@ static void def_geo_attribute_extract(StructRNA *srna)
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 }
 
-static void def_geo_attribute_store_anonymous(StructRNA *srna)
+static void def_geo_attribute_freeze(StructRNA *srna)
 {
   PropertyRNA *prop;
 
-  RNA_def_struct_sdna_from(srna, "NodeGeometryAttributeStore", "storage");
+  RNA_def_struct_sdna_from(srna, "NodeGeometryAttributeFreeze", "storage");
 
   prop = RNA_def_property(srna, "data_type", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, rna_enum_attribute_type_items);

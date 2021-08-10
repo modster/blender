@@ -19,7 +19,7 @@
 
 #include "node_geometry_util.hh"
 
-static bNodeSocketTemplate geo_node_attribute_store_anonymous_in[] = {
+static bNodeSocketTemplate geo_node_attribute_freeze_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
     {SOCK_VECTOR, N_("Value"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX, PROP_NONE, SOCK_FIELD},
     {SOCK_FLOAT, N_("Value"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX, PROP_NONE, SOCK_FIELD},
@@ -29,7 +29,7 @@ static bNodeSocketTemplate geo_node_attribute_store_anonymous_in[] = {
     {-1, ""},
 };
 
-static bNodeSocketTemplate geo_node_attribute_store_anonymous_out[] = {
+static bNodeSocketTemplate geo_node_attribute_freeze_out[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
     {SOCK_VECTOR, N_("Attribute"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX},
     {SOCK_FLOAT, N_("Attribute"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX},
@@ -39,9 +39,9 @@ static bNodeSocketTemplate geo_node_attribute_store_anonymous_out[] = {
     {-1, ""},
 };
 
-static void geo_node_attribute_store_anonymous_layout(uiLayout *layout,
-                                                      bContext *UNUSED(C),
-                                                      PointerRNA *ptr)
+static void geo_node_attribute_freeze_layout(uiLayout *layout,
+                                             bContext *UNUSED(C),
+                                             PointerRNA *ptr)
 {
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetPropDecorate(layout, false);
@@ -49,19 +49,19 @@ static void geo_node_attribute_store_anonymous_layout(uiLayout *layout,
   uiItemR(layout, ptr, "data_type", 0, "", ICON_NONE);
 }
 
-static void geo_node_attribute_store_anonymous_init(bNodeTree *UNUSED(tree), bNode *node)
+static void geo_node_attribute_freeze_init(bNodeTree *UNUSED(tree), bNode *node)
 {
-  NodeGeometryAttributeStore *data = (NodeGeometryAttributeStore *)MEM_callocN(
-      sizeof(NodeGeometryAttributeStore), __func__);
+  NodeGeometryAttributeFreeze *data = (NodeGeometryAttributeFreeze *)MEM_callocN(
+      sizeof(NodeGeometryAttributeFreeze), __func__);
   data->data_type = CD_PROP_FLOAT;
   data->domain = ATTR_DOMAIN_POINT;
 
   node->storage = data;
 }
 
-static void geo_node_attribute_store_anonymous_update(bNodeTree *UNUSED(ntree), bNode *node)
+static void geo_node_attribute_freeze_update(bNodeTree *UNUSED(ntree), bNode *node)
 {
-  const NodeGeometryAttributeStore &storage = *(const NodeGeometryAttributeStore *)node->storage;
+  const NodeGeometryAttributeFreeze &storage = *(const NodeGeometryAttributeFreeze *)node->storage;
   const CustomDataType data_type = static_cast<CustomDataType>(storage.data_type);
 
   bNodeSocket *socket_value_attribute_name = (bNodeSocket *)node->inputs.first;
@@ -201,18 +201,18 @@ static void fill_anonymous(GeometryComponent &component,
   attribute.save();
 }
 
-static void geo_node_attribute_store_anonymous_exec(GeoNodeExecParams params)
+static void geo_node_attribute_freeze_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
 
   geometry_set = bke::geometry_set_realize_instances(geometry_set);
 
   const bNode &node = params.node();
-  const NodeGeometryAttributeStore &storage = *(const NodeGeometryAttributeStore *)node.storage;
+  const NodeGeometryAttributeFreeze &storage = *(const NodeGeometryAttributeFreeze *)node.storage;
   const CustomDataType data_type = static_cast<CustomDataType>(storage.data_type);
   const AttributeDomain domain = static_cast<AttributeDomain>(storage.domain);
 
-  AnonymousCustomDataLayerID *id = CustomData_anonymous_id_new("Store Attribute");
+  AnonymousCustomDataLayerID *id = CustomData_anonymous_id_new("Attribute Freeze");
 
   static const Array<GeometryComponentType> types = {
       GEO_COMPONENT_TYPE_MESH, GEO_COMPONENT_TYPE_POINT_CLOUD, GEO_COMPONENT_TYPE_CURVE};
@@ -229,21 +229,20 @@ static void geo_node_attribute_store_anonymous_exec(GeoNodeExecParams params)
 
 }  // namespace blender::nodes
 
-void register_node_type_geo_attribute_store_anonymous()
+void register_node_type_geo_attribute_freeze()
 {
   static bNodeType ntype;
 
   geo_node_type_base(
-      &ntype, GEO_NODE_ATTRIBUTE_STORE_ANONYMOUS, "Store Attribute", NODE_CLASS_ATTRIBUTE, 0);
-  node_type_socket_templates(
-      &ntype, geo_node_attribute_store_anonymous_in, geo_node_attribute_store_anonymous_out);
+      &ntype, GEO_NODE_ATTRIBUTE_FREEZE, "Attribute Freeze", NODE_CLASS_ATTRIBUTE, 0);
+  node_type_socket_templates(&ntype, geo_node_attribute_freeze_in, geo_node_attribute_freeze_out);
   node_type_storage(&ntype,
-                    "NodeGeometryAttributeStore",
+                    "NodeGeometryAttributeFreeze",
                     node_free_standard_storage,
                     node_copy_standard_storage);
-  node_type_init(&ntype, geo_node_attribute_store_anonymous_init);
-  node_type_update(&ntype, geo_node_attribute_store_anonymous_update);
-  ntype.geometry_node_execute = blender::nodes::geo_node_attribute_store_anonymous_exec;
-  ntype.draw_buttons = geo_node_attribute_store_anonymous_layout;
+  node_type_init(&ntype, geo_node_attribute_freeze_init);
+  node_type_update(&ntype, geo_node_attribute_freeze_update);
+  ntype.geometry_node_execute = blender::nodes::geo_node_attribute_freeze_exec;
+  ntype.draw_buttons = geo_node_attribute_freeze_layout;
   nodeRegisterType(&ntype);
 }

@@ -1423,12 +1423,12 @@ typedef struct NodeGeometryRaycast {
   uint8_t mapping;
 } NodeGeometryRaycast;
 
-typedef struct NodeGeometryAttributeStore {
+typedef struct NodeGeometryAttributeFreeze {
   /* CustomDataType. */
   int8_t data_type;
   /* AttributeDomain. */
   int8_t domain;
-} NodeGeometryAttributeStore;
+} NodeGeometryAttributeFreeze;
 
 typedef struct NodeGeometryAttribute {
   /* eNodeSocketDatatype. */

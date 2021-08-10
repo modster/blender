@@ -353,7 +353,7 @@ DefNode(GeometryNode, GEO_NODE_TRANSFORM, 0, "TRANSFORM", Transform, "Transform"
 DefNode(GeometryNode, GEO_NODE_TRIANGULATE, def_geo_triangulate, "TRIANGULATE", Triangulate, "Triangulate", "")
 DefNode(GeometryNode, GEO_NODE_VIEWER, 0, "VIEWER", Viewer, "Viewer", "")
 DefNode(GeometryNode, GEO_NODE_VOLUME_TO_MESH, def_geo_volume_to_mesh, "VOLUME_TO_MESH", VolumeToMesh, "Volume to Mesh", "")
-DefNode(GeometryNode, GEO_NODE_ATTRIBUTE_STORE_ANONYMOUS, def_geo_attribute_store_anonymous, "ATTRIBUTE_STORE_ANONYMOUS", AttributeStore, "Store Attribute", "")
+DefNode(GeometryNode, GEO_NODE_ATTRIBUTE_FREEZE, def_geo_attribute_freeze, "ATTRIBUTE_FREEZE", AttributeFreeze, "Attribute Freeze", "")
 
 /* undefine macros */
 #undef DefNode

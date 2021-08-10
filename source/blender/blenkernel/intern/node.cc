@@ -5198,7 +5198,7 @@ static void registerGeometryNodes()
   register_node_type_geo_triangulate();
   register_node_type_geo_viewer();
   register_node_type_geo_volume_to_mesh();
-  register_node_type_geo_attribute_store_anonymous();
+  register_node_type_geo_attribute_freeze();
 }
 
 static void registerFunctionNodes()
