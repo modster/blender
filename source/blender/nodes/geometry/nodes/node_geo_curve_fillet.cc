@@ -175,17 +175,13 @@ static void limit_radii(FilletData &fd, const Span<float3> &spline_positions, co
     fillet_count = size;
 
     /* Calculate lengths between adjacent control points. */
-    const float len_prev = (positions[0] - positions[size - 1]).length_squared();
-    const float len_next = (positions[0] - positions[1]).length_squared();
+    const float len_prev = (positions[0] - positions[size - 1]).length();
+    const float len_next = (positions[0] - positions[1]).length();
 
     /* Calculate tangent lengths of fillets in control points. */
     const float tan_len = radii[0] * tanf(angles[0] / 2);
     const float tan_len_prev = radii[size - 1] * tanf(angles[size - 1] / 2);
     const float tan_len_next = radii[1] * tanf(angles[1] / 2);
-
-    max_radii[0] = radii[0];
-    max_radii[1] = radii[1];
-    max_radii[size - 1] = radii[size - 1];
 
     float factor_prev = 1, factor_next = 1;
     if (tan_len + tan_len_prev > len_prev) {
@@ -196,9 +192,9 @@ static void limit_radii(FilletData &fd, const Span<float3> &spline_positions, co
     }
 
     /* Scale max radii by calculated factors. */
-    max_radii[0] *= min_ff(factor_next, factor_prev);
-    max_radii[1] *= factor_next;
-    max_radii[size - 1] *= factor_prev;
+    max_radii[0] = radii[0] * min_ff(factor_next, factor_prev);
+    max_radii[1] = radii[1] * factor_next;
+    max_radii[size - 1] = radii[size - 1] * factor_prev;
   }
   else {
     fillet_count = size - 2;
@@ -206,12 +202,10 @@ static void limit_radii(FilletData &fd, const Span<float3> &spline_positions, co
   }
 
   /* Initialize max_radii to largest possible radii. */
-  for (const int i : IndexRange(start, fillet_count)) {
-    if (i > 0 && i < size - 1) {
-      max_radii[i] = min_ff(len_v3v3(spline_positions[i], spline_positions[i - 1]),
-                            len_v3v3(spline_positions[i], spline_positions[i + 1])) /
-                     tanf(angles[i - start] / 2);
-    }
+  for (const int i : IndexRange(1, size - 2)) {
+    max_radii[i] = min_ff(len_v3v3(spline_positions[i], spline_positions[i - 1]),
+                          len_v3v3(spline_positions[i], spline_positions[i + 1])) /
+                   tanf(angles[i - start] / 2);
   }
 
   /* Max radii calculations for each index. */
@@ -222,7 +216,7 @@ static void limit_radii(FilletData &fd, const Span<float3> &spline_positions, co
     float tan_len_next = radii[fillet_i + 1] * tanf(angles[fillet_i + 1] / 2);
 
     /* Scale down radii if too large for segment. */
-    float factor = 1;
+    float factor = 1.0f;
     if (tan_len + tan_len_next > len_next) {
       factor = len_next / (tan_len + tan_len_next);
     }
