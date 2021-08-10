@@ -101,8 +101,8 @@ static void geo_node_curve_fillet_update(bNodeTree *UNUSED(ntree), bNode *node)
   nodeSetSocketAvailability(adaptive_socket, mode == GEO_NODE_CURVE_FILLET_ADAPTIVE);
   nodeSetSocketAvailability(user_socket, mode == GEO_NODE_CURVE_FILLET_USER_DEFINED);
 
-  const GeometryNodeCurveFilletMode radius_mode = (GeometryNodeCurveFilletMode)
-                                                      node_storage.radius_mode;
+  const GeometryNodeCurveFilletRadiusMode radius_mode = (GeometryNodeCurveFilletRadiusMode)
+                                                            node_storage.radius_mode;
 
   bNodeSocket *float_socket = user_socket->next->next;
   bNodeSocket *attribute_socket = float_socket->next;
@@ -141,8 +141,7 @@ static FilletData calculate_fillet_data_per_vertex(const float3 prev_pos,
                                                    const float3 next_pos,
                                                    const std::optional<float> arc_angle,
                                                    const std::optional<int> count,
-                                                   const float radius,
-                                                   const bool limit_radius)
+                                                   const float radius)
 {
   FilletData fd{};
   float3 vec_pos2prev = prev_pos - pos;
@@ -281,13 +280,8 @@ static Array<FilletData> calculate_fillet_data(const SplinePtr &spline,
     }
 
     /* Calculate fillet data for the vertex. */
-    fds[i] = calculate_fillet_data_per_vertex(prev_pos,
-                                              pos,
-                                              next_pos,
-                                              mode_param.angle,
-                                              mode_param.count,
-                                              radius,
-                                              mode_param.limit_radius);
+    fds[i] = calculate_fillet_data_per_vertex(
+        prev_pos, pos, next_pos, mode_param.angle, mode_param.count, radius);
 
     /* Exit from here if the radius is zero */
     if (!radius) {
@@ -385,7 +379,7 @@ static void update_bezier_handle_types(BezierSpline &dst,
 {
   MutableSpan<BezierSpline::HandleType> left_handle_types = dst.handle_types_left();
   MutableSpan<BezierSpline::HandleType> right_handle_types = dst.handle_types_right();
-  bool is_cyclic = dst.is_cyclic();
+
   for (int i = 0; i < mapping.size(); i++) {
     if (point_counts[mapping[i]] > 1) {
       /* There will always be a prev and next if point count > 1. */
