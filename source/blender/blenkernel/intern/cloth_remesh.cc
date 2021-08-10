@@ -388,11 +388,7 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
 
         auto mesh_diff = this->flip_edge_triangulate(edge.get_self_index(), false);
 
-        /* For each new edge added, set it's sizing */
-        for (const auto &edge_index : mesh_diff.get_added_edges()) {
-          auto &edge = this->get_checked_edge(edge_index);
-          this->edge_set_size(edge);
-        }
+        this->compute_info_adaptivemesh(mesh_diff);
 
 #if SHOULD_REMESH_DUMP_FILE
         auto after_flip_msgpack = this->serialize();
@@ -450,11 +446,7 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
         dump_file(after_split_filename, after_split_msgpack);
 #endif
 
-        /* For each new edge added, set it's sizing */
-        for (const auto &edge_index : mesh_diff.get_added_edges()) {
-          auto &edge = this->get_checked_edge(edge_index);
-          this->edge_set_size(edge);
-        }
+        this->compute_info_adaptivemesh(mesh_diff);
 
         /* Flip edges of those faces that were created during the
          * split edge operation */
@@ -520,6 +512,8 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
             dump_file(after_flip_filename, after_flip_msgpack);
 #endif
             const auto mesh_diff = op_mesh_diff.value();
+
+            this->compute_info_adaptivemesh(mesh_diff);
 
             /* Must run flip edges on the newly added faces and
              * together the newly added faces must be added to
