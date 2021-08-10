@@ -261,10 +261,12 @@ static void updateDepsgraph(GpencilModifierData *md,
   else {
     add_this_collection(ctx->scene->master_collection, ctx, mode);
   }
-  DEG_add_object_relation(
-      ctx->node, ctx->scene->camera, DEG_OB_COMP_TRANSFORM, "Line Art Modifier");
-  DEG_add_object_relation(
-      ctx->node, ctx->scene->camera, DEG_OB_COMP_PARAMETERS, "Line Art Modifier");
+  if (ctx->scene->camera) {
+    DEG_add_object_relation(
+        ctx->node, ctx->scene->camera, DEG_OB_COMP_TRANSFORM, "Line Art Modifier");
+    DEG_add_object_relation(
+        ctx->node, ctx->scene->camera, DEG_OB_COMP_PARAMETERS, "Line Art Modifier");
+  }
 }
 
 static void foreachIDLink(GpencilModifierData *md, Object *ob, IDWalkFunc walk, void *userData)
@@ -320,13 +322,8 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
   }
   uiLayout *row = uiLayoutRow(layout, true);
   uiLayoutSetRedAlert(row, !material_valid);
-  uiItemPointerR(row,
-                 ptr,
-                 "target_material",
-                 &obj_data_ptr,
-                 "materials",
-                 NULL,
-                 material_valid ? ICON_SHADING_TEXTURE : ICON_ERROR);
+  uiItemPointerR(
+      row, ptr, "target_material", &obj_data_ptr, "materials", NULL, ICON_SHADING_TEXTURE);
 
   gpencil_modifier_panel_end(layout, ptr);
 }
@@ -385,6 +382,8 @@ static void options_panel_draw(const bContext *UNUSED(C), Panel *panel)
     return;
   }
 
+  uiItemR(layout, ptr, "overscan", 0, NULL, ICON_NONE);
+
   uiLayout *col = uiLayoutColumn(layout, true);
 
   uiItemR(col, ptr, "use_remove_doubles", 0, NULL, ICON_NONE);
@@ -440,9 +439,7 @@ static bool anything_showing_through(PointerRNA *ptr)
   if (use_multiple_levels) {
     return (MAX2(level_start, level_end) > 0);
   }
-  else {
-    return (level_start > 0);
-  }
+  return (level_start > 0);
 }
 
 static void material_mask_panel_draw_header(const bContext *UNUSED(C), Panel *panel)
@@ -626,7 +623,7 @@ static void vgroup_panel_draw(const bContext *UNUSED(C), Panel *panel)
   }
 }
 
-static void baking_panel_draw(const bContext *UNUSED(C), Panel *panel)
+static void bake_panel_draw(const bContext *UNUSED(C), Panel *panel)
 {
   uiLayout *layout = panel->layout;
   PointerRNA ob_ptr;
@@ -682,7 +679,7 @@ static void panelRegister(ARegionType *region_type)
   gpencil_modifier_subpanel_register(
       region_type, "vgroup", "Vertex Weight Transfer", NULL, vgroup_panel_draw, panel_type);
   gpencil_modifier_subpanel_register(
-      region_type, "baking", "Baking", NULL, baking_panel_draw, panel_type);
+      region_type, "bake", "Bake", NULL, bake_panel_draw, panel_type);
 }
 
 GpencilModifierTypeInfo modifierType_Gpencil_Lineart = {
