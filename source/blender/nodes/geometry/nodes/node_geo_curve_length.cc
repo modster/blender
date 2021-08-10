@@ -42,7 +42,7 @@ static void geo_node_curve_length_exec(GeoNodeExecParams params)
   for (const SplinePtr &spline : curve.splines()) {
     length += spline->length();
   }
-  params.set_output("Length", length);
+  params.set_output("Length", bke::FieldRef<float>(new bke::ConstantField(length)));
 }
 
 }  // namespace blender::nodes
