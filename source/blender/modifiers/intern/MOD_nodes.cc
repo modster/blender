@@ -87,6 +87,8 @@
 #include "NOD_geometry_nodes_eval_log.hh"
 #include "NOD_node_tree_multi_function.hh"
 
+#include "WM_types.h"
+
 using blender::destruct_ptr;
 using blender::float3;
 using blender::FunctionRef;
@@ -1110,6 +1112,7 @@ static void modifyGeometrySet(ModifierData *md,
  * the node socket identifier for the property names, since they are unique, but also having
  * the correct label displayed in the UI. */
 static void draw_property_for_socket(uiLayout *layout,
+                                     NodesModifierData *nmd,
                                      PointerRNA *bmain_ptr,
                                      PointerRNA *md_ptr,
                                      const IDProperty *modifier_props,
@@ -1185,15 +1188,25 @@ static void draw_property_for_socket(uiLayout *layout,
     case SOCK_RGBA:
     case SOCK_INT:
     case SOCK_BOOLEAN: {
-      uiLayout *col = uiLayoutColumn(layout, false);
+      uiLayout *row = uiLayoutRow(layout, true);
       const int use_attribute = RNA_int_get(md_ptr, rna_path_use_attribute) != 0;
       if (use_attribute) {
-        uiItemR(col, md_ptr, rna_path_attribute, 0, socket.name, ICON_NONE);
+        uiItemR(row, md_ptr, rna_path_attribute, 0, socket.name, ICON_NONE);
       }
       else {
-        uiItemR(col, md_ptr, rna_path, 0, socket.name, ICON_NONE);
+        uiItemR(row, md_ptr, rna_path, 0, socket.name, ICON_NONE);
       }
-      uiItemR(col, md_ptr, rna_path_use_attribute, 0, "Use Attribute", ICON_NONE);
+      PointerRNA props;
+      uiItemFullO(row,
+                  "object.geometry_nodes_modifier_value_or_attribute_toggle",
+                  "",
+                  ICON_SPREADSHEET,
+                  nullptr,
+                  WM_OP_INVOKE_DEFAULT,
+                  0,
+                  &props);
+      RNA_string_set(&props, "modifier_name", nmd->modifier.name);
+      RNA_string_set(&props, "prop_path", rna_path_use_attribute);
       break;
     }
     default: {
@@ -1230,7 +1243,7 @@ static void panel_draw(const bContext *C, Panel *panel)
     RNA_main_pointer_create(bmain, &bmain_ptr);
 
     LISTBASE_FOREACH (bNodeSocket *, socket, &nmd->node_group->inputs) {
-      draw_property_for_socket(layout, &bmain_ptr, ptr, nmd->settings.properties, *socket);
+      draw_property_for_socket(layout, nmd, &bmain_ptr, ptr, nmd->settings.properties, *socket);
     }
   }
 
