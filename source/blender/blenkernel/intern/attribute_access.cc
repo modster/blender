@@ -988,9 +988,25 @@ std::unique_ptr<blender::fn::GVArray> GeometryComponent::attribute_try_get_for_r
 
   std::unique_ptr<blender::fn::GVArray> varray = std::move(attribute.varray);
   if (domain != ATTR_DOMAIN_AUTO && attribute.domain != domain) {
-    varray = this->attribute_try_adapt_domain(std::move(varray), attribute.domain, domain);
-    if (!varray) {
-      return {};
+    if (this->type() == GEO_COMPONENT_TYPE_MESH && data_type == CD_PROP_BOOL &&
+        varray->type().is<bool>()) {
+      /* TODO: Not all boolean attributes are selections. */
+      const MeshComponent &mesh_component = static_cast<const MeshComponent &>(*this);
+      blender::VArrayPtr<bool> varray_bool =
+          std::make_unique<blender::fn::VArray_For_OwnedGVArray<bool>>(std::move(varray));
+      varray_bool = mesh_component.adapt_selection(
+          std::move(varray_bool), attribute.domain, domain);
+      if (!varray_bool) {
+        return {};
+      }
+      varray = std::make_unique<blender::fn::GVArray_For_OwnedVArray<bool>>(
+          std::move(varray_bool));
+    }
+    else {
+      varray = this->attribute_try_adapt_domain(std::move(varray), attribute.domain, domain);
+      if (!varray) {
+        return {};
+      }
     }
   }
 

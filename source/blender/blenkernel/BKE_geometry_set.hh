@@ -345,6 +345,10 @@ class MeshComponent : public GeometryComponent {
       const AttributeDomain from_domain,
       const AttributeDomain to_domain) const final;
 
+  blender::VArrayPtr<bool> adapt_selection(blender::VArrayPtr<bool> selection,
+                                           AttributeDomain from_domain,
+                                           AttributeDomain to_domain) const;
+
   bool is_empty() const final;
 
   bool owns_direct_data() const override;
