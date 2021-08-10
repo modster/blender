@@ -891,6 +891,39 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
     /* TODO(ish): aspect ratio test */
     return true;
   }
+
+  /* Compute extra information for all the elements added (stored
+   * within mesh_diff) */
+  void compute_info_adaptivemesh(
+      const MeshDiff<NodeData<END>, VertData, EdgeData, internal::EmptyExtraData> &mesh_diff)
+  {
+    this->compute_info(mesh_diff);
+
+/* Not using setting anything in these as of right now */
+#if 0
+    for (const auto &node_index : mesh_diff.get_added_nodes()) {
+      const auto &node = this->get_checked_node(node_index);
+    }
+
+    for (const auto &vert_index : mesh_diff.get_added_verts()) {
+      const auto &vert = this->get_checked_vert(vert_index);
+    }
+#endif
+
+    for (const auto &edge_index : mesh_diff.get_added_edges()) {
+      auto &edge = this->get_checked_edge(edge_index);
+
+      /* For each new edge added, set it's sizing */
+      this->edge_set_size(edge);
+    }
+
+/* Not using setting anything in these as of right now */
+#if 0
+    for (const auto &face_index : mesh_diff.get_added_faces()) {
+      auto &face = this->get_checked_face(face_index);
+    }
+#endif
+  }
 };
 
 }  // namespace blender::bke::internal
