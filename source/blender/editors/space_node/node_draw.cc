@@ -816,10 +816,7 @@ static bool use_special_non_field_socket_drawing(const bNodeTree *node_tree,
     /* Wow, that's hacky. Don't use vertical bar for function nodes. */
     return false;
   }
-  if (node->type == NODE_REROUTE) {
-    return false;
-  }
-  if (node->type == NODE_GROUP) {
+  if (ELEM(node->type, NODE_REROUTE, NODE_GROUP, NODE_GROUP_OUTPUT)) {
     return false;
   }
 
