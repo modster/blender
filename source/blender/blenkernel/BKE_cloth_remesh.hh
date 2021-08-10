@@ -595,6 +595,11 @@ template<typename T> class Face {
     return this->self_index;
   }
 
+  const auto &get_normal() const
+  {
+    return this->normal;
+  }
+
   void set_extra_data(T extra_data)
   {
     this->extra_data = extra_data;
@@ -2427,6 +2432,36 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
                     std::move(deleted_verts),
                     std::move(deleted_edges),
                     std::move(deleted_faces));
+  }
+
+  float3 compute_face_normal(const Vert<EVD> &v1, const Vert<EVD> &v2, const Vert<EVD> &v3) const
+  {
+    const auto &n1 = this->get_checked_node_of_vert(v1);
+    const auto &n2 = this->get_checked_node_of_vert(v2);
+    const auto &n3 = this->get_checked_node_of_vert(v3);
+
+    return float3::cross(n2.pos - n1.pos, n3.pos - n1.pos).normalized();
+  }
+
+  /**
+   * Takes the first 3 verts to compute the face normal
+   */
+  void compute_face_normal(Face<EFD> &face)
+  {
+    BLI_assert(face.get_verts().size() >= 3);
+
+    const auto &v1 = this->get_checked_vert(face.get_verts()[0]);
+    const auto &v2 = this->get_checked_vert(face.get_verts()[1]);
+    const auto &v3 = this->get_checked_vert(face.get_verts()[2]);
+
+    face.normal = this->compute_face_normal(v1, v2, v3);
+  }
+
+  void compute_face_normal_all_faces()
+  {
+    for (auto &face : this->get_faces_mut()) {
+      this->compute_face_normal(face);
+    }
   }
 
   std::string serialize() const
