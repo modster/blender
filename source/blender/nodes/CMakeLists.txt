@@ -149,6 +149,7 @@ set(SRC
   geometry/nodes/node_geo_attribute_compare.cc
   geometry/nodes/node_geo_attribute_convert.cc
   geometry/nodes/node_geo_attribute_curve_map.cc
+  geometry/nodes/node_geo_attribute_extract.cc
   geometry/nodes/node_geo_attribute_fill.cc
   geometry/nodes/node_geo_attribute_map_range.cc
   geometry/nodes/node_geo_attribute_math.cc
@@ -168,6 +169,7 @@ set(SRC
   geometry/nodes/node_geo_convex_hull.cc
   geometry/nodes/node_geo_curve_endpoints.cc
   geometry/nodes/node_geo_curve_length.cc
+  geometry/nodes/node_geo_curve_parameter.cc
   geometry/nodes/node_geo_curve_primitive_bezier_segment.cc
   geometry/nodes/node_geo_curve_primitive_circle.cc
   geometry/nodes/node_geo_curve_primitive_line.cc
@@ -204,6 +206,7 @@ set(SRC
   geometry/nodes/node_geo_mesh_primitive_uv_sphere.cc
   geometry/nodes/node_geo_mesh_subdivide.cc
   geometry/nodes/node_geo_mesh_to_curve.cc
+  geometry/nodes/node_geo_normal.cc
   geometry/nodes/node_geo_object_info.cc
   geometry/nodes/node_geo_point_distribute.cc
   geometry/nodes/node_geo_point_instance.cc

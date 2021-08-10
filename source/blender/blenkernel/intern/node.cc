@@ -5124,6 +5124,7 @@ static void registerGeometryNodes()
   register_node_type_geo_attribute_compare();
   register_node_type_geo_attribute_convert();
   register_node_type_geo_attribute_curve_map();
+  register_node_type_geo_attribute_extract();
   register_node_type_geo_attribute_fill();
   register_node_type_geo_attribute_map_range();
   register_node_type_geo_attribute_math();
@@ -5141,6 +5142,7 @@ static void registerGeometryNodes()
   register_node_type_geo_convex_hull();
   register_node_type_geo_curve_endpoints();
   register_node_type_geo_curve_length();
+  register_node_type_geo_curve_parameter();
   register_node_type_geo_curve_primitive_bezier_segment();
   register_node_type_geo_curve_primitive_circle();
   register_node_type_geo_curve_primitive_line();
@@ -5175,6 +5177,7 @@ static void registerGeometryNodes()
   register_node_type_geo_mesh_primitive_uv_sphere();
   register_node_type_geo_mesh_subdivide();
   register_node_type_geo_mesh_to_curve();
+  register_node_type_geo_normal();
   register_node_type_geo_object_info();
   register_node_type_geo_point_distribute();
   register_node_type_geo_point_instance();

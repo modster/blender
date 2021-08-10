@@ -482,6 +482,7 @@ geometry_node_categories = [
         NodeItem("GeometryNodeAttributeRemove"),
         NodeItem("GeometryNodeAttributeMapRange"),
         NodeItem("GeometryNodeAttributeTransfer"),
+        NodeItem("GeometryNodeAttributeExtract"),
         NodeItem("GeometryNodeAttributeStore"),
     ]),
     GeometryNodeCategory("GEO_COLOR", "Color", items=[
@@ -534,6 +535,8 @@ geometry_node_categories = [
         NodeItem("GeometryNodeIsViewport"),
         NodeItem("GeometryNodeAttribute"),
         NodeItem("GeometryNodeIndex"),
+        NodeItem("GeometryNodeNormal"),
+        NodeItem("GeometryNodeCurveParameter"),
     ]),
     GeometryNodeCategory("GEO_MATERIAL", "Material", items=[
         NodeItem("GeometryNodeMaterialAssign"),
@@ -559,7 +562,6 @@ geometry_node_categories = [
         NodeItem("GeometryNodeMeshLine"),
         NodeItem("GeometryNodeMeshUVSphere"),
     ]),
-
     GeometryNodeCategory("GEO_POINT", "Point", items=[
         NodeItem("GeometryNodePointDistribute"),
         NodeItem("GeometryNodePointInstance"),

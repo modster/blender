@@ -1435,6 +1435,13 @@ typedef struct NodeGeometryAttribute {
   int8_t output_type;
 } NodeGeometryAttribute;
 
+typedef struct NodeGeometryAttributeExtract {
+  /* CustomDataType. */
+  int8_t data_type;
+  /* Boolean that indicates whether the persistent attribute should be removed. */
+  uint8_t delete_persistent;
+} NodeGeometryAttributeExtract;
+
 /* script node mode */
 #define NODE_SCRIPT_INTERNAL 0
 #define NODE_SCRIPT_EXTERNAL 1
