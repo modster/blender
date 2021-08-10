@@ -97,7 +97,7 @@ class CurveParameterFieldInputKey : public FieldInputKey {
 
   const CPPType &type() const override
   {
-    return CPPType::get<int>();
+    return CPPType::get<float>();
   }
 
  private:
