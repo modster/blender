@@ -285,7 +285,7 @@ static FilletData calculate_fillet_data(const Spline &spline,
     if (mode_param.radius_mode == GEO_NODE_CURVE_FILLET_RADIUS_FLOAT) {
       radius = mode_param.radius.value();
     }
-    else if (mode_param.radius_mode == GEO_NODE_CURVE_FILLET_RADIUS_ATTRIBUTE) {
+    else if (mode_param.radius_mode == GEO_NODE_CURVE_FILLET_RADIUS_ATTRIBUTE && spline_index + i < mode_param.radii->size()) {
       radius = (*mode_param.radii)[spline_index + i];
     }
 
