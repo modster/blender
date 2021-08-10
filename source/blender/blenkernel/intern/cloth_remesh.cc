@@ -694,6 +694,27 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
       }
     }
 
+    /* Should not flip an edge that creates face(s) that are inverted */
+    {
+      const auto &f1 = this->get_checked_face(edge.get_faces()[0]);
+      const auto &f2 = this->get_checked_face(edge.get_faces()[1]);
+      const auto &ov1 = this->get_checked_other_vert(edge, f1);
+      const auto &ov2 = this->get_checked_other_vert(edge, f2);
+
+      const auto [v1, v2] = this->get_checked_verts_of_edge(edge, false);
+
+      const auto n1 = this->compute_face_normal(v1, ov2, ov1);
+      const auto n2 = this->compute_face_normal(v2, ov1, ov2);
+      const auto expected_normal = f1.get_normal() + f2.get_normal();
+
+      if (float3::dot(n1, expected_normal) <= 0.0) {
+        return false;
+      }
+      if (float3::dot(n2, expected_normal) <= 0.0) {
+        return false;
+      }
+    }
+
     const auto cross_2d = [](const float2 &a, const float2 &b) { return a.x * b.y - a.y * b.x; };
 
     /* Now the actual anisotropic aware critereon */
