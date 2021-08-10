@@ -914,7 +914,7 @@ static void object_blend_read_lib(BlendLibReader *reader, ID *id)
     if (ob->id.lib) {
       BLO_reportf_wrap(reports,
                        RPT_INFO,
-                       TIP_("Can't find obdata of %s lib %s\n"),
+                       TIP_("Can't find object data of %s lib %s\n"),
                        ob->id.name + 2,
                        ob->id.lib->filepath);
     }
@@ -2080,6 +2080,12 @@ static void object_init(Object *ob, const short ob_type)
 
   if (ob->type == OB_GPENCIL) {
     ob->dtx |= OB_USE_GPENCIL_LIGHTS;
+  }
+
+  if (ob->type == OB_LAMP) {
+    /* Lights are invisible to camera rays and are assumed to be a
+     * shadow catcher by default. */
+    ob->visibility_flag |= OB_HIDE_CAMERA | OB_SHADOW_CATCHER;
   }
 }
 
@@ -4041,10 +4047,7 @@ void BKE_object_empty_draw_type_set(Object *ob, const int value)
     }
   }
   else {
-    if (ob->iuser) {
-      MEM_freeN(ob->iuser);
-      ob->iuser = NULL;
-    }
+    MEM_SAFE_FREE(ob->iuser);
   }
 }
 

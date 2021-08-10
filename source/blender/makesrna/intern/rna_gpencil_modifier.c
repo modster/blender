@@ -2968,7 +2968,7 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
   RNA_def_property_float_sdna(prop, NULL, "chain_smooth_tolerance");
   RNA_def_property_ui_text(
       prop, "Smooth Tolerance", "Strength of smoothing applied on jagged chains");
-  RNA_def_property_ui_range(prop, 0.0f, 1.0f, 0.05f, 4);
+  RNA_def_property_ui_range(prop, 0.0f, 0.1f, 0.05f, 4);
   RNA_def_property_range(prop, 0.0f, 30.0f);
   RNA_def_property_update(prop, NC_SCENE, "rna_GpencilModifier_update");
 
@@ -3021,8 +3021,10 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
       prop,
       "Image Threshold",
       "Segments with an image distance smaller than this will be chained together");
-  RNA_def_property_ui_range(prop, 0.0f, 0.3f, 0.001f, 4);
-  RNA_def_property_range(prop, 0.0f, 0.3f);
+  RNA_def_property_ui_range(prop, 0.0f, 0.1f, 0.001f, 4);
+  /* A threshold of 1.0 means half of the image frame width already, it does not make any sense to
+   * go anything beyond that.  */
+  RNA_def_property_range(prop, 0.0f, 1.0f);
   RNA_def_property_update(prop, NC_SCENE, "rna_GpencilModifier_update");
 
   prop = RNA_def_property(srna, "use_loose_edge_chain", PROP_BOOLEAN, PROP_NONE);
@@ -3201,7 +3203,7 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
                            "Certain settings will be unavailable");
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
 
-  prop = RNA_def_property(srna, "overscan", PROP_FLOAT, PROP_NONE);
+  prop = RNA_def_property(srna, "overscan", PROP_FLOAT, PROP_FACTOR);
   RNA_def_property_ui_text(
       prop,
       "Overscan",
@@ -3213,7 +3215,8 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
   prop = RNA_def_property(srna, "thickness", PROP_INT, PROP_NONE);
   RNA_def_property_ui_text(prop, "Thickness", "The thickness for the generated strokes");
   RNA_def_property_ui_range(prop, 1, 100, 1, 1);
-  RNA_def_property_range(prop, 1, 200);
+  /* GPencil internal limit, use hard coded value for now until we have a marco. */
+  RNA_def_property_range(prop, 1, 5000);
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
 
   prop = RNA_def_property(srna, "opacity", PROP_FLOAT, PROP_FACTOR);
