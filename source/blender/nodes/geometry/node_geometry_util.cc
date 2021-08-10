@@ -189,7 +189,12 @@ void prepare_field_inputs(bke::FieldInputs &field_inputs,
             break;
           }
           case Spline::Type::Poly: {
-            spline_parameters.drop_front(1).copy_from(lengths_eval);
+            if (spline.is_cyclic()) {
+              spline_parameters.drop_front(1).copy_from(lengths_eval.drop_back(1));
+            }
+            else {
+              spline_parameters.drop_front(1).copy_from(lengths_eval);
+            }
             break;
           }
           case Spline::Type::NURBS: {
