@@ -1484,7 +1484,7 @@ int ntreeTexExecTree(struct bNodeTree *ntree,
 #define GEO_NODE_ATTRIBUTE_EXTRACT 1079
 #define GEO_NODE_NORMAL 1080
 #define GEO_NODE_CURVE_PARAMETER 1081
-#define GEO_NODE_EXTRUDE_AND_MOVE 1079
+#define GEO_NODE_EXTRUDE_AND_MOVE 1082
 
 /** \} */
 

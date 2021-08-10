@@ -120,7 +120,12 @@ static Mesh *extrude_edges(const Mesh *mesh,
   BM_select_edges(bm, selection.data());
 
   BMOperator extrude_op;
-  BMO_op_initf(bm, &extrude_op, 0, "extrude_edge_only edges=%he", BM_ELEM_SELECT);
+  BMO_op_initf(bm,
+               &extrude_op,
+               0,
+               "extrude_edge_only edges=%he use_select_history=%b",
+               BM_ELEM_SELECT,
+               true);
   BMO_op_exec(bm, &extrude_op);
 
   float o[3] = {offset.x, offset.y, offset.z};
@@ -145,8 +150,8 @@ static Mesh *extrude_edges(const Mesh *mesh,
   if (out_selection_id) {
     OutputAttribute_Typed<bool> attribute =
         component.attribute_try_get_anonymous_for_output_only<bool>(*out_selection_id,
-                                                                    ATTR_DOMAIN_EDGE);
-    BM_get_selected_edges(bm, attribute.as_span().data());
+                                                                    ATTR_DOMAIN_POINT);
+    BM_get_selected_vertices(bm, attribute.as_span().data());
     attribute.save();
   }
 
