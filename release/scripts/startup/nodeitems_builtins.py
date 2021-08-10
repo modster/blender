@@ -523,6 +523,7 @@ geometry_node_categories = [
         NodeItem("GeometryNodeSeparateComponents"),
         NodeItem("GeometryNodeRaycast"),
         NodeItem("GeometryNodeAttributeProximity"),
+        NodeItem("GeometryNodeSetPosition"),
     ]),
     GeometryNodeCategory("GEO_INPUT", "Input", items=[
         NodeItem("GeometryNodeObjectInfo"),
