@@ -536,6 +536,7 @@ geometry_node_categories = [
         NodeItem("GeometryNodeAttribute"),
         NodeItem("GeometryNodeIndex"),
         NodeItem("GeometryNodeNormal"),
+        NodeItem("GeometryNodePosition"),
         NodeItem("GeometryNodeCurveParameter"),
     ]),
     GeometryNodeCategory("GEO_MATERIAL", "Material", items=[
