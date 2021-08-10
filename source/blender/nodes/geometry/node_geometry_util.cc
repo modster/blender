@@ -173,7 +173,7 @@ void prepare_field_inputs(bke::FieldInputs &field_inputs,
       for (const int i_spline : splines.index_range()) {
         const int offset = offsets[i_spline];
         MutableSpan<float> spline_parameters = parameters.as_mutable_span().slice(
-            offset, offsets[i_spline + 1]);
+            offset, offsets[i_spline + 1] - offset);
         spline_parameters.first() = 0.0f;
 
         const Spline &spline = *splines[i_spline];
