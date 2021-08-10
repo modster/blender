@@ -2791,6 +2791,34 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     return edge_indices;
   }
 
+  /**
+   * For all added elements within mesh_diff, compute information
+   * needed by the mesh. For example, face normals, etc.
+   */
+  void compute_info(const MeshDiff<END, EVD, EED, EFD> &mesh_diff)
+  {
+/* Not using setting anything in these as of right now */
+#  if 0
+    for (const auto &node_index : mesh_diff.get_added_nodes()) {
+      const auto &node = this->get_checked_node(node_index);
+    }
+
+    for (const auto &vert_index : mesh_diff.get_added_verts()) {
+      const auto &vert = this->get_checked_vert(vert_index);
+    }
+
+    for (const auto &edge_index : mesh_diff.get_added_edges()) {
+      const auto &edge = this->get_checked_edge(edge_index);
+    }
+#  endif
+
+    for (const auto &face_index : mesh_diff.get_added_faces()) {
+      auto &face = this->get_checked_face(face_index);
+
+      this->compute_face_normal(face);
+    }
+  }
+
  private:
   /* all private static methods */
   /* all private non-static methods */
