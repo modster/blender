@@ -88,9 +88,10 @@ static void node_shader_update_tex_noise(bNodeTree *UNUSED(ntree), bNode *node)
   nodeSetSocketAvailability(sockW, tex->dimensions == 1 || tex->dimensions == 4);
 }
 
-class NoiseTextureFunction : public blender::fn::MultiFunction {
+class NoiseTextureFunction3D : public blender::fn::MultiFunction {
+
  public:
-  NoiseTextureFunction()
+  NoiseTextureFunction3D()
   {
     static blender::fn::MFSignature signature = create_signature();
     this->set_signature(&signature);
@@ -139,16 +140,70 @@ class NoiseTextureFunction : public blender::fn::MultiFunction {
   }
 };
 
+class NoiseTextureFunction1D : public blender::fn::MultiFunction {
+
+ public:
+  NoiseTextureFunction1D()
+  {
+    static blender::fn::MFSignature signature = create_signature();
+    this->set_signature(&signature);
+  }
+
+  static blender::fn::MFSignature create_signature()
+  {
+    blender::fn::MFSignatureBuilder signature{"Noise Texture"};
+    signature.single_input<float>("W");
+    signature.single_input<float>("Scale");
+    signature.single_input<float>("Detail");
+    signature.single_input<float>("Roughness");
+    signature.single_input<float>("Distortion");
+    signature.single_output<float>("Fac");
+    signature.single_output<blender::ColorGeometry4f>("Color");
+    return signature.build();
+  }
+
+  void call(blender::IndexMask mask,
+            blender::fn::MFParams params,
+            blender::fn::MFContext UNUSED(context)) const override
+  {
+    const blender::VArray<float> &inputs = params.readonly_single_input<float>(0, "W");
+    const blender::VArray<float> &scales = params.readonly_single_input<float>(1, "Scale");
+    const blender::VArray<float> &details = params.readonly_single_input<float>(2, "Detail");
+
+    blender::MutableSpan<float> r_values = params.uninitialized_single_output<float>(5, "Fac");
+    blender::MutableSpan<blender::ColorGeometry4f> r_colors =
+        params.uninitialized_single_output<blender::ColorGeometry4f>(6, "Color");
+
+    for (int i : mask) {
+      const float value = inputs[i];
+      const float scale = scales[i];
+      const float noise_size = safe_divide(1.0f, scale);
+      const float detail = details[i];
+      const float noise1 = BLI_noise_generic_turbulence(
+          noise_size, value, value, value, detail, false, 1);
+      const float noise2 = BLI_noise_generic_turbulence(
+          noise_size, value, value + 100.0f, value, detail, false, 1);
+      const float noise3 = BLI_noise_generic_turbulence(
+          noise_size, value + 100.0f, value, value, detail, false, 1);
+      r_values[i] = noise1;
+      r_colors[i] = {noise1, noise2, noise3, 1.0f};
+    }
+  }
+};
+
 static void sh_node_tex_noise_expand_in_mf_network(blender::nodes::NodeMFNetworkBuilder &builder)
 {
-  /* TODO: Not only support 3D. */
+  /* TODO: Not only support 1D and 3D. */
   NodeTexNoise *tex = builder.dnode()->storage<NodeTexNoise>();
-  if (tex->dimensions != 3) {
-    builder.set_not_implemented();
-    return;
+  if (tex->dimensions == 1) {
+    builder.construct_and_set_matching_fn<NoiseTextureFunction1D>();
   }
-  static NoiseTextureFunction fn;
-  builder.set_matching_fn(fn);
+  else if (tex->dimensions == 3) {
+    builder.construct_and_set_matching_fn<NoiseTextureFunction3D>();
+  }
+  else {
+    builder.set_not_implemented();
+  }
 }
 
 /* node type definition */
