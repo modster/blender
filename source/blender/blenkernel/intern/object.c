@@ -914,7 +914,7 @@ static void object_blend_read_lib(BlendLibReader *reader, ID *id)
     if (ob->id.lib) {
       BLO_reportf_wrap(reports,
                        RPT_INFO,
-                       TIP_("Can't find obdata of %s lib %s\n"),
+                       TIP_("Can't find object data of %s lib %s\n"),
                        ob->id.name + 2,
                        ob->id.lib->filepath);
     }
@@ -4047,10 +4047,7 @@ void BKE_object_empty_draw_type_set(Object *ob, const int value)
     }
   }
   else {
-    if (ob->iuser) {
-      MEM_freeN(ob->iuser);
-      ob->iuser = NULL;
-    }
+    MEM_SAFE_FREE(ob->iuser);
   }
 }
 
