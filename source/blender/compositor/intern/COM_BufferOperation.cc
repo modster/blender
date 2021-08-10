@@ -43,7 +43,9 @@ const float *BufferOperation::get_constant_elem()
 
 void BufferOperation::initExecution()
 {
-  initMutex();
+  if (buffer_->is_a_single_elem()) {
+    initMutex();
+  }
 }
 
 void *BufferOperation::initializeTileData(rcti * /*rect*/)
@@ -62,7 +64,9 @@ void *BufferOperation::initializeTileData(rcti * /*rect*/)
 
 void BufferOperation::deinitExecution()
 {
-  deinitMutex();
+  if (buffer_->is_a_single_elem()) {
+    deinitMutex();
+  }
   delete inflated_buffer_;
 }
 

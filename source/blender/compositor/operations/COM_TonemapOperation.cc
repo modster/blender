@@ -20,6 +20,7 @@
 
 #include "COM_ExecutionSystem.h"
 #include "COM_TonemapOperation.h"
+#include "COM_ExecutionSystem.h"
 
 #include "BLI_math.h"
 #include "BLI_utildefines.h"
@@ -231,12 +232,13 @@ void TonemapOperation::update_memory_buffer_partial(MemoryBuffer *output,
 {
   AvgLogLum *avg = m_cachedInstance;
   const float igm = avg->igm;
+  const float offset = this->m_data->offset;
   for (BuffersIterator<float> it = output->iterate_with(inputs, area); !it.is_end(); ++it) {
     copy_v4_v4(it.out, it.in(0));
     mul_v3_fl(it.out, avg->al);
-    float dr = it.out[0] + this->m_data->offset;
-    float dg = it.out[1] + this->m_data->offset;
-    float db = it.out[2] + this->m_data->offset;
+    float dr = it.out[0] + offset;
+    float dg = it.out[1] + offset;
+    float db = it.out[2] + offset;
     it.out[0] /= ((dr == 0.0f) ? 1.0f : dr);
     it.out[1] /= ((dg == 0.0f) ? 1.0f : dg);
     it.out[2] /= ((db == 0.0f) ? 1.0f : db);

@@ -105,11 +105,10 @@ void ColorCurveOperation::update_memory_buffer_partial(MemoryBuffer *output,
   CurveMapping *cumap = this->m_curveMapping;
   float bwmul[3];
   for (BuffersIterator<float> it = output->iterate_with(inputs, area); !it.is_end(); ++it) {
-    /* Local versions of cumap->black, cumap->white. */
+    /* Local versions of `cumap->black` and `cumap->white`. */
     const float *black = it.in(2);
     const float *white = it.in(3);
-    /* Get our own local bwmul value, since we can't be threadsafe and use cumap->bwmul &
-     * friends. */
+    /* Get a local `bwmul` value, it's not threadsafe using `cumap->bwmul` and others. */
     BKE_curvemapping_set_black_white_ex(black, white, bwmul);
 
     const float fac = *it.in(0);

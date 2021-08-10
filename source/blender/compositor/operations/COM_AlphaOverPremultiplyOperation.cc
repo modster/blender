@@ -20,6 +20,11 @@
 
 namespace blender::compositor {
 
+AlphaOverPremultiplyOperation::AlphaOverPremultiplyOperation()
+{
+  this->flags.can_be_constant = true;
+}
+
 void AlphaOverPremultiplyOperation::executePixelSampled(float output[4],
                                                         float x,
                                                         float y,

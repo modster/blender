@@ -85,8 +85,7 @@ void SplitOperation::update_memory_buffer_partial(MemoryBuffer *output,
 {
   const int percent = this->m_xSplit ? this->m_splitPercentage * this->getWidth() / 100.0f :
                                        this->m_splitPercentage * this->getHeight() / 100.0f;
-  const size_t elem_bytes = COM_data_type_num_channels(getOutputSocket()->getDataType()) *
-                            sizeof(float);
+  const size_t elem_bytes = COM_data_type_bytes_len(getOutputSocket()->getDataType());
   for (BuffersIterator<float> it = output->iterate_with(inputs, area); !it.is_end(); ++it) {
     const bool is_image1 = this->m_xSplit ? it.x > percent : it.y > percent;
     memcpy(it.out, it.in(is_image1 ? 0 : 1), elem_bytes);

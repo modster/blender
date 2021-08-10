@@ -28,6 +28,8 @@ namespace blender::compositor {
  */
 class AlphaOverKeyOperation : public MixBaseOperation {
  public:
+  AlphaOverKeyOperation();
+
   /**
    * The inner loop of this operation.
    */

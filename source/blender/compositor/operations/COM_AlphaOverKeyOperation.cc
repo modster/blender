@@ -20,6 +20,11 @@
 
 namespace blender::compositor {
 
+AlphaOverKeyOperation::AlphaOverKeyOperation()
+{
+  this->flags.can_be_constant = true;
+}
+
 void AlphaOverKeyOperation::executePixelSampled(float output[4],
                                                 float x,
                                                 float y,
