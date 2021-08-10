@@ -1349,8 +1349,7 @@ static BMFace *knife_bvh_raycast(KnifeTool_OpData *kcd,
   hit.dist = dist;
   hit.index = -1;
 
-  int index = BLI_bvhtree_ray_cast(
-      kcd->bvh.tree, co, dir, radius, &hit, knife_bvh_raycast_cb, kcd);
+  BLI_bvhtree_ray_cast(kcd->bvh.tree, co, dir, radius, &hit, knife_bvh_raycast_cb, kcd);
 
   // Handle Hit
   if (hit.index != -1 && hit.dist != dist) {
@@ -1408,8 +1407,7 @@ static BMFace *knife_bvh_raycast_filter(
   hit.dist = dist;
   hit.index = -1;
 
-  int index = BLI_bvhtree_ray_cast(
-      kcd->bvh.tree, co, dir, radius, &hit, knife_bvh_raycast_cb, kcd);
+  BLI_bvhtree_ray_cast(kcd->bvh.tree, co, dir, radius, &hit, knife_bvh_raycast_cb, kcd);
 
   kcd->bvh.filter_cb = NULL;
   kcd->bvh.filter_data = NULL;
@@ -2834,7 +2832,6 @@ static void knife_find_line_hits(KnifeTool_OpData *kcd)
 {
   SmallHash faces, kfes, kfvs;
   float v1[3], v2[3], v3[3], v4[3], s1[2], s2[2];
-  BVHTree *tree;
   int *results, *result;
   BMLoop **ls;
   BMFace *f;
@@ -3998,6 +3995,7 @@ static void knifetool_init(bContext *C,
                            KnifeTool_OpData *kcd,
                            const bool only_select,
                            const bool cut_through,
+                           const bool visible_measurements,
                            const float angle_snapping_increment,
                            const bool is_interactive)
 {
@@ -4033,6 +4031,8 @@ static void knifetool_init(bContext *C,
   kcd->is_interactive = is_interactive;
   kcd->cut_through = cut_through;
   kcd->only_select = only_select;
+  kcd->show_dist_angle = visible_measurements;
+  kcd->dist_angle_mode = (visible_measurements ? KNF_MEASUREMENT_BOTH : KNF_MEASUREMENT_NONE);
   kcd->angle_snapping_increment = angle_snapping_increment;
 
   kcd->arena = BLI_memarena_new(MEM_SIZE_OPTIMAL(1 << 15), "knife");
@@ -4647,6 +4647,7 @@ static int knifetool_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
   const bool only_select = RNA_boolean_get(op->ptr, "only_selected");
   const bool cut_through = !RNA_boolean_get(op->ptr, "use_occlude_geometry");
+  const bool visible_measurements = RNA_boolean_get(op->ptr, "visible_measurements");
   const bool wait_for_input = RNA_boolean_get(op->ptr, "wait_for_input");
   const float angle_snapping_increment = RAD2DEGF(
       RNA_float_get(op->ptr, "angle_snapping_increment"));
@@ -4655,6 +4656,12 @@ static int knifetool_invoke(bContext *C, wmOperator *op, const wmEvent *event)
   KnifeTool_OpData *kcd;
 
   em_setup_viewcontext(C, &vc);
+
+  /* alloc new customdata */
+  kcd = op->customdata = MEM_callocN(sizeof(KnifeTool_OpData), __func__);
+
+  knifetool_init(
+      C, &vc, kcd, only_select, cut_through, visible_measurements, angle_snapping_increment, true);
 
   if (only_select) {
     Object *obedit;
@@ -4674,11 +4681,6 @@ static int knifetool_invoke(bContext *C, wmOperator *op, const wmEvent *event)
       return OPERATOR_CANCELLED;
     }
   }
-
-  /* alloc new customdata */
-  kcd = op->customdata = MEM_callocN(sizeof(KnifeTool_OpData), __func__);
-
-  knifetool_init(C, &vc, kcd, only_select, cut_through, angle_snapping_increment, true);
 
   op->flag |= OP_IS_MODAL_CURSOR_REGION;
 
@@ -4729,6 +4731,11 @@ void MESH_OT_knife_tool(wmOperatorType *ot)
                   "Occlude Geometry",
                   "Only cut the front most geometry");
   RNA_def_boolean(ot->srna, "only_selected", false, "Only Selected", "Only cut selected geometry");
+  RNA_def_boolean(ot->srna,
+                  "visible_measurements",
+                  false,
+                  "Measurements",
+                  "Show visible distance and angle measurements");
   prop = RNA_def_float(ot->srna,
                        "angle_snapping_increment",
                        DEG2RADF(KNIFE_DEFAULT_ANGLE_SNAPPING_INCREMENT),
@@ -4781,11 +4788,19 @@ void EDBM_mesh_knife(bContext *C, ViewContext *vc, LinkNode *polys, bool use_tag
   {
     const bool only_select = false;
     const bool is_interactive = false; /* Can enable for testing. */
+    const bool visible_measurements = false;
     const float angle_snapping_increment = KNIFE_DEFAULT_ANGLE_SNAPPING_INCREMENT;
 
     kcd = MEM_callocN(sizeof(KnifeTool_OpData), __func__);
 
-    knifetool_init(C, vc, kcd, only_select, cut_through, angle_snapping_increment, is_interactive);
+    knifetool_init(C,
+                   vc,
+                   kcd,
+                   only_select,
+                   cut_through,
+                   visible_measurements,
+                   angle_snapping_increment,
+                   is_interactive);
 
     kcd->ignore_edge_snapping = true;
     kcd->ignore_vert_snapping = true;

@@ -1087,6 +1087,7 @@ class _defs_edit_mesh:
                     extra = True
             if extra:
                 layout.use_property_split = True
+                layout.prop(props, "visible_measurements")
                 layout.label(text="Angle Snapping")
                 layout.row().prop(props, "angle_snapping_increment", text="", expand=True)
             if show_extra:
