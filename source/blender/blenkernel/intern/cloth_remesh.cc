@@ -1040,6 +1040,10 @@ Mesh *adaptive_remesh(const AdaptiveRemeshParams<END, ExtraData> &params,
     internal::dump_file("/tmp/test.mesh", serialized);
   }
 
+  /* Compute all the face normals, cannot rely on face normals set
+   * when reading from the internal::MeshIO */
+  adaptive_mesh.compute_face_normal_all_faces();
+
   /* Load up the `NodeData`'s extra_data */
   {
     auto i = 0;
