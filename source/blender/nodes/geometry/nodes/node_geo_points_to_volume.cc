@@ -30,7 +30,6 @@
 
 static bNodeSocketTemplate geo_node_points_to_volume_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
-    {SOCK_FLOAT, N_("Density"), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX},
     {SOCK_FLOAT, N_("Voxel Size"), 0.3f, 0.0f, 0.0f, 0.0f, 0.01f, FLT_MAX, PROP_DISTANCE},
     {SOCK_FLOAT, N_("Voxel Amount"), 64.0f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX},
     {SOCK_STRING, N_("Radius")},
@@ -112,8 +111,7 @@ struct ParticleList {
 }  // namespace
 
 static openvdb::FloatGrid::Ptr generate_volume_from_points(const Span<float3> positions,
-                                                           const Span<float> radii,
-                                                           const float density)
+                                                           const Span<float> radii)
 {
   /* Create a new grid that will be filled. #ParticlesToLevelSet requires the background value to
    * be positive. It will be set to zero later on. */
@@ -128,15 +126,6 @@ static openvdb::FloatGrid::Ptr generate_volume_from_points(const Span<float3> po
   op.rasterizeSpheres(particles);
   op.finalize();
 
-  /* Convert the level set to a fog volume. This also sets the background value to zero. Inside the
-   * fog there will be a density of 1. */
-  openvdb::tools::sdfToFogVolume(*new_grid);
-
-  /* Take the desired density into account. */
-  openvdb::tools::foreach (new_grid->beginValueOn(),
-                           [&](const openvdb::FloatGrid::ValueOnIter &iter) {
-                             iter.modifyValue([&](float &value) { value *= density; });
-                           });
   return new_grid;
 }
 
@@ -233,9 +222,8 @@ static void initialize_volume_component_from_points(const GeometrySet &geometry_
   openvdb::FloatGrid::Ptr density_grid = openvdb::gridPtrCast<openvdb::FloatGrid>(
       BKE_volume_grid_openvdb_for_write(volume, c_density_grid));
 
-  const float density = params.get_input<float>("Density");
   convert_to_grid_index_space(voxel_size, positions, radii);
-  openvdb::FloatGrid::Ptr new_grid = generate_volume_from_points(positions, radii, density);
+  openvdb::FloatGrid::Ptr new_grid = generate_volume_from_points(positions, radii);
   /* This merge is cheap, because the #density_grid is empty. */
   density_grid->merge(*new_grid);
   density_grid->transform().postScale(voxel_size);
@@ -267,7 +255,7 @@ void register_node_type_geo_points_to_volume()
   static bNodeType ntype;
 
   geo_node_type_base(
-      &ntype, GEO_NODE_POINTS_TO_VOLUME, "Points to Volume", NODE_CLASS_GEOMETRY, 0);
+      &ntype, GEO_NODE_POINTS_TO_VOLUME, "Points to Level Set", NODE_CLASS_GEOMETRY, 0);
   node_type_socket_templates(&ntype, geo_node_points_to_volume_in, geo_node_points_to_volume_out);
   node_type_storage(&ntype,
                     "NodeGeometryPointsToVolume",

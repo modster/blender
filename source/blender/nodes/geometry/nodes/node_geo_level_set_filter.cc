@@ -21,11 +21,10 @@
 
 #include "BKE_volume.h"
 
-#include "DNA_mesh_types.h"
-#include "DNA_meshdata_types.h"
-
 #include "UI_interface.h"
 #include "UI_resources.h"
+
+#include "DEG_depsgraph_query.h"
 
 #include "node_geometry_util.hh"
 
@@ -148,6 +147,9 @@ static void geo_node_level_set_filter_exec(GeoNodeExecParams params)
     params.set_output("Level Set", std::move(geometry_set));
     return;
   }
+
+  const Main *bmain = DEG_get_bmain(params.depsgraph());
+  BKE_volume_load(volume, bmain);
 
   const NodeGeometryLevelSetFilter &data =
       *(const NodeGeometryLevelSetFilter *)params.node().storage;

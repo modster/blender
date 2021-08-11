@@ -94,6 +94,8 @@ static void create_mesh_from_volume(GeometrySet &geometry_set_in,
     return;
   }
 
+  SCOPED_TIMER(__func__);
+
   const NodeGeometryVolumeToMesh &storage =
       *(const NodeGeometryVolumeToMesh *)params.node().storage;
 

@@ -94,9 +94,12 @@ static openvdb::FloatGrid::Ptr meshes_to_level_set_grid(
 
   // openvdb::math::Transform::Ptr transform = openvdb::math::Transform::createLinearTransform(
   //     voxel_size);
-  openvdb::FloatGrid::Ptr grid = openvdb::tools::meshToLevelSet<openvdb::FloatGrid>(
-      {}, positions, triangles, 1.0f);
-  grid->transform().postScale(voxel_size);
+  openvdb::FloatGrid::Ptr grid;
+  {
+    SCOPED_TIMER("  mesh_to_level_set_only_openvdb");
+    grid = openvdb::tools::meshToLevelSet<openvdb::FloatGrid>({}, positions, triangles);
+    grid->transform().postScale(voxel_size);
+  }
 
   return grid;
 }
@@ -121,6 +124,8 @@ static void geo_node_mesh_to_level_set_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Mesh");
 
+  SCOPED_TIMER(__func__);
+
   Vector<GeometryInstanceGroup> set_groups;
   bke::geometry_set_gather_instances(geometry_set, set_groups);
   if (set_groups.is_empty()) {
@@ -134,6 +139,11 @@ static void geo_node_mesh_to_level_set_exec(GeoNodeExecParams params)
     if (!set.has_mesh()) {
       set_groups.remove_and_reorder(i);
     }
+  }
+
+  if (set_groups.is_empty()) {
+    params.set_output("Level Set", GeometrySet());
+    return;
   }
 
   GeometrySet geometry_set_out;

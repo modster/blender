@@ -25,6 +25,8 @@
 #include "UI_interface.h"
 #include "UI_resources.h"
 
+#include "DEG_depsgraph_query.h"
+
 #include "node_geometry_util.hh"
 
 static bNodeSocketTemplate geo_node_level_set_boolean_in[] = {
@@ -134,12 +136,18 @@ static void geo_node_level_set_boolean_exec(GeoNodeExecParams params)
       *(const NodeGeometryLevelSetBoolean *)params.node().storage;
   const GeometryNodeBooleanOperation operation = (GeometryNodeBooleanOperation)storage.operation;
 
+  SCOPED_TIMER(__func__);
+
   Volume *volume_a = geometry_set_a.get_volume_for_write();
   const Volume *volume_b = geometry_set_b.get_volume_for_read();
   if (volume_a == nullptr || volume_b == nullptr) {
     params.set_output("Level Set", std::move(geometry_set_a));
     return;
   }
+
+  const Main *bmain = DEG_get_bmain(params.depsgraph());
+  BKE_volume_load(volume_a, bmain);
+  BKE_volume_load(volume_b, bmain);
 
   level_set_boolean(*volume_a, *volume_b, operation, params);
 #else

@@ -49,6 +49,7 @@
 #include "BLI_float4x4.hh"
 #include "BLI_index_range.hh"
 #include "BLI_span.hh"
+#include "BLI_timeit.hh"
 
 #include "RNA_access.h"
 
@@ -222,6 +223,9 @@ static Volume *mesh_to_volume(ModifierData *md,
   if (mesh == nullptr) {
     return input_volume;
   }
+
+  SCOPED_TIMER(__func__);
+
   BKE_mesh_wrapper_ensure_mdata(mesh);
 
   const float4x4 mesh_to_own_object_space_transform = float4x4(ctx->object->imat) *
