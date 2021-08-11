@@ -18,12 +18,27 @@
 
 #pragma once
 
-#include "COM_NodeOperation.h"
+#include "COM_MultiThreadedOperation.h"
 
 namespace blender::compositor {
 
-class DilateErodeThresholdOperation : public NodeOperation {
+class DilateErodeThresholdOperation : public MultiThreadedOperation {
  private:
+  struct PixelData {
+    int x;
+    int y;
+    int xmin;
+    int xmax;
+    int ymin;
+    int ymax;
+    const float *elem;
+    float distance;
+    int elem_stride;
+    int row_stride;
+    /** Switch. */
+    float sw;
+  };
+
   /**
    * Cached reference to the inputProgram
    */
@@ -47,6 +62,7 @@ class DilateErodeThresholdOperation : public NodeOperation {
    */
   void executePixel(float output[4], int x, int y, void *data) override;
 
+  void init_data() override;
   /**
    * Initialize the execution
    */
@@ -74,11 +90,43 @@ class DilateErodeThresholdOperation : public NodeOperation {
   bool determineDependingAreaOfInterest(rcti *input,
                                         ReadBufferOperation *readOperation,
                                         rcti *output) override;
+
+  void get_area_of_interest(int input_idx, const rcti &output_area, rcti &r_input_area) override;
+  void update_memory_buffer_partial(MemoryBuffer *output,
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
 };
 
-class DilateDistanceOperation : public NodeOperation {
- private:
+class DilateDistanceOperation : public MultiThreadedOperation {
  protected:
+  struct PixelData {
+    int x;
+    int y;
+    int xmin;
+    int xmax;
+    int ymin;
+    int ymax;
+    const float *elem;
+    float min_distance;
+    int scope;
+    int elem_stride;
+    int row_stride;
+    const rcti &input_rect;
+
+    PixelData(MemoryBuffer *input, int distance, int scope);
+
+    void update(BuffersIterator<float> &it)
+    {
+      x = it.x;
+      y = it.y;
+      xmin = MAX2(x - scope, input_rect.xmin);
+      ymin = MAX2(y - scope, input_rect.ymin);
+      xmax = MIN2(x + scope, input_rect.xmax);
+      ymax = MIN2(y + scope, input_rect.ymax);
+      elem = it.in(0);
+    }
+  };
+
   /**
    * Cached reference to the inputProgram
    */
@@ -94,6 +142,7 @@ class DilateDistanceOperation : public NodeOperation {
    */
   void executePixel(float output[4], int x, int y, void *data) override;
 
+  void init_data() override;
   /**
    * Initialize the execution
    */
@@ -119,7 +168,13 @@ class DilateDistanceOperation : public NodeOperation {
                      MemoryBuffer **inputMemoryBuffers,
                      std::list<cl_mem> *clMemToCleanUp,
                      std::list<cl_kernel> *clKernelsToCleanUp) override;
+
+  void get_area_of_interest(int input_idx, const rcti &output_area, rcti &r_input_area) final;
+  virtual void update_memory_buffer_partial(MemoryBuffer *output,
+                                            const rcti &area,
+                                            Span<MemoryBuffer *> inputs) override;
 };
+
 class ErodeDistanceOperation : public DilateDistanceOperation {
  public:
   ErodeDistanceOperation();
@@ -135,9 +190,13 @@ class ErodeDistanceOperation : public DilateDistanceOperation {
                      MemoryBuffer **inputMemoryBuffers,
                      std::list<cl_mem> *clMemToCleanUp,
                      std::list<cl_kernel> *clKernelsToCleanUp) override;
+
+  void update_memory_buffer_partial(MemoryBuffer *output,
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
 };
 
-class DilateStepOperation : public NodeOperation {
+class DilateStepOperation : public MultiThreadedOperation {
  protected:
   /**
    * Cached reference to the inputProgram
@@ -174,6 +233,11 @@ class DilateStepOperation : public NodeOperation {
   bool determineDependingAreaOfInterest(rcti *input,
                                         ReadBufferOperation *readOperation,
                                         rcti *output) override;
+
+  void get_area_of_interest(int input_idx, const rcti &output_area, rcti &r_input_area) final;
+  virtual void update_memory_buffer_partial(MemoryBuffer *output,
+                                            const rcti &area,
+                                            Span<MemoryBuffer *> inputs) override;
 };
 
 class ErodeStepOperation : public DilateStepOperation {
@@ -181,6 +245,9 @@ class ErodeStepOperation : public DilateStepOperation {
   ErodeStepOperation();
 
   void *initializeTileData(rcti *rect) override;
+  void update_memory_buffer_partial(MemoryBuffer *output,
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
 };
 
 }  // namespace blender::compositor
