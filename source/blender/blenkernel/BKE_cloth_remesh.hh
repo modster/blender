@@ -1826,22 +1826,11 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
      * multiple v2 as of right now, so if we find such a case tell
      * user that edge is not collapseable */
     {
-      auto get_v1_v2_indices = [this, &n1_index, &verts_swapped](const Edge<EED> &e) {
-        const auto [v1, v2] = this->get_checked_verts_of_edge(e, verts_swapped);
-        auto v1_index = v1.self_index;
-        auto v2_index = v2.self_index;
-        /* Need to swap the verts if v1 does not point to n1 */
-        if (v1.node.value() != n1_index) {
-          std::swap(v1_index, v2_index);
-        }
-        BLI_assert(this->get_checked_vert(v1_index).node.value() == n1_index);
-        return std::make_tuple(v1_index, v2_index);
-      };
-
       blender::Vector<VertIndex> v1_list;
       for (const auto &edge_index : edge_indices) {
         const auto &e = this->get_checked_edge(edge_index);
-        const auto [v1_index, v2_index] = get_v1_v2_indices(e);
+        const auto [v1_index, v2_index] = this->get_checked_vert_indices_of_edge_aligned_with_n1(
+            e, n1_index);
 
         if (v1_list.contains(v1_index)) {
           return false;
@@ -1923,21 +1912,10 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
       edge_indices = this->get_connecting_edge_indices(n1_a, n2_a);
     }
 
-    auto get_v1_v2_indices = [this, &n1_index, &verts_swapped](const Edge<EED> &e) {
-      auto [v1, v2] = this->get_checked_verts_of_edge(e, verts_swapped);
-      auto v1_index = v1.self_index;
-      auto v2_index = v2.self_index;
-      /* Need to swap the verts if v1 does not point to n1 */
-      if (v1.node.value() != n1_index) {
-        std::swap(v1_index, v2_index);
-      }
-      BLI_assert(this->get_checked_vert(v1_index).node.value() == n1_index);
-      return std::make_tuple(v1_index, v2_index);
-    };
-
     for (const auto &edge_index : edge_indices) {
       auto &e = this->get_checked_edge(edge_index);
-      auto [v1_index, v2_index] = get_v1_v2_indices(e);
+      auto [v1_index, v2_index] = this->get_checked_vert_indices_of_edge_aligned_with_n1(e,
+                                                                                         n1_index);
 
       auto v1_face_indices = this->get_checked_face_indices_of_vert(v1_index);
 
@@ -2008,7 +1986,8 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
 
       for (const auto &edge_index : edge_indices) {
         const auto &e = this->get_checked_edge(edge_index);
-        const auto [v1_index, v2_index] = get_v1_v2_indices(e);
+        const auto [v1_index, v2_index] = this->get_checked_vert_indices_of_edge_aligned_with_n1(
+            e, n1_index);
 
         auto v1_face_indices = this->get_checked_face_indices_of_vert(v1_index);
 
@@ -2637,6 +2616,26 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     }
 
     return face_indices;
+  }
+
+  /**
+   * Gets the vert indices of the edge where v1.node is n1_index.
+   *
+   * Caller must ensure at least of one the verts of the edge must have
+   * a reference to n1_index.
+   */
+  inline std::tuple<VertIndex, VertIndex> get_checked_vert_indices_of_edge_aligned_with_n1(
+      const Edge<EED> &edge, const NodeIndex &n1_index) const
+  {
+    const auto [v1, v2] = this->get_checked_verts_of_edge(edge, false);
+    auto v1_index = v1.get_self_index();
+    auto v2_index = v2.get_self_index();
+    /* Need to swap the verts if v1 does not point to n1 */
+    if (v1.get_node().value() != n1_index) {
+      std::swap(v1_index, v2_index);
+    }
+    BLI_assert(this->get_checked_vert(v1_index).get_node().value() == n1_index);
+    return {v1_index, v2_index};
   }
 
   inline std::tuple<Vert<EVD> &, Vert<EVD> &> get_checked_verts_of_edge(const Edge<EED> &edge,

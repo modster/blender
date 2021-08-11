@@ -839,17 +839,6 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
       const auto &n1_a = this->get_checked_node_of_vert(v1_a);
       const auto &n2_a = this->get_checked_node_of_vert(v2_a);
       const auto n1_index = n1_a.get_self_index();
-      auto get_v1_v2_indices = [this, &n1_index, &verts_swapped](const AdaptiveEdge &e) {
-        auto [v1, v2] = this->get_checked_verts_of_edge(e, verts_swapped);
-        auto v1_index = v1.get_self_index();
-        auto v2_index = v2.get_self_index();
-        /* Need to swap the verts if v1 does not point to n1 */
-        if (v1.get_node().value() != n1_index) {
-          std::swap(v1_index, v2_index);
-        }
-        BLI_assert(this->get_checked_vert(v1_index).get_node().value() == n1_index);
-        return std::make_tuple(v1_index, v2_index);
-      };
 
       /* Get all 3D edges */
       const auto edge_indices = this->get_connecting_edge_indices(n1_a, n2_a);
@@ -857,7 +846,7 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
       for (const auto &edge_index : edge_indices) {
         /* Get v1 of the 3D edge in correct order */
         const auto &e = this->get_checked_edge(edge_index);
-        const auto [v1_index, v2_index] = get_v1_v2_indices(e);
+        const auto [v1_index, v2_index] = this->get_checked_vert_indices_of_edge_aligned_with_n1(e, n1_index);
         const auto &v1 = this->get_checked_vert(v1_index);
         const auto &v2 = this->get_checked_vert(v2_index);
 
