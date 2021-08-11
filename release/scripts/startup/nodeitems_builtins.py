@@ -599,6 +599,7 @@ geometry_node_categories = [
         NodeItem("GeometryNodeMeshToLevelSet"),
         NodeItem("GeometryNodeLevelSetBoolean"),
         NodeItem("GeometryNodeLevelSetFilter"),
+        NodeItem("GeometryNodeLevelSetToFogVolume"),
     ]),
     GeometryNodeCategory("GEO_GROUP", "Group", items=node_group_items),
     GeometryNodeCategory("GEO_LAYOUT", "Layout", items=[

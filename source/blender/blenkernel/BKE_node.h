@@ -1480,6 +1480,7 @@ int ntreeTexExecTree(struct bNodeTree *ntree,
 #define GEO_NODE_MESH_TO_LEVEL_SET 1075
 #define GEO_NODE_LEVEL_SET_BOOLEAN 1076
 #define GEO_NODE_LEVEL_SET_FILTER 1077
+#define GEO_NODE_LEVEL_SET_TO_FOG_VOLUME 1078
 
 /** \} */
 
