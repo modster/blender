@@ -48,6 +48,15 @@
 namespace blender::bke::internal {
 static FilenameGen static_remesh_name_gen("/tmp/static_remesh/remesh", ".mesh");
 
+static std::string get_number_as_string(usize number)
+{
+  char number_str_c[16];
+  BLI_snprintf(number_str_c, 16, "%05lu", number);
+  std::string number_str(number_str_c);
+
+  return number_str;
+}
+
 class ClothNodeData;
 
 template<typename T> class NodeData;
@@ -392,7 +401,8 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
 
 #if SHOULD_REMESH_DUMP_FILE
         auto after_flip_msgpack = this->serialize();
-        auto after_flip_filename = static_remesh_name_gen.get_curr("after_flip");
+        auto after_flip_filename = static_remesh_name_gen.get_curr(
+            "after_flip_" + get_number_as_string(std::get<0>(edge_index.get_raw())));
         static_remesh_name_gen.gen_next();
         dump_file(after_flip_filename, after_flip_msgpack);
 #endif
@@ -441,7 +451,8 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
 
 #if SHOULD_REMESH_DUMP_FILE
         auto after_split_msgpack = this->serialize();
-        auto after_split_filename = static_remesh_name_gen.get_curr("after_split");
+        auto after_split_filename = static_remesh_name_gen.get_curr(
+            "after_split_" + get_number_as_string(std::get<0>(edge_index.get_raw())));
         static_remesh_name_gen.gen_next();
         dump_file(after_split_filename, after_split_msgpack);
 #endif
@@ -507,7 +518,8 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
           if (op_mesh_diff) {
 #if SHOULD_REMESH_DUMP_FILE
             auto after_flip_msgpack = this->serialize();
-            auto after_flip_filename = static_remesh_name_gen.get_curr("after_collapse");
+            auto after_flip_filename = static_remesh_name_gen.get_curr(
+                "after_collapse_" + get_number_as_string(std::get<0>(edge_index.get_raw())));
             static_remesh_name_gen.gen_next();
             dump_file(after_flip_filename, after_flip_msgpack);
 #endif
