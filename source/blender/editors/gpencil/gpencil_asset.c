@@ -180,7 +180,7 @@ enum eGP_CageCorners {
 
 static bool gpencil_asset_generic_poll(bContext *C)
 {
-  if (U.experimental.use_asset_browser == false) {
+  if (U.experimental.use_extended_asset_browser == false) {
     return false;
   }
 
