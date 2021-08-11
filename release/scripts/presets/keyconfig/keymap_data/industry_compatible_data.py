@@ -139,12 +139,12 @@ def _template_items_basic_tools(*, connected=False):
     ]
 
 def _template_items_tool_select(params, operator, *, extend):
-        return [
-            (operator, {"type": 'LEFTMOUSE', "value": 'PRESS'},
-             {"properties": [("deselect_all", True)]}),
-            (operator, {"type": 'LEFTMOUSE', "value": 'PRESS', "shift": True},
-             {"properties": [(extend, True)]}),
-        ]
+    return [
+        (operator, {"type": 'LEFTMOUSE', "value": 'PRESS'},
+         {"properties": [("deselect_all", True)]}),
+        (operator, {"type": 'LEFTMOUSE', "value": 'PRESS', "shift": True},
+         {"properties": [(extend, True)]}),
+    ]
 
 
 def _template_items_tool_select_actions(operator, *, type, value):
@@ -1248,6 +1248,10 @@ def km_file_browser(params):
          {"properties": [("increment", -10)]}),
         ("file.filenum", {"type": 'NUMPAD_MINUS', "value": 'PRESS', "ctrl": True, "repeat": True},
          {"properties": [("increment", -100)]}),
+
+        # Select file under cursor before spawning the context menu.
+        ("file.select", {"type": 'RIGHTMOUSE', "value": 'PRESS'},
+         {"properties": [("open", False), ("only_activate_if_selected", True), ("pass_through", True)]}),
         *_template_items_context_menu("FILEBROWSER_MT_context_menu", {"type": 'RIGHTMOUSE', "value": 'PRESS'}),
         *_template_items_context_menu("ASSETBROWSER_MT_context_menu", {"type": 'RIGHTMOUSE', "value": 'PRESS'}),
     ])
