@@ -797,22 +797,31 @@ static void file_read_reports_finalize(BlendFileReadReport *bf_reports)
             bf_reports->count.resynced_lib_overrides,
             duration_lib_override_recursive_resync_minutes,
             duration_lib_override_recursive_resync_seconds);
+
   if (bf_reports->resynced_lib_overrides_libraries_count != 0) {
     for (LinkNode *node_lib = bf_reports->resynced_lib_overrides_libraries; node_lib != NULL;
          node_lib = node_lib->next) {
       Library *library = node_lib->link;
       BKE_reportf(
-          bf_reports->reports, RPT_INFO, "Library %s needs overrides resync.", library->filepath);
+          bf_reports->reports, RPT_INFO, "Library %s needs overrides resync", library->filepath);
     }
   }
+
   if (bf_reports->count.missing_libraries != 0 || bf_reports->count.missing_linked_id != 0) {
     BKE_reportf(bf_reports->reports,
                 RPT_WARNING,
-                "%d libraries and %d linked data-blocks are missing, please check the "
-                "Info and Outliner editors for details",
+                "%d libraries and %d linked data-blocks are missing (including %d ObjectData and "
+                "%d Proxies), please check the Info and Outliner editors for details",
                 bf_reports->count.missing_libraries,
-                bf_reports->count.missing_linked_id);
+                bf_reports->count.missing_linked_id,
+                bf_reports->count.missing_obdata,
+                bf_reports->count.missing_obproxies);
   }
+  else {
+    BLI_assert(bf_reports->count.missing_obdata == 0);
+    BLI_assert(bf_reports->count.missing_obproxies == 0);
+  }
+
   if (bf_reports->resynced_lib_overrides_libraries_count != 0) {
     BKE_reportf(bf_reports->reports,
                 RPT_WARNING,
@@ -3434,7 +3443,7 @@ static uiBlock *block_create__close_file_dialog(struct bContext *C,
     BLI_split_file_part(blendfile_pathpath, filename, sizeof(filename));
   }
   else {
-    STRNCPY(filename, IFACE_("untitled.blend"));
+    STRNCPY(filename, "untitled.blend");
   }
   uiItemL(layout, filename, ICON_NONE);
 

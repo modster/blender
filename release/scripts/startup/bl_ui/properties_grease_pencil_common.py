@@ -23,6 +23,40 @@ from bpy.types import Menu, UIList, Operator
 from bpy.app.translations import pgettext_iface as iface_
 
 
+# XXX: To be replaced with active tools
+# Currently only used by the clip editor
+class AnnotationDrawingToolsPanel:
+    # subclass must set
+    # bl_space_type = 'IMAGE_EDITOR'
+    bl_label = "Annotation"
+    bl_category = "Annotation"
+    bl_region_type = 'TOOLS'
+
+    def draw(self, context):
+        layout = self.layout
+
+        tool_settings = context.tool_settings
+
+        col = layout.column(align=True)
+
+        col.label(text="Draw:")
+        row = col.row(align=True)
+        row.operator("gpencil.annotate", icon='GREASEPENCIL', text="Draw").mode = 'DRAW'
+        # XXX: Needs a dedicated icon
+        row.operator("gpencil.annotate", icon='FORCE_CURVE', text="Erase").mode = 'ERASER'
+
+        row = col.row(align=True)
+        row.operator("gpencil.annotate", icon='LINE_DATA', text="Line").mode = 'DRAW_STRAIGHT'
+        row.operator("gpencil.annotate", icon='MESH_DATA', text="Poly").mode = 'DRAW_POLY'
+
+        col.separator()
+
+        col.label(text="Stroke Placement:")
+        row = col.row(align=True)
+        row.prop_enum(tool_settings, "annotation_stroke_placement_view2d", 'VIEW')
+        row.prop_enum(tool_settings, "annotation_stroke_placement_view2d", 'IMAGE', text="Image")
+
+
 class GreasePencilSculptOptionsPanel:
     bl_label = "Sculpt Strokes"
 

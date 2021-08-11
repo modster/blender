@@ -233,7 +233,7 @@ static void rna_def_asset_data(BlenderRNA *brna)
 
   srna = RNA_def_struct(brna, "AssetMetaData", NULL);
   RNA_def_struct_ui_text(srna, "Asset Data", "Additional data stored for an asset data-block");
-  //  RNA_def_struct_ui_icon(srna, ICON_ASSET); /* TODO: Icon doesn't exist!. */
+  //  RNA_def_struct_ui_icon(srna, ICON_ASSET); /* TODO: Icon doesn't exist! */
   /* The struct has custom properties, but no pointer properties to other IDs! */
   RNA_def_struct_idprops_func(srna, "rna_AssetMetaData_idprops");
   RNA_def_struct_flag(srna, STRUCT_NO_DATABLOCK_IDPROPERTIES); /* Mandatory! */
@@ -273,7 +273,7 @@ static void rna_def_asset_handle_api(StructRNA *srna)
   parm = RNA_def_pointer(func, "asset_file_handle", "FileSelectEntry", "", "");
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
   parm = RNA_def_pointer(func,
-                         "asset_library",
+                         "asset_library_ref",
                          "AssetLibraryReference",
                          "",
                          "The asset library containing the given asset, only valid if the asset "
@@ -319,7 +319,7 @@ static void rna_def_asset_library_reference(BlenderRNA *brna)
 {
   StructRNA *srna = RNA_def_struct(brna, "AssetLibraryReference", NULL);
   RNA_def_struct_ui_text(
-      srna, "Asset Library Reference", "Identifier to refere to the asset library");
+      srna, "Asset Library Reference", "Identifier to refer to the asset library");
 }
 
 /**
@@ -329,7 +329,7 @@ PropertyRNA *rna_def_asset_library_reference_common(struct StructRNA *srna,
                                                     const char *get,
                                                     const char *set)
 {
-  PropertyRNA *prop = RNA_def_property(srna, "asset_library", PROP_ENUM, PROP_NONE);
+  PropertyRNA *prop = RNA_def_property(srna, "asset_library_ref", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, DummyRNA_NULL_items);
   RNA_def_property_enum_funcs(prop, get, set, "rna_asset_library_reference_itemf");
 
