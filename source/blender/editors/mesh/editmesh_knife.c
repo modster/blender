@@ -3585,14 +3585,11 @@ static float snap_v3_angle_plane(
 /* Snap to required angle along the plane of the face nearest to kcd->prev. */
 static bool knife_snap_angle_local(KnifeTool_OpData *kcd)
 {
-  /* Calculate a reference vector using previous cut segment. If none exists then exit. */
+  Ref *ref;
+  KnifeEdge *kfe;
+  KnifeVert *kfv;
+  BMFace *f;
   float refv[3];
-  if (kcd->mdata.is_stored && !kcd->prev.is_space) {
-    sub_v3_v3v3(refv, kcd->mdata.cage, kcd->prev.cage);
-  }
-  else {
-    return false;
-  }
 
   /* Ray for kcd->curr. */
   float curr_origin[3];
@@ -3615,12 +3612,36 @@ static bool knife_snap_angle_local(KnifeTool_OpData *kcd)
     return false;
   }
 
+  /* Calculate a reference vector using previous cut segment, edge or vertex.
+   * If none exists then exit. */
+  if (kcd->mdata.is_stored) {
+    sub_v3_v3v3(refv, kcd->mdata.cage, kcd->prev.cage);
+  }
+  else if (kcd->prev.vert && kcd->prev.vert->v) {
+    for (ref = kcd->prev.vert->edges.first; ref; ref = ref->next) {
+      kfe = ((KnifeEdge *)(ref->ref));
+      if (kfe->e) {
+        if (BM_edge_in_face(kfe->e, fcurr)) {
+          kfv = equals_v3v3(kfe->v1->cageco, kcd->prev.cage) ? kfe->v2 : kfe->v1;
+          sub_v3_v3v3(refv, kfv->cageco, kcd->prev.cage);
+        }
+      }
+    }
+  }
+  else if (kcd->prev.edge) {
+    kfv = equals_v3v3(kcd->prev.edge->v1->cageco, kcd->prev.cage) ? kcd->prev.edge->v2 :
+                                                                    kcd->prev.edge->v1;
+    sub_v3_v3v3(refv, kfv->cageco, kcd->prev.cage);
+  }
+  else {
+    return false;
+  }
+
   /* Choose best face for plane. */
-  Ref *ref;
   BMFace *fprev = NULL;
   if (kcd->prev.vert && kcd->prev.vert->v) {
     for (ref = kcd->prev.vert->faces.first; ref; ref = ref->next) {
-      BMFace *f = ((BMFace *)(ref->ref));
+      f = ((BMFace *)(ref->ref));
       if (f == fcurr) {
         fprev = f;
       }
@@ -3628,7 +3649,7 @@ static bool knife_snap_angle_local(KnifeTool_OpData *kcd)
   }
   else if (kcd->prev.edge) {
     for (ref = kcd->prev.edge->faces.first; ref; ref = ref->next) {
-      BMFace *f = ((BMFace *)(ref->ref));
+      f = ((BMFace *)(ref->ref));
       if (f == fcurr) {
         fprev = f;
       }
