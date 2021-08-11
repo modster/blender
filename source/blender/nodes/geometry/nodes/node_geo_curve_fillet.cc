@@ -285,7 +285,8 @@ static FilletData calculate_fillet_data(const Spline &spline,
     if (mode_param.radius_mode == GEO_NODE_CURVE_FILLET_RADIUS_FLOAT) {
       radius = mode_param.radius.value();
     }
-    else if (mode_param.radius_mode == GEO_NODE_CURVE_FILLET_RADIUS_ATTRIBUTE && spline_index + i < mode_param.radii->size()) {
+    else if (mode_param.radius_mode == GEO_NODE_CURVE_FILLET_RADIUS_ATTRIBUTE &&
+             spline_index + i < mode_param.radii->size()) {
       radius = (*mode_param.radii)[spline_index + i];
     }
 
@@ -337,7 +338,9 @@ static Array<int> create_dst_to_src_map(const Span<int> point_counts, const int 
 
 /* Copy attribute data from source spline's Span to destination spline's Span. */
 template<typename T>
-static void copy_attribute_by_mapping(const Span<T> src, MutableSpan<T> dst, Span<int> mapping)
+static void copy_attribute_by_mapping(const Span<T> src,
+                                      MutableSpan<T> dst,
+                                      const Span<int> mapping)
 {
   for (const int i : dst.index_range()) {
     dst[i] = src[mapping[i]];
@@ -347,7 +350,7 @@ static void copy_attribute_by_mapping(const Span<T> src, MutableSpan<T> dst, Spa
 /* Copy all attributes in Bezier splines. */
 static void copy_bezier_attributes_by_mapping(const BezierSpline &src,
                                               BezierSpline &dst,
-                                              Span<int> mapping)
+                                              const Span<int> mapping)
 {
   copy_attribute_by_mapping(src.positions(), dst.positions(), mapping);
   copy_attribute_by_mapping(src.radii(), dst.radii(), mapping);
@@ -361,7 +364,7 @@ static void copy_bezier_attributes_by_mapping(const BezierSpline &src,
 /* Copy all attributes in Poly splines. */
 static void copy_poly_attributes_by_mapping(const PolySpline &src,
                                             PolySpline &dst,
-                                            Span<int> mapping)
+                                            const Span<int> mapping)
 {
   copy_attribute_by_mapping(src.positions(), dst.positions(), mapping);
   copy_attribute_by_mapping(src.radii(), dst.radii(), mapping);
@@ -371,7 +374,7 @@ static void copy_poly_attributes_by_mapping(const PolySpline &src,
 /* Copy all attributes in NURBS splines. */
 static void copy_NURBS_attributes_by_mapping(const NURBSpline &src,
                                              NURBSpline &dst,
-                                             Span<int> mapping)
+                                             const Span<int> mapping)
 {
   copy_attribute_by_mapping(src.positions(), dst.positions(), mapping);
   copy_attribute_by_mapping(src.radii(), dst.radii(), mapping);
@@ -384,8 +387,8 @@ static void copy_NURBS_attributes_by_mapping(const NURBSpline &src,
  * Required when handles are not of type `Vector`.
  */
 static void update_bezier_handle_types(BezierSpline &dst,
-                                       Span<int> mapping,
-                                       Span<int> point_counts)
+                                       const Span<int> mapping,
+                                       const Span<int> point_counts)
 {
   MutableSpan<BezierSpline::HandleType> left_handle_types = dst.handle_types_left();
   MutableSpan<BezierSpline::HandleType> right_handle_types = dst.handle_types_right();
