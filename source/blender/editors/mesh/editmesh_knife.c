@@ -3995,7 +3995,8 @@ static void knifetool_init(bContext *C,
                            KnifeTool_OpData *kcd,
                            const bool only_select,
                            const bool cut_through,
-                           const bool visible_measurements,
+                           const int visible_measurements,
+                           const int angle_snapping,
                            const float angle_snapping_increment,
                            const bool is_interactive)
 {
@@ -4031,8 +4032,10 @@ static void knifetool_init(bContext *C,
   kcd->is_interactive = is_interactive;
   kcd->cut_through = cut_through;
   kcd->only_select = only_select;
-  kcd->show_dist_angle = visible_measurements;
-  kcd->dist_angle_mode = (visible_measurements ? KNF_MEASUREMENT_BOTH : KNF_MEASUREMENT_NONE);
+  kcd->dist_angle_mode = visible_measurements;
+  kcd->show_dist_angle = (kcd->dist_angle_mode != KNF_MEASUREMENT_NONE);
+  kcd->angle_snapping_mode = angle_snapping;
+  kcd->angle_snapping = (kcd->angle_snapping_mode != KNF_CONSTRAIN_ANGLE_MODE_NONE);
   kcd->angle_snapping_increment = angle_snapping_increment;
 
   kcd->arena = BLI_memarena_new(MEM_SIZE_OPTIMAL(1 << 15), "knife");
@@ -4647,7 +4650,8 @@ static int knifetool_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
   const bool only_select = RNA_boolean_get(op->ptr, "only_selected");
   const bool cut_through = !RNA_boolean_get(op->ptr, "use_occlude_geometry");
-  const bool visible_measurements = RNA_boolean_get(op->ptr, "visible_measurements");
+  const int visible_measurements = RNA_enum_get(op->ptr, "visible_measurements");
+  const int angle_snapping = RNA_enum_get(op->ptr, "angle_snapping");
   const bool wait_for_input = RNA_boolean_get(op->ptr, "wait_for_input");
   const float angle_snapping_increment = RAD2DEGF(
       RNA_float_get(op->ptr, "angle_snapping_increment"));
@@ -4660,8 +4664,15 @@ static int knifetool_invoke(bContext *C, wmOperator *op, const wmEvent *event)
   /* alloc new customdata */
   kcd = op->customdata = MEM_callocN(sizeof(KnifeTool_OpData), __func__);
 
-  knifetool_init(
-      C, &vc, kcd, only_select, cut_through, visible_measurements, angle_snapping_increment, true);
+  knifetool_init(C,
+                 &vc,
+                 kcd,
+                 only_select,
+                 cut_through,
+                 visible_measurements,
+                 angle_snapping,
+                 angle_snapping_increment,
+                 true);
 
   if (only_select) {
     Object *obedit;
@@ -4725,17 +4736,45 @@ void MESH_OT_knife_tool(wmOperatorType *ot)
 
   /* Properties. */
   PropertyRNA *prop;
+  static const EnumPropertyItem visible_measurements_items[] = {
+      {KNF_MEASUREMENT_NONE, "NONE", 0, "None", "Show no measurements"},
+      {KNF_MEASUREMENT_BOTH, "BOTH", 0, "Both", "Show both distances and angles"},
+      {KNF_MEASUREMENT_DISTANCE, "DISTANCE", 0, "Distance", "Show just distance measurements"},
+      {KNF_MEASUREMENT_ANGLE, "ANGLE", 0, "Angle", "Show just angle measurements"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  static const EnumPropertyItem angle_snapping_items[] = {
+      {KNF_CONSTRAIN_ANGLE_MODE_NONE, "NONE", 0, "None", "No angle snapping"},
+      {KNF_CONSTRAIN_ANGLE_MODE_SCREEN, "SCREEN", 0, "Screen", "Screen space angle snapping"},
+      {KNF_CONSTRAIN_ANGLE_MODE_LOCAL,
+       "LOCAL",
+       0,
+       "Local",
+       "Angle snapping relative to the previous cut edge"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
   RNA_def_boolean(ot->srna,
                   "use_occlude_geometry",
                   true,
                   "Occlude Geometry",
                   "Only cut the front most geometry");
   RNA_def_boolean(ot->srna, "only_selected", false, "Only Selected", "Only cut selected geometry");
-  RNA_def_boolean(ot->srna,
-                  "visible_measurements",
-                  false,
-                  "Measurements",
-                  "Show visible distance and angle measurements");
+
+  RNA_def_enum(ot->srna,
+               "visible_measurements",
+               visible_measurements_items,
+               KNF_MEASUREMENT_NONE,
+               "Measurements",
+               "Visible distance and angle measurements");
+  RNA_def_enum(ot->srna,
+               "angle_snapping",
+               angle_snapping_items,
+               KNF_CONSTRAIN_ANGLE_MODE_NONE,
+               "Angle Snapping",
+               "Angle snapping mode");
+
   prop = RNA_def_float(ot->srna,
                        "angle_snapping_increment",
                        DEG2RADF(KNIFE_DEFAULT_ANGLE_SNAPPING_INCREMENT),
@@ -4788,7 +4827,8 @@ void EDBM_mesh_knife(bContext *C, ViewContext *vc, LinkNode *polys, bool use_tag
   {
     const bool only_select = false;
     const bool is_interactive = false; /* Can enable for testing. */
-    const bool visible_measurements = false;
+    const int visible_measurements = KNF_MEASUREMENT_NONE;
+    const int angle_snapping = KNF_CONSTRAIN_ANGLE_MODE_NONE;
     const float angle_snapping_increment = KNIFE_DEFAULT_ANGLE_SNAPPING_INCREMENT;
 
     kcd = MEM_callocN(sizeof(KnifeTool_OpData), __func__);
@@ -4799,6 +4839,7 @@ void EDBM_mesh_knife(bContext *C, ViewContext *vc, LinkNode *polys, bool use_tag
                    only_select,
                    cut_through,
                    visible_measurements,
+                   angle_snapping,
                    angle_snapping_increment,
                    is_interactive);
 
