@@ -833,9 +833,12 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
       return false;
     }
 
-    /* Newly formed edges shouldn't exceed the edge size criterion */
+    /* Newly formed edges shouldn't exceed the edge size criterion
+     * and newly formed faces shouldn't be inverted */
     {
       const auto [v1_a, v2_a] = this->get_checked_verts_of_edge(edge, verts_swapped);
+      const auto v1_index = v1_a.get_self_index();
+      const auto v2_index = v2_a.get_self_index();
       const auto &n1_a = this->get_checked_node_of_vert(v1_a);
       const auto &n2_a = this->get_checked_node_of_vert(v2_a);
       const auto n1_index = n1_a.get_self_index();
@@ -846,7 +849,8 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
       for (const auto &edge_index : edge_indices) {
         /* Get v1 of the 3D edge in correct order */
         const auto &e = this->get_checked_edge(edge_index);
-        const auto [v1_index, v2_index] = this->get_checked_vert_indices_of_edge_aligned_with_n1(e, n1_index);
+        const auto [v1_index, v2_index] = this->get_checked_vert_indices_of_edge_aligned_with_n1(
+            e, n1_index);
         const auto &v1 = this->get_checked_vert(v1_index);
         const auto &v2 = this->get_checked_vert(v2_index);
 
@@ -867,6 +871,46 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
           if (edge_size > (1.0 - small_value)) {
             return false;
           }
+        }
+      }
+
+      /* Face inversion check */
+      const auto v1_face_indices = this->get_checked_face_indices_of_vert(v1_index);
+      for (const auto &face_index : v1_face_indices) {
+        auto &f = this->get_checked_face(face_index);
+
+        /* Cannot create face between v2, v2, ov */
+        if (f.has_vert_index(v2_index)) {
+          continue;
+        }
+
+        BLI_assert(f.get_verts().size() == 3);
+
+        blender::Array<VertIndex> vert_indices(f.get_verts().as_span());
+
+        bool v2_exists = false;
+        for (auto &vert_index : vert_indices) {
+          if (vert_index == v2_index) {
+            v2_exists = true;
+            break;
+          }
+          if (vert_index == v1_index) {
+            vert_index = v2_index;
+            break;
+          }
+        }
+
+        if (v2_exists) {
+          continue;
+        }
+
+        const auto new_normal = this->compute_face_normal(this->get_checked_vert(vert_indices[0]),
+                                                          this->get_checked_vert(vert_indices[1]),
+                                                          this->get_checked_vert(vert_indices[2]));
+        const auto &expected_normal = f.get_normal();
+
+        if (float3::dot(new_normal, expected_normal) <= 0.0) {
+          return false;
         }
       }
     }

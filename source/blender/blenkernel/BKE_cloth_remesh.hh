@@ -1286,6 +1286,18 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
   }
 
   /**
+   * A "3D edge" is the set of all edges between 2 nodes. An edge
+   * stores the edge verts, these are used to find the edge nodes and
+   * all connecting edge indicies between the edge nodes constitute
+   * the 3D edge.
+   */
+  blender::Vector<EdgeIndex> get_checked_3d_edge(const Edge<EED> &edge) const
+  {
+    const auto [n1, n2] = this->get_checked_nodes_of_edge(edge);
+    return this->get_connecting_edge_indices(n1, n2);
+  }
+
+  /**
    * Gives first vert index of face that is not part of edge.
    * This should be called only when the face has 3 verts, will return
    * `std::nullopt` otherwise.
