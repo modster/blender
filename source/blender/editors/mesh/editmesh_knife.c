@@ -107,6 +107,10 @@ typedef struct KnifeColors {
   uchar curpoint_a[4];
   uchar point[3];
   uchar point_a[4];
+  uchar xaxis[3];
+  uchar yaxis[3];
+  uchar zaxis[3];
+  uchar axis_extra[3];
 } KnifeColors;
 
 /* Knifetool Operator. */
@@ -464,19 +468,19 @@ static void knifetool_draw_orientation_locking(const KnifeTool_OpData *kcd)
 
     switch (kcd->constrain_axis) {
       case KNF_CONSTRAIN_AXIS_X: {
-        immUniformThemeColor3(TH_AXIS_X);
+        immUniformColor3ubv(kcd->colors.xaxis);
         break;
       }
       case KNF_CONSTRAIN_AXIS_Y: {
-        immUniformThemeColor3(TH_AXIS_Y);
+        immUniformColor3ubv(kcd->colors.yaxis);
         break;
       }
       case KNF_CONSTRAIN_AXIS_Z: {
-        immUniformThemeColor3(TH_AXIS_Z);
+        immUniformColor3ubv(kcd->colors.zaxis);
         break;
       }
       default: {
-        immUniformThemeColor3(TH_TRANSFORM);
+        immUniformColor3ubv(kcd->colors.axis_extra);
         break;
       }
     }
@@ -4058,6 +4062,11 @@ static void knife_init_colors(KnifeColors *colors)
   UI_GetThemeColorType3ubv(TH_ACTIVE_SPLINE, SPACE_VIEW3D, colors->point);
   UI_GetThemeColorType3ubv(TH_ACTIVE_SPLINE, SPACE_VIEW3D, colors->point_a);
   colors->point_a[3] = 102;
+
+  UI_GetThemeColorType3ubv(TH_AXIS_X, SPACE_VIEW3D, colors->xaxis);
+  UI_GetThemeColorType3ubv(TH_AXIS_Y, SPACE_VIEW3D, colors->yaxis);
+  UI_GetThemeColorType3ubv(TH_AXIS_Z, SPACE_VIEW3D, colors->zaxis);
+  UI_GetThemeColorType3ubv(TH_TRANSFORM, SPACE_VIEW3D, colors->axis_extra);
 }
 
 static void knife_switch_object(KnifeTool_OpData *kcd, Object *ob, int base_index)
