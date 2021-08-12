@@ -2003,11 +2003,6 @@ typedef enum GeometryNodeCurveFilletMode {
   GEO_NODE_CURVE_FILLET_USER_DEFINED = 1,
 } GeometryNodeCurveFilletMode;
 
-typedef enum GeometryNodeCurveFilletRadiusMode {
-  GEO_NODE_CURVE_FILLET_RADIUS_FLOAT = 0,
-  GEO_NODE_CURVE_FILLET_RADIUS_ATTRIBUTE = 1,
-} GeometryNodeCurveFilletRadiusMode;
-
 typedef enum GeometryNodeAttributeTransferMapMode {
   GEO_NODE_ATTRIBUTE_TRANSFER_NEAREST_FACE_INTERPOLATED = 0,
   GEO_NODE_ATTRIBUTE_TRANSFER_NEAREST = 1,

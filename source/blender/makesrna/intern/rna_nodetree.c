@@ -10105,12 +10105,12 @@ static void def_geo_curve_fillet(StructRNA *srna)
   };
 
   static EnumPropertyItem radius_mode_items[] = {
-      {GEO_NODE_CURVE_FILLET_RADIUS_FLOAT,
+      {GEO_NODE_ATTRIBUTE_INPUT_FLOAT,
        "FLOAT",
        0,
        "Float",
        "Define a common radius for all points."},
-      {GEO_NODE_CURVE_FILLET_RADIUS_ATTRIBUTE,
+      {GEO_NODE_ATTRIBUTE_INPUT_ATTRIBUTE,
        "ATTRIBUTE",
        0,
        "Attribute",

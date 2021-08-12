@@ -19,6 +19,8 @@
 #include "UI_interface.h"
 #include "UI_resources.h"
 
+#include "DNA_node_types.h"
+
 #include "node_geometry_util.hh"
 
 #include "BKE_spline.hh"
@@ -28,7 +30,7 @@ static bNodeSocketTemplate geo_node_curve_fillet_in[] = {
     {SOCK_FLOAT, N_("Angle"), M_PI_2, 0.0f, 0.0f, 0.0f, 0.001f, FLT_MAX, PROP_ANGLE},
     {SOCK_INT, N_("Count"), 1, 0, 0, 0, 1, 1000},
     {SOCK_BOOLEAN, N_("Limit Radius")},
-    {SOCK_FLOAT, N_("Radius"), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX, PROP_DISTANCE},
+    {SOCK_FLOAT, N_("Radii"), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX, PROP_DISTANCE},
     {SOCK_STRING, N_("Radii")},
     {-1, ""},
 };
@@ -52,7 +54,7 @@ static void geo_node_curve_fillet_init(bNodeTree *UNUSED(tree), bNode *node)
       sizeof(NodeGeometryCurveFillet), __func__);
 
   data->mode = GEO_NODE_CURVE_FILLET_ADAPTIVE;
-  data->radius_mode = GEO_NODE_CURVE_FILLET_RADIUS_FLOAT;
+  data->radius_mode = GEO_NODE_ATTRIBUTE_INPUT_FLOAT;
 
   node->storage = data;
 }
@@ -68,18 +70,13 @@ struct FilletModeParam {
   /* Number of points to be added. */
   std::optional<int> count;
 
-  GeometryNodeCurveFilletRadiusMode radius_mode;
+  GeometryNodeAttributeInputMode radius_mode;
 
   /* Whether or not fillets are allowed to overlap. */
   bool limit_radius;
 
-  /* The radius of the formed circle */
-  std::optional<float> radius;
-
-  /* Distribution of radii on the spline. */
-  std::optional<std::string> radii_dist;
-
-  GVArray_Typed<float> *radii{};
+  /* Radii for fillet arc at all vertices. */
+  GVArray_Typed<float> *radii;
 };
 
 /* A data structure used to store fillet data about all vertices to be filleted. */
@@ -111,15 +108,8 @@ static void geo_node_curve_fillet_update(bNodeTree *UNUSED(ntree), bNode *node)
   nodeSetSocketAvailability(adaptive_socket, mode == GEO_NODE_CURVE_FILLET_ADAPTIVE);
   nodeSetSocketAvailability(user_socket, mode == GEO_NODE_CURVE_FILLET_USER_DEFINED);
 
-  const GeometryNodeCurveFilletRadiusMode radius_mode = (GeometryNodeCurveFilletRadiusMode)
-                                                            node_storage.radius_mode;
-
-  bNodeSocket *float_socket = user_socket->next->next;
-  bNodeSocket *attribute_socket = float_socket->next;
-
-  nodeSetSocketAvailability(float_socket, radius_mode == GEO_NODE_CURVE_FILLET_RADIUS_FLOAT);
-  nodeSetSocketAvailability(attribute_socket,
-                            radius_mode == GEO_NODE_CURVE_FILLET_RADIUS_ATTRIBUTE);
+  update_attribute_input_socket_availabilities(
+      *node, "Radii", (GeometryNodeAttributeInputMode)node_storage.radius_mode);
 }
 
 /* Function to get the center of a fillet. */
@@ -224,19 +214,14 @@ static Array<int> calculate_counts(const std::optional<float> arc_angle,
 
 /* Calculate the radii for the vertices to be filleted. */
 static Array<float> calculate_radii(const FilletModeParam &mode_param,
-                                    const int spline_index,
+                                    const int start_index,
                                     const int fillet_count)
 {
   Array<float> radii(fillet_count, 0.0f);
 
   for (const int i : IndexRange(fillet_count)) {
-    if (mode_param.radius_mode == GEO_NODE_CURVE_FILLET_RADIUS_FLOAT) {
-      radii[i] = mode_param.radius.value();
-    }
-    else if (mode_param.radius_mode == GEO_NODE_CURVE_FILLET_RADIUS_ATTRIBUTE &&
-             spline_index + i < mode_param.radii->size()) {
-      radii[i] = (*mode_param.radii)[spline_index + i];
-    }
+    const float radius = (*mode_param.radii)[start_index + i];
+    radii[i] = mode_param.limit_radius && radius < 0 ? 0 : radius;
   }
 
   return radii;
@@ -361,7 +346,7 @@ static FilletData calculate_fillet_data(const Spline &spline,
   fd.axes = calculate_axes(fd.prev_dirs, fd.next_dirs, fillet_count);
   fd.angles = calculate_angles(fd.prev_dirs, fd.next_dirs, fillet_count);
   fd.counts = calculate_counts(mode_param.angle, mode_param.count, fd.angles, fillet_count);
-  fd.radii = calculate_radii(mode_param, spline_index, fillet_count);
+  fd.radii = calculate_radii(mode_param, spline_index + start, fillet_count);
 
   added_count = calculate_point_counts(point_counts, fd.radii, fd.counts, fillet_count, start);
 
@@ -708,8 +693,8 @@ static void geo_node_fillet_exec(GeoNodeExecParams params)
   const CurveEval &input_curve = *geometry_set.get_curve_for_read();
   NodeGeometryCurveFillet &node_storage = *(NodeGeometryCurveFillet *)params.node().storage;
   const GeometryNodeCurveFilletMode mode = (GeometryNodeCurveFilletMode)node_storage.mode;
-  const GeometryNodeCurveFilletRadiusMode radius_mode = (GeometryNodeCurveFilletRadiusMode)
-                                                            node_storage.radius_mode;
+  const GeometryNodeAttributeInputMode radius_mode = (GeometryNodeAttributeInputMode)
+                                                         node_storage.radius_mode;
   FilletModeParam mode_param;
   mode_param.mode = mode;
   mode_param.radius_mode = radius_mode;
@@ -730,18 +715,16 @@ static void geo_node_fillet_exec(GeoNodeExecParams params)
   mode_param.limit_radius = params.extract_input<bool>("Limit Radius");
 
   std::unique_ptr<CurveEval> output_curve;
-  if (radius_mode == GEO_NODE_CURVE_FILLET_RADIUS_FLOAT) {
-    mode_param.radius.emplace(params.extract_input<float>("Radius"));
-    output_curve = fillet_curve(input_curve, mode_param);
-  }
-  else {
-    GVArray_Typed<float> radii_array = params.get_input_attribute<float>(
-        "Radii", geometry_set.get_component_for_write<CurveComponent>(), ATTR_DOMAIN_AUTO, 0.0f);
+  GVArray_Typed<float> radii_array = params.get_input_attribute<float>(
+      "Radii", geometry_set.get_component_for_write<CurveComponent>(), ATTR_DOMAIN_POINT, 0.0f);
 
-    mode_param.radii = &radii_array;
-    mode_param.radii_dist.emplace(params.extract_input<std::string>("Radii"));
-    output_curve = fillet_curve(input_curve, mode_param);
+  if (radii_array->is_single() && radii_array->get_internal_single() < 0) {
+    params.set_output("Geometry", geometry_set);
+    return;
   }
+
+  mode_param.radii = &radii_array;
+  output_curve = fillet_curve(input_curve, mode_param);
 
   params.set_output("Curve", GeometrySet::create_with_curve(output_curve.release()));
 }
