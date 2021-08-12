@@ -36,6 +36,7 @@ DenoiseOperation::DenoiseOperation()
   this->addOutputSocket(DataType::Color);
   this->m_settings = nullptr;
   flags.is_fullframe_operation = true;
+  output_rendered_ = false;
 }
 void DenoiseOperation::initExecution()
 {
@@ -196,10 +197,13 @@ void DenoiseOperation::get_area_of_interest(const int UNUSED(input_idx),
 }
 
 void DenoiseOperation::update_memory_buffer(MemoryBuffer *output,
-                                            const rcti &area,
+                                            const rcti &UNUSED(area),
                                             Span<MemoryBuffer *> inputs)
 {
-  this->generateDenoise(output, inputs[0], inputs[1], inputs[2], m_settings);
+  if (!output_rendered_) {
+    this->generateDenoise(output, inputs[0], inputs[1], inputs[2], m_settings);
+    output_rendered_ = true;
+  }
 }
 
 }  // namespace blender::compositor

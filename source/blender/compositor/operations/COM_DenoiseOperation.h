@@ -37,6 +37,8 @@ class DenoiseOperation : public SingleThreadedOperation {
    */
   NodeDenoise *m_settings;
 
+  bool output_rendered_;
+
  public:
   DenoiseOperation();
   /**
