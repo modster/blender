@@ -1149,7 +1149,7 @@ void BKE_effectors_apply(ListBase *effectors,
                          float *force,
                          float *wind_force,
                          float *impulse,
-                         float eff_forces[3][3])
+                         float r_eff_forces[3][3])
 {
   /*
    * Modifies the force on a particle according to its
@@ -1214,12 +1214,12 @@ void BKE_effectors_apply(ListBase *effectors,
           add_v3_v3v3(impulse, impulse, efd.vel);
         }
 
-        if (eff_forces != NULL) {
+        if (r_eff_forces != NULL) {
           if (eff->flag & PE_VELOCITY_TO_IMPULSE && impulse) {
-            copy_v3_v3(eff_forces[num_eff_forces], impulse);
+            copy_v3_v3(r_eff_forces[num_eff_forces], impulse);
           }
           else {
-            copy_v3_v3(eff_forces[num_eff_forces], force);
+            copy_v3_v3(r_eff_forces[num_eff_forces], force);
           }
         }
       }
