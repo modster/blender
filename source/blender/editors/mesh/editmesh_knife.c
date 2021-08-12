@@ -1361,6 +1361,7 @@ static BMFace *knife_bvh_raycast(KnifeTool_OpData *kcd,
 
     face = kcd->bvh.looptris[hit.index][0]->f;
 
+    /* Hits returned in object space. */
     if (r_hitout) {
       ltri = kcd->bvh.looptris[hit.index];
       interp_v3_v3v3v3_uv(r_hitout, ltri[0]->v->co, ltri[1]->v->co, ltri[2]->v->co, kcd->bvh.uv);
@@ -1422,6 +1423,7 @@ static BMFace *knife_bvh_raycast_filter(
 
     face = kcd->bvh.looptris[hit.index][0]->f;
 
+    /* Hits returned in object space. */
     if (r_hitout) {
       ltri = kcd->bvh.looptris[hit.index];
       interp_v3_v3v3v3_uv(r_hitout, ltri[0]->v->co, ltri[1]->v->co, ltri[2]->v->co, kcd->bvh.uv);
@@ -3675,6 +3677,11 @@ static bool knife_snap_angle_local(KnifeTool_OpData *kcd)
   if (!fprev || fprev != fcurr) {
     return false;
   }
+
+  /* Re-calculate current ray in object space. */
+  knife_input_ray_segment_object(kcd, kcd->curr.mval, 1.0f, curr_origin, curr_origin_ofs);
+  sub_v3_v3v3(curr_ray, curr_origin_ofs, curr_origin);
+  normalize_v3_v3(curr_ray_normal, curr_ray);
 
   plane_from_point_normal_v3(plane, kcd->prev.cage, fprev->no);
 
