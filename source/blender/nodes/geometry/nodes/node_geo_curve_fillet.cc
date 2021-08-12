@@ -60,7 +60,7 @@ static void geo_node_curve_fillet_init(bNodeTree *UNUSED(tree), bNode *node)
 namespace blender::nodes {
 
 struct FilletModeParam {
-  GeometryNodeCurveFilletMode mode{};
+  GeometryNodeCurveFilletMode mode;
 
   /* Minimum angle between two adjust control points. */
   std::optional<float> angle;
@@ -68,7 +68,7 @@ struct FilletModeParam {
   /* Number of points to be added. */
   std::optional<int> count;
 
-  GeometryNodeCurveFilletRadiusMode radius_mode{};
+  GeometryNodeCurveFilletRadiusMode radius_mode;
 
   /* Whether or not fillets are allowed to overlap. */
   bool limit_radius;
