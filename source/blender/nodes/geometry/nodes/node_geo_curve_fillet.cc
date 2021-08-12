@@ -592,7 +592,6 @@ static SplinePtr fillet_spline(const Spline &spline,
   int fillet_count, start = 0;
   const int size = spline.size();
   bool cyclic = spline.is_cyclic();
-  SplinePtr src_spline_ptr = spline.copy();
 
   /* Determine the number of vertices that can be filleted. */
   if (cyclic) {
@@ -604,7 +603,7 @@ static SplinePtr fillet_spline(const Spline &spline,
   }
 
   if (fillet_count <= 0) {
-    return src_spline_ptr;
+    return spline.copy();
   }
 
   /* Initialize the point_counts with 1s (at least one vertex on dst for each vertex on src). */
@@ -613,7 +612,7 @@ static SplinePtr fillet_spline(const Spline &spline,
   int added_count = 0;
   /* Update point_counts array and added_count. */
   FilletData fd = calculate_fillet_data(
-      *src_spline_ptr, mode_param, added_count, point_counts, spline_index);
+      spline, mode_param, added_count, point_counts, spline_index);
   if (mode_param.limit_radius) {
     limit_radii(fd, spline.positions(), cyclic);
   }
@@ -624,7 +623,7 @@ static SplinePtr fillet_spline(const Spline &spline,
 
   switch (spline.type()) {
     case Spline::Type::Bezier: {
-      BezierSpline src_spline = static_cast<BezierSpline &>(*src_spline_ptr);
+      const BezierSpline &src_spline = (const BezierSpline &)spline;
       BezierSpline &dst_spline = static_cast<BezierSpline &>(*dst_spline_ptr);
       dst_spline.resize(total_points);
       copy_bezier_attributes_by_mapping(src_spline, dst_spline, dst_to_src);
@@ -633,7 +632,7 @@ static SplinePtr fillet_spline(const Spline &spline,
       break;
     }
     case Spline::Type::Poly: {
-      PolySpline src_spline = static_cast<PolySpline &>(*src_spline_ptr);
+      PolySpline &src_spline = (PolySpline &)spline;
       PolySpline &dst_spline = static_cast<PolySpline &>(*dst_spline_ptr);
       dst_spline.resize(total_points);
       copy_poly_attributes_by_mapping(src_spline, dst_spline, dst_to_src);
@@ -641,7 +640,7 @@ static SplinePtr fillet_spline(const Spline &spline,
       break;
     }
     case Spline::Type::NURBS: {
-      NURBSpline src_spline = static_cast<NURBSpline &>(*src_spline_ptr);
+      NURBSpline &src_spline = (NURBSpline &)spline;
       NURBSpline &dst_spline = static_cast<NURBSpline &>(*dst_spline_ptr);
       dst_spline.resize(total_points);
       copy_NURBS_attributes_by_mapping(src_spline, dst_spline, dst_to_src);
@@ -716,7 +715,7 @@ static void geo_node_fillet_exec(GeoNodeExecParams params)
 
   std::unique_ptr<CurveEval> output_curve;
   GVArray_Typed<float> radii_array = params.get_input_attribute<float>(
-      "Radii", geometry_set.get_component_for_write<CurveComponent>(), ATTR_DOMAIN_POINT, 0.0f);
+      "Radii", *geometry_set.get_component_for_read<CurveComponent>(), ATTR_DOMAIN_POINT, 0.0f);
 
   if (radii_array->is_single() && radii_array->get_internal_single() < 0) {
     params.set_output("Geometry", geometry_set);
