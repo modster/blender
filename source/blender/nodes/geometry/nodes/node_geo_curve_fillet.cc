@@ -86,6 +86,17 @@ struct FilletModeParam {
 struct FilletData {
   Array<float3> prev_dirs, positions, next_dirs, axes;
   Array<float> radii, angles, counts;
+
+  FilletData(const int size)
+  {
+    prev_dirs.reinitialize(size);
+    positions.reinitialize(size);
+    next_dirs.reinitialize(size);
+    axes.reinitialize(size);
+    radii.reinitialize(size);
+    angles.reinitialize(size);
+    counts.reinitialize(size);
+  }
 };
 
 static void geo_node_curve_fillet_update(bNodeTree *UNUSED(ntree), bNode *node)
@@ -145,10 +156,10 @@ static FilletData calculate_fillet_data_per_vertex(FilletData &fd,
 {
   float3 vec_pos2prev = prev_pos - pos;
   float3 vec_pos2next = next_pos - pos;
-  normalize_v3_v3(fd.prev_dirs[index], vec_pos2prev);
-  normalize_v3_v3(fd.next_dirs[index], vec_pos2next);
+  fd.prev_dirs[index] = vec_pos2prev.normalized();
+  fd.next_dirs[index] = vec_pos2next.normalized();
   fd.positions[index] = pos;
-  cross_v3_v3v3(fd.axes[index], vec_pos2prev, vec_pos2next);
+  fd.axes[index] = float3::cross(vec_pos2prev, vec_pos2next);
   fd.angles[index] = M_PI - angle_v3v3v3(prev_pos, pos, next_pos);
   fd.counts[index] = count.has_value() ? count.value() : fd.angles[index] / arc_angle.value();
   fd.radii[index] = radius;
@@ -157,7 +168,7 @@ static FilletData calculate_fillet_data_per_vertex(FilletData &fd,
 }
 
 /* Limit the radius based on angle and radii to prevent overlap. */
-static void limit_radii(FilletData &fd, const Span<float3> &spline_positions, const bool cyclic)
+static void limit_radii(FilletData &fd, const Span<float3> spline_positions, const bool cyclic)
 {
   MutableSpan<float> radii(fd.radii);
   Span<float> angles(fd.angles);
@@ -230,18 +241,6 @@ static void limit_radii(FilletData &fd, const Span<float3> &spline_positions, co
   }
 }
 
-/* Initialize FilletData data structure with Arrays of specified length. */
-static void init_fillet_data(FilletData &fd, const int fillet_count)
-{
-  fd.prev_dirs = Array<float3>(fillet_count);
-  fd.positions = Array<float3>(fillet_count);
-  fd.next_dirs = Array<float3>(fillet_count);
-  fd.axes = Array<float3>(fillet_count);
-  fd.radii = Array<float>(fillet_count);
-  fd.angles = Array<float>(fillet_count);
-  fd.counts = Array<float>(fillet_count);
-}
-
 /* Function to calculate and obtain the fillet data for the entire spline. */
 static FilletData calculate_fillet_data(const Spline &spline,
                                         const FilletModeParam &mode_param,
@@ -249,7 +248,6 @@ static FilletData calculate_fillet_data(const Spline &spline,
                                         MutableSpan<int> point_counts,
                                         const int spline_index)
 {
-  Span<float3> positions = spline.positions();
   int fillet_count, start = 0;
   const int size = spline.size();
 
@@ -263,21 +261,20 @@ static FilletData calculate_fillet_data(const Spline &spline,
     start = 1;
   }
 
-  FilletData fd;
-  init_fillet_data(fd, fillet_count);
+  FilletData fd(fillet_count);
 
   for (const int i : IndexRange(start, fillet_count)) {
     /* Find the positions of the adjacent vertices. */
     float3 prev_pos, pos, next_pos;
     if (cyclic) {
-      prev_pos = positions[i == 0 ? positions.size() - 1 : i - 1];
-      pos = positions[i];
-      next_pos = positions[i == positions.size() - 1 ? 0 : i + 1];
+      prev_pos = spline.positions()[i == 0 ? spline.size() - 1 : i - 1];
+      pos = spline.positions()[i];
+      next_pos = spline.positions()[i == spline.size() - 1 ? 0 : i + 1];
     }
     else {
-      prev_pos = positions[i - 1];
-      pos = positions[i];
-      next_pos = positions[i + 1];
+      prev_pos = spline.positions()[i - 1];
+      pos = spline.positions()[i];
+      next_pos = spline.positions()[i + 1];
     }
 
     /* Define the radius. */
@@ -295,7 +292,7 @@ static FilletData calculate_fillet_data(const Spline &spline,
         fd, prev_pos, pos, next_pos, mode_param.angle, mode_param.count, radius, i - start);
 
     /* Exit from here if the radius is zero */
-    if (!radius) {
+    if (radius == 0.0f) {
       continue;
     }
 
@@ -326,7 +323,7 @@ static Array<int> create_dst_to_src_map(const Span<int> point_counts, const int 
 
   int index = 0;
 
-  for (int i = 0; i < point_counts.size(); i++) {
+  for (const int i : point_counts.index_range()) {
     map_span.slice(index, point_counts[i]).fill(i);
     index += point_counts[i];
   }
@@ -393,7 +390,7 @@ static void update_bezier_handle_types(BezierSpline &dst,
   MutableSpan<BezierSpline::HandleType> left_handle_types = dst.handle_types_left();
   MutableSpan<BezierSpline::HandleType> right_handle_types = dst.handle_types_right();
 
-  for (int i = 0; i < mapping.size(); i++) {
+  for (const int i : mapping.index_range()) {
     if (point_counts[mapping[i]] > 1) {
       /* There will always be a prev and next if point count > 1. */
       int prev = 0, next = 0;
@@ -533,7 +530,7 @@ static void update_poly_or_NURBS_positions(FilletData &fd,
     /* Calculate the vector of the radius formed by the first vertex. */
     float3 radius_vec = dst_spline.positions()[cur_i] - center;
 
-    for (int j = 1; j < count - 1; j++) {
+    for (const int j : IndexRange(1, count - 2)) {
       /* Rotate the radius by the segment angle */
       float3 new_radius_vec;
       rotate_v3_v3v3fl(new_radius_vec, radius_vec, -axes[i - start], segment_angle);
@@ -557,12 +554,12 @@ static SplinePtr fillet_spline(const Spline &spline,
   SplinePtr src_spline_ptr = spline.copy();
 
   /* Determine the number of vertices that can be filleted. */
-  if (!cyclic) {
-    fillet_count = size - 2;
-    start = 1;
+  if (cyclic) {
+    fillet_count = size;
   }
   else {
-    fillet_count = size;
+    fillet_count = size - 2;
+    start = 1;
   }
 
   if (fillet_count <= 0) {
