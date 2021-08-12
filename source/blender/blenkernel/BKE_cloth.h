@@ -257,6 +257,12 @@ struct Mesh *cloth_to_object(struct Object *ob,
                              struct ClothModifierData *clmd,
                              struct Mesh *mesh,
                              bool create_new);
+void cloth_from_mesh(struct ClothModifierData *clmd,
+                     const Object *ob,
+                     struct Mesh *mesh,
+                     bool alloc_verts);
+bool cloth_build_springs(struct ClothModifierData *clmd, struct Mesh *mesh);
+struct BVHTree *bvhtree_build_from_cloth(struct ClothModifierData *clmd, float epsilon);
 
 // needed for collision.c
 void bvhtree_update_from_cloth(struct ClothModifierData *clmd, bool moving, bool self);

@@ -28,6 +28,7 @@
 
 #include "BLI_assert.h"
 #include "BLI_float2x2.hh"
+#include "BLI_kdopbvh.h"
 #include "BLI_math_vector.h"
 #include "BLI_utildefines.h"
 
@@ -35,6 +36,9 @@
 
 #include "BKE_cloth.h"
 #include "BKE_cloth_remesh.hh"
+#include "BKE_modifier.h"
+
+#include "SIM_mass_spring.h"
 
 #include <algorithm>
 #include <cmath>
@@ -1196,6 +1200,46 @@ Mesh *adaptive_remesh<internal::EmptyExtraData, internal::EmptyExtraData>(
     Mesh *,
     internal::EmptyExtraData const &);
 
+/**
+ * If the mesh has been updated, the caller must ensure that
+ * clmd->clothObject->verts has been set and then call this to update
+ * the rest of the cloth modifier to reflect the changes in the mesh.
+ */
+static void set_cloth_information_when_new_mesh(Object *ob, ClothModifierData *clmd, Mesh *mesh)
+{
+  BLI_assert(clmd != nullptr);
+  BLI_assert(mesh != nullptr);
+  Cloth &cloth = *clmd->clothObject;
+  BLI_assert(cloth.verts != nullptr);
+  BLI_assert(cloth.mvert_num == mesh->totvert);
+
+  cloth_from_mesh(clmd, ob, mesh, false);
+
+  /* Build the springs */
+  if (!cloth_build_springs(clmd, mesh)) {
+    cloth_free_modifier(clmd);
+    BKE_modifier_set_error(ob, &(clmd->modifier), "Cannot build springs");
+    /* TODO(ish): error handling */
+    /* return false; */
+  }
+
+  /* Set up the cloth solver */
+  SIM_cloth_solver_free(clmd);
+  SIM_cloth_solver_init(ob, clmd);
+  SIM_cloth_solver_set_positions(clmd);
+
+  /* Free any existing bvh trees */
+  if (clmd->clothObject->bvhtree) {
+    BLI_bvhtree_free(clmd->clothObject->bvhtree);
+  }
+  if (clmd->clothObject->bvhselftree) {
+    BLI_bvhtree_free(clmd->clothObject->bvhselftree);
+  }
+
+  clmd->clothObject->bvhtree = bvhtree_build_from_cloth(clmd, clmd->coll_parms->epsilon);
+  clmd->clothObject->bvhselftree = bvhtree_build_from_cloth(clmd, clmd->coll_parms->selfepsilon);
+}
+
 Mesh *BKE_cloth_remesh(Object *ob, ClothModifierData *clmd, Mesh *mesh)
 {
   auto *cloth_to_object_res = cloth_to_object(ob, clmd, mesh, false);
@@ -1233,7 +1277,11 @@ Mesh *BKE_cloth_remesh(Object *ob, ClothModifierData *clmd, Mesh *mesh)
     cloth.mvert_num = num_nodes;
   };
 
-  return adaptive_remesh(params, mesh, *clmd->clothObject);
+  Mesh *new_mesh = adaptive_remesh(params, mesh, *clmd->clothObject);
+
+  set_cloth_information_when_new_mesh(ob, clmd, new_mesh);
+
+  return new_mesh;
 }
 
 Mesh *__temp_empty_adaptive_remesh(const TempEmptyAdaptiveRemeshParams &input_params, Mesh *mesh)

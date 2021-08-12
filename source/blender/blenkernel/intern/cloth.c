@@ -55,13 +55,11 @@
 /* ********** cloth engine ******* */
 /* Prototypes for internal functions.
  */
-static void cloth_from_mesh(ClothModifierData *clmd, const Object *ob, Mesh *mesh);
 static bool cloth_from_object(
     Object *ob, ClothModifierData *clmd, Mesh *mesh, float framenr, int first);
 static void cloth_update_springs(ClothModifierData *clmd);
 static void cloth_update_verts(Object *ob, ClothModifierData *clmd, Mesh *mesh);
 static void cloth_update_spring_lengths(ClothModifierData *clmd, Mesh *mesh);
-static bool cloth_build_springs(ClothModifierData *clmd, Mesh *mesh);
 static void cloth_apply_vgroup(ClothModifierData *clmd, Mesh *mesh);
 
 typedef struct BendSpringRef {
@@ -76,7 +74,7 @@ typedef struct BendSpringRef {
  *
  ******************************************************************************/
 
-static BVHTree *bvhtree_build_from_cloth(ClothModifierData *clmd, float epsilon)
+BVHTree *bvhtree_build_from_cloth(ClothModifierData *clmd, float epsilon)
 {
   if (!clmd) {
     return NULL;
@@ -795,7 +793,7 @@ static bool cloth_from_object(
     return false;
   }
 
-  cloth_from_mesh(clmd, ob, mesh);
+  cloth_from_mesh(clmd, ob, mesh, true);
 
   /* create springs */
   clmd->clothObject->springs = NULL;
@@ -875,23 +873,25 @@ static bool cloth_from_object(
   return true;
 }
 
-static void cloth_from_mesh(ClothModifierData *clmd, const Object *ob, Mesh *mesh)
+void cloth_from_mesh(ClothModifierData *clmd, const Object *ob, Mesh *mesh, bool alloc_verts)
 {
   const MLoop *mloop = mesh->mloop;
   const MLoopTri *looptri = BKE_mesh_runtime_looptri_ensure(mesh);
   const unsigned int mvert_num = mesh->totvert;
   const unsigned int looptri_num = mesh->runtime.looptris.len;
 
-  /* Allocate our vertices. */
-  clmd->clothObject->mvert_num = mvert_num;
-  clmd->clothObject->verts = MEM_callocN(sizeof(ClothVertex) * clmd->clothObject->mvert_num,
-                                         "clothVertex");
-  if (clmd->clothObject->verts == NULL) {
-    cloth_free_modifier(clmd);
-    BKE_modifier_set_error(
-        ob, &(clmd->modifier), "Out of memory on allocating clmd->clothObject->verts");
-    printf("cloth_free_modifier clmd->clothObject->verts\n");
-    return;
+  /* Allocate vertices only if requested (alloc_verts) */
+  if (alloc_verts) {
+    clmd->clothObject->mvert_num = mvert_num;
+    clmd->clothObject->verts = MEM_callocN(sizeof(ClothVertex) * clmd->clothObject->mvert_num,
+                                           "clothVertex");
+    if (clmd->clothObject->verts == NULL) {
+      cloth_free_modifier(clmd);
+      BKE_modifier_set_error(
+          ob, &(clmd->modifier), "Out of memory on allocating clmd->clothObject->verts");
+      printf("cloth_free_modifier clmd->clothObject->verts\n");
+      return;
+    }
   }
 
   /* save face information */
@@ -917,8 +917,36 @@ static void cloth_from_mesh(ClothModifierData *clmd, const Object *ob, Mesh *mes
   /* Free the springs since they can't be correct if the vertices
    * changed.
    */
-  if (clmd->clothObject->springs != NULL) {
-    MEM_freeN(clmd->clothObject->springs);
+  {
+    if (clmd->clothObject->springs != NULL) {
+      LinkNode *search = clmd->clothObject->springs;
+      while (search) {
+        ClothSpring *spring = search->link;
+
+        MEM_SAFE_FREE(spring->pa);
+        MEM_SAFE_FREE(spring->pb);
+
+        MEM_freeN(spring);
+        search = search->next;
+      }
+      BLI_linklist_free(clmd->clothObject->springs, NULL);
+
+      clmd->clothObject->springs = NULL;
+    }
+
+    clmd->clothObject->springs = NULL;
+    clmd->clothObject->numsprings = 0;
+
+    if (clmd->clothObject->edgeset != NULL) {
+      BLI_edgeset_free(clmd->clothObject->edgeset);
+      clmd->clothObject->edgeset = NULL;
+    }
+  }
+
+  /* Free the sew edge graph since it may not be correct if vertices changed */
+  if (clmd->clothObject->sew_edge_graph != NULL) {
+    BLI_edgeset_free(clmd->clothObject->sew_edge_graph);
+    clmd->clothObject->sew_edge_graph = NULL;
   }
 }
 
@@ -1503,7 +1531,7 @@ static bool find_internal_spring_target_vertex(BVHTreeFromMesh *treedata,
   return false;
 }
 
-static bool cloth_build_springs(ClothModifierData *clmd, Mesh *mesh)
+bool cloth_build_springs(ClothModifierData *clmd, Mesh *mesh)
 {
   Cloth *cloth = clmd->clothObject;
   ClothSpring *spring = NULL, *tspring = NULL, *tspring2 = NULL;
