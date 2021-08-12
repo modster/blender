@@ -177,6 +177,21 @@ void DilateErodeThresholdOperation::get_area_of_interest(const int input_idx,
   r_input_area.ymax = output_area.ymax + m_scope;
 }
 
+struct DilateErodeThresholdOperation::PixelData {
+  int x;
+  int y;
+  int xmin;
+  int xmax;
+  int ymin;
+  int ymax;
+  const float *elem;
+  float distance;
+  int elem_stride;
+  int row_stride;
+  /** Switch. */
+  float sw;
+};
+
 template<template<typename> typename TCompare>
 static float get_min_distance(DilateErodeThresholdOperation::PixelData &p)
 {
@@ -265,17 +280,6 @@ DilateDistanceOperation::DilateDistanceOperation()
   this->m_distance = 0.0f;
   flags.complex = true;
   flags.open_cl = true;
-}
-
-DilateDistanceOperation::PixelData::PixelData(MemoryBuffer *input,
-                                              const int distance,
-                                              const int scope)
-    : min_distance(distance * distance),
-      scope(scope),
-      elem_stride(input->elem_stride),
-      row_stride(input->row_stride),
-      input_rect(input->get_rect())
-{
 }
 
 void DilateDistanceOperation::init_data()
@@ -382,6 +386,41 @@ void DilateDistanceOperation::get_area_of_interest(const int input_idx,
   r_input_area.ymax = output_area.ymax + m_scope;
 }
 
+struct DilateDistanceOperation::PixelData {
+  int x;
+  int y;
+  int xmin;
+  int xmax;
+  int ymin;
+  int ymax;
+  const float *elem;
+  float min_distance;
+  int scope;
+  int elem_stride;
+  int row_stride;
+  const rcti &input_rect;
+
+  PixelData(MemoryBuffer *input, const int distance, const int scope)
+      : min_distance(distance * distance),
+        scope(scope),
+        elem_stride(input->elem_stride),
+        row_stride(input->row_stride),
+        input_rect(input->get_rect())
+  {
+  }
+
+  void update(BuffersIterator<float> &it)
+  {
+    x = it.x;
+    y = it.y;
+    xmin = MAX2(x - scope, input_rect.xmin);
+    ymin = MAX2(y - scope, input_rect.ymin);
+    xmax = MIN2(x + scope, input_rect.xmax);
+    ymax = MIN2(y + scope, input_rect.ymax);
+    elem = it.in(0);
+  }
+};
+
 template<template<typename> typename TCompare>
 static float get_distance_value(DilateDistanceOperation::PixelData &p, const float start_value)
 {
@@ -398,7 +437,7 @@ static float get_distance_value(DilateDistanceOperation::PixelData &p, const flo
     const float *elem = row;
     for (int xi = p.xmin; xi < p.xmax; xi++) {
       const float dx = xi - p.x;
-      const float dist = dx * dx + dy * dy;
+      const float dist = dx * dx + dist_y;
       if (dist <= min_dist) {
         value = compare(*elem, value) ? *elem : value;
       }
@@ -761,6 +800,7 @@ struct Max2Selector {
     return MAX2(f1, f2);
   }
 };
+
 void DilateStepOperation::update_memory_buffer_partial(MemoryBuffer *output,
                                                        const rcti &area,
                                                        Span<MemoryBuffer *> inputs)
@@ -870,6 +910,7 @@ struct Min2Selector {
     return MIN2(f1, f2);
   }
 };
+
 void ErodeStepOperation::update_memory_buffer_partial(MemoryBuffer *output,
                                                       const rcti &area,
                                                       Span<MemoryBuffer *> inputs)

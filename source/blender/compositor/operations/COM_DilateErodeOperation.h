@@ -23,22 +23,10 @@
 namespace blender::compositor {
 
 class DilateErodeThresholdOperation : public MultiThreadedOperation {
- private:
-  struct PixelData {
-    int x;
-    int y;
-    int xmin;
-    int xmax;
-    int ymin;
-    int ymax;
-    const float *elem;
-    float distance;
-    int elem_stride;
-    int row_stride;
-    /** Switch. */
-    float sw;
-  };
+ public:
+  struct PixelData;
 
+ private:
   /**
    * Cached reference to the inputProgram
    */
@@ -98,35 +86,10 @@ class DilateErodeThresholdOperation : public MultiThreadedOperation {
 };
 
 class DilateDistanceOperation : public MultiThreadedOperation {
+ public:
+  struct PixelData;
+
  protected:
-  struct PixelData {
-    int x;
-    int y;
-    int xmin;
-    int xmax;
-    int ymin;
-    int ymax;
-    const float *elem;
-    float min_distance;
-    int scope;
-    int elem_stride;
-    int row_stride;
-    const rcti &input_rect;
-
-    PixelData(MemoryBuffer *input, int distance, int scope);
-
-    void update(BuffersIterator<float> &it)
-    {
-      x = it.x;
-      y = it.y;
-      xmin = MAX2(x - scope, input_rect.xmin);
-      ymin = MAX2(y - scope, input_rect.ymin);
-      xmax = MIN2(x + scope, input_rect.xmax);
-      ymax = MIN2(y + scope, input_rect.ymax);
-      elem = it.in(0);
-    }
-  };
-
   /**
    * Cached reference to the inputProgram
    */
