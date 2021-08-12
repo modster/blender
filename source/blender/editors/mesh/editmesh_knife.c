@@ -102,6 +102,7 @@
 typedef struct KnifeColors {
   uchar line[3];
   uchar edge[3];
+  uchar edge_extra[3];
   uchar curpoint[3];
   uchar curpoint_a[4];
   uchar point[3];
@@ -305,6 +306,10 @@ typedef struct KnifeTool_OpData {
   bool is_angle_snapping;
   bool angle_snapping;
   float angle;
+  /* Local angle snapping reference edge. */
+  KnifeEdge *snap_ref_edge;
+  int snap_ref_edges_count;
+  int snap_edge; /* Used by #KNF_MODAL_CYCLE_ANGLE_SNAP_EDGE to choose an edge for snapping. */
 
   short constrain_axis;
   short constrain_axis_mode;
@@ -333,6 +338,7 @@ enum {
   KNF_MODAL_IGNORE_SNAP_OFF,
   KNF_MODAL_ADD_CUT,
   KNF_MODAL_ANGLE_SNAP_TOGGLE,
+  KNF_MODAL_CYCLE_ANGLE_SNAP_EDGE,
   KNF_MODAL_CUT_THROUGH_TOGGLE,
   KNF_MODAL_SHOW_DISTANCE_ANGLE_TOGGLE,
   KNF_MODAL_DEPTH_TEST_TOGGLE,
@@ -780,20 +786,35 @@ static void knifetool_draw_visible_angles(const KnifeTool_OpData *kcd)
     float angle = 0.0f;
     float *end;
 
-    kfe = ((Ref *)kfv->edges.first)->ref;
-    for (ref = kfv->edges.first; ref; ref = ref->next) {
-      tempkfe = ref->ref;
-      if (tempkfe->v1 != kfv) {
-        tempkfv = tempkfe->v1;
+    /* If using local angle snapping, always draw angle to reference edge. */
+    if (kcd->is_angle_snapping && kcd->angle_snapping_mode == KNF_CONSTRAIN_ANGLE_MODE_LOCAL) {
+      kfe = kcd->snap_ref_edge;
+      if (kfe->v1 != kfv) {
+        tempkfv = kfe->v1;
       }
       else {
-        tempkfv = tempkfe->v2;
+        tempkfv = kfe->v2;
       }
-      angle = angle_v3v3v3(kcd->curr.cage, kcd->prev.cage, tempkfv->cageco);
-      if (angle < min_angle) {
-        min_angle = angle;
-        kfe = tempkfe;
-        end = tempkfv->cageco;
+      min_angle = angle_v3v3v3(kcd->curr.cage, kcd->prev.cage, tempkfv->cageco);
+      end = tempkfv->cageco;
+    }
+    else {
+      /* Choose minimum angle edge. */
+      kfe = ((Ref *)kfv->edges.first)->ref;
+      for (ref = kfv->edges.first; ref; ref = ref->next) {
+        tempkfe = ref->ref;
+        if (tempkfe->v1 != kfv) {
+          tempkfv = tempkfe->v1;
+        }
+        else {
+          tempkfv = tempkfe->v2;
+        }
+        angle = angle_v3v3v3(kcd->curr.cage, kcd->prev.cage, tempkfv->cageco);
+        if (angle < min_angle) {
+          min_angle = angle;
+          kfe = tempkfe;
+          end = tempkfv->cageco;
+        }
       }
     }
 
@@ -1004,6 +1025,17 @@ static void knifetool_draw(const bContext *UNUSED(C), ARegion *UNUSED(region), v
     GPU_batch_discard(batch);
   }
 
+  /* Draw local angle snapping reference edge. */
+  if (kcd->is_angle_snapping && kcd->angle_snapping_mode == KNF_CONSTRAIN_ANGLE_MODE_LOCAL) {
+    immUniformColor3ubv(kcd->colors.edge_extra);
+    GPU_line_width(2.0);
+
+    immBegin(GPU_PRIM_LINES, 2);
+    immVertex3fv(pos, kcd->snap_ref_edge->v1->cageco);
+    immVertex3fv(pos, kcd->snap_ref_edge->v2->cageco);
+    immEnd();
+  }
+
   GPU_matrix_mul(kcd->ob->obmat);
 
   if (kcd->totlinehit > 0) {
@@ -1098,7 +1130,7 @@ static void knife_update_header(bContext *C, wmOperator *op, KnifeTool_OpData *k
       TIP_("%s: confirm, %s: cancel, %s: undo, "
            "%s: start/define cut, %s: close cut, %s: new cut, "
            "%s: midpoint snap (%s), %s: ignore snap (%s), "
-           "%s: angle constraint %.2f(%.2f) (%s), %s: cut through (%s), "
+           "%s: angle constraint %.2f(%.2f) (%s%s%s%s), %s: cut through (%s), "
            "%s: panning, XYZ: orientation lock (%s), "
            "%s: distance/angle measurements (%s), "
            "%s: depth check (%s)"),
@@ -1121,6 +1153,13 @@ static void knife_update_header(bContext *C, wmOperator *op, KnifeTool_OpData *k
       kcd->angle_snapping ?
           ((kcd->angle_snapping_mode == KNF_CONSTRAIN_ANGLE_MODE_SCREEN) ? "Screen" : "Local") :
           "OFF",
+      /* TODO: Can this be simplified? */
+      (kcd->angle_snapping_mode == KNF_CONSTRAIN_ANGLE_MODE_LOCAL) ? " - " : "",
+      (kcd->angle_snapping_mode == KNF_CONSTRAIN_ANGLE_MODE_LOCAL) ?
+          WM_MODALKEY(KNF_MODAL_CYCLE_ANGLE_SNAP_EDGE) :
+          "",
+      (kcd->angle_snapping_mode == KNF_CONSTRAIN_ANGLE_MODE_LOCAL) ? ": cycle edge" : "",
+      /**/
       WM_MODALKEY(KNF_MODAL_CUT_THROUGH_TOGGLE),
       WM_bool_as_string(kcd->cut_through),
       WM_MODALKEY(KNF_MODAL_PANNING),
@@ -3616,24 +3655,33 @@ static bool knife_snap_angle_local(KnifeTool_OpData *kcd)
 
   /* Calculate a reference vector using previous cut segment, edge or vertex.
    * If none exists then exit. */
-  if (kcd->mdata.is_stored) {
-    sub_v3_v3v3(refv, kcd->mdata.cage, kcd->prev.cage);
-  }
-  else if (kcd->prev.vert && kcd->prev.vert->v) {
+  if (kcd->prev.vert) {
+    int count = 0;
     for (ref = kcd->prev.vert->edges.first; ref; ref = ref->next) {
       kfe = ((KnifeEdge *)(ref->ref));
+      if (kfe->is_invalid) {
+        continue;
+      }
       if (kfe->e) {
-        if (BM_edge_in_face(kfe->e, fcurr)) {
-          kfv = equals_v3v3(kfe->v1->cageco, kcd->prev.cage) ? kfe->v2 : kfe->v1;
-          sub_v3_v3v3(refv, kfv->cageco, kcd->prev.cage);
+        if (!BM_edge_in_face(kfe->e, fcurr)) {
+          continue;
         }
       }
+      if (count == kcd->snap_edge) {
+        kfv = compare_v3v3(kfe->v1->cageco, kcd->prev.cage, KNIFE_FLT_EPSBIG) ? kfe->v2 : kfe->v1;
+        sub_v3_v3v3(refv, kfv->cageco, kcd->prev.cage);
+        kcd->snap_ref_edge = kfe;
+        break;
+      }
+      count++;
     }
   }
   else if (kcd->prev.edge) {
-    kfv = equals_v3v3(kcd->prev.edge->v1->cageco, kcd->prev.cage) ? kcd->prev.edge->v2 :
-                                                                    kcd->prev.edge->v1;
+    kfv = compare_v3v3(kcd->prev.edge->v1->cageco, kcd->prev.cage, KNIFE_FLT_EPSBIG) ?
+              kcd->prev.edge->v2 :
+              kcd->prev.edge->v1;
     sub_v3_v3v3(refv, kfv->cageco, kcd->prev.cage);
+    kcd->snap_ref_edge = kcd->prev.edge;
   }
   else {
     return false;
@@ -3712,6 +3760,50 @@ static bool knife_snap_angle_local(KnifeTool_OpData *kcd)
     return true;
   }
   return false;
+}
+
+static int knife_calculate_snap_ref_edges(KnifeTool_OpData *kcd)
+{
+  Ref *ref;
+  KnifeEdge *kfe;
+
+  /* Ray for kcd->curr. */
+  float curr_origin[3];
+  float curr_origin_ofs[3];
+  float curr_ray[3], curr_ray_normal[3];
+  float curr_co[3], curr_cage[3]; /* Unused. */
+
+  knife_input_ray_segment_world(kcd, kcd->curr.mval, 1.0f, curr_origin, curr_origin_ofs);
+  sub_v3_v3v3(curr_ray, curr_origin_ofs, curr_origin);
+  normalize_v3_v3(curr_ray_normal, curr_ray);
+
+  BMFace *fcurr = knife_bvh_raycast(
+      kcd, curr_origin, curr_ray_normal, 0.0f, NULL, curr_co, curr_cage, true, NULL);
+
+  int count = 0;
+
+  if (!fcurr) {
+    return count;
+  }
+
+  if (kcd->prev.vert) {
+    for (ref = kcd->prev.vert->edges.first; ref; ref = ref->next) {
+      kfe = ((KnifeEdge *)(ref->ref));
+      if (kfe->is_invalid) {
+        continue;
+      }
+      if (kfe->e) {
+        if (!BM_edge_in_face(kfe->e, fcurr)) {
+          continue;
+        }
+      }
+      count++;
+    }
+  }
+  else if (kcd->prev.edge) {
+    return 1;
+  }
+  return count;
 }
 
 /* Reset the snapping angle num input. */
@@ -3802,6 +3894,7 @@ static bool knife_snap_update_from_mval(bContext *C, KnifeTool_OpData *kcd, cons
   /* view matrix may have changed, reproject */
   knife_project_v2(kcd, kcd->prev.cage, kcd->prev.mval);
 
+  kcd->is_angle_snapping = false;
   if (kcd->mode == MODE_DRAGGING) {
     if (kcd->angle_snapping) {
       if (kcd->angle_snapping_mode == KNF_CONSTRAIN_ANGLE_MODE_SCREEN) {
@@ -3809,10 +3902,10 @@ static bool knife_snap_update_from_mval(bContext *C, KnifeTool_OpData *kcd, cons
       }
       else if (kcd->angle_snapping_mode == KNF_CONSTRAIN_ANGLE_MODE_LOCAL) {
         kcd->is_angle_snapping = knife_snap_angle_local(kcd);
+        if (kcd->is_angle_snapping) {
+          kcd->snap_ref_edges_count = knife_calculate_snap_ref_edges(kcd);
+        }
       }
-    }
-    else {
-      kcd->is_angle_snapping = false;
     }
 
     if (kcd->axis_constrained) {
@@ -3958,6 +4051,7 @@ static void knife_init_colors(KnifeColors *colors)
    * a la UI_make_axis_color. */
   UI_GetThemeColorType3ubv(TH_NURB_VLINE, SPACE_VIEW3D, colors->line);
   UI_GetThemeColorType3ubv(TH_NURB_ULINE, SPACE_VIEW3D, colors->edge);
+  UI_GetThemeColorType3ubv(TH_NURB_SEL_ULINE, SPACE_VIEW3D, colors->edge_extra);
   UI_GetThemeColorType3ubv(TH_HANDLE_SEL_VECT, SPACE_VIEW3D, colors->curpoint);
   UI_GetThemeColorType3ubv(TH_HANDLE_SEL_VECT, SPACE_VIEW3D, colors->curpoint_a);
   colors->curpoint_a[3] = 102;
@@ -4303,6 +4397,11 @@ wmKeyMap *knifetool_modal_keymap(wmKeyConfig *keyconf)
       {KNF_MODAL_IGNORE_SNAP_ON, "IGNORE_SNAP_ON", 0, "Ignore Snapping On", ""},
       {KNF_MODAL_IGNORE_SNAP_OFF, "IGNORE_SNAP_OFF", 0, "Ignore Snapping Off", ""},
       {KNF_MODAL_ANGLE_SNAP_TOGGLE, "ANGLE_SNAP_TOGGLE", 0, "Toggle Angle Snapping", ""},
+      {KNF_MODAL_CYCLE_ANGLE_SNAP_EDGE,
+       "CYCLE_ANGLE_SNAP_EDGE",
+       0,
+       "Cycle Angle Snapping Relative Edge",
+       ""},
       {KNF_MODAL_CUT_THROUGH_TOGGLE, "CUT_THROUGH_TOGGLE", 0, "Toggle Cut Through", ""},
       {KNF_MODAL_SHOW_DISTANCE_ANGLE_TOGGLE,
        "SHOW_DISTANCE_ANGLE_TOGGLE",
@@ -4451,6 +4550,8 @@ static int knifetool_modal(bContext *C, wmOperator *op, const wmEvent *event)
       case KNF_MODAL_ANGLE_SNAP_TOGGLE:
         if (kcd->angle_snapping_mode != KNF_CONSTRAIN_ANGLE_MODE_LOCAL) {
           kcd->angle_snapping_mode++;
+          kcd->snap_ref_edges_count = 0;
+          kcd->snap_edge = 0;
         }
         else {
           kcd->angle_snapping_mode = KNF_CONSTRAIN_ANGLE_MODE_NONE;
@@ -4463,6 +4564,16 @@ static int knifetool_modal(bContext *C, wmOperator *op, const wmEvent *event)
         knife_update_active(C, kcd);
         knife_update_header(C, op, kcd);
         ED_region_tag_redraw(kcd->region);
+        do_refresh = true;
+        handled = true;
+        break;
+      case KNF_MODAL_CYCLE_ANGLE_SNAP_EDGE:
+        if (kcd->angle_snapping && kcd->angle_snapping_mode == KNF_CONSTRAIN_ANGLE_MODE_LOCAL) {
+          if (kcd->snap_ref_edges_count) {
+            kcd->snap_edge++;
+            kcd->snap_edge %= kcd->snap_ref_edges_count;
+          }
+        }
         do_refresh = true;
         handled = true;
         break;
