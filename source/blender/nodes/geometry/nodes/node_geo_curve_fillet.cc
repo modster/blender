@@ -85,7 +85,8 @@ struct FilletModeParam {
 /* A data structure used to store fillet data about all vertices to be filleted. */
 struct FilletData {
   Array<float3> prev_dirs, positions, next_dirs, axes;
-  Array<float> radii, angles, counts;
+  Array<float> radii, angles;
+  Array<int> counts;
 
   FilletData(const int size)
   {
@@ -144,27 +145,101 @@ static float3 get_center(const float3 vec_pos2prev, const FilletData &fd, const 
   return get_center(vec_pos2prev, pos, axis, angle);
 }
 
-/* Function to calculate fillet data for the specified index. */
-static FilletData calculate_fillet_data_per_vertex(FilletData &fd,
-                                                   const float3 prev_pos,
-                                                   const float3 pos,
-                                                   const float3 next_pos,
-                                                   const std::optional<float> arc_angle,
-                                                   const std::optional<int> count,
-                                                   const float radius,
-                                                   const int index)
+/* Calculate the directions to the previous vertices from each filleted vertex. */
+static Array<float3> calculate_prev_directions(const Span<float3> positions,
+                                               const bool cyclic,
+                                               const int fillet_count)
 {
-  float3 vec_pos2prev = prev_pos - pos;
-  float3 vec_pos2next = next_pos - pos;
-  fd.prev_dirs[index] = vec_pos2prev.normalized();
-  fd.next_dirs[index] = vec_pos2next.normalized();
-  fd.positions[index] = pos;
-  fd.axes[index] = float3::cross(vec_pos2prev, vec_pos2next);
-  fd.angles[index] = M_PI - angle_v3v3v3(prev_pos, pos, next_pos);
-  fd.counts[index] = count.has_value() ? count.value() : fd.angles[index] / arc_angle.value();
-  fd.radii[index] = radius;
+  Array<float3> prev_dirs(fillet_count);
+  const int size = positions.size();
+  const int start = cyclic ? 0 : 1;
 
-  return fd;
+  for (const int i : IndexRange(start, fillet_count)) {
+    const bool wrap_around = cyclic && i == 0;
+    prev_dirs[i - start] = (positions[wrap_around ? size - 1 : i - 1] - positions[i]).normalized();
+  }
+
+  return prev_dirs;
+}
+
+/* Calculate the directions to the next vertices from each filleted vertex. */
+static Array<float3> calculate_next_directions(const Span<float3> positions,
+                                               const bool cyclic,
+                                               const int fillet_count)
+{
+  Array<float3> next_dirs(fillet_count);
+  const int size = positions.size();
+  const int start = cyclic ? 0 : 1;
+
+  for (const int i : IndexRange(start, fillet_count)) {
+    const bool wrap_around = cyclic && i == size - 1;
+    next_dirs[i - start] = (positions[wrap_around ? 0 : i + 1] - positions[i]).normalized();
+  }
+
+  return next_dirs;
+}
+
+/* Calculate the axes around which the fillet is built. */
+static Array<float3> calculate_axes(const Span<float3> prev_dirs,
+                                    const Span<float3> next_dirs,
+                                    const int fillet_count)
+{
+  Array<float3> axes(fillet_count);
+
+  for (const int i : IndexRange(fillet_count)) {
+    axes[i] = float3::cross(prev_dirs[i], next_dirs[i]);
+  }
+
+  return axes;
+}
+
+/* Calculate the angle of the arc formed by the fillet. */
+static Array<float> calculate_angles(const Span<float3> prev_dirs,
+                                     const Span<float3> next_dirs,
+                                     const int fillet_count)
+{
+  Array<float> angles(fillet_count);
+
+  for (const int i : IndexRange(fillet_count)) {
+    angles[i] = M_PI - angle_v3v3(prev_dirs[i], next_dirs[i]);
+  }
+
+  return angles;
+}
+
+/* Calculate the segment count in each filleted arc. */
+static Array<int> calculate_counts(const std::optional<float> arc_angle,
+                                   const std::optional<int> count,
+                                   const Span<float> angles,
+                                   const int fillet_count)
+{
+  Array<int> counts(fillet_count);
+
+  for (const int i : IndexRange(fillet_count)) {
+    counts[i] = count.has_value() ? count.value() : ceil(angles[i] / arc_angle.value());
+  }
+
+  return counts;
+}
+
+/* Calculate the radii for the vertices to be filleted. */
+static Array<float> calculate_radii(const FilletModeParam &mode_param,
+                                    const int spline_index,
+                                    const int fillet_count)
+{
+  Array<float> radii(fillet_count, 0.0f);
+
+  for (const int i : IndexRange(fillet_count)) {
+    if (mode_param.radius_mode == GEO_NODE_CURVE_FILLET_RADIUS_FLOAT) {
+      radii[i] = mode_param.radius.value();
+    }
+    else if (mode_param.radius_mode == GEO_NODE_CURVE_FILLET_RADIUS_ATTRIBUTE &&
+             spline_index + i < mode_param.radii->size()) {
+      radii[i] = (*mode_param.radii)[spline_index + i];
+    }
+  }
+
+  return radii;
 }
 
 /* Limit the radius based on angle and radii to prevent overlap. */
@@ -241,6 +316,24 @@ static void limit_radii(FilletData &fd, const Span<float3> spline_positions, con
   }
 }
 
+static int calculate_point_counts(MutableSpan<int> point_counts,
+                                  const Span<float> radii,
+                                  const Span<int> counts,
+                                  const int fillet_count,
+                                  const int start)
+{
+  int added_count = 0;
+  for (const int i : IndexRange(fillet_count)) {
+    /* Calculate number of points to be added for the vertex. */
+    if (radii[i] != 0.0f) {
+      added_count += counts[i];
+      point_counts[i + start] = counts[i] + 1;
+    }
+  }
+
+  return added_count;
+}
+
 /* Function to calculate and obtain the fillet data for the entire spline. */
 static FilletData calculate_fillet_data(const Spline &spline,
                                         const FilletModeParam &mode_param,
@@ -262,52 +355,15 @@ static FilletData calculate_fillet_data(const Spline &spline,
   }
 
   FilletData fd(fillet_count);
+  fd.prev_dirs = calculate_prev_directions(spline.positions(), spline.is_cyclic(), fillet_count);
+  fd.next_dirs = calculate_next_directions(spline.positions(), spline.is_cyclic(), fillet_count);
+  fd.positions = spline.positions().slice(IndexRange(start, fillet_count));
+  fd.axes = calculate_axes(fd.prev_dirs, fd.next_dirs, fillet_count);
+  fd.angles = calculate_angles(fd.prev_dirs, fd.next_dirs, fillet_count);
+  fd.counts = calculate_counts(mode_param.angle, mode_param.count, fd.angles, fillet_count);
+  fd.radii = calculate_radii(mode_param, spline_index, fillet_count);
 
-  for (const int i : IndexRange(start, fillet_count)) {
-    /* Find the positions of the adjacent vertices. */
-    float3 prev_pos, pos, next_pos;
-    if (cyclic) {
-      prev_pos = spline.positions()[i == 0 ? spline.size() - 1 : i - 1];
-      pos = spline.positions()[i];
-      next_pos = spline.positions()[i == spline.size() - 1 ? 0 : i + 1];
-    }
-    else {
-      prev_pos = spline.positions()[i - 1];
-      pos = spline.positions()[i];
-      next_pos = spline.positions()[i + 1];
-    }
-
-    /* Define the radius. */
-    float radius = 0.0f;
-    if (mode_param.radius_mode == GEO_NODE_CURVE_FILLET_RADIUS_FLOAT) {
-      radius = mode_param.radius.value();
-    }
-    else if (mode_param.radius_mode == GEO_NODE_CURVE_FILLET_RADIUS_ATTRIBUTE &&
-             spline_index + i < mode_param.radii->size()) {
-      radius = (*mode_param.radii)[spline_index + i];
-    }
-
-    /* Calculate fillet data for the vertex. */
-    calculate_fillet_data_per_vertex(
-        fd, prev_pos, pos, next_pos, mode_param.angle, mode_param.count, radius, i - start);
-
-    /* Exit from here if the radius is zero */
-    if (radius == 0.0f) {
-      continue;
-    }
-
-    /* Calculate number of points to be added for the vertex. */
-    int count = 0;
-    if (mode_param.mode == GEO_NODE_CURVE_FILLET_ADAPTIVE) {
-      count = ceil(fd.angles[i - start] / mode_param.angle.value());
-    }
-    else if (mode_param.mode == GEO_NODE_CURVE_FILLET_USER_DEFINED) {
-      count = mode_param.count.value();
-    }
-
-    added_count += count;
-    point_counts[i] = count + 1;
-  }
+  added_count = calculate_point_counts(point_counts, fd.radii, fd.counts, fillet_count, start);
 
   return fd;
 }
