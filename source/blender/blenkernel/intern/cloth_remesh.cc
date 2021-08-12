@@ -316,6 +316,16 @@ using AdaptiveMeshDiff = MeshDiff<NodeData<T>, VertData, EdgeData, internal::Emp
 template<typename END>
 class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::EmptyExtraData> {
  public:
+  std::string serialize() const
+  {
+    std::stringstream ss;
+    ss << "GenericAdaptiveMesh" << std::endl;
+
+    msgpack::pack(ss, *this);
+
+    return ss.str();
+  }
+
   float compute_edge_size(const AdaptiveVert &v1, const AdaptiveVert &v2) const
   {
     const auto &v1_uv = v1.get_uv();
@@ -969,6 +979,33 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
   }
 };
 
+template<typename END> using AdaptiveNode = Node<NodeData<END>>;
+using AdaptiveVert = Vert<VertData>;
+using AdaptiveEdge = Edge<EdgeData>;
+using AdaptiveFace = Face<EmptyExtraData>;
+using EmptyAdaptiveMesh = AdaptiveMesh<EmptyExtraData>;
+using ClothAdaptiveMesh = AdaptiveMesh<ClothNodeData>;
+
+template<> std::string EmptyAdaptiveMesh::serialize() const
+{
+  std::stringstream ss;
+  ss << "EmptyAdaptiveMesh" << std::endl;
+
+  msgpack::pack(ss, *this);
+
+  return ss.str();
+}
+
+template<> std::string ClothAdaptiveMesh::serialize() const
+{
+  std::stringstream ss;
+  ss << "ClothAdaptiveMesh" << std::endl;
+
+  msgpack::pack(ss, *this);
+
+  return ss.str();
+}
+
 }  // namespace blender::bke::internal
 
 namespace msgpack {
@@ -1111,6 +1148,28 @@ MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS)
 
       o.pack(std::string("sizing"));
       o.pack(v.get_m());
+
+      return o;
+    }
+  };
+
+  template<> struct pack<blender::bke::internal::EmptyAdaptiveMesh> {
+    template<typename Stream>
+    msgpack::packer<Stream> &operator()(
+        msgpack::packer<Stream> &o, const blender::bke::internal::EmptyAdaptiveMesh &mesh) const
+    {
+      pack_mesh(o, mesh);
+
+      return o;
+    }
+  };
+
+  template<> struct pack<blender::bke::internal::ClothAdaptiveMesh> {
+    template<typename Stream>
+    msgpack::packer<Stream> &operator()(
+        msgpack::packer<Stream> &o, const blender::bke::internal::ClothAdaptiveMesh &mesh) const
+    {
+      pack_mesh(o, mesh);
 
       return o;
     }

@@ -2458,6 +2458,8 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
   std::string serialize() const
   {
     std::stringstream ss;
+    ss << "GenericMesh" << std::endl;
+
     msgpack::pack(ss, *this);
 
     return ss.str();
@@ -3338,70 +3340,64 @@ MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS)
 {
   namespace adaptor {
 
-  template<typename END, typename EVD, typename EED, typename EFD>
-  struct pack<blender::bke::internal::Mesh<END, EVD, EED, EFD>> {
-    template<typename Stream>
-    msgpack::packer<Stream> &operator()(
-        msgpack::packer<Stream> &o,
-        const blender::bke::internal::Mesh<END, EVD, EED, EFD> &mesh) const
-    {
-      blender::Map<blender::bke::internal::NodeIndex, uint64_t> node_pos_index_map;
-      auto node_pos = 0;
-      for (const auto &node : mesh.get_nodes()) {
-        auto self_index = node.get_self_index();
-        node_pos_index_map.add_new(self_index, node_pos);
-        node_pos++;
-      }
-
-      blender::Map<blender::bke::internal::VertIndex, uint64_t> vert_pos_index_map;
-      auto vert_pos = 0;
-      for (const auto &vert : mesh.get_verts()) {
-        auto self_index = vert.get_self_index();
-        vert_pos_index_map.add_new(self_index, vert_pos);
-        vert_pos++;
-      }
-
-      blender::Map<blender::bke::internal::EdgeIndex, uint64_t> edge_pos_index_map;
-      auto edge_pos = 0;
-      for (const auto &edge : mesh.get_edges()) {
-        auto self_index = edge.get_self_index();
-        edge_pos_index_map.add_new(self_index, edge_pos);
-        edge_pos++;
-      }
-
-      blender::Map<blender::bke::internal::FaceIndex, uint64_t> face_pos_index_map;
-      auto face_pos = 0;
-      for (const auto &face : mesh.get_faces()) {
-        auto self_index = face.get_self_index();
-        face_pos_index_map.add_new(self_index, face_pos);
-        face_pos++;
-      }
-
-      /* Need to store the arenas and the corresponding mappings
-       * between the arena index and positional index of that element */
-      o.pack_array(16);
-
-      o.pack(std::string("nodes"));
-      o.pack(mesh.get_nodes());
-      o.pack(std::string("verts"));
-      o.pack(mesh.get_verts());
-      o.pack(std::string("edges"));
-      o.pack(mesh.get_edges());
-      o.pack(std::string("faces"));
-      o.pack(mesh.get_faces());
-
-      o.pack(std::string("node_map"));
-      o.pack(node_pos_index_map);
-      o.pack(std::string("vert_map"));
-      o.pack(vert_pos_index_map);
-      o.pack(std::string("edge_map"));
-      o.pack(edge_pos_index_map);
-      o.pack(std::string("face_map"));
-      o.pack(face_pos_index_map);
-
-      return o;
+  template<typename END, typename EVD, typename EED, typename EFD, typename Stream>
+  void pack_mesh(msgpack::packer<Stream> &o,
+                 const blender::bke::internal::Mesh<END, EVD, EED, EFD> &mesh)
+  {
+    blender::Map<blender::bke::internal::NodeIndex, uint64_t> node_pos_index_map;
+    auto node_pos = 0;
+    for (const auto &node : mesh.get_nodes()) {
+      auto self_index = node.get_self_index();
+      node_pos_index_map.add_new(self_index, node_pos);
+      node_pos++;
     }
-  };
+
+    blender::Map<blender::bke::internal::VertIndex, uint64_t> vert_pos_index_map;
+    auto vert_pos = 0;
+    for (const auto &vert : mesh.get_verts()) {
+      auto self_index = vert.get_self_index();
+      vert_pos_index_map.add_new(self_index, vert_pos);
+      vert_pos++;
+    }
+
+    blender::Map<blender::bke::internal::EdgeIndex, uint64_t> edge_pos_index_map;
+    auto edge_pos = 0;
+    for (const auto &edge : mesh.get_edges()) {
+      auto self_index = edge.get_self_index();
+      edge_pos_index_map.add_new(self_index, edge_pos);
+      edge_pos++;
+    }
+
+    blender::Map<blender::bke::internal::FaceIndex, uint64_t> face_pos_index_map;
+    auto face_pos = 0;
+    for (const auto &face : mesh.get_faces()) {
+      auto self_index = face.get_self_index();
+      face_pos_index_map.add_new(self_index, face_pos);
+      face_pos++;
+    }
+
+    /* Need to store the arenas and the corresponding mappings
+     * between the arena index and positional index of that element */
+    o.pack_array(16);
+
+    o.pack(std::string("nodes"));
+    o.pack(mesh.get_nodes());
+    o.pack(std::string("verts"));
+    o.pack(mesh.get_verts());
+    o.pack(std::string("edges"));
+    o.pack(mesh.get_edges());
+    o.pack(std::string("faces"));
+    o.pack(mesh.get_faces());
+
+    o.pack(std::string("node_map"));
+    o.pack(node_pos_index_map);
+    o.pack(std::string("vert_map"));
+    o.pack(vert_pos_index_map);
+    o.pack(std::string("edge_map"));
+    o.pack(edge_pos_index_map);
+    o.pack(std::string("face_map"));
+    o.pack(face_pos_index_map);
+  }
 
   template<> struct pack<blender::bke::internal::EmptyExtraData> {
     template<typename Stream>
@@ -3411,6 +3407,19 @@ MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS)
       o.pack_array(1);
 
       o.pack("EmptyExtraData");
+
+      return o;
+    }
+  };
+
+  template<typename END, typename EVD, typename EED, typename EFD>
+  struct pack<blender::bke::internal::Mesh<END, EVD, EED, EFD>> {
+    template<typename Stream>
+    msgpack::packer<Stream> &operator()(
+        msgpack::packer<Stream> &o,
+        const blender::bke::internal::Mesh<END, EVD, EED, EFD> &mesh) const
+    {
+      pack_mesh(o, mesh);
 
       return o;
     }
