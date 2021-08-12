@@ -21,6 +21,7 @@
 #include <cassert>
 
 #include <Eigen/Core>
+#include <Eigen/Geometry>
 
 #include "GHOST_Types.h"
 #include "GHOST_XrException.h"
@@ -33,8 +34,6 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #define STBIWDEF static inline
 #include "tiny_gltf.h"
-
-using Eigen::Matrix4f; /* For matrix multiplication. */
 
 /* -------------------------------------------------------------------- */
 /** \name glTF Utilities
@@ -227,26 +226,70 @@ static void calc_node_transform(const tinygltf::Node &gltf_node,
                                 const float parent_transform[4][4],
                                 float r_transform[4][4])
 {
-  const std::vector<double> &dm = gltf_node.matrix;
-  assert(dm.size() == 16);
-  float m[4][4] = {(float)dm[0],
-                   (float)dm[1],
-                   (float)dm[2],
-                   (float)dm[3],
-                   (float)dm[4],
-                   (float)dm[5],
-                   (float)dm[6],
-                   (float)dm[7],
-                   (float)dm[8],
-                   (float)dm[9],
-                   (float)dm[10],
-                   (float)dm[11],
-                   (float)dm[12],
-                   (float)dm[13],
-                   (float)dm[14],
-                   (float)dm[15]};
+  /* A node may specify either a 4x4 matrix or TRS (Translation - Rotation - Scale) values, but not
+   * both. */
+  if (gltf_node.matrix.size() == 16) {
+    const std::vector<double> &dm = gltf_node.matrix;
+    float m[4][4] = {(float)dm[0],
+                     (float)dm[1],
+                     (float)dm[2],
+                     (float)dm[3],
+                     (float)dm[4],
+                     (float)dm[5],
+                     (float)dm[6],
+                     (float)dm[7],
+                     (float)dm[8],
+                     (float)dm[9],
+                     (float)dm[10],
+                     (float)dm[11],
+                     (float)dm[12],
+                     (float)dm[13],
+                     (float)dm[14],
+                     (float)dm[15]};
 
-  *(Matrix4f *)r_transform = *((Matrix4f *)parent_transform) * *((Matrix4f *)m);
+    *(Eigen::Matrix4f *)r_transform = *(Eigen::Matrix4f *)parent_transform * *(Eigen::Matrix4f *)m;
+  }
+  else {
+    /* No matrix is present, so construct a matrix from the TRS values (each one is optional). */
+    std::vector<double> translation = gltf_node.translation;
+    std::vector<double> rotation = gltf_node.rotation;
+    std::vector<double> scale = gltf_node.scale;
+    Eigen::Matrix4f m;
+    Eigen::Quaternionf q;
+    Eigen::Matrix3f scalemat;
+
+    if (translation.size() != 3) {
+      translation.resize(3);
+      translation[0] = translation[1] = translation[2] = 0.0;
+    }
+    if (rotation.size() != 4) {
+      rotation.resize(4);
+      rotation[0] = rotation[1] = rotation[2] = 0.0;
+      rotation[3] = 1.0;
+    }
+    if (scale.size() != 3) {
+      scale.resize(3);
+      scale[0] = scale[1] = scale[2] = 1.0;
+    }
+
+    q.w() = (float)rotation[3];
+    q.x() = (float)rotation[0];
+    q.y() = (float)rotation[1];
+    q.z() = (float)rotation[2];
+    q.normalize();
+
+    scalemat.setIdentity();
+    scalemat(0, 0) = (float)scale[0];
+    scalemat(1, 1) = (float)scale[1];
+    scalemat(2, 2) = (float)scale[2];
+
+    m.setIdentity();
+    m.block<3, 3>(0, 0) = q.toRotationMatrix() * scalemat;
+    m.block<3, 1>(0, 3) = Eigen::Vector3f(
+        (float)translation[0], (float)translation[1], (float)translation[2]);
+
+    *(Eigen::Matrix4f *)r_transform = *(Eigen::Matrix4f *)parent_transform * m;
+  }
 }
 
 static void load_node(tinygltf::Model gltf_model,
