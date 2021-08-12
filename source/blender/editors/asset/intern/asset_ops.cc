@@ -36,7 +36,7 @@ using PointerRNAVec = blender::Vector<PointerRNA>;
 
 static bool asset_operation_poll(bContext * /*C*/)
 {
-  return U.experimental.use_asset_browser;
+  return U.experimental.use_extended_asset_browser;
 }
 
 /**
@@ -110,7 +110,7 @@ void AssetMarkHelper::reportResults(ReportList &reports) const
 {
   /* User feedback on failure. */
   if (!wasSuccessful()) {
-    if ((stats.tot_already_asset > 0)) {
+    if (stats.tot_already_asset > 0) {
       BKE_report(&reports,
                  RPT_ERROR,
                  "Selected data-blocks are already assets (or do not support use as assets)");
@@ -151,7 +151,7 @@ static int asset_mark_exec(bContext *C, wmOperator *op)
 
 static void ASSET_OT_mark(wmOperatorType *ot)
 {
-  ot->name = "Mark Asset";
+  ot->name = "Mark as Asset";
   ot->description =
       "Enable easier reuse of selected data-blocks through the Asset Browser, with the help of "
       "customizable metadata (like previews, descriptions and tags)";
@@ -169,7 +169,7 @@ class AssetClearHelper {
  public:
   void operator()(PointerRNAVec &ids);
 
-  void reportResults(ReportList &reports) const;
+  void reportResults(const bContext *C, ReportList &reports) const;
   bool wasSuccessful() const;
 
  private:
@@ -198,10 +198,22 @@ void AssetClearHelper::operator()(PointerRNAVec &ids)
   }
 }
 
-void AssetClearHelper::reportResults(ReportList &reports) const
+void AssetClearHelper::reportResults(const bContext *C, ReportList &reports) const
 {
   if (!wasSuccessful()) {
-    BKE_report(&reports, RPT_ERROR, "No asset data-blocks selected/focused");
+    bool is_valid;
+    /* Dedicated error message for when there is an active asset detected, but it's not an ID local
+     * to this file. Helps users better understanding what's going on. */
+    if (AssetHandle active_asset = CTX_wm_asset_handle(C, &is_valid);
+        is_valid && !ED_asset_handle_get_local_id(&active_asset)) {
+      BKE_report(&reports,
+                 RPT_ERROR,
+                 "No asset data-blocks from the current file selected (assets must be stored in "
+                 "the current file to be able to edit or clear them)");
+    }
+    else {
+      BKE_report(&reports, RPT_ERROR, "No asset data-blocks selected/focused");
+    }
   }
   else if (stats.tot_cleared == 1) {
     /* If only one data-block: Give more useful message by printing asset name. */
@@ -224,7 +236,7 @@ static int asset_clear_exec(bContext *C, wmOperator *op)
 
   AssetClearHelper clear_helper;
   clear_helper(ids);
-  clear_helper.reportResults(*op->reports);
+  clear_helper.reportResults(C, *op->reports);
 
   if (!clear_helper.wasSuccessful()) {
     return OPERATOR_CANCELLED;
@@ -254,7 +266,7 @@ static void ASSET_OT_clear(wmOperatorType *ot)
 
 static bool asset_list_refresh_poll(bContext *C)
 {
-  const AssetLibraryReference *library = CTX_wm_asset_library(C);
+  const AssetLibraryReference *library = CTX_wm_asset_library_ref(C);
   if (!library) {
     return false;
   }
@@ -264,7 +276,7 @@ static bool asset_list_refresh_poll(bContext *C)
 
 static int asset_list_refresh_exec(bContext *C, wmOperator *UNUSED(unused))
 {
-  const AssetLibraryReference *library = CTX_wm_asset_library(C);
+  const AssetLibraryReference *library = CTX_wm_asset_library_ref(C);
   ED_assetlist_clear(library, C);
   return OPERATOR_FINISHED;
 }

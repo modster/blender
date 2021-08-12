@@ -44,7 +44,9 @@ static bool is_constant_foldable(NodeOperation *operation)
 {
   if (operation->get_flags().can_be_constant && !operation->get_flags().is_constant_operation) {
     for (int i = 0; i < operation->getNumberOfInputSockets(); i++) {
-      if (!operation->get_input_operation(i)->get_flags().is_constant_operation) {
+      NodeOperation *input = operation->get_input_operation(i);
+      if (!input->get_flags().is_constant_operation ||
+          !static_cast<ConstantOperation *>(input)->can_get_constant_elem()) {
         return false;
       }
     }
@@ -94,6 +96,7 @@ ConstantOperation *ConstantFolder::fold_operation(NodeOperation *operation)
   const DataType data_type = operation->getOutputSocket()->getDataType();
   MemoryBuffer fold_buf(data_type, first_elem_area_);
   Vector<MemoryBuffer *> input_bufs = get_constant_input_buffers(operation);
+  operation->init_data();
   operation->render(&fold_buf, {first_elem_area_}, input_bufs);
 
   MemoryBuffer *constant_buf = create_constant_buffer(data_type);

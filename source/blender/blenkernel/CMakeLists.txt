@@ -194,7 +194,7 @@ set(SRC
   intern/mesh_mirror.c
   intern/mesh_normals.cc
   intern/mesh_remap.c
-  intern/mesh_remesh_voxel.c
+  intern/mesh_remesh_voxel.cc
   intern/mesh_runtime.c
   intern/mesh_sample.cc
   intern/mesh_tangent.c
@@ -696,6 +696,13 @@ if(WITH_ALEMBIC)
     ../io/alembic
   )
   add_definitions(-DWITH_ALEMBIC)
+endif()
+
+if(WITH_USD)
+  list(APPEND INC
+    ../io/usd
+  )
+  add_definitions(-DWITH_USD)
 endif()
 
 if(WITH_OPENSUBDIV)

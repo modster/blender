@@ -150,7 +150,7 @@ static Mesh *hull_from_bullet(const Mesh *mesh, Span<float3> coords)
 
   plConvexHullDelete(hull);
 
-  BKE_mesh_calc_normals(result);
+  BKE_mesh_normals_tag_dirty(result);
   return result;
 }
 
@@ -304,6 +304,8 @@ static void geo_node_convex_hull_exec(GeoNodeExecParams params)
   }
   params.set_output("Convex Hull", GeometrySet::create_with_mesh(mesh));
 #else
+  params.error_message_add(NodeWarningType::Error,
+                           TIP_("Disabled, Blender was compiled without Bullet"));
   params.set_output("Convex Hull", geometry_set);
 #endif /* WITH_BULLET */
 }

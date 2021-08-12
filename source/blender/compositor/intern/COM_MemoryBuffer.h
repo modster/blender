@@ -189,6 +189,25 @@ class MemoryBuffer {
     return m_buffer + get_coords_offset(x, y);
   }
 
+  void read_elem(int x, int y, float *out) const
+  {
+    memcpy(out, get_elem(x, y), m_num_channels * sizeof(float));
+  }
+
+  void read_elem_sampled(float x, float y, PixelSampler sampler, float *out) const
+  {
+    switch (sampler) {
+      case PixelSampler::Nearest:
+        this->read_elem(x, y, out);
+        break;
+      case PixelSampler::Bilinear:
+      case PixelSampler::Bicubic:
+        /* No bicubic. Current implementation produces fuzzy results. */
+        this->readBilinear(out, x, y);
+        break;
+    }
+  }
+
   /**
    * Get channel value at given coordinates.
    */
@@ -239,6 +258,11 @@ class MemoryBuffer {
   uint8_t get_num_channels() const
   {
     return this->m_num_channels;
+  }
+
+  uint8_t get_elem_bytes_len() const
+  {
+    return this->m_num_channels * sizeof(float);
   }
 
   /**
@@ -330,7 +354,7 @@ class MemoryBuffer {
   inline void wrap_pixel(float &x,
                          float &y,
                          MemoryBufferExtend extend_x,
-                         MemoryBufferExtend extend_y)
+                         MemoryBufferExtend extend_y) const
   {
     const float w = (float)getWidth();
     const float h = (float)getHeight();
@@ -427,7 +451,7 @@ class MemoryBuffer {
                            float x,
                            float y,
                            MemoryBufferExtend extend_x = MemoryBufferExtend::Clip,
-                           MemoryBufferExtend extend_y = MemoryBufferExtend::Clip)
+                           MemoryBufferExtend extend_y = MemoryBufferExtend::Clip) const
   {
     float u = x;
     float v = y;

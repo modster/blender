@@ -181,23 +181,13 @@ static PyMethodDef id_free_weakref_cb_def = {
 /* Adds a reference to the list, remember to decref. */
 static GHash *id_weakref_pool_get(ID *id)
 {
-  GHash *weakinfo_hash = NULL;
-
-  if (id_weakref_pool) {
-    weakinfo_hash = BLI_ghash_lookup(id_weakref_pool, (void *)id);
-  }
-  else {
-    /* First time, allocate pool. */
-    id_weakref_pool = BLI_ghash_ptr_new("rna_global_pool");
-    weakinfo_hash = NULL;
-  }
-
+  GHash *weakinfo_hash = BLI_ghash_lookup(id_weakref_pool, (void *)id);
   if (weakinfo_hash == NULL) {
-    /* We use a ghash as a set, we could use libHX's HXMAP_SINGULAR, but would be an extra dep. */
+    /* This could be a set, values are used to keep a reference back to the ID
+     * (all of them are the same). */
     weakinfo_hash = BLI_ghash_ptr_new("rna_id");
     BLI_ghash_insert(id_weakref_pool, id, weakinfo_hash);
   }
-
   return weakinfo_hash;
 }
 
@@ -283,14 +273,6 @@ static void id_release_weakref_list(struct ID *id, GHash *weakinfo_hash)
 
   BLI_ghash_remove(id_weakref_pool, (void *)id, NULL, NULL);
   BLI_ghash_free(weakinfo_hash, NULL, NULL);
-
-  if (BLI_ghash_len(id_weakref_pool) == 0) {
-    BLI_ghash_free(id_weakref_pool, NULL, NULL);
-    id_weakref_pool = NULL;
-#  ifdef DEBUG_RNA_WEAKREF
-    printf("id_release_weakref freeing pool\n");
-#  endif
-  }
 }
 
 static void id_release_weakref(struct ID *id)
@@ -310,7 +292,8 @@ void BPY_id_release(struct ID *id)
 #endif
 
 #ifdef USE_PYRNA_INVALIDATE_WEAKREF
-  if (id_weakref_pool) {
+  /* Check for NULL since this may run before Python has been started. */
+  if (id_weakref_pool != NULL) {
     PyGILState_STATE gilstate = PyGILState_Ensure();
 
     id_release_weakref(id);
@@ -815,6 +798,47 @@ int pyrna_enum_value_from_id(const EnumPropertyItem *item,
   }
 
   return 0;
+}
+
+/**
+ * Use with #PyArg_ParseTuple's `O&` formatting.
+ */
+int pyrna_enum_value_parse_string(PyObject *o, void *p)
+{
+  const char *identifier = PyUnicode_AsUTF8(o);
+  if (identifier == NULL) {
+    PyErr_Format(PyExc_TypeError, "expected a string enum, not %.200s", Py_TYPE(o)->tp_name);
+    return 0;
+  }
+  struct BPy_EnumProperty_Parse *parse_data = p;
+  if (pyrna_enum_value_from_id(
+          parse_data->items, identifier, &parse_data->value, "enum identifier") == -1) {
+    return 0;
+  }
+
+  parse_data->value_orig = o;
+  parse_data->is_set = true;
+  return 1;
+}
+
+/**
+ * Use with #PyArg_ParseTuple's `O&` formatting.
+ */
+int pyrna_enum_bitfield_parse_set(PyObject *o, void *p)
+{
+  if (!PySet_Check(o)) {
+    PyErr_Format(PyExc_TypeError, "expected a set, not %.200s", Py_TYPE(o)->tp_name);
+    return 0;
+  }
+
+  struct BPy_EnumProperty_Parse *parse_data = p;
+  if (pyrna_set_to_enum_bitfield(
+          parse_data->items, o, &parse_data->value, "enum identifier set") == -1) {
+    return 0;
+  }
+  parse_data->value_orig = o;
+  parse_data->is_set = true;
+  return 1;
 }
 
 /* NOTE(campbell): Regarding comparison `__cmp__`:
@@ -2784,9 +2808,11 @@ static PyObject *pyrna_prop_collection_subscript(BPy_PropertyRNA *self, PyObject
       const Py_ssize_t len = (Py_ssize_t)RNA_property_collection_length(&self->ptr, self->prop);
       if (start < 0) {
         start += len;
+        CLAMP_MIN(start, 0);
       }
       if (stop < 0) {
         stop += len;
+        CLAMP_MIN(stop, 0);
       }
     }
 
@@ -2914,9 +2940,11 @@ static int pyrna_prop_collection_ass_subscript(BPy_PropertyRNA *self,
         Py_ssize_t len = (Py_ssize_t)RNA_property_collection_length(&self->ptr, self->prop);
         if (start < 0) {
           start += len;
+          CLAMP_MIN(start, 0);
         }
         if (stop < 0) {
           stop += len;
+          CLAMP_MIN(stop, 0);
         }
       }
 
@@ -4447,7 +4475,7 @@ static PyObject *pyrna_struct_meta_idprop_getattro(PyObject *cls, PyObject *attr
   if ((ret == NULL)  /* || BPy_PropDeferred_CheckTypeExact(ret) */ ) {
     StructRNA *srna = srna_from_self(cls, "StructRNA.__getattr__");
     if (srna) {
-      PropertyRNA *prop = RNA_struct_type_find_property(srna, PyUnicode_AsUTF8(attr));
+      PropertyRNA *prop = RNA_struct_type_find_property_no_base(srna, PyUnicode_AsUTF8(attr));
       if (prop) {
         PointerRNA tptr;
         PyErr_Clear(); /* Clear error from tp_getattro. */
@@ -4469,7 +4497,7 @@ static int pyrna_struct_meta_idprop_setattro(PyObject *cls, PyObject *attr, PyOb
   const char *attr_str = PyUnicode_AsUTF8(attr);
 
   if (srna && !pyrna_write_check() &&
-      (is_deferred_prop || RNA_struct_type_find_property(srna, attr_str))) {
+      (is_deferred_prop || RNA_struct_type_find_property_no_base(srna, attr_str))) {
     PyErr_Format(PyExc_AttributeError,
                  "pyrna_struct_meta_idprop_setattro() "
                  "can't set in readonly state '%.200s.%S'",
@@ -7477,7 +7505,7 @@ static PyObject *pyrna_srna_Subtype(StructRNA *srna)
     /* Newclass will now have 2 ref's, ???,
      * probably 1 is internal since #Py_DECREF here segfaults. */
 
-    /* PyC_ObSpit("new class ref", newclass); */
+    // PyC_ObSpit("new class ref", newclass);
 
     if (newclass) {
       /* srna owns one, and the other is owned by the caller. */
@@ -7730,6 +7758,32 @@ void BPY_rna_init(void)
   if (PyType_Ready(&pyrna_prop_collection_iter_Type) < 0) {
     return;
   }
+#endif
+
+#ifdef USE_PYRNA_INVALIDATE_WEAKREF
+  BLI_assert(id_weakref_pool == NULL);
+  id_weakref_pool = BLI_ghash_ptr_new("rna_global_pool");
+#endif
+}
+
+void BPY_rna_exit(void)
+{
+#ifdef USE_PYRNA_INVALIDATE_WEAKREF
+  /* This can help track down which kinds of data were not released.
+   * If they were in fact freed by Blender, printing their names
+   * will crash giving a useful error with address sanitizer. The likely cause
+   * for this list not being empty is a missing call to: #BKE_libblock_free_data_py. */
+  const int id_weakref_pool_len = BLI_ghash_len(id_weakref_pool);
+  if (id_weakref_pool_len != id_weakref_pool_len) {
+    printf("Found %d unreleased ID's\n", id_weakref_pool_len);
+    GHashIterator gh_iter;
+    GHASH_ITER (gh_iter, id_weakref_pool) {
+      ID *id = BLI_ghashIterator_getKey(&gh_iter);
+      printf("ID: %s\n", id->name);
+    }
+  }
+  BLI_ghash_free(id_weakref_pool, NULL, NULL);
+  id_weakref_pool = NULL;
 #endif
 }
 
@@ -7999,14 +8053,21 @@ static int deferred_register_prop(StructRNA *srna, PyObject *key, PyObject *item
   PyObject *py_kw = ((BPy_PropDeferred *)item)->kw;
   PyObject *py_srna_cobject, *py_ret;
 
-  PyObject *args_fake;
+  /* Show the function name in errors to help give context. */
+  BLI_assert(PyCFunction_CheckExact(py_func));
+  PyMethodDef *py_func_method_def = ((PyCFunctionObject *)py_func)->m_ml;
+  const char *func_name = py_func_method_def->ml_name;
 
-  if (*PyUnicode_AsUTF8(key) == '_') {
+  PyObject *args_fake;
+  const char *key_str = PyUnicode_AsUTF8(key);
+
+  if (*key_str == '_') {
     PyErr_Format(PyExc_ValueError,
                  "bpy_struct \"%.200s\" registration error: "
-                 "%.200s could not register because the property starts with an '_'\n",
+                 "'%.200s' %.200s could not register because it starts with an '_'",
                  RNA_struct_identifier(srna),
-                 PyUnicode_AsUTF8(key));
+                 key_str,
+                 func_name);
     return -1;
   }
   py_srna_cobject = PyCapsule_New(srna, NULL, NULL);
@@ -8025,8 +8086,12 @@ static int deferred_register_prop(StructRNA *srna, PyObject *key, PyObject *item
          *(PyCFunctionWithKeywords)PyCFunction_GET_FUNCTION(py_func) == BPy_CollectionProperty) &&
         RNA_struct_idprops_contains_datablock(type_srna)) {
       PyErr_Format(PyExc_ValueError,
-                   "bpy_struct \"%.200s\" doesn't support datablock properties\n",
-                   RNA_struct_identifier(srna));
+                   "bpy_struct \"%.200s\" registration error: "
+                   "'%.200s' %.200s could not register because "
+                   "this type doesn't support data-block properties",
+                   RNA_struct_identifier(srna),
+                   key_str,
+                   func_name);
       return -1;
     }
   }
@@ -8044,12 +8109,12 @@ static int deferred_register_prop(StructRNA *srna, PyObject *key, PyObject *item
 
     Py_DECREF(args_fake); /* Free's py_srna_cobject too. */
 
-    // PyC_LineSpit();
     PyErr_Format(PyExc_ValueError,
                  "bpy_struct \"%.200s\" registration error: "
-                 "%.200s could not register\n",
+                 "'%.200s' %.200s could not register (see previous error)",
                  RNA_struct_identifier(srna),
-                 PyUnicode_AsUTF8(key));
+                 key_str,
+                 func_name);
     return -1;
   }
 
@@ -8625,6 +8690,8 @@ static int bpy_class_call(bContext *C, PointerRNA *ptr, FunctionRNA *func, Param
       }
 
 #ifdef USE_PEDANTIC_WRITE
+      /* Handle nested draw calls, see: T89253. */
+      const bool rna_disallow_writes_prev = rna_disallow_writes;
       rna_disallow_writes = is_readonly ? true : false;
 #endif
       /* *** Main Caller *** */
@@ -8634,7 +8701,7 @@ static int bpy_class_call(bContext *C, PointerRNA *ptr, FunctionRNA *func, Param
       /* *** Done Calling *** */
 
 #ifdef USE_PEDANTIC_WRITE
-      rna_disallow_writes = false;
+      rna_disallow_writes = rna_disallow_writes_prev;
 #endif
 
       RNA_parameter_list_end(&iter);
