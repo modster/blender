@@ -1301,7 +1301,12 @@ static void set_cloth_information_when_new_mesh(Object *ob, ClothModifierData *c
 
 Mesh *BKE_cloth_remesh(Object *ob, ClothModifierData *clmd, Mesh *mesh)
 {
-  auto *cloth_to_object_res = cloth_to_object(ob, clmd, mesh, false);
+  if (clmd->prev_frame_mesh) {
+    mesh = clmd->prev_frame_mesh;
+  }
+
+  Mesh *cloth_to_object_res = cloth_to_object(ob, clmd, mesh, false);
+
   BLI_assert(cloth_to_object_res == nullptr);
 
   AdaptiveRemeshParams<internal::ClothNodeData, Cloth> params;
@@ -1339,6 +1344,13 @@ Mesh *BKE_cloth_remesh(Object *ob, ClothModifierData *clmd, Mesh *mesh)
   Mesh *new_mesh = adaptive_remesh(params, mesh, *clmd->clothObject);
 
   set_cloth_information_when_new_mesh(ob, clmd, new_mesh);
+
+  if (clmd->prev_frame_mesh) {
+    BKE_mesh_eval_delete(clmd->prev_frame_mesh);
+    clmd->prev_frame_mesh = nullptr;
+  }
+
+  clmd->prev_frame_mesh = BKE_mesh_copy_for_eval(new_mesh, false);
 
   return new_mesh;
 }

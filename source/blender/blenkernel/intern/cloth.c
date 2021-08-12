@@ -50,6 +50,8 @@
 
 #include "SIM_mass_spring.h"
 
+#include <stdio.h>
+
 // #include "PIL_time.h"  /* timing for debug prints */
 
 /* ********** cloth engine ******* */
@@ -269,35 +271,44 @@ static Mesh *do_step_cloth(
   MVert *mvert;
   unsigned int i = 0;
   int ret = 0;
+  const bool remesh = clmd->sim_parms->flags & CLOTH_SIMSETTINGS_FLAG_REMESH;
 
   /* simulate 1 frame forward */
   cloth = clmd->clothObject;
   verts = cloth->verts;
   mvert = mesh->mvert;
 
-  /* force any pinned verts to their constrained location. */
-  for (i = 0; i < clmd->clothObject->mvert_num; i++, verts++) {
-    /* save the previous position. */
-    copy_v3_v3(verts->xold, verts->xconst);
-    copy_v3_v3(verts->txold, verts->x);
+  printf("clmd->clothObject->mvert_num: %u framenr: %d\n", clmd->clothObject->mvert_num, framenr);
 
-    /* Get the current position. */
-    copy_v3_v3(verts->xconst, mvert[i].co);
-    mul_m4_v3(ob->obmat, verts->xconst);
+  /* Don't force if remesh is active */
+  if (remesh == false) {
+    /* force any pinned verts to their constrained location. */
+    for (i = 0; i < clmd->clothObject->mvert_num; i++, verts++) {
+      /* save the previous position. */
+      copy_v3_v3(verts->xold, verts->xconst);
+      copy_v3_v3(verts->txold, verts->x);
+
+      /* Get the current position. */
+      copy_v3_v3(verts->xconst, mvert[i].co);
+      mul_m4_v3(ob->obmat, verts->xconst);
+    }
   }
 
   effectors = BKE_effectors_create(depsgraph, ob, NULL, clmd->sim_parms->effector_weights, false);
 
-  if (clmd->sim_parms->flags & CLOTH_SIMSETTINGS_FLAG_DYNAMIC_BASEMESH) {
-    cloth_update_verts(ob, clmd, mesh);
-  }
+  /* Allow updates from mesh to cloth only if remesh is not active */
+  if (remesh == false) {
+    if (clmd->sim_parms->flags & CLOTH_SIMSETTINGS_FLAG_DYNAMIC_BASEMESH) {
+      cloth_update_verts(ob, clmd, mesh);
+    }
 
-  /* Support for dynamic vertex groups, changing from frame to frame */
-  cloth_apply_vgroup(clmd, mesh);
+    /* Support for dynamic vertex groups, changing from frame to frame */
+    cloth_apply_vgroup(clmd, mesh);
 
-  if ((clmd->sim_parms->flags & CLOTH_SIMSETTINGS_FLAG_DYNAMIC_BASEMESH) ||
-      (clmd->sim_parms->vgroup_shrink > 0) || (clmd->sim_parms->shrink_min != 0.0f)) {
-    cloth_update_spring_lengths(clmd, mesh);
+    if ((clmd->sim_parms->flags & CLOTH_SIMSETTINGS_FLAG_DYNAMIC_BASEMESH) ||
+        (clmd->sim_parms->vgroup_shrink > 0) || (clmd->sim_parms->shrink_min != 0.0f)) {
+      cloth_update_spring_lengths(clmd, mesh);
+    }
   }
 
   cloth_update_springs(clmd);
@@ -317,7 +328,7 @@ static Mesh *do_step_cloth(
 
   // printf ( "%f\n", ( float ) tval() );
 
-  if (clmd->sim_parms->flags & CLOTH_SIMSETTINGS_FLAG_REMESH) {
+  if (remesh) {
     /* In case remeshing is enabled, the remeshing function will
      * return the final mesh needed */
     return BKE_cloth_remesh(ob, clmd, mesh);
@@ -346,6 +357,15 @@ Mesh *clothModifier_do(
   BKE_ptcache_id_from_cloth(&pid, ob, clmd);
   BKE_ptcache_id_time(&pid, scene, framenr, &startframe, &endframe, &timescale);
   clmd->sim_parms->timescale = timescale * clmd->sim_parms->time_scale;
+
+  if (clmd->clothObject) {
+    printf("mesh->totvert: %d clmd->clothObject->mvert_num: %u\n",
+           mesh->totvert,
+           clmd->clothObject->mvert_num);
+  }
+  else {
+    printf("mesh->totvert: %d clmd->clothObject not available\n", mesh->totvert);
+  }
 
   if (clmd->sim_parms->reset ||
       (clmd->clothObject && mesh->totvert != clmd->clothObject->mvert_num)) {
@@ -511,6 +531,11 @@ void cloth_free_modifier(ClothModifierData *clmd)
     MEM_freeN(cloth);
     clmd->clothObject = NULL;
   }
+
+  if (clmd->prev_frame_mesh) {
+    BKE_mesh_eval_delete(clmd->prev_frame_mesh);
+    clmd->prev_frame_mesh = NULL;
+  }
 }
 
 /* frees all */
@@ -592,6 +617,11 @@ void cloth_free_modifier_extern(ClothModifierData *clmd)
 #endif
     MEM_freeN(cloth);
     clmd->clothObject = NULL;
+  }
+
+  if (clmd->prev_frame_mesh) {
+    BKE_mesh_eval_delete(clmd->prev_frame_mesh);
+    clmd->prev_frame_mesh = NULL;
   }
 }
 
@@ -882,6 +912,10 @@ void cloth_from_mesh(ClothModifierData *clmd, const Object *ob, Mesh *mesh, bool
 
   /* Allocate vertices only if requested (alloc_verts) */
   if (alloc_verts) {
+    if (clmd->clothObject->verts) {
+      MEM_freeN(clmd->clothObject->verts);
+    }
+
     clmd->clothObject->mvert_num = mvert_num;
     clmd->clothObject->verts = MEM_callocN(sizeof(ClothVertex) * clmd->clothObject->mvert_num,
                                            "clothVertex");
@@ -900,6 +934,11 @@ void cloth_from_mesh(ClothModifierData *clmd, const Object *ob, Mesh *mesh, bool
   }
   else {
     clmd->clothObject->primitive_num = mesh->totedge;
+  }
+
+  if (clmd->clothObject->tri) {
+    MEM_freeN(clmd->clothObject->tri);
+    clmd->clothObject->tri = NULL;
   }
 
   clmd->clothObject->tri = MEM_mallocN(sizeof(MVertTri) * looptri_num, "clothLoopTris");

@@ -87,6 +87,8 @@ static void initData(ModifierData *md)
   if (clmd->point_cache) {
     clmd->point_cache->step = 1;
   }
+
+  clmd->prev_frame_mesh = NULL;
 }
 
 static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *mesh)

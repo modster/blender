@@ -32,6 +32,7 @@
 #include "MEM_guardedalloc.h"
 
 #include "DNA_ID.h"
+#include "DNA_cloth_types.h"
 #include "DNA_collection_types.h"
 #include "DNA_dynamicpaint_types.h"
 #include "DNA_fluid_types.h"
@@ -2920,7 +2921,18 @@ int BKE_ptcache_id_reset(Scene *scene, PTCacheID *pid, int mode)
     cache->flag &= ~PTCACHE_REDO_NEEDED;
 
     if (pid->type == PTCACHE_TYPE_CLOTH) {
-      cloth_free_modifier(pid->calldata);
+      ClothModifierData *clmd = (ClothModifierData *)pid->calldata;
+
+      const bool remesh = clmd->sim_parms->flags & CLOTH_SIMSETTINGS_FLAG_REMESH;
+      /* This is a hacky way to prevent deleting the previous frame
+       * information needed by the remeshing step. The remeshing step
+       * always leads to an invalid cache as of right now. Instead of
+       * disabling the point cache through the modifier, this is
+       * easier method. Will need to come around to fixing this
+       * later. */
+      if (remesh == false) {
+        cloth_free_modifier(clmd);
+      }
     }
     else if (pid->type == PTCACHE_TYPE_SOFTBODY) {
       sbFreeSimulation(pid->calldata);
