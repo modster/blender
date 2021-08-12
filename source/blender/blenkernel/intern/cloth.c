@@ -358,6 +358,22 @@ Mesh *clothModifier_do(
   BKE_ptcache_id_time(&pid, scene, framenr, &startframe, &endframe, &timescale);
   clmd->sim_parms->timescale = timescale * clmd->sim_parms->time_scale;
 
+  /* If it is not the exact next frame, previous frame mesh is no
+   * longer valid */
+  if (clmd->clothObject) {
+    if (framenr != clmd->clothObject->last_frame + 1) {
+      if (clmd->prev_frame_mesh) {
+        BKE_mesh_eval_delete(clmd->prev_frame_mesh);
+        clmd->prev_frame_mesh = NULL;
+      }
+      if (clmd->sim_parms->flags & CLOTH_SIMSETTINGS_FLAG_REMESH) {
+        /* Need to also reset the modifier if remesh is on since the
+         * clothObject has invalid information */
+        cloth_free_modifier(clmd);
+      }
+    }
+  }
+
   if (clmd->clothObject) {
     printf("mesh->totvert: %d clmd->clothObject->mvert_num: %u\n",
            mesh->totvert,
