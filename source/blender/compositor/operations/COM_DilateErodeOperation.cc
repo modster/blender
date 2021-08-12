@@ -180,6 +180,9 @@ void DilateErodeThresholdOperation::get_area_of_interest(const int input_idx,
 template<template<typename> typename TCompare>
 static float get_min_distance(DilateErodeThresholdOperation::PixelData &p)
 {
+  /* TODO(manzanilla): bad performance, generate a table with relative offsets on operation
+   * initialization to loop from less to greater distance and break as soon as #compare is
+   * true. */
   const TCompare compare;
   float min_dist = p.distance;
   const float *row = p.elem + ((intptr_t)p.ymin - p.y) * p.row_stride +
@@ -382,6 +385,8 @@ void DilateDistanceOperation::get_area_of_interest(const int input_idx,
 template<template<typename> typename TCompare>
 static float get_distance_value(DilateDistanceOperation::PixelData &p, const float start_value)
 {
+  /* TODO(manzanilla): bad performance, only loop elements within minimum distance removing
+   * coordinates and conditional if `dist <= min_dist`. May need to generate a table of offsets. */
   const TCompare compare;
   const float min_dist = p.min_distance;
   float value = start_value;
