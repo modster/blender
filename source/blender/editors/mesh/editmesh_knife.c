@@ -1390,7 +1390,7 @@ static BMFace *knife_bvh_raycast(KnifeTool_OpData *kcd,
 
   BLI_bvhtree_ray_cast(kcd->bvh.tree, co, dir, radius, &hit, knife_bvh_raycast_cb, kcd);
 
-  // Handle Hit
+  /* Handle Hit */
   if (hit.index != -1 && hit.dist != dist) {
     if (same_object) {
       if (kcd->base_index != kcd->bvh.base_index) {
@@ -1452,7 +1452,7 @@ static BMFace *knife_bvh_raycast_filter(
   kcd->bvh.filter_cb = NULL;
   kcd->bvh.filter_data = NULL;
 
-  // Handle Hit
+  /* Handle Hit */
   if (hit.index != -1 && hit.dist != dist) {
     if (same_object) {
       if (kcd->base_index != kcd->bvh.base_index) {
