@@ -954,12 +954,6 @@ static void update_attributes(AttributeSet &attributes, CachedData &cached_data,
   /* remove any attributes not in cached_attributes */
   list<Attribute>::iterator it;
   for (it = attributes.attributes.begin(); it != attributes.attributes.end();) {
-    /* Do not remove generated attribute, it will be updated in the data reading function */
-    if (it->std == ATTR_STD_GENERATED) {
-      ++it;
-      continue;
-    }
-
     if (cached_attributes.find(&(*it)) == cached_attributes.end()) {
       attributes.remove(it++);
       continue;
@@ -1309,14 +1303,6 @@ void AlembicProcedural::read_mesh(AlembicObject *abc_object, Abc::chrono_t frame
   cached_data.min_delta.copy_to_socket(frame_time, mesh, mesh->get_min_delta_socket());
   cached_data.max_delta.copy_to_socket(frame_time, mesh, mesh->get_max_delta_socket());
 
-  /* we don't yet support arbitrary attributes, for now add vertex
-   * coordinates as generated coordinates if requested */
-  if (mesh->need_attribute(scene_, ATTR_STD_GENERATED)) {
-    Attribute *attr = mesh->attributes.add(ATTR_STD_GENERATED);
-    memcpy(
-        attr->data_float3(), mesh->get_verts().data(), sizeof(float3) * mesh->get_verts().size());
-  }
-
   if (mesh->is_modified()) {
     bool need_rebuild = mesh->triangles_is_modified();
     mesh->tag_update(scene_, need_rebuild);
@@ -1408,14 +1394,6 @@ void AlembicProcedural::read_subd(AlembicObject *abc_object, Abc::chrono_t frame
 
   update_attributes(mesh->subd_attributes, cached_data, frame_time);
 
-  /* we don't yet support arbitrary attributes, for now add vertex
-   * coordinates as generated coordinates if requested */
-  if (mesh->need_attribute(scene_, ATTR_STD_GENERATED)) {
-    Attribute *attr = mesh->attributes.add(ATTR_STD_GENERATED);
-    memcpy(
-        attr->data_float3(), mesh->get_verts().data(), sizeof(float3) * mesh->get_verts().size());
-  }
-
   if (mesh->is_modified()) {
     bool need_rebuild = (mesh->triangles_is_modified()) ||
                         (mesh->subd_num_corners_is_modified()) ||
@@ -1464,17 +1442,6 @@ void AlembicProcedural::read_curves(AlembicObject *abc_object, Abc::chrono_t fra
   /* update attributes */
 
   update_attributes(hair->attributes, cached_data, frame_time);
-
-  /* we don't yet support arbitrary attributes, for now add first keys as generated coordinates if
-   * requested */
-  if (hair->need_attribute(scene_, ATTR_STD_GENERATED)) {
-    Attribute *attr_generated = hair->attributes.add(ATTR_STD_GENERATED);
-    float3 *generated = attr_generated->data_float3();
-
-    for (size_t i = 0; i < hair->num_curves(); i++) {
-      generated[i] = hair->get_curve_keys()[hair->get_curve(i).first_key];
-    }
-  }
 
   cached_data.min_delta.copy_to_socket(frame_time, hair, hair->get_min_delta_socket());
   cached_data.max_delta.copy_to_socket(frame_time, hair, hair->get_max_delta_socket());
