@@ -20,7 +20,6 @@
 
 #include "COM_ExecutionSystem.h"
 #include "COM_TonemapOperation.h"
-#include "COM_ExecutionSystem.h"
 
 #include "BLI_math.h"
 #include "BLI_utildefines.h"
