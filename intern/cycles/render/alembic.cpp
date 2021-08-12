@@ -1276,7 +1276,8 @@ void AlembicProcedural::read_mesh(AlembicObject *abc_object, Abc::chrono_t frame
 
   cached_data.shader.copy_to_socket(frame_time, mesh, mesh->get_shader_socket());
 
-  const array<int3> *triangle_data = cached_data.triangles.data_for_time(frame_time).get_data_or_null();
+  const array<int3> *triangle_data =
+      cached_data.triangles.data_for_time(frame_time).get_data_or_null();
   if (triangle_data) {
     array<int> triangles;
     array<bool> smooth;
