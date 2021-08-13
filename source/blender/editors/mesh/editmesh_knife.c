@@ -1137,7 +1137,7 @@ static void knife_update_header(bContext *C, wmOperator *op, KnifeTool_OpData *k
            "%s: angle constraint %.2f(%.2f) (%s%s%s%s), %s: cut through (%s), "
            "%s: panning, XYZ: orientation lock (%s), "
            "%s: distance/angle measurements (%s), "
-           "%s: depth check (%s)"),
+           "%s: x-ray (%s)"),
       WM_MODALKEY(KNF_MODAL_CONFIRM),
       WM_MODALKEY(KNF_MODAL_CANCEL),
       WM_MODALKEY(KNF_MODAL_UNDO),
@@ -1171,7 +1171,7 @@ static void knife_update_header(bContext *C, wmOperator *op, KnifeTool_OpData *k
       WM_MODALKEY(KNF_MODAL_SHOW_DISTANCE_ANGLE_TOGGLE),
       WM_bool_as_string(kcd->show_dist_angle),
       WM_MODALKEY(KNF_MODAL_DEPTH_TEST_TOGGLE),
-      WM_bool_as_string(kcd->depth_test));
+      WM_bool_as_string(!kcd->depth_test));
 
 #undef WM_MODALKEY
 
