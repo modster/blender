@@ -75,50 +75,6 @@ namespace blender::nodes {
 
 #ifdef WITH_OPENVDB
 
-struct FilterGridOp {
-  openvdb::GridBase &grid_base;
-  GeometryNodeFilterOperation operation;
-  const GeoNodeExecParams &params;
-
-  template<typename GridType> void operator()()
-  {
-    if constexpr (std::is_same_v<GridType, openvdb::FloatGrid>) {
-      this->filter_operation<GridType>();
-    }
-    else {
-      params.error_message_add(NodeWarningType::Error,
-                               TIP_("Filter operations only support float grids"));
-    }
-  }
-
-  template<typename GridType> void filter_operation()
-  {
-    GridType &grid = static_cast<GridType &>(grid_base);
-
-    openvdb::tools::LevelSetFilter<GridType> filter(grid);
-    switch (operation) {
-      case GEO_NODE_LEVEL_SET_FILTER_GAUSSIAN:
-        filter.gaussian(params.get_input<int>("Width"));
-        break;
-      case GEO_NODE_LEVEL_SET_FILTER_OFFSET:
-        filter.offset(-params.get_input<float>("Distance"));
-        break;
-      case GEO_NODE_LEVEL_SET_FILTER_MEDIAN:
-        filter.median(params.get_input<int>("Width"));
-        break;
-      case GEO_NODE_LEVEL_SET_FILTER_MEAN:
-        filter.mean(params.get_input<int>("Width"));
-        break;
-      case GEO_NODE_LEVEL_SET_FILTER_MEAN_CURVATURE:
-        filter.meanCurvature();
-        break;
-      case GEO_NODE_LEVEL_SET_FILTER_LAPLACIAN:
-        filter.laplacian();
-        break;
-    }
-  }
-};
-
 static void level_set_filter(Volume &volume,
                              const GeometryNodeFilterOperation operation,
                              const GeoNodeExecParams &params)
@@ -129,10 +85,40 @@ static void level_set_filter(Volume &volume,
     return;
   }
 
-  openvdb::GridBase::Ptr grid = BKE_volume_grid_openvdb_for_write(&volume, volume_grid);
+  openvdb::GridBase::Ptr grid_base = BKE_volume_grid_openvdb_for_write(&volume, volume_grid);
 
-  FilterGridOp filter_grid_op{*grid, operation, params};
-  BKE_volume_grid_type_operation(BKE_volume_grid_type(volume_grid), filter_grid_op);
+  bke::volume::to_static_type(BKE_volume_grid_type_openvdb(*grid_base), [&](auto dummy) {
+    using GridType = decltype(dummy);
+    if constexpr (std::is_same_v<GridType, openvdb::FloatGrid>) {
+      GridType &grid = static_cast<GridType &>(*grid_base);
+
+      openvdb::tools::LevelSetFilter<GridType> filter(grid);
+      switch (operation) {
+        case GEO_NODE_LEVEL_SET_FILTER_GAUSSIAN:
+          filter.gaussian(params.get_input<int>("Width"));
+          break;
+        case GEO_NODE_LEVEL_SET_FILTER_OFFSET:
+          filter.offset(-params.get_input<float>("Distance"));
+          break;
+        case GEO_NODE_LEVEL_SET_FILTER_MEDIAN:
+          filter.median(params.get_input<int>("Width"));
+          break;
+        case GEO_NODE_LEVEL_SET_FILTER_MEAN:
+          filter.mean(params.get_input<int>("Width"));
+          break;
+        case GEO_NODE_LEVEL_SET_FILTER_MEAN_CURVATURE:
+          filter.meanCurvature();
+          break;
+        case GEO_NODE_LEVEL_SET_FILTER_LAPLACIAN:
+          filter.laplacian();
+          break;
+      }
+    }
+    else {
+      params.error_message_add(NodeWarningType::Error,
+                               TIP_("Filter operations only support float grids"));
+    }
+  });
 }
 
 #endif /* WITH_OPENVDB */
