@@ -859,7 +859,7 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
 
     const auto cross_2d = [](const float2 &a, const float2 &b) { return a.x * b.y - a.y * b.x; };
 
-    const auto area = cross_2d(p2 - p1, p3 - p1) * 0.5;
+    const auto area = fabs(cross_2d(p2 - p1, p3 - p1)) * 0.5;
 
     return 4.0 * M_SQRT3 * area / (l_max * (l1 + l2 + l3));
   }
