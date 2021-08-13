@@ -24,15 +24,9 @@
 extern "C" {
 #endif
 
-enum {
-  WELD_MODE_ALL = 0,
-  WELD_MODE_CONNECTED = 1,
-};
-
-struct Mesh *GEO_mesh_merge_by_distance(const struct Mesh *mesh,
-               const bool *mask,
-               const float merge_distance,
-               const int weld_mode);
+PointCloud *merge_by_distance_pointcloud(const PointCloud &point_cloud,
+                                         const float merge_threshold,
+                                         blender::Span<bool> selection);
 
 #ifdef __cplusplus
 }

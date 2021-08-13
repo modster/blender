@@ -24,6 +24,7 @@
          ../blenkernel
          ../blenlib
          ../blentranslation
+         ../functions
          ../makesdna
          ../makesrna
          ../../../intern/guardedalloc
@@ -33,7 +34,9 @@
 
  set(SRC
          intern/mesh_merge_by_distance.c
+         intern/pointcloud_merge_by_distance.cc
          GEO_mesh_merge_by_distance.h
+         GEO_pointcloud_merge_by_distance.h
          )
 
  set(LIB
