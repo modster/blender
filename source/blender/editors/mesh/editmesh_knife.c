@@ -1035,8 +1035,8 @@ static void knifetool_draw(const bContext *UNUSED(C), ARegion *UNUSED(region), v
     GPU_line_width(2.0);
 
     immBegin(GPU_PRIM_LINES, 2);
-    immVertex3fv(pos, kcd->snap_ref_edge->v1->cageco);
-    immVertex3fv(pos, kcd->snap_ref_edge->v2->cageco);
+    immVertex3fv(pos, kcd->snap_ref_edge->v1->wcageco);
+    immVertex3fv(pos, kcd->snap_ref_edge->v2->wcageco);
     immEnd();
   }
 
