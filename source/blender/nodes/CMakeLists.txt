@@ -189,6 +189,7 @@ set(SRC
   geometry/nodes/node_geo_join_geometry.cc
   geometry/nodes/node_geo_level_set_boolean.cc
   geometry/nodes/node_geo_level_set_filter.cc
+  geometry/nodes/node_geo_level_set_morph.cc
   geometry/nodes/node_geo_level_set_primitive_platonic.cc
   geometry/nodes/node_geo_level_set_primitive_sphere.cc
   geometry/nodes/node_geo_level_set_to_fog_volume.cc

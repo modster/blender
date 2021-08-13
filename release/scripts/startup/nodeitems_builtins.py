@@ -600,6 +600,7 @@ geometry_node_categories = [
         NodeItem("GeometryNodeLevelSetBoolean"),
         NodeItem("GeometryNodeLevelSetFilter"),
         NodeItem("GeometryNodeLevelSetToFogVolume"),
+        NodeItem("GeometryNodeLevelSetMorph"),
     ]),
         GeometryNodeCategory("GEO_PRIMITIVES_VOLUME", "Volume Primitives", items=[
         NodeItem("GeometryNodeLevelSetSphere"),

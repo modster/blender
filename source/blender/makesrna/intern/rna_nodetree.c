@@ -9941,6 +9941,40 @@ static void def_geo_level_set_filter(StructRNA *srna)
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
 }
 
+static void def_geo_level_set_morph(StructRNA *srna)
+{
+  PropertyRNA *prop;
+
+  static EnumPropertyItem spatial_scheme_items[] = {
+      {GEO_NODE_LEVEL_SET_MORPH_SPATIAL_FIRST, "FIRST", 0, "First", "1st-order biased gradient"},
+      {GEO_NODE_LEVEL_SET_MORPH_SPATIAL_HJWENO5,
+       "HJWENO5",
+       0,
+       "HJWENO5",
+       "5th-order HJ-WENO biased gradient"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  static EnumPropertyItem temporal_scheme_items[] = {
+      {GEO_NODE_LEVEL_SET_MORPH_SPATIAL_FORWARD_EULER, "FORWARD_EULER", 0, "Forward Euler", ""},
+      {GEO_NODE_LEVEL_SET_MORPH_SPATIAL_2ND, "2ND", 0, "Second Order", "2nd order Runge-Kutta"},
+      {GEO_NODE_LEVEL_SET_MORPH_SPATIAL_3RD, "3RD", 0, "Third Order", "3rd order Runge-Kutta"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  RNA_def_struct_sdna_from(srna, "NodeGeometryLevelSetMorph", "storage");
+
+  prop = RNA_def_property(srna, "spatial_scheme", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, spatial_scheme_items);
+  RNA_def_property_ui_text(prop, "Spatial Scheme", "");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+
+  prop = RNA_def_property(srna, "temporal_scheme", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, temporal_scheme_items);
+  RNA_def_property_ui_text(prop, "Temporal Scheme", "");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+}
+
 static void def_geo_level_set_primitive_platonic(StructRNA *srna)
 {
   PropertyRNA *prop;

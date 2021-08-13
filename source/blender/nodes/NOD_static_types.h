@@ -316,6 +316,7 @@ DefNode(GeometryNode, GEO_NODE_IS_VIEWPORT, 0, "IS_VIEWPORT", IsViewport, "Is Vi
 DefNode(GeometryNode, GEO_NODE_JOIN_GEOMETRY, 0, "JOIN_GEOMETRY", JoinGeometry, "Join Geometry", "")
 DefNode(GeometryNode, GEO_NODE_LEVEL_SET_BOOLEAN , def_geo_level_set_boolean, "LEVEL_SET_BOOLEAN", LevelSetBoolean, "Level Set Boolean", "")
 DefNode(GeometryNode, GEO_NODE_LEVEL_SET_FILTER , def_geo_level_set_filter, "LEVEL_SET_FILTER", LevelSetFilter, "Level Set Filter", "")
+DefNode(GeometryNode, GEO_NODE_LEVEL_SET_MORPH , def_geo_level_set_morph, "LEVEL_SET_MORPH", LevelSetMorph, "Level Set Morph", "")
 DefNode(GeometryNode, GEO_NODE_LEVEL_SET_PRIMITIVE_SPHERE , 0, "LEVEL_SET_PRIMITIVE_SPHERE", LevelSetSphere, "Level Set Sphere", "")
 DefNode(GeometryNode, GEO_NODE_LEVEL_SET_PRIMITIVE_PLATONIC , def_geo_level_set_primitive_platonic, "LEVEL_SET_PRIMITIVE_PLATONIC", LevelSetPlatonic, "Level Set Platonic", "")
 DefNode(GeometryNode, GEO_NODE_LEVEL_SET_TO_FOG_VOLUME , 0, "LEVEL_SET_TO_FOG", LevelSetToFogVolume, "Level Set to Fog Volume", "")

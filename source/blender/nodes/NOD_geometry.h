@@ -75,6 +75,7 @@ void register_node_type_geo_is_viewport(void);
 void register_node_type_geo_join_geometry(void);
 void register_node_type_geo_level_set_boolean(void);
 void register_node_type_geo_level_set_filter(void);
+void register_node_type_geo_level_set_morph(void);
 void register_node_type_geo_level_set_primitive_platonic(void);
 void register_node_type_geo_level_set_primitive_sphere(void);
 void register_node_type_geo_level_set_to_fog_volume(void);

@@ -1312,6 +1312,13 @@ typedef struct NodeGeometryLevelSetBoolean {
   uint8_t operation;
 } NodeGeometryLevelSetBoolean;
 
+typedef struct NodeGeometryLevelSetMorph {
+  /* GeometryNodeLevelSetSpacialScheme */
+  uint8_t spatial_scheme;
+  /* GeometryNodeLevelSetTemporalScheme */
+  uint8_t temporal_scheme;
+} NodeGeometryLevelSetMorph;
+
 typedef struct NodeGeometryLevelSetFilter {
   /* GeometryNodeFilterOperation */
   uint8_t operation;
@@ -2022,6 +2029,17 @@ typedef enum NodeGeometryPlatonicShape {
   GEO_NODE_PLATONIC_DODECAHEDRON = 12,
   GEO_NODE_PLATONIC_ICOSAHEDRON = 20,
 } NodeGeometryPlatonicShape;
+
+typedef enum GeometryNodeLevelSetSpatialScheme {
+  GEO_NODE_LEVEL_SET_MORPH_SPATIAL_FIRST = 0,
+  GEO_NODE_LEVEL_SET_MORPH_SPATIAL_HJWENO5 = 1,
+} GeometryNodeLevelSetSpatialScheme;
+
+typedef enum GeometryNodeLevelSetTemporalScheme {
+  GEO_NODE_LEVEL_SET_MORPH_SPATIAL_FORWARD_EULER = 0,
+  GEO_NODE_LEVEL_SET_MORPH_SPATIAL_2ND = 1,
+  GEO_NODE_LEVEL_SET_MORPH_SPATIAL_3RD = 2,
+} GeometryNodeLevelSetTemporalScheme;
 
 typedef enum GeometryNodeAttributeTransferMapMode {
   GEO_NODE_ATTRIBUTE_TRANSFER_NEAREST_FACE_INTERPOLATED = 0,

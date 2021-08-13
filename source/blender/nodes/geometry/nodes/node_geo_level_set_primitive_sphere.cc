@@ -29,7 +29,15 @@
 #include "node_geometry_util.hh"
 
 static bNodeSocketTemplate geo_node_level_set_primitive_sphere_in[] = {
-    {SOCK_FLOAT, N_("Radius"), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX, PROP_UNSIGNED},
+    {SOCK_FLOAT,
+     N_("Radius"),
+     1.0f,
+     0.0f,
+     0.0f,
+     0.0f,
+     0.0f,
+     FLT_MAX,
+     PROP_UNSIGNED | PROP_DISTANCE},
     {SOCK_VECTOR, N_("Center"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX, PROP_TRANSLATION},
     {SOCK_FLOAT, N_("Voxel Size"), 0.3f, 0.0f, 0.0f, 0.0f, 0.01f, FLT_MAX, PROP_DISTANCE},
     {-1, ""},

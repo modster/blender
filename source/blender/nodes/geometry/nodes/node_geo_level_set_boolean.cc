@@ -140,9 +140,21 @@ static void geo_node_level_set_boolean_exec(GeoNodeExecParams params)
 
   Volume *volume_a = geometry_set_a.get_volume_for_write();
   const Volume *volume_b = geometry_set_b.get_volume_for_read();
-  if (volume_a == nullptr || volume_b == nullptr) {
-    params.set_output("Level Set", std::move(geometry_set_a));
+  if (volume_a == nullptr && volume_b == nullptr) {
+    params.set_output("Level Set", GeometrySet());
     return;
+  }
+  if (ELEM(operation, GEO_NODE_BOOLEAN_DIFFERENCE, GEO_NODE_BOOLEAN_UNION)) {
+    if (volume_a == nullptr) {
+      params.set_output("Level Set", std::move(geometry_set_b));
+      return;
+    }
+  }
+  if (operation == GEO_NODE_BOOLEAN_UNION) {
+    if (volume_b == nullptr) {
+      params.set_output("Level Set", std::move(geometry_set_a));
+      return;
+    }
   }
 
   const Main *bmain = DEG_get_bmain(params.depsgraph());
