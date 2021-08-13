@@ -21,6 +21,7 @@
  * \ingroup bke
  */
 
+#include "BLI_float2.hh"
 #include "DNA_cloth_types.h"
 #include "DNA_mesh_types.h"
 #include "DNA_modifier_types.h"
@@ -29,6 +30,7 @@
 #include "BLI_assert.h"
 #include "BLI_float2x2.hh"
 #include "BLI_kdopbvh.h"
+#include "BLI_math.h"
 #include "BLI_math_vector.h"
 #include "BLI_utildefines.h"
 
@@ -833,10 +835,77 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
     return flippable_edge_indices;
   }
 
+  /**
+   * Calculates the aspect ratio of the triangle formed by the given
+   * positions (p1, p2, p3).
+   *
+   * Refer to [4] for more information about the aspect ratio
+   * calculation. Using "The measure associated with interpolation
+   * error in the usual (weaker) bounds given by approximation
+   * theory. Nonsmooth." in table 7.
+   */
+  float compute_aspect_ratio(const float2 &p1, const float2 &p2, const float2 &p3) const
+  {
+    /* It is possible to use "The aspect ratio, or ratio
+     * between the minimum and maximum dimensions of the triangle.
+     * Nonsmooth." from [4] but the current implemention seems to
+     * provide results closer to that of [1] */
+
+    const auto l1 = (p2 - p1).length();
+    const auto l2 = (p3 - p2).length();
+    const auto l3 = (p1 - p3).length();
+
+    const auto l_max = max_ff(max_ff(l1, l2), l3);
+
+    const auto cross_2d = [](const float2 &a, const float2 &b) { return a.x * b.y - a.y * b.x; };
+
+    const auto area = cross_2d(p2 - p1, p3 - p1) * 0.5;
+
+    return 4.0 * M_SQRT3 * area / (l_max * (l1 + l2 + l3));
+  }
+
+  /**
+   * Calculates the aspect ratio of the triangle described by the UVs
+   * of the `Vert`s provided.
+   */
+  float compute_aspect_ratio(const AdaptiveVert &v1,
+                             const AdaptiveVert &v2,
+                             const AdaptiveVert &v3) const
+  {
+    return this->compute_aspect_ratio(v1.get_uv(), v2.get_uv(), v3.get_uv());
+  }
+
+  /**
+   * Easy call to above when only indices available
+   */
+  float compute_aspect_ratio(const VertIndex &v1_index,
+                             const VertIndex &v2_index,
+                             const VertIndex &v3_index) const
+  {
+    return this->compute_aspect_ratio(this->get_checked_vert(v1_index),
+                                      this->get_checked_vert(v2_index),
+                                      this->get_checked_vert(v3_index));
+  }
+
+  /**
+   * Calculates the aspect ratio of given triangle
+   *
+   * Note: This function asserts in debug mode that the given face is
+   * a triangle. In release mode it will lead to undefined behaviour
+   * when the number of verts in the face is not 3.
+   */
+  float compute_aspect_ratio(const AdaptiveFace &face) const
+  {
+    BLI_assert(face.get_verts().size() == 3);
+    return this->compute_aspect_ratio(
+        face.get_verts()[0], face.get_verts()[1], face.get_verts()[2]);
+  }
+
   bool is_edge_collapseable_adaptivemesh(const AdaptiveEdge &edge, bool verts_swapped) const
   {
-    /* TODO(ish): expose small_value to gui */
+    /* TODO(ish): expose small_value, aspect_ratio_min to gui */
     const auto small_value = 0.2;
+    const auto aspect_ratio_min = 0.1;
 
     if (this->is_edge_collapseable(edge.get_self_index(), verts_swapped, true) == false) {
       return false;
@@ -900,7 +969,7 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
         }
       }
 
-      /* Face inversion check */
+      /* Face inversion check and aspect ratio check */
       const auto v1_face_indices = this->get_checked_face_indices_of_vert(v1_index);
       for (const auto &face_index : v1_face_indices) {
         auto &f = this->get_checked_face(face_index);
@@ -935,13 +1004,19 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
                                                           this->get_checked_vert(vert_indices[2]));
         const auto &expected_normal = f.get_normal();
 
+        /* Face inversion check */
         if (float3::dot(new_normal, expected_normal) <= 0.0) {
+          return false;
+        }
+
+        /* Aspect ratio check */
+        if (this->compute_aspect_ratio(vert_indices[0], vert_indices[1], vert_indices[2]) <
+            aspect_ratio_min) {
           return false;
         }
       }
     }
 
-    /* TODO(ish): aspect ratio test */
     return true;
   }
 

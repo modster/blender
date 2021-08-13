@@ -40,6 +40,9 @@
  * https://dl.acm.org/doi/10.1145/2461912.2462010
  * http://graphics.berkeley.edu/papers/Narain-FCA-2013-07/Narain-FCA-2013-07.pdf
  *
+ * [4] "What Is a Good Linear Finite Element? Interpolation,
+ * Conditioning, Anisotropy, and Quality Measures" by Jonathan Richard Shewchuk
+ *
  * *****************************************************************************/
 
 #include "BKE_mesh.h"
