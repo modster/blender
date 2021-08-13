@@ -9941,6 +9941,31 @@ static void def_geo_level_set_filter(StructRNA *srna)
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
 }
 
+static void def_geo_level_set_primitive_platonic(StructRNA *srna)
+{
+  PropertyRNA *prop;
+
+  static EnumPropertyItem shape_items[] = {
+      {GEO_NODE_PLATONIC_TETRAHEDRON, "TETRAHEDRON", 0, "Tetrahedron", "Create a 4-sided shape"},
+      {GEO_NODE_PLATONIC_CUBE, "CUBE", 0, "Cube", "Create a 6-sided cube"},
+      {GEO_NODE_PLATONIC_OCTAHEDRON, "OCTAHEDRON", 0, "Octahedron", "Create a 8-sided shape"},
+      {GEO_NODE_PLATONIC_DODECAHEDRON,
+       "DODECAHEDRON",
+       0,
+       "Dodecahedron",
+       "Create a 12-sided shape"},
+      {GEO_NODE_PLATONIC_ICOSAHEDRON, "ICOSAHEDRON", 0, "Icosahedron", "Create a 20-sided shape"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  RNA_def_struct_sdna_from(srna, "NodeGeometryLevelSetPlatonic", "storage");
+
+  prop = RNA_def_property(srna, "shape", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, shape_items);
+  RNA_def_property_ui_text(prop, "Shape", "");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+}
+
 static void def_geo_attribute_combine_xyz(StructRNA *srna)
 {
   PropertyRNA *prop;

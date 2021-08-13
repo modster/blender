@@ -5162,6 +5162,8 @@ static void registerGeometryNodes()
   register_node_type_geo_join_geometry();
   register_node_type_geo_level_set_boolean();
   register_node_type_geo_level_set_filter();
+  register_node_type_geo_level_set_primitive_platonic();
+  register_node_type_geo_level_set_primitive_sphere();
   register_node_type_geo_level_set_to_fog_volume();
   register_node_type_geo_material_assign();
   register_node_type_geo_material_replace();

@@ -1317,6 +1317,11 @@ typedef struct NodeGeometryLevelSetFilter {
   uint8_t operation;
 } NodeGeometryLevelSetFilter;
 
+typedef struct NodeGeometryLevelSetPlatonic {
+  /* NodeGeometryPlatonicShape */
+  uint8_t shape;
+} NodeGeometryLevelSetPlatonic;
+
 typedef struct NodeAttributeCombineXYZ {
   /* GeometryNodeAttributeInputMode. */
   uint8_t input_type_x;
@@ -2009,6 +2014,14 @@ typedef enum GeometryNodeFilterOperation {
   GEO_NODE_LEVEL_SET_FILTER_MEAN_CURVATURE = 4,
   GEO_NODE_LEVEL_SET_FILTER_LAPLACIAN = 5,
 } GeometryNodeFilterOperation;
+
+typedef enum NodeGeometryPlatonicShape {
+  GEO_NODE_PLATONIC_TETRAHEDRON = 4,
+  GEO_NODE_PLATONIC_CUBE = 6,
+  GEO_NODE_PLATONIC_OCTAHEDRON = 8,
+  GEO_NODE_PLATONIC_DODECAHEDRON = 12,
+  GEO_NODE_PLATONIC_ICOSAHEDRON = 20,
+} NodeGeometryPlatonicShape;
 
 typedef enum GeometryNodeAttributeTransferMapMode {
   GEO_NODE_ATTRIBUTE_TRANSFER_NEAREST_FACE_INTERPOLATED = 0,
