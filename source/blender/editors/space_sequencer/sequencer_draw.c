@@ -1233,7 +1233,7 @@ static void sequencer_thumbnail_get_job(const bContext *C,
                        CTX_wm_window(C),
                        CTX_data_scene(C),
                        "Draw Thumbnails",
-                       WM_JOB_PROGRESS,
+                       1 << 3,
                        WM_JOB_TYPE_SEQ_DRAW_THUMBNAIL);
 
   /* Get the thumbnail job if it exists. */
@@ -1321,8 +1321,7 @@ static void thumbnail_call_for_job(const bContext *C, Editing *ed, View2D *v2d, 
   }
 }
 
-/* TODO(AYJ) : 1) Add operator to choose whether thumbnails required by user or not in overlay menu
- *             2) Decrease Opacity of images when overlay over another strip
+/* TODO(AYJ) : Decrease Opacity of images when overlay over another strip
  */
 
 static void draw_seq_strip_thumbnail(View2D *v2d,
@@ -1411,8 +1410,17 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
 
     /* Get the image */
     ibuf = SEQ_get_thumbnail(&context, seq, roundf(x1), &crop, clipped, false);
+    int tot;
 
     if (ibuf) {
+      if (seq->flag & SEQ_OVERLAP) {
+        GPU_blend(GPU_BLEND_ALPHA);
+        unsigned char *buf = (unsigned char *)ibuf->rect;
+        for (tot = ibuf->x * ibuf->y; tot--; buf += 4) {
+          buf[3] = OVERLAP_ALPHA;
+        }
+      }
+
       ED_draw_imbuf_ctx_clipping(
           C, ibuf, x1 + cut_off, y1, true, x1 + cut_off, y1, x2, y2, zoom_x, zoom_y);
       IMB_freeImBuf(ibuf);
@@ -1420,7 +1428,7 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
     else {
       thumbnail_call_for_job(C, scene->ed, v2d, true);
     }
-
+    GPU_blend(GPU_BLEND_NONE);
     cut_off = 0;
     x1 = x2;
   }

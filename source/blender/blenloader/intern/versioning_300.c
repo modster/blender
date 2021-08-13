@@ -698,7 +698,7 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
         LISTBASE_FOREACH (SpaceLink *, sl, &area->spacedata) {
           if (sl->spacetype == SPACE_SEQ) {
             SpaceSeq *sseq = (SpaceSeq *)sl;
-            sseq->flag |= SEQ_SHOW_GRID;
+            sseq->flag |= SEQ_SHOW_GRID | SEQ_SHOW_THUMBNAILS;
           }
         }
       }
