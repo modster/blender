@@ -118,4 +118,36 @@ void ColorSpillOperation::executePixelSampled(float output[4],
   }
 }
 
+void ColorSpillOperation::update_memory_buffer_partial(MemoryBuffer *output,
+                                                       const rcti &area,
+                                                       Span<MemoryBuffer *> inputs)
+{
+  for (BuffersIterator<float> it = output->iterate_with(inputs, area); !it.is_end(); ++it) {
+    const float *color = it.in(0);
+    const float factor = MIN2(1.0f, *it.in(1));
+
+    float map;
+    switch (m_spillMethod) {
+      case 0: /* simple */
+        map = factor *
+              (color[m_spillChannel] - (m_settings->limscale * color[m_settings->limchan]));
+        break;
+      default: /* average */
+        map = factor * (color[m_spillChannel] -
+                        (m_settings->limscale * AVG(color[m_channel2], color[m_channel3])));
+        break;
+    }
+
+    if (map > 0.0f) {
+      it.out[0] = color[0] + m_rmut * (m_settings->uspillr * map);
+      it.out[1] = color[1] + m_gmut * (m_settings->uspillg * map);
+      it.out[2] = color[2] + m_bmut * (m_settings->uspillb * map);
+      it.out[3] = color[3];
+    }
+    else {
+      copy_v4_v4(it.out, color);
+    }
+  }
+}
+
 }  // namespace blender::compositor
