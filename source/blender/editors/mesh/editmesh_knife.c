@@ -4479,6 +4479,9 @@ static int knifetool_modal(bContext *C, wmOperator *op, const wmEvent *event)
   float snapping_increment_temp;
 
   if (kcd->angle_snapping) {
+    if (kcd->num.str_cur >= 2) {
+      knife_reset_snap_angle_input(kcd);
+    }
     knife_update_header(C, op, kcd); /* Update the angle multiple. */
     /* Modal numinput active, try to handle numeric inputs first... */
     if (event->val == KM_PRESS && hasNumInput(&kcd->num) && handleNumInput(C, &kcd->num, event)) {
@@ -4729,6 +4732,9 @@ static int knifetool_modal(bContext *C, wmOperator *op, const wmEvent *event)
   }
 
   if (kcd->angle_snapping) {
+    if (kcd->num.str_cur >= 2) {
+      knife_reset_snap_angle_input(kcd);
+    }
     /* Modal numinput inactive, try to handle numeric inputs last... */
     if (!handled && event->val == KM_PRESS && handleNumInput(C, &kcd->num, event)) {
       applyNumInput(&kcd->num, &snapping_increment_temp);
