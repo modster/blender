@@ -2291,7 +2291,6 @@ static void OVERLAY_linear_limits_rod(RigidBodyCon *rbc,
 
 static void OVERLAY_angular_limits_rods( OVERLAY_ExtraCallBuffers *cb,
                                      Object *ob,
-                                     const float axis_in_w[3],
                                      const float pivot[3],
                                      const float ob_offset_vec[3],
                                      const float coupled_ob_offset_vec[3],
@@ -2300,9 +2299,6 @@ static void OVERLAY_angular_limits_rods( OVERLAY_ExtraCallBuffers *cb,
     float end[3];
 
     float mid[3];
-
-    float axis[3];
-    copy_v3_v3(axis, axis_in_w);
 
     float ob_pivot_dist_vec[3];
     sub_v3_v3v3(ob_pivot_dist_vec, ob->rigidbody_object->pos, pivot);
@@ -2335,25 +2331,26 @@ static void OVERLAY_angular_limits_arc(OVERLAY_Data *data,
                                      const float transform_mat[3][3],
                                      const float angle,
                                      float angular_offset,
+                                     const float delta_angle,
                                      const float axis_in_w[3],
                                      const float offset_vec[3],
                                      const float real_pivot[3],
                                      const float color[4]) {
 
     float ob1_pivot_dist_initial[3];
-    sub_v3_v3v3(ob1_pivot_dist_initial, constraint_ob->loc, ob->loc);
+    sub_v3_v3v3(ob1_pivot_dist_initial, real_pivot, ob->rigidbody_object->pos);
 
     /* Rotate the arc about constrained axis by required amount.
      * The arc should lie along the object-pivot distance vector. */
     float constrained_axis_rot;
 
     if(ob == rbc->ob1) {
-        float arc_start[3] = {cosf(0.0f), sinf(0.0f), 0.0f};
+        float arc_start[3] = {cosf(0.0f+delta_angle), sinf(0.0f+delta_angle), 0.0f};
         mul_m3_v3(transform_mat, arc_start);
         constrained_axis_rot = angle_signed_on_axis_v3v3_v3(arc_start, ob1_pivot_dist_initial, axis_in_w);
     }
     else {
-        float arc_start1[3] = {cosf(angle + (2*angular_offset)), sinf(angle + (2*angular_offset)), 0.0f};
+        float arc_start1[3] = {cosf(angle + (2*angular_offset)-delta_angle), sinf(angle + (2*angular_offset)-delta_angle), 0.0f};
         mul_m3_v3(transform_mat, arc_start1);
         constrained_axis_rot = angle_signed_on_axis_v3v3_v3(arc_start1, ob1_pivot_dist_initial, axis_in_w);
     }
@@ -2365,21 +2362,10 @@ static void OVERLAY_angular_limits_arc(OVERLAY_Data *data,
 
     float final_mat[4][4] = {{0.0f}};
 
-    float coupled_ob_initial_rot_inv[3][3];
-    float coupled_ob_transform[4][4];
-
-    BKE_object_rot_to_mat3(coupled_ob, coupled_ob_initial_rot_inv, false);
-    invert_m3(coupled_ob_initial_rot_inv);
-    copy_m4_m4(coupled_ob_transform, coupled_ob->obmat);
-    zero_v4(coupled_ob_transform[3]);
-
-    mul_m4_m4m3(final_mat, coupled_ob_transform, coupled_ob_initial_rot_inv);
-    mul_m4_m4m3(final_mat, final_mat, transform_mat);
+    copy_m4_m3(final_mat, transform_mat);
 
     copy_v3_v3(final_mat[3], disk_pos);
     final_mat[3][3] = 1.0f;
-
-    normalize_m4(final_mat);
 
     float segment_width = M_PI*10/180;
     int n_segments = (int)(angle/segment_width) + 2;
@@ -2406,6 +2392,38 @@ static void OVERLAY_angular_limits(OVERLAY_Data *data,
     float angle = 0.0f;
     float angular_offset = 0.0f;
 
+    float t1[3][3] = {{0.0f}};
+    float t2[3][3] = {{0.0f}};
+    float ob_init[3][3] = {{0.0f}};
+    float ob_curr[3][3] = {{0.0f}};
+
+    float ob1_transform[4][4];
+    float ob2_transform[4][4];
+
+    if(rbc->physics_constraint != NULL) {
+      printf("yes ");
+      RB_constraint_get_transforms_hinge(rbc->physics_constraint, ob1_transform, ob2_transform);
+      copy_m3_m4(t1, ob1_transform);
+      copy_m3_m4(t2, ob2_transform);
+    }
+
+    else {
+      printf("No ");
+      BKE_object_rot_to_mat3(constraint_ob, t1, false);
+      BKE_object_rot_to_mat3(ob1, ob_init, false);
+      invert_m3(ob_init);
+      copy_m3_m4(ob_curr, ob1->obmat);
+      mul_m3_m3m3(t1, ob_init, t1);
+      mul_m3_m3m3(t1, ob_curr, t1);
+
+      BKE_object_rot_to_mat3(constraint_ob, t2, false);
+      BKE_object_rot_to_mat3(ob2, ob_init, false);
+      invert_m3(ob_init);
+      copy_m3_m4(ob_curr, ob2->obmat);
+      mul_m3_m3m3(t2, ob_init, t2);
+      mul_m3_m3m3(t2, ob_curr, t2);
+    }
+
     float ob1_pivot_dist_initial[3];
     sub_v3_v3v3(ob1_pivot_dist_initial, constraint_ob->loc, ob1->loc);
     float real_pivot[3] = {0.0f};
@@ -2421,6 +2439,7 @@ static void OVERLAY_angular_limits(OVERLAY_Data *data,
         copy_v3_v3(real_pivot, ob2->rigidbody_object->pos);
     }
     else{
+
       mul_v3_m3v3(real_pivot, ob1_initial_rot_inv, ob1_pivot_dist_initial);
       mul_v3_m4v3(real_pivot, ob1->obmat, real_pivot);
     }
@@ -2429,11 +2448,9 @@ static void OVERLAY_angular_limits(OVERLAY_Data *data,
     /* Constraint axis transform. */
     float constrained_axis_transoform[3][3] = {{0}};
 
-    float constrained_axis_local[3] = {0.0f};
     float constrained_axis_w_initial[3] = {0.0f};
     float constrained_axis_w[3] = {0.0f};
 
-    constrained_axis_local[axis] = 1.0f;
     constrained_axis_w_initial[axis] = 1.0f;
 
     /* Get constrained axis rotation from constraint object. */
@@ -2443,11 +2460,6 @@ static void OVERLAY_angular_limits(OVERLAY_Data *data,
 
     mul_m3_v3(ob1_initial_rot_inv, constrained_axis_w);
     mul_m3_v3(ob1_rot, constrained_axis_w);
-
-    float rot_axis[3];
-    cross_v3_v3v3(rot_axis, constrained_axis_local, constrained_axis_w_initial);
-    float rot_angle = angle_on_axis_v3v3_v3(constrained_axis_local, constrained_axis_w_initial, rot_axis);
-    axis_angle_to_mat3(constrained_axis_transoform, rot_axis, rot_angle);
 
     float ax[3] = {0.0f};
 
@@ -2467,10 +2479,11 @@ static void OVERLAY_angular_limits(OVERLAY_Data *data,
        case 2:
         angle = (rbc->limit_ang_z_upper - rbc->limit_ang_z_lower);
         angular_offset = rbc->limit_ang_z_lower;
+        ax[0] = 1.0f;
         unit_m3(corr_rot);
         break;
     }
-    mul_m3_m3m3(constrained_axis_transoform, constrained_axis_transoform, corr_rot);
+
 
     float ob1_pivot_dist[3];
     float ob2_pivot_dist[3];
@@ -2495,16 +2508,24 @@ static void OVERLAY_angular_limits(OVERLAY_Data *data,
     mul_v3_fl(ob1_offset_vec, ob1_offset);
     mul_v3_fl(ob2_offset_vec, ob2_offset);
 
+    float axis_ob1[3];
+    float axis_ob2[3];
+    copy_v3_v3(axis_ob1, ax);
+    copy_v3_v3(axis_ob2, ax);
+    mul_m3_v3(t1, axis_ob1);
+    mul_m3_v3(t2, axis_ob2);
+    float delta_angle = angle_signed_on_axis_v3v3_v3(axis_ob1, axis_ob2, constrained_axis_w);
+
     OVERLAY_PrivateData *pd = data->stl->pd;
     cb = &pd->extra_call_buffers[1];
 
     if(ob1->rigidbody_object->type == RBO_TYPE_ACTIVE) {
-      OVERLAY_angular_limits_arc(data, rbc, ob1, ob2, constraint_ob, constrained_axis_transoform, angle, angular_offset, constrained_axis_w_initial, ob1_offset_vec, real_pivot, color1);
-      OVERLAY_angular_limits_rods(cb, ob1, constrained_axis_w_initial, real_pivot, ob1_offset_vec, ob2_offset_vec, color2);
+      OVERLAY_angular_limits_arc(data, rbc, ob1, ob2, constraint_ob, t2, angle, angular_offset, delta_angle, constrained_axis_w, ob1_offset_vec, real_pivot, color1);
+      OVERLAY_angular_limits_rods(cb, ob1, real_pivot, ob1_offset_vec, ob2_offset_vec, color2);
     }
     if(ob2->rigidbody_object->type == RBO_TYPE_ACTIVE) {
-      OVERLAY_angular_limits_arc(data, rbc, ob2, ob1, constraint_ob, constrained_axis_transoform, angle, angular_offset, constrained_axis_w_initial, ob2_offset_vec, real_pivot, color2);
-      OVERLAY_angular_limits_rods(cb, ob2, constrained_axis_w_initial, real_pivot, ob2_offset_vec, ob1_offset_vec, color1);
+      OVERLAY_angular_limits_arc(data, rbc, ob2, ob1, constraint_ob, t1, angle, angular_offset, delta_angle, constrained_axis_w, ob2_offset_vec, real_pivot, color2);
+      OVERLAY_angular_limits_rods(cb, ob2, real_pivot, ob2_offset_vec, ob1_offset_vec, color1);
     }
 
 }

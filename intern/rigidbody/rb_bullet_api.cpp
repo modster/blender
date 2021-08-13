@@ -1395,4 +1395,16 @@ void RB_constraint_set_target_velocity_motor(rbConstraint *con,
   constraint->getRotationalLimitMotor(0)->m_targetVelocity = velocity_ang;
 }
 
+void RB_constraint_get_transforms_hinge(rbConstraint *con, float r_ob1_transform[4][4], float r_ob2_transform[4][4]) {
+    btHingeConstraint *constraint = reinterpret_cast<btHingeConstraint *>(con);
+    btTransform transform1;
+    btTransform transform2;
+
+    transform1 = constraint->getAFrame();
+    transform2 = constraint->getBFrame();
+
+    transform1.getOpenGLMatrix((btScalar *)r_ob1_transform);
+    transform2.getOpenGLMatrix((btScalar *)r_ob2_transform);
+}
+
 /* ********************************** */

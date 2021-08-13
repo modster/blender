@@ -371,6 +371,9 @@ void RB_constraint_set_target_velocity_motor(rbConstraint *con,
                                              float velocity_lin,
                                              float velocity_ang);
 
+/* Get object transforms */
+void RB_constraint_get_transforms_hinge(rbConstraint *con, float r_ob1_transform[4][4], float r_ob2_transform[4][4]);
+
 /* Set number of constraint solver iterations made per step, this overrided world setting
  * To use default set it to -1 */
 void RB_constraint_set_solver_iterations(rbConstraint *con, int num_solver_iterations);
