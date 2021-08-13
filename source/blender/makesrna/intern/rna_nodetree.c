@@ -10160,7 +10160,7 @@ static void def_geo_attribute_transfer(StructRNA *srna)
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 }
 
-static void def_geo_extrude(StructRNA *srna)
+static void def_geo_mesh_inset(StructRNA *srna)
 {
   PropertyRNA *prop;
 
