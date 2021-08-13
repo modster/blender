@@ -310,7 +310,7 @@ typedef struct KnifeTool_OpData {
   bool is_angle_snapping;
   bool angle_snapping;
   float angle;
-  /* Local angle snapping reference edge. */
+  /* Relative angle snapping reference edge. */
   KnifeEdge *snap_ref_edge;
   int snap_ref_edges_count;
   int snap_edge; /* Used by #KNF_MODAL_CYCLE_ANGLE_SNAP_EDGE to choose an edge for snapping. */
@@ -353,7 +353,7 @@ enum {
 enum {
   KNF_CONSTRAIN_ANGLE_MODE_NONE = 0,
   KNF_CONSTRAIN_ANGLE_MODE_SCREEN = 1,
-  KNF_CONSTRAIN_ANGLE_MODE_LOCAL = 2
+  KNF_CONSTRAIN_ANGLE_MODE_RELATIVE = 2
 };
 
 enum {
@@ -790,8 +790,8 @@ static void knifetool_draw_visible_angles(const KnifeTool_OpData *kcd)
     float angle = 0.0f;
     float *end;
 
-    /* If using local angle snapping, always draw angle to reference edge. */
-    if (kcd->is_angle_snapping && kcd->angle_snapping_mode == KNF_CONSTRAIN_ANGLE_MODE_LOCAL) {
+    /* If using relative angle snapping, always draw angle to reference edge. */
+    if (kcd->is_angle_snapping && kcd->angle_snapping_mode == KNF_CONSTRAIN_ANGLE_MODE_RELATIVE) {
       kfe = kcd->snap_ref_edge;
       if (kfe->v1 != kfv) {
         tempkfv = kfe->v1;
@@ -1029,8 +1029,8 @@ static void knifetool_draw(const bContext *UNUSED(C), ARegion *UNUSED(region), v
     GPU_batch_discard(batch);
   }
 
-  /* Draw local angle snapping reference edge. */
-  if (kcd->is_angle_snapping && kcd->angle_snapping_mode == KNF_CONSTRAIN_ANGLE_MODE_LOCAL) {
+  /* Draw relative angle snapping reference edge. */
+  if (kcd->is_angle_snapping && kcd->angle_snapping_mode == KNF_CONSTRAIN_ANGLE_MODE_RELATIVE) {
     immUniformColor3ubv(kcd->colors.edge_extra);
     GPU_line_width(2.0);
 
@@ -1155,14 +1155,14 @@ static void knife_update_header(bContext *C, wmOperator *op, KnifeTool_OpData *k
           kcd->angle_snapping_increment :
           KNIFE_DEFAULT_ANGLE_SNAPPING_INCREMENT,
       kcd->angle_snapping ?
-          ((kcd->angle_snapping_mode == KNF_CONSTRAIN_ANGLE_MODE_SCREEN) ? "Screen" : "Local") :
+          ((kcd->angle_snapping_mode == KNF_CONSTRAIN_ANGLE_MODE_SCREEN) ? "Screen" : "Relative") :
           "OFF",
       /* TODO: Can this be simplified? */
-      (kcd->angle_snapping_mode == KNF_CONSTRAIN_ANGLE_MODE_LOCAL) ? " - " : "",
-      (kcd->angle_snapping_mode == KNF_CONSTRAIN_ANGLE_MODE_LOCAL) ?
+      (kcd->angle_snapping_mode == KNF_CONSTRAIN_ANGLE_MODE_RELATIVE) ? " - " : "",
+      (kcd->angle_snapping_mode == KNF_CONSTRAIN_ANGLE_MODE_RELATIVE) ?
           WM_MODALKEY(KNF_MODAL_CYCLE_ANGLE_SNAP_EDGE) :
           "",
-      (kcd->angle_snapping_mode == KNF_CONSTRAIN_ANGLE_MODE_LOCAL) ? ": cycle edge" : "",
+      (kcd->angle_snapping_mode == KNF_CONSTRAIN_ANGLE_MODE_RELATIVE) ? ": cycle edge" : "",
       /**/
       WM_MODALKEY(KNF_MODAL_CUT_THROUGH_TOGGLE),
       WM_bool_as_string(kcd->cut_through),
@@ -3628,7 +3628,7 @@ static float snap_v3_angle_plane(
 }
 
 /* Snap to required angle along the plane of the face nearest to kcd->prev. */
-static bool knife_snap_angle_local(KnifeTool_OpData *kcd)
+static bool knife_snap_angle_relative(KnifeTool_OpData *kcd)
 {
   Ref *ref;
   KnifeEdge *kfe;
@@ -3904,8 +3904,8 @@ static bool knife_snap_update_from_mval(bContext *C, KnifeTool_OpData *kcd, cons
       if (kcd->angle_snapping_mode == KNF_CONSTRAIN_ANGLE_MODE_SCREEN) {
         kcd->is_angle_snapping = knife_snap_angle_screen(kcd);
       }
-      else if (kcd->angle_snapping_mode == KNF_CONSTRAIN_ANGLE_MODE_LOCAL) {
-        kcd->is_angle_snapping = knife_snap_angle_local(kcd);
+      else if (kcd->angle_snapping_mode == KNF_CONSTRAIN_ANGLE_MODE_RELATIVE) {
+        kcd->is_angle_snapping = knife_snap_angle_relative(kcd);
         if (kcd->is_angle_snapping) {
           kcd->snap_ref_edges_count = knife_calculate_snap_ref_edges(kcd);
         }
@@ -4557,7 +4557,7 @@ static int knifetool_modal(bContext *C, wmOperator *op, const wmEvent *event)
         handled = true;
         break;
       case KNF_MODAL_ANGLE_SNAP_TOGGLE:
-        if (kcd->angle_snapping_mode != KNF_CONSTRAIN_ANGLE_MODE_LOCAL) {
+        if (kcd->angle_snapping_mode != KNF_CONSTRAIN_ANGLE_MODE_RELATIVE) {
           kcd->angle_snapping_mode++;
           kcd->snap_ref_edges_count = 0;
           kcd->snap_edge = 0;
@@ -4577,7 +4577,7 @@ static int knifetool_modal(bContext *C, wmOperator *op, const wmEvent *event)
         handled = true;
         break;
       case KNF_MODAL_CYCLE_ANGLE_SNAP_EDGE:
-        if (kcd->angle_snapping && kcd->angle_snapping_mode == KNF_CONSTRAIN_ANGLE_MODE_LOCAL) {
+        if (kcd->angle_snapping && kcd->angle_snapping_mode == KNF_CONSTRAIN_ANGLE_MODE_RELATIVE) {
           if (kcd->snap_ref_edges_count) {
             kcd->snap_edge++;
             kcd->snap_edge %= kcd->snap_ref_edges_count;
@@ -4895,10 +4895,10 @@ void MESH_OT_knife_tool(wmOperatorType *ot)
   static const EnumPropertyItem angle_snapping_items[] = {
       {KNF_CONSTRAIN_ANGLE_MODE_NONE, "NONE", 0, "None", "No angle snapping"},
       {KNF_CONSTRAIN_ANGLE_MODE_SCREEN, "SCREEN", 0, "Screen", "Screen space angle snapping"},
-      {KNF_CONSTRAIN_ANGLE_MODE_LOCAL,
-       "LOCAL",
+      {KNF_CONSTRAIN_ANGLE_MODE_RELATIVE,
+       "RELATIVE",
        0,
-       "Local",
+       "Relative",
        "Angle snapping relative to the previous cut edge"},
       {0, NULL, 0, NULL, NULL},
   };
