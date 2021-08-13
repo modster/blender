@@ -51,7 +51,7 @@ static void geo_node_mesh_inset_layout(uiLayout *layout, bContext *UNUSED(C), Po
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetPropDecorate(layout, false);
   uiItemR(layout, ptr, "distance_mode", 0, nullptr, ICON_NONE);
-  uiItemR(layout, ptr, "mesh_inset_mode", 0, nullptr, ICON_NONE);
+  uiItemR(layout, ptr, "inset_mode", 0, nullptr, ICON_NONE);
 }
 
 static void geo_node_mesh_inset_init(bNodeTree *UNUSED(tree), bNode *node)
