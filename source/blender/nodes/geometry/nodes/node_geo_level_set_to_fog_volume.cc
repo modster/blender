@@ -63,7 +63,7 @@ static void level_set_to_fog_volume(Volume &volume, const GeoNodeExecParams &par
 
       const float density = params.get_input<float>("Density");
       if (density != 1.0f) {
-        openvdb::tools::foreach (grid->beginValueOn(),
+        openvdb::tools::foreach (grid.beginValueOn(),
                                  [&](const openvdb::FloatGrid::ValueOnIter &iter) {
                                    iter.modifyValue([&](float &value) { value *= density; });
                                  });
