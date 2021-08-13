@@ -84,11 +84,13 @@ BLI_INLINE void bm_vert_calc_normals_accum_loop(const BMLoop *l_iter,
   if ((l_iter->prev->e->v1 == l_iter->prev->v) ^ (l_iter->e->v1 == l_iter->v)) {
     dotprod = -dotprod;
   }
-  const float fac = saacos(-dotprod);
-  /* NAN detection, otherwise this is a degenerated case, ignore that vertex in this case. */
-  if (fac == fac) {
-    madd_v3_v3fl(v_no, f_no, fac);
-  }
+  /* Calculate angle between the two poly edges incident on this vertex.
+   * NOTE: no need for #saacos here as the input has been sanitized,
+   * `nan` values in coordinates normalize to zero which works for `acosf`. */
+  const float fac = acosf(-dotprod);
+  /* NAN values should never happen. */
+  BLI_assert(fac == fac);
+  madd_v3_v3fl(v_no, f_no, fac);
 }
 
 static void bm_vert_calc_normals_impl(BMVert *v)
@@ -680,9 +682,11 @@ static int bm_mesh_loops_calc_normals_for_loop(BMesh *bm,
 
       {
         /* Code similar to accumulate_vertex_normals_poly_v3. */
-        /* Calculate angle between the two poly edges incident on this vertex. */
+        /* Calculate angle between the two poly edges incident on this vertex.
+         * NOTE: no need for #saacos here as the input has been sanitized,
+         * `nan` values in coordinates normalize to zero which works for `acosf`. */
         const BMFace *f = lfan_pivot->f;
-        const float fac = saacos(dot_v3v3(vec_next, vec_curr));
+        const float fac = acosf(dot_v3v3(vec_next, vec_curr));
         const float *no = fnos ? fnos[BM_elem_index_get(f)] : f->no;
         /* Accumulate */
         madd_v3_v3fl(lnor, no, fac);
@@ -1116,8 +1120,6 @@ static void bm_mesh_loops_calc_normals__single_threaded(BMesh *bm,
   BMIter fiter;
   BMFace *f_curr;
   const bool has_clnors = clnors_data || (cd_loop_clnors_offset != -1);
-  const bool check_angle = (split_angle < (float)M_PI);
-  const float split_angle_cos = check_angle ? cosf(split_angle) : -1.0f;
 
   MLoopNorSpaceArray _lnors_spacearr = {NULL};
 
@@ -1152,16 +1154,13 @@ static void bm_mesh_loops_calc_normals__single_threaded(BMesh *bm,
     do {
       BM_elem_index_set(l_curr, index_loop++); /* set_inline */
       BM_elem_flag_disable(l_curr, BM_ELEM_TAG);
-      /* Needed for when #bm_mesh_edges_sharp_tag doesn't run.
-       * Mark smooth if there is no smoothing angle. */
-      BM_elem_flag_enable(l_curr->e, BM_ELEM_TAG);
     } while ((l_curr = l_curr->next) != l_first);
   }
   bm->elem_index_dirty &= ~(BM_FACE | BM_LOOP);
 
-  if (split_angle_cos != -1.0f) {
-    bm_mesh_edges_sharp_tag(bm, fnos, has_clnors ? (float)M_PI : split_angle, false);
-  }
+  /* Always tag edges based on winding & sharp edge flag
+   * (even when the auto-smooth angle doesn't need to be calculated). */
+  bm_mesh_edges_sharp_tag(bm, fnos, has_clnors ? (float)M_PI : split_angle, false);
 
   /* We now know edges that can be smoothed (they are tagged),
    * and edges that will be hard (they aren't).
