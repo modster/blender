@@ -92,8 +92,6 @@ static openvdb::FloatGrid::Ptr meshes_to_level_set_grid(
     }
   }
 
-  // openvdb::math::Transform::Ptr transform = openvdb::math::Transform::createLinearTransform(
-  //     voxel_size);
   openvdb::FloatGrid::Ptr grid;
   {
     SCOPED_TIMER("  mesh_to_level_set_only_openvdb");
@@ -111,9 +109,8 @@ static Volume *meshes_to_level_set_volume(const Span<GeometryInstanceGroup> set_
   BKE_volume_init_grids(volume);
 
   openvdb::FloatGrid::Ptr new_grid = meshes_to_level_set_grid(set_groups, voxel_size);
-  // new_grid->transform().postScale(voxel_size);
 
-  BKE_volume_grid_add_vdb(volume, "level_set", new_grid);
+  BKE_volume_grid_add_vdb(volume, "level_set", std::move(new_grid));
 
   return volume;
 }
