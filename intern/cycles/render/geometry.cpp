@@ -792,6 +792,11 @@ void GeometryManager::device_update_attributes(Device *device,
     foreach (AttributeRequest &req, attributes.requests) {
       Attribute *attr = geom->attributes.find(req);
 
+      /* Vertex normals are stored in DeviceScene.tri_vnormal. */
+      if (attr && attr->std == ATTR_STD_VERTEX_NORMAL) {
+        continue;
+      }
+
       update_attribute_element_size(geom,
                                     attr,
                                     ATTR_PRIM_GEOMETRY,
@@ -853,6 +858,11 @@ void GeometryManager::device_update_attributes(Device *device,
       Attribute *attr = geom->attributes.find(req);
 
       if (attr) {
+        /* Vertex normals are stored in DeviceScene.tri_vnormal. */
+        if (attr->std == ATTR_STD_VERTEX_NORMAL) {
+          continue;
+        }
+
         /* force a copy if we need to reallocate all the data */
         attr->modified |= attributes_need_realloc[Attribute::kernel_type(*attr)];
       }
@@ -872,6 +882,11 @@ void GeometryManager::device_update_attributes(Device *device,
         Attribute *subd_attr = mesh->subd_attributes.find(req);
 
         if (subd_attr) {
+          /* Vertex normals are stored in DeviceScene.tri_vnormal. */
+          if (subd_attr->std == ATTR_STD_VERTEX_NORMAL) {
+            continue;
+          }
+
           /* force a copy if we need to reallocate all the data */
           subd_attr->modified |= attributes_need_realloc[Attribute::kernel_type(*subd_attr)];
         }
