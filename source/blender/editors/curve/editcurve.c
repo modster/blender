@@ -6505,6 +6505,70 @@ static bool test_bezt_is_sel_any(const void *bezt_v, void *user_data)
   return BEZT_ISSEL_ANY_HIDDENHANDLES(v3d, bezt);
 }
 
+void dissolve_bez_segment(BezTriple *bezt_prev,
+                          BezTriple *bezt_next,
+                          const Nurb *nu,
+                          const Curve *cu,
+                          const int span_len,
+                          const uint span_step[2])
+{
+  int i_span_edge_len = span_len + 1;
+  const uint dims = 3;
+
+  const uint points_len = ((cu->resolu - 1) * i_span_edge_len) + 1;
+  float *points = MEM_mallocN(points_len * dims * sizeof(float), __func__);
+  float *points_stride = points;
+  const int points_stride_len = (cu->resolu - 1);
+
+  for (int segment = 0; segment < i_span_edge_len; segment++) {
+    BezTriple *bezt_a = &nu->bezt[mod_i((span_step[0] + segment) - 1, nu->pntsu)];
+    BezTriple *bezt_b = &nu->bezt[mod_i((span_step[0] + segment), nu->pntsu)];
+
+    for (int axis = 0; axis < dims; axis++) {
+      BKE_curve_forward_diff_bezier(bezt_a->vec[1][axis],
+                                    bezt_a->vec[2][axis],
+                                    bezt_b->vec[0][axis],
+                                    bezt_b->vec[1][axis],
+                                    points_stride + axis,
+                                    points_stride_len,
+                                    dims * sizeof(float));
+    }
+
+    points_stride += dims * points_stride_len;
+  }
+
+  BLI_assert(points_stride + dims == points + (points_len * dims));
+
+  float tan_l[3], tan_r[3], error_sq_dummy;
+  uint error_index_dummy;
+
+  sub_v3_v3v3(tan_l, bezt_prev->vec[1], bezt_prev->vec[2]);
+  normalize_v3(tan_l);
+  sub_v3_v3v3(tan_r, bezt_next->vec[0], bezt_next->vec[1]);
+  normalize_v3(tan_r);
+
+  curve_fit_cubic_to_points_single_fl(points,
+                                      points_len,
+                                      NULL,
+                                      dims,
+                                      FLT_EPSILON,
+                                      tan_l,
+                                      tan_r,
+                                      bezt_prev->vec[2],
+                                      bezt_next->vec[0],
+                                      &error_sq_dummy,
+                                      &error_index_dummy);
+
+  if (!ELEM(bezt_prev->h2, HD_FREE, HD_ALIGN)) {
+    bezt_prev->h2 = (bezt_prev->h2 == HD_VECT) ? HD_FREE : HD_ALIGN;
+  }
+  if (!ELEM(bezt_next->h1, HD_FREE, HD_ALIGN)) {
+    bezt_next->h1 = (bezt_next->h1 == HD_VECT) ? HD_FREE : HD_ALIGN;
+  }
+
+  MEM_freeN(points);
+}
+
 static int curve_dissolve_exec(bContext *C, wmOperator *UNUSED(op))
 {
   Main *bmain = CTX_data_main(C);
@@ -6540,61 +6604,7 @@ static int curve_dissolve_exec(bContext *C, wmOperator *UNUSED(op))
           BezTriple *bezt_prev = &nu->bezt[mod_i(span_step[0] - 1, nu->pntsu)];
           BezTriple *bezt_next = &nu->bezt[mod_i(span_step[1] + 1, nu->pntsu)];
 
-          int i_span_edge_len = span_len + 1;
-          const uint dims = 3;
-
-          const uint points_len = ((cu->resolu - 1) * i_span_edge_len) + 1;
-          float *points = MEM_mallocN(points_len * dims * sizeof(float), __func__);
-          float *points_stride = points;
-          const int points_stride_len = (cu->resolu - 1);
-
-          for (int segment = 0; segment < i_span_edge_len; segment++) {
-            BezTriple *bezt_a = &nu->bezt[mod_i((span_step[0] + segment) - 1, nu->pntsu)];
-            BezTriple *bezt_b = &nu->bezt[mod_i((span_step[0] + segment), nu->pntsu)];
-
-            for (int axis = 0; axis < dims; axis++) {
-              BKE_curve_forward_diff_bezier(bezt_a->vec[1][axis],
-                                            bezt_a->vec[2][axis],
-                                            bezt_b->vec[0][axis],
-                                            bezt_b->vec[1][axis],
-                                            points_stride + axis,
-                                            points_stride_len,
-                                            dims * sizeof(float));
-            }
-
-            points_stride += dims * points_stride_len;
-          }
-
-          BLI_assert(points_stride + dims == points + (points_len * dims));
-
-          float tan_l[3], tan_r[3], error_sq_dummy;
-          uint error_index_dummy;
-
-          sub_v3_v3v3(tan_l, bezt_prev->vec[1], bezt_prev->vec[2]);
-          normalize_v3(tan_l);
-          sub_v3_v3v3(tan_r, bezt_next->vec[0], bezt_next->vec[1]);
-          normalize_v3(tan_r);
-
-          curve_fit_cubic_to_points_single_fl(points,
-                                              points_len,
-                                              NULL,
-                                              dims,
-                                              FLT_EPSILON,
-                                              tan_l,
-                                              tan_r,
-                                              bezt_prev->vec[2],
-                                              bezt_next->vec[0],
-                                              &error_sq_dummy,
-                                              &error_index_dummy);
-
-          if (!ELEM(bezt_prev->h2, HD_FREE, HD_ALIGN)) {
-            bezt_prev->h2 = (bezt_prev->h2 == HD_VECT) ? HD_FREE : HD_ALIGN;
-          }
-          if (!ELEM(bezt_next->h1, HD_FREE, HD_ALIGN)) {
-            bezt_next->h1 = (bezt_next->h1 == HD_VECT) ? HD_FREE : HD_ALIGN;
-          }
-
-          MEM_freeN(points);
+          dissolve_bez_segment(bezt_prev, bezt_next, nu, cu, span_len, span_step);
         }
       }
     }

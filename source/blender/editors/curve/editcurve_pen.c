@@ -942,7 +942,15 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
         found_point = nu != NULL;
 
         if (found_point) {
+          ED_curve_deselect_all(cu->editnurb);
           if (nu->type == CU_BEZIER) {
+            BezTriple *next_bezt = BKE_nurb_bezt_get_next(nu, bezt);
+            BezTriple *prev_bezt = BKE_nurb_bezt_get_prev(nu, bezt);
+            if (next_bezt && prev_bezt) {
+              const int bez_index = BKE_curve_nurb_vert_index_get(nu, bezt);
+              uint span_step[2] = {bez_index, bez_index};
+              dissolve_bez_segment(prev_bezt, next_bezt, nu, cu, 1, span_step);
+            }
             delete_bezt_from_nurb(bezt, nu);
           }
           if (nu->type == CU_NURBS) {

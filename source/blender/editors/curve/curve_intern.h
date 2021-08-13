@@ -145,6 +145,12 @@ void ED_curve_keyindex_update_nurb(struct EditNurb *editnurb, struct Nurb *nu, s
 bool ed_editcurve_extrude(Curve *cu, EditNurb *editnurb, View3D *v3d);
 int ed_editcurve_addvert(Curve *cu, EditNurb *editnurb, View3D *v3d, const float location_init[3]);
 bool curve_toggle_cyclic(View3D *v3d, ListBase *editnurb, int direction);
+void dissolve_bez_segment(BezTriple *bezt_prev,
+                          BezTriple *bezt_next,
+                          Nurb *nu,
+                          const Curve *cu,
+                          const int span_len,
+                          uint span_step[2]);
 
 /* helper functions */
 void ed_editnurb_translate_flag(struct ListBase *editnurb,
