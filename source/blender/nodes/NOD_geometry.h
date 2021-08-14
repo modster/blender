@@ -79,6 +79,7 @@ void register_node_type_geo_level_set_morph(void);
 void register_node_type_geo_level_set_primitive_platonic(void);
 void register_node_type_geo_level_set_primitive_sphere(void);
 void register_node_type_geo_level_set_to_fog_volume(void);
+void register_node_type_geo_level_set_to_mask(void);
 void register_node_type_geo_material_assign(void);
 void register_node_type_geo_material_replace(void);
 void register_node_type_geo_mesh_primitive_circle(void);
@@ -111,6 +112,7 @@ void register_node_type_geo_transform(void);
 void register_node_type_geo_triangulate(void);
 void register_node_type_geo_viewer(void);
 void register_node_type_geo_volume_to_mesh(void);
+void register_node_type_geo_volume_sample(void);
 
 #ifdef __cplusplus
 }

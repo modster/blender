@@ -320,6 +320,7 @@ DefNode(GeometryNode, GEO_NODE_LEVEL_SET_MORPH , def_geo_level_set_morph, "LEVEL
 DefNode(GeometryNode, GEO_NODE_LEVEL_SET_PRIMITIVE_SPHERE , 0, "LEVEL_SET_PRIMITIVE_SPHERE", LevelSetSphere, "Level Set Sphere", "")
 DefNode(GeometryNode, GEO_NODE_LEVEL_SET_PRIMITIVE_PLATONIC , def_geo_level_set_primitive_platonic, "LEVEL_SET_PRIMITIVE_PLATONIC", LevelSetPlatonic, "Level Set Platonic", "")
 DefNode(GeometryNode, GEO_NODE_LEVEL_SET_TO_FOG_VOLUME , 0, "LEVEL_SET_TO_FOG", LevelSetToFogVolume, "Level Set to Fog Volume", "")
+DefNode(GeometryNode, GEO_NODE_LEVEL_SET_TO_MASK , 0, "LEVEL_SET_TO_Mask", LevelSetToMask, "Level Set to Mask", "")
 DefNode(GeometryNode, GEO_NODE_MATERIAL_ASSIGN, 0, "MATERIAL_ASSIGN", MaterialAssign, "Material Assign", "")
 DefNode(GeometryNode, GEO_NODE_MATERIAL_REPLACE, 0, "MATERIAL_REPLACE", MaterialReplace, "Material Replace", "")
 DefNode(GeometryNode, GEO_NODE_MESH_PRIMITIVE_CIRCLE, def_geo_mesh_circle, "MESH_PRIMITIVE_CIRCLE", MeshCircle, "Mesh Circle", "")
@@ -350,6 +351,7 @@ DefNode(GeometryNode, GEO_NODE_TRANSFORM, 0, "TRANSFORM", Transform, "Transform"
 DefNode(GeometryNode, GEO_NODE_TRIANGULATE, def_geo_triangulate, "TRIANGULATE", Triangulate, "Triangulate", "")
 DefNode(GeometryNode, GEO_NODE_VIEWER, 0, "VIEWER", Viewer, "Viewer", "")
 DefNode(GeometryNode, GEO_NODE_VOLUME_TO_MESH, def_geo_volume_to_mesh, "VOLUME_TO_MESH", VolumeToMesh, "Volume to Mesh", "")
+DefNode(GeometryNode, GEO_NODE_VOLUME_SAMPLE, 0, "VOLUME_SAMPLE", VolumeSample, "Sample Volume", "")
 
 /* undefine macros */
 #undef DefNode

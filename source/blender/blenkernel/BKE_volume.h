@@ -171,7 +171,7 @@ bool BKE_volume_min_max(const Volume *volume, blender::float3 &r_min, blender::f
 
 VolumeGrid *BKE_volume_grid_add_vdb(Volume *volume,
                                     blender::StringRef name,
-                                    openvdb::FloatGrid::Ptr vdb_grid);
+                                    openvdb::GridBase::Ptr vdb_grid);
 
 bool BKE_volume_grid_bounds(openvdb::GridBase::ConstPtr grid,
                             blender::float3 &r_min,

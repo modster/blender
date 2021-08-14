@@ -1470,7 +1470,7 @@ VolumeGrid *BKE_volume_grid_add(Volume *volume, const char *name, VolumeGridType
 #ifdef WITH_OPENVDB
 VolumeGrid *BKE_volume_grid_add_vdb(Volume *volume,
                                     const StringRef name,
-                                    openvdb::FloatGrid::Ptr vdb_grid)
+                                    openvdb::GridBase::Ptr vdb_grid)
 {
   VolumeGridVector &grids = *volume->runtime.grids;
   BLI_assert(BKE_volume_grid_find_for_read(volume, name.data()) == nullptr);

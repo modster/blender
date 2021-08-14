@@ -113,9 +113,8 @@ struct ParticleList {
 static openvdb::FloatGrid::Ptr generate_volume_from_points(const Span<float3> positions,
                                                            const Span<float> radii)
 {
-  /* Create a new grid that will be filled. #ParticlesToLevelSet requires the background value to
-   * be positive. It will be set to zero later on. */
-  openvdb::FloatGrid::Ptr new_grid = openvdb::FloatGrid::create(1.0f);
+  /* Create a new grid that will be filled.  */
+  openvdb::FloatGrid::Ptr new_grid = openvdb::createLevelSet<openvdb::FloatGrid>();
 
   /* Create a narrow-band level set grid based on the positions and radii. */
   openvdb::tools::ParticlesToLevelSet op{*new_grid};
@@ -218,15 +217,10 @@ static void initialize_volume_component_from_points(const GeometrySet &geometry_
   Volume *volume = (Volume *)BKE_id_new_nomain(ID_VO, nullptr);
   BKE_volume_init_grids(volume);
 
-  VolumeGrid *c_density_grid = BKE_volume_grid_add(volume, "density", VOLUME_GRID_FLOAT);
-  openvdb::FloatGrid::Ptr density_grid = openvdb::gridPtrCast<openvdb::FloatGrid>(
-      BKE_volume_grid_openvdb_for_write(volume, c_density_grid));
-
   convert_to_grid_index_space(voxel_size, positions, radii);
   openvdb::FloatGrid::Ptr new_grid = generate_volume_from_points(positions, radii);
-  /* This merge is cheap, because the #density_grid is empty. */
-  density_grid->merge(*new_grid);
-  density_grid->transform().postScale(voxel_size);
+  new_grid->transform().postScale(voxel_size);
+  BKE_volume_grid_add_vdb(volume, "level_set", std::move(new_grid));
 
   VolumeComponent &volume_component = geometry_set_out.get_component_for_write<VolumeComponent>();
   volume_component.replace(volume);

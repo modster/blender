@@ -193,6 +193,7 @@ set(SRC
   geometry/nodes/node_geo_level_set_primitive_platonic.cc
   geometry/nodes/node_geo_level_set_primitive_sphere.cc
   geometry/nodes/node_geo_level_set_to_fog_volume.cc
+  geometry/nodes/node_geo_level_set_to_mask.cc
   geometry/nodes/node_geo_material_assign.cc
   geometry/nodes/node_geo_material_replace.cc
   geometry/nodes/node_geo_mesh_primitive_circle.cc
@@ -222,6 +223,7 @@ set(SRC
   geometry/nodes/node_geo_transform.cc
   geometry/nodes/node_geo_triangulate.cc
   geometry/nodes/node_geo_viewer.cc
+  geometry/nodes/node_geo_volume_sample.cc
   geometry/nodes/node_geo_volume_to_mesh.cc
   geometry/node_geometry_exec.cc
   geometry/node_geometry_tree.cc

@@ -5166,6 +5166,7 @@ static void registerGeometryNodes()
   register_node_type_geo_level_set_primitive_platonic();
   register_node_type_geo_level_set_primitive_sphere();
   register_node_type_geo_level_set_to_fog_volume();
+  register_node_type_geo_level_set_to_mask();
   register_node_type_geo_material_assign();
   register_node_type_geo_material_replace();
   register_node_type_geo_mesh_primitive_circle();
@@ -5197,6 +5198,7 @@ static void registerGeometryNodes()
   register_node_type_geo_transform();
   register_node_type_geo_triangulate();
   register_node_type_geo_viewer();
+  register_node_type_geo_volume_sample();
   register_node_type_geo_volume_to_mesh();
 }
 
