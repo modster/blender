@@ -2018,6 +2018,21 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
         for (const auto &e_index : v1.get_edges()) {
           to_delete_edge_indices.add(e_index);
         }
+
+        /* If any edges around v2 that have only one face and that
+         * face contains v1, it will become a loose edge, so delete
+         * it */
+        const auto &v2 = this->get_checked_vert(v2_index);
+        for (const auto &v2_e_index : v2.get_edges()) {
+          const auto &v2_e = this->get_checked_edge(v2_e_index);
+          if (v2_e.get_faces().size() == 1) {
+            const auto &v2_e_f = this->get_checked_face(v2_e.get_faces()[0]);
+
+            if (v2_e_f.has_vert_index(v1_index)) {
+              to_delete_edge_indices.add(v2_e_index);
+            }
+          }
+        }
       }
 
       for (const auto &face_index : to_delete_face_indices) {
