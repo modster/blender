@@ -202,7 +202,7 @@ void BKE_rigidbody_free_object(Object *ob, RigidBodyWorld *rbw)
     }
 
     if (rbo->col_shape_draw_data) {
-        BKE_mesh_clear_geometry(rbo->col_shape_draw_data);
+        BKE_mesh_free(rbo->col_shape_draw_data);
     }
 
     MEM_freeN(rbo->shared);
@@ -420,13 +420,14 @@ static void rigidbody_store_convex_hull_draw_data(Object *ob) {
     else {
       CLOG_ERROR(&LOG, "cannot make Convex Hull collision shape for non-Mesh object");
     }
-    float (*verts)[3] = MEM_malloc_arrayN(totvert, sizeof(float)*3, __func__);
+    float (*verts)[3] = (float(*)[3])MEM_malloc_arrayN(sizeof(float[3]), totvert, __func__);
     for(int i=0; i<totvert; i++){
+       // verts[i] = (float*)MEM_malloc_arrayN(sizeof(float), 3, __func__);
         copy_v3_v3(verts[i], mvert[i].co);
     }
 
     plConvexHull hull = plConvexHullCompute((float(*)[3])verts, totvert);
-    free(verts);
+    MEM_freeN(verts);
     const int num_verts = plConvexHullNumVertices(hull);
     const int num_faces = num_verts <= 2 ? 0 : plConvexHullNumFaces(hull);
     const int num_loops = num_verts <= 2 ? 0 : plConvexHullNumLoops(hull);
