@@ -1321,9 +1321,6 @@ static void thumbnail_call_for_job(const bContext *C, Editing *ed, View2D *v2d, 
   }
 }
 
-/* TODO(AYJ) : Decrease Opacity of images when overlay over another strip
- */
-
 static void draw_seq_strip_thumbnail(View2D *v2d,
                                      const bContext *C,
                                      SpaceSeq *sseq,
@@ -1403,10 +1400,9 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
         break;
     }
 
-    // TODO(AYJ) : Fix pixel errors in the first frame when cropping
     cropx_min = (cut_off / pixelx) / (zoom_y / pixely);
     cropx_max = ((x2 - x1) / pixelx) / (zoom_y / pixely);
-    BLI_rcti_init(&crop, (int)(cropx_min), (int)(cropx_max)-1, 0, (int)(image_y)-1);
+    BLI_rcti_init(&crop, (int)(cropx_min), (int)image_x, 0, (int)(image_y)-1);
 
     /* Get the image */
     ibuf = SEQ_get_thumbnail(&context, seq, roundf(x1), &crop, clipped, false);
