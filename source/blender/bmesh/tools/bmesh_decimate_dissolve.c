@@ -115,8 +115,8 @@ static bool bm_edge_is_delimiter(const BMEdge *e,
       }
     }
     if (delimit & BMO_DELIM_FACE_SELECTION) {
-      if (BM_elem_flag_test(e->l->f, BM_ELEM_SELECT) !=
-          BM_elem_flag_test(e->l->radial_next->f, BM_ELEM_SELECT)) {
+      if (BM_elem_flag_test(e->l->f, BM_ELEM_TAG) !=
+          BM_elem_flag_test(e->l->radial_next->f, BM_ELEM_TAG)) {
         return true;
       }
     }
@@ -350,6 +350,7 @@ void BM_mesh_decimate_dissolve_ex(BMesh *bm,
       BM_elem_index_set(e_iter, -1); /* set dirty */
     }
     bm->elem_index_dirty |= BM_EDGE;
+
     /* build heap */
     for (i = 0; i < einput_len; i++) {
       BMEdge *e = einput_arr[i];

@@ -58,7 +58,7 @@ static void geo_node_collapse_init(bNodeTree *UNUSED(tree), bNode *node)
 namespace blender::nodes {
 
 static Mesh *collapse_mesh(const float factor,
-                           const VArray_Span<float> &selection,
+                           const VArray<float> &selection,
                            const bool triangulate,
                            const int symmetry_axis,
                            const Mesh *mesh)
@@ -70,9 +70,8 @@ static Mesh *collapse_mesh(const float factor,
 
   const float symmetry_eps = 0.00002f;
   Array<float> mask(selection.size());
-  for (const int i : selection.index_range()) {
-    mask[i] = selection[i];
-  }
+  selection.materialize(mask);
+
   BM_mesh_decimate_collapse(
       bm, factor, mask.data(), 1.0f, triangulate, symmetry_axis, symmetry_eps);
   Mesh *result = BKE_mesh_from_bmesh_for_eval_nomain(bm, NULL, mesh);
@@ -93,12 +92,13 @@ static void geo_node_collapse_exec(GeoNodeExecParams params)
     const float default_factor = 1.0f;
     GVArray_Typed<float> selection_attribute = params.get_input_attribute<float>(
         "Selection", mesh_component, ATTR_DOMAIN_POINT, default_factor);
-    VArray_Span<float> selection{selection_attribute};
+    // VArray<float> selection(selection_attribute.to);
     const Mesh *input_mesh = mesh_component.get_for_read();
 
     const bNode &node = params.node();
     const NodeGeometryCollapse &node_storage = *(NodeGeometryCollapse *)node.storage;
-    Mesh *result = collapse_mesh(factor, selection, false, node_storage.symmetry_axis, input_mesh);
+    Mesh *result = collapse_mesh(
+        factor, selection_attribute, false, node_storage.symmetry_axis, input_mesh);
     geometry_set.replace_mesh(result);
   }
 

@@ -1453,15 +1453,9 @@ void BM_select_vertices(BMesh *bm, const bool *mask)
 {
   BMIter iter;
   BMVert *v;
-  int i = 0;
-  BM_ITER_MESH (v, &iter, bm, BM_VERTS_OF_MESH) {
-    if (mask[i]) {
-      BM_elem_flag_set(v, BM_ELEM_SELECT, true);
-    }
-    else {
-      BM_elem_flag_set(v, BM_ELEM_SELECT, false);
-    }
-    i++;
+  int i;
+  BM_ITER_MESH_INDEX (v, &iter, bm, BM_VERTS_OF_MESH, i) {
+    BM_elem_flag_set(v, BM_ELEM_SELECT, mask[i]);
   }
 }
 
@@ -1472,15 +1466,9 @@ void BM_select_edges(BMesh *bm, const bool *mask)
 {
   BMIter iter;
   BMEdge *e;
-  int i = 0;
-  BM_ITER_MESH (e, &iter, bm, BM_EDGES_OF_MESH) {
-    if (mask[i]) {
-      BM_elem_flag_set(e, BM_ELEM_SELECT, true);
-    }
-    else {
-      BM_elem_flag_set(e, BM_ELEM_SELECT, false);
-    }
-    i++;
+  int i;
+  BM_ITER_MESH_INDEX (e, &iter, bm, BM_EDGES_OF_MESH, i) {
+    BM_elem_flag_set(e, BM_ELEM_SELECT, mask[i]);
   }
 }
 
@@ -1491,15 +1479,9 @@ void BM_select_faces(BMesh *bm, const bool *mask)
 {
   BMIter iter;
   BMFace *f;
-  int i = 0;
-  BM_ITER_MESH (f, &iter, bm, BM_FACES_OF_MESH) {
-    if (mask[i]) {
-      BM_elem_flag_set(f, BM_ELEM_SELECT, true);
-    }
-    else {
-      BM_elem_flag_set(f, BM_ELEM_SELECT, false);
-    }
-    i++;
+  int i;
+  BM_ITER_MESH_INDEX (f, &iter, bm, BM_FACES_OF_MESH, i) {
+    BM_elem_flag_set(f, BM_ELEM_SELECT, mask[i]);
   }
 }
 
@@ -1507,15 +1489,9 @@ void BM_tag_vertices(BMesh *bm, const bool *mask)
 {
   BMIter iter;
   BMVert *v;
-  int i = 0;
-  BM_ITER_MESH (v, &iter, bm, BM_VERTS_OF_MESH) {
-    if (mask[i]) {
-      BM_elem_flag_set(v, BM_ELEM_TAG, true);
-    }
-    else {
-      BM_elem_flag_set(v, BM_ELEM_TAG, false);
-    }
-    i++;
+  int i;
+  BM_ITER_MESH_INDEX (v, &iter, bm, BM_VERTS_OF_MESH, i) {
+    BM_elem_flag_set(v, BM_ELEM_TAG, mask[i]);
   }
 }
 
@@ -1526,15 +1502,9 @@ void BM_tag_edges(BMesh *bm, const bool *mask)
 {
   BMIter iter;
   BMEdge *e;
-  int i = 0;
-  BM_ITER_MESH (e, &iter, bm, BM_EDGES_OF_MESH) {
-    if (mask[i]) {
-      BM_elem_flag_set(e, BM_ELEM_TAG, true);
-    }
-    else {
-      BM_elem_flag_set(e, BM_ELEM_TAG, false);
-    }
-    i++;
+  int i;
+  BM_ITER_MESH_INDEX (e, &iter, bm, BM_EDGES_OF_MESH, i) {
+    BM_elem_flag_set(e, BM_ELEM_TAG, mask[i]);
   }
 }
 
@@ -1545,15 +1515,9 @@ void BM_tag_faces(BMesh *bm, const bool *mask)
 {
   BMIter iter;
   BMFace *f;
-  int i = 0;
-  BM_ITER_MESH (f, &iter, bm, BM_FACES_OF_MESH) {
-    if (mask[i]) {
-      BM_elem_flag_set(f, BM_ELEM_TAG, true);
-    }
-    else {
-      BM_elem_flag_set(f, BM_ELEM_TAG, false);
-    }
-    i++;
+  int i;
+  BM_ITER_MESH_INDEX (f, &iter, bm, BM_FACES_OF_MESH, i) {
+    BM_elem_flag_set(f, BM_ELEM_TAG, mask[i]);
   }
 }
 /** \} */

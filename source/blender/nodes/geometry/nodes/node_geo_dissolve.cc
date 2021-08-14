@@ -53,7 +53,7 @@ static void geo_node_dissolve_init(bNodeTree *UNUSED(tree), bNode *node)
       sizeof(NodeGeometryDissolve), __func__);
 
   node->storage = node_storage;
-  node_storage->selection_type = GEO_NODE_DISSOLVE_DELIMITTER_SELECTION_BORDER;
+  node_storage->selection_type = GEO_NODE_DISSOLVE_DELIMITTER_UNSELECTED;
 }
 
 namespace blender::nodes {
@@ -68,7 +68,7 @@ static Mesh *dissolve_mesh(const float angle,
       true, 0, 0, 0, {CD_MASK_ORIGINDEX, CD_MASK_ORIGINDEX, CD_MASK_ORIGINDEX}};
   BMesh *bm = BKE_mesh_to_bmesh_ex(mesh, &bmesh_create_params, &bmesh_from_mesh_params);
   if (delimiter & BMO_DELIM_FACE_SELECTION) {
-    BM_select_faces(bm, selection.data());
+    BM_tag_faces(bm, selection.data());
   }
   else {
     BM_select_edges(bm, selection.data());

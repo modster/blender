@@ -1432,14 +1432,12 @@ typedef struct NodeGeometryRaycast {
 
 typedef struct NodeGeometryCollapse {
   /* GeometryNodeCollapseSymmetryAxis. */
-  int symmetry_axis;
-  char _pad[4];
+  int8_t symmetry_axis;
 } NodeGeometryCollapse;
 
 typedef struct NodeGeometryDissolve {
   /* GeometryNodeDissolveDelimiter */
-  int selection_type;
-  char _pad[4];
+  int8_t selection_type;
 } NodeGeometryDissolve;
 
 /* script node mode */
