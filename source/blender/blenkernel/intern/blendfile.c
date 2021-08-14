@@ -660,10 +660,6 @@ UserDef *BKE_blendfile_userdef_from_defaults(void)
   BKE_studiolight_default(userdef->light_param, userdef->light_ambient);
 
   BKE_preferences_asset_library_default_add(userdef);
-  /* Enable asset browser features by default for alpha testing.
-   * BLO_sanitize_experimental_features_userpref_blend() will disable it again for non-alpha
-   * builds. */
-  userdef->experimental.use_asset_browser = true;
 
   return userdef;
 }
@@ -736,10 +732,12 @@ bool BKE_blendfile_userdef_write_all(ReportList *reports)
 
     if (ok_write) {
       printf("ok\n");
+      BKE_report(reports, RPT_INFO, "Preferences saved");
     }
     else {
       printf("fail\n");
       ok = false;
+      BKE_report(reports, RPT_ERROR, "Saving preferences failed");
     }
   }
   else {
