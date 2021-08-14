@@ -312,7 +312,7 @@ void uvedit_face_select_set_with_sticky(const SpaceImage *sima,
         do {
           MLoopUV *luv = BM_ELEM_CD_GET_VOID_P(l_iter, cd_loop_uv_offset);
           if (select) {
-            /* Set selection flag for the internal edges of the face that is being selected */
+            /* Set selection flag for only the internal edges of the face that is being selected */
             luv->flag |= MLOOPUV_EDGESEL;
             /* Select all shared vertices */
             uvedit_uv_select_shared_location(
@@ -321,30 +321,8 @@ void uvedit_face_select_set_with_sticky(const SpaceImage *sima,
           else {
             luv->flag &= ~MLOOPUV_EDGESEL;
 
-            bool do_vert_deselect = true;
-            BMEdge *e_first = l_iter->e, *e_iter;
-            e_iter = e_first;
-            do {
-              /* If any surrounding UV face is selected then don't deselect the shared UV vertices
-               * Deselcting the shared UV vertices could deselect the surrounding UV faces as
-               * well*/
-              BMLoop *l_radial_iter = e_iter->l;
-              do {
-                MLoopUV *luv_radial_other = BM_ELEM_CD_GET_VOID_P(l_radial_iter,
-                                                                  cd_loop_uv_offset);
-                if ((l_radial_iter->f != l_iter->f) &&
-                    uvedit_face_select_test(scene, l_radial_iter->f, cd_loop_uv_offset) &&
-                    equals_v2v2(luv->uv, luv_radial_other->uv)) {
-                  do_vert_deselect = false;
-                  break;
-                }
-              } while ((l_radial_iter = l_radial_iter->radial_next) != e_iter->l);
-              if (!do_vert_deselect) {
-                break;
-              }
-            } while ((e_iter = BM_DISK_EDGE_NEXT(e_iter, l_iter->v)) != e_first);
-
-            if (do_vert_deselect) {
+            if (!uvedit_vert_is_any_other_face_selected(
+                    scene, l_iter, l_iter->v, cd_loop_uv_offset)) {
               uvedit_uv_select_shared_location(
                   scene, em, l_iter, select, false, do_history, cd_loop_uv_offset);
             }
