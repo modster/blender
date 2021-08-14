@@ -423,7 +423,9 @@ typedef enum eRigidBodyCon_Flag {
   RBC_FLAG_USE_SPRING_ANG_Y = (1 << 17),
   RBC_FLAG_USE_SPRING_ANG_Z = (1 << 18),
   /* Debug draw constraint limits */
-  RBC_FLAG_DRAW_CONSTRAINT_LIMITS = (1 << 19),
+  RBC_FLAG_DEBUG_DRAW_LIMITS = (1 << 19),
+  /* Fade linear limit walls when object is not close to hitting the limit. */
+  RBC_FLAG_DEBUG_DRAW_FADE_WALLS = (1 << 20),
 } eRigidBodyCon_Flag;
 
 /* ******************************** */

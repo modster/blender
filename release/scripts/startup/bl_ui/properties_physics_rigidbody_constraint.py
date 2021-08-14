@@ -499,6 +499,10 @@ class PHYSICS_PT_rigid_body_constraint_debug_draw(PHYSICS_PT_rigidbody_constrain
         col = flow.column()
         col.prop(rbc, "debug_draw_limits", text="Debug draw")
 
+        if rbc.type in {'PISTON', 'SLIDER'}:
+            col = flow.column()
+            col.prop(rbc, "debug_draw_fade_walls", text="Fade walls")
+
 classes = (
     PHYSICS_PT_rigid_body_constraint,
     PHYSICS_PT_rigid_body_constraint_settings,
