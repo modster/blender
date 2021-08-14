@@ -317,7 +317,8 @@ static GlyphBLF **blf_font_ensure_ascii_table(FontBLF *font, GlyphCacheBLF *gc)
   /* build ascii on demand */
   if (glyph_ascii_table['0'] == NULL) {
     GlyphBLF *g;
-    for (uint i = 0; i < 256; i++) {
+    /* Skip control characters and just cache rendered glyphs for visible ASCII range. */
+    for (uint i = GLYPH_ASCII_CACHE_MIN; i <= GLYPH_ASCII_CACHE_MAX; i++) {
       g = blf_glyph_search(gc, i);
       if (!g) {
         FT_UInt glyph_index = FT_Get_Char_Index(font->face, i);
@@ -354,7 +355,7 @@ static void blf_font_ensure_ascii_kerning(FontBLF *font,
 /* NOTE: `blf_font_ensure_ascii_table(font, gc);` must be called before this macro. */
 
 #define BLF_UTF8_NEXT_FAST(_font, _gc, _g, _str, _i, _c, _glyph_ascii_table) \
-  if (((_c) = (_str)[_i]) < 0x80) { \
+  if (((_c) = (_str)[_i]) < GLYPH_ASCII_TABLE_SIZE) { \
     _g = (_glyph_ascii_table)[_c]; \
     _i++; \
   } \
@@ -369,11 +370,10 @@ static void blf_font_ensure_ascii_kerning(FontBLF *font,
   (void)0
 
 #define BLF_KERNING_VARS(_font, _has_kerning, _kern_mode) \
-  const bool _has_kerning = FT_HAS_KERNING((_font)->face) != 0; \
-  const FT_UInt _kern_mode = (_has_kerning == 0) ? 0 : \
-                                                   (((_font)->flags & BLF_KERNING_DEFAULT) ? \
-                                                        ft_kerning_default : \
-                                                        (FT_UInt)FT_KERNING_UNFITTED)
+  const bool _has_kerning = FT_HAS_KERNING((_font)->face); \
+  const FT_UInt _kern_mode = (_has_kerning && !((_font)->flags & BLF_KERNING_DEFAULT)) ? \
+                                 FT_KERNING_UNFITTED : \
+                                 FT_KERNING_DEFAULT;
 
 /* NOTE: `blf_font_ensure_ascii_kerning(font, gc, kern_mode);` must be called before this macro. */
 
@@ -381,7 +381,7 @@ static void blf_font_ensure_ascii_kerning(FontBLF *font,
   { \
     if (_g_prev) { \
       FT_Vector _delta; \
-      if (_c_prev < 0x80 && _c < 0x80) { \
+      if (_c_prev < KERNING_CACHE_TABLE_SIZE && _c < GLYPH_ASCII_TABLE_SIZE) { \
         _pen_x += (_font)->kerning_cache->table[_c][_c_prev]; \
       } \
       else if (FT_Get_Kerning((_font)->face, (_g_prev)->idx, (_g)->idx, _kern_mode, &(_delta)) == \
@@ -481,7 +481,7 @@ static void blf_font_draw_ascii_ex(
   blf_batch_draw_begin(font);
 
   while ((c = *(str++)) && len--) {
-    BLI_assert(c < 128);
+    BLI_assert(c < GLYPH_ASCII_TABLE_SIZE);
     if ((g = glyph_ascii_table[c]) == NULL) {
       continue;
     }
@@ -1261,7 +1261,7 @@ int blf_font_count_missing_chars(FontBLF *font,
   while (i < len) {
     unsigned int c;
 
-    if ((c = str[i]) < 0x80) {
+    if ((c = str[i]) < GLYPH_ASCII_TABLE_SIZE) {
       i++;
     }
     else if ((c = BLI_str_utf8_as_unicode_step(str, &i)) != BLI_UTF8_ERR) {
@@ -1359,9 +1359,15 @@ FontBLF *blf_font_new(const char *name, const char *filename)
     return NULL;
   }
 
-  err = FT_Select_Charmap(font->face, ft_encoding_unicode);
+  err = FT_Select_Charmap(font->face, FT_ENCODING_UNICODE);
   if (err) {
-    printf("Can't set the unicode character map!\n");
+    err = FT_Select_Charmap(font->face, FT_ENCODING_APPLE_ROMAN);
+  }
+  if (err && font->face->num_charmaps > 0) {
+    err = FT_Select_Charmap(font->face, font->face->charmaps[0]->encoding);
+  }
+  if (err) {
+    printf("Can't set a character map!\n");
     FT_Done_Face(font->face);
     MEM_freeN(font);
     return NULL;
