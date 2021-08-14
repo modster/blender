@@ -16,8 +16,14 @@
 
 #include "DNA_mesh_types.h"
 
+#ifdef WITH_OPENVDB
+#  include <openvdb/tools/RayIntersector.h>
+#  include <openvdb/tools/VolumeToMesh.h>
+#endif
+
 #include "BKE_bvhutils.h"
 #include "BKE_mesh_sample.hh"
+#include "BKE_volume.h"
 
 #include "UI_interface.h"
 #include "UI_resources.h"
@@ -75,6 +81,38 @@ static void geo_node_raycast_update(bNodeTree *UNUSED(ntree), bNode *node)
   update_attribute_input_socket_availabilities(
       *node, "Ray Length", (GeometryNodeAttributeInputMode)node_storage->input_type_ray_length);
 }
+
+#ifdef WITH_OPENVDB
+static void raycast_to_level_set(const openvdb::FloatGrid &level_set,
+                                 const VArray<float3> &ray_origins,
+                                 const VArray<float3> &ray_directions,
+                                 const VArray<float> &ray_lengths,
+                                 const MutableSpan<bool> r_hit,
+                                 const MutableSpan<float3> r_hit_positions,
+                                 const MutableSpan<float3> r_hit_normals,
+                                 const MutableSpan<float> r_hit_distances)
+{
+  openvdb::tools::LevelSetRayIntersector intersector(level_set);
+
+  for (const int i : ray_origins.index_range()) {
+    const openvdb::math::Vec3s origin(ray_origins[i].x, ray_origins[i].y, ray_origins[i].z);
+    const openvdb::math::Vec3s dir(ray_directions[i].x, ray_directions[i].y, ray_directions[i].z);
+    const openvdb::math::Ray<double> ray(origin, dir);
+
+    openvdb::math::Vec3d hit_position(0);
+    openvdb::math::Vec3d hit_normal(0);
+    if (!r_hit.is_empty()) {
+      r_hit[i] = intersector.intersectsWS(ray, hit_position, hit_normal);
+    }
+    if (!r_hit_positions.is_empty()) {
+      r_hit_positions[i] = float3(hit_position.x(), hit_position.y(), hit_position.z());
+    }
+    if (!r_hit_normals.is_empty()) {
+      r_hit_normals[i] = float3(hit_normal.x(), hit_normal.y(), hit_normal.z());
+    }
+  }
+}
+#endif
 
 static void raycast_to_mesh(const Mesh &mesh,
                             const VArray<float3> &ray_origins,
@@ -167,6 +205,33 @@ static bke::mesh_surface_sample::eAttributeMapMode get_map_mode(
   }
 }
 
+static bool level_set_available(const GeometrySet &target_geometry,
+                                const GeoNodeExecParams &params,
+                                const bool has_mesh)
+{
+  const Volume *volume = target_geometry.get_volume_for_read();
+  if (volume == nullptr) {
+    return false;
+  }
+  const VolumeGrid *volume_grid = BKE_volume_grid_get_for_read(volume, 0);
+  if (volume_grid == nullptr) {
+    return false;
+  }
+
+  openvdb::GridBase::ConstPtr grid = BKE_volume_grid_openvdb_for_read(volume, volume_grid);
+  if (grid->empty()) {
+    return false;
+  }
+  if (grid->getGridClass() != openvdb::GridClass::GRID_LEVEL_SET) {
+    if (!has_mesh) {
+      params.error_message_add(NodeWarningType::Error, TIP_("Volume is not a level set"));
+    }
+    return false;
+  }
+
+  return true;
+}
+
 static void raycast_from_points(const GeoNodeExecParams &params,
                                 const GeometrySet &target_geometry,
                                 GeometryComponent &dst_component,
@@ -181,15 +246,18 @@ static void raycast_from_points(const GeoNodeExecParams &params,
 
   const MeshComponent *src_mesh_component =
       target_geometry.get_component_for_read<MeshComponent>();
-  if (src_mesh_component == nullptr) {
-    return;
-  }
-  const Mesh *src_mesh = src_mesh_component->get_for_read();
-  if (src_mesh == nullptr) {
-    return;
-  }
-  if (src_mesh->totpoly == 0) {
-    return;
+
+  const Mesh *src_mesh = src_mesh_component == nullptr ? nullptr :
+                                                         src_mesh_component->get_for_read();
+
+  const bool can_use_level_set = level_set_available(target_geometry, params, src_mesh == nullptr);
+  if (!can_use_level_set) {
+    if (src_mesh == nullptr) {
+      return;
+    }
+    if (src_mesh->totpoly == 0) {
+      return;
+    }
   }
 
   const NodeGeometryRaycast &storage = *(const NodeGeometryRaycast *)params.node().storage;
@@ -213,58 +281,71 @@ static void raycast_from_points(const GeoNodeExecParams &params,
   OutputAttribute_Typed<float> hit_distance_attribute =
       dst_component.attribute_try_get_for_output_only<float>(hit_distance_name, result_domain);
 
-  /* Positions and looptri indices are always needed for interpolation,
-   * so create temporary arrays if no output attribute is given. */
-  Array<int> hit_indices;
-  Array<float3> hit_positions_internal;
-  if (!hit_attribute_names.is_empty()) {
-    hit_indices.reinitialize(ray_origins->size());
+  if (src_mesh == nullptr) {
+    BLI_assert(can_use_level_set);
+    const Volume *volume = target_geometry.get_volume_for_read();
+    const VolumeGrid *volume_grid = BKE_volume_grid_get_for_read(volume, 0);
+    openvdb::GridBase::ConstPtr grid_base = BKE_volume_grid_openvdb_for_read(volume, volume_grid);
 
-    if (!hit_position_attribute) {
-      hit_positions_internal.reinitialize(ray_origins->size());
+    raycast_to_level_set(
+        *openvdb::gridConstPtrCast<openvdb::FloatGrid>(grid_base),
+        ray_origins,
+        ray_directions,
+        ray_lengths,
+        hit_attribute ? hit_attribute.as_span() : MutableSpan<bool>(),
+        hit_position_attribute ? hit_position_attribute.as_span() : MutableSpan<float3>(),
+        hit_normal_attribute ? hit_normal_attribute.as_span() : MutableSpan<float3>(),
+        hit_distance_attribute ? hit_distance_attribute.as_span() : MutableSpan<float>());
+  }
+  else {
+    /* Positions and looptri indices are always needed for interpolation,
+     * so create temporary arrays if no output attribute is given. */
+    Array<int> hit_indices;
+    Array<float3> hit_positions_internal;
+    if (!hit_attribute_names.is_empty()) {
+      hit_indices.reinitialize(ray_origins->size());
+
+      if (!hit_position_attribute) {
+        hit_positions_internal.reinitialize(ray_origins->size());
+      }
+    }
+
+    MutableSpan<float3> hit_positions = hit_position_attribute ? hit_position_attribute.as_span() :
+                                                                 hit_positions_internal;
+    raycast_to_mesh(*src_mesh,
+                    ray_origins,
+                    ray_directions,
+                    ray_lengths,
+                    hit_attribute ? hit_attribute.as_span() : MutableSpan<bool>(),
+                    hit_indices,
+                    hit_positions,
+                    hit_normal_attribute ? hit_normal_attribute.as_span() : MutableSpan<float3>(),
+                    hit_distance_attribute ? hit_distance_attribute.as_span() :
+                                             MutableSpan<float>());
+
+    /* Custom interpolated attributes */
+    bke::mesh_surface_sample::MeshAttributeInterpolator interp(
+        src_mesh, hit_positions, hit_indices);
+    for (const int i : hit_attribute_names.index_range()) {
+      const std::optional<AttributeMetaData> meta_data =
+          src_mesh_component->attribute_get_meta_data(hit_attribute_names[i]);
+      if (meta_data) {
+        ReadAttributeLookup hit_attribute = src_mesh_component->attribute_try_get_for_read(
+            hit_attribute_names[i]);
+        OutputAttribute hit_attribute_output = dst_component.attribute_try_get_for_output_only(
+            hit_attribute_output_names[i], result_domain, meta_data->data_type);
+
+        interp.sample_attribute(hit_attribute, hit_attribute_output, map_mode);
+
+        hit_attribute_output.save();
+      }
     }
   }
-  const MutableSpan<bool> is_hit = hit_attribute ? hit_attribute.as_span() : MutableSpan<bool>();
-  const MutableSpan<float3> hit_positions = hit_position_attribute ?
-                                                hit_position_attribute.as_span() :
-                                                hit_positions_internal;
-  const MutableSpan<float3> hit_normals = hit_normal_attribute ? hit_normal_attribute.as_span() :
-                                                                 MutableSpan<float3>();
-  const MutableSpan<float> hit_distances = hit_distance_attribute ?
-                                               hit_distance_attribute.as_span() :
-                                               MutableSpan<float>();
-
-  raycast_to_mesh(*src_mesh,
-                  ray_origins,
-                  ray_directions,
-                  ray_lengths,
-                  is_hit,
-                  hit_indices,
-                  hit_positions,
-                  hit_normals,
-                  hit_distances);
 
   hit_attribute.save();
   hit_position_attribute.save();
   hit_normal_attribute.save();
   hit_distance_attribute.save();
-
-  /* Custom interpolated attributes */
-  bke::mesh_surface_sample::MeshAttributeInterpolator interp(src_mesh, hit_positions, hit_indices);
-  for (const int i : hit_attribute_names.index_range()) {
-    const std::optional<AttributeMetaData> meta_data = src_mesh_component->attribute_get_meta_data(
-        hit_attribute_names[i]);
-    if (meta_data) {
-      ReadAttributeLookup hit_attribute = src_mesh_component->attribute_try_get_for_read(
-          hit_attribute_names[i]);
-      OutputAttribute hit_attribute_output = dst_component.attribute_try_get_for_output_only(
-          hit_attribute_output_names[i], result_domain, meta_data->data_type);
-
-      interp.sample_attribute(hit_attribute, hit_attribute_output, map_mode);
-
-      hit_attribute_output.save();
-    }
-  }
 }
 
 static void geo_node_raycast_exec(GeoNodeExecParams params)
