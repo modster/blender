@@ -2030,6 +2030,20 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
 
             if (v2_e_f.has_vert_index(v1_index)) {
               to_delete_edge_indices.add(v2_e_index);
+
+              /* It is possible for `ov` to become a loose vert when
+               * it has only one face attached. So delete it in such
+               * a case */
+              BLI_assert(v2_e.get_verts());
+              auto ov_index = std::get<0>(v2_e.get_verts().value());
+              if (ov_index == v2_index) {
+                ov_index = std::get<1>(v2_e.get_verts().value());
+              }
+
+              const auto ov_face_indices = this->get_checked_face_indices_of_vert(ov_index);
+              if (ov_face_indices.size() == 1) {
+                to_delete_vert_indices.add(ov_index);
+              }
             }
           }
         }
