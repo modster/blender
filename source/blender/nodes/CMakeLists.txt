@@ -396,7 +396,7 @@ if(WITH_BULLET)
   if(NOT WITH_SYSTEM_BULLET)
   list(APPEND LIB
     extern_bullet
-    )
+  )
   endif()
 
   list(APPEND LIB
@@ -468,15 +468,15 @@ endif()
 
 if(WITH_OPENVDB)
   list(APPEND INC
-          ../../../intern/openvdb
-          )
+    ../../../intern/openvdb
+  )
   list(APPEND INC_SYS
-          ${OPENVDB_INCLUDE_DIRS}
-          )
+    ${OPENVDB_INCLUDE_DIRS}
+  )
   list(APPEND LIB
-          bf_intern_openvdb
-          ${OPENVDB_LIBRARIES}
-          )
+    bf_intern_openvdb
+    ${OPENVDB_LIBRARIES}
+  )
   add_definitions(-DWITH_OPENVDB ${OPENVDB_DEFINITIONS})
 endif()
 

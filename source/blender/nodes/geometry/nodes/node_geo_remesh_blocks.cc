@@ -69,7 +69,7 @@ static void geo_node_remesh_blocks_exec(GeoNodeExecParams params)
 
     BKE_mesh_copy_parameters_for_eval(output_mesh, input_mesh);
     BKE_mesh_calc_edges(output_mesh, true, false);
-    output_mesh->runtime.cd_dirty_vert |= CD_MASK_NORMAL;
+    BKE_mesh_normals_tag_dirty(output_mesh);
 
     geometry_set.replace_mesh(output_mesh);
   }

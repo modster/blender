@@ -16,31 +16,31 @@
 # ***** END GPL LICENSE BLOCK *****
 
 set(INC
-        .
-        ../blenkernel
-        ../blenlib
-        ../makesdna
-        ../../../intern/guardedalloc
-        )
+  .
+  ../blenkernel
+  ../blenlib
+  ../makesdna
+  ../../../intern/guardedalloc
+)
 
 set(SRC
-        intern/remesh_blocks.c
-        GEO_mesh_remesh_blocks.h
-        )
+  intern/remesh_blocks.c
+  GEO_mesh_remesh_blocks.h
+)
 
 set(LIB
-        bf_blenkernel
-        bf_blenlib
-        )
+  bf_blenkernel
+  bf_blenlib
+)
 
 if(WITH_REMESH_DUALCON)
-    list(APPEND INC
-            ../../../intern/dualcon
-            )
-    list(APPEND LIB
-            bf_intern_dualcon
-            )
-    add_definitions(-DWITH_REMESH_DUALCON)
+  list(APPEND INC
+    ../../../intern/dualcon
+  )
+  list(APPEND LIB
+    bf_intern_dualcon
+  )
+  add_definitions(-DWITH_REMESH_DUALCON)
 endif()
 
 blender_add_lib(bf_geometry "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")

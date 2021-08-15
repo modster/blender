@@ -270,7 +270,7 @@ if(UNIX AND NOT APPLE)
 endif()
 
 # Geometry
-option(WITH_REMESH_DUALCON          "Enable Remesh Algorithm using Dualcon" ON)
+option(WITH_REMESH_DUALCON      "Enable Remesh Algorithm using Dualcon" ON)
 
 # Modifiers
 option(WITH_MOD_FLUID           "Enable Mantaflow Fluid Simulation Framework" ON)
