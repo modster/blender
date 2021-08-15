@@ -844,6 +844,9 @@ static void wm_xr_session_controller_data_update(const bContext *C,
        * be created in wm_xr_draw_controllers(). */
       GHOST_XrLoadControllerModel(xr_context, controller->subaction_path);
     }
+    else {
+      GHOST_XrUpdateControllerModelComponents(xr_context, controller->subaction_path);
+    }
   }
 }
 

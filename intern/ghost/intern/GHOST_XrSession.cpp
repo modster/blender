@@ -868,7 +868,7 @@ bool GHOST_XrSession::loadControllerModel(const char *subaction_path)
              .first;
   }
 
-  it->second.update(session);
+  it->second.load(session);
 
   return true;
 }
@@ -879,6 +879,20 @@ void GHOST_XrSession::unloadControllerModel(const char *subaction_path)
   if (controller_models.find(subaction_path) != controller_models.end()) {
     controller_models.erase(subaction_path);
   }
+}
+
+bool GHOST_XrSession::updateControllerModelComponents(const char *subaction_path)
+{
+  XrSession session = m_oxr->session;
+  std::map<std::string, GHOST_XrControllerModel>::iterator it = m_oxr->controller_models.find(
+      subaction_path);
+  if (it == m_oxr->controller_models.end()) {
+    return false;
+  }
+
+  it->second.updateComponents(session);
+
+  return true;
 }
 
 bool GHOST_XrSession::getControllerModelData(const char *subaction_path,

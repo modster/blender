@@ -28,6 +28,8 @@
 #include <memory>
 #include <vector>
 
+struct GHOST_XrControllerModelNode;
+
 /**
  * OpenXR glTF controller model.
  */
@@ -36,17 +38,24 @@ class GHOST_XrControllerModel {
   GHOST_XrControllerModel(XrInstance instance, const char *subaction_path);
   ~GHOST_XrControllerModel();
 
-  void update(XrSession session);
+  void load(XrSession session);
+  void updateComponents(XrSession session);
   void getData(GHOST_XrControllerModelData &r_data);
 
  private:
   XrPath m_subaction_path = XR_NULL_PATH;
+  XrControllerModelKeyMSFT m_model_key = XR_NULL_CONTROLLER_MODEL_KEY_MSFT;
+
   std::future<void> m_load_task;
   std::atomic<bool> m_data_loaded = false;
   std::unique_ptr<uint8_t[]> m_data = nullptr;
+
   std::vector<GHOST_XrControllerModelVertex> m_vertices;
   std::vector<uint32_t> m_indices;
   std::vector<GHOST_XrControllerModelComponent> m_components;
+  std::vector<GHOST_XrControllerModelNode> m_nodes;
+  /** Maps node states to nodes. */
+  std::vector<int32_t> m_node_state_indices;
 
-  void loadControllerModel(XrSession session, XrControllerModelKeyMSFT model_key);
+  void loadControllerModel(XrSession session);
 };

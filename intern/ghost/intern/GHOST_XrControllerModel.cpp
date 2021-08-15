@@ -35,6 +35,13 @@
 #define STBIWDEF static inline
 #include "tiny_gltf.h"
 
+struct GHOST_XrControllerModelNode {
+  int32_t parent_idx = -1;
+  int32_t component_idx = -1;
+  float local_transform[4][4];
+  float world_transform[4][4];
+};
+
 /* -------------------------------------------------------------------- */
 /** \name glTF Utilities
  *
@@ -224,7 +231,7 @@ static GHOST_XrPrimitive read_primitive(const tinygltf::Model &gltf_model,
 /* Calculate node transform in world space. */
 static void calc_node_transform(const tinygltf::Node &gltf_node,
                                 const float parent_transform[4][4],
-                                float r_transform[4][4])
+                                GHOST_XrControllerModelNode &node)
 {
   /* A node may specify either a 4x4 matrix or TRS (Translation - Rotation - Scale) values, but not
    * both. */
@@ -246,15 +253,14 @@ static void calc_node_transform(const tinygltf::Node &gltf_node,
                      (float)dm[13],
                      (float)dm[14],
                      (float)dm[15]};
-
-    *(Eigen::Matrix4f *)r_transform = *(Eigen::Matrix4f *)parent_transform * *(Eigen::Matrix4f *)m;
+    memcpy(node.local_transform, m, sizeof(node.local_transform));
   }
   else {
     /* No matrix is present, so construct a matrix from the TRS values (each one is optional). */
     std::vector<double> translation = gltf_node.translation;
     std::vector<double> rotation = gltf_node.rotation;
     std::vector<double> scale = gltf_node.scale;
-    Eigen::Matrix4f m;
+    Eigen::Matrix4f &m = *(Eigen::Matrix4f *)node.local_transform;
     Eigen::Quaternionf q;
     Eigen::Matrix3f scalemat;
 
@@ -287,28 +293,45 @@ static void calc_node_transform(const tinygltf::Node &gltf_node,
     m.block<3, 3>(0, 0) = q.toRotationMatrix() * scalemat;
     m.block<3, 1>(0, 3) = Eigen::Vector3f(
         (float)translation[0], (float)translation[1], (float)translation[2]);
-
-    *(Eigen::Matrix4f *)r_transform = *(Eigen::Matrix4f *)parent_transform * m;
   }
+
+  *(Eigen::Matrix4f *)node.world_transform = *(Eigen::Matrix4f *)parent_transform *
+                                             *(Eigen::Matrix4f *)node.local_transform;
 }
 
 static void load_node(tinygltf::Model gltf_model,
-                      int node_id,
+                      int gltf_node_id,
+                      int32_t parent_idx,
                       const float parent_transform[4][4],
+                      const std::string &parent_name,
+                      const std::vector<XrControllerModelNodePropertiesMSFT> &node_properties,
                       std::vector<GHOST_XrControllerModelVertex> &vertices,
                       std::vector<uint32_t> &indices,
-                      std::vector<GHOST_XrControllerModelComponent> &components)
+                      std::vector<GHOST_XrControllerModelComponent> &components,
+                      std::vector<GHOST_XrControllerModelNode> &nodes,
+                      std::vector<int32_t> &node_state_indices)
 {
-  const tinygltf::Node &gltf_node = gltf_model.nodes.at(node_id);
-  float transform[4][4];
+  const tinygltf::Node &gltf_node = gltf_model.nodes.at(gltf_node_id);
 
-  calc_node_transform(gltf_node, parent_transform, transform);
+  GHOST_XrControllerModelNode &node = nodes.emplace_back();
+  const int32_t node_idx = (int32_t)(nodes.size() - 1);
+  node.parent_idx = parent_idx;
+  calc_node_transform(gltf_node, parent_transform, node);
+
+  for (size_t i = 0; i < node_properties.size(); ++i) {
+    if ((node_state_indices[i] < 0) && (parent_name == node_properties[i].parentNodeName) &&
+        (gltf_node.name == node_properties[i].nodeName)) {
+      node_state_indices[i] = node_idx;
+      break;
+    }
+  }
 
   if (gltf_node.mesh != -1) {
     const tinygltf::Mesh &gltf_mesh = gltf_model.meshes.at(gltf_node.mesh);
 
     GHOST_XrControllerModelComponent &component = components.emplace_back();
-    memcpy(component.transform, transform, sizeof(component.transform));
+    node.component_idx = components.size() - 1;
+    memcpy(component.transform, node.world_transform, sizeof(component.transform));
     component.vertex_offset = vertices.size();
     component.index_offset = indices.size();
 
@@ -340,7 +363,17 @@ static void load_node(tinygltf::Model gltf_model,
 
   /* Recursively load all children. */
   for (const int child_node_id : gltf_node.children) {
-    load_node(gltf_model, child_node_id, transform, vertices, indices, components);
+    load_node(gltf_model,
+              child_node_id,
+              node_idx,
+              node.world_transform,
+              gltf_node.name,
+              node_properties,
+              vertices,
+              indices,
+              components,
+              nodes,
+              node_state_indices);
   }
 }
 
@@ -357,12 +390,12 @@ static PFN_xrGetControllerModelPropertiesMSFT g_xrGetControllerModelPropertiesMS
 static PFN_xrGetControllerModelStateMSFT g_xrGetControllerModelStateMSFT = nullptr;
 static XrInstance g_instance = XR_NULL_HANDLE;
 
-#define LOAD_EXTENSION_FUNCTION(name) \
+#define INIT_EXTENSION_FUNCTION(name) \
   CHECK_XR( \
       xrGetInstanceProcAddr(instance, #name, reinterpret_cast<PFN_xrVoidFunction *>(&g_##name)), \
-      "Failed to load extension function: " #name);
+      "Failed to get pointer to extension function: " #name);
 
-static void load_controller_model_extension_functions(XrInstance instance)
+static void init_controller_model_extension_functions(XrInstance instance)
 {
   if (instance != g_instance) {
     g_instance = instance;
@@ -373,16 +406,16 @@ static void load_controller_model_extension_functions(XrInstance instance)
   }
 
   if (g_xrGetControllerModelKeyMSFT == nullptr) {
-    LOAD_EXTENSION_FUNCTION(xrGetControllerModelKeyMSFT);
+    INIT_EXTENSION_FUNCTION(xrGetControllerModelKeyMSFT);
   }
   if (g_xrLoadControllerModelMSFT == nullptr) {
-    LOAD_EXTENSION_FUNCTION(xrLoadControllerModelMSFT);
+    INIT_EXTENSION_FUNCTION(xrLoadControllerModelMSFT);
   }
   if (g_xrGetControllerModelPropertiesMSFT == nullptr) {
-    LOAD_EXTENSION_FUNCTION(xrGetControllerModelPropertiesMSFT);
+    INIT_EXTENSION_FUNCTION(xrGetControllerModelPropertiesMSFT);
   }
   if (g_xrGetControllerModelStateMSFT == nullptr) {
-    LOAD_EXTENSION_FUNCTION(xrGetControllerModelStateMSFT);
+    INIT_EXTENSION_FUNCTION(xrGetControllerModelStateMSFT);
   }
 }
 
@@ -396,8 +429,7 @@ static void load_controller_model_extension_functions(XrInstance instance)
 GHOST_XrControllerModel::GHOST_XrControllerModel(XrInstance instance,
                                                  const char *subaction_path_str)
 {
-  /* Load extension functions. */
-  load_controller_model_extension_functions(instance);
+  init_controller_model_extension_functions(instance);
 
   CHECK_XR(xrStringToPath(instance, subaction_path_str, &m_subaction_path),
            (std::string("Failed to get user path \"") + subaction_path_str + "\".").data());
@@ -410,7 +442,7 @@ GHOST_XrControllerModel::~GHOST_XrControllerModel()
   }
 }
 
-void GHOST_XrControllerModel::update(XrSession session)
+void GHOST_XrControllerModel::load(XrSession session)
 {
   if (m_data_loaded || m_load_task.valid()) {
     return;
@@ -422,23 +454,22 @@ void GHOST_XrControllerModel::update(XrSession session)
            "Failed to get controller model key state.");
 
   if (key_state.modelKey != XR_NULL_CONTROLLER_MODEL_KEY_MSFT) {
+    m_model_key = key_state.modelKey;
+    /* Load asynchronously. */
     m_load_task = std::async(std::launch::async,
-                             [&, session = session, model_key = key_state.modelKey]() {
-                               return loadControllerModel(session, model_key);
-                             });
+                             [&, session = session]() { return loadControllerModel(session); });
   }
 }
 
-void GHOST_XrControllerModel::loadControllerModel(XrSession session,
-                                                  XrControllerModelKeyMSFT model_key)
+void GHOST_XrControllerModel::loadControllerModel(XrSession session)
 {
   /* Load binary buffers. */
   uint32_t buf_size = 0;
-  CHECK_XR(g_xrLoadControllerModelMSFT(session, model_key, 0, &buf_size, nullptr),
+  CHECK_XR(g_xrLoadControllerModelMSFT(session, m_model_key, 0, &buf_size, nullptr),
            "Failed to get controller model buffer size.");
 
   m_data = std::make_unique<uint8_t[]>(buf_size);
-  CHECK_XR(g_xrLoadControllerModelMSFT(session, model_key, buf_size, &buf_size, m_data.get()),
+  CHECK_XR(g_xrLoadControllerModelMSFT(session, m_model_key, buf_size, &buf_size, m_data.get()),
            "Failed to load controller model binary buffers.");
 
   /* Convert to glTF model. */
@@ -450,17 +481,94 @@ void GHOST_XrControllerModel::loadControllerModel(XrSession session,
     throw GHOST_XrException(("Failed to load glTF controller model: " + err_msg).c_str());
   }
 
+  /* Get node properties. */
+  XrControllerModelPropertiesMSFT model_properties{XR_TYPE_CONTROLLER_MODEL_PROPERTIES_MSFT};
+  model_properties.nodeCapacityInput = 0;
+  CHECK_XR(g_xrGetControllerModelPropertiesMSFT(session, m_model_key, &model_properties),
+           "Failed to get controller model node properties count.");
+
+  std::vector<XrControllerModelNodePropertiesMSFT> node_properties(
+      model_properties.nodeCountOutput, {XR_TYPE_CONTROLLER_MODEL_NODE_PROPERTIES_MSFT});
+  model_properties.nodeCapacityInput = (uint32_t)node_properties.size();
+  model_properties.nodeProperties = node_properties.data();
+  CHECK_XR(g_xrGetControllerModelPropertiesMSFT(session, m_model_key, &model_properties),
+           "Failed to get controller model node properties.");
+
+  m_node_state_indices.resize(node_properties.size(), -1);
+
   /* Get mesh vertex data. */
   const tinygltf::Scene &default_scene = gltf_model.scenes.at(
       (gltf_model.defaultScene == -1) ? 0 : gltf_model.defaultScene);
+  const int32_t root_idx = -1;
+  const std::string root_name = "";
   float root_transform[4][4] = {0};
   root_transform[0][0] = root_transform[1][1] = root_transform[2][2] = root_transform[3][3] = 1.0f;
 
   for (const int node_id : default_scene.nodes) {
-    load_node(gltf_model, node_id, root_transform, m_vertices, m_indices, m_components);
+    load_node(gltf_model,
+              node_id,
+              root_idx,
+              root_transform,
+              root_name,
+              node_properties,
+              m_vertices,
+              m_indices,
+              m_components,
+              m_nodes,
+              m_node_state_indices);
   }
 
   m_data_loaded = true;
+}
+
+void GHOST_XrControllerModel::updateComponents(XrSession session)
+{
+  if (!m_data_loaded) {
+    return;
+  }
+
+  /* Get node states. */
+  XrControllerModelStateMSFT model_state{XR_TYPE_CONTROLLER_MODEL_STATE_MSFT};
+  model_state.nodeCapacityInput = 0;
+  CHECK_XR(g_xrGetControllerModelStateMSFT(session, m_model_key, &model_state),
+           "Failed to get controller model node state count.");
+
+  const uint32_t count = model_state.nodeCountOutput;
+  std::vector<XrControllerModelNodeStateMSFT> node_states(
+      count, {XR_TYPE_CONTROLLER_MODEL_NODE_STATE_MSFT});
+  model_state.nodeCapacityInput = count;
+  model_state.nodeStates = node_states.data();
+  CHECK_XR(g_xrGetControllerModelStateMSFT(session, m_model_key, &model_state),
+           "Failed to get controller model node states.");
+
+  /* Update node local transforms. */
+  assert(m_node_state_indices.size() == count);
+
+  for (uint32_t state_idx = 0; state_idx < count; ++state_idx) {
+    const int32_t &node_idx = m_node_state_indices[state_idx];
+    if (node_idx > 0) {
+      const XrPosef &pose = node_states[state_idx].nodePose;
+      Eigen::Matrix4f &m = *(Eigen::Matrix4f *)m_nodes[node_idx].local_transform;
+      Eigen::Quaternionf q(
+          pose.orientation.w, pose.orientation.x, pose.orientation.y, pose.orientation.z);
+      m.setIdentity();
+      m.block<3, 3>(0, 0) = q.toRotationMatrix();
+      m.block<3, 1>(0, 3) = Eigen::Vector3f(pose.position.x, pose.position.y, pose.position.z);
+    }
+  }
+
+  /* Update node/component world transforms. */
+  for (GHOST_XrControllerModelNode &node : m_nodes) {
+    *(Eigen::Matrix4f *)node.world_transform =
+        (node.parent_idx > 0) ? *(Eigen::Matrix4f *)m_nodes[node.parent_idx].world_transform *
+                                    *(Eigen::Matrix4f *)node.local_transform :
+                                *(Eigen::Matrix4f *)node.local_transform;
+    if (node.component_idx > 0) {
+      memcpy(m_components[node.component_idx].transform,
+             node.world_transform,
+             sizeof(m_components[node.component_idx].transform));
+    }
+  }
 }
 
 void GHOST_XrControllerModel::getData(GHOST_XrControllerModelData &r_data)

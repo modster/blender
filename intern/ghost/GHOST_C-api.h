@@ -1152,6 +1152,12 @@ int GHOST_XrLoadControllerModel(GHOST_XrContextHandle xr_context, const char *su
 void GHOST_XrUnloadControllerModel(GHOST_XrContextHandle xr_context, const char *subaction_path);
 
 /**
+ * Update component transforms for the OpenXR controller model.
+ */
+int GHOST_XrUpdateControllerModelComponents(GHOST_XrContextHandle xr_context,
+                                            const char *subaction_path);
+
+/**
  * Get vertex data for the OpenXR controller model.
  */
 int GHOST_XrGetControllerModelData(GHOST_XrContextHandle xr_context,

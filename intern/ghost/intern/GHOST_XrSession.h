@@ -91,6 +91,7 @@ class GHOST_XrSession {
   /** Controller model functions. */
   bool loadControllerModel(const char *subaction_path);
   void unloadControllerModel(const char *subaction_path);
+  bool updateControllerModelComponents(const char *subaction_path);
   bool getControllerModelData(const char *subaction_path, GHOST_XrControllerModelData &r_data);
 
  private:

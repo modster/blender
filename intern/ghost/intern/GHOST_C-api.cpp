@@ -1085,6 +1085,15 @@ void GHOST_XrUnloadControllerModel(GHOST_XrContextHandle xr_contexthandle,
   GHOST_XR_CAPI_CALL(xr_session->unloadControllerModel(subaction_path), xr_context);
 }
 
+int GHOST_XrUpdateControllerModelComponents(GHOST_XrContextHandle xr_contexthandle,
+                                            const char *subaction_path)
+{
+  GHOST_IXrContext *xr_context = (GHOST_IXrContext *)xr_contexthandle;
+  GHOST_XrSession *xr_session = xr_context->getSession();
+  GHOST_XR_CAPI_CALL_RET(xr_session->updateControllerModelComponents(subaction_path), xr_context);
+  return 0;
+}
+
 int GHOST_XrGetControllerModelData(GHOST_XrContextHandle xr_contexthandle,
                                    const char *subaction_path,
                                    GHOST_XrControllerModelData *r_data)
