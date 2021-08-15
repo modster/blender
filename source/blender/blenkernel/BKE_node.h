@@ -1477,7 +1477,7 @@ int ntreeTexExecTree(struct bNodeTree *ntree,
 #define GEO_NODE_CURVE_SET_HANDLES 1072
 #define GEO_NODE_CURVE_SPLINE_TYPE 1073
 #define GEO_NODE_CURVE_SELECT_HANDLES 1074
-#define GEO_NODE_MESH_INSET 1075
+#define GEO_NODE_MESH_EXTRUDE 1075
 
 /** \} */
 

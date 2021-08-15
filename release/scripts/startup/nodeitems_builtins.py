@@ -553,7 +553,7 @@ geometry_node_categories = [
         NodeItem("GeometryNodeEdgeSplit"),
         NodeItem("GeometryNodeSubdivisionSurface"),
         NodeItem("GeometryNodeMeshSubdivide"),
-        NodeItem("GeometryNodeMeshInset"),
+        NodeItem("GeometryNodeMeshExtrude"),
     ]),
     GeometryNodeCategory("GEO_PRIMITIVES_MESH", "Mesh Primitives", items=[
         NodeItem("GeometryNodeMeshCircle"),
