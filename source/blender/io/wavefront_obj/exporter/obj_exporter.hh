@@ -71,6 +71,10 @@ void exporter_main(bContext *C, const OBJExportParams &export_params);
 class OBJMesh;
 class OBJCurve;
 
+void export_frame(Depsgraph *depsgraph,
+                  const OBJExportParams &export_params,
+                  const char *filepath);
+
 std::pair<Vector<std::unique_ptr<OBJMesh>>, Vector<std::unique_ptr<OBJCurve>>>
 filter_supported_objects(Depsgraph *depsgraph, const OBJExportParams &export_params);
 

@@ -211,9 +211,7 @@ static void write_nurbs_curve_objects(const Vector<std::unique_ptr<OBJCurve>> &e
  *
  * Conditionally write a .MTL file also.
  */
-static void export_frame(Depsgraph *depsgraph,
-                         const OBJExportParams &export_params,
-                         const char *filepath)
+void export_frame(Depsgraph *depsgraph, const OBJExportParams &export_params, const char *filepath)
 {
   std::unique_ptr<OBJWriter> frame_writer = nullptr;
   try {

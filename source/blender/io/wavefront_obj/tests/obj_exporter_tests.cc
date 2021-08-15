@@ -13,6 +13,7 @@
 
 #include "BKE_blender_version.h"
 
+#include "BLI_fileops.h"
 #include "BLI_index_range.hh"
 #include "BLI_string_utf8.h"
 #include "BLI_vector.hh"
@@ -49,8 +50,6 @@ class obj_exporter_test : public BlendfileLoadingBaseTest {
 const std::string all_objects_file = "io_tests/blend_scene/all_objects_2_92.blend";
 // https://developer.blender.org/F9278970
 const std::string all_curve_objects_file = "io_tests/blend_scene/all_curves_2_92.blend";
-
-const std::string some_meshes_file = "io_tests/blend_scene/all_meshes.blend";
 
 TEST_F(obj_exporter_test, filter_objects_curves_as_mesh)
 {
@@ -188,6 +187,7 @@ static std::unique_ptr<OBJWriter> init_writer(const OBJExportParams &params,
 
 /* The following is relative to the flags_test_release_dir(). */
 const char *const temp_file_path = "../../Testing/Temporary/output.OBJ";
+const char *const temp_file_dir = "../../Testing/Temporary/";
 
 static std::string read_temp_file_in_string(const std::string &file_path)
 {
@@ -229,6 +229,69 @@ TEST(obj_exporter_writer, mtllib)
   }
   const std::string result = read_temp_file_in_string(out_file_path);
   ASSERT_EQ(result, "mtllib blah.mtl\nmtllib blah.mtl\n");
+}
+
+/* Return true if string #a and string #b are equal after their first newline. */
+static bool strings_equal_after_first_lines(const std::string &a, const std::string &b)
+{
+  size_t a_len = a.size();
+  size_t b_len = b.size();
+  size_t a_next = a.find_first_of('\n');
+  size_t b_next = b.find_first_of('\n');
+  if (a_next == std::string::npos || b_next == std::string::npos) {
+    return false;
+  }
+  return a.compare(a_next, a_len - a_next, b, b_next, b_len - b_next) == 0;
+}
+
+/* From here on, tests are whole file tests, testing for golden output. */
+class obj_exporter_regression_test : public obj_exporter_test {
+ public:
+  /**
+   * Export the given blend file with the given parameters and
+   * test to see if it matches a golden file (ignoring any difference in Blender version number).
+   * \param blendfile: input, relative to "tests" directory.
+   * \param golden_obj: expected output, relative to "tests" directory.
+   * \param params: the parameters to be used for export.
+   */
+  void compare_obj_export_to_golden(const std::string &blendfile,
+                                    const std::string &golden_obj,
+                                    const std::string &golden_mtl,
+                                    OBJExportParams &params)
+  {
+    if (!load_file_and_depsgraph(blendfile)) {
+      return;
+    }
+    std::string out_file_path = blender::tests::flags_test_release_dir() + "/" + temp_file_dir +
+                                BLI_path_basename(golden_obj.c_str());
+    strncpy(params.filepath, out_file_path.c_str(), FILE_MAX);
+    params.blen_filepath = blendfile.c_str();
+    export_frame(depsgraph, params, out_file_path.c_str());
+    std::string output_str = read_temp_file_in_string(out_file_path);
+
+    std::string golden_file_path = blender::tests::flags_test_asset_dir() + "/" + golden_obj;
+    std::string golden_str = read_temp_file_in_string(golden_file_path);
+    ASSERT_TRUE(strings_equal_after_first_lines(output_str, golden_str));
+    BLI_delete(out_file_path.c_str(), false, false);
+    if (!golden_mtl.empty()) {
+      std::string out_mtl_file_path = blender::tests::flags_test_release_dir() + "/" +
+                                      temp_file_dir + BLI_path_basename(golden_mtl.c_str());
+      std::string output_mtl_str = read_temp_file_in_string(out_mtl_file_path);
+      std::string golden_mtl_file_path = blender::tests::flags_test_asset_dir() + "/" + golden_mtl;
+      std::string golden_mtl_str = read_temp_file_in_string(golden_mtl_file_path);
+      ASSERT_TRUE(strings_equal_after_first_lines(output_mtl_str, golden_mtl_str));
+      BLI_delete(out_mtl_file_path.c_str(), false, false);
+    }
+  }
+};
+
+TEST_F(obj_exporter_regression_test, all_tris)
+{
+  OBJExportParamsDefault _export;
+  compare_obj_export_to_golden("io_tests/blend_geometry/all_tris.blend",
+                               "io_tests/obj/all_tris.obj",
+                               "io_tests/obj/all_tris.mtl",
+                               _export.params);
 }
 
 }  // namespace blender::io::obj

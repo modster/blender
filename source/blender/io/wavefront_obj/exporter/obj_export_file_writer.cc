@@ -484,7 +484,6 @@ MTLWriter::MTLWriter(const char *obj_filepath) noexcept(false)
     throw std::system_error(ENAMETOOLONG, std::system_category(), "");
   }
   file_handler_ = std::make_unique<FileHandler<eFileType::MTL>>(mtl_filepath_);
-  std::cout << "Material Library created at: " << mtl_filepath_ << std::endl;
 }
 
 void MTLWriter::write_header(const char *blen_filepath) const
