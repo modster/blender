@@ -40,12 +40,9 @@ static void geo_node_remesh_voxel_exec(GeoNodeExecParams params)
   const float adaptivity = params.extract_input<float>("Adaptivity");
 
   if (geometry_set.has_mesh()) {
-    /* Unfortunately input_mesh can't be const because
-     * BKE_mesh_remesh_voxel_to_mesh_nomain expects a non-const mesh */
-    Mesh *input_mesh = geometry_set.get_mesh_for_write();
+    const Mesh *input_mesh = geometry_set.get_mesh_for_read();
 
-    Mesh *output_mesh = BKE_mesh_remesh_voxel_to_mesh_nomain(
-        input_mesh, voxel_size, adaptivity, 0.0f);
+    Mesh *output_mesh = BKE_mesh_remesh_voxel(input_mesh, voxel_size, adaptivity, 0.0f);
     geometry_set.replace_mesh(output_mesh);
   }
   params.set_output("Geometry", std::move(geometry_set));
