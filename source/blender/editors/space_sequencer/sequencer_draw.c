@@ -1123,6 +1123,9 @@ static void thumbnail_endjob(void *data)
 
 static bool check_seq_need_thumbnails(Sequence *seq, rctf *view_area)
 {
+  if (seq->type != SEQ_TYPE_MOVIE && seq->type != SEQ_TYPE_IMAGE) {
+    return false;
+  }
   if (min_ii(seq->startdisp, seq->start) > view_area->xmax) {
     return false;
   }
@@ -1135,24 +1138,22 @@ static bool check_seq_need_thumbnails(Sequence *seq, rctf *view_area)
   else if (seq->machine > view_area->ymax) {
     return false;
   }
-  if (seq->type != SEQ_TYPE_MOVIE && seq->type != SEQ_TYPE_IMAGE) {
-    return false;
-  }
+
   return true;
 }
 
 static void seq_thumbnail_get_frame_step(Sequence *seq,
-                                         float *thumb_w,
-                                         float *thumb_h,
-                                         float *image_x,
-                                         float *image_y,
                                          float pixelx,
-                                         float pixely)
+                                         float pixely,
+                                         float *r_thumb_w,
+                                         float *r_thumb_h,
+                                         float *r_image_x,
+                                         float *r_image_y)
 {
   float image_width = seq->strip->stripdata->orig_width;
   float image_height = seq->strip->stripdata->orig_height;
 
-  /* Fix the dimensions to be max 256 for x or y */
+  /* Fix the dimensions to be max 256 for x or y. */
   float aspect_ratio = (float)image_width / image_height;
   if (image_width > image_height) {
     image_width = 256;
@@ -1163,32 +1164,38 @@ static void seq_thumbnail_get_frame_step(Sequence *seq,
     image_width = round_fl_to_int(image_height * aspect_ratio);
   }
 
-  /*Calculate thumb dimensions */
+  /* Calculate thumb dimensions. */
   float thumb_height = (SEQ_STRIP_OFSTOP - SEQ_STRIP_OFSBOTTOM) - (20 * U.dpi_fac * pixely);
   aspect_ratio = ((float)image_width) / image_height;
   float thumb_h_px = thumb_height / pixely;
   float thumb_width = aspect_ratio * thumb_h_px * pixelx;
 
-  *image_x = image_width;
-  *image_y = image_height;
-  *thumb_w = thumb_width;
-  *thumb_h = thumb_height;
+  if (r_thumb_h == NULL) {
+    *r_thumb_w = thumb_width;
+    return;
+  }
+
+  *r_thumb_h = thumb_height;
+  *r_image_x = image_width;
+  *r_image_y = image_height;
+  *r_thumb_w = thumb_width;
 }
 
 static void seq_thumbnail_get_start_frame(Sequence *seq,
                                           float frame_step,
-                                          float *start_frame,
-                                          rctf *view_area)
+                                          rctf *view_area,
+                                          float *r_start_frame)
 {
   if (seq->start > view_area->xmin && seq->start < view_area->xmax) {
-    *start_frame = seq->start;
+    *r_start_frame = seq->start;
     return;
   }
+
   /* Drawing and caching both check to see if strip is in view area or not before calling this
-   * function so assuming strip/part of strip in view */
+   * function so assuming strip/part of strip in view. */
 
   int no_invisible_thumbs = (view_area->xmin - seq->start) / frame_step;
-  *start_frame = ((no_invisible_thumbs - 1) * frame_step) + seq->start;
+  *r_start_frame = ((no_invisible_thumbs - 1) * frame_step) + seq->start;
 }
 
 static void thumbnail_startjob(void *data, short *stop, short *do_update, float *progress)
@@ -1196,7 +1203,7 @@ static void thumbnail_startjob(void *data, short *stop, short *do_update, float 
   ThumbnailDrawJob *tj = data;
   ThumbDataItem *val;
   Sequence *seq_orig;
-  float start_frame, frame_step, temp_dummy = 0;
+  float start_frame, frame_step;
 
   GHashIterator gh_iter;
   BLI_ghashIterator_init(&gh_iter, tj->seqs);
@@ -1205,14 +1212,9 @@ static void thumbnail_startjob(void *data, short *stop, short *do_update, float 
     val = BLI_ghash_lookup(tj->seqs, seq_orig);
 
     if (check_seq_need_thumbnails(seq_orig, tj->view_area)) {
-      seq_thumbnail_get_frame_step(val->seq_dupli,
-                                   &frame_step,
-                                   &temp_dummy,
-                                   &temp_dummy,
-                                   &temp_dummy,
-                                   tj->pixelx,
-                                   tj->pixely);
-      seq_thumbnail_get_start_frame(seq_orig, frame_step, &start_frame, tj->view_area);
+      seq_thumbnail_get_frame_step(
+          val->seq_dupli, tj->pixelx, tj->pixely, &frame_step, NULL, NULL, NULL);
+      seq_thumbnail_get_start_frame(seq_orig, frame_step, tj->view_area, &start_frame);
       SEQ_render_thumbnails(
           &tj->context, val->seq_dupli, seq_orig, start_frame, frame_step, tj->view_area, stop);
     }
@@ -1239,9 +1241,9 @@ static void sequencer_thumbnail_get_job(const bContext *C,
   /* Get the thumbnail job if it exists. */
   tj = WM_jobs_customdata_get(wm_job);
   if (!tj) {
-    tj = MEM_callocN(sizeof(ThumbnailDrawJob), "Thumbnail draw job");
+    tj = MEM_callocN(sizeof(ThumbnailDrawJob), "Thumbnail cache job");
 
-    /* Duplicate value of v2d->cur and v2d->tot to have module separation */
+    /* Duplicate value of v2d->cur and v2d->tot to have module separation. */
     rctf *view_area = MEM_callocN(sizeof(struct rctf), "viewport area");
     view_area->xmax = v2d->cur.xmax;
     view_area->xmin = v2d->cur.xmin;
@@ -1259,7 +1261,7 @@ static void sequencer_thumbnail_get_job(const bContext *C,
     WM_jobs_callbacks(wm_job, thumbnail_startjob, NULL, NULL, thumbnail_endjob);
   }
   else {
-    /* Free the hash input */
+    /* Free the hash input. */
     BLI_ghash_free(seqs, NULL, thumbnail_hash_data_free);
   }
 
@@ -1281,14 +1283,17 @@ static void thumbnail_call_for_job(const bContext *C, Editing *ed, View2D *v2d, 
   Scene *scene = CTX_data_scene(C);
   SpaceSeq *sseq = CTX_wm_space_seq(C);
 
-  /* Set the data for thumbnail caching job */
+  /* Set the data for thumbnail caching job. */
   GHash *thumb_data_hash;
 
   ThumbDataItem *val_need_update;
-  // leftover is set to true if missing image in strip. false when normal call to all strips done
+
+  /* Leftover is set to true if missing image in strip. False when normal call to all strips done.
+   */
   if (v2d->cur.xmax != sseq->check_view_area.xmax || v2d->cur.ymax != sseq->check_view_area.ymax ||
       leftover) {
 
+    /* Stop the job first as view has changed. Pointless to continue old job. */
     if (v2d->cur.xmax != sseq->check_view_area.xmax ||
         v2d->cur.ymax != sseq->check_view_area.ymax) {
       WM_jobs_stop(CTX_wm_manager(C), NULL, thumbnail_startjob);
@@ -1341,7 +1346,7 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
   float image_y, image_x, cropx_min, cropx_max, thumb_w, thumb_h;
   rcti crop;
 
-  /* If thumbs too small ignore */
+  /* If thumbs too small ignore. */
   min_size = ((y2 - y1) / pixely) > 40 * U.dpi_fac;
 
   if (!min_size)
@@ -1351,7 +1356,7 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
   context.view_id = BKE_scene_multiview_view_id_get(&scene->r, STEREO_LEFT_NAME);
   context.use_proxies = false;
 
-  seq_thumbnail_get_frame_step(seq, &thumb_w, &thumb_h, &image_x, &image_y, pixelx, pixely);
+  seq_thumbnail_get_frame_step(seq, pixelx, pixely, &thumb_w, &thumb_h, &image_x, &image_y);
 
   float zoom_x = thumb_w / image_x;
   float zoom_y = thumb_h / image_y;
@@ -1362,16 +1367,16 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
   float cut_off = 0;
   float upper_thumb_bound = (seq->endstill) ? (seq->start + seq->len) : seq->enddisp;
 
-  /* Start drawing */
+  /* Start drawing. */
 
-  seq_thumbnail_get_start_frame(seq, thumb_w, &x1, &v2d->cur);
+  seq_thumbnail_get_start_frame(seq, thumb_w, &v2d->cur, &x1);
   while (x1 < upper_thumb_bound) {
     x2 = x1 + thumb_w;
     clipped = false;
 
     /* Checks to make sure that thumbs are loaded only when in view and within the confines of the
      * strip. Some may not be required but better to have conditions for safety as x1 here is
-     * point to start caching from and not drawing*/
+     * point to start caching from and not drawing. */
     if (x1 > v2d->cur.xmax)
       break;
 
@@ -1380,19 +1385,19 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
       continue;
     }
 
-    /* ignore thumbs to the left of strip */
+    /* Ignore thumbs to the left of strip. */
     if (x2 < seq->startdisp) {
       x1 = x2;
       continue;
     }
 
-    /* set the clipping bound to show the left handle moving over thumbs and not shift thumbs */
+    /* Set the clipping bound to show the left handle moving over thumbs and not shift thumbs. */
     if (IN_RANGE_INCL(seq->startdisp, x1, x2)) {
       cut_off = seq->startdisp - x1;
       clipped = true;
     }
 
-    /* clip if full thumbnail cannot be displayed */
+    /* Clip if full thumbnail cannot be displayed. */
     if (x2 > (upper_thumb_bound)) {
       x2 = upper_thumb_bound;
       clipped = true;
@@ -1404,11 +1409,12 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
     cropx_max = ((x2 - x1) / pixelx) / (zoom_y / pixely);
     BLI_rcti_init(&crop, (int)(cropx_min), (int)cropx_max + 1, 0, (int)(image_y)-1);
 
-    /* Get the image */
-    ibuf = SEQ_get_thumbnail(&context, seq, roundf(x1), &crop, clipped, false);
+    /* Get the image. */
+    ibuf = SEQ_get_thumbnail(&context, seq, roundf(x1), &crop, clipped);
     int tot;
 
     if (ibuf) {
+      /* Transparency on overlap. */
       if (seq->flag & SEQ_OVERLAP) {
         GPU_blend(GPU_BLEND_ALPHA);
         unsigned char *buf = (unsigned char *)ibuf->rect;
@@ -1501,8 +1507,8 @@ static void draw_seq_strip(const bContext *C,
     drawmeta_contents(scene, seq, x1, y1, x2, y2);
   }
 
-  if ((sseq->flag & SEQ_SHOW_THUMBNAILS) && seq->type == SEQ_TYPE_MOVIE ||
-      seq->type == SEQ_TYPE_IMAGE) {
+  if ((sseq->flag & SEQ_SHOW_THUMBNAILS) &&
+      (seq->type == SEQ_TYPE_MOVIE || seq->type == SEQ_TYPE_IMAGE)) {
     draw_seq_strip_thumbnail(v2d, C, sseq, scene, seq, x1, y1, x2, y2, pixelx, pixely);
   }
 

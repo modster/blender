@@ -83,6 +83,8 @@
 #include "strip_time.h"
 #include "utils.h"
 
+#define THUMB_SIZE 256
+
 static ImBuf *seq_render_strip_stack(const SeqRenderData *context,
                                      SeqRenderState *state,
                                      ListBase *seqbasep,
@@ -532,7 +534,7 @@ static void sequencer_thumbnail_transform(ImBuf *in, ImBuf *out, const SeqRender
   float image_scale_factor = (float)out->x / in->x;
   float transform_matrix[3][3];
 
-  /* set to keep same loc,scale,rot but change scale to thumb size limit*/
+  /* Set to keep same loc,scale,rot but change scale to thumb size limit. */
   const float scale_x = 1 * image_scale_factor;
   const float scale_y = 1 * image_scale_factor;
   const float image_center_offs_x = (out->x - in->x) / 2;
@@ -545,7 +547,7 @@ static void sequencer_thumbnail_transform(ImBuf *in, ImBuf *out, const SeqRender
   transform_pivot_set_m3(transform_matrix, pivot);
   invert_m3(transform_matrix);
 
-  /* no crop */
+  /* No crop. */
   rctf source_crop;
   BLI_rctf_init(&source_crop, 0, in->x, 0, in->y);
 
@@ -2019,7 +2021,7 @@ ImBuf *SEQ_render_give_ibuf_direct(const SeqRenderData *context,
   return ibuf;
 }
 
-/* Gets the direct image from source and scales to thumbnail size */
+/* Gets the direct image from source and scales to thumbnail size. */
 static ImBuf *seq_get_uncached_thumbnail(SeqRenderData *context,
                                          SeqRenderState *state,
                                          Sequence *seq,
@@ -2034,17 +2036,17 @@ static ImBuf *seq_get_uncached_thumbnail(SeqRenderData *context,
   if (ibuf) {
     float aspect_ratio = (float)ibuf->x / ibuf->y;
 
-    /* Fix the dimensions to be max 256 for x or y */
+    /* Fix the dimensions to be max THUMB_SIZE (256) for x or y. */
     if (ibuf->x > ibuf->y) {
-      rectx = 256;
+      rectx = THUMB_SIZE;
       recty = round_fl_to_int(rectx / aspect_ratio);
     }
     else {
-      recty = 256;
+      recty = THUMB_SIZE;
       rectx = round_fl_to_int(recty * aspect_ratio);
     }
 
-    /* Perform scaling of ibuf to thumb size */
+    /* Perform scaling of ibuf to thumb size. */
     scaled_ibuf = IMB_allocImBuf(rectx, recty, 32, ibuf->rect_float ? IB_rectfloat : IB_rect);
     sequencer_thumbnail_transform(ibuf, scaled_ibuf, context);
     seq_imbuf_assign_spaces(context->scene, scaled_ibuf);
@@ -2060,27 +2062,16 @@ static ImBuf *seq_get_uncached_thumbnail(SeqRenderData *context,
   return scaled_ibuf;
 }
 
-/* Get cached thumbnails */
-ImBuf *SEQ_get_thumbnail(SeqRenderData *context,
-                         Sequence *seq,
-                         float timeline_frame,
-                         rcti *crop,
-                         bool clipped,
-                         bool once)
+/* Get cached thumbnails. */
+ImBuf *SEQ_get_thumbnail(
+    SeqRenderData *context, Sequence *seq, float timeline_frame, rcti *crop, bool clipped)
 {
   SeqRenderState state;
   seq_render_state_init(&state);
   ImBuf *ibuf = NULL, *temp = NULL;
   ibuf = seq_cache_get(context, seq, roundf(timeline_frame), SEQ_CACHE_STORE_THUMBNAIL);
 
-  /* Special scenario in case not in cache but need dimensions for thumbnail job. */
-  if (ibuf == NULL) {
-    if (once) {
-      ibuf = seq_get_uncached_thumbnail(context, &state, seq, roundf(timeline_frame));
-    }
-  }
-
-  /* Do clipping */
+  /* Do clipping. */
   if (clipped && ibuf != NULL) {
     temp = IMB_dupImBuf(ibuf);
     if (crop->xmin < 0 || crop->ymin < 0) {
@@ -2101,7 +2092,7 @@ ImBuf *SEQ_get_thumbnail(SeqRenderData *context,
   return ibuf;
 }
 
-/* Render the series of thumbnails and store in cache */
+/* Render the series of thumbnails and store in cache. */
 void SEQ_render_thumbnails(SeqRenderData *context,
                            Sequence *seq,
                            Sequence *seq_orig,
@@ -2117,6 +2108,7 @@ void SEQ_render_thumbnails(SeqRenderData *context,
   start_frame = start_frame - 5 * frame_step;
   float upper_limit = (seq->endstill) ? (seq->start + seq->len) : seq->enddisp;
   upper_limit = (upper_limit > view_area->xmax) ? view_area->xmax + 3 * frame_step : upper_limit;
+
   while ((start_frame < upper_limit) & !*stop) {
     ibuf = seq_cache_get(context, seq_orig, roundf(start_frame), SEQ_CACHE_STORE_THUMBNAIL);
     if (ibuf) {
@@ -2136,5 +2128,4 @@ void SEQ_render_thumbnails(SeqRenderData *context,
     start_frame += frame_step;
   }
 }
-
 /** \} */

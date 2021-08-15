@@ -74,12 +74,8 @@ void SEQ_render_thumbnails(struct SeqRenderData *context,
                            float frame_step,
                            rctf *view_area,
                            short *stop);
-struct ImBuf *SEQ_get_thumbnail(SeqRenderData *context,
-                                struct Sequence *seq,
-                                float timeline_frame,
-                                rcti *crop,
-                                bool clipped,
-                                bool once);
+struct ImBuf *SEQ_get_thumbnail(
+    SeqRenderData *context, struct Sequence *seq, float timeline_frame, rcti *crop, bool clipped);
 void SEQ_render_init_colorspace(struct Sequence *seq);
 void SEQ_render_new_render_data(struct Main *bmain,
                                 struct Depsgraph *depsgraph,

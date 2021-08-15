@@ -104,6 +104,7 @@
 #define DCACHE_IMAGES_PER_FILE 100
 #define DCACHE_CURRENT_VERSION 1
 #define COLORSPACE_NAME_MAX 64 /* XXX: defined in imb intern */
+#define THUMB_CACHE_LIMIT 5000
 
 typedef struct DiskCacheHeaderEntry {
   unsigned char encoding;
@@ -1493,8 +1494,8 @@ void seq_cache_thumbnail_put(const SeqRenderData *context,
   SeqCache *cache = seq_cache_get_from_scene(scene);
   SeqCacheKey *key = seq_cache_allocate_key(cache, context, seq, timeline_frame, type);
 
-  /* Limit cache to 5000 images stored. */
-  if (cache->count >= 5000) {
+  /* Limit cache to THUMB_CACHE_LIMIT (5000) images stored. */
+  if (cache->count >= THUMB_CACHE_LIMIT) {
     rctf view_area_safe = *view_area;
     view_area_safe.xmax += 200;
     view_area_safe.xmin -= 200;
