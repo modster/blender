@@ -143,6 +143,26 @@ if(WITH_ALEMBIC)
   )
 endif()
 
+if(WITH_USD)
+  add_definitions(-DWITH_USD)
+  list(APPEND INC
+    ../io/usd
+  )
+  list(APPEND LIB
+    bf_usd
+  )
+endif()
+
+if(WITH_MOD_REMESH)
+  list(APPEND INC
+    ../../../intern/dualcon
+  )
+  list(APPEND LIB
+    bf_intern_dualcon
+  )
+  add_definitions(-DWITH_MOD_REMESH)
+endif()
+
 if(WITH_MOD_FLUID)
   add_definitions(-DWITH_FLUID)
 endif()
