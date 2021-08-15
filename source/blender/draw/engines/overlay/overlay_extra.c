@@ -34,6 +34,7 @@
 #include "BKE_modifier.h"
 #include "BKE_movieclip.h"
 #include "BKE_object.h"
+#include "BKE_rigidbody.h"
 #include "BKE_tracking.h"
 
 #include "BLI_listbase.h"
@@ -372,6 +373,16 @@ static void OVERLAY_non_primitive_collision_shape(OVERLAY_ExtraCallBuffers *cb,
 {
 
     if(ob->rigidbody_object){
+          if(ob->rigidbody_object->col_shape_draw_data == NULL) {
+              switch(ob->rigidbody_object->shape) {
+                case RB_SHAPE_CONVEXH:
+                  BKE_rigidbody_store_convex_hull_draw_data(ob);
+                  break;
+                case RB_SHAPE_TRIMESH:
+                  BKE_rigidbody_store_trimesh_draw_data(ob);
+                  break;
+              }
+          }
           if(ob->rigidbody_object->col_shape_draw_data != NULL){
               const DRWContextState *draw_ctx = DRW_context_state_get();
               DRW_mesh_batch_cache_validate(ob->rigidbody_object->col_shape_draw_data);

@@ -203,6 +203,9 @@ void BKE_rigidbody_free_object(Object *ob, RigidBodyWorld *rbw)
 
     if (rbo->col_shape_draw_data) {
         BKE_mesh_free(rbo->col_shape_draw_data);
+        BKE_id_free(NULL, rbo->col_shape_draw_data);
+       // MEM_freeN(rbo->col_shape_draw_data);
+        rbo->col_shape_draw_data = NULL;
     }
 
     MEM_freeN(rbo->shared);
@@ -405,149 +408,6 @@ static rbCollisionShape *rigidbody_get_shape_convexhull_from_mesh(Object *ob,
   return shape;
 }
 
-static void rigidbody_store_convex_hull_draw_data(Object *ob) {
-    Mesh *hull_draw_data;
-
-    Mesh *mesh = NULL;
-    MVert *mvert = NULL;
-    int totvert = 0;
-
-    if (ob->type == OB_MESH && ob->data) {
-      mesh = rigidbody_get_mesh(ob);
-      mvert = (mesh) ? mesh->mvert : NULL;
-      totvert = (mesh) ? mesh->totvert : 0;
-    }
-    else {
-      CLOG_ERROR(&LOG, "cannot make Convex Hull collision shape for non-Mesh object");
-    }
-    float (*verts)[3] = (float(*)[3])MEM_malloc_arrayN(sizeof(float[3]), totvert, __func__);
-    for(int i=0; i<totvert; i++){
-       // verts[i] = (float*)MEM_malloc_arrayN(sizeof(float), 3, __func__);
-        copy_v3_v3(verts[i], mvert[i].co);
-    }
-
-    plConvexHull hull = plConvexHullCompute((float(*)[3])verts, totvert);
-    MEM_freeN(verts);
-    const int num_verts = plConvexHullNumVertices(hull);
-    const int num_faces = num_verts <= 2 ? 0 : plConvexHullNumFaces(hull);
-    const int num_loops = num_verts <= 2 ? 0 : plConvexHullNumLoops(hull);
-
-    const int num_edges = num_verts == 2 ? 1 : num_verts < 2 ? 0 : num_loops / 2;
-    hull_draw_data = BKE_mesh_new_nomain(num_verts, num_edges, 0, num_loops, num_faces);
-
-    for (int i=0; i<num_verts; i++) {
-      float co[3];
-      int original_index;
-      plConvexHullGetVertex(hull, i, co, &original_index);
-
-      if (original_index >= 0 && original_index < totvert) {
-
-        copy_v3_v3(hull_draw_data->mvert[i].co, co);
-      }
-      else {
-        BLI_assert(!"Unexpected new vertex in hull output");
-      }
-    }
-
-   MLoop *mloop_src = MEM_mallocN(num_loops * sizeof(MLoop), __func__);
-
-    uint edge_index = 0;
-    for (int i=0; i<num_loops; i++) {
-      int v_from;
-      int v_to;
-      plConvexHullGetLoop(hull, i, &v_from, &v_to);
-
-      mloop_src[i].v = v_from;
-      if (v_from < v_to) {
-        hull_draw_data->medge[edge_index].v1 = v_from;
-        hull_draw_data->medge[edge_index].v2 = v_to;
-        hull_draw_data->medge[edge_index].flag = ME_EDGEDRAW | ME_EDGERENDER;
-
-        int reverse_index = plConvexHullGetReversedLoopIndex(hull, i);
-        mloop_src[i].e = edge_index;
-        mloop_src[reverse_index].e = edge_index;
-        edge_index++;
-
-      }
-    }
-
-    /* Copy faces. */
-    int *loops;
-    int j = 0;
-    MLoop *loop = hull_draw_data->mloop;
-    for (int i=0; i<num_faces; i++) {
-      const int len = plConvexHullGetFaceSize(hull, i);
-
-      BLI_assert(len > 2);
-
-      /* Get face loop indices. */
-      loops = MEM_mallocN(sizeof(int)*len, __func__);
-      plConvexHullGetFaceLoops(hull, i, loops);
-
-      MPoly *face = &(hull_draw_data->mpoly[i]);
-      face->loopstart = j;
-      face->totloop = len;
-      for (int k=0; k<len; k++) {
-        MLoop src_loop = mloop_src[loops[k]];
-        loop->v = src_loop.v;
-        loop->e = src_loop.e;
-        loop++;
-      }
-      j += len;
-      MEM_freeN(loops);
-    }
-    MEM_freeN(mloop_src);
-    ob->rigidbody_object->col_shape_draw_data = hull_draw_data;
-
-}
-
-static void rigidbody_store_trimesh_draw_data(Object *ob) {
-
-    Mesh *mesh = NULL;
-    Mesh *trimesh_draw_data;
-    MLoop *mloop;
-    const MLoopTri *looptri;
-    int tottri;
-
-
-    int num_verts;
-    int num_loops;
-
-    mesh = rigidbody_get_mesh(ob);
-
-    if(mesh != NULL) {
-        looptri = BKE_mesh_runtime_looptri_ensure(mesh);
-        tottri = mesh->runtime.looptris.len;
-
-        num_verts = mesh->totvert;
-        num_loops = tottri*3;
-        mloop = mesh->mloop;
-
-        trimesh_draw_data = BKE_mesh_new_nomain(num_verts, 0, tottri, num_loops, 0);
-        for(int i=0; i<num_verts; i++){
-            MVert *vert = &(trimesh_draw_data->mvert[i]);
-            copy_v3_v3(vert->co, mesh->mvert[i].co);
-        }
-
-        for (int i = 0; i < tottri; i++) {
-          /* add first triangle - verts 1,2,3 */
-          const MLoopTri *lt = &looptri[i];
-          MFace *face = &(trimesh_draw_data->mface[i]);
-
-          face->v1 = mloop[lt->tri[0]].v;
-          face->v2 = mloop[lt->tri[1]].v;
-          face->v3 = mloop[lt->tri[2]].v;
-
-        }
-        BKE_mesh_convert_mfaces_to_mpolys(trimesh_draw_data);
-        BKE_mesh_calc_edges(trimesh_draw_data, false, false);
-
-        ob->rigidbody_object->col_shape_draw_data = trimesh_draw_data;
-
-    }
-
-}
-
 /* create collision shape of mesh - triangulated mesh
  * returns NULL if creation fails.
  */
@@ -629,8 +489,6 @@ static rbCollisionShape *rigidbody_get_shape_trimesh_from_mesh(Object *ob)
   else {
     CLOG_ERROR(&LOG, "cannot make Triangular Mesh collision shape for non-Mesh object");
   }
-
-  rigidbody_store_trimesh_draw_data(ob);
   return shape;
 }
 
@@ -714,7 +572,6 @@ static rbCollisionShape *rigidbody_validate_sim_shape_helper(RigidBodyWorld *rbw
                           0.04f :
                           0.0f; /* RB_TODO ideally we shouldn't directly change the margin here */
       }
-      rigidbody_store_convex_hull_draw_data(ob);
       break;
     case RB_SHAPE_TRIMESH:
       new_shape = rigidbody_get_shape_trimesh_from_mesh(ob);
@@ -780,6 +637,13 @@ static void rigidbody_validate_sim_shape(RigidBodyWorld *rbw, Object *ob, bool r
   if (new_shape) {
     if (rbo->shared->physics_shape) {
       RB_shape_delete(rbo->shared->physics_shape);
+    }
+    /* Delete old debug drawing mesh data if it exists. */
+    if (rbo->col_shape_draw_data) {
+        BKE_mesh_free(rbo->col_shape_draw_data);
+        BKE_id_free(NULL, rbo->col_shape_draw_data);
+       // MEM_freeN(rbo->col_shape_draw_data);
+        rbo->col_shape_draw_data = NULL;
     }
     rbo->shared->physics_shape = new_shape;
   }
@@ -2508,6 +2372,150 @@ void BKE_rigidbody_do_simulation(Depsgraph *depsgraph, Scene *scene, float ctime
     rbw->ltime = ctime;
   }
 }
+
+void BKE_rigidbody_store_convex_hull_draw_data(Object *ob) {
+    Mesh *hull_draw_data;
+
+    Mesh *mesh = NULL;
+    MVert *mvert = NULL;
+    int totvert = 0;
+
+    if (ob->type == OB_MESH && ob->data) {
+      mesh = rigidbody_get_mesh(ob);
+      mvert = (mesh) ? mesh->mvert : NULL;
+      totvert = (mesh) ? mesh->totvert : 0;
+    }
+    else {
+      CLOG_ERROR(&LOG, "cannot make Convex Hull collision shape for non-Mesh object");
+    }
+    float (*verts)[3] = (float(*)[3])MEM_malloc_arrayN(sizeof(float[3]), totvert, __func__);
+    for(int i=0; i<totvert; i++){
+       // verts[i] = (float*)MEM_malloc_arrayN(sizeof(float), 3, __func__);
+        copy_v3_v3(verts[i], mvert[i].co);
+    }
+
+    plConvexHull hull = plConvexHullCompute((float(*)[3])verts, totvert);
+    MEM_freeN(verts);
+    const int num_verts = plConvexHullNumVertices(hull);
+    const int num_faces = num_verts <= 2 ? 0 : plConvexHullNumFaces(hull);
+    const int num_loops = num_verts <= 2 ? 0 : plConvexHullNumLoops(hull);
+
+    const int num_edges = num_verts == 2 ? 1 : num_verts < 2 ? 0 : num_loops / 2;
+    hull_draw_data = BKE_mesh_new_nomain(num_verts, num_edges, 0, num_loops, num_faces);
+
+    for (int i=0; i<num_verts; i++) {
+      float co[3];
+      int original_index;
+      plConvexHullGetVertex(hull, i, co, &original_index);
+
+      if (original_index >= 0 && original_index < totvert) {
+
+        copy_v3_v3(hull_draw_data->mvert[i].co, co);
+      }
+      else {
+        BLI_assert(!"Unexpected new vertex in hull output");
+      }
+    }
+
+   MLoop *mloop_src = MEM_mallocN(num_loops * sizeof(MLoop), __func__);
+
+    uint edge_index = 0;
+    for (int i=0; i<num_loops; i++) {
+      int v_from;
+      int v_to;
+      plConvexHullGetLoop(hull, i, &v_from, &v_to);
+
+      mloop_src[i].v = v_from;
+      if (v_from < v_to) {
+        hull_draw_data->medge[edge_index].v1 = v_from;
+        hull_draw_data->medge[edge_index].v2 = v_to;
+        hull_draw_data->medge[edge_index].flag = ME_EDGEDRAW | ME_EDGERENDER;
+
+        int reverse_index = plConvexHullGetReversedLoopIndex(hull, i);
+        mloop_src[i].e = edge_index;
+        mloop_src[reverse_index].e = edge_index;
+        edge_index++;
+
+      }
+    }
+
+    /* Copy faces. */
+    int *loops;
+    int j = 0;
+    MLoop *loop = hull_draw_data->mloop;
+    for (int i=0; i<num_faces; i++) {
+      const int len = plConvexHullGetFaceSize(hull, i);
+
+      BLI_assert(len > 2);
+
+      /* Get face loop indices. */
+      loops = MEM_mallocN(sizeof(int)*len, __func__);
+      plConvexHullGetFaceLoops(hull, i, loops);
+
+      MPoly *face = &(hull_draw_data->mpoly[i]);
+      face->loopstart = j;
+      face->totloop = len;
+      for (int k=0; k<len; k++) {
+        MLoop src_loop = mloop_src[loops[k]];
+        loop->v = src_loop.v;
+        loop->e = src_loop.e;
+        loop++;
+      }
+      j += len;
+      MEM_freeN(loops);
+    }
+    MEM_freeN(mloop_src);
+    ob->rigidbody_object->col_shape_draw_data = hull_draw_data;
+
+}
+
+void BKE_rigidbody_store_trimesh_draw_data(Object *ob) {
+
+    Mesh *mesh = NULL;
+    Mesh *trimesh_draw_data;
+    MLoop *mloop;
+    const MLoopTri *looptri;
+    int tottri;
+
+
+    int num_verts;
+    int num_loops;
+
+    mesh = rigidbody_get_mesh(ob);
+
+    if(mesh != NULL) {
+        looptri = BKE_mesh_runtime_looptri_ensure(mesh);
+        tottri = mesh->runtime.looptris.len;
+
+        num_verts = mesh->totvert;
+        num_loops = tottri*3;
+        mloop = mesh->mloop;
+
+        trimesh_draw_data = BKE_mesh_new_nomain(num_verts, 0, tottri, num_loops, 0);
+        for(int i=0; i<num_verts; i++){
+            MVert *vert = &(trimesh_draw_data->mvert[i]);
+            copy_v3_v3(vert->co, mesh->mvert[i].co);
+        }
+
+        for (int i = 0; i < tottri; i++) {
+          /* add first triangle - verts 1,2,3 */
+          const MLoopTri *lt = &looptri[i];
+          MFace *face = &(trimesh_draw_data->mface[i]);
+
+          face->v1 = mloop[lt->tri[0]].v;
+          face->v2 = mloop[lt->tri[1]].v;
+          face->v3 = mloop[lt->tri[2]].v;
+
+        }
+        BKE_mesh_convert_mfaces_to_mpolys(trimesh_draw_data);
+        BKE_mesh_calc_edges(trimesh_draw_data, false, false);
+
+        ob->rigidbody_object->col_shape_draw_data = trimesh_draw_data;
+
+    }
+
+}
+
 /* ************************************** */
 
 #else /* WITH_BULLET */

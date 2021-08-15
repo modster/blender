@@ -159,6 +159,13 @@ void BKE_rigidbody_object_sync_transforms(struct Depsgraph *depsgraph,
                                           struct Scene *scene,
                                           struct Object *ob);
 
+/* -------------------- */
+/* Debug draw collision shapes */
+/* -------------------- */
+void BKE_rigidbody_store_convex_hull_draw_data(struct Object *ob);
+void BKE_rigidbody_store_trimesh_draw_data(struct Object *ob);
+
+
 #ifdef __cplusplus
 }
 #endif
