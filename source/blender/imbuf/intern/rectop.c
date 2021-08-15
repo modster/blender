@@ -266,7 +266,7 @@ void IMB_rect_crop(ImBuf *ibuf, const rcti *crop)
   };
   BLI_assert(size_dst[0] > 0 && size_dst[1] > 0);
   BLI_assert(crop->xmin >= 0 && crop->ymin >= 0);
-  BLI_assert(crop->xmax <= ibuf->x && crop->ymax <= ibuf->y);
+  BLI_assert(crop->xmax < ibuf->x && crop->ymax < ibuf->y);
 
   if ((size_dst[0] == ibuf->x) && (size_dst[1] == ibuf->y)) {
     return;
