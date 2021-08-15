@@ -29,6 +29,7 @@ LuminanceMatteOperation::LuminanceMatteOperation()
   addOutputSocket(DataType::Value);
 
   this->m_inputImageProgram = nullptr;
+  flags.can_be_constant = true;
 }
 
 void LuminanceMatteOperation::initExecution()

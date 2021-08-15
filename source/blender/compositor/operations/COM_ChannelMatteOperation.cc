@@ -27,6 +27,7 @@ ChannelMatteOperation::ChannelMatteOperation()
   addOutputSocket(DataType::Value);
 
   this->m_inputImageProgram = nullptr;
+  flags.can_be_constant = true;
 }
 
 void ChannelMatteOperation::initExecution()

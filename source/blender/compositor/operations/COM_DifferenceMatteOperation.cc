@@ -29,6 +29,7 @@ DifferenceMatteOperation::DifferenceMatteOperation()
 
   this->m_inputImage1Program = nullptr;
   this->m_inputImage2Program = nullptr;
+  flags.can_be_constant = true;
 }
 
 void DifferenceMatteOperation::initExecution()

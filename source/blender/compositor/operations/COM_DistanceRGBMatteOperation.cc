@@ -29,6 +29,7 @@ DistanceRGBMatteOperation::DistanceRGBMatteOperation()
 
   this->m_inputImageProgram = nullptr;
   this->m_inputKeyProgram = nullptr;
+  flags.can_be_constant = true;
 }
 
 void DistanceRGBMatteOperation::initExecution()

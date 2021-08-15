@@ -36,6 +36,7 @@ KeyingDespillOperation::KeyingDespillOperation()
 
   this->m_pixelReader = nullptr;
   this->m_screenReader = nullptr;
+  flags.can_be_constant = true;
 }
 
 void KeyingDespillOperation::initExecution()
