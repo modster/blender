@@ -6509,7 +6509,7 @@ void dissolve_bez_segment(BezTriple *bezt_prev,
                           BezTriple *bezt_next,
                           const Nurb *nu,
                           const Curve *cu,
-                          const int span_len,
+                          const uint span_len,
                           const uint span_step[2])
 {
   int i_span_edge_len = span_len + 1;
