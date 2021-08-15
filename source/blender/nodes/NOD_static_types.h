@@ -311,7 +311,7 @@ DefNode(GeometryNode, GEO_NODE_CURVE_TO_POINTS, def_geo_curve_to_points, "CURVE_
 DefNode(GeometryNode, GEO_NODE_CURVE_TRIM, def_geo_curve_trim, "CURVE_TRIM", CurveTrim, "Curve Trim", "")
 DefNode(GeometryNode, GEO_NODE_DELETE_GEOMETRY, 0, "DELETE_GEOMETRY", DeleteGeometry, "Delete Geometry", "")
 DefNode(GeometryNode, GEO_NODE_EDGE_SPLIT, 0, "EDGE_SPLIT", EdgeSplit, "Edge Split", "")
-DefNode(GeometryNode, GEO_NODE_MESH_INSET, def_geo_mesh_inset, "MESH_INSET", MeshInset, "Mesh Inset", "")
+DefNode(GeometryNode, GEO_NODE_MESH_EXTRUDE, def_geo_mesh_extrude, "MESH_EXTRUDE", MeshExtrude, "Mesh Extrude", "")
 DefNode(GeometryNode, GEO_NODE_INPUT_MATERIAL, def_geo_input_material, "INPUT_MATERIAL", InputMaterial, "Material", "")
 DefNode(GeometryNode, GEO_NODE_IS_VIEWPORT, 0, "IS_VIEWPORT", IsViewport, "Is Viewport", "")
 DefNode(GeometryNode, GEO_NODE_JOIN_GEOMETRY, 0, "JOIN_GEOMETRY", JoinGeometry, "Join Geometry", "")
