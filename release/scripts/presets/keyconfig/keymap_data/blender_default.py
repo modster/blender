@@ -775,6 +775,8 @@ def km_property_editor(_params):
         # Constraint panels
         ("constraint.delete", {"type": 'X', "value": 'PRESS'}, {"properties": [("report", True)]}),
         ("constraint.delete", {"type": 'DEL', "value": 'PRESS'}, {"properties": [("report", True)]}),
+        ("constraint.copy", {"type": 'D', "value": 'PRESS', "shift": True}, None),
+        ("constraint.apply", {"type": 'A', "value": 'PRESS', "ctrl": True}, {"properties": [("report", True)]}),
     ])
 
     return keymap
@@ -1968,8 +1970,8 @@ def km_file_browser(params):
         *_template_space_region_type_toggle(
             toolbar_key={"type": 'T', "value": 'PRESS'},
         ),
-        ("screen.region_toggle", {"type": 'N', "value": 'PRESS'},
-         {"properties": [("region_type", 'TOOL_PROPS')]}),
+        ("wm.context_toggle", {"type": 'N', "value": 'PRESS'},
+          {"properties": [("data_path", 'space_data.show_region_tool_props')]}),
         ("file.parent", {"type": 'UP_ARROW', "value": 'PRESS', "alt": True}, None),
         ("file.previous", {"type": 'LEFT_ARROW', "value": 'PRESS', "alt": True}, None),
         ("file.next", {"type": 'RIGHT_ARROW', "value": 'PRESS', "alt": True}, None),
@@ -1999,6 +2001,10 @@ def km_file_browser(params):
          {"properties": [("increment", -10)]}),
         ("file.filenum", {"type": 'NUMPAD_MINUS', "value": 'PRESS', "ctrl": True, "repeat": True},
          {"properties": [("increment", -100)]}),
+
+        # Select file under cursor before spawning the context menu.
+        ("file.select", {"type": 'RIGHTMOUSE', "value": 'PRESS'},
+         {"properties": [("open", False), ("only_activate_if_selected", params.select_mouse == 'LEFTMOUSE'), ("pass_through", True)]}),
         *_template_items_context_menu("FILEBROWSER_MT_context_menu", params.context_menu_event),
         *_template_items_context_menu("ASSETBROWSER_MT_context_menu", params.context_menu_event),
     ])
