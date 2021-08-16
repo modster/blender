@@ -1507,7 +1507,7 @@ static void draw_seq_strip(const bContext *C,
     drawmeta_contents(scene, seq, x1, y1, x2, y2);
   }
 
-  if ((sseq->flag & SEQ_SHOW_THUMBNAILS) &&
+  if ((sseq->flag & SEQ_SHOW_STRIP_OVERLAY) && (sseq->flag & SEQ_SHOW_THUMBNAILS) &&
       (seq->type == SEQ_TYPE_MOVIE || seq->type == SEQ_TYPE_IMAGE)) {
     draw_seq_strip_thumbnail(v2d, C, sseq, scene, seq, x1, y1, x2, y2, pixelx, pixely);
   }
