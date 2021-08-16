@@ -5002,7 +5002,7 @@ static bool lineart_shadow_cast_generate_edges(LineartRenderBuffer *rb,
     printf("Line art shadow segments total: %d\n", tot_edges);
   }
 
-  if (!tot_edges) {
+  if (!edge_alloc) {
     return false;
   }
   LineartElementLinkNode *veln = lineart_mem_acquire(rb->shadow_data_pool,
