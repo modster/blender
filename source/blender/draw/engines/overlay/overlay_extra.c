@@ -383,18 +383,9 @@ static void OVERLAY_non_primitive_collision_shape(OVERLAY_ExtraCallBuffers *cb,
                   break;
               }
           }
-          if(ob->rigidbody_object->col_shape_draw_data != NULL){
-              const DRWContextState *draw_ctx = DRW_context_state_get();
-              DRW_mesh_batch_cache_validate(ob->rigidbody_object->col_shape_draw_data);
-
-              GPUBatch *geom = DRW_mesh_batch_cache_get_all_edges(ob->rigidbody_object->col_shape_draw_data);
-              if(geom){
-                  OVERLAY_extra_wire(cb, geom, ob->obmat, color);
-              }
-              struct TaskGraph *task_graph = BLI_task_graph_create();
-              DRW_mesh_batch_cache_create_requested(task_graph, ob, ob->rigidbody_object->col_shape_draw_data, draw_ctx->scene, false, false);
-              BLI_task_graph_work_and_wait(task_graph);
-              BLI_task_graph_free(task_graph);
+          GPUBatch *geom = DRW_cache_non_primitive_col_shape_get(ob);
+          if(geom){
+              OVERLAY_extra_wire(cb, geom, ob->obmat, color);
           }
     }
 

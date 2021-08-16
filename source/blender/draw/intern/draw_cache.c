@@ -3531,6 +3531,23 @@ GPUBatch *DRW_cache_cursor_get(bool crosshair_lines)
   return *drw_cursor;
 }
 
+GPUBatch *DRW_cache_non_primitive_col_shape_get(Object *ob) {
+
+    GPUBatch *geom;
+    if(ob->rigidbody_object->col_shape_draw_data != NULL){
+        const DRWContextState *draw_ctx = DRW_context_state_get();
+        DRW_mesh_batch_cache_validate(ob->rigidbody_object->col_shape_draw_data);
+
+        geom = DRW_mesh_batch_cache_get_all_edges(ob->rigidbody_object->col_shape_draw_data);
+
+        struct TaskGraph *task_graph = BLI_task_graph_create();
+        DRW_mesh_batch_cache_create_requested(task_graph, ob, ob->rigidbody_object->col_shape_draw_data, draw_ctx->scene, false, false);
+        BLI_task_graph_work_and_wait(task_graph);
+        BLI_task_graph_free(task_graph);
+    }
+    return geom;
+}
+
 /** \} */
 
 /* -------------------------------------------------------------------- */
