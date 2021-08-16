@@ -27,6 +27,7 @@ NormalizeOperation::NormalizeOperation()
   this->m_imageReader = nullptr;
   this->m_cachedInstance = nullptr;
   this->flags.complex = true;
+  flags.can_be_constant = true;
 }
 void NormalizeOperation::initExecution()
 {

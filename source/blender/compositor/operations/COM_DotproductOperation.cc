@@ -28,6 +28,7 @@ DotproductOperation::DotproductOperation()
   this->setResolutionInputSocketIndex(0);
   this->m_input1Operation = nullptr;
   this->m_input2Operation = nullptr;
+  flags.can_be_constant = true;
 }
 void DotproductOperation::initExecution()
 {

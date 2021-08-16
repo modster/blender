@@ -30,6 +30,7 @@ MapRangeOperation::MapRangeOperation()
   this->addOutputSocket(DataType::Value);
   this->m_inputOperation = nullptr;
   this->m_useClamp = false;
+  flags.can_be_constant = true;
 }
 
 void MapRangeOperation::initExecution()
