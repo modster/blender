@@ -1517,6 +1517,9 @@ static uint16_t lineart_identify_feature_line(LineartRenderBuffer *rb,
   }
 
   if (!ll && !lr) {
+    if (!rb->use_loose) {
+      return 0;
+    }
     if (!rb->use_loose_as_contour) {
       if (use_freestyle_face && rb->filter_face_mark) {
         if (rb->filter_face_mark_invert) {
@@ -1576,7 +1579,7 @@ static uint16_t lineart_identify_feature_line(LineartRenderBuffer *rb,
 
   /* Mesh boundary */
   if (!lr || ll == lr) {
-    return (edge_flag_result | LRT_EDGE_FLAG_CONTOUR);
+    return (edge_flag_result | (rb->use_contour ? LRT_EDGE_FLAG_CONTOUR : 0));
   }
 
   LineartTriangle *tri1, *tri2;
@@ -5104,7 +5107,8 @@ static bool lineart_main_try_generate_shadow(Depsgraph *depsgraph,
   }
   rb->tile_recursive_level = is_persp ? LRT_TILE_RECURSIVE_PERSPECTIVE : LRT_TILE_RECURSIVE_ORTHO;
   rb->use_crease = rb->use_material = rb->use_edge_marks = rb->use_intersections =
-      rb->use_light_contour = rb->use_loose = false;
+      rb->use_light_contour = false;
+  rb->use_loose = true;
   rb->use_contour = true; /* Only contour from light viewing direction will be casted as shadow. */
 
   rb->max_occlusion_level = 0; /* No point getting see-through projections there. */
