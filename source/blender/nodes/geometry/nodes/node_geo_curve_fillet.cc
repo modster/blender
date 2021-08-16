@@ -70,8 +70,6 @@ struct FilletModeParam {
   /* Number of points to be added. */
   std::optional<int> count;
 
-  GeometryNodeAttributeInputMode radius_mode;
-
   /* Whether or not fillets are allowed to overlap. */
   bool limit_radius;
 
@@ -128,9 +126,9 @@ static float3 get_center(const float3 vec_pos2prev,
 /* Function to get the center of the fillet using fillet data */
 static float3 get_center(const float3 vec_pos2prev, const FilletData &fd, const int index)
 {
-  float angle = fd.angles[index];
-  float3 axis = fd.axes[index];
-  float3 pos = fd.positions[index];
+  const float angle = fd.angles[index];
+  const float3 axis = fd.axes[index];
+  const float3 pos = fd.positions[index];
 
   return get_center(vec_pos2prev, pos, axis, angle);
 }
@@ -142,28 +140,38 @@ static Array<float3> calculate_prev_directions(const Span<float3> positions,
 {
   Array<float3> prev_dirs(fillet_count);
   const int size = positions.size();
-  const int start = cyclic ? 0 : 1;
 
-  for (const int i : IndexRange(start, fillet_count)) {
-    const bool wrap_around = cyclic && i == 0;
-    prev_dirs[i - start] = (positions[wrap_around ? size - 1 : i - 1] - positions[i]).normalized();
+  if (cyclic) {
+    for (const int i : IndexRange(fillet_count)) {
+      prev_dirs[i] = (positions[i == 0 ? size - 1 : i - 1] - positions[i]).normalized();
+    }
+  }
+  else {
+    for (const int i : IndexRange(1, fillet_count)) {
+      prev_dirs[i - 1] = (positions[i - 1] - positions[i]).normalized();
+    }
   }
 
   return prev_dirs;
 }
-
-/* Calculate the directions to the next vertices from each filleted vertex. */
+/* Uses prev_dirs to calculate the directions to the next vertices from each filleted vertex. */
 static Array<float3> calculate_next_directions(const Span<float3> positions,
-                                               const bool cyclic,
-                                               const int fillet_count)
+                                               const Span<float3> prev_dirs,
+                                               const bool cyclic)
 {
-  Array<float3> next_dirs(fillet_count);
+  const int fillet_count = prev_dirs.size();
   const int size = positions.size();
-  const int start = cyclic ? 0 : 1;
+  Array<float3> next_dirs(fillet_count);
 
-  for (const int i : IndexRange(start, fillet_count)) {
-    const bool wrap_around = cyclic && i == size - 1;
-    next_dirs[i - start] = (positions[wrap_around ? 0 : i + 1] - positions[i]).normalized();
+  if (cyclic) {
+    next_dirs[fillet_count - 1] = -prev_dirs[0];
+  }
+  else {
+    next_dirs[fillet_count - 1] = positions[size - 1] - positions[size - 2];
+  }
+
+  for (const int i : IndexRange(fillet_count - 1)) {
+    next_dirs[i] = -prev_dirs[i + 1];
   }
 
   return next_dirs;
@@ -206,7 +214,7 @@ static Array<int> calculate_counts(const std::optional<float> arc_angle,
   Array<int> counts(fillet_count);
 
   for (const int i : IndexRange(fillet_count)) {
-    counts[i] = count.has_value() ? count.value() : ceil(angles[i] / arc_angle.value());
+    counts[i] = count ? *count : ceil(angles[i] / *arc_angle);
   }
 
   return counts;
@@ -228,16 +236,12 @@ static Array<float> calculate_radii(const FilletModeParam &mode_param,
 }
 
 /* Limit the radius based on angle and radii to prevent overlap. */
-static void limit_radii(FilletData &fd, const Span<float3> spline_positions, const bool cyclic)
+static void limit_radii(FilletData &fd, const Span<float3> positions, const bool cyclic)
 {
   MutableSpan<float> radii(fd.radii);
   Span<float> angles(fd.angles);
-  Span<float3> axes(fd.axes);
-  Span<float3> positions(fd.positions);
-  Span<float3> prev_dirs(fd.prev_dirs);
-  Span<float3> next_dirs(fd.next_dirs);
 
-  const int size = spline_positions.size();
+  const int size = positions.size();
   int fillet_count, start = 0;
   Array<float> max_radii(size, -1.0f);
 
@@ -246,8 +250,8 @@ static void limit_radii(FilletData &fd, const Span<float3> spline_positions, con
     fillet_count = size;
 
     /* Calculate lengths between adjacent control points. */
-    const float len_prev = (positions[0] - positions[size - 1]).length();
-    const float len_next = (positions[0] - positions[1]).length();
+    const float len_prev = float3::distance(positions[0], positions[size - 1]);
+    const float len_next = float3::distance(positions[0], positions[1]);
 
     /* Calculate tangent lengths of fillets in control points. */
     const float tan_len = radii[0] * tanf(angles[0] / 2);
@@ -274,17 +278,17 @@ static void limit_radii(FilletData &fd, const Span<float3> spline_positions, con
 
   /* Initialize max_radii to largest possible radii. */
   for (const int i : IndexRange(1, size - 2)) {
-    max_radii[i] = min_ff(len_v3v3(spline_positions[i], spline_positions[i - 1]),
-                          len_v3v3(spline_positions[i], spline_positions[i + 1])) /
+    max_radii[i] = min_ff(float3::distance(positions[i], positions[i - 1]),
+                          float3::distance(positions[i], positions[i + 1])) /
                    tanf(angles[i - start] / 2);
   }
 
   /* Max radii calculations for each index. */
   for (const int i : IndexRange(start, fillet_count - 1)) {
-    int fillet_i = i - start;
-    float len_next = len_v3v3(positions[fillet_i], positions[fillet_i + 1]);
-    float tan_len = radii[fillet_i] * tanf(angles[fillet_i] / 2);
-    float tan_len_next = radii[fillet_i + 1] * tanf(angles[fillet_i + 1] / 2);
+    const int fillet_i = i - start;
+    const float len_next = float3::distance(positions[i], positions[i + 1]);
+    const float tan_len = radii[fillet_i] * tanf(angles[fillet_i] / 2);
+    const float tan_len_next = radii[fillet_i + 1] * tanf(angles[fillet_i + 1] / 2);
 
     /* Scale down radii if too large for segment. */
     float factor = 1.0f;
@@ -340,8 +344,8 @@ static FilletData calculate_fillet_data(const Spline &spline,
   }
 
   FilletData fd(fillet_count);
-  fd.prev_dirs = calculate_prev_directions(spline.positions(), spline.is_cyclic(), fillet_count);
-  fd.next_dirs = calculate_next_directions(spline.positions(), spline.is_cyclic(), fillet_count);
+  fd.prev_dirs = calculate_prev_directions(spline.positions(), cyclic, fillet_count);
+  fd.next_dirs = calculate_next_directions(spline.positions(), fd.prev_dirs, cyclic);
   fd.positions = spline.positions().slice(IndexRange(start, fillet_count));
   fd.axes = calculate_axes(fd.prev_dirs, fd.next_dirs, fillet_count);
   fd.angles = calculate_angles(fd.prev_dirs, fd.next_dirs, fillet_count);
@@ -484,15 +488,15 @@ static void update_bezier_positions(FilletData &fd,
     }
 
     /* Calculate the angle to be formed between any 2 adjacent vertices within the fillet. */
-    float segment_angle = angles[i - start] / (count - 1);
+    const float segment_angle = angles[i - start] / (count - 1);
     /* Calculate the handle length for each added vertex. Equation: L = 4R/3 * tan(A/4) */
-    float handle_length = 4.0f * radii[i - start] / 3 * tanf(segment_angle / 4);
+    const float handle_length = 4.0f * radii[i - start] / 3 * tanf(segment_angle / 4);
     /* Calculate the distance by which each vertex should be displaced from their initial position.
      */
-    float displacement = radii[i - start] * tanf(angles[i - start] / 2);
+    const float displacement = radii[i - start] * tanf(angles[i - start] / 2);
 
     /* Position the end points of the arc and their handles. */
-    int end_i = cur_i + count - 1;
+    const int end_i = cur_i + count - 1;
     dst_spline.positions()[cur_i] = positions[i - start] + displacement * prev_dirs[i - start];
     dst_spline.positions()[end_i] = positions[i - start] + displacement * next_dirs[i - start];
     dst_spline.handle_positions_right()[cur_i] = dst_spline.positions()[cur_i] -
@@ -505,10 +509,11 @@ static void update_bezier_positions(FilletData &fd,
         BezierSpline::HandleType::Vector;
 
     /* Calculate the center of the radius to be formed. */
-    float3 center = get_center(
+    const float3 center = get_center(
         dst_spline.positions()[cur_i] - positions[i - start], fd, i - start);
     /* Calculate the vector of the radius formed by the first vertex. */
     float3 radius_vec = dst_spline.positions()[cur_i] - center;
+    const float radius = radius_vec.normalize_and_get_length();
 
     /* For each of the vertices in between the end points. */
     for (const int j : IndexRange(1, count - 2)) {
@@ -519,10 +524,10 @@ static void update_bezier_positions(FilletData &fd,
       rotate_v3_v3v3fl(new_radius_vec, radius_vec, -axes[i - start], segment_angle);
       rotate_v3_v3v3fl(tangent_vec, new_radius_vec, axes[i - start], M_PI_2);
       radius_vec = new_radius_vec;
-      normalize_v3_length(tangent_vec, handle_length);
+      tangent_vec *= handle_length;
 
       /* Adjust the positions of the respective vertex and its handles. */
-      dst_spline.positions()[index] = center + new_radius_vec;
+      dst_spline.positions()[index] = center + new_radius_vec * radius;
       dst_spline.handle_types_right()[index] = dst_spline.handle_types_right()[index] =
           BezierSpline::HandleType::Align;
       dst_spline.handle_positions_left()[index] = dst_spline.positions()[index] + tangent_vec;
@@ -549,7 +554,7 @@ static void update_poly_or_NURBS_positions(FilletData &fd,
 
   int cur_i = start;
   for (const int i : IndexRange(start, fillet_count)) {
-    int count = point_counts[i];
+    const int count = point_counts[i];
 
     /* Skip if the point count for the vertex is 1. */
     if (count == 1) {
@@ -557,16 +562,16 @@ static void update_poly_or_NURBS_positions(FilletData &fd,
       continue;
     }
 
-    float segment_angle = angles[i - start] / (count - 1);
-    float displacement = radii[i - start] * tanf(angles[i - start] / 2);
+    const float segment_angle = angles[i - start] / (count - 1);
+    const float displacement = radii[i - start] * tanf(angles[i - start] / 2);
 
     /* Position the end points of the arc. */
-    int end_i = cur_i + count - 1;
+    const int end_i = cur_i + count - 1;
     dst_spline.positions()[cur_i] = positions[i - start] + displacement * prev_dirs[i - start];
     dst_spline.positions()[end_i] = positions[i - start] + displacement * next_dirs[i - start];
 
     /* Calculate the center of the radius to be formed. */
-    float3 center = get_center(
+    const float3 center = get_center(
         dst_spline.positions()[cur_i] - positions[i - start], fd, i - start);
     /* Calculate the vector of the radius formed by the first vertex. */
     float3 radius_vec = dst_spline.positions()[cur_i] - center;
@@ -591,7 +596,7 @@ static SplinePtr fillet_spline(const Spline &spline,
 {
   int fillet_count, start = 0;
   const int size = spline.size();
-  bool cyclic = spline.is_cyclic();
+  const bool cyclic = spline.is_cyclic();
 
   /* Determine the number of vertices that can be filleted. */
   if (cyclic) {
@@ -607,7 +612,7 @@ static SplinePtr fillet_spline(const Spline &spline,
   }
 
   /* Initialize the point_counts with 1s (at least one vertex on dst for each vertex on src). */
-  Array<int> point_counts(size, {1});
+  Array<int> point_counts(size, 1.0f);
 
   int added_count = 0;
   /* Update point_counts array and added_count. */
@@ -617,13 +622,13 @@ static SplinePtr fillet_spline(const Spline &spline,
     limit_radii(fd, spline.positions(), cyclic);
   }
 
-  int total_points = added_count + size;
-  Array<int> dst_to_src = create_dst_to_src_map(point_counts, total_points);
+  const int total_points = added_count + size;
+  const Array<int> dst_to_src = create_dst_to_src_map(point_counts, total_points);
   SplinePtr dst_spline_ptr = spline.copy_only_settings();
 
   switch (spline.type()) {
     case Spline::Type::Bezier: {
-      const BezierSpline &src_spline = (const BezierSpline &)spline;
+      const BezierSpline &src_spline = static_cast<const BezierSpline &>(spline);
       BezierSpline &dst_spline = static_cast<BezierSpline &>(*dst_spline_ptr);
       dst_spline.resize(total_points);
       copy_bezier_attributes_by_mapping(src_spline, dst_spline, dst_to_src);
@@ -632,7 +637,7 @@ static SplinePtr fillet_spline(const Spline &spline,
       break;
     }
     case Spline::Type::Poly: {
-      PolySpline &src_spline = (PolySpline &)spline;
+      const PolySpline &src_spline = static_cast<const PolySpline &>(spline);
       PolySpline &dst_spline = static_cast<PolySpline &>(*dst_spline_ptr);
       dst_spline.resize(total_points);
       copy_poly_attributes_by_mapping(src_spline, dst_spline, dst_to_src);
@@ -640,7 +645,7 @@ static SplinePtr fillet_spline(const Spline &spline,
       break;
     }
     case Spline::Type::NURBS: {
-      NURBSpline &src_spline = (NURBSpline &)spline;
+      const NURBSpline &src_spline = static_cast<const NURBSpline &>(spline);
       NURBSpline &dst_spline = static_cast<NURBSpline &>(*dst_spline_ptr);
       dst_spline.resize(total_points);
       copy_NURBS_attributes_by_mapping(src_spline, dst_spline, dst_to_src);
@@ -696,7 +701,6 @@ static void geo_node_fillet_exec(GeoNodeExecParams params)
                                                          node_storage.radius_mode;
   FilletModeParam mode_param;
   mode_param.mode = mode;
-  mode_param.radius_mode = radius_mode;
 
   if (mode == GEO_NODE_CURVE_FILLET_ADAPTIVE) {
     const float angle = std::max(params.extract_input<float>("Angle"), 0.0001f);
