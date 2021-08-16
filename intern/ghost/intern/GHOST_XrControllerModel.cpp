@@ -39,7 +39,6 @@ struct GHOST_XrControllerModelNode {
   int32_t parent_idx = -1;
   int32_t component_idx = -1;
   float local_transform[4][4];
-  float world_transform[4][4];
 };
 
 /* -------------------------------------------------------------------- */
@@ -228,10 +227,11 @@ static GHOST_XrPrimitive read_primitive(const tinygltf::Model &gltf_model,
   return primitive;
 }
 
-/* Calculate node transform in world space. */
-static void calc_node_transform(const tinygltf::Node &gltf_node,
-                                const float parent_transform[4][4],
-                                GHOST_XrControllerModelNode &node)
+/* Calculate node local and world transforms. */
+static void calc_node_transforms(const tinygltf::Node &gltf_node,
+                                 const float parent_transform[4][4],
+                                 float r_local_transform[4][4],
+                                 float r_world_transform[4][4])
 {
   /* A node may specify either a 4x4 matrix or TRS (Translation - Rotation - Scale) values, but not
    * both. */
@@ -253,14 +253,14 @@ static void calc_node_transform(const tinygltf::Node &gltf_node,
                      (float)dm[13],
                      (float)dm[14],
                      (float)dm[15]};
-    memcpy(node.local_transform, m, sizeof(node.local_transform));
+    memcpy(r_local_transform, m, sizeof(float) * 16);
   }
   else {
     /* No matrix is present, so construct a matrix from the TRS values (each one is optional). */
     std::vector<double> translation = gltf_node.translation;
     std::vector<double> rotation = gltf_node.rotation;
     std::vector<double> scale = gltf_node.scale;
-    Eigen::Matrix4f &m = *(Eigen::Matrix4f *)node.local_transform;
+    Eigen::Matrix4f &m = *(Eigen::Matrix4f *)r_local_transform;
     Eigen::Quaternionf q;
     Eigen::Matrix3f scalemat;
 
@@ -295,8 +295,8 @@ static void calc_node_transform(const tinygltf::Node &gltf_node,
         (float)translation[0], (float)translation[1], (float)translation[2]);
   }
 
-  *(Eigen::Matrix4f *)node.world_transform = *(Eigen::Matrix4f *)parent_transform *
-                                             *(Eigen::Matrix4f *)node.local_transform;
+  *(Eigen::Matrix4f *)r_world_transform = *(Eigen::Matrix4f *)parent_transform *
+                                          *(Eigen::Matrix4f *)r_local_transform;
 }
 
 static void load_node(tinygltf::Model gltf_model,
@@ -312,11 +312,12 @@ static void load_node(tinygltf::Model gltf_model,
                       std::vector<int32_t> &node_state_indices)
 {
   const tinygltf::Node &gltf_node = gltf_model.nodes.at(gltf_node_id);
+  float world_transform[4][4];
 
   GHOST_XrControllerModelNode &node = nodes.emplace_back();
   const int32_t node_idx = (int32_t)(nodes.size() - 1);
   node.parent_idx = parent_idx;
-  calc_node_transform(gltf_node, parent_transform, node);
+  calc_node_transforms(gltf_node, parent_transform, node.local_transform, world_transform);
 
   for (size_t i = 0; i < node_properties.size(); ++i) {
     if ((node_state_indices[i] < 0) && (parent_name == node_properties[i].parentNodeName) &&
@@ -331,7 +332,7 @@ static void load_node(tinygltf::Model gltf_model,
 
     GHOST_XrControllerModelComponent &component = components.emplace_back();
     node.component_idx = components.size() - 1;
-    memcpy(component.transform, node.world_transform, sizeof(component.transform));
+    memcpy(component.transform, world_transform, sizeof(component.transform));
     component.vertex_offset = vertices.size();
     component.index_offset = indices.size();
 
@@ -366,7 +367,7 @@ static void load_node(tinygltf::Model gltf_model,
     load_node(gltf_model,
               child_node_id,
               node_idx,
-              node.world_transform,
+              world_transform,
               gltf_node.name,
               node_properties,
               vertices,
@@ -557,17 +558,19 @@ void GHOST_XrControllerModel::updateComponents(XrSession session)
     }
   }
 
-  /* Update node/component world transforms. */
-  for (GHOST_XrControllerModelNode &node : m_nodes) {
-    *(Eigen::Matrix4f *)node.world_transform =
-        (node.parent_idx > 0) ? *(Eigen::Matrix4f *)m_nodes[node.parent_idx].world_transform *
-                                    *(Eigen::Matrix4f *)node.local_transform :
-                                *(Eigen::Matrix4f *)node.local_transform;
+  /* Calculate component transforms (in world space). */
+  std::vector<Eigen::Matrix4f> world_transforms(m_nodes.size());
+  uint32_t i = 0;
+  for (const GHOST_XrControllerModelNode &node : m_nodes) {
+    world_transforms[i] = (node.parent_idx > 0) ? world_transforms[node.parent_idx] *
+                                                      *(Eigen::Matrix4f *)node.local_transform :
+                                                  *(Eigen::Matrix4f *)node.local_transform;
     if (node.component_idx > 0) {
       memcpy(m_components[node.component_idx].transform,
-             node.world_transform,
+             world_transforms[i].data(),
              sizeof(m_components[node.component_idx].transform));
     }
+    ++i;
   }
 }
 

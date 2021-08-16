@@ -748,7 +748,7 @@ typedef struct GHOST_XrActionProfileInfo {
   const char *profile_path;
   uint32_t count_subaction_paths;
   const char **subaction_paths;
-  /* Bindings for each subaction path. */
+  /** Bindings for each subaction path. */
   const GHOST_XrActionBindingInfo *bindings;
 } GHOST_XrActionProfileInfo;
 
@@ -758,6 +758,7 @@ typedef struct GHOST_XrControllerModelVertex {
 } GHOST_XrControllerModelVertex;
 
 typedef struct GHOST_XrControllerModelComponent {
+  /** World space transform. */
   float transform[4][4];
   uint32_t vertex_offset;
   uint32_t vertex_count;
