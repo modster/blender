@@ -55,4 +55,15 @@ void DotproductOperation::executePixelSampled(float output[4],
   output[0] = -(input1[0] * input2[0] + input1[1] * input2[1] + input1[2] * input2[2]);
 }
 
+void DotproductOperation::update_memory_buffer_partial(MemoryBuffer *output,
+                                                       const rcti &area,
+                                                       Span<MemoryBuffer *> inputs)
+{
+  for (BuffersIterator<float> it = output->iterate_with(inputs, area); !it.is_end(); ++it) {
+    const float *input1 = it.in(0);
+    const float *input2 = it.in(1);
+    *it.out = -(input1[0] * input2[0] + input1[1] * input2[1] + input1[2] * input2[2]);
+  }
+}
+
 }  // namespace blender::compositor
