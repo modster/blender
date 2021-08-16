@@ -230,10 +230,8 @@ static void mesh_calc_normals_poly_and_vertex_accum_fn(
         copy_v3_v3(edvec_next, edvec_end);
       }
 
-      /* Calculate angle between the two poly edges incident on this vertex.
-       * NOTE: no need for #saacos here as the input has been sanitized,
-       * `nan` values in coordinates normalize to zero which works for `acosf`. */
-      const float fac = acosf(-dot_v3v3(edvec_prev, edvec_next));
+      /* Calculate angle between the two poly edges incident on this vertex. */
+      const float fac = saacos(-dot_v3v3(edvec_prev, edvec_next));
       const float vnor_add[3] = {pnor[0] * fac, pnor[1] * fac, pnor[2] * fac};
 
       add_v3_v3_atomic(vnors[ml[i_curr].v], vnor_add);
