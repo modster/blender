@@ -1809,6 +1809,7 @@ static void OVERLAY_colliding_face_on_box(OVERLAY_Data *data,
                                           const float color[4])
 {
     float corr_rot[3][3];
+    float initial_transform[4][4];
     float final_mat[4][4];
     float loc[3] = {0.0f};
     float ax[3] = {0.0f};
@@ -1828,7 +1829,7 @@ static void OVERLAY_colliding_face_on_box(OVERLAY_Data *data,
            loc[1] = -1.0f;
            break;
          case 1:
-           ax[0] = 1.0f;
+           ax[1] = 1.0f;
            axis_angle_to_mat3(corr_rot, ax, M_PI_2);
            loc[0] = 1.0f;
            break;
@@ -1837,7 +1838,7 @@ static void OVERLAY_colliding_face_on_box(OVERLAY_Data *data,
            loc[2] = -1.0f;
            break;
          case 3:
-           ax[0] = 1.0f;
+           ax[1] = 1.0f;
            axis_angle_to_mat3(corr_rot, ax, M_PI_2);
            loc[0] = -1.0f;
            break;
@@ -1854,6 +1855,8 @@ static void OVERLAY_colliding_face_on_box(OVERLAY_Data *data,
 
        GPUBatch *geom = DRW_cache_quad_get();
 
+      // copy_m4_m3(initial_transform, corr_rot);
+     //  copy_v4_v4(initial_transform[3], loc);
        mul_m4_m4m3(final_mat, ob->obmat, corr_rot);
        mul_m4_v3(ob->obmat, loc);
        copy_v3_v3(final_mat[3], loc);
