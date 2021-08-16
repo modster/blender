@@ -1614,24 +1614,20 @@ static void initSnapSpatial(TransInfo *t, float r_snap[2])
     }
   }
   else if (t->spacetype == SPACE_IMAGE) {
-    /* Change the default value of 0.0625 since the UV editor grid is now dynamically subdividing
-     */
     SpaceImage *sima = t->area->spacedata.first;
     View2D *v2d = &t->region->v2d;
-    /* For a NxN grid. Keep in sync with value in overay_grid.c. Could be moved to View2D or
-     * SpaceImage to make it global indirectly */
-    int N = 4;
-    float zoom_factor = ED_space_image_zoom_level(v2d, N); /* Use a better name */
+    /* N denotes the grid dimension when zoomed out (NxN grid).
+     * While zooming in, each grid division further subdivides into smaller NxN divisions
+     *
+     * If this value is changed, then also update the value in OVERLAY_grid_init()
+     * TODO? : Probably best to move this value to SpaceImage/View2D struct */
+    int N = 8;
+    float zoom_factor = ED_space_image_zoom_level(v2d, N);
     float grid_steps[8];
 
-    if (sima->flag & SI_DYNAMIC_GRID) {
-      ED_space_image_grid_steps(sima->dynamic_grid_size, grid_steps, true);
-    }
-    else {
-      ED_space_image_grid_steps(N, grid_steps, false);
-    }
-
-    r_snap[0] = ED_space_image_increment_snap_value(grid_steps, zoom_factor);
+    ED_space_image_grid_steps(sima, grid_steps, N);
+    /* Snapping value based on what type of grid is used (subdividing or dynamic) */
+    r_snap[0] = ED_space_image_increment_snap_value(N, grid_steps, zoom_factor);
     r_snap[1] = r_snap[0] / 2.0f;
   }
   else if (t->spacetype == SPACE_CLIP) {

@@ -130,8 +130,7 @@ void main()
 
     /* For UV/Image editor use zoomFactor */
     if((gridFlag & PLANE_IMAGE) != 0 && (gridFlag & DYNAMIC_GRID) == 0)
-    {/* grid begins to appear when the length of one grid unit is at least
-      * (N^2) pixels in the UV/Image editor.
+    {/* Grid begins to appear when the length of one grid unit is at least 256/N pixels (for NxN grid)
       * Value of N defined in overlay_grid.c */
       grid_res = zoomFactor;
     }
