@@ -1342,7 +1342,8 @@ static void UV_OT_snap_selected(wmOperatorType *ot)
 /** \name UV offset Operator
  * \{ */
 
-/* Pixel offset (defined in T78405) is currently not implemented in the operator */
+/* Since pixel resolution is not implemented yet (refer T78405), pixel offset is not implemented in
+ * this operator */
 enum {
   UDIM_OFFSET_UP = 0,
   UDIM_OFFSET_DOWN,
@@ -1354,18 +1355,10 @@ enum {
   DYNAMIC_GRID_OFFSET_RIGHT,
 };
 
-static int uv_offset_exec(bContext *C, wmOperator *op)
+static void uv_calc_offset(const SpaceImage *sima, const int offset_direction, float uv_offset[2])
 {
-  Scene *scene = CTX_data_scene(C);
-  ViewLayer *view_layer = CTX_data_view_layer(C);
-  const SpaceImage *sima = CTX_wm_space_image(C);
-  const ToolSettings *ts = scene->toolsettings;
-  // const bool synced_selection = (ts->uv_flag & UV_SYNC_SELECTION) != 0;
-  int dynamic_grid_size = (sima->flag & SI_DYNAMIC_GRID) ? sima->dynamic_grid_size : 0;
-
-  const int offset_direction = RNA_enum_get(op->ptr, "offset_direction");
-  float uv_offset[2] = {0.0f, 0.0f};
-
+  const bool is_dynamic_grid = sima->flag & SI_DYNAMIC_GRID;
+  zero_v2(uv_offset);
   /* Assign offset based on the keymap input */
   switch (offset_direction) {
     case UDIM_OFFSET_UP: {
@@ -1385,45 +1378,47 @@ static int uv_offset_exec(bContext *C, wmOperator *op)
       break;
     }
     case DYNAMIC_GRID_OFFSET_UP: {
-      if (dynamic_grid_size) {
-        uv_offset[1] = 1.0f / ((float)dynamic_grid_size);
-      }
-      else { /* Dynamic Grid not in use */
-        return OPERATOR_CANCELLED;
+      if (is_dynamic_grid) {
+        uv_offset[1] = 1.0f / ((float)sima->dynamic_grid_size);
       }
       break;
     }
     case DYNAMIC_GRID_OFFSET_DOWN: {
-      if (dynamic_grid_size) {
-        uv_offset[1] = (-1.0f) / ((float)dynamic_grid_size);
-      }
-      else { /* Dynamic Grid not in use */
-        return OPERATOR_CANCELLED;
+      if (is_dynamic_grid) {
+        uv_offset[1] = (-1.0f) / ((float)sima->dynamic_grid_size);
       }
       break;
     }
     case DYNAMIC_GRID_OFFSET_RIGHT: {
-      if (dynamic_grid_size) {
-        uv_offset[0] = 1.0f / ((float)dynamic_grid_size);
-      }
-      else { /* Dynamic Grid not in use */
-        return OPERATOR_CANCELLED;
+      if (is_dynamic_grid) {
+        uv_offset[0] = 1.0f / ((float)sima->dynamic_grid_size);
       }
       break;
     }
     case DYNAMIC_GRID_OFFSET_LEFT: {
-      if (dynamic_grid_size) {
-        uv_offset[0] = (-1.0f) / ((float)dynamic_grid_size);
-      }
-      else { /* Dynamic Grid not in use */
-        return OPERATOR_CANCELLED;
+      if (is_dynamic_grid) {
+        uv_offset[0] = (-1.0f) / ((float)sima->dynamic_grid_size);
       }
       break;
     }
     default: {
-      /* No valid use case */
-      return OPERATOR_CANCELLED;
+      /* Pass */
     }
+  }
+}
+
+static int uv_offset_exec(bContext *C, wmOperator *op)
+{
+  Scene *scene = CTX_data_scene(C);
+  ViewLayer *view_layer = CTX_data_view_layer(C);
+  const SpaceImage *sima = CTX_wm_space_image(C);
+  const ToolSettings *ts = scene->toolsettings;
+  const int offset_direction = RNA_enum_get(op->ptr, "offset_direction");
+  float uv_offset[2] = {0.0f, 0.0f};
+
+  uv_calc_offset(sima, offset_direction, uv_offset);
+  if (is_zero_v2(uv_offset)) {
+    return OPERATOR_CANCELLED;
   }
 
   BMFace *efa;
@@ -1438,6 +1433,7 @@ static int uv_offset_exec(bContext *C, wmOperator *op)
   for (uint ob_index = 0; ob_index < objects_len; ob_index++) {
     Object *obedit = objects[ob_index];
     BMEditMesh *em = BKE_editmesh_from_object(obedit);
+    bool changed = false;
     const int cd_loop_uv_offset = CustomData_get_offset(&em->bm->ldata, CD_MLOOPUV);
 
     if ((ts->uv_flag & UV_SYNC_SELECTION) && (em->bm->totvertsel == 0)) {
@@ -1450,15 +1446,15 @@ static int uv_offset_exec(bContext *C, wmOperator *op)
       }
 
       BM_ITER_ELEM (l, &liter, efa, BM_LOOPS_OF_FACE) {
-        luv = BM_ELEM_CD_GET_VOID_P(l, cd_loop_uv_offset);
-        if (luv->flag & MLOOPUV_VERTSEL) {
+        if (uvedit_uv_select_test(scene, l, cd_loop_uv_offset)) {
+          luv = BM_ELEM_CD_GET_VOID_P(l, cd_loop_uv_offset);
           add_v2_v2(luv->uv, uv_offset);
+          changed = true;
         }
-        /* FAILS in some cases with UV sync selection. Find out why??? */
       }
     }
-    /* if uv_offset is not zero, then UV elements were updated */
-    if (!is_zero_v2(uv_offset)) {
+
+    if (changed) {
       DEG_id_tag_update(obedit->data, ID_RECALC_GEOMETRY);
       WM_main_add_notifier(NC_GEOM | ND_DATA, obedit->data);
     }
@@ -1468,7 +1464,7 @@ static int uv_offset_exec(bContext *C, wmOperator *op)
   return OPERATOR_FINISHED;
 }
 
-/* Refer Task description given in T78405 */
+/* Refer Task T78405 */
 static void UV_OT_offset(wmOperatorType *ot)
 {
   /* identifiers */

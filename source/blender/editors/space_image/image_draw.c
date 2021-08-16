@@ -595,7 +595,7 @@ void ED_space_image_grid_steps(SpaceImage *sima, float grid_steps[8], const int 
 {
   if (sima->flag & SI_DYNAMIC_GRID) {
     for (int step = 0; step < 8; step++) {
-      grid_steps[step] = powf(1, step) * (1.0f / ((float)grid_dimension));
+      grid_steps[step] = powf(1, step) * (1.0f / ((float)sima->dynamic_grid_size));
     }
   }
   else {
