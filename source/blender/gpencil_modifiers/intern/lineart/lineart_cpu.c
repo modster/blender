@@ -3243,14 +3243,6 @@ static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
    * occlusion levels will get ignored. */
   rb->max_occlusion_level = lmd->level_end_override;
 
-  rb->use_back_face_culling = (lmd->calculation_flags & LRT_USE_BACK_FACE_CULLING) != 0;
-  if (rb->max_occlusion_level < 1 && !rb->use_shadow) {
-    rb->use_back_face_culling = true;
-    if (G.debug_value == 4000) {
-      printf("Backface culling enabled automatically.\n");
-    }
-  }
-
   int16_t edge_types = lmd->edge_types_override;
 
   /* lmd->edge_types_override contains all used flags in the modifier stack. */
@@ -3264,6 +3256,14 @@ static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
                            (lmd->light_contour_object != NULL));
   rb->use_shadow = ((edge_types & LRT_EDGE_FLAG_PROJECTED_SHADOW) != 0 &&
                     (lmd->light_contour_object != NULL));
+
+  rb->use_back_face_culling = (lmd->calculation_flags & LRT_USE_BACK_FACE_CULLING) != 0;
+  if (rb->max_occlusion_level < 1 && !rb->use_shadow) {
+    rb->use_back_face_culling = true;
+    if (G.debug_value == 4000) {
+      printf("Backface culling enabled automatically.\n");
+    }
+  }
 
   rb->filter_face_mark_invert = (lmd->calculation_flags & LRT_FILTER_FACE_MARK_INVERT) != 0;
   rb->filter_face_mark = (lmd->calculation_flags & LRT_FILTER_FACE_MARK) != 0;
