@@ -1023,6 +1023,13 @@ void RB_shape_set_margin(rbCollisionShape *shape, float value)
   shape->cshape->setMargin(value);
 }
 
+/* Get scale data--------------------------- */
+void RB_box_shape_get_half_extents(rbCollisionShape *shape, float *r_half_extents)
+{
+    btBoxShape *box = (btBoxShape*)shape->cshape;
+    copy_v3_btvec3(r_half_extents, box->getHalfExtentsWithMargin());
+}
+
 /* ********************************** */
 /* Constraints */
 

@@ -1313,6 +1313,11 @@ RigidBodyOb *BKE_rigidbody_create_object(Scene *scene, Object *ob, short type)
   zero_v3(rbo->vec_locations[1].vector);
   zero_v3(rbo->vec_locations[2].vector);
 
+  rbo->colliding_faces[0] = -1;
+  rbo->colliding_faces[1] = -1;
+  rbo->colliding_faces[2] = -1;
+
+  zero_v3(rbo->pvel);
   zero_v3(rbo->vel);
 
   rbo->col_shape_draw_data = NULL;
@@ -2056,6 +2061,115 @@ static void rigidbody_update_simulation_post_step(Depsgraph *depsgraph, RigidBod
   FOREACH_COLLECTION_OBJECT_RECURSIVE_END;
 }
 
+static void rigidbody_debug_draw_get_colliding_face(Object *ob, float points[3][3], float forces[3][3]) {
+
+    /* Unit Box vertices. */
+    float box_shape[8][3] = {
+        {1.0f, -1.0f, 1.0f},
+        {1.0f, -1.0f, -1.0f},
+        {-1.0f, -1.0f, -1.0f},
+        {-1.0f, -1.0f, 1.0f},
+        {1.0f, 1.0f, 1.0f},
+        {1.0f, 1.0f, -1.0f},
+        {-1.0f, 1.0f, -1.0f},
+        {-1.0f, 1.0f, 1.0f},
+    };
+
+    /* Triangles that make up the faces of the box. */
+    uint box_shape_tris[12][3] = {
+        {0, 1, 2},
+        {0, 2, 3},
+
+        {0, 1, 5},
+        {0, 5, 4},
+
+        {1, 2, 6},
+        {1, 6, 5},
+
+        {2, 3, 7},
+        {2, 7, 6},
+
+        {3, 0, 4},
+        {3, 4, 7},
+
+        {4, 5, 6},
+        {4, 6, 7},
+    };
+
+    float transform_mat[4][4] = {{0.0f}};
+    float size[3] = {1.0f, 1.0f, 1.0f};
+    float pos[3];
+    float rot[4];
+   // BoundBox *bb = NULL;
+
+    if(ob->rigidbody_object->shared->physics_object) {
+        RB_body_get_position(ob->rigidbody_object->shared->physics_object, pos);
+        RB_body_get_orientation(ob->rigidbody_object->shared->physics_object, rot);
+    }
+    if(ob->rigidbody_object->shared->physics_shape) {
+        RB_box_shape_get_half_extents(ob->rigidbody_object->shared->physics_shape, size);
+    }
+
+
+   // mul_v3_fl(size, 0.5f);
+    loc_quat_size_to_mat4(transform_mat, pos, rot, size);
+    printf("obloc: %f %f %f", pos[0], pos[1], pos[2]);
+    printf("obsize: %f %f %f", size[0], size[1], size[2]);
+
+    /* Transform the box to correct location, orientaion and scale. */
+    for (int i = 0; i < 8; i++) {
+      mul_m4_v3(transform_mat, box_shape[i]);
+    }
+
+    if(ob->rigidbody_object->shape == RB_SHAPE_BOX) {
+
+    float isect_co[3] ={0.0f};
+    float point[3] = {0.0f};
+    float dir[3];
+    int stored_faces = 0;
+    for(int i=0; i<3; i++) {
+        if(stored_faces > 2) {
+            break;
+        }
+        copy_v3_v3(point, points[i]);
+        normalize_v3_v3(dir, forces[i]);
+        /* If face has already collided don't overwrite. */
+        if(ob->rigidbody_object->colliding_faces[i] > -1) {
+            stored_faces++;
+        }
+      for (int j = 0; j < 6; j++) {
+        if (isect_point_tri_v3(point,
+                               box_shape[box_shape_tris[2 * j][0]],
+                               box_shape[box_shape_tris[2 * j][1]],
+                               box_shape[box_shape_tris[2 * j][2]],
+                               isect_co) ||
+            isect_point_tri_v3(point,
+                               box_shape[box_shape_tris[2 * j + 1][0]],
+                               box_shape[box_shape_tris[2 * j + 1][1]],
+                               box_shape[box_shape_tris[2 * j + 1][2]],
+                               isect_co)) {
+          /* Find normal to the face. */
+          float edge1[3], edge2[3], norm[3];
+          sub_v3_v3v3(edge1, box_shape[box_shape_tris[2 * j][0]], box_shape[box_shape_tris[2 * j][1]]);
+          sub_v3_v3v3(edge2, box_shape[box_shape_tris[2 * j][2]], box_shape[box_shape_tris[2 * j][1]]);
+          cross_v3_v3v3(norm, edge1, edge2);
+          normalize_v3(norm);
+          if ((len_manhattan_v3v3(point, isect_co) <= ob->rigidbody_object->margin) &&
+              (fabsf(dot_v3v3(norm, dir)) > 0.99))
+          {
+            ob->rigidbody_object->colliding_faces[stored_faces] = j;
+            break;
+          }
+          else if(j==4) {
+              printf("point:%f %f %f\n isect:%f %f %f\n", point[0], point[1], point[2], isect_co[0], isect_co[1], isect_co[2]);
+              printf("len:%f\n", len_manhattan_v3v3(point, isect_co));
+          }
+        }
+      }
+    }
+    }
+}
+
 static void rigidbody_get_debug_draw_data(RigidBodyWorld *rbw, float substep, bool is_last_substep) {
     /*Loop through all rigid bodies and get the forces being applied in the substep (for drawing debug info).
      * Store average force acting on objects during all substeps.
@@ -2096,7 +2210,9 @@ static void rigidbody_get_debug_draw_data(RigidBodyWorld *rbw, float substep, bo
                                 fric_flag);
           for(int k=0; k<3; k++){
                if (norm_flag || fric_flag) {
-
+                if(!is_zero_v3(norm_forces[0])) {
+                  rigidbody_debug_draw_get_colliding_face(ob, vec_locations, norm_forces);
+                }
                 mul_v3_fl(norm_forces[k], 1/num_substeps);
                 add_v3_v3(ob->rigidbody_object->norm_forces[k].vector, norm_forces[k]);
                 mul_v3_fl(vec_locations[k], len_v3(norm_forces[k]));
@@ -2345,6 +2461,7 @@ void BKE_rigidbody_do_simulation(Depsgraph *depsgraph, Scene *scene, float ctime
           zero_v3(ob->rigidbody_object->norm_forces[j].vector);
           zero_v3(ob->rigidbody_object->vec_locations[j].vector);
           zero_v3(ob->rigidbody_object->fric_forces[j].vector);
+          ob->rigidbody_object->colliding_faces[j] = -1;
         }
     }
 

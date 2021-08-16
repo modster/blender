@@ -1814,99 +1814,66 @@ static void OVERLAY_acceleration_extra(OVERLAY_Data *data,
 #endif
 
 static void OVERLAY_colliding_face_on_box(OVERLAY_Data *data,
-                                          float point[3],
-                                          float mat[4][4],
-                                          float dir[3])
+                                          Object *ob,
+                                          const float color[4])
 {
+    float corr_rot[3][3];
+    float final_mat[4][4];
+    float loc[3] = {0.0f};
+    float ax[3] = {0.0f};
+    int face;
+    RigidBodyOb *rbo = ob->rigidbody_object;
+    for(int i=0; i<3; i++) {
+       face = rbo->colliding_faces[i];
+       zero_v3(loc);
+       zero_v3(ax);
+       if(face == -1) {
+           continue;
+       }
+       switch(face) {
+         case 0:
+           ax[0] = 1.0f;
+           axis_angle_to_mat3(corr_rot, ax, M_PI_2);
+           loc[1] = -1.0f;
+           break;
+         case 1:
+           ax[0] = 1.0f;
+           axis_angle_to_mat3(corr_rot, ax, M_PI_2);
+           loc[0] = 1.0f;
+           break;
+         case 2:
+           unit_m3(corr_rot);
+           loc[2] = -1.0f;
+           break;
+         case 3:
+           ax[0] = 1.0f;
+           axis_angle_to_mat3(corr_rot, ax, M_PI_2);
+           loc[0] = -1.0f;
+           break;
+         case 4:
+            unit_m3(corr_rot);
+            loc[2] = 1.0f;
+            break;
+         case 5:
+           ax[0] = 1.0f;
+           axis_angle_to_mat3(corr_rot, ax, M_PI_2);
+           loc[1] = 1.0f;
+           break;
+       }
 
-  /* Unit Box vertices. */
-  float box_shape[8][3] = {
-      {1.0f, -1.0f, 1.0f},
-      {1.0f, -1.0f, -1.0f},
-      {-1.0f, -1.0f, -1.0f},
-      {-1.0f, -1.0f, 1.0f},
-      {1.0f, 1.0f, 1.0f},
-      {1.0f, 1.0f, -1.0f},
-      {-1.0f, 1.0f, -1.0f},
-      {-1.0f, 1.0f, 1.0f},
-  };
+       GPUBatch *geom = DRW_cache_quad_get();
 
-  /* Triangles that make up the faces of the box. */
-  uint box_shape_tris[12][3] = {
-      {0, 1, 2},
-      {0, 2, 3},
+       mul_m4_m4m3(final_mat, ob->obmat, corr_rot);
+       mul_m4_v3(ob->obmat, loc);
+       copy_v3_v3(final_mat[3], loc);
+       final_mat[3][3] = 1.0f;
 
-      {0, 1, 5},
-      {0, 5, 4},
+       GPUShader *sh = OVERLAY_shader_uniform_color();
+       DRWShadingGroup *grp = DRW_shgroup_create(sh, data->psl->extra_ps[1]);
+       DRW_shgroup_uniform_vec4_copy(grp, "color", color);
+       DRW_shgroup_call_obmat(grp, geom, final_mat);
+     }
 
-      {1, 2, 6},
-      {1, 6, 5},
-
-      {2, 3, 7},
-      {2, 7, 6},
-
-      {3, 0, 4},
-      {3, 4, 7},
-
-      {4, 5, 6},
-      {4, 6, 7},
-  };
-
-  /* Transform the box to correct location, orientaion and scale. */
-  for (int i = 0; i < 8; i++) {
-    mul_m4_v3(mat, box_shape[i]);
-  }
-
-  int face = -1;
-  float isect_co[3];
-  for (int i = 0; i < 6; i++) {
-    if (isect_point_tri_v3(point,
-                           box_shape[box_shape_tris[2 * i][0]],
-                           box_shape[box_shape_tris[2 * i][1]],
-                           box_shape[box_shape_tris[2 * i][2]],
-                           isect_co) ||
-        isect_point_tri_v3(point,
-                           box_shape[box_shape_tris[2 * i + 1][0]],
-                           box_shape[box_shape_tris[2 * i + 1][1]],
-                           box_shape[box_shape_tris[2 * i + 1][2]],
-                           isect_co)) {
-      /* Find normal to the face. */
-      float edge1[3], edge2[3], norm[3];
-      sub_v3_v3v3(edge1, box_shape[box_shape_tris[2 * i][0]], box_shape[box_shape_tris[2 * i][1]]);
-      sub_v3_v3v3(edge2, box_shape[box_shape_tris[2 * i][2]], box_shape[box_shape_tris[2 * i][1]]);
-      cross_v3_v3v3(norm, edge1, edge2);
-      normalize_v3(norm);
-      if ((len_manhattan_v3v3(point, isect_co) <=
-               0.000001f && /* check if distance between impulse point and intersection is small.
-                             */
-           fabsf(dot_v3v3(norm, dir)) >
-               0.9f) || /* impulse direction must not be parallel to face. */
-          (len_manhattan_v3v3(point, isect_co) <= 0.05f &&
-           fabsf(dot_v3v3(point, dir) - dot_v3v3(isect_co, dir)) <
-               0.05 && /* If distance is noy very small, check if error lies in the dir. of
-                          impulse. */
-           fabsf(dot_v3v3(norm, dir)) >
-               0.9f)) /* impulse direction must not be parallel to face. */
-      {
-        face = i;
-        /*if (fabsf(dot_v3v3(norm, dir)) < 0.0001f) {
-          printf("n%f %f %f\n", norm[0], norm[1], norm[2]);
-          printf("d%f %f %f\n", dir[0], dir[1], dir[2]);
-          printf("%f\n", fabsf(dot_v3v3(norm, dir)));
-        }
-        printf("impulse:%f %f %f\n", point[0], point[1],point[2]);
-        printf("intersect:%f %f %f\n", isect_co[0], isect_co[1], isect_co[2]); */
-        GPUShader *sh = OVERLAY_shader_collision_box();
-        DRWShadingGroup *grp = DRW_shgroup_create(sh, data->psl->extra_ps[1]);
-        DRW_shgroup_uniform_vec3_copy(grp, "vert1", box_shape[box_shape_tris[2 * face][0]]);
-        DRW_shgroup_uniform_vec3_copy(grp, "vert2", box_shape[box_shape_tris[2 * face][1]]);
-        DRW_shgroup_uniform_vec3_copy(grp, "vert3", box_shape[box_shape_tris[2 * face][2]]);
-        DRW_shgroup_uniform_vec3_copy(grp, "vert4", box_shape[box_shape_tris[2 * face + 1][2]]);
-        DRW_shgroup_call_procedural_triangles(grp, NULL, 2);
-        break;
-      }
-    }
-  }
 }
 
 static bool OVERLAY_colliding_face_on_cylinder(OVERLAY_Data *data,
@@ -2016,16 +1983,11 @@ static void OVERLAY_indicate_collision(OVERLAY_Data *data, Object *ob)
   copy_v3_v3(dir, ob->rigidbody_object->norm_forces[0].vector);
   normalize_v3(dir);
   if (!is_zero_v3(ob->rigidbody_object->norm_forces[0].vector)) {
-    float color[4] = {0.5f, 0.7f, 0.1f, 1.0f};
+    float color[4] = {0.0f, 1.0f, 0.2f, 0.8f};
     switch (ob->rigidbody_object->shape) {
       case RB_SHAPE_BOX:
         OVERLAY_bounds(cb, ob, color, OB_BOUND_BOX, true, mat);
-        for (int i = 0; i < 3; i++) {
-          if (!is_zero_v3(ob->rigidbody_object->norm_forces[i].vector)) {
-            OVERLAY_colliding_face_on_box(
-                data, ob->rigidbody_object->vec_locations[i].vector, mat, dir);
-          }
-        }
+        OVERLAY_colliding_face_on_box(data, ob, color);
         break;
       case RB_SHAPE_SPHERE:
         OVERLAY_bounds(cb, ob, color, OB_BOUND_SPHERE, true, NULL);
@@ -2099,7 +2061,7 @@ static void OVERLAY_linear_limits_single_object_rod(RigidBodyCon *rbc,
     }
 }
 
-/* Draw walls for ob1 if it lies close to the walls. */
+/* Draw constraint limits as walls. */
 static void OVERLAY_linear_limits_walls(Object *ob,
                                          const float transform_mat[3][3],
                                          const float corr_rot[3][3],

@@ -178,18 +178,20 @@ typedef struct RigidBodyOb {
 
   /** Force vectors. */
   sim_data_vec eff_forces[3];
-  char _pad3[4];
+  char _pad2[4];
   sim_data_vec norm_forces[3];
-  char _pad4[4];
+  char _pad3[4];
   sim_data_vec fric_forces[3];
-  char _pad5[4];
+  char _pad4[4];
   sim_data_vec vec_locations[3];
+
+  /** For box, cyllinder and cone shapes. */
+  int colliding_faces[3];
 
   /** Velocity */
   float vel[3];
   /** Previous velocity, to calculate acceleration. */
   float pvel[3];
-  char _pad6[4];
 
   Mesh *col_shape_draw_data;
 
