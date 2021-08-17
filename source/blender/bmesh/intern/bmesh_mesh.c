@@ -1485,13 +1485,13 @@ void BM_select_faces(BMesh *bm, const bool *mask)
   }
 }
 
-void BM_get_selected_faces(BMesh *bm, bool *selection)
+void BM_get_selected_vertices(BMesh *bm, bool *selection)
 {
   BMIter iter;
-  BMFace *f;
-  int i = 0;
-  BM_ITER_MESH_INDEX (f, &iter, bm, BM_FACES_OF_MESH, i) {
-    selection[i] = BM_elem_flag_test(f, BM_ELEM_SELECT);
+  BMVert *v;
+  int i;
+  BM_ITER_MESH_INDEX (v, &iter, bm, BM_VERTS_OF_MESH, i) {
+    selection[i] = BM_elem_flag_test(v, BM_ELEM_SELECT);
   }
 }
 

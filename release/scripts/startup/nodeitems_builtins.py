@@ -553,6 +553,7 @@ geometry_node_categories = [
         NodeItem("GeometryNodeEdgeSplit"),
         NodeItem("GeometryNodeSubdivisionSurface"),
         NodeItem("GeometryNodeMeshSubdivide"),
+        NodeItem("GeometryNodeMeshExtrude"),
         NodeItem("GeometryNodeMeshInset"),
         NodeItem("GeometryNodeCollapse"),
         NodeItem("GeometryNodeUnsubdivide"),

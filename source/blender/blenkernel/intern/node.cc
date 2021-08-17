@@ -5159,7 +5159,7 @@ static void registerGeometryNodes()
   register_node_type_geo_delete_geometry();
   register_node_type_geo_dissolve();
   register_node_type_geo_edge_split();
-  register_node_type_geo_mesh_inset();
+  register_node_type_geo_mesh_extrude();
   register_node_type_geo_input_material();
   register_node_type_geo_is_viewport();
   register_node_type_geo_join_geometry();

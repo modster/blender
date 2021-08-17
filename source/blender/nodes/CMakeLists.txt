@@ -186,7 +186,7 @@ set(SRC
   geometry/nodes/node_geo_delete_geometry.cc
   geometry/nodes/node_geo_dissolve.cc
   geometry/nodes/node_geo_edge_split.cc
-        geometry/nodes/node_geo_mesh_inset.cc
+    geometry/nodes/node_geo_mesh_extrude.cc
   geometry/nodes/node_geo_input_material.cc
   geometry/nodes/node_geo_is_viewport.cc
   geometry/nodes/node_geo_join_geometry.cc
