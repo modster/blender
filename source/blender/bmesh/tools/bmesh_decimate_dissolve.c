@@ -104,6 +104,22 @@ static bool bm_edge_is_delimiter(const BMEdge *e,
   BLI_assert(BM_edge_is_manifold(e));
 
   if (delimit != 0) {
+    if (delimit & BMO_DELIM_EDGE_SELECTION_INVSE) {
+      if (!BM_elem_flag_test(e, BM_ELEM_SELECT)) {
+        return true;
+      }
+    }
+    if (delimit & BMO_DELIM_EDGE_SELECTION) {
+      if (BM_elem_flag_test(e, BM_ELEM_SELECT)) {
+        return true;
+      }
+    }
+    if (delimit & BMO_DELIM_FACE_SELECTION) {
+      if (BM_elem_flag_test(e->l->f, BM_ELEM_TAG) !=
+          BM_elem_flag_test(e->l->radial_next->f, BM_ELEM_TAG)) {
+        return true;
+      }
+    }
     if (delimit & BMO_DELIM_SEAM) {
       if (BM_elem_flag_test(e, BM_ELEM_SEAM)) {
         return true;

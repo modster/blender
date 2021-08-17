@@ -1437,6 +1437,16 @@ typedef struct NodeGeometryRaycast {
   char _pad[1];
 } NodeGeometryRaycast;
 
+typedef struct NodeGeometryCollapse {
+  /* GeometryNodeCollapseSymmetryAxis. */
+  int8_t symmetry_axis;
+} NodeGeometryCollapse;
+
+typedef struct NodeGeometryDissolve {
+  /* GeometryNodeDissolveDelimiter */
+  int8_t selection_type;
+} NodeGeometryDissolve;
+
 /* script node mode */
 #define NODE_SCRIPT_INTERNAL 0
 #define NODE_SCRIPT_EXTERNAL 1
@@ -2007,6 +2017,19 @@ typedef enum GeometryNodeRaycastMapMode {
   GEO_NODE_RAYCAST_INTERPOLATED = 0,
   GEO_NODE_RAYCAST_NEAREST = 1,
 } GeometryNodeRaycastMapMode;
+
+typedef enum GeometryNodeCollapseSymmetryAxis {
+  GEO_NODE_COLLAPSE_SYMMETRY_AXIS_NONE = -1,
+  GEO_NODE_COLLAPSE_SYMMETRY_AXIS_X = 0,
+  GEO_NODE_COLLAPSE_SYMMETRY_AXIS_Y = 1,
+  GEO_NODE_COLLAPSE_SYMMETRY_AXIS_Z = 2,
+} GeometryNodeCollapseSymmetryAxis;
+
+typedef enum GeometryNodeDissolveDelimiter {
+  GEO_NODE_DISSOLVE_DELIMITTER_UNSELECTED = 0,
+  GEO_NODE_DISSOLVE_DELIMITTER_LIMIT = 1,
+  GEO_NODE_DISSOLVE_DELIMITTER_SELECTION_BORDER = 2,
+} GeometryNodeDissolveDelimiter;
 
 #ifdef __cplusplus
 }

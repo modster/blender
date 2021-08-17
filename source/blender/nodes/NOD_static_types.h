@@ -289,6 +289,7 @@ DefNode(GeometryNode, GEO_NODE_ATTRIBUTE_VECTOR_MATH, def_geo_attribute_vector_m
 DefNode(GeometryNode, GEO_NODE_ATTRIBUTE_VECTOR_ROTATE, def_geo_attribute_vector_rotate, "ATTRIBUTE_VECTOR_ROTATE", AttributeVectorRotate, "Attribute Vector Rotate", "")
 DefNode(GeometryNode, GEO_NODE_BOOLEAN, def_geo_boolean, "BOOLEAN", Boolean, "Boolean", "")
 DefNode(GeometryNode, GEO_NODE_BOUNDING_BOX, 0, "BOUNDING_BOX", BoundBox, "Bounding Box", "")
+DefNode(GeometryNode, GEO_NODE_COLLAPSE, def_geo_collapse, "COLLAPSE", Collapse, "Collapse", "")
 DefNode(GeometryNode, GEO_NODE_COLLECTION_INFO, def_geo_collection_info, "COLLECTION_INFO", CollectionInfo, "Collection Info", "")
 DefNode(GeometryNode, GEO_NODE_CONVEX_HULL, 0, "CONVEX_HULL", ConvexHull, "Convex Hull", "")
 DefNode(GeometryNode, GEO_NODE_CURVE_ENDPOINTS, 0, "CURVE_ENDPOINTS", CurveEndpoints, "Curve Endpoints", "")
@@ -310,6 +311,7 @@ DefNode(GeometryNode, GEO_NODE_CURVE_TO_MESH, 0, "CURVE_TO_MESH", CurveToMesh, "
 DefNode(GeometryNode, GEO_NODE_CURVE_TO_POINTS, def_geo_curve_to_points, "CURVE_TO_POINTS", CurveToPoints, "Curve to Points", "")
 DefNode(GeometryNode, GEO_NODE_CURVE_TRIM, def_geo_curve_trim, "CURVE_TRIM", CurveTrim, "Curve Trim", "")
 DefNode(GeometryNode, GEO_NODE_DELETE_GEOMETRY, 0, "DELETE_GEOMETRY", DeleteGeometry, "Delete Geometry", "")
+DefNode(GeometryNode, GEO_NODE_DISSOLVE, def_geo_dissolve, "DISSOLVE", Dissolve, "Dissolve", "")
 DefNode(GeometryNode, GEO_NODE_EDGE_SPLIT, 0, "EDGE_SPLIT", EdgeSplit, "Edge Split", "")
 DefNode(GeometryNode, GEO_NODE_INPUT_MATERIAL, def_geo_input_material, "INPUT_MATERIAL", InputMaterial, "Material", "")
 DefNode(GeometryNode, GEO_NODE_IS_VIEWPORT, 0, "IS_VIEWPORT", IsViewport, "Is Viewport", "")
@@ -341,6 +343,7 @@ DefNode(GeometryNode, GEO_NODE_SUBDIVISION_SURFACE, def_geo_subdivision_surface,
 DefNode(GeometryNode, GEO_NODE_SWITCH, def_geo_switch, "SWITCH", Switch, "Switch", "")
 DefNode(GeometryNode, GEO_NODE_TRANSFORM, 0, "TRANSFORM", Transform, "Transform", "")
 DefNode(GeometryNode, GEO_NODE_TRIANGULATE, def_geo_triangulate, "TRIANGULATE", Triangulate, "Triangulate", "")
+DefNode(GeometryNode, GEO_NODE_UNSUBDIVIDE, 0, "UNSUBDIVIDE", Unsubdivide, "Unsubdivide", "")
 DefNode(GeometryNode, GEO_NODE_VIEWER, 0, "VIEWER", Viewer, "Viewer", "")
 DefNode(GeometryNode, GEO_NODE_VOLUME_TO_MESH, def_geo_volume_to_mesh, "VOLUME_TO_MESH", VolumeToMesh, "Volume to Mesh", "")
 

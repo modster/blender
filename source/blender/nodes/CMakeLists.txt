@@ -161,6 +161,7 @@ set(SRC
   geometry/nodes/node_geo_attribute_vector_rotate.cc
   geometry/nodes/node_geo_boolean.cc
   geometry/nodes/node_geo_bounding_box.cc
+  geometry/nodes/node_geo_collapse.cc
   geometry/nodes/node_geo_collection_info.cc
   geometry/nodes/node_geo_common.cc
   geometry/nodes/node_geo_convex_hull.cc
@@ -183,6 +184,7 @@ set(SRC
   geometry/nodes/node_geo_curve_to_points.cc
   geometry/nodes/node_geo_curve_trim.cc
   geometry/nodes/node_geo_delete_geometry.cc
+  geometry/nodes/node_geo_dissolve.cc
   geometry/nodes/node_geo_edge_split.cc
   geometry/nodes/node_geo_input_material.cc
   geometry/nodes/node_geo_is_viewport.cc
@@ -214,6 +216,7 @@ set(SRC
   geometry/nodes/node_geo_switch.cc
   geometry/nodes/node_geo_transform.cc
   geometry/nodes/node_geo_triangulate.cc
+  geometry/nodes/node_geo_unsubdivide.cc
   geometry/nodes/node_geo_viewer.cc
   geometry/nodes/node_geo_volume_to_mesh.cc
   geometry/node_geometry_exec.cc

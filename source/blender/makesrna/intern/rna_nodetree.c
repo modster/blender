@@ -10094,6 +10094,58 @@ static void def_geo_curve_resample(StructRNA *srna)
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
 }
 
+static void def_geo_collapse(StructRNA *srna)
+{
+  PropertyRNA *prop;
+
+  static EnumPropertyItem symmetry_axis_items[] = {
+      {GEO_NODE_COLLAPSE_SYMMETRY_AXIS_NONE, "NONE", 0, "None", "No Symmetry is applied"},
+      {GEO_NODE_COLLAPSE_SYMMETRY_AXIS_X, "X", 0, "X", "Symmetry is applied on X axis"},
+      {GEO_NODE_COLLAPSE_SYMMETRY_AXIS_Y, "Y", 0, "Y", "Symmetry is applied on Y axis"},
+      {GEO_NODE_COLLAPSE_SYMMETRY_AXIS_Z, "Z", 0, "Z", "Symmetry is applied on Z axis"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  RNA_def_struct_sdna_from(srna, "NodeGeometryCollapse", "storage");
+
+  prop = RNA_def_property(srna, "symmetry_axis", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, symmetry_axis_items);
+  RNA_def_property_ui_text(
+      prop, "Symmetry", "Set if and on what axis symmetry is applied by the operation");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
+}
+
+static void def_geo_dissolve(StructRNA *srna)
+{
+  PropertyRNA *prop;
+
+  static EnumPropertyItem delimiter_items[] = {
+      {GEO_NODE_DISSOLVE_DELIMITTER_UNSELECTED,
+       "SELECTION",
+       0,
+       "Selection",
+       "Only dissolve selected"},
+      {GEO_NODE_DISSOLVE_DELIMITTER_LIMIT,
+       "LIMIT",
+       0,
+       "Limit",
+       "Only dissolve unselected. Use especially for attributes on edge domain e.g. crease"},
+      {GEO_NODE_DISSOLVE_DELIMITTER_SELECTION_BORDER,
+       "BORDER",
+       0,
+       "Border as Limit",
+       "Use border of selection as delimiter"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  RNA_def_struct_sdna_from(srna, "NodeGeometryDissolve", "storage");
+
+  prop = RNA_def_property(srna, "selection_type", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, delimiter_items);
+  RNA_def_property_ui_text(prop, "Selection", "Define how selection is applied");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
+}
+
 static void def_geo_curve_subdivide(StructRNA *srna)
 {
   PropertyRNA *prop;
