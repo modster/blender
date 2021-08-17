@@ -554,6 +554,7 @@ geometry_node_categories = [
         NodeItem("GeometryNodeEdgeSplit"),
         NodeItem("GeometryNodeSubdivisionSurface"),
         NodeItem("GeometryNodeMeshSubdivide"),
+        NodeItem("GeometryNodeRemeshVoxel"),
         NodeItem("GeometryNodeRemeshBlocks"),
         NodeItem("GeometryNodeMeshExtrude"),
         NodeItem("GeometryNodeMeshInset"),
