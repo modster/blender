@@ -216,7 +216,7 @@ static void limit_radii(FilletData &fd, const bool cyclic)
 
   const int size = radii.size();
   int fillet_count, start;
-  Array<float> max_radii(size, -1.0f);
+  Array<float> max_radii(size, FLT_MAX);
 
   if (cyclic) {
     fillet_count = size;
@@ -241,7 +241,6 @@ static void limit_radii(FilletData &fd, const bool cyclic)
 
     /* Scale max radii by calculated factors. */
     max_radii[0] = radii[0] * min_ff(factor_next, factor_prev);
-    max_radii[1] = radii[1] * factor_next;
     max_radii[size - 1] = radii[size - 1] * factor_prev;
   }
   else {
@@ -249,27 +248,33 @@ static void limit_radii(FilletData &fd, const bool cyclic)
     start = 1;
   }
 
-  /* Initialize max_radii to largest possible radii. */
-  for (const int i : IndexRange(1, size - 2)) {
-    max_radii[i] = min_ff(float3::distance(positions[i], positions[i - 1]),
-                          float3::distance(positions[i], positions[i + 1])) /
-                   tanf(angles[i] / 2);
-  }
-
   /* Max radii calculations for each index. */
   for (const int i : IndexRange(start, fillet_count - 1)) {
-    const int fillet_i = i;
     const float len_next = float3::distance(positions[i], positions[i + 1]);
-    const float tan_len = radii[fillet_i] * tanf(angles[fillet_i] / 2);
-    const float tan_len_next = radii[fillet_i + 1] * tanf(angles[fillet_i + 1] / 2);
+    const float tan_len = radii[i] * tanf(angles[i] / 2);
+    const float tan_len_next = radii[i + 1] * tanf(angles[i + 1] / 2);
 
     /* Scale down radii if too large for segment. */
     float factor = 1.0f;
     if (tan_len + tan_len_next > len_next) {
       factor = len_next / (tan_len + tan_len_next);
     }
-    max_radii[i] = min_ff(max_radii[i], radii[fillet_i] * factor);
-    max_radii[i + 1] = min_ff(max_radii[i + 1], radii[fillet_i + 1] * factor);
+
+    float max_radius = FLT_MAX;
+    if (i > 0 && i < size - 1) {
+      max_radius = min_ff(float3::distance(positions[i], positions[i - 1]),
+                          float3::distance(positions[i], positions[i + 1])) /
+                   tanf(angles[i] / 2);
+    }
+    max_radii[i] = min_fff(max_radii[i], radii[i] * factor, max_radius);
+
+    max_radius = FLT_MAX;
+    if (i + 1 > 0 && i + 1 < size - 1) {
+      max_radius = min_ff(float3::distance(positions[i + 1], positions[i]),
+                          float3::distance(positions[i + 1], positions[i + 2])) /
+                   tanf(angles[i + 1] / 2);
+    }
+    max_radii[i + 1] = min_fff(max_radii[i + 1], radii[i + 1] * factor, max_radius);
   }
 
   /* Assign the max_radii to the fillet data's radii. */
