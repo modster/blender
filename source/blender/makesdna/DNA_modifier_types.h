@@ -1287,9 +1287,11 @@ enum {
   MOD_SOLIDIFY_RIM_MATERIAL = (1 << 4), /* deprecated, used in do_versions */
 #endif
   MOD_SOLIDIFY_FLIP = (1 << 5),
-  MOD_SOLIDIFY_NOSHELL = (1 << 6),
-  MOD_SOLIDIFY_OFFSET_ANGLE_CLAMP = (1 << 7),
-  MOD_SOLIDIFY_NONMANIFOLD_FLAT_FACES = (1 << 8),
+  MOD_SOLIDIFY_SHELL = (1 << 6),
+  MOD_SOLIDIFY_NOSHELL = (1 << 7), /* MOD_SOLIDIFY_SHELL should be used. instead This is kept as
+                                      long as the Modifier uses it. */
+  MOD_SOLIDIFY_OFFSET_ANGLE_CLAMP = (1 << 8),
+  MOD_SOLIDIFY_NONMANIFOLD_FLAT_FACES = (1 << 9),
 };
 
 /** #SolidifyModifierData.mode */

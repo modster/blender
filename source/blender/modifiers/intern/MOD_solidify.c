@@ -29,22 +29,26 @@
 
 #include "DNA_defaults.h"
 #include "DNA_mesh_types.h"
+#include "DNA_meshdata_types.h"
 #include "DNA_object_types.h"
 #include "DNA_screen_types.h"
 
 #include "BKE_context.h"
-#include "BKE_particle.h"
+#include "BKE_deform.h"
 #include "BKE_screen.h"
+
+#include "GEO_solidifiy.h"
 
 #include "UI_interface.h"
 #include "UI_resources.h"
 
 #include "RNA_access.h"
 
-#include "MOD_modifiertypes.h"
-#include "MOD_ui_common.h"
+#include "MEM_guardedalloc.h"
 
+#include "MOD_modifiertypes.h"
 #include "MOD_solidify_util.h"
+#include "MOD_ui_common.h"
 
 static bool dependsOnNormals(ModifierData *md)
 {
@@ -81,14 +85,154 @@ static void requiredDataMask(Object *UNUSED(ob),
   }
 }
 
+static void get_distance_factor(
+    Mesh *mesh, Object *ob, const char *name, bool invert, float *r_selection)
+{
+  int defgrp_index = BKE_object_defgroup_name_index(ob, name);
+
+  if (mesh && defgrp_index != -1) {
+    MDeformVert *dvert = mesh->dvert;
+    for (int i = 0; i < mesh->totvert; i++) {
+      MDeformVert *dv = &dvert[i];
+      r_selection[i] = BKE_defvert_find_weight(dv, defgrp_index);
+    }
+  }
+  else {
+    for (int i = 0; i < mesh->totvert; i++) {
+      r_selection[i] = 1.0f;
+    }
+  }
+
+  if (invert) {
+    for (int i = 0; i < mesh->totvert; i++) {
+      r_selection[i] = 1.0f - r_selection[i];
+    }
+  }
+}
+
+static SolidifyData solidify_data_from_modifier_data(ModifierData *md,
+                                                     const ModifierEvalContext *ctx)
+{
+  const SolidifyModifierData *smd = (SolidifyModifierData *)md;
+  SolidifyData solidify_data = {
+      ctx->object,
+      smd->offset,
+      smd->offset_fac,
+      smd->offset_fac_vg,
+      smd->offset_clamp,
+      smd->nonmanifold_offset_mode,
+      smd->nonmanifold_boundary_mode,
+      smd->flag,
+      smd->merge_tolerance,
+      smd->bevel_convex,
+      NULL,
+  };
+
+  if (!(smd->flag & MOD_SOLIDIFY_NOSHELL)) {
+    solidify_data.flag |= MOD_SOLIDIFY_SHELL;
+  }
+
+  return solidify_data;
+}
+
+static Mesh *solidify_nonmanifold_modify_mesh(ModifierData *md,
+                                              const ModifierEvalContext *ctx,
+                                              Mesh *mesh,
+                                              const SolidifyModifierData *smd)
+{
+  SolidifyData solidify_data = solidify_data_from_modifier_data(md, ctx);
+
+  const bool defgrp_invert = (solidify_data.flag & MOD_SOLIDIFY_VGROUP_INV) != 0;
+  float *selection = MEM_callocN(sizeof(float) * (uint64_t)mesh->totvert, __func__);
+  get_distance_factor(mesh, ctx->object, smd->defgrp_name, defgrp_invert, selection);
+  solidify_data.distance = selection;
+
+  bool *shell_verts = NULL;
+  bool *rim_verts = NULL;
+  bool *shell_faces = NULL;
+  bool *rim_faces = NULL;
+
+  Mesh *output_mesh = solidify_nonmanifold(
+      &solidify_data, mesh, &shell_verts, &rim_verts, &shell_faces, &rim_faces);
+
+  const int shell_defgrp_index = BKE_object_defgroup_name_index(ctx->object,
+                                                                smd->shell_defgrp_name);
+  const int rim_defgrp_index = BKE_object_defgroup_name_index(ctx->object, smd->rim_defgrp_name);
+
+  MDeformVert *dvert;
+  if (shell_defgrp_index != -1 || rim_defgrp_index != -1) {
+    dvert = CustomData_duplicate_referenced_layer(
+        &output_mesh->vdata, CD_MDEFORMVERT, output_mesh->totvert);
+    /* If no vertices were ever added to an object's vgroup, dvert might be NULL. */
+    if (dvert == NULL) {
+      /* Add a valid data layer! */
+      dvert = CustomData_add_layer(
+          &output_mesh->vdata, CD_MDEFORMVERT, CD_CALLOC, NULL, output_mesh->totvert);
+    }
+    output_mesh->dvert = dvert;
+    if ((solidify_data.flag & MOD_SOLIDIFY_SHELL) && shell_defgrp_index != -1) {
+      for (int i = 0; i < output_mesh->totvert; i++) {
+        BKE_defvert_ensure_index(&output_mesh->dvert[i], shell_defgrp_index)->weight =
+            shell_verts[i];
+      }
+    }
+    if ((solidify_data.flag & MOD_SOLIDIFY_RIM) && rim_defgrp_index != -1) {
+      for (int i = 0; i < output_mesh->totvert; i++) {
+        BKE_defvert_ensure_index(&output_mesh->dvert[i], rim_defgrp_index)->weight = rim_verts[i];
+      }
+    }
+  }
+
+  /* Only use material offsets if we have 2 or more materials. */
+  const short mat_nrs = ctx->object->totcol > 1 ? ctx->object->totcol : 1;
+  const short mat_nr_max = mat_nrs - 1;
+  const short mat_ofs = mat_nrs > 1 ? smd->mat_ofs : 0;
+  const short mat_ofs_rim = mat_nrs > 1 ? smd->mat_ofs_rim : 0;
+
+  short most_mat_nr = 0;
+  uint most_mat_nr_count = 0;
+  for (int mat_nr = 0; mat_nr < mat_nrs; mat_nr++) {
+    uint count = 0;
+    for (int i = 0; i < mesh->totpoly; i++) {
+      if (mesh->mpoly[i].mat_nr == mat_nr) {
+        count++;
+      }
+    }
+    if (count > most_mat_nr_count) {
+      most_mat_nr = mat_nr;
+    }
+  }
+
+  for (int i = 0; i < output_mesh->totpoly; i++) {
+    output_mesh->mpoly[i].mat_nr = most_mat_nr;
+    if (mat_ofs > 0 && shell_faces && shell_faces[i]) {
+      output_mesh->mpoly[i].mat_nr += mat_ofs;
+      CLAMP(output_mesh->mpoly[i].mat_nr, 0, mat_nr_max);
+    }
+    else if (mat_ofs_rim > 0 && rim_faces && rim_faces[i]) {
+      output_mesh->mpoly[i].mat_nr += mat_ofs_rim;
+      CLAMP(output_mesh->mpoly[i].mat_nr, 0, mat_nr_max);
+    }
+  }
+
+  MEM_freeN(selection);
+  MEM_freeN(shell_verts);
+  MEM_freeN(rim_verts);
+  MEM_freeN(shell_faces);
+  MEM_freeN(rim_faces);
+  return output_mesh;
+}
+
 static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *mesh)
 {
   const SolidifyModifierData *smd = (SolidifyModifierData *)md;
+
   switch (smd->mode) {
     case MOD_SOLIDIFY_MODE_EXTRUDE:
       return MOD_solidify_extrude_modifyMesh(md, ctx, mesh);
-    case MOD_SOLIDIFY_MODE_NONMANIFOLD:
-      return MOD_solidify_nonmanifold_modifyMesh(md, ctx, mesh);
+    case MOD_SOLIDIFY_MODE_NONMANIFOLD: {
+      return solidify_nonmanifold_modify_mesh(md, ctx, mesh, smd);
+    }
     default:
       BLI_assert(0);
   }

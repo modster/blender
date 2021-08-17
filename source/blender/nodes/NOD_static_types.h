@@ -341,6 +341,7 @@ DefNode(GeometryNode, GEO_NODE_RAYCAST, def_geo_raycast, "RAYCAST", Raycast, "Ra
 DefNode(GeometryNode, GEO_NODE_MERGE_BY_DISTANCE, def_geo_merge_by_distance, "MERGE_BY_DISTANCE", MergeByDistance, "Merge by Distance", "")
 DefNode(GeometryNode, GEO_NODE_SELECT_BY_MATERIAL, 0, "SELECT_BY_MATERIAL", SelectByMaterial, "Select by Material", "")
 DefNode(GeometryNode, GEO_NODE_SEPARATE_COMPONENTS, 0, "SEPARATE_COMPONENTS", SeparateComponents, "Separate Components", "")
+DefNode(GeometryNode, GEO_NODE_SOLIDIFY, def_geo_solidify, "SOLIDIFY", Solidify, "Solidify", "")
 DefNode(GeometryNode, GEO_NODE_SUBDIVISION_SURFACE, def_geo_subdivision_surface, "SUBDIVISION_SURFACE", SubdivisionSurface, "Subdivision Surface", "")
 DefNode(GeometryNode, GEO_NODE_SWITCH, def_geo_switch, "SWITCH", Switch, "Switch", "")
 DefNode(GeometryNode, GEO_NODE_REMESH_VOXEL, 0, "REMESH_VOXEL", RemeshVoxel, "Voxel Remesh", "")

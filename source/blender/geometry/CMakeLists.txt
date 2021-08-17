@@ -33,6 +33,8 @@
          )
 
  set(SRC
+         intern/solidify_nonmanifold.c
+         GEO_solidifiy.h
          intern/remesh_blocks.c
          GEO_mesh_remesh_blocks.h
          intern/mesh_merge_by_distance.c

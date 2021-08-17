@@ -18,23 +18,19 @@
  * \ingroup modifiers
  */
 
-#include "BLI_utildefines.h"
+#include "BKE_customdata.h"
+#include "BKE_mesh.h"
 
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
-#include "DNA_object_types.h"
+#include "DNA_modifier_types.h"
+
+#include "GEO_solidifiy.h"
 
 #include "MEM_guardedalloc.h"
-
-#include "BKE_deform.h"
-#include "BKE_mesh.h"
-#include "BKE_particle.h"
-
-#include "MOD_modifiertypes.h"
-#include "MOD_solidify_util.h" /* Own include. */
-#include "MOD_util.h"
 
 #ifdef __GNUC__
 #  pragma GCC diagnostic error "-Wsign-conversion"
@@ -143,12 +139,14 @@ static int comp_float_int_pair(const void *a, const void *b)
 }
 
 /* NOLINTNEXTLINE: readability-function-size */
-Mesh *MOD_solidify_nonmanifold_modifyMesh(ModifierData *md,
-                                          const ModifierEvalContext *ctx,
-                                          Mesh *mesh)
+Mesh *solidify_nonmanifold(const SolidifyData *solidify_data,
+                           Mesh *mesh,
+                           bool **r_shell_verts,
+                           bool **r_rim_verts,
+                           bool **r_shell_faces,
+                           bool **r_rim_faces)
 {
   Mesh *result;
-  const SolidifyModifierData *smd = (SolidifyModifierData *)md;
 
   MVert *mv, *mvert, *orig_mvert;
   MEdge *ed, *medge, *orig_medge;
@@ -163,39 +161,26 @@ Mesh *MOD_solidify_nonmanifold_modifyMesh(ModifierData *md,
     return mesh;
   }
 
-  /* Only use material offsets if we have 2 or more materials. */
-  const short mat_nrs = ctx->object->totcol > 1 ? ctx->object->totcol : 1;
-  const short mat_nr_max = mat_nrs - 1;
-  const short mat_ofs = mat_nrs > 1 ? smd->mat_ofs : 0;
-  const short mat_ofs_rim = mat_nrs > 1 ? smd->mat_ofs_rim : 0;
-
   float(*poly_nors)[3] = NULL;
 
-  const float ofs_front = (smd->offset_fac + 1.0f) * 0.5f * smd->offset;
-  const float ofs_back = ofs_front - smd->offset * smd->offset_fac;
-  const float ofs_front_clamped = clamp_nonzero(smd->offset > 0 ? ofs_front : ofs_back, 1e-5f);
-  const float ofs_back_clamped = clamp_nonzero(smd->offset > 0 ? ofs_back : ofs_front, 1e-5f);
-  const float offset_fac_vg = smd->offset_fac_vg;
-  const float offset_fac_vg_inv = 1.0f - smd->offset_fac_vg;
-  const float offset = fabsf(smd->offset) * smd->offset_clamp;
-  const bool do_angle_clamp = smd->flag & MOD_SOLIDIFY_OFFSET_ANGLE_CLAMP;
-  const bool do_flip = (smd->flag & MOD_SOLIDIFY_FLIP) != 0;
-  const bool do_rim = smd->flag & MOD_SOLIDIFY_RIM;
-  const bool do_shell = ((smd->flag & MOD_SOLIDIFY_RIM) && (smd->flag & MOD_SOLIDIFY_NOSHELL)) ==
-                        0;
-  const bool do_clamp = (smd->offset_clamp != 0.0f);
+  const float ofs_front = (solidify_data->offset_fac + 1.0f) * 0.5f * solidify_data->offset;
+  const float ofs_back = ofs_front - solidify_data->offset * solidify_data->offset_fac;
+  const float ofs_front_clamped = max_ff(1e-5f,
+                                         fabsf(solidify_data->offset > 0 ? ofs_front : ofs_back));
+  const float ofs_back_clamped = max_ff(1e-5f,
+                                        fabsf(solidify_data->offset > 0 ? ofs_back : ofs_front));
+  const float offset_fac_vg = solidify_data->offset_fac_vg;
+  const float offset_fac_vg_inv = 1.0f - solidify_data->offset_fac_vg;
+  const float offset = fabsf(solidify_data->offset) * solidify_data->offset_clamp;
+  const bool do_angle_clamp = solidify_data->flag & MOD_SOLIDIFY_OFFSET_ANGLE_CLAMP;
+  const bool do_flip = (solidify_data->flag & MOD_SOLIDIFY_FLIP) != 0;
+  const bool do_rim = solidify_data->flag & MOD_SOLIDIFY_RIM;
+  const bool do_shell = solidify_data->flag & MOD_SOLIDIFY_SHELL;
+  const bool do_clamp = (solidify_data->offset_clamp != 0.0f);
 
-  const float bevel_convex = smd->bevel_convex;
+  const float bevel_convex = solidify_data->bevel_convex;
 
-  MDeformVert *dvert;
-  const bool defgrp_invert = (smd->flag & MOD_SOLIDIFY_VGROUP_INV) != 0;
-  int defgrp_index;
-  const int shell_defgrp_index = BKE_id_defgroup_name_index(&mesh->id, smd->shell_defgrp_name);
-  const int rim_defgrp_index = BKE_id_defgroup_name_index(&mesh->id, smd->rim_defgrp_name);
-
-  MOD_get_vgroup(ctx->object, mesh, smd->defgrp_name, &dvert, &defgrp_index);
-
-  const bool do_flat_faces = dvert && (smd->flag & MOD_SOLIDIFY_NONMANIFOLD_FLAT_FACES);
+  const bool do_flat_faces = solidify_data->flag & MOD_SOLIDIFY_NONMANIFOLD_FLAT_FACES;
 
   orig_mvert = mesh->mvert;
   orig_medge = mesh->medge;
@@ -216,10 +201,11 @@ Mesh *MOD_solidify_nonmanifold_modifyMesh(ModifierData *md,
 
   NewFaceRef *face_sides_arr = MEM_malloc_arrayN(
       numPolys * 2, sizeof(*face_sides_arr), "face_sides_arr in solidify");
-  bool *null_faces =
-      (smd->nonmanifold_offset_mode == MOD_SOLIDIFY_NONMANIFOLD_OFFSET_MODE_CONSTRAINTS) ?
-          MEM_calloc_arrayN(numPolys, sizeof(*null_faces), "null_faces in solidify") :
-          NULL;
+  bool *null_faces = (solidify_data->nonmanifold_offset_mode ==
+                      MOD_SOLIDIFY_NONMANIFOLD_OFFSET_MODE_CONSTRAINTS) ?
+                         MEM_calloc_arrayN(
+                             numPolys, sizeof(*null_faces), "null_faces in solidify") :
+                         NULL;
   uint largest_ngon = 3;
   /* Calculate face to #NewFaceRef map. */
   {
@@ -359,7 +345,8 @@ Mesh *MOD_solidify_nonmanifold_modifyMesh(ModifierData *md,
       bool *face_singularity = MEM_calloc_arrayN(
           numPolys, sizeof(*face_singularity), "face_sides_arr in solidify");
 
-      const float merge_tolerance_sqr = smd->merge_tolerance * smd->merge_tolerance;
+      const float merge_tolerance_sqr = solidify_data->merge_tolerance *
+                                        solidify_data->merge_tolerance;
       uint *combined_verts = MEM_calloc_arrayN(
           numVerts, sizeof(*combined_verts), "combined_verts in solidify");
 
@@ -1393,14 +1380,7 @@ Mesh *MOD_solidify_nonmanifold_modifyMesh(ModifierData *md,
         int loopend = mp->loopstart + mp->totloop;
         ml = orig_mloop + mp->loopstart;
         for (int j = mp->loopstart; j < loopend; j++, ml++) {
-          MDeformVert *dv = &dvert[ml->v];
-          if (defgrp_invert) {
-            scalar_vgroup = min_ff(1.0f - BKE_defvert_find_weight(dv, defgrp_index),
-                                   scalar_vgroup);
-          }
-          else {
-            scalar_vgroup = min_ff(BKE_defvert_find_weight(dv, defgrp_index), scalar_vgroup);
-          }
+          scalar_vgroup = min_ff(solidify_data->distance[i], scalar_vgroup);
         }
         scalar_vgroup = offset_fac_vg + (scalar_vgroup * offset_fac_vg_inv);
         face_weight[i] = scalar_vgroup;
@@ -1416,11 +1396,12 @@ Mesh *MOD_solidify_nonmanifold_modifyMesh(ModifierData *md,
           if (!g->is_singularity) {
             float *nor = g->no;
             float move_nor[3] = {0, 0, 0};
-            bool disable_boundary_fix = (smd->nonmanifold_boundary_mode ==
+            bool disable_boundary_fix = (solidify_data->nonmanifold_boundary_mode ==
                                              MOD_SOLIDIFY_NONMANIFOLD_BOUNDARY_MODE_NONE ||
                                          (g->is_orig_closed || g->split));
             /* Constraints Method. */
-            if (smd->nonmanifold_offset_mode == MOD_SOLIDIFY_NONMANIFOLD_OFFSET_MODE_CONSTRAINTS) {
+            if (solidify_data->nonmanifold_offset_mode ==
+                MOD_SOLIDIFY_NONMANIFOLD_OFFSET_MODE_CONSTRAINTS) {
               NewEdgeRef *first_edge = NULL;
               NewEdgeRef **edge_ptr = g->edges;
               /* Contains normal and offset [nx, ny, nz, ofs]. */
@@ -1466,7 +1447,7 @@ Mesh *MOD_solidify_nonmanifold_modifyMesh(ModifierData *md,
                 }
               }
               uint face_nors_len = 0;
-              const float stop_explosion = 0.999f - fabsf(smd->offset_fac) * 0.05f;
+              const float stop_explosion = 0.999f - fabsf(solidify_data->offset_fac) * 0.05f;
               while (queue_index > 0) {
                 if (face_nors_len == 0) {
                   if (queue_index <= 2) {
@@ -1616,7 +1597,7 @@ Mesh *MOD_solidify_nonmanifold_modifyMesh(ModifierData *md,
                         ofs *= face_weight[face->index];
                       }
 
-                      if (smd->nonmanifold_offset_mode ==
+                      if (solidify_data->nonmanifold_offset_mode ==
                           MOD_SOLIDIFY_NONMANIFOLD_OFFSET_MODE_EVEN) {
                         MLoop *ml_next = orig_mloop + face->face->loopstart;
                         ml = ml_next + (face->face->totloop - 1);
@@ -1662,7 +1643,8 @@ Mesh *MOD_solidify_nonmanifold_modifyMesh(ModifierData *md,
               }
 
               /* Set normal length with selected method. */
-              if (smd->nonmanifold_offset_mode == MOD_SOLIDIFY_NONMANIFOLD_OFFSET_MODE_EVEN) {
+              if (solidify_data->nonmanifold_offset_mode ==
+                  MOD_SOLIDIFY_NONMANIFOLD_OFFSET_MODE_EVEN) {
                 if (has_front) {
                   float length_sq = len_squared_v3(nor);
                   if (LIKELY(length_sq > FLT_EPSILON)) {
@@ -1751,7 +1733,8 @@ Mesh *MOD_solidify_nonmanifold_modifyMesh(ModifierData *md,
               sub_v3_v3v3(e1,
                           orig_mvert_co[vm[e1_edge->v1] == i ? e1_edge->v2 : e1_edge->v1],
                           orig_mvert_co[i]);
-              if (smd->nonmanifold_boundary_mode == MOD_SOLIDIFY_NONMANIFOLD_BOUNDARY_MODE_FLAT) {
+              if (solidify_data->nonmanifold_boundary_mode ==
+                  MOD_SOLIDIFY_NONMANIFOLD_BOUNDARY_MODE_FLAT) {
                 cross_v3_v3v3(constr_nor, e0, e1);
               }
               else {
@@ -1785,14 +1768,8 @@ Mesh *MOD_solidify_nonmanifold_modifyMesh(ModifierData *md,
             }
             float scalar_vgroup = 1;
             /* Use vertex group. */
-            if (dvert && !do_flat_faces) {
-              MDeformVert *dv = &dvert[i];
-              if (defgrp_invert) {
-                scalar_vgroup = 1.0f - BKE_defvert_find_weight(dv, defgrp_index);
-              }
-              else {
-                scalar_vgroup = BKE_defvert_find_weight(dv, defgrp_index);
-              }
+            if (!do_flat_faces) {
+              scalar_vgroup = solidify_data->distance[i];
               scalar_vgroup = offset_fac_vg + (scalar_vgroup * offset_fac_vg_inv);
             }
             /* Do clamping. */
@@ -1925,16 +1902,32 @@ Mesh *MOD_solidify_nonmanifold_modifyMesh(ModifierData *md,
     result->cd_flag |= ME_CDFLAG_EDGE_BWEIGHT;
   }
 
-  /* Checks that result has dvert data. */
-  if (shell_defgrp_index != -1 || rim_defgrp_index != -1) {
-    dvert = CustomData_duplicate_referenced_layer(&result->vdata, CD_MDEFORMVERT, result->totvert);
-    /* If no vertices were ever added to an object's vgroup, dvert might be NULL. */
-    if (dvert == NULL) {
-      /* Add a valid data layer! */
-      dvert = CustomData_add_layer(
-          &result->vdata, CD_MDEFORMVERT, CD_CALLOC, NULL, result->totvert);
-    }
-    result->dvert = dvert;
+  *r_shell_verts = MEM_malloc_arrayN(
+      (size_t)result->totvert, sizeof(bool), "shell verts selection in solidify");
+
+  for (int i = 0; i < result->totvert; i++) {
+    (*r_shell_verts)[i] = false;
+  }
+
+  *r_rim_verts = MEM_malloc_arrayN(
+      (size_t)result->totvert, sizeof(bool), "rim verts selection in solidify");
+
+  for (int i = 0; i < result->totvert; i++) {
+    (*r_rim_verts)[i] = false;
+  }
+
+  *r_shell_faces = MEM_malloc_arrayN(
+      (size_t)result->totpoly, sizeof(bool), "shell faces selection in solidify");
+
+  for (int i = 0; i < result->totpoly; i++) {
+    (*r_shell_faces)[i] = false;
+  }
+
+  *r_rim_faces = MEM_malloc_arrayN(
+      (size_t)result->totpoly, sizeof(bool), "rim faces selection in solidify");
+
+  for (int i = 0; i < result->totpoly; i++) {
+    (*r_rim_faces)[i] = false;
   }
 
   /* Make_new_verts. */
@@ -2163,50 +2156,17 @@ Mesh *MOD_solidify_nonmanifold_modifyMesh(ModifierData *md,
 
               /* Loop data. */
               int *loops = MEM_malloc_arrayN(j, sizeof(*loops), "loops in solidify");
-              /* The #mat_nr is from consensus. */
-              short most_mat_nr = 0;
-              uint most_mat_nr_face = 0;
-              uint most_mat_nr_count = 0;
-              for (short l = 0; l < mat_nrs; l++) {
-                uint count = 0;
-                uint face = 0;
-                uint k = 0;
-                for (EdgeGroup *g3 = g2; g3->valid && k < j; g3++) {
-                  if ((do_rim && !g3->is_orig_closed) || (do_shell && g3->split)) {
-                    /* Check both far ends in terms of faces of an edge group. */
-                    if (g3->edges[0]->faces[0]->face->mat_nr == l) {
-                      face = g3->edges[0]->faces[0]->index;
-                      count++;
-                    }
-                    NewEdgeRef *le = g3->edges[g3->edges_len - 1];
-                    if (le->faces[1] && le->faces[1]->face->mat_nr == l) {
-                      face = le->faces[1]->index;
-                      count++;
-                    }
-                    else if (!le->faces[1] && le->faces[0]->face->mat_nr == l) {
-                      face = le->faces[0]->index;
-                      count++;
-                    }
-                    k++;
-                  }
-                }
-                if (count > most_mat_nr_count) {
-                  most_mat_nr = l;
-                  most_mat_nr_face = face;
-                  most_mat_nr_count = count;
-                }
-              }
-              CustomData_copy_data(
-                  &mesh->pdata, &result->pdata, (int)most_mat_nr_face, (int)poly_index, 1);
+
               if (origindex_poly) {
                 origindex_poly[poly_index] = ORIGINDEX_NONE;
               }
               mpoly[poly_index].loopstart = (int)loop_index;
               mpoly[poly_index].totloop = (int)j;
-              mpoly[poly_index].mat_nr = most_mat_nr +
-                                         (g->is_orig_closed || !do_rim ? 0 : mat_ofs_rim);
-              CLAMP(mpoly[poly_index].mat_nr, 0, mat_nr_max);
-              mpoly[poly_index].flag = orig_mpoly[most_mat_nr_face].flag;
+
+              if (g->is_orig_closed || !do_rim) {
+                (*r_rim_faces)[poly_index] = true;
+              }
+
               poly_index++;
 
               for (uint k = 0; g2->valid && k < j; g2++) {
@@ -2278,8 +2238,8 @@ Mesh *MOD_solidify_nonmanifold_modifyMesh(ModifierData *md,
             &mesh->pdata, &result->pdata, (int)(*new_edges)->faces[0]->index, (int)poly_index, 1);
         mpoly[poly_index].loopstart = (int)loop_index;
         mpoly[poly_index].totloop = 4 - (int)(v1_singularity || v2_singularity);
-        mpoly[poly_index].mat_nr = face->mat_nr + mat_ofs_rim;
-        CLAMP(mpoly[poly_index].mat_nr, 0, mat_nr_max);
+
+        (*r_rim_faces)[poly_index] = true;
         mpoly[poly_index].flag = face->flag;
         poly_index++;
 
@@ -2300,20 +2260,17 @@ Mesh *MOD_solidify_nonmanifold_modifyMesh(ModifierData *md,
         MEdge *open_face_edge;
         uint open_face_edge_index;
         if (!do_flip) {
-          if (rim_defgrp_index != -1) {
-            BKE_defvert_ensure_index(&result->dvert[medge[edge1->new_edge].v1], rim_defgrp_index)
-                ->weight = 1.0f;
-          }
+          (*r_rim_verts)[medge[edge1->new_edge].v1] = true;
+
           CustomData_copy_data(&mesh->ldata, &result->ldata, loop1, (int)loop_index, 1);
           mloop[loop_index].v = medge[edge1->new_edge].v1;
           mloop[loop_index++].e = edge1->new_edge;
 
           if (!v2_singularity) {
             open_face_edge_index = edge1->link_edge_groups[1]->open_face_edge;
-            if (rim_defgrp_index != -1) {
-              BKE_defvert_ensure_index(&result->dvert[medge[edge1->new_edge].v2], rim_defgrp_index)
-                  ->weight = 1.0f;
-            }
+
+            (*r_rim_verts)[medge[edge1->new_edge].v2] = true;
+
             CustomData_copy_data(&mesh->ldata, &result->ldata, loop2, (int)loop_index, 1);
             mloop[loop_index].v = medge[edge1->new_edge].v2;
             open_face_edge = medge + open_face_edge_index;
@@ -2324,21 +2281,17 @@ Mesh *MOD_solidify_nonmanifold_modifyMesh(ModifierData *md,
               mloop[loop_index++].e = edge2->link_edge_groups[1]->open_face_edge;
             }
           }
+          (*r_rim_verts)[medge[edge2->new_edge].v2] = true;
 
-          if (rim_defgrp_index != -1) {
-            BKE_defvert_ensure_index(&result->dvert[medge[edge2->new_edge].v2], rim_defgrp_index)
-                ->weight = 1.0f;
-          }
           CustomData_copy_data(&mesh->ldata, &result->ldata, loop2, (int)loop_index, 1);
           mloop[loop_index].v = medge[edge2->new_edge].v2;
           mloop[loop_index++].e = edge2->new_edge;
 
           if (!v1_singularity) {
             open_face_edge_index = edge2->link_edge_groups[0]->open_face_edge;
-            if (rim_defgrp_index != -1) {
-              BKE_defvert_ensure_index(&result->dvert[medge[edge2->new_edge].v1], rim_defgrp_index)
-                  ->weight = 1.0f;
-            }
+
+            (*r_rim_verts)[medge[edge2->new_edge].v1] = true;
+
             CustomData_copy_data(&mesh->ldata, &result->ldata, loop1, (int)loop_index, 1);
             mloop[loop_index].v = medge[edge2->new_edge].v1;
             open_face_edge = medge + open_face_edge_index;
@@ -2353,10 +2306,9 @@ Mesh *MOD_solidify_nonmanifold_modifyMesh(ModifierData *md,
         else {
           if (!v1_singularity) {
             open_face_edge_index = edge1->link_edge_groups[0]->open_face_edge;
-            if (rim_defgrp_index != -1) {
-              BKE_defvert_ensure_index(&result->dvert[medge[edge1->new_edge].v1], rim_defgrp_index)
-                  ->weight = 1.0f;
-            }
+
+            (*r_rim_verts)[medge[edge1->new_edge].v1] = true;
+
             CustomData_copy_data(&mesh->ldata, &result->ldata, loop1, (int)loop_index, 1);
             mloop[loop_index].v = medge[edge1->new_edge].v1;
             open_face_edge = medge + open_face_edge_index;
@@ -2368,20 +2320,17 @@ Mesh *MOD_solidify_nonmanifold_modifyMesh(ModifierData *md,
             }
           }
 
-          if (rim_defgrp_index != -1) {
-            BKE_defvert_ensure_index(&result->dvert[medge[edge2->new_edge].v1], rim_defgrp_index)
-                ->weight = 1.0f;
-          }
+          (*r_rim_verts)[medge[edge2->new_edge].v1] = true;
+
           CustomData_copy_data(&mesh->ldata, &result->ldata, loop1, (int)loop_index, 1);
           mloop[loop_index].v = medge[edge2->new_edge].v1;
           mloop[loop_index++].e = edge2->new_edge;
 
           if (!v2_singularity) {
             open_face_edge_index = edge2->link_edge_groups[1]->open_face_edge;
-            if (rim_defgrp_index != -1) {
-              BKE_defvert_ensure_index(&result->dvert[medge[edge2->new_edge].v2], rim_defgrp_index)
-                  ->weight = 1.0f;
-            }
+
+            (*r_rim_verts)[medge[edge2->new_edge].v2] = true;
+
             CustomData_copy_data(&mesh->ldata, &result->ldata, loop2, (int)loop_index, 1);
             mloop[loop_index].v = medge[edge2->new_edge].v2;
             open_face_edge = medge + open_face_edge_index;
@@ -2393,10 +2342,8 @@ Mesh *MOD_solidify_nonmanifold_modifyMesh(ModifierData *md,
             }
           }
 
-          if (rim_defgrp_index != -1) {
-            BKE_defvert_ensure_index(&result->dvert[medge[edge1->new_edge].v2], rim_defgrp_index)
-                ->weight = 1.0f;
-          }
+          (*r_rim_verts)[medge[edge1->new_edge].v2] = true;
+
           CustomData_copy_data(&mesh->ldata, &result->ldata, loop2, (int)loop_index, 1);
           mloop[loop_index].v = medge[edge1->new_edge].v2;
           mloop[loop_index++].e = edge1->new_edge;
@@ -2410,10 +2357,13 @@ Mesh *MOD_solidify_nonmanifold_modifyMesh(ModifierData *md,
     NewFaceRef *fr = face_sides_arr;
     uint *face_loops = MEM_malloc_arrayN(
         largest_ngon * 2, sizeof(*face_loops), "face_loops in solidify");
+
     uint *face_verts = MEM_malloc_arrayN(
         largest_ngon * 2, sizeof(*face_verts), "face_verts in solidify");
+
     uint *face_edges = MEM_malloc_arrayN(
         largest_ngon * 2, sizeof(*face_edges), "face_edges in solidify");
+
     for (uint i = 0; i < numPolys * 2; i++, fr++) {
       const uint loopstart = (uint)fr->face->loopstart;
       uint totloop = (uint)fr->face->totloop;
@@ -2469,15 +2419,15 @@ Mesh *MOD_solidify_nonmanifold_modifyMesh(ModifierData *md,
           CustomData_copy_data(&mesh->pdata, &result->pdata, (int)(i / 2), (int)poly_index, 1);
           mpoly[poly_index].loopstart = (int)loop_index;
           mpoly[poly_index].totloop = (int)k;
-          mpoly[poly_index].mat_nr = fr->face->mat_nr + (fr->reversed != do_flip ? mat_ofs : 0);
-          CLAMP(mpoly[poly_index].mat_nr, 0, mat_nr_max);
+
+          if (fr->reversed != do_flip) {
+            (*r_shell_faces)[poly_index] = true;
+          }
           mpoly[poly_index].flag = fr->face->flag;
           if (fr->reversed != do_flip) {
             for (int l = (int)k - 1; l >= 0; l--) {
-              if (shell_defgrp_index != -1) {
-                BKE_defvert_ensure_index(&result->dvert[face_verts[l]], shell_defgrp_index)
-                    ->weight = 1.0f;
-              }
+              (*r_shell_verts)[face_verts[l]] = true;
+
               CustomData_copy_data(
                   &mesh->ldata, &result->ldata, (int)face_loops[l], (int)loop_index, 1);
               mloop[loop_index].v = face_verts[l];
@@ -2502,27 +2452,28 @@ Mesh *MOD_solidify_nonmanifold_modifyMesh(ModifierData *md,
     MEM_freeN(face_verts);
     MEM_freeN(face_edges);
   }
-  if (edge_index != numNewEdges) {
-    BKE_modifier_set_error(ctx->object,
-                           md,
-                           "Internal Error: edges array wrong size: %u instead of %u",
-                           numNewEdges,
-                           edge_index);
-  }
-  if (poly_index != numNewPolys) {
-    BKE_modifier_set_error(ctx->object,
-                           md,
-                           "Internal Error: polys array wrong size: %u instead of %u",
-                           numNewPolys,
-                           poly_index);
-  }
-  if (loop_index != numNewLoops) {
-    BKE_modifier_set_error(ctx->object,
-                           md,
-                           "Internal Error: loops array wrong size: %u instead of %u",
-                           numNewLoops,
-                           loop_index);
-  }
+  /* Haven't found a good way to generalize this. */
+  // if (edge_index != numNewEdges) {
+  /*BKE_modifier_set_error(ctx->object,
+                         md,A
+                         "Internal Error: edges array wrong size: %u instead of %u",
+                         numNewEdges,
+                         edge_index);*/
+  //}
+  // if (poly_index != numNewPolys) {
+  /*BKE_modifier_set_error(ctx->object,
+                         md,
+                         "Internal Error: polys array wrong size: %u instead of %u",
+                         numNewPolys,f
+                         poly_index);*/
+  //}
+  // if (loop_index != numNewLoops) {
+  /*BKE_modifier_set_error(ctx->object,
+                         md,
+                         "Internal Error: loops array wrong size: %u instead of %u",
+                         numNewLoops,
+                         loop_index);*/
+  //}
   BLI_assert(edge_index == numNewEdges);
   BLI_assert(poly_index == numNewPolys);
   BLI_assert(loop_index == numNewLoops);
