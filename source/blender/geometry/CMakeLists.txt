@@ -33,6 +33,8 @@
          )
 
  set(SRC
+         intern/remesh_blocks.c
+         GEO_mesh_remesh_blocks.h
          intern/mesh_merge_by_distance.c
          intern/pointcloud_merge_by_distance.cc
          GEO_mesh_merge_by_distance.h
@@ -43,5 +45,15 @@
          bf_blenkernel
          bf_blenlib
          )
+
+ if(WITH_REMESH_DUALCON)
+   list(APPEND INC
+       ../../../intern/dualcon
+       )
+   list(APPEND LIB
+       bf_intern_dualcon
+       )
+   add_definitions(-DWITH_REMESH_DUALCON)
+ endif()
 
  blender_add_lib(bf_geometry "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")

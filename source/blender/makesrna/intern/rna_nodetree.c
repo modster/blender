@@ -9095,6 +9095,26 @@ static void def_geo_triangulate(StructRNA *srna)
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 }
 
+static void def_geo_remesh_blocks(StructRNA *srna)
+{
+  static const EnumPropertyItem remesh_mode_items[] = {
+      {0, "BLOCKS", 0, "Blocks", "Output a blocky surface with no smoothing"},
+      {1, "SMOOTH", 0, "Smooth", "Output a smooth surface with no sharp-features detection"},
+      {2,
+       "SHARP",
+       0,
+       "Sharp",
+       "Output a surface that reproduces sharp edges and corners from the input mesh"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  PropertyRNA *prop = RNA_def_property(srna, "remesh_blocks_mode", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_sdna(prop, NULL, "custom1");
+  RNA_def_property_enum_items(prop, remesh_mode_items);
+  RNA_def_property_ui_text(prop, "Mode", "Mesh smoothing mode for remesh operation");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+}
+
 static void def_geo_subdivision_surface(StructRNA *srna)
 {
   PropertyRNA *prop;
