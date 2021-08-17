@@ -10250,6 +10250,24 @@ static void def_geo_attribute_transfer(StructRNA *srna)
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 }
 
+static void def_geo_mesh_inset(StructRNA *srna)
+{
+  PropertyRNA *prop;
+
+  prop = RNA_def_property(srna, "distance_mode", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_sdna(prop, NULL, "custom1");
+  RNA_def_property_enum_items(prop, rna_node_geometry_attribute_input_type_items_float);
+  RNA_def_property_ui_text(
+      prop, "Distance", "Changes the Distance input between Float and Attribute");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
+
+  prop = RNA_def_property(srna, "inset_mode", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_sdna(prop, NULL, "custom2");
+  RNA_def_property_enum_items(prop, rna_node_geometry_attribute_input_type_items_float);
+  RNA_def_property_ui_text(prop, "Inset", "Changes the Inset input between Float and Attribute");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
+}
+
 static void def_geo_input_material(StructRNA *srna)
 {
   PropertyRNA *prop;
