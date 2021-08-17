@@ -382,6 +382,7 @@ blender_include_dirs(
   ../../bmesh
   ../../depsgraph
   ../../draw
+  ../../geometry
   ../../gpu
   ../../ikplugin
   ../../imbuf

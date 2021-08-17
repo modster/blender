@@ -35,6 +35,68 @@ struct bNodeType;
 #define DEF_ENUM(id) extern const EnumPropertyItem id[];
 #include "RNA_enum_items.h"
 
+extern const EnumPropertyItem rna_enum_operator_context_items[];
+
+extern const EnumPropertyItem rna_enum_wm_report_items[];
+
+extern const EnumPropertyItem rna_enum_transform_pivot_items_full[];
+extern const EnumPropertyItem rna_enum_transform_orientation_items[];
+extern const EnumPropertyItem rna_enum_transform_mode_types[];
+
+extern const EnumPropertyItem rna_enum_property_type_items[];
+extern const EnumPropertyItem rna_enum_property_subtype_items[];
+extern const EnumPropertyItem rna_enum_property_unit_items[];
+
+extern const EnumPropertyItem rna_enum_shading_type_items[];
+
+extern const EnumPropertyItem rna_enum_navigation_mode_items[];
+
+extern const EnumPropertyItem rna_enum_node_socket_in_out_items[];
+
+extern const EnumPropertyItem rna_enum_node_math_items[];
+extern const EnumPropertyItem rna_enum_mapping_type_items[];
+extern const EnumPropertyItem rna_enum_node_vec_math_items[];
+extern const EnumPropertyItem rna_enum_node_boolean_math_items[];
+extern const EnumPropertyItem rna_enum_node_float_compare_items[];
+extern const EnumPropertyItem rna_enum_node_filter_items[];
+extern const EnumPropertyItem rna_enum_node_float_to_int_items[];
+extern const EnumPropertyItem rna_enum_node_map_range_items[];
+extern const EnumPropertyItem rna_enum_node_clamp_items[];
+extern const EnumPropertyItem rna_enum_weld_mode_items[];
+
+extern const EnumPropertyItem rna_enum_ramp_blend_items[];
+
+extern const EnumPropertyItem rna_enum_prop_dynamicpaint_type_items[];
+
+extern const EnumPropertyItem rna_enum_clip_editor_mode_items[];
+
+extern const EnumPropertyItem rna_enum_icon_items[];
+extern const EnumPropertyItem rna_enum_uilist_layout_type_items[];
+
+extern const EnumPropertyItem rna_enum_linestyle_color_modifier_type_items[];
+extern const EnumPropertyItem rna_enum_linestyle_alpha_modifier_type_items[];
+extern const EnumPropertyItem rna_enum_linestyle_thickness_modifier_type_items[];
+extern const EnumPropertyItem rna_enum_linestyle_geometry_modifier_type_items[];
+
+extern const EnumPropertyItem rna_enum_window_cursor_items[];
+
+extern const EnumPropertyItem rna_enum_dt_method_vertex_items[];
+extern const EnumPropertyItem rna_enum_dt_method_edge_items[];
+extern const EnumPropertyItem rna_enum_dt_method_loop_items[];
+extern const EnumPropertyItem rna_enum_dt_method_poly_items[];
+extern const EnumPropertyItem rna_enum_dt_mix_mode_items[];
+extern const EnumPropertyItem rna_enum_dt_layers_select_src_items[];
+extern const EnumPropertyItem rna_enum_dt_layers_select_dst_items[];
+
+extern const EnumPropertyItem rna_enum_context_mode_items[];
+
+extern const EnumPropertyItem rna_enum_curveprofile_preset_items[];
+extern const EnumPropertyItem rna_enum_preference_section_items[];
+
+extern const EnumPropertyItem rna_enum_attribute_type_items[];
+extern const EnumPropertyItem rna_enum_attribute_type_with_auto_items[];
+extern const EnumPropertyItem rna_enum_attribute_domain_items[];
+extern const EnumPropertyItem rna_enum_attribute_domain_with_auto_items[];
 extern const EnumPropertyItem *rna_enum_attribute_domain_itemf(struct ID *id, bool *r_free);
 
 /**

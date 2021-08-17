@@ -2044,12 +2044,6 @@ enum {
   MOD_WELD_LOOSE_EDGES = (1 << 1),
 };
 
-/* #WeldModifierData.mode */
-enum {
-  MOD_WELD_MODE_ALL = 0,
-  MOD_WELD_MODE_CONNECTED = 1,
-};
-
 typedef struct DataTransferModifierData {
   ModifierData modifier;
 
