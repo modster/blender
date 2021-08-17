@@ -132,6 +132,7 @@ static float3 get_center(const float3 vec_pos2prev, const FilletData &fd, const 
   return get_center(vec_pos2prev, pos, axis, angle);
 }
 
+/* Calculate the direction vectors from each vertex to their previous vertex. */
 static Array<float3> calculate_directions(const Span<float3> positions)
 {
   const int size = positions.size();
@@ -208,6 +209,46 @@ static Array<float> calculate_radii(const FilletModeParam &mode_param,
   return radii;
 }
 
+/* Calculate the number of vertices added per vertex on the source spline. */
+static int calculate_point_counts(MutableSpan<int> point_counts,
+                                  const Span<float> radii,
+                                  const Span<int> counts)
+{
+  int added_count = 0;
+  for (const int i : IndexRange(point_counts.size())) {
+    /* Calculate number of points to be added for the vertex. */
+    if (radii[i] != 0.0f) {
+      added_count += counts[i];
+      point_counts[i] = counts[i] + 1;
+    }
+  }
+
+  return added_count;
+}
+
+/* Function to calculate and obtain the fillet data for the entire spline. */
+static FilletData calculate_fillet_data(const Spline &spline,
+                                        const FilletModeParam &mode_param,
+                                        int &added_count,
+                                        MutableSpan<int> point_counts,
+                                        const int spline_index)
+{
+  const int size = spline.size();
+
+  FilletData fd(size);
+  fd.directions = calculate_directions(spline.positions());
+  fd.positions = spline.positions();
+  fd.axes = calculate_axes(fd.directions);
+  fd.angles = calculate_angles(fd.directions);
+  fd.counts = calculate_counts(mode_param.angle, mode_param.count, fd.angles, spline.is_cyclic());
+  fd.radii = calculate_radii(mode_param, size, spline_index);
+
+  added_count = calculate_point_counts(point_counts, fd.radii, fd.counts);
+
+  return fd;
+}
+
+/* Limit the radius based on angle and radii to prevent overlap. */
 static void limit_radii(FilletData &fd, const bool cyclic)
 {
   MutableSpan<float> radii(fd.radii);
@@ -278,44 +319,6 @@ static void limit_radii(FilletData &fd, const bool cyclic)
   }
 }
 
-static int calculate_point_counts(MutableSpan<int> point_counts,
-                                  const Span<float> radii,
-                                  const Span<int> counts)
-{
-  int added_count = 0;
-  for (const int i : IndexRange(point_counts.size())) {
-    /* Calculate number of points to be added for the vertex. */
-    if (radii[i] != 0.0f) {
-      added_count += counts[i];
-      point_counts[i] = counts[i] + 1;
-    }
-  }
-
-  return added_count;
-}
-
-/* Function to calculate and obtain the fillet data for the entire spline. */
-static FilletData calculate_fillet_data(const Spline &spline,
-                                        const FilletModeParam &mode_param,
-                                        int &added_count,
-                                        MutableSpan<int> point_counts,
-                                        const int spline_index)
-{
-  const int size = spline.size();
-
-  FilletData fd(size);
-  fd.directions = calculate_directions(spline.positions());
-  fd.positions = spline.positions();
-  fd.axes = calculate_axes(fd.directions);
-  fd.angles = calculate_angles(fd.directions);
-  fd.counts = calculate_counts(mode_param.angle, mode_param.count, fd.angles, spline.is_cyclic());
-  fd.radii = calculate_radii(mode_param, size, spline_index);
-
-  added_count = calculate_point_counts(point_counts, fd.radii, fd.counts);
-
-  return fd;
-}
-
 /*
  * Create a mapping from each vertex in the resulting spline to that of the source spline.
  * Used for copying the data from the source spline.
@@ -324,7 +327,6 @@ static Array<int> create_dst_to_src_map(const Span<int> point_counts, const int 
 {
   Array<int> map(total_points);
   MutableSpan<int> map_span{map};
-
   int index = 0;
 
   for (const int i : point_counts.index_range()) {
@@ -467,7 +469,7 @@ static void update_bezier_positions(FilletData &fd,
 /* Update the positions of a Poly spline based on fillet data. */
 static void update_poly_or_NURBS_positions(FilletData &fd,
                                            Spline &dst_spline,
-                                           Span<int> point_counts,
+                                           const Span<int> point_counts,
                                            const int start,
                                            const int fillet_count)
 {
@@ -591,7 +593,7 @@ static std::unique_ptr<CurveEval> fillet_curve(const CurveEval &input_curve,
   Span<SplinePtr> input_splines = input_curve.splines();
 
   std::unique_ptr<CurveEval> output_curve = std::make_unique<CurveEval>();
-  int num_splines = input_splines.size();
+  const int num_splines = input_splines.size();
   output_curve->resize(num_splines);
   MutableSpan<SplinePtr> output_splines = output_curve->splines();
 
