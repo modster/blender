@@ -2061,7 +2061,7 @@ static void rigidbody_update_simulation_post_step(Depsgraph *depsgraph, RigidBod
   FOREACH_COLLECTION_OBJECT_RECURSIVE_END;
 }
 
-static void rigidbody_debug_draw_get_colliding_face(Object *ob, float points[3][3], float forces[3][3]) {
+static void rigidbody_debug_draw_get_colliding_face(Object *ob, const float points[3][3], const float forces[3][3]) {
 
     /* Unit Box vertices. */
     float box_shape[8][3] = {
@@ -2097,76 +2097,102 @@ static void rigidbody_debug_draw_get_colliding_face(Object *ob, float points[3][
     };
 
     float transform_mat[4][4] = {{0.0f}};
-    float size[3] = {1.0f, 1.0f, 1.0f};
-    float pos[3];
-    float rot[4];
-   // BoundBox *bb = NULL;
-
-    if(ob->rigidbody_object->shared->physics_object) {
-        RB_body_get_position(ob->rigidbody_object->shared->physics_object, pos);
-        RB_body_get_orientation(ob->rigidbody_object->shared->physics_object, rot);
-    }
-    if(ob->rigidbody_object->shared->physics_shape) {
-        RB_box_shape_get_half_extents(ob->rigidbody_object->shared->physics_shape, size);
-    }
-
-
-   // mul_v3_fl(size, 0.5f);
-    loc_quat_size_to_mat4(transform_mat, pos, rot, size);
-    printf("obloc: %f %f %f", pos[0], pos[1], pos[2]);
-    printf("obsize: %f %f %f", size[0], size[1], size[2]);
-
-    /* Transform the box to correct location, orientaion and scale. */
-    for (int i = 0; i < 8; i++) {
-      mul_m4_v3(transform_mat, box_shape[i]);
-    }
-
-    if(ob->rigidbody_object->shape == RB_SHAPE_BOX) {
+    float size[3] = {1.0f};
+    float pos[3] = {0.0f};
+    float rot[4] = {0.0f};
 
     float isect_co[3] ={0.0f};
     float point[3] = {0.0f};
     float dir[3];
     int stored_faces = 0;
-    for(int i=0; i<3; i++) {
-        if(stored_faces > 2) {
+    int max_faces = 0;
+
+    RigidBodyOb *rbo = ob->rigidbody_object;
+    if(rbo->shared->physics_object) {
+        RB_body_get_position(rbo->shared->physics_object, pos);
+        RB_body_get_orientation(rbo->shared->physics_object, rot);
+    }
+
+    switch(rbo->shape) {
+      case RB_SHAPE_BOX:
+        max_faces = 3;
+        if(rbo->shared->physics_shape) {
+            RB_box_shape_get_half_extents(rbo->shared->physics_shape, size);
+        }
+        break;
+      case RB_SHAPE_CYLINDER:
+        max_faces = 2;
+        if(rbo->shared->physics_shape) {
+            RB_cylinder_shape_get_half_extents(rbo->shared->physics_shape, size);
+        }
+        break;
+      case RB_SHAPE_CONE:
+        max_faces = 1;
+        if(rbo->shared->physics_shape) {
+            RB_cone_shape_get_half_extents(rbo->shared->physics_shape, size);
+        }
+        break;
+    }
+
+    loc_quat_size_to_mat4(transform_mat, pos, rot, size);
+
+    /* Transform the box to correct location, orientaion and scale. */
+    for (int i = 0; i < 8; i++) {
+      mul_m4_v3(transform_mat, box_shape[i]);
+    }
+    if(ELEM(rbo->shape, RB_SHAPE_BOX, RB_SHAPE_CYLINDER, RB_SHAPE_CONE)) {
+      for(int i=0; i<3; i++) {
+        if(stored_faces >= max_faces) {
             break;
         }
         copy_v3_v3(point, points[i]);
         normalize_v3_v3(dir, forces[i]);
         /* If face has already collided don't overwrite. */
-        if(ob->rigidbody_object->colliding_faces[i] > -1) {
+        if(rbo->colliding_faces[i] > -1) {
             stored_faces++;
         }
-      for (int j = 0; j < 6; j++) {
-        if (isect_point_tri_v3(point,
-                               box_shape[box_shape_tris[2 * j][0]],
-                               box_shape[box_shape_tris[2 * j][1]],
-                               box_shape[box_shape_tris[2 * j][2]],
-                               isect_co) ||
-            isect_point_tri_v3(point,
-                               box_shape[box_shape_tris[2 * j + 1][0]],
-                               box_shape[box_shape_tris[2 * j + 1][1]],
-                               box_shape[box_shape_tris[2 * j + 1][2]],
-                               isect_co)) {
-          /* Find normal to the face. */
-          float edge1[3], edge2[3], norm[3];
-          sub_v3_v3v3(edge1, box_shape[box_shape_tris[2 * j][0]], box_shape[box_shape_tris[2 * j][1]]);
-          sub_v3_v3v3(edge2, box_shape[box_shape_tris[2 * j][2]], box_shape[box_shape_tris[2 * j][1]]);
-          cross_v3_v3v3(norm, edge1, edge2);
-          normalize_v3(norm);
-          if ((len_manhattan_v3v3(point, isect_co) <= ob->rigidbody_object->margin) &&
-              (fabsf(dot_v3v3(norm, dir)) > 0.99))
-          {
-            ob->rigidbody_object->colliding_faces[stored_faces] = j;
-            break;
+        for (int j = 0; j < 6; j++) {
+          /* The cylinder and cone have fewer faces. */
+          if(rbo->shape == RB_SHAPE_CYLINDER) {
+              if(!ELEM(j, 2, 4)) {
+                  continue;
+              }
           }
-          else if(j==4) {
-              printf("point:%f %f %f\n isect:%f %f %f\n", point[0], point[1], point[2], isect_co[0], isect_co[1], isect_co[2]);
-              printf("len:%f\n", len_manhattan_v3v3(point, isect_co));
+          if(rbo->shape == RB_SHAPE_CONE) {
+              if(j!=2) {
+                  continue;
+              }
+          }
+          if (isect_point_tri_v3(point,
+                                 box_shape[box_shape_tris[2 * j][0]],
+                                 box_shape[box_shape_tris[2 * j][1]],
+                                 box_shape[box_shape_tris[2 * j][2]],
+                                 isect_co) ||
+              isect_point_tri_v3(point,
+                                 box_shape[box_shape_tris[2 * j + 1][0]],
+                                 box_shape[box_shape_tris[2 * j + 1][1]],
+                                 box_shape[box_shape_tris[2 * j + 1][2]],
+                                 isect_co)) {
+            /* Find normal to the face. */
+            float edge1[3], edge2[3], norm[3];
+            sub_v3_v3v3(edge1, box_shape[box_shape_tris[2 * j][0]], box_shape[box_shape_tris[2 * j][1]]);
+            sub_v3_v3v3(edge2, box_shape[box_shape_tris[2 * j][2]], box_shape[box_shape_tris[2 * j][1]]);
+            cross_v3_v3v3(norm, edge1, edge2);
+            normalize_v3(norm);
+            /* Check that distance is small and force is perpendicular to the face. */
+            if ((len_v3v3(point, isect_co) <= rbo->margin) &&
+              (fabsf(dot_v3v3(norm, dir)) > 0.99))
+            {
+              if(ELEM(j, rbo->colliding_faces[0], rbo->colliding_faces[1], rbo->colliding_faces[2])) {
+                  continue;
+              }
+              rbo->colliding_faces[stored_faces] = j;
+              stored_faces++;
+              break;
+            }
           }
         }
       }
-    }
     }
 }
 

@@ -276,6 +276,8 @@ void RB_shape_trimesh_update(rbCollisionShape *shape,
                              float max[3]);
 /* Get scale data */
 void RB_box_shape_get_half_extents(rbCollisionShape *shape, float *r_half_extents);
+void RB_cone_shape_get_half_extents(rbCollisionShape *shape, float *r_half_extents);
+void RB_cylinder_shape_get_half_extents(rbCollisionShape *shape, float *r_half_extents);
 
 /* ********************************** */
 /* Constraints */

@@ -1030,6 +1030,18 @@ void RB_box_shape_get_half_extents(rbCollisionShape *shape, float *r_half_extent
     copy_v3_btvec3(r_half_extents, box->getHalfExtentsWithMargin());
 }
 
+void RB_cone_shape_get_half_extents(rbCollisionShape *shape, float *r_half_extents)
+{
+    btConeShapeZ *cone = (btConeShapeZ*)shape->cshape;
+    copy_v3_btvec3(r_half_extents, btVector3(cone->getRadius(), cone->getRadius(), cone->getHeight()*0.5));
+}
+
+void RB_cylinder_shape_get_half_extents(rbCollisionShape *shape, float *r_half_extents)
+{
+    btCylinderShapeZ *box = (btCylinderShapeZ*)shape->cshape;
+    copy_v3_btvec3(r_half_extents, box->getHalfExtentsWithMargin());
+}
+
 /* ********************************** */
 /* Constraints */
 

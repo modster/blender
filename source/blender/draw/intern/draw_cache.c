@@ -105,6 +105,8 @@ static struct DRWShapeCache {
   GPUBatch *drw_single_arrow;
   GPUBatch *drw_cube;
   GPUBatch *drw_circle;
+  GPUBatch *drw_solid_cylinder_face;
+  GPUBatch *drw_solid_cone_face;
   GPUBatch *drw_normal_arrow;
   GPUBatch *drw_empty_cube;
   GPUBatch *drw_empty_sphere;
@@ -755,6 +757,8 @@ GPUBatch *DRW_cache_circle_get(void)
 #undef CIRCLE_RESOL
 }
 
+
+
 GPUBatch *DRW_cache_normal_arrow_get(void)
 {
   if (!SHC.drw_normal_arrow) {
@@ -1166,6 +1170,78 @@ GPUBatch *DRW_cache_empty_cylinder_get(void)
     SHC.drw_empty_cylinder = GPU_batch_create_ex(GPU_PRIM_LINES, vbo, NULL, GPU_BATCH_OWNS_VBO);
   }
   return SHC.drw_empty_cylinder;
+#undef NSEGMENTS
+}
+
+GPUBatch *DRW_cache_cylinder_face_get(void)
+{
+#define NSEGMENTS 12
+  if (!SHC.drw_solid_cylinder_face) {
+    GPUVertFormat format = extra_vert_format();
+    GPUVertBuf *vbo = GPU_vertbuf_create_with_format(&format);
+    GPU_vertbuf_data_alloc(vbo, NSEGMENTS * 3);
+
+    /* a single ring of vertices */
+    int v = 0;
+    int flag = VCLASS_EMPTY_SCALED;
+    float p[NSEGMENTS][2];
+    for (int i = 0; i < NSEGMENTS; i++) {
+      float angle = 2 * M_PI * ((float)i / (float)NSEGMENTS);
+      p[i][0] = cosf(angle);
+      p[i][1] = sinf(angle);
+    }
+    for (int i = 0; i < NSEGMENTS; i++) {
+      float cv[2], pv[2];
+      cv[0] = p[(i) % NSEGMENTS][0];
+      cv[1] = p[(i) % NSEGMENTS][1];
+      pv[0] = p[(i + 1) % NSEGMENTS][0];
+      pv[1] = p[(i + 1) % NSEGMENTS][1];
+
+      GPU_vertbuf_vert_set(vbo, v++, &(Vert){{cv[0], cv[1], 0.0f}, flag});
+      GPU_vertbuf_vert_set(vbo, v++, &(Vert){{0.0f, 0.0f, 0.0f}, flag});
+      GPU_vertbuf_vert_set(vbo, v++, &(Vert){{pv[0], pv[1], 0.0f}, flag});
+
+    }
+
+    SHC.drw_solid_cylinder_face = GPU_batch_create_ex(GPU_PRIM_TRIS, vbo, NULL, GPU_BATCH_OWNS_VBO);
+  }
+  return SHC.drw_solid_cylinder_face;
+#undef NSEGMENTS
+}
+
+GPUBatch *DRW_cache_cone_face_get(void)
+{
+#define NSEGMENTS 8
+  if (!SHC.drw_solid_cone_face) {
+    GPUVertFormat format = extra_vert_format();
+    GPUVertBuf *vbo = GPU_vertbuf_create_with_format(&format);
+    GPU_vertbuf_data_alloc(vbo, NSEGMENTS * 3);
+
+    /* a single ring of vertices */
+    int v = 0;
+    int flag = VCLASS_EMPTY_SCALED;
+    float p[NSEGMENTS][2];
+    for (int i = 0; i < NSEGMENTS; i++) {
+      float angle = 2 * M_PI * ((float)i / (float)NSEGMENTS);
+      p[i][0] = cosf(angle);
+      p[i][1] = sinf(angle);
+    }
+    for (int i = 0; i < NSEGMENTS; i++) {
+      float cv[2], pv[2];
+      cv[0] = p[(i) % NSEGMENTS][0];
+      cv[1] = p[(i) % NSEGMENTS][1];
+      pv[0] = p[(i + 1) % NSEGMENTS][0];
+      pv[1] = p[(i + 1) % NSEGMENTS][1];
+
+      GPU_vertbuf_vert_set(vbo, v++, &(Vert){{cv[0], cv[1], 0.0f}, flag});
+      GPU_vertbuf_vert_set(vbo, v++, &(Vert){{0.0f, 0.0f, 0.0f}, flag});
+      GPU_vertbuf_vert_set(vbo, v++, &(Vert){{pv[0], pv[1], 0.0f}, flag});
+
+    }
+
+    SHC.drw_solid_cone_face = GPU_batch_create_ex(GPU_PRIM_TRIS, vbo, NULL, GPU_BATCH_OWNS_VBO);
+  }
+  return SHC.drw_solid_cone_face;
 #undef NSEGMENTS
 }
 

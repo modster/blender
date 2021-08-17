@@ -50,8 +50,6 @@ extern char datatoc_armature_wire_frag_glsl[];
 extern char datatoc_armature_wire_vert_glsl[];
 extern char datatoc_background_frag_glsl[];
 extern char datatoc_clipbound_vert_glsl[];
-extern char datatoc_collision_display_box_vert_glsl[];
-extern char datatoc_collision_display_cylinder_vert_glsl[];
 extern char datatoc_constraint_angular_limits_vert_glsl[];
 extern char datatoc_depth_only_vert_glsl[];
 extern char datatoc_edit_curve_handle_geom_glsl[];
@@ -161,8 +159,6 @@ typedef struct OVERLAY_Shaders {
   GPUShader *armature_wire;
   GPUShader *background;
   GPUShader *clipbound;
-  GPUShader *collision_display_box;
-  GPUShader *collision_display_cylinder;
   GPUShader *constraint_angular_limits;
   GPUShader *depth_only;
   GPUShader *edit_curve_handle;
@@ -1468,34 +1464,6 @@ struct GPUShader *OVERLAY_shader_vector()
         "#define blender_srgb_to_framebuffer_space(a) a\n");
   }
   return sh_data->force_vector;
-}
-
-struct GPUShader *OVERLAY_shader_collision_box()
-{
-  OVERLAY_Shaders *sh_data = &e_data.sh_data[0];
-  if (!sh_data->collision_display_box) {
-    sh_data->collision_display_box = DRW_shader_create_with_lib(
-        datatoc_collision_display_box_vert_glsl,
-        NULL,
-        datatoc_gpu_shader_flat_color_frag_glsl,
-        datatoc_common_view_lib_glsl,
-        "#define blender_srgb_to_framebuffer_space(a) a\n");
-  }
-  return sh_data->collision_display_box;
-}
-
-struct GPUShader *OVERLAY_shader_collision_cylinder()
-{
-  OVERLAY_Shaders *sh_data = &e_data.sh_data[0];
-  if (!sh_data->collision_display_cylinder) {
-    sh_data->collision_display_cylinder = DRW_shader_create_with_lib(
-        datatoc_collision_display_cylinder_vert_glsl,
-        NULL,
-        datatoc_gpu_shader_flat_color_frag_glsl,
-        datatoc_common_view_lib_glsl,
-        "#define blender_srgb_to_framebuffer_space(a) a\n");
-  }
-  return sh_data->collision_display_cylinder;
 }
 
 struct GPUShader *OVERLAY_shader_constraint_angular_limits()

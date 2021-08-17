@@ -1809,7 +1809,6 @@ static void OVERLAY_colliding_face_on_box(OVERLAY_Data *data,
                                           const float color[4])
 {
     float corr_rot[3][3];
-    float initial_transform[4][4];
     float final_mat[4][4];
     float loc[3] = {0.0f};
     float ax[3] = {0.0f};
@@ -1855,8 +1854,6 @@ static void OVERLAY_colliding_face_on_box(OVERLAY_Data *data,
 
        GPUBatch *geom = DRW_cache_quad_get();
 
-      // copy_m4_m3(initial_transform, corr_rot);
-     //  copy_v4_v4(initial_transform[3], loc);
        mul_m4_m4m3(final_mat, ob->obmat, corr_rot);
        mul_m4_v3(ob->obmat, loc);
        copy_v3_v3(final_mat[3], loc);
@@ -1870,101 +1867,62 @@ static void OVERLAY_colliding_face_on_box(OVERLAY_Data *data,
 
 }
 
-static bool OVERLAY_colliding_face_on_cylinder(OVERLAY_Data *data,
-                                               float point[3],
-                                               float mat[4][4],
-                                               float dir[3])
+static void OVERLAY_colliding_face_on_cylinder(OVERLAY_Data *data,
+                                               Object *ob,
+                                               const float color[4])
 {
-  /* Using a unit cube to check if collision is on top/bottom face of cylinder. */
-  float box_shape[8][3] = {
-      {1.0f, -1.0f, 1.0f},
-      {1.0f, -1.0f, -1.0f},
-      {-1.0f, -1.0f, -1.0f},
-      {-1.0f, -1.0f, 1.0f},
-      {1.0f, 1.0f, 1.0f},
-      {1.0f, 1.0f, -1.0f},
-      {-1.0f, 1.0f, -1.0f},
-      {-1.0f, 1.0f, 1.0f},
-  };
+  int face;
+  float loc[4];
+  float final_mat[4][4] = {{0.0f}};
+  for(int i=0; i<2; i++) {
+    face = ob->rigidbody_object->colliding_faces[i];
+    zero_v4(loc);
+    if(face > -1) {
+        switch(face){
+          case 2:
+            loc[2] = -1.0f;
+            loc[3] = 1.0f;
+            break;
+          case 4:
+            loc[2] = 1.0f;
+            loc[3] = 1.0f;
+            break;
+        }
 
-  int top_bottom_tris[4][3] = {
-      /* Top.    */
-      {0, 4, 3},
-      {4, 3, 7},
-      /* Bottom. */
-      {1, 5, 2},
-      {5, 2, 6},
-  };
+      GPUBatch *geom = DRW_cache_cylinder_face_get() ;
+      printf("face%d\n",face);
 
-  /* Transform the box to correct location, orientaion and scale. */
-  for (int i = 0; i < 8; i++) {
-    mul_m4_v3(mat, box_shape[i]);
-  }
-  float isect_co[3];
-  for (int i = 0; i < 2; i++) {
-    if (isect_point_tri_v3(point,
-                           box_shape[top_bottom_tris[2 * i][0]],
-                           box_shape[top_bottom_tris[2 * i][1]],
-                           box_shape[top_bottom_tris[2 * i][2]],
-                           isect_co) ||
-        isect_point_tri_v3(point,
-                           box_shape[top_bottom_tris[2 * i + 1][0]],
-                           box_shape[top_bottom_tris[2 * i + 1][1]],
-                           box_shape[top_bottom_tris[2 * i + 1][2]],
-                           isect_co)) {
-      if (len_manhattan_v3v3(point, isect_co) <= 0.000001f ||
-          fabsf(dot_v3v3(point, dir) - dot_v3v3(isect_co, dir)) < 0.05) {
-        float height = -2.0f * i + 1.0f;
-        GPUShader *sh = OVERLAY_shader_collision_cylinder();
-        DRWShadingGroup *grp = DRW_shgroup_create(sh, data->psl->extra_ps[1]);
-        DRW_shgroup_uniform_vec4_array_copy(grp, "mat_vecs", mat, 4);
-        DRW_shgroup_uniform_float_copy(grp, "zheight", height);
-        DRW_shgroup_uniform_bool_copy(grp, "flag", false);
-        DRW_shgroup_uniform_int_copy(grp, "n_segments", 12);
-        DRW_shgroup_call_procedural_triangles(grp, NULL, 12);
-        return true;
-      }
+      copy_m4_m4(final_mat, ob->obmat);
+      mul_m4_v4(ob->obmat, loc);
+      copy_v4_v4(final_mat[3], loc);
+
+      GPUShader *sh = OVERLAY_shader_uniform_color();
+      DRWShadingGroup *grp = DRW_shgroup_create(sh, data->psl->extra_ps[1]);
+      DRW_shgroup_uniform_vec4_copy(grp, "color", color);
+      DRW_shgroup_call_obmat(grp, geom, final_mat);
     }
   }
-  return false;
 }
 
-static bool OVERLAY_colliding_face_on_cone(OVERLAY_Data *data,
-                                           float point[3],
-                                           float mat[4][4],
-                                           float dir[3])
+static void OVERLAY_colliding_face_on_cone(OVERLAY_Data *data,
+                                           Object *ob,
+                                           const float color[4])
 {
-  /* Using a unit cube to check if collision is on top/bottom face of cylinder. */
-  float square[4][3] = {
-      {1.0f, 0.0f, 1.0f},
-      {1.0f, 0.0f, -1.0f},
-      {-1.0f, 0.0f, -1.0f},
-      {-1.0f, 0.0f, 1.0f},
-  };
+  float loc[4] = {0.0f, 0.0f, -1.0f, 1.0f};
+  float final_mat[4][4] = {{0.0f}};
+  if(ob->rigidbody_object->colliding_faces[0] > -1) {
+      GPUBatch *geom = DRW_cache_cone_face_get();
 
-  /* Transform the box to correct location, orientaion and scale. */
-  for (int i = 0; i < 8; i++) {
-    mul_m4_v3(mat, square[i]);
-  }
+      copy_m4_m4(final_mat, ob->obmat);
+      mul_m4_v4(ob->obmat, loc);
+      copy_v4_v4(final_mat[3], loc);
+      printf("yes");
 
-  float isect_co[3];
-  if (isect_point_tri_v3(point, square[0], square[1], square[2], isect_co) ||
-      isect_point_tri_v3(point, square[2], square[3], square[0], isect_co)) {
-    if (len_manhattan_v3v3(point, isect_co) <= 0.000001f ||
-        fabsf(dot_v3v3(point, dir) - dot_v3v3(isect_co, dir)) < 0.05) {
-      printf("base collided\n");
-      float height = 1.0f;
-      GPUShader *sh = OVERLAY_shader_collision_cylinder();
+      GPUShader *sh = OVERLAY_shader_uniform_color();
       DRWShadingGroup *grp = DRW_shgroup_create(sh, data->psl->extra_ps[1]);
-      DRW_shgroup_uniform_vec4_array_copy(grp, "mat_vecs", mat, 4);
-      DRW_shgroup_uniform_float_copy(grp, "zheight", height);
-      DRW_shgroup_uniform_bool_copy(grp, "flag", true);
-      DRW_shgroup_uniform_int_copy(grp, "n_segments", 8);
-      DRW_shgroup_call_procedural_triangles(grp, NULL, 12);
-      return true;
-    }
+      DRW_shgroup_uniform_vec4_copy(grp, "color", color);
+      DRW_shgroup_call_obmat(grp, geom, final_mat);
   }
-  return false;
 }
 
 static void OVERLAY_indicate_collision(OVERLAY_Data *data, Object *ob)
@@ -1988,21 +1946,11 @@ static void OVERLAY_indicate_collision(OVERLAY_Data *data, Object *ob)
         break;
       case RB_SHAPE_CONE:
         OVERLAY_bounds(cb, ob, color, OB_BOUND_CONE, true, mat);
-        for (int i = 0; i < 2; i++) {
-          if (!is_zero_v3(ob->rigidbody_object->norm_forces[i].vector)) {
-             OVERLAY_colliding_face_on_cone(
-                 data, ob->rigidbody_object->vec_locations[i].vector, mat, dir);
-          }
-        }
+        OVERLAY_colliding_face_on_cone(data, ob, color);
         break;
       case RB_SHAPE_CYLINDER:
         OVERLAY_bounds(cb, ob, color, OB_BOUND_CYLINDER, true, mat);
-        for (int i = 0; i < 2; i++) {
-          if (!is_zero_v3(ob->rigidbody_object->norm_forces[i].vector)) {
-              OVERLAY_colliding_face_on_cylinder(
-                  data, ob->rigidbody_object->vec_locations[i].vector, mat, dir);
-          }
-        }
+        OVERLAY_colliding_face_on_cylinder(data, ob, color);
         break;
       case RB_SHAPE_CAPSULE:
         OVERLAY_bounds(cb, ob, color, OB_BOUND_CAPSULE, true, NULL);

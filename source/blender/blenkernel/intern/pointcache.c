@@ -132,6 +132,7 @@ static int ptcache_data_size[] = {
     sizeof(sim_data_vec[3]), /* BPHYS_DATA_FRIC_FORCES */
     sizeof(sim_data_vec[3]), /* BPHYS_DATA_VEC_LOCATIONS */
     sizeof(float[3]),        /* BHYS_DATA_PREV_VELOCITY */
+    sizeof(int[3]),          /* BHYS_DATA_COLLIDING_FACES */
 };
 
 static int ptcache_extra_datasize[] = {
@@ -791,7 +792,7 @@ static int ptcache_rigidbody_write(int index, void *rb_v, void **data, int UNUSE
       PTCACHE_DATA_FROM(data, BPHYS_DATA_FRIC_FORCES, rbo->fric_forces);
       PTCACHE_DATA_FROM(data, BPHYS_DATA_VEC_LOCATIONS, rbo->vec_locations);
       PTCACHE_DATA_FROM(data, BPHYS_DATA_PREV_VELOCITY, rbo->pvel);
-
+      PTCACHE_DATA_FROM(data, BPHYS_DATA_COLLIDING_FACES, rbo->colliding_faces);
     }
   }
 
@@ -821,6 +822,7 @@ static void ptcache_rigidbody_read(
         memcpy(rbo->fric_forces, data + 28, sizeof(sim_data_vec[3]));
         memcpy(rbo->vec_locations, data + 37, sizeof(sim_data_vec[3]));
         memcpy(rbo->pvel, data + 46, sizeof(float[3]));
+        memcpy(rbo->colliding_faces, data + 49, sizeof(int[3]));
       }
       else {
         PTCACHE_DATA_TO(data, BPHYS_DATA_LOCATION, 0, rbo->pos);
@@ -831,6 +833,7 @@ static void ptcache_rigidbody_read(
         PTCACHE_DATA_TO(data, BPHYS_DATA_FRIC_FORCES, 0, rbo->fric_forces);
         PTCACHE_DATA_TO(data, BPHYS_DATA_VEC_LOCATIONS, 0, rbo->vec_locations);
         PTCACHE_DATA_TO(data, BPHYS_DATA_PREV_VELOCITY, 0, rbo->pvel);
+        PTCACHE_DATA_TO(data, BPHYS_DATA_COLLIDING_FACES, 0, rbo->colliding_faces);
       }
     }
   }
@@ -1121,7 +1124,8 @@ void BKE_ptcache_id_from_rigidbody(PTCacheID *pid, Object *ob, RigidBodyWorld *r
   pid->data_types = (1 << BPHYS_DATA_LOCATION) | (1 << BPHYS_DATA_ROTATION) |
                     (1 << BPHYS_DATA_VELOCITY) | (1 << BPHYS_DATA_EFF_FORCES) |
                     (1 << BPHYS_DATA_NORM_FORCES) | (1 << BPHYS_DATA_FRIC_FORCES) |
-                    (1 << BPHYS_DATA_VEC_LOCATIONS) | (1<<BPHYS_DATA_PREV_VELOCITY);
+                    (1 << BPHYS_DATA_VEC_LOCATIONS) | (1 << BPHYS_DATA_PREV_VELOCITY) |
+                    (1 << BPHYS_DATA_COLLIDING_FACES);
   pid->info_types = 0;
 
   pid->stack_index = pid->cache->index;
@@ -1772,6 +1776,9 @@ static void ptcache_file_pointers_init(PTCacheFile *pf)
                                           &pf->data.vec_locations :
                                           NULL;
   pf->cur[BPHYS_DATA_PREV_VELOCITY] = (data_types & (1 << BPHYS_DATA_PREV_VELOCITY)) ?
+                                          &pf->data.pvel :
+                                          NULL;
+  pf->cur[BPHYS_DATA_COLLIDING_FACES] = (data_types & (1 << BPHYS_DATA_COLLIDING_FACES)) ?
                                           &pf->data.pvel :
                                           NULL;
 }
@@ -3874,6 +3881,7 @@ static const char *ptcache_data_struct[] = {
     "sim_data_vec", //BPHYS_DATA_FRIC_FORCES:
     "sim_data_vec", //BPHYS_DATA_VEC_LOCATIONS:
     "",             //BPHYS_DATA_PREV_VELOCITY:
+    "",             //BPHYS_DATA_COLLIDING_FACES
 };
 static const char *ptcache_extra_struct[] = {
     "",

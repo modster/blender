@@ -80,7 +80,9 @@ struct GPUBatch *DRW_cache_empty_cube_get(void);
 struct GPUBatch *DRW_cache_circle_get(void);
 struct GPUBatch *DRW_cache_empty_sphere_get(void);
 struct GPUBatch *DRW_cache_empty_cylinder_get(void);
+struct GPUBatch *DRW_cache_cylinder_face_get(void);
 struct GPUBatch *DRW_cache_empty_cone_get(void);
+struct GPUBatch *DRW_cache_cone_face_get(void);
 struct GPUBatch *DRW_cache_empty_capsule_cap_get(void);
 struct GPUBatch *DRW_cache_empty_capsule_body_get(void);
 
