@@ -1172,6 +1172,7 @@ void BKE_effectors_apply(ListBase *effectors,
   /* Check for min distance here? (yes would be cool to add that, ton) */
 
   int num_eff_forces = 0;
+  float out_force[3] = {0, 0, 0};
   if (effectors) {
     for (eff = effectors->first; eff; eff = eff->next) {
       /* object effectors were fully checked to be OK to evaluate! */
@@ -1186,7 +1187,7 @@ void BKE_effectors_apply(ListBase *effectors,
             efd.falloff *= eff_calc_visibility(colliders, eff, &efd, point);
           }
           if (efd.falloff > 0.0f) {
-            float out_force[3] = {0, 0, 0};
+            zero_v3(out_force);
 
             if (eff->pd->forcefield == PFIELD_TEXTURE) {
               do_texture_effector(eff, &efd, point, out_force);
@@ -1214,13 +1215,9 @@ void BKE_effectors_apply(ListBase *effectors,
           add_v3_v3v3(impulse, impulse, efd.vel);
         }
 
-        if (r_eff_forces != NULL) {
-          if (eff->flag & PE_VELOCITY_TO_IMPULSE && impulse) {
-            copy_v3_v3(r_eff_forces[num_eff_forces], impulse);
-          }
-          else {
-            copy_v3_v3(r_eff_forces[num_eff_forces], force);
-          }
+        if (r_eff_forces != NULL && num_eff_forces < 3) {
+          copy_v3_v3(r_eff_forces[num_eff_forces], out_force);
+          num_eff_forces++;
         }
       }
     }
