@@ -917,27 +917,55 @@ class GeometryNodesEvaluator {
       OutputState &output_state = node_state.outputs[i];
       const DOutputSocket socket{node.context(), &socket_ref};
       bke::FieldPtr out_field = new bke::MultiFunctionField(input_fields, fn, output_param_index);
-      if (socket->typeinfo()->type == SOCK_FLOAT) {
+
+      eNodeSocketDatatype socket_data_type = (eNodeSocketDatatype)socket->typeinfo()->type;
+
+      {
+        bke::FieldInputs field_inputs = out_field->prepare_inputs();
+        if (field_inputs.tot_inputs() == 0) {
+          bke::FieldOutput field_output = out_field->evaluate(IndexRange(1), field_inputs);
+          const fn::GVArray &varray = field_output.varray_ref();
+          BUFFER_FOR_CPP_TYPE_VALUE(varray.type(), buffer);
+          varray.get_to_uninitialized(0, buffer);
+          if (socket_data_type == SOCK_FLOAT) {
+            out_field = new bke::ConstantField<float>(*(float *)buffer);
+          }
+          else if (socket_data_type == SOCK_VECTOR) {
+            out_field = new bke::ConstantField<float3>(*(float3 *)buffer);
+          }
+          else if (socket_data_type == SOCK_BOOLEAN) {
+            out_field = new bke::ConstantField<bool>(*(bool *)buffer);
+          }
+          else if (socket_data_type == SOCK_RGBA) {
+            out_field = new bke::ConstantField<ColorGeometry4f>(*(ColorGeometry4f *)buffer);
+          }
+          else if (socket_data_type == SOCK_INT) {
+            out_field = new bke::ConstantField<int>(*(int *)buffer);
+          }
+        }
+      }
+
+      if (socket_data_type == SOCK_FLOAT) {
         bke::FieldRef<float> *field_ref =
             allocator.construct<bke::FieldRef<float>>(out_field).release();
         this->forward_output(socket, field_ref);
       }
-      else if (socket->typeinfo()->type == SOCK_VECTOR) {
+      else if (socket_data_type == SOCK_VECTOR) {
         bke::FieldRef<float3> *field_ref =
             allocator.construct<bke::FieldRef<float3>>(out_field).release();
         this->forward_output(socket, field_ref);
       }
-      else if (socket->typeinfo()->type == SOCK_BOOLEAN) {
+      else if (socket_data_type == SOCK_BOOLEAN) {
         bke::FieldRef<bool> *field_ref =
             allocator.construct<bke::FieldRef<bool>>(out_field).release();
         this->forward_output(socket, field_ref);
       }
-      else if (socket->typeinfo()->type == SOCK_RGBA) {
+      else if (socket_data_type == SOCK_RGBA) {
         bke::FieldRef<blender::ColorGeometry4f> *field_ref =
             allocator.construct<bke::FieldRef<blender::ColorGeometry4f>>(out_field).release();
         this->forward_output(socket, field_ref);
       }
-      else if (socket->typeinfo()->type == SOCK_INT) {
+      else if (socket_data_type == SOCK_INT) {
         bke::FieldRef<int> *field_ref =
             allocator.construct<bke::FieldRef<int>>(out_field).release();
         this->forward_output(socket, field_ref);
