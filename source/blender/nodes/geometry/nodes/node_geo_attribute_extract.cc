@@ -110,7 +110,7 @@ static void geo_node_attribute_extract_exec(GeoNodeExecParams params)
 
   const std::string attribute_name = params.get_input<std::string>("Attribute");
   AnonymousCustomDataLayerID *layer_id = CustomData_anonymous_id_new(attribute_name.c_str());
-  auto output_field = new bke::AnonymousAttributeField(*layer_id, *cpp_type);
+  auto *output_field = new bke::AnonymousAttributeField(*layer_id, *cpp_type);
 
   if (geometry_set.has<MeshComponent>()) {
     convert_attribute(geometry_set.get_component_for_write<MeshComponent>(),

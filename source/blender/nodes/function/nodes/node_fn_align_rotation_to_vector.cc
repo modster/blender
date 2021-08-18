@@ -146,24 +146,20 @@ static const blender::fn::MultiFunction &get_multi_function(bNode &node)
         }};
     return auto_pivot;
   }
-  else {
-    float3 local_pivot_axis{0, 0, 0};
-    local_pivot_axis[storage.pivot_axis - 1] = 1;
+  float3 local_pivot_axis{0, 0, 0};
+  local_pivot_axis[storage.pivot_axis - 1] = 1;
 
-    if (local_main_axis == local_pivot_axis) {
-      return blender::fn::dummy_multi_function;
-    }
-
-    static blender::fn::CustomMF_SI_SI_SI_SO<float3, float, float3, float3> fixed_pivot{
-        "Align Rotation Fixed Pivot",
-        [local_main_axis, local_pivot_axis](float3 rotation, float factor, float3 vector) {
-          return align_rotations_fixed_pivot(
-              vector, factor, local_main_axis, local_pivot_axis, rotation);
-        }};
-    return fixed_pivot;
+  if (local_main_axis == local_pivot_axis) {
+    return blender::fn::dummy_multi_function;
   }
 
-  return blender::fn::dummy_multi_function;
+  static blender::fn::CustomMF_SI_SI_SI_SO<float3, float, float3, float3> fixed_pivot{
+      "Align Rotation Fixed Pivot",
+      [local_main_axis, local_pivot_axis](float3 rotation, float factor, float3 vector) {
+        return align_rotations_fixed_pivot(
+            vector, factor, local_main_axis, local_pivot_axis, rotation);
+      }};
+  return fixed_pivot;
 }
 
 static void fn_node_align_rotation_to_vector_expand_in_mf_network(
