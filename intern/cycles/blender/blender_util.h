@@ -145,7 +145,7 @@ static inline void curvemapping_minmax(/*const*/ BL::CurveMapping &cumap,
                                        float *min_x,
                                        float *max_x)
 {
-  /* const int num_curves = cumap.curves.length(); */ /* Gives linking error so far. */
+  // const int num_curves = cumap.curves.length(); /* Gives linking error so far. */
   const int num_curves = rgb_curve ? 4 : 3;
   *min_x = FLT_MAX;
   *max_x = -FLT_MAX;
@@ -246,7 +246,11 @@ static inline string image_user_file_path(BL::ImageUser &iuser,
 
   string filepath_str = string(filepath);
   if (load_tiled && ima.source() == BL::Image::source_TILED) {
-    string_replace(filepath_str, "1001", "<UDIM>");
+    string udim;
+    if (ima.tiles.length() > 0) {
+      udim = to_string(ima.tiles[0].number());
+    }
+    string_replace(filepath_str, udim, "<UDIM>");
   }
   return filepath_str;
 }

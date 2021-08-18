@@ -88,61 +88,63 @@ static void raycast_to_mesh(const Mesh *mesh,
 
   BVHTreeFromMesh tree_data;
   BKE_bvhtree_from_mesh_get(&tree_data, mesh, BVHTREE_FROM_LOOPTRI, 4);
+  if (tree_data.tree == nullptr) {
+    free_bvhtree_from_mesh(&tree_data);
+    return;
+  }
 
-  if (tree_data.tree != nullptr) {
-    for (const int i : ray_origins.index_range()) {
-      const float ray_length = ray_lengths[i];
-      const float3 ray_origin = ray_origins[i];
-      const float3 ray_direction = ray_directions[i].normalized();
+  for (const int i : ray_origins.index_range()) {
+    const float ray_length = ray_lengths[i];
+    const float3 ray_origin = ray_origins[i];
+    const float3 ray_direction = ray_directions[i].normalized();
 
-      BVHTreeRayHit hit;
-      hit.index = -1;
-      hit.dist = ray_length;
-      if (BLI_bvhtree_ray_cast(tree_data.tree,
-                               ray_origin,
-                               ray_direction,
-                               0.0f,
-                               &hit,
-                               tree_data.raycast_callback,
-                               &tree_data) != -1) {
-        if (!r_hit.is_empty()) {
-          r_hit[i] = hit.index >= 0;
-        }
-        if (!r_hit_indices.is_empty()) {
-          /* Index should always be a valid looptri index, use 0 when hit failed. */
-          r_hit_indices[i] = max_ii(hit.index, 0);
-        }
-        if (!r_hit_positions.is_empty()) {
-          r_hit_positions[i] = hit.co;
-        }
-        if (!r_hit_normals.is_empty()) {
-          r_hit_normals[i] = hit.no;
-        }
-        if (!r_hit_distances.is_empty()) {
-          r_hit_distances[i] = hit.dist;
-        }
+    BVHTreeRayHit hit;
+    hit.index = -1;
+    hit.dist = ray_length;
+    if (BLI_bvhtree_ray_cast(tree_data.tree,
+                             ray_origin,
+                             ray_direction,
+                             0.0f,
+                             &hit,
+                             tree_data.raycast_callback,
+                             &tree_data) != -1) {
+      if (!r_hit.is_empty()) {
+        r_hit[i] = hit.index >= 0;
       }
-      else {
-        if (!r_hit.is_empty()) {
-          r_hit[i] = false;
-        }
-        if (!r_hit_indices.is_empty()) {
-          r_hit_indices[i] = 0;
-        }
-        if (!r_hit_positions.is_empty()) {
-          r_hit_positions[i] = float3(0.0f, 0.0f, 0.0f);
-        }
-        if (!r_hit_normals.is_empty()) {
-          r_hit_normals[i] = float3(0.0f, 0.0f, 0.0f);
-        }
-        if (!r_hit_distances.is_empty()) {
-          r_hit_distances[i] = ray_length;
-        }
+      if (!r_hit_indices.is_empty()) {
+        /* Index should always be a valid looptri index, use 0 when hit failed. */
+        r_hit_indices[i] = max_ii(hit.index, 0);
+      }
+      if (!r_hit_positions.is_empty()) {
+        r_hit_positions[i] = hit.co;
+      }
+      if (!r_hit_normals.is_empty()) {
+        r_hit_normals[i] = hit.no;
+      }
+      if (!r_hit_distances.is_empty()) {
+        r_hit_distances[i] = hit.dist;
       }
     }
-
-    free_bvhtree_from_mesh(&tree_data);
+    else {
+      if (!r_hit.is_empty()) {
+        r_hit[i] = false;
+      }
+      if (!r_hit_indices.is_empty()) {
+        r_hit_indices[i] = 0;
+      }
+      if (!r_hit_positions.is_empty()) {
+        r_hit_positions[i] = float3(0.0f, 0.0f, 0.0f);
+      }
+      if (!r_hit_normals.is_empty()) {
+        r_hit_normals[i] = float3(0.0f, 0.0f, 0.0f);
+      }
+      if (!r_hit_distances.is_empty()) {
+        r_hit_distances[i] = ray_length;
+      }
+    }
   }
+
+  free_bvhtree_from_mesh(&tree_data);
 }
 
 static bke::mesh_surface_sample::eAttributeMapMode get_map_mode(
@@ -158,7 +160,7 @@ static bke::mesh_surface_sample::eAttributeMapMode get_map_mode(
 }
 
 static void raycast_from_points(const GeoNodeExecParams &params,
-                                const GeometrySet &src_geometry,
+                                const GeometrySet &target_geometry,
                                 GeometryComponent &dst_component,
                                 const AnonymousCustomDataLayerID *hit_id,
                                 const AnonymousCustomDataLayerID *hit_position_id,
@@ -169,7 +171,8 @@ static void raycast_from_points(const GeoNodeExecParams &params,
 {
   BLI_assert(hit_attribute_names.size() == hit_attribute_output_names.size());
 
-  const MeshComponent *src_mesh_component = src_geometry.get_component_for_read<MeshComponent>();
+  const MeshComponent *src_mesh_component =
+      target_geometry.get_component_for_read<MeshComponent>();
   if (src_mesh_component == nullptr) {
     return;
   }
@@ -291,7 +294,7 @@ static void raycast_from_points(const GeoNodeExecParams &params,
 static void geo_node_raycast_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
-  GeometrySet cast_geometry_set = params.extract_input<GeometrySet>("Target Geometry");
+  GeometrySet target_geometry_set = params.extract_input<GeometrySet>("Target Geometry");
 
   const Array<std::string> hit_attribute_names = {
       params.extract_input<std::string>("Target Attribute")};
@@ -299,7 +302,7 @@ static void geo_node_raycast_exec(GeoNodeExecParams params)
       params.extract_input<std::string>("Hit Attribute")};
 
   geometry_set = bke::geometry_set_realize_instances(geometry_set);
-  cast_geometry_set = bke::geometry_set_realize_instances(cast_geometry_set);
+  target_geometry_set = bke::geometry_set_realize_instances(target_geometry_set);
 
   AnonymousCustomDataLayerID *hit_id = nullptr;
   AnonymousCustomDataLayerID *hit_position_id = nullptr;
@@ -323,7 +326,7 @@ static void geo_node_raycast_exec(GeoNodeExecParams params)
   for (const GeometryComponentType type : types) {
     if (geometry_set.has(type)) {
       raycast_from_points(params,
-                          cast_geometry_set,
+                          target_geometry_set,
                           geometry_set.get_component_for_write(type),
                           hit_id,
                           hit_position_id,
