@@ -162,19 +162,21 @@ static void move_selected_bezt_to_mouse(BezTriple *bezt, ViewContext *vc, const 
 {
   /* Get mouse location in 3D space. */
   float location[3];
-  mouse_location_to_worldspace(event->mval, bezt->vec[1], vc, location);
 
   /* Move entire BezTriple if center point is dragged. */
   if (bezt->f2) {
+    mouse_location_to_worldspace(event->mval, bezt->vec[1], vc, location);
     move_bezt_to_location(bezt, location);
   }
   /* Move handle separately if only a handle is dragged. */
   else {
     free_up_handles_for_movement(bezt, bezt->f1, bezt->f3);
     if (bezt->f1) {
+      mouse_location_to_worldspace(event->mval, bezt->vec[0], vc, location);
       copy_v3_v3(bezt->vec[0], location);
     }
     else {
+      mouse_location_to_worldspace(event->mval, bezt->vec[2], vc, location);
       copy_v3_v3(bezt->vec[2], location);
     }
   }
