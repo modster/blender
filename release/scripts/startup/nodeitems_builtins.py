@@ -484,7 +484,6 @@ geometry_node_categories = [
         NodeItem("GeometryNodeAttributeTransfer"),
         NodeItem("GeometryNodeAttributeExtract"),
         NodeItem("GeometryNodeAttributeFreeze"),
-        NodeItem("GeometryNodeSampleMeshSurface"),
     ]),
     GeometryNodeCategory("GEO_COLOR", "Color", items=[
         NodeItem("ShaderNodeRGBCurve"),
@@ -505,6 +504,7 @@ geometry_node_categories = [
         NodeItem("GeometryNodeCurveSplineType"),
         NodeItem("GeometryNodeCurveSetHandles"),
         NodeItem("GeometryNodeCurveSelectHandles"),
+        NodeItem("GeometryNodeEvaluateCurve"),
     ]),
     GeometryNodeCategory("GEO_PRIMITIVES_CURVE", "Curve Primitives", items=[
         NodeItem("GeometryNodeCurvePrimitiveLine"),
@@ -554,6 +554,7 @@ geometry_node_categories = [
         NodeItem("GeometryNodeMeshSubdivide"),
         NodeItem("GeometryNodeExtrude"),
         NodeItem("GeometryNodeExtrudeAndMove"),
+        NodeItem("GeometryNodeSampleMeshSurface"),
     ]),
     GeometryNodeCategory("GEO_PRIMITIVES_MESH", "Mesh Primitives", items=[
         NodeItem("GeometryNodeMeshCircle"),
