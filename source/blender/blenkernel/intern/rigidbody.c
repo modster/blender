@@ -2213,8 +2213,10 @@ static void rigidbody_get_debug_draw_data(RigidBodyWorld *rbw, float substep, bo
       if (ob->rigidbody_object != NULL) {
         rbRigidBody *rbo = (rbRigidBody *)(ob->rigidbody_object->shared->physics_object);
 
-        if((ob->rigidbody_object->sim_display_options & RB_SIM_VELOCITY) ||
-           (ob->rigidbody_object->sim_display_options & RB_SIM_ACCELERATION)) {
+        if(((ob->rigidbody_object->sim_display_options & RB_SIM_VELOCITY) ||
+           (ob->rigidbody_object->sim_display_options & RB_SIM_ACCELERATION)) &&
+            is_last_substep)
+        {
           /* Get velocity. */
           copy_v3_v3(ob->rigidbody_object->pvel, ob->rigidbody_object->vel);
           RB_body_get_linear_velocity(rbo, ob->rigidbody_object->vel);
@@ -2249,8 +2251,14 @@ static void rigidbody_get_debug_draw_data(RigidBodyWorld *rbw, float substep, bo
                 add_v3_v3(ob->rigidbody_object->fric_forces[k].vector, fric_forces[k]);
               }
 
-              if(is_last_substep && fabsf(len_v3(ob->rigidbody_object->norm_forces[k].vector))>0.0f) {
-                  mul_v3_fl(ob->rigidbody_object->vec_locations[k].vector, (1.0f/(float)(len_v3(ob->rigidbody_object->norm_forces[k].vector))));
+              if(is_last_substep) {
+                  if(fabsf(len_v3(ob->rigidbody_object->norm_forces[k].vector))>0.0f) {
+                    mul_v3_fl(ob->rigidbody_object->vec_locations[k].vector, (1.0f/(float)(len_v3(ob->rigidbody_object->norm_forces[k].vector))));
+                  }
+                  else {
+                      zero_v3(ob->rigidbody_object->vec_locations[k].vector);
+                  }
+
               }
           }
         }

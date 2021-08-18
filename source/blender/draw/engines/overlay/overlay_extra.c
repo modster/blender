@@ -1793,12 +1793,10 @@ static void OVERLAY_acceleration_extra(OVERLAY_Data *data,
   int text_flag = rbo->sim_display_options & RB_SIM_TEXT;
 
   /* Calculate timestep. */
-  const float ctime = DEG_get_ctime(depsgraph);
-  const float frame_diff = ctime - scene->rigidbody_world->ltime;
-  const float timestep = (1.0f / (float)FPS * scene->rigidbody_world->time_scale)/ scene->rigidbody_world->substeps_per_frame;
+  const float timestep = (1.0f / (float)FPS * scene->rigidbody_world->time_scale);
 
   float acc[3];
-  sub_v3_v3v3(acc, rbo->pvel, rbo->vel);
+  sub_v3_v3v3(acc, rbo->vel, rbo->pvel);
   mul_v3_fl(acc, 1 / timestep);
   OVERLAY_vector_extra(data, acc, rbo->pos, scale, min_clamp, color, text_flag);
 }
