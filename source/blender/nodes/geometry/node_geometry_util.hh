@@ -107,4 +107,9 @@ void prepare_field_inputs(bke::FieldInputs &field_inputs,
                           const AttributeDomain domain,
                           Vector<std::unique_ptr<bke::FieldInputValue>> &r_values);
 
+void try_freeze_field_on_geometry(GeometryComponent &component,
+                                  const AnonymousCustomDataLayerID &layer_id,
+                                  AttributeDomain domain,
+                                  const bke::Field &field);
+
 }  // namespace blender::nodes

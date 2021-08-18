@@ -350,14 +350,16 @@ template<typename KeyT> class GVArrayInputField : public Field {
 class MultiFunctionField : public Field {
  private:
   Vector<FieldPtr> input_fields_;
-  const MultiFunction *fn_;
+  optional_ptr<const MultiFunction> fn_;
   const int output_param_index_;
 
  public:
   MultiFunctionField(Vector<FieldPtr> input_fields,
-                     const MultiFunction &fn,
+                     optional_ptr<const MultiFunction> fn,
                      const int output_param_index)
-      : input_fields_(std::move(input_fields)), fn_(&fn), output_param_index_(output_param_index)
+      : input_fields_(std::move(input_fields)),
+        fn_(std::move(fn)),
+        output_param_index_(output_param_index)
   {
   }
 

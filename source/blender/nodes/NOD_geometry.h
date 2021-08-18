@@ -102,6 +102,7 @@ void register_node_type_geo_point_translate(void);
 void register_node_type_geo_points_to_volume(void);
 void register_node_type_geo_position(void);
 void register_node_type_geo_raycast(void);
+void register_node_type_geo_sample_mesh_surface(void);
 void register_node_type_geo_sample_texture(void);
 void register_node_type_geo_select_by_handle_type(void);
 void register_node_type_geo_select_by_material(void);

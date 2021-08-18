@@ -220,6 +220,64 @@ void prepare_field_inputs(bke::FieldInputs &field_inputs,
   }
 }
 
+template<typename T>
+void fill_attribute_impl(GeometryComponent &component,
+                         OutputAttribute &attribute,
+                         const bke::Field &field)
+{
+  const AttributeDomain domain = attribute.domain();
+  const int domain_size = attribute->size();
+  bke::FieldInputs field_inputs = field.prepare_inputs();
+  Vector<std::unique_ptr<bke::FieldInputValue>> input_values;
+  prepare_field_inputs(field_inputs, component, domain, input_values);
+  bke::FieldOutput field_output = field.evaluate(IndexMask(domain_size), field_inputs);
+  for (const int i : IndexRange(domain_size)) {
+    T value;
+    field_output.varray_ref().get(i, &value);
+    attribute->set_by_copy(i, &value);
+  }
+}
+
+void try_freeze_field_on_geometry(GeometryComponent &component,
+                                  const AnonymousCustomDataLayerID &layer_id,
+                                  AttributeDomain domain,
+                                  const bke::Field &field)
+{
+  const CustomDataType data_type = bke::cpp_type_to_custom_data_type(field.output_type());
+  OutputAttribute attribute = component.attribute_try_get_anonymous_for_output(
+      layer_id, domain, data_type);
+  if (!attribute) {
+    return;
+  }
+
+  switch (data_type) {
+    case CD_PROP_FLOAT: {
+      fill_attribute_impl<float>(component, attribute, field);
+      break;
+    }
+    case CD_PROP_FLOAT3: {
+      fill_attribute_impl<float3>(component, attribute, field);
+      break;
+    }
+    case CD_PROP_COLOR: {
+      fill_attribute_impl<ColorGeometry4f>(component, attribute, field);
+      break;
+    }
+    case CD_PROP_BOOL: {
+      fill_attribute_impl<bool>(component, attribute, field);
+      break;
+    }
+    case CD_PROP_INT32: {
+      fill_attribute_impl<int>(component, attribute, field);
+      break;
+    }
+    default:
+      break;
+  }
+
+  attribute.save();
+}
+
 }  // namespace blender::nodes
 
 bool geo_node_poll_default(bNodeType *UNUSED(ntype),

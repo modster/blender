@@ -345,6 +345,7 @@ DefNode(GeometryNode, GEO_NODE_POINT_TRANSLATE, def_geo_point_translate, "POINT_
 DefNode(GeometryNode, GEO_NODE_POINTS_TO_VOLUME, def_geo_points_to_volume, "POINTS_TO_VOLUME", PointsToVolume, "Points to Volume", "")
 DefNode(GeometryNode, GEO_NODE_POSITION, 0, "POSITION", Position, "Position", "")
 DefNode(GeometryNode, GEO_NODE_RAYCAST, def_geo_raycast, "RAYCAST", Raycast, "Raycast", "")
+DefNode(GeometryNode, GEO_NODE_SAMPLE_MESH_SURFACE, 0, "SAMPLE_MESH_SURFACE", SampleMeshSurface, "Sample Mesh Surface", "")
 DefNode(GeometryNode, GEO_NODE_SELECT_BY_MATERIAL, 0, "SELECT_BY_MATERIAL", SelectByMaterial, "Select by Material", "")
 DefNode(GeometryNode, GEO_NODE_SET_POSITION, 0, "SET_POSITION", SetPosition, "Set Position", "")
 DefNode(GeometryNode, GEO_NODE_SEPARATE_COMPONENTS, 0, "SEPARATE_COMPONENTS", SeparateComponents, "Separate Components", "")

@@ -484,6 +484,7 @@ geometry_node_categories = [
         NodeItem("GeometryNodeAttributeTransfer"),
         NodeItem("GeometryNodeAttributeExtract"),
         NodeItem("GeometryNodeAttributeFreeze"),
+        NodeItem("GeometryNodeSampleMeshSurface"),
     ]),
     GeometryNodeCategory("GEO_COLOR", "Color", items=[
         NodeItem("ShaderNodeRGBCurve"),

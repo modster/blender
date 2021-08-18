@@ -17,6 +17,8 @@
 #include "UI_interface.h"
 #include "UI_resources.h"
 
+#include "BKE_attribute_math.hh"
+
 #include "node_geometry_util.hh"
 
 static bNodeSocketTemplate geo_node_attribute_freeze_in[] = {
@@ -133,74 +135,6 @@ static void set_output_field(GeoNodeExecParams &params,
   }
 }
 
-template<typename T>
-void fill_attribute_impl(GeometryComponent &component,
-                         OutputAttribute &attribute,
-                         const GeoNodeExecParams &params,
-                         const StringRef input_name)
-{
-  const AttributeDomain domain = attribute.domain();
-  const int domain_size = attribute->size();
-  bke::FieldRef<T> value_field = params.get_input_field<T>(input_name);
-  bke::FieldInputs field_inputs = value_field->prepare_inputs();
-  Vector<std::unique_ptr<bke::FieldInputValue>> input_values;
-  prepare_field_inputs(field_inputs, component, domain, input_values);
-  bke::FieldOutput field_output = value_field->evaluate(IndexMask(domain_size), field_inputs);
-  for (const int i : IndexRange(domain_size)) {
-    T value;
-    field_output.varray_ref().get(i, &value);
-    attribute->set_by_copy(i, &value);
-  }
-}
-
-static void fill_attribute_data(GeometryComponent &component,
-                                const GeoNodeExecParams &params,
-                                OutputAttribute &attribute,
-                                const CustomDataType data_type)
-{
-  switch (data_type) {
-    case CD_PROP_FLOAT: {
-      fill_attribute_impl<float>(component, attribute, params, "Value_001");
-      break;
-    }
-    case CD_PROP_FLOAT3: {
-      fill_attribute_impl<float3>(component, attribute, params, "Value");
-      break;
-    }
-    case CD_PROP_COLOR: {
-      fill_attribute_impl<ColorGeometry4f>(component, attribute, params, "Value_002");
-      break;
-    }
-    case CD_PROP_BOOL: {
-      fill_attribute_impl<bool>(component, attribute, params, "Value_003");
-      break;
-    }
-    case CD_PROP_INT32: {
-      fill_attribute_impl<int>(component, attribute, params, "Value_004");
-      break;
-    }
-    default:
-      break;
-  }
-}
-
-static void fill_anonymous(GeometryComponent &component,
-                           const GeoNodeExecParams &params,
-                           const AnonymousCustomDataLayerID &layer_id,
-                           const AttributeDomain domain,
-                           const CustomDataType data_type)
-{
-  OutputAttribute attribute = component.attribute_try_get_anonymous_for_output(
-      layer_id, domain, data_type);
-  if (!attribute) {
-    return;
-  }
-
-  fill_attribute_data(component, params, attribute, data_type);
-
-  attribute.save();
-}
-
 static void geo_node_attribute_freeze_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
@@ -214,11 +148,33 @@ static void geo_node_attribute_freeze_exec(GeoNodeExecParams params)
 
   AnonymousCustomDataLayerID *id = CustomData_anonymous_id_new("Attribute Freeze");
 
+  FieldPtr field;
+  switch (data_type) {
+    case CD_PROP_FLOAT:
+      field = params.get_input_field<float>("Value_001").field();
+      break;
+    case CD_PROP_FLOAT3:
+      field = params.get_input_field<float3>("Value").field();
+      break;
+    case CD_PROP_COLOR:
+      field = params.get_input_field<ColorGeometry4f>("Value_002").field();
+      break;
+    case CD_PROP_BOOL:
+      field = params.get_input_field<bool>("Value_003").field();
+      break;
+    case CD_PROP_INT32:
+      field = params.get_input_field<int>("Value_004").field();
+      break;
+    default:
+      break;
+  }
+
   static const Array<GeometryComponentType> types = {
       GEO_COMPONENT_TYPE_MESH, GEO_COMPONENT_TYPE_POINT_CLOUD, GEO_COMPONENT_TYPE_CURVE};
   for (const GeometryComponentType type : types) {
     if (geometry_set.has(type)) {
-      fill_anonymous(geometry_set.get_component_for_write(type), params, *id, domain, data_type);
+      GeometryComponent &component = geometry_set.get_component_for_write(type);
+      try_freeze_field_on_geometry(component, *id, domain, *field);
     }
   }
 
