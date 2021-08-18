@@ -82,7 +82,7 @@ class SampleMeshSurfaceFunction : public fn::MultiFunction {
     signature.single_output<float3>("Position");
     signature.single_output<float3>("Normal");
     signature.single_output<float>("Distance");
-    signature.single_output<ColorGeometry4f>("Attribute");
+    signature.single_output<ColorGeometry4f>("Custom");
     return signature.build();
   }
 
@@ -94,11 +94,18 @@ class SampleMeshSurfaceFunction : public fn::MultiFunction {
     MutableSpan<float3> sampled_normals = params.uninitialized_single_output<float3>(2, "Normal");
     MutableSpan<float> sampled_distances = params.uninitialized_single_output<float>(3,
                                                                                      "Distance");
-    MutableSpan<ColorGeometry4f> sampled_attribute =
-        params.uninitialized_single_output<ColorGeometry4f>(4, "Attribute");
+    MutableSpan<ColorGeometry4f> sampled_custom =
+        params.uninitialized_single_output<ColorGeometry4f>(4, "Custom");
+
+    auto return_default = [&]() {
+      sampled_positions.fill_indices(mask, {0, 0, 0});
+      sampled_normals.fill_indices(mask, {0, 0, 0});
+      sampled_distances.fill_indices(mask, 0.0f);
+      sampled_custom.fill_indices(mask, {0, 0, 0, 1});
+    };
 
     if (!geometry_set_.has_mesh()) {
-      return this->return_default(mask, params);
+      return return_default();
     }
 
     const MeshComponent *mesh_component = geometry_set_.get_component_for_read<MeshComponent>();
@@ -107,7 +114,7 @@ class SampleMeshSurfaceFunction : public fn::MultiFunction {
     GVArrayPtr attribute_ptr = mesh_component->attribute_try_get_anonymous_for_read(
         *attribute_id_, ATTR_DOMAIN_CORNER, CD_PROP_COLOR, nullptr);
     if (!attribute_ptr) {
-      return this->return_default(mask, params);
+      return return_default();
     }
     GVArray_Typed<ColorGeometry4f> attribute{*attribute_ptr};
 
@@ -139,17 +146,8 @@ class SampleMeshSurfaceFunction : public fn::MultiFunction {
       float3 bary_coords;
       interp_weights_tri_v3(bary_coords, v1, v2, v3, nearest.co);
       ColorGeometry4f final_col = attribute_math::mix3(bary_coords, col1, col2, col3);
-      sampled_attribute[i] = final_col;
+      sampled_custom[i] = final_col;
     }
-  }
-
-  void return_default(IndexMask mask, fn::MFParams &params) const
-  {
-    params.uninitialized_single_output<float3>(1, "Position").fill_indices(mask, float3{0, 0, 0});
-    params.uninitialized_single_output<float3>(2, "Normal").fill_indices(mask, float3{0, 0, 0});
-    params.uninitialized_single_output<float>(3, "Distance").fill_indices(mask, 0.0f);
-    params.uninitialized_single_output<ColorGeometry4f>(4, "Attribute")
-        .fill_indices(mask, ColorGeometry4f{0, 0, 0, 1});
   }
 };
 
