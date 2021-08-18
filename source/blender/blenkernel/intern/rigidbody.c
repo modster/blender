@@ -2608,6 +2608,7 @@ void BKE_rigidbody_store_convex_hull_draw_data(Object *ob) {
       MEM_freeN(loops);
     }
     MEM_freeN(mloop_src);
+    plConvexHullDelete(hull);
     ob->rigidbody_object->col_shape_draw_data = hull_draw_data;
 
 }
