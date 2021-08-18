@@ -1414,7 +1414,11 @@ void RB_constraint_set_target_velocity_motor(rbConstraint *con,
   constraint->getRotationalLimitMotor(0)->m_targetVelocity = velocity_ang;
 }
 
-void RB_constraint_get_transforms_hinge(rbConstraint *con, float r_ob1_transform[4][4], float r_ob2_transform[4][4]) {
+void RB_constraint_get_transforms_hinge(rbConstraint *con,
+                                        float r_ob1_basis[3][3],
+                                        float r_ob2_basis[3][3],
+                                        float r_ob1_orig[3],
+                                        float r_ob2_orig[3]) {
     btHingeConstraint *constraint = reinterpret_cast<btHingeConstraint *>(con);
     btTransform transform1;
     btTransform transform2;
@@ -1422,8 +1426,39 @@ void RB_constraint_get_transforms_hinge(rbConstraint *con, float r_ob1_transform
     transform1 = constraint->getAFrame();
     transform2 = constraint->getBFrame();
 
-    transform1.getOpenGLMatrix((btScalar *)r_ob1_transform);
-    transform2.getOpenGLMatrix((btScalar *)r_ob2_transform);
+    for(int i=0; i<3; i++) {
+        copy_v3_btvec3(r_ob1_basis[i], btVector3(transform1.getBasis()[0][i],transform1.getBasis()[1][i], transform1.getBasis()[2][i]));
+        copy_v3_btvec3(r_ob2_basis[i], btVector3(transform2.getBasis()[0][i],transform2.getBasis()[1][i], transform2.getBasis()[2][i]));
+    }
+    copy_v3_btvec3(r_ob1_orig, btVector3(transform1.getOrigin().x(),transform1.getOrigin().y(), transform1.getOrigin().z()));
+    copy_v3_btvec3(r_ob2_orig, btVector3(transform2.getOrigin().x() ,transform2.getOrigin().y(), transform2.getOrigin().z()));
+
+}
+
+void RB_constraint_get_transforms_slider(rbConstraint *con,
+                                        float r_ob1_basis[3][3],
+                                        float r_ob2_basis[3][3],
+                                        float r_ob1_orig[3],
+                                        float r_ob2_orig[3],
+                                        float r_initial_dist[3]) {
+    btSliderConstraint *constraint = reinterpret_cast<btSliderConstraint *>(con);
+    btTransform transform1;
+    btTransform transform2;
+
+    transform1 = constraint->getFrameOffsetA();
+    transform2 = constraint->getFrameOffsetB();
+
+    for(int i=0; i<3; i++) {
+        copy_v3_btvec3(r_ob1_basis[i], btVector3(transform1.getBasis()[0][i],transform1.getBasis()[1][i], transform1.getBasis()[2][i]));
+        copy_v3_btvec3(r_ob2_basis[i], btVector3(transform2.getBasis()[0][i],transform2.getBasis()[1][i], transform2.getBasis()[2][i]));
+    }
+    copy_v3_btvec3(r_ob1_orig, btVector3(transform1.getOrigin().x(),transform1.getOrigin().y(), transform1.getOrigin().z()));
+    copy_v3_btvec3(r_ob2_orig, btVector3(transform2.getOrigin().x() ,transform2.getOrigin().y(), transform2.getOrigin().z()));
+
+    if(r_initial_dist) {
+      btTransform transform3 = transform1 * transform2.inverse();
+      copy_v3_btvec3(r_initial_dist, btVector3(transform3.getOrigin().x() ,transform3.getOrigin().y(), transform3.getOrigin().z()));
+    }
 }
 
 /* ********************************** */
