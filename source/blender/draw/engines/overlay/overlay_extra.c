@@ -1656,7 +1656,7 @@ static void OVERLAY_vector_extra(OVERLAY_Data *data,
                                  float scale,
                                  float min_clamp,
                                  float color[3],
-                                 int text_flag)
+                                 int draw_text)
 {
 
   uchar text_color[4];
@@ -1680,7 +1680,7 @@ static void OVERLAY_vector_extra(OVERLAY_Data *data,
   DRW_shgroup_call_procedural_lines(grp, NULL, 3);
 
   /* Draw magnitude of vector as text */
-  if (text_flag) {
+  if (draw_text) {
     struct DRWTextStore *dt = DRW_text_cache_ensure();
     DRW_text_cache_add(dt,
                        vector_head_pos,
@@ -1697,13 +1697,13 @@ static void OVERLAY_forces_extra(OVERLAY_Data *data, Scene *scene, RigidBodyOb *
 {
 
   float scale = 0.05f;
-  float min_clamp = 2.0f;
+  float min_clamp = 1.0f;
   float vector[3] = {0.0f};
   float color1[3] = {1.0, 0.0, 1.0}; /* Pink. */
   float color2[3] = {0.0, 1.0, 0.5}; /* Cyan. */
   float color3[3] = {1.0, 1.0, 0.0}; /* Yellow. */
 
-  int text_flag = rbo->sim_display_options & RB_SIM_TEXT;
+  int draw_text = rbo->sim_display_options & RB_SIM_TEXT;
 
   if (rbo->display_force_types & RB_SIM_NET_FORCE) {
     /* Calculate net force. */
@@ -1714,10 +1714,11 @@ static void OVERLAY_forces_extra(OVERLAY_Data *data, Scene *scene, RigidBodyOb *
     for (int i = 0; i < 3; i++) {
       add_v3_v3(net_force, rbo->eff_forces[i].vector);
       add_v3_v3(net_force, rbo->norm_forces[i].vector);
+      add_v3_v3(net_force, rbo->fric_forces[i].vector);
     }
 
     if ((len_v3(net_force) > 0.000001f)) {
-      OVERLAY_vector_extra(data, net_force, rbo->pos, scale, min_clamp, color2, text_flag);
+      OVERLAY_vector_extra(data, net_force, rbo->pos, scale, min_clamp, color2, draw_text);
     }
   }
 
@@ -1726,42 +1727,42 @@ static void OVERLAY_forces_extra(OVERLAY_Data *data, Scene *scene, RigidBodyOb *
 
     copy_v3_v3(vector, scene->physics_settings.gravity);
     mul_v3_fl(vector, rbo->mass);
-    OVERLAY_vector_extra(data, vector, rbo->pos, scale, min_clamp, color1, text_flag);
+    OVERLAY_vector_extra(data, vector, rbo->pos, scale, min_clamp, color1, draw_text);
   }
 
   if (rbo->display_force_types & RB_SIM_EFFECTORS) {
 
     for (int i = 0; i < 3; i++) {
-      if (!is_zero_v3(rbo->eff_forces[i].vector)) {
+      if (len_v3(rbo->eff_forces[i].vector)>0.000001f) {
         OVERLAY_vector_extra(
-            data, rbo->eff_forces[i].vector, rbo->pos, scale, min_clamp, color1, text_flag);
+            data, rbo->eff_forces[i].vector, rbo->pos, scale, min_clamp, color1, draw_text);
       }
     }
   }
 
   if (rbo->display_force_types & RB_SIM_NORMAL) {
     for (int i = 0; i < 3; i++) {
-      if (!is_zero_v3(rbo->norm_forces[i].vector)) {
+      if (len_v3(rbo->norm_forces[i].vector)>0.000001f) {
         OVERLAY_vector_extra(data,
                              rbo->norm_forces[i].vector,
                              rbo->vec_locations[i].vector,
                              scale,
                              min_clamp,
                              color1,
-                             text_flag);
+                             draw_text);
       }
     }
   }
   if (rbo->display_force_types & RB_SIM_FRICTION) {
     for (int i = 0; i < 3; i++) {
-      if (!is_zero_v3(rbo->fric_forces[i].vector)) {
+      if (len_v3(rbo->fric_forces[i].vector)>0.000001f) {
         OVERLAY_vector_extra(data,
                              rbo->fric_forces[i].vector,
                              rbo->vec_locations[i].vector,
                              scale,
                              min_clamp,
                              color3,
-                             text_flag);
+                             draw_text);
       }
     }
   }
@@ -1771,7 +1772,7 @@ static void OVERLAY_forces_extra(OVERLAY_Data *data, Scene *scene, RigidBodyOb *
 static void OVERLAY_velocity_extra(OVERLAY_Data *data, RigidBodyOb *rbo)
 {
   float scale = 0.5f;
-  float min_clamp = 2.0f;
+  float min_clamp = 1.0f;
   float color[3] = {1.0, 0.5, 1.0};
 
   int text_flag = rbo->sim_display_options & RB_SIM_TEXT;
@@ -1787,7 +1788,7 @@ static void OVERLAY_acceleration_extra(OVERLAY_Data *data,
                                        Scene *scene)
 {
   float scale = 0.5f;
-  float min_clamp = 2.0f;
+  float min_clamp = 1.0f;
   float color[3] = {1.0, 1.0, 0.0};
 
   int text_flag = rbo->sim_display_options & RB_SIM_TEXT;

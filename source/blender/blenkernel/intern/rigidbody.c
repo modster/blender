@@ -2209,6 +2209,7 @@ static void rigidbody_get_debug_draw_data(RigidBodyWorld *rbw, float substep, bo
       float norm_forces[3][3] = {{0.0f}};
       float fric_forces[3][3] = {{0.0f}};
       float vec_locations[3][3] = {{0.0f}};
+
       Object *ob = rbw->objects[j];
       if (ob->rigidbody_object != NULL) {
         rbRigidBody *rbo = (rbRigidBody *)(ob->rigidbody_object->shared->physics_object);
@@ -2236,11 +2237,13 @@ static void rigidbody_get_debug_draw_data(RigidBodyWorld *rbw, float substep, bo
                                 vec_locations,
                                 norm_flag,
                                 fric_flag);
+          if(!is_zero_v3(norm_forces[0])) {
+            rigidbody_debug_draw_get_colliding_face(ob, vec_locations, norm_forces);
+          }
+
           for(int k=0; k<3; k++){
                if (norm_flag || fric_flag) {
-                if(!is_zero_v3(norm_forces[0])) {
-                  rigidbody_debug_draw_get_colliding_face(ob, vec_locations, norm_forces);
-                }
+
                 mul_v3_fl(norm_forces[k], 1/num_substeps);
                 add_v3_v3(ob->rigidbody_object->norm_forces[k].vector, norm_forces[k]);
                 mul_v3_fl(vec_locations[k], len_v3(norm_forces[k]));
