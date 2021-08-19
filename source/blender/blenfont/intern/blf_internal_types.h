@@ -51,13 +51,11 @@ extern BatchBLF g_batch;
 
 typedef struct KerningCacheBLF {
   struct KerningCacheBLF *next, *prev;
-
-  /* kerning mode. */
-  FT_UInt mode;
-
-  /* only cache a ascii glyph pairs. Only store the x
-   * offset we are interested in, instead of the full FT_Vector. */
-  int table[KERNING_CACHE_TABLE_SIZE][KERNING_CACHE_TABLE_SIZE];
+  /**
+   * Cache a ascii glyph pairs. Only store the x offset we are interested in,
+   * instead of the full #FT_Vector since it's not used for drawing at the moment.
+   */
+  int ascii_table[KERNING_CACHE_TABLE_SIZE][KERNING_CACHE_TABLE_SIZE];
 } KerningCacheBLF;
 
 typedef struct GlyphCacheBLF {
@@ -239,9 +237,6 @@ typedef struct FontBLF {
 
   /* freetype2 face. */
   FT_Face face;
-
-  /* freetype kerning */
-  FT_UInt kerning_mode;
 
   /* data for buffer usage (drawing into a texture buffer) */
   FontBufInfoBLF buf_info;
