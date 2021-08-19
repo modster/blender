@@ -32,8 +32,8 @@ static bNodeSocketTemplate geo_node_mesh_inset_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
     {SOCK_STRING, N_("Distance")},
     {SOCK_FLOAT, N_("Distance"), 0.0f, 0, 0, 0, FLT_MIN, FLT_MAX, PROP_DISTANCE},
-    {SOCK_STRING, N_("mesh_inset")},
-    {SOCK_FLOAT, N_("mesh_inset"), 0.0f, 0, 0, 0, FLT_MIN, FLT_MAX, PROP_DISTANCE},
+    {SOCK_STRING, N_("Inset")},
+    {SOCK_FLOAT, N_("Inset"), 0.0f, 0, 0, 0, FLT_MIN, FLT_MAX, PROP_DISTANCE},
     {SOCK_BOOLEAN, N_("Individual")},
     {SOCK_STRING, N_("Selection")},
     {SOCK_STRING, N_("Top Face")},
@@ -65,7 +65,7 @@ static void geo_node_mesh_inset_update(bNodeTree *UNUSED(ntree), bNode *node)
   blender::nodes::update_attribute_input_socket_availabilities(
       *node, "Distance", (GeometryNodeAttributeInputMode)node->custom1, true);
   blender::nodes::update_attribute_input_socket_availabilities(
-      *node, "mesh_inset", (GeometryNodeAttributeInputMode)node->custom2, true);
+      *node, "Inset", (GeometryNodeAttributeInputMode)node->custom2, true);
 }
 
 using blender::Span;
@@ -179,7 +179,7 @@ static void geo_node_mesh_inset_exec(GeoNodeExecParams params)
 
     const float default_mesh_inset = 0;
     GVArray_Typed<float> mesh_inset_attribute = params.get_input_attribute<float>(
-        "mesh_inset", mesh_component, attribute_domain, default_mesh_inset);
+        "Inset", mesh_component, attribute_domain, default_mesh_inset);
     VArray_Span<float> mesh_inset{mesh_inset_attribute};
 
     std::string selection_top_faces_out_attribute_name = params.get_input<std::string>("Top Face");
