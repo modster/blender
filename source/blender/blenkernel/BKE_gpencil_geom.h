@@ -90,7 +90,7 @@ typedef struct GPencilPointCoordinates {
   float pressure;
 } GPencilPointCoordinates;
 
-int BKE_gpencil_stroke_point_count(struct bGPdata *gpd);
+int BKE_gpencil_stroke_point_count(const struct bGPdata *gpd);
 void BKE_gpencil_point_coords_get(struct bGPdata *gpd, GPencilPointCoordinates *elem_data);
 void BKE_gpencil_point_coords_apply(struct bGPdata *gpd, const GPencilPointCoordinates *elem_data);
 void BKE_gpencil_point_coords_apply_with_mat4(struct bGPdata *gpd,
@@ -169,7 +169,8 @@ bool BKE_gpencil_convert_mesh(struct Main *bmain,
                               const float matrix[4][4],
                               const int frame_offset,
                               const bool use_seams,
-                              const bool use_faces);
+                              const bool use_faces,
+                              const bool use_vgroups);
 
 void BKE_gpencil_stroke_uniform_subdivide(struct bGPdata *gpd,
                                           struct bGPDstroke *gps,

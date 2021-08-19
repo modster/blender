@@ -1289,8 +1289,10 @@ static Image *image_open_single(Main *bmain,
     }
 
     if ((range->length > 1) && (ima->source == IMA_SRC_FILE)) {
-      if (range->udim_tiles.first && range->offset == 1001) {
+      if (range->udim_tiles.first) {
         ima->source = IMA_SRC_TILED;
+        ImageTile *first_tile = ima->tiles.first;
+        first_tile->tile_number = range->offset;
         LISTBASE_FOREACH (LinkData *, node, &range->udim_tiles) {
           BKE_image_add_tile(ima, POINTER_AS_INT(node->data), NULL);
         }
@@ -1607,7 +1609,7 @@ static int image_replace_exec(bContext *C, wmOperator *op)
 
   RNA_string_get(op->ptr, "filepath", str);
 
-  /* we cant do much if the str is longer than FILE_MAX :/ */
+  /* we can't do much if the str is longer than FILE_MAX :/ */
   BLI_strncpy(sima->image->filepath, str, sizeof(sima->image->filepath));
 
   if (sima->image->source == IMA_SRC_GENERATED) {
@@ -1806,10 +1808,13 @@ static int image_save_options_init(Main *bmain,
       }
 
       /* append UDIM numbering if not present */
-      if (ima->source == IMA_SRC_TILED &&
-          (BLI_path_sequence_decode(ima->filepath, NULL, NULL, NULL) != 1001)) {
+      if (ima->source == IMA_SRC_TILED) {
+        char udim[6];
+        ImageTile *tile = ima->tiles.first;
+        BLI_snprintf(udim, sizeof(udim), ".%d", tile->tile_number);
+
         int len = strlen(opts->filepath);
-        STR_CONCAT(opts->filepath, len, ".1001");
+        STR_CONCAT(opts->filepath, len, udim);
       }
     }
 
@@ -1995,7 +2000,7 @@ static bool image_save_as_draw_check_prop(PointerRNA *ptr,
   return !(STREQ(prop_id, "filepath") || STREQ(prop_id, "directory") ||
            STREQ(prop_id, "filename") ||
            /* when saving a copy, relative path has no effect */
-           ((STREQ(prop_id, "relative_path")) && RNA_boolean_get(ptr, "copy")));
+           (STREQ(prop_id, "relative_path") && RNA_boolean_get(ptr, "copy")));
 }
 
 static void image_save_as_draw(bContext *UNUSED(C), wmOperator *op)
@@ -2508,10 +2513,7 @@ static ImageNewData *image_new_init(bContext *C, wmOperator *op)
 
 static void image_new_free(wmOperator *op)
 {
-  if (op->customdata) {
-    MEM_freeN(op->customdata);
-    op->customdata = NULL;
-  }
+  MEM_SAFE_FREE(op->customdata);
 }
 
 static int image_new_exec(bContext *C, wmOperator *op)
@@ -2712,10 +2714,10 @@ static int image_flip_exec(bContext *C, wmOperator *op)
     return OPERATOR_CANCELLED;
   }
 
-  const bool flip_horizontal = RNA_boolean_get(op->ptr, "use_flip_horizontal");
-  const bool flip_vertical = RNA_boolean_get(op->ptr, "use_flip_vertical");
+  const bool use_flip_x = RNA_boolean_get(op->ptr, "use_flip_x");
+  const bool use_flip_y = RNA_boolean_get(op->ptr, "use_flip_y");
 
-  if (!flip_horizontal && !flip_vertical) {
+  if (!use_flip_x && !use_flip_y) {
     BKE_image_release_ibuf(ima, ibuf, NULL);
     return OPERATOR_FINISHED;
   }
@@ -2734,11 +2736,12 @@ static int image_flip_exec(bContext *C, wmOperator *op)
 
     float *orig_float_pixels = MEM_dupallocN(float_pixels);
     for (int x = 0; x < size_x; x++) {
+      const int source_pixel_x = use_flip_x ? size_x - x - 1 : x;
       for (int y = 0; y < size_y; y++) {
-        const int source_pixel_x = flip_horizontal ? size_x - x - 1 : x;
-        const int source_pixel_y = flip_vertical ? size_y - y - 1 : y;
+        const int source_pixel_y = use_flip_y ? size_y - y - 1 : y;
 
-        float *source_pixel = &orig_float_pixels[4 * (source_pixel_x + source_pixel_y * size_x)];
+        const float *source_pixel =
+            &orig_float_pixels[4 * (source_pixel_x + source_pixel_y * size_x)];
         float *target_pixel = &float_pixels[4 * (x + y * size_x)];
 
         copy_v4_v4(target_pixel, source_pixel);
@@ -2754,11 +2757,12 @@ static int image_flip_exec(bContext *C, wmOperator *op)
     char *char_pixels = (char *)ibuf->rect;
     char *orig_char_pixels = MEM_dupallocN(char_pixels);
     for (int x = 0; x < size_x; x++) {
+      const int source_pixel_x = use_flip_x ? size_x - x - 1 : x;
       for (int y = 0; y < size_y; y++) {
-        const int source_pixel_x = flip_horizontal ? size_x - x - 1 : x;
-        const int source_pixel_y = flip_vertical ? size_y - y - 1 : y;
+        const int source_pixel_y = use_flip_y ? size_y - y - 1 : y;
 
-        char *source_pixel = &orig_char_pixels[4 * (source_pixel_x + source_pixel_y * size_x)];
+        const char *source_pixel =
+            &orig_char_pixels[4 * (source_pixel_x + source_pixel_y * size_x)];
         char *target_pixel = &char_pixels[4 * (x + y * size_x)];
 
         copy_v4_v4_char(target_pixel, source_pixel);
@@ -2804,10 +2808,9 @@ void IMAGE_OT_flip(wmOperatorType *ot)
   /* properties */
   PropertyRNA *prop;
   prop = RNA_def_boolean(
-      ot->srna, "use_flip_horizontal", false, "Horizontal", "Flip the image horizontally");
+      ot->srna, "use_flip_x", false, "Horizontal", "Flip the image horizontally");
   RNA_def_property_flag(prop, PROP_SKIP_SAVE);
-  prop = RNA_def_boolean(
-      ot->srna, "use_flip_vertical", false, "Vertical", "Flip the image vertically");
+  prop = RNA_def_boolean(ot->srna, "use_flip_y", false, "Vertical", "Flip the image vertically");
   RNA_def_property_flag(prop, PROP_SKIP_SAVE);
 
   /* flags */
@@ -3870,9 +3873,9 @@ static void tile_fill_init(PointerRNA *ptr, Image *ima, ImageTile *tile)
 
   /* Acquire ibuf to get the default values.
    * If the specified tile has no ibuf, try acquiring the main tile instead
-   * (unless the specified tile already was the main tile).*/
+   * (unless the specified tile already was the first tile). */
   ImBuf *ibuf = BKE_image_acquire_ibuf(ima, &iuser, NULL);
-  if (ibuf == NULL && (tile != NULL) && (tile->tile_number != 1001)) {
+  if (ibuf == NULL && (tile != NULL) && (tile != ima->tiles.first)) {
     ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL);
   }
 
@@ -3924,7 +3927,7 @@ static int tile_add_exec(bContext *C, wmOperator *op)
   Image *ima = CTX_data_edit_image(C);
 
   int start_tile = RNA_int_get(op->ptr, "number");
-  int end_tile = start_tile + RNA_int_get(op->ptr, "count");
+  int end_tile = start_tile + RNA_int_get(op->ptr, "count") - 1;
 
   if (start_tile < 1001 || end_tile > IMA_UDIM_MAX) {
     BKE_report(op->reports, RPT_ERROR, "Invalid UDIM index range was specified");
@@ -3934,25 +3937,29 @@ static int tile_add_exec(bContext *C, wmOperator *op)
   bool fill_tile = RNA_boolean_get(op->ptr, "fill");
   char *label = RNA_string_get_alloc(op->ptr, "label", NULL, 0);
 
-  bool created_tile = false;
-  for (int tile_number = start_tile; tile_number < end_tile; tile_number++) {
+  /* BKE_image_add_tile assumes a pre-sorted list of tiles. */
+  BKE_image_sort_tiles(ima);
+
+  ImageTile *last_tile_created = NULL;
+  for (int tile_number = start_tile; tile_number <= end_tile; tile_number++) {
     ImageTile *tile = BKE_image_add_tile(ima, tile_number, label);
 
     if (tile != NULL) {
-      ima->active_tile_index = BLI_findindex(&ima->tiles, tile);
-
       if (fill_tile) {
         do_fill_tile(op->ptr, ima, tile);
       }
 
-      created_tile = true;
+      last_tile_created = tile;
     }
   }
   MEM_freeN(label);
 
-  if (!created_tile) {
+  if (!last_tile_created) {
+    BKE_report(op->reports, RPT_WARNING, "No UDIM tiles were created");
     return OPERATOR_CANCELLED;
   }
+
+  ima->active_tile_index = BLI_findindex(&ima->tiles, last_tile_created);
 
   WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, NULL);
   return OPERATOR_FINISHED;
@@ -4042,7 +4049,7 @@ static bool tile_remove_poll(bContext *C)
 {
   Image *ima = CTX_data_edit_image(C);
 
-  return (ima != NULL && ima->source == IMA_SRC_TILED && ima->active_tile_index != 0);
+  return (ima != NULL && ima->source == IMA_SRC_TILED && !BLI_listbase_is_single(&ima->tiles));
 }
 
 static int tile_remove_exec(bContext *C, wmOperator *UNUSED(op))

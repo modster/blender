@@ -145,7 +145,7 @@ static inline void curvemapping_minmax(/*const*/ BL::CurveMapping &cumap,
                                        float *min_x,
                                        float *max_x)
 {
-  /* const int num_curves = cumap.curves.length(); */ /* Gives linking error so far. */
+  // const int num_curves = cumap.curves.length(); /* Gives linking error so far. */
   const int num_curves = rgb_curve ? 4 : 3;
   *min_x = FLT_MAX;
   *max_x = -FLT_MAX;
@@ -246,7 +246,11 @@ static inline string image_user_file_path(BL::ImageUser &iuser,
 
   string filepath_str = string(filepath);
   if (load_tiled && ima.source() == BL::Image::source_TILED) {
-    string_replace(filepath_str, "1001", "<UDIM>");
+    string udim;
+    if (ima.tiles.length() > 0) {
+      udim = to_string(ima.tiles[0].number());
+    }
+    string_replace(filepath_str, udim, "<UDIM>");
   }
   return filepath_str;
 }
@@ -568,6 +572,35 @@ static inline BL::FluidDomainSettings object_fluid_gas_domain_find(BL::Object &b
   return BL::FluidDomainSettings(PointerRNA_NULL);
 }
 
+static inline BL::MeshSequenceCacheModifier object_mesh_cache_find(BL::Object &b_ob,
+                                                                   bool check_velocity)
+{
+  for (int i = b_ob.modifiers.length() - 1; i >= 0; --i) {
+    BL::Modifier b_mod = b_ob.modifiers[i];
+
+    if (b_mod.type() == BL::Modifier::type_MESH_SEQUENCE_CACHE) {
+      BL::MeshSequenceCacheModifier mesh_cache = BL::MeshSequenceCacheModifier(b_mod);
+
+      if (check_velocity) {
+        if (!MeshSequenceCacheModifier_has_velocity_get(&mesh_cache.ptr)) {
+          return BL::MeshSequenceCacheModifier(PointerRNA_NULL);
+        }
+      }
+
+      return mesh_cache;
+    }
+
+    /* Skip possible particles system modifiers as they do not modify the geometry. */
+    if (b_mod.type() == BL::Modifier::type_PARTICLE_SYSTEM) {
+      continue;
+    }
+
+    break;
+  }
+
+  return BL::MeshSequenceCacheModifier(PointerRNA_NULL);
+}
+
 static inline Mesh::SubdivisionType object_subdivision_type(BL::Object &b_ob,
                                                             bool preview,
                                                             bool experimental)
@@ -596,15 +629,14 @@ static inline Mesh::SubdivisionType object_subdivision_type(BL::Object &b_ob,
 
 static inline uint object_ray_visibility(BL::Object &b_ob)
 {
-  PointerRNA cvisibility = RNA_pointer_get(&b_ob.ptr, "cycles_visibility");
   uint flag = 0;
 
-  flag |= get_boolean(cvisibility, "camera") ? PATH_RAY_CAMERA : 0;
-  flag |= get_boolean(cvisibility, "diffuse") ? PATH_RAY_DIFFUSE : 0;
-  flag |= get_boolean(cvisibility, "glossy") ? PATH_RAY_GLOSSY : 0;
-  flag |= get_boolean(cvisibility, "transmission") ? PATH_RAY_TRANSMIT : 0;
-  flag |= get_boolean(cvisibility, "shadow") ? PATH_RAY_SHADOW : 0;
-  flag |= get_boolean(cvisibility, "scatter") ? PATH_RAY_VOLUME_SCATTER : 0;
+  flag |= b_ob.visible_camera() ? PATH_RAY_CAMERA : 0;
+  flag |= b_ob.visible_diffuse() ? PATH_RAY_DIFFUSE : 0;
+  flag |= b_ob.visible_glossy() ? PATH_RAY_GLOSSY : 0;
+  flag |= b_ob.visible_transmission() ? PATH_RAY_TRANSMIT : 0;
+  flag |= b_ob.visible_shadow() ? PATH_RAY_SHADOW : 0;
+  flag |= b_ob.visible_volume_scatter() ? PATH_RAY_VOLUME_SCATTER : 0;
 
   return flag;
 }

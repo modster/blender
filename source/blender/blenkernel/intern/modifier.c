@@ -156,7 +156,7 @@ ModifierData *BKE_modifier_new(int type)
   const ModifierTypeInfo *mti = BKE_modifier_get_info(type);
   ModifierData *md = MEM_callocN(mti->structSize, mti->structName);
 
-  /* note, this name must be made unique later */
+  /* NOTE: this name must be made unique later. */
   BLI_strncpy(md->name, DATA_(mti->name), sizeof(md->name));
 
   md->type = type;
@@ -249,11 +249,11 @@ bool BKE_modifier_unique_name(ListBase *modifiers, ModifierData *md)
   return false;
 }
 
-bool BKE_modifier_depends_ontime(ModifierData *md)
+bool BKE_modifier_depends_ontime(Scene *scene, ModifierData *md, const int dag_eval_mode)
 {
   const ModifierTypeInfo *mti = BKE_modifier_get_info(md->type);
 
-  return mti->dependsOnTime && mti->dependsOnTime(md);
+  return mti->dependsOnTime && mti->dependsOnTime(scene, md, dag_eval_mode);
 }
 
 bool BKE_modifier_supports_mapping(ModifierData *md)

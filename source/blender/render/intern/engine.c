@@ -124,8 +124,21 @@ bool RE_engine_is_external(const Render *re)
 
 bool RE_engine_is_opengl(RenderEngineType *render_type)
 {
-  /* TODO refine? Can we have ogl render engine without ogl render pipeline? */
+  /* TODO: refine? Can we have ogl render engine without ogl render pipeline? */
   return (render_type->draw_engine != NULL) && DRW_engine_render_support(render_type->draw_engine);
+}
+
+bool RE_engine_supports_alembic_procedural(const RenderEngineType *render_type, Scene *scene)
+{
+  if ((render_type->flag & RE_USE_ALEMBIC_PROCEDURAL) == 0) {
+    return false;
+  }
+
+  if (BKE_scene_uses_cycles(scene) && !BKE_scene_uses_cycles_experimental_features(scene)) {
+    return false;
+  }
+
+  return true;
 }
 
 /* Create, Free */
@@ -310,7 +323,7 @@ RenderResult *RE_engine_begin_result(
 
   result = render_result_new(re, &disprect, RR_USE_MEM, layername, viewname);
 
-  /* todo: make this thread safe */
+  /* TODO: make this thread safe. */
 
   /* can be NULL if we CLAMP the width or height to 0 */
   if (result) {
@@ -679,7 +692,7 @@ static void engine_depsgraph_init(RenderEngine *engine, ViewLayer *view_layer)
       DRW_render_context_enable(engine->re);
     }
 
-    DEG_evaluate_on_framechange(depsgraph, CFRA);
+    DEG_evaluate_on_framechange(depsgraph, BKE_scene_frame_get(scene));
 
     if (use_gpu_context) {
       DRW_render_context_disable(engine->re);
@@ -735,9 +748,9 @@ void RE_bake_engine_set_engine_parameters(Render *re, Main *bmain, Scene *scene)
   render_copy_renderdata(&re->r, &scene->r);
 }
 
-bool RE_bake_has_engine(Render *re)
+bool RE_bake_has_engine(const Render *re)
 {
-  RenderEngineType *type = RE_engines_find(re->r.engine);
+  const RenderEngineType *type = RE_engines_find(re->r.engine);
   return (type->bake != NULL);
 }
 
@@ -812,7 +825,7 @@ bool RE_bake_engine(Render *re,
   engine->flag &= ~RE_ENGINE_RENDERING;
 
   /* Free depsgraph outside of parts mutex lock, since this locks OpenGL context
-   * while the the UI drawing might also lock the OpenGL context and parts mutex. */
+   * while the UI drawing might also lock the OpenGL context and parts mutex. */
   engine_depsgraph_free(engine);
   BLI_rw_mutex_lock(&re->partsmutex, THREAD_LOCK_WRITE);
 
@@ -1037,7 +1050,7 @@ bool RE_engine_render(Render *re, bool do_all)
   /* re->engine becomes zero if user changed active render engine during render */
   if (!engine_keep_depsgraph(engine) || !re->engine) {
     /* Free depsgraph outside of parts mutex lock, since this locks OpenGL context
-     * while the the UI drawing might also lock the OpenGL context and parts mutex. */
+     * while the UI drawing might also lock the OpenGL context and parts mutex. */
     BLI_rw_mutex_unlock(&re->partsmutex);
     engine_depsgraph_free(engine);
     BLI_rw_mutex_lock(&re->partsmutex, THREAD_LOCK_WRITE);

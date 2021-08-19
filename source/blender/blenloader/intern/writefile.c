@@ -69,7 +69,7 @@
  * - write #TEST (#RenderInfo struct. 128x128 blend file preview is optional).
  * - write #GLOB (#FileGlobal struct) (some global vars).
  * - write #DNA1 (#SDNA struct)
- * - write #USER (#UserDef struct) if filename is ``~/.config/blender/X.XX/config/startup.blend``.
+ * - write #USER (#UserDef struct) if filename is `~/.config/blender/X.XX/config/startup.blend`.
  */
 
 #include <fcntl.h>
@@ -262,7 +262,7 @@ typedef struct {
   size_t write_len;
 #endif
 
-  /** Set on unlikely case of an error (ignores further file writing).  */
+  /** Set on unlikely case of an error (ignores further file writing). */
   bool error;
 
   /** #MemFile writing (used for undo). */
@@ -304,7 +304,7 @@ static void writedata_do_write(WriteData *wd, const void *mem, size_t memlen)
   }
 
   if (memlen > INT_MAX) {
-    BLI_assert(!"Cannot write chunks bigger than INT_MAX.");
+    BLI_assert_msg(0, "Cannot write chunks bigger than INT_MAX.");
     return;
   }
 
@@ -538,7 +538,7 @@ static void writedata(WriteData *wd, int filecode, size_t len, const void *adr)
   }
 
   if (len > INT_MAX) {
-    BLI_assert(!"Cannot write chunks bigger than INT_MAX.");
+    BLI_assert_msg(0, "Cannot write chunks bigger than INT_MAX.");
     return;
   }
 
@@ -605,7 +605,7 @@ static void writelist_id(WriteData *wd, int filecode, const char *structname, co
  * \{ */
 
 /**
- * Take care using 'use_active_win', since we wont want the currently active window
+ * Take care using 'use_active_win', since we won't want the currently active window
  * to change which scene renders (currently only used for undo).
  */
 static void current_screen_compat(Main *mainvar,
@@ -757,8 +757,8 @@ static void write_userdef(BlendWriter *writer, const UserDef *userdef)
     BLO_write_struct(writer, bPathCompare, path_cmp);
   }
 
-  LISTBASE_FOREACH (const bUserAssetLibrary *, asset_library, &userdef->asset_libraries) {
-    BLO_write_struct(writer, bUserAssetLibrary, asset_library);
+  LISTBASE_FOREACH (const bUserAssetLibrary *, asset_library_ref, &userdef->asset_libraries) {
+    BLO_write_struct(writer, bUserAssetLibrary, asset_library_ref);
   }
 
   LISTBASE_FOREACH (const uiStyle *, style, &userdef->uistyles) {
@@ -896,9 +896,10 @@ static void write_global(WriteData *wd, int fileflags, Main *mainvar)
   writestruct(wd, GLOB, FileGlobal, 1, &fg);
 }
 
-/* preview image, first 2 values are width and height
- * second are an RGBA image (uchar)
- * note, this uses 'TEST' since new types will segfault on file load for older blender versions.
+/**
+ * Preview image, first 2 values are width and height
+ * second are an RGBA image (uchar).
+ * \note this uses 'TEST' since new types will segfault on file load for older blender versions.
  */
 static void write_thumb(WriteData *wd, const BlendThumbnail *thumb)
 {
@@ -981,6 +982,14 @@ static bool write_file_handle(Main *mainvar,
         BLI_assert(
             (id->tag & (LIB_TAG_NO_MAIN | LIB_TAG_NO_USER_REFCOUNT | LIB_TAG_NOT_ALLOCATED)) == 0);
 
+        /* We only write unused IDs in undo case.
+         * NOTE: All Scenes, WindowManagers and WorkSpaces should always be written to disk, so
+         * their usercount should never be NULL currently. */
+        if (id->us == 0 && !wd->use_memfile) {
+          BLI_assert(!ELEM(GS(id->name), ID_SCE, ID_WM, ID_WS));
+          continue;
+        }
+
         const bool do_override = !ELEM(override_storage, NULL, bmain) &&
                                  ID_IS_OVERRIDE_LIBRARY_REAL(id);
 
@@ -1014,12 +1023,23 @@ static bool write_file_handle(Main *mainvar,
 
         memcpy(id_buffer, id, idtype_struct_size);
 
+        /* Clear runtime data to reduce false detection of changed data in undo/redo context. */
         ((ID *)id_buffer)->tag = 0;
+        ((ID *)id_buffer)->us = 0;
+        ((ID *)id_buffer)->icon_id = 0;
         /* Those listbase data change every time we add/remove an ID, and also often when
          * renaming one (due to re-sorting). This avoids generating a lot of false 'is changed'
          * detections between undo steps. */
         ((ID *)id_buffer)->prev = NULL;
         ((ID *)id_buffer)->next = NULL;
+        /* Those runtime pointers should never be set during writing stage, but just in case clear
+         * them too. */
+        ((ID *)id_buffer)->orig_id = NULL;
+        ((ID *)id_buffer)->newid = NULL;
+        /* Even though in theory we could be able to preserve this python instance across undo even
+         * when we need to re-read the ID into its original address, this is currently cleared in
+         * #direct_link_id_common in `readfile.c` anyway, */
+        ((ID *)id_buffer)->py_instance = NULL;
 
         const IDTypeInfo *id_type = BKE_idtype_get_info_from_id(id);
         if (id_type->blend_write != NULL) {

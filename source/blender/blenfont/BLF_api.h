@@ -53,6 +53,8 @@ int BLF_load_mem_unique(const char *name, const unsigned char *mem, int mem_size
 void BLF_unload(const char *name) ATTR_NONNULL();
 void BLF_unload_id(int fontid);
 
+char *BLF_display_name_from_file(const char *filename);
+
 /* Check if font supports a particular glyph. */
 bool BLF_has_glyph(int fontid, unsigned int unicode);
 
@@ -269,7 +271,7 @@ void BLF_state_print(int fontid);
 #define BLF_ROTATION (1 << 0)
 #define BLF_CLIPPING (1 << 1)
 #define BLF_SHADOW (1 << 2)
-#define BLF_KERNING_DEFAULT (1 << 3)
+// #define BLF_FLAG_UNUSED_3 (1 << 3) /* dirty */
 #define BLF_MATRIX (1 << 4)
 #define BLF_ASPECT (1 << 5)
 #define BLF_WORD_WRAP (1 << 6)
