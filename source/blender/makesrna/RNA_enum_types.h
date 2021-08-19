@@ -78,6 +78,9 @@ extern const EnumPropertyItem rna_enum_linestyle_alpha_modifier_type_items[];
 extern const EnumPropertyItem rna_enum_linestyle_thickness_modifier_type_items[];
 extern const EnumPropertyItem rna_enum_linestyle_geometry_modifier_type_items[];
 
+extern const EnumPropertyItem nonmanifold_thickness_mode_items[];
+extern const EnumPropertyItem nonmanifold_boundary_mode_items[];
+
 extern const EnumPropertyItem rna_enum_window_cursor_items[];
 
 extern const EnumPropertyItem rna_enum_dt_method_vertex_items[];

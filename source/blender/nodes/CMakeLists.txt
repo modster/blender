@@ -187,7 +187,7 @@ set(SRC
   geometry/nodes/node_geo_delete_geometry.cc
   geometry/nodes/node_geo_dissolve.cc
   geometry/nodes/node_geo_edge_split.cc
-    geometry/nodes/node_geo_mesh_extrude.cc
+  geometry/nodes/node_geo_mesh_extrude.cc
   geometry/nodes/node_geo_input_material.cc
   geometry/nodes/node_geo_is_viewport.cc
   geometry/nodes/node_geo_join_geometry.cc
@@ -417,7 +417,7 @@ if(WITH_BULLET)
   if(NOT WITH_SYSTEM_BULLET)
   list(APPEND LIB
     extern_bullet
-  )
+    )
   endif()
 
   list(APPEND LIB
@@ -488,15 +488,8 @@ if(WITH_GMP)
 endif()
 
 if(WITH_OPENVDB)
-  list(APPEND INC
-    ../../../intern/openvdb
-  )
   list(APPEND INC_SYS
     ${OPENVDB_INCLUDE_DIRS}
-  )
-  list(APPEND LIB
-    bf_intern_openvdb
-    ${OPENVDB_LIBRARIES}
   )
   add_definitions(-DWITH_OPENVDB ${OPENVDB_DEFINITIONS})
 endif()

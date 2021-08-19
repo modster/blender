@@ -1483,10 +1483,9 @@ int ntreeTexExecTree(struct bNodeTree *ntree,
 #define GEO_NODE_MERGE_BY_DISTANCE 1078
 #define GEO_NODE_MESH_EXTRUDE 1079
 #define GEO_NODE_MESH_INSET 1080
-#define GEO_NODE_CURVE_SELECT_HANDLES 1081
-#define GEO_NODE_COLLAPSE 1082
-#define GEO_NODE_UNSUBDIVIDE 1083
-#define GEO_NODE_DISSOLVE 1084
+#define GEO_NODE_COLLAPSE 1081
+#define GEO_NODE_UNSUBDIVIDE 1082
+#define GEO_NODE_DISSOLVE 1083
 /** \} */
 
 /* -------------------------------------------------------------------- */

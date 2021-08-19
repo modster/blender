@@ -1447,8 +1447,8 @@ void BM_mesh_vert_coords_apply_with_mat4(BMesh *bm,
 }
 
 /**
-* Use to select  bmesh vertex data based on an array of bool.
-*/
+ * Use to select bmesh vertex data based on an array of bool.
+ */
 void BM_select_vertices(BMesh *bm, const bool *mask)
 {
   BMIter iter;
@@ -1485,43 +1485,16 @@ void BM_select_faces(BMesh *bm, const bool *mask)
   }
 }
 
-void BM_get_selected_vertices(BMesh *bm, bool *selection)
-{
-  BMIter iter;
-  BMVert *v;
-  int i;
-  BM_ITER_MESH_INDEX (v, &iter, bm, BM_VERTS_OF_MESH, i) {
-    selection[i] = BM_elem_flag_test(v, BM_ELEM_SELECT);
-  }
-}
-
-void BM_get_tagged_faces(BMesh *bm, bool *selection)
-{
-  BMIter iter;
-  BMFace *f;
-  int i;
-  BM_ITER_MESH_INDEX (f, &iter, bm, BM_FACES_OF_MESH, i) {
-    selection[i] = BM_elem_flag_test(f, BM_ELEM_TAG);
-  }
-}
-
-void BM_tag_new_faces(BMesh *bm, BMOperator *b_mesh_operator)
-{
-  BMIter iter;
-  BMFace *f;
-  BM_mesh_elem_hflag_disable_all(bm, BM_FACE, BM_ELEM_TAG, false);
-  BMO_ITER (f, &iter, b_mesh_operator->slots_out, "faces.out", BM_FACE) {
-    BM_elem_flag_enable(f, BM_ELEM_TAG);
-  }
-}
-
+/**
+ * Use to temporary tag bmesh edge data based on an array of bool.
+ */
 void BM_tag_vertices(BMesh *bm, const bool *mask)
 {
   BMIter iter;
-  BMVert *v;
+  BMEdge *e;
   int i;
-  BM_ITER_MESH_INDEX (v, &iter, bm, BM_VERTS_OF_MESH, i) {
-    BM_elem_flag_set(v, BM_ELEM_TAG, mask[i]);
+  BM_ITER_MESH_INDEX (e, &iter, bm, BM_EDGES_OF_MESH, i) {
+    BM_elem_flag_set(e, BM_ELEM_TAG, mask[i]);
   }
 }
 
@@ -1551,6 +1524,117 @@ void BM_tag_faces(BMesh *bm, const bool *mask)
   }
 }
 
+/**
+ * Write selected bmesh vertex to array of bool with length of totvert.
+ */
+void BM_get_selected_vertices(BMesh *bm, bool *selection)
+{
+  BMIter iter;
+  BMVert *v;
+  int i;
+  BM_ITER_MESH_INDEX (v, &iter, bm, BM_VERTS_OF_MESH, i) {
+    selection[i] = BM_elem_flag_test(v, BM_ELEM_SELECT);
+  }
+}
+
+/**
+ * Write selected bmesh edge to array of bool with length of totedge.
+ */
+void BM_get_selected_edges(BMesh *bm, bool *selection)
+{
+  BMIter iter;
+  BMEdge *e;
+  int i;
+  BM_ITER_MESH_INDEX (e, &iter, bm, BM_EDGES_OF_MESH, i) {
+    selection[i] = BM_elem_flag_test(e, BM_ELEM_SELECT);
+  }
+}
+
+/**
+ * Write selected bmesh face to array of bool with length of totpoly.
+ */
+void BM_get_selected_faces(BMesh *bm, bool *selection)
+{
+  BMIter iter;
+  BMFace *f;
+  int i;
+  BM_ITER_MESH_INDEX (f, &iter, bm, BM_FACES_OF_MESH, i) {
+    selection[i] = BM_elem_flag_test(f, BM_ELEM_SELECT);
+  }
+}
+
+/**
+ * Write tagged bmesh vertex to array of bool with length of totvert.
+ */
+void BM_get_tagged_vertices(BMesh *bm, bool *selection)
+{
+  BMIter iter;
+  BMVert *v;
+  int i;
+  BM_ITER_MESH_INDEX (v, &iter, bm, BM_VERTS_OF_MESH, i) {
+    selection[i] = BM_elem_flag_test(v, BM_ELEM_TAG);
+  }
+}
+
+/**
+ * Write tagged bmesh edge to array of bool with length of totedge.
+ */
+void BM_get_tagged_edges(BMesh *bm, bool *selection)
+{
+  BMIter iter;
+  BMEdge *e;
+  int i;
+  BM_ITER_MESH_INDEX (e, &iter, bm, BM_EDGES_OF_MESH, i) {
+    selection[i] = BM_elem_flag_test(e, BM_ELEM_TAG);
+  }
+}
+
+/**
+ * Write tagged bmesh faces to array of bool with length of totpoly.
+ */
+void BM_get_tagged_faces(BMesh *bm, bool *selection)
+{
+  BMIter iter;
+  BMFace *f;
+  int i;
+  BM_ITER_MESH_INDEX (f, &iter, bm, BM_FACES_OF_MESH, i) {
+    selection[i] = BM_elem_flag_test(f, BM_ELEM_TAG);
+  }
+}
+
+/**
+ * Use to remove tag from all bmesh verts that are tagged with another tag.
+ */
+void BM_untag_vertices_by_tag(BMesh *bm, int tag)
+{
+  BMIter iter;
+  BMVert *v;
+  int i;
+  BM_ITER_MESH_INDEX (v, &iter, bm, BM_VERTS_OF_MESH, i) {
+    if (BM_elem_flag_test(v, tag)) {
+      BM_elem_flag_disable(v, BM_ELEM_TAG);
+    }
+  }
+}
+
+/**
+ * Use to remove tag from all bmesh edges that are tagged with another tag.
+ */
+void BM_untag_edges_by_tag(BMesh *bm, int tag)
+{
+  BMIter iter;
+  BMEdge *e;
+  int i;
+  BM_ITER_MESH_INDEX (e, &iter, bm, BM_EDGES_OF_MESH, i) {
+    if (BM_elem_flag_test(e, tag)) {
+      BM_elem_flag_disable(e, BM_ELEM_TAG);
+    }
+  }
+}
+
+/**
+ * Use to remove tag from all bmesh faces that are tagged with another tag.
+ */
 void BM_untag_faces_by_tag(BMesh *bm, int tag)
 {
   BMIter iter;
@@ -1562,78 +1646,3 @@ void BM_untag_faces_by_tag(BMesh *bm, int tag)
     }
   }
 }
-/**
- * Use to select  bmesh vertex data based on an array of bool.
- */
-void BM_select_vertices(BMesh *bm, const bool *mask)
-{
-  BMIter iter;
-  BMVert *v;
-  int i;
-  BM_ITER_MESH_INDEX (v, &iter, bm, BM_VERTS_OF_MESH, i) {
-    BM_elem_flag_set(v, BM_ELEM_SELECT, mask[i]);
-  }
-}
-
-/**
- * Use to select bmesh edge data based on an array of bool.
- */
-void BM_select_edges(BMesh *bm, const bool *mask)
-{
-  BMIter iter;
-  BMEdge *e;
-  int i;
-  BM_ITER_MESH_INDEX (e, &iter, bm, BM_EDGES_OF_MESH, i) {
-    BM_elem_flag_set(e, BM_ELEM_SELECT, mask[i]);
-  }
-}
-
-/**
- * Use to select bmesh face data based on an array of bool.
- */
-void BM_select_faces(BMesh *bm, const bool *mask)
-{
-  BMIter iter;
-  BMFace *f;
-  int i;
-  BM_ITER_MESH_INDEX (f, &iter, bm, BM_FACES_OF_MESH, i) {
-    BM_elem_flag_set(f, BM_ELEM_SELECT, mask[i]);
-  }
-}
-
-void BM_tag_vertices(BMesh *bm, const bool *mask)
-{
-  BMIter iter;
-  BMVert *v;
-  int i;
-  BM_ITER_MESH_INDEX (v, &iter, bm, BM_VERTS_OF_MESH, i) {
-    BM_elem_flag_set(v, BM_ELEM_TAG, mask[i]);
-  }
-}
-
-/**
- * Use to temporary tag bmesh edge data based on an array of bool.
- */
-void BM_tag_edges(BMesh *bm, const bool *mask)
-{
-  BMIter iter;
-  BMEdge *e;
-  int i;
-  BM_ITER_MESH_INDEX (e, &iter, bm, BM_EDGES_OF_MESH, i) {
-    BM_elem_flag_set(e, BM_ELEM_TAG, mask[i]);
-  }
-}
-
-/**
- * Use to temporary tag bmesh face data based on an array of bool.
- */
-void BM_tag_faces(BMesh *bm, const bool *mask)
-{
-  BMIter iter;
-  BMFace *f;
-  int i;
-  BM_ITER_MESH_INDEX (f, &iter, bm, BM_FACES_OF_MESH, i) {
-    BM_elem_flag_set(f, BM_ELEM_TAG, mask[i]);
-  }
-}
-/** \} */
