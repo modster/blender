@@ -47,23 +47,23 @@
 
 /* Data structure to keep track of details about the cut location */
 typedef struct CutData {
-  /* Index of the last bez triple before the cut. */
+  /* Index of the last BezTriple or BPoint before the cut. */
   int bezt_index, bp_index;
   /* Nurb to which the cut belongs to. */
   Nurb *nurb;
   /* Minimum distance to curve from mouse location. */
   float min_dist;
-  /* Ratio at which the new point divides the curve segment. */
+  /* Fraction of segments after which the new point divides the curve segment. */
   float parameter;
-  /* Whether the cut has any vertices before/after it. */
+  /* Whether the currently identified closest point has any vertices before/after it. */
   bool has_prev, has_next;
-  /* Locations of adjacent vertices. */
+  /* Locations of adjacent vertices and cut location. */
   float prev_loc[3], cut_loc[3], next_loc[3];
-  /* Mouse location as floats. */
+  /* Mouse location in floats. */
   float mval[2];
 } CutData;
 
-/* Data required segment altering functionality. */
+/* Data required for segment altering functionality. */
 typedef struct MoveSegmentData {
   /* Nurb being altered. */
   Nurb *nu;
@@ -85,7 +85,7 @@ static void mouse_location_to_worldspace(const int mouse_loc[2],
   mul_m4_v3(imat, r_location);
 }
 
-/* Move the handle of BezTriple to mouse based on the previously added point. */
+/* Move the handle of BezTriple to mouse based on the newly added point. */
 static void move_bezt_handles_to_mouse(BezTriple *bezt,
                                        const bool is_end_point,
                                        const wmEvent *event,
@@ -158,7 +158,9 @@ static void free_up_handles_for_movement(BezTriple *bezt, bool f1, bool f3)
 }
 
 /* Move BezTriple to mouse. */
-static void move_selected_bezt_to_mouse(BezTriple *bezt, ViewContext *vc, const wmEvent *event)
+static void move_selected_bezt_to_mouse(BezTriple *bezt,
+                                        const ViewContext *vc,
+                                        const wmEvent *event)
 {
   /* Get mouse location in 3D space. */
   float location[3];
@@ -192,8 +194,36 @@ static void move_bp_to_mouse(BPoint *bp, const wmEvent *event, const ViewContext
   copy_v3_v3(bp->vec, location);
 }
 
+static int get_nurb_index(ListBase *nurbs, Nurb *nurb)
+{
+  int index = 0;
+  LISTBASE_FOREACH (Nurb *, nu, nurbs) {
+    if (nu == nurb) {
+      return index;
+    }
+    index++;
+  }
+  /* The nurb should've been found by now. */
+  BLI_assert(false);
+  return -1;
+}
+
+static void delete_nurb(Curve *cu, Nurb *nu)
+{
+  EditNurb *editnurb = cu->editnurb;
+  ListBase *nubase = &editnurb->nurbs;
+  const int nuindex = get_nurb_index(nubase, nu);
+  if (cu->actnu == nuindex) {
+    cu->actnu = CU_ACT_NONE;
+  }
+
+  BLI_remlink(nubase, nu);
+  BKE_nurb_free(nu);
+  nu = NULL;
+}
+
 /* Delete given BezTriple from given Nurb. */
-static void delete_bezt_from_nurb(BezTriple *bezt, Nurb *nu)
+static void delete_bezt_from_nurb(const BezTriple *bezt, Nurb *nu)
 {
   BLI_assert(nu->type == CU_BEZIER);
   int index = BKE_curve_nurb_vert_index_get(nu, bezt);
@@ -202,7 +232,7 @@ static void delete_bezt_from_nurb(BezTriple *bezt, Nurb *nu)
 }
 
 /* Delete given BPoint from given Nurb. */
-static void delete_bp_from_nurb(BPoint *bp, Nurb *nu)
+static void delete_bp_from_nurb(const BPoint *bp, Nurb *nu)
 {
   BLI_assert(nu->type == CU_NURBS);
   int index = BKE_curve_nurb_vert_index_get(nu, bp);
@@ -212,7 +242,7 @@ static void delete_bp_from_nurb(BPoint *bp, Nurb *nu)
 
 /* Get the closest point on an edge to a given point based on perpendicular distance. Return true
  * if closest point on curve.  */
-static bool get_closest_point_on_edge(float point[3],
+static bool get_closest_point_on_edge(float r_point[3],
                                       const float pos[2],
                                       const float pos1[3],
                                       const float pos2[3],
@@ -244,24 +274,24 @@ static bool get_closest_point_on_edge(float point[3],
 
     float pos_dif[3];
     sub_v3_v3v3(pos_dif, pos2, pos1);
-    madd_v3_v3v3fl(point, pos1, pos_dif, *factor);
+    madd_v3_v3v3fl(r_point, pos1, pos_dif, *factor);
     return true;
   }
   if (len_manhattan_v2(vec1) < len_manhattan_v2(vec2)) {
-    copy_v3_v3(point, pos1);
+    copy_v3_v3(r_point, pos1);
     return false;
   }
-  copy_v3_v3(point, pos2);
+  copy_v3_v3(r_point, pos2);
   return false;
 }
 
-/* Get closest control point in all nurbs in given ListBase to a given point. */
-static void get_closest_cp_to_point_in_nurbs(ListBase *nurbs,
-                                             Nurb **r_nu,
-                                             BezTriple **r_bezt,
-                                             BPoint **r_bp,
-                                             const float point[2],
-                                             const ViewContext *vc)
+/* Get closest vertex in all nurbs in given ListBase to a given point. */
+static void get_closest_vertex_to_point_in_nurbs(ListBase *nurbs,
+                                                 Nurb **r_nu,
+                                                 BezTriple **r_bezt,
+                                                 BPoint **r_bp,
+                                                 const float point[2],
+                                                 const ViewContext *vc)
 {
   float min_distance_bezt = FLT_MAX;
   float min_distance_bp = FLT_MAX;
@@ -317,13 +347,13 @@ static void get_closest_cp_to_point_in_nurbs(ListBase *nurbs,
 }
 
 /* Update CutData with location of closest vertex on curve. */
-static void update_data_if_nearest_point_in_segment(BezTriple *bezt1,
-                                                    BezTriple *bezt2,
-                                                    Nurb *nu,
-                                                    int index,
-                                                    ViewContext *vc,
-                                                    float screen_co[2],
-                                                    void *op_data)
+static void update_data_if_closest_vertex_in_segment(BezTriple *bezt1,
+                                                     BezTriple *bezt2,
+                                                     Nurb *nu,
+                                                     const int index,
+                                                     const ViewContext *vc,
+                                                     float screen_co[2],
+                                                     void *op_data)
 {
 
   CutData *data = op_data;
@@ -331,7 +361,7 @@ static void update_data_if_nearest_point_in_segment(BezTriple *bezt1,
   float resolu = nu->resolu;
   float *points = MEM_mallocN(sizeof(float[3]) * (resolu + 1), "makeCut_bezier");
 
-  /* Calculate all points on curve. TODO: Get existing . */
+  /* Calculate all points on curve. */
   for (int j = 0; j < 3; j++) {
     BKE_curve_forward_diff_bezier(bezt1->vec[1][j],
                                   bezt1->vec[2][j],
@@ -342,9 +372,7 @@ static void update_data_if_nearest_point_in_segment(BezTriple *bezt1,
                                   sizeof(float[3]));
   }
 
-  /* Calculate angle for middle points */
   for (int k = 0; k <= resolu; k++) {
-    /* Convert point to screen coordinates */
     bool check = ED_view3d_project_float_object(vc->region,
                                                 points + 3 * k,
                                                 screen_co,
@@ -375,8 +403,8 @@ static void update_data_if_nearest_point_in_segment(BezTriple *bezt1,
   MEM_freeN(points);
 }
 
-/* Update the closest point in the data structure. */
-static void update_closest_point_in_data(void *op_data, int resolution, ViewContext *vc)
+/* Update the closest location as cut location in data. */
+static void update_cut_loc_in_data(void *op_data, const ViewContext *vc)
 {
   CutData *data = op_data;
   bool found_min = false;
@@ -398,7 +426,7 @@ static void update_closest_point_in_data(void *op_data, int resolution, ViewCont
         vc->region, point, point_2d, V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN);
     float dist = len_manhattan_v2v2(point_2d, data->mval);
     data->min_dist = dist;
-    data->parameter += factor / resolution;
+    data->parameter += factor / data->nurb->resolu;
     copy_v3_v3(data->cut_loc, point);
   }
 }
@@ -447,7 +475,7 @@ static void calculate_new_bezier_point(const float point_prev[3],
 }
 
 /* Update the nearest point data for all nurbs. */
-static void update_data_for_all_nurbs(ListBase *nurbs, ViewContext *vc, void *op_data)
+static void update_data_for_all_nurbs(const ListBase *nurbs, const ViewContext *vc, void *op_data)
 {
   CutData *data = op_data;
 
@@ -468,11 +496,11 @@ static void update_data_for_all_nurbs(ListBase *nurbs, ViewContext *vc, void *op
       BezTriple *bezt = NULL;
       for (i = 0; i < nu->pntsu - 1; i++) {
         bezt = &nu->bezt[i];
-        update_data_if_nearest_point_in_segment(bezt, bezt + 1, nu, i, vc, screen_co, data);
+        update_data_if_closest_vertex_in_segment(bezt, bezt + 1, nu, i, vc, screen_co, data);
       }
 
       if (nu->flagu & CU_NURB_CYCLIC && bezt) {
-        update_data_if_nearest_point_in_segment(bezt + 1, nu->bezt, nu, i, vc, screen_co, data);
+        update_data_if_closest_vertex_in_segment(bezt + 1, nu->bezt, nu, i, vc, screen_co, data);
       }
     }
     else if (nu->bp) {
@@ -509,10 +537,10 @@ static void update_data_for_all_nurbs(ListBase *nurbs, ViewContext *vc, void *op
 }
 
 /* Insert a bezt to a nurb at the location specified by op_data. */
-static void add_bezt_to_nurb(Nurb *nu, void *op_data, Curve *cu)
+static void add_bezt_to_nurb(Nurb *nu, const void *op_data, Curve *cu)
 {
   EditNurb *editnurb = cu->editnurb;
-  CutData *data = op_data;
+  const CutData *data = op_data;
 
   BezTriple *bezt1 = (BezTriple *)MEM_mallocN((nu->pntsu + 1) * sizeof(BezTriple),
                                               "new_bezt_nurb");
@@ -546,9 +574,7 @@ static void add_bezt_to_nurb(Nurb *nu, void *op_data, Curve *cu)
   new_bezt->radius = interpf(next_bezt->radius, (new_bezt - 1)->radius, data->parameter);
   new_bezt->weight = interpf(next_bezt->weight, (new_bezt - 1)->weight, data->parameter);
 
-  free_up_handles_for_movement(new_bezt, true, true);
-  free_up_handles_for_movement(new_bezt - 1, false, true);
-  free_up_handles_for_movement(next_bezt, true, false);
+  new_bezt->h1 = new_bezt->h2 = HD_ALIGN;
 
   calculate_new_bezier_point((new_bezt - 1)->vec[1],
                              (new_bezt - 1)->vec[2],
@@ -565,11 +591,11 @@ static void add_bezt_to_nurb(Nurb *nu, void *op_data, Curve *cu)
   new_bezt->f1 = new_bezt->f2 = new_bezt->f3 = 1;
 }
 
-/* Insert a bezt to a nurb at the location specified by op_data. */
-static void add_bp_to_nurb(Nurb *nu, void *op_data, Curve *cu)
+/* Insert a BPoint to a nurb at the location specified by op_data. */
+static void add_bp_to_nurb(Nurb *nu, const void *op_data, Curve *cu)
 {
   EditNurb *editnurb = cu->editnurb;
-  CutData *data = op_data;
+  const CutData *data = op_data;
 
   BPoint *bp1 = (BPoint *)MEM_mallocN((nu->pntsu + 1) * sizeof(BPoint), "new_bp_nurb");
   int index = data->bp_index + 1;
@@ -609,7 +635,7 @@ static void add_bp_to_nurb(Nurb *nu, void *op_data, Curve *cu)
 }
 
 /* Make a cut on the nearest nurb at the closest point. */
-static void make_cut(const wmEvent *event, Curve *cu, Nurb **r_nu, ViewContext *vc)
+static void make_cut(const wmEvent *event, Curve *cu, Nurb **r_nu, const ViewContext *vc)
 {
   CutData data = {.bezt_index = 0,
                   .bp_index = 0,
@@ -629,7 +655,7 @@ static void make_cut(const wmEvent *event, Curve *cu, Nurb **r_nu, ViewContext *
   Nurb *nu = data.nurb;
   if (nu) {
     if (nu->bezt) {
-      update_closest_point_in_data(&data, nu->resolu, vc);
+      update_cut_loc_in_data(&data, vc);
       if (data.min_dist < threshold_distance) {
         add_bezt_to_nurb(nu, &data, cu);
         *r_nu = nu;
@@ -641,10 +667,10 @@ static void make_cut(const wmEvent *event, Curve *cu, Nurb **r_nu, ViewContext *
   }
 }
 
-/* Add a new control point connected to the selected control point. */
-static void add_point_connected_to_selected_point(ViewContext *vc,
-                                                  Object *obedit,
-                                                  const wmEvent *event)
+/* Add a new vertex connected to the selected vertex. */
+static void add_vertex_connected_to_selected_vertex(const ViewContext *vc,
+                                                    Object *obedit,
+                                                    const wmEvent *event)
 {
   Nurb *nu = NULL;
   BezTriple *bezt = NULL;
@@ -681,7 +707,7 @@ static void add_point_connected_to_selected_point(ViewContext *vc,
 }
 
 /* Check if a spline segment is nearby. */
-static bool is_curve_nearby(ViewContext *vc, wmOperator *op, const wmEvent *event)
+static bool is_spline_nearby(ViewContext *vc, wmOperator *op, const wmEvent *event)
 {
   Curve *cu = vc->obedit->data;
   ListBase *nurbs = BKE_curve_editNurbs_get(cu);
@@ -698,7 +724,7 @@ static bool is_curve_nearby(ViewContext *vc, wmOperator *op, const wmEvent *even
   update_data_for_all_nurbs(nurbs, vc, &data);
 
   float threshold_distance = ED_view3d_select_dist_px();
-  if (!data.nurb->bp && data.min_dist < threshold_distance) {
+  if (data.nurb && !data.nurb->bp && data.min_dist < threshold_distance) {
     MoveSegmentData *seg_data;
     op->customdata = seg_data = MEM_callocN(sizeof(MoveSegmentData), "MoveSegmentData");
     seg_data->bezt_index = data.bezt_index;
@@ -760,8 +786,8 @@ static void move_segment(MoveSegmentData *seg_data, const wmEvent *event, ViewCo
   }
 }
 
-/* Close the spline if endpoints are selected consecutively. Return true if loop was closed. */
-static bool close_loop_if_endpoints(
+/* Close the spline if endpoints are selected consecutively. Return true if cycle was created. */
+static bool make_cyclic_if_endpoints(
     Nurb *sel_nu, BezTriple *sel_bezt, BPoint *sel_bp, ViewContext *vc, bContext *C)
 {
   if (sel_bezt || sel_bp) {
@@ -910,7 +936,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
         float mouse_point[2] = {(float)event->mval[0], (float)event->mval[1]};
 
         /* Find the closest point to the mouse location. */
-        get_closest_cp_to_point_in_nurbs(nurbs, &nu, &bezt, &bp, mouse_point, &vc);
+        get_closest_vertex_to_point_in_nurbs(nurbs, &nu, &bezt, &bp, mouse_point, &vc);
         found_point = nu != NULL;
 
         if (found_point) {
@@ -924,11 +950,14 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
               uint span_step[2] = {bez_index, bez_index};
               dissolve_bez_segment(prev_bezt, next_bezt, nu, cu, 1, span_step);
             }
-            /* Only delete if otherwise. */
             delete_bezt_from_nurb(bezt, nu);
           }
-          if (nu->type == CU_NURBS) {
+          else if (nu->type == CU_NURBS) {
             delete_bp_from_nurb(bp, nu);
+          }
+
+          if (nu->pntsu == 0) {
+            delete_nurb(cu, nu);
           }
         }
         cu->actvert = CU_ACT_NONE;
@@ -948,35 +977,41 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
         ED_curve_nurb_vert_selected_find(cu, vc.v3d, &nu, &bezt, &bp);
 
         /* Select a point if it's underneath the mouse. */
-        bool retval = ED_curve_editnurb_select_pick(C, event->mval, false, false, false);
-        RNA_boolean_set(op->ptr, "new", !retval);
+        const bool found_point = ED_curve_editnurb_select_pick(
+            C, event->mval, false, false, false);
+        RNA_boolean_set(op->ptr, "new", !found_point);
 
-        if (retval) {
+        if (found_point) {
           copy_v2_v2_int(vc.mval, event->mval);
           if (nu && !(nu->flagu & CU_NURB_CYCLIC)) {
-            bool closed = close_loop_if_endpoints(nu, bezt, bp, &vc, C);
+            bool closed = make_cyclic_if_endpoints(nu, bezt, bp, &vc, C);
 
             /* Set "new" to true to be able to click and drag to control handles when added. */
             RNA_boolean_set(op->ptr, "new", closed);
           }
         }
         else {
-          if (is_curve_nearby(&vc, op, event)) {
+          if (is_spline_nearby(&vc, op, event)) {
             RNA_boolean_set(op->ptr, "moving_segment", true);
             moving_segment = true;
           }
           else {
-            add_point_connected_to_selected_point(&vc, obedit, event);
+            add_vertex_connected_to_selected_vertex(&vc, obedit, event);
           }
         }
       }
     }
-    if (event->val == KM_RELEASE) {
+    else if (event->val == KM_RELEASE) {
+      if (moving_segment) {
+        if (!dragging) {
+          add_vertex_connected_to_selected_vertex(&vc, obedit, event);
+        }
+        else {
+          MEM_freeN(op->customdata);
+        }
+      }
       RNA_boolean_set(op->ptr, "dragging", false);
       RNA_boolean_set(op->ptr, "new", false);
-      if (moving_segment) {
-        MEM_freeN(op->customdata);
-      }
       RNA_boolean_set(op->ptr, "moving_segment", false);
       ret = OPERATOR_FINISHED;
     }
