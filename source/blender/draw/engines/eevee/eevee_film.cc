@@ -131,9 +131,6 @@ void Film::sync(void)
   {
     SNPRINTF(full_name, "Film.%s.Resolve", name_.c_str());
     DRWState state = DRW_STATE_WRITE_COLOR | DRW_STATE_WRITE_DEPTH | DRW_STATE_DEPTH_ALWAYS;
-    if (do_smooth_viewport_smooth_transition()) {
-      state |= DRW_STATE_BLEND_CUSTOM;
-    }
     resolve_ps_ = DRW_pass_create(full_name, state);
     GPUShader *sh = inst_.shaders.static_shader_get(FILM_RESOLVE);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, resolve_ps_);
@@ -141,6 +138,14 @@ void Film::sync(void)
     DRW_shgroup_uniform_texture_ref_ex(grp, "data_tx", &data_tx_[0], no_filter);
     DRW_shgroup_uniform_texture_ref_ex(grp, "weight_tx", &weight_tx_[0], no_filter);
     DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
+
+    if (do_smooth_viewport_smooth_transition()) {
+      resolve_blend_ps_ = DRW_pass_create_instance(
+          full_name, resolve_ps_, state | DRW_STATE_BLEND_CUSTOM);
+    }
+    else {
+      resolve_blend_ps_ = nullptr;
+    }
   }
 }
 
@@ -208,7 +213,14 @@ void Film::resolve_viewport(GPUFrameBuffer *target)
     GPU_framebuffer_viewport_set(target, UNPACK2(data_.offset), UNPACK2(data_.extent));
   }
 
-  DRW_draw_pass(resolve_ps_);
+  if (do_smooth_viewport_smooth_transition() && data_.opacity != 1.0f) {
+    /* Viewport color is preserved from previous redraw and we blend on top. */
+    DRW_draw_pass(resolve_blend_ps_);
+  }
+  else {
+    /* Opaque pass that will clear any undefined values. */
+    DRW_draw_pass(resolve_ps_);
+  }
 
   if (use_render_border) {
     GPU_framebuffer_viewport_reset(target);

@@ -56,6 +56,7 @@ class Film {
   DRWPass *clear_ps_ = nullptr;
   DRWPass *accumulate_ps_ = nullptr;
   DRWPass *resolve_ps_ = nullptr;
+  DRWPass *resolve_blend_ps_ = nullptr;
 
   /** Shader parameter, not allocated. */
   GPUTexture *input_tx_;
