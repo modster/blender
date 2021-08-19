@@ -1491,10 +1491,10 @@ void BM_select_faces(BMesh *bm, const bool *mask)
 void BM_tag_vertices(BMesh *bm, const bool *mask)
 {
   BMIter iter;
-  BMEdge *e;
+  BMVert *v;
   int i;
-  BM_ITER_MESH_INDEX (e, &iter, bm, BM_EDGES_OF_MESH, i) {
-    BM_elem_flag_set(e, BM_ELEM_TAG, mask[i]);
+  BM_ITER_MESH_INDEX (v, &iter, bm, BM_VERTS_OF_MESH, i) {
+    BM_elem_flag_set(v, BM_ELEM_TAG, mask[i]);
   }
 }
 
@@ -1652,7 +1652,7 @@ void BM_tag_vertices_from_operator_slot(BMesh *bm,
                                         const char *slot,
                                         const int tag)
 {
-  BMIter iter;
+  BMOIter iter;
   BMVert *v;
   BM_mesh_elem_hflag_disable_all(bm, BM_VERT, BM_ELEM_TAG, false);
   BMO_ITER (v, &iter, b_mesh_operator->slots_out, slot, tag) {
@@ -1665,7 +1665,7 @@ void BM_tag_edges_from_operator_slot(BMesh *bm,
                                      const char *slot,
                                      const int tag)
 {
-  BMIter iter;
+  BMOIter iter;
   BMEdge *e;
   BM_mesh_elem_hflag_disable_all(bm, BM_EDGE, BM_ELEM_TAG, false);
   BMO_ITER (e, &iter, b_mesh_operator->slots_out, slot, tag) {
@@ -1678,7 +1678,7 @@ void BM_tag_faces_from_operator_slot(BMesh *bm,
                                      const char *slot,
                                      const int tag)
 {
-  BMIter iter;
+  BMOIter iter;
   BMFace *f;
   BM_mesh_elem_hflag_disable_all(bm, BM_FACE, BM_ELEM_TAG, false);
   BMO_ITER (f, &iter, b_mesh_operator->slots_out, slot, tag) {
