@@ -148,7 +148,11 @@ class ClothNodeData {
     interp_v3_v3v3(cn.txold, this->cloth_node_data.txold, other.cloth_node_data.txold, 0.5);
     interp_v3_v3v3(cn.tv, this->cloth_node_data.tv, other.cloth_node_data.tv, 0.5);
     cn.mass = simple_interp(this->cloth_node_data.mass, other.cloth_node_data.mass);
-    cn.goal = simple_interp(this->cloth_node_data.goal, other.cloth_node_data.goal);
+    /* No new nodes should have a goal since the artist has not added
+     * the node and iterpolating the weights for newly added nodes can
+     * lead to unexpected results that cannot be fixed by the
+     * artist */
+    cn.goal = 0.0;
     interp_v3_v3v3(cn.impulse, this->cloth_node_data.impulse, other.cloth_node_data.impulse, 0.5);
     interp_v3_v3v3(cn.xrest, this->cloth_node_data.xrest, other.cloth_node_data.xrest, 0.5);
     interp_v3_v3v3(cn.dcvel, this->cloth_node_data.dcvel, other.cloth_node_data.dcvel, 0.5);
