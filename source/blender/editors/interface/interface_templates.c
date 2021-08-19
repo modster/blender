@@ -6472,7 +6472,8 @@ void uiTemplateCacheFile(uiLayout *layout,
   const struct RenderEngineType *engine_type = CTX_data_engine_type(C);
 
   Scene *scene = CTX_data_scene(C);
-  const bool engine_supports_procedural = RE_engine_supports_alembic_procedural(engine_type, scene);
+  const bool engine_supports_procedural = RE_engine_supports_alembic_procedural(engine_type,
+                                                                                scene);
 
   if (!engine_supports_procedural) {
     row = uiLayoutRow(layout, false);
@@ -6525,7 +6526,8 @@ void uiTemplateCacheFile(uiLayout *layout,
   uiItemR(layout, &fileptr, "velocity_unit", 0, NULL, ICON_NONE);
 
   row = uiLayoutRow(layout, false);
-  uiLayoutSetActive(row, engine_supports_procedural && RNA_boolean_get(&fileptr, "use_render_procedural"));
+  uiLayoutSetActive(
+      row, engine_supports_procedural && RNA_boolean_get(&fileptr, "use_render_procedural"));
   uiItemR(row, &fileptr, "default_radius", 0, NULL, ICON_NONE);
 
   /* TODO: unused for now, so no need to expose. */
