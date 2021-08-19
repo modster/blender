@@ -1374,6 +1374,66 @@ static void set_cloth_information_when_new_mesh(Object *ob, ClothModifierData *c
   clmd->clothObject->bvhselftree = bvhtree_build_from_cloth(clmd, clmd->coll_parms->selfepsilon);
 }
 
+void BKE_cloth_serialize_adaptive_mesh(Object *ob,
+                                       ClothModifierData *clmd,
+                                       Mesh *mesh,
+                                       const char *location)
+{
+  AdaptiveRemeshParams<internal::ClothNodeData, Cloth> params;
+  params.size_min = clmd->sim_parms->remeshing_size_min;
+  params.extra_data_to_end = [](const Cloth &cloth, size_t index) {
+    BLI_assert(index < cloth.mvert_num);
+    BLI_assert(cloth.verts);
+    return internal::ClothNodeData(cloth.verts[index]);
+  };
+  params.post_extra_data_to_end = [](Cloth & /*unused*/) {
+    /* Do nothing */
+  };
+
+  params.end_to_extra_data =
+      [](Cloth & /*unused*/, internal::ClothNodeData /*unused*/, size_t /*unused*/) {
+        /* Do nothing */
+      };
+  params.pre_end_to_extra_data = [](Cloth &cloth, size_t num_nodes) {
+    /* Do not allocate cloth.verts, it shouldn't have been modified */
+    BLI_assert(cloth.verts != nullptr);
+    BLI_assert(cloth.mvert_num == num_nodes);
+  };
+
+  const auto remeshing = clmd->sim_parms->flags & CLOTH_SIMSETTINGS_FLAG_REMESH;
+  Mesh *cloth_to_object_res = nullptr;
+  if (remeshing && clmd->prev_frame_mesh) {
+    cloth_to_object_res = cloth_to_object(ob, clmd, clmd->prev_frame_mesh, true);
+  }
+  else {
+    cloth_to_object_res = cloth_to_object(ob, clmd, mesh, true);
+  }
+
+  internal::MeshIO meshio_input;
+  meshio_input.read(cloth_to_object_res);
+
+  internal::AdaptiveMesh<internal::ClothNodeData> adaptive_mesh;
+  adaptive_mesh.read(meshio_input);
+
+  Cloth &extra_data = *clmd->clothObject;
+
+  /* Load up the `NodeData`'s extra_data */
+  {
+    auto i = 0;
+    for (auto &node : adaptive_mesh.get_nodes_mut()) {
+      node.set_extra_data(internal::NodeData(params.extra_data_to_end(extra_data, i)));
+      i++;
+    }
+
+    params.post_extra_data_to_end(extra_data);
+  }
+
+  const auto serialized = adaptive_mesh.serialize();
+  internal::dump_file(location, serialized);
+
+  BKE_mesh_eval_delete(cloth_to_object_res);
+}
+
 Mesh *BKE_cloth_remesh(Object *ob, ClothModifierData *clmd, Mesh *mesh)
 {
   if (clmd->prev_frame_mesh) {

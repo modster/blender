@@ -33,6 +33,7 @@
 #include "BLI_linklist.h"
 #include "BLI_math.h"
 #include "BLI_rand.h"
+#include "BLI_string.h"
 #include "BLI_utildefines.h"
 
 #include "DEG_depsgraph.h"
@@ -327,6 +328,12 @@ static Mesh *do_step_cloth(
   }
 
   // printf ( "%f\n", ( float ) tval() );
+
+  {
+    char location[48];
+    BLI_snprintf(location, 48, "/tmp/cloth_sim/framenr_%05d.mesh", framenr);
+    BKE_cloth_serialize_adaptive_mesh(ob, clmd, mesh, location);
+  }
 
   if (remesh) {
     /* In case remeshing is enabled, the remeshing function will

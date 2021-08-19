@@ -63,6 +63,11 @@ extern "C" {
 
 Mesh *BKE_cloth_remesh(struct Object *ob, struct ClothModifierData *clmd, struct Mesh *mesh);
 
+void BKE_cloth_serialize_adaptive_mesh(struct Object *ob,
+                                       struct ClothModifierData *clmd,
+                                       struct Mesh *mesh,
+                                       const char *location);
+
 #ifdef __cplusplus
 }
 } /* namespace blender::bke */
