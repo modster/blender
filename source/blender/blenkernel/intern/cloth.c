@@ -1715,9 +1715,11 @@ bool cloth_build_springs(ClothModifierData *clmd, Mesh *mesh)
     BLI_rng_free(rng);
   }
 
+  /* Reset the spring length and spring count */
   clmd->sim_parms->avg_spring_len = 0.0f;
   for (int i = 0; i < mvert_num; i++) {
     cloth->verts[i].avg_spring_len = 0.0f;
+    cloth->verts[i].spring_count = 0;
   }
 
   if (clmd->sim_parms->flags & CLOTH_SIMSETTINGS_FLAG_SEW) {
