@@ -1180,16 +1180,22 @@ static void panel_draw_aligned_widgets(const uiStyle *style,
     };
     BLI_rctf_scale(&collapse_rect, 0.25f);
 
-    float triangle_color[4];
-    rgba_uchar_to_float(triangle_color, title_color);
-
-    ui_draw_anti_tria_rect(&collapse_rect, UI_panel_is_closed(panel) ? 'h' : 'v', triangle_color);
+    GPU_blend(GPU_BLEND_ALPHA);
+    UI_icon_draw_ex(collapse_rect.xmin - 5.0f,
+                    collapse_rect.ymin - 6.0f / aspect,
+                    UI_panel_is_closed(panel) ? ICON_RIGHTARROW : ICON_DOWNARROW_HLT,
+                    aspect * U.inv_dpi_fac,
+                    0.5f,
+                    0.0f,
+                    title_color,
+                    false);
+    GPU_blend(GPU_BLEND_NONE);
   }
 
   /* Draw text label. */
   if (panel->drawname[0] != '\0') {
     const rcti title_rect = {
-        .xmin = widget_rect.xmin + (panel->labelofs / aspect) + scaled_unit * 1.1f,
+        .xmin = widget_rect.xmin + (panel->labelofs / aspect) + scaled_unit * 1.2f,
         .xmax = widget_rect.xmax,
         .ymin = widget_rect.ymin - 2.0f / aspect,
         .ymax = widget_rect.ymax,
@@ -1224,7 +1230,7 @@ static void panel_draw_aligned_widgets(const uiStyle *style,
     /* The magic numbers here center the widget vertically and offset it to the left.
      * Currently this depends on the height of the header, although it could be independent. */
     GPU_matrix_translate_2f(widget_rect.xmax - scaled_unit * 1.15,
-                            widget_rect.ymin + (header_height - drag_widget_size) * 0.5f);
+                            widget_rect.ymin + (header_height - drag_widget_size) * 0.33f);
 
     const int col_tint = 84;
     float color_high[4], color_dark[4];
