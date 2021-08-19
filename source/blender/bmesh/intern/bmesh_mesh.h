@@ -155,6 +155,15 @@ void BM_untag_vertices_by_tag(BMesh *bm, int tag);
 void BM_untag_edges_by_tag(BMesh *bm, int tag);
 void BM_untag_faces_by_tag(BMesh *bm, int tag);
 
-void BM_tag_new_vertices(BMesh *bm, BMOperator *b_mesh_operator);
-void BM_tag_new_edges(BMesh *bm, BMOperator *b_mesh_operator);
-void BM_tag_new_faces(BMesh *bm, BMOperator *b_mesh_operator);
+void BM_tag_vertices_from_operator_slot(BMesh *bm,
+                                     BMOperator *b_mesh_operator,
+                                     const char *slot,
+                                     const int tag);
+void BM_tag_edges_from_operator_slot(BMesh *bm,
+                                     BMOperator *b_mesh_operator,
+                                     const char *slot,
+                                     const int tag);
+void BM_tag_faces_from_operator_slot(BMesh *bm,
+                                     BMOperator *b_mesh_operator,
+                                     const char *slot,
+                                     const int tag);

@@ -1646,3 +1646,42 @@ void BM_untag_faces_by_tag(BMesh *bm, int tag)
     }
   }
 }
+
+void BM_tag_vertices_from_operator_slot(BMesh *bm,
+                                        BMOperator *b_mesh_operator,
+                                        const char *slot,
+                                        const int tag)
+{
+  BMIter iter;
+  BMVert *v;
+  BM_mesh_elem_hflag_disable_all(bm, BM_VERT, BM_ELEM_TAG, false);
+  BMO_ITER (v, &iter, b_mesh_operator->slots_out, slot, tag) {
+    BM_elem_flag_enable(v, BM_ELEM_TAG);
+  }
+}
+
+void BM_tag_edges_from_operator_slot(BMesh *bm,
+                                     BMOperator *b_mesh_operator,
+                                     const char *slot,
+                                     const int tag)
+{
+  BMIter iter;
+  BMEdge *e;
+  BM_mesh_elem_hflag_disable_all(bm, BM_EDGE, BM_ELEM_TAG, false);
+  BMO_ITER (e, &iter, b_mesh_operator->slots_out, slot, tag) {
+    BM_elem_flag_enable(e, BM_ELEM_TAG);
+  }
+}
+
+void BM_tag_faces_from_operator_slot(BMesh *bm,
+                                     BMOperator *b_mesh_operator,
+                                     const char *slot,
+                                     const int tag)
+{
+  BMIter iter;
+  BMFace *f;
+  BM_mesh_elem_hflag_disable_all(bm, BM_FACE, BM_ELEM_TAG, false);
+  BMO_ITER (f, &iter, b_mesh_operator->slots_out, slot, tag) {
+    BM_elem_flag_enable(f, BM_ELEM_TAG);
+  }
+}

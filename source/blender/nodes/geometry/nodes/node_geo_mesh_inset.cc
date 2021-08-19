@@ -115,7 +115,7 @@ static Mesh *mesh_inset_mesh(const Mesh *mesh,
                  distance.data(),
                  true);
   }
-  BM_tag_new_faces(bm, &op);
+  // BM_tag_faces_from_operator_slot(bm, &op, "faces.out", BM_FACE);
   BM_untag_faces_by_tag(bm, BM_ELEM_SELECT);
 
   BMO_op_exec(bm, &op);
@@ -205,7 +205,7 @@ void register_node_type_geo_mesh_inset()
 {
   static bNodeType ntype;
 
-  geo_node_type_base(&ntype, GEO_NODE_MESH_INSET, "MeshInset", NODE_CLASS_GEOMETRY, 0);
+  geo_node_type_base(&ntype, GEO_NODE_MESH_INSET, "Mesh Inset", NODE_CLASS_GEOMETRY, 0);
   node_type_socket_templates(&ntype, geo_node_mesh_inset_in, geo_node_mesh_inset_out);
   node_type_init(&ntype, geo_node_mesh_inset_init);
   node_type_update(&ntype, geo_node_mesh_inset_update);
