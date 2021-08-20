@@ -106,11 +106,15 @@ typedef struct CacheFile {
    */
   char use_render_procedural;
 
+  char _pad1[3];
+
   /** Enable data prefetching when using the Cycles Procedural. */
   char use_prefetch;
-  char _pad[2];
 
+  /** Size in megabytes for the prefetch cache used by the Cycles Procedural. */
   int prefetch_cache_size;
+
+  char _pad2[3];
 
   /** The frequency in frame per seconds at which the data in the cache file should evaluated.
    * This is necessary to have here as the data may have been generated based on a different
@@ -118,7 +122,6 @@ typedef struct CacheFile {
    * a project rendered/animated at 120 FPS).
    */
   float frame_rate;
-  char _pad2[4];
 
   /* Runtime */
   struct CacheArchiveHandle *handle;

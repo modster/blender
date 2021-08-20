@@ -6492,14 +6492,16 @@ void uiTemplateCacheFile(uiLayout *layout,
   uiLayoutSetActive(row, engine_supports_procedural);
   uiItemR(row, &fileptr, "use_render_procedural", 0, NULL, ICON_NONE);
 
-  if (RNA_boolean_get(&fileptr, "use_render_procedural")) {
-    row = uiLayoutRow(layout, false);
-    uiItemR(row, &fileptr, "use_prefetch", 0, NULL, ICON_NONE);
+  const bool use_render_procedural = RNA_boolean_get(&fileptr, "use_render_procedural");
+  const bool use_prefetch = RNA_boolean_get(&fileptr, "use_prefetch");
 
-    sub = uiLayoutRow(layout, false);
-    uiLayoutSetEnabled(sub, RNA_boolean_get(&fileptr, "use_prefetch"));
-    uiItemR(sub, &fileptr, "prefetch_cache_size", 0, NULL, ICON_NONE);
-  }
+  row = uiLayoutRow(layout, false);
+  uiLayoutSetEnabled(row, use_render_procedural);
+  uiItemR(row, &fileptr, "use_prefetch", 0, NULL, ICON_NONE);
+
+  sub = uiLayoutRow(layout, false);
+  uiLayoutSetEnabled(sub, use_prefetch && use_render_procedural);
+  uiItemR(sub, &fileptr, "prefetch_cache_size", 0, NULL, ICON_NONE);
 
   row = uiLayoutRow(layout, false);
   uiItemR(row, &fileptr, "frame_rate", 0, NULL, ICON_NONE);
@@ -6526,8 +6528,7 @@ void uiTemplateCacheFile(uiLayout *layout,
   uiItemR(layout, &fileptr, "velocity_unit", 0, NULL, ICON_NONE);
 
   row = uiLayoutRow(layout, false);
-  uiLayoutSetActive(
-      row, engine_supports_procedural && RNA_boolean_get(&fileptr, "use_render_procedural"));
+  uiLayoutSetActive(row, engine_supports_procedural && use_render_procedural);
   uiItemR(row, &fileptr, "default_radius", 0, NULL, ICON_NONE);
 
   /* TODO: unused for now, so no need to expose. */
