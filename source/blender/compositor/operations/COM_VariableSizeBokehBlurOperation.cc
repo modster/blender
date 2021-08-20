@@ -288,8 +288,8 @@ void VariableSizeBokehBlurOperation::get_area_of_interest(const int input_idx,
       const float scalar = m_do_size_scale ? (max_dim / 100.0f) : 1.0f;
       const int max_blur_scalar = m_maxBlur * scalar;
       r_input_area.xmax = output_area.xmax + max_blur_scalar + 2;
-      r_input_area.xmin = output_area.xmin - max_blur_scalar + 2;
-      r_input_area.ymax = output_area.ymax + max_blur_scalar - 2;
+      r_input_area.xmin = output_area.xmin - max_blur_scalar - 2;
+      r_input_area.ymax = output_area.ymax + max_blur_scalar + 2;
       r_input_area.ymin = output_area.ymin - max_blur_scalar - 2;
       break;
     }
