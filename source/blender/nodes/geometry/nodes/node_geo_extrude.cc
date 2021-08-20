@@ -30,10 +30,10 @@
 
 static bNodeSocketTemplate geo_node_extrude_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
-    {SOCK_FLOAT, N_("Distance"), 0.0f, 0, 0, 0, FLT_MIN, FLT_MAX, PROP_DISTANCE},
-    {SOCK_FLOAT, N_("Inset"), 0.0f, 0, 0, 0, FLT_MIN, FLT_MAX, PROP_DISTANCE},
+    {SOCK_FLOAT, N_("Distance"), 0.0f, 0, 0, 0, FLT_MIN, FLT_MAX, PROP_DISTANCE, SOCK_FIELD},
+    {SOCK_FLOAT, N_("Inset"), 0.0f, 0, 0, 0, FLT_MIN, FLT_MAX, PROP_DISTANCE, SOCK_FIELD},
     {SOCK_BOOLEAN, N_("Individual")},
-    {SOCK_BOOLEAN, N_("Selection"), 1, 0, 0, 0, 0, 0, PROP_NONE, SOCK_HIDE_VALUE},
+    {SOCK_BOOLEAN, N_("Selection"), 1, 0, 0, 0, 0, 0, PROP_NONE, SOCK_HIDE_VALUE | SOCK_FIELD},
     {-1, ""},
 };
 
@@ -130,7 +130,7 @@ static void geo_node_extrude_exec(GeoNodeExecParams params)
   geometry_set = bke::geometry_set_realize_instances(geometry_set);
 
   MeshComponent &mesh_component = geometry_set.get_component_for_write<MeshComponent>();
-  if (mesh_component.has_mesh()) {
+  if (mesh_component.has_mesh() && mesh_component.get_for_read()->totpoly > 0) {
     const Mesh *input_mesh = mesh_component.get_for_read();
 
     bke::FieldRef<bool> field = params.get_input_field<bool>("Selection");
