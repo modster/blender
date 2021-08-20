@@ -610,7 +610,7 @@ class VariableState : NonCopyable, NonMovable {
       case ValueType::OneVector: {
         auto *value_typed = this->value_as<VariableValue_OneVector>();
         BLI_assert(value_typed->data[0].is_empty());
-        params.add_vector_output(this->value_as<VariableValue_OneVector>()->data);
+        params.add_vector_output(value_typed->data);
         break;
       }
       case ValueType::GVArray:
