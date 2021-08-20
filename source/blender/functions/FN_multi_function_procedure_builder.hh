@@ -76,15 +76,16 @@ class MFProcedureBuilder {
   void add_loop_continue(Loop &loop);
   void add_loop_break(Loop &loop);
 
-  MFCallInstruction &add_call(const MultiFunction &fn);
-  MFCallInstruction &add_call(const MultiFunction &fn, Span<MFVariable *> variables);
+  MFCallInstruction &add_call_with_no_variables(const MultiFunction &fn);
+  MFCallInstruction &add_call_with_all_variables(const MultiFunction &fn,
+                                                 Span<MFVariable *> param_variables);
 
-  Vector<MFVariable *> add_call_with_new_variables(
-      const MultiFunction &fn, Span<MFVariable *> input_and_mutable_variables = {});
+  Vector<MFVariable *> add_call(const MultiFunction &fn,
+                                Span<MFVariable *> input_and_mutable_variables = {});
 
   template<int OutputN>
-  std::array<MFVariable *, OutputN> add_call_with_new_variables(
-      const MultiFunction &fn, Span<MFVariable *> input_and_mutable_variables = {});
+  std::array<MFVariable *, OutputN> add_call(const MultiFunction &fn,
+                                             Span<MFVariable *> input_and_mutable_variables = {});
 
   void add_parameter(MFParamType::InterfaceType interface_type, MFVariable &variable);
   MFVariable &add_parameter(MFParamType param_type, std::string name = "");
@@ -192,11 +193,10 @@ inline void MFProcedureBuilder::set_cursor(Span<MFProcedureBuilder *> builders)
 }
 
 template<int OutputN>
-inline std::array<MFVariable *, OutputN> MFProcedureBuilder::add_call_with_new_variables(
+inline std::array<MFVariable *, OutputN> MFProcedureBuilder::add_call(
     const MultiFunction &fn, Span<MFVariable *> input_and_mutable_variables)
 {
-  Vector<MFVariable *> output_variables = this->add_call_with_new_variables(
-      fn, input_and_mutable_variables);
+  Vector<MFVariable *> output_variables = this->add_call(fn, input_and_mutable_variables);
   BLI_assert(output_variables.size() == OutputN);
 
   std::array<MFVariable *, OutputN> output_array;

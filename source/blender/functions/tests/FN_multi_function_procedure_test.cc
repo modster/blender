@@ -26,8 +26,8 @@ TEST(multi_function_procedure, SimpleTest)
 
   MFVariable *var1 = &builder.add_single_input_parameter<int>();
   MFVariable *var2 = &builder.add_single_input_parameter<int>();
-  auto [var3] = builder.add_call_with_new_variables<1>(add_fn, {var1, var2});
-  auto [var4] = builder.add_call_with_new_variables<1>(add_fn, {var2, var3});
+  auto [var3] = builder.add_call<1>(add_fn, {var1, var2});
+  auto [var4] = builder.add_call<1>(add_fn, {var2, var3});
   builder.add_call(add_10_fn, {var4});
   builder.add_destruct({var1, var2, var3});
   builder.add_output_parameter(*var4);
@@ -118,7 +118,7 @@ TEST(multi_function_procedure, EvaluateOne)
   MFProcedureBuilder builder{procedure};
 
   MFVariable *var1 = &builder.add_single_input_parameter<int>();
-  auto [var2] = builder.add_call_with_new_variables<1>(add_10_fn, {var1});
+  auto [var2] = builder.add_call<1>(add_10_fn, {var1});
   builder.add_destruct(*var1);
   builder.add_output_parameter(*var2);
 
@@ -170,14 +170,13 @@ TEST(multi_function_procedure, SimpleLoop)
   MFProcedureBuilder builder{procedure};
 
   MFVariable *var_count = &builder.add_single_input_parameter<int>("count");
-  auto [var_out] = builder.add_call_with_new_variables<1>(const_1_fn);
+  auto [var_out] = builder.add_call<1>(const_1_fn);
   var_out->set_name("out");
-  auto [var_index] = builder.add_call_with_new_variables<1>(const_0_fn);
+  auto [var_index] = builder.add_call<1>(const_0_fn);
   var_index->set_name("index");
 
   MFProcedureBuilder::Loop loop = builder.add_loop();
-  auto [var_condition] = builder.add_call_with_new_variables<1>(greater_or_equal_fn,
-                                                                {var_index, var_count});
+  auto [var_condition] = builder.add_call<1>(greater_or_equal_fn, {var_index, var_count});
   var_condition->set_name("condition");
   MFProcedureBuilder::Branch branch = builder.add_branch(*var_condition);
   branch.branch_true.add_destruct(*var_condition);
@@ -236,12 +235,12 @@ TEST(multi_function_procedure, Vectors)
   MFVariable *var_v1 = &builder.add_input_parameter(MFDataType::ForVector<int>());
   MFVariable *var_v2 = &builder.add_parameter(MFParamType::ForMutableVector(CPPType::get<int>()));
   builder.add_call(extend_fn, {var_v1, var_v2});
-  auto [var_constant] = builder.add_call_with_new_variables<1>(constant_5_fn);
+  auto [var_constant] = builder.add_call<1>(constant_5_fn);
   builder.add_call(append_fn, {var_v2, var_constant});
   builder.add_destruct(*var_constant);
   builder.add_call(extend_fn, {var_v2, var_v1});
-  auto [var_len] = builder.add_call_with_new_variables<1>(sum_elements_fn, {var_v2});
-  auto [var_v3] = builder.add_call_with_new_variables<1>(create_range_fn, {var_len});
+  auto [var_len] = builder.add_call<1>(sum_elements_fn, {var_v2});
+  auto [var_v3] = builder.add_call<1>(create_range_fn, {var_len});
   builder.add_destruct({var_v1, var_len});
   builder.add_output_parameter(*var_v3);
 

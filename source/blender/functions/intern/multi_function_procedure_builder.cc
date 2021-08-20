@@ -72,7 +72,7 @@ void MFProcedureBuilder::add_destruct(Span<MFVariable *> variables)
   }
 }
 
-MFCallInstruction &MFProcedureBuilder::add_call(const MultiFunction &fn)
+MFCallInstruction &MFProcedureBuilder::add_call_with_no_variables(const MultiFunction &fn)
 {
   MFCallInstruction &instruction = procedure_->new_call_instruction(fn);
   this->link_to_cursors(&instruction);
@@ -80,19 +80,19 @@ MFCallInstruction &MFProcedureBuilder::add_call(const MultiFunction &fn)
   return instruction;
 }
 
-MFCallInstruction &MFProcedureBuilder::add_call(const MultiFunction &fn,
-                                                Span<MFVariable *> variables)
+MFCallInstruction &MFProcedureBuilder::add_call_with_all_variables(
+    const MultiFunction &fn, Span<MFVariable *> param_variables)
 {
-  MFCallInstruction &instruction = this->add_call(fn);
-  instruction.set_params(variables);
+  MFCallInstruction &instruction = this->add_call_with_no_variables(fn);
+  instruction.set_params(param_variables);
   return instruction;
 }
 
-Vector<MFVariable *> MFProcedureBuilder::add_call_with_new_variables(
-    const MultiFunction &fn, Span<MFVariable *> input_and_mutable_variables)
+Vector<MFVariable *> MFProcedureBuilder::add_call(const MultiFunction &fn,
+                                                  Span<MFVariable *> input_and_mutable_variables)
 {
   Vector<MFVariable *> output_variables;
-  MFCallInstruction &instruction = this->add_call(fn);
+  MFCallInstruction &instruction = this->add_call_with_no_variables(fn);
   for (const int param_index : fn.param_indices()) {
     const MFParamType param_type = fn.param_type(param_index);
     switch (param_type.interface_type()) {
