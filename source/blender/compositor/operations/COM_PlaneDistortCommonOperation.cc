@@ -195,6 +195,15 @@ void PlaneDistortWarpImageOperation::get_area_of_interest(const int input_idx,
     return;
   }
 
+  /* TODO: figure out the area needed for warping and EWA filtering. */
+  r_input_area.xmin = 0;
+  r_input_area.ymin = 0;
+  r_input_area.xmax = get_input_operation(0)->getWidth();
+  r_input_area.ymax = get_input_operation(0)->getHeight();
+
+/* Old implemention but resulting coordinates are way out of input operation bounds and in some
+ * cases the area result may incorrectly cause cropping. */
+#if 0
   float min[2], max[2];
   INIT_MINMAX2(min, max);
   for (int sample = 0; sample < this->m_motion_blur_samples; sample++) {
@@ -219,6 +228,7 @@ void PlaneDistortWarpImageOperation::get_area_of_interest(const int input_idx,
   r_input_area.ymin = min[1] - 1;
   r_input_area.xmax = max[0] + 1;
   r_input_area.ymax = max[1] + 1;
+#endif
 }
 
 /* ******** PlaneDistort Mask ******** */
