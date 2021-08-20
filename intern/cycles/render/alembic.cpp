@@ -385,6 +385,8 @@ NODE_DEFINE(AlembicObject)
   SOCKET_STRING(path, "Alembic Path", ustring());
   SOCKET_NODE_ARRAY(used_shaders, "Used Shaders", Shader::get_node_type());
 
+  SOCKET_BOOLEAN(ignore_subdivision, "Ignore Subdivision", true);
+
   SOCKET_INT(subd_max_level, "Max Subdivision Level", 1);
   SOCKET_FLOAT(subd_dicing_rate, "Subdivision Dicing Rate", 1.0f);
 
@@ -469,6 +471,33 @@ void AlembicObject::load_data_in_cache(CachedData &cached_data,
   }
 
   cached_data.clear();
+
+  if (this->get_ignore_subdivision()) {
+    PolyMeshSchemaData data;
+    data.topology_variance = schema.getTopologyVariance();
+    data.time_sampling = schema.getTimeSampling();
+    data.positions = schema.getPositionsProperty();
+    data.face_counts = schema.getFaceCountsProperty();
+    data.face_indices = schema.getFaceIndicesProperty();
+    data.num_samples = schema.getNumSamples();
+    data.velocities = schema.getVelocitiesProperty();
+    data.shader_face_sets = parse_face_sets_for_shader_assignment(schema, get_used_shaders());
+
+    read_geometry_data(proc, cached_data, data, progress);
+
+    if (progress.get_cancel()) {
+      return;
+    }
+
+    /* Use the schema as the base compound property to also be able to look for top level
+     * properties. */
+    read_attributes(
+        proc, cached_data, schema, schema.getUVsParam(), get_requested_attributes(), progress);
+
+    cached_data.invalidate_last_loaded_time(true);
+    data_loaded = true;
+    return;
+  }
 
   SubDSchemaData data;
   data.time_sampling = schema.getTimeSampling();
@@ -781,6 +810,19 @@ void AlembicProcedural::generate(Scene *scene, Progress &progress)
 
   const chrono_t frame_time = (chrono_t)((frame - frame_offset) / frame_rate);
 
+  /* Clear the subdivision caches as the data is stored differently. */
+  for (Node *node : objects) {
+    AlembicObject *object = static_cast<AlembicObject *>(node);
+
+    if (object->schema_type != AlembicObject::SUBD) {
+      continue;
+    }
+
+    if (object->ignore_subdivision_is_modified()) {
+      object->clear_cache();
+    }
+  }
+
   build_caches(progress);
 
   foreach (Node *node, objects) {
@@ -959,14 +1001,6 @@ void AlembicProcedural::read_mesh(AlembicObject *abc_object, Abc::chrono_t frame
 
   update_attributes(mesh->attributes, cached_data, frame_time);
 
-  /* we don't yet support arbitrary attributes, for now add vertex
-   * coordinates as generated coordinates if requested */
-  if (mesh->need_attribute(scene_, ATTR_STD_GENERATED)) {
-    Attribute *attr = mesh->attributes.add(ATTR_STD_GENERATED);
-    memcpy(
-        attr->data_float3(), mesh->get_verts().data(), sizeof(float3) * mesh->get_verts().size());
-  }
-
   if (mesh->is_modified()) {
     bool need_rebuild = mesh->triangles_is_modified();
     mesh->tag_update(scene_, need_rebuild);
@@ -975,12 +1009,12 @@ void AlembicProcedural::read_mesh(AlembicObject *abc_object, Abc::chrono_t frame
 
 void AlembicProcedural::read_subd(AlembicObject *abc_object, Abc::chrono_t frame_time)
 {
-  CachedData &cached_data = abc_object->get_cached_data();
-
-  if (abc_object->subd_max_level_is_modified() || abc_object->subd_dicing_rate_is_modified()) {
-    /* need to reset the current data is something changed */
-    cached_data.invalidate_last_loaded_time();
+  if (abc_object->get_ignore_subdivision()) {
+    read_mesh(abc_object, frame_time);
+    return;
   }
+
+  CachedData &cached_data = abc_object->get_cached_data();
 
   /* Update sockets. */
 
@@ -994,6 +1028,11 @@ void AlembicProcedural::read_subd(AlembicObject *abc_object, Abc::chrono_t frame
   /* Only update sockets for the original Geometry. */
   if (abc_object->instance_of) {
     return;
+  }
+
+  if (abc_object->subd_max_level_is_modified() || abc_object->subd_dicing_rate_is_modified()) {
+    /* need to reset the current data is something changed */
+    cached_data.invalidate_last_loaded_time();
   }
 
   Mesh *mesh = static_cast<Mesh *>(object->get_geometry());
@@ -1053,14 +1092,6 @@ void AlembicProcedural::read_subd(AlembicObject *abc_object, Abc::chrono_t frame
 
   update_attributes(mesh->subd_attributes, cached_data, frame_time);
 
-  /* we don't yet support arbitrary attributes, for now add vertex
-   * coordinates as generated coordinates if requested */
-  if (mesh->need_attribute(scene_, ATTR_STD_GENERATED)) {
-    Attribute *attr = mesh->attributes.add(ATTR_STD_GENERATED);
-    memcpy(
-        attr->data_float3(), mesh->get_verts().data(), sizeof(float3) * mesh->get_verts().size());
-  }
-
   if (mesh->is_modified()) {
     bool need_rebuild = (mesh->triangles_is_modified()) ||
                         (mesh->subd_num_corners_is_modified()) ||
@@ -1109,17 +1140,6 @@ void AlembicProcedural::read_curves(AlembicObject *abc_object, Abc::chrono_t fra
   /* update attributes */
 
   update_attributes(hair->attributes, cached_data, frame_time);
-
-  /* we don't yet support arbitrary attributes, for now add first keys as generated coordinates if
-   * requested */
-  if (hair->need_attribute(scene_, ATTR_STD_GENERATED)) {
-    Attribute *attr_generated = hair->attributes.add(ATTR_STD_GENERATED);
-    float3 *generated = attr_generated->data_float3();
-
-    for (size_t i = 0; i < hair->num_curves(); i++) {
-      generated[i] = hair->get_curve_keys()[hair->get_curve(i).first_key];
-    }
-  }
 
   const bool rebuild = (hair->curve_keys_is_modified() || hair->curve_radius_is_modified());
   hair->tag_update(scene_, rebuild);
