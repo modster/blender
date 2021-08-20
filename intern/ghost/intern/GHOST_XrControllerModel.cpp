@@ -547,7 +547,7 @@ void GHOST_XrControllerModel::updateComponents(XrSession session)
 
   for (uint32_t state_idx = 0; state_idx < count; ++state_idx) {
     const int32_t &node_idx = m_node_state_indices[state_idx];
-    if (node_idx > 0) {
+    if (node_idx >= 0) {
       const XrPosef &pose = node_states[state_idx].nodePose;
       Eigen::Matrix4f &m = *(Eigen::Matrix4f *)m_nodes[node_idx].local_transform;
       Eigen::Quaternionf q(
@@ -562,10 +562,10 @@ void GHOST_XrControllerModel::updateComponents(XrSession session)
   std::vector<Eigen::Matrix4f> world_transforms(m_nodes.size());
   uint32_t i = 0;
   for (const GHOST_XrControllerModelNode &node : m_nodes) {
-    world_transforms[i] = (node.parent_idx > 0) ? world_transforms[node.parent_idx] *
-                                                      *(Eigen::Matrix4f *)node.local_transform :
-                                                  *(Eigen::Matrix4f *)node.local_transform;
-    if (node.component_idx > 0) {
+    world_transforms[i] = (node.parent_idx >= 0) ? world_transforms[node.parent_idx] *
+                                                       *(Eigen::Matrix4f *)node.local_transform :
+                                                   *(Eigen::Matrix4f *)node.local_transform;
+    if (node.component_idx >= 0) {
       memcpy(m_components[node.component_idx].transform,
              world_transforms[i].data(),
              sizeof(m_components[node.component_idx].transform));
