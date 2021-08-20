@@ -308,7 +308,7 @@
                          LRT_USE_CREASE_ON_SHARP_EDGES | LRT_FILTER_FACE_MARK_KEEP_CONTOUR, \
     .angle_splitting_threshold = DEG2RAD(60.0f), \
     .chaining_image_threshold = 0.001f, \
-    .stroke_offset = 0.05,\
+    .stroke_depth_offset = 0.05,\
     .chain_smooth_tolerance = 0.0f,\
     .overscan = 0.1f,\
     .shadow_camera_near = 0.1f, \
