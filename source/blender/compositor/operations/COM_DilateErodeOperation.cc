@@ -723,11 +723,9 @@ static void step_update_memory_buffer(MemoryBuffer *output,
   const int bwidth = area.xmax - area.xmin;
   const int bheight = area.ymax - area.ymin;
 
-  /* NOTE: #result has area width, but new height.
-   * We have to calculate the additional rows in the first pass,
-   * to have valid data available for the second pass. */
+  /* Create a buffer with the area needed for horizontal and vertical passes. */
   rcti result_area;
-  BLI_rcti_init(&result_area, area.xmin, area.xmax, ymin, ymax);
+  BLI_rcti_init(&result_area, xmin, xmax, ymin, ymax);
   MemoryBuffer result(DataType::Value, result_area);
 
   /* #temp holds maxima for every step in the algorithm, #buf holds a
@@ -764,12 +762,12 @@ static void step_update_memory_buffer(MemoryBuffer *output,
   }
 
   /* Second pass, vertical dilate/erode. */
-  for (int x = 0; x < bwidth; x++) {
+  for (int x = xmin; x < xmax; x++) {
     for (int y = 0; y < bheight + 5 * half_window; y++) {
       buf[y] = compare_min_value;
     }
     for (int y = ymin; y < ymax; y++) {
-      buf[y - area.ymin + window - 1] = result.get_value(x + area.xmin, y, 0);
+      buf[y - area.ymin + window - 1] = result.get_value(x, y, 0);
     }
 
     for (int i = 0; i < (bheight + 3 * half_window) / window; i++) {
