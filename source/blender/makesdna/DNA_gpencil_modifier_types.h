@@ -1003,7 +1003,7 @@ typedef struct LineartGpencilModifierData {
   int flags;
 
   /* Move strokes towards camera to avoid clipping while preserve depth for the viewport. */
-  float stroke_offset;
+  float stroke_depth_offset;
 
   /* Runtime data. */
 
