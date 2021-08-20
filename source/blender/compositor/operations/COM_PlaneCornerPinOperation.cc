@@ -225,7 +225,7 @@ void PlaneCornerPinMaskOperation::get_area_of_interest(const int UNUSED(input_id
                                                        rcti &r_input_area)
 {
   /* All corner inputs are used as constants. */
-  r_input_area = COM_SINGLE_ELEM_AREA;
+  r_input_area = COM_CONSTANT_INPUT_AREA_OF_INTEREST;
 }
 
 /* ******** PlaneCornerPinWarpImageOperation ******** */
@@ -322,7 +322,7 @@ void PlaneCornerPinWarpImageOperation::get_area_of_interest(const int input_idx,
   }
   else {
     /* Corner inputs are used as constants. */
-    r_input_area = COM_SINGLE_ELEM_AREA;
+    r_input_area = COM_CONSTANT_INPUT_AREA_OF_INTEREST;
   }
 }
 

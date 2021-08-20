@@ -388,7 +388,7 @@ void ScreenLensDistortionOperation::get_area_of_interest(const int input_idx,
 {
   if (input_idx != 0) {
     /* Dispersion and distorsion inputs are used as constants only. */
-    r_input_area = COM_SINGLE_ELEM_AREA;
+    r_input_area = COM_CONSTANT_INPUT_AREA_OF_INTEREST;
   }
 
   /* XXX the original method of estimating the area-of-interest does not work

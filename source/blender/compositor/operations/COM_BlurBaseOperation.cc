@@ -256,7 +256,7 @@ void BlurBaseOperation::get_area_of_interest(const int input_idx,
       r_input_area = output_area;
       break;
     case 1:
-      r_input_area = use_variable_size_ ? output_area : COM_SINGLE_ELEM_AREA;
+      r_input_area = use_variable_size_ ? output_area : COM_CONSTANT_INPUT_AREA_OF_INTEREST;
       break;
   }
 }

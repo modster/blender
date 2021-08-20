@@ -206,7 +206,9 @@ void FullFrameExecutionModel::determine_areas_to_render(NodeOperation *output_op
       /* Ensure area of interest is within operation bounds, cropping areas outside. */
       BLI_rcti_isect(&input_area, &input_op_rect, &input_area);
 
-      stack.append({input_op, input_area});
+      if (!BLI_rcti_is_empty(&input_area)) {
+        stack.append({input_op, input_area});
+      }
     }
   }
 }

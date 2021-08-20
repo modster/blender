@@ -327,7 +327,7 @@ void BokehBlurOperation::get_area_of_interest(const int input_idx,
       r_input_area = output_area;
       break;
     case SIZE_INPUT_INDEX: {
-      r_input_area = COM_SINGLE_ELEM_AREA;
+      r_input_area = COM_CONSTANT_INPUT_AREA_OF_INTEREST;
       break;
     }
   }

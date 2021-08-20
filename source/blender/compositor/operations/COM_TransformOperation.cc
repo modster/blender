@@ -101,7 +101,7 @@ void TransformOperation::get_area_of_interest(const int input_idx,
     case 2:
     case 3: {
       /* Translation x/y and rotation degrees are always constant. */
-      r_input_area = COM_SINGLE_ELEM_AREA;
+      r_input_area = COM_CONSTANT_INPUT_AREA_OF_INTEREST;
       return;
     }
     case 4: {
