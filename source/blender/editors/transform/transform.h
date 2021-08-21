@@ -582,7 +582,7 @@ typedef struct TransInfo {
   short around;
   /** space-type where transforming is. */
   char spacetype;
-  /** Avoid looking inside #TransDataContainer.obedit. */
+  /** Type of active object being edited. */
   short obedit_type;
 
   /** translation, to show for widget. */
@@ -779,7 +779,6 @@ void drawLine(TransInfo *t, const float center[3], const float dir[3], char axis
 
 void applyTransObjects(TransInfo *t);
 void restoreTransObjects(TransInfo *t);
-void recalcData(TransInfo *t);
 
 void calculateCenter2D(TransInfo *t);
 void calculateCenterLocal(TransInfo *t, const float center_global[3]);

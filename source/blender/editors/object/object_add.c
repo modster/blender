@@ -2844,7 +2844,8 @@ static int object_convert_exec(bContext *C, wmOperator *op)
                                                    matrix,
                                                    0,
                                                    use_seams,
-                                                   use_faces);
+                                                   use_faces,
+                                                   true);
 
       /* Remove unused materials. */
       int actcol = ob_gpencil->actcol;
@@ -3530,7 +3531,7 @@ static int object_add_named_exec(bContext *C, wmOperator *op)
     return OPERATOR_CANCELLED;
   }
 
-  basen->object->restrictflag &= ~OB_RESTRICT_VIEWPORT;
+  basen->object->visibility_flag &= ~OB_HIDE_VIEWPORT;
 
   int mval[2];
   if (object_add_drop_xy_get(C, op, &mval)) {

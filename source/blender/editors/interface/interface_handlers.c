@@ -3086,11 +3086,6 @@ static void ui_textedit_set_cursor_pos(uiBut *but, uiHandleButtonData *data, con
 
   UI_fontstyle_set(&fstyle);
 
-  if (fstyle.kerning == 1) {
-    /* for BLF_width */
-    BLF_enable(fstyle.uifont_id, BLF_KERNING_DEFAULT);
-  }
-
   ui_but_text_password_hide(password_str, but, false);
 
   if (ELEM(but->type, UI_BTYPE_TEXT, UI_BTYPE_SEARCH_MENU)) {
@@ -3139,10 +3134,6 @@ static void ui_textedit_set_cursor_pos(uiBut *but, uiHandleButtonData *data, con
       glyph_data[1] = str_last_len;
     }
     but->pos = glyph_data[1] + but->ofs;
-  }
-
-  if (fstyle.kerning == 1) {
-    BLF_disable(fstyle.uifont_id, BLF_KERNING_DEFAULT);
   }
 
   ui_but_text_password_hide(password_str, but, true);
@@ -3438,10 +3429,7 @@ static void ui_textedit_begin(bContext *C, uiBut *but, uiHandleButtonData *data)
   const bool is_num_but = ELEM(but->type, UI_BTYPE_NUM, UI_BTYPE_NUM_SLIDER);
   bool no_zero_strip = false;
 
-  if (data->str) {
-    MEM_freeN(data->str);
-    data->str = NULL;
-  }
+  MEM_SAFE_FREE(data->str);
 
 #ifdef USE_DRAG_MULTINUM
   /* this can happen from multi-drag */
@@ -6037,7 +6025,7 @@ static int ui_do_but_BLOCK(bContext *C, uiBut *but, uiHandleButtonData *data, co
          * the slot menu fails to switch a second time.
          *
          * The active state of the button could be maintained some other way
-         * and remove this mousemove event.
+         * and remove this mouse-move event.
          */
         WM_event_add_mousemove(data->window);
 
@@ -6779,7 +6767,7 @@ static bool ui_numedit_but_HSVCIRCLE(uiBut *but,
 
   ui_color_picker_hsv_to_rgb(hsv, rgb);
 
-  if ((cpicker->use_luminosity_lock)) {
+  if (cpicker->use_luminosity_lock) {
     if (!is_zero_v3(rgb)) {
       normalize_v3_length(rgb, cpicker->luminosity_lock_value);
     }
@@ -8376,7 +8364,7 @@ static void button_activate_state(bContext *C, uiBut *but, uiHandleButtonState s
     }
   }
 
-  /* wait for mousemove to enable drag */
+  /* Wait for mouse-move to enable drag. */
   if (state == BUTTON_STATE_WAIT_DRAG) {
     but->flag &= ~UI_SELECT;
   }
@@ -8635,10 +8623,7 @@ static void button_activate_exit(
   }
 
   /* clean up button */
-  if (but->active) {
-    MEM_freeN(but->active);
-    but->active = NULL;
-  }
+  MEM_SAFE_FREE(but->active);
 
   but->flag &= ~(UI_ACTIVE | UI_SELECT);
   but->flag |= UI_BUT_LAST_ACTIVE;
@@ -8646,9 +8631,9 @@ static void button_activate_exit(
     ui_but_update(but);
   }
 
-  /* adds empty mousemove in queue for re-init handler, in case mouse is
+  /* Adds empty mouse-move in queue for re-initialize handler, in case mouse is
    * still over a button. We cannot just check for this ourselves because
-   * at this point the mouse may be over a button in another region */
+   * at this point the mouse may be over a button in another region. */
   if (mousemove) {
     WM_event_add_mousemove(CTX_wm_window(C));
   }
