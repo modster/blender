@@ -138,7 +138,7 @@ static void greasepencil_free_data(ID *id)
 {
   /* Really not ideal, but for now will do... In theory custom behaviors like not freeing cache
    * should be handled through specific API, and not be part of the generic one. */
-  BKE_gpencil_free((bGPdata *)id, true);
+  BKE_gpencil_free_data((bGPdata *)id, true);
 }
 
 static void greasepencil_foreach_id(ID *id, LibraryForeachIDData *data)
@@ -508,7 +508,7 @@ void BKE_gpencil_free_layers(ListBase *list)
 }
 
 /** Free (or release) any data used by this grease pencil (does not free the gpencil itself). */
-void BKE_gpencil_free(bGPdata *gpd, bool free_all)
+void BKE_gpencil_free_data(bGPdata *gpd, bool free_all)
 {
   /* free layers */
   BKE_gpencil_free_layers(&gpd->layers);
@@ -533,7 +533,7 @@ void BKE_gpencil_free(bGPdata *gpd, bool free_all)
  */
 void BKE_gpencil_eval_delete(bGPdata *gpd_eval)
 {
-  BKE_gpencil_free(gpd_eval, true);
+  BKE_gpencil_free_data(gpd_eval, true);
   BKE_libblock_free_data(&gpd_eval->id, false);
   BLI_assert(!gpd_eval->id.py_instance); /* Or call #BKE_libblock_free_data_py. */
   MEM_freeN(gpd_eval);
