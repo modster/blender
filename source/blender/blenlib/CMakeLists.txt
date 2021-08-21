@@ -31,7 +31,6 @@ set(INC
 
 set(INC_SYS
   ${ZLIB_INCLUDE_DIRS}
-  ${ZSTD_INCLUDE_DIRS}
   ${FREETYPE_INCLUDE_DIRS}
   ${GMP_INCLUDE_DIRS}
 )
@@ -79,7 +78,6 @@ set(SRC
   intern/filereader_file.c
   intern/filereader_gzip.c
   intern/filereader_memory.c
-  intern/filereader_zstd.c
   intern/fnmatch.c
   intern/freetypefont.c
   intern/gsqueue.c
@@ -329,7 +327,6 @@ set(LIB
 
   ${FREETYPE_LIBRARY}
   ${ZLIB_LIBRARIES}
-  ${ZSTD_LIBRARIES}
 )
 
 if(WITH_MEM_VALGRIND)

@@ -42,7 +42,7 @@ set(INC
 )
 
 set(INC_SYS
-  ${ZSTD_INCLUDE_DIRS}
+  ${ZLIB_INCLUDE_DIRS}
 )
 
 set(SRC
