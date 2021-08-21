@@ -95,18 +95,19 @@ static void geo_node_dissolve_exec(GeoNodeExecParams params)
     const bNode &node = params.node();
     const NodeGeometryDissolve &node_storage = *(NodeGeometryDissolve *)node.storage;
 
-    bool default_selection = false;
+    bool default_selection = true;
     AttributeDomain selection_domain = ATTR_DOMAIN_FACE;
     BMO_Delimit delimiter = BMO_DELIM_FACE_SELECTION;
 
     if (node_storage.selection_type == GEO_NODE_DISSOLVE_DELIMITTER_UNSELECTED) {
       selection_domain = ATTR_DOMAIN_EDGE;
       delimiter = BMO_DELIM_EDGE_SELECTION_INVSE;
+      default_selection = true;
     }
     else if (node_storage.selection_type == GEO_NODE_DISSOLVE_DELIMITTER_LIMIT) {
       selection_domain = ATTR_DOMAIN_EDGE;
       delimiter = BMO_DELIM_EDGE_SELECTION;
-      default_selection = true;
+      default_selection = false;
     };
 
     GVArray_Typed<bool> selection_attribute = params.get_input_attribute<bool>(
