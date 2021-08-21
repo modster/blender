@@ -441,6 +441,8 @@ if(WITH_HARU)
   endif()
 endif()
 
+find_package_wrapper(Zstd REQUIRED)
+
 if(EXISTS ${LIBDIR})
   without_system_libs_end()
 endif()
