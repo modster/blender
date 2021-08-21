@@ -21,6 +21,8 @@
  * \ingroup blenloader
  */
 
+#include "zlib.h"
+
 #include <ctype.h> /* for isdigit. */
 #include <fcntl.h> /* for open flags (O_BINARY, O_RDONLY). */
 #include <limits.h>
@@ -69,6 +71,7 @@
 #include "BLI_math.h"
 #include "BLI_memarena.h"
 #include "BLI_mempool.h"
+#include "BLI_mmap.h"
 #include "BLI_threads.h"
 
 #include "PIL_time.h"
@@ -785,7 +788,7 @@ static BHeadN *get_bhead(FileData *fd)
        */
       if (fd->flags & FD_FLAGS_FILE_POINTSIZE_IS_4) {
         bhead4.code = DATA;
-        readsize = fd->file->read(fd->file, &bhead4, sizeof(bhead4));
+        readsize = fd->read(fd, &bhead4, sizeof(bhead4), NULL);
 
         if (readsize == sizeof(bhead4) || bhead4.code == ENDB) {
           if (fd->flags & FD_FLAGS_SWITCH_ENDIAN) {
@@ -808,7 +811,7 @@ static BHeadN *get_bhead(FileData *fd)
       }
       else {
         bhead8.code = DATA;
-        readsize = fd->file->read(fd->file, &bhead8, sizeof(bhead8));
+        readsize = fd->read(fd, &bhead8, sizeof(bhead8), NULL);
 
         if (readsize == sizeof(bhead8) || bhead8.code == ENDB) {
           if (fd->flags & FD_FLAGS_SWITCH_ENDIAN) {
@@ -842,22 +845,22 @@ static BHeadN *get_bhead(FileData *fd)
         /* pass */
       }
 #ifdef USE_BHEAD_READ_ON_DEMAND
-      else if (fd->file->seek != NULL && BHEAD_USE_READ_ON_DEMAND(&bhead)) {
+      else if (fd->seek != NULL && BHEAD_USE_READ_ON_DEMAND(&bhead)) {
         /* Delay reading bhead content. */
         new_bhead = MEM_mallocN(sizeof(BHeadN), "new_bhead");
         if (new_bhead) {
           new_bhead->next = new_bhead->prev = NULL;
-          new_bhead->file_offset = fd->file->offset;
+          new_bhead->file_offset = fd->file_offset;
           new_bhead->has_data = false;
           new_bhead->is_memchunk_identical = false;
           new_bhead->bhead = bhead;
-          off64_t seek_new = fd->file->seek(fd->file, bhead.len, SEEK_CUR);
+          off64_t seek_new = fd->seek(fd, bhead.len, SEEK_CUR);
           if (seek_new == -1) {
             fd->is_eof = true;
             MEM_freeN(new_bhead);
             new_bhead = NULL;
           }
-          BLI_assert(fd->file->offset == seek_new);
+          BLI_assert(fd->file_offset == seek_new);
         }
         else {
           fd->is_eof = true;
@@ -875,16 +878,13 @@ static BHeadN *get_bhead(FileData *fd)
           new_bhead->is_memchunk_identical = false;
           new_bhead->bhead = bhead;
 
-          readsize = fd->file->read(fd->file, new_bhead + 1, (size_t)bhead.len);
+          readsize = fd->read(
+              fd, new_bhead + 1, (size_t)bhead.len, &new_bhead->is_memchunk_identical);
 
-          if (readsize != bhead.len) {
+          if (readsize != (ssize_t)bhead.len) {
             fd->is_eof = true;
             MEM_freeN(new_bhead);
             new_bhead = NULL;
-          }
-
-          if (fd->flags & FD_FLAGS_IS_MEMFILE) {
-            new_bhead->is_memchunk_identical = ((UndoReader *)fd->file)->memchunk_identical;
           }
         }
         else {
@@ -964,19 +964,17 @@ static bool blo_bhead_read_data(FileData *fd, BHead *thisblock, void *buf)
   bool success = true;
   BHeadN *new_bhead = BHEADN_FROM_BHEAD(thisblock);
   BLI_assert(new_bhead->has_data == false && new_bhead->file_offset != 0);
-  off64_t offset_backup = fd->file->offset;
-  if (UNLIKELY(fd->file->seek(fd->file, new_bhead->file_offset, SEEK_SET) == -1)) {
+  off64_t offset_backup = fd->file_offset;
+  if (UNLIKELY(fd->seek(fd, new_bhead->file_offset, SEEK_SET) == -1)) {
     success = false;
   }
   else {
-    if (fd->file->read(fd->file, buf, (size_t)new_bhead->bhead.len) != new_bhead->bhead.len) {
+    if (fd->read(fd, buf, (size_t)new_bhead->bhead.len, &new_bhead->is_memchunk_identical) !=
+        (ssize_t)new_bhead->bhead.len) {
       success = false;
     }
-    if (fd->flags & FD_FLAGS_IS_MEMFILE) {
-      new_bhead->is_memchunk_identical = ((UndoReader *)fd->file)->memchunk_identical;
-    }
   }
-  if (fd->file->seek(fd->file, offset_backup, SEEK_SET) == -1) {
+  if (fd->seek(fd, offset_backup, SEEK_SET) == -1) {
     success = false;
   }
   return success;
@@ -1019,7 +1017,7 @@ static void decode_blender_header(FileData *fd)
   ssize_t readsize;
 
   /* read in the header data */
-  readsize = fd->file->read(fd->file, header, sizeof(header));
+  readsize = fd->read(fd, header, sizeof(header), NULL);
 
   if (readsize == sizeof(header) && STREQLEN(header, "BLENDER", 7) && ELEM(header[7], '_', '-') &&
       ELEM(header[8], 'v', 'V') &&
@@ -1149,11 +1147,209 @@ static int *read_file_thumbnail(FileData *fd)
 
 /** \} */
 
+/* -------------------------------------------------------------------- */
+/** \name File Data API
+ * \{ */
+
+/* Regular file reading. */
+
+static ssize_t fd_read_data_from_file(FileData *filedata,
+                                      void *buffer,
+                                      size_t size,
+                                      bool *UNUSED(r_is_memchunck_identical))
+{
+  ssize_t readsize = read(filedata->filedes, buffer, size);
+
+  if (readsize < 0) {
+    readsize = EOF;
+  }
+  else {
+    filedata->file_offset += readsize;
+  }
+
+  return readsize;
+}
+
+static off64_t fd_seek_data_from_file(FileData *filedata, off64_t offset, int whence)
+{
+  filedata->file_offset = BLI_lseek(filedata->filedes, offset, whence);
+  return filedata->file_offset;
+}
+
+/* GZip file reading. */
+
+static ssize_t fd_read_gzip_from_file(FileData *filedata,
+                                      void *buffer,
+                                      size_t size,
+                                      bool *UNUSED(r_is_memchunck_identical))
+{
+  BLI_assert(size <= INT_MAX);
+
+  ssize_t readsize = gzread(filedata->gzfiledes, buffer, (uint)size);
+
+  if (readsize < 0) {
+    readsize = EOF;
+  }
+  else {
+    filedata->file_offset += readsize;
+  }
+
+  return readsize;
+}
+
+/* Memory reading. */
+
+static ssize_t fd_read_from_memory(FileData *filedata,
+                                   void *buffer,
+                                   size_t size,
+                                   bool *UNUSED(r_is_memchunck_identical))
+{
+  /* don't read more bytes than there are available in the buffer */
+  ssize_t readsize = (ssize_t)MIN2(size, filedata->buffersize - (size_t)filedata->file_offset);
+
+  memcpy(buffer, filedata->buffer + filedata->file_offset, (size_t)readsize);
+  filedata->file_offset += readsize;
+
+  return readsize;
+}
+
+/* Memory-mapped file reading.
+ * By using mmap(), we can map a file so that it can be treated like normal memory,
+ * meaning that we can just read from it with memcpy() etc.
+ * This avoids system call overhead and can significantly speed up file loading.
+ */
+
+static ssize_t fd_read_from_mmap(FileData *filedata,
+                                 void *buffer,
+                                 size_t size,
+                                 bool *UNUSED(r_is_memchunck_identical))
+{
+  /* don't read more bytes than there are available in the buffer */
+  size_t readsize = MIN2(size, (size_t)(filedata->buffersize - filedata->file_offset));
+
+  if (!BLI_mmap_read(filedata->mmap_file, buffer, filedata->file_offset, readsize)) {
+    return 0;
+  }
+
+  filedata->file_offset += readsize;
+
+  return readsize;
+}
+
+static off64_t fd_seek_from_mmap(FileData *filedata, off64_t offset, int whence)
+{
+  off64_t new_pos;
+  if (whence == SEEK_CUR) {
+    new_pos = filedata->file_offset + offset;
+  }
+  else if (whence == SEEK_SET) {
+    new_pos = offset;
+  }
+  else if (whence == SEEK_END) {
+    new_pos = filedata->buffersize + offset;
+  }
+  else {
+    return -1;
+  }
+
+  if (new_pos < 0 || new_pos > filedata->buffersize) {
+    return -1;
+  }
+
+  filedata->file_offset = new_pos;
+  return filedata->file_offset;
+}
+
+/* MemFile reading. */
+
+static ssize_t fd_read_from_memfile(FileData *filedata,
+                                    void *buffer,
+                                    size_t size,
+                                    bool *r_is_memchunck_identical)
+{
+  static size_t seek = SIZE_MAX; /* the current position */
+  static size_t offset = 0;      /* size of previous chunks */
+  static MemFileChunk *chunk = NULL;
+  size_t chunkoffset, readsize, totread;
+
+  if (r_is_memchunck_identical != NULL) {
+    *r_is_memchunck_identical = true;
+  }
+
+  if (size == 0) {
+    return 0;
+  }
+
+  if (seek != (size_t)filedata->file_offset) {
+    chunk = filedata->memfile->chunks.first;
+    seek = 0;
+
+    while (chunk) {
+      if (seek + chunk->size > (size_t)filedata->file_offset) {
+        break;
+      }
+      seek += chunk->size;
+      chunk = chunk->next;
+    }
+    offset = seek;
+    seek = (size_t)filedata->file_offset;
+  }
+
+  if (chunk) {
+    totread = 0;
+
+    do {
+      /* first check if it's on the end if current chunk */
+      if (seek - offset == chunk->size) {
+        offset += chunk->size;
+        chunk = chunk->next;
+      }
+
+      /* debug, should never happen */
+      if (chunk == NULL) {
+        CLOG_ERROR(&LOG, "Illegal read, got a NULL chunk");
+        return 0;
+      }
+
+      chunkoffset = seek - offset;
+      readsize = size - totread;
+
+      /* data can be spread over multiple chunks, so clamp size
+       * to within this chunk, and then it will read further in
+       * the next chunk */
+      if (chunkoffset + readsize > chunk->size) {
+        readsize = chunk->size - chunkoffset;
+      }
+
+      memcpy(POINTER_OFFSET(buffer, totread), chunk->buf + chunkoffset, readsize);
+      totread += readsize;
+      filedata->file_offset += readsize;
+      seek += readsize;
+      if (r_is_memchunck_identical != NULL) {
+        /* `is_identical` of current chunk represents whether it changed compared to previous undo
+         * step. this is fine in redo case, but not in undo case, where we need an extra flag
+         * defined when saving the next (future) step after the one we want to restore, as we are
+         * supposed to 'come from' that future undo step, and not the one before current one. */
+        *r_is_memchunck_identical &= filedata->undo_direction == STEP_REDO ?
+                                         chunk->is_identical :
+                                         chunk->is_identical_future;
+      }
+    } while (totread < size);
+
+    return (ssize_t)totread;
+  }
+
+  return 0;
+}
+
 static FileData *filedata_new(BlendFileReadReport *reports)
 {
   BLI_assert(reports != NULL);
 
   FileData *fd = MEM_callocN(sizeof(FileData), "FileData");
+
+  fd->filedes = -1;
+  fd->gzfiledes = NULL;
 
   fd->memsdna = DNA_sdna_current_get();
 
@@ -1191,60 +1387,78 @@ static FileData *blo_decode_and_check(FileData *fd, ReportList *reports)
 
 static FileData *blo_filedata_from_file_descriptor(const char *filepath,
                                                    BlendFileReadReport *reports,
-                                                   int filedes)
+                                                   int file)
 {
-  char header[7];
-  FileReader *rawfile = BLI_filereader_new_file(filedes);
-  FileReader *file = NULL;
+  FileDataReadFn *read_fn = NULL;
+  FileDataSeekFn *seek_fn = NULL; /* Optional. */
+  size_t buffersize = 0;
+  BLI_mmap_file *mmap_file = NULL;
 
+  gzFile gzfile = (gzFile)Z_NULL;
+
+  char header[7];
+
+  /* Regular file. */
   errno = 0;
-  /* If opening the file failed or we can't read the header, give up. */
-  if (rawfile == NULL || rawfile->read(rawfile, header, sizeof(header)) != sizeof(header)) {
+  if (read(file, header, sizeof(header)) != sizeof(header)) {
     BKE_reportf(reports->reports,
                 RPT_WARNING,
                 "Unable to read '%s': %s",
                 filepath,
                 errno ? strerror(errno) : TIP_("insufficient content"));
-    if (rawfile) {
-      rawfile->close(rawfile);
-    }
-    else {
-      close(filedes);
-    }
     return NULL;
   }
 
-  /* Rewind the file after reading the header. */
-  rawfile->seek(rawfile, 0, SEEK_SET);
-
-  /* Check if we have a regular file. */
+  /* Regular file. */
   if (memcmp(header, "BLENDER", sizeof(header)) == 0) {
-    /* Try opening the file with memory-mapped IO. */
-    file = BLI_filereader_new_mmap(filedes);
-    if (file == NULL) {
-      /* mmap failed, so just keep using rawfile. */
-      file = rawfile;
-      rawfile = NULL;
-    }
-  }
-  else if (BLI_file_magic_is_gzip(header)) {
-    file = BLI_filereader_new_gzip(rawfile);
-    if (file != NULL) {
-      rawfile = NULL; /* The Gzip FileReader takes ownership of `rawfile`. */
+    read_fn = fd_read_data_from_file;
+    seek_fn = fd_seek_data_from_file;
+
+    mmap_file = BLI_mmap_open(file);
+    if (mmap_file != NULL) {
+      read_fn = fd_read_from_mmap;
+      seek_fn = fd_seek_from_mmap;
+      buffersize = BLI_lseek(file, 0, SEEK_END);
     }
   }
 
-  /* Clean up `rawfile` if it wasn't taken over. */
-  if (rawfile != NULL) {
-    rawfile->close(rawfile);
+  BLI_lseek(file, 0, SEEK_SET);
+
+  /* Gzip file. */
+  errno = 0;
+  if ((read_fn == NULL) &&
+      /* Check header magic. */
+      (header[0] == 0x1f && header[1] == 0x8b)) {
+    gzfile = BLI_gzopen(filepath, "rb");
+    if (gzfile == (gzFile)Z_NULL) {
+      BKE_reportf(reports->reports,
+                  RPT_WARNING,
+                  "Unable to open '%s': %s",
+                  filepath,
+                  errno ? strerror(errno) : TIP_("unknown error reading file"));
+      return NULL;
+    }
+
+    /* 'seek_fn' is too slow for gzip, don't set it. */
+    read_fn = fd_read_gzip_from_file;
+    /* Caller must close. */
+    file = -1;
   }
-  if (file == NULL) {
+
+  if (read_fn == NULL) {
     BKE_reportf(reports->reports, RPT_WARNING, "Unrecognized file format '%s'", filepath);
     return NULL;
   }
 
   FileData *fd = filedata_new(reports);
-  fd->file = file;
+
+  fd->filedes = file;
+  fd->gzfiledes = gzfile;
+
+  fd->read = read_fn;
+  fd->seek = seek_fn;
+  fd->mmap_file = mmap_file;
+  fd->buffersize = buffersize;
 
   return fd;
 }
@@ -1261,7 +1475,11 @@ static FileData *blo_filedata_from_file_open(const char *filepath, BlendFileRead
                 errno ? strerror(errno) : TIP_("unknown error reading file"));
     return NULL;
   }
-  return blo_filedata_from_file_descriptor(filepath, reports, file);
+  FileData *fd = blo_filedata_from_file_descriptor(filepath, reports, file);
+  if ((fd == NULL) || (fd->filedes == -1)) {
+    close(file);
+  }
+  return fd;
 }
 
 /* cannot be called with relative paths anymore! */
@@ -1295,6 +1513,50 @@ static FileData *blo_filedata_from_file_minimal(const char *filepath)
   return NULL;
 }
 
+static ssize_t fd_read_gzip_from_memory(FileData *filedata,
+                                        void *buffer,
+                                        size_t size,
+                                        bool *UNUSED(r_is_memchunck_identical))
+{
+  int err;
+
+  filedata->strm.next_out = (Bytef *)buffer;
+  filedata->strm.avail_out = (uint)size;
+
+  /* Inflate another chunk. */
+  err = inflate(&filedata->strm, Z_SYNC_FLUSH);
+
+  if (err == Z_STREAM_END) {
+    return 0;
+  }
+  if (err != Z_OK) {
+    CLOG_ERROR(&LOG, "ZLib error (code %d)", err);
+    return 0;
+  }
+
+  filedata->file_offset += size;
+
+  return (ssize_t)size;
+}
+
+static int fd_read_gzip_from_memory_init(FileData *fd)
+{
+
+  fd->strm.next_in = (Bytef *)fd->buffer;
+  fd->strm.avail_in = fd->buffersize;
+  fd->strm.total_out = 0;
+  fd->strm.zalloc = Z_NULL;
+  fd->strm.zfree = Z_NULL;
+
+  if (inflateInit2(&fd->strm, (16 + MAX_WBITS)) != Z_OK) {
+    return 0;
+  }
+
+  fd->read = fd_read_gzip_from_memory;
+
+  return 1;
+}
+
 FileData *blo_filedata_from_memory(const void *mem, int memsize, BlendFileReadReport *reports)
 {
   if (!mem || memsize < SIZEOFBLENDERHEADER) {
@@ -1303,21 +1565,24 @@ FileData *blo_filedata_from_memory(const void *mem, int memsize, BlendFileReadRe
     return NULL;
   }
 
-  FileReader *mem_file = BLI_filereader_new_memory(mem, memsize);
-  FileReader *file = mem_file;
-
-  if (BLI_file_magic_is_gzip(mem)) {
-    file = BLI_filereader_new_gzip(mem_file);
-  }
-
-  if (file == NULL) {
-    /* Compression initialization failed. */
-    mem_file->close(mem_file);
-    return NULL;
-  }
-
   FileData *fd = filedata_new(reports);
-  fd->file = file;
+  const char *cp = mem;
+
+  fd->buffer = mem;
+  fd->buffersize = memsize;
+
+  /* test if gzip */
+  if (cp[0] == 0x1f && cp[1] == 0x8b) {
+    if (0 == fd_read_gzip_from_memory_init(fd)) {
+      blo_filedata_free(fd);
+      return NULL;
+    }
+  }
+  else {
+    fd->read = fd_read_from_memory;
+  }
+
+  fd->flags |= FD_FLAGS_NOT_MY_BUFFER;
 
   return blo_decode_and_check(fd, reports->reports);
 }
@@ -1332,9 +1597,11 @@ FileData *blo_filedata_from_memfile(MemFile *memfile,
   }
 
   FileData *fd = filedata_new(reports);
-  fd->file = BLO_memfile_new_filereader(memfile, params->undo_direction);
+  fd->memfile = memfile;
   fd->undo_direction = params->undo_direction;
-  fd->flags |= FD_FLAGS_IS_MEMFILE;
+
+  fd->read = fd_read_from_memfile;
+  fd->flags |= FD_FLAGS_NOT_MY_BUFFER;
 
   return blo_decode_and_check(fd, reports->reports);
 }
@@ -1342,7 +1609,30 @@ FileData *blo_filedata_from_memfile(MemFile *memfile,
 void blo_filedata_free(FileData *fd)
 {
   if (fd) {
-    fd->file->close(fd->file);
+    if (fd->filedes != -1) {
+      close(fd->filedes);
+    }
+
+    if (fd->gzfiledes != NULL) {
+      gzclose(fd->gzfiledes);
+    }
+
+    if (fd->strm.next_in) {
+      int err = inflateEnd(&fd->strm);
+      if (err != Z_OK) {
+        CLOG_ERROR(&LOG, "Close gzip stream error (code %d)", err);
+      }
+    }
+
+    if (fd->buffer && !(fd->flags & FD_FLAGS_NOT_MY_BUFFER)) {
+      MEM_freeN((void *)fd->buffer);
+      fd->buffer = NULL;
+    }
+
+    if (fd->mmap_file) {
+      BLI_mmap_free(fd->mmap_file);
+      fd->mmap_file = NULL;
+    }
 
     /* Free all BHeadN data blocks */
 #ifndef NDEBUG
@@ -1350,7 +1640,7 @@ void blo_filedata_free(FileData *fd)
 #else
     /* Sanity check we're not keeping memory we don't need. */
     LISTBASE_FOREACH_MUTABLE (BHeadN *, new_bhead, &fd->bhead_list) {
-      if (fd->file->seek != NULL && BHEAD_USE_READ_ON_DEMAND(&new_bhead->bhead)) {
+      if (fd->seek != NULL && BHEAD_USE_READ_ON_DEMAND(&new_bhead->bhead)) {
         BLI_assert(new_bhead->has_data == 0);
       }
       MEM_freeN(new_bhead);
@@ -1806,7 +2096,7 @@ static void blo_cache_storage_entry_clear_in_old(ID *UNUSED(id),
 
 void blo_cache_storage_init(FileData *fd, Main *bmain)
 {
-  if (fd->flags & FD_FLAGS_IS_MEMFILE) {
+  if (fd->memfile != NULL) {
     BLI_assert(fd->cache_storage == NULL);
     fd->cache_storage = MEM_mallocN(sizeof(*fd->cache_storage), __func__);
     fd->cache_storage->memarena = BLI_memarena_new(BLI_MEMARENA_STD_BUFSIZE, __func__);
@@ -1971,7 +2261,7 @@ static void *read_struct(FileData *fd, BHead *bh, const char *blockname)
  * undo since DNA must match. */
 static const void *peek_struct_undo(FileData *fd, BHead *bhead)
 {
-  BLI_assert(fd->flags & FD_FLAGS_IS_MEMFILE);
+  BLI_assert(fd->memfile != NULL);
   UNUSED_VARS_NDEBUG(fd);
   return (bhead->len) ? (const void *)(bhead + 1) : NULL;
 }
@@ -3389,7 +3679,7 @@ static BHead *read_libblock(FileData *fd,
    * When datablocks are changed but still exist, we restore them at the old
    * address and inherit recalc flags for the dependency graph. */
   ID *id_old = NULL;
-  if (fd->flags & FD_FLAGS_IS_MEMFILE) {
+  if (fd->memfile != NULL) {
     if (read_libblock_undo_restore(fd, main, bhead, tag, &id_old)) {
       if (r_id) {
         *r_id = id_old;
@@ -3690,14 +3980,13 @@ static void lib_link_all(FileData *fd, Main *bmain)
       continue;
     }
 
-    if ((fd->flags & FD_FLAGS_IS_MEMFILE) && GS(id->name) == ID_WM) {
+    if (fd->memfile != NULL && GS(id->name) == ID_WM) {
       /* No load UI for undo memfiles.
        * Only WM currently, SCR needs it still (see below), and so does WS? */
       continue;
     }
 
-    if ((fd->flags & FD_FLAGS_IS_MEMFILE) && do_partial_undo &&
-        (id->tag & LIB_TAG_UNDO_OLD_ID_REUSED) != 0) {
+    if (fd->memfile != NULL && do_partial_undo && (id->tag & LIB_TAG_UNDO_OLD_ID_REUSED) != 0) {
       /* This ID has been re-used from 'old' bmain. Since it was therefore unchanged across
        * current undo step, and old IDs re-use their old memory address, we do not need to liblink
        * it at all. */
@@ -3876,7 +4165,7 @@ BlendFileData *blo_read_file_internal(FileData *fd, const char *filepath)
   BlendFileData *bfd;
   ListBase mainlist = {NULL, NULL};
 
-  if (fd->flags & FD_FLAGS_IS_MEMFILE) {
+  if (fd->memfile != NULL) {
     CLOG_INFO(&LOG_UNDO, 2, "UNDO: read step");
   }
 
@@ -3967,7 +4256,7 @@ BlendFileData *blo_read_file_internal(FileData *fd, const char *filepath)
   }
 
   /* do before read_libraries, but skip undo case */
-  if ((fd->flags & FD_FLAGS_IS_MEMFILE) == 0) {
+  if (fd->memfile == NULL) {
     if ((fd->skip_flags & BLO_READ_SKIP_DATA) == 0) {
       do_versions(fd, NULL, bfd->main);
     }
@@ -3989,7 +4278,7 @@ BlendFileData *blo_read_file_internal(FileData *fd, const char *filepath)
     fd->reports->duration.libraries = PIL_check_seconds_timer() - fd->reports->duration.libraries;
 
     /* Skip in undo case. */
-    if ((fd->flags & FD_FLAGS_IS_MEMFILE) == 0) {
+    if (fd->memfile == NULL) {
       /* Note that we can't recompute user-counts at this point in undo case, we play too much with
        * IDs from different memory realms, and Main database is not in a fully valid state yet.
        */
@@ -4022,7 +4311,7 @@ BlendFileData *blo_read_file_internal(FileData *fd, const char *filepath)
 
     /* Now that all our data-blocks are loaded,
      * we can re-generate overrides from their references. */
-    if ((fd->flags & FD_FLAGS_IS_MEMFILE) == 0) {
+    if (fd->memfile == NULL) {
       /* Do not apply in undo case! */
       fd->reports->duration.lib_overrides = PIL_check_seconds_timer();
 
@@ -4102,7 +4391,7 @@ static void sort_bhead_old_map(FileData *fd)
 static BHead *find_previous_lib(FileData *fd, BHead *bhead)
 {
   /* Skip library data-blocks in undo, see comment in read_libblock. */
-  if (fd->flags & FD_FLAGS_IS_MEMFILE) {
+  if (fd->memfile) {
     return NULL;
   }
 
@@ -5561,7 +5850,7 @@ void BLO_read_pointer_array(BlendDataReader *reader, void **ptr_p)
 
 bool BLO_read_data_is_undo(BlendDataReader *reader)
 {
-  return (reader->fd->flags & FD_FLAGS_IS_MEMFILE);
+  return reader->fd->memfile != NULL;
 }
 
 void BLO_read_data_globmap_add(BlendDataReader *reader, void *oldaddr, void *newaddr)
@@ -5581,7 +5870,7 @@ BlendFileReadReport *BLO_read_data_reports(BlendDataReader *reader)
 
 bool BLO_read_lib_is_undo(BlendLibReader *reader)
 {
-  return (reader->fd->flags & FD_FLAGS_IS_MEMFILE);
+  return reader->fd->memfile != NULL;
 }
 
 Main *BLO_read_lib_get_main(BlendLibReader *reader)

@@ -24,8 +24,6 @@
  * \ingroup blenloader
  */
 
-#include "BLI_filereader.h"
-
 struct GHash;
 struct Scene;
 
@@ -67,16 +65,6 @@ typedef struct MemFileUndoData {
   size_t undo_size;
 } MemFileUndoData;
 
-/* FileReader-compatible wrapper for reading MemFiles */
-typedef struct {
-  FileReader reader;
-
-  MemFile *memfile;
-  int undo_direction;
-
-  bool memchunk_identical;
-} UndoReader;
-
 /* actually only used writefile.c */
 
 void BLO_memfile_write_init(MemFileWriteData *mem_data,
@@ -96,5 +84,3 @@ extern struct Main *BLO_memfile_main_get(struct MemFile *memfile,
                                          struct Main *bmain,
                                          struct Scene **r_scene);
 extern bool BLO_memfile_write_file(struct MemFile *memfile, const char *filename);
-
-FileReader *BLO_memfile_new_filereader(MemFile *memfile, int undo_direction);

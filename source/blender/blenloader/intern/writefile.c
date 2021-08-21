@@ -78,12 +78,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <zlib.h>
 
 #ifdef WIN32
 #  include "BLI_winstuff.h"
 #  include "winsock2.h"
 #  include <io.h>
+#  include <zlib.h> /* odd include order-issue */
 #else
 #  include <unistd.h> /* FreeBSD, for write() and close(). */
 #endif
@@ -101,12 +101,7 @@
 #include "BLI_bitmap.h"
 #include "BLI_blenlib.h"
 #include "BLI_endian_defines.h"
-#include "BLI_endian_switch.h"
-#include "BLI_link_utils.h"
-#include "BLI_linklist.h"
-#include "BLI_math_base.h"
 #include "BLI_mempool.h"
-#include "BLI_threads.h"
 #include "MEM_guardedalloc.h" /* MEM_freeN */
 
 #include "BKE_blender_version.h"

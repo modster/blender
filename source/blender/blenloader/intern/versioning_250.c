@@ -23,7 +23,8 @@
 #else
 #  include "BLI_winstuff.h"
 #  include "winsock2.h"
-#  include <io.h> /* for open close read */
+#  include <io.h>   /* for open close read */
+#  include <zlib.h> /* odd include order-issue */
 #endif
 
 /* allow readfile to use deprecated functionality */
