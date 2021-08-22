@@ -318,48 +318,50 @@ typedef struct bNode {
 } bNode;
 
 /* node->flag */
-#define NODE_SELECT 1
-#define NODE_OPTIONS 2
-#define NODE_PREVIEW 4
-#define NODE_HIDDEN 8
-#define NODE_ACTIVE 16
-#define NODE_ACTIVE_ID 32
-/* Used to indicate which group output node is used and which viewer node is active. */
-#define NODE_DO_OUTPUT 64
-#define __NODE_GROUP_EDIT 128 /* DEPRECATED */
-/* free test flag, undefined */
-#define NODE_TEST 256
-/* node is disabled */
-#define NODE_MUTED 512
-// #define NODE_CUSTOM_NAME 1024    /* deprecated! */
-/* group node types: use const outputs by default */
-#define NODE_CONST_OUTPUT (1 << 11)
-/* node is always behind others */
-#define NODE_BACKGROUND (1 << 12)
-/* automatic flag for nodes included in transforms */
-#define NODE_TRANSFORM (1 << 13)
-/* node is active texture */
+enum eNodeFlag {
+  NODE_SELECT = 1,
+  NODE_OPTIONS = 2,
+  NODE_PREVIEW = 4,
+  NODE_HIDDEN = 8,
+  NODE_ACTIVE = 16,
+  NODE_ACTIVE_ID = 32,
+  /* Used to indicate which group output node is used and which viewer node is active. */
+  NODE_DO_OUTPUT = 64,
+  __NODE_GROUP_EDIT = 128, /* DEPRECATED */
+  /* free test flag, undefined */
+  NODE_TEST = 256,
+  /* node is disabled */
+  NODE_MUTED = 512,
+  __NODE_CUSTOM_NAME = 1024, /* DEPRECATED */
+  /* group node types: use const outputs by default */
+  NODE_CONST_OUTPUT = (1 << 11),
+  /* node is always behind others */
+  NODE_BACKGROUND = (1 << 12),
+  /* automatic flag for nodes included in transforms */
+  NODE_TRANSFORM = (1 << 13),
+  /* node is active texture */
 
-/* NOTE: take care with this flag since its possible it gets
- * `stuck` inside/outside the active group - which makes buttons
- * window texture not update, we try to avoid it by clearing the
- * flag when toggling group editing - Campbell */
-#define NODE_ACTIVE_TEXTURE (1 << 14)
-/* use a custom color for the node */
-#define NODE_CUSTOM_COLOR (1 << 15)
-/* Node has been initialized
- * This flag indicates the node->typeinfo->init function has been called.
- * In case of undefined type at creation time this can be delayed until
- * until the node type is registered.
- */
-#define NODE_INIT (1 << 16)
+  /* NOTE: take care with this flag since its possible it gets
+   * `stuck` inside/outside the active group - which makes buttons
+   * window texture not update, we try to avoid it by clearing the
+   * flag when toggling group editing - Campbell */
+  NODE_ACTIVE_TEXTURE = (1 << 14),
+  /* use a custom color for the node */
+  NODE_CUSTOM_COLOR = (1 << 15),
+  /* Node has been initialized
+   * This flag indicates the node->typeinfo->init function has been called.
+   * In case of undefined type at creation time this can be delayed until
+   * until the node type is registered.
+   */
+  NODE_INIT = (1 << 16),
 
-/* do recalc of output, used to skip recalculation of unwanted
- * composite out nodes when editing tree
- */
-#define NODE_DO_OUTPUT_RECALC (1 << 17)
-/* A preview for the data in this node can be displayed in the spreadsheet editor. */
-#define __NODE_ACTIVE_PREVIEW (1 << 18) /* deprecated */
+  /* do recalc of output, used to skip recalculation of unwanted
+   * composite out nodes when editing tree
+   */
+  NODE_DO_OUTPUT_RECALC = (1 << 17),
+  /* A preview for the data in this node can be displayed in the spreadsheet editor. */
+  __NODE_ACTIVE_PREVIEW = (1 << 18), /* DEPRECATED */
+};
 
 /* node->update */
 /* XXX NODE_UPDATE is a generic update flag. More fine-grained updates

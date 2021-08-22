@@ -31,6 +31,9 @@
 
 #include "NOD_geometry.h"
 #include "NOD_geometry_exec.hh"
+#include "NOD_runtime_types.hh"
+
+#include "UI_resources.h"
 
 #include "node_util.h"
 
@@ -41,6 +44,37 @@ bool geo_node_poll_default(struct bNodeType *ntype,
                            const char **r_disabled_hint);
 
 namespace blender::nodes {
+
+namespace detail {
+DECL_NODE_FUNC_OPTIONAL(build_multi_function)
+DECL_NODE_FUNC_OPTIONAL(geometry_node_execute)
+DECL_NODE_FIELD_OPTIONAL(geometry_node_execute_supports_laziness, false);
+}  // namespace detail
+
+template<typename T> struct GeometryNodeDefinition : public NodeDefinition<T> {
+  static const int ui_icon = ICON_NONE;
+  static const short node_class = NODE_CLASS_GEOMETRY;
+  inline static const StructRNA *rna_base = &RNA_GeometryNode;
+
+  static bool poll(bNodeType *ntype, bNodeTree *ntree, const char **r_disabled_hint)
+  {
+    return geo_node_poll_default(ntype, ntree, r_disabled_hint);
+  }
+
+  /* Registers a node type using static fields and callbacks of the template argument. */
+  static void register_type()
+  {
+    NodeDefinition<T>::typeinfo_.build_multi_function =
+        detail::node_type_get__build_multi_function<T>();
+    NodeDefinition<T>::typeinfo_.geometry_node_execute =
+        detail::node_type_get__geometry_node_execute<T>();
+    NodeDefinition<T>::typeinfo_.geometry_node_execute_supports_laziness =
+        detail::node_type_get__geometry_node_execute_supports_laziness<T>();
+
+    NodeDefinition<T>::register_type();
+  }
+};
+
 void update_attribute_input_socket_availabilities(bNode &node,
                                                   const StringRef name,
                                                   const GeometryNodeAttributeInputMode mode,

@@ -560,6 +560,7 @@ geometry_node_categories = [
         NodeItem("GeometryNodeMeshCone"),
         NodeItem("GeometryNodeMeshCube"),
         NodeItem("GeometryNodeMeshCylinder"),
+        NodeItem("GeometryNodeMeshEllipse"),
         NodeItem("GeometryNodeMeshGrid"),
         NodeItem("GeometryNodeMeshIcoSphere"),
         NodeItem("GeometryNodeMeshLine"),

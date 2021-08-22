@@ -5165,6 +5165,7 @@ static void registerGeometryNodes()
   register_node_type_geo_mesh_primitive_cone();
   register_node_type_geo_mesh_primitive_cube();
   register_node_type_geo_mesh_primitive_cylinder();
+  register_node_type_geo_mesh_primitive_ellipse();
   register_node_type_geo_mesh_primitive_grid();
   register_node_type_geo_mesh_primitive_ico_sphere();
   register_node_type_geo_mesh_primitive_line();

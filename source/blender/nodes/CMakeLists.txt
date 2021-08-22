@@ -193,6 +193,7 @@ set(SRC
   geometry/nodes/node_geo_mesh_primitive_cone.cc
   geometry/nodes/node_geo_mesh_primitive_cube.cc
   geometry/nodes/node_geo_mesh_primitive_cylinder.cc
+  geometry/nodes/node_geo_mesh_primitive_ellipse.cc
   geometry/nodes/node_geo_mesh_primitive_grid.cc
   geometry/nodes/node_geo_mesh_primitive_ico_sphere.cc
   geometry/nodes/node_geo_mesh_primitive_line.cc
@@ -346,6 +347,7 @@ set(SRC
   intern/node_exec.cc
   intern/node_geometry_exec.cc
   intern/node_multi_function.cc
+  intern/node_runtime_types.cc
   intern/node_socket.cc
   intern/node_tree_ref.cc
   intern/node_util.c
@@ -367,6 +369,7 @@ set(SRC
   NOD_math_functions.hh
   NOD_multi_function.hh
   NOD_node_tree_ref.hh
+  NOD_runtime_types.hh
   NOD_shader.h
   NOD_socket.h
   NOD_static_types.h

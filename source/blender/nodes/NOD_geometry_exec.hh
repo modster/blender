@@ -239,6 +239,14 @@ class GeoNodeExecParams {
     return *provider_->dnode->bnode();
   }
 
+  /**
+   * Get the node tree containing the executed node.
+   */
+  const bNodeTree &node_tree() const
+  {
+    return *provider_->dnode->btree();
+  }
+
   const Object *self_object() const
   {
     return provider_->self_object;
