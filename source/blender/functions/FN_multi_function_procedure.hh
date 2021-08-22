@@ -78,6 +78,7 @@ class MFInstruction : NonCopyable, NonMovable {
  public:
   MFInstructionType type() const;
   Span<MFInstruction *> prev();
+  Span<const MFInstruction *> prev() const;
 };
 
 class MFCallInstruction : public MFInstruction {
@@ -264,6 +265,11 @@ inline MFInstructionType MFInstruction::type() const
 }
 
 inline Span<MFInstruction *> MFInstruction::prev()
+{
+  return prev_;
+}
+
+inline Span<const MFInstruction *> MFInstruction::prev() const
 {
   return prev_;
 }
