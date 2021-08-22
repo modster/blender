@@ -53,6 +53,11 @@ void MFInstructionCursor::insert(MFProcedure &procedure, MFInstruction *new_inst
         static_cast<MFDummyInstruction *>(instruction_)->set_next(new_instruction);
         break;
       }
+      case MFInstructionType::Return: {
+        /* It shouldn't be possible to build a cursor that points to a return instruction. */
+        BLI_assert_unreachable();
+        break;
+      }
     }
   }
 }
@@ -70,6 +75,14 @@ void MFProcedureBuilder::add_destruct(Span<MFVariable *> variables)
   for (MFVariable *variable : variables) {
     this->add_destruct(*variable);
   }
+}
+
+MFReturnInstruction &MFProcedureBuilder::add_return()
+{
+  MFReturnInstruction &instruction = procedure_->new_return_instruction();
+  this->link_to_cursors(&instruction);
+  cursors_ = {};
+  return instruction;
 }
 
 MFCallInstruction &MFProcedureBuilder::add_call_with_no_variables(const MultiFunction &fn)

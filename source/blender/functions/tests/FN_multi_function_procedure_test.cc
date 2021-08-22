@@ -31,7 +31,10 @@ TEST(multi_function_procedure, SimpleTest)
   auto [var4] = builder.add_call<1>(add_fn, {var2, var3});
   builder.add_call(add_10_fn, {var4});
   builder.add_destruct({var1, var2, var3});
+  builder.add_return();
   builder.add_output_parameter(*var4);
+
+  EXPECT_TRUE(procedure.validate());
 
   MFProcedureExecutor executor{"My Procedure", procedure};
 
@@ -81,6 +84,9 @@ TEST(multi_function_procedure, BranchTest)
   builder.set_cursor_after_branch(branch);
   builder.add_call(add_10_fn, {var1});
   builder.add_destruct({var2});
+  builder.add_return();
+
+  EXPECT_TRUE(procedure.validate());
 
   MFProcedureExecutor procedure_fn{"Condition Test", procedure};
   MFParamsBuilder params(procedure_fn, 5);
@@ -121,6 +127,7 @@ TEST(multi_function_procedure, EvaluateOne)
   MFVariable *var1 = &builder.add_single_input_parameter<int>();
   auto [var2] = builder.add_call<1>(add_10_fn, {var1});
   builder.add_destruct(*var1);
+  builder.add_return();
   builder.add_output_parameter(*var2);
 
   MFProcedureExecutor procedure_fn{"Evaluate One", procedure};
@@ -190,7 +197,10 @@ TEST(multi_function_procedure, SimpleLoop)
   builder.set_cursor_after_loop(loop);
   builder.add_call(add_1000_fn, {var_out});
   builder.add_destruct({var_count, var_index});
+  builder.add_return();
   builder.add_output_parameter(*var_out);
+
+  EXPECT_TRUE(procedure.validate());
 
   MFProcedureExecutor procedure_fn{"Simple Loop", procedure};
   MFParamsBuilder params{procedure_fn, 5};
@@ -243,7 +253,10 @@ TEST(multi_function_procedure, Vectors)
   auto [var_len] = builder.add_call<1>(sum_elements_fn, {var_v2});
   auto [var_v3] = builder.add_call<1>(create_range_fn, {var_len});
   builder.add_destruct({var_v1, var_len});
+  builder.add_return();
   builder.add_output_parameter(*var_v3);
+
+  EXPECT_TRUE(procedure.validate());
 
   MFProcedureExecutor procedure_fn{"Vectors", procedure};
   MFParamsBuilder params{procedure_fn, 5};
@@ -304,7 +317,10 @@ TEST(multi_function_procedure, BufferReuse)
   builder.add_destruct(*var_d);
   auto [var_out] = builder.add_call<1>(add_10_fn, {var_e});
   builder.add_destruct(*var_e);
+  builder.add_return();
   builder.add_output_parameter(*var_out);
+
+  EXPECT_TRUE(procedure.validate());
 
   MFProcedureExecutor procedure_fn{"Buffer Reuse", procedure};
 

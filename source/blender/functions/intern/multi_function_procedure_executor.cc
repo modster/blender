@@ -25,9 +25,8 @@ MFProcedureExecutor::MFProcedureExecutor(std::string name, const MFProcedure &pr
 {
   MFSignatureBuilder signature(std::move(name));
 
-  for (const std::pair<MFParamType::InterfaceType, const MFVariable *> &param :
-       procedure.params()) {
-    signature.add(param.second->name(), MFParamType(param.first, param.second->data_type()));
+  for (const ConstMFParameter &param : procedure.params()) {
+    signature.add(param.variable->name(), MFParamType(param.type, param.variable->data_type()));
   }
 
   signature_ = signature.build();
@@ -835,7 +834,7 @@ class VariableStates {
   {
     for (const int param_index : fn.param_indices()) {
       MFParamType param_type = fn.param_type(param_index);
-      const MFVariable *variable = procedure.params()[param_index].second;
+      const MFVariable *variable = procedure.params()[param_index].variable;
 
       auto add_state = [&](VariableValue *value,
                            bool input_is_initialized,
@@ -1047,19 +1046,16 @@ class InstructionScheduler {
     indices_by_instruction_.lookup_or_add_default(instruction).append(mask.indices());
   }
 
-  void add_owned_indices(const MFInstruction *instruction, Vector<int64_t> indices)
+  void add_owned_indices(const MFInstruction &instruction, Vector<int64_t> indices)
   {
-    if (instruction == nullptr) {
-      return;
-    }
     if (indices.is_empty()) {
       return;
     }
     BLI_assert(IndexMask::indices_are_valid_index_mask(indices));
-    indices_by_instruction_.lookup_or_add_default(instruction).append(std::move(indices));
+    indices_by_instruction_.lookup_or_add_default(&instruction).append(std::move(indices));
   }
 
-  void add_previous_instruction_indices(const MFInstruction *instruction,
+  void add_previous_instruction_indices(const MFInstruction &instruction,
                                         NextInstructionInfo &instr_info)
   {
     this->add_owned_indices(instruction, std::move(instr_info.owned_indices));
@@ -1123,7 +1119,7 @@ void MFProcedureExecutor::call(IndexMask full_mask, MFParams params, MFContext c
         const MFCallInstruction &call_instruction = static_cast<const MFCallInstruction &>(
             instruction);
         execute_call_instruction(call_instruction, instr_info.mask(), variable_states, context);
-        scheduler.add_previous_instruction_indices(call_instruction.next(), instr_info);
+        scheduler.add_previous_instruction_indices(*call_instruction.next(), instr_info);
         break;
       }
       case MFInstructionType::Branch: {
@@ -1134,8 +1130,8 @@ void MFProcedureExecutor::call(IndexMask full_mask, MFParams params, MFContext c
 
         IndicesSplitVectors new_indices;
         variable_state.indices_split(instr_info.mask(), new_indices);
-        scheduler.add_owned_indices(branch_instruction.branch_false(), new_indices[false]);
-        scheduler.add_owned_indices(branch_instruction.branch_true(), new_indices[true]);
+        scheduler.add_owned_indices(*branch_instruction.branch_false(), new_indices[false]);
+        scheduler.add_owned_indices(*branch_instruction.branch_true(), new_indices[true]);
         break;
       }
       case MFInstructionType::Destruct: {
@@ -1143,13 +1139,17 @@ void MFProcedureExecutor::call(IndexMask full_mask, MFParams params, MFContext c
             static_cast<const MFDestructInstruction &>(instruction);
         const MFVariable *variable = destruct_instruction.variable();
         variable_states.destruct(*variable, instr_info.mask());
-        scheduler.add_previous_instruction_indices(destruct_instruction.next(), instr_info);
+        scheduler.add_previous_instruction_indices(*destruct_instruction.next(), instr_info);
         break;
       }
       case MFInstructionType::Dummy: {
         const MFDummyInstruction &dummy_instruction = static_cast<const MFDummyInstruction &>(
             instruction);
-        scheduler.add_previous_instruction_indices(dummy_instruction.next(), instr_info);
+        scheduler.add_previous_instruction_indices(*dummy_instruction.next(), instr_info);
+        break;
+      }
+      case MFInstructionType::Return: {
+        /* Don't insert the indices back into the scheduler. */
         break;
       }
     }
@@ -1157,7 +1157,7 @@ void MFProcedureExecutor::call(IndexMask full_mask, MFParams params, MFContext c
 
   for (const int param_index : this->param_indices()) {
     const MFParamType param_type = this->param_type(param_index);
-    const MFVariable *variable = procedure_.params()[param_index].second;
+    const MFVariable *variable = procedure_.params()[param_index].variable;
     VariableState &variable_state = variable_states.get_variable_state(*variable);
     switch (param_type.interface_type()) {
       case MFParamType::Input: {

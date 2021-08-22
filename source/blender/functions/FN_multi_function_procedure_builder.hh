@@ -70,6 +70,8 @@ class MFProcedureBuilder {
   void add_destruct(MFVariable &variable);
   void add_destruct(Span<MFVariable *> variables);
 
+  MFReturnInstruction &add_return();
+
   Branch add_branch(MFVariable &condition);
 
   Loop add_loop();

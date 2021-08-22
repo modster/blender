@@ -30,6 +30,7 @@ class MFCallInstruction;
 class MFBranchInstruction;
 class MFDestructInstruction;
 class MFDummyInstruction;
+class MFReturnInstruction;
 class MFProcedure;
 
 enum class MFInstructionType {
@@ -37,6 +38,7 @@ enum class MFInstructionType {
   Branch,
   Destruct,
   Dummy,
+  Return,
 };
 
 class MFVariable : NonCopyable, NonMovable {
@@ -71,6 +73,7 @@ class MFInstruction : NonCopyable, NonMovable {
   friend MFBranchInstruction;
   friend MFDestructInstruction;
   friend MFDummyInstruction;
+  friend MFReturnInstruction;
 
  public:
   MFInstructionType type() const;
@@ -104,6 +107,8 @@ class MFBranchInstruction : public MFInstruction {
   MFInstruction *branch_true_ = nullptr;
   MFInstruction *branch_false_ = nullptr;
 
+  friend MFProcedure;
+
  public:
   MFVariable *condition();
   const MFVariable *condition() const;
@@ -123,6 +128,8 @@ class MFDestructInstruction : public MFInstruction {
   MFVariable *variable_ = nullptr;
   MFInstruction *next_ = nullptr;
 
+  friend MFProcedure;
+
  public:
   MFVariable *variable();
   const MFVariable *variable() const;
@@ -137,10 +144,25 @@ class MFDummyInstruction : public MFInstruction {
  private:
   MFInstruction *next_ = nullptr;
 
+  friend MFProcedure;
+
  public:
   MFInstruction *next();
   const MFInstruction *next() const;
   void set_next(MFInstruction *instruction);
+};
+
+class MFReturnInstruction : public MFInstruction {
+};
+
+struct MFParameter {
+  MFParamType::InterfaceType type;
+  MFVariable *variable;
+};
+
+struct ConstMFParameter {
+  MFParamType::InterfaceType type;
+  const MFVariable *variable;
 };
 
 class MFProcedure : NonCopyable, NonMovable {
@@ -150,8 +172,9 @@ class MFProcedure : NonCopyable, NonMovable {
   Vector<MFBranchInstruction *> branch_instructions_;
   Vector<MFDestructInstruction *> destruct_instructions_;
   Vector<MFDummyInstruction *> dummy_instructions_;
+  Vector<MFReturnInstruction *> return_instructions_;
   Vector<MFVariable *> variables_;
-  Vector<std::pair<MFParamType::InterfaceType, MFVariable *>> params_;
+  Vector<MFParameter> params_;
   MFInstruction *entry_ = nullptr;
 
  public:
@@ -163,10 +186,11 @@ class MFProcedure : NonCopyable, NonMovable {
   MFBranchInstruction &new_branch_instruction();
   MFDestructInstruction &new_destruct_instruction();
   MFDummyInstruction &new_dummy_instruction();
+  MFReturnInstruction &new_return_instruction();
 
   void add_parameter(MFParamType::InterfaceType interface_type, MFVariable &variable);
 
-  Span<std::pair<MFParamType::InterfaceType, const MFVariable *>> params() const;
+  Span<ConstMFParameter> params() const;
 
   MFInstruction *entry();
   const MFInstruction *entry() const;
@@ -178,6 +202,23 @@ class MFProcedure : NonCopyable, NonMovable {
   void assert_valid() const;
 
   std::string to_dot() const;
+
+  bool validate() const;
+
+ private:
+  bool validate_all_instruction_pointers_set() const;
+  bool validate_all_params_provided() const;
+  bool validate_same_variables_in_one_call() const;
+  bool validate_parameters() const;
+  bool validate_initialization() const;
+
+  struct InitState {
+    bool can_be_initialized = false;
+    bool can_be_uninitialized = false;
+  };
+
+  InitState find_initialization_state_before_instruction(const MFInstruction &target_instruction,
+                                                         const MFVariable &variable) const;
 };
 
 namespace multi_function_procedure_types {
@@ -332,9 +373,10 @@ inline const MFInstruction *MFDummyInstruction::next() const
  * MFProcedure inline methods.
  */
 
-inline Span<std::pair<MFParamType::InterfaceType, const MFVariable *>> MFProcedure::params() const
+inline Span<ConstMFParameter> MFProcedure::params() const
 {
-  return params_.as_span().cast<std::pair<MFParamType::InterfaceType, const MFVariable *>>();
+  static_assert(sizeof(MFParameter) == sizeof(ConstMFParameter));
+  return params_.as_span().cast<ConstMFParameter>();
 }
 
 inline MFInstruction *MFProcedure::entry()
