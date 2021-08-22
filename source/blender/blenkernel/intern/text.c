@@ -171,9 +171,6 @@ static void text_free_data(ID *id)
 
 static void text_blend_write(BlendWriter *writer, ID *id, const void *id_address)
 {
-  if (id->us < 1 && !BLO_write_is_undo(writer)) {
-    return;
-  }
   Text *text = (Text *)id;
 
   /* NOTE: we are clearing local temp data here, *not* the flag in the actual 'real' ID. */
@@ -2331,7 +2328,7 @@ int txt_setcurr_tab_spaces(Text *text, int space)
   }
 
   while (text->curl->line[i] == indent) {
-    // we only count those tabs/spaces that are before any text or before the curs;
+    /* We only count those tabs/spaces that are before any text or before the curs; */
     if (i == text->curc) {
       return i;
     }

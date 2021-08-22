@@ -28,8 +28,7 @@
 #else
 #  include "BLI_winstuff.h"
 #  include "winsock2.h"
-#  include <io.h>   /* for open close read */
-#  include <zlib.h> /* odd include order-issue */
+#  include <io.h> /* for open close read */
 #endif
 
 /* allow readfile to use deprecated functionality */
@@ -1335,7 +1334,7 @@ void blo_do_versions_pre250(FileData *fd, Library *lib, Main *bmain)
           ME_OPT_EDGES = (1 << 8),
         };
 
-        if ((me->flag & ME_SUBSURF)) {
+        if (me->flag & ME_SUBSURF) {
           SubsurfModifierData *smd = (SubsurfModifierData *)BKE_modifier_new(
               eModifierType_Subsurf);
 
