@@ -234,6 +234,9 @@ static std::string optional_variable_to_string(const MFVariable *variable)
 
 bool MFProcedure::validate() const
 {
+  if (entry_ == nullptr) {
+    return false;
+  }
   if (!this->validate_all_instruction_pointers_set()) {
     return false;
   }

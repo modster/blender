@@ -376,9 +376,6 @@ class VariableState : NonCopyable, NonMovable {
     }
   }
 
-  /* TODO: What happens when the same parameter is passed to the same function more than ones.
-   * Maybe restrict this so that one variable can only be used either as multiple inputs, one
-   * mutable or one output. */
   void ensure_is_mutable(IndexMask full_mask,
                          const MFDataType &data_type,
                          ValueAllocator &value_allocator)
@@ -1013,13 +1010,27 @@ static void execute_call_instruction(const MFCallInstruction &instruction,
   }
 }
 
-struct NextInstructionInfo {
-  const MFInstruction *instruction = nullptr;
+struct InstructionIndices {
+  bool is_owned;
   Vector<int64_t> owned_indices;
+  IndexMask referenced_indices;
 
   IndexMask mask() const
   {
-    return this->owned_indices.as_span();
+    if (this->is_owned) {
+      return this->owned_indices.as_span();
+    }
+    return this->referenced_indices;
+  }
+};
+
+struct NextInstructionInfo {
+  const MFInstruction *instruction = nullptr;
+  InstructionIndices indices;
+
+  IndexMask mask() const
+  {
+    return this->indices.mask();
   }
 
   operator bool() const
@@ -1030,20 +1041,20 @@ struct NextInstructionInfo {
 
 class InstructionScheduler {
  private:
-  Map<const MFInstruction *, Vector<Vector<int64_t>>> indices_by_instruction_;
+  Map<const MFInstruction *, Vector<InstructionIndices>> indices_by_instruction_;
 
  public:
   InstructionScheduler() = default;
 
-  void add_referenced_indices(const MFInstruction *instruction, IndexMask mask)
+  void add_referenced_indices(const MFInstruction &instruction, IndexMask mask)
   {
-    if (instruction == nullptr) {
-      return;
-    }
     if (mask.is_empty()) {
       return;
     }
-    indices_by_instruction_.lookup_or_add_default(instruction).append(mask.indices());
+    InstructionIndices new_indices;
+    new_indices.is_owned = false;
+    new_indices.referenced_indices = mask;
+    indices_by_instruction_.lookup_or_add_default(&instruction).append(std::move(new_indices));
   }
 
   void add_owned_indices(const MFInstruction &instruction, Vector<int64_t> indices)
@@ -1052,13 +1063,18 @@ class InstructionScheduler {
       return;
     }
     BLI_assert(IndexMask::indices_are_valid_index_mask(indices));
-    indices_by_instruction_.lookup_or_add_default(&instruction).append(std::move(indices));
+
+    InstructionIndices new_indices;
+    new_indices.is_owned = true;
+    new_indices.owned_indices = std::move(indices);
+    indices_by_instruction_.lookup_or_add_default(&instruction).append(std::move(new_indices));
   }
 
   void add_previous_instruction_indices(const MFInstruction &instruction,
                                         NextInstructionInfo &instr_info)
   {
-    this->add_owned_indices(instruction, std::move(instr_info.owned_indices));
+    indices_by_instruction_.lookup_or_add_default(&instruction)
+        .append(std::move(instr_info.indices));
   }
 
   NextInstructionInfo pop_next()
@@ -1069,28 +1085,21 @@ class InstructionScheduler {
     /* TODO: Implement better mechanism to determine next instruction. */
     const MFInstruction *instruction = *indices_by_instruction_.keys().begin();
 
-    Vector<int64_t> indices = this->pop_indices_array(instruction);
-    if (indices.is_empty()) {
-      return {};
-    }
-
     NextInstructionInfo next_instruction_info;
     next_instruction_info.instruction = instruction;
-    next_instruction_info.owned_indices = std::move(indices);
+    next_instruction_info.indices = this->pop_indices_array(instruction);
     return next_instruction_info;
   }
 
  private:
-  Vector<int64_t> pop_indices_array(const MFInstruction *instruction)
+  InstructionIndices pop_indices_array(const MFInstruction *instruction)
   {
-    Vector<Vector<int64_t>> *indices = indices_by_instruction_.lookup_ptr(instruction);
+    Vector<InstructionIndices> *indices = indices_by_instruction_.lookup_ptr(instruction);
     if (indices == nullptr) {
       return {};
     }
-    Vector<int64_t> r_indices;
-    while (!indices->is_empty() && r_indices.is_empty()) {
-      r_indices = (*indices).pop_last();
-    }
+    InstructionIndices r_indices = (*indices).pop_last();
+    BLI_assert(!r_indices.mask().is_empty());
     if (indices->is_empty()) {
       indices_by_instruction_.remove_contained(instruction);
     }
@@ -1100,9 +1109,7 @@ class InstructionScheduler {
 
 void MFProcedureExecutor::call(IndexMask full_mask, MFParams params, MFContext context) const
 {
-  if (procedure_.entry() == nullptr) {
-    return;
-  }
+  BLI_assert(procedure_.validate());
 
   LinearAllocator<> allocator;
 
@@ -1110,7 +1117,7 @@ void MFProcedureExecutor::call(IndexMask full_mask, MFParams params, MFContext c
   variable_states.add_initial_variable_states(*this, procedure_, params);
 
   InstructionScheduler scheduler;
-  scheduler.add_referenced_indices(procedure_.entry(), full_mask);
+  scheduler.add_referenced_indices(*procedure_.entry(), full_mask);
 
   while (NextInstructionInfo instr_info = scheduler.pop_next()) {
     const MFInstruction &instruction = *instr_info.instruction;
