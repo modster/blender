@@ -276,4 +276,53 @@ TEST(multi_function_procedure, Vectors)
   EXPECT_EQ(v3[4].size(), 35);
 }
 
+TEST(multi_function_procedure, BufferReuse)
+{
+  /**
+   * procedure(int a, int *out) {
+   *   int b = a + 10;
+   *   int c = c + 10;
+   *   int d = d + 10;
+   *   int e = d + 10;
+   *   out = e + 10;
+   * }
+   */
+
+  CustomMF_SI_SO<int, int> add_10_fn{"add 10", [](int a) { return a + 10; }};
+
+  MFProcedure procedure;
+  MFProcedureBuilder builder{procedure};
+
+  MFVariable *var_a = &builder.add_single_input_parameter<int>();
+  auto [var_b] = builder.add_call<1>(add_10_fn, {var_a});
+  builder.add_destruct(*var_a);
+  auto [var_c] = builder.add_call<1>(add_10_fn, {var_b});
+  builder.add_destruct(*var_b);
+  auto [var_d] = builder.add_call<1>(add_10_fn, {var_c});
+  builder.add_destruct(*var_c);
+  auto [var_e] = builder.add_call<1>(add_10_fn, {var_d});
+  builder.add_destruct(*var_d);
+  auto [var_out] = builder.add_call<1>(add_10_fn, {var_e});
+  builder.add_destruct(*var_e);
+  builder.add_output_parameter(*var_out);
+
+  MFProcedureExecutor procedure_fn{"Buffer Reuse", procedure};
+
+  Array<int> inputs = {4, 1, 6, 2, 3};
+  Array<int> results(5, -1);
+
+  MFParamsBuilder params{procedure_fn, 5};
+  params.add_readonly_single_input(inputs.as_span());
+  params.add_uninitialized_single_output(results.as_mutable_span());
+
+  MFContextBuilder context;
+  procedure_fn.call({0, 2, 3, 4}, params, context);
+
+  EXPECT_EQ(results[0], 54);
+  EXPECT_EQ(results[1], -1);
+  EXPECT_EQ(results[2], 56);
+  EXPECT_EQ(results[3], 52);
+  EXPECT_EQ(results[4], 53);
+}
+
 }  // namespace blender::fn::tests

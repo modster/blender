@@ -132,7 +132,16 @@ class VariableState;
 
 class ValueAllocator : NonCopyable, NonMovable {
  private:
+  /* Allocate with 64 byte alignment for better reusability of buffers and improved cache
+   * performance. */
+  static constexpr inline int min_alignment = 64;
+
+  /* Use stacks so that the most recently used buffers are reused first. This improves cache
+   * efficiency. */
   std::array<Stack<VariableValue *>, tot_variable_value_types> values_free_lists_;
+  /* The integer key is the size of one element (e.g. 4 for an integer buffer). All buffers are
+   * aligned to #min_alignment bytes. */
+  Map<int, Stack<void *>> span_buffers_free_list_;
 
  public:
   ValueAllocator() = default;
@@ -140,6 +149,11 @@ class ValueAllocator : NonCopyable, NonMovable {
   ~ValueAllocator()
   {
     for (Stack<VariableValue *> &stack : values_free_lists_) {
+      while (!stack.is_empty()) {
+        MEM_freeN(stack.pop());
+      }
+    }
+    for (Stack<void *> &stack : span_buffers_free_list_.values()) {
       while (!stack.is_empty()) {
         MEM_freeN(stack.pop());
       }
@@ -167,7 +181,25 @@ class ValueAllocator : NonCopyable, NonMovable {
 
   VariableValue_Span *obtain_Span(const CPPType &type, int size)
   {
-    void *buffer = MEM_mallocN_aligned(type.size() * size, type.alignment(), __func__);
+    void *buffer = nullptr;
+
+    const int element_size = type.size();
+    const int alignment = type.alignment();
+
+    if (alignment > min_alignment) {
+      /* In this rare case we fallback to not reusing existing buffers. */
+      buffer = MEM_mallocN_aligned(element_size * size, alignment, __func__);
+    }
+    else {
+      Stack<void *> *stack = span_buffers_free_list_.lookup_ptr(element_size);
+      if (stack == nullptr || stack->is_empty()) {
+        buffer = MEM_mallocN_aligned(element_size * size, min_alignment, __func__);
+      }
+      else {
+        buffer = stack->pop();
+      }
+    }
+
     return this->obtain<VariableValue_Span>(buffer, true);
   }
 
@@ -203,8 +235,10 @@ class ValueAllocator : NonCopyable, NonMovable {
       case ValueType::Span: {
         auto *value_typed = static_cast<VariableValue_Span *>(value);
         if (value_typed->owned) {
+          const CPPType &type = data_type.single_type();
           /* Assumes all values in the buffer are uninitialized already. */
-          MEM_freeN(value_typed->data);
+          Stack<void *> &buffers = span_buffers_free_list_.lookup_or_add_default(type.size());
+          buffers.push(value_typed->data);
         }
         break;
       }
@@ -630,8 +664,10 @@ class VariableState : NonCopyable, NonMovable {
                 const MFDataType &data_type,
                 ValueAllocator &value_allocator)
   {
+    int new_tot_initialized = tot_initialized_ - mask.size();
+
     /* Sanity check to make sure that enough indices can be destructed. */
-    BLI_assert(tot_initialized_ >= mask.size());
+    BLI_assert(new_tot_initialized >= 0);
 
     switch (value_->type) {
       case ValueType::GVArray: {
@@ -654,6 +690,11 @@ class VariableState : NonCopyable, NonMovable {
       case ValueType::Span: {
         const CPPType &type = data_type.single_type();
         type.destruct_indices(this->value_as<VariableValue_Span>()->data, mask);
+        if (new_tot_initialized == 0) {
+          /* Release span when all values are initialized. */
+          value_allocator.release_value(value_, data_type);
+          value_ = value_allocator.obtain_OneSingle(data_type.single_type());
+        }
         break;
       }
       case ValueType::GVVectorArray: {
@@ -696,7 +737,7 @@ class VariableState : NonCopyable, NonMovable {
       }
     }
 
-    tot_initialized_ -= mask.size();
+    tot_initialized_ = new_tot_initialized;
   }
 
   void indices_split(IndexMask mask, IndicesSplitVectors &r_indices)
