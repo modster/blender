@@ -110,7 +110,7 @@ TEST(multi_function_procedure, BranchTest)
 TEST(multi_function_procedure, EvaluateOne)
 {
   /**
-   * procedure(int var1, int var2) {
+   * procedure(int var1, int *var2) {
    *   var2 = var1 + 10;
    * }
    */
