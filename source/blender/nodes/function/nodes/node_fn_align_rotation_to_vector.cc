@@ -162,10 +162,10 @@ static const blender::fn::MultiFunction &get_multi_function(bNode &node)
   return fixed_pivot;
 }
 
-static void fn_node_align_rotation_to_vector_expand_in_mf_network(
-    blender::nodes::NodeMFNetworkBuilder &builder)
+static void fn_node_align_rotation_to_vector_build_multi_function(
+    blender::nodes::NodeMultiFunctionBuilder &builder)
 {
-  const blender::fn::MultiFunction &fn = get_multi_function(builder.bnode());
+  const blender::fn::MultiFunction &fn = get_multi_function(builder.node());
   builder.set_matching_fn(fn);
 }
 
@@ -185,7 +185,7 @@ void register_node_type_fn_align_rotation_to_vector()
                     "FunctionNodeAlignRotationToVector",
                     node_free_standard_storage,
                     node_copy_standard_storage);
-  ntype.expand_in_mf_network = fn_node_align_rotation_to_vector_expand_in_mf_network;
+  ntype.build_multi_function = fn_node_align_rotation_to_vector_build_multi_function;
   ntype.draw_buttons = fn_node_align_rotation_to_vector_layout;
   nodeRegisterType(&ntype);
 }

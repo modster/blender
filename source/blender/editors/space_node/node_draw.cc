@@ -812,7 +812,7 @@ static bool use_special_non_field_socket_drawing(const bNodeTree *node_tree,
   if (socket->in_out == SOCK_OUT) {
     return false;
   }
-  if (node->typeinfo->expand_in_mf_network) {
+  if (node->typeinfo->build_multi_function) {
     /* Wow, that's hacky. Don't use vertical bar for function nodes. */
     return false;
   }

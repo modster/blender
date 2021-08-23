@@ -191,18 +191,16 @@ class NoiseTextureFunction1D : public blender::fn::MultiFunction {
   }
 };
 
-static void sh_node_tex_noise_expand_in_mf_network(blender::nodes::NodeMFNetworkBuilder &builder)
+static void sh_node_tex_noise_build_multi_function(
+    blender::nodes::NodeMultiFunctionBuilder &builder)
 {
   /* TODO: Not only support 1D and 3D. */
-  NodeTexNoise *tex = builder.dnode()->storage<NodeTexNoise>();
+  NodeTexNoise *tex = (NodeTexNoise *)builder.node().storage;
   if (tex->dimensions == 1) {
     builder.construct_and_set_matching_fn<NoiseTextureFunction1D>();
   }
   else if (tex->dimensions == 3) {
     builder.construct_and_set_matching_fn<NoiseTextureFunction3D>();
-  }
-  else {
-    builder.set_not_implemented();
   }
 }
 
@@ -218,7 +216,7 @@ void register_node_type_sh_tex_noise(void)
       &ntype, "NodeTexNoise", node_free_standard_storage, node_copy_standard_storage);
   node_type_gpu(&ntype, node_shader_gpu_tex_noise);
   node_type_update(&ntype, node_shader_update_tex_noise);
-  ntype.expand_in_mf_network = sh_node_tex_noise_expand_in_mf_network;
+  ntype.build_multi_function = sh_node_tex_noise_build_multi_function;
 
   nodeRegisterType(&ntype);
 }
