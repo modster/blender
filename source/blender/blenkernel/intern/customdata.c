@@ -46,6 +46,7 @@
 
 #include "BLT_translation.h"
 
+#include "BKE_anonymous_attribute.h"
 #include "BKE_customdata.h"
 #include "BKE_customdata_file.h"
 #include "BKE_deform.h"
@@ -2127,6 +2128,10 @@ bool CustomData_merge(const struct CustomData *source,
     if (flag & CD_FLAG_NOCOPY) {
       continue;
     }
+    if (layer->anonymous_id &&
+        !BKE_anonymous_attribute_id_has_strong_references(layer->anonymous_id)) {
+      continue;
+    }
     if (!(mask & CD_TYPE_AS_MASK(type))) {
       continue;
     }
@@ -2166,6 +2171,11 @@ bool CustomData_merge(const struct CustomData *source,
       newlayer->active_mask = lastmask;
       newlayer->flag |= flag & (CD_FLAG_EXTERNAL | CD_FLAG_IN_MEMORY);
       changed = true;
+
+      if (layer->anonymous_id != NULL) {
+        BKE_anonymous_attribute_id_increment_weak(layer->anonymous_id);
+        newlayer->anonymous_id = layer->anonymous_id;
+      }
     }
   }
 
@@ -2206,6 +2216,10 @@ static void customData_free_layer__internal(CustomDataLayer *layer, int totelem)
 {
   const LayerTypeInfo *typeInfo;
 
+  if (layer->anonymous_id != NULL) {
+    BKE_anonymous_attribute_id_decrement_weak(layer->anonymous_id);
+    layer->anonymous_id = NULL;
+  }
   if (!(layer->flag & CD_FLAG_NOFREE) && layer->data) {
     typeInfo = layerType_getInfo(layer->type);
 
@@ -4244,7 +4258,8 @@ void CustomData_blend_write_prepare(CustomData *data,
 
   for (i = 0, j = 0; i < totlayer; i++) {
     CustomDataLayer *layer = &data->layers[i];
-    if (layer->flag & CD_FLAG_NOCOPY) { /* Layers with this flag set are not written to file. */
+    /* Layers with this flag set are not written to file. */
+    if ((layer->flag & CD_FLAG_NOCOPY) || layer->anonymous_id != NULL) {
       data->totlayer--;
       // CLOG_WARN(&LOG, "skipping layer %p (%s)", layer, layer->name);
     }
