@@ -2630,6 +2630,7 @@ static void widget_state(uiWidgetType *wt, int state, int drawflag, eUIEmbossTyp
     if (state & UI_BUT_ACTIVE_DEFAULT) {
       copy_v4_v4_uchar(wt->wcol.inner, wt->wcol.inner_sel);
       copy_v4_v4_uchar(wt->wcol.text, wt->wcol.text_sel);
+      color_mul_hsl_v3(wt->wcol.outline, 1.0f, 1.0f, 0.9f);
     }
     if (color_blend != NULL) {
       color_blend_v3_v3(wt->wcol.inner, color_blend, wcol_state->blend);
