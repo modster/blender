@@ -4278,6 +4278,28 @@ void node_draw_link(View2D *v2d, SpaceNode *snode, bNodeLink *link)
     }
   }
 
+  if (link->fromsock) {
+    const SocketSingleState from_single_state = get_socket_single_state(
+        snode->edittree, link->fromnode, link->fromsock);
+    if (ELEM(from_single_state,
+             SocketSingleState::RequiredSingle,
+             SocketSingleState::CurrentlySingle)) {
+      th_col1 = th_col2 = TH_ACTIVE;
+    }
+  }
+
+  if (link->fromsock && link->tosock) {
+    const SocketSingleState to_single_state = get_socket_single_state(
+        snode->edittree, link->tonode, link->tosock);
+    const SocketSingleState from_single_state = get_socket_single_state(
+        snode->edittree, link->fromnode, link->fromsock);
+
+    if (to_single_state == SocketSingleState::RequiredSingle &&
+        from_single_state == SocketSingleState::MaybeField) {
+      th_col1 = th_col2 = TH_REDALERT;
+    }
+  }
+
   node_draw_link_bezier(v2d, snode, link, th_col1, th_col2, th_col3);
 }
 

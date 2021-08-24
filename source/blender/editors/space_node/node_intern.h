@@ -340,3 +340,14 @@ extern const char *node_context_dir[];
 #ifdef __cplusplus
 }
 #endif
+
+#ifdef __cplusplus
+enum class SocketSingleState {
+  RequiredSingle,
+  CurrentlySingle,
+  MaybeField,
+};
+SocketSingleState get_socket_single_state(const struct bNodeTree *node_tree,
+                                          const struct bNode *node,
+                                          const struct bNodeSocket *socket);
+#endif

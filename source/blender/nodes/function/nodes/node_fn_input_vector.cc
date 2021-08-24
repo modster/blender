@@ -22,7 +22,7 @@
 #include "UI_resources.h"
 
 static bNodeSocketTemplate fn_node_input_vector_out[] = {
-    {SOCK_VECTOR, N_("Vector")},
+    {SOCK_VECTOR, N_("Vector"), 0, 0, 0, 0, 0, 0, PROP_NONE, SOCK_ALWAYS_SINGLE},
     {-1, ""},
 };
 

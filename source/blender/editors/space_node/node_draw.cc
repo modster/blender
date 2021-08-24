@@ -789,12 +789,6 @@ static void node_socket_draw_rounded_rectangle(const float color[4],
       &rect, color, nullptr, 1.0f, color_outline, outline_width, width - outline_width * 0.5f);
 }
 
-enum class SocketSingleState {
-  RequiredSingle,
-  CurrentlySingle,
-  MaybeField,
-};
-
 #define PRIMITIVE_SOCKETS SOCK_FLOAT, SOCK_VECTOR, SOCK_INT, SOCK_BOOLEAN, SOCK_RGBA
 
 static bool is_required_single(const bNodeTree *node_tree,
@@ -833,12 +827,17 @@ static bool is_maybe_field(const bNodeTree *node_tree,
     return true;
   }
   if (socket->in_out == SOCK_IN) {
+    bool found_link = false;
     LISTBASE_FOREACH (const bNodeLink *, link, &node_tree->links) {
       if (link->tosock == socket) {
+        found_link = true;
         if (is_maybe_field(node_tree, link->fromnode, link->fromsock)) {
           return true;
         }
       }
+    }
+    if (!found_link && (socket->flag & SOCK_HIDE_VALUE) && socket->type == SOCK_VECTOR) {
+      return true;
     }
   }
   else {
@@ -853,9 +852,9 @@ static bool is_maybe_field(const bNodeTree *node_tree,
   return false;
 }
 
-static SocketSingleState get_socket_single_state(const bNodeTree *node_tree,
-                                                 const bNode *node,
-                                                 const bNodeSocket *socket)
+SocketSingleState get_socket_single_state(const bNodeTree *node_tree,
+                                          const bNode *node,
+                                          const bNodeSocket *socket)
 {
   if (node_tree->type != NTREE_GEOMETRY) {
     return SocketSingleState::MaybeField;
