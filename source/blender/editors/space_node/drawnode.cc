@@ -4281,7 +4281,7 @@ void node_draw_link(View2D *v2d, SpaceNode *snode, bNodeLink *link)
     if (link->flag & NODE_LINK_VALID) {
       /* special indicated link, on drop-node */
       if (link->flag & NODE_LINKFLAG_HILITE) {
-        th_col1 = th_col2 = TH_ACTIVE;
+        // th_col1 = th_col2 = TH_ACTIVE;
       }
       else if (link->flag & NODE_LINK_MUTED) {
         th_col1 = th_col2 = TH_REDALERT;
@@ -4289,10 +4289,10 @@ void node_draw_link(View2D *v2d, SpaceNode *snode, bNodeLink *link)
       else {
         /* Regular link, highlight if connected to selected node. */
         if (link->fromnode && link->fromnode->flag & SELECT) {
-          th_col1 = TH_EDGE_SELECT;
+          // th_col1 = TH_EDGE_SELECT;
         }
         if (link->tonode && link->tonode->flag & SELECT) {
-          th_col2 = TH_EDGE_SELECT;
+          // th_col2 = TH_EDGE_SELECT;
         }
       }
     }
