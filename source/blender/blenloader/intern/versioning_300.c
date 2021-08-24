@@ -787,5 +787,36 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
    */
   {
     /* Keep this block, even when empty. */
+
+    /* Add node storage for subdivision surface node. */
+    FOREACH_NODETREE_BEGIN (bmain, ntree, id) {
+      if (ntree->type == NTREE_GEOMETRY) {
+        LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
+          if (node->type == GEO_NODE_SUBDIVISION_SURFACE) {
+            if (node->storage == NULL) {
+              NodeGeometrySubdivisionSurface *data = MEM_callocN(
+                  sizeof(NodeGeometrySubdivisionSurface), __func__);
+              data->uv_smooth = SUBSURF_UV_SMOOTH_PRESERVE_BOUNDARIES;
+              data->boundary_smooth = SUBSURF_BOUNDARY_SMOOTH_ALL;
+              node->storage = data;
+            }
+          }
+        }
+      }
+    }
+    FOREACH_NODETREE_END;
+
+    /* Disable Fade Inactive Overlay by default as it is redundant after introducing flash on mode
+     * transfer. */
+    for (bScreen *screen = bmain->screens.first; screen; screen = screen->id.next) {
+      LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
+        LISTBASE_FOREACH (SpaceLink *, sl, &area->spacedata) {
+          if (sl->spacetype == SPACE_VIEW3D) {
+            View3D *v3d = (View3D *)sl;
+            v3d->overlay.flag &= ~V3D_OVERLAY_FADE_INACTIVE;
+          }
+        }
+      }
+    }
   }
 }

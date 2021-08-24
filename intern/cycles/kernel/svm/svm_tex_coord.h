@@ -267,7 +267,7 @@ ccl_device void svm_node_normal_map(KernelGlobals *kg, ShaderData *sd, float *st
 
   if (space == NODE_NORMAL_MAP_TANGENT) {
     /* tangent space */
-    if (sd->object == OBJECT_NONE || (sd->prim & PRIMITIVE_ALL_TRIANGLE) == 0) {
+    if (sd->object == OBJECT_NONE || (sd->type & PRIMITIVE_ALL_TRIANGLE) == 0) {
       /* Fallback to unperturbed normal. */
       stack_store_float3(stack, normal_offset, sd->N);
       return;
@@ -289,7 +289,7 @@ ccl_device void svm_node_normal_map(KernelGlobals *kg, ShaderData *sd, float *st
     float3 normal;
 
     if (sd->shader & SHADER_SMOOTH_NORMAL) {
-      normal = triangle_smooth_normal_unnormalized(kg, sd->Ng, sd->prim, sd->u, sd->v);
+      normal = triangle_smooth_normal_unnormalized(kg, sd, sd->Ng, sd->prim, sd->u, sd->v);
     }
     else {
       normal = sd->Ng;
