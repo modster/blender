@@ -3801,7 +3801,7 @@ static void widget_numslider(
     uchar outline[3];
     copy_v3_v3_uchar(outline, wcol->outline);
     copy_v3_v3_uchar(wcol->outline, wcol->item);
-    copy_v3_v3_uchar(wcol->inner, wcol->item);
+    copy_v4_v4_uchar(wcol->inner, wcol->item);
 
     if (!(state & UI_SELECT)) {
       SWAP(short, wcol->shadetop, wcol->shadedown);
