@@ -21,17 +21,8 @@
 
 static bNodeSocketTemplate geo_node_point_translate_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
-    {SOCK_VECTOR,
-     N_("Translation"),
-     0.0f,
-     0.0f,
-     0.0f,
-     1.0f,
-     -FLT_MAX,
-     FLT_MAX,
-     PROP_TRANSLATION,
-     SOCK_FIELD},
-    {SOCK_BOOLEAN, N_("Selection"), 1, 0, 0, 0, 0, 0, PROP_NONE, SOCK_HIDE_VALUE | SOCK_FIELD},
+    {SOCK_VECTOR, N_("Translation"), 0.0f, 0.0f, 0.0f, 1.0f, -FLT_MAX, FLT_MAX, PROP_TRANSLATION},
+    {SOCK_BOOLEAN, N_("Selection"), 1, 0, 0, 0, 0, 0, PROP_NONE, SOCK_HIDE_VALUE},
     {-1, ""},
 };
 

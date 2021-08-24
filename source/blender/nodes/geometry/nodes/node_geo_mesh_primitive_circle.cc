@@ -26,8 +26,17 @@
 #include "node_geometry_util.hh"
 
 static bNodeSocketTemplate geo_node_mesh_primitive_circle_in[] = {
-    {SOCK_INT, N_("Vertices"), 32, 0.0f, 0.0f, 0.0f, 3, 4096},
-    {SOCK_FLOAT, N_("Radius"), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX, PROP_DISTANCE},
+    {SOCK_INT, N_("Vertices"), 32, 0.0f, 0.0f, 0.0f, 3, 4096, PROP_NONE, SOCK_ALWAYS_SINGLE},
+    {SOCK_FLOAT,
+     N_("Radius"),
+     1.0f,
+     0.0f,
+     0.0f,
+     0.0f,
+     0.0f,
+     FLT_MAX,
+     PROP_DISTANCE,
+     SOCK_ALWAYS_SINGLE},
     {-1, ""},
 };
 

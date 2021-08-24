@@ -20,7 +20,7 @@
 #include "node_geometry_util.hh"
 
 static bNodeSocketTemplate geo_node_index_out[] = {
-    {SOCK_INT, N_("Index")},
+    {SOCK_INT, N_("Index"), 0, 0, 0, 0, 0, 0, PROP_NONE, SOCK_ALWAYS_FIELD},
     {-1, ""},
 };
 

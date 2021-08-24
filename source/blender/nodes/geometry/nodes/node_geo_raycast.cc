@@ -27,17 +27,8 @@
 static bNodeSocketTemplate geo_node_raycast_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
     {SOCK_GEOMETRY, N_("Target Geometry")},
-    {SOCK_VECTOR,
-     N_("Ray Direction"),
-     0.0,
-     0.0,
-     1.0,
-     0.0,
-     -FLT_MAX,
-     FLT_MAX,
-     PROP_NONE,
-     SOCK_FIELD},
-    {SOCK_FLOAT, N_("Ray Length"), 100.0, 0.0, 0.0, 0.0, 0.0f, FLT_MAX, PROP_DISTANCE, SOCK_FIELD},
+    {SOCK_VECTOR, N_("Ray Direction"), 0.0, 0.0, 1.0, 0.0, -FLT_MAX, FLT_MAX, PROP_NONE},
+    {SOCK_FLOAT, N_("Ray Length"), 100.0, 0.0, 0.0, 0.0, 0.0f, FLT_MAX, PROP_DISTANCE},
     {SOCK_STRING, N_("Target Attribute")},
     {SOCK_STRING, N_("Hit Attribute")},
     {-1, ""},
@@ -45,10 +36,10 @@ static bNodeSocketTemplate geo_node_raycast_in[] = {
 
 static bNodeSocketTemplate geo_node_raycast_out[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
-    {SOCK_BOOLEAN, N_("Is Hit")},
-    {SOCK_VECTOR, N_("Hit Position")},
-    {SOCK_VECTOR, N_("Hit Normal")},
-    {SOCK_FLOAT, N_("Hit Distance")},
+    {SOCK_BOOLEAN, N_("Is Hit"), 0, 0, 0, 0, 0, 0, PROP_NONE, SOCK_ALWAYS_FIELD},
+    {SOCK_VECTOR, N_("Hit Position"), 0, 0, 0, 0, 0, 0, PROP_NONE, SOCK_ALWAYS_FIELD},
+    {SOCK_VECTOR, N_("Hit Normal"), 0, 0, 0, 0, 0, 0, PROP_NONE, SOCK_ALWAYS_FIELD},
+    {SOCK_FLOAT, N_("Hit Distance"), 0, 0, 0, 0, 0, 0, PROP_NONE, SOCK_ALWAYS_FIELD},
     {-1, ""},
 };
 

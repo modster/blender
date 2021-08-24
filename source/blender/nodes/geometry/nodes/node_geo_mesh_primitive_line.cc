@@ -26,8 +26,17 @@
 #include "node_geometry_util.hh"
 
 static bNodeSocketTemplate geo_node_mesh_primitive_line_in[] = {
-    {SOCK_INT, N_("Count"), 10, 0.0f, 0.0f, 0.0f, 1, 10000},
-    {SOCK_FLOAT, N_("Resolution"), 1.0f, 0.0f, 0.0f, 0.0f, 0.01f, FLT_MAX, PROP_DISTANCE},
+    {SOCK_INT, N_("Count"), 10, 0.0f, 0.0f, 0.0f, 1, 10000, PROP_NONE, SOCK_ALWAYS_SINGLE},
+    {SOCK_FLOAT,
+     N_("Resolution"),
+     1.0f,
+     0.0f,
+     0.0f,
+     0.0f,
+     0.01f,
+     FLT_MAX,
+     PROP_DISTANCE,
+     SOCK_ALWAYS_SINGLE},
     {SOCK_VECTOR,
      N_("Start Location"),
      0.0f,
@@ -37,7 +46,16 @@ static bNodeSocketTemplate geo_node_mesh_primitive_line_in[] = {
      -FLT_MAX,
      FLT_MAX,
      PROP_TRANSLATION},
-    {SOCK_VECTOR, N_("Offset"), 0.0f, 0.0f, 1.0f, 0.0f, -FLT_MAX, FLT_MAX, PROP_TRANSLATION},
+    {SOCK_VECTOR,
+     N_("Offset"),
+     0.0f,
+     0.0f,
+     1.0f,
+     0.0f,
+     -FLT_MAX,
+     FLT_MAX,
+     PROP_TRANSLATION,
+     SOCK_ALWAYS_SINGLE},
     {-1, ""},
 };
 

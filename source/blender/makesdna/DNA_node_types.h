@@ -215,11 +215,8 @@ typedef enum eNodeSocketFlag {
    * type is obvious and the name takes up too much space.
    */
   SOCK_HIDE_LABEL = (1 << 12),
-  /**
-   * For geometry nodes, the result is not a single value, but evaluated as a callback and
-   * potentially many different values.
-   */
-  SOCK_FIELD = (1 << 13),
+  SOCK_ALWAYS_SINGLE = (1 << 13),
+  SOCK_ALWAYS_FIELD = (1 << 14),
 } eNodeSocketFlag;
 
 /* TODO: Limit data in bNode to what we want to see saved. */

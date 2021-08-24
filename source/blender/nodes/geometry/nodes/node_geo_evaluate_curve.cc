@@ -25,17 +25,8 @@
 
 static bNodeSocketTemplate geo_node_evaluate_curve_in[] = {
     {SOCK_GEOMETRY, N_("Curve")},
-    {SOCK_FLOAT,
-     N_("Length"),
-     0.0f,
-     0.0f,
-     0.0f,
-     0.0f,
-     -FLT_MAX,
-     FLT_MAX,
-     PROP_TRANSLATION,
-     SOCK_FIELD},
-    {SOCK_RGBA, N_("Custom"), 1, 1, 1, 1, 0, 1, PROP_NONE, SOCK_FIELD},
+    {SOCK_FLOAT, N_("Length"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX, PROP_TRANSLATION},
+    {SOCK_RGBA, N_("Custom"), 1, 1, 1, 1, 0, 1, PROP_NONE},
     {-1, ""},
 };
 

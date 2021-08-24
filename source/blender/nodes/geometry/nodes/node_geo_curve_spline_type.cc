@@ -25,7 +25,7 @@
 
 static bNodeSocketTemplate geo_node_curve_spline_type_in[] = {
     {SOCK_GEOMETRY, N_("Curve")},
-    {SOCK_BOOLEAN, N_("Selection"), 1, 0, 0, 0, 0, 0, PROP_NONE, SOCK_HIDE_VALUE | SOCK_FIELD},
+    {SOCK_BOOLEAN, N_("Selection"), 1, 0, 0, 0, 0, 0, PROP_NONE, SOCK_HIDE_VALUE},
     {-1, ""},
 };
 

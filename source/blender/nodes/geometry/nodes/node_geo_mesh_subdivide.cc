@@ -25,7 +25,7 @@
 
 static bNodeSocketTemplate geo_node_mesh_subdivide_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
-    {SOCK_INT, N_("Level"), 1, 0, 0, 0, 0, 6},
+    {SOCK_INT, N_("Level"), 1, 0, 0, 0, 0, 6, PROP_NONE, SOCK_ALWAYS_SINGLE},
     {-1, ""},
 };
 

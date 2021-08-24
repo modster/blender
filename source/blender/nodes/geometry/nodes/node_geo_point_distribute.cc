@@ -41,9 +41,18 @@ using blender::bke::GeometryInstanceGroup;
 
 static bNodeSocketTemplate geo_node_point_distribute_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
-    {SOCK_FLOAT, N_("Distance Min"), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 100000.0f, PROP_DISTANCE},
-    {SOCK_FLOAT, N_("Density"), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 100000.0f, PROP_NONE, SOCK_FIELD},
-    {SOCK_INT, N_("Seed"), 0, 0, 0, 0, -10000, 10000},
+    {SOCK_FLOAT,
+     N_("Distance Min"),
+     0.0f,
+     0.0f,
+     0.0f,
+     0.0f,
+     0.0f,
+     100000.0f,
+     PROP_DISTANCE,
+     SOCK_ALWAYS_SINGLE},
+    {SOCK_FLOAT, N_("Density"), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 100000.0f, PROP_NONE},
+    {SOCK_INT, N_("Seed"), 0, 0, 0, 0, -10000, 10000, PROP_NONE, SOCK_ALWAYS_SINGLE},
     {-1, ""},
 };
 

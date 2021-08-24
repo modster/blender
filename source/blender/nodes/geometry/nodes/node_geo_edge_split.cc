@@ -33,8 +33,9 @@ static bNodeSocketTemplate geo_node_edge_split_in[] = {
      0.0f,
      0.0f,
      DEG2RADF(180.0f),
-     PROP_ANGLE},
-    {SOCK_BOOLEAN, N_("Sharp Edges")},
+     PROP_ANGLE,
+     SOCK_ALWAYS_SINGLE},
+    {SOCK_BOOLEAN, N_("Sharp Edges"), 0, 0, 0, 0, 0, 1, PROP_NONE, SOCK_ALWAYS_SINGLE},
     {-1, ""},
 };
 

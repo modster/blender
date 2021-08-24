@@ -789,38 +789,29 @@ static void node_socket_draw_rounded_rectangle(const float color[4],
       &rect, color, nullptr, 1.0f, color_outline, outline_width, width - outline_width * 0.5f);
 }
 
-static bool use_special_non_field_socket_drawing(const bNodeTree *node_tree,
+enum class SocketSingleState {
+  RequiredSingle,
+  CurrentlySingle,
+  MaybeField,
+};
+
+static SocketSingleState get_socket_single_state(const bNodeTree *node_tree,
                                                  const bNode *node,
                                                  const bNodeSocket *socket)
 {
   if (node_tree->type != NTREE_GEOMETRY) {
-    return false;
+    return SocketSingleState::MaybeField;
   }
-  if (ELEM(socket->type,
-           SOCK_MATERIAL,
-           SOCK_GEOMETRY,
-           SOCK_TEXTURE,
-           SOCK_COLLECTION,
-           SOCK_OBJECT,
-           SOCK_IMAGE,
-           SOCK_STRING)) {
-    return false;
+  if (socket->type == -1) {
+    return SocketSingleState::MaybeField;
   }
-  if (socket->flag & SOCK_FIELD) {
-    return false;
+  if (!ELEM(socket->type, SOCK_FLOAT, SOCK_VECTOR, SOCK_INT, SOCK_BOOLEAN, SOCK_RGBA)) {
+    return SocketSingleState::RequiredSingle;
   }
-  if (socket->in_out == SOCK_OUT) {
-    return false;
+  if (socket->flag & SOCK_ALWAYS_SINGLE) {
+    return SocketSingleState::RequiredSingle;
   }
-  if (node->typeinfo->expand_in_mf_network) {
-    /* Wow, that's hacky. Don't use vertical bar for function nodes. */
-    return false;
-  }
-  if (ELEM(node->type, NODE_REROUTE, NODE_GROUP, NODE_GROUP_OUTPUT)) {
-    return false;
-  }
-
-  return true;
+  return SocketSingleState::CurrentlySingle;
 }
 
 static const float virtual_node_socket_outline_color[4] = {0.5, 0.5, 0.5, 1.0};
@@ -1062,7 +1053,8 @@ static void node_socket_draw_nested(const bContext *C,
 
   bNode *node = (bNode *)node_ptr->data;
 
-  if (!use_special_non_field_socket_drawing(ntree, node, sock)) {
+  const SocketSingleState single_state = get_socket_single_state(ntree, node, sock);
+  if (ELEM(single_state, SocketSingleState::MaybeField, SocketSingleState::CurrentlySingle)) {
     node_socket_draw(sock,
                      color,
                      outline_color,
@@ -1445,6 +1437,7 @@ void node_draw_sockets(const View2D *v2d,
     node_socket_color_get((bContext *)C, ntree, &node_ptr, socket, color);
     node_socket_outline_color_get(selected, socket->type, outline_color);
 
+    const SocketSingleState single_state = get_socket_single_state(ntree, node, socket);
     if (socket->flag & SOCK_MULTI_INPUT) {
       const bool is_node_hidden = (node->flag & NODE_HIDDEN);
       const float width = NODE_SOCKSIZE;
@@ -1453,7 +1446,27 @@ void node_draw_sockets(const View2D *v2d,
       node_socket_draw_rounded_rectangle(
           color, outline_color, width, height, socket->locx, socket->locy, 1.0f);
     }
-    else if (use_special_non_field_socket_drawing(ntree, node, socket)) {
+    else if (ELEM(single_state,
+                  SocketSingleState::CurrentlySingle,
+                  SocketSingleState::RequiredSingle)) {
+      node_socket_draw_rounded_rectangle(color,
+                                         outline_color,
+                                         NODE_SOCKSIZE * 0.6f,
+                                         NODE_SOCKSIZE * 1.3,
+                                         socket->locx - 0.8f,
+                                         socket->locy,
+                                         0.75f);
+    }
+  }
+
+  LISTBASE_FOREACH (bNodeSocket *, socket, &node->outputs) {
+    const SocketSingleState single_state = get_socket_single_state(ntree, node, socket);
+    if (ELEM(
+            single_state, SocketSingleState::CurrentlySingle, SocketSingleState::RequiredSingle)) {
+      float color[4];
+      float outline_color[4];
+      node_socket_color_get((bContext *)C, ntree, &node_ptr, socket, color);
+      node_socket_outline_color_get(selected, socket->type, outline_color);
       node_socket_draw_rounded_rectangle(color,
                                          outline_color,
                                          NODE_SOCKSIZE * 0.6f,

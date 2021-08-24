@@ -25,7 +25,7 @@
 
 static bNodeSocketTemplate geo_node_point_instance_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
-    {SOCK_BOOLEAN, N_("Mask"), 1, 0, 0, 0, 0, 0, PROP_NONE, SOCK_HIDE_VALUE | SOCK_FIELD},
+    {SOCK_BOOLEAN, N_("Mask"), 1, 0, 0, 0, 0, 0, PROP_NONE, SOCK_HIDE_VALUE},
     {-1, ""},
 };
 

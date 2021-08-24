@@ -30,17 +30,17 @@
 
 static bNodeSocketTemplate geo_node_extrude_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
-    {SOCK_FLOAT, N_("Distance"), 0.0f, 0, 0, 0, FLT_MIN, FLT_MAX, PROP_DISTANCE, SOCK_FIELD},
-    {SOCK_FLOAT, N_("Inset"), 0.0f, 0, 0, 0, FLT_MIN, FLT_MAX, PROP_DISTANCE, SOCK_FIELD},
-    {SOCK_BOOLEAN, N_("Individual")},
-    {SOCK_BOOLEAN, N_("Selection"), 1, 0, 0, 0, 0, 0, PROP_NONE, SOCK_HIDE_VALUE | SOCK_FIELD},
+    {SOCK_FLOAT, N_("Distance"), 0.0f, 0, 0, 0, FLT_MIN, FLT_MAX, PROP_DISTANCE},
+    {SOCK_FLOAT, N_("Inset"), 0.0f, 0, 0, 0, FLT_MIN, FLT_MAX, PROP_DISTANCE},
+    {SOCK_BOOLEAN, N_("Individual"), 0, 0, 0, 0, 0, 1, PROP_NONE, SOCK_ALWAYS_SINGLE},
+    {SOCK_BOOLEAN, N_("Selection"), 1, 0, 0, 0, 0, 0, PROP_NONE, SOCK_HIDE_VALUE},
     {-1, ""},
 };
 
 static bNodeSocketTemplate geo_node_extrude_out[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
-    {SOCK_BOOLEAN, N_("Top Faces")},
-    {SOCK_BOOLEAN, N_("Side Faces")},
+    {SOCK_BOOLEAN, N_("Top Faces"), 0, 0, 0, 0, 0, 0, PROP_NONE, SOCK_ALWAYS_FIELD},
+    {SOCK_BOOLEAN, N_("Side Faces"), 0, 0, 0, 0, 0, 0, PROP_NONE, SOCK_ALWAYS_FIELD},
     {-1, ""},
 };
 

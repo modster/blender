@@ -17,7 +17,7 @@
 #include "node_geometry_util.hh"
 
 static bNodeSocketTemplate geo_node_curve_parameter_out[] = {
-    {SOCK_FLOAT, N_("Parameter")},
+    {SOCK_FLOAT, N_("Parameter"), 0, 0, 0, 0, 0, 0, PROP_NONE, SOCK_ALWAYS_FIELD},
     {-1, ""},
 };
 

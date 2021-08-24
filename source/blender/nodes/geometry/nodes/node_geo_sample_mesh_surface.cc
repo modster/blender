@@ -41,8 +41,8 @@ static bNodeSocketTemplate geo_node_sample_mesh_surface_in[] = {
      -FLT_MAX,
      FLT_MAX,
      PROP_TRANSLATION,
-     SOCK_HIDE_VALUE | SOCK_FIELD},
-    {SOCK_RGBA, N_("Custom"), 1, 1, 1, 1, 0, 1, PROP_NONE, SOCK_FIELD},
+     SOCK_HIDE_VALUE},
+    {SOCK_RGBA, N_("Custom"), 1, 1, 1, 1, 0, 1, PROP_NONE},
     {-1, ""},
 };
 

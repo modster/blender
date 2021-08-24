@@ -25,7 +25,16 @@
 #include "node_geometry_util.hh"
 
 static bNodeSocketTemplate geo_node_mesh_primitive_cube_in[] = {
-    {SOCK_FLOAT, N_("Size"), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX, PROP_DISTANCE},
+    {SOCK_FLOAT,
+     N_("Size"),
+     1.0f,
+     0.0f,
+     0.0f,
+     0.0f,
+     0.0f,
+     FLT_MAX,
+     PROP_DISTANCE,
+     SOCK_ALWAYS_SINGLE},
     {-1, ""},
 };
 

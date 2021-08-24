@@ -27,9 +27,9 @@ static bNodeSocketTemplate geo_node_object_info_in[] = {
 };
 
 static bNodeSocketTemplate geo_node_object_info_out[] = {
-    {SOCK_VECTOR, N_("Location")},
-    {SOCK_VECTOR, N_("Rotation")},
-    {SOCK_VECTOR, N_("Scale")},
+    {SOCK_VECTOR, N_("Location"), 0, 0, 0, 0, 0, 0, PROP_NONE, SOCK_ALWAYS_SINGLE},
+    {SOCK_VECTOR, N_("Rotation"), 0, 0, 0, 0, 0, 0, PROP_NONE, SOCK_ALWAYS_SINGLE},
+    {SOCK_VECTOR, N_("Scale"), 0, 0, 0, 0, 0, 0, PROP_NONE, SOCK_ALWAYS_SINGLE},
     {SOCK_GEOMETRY, N_("Geometry")},
     {-1, ""},
 };

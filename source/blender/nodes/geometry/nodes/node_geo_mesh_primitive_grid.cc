@@ -26,10 +26,28 @@
 #include "node_geometry_util.hh"
 
 static bNodeSocketTemplate geo_node_mesh_primitive_grid_in[] = {
-    {SOCK_FLOAT, N_("Size X"), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX, PROP_DISTANCE},
-    {SOCK_FLOAT, N_("Size Y"), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX, PROP_DISTANCE},
-    {SOCK_INT, N_("Vertices X"), 3, 0.0f, 0.0f, 0.0f, 2, 1000},
-    {SOCK_INT, N_("Vertices Y"), 3, 0.0f, 0.0f, 0.0f, 2, 1000},
+    {SOCK_FLOAT,
+     N_("Size X"),
+     1.0f,
+     0.0f,
+     0.0f,
+     0.0f,
+     0.0f,
+     FLT_MAX,
+     PROP_DISTANCE,
+     SOCK_ALWAYS_SINGLE},
+    {SOCK_FLOAT,
+     N_("Size Y"),
+     1.0f,
+     0.0f,
+     0.0f,
+     0.0f,
+     0.0f,
+     FLT_MAX,
+     PROP_DISTANCE,
+     SOCK_ALWAYS_SINGLE},
+    {SOCK_INT, N_("Vertices X"), 3, 0.0f, 0.0f, 0.0f, 2, 1000, PROP_NONE, SOCK_ALWAYS_SINGLE},
+    {SOCK_INT, N_("Vertices Y"), 3, 0.0f, 0.0f, 0.0f, 2, 1000, PROP_NONE, SOCK_ALWAYS_SINGLE},
     {-1, ""},
 };
 

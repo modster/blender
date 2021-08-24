@@ -26,9 +26,18 @@
 #include "node_geometry_util.hh"
 
 static bNodeSocketTemplate geo_node_mesh_primitive_uv_sphere_in[] = {
-    {SOCK_INT, N_("Segments"), 32, 0.0f, 0.0f, 0.0f, 3, 1024},
-    {SOCK_INT, N_("Rings"), 16, 0.0f, 0.0f, 0.0f, 2, 1024},
-    {SOCK_FLOAT, N_("Radius"), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX, PROP_DISTANCE},
+    {SOCK_INT, N_("Segments"), 32, 0.0f, 0.0f, 0.0f, 3, 1024, PROP_NONE, SOCK_ALWAYS_SINGLE},
+    {SOCK_INT, N_("Rings"), 16, 0.0f, 0.0f, 0.0f, 2, 1024, PROP_NONE, SOCK_ALWAYS_SINGLE},
+    {SOCK_FLOAT,
+     N_("Radius"),
+     1.0f,
+     0.0f,
+     0.0f,
+     0.0f,
+     0.0f,
+     FLT_MAX,
+     PROP_DISTANCE,
+     SOCK_ALWAYS_SINGLE},
     {-1, ""},
 };
 

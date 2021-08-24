@@ -36,7 +36,7 @@ static bNodeSocketTemplate geo_node_material_assign_in[] = {
      0.0f,
      PROP_NONE,
      SOCK_HIDE_LABEL},
-    {SOCK_BOOLEAN, N_("Selection"), 1, 0, 0, 0, 0, 0, PROP_NONE, SOCK_HIDE_VALUE | SOCK_FIELD},
+    {SOCK_BOOLEAN, N_("Selection"), 1, 0, 0, 0, 0, 0, PROP_NONE, SOCK_HIDE_VALUE},
     {-1, ""},
 };
 

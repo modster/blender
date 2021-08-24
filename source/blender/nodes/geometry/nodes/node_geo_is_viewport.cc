@@ -19,7 +19,7 @@
 #include "node_geometry_util.hh"
 
 static bNodeSocketTemplate geo_node_is_viewport_out[] = {
-    {SOCK_BOOLEAN, N_("Is Viewport")},
+    {SOCK_BOOLEAN, N_("Is Viewport"), 0, 0, 0, 0, 0, 0, PROP_NONE, SOCK_ALWAYS_SINGLE},
     {-1, ""},
 };
 

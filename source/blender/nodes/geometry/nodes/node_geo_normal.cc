@@ -20,7 +20,7 @@
 #include "node_geometry_util.hh"
 
 static bNodeSocketTemplate geo_node_normal_out[] = {
-    {SOCK_VECTOR, N_("Normal")},
+    {SOCK_VECTOR, N_("Normal"), 0, 0, 0, 0, 0, 0, PROP_NONE, SOCK_ALWAYS_FIELD},
     {-1, ""},
 };
 
