@@ -394,9 +394,6 @@ static void draw_vertical_scale_indicators(const ARegion *region,
   const int font_id = BLF_default();
   UI_FontThemeColor(font_id, colorid);
 
-  BLF_enable(font_id, BLF_ROTATION);
-  BLF_rotation(font_id, M_PI_2);
-
   BLF_batch_draw_begin();
 
   const float xpos = rect->xmax - 2.0f * UI_DPI_FAC;
@@ -416,7 +413,6 @@ static void draw_vertical_scale_indicators(const ARegion *region,
   }
 
   BLF_batch_draw_end();
-  BLF_disable(font_id, BLF_ROTATION);
 
   GPU_matrix_pop_projection();
 }
