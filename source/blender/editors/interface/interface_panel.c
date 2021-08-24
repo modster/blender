@@ -1119,15 +1119,15 @@ static void panel_draw_highlight_border(const Panel *panel,
   }
 
   float radius;
+  UI_draw_roundbox_corner_set(UI_CNR_ALL);
+
   if (draw_box_style) {
     /* Use the theme for box widgets. */
     const uiWidgetColors *box_wcol = &UI_GetTheme()->tui.wcol_box;
-    UI_draw_roundbox_corner_set(UI_CNR_ALL);
     radius = box_wcol->roundness * U.widget_unit;
   }
   else {
-    UI_draw_roundbox_corner_set(UI_CNR_NONE);
-    radius = 0.0f;
+    radius = PNL_CNR_RAD;
   }
 
   float color[4];
@@ -1323,19 +1323,47 @@ static void panel_draw_aligned_backdrop(const Panel *panel,
     }
   }
   else {
+    /* Regular (non box style) panels. */
+    const float margin_y = 2.5f;
+    float panel_backcolor[4];
+    float panel_headercolor[4];
+
     immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
     GPU_blend(GPU_BLEND_ALPHA);
 
     /* Panel backdrop. */
     if (is_open || panel->type->flag & PANEL_TYPE_NO_HEADER) {
-      immUniformThemeColor(is_subpanel ? TH_PANEL_SUB_BACK : TH_PANEL_BACK);
-      immRectf(pos, rect->xmin, rect->ymin, rect->xmax, rect->ymax);
+      UI_draw_roundbox_corner_set(is_open ? UI_CNR_BOTTOM_RIGHT | UI_CNR_BOTTOM_LEFT : UI_CNR_ALL);
+      UI_GetThemeColor4fv((is_subpanel ? TH_PANEL_SUB_BACK : TH_PANEL_BACK), panel_backcolor);
+
+      /* Change the width a little bit to line up with the sides. */
+      UI_draw_roundbox_4fv(
+          &(const rctf){
+              .xmin = rect->xmin,
+              .xmax = rect->xmax,
+              .ymin = rect->ymin,
+              .ymax = rect->ymax,
+          },
+          true,
+          PNL_CNR_RAD,
+          panel_backcolor);
     }
 
     /* Panel header backdrops for non sub-panels. */
     if (!is_subpanel) {
-      immUniformThemeColor(UI_panel_matches_search_filter(panel) ? TH_MATCH : TH_PANEL_HEADER);
-      immRectf(pos, rect->xmin, header_rect->ymin, rect->xmax, header_rect->ymax);
+      UI_GetThemeColor4fv(UI_panel_matches_search_filter(panel) ? TH_MATCH : TH_PANEL_HEADER,
+                          panel_headercolor);
+      UI_draw_roundbox_corner_set(is_open ? UI_CNR_TOP_RIGHT | UI_CNR_TOP_LEFT : UI_CNR_ALL);
+      UI_draw_roundbox_4fv(
+          &(const rctf){
+              .xmin = rect->xmin,
+              .xmax = rect->xmax,
+              .ymin = header_rect->ymin,
+              .ymax = header_rect->ymax - margin_y,
+          },
+          true,
+          PNL_CNR_RAD,
+          panel_headercolor);
     }
 
     GPU_blend(GPU_BLEND_NONE);
