@@ -93,7 +93,7 @@ class GeometryComponent {
 
   /* Return the data type and domain of an attribute with the given name if it exists. */
   std::optional<AttributeMetaData> attribute_get_meta_data(
-      const blender::StringRef attribute_name) const;
+      const blender::bke::AttributeIDRef &attribute_id) const;
 
   /* Returns true when the geometry component supports this attribute domain. */
   bool attribute_domain_supported(const AttributeDomain domain) const;
@@ -110,7 +110,7 @@ class GeometryComponent {
   /* Get read and write access to the highest priority attribute with the given name.
    * Returns null if the attribute does not exist. */
   blender::bke::WriteAttributeLookup attribute_try_get_for_write(
-      const blender::StringRef attribute_name);
+      const blender::bke::AttributeIDRef &attribute_id);
 
   /* Get a read-only attribute for the domain based on the given attribute. This can be used to
    * interpolate from one domain to another.

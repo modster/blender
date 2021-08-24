@@ -337,24 +337,27 @@ class CustomDataAttributes {
   std::optional<blender::fn::GSpan> get_for_read(
       const blender::bke::AttributeIDRef &attribute_id) const;
 
-  blender::fn::GVArrayPtr get_for_read(const StringRef name,
+  blender::fn::GVArrayPtr get_for_read(const AttributeIDRef &attribute_id,
                                        const CustomDataType data_type,
                                        const void *default_value) const;
 
   template<typename T>
-  blender::fn::GVArray_Typed<T> get_for_read(const blender::StringRef name,
+  blender::fn::GVArray_Typed<T> get_for_read(const blender::bke::AttributeIDRef &attribute_id,
                                              const T &default_value) const
   {
     const blender::fn::CPPType &cpp_type = blender::fn::CPPType::get<T>();
     const CustomDataType type = blender::bke::cpp_type_to_custom_data_type(cpp_type);
-    GVArrayPtr varray = this->get_for_read(name, type, &default_value);
+    GVArrayPtr varray = this->get_for_read(attribute_id, type, &default_value);
     return blender::fn::GVArray_Typed<T>(std::move(varray));
   }
 
-  std::optional<blender::fn::GMutableSpan> get_for_write(const blender::StringRef name);
-  bool create(const blender::StringRef name, const CustomDataType data_type);
-  bool create_by_move(const blender::StringRef name, const CustomDataType data_type, void *buffer);
-  bool remove(const blender::StringRef name);
+  std::optional<blender::fn::GMutableSpan> get_for_write(
+      const blender::bke::AttributeIDRef &attribute_id);
+  bool create(const blender::bke::AttributeIDRef &attribute_id, const CustomDataType data_type);
+  bool create_by_move(const blender::bke::AttributeIDRef &attribute_id,
+                      const CustomDataType data_type,
+                      void *buffer);
+  bool remove(const blender::bke::AttributeIDRef &attribute_id);
 
   bool foreach_attribute(const AttributeForeachCallback callback,
                          const AttributeDomain domain) const;
