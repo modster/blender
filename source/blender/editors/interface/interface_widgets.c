@@ -3358,27 +3358,18 @@ static void ui_draw_but_HSV_v(uiBut *but, const rcti *rect)
 static void ui_draw_separator(const rcti *rect, const uiWidgetColors *wcol)
 {
   const int y = rect->ymin + BLI_rcti_size_y(rect) / 2 - 1;
-  const uchar col[4] = {
-      wcol->text[0],
-      wcol->text[1],
-      wcol->text[2],
-      30,
-  };
-
+  const uchar col[3] = {wcol->outline[0], wcol->outline[1], wcol->outline[2]};
   const uint pos = GPU_vertformat_attr_add(
       immVertexFormat(), "pos", GPU_COMP_F32, 2, GPU_FETCH_FLOAT);
   immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 
-  GPU_blend(GPU_BLEND_ALPHA);
-  immUniformColor4ubv(col);
+  immUniformColor3ubv(col);
   GPU_line_width(1.0f);
 
   immBegin(GPU_PRIM_LINES, 2);
   immVertex2f(pos, rect->xmin, y);
   immVertex2f(pos, rect->xmax, y);
   immEnd();
-
-  GPU_blend(GPU_BLEND_NONE);
 
   immUnbindProgram();
 }
