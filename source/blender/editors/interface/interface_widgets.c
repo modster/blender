@@ -4198,10 +4198,32 @@ static void widget_radiobut(uiWidgetColors *wcol, rcti *rect, int UNUSED(state),
 {
   uiWidgetBase wtb;
   widget_init(&wtb);
-
   const float rad = wcol->roundness * U.widget_unit;
-  round_box_edges(&wtb, roundboxalign, rect, rad);
+  const float padding = 0.05f;
+  float color[3];
+  rgba_uchar_to_float(color, wcol->item);
 
+  /* Draw the background for the entire widget first. */
+  UI_draw_roundbox_corner_set(roundboxalign);
+  UI_draw_roundbox_4fv(
+      &(const rctf){
+          .xmin = rect->xmin,
+          .xmax = rect->xmax,
+          .ymin = rect->ymin,
+          .ymax = rect->ymax,
+      },
+      true,
+      rad,
+      color);
+
+  /* Draw the pill inside, with a small margin to separate each radio choice. */
+  rect->xmin += padding * U.widget_unit;
+  rect->xmax -= padding * U.widget_unit;
+  rect->ymin += padding * U.widget_unit;
+  rect->ymax -= padding * U.widget_unit;
+  round_box_edges(&wtb, UI_CNR_ALL, rect, rad);
+
+  wtb.draw_emboss = false;
   widgetbase_draw(&wtb, wcol);
 }
 
