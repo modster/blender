@@ -4176,7 +4176,32 @@ void node_draw_link_bezier(const View2D *v2d,
                            int th_col2,
                            int th_col3)
 {
-  const float dim_factor = node_link_dim_factor(v2d, link);
+  float dim_factor = node_link_dim_factor(v2d, link);
+
+  if (link->fromsock) {
+    const SocketSingleState from_single_state = get_socket_single_state(
+        snode->edittree, link->fromnode, link->fromsock);
+    if (ELEM(from_single_state,
+             SocketSingleState::RequiredSingle,
+             SocketSingleState::CurrentlySingle)) {
+      th_col1 = th_col2 = TH_ACTIVE;
+    }
+    else {
+      dim_factor *= 0.7f;
+    }
+  }
+
+  if (link->fromsock && link->tosock) {
+    const SocketSingleState to_single_state = get_socket_single_state(
+        snode->edittree, link->tonode, link->tosock);
+    const SocketSingleState from_single_state = get_socket_single_state(
+        snode->edittree, link->fromnode, link->fromsock);
+
+    if (to_single_state == SocketSingleState::RequiredSingle &&
+        from_single_state == SocketSingleState::MaybeField) {
+      th_col1 = th_col2 = TH_REDALERT;
+    }
+  }
 
   float vec[4][2];
   const bool highlighted = link->flag & NODE_LINK_TEMP_HIGHLIGHT;
@@ -4275,28 +4300,6 @@ void node_draw_link(View2D *v2d, SpaceNode *snode, bNodeLink *link)
       /* Invalid link. */
       th_col1 = th_col2 = th_col3 = TH_REDALERT;
       // th_col3 = -1; /* no shadow */
-    }
-  }
-
-  if (link->fromsock) {
-    const SocketSingleState from_single_state = get_socket_single_state(
-        snode->edittree, link->fromnode, link->fromsock);
-    if (ELEM(from_single_state,
-             SocketSingleState::RequiredSingle,
-             SocketSingleState::CurrentlySingle)) {
-      th_col1 = th_col2 = TH_ACTIVE;
-    }
-  }
-
-  if (link->fromsock && link->tosock) {
-    const SocketSingleState to_single_state = get_socket_single_state(
-        snode->edittree, link->tonode, link->tosock);
-    const SocketSingleState from_single_state = get_socket_single_state(
-        snode->edittree, link->fromnode, link->fromsock);
-
-    if (to_single_state == SocketSingleState::RequiredSingle &&
-        from_single_state == SocketSingleState::MaybeField) {
-      th_col1 = th_col2 = TH_REDALERT;
     }
   }
 
