@@ -27,7 +27,7 @@ namespace blender::bke {
 
 template<bool IsStrongReference> class OwnedAnonymousAttributeID {
  private:
-  AnonymousAttributeID *data_ = nullptr;
+  const AnonymousAttributeID *data_ = nullptr;
 
  public:
   OwnedAnonymousAttributeID() = default;
@@ -43,7 +43,8 @@ template<bool IsStrongReference> class OwnedAnonymousAttributeID {
   }
 
   /* This transfers ownership, so no incref is necessary. */
-  explicit OwnedAnonymousAttributeID(AnonymousAttributeID *anonymous_id) : data_(anonymous_id)
+  explicit OwnedAnonymousAttributeID(const AnonymousAttributeID *anonymous_id)
+      : data_(anonymous_id)
   {
   }
 
@@ -107,9 +108,9 @@ template<bool IsStrongReference> class OwnedAnonymousAttributeID {
     return BKE_anonymous_attribute_id_has_strong_references(data_);
   }
 
-  AnonymousAttributeID *extract()
+  const AnonymousAttributeID *extract()
   {
-    AnonymousAttributeID *extracted_data = data_;
+    const AnonymousAttributeID *extracted_data = data_;
     /* Don't decref because the caller becomes the new owner. */
     data_ = nullptr;
     return extracted_data;

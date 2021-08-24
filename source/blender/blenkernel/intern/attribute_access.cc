@@ -853,53 +853,57 @@ blender::bke::WriteAttributeLookup GeometryComponent::attribute_try_get_for_writ
   return {};
 }
 
-bool GeometryComponent::attribute_try_delete(const StringRef attribute_name)
+bool GeometryComponent::attribute_try_delete(const blender::bke::AttributeIDRef &attribute_id)
 {
   using namespace blender::bke;
   const ComponentAttributeProviders *providers = this->get_attribute_providers();
   if (providers == nullptr) {
     return {};
   }
-  const BuiltinAttributeProvider *builtin_provider =
-      providers->builtin_attribute_providers().lookup_default_as(attribute_name, nullptr);
-  if (builtin_provider != nullptr) {
-    return builtin_provider->try_delete(*this);
+  if (attribute_id.is_named()) {
+    const BuiltinAttributeProvider *builtin_provider =
+        providers->builtin_attribute_providers().lookup_default_as(attribute_id.name(), nullptr);
+    if (builtin_provider != nullptr) {
+      return builtin_provider->try_delete(*this);
+    }
   }
   bool success = false;
   for (const DynamicAttributesProvider *dynamic_provider :
        providers->dynamic_attribute_providers()) {
-    success = dynamic_provider->try_delete(*this, attribute_name) || success;
+    success = dynamic_provider->try_delete(*this, attribute_id) || success;
   }
   return success;
 }
 
-bool GeometryComponent::attribute_try_create(const StringRef attribute_name,
+bool GeometryComponent::attribute_try_create(const blender::bke::AttributeIDRef &attribute_id,
                                              const AttributeDomain domain,
                                              const CustomDataType data_type,
                                              const AttributeInit &initializer)
 {
   using namespace blender::bke;
-  if (attribute_name.is_empty()) {
+  if (!attribute_id) {
     return false;
   }
   const ComponentAttributeProviders *providers = this->get_attribute_providers();
   if (providers == nullptr) {
     return false;
   }
-  const BuiltinAttributeProvider *builtin_provider =
-      providers->builtin_attribute_providers().lookup_default_as(attribute_name, nullptr);
-  if (builtin_provider != nullptr) {
-    if (builtin_provider->domain() != domain) {
-      return false;
+  if (attribute_id.is_named()) {
+    const BuiltinAttributeProvider *builtin_provider =
+        providers->builtin_attribute_providers().lookup_default_as(attribute_id.name(), nullptr);
+    if (builtin_provider != nullptr) {
+      if (builtin_provider->domain() != domain) {
+        return false;
+      }
+      if (builtin_provider->data_type() != data_type) {
+        return false;
+      }
+      return builtin_provider->try_create(*this, initializer);
     }
-    if (builtin_provider->data_type() != data_type) {
-      return false;
-    }
-    return builtin_provider->try_create(*this, initializer);
   }
   for (const DynamicAttributesProvider *dynamic_provider :
        providers->dynamic_attribute_providers()) {
-    if (dynamic_provider->try_create(*this, attribute_name, domain, data_type, initializer)) {
+    if (dynamic_provider->try_create(*this, attribute_id, domain, data_type, initializer)) {
       return true;
     }
   }
@@ -1012,11 +1016,11 @@ static std::unique_ptr<blender::fn::GVArray> try_adapt_data_type(
 }
 
 std::unique_ptr<blender::fn::GVArray> GeometryComponent::attribute_try_get_for_read(
-    const StringRef attribute_name,
+    const blender::bke::AttributeIDRef &attribute_id,
     const AttributeDomain domain,
     const CustomDataType data_type) const
 {
-  blender::bke::ReadAttributeLookup attribute = this->attribute_try_get_for_read(attribute_name);
+  blender::bke::ReadAttributeLookup attribute = this->attribute_try_get_for_read(attribute_id);
   if (!attribute) {
     return {};
   }
@@ -1042,13 +1046,13 @@ std::unique_ptr<blender::fn::GVArray> GeometryComponent::attribute_try_get_for_r
 }
 
 std::unique_ptr<blender::bke::GVArray> GeometryComponent::attribute_try_get_for_read(
-    const StringRef attribute_name, const AttributeDomain domain) const
+    const blender::bke::AttributeIDRef &attribute_id, const AttributeDomain domain) const
 {
   if (!this->attribute_domain_supported(domain)) {
     return {};
   }
 
-  blender::bke::ReadAttributeLookup attribute = this->attribute_try_get_for_read(attribute_name);
+  blender::bke::ReadAttributeLookup attribute = this->attribute_try_get_for_read(attribute_id);
   if (!attribute) {
     return {};
   }
@@ -1061,9 +1065,9 @@ std::unique_ptr<blender::bke::GVArray> GeometryComponent::attribute_try_get_for_
 }
 
 blender::bke::ReadAttributeLookup GeometryComponent::attribute_try_get_for_read(
-    const blender::StringRef attribute_name, const CustomDataType data_type) const
+    const blender::bke::AttributeIDRef &attribute_id, const CustomDataType data_type) const
 {
-  blender::bke::ReadAttributeLookup attribute = this->attribute_try_get_for_read(attribute_name);
+  blender::bke::ReadAttributeLookup attribute = this->attribute_try_get_for_read(attribute_id);
   if (!attribute) {
     return {};
   }
@@ -1078,13 +1082,13 @@ blender::bke::ReadAttributeLookup GeometryComponent::attribute_try_get_for_read(
 }
 
 std::unique_ptr<blender::bke::GVArray> GeometryComponent::attribute_get_for_read(
-    const StringRef attribute_name,
+    const blender::bke::AttributeIDRef &attribute_id,
     const AttributeDomain domain,
     const CustomDataType data_type,
     const void *default_value) const
 {
   std::unique_ptr<blender::bke::GVArray> varray = this->attribute_try_get_for_read(
-      attribute_name, domain, data_type);
+      attribute_id, domain, data_type);
   if (varray) {
     return varray;
   }
@@ -1100,15 +1104,22 @@ class GVMutableAttribute_For_OutputAttribute
     : public blender::fn::GVMutableArray_For_GMutableSpan {
  public:
   GeometryComponent *component;
-  std::string final_name;
+  std::string attribute_name;
+  blender::bke::WeakAnonymousAttributeID anonymous_attribute_id;
 
   GVMutableAttribute_For_OutputAttribute(GMutableSpan data,
                                          GeometryComponent &component,
-                                         std::string final_name)
-      : blender::fn::GVMutableArray_For_GMutableSpan(data),
-        component(&component),
-        final_name(std::move(final_name))
+                                         const blender::bke::AttributeIDRef &attribute_id)
+      : blender::fn::GVMutableArray_For_GMutableSpan(data), component(&component)
   {
+    if (attribute_id.is_named()) {
+      this->attribute_name = attribute_id.name();
+    }
+    else {
+      const AnonymousAttributeID *anonymous_id = &attribute_id.anonymous_id();
+      BKE_anonymous_attribute_id_increment_weak(anonymous_id);
+      this->anonymous_attribute_id = blender::bke::WeakAnonymousAttributeID{anonymous_id};
+    }
   }
 
   ~GVMutableAttribute_For_OutputAttribute() override
@@ -1128,21 +1139,28 @@ static void save_output_attribute(blender::bke::OutputAttribute &output_attribut
       dynamic_cast<GVMutableAttribute_For_OutputAttribute &>(output_attribute.varray());
 
   GeometryComponent &component = *varray.component;
-  const StringRefNull name = varray.final_name;
+  AttributeIDRef attribute_id;
+  if (!varray.attribute_name.empty()) {
+    attribute_id = varray.attribute_name;
+  }
+  else {
+    attribute_id = varray.anonymous_attribute_id.extract();
+  }
   const AttributeDomain domain = output_attribute.domain();
   const CustomDataType data_type = output_attribute.custom_data_type();
   const CPPType &cpp_type = output_attribute.cpp_type();
 
-  component.attribute_try_delete(name);
-  if (!component.attribute_try_create(
-          varray.final_name, domain, data_type, AttributeInitDefault())) {
-    CLOG_WARN(&LOG,
-              "Could not create the '%s' attribute with type '%s'.",
-              name.c_str(),
-              cpp_type.name().c_str());
+  component.attribute_try_delete(attribute_id);
+  if (!component.attribute_try_create(attribute_id, domain, data_type, AttributeInitDefault())) {
+    if (!varray.attribute_name.empty()) {
+      CLOG_WARN(&LOG,
+                "Could not create the '%s' attribute with type '%s'.",
+                varray.attribute_name.c_str(),
+                cpp_type.name().c_str());
+    }
     return;
   }
-  WriteAttributeLookup write_attribute = component.attribute_try_get_for_write(name);
+  WriteAttributeLookup write_attribute = component.attribute_try_get_for_write(attribute_id);
   BUFFER_FOR_CPP_TYPE_VALUE(varray.type(), buffer);
   for (const int i : IndexRange(varray.size())) {
     varray.get(i, buffer);
@@ -1152,7 +1170,7 @@ static void save_output_attribute(blender::bke::OutputAttribute &output_attribut
 
 static blender::bke::OutputAttribute create_output_attribute(
     GeometryComponent &component,
-    const blender::StringRef attribute_name,
+    const blender::bke::AttributeIDRef &attribute_id,
     const AttributeDomain domain,
     const CustomDataType data_type,
     const bool ignore_old_values,
@@ -1162,7 +1180,7 @@ static blender::bke::OutputAttribute create_output_attribute(
   using namespace blender::fn;
   using namespace blender::bke;
 
-  if (attribute_name.is_empty()) {
+  if (!attribute_id) {
     return {};
   }
 
@@ -1170,7 +1188,8 @@ static blender::bke::OutputAttribute create_output_attribute(
   BLI_assert(cpp_type != nullptr);
   const nodes::DataTypeConversions &conversions = nodes::get_implicit_type_conversions();
 
-  if (component.attribute_is_builtin(attribute_name)) {
+  if (attribute_id.is_named() && component.attribute_is_builtin(attribute_id.name())) {
+    const StringRef attribute_name = attribute_id.name();
     WriteAttributeLookup attribute = component.attribute_try_get_for_write(attribute_name);
     if (!attribute) {
       if (default_value) {
@@ -1204,18 +1223,18 @@ static blender::bke::OutputAttribute create_output_attribute(
 
   const int domain_size = component.attribute_domain_size(domain);
 
-  WriteAttributeLookup attribute = component.attribute_try_get_for_write(attribute_name);
+  WriteAttributeLookup attribute = component.attribute_try_get_for_write(attribute_id);
   if (!attribute) {
     if (default_value) {
       const GVArray_For_SingleValueRef default_varray{*cpp_type, domain_size, default_value};
       component.attribute_try_create(
-          attribute_name, domain, data_type, AttributeInitVArray(&default_varray));
+          attribute_id, domain, data_type, AttributeInitVArray(&default_varray));
     }
     else {
-      component.attribute_try_create(attribute_name, domain, data_type, AttributeInitDefault());
+      component.attribute_try_create(attribute_id, domain, data_type, AttributeInitDefault());
     }
 
-    attribute = component.attribute_try_get_for_write(attribute_name);
+    attribute = component.attribute_try_get_for_write(attribute_id);
     if (!attribute) {
       /* Can't create the attribute. */
       return {};
@@ -1237,28 +1256,28 @@ static blender::bke::OutputAttribute create_output_attribute(
   else {
     /* Fill the temporary array with values from the existing attribute. */
     GVArrayPtr old_varray = component.attribute_get_for_read(
-        attribute_name, domain, data_type, default_value);
+        attribute_id, domain, data_type, default_value);
     old_varray->materialize_to_uninitialized(IndexRange(domain_size), data);
   }
   GVMutableArrayPtr varray = std::make_unique<GVMutableAttribute_For_OutputAttribute>(
-      GMutableSpan{*cpp_type, data, domain_size}, component, attribute_name);
+      GMutableSpan{*cpp_type, data, domain_size}, component, attribute_id);
 
   return OutputAttribute(std::move(varray), domain, save_output_attribute, true);
 }
 
 blender::bke::OutputAttribute GeometryComponent::attribute_try_get_for_output(
-    const StringRef attribute_name,
+    const blender::bke::AttributeIDRef &attribute_id,
     const AttributeDomain domain,
     const CustomDataType data_type,
     const void *default_value)
 {
-  return create_output_attribute(*this, attribute_name, domain, data_type, false, default_value);
+  return create_output_attribute(*this, attribute_id, domain, data_type, false, default_value);
 }
 
 blender::bke::OutputAttribute GeometryComponent::attribute_try_get_for_output_only(
-    const blender::StringRef attribute_name,
+    const blender::bke::AttributeIDRef &attribute_id,
     const AttributeDomain domain,
     const CustomDataType data_type)
 {
-  return create_output_attribute(*this, attribute_name, domain, data_type, true, nullptr);
+  return create_output_attribute(*this, attribute_id, domain, data_type, true, nullptr);
 }
