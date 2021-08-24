@@ -31,6 +31,7 @@
 #include "BLI_user_counter.hh"
 #include "BLI_vector_set.hh"
 
+#include "BKE_anonymous_attribute.hh"
 #include "BKE_attribute_access.hh"
 #include "BKE_geometry_set.h"
 
@@ -88,7 +89,7 @@ class GeometryComponent {
   GeometryComponentType type() const;
 
   /* Return true when any attribute with this name exists, including built in attributes. */
-  bool attribute_exists(const blender::StringRef attribute_name) const;
+  bool attribute_exists(const blender::bke::AttributeIDRef &attribute_id) const;
 
   /* Return the data type and domain of an attribute with the given name if it exists. */
   std::optional<AttributeMetaData> attribute_get_meta_data(
@@ -104,7 +105,7 @@ class GeometryComponent {
   /* Get read-only access to the highest priority attribute with the given name.
    * Returns null if the attribute does not exist. */
   blender::bke::ReadAttributeLookup attribute_try_get_for_read(
-      const blender::StringRef attribute_name) const;
+      const blender::bke::AttributeIDRef &attribute_id) const;
 
   /* Get read and write access to the highest priority attribute with the given name.
    * Returns null if the attribute does not exist. */

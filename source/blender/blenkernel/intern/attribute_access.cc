@@ -334,8 +334,20 @@ bool BuiltinCustomDataLayerProvider::exists(const GeometryComponent &component) 
   return data != nullptr;
 }
 
+static bool custom_data_layer_matches_attribute_id(const CustomDataLayer &layer,
+                                                   const AttributeIDRef &attribute_id)
+{
+  if (!attribute_id) {
+    return false;
+  }
+  if (attribute_id.is_anonymous()) {
+    return layer.anonymous_id == &attribute_id.anonymous_id();
+  }
+  return layer.name == attribute_id.name();
+}
+
 ReadAttributeLookup CustomDataAttributeProvider::try_get_for_read(
-    const GeometryComponent &component, const StringRef attribute_name) const
+    const GeometryComponent &component, const AttributeIDRef &attribute_id) const
 {
   const CustomData *custom_data = custom_data_access_.get_const_custom_data(component);
   if (custom_data == nullptr) {
@@ -343,7 +355,7 @@ ReadAttributeLookup CustomDataAttributeProvider::try_get_for_read(
   }
   const int domain_size = component.attribute_domain_size(domain_);
   for (const CustomDataLayer &layer : Span(custom_data->layers, custom_data->totlayer)) {
-    if (layer.name != attribute_name) {
+    if (!custom_data_layer_matches_attribute_id(layer, attribute_id)) {
       continue;
     }
     const CustomDataType data_type = (CustomDataType)layer.type;
@@ -507,7 +519,7 @@ bool CustomDataAttributeProvider::foreach_attribute(const GeometryComponent &com
 }
 
 ReadAttributeLookup NamedLegacyCustomDataProvider::try_get_for_read(
-    const GeometryComponent &component, const StringRef attribute_name) const
+    const GeometryComponent &component, const AttributeIDRef &attribute_id) const
 {
   const CustomData *custom_data = custom_data_access_.get_const_custom_data(component);
   if (custom_data == nullptr) {
@@ -515,7 +527,7 @@ ReadAttributeLookup NamedLegacyCustomDataProvider::try_get_for_read(
   }
   for (const CustomDataLayer &layer : Span(custom_data->layers, custom_data->totlayer)) {
     if (layer.type == stored_type_) {
-      if (layer.name == attribute_name) {
+      if (custom_data_layer_matches_attribute_id(layer, attribute_id)) {
         const int domain_size = component.attribute_domain_size(domain_);
         return {as_read_attribute_(layer.data, domain_size), domain_};
       }
@@ -627,11 +639,11 @@ CustomDataAttributes &CustomDataAttributes::operator=(const CustomDataAttributes
   return *this;
 }
 
-std::optional<GSpan> CustomDataAttributes::get_for_read(const StringRef name) const
+std::optional<GSpan> CustomDataAttributes::get_for_read(const AttributeIDRef &attribute_id) const
 {
   BLI_assert(size_ != 0);
   for (const CustomDataLayer &layer : Span(data.layers, data.totlayer)) {
-    if (layer.name == name) {
+    if (custom_data_layer_matches_attribute_id(layer, attribute_id)) {
       const CPPType *cpp_type = custom_data_type_to_cpp_type((CustomDataType)layer.type);
       BLI_assert(cpp_type != nullptr);
       return GSpan(*cpp_type, layer.data, size_);
@@ -766,21 +778,23 @@ bool GeometryComponent::attribute_is_builtin(const blender::StringRef attribute_
 }
 
 blender::bke::ReadAttributeLookup GeometryComponent::attribute_try_get_for_read(
-    const StringRef attribute_name) const
+    const blender::bke::AttributeIDRef &attribute_id) const
 {
   using namespace blender::bke;
   const ComponentAttributeProviders *providers = this->get_attribute_providers();
   if (providers == nullptr) {
     return {};
   }
-  const BuiltinAttributeProvider *builtin_provider =
-      providers->builtin_attribute_providers().lookup_default_as(attribute_name, nullptr);
-  if (builtin_provider != nullptr) {
-    return {builtin_provider->try_get_for_read(*this), builtin_provider->domain()};
+  if (attribute_id.is_named()) {
+    const BuiltinAttributeProvider *builtin_provider =
+        providers->builtin_attribute_providers().lookup_default_as(attribute_id.name(), nullptr);
+    if (builtin_provider != nullptr) {
+      return {builtin_provider->try_get_for_read(*this), builtin_provider->domain()};
+    }
   }
   for (const DynamicAttributesProvider *dynamic_provider :
        providers->dynamic_attribute_providers()) {
-    ReadAttributeLookup attribute = dynamic_provider->try_get_for_read(*this, attribute_name);
+    ReadAttributeLookup attribute = dynamic_provider->try_get_for_read(*this, attribute_id);
     if (attribute) {
       return attribute;
     }
@@ -945,9 +959,9 @@ bool GeometryComponent::attribute_foreach(const AttributeForeachCallback callbac
   return true;
 }
 
-bool GeometryComponent::attribute_exists(const blender::StringRef attribute_name) const
+bool GeometryComponent::attribute_exists(const blender::bke::AttributeIDRef &attribute_id) const
 {
-  blender::bke::ReadAttributeLookup attribute = this->attribute_try_get_for_read(attribute_name);
+  blender::bke::ReadAttributeLookup attribute = this->attribute_try_get_for_read(attribute_id);
   if (attribute) {
     return true;
   }

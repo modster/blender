@@ -116,7 +116,7 @@ class BuiltinAttributeProvider {
 class DynamicAttributesProvider {
  public:
   virtual ReadAttributeLookup try_get_for_read(const GeometryComponent &component,
-                                               const StringRef attribute_name) const = 0;
+                                               const AttributeIDRef &attribute_id) const = 0;
   virtual WriteAttributeLookup try_get_for_write(GeometryComponent &component,
                                                  const StringRef attribute_name) const = 0;
   virtual bool try_delete(GeometryComponent &component, const StringRef attribute_name) const = 0;
@@ -154,7 +154,7 @@ class CustomDataAttributeProvider final : public DynamicAttributesProvider {
   }
 
   ReadAttributeLookup try_get_for_read(const GeometryComponent &component,
-                                       const StringRef attribute_name) const final;
+                                       const AttributeIDRef &attribute_id) const final;
 
   WriteAttributeLookup try_get_for_write(GeometryComponent &component,
                                          const StringRef attribute_name) const final;
@@ -231,7 +231,7 @@ class NamedLegacyCustomDataProvider final : public DynamicAttributesProvider {
   }
 
   ReadAttributeLookup try_get_for_read(const GeometryComponent &component,
-                                       const StringRef attribute_name) const final;
+                                       const AttributeIDRef &attribute_id) const final;
   WriteAttributeLookup try_get_for_write(GeometryComponent &component,
                                          const StringRef attribute_name) const final;
   bool try_delete(GeometryComponent &component, const StringRef attribute_name) const final;

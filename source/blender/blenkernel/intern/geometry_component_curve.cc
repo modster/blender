@@ -892,7 +892,7 @@ class DynamicPointAttributeProvider final : public DynamicAttributesProvider {
 
  public:
   ReadAttributeLookup try_get_for_read(const GeometryComponent &component,
-                                       const StringRef attribute_name) const final
+                                       const AttributeIDRef &attribute_id) const final
   {
     const CurveEval *curve = get_curve_from_component_for_read(component);
     if (curve == nullptr || curve->splines().size() == 0) {
@@ -902,13 +902,13 @@ class DynamicPointAttributeProvider final : public DynamicAttributesProvider {
     Span<SplinePtr> splines = curve->splines();
     Vector<GSpan> spans; /* GSpan has no default constructor. */
     spans.reserve(splines.size());
-    std::optional<GSpan> first_span = splines[0]->attributes.get_for_read(attribute_name);
+    std::optional<GSpan> first_span = splines[0]->attributes.get_for_read(attribute_id);
     if (!first_span) {
       return {};
     }
     spans.append(*first_span);
     for (const int i : IndexRange(1, splines.size() - 1)) {
-      std::optional<GSpan> span = splines[i]->attributes.get_for_read(attribute_name);
+      std::optional<GSpan> span = splines[i]->attributes.get_for_read(attribute_id);
       if (!span) {
         /* All splines should have the same set of data layers. It would be possible to recover
          * here and return partial data instead, but that would add a lot of complexity for a

@@ -146,4 +146,61 @@ template<bool IsStrongReference> class OwnedAnonymousAttributeID {
 using StrongAnonymousAttributeID = OwnedAnonymousAttributeID<true>;
 using WeakAnonymousAttributeID = OwnedAnonymousAttributeID<false>;
 
+class AttributeIDRef {
+ private:
+  StringRef name_;
+  const AnonymousAttributeID *anonymous_id_ = nullptr;
+
+ public:
+  AttributeIDRef() = default;
+
+  AttributeIDRef(StringRef name) : name_(name)
+  {
+  }
+
+  AttributeIDRef(StringRefNull name) : name_(name)
+  {
+  }
+
+  AttributeIDRef(const char *name) : name_(name)
+  {
+  }
+
+  AttributeIDRef(const std::string &name) : name_(name)
+  {
+  }
+
+  /* The anonymous id is only borrowed, the caller has to keep a reference to it. */
+  AttributeIDRef(const AnonymousAttributeID *anonymous_id) : anonymous_id_(anonymous_id)
+  {
+  }
+
+  operator bool() const
+  {
+    return this->is_named() || this->is_anonymous();
+  }
+
+  bool is_named() const
+  {
+    return !name_.is_empty();
+  }
+
+  bool is_anonymous() const
+  {
+    return anonymous_id_ != nullptr;
+  }
+
+  StringRef name() const
+  {
+    BLI_assert(this->is_named());
+    return name_;
+  }
+
+  const AnonymousAttributeID &anonymous_id() const
+  {
+    BLI_assert(this->is_anonymous());
+    return *anonymous_id_;
+  }
+};
+
 }  // namespace blender::bke

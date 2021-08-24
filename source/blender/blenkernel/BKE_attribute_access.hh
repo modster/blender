@@ -22,6 +22,7 @@
 #include "FN_generic_span.hh"
 #include "FN_generic_virtual_array.hh"
 
+#include "BKE_anonymous_attribute.hh"
 #include "BKE_attribute.h"
 
 #include "BLI_color.hh"
@@ -333,7 +334,8 @@ class CustomDataAttributes {
 
   void reallocate(const int size);
 
-  std::optional<blender::fn::GSpan> get_for_read(const blender::StringRef name) const;
+  std::optional<blender::fn::GSpan> get_for_read(
+      const blender::bke::AttributeIDRef &attribute_id) const;
 
   blender::fn::GVArrayPtr get_for_read(const StringRef name,
                                        const CustomDataType data_type,
