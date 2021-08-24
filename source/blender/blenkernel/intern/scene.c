@@ -109,6 +109,8 @@
 
 #include "RE_engine.h"
 
+#include "RNA_access.h"
+
 #include "SEQ_edit.h"
 #include "SEQ_iterator.h"
 #include "SEQ_modifier.h"
@@ -1174,11 +1176,6 @@ static void scene_blend_read_data(BlendDataReader *reader, ID *id)
         seq->flag |= SEQ_EFFECT_NOT_LOADED;
       }
 
-      if (seq->type == SEQ_TYPE_SPEED) {
-        SpeedControlVars *s = seq->effectdata;
-        s->frameMap = NULL;
-      }
-
       if (seq->type == SEQ_TYPE_TEXT) {
         TextVars *t = seq->effectdata;
         t->text_blf_id = SEQ_FONT_NOT_LOADED;
@@ -1987,9 +1984,12 @@ Scene *BKE_scene_duplicate(Main *bmain, Scene *sce, eSceneCopyMethod type)
   if (type == SCE_COPY_FULL) {
     /* Scene duplication is always root of duplication currently. */
     const bool is_subprocess = false;
+    const bool is_root_id = true;
 
     if (!is_subprocess) {
       BKE_main_id_newptr_and_tag_clear(bmain);
+    }
+    if (is_root_id) {
       /* In case root duplicated ID is linked, assume we want to get a local copy of it and
        * duplicate all expected linked data. */
       if (ID_IS_LINKED(sce)) {
@@ -2936,6 +2936,22 @@ bool BKE_scene_uses_blender_workbench(const Scene *scene)
 bool BKE_scene_uses_cycles(const Scene *scene)
 {
   return STREQ(scene->r.engine, RE_engine_id_CYCLES);
+}
+
+/* This enumeration has to match the one defined in the Cycles addon. */
+typedef enum eCyclesFeatureSet {
+  CYCLES_FEATURES_SUPPORTED = 0,
+  CYCLES_FEATURES_EXPERIMENTAL = 1,
+} eCyclesFeatureSet;
+
+/* We cannot use const as RNA_id_pointer_create is not using a const ID. */
+bool BKE_scene_uses_cycles_experimental_features(Scene *scene)
+{
+  BLI_assert(BKE_scene_uses_cycles(scene));
+  PointerRNA scene_ptr;
+  RNA_id_pointer_create(&scene->id, &scene_ptr);
+  PointerRNA cycles_ptr = RNA_pointer_get(&scene_ptr, "cycles");
+  return RNA_enum_get(&cycles_ptr, "feature_set") == CYCLES_FEATURES_EXPERIMENTAL;
 }
 
 void BKE_scene_base_flag_to_objects(ViewLayer *view_layer)
