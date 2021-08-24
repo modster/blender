@@ -58,9 +58,9 @@ static bNodeSocketTemplate geo_node_point_distribute_in[] = {
 
 static bNodeSocketTemplate geo_node_point_distribute_out[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
-    {SOCK_VECTOR, N_("Rotation")},
-    {SOCK_VECTOR, N_("Normal")},
-    {SOCK_INT, N_("ID")},
+    {SOCK_VECTOR, N_("Rotation"), 0, 0, 0, 0, 0, 0, PROP_NONE, SOCK_ALWAYS_FIELD},
+    {SOCK_VECTOR, N_("Normal"), 0, 0, 0, 0, 0, 0, PROP_NONE, SOCK_ALWAYS_FIELD},
+    {SOCK_INT, N_("ID"), 0, 0, 0, 0, 0, 0, PROP_NONE, SOCK_ALWAYS_FIELD},
     {-1, ""},
 };
 

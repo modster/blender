@@ -795,6 +795,64 @@ enum class SocketSingleState {
   MaybeField,
 };
 
+#define PRIMITIVE_SOCKETS SOCK_FLOAT, SOCK_VECTOR, SOCK_INT, SOCK_BOOLEAN, SOCK_RGBA
+
+static bool is_required_single(const bNodeTree *node_tree,
+                               const bNode *node,
+                               const bNodeSocket *socket)
+{
+  if (socket->flag & SOCK_ALWAYS_SINGLE) {
+    return true;
+  }
+  if (socket->in_out == SOCK_IN) {
+    LISTBASE_FOREACH (const bNodeSocket *, output, &node->outputs) {
+      if (ELEM(output->type, PRIMITIVE_SOCKETS)) {
+        if (is_required_single(node_tree, node, output)) {
+          return true;
+        }
+      }
+    }
+  }
+  else {
+    LISTBASE_FOREACH (const bNodeLink *, link, &node_tree->links) {
+      if (link->fromsock == socket) {
+        if (is_required_single(node_tree, link->tonode, link->tosock)) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+static bool is_maybe_field(const bNodeTree *node_tree,
+                           const bNode *node,
+                           const bNodeSocket *socket)
+{
+  if (socket->flag & SOCK_ALWAYS_FIELD) {
+    return true;
+  }
+  if (socket->in_out == SOCK_IN) {
+    LISTBASE_FOREACH (const bNodeLink *, link, &node_tree->links) {
+      if (link->tosock == socket) {
+        if (is_maybe_field(node_tree, link->fromnode, link->fromsock)) {
+          return true;
+        }
+      }
+    }
+  }
+  else {
+    LISTBASE_FOREACH (const bNodeSocket *, input, &node->inputs) {
+      if (ELEM(input->type, PRIMITIVE_SOCKETS) && !(input->flag & SOCK_ALWAYS_SINGLE)) {
+        if (is_maybe_field(node_tree, node, input)) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
 static SocketSingleState get_socket_single_state(const bNodeTree *node_tree,
                                                  const bNode *node,
                                                  const bNodeSocket *socket)
@@ -805,11 +863,20 @@ static SocketSingleState get_socket_single_state(const bNodeTree *node_tree,
   if (socket->type == -1) {
     return SocketSingleState::MaybeField;
   }
-  if (!ELEM(socket->type, SOCK_FLOAT, SOCK_VECTOR, SOCK_INT, SOCK_BOOLEAN, SOCK_RGBA)) {
-    return SocketSingleState::RequiredSingle;
-  }
   if (socket->flag & SOCK_ALWAYS_SINGLE) {
     return SocketSingleState::RequiredSingle;
+  }
+  if (socket->flag & SOCK_ALWAYS_FIELD) {
+    return SocketSingleState::MaybeField;
+  }
+  if (!ELEM(socket->type, PRIMITIVE_SOCKETS)) {
+    return SocketSingleState::RequiredSingle;
+  }
+  if (is_required_single(node_tree, node, socket)) {
+    return SocketSingleState::RequiredSingle;
+  }
+  if (is_maybe_field(node_tree, node, socket)) {
+    return SocketSingleState::MaybeField;
   }
   return SocketSingleState::CurrentlySingle;
 }
@@ -1460,6 +1527,9 @@ void node_draw_sockets(const View2D *v2d,
   }
 
   LISTBASE_FOREACH (bNodeSocket *, socket, &node->outputs) {
+    if (nodeSocketIsHidden(socket)) {
+      continue;
+    }
     const SocketSingleState single_state = get_socket_single_state(ntree, node, socket);
     if (ELEM(
             single_state, SocketSingleState::CurrentlySingle, SocketSingleState::RequiredSingle)) {
