@@ -128,6 +128,19 @@ bool RE_engine_is_opengl(RenderEngineType *render_type)
   return (render_type->draw_engine != NULL) && DRW_engine_render_support(render_type->draw_engine);
 }
 
+bool RE_engine_supports_alembic_procedural(const RenderEngineType *render_type, Scene *scene)
+{
+  if ((render_type->flag & RE_USE_ALEMBIC_PROCEDURAL) == 0) {
+    return false;
+  }
+
+  if (BKE_scene_uses_cycles(scene) && !BKE_scene_uses_cycles_experimental_features(scene)) {
+    return false;
+  }
+
+  return true;
+}
+
 /* Create, Free */
 
 RenderEngine *RE_engine_create(RenderEngineType *type)
@@ -198,6 +211,8 @@ static RenderResult *render_result_from_bake(RenderEngine *engine, int x, int y,
       rr, rl, engine->bake.depth, RE_PASSNAME_COMBINED, "", "RGBA");
   RenderPass *primitive_pass = render_layer_add_pass(rr, rl, 4, "BakePrimitive", "", "RGBA");
   RenderPass *differential_pass = render_layer_add_pass(rr, rl, 4, "BakeDifferential", "", "RGBA");
+
+  render_result_passes_allocated_ensure(rr);
 
   /* Fill render passes from bake pixel array, to be read by the render engine. */
   for (int ty = 0; ty < h; ty++) {
@@ -315,6 +330,7 @@ RenderResult *RE_engine_begin_result(
   /* can be NULL if we CLAMP the width or height to 0 */
   if (result) {
     render_result_clone_passes(re, result, viewname);
+    render_result_passes_allocated_ensure(result);
 
     RenderPart *pa;
 
@@ -385,6 +401,14 @@ void RE_engine_end_result(
     BLI_remlink(&engine->fullresult, result);
     render_result_free(result);
     return;
+  }
+
+  if (!re->result->passes_allocated) {
+    BLI_rw_mutex_lock(&re->resultmutex, THREAD_LOCK_WRITE);
+    if (!re->result->passes_allocated) {
+      render_result_passes_allocated_ensure(re->result);
+    }
+    BLI_rw_mutex_unlock(&re->resultmutex);
   }
 
   /* merge. on break, don't merge in result for preview renders, looks nicer */

@@ -775,6 +775,8 @@ def km_property_editor(_params):
         # Constraint panels
         ("constraint.delete", {"type": 'X', "value": 'PRESS'}, {"properties": [("report", True)]}),
         ("constraint.delete", {"type": 'DEL', "value": 'PRESS'}, {"properties": [("report", True)]}),
+        ("constraint.copy", {"type": 'D', "value": 'PRESS', "shift": True}, None),
+        ("constraint.apply", {"type": 'A', "value": 'PRESS', "ctrl": True}, {"properties": [("report", True)]}),
     ])
 
     return keymap
@@ -1907,19 +1909,19 @@ def km_node_editor(params):
         ("node.clipboard_paste", {"type": 'V', "value": 'PRESS', "ctrl": True}, None),
         ("node.viewer_border", {"type": 'B', "value": 'PRESS', "ctrl": True}, None),
         ("node.clear_viewer_border", {"type": 'B', "value": 'PRESS', "ctrl": True, "alt": True}, None),
-        ("node.translate_attach", {"type": 'G', "value": 'PRESS'}, None),
-        ("node.translate_attach", {"type": 'EVT_TWEAK_L', "value": 'ANY'}, None),
-        ("node.translate_attach", {"type": params.select_tweak, "value": 'ANY'}, None),
-        ("transform.translate", {"type": 'G', "value": 'PRESS'}, None),
+        ("node.translate_attach", {"type": 'G', "value": 'PRESS'}, {"properties": [("TRANSFORM_OT_translate", [("view2d_edge_pan", True)])]}),
+        ("node.translate_attach", {"type": 'EVT_TWEAK_L', "value": 'ANY'}, {"properties": [("TRANSFORM_OT_translate", [("view2d_edge_pan", True)])]}),
+        ("node.translate_attach", {"type": params.select_tweak, "value": 'ANY'}, {"properties": [("TRANSFORM_OT_translate", [("view2d_edge_pan", True)])]}),
+        ("transform.translate", {"type": 'G', "value": 'PRESS'}, {"properties": [("view2d_edge_pan", True)]}),
         ("transform.translate", {"type": 'EVT_TWEAK_L', "value": 'ANY'},
-         {"properties": [("release_confirm", True)]}),
+         {"properties": [("release_confirm", True), ("view2d_edge_pan", True)]}),
         ("transform.translate", {"type": params.select_tweak, "value": 'ANY'},
-         {"properties": [("release_confirm", True)]}),
+         {"properties": [("release_confirm", True), ("view2d_edge_pan", True)]}),
         ("transform.rotate", {"type": 'R', "value": 'PRESS'}, None),
         ("transform.resize", {"type": 'S', "value": 'PRESS'}, None),
-        ("node.move_detach_links", {"type": 'D', "value": 'PRESS', "alt": True}, None),
-        ("node.move_detach_links_release", {"type": params.action_tweak, "value": 'ANY', "alt": True}, None),
-        ("node.move_detach_links", {"type": params.select_tweak, "value": 'ANY', "alt": True}, None),
+        ("node.move_detach_links", {"type": 'D', "value": 'PRESS', "alt": True}, {"properties": [("TRANSFORM_OT_translate", [("view2d_edge_pan", True)])]}),
+        ("node.move_detach_links_release", {"type": params.action_tweak, "value": 'ANY', "alt": True}, {"properties": [("NODE_OT_translate_attach", [("TRANSFORM_OT_translate", [("view2d_edge_pan", True)])])]}),
+        ("node.move_detach_links", {"type": params.select_tweak, "value": 'ANY', "alt": True}, {"properties": [("TRANSFORM_OT_translate", [("view2d_edge_pan", True)])]}),
         ("wm.context_toggle", {"type": 'TAB', "value": 'PRESS', "shift": True},
          {"properties": [("data_path", 'tool_settings.use_snap')]}),
         ("wm.context_menu_enum", {"type": 'TAB', "value": 'PRESS', "shift": True, "ctrl": True},
@@ -1999,6 +2001,10 @@ def km_file_browser(params):
          {"properties": [("increment", -10)]}),
         ("file.filenum", {"type": 'NUMPAD_MINUS', "value": 'PRESS', "ctrl": True, "repeat": True},
          {"properties": [("increment", -100)]}),
+
+        # Select file under cursor before spawning the context menu.
+        ("file.select", {"type": 'RIGHTMOUSE', "value": 'PRESS'},
+         {"properties": [("open", False), ("only_activate_if_selected", params.select_mouse == 'LEFTMOUSE'), ("pass_through", True)]}),
         *_template_items_context_menu("FILEBROWSER_MT_context_menu", params.context_menu_event),
         *_template_items_context_menu("ASSETBROWSER_MT_context_menu", params.context_menu_event),
     ])

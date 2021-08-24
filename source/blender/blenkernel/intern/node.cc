@@ -606,19 +606,18 @@ void ntreeBlendWrite(BlendWriter *writer, bNodeTree *ntree)
 static void ntree_blend_write(BlendWriter *writer, ID *id, const void *id_address)
 {
   bNodeTree *ntree = (bNodeTree *)id;
-  if (ntree->id.us > 0 || BLO_write_is_undo(writer)) {
-    /* Clean up, important in undo case to reduce false detection of changed datablocks. */
-    ntree->init = 0; /* to set callbacks and force setting types */
-    ntree->is_updating = false;
-    ntree->typeinfo = nullptr;
-    ntree->interface_type = nullptr;
-    ntree->progress = nullptr;
-    ntree->execdata = nullptr;
 
-    BLO_write_id_struct(writer, bNodeTree, id_address, &ntree->id);
+  /* Clean up, important in undo case to reduce false detection of changed datablocks. */
+  ntree->init = 0; /* to set callbacks and force setting types */
+  ntree->is_updating = false;
+  ntree->typeinfo = nullptr;
+  ntree->interface_type = nullptr;
+  ntree->progress = nullptr;
+  ntree->execdata = nullptr;
 
-    ntreeBlendWrite(writer, ntree);
-  }
+  BLO_write_id_struct(writer, bNodeTree, id_address, &ntree->id);
+
+  ntreeBlendWrite(writer, ntree);
 }
 
 static void direct_link_node_socket(BlendDataReader *reader, bNodeSocket *sock)
@@ -2364,7 +2363,7 @@ bNodeLink *nodeAddLink(
     ntree->update |= NTREE_UPDATE_LINKS;
   }
 
-  if (link->tosock->flag & SOCK_MULTI_INPUT) {
+  if (link != nullptr && link->tosock->flag & SOCK_MULTI_INPUT) {
     link->multi_input_socket_index = node_count_links(ntree, link->tosock) - 1;
   }
 
@@ -3194,6 +3193,7 @@ void ntreeFreeEmbeddedTree(bNodeTree *ntree)
 {
   ntreeFreeTree(ntree);
   BKE_libblock_free_data(&ntree->id, true);
+  BKE_libblock_free_data_py(&ntree->id);
 }
 
 void ntreeFreeLocalTree(bNodeTree *ntree)

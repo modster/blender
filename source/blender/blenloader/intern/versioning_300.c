@@ -26,6 +26,7 @@
 
 #include "BLI_listbase.h"
 #include "BLI_math_vector.h"
+#include "BLI_path_util.h"
 #include "BLI_string.h"
 #include "BLI_utildefines.h"
 
@@ -979,18 +980,7 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
     }
   }
 
-  /**
-   * Versioning code until next subversion bump goes here.
-   *
-   * \note Be sure to check when bumping the version:
-   * - "versioning_userdef.c", #blo_do_versions_userdef
-   * - "versioning_userdef.c", #do_versions_theme
-   *
-   * \note Keep this message at the bottom of the function.
-   */
-  {
-    /* Keep this block, even when empty. */
-
+  if (!MAIN_VERSION_ATLEAST(bmain, 300, 18)) {
     if (!DNA_struct_elem_find(
             fd->filesdna, "WorkSpace", "AssetLibraryReference", "asset_library_ref")) {
       LISTBASE_FOREACH (WorkSpace *, workspace, &bmain->workspaces) {
@@ -1012,6 +1002,59 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
               continue;
             }
             BKE_asset_library_reference_init_default(&sfile->asset_params->asset_library_ref);
+          }
+        }
+      }
+    }
+
+    /* Previously, only text ending with `.py` would run, apply this logic
+     * to existing files so text that happens to have the "Register" enabled
+     * doesn't suddenly start running code on startup that was previously ignored. */
+    LISTBASE_FOREACH (Text *, text, &bmain->texts) {
+      if ((text->flags & TXT_ISSCRIPT) && !BLI_path_extension_check(text->id.name + 2, ".py")) {
+        text->flags &= ~TXT_ISSCRIPT;
+      }
+    }
+  }
+
+  /**
+   * Versioning code until next subversion bump goes here.
+   *
+   * \note Be sure to check when bumping the version:
+   * - "versioning_userdef.c", #blo_do_versions_userdef
+   * - "versioning_userdef.c", #do_versions_theme
+   *
+   * \note Keep this message at the bottom of the function.
+   */
+  {
+    /* Keep this block, even when empty. */
+
+    /* Add node storage for subdivision surface node. */
+    FOREACH_NODETREE_BEGIN (bmain, ntree, id) {
+      if (ntree->type == NTREE_GEOMETRY) {
+        LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
+          if (node->type == GEO_NODE_SUBDIVISION_SURFACE) {
+            if (node->storage == NULL) {
+              NodeGeometrySubdivisionSurface *data = MEM_callocN(
+                  sizeof(NodeGeometrySubdivisionSurface), __func__);
+              data->uv_smooth = SUBSURF_UV_SMOOTH_PRESERVE_BOUNDARIES;
+              data->boundary_smooth = SUBSURF_BOUNDARY_SMOOTH_ALL;
+              node->storage = data;
+            }
+          }
+        }
+      }
+    }
+    FOREACH_NODETREE_END;
+
+    /* Disable Fade Inactive Overlay by default as it is redundant after introducing flash on mode
+     * transfer. */
+    for (bScreen *screen = bmain->screens.first; screen; screen = screen->id.next) {
+      LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
+        LISTBASE_FOREACH (SpaceLink *, sl, &area->spacedata) {
+          if (sl->spacetype == SPACE_VIEW3D) {
+            View3D *v3d = (View3D *)sl;
+            v3d->overlay.flag &= ~V3D_OVERLAY_FADE_INACTIVE;
           }
         }
       }
