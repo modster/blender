@@ -473,7 +473,7 @@ void LightProbeModule::sync_world(const DRWView *view)
 
   grid.resolution = ivec3(1);
   grid.offset = 0;
-  grid.level_skip = 0;
+  grid.level_skip = 1;
   grid.attenuation_bias = 0.001f;
   grid.attenuation_scale = 1.0f;
   grid.visibility_range = 1.0f;
