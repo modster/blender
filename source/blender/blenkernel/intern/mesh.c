@@ -466,8 +466,10 @@ static int customdata_compare(
           int vtot = m1->totvert;
 
           for (j = 0; j < vtot; j++, v1++, v2++) {
-            if (len_squared_v3v3(v1->co, v2->co) > thresh_sq) {
-              return MESHCMP_VERTCOMISMATCH;
+            for (int k = 0; k < 3; k++) {
+              if (compare_threshold_relative(v1->co[k], v2->co[k], thresh)) {
+                return MESHCMP_VERTCOMISMATCH;
+              }
             }
             /* I don't care about normals, let's just do coordinates. */
           }
@@ -547,8 +549,7 @@ static int customdata_compare(
           int ltot = m1->totloop;
 
           for (j = 0; j < ltot; j++, lp1++, lp2++) {
-            if (abs(lp1->r - lp2->r) > thresh || abs(lp1->g - lp2->g) > thresh ||
-                abs(lp1->b - lp2->b) > thresh || abs(lp1->a - lp2->a) > thresh) {
+            if (lp1->r != lp2->r || lp1->g != lp2->g || lp1->b != lp2->b || lp1->a != lp2->a) {
               return MESHCMP_LOOPCOLMISMATCH;
             }
           }
@@ -583,7 +584,7 @@ static int customdata_compare(
           const float *l2_data = l2->data;
 
           for (int i = 0; i < total_length; i++) {
-            if (fabsf(l1_data[i] - l2_data[i]) > thresh) {
+            if (compare_threshold_relative(l1_data[i], l2_data[i], thresh)) {
               return MESHCMP_ATTRIBUTE_VALUE_MISMATCH;
             }
           }
@@ -594,7 +595,10 @@ static int customdata_compare(
           const float(*l2_data)[2] = l2->data;
 
           for (int i = 0; i < total_length; i++) {
-            if (len_squared_v2v2(l1_data[i], l2_data[i]) > thresh_sq) {
+            if (compare_threshold_relative(l1_data[i][0], l2_data[i][0], thresh)) {
+              return MESHCMP_ATTRIBUTE_VALUE_MISMATCH;
+            }
+            if (compare_threshold_relative(l1_data[i][1], l2_data[i][1], thresh)) {
               return MESHCMP_ATTRIBUTE_VALUE_MISMATCH;
             }
           }
@@ -605,7 +609,13 @@ static int customdata_compare(
           const float(*l2_data)[3] = l2->data;
 
           for (int i = 0; i < total_length; i++) {
-            if (len_squared_v3v3(l1_data[i], l2_data[i]) > thresh_sq) {
+            if (compare_threshold_relative(l1_data[i][0], l2_data[i][0], thresh)) {
+              return MESHCMP_ATTRIBUTE_VALUE_MISMATCH;
+            }
+            if (compare_threshold_relative(l1_data[i][1], l2_data[i][1], thresh)) {
+              return MESHCMP_ATTRIBUTE_VALUE_MISMATCH;
+            }
+            if (compare_threshold_relative(l1_data[i][2], l2_data[i][2], thresh)) {
               return MESHCMP_ATTRIBUTE_VALUE_MISMATCH;
             }
           }
@@ -639,7 +649,7 @@ static int customdata_compare(
 
           for (int i = 0; i < total_length; i++) {
             for (j = 0; j < 4; j++) {
-              if (fabsf(l1_data[i].color[j] - l2_data[i].color[j]) > thresh) {
+              if (compare_threshold_relative(l1_data[i].color[j], l2_data[i].color[j], thresh)) {
                 return MESHCMP_ATTRIBUTE_VALUE_MISMATCH;
               }
             }
@@ -861,8 +871,11 @@ bool BKE_mesh_has_custom_loop_normals(Mesh *me)
   return CustomData_has_layer(&me->ldata, CD_CUSTOMLOOPNORMAL);
 }
 
-/** Free (or release) any data used by this mesh (does not free the mesh itself). */
-void BKE_mesh_free(Mesh *me)
+/**
+ * Free (or release) any data used by this mesh (does not free the mesh itself).
+ * Only use for undo, in most cases `BKE_id_free(NULL, me)` should be used.
+ */
+void BKE_mesh_free_data_for_undo(Mesh *me)
 {
   mesh_free_data(&me->id);
 }
@@ -1078,7 +1091,7 @@ void BKE_mesh_eval_delete(struct Mesh *mesh_eval)
 {
   /* Evaluated mesh may point to edit mesh, but never owns it. */
   mesh_eval->edit_mesh = NULL;
-  BKE_mesh_free(mesh_eval);
+  mesh_free_data(&mesh_eval->id);
   BKE_libblock_free_data(&mesh_eval->id, false);
   MEM_freeN(mesh_eval);
 }

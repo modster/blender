@@ -158,8 +158,9 @@ static void TimeToTransData(
   /* Setup #TransData. */
   td->loc = time; /* Usually #td2d->loc is used here. But this is for when the original location is
                      not float[3]. */
+  copy_v3_v3(td->iloc, td->loc);
   td->val = time;
-  td->ival = td->iloc[0] = *(time);
+  td->ival = *(time);
   td->center[0] = td->ival;
   td->center[1] = ypos;
 
@@ -241,15 +242,14 @@ static int GPLayerToTransData(TransData *td,
   for (gpf = gpl->frames.first; gpf; gpf = gpf->next) {
     if (is_prop_edit || (gpf->flag & GP_FRAME_SELECT)) {
       if (FrameOnMouseSide(side, (float)gpf->framenum, cfra)) {
-        /* memory is calloc'ed, so that should zero everything nicely for us */
-        td->val = &tfd->val;
-        td->ival = (float)gpf->framenum;
+        tfd->val = (float)gpf->framenum;
+        tfd->sdata = &gpf->framenum;
+
+        td->val = td->loc = &tfd->val; /* XXX: It's not a 3d array. */
+        td->ival = td->iloc[0] = (float)gpf->framenum;
 
         td->center[0] = td->ival;
         td->center[1] = ypos;
-
-        tfd->val = (float)gpf->framenum;
-        tfd->sdata = &gpf->framenum;
 
         /* Advance `td` now. */
         td++;
@@ -616,7 +616,11 @@ void recalcData_actedit(TransInfo *t)
     if ((autosnap != SACTSNAP_OFF) && (t->state != TRANS_CANCEL) && !(td->flag & TD_NOTIMESNAP)) {
       transform_snap_anim_flush_data(t, td, autosnap, td->loc);
     }
-    transform_convert_flush_handle2D(td, td2d, 1.0f);
+
+    /* Constrain Y. */
+    td->loc[1] = td->iloc[1];
+
+    transform_convert_flush_handle2D(td, td2d, 0.0f);
   }
 
   if (ac.datatype != ANIMCONT_MASK) {

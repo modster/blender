@@ -308,7 +308,7 @@ int txt_extended_ascii_as_utf8(char **str)
   int added = 0;
 
   while ((*str)[i]) {
-    if ((bad_char = BLI_utf8_invalid_byte(*str + i, length - i)) == -1) {
+    if ((bad_char = BLI_str_utf8_invalid_byte(*str + i, length - i)) == -1) {
       break;
     }
 
@@ -322,7 +322,7 @@ int txt_extended_ascii_as_utf8(char **str)
     i = 0;
 
     while ((*str)[i]) {
-      if ((bad_char = BLI_utf8_invalid_byte((*str) + i, length - i)) == -1) {
+      if ((bad_char = BLI_str_utf8_invalid_byte((*str) + i, length - i)) == -1) {
         memcpy(newstr + mi, (*str) + i, length - i + 1);
         break;
       }
@@ -1660,7 +1660,7 @@ void txt_insert_buf(Text *text, const char *in_buffer)
 
   /* Read the first line (or as close as possible */
   while (buffer[i] && buffer[i] != '\n') {
-    txt_add_raw_char(text, BLI_str_utf8_as_unicode_step(buffer, &i));
+    txt_add_raw_char(text, BLI_str_utf8_as_unicode_step(buffer, len, &i));
   }
 
   if (buffer[i] == '\n') {
@@ -1682,7 +1682,7 @@ void txt_insert_buf(Text *text, const char *in_buffer)
       }
       else {
         for (j = i - l; j < i && j < len;) {
-          txt_add_raw_char(text, BLI_str_utf8_as_unicode_step(buffer, &j));
+          txt_add_raw_char(text, BLI_str_utf8_as_unicode_step(buffer, len, &j));
         }
         break;
       }
