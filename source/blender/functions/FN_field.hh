@@ -24,7 +24,6 @@
 #include "BLI_map.hh"
 #include "BLI_vector.hh"
 
-#include "FN_generic_array.hh"
 #include "FN_generic_virtual_array.hh"
 #include "FN_multi_function_procedure.hh"
 #include "FN_multi_function_procedure_builder.hh"
@@ -33,152 +32,103 @@
 namespace blender::fn {
 
 class Field;
+using FieldPtr = std::unique_ptr<Field>;
 
 class Field {
-  fn::CPPType *type_;
+  const fn::CPPType *type_;
+  std::string debug_name_ = "";
 
  public:
-  fn::CPPType &type()
+  virtual ~Field() = default;
+  Field(const fn::CPPType &type, std::string &&debug_name = "")
+      : type_(&type), debug_name_(std::move(debug_name))
   {
+  }
+
+  const fn::CPPType &type() const
+  {
+    BLI_assert(type_ != nullptr);
     return *type_;
   }
 
-  virtual void foreach_input_recursive(blender::FunctionRef<void(const InputField &input)> fn) = 0;
-  virtual void foreach_input(blender::FunctionRef<void(const InputField &input)> fn) = 0;
+  blender::StringRef debug_name() const
+  {
+    return debug_name_;
+  }
+
+  virtual void foreach_input(blender::FunctionRef<void(const Field &input)> UNUSED(fn)) const = 0;
+  virtual void foreach_input_recursive(
+      blender::FunctionRef<void(const Field &input)> UNUSED(fn)) const = 0;
 };
-
-class InputField : public Field {
-
- public:
-  virtual GVArrayPtr get_data(IndexMask mask) const = 0;
-  void foreach_input_recursive(blender::FunctionRef<void(const InputField &input)> fn) final
-  {
-  }
-  void foreach_input(blender::FunctionRef<void(const InputField &input)> fn) final
-  {
-  }
-};
-
-class MultiFunctionField final : public Field {
-  blender::Vector<std::shared_ptr<Field>> input_fields_;
-  MultiFunction &function_;
-
- public:
-  void foreach_input_recursive(blender::FunctionRef<void(const InputField &input)> fn) final
-  {
-    for (const std::shared_ptr<Field> &field : input_fields_) {
-      if (const InputField *input_field = dynamic_cast<const InputField *>(field.get())) {
-        fn(*input_field);
-      }
-      else {
-        field->foreach_input(fn);
-      }
-    }
-  }
-
-  void foreach_input(blender::FunctionRef<void(const InputField &input)> fn) final
-  {
-    for (const std::shared_ptr<Field> &field : input_fields_) {
-      if (const InputField *input_field = dynamic_cast<const InputField *>(field.get())) {
-        fn(*input_field);
-      }
-    }
-  }
-};
-
-void add_procedure_inputs_recursive(const Field &field, MFProcedureBuilder &builder)
-{
-  field.foreach_input()
-}
 
 /**
- * Evaluate more than one prodecure at a time
+ * A field that doesn't have any dependencies on other fields.
+ *
+ * TODO: It might be an elegant simplification if every single field was a multi-function field,
+ * and input fields just happened to have no inputs. Then it might not need to be a virtual class,
+ * since the dynamic behavior would be contained in the multifunction, which would be very nice.
  */
-void evaluate_fields(const Span<std::shared_ptr<Field>> fields,
-                     const MutableSpan<GMutableSpan> outputs,
-                     const IndexMask mask)
-{
-  blender::Map<const InputField *, GVArrayPtr> computed_inputs;
-  for (const std::shared_ptr<Field> &field : fields) {
-    field->foreach_input_recursive([&](const InputField &input_field) {
-      if (!computed_inputs.contains(&input_field)) {
-        computed_inputs.add_new(&input_field, input_field.get_data(mask));
-      }
-    });
+class InputField : public Field {
+ public:
+  InputField(const CPPType &type) : Field(type)
+  {
   }
 
-  /* Build procedure. */
-  MFProcedure procedure;
-  MFProcedureBuilder builder{procedure};
-
-  Map<const Field *, MFVariable *> fields_to_variables;
-  Map<const GMutableSpan, MFVariable *> outputs_to_variables;
-
-  /* Add the unique inputs. */
-  for (blender::Map<const InputField *, GVArrayPtr>::Item item : computed_inputs.items()) {
-    fields_to_variables.add_new(
-        item.key, &builder.add_parameter(MFParamType::ForSingleInput(item.value->type())));
+  void foreach_input(blender::FunctionRef<void(const Field &input)> UNUSED(fn)) const final
+  {
+  }
+  void foreach_input_recursive(
+      blender::FunctionRef<void(const Field &input)> UNUSED(fn)) const final
+  {
   }
 
-  /* Add the inputs recursively for the entire group of nodes. */
-  builder.add_return();
-  for (const int i : outputs.index_range()) {
-    BLI_assert(fields_to_variables.contains(fields[i].get()));
-    builder.add_output_parameter(*fields_to_variables.lookup(fields[i].get()));
+  virtual GVArrayPtr get_data(IndexMask mask) const = 0;
+
+  /**
+   * Return true when the field input is the same as another field, used as an
+   * optimization to avoid creating multiple virtual arrays for the same input node.
+   */
+  virtual bool equals(const InputField &UNUSED(other))
+  {
+    return false;
   }
-  // builder.add_output_parameter(*var4);
+};
 
-  BLI_assert(procedure.validate());
+/**
+ * A field that takes inputs
+ */
+class MultiFunctionField final : public Field {
+  blender::Vector<FieldPtr> input_fields_;
+  const MultiFunction *function_;
 
-  /* Evaluate procedure. */
-  MFProcedureExecutor executor{"Evaluate Field", procedure};
-  MFParamsBuilder params{executor, mask.min_array_size()};
-  MFContextBuilder context;
-
-  /* Add the input data. */
-  for (blender::Map<const InputField *, GVArrayPtr>::Item item : computed_inputs.items()) {
-    params.add_readonly_single_input(*item.value);
+ public:
+  void foreach_input(blender::FunctionRef<void(const Field &input)> fn) const final
+  {
+    for (const FieldPtr &field : input_fields_) {
+      fn(*field);
+    }
+  }
+  void foreach_input_recursive(blender::FunctionRef<void(const Field &input)> fn) const final
+  {
+    for (const FieldPtr &field : input_fields_) {
+      fn(*field);
+      field->foreach_input(fn);
+    }
   }
 
-  /* Add the output arrays. */
-  for (const int i : fields.index_range()) {
-    BLI_assert(outputs[i].type() == fields[i]->type());
-    params.add_uninitialized_single_output(outputs[i]);
+  const MultiFunction &function() const
+  {
+    BLI_assert(function_ != nullptr);
+    return *function_;
   }
+};
 
-  executor.call(mask, params, context);
-
-  // int input_index = 0;
-  // for (const int param_index : fn_->param_indices()) {
-  //   fn::MFParamType param_type = fn_->param_type(param_index);
-  //   switch (param_type.category()) {
-  //     case fn::MFParamType::SingleInput: {
-  //       const Field &field = *input_fields_[input_index];
-  //       FieldOutput &output = scope.add_value(field.evaluate(mask, inputs), __func__);
-  //       params.add_readonly_single_input(output.varray_ref());
-  //       input_index++;
-  //       break;
-  //     }
-  //     case fn::MFParamType::SingleOutput: {
-  //       const CPPType &type = param_type.data_type().single_type();
-  //       void *buffer = MEM_mallocN_aligned(
-  //           mask.min_array_size() * type.size(), type.alignment(), __func__);
-  //       GMutableSpan span{type, buffer, mask.min_array_size()};
-  //       outputs.append(span);
-  //       params.add_uninitialized_single_output(span);
-  //       if (param_index == output_param_index_) {
-  //         output_span_index = outputs.size() - 1;
-  //       }
-  //       break;
-  //     }
-  //     case fn::MFParamType::SingleMutable:
-  //     case fn::MFParamType::VectorInput:
-  //     case fn::MFParamType::VectorMutable:
-  //     case fn::MFParamType::VectorOutput:
-  //       BLI_assert_unreachable();
-  //       break;
-  //   }
-  // }
-}
+/**
+ * Evaluate more than one field at a time, as an optimization
+ * in case they share inputs or various intermediate values.
+ */
+void evaluate_fields(const blender::Span<FieldPtr> fields,
+                     const blender::MutableSpan<GMutableSpan> outputs,
+                     const blender::IndexMask mask);
 
 }  // namespace blender::fn
