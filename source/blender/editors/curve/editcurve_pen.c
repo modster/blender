@@ -984,7 +984,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
         if (found_point) {
           copy_v2_v2_int(vc.mval, event->mval);
           if (nu && !(nu->flagu & CU_NURB_CYCLIC)) {
-            bool closed = make_cyclic_if_endpoints(nu, bezt, bp, &vc, C);
+            bool closed = nu->pntsu > 2 && make_cyclic_if_endpoints(nu, bezt, bp, &vc, C);
 
             /* Set "new" to true to be able to click and drag to control handles when added. */
             RNA_boolean_set(op->ptr, "new", closed);
