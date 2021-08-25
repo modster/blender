@@ -111,7 +111,8 @@ void evaluate_fields(const Span<std::shared_ptr<Field>> fields,
   MFProcedure procedure;
   MFProcedureBuilder builder{procedure};
 
-  Map<const InputField *, MFVariable *> fields_to_variables;
+  Map<const Field *, MFVariable *> fields_to_variables;
+  Map<const GMutableSpan, MFVariable *> outputs_to_variables;
 
   /* Add the unique inputs. */
   for (blender::Map<const InputField *, GVArrayPtr>::Item item : computed_inputs.items()) {
@@ -120,7 +121,11 @@ void evaluate_fields(const Span<std::shared_ptr<Field>> fields,
   }
 
   /* Add the inputs recursively for the entire group of nodes. */
-  // builder.add_return();
+  builder.add_return();
+  for (const int i : outputs.index_range()) {
+    BLI_assert(fields_to_variables.contains(fields[i].get()));
+    builder.add_output_parameter(*fields_to_variables.lookup(fields[i].get()));
+  }
   // builder.add_output_parameter(*var4);
 
   BLI_assert(procedure.validate());
@@ -137,6 +142,7 @@ void evaluate_fields(const Span<std::shared_ptr<Field>> fields,
 
   /* Add the output arrays. */
   for (const int i : fields.index_range()) {
+    BLI_assert(outputs[i].type() == fields[i]->type());
     params.add_uninitialized_single_output(outputs[i]);
   }
 
