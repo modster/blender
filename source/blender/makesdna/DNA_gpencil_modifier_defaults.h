@@ -311,6 +311,7 @@
     .stroke_depth_offset = 0.05,\
     .chain_smooth_tolerance = 0.0f,\
     .overscan = 0.1f,\
+    .stroke_depth_offset = 0.05,\
   }
 
 #define _DNA_DEFAULT_LengthGpencilModifierData \
