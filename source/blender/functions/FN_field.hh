@@ -32,16 +32,20 @@
 namespace blender::fn {
 
 class Field;
-using FieldPtr = std::unique_ptr<Field>;
 
 class Field {
   const fn::CPPType *type_;
+  // std::unique_ptr<MultiFunction> function_;
+  const MultiFunction *function_;
+
+  blender::Vector<std::shared_ptr<Field>> input_fields_;
+
   std::string debug_name_ = "";
 
  public:
-  virtual ~Field() = default;
-  Field(const fn::CPPType &type, std::string &&debug_name = "")
-      : type_(&type), debug_name_(std::move(debug_name))
+  ~Field() = default;
+  Field(const fn::CPPType &type, const MultiFunction &function)
+      : type_(&type), function_(&function)
   {
   }
 
@@ -51,14 +55,30 @@ class Field {
     return *type_;
   }
 
+  const MultiFunction &function() const
+  {
+    BLI_assert(function_ != nullptr);
+    return *function_;
+  }
+
   blender::StringRef debug_name() const
   {
     return debug_name_;
   }
 
-  virtual void foreach_input(blender::FunctionRef<void(const Field &input)> UNUSED(fn)) const = 0;
-  virtual void foreach_input_recursive(
-      blender::FunctionRef<void(const Field &input)> UNUSED(fn)) const = 0;
+  void foreach_input(blender::FunctionRef<void(const Field &input)> fn) const
+  {
+    for (const std::shared_ptr<Field> &field : input_fields_) {
+      fn(*field);
+    }
+  }
+  void foreach_input_recursive(blender::FunctionRef<void(const Field &input)> fn) const
+  {
+    for (const std::shared_ptr<Field> &field : input_fields_) {
+      fn(*field);
+      field->foreach_input(fn);
+    }
+  }
 };
 
 /**
@@ -68,66 +88,66 @@ class Field {
  * and input fields just happened to have no inputs. Then it might not need to be a virtual class,
  * since the dynamic behavior would be contained in the multifunction, which would be very nice.
  */
-class InputField : public Field {
- public:
-  InputField(const CPPType &type) : Field(type)
-  {
-  }
+// class InputField : public Field {
+//  public:
+//   InputField(const CPPType &type) : Field(type)
+//   {
+//   }
 
-  void foreach_input(blender::FunctionRef<void(const Field &input)> UNUSED(fn)) const final
-  {
-  }
-  void foreach_input_recursive(
-      blender::FunctionRef<void(const Field &input)> UNUSED(fn)) const final
-  {
-  }
+//   void foreach_input(blender::FunctionRef<void(const Field &input)> UNUSED(fn)) const final
+//   {
+//   }
+//   void foreach_input_recursive(
+//       blender::FunctionRef<void(const Field &input)> UNUSED(fn)) const final
+//   {
+//   }
 
-  virtual GVArrayPtr get_data(IndexMask mask) const = 0;
+//   virtual GVArrayPtr get_data(IndexMask mask) const = 0;
 
-  /**
-   * Return true when the field input is the same as another field, used as an
-   * optimization to avoid creating multiple virtual arrays for the same input node.
-   */
-  virtual bool equals(const InputField &UNUSED(other))
-  {
-    return false;
-  }
-};
+//   /**
+//    * Return true when the field input is the same as another field, used as an
+//    * optimization to avoid creating multiple virtual arrays for the same input node.
+//    */
+//   virtual bool equals(const InputField &UNUSED(other))
+//   {
+//     return false;
+//   }
+// };
 
 /**
  * A field that takes inputs
  */
-class MultiFunctionField final : public Field {
-  blender::Vector<FieldPtr> input_fields_;
-  const MultiFunction *function_;
+// class MultiFunctionField final : public Field {
+//   blender::Vector<FieldPtr> input_fields_;
+//   const MultiFunction *function_;
 
- public:
-  void foreach_input(blender::FunctionRef<void(const Field &input)> fn) const final
-  {
-    for (const FieldPtr &field : input_fields_) {
-      fn(*field);
-    }
-  }
-  void foreach_input_recursive(blender::FunctionRef<void(const Field &input)> fn) const final
-  {
-    for (const FieldPtr &field : input_fields_) {
-      fn(*field);
-      field->foreach_input(fn);
-    }
-  }
+//  public:
+//   void foreach_input(blender::FunctionRef<void(const Field &input)> fn) const final
+//   {
+//     for (const FieldPtr &field : input_fields_) {
+//       fn(*field);
+//     }
+//   }
+//   void foreach_input_recursive(blender::FunctionRef<void(const Field &input)> fn) const final
+//   {
+//     for (const FieldPtr &field : input_fields_) {
+//       fn(*field);
+//       field->foreach_input(fn);
+//     }
+//   }
 
-  const MultiFunction &function() const
-  {
-    BLI_assert(function_ != nullptr);
-    return *function_;
-  }
-};
+//   const MultiFunction &function() const
+//   {
+//     BLI_assert(function_ != nullptr);
+//     return *function_;
+//   }
+// };
 
 /**
  * Evaluate more than one field at a time, as an optimization
  * in case they share inputs or various intermediate values.
  */
-void evaluate_fields(const blender::Span<FieldPtr> fields,
+void evaluate_fields(const blender::Span<Field> fields,
                      const blender::MutableSpan<GMutableSpan> outputs,
                      const blender::IndexMask mask);
 
