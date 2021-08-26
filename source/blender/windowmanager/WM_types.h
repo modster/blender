@@ -112,12 +112,12 @@ struct ID;
 struct IDProperty;
 struct ImBuf;
 struct bContext;
+struct wmDrag;
+struct wmDropBox;
 struct wmEvent;
 struct wmOperator;
 struct wmOperatorType;
 struct wmWindowManager;
-struct wmDrag;
-struct wmDropBox;
 
 #include "BLI_compiler_attrs.h"
 #include "DNA_listBase.h"
