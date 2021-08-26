@@ -138,8 +138,8 @@ class ClothNodeData {
     ClothVertex cn;
     /* CLOTH_VERT_FLAG_PINNED should not be propagated so that the
      * artist has the choice of pinning only verts that they want */
-    cn.flags |= (this->cloth_node_data.flags | other.cloth_node_data.flags) &
-                (CLOTH_VERT_FLAG_NOSELFCOLL | CLOTH_VERT_FLAG_NOOBJCOLL);
+    cn.flags = (this->cloth_node_data.flags | other.cloth_node_data.flags) &
+               (CLOTH_VERT_FLAG_NOSELFCOLL | CLOTH_VERT_FLAG_NOOBJCOLL);
     interp_v3_v3v3(cn.v, this->cloth_node_data.v, other.cloth_node_data.v, 0.5);
     interp_v3_v3v3(cn.xconst, this->cloth_node_data.xconst, other.cloth_node_data.xconst, 0.5);
     interp_v3_v3v3(cn.x, this->cloth_node_data.x, other.cloth_node_data.x, 0.5);
