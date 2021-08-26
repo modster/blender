@@ -1001,14 +1001,6 @@ void WM_xr_session_state_nav_rotation_set(wmXrData *xr, const float rotation[4])
 bool WM_xr_session_state_nav_scale_get(const wmXrData *xr, float *r_scale);
 void WM_xr_session_state_nav_scale_set(wmXrData *xr, float scale);
 void WM_xr_session_state_navigation_reset(struct wmXrSessionState *state);
-void WM_xr_session_state_viewer_object_get(const wmXrData *xr, Object *ob);
-void WM_xr_session_state_viewer_object_set(wmXrData *xr, const Object *ob);
-void WM_xr_session_state_controller_object_get(const wmXrData *xr,
-                                               unsigned int subaction_idx,
-                                               Object *ob);
-void WM_xr_session_state_controller_object_set(wmXrData *xr,
-                                               unsigned int subaction_idx,
-                                               const Object *ob);
 
 struct ARegionType *WM_xr_surface_controller_region_type_get(void);
 
@@ -1122,6 +1114,16 @@ void WM_xr_actionmap_clear(XrActionMap *actionmap);
 void WM_xr_actionmap_item_properties_free(XrActionMapItem *ami);
 void WM_xr_actionmap_item_bindings_clear(XrActionMapItem *ami);
 
+/* wm_xr_mocap.c */
+XrMotionCaptureObject *WM_xr_mocap_object_new(XrSessionSettings *settings, Object *ob);
+void WM_xr_mocap_object_ensure_unique(XrSessionSettings *settings,
+                                      XrMotionCaptureObject *mocap_ob);
+void WM_xr_mocap_object_remove(XrSessionSettings *settings, XrMotionCaptureObject *mocap_ob);
+XrMotionCaptureObject *WM_xr_mocap_object_find(const XrSessionSettings *settings,
+                                               const Object *ob);
+
+bool WM_xr_session_state_mocap_pose_get(const wmXrData *xr, XrMotionCaptureObject *mocap_ob);
+void WM_xr_session_state_mocap_pose_set(wmXrData *xr, const XrMotionCaptureObject *mocap_ob);
 #ifdef __cplusplus
 }
 #endif

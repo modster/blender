@@ -128,6 +128,10 @@ static void write_wm_xr_data(BlendWriter *writer, wmXrData *xr_data)
       }
     }
   }
+
+  LISTBASE_FOREACH (XrMotionCaptureObject *, mocap_ob, &xr_data->session_settings.mocap_objects) {
+    BLO_write_struct(writer, XrMotionCaptureObject, mocap_ob);
+  }
 }
 
 static void window_manager_blend_write(BlendWriter *writer, ID *id, const void *id_address)
@@ -187,6 +191,8 @@ static void direct_link_wm_xr_data(BlendDataReader *reader, wmXrData *xr_data)
   BLO_read_data_address(reader, &xr_data->session_settings.defaultconf);
   BLO_read_data_address(reader, &xr_data->session_settings.addonconf);
   BLO_read_data_address(reader, &xr_data->session_settings.userconf);
+
+  BLO_read_list(reader, &xr_data->session_settings.mocap_objects);
 }
 
 static void window_manager_blend_read_data(BlendDataReader *reader, ID *id)
@@ -280,9 +286,12 @@ static void window_manager_blend_read_data(BlendDataReader *reader, ID *id)
 static void lib_link_wm_xr_data(BlendLibReader *reader, ID *parent_id, wmXrData *xr_data)
 {
   BLO_read_id_address(reader, parent_id->lib, &xr_data->session_settings.base_pose_object);
-  BLO_read_id_address(reader, parent_id->lib, &xr_data->session_settings.headset_object);
-  BLO_read_id_address(reader, parent_id->lib, &xr_data->session_settings.controller0_object);
-  BLO_read_id_address(reader, parent_id->lib, &xr_data->session_settings.controller1_object);
+
+  LISTBASE_FOREACH (XrMotionCaptureObject *, mocap_ob, &xr_data->session_settings.mocap_objects) {
+    if (mocap_ob->ob) {
+      BLO_read_id_address(reader, parent_id->lib, &mocap_ob->ob);
+    }
+  }
 }
 
 static void lib_link_workspace_instance_hook(BlendLibReader *reader,
@@ -708,6 +717,8 @@ void wm_close_and_free(bContext *C, wmWindowManager *wm)
   while ((actionconf = BLI_pophead(&wm->xr.session_settings.actionconfigs))) {
     WM_xr_actionconfig_free(actionconf);
   }
+
+  BLI_freelistN(&wm->xr.session_settings.mocap_objects);
 
   BLI_freelistN(&wm->notifier_queue);
 

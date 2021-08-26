@@ -728,7 +728,8 @@ void createTransObject(bContext *C, TransInfo *t)
  * \note Context may not always be available,
  * so must check before using it as it's a luxury for a few cases.
  */
-void autokeyframe_object(bContext *C, Scene *scene, ViewLayer *view_layer, Object *ob, int tmode)
+void ED_transform_autokeyframe_object(
+    bContext *C, Scene *scene, ViewLayer *view_layer, Object *ob, int tmode)
 {
   Main *bmain = CTX_data_main(C);
   ID *id = &ob->id;
@@ -849,7 +850,7 @@ void autokeyframe_object(bContext *C, Scene *scene, ViewLayer *view_layer, Objec
 
 /* Return if we need to update motion paths, only if they already exist,
  * and we will insert a keyframe at the end of transform. */
-bool motionpath_need_update_object(Scene *scene, Object *ob)
+bool ED_transform_motionpath_need_update_object(Scene *scene, Object *ob)
 {
   /* XXX: there's potential here for problems with unkeyed rotations/scale,
    *      but for now (until proper data-locality for baking operations),
@@ -894,11 +895,11 @@ void recalcData_objects(TransInfo *t)
       /* TODO: autokeyframe calls need some setting to specify to add samples
        * (FPoints) instead of keyframes? */
       if ((t->animtimer) && IS_AUTOKEY_ON(t->scene)) {
-        animrecord_check_state(t, ob);
-        autokeyframe_object(t->context, t->scene, t->view_layer, ob, t->mode);
+        ED_transform_animrecord_check_state(t->scene, t->animtimer, ob);
+        ED_transform_autokeyframe_object(t->context, t->scene, t->view_layer, ob, t->mode);
       }
 
-      motionpath_update |= motionpath_need_update_object(t->scene, ob);
+      motionpath_update |= ED_transform_motionpath_need_update_object(t->scene, ob);
 
       /* sets recalc flags fully, instead of flushing existing ones
        * otherwise proxies don't function correctly
@@ -970,10 +971,10 @@ void special_aftertrans_update__object(bContext *C, TransInfo *t)
 
     /* Set autokey if necessary */
     if (!canceled) {
-      autokeyframe_object(C, t->scene, t->view_layer, ob, t->mode);
+      ED_transform_autokeyframe_object(C, t->scene, t->view_layer, ob, t->mode);
     }
 
-    motionpath_update |= motionpath_need_update_object(t->scene, ob);
+    motionpath_update |= ED_transform_motionpath_need_update_object(t->scene, ob);
 
     /* restore rigid body transform */
     if (ob->rigidbody_object && canceled) {

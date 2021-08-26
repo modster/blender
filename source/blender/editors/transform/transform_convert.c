@@ -1584,11 +1584,9 @@ void transform_convert_clip_mirror_modifier_apply(TransDataContainer *tc)
 }
 
 /* for the realtime animation recording feature, handle overlapping data */
-void animrecord_check_state(TransInfo *t, struct Object *ob)
+void ED_transform_animrecord_check_state(Scene *scene, wmTimer *animtimer, struct Object *ob)
 {
-  Scene *scene = t->scene;
   ID *id = &ob->id;
-  wmTimer *animtimer = t->animtimer;
   ScreenAnimData *sad = (animtimer) ? animtimer->customdata : NULL;
 
   /* sanity checks */

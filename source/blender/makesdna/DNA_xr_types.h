@@ -48,16 +48,15 @@ typedef struct XrSessionSettings {
   char controller_draw_style;
   /** The eye (view) used when projecting 3D to 2D (e.g. when performing GPU select). */
   char selection_eye;
-
   char _pad2;
 
   /** Clipping distance. */
   float clip_start, clip_end;
 
-  int flag;
+  int flag; /* eXrSessionFlag */
 
   /** Known action configurations. */
-  ListBase actionconfigs;
+  ListBase actionconfigs; /* XrActionConfig */
   /** Default configuration. */
   struct XrActionConfig *defaultconf;
   /** Addon configuration. */
@@ -65,14 +64,10 @@ typedef struct XrSessionSettings {
   /** User configuration. */
   struct XrActionConfig *userconf;
 
-  /** Objects to constrain to XR headset/controller poses. */
-  Object *headset_object;
-  Object *controller0_object;
-  Object *controller1_object;
-  char headset_flag;
-  char controller0_flag;
-  char controller1_flag;
-  char _pad3[5];
+  /** Objects to bind to headset/controller poses. */
+  ListBase mocap_objects; /* XrMotionCaptureObject */
+  short sel_mocap_object;
+  char _pad3[6];
 } XrSessionSettings;
 
 typedef enum eXrSessionFlag {
@@ -97,11 +92,6 @@ typedef enum eXrSessionEye {
   XR_EYE_LEFT = 0,
   XR_EYE_RIGHT = 1,
 } eXrSessionEye;
-
-typedef enum eXrSessionObjectFlag {
-  XR_OBJECT_ENABLE = (1 << 0),
-  XR_OBJECT_AUTOKEY = (1 << 1),
-} eXrSessionObjectFlag;
 
 /** XR action type. Enum values match those in GHOST_XrActionType enum for consistency. */
 typedef enum eXrActionType {
@@ -152,6 +142,11 @@ typedef enum eXrPoseFlag {
   XR_POSE_GRIP = (1 << 0),
   XR_POSE_AIM = (1 << 1),
 } eXrPoseFlag;
+
+typedef enum eXrMotionCaptureFlag {
+  XR_MOCAP_OBJECT_ENABLE = (1 << 0),
+  XR_MOCAP_OBJECT_AUTOKEY = (1 << 1),
+} eXrMotionCaptureFlag;
 
 /* -------------------------------------------------------------------- */
 
@@ -260,6 +255,24 @@ typedef struct XrActionConfig {
 enum {
   XR_ACTIONCONF_USER = (1 << 0), /* User action config. */
 };
+
+/* -------------------------------------------------------------------- */
+
+typedef struct XrMotionCaptureObject {
+  struct XrMotionCaptureObject *next, *prev;
+
+  /** Object to bind to a VR device. Used as struct identifier. */
+  Object *ob;
+  /** OpenXR user path, identifies the target headset/controller. */
+  char user_path[64];
+
+  /** Location/rotation offsets. */
+  float location_offset[3];
+  float rotation_offset[3];
+
+  short flag; /* eXrMotionCaptureFlag */
+  char _pad[6];
+} XrMotionCaptureObject;
 
 /* -------------------------------------------------------------------- */
 

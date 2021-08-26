@@ -205,7 +205,7 @@ static void wm_window_match_init(bContext *C, ListBase *wmlist)
       ED_screen_exit(C, win, WM_window_get_active_screen(win));
     }
 
-    /* Free XR actionconfigs. */
+    /* Free XR actionconfigs and motion capture objects. */
     XrSessionSettings *xrsettings = &wm->xr.session_settings;
     XrActionConfig *actionconf;
     while ((actionconf = BLI_pophead(&xrsettings->actionconfigs))) {
@@ -214,6 +214,8 @@ static void wm_window_match_init(bContext *C, ListBase *wmlist)
     xrsettings->defaultconf = NULL;
     xrsettings->addonconf = NULL;
     xrsettings->userconf = NULL;
+
+    BLI_freelistN(&xrsettings->mocap_objects);
   }
 
   /* reset active window */

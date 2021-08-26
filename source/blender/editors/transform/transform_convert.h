@@ -30,11 +30,9 @@ struct BezTriple;
 struct FCurve;
 struct ListBase;
 struct Object;
-struct Scene;
 struct TransData;
 struct TransDataCurveHandleFlags;
 struct TransInfo;
-struct ViewLayer;
 struct bContext;
 
 /* transform_convert.c */
@@ -69,7 +67,6 @@ struct TransDataCurveHandleFlags *initTransDataCurveHandles(TransData *td, struc
 char transform_convert_frame_side_dir_get(TransInfo *t, float cframe);
 bool FrameOnMouseSide(char side, float frame, float cframe);
 void transform_convert_clip_mirror_modifier_apply(TransDataContainer *tc);
-void animrecord_check_state(TransInfo *t, struct Object *ob);
 
 /* transform_convert_action.c */
 void createTransActionData(bContext *C, TransInfo *t);
@@ -197,9 +194,6 @@ void special_aftertrans_update__node(bContext *C, TransInfo *t);
 
 /* transform_convert_object.c */
 void createTransObject(bContext *C, TransInfo *t);
-void autokeyframe_object(
-    bContext *C, struct Scene *scene, struct ViewLayer *view_layer, Object *ob, int tmode);
-bool motionpath_need_update_object(Scene *scene, Object *ob);
 void recalcData_objects(TransInfo *t);
 void special_aftertrans_update__object(bContext *C, TransInfo *t);
 

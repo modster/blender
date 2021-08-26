@@ -26,6 +26,7 @@
 
 #include "wm_xr.h"
 
+struct bScreen;
 struct GPUBatch;
 struct wmXrActionSet;
 
@@ -75,10 +76,9 @@ typedef struct wmXrSessionState {
    * updated. */
   struct wmXrActionSet *active_action_set;
 
-  /** Constraint object original poses. */
-  GHOST_XrPose headset_object_orig_pose;
-  GHOST_XrPose controller0_object_orig_pose;
-  GHOST_XrPose controller1_object_orig_pose;
+  /* Original poses for motion capture objects. Used to properly restore object transforms on
+   * session end. */
+  ListBase mocap_orig_poses; /* wmXrMotionCapturePose */
 } wmXrSessionState;
 
 typedef struct wmXrRuntimeData {
@@ -214,10 +214,18 @@ typedef struct wmXrActionSet {
   ListBase active_haptic_actions; /* wmXrHapticAction */
 } wmXrActionSet;
 
+typedef struct wmXrMotionCapturePose {
+  struct wmXrMotionCapturePose *next, *prev;
+  const Object *ob;
+  GHOST_XrPose pose;
+} wmXrMotionCapturePose;
+
+/* wm_xr.c */
 wmXrRuntimeData *wm_xr_runtime_data_create(void);
 void wm_xr_runtime_data_free(wmXrRuntimeData **runtime);
-void wm_xr_session_data_free(wmXrSessionState *state);
 
+/* wm_xr_session.c */
+void wm_xr_session_data_free(wmXrSessionState *state);
 void wm_xr_session_draw_data_update(wmXrSessionState *state,
                                     const XrSessionSettings *settings,
                                     const GHOST_XrDrawViewInfo *draw_view,
@@ -239,13 +247,8 @@ void wm_xr_session_controller_data_populate(const wmXrAction *grip_action,
                                             const wmXrAction *aim_action,
                                             wmXrData *xr);
 void wm_xr_session_controller_data_clear(wmXrSessionState *state);
-void wm_xr_session_object_autokey(struct bContext *C,
-                                  struct Scene *scene,
-                                  struct ViewLayer *view_layer,
-                                  wmWindow *win,
-                                  Object *ob,
-                                  bool notify);
 
+/* wm_xr_draw.c */
 void wm_xr_pose_to_mat(const GHOST_XrPose *pose, float r_mat[4][4]);
 void wm_xr_pose_scale_to_mat(const GHOST_XrPose *pose, float scale, float r_mat[4][4]);
 void wm_xr_pose_to_imat(const GHOST_XrPose *pose, float r_imat[4][4]);
@@ -253,3 +256,22 @@ void wm_xr_pose_scale_to_imat(const GHOST_XrPose *pose, float scale, float r_ima
 
 void wm_xr_draw_view(const GHOST_XrDrawViewInfo *draw_view, void *customdata);
 void wm_xr_draw_controllers(const struct bContext *C, struct ARegion *region, void *customdata);
+
+/* wm_xr_mocap.c */
+void wm_xr_mocap_orig_poses_store(const XrSessionSettings *settings, wmXrSessionState *state);
+void wm_xr_mocap_orig_poses_restore(const wmXrSessionState *state, XrSessionSettings *settings);
+void wm_xr_mocap_object_autokey(struct bContext *C,
+                                struct Scene *scene,
+                                struct ViewLayer *view_layer,
+                                wmWindow *win,
+                                Object *ob,
+                                bool notify);
+void wm_xr_mocap_objects_update(const char *user_path,
+                                const GHOST_XrPose *pose,
+                                struct bContext *C,
+                                XrSessionSettings *settings,
+                                struct Scene *scene,
+                                struct ViewLayer *view_layer,
+                                wmWindow *win,
+                                struct bScreen *screen_anim,
+                                bool notify);
