@@ -27,13 +27,16 @@ static void add_field_parameters(const Field &field,
       [&](const Field &input_field) { add_field_parameters(input_field, builder, output_map); });
 
   /* Add the immediate inputs to this field. */
+  Vector<MFVariable *> inputs;
   field.foreach_input([&](const Field &input_field) {
-    builder.add_input_parameter(output_map.lookup(&input_field)->data_type());
+    MFVariable *input = output_map.lookup(&input_field);
+    builder.add_input_parameter(input->data_type());
+    inputs.append(input);
   });
 
-  Vector<MFVariable *> outputs = builder.add_call(field.function());
+  Vector<MFVariable *> outputs = builder.add_call(field.function(), inputs);
 
-  // builder.add_destruct(inputs);
+  builder.add_destruct(inputs);
 
   /* TODO: How to support multiple outputs?! */
   BLI_assert(outputs.size() == 1);
@@ -50,16 +53,13 @@ static void build_procedure(const Span<Field> fields, MFProcedure &procedure)
     add_field_parameters(field, builder, output_map);
   }
 
-  /* TODO: Move this to the proper place. */
-  for (MFVariable *variable : output_map.values()) {
-    builder.add_destruct(*variable);
-  }
-
   builder.add_return();
 
   for (const Field &field : fields) {
     builder.add_output_parameter(*output_map.lookup(&field));
   }
+
+  std::cout << procedure.to_dot();
 
   BLI_assert(procedure.validate());
 }
