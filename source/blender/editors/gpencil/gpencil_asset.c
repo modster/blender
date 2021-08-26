@@ -373,6 +373,18 @@ static bool gpencil_asset_create(const bContext *C,
   return non_supported_feature;
 }
 
+static bool gpencil_asset_create_poll(bContext *C)
+{
+  const enum eContextObjectMode mode = CTX_data_mode_enum(C);
+
+  /* Only allowed in Grease Pencil Edit mode. */
+  if (mode != CTX_MODE_EDIT_GPENCIL) {
+    return false;
+  }
+
+  return gpencil_asset_generic_poll(C);
+}
+
 static int gpencil_asset_create_exec(const bContext *C, const wmOperator *op)
 {
   Object *ob = CTX_data_active_object(C);
@@ -433,7 +445,7 @@ void GPENCIL_OT_asset_create(wmOperatorType *ot)
   /* callbacks */
   ot->invoke = WM_menu_invoke;
   ot->exec = gpencil_asset_create_exec;
-  ot->poll = gpencil_asset_generic_poll;
+  ot->poll = gpencil_asset_create_poll;
 
   /* flags */
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
@@ -1413,6 +1425,12 @@ static void gpencil_asset_import_cancel(bContext *C, wmOperator *op)
   gpencil_asset_import_exit(C, op);
 }
 
+
+static bool gpencil_asset_import_poll(bContext *C)
+{
+  return gpencil_asset_generic_poll(C);
+}
+
 void GPENCIL_OT_asset_import(wmOperatorType *ot)
 {
 
@@ -1427,7 +1445,7 @@ void GPENCIL_OT_asset_import(wmOperatorType *ot)
   ot->invoke = gpencil_asset_import_invoke;
   ot->modal = gpencil_asset_import_modal;
   ot->cancel = gpencil_asset_import_cancel;
-  ot->poll = gpencil_asset_generic_poll;
+  ot->poll = gpencil_asset_import_poll;
 
   /* flags */
   ot->flag = OPTYPE_UNDO | OPTYPE_BLOCKING;
