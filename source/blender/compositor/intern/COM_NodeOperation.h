@@ -60,9 +60,13 @@ enum class ResizeMode {
   /** \brief Center the input image to the center of the working area of the node, no resizing
    * occurs */
   Center = NS_CR_CENTER,
-  /** \brief The bottom left of the input image is the bottom left of the working area of the node,
-   * no resizing occurs */
+  /** No resizing or translation. */
   None = NS_CR_NONE,
+  /**
+   * Input image is translated so that its bottom left matches the bottom left of the working area
+   * of the node, no resizing occurs.
+   */
+  Align = 100,
   /** \brief Fit the width of the input image to the width of the working area of the node */
   FitWidth = NS_CR_FIT_WIDTH,
   /** \brief Fit the height of the input image to the height of the working area of the node */
@@ -467,18 +471,9 @@ class NodeOperation {
   }
   virtual void deinitExecution();
 
-  void set_canvas(const rcti &canvas_area)
-  {
-    if (!this->flags.is_canvas_set) {
-      canvas_ = canvas_area;
-      flags.is_canvas_set = true;
-    }
-  }
-
-  const rcti &get_canvas() const
-  {
-    return canvas_;
-  }
+  void set_canvas(const rcti &canvas_area);
+  const rcti &get_canvas() const;
+  void unset_canvas();
 
   /**
    * \brief is this operation the active viewer output
@@ -535,12 +530,12 @@ class NodeOperation {
 
   unsigned int getWidth() const
   {
-    return BLI_rcti_size_x(&canvas_);
+    return BLI_rcti_size_x(&get_canvas());
   }
 
   unsigned int getHeight() const
   {
-    return BLI_rcti_size_y(&canvas_);
+    return BLI_rcti_size_y(&get_canvas());
   }
 
   inline void readSampled(float result[4], float x, float y, PixelSampler sampler)
@@ -610,6 +605,7 @@ class NodeOperation {
   void addInputSocket(DataType datatype, ResizeMode resize_mode = ResizeMode::Center);
   void addOutputSocket(DataType datatype);
 
+  /* TODO(manzanilla): to be removed with tiled implementation. */
   void setWidth(unsigned int width)
   {
     canvas_.xmax = canvas_.xmin + width;
@@ -620,6 +616,7 @@ class NodeOperation {
     canvas_.ymax = canvas_.ymin + height;
     this->flags.is_canvas_set = true;
   }
+
   SocketReader *getInputSocketReader(unsigned int inputSocketindex);
   NodeOperation *getInputOperation(unsigned int inputSocketindex);
 

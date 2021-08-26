@@ -86,7 +86,7 @@ void TransformOperation::get_area_of_interest(const int input_idx,
     case 0: {
       r_input_area = output_area;
       BLI_rcti_translate(&r_input_area, translate_x_, translate_y_);
-      ScaleOperation::scale_area(
+      ScaleOperation::scale_area_inverted(
           r_input_area, scale_center_x_, scale_center_y_, constant_scale_, constant_scale_);
       RotateOperation::get_area_rotation_bounds(r_input_area,
                                                 rotate_center_x_,
@@ -135,8 +135,8 @@ void TransformOperation::transform(BuffersIterator<float> &it, const MemoryBuffe
     float y = it.y - translate_y_;
     RotateOperation::rotate_coords(
         x, y, rotate_center_x_, rotate_center_y_, rotate_sine_, rotate_cosine_);
-    x = ScaleOperation::scale_coord(x, scale_center_x_, scale);
-    y = ScaleOperation::scale_coord(y, scale_center_y_, scale);
+    x = ScaleOperation::scale_coord_inverted(x, scale_center_x_, scale);
+    y = ScaleOperation::scale_coord_inverted(y, scale_center_y_, scale);
     input_img->read_elem_sampled(x, y, sampler_, it.out);
   }
 }
@@ -146,8 +146,8 @@ void TransformOperation::transform_inverted(BuffersIterator<float> &it,
 {
   for (; !it.is_end(); ++it) {
     const float scale = *it.in(0);
-    float x = ScaleOperation::scale_coord(it.x, scale_center_x_, scale);
-    float y = ScaleOperation::scale_coord(it.y, scale_center_y_, scale);
+    float x = ScaleOperation::scale_coord_inverted(it.x, scale_center_x_, scale);
+    float y = ScaleOperation::scale_coord_inverted(it.y, scale_center_y_, scale);
     RotateOperation::rotate_coords(
         x, y, rotate_center_x_, rotate_center_y_, rotate_sine_, rotate_cosine_);
     x -= translate_x_;

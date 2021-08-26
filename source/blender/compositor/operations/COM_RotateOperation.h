@@ -26,13 +26,17 @@ class RotateOperation : public MultiThreadedOperation {
  private:
   SocketReader *m_imageSocket;
   SocketReader *m_degreeSocket;
+  /* TODO(manzanilla): to be removed with tiled implementation. */
   float m_centerX;
   float m_centerY;
+
   float m_cosine;
   float m_sine;
   bool m_doDegree2RadConversion;
   bool m_isDegreeSet;
   PixelSampler sampler_;
+  float rotate_offset_x_;
+  float rotate_offset_y_;
 
  public:
   RotateOperation();
@@ -45,6 +49,15 @@ class RotateOperation : public MultiThreadedOperation {
     x = center_x + (cosine * dx + sine * dy);
     y = center_y + (-sine * dx + cosine * dy);
   }
+
+  static void get_rotation_center(const rcti &area, float &r_x, float &r_y)
+  {
+    r_x = area.xmin + (BLI_rcti_size_x(&area) - 1) / 2.0;
+    r_y = area.ymin + (BLI_rcti_size_y(&area) - 1) / 2.0;
+  }
+
+  // static void rotate_area(
+  //    rcti& area, float center_x, float center_y, float sine, float cosine);
   static void get_area_rotation_bounds(const rcti &area,
                                        const float center_x,
                                        const float center_y,
@@ -74,6 +87,8 @@ class RotateOperation : public MultiThreadedOperation {
   void update_memory_buffer_partial(MemoryBuffer *output,
                                     const rcti &area,
                                     Span<MemoryBuffer *> inputs) override;
+
+  void determine_canvas(const rcti &preferred_area, rcti &r_area) override;
 };
 
 }  // namespace blender::compositor

@@ -44,11 +44,11 @@ ScaleOperation::ScaleOperation() : ScaleOperation(DataType::Color)
 
 ScaleOperation::ScaleOperation(DataType data_type) : BaseScaleOperation()
 {
-  this->addInputSocket(data_type);
+  this->addInputSocket(data_type, ResizeMode::Align);
   this->addInputSocket(DataType::Value);
   this->addInputSocket(DataType::Value);
   this->addOutputSocket(data_type);
-  this->set_canvas_input_index(0);
+  this->set_canvas_input_index(IMAGE_INPUT_INDEX);
   this->m_inputOperation = nullptr;
   this->m_inputXOperation = nullptr;
   this->m_inputYOperation = nullptr;
@@ -64,34 +64,43 @@ float ScaleOperation::get_constant_scale(const int input_op_idx, const float fac
   return 1.0f;
 }
 
-float ScaleOperation::get_constant_scale_x()
+float ScaleOperation::get_constant_scale_x(const float width)
 {
-  return get_constant_scale(1, get_relative_scale_x_factor());
+  return get_constant_scale(X_INPUT_INDEX, get_relative_scale_x_factor(width));
 }
 
-float ScaleOperation::get_constant_scale_y()
+float ScaleOperation::get_constant_scale_y(const float height)
 {
-  return get_constant_scale(2, get_relative_scale_y_factor());
+  return get_constant_scale(Y_INPUT_INDEX, get_relative_scale_y_factor(height));
 }
 
-void ScaleOperation::scale_area(
+void ScaleOperation::scale_area_inverted(
     rcti &rect, float center_x, float center_y, float scale_x, float scale_y)
 {
-  rect.xmin = scale_coord(rect.xmin, center_x, scale_x);
-  rect.xmax = scale_coord(rect.xmax, center_x, scale_x);
-  rect.ymin = scale_coord(rect.ymin, center_y, scale_y);
-  rect.ymax = scale_coord(rect.ymax, center_y, scale_y);
+  rect.xmin = scale_coord_inverted(rect.xmin, center_x, scale_x);
+  rect.xmax = scale_coord_inverted(rect.xmax, center_x, scale_x);
+  rect.ymin = scale_coord_inverted(rect.ymin, center_y, scale_y);
+  rect.ymax = scale_coord_inverted(rect.ymax, center_y, scale_y);
 }
 
-void ScaleOperation::scale_area(rcti &rect, float scale_x, float scale_y)
+void ScaleOperation::scale_area(rcti &rect,
+                                float scale_offset_x,
+                                float scale_offset_y,
+                                float relative_scale_x,
+                                float relative_scale_y)
 {
-  scale_area(rect, m_centerX, m_centerY, scale_x, scale_y);
+  rect.xmin = scale_coord(rect.xmin, scale_offset_x, relative_scale_x);
+  rect.xmax = scale_coord(rect.xmax, scale_offset_x, relative_scale_x);
+  rect.ymin = scale_coord(rect.ymin, scale_offset_y, relative_scale_y);
+  rect.ymax = scale_coord(rect.ymax, scale_offset_y, relative_scale_y);
 }
 
 void ScaleOperation::init_data()
 {
-  m_centerX = getWidth() / 2.0f;
-  m_centerY = getHeight() / 2.0f;
+  canvas_center_x_ = canvas_.xmin + getWidth() / 2.0f;
+  canvas_center_y_ = canvas_.ymin + getHeight() / 2.0f;
+  scale_offset_x_ = (input_width_scaled_ - getWidth()) / 2.0f;
+  scale_offset_y_ = (input_height_scaled_ - getHeight()) / 2.0f;
 }
 
 void ScaleOperation::initExecution()
@@ -117,28 +126,68 @@ void ScaleOperation::get_area_of_interest(const int input_idx,
     return;
   }
 
-  float scale_x = get_constant_scale_x();
-  float scale_y = get_constant_scale_y();
-  scale_area(r_input_area, scale_x, scale_y);
-  expand_area_for_sampler(r_input_area, (PixelSampler)m_sampler);
+  NodeOperation *input_img = get_input_operation(IMAGE_INPUT_INDEX);
+  const float scale_x = get_constant_scale_x(input_img->getWidth());
+  const float scale_y = get_constant_scale_y(input_img->getHeight());
+  scale_area(r_input_area, scale_offset_x_, scale_offset_y_, scale_x, scale_y);
 }
 
 void ScaleOperation::update_memory_buffer_partial(MemoryBuffer *output,
                                                   const rcti &area,
                                                   Span<MemoryBuffer *> inputs)
 {
-  const MemoryBuffer *input_img = inputs[0];
-  MemoryBuffer *input_x = inputs[1];
-  MemoryBuffer *input_y = inputs[2];
-  const float scale_x_factor = get_relative_scale_x_factor();
-  const float scale_y_factor = get_relative_scale_y_factor();
+  const MemoryBuffer *input_img = inputs[IMAGE_INPUT_INDEX];
+  MemoryBuffer *input_x = inputs[X_INPUT_INDEX];
+  MemoryBuffer *input_y = inputs[Y_INPUT_INDEX];
+  const float scale_x_factor = get_relative_scale_x_factor(input_img->getWidth());
+  const float scale_y_factor = get_relative_scale_y_factor(input_img->getHeight());
   BuffersIterator<float> it = output->iterate_with({input_x, input_y}, area);
   for (; !it.is_end(); ++it) {
     const float rel_scale_x = *it.in(0) * scale_x_factor;
     const float rel_scale_y = *it.in(1) * scale_y_factor;
-    const float scaled_x = scale_coord(it.x, m_centerX, rel_scale_x);
-    const float scaled_y = scale_coord(it.y, m_centerY, rel_scale_y);
+    const float scaled_x = scale_coord(it.x, scale_offset_x_, rel_scale_x);
+    const float scaled_y = scale_coord(it.y, scale_offset_y_, rel_scale_y);
     input_img->read_elem_sampled(scaled_x, scaled_y, (PixelSampler)m_sampler, it.out);
+  }
+}
+
+void ScaleOperation::determine_canvas(const rcti &preferred_area, rcti &r_area)
+{
+  if (execution_model_ == eExecutionModel::Tiled) {
+    NodeOperation::determine_canvas(preferred_area, r_area);
+    return;
+  }
+
+  const bool determined = getInputSocket(0)->determine_canvas(preferred_area, r_area);
+  if (determined) {
+    /* Constant input canvases need to be determined before getting constants. */
+    rcti unused;
+    if (get_input_operation(X_INPUT_INDEX)->get_flags().is_constant_operation) {
+      getInputSocket(X_INPUT_INDEX)->determine_canvas(r_area, unused);
+    }
+    if (get_input_operation(Y_INPUT_INDEX)->get_flags().is_constant_operation) {
+      getInputSocket(Y_INPUT_INDEX)->determine_canvas(r_area, unused);
+    }
+
+    const float width = BLI_rcti_size_x(&r_area);
+    const float height = BLI_rcti_size_y(&r_area);
+    const float scale_x = get_constant_scale_x(width);
+    const float scale_y = get_constant_scale_y(height);
+
+    input_width_scaled_ = width * scale_x;
+    input_height_scaled_ = height * scale_y;
+    const float max_scale_width = width * MAX_CANVAS_SCALE_FACTOR;
+    const float max_scale_height = height * MAX_CANVAS_SCALE_FACTOR;
+    r_area.xmax = r_area.xmin +
+                  (input_width_scaled_ < max_scale_width ? input_width_scaled_ : max_scale_width);
+    r_area.ymax = r_area.ymin + (input_height_scaled_ < max_scale_height ? input_height_scaled_ :
+                                                                           max_scale_height);
+
+    /* Determine x/y inputs canvases with scaled canvas as preferred. */
+    get_input_operation(X_INPUT_INDEX)->unset_canvas();
+    get_input_operation(Y_INPUT_INDEX)->unset_canvas();
+    getInputSocket(X_INPUT_INDEX)->determine_canvas(r_area, unused);
+    getInputSocket(Y_INPUT_INDEX)->determine_canvas(r_area, unused);
   }
 }
 
@@ -166,8 +215,8 @@ void ScaleRelativeOperation::executePixelSampled(float output[4],
   const float scx = scaleX[0];
   const float scy = scaleY[0];
 
-  float nx = this->m_centerX + (x - this->m_centerX) / scx;
-  float ny = this->m_centerY + (y - this->m_centerY) / scy;
+  float nx = this->canvas_center_x_ + (x - this->canvas_center_x_) / scx;
+  float ny = this->canvas_center_y_ + (y - this->canvas_center_y_) / scy;
   this->m_inputOperation->readSampled(output, nx, ny, effective_sampler);
 }
 
@@ -186,10 +235,10 @@ bool ScaleRelativeOperation::determineDependingAreaOfInterest(rcti *input,
     const float scx = scaleX[0];
     const float scy = scaleY[0];
 
-    newInput.xmax = this->m_centerX + (input->xmax - this->m_centerX) / scx + 1;
-    newInput.xmin = this->m_centerX + (input->xmin - this->m_centerX) / scx - 1;
-    newInput.ymax = this->m_centerY + (input->ymax - this->m_centerY) / scy + 1;
-    newInput.ymin = this->m_centerY + (input->ymin - this->m_centerY) / scy - 1;
+    newInput.xmax = this->canvas_center_x_ + (input->xmax - this->canvas_center_x_) / scx + 1;
+    newInput.xmin = this->canvas_center_x_ + (input->xmin - this->canvas_center_x_) / scx - 1;
+    newInput.ymax = this->canvas_center_y_ + (input->ymax - this->canvas_center_y_) / scy + 1;
+    newInput.ymin = this->canvas_center_y_ + (input->ymin - this->canvas_center_y_) / scy - 1;
   }
   else {
     newInput.xmax = this->getWidth();
@@ -222,8 +271,8 @@ void ScaleAbsoluteOperation::executePixelSampled(float output[4],
   float relativeXScale = scx / width;
   float relativeYScale = scy / height;
 
-  float nx = this->m_centerX + (x - this->m_centerX) / relativeXScale;
-  float ny = this->m_centerY + (y - this->m_centerY) / relativeYScale;
+  float nx = this->canvas_center_x_ + (x - this->canvas_center_x_) / relativeXScale;
+  float ny = this->canvas_center_y_ + (y - this->canvas_center_y_) / relativeYScale;
 
   this->m_inputOperation->readSampled(output, nx, ny, effective_sampler);
 }
@@ -248,10 +297,14 @@ bool ScaleAbsoluteOperation::determineDependingAreaOfInterest(rcti *input,
     float relateveXScale = scx / width;
     float relateveYScale = scy / height;
 
-    newInput.xmax = this->m_centerX + (input->xmax - this->m_centerX) / relateveXScale;
-    newInput.xmin = this->m_centerX + (input->xmin - this->m_centerX) / relateveXScale;
-    newInput.ymax = this->m_centerY + (input->ymax - this->m_centerY) / relateveYScale;
-    newInput.ymin = this->m_centerY + (input->ymin - this->m_centerY) / relateveYScale;
+    newInput.xmax = this->canvas_center_x_ +
+                    (input->xmax - this->canvas_center_x_) / relateveXScale;
+    newInput.xmin = this->canvas_center_x_ +
+                    (input->xmin - this->canvas_center_x_) / relateveXScale;
+    newInput.ymax = this->canvas_center_y_ +
+                    (input->ymax - this->canvas_center_y_) / relateveYScale;
+    newInput.ymin = this->canvas_center_y_ +
+                    (input->ymin - this->canvas_center_y_) / relateveYScale;
   }
   else {
     newInput.xmax = this->getWidth();
@@ -265,7 +318,7 @@ bool ScaleAbsoluteOperation::determineDependingAreaOfInterest(rcti *input,
 // Absolute fixed size
 ScaleFixedSizeOperation::ScaleFixedSizeOperation() : BaseScaleOperation()
 {
-  this->addInputSocket(DataType::Color, ResizeMode::None);
+  this->addInputSocket(DataType::Color, ResizeMode::Align);
   this->addOutputSocket(DataType::Color);
   this->set_canvas_input_index(0);
   this->m_inputOperation = nullptr;

@@ -135,6 +135,23 @@ void NodeOperation::deinitExecution()
 {
   /* pass */
 }
+
+void NodeOperation::set_canvas(const rcti &canvas_area)
+{
+  canvas_ = canvas_area;
+  flags.is_canvas_set = true;
+}
+
+const rcti &NodeOperation::get_canvas() const
+{
+  return canvas_;
+}
+
+void NodeOperation::unset_canvas()
+{
+  flags.is_canvas_set = false;
+}
+
 SocketReader *NodeOperation::getInputSocketReader(unsigned int inputSocketIndex)
 {
   return this->getInputSocket(inputSocketIndex)->getReader();

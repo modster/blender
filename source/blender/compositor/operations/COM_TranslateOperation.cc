@@ -23,9 +23,9 @@ namespace blender::compositor {
 TranslateOperation::TranslateOperation() : TranslateOperation(DataType::Color)
 {
 }
-TranslateOperation::TranslateOperation(DataType data_type)
+TranslateOperation::TranslateOperation(DataType data_type, ResizeMode resize_mode)
 {
-  this->addInputSocket(data_type);
+  this->addInputSocket(data_type, resize_mode);
   this->addInputSocket(DataType::Value);
   this->addInputSocket(DataType::Value);
   this->addOutputSocket(data_type);
@@ -39,6 +39,7 @@ TranslateOperation::TranslateOperation(DataType data_type)
   this->x_extend_mode_ = MemoryBufferExtend::Clip;
   this->y_extend_mode_ = MemoryBufferExtend::Clip;
 }
+
 void TranslateOperation::initExecution()
 {
   this->m_inputOperation = this->getInputSocketReader(0);
@@ -140,6 +141,23 @@ void TranslateOperation::update_memory_buffer_partial(MemoryBuffer *output,
       out += output->elem_stride;
     }
   }
+}
+
+TranslateCanvasOperation::TranslateCanvasOperation()
+    : TranslateOperation(DataType::Color, ResizeMode::None)
+{
+}
+
+void TranslateCanvasOperation::determine_canvas(const rcti &preferred_area, rcti &r_area)
+{
+  getInputSocket(0)->determine_canvas(preferred_area, r_area);
+
+  ensureDelta();
+  BLI_rcti_translate(&r_area, getDeltaX(), getDeltaY());
+  const rcti &preferred = r_area;
+  rcti unused;
+  getInputSocket(1)->determine_canvas(preferred, unused);
+  getInputSocket(2)->determine_canvas(preferred, unused);
 }
 
 }  // namespace blender::compositor

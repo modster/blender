@@ -33,6 +33,7 @@
 #include "COM_SetValueOperation.h"
 #include "COM_SetVectorOperation.h"
 #include "COM_SocketProxyOperation.h"
+#include "COM_TranslateOperation.h"
 #include "COM_ViewerOperation.h"
 #include "COM_WriteBufferOperation.h"
 
@@ -444,7 +445,7 @@ void NodeOperationBuilder::determine_canvases()
       if (link.to()->getResizeMode() != ResizeMode::None) {
         NodeOperation &from_op = link.from()->getOperation();
         NodeOperation &to_op = link.to()->getOperation();
-        if (from_op.getWidth() != to_op.getWidth() || from_op.getHeight() != to_op.getHeight()) {
+        if (!BLI_rcti_compare(&from_op.get_canvas(), &to_op.get_canvas())) {
           convert_links.append(link);
         }
       }

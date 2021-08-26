@@ -38,7 +38,7 @@ class TranslateOperation : public MultiThreadedOperation {
 
  public:
   TranslateOperation();
-  TranslateOperation(DataType data_type);
+  TranslateOperation(DataType data_type, ResizeMode mode = ResizeMode::Center);
   bool determineDependingAreaOfInterest(rcti *input,
                                         ReadBufferOperation *readOperation,
                                         rcti *output) override;
@@ -91,6 +91,12 @@ class TranslateOperation : public MultiThreadedOperation {
   void update_memory_buffer_partial(MemoryBuffer *output,
                                     const rcti &area,
                                     Span<MemoryBuffer *> inputs) override;
+};
+
+class TranslateCanvasOperation : public TranslateOperation {
+ public:
+  TranslateCanvasOperation();
+  void determine_canvas(const rcti &preferred_area, rcti &r_area) override;
 };
 
 }  // namespace blender::compositor

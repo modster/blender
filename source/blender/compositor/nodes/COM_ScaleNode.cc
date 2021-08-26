@@ -81,7 +81,7 @@ void ScaleNode::convertToOperations(NodeConverter &converter,
       operation->setOffset(bnode->custom3, bnode->custom4);
       operation->setNewWidth(rd->xsch * render_size_factor);
       operation->setNewHeight(rd->ysch * render_size_factor);
-      operation->getInputSocket(0)->setResizeMode(ResizeMode::None);
+      operation->getInputSocket(0)->setResizeMode(ResizeMode::Align);
       converter.addOperation(operation);
 
       converter.mapInputSocket(inputSocket, operation->getInputSocket(0));

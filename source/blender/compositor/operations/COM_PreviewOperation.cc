@@ -41,7 +41,7 @@ PreviewOperation::PreviewOperation(const ColorManagedViewSettings *viewSettings,
                                    const unsigned int defaultHeight)
 
 {
-  this->addInputSocket(DataType::Color, ResizeMode::None);
+  this->addInputSocket(DataType::Color, ResizeMode::Align);
   this->m_preview = nullptr;
   this->m_outputBuffer = nullptr;
   this->m_input = nullptr;
