@@ -28,6 +28,20 @@ namespace blender::nodes {
 
 using bke::GeometryInstanceGroup;
 
+void geometry_node_make_runtime_type(bNodeType *ntype,
+                                     const char *idname,
+                                     const char *ui_name,
+                                     const char *ui_description,
+                                     int ui_icon,
+                                     short node_class,
+                                     const StructRNA *rna_base)
+{
+  node_make_runtime_type(ntype, idname, ui_name, ui_description, ui_icon, node_class, rna_base);
+
+  /* Default poll function for geometry nodes. */
+  ntype->poll = geo_node_poll_default;
+}
+
 /**
  * Update the availability of a group of input sockets with the same name,
  * used for switching between attribute inputs or single values.

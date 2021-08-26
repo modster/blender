@@ -44,27 +44,13 @@ static bool custom_node_poll_instance(bNode *node,
   return node->typeinfo->poll(node->typeinfo, nodetree, r_disabled_hint);
 }
 
-void node_make_runtime_type_ex(bNodeType *ntype,
-                               const char *idname,
-                               const char *ui_name,
-                               const char *ui_description,
-                               int ui_icon,
-                               short node_class,
-                               const StructRNA *rna_base,
-                               NodePollCb poll_cb,
-                               NodeInstancePollCb instance_poll_cb,
-                               NodeInitCb init_cb,
-                               NodeFreeCb free_cb,
-                               NodeCopyCb copy_cb,
-                               NodeInsertLinkCb insert_link_cb,
-                               NodeUpdateInternalLinksCb update_internal_links_cb,
-                               NodeUpdateCb update_cb,
-                               NodeGroupUpdateCb group_update_cb,
-                               NodeLabelCb label_cb,
-                               NodeDrawButtonsCb draw_buttons_cb,
-                               NodeDrawButtonsExCb draw_buttons_ex_cb,
-                               NodeDrawBackdropCb draw_backdrop_cb,
-                               eNodeSizePreset size_preset)
+void node_make_runtime_type(bNodeType *ntype,
+                            const char *idname,
+                            const char *ui_name,
+                            const char *ui_description,
+                            int ui_icon,
+                            short node_class,
+                            const StructRNA *rna_base)
 {
   const short node_flags = 0;
 
@@ -80,25 +66,14 @@ void node_make_runtime_type_ex(bNodeType *ntype,
   RNA_def_struct_ui_text(ntype->rna_ext.srna, ntype->ui_name, ntype->ui_description);
   RNA_def_struct_ui_icon(ntype->rna_ext.srna, ntype->ui_icon);
 
-  /* BKE callbacks. */
-  ntype->poll = poll_cb ? poll_cb : custom_node_poll_default;
-  ntype->poll_instance = instance_poll_cb ? instance_poll_cb : custom_node_poll_instance;
-  ntype->initfunc = init_cb ? init_cb : nullptr;
-  ntype->copyfunc = copy_cb ? copy_cb : nullptr;
-  ntype->freefunc = free_cb ? free_cb : nullptr;
-  ntype->insert_link = insert_link_cb ? insert_link_cb : node_insert_link_default;
-  ntype->update_internal_links = update_internal_links_cb ? update_internal_links_cb :
-                                                            node_update_internal_links_default;
-  ntype->updatefunc = update_cb ? update_cb : nullptr;
-  ntype->group_update_func = group_update_cb ? group_update_cb : nullptr;
+  /* Default BKE callbacks. */
+  ntype->poll = custom_node_poll_default;
+  ntype->poll_instance = custom_node_poll_instance;
+  ntype->insert_link = node_insert_link_default;
+  ntype->update_internal_links = node_update_internal_links_default;
 
-  /* UI callbacks. */
+  /* Default UI callbacks. */
   ED_init_custom_node_type(ntype);
-  ntype->labelfunc = label_cb ? label_cb : nullptr;
-  ntype->draw_buttons = draw_buttons_cb ? draw_buttons_cb : nullptr;
-  ntype->draw_buttons_ex = draw_buttons_ex_cb ? draw_buttons_ex_cb : nullptr;
-  ntype->draw_backdrop = draw_backdrop_cb ? draw_backdrop_cb : nullptr;
-  node_type_size_preset(ntype, size_preset);
 }
 
 void node_free_runtime_type(bNodeType *ntype)
@@ -110,7 +85,3 @@ void node_free_runtime_type(bNodeType *ntype)
   RNA_struct_free_extension(ntype->rna_ext.srna, &ntype->rna_ext);
   RNA_struct_free(&BLENDER_RNA, ntype->rna_ext.srna);
 }
-
-namespace blender::nodes {
-
-}  // namespace blender::nodes
