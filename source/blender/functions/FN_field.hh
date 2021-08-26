@@ -18,6 +18,16 @@
 
 /** \file
  * \ingroup fn
+ *
+ * Field serve as an intermediate representation for a calculation of a group of functions. Having
+ * an intermediate representation is helpful mainly to separate the execution system from the
+ * system that describes the necessary computations. Fields can be executed in different contexts,
+ * and optimization might mean executing the fields differently based on some factors like the
+ * number of elements.
+ *
+ * For now, fields are very tied to the multi-function system, but in the future the #Function
+ * class could be extended to use different descriptions of its outputs and computation besides
+ * the embedded multi-function.
  */
 
 #include "BLI_vector.hh"
