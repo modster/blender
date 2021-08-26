@@ -28,7 +28,7 @@ RotateOperation::RotateOperation()
   this->addInputSocket(DataType::Color);
   this->addInputSocket(DataType::Value);
   this->addOutputSocket(DataType::Color);
-  this->setResolutionInputSocketIndex(0);
+  this->set_canvas_input_index(0);
   this->m_imageSocket = nullptr;
   this->m_degreeSocket = nullptr;
   this->m_doDegree2RadConversion = false;

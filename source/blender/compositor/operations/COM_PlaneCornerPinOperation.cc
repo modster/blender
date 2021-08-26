@@ -209,15 +209,13 @@ void *PlaneCornerPinMaskOperation::initializeTileData(rcti *rect)
   return data;
 }
 
-void PlaneCornerPinMaskOperation::determineResolution(unsigned int resolution[2],
-                                                      unsigned int preferredResolution[2])
+void PlaneCornerPinMaskOperation::determine_canvas(const rcti &preferred_area, rcti &r_area)
 {
   if (execution_model_ == eExecutionModel::FullFrame) {
-    /* Determine inputs resolution. */
-    PlaneDistortMaskOperation::determineResolution(resolution, preferredResolution);
+    /* Determine input canvases. */
+    PlaneDistortMaskOperation::determine_canvas(preferred_area, r_area);
   }
-  resolution[0] = preferredResolution[0];
-  resolution[1] = preferredResolution[1];
+  r_area = preferred_area;
 }
 
 void PlaneCornerPinMaskOperation::get_area_of_interest(const int UNUSED(input_idx),
