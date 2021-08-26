@@ -20,6 +20,11 @@
 #include "DNA_mesh_types.h"
 
 #include "BKE_bvhutils.h"
+#include "BKE_volume.h"
+
+#ifdef WITH_OPENVDB
+#  include <openvdb/tools/VolumeToSpheres.h>
+#endif
 
 #include "UI_interface.h"
 #include "UI_resources.h"
@@ -141,6 +146,64 @@ static void calculate_pointcloud_proximity(const VArray<float3> &positions,
   free_bvhtree_from_pointcloud(&bvh_data);
 }
 
+#ifdef WITH_OPENVDB
+static void calculate_level_set_proximity(const GeoNodeExecParams &params,
+                                          const VArray<float3> &positions,
+                                          const Volume &volume,
+                                          MutableSpan<float> r_distances,
+                                          MutableSpan<float3> r_locations)
+{
+  const VolumeGrid *volume_grid = BKE_volume_grid_get_for_read(&volume, 0);
+  if (volume_grid == nullptr) {
+    params.error_message_add(NodeWarningType::Error, TIP_("Volume is empty"));
+    return;
+  }
+
+  openvdb::GridBase::ConstPtr grid_base = BKE_volume_grid_openvdb_for_read(&volume, volume_grid);
+  if (grid_base->getGridClass() != openvdb::GridClass::GRID_LEVEL_SET) {
+    params.error_message_add(NodeWarningType::Error, TIP_("Only level set volumes are supported"));
+  }
+
+  const int size = positions.size();
+
+  bke::volume::to_static_type(BKE_volume_grid_type(volume_grid), [&](auto dummy) {
+    using GridType = decltype(dummy);
+    if constexpr (std::is_same_v<GridType, openvdb::FloatGrid>) {
+      const GridType &grid = static_cast<const GridType &>(*grid_base);
+
+      auto csp = openvdb::tools::ClosestSurfacePoint<GridType>::create(grid);
+      if (!csp) {
+        return;
+      }
+
+      std::vector<openvdb::Vec3R> nearest(size);
+      for (const int i : IndexRange(size)) {
+        nearest[i] = openvdb::Vec3R(positions[i].x, positions[i].y, positions[i].z);
+      }
+      std::vector<float> distances;
+      if (!csp->searchAndReplace(nearest, distances)) {
+        return;
+      }
+
+      BLI_assert(distances.size() == size);
+
+      threading::parallel_for(IndexRange(size), 2048, [&](IndexRange range) {
+        for (const int i : range) {
+          /* TODO: Stupid to square and then sqrt later, consider refactoring this. */
+          const float distance = distances[i] * distances[i];
+          if (distance < r_distances[i]) {
+            r_distances[i] = distance;
+            if (!r_locations.is_empty()) {
+              r_locations[i] = float3(nearest[i].x(), nearest[i].y(), nearest[i].z());
+            }
+          }
+        }
+      });
+    }
+  });
+}
+#endif
+
 static void attribute_calc_proximity(GeometryComponent &component,
                                      GeometrySet &target,
                                      GeoNodeExecParams &params)
@@ -191,6 +254,13 @@ static void attribute_calc_proximity(GeometryComponent &component,
     calculate_pointcloud_proximity(
         positions, *target.get_pointcloud_for_read(), distances, locations);
   }
+
+#ifdef WITH_OPENVDB
+  if (target.has_volume()) {
+    calculate_level_set_proximity(
+        params, positions, *target.get_volume_for_read(), distances, locations);
+  }
+#endif
 
   if (distance_attribute) {
     /* Squared distances are used above to speed up comparisons,
