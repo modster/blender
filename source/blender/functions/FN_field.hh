@@ -20,11 +20,8 @@
  * \ingroup fn
  */
 
-#include "BLI_function_ref.hh"
-#include "BLI_map.hh"
 #include "BLI_vector.hh"
 
-#include "FN_generic_virtual_array.hh"
 #include "FN_multi_function_procedure.hh"
 #include "FN_multi_function_procedure_builder.hh"
 #include "FN_multi_function_procedure_executor.hh"
@@ -33,19 +30,65 @@ namespace blender::fn {
 
 class Field;
 
-class Field {
-  const fn::CPPType *type_;
-  // std::unique_ptr<MultiFunction> function_;
-  const MultiFunction *function_;
+/**
+ * An operation acting on data described by fields. Generally corresponds
+ * to a node or a subset of a node in a node graph.
+ */
+class Function {
+  /**
+   * The function used to calculate the
+   */
+  std::unique_ptr<MultiFunction> function_;
 
-  blender::Vector<std::shared_ptr<Field>> input_fields_;
+  /**
+   * References to descriptions of the results from the functions this function depends on.
+   */
+  blender::Vector<Field *> inputs_;
+
+ public:
+  Function(std::unique_ptr<MultiFunction> function, Span<Field *> inputs)
+      : function_(std::move(function)), inputs_(inputs)
+  {
+  }
+
+  Span<Field *> inputs() const
+  {
+    return inputs_;
+  }
+
+  const MultiFunction &multi_function() const
+  {
+    return *function_;
+  }
+};
+
+/**
+ * Descibes the output of a function. Generally corresponds to the combination of an output socket
+ * and link combination in a node graph.
+ */
+class Field {
+  /**
+   * The type of this field's result.
+   */
+  const fn::CPPType *type_;
+
+  /**
+   * The function that calculates this field's values. Many fields can share the same function,
+   * since a function can have many outputs, just like a node graph, where a single output can be
+   * used as multiple inputs. This avoids calling the same function many times, only using one of
+   * its results.
+   */
+  const Function *function_;
+  /**
+   * Which output of the function this field corresponds to.
+   */
+  int output_index_;
 
   std::string debug_name_ = "";
 
  public:
-  ~Field() = default;
-  Field(const fn::CPPType &type, const MultiFunction &function)
-      : type_(&type), function_(&function)
+  Field(const fn::CPPType &type, const Function &function, const int output_index)
+      : type_(&type), function_(&function), output_index_(output_index)
   {
   }
 
@@ -55,100 +98,29 @@ class Field {
     return *type_;
   }
 
-  const MultiFunction &function() const
+  const Function &function() const
   {
     BLI_assert(function_ != nullptr);
     return *function_;
+  }
+
+  int function_output_index() const
+  {
+    return output_index_;
   }
 
   blender::StringRef debug_name() const
   {
     return debug_name_;
   }
-
-  void foreach_input(blender::FunctionRef<void(const Field &input)> fn) const
-  {
-    for (const std::shared_ptr<Field> &field : input_fields_) {
-      fn(*field);
-    }
-  }
-  void foreach_input_recursive(blender::FunctionRef<void(const Field &input)> fn) const
-  {
-    for (const std::shared_ptr<Field> &field : input_fields_) {
-      fn(*field);
-      field->foreach_input(fn);
-    }
-  }
 };
-
-/**
- * A field that doesn't have any dependencies on other fields.
- *
- * TODO: It might be an elegant simplification if every single field was a multi-function field,
- * and input fields just happened to have no inputs. Then it might not need to be a virtual class,
- * since the dynamic behavior would be contained in the multifunction, which would be very nice.
- */
-// class InputField : public Field {
-//  public:
-//   InputField(const CPPType &type) : Field(type)
-//   {
-//   }
-
-//   void foreach_input(blender::FunctionRef<void(const Field &input)> UNUSED(fn)) const final
-//   {
-//   }
-//   void foreach_input_recursive(
-//       blender::FunctionRef<void(const Field &input)> UNUSED(fn)) const final
-//   {
-//   }
-
-//   virtual GVArrayPtr get_data(IndexMask mask) const = 0;
-
-//   /**
-//    * Return true when the field input is the same as another field, used as an
-//    * optimization to avoid creating multiple virtual arrays for the same input node.
-//    */
-//   virtual bool equals(const InputField &UNUSED(other))
-//   {
-//     return false;
-//   }
-// };
-
-/**
- * A field that takes inputs
- */
-// class MultiFunctionField final : public Field {
-//   blender::Vector<FieldPtr> input_fields_;
-//   const MultiFunction *function_;
-
-//  public:
-//   void foreach_input(blender::FunctionRef<void(const Field &input)> fn) const final
-//   {
-//     for (const FieldPtr &field : input_fields_) {
-//       fn(*field);
-//     }
-//   }
-//   void foreach_input_recursive(blender::FunctionRef<void(const Field &input)> fn) const final
-//   {
-//     for (const FieldPtr &field : input_fields_) {
-//       fn(*field);
-//       field->foreach_input(fn);
-//     }
-//   }
-
-//   const MultiFunction &function() const
-//   {
-//     BLI_assert(function_ != nullptr);
-//     return *function_;
-//   }
-// };
 
 /**
  * Evaluate more than one field at a time, as an optimization
  * in case they share inputs or various intermediate values.
  */
-void evaluate_fields(const blender::Span<Field> fields,
-                     const blender::MutableSpan<GMutableSpan> outputs,
-                     const blender::IndexMask mask);
+void evaluate_fields(blender::Span<Field> fields,
+                     blender::IndexMask mask,
+                     blender::MutableSpan<GMutableSpan> outputs);
 
 }  // namespace blender::fn

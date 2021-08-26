@@ -14,49 +14,68 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
+#include "BLI_map.hh"
+#include "BLI_multi_value_map.hh"
+
 #include "FN_field.hh"
 
 namespace blender::fn {
 
-static void add_field_parameters(const Field &field,
-                                 MFProcedureBuilder &builder,
-                                 Map<const Field *, MFVariable *> &output_map)
-{
-  /* Recursively make sure all of the inputs have entries in the variable map. */
-  field.foreach_input_recursive(
-      [&](const Field &input_field) { add_field_parameters(input_field, builder, output_map); });
+/* A map to hold the output variables for each function so they can be reused. */
+using OutputMap = MultiValueMap<const Function *, MFVariable *>;
 
-  /* Add the immediate inputs to this field. */
+static MFVariable *get_field_variable(const Field &field, const OutputMap &output_map)
+{
+  const Function &input_field_function = field.function();
+  const Span<MFVariable *> input_function_outputs = output_map.lookup(&input_field_function);
+  return input_function_outputs[field.function_output_index()];
+}
+
+/**
+ * Traverse the fields recursively. Eventually there will be a field whose function has no
+ * inputs. Start adding multi-function variables there. Those outputs are then used as inputs
+ * for the dependent functions, and the rest of the field tree is built up from there.
+ */
+static void add_field_variables(const Field &field,
+                                MFProcedureBuilder &builder,
+                                OutputMap &output_map)
+{
+  const Function &function = field.function();
+  for (const Field *input_field : function.inputs()) {
+    add_field_variables(*input_field, builder, output_map);
+  }
+
+  /* Add the immediate inputs to this field, which were added before in the recursive call.
+   * This will be skipped for functions with no inputs. */
   Vector<MFVariable *> inputs;
-  field.foreach_input([&](const Field &input_field) {
-    MFVariable *input = output_map.lookup(&input_field);
+  for (const Field *input_field : function.inputs()) {
+    MFVariable *input = get_field_variable(*input_field, output_map);
     builder.add_input_parameter(input->data_type());
     inputs.append(input);
-  });
+  }
 
-  Vector<MFVariable *> outputs = builder.add_call(field.function(), inputs);
+  Vector<MFVariable *> outputs = builder.add_call(function.multi_function(), inputs);
 
   builder.add_destruct(inputs);
 
-  /* TODO: How to support multiple outputs?! */
-  BLI_assert(outputs.size() == 1);
-  output_map.add_new(&field, outputs.first());
+  output_map.add_multiple(&function, outputs);
 }
 
 static void build_procedure(const Span<Field> fields, MFProcedure &procedure)
 {
   MFProcedureBuilder builder{procedure};
 
-  Map<const Field *, MFVariable *> output_map;
+  OutputMap output_map;
 
   for (const Field &field : fields) {
-    add_field_parameters(field, builder, output_map);
+    add_field_variables(field, builder, output_map);
   }
 
   builder.add_return();
 
   for (const Field &field : fields) {
-    builder.add_output_parameter(*output_map.lookup(&field));
+    MFVariable *input = get_field_variable(field, output_map);
+    builder.add_output_parameter(*input);
   }
 
   std::cout << procedure.to_dot();
@@ -84,8 +103,8 @@ static void evaluate_procedure(MFProcedure &procedure,
  * Evaluate more than one prodecure at a time
  */
 void evaluate_fields(const Span<Field> fields,
-                     const MutableSpan<GMutableSpan> outputs,
-                     const IndexMask mask)
+                     const IndexMask mask,
+                     const MutableSpan<GMutableSpan> outputs)
 {
   MFProcedure procedure;
   build_procedure(fields, procedure);

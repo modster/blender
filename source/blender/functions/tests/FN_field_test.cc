@@ -10,13 +10,13 @@ namespace blender::fn::tests {
 
 TEST(field, ConstantFieldTest)
 {
-  CustomMF_Constant<int> const_fn{10};
-  Field constant_field = Field(CPPType::get<int>(), const_fn);
+  std::unique_ptr<CustomMF_Constant<int>> const_fn = std::make_unique<CustomMF_Constant<int>>(10);
+  Function function = Function(std::move(const_fn), {});
+  Field constant_field = Field(CPPType::get<int>(), function, 0);
 
   Array<int> result(4);
   GMutableSpan result_generic(result.as_mutable_span());
-  // MutableSpan<GMutableSpan> result_span{&result_generic, 1};
-  evaluate_fields({&constant_field, 1}, {&result_generic, 1}, IndexMask(IndexRange(4)));
+  evaluate_fields({&constant_field, 1}, IndexMask(IndexRange(4)), {&result_generic, 1});
 
   ASSERT_EQ(result[0], 10);
   ASSERT_EQ(result[1], 10);
