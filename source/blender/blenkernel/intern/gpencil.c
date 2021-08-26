@@ -221,7 +221,7 @@ void BKE_gpencil_blend_read_data(BlendDataReader *reader, bGPdata *gpd)
   BKE_previewimg_blend_read(reader, gpd->preview);
 
   /* Ensure full objectmode for linked grease pencil. */
-  if (gpd->id.lib != NULL) {
+  if (ID_IS_LINKED(gpd)) {
     gpd->flag &= ~GP_DATA_STROKE_PAINTMODE;
     gpd->flag &= ~GP_DATA_STROKE_EDITMODE;
     gpd->flag &= ~GP_DATA_STROKE_SCULPTMODE;
