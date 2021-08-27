@@ -22,6 +22,7 @@
  */
 
 #include "BLI_float2.hh"
+#include "BLI_vector.hh"
 #include "DNA_cloth_types.h"
 #include "DNA_mesh_types.h"
 #include "DNA_modifier_types.h"
@@ -454,12 +455,14 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
   /**
    * Splits edges whose "size" is greater than 1.0
    *
+   * If sewing is enabled, it tried to add sewing edges if necessary.
+   *
    * Based on [1]
    *
    * Here "size" is determined by `Sizing` stores in `Vert`s of the
    * `Edge`, using the function `Sizing::get_edge_size_sq()`.
    */
-  void split_edges()
+  void split_edges(bool sewing_enabled)
   {
     auto splittable_edges_set = this->get_splittable_edge_indices_set();
     do {
@@ -468,23 +471,8 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
         if (!op_edge) {
           continue;
         }
-        auto &edge = this->get_checked_edge(edge_index);
-        auto mesh_diff = this->split_edge_triangulate(edge.get_self_index(), true);
 
-#if SHOULD_REMESH_DUMP_FILE
-        auto after_split_msgpack = this->serialize();
-        auto after_split_filename = static_remesh_name_gen.get_curr(
-            "after_split_" + get_number_as_string(std::get<0>(edge_index.get_raw())));
-        static_remesh_name_gen.gen_next();
-        dump_file(after_split_filename, after_split_msgpack);
-#endif
-
-        this->compute_info_adaptivemesh(mesh_diff);
-
-        /* Flip edges of those faces that were created during the
-         * split edge operation */
-        auto added_faces = mesh_diff.get_added_faces();
-        this->flip_edges(added_faces);
+        this->split_edge_adaptivemesh(edge_index, sewing_enabled);
       }
 
       splittable_edges_set = this->get_splittable_edge_indices_set();
@@ -568,7 +556,8 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
     } while (active_faces.size() != 0);
   }
 
-  void static_remesh(const Sizing &sizing)
+  template<typename ExtraData>
+  void static_remesh(const Sizing &sizing, const AdaptiveRemeshParams<END, ExtraData> &params)
   {
 #if SHOULD_REMESH_DUMP_FILE
     auto static_remesh_start_msgpack = this->serialize();
@@ -590,8 +579,10 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
 
     this->set_edge_sizes();
 
+    bool sewing_enabled = params.flags & ADAPTIVE_REMESH_PARAMS_SEWING;
+
     /* Split the edges */
-    this->split_edges();
+    this->split_edges(sewing_enabled);
 
     /* Collapse the edges */
     this->collapse_edges();
@@ -678,6 +669,145 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
               });
 
     return splittable_edge_indices;
+  }
+
+  /**
+   * Split the given edge and handle adaptivemesh specific
+   * requirements like running `this->flip_edges` on faces created
+   * during splitting, handling sewing if enabled.
+   */
+  void split_edge_adaptivemesh(const EdgeIndex &edge_index, bool sewing_enabled)
+  {
+    auto &edge = this->get_checked_edge(edge_index);
+    auto mesh_diff = this->split_edge_triangulate(edge.get_self_index(), true);
+
+#if SHOULD_REMESH_DUMP_FILE
+    auto after_split_msgpack = this->serialize();
+    auto after_split_filename = static_remesh_name_gen.get_curr(
+        "after_split_" + get_number_as_string(std::get<0>(edge_index.get_raw())));
+    static_remesh_name_gen.gen_next();
+    dump_file(after_split_filename, after_split_msgpack);
+#endif
+
+    this->compute_info_adaptivemesh(mesh_diff);
+
+    if (sewing_enabled) {
+      BLI_assert(mesh_diff.get_added_nodes().size() == 1);
+      std::cout << "mesh_diff.get_added_verts().size(): " << mesh_diff.get_added_verts().size()
+                << std::endl;
+      this->try_adding_sewing_edge(mesh_diff.get_added_verts()[0]);
+    }
+
+    /* Flip edges of those faces that were created during the
+     * split edge operation */
+    auto added_faces = mesh_diff.get_added_faces();
+    this->flip_edges(added_faces);
+  }
+
+  /**
+   * Tries to add a sewing edge to `vert_index` if it is possible.
+   *
+   * Adding a sewing edge is possible if the following checks are
+   * true.
+   *
+   * => If there is a loose edge attached to one of the adjacent edges
+   * of the given vert.
+   *
+   * => There is an adjacent edge to that loose edge which can be
+   * split and it has another loose edge adjacent to it which can loop
+   * back the given vert via an edge.
+   */
+  void try_adding_sewing_edge(const VertIndex &vert_index)
+  {
+    /* vert: is the vert that is being tested.
+     *
+     * e1: is an incident edge of `vert`.
+     * e1_ov: is the other vertex of `e1` compared to `vert`.
+     *
+     * e2: is supposed to be the loose edge
+     * e2_ov: is the other vertex of `e2` compared to `e1_ov`.
+     *
+     * opposite_edges: list of all edges that may be split to add the
+     * sewing edge between `vert` and and the vert created when
+     * `opposite_edge` is split.
+     */
+    /*
+     *            e1   vert   e5
+     *    e1_ov.________.________.e4_ov
+     *         |                 |
+     *       e2|                 |e4
+     *         ._________________.
+     *    e2_ov   opposite_edge   e3_ov
+     *                 (e3)
+     *
+     */
+
+    /* TODO(ish): Optimizations can be done, do an early check if
+     * there are at least 2 edges incident on `vert` that have an
+     * adjacent loose edge. (check if e1 and e5 exist).
+     *
+     * Another optimization can be to find the opposite edge before
+     * splitting the edge. This does mean that it is not so
+     * generalized, like it would not be able to add a sewing edge to
+     * an existing vert but it will be a lot faster.
+     */
+    const auto &vert = this->get_checked_vert(vert_index);
+
+    blender::Vector<EdgeIndex> opposite_edges;
+
+    /* Get the list of all opposite edges */
+    for (const auto &e1_index : vert.get_edges()) {
+      const auto &e1 = this->get_checked_edge(e1_index);
+
+      const auto e1_ov_index = e1.get_checked_other_vert(vert_index);
+      const auto &e1_ov = this->get_checked_vert(e1_ov_index);
+
+      for (const auto &e2_index : e1_ov.get_edges()) {
+        const auto &e2 = this->get_checked_edge(e2_index);
+
+        if (e2.is_loose() == false) {
+          continue;
+        }
+
+        const auto e2_ov_index = e2.get_checked_other_vert(e1_ov_index);
+        const auto &e2_ov = this->get_checked_vert(e2_ov_index);
+
+        for (const auto &e3_index : e2_ov.get_edges()) {
+          const auto &e3 = this->get_checked_edge(e3_index);
+
+          const auto e3_ov_index = e3.get_checked_other_vert(e2_ov_index);
+          const auto &e3_ov = this->get_checked_vert(e3_ov_index);
+
+          for (const auto &e4_index : e3_ov.get_edges()) {
+            const auto &e4 = this->get_checked_edge(e4_index);
+
+            if (e4.is_loose() == false) {
+              continue;
+            }
+
+            const auto e4_ov_index = e4.get_checked_other_vert(e3_ov_index);
+            const auto &e4_ov = this->get_checked_vert(e4_ov_index);
+
+            for (const auto &e5_index : e4_ov.get_edges()) {
+              const auto &e5 = this->get_checked_edge(e5_index);
+
+              const auto e5_ov_index = e5.get_checked_other_vert(e4_ov_index);
+
+              if (e5_ov_index == vert_index) {
+                opposite_edges.append_non_duplicates(e3_index);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    /* Iterate over `opposite_edges`, if an `opposite_edge` is
+     * splittable, then split it and create a new edge between the
+     * `new_vert` and `vert` */
+
+    std::cout << "vert_index: " << vert_index << " opposite_edges: " << opposite_edges
+              << std::endl;
   }
 
   /**
@@ -1303,7 +1433,7 @@ Mesh *adaptive_remesh(const AdaptiveRemeshParams<END, ExtraData> &params,
     auto m = float2x2::identity();
     m = m * (1.0 / size_min);
     internal::Sizing vert_sizing(std::move(m));
-    adaptive_mesh.static_remesh(vert_sizing);
+    adaptive_mesh.static_remesh(vert_sizing, params);
   }
 
   /* set back data from `AdaptiveMesh` to whatever needs it */
