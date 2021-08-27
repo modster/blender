@@ -4200,7 +4200,7 @@ static void widget_radiobut(uiWidgetColors *wcol, rcti *rect, int UNUSED(state),
   widget_init(&wtb);
   const float rad = wcol->roundness * U.widget_unit;
   const float padding = 0.05f;
-  float color[3];
+  float color[4];
   rgba_uchar_to_float(color, wcol->item);
 
   /* Draw the background for the entire widget first. */
