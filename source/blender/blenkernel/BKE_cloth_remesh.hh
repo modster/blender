@@ -1727,6 +1727,7 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
 
     /* Create the new new by interpolating the nodes of the edge */
     auto &new_node = this->add_empty_interp_node(edge_node_1, edge_node_2);
+    added_nodes.append(new_node.self_index);
 
     for (const auto &edge_index : edge_indices) {
       auto &edge_a = this->get_checked_edge(edge_index);
@@ -1734,6 +1735,7 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
 
       /* Create the new vert by interpolating the verts of the edge */
       auto &new_vert = this->add_empty_interp_vert(edge_vert_1_a, edge_vert_2_a);
+      added_verts.append(new_vert.self_index);
 
       auto [edge_vert_1_b, edge_vert_2_b] = this->get_checked_verts_of_edge(edge_a, false);
 
