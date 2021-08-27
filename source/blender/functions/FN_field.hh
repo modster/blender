@@ -55,7 +55,10 @@ class FieldFunction {
    */
   blender::Vector<Field *> inputs_;
 
+  std::string name_ = "";
+
  public:
+  FieldFunction() = default;
   FieldFunction(std::unique_ptr<MultiFunction> function, Span<Field *> inputs)
       : function_(std::move(function)), inputs_(inputs)
   {
@@ -69,6 +72,34 @@ class FieldFunction {
   const MultiFunction &multi_function() const
   {
     return *function_;
+  }
+
+  blender::StringRef name() const
+  {
+    return name_;
+  }
+};
+
+class FieldInput {
+
+  GVArrayPtr data_;
+
+  std::string name_ = "";
+
+ public:
+  FieldInput(GVArrayPtr data) : data_(std::move(data))
+  {
+  }
+
+  const GVArray &data() const
+  {
+    BLI_assert(data_);
+    return *data_;
+  }
+
+  blender::StringRef name() const
+  {
+    return name_;
   }
 };
 
@@ -88,17 +119,21 @@ class Field {
    * used as multiple inputs. This avoids calling the same function many times, only using one of
    * its results.
    */
-  const FieldFunction *function_;
+  std::shared_ptr<FieldFunction> function_;
   /**
    * Which output of the function this field corresponds to.
    */
   int output_index_;
 
-  std::string debug_name_ = "";
+  std::shared_ptr<FieldInput> input_;
 
  public:
-  Field(const fn::CPPType &type, const FieldFunction &function, const int output_index)
-      : type_(&type), function_(&function), output_index_(output_index)
+  Field(const fn::CPPType &type, std::shared_ptr<FieldFunction> function, const int output_index)
+      : type_(&type), function_(function), output_index_(output_index)
+  {
+  }
+
+  Field(const fn::CPPType &type, std::shared_ptr<FieldInput> input) : type_(&type), input_(input)
   {
   }
 
@@ -108,20 +143,41 @@ class Field {
     return *type_;
   }
 
+  bool is_input() const
+  {
+    return input_ != nullptr;
+  }
+  const FieldInput &input()
+  {
+    BLI_assert(function_ == nullptr);
+    BLI_assert(input_ != nullptr);
+    return *input_;
+  }
+
+  bool is_function() const
+  {
+    return function_ != nullptr;
+  }
   const FieldFunction &function() const
   {
     BLI_assert(function_ != nullptr);
+    BLI_assert(input_ == nullptr);
     return *function_;
   }
 
   int function_output_index() const
   {
+    BLI_assert(function_ != nullptr);
+    BLI_assert(input_ == nullptr);
     return output_index_;
   }
 
-  blender::StringRef debug_name() const
+  blender::StringRef name() const
   {
-    return debug_name_;
+    if (this->is_function()) {
+      return function_->name();
+    }
+    return input_->name();
   }
 };
 
