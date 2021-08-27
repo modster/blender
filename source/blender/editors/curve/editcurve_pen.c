@@ -71,7 +71,6 @@ typedef struct MoveSegmentData {
   int bezt_index;
 } MoveSegmentData;
 
-/* Convert mouse location to worldspace coordinates. */
 static void mouse_location_to_worldspace(const int mouse_loc[2],
                                          const float depth[3],
                                          const ViewContext *vc,
@@ -85,7 +84,7 @@ static void mouse_location_to_worldspace(const int mouse_loc[2],
   mul_m4_v3(imat, r_location);
 }
 
-/* Move the handle of BezTriple to mouse based on the newly added point. */
+/* Move the handle of the newly added BezTriple to mouse. */
 static void move_bezt_handles_to_mouse(BezTriple *bezt,
                                        const bool is_end_point,
                                        const wmEvent *event,
@@ -96,27 +95,21 @@ static void move_bezt_handles_to_mouse(BezTriple *bezt,
     bezt->h2 = HD_ALIGN;
   }
 
-  /* Obtain world space mouse location. */
   float location[3];
   mouse_location_to_worldspace(event->mval, bezt->vec[1], vc, location);
 
   /* If the new point is the last point of the curve, move the second handle. */
   if (is_end_point) {
-    /* Set handle 2 location. */
     copy_v3_v3(bezt->vec[2], location);
 
-    /* Set handle 1 location if handle not of type FREE. */
     if (bezt->h2 != HD_FREE) {
       mul_v3_fl(location, -1);
       madd_v3_v3v3fl(bezt->vec[0], location, bezt->vec[1], 2);
     }
   }
-  /* Else move the first handle. */
   else {
-    /* Set handle 1 location. */
     copy_v3_v3(bezt->vec[0], location);
 
-    /* Set handle 2 location if handle not of type FREE. */
     if (bezt->h1 != HD_FREE) {
       mul_v3_fl(location, -1);
       madd_v3_v3v3fl(bezt->vec[2], location, bezt->vec[1], 2);
@@ -162,15 +155,11 @@ static void move_selected_bezt_to_mouse(BezTriple *bezt,
                                         const ViewContext *vc,
                                         const wmEvent *event)
 {
-  /* Get mouse location in 3D space. */
   float location[3];
-
-  /* Move entire BezTriple if center point is dragged. */
   if (bezt->f2) {
     mouse_location_to_worldspace(event->mval, bezt->vec[1], vc, location);
     move_bezt_to_location(bezt, location);
   }
-  /* Move handle separately if only a handle is dragged. */
   else {
     free_up_handles_for_movement(bezt, bezt->f1, bezt->f3);
     if (bezt->f1) {
@@ -184,10 +173,8 @@ static void move_selected_bezt_to_mouse(BezTriple *bezt,
   }
 }
 
-/* Move BPoint to mouse. */
 static void move_bp_to_mouse(BPoint *bp, const wmEvent *event, const ViewContext *vc)
 {
-  /* Get mouse location in 3D space. */
   float location[3];
   mouse_location_to_worldspace(event->mval, bp->vec, vc, location);
 
@@ -222,7 +209,6 @@ static void delete_nurb(Curve *cu, Nurb *nu)
   nu = NULL;
 }
 
-/* Delete given BezTriple from given Nurb. */
 static void delete_bezt_from_nurb(const BezTriple *bezt, Nurb *nu)
 {
   BLI_assert(nu->type == CU_BEZIER);
@@ -231,7 +217,6 @@ static void delete_bezt_from_nurb(const BezTriple *bezt, Nurb *nu)
   memcpy(nu->bezt + index, nu->bezt + index + 1, (nu->pntsu - index) * sizeof(BezTriple));
 }
 
-/* Delete given BPoint from given Nurb. */
 static void delete_bp_from_nurb(const BPoint *bp, Nurb *nu)
 {
   BLI_assert(nu->type == CU_NURBS);
@@ -671,7 +656,6 @@ static void make_cut(const wmEvent *event, Curve *cu, Nurb **r_nu, const ViewCon
   update_data_for_all_nurbs(nurbs, vc, &data);
 
   float threshold_distance = ED_view3d_select_dist_px();
-  /* If the minimum distance found < threshold distance, make cut. */
   Nurb *nu = data.nurb;
   if (nu) {
     if (nu->bezt) {
@@ -886,7 +870,6 @@ wmKeyMap *curve_pen_modal_keymap(wmKeyConfig *keyconf)
 
   wmKeyMap *keymap = WM_modalkeymap_find(keyconf, "Curve Pen Modal Map");
 
-  /* This function is called for each spacetype, only needs to add map once */
   if (keymap && keymap->modal_items) {
     return NULL;
   }
@@ -940,13 +923,13 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
       dragging = true;
     }
     if (dragging) {
-      /* If segment is being dragged instead of edge, move the segment */
       if (moving_segment) {
         MoveSegmentData *seg_data = op->customdata;
         nu = seg_data->nu;
         move_segment(seg_data, event, &vc);
       }
-      /* If dragging a new control point, move handle point with mouse cursor . */
+      /* If dragging a new control point, move handle point with mouse cursor. Else move entire
+       * control point. */
       else if (is_new_point) {
         if (!picked) {
           select_and_get_point(&vc, &nu, &bezt, &bp, event->mval, event->prevval != KM_PRESS);
@@ -959,7 +942,6 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
           move_bezt_handles_to_mouse(bezt, invert, event, &vc);
         }
       }
-      /* Move entire control point with mouse cursor if dragging an existing control point. */
       else {
         select_and_get_point(&vc, &nu, &bezt, &bp, event->mval, event->prevval != KM_PRESS);
         if (bezt) {
@@ -981,14 +963,12 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
         ListBase *nurbs = BKE_curve_editNurbs_get(cu);
         float mouse_point[2] = {(float)event->mval[0], (float)event->mval[1]};
 
-        /* Find the closest point to the mouse location. */
         get_closest_vertex_to_point_in_nurbs(nurbs, &nu, &bezt, &bp, mouse_point, &vc);
         const bool found_point = nu != NULL;
 
         if (found_point) {
           ED_curve_deselect_all(cu->editnurb);
           if (nu->type == CU_BEZIER) {
-            /* Dissolve if previous and next BezTriples are available. */
             BezTriple *next_bezt = BKE_nurb_bezt_get_next(nu, bezt);
             BezTriple *prev_bezt = BKE_nurb_bezt_get_prev(nu, bezt);
             if (next_bezt && prev_bezt) {
@@ -1008,7 +988,6 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
         }
         cu->actvert = CU_ACT_NONE;
 
-        /* Make a cut if no point was found. */
         if (!found_point) {
           make_cut(event, cu, &nu, &vc);
         }
@@ -1022,7 +1001,6 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
         Curve *cu = vc.obedit->data;
         ED_curve_nurb_vert_selected_find(cu, vc.v3d, &nu, &bezt, &bp);
 
-        /* Select a point if it's underneath the mouse. */
         const bool found_point = ED_curve_editnurb_select_pick(
             C, event->mval, false, false, false);
         RNA_boolean_set(op->ptr, "new", !found_point);
