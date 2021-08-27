@@ -137,7 +137,7 @@ void register_node_type_geo_boolean()
 {
   static bNodeType ntype;
 
-  geo_node_type_base(&ntype, GEO_NODE_BOOLEAN, "Mesh Boolean", NODE_CLASS_GEOMETRY, 0);
+  geo_node_type_base(&ntype, GEO_NODE_BOOLEAN, "Boolean", NODE_CLASS_GEOMETRY, 0);
   node_type_socket_templates(&ntype, geo_node_boolean_in, geo_node_boolean_out);
   ntype.draw_buttons = geo_node_boolean_layout;
   ntype.updatefunc = geo_node_boolean_update;
