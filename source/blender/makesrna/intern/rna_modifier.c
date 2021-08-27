@@ -7276,6 +7276,11 @@ static void rna_def_modifier_adaptive_remesh(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Verts Swapped", "Swap verts during the operation");
   RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
+  prop = RNA_def_property(srna, "enable_sewing", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "flag", ADAPTIVE_REMESH_SEWING);
+  RNA_def_property_ui_text(prop, "Enable Sewing", "Enable sewing during remeshing");
+  RNA_def_property_update(prop, 0, "rna_Modifier_update");
+
   prop = RNA_def_property(srna, "size_min", PROP_FLOAT, PROP_NONE);
   RNA_def_property_float_sdna(prop, NULL, "size_min");
   RNA_def_property_ui_range(prop, 0.0001f, 2.0f, 0.005f, 4);

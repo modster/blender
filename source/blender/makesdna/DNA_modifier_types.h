@@ -2364,6 +2364,7 @@ typedef struct AdaptiveRemeshModifierData {
 typedef enum AdaptiveRemeshFlag {
   ADAPTIVE_REMESH_ACROSS_SEAMS = 1 << 0,
   ADAPTIVE_REMESH_VERTS_SWAPPED = 1 << 1,
+  ADAPTIVE_REMESH_SEWING = 1 << 2,
 } AdaptiveRemeshFlag;
 
 typedef enum AdaptiveRemeshMode {

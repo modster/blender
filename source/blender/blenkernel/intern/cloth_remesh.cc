@@ -1452,6 +1452,10 @@ Mesh *BKE_cloth_remesh(Object *ob, ClothModifierData *clmd, Mesh *mesh)
 
   AdaptiveRemeshParams<internal::ClothNodeData, Cloth> params;
   params.size_min = clmd->sim_parms->remeshing_size_min;
+  params.flags = 0;
+  if (clmd->sim_parms->flags & CLOTH_SIMSETTINGS_FLAG_SEW) {
+    params.flags |= ADAPTIVE_REMESH_PARAMS_SEWING;
+  }
   params.extra_data_to_end = [](const Cloth &cloth, size_t index) {
     BLI_assert(index < cloth.mvert_num);
     BLI_assert(cloth.verts);
@@ -1504,6 +1508,10 @@ Mesh *__temp_empty_adaptive_remesh(const TempEmptyAdaptiveRemeshParams &input_pa
 
   AdaptiveRemeshParams<EmptyData, EmptyData> params;
   params.size_min = input_params.size_min;
+  params.flags = 0;
+  if (input_params.flags & ADAPTIVE_REMESH_PARAMS_SEWING) {
+    params.flags |= ADAPTIVE_REMESH_PARAMS_SEWING;
+  }
   params.extra_data_to_end = [](const EmptyData &UNUSED(data), size_t UNUSED(index)) {
     return internal::EmptyExtraData();
   };

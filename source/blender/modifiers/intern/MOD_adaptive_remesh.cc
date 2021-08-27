@@ -65,6 +65,10 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *UNUSED(ctx)
 
     TempEmptyAdaptiveRemeshParams params;
     params.size_min = size_min;
+    params.flags = 0;
+    if (armd->flag & ADAPTIVE_REMESH_SEWING) {
+      params.flags |= ADAPTIVE_REMESH_PARAMS_SEWING;
+    }
 
     return __temp_empty_adaptive_remesh(params, mesh);
   }
@@ -174,6 +178,7 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
   }
   else if (armd->mode == ADAPTIVE_REMESH_STATIC_REMESHING) {
     uiItemR(layout, ptr, "size_min", 0, nullptr, ICON_NONE);
+    uiItemR(layout, ptr, "enable_sewing", 0, nullptr, ICON_NONE);
   }
   else {
     BLI_assert_unreachable();

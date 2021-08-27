@@ -115,6 +115,8 @@ namespace blender::bke {
  */
 template<typename END, typename ExtraData> struct AdaptiveRemeshParams {
   float size_min;
+  /* AdaptiveRemeshParamsFlags */
+  uint32_t flags;
 
   /* For handling Extra Node Data */
   /**
@@ -147,6 +149,14 @@ template<typename END, typename ExtraData> struct AdaptiveRemeshParams {
    * useful for memory management of resources within `ExtraData`.
    */
   std::function<void(ExtraData &, size_t)> pre_end_to_extra_data;
+};
+
+/**
+ * AdaptiveRemeshParams->flags
+ */
+enum AdaptiveRemeshParamsFlags {
+  /** Sewing is enabled */
+  ADAPTIVE_REMESH_PARAMS_SEWING = 1 << 0,
 };
 
 /* `mesh` cannot be made const because function defined on `struct
@@ -3366,6 +3376,8 @@ namespace blender::bke {
 
 struct TempEmptyAdaptiveRemeshParams {
   float size_min;
+  /* AdaptiveRemeshParamsFlags */
+  uint32_t flags;
 };
 
 Mesh *__temp_empty_adaptive_remesh(const TempEmptyAdaptiveRemeshParams &params, Mesh *mesh);
