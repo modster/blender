@@ -572,6 +572,17 @@ template<typename T> class Edge {
     return this->verts.value();
   }
 
+  VertIndex get_checked_other_vert(const VertIndex &vert_index) const
+  {
+    BLI_assert(this->has_vert(vert_index));
+
+    const auto &verts = this->get_checked_verts();
+    if (std::get<0>(verts) == vert_index) {
+      return std::get<1>(verts);
+    }
+    return std::get<0>(verts);
+  }
+
   friend std::ostream &operator<<(std::ostream &stream, const Edge &edge)
   {
     stream << "(self_index: " << edge.self_index << ", faces: " << edge.faces
