@@ -77,10 +77,10 @@
         </wcol_toolbar_item>
         <wcol_radio>
           <ThemeWidgetColors
-            outline="#434343"
+            outline="#3b3b3b"
             inner="#3b3b3bff"
             inner_sel="#5680c2e6"
-            item="#ffffffff"
+            item="#3b3b3bff"
             text="#d9d9d9"
             text_sel="#ffffff"
             show_shaded="FALSE"
@@ -257,7 +257,7 @@
         </wcol_tooltip>
         <wcol_menu_item>
           <ThemeWidgetColors
-            outline="#000000"
+            outline="#a6a6a6"
             inner="#00000000"
             inner_sel="#5680c2e6"
             item="#ffffff8f"
@@ -879,7 +879,7 @@
             >
             <panelcolors>
               <ThemePanelColors
-                header="#b3b3b300"
+                header="#a3a3a3cc"
                 back="#a3a3a3cc"
                 sub_back="#00000024"
                 >
@@ -1054,17 +1054,17 @@
       <ThemeInfo
         info_selected="#6080ff"
         info_selected_text="#000000"
-        info_error="#FF0038ff"
+        info_error="#ff0038ff"
         info_error_text="#000000"
-        info_warning="#FFE900ff"
+        info_warning="#ffe900ff"
         info_warning_text="#000000"
-        info_info="#0068B3ff"
+        info_info="#0068b3ff"
         info_info_text="#000000"
-        info_debug="#B30095ff"
+        info_debug="#b30095ff"
         info_debug_text="#000000"
-        info_property="#44B300ff"
+        info_property="#44b300ff"
         info_property_text="#000000"
-        info_operator="#44B300ff"
+        info_operator="#44b300ff"
         info_operator_text="#000000"
         >
         <space>
@@ -1350,6 +1350,15 @@
             </panelcolors>
           </ThemeSpaceGeneric>
         </space>
+        <space_list>
+          <ThemeSpaceListGeneric
+            list="#424242"
+            list_title="#c3c3c3"
+            list_text="#c3c3c3"
+            list_text_hi="#00ffff"
+            >
+          </ThemeSpaceListGeneric>
+        </space_list>
       </ThemeSpreadsheet>
     </spreadsheet>
     <bone_color_sets>
