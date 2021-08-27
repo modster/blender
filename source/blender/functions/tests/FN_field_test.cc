@@ -10,7 +10,7 @@ namespace blender::fn::tests {
 
 TEST(field, ConstantInput)
 {
-  Function function = Function(std::make_unique<CustomMF_Constant<int>>(10), {});
+  FieldFunction function = FieldFunction(std::make_unique<CustomMF_Constant<int>>(10), {});
   Field constant_field = Field(CPPType::get<int>(), function, 0);
 
   Array<int> result(4);
@@ -49,7 +49,7 @@ class IndexFunction : public MultiFunction {
 
 TEST(field, IndexInput)
 {
-  Function function = Function(std::make_unique<IndexFunction>(), {});
+  FieldFunction function = FieldFunction(std::make_unique<IndexFunction>(), {});
   Field index_field = Field(CPPType::get<int>(), function, 0);
 
   Array<int> result_1(4);

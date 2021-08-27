@@ -25,7 +25,7 @@
  * and optimization might mean executing the fields differently based on some factors like the
  * number of elements.
  *
- * For now, fields are very tied to the multi-function system, but in the future the #Function
+ * For now, fields are very tied to the multi-function system, but in the future the #FieldFunction
  * class could be extended to use different descriptions of its outputs and computation besides
  * the embedded multi-function.
  */
@@ -44,7 +44,7 @@ class Field;
  * An operation acting on data described by fields. Generally corresponds
  * to a node or a subset of a node in a node graph.
  */
-class Function {
+class FieldFunction {
   /**
    * The function used to calculate the
    */
@@ -56,7 +56,7 @@ class Function {
   blender::Vector<Field *> inputs_;
 
  public:
-  Function(std::unique_ptr<MultiFunction> function, Span<Field *> inputs)
+  FieldFunction(std::unique_ptr<MultiFunction> function, Span<Field *> inputs)
       : function_(std::move(function)), inputs_(inputs)
   {
   }
@@ -88,7 +88,7 @@ class Field {
    * used as multiple inputs. This avoids calling the same function many times, only using one of
    * its results.
    */
-  const Function *function_;
+  const FieldFunction *function_;
   /**
    * Which output of the function this field corresponds to.
    */
@@ -97,7 +97,7 @@ class Field {
   std::string debug_name_ = "";
 
  public:
-  Field(const fn::CPPType &type, const Function &function, const int output_index)
+  Field(const fn::CPPType &type, const FieldFunction &function, const int output_index)
       : type_(&type), function_(&function), output_index_(output_index)
   {
   }
@@ -108,7 +108,7 @@ class Field {
     return *type_;
   }
 
-  const Function &function() const
+  const FieldFunction &function() const
   {
     BLI_assert(function_ != nullptr);
     return *function_;

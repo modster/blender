@@ -22,11 +22,11 @@
 namespace blender::fn {
 
 /* A map to hold the output variables for each function so they can be reused. */
-using OutputMap = MultiValueMap<const Function *, MFVariable *>;
+using OutputMap = MultiValueMap<const FieldFunction *, MFVariable *>;
 
 static MFVariable *get_field_variable(const Field &field, const OutputMap &output_map)
 {
-  const Function &input_field_function = field.function();
+  const FieldFunction &input_field_function = field.function();
   const Span<MFVariable *> input_function_outputs = output_map.lookup(&input_field_function);
   return input_function_outputs[field.function_output_index()];
 }
@@ -40,7 +40,7 @@ static void add_field_variables(const Field &field,
                                 MFProcedureBuilder &builder,
                                 OutputMap &output_map)
 {
-  const Function &function = field.function();
+  const FieldFunction &function = field.function();
   for (const Field *input_field : function.inputs()) {
     add_field_variables(*input_field, builder, output_map);
   }
