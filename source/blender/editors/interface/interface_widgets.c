@@ -4247,6 +4247,7 @@ static void widget_box(
   const float rad = wcol->roundness * U.widget_unit;
   round_box_edges(&wtb, roundboxalign, rect, rad);
 
+  wtb.draw_emboss = false;
   widgetbase_draw(&wtb, wcol);
 
   copy_v3_v3_uchar(wcol->inner, old_col);
