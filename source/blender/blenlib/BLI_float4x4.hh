@@ -21,6 +21,17 @@
 
 namespace blender {
 
+/**
+ * A 4x4 column major matrix.
+ *
+ * float4x4::values[i] is the ith column of the matrix.
+ *
+ * |m00 m10 m20 m30|
+ * |m01 m11 m21 m31|
+ * |m02 m12 m22 m32|
+ * |m03 m13 m23 m33|
+ *
+ */
 struct float4x4 {
   float values[4][4];
 
