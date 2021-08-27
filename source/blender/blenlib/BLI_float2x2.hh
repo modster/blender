@@ -22,6 +22,15 @@
 
 namespace blender {
 
+/**
+ * A 2x2 column major matrix.
+ *
+ * float2x2::values[i] is the ith column of the matrix.
+ *
+ * |m00 m10|
+ * |m01 m11|
+ *
+ */
 struct float2x2 {
   float values[2][2];
 
