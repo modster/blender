@@ -689,8 +689,13 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
    * Split the given edge and handle adaptivemesh specific
    * requirements like running `this->flip_edges` on faces created
    * during splitting, handling sewing if enabled.
+   *
+   * Returns a tuple of the MeshDiff of the entire split edge
+   * operation (includes sewing related and flip edges operations) and
+   * the set of verts that were added by the split operation only.
    */
-  void split_edge_adaptivemesh(const EdgeIndex &edge_index, bool sewing_enabled)
+  std::tuple<AdaptiveMeshDiff<END>, blender::Vector<VertIndex>> split_edge_adaptivemesh(
+      const EdgeIndex &edge_index, bool sewing_enabled)
   {
     auto &edge = this->get_checked_edge(edge_index);
     auto mesh_diff = this->split_edge_triangulate(edge.get_self_index(), true);
@@ -705,6 +710,10 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
 
     this->compute_info_adaptivemesh(mesh_diff);
 
+    /* Store the verts added by the split edge operation to return
+     * from the function */
+    const auto added_verts = mesh_diff.get_added_verts();
+
     if (sewing_enabled) {
       BLI_assert(mesh_diff.get_added_nodes().size() == 1);
       std::cout << "mesh_diff.get_added_verts().size(): " << mesh_diff.get_added_verts().size()
@@ -715,7 +724,12 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
     /* Flip edges of those faces that were created during the
      * split edge operation */
     auto added_faces = mesh_diff.get_added_faces();
-    this->flip_edges(added_faces);
+    const auto flip_edges_mesh_diff = this->flip_edges(added_faces);
+
+    mesh_diff.append(flip_edges_mesh_diff);
+    mesh_diff.remove_non_existing_elements(*this);
+
+    return {mesh_diff, added_verts};
   }
 
   /**
