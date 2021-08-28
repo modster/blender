@@ -3395,6 +3395,26 @@ template<typename END, typename EVD, typename EED, typename EFD> class MeshDiff 
   {
   }
 
+  void add_node(const NodeIndex &node_index)
+  {
+    this->added_nodes.append(node_index);
+  }
+
+  void add_vert(const VertIndex &vert_index)
+  {
+    this->added_verts.append(vert_index);
+  }
+
+  void add_edge(const EdgeIndex &edge_index)
+  {
+    this->added_edges.append(edge_index);
+  }
+
+  void add_face(const FaceIndex &face_index)
+  {
+    this->added_faces.append(face_index);
+  }
+
   const auto &get_added_nodes() const
   {
     return this->added_nodes;
