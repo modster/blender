@@ -718,7 +718,12 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
       BLI_assert(mesh_diff.get_added_nodes().size() == 1);
       std::cout << "mesh_diff.get_added_verts().size(): " << mesh_diff.get_added_verts().size()
                 << std::endl;
-      this->try_adding_sewing_edge(mesh_diff.get_added_verts()[0]);
+      const auto sewing_mesh_diff = this->try_adding_sewing_edge(mesh_diff.get_added_verts()[0]);
+
+      /* Append `sewing_mesh_diff` to `mesh_diff` so that
+       * `flip_edges()` operates on a valid MeshDiff */
+      mesh_diff.append(sewing_mesh_diff);
+      mesh_diff.remove_non_existing_elements(*this);
     }
 
     /* Flip edges of those faces that were created during the
@@ -745,7 +750,7 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
    * split and it has another loose edge adjacent to it which can loop
    * back the given vert via an edge.
    */
-  void try_adding_sewing_edge(const VertIndex &vert_index)
+  AdaptiveMeshDiff<END> try_adding_sewing_edge(const VertIndex &vert_index)
   {
     /* vert: is the vert that is being tested.
      *
@@ -836,6 +841,39 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
 
     std::cout << "vert_index: " << vert_index << " opposite_edges: " << opposite_edges
               << std::endl;
+
+    AdaptiveMeshDiff<END> complete_mesh_diff;
+    for (const auto &opposite_edge_index : opposite_edges) {
+      /* It is possible that that splitting a previous `opposite_edge`
+       * might have removed this edge */
+      if (this->has_edge(opposite_edge_index) == false) {
+        continue;
+      }
+
+      {
+        const auto &opposite_edge = this->get_checked_edge(opposite_edge_index);
+
+        if (this->is_edge_splittable_adaptivemesh(opposite_edge) == false) {
+          continue;
+        }
+      }
+
+      const auto [mesh_diff, added_verts] = this->split_edge_adaptivemesh(opposite_edge_index,
+                                                                          true);
+      complete_mesh_diff.append(mesh_diff);
+      complete_mesh_diff.remove_non_existing_elements(*this);
+
+      /* TODO(ish): update this when the sewing edge is added between
+       * nodes and not just verts. */
+      /* Create an edge between given `vert` and `added_verts[0]` */
+      BLI_assert(added_verts.size() >= 1);
+      auto &new_edge = this->add_checked_loose_edge(vert_index, added_verts[0]);
+      this->compute_info_edge_adaptivemesh(new_edge);
+
+      complete_mesh_diff.add_edge(new_edge.get_self_index());
+    }
+
+    return complete_mesh_diff;
   }
 
   /**
