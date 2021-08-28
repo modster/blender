@@ -2889,30 +2889,59 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
   }
 
   /**
+   * Computes extra data information for given node
+   */
+  void compute_info_node(Node<END> &UNUSED(node))
+  {
+  }
+
+  /**
+   * Computes extra data information for given vert
+   */
+  void compute_info_vert(Vert<EVD> &UNUSED(vert))
+  {
+  }
+
+  /**
+   * Computes extra data information for given edge
+   */
+  void compute_info_edge(Edge<EED> &UNUSED(edge))
+  {
+  }
+
+  /**
+   * Computes extra data information for given face
+   */
+  void compute_info_face(Face<EFD> &face)
+  {
+    this->compute_face_normal(face);
+  }
+
+  /**
    * For all added elements within mesh_diff, compute information
    * needed by the mesh. For example, face normals, etc.
    */
   void compute_info(const MeshDiff<END, EVD, EED, EFD> &mesh_diff)
   {
-/* Not using setting anything in these as of right now */
-#  if 0
     for (const auto &node_index : mesh_diff.get_added_nodes()) {
-      const auto &node = this->get_checked_node(node_index);
+      auto &node = this->get_checked_node(node_index);
+      this->compute_info_node(node);
     }
 
     for (const auto &vert_index : mesh_diff.get_added_verts()) {
-      const auto &vert = this->get_checked_vert(vert_index);
+      auto &vert = this->get_checked_vert(vert_index);
+      this->compute_info_vert(vert);
     }
 
     for (const auto &edge_index : mesh_diff.get_added_edges()) {
-      const auto &edge = this->get_checked_edge(edge_index);
+      auto &edge = this->get_checked_edge(edge_index);
+      this->compute_info_edge(edge);
     }
-#  endif
 
     for (const auto &face_index : mesh_diff.get_added_faces()) {
       auto &face = this->get_checked_face(face_index);
 
-      this->compute_face_normal(face);
+      this->compute_info_face(face);
     }
   }
 
