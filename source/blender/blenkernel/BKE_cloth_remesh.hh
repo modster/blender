@@ -2945,6 +2945,22 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     }
   }
 
+  Edge<EED> &add_checked_loose_edge(const VertIndex v1_index, const VertIndex v2_index)
+  {
+    /* Checks to ensure v1 and v2 are valid */
+    {
+      BLI_assert(this->has_vert(v1_index));
+      BLI_assert(this->has_vert(v2_index));
+      BLI_assert(this->get_connecting_edge_index(v1_index, v2_index) == std::nullopt);
+    }
+
+    auto &new_edge = this->add_empty_edge();
+    new_edge.verts = std::make_tuple(v1_index, v2_index);
+    this->add_edge_ref_to_verts(new_edge);
+
+    return new_edge;
+  }
+
  private:
   /* all private static methods */
   /* all private non-static methods */
