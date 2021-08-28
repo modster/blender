@@ -26,6 +26,7 @@ TEST(field, ConstantFunction)
 }
 
 class IndexFieldInput final : public FieldInput {
+  StringRef name_ = "Index";
   GVArrayPtr retrieve_data(IndexMask mask) const final
   {
     auto index_func = [](int i) { return i; };
@@ -37,7 +38,7 @@ class IndexFieldInput final : public FieldInput {
 
 TEST(field, VArrayInput)
 {
-  Field index_field = Field(CPPType::get<int>(), std::make_shared<IndexFieldInput>(), "Index");
+  Field index_field = Field(CPPType::get<int>(), std::make_shared<IndexFieldInput>());
 
   Array<int> result_1(4);
   GMutableSpan result_generic_1(result_1.as_mutable_span());
@@ -60,8 +61,8 @@ TEST(field, VArrayInput)
 TEST(field, VArrayInputMultipleOutputs)
 {
   std::shared_ptr<FieldInput> index_input = std::make_shared<IndexFieldInput>();
-  Field field_1 = Field(CPPType::get<int>(), index_input, "Index");
-  Field field_2 = Field(CPPType::get<int>(), index_input, "Index");
+  Field field_1 = Field(CPPType::get<int>(), index_input);
+  Field field_2 = Field(CPPType::get<int>(), index_input);
 
   Array<int> result_1(10);
   Array<int> result_2(10);
@@ -81,7 +82,7 @@ TEST(field, VArrayInputMultipleOutputs)
 
 TEST(field, InputAndFunction)
 {
-  Field index_field = Field(CPPType::get<int>(), std::make_shared<IndexFieldInput>(), "Index");
+  Field index_field = Field(CPPType::get<int>(), std::make_shared<IndexFieldInput>());
 
   Field output_field = Field(CPPType::get<int>(),
                              std::make_shared<FieldFunction>(
@@ -89,10 +90,6 @@ TEST(field, InputAndFunction)
                                                    "add", [](int a, int b) { return a + b; }),
                                                {index_field, index_field})),
                              0);
-
-  std::shared_ptr<FieldInput> index_input = std::make_shared<IndexFieldInput>();
-  Field field_1 = Field(CPPType::get<int>(), index_input);
-  Field field_2 = Field(CPPType::get<int>(), index_input);
 
   Array<int> result(10);
   GMutableSpan result_generic(result.as_mutable_span());

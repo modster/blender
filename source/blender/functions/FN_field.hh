@@ -66,19 +66,13 @@ class Field {
 
   std::shared_ptr<FieldInput> input_;
 
-  StringRef name_;
-
  public:
-  Field(const fn::CPPType &type,
-        std::shared_ptr<FieldFunction> function,
-        const int output_index,
-        StringRef name = "")
-      : type_(&type), function_(function), output_index_(output_index), name_(name)
+  Field(const fn::CPPType &type, std::shared_ptr<FieldFunction> function, const int output_index)
+      : type_(&type), function_(function), output_index_(output_index)
   {
   }
 
-  Field(const fn::CPPType &type, std::shared_ptr<FieldInput> input, StringRef name = "")
-      : type_(&type), input_(input), name_(name)
+  Field(const fn::CPPType &type, std::shared_ptr<FieldInput> input) : type_(&type), input_(input)
   {
   }
 
@@ -116,11 +110,6 @@ class Field {
     BLI_assert(input_ == nullptr);
     return output_index_;
   }
-
-  blender::StringRef name() const
-  {
-    return name_;
-  }
 };
 
 /**
@@ -156,8 +145,21 @@ class FieldFunction {
 };
 
 class FieldInput {
+
+ protected:
+  StringRef name_;
+
  public:
+  FieldInput(StringRef name = "") : name_(name)
+  {
+  }
+
   virtual GVArrayPtr retrieve_data(IndexMask mask) const = 0;
+
+  blender::StringRef name() const
+  {
+    return name_;
+  }
 };
 
 /**

@@ -16,6 +16,7 @@
 
 #include "BLI_map.hh"
 #include "BLI_set.hh"
+#include "BLI_vector_set.hh"
 
 #include "FN_field.hh"
 
@@ -56,8 +57,9 @@ static void add_field_variables_recursive(const Field &field,
   if (field.is_input()) {
     const FieldInput &input = field.input();
     if (!variable_map.contains(&input)) {
-      variable_map.add(&input,
-                       {&builder.add_input_parameter(MFDataType::ForSingle(field.type()))});
+      MFVariable &variable = builder.add_input_parameter(MFDataType::ForSingle(field.type()),
+                                                         input.name());
+      variable_map.add(&input, {&variable});
     }
   }
   else {
@@ -66,17 +68,18 @@ static void add_field_variables_recursive(const Field &field,
       add_field_variables_recursive(input_field, builder, variable_map); /* TODO: Use stack. */
     }
 
-    /* Add the immediate inputs to this field, which were added earlier in the
-     * recursive call. This will be skipped for functions with no inputs. */
+    /* Add the immediate inputs to this field, which were added earlier in the recursive call.  */
     Vector<MFVariable *> inputs;
+    VectorSet<MFVariable *> unique_inputs;
     for (const Field &input_field : function.inputs()) {
       MFVariable &input = get_field_variable(input_field, variable_map);
+      unique_inputs.add(&input);
       inputs.append(&input);
     }
 
     Vector<MFVariable *> outputs = builder.add_call(function.multi_function(), inputs);
 
-    builder.add_destruct(inputs);
+    builder.add_destruct(unique_inputs);
 
     variable_map.add(&function, std::move(outputs));
   }
@@ -121,7 +124,7 @@ static void gather_inputs_recursive(const Field &field,
     if (!computed_inputs.contains(variable)) {
       GVArrayPtr data = input.retrieve_data(mask);
       computed_inputs.add_new(variable);
-      params.add_readonly_single_input(*data, field.name());
+      params.add_readonly_single_input(*data, input.name());
       r_inputs.append(std::move(data));
     }
   }
