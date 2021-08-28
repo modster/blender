@@ -33,15 +33,15 @@ using VariableMap = Map<const void *, Vector<MFVariable *>>;
  */
 using ComputedInputMap = Map<const MFVariable *, GVArrayPtr>;
 
-static MFVariable *get_field_variable(const Field &field, const VariableMap &variable_map)
+static MFVariable &get_field_variable(const Field &field, const VariableMap &variable_map)
 {
   if (field.is_input()) {
     const FieldInput &input = field.input();
-    return variable_map.lookup(&input).first();
+    return *variable_map.lookup(&input).first();
   }
   const FieldFunction &function = field.function();
   const Span<MFVariable *> function_outputs = variable_map.lookup(&function);
-  return function_outputs[field.function_output_index()];
+  return *function_outputs[field.function_output_index()];
 }
 
 /**
@@ -62,17 +62,17 @@ static void add_field_variables_recursive(const Field &field,
   }
   else {
     const FieldFunction &function = field.function();
-    for (const Field *input_field : function.inputs()) {
-      add_field_variables_recursive(*input_field, builder, variable_map);
+    for (const Field &input_field : function.inputs()) {
+      add_field_variables_recursive(input_field, builder, variable_map);
     }
 
     /* Add the immediate inputs to this field, which were added earlier in the
      * recursive call. This will be skipped for functions with no inputs. */
     Vector<MFVariable *> inputs;
-    for (const Field *input_field : function.inputs()) {
-      MFVariable *input = get_field_variable(*input_field, variable_map);
-      builder.add_input_parameter(input->data_type(), input_field->name());
-      inputs.append(input);
+    for (const Field &input_field : function.inputs()) {
+      MFVariable &input = get_field_variable(input_field, variable_map);
+      builder.add_input_parameter(input.data_type());
+      inputs.append(&input);
     }
 
     Vector<MFVariable *> outputs = builder.add_call(function.multi_function(), inputs);
@@ -96,8 +96,8 @@ static void build_procedure(const Span<Field> fields,
   builder.add_return();
 
   for (const Field &field : fields) {
-    MFVariable *input = get_field_variable(field, variable_map);
-    builder.add_output_parameter(*input);
+    MFVariable &input = get_field_variable(field, variable_map);
+    builder.add_output_parameter(input);
   }
 
   std::cout << procedure.to_dot();
@@ -122,14 +122,14 @@ static void gather_inputs_recursive(const Field &field,
     if (!computed_inputs.contains(variable)) {
       GVArrayPtr data = input.retrieve_data(mask);
       computed_inputs.add_new(variable);
-      params.add_readonly_single_input(*data, input.name());
+      params.add_readonly_single_input(*data, field.name());
       r_inputs.append(std::move(data));
     }
   }
   else {
     const FieldFunction &function = field.function();
-    for (const Field *input_field : function.inputs()) {
-      gather_inputs_recursive(*input_field, variable_map, mask, params, computed_inputs, r_inputs);
+    for (const Field &input_field : function.inputs()) {
+      gather_inputs_recursive(input_field, variable_map, mask, params, computed_inputs, r_inputs);
     }
   }
 }

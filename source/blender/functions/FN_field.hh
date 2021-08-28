@@ -30,6 +30,7 @@
  * the embedded multi-function.
  */
 
+#include "BLI_string_ref.hh"
 #include "BLI_vector.hh"
 
 #include "FN_multi_function_procedure.hh"
@@ -38,64 +39,8 @@
 
 namespace blender::fn {
 
-class Field;
-
-/**
- * An operation acting on data described by fields. Generally corresponds
- * to a node or a subset of a node in a node graph.
- */
-class FieldFunction {
-  /**
-   * The function used to calculate the
-   */
-  std::unique_ptr<MultiFunction> function_;
-
-  /**
-   * References to descriptions of the results from the functions this function depends on.
-   */
-  blender::Vector<Field *> inputs_;
-
-  std::string name_;
-
- public:
-  FieldFunction(std::unique_ptr<MultiFunction> function,
-                Span<Field *> inputs,
-                std::string &&name = "")
-      : function_(std::move(function)), inputs_(inputs), name_(std::move(name))
-  {
-  }
-
-  Span<Field *> inputs() const
-  {
-    return inputs_;
-  }
-
-  const MultiFunction &multi_function() const
-  {
-    return *function_;
-  }
-
-  blender::StringRef name() const
-  {
-    return name_;
-  }
-};
-
-class FieldInput {
-  std::string name_;
-
- public:
-  FieldInput(std::string &&name = "") : name_(std::move(name))
-  {
-  }
-
-  virtual GVArrayPtr retrieve_data(IndexMask mask) const = 0;
-
-  blender::StringRef name() const
-  {
-    return name_;
-  }
-};
+class FieldInput;
+class FieldFunction;
 
 /**
  * Descibes the output of a function. Generally corresponds to the combination of an output socket
@@ -121,13 +66,19 @@ class Field {
 
   std::shared_ptr<FieldInput> input_;
 
+  StringRef name_;
+
  public:
-  Field(const fn::CPPType &type, std::shared_ptr<FieldFunction> function, const int output_index)
-      : type_(&type), function_(function), output_index_(output_index)
+  Field(const fn::CPPType &type,
+        std::shared_ptr<FieldFunction> function,
+        const int output_index,
+        StringRef name = "")
+      : type_(&type), function_(function), output_index_(output_index), name_(name)
   {
   }
 
-  Field(const fn::CPPType &type, std::shared_ptr<FieldInput> input) : type_(&type), input_(input)
+  Field(const fn::CPPType &type, std::shared_ptr<FieldInput> input, StringRef name = "")
+      : type_(&type), input_(input), name_(name)
   {
   }
 
@@ -168,11 +119,45 @@ class Field {
 
   blender::StringRef name() const
   {
-    if (this->is_function()) {
-      return function_->name();
-    }
-    return input_->name();
+    return name_;
   }
+};
+
+/**
+ * An operation acting on data described by fields. Generally corresponds
+ * to a node or a subset of a node in a node graph.
+ */
+class FieldFunction {
+  /**
+   * The function used to calculate the
+   */
+  std::unique_ptr<MultiFunction> function_;
+
+  /**
+   * References to descriptions of the results from the functions this function depends on.
+   */
+  blender::Vector<Field> inputs_;
+
+ public:
+  FieldFunction(std::unique_ptr<MultiFunction> function, Vector<Field> &&inputs)
+      : function_(std::move(function)), inputs_(std::move(inputs))
+  {
+  }
+
+  Span<Field> inputs() const
+  {
+    return inputs_;
+  }
+
+  const MultiFunction &multi_function() const
+  {
+    return *function_;
+  }
+};
+
+class FieldInput {
+ public:
+  virtual GVArrayPtr retrieve_data(IndexMask mask) const = 0;
 };
 
 /**

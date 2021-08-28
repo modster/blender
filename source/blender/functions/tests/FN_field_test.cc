@@ -37,7 +37,7 @@ class IndexFieldInput final : public FieldInput {
 
 TEST(field, VArrayInput)
 {
-  Field index_field = Field(CPPType::get<int>(), std::make_shared<IndexFieldInput>());
+  Field index_field = Field(CPPType::get<int>(), std::make_shared<IndexFieldInput>(), "Index");
 
   Array<int> result_1(4);
   GMutableSpan result_generic_1(result_1.as_mutable_span());
@@ -60,8 +60,8 @@ TEST(field, VArrayInput)
 TEST(field, VArrayInputMultipleOutputs)
 {
   std::shared_ptr<FieldInput> index_input = std::make_shared<IndexFieldInput>();
-  Field field_1 = Field(CPPType::get<int>(), index_input);
-  Field field_2 = Field(CPPType::get<int>(), index_input);
+  Field field_1 = Field(CPPType::get<int>(), index_input, "Index");
+  Field field_2 = Field(CPPType::get<int>(), index_input, "Index");
 
   Array<int> result_1(10);
   Array<int> result_2(10);
@@ -69,10 +69,38 @@ TEST(field, VArrayInputMultipleOutputs)
   GMutableSpan result_generic_2(result_2.as_mutable_span());
 
   evaluate_fields({field_1, field_2}, {2, 4, 6, 8}, {result_generic_1, result_generic_2});
+  EXPECT_EQ(result_1[2], 2);
+  EXPECT_EQ(result_1[4], 4);
+  EXPECT_EQ(result_1[6], 6);
+  EXPECT_EQ(result_1[8], 8);
   EXPECT_EQ(result_2[2], 2);
   EXPECT_EQ(result_2[4], 4);
   EXPECT_EQ(result_2[6], 6);
   EXPECT_EQ(result_2[8], 8);
+}
+
+TEST(field, InputAndFunction)
+{
+  Field index_field = Field(CPPType::get<int>(), std::make_shared<IndexFieldInput>(), "Index");
+
+  Field output_field = Field(CPPType::get<int>(),
+                             std::make_shared<FieldFunction>(
+                                 FieldFunction(std::make_unique<CustomMF_SI_SI_SO<int, int, int>>(
+                                                   "add", [](int a, int b) { return a + b; }),
+                                               {index_field, index_field})),
+                             0);
+
+  std::shared_ptr<FieldInput> index_input = std::make_shared<IndexFieldInput>();
+  Field field_1 = Field(CPPType::get<int>(), index_input);
+  Field field_2 = Field(CPPType::get<int>(), index_input);
+
+  Array<int> result(10);
+  GMutableSpan result_generic(result.as_mutable_span());
+  evaluate_fields({output_field}, {2, 4, 6, 8}, {result_generic});
+  EXPECT_EQ(result[2], 4);
+  EXPECT_EQ(result[4], 8);
+  EXPECT_EQ(result[6], 12);
+  EXPECT_EQ(result[8], 16);
 }
 
 }  // namespace blender::fn::tests
