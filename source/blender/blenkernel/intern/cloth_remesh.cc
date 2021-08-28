@@ -876,6 +876,15 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
       auto &new_edge = this->add_checked_loose_edge(vert_index, added_verts[0]);
       this->compute_info_edge_adaptivemesh(new_edge);
 
+#if SHOULD_REMESH_DUMP_FILE
+      auto after_adding_loose_edge_msgpack = this->serialize();
+      auto after_adding_loose_edge_filename = static_remesh_name_gen.get_curr(
+          "after_adding_loose_edge_" + get_number_as_string(std::get<0>(vert_index.get_raw())) +
+          "_" + get_number_as_string(std::get<0>(added_verts[0].get_raw())));
+      static_remesh_name_gen.gen_next();
+      dump_file(after_adding_loose_edge_filename, after_adding_loose_edge_msgpack);
+#endif
+
       complete_mesh_diff.add_edge(new_edge.get_self_index());
     }
 
