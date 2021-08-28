@@ -405,8 +405,9 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
    *
    * Updates the active_faces in place
    */
-  void flip_edges(blender::Vector<FaceIndex> &active_faces)
+  AdaptiveMeshDiff<END> flip_edges(blender::Vector<FaceIndex> &active_faces)
   {
+    AdaptiveMeshDiff<END> complete_mesh_diff;
     auto max_loop_cycles = active_faces.size() * 3;
     auto loop_cycles_until_now = 0;
     auto flippable_edge_indices_set = this->get_flippable_edge_indices_set(active_faces);
@@ -418,7 +419,8 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
           continue;
         }
 
-        auto mesh_diff = this->flip_edge_triangulate(edge.get_self_index(), false);
+        const auto mesh_diff = this->flip_edge_triangulate(edge.get_self_index(), false);
+        complete_mesh_diff.append(mesh_diff);
 
         this->compute_info_adaptivemesh(mesh_diff);
 
@@ -450,6 +452,12 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
       flippable_edge_indices_set = this->get_flippable_edge_indices_set(active_faces);
       loop_cycles_until_now++;
     } while (flippable_edge_indices_set.size() != 0 && loop_cycles_until_now != max_loop_cycles);
+
+    /* Since `complete_mesh_diff` is not used for operations within
+     * this function, `remove_non_existing_elements()` can be called
+     * only once here before returning the `complete_mesh_diff` */
+    complete_mesh_diff.remove_non_existing_elements(*this);
+    return complete_mesh_diff;
   }
 
   /**
