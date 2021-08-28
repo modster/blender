@@ -611,6 +611,12 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
     /*     v2.get_checked_extra_data().get_flag() & VERT_SELECTED_FOR_SPLIT) { */
     /*   continue; */
     /* } */
+
+    /* A loose edge should not be split */
+    if (edge.is_loose()) {
+      return false;
+    }
+
     const auto &edge_data = edge.get_checked_extra_data();
     auto edge_size = edge_data.get_size();
     return edge_size > 1.0;
