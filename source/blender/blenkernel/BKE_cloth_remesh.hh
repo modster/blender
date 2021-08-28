@@ -1271,6 +1271,30 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     return this->faces;
   }
 
+  bool has_node(const NodeIndex node_index) const
+  {
+    const auto op_node = this->get_nodes().get(node_index);
+    return op_node != std::nullopt;
+  }
+
+  bool has_vert(const VertIndex vert_index) const
+  {
+    const auto op_vert = this->get_verts().get(vert_index);
+    return op_vert != std::nullopt;
+  }
+
+  bool has_edge(const EdgeIndex edge_index) const
+  {
+    const auto op_edge = this->get_edges().get(edge_index);
+    return op_edge != std::nullopt;
+  }
+
+  bool has_face(const FaceIndex face_index) const
+  {
+    const auto op_face = this->get_faces().get(face_index);
+    return op_face != std::nullopt;
+  }
+
   std::optional<EdgeIndex> get_connecting_edge_index(VertIndex vert_1_index,
                                                      VertIndex vert_2_index) const
   {
