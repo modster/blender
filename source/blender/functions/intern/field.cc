@@ -187,7 +187,7 @@ void evaluate_fields(const Span<Field> fields,
    * special case to avoid sharing the same variable for an input and output elsewhere. */
   Vector<Field> non_input_fields{fields};
   Vector<GMutableSpan> non_input_outputs{outputs};
-  for (const int i : fields.index_range()) {
+  for (int i = fields.size() - 1; i >= 0; i--) {
     if (non_input_fields[i].is_input()) {
       non_input_fields[i].input().retrieve_data(mask)->materialize(mask, outputs[i].data());
 

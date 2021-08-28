@@ -17,7 +17,7 @@ TEST(field, ConstantFunction)
 
   Array<int> result(4);
   GMutableSpan result_generic(result.as_mutable_span());
-  evaluate_fields({&constant_field, 1}, IndexMask(IndexRange(4)), {&result_generic, 1});
+  evaluate_fields({constant_field}, IndexMask(IndexRange(4)), {result_generic});
 
   EXPECT_EQ(result[0], 10);
   EXPECT_EQ(result[1], 10);
@@ -41,15 +41,34 @@ TEST(field, VArrayInput)
 
   Array<int> result_1(4);
   GMutableSpan result_generic_1(result_1.as_mutable_span());
-  evaluate_fields({&index_field, 1}, IndexMask(IndexRange(4)), {&result_generic_1, 1});
+  evaluate_fields({index_field}, IndexMask(IndexRange(4)), {result_generic_1});
   EXPECT_EQ(result_1[0], 0);
   EXPECT_EQ(result_1[1], 1);
   EXPECT_EQ(result_1[2], 2);
   EXPECT_EQ(result_1[3], 3);
 
+  /* Evaluate a second time, just to test that the first didn't break anything. */
   Array<int> result_2(10);
   GMutableSpan result_generic_2(result_2.as_mutable_span());
-  evaluate_fields({&index_field, 1}, {2, 4, 6, 8}, {&result_generic_2, 1});
+  evaluate_fields({index_field}, {2, 4, 6, 8}, {result_generic_2});
+  EXPECT_EQ(result_2[2], 2);
+  EXPECT_EQ(result_2[4], 4);
+  EXPECT_EQ(result_2[6], 6);
+  EXPECT_EQ(result_2[8], 8);
+}
+
+TEST(field, VArrayInputMultipleOutputs)
+{
+  std::shared_ptr<FieldInput> index_input = std::make_shared<IndexFieldInput>();
+  Field field_1 = Field(CPPType::get<int>(), index_input);
+  Field field_2 = Field(CPPType::get<int>(), index_input);
+
+  Array<int> result_1(10);
+  Array<int> result_2(10);
+  GMutableSpan result_generic_1(result_1.as_mutable_span());
+  GMutableSpan result_generic_2(result_2.as_mutable_span());
+
+  evaluate_fields({field_1, field_2}, {2, 4, 6, 8}, {result_generic_1, result_generic_2});
   EXPECT_EQ(result_2[2], 2);
   EXPECT_EQ(result_2[4], 4);
   EXPECT_EQ(result_2[6], 6);
