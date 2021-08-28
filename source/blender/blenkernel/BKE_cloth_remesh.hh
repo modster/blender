@@ -3455,6 +3455,44 @@ template<typename END, typename EVD, typename EED, typename EFD> class MeshDiff 
     return this->deleted_faces;
   }
 
+  /**
+   * Removes elements from added elements that no longer exist in the
+   * mesh.
+   */
+  void remove_non_existing_elements(const Mesh<END, EVD, EED, EFD> &mesh)
+  {
+    blender::Vector<NodeIndex> added_nodes;
+    blender::Vector<VertIndex> added_verts;
+    blender::Vector<EdgeIndex> added_edges;
+    blender::Vector<FaceIndex> added_faces;
+
+    for (const auto &node_index : this->added_nodes) {
+      if (mesh.has_node(node_index)) {
+        added_nodes.append(node_index);
+      }
+    }
+    for (const auto &vert_index : this->added_verts) {
+      if (mesh.has_vert(vert_index)) {
+        added_verts.append(vert_index);
+      }
+    }
+    for (const auto &edge_index : this->added_edges) {
+      if (mesh.has_edge(edge_index)) {
+        added_edges.append(edge_index);
+      }
+    }
+    for (const auto &face_index : this->added_faces) {
+      if (mesh.has_face(face_index)) {
+        added_faces.append(face_index);
+      }
+    }
+
+    this->added_nodes = added_nodes;
+    this->added_verts = added_verts;
+    this->added_edges = added_edges;
+    this->added_faces = added_faces;
+  }
+
   friend std::ostream &operator<<(std::ostream &stream,
                                   const MeshDiff<END, EVD, EED, EFD> &mesh_diff)
   {
