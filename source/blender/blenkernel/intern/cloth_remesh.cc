@@ -596,6 +596,18 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
   }
 
  private:
+  bool is_edge_splittable_adaptivemesh(const AdaptiveEdge &edge) const
+  {
+    /* auto [v1, v2] = this->get_checked_verts_of_edge(edge, false); */
+    /* if (v1.get_checked_extra_data().get_flag() & VERT_SELECTED_FOR_SPLIT || */
+    /*     v2.get_checked_extra_data().get_flag() & VERT_SELECTED_FOR_SPLIT) { */
+    /*   continue; */
+    /* } */
+    const auto &edge_data = edge.get_checked_extra_data();
+    auto edge_size = edge_data.get_size();
+    return edge_size > 1.0;
+  }
+
   /**
    * Gets the maximal independent set of splittable edge indices in
    * the `AdaptiveMesh`.
@@ -638,14 +650,8 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
     /* It is assumed that the edges sizes have been computed earlier
      * and stored in the extra data of the edges */
     for (const auto &edge : this->get_edges()) {
-      auto [v1, v2] = this->get_checked_verts_of_edge(edge, false);
-      /* if (v1.get_checked_extra_data().get_flag() & VERT_SELECTED_FOR_SPLIT || */
-      /*     v2.get_checked_extra_data().get_flag() & VERT_SELECTED_FOR_SPLIT) { */
-      /*   continue; */
-      /* } */
-      const auto &edge_data = edge.get_checked_extra_data();
-      auto edge_size = edge_data.get_size();
-      if (edge_size > 1.0) {
+      if (this->is_edge_splittable_adaptivemesh(edge)) {
+        auto [v1, v2] = this->get_checked_verts_of_edge(edge, false);
         splittable_edge_indices.append(edge.get_self_index());
         auto &v1_data = v1.get_checked_extra_data_mut();
         auto &v1_flag = v1_data.get_flag_mut();
