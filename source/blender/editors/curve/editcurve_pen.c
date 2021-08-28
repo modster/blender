@@ -833,24 +833,6 @@ static bool make_cyclic_if_endpoints(
   return false;
 }
 
-/* Deselect all points except the end points. */
-static void deselect_except_end_points(Nurb *nu, EditNurb *editnurb)
-{
-  BezTriple *start_bezt = nu->bezt;
-  BezTriple *last_bezt = nu->bezt + nu->pntsu - 1;
-  bool temp_handle_sel1[3] = {start_bezt->f1, start_bezt->f2, start_bezt->f3};
-  bool temp_handle_sel2[3] = {last_bezt->f1, last_bezt->f2, last_bezt->f3};
-
-  ED_curve_deselect_all(editnurb);
-
-  start_bezt->f1 = temp_handle_sel1[0];
-  start_bezt->f2 = temp_handle_sel1[1];
-  start_bezt->f3 = temp_handle_sel1[2];
-  last_bezt->f1 = temp_handle_sel2[0];
-  last_bezt->f2 = temp_handle_sel2[1];
-  last_bezt->f3 = temp_handle_sel2[2];
-}
-
 enum {
   PEN_MODAL_CANCEL = 1,
   PEN_MODAL_FREE_MOVE_HANDLE,
@@ -1020,14 +1002,6 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
             moving_segment = true;
           }
           else {
-            if (nu) {
-              if (!(nu->flagu & CU_NURB_CYCLIC)) {
-                deselect_except_end_points(nu, cu->editnurb);
-              }
-              else {
-                ED_curve_deselect_all(cu->editnurb);
-              }
-            }
             add_vertex_connected_to_selected_vertex(&vc, obedit, event);
           }
         }
