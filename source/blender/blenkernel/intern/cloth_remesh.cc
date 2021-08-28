@@ -1156,37 +1156,66 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
     return true;
   }
 
-  /* Compute extra information for all the elements added (stored
+  /**
+   * Computes extra data information for given node
+   */
+  void compute_info_node_adaptivemesh(AdaptiveNode<END> &node)
+  {
+    this->compute_info_node(node);
+  }
+
+  /**
+   * Computes extra data information for given vert
+   */
+  void compute_info_vert_adaptivemesh(AdaptiveVert &vert)
+  {
+    this->compute_info_vert(vert);
+  }
+
+  /**
+   * Computes extra data information for given edge
+   */
+  void compute_info_edge_adaptivemesh(AdaptiveEdge &edge)
+  {
+    this->compute_info_edge(edge);
+
+    /* For each new edge added, set it's sizing */
+    this->edge_set_size(edge);
+  }
+
+  /**
+   * Computes extra data information for given face
+   */
+  void compute_info_face_adaptivemesh(AdaptiveFace &face)
+  {
+    this->compute_info_face(face);
+  }
+
+  /**
+   * Compute extra information for all the elements added (stored
    * within mesh_diff) */
   void compute_info_adaptivemesh(
       const MeshDiff<NodeData<END>, VertData, EdgeData, internal::EmptyExtraData> &mesh_diff)
   {
-    this->compute_info(mesh_diff);
-
-/* Not using setting anything in these as of right now */
-#if 0
     for (const auto &node_index : mesh_diff.get_added_nodes()) {
-      const auto &node = this->get_checked_node(node_index);
+      auto &node = this->get_checked_node(node_index);
+      this->compute_info_node_adaptivemesh(node);
     }
 
     for (const auto &vert_index : mesh_diff.get_added_verts()) {
-      const auto &vert = this->get_checked_vert(vert_index);
+      auto &vert = this->get_checked_vert(vert_index);
+      this->compute_info_vert_adaptivemesh(vert);
     }
-#endif
 
     for (const auto &edge_index : mesh_diff.get_added_edges()) {
       auto &edge = this->get_checked_edge(edge_index);
-
-      /* For each new edge added, set it's sizing */
-      this->edge_set_size(edge);
+      this->compute_info_edge_adaptivemesh(edge);
     }
 
-/* Not using setting anything in these as of right now */
-#if 0
     for (const auto &face_index : mesh_diff.get_added_faces()) {
       auto &face = this->get_checked_face(face_index);
+      this->compute_info_face_adaptivemesh(face);
     }
-#endif
   }
 };
 
