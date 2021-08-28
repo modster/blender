@@ -63,7 +63,7 @@ static void add_field_variables_recursive(const Field &field,
   else {
     const FieldFunction &function = field.function();
     for (const Field &input_field : function.inputs()) {
-      add_field_variables_recursive(input_field, builder, variable_map);
+      add_field_variables_recursive(input_field, builder, variable_map); /* TODO: Use stack. */
     }
 
     /* Add the immediate inputs to this field, which were added earlier in the
@@ -71,7 +71,6 @@ static void add_field_variables_recursive(const Field &field,
     Vector<MFVariable *> inputs;
     for (const Field &input_field : function.inputs()) {
       MFVariable &input = get_field_variable(input_field, variable_map);
-      builder.add_input_parameter(input.data_type());
       inputs.append(&input);
     }
 
