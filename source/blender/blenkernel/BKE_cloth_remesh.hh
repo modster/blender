@@ -3456,6 +3456,26 @@ template<typename END, typename EVD, typename EED, typename EFD> class MeshDiff 
   }
 
   /**
+   * Appends other into the current MeshDiff.
+   *
+   * It is generally a good idea to run
+   * `remove_non_existing_elements()` after this function to ensure
+   * correct `MeshDiff` does not contain invalid elements.
+   */
+  void append(const MeshDiff<END, EVD, EED, EFD> &other)
+  {
+    this->deleted_nodes.extend(other.deleted_nodes.as_span());
+    this->deleted_verts.extend(other.deleted_verts.as_span());
+    this->deleted_edges.extend(other.deleted_edges.as_span());
+    this->deleted_faces.extend(other.deleted_faces.as_span());
+
+    this->added_nodes.extend(other.added_nodes.as_span());
+    this->added_verts.extend(other.added_verts.as_span());
+    this->added_edges.extend(other.added_edges.as_span());
+    this->added_faces.extend(other.added_faces.as_span());
+  }
+
+  /**
    * Removes elements from added elements that no longer exist in the
    * mesh.
    */
