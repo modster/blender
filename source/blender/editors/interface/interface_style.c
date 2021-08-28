@@ -117,12 +117,12 @@ static uiStyle *ui_style_new(ListBase *styles, const char *name, short uifont_id
   style->widget.shadowcolor = 0.0f;
 
   style->columnspace = 8;
-  style->templatespace = 5;
-  style->boxspace = 5;
+  style->templatespace = 4;
+  style->boxspace = 4;
   style->buttonspacex = 8;
   style->buttonspacey = 2;
   style->panelspace = 8;
-  style->panelouter = 4;
+  style->panelouter = 8;
 
   return style;
 }

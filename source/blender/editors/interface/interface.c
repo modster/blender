@@ -1996,6 +1996,7 @@ static void ui_but_to_pixelrect(rcti *rect, const ARegion *region, uiBlock *bloc
 void UI_block_draw(const bContext *C, uiBlock *block)
 {
   uiStyle style = *UI_style_get_dpi(); /* XXX pass on as arg */
+  const uiStyle *stylo = UI_style_get_dpi();
 
   /* get menu region or area region */
   ARegion *region = CTX_wm_menu(C);
@@ -2050,6 +2051,8 @@ void UI_block_draw(const bContext *C, uiBlock *block)
           show_background = region->overlap != 0;
         }
       }
+
+      rect.xmin += stylo->panelouter;
     }
     ui_draw_aligned_panel(&style,
                           block,

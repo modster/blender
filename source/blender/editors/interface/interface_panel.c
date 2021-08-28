@@ -1075,9 +1075,10 @@ void UI_panels_draw(const bContext *C, ARegion *region)
 void UI_panel_label_offset(const uiBlock *block, int *r_x, int *r_y)
 {
   Panel *panel = block->panel;
+  const uiStyle *style = UI_style_get();
   const bool is_subpanel = (panel->type && panel->type->parent);
 
-  *r_x = UI_UNIT_X * 1.0f;
+  *r_x = UI_UNIT_X * 1.0f + style->panelouter + U.pixelsize;
   *r_y = UI_UNIT_Y * 1.5f;
 
   if (is_subpanel) {

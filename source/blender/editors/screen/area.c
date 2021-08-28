@@ -2720,6 +2720,10 @@ static void ed_panel_draw(const bContext *C,
   if (open || search_filter_active) {
     short panelContext;
 
+    /* Extra offset and panel width adjustment to accomodate sides margin (style->panelouter). */
+    const int xofs = (pt->flag & PANEL_TYPE_NO_HEADER) ? 0 : style->panelouter;
+    const int wofs = (pt->flag & PANEL_TYPE_NO_HEADER) ? style->panelouter : 0;
+
     /* panel context can either be toolbar region or normal panels region */
     if (pt->flag & PANEL_TYPE_LAYOUT_VERT_BAR) {
       panelContext = UI_LAYOUT_VERT_BAR;
@@ -2735,9 +2739,9 @@ static void ed_panel_draw(const bContext *C,
         block,
         UI_LAYOUT_VERTICAL,
         panelContext,
-        (pt->flag & PANEL_TYPE_LAYOUT_VERT_BAR) ? 0 : style->panelspace,
+        (pt->flag & PANEL_TYPE_LAYOUT_VERT_BAR) ? 0 : style->panelspace + xofs,
         0,
-        (pt->flag & PANEL_TYPE_LAYOUT_VERT_BAR) ? 0 : w - 2 * style->panelspace,
+        (pt->flag & PANEL_TYPE_LAYOUT_VERT_BAR) ? 0 : (w - 2 * style->panelspace + wofs - xofs),
         em,
         0,
         style);
@@ -2877,12 +2881,13 @@ void ED_region_panels_layout_ex(const bContext *C,
 
   ScrArea *area = CTX_wm_area(C);
   View2D *v2d = &region->v2d;
+  const uiStyle *style = UI_style_get_dpi();
 
   bool use_category_tabs = (category_override == NULL) && region_uses_category_tabs(area, region);
   /* offset panels for small vertical tab area */
   const char *category = NULL;
   const int category_tabs_width = UI_PANEL_CATEGORY_MARGIN_WIDTH;
-  int margin_x = 0;
+  int margin_x = style->panelouter;
   const bool region_layout_based = region->flag & RGN_FLAG_DYNAMIC_SIZE;
   bool update_tot_size = true;
 
@@ -2897,7 +2902,7 @@ void ED_region_panels_layout_ex(const bContext *C,
     category = region_panels_collect_categories(region, panel_types_stack, &use_category_tabs);
   }
   if (use_category_tabs) {
-    margin_x = category_tabs_width;
+    margin_x = category_tabs_width + style->panelouter;
   }
 
   const int w = BLI_rctf_size_x(&v2d->cur) - margin_x;
