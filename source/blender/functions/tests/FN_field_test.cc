@@ -25,27 +25,35 @@ TEST(field, ConstantFunction)
   EXPECT_EQ(result[3], 10);
 }
 
-// TEST(field, VArrayInput)
-// {
+class IndexFieldInput final : public FieldInput {
+  GVArrayPtr retrieve_data(IndexMask mask) const final
+  {
+    auto index_func = [](int i) { return i; };
+    return std::make_unique<
+        GVArray_For_EmbeddedVArray<int, VArray_For_Func<int, decltype(index_func)>>>(
+        mask.min_array_size(), mask.min_array_size(), index_func);
+  }
+};
 
-//   FieldFunction function = FieldFunction(std::make_unique<IndexFunction>(), {});
-//   Field index_field = Field(CPPType::get<int>(), function, 0);
+TEST(field, VArrayInput)
+{
+  Field index_field = Field(CPPType::get<int>(), std::make_shared<IndexFieldInput>());
 
-//   Array<int> result_1(4);
-//   GMutableSpan result_generic_1(result_1.as_mutable_span());
-//   evaluate_fields({&index_field, 1}, IndexMask(IndexRange(4)), {&result_generic_1, 1});
-//   EXPECT_EQ(result_1[0], 0);
-//   EXPECT_EQ(result_1[1], 1);
-//   EXPECT_EQ(result_1[2], 2);
-//   EXPECT_EQ(result_1[3], 3);
+  Array<int> result_1(4);
+  GMutableSpan result_generic_1(result_1.as_mutable_span());
+  evaluate_fields({&index_field, 1}, IndexMask(IndexRange(4)), {&result_generic_1, 1});
+  EXPECT_EQ(result_1[0], 0);
+  EXPECT_EQ(result_1[1], 1);
+  EXPECT_EQ(result_1[2], 2);
+  EXPECT_EQ(result_1[3], 3);
 
-//   Array<int> result_2(4);
-//   GMutableSpan result_generic_2(result_2.as_mutable_span());
-//   evaluate_fields({&index_field, 1}, {20, 30, 40, 50}, {&result_generic_2, 1});
-//   EXPECT_EQ(result_2[0], 20);
-//   EXPECT_EQ(result_2[1], 30);
-//   EXPECT_EQ(result_2[2], 40);
-//   EXPECT_EQ(result_2[3], 50);
-// }
+  Array<int> result_2(10);
+  GMutableSpan result_generic_2(result_2.as_mutable_span());
+  evaluate_fields({&index_field, 1}, {2, 4, 6, 8}, {&result_generic_2, 1});
+  EXPECT_EQ(result_2[2], 2);
+  EXPECT_EQ(result_2[4], 4);
+  EXPECT_EQ(result_2[6], 6);
+  EXPECT_EQ(result_2[8], 8);
+}
 
 }  // namespace blender::fn::tests

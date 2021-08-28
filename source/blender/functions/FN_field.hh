@@ -55,12 +55,13 @@ class FieldFunction {
    */
   blender::Vector<Field *> inputs_;
 
-  std::string name_ = "";
+  std::string name_;
 
  public:
-  FieldFunction() = default;
-  FieldFunction(std::unique_ptr<MultiFunction> function, Span<Field *> inputs)
-      : function_(std::move(function)), inputs_(inputs)
+  FieldFunction(std::unique_ptr<MultiFunction> function,
+                Span<Field *> inputs,
+                std::string &&name = "")
+      : function_(std::move(function)), inputs_(inputs), name_(std::move(name))
   {
   }
 
@@ -81,21 +82,14 @@ class FieldFunction {
 };
 
 class FieldInput {
-
-  GVArrayPtr data_;
-
-  std::string name_ = "";
+  std::string name_;
 
  public:
-  FieldInput(GVArrayPtr data) : data_(std::move(data))
+  FieldInput(std::string &&name = "") : name_(std::move(name))
   {
   }
 
-  const GVArray &data() const
-  {
-    BLI_assert(data_);
-    return *data_;
-  }
+  virtual GVArrayPtr retrieve_data(IndexMask mask) const = 0;
 
   blender::StringRef name() const
   {
@@ -147,7 +141,7 @@ class Field {
   {
     return input_ != nullptr;
   }
-  const FieldInput &input()
+  const FieldInput &input() const
   {
     BLI_assert(function_ == nullptr);
     BLI_assert(input_ != nullptr);
@@ -187,6 +181,6 @@ class Field {
  */
 void evaluate_fields(blender::Span<Field> fields,
                      blender::IndexMask mask,
-                     blender::MutableSpan<GMutableSpan> outputs);
+                     blender::Span<GMutableSpan> outputs);
 
 }  // namespace blender::fn
