@@ -19,7 +19,7 @@
 /** \file
  * \ingroup fn
  *
- * Field serve as an intermediate representation for a calculation of a group of functions. Having
+ * Field serve as an intermediate representation for calculation of a group of functions. Having
  * an intermediate representation is helpful mainly to separate the execution system from the
  * system that describes the necessary computations. Fields can be executed in different contexts,
  * and optimization might mean executing the fields differently based on some factors like the
@@ -33,6 +33,7 @@
 #include "BLI_string_ref.hh"
 #include "BLI_vector.hh"
 
+#include "FN_generic_virtual_array.hh"
 #include "FN_multi_function_procedure.hh"
 #include "FN_multi_function_procedure_builder.hh"
 #include "FN_multi_function_procedure_executor.hh"
@@ -145,7 +146,6 @@ class FieldFunction {
 };
 
 class FieldInput {
-
  protected:
   StringRef name_;
 

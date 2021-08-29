@@ -23,10 +23,11 @@
 namespace blender::fn {
 
 /**
- * A map to hold the output variables for each function so they can be reused.
+ * A map to hold the output variables for each function or input so they can be reused.
  */
 // using VariableMap = Map<const FunctionOrInput *, Vector<MFVariable *>>;
 using VariableMap = Map<const void *, Vector<MFVariable *>>;
+/* TODO: Use use counter in the vector to control when to add the desctruct call. */
 
 /**
  * A map of the computed inputs for all of a field system's inputs, to avoid creating duplicates.
@@ -79,7 +80,7 @@ static void add_field_variables_recursive(const Field &field,
 
     Vector<MFVariable *> outputs = builder.add_call(function.multi_function(), inputs);
 
-    builder.add_destruct(unique_inputs);
+    builder.add_destruct(unique_inputs); /* TODO: What if the same variable was used later on? */
 
     variable_map.add(&function, std::move(outputs));
   }

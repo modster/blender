@@ -10,10 +10,10 @@ namespace blender::fn::tests {
 
 TEST(field, ConstantFunction)
 {
-  Field constant_field = Field(CPPType::get<int>(),
-                               std::make_shared<FieldFunction>(FieldFunction(
-                                   std::make_unique<CustomMF_Constant<int>>(10), {})),
-                               0);
+  Field constant_field{CPPType::get<int>(),
+                       std::make_shared<FieldFunction>(
+                           FieldFunction(std::make_unique<CustomMF_Constant<int>>(10), {})),
+                       0};
 
   Array<int> result(4);
   GMutableSpan result_generic(result.as_mutable_span());
@@ -38,7 +38,7 @@ class IndexFieldInput final : public FieldInput {
 
 TEST(field, VArrayInput)
 {
-  Field index_field = Field(CPPType::get<int>(), std::make_shared<IndexFieldInput>());
+  Field index_field{CPPType::get<int>(), std::make_shared<IndexFieldInput>()};
 
   Array<int> result_1(4);
   GMutableSpan result_generic_1(result_1.as_mutable_span());
@@ -61,8 +61,8 @@ TEST(field, VArrayInput)
 TEST(field, VArrayInputMultipleOutputs)
 {
   std::shared_ptr<FieldInput> index_input = std::make_shared<IndexFieldInput>();
-  Field field_1 = Field(CPPType::get<int>(), index_input);
-  Field field_2 = Field(CPPType::get<int>(), index_input);
+  Field field_1{CPPType::get<int>(), index_input};
+  Field field_2{CPPType::get<int>(), index_input};
 
   Array<int> result_1(10);
   Array<int> result_2(10);
@@ -82,14 +82,14 @@ TEST(field, VArrayInputMultipleOutputs)
 
 TEST(field, InputAndFunction)
 {
-  Field index_field = Field(CPPType::get<int>(), std::make_shared<IndexFieldInput>());
+  Field index_field{CPPType::get<int>(), std::make_shared<IndexFieldInput>()};
 
-  Field output_field = Field(CPPType::get<int>(),
-                             std::make_shared<FieldFunction>(
-                                 FieldFunction(std::make_unique<CustomMF_SI_SI_SO<int, int, int>>(
-                                                   "add", [](int a, int b) { return a + b; }),
-                                               {index_field, index_field})),
-                             0);
+  Field output_field{CPPType::get<int>(),
+                     std::make_shared<FieldFunction>(
+                         FieldFunction(std::make_unique<CustomMF_SI_SI_SO<int, int, int>>(
+                                           "add", [](int a, int b) { return a + b; }),
+                                       {index_field, index_field})),
+                     0};
 
   Array<int> result(10);
   GMutableSpan result_generic(result.as_mutable_span());
@@ -98,6 +98,33 @@ TEST(field, InputAndFunction)
   EXPECT_EQ(result[4], 8);
   EXPECT_EQ(result[6], 12);
   EXPECT_EQ(result[8], 16);
+}
+
+TEST(field, TwoFunctions)
+{
+  Field index_field{CPPType::get<int>(), std::make_shared<IndexFieldInput>()};
+
+  Field add_field{CPPType::get<int>(),
+                  std::make_shared<FieldFunction>(
+                      FieldFunction(std::make_unique<CustomMF_SI_SI_SO<int, int, int>>(
+                                        "add", [](int a, int b) { return a + b; }),
+                                    {index_field, index_field})),
+                  0};
+
+  Field result_field{
+      CPPType::get<int>(),
+      std::make_shared<FieldFunction>(FieldFunction(
+          std::make_unique<CustomMF_SI_SO<int, int>>("add_10", [](int a) { return a + 10; }),
+          {add_field})),
+      0};
+
+  Array<int> result(10);
+  GMutableSpan result_generic(result.as_mutable_span());
+  evaluate_fields({result_field}, {2, 4, 6, 8}, {result_generic});
+  EXPECT_EQ(result[2], 14);
+  EXPECT_EQ(result[4], 18);
+  EXPECT_EQ(result[6], 22);
+  EXPECT_EQ(result[8], 26);
 }
 
 }  // namespace blender::fn::tests
