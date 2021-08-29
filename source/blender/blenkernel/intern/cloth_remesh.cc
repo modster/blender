@@ -290,12 +290,18 @@ class VertData {
   }
 };
 
+enum EdgeFlags {
+  EDGE_BETWEEN_SEWING_EDGES = 1 << 0,
+};
+
 class EdgeData {
   float size; /* from [1], the size calculated by the `Vert`s of the
                * `Edge` */
+  /* EdgeFlags */
+  uint32_t flags;
 
  public:
-  EdgeData(float size) : size(size)
+  EdgeData(float size) : size(size), flags(0)
   {
   }
 
@@ -309,9 +315,29 @@ class EdgeData {
     this->size = size;
   }
 
-  EdgeData interp(const EdgeData &UNUSED(other)) const
+  const auto &get_flags() const
   {
-    return EdgeData(std::numeric_limits<float>::signaling_NaN());
+    return this->flags;
+  }
+
+  auto &get_flags_mut()
+  {
+    return this->flags;
+  }
+
+  EdgeData interp(const EdgeData &other) const
+  {
+    EdgeData res(std::numeric_limits<float>::signaling_NaN());
+
+    res.flags = 0;
+    /* Only if both the edge data are marked for
+     * `EDGE_BETWEEN_SEWING_EDGES`, the result should be marked for
+     * `EDGE_BETWEEN_SEWING_EDGES` */
+    if ((this->flags & EDGE_BETWEEN_SEWING_EDGES) && (other.flags & EDGE_BETWEEN_SEWING_EDGES)) {
+      res.flags |= EDGE_BETWEEN_SEWING_EDGES;
+    }
+
+    return res;
   }
 };
 
@@ -585,9 +611,16 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
       }
     }
 
+    /* Set edge sizes */
     this->set_edge_sizes();
 
     bool sewing_enabled = params.flags & ADAPTIVE_REMESH_PARAMS_SEWING;
+
+    /* Mark edges that are between sewing edges only if sewing is
+     * enabled */
+    if (sewing_enabled) {
+      this->mark_edges_between_sewing_edges();
+    }
 
     /* Split the edges */
     this->split_edges(sewing_enabled);
@@ -1298,6 +1331,66 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
       this->compute_info_face_adaptivemesh(face);
     }
   }
+
+  /**
+   * Marks all edges that are between two sewing edges that are
+   * connected by another edge as well.
+   */
+  void mark_edges_between_sewing_edges()
+  {
+    /*                    edge
+     *        v1 ._____________________. v2
+     *           |                     |
+     *      v1_e |                     | v2_e
+     *           |                     |
+     *   v1_e_ov ._____________________. v2_e_ov
+     *               connecting_edge
+     *
+     *
+     * Here `v1_e` and `v2_e` must be loose and there must be a
+     * connecting edge between `v1_e_ov` and `v2_e_ov` for the `edge`
+     * to be marked as `EDGE_BETWEEN_SEWING_EDGES`.
+     */
+    for (auto &edge : this->get_edges_mut()) {
+      const auto [v1_index, v2_index] = edge.get_checked_verts();
+
+      const auto &v1 = this->get_checked_vert(v1_index);
+      const auto &v2 = this->get_checked_vert(v2_index);
+
+      blender::Vector<EdgeIndex> v1_loose_edges;
+      for (const auto &v1_e_index : v1.get_edges()) {
+        const auto &v1_e = this->get_checked_edge(v1_e_index);
+        if (v1_e.is_loose()) {
+          v1_loose_edges.append(v1_e_index);
+        }
+      }
+
+      blender::Vector<EdgeIndex> v2_loose_edges;
+      for (const auto &v2_e_index : v2.get_edges()) {
+        const auto &v2_e = this->get_checked_edge(v2_e_index);
+        if (v2_e.is_loose()) {
+          v2_loose_edges.append(v2_e_index);
+        }
+      }
+
+      for (const auto &v1_e_index : v1_loose_edges) {
+        const auto &v1_e = this->get_checked_edge(v1_e_index);
+        const auto &v1_e_ov_index = v1_e.get_checked_other_vert(v1_index);
+        for (const auto &v2_e_index : v2_loose_edges) {
+          const auto &v2_e = this->get_checked_edge(v2_e_index);
+          const auto &v2_e_ov_index = v2_e.get_checked_other_vert(v2_index);
+
+          if (this->get_connecting_edge_index(v1_e_ov_index, v2_e_ov_index)) {
+            /* Mark `edge` as an edge between sewing edges */
+            /* `edge`'s extra data should have been set by this point */
+            auto &edge_data = edge.get_checked_extra_data_mut();
+            auto &flags = edge_data.get_flags_mut();
+            flags |= EDGE_BETWEEN_SEWING_EDGES;
+          }
+        }
+      }
+    }
+  }
 };
 
 template<typename END> using AdaptiveNode = Node<NodeData<END>>;
@@ -1435,10 +1528,11 @@ MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS)
     msgpack::packer<Stream> &operator()(msgpack::packer<Stream> &o,
                                         const blender::bke::internal::EdgeData &v) const
     {
-      o.pack_array(2);
+      o.pack_array(3);
 
       o.pack(std::string("edge_data"));
       o.pack(v.get_size());
+      o.pack(v.get_flags());
 
       return o;
     }
