@@ -178,6 +178,8 @@ class MFProcedure : NonCopyable, NonMovable {
   Vector<MFParameter> params_;
   MFInstruction *entry_ = nullptr;
 
+  friend class MFProcedureDotExport;
+
  public:
   MFProcedure() = default;
   ~MFProcedure();

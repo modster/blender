@@ -488,264 +488,285 @@ MFProcedure::InitState MFProcedure::find_initialization_state_before_instruction
   return state;
 }
 
-static bool has_to_be_block_begin(const MFProcedure &procedure, const MFInstruction &instruction)
-{
-  if (procedure.entry() == &instruction) {
-    return true;
-  }
-  if (instruction.prev().size() != 1) {
-    return true;
-  }
-  if (instruction.prev()[0]->type() == MFInstructionType::Branch) {
-    return true;
-  }
-  return false;
-}
+class MFProcedureDotExport {
+ private:
+  const MFProcedure &procedure_;
+  dot::DirectedGraph digraph_;
+  Map<const MFInstruction *, dot::Node *> dot_nodes_by_begin_;
+  Map<const MFInstruction *, dot::Node *> dot_nodes_by_end_;
 
-static const MFInstruction &get_first_instruction_in_block(const MFProcedure &procedure,
-                                                           const MFInstruction &representative)
-{
-  const MFInstruction *current = &representative;
-  while (!has_to_be_block_begin(procedure, *current)) {
-    current = current->prev()[0];
-    if (current == &representative) {
-      /* There is a loop without entry or exit, just break it up here. */
-      break;
-    }
+ public:
+  MFProcedureDotExport(const MFProcedure &procedure) : procedure_(procedure)
+  {
   }
-  return *current;
-}
 
-static const MFInstruction *get_next_instruction_in_block(const MFProcedure &procedure,
-                                                          const MFInstruction &instruction,
-                                                          const MFInstruction &block_begin)
-{
-  const MFInstruction *next = nullptr;
-  switch (instruction.type()) {
-    case MFInstructionType::Call: {
-      next = static_cast<const MFCallInstruction &>(instruction).next();
-      break;
-    }
-    case MFInstructionType::Destruct: {
-      next = static_cast<const MFDestructInstruction &>(instruction).next();
-      break;
-    }
-    case MFInstructionType::Dummy: {
-      next = static_cast<const MFDummyInstruction &>(instruction).next();
-      break;
-    }
-    case MFInstructionType::Return:
-    case MFInstructionType::Branch: {
-      break;
-    }
+  std::string generate()
+  {
+    this->create_nodes();
+    this->create_edges();
+    return digraph_.to_dot_string();
   }
-  if (next == nullptr) {
-    return nullptr;
-  }
-  if (next == &block_begin) {
-    return nullptr;
-  }
-  if (has_to_be_block_begin(procedure, *next)) {
-    return nullptr;
-  }
-  return next;
-}
 
-static Vector<const MFInstruction *> get_instructions_in_block(const MFProcedure &procedure,
-                                                               const MFInstruction &representative)
-{
-  Vector<const MFInstruction *> instructions;
-  const MFInstruction &begin = get_first_instruction_in_block(procedure, representative);
-  for (const MFInstruction *current = &begin; current != nullptr;
-       current = get_next_instruction_in_block(procedure, *current, begin)) {
-    instructions.append(current);
-  }
-  return instructions;
-}
+  void create_nodes()
+  {
+    Vector<const MFInstruction *> all_instructions;
+    auto add_instructions = [&](auto instructions) {
+      all_instructions.extend(instructions.begin(), instructions.end());
+    };
+    add_instructions(procedure_.call_instructions_);
+    add_instructions(procedure_.branch_instructions_);
+    add_instructions(procedure_.destruct_instructions_);
+    add_instructions(procedure_.dummy_instructions_);
+    add_instructions(procedure_.return_instructions_);
 
-static void variable_to_string(const MFVariable *variable, std::stringstream &ss)
-{
-  if (variable == nullptr) {
-    ss << "null";
-  }
-  else {
-    ss << "$" << variable->id();
-    if (!variable->name().is_empty()) {
-      ss << "(" << variable->name() << ")";
-    }
-  }
-}
+    Set<const MFInstruction *> handled_instructions;
 
-static void instruction_name_format(StringRef name, std::stringstream &ss)
-{
-  ss << name;
-}
-
-static void instruction_to_string(const MFCallInstruction &instruction, std::stringstream &ss)
-{
-  const MultiFunction &fn = instruction.fn();
-  instruction_name_format(fn.name() + ": ", ss);
-  for (const int param_index : fn.param_indices()) {
-    const MFParamType param_type = fn.param_type(param_index);
-    const MFVariable *variable = instruction.params()[param_index];
-    ss << R"(<font color="grey30">)";
-    switch (param_type.interface_type()) {
-      case MFParamType::Input: {
-        ss << "in";
-        break;
+    for (const MFInstruction *representative : all_instructions) {
+      if (handled_instructions.contains(representative)) {
+        continue;
       }
-      case MFParamType::Mutable: {
-        ss << "mut";
-        break;
+      Vector<const MFInstruction *> block_instructions = this->get_instructions_in_block(
+          *representative);
+      std::stringstream ss;
+      ss << "<";
+
+      for (const MFInstruction *current : block_instructions) {
+        handled_instructions.add_new(current);
+        switch (current->type()) {
+          case MFInstructionType::Call: {
+            this->instruction_to_string(*static_cast<const MFCallInstruction *>(current), ss);
+            break;
+          }
+          case MFInstructionType::Destruct: {
+            this->instruction_to_string(*static_cast<const MFDestructInstruction *>(current), ss);
+            break;
+          }
+          case MFInstructionType::Dummy: {
+            this->instruction_to_string(*static_cast<const MFDummyInstruction *>(current), ss);
+            break;
+          }
+          case MFInstructionType::Return: {
+            this->instruction_to_string(*static_cast<const MFReturnInstruction *>(current), ss);
+            break;
+          }
+          case MFInstructionType::Branch: {
+            this->instruction_to_string(*static_cast<const MFBranchInstruction *>(current), ss);
+            break;
+          }
+        }
+        ss << R"(<br align="left" />)";
       }
-      case MFParamType::Output: {
-        ss << "out";
-        break;
-      }
-    }
-    ss << " </font> ";
-    variable_to_string(variable, ss);
-    if (param_index < fn.param_amount() - 1) {
-      ss << ", ";
+      ss << ">";
+
+      dot::Node &dot_node = digraph_.new_node(ss.str());
+      dot_node.set_shape(dot::Attr_shape::Rectangle);
+      dot_nodes_by_begin_.add_new(block_instructions.first(), &dot_node);
+      dot_nodes_by_end_.add_new(block_instructions.last(), &dot_node);
     }
   }
-}
 
-static void instruction_to_string(const MFDestructInstruction &instruction, std::stringstream &ss)
-{
-  instruction_name_format("Destruct ", ss);
-  variable_to_string(instruction.variable(), ss);
-}
+  void create_edges()
+  {
+    auto create_edge = [&](dot::Node &from_node,
+                           const MFInstruction *to_instruction) -> dot::DirectedEdge & {
+      if (to_instruction == nullptr) {
+        dot::Node &to_node = digraph_.new_node("missing");
+        to_node.set_shape(dot::Attr_shape::Diamond);
+        return digraph_.new_edge(from_node, to_node);
+      }
+      dot::Node &to_node = *dot_nodes_by_begin_.lookup(to_instruction);
+      return digraph_.new_edge(from_node, to_node);
+    };
 
-static void instruction_to_string(const MFDummyInstruction &UNUSED(instruction),
-                                  std::stringstream &ss)
-{
-  instruction_name_format("Dummy ", ss);
-}
-
-static void instruction_to_string(const MFReturnInstruction &UNUSED(instruction),
-                                  std::stringstream &ss)
-{
-  instruction_name_format("Return ", ss);
-}
-
-static void instruction_to_string(const MFBranchInstruction &instruction, std::stringstream &ss)
-{
-  instruction_name_format("Branch ", ss);
-  variable_to_string(instruction.condition(), ss);
-}
-
-std::string MFProcedure::to_dot() const
-{
-  Vector<const MFInstruction *> all_instructions;
-  all_instructions.extend(call_instructions_.begin(), call_instructions_.end());
-  all_instructions.extend(branch_instructions_.begin(), branch_instructions_.end());
-  all_instructions.extend(destruct_instructions_.begin(), destruct_instructions_.end());
-  all_instructions.extend(dummy_instructions_.begin(), dummy_instructions_.end());
-  all_instructions.extend(return_instructions_.begin(), return_instructions_.end());
-
-  Set<const MFInstruction *> handled_instructions;
-
-  dot::DirectedGraph digraph;
-  Map<const MFInstruction *, dot::Node *> dot_nodes_by_begin;
-  Map<const MFInstruction *, dot::Node *> dot_nodes_by_end;
-
-  for (const MFInstruction *representative : all_instructions) {
-    if (handled_instructions.contains(representative)) {
-      continue;
-    }
-    Vector<const MFInstruction *> block_instructions = get_instructions_in_block(*this,
-                                                                                 *representative);
-    std::stringstream ss;
-    ss << "<";
-
-    for (const MFInstruction *current : block_instructions) {
-      handled_instructions.add_new(current);
-      switch (current->type()) {
+    for (auto item : dot_nodes_by_end_.items()) {
+      const MFInstruction &from_instruction = *item.key;
+      dot::Node &from_node = *item.value;
+      switch (from_instruction.type()) {
         case MFInstructionType::Call: {
-          instruction_to_string(*static_cast<const MFCallInstruction *>(current), ss);
+          const MFInstruction *to_instruction =
+              static_cast<const MFCallInstruction &>(from_instruction).next();
+          create_edge(from_node, to_instruction);
           break;
         }
         case MFInstructionType::Destruct: {
-          instruction_to_string(*static_cast<const MFDestructInstruction *>(current), ss);
+          const MFInstruction *to_instruction =
+              static_cast<const MFDestructInstruction &>(from_instruction).next();
+          create_edge(from_node, to_instruction);
           break;
         }
         case MFInstructionType::Dummy: {
-          instruction_to_string(*static_cast<const MFDummyInstruction *>(current), ss);
+          const MFInstruction *to_instruction =
+              static_cast<const MFDummyInstruction &>(from_instruction).next();
+          create_edge(from_node, to_instruction);
           break;
         }
         case MFInstructionType::Return: {
-          instruction_to_string(*static_cast<const MFReturnInstruction *>(current), ss);
           break;
         }
         case MFInstructionType::Branch: {
-          instruction_to_string(*static_cast<const MFBranchInstruction *>(current), ss);
+          const MFBranchInstruction &branch_instruction = static_cast<const MFBranchInstruction &>(
+              from_instruction);
+          const MFInstruction *to_true_instruction = branch_instruction.branch_true();
+          const MFInstruction *to_false_instruction = branch_instruction.branch_false();
+          create_edge(from_node, to_true_instruction).attributes.set("color", "#118811");
+          create_edge(from_node, to_false_instruction).attributes.set("color", "#881111");
           break;
         }
       }
-      ss << R"(<br align="left" />)";
     }
-    ss << ">";
 
-    dot::Node &dot_node = digraph.new_node(ss.str());
-    dot_node.set_shape(dot::Attr_shape::Rectangle);
-    dot_nodes_by_begin.add_new(block_instructions.first(), &dot_node);
-    dot_nodes_by_end.add_new(block_instructions.last(), &dot_node);
+    dot::Node &entry_node = digraph_.new_node("Entry");
+    entry_node.set_shape(dot::Attr_shape::Circle);
+    create_edge(entry_node, procedure_.entry());
   }
 
-  auto create_edge = [&](dot::Node &from_node,
-                         const MFInstruction *to_instruction) -> dot::DirectedEdge & {
-    if (to_instruction == nullptr) {
-      dot::Node &to_node = digraph.new_node("missing");
-      to_node.set_shape(dot::Attr_shape::Diamond);
-      return digraph.new_edge(from_node, to_node);
+  bool has_to_be_block_begin(const MFInstruction &instruction)
+  {
+    if (procedure_.entry() == &instruction) {
+      return true;
     }
-    dot::Node &to_node = *dot_nodes_by_begin.lookup(to_instruction);
-    return digraph.new_edge(from_node, to_node);
-  };
+    if (instruction.prev().size() != 1) {
+      return true;
+    }
+    if (instruction.prev()[0]->type() == MFInstructionType::Branch) {
+      return true;
+    }
+    return false;
+  }
 
-  for (auto item : dot_nodes_by_end.items()) {
-    const MFInstruction &from_instruction = *item.key;
-    dot::Node &from_node = *item.value;
-    switch (from_instruction.type()) {
+  const MFInstruction &get_first_instruction_in_block(const MFInstruction &representative)
+  {
+    const MFInstruction *current = &representative;
+    while (!this->has_to_be_block_begin(*current)) {
+      current = current->prev()[0];
+      if (current == &representative) {
+        /* There is a loop without entry or exit, just break it up here. */
+        break;
+      }
+    }
+    return *current;
+  }
+
+  const MFInstruction *get_next_instruction_in_block(const MFInstruction &instruction,
+                                                     const MFInstruction &block_begin)
+  {
+    const MFInstruction *next = nullptr;
+    switch (instruction.type()) {
       case MFInstructionType::Call: {
-        const MFInstruction *to_instruction =
-            static_cast<const MFCallInstruction &>(from_instruction).next();
-        create_edge(from_node, to_instruction);
+        next = static_cast<const MFCallInstruction &>(instruction).next();
         break;
       }
       case MFInstructionType::Destruct: {
-        const MFInstruction *to_instruction =
-            static_cast<const MFDestructInstruction &>(from_instruction).next();
-        create_edge(from_node, to_instruction);
+        next = static_cast<const MFDestructInstruction &>(instruction).next();
         break;
       }
       case MFInstructionType::Dummy: {
-        const MFInstruction *to_instruction =
-            static_cast<const MFDummyInstruction &>(from_instruction).next();
-        create_edge(from_node, to_instruction);
+        next = static_cast<const MFDummyInstruction &>(instruction).next();
         break;
       }
-      case MFInstructionType::Return: {
-        break;
-      }
+      case MFInstructionType::Return:
       case MFInstructionType::Branch: {
-        const MFBranchInstruction &branch_instruction = static_cast<const MFBranchInstruction &>(
-            from_instruction);
-        const MFInstruction *to_true_instruction = branch_instruction.branch_true();
-        const MFInstruction *to_false_instruction = branch_instruction.branch_false();
-        create_edge(from_node, to_true_instruction).attributes.set("color", "#118811");
-        create_edge(from_node, to_false_instruction).attributes.set("color", "#881111");
         break;
+      }
+    }
+    if (next == nullptr) {
+      return nullptr;
+    }
+    if (next == &block_begin) {
+      return nullptr;
+    }
+    if (this->has_to_be_block_begin(*next)) {
+      return nullptr;
+    }
+    return next;
+  }
+
+  Vector<const MFInstruction *> get_instructions_in_block(const MFInstruction &representative)
+  {
+    Vector<const MFInstruction *> instructions;
+    const MFInstruction &begin = this->get_first_instruction_in_block(representative);
+    for (const MFInstruction *current = &begin; current != nullptr;
+         current = this->get_next_instruction_in_block(*current, begin)) {
+      instructions.append(current);
+    }
+    return instructions;
+  }
+
+  void variable_to_string(const MFVariable *variable, std::stringstream &ss)
+  {
+    if (variable == nullptr) {
+      ss << "null";
+    }
+    else {
+      ss << "$" << variable->id();
+      if (!variable->name().is_empty()) {
+        ss << "(" << variable->name() << ")";
       }
     }
   }
 
-  dot::Node &entry_node = digraph.new_node("Entry");
-  entry_node.set_shape(dot::Attr_shape::Circle);
-  create_edge(entry_node, entry_);
+  void instruction_name_format(StringRef name, std::stringstream &ss)
+  {
+    ss << name;
+  }
 
-  return digraph.to_dot_string();
+  void instruction_to_string(const MFCallInstruction &instruction, std::stringstream &ss)
+  {
+    const MultiFunction &fn = instruction.fn();
+    this->instruction_name_format(fn.name() + ": ", ss);
+    for (const int param_index : fn.param_indices()) {
+      const MFParamType param_type = fn.param_type(param_index);
+      const MFVariable *variable = instruction.params()[param_index];
+      ss << R"(<font color="grey30">)";
+      switch (param_type.interface_type()) {
+        case MFParamType::Input: {
+          ss << "in";
+          break;
+        }
+        case MFParamType::Mutable: {
+          ss << "mut";
+          break;
+        }
+        case MFParamType::Output: {
+          ss << "out";
+          break;
+        }
+      }
+      ss << " </font> ";
+      variable_to_string(variable, ss);
+      if (param_index < fn.param_amount() - 1) {
+        ss << ", ";
+      }
+    }
+  }
+
+  void instruction_to_string(const MFDestructInstruction &instruction, std::stringstream &ss)
+  {
+    instruction_name_format("Destruct ", ss);
+    variable_to_string(instruction.variable(), ss);
+  }
+
+  void instruction_to_string(const MFDummyInstruction &UNUSED(instruction), std::stringstream &ss)
+  {
+    instruction_name_format("Dummy ", ss);
+  }
+
+  void instruction_to_string(const MFReturnInstruction &UNUSED(instruction), std::stringstream &ss)
+  {
+    instruction_name_format("Return ", ss);
+  }
+
+  void instruction_to_string(const MFBranchInstruction &instruction, std::stringstream &ss)
+  {
+    instruction_name_format("Branch ", ss);
+    variable_to_string(instruction.condition(), ss);
+  }
+};
+
+std::string MFProcedure::to_dot() const
+{
+  MFProcedureDotExport dot_export{*this};
+  return dot_export.generate();
 }
 
 }  // namespace blender::fn
