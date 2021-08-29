@@ -11,6 +11,7 @@
 #include "testing/testing.h"
 #include "tests/blendfile_loading_base_test.h"
 
+#include "BKE_appdir.h"
 #include "BKE_blender_version.h"
 
 #include "BLI_fileops.h"
@@ -185,9 +186,8 @@ static std::unique_ptr<OBJWriter> init_writer(const OBJExportParams &params,
   }
 }
 
-/* The following is relative to the flags_test_release_dir(). */
-const char *const temp_file_path = "../../Testing/Temporary/output.OBJ";
-const char *const temp_file_dir = "../../Testing/Temporary/";
+/* The following is relative to BKE_tempdir_base. */
+const char *const temp_file_path = "output.OBJ";
 
 static std::string read_temp_file_in_string(const std::string &file_path)
 {
@@ -199,7 +199,8 @@ static std::string read_temp_file_in_string(const std::string &file_path)
 
 TEST(obj_exporter_writer, header)
 {
-  std::string out_file_path = blender::tests::flags_test_release_dir() + "/" + temp_file_path;
+  /* Because testing doesn't fully initialize Blender, we need the following. */
+  BKE_tempdir_init(NULL);
   {
     OBJExportParamsDefault _export;
     std::unique_ptr<OBJWriter> writer = init_writer(_export.params, out_file_path);
@@ -212,6 +213,7 @@ TEST(obj_exporter_writer, header)
   const std::string result = read_temp_file_in_string(out_file_path);
   using namespace std::string_literals;
   ASSERT_EQ(result, "# Blender "s + BKE_blender_version_string() + "\n" + "# www.blender.org\n");
+  BLI_delete(out_file_path.c_str(), false, false);
 }
 
 TEST(obj_exporter_writer, mtllib)
@@ -262,8 +264,10 @@ class obj_exporter_regression_test : public obj_exporter_test {
     if (!load_file_and_depsgraph(blendfile)) {
       return;
     }
-    std::string out_file_path = blender::tests::flags_test_release_dir() + "/" + temp_file_dir +
-                                BLI_path_basename(golden_obj.c_str());
+    /* Because testing doesn't fully initialize Blender, we need the following. */
+    BKE_tempdir_init(NULL);
+    std::string tempdir = std::string(BKE_tempdir_base());
+    std::string out_file_path = tempdir + BLI_path_basename(golden_obj.c_str());
     strncpy(params.filepath, out_file_path.c_str(), FILE_MAX);
     params.blen_filepath = blendfile.c_str();
     export_frame(depsgraph, params, out_file_path.c_str());
@@ -274,8 +278,7 @@ class obj_exporter_regression_test : public obj_exporter_test {
     ASSERT_TRUE(strings_equal_after_first_lines(output_str, golden_str));
     BLI_delete(out_file_path.c_str(), false, false);
     if (!golden_mtl.empty()) {
-      std::string out_mtl_file_path = blender::tests::flags_test_release_dir() + "/" +
-                                      temp_file_dir + BLI_path_basename(golden_mtl.c_str());
+      std::string out_mtl_file_path = tempdir + BLI_path_basename(golden_mtl.c_str());
       std::string output_mtl_str = read_temp_file_in_string(out_mtl_file_path);
       std::string golden_mtl_file_path = blender::tests::flags_test_asset_dir() + "/" + golden_mtl;
       std::string golden_mtl_str = read_temp_file_in_string(golden_mtl_file_path);
