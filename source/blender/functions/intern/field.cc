@@ -16,9 +16,41 @@
 
 #include "BLI_map.hh"
 #include "BLI_set.hh"
-#include "BLI_vector_set.hh"
+#include "BLI_stack.hh"
 
 #include "FN_field.hh"
+
+struct InputOrFunction {
+  const void *ptr;
+
+ public:
+  InputOrFunction(const blender::fn::FieldFunction &function) : ptr(&function)
+  {
+  }
+  InputOrFunction(const blender::fn::FieldInput &input) : ptr(&input)
+  {
+  }
+  InputOrFunction(const blender::fn::Field &field) /* Maybe this is too clever. */
+  {
+    if (field.is_function()) {
+      ptr = &field.function();
+    }
+    else {
+      ptr = &field.input();
+    }
+  }
+  friend bool operator==(const InputOrFunction &a, const InputOrFunction &b)
+  {
+    return a.ptr == b.ptr;
+  }
+};
+
+template<> struct blender::DefaultHash<InputOrFunction> {
+  uint64_t operator()(const InputOrFunction &value) const
+  {
+    return DefaultHash<const void *>{}(value.ptr);
+  }
+};
 
 namespace blender::fn {
 
@@ -26,7 +58,16 @@ namespace blender::fn {
  * A map to hold the output variables for each function or input so they can be reused.
  */
 // using VariableMap = Map<const FunctionOrInput *, Vector<MFVariable *>>;
-using VariableMap = Map<const void *, Vector<MFVariable *>>;
+
+struct FieldVariable {
+  MFVariable *variable;
+  int remaining_uses = 1;
+  FieldVariable(MFVariable &variable) : variable(&variable)
+  {
+  }
+};
+
+using VariableMap = Map<InputOrFunction, Vector<FieldVariable>>;
 /* TODO: Use use counter in the vector to control when to add the desctruct call. */
 
 /**
@@ -35,54 +76,104 @@ using VariableMap = Map<const void *, Vector<MFVariable *>>;
  */
 using ComputedInputMap = Map<const MFVariable *, GVArrayPtr>;
 
-static MFVariable &get_field_variable(const Field &field, const VariableMap &unique_variables)
+static FieldVariable &get_field_variable(const Field &field, VariableMap &unique_variables)
 {
   if (field.is_input()) {
     const FieldInput &input = field.input();
-    return *unique_variables.lookup(&input).first();
+    return unique_variables.lookup(input).first();
   }
   const FieldFunction &function = field.function();
-  const Span<MFVariable *> function_outputs = unique_variables.lookup(&function);
-  return *function_outputs[field.function_output_index()];
+  MutableSpan<FieldVariable> function_outputs = unique_variables.lookup(function);
+  return function_outputs[field.function_output_index()];
 }
 
-/**
- * Traverse the fields recursively. Eventually there will be a field whose function has no
- * inputs. Start adding multi-function variables there. Those outputs are then used as inputs
- * for the dependent functions, and the rest of the field tree is built up from there.
- */
-static void add_field_variables_recursive(const Field &field,
-                                          MFProcedureBuilder &builder,
-                                          VariableMap &unique_variables)
+static const FieldVariable &get_field_variable(const Field &field,
+                                               const VariableMap &unique_variables)
 {
   if (field.is_input()) {
     const FieldInput &input = field.input();
-    if (!unique_variables.contains(&input)) {
+    return unique_variables.lookup(input).first();
+  }
+  const FieldFunction &function = field.function();
+  Span<FieldVariable> function_outputs = unique_variables.lookup(function);
+  return function_outputs[field.function_output_index()];
+}
+
+static void add_unique_variables(const Span<Field> fields,
+                                 MFProcedureBuilder &builder,
+                                 VariableMap &unique_variables)
+{
+  Stack<const Field *> fields_to_visit;
+  for (const Field &field : fields) {
+    fields_to_visit.push(&field);
+  }
+
+  while (!fields_to_visit.is_empty()) {
+    const Field &field = *fields_to_visit.pop();
+    if (unique_variables.contains(field)) {
+      continue;
+    }
+
+    if (field.is_input()) {
+      const FieldInput &input = field.input();
       MFVariable &variable = builder.add_input_parameter(MFDataType::ForSingle(field.type()),
                                                          input.name());
-      unique_variables.add(&input, {&variable});
+      unique_variables.add(input, {variable});
+    }
+    else {
+      const FieldFunction &function = field.function();
+      for (const Field &input_field : function.inputs()) {
+        fields_to_visit.push(&input_field);
+      }
+
+      Vector<MFVariable *> inputs;
+      Set<FieldVariable *> unique_inputs;
+      for (const Field &input_field : function.inputs()) {
+        FieldVariable &input = get_field_variable(input_field, unique_variables);
+        input.remaining_uses++;
+        unique_inputs.add(&input);
+        inputs.append(input.variable);
+      }
+
+      Vector<MFVariable *> outputs = builder.add_call(function.multi_function(), inputs);
+      Vector<FieldVariable> &unique_outputs = unique_variables.lookup_or_add(function, {});
+      for (MFVariable *output : outputs) {
+        unique_outputs.append(*output);
+      }
     }
   }
-  else {
+}
+
+static void add_destructs(const Span<Field> fields,
+                          MFProcedureBuilder &builder,
+                          VariableMap &unique_variables)
+{
+  Stack<const Field *> fields_to_visit;
+  for (const Field &field : fields) {
+    fields_to_visit.push(&field);
+  }
+
+  while (!fields_to_visit.is_empty()) {
+    const Field &field = *fields_to_visit.pop();
+    if (field.is_input()) {
+      continue;
+    }
     const FieldFunction &function = field.function();
     for (const Field &input_field : function.inputs()) {
-      add_field_variables_recursive(input_field, builder, unique_variables); /* TODO: Use stack. */
+      fields_to_visit.push(&input_field);
     }
 
-    /* Add the immediate inputs to this field, which were added earlier in the recursive call.  */
-    Vector<MFVariable *> inputs;
-    VectorSet<MFVariable *> unique_inputs;
-    for (const Field &input_field : function.inputs()) {
-      MFVariable &input = get_field_variable(input_field, unique_variables);
-      unique_inputs.add(&input);
-      inputs.append(&input);
+    /* Don't desctruct the outputs of the network. */
+    if (!fields.contains_ptr(&field)) {
+      MutableSpan<FieldVariable> outputs = unique_variables.lookup(function);
+
+      for (FieldVariable &output : outputs) {
+        output.remaining_uses--;
+        if (output.remaining_uses == 0) {
+          builder.add_destruct(*output.variable);
+        }
+      }
     }
-
-    Vector<MFVariable *> outputs = builder.add_call(function.multi_function(), inputs);
-
-    builder.add_destruct(unique_inputs); /* TODO: What if the same variable was used later on? */
-
-    unique_variables.add(&function, std::move(outputs));
   }
 }
 
@@ -92,50 +183,22 @@ static void build_procedure(const Span<Field> fields,
 {
   MFProcedureBuilder builder{procedure};
 
-  for (const Field &field : fields) {
-    add_field_variables_recursive(field, builder, unique_variables);
-  }
+  add_unique_variables(fields, builder, unique_variables);
+
+  add_destructs(fields, builder, unique_variables);
 
   builder.add_return();
 
+  /* TODO: Maybe handle input fields differently right here? To avoid the
+   * preprocessing step at the beginning of the procedure construction. */
   for (const Field &field : fields) {
-    MFVariable &input = get_field_variable(field, unique_variables);
+    MFVariable &input = *get_field_variable(field, unique_variables).variable;
     builder.add_output_parameter(input);
   }
 
   std::cout << procedure.to_dot();
 
   BLI_assert(procedure.validate());
-}
-
-/**
- * \TODO: In the future this could remove from the input map instead of building a second map.
- * Right now it's preferrable to keep this more understandable though.
- */
-static void gather_inputs_recursive(const Field &field,
-                                    const VariableMap &unique_variables,
-                                    const IndexMask mask,
-                                    MFParamsBuilder &params,
-                                    Set<const MFVariable *> &computed_inputs,
-                                    Vector<GVArrayPtr> &r_inputs)
-{
-  if (field.is_input()) {
-    const FieldInput &input = field.input();
-    const MFVariable *variable = unique_variables.lookup(&input).first();
-    if (!computed_inputs.contains(variable)) {
-      GVArrayPtr data = input.retrieve_data(mask);
-      computed_inputs.add_new(variable);
-      params.add_readonly_single_input(*data, input.name());
-      r_inputs.append(std::move(data));
-    }
-  }
-  else {
-    const FieldFunction &function = field.function();
-    for (const Field &input_field : function.inputs()) {
-      gather_inputs_recursive(
-          input_field, unique_variables, mask, params, computed_inputs, r_inputs);
-    }
-  }
 }
 
 static void gather_inputs(const Span<Field> fields,
@@ -145,8 +208,29 @@ static void gather_inputs(const Span<Field> fields,
                           Vector<GVArrayPtr> &r_inputs)
 {
   Set<const MFVariable *> computed_inputs;
+  Stack<const Field *> fields_to_visit;
   for (const Field &field : fields) {
-    gather_inputs_recursive(field, unique_variables, mask, params, computed_inputs, r_inputs);
+    fields_to_visit.push(&field);
+  }
+
+  while (!fields_to_visit.is_empty()) {
+    const Field &field = *fields_to_visit.pop();
+    if (field.is_input()) {
+      const FieldInput &input = field.input();
+      const FieldVariable &variable = get_field_variable(field, unique_variables);
+      if (!computed_inputs.contains(variable.variable)) {
+        GVArrayPtr data = input.retrieve_data(mask);
+        computed_inputs.add_new(variable.variable);
+        params.add_readonly_single_input(*data, input.name());
+        r_inputs.append(std::move(data));
+      }
+    }
+    else {
+      const FieldFunction &function = field.function();
+      for (const Field &input_field : function.inputs()) {
+        fields_to_visit.push(&input_field);
+      }
+    }
   }
 }
 
