@@ -615,8 +615,7 @@ class MFProcedureDotExport {
       }
     }
 
-    dot::Node &entry_node = digraph_.new_node("Entry");
-    entry_node.set_shape(dot::Attr_shape::Circle);
+    dot::Node &entry_node = this->create_entry_node();
     create_edge(entry_node, procedure_.entry());
   }
 
@@ -754,12 +753,49 @@ class MFProcedureDotExport {
   void instruction_to_string(const MFReturnInstruction &UNUSED(instruction), std::stringstream &ss)
   {
     instruction_name_format("Return ", ss);
+
+    Vector<ConstMFParameter> outgoing_parameters;
+    for (const ConstMFParameter &param : procedure_.params()) {
+      if (ELEM(param.type, MFParamType::Mutable, MFParamType::Output)) {
+        outgoing_parameters.append(param);
+      }
+    }
+    for (const int param_index : outgoing_parameters.index_range()) {
+      const ConstMFParameter &param = outgoing_parameters[param_index];
+      variable_to_string(param.variable, ss);
+      if (param_index < outgoing_parameters.size() - 1) {
+        ss << ", ";
+      }
+    }
   }
 
   void instruction_to_string(const MFBranchInstruction &instruction, std::stringstream &ss)
   {
     instruction_name_format("Branch ", ss);
     variable_to_string(instruction.condition(), ss);
+  }
+
+  dot::Node &create_entry_node()
+  {
+    std::stringstream ss;
+    ss << "Entry: ";
+    Vector<ConstMFParameter> incoming_parameters;
+    for (const ConstMFParameter &param : procedure_.params()) {
+      if (ELEM(param.type, MFParamType::Input, MFParamType::Mutable)) {
+        incoming_parameters.append(param);
+      }
+    }
+    for (const int param_index : incoming_parameters.index_range()) {
+      const ConstMFParameter &param = incoming_parameters[param_index];
+      variable_to_string(param.variable, ss);
+      if (param_index < incoming_parameters.size() - 1) {
+        ss << ", ";
+      }
+    }
+
+    dot::Node &node = digraph_.new_node(ss.str());
+    node.set_shape(dot::Attr_shape::Ellipse);
+    return node;
   }
 };
 
