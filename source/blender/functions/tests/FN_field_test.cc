@@ -26,7 +26,7 @@ TEST(field, ConstantFunction)
 }
 
 class IndexFieldInput final : public FieldInput {
-  StringRef name_ = "Index";
+  StringRef name_ = "Index"; /* TODO: I don't think this is a valid way to override the name. */
   GVArrayPtr retrieve_data(IndexMask mask) const final
   {
     auto index_func = [](int i) { return i; };
