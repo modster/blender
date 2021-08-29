@@ -566,7 +566,7 @@ static Vector<const MFInstruction *> get_instructions_in_block(const MFProcedure
 static void variable_to_string(const MFVariable *variable, std::stringstream &ss)
 {
   if (variable == nullptr) {
-    ss << "<none>";
+    ss << "null";
   }
   else {
     ss << "$" << variable->id();
@@ -576,13 +576,19 @@ static void variable_to_string(const MFVariable *variable, std::stringstream &ss
   }
 }
 
+static void instruction_name_format(StringRef name, std::stringstream &ss)
+{
+  ss << name;
+}
+
 static void instruction_to_string(const MFCallInstruction &instruction, std::stringstream &ss)
 {
   const MultiFunction &fn = instruction.fn();
-  ss << fn.name() << " - ";
+  instruction_name_format(fn.name() + ": ", ss);
   for (const int param_index : fn.param_indices()) {
     const MFParamType param_type = fn.param_type(param_index);
     const MFVariable *variable = instruction.params()[param_index];
+    ss << R"(<font color="grey30">)";
     switch (param_type.interface_type()) {
       case MFParamType::Input: {
         ss << "in";
@@ -597,7 +603,7 @@ static void instruction_to_string(const MFCallInstruction &instruction, std::str
         break;
       }
     }
-    ss << " ";
+    ss << " </font> ";
     variable_to_string(variable, ss);
     if (param_index < fn.param_amount() - 1) {
       ss << ", ";
@@ -607,25 +613,25 @@ static void instruction_to_string(const MFCallInstruction &instruction, std::str
 
 static void instruction_to_string(const MFDestructInstruction &instruction, std::stringstream &ss)
 {
-  ss << "Destruct ";
+  instruction_name_format("Destruct ", ss);
   variable_to_string(instruction.variable(), ss);
 }
 
 static void instruction_to_string(const MFDummyInstruction &UNUSED(instruction),
                                   std::stringstream &ss)
 {
-  ss << "Dummy";
+  instruction_name_format("Dummy ", ss);
 }
 
 static void instruction_to_string(const MFReturnInstruction &UNUSED(instruction),
                                   std::stringstream &ss)
 {
-  ss << "Return";
+  instruction_name_format("Return ", ss);
 }
 
 static void instruction_to_string(const MFBranchInstruction &instruction, std::stringstream &ss)
 {
-  ss << "Branch on ";
+  instruction_name_format("Branch ", ss);
   variable_to_string(instruction.condition(), ss);
 }
 
@@ -651,6 +657,7 @@ std::string MFProcedure::to_dot() const
     Vector<const MFInstruction *> block_instructions = get_instructions_in_block(*this,
                                                                                  *representative);
     std::stringstream ss;
+    ss << "<";
 
     for (const MFInstruction *current : block_instructions) {
       handled_instructions.add_new(current);
@@ -676,8 +683,9 @@ std::string MFProcedure::to_dot() const
           break;
         }
       }
-      ss << "\\l";
+      ss << R"(<br align="left" />)";
     }
+    ss << ">";
 
     dot::Node &dot_node = digraph.new_node(ss.str());
     dot_node.set_shape(dot::Attr_shape::Rectangle);
