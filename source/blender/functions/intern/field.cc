@@ -35,14 +35,14 @@ using VariableMap = Map<const void *, Vector<MFVariable *>>;
  */
 using ComputedInputMap = Map<const MFVariable *, GVArrayPtr>;
 
-static MFVariable &get_field_variable(const Field &field, const VariableMap &variable_map)
+static MFVariable &get_field_variable(const Field &field, const VariableMap &unique_variables)
 {
   if (field.is_input()) {
     const FieldInput &input = field.input();
-    return *variable_map.lookup(&input).first();
+    return *unique_variables.lookup(&input).first();
   }
   const FieldFunction &function = field.function();
-  const Span<MFVariable *> function_outputs = variable_map.lookup(&function);
+  const Span<MFVariable *> function_outputs = unique_variables.lookup(&function);
   return *function_outputs[field.function_output_index()];
 }
 
@@ -53,27 +53,27 @@ static MFVariable &get_field_variable(const Field &field, const VariableMap &var
  */
 static void add_field_variables_recursive(const Field &field,
                                           MFProcedureBuilder &builder,
-                                          VariableMap &variable_map)
+                                          VariableMap &unique_variables)
 {
   if (field.is_input()) {
     const FieldInput &input = field.input();
-    if (!variable_map.contains(&input)) {
+    if (!unique_variables.contains(&input)) {
       MFVariable &variable = builder.add_input_parameter(MFDataType::ForSingle(field.type()),
                                                          input.name());
-      variable_map.add(&input, {&variable});
+      unique_variables.add(&input, {&variable});
     }
   }
   else {
     const FieldFunction &function = field.function();
     for (const Field &input_field : function.inputs()) {
-      add_field_variables_recursive(input_field, builder, variable_map); /* TODO: Use stack. */
+      add_field_variables_recursive(input_field, builder, unique_variables); /* TODO: Use stack. */
     }
 
     /* Add the immediate inputs to this field, which were added earlier in the recursive call.  */
     Vector<MFVariable *> inputs;
     VectorSet<MFVariable *> unique_inputs;
     for (const Field &input_field : function.inputs()) {
-      MFVariable &input = get_field_variable(input_field, variable_map);
+      MFVariable &input = get_field_variable(input_field, unique_variables);
       unique_inputs.add(&input);
       inputs.append(&input);
     }
@@ -82,24 +82,24 @@ static void add_field_variables_recursive(const Field &field,
 
     builder.add_destruct(unique_inputs); /* TODO: What if the same variable was used later on? */
 
-    variable_map.add(&function, std::move(outputs));
+    unique_variables.add(&function, std::move(outputs));
   }
 }
 
 static void build_procedure(const Span<Field> fields,
                             MFProcedure &procedure,
-                            VariableMap &variable_map)
+                            VariableMap &unique_variables)
 {
   MFProcedureBuilder builder{procedure};
 
   for (const Field &field : fields) {
-    add_field_variables_recursive(field, builder, variable_map);
+    add_field_variables_recursive(field, builder, unique_variables);
   }
 
   builder.add_return();
 
   for (const Field &field : fields) {
-    MFVariable &input = get_field_variable(field, variable_map);
+    MFVariable &input = get_field_variable(field, unique_variables);
     builder.add_output_parameter(input);
   }
 
@@ -113,7 +113,7 @@ static void build_procedure(const Span<Field> fields,
  * Right now it's preferrable to keep this more understandable though.
  */
 static void gather_inputs_recursive(const Field &field,
-                                    const VariableMap &variable_map,
+                                    const VariableMap &unique_variables,
                                     const IndexMask mask,
                                     MFParamsBuilder &params,
                                     Set<const MFVariable *> &computed_inputs,
@@ -121,7 +121,7 @@ static void gather_inputs_recursive(const Field &field,
 {
   if (field.is_input()) {
     const FieldInput &input = field.input();
-    const MFVariable *variable = variable_map.lookup(&input).first();
+    const MFVariable *variable = unique_variables.lookup(&input).first();
     if (!computed_inputs.contains(variable)) {
       GVArrayPtr data = input.retrieve_data(mask);
       computed_inputs.add_new(variable);
@@ -132,20 +132,21 @@ static void gather_inputs_recursive(const Field &field,
   else {
     const FieldFunction &function = field.function();
     for (const Field &input_field : function.inputs()) {
-      gather_inputs_recursive(input_field, variable_map, mask, params, computed_inputs, r_inputs);
+      gather_inputs_recursive(
+          input_field, unique_variables, mask, params, computed_inputs, r_inputs);
     }
   }
 }
 
 static void gather_inputs(const Span<Field> fields,
-                          const VariableMap &variable_map,
+                          const VariableMap &unique_variables,
                           const IndexMask mask,
                           MFParamsBuilder &params,
                           Vector<GVArrayPtr> &r_inputs)
 {
   Set<const MFVariable *> computed_inputs;
   for (const Field &field : fields) {
-    gather_inputs_recursive(field, variable_map, mask, params, computed_inputs, r_inputs);
+    gather_inputs_recursive(field, unique_variables, mask, params, computed_inputs, r_inputs);
   }
 }
 
@@ -161,15 +162,15 @@ static void evaluate_non_input_fields(const Span<Field> fields,
                                       const Span<GMutableSpan> outputs)
 {
   MFProcedure procedure;
-  VariableMap variable_map;
-  build_procedure(fields, procedure, variable_map);
+  VariableMap unique_variables;
+  build_procedure(fields, procedure, unique_variables);
 
   MFProcedureExecutor executor{"Evaluate Field", procedure};
   MFParamsBuilder params{executor, mask.min_array_size()};
   MFContextBuilder context;
 
   Vector<GVArrayPtr> inputs;
-  gather_inputs(fields, variable_map, mask, params, inputs);
+  gather_inputs(fields, unique_variables, mask, params, inputs);
 
   add_outputs(params, outputs);
 
