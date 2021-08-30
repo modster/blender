@@ -219,6 +219,10 @@ static void build_procedure(const Span<Field> fields,
   BLI_assert(procedure.validate());
 }
 
+/**
+ * TODO: Maybe this doesn't add inputs in the same order as the the unique
+ * variable traversal. Add a test for that and fix it if it doesn't work.
+ */
 static void gather_inputs(const Span<Field> fields,
                           const VariableMap &unique_variables,
                           const IndexMask mask,
