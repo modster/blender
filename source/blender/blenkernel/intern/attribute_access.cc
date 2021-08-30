@@ -391,8 +391,14 @@ WriteAttributeLookup CustomDataAttributeProvider::try_get_for_write(
     if (!custom_data_layer_matches_attribute_id(layer, attribute_id)) {
       continue;
     }
-    /* TODO: Properly handle anonymous attribute. */
-    CustomData_duplicate_referenced_layer_named(custom_data, layer.type, layer.name, domain_size);
+    if (attribute_id.is_named()) {
+      CustomData_duplicate_referenced_layer_named(
+          custom_data, layer.type, layer.name, domain_size);
+    }
+    else {
+      CustomData_duplicate_referenced_layer_anonymous(
+          custom_data, layer.type, &attribute_id.anonymous_id(), domain_size);
+    }
     const CustomDataType data_type = (CustomDataType)layer.type;
     switch (data_type) {
       case CD_PROP_FLOAT:
@@ -433,11 +439,22 @@ bool CustomDataAttributeProvider::try_delete(GeometryComponent &component,
   return false;
 }
 
-static std::string get_anonymous_attribute_name()
+static void *add_generic_custom_data_layer(CustomData &custom_data,
+                                           const CustomDataType data_type,
+                                           const eCDAllocType alloctype,
+                                           void *layer_data,
+                                           const int domain_size,
+                                           const AttributeIDRef &attribute_id)
 {
-  static std::atomic<int> index = 0;
-  const int next_index = index.fetch_add(1);
-  return "anonymous_attribute_" + std::to_string(next_index);
+  if (attribute_id.is_named()) {
+    char attribute_name_c[MAX_NAME];
+    attribute_id.name().copy(attribute_name_c);
+    return CustomData_add_layer_named(
+        &custom_data, data_type, CD_DEFAULT, nullptr, domain_size, attribute_name_c);
+  }
+  const AnonymousAttributeID &anonymous_id = attribute_id.anonymous_id();
+  return CustomData_add_layer_anonymous(
+      &custom_data, data_type, alloctype, layer_data, domain_size, &anonymous_id);
 }
 
 static bool add_custom_data_layer_from_attribute_init(const AttributeIDRef &attribute_id,
@@ -446,62 +463,36 @@ static bool add_custom_data_layer_from_attribute_init(const AttributeIDRef &attr
                                                       const int domain_size,
                                                       const AttributeInit &initializer)
 {
-  char attribute_name_c[MAX_NAME];
-  if (attribute_id.is_named()) {
-    attribute_id.name().copy(attribute_name_c);
-  }
-  else {
-    const std::string name = get_anonymous_attribute_name();
-    STRNCPY(attribute_name_c, name.c_str());
-  }
-
-  bool success = false;
-
   switch (initializer.type) {
     case AttributeInit::Type::Default: {
-      void *data = CustomData_add_layer_named(
-          &custom_data, data_type, CD_DEFAULT, nullptr, domain_size, attribute_name_c);
-      success = data != nullptr;
-      break;
+      void *data = add_generic_custom_data_layer(
+          custom_data, data_type, CD_DEFAULT, nullptr, domain_size, attribute_id);
+      return data != nullptr;
     }
     case AttributeInit::Type::VArray: {
-      void *data = CustomData_add_layer_named(
-          &custom_data, data_type, CD_DEFAULT, nullptr, domain_size, attribute_name_c);
-      if (data != nullptr) {
-        success = true;
-        const GVArray *varray = static_cast<const AttributeInitVArray &>(initializer).varray;
-        varray->materialize_to_uninitialized(IndexRange(varray->size()), data);
+      void *data = add_generic_custom_data_layer(
+          custom_data, data_type, CD_DEFAULT, nullptr, domain_size, attribute_id);
+      if (data == nullptr) {
+        return false;
       }
-      break;
+      const GVArray *varray = static_cast<const AttributeInitVArray &>(initializer).varray;
+      varray->materialize_to_uninitialized(IndexRange(varray->size()), data);
+      return true;
     }
     case AttributeInit::Type::MoveArray: {
       void *source_data = static_cast<const AttributeInitMove &>(initializer).data;
-      void *data = CustomData_add_layer_named(
-          &custom_data, data_type, CD_ASSIGN, source_data, domain_size, attribute_name_c);
+      void *data = add_generic_custom_data_layer(
+          custom_data, data_type, CD_ASSIGN, source_data, domain_size, attribute_id);
       if (data == nullptr) {
         MEM_freeN(source_data);
+        return false;
       }
-      else {
-        success = true;
-      }
-      break;
+      return true;
     }
   }
 
-  if (!success) {
-    return false;
-  }
-
-  if (attribute_id.is_anonymous()) {
-    for (CustomDataLayer &layer : MutableSpan(custom_data.layers, custom_data.totlayer)) {
-      if (STREQ(layer.name, attribute_name_c)) {
-        layer.anonymous_id = &attribute_id.anonymous_id();
-        BKE_anonymous_attribute_id_increment_weak(layer.anonymous_id);
-      }
-    }
-  }
-
-  return true;
+  BLI_assert_unreachable();
+  return false;
 }
 
 bool CustomDataAttributeProvider::try_create(GeometryComponent &component,
@@ -542,7 +533,14 @@ bool CustomDataAttributeProvider::foreach_attribute(const GeometryComponent &com
     const CustomDataType data_type = (CustomDataType)layer.type;
     if (this->type_is_supported(data_type)) {
       AttributeMetaData meta_data{domain_, data_type};
-      if (!callback(layer.name, meta_data)) {
+      AttributeIDRef attribute_id;
+      if (layer.anonymous_id != nullptr) {
+        attribute_id = layer.anonymous_id;
+      }
+      else {
+        attribute_id = layer.name;
+      }
+      if (!callback(attribute_id, meta_data)) {
         return false;
       }
     }
@@ -727,13 +725,8 @@ std::optional<GMutableSpan> CustomDataAttributes::get_for_write(const AttributeI
 bool CustomDataAttributes::create(const AttributeIDRef &attribute_id,
                                   const CustomDataType data_type)
 {
-  /* TODO: Support anonymous attributes. */
-  if (!attribute_id.is_named()) {
-    return false;
-  }
-  char name_c[MAX_NAME];
-  attribute_id.name().copy(name_c);
-  void *result = CustomData_add_layer_named(&data, data_type, CD_DEFAULT, nullptr, size_, name_c);
+  void *result = add_generic_custom_data_layer(
+      data, data_type, CD_DEFAULT, nullptr, size_, attribute_id);
   return result != nullptr;
 }
 
@@ -741,13 +734,8 @@ bool CustomDataAttributes::create_by_move(const blender::bke::AttributeIDRef &at
                                           const CustomDataType data_type,
                                           void *buffer)
 {
-  /* TODO: Support anonymous attributes. */
-  if (!attribute_id.is_named()) {
-    return false;
-  }
-  char name_c[MAX_NAME];
-  attribute_id.name().copy(name_c);
-  void *result = CustomData_add_layer_named(&data, data_type, CD_ASSIGN, buffer, size_, name_c);
+  void *result = add_generic_custom_data_layer(
+      data, data_type, CD_ASSIGN, buffer, size_, attribute_id);
   return result != nullptr;
 }
 
@@ -775,7 +763,14 @@ bool CustomDataAttributes::foreach_attribute(const AttributeForeachCallback call
 {
   for (const CustomDataLayer &layer : Span(data.layers, data.totlayer)) {
     AttributeMetaData meta_data{domain, (CustomDataType)layer.type};
-    if (!callback(layer.name, meta_data)) {
+    AttributeIDRef attribute_id;
+    if (layer.anonymous_id != nullptr) {
+      attribute_id = layer.anonymous_id;
+    }
+    else {
+      attribute_id = layer.name;
+    }
+    if (!callback(attribute_id, meta_data)) {
       return false;
     }
   }
@@ -955,11 +950,12 @@ bool GeometryComponent::attribute_try_create_builtin(const blender::StringRef at
   return builtin_provider->try_create(*this, initializer);
 }
 
-Set<std::string> GeometryComponent::attribute_names() const
+Set<blender::bke::AttributeIDRef> GeometryComponent::attribute_ids() const
 {
-  Set<std::string> attributes;
-  this->attribute_foreach([&](StringRefNull name, const AttributeMetaData &UNUSED(meta_data)) {
-    attributes.add(name);
+  Set<blender::bke::AttributeIDRef> attributes;
+  this->attribute_foreach([&](const blender::bke::AttributeIDRef &attribute_id,
+                              const AttributeMetaData &UNUSED(meta_data)) {
+    attributes.add(attribute_id);
     return true;
   });
   return attributes;
@@ -992,9 +988,9 @@ bool GeometryComponent::attribute_foreach(const AttributeForeachCallback callbac
   }
   for (const DynamicAttributesProvider *provider : providers->dynamic_attribute_providers()) {
     const bool continue_loop = provider->foreach_attribute(
-        *this, [&](StringRefNull name, const AttributeMetaData &meta_data) {
-          if (handled_attribute_names.add(name)) {
-            return callback(name, meta_data);
+        *this, [&](const AttributeIDRef &attribute_id, const AttributeMetaData &meta_data) {
+          if (attribute_id.is_anonymous() || handled_attribute_names.add(attribute_id.name())) {
+            return callback(attribute_id, meta_data);
           }
           return true;
         });
@@ -1018,13 +1014,10 @@ bool GeometryComponent::attribute_exists(const blender::bke::AttributeIDRef &att
 std::optional<AttributeMetaData> GeometryComponent::attribute_get_meta_data(
     const blender::bke::AttributeIDRef &attribute_id) const
 {
-  /* TODO: Support anonymous attributes. */
-  if (!attribute_id.is_named()) {
-    return {};
-  }
   std::optional<AttributeMetaData> result{std::nullopt};
-  this->attribute_foreach([&](StringRefNull name, const AttributeMetaData &meta_data) {
-    if (attribute_id.name() == name) {
+  this->attribute_foreach([&](const blender::bke::AttributeIDRef &current_attribute_id,
+                              const AttributeMetaData &meta_data) {
+    if (attribute_id == current_attribute_id) {
       result = meta_data;
       return false;
     }

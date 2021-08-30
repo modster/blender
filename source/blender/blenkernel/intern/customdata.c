@@ -2663,6 +2663,27 @@ void *CustomData_add_layer_named(CustomData *data,
   return NULL;
 }
 
+void *CustomData_add_layer_anonymous(struct CustomData *data,
+                                     int type,
+                                     eCDAllocType alloctype,
+                                     void *layerdata,
+                                     int totelem,
+                                     const AnonymousAttributeID *anonymous_id)
+{
+  const char *name = BKE_anonymous_attribute_id_internal_name(anonymous_id);
+  CustomDataLayer *layer = customData_add_layer__internal(
+      data, type, alloctype, layerdata, totelem, name);
+  CustomData_update_typemap(data);
+
+  if (layer == NULL) {
+    return NULL;
+  }
+
+  BKE_anonymous_attribute_id_increment_weak(anonymous_id);
+  layer->anonymous_id = anonymous_id;
+  return layer->data;
+}
+
 bool CustomData_free_layer(CustomData *data, int type, int totelem, int index)
 {
   const int index_first = CustomData_get_layer_index(data, type);
@@ -2824,6 +2845,20 @@ void *CustomData_duplicate_referenced_layer_named(CustomData *data,
   int layer_index = CustomData_get_named_layer_index(data, type, name);
 
   return customData_duplicate_referenced_layer_index(data, layer_index, totelem);
+}
+
+void *CustomData_duplicate_referenced_layer_anonymous(CustomData *data,
+                                                      const int type,
+                                                      const AnonymousAttributeID *anonymous_id,
+                                                      const int totelem)
+{
+  for (int i = 0; i < data->totlayer; i++) {
+    if (data->layers[i].anonymous_id == anonymous_id) {
+      return customData_duplicate_referenced_layer_index(data, i, totelem);
+    }
+  }
+  BLI_assert_unreachable();
+  return NULL;
 }
 
 void CustomData_duplicate_referenced_layers(CustomData *data, int totelem)

@@ -19,15 +19,24 @@
 using namespace blender::bke;
 
 struct AnonymousAttributeID {
-  mutable std::atomic<int> refcount_weak;
-  mutable std::atomic<int> refcount_strong;
+  mutable std::atomic<int> refcount_weak = 0;
+  mutable std::atomic<int> refcount_strong = 0;
   std::string debug_name;
+  std::string internal_name;
 };
+
+static std::string get_new_internal_name()
+{
+  static std::atomic<int> index = 0;
+  const int next_index = index.fetch_add(1);
+  return "anonymous_attribute_" + std::to_string(next_index);
+}
 
 AnonymousAttributeID *BKE_anonymous_attribute_id_new_weak(const char *debug_name)
 {
   AnonymousAttributeID *anonymous_id = new AnonymousAttributeID();
   anonymous_id->debug_name = debug_name;
+  anonymous_id->internal_name = get_new_internal_name();
   anonymous_id->refcount_weak.store(1);
   return anonymous_id;
 }
@@ -36,6 +45,7 @@ AnonymousAttributeID *BKE_anonymous_attribute_id_new_strong(const char *debug_na
 {
   AnonymousAttributeID *anonymous_id = new AnonymousAttributeID();
   anonymous_id->debug_name = debug_name;
+  anonymous_id->internal_name = get_new_internal_name();
   anonymous_id->refcount_weak.store(1);
   anonymous_id->refcount_strong.store(1);
   return anonymous_id;
@@ -74,4 +84,9 @@ void BKE_anonymous_attribute_id_decrement_strong(const AnonymousAttributeID *ano
 const char *BKE_anonymous_attribute_id_debug_name(const AnonymousAttributeID *anonymous_id)
 {
   return anonymous_id->debug_name.c_str();
+}
+
+const char *BKE_anonymous_attribute_id_internal_name(const AnonymousAttributeID *anonymous_id)
+{
+  return anonymous_id->internal_name.c_str();
 }

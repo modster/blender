@@ -32,6 +32,7 @@ struct ModifierData;
 
 namespace blender::nodes {
 
+using bke::AttributeIDRef;
 using bke::geometry_set_realize_instances;
 using bke::OutputAttribute;
 using bke::OutputAttribute_Typed;

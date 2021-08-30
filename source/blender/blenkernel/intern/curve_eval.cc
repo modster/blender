@@ -25,6 +25,7 @@
 
 #include "DNA_curve_types.h"
 
+#include "BKE_anonymous_attribute.hh"
 #include "BKE_curve.h"
 #include "BKE_spline.hh"
 
@@ -330,13 +331,13 @@ void CurveEval::assert_valid_point_attributes() const
     return;
   }
   const int layer_len = splines_.first()->attributes.data.totlayer;
-  Map<StringRefNull, AttributeMetaData> map;
+  Map<blender::bke::AttributeIDRef, AttributeMetaData> map;
   for (const SplinePtr &spline : splines_) {
     BLI_assert(spline->attributes.data.totlayer == layer_len);
     spline->attributes.foreach_attribute(
-        [&](StringRefNull name, const AttributeMetaData &meta_data) {
+        [&](const blender::bke::AttributeIDRef &attribute_id, const AttributeMetaData &meta_data) {
           map.add_or_modify(
-              name,
+              attribute_id,
               [&](AttributeMetaData *map_data) {
                 /* All unique attribute names should be added on the first spline. */
                 BLI_assert(spline == splines_.first());

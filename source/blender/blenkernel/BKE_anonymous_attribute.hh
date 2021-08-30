@@ -19,6 +19,7 @@
 #include <atomic>
 #include <string>
 
+#include "BLI_hash.hh"
 #include "BLI_string_ref.hh"
 
 #include "BKE_anonymous_attribute.h"
@@ -184,6 +185,16 @@ class AttributeIDRef {
   operator bool() const
   {
     return this->is_named() || this->is_anonymous();
+  }
+
+  friend bool operator==(const AttributeIDRef &a, const AttributeIDRef &b)
+  {
+    return a.anonymous_id_ == b.anonymous_id_ && a.name_ == b.name_;
+  }
+
+  uint64_t hash() const
+  {
+    return get_default_hash_2(name_, anonymous_id_);
   }
 
   bool is_named() const

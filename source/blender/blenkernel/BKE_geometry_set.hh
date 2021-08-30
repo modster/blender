@@ -134,7 +134,7 @@ class GeometryComponent {
   bool attribute_try_create_builtin(const blender::StringRef attribute_name,
                                     const AttributeInit &initializer);
 
-  blender::Set<std::string> attribute_names() const;
+  blender::Set<blender::bke::AttributeIDRef> attribute_ids() const;
   bool attribute_foreach(const AttributeForeachCallback callback) const;
 
   virtual bool is_empty() const;

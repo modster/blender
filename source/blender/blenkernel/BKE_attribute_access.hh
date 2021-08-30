@@ -105,8 +105,8 @@ struct AttributeInitMove : public AttributeInit {
 };
 
 /* Returns false when the iteration should be stopped. */
-using AttributeForeachCallback = blender::FunctionRef<bool(blender::StringRefNull attribute_name,
-                                                           const AttributeMetaData &meta_data)>;
+using AttributeForeachCallback = blender::FunctionRef<bool(
+    const blender::bke::AttributeIDRef &attribute_id, const AttributeMetaData &meta_data)>;
 
 namespace blender::bke {
 

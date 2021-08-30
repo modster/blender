@@ -30,6 +30,7 @@ void BKE_anonymous_attribute_id_increment_strong(const AnonymousAttributeID *ano
 void BKE_anonymous_attribute_id_decrement_weak(const AnonymousAttributeID *anonymous_id);
 void BKE_anonymous_attribute_id_decrement_strong(const AnonymousAttributeID *anonymous_id);
 const char *BKE_anonymous_attribute_id_debug_name(const AnonymousAttributeID *anonymous_id);
+const char *BKE_anonymous_attribute_id_internal_name(const AnonymousAttributeID *anonymous_id);
 
 #ifdef __cplusplus
 }
