@@ -754,29 +754,6 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
     const auto added_verts = mesh_diff.get_added_verts();
 
     if (sewing_enabled) {
-      /* Edges that were split and had `EDGE_BETWEEN_SEWING_EDGES`,
-       * the new edges formed from the edge split should also have
-       * `EDGE_BETWEEN_SEWING_EDGES` */
-      {
-        blender::Vector<VertIndex> verts_with_edge_between_sewing_edges;
-        for (const auto &deleted_edge : mesh_diff.get_deleted_edges()) {
-          const auto &edge_verts = deleted_edge.get_checked_verts();
-          verts_with_edge_between_sewing_edges.append_non_duplicates(std::get<0>(edge_verts));
-          verts_with_edge_between_sewing_edges.append_non_duplicates(std::get<1>(edge_verts));
-        }
-
-        for (const auto &added_edge_index : mesh_diff.get_added_edges()) {
-          auto &added_edge = this->get_checked_edge(added_edge_index);
-          for (const auto &vert_with_edge_between_sewing_edges :
-               verts_with_edge_between_sewing_edges) {
-            if (added_edge.has_vert(vert_with_edge_between_sewing_edges)) {
-              auto &added_edge_flags = added_edge.get_checked_extra_data_mut().get_flags_mut();
-              added_edge_flags |= EDGE_BETWEEN_SEWING_EDGES;
-            }
-          }
-        }
-      }
-
       BLI_assert(mesh_diff.get_added_nodes().size() == 1);
       std::cout << "mesh_diff.get_added_verts().size(): " << mesh_diff.get_added_verts().size()
                 << std::endl;
