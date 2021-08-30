@@ -323,6 +323,8 @@ SequencerToolSettings *SEQ_tool_settings_init(void)
   tool_settings->snap_mode = SEQ_SNAP_TO_STRIPS | SEQ_SNAP_TO_CURRENT_FRAME |
                              SEQ_SNAP_TO_STRIP_HOLD;
   tool_settings->snap_distance = 15;
+  tool_settings->overlap_mode = SEQ_OVERLAP_SHUFFLE;
+
   return tool_settings;
 }
 
@@ -370,6 +372,12 @@ void SEQ_tool_settings_fit_method_set(Scene *scene, eSeqImageFitMethod fit_metho
 {
   SequencerToolSettings *tool_settings = SEQ_tool_settings_ensure(scene);
   tool_settings->fit_method = fit_method;
+}
+
+eSeqOverlapMode SEQ_tool_settings_overlap_mode_get(Scene *scene)
+{
+  const SequencerToolSettings *tool_settings = SEQ_tool_settings_ensure(scene);
+  return tool_settings->overlap_mode;
 }
 
 /**
@@ -755,9 +763,9 @@ static bool seq_write_data_cb(Sequence *seq, void *userdata)
   BlendWriter *writer = (BlendWriter *)userdata;
   BLO_write_struct(writer, Sequence, seq);
   if (seq->strip && seq->strip->done == 0) {
-    /* write strip with 'done' at 0 because readfile */
+    /* Write strip with 'done' at 0 because read-file. */
 
-    // TODO this doesn't depend on the `Strip` data to be present?
+    /* TODO this doesn't depend on the `Strip` data to be present? */
     if (seq->effectdata) {
       switch (seq->type) {
         case SEQ_TYPE_COLOR:
