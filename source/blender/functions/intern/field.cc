@@ -159,6 +159,7 @@ static void add_unique_variables(const Span<Field> fields,
   while (!fields_to_visit.is_empty()) {
     const Field &field = *fields_to_visit.peek();
     if (unique_variables.contains(field)) {
+      fields_to_visit.pop();
       continue;
     }
 
