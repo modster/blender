@@ -346,7 +346,7 @@ typedef struct bNodeType {
 #define NODE_CLASS_OP_FILTER 5
 #define NODE_CLASS_GROUP 6
 // #define NODE_CLASS_FILE              7
-#define NODE_CLASS_CONVERTOR 8
+#define NODE_CLASS_CONVERTER 8
 #define NODE_CLASS_MATTE 9
 #define NODE_CLASS_DISTORT 10
 // #define NODE_CLASS_OP_DYNAMIC        11 /* deprecated */
@@ -1472,6 +1472,7 @@ int ntreeTexExecTree(struct bNodeTree *ntree,
 #define GEO_NODE_CURVE_SET_HANDLES 1072
 #define GEO_NODE_CURVE_SPLINE_TYPE 1073
 #define GEO_NODE_CURVE_SELECT_HANDLES 1074
+#define GEO_NODE_CURVE_FILL 1075
 
 /** \} */
 
