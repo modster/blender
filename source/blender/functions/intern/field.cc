@@ -102,6 +102,9 @@ static const FieldVariable &get_field_variable(const Field &field,
   return function_outputs[field.function_output_index()];
 }
 
+/**
+ * TODO: Merge duplicate input nodes, not just fields pointing to the same FieldInput.
+ */
 static void add_variables_for_input(const Field &field,
                                     Stack<const Field *> &fields_to_visit,
                                     MFProcedureBuilder &builder,
