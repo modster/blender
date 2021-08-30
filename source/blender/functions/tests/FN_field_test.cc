@@ -27,8 +27,11 @@ TEST(field, ConstantFunction)
 }
 
 class IndexFieldInput final : public FieldInput {
-  /* TODO: I don't think this is a valid way to override the name, but I wish it was. */
-  StringRef name_ = "Index";
+ public:
+  IndexFieldInput() : FieldInput("Index")
+  {
+  }
+
   GVArrayPtr get_varray_generic_context(IndexMask mask) const final
   {
     auto index_func = [](int i) { return i; };
