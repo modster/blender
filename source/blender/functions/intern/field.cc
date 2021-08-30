@@ -65,8 +65,8 @@ namespace blender::fn {
  * currently it isn't useful.
  */
 struct FieldVariable {
-  MFVariable *variable;
-  FieldVariable(MFVariable &variable) : variable(&variable)
+  MFVariable *mf_variable;
+  FieldVariable(MFVariable &variable) : mf_variable(&variable)
   {
   }
 };
@@ -140,7 +140,7 @@ static void add_variables_for_function(const Field &field,
   for (const Field &input_field : function.inputs()) {
     FieldVariable &input = get_field_variable(input_field, unique_variables);
     unique_inputs.add(&input);
-    inputs.append(input.variable);
+    inputs.append(input.mf_variable);
   }
 
   Vector<MFVariable *> outputs = builder.add_call(function.multi_function(), inputs);
@@ -185,18 +185,42 @@ static void add_destructs(const Span<Field> fields,
                           MFProcedureBuilder &builder,
                           VariableMap &unique_variables)
 {
-  Set<InputOrFunction> outputs;
+  Set<MFVariable *> destructed_variables;
+  Set<FieldVariable *> outputs;
   for (const Field &field : fields) {
-    outputs.add(field);
+    /* Currently input fields are handled separately in the evaluator. */
+    BLI_assert(!field.is_input());
+    outputs.add(&get_field_variable(field, unique_variables));
   }
-  for (const InputOrFunction &input_or_function : unique_variables.keys()) {
-    /* Don't destruct variables used for the output of the field network. */
-    if (outputs.contains(input_or_function)) {
+
+  Stack<const Field *> fields_to_visit;
+  for (const Field &field : fields) {
+    fields_to_visit.push(&field);
+  }
+
+  while (!fields_to_visit.is_empty()) {
+    const Field &field = *fields_to_visit.pop();
+    if (field.is_function()) {
+      const FieldFunction &function = field.function();
+      for (const Field &input_field : function.inputs()) {
+        fields_to_visit.push(&input_field);
+      }
+    }
+
+    FieldVariable &variable = get_field_variable(field, unique_variables);
+
+    /* Don't destruct the same variable twice. */
+    if (destructed_variables.contains(variable.mf_variable)) {
       continue;
     }
-    for (FieldVariable &variable : unique_variables.lookup(input_or_function)) {
-      builder.add_destruct(*variable.variable);
+
+    /* Don't destruct the variable if it is used as an output parameter. */
+    if (outputs.contains(&variable)) {
+      continue;
     }
+
+    builder.add_destruct(*variable.mf_variable);
+    destructed_variables.add_new(variable.mf_variable);
   }
 }
 
@@ -213,7 +237,7 @@ static void build_procedure(const Span<Field> fields,
   builder.add_return();
 
   for (const Field &field : fields) {
-    MFVariable &input = *get_field_variable(field, unique_variables).variable;
+    MFVariable &input = *get_field_variable(field, unique_variables).mf_variable;
     builder.add_output_parameter(input);
   }
 
@@ -243,9 +267,9 @@ static void gather_inputs(const Span<Field> fields,
     if (field.is_input()) {
       const FieldInput &input = field.input();
       const FieldVariable &variable = get_field_variable(field, unique_variables);
-      if (!computed_inputs.contains(variable.variable)) {
+      if (!computed_inputs.contains(variable.mf_variable)) {
         GVArrayPtr data = input.retrieve_data(mask);
-        computed_inputs.add_new(variable.variable);
+        computed_inputs.add_new(variable.mf_variable);
         params.add_readonly_single_input(*data, input.name());
         r_inputs.append(std::move(data));
       }
