@@ -186,4 +186,38 @@ TEST(field, FunctionTwoOutputs)
   EXPECT_EQ(result_2[8], 26);
 }
 
+TEST(field, TwoFunctionsTwoOutputs)
+{
+  /* Also use two separate input fields, why not. */
+  Field index_field{CPPType::get<int>(), std::make_shared<IndexFieldInput>()};
+
+  std::shared_ptr<FieldFunction> fn = std::make_shared<FieldFunction>(FieldFunction(
+      std::make_unique<TwoOutputFunction>("SI_SI_SO_SO"), {index_field, index_field}));
+
+  Field result_field_1{CPPType::get<int>(), fn, 0};
+  Field intermediate_field{CPPType::get<int>(), fn, 1};
+
+  std::unique_ptr<MultiFunction> add_10_fn = std::make_unique<CustomMF_SI_SO<int, int>>(
+      "add_10", [](int a) { return a + 10; });
+  Field result_field_2{
+      CPPType::get<int>(),
+      std::make_shared<FieldFunction>(FieldFunction(std::move(add_10_fn), {intermediate_field})),
+      0};
+
+  Array<int> result_1(10);
+  Array<int> result_2(10);
+  GMutableSpan result_generic_1(result_1.as_mutable_span());
+  GMutableSpan result_generic_2(result_2.as_mutable_span());
+  evaluate_fields(
+      {result_field_1, result_field_2}, {2, 4, 6, 8}, {result_generic_1, result_generic_2});
+  EXPECT_EQ(result_1[2], 4);
+  EXPECT_EQ(result_1[4], 8);
+  EXPECT_EQ(result_1[6], 12);
+  EXPECT_EQ(result_1[8], 16);
+  EXPECT_EQ(result_2[2], 24);
+  EXPECT_EQ(result_2[4], 28);
+  EXPECT_EQ(result_2[6], 32);
+  EXPECT_EQ(result_2[8], 36);
+}
+
 }  // namespace blender::fn::tests
