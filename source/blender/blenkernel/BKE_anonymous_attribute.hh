@@ -116,6 +116,11 @@ template<bool IsStrongReference> class OwnedAnonymousAttributeID {
     return extracted_data;
   }
 
+  const AnonymousAttributeID *get()
+  {
+    return data_;
+  }
+
  private:
   void incref()
   {

@@ -57,7 +57,7 @@ typedef struct CustomDataLayer {
   void *data;
   /** Run-time identifier for this layer.  If no
    * one has a strong reference to this id anymore, the layer can be removed. */
-  struct AnonymousAttributeID *anonymous_id;
+  const struct AnonymousAttributeID *anonymous_id;
 } CustomDataLayer;
 
 #define MAX_CUSTOMDATA_LAYER_NAME 64

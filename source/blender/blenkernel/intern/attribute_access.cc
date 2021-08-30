@@ -433,30 +433,46 @@ bool CustomDataAttributeProvider::try_delete(GeometryComponent &component,
   return false;
 }
 
-static bool add_named_custom_data_layer_from_attribute_init(const StringRef attribute_name,
-                                                            CustomData &custom_data,
-                                                            const CustomDataType data_type,
-                                                            const int domain_size,
-                                                            const AttributeInit &initializer)
+static std::string get_anonymous_attribute_name()
+{
+  static std::atomic<int> index = 0;
+  const int next_index = index.fetch_add(1);
+  return "anonymous_attribute_" + std::to_string(next_index);
+}
+
+static bool add_custom_data_layer_from_attribute_init(const AttributeIDRef &attribute_id,
+                                                      CustomData &custom_data,
+                                                      const CustomDataType data_type,
+                                                      const int domain_size,
+                                                      const AttributeInit &initializer)
 {
   char attribute_name_c[MAX_NAME];
-  attribute_name.copy(attribute_name_c);
+  if (attribute_id.is_named()) {
+    attribute_id.name().copy(attribute_name_c);
+  }
+  else {
+    const std::string name = get_anonymous_attribute_name();
+    STRNCPY(attribute_name_c, name.c_str());
+  }
+
+  bool success = false;
 
   switch (initializer.type) {
     case AttributeInit::Type::Default: {
       void *data = CustomData_add_layer_named(
           &custom_data, data_type, CD_DEFAULT, nullptr, domain_size, attribute_name_c);
-      return data != nullptr;
+      success = data != nullptr;
+      break;
     }
     case AttributeInit::Type::VArray: {
       void *data = CustomData_add_layer_named(
           &custom_data, data_type, CD_DEFAULT, nullptr, domain_size, attribute_name_c);
-      if (data == nullptr) {
-        return false;
+      if (data != nullptr) {
+        success = true;
+        const GVArray *varray = static_cast<const AttributeInitVArray &>(initializer).varray;
+        varray->materialize_to_uninitialized(IndexRange(varray->size()), data);
       }
-      const GVArray *varray = static_cast<const AttributeInitVArray &>(initializer).varray;
-      varray->materialize_to_uninitialized(IndexRange(varray->size()), data);
-      return true;
+      break;
     }
     case AttributeInit::Type::MoveArray: {
       void *source_data = static_cast<const AttributeInitMove &>(initializer).data;
@@ -464,14 +480,28 @@ static bool add_named_custom_data_layer_from_attribute_init(const StringRef attr
           &custom_data, data_type, CD_ASSIGN, source_data, domain_size, attribute_name_c);
       if (data == nullptr) {
         MEM_freeN(source_data);
-        return false;
       }
-      return true;
+      else {
+        success = true;
+      }
+      break;
     }
   }
 
-  BLI_assert_unreachable();
-  return false;
+  if (!success) {
+    return false;
+  }
+
+  if (attribute_id.is_anonymous()) {
+    for (CustomDataLayer &layer : MutableSpan(custom_data.layers, custom_data.totlayer)) {
+      if (STREQ(layer.name, attribute_name_c)) {
+        layer.anonymous_id = &attribute_id.anonymous_id();
+        BKE_anonymous_attribute_id_increment_weak(layer.anonymous_id);
+      }
+    }
+  }
+
+  return true;
 }
 
 bool CustomDataAttributeProvider::try_create(GeometryComponent &component,
@@ -496,12 +526,8 @@ bool CustomDataAttributeProvider::try_create(GeometryComponent &component,
     }
   }
   const int domain_size = component.attribute_domain_size(domain_);
-  /* TODO: Handle anonymous attribute. */
-  if (!attribute_id.is_named()) {
-    return false;
-  }
-  add_named_custom_data_layer_from_attribute_init(
-      attribute_id.name(), *custom_data, data_type, domain_size, initializer);
+  add_custom_data_layer_from_attribute_init(
+      attribute_id, *custom_data, data_type, domain_size, initializer);
   return true;
 }
 
