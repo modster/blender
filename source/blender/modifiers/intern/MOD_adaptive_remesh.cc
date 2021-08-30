@@ -107,7 +107,7 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *UNUSED(ctx)
       auto pre_split_msgpack = internal_mesh.serialize();
       auto pre_split_filename = split_edge_name_gen.get_curr(filename_pre_suffix + "_pre");
 
-      internal_mesh.split_edge_triangulate(edge_index, across_seams);
+      internal_mesh.split_edge_triangulate(edge_index, across_seams, true);
 
       auto post_split_msgpack = internal_mesh.serialize();
       auto post_split_filename = split_edge_name_gen.get_curr(filename_pre_suffix + "_post");

@@ -1725,13 +1725,20 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
    * formed between the nodes of the given edge are also split and
    * triangulated regardless if it on a seam or not.
    *
+   * @param copy_extra_data_for_split_edge If true, the extra data
+   * from the edge that is split to form 2 new edges is copied into
+   * the 2 new edges. The extra data is not copied to the edges that
+   * are added to ensure triangulation.
+   *
    * Returns the `MeshDiff` that lead to the operation.
    *
    * Note, the caller must ensure the adjacent faces to the edge are
    * triangulated. In debug mode, it will assert, in release mode, it
    * is undefined behaviour.
    **/
-  MeshDiff<END, EVD, EED, EFD> split_edge_triangulate(EdgeIndex edge_index, bool across_seams)
+  MeshDiff<END, EVD, EED, EFD> split_edge_triangulate(EdgeIndex edge_index,
+                                                      bool across_seams,
+                                                      bool copy_extra_data_for_split_edge)
   {
     /* This operation will delete the following-
      * the edge specified, faces incident to the edge.
@@ -1767,6 +1774,7 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     for (const auto &edge_index : edge_indices) {
       auto &edge_a = this->get_checked_edge(edge_index);
       auto [edge_vert_1_a, edge_vert_2_a] = this->get_checked_verts_of_edge(edge_a, false);
+      const auto orig_edge_extra_data = edge_a.get_extra_data();
 
       /* Create the new vert by interpolating the verts of the edge */
       auto &new_vert = this->add_empty_interp_vert(edge_vert_1_a, edge_vert_2_a);
@@ -1784,12 +1792,20 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
       added_edges.append(new_edge_1.self_index);
       auto new_edge_1_index = new_edge_1.self_index;
       this->add_edge_ref_to_verts(new_edge_1);
+      if (copy_extra_data_for_split_edge) {
+        auto &extra_data = new_edge_1.get_extra_data_mut();
+        extra_data = orig_edge_extra_data;
+      }
 
       auto &new_edge_2 = this->add_empty_edge();
       new_edge_2.verts = {new_vert.self_index, edge_vert_2_b.self_index};
       added_edges.append(new_edge_2.self_index);
       auto new_edge_2_index = new_edge_2.self_index;
       this->add_edge_ref_to_verts(new_edge_2);
+      if (copy_extra_data_for_split_edge) {
+        auto &extra_data = new_edge_2.get_extra_data_mut();
+        extra_data = orig_edge_extra_data;
+      }
 
       /* Need to reinitialize edge because `add_empty_edge()` may have
        * reallocated `this->edges` */

@@ -737,7 +737,7 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
       const EdgeIndex &edge_index, bool sewing_enabled)
   {
     auto &edge = this->get_checked_edge(edge_index);
-    auto mesh_diff = this->split_edge_triangulate(edge.get_self_index(), true);
+    auto mesh_diff = this->split_edge_triangulate(edge.get_self_index(), true, true);
 
 #if SHOULD_REMESH_DUMP_FILE
     auto after_split_msgpack = this->serialize();
