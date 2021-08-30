@@ -147,10 +147,10 @@ class TwoOutputFunction : public MultiFunction {
 
   void call(IndexMask mask, MFParams params, MFContext UNUSED(context)) const override
   {
-    const VArray<int> &in1 = params.readonly_single_input<int>(0);
-    const VArray<int> &in2 = params.readonly_single_input<int>(1);
-    MutableSpan<int> add = params.uninitialized_single_output<int>(2);
-    MutableSpan<int> add_10 = params.uninitialized_single_output<int>(2);
+    const VArray<int> &in1 = params.readonly_single_input<int>(0, "In1");
+    const VArray<int> &in2 = params.readonly_single_input<int>(1, "In2");
+    MutableSpan<int> add = params.uninitialized_single_output<int>(2, "Add");
+    MutableSpan<int> add_10 = params.uninitialized_single_output<int>(3, "Add10");
     mask.foreach_index([&](const int64_t i) {
       add[i] = in1[i] + in2[i];
       add_10[i] = add[i] + 10;
