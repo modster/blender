@@ -59,16 +59,19 @@ namespace blender::fn {
  */
 // using VariableMap = Map<const FunctionOrInput *, Vector<MFVariable *>>;
 
+/**
+ * TODO: This exists because it seemed helpful for the procedure creation to be able to store
+ * mutable data for each input or function output. That still may be helpful in the future, but
+ * currently it isn't useful.
+ */
 struct FieldVariable {
   MFVariable *variable;
-  int remaining_uses = 1;
   FieldVariable(MFVariable &variable) : variable(&variable)
   {
   }
 };
 
 using VariableMap = Map<InputOrFunction, Vector<FieldVariable>>;
-/* TODO: Use use counter in the vector to control when to add the desctruct call. */
 
 /**
  * A map of the computed inputs for all of a field system's inputs, to avoid creating duplicates.
@@ -99,6 +102,51 @@ static const FieldVariable &get_field_variable(const Field &field,
   return function_outputs[field.function_output_index()];
 }
 
+static void add_variables_for_input(const Field &field,
+                                    Stack<const Field *> &fields_to_visit,
+                                    MFProcedureBuilder &builder,
+                                    VariableMap &unique_variables)
+{
+  fields_to_visit.pop();
+  const FieldInput &input = field.input();
+  MFVariable &variable = builder.add_input_parameter(MFDataType::ForSingle(field.type()),
+                                                     input.name());
+  unique_variables.add(input, {variable});
+}
+
+static void add_variables_for_function(const Field &field,
+                                       Stack<const Field *> &fields_to_visit,
+                                       MFProcedureBuilder &builder,
+                                       VariableMap &unique_variables)
+{
+  const FieldFunction &function = field.function();
+  for (const Field &input_field : function.inputs()) {
+    if (!unique_variables.contains(input_field)) {
+      /* The field for this input hasn't been handled yet. Handle it now, so that we know all
+       * of this field's function inputs already have variables. TODO: Verify that this is the
+       * best way to do a depth first traversal. These extra lookups don't seem ideal. */
+      fields_to_visit.push(&input_field);
+      return;
+    }
+  }
+
+  fields_to_visit.pop();
+
+  Vector<MFVariable *> inputs;
+  Set<FieldVariable *> unique_inputs;
+  for (const Field &input_field : function.inputs()) {
+    FieldVariable &input = get_field_variable(input_field, unique_variables);
+    unique_inputs.add(&input);
+    inputs.append(input.variable);
+  }
+
+  Vector<MFVariable *> outputs = builder.add_call(function.multi_function(), inputs);
+  Vector<FieldVariable> &unique_outputs = unique_variables.lookup_or_add(function, {});
+  for (MFVariable *output : outputs) {
+    unique_outputs.append(*output);
+  }
+}
+
 static void add_unique_variables(const Span<Field> fields,
                                  MFProcedureBuilder &builder,
                                  VariableMap &unique_variables)
@@ -109,70 +157,41 @@ static void add_unique_variables(const Span<Field> fields,
   }
 
   while (!fields_to_visit.is_empty()) {
-    const Field &field = *fields_to_visit.pop();
+    const Field &field = *fields_to_visit.peek();
     if (unique_variables.contains(field)) {
       continue;
     }
 
     if (field.is_input()) {
-      const FieldInput &input = field.input();
-      MFVariable &variable = builder.add_input_parameter(MFDataType::ForSingle(field.type()),
-                                                         input.name());
-      unique_variables.add(input, {variable});
+      add_variables_for_input(field, fields_to_visit, builder, unique_variables);
     }
     else {
-      const FieldFunction &function = field.function();
-      for (const Field &input_field : function.inputs()) {
-        fields_to_visit.push(&input_field);
-      }
-
-      Vector<MFVariable *> inputs;
-      Set<FieldVariable *> unique_inputs;
-      for (const Field &input_field : function.inputs()) {
-        FieldVariable &input = get_field_variable(input_field, unique_variables);
-        input.remaining_uses++;
-        unique_inputs.add(&input);
-        inputs.append(input.variable);
-      }
-
-      Vector<MFVariable *> outputs = builder.add_call(function.multi_function(), inputs);
-      Vector<FieldVariable> &unique_outputs = unique_variables.lookup_or_add(function, {});
-      for (MFVariable *output : outputs) {
-        unique_outputs.append(*output);
-      }
+      add_variables_for_function(field, fields_to_visit, builder, unique_variables);
     }
   }
 }
 
+/**
+ * Add destruct calls to the procedure so that internal variables and inputs are destructed before
+ * the procedure finishes. Currently this just adds all of the destructs at the end. That is not
+ * optimal, but properly ordering destructs should be combined with reordering function calls to
+ * use variables more optimally.
+ */
 static void add_destructs(const Span<Field> fields,
                           MFProcedureBuilder &builder,
                           VariableMap &unique_variables)
 {
-  Stack<const Field *> fields_to_visit;
+  Set<InputOrFunction> outputs;
   for (const Field &field : fields) {
-    fields_to_visit.push(&field);
+    outputs.add(field);
   }
-
-  while (!fields_to_visit.is_empty()) {
-    const Field &field = *fields_to_visit.pop();
-    if (field.is_input()) {
+  for (const InputOrFunction &input_or_function : unique_variables.keys()) {
+    /* Don't destruct variables used for the output of the field network. */
+    if (outputs.contains(input_or_function)) {
       continue;
     }
-    const FieldFunction &function = field.function();
-    for (const Field &input_field : function.inputs()) {
-      fields_to_visit.push(&input_field);
-    }
-
-    /* Don't desctruct the outputs of the network. */
-    if (!fields.contains_ptr(&field)) {
-      MutableSpan<FieldVariable> outputs = unique_variables.lookup(function);
-
-      for (FieldVariable &output : outputs) {
-        output.remaining_uses--;
-        if (output.remaining_uses == 0) {
-          builder.add_destruct(*output.variable);
-        }
-      }
+    for (FieldVariable &variable : unique_variables.lookup(input_or_function)) {
+      builder.add_destruct(*variable.variable);
     }
   }
 }
@@ -189,8 +208,6 @@ static void build_procedure(const Span<Field> fields,
 
   builder.add_return();
 
-  /* TODO: Maybe handle input fields differently right here? To avoid the
-   * preprocessing step at the beginning of the procedure construction. */
   for (const Field &field : fields) {
     MFVariable &input = *get_field_variable(field, unique_variables).variable;
     builder.add_output_parameter(input);
@@ -271,8 +288,10 @@ void evaluate_fields(const Span<Field> fields,
 {
   BLI_assert(fields.size() == outputs.size());
 
-  /* Process fields that just connect to inputs separately, since otherwise we need
-   * special case to avoid sharing the same variable for an input and output elsewhere. */
+  /* Process fields that just connect to inputs separately, since otherwise we need a special
+   * case to avoid sharing the same variable for an input and output parameters elsewhere.
+   * TODO: It would be nice if there were a more elegant way to handle this, rather than a
+   * separate step here, but I haven't thought of anything yet. */
   Vector<Field> non_input_fields{fields};
   Vector<GMutableSpan> non_input_outputs{outputs};
   for (int i = fields.size() - 1; i >= 0; i--) {
@@ -284,7 +303,9 @@ void evaluate_fields(const Span<Field> fields,
     }
   }
 
-  evaluate_non_input_fields(non_input_fields, mask, non_input_outputs);
+  if (!non_input_fields.is_empty()) {
+    evaluate_non_input_fields(non_input_fields, mask, non_input_outputs);
+  }
 }
 
 }  // namespace blender::fn
