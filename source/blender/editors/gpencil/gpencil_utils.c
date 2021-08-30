@@ -3406,6 +3406,8 @@ void ED_gpencil_layer_merge(bGPdata *gpd, bGPDlayer *gpl_src, bGPDlayer *gpl_dst
     bGPDframe *gpf_dst = BLI_ghash_lookup(gh_frames_dst, POINTER_FROM_INT(gpf_src->framenum));
     if (!gpf_dst) {
       gpf_dst = BKE_gpencil_layer_frame_get(gpl_dst, gpf_src->framenum, GP_GETFRAME_ADD_COPY);
+      /* Use same frame type. */
+      gpf_dst->key_type = gpf_src->key_type;
       BLI_ghash_insert(gh_frames_dst, POINTER_FROM_INT(gpf_src->framenum), gpf_dst);
     }
   }
