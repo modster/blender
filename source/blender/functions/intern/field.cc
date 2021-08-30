@@ -20,6 +20,10 @@
 
 #include "FN_field.hh"
 
+/**
+ * TODO: There might be a more obvious way to implement this, or we might end up with
+ * a separate map for functions and inputs anyway, so we could just remove it.
+ */
 struct InputOrFunction {
   const void *ptr;
 
@@ -55,11 +59,6 @@ template<> struct blender::DefaultHash<InputOrFunction> {
 namespace blender::fn {
 
 /**
- * A map to hold the output variables for each function or input so they can be reused.
- */
-// using VariableMap = Map<const FunctionOrInput *, Vector<MFVariable *>>;
-
-/**
  * TODO: This exists because it seemed helpful for the procedure creation to be able to store
  * mutable data for each input or function output. That still may be helpful in the future, but
  * currently it isn't useful.
@@ -71,6 +70,9 @@ struct FieldVariable {
   }
 };
 
+/**
+ * A map to hold the output variables for each function output or input so they can be reused.
+ */
 using VariableMap = Map<InputOrFunction, Vector<FieldVariable>>;
 
 /**
@@ -268,7 +270,7 @@ static void gather_inputs(const Span<Field> fields,
       const FieldInput &input = field.input();
       const FieldVariable &variable = get_field_variable(field, unique_variables);
       if (!computed_inputs.contains(variable.mf_variable)) {
-        GVArrayPtr data = input.retrieve_data(mask);
+        GVArrayPtr data = input.get_varray_generic_context(mask);
         computed_inputs.add_new(variable.mf_variable);
         params.add_readonly_single_input(*data, input.name());
         r_inputs.append(std::move(data));
@@ -328,7 +330,8 @@ void evaluate_fields(const Span<Field> fields,
   Vector<GMutableSpan> non_input_outputs{outputs};
   for (int i = fields.size() - 1; i >= 0; i--) {
     if (non_input_fields[i].is_input()) {
-      non_input_fields[i].input().retrieve_data(mask)->materialize(mask, outputs[i].data());
+      non_input_fields[i].input().get_varray_generic_context(mask)->materialize(mask,
+                                                                                outputs[i].data());
 
       non_input_fields.remove_and_reorder(i);
       non_input_outputs.remove_and_reorder(i);

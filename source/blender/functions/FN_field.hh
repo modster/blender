@@ -154,7 +154,7 @@ class FieldInput {
   {
   }
 
-  virtual GVArrayPtr retrieve_data(IndexMask mask) const = 0;
+  virtual GVArrayPtr get_varray_generic_context(IndexMask mask) const = 0;
 
   blender::StringRef name() const
   {
