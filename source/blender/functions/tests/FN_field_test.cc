@@ -84,11 +84,11 @@ TEST(field, InputAndFunction)
 {
   Field index_field{CPPType::get<int>(), std::make_shared<IndexFieldInput>()};
 
+  std::unique_ptr<MultiFunction> add_fn = std::make_unique<CustomMF_SI_SI_SO<int, int, int>>(
+      "add", [](int a, int b) { return a + b; });
   Field output_field{CPPType::get<int>(),
                      std::make_shared<FieldFunction>(
-                         FieldFunction(std::make_unique<CustomMF_SI_SI_SO<int, int, int>>(
-                                           "add", [](int a, int b) { return a + b; }),
-                                       {index_field, index_field})),
+                         FieldFunction(std::move(add_fn), {index_field, index_field})),
                      0};
 
   Array<int> result(10);
@@ -104,18 +104,18 @@ TEST(field, TwoFunctions)
 {
   Field index_field{CPPType::get<int>(), std::make_shared<IndexFieldInput>()};
 
+  std::unique_ptr<MultiFunction> add_fn = std::make_unique<CustomMF_SI_SI_SO<int, int, int>>(
+      "add", [](int a, int b) { return a + b; });
   Field add_field{CPPType::get<int>(),
                   std::make_shared<FieldFunction>(
-                      FieldFunction(std::make_unique<CustomMF_SI_SI_SO<int, int, int>>(
-                                        "add", [](int a, int b) { return a + b; }),
-                                    {index_field, index_field})),
+                      FieldFunction(std::move(add_fn), {index_field, index_field})),
                   0};
 
+  std::unique_ptr<MultiFunction> add_10_fn = std::make_unique<CustomMF_SI_SO<int, int>>(
+      "add_10", [](int a) { return a + 10; });
   Field result_field{
       CPPType::get<int>(),
-      std::make_shared<FieldFunction>(FieldFunction(
-          std::make_unique<CustomMF_SI_SO<int, int>>("add_10", [](int a) { return a + 10; }),
-          {add_field})),
+      std::make_shared<FieldFunction>(FieldFunction(std::move(add_10_fn), {add_field})),
       0};
 
   Array<int> result(10);
