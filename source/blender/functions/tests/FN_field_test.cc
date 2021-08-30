@@ -188,7 +188,6 @@ TEST(field, FunctionTwoOutputs)
 
 TEST(field, TwoFunctionsTwoOutputs)
 {
-  /* Also use two separate input fields, why not. */
   Field index_field{CPPType::get<int>(), std::make_shared<IndexFieldInput>()};
 
   std::shared_ptr<FieldFunction> fn = std::make_shared<FieldFunction>(FieldFunction(
