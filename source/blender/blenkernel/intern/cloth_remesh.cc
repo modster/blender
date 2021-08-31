@@ -777,6 +777,18 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
   }
 
   /**
+   * Checks for the extra data flags of the edge to see if the edge is
+   * flagged for `EDGE_BETWEEN_SEWING_EDGES`.
+   *
+   * Note: Caller must ensure edge has `extra_data`.
+   */
+  bool is_edge_between_sewing_edges(const AdaptiveEdge &edge) const
+  {
+    const auto &extra_data = edge.get_checked_extra_data();
+    return extra_data.get_flags() & EDGE_BETWEEN_SEWING_EDGES;
+  }
+
+  /**
    * Tries to add a sewing edge to `vert_index` if it is possible.
    *
    * Adding a sewing edge is possible if the following checks are
@@ -824,6 +836,21 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
      * an existing vert but it will be a lot faster.
      */
     const auto &vert = this->get_checked_vert(vert_index);
+
+    /* Need to ensure that the vert in question is in between 2 or
+     * more edges that are between sewing edges. In case it is not, no
+     * sewing edge from this vert should be created. */
+    auto num_edges_between_sewing_edges = 0;
+    for (const auto &e1_index : vert.get_edges()) {
+      const auto &e1 = this->get_checked_edge(e1_index);
+
+      if (this->is_edge_between_sewing_edges(e1)) {
+        num_edges_between_sewing_edges++;
+      }
+    }
+    if (num_edges_between_sewing_edges < 2) {
+      return AdaptiveMeshDiff<END>();
+    }
 
     blender::Vector<EdgeIndex> opposite_edges;
 
@@ -893,6 +920,10 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
         const auto &opposite_edge = this->get_checked_edge(opposite_edge_index);
 
         if (this->is_edge_splittable_adaptivemesh(opposite_edge) == false) {
+          continue;
+        }
+
+        if (this->is_edge_between_sewing_edges(opposite_edge) == false) {
           continue;
         }
       }
