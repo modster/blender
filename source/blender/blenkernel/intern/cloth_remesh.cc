@@ -408,19 +408,47 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
 
   /**
    * Marks verts which are on a seam or boundary for preserve
+   *
+   * Important to not mess with the panel boundaries so if a vert is
+   * marked for preserve it will not be removed and this takes care of
+   * that.
+   *
+   * It also ensures that when sewing is enabled, all verts attached
+   * to sewing edge(s) are also preserved.
    */
-  void mark_verts_for_preserve()
+  void mark_verts_for_preserve(bool sewing_enabled)
   {
+    const auto set_vert_preserve = [](AdaptiveVert &vert) {
+      auto &op_vert_data = vert.get_extra_data_mut();
+      if (op_vert_data) {
+        auto &vert_data = op_vert_data.value();
+        vert_data.get_flag_mut() |= VERT_PRESERVE;
+      }
+      else {
+        vert.set_extra_data(VertData());
+        vert.get_extra_data_mut().value().get_flag_mut() |= VERT_PRESERVE;
+      }
+    };
+
     for (auto &vert : this->get_verts_mut()) {
       if (this->is_vert_on_seam_or_boundary(vert)) {
-        auto &op_vert_data = vert.get_extra_data_mut();
-        if (op_vert_data) {
-          auto &vert_data = op_vert_data.value();
-          vert_data.get_flag_mut() |= VERT_PRESERVE;
-        }
-        else {
-          vert.set_extra_data(VertData());
-          vert.get_extra_data_mut().value().get_flag_mut() |= VERT_PRESERVE;
+        set_vert_preserve(vert);
+      }
+    }
+
+    /* Mark all verts attached to sewing edge(s) as preserve, this
+     * ensures that no sewing edge(s) are removed which would
+     * otherwise lead to results are not in line with what the artist
+     * would want. */
+    if (sewing_enabled) {
+      for (const auto &edge : this->get_edges()) {
+        if (edge.is_loose()) {
+          const auto [v1_index, v2_index] = edge.get_checked_verts();
+          auto &v1 = this->get_checked_vert(v1_index);
+          set_vert_preserve(v1);
+
+          auto &v2 = this->get_checked_vert(v2_index);
+          set_vert_preserve(v2);
         }
       }
     }
@@ -1660,7 +1688,8 @@ Mesh *adaptive_remesh(const AdaptiveRemeshParams<END, ExtraData> &params,
   /* Important to not mess with the panel boundaries so if a vert is
    * marked for preserve it will not be removed and this takes care of
    * that. */
-  adaptive_mesh.mark_verts_for_preserve();
+  bool sewing_enabled = params.flags & ADAPTIVE_REMESH_PARAMS_SEWING;
+  adaptive_mesh.mark_verts_for_preserve(sewing_enabled);
 
   /* Actual Remeshing Part */
   {
