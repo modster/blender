@@ -188,41 +188,20 @@ static void add_destructs(const Span<GField> fields,
                           VariableMap &unique_variables)
 {
   Set<MFVariable *> destructed_variables;
-  Set<FieldVariable *> outputs;
+  Set<const FieldVariable *> outputs;
   for (const GField &field : fields) {
     /* Currently input fields are handled separately in the evaluator. */
     BLI_assert(!field.is_input());
     outputs.add(&get_field_variable(field, unique_variables));
   }
 
-  Stack<const GField *> fields_to_visit;
-  for (const GField &field : fields) {
-    fields_to_visit.push(&field);
-  }
-
-  while (!fields_to_visit.is_empty()) {
-    const GField &field = *fields_to_visit.pop();
-    if (field.is_function()) {
-      const FieldFunction &function = field.function();
-      for (const GField &input_field : function.inputs()) {
-        fields_to_visit.push(&input_field);
+  for (Span<FieldVariable> variables : unique_variables.values()) {
+    for (const FieldVariable &variable : variables) {
+      /* Don't destruct the variable if it is used as an output parameter. */
+      if (!outputs.contains(&variable)) {
+        builder.add_destruct(*variable.mf_variable);
       }
     }
-
-    FieldVariable &variable = get_field_variable(field, unique_variables);
-
-    /* Don't destruct the same variable twice. */
-    if (destructed_variables.contains(variable.mf_variable)) {
-      continue;
-    }
-
-    /* Don't destruct the variable if it is used as an output parameter. */
-    if (outputs.contains(&variable)) {
-      continue;
-    }
-
-    builder.add_destruct(*variable.mf_variable);
-    destructed_variables.add_new(variable.mf_variable);
   }
 }
 
