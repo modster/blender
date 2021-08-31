@@ -2365,6 +2365,7 @@ typedef enum AdaptiveRemeshFlag {
   ADAPTIVE_REMESH_ACROSS_SEAMS = 1 << 0,
   ADAPTIVE_REMESH_VERTS_SWAPPED = 1 << 1,
   ADAPTIVE_REMESH_SEWING = 1 << 2,
+  ADAPTIVE_REMESH_FORCE_SPLIT_FOR_SEWING = 1 << 3,
 } AdaptiveRemeshFlag;
 
 typedef enum AdaptiveRemeshMode {

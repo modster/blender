@@ -157,6 +157,7 @@ template<typename END, typename ExtraData> struct AdaptiveRemeshParams {
 enum AdaptiveRemeshParamsFlags {
   /** Sewing is enabled */
   ADAPTIVE_REMESH_PARAMS_SEWING = 1 << 0,
+  ADAPTIVE_REMESH_PARAMS_FORCE_SPLIT_FOR_SEWING = 1 << 1,
 };
 
 /* `mesh` cannot be made const because function defined on `struct

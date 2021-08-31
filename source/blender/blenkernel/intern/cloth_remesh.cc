@@ -47,6 +47,7 @@
 #include <cmath>
 #include <cstddef>
 #include <functional>
+#include <iostream>
 #include <limits>
 #include <optional>
 
@@ -524,7 +525,7 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
    * Here "size" is determined by `Sizing` stores in `Vert`s of the
    * `Edge`, using the function `Sizing::get_edge_size_sq()`.
    */
-  void split_edges(bool sewing_enabled)
+  void split_edges(bool sewing_enabled, bool force_split_for_sewing)
   {
     auto splittable_edges_set = this->get_splittable_edge_indices_set();
     do {
@@ -534,7 +535,7 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
           continue;
         }
 
-        this->split_edge_adaptivemesh(edge_index, sewing_enabled);
+        this->split_edge_adaptivemesh(edge_index, sewing_enabled, force_split_for_sewing);
       }
 
       splittable_edges_set = this->get_splittable_edge_indices_set();
@@ -643,6 +644,7 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
     this->set_edge_sizes();
 
     bool sewing_enabled = params.flags & ADAPTIVE_REMESH_PARAMS_SEWING;
+    bool force_split_for_sewing = params.flags & ADAPTIVE_REMESH_PARAMS_FORCE_SPLIT_FOR_SEWING;
 
     /* Mark edges that are between sewing edges only if sewing is
      * enabled */
@@ -651,7 +653,7 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
     }
 
     /* Split the edges */
-    this->split_edges(sewing_enabled);
+    this->split_edges(sewing_enabled, force_split_for_sewing);
 
     /* Collapse the edges */
     this->collapse_edges();
@@ -762,7 +764,7 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
    * the set of verts that were added by the split operation only.
    */
   std::tuple<AdaptiveMeshDiff<END>, blender::Vector<VertIndex>> split_edge_adaptivemesh(
-      const EdgeIndex &edge_index, bool sewing_enabled)
+      const EdgeIndex &edge_index, bool sewing_enabled, bool force_split_for_sewing)
   {
     auto &edge = this->get_checked_edge(edge_index);
     auto mesh_diff = this->split_edge_triangulate(edge.get_self_index(), true, true);
@@ -785,7 +787,8 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
       BLI_assert(mesh_diff.get_added_nodes().size() == 1);
       std::cout << "mesh_diff.get_added_verts().size(): " << mesh_diff.get_added_verts().size()
                 << std::endl;
-      const auto sewing_mesh_diff = this->try_adding_sewing_edge(mesh_diff.get_added_verts()[0]);
+      const auto sewing_mesh_diff = this->try_adding_sewing_edge(mesh_diff.get_added_verts()[0],
+                                                                 force_split_for_sewing);
 
       /* Append `sewing_mesh_diff` to `mesh_diff` so that
        * `flip_edges()` operates on a valid MeshDiff */
@@ -829,7 +832,8 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
    * split and it has another loose edge adjacent to it which can loop
    * back the given vert via an edge.
    */
-  AdaptiveMeshDiff<END> try_adding_sewing_edge(const VertIndex &vert_index)
+  AdaptiveMeshDiff<END> try_adding_sewing_edge(const VertIndex &vert_index,
+                                               bool force_split_for_sewing)
   {
     /* vert: is the vert that is being tested.
      *
@@ -947,8 +951,10 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
       {
         const auto &opposite_edge = this->get_checked_edge(opposite_edge_index);
 
-        if (this->is_edge_splittable_adaptivemesh(opposite_edge) == false) {
-          continue;
+        if (force_split_for_sewing == false) {
+          if (this->is_edge_splittable_adaptivemesh(opposite_edge) == false) {
+            continue;
+          }
         }
 
         if (this->is_edge_between_sewing_edges(opposite_edge) == false) {
@@ -956,8 +962,8 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
         }
       }
 
-      const auto [mesh_diff, added_verts] = this->split_edge_adaptivemesh(opposite_edge_index,
-                                                                          true);
+      const auto [mesh_diff, added_verts] = this->split_edge_adaptivemesh(
+          opposite_edge_index, true, force_split_for_sewing);
       complete_mesh_diff.append(mesh_diff);
       complete_mesh_diff.remove_non_existing_elements(*this);
 
@@ -1902,10 +1908,7 @@ Mesh *__temp_empty_adaptive_remesh(const TempEmptyAdaptiveRemeshParams &input_pa
 
   AdaptiveRemeshParams<EmptyData, EmptyData> params;
   params.size_min = input_params.size_min;
-  params.flags = 0;
-  if (input_params.flags & ADAPTIVE_REMESH_PARAMS_SEWING) {
-    params.flags |= ADAPTIVE_REMESH_PARAMS_SEWING;
-  }
+  params.flags = input_params.flags;
   params.extra_data_to_end = [](const EmptyData &UNUSED(data), size_t UNUSED(index)) {
     return internal::EmptyExtraData();
   };
