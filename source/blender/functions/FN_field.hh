@@ -109,13 +109,19 @@ template<typename T> class Field {
   GField field_;
 
  public:
-  Field(GField field) : field_(field)
+  Field(GField field) : field_(std::move(field))
   {
+    BLI_assert(field_.cpp_type().is<T>());
   }
 
   const GField *operator->() const
   {
     return &field_;
+  }
+
+  const GField &operator*() const
+  {
+    return field_;
   }
 };
 
