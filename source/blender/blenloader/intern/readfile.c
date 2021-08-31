@@ -2484,9 +2484,7 @@ static void lib_link_wm_xr_data_restore(struct IDNameLib_Map *id_map, wmXrData *
       id_map, (ID *)xr_data->session_settings.base_pose_object, USER_REAL);
 
   LISTBASE_FOREACH (XrMotionCaptureObject *, mocap_ob, &xr_data->session_settings.mocap_objects) {
-    if (mocap_ob->ob) {
-      mocap_ob->ob = restore_pointer_by_name(id_map, (ID *)mocap_ob->ob, USER_REAL);
-    }
+    mocap_ob->ob = restore_pointer_by_name(id_map, (ID *)mocap_ob->ob, USER_REAL);
   }
 }
 

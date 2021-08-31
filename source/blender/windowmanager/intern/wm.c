@@ -288,9 +288,7 @@ static void lib_link_wm_xr_data(BlendLibReader *reader, ID *parent_id, wmXrData 
   BLO_read_id_address(reader, parent_id->lib, &xr_data->session_settings.base_pose_object);
 
   LISTBASE_FOREACH (XrMotionCaptureObject *, mocap_ob, &xr_data->session_settings.mocap_objects) {
-    if (mocap_ob->ob) {
-      BLO_read_id_address(reader, parent_id->lib, &mocap_ob->ob);
-    }
+    BLO_read_id_address(reader, parent_id->lib, &mocap_ob->ob);
   }
 }
 

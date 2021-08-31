@@ -26,8 +26,17 @@
 
 #include "wm_xr.h"
 
+struct ARegion;
+struct ARegionType;
+struct bContext;
 struct bScreen;
+struct Depsgraph;
 struct GPUBatch;
+struct GPUOffScreen;
+struct GPUViewport;
+struct Scene;
+struct ViewLayer;
+struct wmOperatorType;
 struct wmXrActionSet;
 
 typedef struct wmXrSessionState {
@@ -83,10 +92,6 @@ typedef struct wmXrSessionState {
 
 typedef struct wmXrRuntimeData {
   GHOST_XrContextHandle context;
-
-  /** The context the session was started in. Stored to execute Python handlers
-   * for "xr_session_start_pre". Afterwards, this may be an invalid reference. */
-  struct bContext *bcontext;
 
   /** The window the session was started in. Stored to be able to follow its view-layer. This may
    * be an invalid reference, i.e. the window may have been closed. */
