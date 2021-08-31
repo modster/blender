@@ -130,7 +130,8 @@ class GeoNodeExecParams {
                                                       std::is_same_v<T, int> ||
                                                       std::is_same_v<T, bool> ||
                                                       std::is_same_v<T, ColorGeometry4f> ||
-                                                      std::is_same_v<T, float3>;
+                                                      std::is_same_v<T, float3> ||
+                                                      std::is_same_v<T, std::string>;
 
   /**
    * Get the input value for the input socket with the given identifier.
@@ -173,11 +174,16 @@ class GeoNodeExecParams {
    */
   template<typename T> Vector<T> extract_multi_input(StringRef identifier)
   {
-    // static_assert(!is_stored_as_field_v<T>);
     Vector<GMutablePointer> gvalues = provider_->extract_multi_input(identifier);
     Vector<T> values;
     for (GMutablePointer gvalue : gvalues) {
-      values.append(gvalue.relocate_out<T>());
+      if constexpr (is_stored_as_field_v<T>) {
+        const Field<T> &field = *gvalue.get<Field<T>>();
+        values.append(fn::evaluate_constant_field(field));
+      }
+      else {
+        values.append(gvalue.relocate_out<T>());
+      }
     }
     return values;
   }

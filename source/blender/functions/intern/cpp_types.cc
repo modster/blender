@@ -46,5 +46,6 @@ MAKE_FIELD_CPP_TYPE(Float3Field, float3);
 MAKE_FIELD_CPP_TYPE(ColorGeometry4fField, blender::ColorGeometry4f);
 MAKE_FIELD_CPP_TYPE(BoolField, bool);
 MAKE_FIELD_CPP_TYPE(Int32Field, int32_t);
+MAKE_FIELD_CPP_TYPE(StringField, std::string);
 
 }  // namespace blender::fn

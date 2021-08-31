@@ -795,8 +795,15 @@ static bNodeSocketType *make_socket_type_string()
   socktype->get_base_cpp_value = [](const bNodeSocket &socket, void *r_value) {
     new (r_value) std::string(((bNodeSocketValueString *)socket.default_value)->value);
   };
-  socktype->get_geometry_nodes_cpp_type = socktype->get_base_cpp_type;
-  socktype->get_geometry_nodes_cpp_value = socktype->get_base_cpp_value;
+  socktype->get_geometry_nodes_cpp_type = []() {
+    return &blender::fn::CPPType::get<blender::fn::Field<std::string>>();
+  };
+  socktype->get_geometry_nodes_cpp_value = [](const bNodeSocket &socket, void *r_value) {
+    std::string value;
+    value.~basic_string();
+    socket.typeinfo->get_base_cpp_value(socket, &value);
+    new (r_value) blender::fn::Field<std::string>(blender::fn::make_constant_field(value));
+  };
   return socktype;
 }
 
