@@ -22,6 +22,7 @@
 #include "DEG_depsgraph_query.h"
 
 #include "FN_field.hh"
+#include "FN_field_cpp_type.hh"
 #include "FN_generic_value_map.hh"
 #include "FN_multi_function.hh"
 
@@ -913,7 +914,7 @@ class GeometryNodesEvaluator {
       OutputState &output_state = node_state.outputs[socket->index()];
       output_state.has_been_computed = true;
       void *buffer = allocator.allocate(type->size(), type->alignment());
-      type->copy_construct(type->default_value(), buffer);
+      this->construct_default_value(*type, buffer);
       this->forward_output({node.context(), socket}, {*type, buffer});
     }
   }
@@ -1386,8 +1387,21 @@ class GeometryNodesEvaluator {
     }
     else {
       /* Cannot convert, use default value instead. */
-      to_type.copy_construct(to_type.default_value(), to_value);
+      this->construct_default_value(to_type, to_value);
     }
+  }
+
+  void construct_default_value(const CPPType &type, void *r_value)
+  {
+    if (const fn::FieldCPPType *field_cpp_type = dynamic_cast<const fn::FieldCPPType *>(&type)) {
+      const CPPType &base_type = field_cpp_type->field_type();
+      auto constant_fn = std::make_unique<fn::CustomMF_GenericConstant>(base_type,
+                                                                        base_type.default_value());
+      auto field_fn = std::make_shared<fn::FieldFunction>(std::move(constant_fn));
+      new (r_value) GField(std::move(field_fn), 0);
+      return;
+    }
+    type.copy_construct(type.default_value(), r_value);
   }
 
   NodeState &get_node_state(const DNode node)
