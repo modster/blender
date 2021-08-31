@@ -34,7 +34,7 @@ struct InputOrFunction {
   InputOrFunction(const blender::fn::FieldInput &input) : ptr(&input)
   {
   }
-  InputOrFunction(const blender::fn::Field &field) /* Maybe this is too clever. */
+  InputOrFunction(const blender::fn::GField &field) /* Maybe this is too clever. */
   {
     if (field.is_function()) {
       ptr = &field.function();
@@ -81,7 +81,7 @@ using VariableMap = Map<InputOrFunction, Vector<FieldVariable>>;
  */
 using ComputedInputMap = Map<const MFVariable *, GVArrayPtr>;
 
-static FieldVariable &get_field_variable(const Field &field, VariableMap &unique_variables)
+static FieldVariable &get_field_variable(const GField &field, VariableMap &unique_variables)
 {
   if (field.is_input()) {
     const FieldInput &input = field.input();
@@ -92,7 +92,7 @@ static FieldVariable &get_field_variable(const Field &field, VariableMap &unique
   return function_outputs[field.function_output_index()];
 }
 
-static const FieldVariable &get_field_variable(const Field &field,
+static const FieldVariable &get_field_variable(const GField &field,
                                                const VariableMap &unique_variables)
 {
   if (field.is_input()) {
@@ -107,25 +107,25 @@ static const FieldVariable &get_field_variable(const Field &field,
 /**
  * TODO: Merge duplicate input nodes, not just fields pointing to the same FieldInput.
  */
-static void add_variables_for_input(const Field &field,
-                                    Stack<const Field *> &fields_to_visit,
+static void add_variables_for_input(const GField &field,
+                                    Stack<const GField *> &fields_to_visit,
                                     MFProcedureBuilder &builder,
                                     VariableMap &unique_variables)
 {
   fields_to_visit.pop();
   const FieldInput &input = field.input();
-  MFVariable &variable = builder.add_input_parameter(MFDataType::ForSingle(field.type()),
-                                                     input.name());
+  MFVariable &variable = builder.add_input_parameter(MFDataType::ForSingle(field.cpp_type()),
+                                                     input.debug_name());
   unique_variables.add(input, {variable});
 }
 
-static void add_variables_for_function(const Field &field,
-                                       Stack<const Field *> &fields_to_visit,
+static void add_variables_for_function(const GField &field,
+                                       Stack<const GField *> &fields_to_visit,
                                        MFProcedureBuilder &builder,
                                        VariableMap &unique_variables)
 {
   const FieldFunction &function = field.function();
-  for (const Field &input_field : function.inputs()) {
+  for (const GField &input_field : function.inputs()) {
     if (!unique_variables.contains(input_field)) {
       /* The field for this input hasn't been handled yet. Handle it now, so that we know all
        * of this field's function inputs already have variables. TODO: Verify that this is the
@@ -139,7 +139,7 @@ static void add_variables_for_function(const Field &field,
 
   Vector<MFVariable *> inputs;
   Set<FieldVariable *> unique_inputs;
-  for (const Field &input_field : function.inputs()) {
+  for (const GField &input_field : function.inputs()) {
     FieldVariable &input = get_field_variable(input_field, unique_variables);
     unique_inputs.add(&input);
     inputs.append(input.mf_variable);
@@ -152,17 +152,17 @@ static void add_variables_for_function(const Field &field,
   }
 }
 
-static void add_unique_variables(const Span<Field> fields,
+static void add_unique_variables(const Span<GField> fields,
                                  MFProcedureBuilder &builder,
                                  VariableMap &unique_variables)
 {
-  Stack<const Field *> fields_to_visit;
-  for (const Field &field : fields) {
+  Stack<const GField *> fields_to_visit;
+  for (const GField &field : fields) {
     fields_to_visit.push(&field);
   }
 
   while (!fields_to_visit.is_empty()) {
-    const Field &field = *fields_to_visit.peek();
+    const GField &field = *fields_to_visit.peek();
     if (unique_variables.contains(field)) {
       fields_to_visit.pop();
       continue;
@@ -183,28 +183,28 @@ static void add_unique_variables(const Span<Field> fields,
  * optimal, but properly ordering destructs should be combined with reordering function calls to
  * use variables more optimally.
  */
-static void add_destructs(const Span<Field> fields,
+static void add_destructs(const Span<GField> fields,
                           MFProcedureBuilder &builder,
                           VariableMap &unique_variables)
 {
   Set<MFVariable *> destructed_variables;
   Set<FieldVariable *> outputs;
-  for (const Field &field : fields) {
+  for (const GField &field : fields) {
     /* Currently input fields are handled separately in the evaluator. */
     BLI_assert(!field.is_input());
     outputs.add(&get_field_variable(field, unique_variables));
   }
 
-  Stack<const Field *> fields_to_visit;
-  for (const Field &field : fields) {
+  Stack<const GField *> fields_to_visit;
+  for (const GField &field : fields) {
     fields_to_visit.push(&field);
   }
 
   while (!fields_to_visit.is_empty()) {
-    const Field &field = *fields_to_visit.pop();
+    const GField &field = *fields_to_visit.pop();
     if (field.is_function()) {
       const FieldFunction &function = field.function();
-      for (const Field &input_field : function.inputs()) {
+      for (const GField &input_field : function.inputs()) {
         fields_to_visit.push(&input_field);
       }
     }
@@ -226,7 +226,7 @@ static void add_destructs(const Span<Field> fields,
   }
 }
 
-static void build_procedure(const Span<Field> fields,
+static void build_procedure(const Span<GField> fields,
                             MFProcedure &procedure,
                             VariableMap &unique_variables)
 {
@@ -238,7 +238,7 @@ static void build_procedure(const Span<Field> fields,
 
   builder.add_return();
 
-  for (const Field &field : fields) {
+  for (const GField &field : fields) {
     MFVariable &input = *get_field_variable(field, unique_variables).mf_variable;
     builder.add_output_parameter(input);
   }
@@ -252,33 +252,33 @@ static void build_procedure(const Span<Field> fields,
  * TODO: Maybe this doesn't add inputs in the same order as the the unique
  * variable traversal. Add a test for that and fix it if it doesn't work.
  */
-static void gather_inputs(const Span<Field> fields,
+static void gather_inputs(const Span<GField> fields,
                           const VariableMap &unique_variables,
                           const IndexMask mask,
                           MFParamsBuilder &params,
                           Vector<GVArrayPtr> &r_inputs)
 {
   Set<const MFVariable *> computed_inputs;
-  Stack<const Field *> fields_to_visit;
-  for (const Field &field : fields) {
+  Stack<const GField *> fields_to_visit;
+  for (const GField &field : fields) {
     fields_to_visit.push(&field);
   }
 
   while (!fields_to_visit.is_empty()) {
-    const Field &field = *fields_to_visit.pop();
+    const GField &field = *fields_to_visit.pop();
     if (field.is_input()) {
       const FieldInput &input = field.input();
       const FieldVariable &variable = get_field_variable(field, unique_variables);
       if (!computed_inputs.contains(variable.mf_variable)) {
         GVArrayPtr data = input.get_varray_generic_context(mask);
         computed_inputs.add_new(variable.mf_variable);
-        params.add_readonly_single_input(*data, input.name());
+        params.add_readonly_single_input(*data, input.debug_name());
         r_inputs.append(std::move(data));
       }
     }
     else {
       const FieldFunction &function = field.function();
-      for (const Field &input_field : function.inputs()) {
+      for (const GField &input_field : function.inputs()) {
         fields_to_visit.push(&input_field);
       }
     }
@@ -292,7 +292,7 @@ static void add_outputs(MFParamsBuilder &params, Span<GMutableSpan> outputs)
   }
 }
 
-static void evaluate_non_input_fields(const Span<Field> fields,
+static void evaluate_non_input_fields(const Span<GField> fields,
                                       const IndexMask mask,
                                       const Span<GMutableSpan> outputs)
 {
@@ -316,7 +316,7 @@ static void evaluate_non_input_fields(const Span<Field> fields,
  * Evaluate more than one prodecure at a time, since often intermediate results will be shared
  * between multiple final results, and the procedure evaluator can optimize for this case.
  */
-void evaluate_fields(const Span<Field> fields,
+void evaluate_fields(const Span<GField> fields,
                      const IndexMask mask,
                      const Span<GMutableSpan> outputs)
 {
@@ -326,7 +326,7 @@ void evaluate_fields(const Span<Field> fields,
    * case to avoid sharing the same variable for an input and output parameters elsewhere.
    * TODO: It would be nice if there were a more elegant way to handle this, rather than a
    * separate step here, but I haven't thought of anything yet. */
-  Vector<Field> non_input_fields{fields};
+  Vector<GField> non_input_fields{fields};
   Vector<GMutableSpan> non_input_outputs{outputs};
   for (int i = fields.size() - 1; i >= 0; i--) {
     if (non_input_fields[i].is_input()) {

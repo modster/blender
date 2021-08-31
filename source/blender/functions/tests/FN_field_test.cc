@@ -11,10 +11,9 @@ namespace blender::fn::tests {
 TEST(field, ConstantFunction)
 {
   /* TODO: Figure out how to not use another "FieldFunction(" inside of std::make_shared. */
-  Field constant_field{CPPType::get<int>(),
-                       std::make_shared<FieldFunction>(
-                           FieldFunction(std::make_unique<CustomMF_Constant<int>>(10), {})),
-                       0};
+  GField constant_field{std::make_shared<FieldFunction>(
+                            FieldFunction(std::make_unique<CustomMF_Constant<int>>(10), {})),
+                        0};
 
   Array<int> result(4);
   GMutableSpan result_generic(result.as_mutable_span());
@@ -28,7 +27,7 @@ TEST(field, ConstantFunction)
 
 class IndexFieldInput final : public FieldInput {
  public:
-  IndexFieldInput() : FieldInput("Index")
+  IndexFieldInput() : FieldInput(CPPType::get<int>(), "Index")
   {
   }
 
@@ -43,7 +42,7 @@ class IndexFieldInput final : public FieldInput {
 
 TEST(field, VArrayInput)
 {
-  Field index_field{CPPType::get<int>(), std::make_shared<IndexFieldInput>()};
+  GField index_field{std::make_shared<IndexFieldInput>()};
 
   Array<int> result_1(4);
   GMutableSpan result_generic_1(result_1.as_mutable_span());
@@ -66,8 +65,8 @@ TEST(field, VArrayInput)
 TEST(field, VArrayInputMultipleOutputs)
 {
   std::shared_ptr<FieldInput> index_input = std::make_shared<IndexFieldInput>();
-  Field field_1{CPPType::get<int>(), index_input};
-  Field field_2{CPPType::get<int>(), index_input};
+  GField field_1{index_input};
+  GField field_2{index_input};
 
   Array<int> result_1(10);
   Array<int> result_2(10);
@@ -87,14 +86,13 @@ TEST(field, VArrayInputMultipleOutputs)
 
 TEST(field, InputAndFunction)
 {
-  Field index_field{CPPType::get<int>(), std::make_shared<IndexFieldInput>()};
+  GField index_field{std::make_shared<IndexFieldInput>()};
 
   std::unique_ptr<MultiFunction> add_fn = std::make_unique<CustomMF_SI_SI_SO<int, int, int>>(
       "add", [](int a, int b) { return a + b; });
-  Field output_field{CPPType::get<int>(),
-                     std::make_shared<FieldFunction>(
-                         FieldFunction(std::move(add_fn), {index_field, index_field})),
-                     0};
+  GField output_field{std::make_shared<FieldFunction>(
+                          FieldFunction(std::move(add_fn), {index_field, index_field})),
+                      0};
 
   Array<int> result(10);
   GMutableSpan result_generic(result.as_mutable_span());
@@ -107,21 +105,18 @@ TEST(field, InputAndFunction)
 
 TEST(field, TwoFunctions)
 {
-  Field index_field{CPPType::get<int>(), std::make_shared<IndexFieldInput>()};
+  GField index_field{std::make_shared<IndexFieldInput>()};
 
   std::unique_ptr<MultiFunction> add_fn = std::make_unique<CustomMF_SI_SI_SO<int, int, int>>(
       "add", [](int a, int b) { return a + b; });
-  Field add_field{CPPType::get<int>(),
-                  std::make_shared<FieldFunction>(
-                      FieldFunction(std::move(add_fn), {index_field, index_field})),
-                  0};
+  GField add_field{std::make_shared<FieldFunction>(
+                       FieldFunction(std::move(add_fn), {index_field, index_field})),
+                   0};
 
   std::unique_ptr<MultiFunction> add_10_fn = std::make_unique<CustomMF_SI_SO<int, int>>(
       "add_10", [](int a) { return a + 10; });
-  Field result_field{
-      CPPType::get<int>(),
-      std::make_shared<FieldFunction>(FieldFunction(std::move(add_10_fn), {add_field})),
-      0};
+  GField result_field{
+      std::make_shared<FieldFunction>(FieldFunction(std::move(add_10_fn), {add_field})), 0};
 
   Array<int> result(10);
   GMutableSpan result_generic(result.as_mutable_span());
@@ -164,14 +159,14 @@ class TwoOutputFunction : public MultiFunction {
 TEST(field, FunctionTwoOutputs)
 {
   /* Also use two separate input fields, why not. */
-  Field index_field_1{CPPType::get<int>(), std::make_shared<IndexFieldInput>()};
-  Field index_field_2{CPPType::get<int>(), std::make_shared<IndexFieldInput>()};
+  GField index_field_1{std::make_shared<IndexFieldInput>()};
+  GField index_field_2{std::make_shared<IndexFieldInput>()};
 
   std::shared_ptr<FieldFunction> fn = std::make_shared<FieldFunction>(FieldFunction(
       std::make_unique<TwoOutputFunction>("SI_SI_SO_SO"), {index_field_1, index_field_2}));
 
-  Field result_field_1{CPPType::get<int>(), fn, 0};
-  Field result_field_2{CPPType::get<int>(), fn, 1};
+  GField result_field_1{fn, 0};
+  GField result_field_2{fn, 1};
 
   Array<int> result_1(10);
   Array<int> result_2(10);
@@ -191,18 +186,17 @@ TEST(field, FunctionTwoOutputs)
 
 TEST(field, TwoFunctionsTwoOutputs)
 {
-  Field index_field{CPPType::get<int>(), std::make_shared<IndexFieldInput>()};
+  GField index_field{std::make_shared<IndexFieldInput>()};
 
   std::shared_ptr<FieldFunction> fn = std::make_shared<FieldFunction>(FieldFunction(
       std::make_unique<TwoOutputFunction>("SI_SI_SO_SO"), {index_field, index_field}));
 
-  Field result_field_1{CPPType::get<int>(), fn, 0};
-  Field intermediate_field{CPPType::get<int>(), fn, 1};
+  GField result_field_1{fn, 0};
+  GField intermediate_field{fn, 1};
 
   std::unique_ptr<MultiFunction> add_10_fn = std::make_unique<CustomMF_SI_SO<int, int>>(
       "add_10", [](int a) { return a + 10; });
-  Field result_field_2{
-      CPPType::get<int>(),
+  GField result_field_2{
       std::make_shared<FieldFunction>(FieldFunction(std::move(add_10_fn), {intermediate_field})),
       0};
 

@@ -47,12 +47,7 @@ class FieldFunction;
  * Descibes the output of a function. Generally corresponds to the combination of an output socket
  * and link combination in a node graph.
  */
-class Field {
-  /**
-   * The type of this field's result.
-   */
-  const fn::CPPType *type_;
-
+class GField {
   /**
    * The function that calculates this field's values. Many fields can share the same function,
    * since a function can have many outputs, just like a node graph, where a single output can be
@@ -68,35 +63,31 @@ class Field {
   std::shared_ptr<FieldInput> input_;
 
  public:
-  Field(const fn::CPPType &type, std::shared_ptr<FieldFunction> function, const int output_index)
-      : type_(&type), function_(function), output_index_(output_index)
+  GField(std::shared_ptr<FieldFunction> function, const int output_index)
+      : function_(std::move(function)), output_index_(output_index)
   {
   }
 
-  Field(const fn::CPPType &type, std::shared_ptr<FieldInput> input) : type_(&type), input_(input)
+  GField(std::shared_ptr<FieldInput> input) : input_(std::move(input))
   {
   }
 
-  const fn::CPPType &type() const
-  {
-    BLI_assert(type_ != nullptr);
-    return *type_;
-  }
+  const fn::CPPType &cpp_type() const;
 
   bool is_input() const
   {
-    return input_ != nullptr;
+    return input_.get() != nullptr;
   }
   const FieldInput &input() const
   {
-    BLI_assert(function_ == nullptr);
-    BLI_assert(input_ != nullptr);
+    BLI_assert(!function_);
+    BLI_assert(input_);
     return *input_;
   }
 
   bool is_function() const
   {
-    return function_ != nullptr;
+    return function_.get() != nullptr;
   }
   const FieldFunction &function() const
   {
@@ -113,28 +104,45 @@ class Field {
   }
 };
 
+template<typename T> class Field {
+ private:
+  GField field_;
+
+ public:
+  Field(GField field) : field_(field)
+  {
+  }
+
+  const GField *operator->() const
+  {
+    return &field_;
+  }
+};
+
 /**
  * An operation acting on data described by fields. Generally corresponds
  * to a node or a subset of a node in a node graph.
  */
 class FieldFunction {
   /**
-   * The function used to calculate the
+   * The function used to calculate the field.
    */
-  std::unique_ptr<MultiFunction> function_;
+  std::unique_ptr<const MultiFunction> owned_function_;
+  const MultiFunction *function_;
 
   /**
    * References to descriptions of the results from the functions this function depends on.
    */
-  blender::Vector<Field> inputs_;
+  blender::Vector<GField> inputs_;
 
  public:
-  FieldFunction(std::unique_ptr<MultiFunction> function, Vector<Field> &&inputs)
-      : function_(std::move(function)), inputs_(std::move(inputs))
+  FieldFunction(std::unique_ptr<const MultiFunction> function, Vector<GField> &&inputs)
+      : owned_function_(std::move(function)), inputs_(std::move(inputs))
   {
+    function_ = owned_function_.get();
   }
 
-  Span<Field> inputs() const
+  Span<GField> inputs() const
   {
     return inputs_;
   }
@@ -143,22 +151,38 @@ class FieldFunction {
   {
     return *function_;
   }
+
+  const CPPType &cpp_type_of_output_index(int index) const
+  {
+    MFParamType param_type = function_->param_type(index);
+    MFDataType data_type = param_type.data_type();
+    BLI_assert(param_type.interface_type() == MFParamType::Output);
+    BLI_assert(data_type.is_single());
+    return data_type.single_type();
+  }
 };
 
 class FieldInput {
  protected:
-  StringRef name_;
+  const CPPType *type_;
+  std::string debug_name_;
 
  public:
-  FieldInput(StringRef name = "") : name_(name)
+  FieldInput(const CPPType &type, std::string debug_name = "")
+      : type_(&type), debug_name_(std::move(debug_name))
   {
   }
 
   virtual GVArrayPtr get_varray_generic_context(IndexMask mask) const = 0;
 
-  blender::StringRef name() const
+  blender::StringRef debug_name() const
   {
-    return name_;
+    return debug_name_;
+  }
+
+  const CPPType &cpp_type() const
+  {
+    return *type_;
   }
 };
 
@@ -166,8 +190,20 @@ class FieldInput {
  * Evaluate more than one field at a time, as an optimization
  * in case they share inputs or various intermediate values.
  */
-void evaluate_fields(blender::Span<Field> fields,
+void evaluate_fields(blender::Span<GField> fields,
                      blender::IndexMask mask,
                      blender::Span<GMutableSpan> outputs);
+
+/* --------------------------------------------------------------------
+ * GField inline methods.
+ */
+
+inline const CPPType &GField::cpp_type() const
+{
+  if (this->is_function()) {
+    return function_->cpp_type_of_output_index(output_index_);
+  }
+  return input_->cpp_type();
+}
 
 }  // namespace blender::fn
