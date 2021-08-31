@@ -34,6 +34,7 @@
 #include "BLI_vector.hh"
 
 #include "FN_generic_virtual_array.hh"
+#include "FN_multi_function_builder.hh"
 #include "FN_multi_function_procedure.hh"
 #include "FN_multi_function_procedure_builder.hh"
 #include "FN_multi_function_procedure_executor.hh"
@@ -58,11 +59,13 @@ class GField {
   /**
    * Which output of the function this field corresponds to.
    */
-  int output_index_;
+  int output_index_ = 0;
 
   std::shared_ptr<FieldInput> input_;
 
  public:
+  GField() = default;
+
   GField(std::shared_ptr<FieldFunction> function, const int output_index)
       : function_(std::move(function)), output_index_(output_index)
   {
@@ -109,6 +112,8 @@ template<typename T> class Field {
   GField field_;
 
  public:
+  Field() = default;
+
   Field(GField field) : field_(std::move(field))
   {
     BLI_assert(field_.cpp_type().is<T>());
@@ -142,7 +147,7 @@ class FieldFunction {
   blender::Vector<GField> inputs_;
 
  public:
-  FieldFunction(std::unique_ptr<const MultiFunction> function, Vector<GField> &&inputs)
+  FieldFunction(std::unique_ptr<const MultiFunction> function, Vector<GField> inputs = {})
       : owned_function_(std::move(function)), inputs_(std::move(inputs))
   {
     function_ = owned_function_.get();
@@ -199,6 +204,22 @@ class FieldInput {
 void evaluate_fields(blender::Span<GField> fields,
                      blender::IndexMask mask,
                      blender::Span<GMutableSpan> outputs);
+void evaluate_constant_field(const GField &field, void *r_value);
+
+template<typename T> T evaluate_constant_field(const Field<T> &field)
+{
+  T value;
+  value.~T();
+  evaluate_constant_field(*field, &value);
+  return value;
+}
+
+template<typename T> Field<T> make_constant_field(T value)
+{
+  auto constant_fn = std::make_unique<fn::CustomMF_Constant<T>>(std::forward<T>(value));
+  auto field_fn = std::make_shared<FieldFunction>(std::move(constant_fn));
+  return Field<T>{GField{std::move(field_fn), 0}};
+}
 
 /* --------------------------------------------------------------------
  * GField inline methods.

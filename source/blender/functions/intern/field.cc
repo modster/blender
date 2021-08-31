@@ -243,7 +243,7 @@ static void build_procedure(const Span<GField> fields,
     builder.add_output_parameter(input);
   }
 
-  std::cout << procedure.to_dot();
+  // std::cout << procedure.to_dot();
 
   BLI_assert(procedure.validate());
 }
@@ -341,6 +341,15 @@ void evaluate_fields(const Span<GField> fields,
   if (!non_input_fields.is_empty()) {
     evaluate_non_input_fields(non_input_fields, mask, non_input_outputs);
   }
+}
+
+/**
+ * #r_value is expected to be uninitialized.
+ */
+void evaluate_constant_field(const GField &field, void *r_value)
+{
+  GMutableSpan value_span{field.cpp_type(), r_value, 1};
+  evaluate_fields({field}, IndexRange(1), {value_span});
 }
 
 }  // namespace blender::fn
