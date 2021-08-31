@@ -36,6 +36,7 @@ namespace blender::modifiers::geometry_nodes {
 
 using fn::CPPType;
 using fn::Field;
+using fn::FieldCPPType;
 using fn::GField;
 using fn::GValueMap;
 using nodes::GeoNodeExecParams;
@@ -1381,6 +1382,21 @@ class GeometryNodesEvaluator {
       return;
     }
 
+    const FieldCPPType *from_field_type = dynamic_cast<const FieldCPPType *>(&from_type);
+    const FieldCPPType *to_field_type = dynamic_cast<const FieldCPPType *>(&to_type);
+
+    if (from_field_type != nullptr && to_field_type != nullptr) {
+      const CPPType &from_base_type = from_field_type->field_type();
+      const CPPType &to_base_type = to_field_type->field_type();
+      if (conversions_.is_convertible(from_base_type, to_base_type)) {
+        const MultiFunction &fn = *conversions_.get_conversion_multi_function(
+            MFDataType::ForSingle(from_base_type), MFDataType::ForSingle(to_base_type));
+        const GField &from_field = *(const GField *)from_value;
+        auto field_fn = std::make_shared<fn::FieldFunction>(fn, Vector<GField>{from_field});
+        new (to_value) GField(std::move(field_fn), 0);
+        return;
+      }
+    }
     if (conversions_.is_convertible(from_type, to_type)) {
       /* Do the conversion if possible. */
       conversions_.convert_to_uninitialized(from_type, to_type, from_value, to_value);
@@ -1393,7 +1409,7 @@ class GeometryNodesEvaluator {
 
   void construct_default_value(const CPPType &type, void *r_value)
   {
-    if (const fn::FieldCPPType *field_cpp_type = dynamic_cast<const fn::FieldCPPType *>(&type)) {
+    if (const FieldCPPType *field_cpp_type = dynamic_cast<const FieldCPPType *>(&type)) {
       const CPPType &base_type = field_cpp_type->field_type();
       auto constant_fn = std::make_unique<fn::CustomMF_GenericConstant>(base_type,
                                                                         base_type.default_value());

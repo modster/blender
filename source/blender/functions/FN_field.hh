@@ -107,26 +107,13 @@ class GField {
   }
 };
 
-template<typename T> class Field {
- private:
-  GField field_;
-
+template<typename T> class Field : public GField {
  public:
   Field() = default;
 
-  Field(GField field) : field_(std::move(field))
+  Field(GField field) : GField(std::move(field))
   {
-    BLI_assert(field_.cpp_type().is<T>());
-  }
-
-  const GField *operator->() const
-  {
-    return &field_;
-  }
-
-  const GField &operator*() const
-  {
-    return field_;
+    BLI_assert(this->cpp_type().template is<T>());
   }
 };
 
@@ -222,7 +209,7 @@ template<typename T> T evaluate_constant_field(const Field<T> &field)
 {
   T value;
   value.~T();
-  evaluate_constant_field(*field, &value);
+  evaluate_constant_field(field, &value);
   return value;
 }
 
