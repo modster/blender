@@ -21,6 +21,7 @@
 
 #include "DEG_depsgraph_query.h"
 
+#include "FN_field.hh"
 #include "FN_generic_value_map.hh"
 #include "FN_multi_function.hh"
 
@@ -33,6 +34,8 @@
 namespace blender::modifiers::geometry_nodes {
 
 using fn::CPPType;
+using fn::Field;
+using fn::GField;
 using fn::GValueMap;
 using nodes::GeoNodeExecParams;
 using namespace fn::multi_function_types;
@@ -858,11 +861,10 @@ class GeometryNodesEvaluator {
                                    const MultiFunction &fn,
                                    NodeState &node_state)
   {
-    MFContextBuilder fn_context;
-    MFParamsBuilder fn_params{fn, 1};
     LinearAllocator<> &allocator = local_allocators_.local();
 
     /* Prepare the inputs for the multi function. */
+    Vector<GField> input_fields;
     for (const int i : node->inputs().index_range()) {
       const InputSocketRef &socket_ref = node->input(i);
       if (!socket_ref.is_available()) {
@@ -873,24 +875,12 @@ class GeometryNodesEvaluator {
       BLI_assert(input_state.was_ready_for_execution);
       SingleInputValue &single_value = *input_state.value.single;
       BLI_assert(single_value.value != nullptr);
-      fn_params.add_readonly_single_input(GPointer{*input_state.type, single_value.value});
-    }
-    /* Prepare the outputs for the multi function. */
-    Vector<GMutablePointer> outputs;
-    for (const int i : node->outputs().index_range()) {
-      const OutputSocketRef &socket_ref = node->output(i);
-      if (!socket_ref.is_available()) {
-        continue;
-      }
-      const CPPType &type = *get_socket_cpp_type(socket_ref);
-      void *buffer = allocator.allocate(type.size(), type.alignment());
-      fn_params.add_uninitialized_single_output(GMutableSpan{type, buffer, 1});
-      outputs.append({type, buffer});
+      input_fields.append(std::move(*(GField *)single_value.value));
     }
 
-    fn.call(IndexRange(1), fn_params, fn_context);
+    auto field_fn = std::make_shared<fn::FieldFunction>(fn, std::move(input_fields));
 
-    /* Forward the computed outputs. */
+    /* Forward outputs. */
     int output_index = 0;
     for (const int i : node->outputs().index_range()) {
       const OutputSocketRef &socket_ref = node->output(i);
@@ -899,8 +889,9 @@ class GeometryNodesEvaluator {
       }
       OutputState &output_state = node_state.outputs[i];
       const DOutputSocket socket{node.context(), &socket_ref};
-      GMutablePointer value = outputs[output_index];
-      this->forward_output(socket, value);
+      const CPPType *cpp_type = get_socket_cpp_type(socket_ref);
+      GField &field = *allocator.construct<GField>(field_fn, output_index).release();
+      this->forward_output(socket, {cpp_type, &field});
       output_state.has_been_computed = true;
       output_index++;
     }

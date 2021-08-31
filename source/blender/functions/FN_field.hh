@@ -153,6 +153,11 @@ class FieldFunction {
     function_ = owned_function_.get();
   }
 
+  FieldFunction(const MultiFunction &function, Vector<GField> inputs = {})
+      : function_(&function), inputs_(std::move(inputs))
+  {
+  }
+
   Span<GField> inputs() const
   {
     return inputs_;
@@ -163,13 +168,20 @@ class FieldFunction {
     return *function_;
   }
 
-  const CPPType &cpp_type_of_output_index(int index) const
+  const CPPType &cpp_type_of_output_index(int output_index) const
   {
-    MFParamType param_type = function_->param_type(index);
-    MFDataType data_type = param_type.data_type();
-    BLI_assert(param_type.interface_type() == MFParamType::Output);
-    BLI_assert(data_type.is_single());
-    return data_type.single_type();
+    int output_counter = 0;
+    for (const int param_index : function_->param_indices()) {
+      MFParamType param_type = function_->param_type(param_index);
+      if (param_type.is_output()) {
+        if (output_counter == output_index) {
+          return param_type.data_type().single_type();
+        }
+        output_counter++;
+      }
+    }
+    BLI_assert_unreachable();
+    return CPPType::get<float>();
   }
 };
 
