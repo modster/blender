@@ -76,7 +76,10 @@ static bool wm_xr_operator_sessionactive(bContext *C)
 
 static bool wm_xr_operator_test_event(const wmOperator *op, const wmEvent *event)
 {
-  BLI_assert(event->type == EVT_XR_ACTION);
+  if (event->type != EVT_XR_ACTION) {
+    return false;
+  }
+
   BLI_assert(event->custom == EVT_DATA_XR);
   BLI_assert(event->customdata);
 
@@ -408,7 +411,7 @@ static void wm_xr_grab_compute_bimanual(const wmXrActionData *actiondata,
  * Navigates the scene by grabbing with XR controllers.
  * \{ */
 
-static int wm_xr_navigation_grab_invoke_3d(bContext *C, wmOperator *op, const wmEvent *event)
+static int wm_xr_navigation_grab_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
   if (!wm_xr_operator_test_event(op, event)) {
     return OPERATOR_PASS_THROUGH;
@@ -429,7 +432,7 @@ static int wm_xr_navigation_grab_exec(bContext *UNUSED(C), wmOperator *UNUSED(op
   return OPERATOR_CANCELLED;
 }
 
-static int wm_xr_navigation_grab_modal_3d(bContext *C, wmOperator *op, const wmEvent *event)
+static int wm_xr_navigation_grab_modal(bContext *C, wmOperator *op, const wmEvent *event)
 {
   if (!wm_xr_operator_test_event(op, event)) {
     return OPERATOR_PASS_THROUGH;
@@ -556,9 +559,9 @@ static void WM_OT_xr_navigation_grab(wmOperatorType *ot)
   ot->description = "Navigate the VR scene by grabbing with controllers";
 
   /* callbacks */
-  ot->invoke_3d = wm_xr_navigation_grab_invoke_3d;
+  ot->invoke = wm_xr_navigation_grab_invoke;
   ot->exec = wm_xr_navigation_grab_exec;
-  ot->modal_3d = wm_xr_navigation_grab_modal_3d;
+  ot->modal = wm_xr_navigation_grab_modal;
   ot->poll = wm_xr_operator_sessionactive;
 
   /* properties */
@@ -885,7 +888,7 @@ static void wm_xr_basenav_rotation_calc(const wmXrData *xr,
   mul_qt_qtqt(r_rotation, nav_rotation, base_quatz);
 }
 
-static int wm_xr_navigation_fly_invoke_3d(bContext *C, wmOperator *op, const wmEvent *event)
+static int wm_xr_navigation_fly_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
   if (!wm_xr_operator_test_event(op, event)) {
     return OPERATOR_PASS_THROUGH;
@@ -905,7 +908,7 @@ static int wm_xr_navigation_fly_exec(bContext *UNUSED(C), wmOperator *UNUSED(op)
   return OPERATOR_CANCELLED;
 }
 
-static int wm_xr_navigation_fly_modal_3d(bContext *C, wmOperator *op, const wmEvent *event)
+static int wm_xr_navigation_fly_modal(bContext *C, wmOperator *op, const wmEvent *event)
 {
   if (!wm_xr_operator_test_event(op, event)) {
     return OPERATOR_PASS_THROUGH;
@@ -1108,9 +1111,9 @@ static void WM_OT_xr_navigation_fly(wmOperatorType *ot)
   ot->description = "Move/turn relative to the VR viewer or controller";
 
   /* callbacks */
-  ot->invoke_3d = wm_xr_navigation_fly_invoke_3d;
+  ot->invoke = wm_xr_navigation_fly_invoke;
   ot->exec = wm_xr_navigation_fly_exec;
-  ot->modal_3d = wm_xr_navigation_fly_modal_3d;
+  ot->modal = wm_xr_navigation_fly_modal;
   ot->poll = wm_xr_operator_sessionactive;
 
   /* properties */
@@ -1274,7 +1277,7 @@ static void wm_xr_navigation_teleport(bContext *C,
   }
 }
 
-static int wm_xr_navigation_teleport_invoke_3d(bContext *C, wmOperator *op, const wmEvent *event)
+static int wm_xr_navigation_teleport_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
   if (!wm_xr_operator_test_event(op, event)) {
     return OPERATOR_PASS_THROUGH;
@@ -1282,7 +1285,7 @@ static int wm_xr_navigation_teleport_invoke_3d(bContext *C, wmOperator *op, cons
 
   wm_xr_raycast_init(op);
 
-  int retval = op->type->modal_3d(C, op, event);
+  int retval = op->type->modal(C, op, event);
 
   if ((retval & OPERATOR_RUNNING_MODAL) != 0) {
     WM_event_add_modal_handler(C, op);
@@ -1296,7 +1299,7 @@ static int wm_xr_navigation_teleport_exec(bContext *UNUSED(C), wmOperator *UNUSE
   return OPERATOR_CANCELLED;
 }
 
-static int wm_xr_navigation_teleport_modal_3d(bContext *C, wmOperator *op, const wmEvent *event)
+static int wm_xr_navigation_teleport_modal(bContext *C, wmOperator *op, const wmEvent *event)
 {
   if (!wm_xr_operator_test_event(op, event)) {
     return OPERATOR_PASS_THROUGH;
@@ -1365,9 +1368,9 @@ static void WM_OT_xr_navigation_teleport(wmOperatorType *ot)
   ot->description = "Set VR viewer location to controller raycast hit location";
 
   /* callbacks */
-  ot->invoke_3d = wm_xr_navigation_teleport_invoke_3d;
+  ot->invoke = wm_xr_navigation_teleport_invoke;
   ot->exec = wm_xr_navigation_teleport_exec;
-  ot->modal_3d = wm_xr_navigation_teleport_modal_3d;
+  ot->modal = wm_xr_navigation_teleport_modal;
   ot->poll = wm_xr_operator_sessionactive;
 
   /* properties */
@@ -1693,7 +1696,7 @@ static bool wm_xr_select_raycast(bContext *C,
   return changed;
 }
 
-static int wm_xr_select_raycast_invoke_3d(bContext *C, wmOperator *op, const wmEvent *event)
+static int wm_xr_select_raycast_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
   if (!wm_xr_operator_test_event(op, event)) {
     return OPERATOR_PASS_THROUGH;
@@ -1701,7 +1704,7 @@ static int wm_xr_select_raycast_invoke_3d(bContext *C, wmOperator *op, const wmE
 
   wm_xr_raycast_init(op);
 
-  int retval = op->type->modal_3d(C, op, event);
+  int retval = op->type->modal(C, op, event);
 
   if ((retval & OPERATOR_RUNNING_MODAL) != 0) {
     WM_event_add_modal_handler(C, op);
@@ -1715,7 +1718,7 @@ static int wm_xr_select_raycast_exec(bContext *UNUSED(C), wmOperator *UNUSED(op)
   return OPERATOR_CANCELLED;
 }
 
-static int wm_xr_select_raycast_modal_3d(bContext *C, wmOperator *op, const wmEvent *event)
+static int wm_xr_select_raycast_modal(bContext *C, wmOperator *op, const wmEvent *event)
 {
   if (!wm_xr_operator_test_event(op, event)) {
     return OPERATOR_PASS_THROUGH;
@@ -1780,9 +1783,9 @@ static void WM_OT_xr_select_raycast(wmOperatorType *ot)
   ot->description = "Raycast select with a VR controller";
 
   /* callbacks */
-  ot->invoke_3d = wm_xr_select_raycast_invoke_3d;
+  ot->invoke = wm_xr_select_raycast_invoke;
   ot->exec = wm_xr_select_raycast_exec;
-  ot->modal_3d = wm_xr_select_raycast_modal_3d;
+  ot->modal = wm_xr_select_raycast_modal;
   ot->poll = wm_xr_operator_sessionactive;
 
   /* flags */
@@ -1842,7 +1845,7 @@ static void WM_OT_xr_select_raycast(wmOperatorType *ot)
  * Transforms selected objects relative to an XR controller's pose.
  * \{ */
 
-static int wm_xr_transform_grab_invoke_3d(bContext *C, wmOperator *op, const wmEvent *event)
+static int wm_xr_transform_grab_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
   if (!wm_xr_operator_test_event(op, event)) {
     return OPERATOR_PASS_THROUGH;
@@ -2047,7 +2050,7 @@ static int wm_xr_transform_grab_exec(bContext *UNUSED(C), wmOperator *UNUSED(op)
   return OPERATOR_CANCELLED;
 }
 
-static int wm_xr_transform_grab_modal_3d(bContext *C, wmOperator *op, const wmEvent *event)
+static int wm_xr_transform_grab_modal(bContext *C, wmOperator *op, const wmEvent *event)
 {
   if (!wm_xr_operator_test_event(op, event)) {
     return OPERATOR_PASS_THROUGH;
@@ -2236,9 +2239,9 @@ static void WM_OT_xr_transform_grab(wmOperatorType *ot)
   ot->description = "Transform selected objects relative to a VR controller's pose";
 
   /* callbacks */
-  ot->invoke_3d = wm_xr_transform_grab_invoke_3d;
+  ot->invoke = wm_xr_transform_grab_invoke;
   ot->exec = wm_xr_transform_grab_exec;
-  ot->modal_3d = wm_xr_transform_grab_modal_3d;
+  ot->modal = wm_xr_transform_grab_modal;
   ot->poll = wm_xr_operator_sessionactive;
 
   /* flags */
