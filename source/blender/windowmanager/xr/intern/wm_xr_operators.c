@@ -1441,6 +1441,100 @@ static void WM_OT_xr_navigation_teleport(wmOperatorType *ot)
 /** \} */
 
 /* -------------------------------------------------------------------- */
+/** \name XR Navigation Reset
+ *
+ * Resets XR navigation deltas relative to session base pose.
+ * \{ */
+
+static int wm_xr_navigation_reset_exec(bContext *C, wmOperator *op)
+{
+  wmWindowManager *wm = CTX_wm_manager(C);
+  wmXrData *xr = &wm->xr;
+  bool reset_loc, reset_rot, reset_scale;
+
+  PropertyRNA *prop = RNA_struct_find_property(op->ptr, "location");
+  reset_loc = prop ? RNA_property_boolean_get(op->ptr, prop) : true;
+
+  prop = RNA_struct_find_property(op->ptr, "rotation");
+  reset_rot = prop ? RNA_property_boolean_get(op->ptr, prop) : true;
+
+  prop = RNA_struct_find_property(op->ptr, "scale");
+  reset_scale = prop ? RNA_property_boolean_get(op->ptr, prop) : true;
+
+  if (reset_loc) {
+    float loc[3];
+    if (!reset_scale) {
+      float nav_rotation[4], nav_scale;
+
+      WM_xr_session_state_nav_rotation_get(xr, nav_rotation);
+      WM_xr_session_state_nav_scale_get(xr, &nav_scale);
+
+      /* Adjust location based on scale. */
+      mul_v3_v3fl(loc, xr->runtime->session_state.prev_base_pose.position, nav_scale);
+      sub_v3_v3(loc, xr->runtime->session_state.prev_base_pose.position);
+      mul_qt_v3(nav_rotation, loc);
+      negate_v3(loc);
+    }
+    else {
+      zero_v3(loc);
+    }
+    WM_xr_session_state_nav_location_set(xr, loc);
+  }
+
+  if (reset_rot) {
+    float rot[4];
+    unit_qt(rot);
+    WM_xr_session_state_nav_rotation_set(xr, rot);
+  }
+
+  if (reset_scale) {
+    if (!reset_loc) {
+      float nav_location[3], nav_rotation[4], nav_scale;
+      float nav_axes[3][3], v[3];
+
+      WM_xr_session_state_nav_location_get(xr, nav_location);
+      WM_xr_session_state_nav_rotation_get(xr, nav_rotation);
+      WM_xr_session_state_nav_scale_get(xr, &nav_scale);
+
+      /* Offset any location changes when changing scale. */
+      mul_v3_v3fl(v, xr->runtime->session_state.prev_base_pose.position, nav_scale);
+      sub_v3_v3(v, xr->runtime->session_state.prev_base_pose.position);
+      mul_qt_v3(nav_rotation, v);
+      add_v3_v3(nav_location, v);
+
+      /* Reset elevation to base pose value. */
+      quat_to_mat3(nav_axes, nav_rotation);
+      project_v3_v3v3_normalized(v, nav_location, nav_axes[2]);
+      sub_v3_v3(nav_location, v);
+
+      WM_xr_session_state_nav_location_set(xr, nav_location);
+    }
+    WM_xr_session_state_nav_scale_set(xr, 1.0f);
+  }
+
+  return OPERATOR_FINISHED;
+}
+
+static void WM_OT_xr_navigation_reset(wmOperatorType *ot)
+{
+  /* identifiers */
+  ot->name = "XR Navigation Reset";
+  ot->idname = "WM_OT_xr_navigation_reset";
+  ot->description = "Reset VR navigation deltas relative to session base pose";
+
+  /* callbacks */
+  ot->exec = wm_xr_navigation_reset_exec;
+  ot->poll = wm_xr_operator_sessionactive;
+
+  /* properties */
+  RNA_def_boolean(ot->srna, "location", true, "Location", "Reset location deltas");
+  RNA_def_boolean(ot->srna, "rotation", true, "Rotation", "Reset rotation deltas");
+  RNA_def_boolean(ot->srna, "scale", true, "Scale", "Reset scale deltas");
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
 /** \name XR Raycast Select
  *
  * Casts a ray from an XR controller's pose and selects any hit geometry.
@@ -2378,6 +2472,7 @@ void wm_xr_operatortypes_register(void)
   WM_operatortype_append(WM_OT_xr_navigation_grab);
   WM_operatortype_append(WM_OT_xr_navigation_fly);
   WM_operatortype_append(WM_OT_xr_navigation_teleport);
+  WM_operatortype_append(WM_OT_xr_navigation_reset);
   WM_operatortype_append(WM_OT_xr_select_raycast);
   WM_operatortype_append(WM_OT_xr_transform_grab);
   WM_operatortype_append(WM_OT_xr_mocap_objects_toggle);
