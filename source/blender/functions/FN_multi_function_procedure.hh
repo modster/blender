@@ -156,6 +156,9 @@ class MFDummyInstruction : public MFInstruction {
 class MFReturnInstruction : public MFInstruction {
 };
 
+/**
+ * Inputs and outputs of the entire procedure network.
+ */
 struct MFParameter {
   MFParamType::InterfaceType type;
   MFVariable *variable;

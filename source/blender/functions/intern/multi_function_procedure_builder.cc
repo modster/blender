@@ -117,7 +117,8 @@ Vector<MFVariable *> MFProcedureBuilder::add_call(const MultiFunction &fn,
         break;
       }
       case MFParamType::Output: {
-        MFVariable &variable = procedure_->new_variable(param_type.data_type());
+        MFVariable &variable = procedure_->new_variable(param_type.data_type(),
+                                                        fn.param_name(param_index));
         instruction.set_param_variable(param_index, &variable);
         output_variables.append(&variable);
         break;
