@@ -47,9 +47,29 @@ class FieldSource {
 
   virtual const CPPType &cpp_type_of_output_index(int output_index) const = 0;
 
-  virtual bool is_input() const
+  virtual bool is_context_source() const
   {
     return false;
+  }
+
+  virtual bool is_operation_source() const
+  {
+    return false;
+  }
+
+  virtual uint64_t hash() const
+  {
+    return get_default_hash(this);
+  }
+
+  friend bool operator==(const FieldSource &a, const FieldSource &b)
+  {
+    return a.is_equal_to(b);
+  }
+
+  virtual bool is_equal_to(const FieldSource &other) const
+  {
+    return this == &other;
   }
 };
 
@@ -79,9 +99,14 @@ class GField {
     return source_->cpp_type_of_output_index(source_output_index_);
   }
 
-  bool is_input() const
+  bool has_context_source() const
   {
-    return source_->is_input();
+    return source_->is_context_source();
+  }
+
+  bool has_operation_source() const
+  {
+    return source_->is_operation_source();
   }
 
   const FieldSource &source() const
@@ -105,20 +130,20 @@ template<typename T> class Field : public GField {
   }
 };
 
-class FieldOperation : public FieldSource {
+class OperationFieldSource : public FieldSource {
   std::unique_ptr<const MultiFunction> owned_function_;
   const MultiFunction *function_;
 
   blender::Vector<GField> inputs_;
 
  public:
-  FieldOperation(std::unique_ptr<const MultiFunction> function, Vector<GField> inputs = {})
+  OperationFieldSource(std::unique_ptr<const MultiFunction> function, Vector<GField> inputs = {})
       : owned_function_(std::move(function)), inputs_(std::move(inputs))
   {
     function_ = owned_function_.get();
   }
 
-  FieldOperation(const MultiFunction &function, Vector<GField> inputs = {})
+  OperationFieldSource(const MultiFunction &function, Vector<GField> inputs = {})
       : function_(&function), inputs_(std::move(inputs))
   {
   }
@@ -131,6 +156,11 @@ class FieldOperation : public FieldSource {
   const MultiFunction &multi_function() const
   {
     return *function_;
+  }
+
+  bool is_operation_source() const override
+  {
+    return true;
   }
 
   const CPPType &cpp_type_of_output_index(int output_index) const override
@@ -150,18 +180,25 @@ class FieldOperation : public FieldSource {
   }
 };
 
-class FieldInput : public FieldSource {
+class FieldContext {
+ public:
+  ~FieldContext() = default;
+};
+
+class ContextFieldSource : public FieldSource {
  protected:
   const CPPType *type_;
   std::string debug_name_;
 
  public:
-  FieldInput(const CPPType &type, std::string debug_name = "")
+  ContextFieldSource(const CPPType &type, std::string debug_name = "")
       : type_(&type), debug_name_(std::move(debug_name))
   {
   }
 
-  virtual GVArrayPtr get_varray_generic_context(IndexMask mask) const = 0;
+  virtual const GVArray *try_get_varray_for_context(const FieldContext &context,
+                                                    IndexMask mask,
+                                                    ResourceScope &scope) const = 0;
 
   blender::StringRef debug_name() const
   {
@@ -179,20 +216,24 @@ class FieldInput : public FieldSource {
     return *type_;
   }
 
-  bool is_input() const override
+  bool is_context_source() const override
   {
     return true;
   }
 };
 
-/**
- * Evaluate more than one field at a time, as an optimization
- * in case they share inputs or various intermediate values.
- */
-void evaluate_fields(blender::Span<GField> fields,
-                     blender::IndexMask mask,
-                     blender::Span<GMutableSpan> outputs);
+Vector<const GVArray *> evaluate_fields(ResourceScope &scope,
+                                        Span<const GField *> fields_to_evaluate,
+                                        IndexMask mask,
+                                        FieldContext &context,
+                                        Span<GVMutableArray *> dst_hints = {});
+
 void evaluate_constant_field(const GField &field, void *r_value);
+
+void evaluate_fields_to_spans(Span<const GField *> fields_to_evaluate,
+                              IndexMask mask,
+                              FieldContext &context,
+                              Span<GMutableSpan> out_spans);
 
 template<typename T> T evaluate_constant_field(const Field<T> &field)
 {
@@ -205,7 +246,7 @@ template<typename T> T evaluate_constant_field(const Field<T> &field)
 template<typename T> Field<T> make_constant_field(T value)
 {
   auto constant_fn = std::make_unique<fn::CustomMF_Constant<T>>(std::forward<T>(value));
-  auto operation = std::make_shared<FieldOperation>(std::move(constant_fn));
+  auto operation = std::make_shared<OperationFieldSource>(std::move(constant_fn));
   return Field<T>{GField{std::move(operation), 0}};
 }
 

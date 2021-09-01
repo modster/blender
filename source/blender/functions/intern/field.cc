@@ -15,273 +15,408 @@
  */
 
 #include "BLI_map.hh"
+#include "BLI_multi_value_map.hh"
 #include "BLI_set.hh"
 #include "BLI_stack.hh"
+#include "BLI_vector_set.hh"
 
 #include "FN_field.hh"
 
 namespace blender::fn {
 
-/**
- * A map to hold the output variables for each function output or input so they can be reused.
- */
-using VariableMap = Map<const FieldSource *, Vector<MFVariable *>>;
+struct GFieldRef {
+  const FieldSource *source;
+  int index;
 
-/**
- * A map of the computed inputs for all of a field system's inputs, to avoid creating duplicates.
- * Usually virtual arrays are just references, but sometimes they can be heavier as well.
- */
-using ComputedInputMap = Map<const MFVariable *, GVArrayPtr>;
-
-static MFVariable &get_field_variable(const GField &field, VariableMap &unique_variables)
-{
-  if (field.is_input()) {
-    const FieldInput &input = dynamic_cast<const FieldInput &>(field.source());
-    return *unique_variables.lookup(&input).first();
+  GFieldRef(const FieldSource &source, const int index) : source(&source), index(index)
+  {
   }
-  const FieldOperation &operation = dynamic_cast<const FieldOperation &>(field.source());
-  MutableSpan<MFVariable *> operation_outputs = unique_variables.lookup(&operation);
-  return *operation_outputs[field.source_output_index()];
-}
 
-static const MFVariable &get_field_variable(const GField &field,
-                                            const VariableMap &unique_variables)
-{
-  if (field.is_input()) {
-    const FieldInput &input = dynamic_cast<const FieldInput &>(field.source());
-    return *unique_variables.lookup(&input).first();
+  GFieldRef(const GField &field) : source(&field.source()), index(field.source_output_index())
+  {
   }
-  const FieldOperation &operation = dynamic_cast<const FieldOperation &>(field.source());
-  Span<MFVariable *> operation_outputs = unique_variables.lookup(&operation);
-  return *operation_outputs[field.source_output_index()];
-}
 
-/**
- * TODO: Merge duplicate input nodes, not just fields pointing to the same FieldInput.
- */
-static void add_variables_for_input(const GField &field,
-                                    Stack<const GField *> &fields_to_visit,
-                                    MFProcedureBuilder &builder,
-                                    VariableMap &unique_variables)
-{
-  fields_to_visit.pop();
-  const FieldInput &input = dynamic_cast<const FieldInput &>(field.source());
-  MFVariable &variable = builder.add_input_parameter(MFDataType::ForSingle(field.cpp_type()),
-                                                     input.debug_name());
-  unique_variables.add(&input, {&variable});
-}
+  uint64_t hash() const
+  {
+    return get_default_hash_2(*source, index);
+  }
 
-static void add_variables_for_operation(const GField &field,
-                                        Stack<const GField *> &fields_to_visit,
-                                        MFProcedureBuilder &builder,
-                                        VariableMap &unique_variables)
+  friend bool operator==(const GFieldRef &a, const GFieldRef &b)
+  {
+    return *a.source == *b.source && a.index == b.index;
+  }
+};
+
+struct FieldGraphInfo {
+  MultiValueMap<GFieldRef, const GField *> field_users;
+  VectorSet<std::reference_wrapper<const ContextFieldSource>> deduplicated_context_sources;
+};
+
+static FieldGraphInfo preprocess_field_graph(Span<const GField *> entry_fields)
 {
-  const FieldOperation &operation = dynamic_cast<const FieldOperation &>(field.source());
-  for (const GField &input_field : operation.inputs()) {
-    if (!unique_variables.contains(&input_field.source())) {
-      /* The field for this input hasn't been handled yet. Handle it now, so that we know all
-       * of this field's function inputs already have variables. TODO: Verify that this is the
-       * best way to do a depth first traversal. These extra lookups don't seem ideal. */
-      fields_to_visit.push(&input_field);
-      return;
+  FieldGraphInfo graph_info;
+
+  Stack<const GField *> fields_to_check;
+  Set<const GField *> handled_fields;
+
+  for (const GField *field : entry_fields) {
+    if (handled_fields.add(field)) {
+      fields_to_check.push(field);
     }
   }
 
-  fields_to_visit.pop();
-
-  Vector<MFVariable *> inputs;
-  Set<MFVariable *> unique_inputs;
-  for (const GField &input_field : operation.inputs()) {
-    MFVariable &input = get_field_variable(input_field, unique_variables);
-    unique_inputs.add(&input);
-    inputs.append(&input);
-  }
-
-  Vector<MFVariable *> outputs = builder.add_call(operation.multi_function(), inputs);
-  Vector<MFVariable *> &unique_outputs = unique_variables.lookup_or_add(&operation, {});
-  for (MFVariable *output : outputs) {
-    unique_outputs.append(output);
-  }
-}
-
-static void add_unique_variables(const Span<GField> fields,
-                                 MFProcedureBuilder &builder,
-                                 VariableMap &unique_variables)
-{
-  Stack<const GField *> fields_to_visit;
-  for (const GField &field : fields) {
-    fields_to_visit.push(&field);
-  }
-
-  while (!fields_to_visit.is_empty()) {
-    const GField &field = *fields_to_visit.peek();
-    if (unique_variables.contains(&field.source())) {
-      fields_to_visit.pop();
+  while (!fields_to_check.is_empty()) {
+    const GField *field = fields_to_check.pop();
+    if (field->has_context_source()) {
+      const ContextFieldSource &context_source = static_cast<const ContextFieldSource &>(
+          field->source());
+      graph_info.deduplicated_context_sources.add(context_source);
       continue;
     }
-
-    if (field.is_input()) {
-      add_variables_for_input(field, fields_to_visit, builder, unique_variables);
-    }
-    else {
-      add_variables_for_operation(field, fields_to_visit, builder, unique_variables);
-    }
-  }
-}
-
-/**
- * Add destruct calls to the procedure so that internal variables and inputs are destructed before
- * the procedure finishes. Currently this just adds all of the destructs at the end. That is not
- * optimal, but properly ordering destructs should be combined with reordering function calls to
- * use variables more optimally.
- */
-static void add_destructs(const Span<GField> fields,
-                          MFProcedureBuilder &builder,
-                          VariableMap &unique_variables)
-{
-  Set<MFVariable *> destructed_variables;
-  Set<MFVariable *> outputs;
-  for (const GField &field : fields) {
-    /* Currently input fields are handled separately in the evaluator. */
-    BLI_assert(!field.is_input());
-    outputs.add(&get_field_variable(field, unique_variables));
-  }
-
-  for (MutableSpan<MFVariable *> variables : unique_variables.values()) {
-    for (MFVariable *variable : variables) {
-      /* Don't destruct the variable if it is used as an output parameter. */
-      if (!outputs.contains(variable)) {
-        builder.add_destruct(*variable);
+    BLI_assert(field->has_operation_source());
+    const OperationFieldSource &operation = static_cast<const OperationFieldSource &>(
+        field->source());
+    for (const GField &operation_input : operation.inputs()) {
+      graph_info.field_users.add(operation_input, field);
+      if (handled_fields.add(&operation_input)) {
+        fields_to_check.push(&operation_input);
       }
     }
   }
+  return graph_info;
 }
 
-static void build_procedure(const Span<GField> fields,
-                            MFProcedure &procedure,
-                            VariableMap &unique_variables)
+static Vector<const GVArray *> get_field_context_inputs(ResourceScope &scope,
+                                                        const IndexMask mask,
+                                                        FieldContext &context,
+                                                        const FieldGraphInfo &graph_info)
+{
+  Vector<const GVArray *> field_context_inputs;
+  for (const ContextFieldSource &context_source : graph_info.deduplicated_context_sources) {
+    const GVArray *varray = context_source.try_get_varray_for_context(context, mask, scope);
+    if (varray == nullptr) {
+      const CPPType &type = context_source.cpp_type();
+      varray = &scope.construct<GVArray_For_SingleValueRef>(
+          __func__, type, mask.min_array_size(), type.default_value());
+    }
+    field_context_inputs.append(varray);
+  }
+  return field_context_inputs;
+}
+
+static Set<const GField *> find_varying_fields(const FieldGraphInfo &graph_info,
+                                               Span<const GVArray *> field_context_inputs)
+{
+  Set<const GField *> found_fields;
+  Stack<const GField *> fields_to_check;
+  for (const int i : field_context_inputs.index_range()) {
+    const GVArray *varray = field_context_inputs[i];
+    if (varray->is_single()) {
+      continue;
+    }
+    const ContextFieldSource &context_source = graph_info.deduplicated_context_sources[i];
+    const GFieldRef context_source_field{context_source, 0};
+    const Span<const GField *> users = graph_info.field_users.lookup(context_source_field);
+    for (const GField *field : users) {
+      if (found_fields.add(field)) {
+        fields_to_check.push(field);
+      }
+    }
+  }
+  while (!fields_to_check.is_empty()) {
+    const GField *field = fields_to_check.pop();
+    const Span<const GField *> users = graph_info.field_users.lookup(*field);
+    for (const GField *field : users) {
+      if (found_fields.add(field)) {
+        fields_to_check.push(field);
+      }
+    }
+  }
+  return found_fields;
+}
+
+static void build_multi_function_procedure_for_fields(MFProcedure &procedure,
+                                                      const FieldGraphInfo &graph_info,
+                                                      Span<const GField *> output_fields)
 {
   MFProcedureBuilder builder{procedure};
+  Map<GFieldRef, MFVariable *> variable_by_field;
+  for (const ContextFieldSource &context_field_source : graph_info.deduplicated_context_sources) {
+    MFVariable &variable = builder.add_input_parameter(
+        MFDataType::ForSingle(context_field_source.cpp_type()), context_field_source.debug_name());
+    variable_by_field.add_new({context_field_source, 0}, &variable);
+  }
 
-  add_unique_variables(fields, builder, unique_variables);
+  struct FieldWithIndex {
+    const GField *field;
+    int current_input_index = 0;
+  };
 
-  add_destructs(fields, builder, unique_variables);
+  for (const GField *field : output_fields) {
+    Stack<FieldWithIndex> fields_to_check;
+    fields_to_check.push({field, 0});
+    while (!fields_to_check.is_empty()) {
+      FieldWithIndex &field_with_index = fields_to_check.peek();
+      const GField &field = *field_with_index.field;
+      if (variable_by_field.contains(field)) {
+        fields_to_check.pop();
+        continue;
+      }
+      /* Context sources should already be handled above. */
+      BLI_assert(field.has_operation_source());
+      const OperationFieldSource &operation_field_source =
+          static_cast<const OperationFieldSource &>(field.source());
+      const Span<GField> operation_inputs = operation_field_source.inputs();
+      if (field_with_index.current_input_index < operation_inputs.size()) {
+        /* Push next input. */
+        fields_to_check.push({&operation_inputs[field_with_index.current_input_index], 0});
+        field_with_index.current_input_index++;
+      }
+      else {
+        /* All inputs variables are ready, now add the function call. */
+        Vector<MFVariable *> input_variables;
+        for (const GField &field : operation_inputs) {
+          input_variables.append(variable_by_field.lookup(field));
+        }
+        const MultiFunction &multi_function = operation_field_source.multi_function();
+        Vector<MFVariable *> output_variables = builder.add_call(multi_function, input_variables);
+        for (const int i : output_variables.index_range()) {
+          variable_by_field.add_new({operation_field_source, i}, output_variables[i]);
+        }
+      }
+    }
+  }
+
+  /* TODO: Handle case when there are duplicates in #output_fields. */
+  for (const GField *field : output_fields) {
+    MFVariable *variable = variable_by_field.lookup(*field);
+    builder.add_output_parameter(*variable);
+  }
+
+  /* Remove the variables that should not be destructed from the map. */
+  for (const GField *field : output_fields) {
+    variable_by_field.remove(*field);
+  }
+  for (MFVariable *variable : variable_by_field.values()) {
+    builder.add_destruct(*variable);
+  }
 
   builder.add_return();
 
-  for (const GField &field : fields) {
-    MFVariable &input = get_field_variable(field, unique_variables);
-    builder.add_output_parameter(input);
-  }
-
-  // std::cout << procedure.to_dot();
-
+  // std::cout << procedure.to_dot() << "\n";
   BLI_assert(procedure.validate());
 }
 
+struct PartiallyInitializedArray : NonCopyable, NonMovable {
+  void *buffer;
+  IndexMask mask;
+  const CPPType *type;
+
+  ~PartiallyInitializedArray()
+  {
+    this->type->destruct_indices(this->buffer, this->mask);
+  }
+};
+
 /**
- * TODO: Maybe this doesn't add inputs in the same order as the the unique
- * variable traversal. Add a test for that and fix it if it doesn't work.
+ * Evaluate fields in the given context. If possible, multiple fields should be evaluated together,
+ * because that can be more efficient when they share common sub-fields.
+ *
+ * \param scope: The resource scope that owns data that makes up the output virtual arrays. Make
+ *   sure the scope is not destructed when the output virtual arrays are still used.
+ * \param fields_to_evaluate: The fields that should be evaluated together.
+ * \param mask: Determines which indices are computed. The mask may be referenced by the returned
+ *   virtual arrays. So the underlying index span should live longer then #scope.
+ * \param context: The context that the field is evaluated in.
+ * \param dst_hints: If provided, the computed data will be written into those virtual arrays
+ *   instead of into newly created ones. That allows making the computing data live longer
+ *   than #scope and is more efficient when the data will be written into those virtual arrays
+ *   later anyway.
+ * \return The computed virtual arrays for each provided field. If #dst_hints were passed, the
+ *   provided virtual arrays are returned.
  */
-static void gather_inputs(const Span<GField> fields,
-                          const VariableMap &unique_variables,
-                          const IndexMask mask,
-                          MFParamsBuilder &params,
-                          Vector<GVArrayPtr> &r_inputs)
+Vector<const GVArray *> evaluate_fields(ResourceScope &scope,
+                                        Span<const GField *> fields_to_evaluate,
+                                        IndexMask mask,
+                                        FieldContext &context,
+                                        Span<GVMutableArray *> dst_hints)
 {
-  Set<const MFVariable *> computed_inputs;
-  Stack<const GField *> fields_to_visit;
-  for (const GField &field : fields) {
-    fields_to_visit.push(&field);
+  Vector<const GVArray *> r_varrays(fields_to_evaluate.size(), nullptr);
+
+  auto get_dst_hint_if_available = [&](int index) -> GVMutableArray * {
+    if (dst_hints.is_empty()) {
+      return nullptr;
+    }
+    return dst_hints[index];
+  };
+
+  FieldGraphInfo graph_info = preprocess_field_graph(fields_to_evaluate);
+  Vector<const GVArray *> field_context_inputs = get_field_context_inputs(
+      scope, mask, context, graph_info);
+
+  /* Finish fields that output a context varray directly. */
+  for (const int out_index : fields_to_evaluate.index_range()) {
+    const GField &field = *fields_to_evaluate[out_index];
+    if (!field.has_context_source()) {
+      continue;
+    }
+    const ContextFieldSource &field_source = static_cast<const ContextFieldSource &>(
+        field.source());
+    const int field_source_index = graph_info.deduplicated_context_sources.index_of(field_source);
+    const GVArray *varray = field_context_inputs[field_source_index];
+    r_varrays[out_index] = varray;
   }
 
-  while (!fields_to_visit.is_empty()) {
-    const GField &field = *fields_to_visit.pop();
-    if (field.is_input()) {
-      const FieldInput &input = dynamic_cast<const FieldInput &>(field.source());
-      const MFVariable &variable = get_field_variable(field, unique_variables);
-      if (!computed_inputs.contains(&variable)) {
-        GVArrayPtr data = input.get_varray_generic_context(mask);
-        computed_inputs.add_new(&variable);
-        params.add_readonly_single_input(*data, input.debug_name());
-        r_inputs.append(std::move(data));
-      }
+  Set<const GField *> varying_fields = find_varying_fields(graph_info, field_context_inputs);
+
+  Vector<const GField *> varying_fields_to_evaluate;
+  Vector<int> varying_field_indices;
+  Vector<const GField *> constant_fields_to_evaluate;
+  Vector<int> constant_field_indices;
+  for (const int i : fields_to_evaluate.index_range()) {
+    if (r_varrays[i] != nullptr) {
+      /* Already done. */
+      continue;
+    }
+    const GField *field = fields_to_evaluate[i];
+    if (varying_fields.contains(field)) {
+      varying_fields_to_evaluate.append(field);
+      varying_field_indices.append(i);
     }
     else {
-      const FieldOperation &operation = dynamic_cast<const FieldOperation &>(field.source());
-      for (const GField &input_field : operation.inputs()) {
-        fields_to_visit.push(&input_field);
+      constant_fields_to_evaluate.append(field);
+      constant_field_indices.append(i);
+    }
+  }
+
+  const int array_size = mask.min_array_size();
+  if (!varying_fields_to_evaluate.is_empty()) {
+    MFProcedure procedure;
+    build_multi_function_procedure_for_fields(procedure, graph_info, varying_fields_to_evaluate);
+    MFProcedureExecutor procedure_executor{"Procedure", procedure};
+    MFParamsBuilder mf_params{procedure_executor, mask.min_array_size()};
+    MFContextBuilder mf_context;
+
+    for (const GVArray *varray : field_context_inputs) {
+      mf_params.add_readonly_single_input(*varray);
+    }
+
+    for (const int i : varying_fields_to_evaluate.index_range()) {
+      const GField *field = varying_fields_to_evaluate[i];
+      const CPPType &type = field->cpp_type();
+      const int out_index = varying_field_indices[i];
+
+      GVMutableArray *output_varray = get_dst_hint_if_available(out_index);
+      void *buffer;
+      if (output_varray == nullptr || !output_varray->is_span()) {
+        buffer = scope.linear_allocator().allocate(type.size() * array_size, type.alignment());
+
+        PartiallyInitializedArray &destruct_helper = scope.construct<PartiallyInitializedArray>(
+            __func__);
+        destruct_helper.buffer = buffer;
+        destruct_helper.mask = mask;
+        destruct_helper.type = &type;
+
+        r_varrays[out_index] = &scope.construct<GVArray_For_GSpan>(
+            __func__, GSpan{type, buffer, array_size});
       }
+      else {
+        buffer = output_varray->get_internal_span().data();
+
+        r_varrays[out_index] = output_varray;
+      }
+
+      const GMutableSpan span{type, buffer, array_size};
+      mf_params.add_uninitialized_single_output(span);
+    }
+
+    procedure_executor.call(mask, mf_params, mf_context);
+  }
+  if (!constant_fields_to_evaluate.is_empty()) {
+    MFProcedure procedure;
+    build_multi_function_procedure_for_fields(procedure, graph_info, constant_fields_to_evaluate);
+    MFProcedureExecutor procedure_executor{"Procedure", procedure};
+    MFParamsBuilder mf_params{procedure_executor, 1};
+    MFContextBuilder mf_context;
+
+    for (const GVArray *varray : field_context_inputs) {
+      mf_params.add_readonly_single_input(*varray);
+    }
+
+    Vector<GMutablePointer> output_buffers;
+    for (const int i : constant_fields_to_evaluate.index_range()) {
+      const GField *field = constant_fields_to_evaluate[i];
+      const CPPType &type = field->cpp_type();
+      void *buffer = scope.linear_allocator().allocate(type.size(), type.alignment());
+
+      PartiallyInitializedArray &destruct_helper = scope.construct<PartiallyInitializedArray>(
+          __func__);
+      destruct_helper.buffer = buffer;
+      destruct_helper.mask = IndexRange(1);
+      destruct_helper.type = &type;
+
+      mf_params.add_uninitialized_single_output({type, buffer, 1});
+
+      const int out_index = constant_field_indices[i];
+      r_varrays[out_index] = &scope.construct<GVArray_For_SingleValueRef>(
+          __func__, type, array_size, buffer);
+    }
+
+    procedure_executor.call(IndexRange(1), mf_params, mf_context);
+  }
+
+  if (!dst_hints.is_empty()) {
+    for (const int out_index : fields_to_evaluate.index_range()) {
+      GVMutableArray *output_varray = get_dst_hint_if_available(out_index);
+      if (output_varray == nullptr) {
+        /* Caller did not provide a destination for this output. */
+        continue;
+      }
+      const GVArray *computed_varray = r_varrays[out_index];
+      BLI_assert(computed_varray->type() == output_varray->type());
+      if (output_varray == computed_varray) {
+        /* The result has been written into the destination provided by the caller already. */
+        continue;
+      }
+      /* Still have to copy over the data in the destination provided by the caller. */
+      if (output_varray->is_span()) {
+        /* Materialize into a span. */
+        computed_varray->materialize_to_uninitialized(output_varray->get_internal_span().data());
+      }
+      else {
+        /* Slower materialize into a different structure. */
+        const CPPType &type = computed_varray->type();
+        BUFFER_FOR_CPP_TYPE_VALUE(type, buffer);
+        for (const int i : mask) {
+          computed_varray->get_to_uninitialized(i, buffer);
+          output_varray->set_by_relocate(i, buffer);
+        }
+      }
+      r_varrays[out_index] = output_varray;
     }
   }
+  return r_varrays;
 }
 
-static void add_outputs(MFParamsBuilder &params, Span<GMutableSpan> outputs)
-{
-  for (const int i : outputs.index_range()) {
-    params.add_uninitialized_single_output(outputs[i]);
-  }
-}
-
-static void evaluate_non_input_fields(const Span<GField> fields,
-                                      const IndexMask mask,
-                                      const Span<GMutableSpan> outputs)
-{
-  MFProcedure procedure;
-  VariableMap unique_variables;
-  build_procedure(fields, procedure, unique_variables);
-
-  MFProcedureExecutor executor{"Evaluate Field", procedure};
-  MFParamsBuilder params{executor, mask.min_array_size()};
-  MFContextBuilder context;
-
-  Vector<GVArrayPtr> inputs;
-  gather_inputs(fields, unique_variables, mask, params, inputs);
-
-  add_outputs(params, outputs);
-
-  executor.call(mask, params, context);
-}
-
-/**
- * Evaluate more than one prodecure at a time, since often intermediate results will be shared
- * between multiple final results, and the procedure evaluator can optimize for this case.
- */
-void evaluate_fields(const Span<GField> fields,
-                     const IndexMask mask,
-                     const Span<GMutableSpan> outputs)
-{
-  BLI_assert(fields.size() == outputs.size());
-
-  /* Process fields that just connect to inputs separately, since otherwise we need a special
-   * case to avoid sharing the same variable for an input and output parameters elsewhere.
-   * TODO: It would be nice if there were a more elegant way to handle this, rather than a
-   * separate step here, but I haven't thought of anything yet. */
-  Vector<GField> non_input_fields{fields};
-  Vector<GMutableSpan> non_input_outputs{outputs};
-  for (int i = fields.size() - 1; i >= 0; i--) {
-    if (non_input_fields[i].is_input()) {
-      dynamic_cast<const FieldInput &>(non_input_fields[i].source())
-          .get_varray_generic_context(mask)
-          ->materialize(mask, outputs[i].data());
-
-      non_input_fields.remove_and_reorder(i);
-      non_input_outputs.remove_and_reorder(i);
-    }
-  }
-
-  if (!non_input_fields.is_empty()) {
-    evaluate_non_input_fields(non_input_fields, mask, non_input_outputs);
-  }
-}
-
-/**
- * #r_value is expected to be uninitialized.
- */
 void evaluate_constant_field(const GField &field, void *r_value)
 {
-  GMutableSpan value_span{field.cpp_type(), r_value, 1};
-  evaluate_fields({field}, IndexRange(1), {value_span});
+  ResourceScope scope;
+  FieldContext context;
+  Vector<const GVArray *> varrays = evaluate_fields(scope, {&field}, IndexRange(1), context);
+  varrays[0]->get_to_uninitialized(0, r_value);
+}
+
+void evaluate_fields_to_spans(Span<const GField *> fields_to_evaluate,
+                              IndexMask mask,
+                              FieldContext &context,
+                              Span<GMutableSpan> out_spans)
+{
+  ResourceScope scope;
+  Vector<GVMutableArray *> varrays;
+  for (GMutableSpan span : out_spans) {
+    varrays.append(&scope.construct<GVMutableArray_For_GMutableSpan>(__func__, span));
+  }
+  evaluate_fields(scope, fields_to_evaluate, mask, context, varrays);
 }
 
 }  // namespace blender::fn
