@@ -88,7 +88,7 @@ static FieldGraphInfo preprocess_field_graph(Span<const GField *> entry_fields)
 
 static Vector<const GVArray *> get_field_context_inputs(ResourceScope &scope,
                                                         const IndexMask mask,
-                                                        FieldContext &context,
+                                                        const FieldContext &context,
                                                         const FieldGraphInfo &graph_info)
 {
   Vector<const GVArray *> field_context_inputs;
@@ -238,7 +238,7 @@ struct PartiallyInitializedArray : NonCopyable, NonMovable {
 Vector<const GVArray *> evaluate_fields(ResourceScope &scope,
                                         Span<const GField *> fields_to_evaluate,
                                         IndexMask mask,
-                                        FieldContext &context,
+                                        const FieldContext &context,
                                         Span<GVMutableArray *> dst_hints)
 {
   Vector<const GVArray *> r_varrays(fields_to_evaluate.size(), nullptr);
@@ -408,7 +408,7 @@ void evaluate_constant_field(const GField &field, void *r_value)
 
 void evaluate_fields_to_spans(Span<const GField *> fields_to_evaluate,
                               IndexMask mask,
-                              FieldContext &context,
+                              const FieldContext &context,
                               Span<GMutableSpan> out_spans)
 {
   ResourceScope scope;

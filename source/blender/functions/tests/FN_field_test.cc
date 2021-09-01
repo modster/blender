@@ -207,24 +207,26 @@ TEST(field, TwoFunctionsTwoOutputs)
       OperationFieldSource(std::make_unique<TwoOutputFunction>("SI_SI_SO_SO"),
                            {index_field, index_field}));
 
-  GField result_field_1{fn, 0};
-  GField intermediate_field{fn, 1};
+  Vector<int64_t> mask_indices = {2, 4, 6, 8};
+  IndexMask mask = mask_indices.as_span();
+
+  Field<int> result_field_1{fn, 0};
+  Field<int> intermediate_field{fn, 1};
 
   std::unique_ptr<MultiFunction> add_10_fn = std::make_unique<CustomMF_SI_SO<int, int>>(
       "add_10", [](int a) { return a + 10; });
-  GField result_field_2{std::make_shared<OperationFieldSource>(
-                            OperationFieldSource(std::move(add_10_fn), {intermediate_field})),
-                        0};
+  Field<int> result_field_2{std::make_shared<OperationFieldSource>(
+                                OperationFieldSource(std::move(add_10_fn), {intermediate_field})),
+                            0};
 
-  Array<int> result_1(10);
-  Array<int> result_2(10);
-  GMutableSpan result_generic_1(result_1.as_mutable_span());
-  GMutableSpan result_generic_2(result_2.as_mutable_span());
   FieldContext field_context;
-  evaluate_fields_to_spans({&result_field_1, &result_field_2},
-                           {2, 4, 6, 8},
-                           field_context,
-                           {result_generic_1, result_generic_2});
+  FieldEvaluator field_evaluator{field_context, &mask};
+  FieldOutputHandle<int> handle_1 = field_evaluator.add(result_field_1);
+  FieldOutputHandle<int> handle_2 = field_evaluator.add(result_field_2);
+  field_evaluator.evaluate();
+  const VArray<int> &result_1 = handle_1.get();
+  const VArray<int> &result_2 = handle_2.get();
+
   EXPECT_EQ(result_1[2], 4);
   EXPECT_EQ(result_1[4], 8);
   EXPECT_EQ(result_1[6], 12);

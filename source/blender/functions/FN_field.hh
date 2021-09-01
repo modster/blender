@@ -128,6 +128,11 @@ template<typename T> class Field : public GField {
   {
     BLI_assert(this->cpp_type().template is<T>());
   }
+
+  Field(std::shared_ptr<FieldSource> source, const int source_output_index = 0)
+      : Field(GField(std::move(source), source_output_index))
+  {
+  }
 };
 
 class OperationFieldSource : public FieldSource {
@@ -225,14 +230,14 @@ class ContextFieldSource : public FieldSource {
 Vector<const GVArray *> evaluate_fields(ResourceScope &scope,
                                         Span<const GField *> fields_to_evaluate,
                                         IndexMask mask,
-                                        FieldContext &context,
+                                        const FieldContext &context,
                                         Span<GVMutableArray *> dst_hints = {});
 
 void evaluate_constant_field(const GField &field, void *r_value);
 
 void evaluate_fields_to_spans(Span<const GField *> fields_to_evaluate,
                               IndexMask mask,
-                              FieldContext &context,
+                              const FieldContext &context,
                               Span<GMutableSpan> out_spans);
 
 template<typename T> T evaluate_constant_field(const Field<T> &field)
@@ -248,6 +253,109 @@ template<typename T> Field<T> make_constant_field(T value)
   auto constant_fn = std::make_unique<fn::CustomMF_Constant<T>>(std::forward<T>(value));
   auto operation = std::make_shared<OperationFieldSource>(std::move(constant_fn));
   return Field<T>{GField{std::move(operation), 0}};
+}
+
+class FieldEvaluator;
+
+class GFieldOutputHandle {
+ protected:
+  FieldEvaluator *evaluator_;
+  int field_index_;
+
+ public:
+  GFieldOutputHandle(FieldEvaluator &evaluator, int field_index)
+      : evaluator_(&evaluator), field_index_(field_index)
+  {
+  }
+
+  const GVArray &get();
+};
+
+template<typename T> class FieldOutputHandle : GFieldOutputHandle {
+ public:
+  explicit FieldOutputHandle(const GFieldOutputHandle &other) : GFieldOutputHandle(other)
+  {
+  }
+
+  const VArray<T> &get();
+};
+
+class FieldEvaluator : NonMovable, NonCopyable {
+ private:
+  ResourceScope scope_;
+  const FieldContext &context_;
+  const IndexMask mask_;
+  Vector<GField> fields_to_evaluate_;
+  Vector<GVMutableArray *> dst_hints_;
+  Vector<const GVArray *> evaluated_varrays_;
+  bool is_evaluated_ = false;
+
+ public:
+  /** Takes #mask by pointer because the mask has to live longer than the evaluator. */
+  FieldEvaluator(const FieldContext &context, const IndexMask *mask)
+      : context_(context), mask_(*mask)
+  {
+  }
+
+  GFieldOutputHandle add(GField field, GVMutableArray *dst_hint = nullptr)
+  {
+    const int field_index = fields_to_evaluate_.append_and_get_index(std::move(field));
+    dst_hints_.append(dst_hint);
+    return GFieldOutputHandle(*this, field_index);
+  }
+
+  template<typename T>
+  FieldOutputHandle<T> add(Field<T> field, VMutableArray<T> *dst_hint = nullptr)
+  {
+    GVMutableArray *generic_dst_hint = nullptr;
+    if (dst_hint != nullptr) {
+      generic_dst_hint = &scope_.construct<GVMutableArray_For_VMutableArray<T>>(__func__,
+                                                                                *dst_hint);
+    }
+    return FieldOutputHandle<T>(this->add(GField(std::move(field)), generic_dst_hint));
+  }
+
+  void evaluate()
+  {
+    BLI_assert_msg(!is_evaluated_, "Cannot evaluate twice.");
+    Array<const GField *> fields(fields_to_evaluate_.size());
+    for (const int i : fields_to_evaluate_.index_range()) {
+      fields[i] = &fields_to_evaluate_[i];
+    }
+    evaluated_varrays_ = evaluate_fields(scope_, fields, mask_, context_, dst_hints_);
+    is_evaluated_ = true;
+  }
+
+  const GVArray &get(const int field_index) const
+  {
+    BLI_assert(is_evaluated_);
+    return *evaluated_varrays_[field_index];
+  }
+
+  template<typename T> const VArray<T> &get(const int field_index)
+  {
+    const GVArray &varray = this->get(field_index);
+    GVArray_Typed<T> &typed_varray = scope_.construct<GVArray_Typed<T>>(__func__, varray);
+    return *typed_varray;
+  }
+};
+
+/* --------------------------------------------------------------------
+ * GFieldOutputHandle inline methods.
+ */
+
+inline const GVArray &GFieldOutputHandle::get()
+{
+  return evaluator_->get(field_index_);
+}
+
+/* --------------------------------------------------------------------
+ * FieldOutputHandle inline methods.
+ */
+
+template<typename T> inline const VArray<T> &FieldOutputHandle<T>::get()
+{
+  return evaluator_->get<T>(field_index_);
 }
 
 }  // namespace blender::fn
