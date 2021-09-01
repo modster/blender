@@ -156,13 +156,13 @@ static void move_selected_bezt_to_mouse(BezTriple *bezt,
                                         const wmEvent *event)
 {
   float location[3];
-  if (bezt->f2) {
+  if (BEZT_ISSEL_IDX(bezt, 1)) {
     mouse_location_to_worldspace(event->mval, bezt->vec[1], vc, location);
     move_bezt_to_location(bezt, location);
   }
   else {
     free_up_handles_for_movement(bezt, bezt->f1, bezt->f3);
-    if (bezt->f1) {
+    if (BEZT_ISSEL_IDX(bezt, 0)) {
       mouse_location_to_worldspace(event->mval, bezt->vec[0], vc, location);
       copy_v3_v3(bezt->vec[0], location);
     }
@@ -593,7 +593,7 @@ static void add_bezt_to_nurb(Nurb *nu, const void *op_data, Curve *cu)
   nu->bezt = bezt1;
   ED_curve_deselect_all(editnurb);
   BKE_nurb_handles_calc(nu);
-  new_bezt->f1 = new_bezt->f2 = new_bezt->f3 = 1;
+  BEZT_SEL_ALL(new_bezt);
 }
 
 /* Insert a BPoint to a nurb at the location specified by op_data. */
@@ -888,7 +888,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   bool picked = false;
 
   if (event->type == EVT_MODAL_MAP) {
-    if (event->val == PEN_MODAL_FREE_MOVE_HANDLE) {
+      if (event->val == PEN_MODAL_FREE_MOVE_HANDLE) {
       select_and_get_point(&vc, &nu, &bezt, &bp, event->mval, event->prevval != KM_PRESS);
       picked = true;
 
@@ -1069,7 +1069,6 @@ void CURVE_OT_pen(wmOperatorType *ot)
   RNA_def_property_flag(prop, PROP_SKIP_SAVE);
   prop = RNA_def_boolean(ot->srna, "wait_for_input", true, "Wait for Input", "");
   RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
-  prop = RNA_def_boolean(
-      ot->srna, "cut_or_delete", true, "Whether cut or delete key bindings are pressed", "");
+  prop = RNA_def_boolean(ot->srna, "cut_or_delete", false, "", "");
   RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
 }
