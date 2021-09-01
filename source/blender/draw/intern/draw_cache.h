@@ -268,3 +268,5 @@ void DRW_cache_gpencil_sbuffer_clear(struct Object *ob);
 
 /* Non primitive collision shapes */
 struct GPUBatch *DRW_cache_non_primitive_col_shape_get(Object *ob);
+void DRW_cache_non_primitive_col_shape_free(Object *ob);
+void DRW_cache_non_primitive_col_shape_store_ob(Object *ob);

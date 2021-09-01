@@ -382,6 +382,7 @@ static void OVERLAY_non_primitive_collision_shape(OVERLAY_ExtraCallBuffers *cb,
                   BKE_rigidbody_store_trimesh_draw_data(ob);
                   break;
               }
+           DRW_cache_non_primitive_col_shape_store_ob(ob);
           }
           GPUBatch *geom = DRW_cache_non_primitive_col_shape_get(ob);
           if(geom){

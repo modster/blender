@@ -39,6 +39,8 @@
 
 #include "BKE_object.h"
 #include "BKE_paint.h"
+#include "BKE_mesh.h"
+#include "BKE_lib_id.h"
 
 #include "GPU_batch.h"
 #include "GPU_batch_utils.h"
@@ -155,16 +157,20 @@ static struct DRWShapeCache {
   GPUBatch *drw_particle_axis;
   GPUBatch *drw_gpencil_dummy_quad;
   GPUBatch *drw_sphere_lod[DRW_LOD_MAX];
+  struct GSet *non_primitive_col_shapes;
 } SHC = {NULL};
 
 void DRW_shape_cache_free(void)
 {
-  uint i = sizeof(SHC) / sizeof(GPUBatch *);
+  uint i = (sizeof(SHC) - sizeof(GSet*)) / sizeof(GPUBatch *);
   GPUBatch **batch = (GPUBatch **)&SHC;
   while (i--) {
     GPU_BATCH_DISCARD_SAFE(*batch);
     batch++;
   }
+  BLI_gset_free(SHC.non_primitive_col_shapes, (void (*)(void *key))DRW_cache_non_primitive_col_shape_free);
+  SHC.non_primitive_col_shapes = NULL;
+
 }
 
 /* -------------------------------------------------------------------- */
@@ -3607,9 +3613,19 @@ GPUBatch *DRW_cache_cursor_get(bool crosshair_lines)
   return *drw_cursor;
 }
 
-GPUBatch *DRW_cache_non_primitive_col_shape_get(Object *ob) {
+/* Store the object so it can be freed later. */
+void DRW_cache_non_primitive_col_shape_store_ob(Object *ob)
+{
+    if(!SHC.non_primitive_col_shapes) {
+        SHC.non_primitive_col_shapes = BLI_gset_ptr_new(__func__);
+    }
+    BLI_gset_add(SHC.non_primitive_col_shapes, ob);
+}
 
-    GPUBatch *geom;
+GPUBatch *DRW_cache_non_primitive_col_shape_get(Object *ob)
+{
+
+    GPUBatch *geom = NULL;
     if(ob->rigidbody_object->col_shape_draw_data != NULL){
         const DRWContextState *draw_ctx = DRW_context_state_get();
         DRW_mesh_batch_cache_validate(ob->rigidbody_object->col_shape_draw_data);
@@ -3622,6 +3638,15 @@ GPUBatch *DRW_cache_non_primitive_col_shape_get(Object *ob) {
         BLI_task_graph_free(task_graph);
     }
     return geom;
+}
+
+void DRW_cache_non_primitive_col_shape_free(Object *ob)
+{
+    if (ob->rigidbody_object->col_shape_draw_data != NULL) {
+        BKE_mesh_free(ob->rigidbody_object->col_shape_draw_data);
+        BKE_id_free(NULL, ob->rigidbody_object->col_shape_draw_data);
+        ob->rigidbody_object->col_shape_draw_data = NULL;
+    }
 }
 
 /** \} */
