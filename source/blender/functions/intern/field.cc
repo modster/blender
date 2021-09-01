@@ -20,60 +20,12 @@
 
 #include "FN_field.hh"
 
-/**
- * TODO: There might be a more obvious way to implement this, or we might end up with
- * a separate map for functions and inputs anyway, so we could just remove it.
- */
-struct InputOrFunction {
-  const void *ptr;
-
- public:
-  InputOrFunction(const blender::fn::FieldFunction &function) : ptr(&function)
-  {
-  }
-  InputOrFunction(const blender::fn::FieldInput &input) : ptr(&input)
-  {
-  }
-  InputOrFunction(const blender::fn::GField &field) /* Maybe this is too clever. */
-  {
-    if (field.is_function()) {
-      ptr = &field.function();
-    }
-    else {
-      ptr = &field.input();
-    }
-  }
-  friend bool operator==(const InputOrFunction &a, const InputOrFunction &b)
-  {
-    return a.ptr == b.ptr;
-  }
-};
-
-template<> struct blender::DefaultHash<InputOrFunction> {
-  uint64_t operator()(const InputOrFunction &value) const
-  {
-    return DefaultHash<const void *>{}(value.ptr);
-  }
-};
-
 namespace blender::fn {
-
-/**
- * TODO: This exists because it seemed helpful for the procedure creation to be able to store
- * mutable data for each input or function output. That still may be helpful in the future, but
- * currently it isn't useful.
- */
-struct FieldVariable {
-  MFVariable *mf_variable;
-  FieldVariable(MFVariable &variable) : mf_variable(&variable)
-  {
-  }
-};
 
 /**
  * A map to hold the output variables for each function output or input so they can be reused.
  */
-using VariableMap = Map<InputOrFunction, Vector<FieldVariable>>;
+using VariableMap = Map<const FieldSource *, Vector<MFVariable *>>;
 
 /**
  * A map of the computed inputs for all of a field system's inputs, to avoid creating duplicates.
@@ -81,27 +33,27 @@ using VariableMap = Map<InputOrFunction, Vector<FieldVariable>>;
  */
 using ComputedInputMap = Map<const MFVariable *, GVArrayPtr>;
 
-static FieldVariable &get_field_variable(const GField &field, VariableMap &unique_variables)
+static MFVariable &get_field_variable(const GField &field, VariableMap &unique_variables)
 {
   if (field.is_input()) {
-    const FieldInput &input = field.input();
-    return unique_variables.lookup(input).first();
+    const FieldInput &input = dynamic_cast<const FieldInput &>(field.source());
+    return *unique_variables.lookup(&input).first();
   }
-  const FieldFunction &function = field.function();
-  MutableSpan<FieldVariable> function_outputs = unique_variables.lookup(function);
-  return function_outputs[field.function_output_index()];
+  const FieldOperation &operation = dynamic_cast<const FieldOperation &>(field.source());
+  MutableSpan<MFVariable *> operation_outputs = unique_variables.lookup(&operation);
+  return *operation_outputs[field.source_output_index()];
 }
 
-static const FieldVariable &get_field_variable(const GField &field,
-                                               const VariableMap &unique_variables)
+static const MFVariable &get_field_variable(const GField &field,
+                                            const VariableMap &unique_variables)
 {
   if (field.is_input()) {
-    const FieldInput &input = field.input();
-    return unique_variables.lookup(input).first();
+    const FieldInput &input = dynamic_cast<const FieldInput &>(field.source());
+    return *unique_variables.lookup(&input).first();
   }
-  const FieldFunction &function = field.function();
-  Span<FieldVariable> function_outputs = unique_variables.lookup(function);
-  return function_outputs[field.function_output_index()];
+  const FieldOperation &operation = dynamic_cast<const FieldOperation &>(field.source());
+  Span<MFVariable *> operation_outputs = unique_variables.lookup(&operation);
+  return *operation_outputs[field.source_output_index()];
 }
 
 /**
@@ -113,20 +65,20 @@ static void add_variables_for_input(const GField &field,
                                     VariableMap &unique_variables)
 {
   fields_to_visit.pop();
-  const FieldInput &input = field.input();
+  const FieldInput &input = dynamic_cast<const FieldInput &>(field.source());
   MFVariable &variable = builder.add_input_parameter(MFDataType::ForSingle(field.cpp_type()),
                                                      input.debug_name());
-  unique_variables.add(input, {variable});
+  unique_variables.add(&input, {&variable});
 }
 
-static void add_variables_for_function(const GField &field,
-                                       Stack<const GField *> &fields_to_visit,
-                                       MFProcedureBuilder &builder,
-                                       VariableMap &unique_variables)
+static void add_variables_for_operation(const GField &field,
+                                        Stack<const GField *> &fields_to_visit,
+                                        MFProcedureBuilder &builder,
+                                        VariableMap &unique_variables)
 {
-  const FieldFunction &function = field.function();
-  for (const GField &input_field : function.inputs()) {
-    if (!unique_variables.contains(input_field)) {
+  const FieldOperation &operation = dynamic_cast<const FieldOperation &>(field.source());
+  for (const GField &input_field : operation.inputs()) {
+    if (!unique_variables.contains(&input_field.source())) {
       /* The field for this input hasn't been handled yet. Handle it now, so that we know all
        * of this field's function inputs already have variables. TODO: Verify that this is the
        * best way to do a depth first traversal. These extra lookups don't seem ideal. */
@@ -138,17 +90,17 @@ static void add_variables_for_function(const GField &field,
   fields_to_visit.pop();
 
   Vector<MFVariable *> inputs;
-  Set<FieldVariable *> unique_inputs;
-  for (const GField &input_field : function.inputs()) {
-    FieldVariable &input = get_field_variable(input_field, unique_variables);
+  Set<MFVariable *> unique_inputs;
+  for (const GField &input_field : operation.inputs()) {
+    MFVariable &input = get_field_variable(input_field, unique_variables);
     unique_inputs.add(&input);
-    inputs.append(input.mf_variable);
+    inputs.append(&input);
   }
 
-  Vector<MFVariable *> outputs = builder.add_call(function.multi_function(), inputs);
-  Vector<FieldVariable> &unique_outputs = unique_variables.lookup_or_add(function, {});
+  Vector<MFVariable *> outputs = builder.add_call(operation.multi_function(), inputs);
+  Vector<MFVariable *> &unique_outputs = unique_variables.lookup_or_add(&operation, {});
   for (MFVariable *output : outputs) {
-    unique_outputs.append(*output);
+    unique_outputs.append(output);
   }
 }
 
@@ -163,7 +115,7 @@ static void add_unique_variables(const Span<GField> fields,
 
   while (!fields_to_visit.is_empty()) {
     const GField &field = *fields_to_visit.peek();
-    if (unique_variables.contains(field)) {
+    if (unique_variables.contains(&field.source())) {
       fields_to_visit.pop();
       continue;
     }
@@ -172,7 +124,7 @@ static void add_unique_variables(const Span<GField> fields,
       add_variables_for_input(field, fields_to_visit, builder, unique_variables);
     }
     else {
-      add_variables_for_function(field, fields_to_visit, builder, unique_variables);
+      add_variables_for_operation(field, fields_to_visit, builder, unique_variables);
     }
   }
 }
@@ -188,18 +140,18 @@ static void add_destructs(const Span<GField> fields,
                           VariableMap &unique_variables)
 {
   Set<MFVariable *> destructed_variables;
-  Set<const FieldVariable *> outputs;
+  Set<MFVariable *> outputs;
   for (const GField &field : fields) {
     /* Currently input fields are handled separately in the evaluator. */
     BLI_assert(!field.is_input());
     outputs.add(&get_field_variable(field, unique_variables));
   }
 
-  for (Span<FieldVariable> variables : unique_variables.values()) {
-    for (const FieldVariable &variable : variables) {
+  for (MutableSpan<MFVariable *> variables : unique_variables.values()) {
+    for (MFVariable *variable : variables) {
       /* Don't destruct the variable if it is used as an output parameter. */
-      if (!outputs.contains(&variable)) {
-        builder.add_destruct(*variable.mf_variable);
+      if (!outputs.contains(variable)) {
+        builder.add_destruct(*variable);
       }
     }
   }
@@ -218,7 +170,7 @@ static void build_procedure(const Span<GField> fields,
   builder.add_return();
 
   for (const GField &field : fields) {
-    MFVariable &input = *get_field_variable(field, unique_variables).mf_variable;
+    MFVariable &input = get_field_variable(field, unique_variables);
     builder.add_output_parameter(input);
   }
 
@@ -246,18 +198,18 @@ static void gather_inputs(const Span<GField> fields,
   while (!fields_to_visit.is_empty()) {
     const GField &field = *fields_to_visit.pop();
     if (field.is_input()) {
-      const FieldInput &input = field.input();
-      const FieldVariable &variable = get_field_variable(field, unique_variables);
-      if (!computed_inputs.contains(variable.mf_variable)) {
+      const FieldInput &input = dynamic_cast<const FieldInput &>(field.source());
+      const MFVariable &variable = get_field_variable(field, unique_variables);
+      if (!computed_inputs.contains(&variable)) {
         GVArrayPtr data = input.get_varray_generic_context(mask);
-        computed_inputs.add_new(variable.mf_variable);
+        computed_inputs.add_new(&variable);
         params.add_readonly_single_input(*data, input.debug_name());
         r_inputs.append(std::move(data));
       }
     }
     else {
-      const FieldFunction &function = field.function();
-      for (const GField &input_field : function.inputs()) {
+      const FieldOperation &operation = dynamic_cast<const FieldOperation &>(field.source());
+      for (const GField &input_field : operation.inputs()) {
         fields_to_visit.push(&input_field);
       }
     }
@@ -309,8 +261,9 @@ void evaluate_fields(const Span<GField> fields,
   Vector<GMutableSpan> non_input_outputs{outputs};
   for (int i = fields.size() - 1; i >= 0; i--) {
     if (non_input_fields[i].is_input()) {
-      non_input_fields[i].input().get_varray_generic_context(mask)->materialize(mask,
-                                                                                outputs[i].data());
+      dynamic_cast<const FieldInput &>(non_input_fields[i].source())
+          .get_varray_generic_context(mask)
+          ->materialize(mask, outputs[i].data());
 
       non_input_fields.remove_and_reorder(i);
       non_input_outputs.remove_and_reorder(i);

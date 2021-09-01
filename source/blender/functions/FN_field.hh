@@ -41,69 +41,57 @@
 
 namespace blender::fn {
 
-class FieldInput;
-class FieldFunction;
+class FieldSource {
+ public:
+  ~FieldSource() = default;
+
+  virtual const CPPType &cpp_type_of_output_index(int output_index) const = 0;
+
+  virtual bool is_input() const
+  {
+    return false;
+  }
+};
 
 /**
  * Descibes the output of a function. Generally corresponds to the combination of an output socket
  * and link combination in a node graph.
  */
 class GField {
-  /**
-   * The function that calculates this field's values. Many fields can share the same function,
-   * since a function can have many outputs, just like a node graph, where a single output can be
-   * used as multiple inputs. This avoids calling the same function many times, only using one of
-   * its results.
-   */
-  std::shared_ptr<FieldFunction> function_;
-  /**
-   * Which output of the function this field corresponds to.
-   */
-  int output_index_ = 0;
-
-  std::shared_ptr<FieldInput> input_;
+  std::shared_ptr<FieldSource> source_;
+  int source_output_index_ = 0;
 
  public:
   GField() = default;
 
-  GField(std::shared_ptr<FieldFunction> function, const int output_index)
-      : function_(std::move(function)), output_index_(output_index)
+  GField(std::shared_ptr<FieldSource> source, const int source_output_index = 0)
+      : source_(std::move(source)), source_output_index_(source_output_index)
   {
   }
 
-  GField(std::shared_ptr<FieldInput> input) : input_(std::move(input))
+  operator bool() const
   {
+    return source_ != nullptr;
   }
 
-  const fn::CPPType &cpp_type() const;
+  const fn::CPPType &cpp_type() const
+  {
+    return source_->cpp_type_of_output_index(source_output_index_);
+  }
 
   bool is_input() const
   {
-    return input_.get() != nullptr;
-  }
-  const FieldInput &input() const
-  {
-    BLI_assert(!function_);
-    BLI_assert(input_);
-    return *input_;
+    return source_->is_input();
   }
 
-  bool is_function() const
+  const FieldSource &source() const
   {
-    return function_.get() != nullptr;
-  }
-  const FieldFunction &function() const
-  {
-    BLI_assert(function_ != nullptr);
-    BLI_assert(input_ == nullptr);
-    return *function_;
+    return *source_;
   }
 
-  int function_output_index() const
+  int source_output_index() const
   {
-    BLI_assert(function_ != nullptr);
-    BLI_assert(input_ == nullptr);
-    return output_index_;
+    return source_output_index_;
   }
 };
 
@@ -117,30 +105,20 @@ template<typename T> class Field : public GField {
   }
 };
 
-/**
- * An operation acting on data described by fields. Generally corresponds
- * to a node or a subset of a node in a node graph.
- */
-class FieldFunction {
-  /**
-   * The function used to calculate the field.
-   */
+class FieldOperation : public FieldSource {
   std::unique_ptr<const MultiFunction> owned_function_;
   const MultiFunction *function_;
 
-  /**
-   * References to descriptions of the results from the functions this function depends on.
-   */
   blender::Vector<GField> inputs_;
 
  public:
-  FieldFunction(std::unique_ptr<const MultiFunction> function, Vector<GField> inputs = {})
+  FieldOperation(std::unique_ptr<const MultiFunction> function, Vector<GField> inputs = {})
       : owned_function_(std::move(function)), inputs_(std::move(inputs))
   {
     function_ = owned_function_.get();
   }
 
-  FieldFunction(const MultiFunction &function, Vector<GField> inputs = {})
+  FieldOperation(const MultiFunction &function, Vector<GField> inputs = {})
       : function_(&function), inputs_(std::move(inputs))
   {
   }
@@ -155,7 +133,7 @@ class FieldFunction {
     return *function_;
   }
 
-  const CPPType &cpp_type_of_output_index(int output_index) const
+  const CPPType &cpp_type_of_output_index(int output_index) const override
   {
     int output_counter = 0;
     for (const int param_index : function_->param_indices()) {
@@ -172,7 +150,7 @@ class FieldFunction {
   }
 };
 
-class FieldInput {
+class FieldInput : public FieldSource {
  protected:
   const CPPType *type_;
   std::string debug_name_;
@@ -193,6 +171,17 @@ class FieldInput {
   const CPPType &cpp_type() const
   {
     return *type_;
+  }
+
+  const CPPType &cpp_type_of_output_index(int output_index) const override
+  {
+    BLI_assert(output_index == 0);
+    return *type_;
+  }
+
+  bool is_input() const override
+  {
+    return true;
   }
 };
 
@@ -216,20 +205,8 @@ template<typename T> T evaluate_constant_field(const Field<T> &field)
 template<typename T> Field<T> make_constant_field(T value)
 {
   auto constant_fn = std::make_unique<fn::CustomMF_Constant<T>>(std::forward<T>(value));
-  auto field_fn = std::make_shared<FieldFunction>(std::move(constant_fn));
-  return Field<T>{GField{std::move(field_fn), 0}};
-}
-
-/* --------------------------------------------------------------------
- * GField inline methods.
- */
-
-inline const CPPType &GField::cpp_type() const
-{
-  if (this->is_function()) {
-    return function_->cpp_type_of_output_index(output_index_);
-  }
-  return input_->cpp_type();
+  auto operation = std::make_shared<FieldOperation>(std::move(constant_fn));
+  return Field<T>{GField{std::move(operation), 0}};
 }
 
 }  // namespace blender::fn

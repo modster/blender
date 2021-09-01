@@ -10,9 +10,9 @@ namespace blender::fn::tests {
 
 TEST(field, ConstantFunction)
 {
-  /* TODO: Figure out how to not use another "FieldFunction(" inside of std::make_shared. */
-  GField constant_field{std::make_shared<FieldFunction>(
-                            FieldFunction(std::make_unique<CustomMF_Constant<int>>(10), {})),
+  /* TODO: Figure out how to not use another "FieldOperation(" inside of std::make_shared. */
+  GField constant_field{std::make_shared<FieldOperation>(
+                            FieldOperation(std::make_unique<CustomMF_Constant<int>>(10), {})),
                         0};
 
   Array<int> result(4);
@@ -90,8 +90,8 @@ TEST(field, InputAndFunction)
 
   std::unique_ptr<MultiFunction> add_fn = std::make_unique<CustomMF_SI_SI_SO<int, int, int>>(
       "add", [](int a, int b) { return a + b; });
-  GField output_field{std::make_shared<FieldFunction>(
-                          FieldFunction(std::move(add_fn), {index_field, index_field})),
+  GField output_field{std::make_shared<FieldOperation>(
+                          FieldOperation(std::move(add_fn), {index_field, index_field})),
                       0};
 
   Array<int> result(10);
@@ -109,14 +109,14 @@ TEST(field, TwoFunctions)
 
   std::unique_ptr<MultiFunction> add_fn = std::make_unique<CustomMF_SI_SI_SO<int, int, int>>(
       "add", [](int a, int b) { return a + b; });
-  GField add_field{std::make_shared<FieldFunction>(
-                       FieldFunction(std::move(add_fn), {index_field, index_field})),
+  GField add_field{std::make_shared<FieldOperation>(
+                       FieldOperation(std::move(add_fn), {index_field, index_field})),
                    0};
 
   std::unique_ptr<MultiFunction> add_10_fn = std::make_unique<CustomMF_SI_SO<int, int>>(
       "add_10", [](int a) { return a + 10; });
   GField result_field{
-      std::make_shared<FieldFunction>(FieldFunction(std::move(add_10_fn), {add_field})), 0};
+      std::make_shared<FieldOperation>(FieldOperation(std::move(add_10_fn), {add_field})), 0};
 
   Array<int> result(10);
   GMutableSpan result_generic(result.as_mutable_span());
@@ -162,7 +162,7 @@ TEST(field, FunctionTwoOutputs)
   GField index_field_1{std::make_shared<IndexFieldInput>()};
   GField index_field_2{std::make_shared<IndexFieldInput>()};
 
-  std::shared_ptr<FieldFunction> fn = std::make_shared<FieldFunction>(FieldFunction(
+  std::shared_ptr<FieldOperation> fn = std::make_shared<FieldOperation>(FieldOperation(
       std::make_unique<TwoOutputFunction>("SI_SI_SO_SO"), {index_field_1, index_field_2}));
 
   GField result_field_1{fn, 0};
@@ -188,7 +188,7 @@ TEST(field, TwoFunctionsTwoOutputs)
 {
   GField index_field{std::make_shared<IndexFieldInput>()};
 
-  std::shared_ptr<FieldFunction> fn = std::make_shared<FieldFunction>(FieldFunction(
+  std::shared_ptr<FieldOperation> fn = std::make_shared<FieldOperation>(FieldOperation(
       std::make_unique<TwoOutputFunction>("SI_SI_SO_SO"), {index_field, index_field}));
 
   GField result_field_1{fn, 0};
@@ -197,7 +197,7 @@ TEST(field, TwoFunctionsTwoOutputs)
   std::unique_ptr<MultiFunction> add_10_fn = std::make_unique<CustomMF_SI_SO<int, int>>(
       "add_10", [](int a) { return a + 10; });
   GField result_field_2{
-      std::make_shared<FieldFunction>(FieldFunction(std::move(add_10_fn), {intermediate_field})),
+      std::make_shared<FieldOperation>(FieldOperation(std::move(add_10_fn), {intermediate_field})),
       0};
 
   Array<int> result_1(10);

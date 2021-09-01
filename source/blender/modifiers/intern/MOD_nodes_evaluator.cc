@@ -880,7 +880,7 @@ class GeometryNodesEvaluator {
       input_fields.append(std::move(*(GField *)single_value.value));
     }
 
-    auto field_fn = std::make_shared<fn::FieldFunction>(fn, std::move(input_fields));
+    auto operation = std::make_shared<fn::FieldOperation>(fn, std::move(input_fields));
 
     /* Forward outputs. */
     int output_index = 0;
@@ -892,7 +892,7 @@ class GeometryNodesEvaluator {
       OutputState &output_state = node_state.outputs[i];
       const DOutputSocket socket{node.context(), &socket_ref};
       const CPPType *cpp_type = get_socket_cpp_type(socket_ref);
-      GField &field = *allocator.construct<GField>(field_fn, output_index).release();
+      GField &field = *allocator.construct<GField>(operation, output_index).release();
       this->forward_output(socket, {cpp_type, &field});
       output_state.has_been_computed = true;
       output_index++;
@@ -1392,8 +1392,8 @@ class GeometryNodesEvaluator {
         const MultiFunction &fn = *conversions_.get_conversion_multi_function(
             MFDataType::ForSingle(from_base_type), MFDataType::ForSingle(to_base_type));
         const GField &from_field = *(const GField *)from_value;
-        auto field_fn = std::make_shared<fn::FieldFunction>(fn, Vector<GField>{from_field});
-        new (to_value) GField(std::move(field_fn), 0);
+        auto operation = std::make_shared<fn::FieldOperation>(fn, Vector<GField>{from_field});
+        new (to_value) GField(std::move(operation), 0);
         return;
       }
     }
@@ -1413,8 +1413,8 @@ class GeometryNodesEvaluator {
       const CPPType &base_type = field_cpp_type->field_type();
       auto constant_fn = std::make_unique<fn::CustomMF_GenericConstant>(base_type,
                                                                         base_type.default_value());
-      auto field_fn = std::make_shared<fn::FieldFunction>(std::move(constant_fn));
-      new (r_value) GField(std::move(field_fn), 0);
+      auto operation = std::make_shared<fn::FieldOperation>(std::move(constant_fn));
+      new (r_value) GField(std::move(operation), 0);
       return;
     }
     type.copy_construct(type.default_value(), r_value);
