@@ -419,21 +419,9 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
    */
   void mark_verts_for_preserve(bool sewing_enabled)
   {
-    const auto set_vert_preserve = [](AdaptiveVert &vert) {
-      auto &op_vert_data = vert.get_extra_data_mut();
-      if (op_vert_data) {
-        auto &vert_data = op_vert_data.value();
-        vert_data.get_flag_mut() |= VERT_PRESERVE;
-      }
-      else {
-        vert.set_extra_data(VertData());
-        vert.get_extra_data_mut().value().get_flag_mut() |= VERT_PRESERVE;
-      }
-    };
-
     for (auto &vert : this->get_verts_mut()) {
       if (this->is_vert_on_seam_or_boundary(vert)) {
-        set_vert_preserve(vert);
+        this->mark_vert_for_preserve(vert);
       }
     }
 
@@ -446,10 +434,10 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
         if (edge.is_loose()) {
           const auto [v1_index, v2_index] = edge.get_checked_verts();
           auto &v1 = this->get_checked_vert(v1_index);
-          set_vert_preserve(v1);
+          this->mark_vert_for_preserve(v1);
 
           auto &v2 = this->get_checked_vert(v2_index);
-          set_vert_preserve(v2);
+          this->mark_vert_for_preserve(v2);
         }
       }
     }
@@ -785,8 +773,6 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
 
     if (sewing_enabled) {
       BLI_assert(mesh_diff.get_added_nodes().size() == 1);
-      std::cout << "mesh_diff.get_added_verts().size(): " << mesh_diff.get_added_verts().size()
-                << std::endl;
       const auto sewing_mesh_diff = this->try_adding_sewing_edge(mesh_diff.get_added_verts()[0],
                                                                  force_split_for_sewing);
 
@@ -835,6 +821,9 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
   AdaptiveMeshDiff<END> try_adding_sewing_edge(const VertIndex &vert_index,
                                                bool force_split_for_sewing)
   {
+    /* TODO(ish): make it work over 3D edges, so need to get Node
+     * instead of Vert and then for each vert of the node, add the
+     * sewing edge if needed */
     /* vert: is the vert that is being tested.
      *
      * e1: is an incident edge of `vert`.
@@ -937,9 +926,6 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
      * splittable, then split it and create a new edge between the
      * `new_vert` and `vert` */
 
-    std::cout << "vert_index: " << vert_index << " opposite_edges: " << opposite_edges
-              << std::endl;
-
     AdaptiveMeshDiff<END> complete_mesh_diff;
     for (const auto &opposite_edge_index : opposite_edges) {
       /* It is possible that that splitting a previous `opposite_edge`
@@ -982,6 +968,11 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
       static_remesh_name_gen.gen_next();
       dump_file(after_adding_loose_edge_filename, after_adding_loose_edge_msgpack);
 #endif
+
+      /* Mark the new (loose) edge's verts as preserve */
+      auto [new_edge_v1, new_edge_v2] = this->get_checked_verts_of_edge(new_edge, false);
+      this->mark_vert_for_preserve(new_edge_v1);
+      this->mark_vert_for_preserve(new_edge_v2);
 
       complete_mesh_diff.add_edge(new_edge.get_self_index());
     }
@@ -1394,6 +1385,22 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
     for (const auto &face_index : mesh_diff.get_added_faces()) {
       auto &face = this->get_checked_face(face_index);
       this->compute_info_face_adaptivemesh(face);
+    }
+  }
+
+  /**
+   * For the given vert, sets the `VERT_PRESERVE` flag.
+   */
+  void mark_vert_for_preserve(AdaptiveVert &vert)
+  {
+    auto &op_vert_data = vert.get_extra_data_mut();
+    if (op_vert_data) {
+      auto &vert_data = op_vert_data.value();
+      vert_data.get_flag_mut() |= VERT_PRESERVE;
+    }
+    else {
+      vert.set_extra_data(VertData());
+      vert.get_extra_data_mut().value().get_flag_mut() |= VERT_PRESERVE;
     }
   }
 
