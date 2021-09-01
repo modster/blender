@@ -2401,22 +2401,29 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
     return true;
   }
 
-  /**
-   * Flips the edge specified and ensures triangulation of the Mesh.
-   *
-   * @param across_seams If true, think of edge as world space edge
-   * and not UV space, this means, all the faces across all the edges
-   * formed between the nodes of the given edge are used for flipping
-   * regardless if it on a seam or not.
-   *
-   * Returns the `MeshDiff` that lead to the operation.
-   *
-   * Note, the caller must ensure the adjacent faces to the edge are
-   * triangulated and that they are flippable using
-   * `is_edge_flippable()`. In debug mode, it will assert, in release
-   * mode, it is undefined behaviour.
-   **/
+/**
+ * Flips the edge specified and ensures triangulation of the Mesh.
+ *
+ * @param across_seams If true, think of edge as world space edge
+ * and not UV space, this means, all the faces across all the edges
+ * formed between the nodes of the given edge are used for flipping
+ * regardless if it on a seam or not.
+ *
+ * Returns the `MeshDiff` that lead to the operation.
+ *
+ * Note, the caller must ensure the adjacent faces to the edge are
+ * triangulated and that they are flippable using
+ * `is_edge_flippable()`. In debug mode, it will assert, in release
+ * mode, it is undefined behaviour.
+ **/
+#  ifndef NDEBUG
+  /* TODO(ish): In debug mode, across seams is used. This is confusing
+   * and bad code but prevents the warning for now, will fix later. */
   MeshDiff<END, EVD, EED, EFD> flip_edge_triangulate(EdgeIndex edge_index, bool across_seams)
+#  else
+  MeshDiff<END, EVD, EED, EFD> flip_edge_triangulate(EdgeIndex edge_index,
+                                                     bool UNUSED(across_seams))
+#  endif
   {
     BLI_assert(this->is_edge_flippable(edge_index, across_seams));
 

@@ -1756,9 +1756,8 @@ static void set_cloth_information_when_new_mesh(Object *ob, ClothModifierData *c
 {
   BLI_assert(clmd != nullptr);
   BLI_assert(mesh != nullptr);
-  Cloth &cloth = *clmd->clothObject;
-  BLI_assert(cloth.verts != nullptr);
-  BLI_assert(cloth.mvert_num == mesh->totvert);
+  BLI_assert(clmd->clothObject->verts != nullptr);
+  BLI_assert(clmd->clothObject->mvert_num == mesh->totvert);
 
   cloth_from_mesh(clmd, ob, mesh, false);
 
@@ -1799,19 +1798,25 @@ void BKE_cloth_serialize_adaptive_mesh(Object *ob,
     BLI_assert(cloth.verts);
     return internal::ClothNodeData(cloth.verts[index]);
   };
-  params.post_extra_data_to_end = [](Cloth & /*unused*/) {
+  params.post_extra_data_to_end = [](Cloth &UNUSED(cloth)) {
     /* Do nothing */
   };
 
   params.end_to_extra_data =
-      [](Cloth & /*unused*/, internal::ClothNodeData /*unused*/, size_t /*unused*/) {
+      [](Cloth &UNUSED(cloth), internal::ClothNodeData UNUSED(node_data), size_t UNUSED(index)) {
         /* Do nothing */
       };
+#ifndef NDEBUG
   params.pre_end_to_extra_data = [](Cloth &cloth, size_t num_nodes) {
     /* Do not allocate cloth.verts, it shouldn't have been modified */
     BLI_assert(cloth.verts != nullptr);
     BLI_assert(cloth.mvert_num == num_nodes);
   };
+#else
+  params.pre_end_to_extra_data = [](Cloth &UNUSED(cloth), size_t UNUSED(num_nodes)) {
+    /* Do nothing */
+  };
+#endif
 
   const auto remeshing = clmd->sim_parms->flags & CLOTH_SIMSETTINGS_FLAG_REMESH;
   Mesh *cloth_to_object_res = nullptr;
@@ -1853,9 +1858,12 @@ Mesh *BKE_cloth_remesh(Object *ob, ClothModifierData *clmd, Mesh *mesh)
     mesh = clmd->prev_frame_mesh;
   }
 
+#ifndef NDEBUG
   Mesh *cloth_to_object_res = cloth_to_object(ob, clmd, mesh, false);
-
   BLI_assert(cloth_to_object_res == nullptr);
+#else
+  cloth_to_object(ob, clmd, mesh, false);
+#endif
 
   AdaptiveRemeshParams<internal::ClothNodeData, Cloth> params;
   params.size_min = clmd->sim_parms->remeshing_size_min;
