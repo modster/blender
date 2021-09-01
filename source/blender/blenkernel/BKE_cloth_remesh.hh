@@ -2156,6 +2156,8 @@ template<typename END, typename EVD, typename EED, typename EFD> class Mesh {
 
           auto &v1 = this->get_checked_vert(v1_index);
           v1.node = n2_index;
+          auto &n2 = this->get_checked_node(n2_index);
+          n2.verts.append(v1_index);
 
           n1.verts.remove_first_occurrence_and_reorder(v1_index);
         }
