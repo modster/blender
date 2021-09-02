@@ -22,6 +22,7 @@
  */
 
 #include "BLI_float2.hh"
+#include "BLI_map.hh"
 #include "BLI_vector.hh"
 #include "DNA_cloth_types.h"
 #include "DNA_mesh_types.h"
@@ -720,7 +721,12 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, FaceData> {
     dump_file(dynamic_remesh_start_filename, dynamic_remesh_start_msgpack);
 #endif
 
-    /* TODO(ish): set vert sizing */
+    /* Ensure all necessary pre calculated information is available */
+    this->set_faces_uv_area();
+
+    /* Need to compute the sizing for each vert based on the current
+     * state of the mesh and scene */
+    this->compute_and_set_dynamic_vert_sizing();
 
     /* Set edge sizes */
     this->set_edge_sizes();
@@ -749,6 +755,31 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, FaceData> {
   }
 
  private:
+  /**
+   * Computes and the `Sizing` of every `AdaptiveFace` of the mesh
+   * based on the current state of the mesh and the scene.
+   *
+   * Reference [1]
+   */
+  blender::Map<FaceIndex, Sizing> compute_dynamic_face_sizing() const
+  {
+    /* TODO */
+
+    return blender::Map<FaceIndex, Sizing>();
+  }
+
+  /**
+   * Computes and sets the `Sizing` for every `AdaptiveVert` of the
+   * mesh based on the current state of the mesh and the scene.
+   *
+   * Reference [1]
+   */
+  void compute_and_set_dynamic_vert_sizing()
+  {
+    auto face_sizing = this->compute_dynamic_face_sizing();
+    /* TODO */
+  }
+
   bool is_edge_splittable_adaptivemesh(const AdaptiveEdge &edge) const
   {
     /* auto [v1, v2] = this->get_checked_verts_of_edge(edge, false); */
