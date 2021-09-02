@@ -107,7 +107,7 @@ static void level_set_boolean(Volume &volume_a,
 
   bke::volume::to_static_type(grid_type_a, [&](auto dummy) {
     using GridType = decltype(dummy);
-    if constexpr (std::is_scalar<typename GridType::ValueType>::value) {
+    if constexpr (std::is_same_v<GridType, openvdb::FloatGrid>) {
       GridType &grid_a = static_cast<GridType &>(*grid_base_a);
       const GridType &grid_b = static_cast<const GridType &>(*grid_base_b);
 
