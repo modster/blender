@@ -113,6 +113,7 @@ namespace blender {
 namespace nodes {
 class NodeMultiFunctionBuilder;
 class GeoNodeExecParams;
+class NodeDeclarationBuilder;
 }  // namespace nodes
 namespace fn {
 class CPPType;
@@ -122,6 +123,7 @@ class MFDataType;
 
 using NodeMultiFunctionBuildFunction = void (*)(blender::nodes::NodeMultiFunctionBuilder &builder);
 using NodeGeometryExecFunction = void (*)(blender::nodes::GeoNodeExecParams params);
+using NodeDeclareFunction = void (*)(blender::nodes::NodeDeclarationBuilder &builder);
 using SocketGetCPPTypeFunction = const blender::fn::CPPType *(*)();
 using SocketGetCPPValueFunction = void (*)(const struct bNodeSocket &socket, void *r_value);
 using SocketGetGeometryNodesCPPTypeFunction = const blender::fn::CPPType *(*)();
@@ -131,6 +133,7 @@ using SocketGetGeometryNodesCPPValueFunction = void (*)(const struct bNodeSocket
 #else
 typedef void *NodeMultiFunctionBuildFunction;
 typedef void *NodeGeometryExecFunction;
+typedef void *NodeDeclareFunction;
 typedef void *SocketGetCPPTypeFunction;
 typedef void *SocketGetGeometryNodesCPPTypeFunction;
 typedef void *SocketGetGeometryNodesCPPValueFunction;
@@ -333,6 +336,9 @@ typedef struct bNodeType {
   /* Execute a geometry node. */
   NodeGeometryExecFunction geometry_node_execute;
   bool geometry_node_execute_supports_laziness;
+
+  /* Declares which sockets the node has. */
+  NodeDeclareFunction declare;
 
   /* RNA integration */
   ExtensionRNA rna_ext;
@@ -615,6 +621,10 @@ struct bNodeSocket *nodeInsertStaticSocket(struct bNodeTree *ntree,
                                            const char *identifier,
                                            const char *name);
 void nodeRemoveSocket(struct bNodeTree *ntree, struct bNode *node, struct bNodeSocket *sock);
+void nodeRemoveSocketEx(struct bNodeTree *ntree,
+                        struct bNode *node,
+                        struct bNodeSocket *sock,
+                        bool do_id_user);
 void nodeRemoveAllSockets(struct bNodeTree *ntree, struct bNode *node);
 void nodeModifySocketType(struct bNodeTree *ntree,
                           struct bNode *node,
@@ -1472,15 +1482,16 @@ int ntreeTexExecTree(struct bNodeTree *ntree,
 #define GEO_NODE_CURVE_SET_HANDLES 1072
 #define GEO_NODE_CURVE_SPLINE_TYPE 1073
 #define GEO_NODE_CURVE_SELECT_HANDLES 1074
-#define GEO_NODE_MESH_TO_LEVEL_SET 1075
-#define GEO_NODE_LEVEL_SET_BOOLEAN 1076
-#define GEO_NODE_LEVEL_SET_FILTER 1077
-#define GEO_NODE_LEVEL_SET_TO_FOG_VOLUME 1078
-#define GEO_NODE_LEVEL_SET_PRIMITIVE_SPHERE 1079
-#define GEO_NODE_LEVEL_SET_PRIMITIVE_PLATONIC 1080
-#define GEO_NODE_LEVEL_SET_MORPH 1081
-#define GEO_NODE_VOLUME_SAMPLE 1082
-#define GEO_NODE_LEVEL_SET_TO_MASK 1083
+#define GEO_NODE_CURVE_FILL 1075
+#define GEO_NODE_MESH_TO_LEVEL_SET 1076
+#define GEO_NODE_LEVEL_SET_BOOLEAN 1077
+#define GEO_NODE_LEVEL_SET_FILTER 1078
+#define GEO_NODE_LEVEL_SET_TO_FOG_VOLUME 1079
+#define GEO_NODE_LEVEL_SET_PRIMITIVE_SPHERE 1080
+#define GEO_NODE_LEVEL_SET_PRIMITIVE_PLATONIC 1081
+#define GEO_NODE_LEVEL_SET_MORPH 1082
+#define GEO_NODE_VOLUME_SAMPLE 1083
+#define GEO_NODE_LEVEL_SET_TO_MASK 1084
 
 /** \} */
 

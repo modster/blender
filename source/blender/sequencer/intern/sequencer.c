@@ -240,11 +240,8 @@ void seq_free_sequence_recurse(Scene *scene,
   seq_sequence_free_ex(scene, seq, false, do_id_user, do_clean_animdata);
 }
 
-Editing *SEQ_editing_get(Scene *scene, bool alloc)
+Editing *SEQ_editing_get(const Scene *scene)
 {
-  if (alloc) {
-    SEQ_editing_ensure(scene);
-  }
   return scene->ed;
 }
 
@@ -323,6 +320,8 @@ SequencerToolSettings *SEQ_tool_settings_init(void)
   tool_settings->snap_mode = SEQ_SNAP_TO_STRIPS | SEQ_SNAP_TO_CURRENT_FRAME |
                              SEQ_SNAP_TO_STRIP_HOLD;
   tool_settings->snap_distance = 15;
+  tool_settings->overlap_mode = SEQ_OVERLAP_SHUFFLE;
+
   return tool_settings;
 }
 
@@ -370,6 +369,12 @@ void SEQ_tool_settings_fit_method_set(Scene *scene, eSeqImageFitMethod fit_metho
 {
   SequencerToolSettings *tool_settings = SEQ_tool_settings_ensure(scene);
   tool_settings->fit_method = fit_method;
+}
+
+eSeqOverlapMode SEQ_tool_settings_overlap_mode_get(Scene *scene)
+{
+  const SequencerToolSettings *tool_settings = SEQ_tool_settings_ensure(scene);
+  return tool_settings->overlap_mode;
 }
 
 /**
