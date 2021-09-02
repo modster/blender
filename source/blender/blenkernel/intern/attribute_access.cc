@@ -1317,4 +1317,18 @@ const GVArray *AttributeContextFieldSource::try_get_varray_for_context(
   return nullptr;
 }
 
+uint64_t AttributeContextFieldSource::hash() const
+{
+  return get_default_hash_2(name_, type_);
+}
+
+bool AttributeContextFieldSource::is_equal_to(const fn::FieldSource &other) const
+{
+  if (const AttributeContextFieldSource *other_typed =
+          dynamic_cast<const AttributeContextFieldSource *>(&other)) {
+    return name_ == other_typed->name_ && type_ == other_typed->type_;
+  }
+  return false;
+}
+
 }  // namespace blender::bke

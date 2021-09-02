@@ -621,6 +621,9 @@ class AttributeContextFieldSource : public fn::ContextFieldSource {
   const GVArray *try_get_varray_for_context(const fn::FieldContext &context,
                                             IndexMask mask,
                                             ResourceScope &scope) const override;
+
+  uint64_t hash() const override;
+  bool is_equal_to(const fn::FieldSource &other) const override;
 };
 
 }  // namespace blender::bke
