@@ -28,6 +28,23 @@ static void geo_node_set_position_declare(NodeDeclarationBuilder &b)
   b.add_output<decl::Geometry>("Geometry");
 }
 
+static IndexMask index_mask_from_selection_varray(const VArray<bool> &selection,
+                                                  Vector<int64_t> &r_indices)
+{
+  if (selection.is_single()) {
+    if (selection.get_internal_single()) {
+      return IndexRange(selection.size());
+    }
+    return IndexRange(0);
+  }
+  for (const int i : selection.index_range()) {
+    if (selection[i]) {
+      r_indices.append(i);
+    }
+  }
+  return r_indices.as_span();
+}
+
 static void try_set_position_in_component(GeometrySet &geometry_set,
                                           const GeometryComponentType component_type,
                                           const Field<bool> &selection_field,
@@ -47,23 +64,7 @@ static void try_set_position_in_component(GeometrySet &geometry_set,
   selection_evaluator.evaluate();
 
   Vector<int64_t> mask_indices;
-  IndexMask selected_mask;
-  if (selection->is_single()) {
-    if (selection->get_internal_single()) {
-      selected_mask = IndexRange(domain_size);
-    }
-    else {
-      selected_mask = IndexRange(0);
-    }
-  }
-  else {
-    for (const int i : selection->index_range()) {
-      if (selection->get(i)) {
-        mask_indices.append(i);
-      }
-    }
-    selected_mask = mask_indices.as_span();
-  }
+  const IndexMask selected_mask = index_mask_from_selection_varray(*selection, mask_indices);
 
   OutputAttribute_Typed<float3> position_attribute =
       component.attribute_try_get_for_output<float3>("position", ATTR_DOMAIN_POINT, {0, 0, 0});
