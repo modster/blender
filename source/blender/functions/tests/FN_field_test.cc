@@ -221,20 +221,20 @@ TEST(field, TwoFunctionsTwoOutputs)
 
   FieldContext field_context;
   FieldEvaluator field_evaluator{field_context, &mask};
-  FieldOutputHandle<int> handle_1 = field_evaluator.add(result_field_1);
-  FieldOutputHandle<int> handle_2 = field_evaluator.add(result_field_2);
+  const VArray<int> *result_1 = nullptr;
+  const VArray<int> *result_2 = nullptr;
+  field_evaluator.add(result_field_1, &result_1);
+  field_evaluator.add(result_field_2, &result_2);
   field_evaluator.evaluate();
-  const VArray<int> &result_1 = handle_1.get();
-  const VArray<int> &result_2 = handle_2.get();
 
-  EXPECT_EQ(result_1[2], 4);
-  EXPECT_EQ(result_1[4], 8);
-  EXPECT_EQ(result_1[6], 12);
-  EXPECT_EQ(result_1[8], 16);
-  EXPECT_EQ(result_2[2], 24);
-  EXPECT_EQ(result_2[4], 28);
-  EXPECT_EQ(result_2[6], 32);
-  EXPECT_EQ(result_2[8], 36);
+  EXPECT_EQ(result_1->get(2), 4);
+  EXPECT_EQ(result_1->get(4), 8);
+  EXPECT_EQ(result_1->get(6), 12);
+  EXPECT_EQ(result_1->get(8), 16);
+  EXPECT_EQ(result_2->get(2), 24);
+  EXPECT_EQ(result_2->get(4), 28);
+  EXPECT_EQ(result_2->get(6), 32);
+  EXPECT_EQ(result_2->get(8), 36);
 }
 
 }  // namespace blender::fn::tests
