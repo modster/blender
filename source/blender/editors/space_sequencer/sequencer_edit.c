@@ -579,7 +579,6 @@ static int sequencer_slip_invoke(bContext *C, wmOperator *op, const wmEvent *eve
 static bool sequencer_slip_recursively(Scene *scene, SlipData *data, int offset)
 {
   /* Only data types supported for now. */
-  Editing *ed = SEQ_editing_get(scene, false);
   bool changed = false;
 
   /* Iterate in reverse so meta-strips are iterated after their children. */

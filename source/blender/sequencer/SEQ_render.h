@@ -27,6 +27,8 @@
 extern "C" {
 #endif
 
+#define SEQ_RENDER_THUMB_SIZE 256
+
 struct ListBase;
 struct Main;
 struct Scene;

@@ -576,6 +576,10 @@ typedef enum eSpaceNla_Flag {
 /** \name Sequence Editor
  * \{ */
 
+typedef struct SpaceSeqRuntime {
+  struct rctf last_thumbnail_area;
+} SpaceSeqRuntime;
+
 /* Sequencer */
 typedef struct SpaceSeq {
   SpaceLink *next, *prev;
@@ -617,8 +621,8 @@ typedef struct SpaceSeq {
   char multiview_eye;
   char _pad2[7];
 
-  /** Required for Thumbnail caching job call condition */ 
-  struct rctf check_view_area;
+  /** Required for Thumbnail caching job call condition */
+  SpaceSeqRuntime runtime;
 
 } SpaceSeq;
 
@@ -659,7 +663,7 @@ typedef enum eSpaceSeq_Flag {
   SEQ_SHOW_STRIP_DURATION = (1 << 16),
   SEQ_USE_PROXIES = (1 << 17),
   SEQ_SHOW_GRID = (1 << 18),
-  SEQ_SHOW_THUMBNAILS = (1<<19),
+  SEQ_SHOW_THUMBNAILS = (1 << 19),
 } eSpaceSeq_Flag;
 
 /* SpaceSeq.view */

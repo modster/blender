@@ -104,7 +104,7 @@ static SpaceLink *sequencer_create(const ScrArea *UNUSED(area), const Scene *sce
                SEQ_SHOW_THUMBNAILS;
 
   struct rctf temp = {0, 0, 0, 0};
-  sseq->check_view_area = temp;
+  sseq->runtime.last_thumbnail_area = temp;
   /* Tool header. */
   region = MEM_callocN(sizeof(ARegion), "tool header for sequencer");
 
