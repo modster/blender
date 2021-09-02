@@ -226,11 +226,12 @@ struct PartiallyInitializedArray : NonCopyable, NonMovable {
  *   sure the scope is not destructed when the output virtual arrays are still used.
  * \param fields_to_evaluate: The fields that should be evaluated together.
  * \param mask: Determines which indices are computed. The mask may be referenced by the returned
- *   virtual arrays. So the underlying index span should live longer then #scope.
- * \param context: The context that the field is evaluated in.
+ *   virtual arrays. So the underlying indices (if applicable) should live longer then #scope.
+ * \param context: The context that the field is evaluated in. Used to retrieve data from each
+ *   #ContextFieldSource in the field network.
  * \param dst_hints: If provided, the computed data will be written into those virtual arrays
- *   instead of into newly created ones. That allows making the computing data live longer
- *   than #scope and is more efficient when the data will be written into those virtual arrays
+ *   instead of into newly created ones. That allows making the computed data live longer than
+ *   #scope and is more efficient when the data will be written into those virtual arrays
  *   later anyway.
  * \return The computed virtual arrays for each provided field. If #dst_hints were passed, the
  *   provided virtual arrays are returned.
