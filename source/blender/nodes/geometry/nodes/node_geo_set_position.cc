@@ -37,9 +37,19 @@ static IndexMask index_mask_from_selection_varray(const VArray<bool> &selection,
     }
     return IndexRange(0);
   }
-  for (const int i : selection.index_range()) {
-    if (selection[i]) {
-      r_indices.append(i);
+  if (selection.is_span()) {
+    Span<bool> selection_span = selection.get_internal_span();
+    for (const int i : selection_span.index_range()) {
+      if (selection_span[i]) {
+        r_indices.append(i);
+      }
+    }
+  }
+  else {
+    for (const int i : selection.index_range()) {
+      if (selection[i]) {
+        r_indices.append(i);
+      }
     }
   }
   return r_indices.as_span();
