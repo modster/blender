@@ -55,15 +55,10 @@ static IndexMask index_mask_from_selection_varray(const VArray<bool> &selection,
   return r_indices.as_span();
 }
 
-static void try_set_position_in_component(GeometrySet &geometry_set,
-                                          const GeometryComponentType component_type,
-                                          const Field<bool> &selection_field,
-                                          const Field<float3> &positions_field)
+static void set_position_in_component(GeometryComponent &component,
+                                      const Field<bool> &selection_field,
+                                      const Field<float3> &position_field)
 {
-  if (!geometry_set.has(component_type)) {
-    return;
-  }
-  GeometryComponent &component = geometry_set.get_component_for_write(component_type);
   GeometryComponentFieldContext field_context{component, ATTR_DOMAIN_POINT};
   const int domain_size = component.attribute_domain_size(ATTR_DOMAIN_POINT);
   const IndexMask full_mask{IndexRange(domain_size)};
@@ -79,7 +74,7 @@ static void try_set_position_in_component(GeometrySet &geometry_set,
   OutputAttribute_Typed<float3> position_attribute =
       component.attribute_try_get_for_output<float3>("position", ATTR_DOMAIN_POINT, {0, 0, 0});
   fn::FieldEvaluator position_evaluator{field_context, &selected_mask};
-  position_evaluator.add_with_destination(positions_field, position_attribute.varray());
+  position_evaluator.add_with_destination(position_field, position_attribute.varray());
   position_evaluator.evaluate();
   position_attribute.save();
 }
@@ -89,10 +84,15 @@ static void geo_node_set_position_exec(GeoNodeExecParams params)
   GeometrySet geometry = params.extract_input<GeometrySet>("Geometry");
   geometry = geometry_set_realize_instances(geometry);
   Field<bool> selection_field = params.extract_input<Field<bool>>("Selection");
-  Field<float3> positions_field = params.extract_input<Field<float3>>("Position");
+  Field<float3> position_field = params.extract_input<Field<float3>>("Position");
 
-  try_set_position_in_component(
-      geometry, GEO_COMPONENT_TYPE_MESH, selection_field, positions_field);
+  for (const GeometryComponentType type :
+       {GEO_COMPONENT_TYPE_MESH, GEO_COMPONENT_TYPE_POINT_CLOUD, GEO_COMPONENT_TYPE_CURVE}) {
+    if (geometry.has(type)) {
+      set_position_in_component(
+          geometry.get_component_for_write(type), selection_field, position_field);
+    }
+  }
 
   params.set_output("Geometry", std::move(geometry));
 }
