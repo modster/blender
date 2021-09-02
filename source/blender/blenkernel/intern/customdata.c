@@ -2848,7 +2848,7 @@ void *CustomData_duplicate_referenced_layer_named(CustomData *data,
 }
 
 void *CustomData_duplicate_referenced_layer_anonymous(CustomData *data,
-                                                      const int type,
+                                                      const int UNUSED(type),
                                                       const AnonymousAttributeID *anonymous_id,
                                                       const int totelem)
 {
@@ -3564,7 +3564,6 @@ bool CustomData_bmesh_merge(const CustomData *source,
                             BMesh *bm,
                             const char htype)
 {
-
   if (CustomData_number_of_layers_typemask(source, mask) == 0) {
     return false;
   }
@@ -4813,7 +4812,6 @@ static void copy_bit_flag(void *dst, const void *src, const size_t data_size, co
     *((_type *)(_dst)) |= _val; \
   } \
   (void)0
-
   switch (data_size) {
     case 1:
       COPY_BIT_FLAG(uint8_t, dst, src, flag);

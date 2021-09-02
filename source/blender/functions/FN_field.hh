@@ -185,9 +185,15 @@ class OperationFieldSource : public FieldSource {
   }
 };
 
+class ContextFieldSource;
+
 class FieldContext {
  public:
   ~FieldContext() = default;
+
+  virtual const GVArray *try_get_varray_for_context(const ContextFieldSource &context_source,
+                                                    IndexMask mask,
+                                                    ResourceScope &scope) const;
 };
 
 class ContextFieldSource : public FieldSource {
@@ -218,6 +224,7 @@ class ContextFieldSource : public FieldSource {
   const CPPType &cpp_type_of_output_index(int output_index) const override
   {
     BLI_assert(output_index == 0);
+    UNUSED_VARS_NDEBUG(output_index);
     return *type_;
   }
 
@@ -255,39 +262,20 @@ template<typename T> Field<T> make_constant_field(T value)
   return Field<T>{GField{std::move(operation), 0}};
 }
 
-class FieldEvaluator;
-
-class GFieldOutputHandle {
- protected:
-  FieldEvaluator *evaluator_;
-  int field_index_;
-
- public:
-  GFieldOutputHandle(FieldEvaluator &evaluator, int field_index)
-      : evaluator_(&evaluator), field_index_(field_index)
-  {
-  }
-
-  const GVArray &get();
-};
-
-template<typename T> class FieldOutputHandle : GFieldOutputHandle {
- public:
-  explicit FieldOutputHandle(const GFieldOutputHandle &other) : GFieldOutputHandle(other)
-  {
-  }
-
-  const VArray<T> &get();
-};
-
 class FieldEvaluator : NonMovable, NonCopyable {
  private:
+  struct OutputPointerInfo {
+    void *dst = nullptr;
+    void (*set)(void *dst, const GVArray &varray, ResourceScope &scope) = nullptr;
+  };
+
   ResourceScope scope_;
   const FieldContext &context_;
   const IndexMask mask_;
   Vector<GField> fields_to_evaluate_;
   Vector<GVMutableArray *> dst_hints_;
   Vector<const GVArray *> evaluated_varrays_;
+  Vector<OutputPointerInfo> output_pointer_infos_;
   bool is_evaluated_ = false;
 
  public:
@@ -297,24 +285,56 @@ class FieldEvaluator : NonMovable, NonCopyable {
   {
   }
 
-  GFieldOutputHandle add(GField field, GVMutableArray *dst_hint = nullptr)
+  /**
+   * \param field: Field to add to the evaluator.
+   * \param dst: Mutable virtual array that the evaluated result for this field is be written into.
+   */
+  int add_with_destination(GField field, GVMutableArray &dst)
   {
     const int field_index = fields_to_evaluate_.append_and_get_index(std::move(field));
-    dst_hints_.append(dst_hint);
-    return GFieldOutputHandle(*this, field_index);
+    dst_hints_.append(&dst);
+    output_pointer_infos_.append({});
+    return field_index;
   }
 
-  template<typename T>
-  FieldOutputHandle<T> add(Field<T> field, VMutableArray<T> *dst_hint = nullptr)
+  /** Same as above but typed. */
+  template<typename T> int add_with_destination(Field<T> field, VMutableArray<T> &dst)
   {
-    GVMutableArray *generic_dst_hint = nullptr;
-    if (dst_hint != nullptr) {
-      generic_dst_hint = &scope_.construct<GVMutableArray_For_VMutableArray<T>>(__func__,
-                                                                                *dst_hint);
-    }
-    return FieldOutputHandle<T>(this->add(GField(std::move(field)), generic_dst_hint));
+    GVMutableArray &generic_dst_hint = scope_.construct<GVMutableArray_For_VMutableArray<T>>(
+        __func__, dst);
+    return this->add_with_destination(GField(std::move(field)), generic_dst_hint);
   }
 
+  /**
+   * \param field: Field to add to the evaluator.
+   * \param varray_ptr: Once #evaluate is called, the resulting virtual array will be will be
+   *   assigned to the given position.
+   */
+  template<typename T> int add(Field<T> field, const VArray<T> **varray_ptr)
+  {
+    const int field_index = fields_to_evaluate_.append_and_get_index(std::move(field));
+    dst_hints_.append(nullptr);
+    output_pointer_infos_.append(OutputPointerInfo{
+        varray_ptr, [](void *dst, const GVArray &varray, ResourceScope &scope) {
+          *(const VArray<T> **)dst = &*scope.construct<GVArray_Typed<T>>(__func__, varray);
+        }});
+    return field_index;
+  }
+
+  /**
+   * \return Index of the field in the evaluator. Can be used in the #get_evaluated methods.
+   */
+  int add(GField field)
+  {
+    const int field_index = fields_to_evaluate_.append_and_get_index(std::move(field));
+    dst_hints_.append(nullptr);
+    output_pointer_infos_.append({});
+    return field_index;
+  }
+
+  /**
+   * Evaluate all fields on the evaluator. This can only be called once.
+   */
   void evaluate()
   {
     BLI_assert_msg(!is_evaluated_, "Cannot evaluate twice.");
@@ -323,39 +343,28 @@ class FieldEvaluator : NonMovable, NonCopyable {
       fields[i] = &fields_to_evaluate_[i];
     }
     evaluated_varrays_ = evaluate_fields(scope_, fields, mask_, context_, dst_hints_);
+    BLI_assert(fields_to_evaluate_.size() == evaluated_varrays_.size());
+    for (const int i : fields_to_evaluate_.index_range()) {
+      OutputPointerInfo &info = output_pointer_infos_[i];
+      if (info.dst != nullptr) {
+        info.set(info.dst, *evaluated_varrays_[i], scope_);
+      }
+    }
     is_evaluated_ = true;
   }
 
-  const GVArray &get(const int field_index) const
+  const GVArray &get_evaluated(const int field_index) const
   {
     BLI_assert(is_evaluated_);
     return *evaluated_varrays_[field_index];
   }
 
-  template<typename T> const VArray<T> &get(const int field_index)
+  template<typename T> const VArray<T> &get_evaluated(const int field_index)
   {
-    const GVArray &varray = this->get(field_index);
+    const GVArray &varray = this->get_evaluated(field_index);
     GVArray_Typed<T> &typed_varray = scope_.construct<GVArray_Typed<T>>(__func__, varray);
     return *typed_varray;
   }
 };
-
-/* --------------------------------------------------------------------
- * GFieldOutputHandle inline methods.
- */
-
-inline const GVArray &GFieldOutputHandle::get()
-{
-  return evaluator_->get(field_index_);
-}
-
-/* --------------------------------------------------------------------
- * FieldOutputHandle inline methods.
- */
-
-template<typename T> inline const VArray<T> &FieldOutputHandle<T>::get()
-{
-  return evaluator_->get<T>(field_index_);
-}
 
 }  // namespace blender::fn

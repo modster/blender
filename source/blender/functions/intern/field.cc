@@ -93,7 +93,7 @@ static Vector<const GVArray *> get_field_context_inputs(ResourceScope &scope,
 {
   Vector<const GVArray *> field_context_inputs;
   for (const ContextFieldSource &context_source : graph_info.deduplicated_context_sources) {
-    const GVArray *varray = context_source.try_get_varray_for_context(context, mask, scope);
+    const GVArray *varray = context.try_get_varray_for_context(context_source, mask, scope);
     if (varray == nullptr) {
       const CPPType &type = context_source.cpp_type();
       varray = &scope.construct<GVArray_For_SingleValueRef>(
@@ -418,6 +418,15 @@ void evaluate_fields_to_spans(Span<const GField *> fields_to_evaluate,
     varrays.append(&scope.construct<GVMutableArray_For_GMutableSpan>(__func__, span));
   }
   evaluate_fields(scope, fields_to_evaluate, mask, context, varrays);
+}
+
+const GVArray *FieldContext::try_get_varray_for_context(const ContextFieldSource &context_source,
+                                                        IndexMask mask,
+                                                        ResourceScope &scope) const
+{
+  /* By default ask the context source to create the varray. Another field context might overwrite
+   * the context here. */
+  return context_source.try_get_varray_for_context(*this, mask, scope);
 }
 
 }  // namespace blender::fn

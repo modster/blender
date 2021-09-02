@@ -1300,3 +1300,21 @@ blender::bke::OutputAttribute GeometryComponent::attribute_try_get_for_output_on
 {
   return create_output_attribute(*this, attribute_id, domain, data_type, true, nullptr);
 }
+
+namespace blender::bke {
+
+const GVArray *AttributeContextFieldSource::try_get_varray_for_context(
+    const fn::FieldContext &context, IndexMask UNUSED(mask), ResourceScope &scope) const
+{
+  if (const GeometryComponentFieldContext *geometry_context =
+          dynamic_cast<const GeometryComponentFieldContext *>(&context)) {
+    const GeometryComponent &component = geometry_context->geometry_component();
+    const AttributeDomain domain = geometry_context->domain();
+    const CustomDataType data_type = cpp_type_to_custom_data_type(*type_);
+    GVArrayPtr attribute = component.attribute_try_get_for_read(name_, domain, data_type);
+    return scope.add(std::move(attribute), __func__);
+  }
+  return nullptr;
+}
+
+}  // namespace blender::bke

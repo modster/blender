@@ -35,6 +35,8 @@
 #include "BKE_attribute_access.hh"
 #include "BKE_geometry_set.h"
 
+#include "FN_field.hh"
+
 struct Collection;
 struct Curve;
 struct CurveEval;
@@ -581,3 +583,44 @@ class VolumeComponent : public GeometryComponent {
 
   static constexpr inline GeometryComponentType static_type = GEO_COMPONENT_TYPE_VOLUME;
 };
+
+namespace blender::bke {
+
+class GeometryComponentFieldContext : public fn::FieldContext {
+ private:
+  const GeometryComponent &component_;
+  const AttributeDomain domain_;
+
+ public:
+  GeometryComponentFieldContext(const GeometryComponent &component, const AttributeDomain domain)
+      : component_(component), domain_(domain)
+  {
+  }
+
+  const GeometryComponent &geometry_component() const
+  {
+    return component_;
+  }
+
+  AttributeDomain domain() const
+  {
+    return domain_;
+  }
+};
+
+class AttributeContextFieldSource : public fn::ContextFieldSource {
+ private:
+  std::string name_;
+
+ public:
+  AttributeContextFieldSource(std::string name, const CPPType &type)
+      : fn::ContextFieldSource(type, name), name_(std::move(name))
+  {
+  }
+
+  const GVArray *try_get_varray_for_context(const fn::FieldContext &context,
+                                            IndexMask mask,
+                                            ResourceScope &scope) const override;
+};
+
+}  // namespace blender::bke
