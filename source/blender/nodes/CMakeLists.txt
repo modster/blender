@@ -208,9 +208,11 @@ set(SRC
   geometry/nodes/node_geo_point_separate.cc
   geometry/nodes/node_geo_point_translate.cc
   geometry/nodes/node_geo_points_to_volume.cc
+  geometry/nodes/node_geo_position.cc
   geometry/nodes/node_geo_raycast.cc
   geometry/nodes/node_geo_select_by_material.cc
   geometry/nodes/node_geo_separate_components.cc
+  geometry/nodes/node_geo_set_position.cc
   geometry/nodes/node_geo_subdivision_surface.cc
   geometry/nodes/node_geo_switch.cc
   geometry/nodes/node_geo_transform.cc
