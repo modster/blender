@@ -342,15 +342,33 @@ class EdgeData {
   }
 };
 
+class FaceData {
+  float uv_area;
+
+ public:
+  FaceData(float uv_area) : uv_area(uv_area)
+  {
+  }
+
+  const auto &get_uv_area() const
+  {
+    return this->uv_area;
+  }
+
+  void set_uv_area(float uv_area)
+  {
+    this->uv_area = uv_area;
+  }
+};
+
 template<typename T> using AdaptiveNode = Node<NodeData<T>>;
 using AdaptiveVert = Vert<VertData>;
 using AdaptiveEdge = Edge<EdgeData>;
-using AdaptiveFace = Face<internal::EmptyExtraData>;
-template<typename T>
-using AdaptiveMeshDiff = MeshDiff<NodeData<T>, VertData, EdgeData, internal::EmptyExtraData>;
+using AdaptiveFace = Face<FaceData>;
+template<typename T> using AdaptiveMeshDiff = MeshDiff<NodeData<T>, VertData, EdgeData, FaceData>;
 
 template<typename END>
-class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::EmptyExtraData> {
+class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, FaceData> {
  public:
   std::string serialize() const
   {
@@ -1406,7 +1424,7 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
    * Compute extra information for all the elements added (stored
    * within mesh_diff) */
   void compute_info_adaptivemesh(
-      const MeshDiff<NodeData<END>, VertData, EdgeData, internal::EmptyExtraData> &mesh_diff)
+      const MeshDiff<NodeData<END>, VertData, EdgeData, FaceData> &mesh_diff)
   {
     for (const auto &node_index : mesh_diff.get_added_nodes()) {
       auto &node = this->get_checked_node(node_index);
@@ -1509,7 +1527,7 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
 template<typename END> using AdaptiveNode = Node<NodeData<END>>;
 using AdaptiveVert = Vert<VertData>;
 using AdaptiveEdge = Edge<EdgeData>;
-using AdaptiveFace = Face<EmptyExtraData>;
+using AdaptiveFace = Face<FaceData>;
 using EmptyAdaptiveMesh = AdaptiveMesh<EmptyExtraData>;
 using ClothAdaptiveMesh = AdaptiveMesh<ClothNodeData>;
 
@@ -1646,6 +1664,20 @@ MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS)
       o.pack(std::string("edge_data"));
       o.pack(v.get_size());
       o.pack(v.get_flags());
+
+      return o;
+    }
+  };
+
+  template<> struct pack<blender::bke::internal::FaceData> {
+    template<typename Stream>
+    msgpack::packer<Stream> &operator()(msgpack::packer<Stream> &o,
+                                        const blender::bke::internal::FaceData &v) const
+    {
+      o.pack_array(2);
+
+      o.pack(std::string("face_data"));
+      o.pack(v.get_uv_area());
 
       return o;
     }
