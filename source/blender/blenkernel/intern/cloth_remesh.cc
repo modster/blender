@@ -401,7 +401,7 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, FaceData> {
   {
     const auto edge_size = this->compute_edge_size(edge);
 
-    auto op_edge_data = edge.get_extra_data_mut();
+    auto &op_edge_data = edge.get_extra_data_mut();
     if (op_edge_data) {
       auto &edge_data = edge.get_checked_extra_data_mut();
       edge_data.set_sizing(edge_size);
@@ -422,6 +422,41 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, FaceData> {
   {
     for (auto &edge : this->get_edges_mut()) {
       this->edge_set_size(edge);
+    }
+  }
+
+  float face_calculate_uv_area(const AdaptiveFace &face) const
+  {
+    /* The face should be triangulated to make it easier to
+     * calculate */
+    BLI_assert(face.get_verts().size() == 3);
+
+    const auto cross_2d = [](const float2 &a, const float2 &b) { return a.x * b.y - a.y * b.x; };
+
+    const auto &uv1 = this->get_checked_vert(face.get_verts()[0]).get_uv();
+    const auto &uv2 = this->get_checked_vert(face.get_verts()[1]).get_uv();
+    const auto &uv3 = this->get_checked_vert(face.get_verts()[2]).get_uv();
+
+    return std::fabs(cross_2d(uv2 - uv1, uv3 - uv1));
+  }
+
+  void set_face_uv_area(AdaptiveFace &face)
+  {
+    const auto uv_area = this->face_calculate_uv_area(face);
+    auto &op_face_data = face.get_extra_data_mut();
+    if (op_face_data) {
+      auto &face_data = op_face_data.value();
+      face_data.set_uv_area(uv_area);
+    }
+    else {
+      face.set_extra_data(FaceData(uv_area));
+    }
+  }
+
+  void set_faces_uv_area()
+  {
+    for (auto &face : this->get_faces_mut()) {
+      this->set_face_uv_area(face);
     }
   }
 
