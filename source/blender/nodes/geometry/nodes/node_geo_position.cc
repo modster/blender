@@ -14,8 +14,6 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-#include "DEG_depsgraph_query.h"
-
 #include "node_geometry_util.hh"
 
 namespace blender::nodes {
