@@ -266,6 +266,8 @@ class FieldEvaluator : NonMovable, NonCopyable {
  private:
   struct OutputPointerInfo {
     void *dst = nullptr;
+    /* When a destination virtual array is provided for an input, this is
+     * unnecessary, otherwise this is used to construct the required virtual array. */
     void (*set)(void *dst, const GVArray &varray, ResourceScope &scope) = nullptr;
   };
 
@@ -297,7 +299,7 @@ class FieldEvaluator : NonMovable, NonCopyable {
     return field_index;
   }
 
-  /** Same as above but typed. */
+  /** Same as #add_with_destination but typed. */
   template<typename T> int add_with_destination(Field<T> field, VMutableArray<T> &dst)
   {
     GVMutableArray &generic_dst_hint = scope_.construct<GVMutableArray_For_VMutableArray<T>>(
@@ -309,6 +311,7 @@ class FieldEvaluator : NonMovable, NonCopyable {
    * \param field: Field to add to the evaluator.
    * \param varray_ptr: Once #evaluate is called, the resulting virtual array will be will be
    *   assigned to the given position.
+   * \return Index of the field in the evaluator which can be used in the #get_evaluated methods.
    */
   template<typename T> int add(Field<T> field, const VArray<T> **varray_ptr)
   {
@@ -322,7 +325,7 @@ class FieldEvaluator : NonMovable, NonCopyable {
   }
 
   /**
-   * \return Index of the field in the evaluator. Can be used in the #get_evaluated methods.
+   * \return Index of the field in the evaluator which can be used in the #get_evaluated methods.
    */
   int add(GField field)
   {
@@ -337,7 +340,7 @@ class FieldEvaluator : NonMovable, NonCopyable {
    */
   void evaluate()
   {
-    BLI_assert_msg(!is_evaluated_, "Cannot evaluate twice.");
+    BLI_assert_msg(!is_evaluated_, "Cannot evaluate fields twice.");
     Array<const GField *> fields(fields_to_evaluate_.size());
     for (const int i : fields_to_evaluate_.index_range()) {
       fields[i] = &fields_to_evaluate_[i];
