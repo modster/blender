@@ -18,7 +18,7 @@
 
 namespace blender::nodes {
 
-static void geo_node_index_declare(NodeDeclarationBuilder &b)
+static void GEO_NODE_INPUT_INDEX_declare(NodeDeclarationBuilder &b)
 {
   b.add_output<decl::Int>("Index");
 }
@@ -41,7 +41,7 @@ class IndexContextFieldSource final : public fn::ContextFieldSource {
   }
 };
 
-static void geo_node_index_exec(GeoNodeExecParams params)
+static void GEO_NODE_INPUT_INDEX_exec(GeoNodeExecParams params)
 {
   Field<int> index_field{std::make_shared<IndexContextFieldSource>()};
   params.set_output("Index", std::move(index_field));
@@ -53,8 +53,8 @@ void register_node_type_geo_index()
 {
   static bNodeType ntype;
 
-  geo_node_type_base(&ntype, GEO_NODE_INDEX, "Index", NODE_CLASS_INPUT, 0);
-  ntype.geometry_node_execute = blender::nodes::geo_node_index_exec;
-  ntype.declare = blender::nodes::geo_node_index_declare;
+  geo_node_type_base(&ntype, GEO_NODE_INPUT_INDEX, "Index", NODE_CLASS_INPUT, 0);
+  ntype.geometry_node_execute = blender::nodes::GEO_NODE_INPUT_INDEX_exec;
+  ntype.declare = blender::nodes::GEO_NODE_INPUT_INDEX_declare;
   nodeRegisterType(&ntype);
 }
