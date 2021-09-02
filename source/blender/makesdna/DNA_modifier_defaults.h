@@ -174,6 +174,7 @@
     .max_internal_tension = 15.0f, \
     .max_internal_compression = 15.0f, \
     /* TODO(ish): setup better remeshing defaults */ \
+    .remeshing_type = CLOTH_REMESHING_STATIC, \
     .remeshing_size_min = 0.01f, \
   }
 

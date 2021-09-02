@@ -7245,6 +7245,11 @@ static void rna_def_modifier_adaptive_remesh(BlenderRNA *brna)
        0,
        "Static Remeshing",
        "Static Remeshing"},
+      {ADAPTIVE_REMESH_DYNAMIC_REMESHING,
+       "DYNAMIC_REMESHING",
+       0,
+       "Dynamic Remeshing",
+       "Dynamic Remeshing"},
       {0, NULL, 0, NULL, NULL},
   };
 

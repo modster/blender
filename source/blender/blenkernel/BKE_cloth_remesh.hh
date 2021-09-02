@@ -117,6 +117,8 @@ template<typename END, typename ExtraData> struct AdaptiveRemeshParams {
   float size_min;
   /* AdaptiveRemeshParamsFlags */
   uint32_t flags;
+  /* AdaptiveRemeshParamsType */
+  uint32_t type;
 
   /* For handling Extra Node Data */
   /**
@@ -158,6 +160,14 @@ enum AdaptiveRemeshParamsFlags {
   /** Sewing is enabled */
   ADAPTIVE_REMESH_PARAMS_SEWING = 1 << 0,
   ADAPTIVE_REMESH_PARAMS_FORCE_SPLIT_FOR_SEWING = 1 << 1,
+};
+
+/**
+ * AdaptiveRemeshParams->type
+ */
+enum AdaptiveRemeshParamsType {
+  ADAPTIVE_REMESH_PARAMS_STATIC_REMESH = 0,
+  ADAPTIVE_REMESH_PARAMS_DYNAMIC_REMESH = 1,
 };
 
 /* `mesh` cannot be made const because function defined on `struct
@@ -3564,6 +3574,8 @@ struct TempEmptyAdaptiveRemeshParams {
   float size_min;
   /* AdaptiveRemeshParamsFlags */
   uint32_t flags;
+  /* AdaptiveRemeshParamsType */
+  uint32_t type;
 };
 
 Mesh *__temp_empty_adaptive_remesh(const TempEmptyAdaptiveRemeshParams &params, Mesh *mesh);

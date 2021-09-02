@@ -2373,6 +2373,7 @@ typedef enum AdaptiveRemeshMode {
   ADAPTIVE_REMESH_COLLAPSE_EDGE = 1,
   ADAPTIVE_REMESH_FLIP_EDGE = 2,
   ADAPTIVE_REMESH_STATIC_REMESHING = 3,
+  ADAPTIVE_REMESH_DYNAMIC_REMESHING = 4,
 } AdaptiveRemeshMode;
 
 #ifdef __cplusplus

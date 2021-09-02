@@ -54,7 +54,7 @@
 #define SHOULD_REMESH_DUMP_FILE 1
 
 namespace blender::bke::internal {
-static FilenameGen static_remesh_name_gen("/tmp/static_remesh/remesh", ".mesh");
+static FilenameGen remesh_name_gen("/tmp/remesh/remesh", ".mesh");
 
 static std::string get_number_as_string(usize number)
 {
@@ -469,9 +469,9 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
 
 #if SHOULD_REMESH_DUMP_FILE
         auto after_flip_msgpack = this->serialize();
-        auto after_flip_filename = static_remesh_name_gen.get_curr(
+        auto after_flip_filename = remesh_name_gen.get_curr(
             "after_flip_" + get_number_as_string(std::get<0>(edge_index.get_raw())));
-        static_remesh_name_gen.gen_next();
+        remesh_name_gen.gen_next();
         dump_file(after_flip_filename, after_flip_msgpack);
 #endif
 
@@ -579,9 +579,9 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
           if (op_mesh_diff) {
 #if SHOULD_REMESH_DUMP_FILE
             auto after_flip_msgpack = this->serialize();
-            auto after_flip_filename = static_remesh_name_gen.get_curr(
+            auto after_flip_filename = remesh_name_gen.get_curr(
                 "after_collapse_" + get_number_as_string(std::get<0>(edge_index.get_raw())));
-            static_remesh_name_gen.gen_next();
+            remesh_name_gen.gen_next();
             dump_file(after_flip_filename, after_flip_msgpack);
 #endif
             const auto mesh_diff = op_mesh_diff.value();
@@ -612,8 +612,8 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
   {
 #if SHOULD_REMESH_DUMP_FILE
     auto static_remesh_start_msgpack = this->serialize();
-    auto static_remesh_start_filename = static_remesh_name_gen.get_curr("static_remesh_start");
-    static_remesh_name_gen.gen_next();
+    auto static_remesh_start_filename = remesh_name_gen.get_curr("static_remesh_start");
+    remesh_name_gen.gen_next();
     dump_file(static_remesh_start_filename, static_remesh_start_msgpack);
 #endif
     /* Set sizing for all verts */
@@ -648,9 +648,50 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
 
 #if SHOULD_REMESH_DUMP_FILE
     auto static_remesh_end_msgpack = this->serialize();
-    auto static_remesh_end_filename = static_remesh_name_gen.get_curr("static_remesh_end");
-    static_remesh_name_gen.gen_next();
+    auto static_remesh_end_filename = remesh_name_gen.get_curr("static_remesh_end");
+    remesh_name_gen.gen_next();
     dump_file(static_remesh_end_filename, static_remesh_end_msgpack);
+#endif
+  }
+
+  template<typename ExtraData>
+  void dynamic_remesh(const AdaptiveRemeshParams<END, ExtraData> &params)
+  {
+    /* TODO(ish): merge static_remesh and dynamic_remesh functions
+     * since they differ only by a small part. Keeping it separate for
+     * now for testing purposes. */
+#if SHOULD_REMESH_DUMP_FILE
+    auto dynamic_remesh_start_msgpack = this->serialize();
+    auto dynamic_remesh_start_filename = remesh_name_gen.get_curr("dynamic_remesh_start");
+    remesh_name_gen.gen_next();
+    dump_file(dynamic_remesh_start_filename, dynamic_remesh_start_msgpack);
+#endif
+
+    /* TODO(ish): set vert sizing */
+
+    /* Set edge sizes */
+    this->set_edge_sizes();
+
+    bool sewing_enabled = params.flags & ADAPTIVE_REMESH_PARAMS_SEWING;
+    bool force_split_for_sewing = params.flags & ADAPTIVE_REMESH_PARAMS_FORCE_SPLIT_FOR_SEWING;
+
+    /* Mark edges that are between sewing edges only if sewing is
+     * enabled */
+    if (sewing_enabled) {
+      this->mark_edges_between_sewing_edges();
+    }
+
+    /* Split the edges */
+    this->split_edges(sewing_enabled, force_split_for_sewing);
+
+    /* Collapse the edges */
+    this->collapse_edges();
+
+#if SHOULD_REMESH_DUMP_FILE
+    auto dynamic_remesh_end_msgpack = this->serialize();
+    auto dynamic_remesh_end_filename = remesh_name_gen.get_curr("dynamic_remesh_end");
+    remesh_name_gen.gen_next();
+    dump_file(dynamic_remesh_end_filename, dynamic_remesh_end_msgpack);
 #endif
   }
 
@@ -759,9 +800,9 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
 
 #if SHOULD_REMESH_DUMP_FILE
     auto after_split_msgpack = this->serialize();
-    auto after_split_filename = static_remesh_name_gen.get_curr(
+    auto after_split_filename = remesh_name_gen.get_curr(
         "after_split_" + get_number_as_string(std::get<0>(edge_index.get_raw())));
-    static_remesh_name_gen.gen_next();
+    remesh_name_gen.gen_next();
     dump_file(after_split_filename, after_split_msgpack);
 #endif
 
@@ -962,10 +1003,10 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, internal::Em
 
 #if SHOULD_REMESH_DUMP_FILE
       auto after_adding_loose_edge_msgpack = this->serialize();
-      auto after_adding_loose_edge_filename = static_remesh_name_gen.get_curr(
+      auto after_adding_loose_edge_filename = remesh_name_gen.get_curr(
           "after_adding_loose_edge_" + get_number_as_string(std::get<0>(vert_index.get_raw())) +
           "_" + get_number_as_string(std::get<0>(added_verts[0].get_raw())));
-      static_remesh_name_gen.gen_next();
+      remesh_name_gen.gen_next();
       dump_file(after_adding_loose_edge_filename, after_adding_loose_edge_msgpack);
 #endif
 
@@ -1705,12 +1746,18 @@ Mesh *adaptive_remesh(const AdaptiveRemeshParams<END, ExtraData> &params,
   adaptive_mesh.mark_verts_for_preserve(sewing_enabled);
 
   /* Actual Remeshing Part */
-  {
+  if (params.type == ADAPTIVE_REMESH_PARAMS_STATIC_REMESH) {
     float size_min = params.size_min;
     auto m = float2x2::identity();
     m = m * (1.0 / size_min);
     internal::Sizing vert_sizing(std::move(m));
     adaptive_mesh.static_remesh(vert_sizing, params);
+  }
+  else if (params.type == ADAPTIVE_REMESH_PARAMS_DYNAMIC_REMESH) {
+    adaptive_mesh.dynamic_remesh(params);
+  }
+  else {
+    BLI_assert_unreachable();
   }
 
   /* set back data from `AdaptiveMesh` to whatever needs it */
@@ -1871,6 +1918,16 @@ Mesh *BKE_cloth_remesh(Object *ob, ClothModifierData *clmd, Mesh *mesh)
   if (clmd->sim_parms->flags & CLOTH_SIMSETTINGS_FLAG_SEW) {
     params.flags |= ADAPTIVE_REMESH_PARAMS_SEWING;
   }
+  if (clmd->sim_parms->remeshing_type == CLOTH_REMESHING_STATIC) {
+    params.type = ADAPTIVE_REMESH_PARAMS_STATIC_REMESH;
+  }
+  else if (clmd->sim_parms->remeshing_type == CLOTH_REMESHING_DYNAMIC) {
+    params.type = ADAPTIVE_REMESH_PARAMS_DYNAMIC_REMESH;
+  }
+  else {
+    BLI_assert_unreachable();
+  }
+
   params.extra_data_to_end = [](const Cloth &cloth, size_t index) {
     BLI_assert(index < cloth.mvert_num);
     BLI_assert(cloth.verts);
@@ -1924,6 +1981,7 @@ Mesh *__temp_empty_adaptive_remesh(const TempEmptyAdaptiveRemeshParams &input_pa
   AdaptiveRemeshParams<EmptyData, EmptyData> params;
   params.size_min = input_params.size_min;
   params.flags = input_params.flags;
+  params.type = input_params.type;
   params.extra_data_to_end = [](const EmptyData &UNUSED(data), size_t UNUSED(index)) {
     return internal::EmptyExtraData();
   };

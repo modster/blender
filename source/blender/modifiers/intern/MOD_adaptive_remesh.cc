@@ -60,7 +60,7 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *UNUSED(ctx)
 
   auto mode = armd->mode;
 
-  if (mode == ADAPTIVE_REMESH_STATIC_REMESHING) {
+  if (mode == ADAPTIVE_REMESH_STATIC_REMESHING || mode == ADAPTIVE_REMESH_DYNAMIC_REMESHING) {
     auto size_min = armd->size_min;
 
     TempEmptyAdaptiveRemeshParams params;
@@ -71,6 +71,15 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *UNUSED(ctx)
     }
     if (armd->flag & ADAPTIVE_REMESH_FORCE_SPLIT_FOR_SEWING) {
       params.flags |= ADAPTIVE_REMESH_PARAMS_FORCE_SPLIT_FOR_SEWING;
+    }
+    if (mode == ADAPTIVE_REMESH_STATIC_REMESHING) {
+      params.type = ADAPTIVE_REMESH_PARAMS_STATIC_REMESH;
+    }
+    else if (mode == ADAPTIVE_REMESH_DYNAMIC_REMESHING) {
+      params.type = ADAPTIVE_REMESH_PARAMS_DYNAMIC_REMESH;
+    }
+    else {
+      BLI_assert_unreachable();
     }
 
     return __temp_empty_adaptive_remesh(params, mesh);
@@ -179,7 +188,8 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
     uiItemR(layout, ptr, "use_across_seams", 0, nullptr, ICON_NONE);
     uiItemR(layout, ptr, "is_verts_swapped", 0, nullptr, ICON_NONE);
   }
-  else if (armd->mode == ADAPTIVE_REMESH_STATIC_REMESHING) {
+  else if (armd->mode == ADAPTIVE_REMESH_STATIC_REMESHING ||
+           armd->mode == ADAPTIVE_REMESH_DYNAMIC_REMESHING) {
     uiItemR(layout, ptr, "size_min", 0, nullptr, ICON_NONE);
     uiItemR(layout, ptr, "enable_sewing", 0, nullptr, ICON_NONE);
     uiItemR(layout, ptr, "force_split_for_sewing", 0, nullptr, ICON_NONE);

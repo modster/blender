@@ -579,6 +579,12 @@ static void rna_def_cloth_sim_settings(BlenderRNA *brna)
       {0, NULL, 0, NULL, NULL},
   };
 
+  static const EnumPropertyItem prop_remeshing_type_items[] = {
+      {CLOTH_REMESHING_STATIC, "STATIC", 0, "Static", "Static remeshing applied to the cloth"},
+      {CLOTH_REMESHING_DYNAMIC, "DYNAMIC", 0, "Dynamic", "Dynamic remeshing applied to the cloth"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
   srna = RNA_def_struct(brna, "ClothSettings", NULL);
   RNA_def_struct_ui_text(srna, "Cloth Settings", "Cloth simulation settings for an object");
   RNA_def_struct_sdna(srna, "ClothSimSettings");
@@ -1059,6 +1065,13 @@ static void rna_def_cloth_sim_settings(BlenderRNA *brna)
       prop, "Remesh", "Remesh the cloth's mesh based on user defined parameters");
   RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
   RNA_def_property_update(prop, 0, "rna_cloth_update");
+
+  prop = RNA_def_property(srna, "remeshing_type", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_sdna(prop, NULL, "remeshing_type");
+  RNA_def_property_enum_items(prop, prop_remeshing_type_items);
+  RNA_def_property_ui_text(prop, "Remeshing Type", "Type of remeshing applied to the cloth");
+  RNA_def_property_update(prop, 0, "rna_cloth_update");
+  RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 
   /* TODO(ish): remeshing paramters need proper text and doc */
   prop = RNA_def_property(srna, "remeshing_size_min", PROP_FLOAT, PROP_NONE);

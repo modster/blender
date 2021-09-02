@@ -24,6 +24,7 @@
 #pragma once
 
 #include "DNA_defs.h"
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -182,8 +183,11 @@ typedef struct ClothSimSettings {
   float max_internal_compression;
 
   /* Remeshing parameters */
+  /** ClothRemeshingType */
+  uint32_t remeshing_type;
   /* TODO(ish): need to write docs for this */
   float remeshing_size_min;
+  char _pad2[4];
 
 } ClothSimSettings;
 
@@ -223,6 +227,16 @@ typedef enum {
   CLOTH_BENDING_LINEAR = 0,
   CLOTH_BENDING_ANGULAR = 1,
 } CLOTH_BENDING_MODEL;
+
+/**
+ * Type of remeshing for the cloth.
+ *
+ * ClothSimSettings.remeshing_type
+ */
+typedef enum {
+  CLOTH_REMESHING_STATIC = 0,
+  CLOTH_REMESHING_DYNAMIC = 1,
+} ClothRemeshingType;
 
 typedef struct ClothCollSettings {
   /** E.g. pointer to temp memory for collisions. */
