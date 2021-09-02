@@ -18,12 +18,12 @@
 
 namespace blender::nodes {
 
-static void geo_node_position_declare(NodeDeclarationBuilder &b)
+static void geo_node_input_position_declare(NodeDeclarationBuilder &b)
 {
   b.add_output<decl::Vector>("Position");
 }
 
-static void geo_node_position_exec(GeoNodeExecParams params)
+static void geo_node_input_position_exec(GeoNodeExecParams params)
 {
   Field<float3> position_field{
       std::make_shared<bke::AttributeContextFieldSource>("position", CPPType::get<float3>())};
@@ -32,12 +32,12 @@ static void geo_node_position_exec(GeoNodeExecParams params)
 
 }  // namespace blender::nodes
 
-void register_node_type_geo_position()
+void register_node_type_geo_input_input_position()
 {
   static bNodeType ntype;
 
-  geo_node_type_base(&ntype, GEO_NODE_POSITION, "Position", NODE_CLASS_INPUT, 0);
-  ntype.geometry_node_execute = blender::nodes::geo_node_position_exec;
-  ntype.declare = blender::nodes::geo_node_position_declare;
+  geo_node_type_base(&ntype, GEO_NODE_INPUT_POSITION, "Position", NODE_CLASS_INPUT, 0);
+  ntype.geometry_node_execute = blender::nodes::geo_node_input_position_exec;
+  ntype.declare = blender::nodes::geo_node_input_position_declare;
   nodeRegisterType(&ntype);
 }

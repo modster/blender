@@ -49,7 +49,7 @@ static void GEO_NODE_INPUT_INDEX_exec(GeoNodeExecParams params)
 
 }  // namespace blender::nodes
 
-void register_node_type_geo_index()
+void register_node_type_geo_input_index()
 {
   static bNodeType ntype;
 

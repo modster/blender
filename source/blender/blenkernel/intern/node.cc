@@ -5173,8 +5173,9 @@ static void registerGeometryNodes()
   register_node_type_geo_curve_trim();
   register_node_type_geo_delete_geometry();
   register_node_type_geo_edge_split();
+  register_node_type_geo_input_index();
   register_node_type_geo_input_material();
-  register_node_type_geo_index();
+  register_node_type_geo_input_position();
   register_node_type_geo_is_viewport();
   register_node_type_geo_join_geometry();
   register_node_type_geo_material_assign();
@@ -5197,7 +5198,6 @@ static void registerGeometryNodes()
   register_node_type_geo_point_separate();
   register_node_type_geo_point_translate();
   register_node_type_geo_points_to_volume();
-  register_node_type_geo_position();
   register_node_type_geo_raycast();
   register_node_type_geo_sample_texture();
   register_node_type_geo_select_by_handle_type();
