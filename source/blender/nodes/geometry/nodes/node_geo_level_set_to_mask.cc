@@ -28,17 +28,13 @@
 
 #include "node_geometry_util.hh"
 
-static bNodeSocketTemplate geo_node_level_set_to_mask_in[] = {
-    {SOCK_GEOMETRY, N_("Level Set")},
-    {-1, ""},
-};
-
-static bNodeSocketTemplate geo_node_level_set_to_mask_out[] = {
-    {SOCK_GEOMETRY, N_("Mask Volume")},
-    {-1, ""},
-};
-
 namespace blender::nodes {
+
+static void geo_node_level_set_to_mask_declare(NodeDeclarationBuilder &b)
+{
+  b.add_input<decl::Geometry>("Level Set");
+  b.add_output<decl::Geometry>("Mask Volume");
+}
 
 #ifdef WITH_OPENVDB
 
@@ -104,8 +100,7 @@ void register_node_type_geo_level_set_to_mask()
 
   geo_node_type_base(
       &ntype, GEO_NODE_LEVEL_SET_TO_MASK, "Level Set to Mask", NODE_CLASS_GEOMETRY, 0);
-  node_type_socket_templates(
-      &ntype, geo_node_level_set_to_mask_in, geo_node_level_set_to_mask_out);
+  ntype.declare = blender::nodes::geo_node_level_set_to_mask_declare;
   ntype.geometry_node_execute = blender::nodes::geo_node_level_set_to_mask_exec;
 
   nodeRegisterType(&ntype);

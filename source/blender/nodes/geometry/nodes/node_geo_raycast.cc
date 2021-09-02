@@ -97,18 +97,22 @@ static void raycast_to_level_set(const openvdb::FloatGrid &level_set,
   for (const int i : ray_origins.index_range()) {
     const openvdb::math::Vec3s origin(ray_origins[i].x, ray_origins[i].y, ray_origins[i].z);
     const openvdb::math::Vec3s dir(ray_directions[i].x, ray_directions[i].y, ray_directions[i].z);
-    const openvdb::math::Ray<double> ray(origin, dir);
+    const openvdb::math::Ray<double> ray(origin, dir, 0.0, ray_lengths[i]);
 
     openvdb::math::Vec3d hit_position(0);
     openvdb::math::Vec3d hit_normal(0);
+    const bool hit = intersector.intersectsWS(ray, hit_position, hit_normal);
     if (!r_hit.is_empty()) {
-      r_hit[i] = intersector.intersectsWS(ray, hit_position, hit_normal);
+      r_hit[i] = hit;
     }
     if (!r_hit_positions.is_empty()) {
       r_hit_positions[i] = float3(hit_position.x(), hit_position.y(), hit_position.z());
     }
     if (!r_hit_normals.is_empty()) {
       r_hit_normals[i] = float3(hit_normal.x(), hit_normal.y(), hit_normal.z());
+    }
+    if (!r_hit_distances.is_empty()) {
+      r_hit_distances[i] = float3::distance(r_hit_positions[i], ray_origins[i]);
     }
   }
 }
@@ -282,6 +286,7 @@ static void raycast_from_points(const GeoNodeExecParams &params,
       dst_component.attribute_try_get_for_output_only<float>(hit_distance_name, result_domain);
 
   if (src_mesh == nullptr) {
+#ifdef WITH_OPENVDB
     BLI_assert(can_use_level_set);
     const Volume *volume = target_geometry.get_volume_for_read();
     const VolumeGrid *volume_grid = BKE_volume_grid_get_for_read(volume, 0);
@@ -296,6 +301,7 @@ static void raycast_from_points(const GeoNodeExecParams &params,
         hit_position_attribute ? hit_position_attribute.as_span() : MutableSpan<float3>(),
         hit_normal_attribute ? hit_normal_attribute.as_span() : MutableSpan<float3>(),
         hit_distance_attribute ? hit_distance_attribute.as_span() : MutableSpan<float>());
+#endif
   }
   else {
     /* Positions and looptri indices are always needed for interpolation,

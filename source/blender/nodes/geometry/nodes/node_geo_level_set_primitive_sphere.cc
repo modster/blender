@@ -28,19 +28,15 @@
 
 #include "node_geometry_util.hh"
 
-static bNodeSocketTemplate geo_node_level_set_primitive_sphere_in[] = {
-    {SOCK_FLOAT, N_("Radius"), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX, PROP_DISTANCE},
-    {SOCK_VECTOR, N_("Center"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX, PROP_TRANSLATION},
-    {SOCK_FLOAT, N_("Voxel Size"), 0.3f, 0.0f, 0.0f, 0.0f, 0.01f, FLT_MAX, PROP_DISTANCE},
-    {-1, ""},
-};
-
-static bNodeSocketTemplate geo_node_level_set_primitive_sphere_out[] = {
-    {SOCK_GEOMETRY, N_("Level Set")},
-    {-1, ""},
-};
-
 namespace blender::nodes {
+
+static void geo_node_level_set_primitive_sphere_declare(NodeDeclarationBuilder &b)
+{
+  b.add_input<decl::Float>("Radius").default_value(1.0f).min(0.0f).subtype(PROP_DISTANCE);
+  b.add_input<decl::Vector>("Target").subtype(PROP_TRANSLATION);
+  b.add_input<decl::Float>("Voxel Size").default_value(0.3f).min(0.01f).subtype(PROP_DISTANCE);
+  b.add_output<decl::Geometry>("Level Set");
+}
 
 #ifdef WITH_OPENVDB
 
@@ -80,8 +76,7 @@ void register_node_type_geo_level_set_primitive_sphere()
 
   geo_node_type_base(
       &ntype, GEO_NODE_LEVEL_SET_PRIMITIVE_SPHERE, "Level Set Sphere", NODE_CLASS_GEOMETRY, 0);
-  node_type_socket_templates(
-      &ntype, geo_node_level_set_primitive_sphere_in, geo_node_level_set_primitive_sphere_out);
+  ntype.declare = blender::nodes::geo_node_level_set_primitive_sphere_declare;
   ntype.geometry_node_execute = blender::nodes::geo_node_level_set_primitive_sphere_exec;
 
   nodeRegisterType(&ntype);

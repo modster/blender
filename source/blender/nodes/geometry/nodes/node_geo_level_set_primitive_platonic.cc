@@ -26,17 +26,15 @@
 
 #include "node_geometry_util.hh"
 
-static bNodeSocketTemplate geo_node_level_set_primitive_platonic_in[] = {
-    {SOCK_FLOAT, N_("Size"), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX, PROP_DISTANCE},
-    {SOCK_VECTOR, N_("Center"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX, PROP_TRANSLATION},
-    {SOCK_FLOAT, N_("Voxel Size"), 0.3f, 0.0f, 0.0f, 0.0f, 0.01f, FLT_MAX, PROP_DISTANCE},
-    {-1, ""},
-};
+namespace blender::nodes {
 
-static bNodeSocketTemplate geo_node_level_set_primitive_platonic_out[] = {
-    {SOCK_GEOMETRY, N_("Level Set")},
-    {-1, ""},
-};
+static void geo_node_level_set_primitive_platonic_declare(NodeDeclarationBuilder &b)
+{
+  b.add_input<decl::Float>("Size").default_value(1.0f).min(0.0f).subtype(PROP_DISTANCE);
+  b.add_input<decl::Vector>("Target").subtype(PROP_TRANSLATION);
+  b.add_input<decl::Float>("Voxel Size").default_value(0.3f).min(0.01f).subtype(PROP_DISTANCE);
+  b.add_output<decl::Geometry>("Level Set");
+}
 
 static void geo_node_level_set_primitive_platonic_layout(uiLayout *layout,
                                                          bContext *UNUSED(C),
@@ -52,8 +50,6 @@ static void geo_node_level_set_primitive_platonic_init(bNodeTree *UNUSED(ntree),
   data->shape = GEO_NODE_PLATONIC_CUBE;
   node->storage = data;
 }
-
-namespace blender::nodes {
 
 #ifdef WITH_OPENVDB
 
@@ -99,15 +95,14 @@ void register_node_type_geo_level_set_primitive_platonic()
 
   geo_node_type_base(
       &ntype, GEO_NODE_LEVEL_SET_PRIMITIVE_PLATONIC, "Level Set Platonic", NODE_CLASS_GEOMETRY, 0);
-  node_type_socket_templates(
-      &ntype, geo_node_level_set_primitive_platonic_in, geo_node_level_set_primitive_platonic_out);
+  ntype.declare = blender::nodes::geo_node_level_set_primitive_platonic_declare;
   ntype.geometry_node_execute = blender::nodes::geo_node_level_set_primitive_platonic_exec;
   node_type_storage(&ntype,
                     "NodeGeometryLevelSetPlatonic",
                     node_free_standard_storage,
                     node_copy_standard_storage);
-  node_type_init(&ntype, geo_node_level_set_primitive_platonic_init);
-  ntype.draw_buttons = geo_node_level_set_primitive_platonic_layout;
+  node_type_init(&ntype, blender::nodes::geo_node_level_set_primitive_platonic_init);
+  ntype.draw_buttons = blender::nodes::geo_node_level_set_primitive_platonic_layout;
 
   nodeRegisterType(&ntype);
 }

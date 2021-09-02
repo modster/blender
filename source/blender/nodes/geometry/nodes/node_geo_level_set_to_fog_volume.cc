@@ -27,18 +27,14 @@
 
 #include "node_geometry_util.hh"
 
-static bNodeSocketTemplate geo_node_level_set_to_fog_volume_in[] = {
-    {SOCK_GEOMETRY, N_("Level Set")},
-    {SOCK_FLOAT, N_("Density"), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX},
-    {-1, ""},
-};
-
-static bNodeSocketTemplate geo_node_level_set_to_fog_volume_out[] = {
-    {SOCK_GEOMETRY, N_("Fog Volume")},
-    {-1, ""},
-};
-
 namespace blender::nodes {
+
+static void geo_node_level_set_to_fog_volume_declare(NodeDeclarationBuilder &b)
+{
+  b.add_input<decl::Geometry>("Level Set");
+  b.add_input<decl::Float>("Density").default_value(1.0f).min(0.0f);
+  b.add_output<decl::Geometry>("Fog Volume");
+}
 
 #ifdef WITH_OPENVDB
 
@@ -103,8 +99,7 @@ void register_node_type_geo_level_set_to_fog_volume()
 
   geo_node_type_base(
       &ntype, GEO_NODE_LEVEL_SET_TO_FOG_VOLUME, "Level Set to Fog Volume", NODE_CLASS_GEOMETRY, 0);
-  node_type_socket_templates(
-      &ntype, geo_node_level_set_to_fog_volume_in, geo_node_level_set_to_fog_volume_out);
+  ntype.declare = blender::nodes::geo_node_level_set_to_fog_volume_declare;
   ntype.geometry_node_execute = blender::nodes::geo_node_level_set_to_fog_volume_exec;
 
   nodeRegisterType(&ntype);

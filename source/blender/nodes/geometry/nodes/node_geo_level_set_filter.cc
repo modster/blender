@@ -28,17 +28,15 @@
 
 #include "node_geometry_util.hh"
 
-static bNodeSocketTemplate geo_node_level_set_filter_in[] = {
-    {SOCK_GEOMETRY, N_("Level Set")},
-    {SOCK_FLOAT, N_("Distance"), 0.1f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX, PROP_DISTANCE},
-    {SOCK_INT, N_("Width"), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 128, PROP_DISTANCE},
-    {-1, ""},
-};
+namespace blender::nodes {
 
-static bNodeSocketTemplate geo_node_level_set_filter_out[] = {
-    {SOCK_GEOMETRY, N_("Level Set")},
-    {-1, ""},
-};
+static void geo_node_level_set_filter_declare(NodeDeclarationBuilder &b)
+{
+  b.add_input<decl::Geometry>("Level Set");
+  b.add_input<decl::Float>("Distance").default_value(0.1f).subtype(PROP_DISTANCE);
+  b.add_input<decl::Int>("Width").default_value(1).min(128);
+  b.add_output<decl::Geometry>("Level Set");
+}
 
 static void geo_node_level_set_filter_layout(uiLayout *layout,
                                              bContext *UNUSED(C),
@@ -70,8 +68,6 @@ static void geo_node_level_set_filter_update(bNodeTree *UNUSED(ntree), bNode *no
                                  GEO_NODE_LEVEL_SET_FILTER_MEDIAN,
                                  GEO_NODE_LEVEL_SET_FILTER_MEAN));
 }
-
-namespace blender::nodes {
 
 #ifdef WITH_OPENVDB
 
@@ -155,15 +151,15 @@ void register_node_type_geo_level_set_filter()
 
   geo_node_type_base(
       &ntype, GEO_NODE_LEVEL_SET_FILTER, "Level Set Filter", NODE_CLASS_GEOMETRY, 0);
-  node_type_socket_templates(&ntype, geo_node_level_set_filter_in, geo_node_level_set_filter_out);
+  ntype.declare = blender::nodes::geo_node_level_set_filter_declare;
   ntype.geometry_node_execute = blender::nodes::geo_node_level_set_filter_exec;
   node_type_storage(&ntype,
                     "NodeGeometryLevelSetFilter",
                     node_free_standard_storage,
                     node_copy_standard_storage);
-  node_type_init(&ntype, geo_node_level_set_filter_init);
-  ntype.draw_buttons = geo_node_level_set_filter_layout;
-  ntype.updatefunc = geo_node_level_set_filter_update;
+  node_type_init(&ntype, blender::nodes::geo_node_level_set_filter_init);
+  ntype.draw_buttons = blender::nodes::geo_node_level_set_filter_layout;
+  ntype.updatefunc = blender::nodes::geo_node_level_set_filter_update;
 
   nodeRegisterType(&ntype);
 }

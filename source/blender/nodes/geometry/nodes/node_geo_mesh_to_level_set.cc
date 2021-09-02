@@ -34,18 +34,14 @@
 
 using blender::bke::GeometryInstanceGroup;
 
-static bNodeSocketTemplate geo_node_mesh_to_level_set_in[] = {
-    {SOCK_GEOMETRY, N_("Mesh")},
-    {SOCK_FLOAT, N_("Voxel Size"), 0.3f, 0.0f, 0.0f, 0.0f, 0.01f, FLT_MAX, PROP_DISTANCE},
-    {-1, ""},
-};
-
-static bNodeSocketTemplate geo_node_mesh_to_level_set_out[] = {
-    {SOCK_GEOMETRY, N_("Level Set")},
-    {-1, ""},
-};
-
 namespace blender::nodes {
+
+static void geo_node_mesh_to_level_set_declare(NodeDeclarationBuilder &b)
+{
+  b.add_input<decl::Geometry>("Mesh");
+  b.add_input<decl::Float>("Voxel Size").default_value(0.3f).min(0.01f).subtype(PROP_DISTANCE);
+  b.add_output<decl::Geometry>("Level Set");
+}
 
 #ifdef WITH_OPENVDB
 
@@ -54,7 +50,7 @@ static openvdb::FloatGrid::Ptr meshes_to_level_set_grid(
 {
   const float voxel_size_inv = 1.0f / voxel_size;
 
-  /* Count the vertex and triangle size of all input meshes. */
+  /* Count the vertex and triangle size of all input meshes to avoid reallocating the vectors. */
   int vert_size = 0;
   int tri_size = 0;
   for (const GeometryInstanceGroup &set_group : set_groups) {
@@ -92,12 +88,10 @@ static openvdb::FloatGrid::Ptr meshes_to_level_set_grid(
     }
   }
 
-  openvdb::FloatGrid::Ptr grid;
-  {
-    SCOPED_TIMER("  mesh_to_level_set_only_openvdb");
-    grid = openvdb::tools::meshToLevelSet<openvdb::FloatGrid>({}, positions, triangles);
-    grid->transform().postScale(voxel_size);
-  }
+  openvdb::FloatGrid::Ptr grid
+
+      = openvdb::tools::meshToLevelSet<openvdb::FloatGrid>({}, positions, triangles);
+  grid->transform().postScale(voxel_size);
 
   return grid;
 }
@@ -120,8 +114,6 @@ static Volume *meshes_to_level_set_volume(const Span<GeometryInstanceGroup> set_
 static void geo_node_mesh_to_level_set_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Mesh");
-
-  SCOPED_TIMER(__func__);
 
   Vector<GeometryInstanceGroup> set_groups;
   bke::geometry_set_gather_instances(geometry_set, set_groups);
@@ -160,8 +152,7 @@ void register_node_type_geo_mesh_to_level_set()
 
   geo_node_type_base(
       &ntype, GEO_NODE_MESH_TO_LEVEL_SET, "Mesh to Level Set", NODE_CLASS_GEOMETRY, 0);
-  node_type_socket_templates(
-      &ntype, geo_node_mesh_to_level_set_in, geo_node_mesh_to_level_set_out);
+  ntype.declare = blender::nodes::geo_node_mesh_to_level_set_declare;
   ntype.geometry_node_execute = blender::nodes::geo_node_mesh_to_level_set_exec;
   nodeRegisterType(&ntype);
 }

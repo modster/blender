@@ -29,17 +29,15 @@
 
 #include "node_geometry_util.hh"
 
-static bNodeSocketTemplate geo_node_level_set_morph_in[] = {
-    {SOCK_GEOMETRY, N_("Source")},
-    {SOCK_GEOMETRY, N_("Target")},
-    {SOCK_FLOAT, N_("Factor"), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, PROP_UNSIGNED},
-    {-1, ""},
-};
+namespace blender::nodes {
 
-static bNodeSocketTemplate geo_node_level_set_morph_out[] = {
-    {SOCK_GEOMETRY, N_("Result")},
-    {-1, ""},
-};
+static void geo_node_level_set_morph_declare(NodeDeclarationBuilder &b)
+{
+  b.add_input<decl::Geometry>("Source");
+  b.add_input<decl::Geometry>("Target");
+  b.add_input<decl::Float>("Factor").default_value(0.5f).min(0.0f).max(1.0f).subtype(PROP_FACTOR);
+  b.add_output<decl::Geometry>("Result");
+}
 
 static void geo_node_level_set_morph_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 {
@@ -55,8 +53,6 @@ static void geo_node_level_set_morph_init(bNodeTree *UNUSED(ntree), bNode *node)
   data->temporal_scheme = GEO_NODE_LEVEL_SET_MORPH_SPATIAL_2ND;
   node->storage = data;
 }
-
-namespace blender::nodes {
 
 #ifdef WITH_OPENVDB
 
@@ -202,12 +198,12 @@ void register_node_type_geo_level_set_morph()
   static bNodeType ntype;
 
   geo_node_type_base(&ntype, GEO_NODE_LEVEL_SET_MORPH, "Level Set Morph", NODE_CLASS_GEOMETRY, 0);
-  node_type_socket_templates(&ntype, geo_node_level_set_morph_in, geo_node_level_set_morph_out);
+  ntype.declare = blender::nodes::geo_node_level_set_morph_declare;
   ntype.geometry_node_execute = blender::nodes::geo_node_level_set_morph_exec;
   node_type_storage(
       &ntype, "NodeGeometryLevelSetMorph", node_free_standard_storage, node_copy_standard_storage);
-  node_type_init(&ntype, geo_node_level_set_morph_init);
-  ntype.draw_buttons = geo_node_level_set_morph_layout;
+  node_type_init(&ntype, blender::nodes::geo_node_level_set_morph_init);
+  ntype.draw_buttons = blender::nodes::geo_node_level_set_morph_layout;
 
   nodeRegisterType(&ntype);
 }

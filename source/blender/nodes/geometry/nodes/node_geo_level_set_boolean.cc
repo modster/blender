@@ -31,7 +31,16 @@
 
 static bNodeSocketTemplate geo_node_level_set_boolean_in[] = {
     {SOCK_GEOMETRY, N_("Level Set 1")},
-    {SOCK_GEOMETRY, N_("Level Set 2")},
+    {SOCK_GEOMETRY,
+     N_("Level Set 2"),
+     0.0f,
+     0.0f,
+     0.0f,
+     0.0f,
+     0.0f,
+     0.0f,
+     PROP_NONE,
+     SOCK_MULTI_INPUT},
     {-1, ""},
 };
 
