@@ -776,8 +776,40 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, FaceData> {
    */
   void compute_and_set_dynamic_vert_sizing()
   {
-    auto face_sizing = this->compute_dynamic_face_sizing();
-    /* TODO */
+    /* Reference [1] says that the `Sizing` for a vertex that is on a
+     * seam should be handled differently. This is required only if
+     * the `Sizing` is stored across seams, but since it is stored per
+     * `Vert` and not per `Node` that special case is not needed. */
+
+    auto face_sizing_map = this->compute_dynamic_face_sizing();
+
+    for (auto &vert : this->get_verts_mut()) {
+      /* Compute and store the area weighted average of the adjacent
+       * faces of the vert */
+
+      const auto face_indices = this->get_checked_face_indices_of_vert(vert.get_self_index());
+
+      Sizing sizing((float2x2()));
+      float area_total = 0.0;
+      for (const auto &face_index : face_indices) {
+        const auto &face = this->get_checked_face(face_index);
+        const auto area = face.get_checked_extra_data().get_uv_area();
+
+        sizing = sizing + face_sizing_map.lookup(face_index) * area;
+        area_total += area;
+      }
+
+      sizing = sizing * (1.0 / area_total);
+
+      auto &op_vert_data = vert.get_extra_data_mut();
+      if (op_vert_data) {
+        auto &vert_data = op_vert_data.value();
+        vert_data.set_sizing(sizing);
+      }
+      else {
+        vert.set_extra_data(VertData(sizing));
+      }
+    }
   }
 
   bool is_edge_splittable_adaptivemesh(const AdaptiveEdge &edge) const
