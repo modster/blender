@@ -767,19 +767,6 @@ static void rna_XrSessionState_reset_to_base_pose(bContext *C)
 #  endif
 }
 
-static void rna_XrSessionState_reset_navigation(bContext *C)
-{
-#  ifdef WITH_XR_OPENXR
-  wmWindowManager *wm = CTX_wm_manager(C);
-  if (WM_xr_session_exists(&wm->xr)) {
-    struct wmXrSessionState *state = WM_xr_session_state_handle_get(&wm->xr);
-    WM_xr_session_state_navigation_reset(state);
-  }
-#  else
-  UNUSED_VARS(C);
-#  endif
-}
-
 static bool rna_XrSessionState_action_set_create(bContext *C, XrActionMap *actionmap)
 {
 #  ifdef WITH_XR_OPENXR
@@ -1994,12 +1981,6 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
 
   func = RNA_def_function(srna, "reset_to_base_pose", "rna_XrSessionState_reset_to_base_pose");
   RNA_def_function_ui_description(func, "Force resetting of position and rotation deltas");
-  RNA_def_function_flag(func, FUNC_NO_SELF);
-  parm = RNA_def_pointer(func, "context", "Context", "", "");
-  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
-
-  func = RNA_def_function(srna, "reset_navigation", "rna_XrSessionState_reset_navigation");
-  RNA_def_function_ui_description(func, "Reset VR navigation deltas");
   RNA_def_function_flag(func, FUNC_NO_SELF);
   parm = RNA_def_pointer(func, "context", "Context", "", "");
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
