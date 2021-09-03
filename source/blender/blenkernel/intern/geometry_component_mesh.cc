@@ -829,7 +829,7 @@ class VertexGroupsAttributeProvider final : public DynamicAttributesProvider {
     if (mesh == nullptr) {
       return {};
     }
-    std::string name = attribute_id.name();
+    const std::string name = attribute_id.name();
     const int vertex_group_index = BLI_findstringindex(
         &mesh->vertex_group_names, name.c_str(), offsetof(bDeformGroup, name));
     if (vertex_group_index < 0) {

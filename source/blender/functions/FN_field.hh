@@ -25,9 +25,9 @@
  * and optimization might mean executing the fields differently based on some factors like the
  * number of elements.
  *
- * For now, fields are very tied to the multi-function system, but in the future the #FieldFunction
- * class could be extended to use different descriptions of its outputs and computation besides
- * the embedded multi-function.
+ * For now, fields are very tied to the multi-function system, but in the future #FieldOperation
+ * could be extended to use different descriptions of its outputs and computation besides the
+ * embedded multi-function.
  */
 
 #include "BLI_string_ref.hh"

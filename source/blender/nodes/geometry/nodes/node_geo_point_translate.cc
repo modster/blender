@@ -88,8 +88,8 @@ static void execute_on_component(GeometryComponent &component,
   MutableSpan<float3> position_span = positions.as_span();
   fn::Field<float3> position_field{std::make_shared<SpanFieldInput>(position_span.as_span())};
 
-  /* Retrieve the translation field and add an add operation field on top of that, which can be
-   * evaluated directly into the position virtual array so that any optimizations can be done more
+  /* Add an add operation field on top of the provided translation field, which can be evaluated
+   * directly into the position virtual array. That way, any optimizations can be done more
    * generally for the whole evaluation system. */
   static const fn::CustomMF_SI_SI_SO<float3, float3, float3> add_fn = {
       "Add", [](float3 a, float3 b) { return a + b; }};
