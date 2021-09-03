@@ -136,6 +136,7 @@ static Set<const GField *> find_varying_fields(const FieldGraphInfo &graph_info,
 }
 
 static void build_multi_function_procedure_for_fields(MFProcedure &procedure,
+                                                      ResourceScope &scope,
                                                       const FieldGraphInfo &graph_info,
                                                       Span<const GField *> output_fields)
 {
@@ -187,9 +188,15 @@ static void build_multi_function_procedure_for_fields(MFProcedure &procedure,
     }
   }
 
-  /* TODO: Handle case when there are duplicates in #output_fields. */
+  Set<MFVariable *> already_output_variables;
   for (const GField *field : output_fields) {
     MFVariable *variable = variable_by_field.lookup(*field);
+    if (!already_output_variables.add(variable)) {
+      /* The same variable is output twice. Create a copy to make it work. */
+      const MultiFunction &copy_fn = scope.construct<CustomMF_GenericCopy>(
+          __func__, "copy", variable->data_type());
+      variable = builder.add_call<1>(copy_fn, {variable})[0];
+    }
     builder.add_output_parameter(*variable);
   }
 
@@ -293,7 +300,8 @@ Vector<const GVArray *> evaluate_fields(ResourceScope &scope,
   const int array_size = mask.min_array_size();
   if (!varying_fields_to_evaluate.is_empty()) {
     MFProcedure procedure;
-    build_multi_function_procedure_for_fields(procedure, graph_info, varying_fields_to_evaluate);
+    build_multi_function_procedure_for_fields(
+        procedure, scope, graph_info, varying_fields_to_evaluate);
     MFProcedureExecutor procedure_executor{"Procedure", procedure};
     MFParamsBuilder mf_params{procedure_executor, mask.min_array_size()};
     MFContextBuilder mf_context;
@@ -335,7 +343,8 @@ Vector<const GVArray *> evaluate_fields(ResourceScope &scope,
   }
   if (!constant_fields_to_evaluate.is_empty()) {
     MFProcedure procedure;
-    build_multi_function_procedure_for_fields(procedure, graph_info, constant_fields_to_evaluate);
+    build_multi_function_procedure_for_fields(
+        procedure, scope, graph_info, constant_fields_to_evaluate);
     MFProcedureExecutor procedure_executor{"Procedure", procedure};
     MFParamsBuilder mf_params{procedure_executor, 1};
     MFContextBuilder mf_context;

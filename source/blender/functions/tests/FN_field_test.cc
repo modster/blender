@@ -237,4 +237,24 @@ TEST(field, TwoFunctionsTwoOutputs)
   EXPECT_EQ(result_2->get(8), 36);
 }
 
+TEST(field, SameFieldTwice)
+{
+  GField constant_field{
+      std::make_shared<OperationFieldSource>(std::make_unique<CustomMF_Constant<int>>(10)), 0};
+
+  FieldContext field_context;
+  IndexMask mask{IndexRange(2)};
+  ResourceScope scope;
+  Vector<const GVArray *> results = evaluate_fields(
+      scope, {&constant_field, &constant_field}, mask, field_context);
+
+  GVArray_Typed<int> varray1{*results[0]};
+  GVArray_Typed<int> varray2{*results[1]};
+
+  EXPECT_EQ(varray1->get(0), 10);
+  EXPECT_EQ(varray1->get(1), 10);
+  EXPECT_EQ(varray2->get(0), 10);
+  EXPECT_EQ(varray2->get(1), 10);
+}
+
 }  // namespace blender::fn::tests
