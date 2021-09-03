@@ -179,6 +179,17 @@ class NormalContextFieldSource final : public fn::ContextFieldSource {
     }
     return nullptr;
   }
+
+  uint64_t hash() const override
+  {
+    /* Some random constant hash. */
+    return 669605641;
+  }
+
+  bool is_equal_to(const fn::FieldSource &other) const override
+  {
+    return dynamic_cast<const NormalContextFieldSource *>(&other) != nullptr;
+  }
 };
 
 static void geo_node_input_normal_exec(GeoNodeExecParams params)
