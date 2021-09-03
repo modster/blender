@@ -134,7 +134,7 @@ static const GVArray *construct_mesh_normals_gvarray(const MeshComponent &mesh_c
       /* The normals on corners are just the mesh's face normals, so start with the face normal
        * array and copy the face normal for each of its corners. */
       GVArrayPtr face_normals = mesh_face_normals(
-          mesh, verts, polys, loops, IndexRange(polys.size()]));
+          mesh, verts, polys, loops, IndexRange(polys.size()));
 
       /* In this case using the mesh component's generic domain interpolation is fine,
        * since the face normal is just copied to every corner. */
