@@ -147,9 +147,9 @@ static const GVArray *construct_mesh_normals_gvarray(const MeshComponent &mesh_c
   }
 }
 
-class NormalContextFieldSource final : public fn::ContextFieldSource {
+class NormalFieldInput final : public fn::FieldInput {
  public:
-  NormalContextFieldSource() : ContextFieldSource(CPPType::get<float3>(), "Normal")
+  NormalFieldInput() : fn::FieldInput(CPPType::get<float3>(), "Normal")
   {
   }
 
@@ -186,15 +186,15 @@ class NormalContextFieldSource final : public fn::ContextFieldSource {
     return 669605641;
   }
 
-  bool is_equal_to(const fn::FieldSource &other) const override
+  bool is_equal_to(const fn::FieldNode &other) const override
   {
-    return dynamic_cast<const NormalContextFieldSource *>(&other) != nullptr;
+    return dynamic_cast<const NormalFieldInput *>(&other) != nullptr;
   }
 };
 
 static void geo_node_input_normal_exec(GeoNodeExecParams params)
 {
-  Field<float3> normal_field{std::make_shared<NormalContextFieldSource>()};
+  Field<float3> normal_field{std::make_shared<NormalFieldInput>()};
   params.set_output("Normal", std::move(normal_field));
 }
 

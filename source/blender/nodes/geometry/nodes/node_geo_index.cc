@@ -23,9 +23,9 @@ static void geo_node_input_index_declare(NodeDeclarationBuilder &b)
   b.add_output<decl::Int>("Index");
 }
 
-class IndexContextFieldSource final : public fn::ContextFieldSource {
+class IndexFieldInput final : public fn::FieldInput {
  public:
-  IndexContextFieldSource() : ContextFieldSource(CPPType::get<int>(), "Index")
+  IndexFieldInput() : FieldInput(CPPType::get<int>(), "Index")
   {
   }
 
@@ -43,7 +43,7 @@ class IndexContextFieldSource final : public fn::ContextFieldSource {
 
 static void geo_node_input_index_exec(GeoNodeExecParams params)
 {
-  Field<int> index_field{std::make_shared<IndexContextFieldSource>()};
+  Field<int> index_field{std::make_shared<IndexFieldInput>()};
   params.set_output("Index", std::move(index_field));
 }
 

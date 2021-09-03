@@ -41,18 +41,18 @@
 
 namespace blender::fn {
 
-class FieldSource {
+class FieldNode {
  public:
-  ~FieldSource() = default;
+  ~FieldNode() = default;
 
   virtual const CPPType &cpp_type_of_output_index(int output_index) const = 0;
 
-  virtual bool is_context_source() const
+  virtual bool is_input_node() const
   {
     return false;
   }
 
-  virtual bool is_operation_source() const
+  virtual bool is_operation_node() const
   {
     return false;
   }
@@ -62,25 +62,25 @@ class FieldSource {
     return get_default_hash(this);
   }
 
-  friend bool operator==(const FieldSource &a, const FieldSource &b)
+  friend bool operator==(const FieldNode &a, const FieldNode &b)
   {
     return a.is_equal_to(b);
   }
 
-  virtual bool is_equal_to(const FieldSource &other) const
+  virtual bool is_equal_to(const FieldNode &other) const
   {
     return this == &other;
   }
 };
 
 /** Common base class for fields to avoid declaring the same methods for #GField and #GFieldRef. */
-template<typename SourcePtr> class GFieldBase {
+template<typename NodePtr> class GFieldBase {
  protected:
-  SourcePtr source_ = nullptr;
-  int source_output_index_ = 0;
+  NodePtr node_ = nullptr;
+  int node_output_index_ = 0;
 
-  GFieldBase(SourcePtr source, const int source_output_index)
-      : source_(std::move(source)), source_output_index_(source_output_index)
+  GFieldBase(NodePtr node, const int node_output_index)
+      : node_(std::move(node)), node_output_index_(node_output_index)
   {
   }
 
@@ -89,42 +89,42 @@ template<typename SourcePtr> class GFieldBase {
 
   operator bool() const
   {
-    return source_ != nullptr;
+    return node_ != nullptr;
   }
 
   friend bool operator==(const GFieldBase &a, const GFieldBase &b)
   {
-    return &*a.source_ == &*b.source_ && a.source_output_index_ == b.source_output_index_;
+    return &*a.node_ == &*b.node_ && a.node_output_index_ == b.node_output_index_;
   }
 
   uint64_t hash() const
   {
-    return get_default_hash_2(source_, source_output_index_);
+    return get_default_hash_2(node_, node_output_index_);
   }
 
   const fn::CPPType &cpp_type() const
   {
-    return source_->cpp_type_of_output_index(source_output_index_);
+    return node_->cpp_type_of_output_index(node_output_index_);
   }
 
-  bool has_context_source() const
+  bool has_context_node() const
   {
-    return source_->is_context_source();
+    return node_->is_input_node();
   }
 
-  bool has_operation_source() const
+  bool has_operation_node() const
   {
-    return source_->is_operation_source();
+    return node_->is_operation_node();
   }
 
-  const FieldSource &source() const
+  const FieldNode &node() const
   {
-    return *source_;
+    return *node_;
   }
 
-  int source_output_index() const
+  int node_output_index() const
   {
-    return source_output_index_;
+    return node_output_index_;
   }
 };
 
@@ -132,12 +132,12 @@ template<typename SourcePtr> class GFieldBase {
  * Describes the output of a function. Generally corresponds to the combination of an output socket
  * and link combination in a node graph.
  */
-class GField : public GFieldBase<std::shared_ptr<FieldSource>> {
+class GField : public GFieldBase<std::shared_ptr<FieldNode>> {
  public:
   GField() = default;
 
-  GField(std::shared_ptr<FieldSource> source, const int source_output_index = 0)
-      : GFieldBase<std::shared_ptr<FieldSource>>(std::move(source), source_output_index)
+  GField(std::shared_ptr<FieldNode> node, const int node_output_index = 0)
+      : GFieldBase<std::shared_ptr<FieldNode>>(std::move(node), node_output_index)
   {
   }
 };
@@ -145,17 +145,17 @@ class GField : public GFieldBase<std::shared_ptr<FieldSource>> {
 /** Same as #GField but is cheaper to copy/move around, because it does not contain a
  * #std::shared_ptr.
  */
-class GFieldRef : public GFieldBase<const FieldSource *> {
+class GFieldRef : public GFieldBase<const FieldNode *> {
  public:
   GFieldRef() = default;
 
   GFieldRef(const GField &field)
-      : GFieldBase<const FieldSource *>(&field.source(), field.source_output_index())
+      : GFieldBase<const FieldNode *>(&field.node(), field.node_output_index())
   {
   }
 
-  GFieldRef(const FieldSource &source, const int source_output_index = 0)
-      : GFieldBase<const FieldSource *>(&source, source_output_index)
+  GFieldRef(const FieldNode &node, const int node_output_index = 0)
+      : GFieldBase<const FieldNode *>(&node, node_output_index)
   {
   }
 };
@@ -169,26 +169,26 @@ template<typename T> class Field : public GField {
     BLI_assert(this->cpp_type().template is<T>());
   }
 
-  Field(std::shared_ptr<FieldSource> source, const int source_output_index = 0)
-      : Field(GField(std::move(source), source_output_index))
+  Field(std::shared_ptr<FieldNode> node, const int node_output_index = 0)
+      : Field(GField(std::move(node), node_output_index))
   {
   }
 };
 
-class OperationFieldSource : public FieldSource {
+class FieldOperation : public FieldNode {
   std::unique_ptr<const MultiFunction> owned_function_;
   const MultiFunction *function_;
 
   blender::Vector<GField> inputs_;
 
  public:
-  OperationFieldSource(std::unique_ptr<const MultiFunction> function, Vector<GField> inputs = {})
+  FieldOperation(std::unique_ptr<const MultiFunction> function, Vector<GField> inputs = {})
       : owned_function_(std::move(function)), inputs_(std::move(inputs))
   {
     function_ = owned_function_.get();
   }
 
-  OperationFieldSource(const MultiFunction &function, Vector<GField> inputs = {})
+  FieldOperation(const MultiFunction &function, Vector<GField> inputs = {})
       : function_(&function), inputs_(std::move(inputs))
   {
   }
@@ -203,7 +203,7 @@ class OperationFieldSource : public FieldSource {
     return *function_;
   }
 
-  bool is_operation_source() const override
+  bool is_operation_node() const override
   {
     return true;
   }
@@ -225,24 +225,24 @@ class OperationFieldSource : public FieldSource {
   }
 };
 
-class ContextFieldSource;
+class FieldInput;
 
 class FieldContext {
  public:
   ~FieldContext() = default;
 
-  virtual const GVArray *try_get_varray_for_context(const ContextFieldSource &context_source,
+  virtual const GVArray *try_get_varray_for_context(const FieldInput &field_input,
                                                     IndexMask mask,
                                                     ResourceScope &scope) const;
 };
 
-class ContextFieldSource : public FieldSource {
+class FieldInput : public FieldNode {
  protected:
   const CPPType *type_;
   std::string debug_name_;
 
  public:
-  ContextFieldSource(const CPPType &type, std::string debug_name = "")
+  FieldInput(const CPPType &type, std::string debug_name = "")
       : type_(&type), debug_name_(std::move(debug_name))
   {
   }
@@ -268,7 +268,7 @@ class ContextFieldSource : public FieldSource {
     return *type_;
   }
 
-  bool is_context_source() const override
+  bool is_input_node() const override
   {
     return true;
   }
@@ -298,7 +298,7 @@ template<typename T> T evaluate_constant_field(const Field<T> &field)
 template<typename T> Field<T> make_constant_field(T value)
 {
   auto constant_fn = std::make_unique<fn::CustomMF_Constant<T>>(std::forward<T>(value));
-  auto operation = std::make_shared<OperationFieldSource>(std::move(constant_fn));
+  auto operation = std::make_shared<FieldOperation>(std::move(constant_fn));
   return Field<T>{GField{std::move(operation), 0}};
 }
 

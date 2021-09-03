@@ -26,7 +26,7 @@ namespace blender::fn {
 
 struct FieldGraphInfo {
   MultiValueMap<GFieldRef, GFieldRef> field_users;
-  VectorSet<std::reference_wrapper<const ContextFieldSource>> deduplicated_context_sources;
+  VectorSet<std::reference_wrapper<const FieldInput>> deduplicated_field_inputs;
 };
 
 static FieldGraphInfo preprocess_field_graph(Span<GFieldRef> entry_fields)
@@ -44,15 +44,13 @@ static FieldGraphInfo preprocess_field_graph(Span<GFieldRef> entry_fields)
 
   while (!fields_to_check.is_empty()) {
     GFieldRef field = fields_to_check.pop();
-    if (field.has_context_source()) {
-      const ContextFieldSource &context_source = static_cast<const ContextFieldSource &>(
-          field.source());
-      graph_info.deduplicated_context_sources.add(context_source);
+    if (field.has_context_node()) {
+      const FieldInput &field_input = static_cast<const FieldInput &>(field.node());
+      graph_info.deduplicated_field_inputs.add(field_input);
       continue;
     }
-    BLI_assert(field.has_operation_source());
-    const OperationFieldSource &operation = static_cast<const OperationFieldSource &>(
-        field.source());
+    BLI_assert(field.has_operation_node());
+    const FieldOperation &operation = static_cast<const FieldOperation &>(field.node());
     for (const GFieldRef operation_input : operation.inputs()) {
       graph_info.field_users.add(operation_input, field);
       if (handled_fields.add(operation_input)) {
@@ -69,10 +67,10 @@ static Vector<const GVArray *> get_field_context_inputs(ResourceScope &scope,
                                                         const FieldGraphInfo &graph_info)
 {
   Vector<const GVArray *> field_context_inputs;
-  for (const ContextFieldSource &context_source : graph_info.deduplicated_context_sources) {
-    const GVArray *varray = context.try_get_varray_for_context(context_source, mask, scope);
+  for (const FieldInput &field_input : graph_info.deduplicated_field_inputs) {
+    const GVArray *varray = context.try_get_varray_for_context(field_input, mask, scope);
     if (varray == nullptr) {
-      const CPPType &type = context_source.cpp_type();
+      const CPPType &type = field_input.cpp_type();
       varray = &scope.construct<GVArray_For_SingleValueRef>(
           __func__, type, mask.min_array_size(), type.default_value());
     }
@@ -91,9 +89,9 @@ static Set<GFieldRef> find_varying_fields(const FieldGraphInfo &graph_info,
     if (varray->is_single()) {
       continue;
     }
-    const ContextFieldSource &context_source = graph_info.deduplicated_context_sources[i];
-    const GFieldRef context_source_field{context_source, 0};
-    const Span<GFieldRef> users = graph_info.field_users.lookup(context_source_field);
+    const FieldInput &field_input = graph_info.deduplicated_field_inputs[i];
+    const GFieldRef field_input_field{field_input, 0};
+    const Span<GFieldRef> users = graph_info.field_users.lookup(field_input_field);
     for (const GFieldRef &field : users) {
       if (found_fields.add(field)) {
         fields_to_check.push(field);
@@ -119,10 +117,10 @@ static void build_multi_function_procedure_for_fields(MFProcedure &procedure,
 {
   MFProcedureBuilder builder{procedure};
   Map<GFieldRef, MFVariable *> variable_by_field;
-  for (const ContextFieldSource &context_field_source : graph_info.deduplicated_context_sources) {
+  for (const FieldInput &field_input : graph_info.deduplicated_field_inputs) {
     MFVariable &variable = builder.add_input_parameter(
-        MFDataType::ForSingle(context_field_source.cpp_type()), context_field_source.debug_name());
-    variable_by_field.add_new({context_field_source, 0}, &variable);
+        MFDataType::ForSingle(field_input.cpp_type()), field_input.debug_name());
+    variable_by_field.add_new({field_input, 0}, &variable);
   }
 
   struct FieldWithIndex {
@@ -140,11 +138,10 @@ static void build_multi_function_procedure_for_fields(MFProcedure &procedure,
         fields_to_check.pop();
         continue;
       }
-      /* Context sources should already be handled above. */
-      BLI_assert(field.has_operation_source());
-      const OperationFieldSource &operation_field_source =
-          static_cast<const OperationFieldSource &>(field.source());
-      const Span<GField> operation_inputs = operation_field_source.inputs();
+      /* Field inputs should already be handled above. */
+      BLI_assert(field.has_operation_node());
+      const FieldOperation &operation = static_cast<const FieldOperation &>(field.node());
+      const Span<GField> operation_inputs = operation.inputs();
       if (field_with_index.current_input_index < operation_inputs.size()) {
         /* Push next input. */
         fields_to_check.push({operation_inputs[field_with_index.current_input_index]});
@@ -156,10 +153,10 @@ static void build_multi_function_procedure_for_fields(MFProcedure &procedure,
         for (const GField &field : operation_inputs) {
           input_variables.append(variable_by_field.lookup(field));
         }
-        const MultiFunction &multi_function = operation_field_source.multi_function();
+        const MultiFunction &multi_function = operation.multi_function();
         Vector<MFVariable *> output_variables = builder.add_call(multi_function, input_variables);
         for (const int i : output_variables.index_range()) {
-          variable_by_field.add_new({operation_field_source, i}, output_variables[i]);
+          variable_by_field.add_new({operation, i}, output_variables[i]);
         }
       }
     }
@@ -212,7 +209,7 @@ struct PartiallyInitializedArray : NonCopyable, NonMovable {
  * \param mask: Determines which indices are computed. The mask may be referenced by the returned
  *   virtual arrays. So the underlying indices (if applicable) should live longer then #scope.
  * \param context: The context that the field is evaluated in. Used to retrieve data from each
- *   #ContextFieldSource in the field network.
+ *   #FieldInput in the field network.
  * \param dst_hints: If provided, the computed data will be written into those virtual arrays
  *   instead of into newly created ones. That allows making the computed data live longer than
  *   #scope and is more efficient when the data will be written into those virtual arrays
@@ -242,13 +239,12 @@ Vector<const GVArray *> evaluate_fields(ResourceScope &scope,
   /* Finish fields that output a context varray directly. */
   for (const int out_index : fields_to_evaluate.index_range()) {
     const GFieldRef &field = fields_to_evaluate[out_index];
-    if (!field.has_context_source()) {
+    if (!field.has_context_node()) {
       continue;
     }
-    const ContextFieldSource &field_source = static_cast<const ContextFieldSource &>(
-        field.source());
-    const int field_source_index = graph_info.deduplicated_context_sources.index_of(field_source);
-    const GVArray *varray = field_context_inputs[field_source_index];
+    const FieldInput &field_input = static_cast<const FieldInput &>(field.node());
+    const int field_input_index = graph_info.deduplicated_field_inputs.index_of(field_input);
+    const GVArray *varray = field_context_inputs[field_input_index];
     r_varrays[out_index] = varray;
   }
 
@@ -406,13 +402,13 @@ void evaluate_fields_to_spans(Span<GFieldRef> fields_to_evaluate,
   evaluate_fields(scope, fields_to_evaluate, mask, context, varrays);
 }
 
-const GVArray *FieldContext::try_get_varray_for_context(const ContextFieldSource &context_source,
+const GVArray *FieldContext::try_get_varray_for_context(const FieldInput &field_input,
                                                         IndexMask mask,
                                                         ResourceScope &scope) const
 {
-  /* By default ask the context source to create the varray. Another field context might overwrite
+  /* By default ask the field input to create the varray. Another field context might overwrite
    * the context here. */
-  return context_source.try_get_varray_for_context(*this, mask, scope);
+  return field_input.try_get_varray_for_context(*this, mask, scope);
 }
 
 }  // namespace blender::fn

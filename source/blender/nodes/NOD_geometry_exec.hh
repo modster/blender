@@ -42,9 +42,10 @@ using bke::ReadAttributeLookup;
 using bke::StrongAnonymousAttributeID;
 using bke::WeakAnonymousAttributeID;
 using bke::WriteAttributeLookup;
-using fn::ContextFieldSource;
 using fn::CPPType;
 using fn::Field;
+using fn::FieldInput;
+using fn::FieldOperation;
 using fn::GField;
 using fn::GMutablePointer;
 using fn::GMutableSpan;
@@ -59,7 +60,6 @@ using fn::GVMutableArray;
 using fn::GVMutableArray_GSpan;
 using fn::GVMutableArray_Typed;
 using fn::GVMutableArrayPtr;
-using fn::OperationFieldSource;
 using geometry_nodes_eval_log::NodeWarningType;
 
 /**

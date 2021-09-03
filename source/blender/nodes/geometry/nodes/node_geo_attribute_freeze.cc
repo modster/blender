@@ -157,7 +157,7 @@ static void geo_node_attribute_freeze_exec(GeoNodeExecParams params)
   }
 
   GField output_field{
-      std::make_shared<bke::AnonymousAttributeContextFieldSource>(std::move(anonymous_id), type)};
+      std::make_shared<bke::AnonymousAttributeFieldInput>(std::move(anonymous_id), type)};
 
   switch (data_type) {
     case CD_PROP_FLOAT: {

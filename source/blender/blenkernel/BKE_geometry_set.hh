@@ -608,13 +608,13 @@ class GeometryComponentFieldContext : public fn::FieldContext {
   }
 };
 
-class AttributeContextFieldSource : public fn::ContextFieldSource {
+class AttributeFieldInput : public fn::FieldInput {
  private:
   std::string name_;
 
  public:
-  AttributeContextFieldSource(std::string name, const CPPType &type)
-      : fn::ContextFieldSource(type, name), name_(std::move(name))
+  AttributeFieldInput(std::string name, const CPPType &type)
+      : fn::FieldInput(type, name), name_(std::move(name))
   {
   }
 
@@ -623,18 +623,16 @@ class AttributeContextFieldSource : public fn::ContextFieldSource {
                                             ResourceScope &scope) const override;
 
   uint64_t hash() const override;
-  bool is_equal_to(const fn::FieldSource &other) const override;
+  bool is_equal_to(const fn::FieldNode &other) const override;
 };
 
-class AnonymousAttributeContextFieldSource : public fn::ContextFieldSource {
+class AnonymousAttributeFieldInput : public fn::FieldInput {
  private:
   StrongAnonymousAttributeID anonymous_id_;
 
  public:
-  AnonymousAttributeContextFieldSource(StrongAnonymousAttributeID anonymous_id,
-                                       const CPPType &type)
-      : fn::ContextFieldSource(type, anonymous_id.debug_name()),
-        anonymous_id_(std::move(anonymous_id))
+  AnonymousAttributeFieldInput(StrongAnonymousAttributeID anonymous_id, const CPPType &type)
+      : fn::FieldInput(type, anonymous_id.debug_name()), anonymous_id_(std::move(anonymous_id))
   {
   }
 
@@ -643,7 +641,7 @@ class AnonymousAttributeContextFieldSource : public fn::ContextFieldSource {
                                             ResourceScope &scope) const override;
 
   uint64_t hash() const override;
-  bool is_equal_to(const fn::FieldSource &other) const override;
+  bool is_equal_to(const fn::FieldNode &other) const override;
 };
 
 }  // namespace blender::bke

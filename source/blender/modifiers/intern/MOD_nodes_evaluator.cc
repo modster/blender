@@ -880,7 +880,7 @@ class GeometryNodesEvaluator {
       input_fields.append(std::move(*(GField *)single_value.value));
     }
 
-    auto operation = std::make_shared<fn::OperationFieldSource>(fn, std::move(input_fields));
+    auto operation = std::make_shared<fn::FieldOperation>(fn, std::move(input_fields));
 
     /* Forward outputs. */
     int output_index = 0;
@@ -1392,8 +1392,7 @@ class GeometryNodesEvaluator {
         const MultiFunction &fn = *conversions_.get_conversion_multi_function(
             MFDataType::ForSingle(from_base_type), MFDataType::ForSingle(to_base_type));
         const GField &from_field = *(const GField *)from_value;
-        auto operation = std::make_shared<fn::OperationFieldSource>(fn,
-                                                                    Vector<GField>{from_field});
+        auto operation = std::make_shared<fn::FieldOperation>(fn, Vector<GField>{from_field});
         new (to_value) GField(std::move(operation), 0);
         return;
       }
@@ -1414,7 +1413,7 @@ class GeometryNodesEvaluator {
       const CPPType &base_type = field_cpp_type->field_type();
       auto constant_fn = std::make_unique<fn::CustomMF_GenericConstant>(base_type,
                                                                         base_type.default_value());
-      auto operation = std::make_shared<fn::OperationFieldSource>(std::move(constant_fn));
+      auto operation = std::make_shared<fn::FieldOperation>(std::move(constant_fn));
       new (r_value) GField(std::move(operation), 0);
       return;
     }

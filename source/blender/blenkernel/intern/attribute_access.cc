@@ -1303,8 +1303,9 @@ blender::bke::OutputAttribute GeometryComponent::attribute_try_get_for_output_on
 
 namespace blender::bke {
 
-const GVArray *AttributeContextFieldSource::try_get_varray_for_context(
-    const fn::FieldContext &context, IndexMask UNUSED(mask), ResourceScope &scope) const
+const GVArray *AttributeFieldInput::try_get_varray_for_context(const fn::FieldContext &context,
+                                                               IndexMask UNUSED(mask),
+                                                               ResourceScope &scope) const
 {
   if (const GeometryComponentFieldContext *geometry_context =
           dynamic_cast<const GeometryComponentFieldContext *>(&context)) {
@@ -1317,21 +1318,20 @@ const GVArray *AttributeContextFieldSource::try_get_varray_for_context(
   return nullptr;
 }
 
-uint64_t AttributeContextFieldSource::hash() const
+uint64_t AttributeFieldInput::hash() const
 {
   return get_default_hash_2(name_, type_);
 }
 
-bool AttributeContextFieldSource::is_equal_to(const fn::FieldSource &other) const
+bool AttributeFieldInput::is_equal_to(const fn::FieldNode &other) const
 {
-  if (const AttributeContextFieldSource *other_typed =
-          dynamic_cast<const AttributeContextFieldSource *>(&other)) {
+  if (const AttributeFieldInput *other_typed = dynamic_cast<const AttributeFieldInput *>(&other)) {
     return name_ == other_typed->name_ && type_ == other_typed->type_;
   }
   return false;
 }
 
-const GVArray *AnonymousAttributeContextFieldSource::try_get_varray_for_context(
+const GVArray *AnonymousAttributeFieldInput::try_get_varray_for_context(
     const fn::FieldContext &context, IndexMask UNUSED(mask), ResourceScope &scope) const
 {
   if (const GeometryComponentFieldContext *geometry_context =
@@ -1346,15 +1346,15 @@ const GVArray *AnonymousAttributeContextFieldSource::try_get_varray_for_context(
   return nullptr;
 }
 
-uint64_t AnonymousAttributeContextFieldSource::hash() const
+uint64_t AnonymousAttributeFieldInput::hash() const
 {
   return get_default_hash_2(anonymous_id_.get(), type_);
 }
 
-bool AnonymousAttributeContextFieldSource::is_equal_to(const fn::FieldSource &other) const
+bool AnonymousAttributeFieldInput::is_equal_to(const fn::FieldNode &other) const
 {
-  if (const AnonymousAttributeContextFieldSource *other_typed =
-          dynamic_cast<const AnonymousAttributeContextFieldSource *>(&other)) {
+  if (const AnonymousAttributeFieldInput *other_typed =
+          dynamic_cast<const AnonymousAttributeFieldInput *>(&other)) {
     return anonymous_id_.get() == other_typed->anonymous_id_.get() && type_ == other_typed->type_;
   }
   return false;
