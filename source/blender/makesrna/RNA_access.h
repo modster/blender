@@ -1006,7 +1006,7 @@ int RNA_property_int_get_index(PointerRNA *ptr, PropertyRNA *prop, int index);
 void RNA_property_int_set_array(PointerRNA *ptr, PropertyRNA *prop, const int *values);
 void RNA_property_int_set_index(PointerRNA *ptr, PropertyRNA *prop, int index, int value);
 int RNA_property_int_get_default(PointerRNA *ptr, PropertyRNA *prop);
-bool RNA_property_int_set_default(PointerRNA *ptr, PropertyRNA *prop, int value);
+bool RNA_property_int_set_default(PropertyRNA *prop, int value);
 void RNA_property_int_get_default_array(PointerRNA *ptr, PropertyRNA *prop, int *values);
 int RNA_property_int_get_default_index(PointerRNA *ptr, PropertyRNA *prop, int index);
 
@@ -1018,7 +1018,7 @@ float RNA_property_float_get_index(PointerRNA *ptr, PropertyRNA *prop, int index
 void RNA_property_float_set_array(PointerRNA *ptr, PropertyRNA *prop, const float *values);
 void RNA_property_float_set_index(PointerRNA *ptr, PropertyRNA *prop, int index, float value);
 float RNA_property_float_get_default(PointerRNA *ptr, PropertyRNA *prop);
-bool RNA_property_float_set_default(PointerRNA *ptr, PropertyRNA *prop, float value);
+bool RNA_property_float_set_default(PropertyRNA *prop, float value);
 void RNA_property_float_get_default_array(PointerRNA *ptr, PropertyRNA *prop, float *values);
 float RNA_property_float_get_default_index(PointerRNA *ptr, PropertyRNA *prop, int index);
 
@@ -1028,11 +1028,9 @@ char *RNA_property_string_get_alloc(
 void RNA_property_string_set(PointerRNA *ptr, PropertyRNA *prop, const char *value);
 void RNA_property_string_set_bytes(PointerRNA *ptr, PropertyRNA *prop, const char *value, int len);
 int RNA_property_string_length(PointerRNA *ptr, PropertyRNA *prop);
-void RNA_property_string_get_default(PointerRNA *ptr, PropertyRNA *prop, char *value);
-char *RNA_property_string_get_default_alloc(PointerRNA *ptr,
-                                            PropertyRNA *prop,
-                                            char *fixedbuf,
-                                            int fixedlen);
+void RNA_property_string_get_default(PropertyRNA *prop, char *value, int max_len);
+char *RNA_property_string_get_default_alloc(
+    PointerRNA *ptr, PropertyRNA *prop, char *fixedbuf, int fixedlen, int *r_len);
 int RNA_property_string_default_length(PointerRNA *ptr, PropertyRNA *prop);
 
 int RNA_property_enum_get(PointerRNA *ptr, PropertyRNA *prop);
@@ -1126,6 +1124,8 @@ bool RNA_path_resolve(PointerRNA *ptr, const char *path, PointerRNA *r_ptr, Prop
 
 bool RNA_path_resolve_full(
     PointerRNA *ptr, const char *path, PointerRNA *r_ptr, PropertyRNA **r_prop, int *r_index);
+bool RNA_path_resolve_full_maybe_null(
+    PointerRNA *ptr, const char *path, PointerRNA *r_ptr, PropertyRNA **r_prop, int *r_index);
 
 /* path_resolve_property() variants ensure that pointer + property both exist */
 bool RNA_path_resolve_property(PointerRNA *ptr,
@@ -1164,7 +1164,7 @@ char *RNA_path_from_struct_to_idproperty(PointerRNA *ptr, struct IDProperty *nee
 
 struct ID *RNA_find_real_ID_and_path(struct Main *bmain, struct ID *id, const char **r_path);
 
-char *RNA_path_from_ID_to_struct(PointerRNA *ptr);
+char *RNA_path_from_ID_to_struct(const PointerRNA *ptr);
 
 char *RNA_path_from_real_ID_to_struct(struct Main *bmain, PointerRNA *ptr, struct ID **r_real);
 
@@ -1194,7 +1194,7 @@ char *RNA_path_full_property_py(struct Main *bmain,
                                 struct PropertyRNA *prop,
                                 int index);
 char *RNA_path_struct_property_py(struct PointerRNA *ptr, struct PropertyRNA *prop, int index);
-char *RNA_path_property_py(struct PointerRNA *ptr, struct PropertyRNA *prop, int index);
+char *RNA_path_property_py(const struct PointerRNA *ptr, struct PropertyRNA *prop, int index);
 
 /* Quick name based property access
  *
@@ -1238,7 +1238,8 @@ bool RNA_enum_icon_from_value(const EnumPropertyItem *item, int value, int *r_ic
 bool RNA_enum_name_from_value(const EnumPropertyItem *item, int value, const char **r_name);
 
 void RNA_string_get(PointerRNA *ptr, const char *name, char *value);
-char *RNA_string_get_alloc(PointerRNA *ptr, const char *name, char *fixedbuf, int fixedlen);
+char *RNA_string_get_alloc(
+    PointerRNA *ptr, const char *name, char *fixedbuf, int fixedlen, int *r_len);
 int RNA_string_length(PointerRNA *ptr, const char *name);
 void RNA_string_set(PointerRNA *ptr, const char *name, const char *value);
 

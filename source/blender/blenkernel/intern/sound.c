@@ -137,24 +137,23 @@ static void sound_blend_write(BlendWriter *writer, ID *id, const void *id_addres
 {
   bSound *sound = (bSound *)id;
   const bool is_undo = BLO_write_is_undo(writer);
-  if (sound->id.us > 0 || is_undo) {
-    /* Clean up, important in undo case to reduce false detection of changed datablocks. */
-    sound->tags = 0;
-    sound->handle = NULL;
-    sound->playback_handle = NULL;
-    sound->spinlock = NULL;
 
-    /* Do not store packed files in case this is a library override ID. */
-    if (ID_IS_OVERRIDE_LIBRARY(sound) && !is_undo) {
-      sound->packedfile = NULL;
-    }
+  /* Clean up, important in undo case to reduce false detection of changed datablocks. */
+  sound->tags = 0;
+  sound->handle = NULL;
+  sound->playback_handle = NULL;
+  sound->spinlock = NULL;
 
-    /* write LibData */
-    BLO_write_id_struct(writer, bSound, id_address, &sound->id);
-    BKE_id_blend_write(writer, &sound->id);
-
-    BKE_packedfile_blend_write(writer, sound->packedfile);
+  /* Do not store packed files in case this is a library override ID. */
+  if (ID_IS_OVERRIDE_LIBRARY(sound) && !is_undo) {
+    sound->packedfile = NULL;
   }
+
+  /* write LibData */
+  BLO_write_id_struct(writer, bSound, id_address, &sound->id);
+  BKE_id_blend_write(writer, &sound->id);
+
+  BKE_packedfile_blend_write(writer, sound->packedfile);
 }
 
 static void sound_blend_read_data(BlendDataReader *reader, ID *id)
@@ -703,7 +702,7 @@ void *BKE_sound_scene_add_scene_sound(
     Scene *scene, Sequence *sequence, int startframe, int endframe, int frameskip)
 {
   sound_verify_evaluated_id(&scene->id);
-  if (sequence->scene && scene != sequence->scene) {
+  if (sequence->scene && scene != sequence->scene && sequence->sound) {
     const double fps = FPS;
     return AUD_Sequence_add(scene->sound_scene,
                             sequence->scene->sound_scene,
@@ -775,7 +774,7 @@ void BKE_sound_move_scene_sound(
 void BKE_sound_move_scene_sound_defaults(Scene *scene, Sequence *sequence)
 {
   sound_verify_evaluated_id(&scene->id);
-  if (sequence->scene_sound) {
+  if (sequence->scene_sound && sequence->sound) {
     BKE_sound_move_scene_sound(scene,
                                sequence->scene_sound,
                                sequence->startdisp,
