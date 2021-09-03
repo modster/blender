@@ -1168,8 +1168,10 @@ static void panel_draw_aligned_widgets(const uiStyle *style,
   };
 
   uchar title_color[4];
+  uchar collapse_icon_color[4];
   panel_title_color_get(panel, show_background, region_search_filter_active, title_color);
-  title_color[3] = 255;
+  copy_v4_uchar(collapse_icon_color, *title_color);
+  collapse_icon_color[3] = 100;
 
   /* Draw collapse icon. */
   {
@@ -1188,7 +1190,7 @@ static void panel_draw_aligned_widgets(const uiStyle *style,
                     aspect * U.inv_dpi_fac,
                     0.5f,
                     0.0f,
-                    title_color,
+                    collapse_icon_color,
                     false);
     GPU_blend(GPU_BLEND_NONE);
   }
