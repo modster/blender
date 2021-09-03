@@ -40,7 +40,7 @@ static GVArrayPtr mesh_face_normals(const Mesh &mesh,
     const void *data = CustomData_get_layer(&mesh.pdata, CD_NORMAL);
 
     return std::make_unique<fn::GVArray_For_Span<float3>>(
-        Span<float3>((const float3 *)data, mesh.totpoly));
+        Span<float3>((const float3 *)data, polys.size()));
   }
 
   auto normal_fn = [verts, polys, loops](const int i) -> float3 {
@@ -73,7 +73,8 @@ static GVArrayPtr mesh_vertex_normals(const Mesh &mesh,
   /* If the normals are dirty, they must be recalculated for the output of this node's field
    * source. Ideally vertex normals could be calculated lazily on a const mesh, protected with a
    * mutex. But that's not possible at the moment, so we take ownership of the results. Sadly we
-   * must also create a copy of MVert to use the mesh normals API.
+   * must also create a copy of MVert to use the mesh normals API. This can be improved by adding
+   * mutex-protected lazy calculation of normals on meshes.
    *
    * Use mask.min_array_size() to avoid calculating a final chunk of data if possible. */
   Array<MVert> temp_verts(verts);
@@ -133,7 +134,7 @@ static const GVArray *construct_mesh_normals_gvarray(const MeshComponent &mesh_c
       /* The normals on corners are just the mesh's face normals, so start with the face normal
        * array and copy the face normal for each of its corners. */
       GVArrayPtr face_normals = mesh_face_normals(
-          mesh, verts, polys, loops, IndexRange(mesh.totpoly));
+          mesh, verts, polys, loops, IndexRange(polys.size()]));
 
       /* In this case using the mesh component's generic domain interpolation is fine,
        * since the face normal is just copied to every corner. */
