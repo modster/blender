@@ -78,7 +78,7 @@ static GVArrayPtr mesh_vertex_normals(const Mesh &mesh,
    *
    * Use mask.min_array_size() to avoid calculating a final chunk of data if possible. */
   Array<MVert> temp_verts(verts);
-  Array<float3> normals(mask.min_array_size());
+  Array<float3> normals(verts.size()); /* Use full size for accumulation from faces. */
   BKE_mesh_calc_normals_poly_and_vertex(temp_verts.data(),
                                         mask.min_array_size(),
                                         loops.data(),
