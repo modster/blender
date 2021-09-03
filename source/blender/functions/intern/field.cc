@@ -32,8 +32,8 @@ struct FieldTreeInfo {
    */
   MultiValueMap<GFieldRef, GFieldRef> field_users;
   /**
-   * The same field input may exist in the field tree as as separate nodes due to the way the tree
-   * is constructed. This set contains every input only once.
+   * The same field input may exist in the field tree as as separate nodes due to the way
+   * the tree is constructed. This set contains every different input only once.
    */
   VectorSet<std::reference_wrapper<const FieldInput>> deduplicated_field_inputs;
 };
@@ -205,8 +205,8 @@ static void build_multi_function_procedure_for_fields(MFProcedure &procedure,
   for (const GFieldRef &field : output_fields) {
     MFVariable *variable = variable_by_field.lookup(field);
     if (!already_output_variables.add(variable)) {
-      /* One variable can be output at most once. To output the same value twice, we have to make a
-       * copy first. */
+      /* One variable can be output at most once. To output the same value twice, we have to make
+       * a copy first. */
       const MultiFunction &copy_fn = scope.construct<CustomMF_GenericCopy>(
           __func__, "copy", variable->data_type());
       variable = builder.add_call<1>(copy_fn, {variable})[0];
@@ -258,7 +258,7 @@ struct PartiallyInitializedArray : NonCopyable, NonMovable {
  *   instead of into newly created ones. That allows making the computed data live longer than
  *   #scope and is more efficient when the data will be written into those virtual arrays
  *   later anyway.
- * \return The computed virtual arrays for each provided field. If #dst_hints were passed, the
+ * \return The computed virtual arrays for each provided field. If #dst_hints is passed, the
  *   provided virtual arrays are returned.
  */
 Vector<const GVArray *> evaluate_fields(ResourceScope &scope,
@@ -284,7 +284,7 @@ Vector<const GVArray *> evaluate_fields(ResourceScope &scope,
   Vector<const GVArray *> field_context_inputs = get_field_context_inputs(
       scope, mask, context, field_tree_info.deduplicated_field_inputs);
 
-  /* Finish fields that output a context varray directly. For those we don't have to do any further
+  /* Finish fields that output an input varray directly. For those we don't have to do any further
    * processing. */
   for (const int out_index : fields_to_evaluate.index_range()) {
     const GFieldRef &field = fields_to_evaluate[out_index];
@@ -330,7 +330,7 @@ Vector<const GVArray *> evaluate_fields(ResourceScope &scope,
     build_multi_function_procedure_for_fields(
         procedure, scope, field_tree_info, varying_fields_to_evaluate);
     MFProcedureExecutor procedure_executor{"Procedure", procedure};
-    MFParamsBuilder mf_params{procedure_executor, mask.min_array_size()};
+    MFParamsBuilder mf_params{procedure_executor, array_size};
     MFContextBuilder mf_context;
 
     /* Provide inputs to the procedure executor. */
@@ -478,6 +478,30 @@ const GVArray *FieldContext::try_get_varray_for_context(const FieldInput &field_
   /* By default ask the field input to create the varray. Another field context might overwrite
    * the context here. */
   return field_input.try_get_varray_for_context(*this, mask, scope);
+}
+
+Vector<int64_t> indices_from_selection(const VArray<bool> &selection)
+{
+  /* If the selection is just a single value, it's best to avoid calling this
+   * function when constructing an IndexMask and use an IndexRange instead. */
+  BLI_assert(!selection.is_single());
+  Vector<int64_t> indices;
+  if (selection.is_span()) {
+    Span<bool> span = selection.get_internal_span();
+    for (const int64_t i : span.index_range()) {
+      if (span[i]) {
+        indices.append(i);
+      }
+    }
+  }
+  else {
+    for (const int i : selection.index_range()) {
+      if (selection[i]) {
+        indices.append(i);
+      }
+    }
+  }
+  return indices;
 }
 
 }  // namespace blender::fn

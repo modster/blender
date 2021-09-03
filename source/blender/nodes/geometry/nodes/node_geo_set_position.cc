@@ -28,55 +28,24 @@ static void geo_node_set_position_declare(NodeDeclarationBuilder &b)
   b.add_output<decl::Geometry>("Geometry");
 }
 
-static IndexMask index_mask_from_selection_varray(const VArray<bool> &selection,
-                                                  Vector<int64_t> &r_indices)
-{
-  if (selection.is_single()) {
-    if (selection.get_internal_single()) {
-      return IndexRange(selection.size());
-    }
-    return IndexRange(0);
-  }
-  if (selection.is_span()) {
-    Span<bool> selection_span = selection.get_internal_span();
-    for (const int i : selection_span.index_range()) {
-      if (selection_span[i]) {
-        r_indices.append(i);
-      }
-    }
-  }
-  else {
-    for (const int i : selection.index_range()) {
-      if (selection[i]) {
-        r_indices.append(i);
-      }
-    }
-  }
-  return r_indices.as_span();
-}
-
 static void set_position_in_component(GeometryComponent &component,
                                       const Field<bool> &selection_field,
                                       const Field<float3> &position_field)
 {
   GeometryComponentFieldContext field_context{component, ATTR_DOMAIN_POINT};
   const int domain_size = component.attribute_domain_size(ATTR_DOMAIN_POINT);
-  const IndexMask full_mask{IndexRange(domain_size)};
 
-  fn::FieldEvaluator selection_evaluator{field_context, &full_mask};
-  const VArray<bool> *selection = nullptr;
-  selection_evaluator.add(selection_field, &selection);
+  fn::FieldEvaluator selection_evaluator{field_context, domain_size};
+  selection_evaluator.add(selection_field);
   selection_evaluator.evaluate();
+  const IndexMask selection = selection_evaluator.get_evaluated_as_mask(0);
 
-  Vector<int64_t> mask_indices;
-  const IndexMask selected_mask = index_mask_from_selection_varray(*selection, mask_indices);
-
-  OutputAttribute_Typed<float3> position_attribute =
-      component.attribute_try_get_for_output<float3>("position", ATTR_DOMAIN_POINT, {0, 0, 0});
-  fn::FieldEvaluator position_evaluator{field_context, &selected_mask};
-  position_evaluator.add_with_destination(position_field, position_attribute.varray());
+  OutputAttribute_Typed<float3> positions = component.attribute_try_get_for_output<float3>(
+      "position", ATTR_DOMAIN_POINT, {0, 0, 0});
+  fn::FieldEvaluator position_evaluator{field_context, &selection};
+  position_evaluator.add_with_destination(position_field, positions.varray());
   position_evaluator.evaluate();
-  position_attribute.save();
+  positions.save();
 }
 
 static void geo_node_set_position_exec(GeoNodeExecParams params)

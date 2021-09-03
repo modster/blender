@@ -142,7 +142,8 @@ class GField : public GFieldBase<std::shared_ptr<FieldNode>> {
   }
 };
 
-/** Same as #GField but is cheaper to copy/move around, because it does not contain a
+/**
+ * Same as #GField but is cheaper to copy/move around, because it does not contain a
  * #std::shared_ptr.
  */
 class GFieldRef : public GFieldBase<const FieldNode *> {
@@ -287,6 +288,8 @@ void evaluate_fields_to_spans(Span<GFieldRef> fields_to_evaluate,
                               const FieldContext &context,
                               Span<GMutableSpan> out_spans);
 
+Vector<int64_t> indices_from_selection(const VArray<bool> &selection);
+
 template<typename T> T evaluate_constant_field(const Field<T> &field)
 {
   T value;
@@ -326,6 +329,9 @@ class FieldEvaluator : NonMovable, NonCopyable {
       : context_(context), mask_(*mask)
   {
   }
+  FieldEvaluator(const FieldContext &context, const int64_t size) : context_(context), mask_(size)
+  {
+  }
 
   /**
    * \param field: Field to add to the evaluator.
@@ -345,6 +351,34 @@ class FieldEvaluator : NonMovable, NonCopyable {
     GVMutableArray &generic_dst_hint = scope_.construct<GVMutableArray_For_VMutableArray<T>>(
         __func__, dst);
     return this->add_with_destination(GField(std::move(field)), generic_dst_hint);
+  }
+
+  /**
+   * \param field: Field to add to the evaluator.
+   * \param dst: Mutable span that the evaluated result for this field is be written into.
+   * \note: When the output may only be used as a single value, the version of this function with
+   * a virtual array result array should be used.
+   */
+  int add_with_destination(GField field, GMutableSpan dst)
+  {
+    const int field_index = fields_to_evaluate_.append_and_get_index(std::move(field));
+    dst_hints_.append(&scope_.construct<GVMutableArray_For_GMutableSpan>(__func__, dst));
+    output_pointer_infos_.append({});
+    return field_index;
+  }
+
+  /**
+   * \param field: Field to add to the evaluator.
+   * \param dst: Mutable span that the evaluated result for this field is be written into.
+   * \note: When the output may only be used as a single value, the version of this function with
+   * a virtual array result array should be used.
+   */
+  template<typename T> int add_with_destination(Field<T> field, MutableSpan<T> dst)
+  {
+    const int field_index = fields_to_evaluate_.append_and_get_index(std::move(field));
+    dst_hints_.append(&scope_.construct<GVMutableArray_For_MutableSpan<T>>(__func__, dst));
+    output_pointer_infos_.append({});
+    return field_index;
   }
 
   int add(GField field, const GVArray **varray_ptr)
@@ -418,6 +452,26 @@ class FieldEvaluator : NonMovable, NonCopyable {
     const GVArray &varray = this->get_evaluated(field_index);
     GVArray_Typed<T> &typed_varray = scope_.construct<GVArray_Typed<T>>(__func__, varray);
     return *typed_varray;
+  }
+
+  /**
+   * Retrieve the output of an evaluated boolean field and convert it to a mask, which can be used
+   * to avoid calculations for unnecessary elements later on. The evaluator will own the indices in
+   * some cases, so it must live at least as long as the returned mask.
+   */
+  IndexMask get_evaluated_as_mask(const int field_index)
+  {
+    const GVArray &varray = this->get_evaluated(field_index);
+    GVArray_Typed<bool> typed_varray{varray};
+
+    if (typed_varray->is_single()) {
+      if (typed_varray->get_internal_single()) {
+        return IndexRange(typed_varray.size());
+      }
+      return IndexRange(0);
+    }
+
+    return scope_.add_value(indices_from_selection(*typed_varray), __func__).as_span();
   }
 };
 
