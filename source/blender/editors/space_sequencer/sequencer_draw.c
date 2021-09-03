@@ -1345,14 +1345,14 @@ static void seq_get_thumb_image_dimensions(Sequence *seq,
   float image_width = seq->strip->stripdata->orig_width;
   float image_height = seq->strip->stripdata->orig_height;
 
-  /* Fix the dimensions to be max 256 for x or y. */
+  /* Fix the dimensions to be max SEQ_RENDER_THUMB_SIZE (256) for x or y. */
   float aspect_ratio = (float)image_width / image_height;
   if (image_width > image_height) {
-    image_width = 256;
+    image_width = SEQ_RENDER_THUMB_SIZE;
     image_height = round_fl_to_int(image_width / aspect_ratio);
   }
   else {
-    image_height = 256;
+    image_height = SEQ_RENDER_THUMB_SIZE;
     image_width = round_fl_to_int(image_height * aspect_ratio);
   }
 
@@ -1461,7 +1461,7 @@ static void sequencer_thumbnail_init_job(const bContext *C, View2D *v2d, Editing
                        CTX_wm_window(C),
                        CTX_data_scene(C),
                        "Draw Thumbnails",
-                       WM_JOB_PROGRESS,  // TODO(AYJ): change this and use SEQ_RENDER_THUMB_SIZE
+                       0,
                        WM_JOB_TYPE_SEQ_DRAW_THUMBNAIL);
 
   /* Get the thumbnail job if it exists. */
