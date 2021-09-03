@@ -19,7 +19,7 @@ TEST(field, ConstantFunction)
   GMutableSpan result_generic(result.as_mutable_span());
   FieldContext field_context;
   evaluate_fields_to_spans(
-      {&constant_field}, IndexMask(IndexRange(4)), field_context, {result_generic});
+      {constant_field}, IndexMask(IndexRange(4)), field_context, {result_generic});
 
   EXPECT_EQ(result[0], 10);
   EXPECT_EQ(result[1], 10);
@@ -52,7 +52,7 @@ TEST(field, VArrayInput)
   GMutableSpan result_generic_1(result_1.as_mutable_span());
   FieldContext field_context;
   evaluate_fields_to_spans(
-      {&index_field}, IndexMask(IndexRange(4)), field_context, {result_generic_1});
+      {index_field}, IndexMask(IndexRange(4)), field_context, {result_generic_1});
   EXPECT_EQ(result_1[0], 0);
   EXPECT_EQ(result_1[1], 1);
   EXPECT_EQ(result_1[2], 2);
@@ -61,7 +61,7 @@ TEST(field, VArrayInput)
   /* Evaluate a second time, just to test that the first didn't break anything. */
   Array<int> result_2(10);
   GMutableSpan result_generic_2(result_2.as_mutable_span());
-  evaluate_fields_to_spans({&index_field}, {2, 4, 6, 8}, field_context, {result_generic_2});
+  evaluate_fields_to_spans({index_field}, {2, 4, 6, 8}, field_context, {result_generic_2});
   EXPECT_EQ(result_2[2], 2);
   EXPECT_EQ(result_2[4], 4);
   EXPECT_EQ(result_2[6], 6);
@@ -81,7 +81,7 @@ TEST(field, VArrayInputMultipleOutputs)
 
   FieldContext field_context;
   evaluate_fields_to_spans(
-      {&field_1, &field_2}, {2, 4, 6, 8}, field_context, {result_generic_1, result_generic_2});
+      {field_1, field_2}, {2, 4, 6, 8}, field_context, {result_generic_1, result_generic_2});
   EXPECT_EQ(result_1[2], 2);
   EXPECT_EQ(result_1[4], 4);
   EXPECT_EQ(result_1[6], 6);
@@ -105,7 +105,7 @@ TEST(field, InputAndFunction)
   Array<int> result(10);
   GMutableSpan result_generic(result.as_mutable_span());
   FieldContext field_context;
-  evaluate_fields_to_spans({&output_field}, {2, 4, 6, 8}, field_context, {result_generic});
+  evaluate_fields_to_spans({output_field}, {2, 4, 6, 8}, field_context, {result_generic});
   EXPECT_EQ(result[2], 4);
   EXPECT_EQ(result[4], 8);
   EXPECT_EQ(result[6], 12);
@@ -131,7 +131,7 @@ TEST(field, TwoFunctions)
   Array<int> result(10);
   GMutableSpan result_generic(result.as_mutable_span());
   FieldContext field_context;
-  evaluate_fields_to_spans({&result_field}, {2, 4, 6, 8}, field_context, {result_generic});
+  evaluate_fields_to_spans({result_field}, {2, 4, 6, 8}, field_context, {result_generic});
   EXPECT_EQ(result[2], 14);
   EXPECT_EQ(result[4], 18);
   EXPECT_EQ(result[6], 22);
@@ -185,7 +185,7 @@ TEST(field, FunctionTwoOutputs)
   GMutableSpan result_generic_1(result_1.as_mutable_span());
   GMutableSpan result_generic_2(result_2.as_mutable_span());
   FieldContext field_context;
-  evaluate_fields_to_spans({&result_field_1, &result_field_2},
+  evaluate_fields_to_spans({result_field_1, result_field_2},
                            {2, 4, 6, 8},
                            field_context,
                            {result_generic_1, result_generic_2});
@@ -246,7 +246,7 @@ TEST(field, SameFieldTwice)
   IndexMask mask{IndexRange(2)};
   ResourceScope scope;
   Vector<const GVArray *> results = evaluate_fields(
-      scope, {&constant_field, &constant_field}, mask, field_context);
+      scope, {constant_field, constant_field}, mask, field_context);
 
   GVArray_Typed<int> varray1{*results[0]};
   GVArray_Typed<int> varray2{*results[1]};

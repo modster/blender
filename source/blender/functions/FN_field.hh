@@ -73,25 +73,33 @@ class FieldSource {
   }
 };
 
-/**
- * Descibes the output of a function. Generally corresponds to the combination of an output socket
- * and link combination in a node graph.
- */
-class GField {
-  std::shared_ptr<FieldSource> source_;
+/** Common base class for fields to avoid declaring the same methods for #GField and #GFieldRef. */
+template<typename SourcePtr> class GFieldBase {
+ protected:
+  SourcePtr source_ = nullptr;
   int source_output_index_ = 0;
 
- public:
-  GField() = default;
-
-  GField(std::shared_ptr<FieldSource> source, const int source_output_index = 0)
+  GFieldBase(SourcePtr source, const int source_output_index)
       : source_(std::move(source)), source_output_index_(source_output_index)
   {
   }
 
+ public:
+  GFieldBase() = default;
+
   operator bool() const
   {
     return source_ != nullptr;
+  }
+
+  friend bool operator==(const GFieldBase &a, const GFieldBase &b)
+  {
+    return &*a.source_ == &*b.source_ && a.source_output_index_ == b.source_output_index_;
+  }
+
+  uint64_t hash() const
+  {
+    return get_default_hash_2(source_, source_output_index_);
   }
 
   const fn::CPPType &cpp_type() const
@@ -117,6 +125,38 @@ class GField {
   int source_output_index() const
   {
     return source_output_index_;
+  }
+};
+
+/**
+ * Describes the output of a function. Generally corresponds to the combination of an output socket
+ * and link combination in a node graph.
+ */
+class GField : public GFieldBase<std::shared_ptr<FieldSource>> {
+ public:
+  GField() = default;
+
+  GField(std::shared_ptr<FieldSource> source, const int source_output_index = 0)
+      : GFieldBase<std::shared_ptr<FieldSource>>(std::move(source), source_output_index)
+  {
+  }
+};
+
+/** Same as #GField but is cheaper to copy/move around, because it does not contain a
+ * #std::shared_ptr.
+ */
+class GFieldRef : public GFieldBase<const FieldSource *> {
+ public:
+  GFieldRef() = default;
+
+  GFieldRef(const GField &field)
+      : GFieldBase<const FieldSource *>(&field.source(), field.source_output_index())
+  {
+  }
+
+  GFieldRef(const FieldSource &source, const int source_output_index = 0)
+      : GFieldBase<const FieldSource *>(&source, source_output_index)
+  {
   }
 };
 
@@ -235,14 +275,14 @@ class ContextFieldSource : public FieldSource {
 };
 
 Vector<const GVArray *> evaluate_fields(ResourceScope &scope,
-                                        Span<const GField *> fields_to_evaluate,
+                                        Span<GFieldRef> fields_to_evaluate,
                                         IndexMask mask,
                                         const FieldContext &context,
                                         Span<GVMutableArray *> dst_hints = {});
 
 void evaluate_constant_field(const GField &field, void *r_value);
 
-void evaluate_fields_to_spans(Span<const GField *> fields_to_evaluate,
+void evaluate_fields_to_spans(Span<GFieldRef> fields_to_evaluate,
                               IndexMask mask,
                               const FieldContext &context,
                               Span<GMutableSpan> out_spans);
@@ -352,9 +392,9 @@ class FieldEvaluator : NonMovable, NonCopyable {
   void evaluate()
   {
     BLI_assert_msg(!is_evaluated_, "Cannot evaluate fields twice.");
-    Array<const GField *> fields(fields_to_evaluate_.size());
+    Array<GFieldRef> fields(fields_to_evaluate_.size());
     for (const int i : fields_to_evaluate_.index_range()) {
-      fields[i] = &fields_to_evaluate_[i];
+      fields[i] = fields_to_evaluate_[i];
     }
     evaluated_varrays_ = evaluate_fields(scope_, fields, mask_, context_, dst_hints_);
     BLI_assert(fields_to_evaluate_.size() == evaluated_varrays_.size());
