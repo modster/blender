@@ -32,7 +32,7 @@ static void geo_node_input_position_exec(GeoNodeExecParams params)
 
 }  // namespace blender::nodes
 
-void register_node_type_geo_input_input_position()
+void register_node_type_geo_input_position()
 {
   static bNodeType ntype;
 
