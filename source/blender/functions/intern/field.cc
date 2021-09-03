@@ -24,14 +24,26 @@
 
 namespace blender::fn {
 
-struct FieldGraphInfo {
+struct FieldTreeInfo {
+  /**
+   * When fields are build, they only have references to the fields that they depend on. This map
+   * allows traversal of fields in the opposite direction. So for every field it stores what other
+   * fields directly depend on it.
+   */
   MultiValueMap<GFieldRef, GFieldRef> field_users;
+  /**
+   * The same field input may exist in the field tree as as separate nodes due to the way the tree
+   * is constructed. This set contains every input only once.
+   */
   VectorSet<std::reference_wrapper<const FieldInput>> deduplicated_field_inputs;
 };
 
-static FieldGraphInfo preprocess_field_graph(Span<GFieldRef> entry_fields)
+/**
+ * Collects some information from the field tree that is required by later steps.
+ */
+static FieldTreeInfo preprocess_field_tree(Span<GFieldRef> entry_fields)
 {
-  FieldGraphInfo graph_info;
+  FieldTreeInfo field_tree_info;
 
   Stack<GFieldRef> fields_to_check;
   Set<GFieldRef> handled_fields;
@@ -44,30 +56,34 @@ static FieldGraphInfo preprocess_field_graph(Span<GFieldRef> entry_fields)
 
   while (!fields_to_check.is_empty()) {
     GFieldRef field = fields_to_check.pop();
-    if (field.has_context_node()) {
+    if (field.has_input_node()) {
       const FieldInput &field_input = static_cast<const FieldInput &>(field.node());
-      graph_info.deduplicated_field_inputs.add(field_input);
+      field_tree_info.deduplicated_field_inputs.add(field_input);
       continue;
     }
     BLI_assert(field.has_operation_node());
     const FieldOperation &operation = static_cast<const FieldOperation &>(field.node());
     for (const GFieldRef operation_input : operation.inputs()) {
-      graph_info.field_users.add(operation_input, field);
+      field_tree_info.field_users.add(operation_input, field);
       if (handled_fields.add(operation_input)) {
         fields_to_check.push(operation_input);
       }
     }
   }
-  return graph_info;
+  return field_tree_info;
 }
 
-static Vector<const GVArray *> get_field_context_inputs(ResourceScope &scope,
-                                                        const IndexMask mask,
-                                                        const FieldContext &context,
-                                                        const FieldGraphInfo &graph_info)
+/**
+ * Retrieves the data from the context that is passed as input into the field.
+ */
+static Vector<const GVArray *> get_field_context_inputs(
+    ResourceScope &scope,
+    const IndexMask mask,
+    const FieldContext &context,
+    const Span<std::reference_wrapper<const FieldInput>> field_inputs)
 {
   Vector<const GVArray *> field_context_inputs;
-  for (const FieldInput &field_input : graph_info.deduplicated_field_inputs) {
+  for (const FieldInput &field_input : field_inputs) {
     const GVArray *varray = context.try_get_varray_for_context(field_input, mask, scope);
     if (varray == nullptr) {
       const CPPType &type = field_input.cpp_type();
@@ -79,19 +95,27 @@ static Vector<const GVArray *> get_field_context_inputs(ResourceScope &scope,
   return field_context_inputs;
 }
 
-static Set<GFieldRef> find_varying_fields(const FieldGraphInfo &graph_info,
+/**
+ * \return A set that contains all fields from the field tree that depend on an input that varies
+ * for different indices.
+ */
+static Set<GFieldRef> find_varying_fields(const FieldTreeInfo &field_tree_info,
                                           Span<const GVArray *> field_context_inputs)
 {
   Set<GFieldRef> found_fields;
   Stack<GFieldRef> fields_to_check;
+
+  /* The varying fields are the ones that depend on inputs that are not constant. Therefore we
+   * start the tree search at the non-constant input fields and traverse through all fields that
+   * depend on those. */
   for (const int i : field_context_inputs.index_range()) {
     const GVArray *varray = field_context_inputs[i];
     if (varray->is_single()) {
       continue;
     }
-    const FieldInput &field_input = graph_info.deduplicated_field_inputs[i];
+    const FieldInput &field_input = field_tree_info.deduplicated_field_inputs[i];
     const GFieldRef field_input_field{field_input, 0};
-    const Span<GFieldRef> users = graph_info.field_users.lookup(field_input_field);
+    const Span<GFieldRef> users = field_tree_info.field_users.lookup(field_input_field);
     for (const GFieldRef &field : users) {
       if (found_fields.add(field)) {
         fields_to_check.push(field);
@@ -100,7 +124,7 @@ static Set<GFieldRef> find_varying_fields(const FieldGraphInfo &graph_info,
   }
   while (!fields_to_check.is_empty()) {
     GFieldRef field = fields_to_check.pop();
-    const Span<GFieldRef> users = graph_info.field_users.lookup(field);
+    const Span<GFieldRef> users = field_tree_info.field_users.lookup(field);
     for (GFieldRef field : users) {
       if (found_fields.add(field)) {
         fields_to_check.push(field);
@@ -110,40 +134,53 @@ static Set<GFieldRef> find_varying_fields(const FieldGraphInfo &graph_info,
   return found_fields;
 }
 
+/**
+ * Builds the #procedure so that it computes the the fields.
+ */
 static void build_multi_function_procedure_for_fields(MFProcedure &procedure,
                                                       ResourceScope &scope,
-                                                      const FieldGraphInfo &graph_info,
+                                                      const FieldTreeInfo &field_tree_info,
                                                       Span<GFieldRef> output_fields)
 {
   MFProcedureBuilder builder{procedure};
+  /* Every input, intermediate and output field corresponds to a variable in the procedure. */
   Map<GFieldRef, MFVariable *> variable_by_field;
-  for (const FieldInput &field_input : graph_info.deduplicated_field_inputs) {
+
+  /* Start by adding the field inputs as parameters to the procedure. */
+  for (const FieldInput &field_input : field_tree_info.deduplicated_field_inputs) {
     MFVariable &variable = builder.add_input_parameter(
         MFDataType::ForSingle(field_input.cpp_type()), field_input.debug_name());
     variable_by_field.add_new({field_input, 0}, &variable);
   }
 
+  /* Utility struct that is used to do proper depth first search traversal of the tree below. */
   struct FieldWithIndex {
     GFieldRef field;
     int current_input_index = 0;
   };
 
   for (GFieldRef field : output_fields) {
+    /* We start a new stack for each output field to make sure that a field pushed later to the
+     * stack does never depend on a field that was pushed before. */
     Stack<FieldWithIndex> fields_to_check;
     fields_to_check.push({field, 0});
     while (!fields_to_check.is_empty()) {
       FieldWithIndex &field_with_index = fields_to_check.peek();
       const GFieldRef &field = field_with_index.field;
       if (variable_by_field.contains(field)) {
+        /* The field has been handled already. */
         fields_to_check.pop();
         continue;
       }
       /* Field inputs should already be handled above. */
       BLI_assert(field.has_operation_node());
+
       const FieldOperation &operation = static_cast<const FieldOperation &>(field.node());
       const Span<GField> operation_inputs = operation.inputs();
+
       if (field_with_index.current_input_index < operation_inputs.size()) {
-        /* Push next input. */
+        /* Not all inputs are handled yet. Push the next input field to the stack and increment the
+         * input index. */
         fields_to_check.push({operation_inputs[field_with_index.current_input_index]});
         field_with_index.current_input_index++;
       }
@@ -155,6 +192,7 @@ static void build_multi_function_procedure_for_fields(MFProcedure &procedure,
         }
         const MultiFunction &multi_function = operation.multi_function();
         Vector<MFVariable *> output_variables = builder.add_call(multi_function, input_variables);
+        /* Add newly created variables to the map. */
         for (const int i : output_variables.index_range()) {
           variable_by_field.add_new({operation, i}, output_variables[i]);
         }
@@ -162,11 +200,13 @@ static void build_multi_function_procedure_for_fields(MFProcedure &procedure,
     }
   }
 
+  /* Add output parameters to the procedure. */
   Set<MFVariable *> already_output_variables;
   for (const GFieldRef &field : output_fields) {
     MFVariable *variable = variable_by_field.lookup(field);
     if (!already_output_variables.add(variable)) {
-      /* The same variable is output twice. Create a copy to make it work. */
+      /* One variable can be output at most once. To output the same value twice, we have to make a
+       * copy first. */
       const MultiFunction &copy_fn = scope.construct<CustomMF_GenericCopy>(
           __func__, "copy", variable->data_type());
       variable = builder.add_call<1>(copy_fn, {variable})[0];
@@ -178,6 +218,7 @@ static void build_multi_function_procedure_for_fields(MFProcedure &procedure,
   for (const GFieldRef &field : output_fields) {
     variable_by_field.remove(field);
   }
+  /* Add destructor calls for the remaining variables. */
   for (MFVariable *variable : variable_by_field.values()) {
     builder.add_destruct(*variable);
   }
@@ -188,6 +229,9 @@ static void build_multi_function_procedure_for_fields(MFProcedure &procedure,
   BLI_assert(procedure.validate());
 }
 
+/**
+ * Utility class that destructs elements from a partially initialized array.
+ */
 struct PartiallyInitializedArray : NonCopyable, NonMovable {
   void *buffer;
   IndexMask mask;
@@ -225,6 +269,7 @@ Vector<const GVArray *> evaluate_fields(ResourceScope &scope,
 {
   Vector<const GVArray *> r_varrays(fields_to_evaluate.size(), nullptr);
 
+  /* Destination hints are optional. Create a small utility method to access them. */
   auto get_dst_hint_if_available = [&](int index) -> GVMutableArray * {
     if (dst_hints.is_empty()) {
       return nullptr;
@@ -232,24 +277,30 @@ Vector<const GVArray *> evaluate_fields(ResourceScope &scope,
     return dst_hints[index];
   };
 
-  FieldGraphInfo graph_info = preprocess_field_graph(fields_to_evaluate);
-  Vector<const GVArray *> field_context_inputs = get_field_context_inputs(
-      scope, mask, context, graph_info);
+  /* Traverse the field tree and prepare some data that is used in later steps. */
+  FieldTreeInfo field_tree_info = preprocess_field_tree(fields_to_evaluate);
 
-  /* Finish fields that output a context varray directly. */
+  /* Get inputs that will be passed into the field when evaluated. */
+  Vector<const GVArray *> field_context_inputs = get_field_context_inputs(
+      scope, mask, context, field_tree_info.deduplicated_field_inputs);
+
+  /* Finish fields that output a context varray directly. For those we don't have to do any further
+   * processing. */
   for (const int out_index : fields_to_evaluate.index_range()) {
     const GFieldRef &field = fields_to_evaluate[out_index];
-    if (!field.has_context_node()) {
+    if (!field.has_input_node()) {
       continue;
     }
     const FieldInput &field_input = static_cast<const FieldInput &>(field.node());
-    const int field_input_index = graph_info.deduplicated_field_inputs.index_of(field_input);
+    const int field_input_index = field_tree_info.deduplicated_field_inputs.index_of(field_input);
     const GVArray *varray = field_context_inputs[field_input_index];
     r_varrays[out_index] = varray;
   }
 
-  Set<GFieldRef> varying_fields = find_varying_fields(graph_info, field_context_inputs);
+  Set<GFieldRef> varying_fields = find_varying_fields(field_tree_info, field_context_inputs);
 
+  /* Separate fields into two categories. Those that are constant and need to be evaluated only
+   * once, and those that need to be evaluated for every index. */
   Vector<GFieldRef> varying_fields_to_evaluate;
   Vector<int> varying_field_indices;
   Vector<GFieldRef> constant_fields_to_evaluate;
@@ -271,14 +322,18 @@ Vector<const GVArray *> evaluate_fields(ResourceScope &scope,
   }
 
   const int array_size = mask.min_array_size();
+
+  /* Evaluate varying fields if necessary. */
   if (!varying_fields_to_evaluate.is_empty()) {
+    /* Build the procedure for those fields. */
     MFProcedure procedure;
     build_multi_function_procedure_for_fields(
-        procedure, scope, graph_info, varying_fields_to_evaluate);
+        procedure, scope, field_tree_info, varying_fields_to_evaluate);
     MFProcedureExecutor procedure_executor{"Procedure", procedure};
     MFParamsBuilder mf_params{procedure_executor, mask.min_array_size()};
     MFContextBuilder mf_context;
 
+    /* Provide inputs to the procedure executor. */
     for (const GVArray *varray : field_context_inputs) {
       mf_params.add_readonly_single_input(*varray);
     }
@@ -288,11 +343,14 @@ Vector<const GVArray *> evaluate_fields(ResourceScope &scope,
       const CPPType &type = field.cpp_type();
       const int out_index = varying_field_indices[i];
 
+      /* Try to get an existing virtual array that the result should be written into. */
       GVMutableArray *output_varray = get_dst_hint_if_available(out_index);
       void *buffer;
       if (output_varray == nullptr || !output_varray->is_span()) {
+        /* Allocate a new buffer for the computed result. */
         buffer = scope.linear_allocator().allocate(type.size() * array_size, type.alignment());
 
+        /* Make sure that elements in the buffer will be destructed. */
         PartiallyInitializedArray &destruct_helper = scope.construct<PartiallyInitializedArray>(
             __func__);
         destruct_helper.buffer = buffer;
@@ -303,43 +361,52 @@ Vector<const GVArray *> evaluate_fields(ResourceScope &scope,
             __func__, GSpan{type, buffer, array_size});
       }
       else {
+        /* Write the result into the existing span. */
         buffer = output_varray->get_internal_span().data();
 
         r_varrays[out_index] = output_varray;
       }
 
+      /* Pass output buffer to the procedure executor. */
       const GMutableSpan span{type, buffer, array_size};
       mf_params.add_uninitialized_single_output(span);
     }
 
     procedure_executor.call(mask, mf_params, mf_context);
   }
+
+  /* Evaluate constant fields if necessary. */
   if (!constant_fields_to_evaluate.is_empty()) {
+    /* Build the procedure for those fields. */
     MFProcedure procedure;
     build_multi_function_procedure_for_fields(
-        procedure, scope, graph_info, constant_fields_to_evaluate);
+        procedure, scope, field_tree_info, constant_fields_to_evaluate);
     MFProcedureExecutor procedure_executor{"Procedure", procedure};
     MFParamsBuilder mf_params{procedure_executor, 1};
     MFContextBuilder mf_context;
 
+    /* Provide inputs to the procedure executor. */
     for (const GVArray *varray : field_context_inputs) {
       mf_params.add_readonly_single_input(*varray);
     }
 
-    Vector<GMutablePointer> output_buffers;
     for (const int i : constant_fields_to_evaluate.index_range()) {
       const GFieldRef &field = constant_fields_to_evaluate[i];
       const CPPType &type = field.cpp_type();
+      /* Allocate memory where the computed value will be stored in. */
       void *buffer = scope.linear_allocator().allocate(type.size(), type.alignment());
 
+      /* Use this to make sure that the value is destructed in the end. */
       PartiallyInitializedArray &destruct_helper = scope.construct<PartiallyInitializedArray>(
           __func__);
       destruct_helper.buffer = buffer;
       destruct_helper.mask = IndexRange(1);
       destruct_helper.type = &type;
 
+      /* Pass output buffer to the procedure executor. */
       mf_params.add_uninitialized_single_output({type, buffer, 1});
 
+      /* Create virtual array that can be used after the procedure has been executed below. */
       const int out_index = constant_field_indices[i];
       r_varrays[out_index] = &scope.construct<GVArray_For_SingleValueRef>(
           __func__, type, array_size, buffer);
@@ -348,6 +415,8 @@ Vector<const GVArray *> evaluate_fields(ResourceScope &scope,
     procedure_executor.call(IndexRange(1), mf_params, mf_context);
   }
 
+  /* Copy data to destination hints if still necessary. In some cases the evaluation above has
+   * written the computed data in the right place already. */
   if (!dst_hints.is_empty()) {
     for (const int out_index : fields_to_evaluate.index_range()) {
       GVMutableArray *output_varray = get_dst_hint_if_available(out_index);

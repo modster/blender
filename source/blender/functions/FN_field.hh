@@ -107,7 +107,7 @@ template<typename NodePtr> class GFieldBase {
     return node_->cpp_type_of_output_index(node_output_index_);
   }
 
-  bool has_context_node() const
+  bool has_input_node() const
   {
     return node_->is_input_node();
   }
