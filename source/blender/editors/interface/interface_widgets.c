@@ -3810,6 +3810,9 @@ static void widget_numslider(
       factor_discard = factor;
     }
 
+    rect->xmin += 0.2f * U.widget_unit;
+    rect->xmax -= 0.2f * U.widget_unit;
+
     round_box_edges(&wtb1, roundboxalign_slider, &rect1, ofs);
     wtb1.draw_outline = false;
     widgetbase_set_uniform_discard_factor(&wtb1, factor_discard);

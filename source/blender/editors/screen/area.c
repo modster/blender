@@ -2709,12 +2709,10 @@ static void ed_panel_draw(const bContext *C,
 
     UI_block_apply_search_filter(block, search_filter);
     UI_block_layout_resolve(block, &xco, &yco);
-    panel->labelofs = xco - labelx;
     panel->layout = NULL;
   }
-  else {
-    panel->labelofs = 0;
-  }
+
+  panel->labelofs = UI_PANEL_LABEL_OFFSET;
   UI_panel_header_buttons_end(panel);
 
   if (open || search_filter_active) {
