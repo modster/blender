@@ -1233,10 +1233,10 @@ static void panel_draw_aligned_widgets(const uiStyle *style,
     GPU_matrix_translate_2f(widget_rect.xmax - scaled_unit * 1.15,
                             widget_rect.ymin + (header_height - drag_widget_size) * 0.33f);
 
-    const int col_tint = 84;
+    const int col_tint = 40;
     float color_high[4], color_dark[4];
     UI_GetThemeColorShade4fv(TH_PANEL_HEADER, col_tint, color_high);
-    UI_GetThemeColorShade4fv(TH_PANEL_BACK, -col_tint, color_dark);
+    UI_GetThemeColorShade4fv(TH_PANEL_HEADER, (-col_tint / 2), color_dark);
 
     GPUBatch *batch = GPU_batch_preset_panel_drag_widget(
         U.pixelsize, color_high, color_dark, drag_widget_size);

@@ -266,7 +266,7 @@ static GPUBatch *gpu_batch_preset_panel_drag_widget(float pixelsize,
                                                     const float width)
 {
   GPUVertBuf *vbo = GPU_vertbuf_create_with_format(preset_2d_format());
-  const uint vbo_len = 4 * 2 * (6 * 2);
+  const uint vbo_len = 3 * 2 * (6 * 2);
   GPU_vertbuf_data_alloc(vbo, vbo_len);
 
   GPUVertBufRaw pos_step, col_step;
@@ -274,16 +274,16 @@ static GPUBatch *gpu_batch_preset_panel_drag_widget(float pixelsize,
   GPU_vertbuf_attr_get_raw_data(vbo, g_presets_2d.attr_id.col, &col_step);
 
   const int px = (int)pixelsize;
-  const int px_zoom = max_ii(round_fl_to_int(width / 22.0f), 1);
+  const int px_zoom = max_ii(round_fl_to_int(width / 24.0f), 1);
 
   const int box_margin = max_ii(round_fl_to_int((float)(px_zoom * 2.0f)), px);
-  const int box_size = max_ii(round_fl_to_int((width / 8.0f) - px), px);
+  const int box_size = max_ii(round_fl_to_int((width / 6.0f) - px), px);
 
-  const int y_ofs = max_ii(round_fl_to_int(width / 2.5f), px);
+  const int y_ofs = max_ii(round_fl_to_int(width / 3.0f), px);
   const int x_ofs = y_ofs;
   int i_x, i_y;
 
-  for (i_x = 0; i_x < 4; i_x++) {
+  for (i_x = 0; i_x < 3; i_x++) {
     for (i_y = 0; i_y < 2; i_y++) {
       const int x_co = (x_ofs) + (i_x * (box_size + box_margin));
       const int y_co = (y_ofs) + (i_y * (box_size + box_margin));
