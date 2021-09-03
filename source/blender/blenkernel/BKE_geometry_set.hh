@@ -626,4 +626,24 @@ class AttributeContextFieldSource : public fn::ContextFieldSource {
   bool is_equal_to(const fn::FieldSource &other) const override;
 };
 
+class AnonymousAttributeContextFieldSource : public fn::ContextFieldSource {
+ private:
+  StrongAnonymousAttributeID anonymous_id_;
+
+ public:
+  AnonymousAttributeContextFieldSource(StrongAnonymousAttributeID anonymous_id,
+                                       const CPPType &type)
+      : fn::ContextFieldSource(type, anonymous_id.debug_name()),
+        anonymous_id_(std::move(anonymous_id))
+  {
+  }
+
+  const GVArray *try_get_varray_for_context(const fn::FieldContext &context,
+                                            IndexMask mask,
+                                            ResourceScope &scope) const override;
+
+  uint64_t hash() const override;
+  bool is_equal_to(const fn::FieldSource &other) const override;
+};
+
 }  // namespace blender::bke

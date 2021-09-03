@@ -1331,4 +1331,33 @@ bool AttributeContextFieldSource::is_equal_to(const fn::FieldSource &other) cons
   return false;
 }
 
+const GVArray *AnonymousAttributeContextFieldSource::try_get_varray_for_context(
+    const fn::FieldContext &context, IndexMask UNUSED(mask), ResourceScope &scope) const
+{
+  if (const GeometryComponentFieldContext *geometry_context =
+          dynamic_cast<const GeometryComponentFieldContext *>(&context)) {
+    const GeometryComponent &component = geometry_context->geometry_component();
+    const AttributeDomain domain = geometry_context->domain();
+    const CustomDataType data_type = cpp_type_to_custom_data_type(*type_);
+    GVArrayPtr attribute = component.attribute_try_get_for_read(
+        anonymous_id_.get(), domain, data_type);
+    return scope.add(std::move(attribute), __func__);
+  }
+  return nullptr;
+}
+
+uint64_t AnonymousAttributeContextFieldSource::hash() const
+{
+  return get_default_hash_2(anonymous_id_.get(), type_);
+}
+
+bool AnonymousAttributeContextFieldSource::is_equal_to(const fn::FieldSource &other) const
+{
+  if (const AnonymousAttributeContextFieldSource *other_typed =
+          dynamic_cast<const AnonymousAttributeContextFieldSource *>(&other)) {
+    return anonymous_id_.get() == other_typed->anonymous_id_.get() && type_ == other_typed->type_;
+  }
+  return false;
+}
+
 }  // namespace blender::bke

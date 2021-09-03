@@ -482,6 +482,7 @@ geometry_node_categories = [
         NodeItem("GeometryNodeAttributeConvert"),
         NodeItem("GeometryNodeAttributeCurveMap"),
         NodeItem("GeometryNodeAttributeFill"),
+        NodeItem("GeometryNodeAttributeFreeze"),
         NodeItem("GeometryNodeAttributeMix"),
         NodeItem("GeometryNodeAttributeProximity"),
         NodeItem("GeometryNodeAttributeColorRamp"),

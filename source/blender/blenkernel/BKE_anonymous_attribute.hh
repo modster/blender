@@ -30,6 +30,8 @@ template<bool IsStrongReference> class OwnedAnonymousAttributeID {
  private:
   const AnonymousAttributeID *data_ = nullptr;
 
+  template<bool OtherIsStrongReference> friend class OwnedAnonymousAttributeID;
+
  public:
   OwnedAnonymousAttributeID() = default;
 
@@ -117,7 +119,7 @@ template<bool IsStrongReference> class OwnedAnonymousAttributeID {
     return extracted_data;
   }
 
-  const AnonymousAttributeID *get()
+  const AnonymousAttributeID *get() const
   {
     return data_;
   }

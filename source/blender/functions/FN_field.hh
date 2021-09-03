@@ -307,6 +307,17 @@ class FieldEvaluator : NonMovable, NonCopyable {
     return this->add_with_destination(GField(std::move(field)), generic_dst_hint);
   }
 
+  int add(GField field, const GVArray **varray_ptr)
+  {
+    const int field_index = fields_to_evaluate_.append_and_get_index(std::move(field));
+    dst_hints_.append(nullptr);
+    output_pointer_infos_.append(OutputPointerInfo{
+        varray_ptr, [](void *dst, const GVArray &varray, ResourceScope &UNUSED(scope)) {
+          *(const GVArray **)dst = &varray;
+        }});
+    return field_index;
+  }
+
   /**
    * \param field: Field to add to the evaluator.
    * \param varray_ptr: Once #evaluate is called, the resulting virtual array will be will be
