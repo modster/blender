@@ -188,6 +188,7 @@ set(SRC
   geometry/nodes/node_geo_edge_split.cc
   geometry/nodes/node_geo_input_material.cc
   geometry/nodes/node_geo_input_normal.cc
+  geometry/nodes/node_geo_input_position.cc
   geometry/nodes/node_geo_index.cc
   geometry/nodes/node_geo_is_viewport.cc
   geometry/nodes/node_geo_join_geometry.cc
@@ -211,7 +212,6 @@ set(SRC
   geometry/nodes/node_geo_point_separate.cc
   geometry/nodes/node_geo_point_translate.cc
   geometry/nodes/node_geo_points_to_volume.cc
-  geometry/nodes/node_geo_position.cc
   geometry/nodes/node_geo_raycast.cc
   geometry/nodes/node_geo_select_by_material.cc
   geometry/nodes/node_geo_separate_components.cc
