@@ -5175,6 +5175,7 @@ static void registerGeometryNodes()
   register_node_type_geo_edge_split();
   register_node_type_geo_input_index();
   register_node_type_geo_input_material();
+  register_node_type_geo_input_normal();
   register_node_type_geo_input_position();
   register_node_type_geo_is_viewport();
   register_node_type_geo_join_geometry();
