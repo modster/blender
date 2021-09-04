@@ -116,8 +116,8 @@ static float3 get_center(const float3 vec_pos2prev,
                          const float angle)
 {
   float3 vec_pos2center;
-  rotate_v3_v3v3fl(vec_pos2center, vec_pos2prev, axis, M_PI_2 - angle / 2);
-  vec_pos2center *= 1 / sinf(angle / 2);
+  rotate_v3_v3v3fl(vec_pos2center, vec_pos2prev, axis, M_PI_2 - angle / 2.0f);
+  vec_pos2center *= 1.0f / sinf(angle / 2.0f);
 
   return vec_pos2center + pos;
 }
@@ -203,7 +203,7 @@ static Array<float> calculate_radii(const FilletParam &fillet_param,
 
   for (const int i : IndexRange(size)) {
     const float radius = (*fillet_param.radii)[spline_index + i];
-    radii[i] = fillet_param.limit_radius && radius < 0 ? 0 : radius;
+    radii[i] = fillet_param.limit_radius && radius < 0.0f ? 0.0f : radius;
   }
 
   return radii;
@@ -240,7 +240,8 @@ static FilletData calculate_fillet_data(const Spline &spline,
   fd.positions = spline.positions();
   fd.axes = calculate_axes(fd.directions);
   fd.angles = calculate_angles(fd.directions);
-  fd.counts = calculate_counts(fillet_param.angle, fillet_param.count, fd.angles, spline.is_cyclic());
+  fd.counts = calculate_counts(
+      fillet_param.angle, fillet_param.count, fd.angles, spline.is_cyclic());
   fd.radii = calculate_radii(fillet_param, size, spline_index);
 
   added_count = calculate_point_counts(point_counts, fd.radii, fd.counts);
@@ -268,11 +269,11 @@ static void limit_radii(FilletData &fd, const bool cyclic)
     const float len_next = float3::distance(positions[0], positions[1]);
 
     /* Calculate tangent lengths of fillets in control points. */
-    const float tan_len = radii[0] * tanf(angles[0] / 2);
-    const float tan_len_prev = radii[size - 1] * tanf(angles[size - 1] / 2);
-    const float tan_len_next = radii[1] * tanf(angles[1] / 2);
+    const float tan_len = radii[0] * tanf(angles[0] / 2.0f);
+    const float tan_len_prev = radii[size - 1] * tanf(angles[size - 1] / 2.0f);
+    const float tan_len_next = radii[1] * tanf(angles[1] / 2.0f);
 
-    float factor_prev = 1, factor_next = 1;
+    float factor_prev = 1.0f, factor_next = 1.0f;
     if (tan_len + tan_len_prev > len_prev) {
       factor_prev = len_prev / (tan_len + tan_len_prev);
     }
@@ -294,15 +295,15 @@ static void limit_radii(FilletData &fd, const bool cyclic)
   float prev_dist = float3::distance(positions[1], positions[0]);
   for (const int i : IndexRange(1, size - 2)) {
     const float temp_dist = float3::distance(positions[i], positions[i + 1]);
-    max_radii[i] = min_ff(prev_dist, temp_dist) / tanf(angles[i] / 2);
+    max_radii[i] = min_ff(prev_dist, temp_dist) / tanf(angles[i] / 2.0f);
     prev_dist = temp_dist;
   }
 
   /* Max radii calculations for each index. */
   for (const int i : IndexRange(start, fillet_count - 1)) {
     const float len_next = float3::distance(positions[i], positions[i + 1]);
-    const float tan_len = radii[i] * tanf(angles[i] / 2);
-    const float tan_len_next = radii[i + 1] * tanf(angles[i + 1] / 2);
+    const float tan_len = radii[i] * tanf(angles[i] / 2.0f);
+    const float tan_len_next = radii[i + 1] * tanf(angles[i + 1] / 2.0f);
 
     /* Scale down radii if too large for segment. */
     float factor = 1.0f;
@@ -413,10 +414,10 @@ static void update_bezier_positions(FilletData &fd,
     /* Calculate the angle to be formed between any 2 adjacent vertices within the fillet. */
     const float segment_angle = angles[i] / (count - 1);
     /* Calculate the handle length for each added vertex. Equation: L = 4R/3 * tan(A/4) */
-    const float handle_length = 4.0f * radii[i] / 3 * tanf(segment_angle / 4);
+    const float handle_length = 4.0f * radii[i] / 3.0f * tanf(segment_angle / 4.0f);
     /* Calculate the distance by which each vertex should be displaced from their initial position.
      */
-    const float displacement = radii[i] * tanf(angles[i] / 2);
+    const float displacement = radii[i] * tanf(angles[i] / 2.0f);
 
     /* Position the end points of the arc and their handles. */
     const int end_i = cur_i + count - 1;
@@ -492,7 +493,7 @@ static void update_poly_or_NURBS_positions(FilletData &fd,
     }
 
     const float segment_angle = angles[i] / (count - 1);
-    const float displacement = radii[i] * tanf(angles[i] / 2);
+    const float displacement = radii[i] * tanf(angles[i] / 2.0f);
 
     /* Position the end points of the arc. */
     const int end_i = cur_i + count - 1;
