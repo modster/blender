@@ -4126,6 +4126,7 @@ static void knifetool_init(bContext *C,
                            KnifeTool_OpData *kcd,
                            const bool only_select,
                            const bool cut_through,
+                           const bool xray,
                            const int visible_measurements,
                            const int angle_snapping,
                            const float angle_snapping_increment,
@@ -4163,6 +4164,7 @@ static void knifetool_init(bContext *C,
   kcd->is_interactive = is_interactive;
   kcd->cut_through = cut_through;
   kcd->only_select = only_select;
+  kcd->depth_test = xray;
   kcd->dist_angle_mode = visible_measurements;
   kcd->show_dist_angle = (kcd->dist_angle_mode != KNF_MEASUREMENT_NONE);
   kcd->angle_snapping_mode = angle_snapping;
@@ -4804,6 +4806,7 @@ static int knifetool_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
   const bool only_select = RNA_boolean_get(op->ptr, "only_selected");
   const bool cut_through = !RNA_boolean_get(op->ptr, "use_occlude_geometry");
+  const bool xray = !RNA_boolean_get(op->ptr, "xray");
   const int visible_measurements = RNA_enum_get(op->ptr, "visible_measurements");
   const int angle_snapping = RNA_enum_get(op->ptr, "angle_snapping");
   const bool wait_for_input = RNA_boolean_get(op->ptr, "wait_for_input");
@@ -4823,6 +4826,7 @@ static int knifetool_invoke(bContext *C, wmOperator *op, const wmEvent *event)
                  kcd,
                  only_select,
                  cut_through,
+                 xray,
                  visible_measurements,
                  angle_snapping,
                  angle_snapping_increment,
@@ -4915,6 +4919,7 @@ void MESH_OT_knife_tool(wmOperatorType *ot)
                   "Occlude Geometry",
                   "Only cut the front most geometry");
   RNA_def_boolean(ot->srna, "only_selected", false, "Only Selected", "Only cut selected geometry");
+  RNA_def_boolean(ot->srna, "xray", true, "X-Ray", "Show cuts through geometry");
 
   RNA_def_enum(ot->srna,
                "visible_measurements",
@@ -4981,6 +4986,7 @@ void EDBM_mesh_knife(bContext *C, ViewContext *vc, LinkNode *polys, bool use_tag
   {
     const bool only_select = false;
     const bool is_interactive = false; /* Can enable for testing. */
+    const bool xray = false;
     const int visible_measurements = KNF_MEASUREMENT_NONE;
     const int angle_snapping = KNF_CONSTRAIN_ANGLE_MODE_NONE;
     const float angle_snapping_increment = KNIFE_DEFAULT_ANGLE_SNAPPING_INCREMENT;
@@ -4992,6 +4998,7 @@ void EDBM_mesh_knife(bContext *C, ViewContext *vc, LinkNode *polys, bool use_tag
                    kcd,
                    only_select,
                    cut_through,
+                   xray,
                    visible_measurements,
                    angle_snapping,
                    angle_snapping_increment,

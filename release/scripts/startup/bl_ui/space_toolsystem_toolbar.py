@@ -1080,6 +1080,8 @@ class _defs_edit_mesh:
                 layout.prop(props, "use_occlude_geometry")
                 row = layout.row()
                 layout.prop(props, "only_selected")
+                row = layout.row()
+                layout.prop(props, "xray")
                 region_is_header = bpy.context.region.type == 'TOOL_HEADER'
                 if region_is_header:
                     show_extra = True
