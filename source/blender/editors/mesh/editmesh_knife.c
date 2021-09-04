@@ -3846,7 +3846,7 @@ static void knife_constrain_axis(bContext *C, KnifeTool_OpData *kcd)
   const int pivot_point = scene->toolsettings->transform_pivot_point;
   float mat[3][3];
   ED_transform_calc_orientation_from_type_ex(
-      C, mat, scene, rv3d, ob, obedit, orientation_type, pivot_point);
+      scene, view_layer, kcd->vc.v3d, rv3d, ob, obedit, orientation_type, pivot_point, mat);
 
   /* Apply orientation matrix (can be simplified?). */
   float co[3][3];
