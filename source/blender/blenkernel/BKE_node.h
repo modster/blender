@@ -113,6 +113,7 @@ namespace blender {
 namespace nodes {
 class NodeMultiFunctionBuilder;
 class GeoNodeExecParams;
+class NodeDeclarationBuilder;
 }  // namespace nodes
 namespace fn {
 class CPPType;
@@ -122,6 +123,7 @@ class MFDataType;
 
 using NodeMultiFunctionBuildFunction = void (*)(blender::nodes::NodeMultiFunctionBuilder &builder);
 using NodeGeometryExecFunction = void (*)(blender::nodes::GeoNodeExecParams params);
+using NodeDeclareFunction = void (*)(blender::nodes::NodeDeclarationBuilder &builder);
 using SocketGetCPPTypeFunction = const blender::fn::CPPType *(*)();
 using SocketGetCPPValueFunction = void (*)(const struct bNodeSocket &socket, void *r_value);
 using SocketGetGeometryNodesCPPTypeFunction = const blender::fn::CPPType *(*)();
@@ -131,6 +133,7 @@ using SocketGetGeometryNodesCPPValueFunction = void (*)(const struct bNodeSocket
 #else
 typedef void *NodeMultiFunctionBuildFunction;
 typedef void *NodeGeometryExecFunction;
+typedef void *NodeDeclareFunction;
 typedef void *SocketGetCPPTypeFunction;
 typedef void *SocketGetGeometryNodesCPPTypeFunction;
 typedef void *SocketGetGeometryNodesCPPValueFunction;
@@ -334,6 +337,9 @@ typedef struct bNodeType {
   NodeGeometryExecFunction geometry_node_execute;
   bool geometry_node_execute_supports_laziness;
 
+  /* Declares which sockets the node has. */
+  NodeDeclareFunction declare;
+
   /* RNA integration */
   ExtensionRNA rna_ext;
 } bNodeType;
@@ -346,7 +352,7 @@ typedef struct bNodeType {
 #define NODE_CLASS_OP_FILTER 5
 #define NODE_CLASS_GROUP 6
 // #define NODE_CLASS_FILE              7
-#define NODE_CLASS_CONVERTOR 8
+#define NODE_CLASS_CONVERTER 8
 #define NODE_CLASS_MATTE 9
 #define NODE_CLASS_DISTORT 10
 // #define NODE_CLASS_OP_DYNAMIC        11 /* deprecated */
@@ -615,6 +621,10 @@ struct bNodeSocket *nodeInsertStaticSocket(struct bNodeTree *ntree,
                                            const char *identifier,
                                            const char *name);
 void nodeRemoveSocket(struct bNodeTree *ntree, struct bNode *node, struct bNodeSocket *sock);
+void nodeRemoveSocketEx(struct bNodeTree *ntree,
+                        struct bNode *node,
+                        struct bNodeSocket *sock,
+                        bool do_id_user);
 void nodeRemoveAllSockets(struct bNodeTree *ntree, struct bNode *node);
 void nodeModifySocketType(struct bNodeTree *ntree,
                           struct bNode *node,
@@ -1472,6 +1482,7 @@ int ntreeTexExecTree(struct bNodeTree *ntree,
 #define GEO_NODE_CURVE_SET_HANDLES 1072
 #define GEO_NODE_CURVE_SPLINE_TYPE 1073
 #define GEO_NODE_CURVE_SELECT_HANDLES 1074
+#define GEO_NODE_CURVE_FILL 1075
 
 /** \} */
 

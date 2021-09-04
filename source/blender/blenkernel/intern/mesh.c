@@ -160,6 +160,14 @@ static void mesh_free_data(ID *id)
 
   BLI_freelistN(&mesh->vertex_group_names);
 
+  if (mesh->edit_mesh) {
+    if (mesh->edit_mesh->is_shallow_copy == false) {
+      BKE_editmesh_free_data(mesh->edit_mesh);
+    }
+    MEM_freeN(mesh->edit_mesh);
+    mesh->edit_mesh = NULL;
+  }
+
   BKE_mesh_runtime_clear_cache(mesh);
   mesh_clear_geometry(mesh);
   MEM_SAFE_FREE(mesh->mat);
@@ -466,8 +474,10 @@ static int customdata_compare(
           int vtot = m1->totvert;
 
           for (j = 0; j < vtot; j++, v1++, v2++) {
-            if (len_squared_v3v3(v1->co, v2->co) > thresh_sq) {
-              return MESHCMP_VERTCOMISMATCH;
+            for (int k = 0; k < 3; k++) {
+              if (compare_threshold_relative(v1->co[k], v2->co[k], thresh)) {
+                return MESHCMP_VERTCOMISMATCH;
+              }
             }
             /* I don't care about normals, let's just do coordinates. */
           }
@@ -547,8 +557,7 @@ static int customdata_compare(
           int ltot = m1->totloop;
 
           for (j = 0; j < ltot; j++, lp1++, lp2++) {
-            if (abs(lp1->r - lp2->r) > thresh || abs(lp1->g - lp2->g) > thresh ||
-                abs(lp1->b - lp2->b) > thresh || abs(lp1->a - lp2->a) > thresh) {
+            if (lp1->r != lp2->r || lp1->g != lp2->g || lp1->b != lp2->b || lp1->a != lp2->a) {
               return MESHCMP_LOOPCOLMISMATCH;
             }
           }
@@ -583,7 +592,7 @@ static int customdata_compare(
           const float *l2_data = l2->data;
 
           for (int i = 0; i < total_length; i++) {
-            if (fabsf(l1_data[i] - l2_data[i]) > thresh) {
+            if (compare_threshold_relative(l1_data[i], l2_data[i], thresh)) {
               return MESHCMP_ATTRIBUTE_VALUE_MISMATCH;
             }
           }
@@ -594,7 +603,10 @@ static int customdata_compare(
           const float(*l2_data)[2] = l2->data;
 
           for (int i = 0; i < total_length; i++) {
-            if (len_squared_v2v2(l1_data[i], l2_data[i]) > thresh_sq) {
+            if (compare_threshold_relative(l1_data[i][0], l2_data[i][0], thresh)) {
+              return MESHCMP_ATTRIBUTE_VALUE_MISMATCH;
+            }
+            if (compare_threshold_relative(l1_data[i][1], l2_data[i][1], thresh)) {
               return MESHCMP_ATTRIBUTE_VALUE_MISMATCH;
             }
           }
@@ -605,7 +617,13 @@ static int customdata_compare(
           const float(*l2_data)[3] = l2->data;
 
           for (int i = 0; i < total_length; i++) {
-            if (len_squared_v3v3(l1_data[i], l2_data[i]) > thresh_sq) {
+            if (compare_threshold_relative(l1_data[i][0], l2_data[i][0], thresh)) {
+              return MESHCMP_ATTRIBUTE_VALUE_MISMATCH;
+            }
+            if (compare_threshold_relative(l1_data[i][1], l2_data[i][1], thresh)) {
+              return MESHCMP_ATTRIBUTE_VALUE_MISMATCH;
+            }
+            if (compare_threshold_relative(l1_data[i][2], l2_data[i][2], thresh)) {
               return MESHCMP_ATTRIBUTE_VALUE_MISMATCH;
             }
           }
@@ -639,7 +657,7 @@ static int customdata_compare(
 
           for (int i = 0; i < total_length; i++) {
             for (j = 0; j < 4; j++) {
-              if (fabsf(l1_data[i].color[j] - l2_data[i].color[j]) > thresh) {
+              if (compare_threshold_relative(l1_data[i].color[j], l2_data[i].color[j], thresh)) {
                 return MESHCMP_ATTRIBUTE_VALUE_MISMATCH;
               }
             }
@@ -870,6 +888,18 @@ void BKE_mesh_free_data_for_undo(Mesh *me)
   mesh_free_data(&me->id);
 }
 
+/**
+ * \note on data that this function intentionally doesn't free:
+ *
+ * - Materials and shape keys are not freed here (#Mesh.mat & #Mesh.key).
+ *   As freeing shape keys requires tagging the depsgraph for updated relations,
+ *   which is expensive.
+ *   Material slots should be kept in sync with the object.
+ *
+ * - Edit-Mesh (#Mesh.edit_mesh)
+ *   Since edit-mesh is tied to the objects mode,
+ *   which crashes when called in edit-mode, see: T90972.
+ */
 static void mesh_clear_geometry(Mesh *mesh)
 {
   CustomData_free(&mesh->vdata, mesh->totvert);
@@ -879,11 +909,6 @@ static void mesh_clear_geometry(Mesh *mesh)
   CustomData_free(&mesh->pdata, mesh->totpoly);
 
   MEM_SAFE_FREE(mesh->mselect);
-  MEM_SAFE_FREE(mesh->edit_mesh);
-
-  /* Note that materials and shape keys are not freed here. This is intentional, as freeing
-   * shape keys requires tagging the depsgraph for updated relations, which is expensive.
-   * Material slots should be kept in sync with the object. */
 
   mesh->totvert = 0;
   mesh->totedge = 0;
@@ -1581,7 +1606,7 @@ void BKE_mesh_transform(Mesh *me, const float mat[4][4], bool do_keys)
   MVert *mvert = CustomData_duplicate_referenced_layer(&me->vdata, CD_MVERT, me->totvert);
   float(*lnors)[3] = CustomData_duplicate_referenced_layer(&me->ldata, CD_NORMAL, me->totloop);
 
-  /* If the referenced l;ayer has been re-allocated need to update pointers stored in the mesh. */
+  /* If the referenced layer has been re-allocated need to update pointers stored in the mesh. */
   BKE_mesh_update_customdata_pointers(me, false);
 
   for (i = 0; i < me->totvert; i++, mvert++) {

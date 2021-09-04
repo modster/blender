@@ -620,7 +620,10 @@ bool BKE_gpencil_stroke_trim_points(bGPDstroke *gps, const int index_from, const
   }
 
   if (new_count == 1) {
-    BKE_gpencil_free_stroke_weights(gps);
+    if (gps->dvert) {
+      BKE_gpencil_free_stroke_weights(gps);
+      MEM_freeN(gps->dvert);
+    }
     MEM_freeN(gps->points);
     gps->points = nullptr;
     gps->dvert = nullptr;
@@ -628,27 +631,24 @@ bool BKE_gpencil_stroke_trim_points(bGPDstroke *gps, const int index_from, const
     return false;
   }
 
-  new_pt = (bGPDspoint *)MEM_callocN(sizeof(bGPDspoint) * new_count, "gp_stroke_points_trimmed");
-
-  for (int i = 0; i < new_count; i++) {
-    memcpy(&new_pt[i], &pt[i + index_from], sizeof(bGPDspoint));
-  }
+  new_pt = (bGPDspoint *)MEM_mallocN(sizeof(bGPDspoint) * new_count, "gp_stroke_points_trimmed");
+  memcpy(new_pt, &pt[index_from], sizeof(bGPDspoint) * new_count);
 
   if (gps->dvert) {
-    new_dv = (MDeformVert *)MEM_callocN(sizeof(MDeformVert) * new_count,
+    new_dv = (MDeformVert *)MEM_mallocN(sizeof(MDeformVert) * new_count,
                                         "gp_stroke_dverts_trimmed");
     for (int i = 0; i < new_count; i++) {
       dv = &gps->dvert[i + index_from];
       new_dv[i].flag = dv->flag;
       new_dv[i].totweight = dv->totweight;
-      new_dv[i].dw = (MDeformWeight *)MEM_callocN(sizeof(MDeformWeight) * dv->totweight,
+      new_dv[i].dw = (MDeformWeight *)MEM_mallocN(sizeof(MDeformWeight) * dv->totweight,
                                                   "gp_stroke_dverts_dw_trimmed");
       for (int j = 0; j < dv->totweight; j++) {
         new_dv[i].dw[j].weight = dv->dw[j].weight;
         new_dv[i].dw[j].def_nr = dv->dw[j].def_nr;
       }
-      BKE_defvert_clear(dv);
     }
+    BKE_gpencil_free_stroke_weights(gps);
     MEM_freeN(gps->dvert);
     gps->dvert = new_dv;
   }
@@ -692,25 +692,21 @@ bool BKE_gpencil_stroke_split(bGPdata *gpd,
       gpf, gps, gps->mat_nr, new_count, gps->thickness);
 
   new_pt = new_gps->points; /* Allocated from above. */
-
-  for (int i = 0; i < new_count; i++) {
-    memcpy(&new_pt[i], &pt[i + before_index], sizeof(bGPDspoint));
-  }
+  memcpy(new_pt, &pt[before_index], sizeof(bGPDspoint) * new_count);
 
   if (gps->dvert) {
-    new_dv = (MDeformVert *)MEM_callocN(sizeof(MDeformVert) * new_count,
+    new_dv = (MDeformVert *)MEM_mallocN(sizeof(MDeformVert) * new_count,
                                         "gp_stroke_dverts_remaining(MDeformVert)");
     for (int i = 0; i < new_count; i++) {
       dv = &gps->dvert[i + before_index];
       new_dv[i].flag = dv->flag;
       new_dv[i].totweight = dv->totweight;
-      new_dv[i].dw = (MDeformWeight *)MEM_callocN(sizeof(MDeformWeight) * dv->totweight,
+      new_dv[i].dw = (MDeformWeight *)MEM_mallocN(sizeof(MDeformWeight) * dv->totweight,
                                                   "gp_stroke_dverts_dw_remaining(MDeformWeight)");
       for (int j = 0; j < dv->totweight; j++) {
         new_dv[i].dw[j].weight = dv->dw[j].weight;
         new_dv[i].dw[j].def_nr = dv->dw[j].def_nr;
       }
-      BKE_defvert_clear(dv);
     }
     new_gps->dvert = new_dv;
   }
@@ -804,7 +800,7 @@ bool BKE_gpencil_stroke_shrink(bGPDstroke *gps, const float dist, const short mo
  * \param i: Point index
  * \param inf: Amount of smoothing to apply
  */
-bool BKE_gpencil_stroke_smooth(bGPDstroke *gps, int i, float inf)
+bool BKE_gpencil_stroke_smooth_point(bGPDstroke *gps, int i, float inf)
 {
   bGPDspoint *pt = &gps->points[i];
   float sco[3] = {0.0f};
@@ -3252,7 +3248,8 @@ static void gpencil_stroke_copy_point(bGPDstroke *gps,
 void BKE_gpencil_stroke_join(bGPDstroke *gps_a,
                              bGPDstroke *gps_b,
                              const bool leave_gaps,
-                             const bool fit_thickness)
+                             const bool fit_thickness,
+                             const bool smooth)
 {
   bGPDspoint point;
   bGPDspoint *pt;
@@ -3330,15 +3327,50 @@ void BKE_gpencil_stroke_join(bGPDstroke *gps_a,
     gpencil_stroke_copy_point(gps_a, nullptr, &point, delta, 0.0f, 0.0f, deltatime);
   }
 
+  /* Ratio to apply in the points to keep the same thickness in the joined stroke using the
+   * destination stroke thickness. */
   const float ratio = (fit_thickness && gps_a->thickness > 0.0f) ?
                           (float)gps_b->thickness / (float)gps_a->thickness :
                           1.0f;
 
   /* 3rd: add all points */
+  const int totpoints_a = gps_a->totpoints;
   for (i = 0, pt = gps_b->points; i < gps_b->totpoints && pt; i++, pt++) {
     MDeformVert *dvert = (gps_b->dvert) ? &gps_b->dvert[i] : nullptr;
     gpencil_stroke_copy_point(
         gps_a, dvert, pt, delta, pt->pressure * ratio, pt->strength, deltatime);
+  }
+  /* Smooth the join to avoid hard thickness changes. */
+  if (smooth) {
+    const int sample_points = 8;
+    /* Get the segment to smooth using n points on each side of the join. */
+    int start = MAX2(0, totpoints_a - sample_points);
+    int end = MIN2(gps_a->totpoints - 1, start + (sample_points * 2));
+    const int len = (end - start);
+    float step = 1.0f / ((len / 2) + 1);
+
+    /* Calc the average pressure. */
+    float avg_pressure = 0.0f;
+    for (i = start; i < end; i++) {
+      pt = &gps_a->points[i];
+      avg_pressure += pt->pressure;
+    }
+    avg_pressure = avg_pressure / len;
+
+    /* Smooth segment thickness and position. */
+    float ratio = step;
+    for (i = start; i < end; i++) {
+      pt = &gps_a->points[i];
+      pt->pressure += (avg_pressure - pt->pressure) * ratio;
+      BKE_gpencil_stroke_smooth_point(gps_a, i, ratio * 0.6f);
+
+      ratio += step;
+      /* In the center, reverse the ratio. */
+      if (ratio > 1.0f) {
+        ratio = ratio - step - step;
+        step *= -1.0f;
+      }
+    }
   }
 }
 
