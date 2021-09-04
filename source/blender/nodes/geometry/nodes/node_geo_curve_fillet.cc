@@ -30,8 +30,8 @@ static bNodeSocketTemplate geo_node_curve_fillet_in[] = {
     {SOCK_FLOAT, N_("Angle"), M_PI_2, 0.0f, 0.0f, 0.0f, 0.001f, FLT_MAX, PROP_ANGLE},
     {SOCK_INT, N_("Count"), 1, 0, 0, 0, 1, 1000},
     {SOCK_BOOLEAN, N_("Limit Radius")},
-    {SOCK_FLOAT, N_("Radii"), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX, PROP_DISTANCE},
-    {SOCK_STRING, N_("Radii")},
+    {SOCK_FLOAT, N_("Radius"), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX, PROP_DISTANCE},
+    {SOCK_STRING, N_("Radius")},
     {-1, ""},
 };
 
@@ -106,7 +106,7 @@ static void geo_node_curve_fillet_update(bNodeTree *UNUSED(ntree), bNode *node)
   nodeSetSocketAvailability(user_socket, mode == GEO_NODE_CURVE_FILLET_USER_DEFINED);
 
   update_attribute_input_socket_availabilities(
-      *node, "Radii", (GeometryNodeAttributeInputMode)node_storage.radius_mode);
+      *node, "Radius", (GeometryNodeAttributeInputMode)node_storage.radius_mode);
 }
 
 /* Function to get the center of a fillet. */
@@ -648,7 +648,7 @@ static void geo_node_fillet_exec(GeoNodeExecParams params)
 
   std::unique_ptr<CurveEval> output_curve;
   GVArray_Typed<float> radii_array = params.get_input_attribute<float>(
-      "Radii", *geometry_set.get_component_for_read<CurveComponent>(), ATTR_DOMAIN_POINT, 0.0f);
+      "Radius", *geometry_set.get_component_for_read<CurveComponent>(), ATTR_DOMAIN_POINT, 0.0f);
 
   if (radii_array->is_single() && radii_array->get_internal_single() < 0) {
     params.set_output("Geometry", geometry_set);
