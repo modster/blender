@@ -20,6 +20,9 @@
 #include "BLI_float2.hh"
 #include "BLI_math_matrix.h"
 
+#include <cmath>
+#include <tuple>
+
 namespace blender {
 
 /**
@@ -131,6 +134,62 @@ struct float2x2 {
     res.ptr()[1][1] = this->ptr()[1][1] * factor + other.ptr()[1][1] * inv_factor;
 
     return float2x2(res);
+  }
+
+  /**
+   * Computes the eigen decomposition of the 2x2 matrix and returns Q
+   * and Lambda
+   *
+   * A = Q * Lambda * Q.inverse()
+   *
+   * A is this matrix.
+   *
+   * Q is a 2x2 matrix whose ith column is the eigen vector q_i of the
+   * matrix A.
+   *
+   * Lambda is the diagonal matrix whose diagonal elements are the
+   * corresponding eigenvalues.
+   *
+   * Reference https://en.wikipedia.org/wiki/Eigenvalue_algorithm
+   * http://www.math.harvard.edu/archive/21b_fall_04/exhibits/2dmatrices/index.html
+   */
+  std::tuple<float2x2, float2> eigen_decomposition() const
+  {
+    const auto a = this->ptr()[0][0];
+    const auto b = this->ptr()[1][0];
+    const auto c = this->ptr()[0][1];
+    const auto d = this->ptr()[1][1];
+
+    const auto trace = a + d;
+    const auto det = a * d - b * c;
+
+    const auto l1 = (trace + std::sqrt(trace * trace - 4.0 * det)) / 2.0;
+    const auto l2 = (trace - std::sqrt(trace * trace - 4.0 * det)) / 2.0;
+    const auto lambda = float2(l1, l2);
+
+    if (c != 0.0) {
+      float2x2 q;
+      q.ptr()[0][0] = l1 - d;
+      q.ptr()[1][0] = l2 - d;
+      q.ptr()[0][1] = c;
+      q.ptr()[1][1] = c;
+      return {q, lambda};
+    }
+    if (b != 0.0) {
+      float2x2 q;
+      q.ptr()[0][0] = b;
+      q.ptr()[1][0] = b;
+      q.ptr()[0][1] = l1 - a;
+      q.ptr()[1][1] = l2 - a;
+      return {q, lambda};
+    }
+
+    float2x2 q;
+    q.ptr()[0][0] = 1;
+    q.ptr()[1][0] = 0;
+    q.ptr()[0][1] = 0;
+    q.ptr()[1][1] = 1;
+    return {q, lambda};
   }
 
   uint64_t hash() const
