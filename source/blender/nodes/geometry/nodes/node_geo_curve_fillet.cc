@@ -61,7 +61,7 @@ static void geo_node_curve_fillet_init(bNodeTree *UNUSED(tree), bNode *node)
 
 namespace blender::nodes {
 
-struct FilletModeParam {
+struct FilletParam {
   GeometryNodeCurveFilletMode mode;
 
   /* Minimum angle between two adjust control points. */
@@ -195,15 +195,15 @@ static Array<int> calculate_counts(const std::optional<float> arc_angle,
 }
 
 /* Calculate the radii for the vertices to be filleted. */
-static Array<float> calculate_radii(const FilletModeParam &mode_param,
+static Array<float> calculate_radii(const FilletParam &fillet_param,
                                     const int size,
                                     const int spline_index)
 {
   Array<float> radii(size, 0.0f);
 
   for (const int i : IndexRange(size)) {
-    const float radius = (*mode_param.radii)[spline_index + i];
-    radii[i] = mode_param.limit_radius && radius < 0 ? 0 : radius;
+    const float radius = (*fillet_param.radii)[spline_index + i];
+    radii[i] = fillet_param.limit_radius && radius < 0 ? 0 : radius;
   }
 
   return radii;
@@ -228,7 +228,7 @@ static int calculate_point_counts(MutableSpan<int> point_counts,
 
 /* Function to calculate and obtain the fillet data for the entire spline. */
 static FilletData calculate_fillet_data(const Spline &spline,
-                                        const FilletModeParam &mode_param,
+                                        const FilletParam &fillet_param,
                                         int &added_count,
                                         MutableSpan<int> point_counts,
                                         const int spline_index)
@@ -240,8 +240,8 @@ static FilletData calculate_fillet_data(const Spline &spline,
   fd.positions = spline.positions();
   fd.axes = calculate_axes(fd.directions);
   fd.angles = calculate_angles(fd.directions);
-  fd.counts = calculate_counts(mode_param.angle, mode_param.count, fd.angles, spline.is_cyclic());
-  fd.radii = calculate_radii(mode_param, size, spline_index);
+  fd.counts = calculate_counts(fillet_param.angle, fillet_param.count, fd.angles, spline.is_cyclic());
+  fd.radii = calculate_radii(fillet_param, size, spline_index);
 
   added_count = calculate_point_counts(point_counts, fd.radii, fd.counts);
 
@@ -521,7 +521,7 @@ static void update_poly_or_NURBS_positions(FilletData &fd,
 
 /* Function to fillet a spline. */
 static SplinePtr fillet_spline(const Spline &spline,
-                               const FilletModeParam &mode_param,
+                               const FilletParam &fillet_param,
                                const int spline_index)
 {
   int fillet_count, start = 0;
@@ -547,8 +547,8 @@ static SplinePtr fillet_spline(const Spline &spline,
   int added_count = 0;
   /* Update point_counts array and added_count. */
   FilletData fd = calculate_fillet_data(
-      spline, mode_param, added_count, point_counts, spline_index);
-  if (mode_param.limit_radius) {
+      spline, fillet_param, added_count, point_counts, spline_index);
+  if (fillet_param.limit_radius) {
     limit_radii(fd, cyclic);
   }
 
@@ -588,7 +588,7 @@ static SplinePtr fillet_spline(const Spline &spline,
 
 /* Function to fillet a curve */
 static std::unique_ptr<CurveEval> fillet_curve(const CurveEval &input_curve,
-                                               const FilletModeParam &mode_param)
+                                               const FilletParam &fillet_param)
 {
   Span<SplinePtr> input_splines = input_curve.splines();
 
@@ -605,7 +605,7 @@ static std::unique_ptr<CurveEval> fillet_curve(const CurveEval &input_curve,
 
   threading::parallel_for(input_splines.index_range(), 128, [&](IndexRange range) {
     for (const int i : range) {
-      output_splines[i] = fillet_spline(*input_splines[i], mode_param, spline_indices[i]);
+      output_splines[i] = fillet_spline(*input_splines[i], fillet_param, spline_indices[i]);
     }
   });
 
@@ -628,12 +628,12 @@ static void geo_node_fillet_exec(GeoNodeExecParams params)
   const GeometryNodeCurveFilletMode mode = (GeometryNodeCurveFilletMode)node_storage.mode;
   const GeometryNodeAttributeInputMode radius_mode = (GeometryNodeAttributeInputMode)
                                                          node_storage.radius_mode;
-  FilletModeParam mode_param;
-  mode_param.mode = mode;
+  FilletParam fillet_param;
+  fillet_param.mode = mode;
 
   if (mode == GEO_NODE_CURVE_FILLET_ADAPTIVE) {
     const float angle = std::max(params.extract_input<float>("Angle"), 0.0001f);
-    mode_param.angle.emplace(angle);
+    fillet_param.angle.emplace(angle);
   }
   else if (mode == GEO_NODE_CURVE_FILLET_USER_DEFINED) {
     const int count = params.extract_input<int>("Count");
@@ -641,10 +641,10 @@ static void geo_node_fillet_exec(GeoNodeExecParams params)
       params.set_output("Curve", GeometrySet());
       return;
     }
-    mode_param.count.emplace(count);
+    fillet_param.count.emplace(count);
   }
 
-  mode_param.limit_radius = params.extract_input<bool>("Limit Radius");
+  fillet_param.limit_radius = params.extract_input<bool>("Limit Radius");
 
   std::unique_ptr<CurveEval> output_curve;
   GVArray_Typed<float> radii_array = params.get_input_attribute<float>(
@@ -655,8 +655,8 @@ static void geo_node_fillet_exec(GeoNodeExecParams params)
     return;
   }
 
-  mode_param.radii = &radii_array;
-  output_curve = fillet_curve(input_curve, mode_param);
+  fillet_param.radii = &radii_array;
+  output_curve = fillet_curve(input_curve, fillet_param);
 
   params.set_output("Curve", GeometrySet::create_with_curve(output_curve.release()));
 }
