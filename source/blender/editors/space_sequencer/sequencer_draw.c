@@ -737,7 +737,8 @@ static void draw_seq_handle(View2D *v2d,
   }
 }
 
-static void draw_seq_outline(Sequence *seq,
+static void draw_seq_outline(Scene *scene,
+                             Sequence *seq,
                              uint pos,
                              float x1,
                              float x2,
@@ -765,7 +766,9 @@ static void draw_seq_outline(Sequence *seq,
    *  - Slightly lighter.
    *  - Red when overlapping with other strips.
    */
-  if ((G.moving & G_TRANSFORM_SEQ) && (seq->flag & SELECT)) {
+  const eSeqOverlapMode overlap_mode = SEQ_tool_settings_overlap_mode_get(scene);
+  if ((G.moving & G_TRANSFORM_SEQ) && (seq->flag & SELECT) &&
+      overlap_mode != SEQ_OVERLAP_OVERWRITE) {
     if (seq->flag & SEQ_OVERLAP) {
       col[0] = 255;
       col[1] = col[2] = 33;
@@ -1383,7 +1386,7 @@ static void draw_seq_strip(const bContext *C,
         v2d, seq, handsize_clamped, SEQ_RIGHTHANDLE, pos, seq_active, pixelx, y_threshold);
   }
 
-  draw_seq_outline(seq, pos, x1, x2, y1, y2, pixelx, pixely, seq_active);
+  draw_seq_outline(scene, seq, pos, x1, x2, y1, y2, pixelx, pixely, seq_active);
 
   immUnbindProgram();
 
@@ -2272,9 +2275,9 @@ static void draw_seq_strips(const bContext *C, Editing *ed, ARegion *region)
   }
 }
 
-static void seq_draw_sfra_efra(Scene *scene, View2D *v2d)
+static void seq_draw_sfra_efra(const Scene *scene, View2D *v2d)
 {
-  const Editing *ed = SEQ_editing_get(scene, false);
+  const Editing *ed = SEQ_editing_get(scene);
   const int frame_sta = scene->r.sfra;
   const int frame_end = scene->r.efra + 1;
 
@@ -2309,7 +2312,7 @@ static void seq_draw_sfra_efra(Scene *scene, View2D *v2d)
 
   /* While in meta strip, draw a checkerboard overlay outside of frame range. */
   if (ed && !BLI_listbase_is_empty(&ed->metastack)) {
-    MetaStack *ms = ed->metastack.last;
+    const MetaStack *ms = ed->metastack.last;
     immUnbindProgram();
 
     immBindBuiltinProgram(GPU_SHADER_2D_CHECKER);
@@ -2583,7 +2586,7 @@ static void draw_overlap_frame_indicator(const struct Scene *scene, const View2D
 void draw_timeline_seq(const bContext *C, ARegion *region)
 {
   Scene *scene = CTX_data_scene(C);
-  Editing *ed = SEQ_editing_get(scene, false);
+  Editing *ed = SEQ_editing_get(scene);
   SpaceSeq *sseq = CTX_wm_space_seq(C);
   View2D *v2d = &region->v2d;
   short cfra_flag = 0;

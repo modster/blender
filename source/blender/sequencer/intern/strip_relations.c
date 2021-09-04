@@ -134,7 +134,7 @@ static bool seq_relations_find_and_invalidate_metas(Scene *scene,
   ListBase *seqbase;
 
   if (meta_seq == NULL) {
-    Editing *ed = SEQ_editing_get(scene, false);
+    Editing *ed = SEQ_editing_get(scene);
     seqbase = &ed->seqbase;
   }
   else {
@@ -342,7 +342,7 @@ void SEQ_relations_update_changed_seq_and_deps(Scene *scene,
                                                int len_change,
                                                int ibuf_change)
 {
-  Editing *ed = SEQ_editing_get(scene, false);
+  Editing *ed = SEQ_editing_get(scene);
   Sequence *seq;
 
   if (ed == NULL) {
@@ -370,7 +370,7 @@ static void sequencer_all_free_anim_ibufs(ListBase *seqbase, int timeline_frame)
 /* Unused */
 void SEQ_relations_free_all_anim_ibufs(Scene *scene, int timeline_frame)
 {
-  Editing *ed = SEQ_editing_get(scene, false);
+  Editing *ed = SEQ_editing_get(scene);
   if (ed == NULL) {
     return;
   }
@@ -401,7 +401,7 @@ static Sequence *sequencer_check_scene_recursion(Scene *scene, ListBase *seqbase
 
 bool SEQ_relations_check_scene_recursion(Scene *scene, ReportList *reports)
 {
-  Editing *ed = SEQ_editing_get(scene, false);
+  Editing *ed = SEQ_editing_get(scene);
   if (ed == NULL) {
     return false;
   }
@@ -476,6 +476,24 @@ void SEQ_relations_session_uuid_generate(struct Sequence *sequence)
   sequence->runtime.session_uuid = BLI_session_uuid_generate();
 }
 
+static bool get_uuids_cb(Sequence *seq, void *user_data)
+{
+  struct GSet *used_uuids = (struct GSet *)user_data;
+  const SessionUUID *session_uuid = &seq->runtime.session_uuid;
+  if (!BLI_session_uuid_is_generated(session_uuid)) {
+    printf("Sequence %s does not have UUID generated.\n", seq->name);
+    return true;
+  }
+
+  if (BLI_gset_lookup(used_uuids, session_uuid) != NULL) {
+    printf("Sequence %s has duplicate UUID generated.\n", seq->name);
+    return true;
+  }
+
+  BLI_gset_insert(used_uuids, (void *)session_uuid);
+  return true;
+}
+
 void SEQ_relations_check_uuids_unique_and_report(const Scene *scene)
 {
   if (scene->ed == NULL) {
@@ -485,22 +503,7 @@ void SEQ_relations_check_uuids_unique_and_report(const Scene *scene)
   struct GSet *used_uuids = BLI_gset_new(
       BLI_session_uuid_ghash_hash, BLI_session_uuid_ghash_compare, "sequencer used uuids");
 
-  const Sequence *sequence;
-  SEQ_ALL_BEGIN (scene->ed, sequence) {
-    const SessionUUID *session_uuid = &sequence->runtime.session_uuid;
-    if (!BLI_session_uuid_is_generated(session_uuid)) {
-      printf("Sequence %s does not have UUID generated.\n", sequence->name);
-      continue;
-    }
-
-    if (BLI_gset_lookup(used_uuids, session_uuid) != NULL) {
-      printf("Sequence %s has duplicate UUID generated.\n", sequence->name);
-      continue;
-    }
-
-    BLI_gset_insert(used_uuids, (void *)session_uuid);
-  }
-  SEQ_ALL_END;
+  SEQ_for_each_callback(&scene->ed->seqbase, get_uuids_cb, used_uuids);
 
   BLI_gset_free(used_uuids, NULL);
 }

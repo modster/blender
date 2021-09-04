@@ -864,7 +864,7 @@ static void object_blend_read_lib(BlendLibReader *reader, ID *id)
   BLO_read_id_address(reader, ob->id.lib, &ob->proxy);
   if (ob->proxy) {
     /* paranoia check, actually a proxy_from pointer should never be written... */
-    if (ob->proxy->id.lib == NULL) {
+    if (!ID_IS_LINKED(ob->proxy)) {
       ob->proxy->proxy_from = NULL;
       ob->proxy = NULL;
 
@@ -3307,8 +3307,8 @@ static void ob_parbone(Object *ob, Object *par, float r_mat[4][4])
   /* Make sure the bone is still valid */
   bPoseChannel *pchan = BKE_pose_channel_find_name(par->pose, ob->parsubstr);
   if (!pchan || !pchan->bone) {
-    CLOG_ERROR(
-        &LOG, "Object %s with Bone parent: bone %s doesn't exist", ob->id.name + 2, ob->parsubstr);
+    CLOG_WARN(
+        &LOG, "Parent Bone: '%s' for Object: '%s' doesn't exist", ob->parsubstr, ob->id.name + 2);
     unit_m4(r_mat);
     return;
   }
