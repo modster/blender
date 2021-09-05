@@ -20,14 +20,15 @@
 #include "BLI_float2.hh"
 #include "BLI_float2x2.hh"
 #include "BLI_float3.hh"
-#include "BLI_float3x2.hh"
 
 namespace blender {
+
+struct float3x2;
 
 /**
  * A 2x3 column major matrix.
  *
- * float3x3::values[i] is the ith column of the matrix.
+ * float2x3::values[i] is the ith column of the matrix.
  *
  * |m00 m10 m20|
  * |m01 m11 m21|
@@ -78,22 +79,7 @@ struct float2x3 {
     return result;
   }
 
-  friend float2x2 operator*(const float2x3 &a, const float3x2 &b)
-  {
-    float2x2 result;
-
-    result.ptr()[0][0] = a.ptr()[0][0] * b.ptr()[0][0] + a.ptr()[1][0] * b.ptr()[0][1] +
-                         a.ptr()[2][0] * b.ptr()[0][2];
-    result.ptr()[0][1] = a.ptr()[0][1] * b.ptr()[0][0] + a.ptr()[1][1] * b.ptr()[0][1] +
-                         a.ptr()[2][1] * b.ptr()[0][2];
-
-    result.ptr()[1][0] = a.ptr()[0][0] * b.ptr()[1][0] + a.ptr()[1][0] * b.ptr()[1][1] +
-                         a.ptr()[2][0] * b.ptr()[1][2];
-    result.ptr()[1][1] = a.ptr()[0][1] * b.ptr()[1][0] + a.ptr()[1][1] * b.ptr()[1][1] +
-                         a.ptr()[2][1] * b.ptr()[1][2];
-
-    return result;
-  }
+  friend float2x2 operator*(const float2x3 &a, const float3x2 &b);
 
   friend float2x3 operator*(const float2x2 &a, const float2x3 &b)
   {
@@ -163,6 +149,8 @@ struct float2x3 {
 
     return res;
   }
+
+  float3x2 transpose() const;
 
   uint64_t hash() const
   {

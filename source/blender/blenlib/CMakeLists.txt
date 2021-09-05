@@ -44,6 +44,8 @@ set(SRC
   intern/BLI_dial_2d.c
   intern/BLI_dynstr.c
   intern/BLI_filelist.c
+  intern/BLI_float2x3.cc
+  intern/BLI_float3x2.cc
   intern/BLI_ghash.c
   intern/BLI_ghash_utils.c
   intern/BLI_heap.c

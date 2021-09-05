@@ -23,6 +23,8 @@
 
 namespace blender {
 
+struct float2x3;
+
 /**
  * A 3x2 column major matrix.
  *
@@ -159,6 +161,8 @@ struct float3x2 {
 
     return res;
   }
+
+  float2x3 transpose() const;
 
   uint64_t hash() const
   {
