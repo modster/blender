@@ -228,6 +228,11 @@ struct float2x2 {
     return float2x2(d, -c, -b, a) * (1.0 / det);
   }
 
+  float2x2 transpose() const
+  {
+    return float2x2(this->ptr()[0][0], this->ptr()[1][0], this->ptr()[0][1], this->ptr()[1][1]);
+  }
+
   uint64_t hash() const
   {
     uint64_t h = 435109;
