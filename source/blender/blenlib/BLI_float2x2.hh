@@ -215,6 +215,19 @@ struct float2x2 {
     return {q, lambda};
   }
 
+  float2x2 inverse() const
+  {
+    const auto a = this->ptr()[0][0];
+    const auto b = this->ptr()[1][0];
+    const auto c = this->ptr()[0][1];
+    const auto d = this->ptr()[1][1];
+
+    const auto det = a * d - b * c;
+    BLI_assert(det != 0.0);
+
+    return float2x2(d, -c, -b, a) * (1.0 / det);
+  }
+
   uint64_t hash() const
   {
     uint64_t h = 435109;
