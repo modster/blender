@@ -1397,7 +1397,7 @@ static int wm_operator_invoke(bContext *C,
         int bounds[4] = {-1, -1, -1, -1};
         int wrap = WM_CURSOR_WRAP_NONE;
 
-        if (event && (U.uiflag & USER_CONTINUOUS_MOUSE)) {
+        if (event && (U.uiflag & USER_CONTINUOUS_MOUSE || op->flag & OPTYPE_GRAB_CURSOR_FORCE)) {
           const wmOperator *op_test = op->opm ? op->opm : op;
           const wmOperatorType *ot_test = op_test->type;
           if ((ot_test->flag & OPTYPE_GRAB_CURSOR_XY) ||

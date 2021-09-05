@@ -284,9 +284,6 @@ typedef struct WalkInfo {
   bool is_reversed;
 
 #ifdef USE_TABLET_SUPPORT
-  /** Check if we had a cursor event before. */
-  bool is_cursor_first;
-
   /** Tablet devices (we can't relocate the cursor). */
   bool is_cursor_absolute;
 #endif
@@ -495,7 +492,7 @@ enum {
 static float base_speed = -1.0f;
 static float userdef_speed = -1.0f;
 
-static bool initWalkInfo(bContext *C, WalkInfo *walk, wmOperator *op)
+static bool initWalkInfo(bContext *C, WalkInfo *walk, wmOperator *op, wmEvent *event)
 {
   wmWindowManager *wm = CTX_wm_manager(C);
   wmWindow *win = CTX_wm_window(C);
@@ -537,6 +534,8 @@ static bool initWalkInfo(bContext *C, WalkInfo *walk, wmOperator *op)
     userdef_speed = U.walk_navigation.walk_speed;
   }
 
+  walk->moffset[0] = 0;
+  walk->moffset[1] = 0;
   walk->speed = 0.0f;
   walk->is_fast = false;
   walk->is_slow = false;
@@ -573,8 +572,6 @@ static bool initWalkInfo(bContext *C, WalkInfo *walk, wmOperator *op)
   walk->is_reversed = ((U.walk_navigation.flag & USER_WALK_MOUSE_REVERSE) != 0);
 
 #ifdef USE_TABLET_SUPPORT
-  walk->is_cursor_first = true;
-
   walk->is_cursor_absolute = false;
 #endif
 
@@ -622,11 +619,7 @@ static bool initWalkInfo(bContext *C, WalkInfo *walk, wmOperator *op)
   walk->center_mval[1] -= walk->region->winrct.ymin;
 #endif
 
-  copy_v2_v2_int(walk->prev_mval, walk->center_mval);
-
-  WM_cursor_warp(win,
-                 walk->region->winrct.xmin + walk->center_mval[0],
-                 walk->region->winrct.ymin + walk->center_mval[1]);
+  copy_v2_v2_int(walk->prev_mval, event->mval);
 
   /* remove the mouse cursor temporarily */
   WM_cursor_modal_set(win, WM_CURSOR_NONE);
@@ -706,59 +699,13 @@ static void walkEvent(bContext *C, WalkInfo *walk, const wmEvent *event)
     walk->redraw = true;
   }
   else if (ELEM(event->type, MOUSEMOVE, INBETWEEN_MOUSEMOVE)) {
-
-#ifdef USE_TABLET_SUPPORT
-    if (walk->is_cursor_first) {
-      /* wait until we get the 'warp' event */
-      if ((walk->center_mval[0] == event->mval[0]) && (walk->center_mval[1] == event->mval[1])) {
-        walk->is_cursor_first = false;
-      }
-      else {
-        /* NOTE: its possible the system isn't giving us the warp event
-         * ideally we shouldn't have to worry about this, see: T45361 */
-        wmWindow *win = CTX_wm_window(C);
-        WM_cursor_warp(win,
-                       walk->region->winrct.xmin + walk->center_mval[0],
-                       walk->region->winrct.ymin + walk->center_mval[1]);
-      }
-      return;
-    }
-
-    if ((walk->is_cursor_absolute == false) && event->tablet.is_motion_absolute) {
-      walk->is_cursor_absolute = true;
-      copy_v2_v2_int(walk->prev_mval, event->mval);
-      copy_v2_v2_int(walk->center_mval, event->mval);
-    }
-#endif /* USE_TABLET_SUPPORT */
-
     walk->moffset[0] += event->mval[0] - walk->prev_mval[0];
     walk->moffset[1] += event->mval[1] - walk->prev_mval[1];
 
     copy_v2_v2_int(walk->prev_mval, event->mval);
 
-    if ((walk->center_mval[0] != event->mval[0]) || (walk->center_mval[1] != event->mval[1])) {
+    if (walk->moffset[0] != 0 || walk->moffset[1] != 0) {
       walk->redraw = true;
-
-#ifdef USE_TABLET_SUPPORT
-      if (walk->is_cursor_absolute) {
-        /* pass */
-      }
-      else
-#endif
-          if (WM_event_is_last_mousemove(event)) {
-        wmWindow *win = CTX_wm_window(C);
-
-#ifdef __APPLE__
-        if ((abs(walk->prev_mval[0] - walk->center_mval[0]) > walk->center_mval[0] / 2) ||
-            (abs(walk->prev_mval[1] - walk->center_mval[1]) > walk->center_mval[1] / 2))
-#endif
-        {
-          WM_cursor_warp(win,
-                         walk->region->winrct.xmin + walk->center_mval[0],
-                         walk->region->winrct.ymin + walk->center_mval[1]);
-          copy_v2_v2_int(walk->prev_mval, walk->center_mval);
-        }
-      }
     }
   }
 #ifdef WITH_INPUT_NDOF
@@ -1095,16 +1042,7 @@ static int walkApply(bContext *C, WalkInfo *walk, bool is_confirm)
           y = (float)moffset[1];
 
           /* Speed factor. */
-#ifdef USE_TABLET_SUPPORT
-          if (walk->is_cursor_absolute) {
-            y /= region->winy;
-            y *= walk_rotate_tablet_factor;
-          }
-          else
-#endif
-          {
-            y *= walk_rotate_constant_factor;
-          }
+          y *= walk_rotate_constant_factor;
 
           /* user adjustment factor */
           y *= walk->mouse_speed;
@@ -1144,16 +1082,7 @@ static int walkApply(bContext *C, WalkInfo *walk, bool is_confirm)
           x = (float)moffset[0];
 
           /* Speed factor. */
-#ifdef USE_TABLET_SUPPORT
-          if (walk->is_cursor_absolute) {
-            x /= region->winx;
-            x *= walk_rotate_tablet_factor;
-          }
-          else
-#endif
-          {
-            x *= walk_rotate_constant_factor;
-          }
+          x *= walk_rotate_constant_factor;
 
           /* user adjustment factor */
           x *= walk->mouse_speed;
@@ -1442,7 +1371,7 @@ static int walk_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 
   op->customdata = walk;
 
-  if (initWalkInfo(C, walk, op) == false) {
+  if (initWalkInfo(C, walk, op, event) == false) {
     MEM_freeN(op->customdata);
     return OPERATOR_CANCELLED;
   }
@@ -1521,7 +1450,7 @@ void VIEW3D_OT_walk(wmOperatorType *ot)
   ot->poll = ED_operator_region_view3d_active;
 
   /* flags */
-  ot->flag = OPTYPE_BLOCKING;
+  ot->flag = OPTYPE_BLOCKING | OPTYPE_GRAB_CURSOR_XY | OPTYPE_GRAB_CURSOR_FORCE;
 }
 
 /** \} */

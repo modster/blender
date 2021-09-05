@@ -184,6 +184,9 @@ enum {
   OPTYPE_LOCK_BYPASS = (1 << 9),
   /** Special type of undo which doesn't store itself multiple times. */
   OPTYPE_UNDO_GROUPED = (1 << 10),
+
+  /** Force cursor warp. */
+  OPTYPE_GRAB_CURSOR_FORCE = (1 << 11),
 };
 
 /** For #WM_cursor_grab_enable wrap axis. */
