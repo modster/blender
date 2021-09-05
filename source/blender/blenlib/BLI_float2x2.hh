@@ -48,6 +48,18 @@ struct float2x2 {
   {
   }
 
+  /**
+   * Constructor through columns of the matrix
+   */
+  float2x2(const float2 &col1, const float2 &col2)
+  {
+    this->ptr()[0][0] = col1[0];
+    this->ptr()[0][1] = col1[1];
+
+    this->ptr()[1][0] = col2[0];
+    this->ptr()[1][1] = col2[1];
+  }
+
   static float2x2 identity()
   {
     float2x2 mat;
