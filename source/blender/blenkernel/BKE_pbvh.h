@@ -373,7 +373,7 @@ typedef struct PBVHVertexIter {
   struct MVert *mvert;
   struct BMVert *bm_vert;
   float *co;
-  float *no;
+  const float *no;
   float *fno;
   float *mask;
   float *col;

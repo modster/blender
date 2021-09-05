@@ -72,6 +72,7 @@ typedef struct MultiresBakeResult {
 
 typedef struct {
   MVert *mvert;
+  const float (*vert_normals)[3];
   MPoly *mpoly;
   MLoop *mloop;
   MLoopUV *mloopuv;

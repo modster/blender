@@ -292,8 +292,8 @@ void BKE_mesh_calc_normals_poly_and_vertex(struct MVert *mvert,
                                            float (*r_poly_normals)[3],
                                            float (*r_vert_normals)[3]);
 void BKE_mesh_calc_normals(struct Mesh *me);
-const float (*BKE_mesh_ensure_vertex_normals(const Mesh *mesh))[3];
-const float (*BKE_mesh_ensure_face_normals(const Mesh *mesh))[3];
+const float (*BKE_mesh_ensure_vertex_normals(const struct Mesh *mesh))[3];
+const float (*BKE_mesh_ensure_face_normals(const struct Mesh *mesh))[3];
 void BKE_mesh_ensure_normals_for_display(struct Mesh *mesh);
 void BKE_mesh_calc_normals_looptri(struct MVert *mverts,
                                    int numVerts,
@@ -412,6 +412,7 @@ void BKE_mesh_normals_loop_split(const struct MVert *mverts,
                                  const int numLoops,
                                  struct MPoly *mpolys,
                                  const float (*polynors)[3],
+                                 const float (*vert_normals)[3],
                                  const int numPolys,
                                  const bool use_split_normals,
                                  const float split_angle,
@@ -420,6 +421,7 @@ void BKE_mesh_normals_loop_split(const struct MVert *mverts,
                                  int *r_loop_to_poly);
 
 void BKE_mesh_normals_loop_custom_set(const struct MVert *mverts,
+                                      const float (*vert_normals)[3],
                                       const int numVerts,
                                       struct MEdge *medges,
                                       const int numEdges,

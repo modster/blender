@@ -1738,13 +1738,6 @@ static bool wpaint_stroke_test_start(bContext *C, wmOperator *op, const float mo
   return true;
 }
 
-static float dot_vf3vs3(const float brushNormal[3], const short vertexNormal[3])
-{
-  float normal[3];
-  normal_short_to_float_v3(normal, vertexNormal);
-  return dot_v3v3(brushNormal, normal);
-}
-
 static void get_brush_alpha_data(const Scene *scene,
                                  const SculptSession *ss,
                                  const Brush *brush,

@@ -1075,6 +1075,9 @@ void BM_mesh_bm_to_me_for_eval(BMesh *bm, Mesh *me, const CustomData_MeshMasks *
   const int cd_edge_bweight_offset = CustomData_get_offset(&bm->edata, CD_BWEIGHT);
   const int cd_edge_crease_offset = CustomData_get_offset(&bm->edata, CD_CREASE);
 
+  float(*vert_normals)[3] = (float(*)[3])CustomData_add_layer(
+      &me->vdata, CD_NORMAL, CD_DEFAULT, NULL, me->totvert);
+
   me->runtime.deformed_only = true;
 
   /* Don't add origindex layer if one already exists. */
@@ -1089,7 +1092,7 @@ void BM_mesh_bm_to_me_for_eval(BMesh *bm, Mesh *me, const CustomData_MeshMasks *
 
     BM_elem_index_set(eve, i); /* set_inline */
 
-    normal_float_to_short_v3(mv->no, eve->no);
+    copy_v3_v3(vert_normals[i], eve->no);
 
     mv->flag = BM_vert_flag_to_mflag(eve);
 

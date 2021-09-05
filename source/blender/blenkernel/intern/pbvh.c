@@ -1311,6 +1311,7 @@ static void pbvh_update_draw_buffer_cb(void *__restrict userdata,
       case PBVH_FACES:
         GPU_pbvh_mesh_buffers_update(node->draw_buffers,
                                      pbvh->verts,
+                                     pbvh->vert_normals,
                                      CustomData_get_layer(pbvh->vdata, CD_PAINT_MASK),
                                      CustomData_get_layer(pbvh->ldata, CD_MLOOPCOL),
                                      CustomData_get_layer(pbvh->pdata, CD_SCULPT_FACE_SETS),

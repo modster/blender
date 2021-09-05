@@ -231,7 +231,7 @@ typedef struct {
 
   /* Original coordinate, normal, and mask. */
   const float *co;
-  const float *no;
+  const short *no;
   float mask;
   const float *col;
 } SculptOrigVertData;

@@ -3866,7 +3866,6 @@ static void proj_paint_state_screen_coords_init(ProjPaintState *ps, const int di
 
 static void proj_paint_state_cavity_init(ProjPaintState *ps)
 {
-  const MVert *mv;
   const MEdge *me;
   float *cavities;
   int a;
@@ -3957,7 +3956,7 @@ static void proj_paint_state_vert_flags_init(ProjPaintState *ps)
     ps->vertFlags = MEM_callocN(sizeof(char) * ps->totvert_eval, "paint-vertFlags");
 
     for (a = 0, mv = ps->mvert_eval; a < ps->totvert_eval; a++, mv++) {
-      normal_short_to_float_v3(no, ps->vert_normals[a]);
+      copy_v3_v3(no, ps->vert_normals[a]);
       if (UNLIKELY(ps->is_flip_object)) {
         negate_v3(no);
       }

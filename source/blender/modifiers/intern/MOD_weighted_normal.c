@@ -85,6 +85,7 @@ typedef struct WeightedNormalData {
   const int numPolys;
 
   MVert *mvert;
+  const float (*vert_normals)[3];
   MEdge *medge;
 
   MLoop *mloop;
@@ -206,6 +207,7 @@ static void apply_weights_vertex_normal(WeightedNormalModifierData *wnmd,
   int *loop_to_poly = wn_data->loop_to_poly;
 
   MPoly *mpoly = wn_data->mpoly;
+  const float(*vert_normals)[3] = wn_data->vert_normals;
   float(*polynors)[3] = wn_data->polynors;
   int *poly_strength = wn_data->poly_strength;
 
@@ -242,6 +244,7 @@ static void apply_weights_vertex_normal(WeightedNormalModifierData *wnmd,
                                 numLoops,
                                 mpoly,
                                 polynors,
+                                vert_normals,
                                 numPolys,
                                 true,
                                 split_angle,
@@ -415,6 +418,7 @@ static void apply_weights_vertex_normal(WeightedNormalModifierData *wnmd,
                                   numLoops,
                                   mpoly,
                                   polynors,
+                                  vert_normals,
                                   numPolys,
                                   true,
                                   split_angle,
@@ -609,15 +613,6 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
     weight = (weight - 1) * 25;
   }
 
-  CustomData *pdata = &result->pdata;
-  float(*polynors)[3] = CustomData_get_layer(pdata, CD_NORMAL);
-  if (!polynors) {
-    polynors = CustomData_add_layer(pdata, CD_NORMAL, CD_CALLOC, NULL, numPolys);
-    CustomData_set_layer_flag(pdata, CD_NORMAL, CD_FLAG_TEMPORARY);
-  }
-  BKE_mesh_calc_normals_poly_and_vertex(
-      mvert, numVerts, mloop, numLoops, mpoly, numPolys, polynors, NULL);
-
   const float split_angle = mesh->smoothresh;
   short(*clnors)[2];
   CustomData *ldata = &result->ldata;
@@ -641,6 +636,7 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
       .numPolys = numPolys,
 
       .mvert = mvert,
+      .vert_normals = BKE_mesh_ensure_vertex_normals(result),
       .medge = medge,
 
       .mloop = mloop,
@@ -649,7 +645,7 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
       .split_angle = split_angle,
 
       .mpoly = mpoly,
-      .polynors = polynors,
+      .polynors = BKE_mesh_ensure_face_normals(mesh),
       .poly_strength = CustomData_get_layer_named(
           &result->pdata, CD_PROP_INT32, MOD_WEIGHTEDNORMALS_FACEWEIGHT_CDLAYER_ID),
 
@@ -676,9 +672,6 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
   MEM_SAFE_FREE(wn_data.loop_to_poly);
   MEM_SAFE_FREE(wn_data.mode_pair);
   MEM_SAFE_FREE(wn_data.items_data);
-
-  /* Currently Modifier stack assumes there is no poly normal data passed around... */
-  CustomData_free_layers(pdata, CD_NORMAL, numPolys);
 
   result->runtime.is_original = false;
 

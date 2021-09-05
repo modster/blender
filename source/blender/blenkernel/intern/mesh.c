@@ -1896,9 +1896,7 @@ void BKE_mesh_vert_normals_apply(Mesh *mesh, const short (*vert_normals)[3])
 void BKE_mesh_calc_normals_split_ex(Mesh *mesh, MLoopNorSpaceArray *r_lnors_spacearr)
 {
   float(*r_loopnors)[3];
-  float(*polynors)[3];
   short(*clnors)[2] = NULL;
-  bool free_polynors = false;
 
   /* Note that we enforce computing clnors when the clnor space array is requested by caller here.
    * However, we obviously only use the autosmooth angle threshold
@@ -1918,25 +1916,6 @@ void BKE_mesh_calc_normals_split_ex(Mesh *mesh, MLoopNorSpaceArray *r_lnors_spac
   /* may be NULL */
   clnors = CustomData_get_layer(&mesh->ldata, CD_CUSTOMLOOPNORMAL);
 
-  if (CustomData_has_layer(&mesh->pdata, CD_NORMAL)) {
-    /* This assume that layer is always up to date, not sure this is the case
-     * (esp. in Edit mode?)... */
-    polynors = CustomData_get_layer(&mesh->pdata, CD_NORMAL);
-    free_polynors = false;
-  }
-  else {
-    polynors = MEM_malloc_arrayN(mesh->totpoly, sizeof(float[3]), __func__);
-    BKE_mesh_calc_normals_poly_and_vertex(mesh->mvert,
-                                          mesh->totvert,
-                                          mesh->mloop,
-                                          mesh->totloop,
-                                          mesh->mpoly,
-                                          mesh->totpoly,
-                                          polynors,
-                                          NULL);
-    free_polynors = true;
-  }
-
   BKE_mesh_normals_loop_split(mesh->mvert,
                               mesh->totvert,
                               mesh->medge,
@@ -1945,17 +1924,14 @@ void BKE_mesh_calc_normals_split_ex(Mesh *mesh, MLoopNorSpaceArray *r_lnors_spac
                               r_loopnors,
                               mesh->totloop,
                               mesh->mpoly,
-                              (const float(*)[3])polynors,
+                              BKE_mesh_ensure_face_normals(mesh),
+                              BKE_mesh_ensure_vertex_normals(mesh),
                               mesh->totpoly,
                               use_split_normals,
                               split_angle,
                               r_lnors_spacearr,
                               clnors,
                               NULL);
-
-  if (free_polynors) {
-    MEM_freeN(polynors);
-  }
 
   mesh->runtime.cd_dirty_vert &= ~CD_MASK_NORMAL;
   mesh->runtime.cd_dirty_poly &= ~CD_MASK_NORMAL;

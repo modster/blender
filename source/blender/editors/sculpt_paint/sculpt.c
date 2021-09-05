@@ -1496,7 +1496,7 @@ static void paint_mesh_restore_co_task_cb(void *__restrict userdata,
     if (orig_data.unode->type == SCULPT_UNDO_COORDS) {
       copy_v3_v3(vd.co, orig_data.co);
       if (vd.no) {
-        copy_v3_v3_short(vd.no, orig_data.no);
+        copy_v3_v3(vd.no, orig_data.no);
       }
       else {
         normal_short_to_float_v3(vd.fno, orig_data.no);
@@ -4814,7 +4814,7 @@ static void do_inflate_brush_task_cb_ex(void *__restrict userdata,
       copy_v3_v3(val, vd.fno);
     }
     else {
-      normal_short_to_float_v3(val, vd.no);
+      copy_v3_v3(val, vd.no);
     }
 
     mul_v3_fl(val, fade * ss->cache->radius);

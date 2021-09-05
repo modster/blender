@@ -373,14 +373,9 @@ static void pointdensity_cache_vertex_normal(PointDensity *pd,
                                              Mesh *mesh,
                                              float *data_color)
 {
-  MVert *mvert = mesh->mvert, *mv;
-  int i;
-
   BLI_assert(data_color);
-
-  for (i = 0, mv = mvert; i < pd->totpoints; i++, mv++, data_color += 3) {
-    normal_short_to_float_v3(data_color, mv->no);
-  }
+  const float(*vert_normals)[3] = BKE_mesh_ensure_vertex_normals(mesh);
+  memcpy(data_color, vert_normals, sizeof(float[3]) * mesh->totvert);
 }
 
 static void pointdensity_cache_object(PointDensity *pd, Object *ob)

@@ -382,6 +382,7 @@ void mesh_render_data_update_normals(MeshRenderData *mr, const eMRDataType data_
 
   if (mr->extract_type != MR_EXTRACT_BMESH) {
     /* Mesh */
+    mr->vert_normals = BKE_mesh_ensure_vertex_normals(mr->me);
     if (data_flag & (MR_DATA_POLY_NOR | MR_DATA_LOOP_NOR | MR_DATA_TAN_LOOP_NOR)) {
       BKE_mesh_ensure_normals_for_display(mr->me);
       mr->poly_normals = CustomData_get_layer(&mr->me->pdata, CD_NORMAL);
@@ -398,6 +399,7 @@ void mesh_render_data_update_normals(MeshRenderData *mr, const eMRDataType data_
                                   mr->loop_len,
                                   mr->me->mpoly,
                                   mr->poly_normals,
+                                  mr->vert_normals,
                                   mr->poly_len,
                                   is_auto_smooth,
                                   split_angle,

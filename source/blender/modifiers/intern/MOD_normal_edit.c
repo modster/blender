@@ -545,26 +545,11 @@ static Mesh *normalEditModifier_do(NormalEditModifierData *enmd,
   float(*loopnors)[3] = NULL;
   short(*clnors)[2] = NULL;
 
-  float(*polynors)[3];
-
   CustomData *ldata = &result->ldata;
 
   /* Compute poly (always needed) and vert normals. */
-  CustomData *pdata = &result->pdata;
-  polynors = CustomData_get_layer(pdata, CD_NORMAL);
-  if (!polynors) {
-    polynors = CustomData_add_layer(pdata, CD_NORMAL, CD_CALLOC, NULL, num_polys);
-    CustomData_set_layer_flag(pdata, CD_NORMAL, CD_FLAG_TEMPORARY);
-  }
-  if (result->runtime.cd_dirty_vert & CD_MASK_NORMAL) {
-    BKE_mesh_calc_normals_poly_and_vertex(
-        mvert, num_verts, mloop, num_loops, mpoly, num_polys, polynors, NULL);
-  }
-  else {
-    BKE_mesh_calc_normals_poly(mvert, num_verts, mloop, num_loops, mpoly, num_polys, polynors);
-  }
-
-  result->runtime.cd_dirty_vert &= ~CD_MASK_NORMAL;
+  const float(*vert_normals)[3] = BKE_mesh_ensure_vertex_normals(mesh);
+  const float(*poly_normals)[3] = BKE_mesh_ensure_face_normals(mesh);
 
   clnors = CustomData_get_layer(ldata, CD_CUSTOMLOOPNORMAL);
   if (use_current_clnors) {
@@ -579,7 +564,8 @@ static Mesh *normalEditModifier_do(NormalEditModifierData *enmd,
                                 loopnors,
                                 num_loops,
                                 mpoly,
-                                (const float(*)[3])polynors,
+                                poly_normals,
+                                vert_normals,
                                 num_polys,
                                 true,
                                 result->smoothresh,
@@ -601,7 +587,7 @@ static Mesh *normalEditModifier_do(NormalEditModifierData *enmd,
                                  result,
                                  clnors,
                                  loopnors,
-                                 polynors,
+                                 poly_normals,
                                  enmd->mix_mode,
                                  enmd->mix_factor,
                                  enmd->mix_limit,
@@ -624,7 +610,7 @@ static Mesh *normalEditModifier_do(NormalEditModifierData *enmd,
                                       result,
                                       clnors,
                                       loopnors,
-                                      polynors,
+                                      poly_normals,
                                       enmd->mix_mode,
                                       enmd->mix_factor,
                                       enmd->mix_limit,
@@ -641,8 +627,6 @@ static Mesh *normalEditModifier_do(NormalEditModifierData *enmd,
                                       num_polys);
   }
 
-  /* Currently Modifier stack assumes there is no poly normal data passed around... */
-  CustomData_free_layers(pdata, CD_NORMAL, num_polys);
   MEM_SAFE_FREE(loopnors);
 
   result->runtime.is_original = false;

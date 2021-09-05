@@ -383,7 +383,6 @@ Mesh *BKE_mesh_mirror_apply_mirror_on_axis_for_modifier(MirrorModifierData *mmd,
     CustomData *ldata = &result->ldata;
     short(*clnors)[2] = CustomData_get_layer(ldata, CD_CUSTOMLOOPNORMAL);
     MLoopNorSpaceArray lnors_spacearr = {NULL};
-    float(*poly_normals)[3] = MEM_mallocN(sizeof(*poly_normals) * totpoly, __func__);
 
     /* The transform matrix of a normal must be
      * the transpose of inverse of transform matrix of the geometry... */
@@ -393,15 +392,6 @@ Mesh *BKE_mesh_mirror_apply_mirror_on_axis_for_modifier(MirrorModifierData *mmd,
 
     /* calculate custom normals into loop_normals, then mirror first half into second half */
 
-    BKE_mesh_calc_normals_poly_and_vertex(result->mvert,
-                                          result->totvert,
-                                          result->mloop,
-                                          totloop,
-                                          result->mpoly,
-                                          totpoly,
-                                          poly_normals,
-                                          NULL);
-
     BKE_mesh_normals_loop_split(result->mvert,
                                 result->totvert,
                                 result->medge,
@@ -410,7 +400,8 @@ Mesh *BKE_mesh_mirror_apply_mirror_on_axis_for_modifier(MirrorModifierData *mmd,
                                 loop_normals,
                                 totloop,
                                 result->mpoly,
-                                poly_normals,
+                                BKE_mesh_ensure_face_normals(mesh),
+                                BKE_mesh_ensure_vertex_normals(mesh),
                                 totpoly,
                                 true,
                                 mesh->smoothresh,
@@ -436,7 +427,6 @@ Mesh *BKE_mesh_mirror_apply_mirror_on_axis_for_modifier(MirrorModifierData *mmd,
       }
     }
 
-    MEM_freeN(poly_normals);
     MEM_freeN(loop_normals);
     BKE_lnor_spacearr_free(&lnors_spacearr);
   }
