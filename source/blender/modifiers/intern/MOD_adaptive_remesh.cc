@@ -191,6 +191,7 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
   }
   else if (armd->mode == ADAPTIVE_REMESH_STATIC_REMESHING) {
     uiItemR(layout, ptr, "edge_length_min", 0, nullptr, ICON_NONE);
+    uiItemR(layout, ptr, "aspect_ratio_min", 0, nullptr, ICON_NONE);
     uiItemR(layout, ptr, "enable_sewing", 0, nullptr, ICON_NONE);
     uiItemR(layout, ptr, "force_split_for_sewing", 0, nullptr, ICON_NONE);
   }

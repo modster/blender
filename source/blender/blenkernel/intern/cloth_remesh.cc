@@ -594,7 +594,8 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, FaceData> {
    * Here "size" is determined by `Sizing` stores in `Vert`s of the
    * `Edge`, using the function `Sizing::get_edge_size_sq()`.
    */
-  void collapse_edges()
+  template<typename ExtraData>
+  void collapse_edges(const AdaptiveRemeshParams<END, ExtraData> &params)
   {
     blender::Set<FaceIndex> active_faces;
     for (const auto &face : this->get_faces()) {
@@ -625,10 +626,10 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, FaceData> {
           const auto &edge = this->get_checked_edge(edge_index);
 
           std::optional<AdaptiveMeshDiff<END>> op_mesh_diff = std::nullopt;
-          if (this->is_edge_collapseable_adaptivemesh(edge, false)) {
+          if (this->is_edge_collapseable_adaptivemesh(params, edge, false)) {
             op_mesh_diff = this->collapse_edge_triangulate(edge.get_self_index(), false, true);
           }
-          else if (this->is_edge_collapseable_adaptivemesh(edge, true)) {
+          else if (this->is_edge_collapseable_adaptivemesh(params, edge, true)) {
             op_mesh_diff = this->collapse_edge_triangulate(edge.get_self_index(), true, true);
           }
 
@@ -700,7 +701,7 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, FaceData> {
     this->split_edges(sewing_enabled, force_split_for_sewing);
 
     /* Collapse the edges */
-    this->collapse_edges();
+    this->collapse_edges(params);
 
 #if SHOULD_REMESH_DUMP_FILE
     auto static_remesh_end_msgpack = this->serialize();
@@ -746,7 +747,7 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, FaceData> {
     this->split_edges(sewing_enabled, force_split_for_sewing);
 
     /* Collapse the edges */
-    this->collapse_edges();
+    this->collapse_edges(params);
 
 #if SHOULD_REMESH_DUMP_FILE
     auto dynamic_remesh_end_msgpack = this->serialize();
@@ -1434,11 +1435,14 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, FaceData> {
         face.get_verts()[0], face.get_verts()[1], face.get_verts()[2]);
   }
 
-  bool is_edge_collapseable_adaptivemesh(const AdaptiveEdge &edge, bool verts_swapped) const
+  template<typename ExtraData>
+  bool is_edge_collapseable_adaptivemesh(const AdaptiveRemeshParams<END, ExtraData> &params,
+                                         const AdaptiveEdge &edge,
+                                         bool verts_swapped) const
   {
-    /* TODO(ish): expose small_value, aspect_ratio_min to gui */
+    /* TODO(ish): expose small_value to gui */
     const auto small_value = 0.2;
-    const auto aspect_ratio_min = 0.1;
+    const auto aspect_ratio_min = params.aspect_ratio_min;
 
     if (this->is_edge_collapseable(edge.get_self_index(), verts_swapped, true) == false) {
       return false;
