@@ -391,6 +391,11 @@ template<typename T> class Node {
     return this->verts;
   }
 
+  const auto &get_normal() const
+  {
+    return this->normal;
+  }
+
   friend std::ostream &operator<<(std::ostream &stream, const Node &node)
   {
     stream << "(self_index: " << node.self_index << ", verts: " << node.verts
