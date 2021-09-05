@@ -3443,7 +3443,8 @@ static KnifeEdge *knife_find_closest_edge_of_face(KnifeTool_OpData *kcd,
     knife_project_v2(kcd, kfe->v2->cageco, kfv2_sco);
 
     /* Check if we're close enough and calculate 'lambda'. */
-    if (kcd->is_angle_snapping || kcd->axis_constrained) {
+    /* In constrained mode calculate lambda differently, unless constrained along kcd->prev.edge */
+    if ((kcd->is_angle_snapping || kcd->axis_constrained) && (kfe != kcd->prev.edge)) {
       dis_sq = curdis_sq;
       if (!knife_snap_edge_constrained(kcd, sco, kfv1_sco, kfv2_sco, &dis_sq, &lambda)) {
         continue;
