@@ -63,6 +63,17 @@ GHOST_Wintab *GHOST_Wintab::loadWintab(HWND hwnd)
     return nullptr;
   }
 
+  auto dataGet = (GHOST_WIN32_WTDataGet)::GetProcAddress(handle.get(), "WTDataGet");
+  if (!dataGet) {
+    return nullptr;
+  }
+
+  auto queuePacketsEx = (GHOST_WIN32_WTQueuePacketsEx)::GetProcAddress(handle.get(),
+                                                                       "WTQueuePacketsEx");
+  if (!queuePacketsEx) {
+    return nullptr;
+  }
+
   auto queueSizeGet = (GHOST_WIN32_WTQueueSizeGet)::GetProcAddress(handle.get(), "WTQueueSizeGet");
   if (!queueSizeGet) {
     return nullptr;
@@ -136,6 +147,8 @@ GHOST_Wintab *GHOST_Wintab::loadWintab(HWND hwnd)
                           get,
                           set,
                           packetsGet,
+                          dataGet,
+                          queuePacketsEx,
                           enable,
                           overlap,
                           std::move(hctx),
@@ -180,6 +193,8 @@ GHOST_Wintab::GHOST_Wintab(HWND hwnd,
                            GHOST_WIN32_WTGet get,
                            GHOST_WIN32_WTSet set,
                            GHOST_WIN32_WTPacketsGet packetsGet,
+                           GHOST_WIN32_WTDataGet dataGet,
+                           GHOST_WIN32_WTQueuePacketsEx queuePacketsEx,
                            GHOST_WIN32_WTEnable enable,
                            GHOST_WIN32_WTOverlap overlap,
                            unique_hctx hctx,
@@ -191,6 +206,8 @@ GHOST_Wintab::GHOST_Wintab(HWND hwnd,
       m_fpGet{get},
       m_fpSet{set},
       m_fpPacketsGet{packetsGet},
+      m_fpDataGet{dataGet},
+      m_fpQueuePacketsEx{queuePacketsEx},
       m_fpEnable{enable},
       m_fpOverlap{overlap},
       m_context{std::move(hctx)},
@@ -244,7 +261,16 @@ void GHOST_Wintab::leaveRange()
   /* Set to none to indicate tablet is inactive. */
   m_lastTabletData = GHOST_TABLET_DATA_NONE;
   /* Clear the packet queue. */
-  m_fpPacketsGet(m_context.get(), m_pkts.size(), m_pkts.data());
+  // XXX proximity may return before proximity leave is processed, this would thus clear valid
+  // events.
+  // m_fpPacketsGet(m_context.get(), m_pkts.size(), m_pkts.data());
+}
+
+void GHOST_Wintab::enterRange()
+{
+  /* Dummy until input arrives. */
+  m_lastTabletData.Active = GHOST_kTabletModeStylus;
+  m_firstProximity = true;
 }
 
 void GHOST_Wintab::remapCoordinates()
@@ -295,10 +321,29 @@ GHOST_TabletData GHOST_Wintab::getLastTabletData()
   return m_lastTabletData;
 }
 
-void GHOST_Wintab::getInput(std::vector<GHOST_WintabInfoWin32> &outWintabInfo)
+void GHOST_Wintab::getInput(std::vector<GHOST_WintabInfoWin32> &outWintabInfo, UINT genSerial)
 {
-  const int numPackets = m_fpPacketsGet(m_context.get(), m_pkts.size(), m_pkts.data());
+  // const int numPackets = m_fpPacketsGet(m_context.get(), m_pkts.size(), m_pkts.data());
+  // outWintabInfo.resize(numPackets);
+  UINT beginSerial, unusedEndSerial;
+  if (!m_fpQueuePacketsEx(m_context.get(), &beginSerial, &unusedEndSerial)) {
+    return;
+  }
+  int numPackets;
+  m_fpDataGet(m_context.get(), beginSerial, genSerial, m_pkts.size(), m_pkts.data(), &numPackets);
+
+  /* If this is the first event since a proximity event, we want to skip all events prior to the
+   * one which triggered the WT_PACKET event so that we don't use events from the last time the
+   * stylus was in range. */
+  if (m_firstProximity) {
+    m_firstProximity = false;
+
+    m_pkts[0] = m_pkts[numPackets - 1];
+    numPackets = 1;
+  }
+
   outWintabInfo.resize(numPackets);
+
   size_t outExtent = 0;
 
   for (int i = 0; i < numPackets; i++) {

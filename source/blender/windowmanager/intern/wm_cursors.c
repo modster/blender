@@ -271,9 +271,7 @@ void WM_cursor_grab_enable(wmWindow *win, int wrap, bool hide, int bounds[4])
 
   if ((G.debug & G_DEBUG) == 0) {
     if (win->ghostwin) {
-      if (win->eventstate->tablet.is_motion_absolute == false) {
-        GHOST_SetCursorGrab(win->ghostwin, mode, mode_axis, bounds, NULL);
-      }
+      GHOST_SetCursorGrab(win->ghostwin, mode, mode_axis, bounds, NULL);
 
       win->grabcursor = mode;
     }

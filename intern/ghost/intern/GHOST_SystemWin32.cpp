@@ -150,6 +150,8 @@ GHOST_SystemWin32::GHOST_SystemWin32()
   // blurry scaling and enables WM_DPICHANGED to allow us to draw at proper DPI.
   SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE);
 
+  EnableMouseInPointer(true);
+
   // Check if current keyboard layout uses AltGr and save keylayout ID for
   // specialized handling if keys like VK_OEM_*. I.e. french keylayout
   // generates VK_OEM_8 for their exclamation key (key left of right shift)
@@ -160,6 +162,11 @@ GHOST_SystemWin32::GHOST_SystemWin32()
 #ifdef WITH_INPUT_NDOF
   m_ndofManager = new GHOST_NDOFManagerWin32(*this);
 #endif
+
+  POINT pt;
+  ::GetCursorPos(&pt);
+  m_lastX = pt.x;
+  m_lastY = pt.y;
 }
 
 GHOST_SystemWin32::~GHOST_SystemWin32()
@@ -878,7 +885,7 @@ GHOST_EventButton *GHOST_SystemWin32::processButtonEvent(GHOST_TEventType type,
   return new GHOST_EventButton(system->getMilliSeconds(), type, window, mask, td);
 }
 
-void GHOST_SystemWin32::processWintabEvent(GHOST_WindowWin32 *window)
+void GHOST_SystemWin32::processWintabEvent(GHOST_WindowWin32 *window, UINT genSerial)
 {
   GHOST_Wintab *wt = window->getWintab();
   if (!wt) {
@@ -888,7 +895,7 @@ void GHOST_SystemWin32::processWintabEvent(GHOST_WindowWin32 *window)
   GHOST_SystemWin32 *system = (GHOST_SystemWin32 *)getSystem();
 
   std::vector<GHOST_WintabInfoWin32> wintabInfo;
-  wt->getInput(wintabInfo);
+  wt->getInput(wintabInfo, genSerial);
 
   /* Wintab provided coordinates are untrusted until a Wintab and Win32 button down event match.
    * This is checked on every button down event, and revoked if there is a mismatch. This can
@@ -908,8 +915,35 @@ void GHOST_SystemWin32::processWintabEvent(GHOST_WindowWin32 *window)
         }
 
         wt->mapWintabToSysCoordinates(info.x, info.y, info.x, info.y);
+
+        if (system->m_firstProximity) {
+          system->m_firstProximity = false;
+
+          // XXX bad if not trusted coodinates
+          if (window->getCursorGrabModeIsWarp()) {
+            int32_t x_accum, y_accum;
+            window->getCursorGrabAccum(x_accum, y_accum);
+            x_accum -= info.x - system->m_lastX;
+            y_accum -= info.y - system->m_lastY;
+            window->setCursorGrabAccum(x_accum, y_accum);
+          }
+        }
+
+        int x = info.x;
+        int y = info.y;
+
+        if (window->getCursorGrabModeIsWarp()) {
+          int32_t x_accum, y_accum;
+          window->getCursorGrabAccum(x_accum, y_accum);
+          x += x_accum;
+          y += y_accum;
+        }
+
         system->pushEvent(new GHOST_EventCursor(
-            info.time, GHOST_kEventCursorMove, window, info.x, info.y, info.tabletData));
+            info.time, GHOST_kEventCursorMove, window, x, y, info.tabletData));
+
+        system->m_lastX = info.x;
+        system->m_lastY = info.y;
 
         break;
       }
@@ -948,8 +982,18 @@ void GHOST_SystemWin32::processWintabEvent(GHOST_WindowWin32 *window)
           /* Move cursor to button location, to prevent incorrect cursor position when
            * transitioning from unsynchronized Win32 to Wintab cursor control. */
           wt->mapWintabToSysCoordinates(info.x, info.y, info.x, info.y);
+
+          int x = info.x;
+          int y = info.y;
+
+          if (window->getCursorGrabModeIsWarp()) {
+            int32_t x_accum, y_accum;
+            window->getCursorGrabAccum(x_accum, y_accum);
+            x += x_accum;
+            y += y_accum;
+          }
           system->pushEvent(new GHOST_EventCursor(
-              info.time, GHOST_kEventCursorMove, window, info.x, info.y, info.tabletData));
+              info.time, GHOST_kEventCursorMove, window, x, y, info.tabletData));
 
           window->updateMouseCapture(MousePressed);
           system->pushEvent(
@@ -1006,6 +1050,17 @@ void GHOST_SystemWin32::processWintabEvent(GHOST_WindowWin32 *window)
     int x, y;
     system->getCursorPosition(x, y);
 
+    /* TODO decouple required ordering of accum and last position */
+    system->m_lastX = x;
+    system->m_lastY = y;
+
+    if (window->getCursorGrabModeIsWarp()) {
+      int32_t x_accum, y_accum;
+      window->getCursorGrabAccum(x_accum, y_accum);
+      x += x_accum;
+      y += y_accum;
+    }
+
     /* TODO supply tablet data */
     GHOST_TabletData td = wt->getLastTabletData();
     td.Pressure = 1.0f;
@@ -1017,9 +1072,13 @@ void GHOST_SystemWin32::processWintabEvent(GHOST_WindowWin32 *window)
 void GHOST_SystemWin32::processPointerEvent(
     UINT type, GHOST_WindowWin32 *window, WPARAM wParam, LPARAM lParam, bool &eventHandled)
 {
+  int32_t pointerId = GET_POINTERID_WPARAM(wParam);
+  POINTER_INPUT_TYPE inputType;
+  GetPointerType(pointerId, &inputType);
+
   /* Pointer events might fire when changing windows for a device which is set to use Wintab,
    * even when Wintab is left enabled but set to the bottom of Wintab overlap order. */
-  if (!window->usingTabletAPI(GHOST_kTabletWinPointer)) {
+  if (!window->usingTabletAPI(GHOST_kTabletWinPointer) && inputType != PT_MOUSE) {
     return;
   }
 
@@ -1027,6 +1086,13 @@ void GHOST_SystemWin32::processPointerEvent(
   std::vector<GHOST_PointerInfoWin32> pointerInfo;
 
   if (window->getPointerInfo(pointerInfo, wParam, lParam) != GHOST_kSuccess) {
+    if (inputType == PT_MOUSE && type == WM_POINTERUPDATE) {
+      GHOST_EventCursor *event = processCursorEvent(window, pointerId);
+      if (event) {
+        system->pushEvent(event);
+        eventHandled = true;
+      }
+    }
     return;
   }
 
@@ -1035,25 +1101,43 @@ void GHOST_SystemWin32::processPointerEvent(
       /* Coalesced pointer events are reverse chronological order, reorder chronologically.
        * Only contiguous move events are coalesced. */
       for (uint32_t i = pointerInfo.size(); i-- > 0;) {
-        system->pushEvent(new GHOST_EventCursor(pointerInfo[i].time,
-                                                GHOST_kEventCursorMove,
-                                                window,
-                                                pointerInfo[i].pixelLocation.x,
-                                                pointerInfo[i].pixelLocation.y,
-                                                pointerInfo[i].tabletData));
+        int x = pointerInfo[i].pixelLocation.x;
+        int y = pointerInfo[i].pixelLocation.y;
+
+        if (window->getCursorGrabModeIsWarp()) {
+          int32_t x_accum, y_accum;
+          window->getCursorGrabAccum(x_accum, y_accum);
+          x += x_accum;
+          y += y_accum;
+        }
+
+        system->pushEvent(new GHOST_EventCursor(
+            pointerInfo[i].time, GHOST_kEventCursorMove, window, x, y, pointerInfo[i].tabletData));
+      }
+
+      if (pointerInfo.size() > 0) {
+        GHOST_PointerInfoWin32 front = pointerInfo.front();
+        system->m_lastX = front.pixelLocation.x;
+        system->m_lastY = front.pixelLocation.y;
       }
 
       /* Leave event unhandled so that system cursor is moved. */
 
       break;
-    case WM_POINTERDOWN:
+    case WM_POINTERDOWN: {
+      int x = pointerInfo[0].pixelLocation.x;
+      int y = pointerInfo[0].pixelLocation.y;
+
+      if (window->getCursorGrabModeIsWarp()) {
+        int32_t x_accum, y_accum;
+        window->getCursorGrabAccum(x_accum, y_accum);
+        x += x_accum;
+        y += y_accum;
+      }
+
       /* Move cursor to point of contact because GHOST_EventButton does not include position. */
-      system->pushEvent(new GHOST_EventCursor(pointerInfo[0].time,
-                                              GHOST_kEventCursorMove,
-                                              window,
-                                              pointerInfo[0].pixelLocation.x,
-                                              pointerInfo[0].pixelLocation.y,
-                                              pointerInfo[0].tabletData));
+      system->pushEvent(new GHOST_EventCursor(
+          pointerInfo[0].time, GHOST_kEventCursorMove, window, x, y, pointerInfo[0].tabletData));
       system->pushEvent(new GHOST_EventButton(pointerInfo[0].time,
                                               GHOST_kEventButtonDown,
                                               window,
@@ -1065,6 +1149,7 @@ void GHOST_SystemWin32::processPointerEvent(
       eventHandled = true;
 
       break;
+    }
     case WM_POINTERUP:
       system->pushEvent(new GHOST_EventButton(pointerInfo[0].time,
                                               GHOST_kEventButtonUp,
@@ -1082,9 +1167,9 @@ void GHOST_SystemWin32::processPointerEvent(
   }
 }
 
-GHOST_EventCursor *GHOST_SystemWin32::processCursorEvent(GHOST_WindowWin32 *window)
+GHOST_EventCursor *GHOST_SystemWin32::processCursorEvent(GHOST_WindowWin32 *window,
+                                                         int32_t pointerId)
 {
-  int32_t x_screen, y_screen;
   GHOST_SystemWin32 *system = (GHOST_SystemWin32 *)getSystem();
 
   if (window->getTabletData().Active != GHOST_kTabletModeNone) {
@@ -1092,9 +1177,11 @@ GHOST_EventCursor *GHOST_SystemWin32::processCursorEvent(GHOST_WindowWin32 *wind
     return NULL;
   }
 
-  DWORD pos = ::GetMessagePos();
-  x_screen = GET_X_LPARAM(pos);
-  y_screen = GET_Y_LPARAM(pos);
+  POINTER_INFO pointerInfo;
+  GetPointerInfo(pointerId, &pointerInfo);
+
+  int32_t x_screen = pointerInfo.ptPixelLocation.x;
+  int32_t y_screen = pointerInfo.ptPixelLocation.y;
 
   int32_t x_accum = 0;
   int32_t y_accum = 0;
@@ -1120,20 +1207,23 @@ GHOST_EventCursor *GHOST_SystemWin32::processCursorEvent(GHOST_WindowWin32 *wind
       system->setCursorPosition(x_new, y_new); /* wrap */
 
       /* We may be in an event before cursor wrap has taken effect */
-      if (window->m_activeWarpX >= 0 && warpX < 0 ||
-          window->m_activeWarpX <= 0 && warpX > 0) {
+      if (window->m_activeWarpX >= 0 && warpX < 0 || window->m_activeWarpX <= 0 && warpX > 0) {
         x_accum -= warpX;
       }
 
-      if (window->m_activeWarpY >= 0 && warpY < 0 ||
-          window->m_activeWarpY <= 0 && warpY > 0) {
+      if (window->m_activeWarpY >= 0 && warpY < 0 || window->m_activeWarpY <= 0 && warpY > 0) {
         y_accum -= warpY;
       }
 
+      /* XXX move to else, track pending accum instead? may add more code with no gain other than
+       * minimizing risk of object momentarily jumping, if any benefit? */
       window->setCursorGrabAccum(x_accum, y_accum);
 
       window->m_activeWarpX = warpX;
       window->m_activeWarpY = warpY;
+
+      system->m_lastX = x_new;
+      system->m_lastY = y_new;
 
       /* When wrapping we don't need to add an event because the setCursorPosition call will cause
        * a new event after. We also need to skip outdated messages while warp is active to prevent
@@ -1145,6 +1235,9 @@ GHOST_EventCursor *GHOST_SystemWin32::processCursorEvent(GHOST_WindowWin32 *wind
       window->m_activeWarpY = 0;
     }
   }
+
+  system->m_lastX = x_screen;
+  system->m_lastY = y_screen;
 
   return new GHOST_EventCursor(system->getMilliSeconds(),
                                GHOST_kEventCursorMove,
@@ -1629,9 +1722,39 @@ LRESULT WINAPI GHOST_SystemWin32::s_wndProc(HWND hwnd, UINT msg, WPARAM wParam, 
             if (inRange) {
               /* Some devices don't emit WT_CSRCHANGE events, so update cursor info here. */
               wt->updateCursorInfo();
+
+              wt->enterRange();
+
+              window->m_mousePresent = true;
+
+              if (window->getCursorGrabModeIsWarp()) {
+                system->m_firstProximity = true;
+                /* Mouse events are still generated asynchronously and may have been processed
+                 * while Wintab was out of range, thus we may be in the middle of a cursor wrap
+                 * event. */
+                window->m_activeWarpX = 0;
+                window->m_activeWarpY = 0;
+              }
             }
             else {
               wt->leaveRange();
+
+              /* Check if pointer device left range while outside of the window. This is necessary
+               * because WM_POINTERENTER and WM_POINTERLEAVE events don't fire when a pen enters
+               * and leaves without hoving over the window, but the cursor is moved resulting in a
+               * WM_POINTERLEAVE event for the mouse. */
+              int32_t msgPosX;
+              int32_t msgPosY;
+              system->getCursorPosition(msgPosX, msgPosY);
+
+              GHOST_Rect bounds;
+              window->getClientBounds(bounds);
+
+              if (!bounds.isInside(msgPosX, msgPosY)) {
+                window->m_mousePresent = false;
+              }
+
+              break;
             }
           }
           eventHandled = true;
@@ -1650,29 +1773,153 @@ LRESULT WINAPI GHOST_SystemWin32::s_wndProc(HWND hwnd, UINT msg, WPARAM wParam, 
           break;
         }
         case WT_PACKET:
-          processWintabEvent(window);
+          processWintabEvent(window, wParam);
           eventHandled = true;
           break;
         ////////////////////////////////////////////////////////////////////////
         // Pointer events, processed
         ////////////////////////////////////////////////////////////////////////
         case WM_POINTERUPDATE:
+          if (!window->m_mousePresent) {
+            if (window->usingTabletAPI(GHOST_kTabletWintab) && window->getCursorGrabModeIsWarp() &&
+                !window->m_activeWarpX && !window->m_activeWarpY) {
+              int32_t x, y;
+              system->getCursorPosition(x, y);
+
+              GHOST_Rect bounds;
+              window->getClientBounds(bounds);
+
+              if (!bounds.isInside(x, y)) {
+                break;
+              }
+            }
+
+            window->m_mousePresent = true;
+
+            GHOST_Wintab *wt = window->getWintab();
+            if (wt) {
+              wt->gainFocus();
+            }
+
+            /* Only adjust cursor/grab accum offset if not in the middle of a warp event. */
+            if (window->getCursorGrabModeIsWarp() && !window->m_activeWarpX &&
+                !window->m_activeWarpY) {
+              uint32_t pointerId = GET_POINTERID_WPARAM(wParam);
+              POINTER_INFO pointerInfo;
+              GetPointerInfo(pointerId, &pointerInfo);
+              int x = pointerInfo.ptPixelLocation.x;
+              int y = pointerInfo.ptPixelLocation.y;
+
+              int32_t x_accum, y_accum;
+              window->getCursorGrabAccum(x_accum, y_accum);
+              x_accum -= x - system->m_lastX;
+              y_accum -= y - system->m_lastY;
+              window->setCursorGrabAccum(x_accum, y_accum);
+            }
+          }
+
+          processPointerEvent(msg, window, wParam, lParam, eventHandled);
+          break;
         case WM_POINTERDOWN:
         case WM_POINTERUP:
           processPointerEvent(msg, window, wParam, lParam, eventHandled);
           break;
-        case WM_POINTERLEAVE: {
+        case WM_POINTERDEVICEINRANGE:
+          break;
+        case WM_POINTERDEVICEOUTOFRANGE: {
+          /* Check if pointer device left range while outside of the window. This is necessary
+           * because WM_POINTERENTER and WM_POINTERLEAVE events don't fire when a pen enters and
+           * leaves without hoving over the window, but the cursor is moved resulting in a
+           * WM_POINTERLEAVE event for the mouse. */
+          DWORD msgPos = ::GetMessagePos();
+          int msgPosX = GET_X_LPARAM(msgPos);
+          int msgPosY = GET_Y_LPARAM(msgPos);
+
+          GHOST_Rect bounds;
+          window->getClientBounds(bounds);
+
+          if (!bounds.isInside(msgPosX, msgPosY)) {
+            window->m_mousePresent = false;
+          }
+
+          break;
+        }
+        case WM_POINTERENTER: {
+          /* XXX no pointerenter for PT_MOUSE. */
+
           uint32_t pointerId = GET_POINTERID_WPARAM(wParam);
           POINTER_INFO pointerInfo;
-          if (!GetPointerInfo(pointerId, &pointerInfo)) {
+          POINTER_INPUT_TYPE type;
+          if (!GetPointerType(pointerId, &type) || !GetPointerInfo(pointerId, &pointerInfo)) {
+            break;
+          }
+          if (type == PT_PEN) {
+            // window->setPointerPenInfo();
+          }
+
+          /* if mouse is not present, don't apply warp as it will be handled in WM_POINTERUPDATE */
+          /* XXX this is likely causing issues on leaving/entering across same process windows. */
+          if (window->getCursorGrabModeIsWarp() && window->m_mousePresent) {
+            if (type == PT_PEN && window->usingTabletAPI(GHOST_kTabletWintab)) {
+              break;
+            }
+
+            int x = pointerInfo.ptPixelLocation.x;
+            int y = pointerInfo.ptPixelLocation.y;
+
+            int32_t x_accum, y_accum;
+            window->getCursorGrabAccum(x_accum, y_accum);
+            x_accum -= x - system->m_lastX;
+            y_accum -= y - system->m_lastY;
+            window->setCursorGrabAccum(x_accum, y_accum);
+
+            window->m_activeWarpX = 0;
+            window->m_activeWarpY = 0;
+          }
+
+          break;
+        }
+        case WM_POINTERLEAVE: {
+          uint32_t pointerId = GET_POINTERID_WPARAM(wParam);
+          POINTER_INPUT_TYPE type;
+          if (!GetPointerType(pointerId, &type)) {
             break;
           }
 
           /* Reset pointer pen info if pen device has left tracking range. */
-          if (pointerInfo.pointerType == PT_PEN) {
+          /* XXX Note, because touch is considered a left button down, it is never in range when it
+           * leaves */
+          if (type == PT_PEN) {
+            if (window->usingTabletAPI(GHOST_kTabletWintab)) {
+              break;
+            }
             window->resetPointerPenInfo();
+
+            /* If pen is still in range, the cursor left the window via a hovering pen. */
+            if (IS_POINTER_INRANGE_WPARAM(wParam)) {
+              window->m_mousePresent = false;
+            }
+
             eventHandled = true;
           }
+
+          /* XXX this fires when a mouse is moved after having left from a pen device entering
+           * while outside of the window. */
+          if (type == PT_MOUSE && window->m_mousePresent) {
+            window->m_mousePresent = false;
+            /* Check for tablet data in case mouse movement is actually a Wintab device. */
+            if (window->getCursorGrabModeIsWarp() &&
+                window->getTabletData().Active == GHOST_kTabletModeNone) {
+              event = processCursorEvent(window, pointerId);
+            }
+            else if (!window->getCursorGrabModeIsWarp()) {
+              GHOST_Wintab *wt = window->getWintab();
+              if (wt) {
+                wt->loseFocus();
+              }
+            }
+          }
+
           break;
         }
         ////////////////////////////////////////////////////////////////////////
@@ -1713,20 +1960,6 @@ LRESULT WINAPI GHOST_SystemWin32::s_wndProc(HWND hwnd, UINT msg, WPARAM wParam, 
           }
           break;
         case WM_MOUSEMOVE:
-          if (!window->m_mousePresent) {
-            TRACKMOUSEEVENT tme = {sizeof(tme)};
-            tme.dwFlags = TME_LEAVE;
-            tme.hwndTrack = hwnd;
-            TrackMouseEvent(&tme);
-            window->m_mousePresent = true;
-            GHOST_Wintab *wt = window->getWintab();
-            if (wt) {
-              wt->gainFocus();
-            }
-          }
-
-          event = processCursorEvent(window);
-
           break;
         case WM_MOUSEWHEEL: {
           /* The WM_MOUSEWHEEL message is sent to the focus window
@@ -1762,17 +1995,8 @@ LRESULT WINAPI GHOST_SystemWin32::s_wndProc(HWND hwnd, UINT msg, WPARAM wParam, 
           }
           break;
         case WM_MOUSELEAVE: {
-          window->m_mousePresent = false;
-          if (window->getTabletData().Active == GHOST_kTabletModeNone) {
-            event = processCursorEvent(window);
-          }
-          GHOST_Wintab *wt = window->getWintab();
-          if (wt) {
-            wt->loseFocus();
-          }
           break;
         }
-        ////////////////////////////////////////////////////////////////////////
         // Mouse events, ignored
         ////////////////////////////////////////////////////////////////////////
         case WM_NCMOUSEMOVE:
@@ -1817,8 +2041,14 @@ LRESULT WINAPI GHOST_SystemWin32::s_wndProc(HWND hwnd, UINT msg, WPARAM wParam, 
                                        window);
             /* WARNING: Let DefWindowProc handle WM_ACTIVATE, otherwise WM_MOUSEWHEEL
              * will not be dispatched to OUR active window if we minimize one of OUR windows. */
-            if (LOWORD(wParam) == WA_INACTIVE)
+            if (LOWORD(wParam) == WA_INACTIVE) {
               window->lostMouseCapture();
+
+              GHOST_Wintab *wt = window->getWintab();
+              if (wt) {
+                wt->loseFocus();
+              }
+            }
 
             lResult = ::DefWindowProc(hwnd, msg, wParam, lParam);
             break;
@@ -2272,4 +2502,9 @@ int GHOST_SystemWin32::toggleConsole(int action)
   }
 
   return m_consoleStatus;
+}
+
+void GHOST_SystemWin32::warpGrabAccum(GHOST_WindowWin32 *win, int32_t x, int32_t y)
+{
+  GHOST_SystemWin32 *system = (GHOST_SystemWin32 *)getSystem();
 }

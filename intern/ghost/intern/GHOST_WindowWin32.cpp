@@ -194,6 +194,8 @@ GHOST_WindowWin32::GHOST_WindowWin32(GHOST_SystemWin32 *system,
     loadWintab(GHOST_kWindowStateMinimized != state);
   }
 
+  RegisterPointerDeviceNotifications(m_hWnd, TRUE);
+
   /* Allow the showing of a progress bar on the taskbar. */
   CoCreateInstance(
       CLSID_TaskbarList, NULL, CLSCTX_INPROC_SERVER, IID_ITaskbarList3, (LPVOID *)&m_Bar);
@@ -627,6 +629,7 @@ void GHOST_WindowWin32::lostMouseCapture()
     m_hasGrabMouse = false;
     m_nPressedButtons = 0;
     m_hasMouseCaptured = false;
+    m_mousePresent = false;  // XXX necessary?
   }
 }
 
@@ -878,6 +881,11 @@ GHOST_TSuccess GHOST_WindowWin32::getPointerInfo(
   GHOST_SystemWin32 *system = (GHOST_SystemWin32 *)GHOST_System::getSystem();
   uint32_t outCount = 0;
 
+  POINTER_INPUT_TYPE inputType;
+  if (GetPointerType(pointerId, &inputType) && inputType == PT_MOUSE) {
+    return GHOST_kFailure;
+  }
+
   if (!(GetPointerPenInfoHistory(pointerId, &outCount, NULL))) {
     return GHOST_kFailure;
   }
@@ -954,6 +962,11 @@ GHOST_TSuccess GHOST_WindowWin32::getPointerInfo(
 void GHOST_WindowWin32::resetPointerPenInfo()
 {
   m_lastPointerTabletData = GHOST_TABLET_DATA_NONE;
+}
+
+void GHOST_WindowWin32::setPointerPenInfo()
+{
+  m_lastPointerTabletData.Active = GHOST_kTabletModeStylus;
 }
 
 GHOST_Wintab *GHOST_WindowWin32::getWintab() const

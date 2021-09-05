@@ -46,6 +46,8 @@ typedef BOOL(API *GHOST_WIN32_WTSet)(HCTX, LPLOGCONTEXTA);
 typedef HCTX(API *GHOST_WIN32_WTOpen)(HWND, LPLOGCONTEXTA, BOOL);
 typedef BOOL(API *GHOST_WIN32_WTClose)(HCTX);
 typedef int(API *GHOST_WIN32_WTPacketsGet)(HCTX, int, LPVOID);
+typedef BOOL(API *GHOST_WIN32_WTQueuePacketsEx)(HCTX, UINT FAR *, UINT FAR *);
+typedef int(API *GHOST_WIN32_WTDataGet)(HCTX, UINT, UINT, int, LPVOID, LPINT);
 typedef int(API *GHOST_WIN32_WTQueueSizeGet)(HCTX);
 typedef BOOL(API *GHOST_WIN32_WTQueueSizeSet)(HCTX, int);
 typedef BOOL(API *GHOST_WIN32_WTEnable)(HCTX, BOOL);
@@ -91,6 +93,8 @@ class GHOST_Wintab {
    */
   void loseFocus();
 
+  void enterRange();
+
   /**
    * Clean up when Wintab leaves tracking range.
    */
@@ -130,8 +134,9 @@ class GHOST_Wintab {
   /**
    * Translate Wintab packets into GHOST_WintabInfoWin32 structs.
    * \param outWintabInfo: Storage to return resulting GHOST_WintabInfoWin32 data.
+   * \param TODO
    */
-  void getInput(std::vector<GHOST_WintabInfoWin32> &outWintabInfo);
+  void getInput(std::vector<GHOST_WintabInfoWin32> &outWintabInfo, UINT genSerial);
 
   /**
    * Whether Wintab coordinates should be trusted.
@@ -167,6 +172,8 @@ class GHOST_Wintab {
   GHOST_WIN32_WTGet m_fpGet = nullptr;
   GHOST_WIN32_WTSet m_fpSet = nullptr;
   GHOST_WIN32_WTPacketsGet m_fpPacketsGet = nullptr;
+  GHOST_WIN32_WTDataGet m_fpDataGet = nullptr;
+  GHOST_WIN32_WTQueuePacketsEx m_fpQueuePacketsEx = nullptr;
   GHOST_WIN32_WTEnable m_fpEnable = nullptr;
   GHOST_WIN32_WTOverlap m_fpOverlap = nullptr;
 
@@ -176,6 +183,7 @@ class GHOST_Wintab {
   bool m_enabled = false;
   /** Whether the context has focus and is at the top of overlap order. */
   bool m_focused = false;
+  bool m_firstProximity = false;
 
   /** Pressed button map. */
   uint8_t m_buttons = 0;
@@ -219,6 +227,8 @@ class GHOST_Wintab {
                GHOST_WIN32_WTGet get,
                GHOST_WIN32_WTSet set,
                GHOST_WIN32_WTPacketsGet packetsGet,
+               GHOST_WIN32_WTDataGet dataGet,
+               GHOST_WIN32_WTQueuePacketsEx queuePacketsEx,
                GHOST_WIN32_WTEnable enable,
                GHOST_WIN32_WTOverlap overlap,
                unique_hctx hctx,
