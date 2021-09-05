@@ -127,10 +127,9 @@ static void initRawInput()
   devices[1].usUsage = 0x08;
 #endif
 
-  if (RegisterRawInputDevices(devices, DEVICE_COUNT, sizeof(RAWINPUTDEVICE)))
-    ;  // yay!
-  else
+  if (!RegisterRawInputDevices(devices, DEVICE_COUNT, sizeof(RAWINPUTDEVICE))) {
     GHOST_PRINTF("could not register for RawInput: %d\n", (int)GetLastError());
+  }
 
 #undef DEVICE_COUNT
 }
