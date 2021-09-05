@@ -728,7 +728,7 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, FaceData> {
 
     /* Need to compute the sizing for each vert based on the current
      * state of the mesh and scene */
-    this->compute_and_set_dynamic_vert_sizing();
+    this->compute_and_set_dynamic_vert_sizing(params);
 
     /* Set edge sizes */
     this->set_edge_sizes();
@@ -775,11 +775,13 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, FaceData> {
     return float3x2(f2 - f1, f3 - f1) * dm_inv;
   }
 
-  Sizing compute_dynamic_face_sizing(const AdaptiveFace &face) const
+  template<typename ExtraData>
+  Sizing compute_dynamic_face_sizing(const AdaptiveRemeshParams<END, ExtraData> &params,
+                                     const AdaptiveFace &face) const
   {
-    const float edge_length_min = 0.01;
-    const float edge_length_max = 1.0;
-    const float aspect_ratio_min = 0.2;
+    const float edge_length_min = params.edge_length_min;
+    const float edge_length_max = params.edge_length_max;
+    const float aspect_ratio_min = params.aspect_ratio_min;
     const float change_in_vertex_normal_max = 0.01;
 
     BLI_assert(face.get_verts().size() == 3);
@@ -820,12 +822,14 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, FaceData> {
    *
    * Reference [1]
    */
-  blender::Map<FaceIndex, Sizing> compute_dynamic_face_sizing() const
+  template<typename ExtraData>
+  blender::Map<FaceIndex, Sizing> compute_dynamic_face_sizing(
+      const AdaptiveRemeshParams<END, ExtraData> &params) const
   {
     blender::Map<FaceIndex, Sizing> face_sizing_map;
 
     for (const auto &face : this->get_faces()) {
-      const auto sizing = this->compute_dynamic_face_sizing(face);
+      const auto sizing = this->compute_dynamic_face_sizing(params, face);
 
       face_sizing_map.add_new(face.get_self_index(), sizing);
     }
@@ -839,14 +843,15 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, FaceData> {
    *
    * Reference [1]
    */
-  void compute_and_set_dynamic_vert_sizing()
+  template<typename ExtraData>
+  void compute_and_set_dynamic_vert_sizing(const AdaptiveRemeshParams<END, ExtraData> &params)
   {
     /* Reference [1] says that the `Sizing` for a vertex that is on a
      * seam should be handled differently. This is required only if
      * the `Sizing` is stored across seams, but since it is stored per
      * `Vert` and not per `Node` that special case is not needed. */
 
-    auto face_sizing_map = this->compute_dynamic_face_sizing();
+    auto face_sizing_map = this->compute_dynamic_face_sizing(params);
 
     for (auto &vert : this->get_verts_mut()) {
       /* Compute and store the area weighted average of the adjacent
