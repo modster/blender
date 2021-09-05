@@ -97,7 +97,11 @@ static void raycast_to_level_set(const openvdb::FloatGrid &level_set,
   for (const int i : ray_origins.index_range()) {
     const openvdb::math::Vec3s origin(ray_origins[i].x, ray_origins[i].y, ray_origins[i].z);
     const openvdb::math::Vec3s dir(ray_directions[i].x, ray_directions[i].y, ray_directions[i].z);
-    const openvdb::math::Ray<double> ray(origin, dir, 0.0, ray_lengths[i]);
+    const openvdb::math::Ray<double> ray(
+        origin,
+        dir.unitSafe(),
+        std::numeric_limits<double>::epsilon(),
+        std::max(std::numeric_limits<float>::epsilon(), ray_lengths[i]));
 
     openvdb::math::Vec3d hit_position(0);
     openvdb::math::Vec3d hit_normal(0);
