@@ -60,6 +60,17 @@ struct float2x2 {
     this->ptr()[1][1] = col2[1];
   }
 
+  /**
+   * Constructor through direct values of matrix
+   */
+  float2x2(float m00, float m01, float m10, float m11)
+  {
+    this->ptr()[0][0] = m00;
+    this->ptr()[0][1] = m01;
+    this->ptr()[1][0] = m10;
+    this->ptr()[1][1] = m11;
+  }
+
   static float2x2 identity()
   {
     float2x2 mat;
