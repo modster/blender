@@ -7309,6 +7309,12 @@ static void rna_def_modifier_adaptive_remesh(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Remeshing Minimum Aspect Ratio", "");
   RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
+  prop = RNA_def_property(srna, "change_in_vertex_normal_max", PROP_FLOAT, PROP_NONE);
+  RNA_def_property_float_sdna(prop, NULL, "change_in_vertex_normal_max");
+  RNA_def_property_ui_range(prop, 0.0001f, 2.0f, 0.005f, 4);
+  RNA_def_property_ui_text(prop, "Remeshing Maximum Change in Vertex Normal", "");
+  RNA_def_property_update(prop, 0, "rna_Modifier_update");
+
   RNA_define_lib_overridable(false);
 }
 

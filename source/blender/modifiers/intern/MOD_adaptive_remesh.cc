@@ -65,6 +65,7 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *UNUSED(ctx)
     params.edge_length_min = armd->edge_length_min;
     params.edge_length_max = armd->edge_length_max;
     params.aspect_ratio_min = armd->aspect_ratio_min;
+    params.change_in_vertex_normal_max = armd->change_in_vertex_normal_max;
     params.flags = 0;
     if (armd->flag & ADAPTIVE_REMESH_SEWING) {
       params.flags |= ADAPTIVE_REMESH_PARAMS_SEWING;
@@ -197,6 +198,7 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
     uiItemR(layout, ptr, "edge_length_min", 0, nullptr, ICON_NONE);
     uiItemR(layout, ptr, "edge_length_max", 0, nullptr, ICON_NONE);
     uiItemR(layout, ptr, "aspect_ratio_min", 0, nullptr, ICON_NONE);
+    uiItemR(layout, ptr, "change_in_vertex_normal_max", 0, nullptr, ICON_NONE);
     uiItemR(layout, ptr, "enable_sewing", 0, nullptr, ICON_NONE);
     uiItemR(layout, ptr, "force_split_for_sewing", 0, nullptr, ICON_NONE);
   }

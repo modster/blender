@@ -2360,6 +2360,9 @@ typedef struct AdaptiveRemeshModifierData {
   float edge_length_min;
   float edge_length_max;
   float aspect_ratio_min;
+  float change_in_vertex_normal_max;
+
+  char _pad1[4];
 } AdaptiveRemeshModifierData;
 
 typedef enum AdaptiveRemeshFlag {

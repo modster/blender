@@ -782,7 +782,7 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, FaceData> {
     const float edge_length_min = params.edge_length_min;
     const float edge_length_max = params.edge_length_max;
     const float aspect_ratio_min = params.aspect_ratio_min;
-    const float change_in_vertex_normal_max = 0.01;
+    const float change_in_vertex_normal_max = params.change_in_vertex_normal_max;
 
     BLI_assert(face.get_verts().size() == 3);
     const auto &n1 = this->get_checked_node_of_vert(this->get_checked_vert(face.get_verts()[0]));
@@ -2042,6 +2042,7 @@ void BKE_cloth_serialize_adaptive_mesh(Object *ob,
   params.edge_length_min = clmd->sim_parms->remeshing_edge_length_min;
   params.edge_length_max = clmd->sim_parms->remeshing_edge_length_max;
   params.aspect_ratio_min = clmd->sim_parms->remeshing_aspect_ratio_min;
+  params.change_in_vertex_normal_max = clmd->sim_parms->remeshing_change_in_vertex_normal_max;
   params.extra_data_to_end = [](const Cloth &cloth, size_t index) {
     BLI_assert(index < cloth.mvert_num);
     BLI_assert(cloth.verts);
@@ -2118,6 +2119,7 @@ Mesh *BKE_cloth_remesh(Object *ob, ClothModifierData *clmd, Mesh *mesh)
   params.edge_length_min = clmd->sim_parms->remeshing_edge_length_min;
   params.edge_length_max = clmd->sim_parms->remeshing_edge_length_max;
   params.aspect_ratio_min = clmd->sim_parms->remeshing_aspect_ratio_min;
+  params.change_in_vertex_normal_max = clmd->sim_parms->remeshing_change_in_vertex_normal_max;
   params.flags = 0;
   if (clmd->sim_parms->flags & CLOTH_SIMSETTINGS_FLAG_SEW) {
     params.flags |= ADAPTIVE_REMESH_PARAMS_SEWING;
@@ -2186,6 +2188,7 @@ Mesh *__temp_empty_adaptive_remesh(const TempEmptyAdaptiveRemeshParams &input_pa
   params.edge_length_min = input_params.edge_length_min;
   params.edge_length_max = input_params.edge_length_max;
   params.aspect_ratio_min = input_params.aspect_ratio_min;
+  params.change_in_vertex_normal_max = input_params.change_in_vertex_normal_max;
   params.flags = input_params.flags;
   params.type = input_params.type;
   params.extra_data_to_end = [](const EmptyData &UNUSED(data), size_t UNUSED(index)) {

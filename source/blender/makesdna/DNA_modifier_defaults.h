@@ -31,6 +31,7 @@
     .edge_length_min = 0.05f, \
     .edge_length_max = 0.5f, \
     .aspect_ratio_min = 0.2f, \
+    .change_in_vertex_normal_max = 0.01f, \
   }
 
 #define _DNA_DEFAULT_ArmatureModifierData \
@@ -180,6 +181,7 @@
     .remeshing_edge_length_min = 0.05f, \
     .remeshing_edge_length_max = 0.5f, \
     .remeshing_aspect_ratio_min = 0.2f, \
+    .remeshing_change_in_vertex_normal_max = 0.01f, \
   }
 
 #define _DNA_DEFAULT_ClothCollSettings \

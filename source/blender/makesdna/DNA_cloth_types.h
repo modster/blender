@@ -189,8 +189,7 @@ typedef struct ClothSimSettings {
   float remeshing_edge_length_min;
   float remeshing_edge_length_max;
   float remeshing_aspect_ratio_min;
-  char _pad2[4];
-
+  float remeshing_change_in_vertex_normal_max;
 } ClothSimSettings;
 
 /* SIMULATION FLAGS: goal flags,.. */

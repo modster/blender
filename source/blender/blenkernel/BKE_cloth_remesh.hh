@@ -117,6 +117,7 @@ template<typename END, typename ExtraData> struct AdaptiveRemeshParams {
   float edge_length_min;
   float edge_length_max;
   float aspect_ratio_min;
+  float change_in_vertex_normal_max;
   /* AdaptiveRemeshParamsFlags */
   uint32_t flags;
   /* AdaptiveRemeshParamsType */
@@ -3581,6 +3582,7 @@ struct TempEmptyAdaptiveRemeshParams {
   float edge_length_min;
   float edge_length_max;
   float aspect_ratio_min;
+  float change_in_vertex_normal_max;
   /* AdaptiveRemeshParamsFlags */
   uint32_t flags;
   /* AdaptiveRemeshParamsType */

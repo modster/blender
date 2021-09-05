@@ -338,6 +338,7 @@ class PHYSICS_PT_cloth_remesh(PhysicButtonsPanel, Panel):
         col.prop(cloth, "remeshing_edge_length_min", text="Remeshing Minimum Edge Length")
         col.prop(cloth, "remeshing_edge_length_max", text="Remeshing Maximum Edge Length")
         col.prop(cloth, "remeshing_aspect_ratio_min", text="Remeshing Minimum Aspect Ratio")
+        col.prop(cloth, "remeshing_change_in_vertex_normal_max", text="Remeshing Maximum Change in Vertex Normal")
 
 
 class PHYSICS_PT_cloth_collision(PhysicButtonsPanel, Panel):

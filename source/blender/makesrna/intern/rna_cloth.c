@@ -1092,6 +1092,12 @@ static void rna_def_cloth_sim_settings(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Remeshing Minimum Aspect Ratio", "");
   RNA_def_property_update(prop, 0, "rna_cloth_update");
 
+  prop = RNA_def_property(srna, "remeshing_change_in_vertex_normal_max", PROP_FLOAT, PROP_NONE);
+  RNA_def_property_float_sdna(prop, NULL, "remeshing_change_in_vertex_normal_max");
+  RNA_def_property_ui_range(prop, 0.0001f, 2.0f, 0.005f, 4);
+  RNA_def_property_ui_text(prop, "Remeshing Maximum Change in Vertex Normal", "");
+  RNA_def_property_update(prop, 0, "rna_cloth_update");
+
   /* unused */
 
   /* unused still */
