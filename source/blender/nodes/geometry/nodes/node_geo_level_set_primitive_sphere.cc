@@ -33,7 +33,7 @@ namespace blender::nodes {
 static void geo_node_level_set_primitive_sphere_declare(NodeDeclarationBuilder &b)
 {
   b.add_input<decl::Float>("Radius").default_value(1.0f).min(0.0f).subtype(PROP_DISTANCE);
-  b.add_input<decl::Vector>("Target").subtype(PROP_TRANSLATION);
+  b.add_input<decl::Vector>("Center").subtype(PROP_TRANSLATION);
   b.add_input<decl::Float>("Voxel Size").default_value(0.3f).min(0.01f).subtype(PROP_DISTANCE);
   b.add_output<decl::Geometry>("Level Set");
 }
