@@ -47,6 +47,17 @@ struct float3x2 {
   {
   }
 
+  float3x2(const float3 &col1, const float3 &col2)
+  {
+    this->ptr()[0][0] = col1[0];
+    this->ptr()[0][1] = col1[1];
+    this->ptr()[0][2] = col1[2];
+
+    this->ptr()[1][0] = col2[0];
+    this->ptr()[1][1] = col2[1];
+    this->ptr()[1][2] = col2[2];
+  }
+
   operator float *()
   {
     return &values[0][0];
