@@ -190,7 +190,7 @@ class Sizing {
   float2x2 m; /* in [1], the "sizing" tensor field given as `M` */
 
  public:
-  Sizing(float2x2 &&m) : m(m)
+  Sizing(const float2x2 &m) : m(m)
   {
   }
 
@@ -775,6 +775,45 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, FaceData> {
     return float3x2(f2 - f1, f3 - f1) * dm_inv;
   }
 
+  Sizing compute_dynamic_face_sizing(const AdaptiveFace &face) const
+  {
+    const float edge_length_min = 0.01;
+    const float edge_length_max = 1.0;
+    const float aspect_ratio_min = 0.2;
+    const float change_in_vertex_normal_max = 0.01;
+
+    BLI_assert(face.get_verts().size() == 3);
+    const auto &n1 = this->get_checked_node_of_vert(this->get_checked_vert(face.get_verts()[0]));
+    const auto &n2 = this->get_checked_node_of_vert(this->get_checked_vert(face.get_verts()[1]));
+    const auto &n3 = this->get_checked_node_of_vert(this->get_checked_vert(face.get_verts()[2]));
+
+    const float3x2 jacobian_normal = this->calculate_derivative(
+        face, n1.get_normal(), n2.get_normal(), n3.get_normal());
+    const float2x3 jacobian_normal_transpose = jacobian_normal.transpose();
+
+    const float2x2 m_crv = jacobian_normal_transpose * jacobian_normal;
+
+    const float2x2 m_hat = m_crv *
+                           (1.0 / (change_in_vertex_normal_max * change_in_vertex_normal_max));
+
+    /* Eigen Decomposition for adding the constraints */
+    const auto [q, lambda_hat] = m_hat.eigen_decomposition();
+    const auto lambda_tilda_1 = std::clamp(lambda_hat[0],
+                                           (1.0f / (edge_length_max * edge_length_max)),
+                                           (1.0f / (edge_length_min * edge_length_min)));
+    const auto lambda_tilda_2 = std::clamp(lambda_hat[1],
+                                           (1.0f / (edge_length_max * edge_length_max)),
+                                           (1.0f / (edge_length_min * edge_length_min)));
+    const auto lambda_tilda_max = std::max(lambda_tilda_1, lambda_tilda_2);
+    const auto lambda = float2(
+        std::max(lambda_tilda_1, aspect_ratio_min * aspect_ratio_min * lambda_tilda_max),
+        std::max(lambda_tilda_2, aspect_ratio_min * aspect_ratio_min * lambda_tilda_max));
+
+    const float2x2 m = q * float2x2(lambda[0], 0.0, 0.0, lambda[1]) * q.transpose();
+
+    return Sizing(m);
+  }
+
   /**
    * Computes and the `Sizing` of every `AdaptiveFace` of the mesh
    * based on the current state of the mesh and the scene.
@@ -783,9 +822,15 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, FaceData> {
    */
   blender::Map<FaceIndex, Sizing> compute_dynamic_face_sizing() const
   {
-    /* TODO */
+    blender::Map<FaceIndex, Sizing> face_sizing_map;
 
-    return blender::Map<FaceIndex, Sizing>();
+    for (const auto &face : this->get_faces()) {
+      const auto sizing = this->compute_dynamic_face_sizing(face);
+
+      face_sizing_map.add_new(face.get_self_index(), sizing);
+    }
+
+    return face_sizing_map;
   }
 
   /**
