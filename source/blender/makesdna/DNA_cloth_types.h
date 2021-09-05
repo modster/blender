@@ -185,8 +185,10 @@ typedef struct ClothSimSettings {
   /* Remeshing parameters */
   /** ClothRemeshingType */
   uint32_t remeshing_type;
-  /* TODO(ish): need to write docs for this */
+  /* TODO(ish): need to write docs for remeshing params */
   float remeshing_edge_length_min;
+  float remeshing_edge_length_max;
+  float remeshing_aspect_ratio_min;
   char _pad2[4];
 
 } ClothSimSettings;

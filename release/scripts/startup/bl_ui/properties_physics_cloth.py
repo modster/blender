@@ -336,6 +336,8 @@ class PHYSICS_PT_cloth_remesh(PhysicButtonsPanel, Panel):
         # TODO(ish): setup better ui
         col = flow.column(align=True)
         col.prop(cloth, "remeshing_edge_length_min", text="Remeshing Minimum Edge Length")
+        col.prop(cloth, "remeshing_edge_length_max", text="Remeshing Maximum Edge Length")
+        col.prop(cloth, "remeshing_aspect_ratio_min", text="Remeshing Minimum Aspect Ratio")
 
 
 class PHYSICS_PT_cloth_collision(PhysicButtonsPanel, Panel):

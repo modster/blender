@@ -2035,6 +2035,8 @@ void BKE_cloth_serialize_adaptive_mesh(Object *ob,
 {
   AdaptiveRemeshParams<internal::ClothNodeData, Cloth> params;
   params.edge_length_min = clmd->sim_parms->remeshing_edge_length_min;
+  params.edge_length_max = clmd->sim_parms->remeshing_edge_length_max;
+  params.aspect_ratio_min = clmd->sim_parms->remeshing_aspect_ratio_min;
   params.extra_data_to_end = [](const Cloth &cloth, size_t index) {
     BLI_assert(index < cloth.mvert_num);
     BLI_assert(cloth.verts);
@@ -2109,6 +2111,8 @@ Mesh *BKE_cloth_remesh(Object *ob, ClothModifierData *clmd, Mesh *mesh)
 
   AdaptiveRemeshParams<internal::ClothNodeData, Cloth> params;
   params.edge_length_min = clmd->sim_parms->remeshing_edge_length_min;
+  params.edge_length_max = clmd->sim_parms->remeshing_edge_length_max;
+  params.aspect_ratio_min = clmd->sim_parms->remeshing_aspect_ratio_min;
   params.flags = 0;
   if (clmd->sim_parms->flags & CLOTH_SIMSETTINGS_FLAG_SEW) {
     params.flags |= ADAPTIVE_REMESH_PARAMS_SEWING;
@@ -2175,6 +2179,8 @@ Mesh *__temp_empty_adaptive_remesh(const TempEmptyAdaptiveRemeshParams &input_pa
 
   AdaptiveRemeshParams<EmptyData, EmptyData> params;
   params.edge_length_min = input_params.edge_length_min;
+  params.edge_length_max = input_params.edge_length_max;
+  params.aspect_ratio_min = input_params.aspect_ratio_min;
   params.flags = input_params.flags;
   params.type = input_params.type;
   params.extra_data_to_end = [](const EmptyData &UNUSED(data), size_t UNUSED(index)) {

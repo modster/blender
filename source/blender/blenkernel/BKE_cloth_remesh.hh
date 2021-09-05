@@ -115,6 +115,8 @@ namespace blender::bke {
  */
 template<typename END, typename ExtraData> struct AdaptiveRemeshParams {
   float edge_length_min;
+  float edge_length_max;
+  float aspect_ratio_min;
   /* AdaptiveRemeshParamsFlags */
   uint32_t flags;
   /* AdaptiveRemeshParamsType */
@@ -3577,6 +3579,8 @@ namespace blender::bke {
 
 struct TempEmptyAdaptiveRemeshParams {
   float edge_length_min;
+  float edge_length_max;
+  float aspect_ratio_min;
   /* AdaptiveRemeshParamsFlags */
   uint32_t flags;
   /* AdaptiveRemeshParamsType */

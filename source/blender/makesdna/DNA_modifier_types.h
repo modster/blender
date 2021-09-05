@@ -2356,9 +2356,10 @@ typedef struct AdaptiveRemeshModifierData {
   /* AdaptiveRemeshMode */
   uint32_t mode;
 
-  /* Needed for static remeshing and in the future dynamic remeshing
-   * as well */
+  /* Parameters for static and dynamic remeshing */
   float edge_length_min;
+  float edge_length_max;
+  float aspect_ratio_min;
 } AdaptiveRemeshModifierData;
 
 typedef enum AdaptiveRemeshFlag {
