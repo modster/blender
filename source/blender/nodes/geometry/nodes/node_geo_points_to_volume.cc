@@ -36,7 +36,10 @@ static void geo_node_points_to_volume_declare(NodeDeclarationBuilder &b)
   b.add_input<decl::Float>("Voxel Size").default_value(0.3f).min(0.01f).subtype(PROP_DISTANCE);
   b.add_input<decl::Float>("Voxel Amount").default_value(64.0f).min(0.0f);
   b.add_input<decl::String>("Radius");
-  b.add_input<decl::Float>("Radius", "Radius_001").default_value(0.5f).min(0.0f);
+  b.add_input<decl::Float>("Radius", "Radius_001")
+      .default_value(0.5f)
+      .min(0.0f)
+      .subtype(PROP_DISTANCE);
   b.add_output<decl::Geometry>("Geometry");
 }
 

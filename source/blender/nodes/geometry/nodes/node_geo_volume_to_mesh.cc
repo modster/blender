@@ -202,7 +202,7 @@ static void geo_node_volume_to_mesh_exec(GeoNodeExecParams params)
                                              params.get_input<float>("Threshold"),
                                              params.get_input<float>("Adaptivity"),
                                              resolution);
-  params.set_output("Geometry", mesh ? GeometrySet::create_with_mesh(mesh) : GeometrySet());
+  params.set_output("Geometry", GeometrySet::create_with_mesh(mesh));
 #else
   params.error_message_add(NodeWarningType::Error,
                            TIP_("Disabled, Blender was compiled without OpenVDB"));

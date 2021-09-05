@@ -72,18 +72,17 @@ static Volume *level_set_to_mask(const Volume &volume, const GeoNodeExecParams &
 
 static void geo_node_level_set_to_mask_exec(GeoNodeExecParams params)
 {
-
 #ifdef WITH_OPENVDB
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Level Set");
   const Volume *volume = geometry_set.get_volume_for_read();
 
-  const Main *bmain = DEG_get_bmain(params.depsgraph());
-  BKE_volume_load(volume, bmain);
-
   if (volume == nullptr) {
-    params.set_output("Level Set", std::move(geometry_set));
+    params.set_output("Mask Volume", std::move(geometry_set));
     return;
   }
+
+  const Main *bmain = DEG_get_bmain(params.depsgraph());
+  BKE_volume_load(volume, bmain);
 
   Volume *mask_volume = level_set_to_mask(*volume, params);
   params.set_output("Mask Volume", GeometrySet::create_with_volume(mask_volume));
