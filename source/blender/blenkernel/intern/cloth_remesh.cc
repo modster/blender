@@ -1942,7 +1942,7 @@ Mesh *adaptive_remesh(const AdaptiveRemeshParams<END, ExtraData> &params,
 
   /* Actual Remeshing Part */
   if (params.type == ADAPTIVE_REMESH_PARAMS_STATIC_REMESH) {
-    float size_min = params.size_min;
+    float size_min = params.edge_length_min;
     auto m = float2x2::identity();
     m = m * (1.0 / size_min);
     internal::Sizing vert_sizing(std::move(m));
@@ -2034,7 +2034,7 @@ void BKE_cloth_serialize_adaptive_mesh(Object *ob,
                                        const char *location)
 {
   AdaptiveRemeshParams<internal::ClothNodeData, Cloth> params;
-  params.size_min = clmd->sim_parms->remeshing_size_min;
+  params.edge_length_min = clmd->sim_parms->remeshing_edge_length_min;
   params.extra_data_to_end = [](const Cloth &cloth, size_t index) {
     BLI_assert(index < cloth.mvert_num);
     BLI_assert(cloth.verts);
@@ -2108,7 +2108,7 @@ Mesh *BKE_cloth_remesh(Object *ob, ClothModifierData *clmd, Mesh *mesh)
 #endif
 
   AdaptiveRemeshParams<internal::ClothNodeData, Cloth> params;
-  params.size_min = clmd->sim_parms->remeshing_size_min;
+  params.edge_length_min = clmd->sim_parms->remeshing_edge_length_min;
   params.flags = 0;
   if (clmd->sim_parms->flags & CLOTH_SIMSETTINGS_FLAG_SEW) {
     params.flags |= ADAPTIVE_REMESH_PARAMS_SEWING;
@@ -2174,7 +2174,7 @@ Mesh *__temp_empty_adaptive_remesh(const TempEmptyAdaptiveRemeshParams &input_pa
   EmptyData empty_data;
 
   AdaptiveRemeshParams<EmptyData, EmptyData> params;
-  params.size_min = input_params.size_min;
+  params.edge_length_min = input_params.edge_length_min;
   params.flags = input_params.flags;
   params.type = input_params.type;
   params.extra_data_to_end = [](const EmptyData &UNUSED(data), size_t UNUSED(index)) {

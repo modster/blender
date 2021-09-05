@@ -61,10 +61,10 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *UNUSED(ctx)
   auto mode = armd->mode;
 
   if (mode == ADAPTIVE_REMESH_STATIC_REMESHING || mode == ADAPTIVE_REMESH_DYNAMIC_REMESHING) {
-    auto size_min = armd->size_min;
+    auto size_min = armd->edge_length_min;
 
     TempEmptyAdaptiveRemeshParams params;
-    params.size_min = size_min;
+    params.edge_length_min = size_min;
     params.flags = 0;
     if (armd->flag & ADAPTIVE_REMESH_SEWING) {
       params.flags |= ADAPTIVE_REMESH_PARAMS_SEWING;
@@ -190,7 +190,7 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
   }
   else if (armd->mode == ADAPTIVE_REMESH_STATIC_REMESHING ||
            armd->mode == ADAPTIVE_REMESH_DYNAMIC_REMESHING) {
-    uiItemR(layout, ptr, "size_min", 0, nullptr, ICON_NONE);
+    uiItemR(layout, ptr, "edge_length_min", 0, nullptr, ICON_NONE);
     uiItemR(layout, ptr, "enable_sewing", 0, nullptr, ICON_NONE);
     uiItemR(layout, ptr, "force_split_for_sewing", 0, nullptr, ICON_NONE);
   }

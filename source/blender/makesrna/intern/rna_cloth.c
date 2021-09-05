@@ -1074,10 +1074,10 @@ static void rna_def_cloth_sim_settings(BlenderRNA *brna)
   RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 
   /* TODO(ish): remeshing paramters need proper text and doc */
-  prop = RNA_def_property(srna, "remeshing_size_min", PROP_FLOAT, PROP_NONE);
-  RNA_def_property_float_sdna(prop, NULL, "remeshing_size_min");
+  prop = RNA_def_property(srna, "remeshing_edge_length_min", PROP_FLOAT, PROP_NONE);
+  RNA_def_property_float_sdna(prop, NULL, "remeshing_edge_length_min");
   RNA_def_property_ui_range(prop, 0.0f, 2.0f, 0.005f, 4);
-  RNA_def_property_ui_text(prop, "Remeshing Size Min", "");
+  RNA_def_property_ui_text(prop, "Remeshing Minimum Edge Length", "");
   RNA_def_property_update(prop, 0, "rna_cloth_update");
 
   /* unused */

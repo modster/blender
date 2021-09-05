@@ -114,7 +114,7 @@ namespace blender::bke {
  * "Element" Data`
  */
 template<typename END, typename ExtraData> struct AdaptiveRemeshParams {
-  float size_min;
+  float edge_length_min;
   /* AdaptiveRemeshParamsFlags */
   uint32_t flags;
   /* AdaptiveRemeshParamsType */
@@ -3576,7 +3576,7 @@ template<typename END, typename EVD, typename EED, typename EFD> class MeshDiff 
 namespace blender::bke {
 
 struct TempEmptyAdaptiveRemeshParams {
-  float size_min;
+  float edge_length_min;
   /* AdaptiveRemeshParamsFlags */
   uint32_t flags;
   /* AdaptiveRemeshParamsType */

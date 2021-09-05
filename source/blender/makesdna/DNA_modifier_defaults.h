@@ -28,7 +28,7 @@
     .edge_index = 0, \
     .flag = 0, \
     .mode = 0, \
-    .size_min = 0.05 \
+    .edge_length_min = 0.05 \
   }
 
 #define _DNA_DEFAULT_ArmatureModifierData \
@@ -175,7 +175,7 @@
     .max_internal_compression = 15.0f, \
     /* TODO(ish): setup better remeshing defaults */ \
     .remeshing_type = CLOTH_REMESHING_STATIC, \
-    .remeshing_size_min = 0.01f, \
+    .remeshing_edge_length_min = 0.01f, \
   }
 
 #define _DNA_DEFAULT_ClothCollSettings \

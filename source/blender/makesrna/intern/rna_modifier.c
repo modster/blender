@@ -7291,10 +7291,10 @@ static void rna_def_modifier_adaptive_remesh(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Force Split for Sewing", "Force splitting of edge for sewing");
   RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
-  prop = RNA_def_property(srna, "size_min", PROP_FLOAT, PROP_NONE);
-  RNA_def_property_float_sdna(prop, NULL, "size_min");
+  prop = RNA_def_property(srna, "edge_length_min", PROP_FLOAT, PROP_NONE);
+  RNA_def_property_float_sdna(prop, NULL, "edge_length_min");
   RNA_def_property_ui_range(prop, 0.0001f, 2.0f, 0.005f, 4);
-  RNA_def_property_ui_text(prop, "Remeshing Size Min", "");
+  RNA_def_property_ui_text(prop, "Remeshing Minimum Edge Length", "");
   RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
   RNA_define_lib_overridable(false);

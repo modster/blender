@@ -186,7 +186,7 @@ typedef struct ClothSimSettings {
   /** ClothRemeshingType */
   uint32_t remeshing_type;
   /* TODO(ish): need to write docs for this */
-  float remeshing_size_min;
+  float remeshing_edge_length_min;
   char _pad2[4];
 
 } ClothSimSettings;

@@ -2358,7 +2358,7 @@ typedef struct AdaptiveRemeshModifierData {
 
   /* Needed for static remeshing and in the future dynamic remeshing
    * as well */
-  float size_min;
+  float edge_length_min;
 } AdaptiveRemeshModifierData;
 
 typedef enum AdaptiveRemeshFlag {
