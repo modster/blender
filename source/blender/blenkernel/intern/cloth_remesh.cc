@@ -22,6 +22,8 @@
  */
 
 #include "BLI_float2.hh"
+#include "BLI_float2x3.hh"
+#include "BLI_float3x2.hh"
 #include "BLI_map.hh"
 #include "BLI_vector.hh"
 #include "DNA_cloth_types.h"
@@ -755,6 +757,24 @@ class AdaptiveMesh : public Mesh<NodeData<END>, VertData, EdgeData, FaceData> {
   }
 
  private:
+  float3x2 calculate_derivative(const AdaptiveFace &face,
+                                const float3 &f1,
+                                const float3 &f2,
+                                const float3 &f3) const
+  {
+    /* TODO(ish): calculate and store dm_inv before hand within face */
+    /* Work only on triangles */
+    BLI_assert(face.get_verts().size() == 3);
+    const auto &uv1 = this->get_checked_vert(face.get_verts()[0]).get_uv();
+    const auto &uv2 = this->get_checked_vert(face.get_verts()[1]).get_uv();
+    const auto &uv3 = this->get_checked_vert(face.get_verts()[2]).get_uv();
+    const auto dm = float2x2(uv2 - uv1, uv3 - uv1);
+
+    const auto dm_inv = dm.inverse();
+
+    return float3x2(f2 - f1, f3 - f1) * dm_inv;
+  }
+
   /**
    * Computes and the `Sizing` of every `AdaptiveFace` of the mesh
    * based on the current state of the mesh and the scene.
