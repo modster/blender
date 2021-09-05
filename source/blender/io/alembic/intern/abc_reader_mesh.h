@@ -78,6 +78,7 @@ class AbcSubDReader : public AbcObjectReader {
 };
 
 void read_mverts(MVert *mverts,
+                 float (*vert_normals)[3],
                  const Alembic::AbcGeom::P3fArraySamplePtr positions,
                  const Alembic::AbcGeom::N3fArraySamplePtr normals);
 

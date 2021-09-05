@@ -231,7 +231,7 @@ typedef struct {
 
   /* Original coordinate, normal, and mask. */
   const float *co;
-  const short *no;
+  const float *no;
   float mask;
   const float *col;
 } SculptOrigVertData;
@@ -863,7 +863,7 @@ float SCULPT_brush_strength_factor(struct SculptSession *ss,
                                    const struct Brush *br,
                                    const float point[3],
                                    const float len,
-                                   const short vno[3],
+                                   const float vno[3],
                                    const float fno[3],
                                    const float mask,
                                    const int vertex_index,

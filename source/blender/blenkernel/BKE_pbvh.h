@@ -356,6 +356,7 @@ typedef struct PBVHVertexIter {
 
   /* mesh */
   struct MVert *mverts;
+  const float (*vert_normals)[3];
   int totvert;
   const int *vert_indices;
   struct MPropCol *vcol;
@@ -372,7 +373,7 @@ typedef struct PBVHVertexIter {
   struct MVert *mvert;
   struct BMVert *bm_vert;
   float *co;
-  short *no;
+  float *no;
   float *fno;
   float *mask;
   float *col;
@@ -426,7 +427,7 @@ void pbvh_vertex_iter_init(PBVH *pbvh, PBVHNode *node, PBVHVertexIter *vi, int m
             BLI_assert(vi.visible); \
           } \
           vi.co = vi.mvert->co; \
-          vi.no = vi.mvert->no; \
+          vi.no = vi.vert_normals[vi.vert_indices[vi.gx]]; \
           vi.index = vi.vert_indices[vi.i]; \
           if (vi.vmask) { \
             vi.mask = &vi.vmask[vi.index]; \
@@ -486,6 +487,7 @@ void BKE_pbvh_parallel_range_settings(struct TaskParallelSettings *settings,
                                       int totnode);
 
 struct MVert *BKE_pbvh_get_verts(const PBVH *pbvh);
+const float (*BKE_pbvh_get_vert_normals(const PBVH *pbvh))[3];
 
 PBVHColorBufferNode *BKE_pbvh_node_color_buffer_get(PBVHNode *node);
 void BKE_pbvh_node_color_buffer_free(PBVH *pbvh);

@@ -432,10 +432,10 @@ static Mesh *join_mesh_topology_and_builtin_attributes(Span<GeometryInstanceGrou
           const MVert &old_vert = mesh.mvert[i];
           MVert &new_vert = new_mesh->mvert[vert_offset + i];
 
-          new_vert = old_vert;
-
           const float3 new_position = transform * float3(old_vert.co);
           copy_v3_v3(new_vert.co, new_position);
+          new_vert.flag = old_vert.flag;
+          new_vert.bweight = old_vert.bweight;
         }
         for (const int i : IndexRange(mesh.totedge)) {
           const MEdge &old_edge = mesh.medge[i];
@@ -472,10 +472,6 @@ static Mesh *join_mesh_topology_and_builtin_attributes(Span<GeometryInstanceGrou
       }
     }
 
-    const float3 point_normal{0.0f, 0.0f, 1.0f};
-    short point_normal_short[3];
-    normal_float_to_short_v3(point_normal_short, point_normal);
-
     if (convert_points_to_vertices && set.has_pointcloud()) {
       const PointCloud &pointcloud = *set.get_pointcloud_for_read();
       for (const float4x4 &transform : set_group.transforms) {
@@ -484,7 +480,6 @@ static Mesh *join_mesh_topology_and_builtin_attributes(Span<GeometryInstanceGrou
           const float3 old_position = pointcloud.co[i];
           const float3 new_position = transform * old_position;
           copy_v3_v3(new_vert.co, new_position);
-          memcpy(&new_vert.no, point_normal_short, sizeof(point_normal_short));
         }
         vert_offset += pointcloud.totpoint;
       }

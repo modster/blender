@@ -1030,7 +1030,6 @@ static void obstacles_from_mesh(Object *coll_ob,
       CustomData_set_layer(&me->vdata, CD_MVERT, me->mvert);
     }
 
-    BKE_mesh_ensure_normals(me);
     mvert = me->mvert;
     mloop = me->mloop;
     looptri = BKE_mesh_runtime_looptri_ensure(me);
@@ -1054,6 +1053,8 @@ static void obstacles_from_mesh(Object *coll_ob,
     }
 
     /* Transform mesh vertices to domain grid space for fast lookups */
+    BKE_mesh_ensure_vertex_normals(me);
+    float(*vert_normals)[3] = (float(*)[3])CustomData_get_layer(&me->vdata, CD_NORMAL);
     for (i = 0; i < numverts; i++) {
       float n[3];
       float co[3];
@@ -1063,11 +1064,9 @@ static void obstacles_from_mesh(Object *coll_ob,
       manta_pos_to_cell(fds, mvert[i].co);
 
       /* Vertex normal. */
-      normal_short_to_float_v3(n, mvert[i].no);
-      mul_mat3_m4_v3(coll_ob->obmat, n);
-      mul_mat3_m4_v3(fds->imat, n);
-      normalize_v3(n);
-      normal_float_to_short_v3(mvert[i].no, n);
+      mul_mat3_m4_v3(coll_ob->obmat, vert_normals[i]);
+      mul_mat3_m4_v3(fds->imat, vert_normals[i]);
+      normalize_v3(vert_normals[i]);
 
       /* Vertex velocity. */
       add_v3fl_v3fl_v3i(co, mvert[i].co, fds->shift);
@@ -1826,6 +1825,7 @@ static void update_distances(int index,
 
 static void sample_mesh(FluidFlowSettings *ffs,
                         const MVert *mvert,
+                        const float (*vert_normals)[3],
                         const MLoop *mloop,
                         const MLoopTri *mlooptri,
                         const MLoopUV *mloopuv,
@@ -1906,7 +1906,7 @@ static void sample_mesh(FluidFlowSettings *ffs,
           tree_data->tree, ray_start, &nearest, tree_data->nearest_callback, tree_data) != -1) {
     float weights[3];
     int v1, v2, v3, f_index = nearest.index;
-    float n1[3], n2[3], n3[3], hit_normal[3];
+    float hit_normal[3];
 
     /* Calculate barycentric weights for nearest point. */
     v1 = mloop[mlooptri[f_index].tri[0]].v;
@@ -1969,10 +1969,8 @@ static void sample_mesh(FluidFlowSettings *ffs,
       /* Apply normal directional velocity. */
       if (ffs->vel_normal) {
         /* Interpolate vertex normal vectors to get nearest point normal. */
-        normal_short_to_float_v3(n1, mvert[v1].no);
-        normal_short_to_float_v3(n2, mvert[v2].no);
-        normal_short_to_float_v3(n3, mvert[v3].no);
-        interp_v3_v3v3v3(hit_normal, n1, n2, n3, weights);
+        interp_v3_v3v3v3(
+            hit_normal, vert_normals[v1], vert_normals[v2], vert_normals[v3], weights);
         normalize_v3(hit_normal);
 
         /* Apply normal directional velocity. */
@@ -2022,6 +2020,7 @@ typedef struct EmitFromDMData {
   FluidFlowSettings *ffs;
 
   const MVert *mvert;
+  const float (*vert_normals)[3];
   const MLoop *mloop;
   const MLoopTri *mlooptri;
   const MLoopUV *mloopuv;
@@ -2056,6 +2055,7 @@ static void emit_from_mesh_task_cb(void *__restrict userdata,
           (data->ffs->behavior == FLUID_FLOW_BEHAVIOR_INFLOW)) {
         sample_mesh(data->ffs,
                     data->mvert,
+                    data->vert_normals,
                     data->mloop,
                     data->mlooptri,
                     data->mloopuv,
@@ -2117,7 +2117,6 @@ static void emit_from_mesh(
       CustomData_set_layer(&me->vdata, CD_MVERT, me->mvert);
     }
 
-    BKE_mesh_ensure_normals(me);
     mvert = me->mvert;
     mloop = me->mloop;
     mlooptri = BKE_mesh_runtime_looptri_ensure(me);
@@ -2141,6 +2140,8 @@ static void emit_from_mesh(
     }
 
     /* Transform mesh vertices to domain grid space for fast lookups */
+    BKE_mesh_ensure_vertex_normals(me);
+    float(*vert_normals)[3] = (float(*)[3])CustomData_get_layer(&me->vdata, CD_NORMAL);
     for (i = 0; i < numverts; i++) {
       float n[3];
 
@@ -2149,11 +2150,9 @@ static void emit_from_mesh(
       manta_pos_to_cell(fds, mvert[i].co);
 
       /* Vertex normal. */
-      normal_short_to_float_v3(n, mvert[i].no);
-      mul_mat3_m4_v3(flow_ob->obmat, n);
-      mul_mat3_m4_v3(fds->imat, n);
-      normalize_v3(n);
-      normal_float_to_short_v3(mvert[i].no, n);
+      mul_mat3_m4_v3(flow_ob->obmat, vert_normals[i]);
+      mul_mat3_m4_v3(fds->imat, vert_normals[i]);
+      normalize_v3(vert_normals[i]);
 
       /* Vertex velocity. */
       if (ffs->flags & FLUID_FLOW_INITVELOCITY) {
@@ -2185,6 +2184,8 @@ static void emit_from_mesh(
       res[i] = bb->res[i];
     }
 
+    const float(*vert_normals)[3] = BKE_mesh_ensure_vertex_normals(me);
+
     /* Skip flow sampling loop if object has disabled flow. */
     bool use_flow = ffs->flags & FLUID_FLOW_USE_INFLOW;
     if (use_flow && BKE_bvhtree_from_mesh_get(&tree_data, me, BVHTREE_FROM_LOOPTRI, 4)) {
@@ -2193,6 +2194,7 @@ static void emit_from_mesh(
           .fds = fds,
           .ffs = ffs,
           .mvert = mvert,
+          .vert_normals = vert_normals,
           .mloop = mloop,
           .mlooptri = mlooptri,
           .mloopuv = mloopuv,
@@ -3426,7 +3428,7 @@ static Mesh *create_liquid_geometry(FluidDomainSettings *fds, Mesh *orgmesh, Obj
 #  endif
   }
 
-  BKE_mesh_ensure_normals(me);
+  BKE_mesh_ensure_vertex_normals(me);
   BKE_mesh_calc_edges(me, false, false);
   BKE_mesh_vert_normals_apply(me, (short(*)[3])normals);
 

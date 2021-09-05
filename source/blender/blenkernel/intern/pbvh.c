@@ -2966,6 +2966,8 @@ void pbvh_vertex_iter_init(PBVH *pbvh, PBVHNode *node, PBVHVertexIter *vi, int m
   vi->vert_indices = vert_indices;
   vi->mverts = verts;
 
+  vi->vert_normals = BKE_mesh_ensure_vertex_normals(pbvh->mesh);
+
   if (pbvh->type == PBVH_BMESH) {
     BLI_gsetIterator_init(&vi->bm_unique_verts, node->bm_unique_verts);
     BLI_gsetIterator_init(&vi->bm_other_verts, node->bm_other_verts);
@@ -3051,6 +3053,12 @@ MVert *BKE_pbvh_get_verts(const PBVH *pbvh)
 {
   BLI_assert(pbvh->type == PBVH_FACES);
   return pbvh->verts;
+}
+
+const float (*BKE_pbvh_get_vert_normals(const PBVH *pbvh))[3]
+{
+  BLI_assert(pbvh->type == PBVH_FACES);
+  return pbvh->vert_normals;
 }
 
 void BKE_pbvh_subdiv_cgg_set(PBVH *pbvh, SubdivCCG *subdiv_ccg)

@@ -159,7 +159,10 @@ static void read_mverts(CDStreamConfig &config, const AbcMeshData &mesh_data)
   read_mverts(mverts, positions, nullptr);
 }
 
-void read_mverts(MVert *mverts, const P3fArraySamplePtr positions, const N3fArraySamplePtr normals)
+void read_mverts(MVert *mverts,
+                 float (*vert_normals)[3],
+                 const P3fArraySamplePtr positions,
+                 const N3fArraySamplePtr normals)
 {
   for (int i = 0; i < positions->size(); i++) {
     MVert &mvert = mverts[i];
@@ -171,11 +174,7 @@ void read_mverts(MVert *mverts, const P3fArraySamplePtr positions, const N3fArra
 
     if (normals) {
       Imath::V3f nor_in = (*normals)[i];
-
-      short no[3];
-      normal_float_to_short_v3(no, nor_in.getValue());
-
-      copy_zup_from_yup(mvert.no, no);
+      copy_zup_from_yup(vert_normals[i], nor_in.getValue());
     }
   }
 }
@@ -468,6 +467,8 @@ CDStreamConfig get_config(Mesh *mesh, const bool use_vertex_interpolation)
 
   config.mesh = mesh;
   config.mvert = mesh->mvert;
+  config.vert_normals = (float(*)[3])CustomData_add_layer(
+      &mesh->vdata, CD_NORMAL, CD_DEFAULT, NULL, mesh->totvert);
   config.mloop = mesh->mloop;
   config.mpoly = mesh->mpoly;
   config.totvert = mesh->totvert;

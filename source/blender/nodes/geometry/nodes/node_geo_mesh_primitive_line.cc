@@ -103,12 +103,14 @@ Mesh *create_line_mesh(const float3 start, const float3 delta, const int count)
   MutableSpan<MVert> verts{mesh->mvert, mesh->totvert};
   MutableSpan<MEdge> edges{mesh->medge, mesh->totedge};
 
-  short normal[3];
-  normal_float_to_short_v3(normal, delta.normalized());
+  /* Fill vertex normal data here since it is trivial and can avoid calculations later. */
+  MutableSpan<float3> vert_normals{
+      (float3 *)CustomData_add_layer(&mesh->vdata, CD_NORMAL, CD_DEFAULT, NULL, mesh->totvert),
+      mesh->totvert};
+  vert_normals.fill(delta.normalized());
 
   for (const int i : verts.index_range()) {
     copy_v3_v3(verts[i].co, start + delta * i);
-    copy_v3_v3_short(verts[i].no, normal);
   }
 
   fill_edge_data(edges);

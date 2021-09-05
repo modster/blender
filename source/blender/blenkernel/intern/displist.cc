@@ -934,7 +934,7 @@ static void curve_calc_modifiers_post(Depsgraph *depsgraph,
           vertCos = BKE_mesh_vert_coords_alloc(modified, &totvert);
         }
         if (need_normal) {
-          BKE_mesh_ensure_normals(modified);
+          BKE_mesh_ensure_vertex_normals(modified);
         }
         mti->deformVerts(md, &mectx_deform, modified, vertCos, totvert);
       }
@@ -982,7 +982,7 @@ static void curve_calc_modifiers_post(Depsgraph *depsgraph,
       }
 
       if (need_normal) {
-        BKE_mesh_ensure_normals(modified);
+        BKE_mesh_ensure_vertex_normals(modified);
       }
       Mesh *mesh_applied = mti->modifyMesh(md, &mectx_apply, modified);
 
@@ -1035,7 +1035,7 @@ static void curve_calc_modifiers_post(Depsgraph *depsgraph,
     if (modified) {
 
       /* XXX2.8(Sybren): make sure the face normals are recalculated as well */
-      BKE_mesh_ensure_normals(modified);
+      BKE_mesh_ensure_vertex_normals(modified);
 
       /* Special tweaks, needed since neither BKE_mesh_new_nomain_from_template() nor
        * BKE_mesh_new_nomain_from_curve_displist() properly duplicate mat info... */

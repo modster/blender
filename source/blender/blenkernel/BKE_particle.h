@@ -545,6 +545,7 @@ void psys_get_texture(struct ParticleSimulationData *sim,
                       int event,
                       float cfra);
 void psys_interpolate_face(struct MVert *mvert,
+                           const float (*vert_normals)[3],
                            struct MFace *mface,
                            struct MTFace *tface,
                            float (*orcodata)[3],

@@ -285,17 +285,15 @@ Mesh *create_cylinder_or_cone_mesh(const float radius_top,
   if (top_is_point && bottom_is_point) {
     const bool single_vertex = height == 0.0f;
     Mesh *mesh = BKE_mesh_new_nomain(single_vertex ? 1 : 2, single_vertex ? 0 : 1, 0, 0, 0);
+    BKE_mesh_normals_tag_dirty(mesh);
     copy_v3_v3(mesh->mvert[0].co, float3(0.0f, 0.0f, height));
     if (single_vertex) {
-      const short up[3] = {0, 0, SHRT_MAX};
-      copy_v3_v3_short(mesh->mvert[0].no, up);
       return mesh;
     }
     copy_v3_v3(mesh->mvert[1].co, float3(0.0f, 0.0f, -height));
     mesh->medge[0].v1 = 0;
     mesh->medge[0].v2 = 1;
     mesh->medge[0].flag |= ME_LOOSEEDGE;
-    BKE_mesh_normals_tag_dirty(mesh);
     return mesh;
   }
 

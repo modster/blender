@@ -236,7 +236,8 @@ typedef struct {
   MLoopUV *mloopuv;   /* texture coordinates */
   const MPoly *mpoly; /* indices */
   const MLoop *mloop; /* indices */
-  const MVert *mvert; /* vertices & normals */
+  const MVert *mvert; /* vertex coordinates */
+  const float (*vert_normals)[3];
   const float (*orco)[3];
   float (*tangent)[4]; /* destination */
   int numTessFaces;
@@ -410,8 +411,7 @@ finally:
     }
   }
   else {
-    const short *no = pMesh->mvert[pMesh->mloop[loop_index].v].no;
-    normal_short_to_float_v3(r_no, no);
+    copy_v3_v3(r_no, pMesh->vert_normals[pMesh->mloop[loop_index].v]);
   }
 }
 
@@ -578,6 +578,7 @@ void BKE_mesh_calc_loop_tangent_ex(const MVert *mvert,
                                    bool calc_active_tangent,
                                    const char (*tangent_names)[MAX_NAME],
                                    int tangent_names_len,
+                                   const float (*vert_normals)[3],
                                    const float (*poly_normals)[3],
                                    const float (*loop_normals)[3],
                                    const float (*vert_orco)[3],
@@ -672,6 +673,7 @@ void BKE_mesh_calc_loop_tangent_ex(const MVert *mvert,
         mesh2tangent->num_face_as_quad_map = num_face_as_quad_map;
 #endif
         mesh2tangent->mvert = mvert;
+        mesh2tangent->vert_normals = vert_normals;
         mesh2tangent->mpoly = mpoly;
         mesh2tangent->mloop = mloop;
         mesh2tangent->looptri = looptri;
@@ -764,6 +766,7 @@ void BKE_mesh_calc_loop_tangents(Mesh *me_eval,
                                 calc_active_tangent,
                                 tangent_names,
                                 tangent_names_len,
+                                BKE_mesh_ensure_vertex_normals(me_eval),
                                 CustomData_get_layer(&me_eval->pdata, CD_NORMAL),
                                 CustomData_get_layer(&me_eval->ldata, CD_NORMAL),
                                 CustomData_get_layer(&me_eval->vdata, CD_ORCO), /* may be NULL */

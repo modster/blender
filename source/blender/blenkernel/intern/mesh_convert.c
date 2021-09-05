@@ -93,6 +93,9 @@ void BKE_mesh_from_metaball(ListBase *lb, Mesh *me)
     mvert = CustomData_add_layer(&me->vdata, CD_MVERT, CD_CALLOC, NULL, dl->nr);
     allloop = mloop = CustomData_add_layer(&me->ldata, CD_MLOOP, CD_CALLOC, NULL, dl->parts * 4);
     mpoly = CustomData_add_layer(&me->pdata, CD_MPOLY, CD_CALLOC, NULL, dl->parts);
+    float(*vert_normals)[3] = (float(*)[3])CustomData_add_layer(
+        &me->vdata, CD_NORMAL, CD_DEFAULT, NULL, me->totvert);
+
     me->mvert = mvert;
     me->mloop = mloop;
     me->mpoly = mpoly;
@@ -104,7 +107,8 @@ void BKE_mesh_from_metaball(ListBase *lb, Mesh *me)
     verts = dl->verts;
     while (a--) {
       copy_v3_v3(mvert->co, verts);
-      normal_float_to_short_v3(mvert->no, nors);
+
+      copy_v3_v3(vert_normals[a], nors);
       mvert++;
       nors += 3;
       verts += 3;
@@ -1512,7 +1516,7 @@ void BKE_mesh_nomain_to_mesh(Mesh *mesh_src,
   CustomData_reset(&tmp.ldata);
   CustomData_reset(&tmp.pdata);
 
-  BKE_mesh_ensure_normals(mesh_src);
+  BKE_mesh_ensure_vertex_normals(mesh_src);
 
   totvert = tmp.totvert = mesh_src->totvert;
   totedge = tmp.totedge = mesh_src->totedge;

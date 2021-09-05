@@ -174,8 +174,8 @@ void SCULPT_vertex_normal_get(SculptSession *ss, int index, float no[3])
   switch (BKE_pbvh_type(ss->pbvh)) {
     case PBVH_FACES: {
       if (ss->shapekey_active || ss->deform_modifiers_active) {
-        const MVert *mverts = BKE_pbvh_get_verts(ss->pbvh);
-        normal_short_to_float_v3(no, mverts[index].no);
+        const float(*vert_normals)[3] = BKE_pbvh_get_vert_normals(ss->pbvh);
+        copy_v3_v3(no, vert_normals[index]);
       }
       else {
         normal_short_to_float_v3(no, ss->mvert[index].no);
@@ -1799,7 +1799,7 @@ const float *SCULPT_brush_frontface_normal_from_falloff_shape(SculptSession *ss,
 
 static float frontface(const Brush *br,
                        const float sculpt_normal[3],
-                       const short no[3],
+                       const float no[3],
                        const float fno[3])
 {
   if (!(br->flag & BRUSH_FRONTFACE)) {
@@ -1808,10 +1808,7 @@ static float frontface(const Brush *br,
 
   float dot;
   if (no) {
-    float tmp[3];
-
-    normal_short_to_float_v3(tmp, no);
-    dot = dot_v3v3(tmp, sculpt_normal);
+    dot = dot_v3v3(no, sculpt_normal);
   }
   else {
     dot = dot_v3v3(fno, sculpt_normal);
@@ -2467,7 +2464,7 @@ float SCULPT_brush_strength_factor(SculptSession *ss,
                                    const Brush *br,
                                    const float brush_point[3],
                                    const float len,
-                                   const short vno[3],
+                                   const float vno[3],
                                    const float fno[3],
                                    const float mask,
                                    const int vertex_index,

@@ -132,11 +132,11 @@ static Mesh *create_circle_mesh(const float radius,
     copy_v3_v3(verts.last().co, float3(0));
   }
 
-  /* Point all vertex normals in the up direction. */
-  const short up_normal[3] = {0, 0, SHRT_MAX};
-  for (MVert &vert : verts) {
-    copy_v3_v3_short(vert.no, up_normal);
-  }
+  /* Fill vertex normal data here since it is trivial and can avoid calculations later. */
+  MutableSpan<float3> vert_normals{
+      (float3 *)CustomData_add_layer(&mesh->vdata, CD_NORMAL, CD_DEFAULT, NULL, mesh->totvert),
+      mesh->totvert};
+  vert_normals.fill(float3(0.0f, 0.0f, 1.0f));
 
   /* Create outer edges. */
   const short edge_flag = (fill_type == GEO_NODE_MESH_CIRCLE_FILL_NONE) ?

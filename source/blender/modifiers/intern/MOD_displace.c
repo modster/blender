@@ -177,6 +177,7 @@ typedef struct DisplaceUserdata {
   float (*vertexCos)[3];
   float local_mat[4][4];
   MVert *mvert;
+  const float (*vert_normals)[3];
   float (*vert_clnors)[3];
 } DisplaceUserdata;
 
@@ -272,9 +273,7 @@ static void displaceModifier_do_task(void *__restrict userdata,
       add_v3_v3(vertexCos[iter], local_vec);
       break;
     case MOD_DISP_DIR_NOR:
-      vertexCos[iter][0] += delta * (mvert[iter].no[0] / 32767.0f);
-      vertexCos[iter][1] += delta * (mvert[iter].no[1] / 32767.0f);
-      vertexCos[iter][2] += delta * (mvert[iter].no[2] / 32767.0f);
+      madd_v3_v3fl(vertexCos[iter], data->vert_normals[iter], delta);
       break;
     case MOD_DISP_DIR_CLNOR:
       madd_v3_v3fl(vertexCos[iter], vert_clnors[iter], delta);
@@ -363,6 +362,7 @@ static void displaceModifier_do(DisplaceModifierData *dmd,
   data.vertexCos = vertexCos;
   copy_m4_m4(data.local_mat, local_mat);
   data.mvert = mvert;
+  data.vert_normals = BKE_mesh_ensure_vertex_normals(mesh);
   data.vert_clnors = vert_clnors;
   if (tex_target != NULL) {
     data.pool = BKE_image_pool_new();

@@ -167,6 +167,8 @@ static void waveModifier_do(WaveModifierData *md,
     mvert = mesh->mvert;
   }
 
+  const float(*vert_normals)[3] = BKE_mesh_ensure_vertex_normals(mesh);
+
   if (wmd->objectcenter != NULL) {
     float mat[4][4];
     /* get the control object's location in local coordinates */
@@ -288,13 +290,13 @@ static void waveModifier_do(WaveModifierData *md,
         if (mvert) {
           /* move along normals */
           if (wmd->flag & MOD_WAVE_NORM_X) {
-            co[0] += (lifefac * amplit) * mvert[i].no[0] / 32767.0f;
+            co[0] += (lifefac * amplit) * vert_normals[i][0] / 32767.0f;
           }
           if (wmd->flag & MOD_WAVE_NORM_Y) {
-            co[1] += (lifefac * amplit) * mvert[i].no[1] / 32767.0f;
+            co[1] += (lifefac * amplit) * vert_normals[i][1] / 32767.0f;
           }
           if (wmd->flag & MOD_WAVE_NORM_Z) {
-            co[2] += (lifefac * amplit) * mvert[i].no[2] / 32767.0f;
+            co[2] += (lifefac * amplit) * vert_normals[i][2] / 32767.0f;
           }
         }
         else {

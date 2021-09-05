@@ -719,9 +719,10 @@ int get_effector_data(EffectorCache *eff,
   else if (eff->pd && eff->pd->shape == PFIELD_SHAPE_POINTS) {
     /* TODO: hair and points object support */
     const Mesh *me_eval = BKE_object_get_evaluated_mesh(eff->ob);
+    const float(*vert_normals)[3] = BKE_mesh_ensure_vertex_normals(me_eval);
     if (me_eval != NULL) {
       copy_v3_v3(efd->loc, me_eval->mvert[*efd->index].co);
-      normal_short_to_float_v3(efd->nor, me_eval->mvert[*efd->index].no);
+      copy_v3_v3(efd->nor, vert_normals[*efd->index]);
 
       mul_m4_v3(eff->ob->obmat, efd->loc);
       mul_mat3_m4_v3(eff->ob->obmat, efd->nor);

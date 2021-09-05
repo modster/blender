@@ -45,7 +45,6 @@ typedef struct MVert {
    * Cache the normal, can always be recalculated from surrounding faces.
    * See #CD_CUSTOMLOOPNORMAL for custom normals.
    */
-  short no[3];
   char flag, bweight;
 } MVert;
 
