@@ -29,9 +29,9 @@ class IndexFieldInput final : public fn::FieldInput {
   {
   }
 
-  const GVArray *try_get_varray_for_context(const fn::FieldContext &UNUSED(context),
-                                            IndexMask mask,
-                                            ResourceScope &scope) const final
+  const GVArray *get_varray_for_context(const fn::FieldContext &UNUSED(context),
+                                        IndexMask mask,
+                                        ResourceScope &scope) const final
   {
     /* TODO: Investigate a similar method to IndexRange::as_span() */
     auto index_func = [](int i) { return i; };

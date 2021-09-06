@@ -88,7 +88,7 @@ static Vector<const GVArray *> get_field_context_inputs(
 {
   Vector<const GVArray *> field_context_inputs;
   for (const FieldInput &field_input : field_inputs) {
-    const GVArray *varray = context.try_get_varray_for_context(field_input, mask, scope);
+    const GVArray *varray = context.get_varray_for_input(field_input, mask, scope);
     if (varray == nullptr) {
       const CPPType &type = field_input.cpp_type();
       varray = &scope.construct<GVArray_For_SingleValueRef>(
@@ -475,13 +475,13 @@ void evaluate_fields_to_spans(Span<GFieldRef> fields_to_evaluate,
   evaluate_fields(scope, fields_to_evaluate, mask, context, varrays);
 }
 
-const GVArray *FieldContext::try_get_varray_for_context(const FieldInput &field_input,
-                                                        IndexMask mask,
-                                                        ResourceScope &scope) const
+const GVArray *FieldContext::get_varray_for_input(const FieldInput &field_input,
+                                                  IndexMask mask,
+                                                  ResourceScope &scope) const
 {
   /* By default ask the field input to create the varray. Another field context might overwrite
    * the context here. */
-  return field_input.try_get_varray_for_context(*this, mask, scope);
+  return field_input.get_varray_for_context(*this, mask, scope);
 }
 
 /* --------------------------------------------------------------------

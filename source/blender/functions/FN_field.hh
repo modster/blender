@@ -267,11 +267,11 @@ class FieldInput : public FieldNode {
 
   /**
    * Get the value of this specific input based on the given context. The returned virtual array,
-   * should live at least as long as the passed in #scope.
+   * should live at least as long as the passed in #scope. May return null.
    */
-  virtual const GVArray *try_get_varray_for_context(const FieldContext &context,
-                                                    IndexMask mask,
-                                                    ResourceScope &scope) const = 0;
+  virtual const GVArray *get_varray_for_context(const FieldContext &context,
+                                                IndexMask mask,
+                                                ResourceScope &scope) const = 0;
 
   blender::StringRef debug_name() const
   {
@@ -298,9 +298,9 @@ class FieldContext {
  public:
   ~FieldContext() = default;
 
-  virtual const GVArray *try_get_varray_for_context(const FieldInput &field_input,
-                                                    IndexMask mask,
-                                                    ResourceScope &scope) const;
+  virtual const GVArray *get_varray_for_input(const FieldInput &field_input,
+                                              IndexMask mask,
+                                              ResourceScope &scope) const;
 };
 
 /**

@@ -63,9 +63,9 @@ class SpanFieldInput final : public fn::FieldInput {
   SpanFieldInput(GSpan span) : FieldInput(CPPType::get<float3>(), "Span"), span_(span)
   {
   }
-  const GVArray *try_get_varray_for_context(const fn::FieldContext &UNUSED(context),
-                                            IndexMask UNUSED(mask),
-                                            ResourceScope &scope) const final
+  const GVArray *get_varray_for_context(const fn::FieldContext &UNUSED(context),
+                                        IndexMask UNUSED(mask),
+                                        ResourceScope &scope) const final
   {
     return &scope.construct<fn::GVArray_For_GSpan>(__func__, span_);
   }

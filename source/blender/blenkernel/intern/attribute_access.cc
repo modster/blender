@@ -1303,9 +1303,9 @@ OutputAttribute GeometryComponent::attribute_try_get_for_output_only(
 
 namespace blender::bke {
 
-const GVArray *AttributeFieldInput::try_get_varray_for_context(const fn::FieldContext &context,
-                                                               IndexMask UNUSED(mask),
-                                                               ResourceScope &scope) const
+const GVArray *AttributeFieldInput::get_varray_for_context(const fn::FieldContext &context,
+                                                           IndexMask UNUSED(mask),
+                                                           ResourceScope &scope) const
 {
   if (const GeometryComponentFieldContext *geometry_context =
           dynamic_cast<const GeometryComponentFieldContext *>(&context)) {
@@ -1331,7 +1331,7 @@ bool AttributeFieldInput::is_equal_to(const fn::FieldNode &other) const
   return false;
 }
 
-const GVArray *AnonymousAttributeFieldInput::try_get_varray_for_context(
+const GVArray *AnonymousAttributeFieldInput::get_varray_for_context(
     const fn::FieldContext &context, IndexMask UNUSED(mask), ResourceScope &scope) const
 {
   if (const GeometryComponentFieldContext *geometry_context =

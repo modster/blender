@@ -33,9 +33,9 @@ class IndexFieldInput final : public FieldInput {
   {
   }
 
-  const GVArray *try_get_varray_for_context(const FieldContext &UNUSED(context),
-                                            IndexMask mask,
-                                            ResourceScope &scope) const final
+  const GVArray *get_varray_for_context(const FieldContext &UNUSED(context),
+                                        IndexMask mask,
+                                        ResourceScope &scope) const final
   {
     auto index_func = [](int i) { return i; };
     return &scope.construct<

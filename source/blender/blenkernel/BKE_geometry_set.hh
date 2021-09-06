@@ -618,9 +618,9 @@ class AttributeFieldInput : public fn::FieldInput {
   {
   }
 
-  const GVArray *try_get_varray_for_context(const fn::FieldContext &context,
-                                            IndexMask mask,
-                                            ResourceScope &scope) const override;
+  const GVArray *get_varray_for_context(const fn::FieldContext &context,
+                                        IndexMask mask,
+                                        ResourceScope &scope) const override;
 
   uint64_t hash() const override;
   bool is_equal_to(const fn::FieldNode &other) const override;
@@ -636,9 +636,9 @@ class AnonymousAttributeFieldInput : public fn::FieldInput {
   {
   }
 
-  const GVArray *try_get_varray_for_context(const fn::FieldContext &context,
-                                            IndexMask mask,
-                                            ResourceScope &scope) const override;
+  const GVArray *get_varray_for_context(const fn::FieldContext &context,
+                                        IndexMask mask,
+                                        ResourceScope &scope) const override;
 
   uint64_t hash() const override;
   bool is_equal_to(const fn::FieldNode &other) const override;
