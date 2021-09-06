@@ -438,7 +438,9 @@ static void init_socket_cpp_value_from_property(const IDProperty &property,
       break;
     }
     case SOCK_STRING: {
-      new (r_value) std::string(IDP_String(&property));
+      std::string value = IDP_String(&property);
+      new (r_value)
+          blender::fn::Field<std::string>(blender::fn::make_constant_field(std::move(value)));
       break;
     }
     case SOCK_OBJECT: {
