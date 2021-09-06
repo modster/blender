@@ -18,10 +18,18 @@
 
 using namespace blender::bke;
 
+/**
+ * A struct that identifies an attribute. It's lifetime is managed by an atomic reference count.
+ *
+ * Additionally, this struct can be strongly or weakly owned. The difference is that strong
+ * ownership means that attributes with this id will be kept around. Weak ownership just makes sure
+ * that the struct itself stays alive, but corresponding attributes might still be removed
+ * automatically.
+ */
 struct AnonymousAttributeID {
   /**
    * Total number of references to this attribute id. Once this reaches zero, the struct can be
-   * freed.
+   * freed. This includes strong and weak references.
    */
   mutable std::atomic<int> refcount_tot = 0;
 
