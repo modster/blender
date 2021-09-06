@@ -1539,7 +1539,7 @@ static ImBuf *blend_file_thumb_from_screenshot(bContext *C, BlendThumbnail **thu
 
   int win_size[2];
   uint *buffer = WM_window_pixels_read(CTX_wm_manager(C), win, win_size);
-  ImBuf *ibuf = IMB_allocFromBuffer(buffer, NULL, win_size[0], win_size[1], 24);
+  ImBuf *ibuf = IMB_allocFromBufferOwn(buffer, NULL, win_size[0], win_size[1], 24);
 
   if (ibuf) {
     int ex, ey;
@@ -1561,7 +1561,6 @@ static ImBuf *blend_file_thumb_from_screenshot(bContext *C, BlendThumbnail **thu
 
     BlendThumbnail *thumb = BKE_main_thumbnail_from_imbuf(NULL, thumb_ibuf);
     IMB_freeImBuf(thumb_ibuf);
-    MEM_freeN(buffer);
     *thumb_pt = thumb;
   }
   WM_cursor_wait(false);
@@ -1676,7 +1675,7 @@ static ImBuf *blend_file_thumb_from_camera(const bContext *C,
     IMB_scaleImBuf(thumb_ibuf, BLEN_THUMB_SIZE, BLEN_THUMB_SIZE);
     thumb = BKE_main_thumbnail_from_imbuf(NULL, thumb_ibuf);
     IMB_freeImBuf(thumb_ibuf);
-    /* Thumbnail saved to filesystem should be 256x256. */
+    /* Thumbnail saved to file-system should be 256x256. */
     IMB_scaleImBuf(ibuf, PREVIEW_RENDER_LARGE_HEIGHT, PREVIEW_RENDER_LARGE_HEIGHT);
   }
   else {
