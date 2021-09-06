@@ -47,6 +47,10 @@ enum class ValueType {
 constexpr int tot_variable_value_types = 6;
 }  // namespace
 
+/**
+ * During evaluation, a variable may be stored in various different forms, depending on what
+ * instructions do with the variables.
+ */
 struct VariableValue {
   ValueType type;
 
@@ -129,6 +133,10 @@ static_assert(std::is_trivially_destructible_v<VariableValue_OneVector>);
 
 class VariableState;
 
+/**
+ * The #ValueAllocator is responsible for providing memory for variables and their values. It also
+ * manages the reuse of buffers to improve performance.
+ */
 class ValueAllocator : NonCopyable, NonMovable {
  private:
   /* Allocate with 64 byte alignment for better reusability of buffers and improved cache
@@ -195,6 +203,7 @@ class ValueAllocator : NonCopyable, NonMovable {
         buffer = MEM_mallocN_aligned(element_size * size, min_alignment, __func__);
       }
       else {
+        /* Reuse existing buffer. */
         buffer = stack->pop();
       }
     }
@@ -284,9 +293,14 @@ class ValueAllocator : NonCopyable, NonMovable {
   }
 };
 
+/**
+ * This class keeps track of a single variable during evaluation.
+ */
 class VariableState : NonCopyable, NonMovable {
  private:
+  /** The current value of the variable. The storage format may change over time. */
   VariableValue *value_;
+  /** Number of indices that are currently initialized in this variable. */
   int tot_initialized_;
   /* This a non-owning pointer to either span buffer or #GVectorArray or null. */
   void *caller_provided_storage_ = nullptr;
@@ -795,6 +809,7 @@ void ValueAllocator::release_variable_state(VariableState *state)
   delete state;
 }
 
+/** Keeps track of the states of all variables during evaluation. */
 class VariableStates {
  private:
   ValueAllocator value_allocator_;
@@ -986,6 +1001,8 @@ static void execute_call_instruction(const MFCallInstruction &instruction,
     param_variable_states[param_index] = &variable_state;
   }
 
+  /* If all inputs to the function are constant, it's enough to call the function only once instead
+   * of for every index. */
   if (evaluate_as_one(fn, param_variable_states, mask, variable_states.full_mask())) {
     MFParamsBuilder params(fn, 1);
 
@@ -1010,6 +1027,7 @@ static void execute_call_instruction(const MFCallInstruction &instruction,
   }
 }
 
+/** An index mask, that might own the indices if necessary. */
 struct InstructionIndices {
   bool is_owned;
   Vector<int64_t> owned_indices;
@@ -1024,6 +1042,7 @@ struct InstructionIndices {
   }
 };
 
+/** Contains information about the next instruction that should be executed. */
 struct NextInstructionInfo {
   const MFInstruction *instruction = nullptr;
   InstructionIndices indices;
@@ -1039,6 +1058,10 @@ struct NextInstructionInfo {
   }
 };
 
+/**
+ * Keeps track of the next instruction for all indices and decides in which order instructions are
+ * evaluated.
+ */
 class InstructionScheduler {
  private:
   Map<const MFInstruction *, Vector<InstructionIndices>> indices_by_instruction_;
@@ -1119,6 +1142,7 @@ void MFProcedureExecutor::call(IndexMask full_mask, MFParams params, MFContext c
   InstructionScheduler scheduler;
   scheduler.add_referenced_indices(*procedure_.entry(), full_mask);
 
+  /* Loop until all indices got to a return instruction. */
   while (NextInstructionInfo instr_info = scheduler.pop_next()) {
     const MFInstruction &instruction = *instr_info.instruction;
     switch (instruction.type()) {
