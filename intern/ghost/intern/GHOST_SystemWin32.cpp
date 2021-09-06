@@ -1235,7 +1235,7 @@ GHOST_EventCursor *GHOST_SystemWin32::processCursorEvent(GHOST_WindowWin32 *wind
                                window,
                                x_screen + x_accum,
                                y_screen + y_accum,
-                               GHOST_TABLET_DATA_NONE);
+                               td);
 }
 
 void GHOST_SystemWin32::processWheelEvent(GHOST_WindowWin32 *window, WPARAM wParam, LPARAM lParam)
