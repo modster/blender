@@ -58,7 +58,7 @@
 namespace blender::fn {
 
 /**
- * A node in a field-tree. It has one our more outputs that can be referenced by fields.
+ * A node in a field-tree. It has at least one output that can be referenced by fields.
  */
 class FieldNode {
  private:
@@ -331,6 +331,7 @@ class FieldEvaluator : NonMovable, NonCopyable {
   {
   }
 
+  /** Construct a field evaluator for all indices less than #size. */
   FieldEvaluator(const FieldContext &context, const int64_t size) : context_(context), mask_(size)
   {
   }

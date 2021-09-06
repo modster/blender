@@ -33,8 +33,8 @@
 namespace blender::bke {
 
 /**
- * Identifies an attribute that is either named or anonymous. It does not own the identifier, so it
- * is just a reference.
+ * Identifies an attribute that is either named or anonymous.
+ * It does not own the identifier, so it is just a reference.
  */
 class AttributeIDRef {
  private:

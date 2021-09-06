@@ -112,7 +112,7 @@ static void geo_node_point_translate_exec(GeoNodeExecParams params)
   const NodeGeometryPointTranslate &storage =
       *(const NodeGeometryPointTranslate *)params.node().storage;
 
-  const Array<GeometryComponentType> types{
+  static const Array<GeometryComponentType> types{
       GEO_COMPONENT_TYPE_MESH,
       GEO_COMPONENT_TYPE_POINT_CLOUD,
       GEO_COMPONENT_TYPE_CURVE,

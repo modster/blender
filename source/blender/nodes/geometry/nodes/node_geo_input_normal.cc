@@ -71,10 +71,10 @@ static GVArrayPtr mesh_vertex_normals(const Mesh &mesh,
   }
 
   /* If the normals are dirty, they must be recalculated for the output of this node's field
-   * source. Ideally vertex normals could be calculated lazily on a const mesh, protected with a
-   * mutex. But that's not possible at the moment, so we take ownership of the results. Sadly we
-   * must also create a copy of MVert to use the mesh normals API. This can be improved by adding
-   * mutex-protected lazy calculation of normals on meshes.
+   * source. Ideally vertex normals could be calculated lazily on a const mesh. But that's not
+   * possible at the moment, so we take ownership of the results. Sadly we must also create a copy
+   * of MVert to use the mesh normals API. This can be improved by adding mutex-protected lazy
+   * calculation of normals on meshes.
    *
    * Use mask.min_array_size() to avoid calculating a final chunk of data if possible. */
   Array<MVert> temp_verts(verts);
