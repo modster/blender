@@ -366,10 +366,9 @@ class FieldEvaluator : NonMovable, NonCopyable {
    */
   template<typename T> int add_with_destination(Field<T> field, MutableSpan<T> dst)
   {
-    const int field_index = fields_to_evaluate_.append_and_get_index(std::move(field));
-    dst_hints_.append(&scope_.construct<GVMutableArray_For_MutableSpan<T>>(__func__, dst));
-    output_pointer_infos_.append({});
-    return field_index;
+    GVMutableArray &generic_dst_hint = scope_.construct<GVMutableArray_For_MutableSpan<T>>(
+        __func__, dst);
+    return this->add_with_destination(std::move(field), generic_dst_hint);
   }
 
   int add(GField field, const GVArray **varray_ptr);
@@ -433,11 +432,6 @@ Vector<const GVArray *> evaluate_fields(ResourceScope &scope,
  */
 
 void evaluate_constant_field(const GField &field, void *r_value);
-
-void evaluate_fields_to_spans(Span<GFieldRef> fields_to_evaluate,
-                              IndexMask mask,
-                              const FieldContext &context,
-                              Span<GMutableSpan> out_spans);
 
 template<typename T> T evaluate_constant_field(const Field<T> &field)
 {

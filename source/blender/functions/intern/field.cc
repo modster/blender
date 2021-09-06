@@ -462,19 +462,6 @@ void evaluate_constant_field(const GField &field, void *r_value)
   varrays[0]->get_to_uninitialized(0, r_value);
 }
 
-void evaluate_fields_to_spans(Span<GFieldRef> fields_to_evaluate,
-                              IndexMask mask,
-                              const FieldContext &context,
-                              Span<GMutableSpan> out_spans)
-{
-  ResourceScope scope;
-  Vector<GVMutableArray *> varrays;
-  for (GMutableSpan span : out_spans) {
-    varrays.append(&scope.construct<GVMutableArray_For_GMutableSpan>(__func__, span));
-  }
-  evaluate_fields(scope, fields_to_evaluate, mask, context, varrays);
-}
-
 const GVArray *FieldContext::get_varray_for_input(const FieldInput &field_input,
                                                   IndexMask mask,
                                                   ResourceScope &scope) const
@@ -522,10 +509,9 @@ int FieldEvaluator::add_with_destination(GField field, GVMutableArray &dst)
 
 int FieldEvaluator::add_with_destination(GField field, GMutableSpan dst)
 {
-  const int field_index = fields_to_evaluate_.append_and_get_index(std::move(field));
-  dst_hints_.append(&scope_.construct<GVMutableArray_For_GMutableSpan>(__func__, dst));
-  output_pointer_infos_.append({});
-  return field_index;
+  GVMutableArray &varray_dst_hint = scope_.construct<GVMutableArray_For_GMutableSpan>(__func__,
+                                                                                      dst);
+  return this->add_with_destination(std::move(field), varray_dst_hint);
 }
 
 int FieldEvaluator::add(GField field, const GVArray **varray_ptr)

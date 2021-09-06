@@ -16,11 +16,11 @@ TEST(field, ConstantFunction)
                         0};
 
   Array<int> result(4);
-  GMutableSpan result_generic(result.as_mutable_span());
-  FieldContext field_context;
-  evaluate_fields_to_spans(
-      {constant_field}, IndexMask(IndexRange(4)), field_context, {result_generic});
 
+  FieldContext context;
+  FieldEvaluator evaluator{context, 4};
+  evaluator.add_with_destination(constant_field, result.as_mutable_span());
+  evaluator.evaluate();
   EXPECT_EQ(result[0], 10);
   EXPECT_EQ(result[1], 10);
   EXPECT_EQ(result[2], 10);
@@ -49,10 +49,11 @@ TEST(field, VArrayInput)
   GField index_field{std::make_shared<IndexFieldInput>()};
 
   Array<int> result_1(4);
-  GMutableSpan result_generic_1(result_1.as_mutable_span());
-  FieldContext field_context;
-  evaluate_fields_to_spans(
-      {index_field}, IndexMask(IndexRange(4)), field_context, {result_generic_1});
+
+  FieldContext context;
+  FieldEvaluator evaluator{context, 4};
+  evaluator.add_with_destination(index_field, result_1.as_mutable_span());
+  evaluator.evaluate();
   EXPECT_EQ(result_1[0], 0);
   EXPECT_EQ(result_1[1], 1);
   EXPECT_EQ(result_1[2], 2);
@@ -60,8 +61,13 @@ TEST(field, VArrayInput)
 
   /* Evaluate a second time, just to test that the first didn't break anything. */
   Array<int> result_2(10);
-  GMutableSpan result_generic_2(result_2.as_mutable_span());
-  evaluate_fields_to_spans({index_field}, {2, 4, 6, 8}, field_context, {result_generic_2});
+
+  const Array<int64_t> indices = {2, 4, 6, 8};
+  const IndexMask mask{indices};
+
+  FieldEvaluator evaluator_2{context, &mask};
+  evaluator_2.add_with_destination(index_field, result_2.as_mutable_span());
+  evaluator_2.evaluate();
   EXPECT_EQ(result_2[2], 2);
   EXPECT_EQ(result_2[4], 4);
   EXPECT_EQ(result_2[6], 6);
@@ -76,12 +82,15 @@ TEST(field, VArrayInputMultipleOutputs)
 
   Array<int> result_1(10);
   Array<int> result_2(10);
-  GMutableSpan result_generic_1(result_1.as_mutable_span());
-  GMutableSpan result_generic_2(result_2.as_mutable_span());
 
-  FieldContext field_context;
-  evaluate_fields_to_spans(
-      {field_1, field_2}, {2, 4, 6, 8}, field_context, {result_generic_1, result_generic_2});
+  const Array<int64_t> indices = {2, 4, 6, 8};
+  const IndexMask mask{indices};
+
+  FieldContext context;
+  FieldEvaluator evaluator{context, &mask};
+  evaluator.add_with_destination(field_1, result_1.as_mutable_span());
+  evaluator.add_with_destination(field_2, result_2.as_mutable_span());
+  evaluator.evaluate();
   EXPECT_EQ(result_1[2], 2);
   EXPECT_EQ(result_1[4], 4);
   EXPECT_EQ(result_1[6], 6);
@@ -103,9 +112,14 @@ TEST(field, InputAndFunction)
                       0};
 
   Array<int> result(10);
-  GMutableSpan result_generic(result.as_mutable_span());
-  FieldContext field_context;
-  evaluate_fields_to_spans({output_field}, {2, 4, 6, 8}, field_context, {result_generic});
+
+  const Array<int64_t> indices = {2, 4, 6, 8};
+  const IndexMask mask{indices};
+
+  FieldContext context;
+  FieldEvaluator evaluator{context, &mask};
+  evaluator.add_with_destination(output_field, result.as_mutable_span());
+  evaluator.evaluate();
   EXPECT_EQ(result[2], 4);
   EXPECT_EQ(result[4], 8);
   EXPECT_EQ(result[6], 12);
@@ -128,9 +142,14 @@ TEST(field, TwoFunctions)
       std::make_shared<FieldOperation>(FieldOperation(std::move(add_10_fn), {add_field})), 0};
 
   Array<int> result(10);
-  GMutableSpan result_generic(result.as_mutable_span());
-  FieldContext field_context;
-  evaluate_fields_to_spans({result_field}, {2, 4, 6, 8}, field_context, {result_generic});
+
+  const Array<int64_t> indices = {2, 4, 6, 8};
+  const IndexMask mask{indices};
+
+  FieldContext context;
+  FieldEvaluator evaluator{context, &mask};
+  evaluator.add_with_destination(result_field, result.as_mutable_span());
+  evaluator.evaluate();
   EXPECT_EQ(result[2], 14);
   EXPECT_EQ(result[4], 18);
   EXPECT_EQ(result[6], 22);
@@ -180,13 +199,15 @@ TEST(field, FunctionTwoOutputs)
 
   Array<int> result_1(10);
   Array<int> result_2(10);
-  GMutableSpan result_generic_1(result_1.as_mutable_span());
-  GMutableSpan result_generic_2(result_2.as_mutable_span());
-  FieldContext field_context;
-  evaluate_fields_to_spans({result_field_1, result_field_2},
-                           {2, 4, 6, 8},
-                           field_context,
-                           {result_generic_1, result_generic_2});
+
+  const Array<int64_t> indices = {2, 4, 6, 8};
+  const IndexMask mask{indices};
+
+  FieldContext context;
+  FieldEvaluator evaluator{context, &mask};
+  evaluator.add_with_destination(result_field_1, result_1.as_mutable_span());
+  evaluator.add_with_destination(result_field_2, result_2.as_mutable_span());
+  evaluator.evaluate();
   EXPECT_EQ(result_1[2], 4);
   EXPECT_EQ(result_1[4], 8);
   EXPECT_EQ(result_1[6], 12);
@@ -204,7 +225,7 @@ TEST(field, TwoFunctionsTwoOutputs)
   std::shared_ptr<FieldOperation> fn = std::make_shared<FieldOperation>(FieldOperation(
       std::make_unique<TwoOutputFunction>("SI_SI_SO_SO"), {index_field, index_field}));
 
-  Vector<int64_t> mask_indices = {2, 4, 6, 8};
+  Array<int64_t> mask_indices = {2, 4, 6, 8};
   IndexMask mask = mask_indices.as_span();
 
   Field<int> result_field_1{fn, 0};
