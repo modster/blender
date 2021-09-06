@@ -336,6 +336,13 @@ class FieldEvaluator : NonMovable, NonCopyable {
   {
   }
 
+  ~FieldEvaluator()
+  {
+    /* While this assert isn't strictly necessary, and could be replaced with a warning,
+     * it will catch cases where someone forgets to call #evaluate() */
+    BLI_assert(is_evaluated_);
+  }
+
   /**
    * \param field: Field to add to the evaluator.
    * \param dst: Mutable virtual array that the evaluated result for this field is be written into.
