@@ -2130,6 +2130,7 @@ bool CustomData_merge(const struct CustomData *source,
     }
     if (layer->anonymous_id &&
         !BKE_anonymous_attribute_id_has_strong_references(layer->anonymous_id)) {
+      /* This attribute is not referenced anymore, so it can be treated as if it didn't exist. */
       continue;
     }
     if (!(mask & CD_TYPE_AS_MASK(type))) {
@@ -3564,6 +3565,7 @@ bool CustomData_bmesh_merge(const CustomData *source,
                             BMesh *bm,
                             const char htype)
 {
+
   if (CustomData_number_of_layers_typemask(source, mask) == 0) {
     return false;
   }
@@ -4812,6 +4814,7 @@ static void copy_bit_flag(void *dst, const void *src, const size_t data_size, co
     *((_type *)(_dst)) |= _val; \
   } \
   (void)0
+
   switch (data_size) {
     case 1:
       COPY_BIT_FLAG(uint8_t, dst, src, flag);

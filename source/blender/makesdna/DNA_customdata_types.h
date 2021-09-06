@@ -55,8 +55,10 @@ typedef struct CustomDataLayer {
   char name[64];
   /** Layer data. */
   void *data;
-  /** Run-time identifier for this layer.  If no
-   * one has a strong reference to this id anymore, the layer can be removed. */
+  /**
+   * Run-time identifier for this layer.  If no one has a strong reference to this id anymore, the
+   * layer can be removed.
+   */
   const struct AnonymousAttributeID *anonymous_id;
 } CustomDataLayer;
 

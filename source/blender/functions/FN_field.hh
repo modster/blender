@@ -438,8 +438,6 @@ void evaluate_fields_to_spans(Span<GFieldRef> fields_to_evaluate,
                               const FieldContext &context,
                               Span<GMutableSpan> out_spans);
 
-Vector<int64_t> indices_from_selection(const VArray<bool> &selection);
-
 template<typename T> T evaluate_constant_field(const Field<T> &field)
 {
   T value;

@@ -26,6 +26,11 @@
 
 namespace blender::bke {
 
+/**
+ * Wrapper for #AnonymousAttributeID with RAII semantics.
+ * This class should typically not be used directly. Instead use #StrongAnonymousAttributeID or
+ * #WeakAnonymousAttributeID.
+ */
 template<bool IsStrongReference> class OwnedAnonymousAttributeID {
  private:
   const AnonymousAttributeID *data_ = nullptr;
@@ -35,6 +40,7 @@ template<bool IsStrongReference> class OwnedAnonymousAttributeID {
  public:
   OwnedAnonymousAttributeID() = default;
 
+  /** Create a new anonymous attribute id. */
   explicit OwnedAnonymousAttributeID(StringRefNull debug_name)
   {
     if constexpr (IsStrongReference) {
@@ -45,7 +51,10 @@ template<bool IsStrongReference> class OwnedAnonymousAttributeID {
     }
   }
 
-  /* This transfers ownership, so no incref is necessary. */
+  /**
+   * This transfers ownership, so no incref is necessary.
+   * The caller has to make sure that it owned the anonymous id.
+   */
   explicit OwnedAnonymousAttributeID(const AnonymousAttributeID *anonymous_id)
       : data_(anonymous_id)
   {
@@ -111,6 +120,7 @@ template<bool IsStrongReference> class OwnedAnonymousAttributeID {
     return BKE_anonymous_attribute_id_has_strong_references(data_);
   }
 
+  /** Extract the onwership of the currently wrapped anonymous id. */
   const AnonymousAttributeID *extract()
   {
     const AnonymousAttributeID *extracted_data = data_;
@@ -119,6 +129,7 @@ template<bool IsStrongReference> class OwnedAnonymousAttributeID {
     return extracted_data;
   }
 
+  /** Get the wrapped anonymous id, without taking ownership. */
   const AnonymousAttributeID *get() const
   {
     return data_;
@@ -154,72 +165,5 @@ template<bool IsStrongReference> class OwnedAnonymousAttributeID {
 
 using StrongAnonymousAttributeID = OwnedAnonymousAttributeID<true>;
 using WeakAnonymousAttributeID = OwnedAnonymousAttributeID<false>;
-
-class AttributeIDRef {
- private:
-  StringRef name_;
-  const AnonymousAttributeID *anonymous_id_ = nullptr;
-
- public:
-  AttributeIDRef() = default;
-
-  AttributeIDRef(StringRef name) : name_(name)
-  {
-  }
-
-  AttributeIDRef(StringRefNull name) : name_(name)
-  {
-  }
-
-  AttributeIDRef(const char *name) : name_(name)
-  {
-  }
-
-  AttributeIDRef(const std::string &name) : name_(name)
-  {
-  }
-
-  /* The anonymous id is only borrowed, the caller has to keep a reference to it. */
-  AttributeIDRef(const AnonymousAttributeID *anonymous_id) : anonymous_id_(anonymous_id)
-  {
-  }
-
-  operator bool() const
-  {
-    return this->is_named() || this->is_anonymous();
-  }
-
-  friend bool operator==(const AttributeIDRef &a, const AttributeIDRef &b)
-  {
-    return a.anonymous_id_ == b.anonymous_id_ && a.name_ == b.name_;
-  }
-
-  uint64_t hash() const
-  {
-    return get_default_hash_2(name_, anonymous_id_);
-  }
-
-  bool is_named() const
-  {
-    return !name_.is_empty();
-  }
-
-  bool is_anonymous() const
-  {
-    return anonymous_id_ != nullptr;
-  }
-
-  StringRef name() const
-  {
-    BLI_assert(this->is_named());
-    return name_;
-  }
-
-  const AnonymousAttributeID &anonymous_id() const
-  {
-    BLI_assert(this->is_anonymous());
-    return *anonymous_id_;
-  }
-};
 
 }  // namespace blender::bke

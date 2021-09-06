@@ -16,6 +16,12 @@
 
 #pragma once
 
+/** \file
+ * \ingroup bke
+ *
+ * An #AnonymousAttributeID is used to identify attributes that are not explicitly named.
+ */
+
 #ifdef __cplusplus
 extern "C" {
 #endif

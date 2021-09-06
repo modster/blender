@@ -44,6 +44,8 @@ using blender::float3;
 using blender::Set;
 using blender::StringRef;
 using blender::StringRefNull;
+using blender::bke::AttributeIDRef;
+using blender::bke::OutputAttribute;
 using blender::fn::GMutableSpan;
 using blender::fn::GSpan;
 using blender::fn::GVArray_For_GSpan;
@@ -730,7 +732,7 @@ bool CustomDataAttributes::create(const AttributeIDRef &attribute_id,
   return result != nullptr;
 }
 
-bool CustomDataAttributes::create_by_move(const blender::bke::AttributeIDRef &attribute_id,
+bool CustomDataAttributes::create_by_move(const AttributeIDRef &attribute_id,
                                           const CustomDataType data_type,
                                           void *buffer)
 {
@@ -739,7 +741,7 @@ bool CustomDataAttributes::create_by_move(const blender::bke::AttributeIDRef &at
   return result != nullptr;
 }
 
-bool CustomDataAttributes::remove(const blender::bke::AttributeIDRef &attribute_id)
+bool CustomDataAttributes::remove(const AttributeIDRef &attribute_id)
 {
   bool result = false;
   for (const int i : IndexRange(data.totlayer)) {
@@ -814,7 +816,7 @@ bool GeometryComponent::attribute_is_builtin(const blender::StringRef attribute_
 }
 
 blender::bke::ReadAttributeLookup GeometryComponent::attribute_try_get_for_read(
-    const blender::bke::AttributeIDRef &attribute_id) const
+    const AttributeIDRef &attribute_id) const
 {
   using namespace blender::bke;
   const ComponentAttributeProviders *providers = this->get_attribute_providers();
@@ -850,7 +852,7 @@ std::unique_ptr<blender::fn::GVArray> GeometryComponent::attribute_try_adapt_dom
 }
 
 blender::bke::WriteAttributeLookup GeometryComponent::attribute_try_get_for_write(
-    const blender::bke::AttributeIDRef &attribute_id)
+    const AttributeIDRef &attribute_id)
 {
   using namespace blender::bke;
   const ComponentAttributeProviders *providers = this->get_attribute_providers();
@@ -874,7 +876,7 @@ blender::bke::WriteAttributeLookup GeometryComponent::attribute_try_get_for_writ
   return {};
 }
 
-bool GeometryComponent::attribute_try_delete(const blender::bke::AttributeIDRef &attribute_id)
+bool GeometryComponent::attribute_try_delete(const AttributeIDRef &attribute_id)
 {
   using namespace blender::bke;
   const ComponentAttributeProviders *providers = this->get_attribute_providers();
@@ -896,7 +898,7 @@ bool GeometryComponent::attribute_try_delete(const blender::bke::AttributeIDRef 
   return success;
 }
 
-bool GeometryComponent::attribute_try_create(const blender::bke::AttributeIDRef &attribute_id,
+bool GeometryComponent::attribute_try_create(const AttributeIDRef &attribute_id,
                                              const AttributeDomain domain,
                                              const CustomDataType data_type,
                                              const AttributeInit &initializer)
@@ -950,14 +952,14 @@ bool GeometryComponent::attribute_try_create_builtin(const blender::StringRef at
   return builtin_provider->try_create(*this, initializer);
 }
 
-Set<blender::bke::AttributeIDRef> GeometryComponent::attribute_ids() const
+Set<AttributeIDRef> GeometryComponent::attribute_ids() const
 {
-  Set<blender::bke::AttributeIDRef> attributes;
-  this->attribute_foreach([&](const blender::bke::AttributeIDRef &attribute_id,
-                              const AttributeMetaData &UNUSED(meta_data)) {
-    attributes.add(attribute_id);
-    return true;
-  });
+  Set<AttributeIDRef> attributes;
+  this->attribute_foreach(
+      [&](const AttributeIDRef &attribute_id, const AttributeMetaData &UNUSED(meta_data)) {
+        attributes.add(attribute_id);
+        return true;
+      });
   return attributes;
 }
 
@@ -1002,7 +1004,7 @@ bool GeometryComponent::attribute_foreach(const AttributeForeachCallback callbac
   return true;
 }
 
-bool GeometryComponent::attribute_exists(const blender::bke::AttributeIDRef &attribute_id) const
+bool GeometryComponent::attribute_exists(const AttributeIDRef &attribute_id) const
 {
   blender::bke::ReadAttributeLookup attribute = this->attribute_try_get_for_read(attribute_id);
   if (attribute) {
@@ -1012,17 +1014,17 @@ bool GeometryComponent::attribute_exists(const blender::bke::AttributeIDRef &att
 }
 
 std::optional<AttributeMetaData> GeometryComponent::attribute_get_meta_data(
-    const blender::bke::AttributeIDRef &attribute_id) const
+    const AttributeIDRef &attribute_id) const
 {
   std::optional<AttributeMetaData> result{std::nullopt};
-  this->attribute_foreach([&](const blender::bke::AttributeIDRef &current_attribute_id,
-                              const AttributeMetaData &meta_data) {
-    if (attribute_id == current_attribute_id) {
-      result = meta_data;
-      return false;
-    }
-    return true;
-  });
+  this->attribute_foreach(
+      [&](const AttributeIDRef &current_attribute_id, const AttributeMetaData &meta_data) {
+        if (attribute_id == current_attribute_id) {
+          result = meta_data;
+          return false;
+        }
+        return true;
+      });
   return result;
 }
 
@@ -1035,7 +1037,7 @@ static std::unique_ptr<blender::fn::GVArray> try_adapt_data_type(
 }
 
 std::unique_ptr<blender::fn::GVArray> GeometryComponent::attribute_try_get_for_read(
-    const blender::bke::AttributeIDRef &attribute_id,
+    const AttributeIDRef &attribute_id,
     const AttributeDomain domain,
     const CustomDataType data_type) const
 {
@@ -1065,7 +1067,7 @@ std::unique_ptr<blender::fn::GVArray> GeometryComponent::attribute_try_get_for_r
 }
 
 std::unique_ptr<blender::bke::GVArray> GeometryComponent::attribute_try_get_for_read(
-    const blender::bke::AttributeIDRef &attribute_id, const AttributeDomain domain) const
+    const AttributeIDRef &attribute_id, const AttributeDomain domain) const
 {
   if (!this->attribute_domain_supported(domain)) {
     return {};
@@ -1084,7 +1086,7 @@ std::unique_ptr<blender::bke::GVArray> GeometryComponent::attribute_try_get_for_
 }
 
 blender::bke::ReadAttributeLookup GeometryComponent::attribute_try_get_for_read(
-    const blender::bke::AttributeIDRef &attribute_id, const CustomDataType data_type) const
+    const AttributeIDRef &attribute_id, const CustomDataType data_type) const
 {
   blender::bke::ReadAttributeLookup attribute = this->attribute_try_get_for_read(attribute_id);
   if (!attribute) {
@@ -1101,7 +1103,7 @@ blender::bke::ReadAttributeLookup GeometryComponent::attribute_try_get_for_read(
 }
 
 std::unique_ptr<blender::bke::GVArray> GeometryComponent::attribute_get_for_read(
-    const blender::bke::AttributeIDRef &attribute_id,
+    const AttributeIDRef &attribute_id,
     const AttributeDomain domain,
     const CustomDataType data_type,
     const void *default_value) const
@@ -1128,7 +1130,7 @@ class GVMutableAttribute_For_OutputAttribute
 
   GVMutableAttribute_For_OutputAttribute(GMutableSpan data,
                                          GeometryComponent &component,
-                                         const blender::bke::AttributeIDRef &attribute_id)
+                                         const AttributeIDRef &attribute_id)
       : blender::fn::GVMutableArray_For_GMutableSpan(data), component(&component)
   {
     if (attribute_id.is_named()) {
@@ -1148,7 +1150,7 @@ class GVMutableAttribute_For_OutputAttribute
   }
 };
 
-static void save_output_attribute(blender::bke::OutputAttribute &output_attribute)
+static void save_output_attribute(OutputAttribute &output_attribute)
 {
   using namespace blender;
   using namespace blender::fn;
@@ -1187,13 +1189,12 @@ static void save_output_attribute(blender::bke::OutputAttribute &output_attribut
   }
 }
 
-static blender::bke::OutputAttribute create_output_attribute(
-    GeometryComponent &component,
-    const blender::bke::AttributeIDRef &attribute_id,
-    const AttributeDomain domain,
-    const CustomDataType data_type,
-    const bool ignore_old_values,
-    const void *default_value)
+static OutputAttribute create_output_attribute(GeometryComponent &component,
+                                               const AttributeIDRef &attribute_id,
+                                               const AttributeDomain domain,
+                                               const CustomDataType data_type,
+                                               const bool ignore_old_values,
+                                               const void *default_value)
 {
   using namespace blender;
   using namespace blender::fn;
@@ -1284,17 +1285,16 @@ static blender::bke::OutputAttribute create_output_attribute(
   return OutputAttribute(std::move(varray), domain, save_output_attribute, true);
 }
 
-blender::bke::OutputAttribute GeometryComponent::attribute_try_get_for_output(
-    const blender::bke::AttributeIDRef &attribute_id,
-    const AttributeDomain domain,
-    const CustomDataType data_type,
-    const void *default_value)
+OutputAttribute GeometryComponent::attribute_try_get_for_output(const AttributeIDRef &attribute_id,
+                                                                const AttributeDomain domain,
+                                                                const CustomDataType data_type,
+                                                                const void *default_value)
 {
   return create_output_attribute(*this, attribute_id, domain, data_type, false, default_value);
 }
 
-blender::bke::OutputAttribute GeometryComponent::attribute_try_get_for_output_only(
-    const blender::bke::AttributeIDRef &attribute_id,
+OutputAttribute GeometryComponent::attribute_try_get_for_output_only(
+    const AttributeIDRef &attribute_id,
     const AttributeDomain domain,
     const CustomDataType data_type)
 {

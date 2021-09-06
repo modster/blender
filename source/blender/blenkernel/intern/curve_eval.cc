@@ -38,6 +38,7 @@ using blender::MutableSpan;
 using blender::Span;
 using blender::StringRefNull;
 using blender::Vector;
+using blender::bke::AttributeIDRef;
 
 blender::Span<SplinePtr> CurveEval::splines() const
 {
@@ -331,11 +332,11 @@ void CurveEval::assert_valid_point_attributes() const
     return;
   }
   const int layer_len = splines_.first()->attributes.data.totlayer;
-  Map<blender::bke::AttributeIDRef, AttributeMetaData> map;
+  Map<AttributeIDRef, AttributeMetaData> map;
   for (const SplinePtr &spline : splines_) {
     BLI_assert(spline->attributes.data.totlayer == layer_len);
     spline->attributes.foreach_attribute(
-        [&](const blender::bke::AttributeIDRef &attribute_id, const AttributeMetaData &meta_data) {
+        [&](const AttributeIDRef &attribute_id, const AttributeMetaData &meta_data) {
           map.add_or_modify(
               attribute_id,
               [&](AttributeMetaData *map_data) {

@@ -30,6 +30,81 @@
 #include "BLI_float3.hh"
 #include "BLI_function_ref.hh"
 
+namespace blender::bke {
+
+/**
+ * Identifies an attribute that is either named or anonymous. It does not own the identifier, so it
+ * is just a reference.
+ */
+class AttributeIDRef {
+ private:
+  StringRef name_;
+  const AnonymousAttributeID *anonymous_id_ = nullptr;
+
+ public:
+  AttributeIDRef() = default;
+
+  AttributeIDRef(StringRef name) : name_(name)
+  {
+  }
+
+  AttributeIDRef(StringRefNull name) : name_(name)
+  {
+  }
+
+  AttributeIDRef(const char *name) : name_(name)
+  {
+  }
+
+  AttributeIDRef(const std::string &name) : name_(name)
+  {
+  }
+
+  /* The anonymous id is only borrowed, the caller has to keep a reference to it. */
+  AttributeIDRef(const AnonymousAttributeID *anonymous_id) : anonymous_id_(anonymous_id)
+  {
+  }
+
+  operator bool() const
+  {
+    return this->is_named() || this->is_anonymous();
+  }
+
+  friend bool operator==(const AttributeIDRef &a, const AttributeIDRef &b)
+  {
+    return a.anonymous_id_ == b.anonymous_id_ && a.name_ == b.name_;
+  }
+
+  uint64_t hash() const
+  {
+    return get_default_hash_2(name_, anonymous_id_);
+  }
+
+  bool is_named() const
+  {
+    return !name_.is_empty();
+  }
+
+  bool is_anonymous() const
+  {
+    return anonymous_id_ != nullptr;
+  }
+
+  StringRef name() const
+  {
+    BLI_assert(this->is_named());
+    return name_;
+  }
+
+  const AnonymousAttributeID &anonymous_id() const
+  {
+    BLI_assert(this->is_anonymous());
+    return *anonymous_id_;
+  }
+};
+
+}  // namespace blender::bke
+
 /**
  * Contains information about an attribute in a geometry component.
  * More information can be added in the future. E.g. whether the attribute is builtin and how it is

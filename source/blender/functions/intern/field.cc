@@ -24,6 +24,10 @@
 
 namespace blender::fn {
 
+/* --------------------------------------------------------------------
+ * Field Evaluation.
+ */
+
 struct FieldTreeInfo {
   /**
    * When fields are build, they only have references to the fields that they depend on. This map
@@ -480,7 +484,11 @@ const GVArray *FieldContext::try_get_varray_for_context(const FieldInput &field_
   return field_input.try_get_varray_for_context(*this, mask, scope);
 }
 
-Vector<int64_t> indices_from_selection(const VArray<bool> &selection)
+/* --------------------------------------------------------------------
+ * FieldEvaluator.
+ */
+
+static Vector<int64_t> indices_from_selection(const VArray<bool> &selection)
 {
   /* If the selection is just a single value, it's best to avoid calling this
    * function when constructing an IndexMask and use an IndexRange instead. */
@@ -503,10 +511,6 @@ Vector<int64_t> indices_from_selection(const VArray<bool> &selection)
   }
   return indices;
 }
-
-/* --------------------------------------------------------------------
- * FieldEvaluator.
- */
 
 int FieldEvaluator::add_with_destination(GField field, GVMutableArray &dst)
 {
