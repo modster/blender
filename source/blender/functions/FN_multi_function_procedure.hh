@@ -246,8 +246,6 @@ class MFProcedure : NonCopyable, NonMovable {
   Span<MFVariable *> variables();
   Span<const MFVariable *> variables() const;
 
-  void assert_valid() const;
-
   std::string to_dot() const;
 
   bool validate() const;
