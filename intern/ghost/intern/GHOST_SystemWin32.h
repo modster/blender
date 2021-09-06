@@ -339,10 +339,9 @@ class GHOST_SystemWin32 : public GHOST_System {
   /**
    * Creates cursor event.
    * \param window: The window receiving the event (the active window).
-   * \param TODO
    * \return The event created.
    */
-  static GHOST_EventCursor *processCursorEvent(GHOST_WindowWin32 *window, int32_t pointerId);
+  static GHOST_EventCursor *processCursorEvent(GHOST_WindowWin32 *window);
 
   /**
    * Handles a mouse wheel event.
@@ -477,8 +476,9 @@ class GHOST_SystemWin32 : public GHOST_System {
   int32_t m_lastX;
   int32_t m_lastY;
   bool m_firstProximity = false;
+  bool m_absoluteCursor = false;
 
-  static void warpGrabAccum(GHOST_WindowWin32 *win, int32_t x, int32_t y);
+  void warpGrabAccum(GHOST_WindowWin32 *win, int32_t x, int32_t y);
 };
 
 inline void GHOST_SystemWin32::retrieveModifierKeys(GHOST_ModifierKeys &keys) const
