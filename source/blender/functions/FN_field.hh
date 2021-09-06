@@ -42,19 +42,26 @@
 namespace blender::fn {
 
 class FieldNode {
+ private:
+  bool is_input_;
+
  public:
-  ~FieldNode() = default;
-
-  virtual const CPPType &cpp_type_of_output_index(int output_index) const = 0;
-
-  virtual bool is_input_node() const
+  FieldNode(bool is_input) : is_input_(is_input)
   {
-    return false;
   }
 
-  virtual bool is_operation_node() const
+  ~FieldNode() = default;
+
+  virtual const CPPType &output_cpp_type(int output_index) const = 0;
+
+  bool is_input() const
   {
-    return false;
+    return is_input_;
+  }
+
+  bool is_operation() const
+  {
+    return !is_input_;
   }
 
   virtual uint64_t hash() const
@@ -104,17 +111,7 @@ template<typename NodePtr> class GFieldBase {
 
   const fn::CPPType &cpp_type() const
   {
-    return node_->cpp_type_of_output_index(node_output_index_);
-  }
-
-  bool has_input_node() const
-  {
-    return node_->is_input_node();
-  }
-
-  bool has_operation_node() const
-  {
-    return node_->is_operation_node();
+    return node_->output_cpp_type(node_output_index_);
   }
 
   const FieldNode &node() const
@@ -184,13 +181,13 @@ class FieldOperation : public FieldNode {
 
  public:
   FieldOperation(std::unique_ptr<const MultiFunction> function, Vector<GField> inputs = {})
-      : owned_function_(std::move(function)), inputs_(std::move(inputs))
+      : FieldNode(false), owned_function_(std::move(function)), inputs_(std::move(inputs))
   {
     function_ = owned_function_.get();
   }
 
   FieldOperation(const MultiFunction &function, Vector<GField> inputs = {})
-      : function_(&function), inputs_(std::move(inputs))
+      : FieldNode(false), function_(&function), inputs_(std::move(inputs))
   {
   }
 
@@ -204,12 +201,7 @@ class FieldOperation : public FieldNode {
     return *function_;
   }
 
-  bool is_operation_node() const override
-  {
-    return true;
-  }
-
-  const CPPType &cpp_type_of_output_index(int output_index) const override
+  const CPPType &output_cpp_type(int output_index) const override
   {
     int output_counter = 0;
     for (const int param_index : function_->param_indices()) {
@@ -244,7 +236,7 @@ class FieldInput : public FieldNode {
 
  public:
   FieldInput(const CPPType &type, std::string debug_name = "")
-      : type_(&type), debug_name_(std::move(debug_name))
+      : FieldNode(true), type_(&type), debug_name_(std::move(debug_name))
   {
   }
 
@@ -262,16 +254,11 @@ class FieldInput : public FieldNode {
     return *type_;
   }
 
-  const CPPType &cpp_type_of_output_index(int output_index) const override
+  const CPPType &output_cpp_type(int output_index) const override
   {
     BLI_assert(output_index == 0);
     UNUSED_VARS_NDEBUG(output_index);
     return *type_;
-  }
-
-  bool is_input_node() const override
-  {
-    return true;
   }
 };
 

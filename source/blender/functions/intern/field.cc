@@ -56,12 +56,12 @@ static FieldTreeInfo preprocess_field_tree(Span<GFieldRef> entry_fields)
 
   while (!fields_to_check.is_empty()) {
     GFieldRef field = fields_to_check.pop();
-    if (field.has_input_node()) {
+    if (field.node().is_input()) {
       const FieldInput &field_input = static_cast<const FieldInput &>(field.node());
       field_tree_info.deduplicated_field_inputs.add(field_input);
       continue;
     }
-    BLI_assert(field.has_operation_node());
+    BLI_assert(field.node().is_operation());
     const FieldOperation &operation = static_cast<const FieldOperation &>(field.node());
     for (const GFieldRef operation_input : operation.inputs()) {
       field_tree_info.field_users.add(operation_input, field);
@@ -173,7 +173,7 @@ static void build_multi_function_procedure_for_fields(MFProcedure &procedure,
         continue;
       }
       /* Field inputs should already be handled above. */
-      BLI_assert(field.has_operation_node());
+      BLI_assert(field.node().is_operation());
 
       const FieldOperation &operation = static_cast<const FieldOperation &>(field.node());
       const Span<GField> operation_inputs = operation.inputs();
@@ -288,7 +288,7 @@ Vector<const GVArray *> evaluate_fields(ResourceScope &scope,
    * processing. */
   for (const int out_index : fields_to_evaluate.index_range()) {
     const GFieldRef &field = fields_to_evaluate[out_index];
-    if (!field.has_input_node()) {
+    if (!field.node().is_input()) {
       continue;
     }
     const FieldInput &field_input = static_cast<const FieldInput &>(field.node());
