@@ -33,6 +33,7 @@ class MFDummyInstruction;
 class MFReturnInstruction;
 class MFProcedure;
 
+/** Every instruction has exactly one of these types. */
 enum class MFInstructionType {
   Call,
   Branch,
@@ -41,6 +42,11 @@ enum class MFInstructionType {
   Return,
 };
 
+/**
+ * A variable is similar to a virtual register in other libraries. During evaluation, every is
+ * either uninitialized or contains a value for every index (remember, a multi-function procedure
+ * is always evaluated for many indices at the same time).
+ */
 class MFVariable : NonCopyable, NonMovable {
  private:
   MFDataType data_type_;
@@ -63,6 +69,7 @@ class MFVariable : NonCopyable, NonMovable {
   int id() const;
 };
 
+/** Base class for all instruction types. */
 class MFInstruction : NonCopyable, NonMovable {
  protected:
   MFInstructionType type_;
@@ -77,10 +84,19 @@ class MFInstruction : NonCopyable, NonMovable {
 
  public:
   MFInstructionType type() const;
+
+  /**
+   * Other instructions that come before this instruction. There can be multiple previous
+   * instructions when branching is used in the procedure.
+   */
   Span<MFInstruction *> prev();
   Span<const MFInstruction *> prev() const;
 };
 
+/**
+ * References a multi-function that is evaluated when the instruction is executed. It also
+ * references the variables whose data will be passed into the multi-function.
+ */
 class MFCallInstruction : public MFInstruction {
  private:
   const MultiFunction *fn_ = nullptr;
@@ -98,10 +114,15 @@ class MFCallInstruction : public MFInstruction {
 
   void set_param_variable(int param_index, MFVariable *variable);
   void set_params(Span<MFVariable *> variables);
+
   Span<MFVariable *> params();
   Span<const MFVariable *> params() const;
 };
 
+/**
+ * What makes a branch instruction special is that it has two successor instructions. One that will
+ * be used when a condition variable was true, and one otherwise.
+ */
 class MFBranchInstruction : public MFInstruction {
  private:
   MFVariable *condition_ = nullptr;
@@ -124,6 +145,12 @@ class MFBranchInstruction : public MFInstruction {
   void set_branch_false(MFInstruction *instruction);
 };
 
+/**
+ * A destruct instruction destructs a single variable. So the variable value will be uninitialized
+ * after this instruction. All variables that are not output variables of the procedure, have to be
+ * destructed before the procedure ends. Destructing early is generally a good thing, because it
+ * might help with memory buffer reuse, which decreases memory-usage and increases performance.
+ */
 class MFDestructInstruction : public MFInstruction {
  private:
   MFVariable *variable_ = nullptr;
@@ -141,6 +168,9 @@ class MFDestructInstruction : public MFInstruction {
   void set_next(MFInstruction *instruction);
 };
 
+/**
+ * This instruction does nothing, it just exists to building a procedure simpler in some cases.
+ */
 class MFDummyInstruction : public MFInstruction {
  private:
   MFInstruction *next_ = nullptr;
@@ -153,6 +183,9 @@ class MFDummyInstruction : public MFInstruction {
   void set_next(MFInstruction *instruction);
 };
 
+/**
+ * This instruction ends the procedure.
+ */
 class MFReturnInstruction : public MFInstruction {
 };
 
@@ -169,6 +202,14 @@ struct ConstMFParameter {
   const MFVariable *variable;
 };
 
+/**
+ * A multi-function procedure allows composing multi-functions in arbitrary ways. It consists of
+ * variables and instructions that operate on those variables. Branching and looping within the
+ * procedure is supported as well.
+ *
+ * Typically, a #MFProcedure should be constructed using a #MFProcedureBuilder, which has many more
+ * utility methods for common use cases.
+ */
 class MFProcedure : NonCopyable, NonMovable {
  private:
   LinearAllocator<> allocator_;

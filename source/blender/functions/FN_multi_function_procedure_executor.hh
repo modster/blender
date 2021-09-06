@@ -24,6 +24,7 @@
 
 namespace blender::fn {
 
+/** A multi-function that executes a procedure internally. */
 class MFProcedureExecutor : public MultiFunction {
  private:
   MFSignature signature_;

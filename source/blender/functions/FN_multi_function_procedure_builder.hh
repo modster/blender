@@ -24,6 +24,10 @@
 
 namespace blender::fn {
 
+/**
+ * An #MFInstructionCursor points to a position in a multi-function procedure, where an instruction
+ * can be inserted.
+ */
 class MFInstructionCursor {
  private:
   MFInstruction *instruction_ = nullptr;
@@ -45,9 +49,14 @@ class MFInstructionCursor {
   void insert(MFProcedure &procedure, MFInstruction *new_instruction);
 };
 
+/**
+ * Utility class to build a #MFProcedure.
+ */
 class MFProcedureBuilder {
  private:
+  /** Procedure that is being build. */
   MFProcedure *procedure_ = nullptr;
+  /** Cursors where the next instruction should be inserted. */
   Vector<MFInstructionCursor> cursors_;
 
  public:
