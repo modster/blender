@@ -628,6 +628,10 @@ class AttributeFieldInput : public fn::FieldInput {
 
 class AnonymousAttributeFieldInput : public fn::FieldInput {
  private:
+  /**
+   * A strong reference is required to make sure that the referenced attribute is not removed
+   * automatically.
+   */
   StrongAnonymousAttributeID anonymous_id_;
 
  public:

@@ -57,7 +57,9 @@ typedef struct CustomDataLayer {
   void *data;
   /**
    * Run-time identifier for this layer. If no one has a strong reference to this id anymore,
-   * the layer can be removed.
+   * the layer can be removed. The custom data layer only has a weak reference to the id, because
+   * otherwise there will always be a strong reference and the attribute can't be removed
+   * automatically.
    */
   const struct AnonymousAttributeID *anonymous_id;
 } CustomDataLayer;
