@@ -478,12 +478,12 @@ geometry_node_categories = [
     GeometryNodeCategory("GEO_ATTRIBUTE", "Attribute", items=[
         NodeItem("GeometryNodeAttributeRandomize"),
         NodeItem("GeometryNodeAttributeMath"),
+        NodeItem("GeometryNodeAttributeCapture"),
         NodeItem("GeometryNodeAttributeClamp"),
         NodeItem("GeometryNodeAttributeCompare"),
         NodeItem("GeometryNodeAttributeConvert"),
         NodeItem("GeometryNodeAttributeCurveMap"),
         NodeItem("GeometryNodeAttributeFill"),
-        NodeItem("GeometryNodeAttributeFreeze"),
         NodeItem("GeometryNodeAttributeMix"),
         NodeItem("GeometryNodeAttributeProximity"),
         NodeItem("GeometryNodeAttributeColorRamp"),

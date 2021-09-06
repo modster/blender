@@ -10279,11 +10279,11 @@ static void def_geo_curve_fill(StructRNA *srna)
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 }
 
-static void def_geo_attribute_freeze(StructRNA *srna)
+static void def_geo_attribute_capture(StructRNA *srna)
 {
   PropertyRNA *prop;
 
-  RNA_def_struct_sdna_from(srna, "NodeGeometryAttributeFreeze", "storage");
+  RNA_def_struct_sdna_from(srna, "NodeGeometryAttributeCapture", "storage");
 
   prop = RNA_def_property(srna, "data_type", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, rna_enum_attribute_type_items);

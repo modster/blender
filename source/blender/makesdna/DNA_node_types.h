@@ -1441,12 +1441,12 @@ typedef struct NodeGeometryCurveFill {
   uint8_t mode;
 } NodeGeometryCurveFill;
 
-typedef struct NodeGeometryAttributeFreeze {
+typedef struct NodeGeometryAttributeCapture {
   /* CustomDataType. */
   int8_t data_type;
   /* AttributeDomain. */
   int8_t domain;
-} NodeGeometryAttributeFreeze;
+} NodeGeometryAttributeCapture;
 
 /* script node mode */
 #define NODE_SCRIPT_INTERNAL 0

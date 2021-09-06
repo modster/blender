@@ -142,6 +142,7 @@ set(SRC
   function/node_function_util.cc
 
   geometry/nodes/node_geo_align_rotation_to_vector.cc
+  geometry/nodes/node_geo_attribute_capture.cc
   geometry/nodes/node_geo_attribute_clamp.cc
   geometry/nodes/node_geo_attribute_color_ramp.cc
   geometry/nodes/node_geo_attribute_combine_xyz.cc
@@ -149,7 +150,6 @@ set(SRC
   geometry/nodes/node_geo_attribute_convert.cc
   geometry/nodes/node_geo_attribute_curve_map.cc
   geometry/nodes/node_geo_attribute_fill.cc
-  geometry/nodes/node_geo_attribute_freeze.cc
   geometry/nodes/node_geo_attribute_map_range.cc
   geometry/nodes/node_geo_attribute_math.cc
   geometry/nodes/node_geo_attribute_mix.cc

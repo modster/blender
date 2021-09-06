@@ -23,7 +23,7 @@
 
 namespace blender::nodes {
 
-static void geo_node_attribute_freeze_declare(NodeDeclarationBuilder &b)
+static void geo_node_attribute_capture_declare(NodeDeclarationBuilder &b)
 {
   b.add_input<decl::Geometry>("Geometry");
   b.add_input<decl::Vector>("Value");
@@ -40,9 +40,9 @@ static void geo_node_attribute_freeze_declare(NodeDeclarationBuilder &b)
   b.add_output<decl::Int>("Attribute", "Attribute_004");
 }
 
-static void geo_node_attribute_freeze_layout(uiLayout *layout,
-                                             bContext *UNUSED(C),
-                                             PointerRNA *ptr)
+static void geo_node_attribute_capture_layout(uiLayout *layout,
+                                              bContext *UNUSED(C),
+                                              PointerRNA *ptr)
 {
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetPropDecorate(layout, false);
@@ -50,19 +50,20 @@ static void geo_node_attribute_freeze_layout(uiLayout *layout,
   uiItemR(layout, ptr, "data_type", 0, "", ICON_NONE);
 }
 
-static void geo_node_attribute_freeze_init(bNodeTree *UNUSED(tree), bNode *node)
+static void geo_node_attribute_capture_init(bNodeTree *UNUSED(tree), bNode *node)
 {
-  NodeGeometryAttributeFreeze *data = (NodeGeometryAttributeFreeze *)MEM_callocN(
-      sizeof(NodeGeometryAttributeFreeze), __func__);
+  NodeGeometryAttributeCapture *data = (NodeGeometryAttributeCapture *)MEM_callocN(
+      sizeof(NodeGeometryAttributeCapture), __func__);
   data->data_type = CD_PROP_FLOAT;
   data->domain = ATTR_DOMAIN_POINT;
 
   node->storage = data;
 }
 
-static void geo_node_attribute_freeze_update(bNodeTree *UNUSED(ntree), bNode *node)
+static void geo_node_attribute_capture_update(bNodeTree *UNUSED(ntree), bNode *node)
 {
-  const NodeGeometryAttributeFreeze &storage = *(const NodeGeometryAttributeFreeze *)node->storage;
+  const NodeGeometryAttributeCapture &storage = *(const NodeGeometryAttributeCapture *)
+                                                     node->storage;
   const CustomDataType data_type = static_cast<CustomDataType>(storage.data_type);
 
   bNodeSocket *socket_value_attribute_name = (bNodeSocket *)node->inputs.first;
@@ -92,10 +93,10 @@ static void geo_node_attribute_freeze_update(bNodeTree *UNUSED(ntree), bNode *no
   nodeSetSocketAvailability(out_socket_value_int32, data_type == CD_PROP_INT32);
 }
 
-static void try_freeze_field_on_geometry(GeometryComponent &component,
-                                         const AttributeIDRef &attribute_id,
-                                         const AttributeDomain domain,
-                                         const GField &field)
+static void try_capture_field_on_geometry(GeometryComponent &component,
+                                          const AttributeIDRef &attribute_id,
+                                          const AttributeDomain domain,
+                                          const GField &field)
 {
   GeometryComponentFieldContext field_context{component, domain};
   const int domain_size = component.attribute_domain_size(domain);
@@ -112,14 +113,15 @@ static void try_freeze_field_on_geometry(GeometryComponent &component,
   output_attribute.save();
 }
 
-static void geo_node_attribute_freeze_exec(GeoNodeExecParams params)
+static void geo_node_attribute_capture_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
 
   geometry_set = bke::geometry_set_realize_instances(geometry_set);
 
   const bNode &node = params.node();
-  const NodeGeometryAttributeFreeze &storage = *(const NodeGeometryAttributeFreeze *)node.storage;
+  const NodeGeometryAttributeCapture &storage = *(const NodeGeometryAttributeCapture *)
+                                                     node.storage;
   const CustomDataType data_type = static_cast<CustomDataType>(storage.data_type);
   const AttributeDomain domain = static_cast<AttributeDomain>(storage.domain);
 
@@ -144,7 +146,7 @@ static void geo_node_attribute_freeze_exec(GeoNodeExecParams params)
       break;
   }
 
-  WeakAnonymousAttributeID anonymous_id{"Attribute Freeze"};
+  WeakAnonymousAttributeID anonymous_id{"Attribute Capture"};
   const CPPType &type = field.cpp_type();
 
   static const Array<GeometryComponentType> types = {
@@ -152,7 +154,7 @@ static void geo_node_attribute_freeze_exec(GeoNodeExecParams params)
   for (const GeometryComponentType type : types) {
     if (geometry_set.has(type)) {
       GeometryComponent &component = geometry_set.get_component_for_write(type);
-      try_freeze_field_on_geometry(component, anonymous_id.get(), domain, field);
+      try_capture_field_on_geometry(component, anonymous_id.get(), domain, field);
     }
   }
 
@@ -189,20 +191,20 @@ static void geo_node_attribute_freeze_exec(GeoNodeExecParams params)
 
 }  // namespace blender::nodes
 
-void register_node_type_geo_attribute_freeze()
+void register_node_type_geo_attribute_capture()
 {
   static bNodeType ntype;
 
   geo_node_type_base(
-      &ntype, GEO_NODE_ATTRIBUTE_FREEZE, "Attribute Freeze", NODE_CLASS_ATTRIBUTE, 0);
+      &ntype, GEO_NODE_ATTRIBUTE_CAPTURE, "Attribute Capture", NODE_CLASS_ATTRIBUTE, 0);
   node_type_storage(&ntype,
-                    "NodeGeometryAttributeFreeze",
+                    "NodeGeometryAttributeCapture",
                     node_free_standard_storage,
                     node_copy_standard_storage);
-  node_type_init(&ntype, blender::nodes::geo_node_attribute_freeze_init);
-  node_type_update(&ntype, blender::nodes::geo_node_attribute_freeze_update);
-  ntype.declare = blender::nodes::geo_node_attribute_freeze_declare;
-  ntype.geometry_node_execute = blender::nodes::geo_node_attribute_freeze_exec;
-  ntype.draw_buttons = blender::nodes::geo_node_attribute_freeze_layout;
+  node_type_init(&ntype, blender::nodes::geo_node_attribute_capture_init);
+  node_type_update(&ntype, blender::nodes::geo_node_attribute_capture_update);
+  ntype.declare = blender::nodes::geo_node_attribute_capture_declare;
+  ntype.geometry_node_execute = blender::nodes::geo_node_attribute_capture_exec;
+  ntype.draw_buttons = blender::nodes::geo_node_attribute_capture_layout;
   nodeRegisterType(&ntype);
 }
