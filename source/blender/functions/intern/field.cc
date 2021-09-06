@@ -504,4 +504,76 @@ Vector<int64_t> indices_from_selection(const VArray<bool> &selection)
   return indices;
 }
 
+/* --------------------------------------------------------------------
+ * FieldEvaluator.
+ */
+
+int FieldEvaluator::add_with_destination(GField field, GVMutableArray &dst)
+{
+  const int field_index = fields_to_evaluate_.append_and_get_index(std::move(field));
+  dst_hints_.append(&dst);
+  output_pointer_infos_.append({});
+  return field_index;
+}
+
+int FieldEvaluator::add_with_destination(GField field, GMutableSpan dst)
+{
+  const int field_index = fields_to_evaluate_.append_and_get_index(std::move(field));
+  dst_hints_.append(&scope_.construct<GVMutableArray_For_GMutableSpan>(__func__, dst));
+  output_pointer_infos_.append({});
+  return field_index;
+}
+
+int FieldEvaluator::add(GField field, const GVArray **varray_ptr)
+{
+  const int field_index = fields_to_evaluate_.append_and_get_index(std::move(field));
+  dst_hints_.append(nullptr);
+  output_pointer_infos_.append(OutputPointerInfo{
+      varray_ptr, [](void *dst, const GVArray &varray, ResourceScope &UNUSED(scope)) {
+        *(const GVArray **)dst = &varray;
+      }});
+  return field_index;
+}
+
+int FieldEvaluator::add(GField field)
+{
+  const int field_index = fields_to_evaluate_.append_and_get_index(std::move(field));
+  dst_hints_.append(nullptr);
+  output_pointer_infos_.append({});
+  return field_index;
+}
+
+void FieldEvaluator::evaluate()
+{
+  BLI_assert_msg(!is_evaluated_, "Cannot evaluate fields twice.");
+  Array<GFieldRef> fields(fields_to_evaluate_.size());
+  for (const int i : fields_to_evaluate_.index_range()) {
+    fields[i] = fields_to_evaluate_[i];
+  }
+  evaluated_varrays_ = evaluate_fields(scope_, fields, mask_, context_, dst_hints_);
+  BLI_assert(fields_to_evaluate_.size() == evaluated_varrays_.size());
+  for (const int i : fields_to_evaluate_.index_range()) {
+    OutputPointerInfo &info = output_pointer_infos_[i];
+    if (info.dst != nullptr) {
+      info.set(info.dst, *evaluated_varrays_[i], scope_);
+    }
+  }
+  is_evaluated_ = true;
+}
+
+IndexMask FieldEvaluator::get_evaluated_as_mask(const int field_index)
+{
+  const GVArray &varray = this->get_evaluated(field_index);
+  GVArray_Typed<bool> typed_varray{varray};
+
+  if (typed_varray->is_single()) {
+    if (typed_varray->get_internal_single()) {
+      return IndexRange(typed_varray.size());
+    }
+    return IndexRange(0);
+  }
+
+  return scope_.add_value(indices_from_selection(*typed_varray), __func__).as_span();
+}
+
 }  // namespace blender::fn

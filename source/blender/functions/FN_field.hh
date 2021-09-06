@@ -19,15 +19,31 @@
 /** \file
  * \ingroup fn
  *
- * Field serve as an intermediate representation for calculation of a group of functions. Having
- * an intermediate representation is helpful mainly to separate the execution system from the
- * system that describes the necessary computations. Fields can be executed in different contexts,
- * and optimization might mean executing the fields differently based on some factors like the
- * number of elements.
+ * A #Field represents a function that outputs a value based on an arbitrary number of inputs. The
+ * inputs for a specific field evaluation are provided by a #FieldContext.
  *
- * For now, fields are very tied to the multi-function system, but in the future #FieldOperation
- * could be extended to use different descriptions of its outputs and computation besides the
- * embedded multi-function.
+ * A typical example is a field that computes a displacement vector for every vertex on a mesh
+ * based on its position.
+ *
+ * Fields can be build, composed and evaluated at run-time. They are stored in a directed tree
+ * graph data structure, whereby each node is a #FieldNode and edges are dependencies. A #FieldNode
+ * has an arbitrary number of inputs and at least one output. A #Field references a specific output
+ * of a #FieldNode. The inputs of a #FieldNode are other fields.
+ *
+ * There are two different types of field nodes:
+ *  - #FieldInput: Has no input and exactly one output. It represents an input to the entire field
+ *    when it is evaluated. During evaluation, the value of this input is based on a #FieldContext.
+ *  - #FieldOperation: Has an arbitrary number of field inputs and at least one output. Its main
+ *    use is to compose multiple existing fields into new fields.
+ *
+ * When fields are evaluated, they are converted into a multi-function procedure which allows
+ * efficient compution. In the future, we might support different field evaluation mechanisms for
+ * e.g. the following scenarios:
+ *  - Latency of a single evaluation is more important than throughput.
+ *  - Evaluation should happen on other hardware like GPUs.
+ *
+ * Whenever possible, multiple fields should be evaluated together to avoid duplicate work when
+ * they share common sub-fields and a common context.
  */
 
 #include "BLI_string_ref.hh"
@@ -41,6 +57,9 @@
 
 namespace blender::fn {
 
+/**
+ * A node in a field-tree. It has one our more outputs that can be referenced by fields.
+ */
 class FieldNode {
  private:
   bool is_input_;
@@ -80,7 +99,9 @@ class FieldNode {
   }
 };
 
-/** Common base class for fields to avoid declaring the same methods for #GField and #GFieldRef. */
+/**
+ * Common base class for fields to avoid declaring the same methods for #GField and #GFieldRef.
+ */
 template<typename NodePtr> class GFieldBase {
  protected:
   NodePtr node_ = nullptr;
@@ -126,8 +147,7 @@ template<typename NodePtr> class GFieldBase {
 };
 
 /**
- * Describes the output of a function. Generally corresponds to the combination of an output socket
- * and link combination in a node graph.
+ * A field whose output type is only known at run-time.
  */
 class GField : public GFieldBase<std::shared_ptr<FieldNode>> {
  public:
@@ -158,6 +178,9 @@ class GFieldRef : public GFieldBase<const FieldNode *> {
   }
 };
 
+/**
+ * A typed version of #GField. It has the same memory layout as #GField.
+ */
 template<typename T> class Field : public GField {
  public:
   Field() = default;
@@ -173,10 +196,18 @@ template<typename T> class Field : public GField {
   }
 };
 
+/**
+ * A #FieldNode that allows composing existing fields into new fields.
+ */
 class FieldOperation : public FieldNode {
+  /**
+   * The multi-function used by this node. It is optionally owned.
+   * Multi-functions with mutable or vector parameters are not supported currently.
+   */
   std::unique_ptr<const MultiFunction> owned_function_;
   const MultiFunction *function_;
 
+  /** Inputs to the operation. */
   blender::Vector<GField> inputs_;
 
  public:
@@ -218,17 +249,11 @@ class FieldOperation : public FieldNode {
   }
 };
 
-class FieldInput;
+class FieldContext;
 
-class FieldContext {
- public:
-  ~FieldContext() = default;
-
-  virtual const GVArray *try_get_varray_for_context(const FieldInput &field_input,
-                                                    IndexMask mask,
-                                                    ResourceScope &scope) const;
-};
-
+/**
+ * A #FieldNode that represents an input to the entire field-tree.
+ */
 class FieldInput : public FieldNode {
  protected:
   const CPPType *type_;
@@ -240,6 +265,10 @@ class FieldInput : public FieldNode {
   {
   }
 
+  /**
+   * Get the value of this specific input based on the given context. The returned virtual array,
+   * should live at least as long as the passed in #scope.
+   */
   virtual const GVArray *try_get_varray_for_context(const FieldContext &context,
                                                     IndexMask mask,
                                                     ResourceScope &scope) const = 0;
@@ -262,36 +291,21 @@ class FieldInput : public FieldNode {
   }
 };
 
-Vector<const GVArray *> evaluate_fields(ResourceScope &scope,
-                                        Span<GFieldRef> fields_to_evaluate,
-                                        IndexMask mask,
-                                        const FieldContext &context,
-                                        Span<GVMutableArray *> dst_hints = {});
+/**
+ * Provides inputs for a specific field evaluation.
+ */
+class FieldContext {
+ public:
+  ~FieldContext() = default;
 
-void evaluate_constant_field(const GField &field, void *r_value);
+  virtual const GVArray *try_get_varray_for_context(const FieldInput &field_input,
+                                                    IndexMask mask,
+                                                    ResourceScope &scope) const;
+};
 
-void evaluate_fields_to_spans(Span<GFieldRef> fields_to_evaluate,
-                              IndexMask mask,
-                              const FieldContext &context,
-                              Span<GMutableSpan> out_spans);
-
-Vector<int64_t> indices_from_selection(const VArray<bool> &selection);
-
-template<typename T> T evaluate_constant_field(const Field<T> &field)
-{
-  T value;
-  value.~T();
-  evaluate_constant_field(field, &value);
-  return value;
-}
-
-template<typename T> Field<T> make_constant_field(T value)
-{
-  auto constant_fn = std::make_unique<fn::CustomMF_Constant<T>>(std::forward<T>(value));
-  auto operation = std::make_shared<FieldOperation>(std::move(constant_fn));
-  return Field<T>{GField{std::move(operation), 0}};
-}
-
+/**
+ * Utility class that makes it easier to evaluate fields.
+ */
 class FieldEvaluator : NonMovable, NonCopyable {
  private:
   struct OutputPointerInfo {
@@ -316,6 +330,7 @@ class FieldEvaluator : NonMovable, NonCopyable {
       : context_(context), mask_(*mask)
   {
   }
+
   FieldEvaluator(const FieldContext &context, const int64_t size) : context_(context), mask_(size)
   {
   }
@@ -324,13 +339,7 @@ class FieldEvaluator : NonMovable, NonCopyable {
    * \param field: Field to add to the evaluator.
    * \param dst: Mutable virtual array that the evaluated result for this field is be written into.
    */
-  int add_with_destination(GField field, GVMutableArray &dst)
-  {
-    const int field_index = fields_to_evaluate_.append_and_get_index(std::move(field));
-    dst_hints_.append(&dst);
-    output_pointer_infos_.append({});
-    return field_index;
-  }
+  int add_with_destination(GField field, GVMutableArray &dst);
 
   /** Same as #add_with_destination but typed. */
   template<typename T> int add_with_destination(Field<T> field, VMutableArray<T> &dst)
@@ -346,13 +355,7 @@ class FieldEvaluator : NonMovable, NonCopyable {
    * \note: When the output may only be used as a single value, the version of this function with
    * a virtual array result array should be used.
    */
-  int add_with_destination(GField field, GMutableSpan dst)
-  {
-    const int field_index = fields_to_evaluate_.append_and_get_index(std::move(field));
-    dst_hints_.append(&scope_.construct<GVMutableArray_For_GMutableSpan>(__func__, dst));
-    output_pointer_infos_.append({});
-    return field_index;
-  }
+  int add_with_destination(GField field, GMutableSpan dst);
 
   /**
    * \param field: Field to add to the evaluator.
@@ -368,16 +371,7 @@ class FieldEvaluator : NonMovable, NonCopyable {
     return field_index;
   }
 
-  int add(GField field, const GVArray **varray_ptr)
-  {
-    const int field_index = fields_to_evaluate_.append_and_get_index(std::move(field));
-    dst_hints_.append(nullptr);
-    output_pointer_infos_.append(OutputPointerInfo{
-        varray_ptr, [](void *dst, const GVArray &varray, ResourceScope &UNUSED(scope)) {
-          *(const GVArray **)dst = &varray;
-        }});
-    return field_index;
-  }
+  int add(GField field, const GVArray **varray_ptr);
 
   /**
    * \param field: Field to add to the evaluator.
@@ -399,34 +393,12 @@ class FieldEvaluator : NonMovable, NonCopyable {
   /**
    * \return Index of the field in the evaluator which can be used in the #get_evaluated methods.
    */
-  int add(GField field)
-  {
-    const int field_index = fields_to_evaluate_.append_and_get_index(std::move(field));
-    dst_hints_.append(nullptr);
-    output_pointer_infos_.append({});
-    return field_index;
-  }
+  int add(GField field);
 
   /**
    * Evaluate all fields on the evaluator. This can only be called once.
    */
-  void evaluate()
-  {
-    BLI_assert_msg(!is_evaluated_, "Cannot evaluate fields twice.");
-    Array<GFieldRef> fields(fields_to_evaluate_.size());
-    for (const int i : fields_to_evaluate_.index_range()) {
-      fields[i] = fields_to_evaluate_[i];
-    }
-    evaluated_varrays_ = evaluate_fields(scope_, fields, mask_, context_, dst_hints_);
-    BLI_assert(fields_to_evaluate_.size() == evaluated_varrays_.size());
-    for (const int i : fields_to_evaluate_.index_range()) {
-      OutputPointerInfo &info = output_pointer_infos_[i];
-      if (info.dst != nullptr) {
-        info.set(info.dst, *evaluated_varrays_[i], scope_);
-      }
-    }
-    is_evaluated_ = true;
-  }
+  void evaluate();
 
   const GVArray &get_evaluated(const int field_index) const
   {
@@ -446,20 +418,41 @@ class FieldEvaluator : NonMovable, NonCopyable {
    * to avoid calculations for unnecessary elements later on. The evaluator will own the indices in
    * some cases, so it must live at least as long as the returned mask.
    */
-  IndexMask get_evaluated_as_mask(const int field_index)
-  {
-    const GVArray &varray = this->get_evaluated(field_index);
-    GVArray_Typed<bool> typed_varray{varray};
-
-    if (typed_varray->is_single()) {
-      if (typed_varray->get_internal_single()) {
-        return IndexRange(typed_varray.size());
-      }
-      return IndexRange(0);
-    }
-
-    return scope_.add_value(indices_from_selection(*typed_varray), __func__).as_span();
-  }
+  IndexMask get_evaluated_as_mask(const int field_index);
 };
+
+Vector<const GVArray *> evaluate_fields(ResourceScope &scope,
+                                        Span<GFieldRef> fields_to_evaluate,
+                                        IndexMask mask,
+                                        const FieldContext &context,
+                                        Span<GVMutableArray *> dst_hints = {});
+
+/* --------------------------------------------------------------------
+ * Utility functions for simple field creation and evaluation.
+ */
+
+void evaluate_constant_field(const GField &field, void *r_value);
+
+void evaluate_fields_to_spans(Span<GFieldRef> fields_to_evaluate,
+                              IndexMask mask,
+                              const FieldContext &context,
+                              Span<GMutableSpan> out_spans);
+
+Vector<int64_t> indices_from_selection(const VArray<bool> &selection);
+
+template<typename T> T evaluate_constant_field(const Field<T> &field)
+{
+  T value;
+  value.~T();
+  evaluate_constant_field(field, &value);
+  return value;
+}
+
+template<typename T> Field<T> make_constant_field(T value)
+{
+  auto constant_fn = std::make_unique<fn::CustomMF_Constant<T>>(std::forward<T>(value));
+  auto operation = std::make_shared<FieldOperation>(std::move(constant_fn));
+  return Field<T>{GField{std::move(operation), 0}};
+}
 
 }  // namespace blender::fn
