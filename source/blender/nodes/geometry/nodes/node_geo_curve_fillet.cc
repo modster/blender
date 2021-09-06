@@ -27,8 +27,7 @@
 
 static bNodeSocketTemplate geo_node_curve_fillet_in[] = {
     {SOCK_GEOMETRY, N_("Curve")},
-    {SOCK_FLOAT, N_("Angle"), M_PI_2, 0.0f, 0.0f, 0.0f, 0.001f, FLT_MAX, PROP_ANGLE},
-    {SOCK_INT, N_("Count"), 1, 0, 0, 0, 1, 1000},
+    {SOCK_INT, N_("Poly Count"), 1, 0, 0, 0, 1, 1000},
     {SOCK_BOOLEAN, N_("Limit Radius")},
     {SOCK_FLOAT, N_("Radius"), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX, PROP_DISTANCE},
     {SOCK_STRING, N_("Radius")},
@@ -53,7 +52,7 @@ static void geo_node_curve_fillet_init(bNodeTree *UNUSED(tree), bNode *node)
   NodeGeometryCurveFillet *data = (NodeGeometryCurveFillet *)MEM_callocN(
       sizeof(NodeGeometryCurveFillet), __func__);
 
-  data->mode = GEO_NODE_CURVE_FILLET_ADAPTIVE;
+  data->mode = GEO_NODE_CURVE_FILLET_BEZIER;
   data->radius_mode = GEO_NODE_ATTRIBUTE_INPUT_FLOAT;
 
   node->storage = data;
@@ -63,9 +62,6 @@ namespace blender::nodes {
 
 struct FilletParam {
   GeometryNodeCurveFilletMode mode;
-
-  /* Minimum angle between two adjust control points. */
-  std::optional<float> angle;
 
   /* Number of points to be added. */
   std::optional<int> count;
@@ -99,11 +95,9 @@ static void geo_node_curve_fillet_update(bNodeTree *UNUSED(ntree), bNode *node)
   NodeGeometryCurveFillet &node_storage = *(NodeGeometryCurveFillet *)node->storage;
   const GeometryNodeCurveFilletMode mode = (GeometryNodeCurveFilletMode)node_storage.mode;
 
-  bNodeSocket *adaptive_socket = ((bNodeSocket *)node->inputs.first)->next;
-  bNodeSocket *user_socket = adaptive_socket->next;
+  bNodeSocket *poly_socket = ((bNodeSocket *)node->inputs.first)->next;
 
-  nodeSetSocketAvailability(adaptive_socket, mode == GEO_NODE_CURVE_FILLET_ADAPTIVE);
-  nodeSetSocketAvailability(user_socket, mode == GEO_NODE_CURVE_FILLET_USER_DEFINED);
+  nodeSetSocketAvailability(poly_socket, mode == GEO_NODE_CURVE_FILLET_POLY);
 
   update_attribute_input_socket_availabilities(
       *node, "Radius", (GeometryNodeAttributeInputMode)node_storage.radius_mode);
@@ -175,20 +169,13 @@ static Array<float> calculate_angles(const Span<float3> directions)
 }
 
 /* Calculate the segment count in each filleted arc. */
-static Array<int> calculate_counts(const std::optional<float> arc_angle,
-                                   const std::optional<int> count,
-                                   const Span<float> angles,
+static Array<int> calculate_counts(const std::optional<int> count,
+                                   const int size,
                                    const bool cyclic)
 {
-  const int size = angles.size();
-  Array<int> counts(size, 0);
-
-  if (cyclic) {
-    counts[0] = count ? *count : ceil(angles[0] / *arc_angle);
-    counts[size - 1] = count ? *count : ceil(angles[size - 1] / *arc_angle);
-  }
-  for (const int i : IndexRange(1, size - 2)) {
-    counts[i] = count ? *count : ceil(angles[i] / *arc_angle);
+  Array<int> counts(size, *count);
+  if (!cyclic) {
+    counts[0] = counts[size - 1] = 0;
   }
 
   return counts;
@@ -240,8 +227,7 @@ static FilletData calculate_fillet_data(const Spline &spline,
   fd.positions = spline.positions();
   fd.axes = calculate_axes(fd.directions);
   fd.angles = calculate_angles(fd.directions);
-  fd.counts = calculate_counts(
-      fillet_param.angle, fillet_param.count, fd.angles, spline.is_cyclic());
+  fd.counts = calculate_counts(fillet_param.count, size, spline.is_cyclic());
   fd.radii = calculate_radii(fillet_param, size, spline_index);
 
   added_count = calculate_point_counts(point_counts, fd.radii, fd.counts);
@@ -563,7 +549,14 @@ static SplinePtr fillet_spline(const Spline &spline,
       BezierSpline &dst_spline = static_cast<BezierSpline &>(*dst_spline_ptr);
       dst_spline.resize(total_points);
       copy_bezier_attributes_by_mapping(src_spline, dst_spline, dst_to_src);
-      update_bezier_positions(fd, dst_spline, point_counts, start, fillet_count);
+      if (fillet_param.mode == GEO_NODE_CURVE_FILLET_POLY) {
+        dst_spline.handle_types_left().fill(BezierSpline::HandleType::Vector);
+        dst_spline.handle_types_right().fill(BezierSpline::HandleType::Vector);
+        update_poly_or_NURBS_positions(fd, dst_spline, point_counts, start, fillet_count);
+      }
+      else {
+        update_bezier_positions(fd, dst_spline, point_counts, start, fillet_count);
+      }
       break;
     }
     case Spline::Type::Poly: {
@@ -632,17 +625,16 @@ static void geo_node_fillet_exec(GeoNodeExecParams params)
   FilletParam fillet_param;
   fillet_param.mode = mode;
 
-  if (mode == GEO_NODE_CURVE_FILLET_ADAPTIVE) {
-    const float angle = std::max(params.extract_input<float>("Angle"), 0.0001f);
-    fillet_param.angle.emplace(angle);
-  }
-  else if (mode == GEO_NODE_CURVE_FILLET_USER_DEFINED) {
-    const int count = params.extract_input<int>("Count");
+  if (mode == GEO_NODE_CURVE_FILLET_POLY) {
+    const int count = params.extract_input<int>("Poly Count");
     if (count < 1) {
       params.set_output("Curve", GeometrySet());
       return;
     }
     fillet_param.count.emplace(count);
+  }
+  else {
+    fillet_param.count.emplace(1);
   }
 
   fillet_param.limit_radius = params.extract_input<bool>("Limit Radius");

@@ -10125,16 +10125,16 @@ static void def_geo_curve_fillet(StructRNA *srna)
   PropertyRNA *prop;
 
   static EnumPropertyItem mode_items[] = {
-      {GEO_NODE_CURVE_FILLET_ADAPTIVE,
-       "ADAPTIVE",
+      {GEO_NODE_CURVE_FILLET_BEZIER,
+       "BEZIER",
        0,
-       "Adaptive",
-       "Decide the best number of control points based on angle"},
-      {GEO_NODE_CURVE_FILLET_USER_DEFINED,
-       "USER_DEFINED",
+       "Bezier",
+       "Set Bezier align handles to create an arc as perfectly circular as possible."},
+      {GEO_NODE_CURVE_FILLET_POLY,
+       "POLY",
        0,
-       "User Defined",
-       "Specify the number of control points"},
+       "Poly",
+       "Add control points along a circular arc (handle type is vector if Bezier Spline)"},
       {0, NULL, 0, NULL, NULL},
   };
 

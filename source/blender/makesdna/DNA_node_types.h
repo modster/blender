@@ -2010,8 +2010,8 @@ typedef enum GeometryNodeCurveInterpolateMode {
 } GeometryNodeCurveInterpolateMode;
 
 typedef enum GeometryNodeCurveFilletMode {
-  GEO_NODE_CURVE_FILLET_ADAPTIVE = 0,
-  GEO_NODE_CURVE_FILLET_USER_DEFINED = 1,
+  GEO_NODE_CURVE_FILLET_BEZIER = 0,
+  GEO_NODE_CURVE_FILLET_POLY = 1,
 } GeometryNodeCurveFilletMode;
 
 typedef enum GeometryNodeAttributeTransferMapMode {
