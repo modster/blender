@@ -90,7 +90,9 @@ static void execute_on_component(GeometryComponent &component,
 
   /* Add an add operation field on top of the provided translation field, which can be evaluated
    * directly into the position virtual array. That way, any optimizations can be done more
-   * generally for the whole evaluation system. */
+   * generally for the whole evaluation system. In the general case it may not work to share the
+   * same span for the input and output of an evaluation, but in this case there there is only one
+   * output, so it is fine. */
   static const fn::CustomMF_SI_SI_SO<float3, float3, float3> add_fn = {
       "Add", [](float3 a, float3 b) { return a + b; }};
   std::shared_ptr<fn::FieldOperation> add_operation = std::make_shared<fn::FieldOperation>(
