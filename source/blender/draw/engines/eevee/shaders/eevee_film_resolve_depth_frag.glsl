@@ -11,9 +11,6 @@ uniform sampler2D weight_tx;
 
 in vec4 uvcoordsvar;
 
-layout(location = 0, index = 0) out vec4 out_color;
-layout(location = 0, index = 1) out vec4 out_mul;
-
 void main(void)
 {
   vec2 uv = uvcoordsvar.xy;
@@ -21,8 +18,5 @@ void main(void)
   vec4 color = textureLod(data_tx, uv, 0.0);
   float weight = textureLod(weight_tx, uv, 0.0).r;
 
-  out_color = film_data_decode(film, color, weight);
-
-  out_color *= film.opacity;
-  out_mul = vec4(1.0 - film.opacity);
+  gl_FragDepth = film_data_decode(film, color, weight).r;
 }

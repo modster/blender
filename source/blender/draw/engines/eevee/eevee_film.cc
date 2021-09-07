@@ -130,9 +130,14 @@ void Film::sync(void)
   }
   {
     SNPRINTF(full_name, "Film.%s.Resolve", name_.c_str());
-    DRWState state = DRW_STATE_WRITE_COLOR | DRW_STATE_WRITE_DEPTH | DRW_STATE_DEPTH_ALWAYS;
+    DRWState state = DRW_STATE_WRITE_COLOR;
+    eShaderType sh_type = FILM_RESOLVE;
+    if (data_.data_type == FILM_DATA_DEPTH) {
+      state = DRW_STATE_WRITE_DEPTH | DRW_STATE_DEPTH_ALWAYS;
+      sh_type = FILM_RESOLVE_DEPTH;
+    }
     resolve_ps_ = DRW_pass_create(full_name, state);
-    GPUShader *sh = inst_.shaders.static_shader_get(FILM_RESOLVE);
+    GPUShader *sh = inst_.shaders.static_shader_get(sh_type);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, resolve_ps_);
     DRW_shgroup_uniform_block(grp, "film_block", data_.ubo_get());
     DRW_shgroup_uniform_texture_ref_ex(grp, "data_tx", &data_tx_[0], no_filter);

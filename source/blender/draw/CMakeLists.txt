@@ -271,6 +271,7 @@ data_to_c_simple(engines/eevee/shaders/eevee_depth_of_field_tiles_flatten_frag.g
 data_to_c_simple(engines/eevee/shaders/eevee_film_filter_frag.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_film_lib.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_film_resolve_frag.glsl SRC)
+data_to_c_simple(engines/eevee/shaders/eevee_film_resolve_depth_frag.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_gbuffer_lib.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_irradiance_lib.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_light_lib.glsl SRC)

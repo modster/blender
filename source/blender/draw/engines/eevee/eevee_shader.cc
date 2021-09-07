@@ -73,6 +73,7 @@ extern char datatoc_eevee_depth_of_field_tiles_flatten_frag_glsl[];
 extern char datatoc_eevee_film_filter_frag_glsl[];
 extern char datatoc_eevee_film_lib_glsl[];
 extern char datatoc_eevee_film_resolve_frag_glsl[];
+extern char datatoc_eevee_film_resolve_depth_frag_glsl[];
 extern char datatoc_eevee_gbuffer_lib_glsl[];
 extern char datatoc_eevee_irradiance_lib_glsl[];
 extern char datatoc_eevee_light_eval_lib_glsl[];
@@ -203,6 +204,7 @@ ShaderModule::ShaderModule()
   SHADER_FULLSCREEN(CULLING_LIGHT, eevee_culling_light_frag);
   SHADER_FULLSCREEN(FILM_FILTER, eevee_film_filter_frag);
   SHADER_FULLSCREEN(FILM_RESOLVE, eevee_film_resolve_frag);
+  SHADER_FULLSCREEN(FILM_RESOLVE_DEPTH, eevee_film_resolve_depth_frag);
   SHADER_FULLSCREEN(DEFERRED_EVAL_DIRECT, eevee_deferred_direct_frag);
   SHADER_FULLSCREEN(DEFERRED_EVAL_HOLDOUT, eevee_deferred_holdout_frag);
   SHADER_FULLSCREEN(DEFERRED_EVAL_TRANSPARENT, eevee_deferred_transparent_frag);
