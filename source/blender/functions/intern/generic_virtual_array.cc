@@ -387,4 +387,43 @@ void GVMutableArray_GSpan::disable_not_applied_warning()
   show_not_saved_warning_ = false;
 }
 
+/* --------------------------------------------------------------------
+ * GVArray_For_SlicedGVArray.
+ */
+
+void GVArray_For_SlicedGVArray::get_impl(const int64_t index, void *r_value) const
+{
+  varray_.get(index + offset_, r_value);
+}
+
+void GVArray_For_SlicedGVArray::get_to_uninitialized_impl(const int64_t index, void *r_value) const
+{
+  varray_.get_to_uninitialized(index + offset_, r_value);
+}
+
+/* --------------------------------------------------------------------
+ * GVArray_Slice.
+ */
+
+GVArray_Slice::GVArray_Slice(const GVArray &varray, const IndexRange slice)
+{
+  const CPPType &type = varray.type();
+  if (varray.is_span()) {
+    const GSpan span = varray.get_internal_span();
+    varray_span_.emplace(span.slice(slice.start(), slice.size()));
+    varray_ = &*varray_span_;
+  }
+  else if (varray.is_single()) {
+    BUFFER_FOR_CPP_TYPE_VALUE(type, buffer);
+    varray_->get_internal_single_to_uninitialized(buffer);
+    varray_single_.emplace(type, slice.size(), buffer);
+    type.destruct(buffer);
+    varray_ = &*varray_single_;
+  }
+  else {
+    varray_any_.emplace(varray, slice);
+    varray_ = &*varray_any_;
+  }
+}
+
 }  // namespace blender::fn
