@@ -180,6 +180,10 @@ def object_eevee_cycles_shader_nodes_poll(context):
             eevee_cycles_shader_nodes_poll(context))
 
 
+def geometry_nodes_fields_poll(context):
+    return context.preferences.experimental.use_geometry_nodes_fields
+
+
 # All standard node categories currently used in nodes.
 
 shader_node_categories = [
@@ -478,7 +482,7 @@ geometry_node_categories = [
     GeometryNodeCategory("GEO_ATTRIBUTE", "Attribute", items=[
         NodeItem("GeometryNodeAttributeRandomize"),
         NodeItem("GeometryNodeAttributeMath"),
-        NodeItem("GeometryNodeAttributeCapture"),
+        NodeItem("GeometryNodeAttributeCapture", poll=geometry_nodes_fields_poll),
         NodeItem("GeometryNodeAttributeClamp"),
         NodeItem("GeometryNodeAttributeCompare"),
         NodeItem("GeometryNodeAttributeConvert"),
@@ -535,7 +539,7 @@ geometry_node_categories = [
         NodeItem("GeometryNodeJoinGeometry"),
         NodeItem("GeometryNodeSeparateComponents"),
         NodeItem("GeometryNodeRaycast"),
-        NodeItem("GeometryNodeSetPosition"),
+        NodeItem("GeometryNodeSetPosition", poll=geometry_nodes_fields_poll),
     ]),
     GeometryNodeCategory("GEO_INPUT", "Input", items=[
         NodeItem("GeometryNodeObjectInfo"),
@@ -546,9 +550,9 @@ geometry_node_categories = [
         NodeItem("FunctionNodeInputVector"),
         NodeItem("GeometryNodeInputMaterial"),
         NodeItem("GeometryNodeIsViewport"),
-        NodeItem("GeometryNodeInputPosition"),
-        NodeItem("GeometryNodeInputIndex"),
-        NodeItem("GeometryNodeInputNormal"),
+        NodeItem("GeometryNodeInputPosition", poll=geometry_nodes_fields_poll),
+        NodeItem("GeometryNodeInputIndex", poll=geometry_nodes_fields_poll),
+        NodeItem("GeometryNodeInputNormal", poll=geometry_nodes_fields_poll),
     ]),
     GeometryNodeCategory("GEO_MATERIAL", "Material", items=[
         NodeItem("GeometryNodeMaterialAssign"),
