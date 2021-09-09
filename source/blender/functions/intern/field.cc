@@ -24,6 +24,8 @@
 #include "FN_field.hh"
 #include "FN_multi_function_parallel.hh"
 
+#include "FN_field.hh"
+
 namespace blender::fn {
 
 /* --------------------------------------------------------------------
@@ -185,8 +187,8 @@ static void build_multi_function_procedure_for_fields(MFProcedure &procedure,
       const Span<GField> operation_inputs = operation.inputs();
 
       if (field_with_index.current_input_index < operation_inputs.size()) {
-        /* Not all inputs are handled yet. Push the next input field to the stack and increment the
-         * input index. */
+        /* Not all inputs are handled yet. Push the next input field to the stack and increment
+         * the input index. */
         fields_to_check.push({operation_inputs[field_with_index.current_input_index]});
         field_with_index.current_input_index++;
       }
@@ -250,8 +252,8 @@ struct PartiallyInitializedArray : NonCopyable, NonMovable {
 };
 
 /**
- * Evaluate fields in the given context. If possible, multiple fields should be evaluated together,
- * because that can be more efficient when they share common sub-fields.
+ * Evaluate fields in the given context. If possible, multiple fields should be evaluated
+ * together, because that can be more efficient when they share common sub-fields.
  *
  * \param scope: The resource scope that owns data that makes up the output virtual arrays. Make
  *   sure the scope is not destructed when the output virtual arrays are still used.
@@ -294,8 +296,8 @@ Vector<const GVArray *> evaluate_fields(ResourceScope &scope,
   Vector<const GVArray *> field_context_inputs = get_field_context_inputs(
       scope, mask, context, field_tree_info.deduplicated_field_inputs);
 
-  /* Finish fields that output an input varray directly. For those we don't have to do any further
-   * processing. */
+  /* Finish fields that output an input varray directly. For those we don't have to do any
+   * further processing. */
   for (const int out_index : fields_to_evaluate.index_range()) {
     const GFieldRef &field = fields_to_evaluate[out_index];
     if (!field.node().is_input()) {
@@ -426,8 +428,8 @@ Vector<const GVArray *> evaluate_fields(ResourceScope &scope,
     procedure_executor.call(IndexRange(1), mf_params, mf_context);
   }
 
-  /* Copy data to supplied destination arrays if necessary. In some cases the evaluation above has
-   * written the computed data in the right place already. */
+  /* Copy data to supplied destination arrays if necessary. In some cases the evaluation above
+   * has written the computed data in the right place already. */
   if (!dst_varrays.is_empty()) {
     for (const int out_index : fields_to_evaluate.index_range()) {
       GVMutableArray *output_varray = get_dst_varray_if_available(out_index);
