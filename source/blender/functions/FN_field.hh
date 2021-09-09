@@ -27,8 +27,8 @@
  *
  * Fields can be build, composed and evaluated at run-time. They are stored in a directed tree
  * graph data structure, whereby each node is a #FieldNode and edges are dependencies. A #FieldNode
- * has an arbitrary number of inputs and at least one output. A #Field references a specific output
- * of a #FieldNode. The inputs of a #FieldNode are other fields.
+ * has an arbitrary number of inputs and at least one output and a #Field references a specific
+ * output of a #FieldNode. The inputs of a #FieldNode are other fields.
  *
  * There are two different types of field nodes:
  *  - #FieldInput: Has no input and exactly one output. It represents an input to the entire field
@@ -319,7 +319,7 @@ class FieldEvaluator : NonMovable, NonCopyable {
   const FieldContext &context_;
   const IndexMask mask_;
   Vector<GField> fields_to_evaluate_;
-  Vector<GVMutableArray *> dst_hints_;
+  Vector<GVMutableArray *> dst_varrays_;
   Vector<const GVArray *> evaluated_varrays_;
   Vector<OutputPointerInfo> output_pointer_infos_;
   bool is_evaluated_ = false;
@@ -352,9 +352,8 @@ class FieldEvaluator : NonMovable, NonCopyable {
   /** Same as #add_with_destination but typed. */
   template<typename T> int add_with_destination(Field<T> field, VMutableArray<T> &dst)
   {
-    GVMutableArray &generic_dst_hint = scope_.construct<GVMutableArray_For_VMutableArray<T>>(
-        __func__, dst);
-    return this->add_with_destination(GField(std::move(field)), generic_dst_hint);
+    GVMutableArray &varray = scope_.construct<GVMutableArray_For_VMutableArray<T>>(__func__, dst);
+    return this->add_with_destination(GField(std::move(field)), varray);
   }
 
   /**
@@ -373,9 +372,8 @@ class FieldEvaluator : NonMovable, NonCopyable {
    */
   template<typename T> int add_with_destination(Field<T> field, MutableSpan<T> dst)
   {
-    GVMutableArray &generic_dst_hint = scope_.construct<GVMutableArray_For_MutableSpan<T>>(
-        __func__, dst);
-    return this->add_with_destination(std::move(field), generic_dst_hint);
+    GVMutableArray &varray = scope_.construct<GVMutableArray_For_MutableSpan<T>>(__func__, dst);
+    return this->add_with_destination(std::move(field), varray);
   }
 
   int add(GField field, const GVArray **varray_ptr);
@@ -389,7 +387,7 @@ class FieldEvaluator : NonMovable, NonCopyable {
   template<typename T> int add(Field<T> field, const VArray<T> **varray_ptr)
   {
     const int field_index = fields_to_evaluate_.append_and_get_index(std::move(field));
-    dst_hints_.append(nullptr);
+    dst_varrays_.append(nullptr);
     output_pointer_infos_.append(OutputPointerInfo{
         varray_ptr, [](void *dst, const GVArray &varray, ResourceScope &scope) {
           *(const VArray<T> **)dst = &*scope.construct<GVArray_Typed<T>>(__func__, varray);
@@ -432,7 +430,7 @@ Vector<const GVArray *> evaluate_fields(ResourceScope &scope,
                                         Span<GFieldRef> fields_to_evaluate,
                                         IndexMask mask,
                                         const FieldContext &context,
-                                        Span<GVMutableArray *> dst_hints = {});
+                                        Span<GVMutableArray *> dst_varrays = {});
 
 /* --------------------------------------------------------------------
  * Utility functions for simple field creation and evaluation.

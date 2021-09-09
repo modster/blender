@@ -32,9 +32,9 @@ namespace blender::fn {
 
 struct FieldTreeInfo {
   /**
-   * When fields are build, they only have references to the fields that they depend on. This map
-   * allows traversal of fields in the opposite direction. So for every field it stores what other
-   * fields directly depend on it.
+   * When fields are built, they only have references to the fields that they depend on. This map
+   * allows traversal of fields in the opposite direction. So for every field it stores the other
+   * fields that depend on it directly.
    */
   MultiValueMap<GFieldRef, GFieldRef> field_users;
   /**
@@ -113,7 +113,7 @@ static Set<GFieldRef> find_varying_fields(const FieldTreeInfo &field_tree_info,
 
   /* The varying fields are the ones that depend on inputs that are not constant. Therefore we
    * start the tree search at the non-constant input fields and traverse through all fields that
-   * depend on those. */
+   * depend on them. */
   for (const int i : field_context_inputs.index_range()) {
     const GVArray *varray = field_context_inputs[i];
     if (varray->is_single()) {
@@ -260,29 +260,31 @@ struct PartiallyInitializedArray : NonCopyable, NonMovable {
  *   virtual arrays. So the underlying indices (if applicable) should live longer then #scope.
  * \param context: The context that the field is evaluated in. Used to retrieve data from each
  *   #FieldInput in the field network.
- * \param dst_hints: If provided, the computed data will be written into those virtual arrays
+ * \param dst_varrays: If provided, the computed data will be written into those virtual arrays
  *   instead of into newly created ones. That allows making the computed data live longer than
  *   #scope and is more efficient when the data will be written into those virtual arrays
  *   later anyway.
- * \return The computed virtual arrays for each provided field. If #dst_hints is passed, the
+ * \return The computed virtual arrays for each provided field. If #dst_varrays is passed, the
  *   provided virtual arrays are returned.
  */
 Vector<const GVArray *> evaluate_fields(ResourceScope &scope,
                                         Span<GFieldRef> fields_to_evaluate,
                                         IndexMask mask,
                                         const FieldContext &context,
-                                        Span<GVMutableArray *> dst_hints)
+                                        Span<GVMutableArray *> dst_varrays)
 {
   SCOPED_TIMER(__func__);
 
   Vector<const GVArray *> r_varrays(fields_to_evaluate.size(), nullptr);
+  const int array_size = mask.min_array_size();
 
-  /* Destination hints are optional. Create a small utility method to access them. */
-  auto get_dst_hint_if_available = [&](int index) -> GVMutableArray * {
-    if (dst_hints.is_empty()) {
+  /* Destination arrays are optional. Create a small utility method to access them. */
+  auto get_dst_varray_if_available = [&](int index) -> GVMutableArray * {
+    if (dst_varrays.is_empty()) {
       return nullptr;
     }
-    return dst_hints[index];
+    BLI_assert(dst_varrays[index] == nullptr || dst_varrays[index]->size() >= array_size);
+    return dst_varrays[index];
   };
 
   /* Traverse the field tree and prepare some data that is used in later steps. */
@@ -329,8 +331,6 @@ Vector<const GVArray *> evaluate_fields(ResourceScope &scope,
     }
   }
 
-  const int array_size = mask.min_array_size();
-
   /* Evaluate varying fields if necessary. */
   if (!varying_fields_to_evaluate.is_empty()) {
     /* Build the procedure for those fields. */
@@ -355,7 +355,7 @@ Vector<const GVArray *> evaluate_fields(ResourceScope &scope,
       const int out_index = varying_field_indices[i];
 
       /* Try to get an existing virtual array that the result should be written into. */
-      GVMutableArray *output_varray = get_dst_hint_if_available(out_index);
+      GVMutableArray *output_varray = get_dst_varray_if_available(out_index);
       void *buffer;
       if (output_varray == nullptr || !output_varray->is_span()) {
         /* Allocate a new buffer for the computed result. */
@@ -426,11 +426,11 @@ Vector<const GVArray *> evaluate_fields(ResourceScope &scope,
     procedure_executor.call(IndexRange(1), mf_params, mf_context);
   }
 
-  /* Copy data to destination hints if still necessary. In some cases the evaluation above has
+  /* Copy data to supplied destination arrays if necessary. In some cases the evaluation above has
    * written the computed data in the right place already. */
-  if (!dst_hints.is_empty()) {
+  if (!dst_varrays.is_empty()) {
     for (const int out_index : fields_to_evaluate.index_range()) {
-      GVMutableArray *output_varray = get_dst_hint_if_available(out_index);
+      GVMutableArray *output_varray = get_dst_varray_if_available(out_index);
       if (output_varray == nullptr) {
         /* Caller did not provide a destination for this output. */
         continue;
@@ -487,6 +487,7 @@ static Vector<int64_t> indices_from_selection(const VArray<bool> &selection)
   /* If the selection is just a single value, it's best to avoid calling this
    * function when constructing an IndexMask and use an IndexRange instead. */
   BLI_assert(!selection.is_single());
+
   Vector<int64_t> indices;
   if (selection.is_span()) {
     Span<bool> span = selection.get_internal_span();
@@ -509,22 +510,21 @@ static Vector<int64_t> indices_from_selection(const VArray<bool> &selection)
 int FieldEvaluator::add_with_destination(GField field, GVMutableArray &dst)
 {
   const int field_index = fields_to_evaluate_.append_and_get_index(std::move(field));
-  dst_hints_.append(&dst);
+  dst_varrays_.append(&dst);
   output_pointer_infos_.append({});
   return field_index;
 }
 
 int FieldEvaluator::add_with_destination(GField field, GMutableSpan dst)
 {
-  GVMutableArray &varray_dst_hint = scope_.construct<GVMutableArray_For_GMutableSpan>(__func__,
-                                                                                      dst);
-  return this->add_with_destination(std::move(field), varray_dst_hint);
+  GVMutableArray &varray = scope_.construct<GVMutableArray_For_GMutableSpan>(__func__, dst);
+  return this->add_with_destination(std::move(field), varray);
 }
 
 int FieldEvaluator::add(GField field, const GVArray **varray_ptr)
 {
   const int field_index = fields_to_evaluate_.append_and_get_index(std::move(field));
-  dst_hints_.append(nullptr);
+  dst_varrays_.append(nullptr);
   output_pointer_infos_.append(OutputPointerInfo{
       varray_ptr, [](void *dst, const GVArray &varray, ResourceScope &UNUSED(scope)) {
         *(const GVArray **)dst = &varray;
@@ -535,7 +535,7 @@ int FieldEvaluator::add(GField field, const GVArray **varray_ptr)
 int FieldEvaluator::add(GField field)
 {
   const int field_index = fields_to_evaluate_.append_and_get_index(std::move(field));
-  dst_hints_.append(nullptr);
+  dst_varrays_.append(nullptr);
   output_pointer_infos_.append({});
   return field_index;
 }
@@ -547,7 +547,7 @@ void FieldEvaluator::evaluate()
   for (const int i : fields_to_evaluate_.index_range()) {
     fields[i] = fields_to_evaluate_[i];
   }
-  evaluated_varrays_ = evaluate_fields(scope_, fields, mask_, context_, dst_hints_);
+  evaluated_varrays_ = evaluate_fields(scope_, fields, mask_, context_, dst_varrays_);
   BLI_assert(fields_to_evaluate_.size() == evaluated_varrays_.size());
   for (const int i : fields_to_evaluate_.index_range()) {
     OutputPointerInfo &info = output_pointer_infos_[i];

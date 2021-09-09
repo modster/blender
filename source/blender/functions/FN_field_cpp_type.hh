@@ -45,8 +45,7 @@ class FieldCPPType : public CPPType {
     return field_type_;
   }
 
-  /* Ensure that a #GField and #Field<T> have the same layout, so pointers can be cast between the
-   * two. */
+  /* Ensure that #GField and #Field<T> have the same layout, to enable casting between the two. */
   static_assert(sizeof(Field<int>) == sizeof(GField));
   static_assert(sizeof(Field<int>) == sizeof(Field<std::string>));
 

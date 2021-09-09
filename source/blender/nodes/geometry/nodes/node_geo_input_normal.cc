@@ -71,7 +71,7 @@ static GVArrayPtr mesh_vertex_normals(const Mesh &mesh,
   }
 
   /* If the normals are dirty, they must be recalculated for the output of this node's field
-   * source. Ideally vertex normals could be calculated lazily on a const mesh. But that's not
+   * source. Ideally vertex normals could be calculated lazily on a const mesh, but that's not
    * possible at the moment, so we take ownership of the results. Sadly we must also create a copy
    * of MVert to use the mesh normals API. This can be improved by adding mutex-protected lazy
    * calculation of normals on meshes.
@@ -136,8 +136,8 @@ static const GVArray *construct_mesh_normals_gvarray(const MeshComponent &mesh_c
       GVArrayPtr face_normals = mesh_face_normals(
           mesh, verts, polys, loops, IndexRange(polys.size()));
 
-      /* In this case using the mesh component's generic domain interpolation is fine,
-       * since the face normal is just copied to every corner. */
+      /* In this case using the mesh component's generic domain interpolation is fine, the data
+       * will still be normalized, since the face normal is just copied to every corner. */
       GVArrayPtr loop_normals = mesh_component.attribute_try_adapt_domain(
           std::move(face_normals), ATTR_DOMAIN_FACE, ATTR_DOMAIN_CORNER);
       return scope.add_value(std::move(loop_normals), __func__).get();
