@@ -23,6 +23,7 @@
 
 #include "FN_field.hh"
 #include "FN_multi_function_parallel.hh"
+#include "FN_multi_function_procedure_optimization.hh"
 
 #include "FN_field.hh"
 
@@ -339,9 +340,12 @@ Vector<const GVArray *> evaluate_fields(ResourceScope &scope,
     MFProcedure procedure;
     build_multi_function_procedure_for_fields(
         procedure, scope, field_tree_info, varying_fields_to_evaluate);
+    std::cout << procedure.to_dot() << "\n";
+    fn::procedure_optimization::move_destructs_up(procedure);
+    std::cout << procedure.to_dot() << "\n";
     MFProcedureExecutor procedure_executor{"Procedure", procedure};
-    fn::ParallelMultiFunction parallel_fn{procedure_executor, 20000};
-    const MultiFunction &fn_to_execute = procedure_executor;
+    fn::ParallelMultiFunction parallel_fn{procedure_executor, 10000};
+    const MultiFunction &fn_to_execute = parallel_fn;
 
     MFParamsBuilder mf_params{fn_to_execute, array_size};
     MFContextBuilder mf_context;

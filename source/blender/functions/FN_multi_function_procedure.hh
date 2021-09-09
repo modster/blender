@@ -246,6 +246,9 @@ class MFProcedure : NonCopyable, NonMovable {
   Span<MFVariable *> variables();
   Span<const MFVariable *> variables() const;
 
+  Span<MFDestructInstruction *> destruct_instructions();
+  Span<const MFDestructInstruction *> destruct_instructions() const;
+
   std::string to_dot() const;
 
   bool validate() const;
@@ -447,6 +450,16 @@ inline Span<MFVariable *> MFProcedure::variables()
 inline Span<const MFVariable *> MFProcedure::variables() const
 {
   return variables_;
+}
+
+inline Span<MFDestructInstruction *> MFProcedure::destruct_instructions()
+{
+  return destruct_instructions_;
+}
+
+inline Span<const MFDestructInstruction *> MFProcedure::destruct_instructions() const
+{
+  return destruct_instructions_;
 }
 
 }  // namespace blender::fn
