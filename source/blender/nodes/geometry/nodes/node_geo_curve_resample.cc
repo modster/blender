@@ -84,14 +84,14 @@ static SplinePtr resample_spline(const Spline &input_spline, const int count)
                              input_spline.radii().first());
     output_spline->attributes.reallocate(1);
     input_spline.attributes.foreach_attribute(
-        [&](StringRefNull name, const AttributeMetaData &meta_data) {
-          std::optional<GSpan> src = input_spline.attributes.get_for_read(name);
+        [&](const AttributeIDRef &attribute_id, const AttributeMetaData &meta_data) {
+          std::optional<GSpan> src = input_spline.attributes.get_for_read(attribute_id);
           BLI_assert(src);
-          if (!output_spline->attributes.create(name, meta_data.data_type)) {
+          if (!output_spline->attributes.create(attribute_id, meta_data.data_type)) {
             BLI_assert_unreachable();
             return false;
           }
-          std::optional<GMutableSpan> dst = output_spline->attributes.get_for_write(name);
+          std::optional<GMutableSpan> dst = output_spline->attributes.get_for_write(attribute_id);
           if (!dst) {
             BLI_assert_unreachable();
             return false;
@@ -122,15 +122,15 @@ static SplinePtr resample_spline(const Spline &input_spline, const int count)
 
   output_spline->attributes.reallocate(count);
   input_spline.attributes.foreach_attribute(
-      [&](StringRefNull name, const AttributeMetaData &meta_data) {
-        std::optional<GSpan> input_attribute = input_spline.attributes.get_for_read(name);
+      [&](const AttributeIDRef &attribute_id, const AttributeMetaData &meta_data) {
+        std::optional<GSpan> input_attribute = input_spline.attributes.get_for_read(attribute_id);
         BLI_assert(input_attribute);
-        if (!output_spline->attributes.create(name, meta_data.data_type)) {
+        if (!output_spline->attributes.create(attribute_id, meta_data.data_type)) {
           BLI_assert_unreachable();
           return false;
         }
         std::optional<GMutableSpan> output_attribute = output_spline->attributes.get_for_write(
-            name);
+            attribute_id);
         if (!output_attribute) {
           BLI_assert_unreachable();
           return false;
@@ -169,7 +169,7 @@ static std::unique_ptr<CurveEval> resample_curve(const CurveEval &input_curve,
     threading::parallel_for(input_splines.index_range(), 128, [&](IndexRange range) {
       for (const int i : range) {
         const float length = input_splines[i]->length();
-        const int count = std::max(int(length / *mode_param.length), 1);
+        const int count = std::max(int(length / *mode_param.length) + 1, 1);
         output_splines[i] = resample_spline(*input_splines[i], count);
       }
     });
