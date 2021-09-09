@@ -622,41 +622,50 @@ inline void devirtualize_varray2(const VArray<T1> &varray1,
                                  const Func &func,
                                  bool enable = true)
 {
-  /* Support disabling the devirtualization to simplify benchmarking. */
-  if (enable) {
-    const bool is_span1 = varray1.is_span();
-    const bool is_span2 = varray2.is_span();
-    const bool is_single1 = varray1.is_single();
-    const bool is_single2 = varray2.is_single();
-    if (is_span1 && is_span2) {
-      const VArray_For_Span<T1> varray1_span{varray1.get_internal_span()};
-      const VArray_For_Span<T2> varray2_span{varray2.get_internal_span()};
-      func(varray1_span, varray2_span);
-      return;
-    }
-    if (is_span1 && is_single2) {
-      const VArray_For_Span<T1> varray1_span{varray1.get_internal_span()};
-      const VArray_For_Single<T2> varray2_single{varray2.get_internal_single(), varray2.size()};
-      func(varray1_span, varray2_single);
-      return;
-    }
-    if (is_single1 && is_span2) {
-      const VArray_For_Single<T1> varray1_single{varray1.get_internal_single(), varray1.size()};
-      const VArray_For_Span<T2> varray2_span{varray2.get_internal_span()};
-      func(varray1_single, varray2_span);
-      return;
-    }
-    if (is_single1 && is_single2) {
-      const VArray_For_Single<T1> varray1_single{varray1.get_internal_single(), varray1.size()};
-      const VArray_For_Single<T2> varray2_single{varray2.get_internal_single(), varray2.size()};
-      func(varray1_single, varray2_single);
-      return;
-    }
-  }
-  /* This fallback is used even when one of the inputs could be optimized. It's probably not worth
-   * it to optimize just one of the inputs, because then the compiler still has to call into
-   * unknown code, which inhibits many compiler optimizations. */
-  func(varray1, varray2);
+  devirtualize_varray(
+      varray1,
+      [&](const auto &varray1) {
+        devirtualize_varray(
+            varray2, [&](const auto &varray2) { func(varray1, varray2); }, enable);
+      },
+      enable);
+
+  // /* Support disabling the devirtualization to simplify benchmarking. */
+  // if (enable) {
+  //   const bool is_span1 = varray1.is_span();
+  //   const bool is_span2 = varray2.is_span();
+  //   const bool is_single1 = varray1.is_single();
+  //   const bool is_single2 = varray2.is_single();
+  //   if (is_span1 && is_span2) {
+  //     const VArray_For_Span<T1> varray1_span{varray1.get_internal_span()};
+  //     const VArray_For_Span<T2> varray2_span{varray2.get_internal_span()};
+  //     func(varray1_span, varray2_span);
+  //     return;
+  //   }
+  //   if (is_span1 && is_single2) {
+  //     const VArray_For_Span<T1> varray1_span{varray1.get_internal_span()};
+  //     const VArray_For_Single<T2> varray2_single{varray2.get_internal_single(), varray2.size()};
+  //     func(varray1_span, varray2_single);
+  //     return;
+  //   }
+  //   if (is_single1 && is_span2) {
+  //     const VArray_For_Single<T1> varray1_single{varray1.get_internal_single(), varray1.size()};
+  //     const VArray_For_Span<T2> varray2_span{varray2.get_internal_span()};
+  //     func(varray1_single, varray2_span);
+  //     return;
+  //   }
+  //   if (is_single1 && is_single2) {
+  //     const VArray_For_Single<T1> varray1_single{varray1.get_internal_single(), varray1.size()};
+  //     const VArray_For_Single<T2> varray2_single{varray2.get_internal_single(), varray2.size()};
+  //     func(varray1_single, varray2_single);
+  //     return;
+  //   }
+  // }
+  // /* This fallback is used even when one of the inputs could be optimized. It's probably not
+  // worth
+  //  * it to optimize just one of the inputs, because then the compiler still has to call into
+  //  * unknown code, which inhibits many compiler optimizations. */
+  // func(varray1, varray2);
 }
 
 }  // namespace blender

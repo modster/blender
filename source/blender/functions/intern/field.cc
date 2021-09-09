@@ -18,9 +18,11 @@
 #include "BLI_multi_value_map.hh"
 #include "BLI_set.hh"
 #include "BLI_stack.hh"
+#include "BLI_timeit.hh"
 #include "BLI_vector_set.hh"
 
 #include "FN_field.hh"
+#include "FN_multi_function_parallel.hh"
 
 namespace blender::fn {
 
@@ -271,6 +273,8 @@ Vector<const GVArray *> evaluate_fields(ResourceScope &scope,
                                         const FieldContext &context,
                                         Span<GVMutableArray *> dst_hints)
 {
+  SCOPED_TIMER(__func__);
+
   Vector<const GVArray *> r_varrays(fields_to_evaluate.size(), nullptr);
 
   /* Destination hints are optional. Create a small utility method to access them. */
@@ -334,7 +338,10 @@ Vector<const GVArray *> evaluate_fields(ResourceScope &scope,
     build_multi_function_procedure_for_fields(
         procedure, scope, field_tree_info, varying_fields_to_evaluate);
     MFProcedureExecutor procedure_executor{"Procedure", procedure};
-    MFParamsBuilder mf_params{procedure_executor, array_size};
+    fn::ParallelMultiFunction parallel_fn{procedure_executor, 20000};
+    const MultiFunction &fn_to_execute = procedure_executor;
+
+    MFParamsBuilder mf_params{fn_to_execute, array_size};
     MFContextBuilder mf_context;
 
     /* Provide inputs to the procedure executor. */
@@ -376,7 +383,7 @@ Vector<const GVArray *> evaluate_fields(ResourceScope &scope,
       mf_params.add_uninitialized_single_output(span);
     }
 
-    procedure_executor.call(mask, mf_params, mf_context);
+    fn_to_execute.call(mask, mf_params, mf_context);
   }
 
   /* Evaluate constant fields if necessary. */

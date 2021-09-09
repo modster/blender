@@ -2,8 +2,11 @@
 
 #include "testing/testing.h"
 
+#include "BLI_timeit.hh"
+
 #include "FN_multi_function.hh"
 #include "FN_multi_function_builder.hh"
+#include "FN_multi_function_parallel.hh"
 #include "FN_multi_function_test_common.hh"
 
 namespace blender::fn::tests {
@@ -326,6 +329,30 @@ TEST(multi_function, CustomMF_Convert)
   EXPECT_EQ(outputs[0], 5);
   EXPECT_EQ(outputs[1], 0);
   EXPECT_EQ(outputs[2], 9);
+}
+
+TEST(multi_function, Parallel)
+{
+  CustomMF_SI_SI_SO<float, float, float> add_fn{
+      "add", [](float a, float b) { return std::tan(std::sin(a)) * std::tanh(std::cos(b)); }};
+  ParallelMultiFunction parallel_fn{add_fn, int64_t(1e5)};
+  const MultiFunction &fn_to_evaluate = parallel_fn;
+
+  const int amount = 1e8;
+  Array<float> inputs_a(amount, 1);
+  Array<float> inputs_b(amount, 1);
+  Array<float> outputs(amount, 1);
+
+  for (int i = 0; i < 10; i++) {
+    SCOPED_TIMER(__func__);
+    MFParamsBuilder params(fn_to_evaluate, amount);
+    params.add_readonly_single_input(inputs_a.as_span());
+    params.add_readonly_single_input(inputs_b.as_span());
+    params.add_uninitialized_single_output(outputs.as_mutable_span());
+
+    MFContextBuilder context;
+    fn_to_evaluate.call(IndexRange(amount), params, context);
+  }
 }
 
 }  // namespace

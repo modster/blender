@@ -20,5 +20,20 @@
  * \ingroup fn
  */
 
+#include "FN_multi_function.hh"
+
 namespace blender::fn {
-}
+
+class ParallelMultiFunction : public MultiFunction {
+ private:
+  const MultiFunction &fn_;
+  const int64_t grain_size_;
+  bool threading_supported_;
+
+ public:
+  ParallelMultiFunction(const MultiFunction &fn, const int64_t grain_size);
+
+  void call(IndexMask mask, MFParams params, MFContext context) const override;
+};
+
+}  // namespace blender::fn
