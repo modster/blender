@@ -2,9 +2,10 @@
 #pragma BLENDER_REQUIRE(common_overlay_lib.glsl)
 
 layout(lines) in;
-layout(triangle_strip, max_vertices = 4) out;
+layout(triangle_strip, max_vertices = 6) out;
 
 in float selectionFac[2];
+in float edgeSelectionFac[2];
 flat in vec2 stippleStart[2];
 noperspective in vec2 stipplePos[2];
 
@@ -35,6 +36,12 @@ void main()
   vec2 ss_pos[2];
   vec4 pos0 = gl_in[0].gl_Position;
   vec4 pos1 = gl_in[1].gl_Position;
+  /* TODO(verify): Calculating edge-center in clip space might cause errors due to precision loss?? */
+  vec4 edgeCenter = (pos0 + pos1) / 2.0;
+  bool is_edge_selected = edgeSelectionFac[0] == 1.0;
+  /* Depth value as specified in vertex shader */
+  edgeCenter.z = is_edge_selected ? 0.25 : 0.35;
+
   ss_pos[0] = pos0.xy / pos0.w;
   ss_pos[1] = pos1.xy / pos1.w;
 
@@ -54,8 +61,14 @@ void main()
   vec2 line_perp = vec2(-line_dir.y, line_dir.x);
   vec2 edge_ofs = line_perp * sizeViewportInv * ceil(half_size);
 
+  vec2 stippleStartCenter, stipplePosCenter;
+  /* TODO(stipple pattern): Probable incorrect implementation - used as specified in vertex shader */
+  stippleStartCenter = stipplePosCenter = 500.0 + 500.0 * (edgeCenter.xy / edgeCenter.w);
+
   do_vertex(pos0, selectionFac[0], stippleStart[0], stipplePos[0], half_size, edge_ofs.xy);
   do_vertex(pos0, selectionFac[0], stippleStart[0], stipplePos[0], -half_size, -edge_ofs.xy);
+  do_vertex(edgeCenter, edgeSelectionFac[0], stippleStartCenter, stipplePosCenter, half_size, edge_ofs.xy);
+  do_vertex(edgeCenter, edgeSelectionFac[0], stippleStartCenter, stipplePosCenter, -half_size, -edge_ofs.xy);
   do_vertex(pos1, selectionFac[1], stippleStart[1], stipplePos[1], half_size, edge_ofs.xy);
   do_vertex(pos1, selectionFac[1], stippleStart[1], stipplePos[1], -half_size, -edge_ofs.xy);
 

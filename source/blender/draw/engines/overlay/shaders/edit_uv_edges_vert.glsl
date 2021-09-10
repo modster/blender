@@ -6,6 +6,7 @@ in vec2 au;
 in int flag;
 
 out float selectionFac;
+out float edgeSelectionFac;
 noperspective out vec2 stipplePos;
 flat out vec2 stippleStart;
 
@@ -20,7 +21,9 @@ void main()
                    half_pixel_offset;
 
   bool is_select = (flag & VERT_UV_SELECT) != 0;
+  bool is_edge_selected = (flag & EDGE_UV_SELECT) != 0;
   selectionFac = is_select ? 1.0 : 0.0;
+  edgeSelectionFac = is_edge_selected ? 1.0 : 0.0;
   /* Move selected edges to the top
    * Vertices are between 0.0 and 0.2, Edges between 0.2 and 0.4
    * actual pixels are at 0.75, 1.0 is used for the background. */
