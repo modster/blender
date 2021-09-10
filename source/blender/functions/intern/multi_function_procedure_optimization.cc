@@ -18,6 +18,20 @@
 
 namespace blender::fn::procedure_optimization {
 
+static bool uses_variable(const MFInstruction &instr, const MFVariable &variable)
+{
+  switch (instr.type()) {
+    case MFInstructionType::Branch:
+      return static_cast<const MFBranchInstruction &>(instr).condition() == &variable;
+    case MFInstructionType::Call:
+      return static_cast<const MFCallInstruction &>(instr).params().contains(&variable);
+    case MFInstructionType::Destruct:
+      return static_cast<const MFDestructInstruction &>(instr).variable() == &variable;
+    default:
+      return false;
+  }
+}
+
 void move_destructs_up(MFProcedure &procedure)
 {
   for (MFDestructInstruction *destruct_instr : procedure.destruct_instructions()) {
@@ -25,46 +39,27 @@ void move_destructs_up(MFProcedure &procedure)
     if (variable == nullptr) {
       continue;
     }
-    if (variable->users().size() != 3) {
-      /* Only support the simple case with two uses of the variable for now. */
-      continue;
-    }
-    /* TODO: This is not working yet. */
-    MFCallInstruction *last_call_instr = nullptr;
-    for (MFInstruction *instr : variable->users()) {
-      if (instr->type() == MFInstructionType::Call) {
-        MFCallInstruction *call_instr = static_cast<MFCallInstruction *>(instr);
-        const int first_param_index = call_instr->params().first_index_try(variable);
-        if (call_instr->fn().param_type(first_param_index).interface_type() ==
-            MFParamType::Output) {
-          last_call_instr = call_instr;
-        }
+    MFInstruction *last_use_in_block_instr = nullptr;
+    MFInstruction *current_instr = destruct_instr;
+    while (current_instr->prev().size() == 1) {
+      current_instr = current_instr->prev()[0].instruction();
+      if (current_instr == nullptr) {
+        break;
+      }
+      if (uses_variable(*current_instr, *variable)) {
+        last_use_in_block_instr = current_instr;
         break;
       }
     }
-    if (last_call_instr == nullptr) {
+    if (last_use_in_block_instr == nullptr) {
       continue;
     }
-    MFInstruction *after_last_call_instr = last_call_instr->next();
-    if (after_last_call_instr == destruct_instr) {
-      continue;
+    if (last_use_in_block_instr->type() == MFInstructionType::Call) {
+      MFCallInstruction &call_instr = static_cast<MFCallInstruction &>(*last_use_in_block_instr);
+      destruct_instr->prev()[0].set_next(procedure, destruct_instr->next());
+      destruct_instr->set_next(call_instr.next());
+      call_instr.set_next(destruct_instr);
     }
-    if (destruct_instr->prev().size() != 1) {
-      continue;
-    }
-    MFInstruction *before_destruct_instr = destruct_instr->prev()[0];
-    MFInstruction *after_destruct_instr = destruct_instr->next();
-    if (before_destruct_instr->type() == MFInstructionType::Call) {
-      static_cast<MFCallInstruction *>(before_destruct_instr)->set_next(after_destruct_instr);
-    }
-    else if (before_destruct_instr->type() == MFInstructionType::Destruct) {
-      static_cast<MFDestructInstruction *>(before_destruct_instr)->set_next(after_destruct_instr);
-    }
-    else {
-      continue;
-    }
-    last_call_instr->set_next(destruct_instr);
-    destruct_instr->set_next(after_last_call_instr);
   }
 }
 

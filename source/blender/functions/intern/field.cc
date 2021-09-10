@@ -276,7 +276,6 @@ Vector<const GVArray *> evaluate_fields(ResourceScope &scope,
                                         const FieldContext &context,
                                         Span<GVMutableArray *> dst_varrays)
 {
-  SCOPED_TIMER(__func__);
 
   Vector<const GVArray *> r_varrays(fields_to_evaluate.size(), nullptr);
   const int array_size = mask.min_array_size();
@@ -340,9 +339,9 @@ Vector<const GVArray *> evaluate_fields(ResourceScope &scope,
     MFProcedure procedure;
     build_multi_function_procedure_for_fields(
         procedure, scope, field_tree_info, varying_fields_to_evaluate);
-    std::cout << procedure.to_dot() << "\n";
-    fn::procedure_optimization::move_destructs_up(procedure);
-    std::cout << procedure.to_dot() << "\n";
+    // std::cout << procedure.to_dot() << "\n";
+    // fn::procedure_optimization::move_destructs_up(procedure);
+    // std::cout << procedure.to_dot() << "\n";
     MFProcedureExecutor procedure_executor{"Procedure", procedure};
     fn::ParallelMultiFunction parallel_fn{procedure_executor, 10000};
     const MultiFunction &fn_to_execute = parallel_fn;
@@ -389,6 +388,7 @@ Vector<const GVArray *> evaluate_fields(ResourceScope &scope,
       mf_params.add_uninitialized_single_output(span);
     }
 
+    SCOPED_TIMER(__func__);
     fn_to_execute.call(mask, mf_params, mf_context);
   }
 
