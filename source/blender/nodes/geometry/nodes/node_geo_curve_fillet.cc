@@ -25,19 +25,18 @@
 
 #include "BKE_spline.hh"
 
-static bNodeSocketTemplate geo_node_curve_fillet_in[] = {
-    {SOCK_GEOMETRY, N_("Curve")},
-    {SOCK_INT, N_("Poly Count"), 1, 0, 0, 0, 1, 1000},
-    {SOCK_BOOLEAN, N_("Limit Radius")},
-    {SOCK_FLOAT, N_("Radius"), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX, PROP_DISTANCE},
-    {SOCK_STRING, N_("Radius")},
-    {-1, ""},
-};
+namespace blender::nodes {
 
-static bNodeSocketTemplate geo_node_curve_fillet_out[] = {
-    {SOCK_GEOMETRY, N_("Curve")},
-    {-1, ""},
-};
+static void geo_node_curve_fillet_declare(NodeDeclarationBuilder &b)
+{
+  b.add_input<decl::Geometry>("Curve");
+  b.add_input<decl::Int>("Poly Count").default_value(1).min(1).max(1000);
+  b.add_input<decl::Bool>("Limit Radius");
+  b.add_input<decl::Float>("Radius").min(0.0f).max(FLT_MAX).subtype(
+      PropertySubType::PROP_DISTANCE);
+  b.add_input<decl::String>("Radius");
+  b.add_output<decl::Geometry>("Curve");
+}
 
 static void geo_node_curve_fillet_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 {
@@ -57,8 +56,6 @@ static void geo_node_curve_fillet_init(bNodeTree *UNUSED(tree), bNode *node)
 
   node->storage = data;
 }
-
-namespace blender::nodes {
 
 struct FilletParam {
   GeometryNodeCurveFilletMode mode;
@@ -650,11 +647,11 @@ void register_node_type_geo_curve_fillet()
   static bNodeType ntype;
 
   geo_node_type_base(&ntype, GEO_NODE_CURVE_FILLET, "Curve Fillet", NODE_CLASS_GEOMETRY, 0);
-  node_type_socket_templates(&ntype, geo_node_curve_fillet_in, geo_node_curve_fillet_out);
-  ntype.draw_buttons = geo_node_curve_fillet_layout;
+  ntype.draw_buttons = blender::nodes::geo_node_curve_fillet_layout;
   node_type_storage(
       &ntype, "NodeGeometryCurveFillet", node_free_standard_storage, node_copy_standard_storage);
-  node_type_init(&ntype, geo_node_curve_fillet_init);
+  ntype.declare = blender::nodes::geo_node_curve_fillet_declare;
+  node_type_init(&ntype, blender::nodes::geo_node_curve_fillet_init);
   node_type_update(&ntype, blender::nodes::geo_node_curve_fillet_update);
   ntype.geometry_node_execute = blender::nodes::geo_node_fillet_exec;
   nodeRegisterType(&ntype);
