@@ -25,7 +25,6 @@
 
 #include <atomic>
 #include <future>
-#include <memory>
 #include <vector>
 
 struct GHOST_XrControllerModelNode;
@@ -48,7 +47,6 @@ class GHOST_XrControllerModel {
 
   std::future<void> m_load_task;
   std::atomic<bool> m_data_loaded = false;
-  std::unique_ptr<uint8_t[]> m_data = nullptr;
 
   std::vector<GHOST_XrControllerModelVertex> m_vertices;
   std::vector<uint32_t> m_indices;

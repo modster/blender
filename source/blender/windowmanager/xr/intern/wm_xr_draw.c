@@ -331,7 +331,14 @@ void wm_xr_draw_controllers(const bContext *UNUSED(C), ARegion *UNUSED(region), 
 
     GPUVertFormat *format = immVertexFormat();
     uint pos = GPU_vertformat_attr_add(format, "pos", GPU_COMP_F32, 3, GPU_FETCH_FLOAT);
-    immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
+    uint col = GPU_vertformat_attr_add(format, "color", GPU_COMP_F32, 4, GPU_FETCH_FLOAT);
+    immBindBuiltinProgram(GPU_SHADER_3D_POLYLINE_FLAT_COLOR);
+
+    float viewport[4];
+    GPU_viewport_size_get_f(viewport);
+    immUniform2fv("viewportSize", &viewport[2]);
+
+    immUniform1f("lineWidth", 3.0f * U.pixelsize);
 
     if (draw_ray) {
       const float color[4] = {0.35f, 0.35f, 1.0f, 0.5f};
@@ -339,19 +346,20 @@ void wm_xr_draw_controllers(const bContext *UNUSED(C), ARegion *UNUSED(region), 
       float ray[3];
 
       GPU_depth_test(GPU_DEPTH_LESS_EQUAL);
-      GPU_line_width(3.0f);
+      GPU_blend(GPU_BLEND_ALPHA);
 
-      immUniformColor4fv(color);
+      immBegin(GPU_PRIM_LINES, (uint)BLI_listbase_count(&state->controllers) * 2);
+      immAttr4fv(col, color);
 
       LISTBASE_FOREACH (wmXrController *, controller, &state->controllers) {
         const float(*mat)[4] = controller->aim_mat;
         madd_v3_v3v3fl(ray, mat[3], mat[2], -scale);
 
-        immBegin(GPU_PRIM_LINES, 2);
         immVertex3fv(pos, mat[3]);
         immVertex3fv(pos, ray);
-        immEnd();
       }
+
+      immEnd();
     }
     else {
       const float r[4] = {1.0f, 0.2f, 0.322f, 1.0f};
@@ -362,7 +370,8 @@ void wm_xr_draw_controllers(const bContext *UNUSED(C), ARegion *UNUSED(region), 
 
       GPU_depth_test(GPU_DEPTH_NONE);
       GPU_blend(GPU_BLEND_NONE);
-      GPU_line_width(3.0f);
+
+      immBegin(GPU_PRIM_LINES, (uint)BLI_listbase_count(&state->controllers) * 6);
 
       LISTBASE_FOREACH (wmXrController *, controller, &state->controllers) {
         const float(*mat)[4] = controller->aim_mat;
@@ -370,24 +379,20 @@ void wm_xr_draw_controllers(const bContext *UNUSED(C), ARegion *UNUSED(region), 
         madd_v3_v3v3fl(y_axis, mat[3], mat[1], scale);
         madd_v3_v3v3fl(z_axis, mat[3], mat[2], scale);
 
-        immBegin(GPU_PRIM_LINES, 2);
-        immUniformColor4fv(r);
+        immAttr4fv(col, r);
         immVertex3fv(pos, mat[3]);
         immVertex3fv(pos, x_axis);
-        immEnd();
 
-        immBegin(GPU_PRIM_LINES, 2);
-        immUniformColor4fv(g);
+        immAttr4fv(col, g);
         immVertex3fv(pos, mat[3]);
         immVertex3fv(pos, y_axis);
-        immEnd();
 
-        immBegin(GPU_PRIM_LINES, 2);
-        immUniformColor4fv(b);
+        immAttr4fv(col, b);
         immVertex3fv(pos, mat[3]);
         immVertex3fv(pos, z_axis);
-        immEnd();
       }
+
+      immEnd();
     }
 
     immUnbindProgram();

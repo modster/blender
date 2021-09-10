@@ -299,7 +299,7 @@ static void calc_node_transforms(const tinygltf::Node &gltf_node,
                                           *(Eigen::Matrix4f *)r_local_transform;
 }
 
-static void load_node(tinygltf::Model gltf_model,
+static void load_node(const tinygltf::Model &gltf_model,
                       int gltf_node_id,
                       int32_t parent_idx,
                       const float parent_transform[4][4],
@@ -469,8 +469,8 @@ void GHOST_XrControllerModel::loadControllerModel(XrSession session)
   CHECK_XR(g_xrLoadControllerModelMSFT(session, m_model_key, 0, &buf_size, nullptr),
            "Failed to get controller model buffer size.");
 
-  m_data = std::make_unique<uint8_t[]>(buf_size);
-  CHECK_XR(g_xrLoadControllerModelMSFT(session, m_model_key, buf_size, &buf_size, m_data.get()),
+  std::vector<uint8_t> buf((size_t)buf_size);
+  CHECK_XR(g_xrLoadControllerModelMSFT(session, m_model_key, buf_size, &buf_size, buf.data()),
            "Failed to load controller model binary buffers.");
 
   /* Convert to glTF model. */
@@ -478,7 +478,7 @@ void GHOST_XrControllerModel::loadControllerModel(XrSession session)
   tinygltf::Model gltf_model;
   std::string err_msg;
 
-  if (!gltf_loader.LoadBinaryFromMemory(&gltf_model, &err_msg, nullptr, m_data.get(), buf_size)) {
+  if (!gltf_loader.LoadBinaryFromMemory(&gltf_model, &err_msg, nullptr, buf.data(), buf_size)) {
     throw GHOST_XrException(("Failed to load glTF controller model: " + err_msg).c_str());
   }
 
