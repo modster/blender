@@ -61,7 +61,7 @@ struct FilletParam {
   GeometryNodeCurveFilletMode mode;
 
   /* Number of points to be added. */
-  std::optional<int> count;
+  GVArray_Typed<int> *counts;
 
   /* Whether or not fillets are allowed to overlap. */
   bool limit_radius;
@@ -167,11 +167,17 @@ static Array<float> calculate_angles(const Span<float3> directions)
 }
 
 /* Calculate the segment count in each filleted arc. */
-static Array<int> calculate_counts(const std::optional<int> count,
+static Array<int> calculate_counts(const FilletParam &fillet_param,
                                    const int size,
+                                   const int spline_offset,
                                    const bool cyclic)
 {
-  Array<int> counts(size, *count);
+  Array<int> counts(size, 1);
+  if (fillet_param.mode == GEO_NODE_CURVE_FILLET_POLY) {
+    for (const int i : IndexRange(size)) {
+      counts[i] = (*fillet_param.counts)[spline_offset + i];
+    }
+  }
   if (!cyclic) {
     counts[0] = counts[size - 1] = 0;
   }
@@ -230,7 +236,7 @@ static FilletData calculate_fillet_data(const Spline &spline,
   fd.positions = spline.positions();
   fd.axes = calculate_axes(fd.directions);
   fd.angles = calculate_angles(fd.directions);
-  fd.counts = calculate_counts(fillet_param.count, size, spline.is_cyclic());
+  fd.counts = calculate_counts(fillet_param, size, spline_offset, spline.is_cyclic());
   fd.radii = calculate_radii(fillet_param, size, spline_offset);
 
   added_count = calculate_point_counts(point_counts, fd.radii, fd.counts);
@@ -612,15 +618,17 @@ static void geo_node_fillet_exec(GeoNodeExecParams params)
   fillet_param.mode = mode;
 
   if (mode == GEO_NODE_CURVE_FILLET_POLY) {
-    const int count = params.extract_input<int>("Poly Count");
-    if (count < 1) {
-      params.set_output("Curve", GeometrySet());
-      return;
-    }
-    fillet_param.count.emplace(count);
-  }
-  else {
-    fillet_param.count.emplace(1);
+    Field<int> count_field = params.extract_input<Field<int>>("Poly Count");
+    GeometryComponent &component = geometry_set.get_component_for_write(GEO_COMPONENT_TYPE_CURVE);
+    GeometryComponentFieldContext field_context{component, ATTR_DOMAIN_POINT};
+    const int domain_size = component.attribute_domain_size(ATTR_DOMAIN_POINT);
+
+    fn::FieldEvaluator count_evaluator{field_context, domain_size};
+    count_evaluator.add(count_field);
+    count_evaluator.evaluate();
+    const GVArray &count = count_evaluator.get_evaluated(0);
+    GVArray_Typed<int> counts_array = GVArray_Typed<int>(count);
+    fillet_param.counts = &counts_array;
   }
 
   fillet_param.limit_radius = params.extract_input<bool>("Limit Radius");
