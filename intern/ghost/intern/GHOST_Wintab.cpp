@@ -150,6 +150,7 @@ void GHOST_Wintab::modifyContext(LOGCONTEXT &lc)
   lc.lcPktMode = PACKETMODE;
   lc.lcMoveMask = PACKETDATA;
   lc.lcOptions |= CXO_CSRMESSAGES | CXO_MESSAGES;
+  lc.lcBtnUpMask = lc.lcBtnDnMask = ~0;
 
   /* Tablet scaling is handled manually because some drivers don't handle HIDPI or multi-display
    * correctly; reset tablet scale factors to un-scaled tablet coordinates. */
