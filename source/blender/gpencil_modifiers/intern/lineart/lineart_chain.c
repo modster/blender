@@ -1015,20 +1015,21 @@ static LineartEdgeChainItem *lineart_chain_create_crossing_point(LineartRenderBu
                                                                  LineartEdgeChainItem *eci_outside)
 {
   float isec[2];
-  float LU[2] = {-1.0f, 1.0f}, LB[2] = {-1.0f, -1.0f}, RU[2] = {1.0f, 1.0f}, RB[2] = {1.0f, -1.0f};
+  float ref_lu[2] = {-1.0f, 1.0f}, ref_lb[2] = {-1.0f, -1.0f}, ref_ru[2] = {1.0f, 1.0f},
+        ref_rb[2] = {1.0f, -1.0f};
   bool found = false;
   LineartEdgeChainItem *eci2 = eci_outside, *eci1 = eci_inside;
   if (eci2->pos[0] < -1.0f) {
-    found = (isect_seg_seg_v2_point(eci1->pos, eci2->pos, LU, LB, isec) > 0);
+    found = (isect_seg_seg_v2_point(eci1->pos, eci2->pos, ref_lu, ref_lb, isec) > 0);
   }
   if (!found && eci2->pos[0] > 1.0f) {
-    found = (isect_seg_seg_v2_point(eci1->pos, eci2->pos, RU, RB, isec) > 0);
+    found = (isect_seg_seg_v2_point(eci1->pos, eci2->pos, ref_ru, ref_rb, isec) > 0);
   }
   if (!found && eci2->pos[1] < -1.0f) {
-    found = (isect_seg_seg_v2_point(eci1->pos, eci2->pos, LB, RB, isec) > 0);
+    found = (isect_seg_seg_v2_point(eci1->pos, eci2->pos, ref_lb, ref_rb, isec) > 0);
   }
   if (!found && eci2->pos[1] > 1.0f) {
-    found = (isect_seg_seg_v2_point(eci1->pos, eci2->pos, LU, RU, isec) > 0);
+    found = (isect_seg_seg_v2_point(eci1->pos, eci2->pos, ref_lu, ref_ru, isec) > 0);
   }
 
   if (UNLIKELY(!found)) {
