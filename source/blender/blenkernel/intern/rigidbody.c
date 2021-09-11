@@ -201,11 +201,10 @@ void BKE_rigidbody_free_object(Object *ob, RigidBodyWorld *rbw)
       rbo->shared->physics_shape = NULL;
     }
 
-    if (rbo->col_shape_draw_data) {
-        BKE_mesh_free(rbo->col_shape_draw_data);
-        BKE_id_free(NULL, rbo->col_shape_draw_data);
-       // MEM_freeN(rbo->col_shape_draw_data);
-        rbo->col_shape_draw_data = NULL;
+    if (rbo->shared->col_shape_draw_data) {
+        BKE_mesh_free(rbo->shared->col_shape_draw_data);
+        BKE_id_free(NULL, rbo->shared->col_shape_draw_data);
+        rbo->shared->col_shape_draw_data = NULL;
     }
 
     MEM_freeN(rbo->shared);
@@ -639,13 +638,19 @@ static void rigidbody_validate_sim_shape(RigidBodyWorld *rbw, Object *ob, bool r
       RB_shape_delete(rbo->shared->physics_shape);
     }
     /* Delete old debug drawing mesh data if it exists. */
-    if (rbo->col_shape_draw_data) {
-        BKE_mesh_free(rbo->col_shape_draw_data);
-        BKE_id_free(NULL, rbo->col_shape_draw_data);
-       // MEM_freeN(rbo->col_shape_draw_data);
-        rbo->col_shape_draw_data = NULL;
+    if (rbo->shared->col_shape_draw_data) {
+        BKE_mesh_free(rbo->shared->col_shape_draw_data);
+        BKE_id_free(NULL, rbo->shared->col_shape_draw_data);
+        rbo->shared->col_shape_draw_data = NULL;
     }
     rbo->shared->physics_shape = new_shape;
+
+    if(rbo->shape == RB_SHAPE_CONVEXH) {
+        BKE_rigidbody_store_convex_hull_draw_data(ob);
+    }
+    if(rbo->shape == RB_SHAPE_TRIMESH) {
+        BKE_rigidbody_store_trimesh_draw_data(ob);
+    }
   }
 }
 
@@ -1320,7 +1325,7 @@ RigidBodyOb *BKE_rigidbody_create_object(Scene *scene, Object *ob, short type)
   zero_v3(rbo->pvel);
   zero_v3(rbo->vel);
 
-  rbo->col_shape_draw_data = NULL;
+  rbo->shared->col_shape_draw_data = NULL;
 
   /* use triangle meshes for passive objects
    * use convex hulls for active objects since dynamic triangle meshes are very unstable
@@ -2620,7 +2625,7 @@ void BKE_rigidbody_store_convex_hull_draw_data(Object *ob) {
     }
     MEM_freeN(mloop_src);
     plConvexHullDelete(hull);
-    ob->rigidbody_object->col_shape_draw_data = hull_draw_data;
+    ob->rigidbody_object->shared->col_shape_draw_data = hull_draw_data;
 
 }
 
@@ -2665,7 +2670,7 @@ void BKE_rigidbody_store_trimesh_draw_data(Object *ob) {
         BKE_mesh_convert_mfaces_to_mpolys(trimesh_draw_data);
         BKE_mesh_calc_edges(trimesh_draw_data, false, false);
 
-        ob->rigidbody_object->col_shape_draw_data = trimesh_draw_data;
+        ob->rigidbody_object->shared->col_shape_draw_data = trimesh_draw_data;
 
     }
 

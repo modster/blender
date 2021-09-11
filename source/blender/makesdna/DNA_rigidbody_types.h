@@ -120,6 +120,8 @@ typedef struct RigidBodyOb_Shared {
   void *physics_object;
   /** Collision shape used by physics sim (i.e. btCollisionShape). */
   void *physics_shape;
+  /** Mesh used to store non pprimitive collision shapes for debug drawing. */
+  Mesh *col_shape_draw_data;
 } RigidBodyOb_Shared;
 
 /* RigidBodyObject (rbo)
@@ -192,8 +194,6 @@ typedef struct RigidBodyOb {
   float vel[3];
   /** Previous velocity, to calculate acceleration. */
   float pvel[3];
-
-  Mesh *col_shape_draw_data;
 
 } RigidBodyOb;
 

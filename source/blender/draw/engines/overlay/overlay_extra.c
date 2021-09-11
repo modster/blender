@@ -373,20 +373,14 @@ static void OVERLAY_non_primitive_collision_shape(OVERLAY_ExtraCallBuffers *cb,
 {
 
     if(ob->rigidbody_object){
-          if(ob->rigidbody_object->col_shape_draw_data == NULL) {
-              switch(ob->rigidbody_object->shape) {
-                case RB_SHAPE_CONVEXH:
-                  BKE_rigidbody_store_convex_hull_draw_data(ob);
-                  break;
-                case RB_SHAPE_TRIMESH:
-                  BKE_rigidbody_store_trimesh_draw_data(ob);
-                  break;
-              }
-           DRW_cache_non_primitive_col_shape_store_ob(ob);
+          if(ob->rigidbody_object->shared->col_shape_draw_data == NULL) {
+
           }
-          GPUBatch *geom = DRW_cache_non_primitive_col_shape_get(ob);
-          if(geom){
-              OVERLAY_extra_wire(cb, geom, ob->obmat, color);
+          else {
+            GPUBatch *geom = DRW_cache_non_primitive_col_shape_get(ob);
+            if(geom){
+                OVERLAY_extra_wire(cb, geom, ob->obmat, color);
+            }
           }
     }
 
