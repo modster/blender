@@ -457,12 +457,24 @@ void uvedit_edge_select_set_with_sticky(const struct SpaceImage *sima,
         if (uvedit_face_visible_test(scene, l_radial_iter->f)) {
           uvedit_edge_select_set(scene, em, l_radial_iter, select, do_history, cd_loop_uv_offset);
 
-          uvedit_uv_select_shared_location(
-              scene, em, l_radial_iter, select, false, do_history, cd_loop_uv_offset);
-          uvedit_uv_select_shared_location(
-              scene, em, l_radial_iter->next, select, false, do_history, cd_loop_uv_offset);
+          if (select) {
+            uvedit_uv_select_shared_location(
+                scene, em, l_radial_iter, select, false, do_history, cd_loop_uv_offset);
+            uvedit_uv_select_shared_location(
+                scene, em, l_radial_iter->next, select, false, do_history, cd_loop_uv_offset);
+          }
+          else {
+            if (!uvedit_vert_is_any_other_edge_selected(scene, l_radial_iter, cd_loop_uv_offset)) {
+              uvedit_uv_select_shared_location(
+                  scene, em, l_radial_iter, select, false, do_history, cd_loop_uv_offset);
+            }
+            if (!uvedit_vert_is_any_other_edge_selected(
+                    scene, l_radial_iter->next, cd_loop_uv_offset)) {
+              uvedit_uv_select_shared_location(
+                  scene, em, l_radial_iter->next, select, false, do_history, cd_loop_uv_offset);
+            }
+          }
         }
-
       } while ((l_radial_iter = l_radial_iter->radial_next) != l);
       break;
     }
