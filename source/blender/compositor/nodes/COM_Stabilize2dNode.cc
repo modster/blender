@@ -127,6 +127,8 @@ void Stabilize2dNode::convertToOperations(NodeConverter &converter,
       transform_op->set_sampler(sampler);
       transform_op->set_convert_rotate_degree_to_rad(false);
       transform_op->set_invert(invert);
+      transform_op->set_scale_canvas_max_size(context.get_render_width(),
+                                              context.get_render_height());
       converter.addOperation(transform_op);
       converter.mapInputSocket(imageInput, transform_op->getInputSocket(0));
       converter.addLink(xAttribute->getOutputSocket(), transform_op->getInputSocket(1));
@@ -134,6 +136,7 @@ void Stabilize2dNode::convertToOperations(NodeConverter &converter,
       converter.addLink(angleAttribute->getOutputSocket(), transform_op->getInputSocket(3));
       converter.addLink(scaleAttribute->getOutputSocket(), transform_op->getInputSocket(4));
       converter.mapOutputSocket(getOutputSocket(), transform_op->getOutputSocket());
+      break;
     }
   }
 }

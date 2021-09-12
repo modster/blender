@@ -75,6 +75,7 @@ void TransformNode::convertToOperations(NodeConverter &converter,
     case eExecutionModel::FullFrame: {
       TransformOperation *op = new TransformOperation();
       op->set_sampler((PixelSampler)this->getbNode()->custom1);
+      op->set_scale_canvas_max_size(context.get_render_width(), context.get_render_height());
       converter.addOperation(op);
 
       converter.mapInputSocket(imageInput, op->getInputSocket(0));

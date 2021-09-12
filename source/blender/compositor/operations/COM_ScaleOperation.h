@@ -42,19 +42,27 @@ class BaseScaleOperation : public MultiThreadedOperation {
   }
 
   int m_sampler;
+  /* TODO(manzanilla): to be removed with tiled implementation. */
   bool m_variable_size;
 };
 
 class ScaleOperation : public BaseScaleOperation {
  public:
-  static constexpr float MIN_SCALE = 0.0001f;
+  static constexpr float MIN_RELATIVE_SCALE = 0.0001f;
+  static constexpr float DEFAULT_MAX_SCALE_CANVAS_SIZE = 12000;
 
  protected:
+  static constexpr int IMAGE_INPUT_INDEX = 0;
+  static constexpr int X_INPUT_INDEX = 1;
+  static constexpr int Y_INPUT_INDEX = 2;
+
   SocketReader *m_inputOperation;
   SocketReader *m_inputXOperation;
   SocketReader *m_inputYOperation;
-  float m_centerX;
-  float m_centerY;
+  float canvas_center_x_;
+  float canvas_center_y_;
+  int max_scale_canvas_width_ = DEFAULT_MAX_SCALE_CANVAS_SIZE;
+  int max_scale_canvas_height_ = DEFAULT_MAX_SCALE_CANVAS_SIZE;
 
  public:
   ScaleOperation();
@@ -62,9 +70,30 @@ class ScaleOperation : public BaseScaleOperation {
 
   static float scale_coord(const float coord, const float center, const float relative_scale)
   {
-    return center + (coord - center) / MAX2(relative_scale, MIN_SCALE);
+    return center + (coord - center) * MAX2(relative_scale, MIN_RELATIVE_SCALE);
   }
-  static void scale_area(rcti &rect, float center_x, float center_y, float scale_x, float scale_y);
+
+  static float scale_coord_inverted(const float coord,
+                                    const float center,
+                                    const float relative_scale)
+  {
+    return center + (coord - center) / MAX2(relative_scale, MIN_RELATIVE_SCALE);
+  }
+
+  static void get_scale_offset(const rcti &input_canvas,
+                               const rcti &scale_canvas,
+                               float &r_scale_offset_x,
+                               float &r_scale_offset_y);
+  static void scale_area(rcti &area, float relative_scale_x, float relative_scale_y);
+  static void get_scale_area_of_interest(const rcti &input_canvas,
+                                         const rcti &scale_canvas,
+                                         const float relative_scale_x,
+                                         const float relative_scale_y,
+                                         const rcti &output_area,
+                                         rcti &r_input_area);
+  static void clamp_area_size_max(rcti &area, int max_width, int max_height);
+
+  void set_scale_canvas_max_size(int width, int height);
 
   void init_data() override;
   void initExecution() override;
@@ -75,15 +104,17 @@ class ScaleOperation : public BaseScaleOperation {
                                     const rcti &area,
                                     Span<MemoryBuffer *> inputs) override;
 
+  void determine_canvas(const rcti &preferred_area, rcti &r_area) override;
+
  protected:
-  virtual float get_relative_scale_x_factor() = 0;
-  virtual float get_relative_scale_y_factor() = 0;
+  virtual float get_relative_scale_x_factor(float width) = 0;
+  virtual float get_relative_scale_y_factor(float height) = 0;
 
  private:
+  bool is_scaling_variable();
   float get_constant_scale(int input_op_idx, float factor);
-  float get_constant_scale_x();
-  float get_constant_scale_y();
-  void scale_area(rcti &rect, float scale_x, float scale_y);
+  float get_constant_scale_x(float width);
+  float get_constant_scale_y(float height);
 };
 
 class ScaleRelativeOperation : public ScaleOperation {
@@ -94,11 +125,13 @@ class ScaleRelativeOperation : public ScaleOperation {
                                         ReadBufferOperation *readOperation,
                                         rcti *output) override;
   void executePixelSampled(float output[4], float x, float y, PixelSampler sampler) override;
-  float get_relative_scale_x_factor() override
+
+  float get_relative_scale_x_factor(float UNUSED(width)) override
   {
     return 1.0f;
   }
-  float get_relative_scale_y_factor() override
+
+  float get_relative_scale_y_factor(float UNUSED(height)) override
   {
     return 1.0f;
   }
@@ -110,13 +143,15 @@ class ScaleAbsoluteOperation : public ScaleOperation {
                                         ReadBufferOperation *readOperation,
                                         rcti *output) override;
   void executePixelSampled(float output[4], float x, float y, PixelSampler sampler) override;
-  float get_relative_scale_x_factor() override
+
+  float get_relative_scale_x_factor(float width) override
   {
-    return 1.0f / getWidth();
+    return 1.0f / width;
   }
-  float get_relative_scale_y_factor() override
+
+  float get_relative_scale_y_factor(float height) override
   {
-    return 1.0f / getHeight();
+    return 1.0f / height;
   }
 };
 

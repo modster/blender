@@ -43,6 +43,16 @@ int CompositorContext::getFramenumber() const
   return m_rd->cfra;
 }
 
+float CompositorContext::get_render_width() const
+{
+  return getRenderData()->xsch * getRenderPercentageAsFactor();
+}
+
+float CompositorContext::get_render_height() const
+{
+  return getRenderData()->ysch * getRenderPercentageAsFactor();
+}
+
 eExecutionModel CompositorContext::get_execution_model() const
 {
   if (U.experimental.use_full_frame_compositor) {

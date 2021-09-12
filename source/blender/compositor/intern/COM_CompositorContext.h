@@ -288,6 +288,9 @@ class CompositorContext {
     return m_rd->size * 0.01f;
   }
 
+  float get_render_width() const;
+  float get_render_height() const;
+
   /**
    * Get active execution model.
    */

@@ -25,8 +25,8 @@ namespace blender::compositor {
 
 RotateOperation::RotateOperation()
 {
-  this->addInputSocket(DataType::Color);
-  this->addInputSocket(DataType::Value);
+  this->addInputSocket(DataType::Color, ResizeMode::Align);
+  this->addInputSocket(DataType::Value, ResizeMode::Align);
   this->addOutputSocket(DataType::Color);
   this->set_canvas_input_index(0);
   this->m_imageSocket = nullptr;
@@ -34,6 +34,30 @@ RotateOperation::RotateOperation()
   this->m_doDegree2RadConversion = false;
   this->m_isDegreeSet = false;
   sampler_ = PixelSampler::Bilinear;
+}
+
+void RotateOperation::get_rotation_center(const rcti &area, float &r_x, float &r_y)
+{
+  r_x = area.xmin + (BLI_rcti_size_x(&area) - 1) / 2.0;
+  r_y = area.ymin + (BLI_rcti_size_y(&area) - 1) / 2.0;
+}
+
+void RotateOperation::get_rotation_center(const float width,
+                                          const float height,
+                                          float &r_x,
+                                          float &r_y)
+{
+  r_x = (width - 1) / 2.0;
+  r_y = (height - 1) / 2.0;
+}
+
+void RotateOperation::get_rotation_offset(const rcti &input_canvas,
+                                          const rcti &rotate_canvas,
+                                          float &r_offset_x,
+                                          float &r_offset_y)
+{
+  r_offset_x = (BLI_rcti_size_x(&input_canvas) - BLI_rcti_size_x(&rotate_canvas)) / 2.0f;
+  r_offset_y = (BLI_rcti_size_y(&input_canvas) - BLI_rcti_size_y(&rotate_canvas)) / 2.0f;
 }
 
 void RotateOperation::get_area_rotation_bounds(const rcti &area,
@@ -67,10 +91,44 @@ void RotateOperation::get_area_rotation_bounds(const rcti &area,
   r_bounds.ymax = ceil(maxy);
 }
 
+void RotateOperation::get_rotation_area_of_interest(const rcti &input_canvas,
+                                                    const rcti &rotate_canvas,
+                                                    const float sine,
+                                                    const float cosine,
+                                                    const rcti &output_area,
+                                                    rcti &r_input_area)
+{
+  float center_x, center_y;
+  get_rotation_center(input_canvas, center_x, center_y);
+
+  float rotate_offset_x, rotate_offset_y;
+  get_rotation_offset(input_canvas, rotate_canvas, rotate_offset_x, rotate_offset_y);
+
+  r_input_area = output_area;
+  BLI_rcti_translate(&r_input_area, rotate_offset_x, rotate_offset_y);
+  get_area_rotation_bounds(r_input_area, center_x, center_y, sine, cosine, r_input_area);
+}
+
+void RotateOperation::get_rotation_canvas(const rcti &input_canvas,
+                                          const float sine,
+                                          const float cosine,
+                                          rcti &r_canvas)
+{
+  float center_x, center_y;
+  get_rotation_center(input_canvas, center_x, center_y);
+
+  rcti rot_bounds;
+  get_area_rotation_bounds(input_canvas, center_x, center_y, sine, cosine, rot_bounds);
+  r_canvas = input_canvas;
+  r_canvas.xmax = input_canvas.xmin + BLI_rcti_size_x(&rot_bounds);
+  r_canvas.ymax = input_canvas.ymin + BLI_rcti_size_y(&rot_bounds);
+}
+
 void RotateOperation::init_data()
 {
-  this->m_centerX = (getWidth() - 1) / 2.0;
-  this->m_centerY = (getHeight() - 1) / 2.0;
+  if (execution_model_ == eExecutionModel::Tiled) {
+    get_rotation_center(get_canvas(), m_centerX, m_centerY);
+  }
 }
 
 void RotateOperation::initExecution()
@@ -94,11 +152,7 @@ inline void RotateOperation::ensureDegree()
         this->m_degreeSocket->readSampled(degree, 0, 0, PixelSampler::Nearest);
         break;
       case eExecutionModel::FullFrame:
-        NodeOperation *degree_op = getInputOperation(DEGREE_INPUT_INDEX);
-        const bool is_constant_degree = degree_op->get_flags().is_constant_operation;
-        degree[0] = is_constant_degree ?
-                        static_cast<ConstantOperation *>(degree_op)->get_constant_elem()[0] :
-                        0.0f;
+        degree[0] = get_input_operation(DEGREE_INPUT_INDEX)->get_constant_value_default(0.0f);
         break;
     }
 
@@ -159,6 +213,25 @@ bool RotateOperation::determineDependingAreaOfInterest(rcti *input,
   return NodeOperation::determineDependingAreaOfInterest(&newInput, readOperation, output);
 }
 
+void RotateOperation::determine_canvas(const rcti &preferred_area, rcti &r_area)
+{
+  if (execution_model_ == eExecutionModel::Tiled) {
+    NodeOperation::determine_canvas(preferred_area, r_area);
+    return;
+  }
+
+  const bool image_determined =
+      getInputSocket(IMAGE_INPUT_INDEX)->determine_canvas(preferred_area, r_area);
+  if (image_determined) {
+    rcti unused;
+    getInputSocket(DEGREE_INPUT_INDEX)->determine_canvas(r_area, unused);
+
+    ensureDegree();
+
+    get_rotation_canvas(r_area, m_sine, m_cosine, r_area);
+  }
+}
+
 void RotateOperation::get_area_of_interest(const int input_idx,
                                            const rcti &output_area,
                                            rcti &r_input_area)
@@ -169,7 +242,10 @@ void RotateOperation::get_area_of_interest(const int input_idx,
   }
 
   ensureDegree();
-  get_area_rotation_bounds(output_area, m_centerX, m_centerY, m_sine, m_cosine, r_input_area);
+
+  const rcti &input_image_canvas = get_input_operation(IMAGE_INPUT_INDEX)->get_canvas();
+  get_rotation_area_of_interest(
+      input_image_canvas, this->get_canvas(), m_sine, m_cosine, output_area, r_input_area);
   expand_area_for_sampler(r_input_area, sampler_);
 }
 
@@ -177,12 +253,22 @@ void RotateOperation::update_memory_buffer_partial(MemoryBuffer *output,
                                                    const rcti &area,
                                                    Span<MemoryBuffer *> inputs)
 {
-  ensureDegree();
   const MemoryBuffer *input_img = inputs[IMAGE_INPUT_INDEX];
+
+  NodeOperation *image_op = get_input_operation(IMAGE_INPUT_INDEX);
+  const float image_width = image_op->getWidth();
+  const float image_height = image_op->getHeight();
+
+  float center_x, center_y;
+  get_rotation_center(image_width, image_height, center_x, center_y);
+  float rotate_offset_x, rotate_offset_y;
+  get_rotation_offset(
+      image_op->get_canvas(), this->get_canvas(), rotate_offset_x, rotate_offset_y);
+
   for (BuffersIterator<float> it = output->iterate_with({}, area); !it.is_end(); ++it) {
-    float x = it.x;
-    float y = it.y;
-    rotate_coords(x, y, m_centerX, m_centerY, m_sine, m_cosine);
+    float x = rotate_offset_x + it.x;
+    float y = rotate_offset_y + it.y;
+    rotate_coords(x, y, center_x, center_y, m_sine, m_cosine);
     input_img->read_elem_sampled(x, y, sampler_, it.out);
   }
 }
