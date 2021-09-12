@@ -22,4 +22,12 @@
 
 #pragma once
 
-extern RenderEngineType DRW_engine_viewport_eevee_type;
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+  extern RenderEngineType DRW_engine_viewport_eevee_type;
+
+#ifdef __cplusplus
+}
+#endif

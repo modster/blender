@@ -26,6 +26,7 @@
 #include "eevee_shader.hh"
 #include "eevee_material.hh"
 
+extern "C" {
 extern char datatoc_common_attribute_lib_glsl[];
 extern char datatoc_common_fullscreen_vert_glsl[];
 extern char datatoc_common_gpencil_lib_glsl[];
@@ -125,6 +126,7 @@ extern char datatoc_eevee_volume_vert_glsl[];
 extern char datatoc_eevee_shader_shared_hh[];
 
 extern char datatoc_gpu_shader_codegen_lib_glsl[];
+}
 
 namespace blender::eevee {
 
