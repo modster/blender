@@ -245,7 +245,6 @@ void BKE_mesh_vert_coords_apply_with_mat4(struct Mesh *mesh,
                                           const float (*vert_coords)[3],
                                           const float mat[4][4]);
 void BKE_mesh_vert_coords_apply(struct Mesh *mesh, const float (*vert_coords)[3]);
-void BKE_mesh_vert_normals_apply(struct Mesh *mesh, const short (*vert_normals)[3]);
 
 /* *** mesh_tessellate.c *** */
 
@@ -433,6 +432,7 @@ void BKE_mesh_normals_loop_custom_set(const struct MVert *mverts,
                                       const int numPolys,
                                       short (*r_clnors_data)[2]);
 void BKE_mesh_normals_loop_custom_from_vertices_set(const struct MVert *mverts,
+                                                    const float (*vert_normals)[3],
                                                     float (*r_custom_vertnors)[3],
                                                     const int numVerts,
                                                     struct MEdge *medges,

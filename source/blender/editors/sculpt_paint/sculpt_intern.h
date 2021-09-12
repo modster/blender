@@ -628,7 +628,7 @@ typedef struct SculptUndoNode {
 
   float (*co)[3];
   float (*orig_co)[3];
-  short (*no)[3];
+  float (*no)[3];
   float (*col)[4];
   float *mask;
   int totvert;

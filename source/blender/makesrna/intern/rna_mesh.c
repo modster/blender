@@ -320,7 +320,7 @@ static void rna_MeshVertex_normal_get(PointerRNA *ptr, float *value)
   Mesh *mesh = rna_mesh(ptr);
   const float(*vert_normals)[3] = BKE_mesh_ensure_vertex_normals(mesh);
 
-  const int index = ptr->data - mesh->mvert;
+  const int index = (MVert *)ptr->data - mesh->mvert;
   BLI_assert(index >= 0);
 
   copy_v3_v3(value, vert_normals[index]);
@@ -332,7 +332,7 @@ static void rna_MeshVertex_normal_set(PointerRNA *ptr, const float *value)
   float(*vert_normals)[3] = (float(*)[3])CustomData_add_layer(
       &mesh->vdata, CD_NORMAL, CD_DEFAULT, NULL, mesh->totvert);
 
-  const int index = ptr->data - mesh->mvert;
+  const int index = (MVert *)ptr->data - mesh->mvert;
   BLI_assert(index >= 0);
 
   copy_v3_v3(vert_normals[index], value);

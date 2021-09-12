@@ -227,7 +227,7 @@ static void normalEditModifier_do_radial(NormalEditModifierData *enmd,
                                          Mesh *mesh,
                                          short (*clnors)[2],
                                          float (*loopnors)[3],
-                                         float (*polynors)[3],
+                                         const float (*polynors)[3],
                                          const short mix_mode,
                                          const float mix_factor,
                                          const float mix_limit,
@@ -334,7 +334,7 @@ static void normalEditModifier_do_radial(NormalEditModifierData *enmd,
   }
 
   if (do_polynors_fix &&
-      polygons_check_flip(mloop, nos, &mesh->ldata, mpoly, polynors, num_polys)) {
+      polygons_check_flip(mloop, nos, &mesh->ldata, mpoly, (float(*)[3])polynors, num_polys)) {
     /* XXX TODO: is this still needed? */
     // mesh->dirty |= DM_DIRTY_TESS_CDLAYERS;
     /* We need to recompute vertex normals! */
@@ -342,6 +342,7 @@ static void normalEditModifier_do_radial(NormalEditModifierData *enmd,
   }
 
   BKE_mesh_normals_loop_custom_set(mvert,
+                                   BKE_mesh_ensure_vertex_normals(mesh),
                                    num_verts,
                                    medge,
                                    num_edges,
@@ -454,6 +455,7 @@ static void normalEditModifier_do_directional(NormalEditModifierData *enmd,
   }
 
   BKE_mesh_normals_loop_custom_set(mvert,
+                                   BKE_mesh_ensure_vertex_normals(mesh),
                                    num_verts,
                                    medge,
                                    num_edges,

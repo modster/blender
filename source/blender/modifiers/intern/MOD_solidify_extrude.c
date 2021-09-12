@@ -43,20 +43,6 @@
 #endif
 
 /* -------------------------------------------------------------------- */
-/** \name Local Utilities
- * \{ */
-
-/* specific function for solidify - define locally */
-BLI_INLINE void madd_v3v3short_fl(float r[3], const short a[3], const float f)
-{
-  r[0] += (float)a[0] * f;
-  r[1] += (float)a[1] * f;
-  r[2] += (float)a[2] * f;
-}
-
-/** \} */
-
-/* -------------------------------------------------------------------- */
 /** \name High Quality Normal Calculation Function
  * \{ */
 
@@ -87,14 +73,12 @@ static void mesh_calc_hq_normal(Mesh *mesh, float (*poly_nors)[3], float (*r_ver
   MPoly *mpoly, *mp;
   MLoop *mloop, *ml;
   MEdge *medge, *ed;
-  MVert *mvert, *mv;
 
   numVerts = mesh->totvert;
   numEdges = mesh->totedge;
   numPolys = mesh->totpoly;
   mpoly = mesh->mpoly;
   medge = mesh->medge;
-  mvert = mesh->mvert;
   mloop = mesh->mloop;
 
   /* we don't want to overwrite any referenced layers */
@@ -105,7 +89,6 @@ static void mesh_calc_hq_normal(Mesh *mesh, float (*poly_nors)[3], float (*r_ver
   cddm->mvert = mv;
 #endif
 
-  mv = mvert;
   mp = mpoly;
 
   {
@@ -171,9 +154,10 @@ static void mesh_calc_hq_normal(Mesh *mesh, float (*poly_nors)[3], float (*r_ver
   }
 
   /* normalize vertex normals and assign */
-  for (i = 0; i < numVerts; i++, mv++) {
+  const float(*vert_normals)[3] = BKE_mesh_ensure_vertex_normals(mesh);
+  for (i = 0; i < numVerts; i++) {
     if (normalize_v3(r_vert_nors[i]) == 0.0f) {
-      normal_short_to_float_v3(r_vert_nors[i], mv->no);
+      copy_v3_v3(r_vert_nors[i], vert_normals[i]);
     }
   }
 }
@@ -247,6 +231,8 @@ Mesh *MOD_solidify_extrude_modifyMesh(ModifierData *md, const ModifierEvalContex
 
   /* array size is doubled in case of using a shell */
   const uint stride = do_shell ? 2 : 1;
+
+  const float(*mesh_vert_normals)[3] = BKE_mesh_ensure_vertex_normals(mesh);
 
   MOD_get_vgroup(ctx->object, mesh, smd->defgrp_name, &dvert, &defgrp_index);
 
@@ -635,7 +621,7 @@ Mesh *MOD_solidify_extrude_modifyMesh(ModifierData *md, const ModifierEvalContex
           madd_v3_v3fl(mv->co, vert_nors[i], ofs_new_vgroup);
         }
         else {
-          madd_v3v3short_fl(mv->co, mv->no, ofs_new_vgroup / 32767.0f);
+          madd_v3_v3fl(mv->co, mesh_vert_normals[i], ofs_new_vgroup);
         }
       }
     }
@@ -686,7 +672,7 @@ Mesh *MOD_solidify_extrude_modifyMesh(ModifierData *md, const ModifierEvalContex
           madd_v3_v3fl(mv->co, vert_nors[i], ofs_new_vgroup);
         }
         else {
-          madd_v3v3short_fl(mv->co, mv->no, ofs_new_vgroup / 32767.0f);
+          madd_v3_v3fl(mv->co, mesh_vert_normals[i], ofs_new_vgroup);
         }
       }
     }
@@ -739,7 +725,7 @@ Mesh *MOD_solidify_extrude_modifyMesh(ModifierData *md, const ModifierEvalContex
     if (vert_nors == NULL) {
       vert_nors = MEM_malloc_arrayN(numVerts, sizeof(float[3]), "mod_solid_vno");
       for (i = 0, mv = mvert; i < numVerts; i++, mv++) {
-        normal_short_to_float_v3(vert_nors[i], mv->no);
+        copy_v3_v3(vert_nors[i], mesh_vert_normals[i]);
       }
     }
 
@@ -994,8 +980,8 @@ Mesh *MOD_solidify_extrude_modifyMesh(ModifierData *md, const ModifierEvalContex
     uint i;
     /* flip vertex normals for copied verts */
     mv = mvert + numVerts;
-    for (i = 0; i < numVerts; i++, mv++) {
-      negate_v3_short(mv->no);
+    for (i = 0; i < numVerts; i++) {
+      negate_v3((float *)mesh_vert_normals[i]);
     }
   }
 
@@ -1200,7 +1186,6 @@ Mesh *MOD_solidify_extrude_modifyMesh(ModifierData *md, const ModifierEvalContex
       ed = medge + (numEdges * stride);
       for (i = 0; i < rimVerts; i++, ed++, ed_orig++) {
         float nor_cpy[3];
-        short *nor_short;
         int k;
 
         /* NOTE: only the first vertex (lower half of the index) is calculated. */
@@ -1208,11 +1193,10 @@ Mesh *MOD_solidify_extrude_modifyMesh(ModifierData *md, const ModifierEvalContex
         normalize_v3_v3(nor_cpy, edge_vert_nos[ed_orig->v1]);
 
         for (k = 0; k < 2; k++) { /* loop over both verts of the edge */
-          nor_short = mvert[*(&ed->v1 + k)].no;
-          normal_short_to_float_v3(nor, nor_short);
+          copy_v3_v3(nor, mesh_vert_normals[*(&ed->v1 + k)]);
           add_v3_v3(nor, nor_cpy);
           normalize_v3(nor);
-          normal_float_to_short_v3(nor_short, nor);
+          copy_v3_v3(mesh_vert_normals[*(&ed->v1 + k)], nor);
         }
       }
 

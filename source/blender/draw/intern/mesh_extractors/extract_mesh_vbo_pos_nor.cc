@@ -72,9 +72,8 @@ static void extract_pos_nor_init(const MeshRenderData *mr,
     }
   }
   else {
-    const MVert *mv = mr->mvert;
-    for (int v = 0; v < mr->vert_len; v++, mv++) {
-      data->normals[v].low = GPU_normal_convert_i10_s3(mv->no);
+    for (int v = 0; v < mr->vert_len; v++) {
+      data->normals[v].low = GPU_normal_convert_i10_v3(mr->vert_normals[v]);
     }
   }
 }
@@ -259,9 +258,8 @@ static void extract_pos_nor_hq_init(const MeshRenderData *mr,
     }
   }
   else {
-    const MVert *mv = mr->mvert;
-    for (int v = 0; v < mr->vert_len; v++, mv++) {
-      copy_v3_v3_short(data->normals[v].high, mv->no);
+    for (int v = 0; v < mr->vert_len; v++) {
+      normal_float_to_short_v3(data->normals[v].high, mr->vert_normals[v]);
     }
   }
 }

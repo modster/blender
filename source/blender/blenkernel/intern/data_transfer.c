@@ -277,7 +277,6 @@ static void data_transfer_dtdata_type_preprocess(Mesh *me_src,
     const int num_polys_dst = me_dst->totpoly;
     MLoop *loops_dst = me_dst->mloop;
     const int num_loops_dst = me_dst->totloop;
-    CustomData *pdata_dst = &me_dst->pdata;
     CustomData *ldata_dst = &me_dst->ldata;
 
     const bool use_split_nors_dst = (me_dst->flag & ME_AUTOSMOOTH) != 0;

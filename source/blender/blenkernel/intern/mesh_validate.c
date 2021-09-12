@@ -317,6 +317,8 @@ bool BKE_mesh_validate_arrays(Mesh *mesh,
     recalc_flag.edges = do_fixes;
   }
 
+  const float(*vert_normals)[3] = BKE_mesh_ensure_vertex_normals(me);
+
   for (i = 0; i < totvert; i++, mv++) {
     bool fix_normal = true;
 
@@ -331,7 +333,7 @@ bool BKE_mesh_validate_arrays(Mesh *mesh,
         }
       }
 
-      if (mv->no[j] != 0) {
+      if (vert_normals[i][j] != 0.0f) {
         fix_normal = false;
         break;
       }
@@ -350,7 +352,8 @@ bool BKE_mesh_validate_arrays(Mesh *mesh,
       if (!is_zero_v3(mv->co)) {
         PRINT_ERR("\tVertex %u: has zero normal, assuming Z-up normal", i);
         if (do_fixes) {
-          mv->no[2] = SHRT_MAX;
+          float *normal = (float *)vert_normals[i];
+          normal[2] = 1.0f;
           fix_flag.verts = true;
         }
       }

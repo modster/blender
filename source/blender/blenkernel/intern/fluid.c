@@ -3267,8 +3267,6 @@ static Mesh *create_liquid_geometry(FluidDomainSettings *fds,
   MVert *mverts;
   MPoly *mpolys;
   MLoop *mloops;
-  short *normals, *no_s;
-  float no[3];
   float min[3];
   float max[3];
   float size[3];
@@ -3287,26 +3285,23 @@ static Mesh *create_liquid_geometry(FluidDomainSettings *fds,
   const char mp_flag = mp_example.flag;
 
   int i;
-  int num_verts, num_normals, num_faces;
+  int num_verts, num_faces;
 
   if (!fds->fluid) {
     return NULL;
   }
 
   num_verts = manta_liquid_get_num_verts(fds->fluid);
-  num_normals = manta_liquid_get_num_normals(fds->fluid);
   num_faces = manta_liquid_get_num_triangles(fds->fluid);
 
 #  ifdef DEBUG_PRINT
   /* Debugging: Print number of vertices, normals, and faces. */
-  printf("num_verts: %d, num_normals: %d, num_faces: %d\n", num_verts, num_normals, num_faces);
+  printf("num_verts: %d, num_faces: %d\n", num_verts, num_faces);
 #  endif
 
   if (!num_verts || !num_faces) {
     return NULL;
   }
-  /* Normals are per vertex, so these must match. */
-  BLI_assert(num_verts == num_normals);
 
   me = BKE_mesh_new_nomain(num_verts, 0, 0, num_faces * 3, num_faces);
   if (!me) {
@@ -3336,9 +3331,6 @@ static Mesh *create_liquid_geometry(FluidDomainSettings *fds,
   co_offset[1] = (fds->p0[1] + fds->p1[1]) / 2.0f;
   co_offset[2] = (fds->p0[2] + fds->p1[2]) / 2.0f;
 
-  /* Normals. */
-  normals = MEM_callocN(sizeof(short[3]) * num_normals, "Fluidmesh_tmp_normals");
-
   /* Velocities. */
   /* If needed, vertex velocities will be read too. */
   bool use_speedvectors = fds->flags & FLUID_DOMAIN_USE_SPEED_VECTORS;
@@ -3352,7 +3344,7 @@ static Mesh *create_liquid_geometry(FluidDomainSettings *fds,
   }
 
   /* Loop for vertices and normals. */
-  for (i = 0, no_s = normals; i < num_verts && i < num_normals; i++, mverts++, no_s += 3) {
+  for (i = 0; i < num_verts; i++, mverts++) {
 
     /* Vertices (data is normalized cube around domain origin). */
     mverts->co[0] = manta_liquid_get_vertex_x_at(fds->fluid, i);
@@ -3378,12 +3370,6 @@ static Mesh *create_liquid_geometry(FluidDomainSettings *fds,
            mverts->co[2]);
 #  endif
 
-    /* Normals (data is normalized cube around domain origin). */
-    no[0] = manta_liquid_get_normal_x_at(fds->fluid, i);
-    no[1] = manta_liquid_get_normal_y_at(fds->fluid, i);
-    no[2] = manta_liquid_get_normal_z_at(fds->fluid, i);
-
-    normal_float_to_short_v3(no_s, no);
 #  ifdef DEBUG_PRINT
     /* Debugging: Print coordinates of normals. */
     printf("no_s[0]: %d, no_s[1]: %d, no_s[2]: %d\n", no_s[0], no_s[1], no_s[2]);
@@ -3427,11 +3413,8 @@ static Mesh *create_liquid_geometry(FluidDomainSettings *fds,
 #  endif
   }
 
-  BKE_mesh_ensure_vertex_normals(me);
+  BKE_mesh_normals_tag_dirty(me);
   BKE_mesh_calc_edges(me, false, false);
-  BKE_mesh_vert_normals_apply(me, (short(*)[3])normals);
-
-  MEM_freeN(normals);
 
   return me;
 }

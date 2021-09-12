@@ -60,6 +60,7 @@
 #include "BKE_gpencil_geom.h"
 #include "BKE_main.h"
 #include "BKE_material.h"
+#include "BKE_mesh.h"
 #include "BKE_object.h"
 
 #include "DEG_depsgraph_query.h"
@@ -2274,6 +2275,8 @@ static void gpencil_generate_edgeloops(Object *ob,
     return;
   }
 
+  const float(*vert_normals)[3] = BKE_mesh_ensure_vertex_normals(me);
+
   /* Arrays for all edge vertices (forward and backward) that form a edge loop.
    * This is reused for each edge-loop to create gpencil stroke. */
   uint *stroke = (uint *)MEM_mallocN(sizeof(uint) * me->totedge * 2, __func__);
@@ -2287,13 +2290,13 @@ static void gpencil_generate_edgeloops(Object *ob,
     MEdge *ed = &me->medge[i];
     gped = &gp_edges[i];
     MVert *mv1 = &me->mvert[ed->v1];
-    normal_short_to_float_v3(gped->n1, mv1->no);
+    copy_v3_v3(gped->n1, vert_normals[ed->v1]);
 
     gped->v1 = ed->v1;
     copy_v3_v3(gped->v1_co, mv1->co);
 
     MVert *mv2 = &me->mvert[ed->v2];
-    normal_short_to_float_v3(gped->n2, mv2->no);
+    copy_v3_v3(gped->n2, vert_normals[ed->v2]);
     gped->v2 = ed->v2;
     copy_v3_v3(gped->v2_co, mv2->co);
 
@@ -2362,7 +2365,7 @@ static void gpencil_generate_edgeloops(Object *ob,
 
       /* Add segment. */
       bGPDspoint *pt = &gps_stroke->points[i];
-      normal_short_to_float_v3(fpt, mv->no);
+      copy_v3_v3(fpt, vert_normals[vertex_index]);
       mul_v3_v3fl(fpt, fpt, offset);
       add_v3_v3v3(&pt->x, mv->co, fpt);
       mul_m4_v3(matrix, &pt->x);

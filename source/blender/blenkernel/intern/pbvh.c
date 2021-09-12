@@ -1087,7 +1087,7 @@ static void pbvh_update_normals_store_task_cb(void *__restrict userdata,
        * so we know only this thread will handle this vertex. */
       if (mvert->flag & ME_VERT_PBVH_UPDATE) {
         normalize_v3(vnors[v]);
-        normal_float_to_short_v3(mvert->no, vnors[v]);
+        copy_v3_v3(pbvh->vert_normals[v], vnors[v]);
         mvert->flag &= ~ME_VERT_PBVH_UPDATE;
       }
     }
@@ -2967,7 +2967,8 @@ void pbvh_vertex_iter_init(PBVH *pbvh, PBVHNode *node, PBVHVertexIter *vi, int m
   vi->vert_indices = vert_indices;
   vi->mverts = verts;
 
-  vi->vert_normals = BKE_mesh_ensure_vertex_normals(pbvh->mesh);
+  /* Sculpt/paint code can adjust normals when restoring mesh data. */
+  vi->vert_normals = (float(*)[3])BKE_mesh_ensure_vertex_normals(pbvh->mesh);
 
   if (pbvh->type == PBVH_BMESH) {
     BLI_gsetIterator_init(&vi->bm_unique_verts, node->bm_unique_verts);

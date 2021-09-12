@@ -94,7 +94,7 @@ typedef struct WeightedNormalData {
   const float split_angle;
 
   MPoly *mpoly;
-  float (*polynors)[3];
+  const float (*polynors)[3];
   int *poly_strength;
 
   MDeformVert *dvert;
@@ -144,7 +144,7 @@ static void aggregate_item_normal(WeightedNormalModifierData *wnmd,
                                   const float curr_val,
                                   const bool use_face_influence)
 {
-  float(*polynors)[3] = wn_data->polynors;
+  const float(*polynors)[3] = wn_data->polynors;
 
   MDeformVert *dvert = wn_data->dvert;
   const int defgrp_index = wn_data->defgrp_index;
@@ -207,8 +207,7 @@ static void apply_weights_vertex_normal(WeightedNormalModifierData *wnmd,
   int *loop_to_poly = wn_data->loop_to_poly;
 
   MPoly *mpoly = wn_data->mpoly;
-  const float(*vert_normals)[3] = wn_data->vert_normals;
-  float(*polynors)[3] = wn_data->polynors;
+  const float(*polynors)[3] = wn_data->polynors;
   int *poly_strength = wn_data->poly_strength;
 
   MDeformVert *dvert = wn_data->dvert;
@@ -244,7 +243,7 @@ static void apply_weights_vertex_normal(WeightedNormalModifierData *wnmd,
                                 numLoops,
                                 mpoly,
                                 polynors,
-                                vert_normals,
+                                wn_data->vert_normals,
                                 numPolys,
                                 true,
                                 split_angle,
@@ -363,6 +362,7 @@ static void apply_weights_vertex_normal(WeightedNormalModifierData *wnmd,
     }
 
     BKE_mesh_normals_loop_custom_set(mvert,
+                                     wn_data->vert_normals,
                                      numVerts,
                                      medge,
                                      numEdges,
@@ -418,7 +418,7 @@ static void apply_weights_vertex_normal(WeightedNormalModifierData *wnmd,
                                   numLoops,
                                   mpoly,
                                   polynors,
-                                  vert_normals,
+                                  wn_data->vert_normals,
                                   numPolys,
                                   true,
                                   split_angle,
@@ -434,6 +434,7 @@ static void apply_weights_vertex_normal(WeightedNormalModifierData *wnmd,
       }
 
       BKE_mesh_normals_loop_custom_set(mvert,
+                                       wn_data->vert_normals,
                                        numVerts,
                                        medge,
                                        numEdges,

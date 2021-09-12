@@ -130,7 +130,9 @@ struct PBVH {
 
   /* Mesh data */
   const struct Mesh *mesh;
-  const float (*vert_normals)[3];
+
+  /* Normals can be updated for drawing. */
+  float (*vert_normals)[3];
   MVert *verts;
   const MPoly *mpoly;
   const MLoop *mloop;

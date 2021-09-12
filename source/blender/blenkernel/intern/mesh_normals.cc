@@ -268,7 +268,7 @@ const float (*BKE_mesh_ensure_vertex_normals(const Mesh *mesh))[3]
 {
   if (!(mesh->runtime.cd_dirty_vert & CD_MASK_NORMAL ||
         mesh->runtime.cd_dirty_poly & CD_MASK_NORMAL)) {
-    BLI_assert(CustomData_has_layer(mesh->vdata, CD_NORMAL));
+    BLI_assert(CustomData_has_layer(&mesh->vdata, CD_NORMAL));
     return (const float(*)[3])CustomData_get_layer(&mesh->vdata, CD_NORMAL);
   }
 
@@ -276,7 +276,7 @@ const float (*BKE_mesh_ensure_vertex_normals(const Mesh *mesh))[3]
   BLI_mutex_lock(mesh_eval_mutex);
   if (!(mesh->runtime.cd_dirty_vert & CD_MASK_NORMAL ||
         mesh->runtime.cd_dirty_poly & CD_MASK_NORMAL)) {
-    BLI_assert(CustomData_has_layer(mesh->vdata, CD_NORMAL));
+    BLI_assert(CustomData_has_layer(&mesh->vdata, CD_NORMAL));
     return (const float(*)[3])CustomData_get_layer(&mesh->vdata, CD_NORMAL);
   }
 
@@ -369,6 +369,7 @@ void BKE_mesh_calc_normals(Mesh *mesh)
   TIMEIT_END_AVERAGED(BKE_mesh_calc_normals);
 #endif
   mesh->runtime.cd_dirty_vert &= ~CD_MASK_NORMAL;
+  mesh->runtime.cd_dirty_poly &= ~CD_MASK_NORMAL;
 }
 
 void BKE_mesh_calc_normals_looptri(MVert *mverts,
@@ -768,7 +769,6 @@ static void mesh_edges_sharp_tag(LoopSplitTaskDataCommon *data,
                                  const float split_angle,
                                  const bool do_sharp_edges_tag)
 {
-  const MVert *mverts = data->mverts;
   const MEdge *medges = data->medges;
   const MLoop *mloops = data->mloops;
 

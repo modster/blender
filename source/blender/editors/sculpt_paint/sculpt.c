@@ -178,7 +178,7 @@ void SCULPT_vertex_normal_get(SculptSession *ss, int index, float no[3])
         copy_v3_v3(no, vert_normals[index]);
       }
       else {
-        normal_short_to_float_v3(no, ss->mvert[index].no);
+        copy_v3_v3(no, ss->vert_normals[index]);
       }
       break;
     }
@@ -1496,7 +1496,7 @@ static void paint_mesh_restore_co_task_cb(void *__restrict userdata,
     if (orig_data.unode->type == SCULPT_UNDO_COORDS) {
       copy_v3_v3(vd.co, orig_data.co);
       if (vd.no) {
-        copy_v3_v3(vd.no, orig_data.no);
+        normal_short_to_float_v3(vd.no, orig_data.no);
       }
       else {
         normal_short_to_float_v3(vd.fno, orig_data.no);
@@ -2052,7 +2052,7 @@ static void calc_area_normal_and_center_task_cb(void *__restrict userdata,
       float co[3];
 
       /* For bm_vert only. */
-      short no_s[3];
+      float no_s[3];
 
       if (use_original) {
         if (unode->bm_entry) {
@@ -2060,11 +2060,11 @@ static void calc_area_normal_and_center_task_cb(void *__restrict userdata,
           const short *temp_no_s;
           BM_log_original_vert_data(ss->bm_log, vd.bm_vert, &temp_co, &temp_no_s);
           copy_v3_v3(co, temp_co);
-          copy_v3_v3_short(no_s, temp_no_s);
+          copy_v3_v3(no_s, temp_no_s);
         }
         else {
           copy_v3_v3(co, unode->co[vd.i]);
-          copy_v3_v3_short(no_s, unode->no[vd.i]);
+          copy_v3_v3(no_s, unode->no[vd.i]);
         }
       }
       else {
@@ -2084,11 +2084,11 @@ static void calc_area_normal_and_center_task_cb(void *__restrict userdata,
       data->any_vertex_sampled = true;
 
       if (use_original) {
-        normal_short_to_float_v3(no, no_s);
+        copy_v3_v3(no, no_s);
       }
       else {
         if (vd.no) {
-          normal_short_to_float_v3(no, vd.no);
+          copy_v3_v3(no, vd.no);
         }
         else {
           copy_v3_v3(no, vd.fno);

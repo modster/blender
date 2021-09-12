@@ -1875,17 +1875,6 @@ void BKE_mesh_vert_coords_apply_with_mat4(Mesh *mesh,
   mesh->runtime.cd_dirty_vert |= CD_MASK_NORMAL;
 }
 
-void BKE_mesh_vert_normals_apply(Mesh *mesh, const short (*vert_normals)[3])
-{
-  /* This will just return the pointer if it wasn't a referenced layer. */
-  MVert *mv = CustomData_duplicate_referenced_layer(&mesh->vdata, CD_MVERT, mesh->totvert);
-  mesh->mvert = mv;
-  for (int i = 0; i < mesh->totvert; i++, mv++) {
-    copy_v3_v3_short(mv->no, vert_normals[i]);
-  }
-  mesh->runtime.cd_dirty_vert &= ~CD_MASK_NORMAL;
-}
-
 /**
  * Compute 'split' (aka loop, or per face corner's) normals.
  *
@@ -1974,8 +1963,8 @@ static int split_faces_prepare_new_verts(const Mesh *mesh,
 
   const int loops_len = mesh->totloop;
   int verts_len = mesh->totvert;
-  MVert *mvert = mesh->mvert;
   MLoop *mloop = mesh->mloop;
+  float(*vert_normals)[3] = (float(*)[3])BKE_mesh_ensure_vertex_normals(mesh);
 
   BLI_bitmap *verts_used = BLI_BITMAP_NEW(verts_len, __func__);
   BLI_bitmap *done_loops = BLI_BITMAP_NEW(loops_len, __func__);
@@ -2019,7 +2008,7 @@ static int split_faces_prepare_new_verts(const Mesh *mesh,
          * vnor should always be defined to 'automatic normal' value computed from its polys,
          * not some custom normal.
          * Fortunately, that's the loop normal space's 'lnor' reference vector. ;) */
-        normal_float_to_short_v3(mvert[vert_idx].no, (*lnor_space)->vec_lnor);
+        copy_v3_v3(vert_normals[vert_idx], (*lnor_space)->vec_lnor);
       }
       else {
         /* Add new vert to list. */
@@ -2108,6 +2097,8 @@ static void split_faces_split_new_verts(Mesh *mesh,
 {
   const int verts_len = mesh->totvert - num_new_verts;
   MVert *mvert = mesh->mvert;
+  float(*vert_normals)[3] = (float(*)[3])CustomData_add_layer(
+      &mesh->vdata, CD_NORMAL, CD_DEFAULT, NULL, mesh->totvert);
 
   /* Remember new_verts is a single linklist, so its items are in reversed order... */
   MVert *new_mv = &mvert[mesh->totvert - 1];
@@ -2116,7 +2107,7 @@ static void split_faces_split_new_verts(Mesh *mesh,
     BLI_assert(new_verts->new_index != new_verts->orig_index);
     CustomData_copy_data(&mesh->vdata, &mesh->vdata, new_verts->orig_index, i, 1);
     if (new_verts->vnor) {
-      normal_float_to_short_v3(new_mv->no, new_verts->vnor);
+      copy_v3_v3(vert_normals[i], new_verts->vnor);
     }
   }
 }
