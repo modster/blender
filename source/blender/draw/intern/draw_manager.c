@@ -271,6 +271,17 @@ bool DRW_object_use_hide_faces(const struct Object *ob)
   return false;
 }
 
+bool DRW_object_use_gpencil_engine(const struct Object *ob)
+{
+  BLI_assert((ob->base_flag & BASE_VISIBLE_DEPSGRAPH) != 0);
+
+  if (ob->type == OB_GPENCIL) {
+    return (ob->dtx & OB_USE_GPENCIL_SCENE_ENGINE) == 0;
+  }
+
+  return false;
+}
+
 bool DRW_object_is_visible_psys_in_active_context(const Object *object, const ParticleSystem *psys)
 {
   const bool for_render = DRW_state_is_image_render();

@@ -601,6 +601,8 @@ enum {
   OB_DRAW_NO_SHADOW_CAST = 1 << 9,
   /* Enable lights for grease pencil. */
   OB_USE_GPENCIL_LIGHTS = 1 << 10,
+  /* Use Scene Render Engine for grease pencil. */
+  OB_USE_GPENCIL_SCENE_ENGINE = 1 << 11,
 };
 
 /* empty_drawtype: no flags */
