@@ -110,6 +110,8 @@ set(SRC
   intern/draw_shader.c
   intern/draw_view.c
   engines/basic/basic_engine.c
+  engines/compositor/compositor_engine.cc
+  engines/compositor/compositor_shader.cc
   engines/image/image_engine.c
   engines/image/image_shader.c
   engines/eevee/eevee_camera.cc
@@ -210,6 +212,8 @@ set(SRC
   intern/draw_view.h
   intern/smaa_textures.h
   engines/basic/basic_engine.h
+  engines/compositor/compositor_engine.h
+  engines/compositor/compositor_shader.hh
   engines/eevee/eevee_engine.h
   engines/eevee/eevee_lightcache.h
   engines/eevee/eevee_camera.hh

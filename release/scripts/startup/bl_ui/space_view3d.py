@@ -5966,6 +5966,8 @@ class VIEW3D_PT_shading_render_pass(Panel):
         layout = self.layout
         layout.prop(shading, "render_pass", text="")
 
+        layout.prop(shading, "use_compositor")
+
 
 class VIEW3D_PT_gizmo_display(Panel):
     bl_space_type = 'VIEW_3D'

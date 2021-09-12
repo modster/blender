@@ -94,6 +94,7 @@
 #include "draw_cache_impl.h"
 
 #include "engines/basic/basic_engine.h"
+#include "engines/compositor/compositor_engine.h"
 #include "engines/eevee/eevee_engine.h"
 #include "engines/external/external_engine.h"
 #include "engines/gpencil/gpencil_engine.h"
@@ -1300,6 +1301,10 @@ static void drw_engines_enable(ViewLayer *UNUSED(view_layer),
   drw_engines_enable_from_engine(engine_type, drawtype);
   if (gpencil_engine_needed && ((drawtype >= OB_SOLID) || !use_xray)) {
     use_drw_engine(&draw_engine_gpencil_type);
+  }
+
+  if (((v3d->shading.flag & V3D_SHADING_COMPOSITOR) != 0) && (drawtype >= OB_MATERIAL)) {
+    use_drw_engine(&draw_engine_compositor_type);
   }
   drw_engines_enable_overlays();
 }
@@ -2915,6 +2920,7 @@ void DRW_engines_register(void)
   DRW_engine_register(&draw_engine_overlay_type);
   DRW_engine_register(&draw_engine_select_type);
   DRW_engine_register(&draw_engine_basic_type);
+  DRW_engine_register(&draw_engine_compositor_type);
 
   DRW_engine_register(&draw_engine_image_type);
   DRW_engine_register(DRW_engine_viewport_external_type.draw_engine);
