@@ -28,7 +28,9 @@
 
 CCL_NAMESPACE_BEGIN
 
-/* Convert part information to an index of `BufferParams::pass_offset_`. */
+/* --------------------------------------------------------------------
+ * Convert part information to an index of `BufferParams::pass_offset_`.
+ */
 
 static int pass_type_mode_to_index(PassType pass_type, PassMode mode)
 {
@@ -41,12 +43,26 @@ static int pass_type_mode_to_index(PassType pass_type, PassMode mode)
   return index;
 }
 
-static int pass_to_index(const Pass *pass)
+static int scene_pass_to_index(const Pass *pass)
 {
   return pass_type_mode_to_index(pass->get_type(), pass->get_mode());
 }
 
-/* Buffer Params */
+/* --------------------------------------------------------------------
+ * Buffer pass.
+ */
+
+BufferPass::BufferPass(const Pass *scene_pass)
+    : type(scene_pass->get_type()),
+      mode(scene_pass->get_mode()),
+      name(scene_pass->get_name()),
+      include_albedo(scene_pass->get_include_albedo())
+{
+}
+
+/* --------------------------------------------------------------------
+ * Buffer Params.
+ */
 
 BufferParams::BufferParams()
 {
@@ -61,22 +77,32 @@ BufferParams::BufferParams()
   reset_pass_offset();
 }
 
-void BufferParams::update_passes(const vector<Pass *> &passes)
+void BufferParams::update_passes(const vector<Pass *> &scene_passes)
 {
   update_offset_stride();
   reset_pass_offset();
 
-  pass_stride = 0;
-  for (const Pass *pass : passes) {
-    const int index = pass_to_index(pass);
+  passes.clear();
 
-    if (pass->is_written()) {
+  pass_stride = 0;
+  for (const Pass *scene_pass : scene_passes) {
+    BufferPass buffer_pass(scene_pass);
+
+    if (scene_pass->is_written()) {
+      buffer_pass.offset = pass_stride;
+
+      const int index = scene_pass_to_index(scene_pass);
       if (pass_offset_[index] == PASS_UNUSED) {
         pass_offset_[index] = pass_stride;
       }
 
-      pass_stride += pass->get_info().num_components;
+      pass_stride += scene_pass->get_info().num_components;
     }
+    else {
+      buffer_pass.offset = PASS_UNUSED;
+    }
+
+    passes.emplace_back(std::move(buffer_pass));
   }
 }
 
@@ -97,6 +123,28 @@ int BufferParams::get_pass_offset(PassType pass_type, PassMode mode) const
   return pass_offset_[index];
 }
 
+const BufferPass *BufferParams::find_pass(string_view name) const
+{
+  for (const BufferPass &pass : passes) {
+    if (pass.name == name) {
+      return &pass;
+    }
+  }
+
+  return nullptr;
+}
+
+const BufferPass *BufferParams::find_pass(PassType type, PassMode mode) const
+{
+  for (const BufferPass &pass : passes) {
+    if (pass.type == type && pass.mode == mode) {
+      return &pass;
+    }
+  }
+
+  return nullptr;
+}
+
 void BufferParams::update_offset_stride()
 {
   offset = -(full_x + full_y * width);
@@ -112,10 +160,12 @@ bool BufferParams::modified(const BufferParams &other) const
     return true;
   }
 
-  return memcmp(pass_offset_, other.pass_offset_, sizeof(pass_offset_)) != 0;
+  return passes != other.passes;
 }
 
-/* Render Buffers */
+/* --------------------------------------------------------------------
+ * Render Buffers.
+ */
 
 RenderBuffers::RenderBuffers(Device *device) : buffer(device, "RenderBuffers", MEM_READ_WRITE)
 {

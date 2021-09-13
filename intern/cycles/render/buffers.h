@@ -19,7 +19,7 @@
 
 #include "device/device_memory.h"
 
-#include "render/film.h"
+#include "render/pass.h"
 
 #include "kernel/kernel_types.h"
 
@@ -33,6 +33,28 @@ CCL_NAMESPACE_BEGIN
 class Device;
 struct DeviceDrawParams;
 struct float4;
+
+class BufferPass {
+ public:
+  PassType type = PASS_NONE;
+  PassMode mode = PassMode::NOISY;
+  ustring name;
+  bool include_albedo = false;
+
+  int offset = -1;
+
+  explicit BufferPass(const Pass *scene_pass);
+
+  inline bool operator==(const BufferPass &other) const
+  {
+    return type == other.type && mode == other.mode && name == other.name &&
+           include_albedo == other.include_albedo && offset == other.offset;
+  }
+  inline bool operator!=(const BufferPass &other) const
+  {
+    return !(*this == other);
+  }
+};
 
 /* Buffer Parameters
  * Size of render buffer and how it fits in the full image (border render). */
@@ -55,14 +77,20 @@ class BufferParams {
   /* Runtime fields, only valid after `update_passes()`. */
   int pass_stride = -1;
 
+  vector<BufferPass> passes;
+
   /* functions */
   BufferParams();
 
-  /* Pre-calculate all fields which depends on the passes. */
-  void update_passes(const vector<Pass *> &passes);
+  /* Pre-calculate all fields which depends on the scene passes. */
+  void update_passes(const vector<Pass *> &scene_passes);
 
   /* Returns PASS_UNUSED if there is no such pass in the buffer. */
   int get_pass_offset(PassType type, PassMode mode = PassMode::NOISY) const;
+
+  /* Returns nullptr if pass with given name does not exist. */
+  const BufferPass *find_pass(string_view name) const;
+  const BufferPass *find_pass(PassType type, PassMode mode = PassMode::NOISY) const;
 
   void update_offset_stride();
 
@@ -74,7 +102,9 @@ class BufferParams {
   /* Multipled by 2 to be able to store noisy and denoised pass types. */
   static constexpr int kNumPassOffsets = PASS_NUM * 2;
 
-  /* Indexed by pass type, indicates offset of the corresponding pass in the buffer. */
+  /* Indexed by an index derived from pass type and mode, indicates offset of the corresponding
+   * pass in the buffer.
+   * If there are multiple passes with same type and mode contains lowest offset of all of them. */
   int pass_offset_[kNumPassOffsets];
 };
 
