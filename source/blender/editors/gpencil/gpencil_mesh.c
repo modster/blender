@@ -159,7 +159,7 @@ static bool gpencil_bake_ob_list(bContext *C, Depsgraph *depsgraph, Scene *scene
     if (ob == obact) {
       continue;
     }
-    /* Add selected meshes.*/
+    /* Add selected meshes. */
     if (ob->type == OB_MESH) {
       elem = MEM_callocN(sizeof(GpBakeOb), __func__);
       elem->ob = ob;
@@ -316,7 +316,8 @@ static int gpencil_bake_mesh_animation_exec(bContext *C, wmOperator *op)
                                ob_eval->obmat,
                                frame_offset,
                                use_seams,
-                               use_faces);
+                               use_faces,
+                               true);
 
       /* Reproject all un-tagged created strokes. */
       if (project_type != GP_REPROJECT_KEEP) {

@@ -37,6 +37,7 @@
 #include "RE_pipeline.h"
 
 struct GHash;
+struct GSet;
 struct Main;
 struct Object;
 struct RenderEngine;
@@ -58,6 +59,10 @@ typedef struct RenderPart {
   int nr;           /* nr is partnr */
   short status;
 } RenderPart;
+
+typedef struct HighlightedTile {
+  rcti rect;
+} HighlightedTile;
 
 enum {
   /* PART_STATUS_NONE = 0, */ /* UNUSED */
@@ -118,6 +123,9 @@ struct Render {
   ThreadRWMutex partsmutex;
   struct GHash *parts;
 
+  ThreadMutex highlighted_tiles_mutex;
+  struct GSet *highlighted_tiles;
+
   /* render engine */
   struct RenderEngine *engine;
 
@@ -153,7 +161,7 @@ struct Render {
   void **movie_ctx_arr;
   char viewname[MAX_NAME];
 
-  /* TODO replace by a whole draw manager. */
+  /* TODO: replace by a whole draw manager. */
   void *gl_context;
   void *gpu_context;
 };

@@ -124,8 +124,21 @@ bool RE_engine_is_external(const Render *re)
 
 bool RE_engine_is_opengl(RenderEngineType *render_type)
 {
-  /* TODO refine? Can we have ogl render engine without ogl render pipeline? */
+  /* TODO: refine? Can we have ogl render engine without ogl render pipeline? */
   return (render_type->draw_engine != NULL) && DRW_engine_render_support(render_type->draw_engine);
+}
+
+bool RE_engine_supports_alembic_procedural(const RenderEngineType *render_type, Scene *scene)
+{
+  if ((render_type->flag & RE_USE_ALEMBIC_PROCEDURAL) == 0) {
+    return false;
+  }
+
+  if (BKE_scene_uses_cycles(scene) && !BKE_scene_uses_cycles_experimental_features(scene)) {
+    return false;
+  }
+
+  return true;
 }
 
 /* Create, Free */
@@ -198,6 +211,8 @@ static RenderResult *render_result_from_bake(RenderEngine *engine, int x, int y,
       rr, rl, engine->bake.depth, RE_PASSNAME_COMBINED, "", "RGBA");
   RenderPass *primitive_pass = render_layer_add_pass(rr, rl, 4, "BakePrimitive", "", "RGBA");
   RenderPass *differential_pass = render_layer_add_pass(rr, rl, 4, "BakeDifferential", "", "RGBA");
+
+  render_result_passes_allocated_ensure(rr);
 
   /* Fill render passes from bake pixel array, to be read by the render engine. */
   for (int ty = 0; ty < h; ty++) {
@@ -276,6 +291,15 @@ static RenderPart *get_part_from_result(Render *re, RenderResult *result)
   return BLI_ghash_lookup(re->parts, &key);
 }
 
+static HighlightedTile highlighted_tile_from_result_get(Render *re, RenderResult *result)
+{
+  HighlightedTile tile;
+  tile.rect = result->tilerect;
+  BLI_rcti_translate(&tile.rect, re->disprect.xmin, re->disprect.ymin);
+
+  return tile;
+}
+
 RenderResult *RE_engine_begin_result(
     RenderEngine *engine, int x, int y, int w, int h, const char *layername, const char *viewname)
 {
@@ -310,11 +334,12 @@ RenderResult *RE_engine_begin_result(
 
   result = render_result_new(re, &disprect, RR_USE_MEM, layername, viewname);
 
-  /* todo: make this thread safe */
+  /* TODO: make this thread safe. */
 
   /* can be NULL if we CLAMP the width or height to 0 */
   if (result) {
     render_result_clone_passes(re, result, viewname);
+    render_result_passes_allocated_ensure(result);
 
     RenderPart *pa;
 
@@ -340,6 +365,17 @@ RenderResult *RE_engine_begin_result(
   return result;
 }
 
+static void re_ensure_passes_allocated_thread_safe(Render *re)
+{
+  if (!re->result->passes_allocated) {
+    BLI_rw_mutex_lock(&re->resultmutex, THREAD_LOCK_WRITE);
+    if (!re->result->passes_allocated) {
+      render_result_passes_allocated_ensure(re->result);
+    }
+    BLI_rw_mutex_unlock(&re->resultmutex);
+  }
+}
+
 void RE_engine_update_result(RenderEngine *engine, RenderResult *result)
 {
   if (engine->bake.pixels) {
@@ -350,6 +386,7 @@ void RE_engine_update_result(RenderEngine *engine, RenderResult *result)
   Render *re = engine->re;
 
   if (result) {
+    re_ensure_passes_allocated_thread_safe(re);
     render_result_merge(re->result, result);
     result->renlay = result->layers.first; /* weak, draws first layer always */
     re->display_update(re->duh, result, NULL);
@@ -387,6 +424,8 @@ void RE_engine_end_result(
     return;
   }
 
+  re_ensure_passes_allocated_thread_safe(re);
+
   /* merge. on break, don't merge in result for preview renders, looks nicer */
   if (!highlight) {
     /* for exr tile render, detect tiles that are done */
@@ -400,6 +439,30 @@ void RE_engine_end_result(
        * buffers, we are going to get OpenEXR save errors. */
       fprintf(stderr, "RenderEngine.end_result: dimensions do not match any OpenEXR tile.\n");
     }
+  }
+
+  if (re->engine && (re->engine->flag & RE_ENGINE_HIGHLIGHT_TILES)) {
+    BLI_mutex_lock(&re->highlighted_tiles_mutex);
+
+    if (re->highlighted_tiles == NULL) {
+      re->highlighted_tiles = BLI_gset_new(
+          BLI_ghashutil_inthash_v4_p, BLI_ghashutil_inthash_v4_cmp, "highlighted tiles");
+    }
+
+    HighlightedTile tile = highlighted_tile_from_result_get(re, result);
+    if (highlight) {
+      void **tile_in_set;
+      if (!BLI_gset_ensure_p_ex(re->highlighted_tiles, &tile, &tile_in_set)) {
+        *tile_in_set = MEM_mallocN(sizeof(HighlightedTile), __func__);
+        memcpy(*tile_in_set, &tile, sizeof(tile));
+      }
+      BLI_gset_add(re->highlighted_tiles, &tile);
+    }
+    else {
+      BLI_gset_remove(re->highlighted_tiles, &tile, MEM_freeN);
+    }
+
+    BLI_mutex_unlock(&re->highlighted_tiles_mutex);
   }
 
   if (!cancel || merge_results) {
@@ -573,43 +636,43 @@ rcti *RE_engine_get_current_tiles(Render *re, int *r_total_tiles, bool *r_needs_
   rcti *tiles = tiles_static;
   int allocation_size = BLENDER_MAX_THREADS;
 
-  BLI_rw_mutex_lock(&re->partsmutex, THREAD_LOCK_READ);
+  BLI_mutex_lock(&re->highlighted_tiles_mutex);
 
   *r_needs_free = false;
 
-  if (!re->parts || (re->engine && (re->engine->flag & RE_ENGINE_HIGHLIGHT_TILES) == 0)) {
+  if (re->highlighted_tiles == NULL) {
     *r_total_tiles = 0;
-    BLI_rw_mutex_unlock(&re->partsmutex);
+    BLI_mutex_unlock(&re->highlighted_tiles_mutex);
     return NULL;
   }
 
-  GHashIterator pa_iter;
-  GHASH_ITER (pa_iter, re->parts) {
-    RenderPart *pa = BLI_ghashIterator_getValue(&pa_iter);
-    if (pa->status == PART_STATUS_IN_PROGRESS) {
-      if (total_tiles >= allocation_size) {
-        /* Just in case we're using crazy network rendering with more
-         * workers than BLENDER_MAX_THREADS.
+  GSET_FOREACH_BEGIN (HighlightedTile *, tile, re->highlighted_tiles) {
+    if (total_tiles >= allocation_size) {
+      /* Just in case we're using crazy network rendering with more
+       * workers than BLENDER_MAX_THREADS.
+       */
+      allocation_size += allocation_step;
+      if (tiles == tiles_static) {
+        /* Can not realloc yet, tiles are pointing to a
+         * stack memory.
          */
-        allocation_size += allocation_step;
-        if (tiles == tiles_static) {
-          /* Can not realloc yet, tiles are pointing to a
-           * stack memory.
-           */
-          tiles = MEM_mallocN(allocation_size * sizeof(rcti), "current engine tiles");
-        }
-        else {
-          tiles = MEM_reallocN(tiles, allocation_size * sizeof(rcti));
-        }
-        *r_needs_free = true;
+        tiles = MEM_mallocN(allocation_size * sizeof(rcti), "current engine tiles");
       }
-      tiles[total_tiles] = pa->disprect;
-
-      total_tiles++;
+      else {
+        tiles = MEM_reallocN(tiles, allocation_size * sizeof(rcti));
+      }
+      *r_needs_free = true;
     }
+    tiles[total_tiles] = tile->rect;
+
+    total_tiles++;
   }
-  BLI_rw_mutex_unlock(&re->partsmutex);
+  GSET_FOREACH_END();
+
+  BLI_mutex_unlock(&re->highlighted_tiles_mutex);
+
   *r_total_tiles = total_tiles;
+
   return tiles;
 }
 
@@ -679,7 +742,7 @@ static void engine_depsgraph_init(RenderEngine *engine, ViewLayer *view_layer)
       DRW_render_context_enable(engine->re);
     }
 
-    DEG_evaluate_on_framechange(depsgraph, CFRA);
+    DEG_evaluate_on_framechange(depsgraph, BKE_scene_frame_get(scene));
 
     if (use_gpu_context) {
       DRW_render_context_disable(engine->re);
@@ -735,9 +798,9 @@ void RE_bake_engine_set_engine_parameters(Render *re, Main *bmain, Scene *scene)
   render_copy_renderdata(&re->r, &scene->r);
 }
 
-bool RE_bake_has_engine(Render *re)
+bool RE_bake_has_engine(const Render *re)
 {
-  RenderEngineType *type = RE_engines_find(re->r.engine);
+  const RenderEngineType *type = RE_engines_find(re->r.engine);
   return (type->bake != NULL);
 }
 
@@ -812,7 +875,7 @@ bool RE_bake_engine(Render *re,
   engine->flag &= ~RE_ENGINE_RENDERING;
 
   /* Free depsgraph outside of parts mutex lock, since this locks OpenGL context
-   * while the the UI drawing might also lock the OpenGL context and parts mutex. */
+   * while the UI drawing might also lock the OpenGL context and parts mutex. */
   engine_depsgraph_free(engine);
   BLI_rw_mutex_lock(&re->partsmutex, THREAD_LOCK_WRITE);
 
@@ -1037,7 +1100,7 @@ bool RE_engine_render(Render *re, bool do_all)
   /* re->engine becomes zero if user changed active render engine during render */
   if (!engine_keep_depsgraph(engine) || !re->engine) {
     /* Free depsgraph outside of parts mutex lock, since this locks OpenGL context
-     * while the the UI drawing might also lock the OpenGL context and parts mutex. */
+     * while the UI drawing might also lock the OpenGL context and parts mutex. */
     BLI_rw_mutex_unlock(&re->partsmutex);
     engine_depsgraph_free(engine);
     BLI_rw_mutex_lock(&re->partsmutex, THREAD_LOCK_WRITE);

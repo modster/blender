@@ -225,7 +225,6 @@ class DepsgraphNodeBuilder : public DepsgraphBuilder {
   virtual void build_texture(Tex *tex);
   virtual void build_image(Image *image);
   virtual void build_world(World *world);
-  virtual void build_gpencil(bGPdata *gpd);
   virtual void build_cachefile(CacheFile *cache_file);
   virtual void build_mask(Mask *mask);
   virtual void build_movieclip(MovieClip *clip);
@@ -289,7 +288,7 @@ class DepsgraphNodeBuilder : public DepsgraphBuilder {
    * setting the current state. */
   Collection *collection_;
   /* Accumulated flag over the hierarchy of currently building collections.
-   * Denotes whether all the hierarchy from parent of collection_ to the
+   * Denotes whether all the hierarchy from parent of `collection_` to the
    * very root is visible (aka not restricted.). */
   bool is_parent_collection_visible_;
 

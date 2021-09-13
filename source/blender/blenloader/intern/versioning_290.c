@@ -80,6 +80,7 @@
 
 #include "BLO_readfile.h"
 #include "readfile.h"
+#include "versioning_common.h"
 
 /* Make preferences read-only, use versioning_userdef.c. */
 #define U (*((const UserDef *)&U))
@@ -117,23 +118,37 @@ static bool can_use_proxy(const Sequence *seq, int psize)
 }
 
 /* image_size is width or height depending what RNA property is converted - X or Y. */
-static void seq_convert_transform_animation(const Scene *scene,
+static void seq_convert_transform_animation(const Sequence *seq,
+                                            const Scene *scene,
                                             const char *path,
-                                            const int image_size)
+                                            const int image_size,
+                                            const int scene_size)
 {
   if (scene->adt == NULL || scene->adt->action == NULL) {
     return;
   }
 
-  FCurve *fcu = BKE_fcurve_find(&scene->adt->action->curves, path, 0);
-  if (fcu != NULL && !BKE_fcurve_is_empty(fcu)) {
-    BezTriple *bezt = fcu->bezt;
-    for (int i = 0; i < fcu->totvert; i++, bezt++) {
-      /* Same math as with old_image_center_*, but simplified. */
-      bezt->vec[0][1] = image_size / 2 + bezt->vec[0][1] - scene->r.xsch / 2;
-      bezt->vec[1][1] = image_size / 2 + bezt->vec[1][1] - scene->r.xsch / 2;
-      bezt->vec[2][1] = image_size / 2 + bezt->vec[2][1] - scene->r.xsch / 2;
+  /* Hardcoded legacy bit-flags which has been removed. */
+  const uint32_t use_transform_flag = (1 << 16);
+  const uint32_t use_crop_flag = (1 << 17);
+
+  /* Convert offset animation, but only if crop is not used. */
+  if ((seq->flag & use_transform_flag) != 0 && (seq->flag & use_crop_flag) == 0) {
+    FCurve *fcu = BKE_fcurve_find(&scene->adt->action->curves, path, 0);
+    if (fcu != NULL && !BKE_fcurve_is_empty(fcu)) {
+      BezTriple *bezt = fcu->bezt;
+      for (int i = 0; i < fcu->totvert; i++, bezt++) {
+        /* Same math as with old_image_center_*, but simplified. */
+        bezt->vec[0][1] = (image_size - scene_size) / 2 + bezt->vec[0][1];
+        bezt->vec[1][1] = (image_size - scene_size) / 2 + bezt->vec[1][1];
+        bezt->vec[2][1] = (image_size - scene_size) / 2 + bezt->vec[2][1];
+      }
     }
+  }
+  else { /* Else, remove offset animation. */
+    FCurve *fcu = BKE_fcurve_find(&scene->adt->action->curves, path, 0);
+    BLI_remlink(&scene->adt->action->curves, fcu);
+    BKE_fcurve_free(fcu);
   }
 }
 
@@ -155,7 +170,7 @@ static void seq_convert_transform_crop(const Scene *scene,
   int image_size_x = scene->r.xsch;
   int image_size_y = scene->r.ysch;
 
-  /* Hardcoded legacy bit-flags which has been removed. */
+  /* Hard-coded legacy bit-flags which has been removed. */
   const uint32_t use_transform_flag = (1 << 16);
   const uint32_t use_crop_flag = (1 << 17);
 
@@ -231,18 +246,15 @@ static void seq_convert_transform_crop(const Scene *scene,
   t->xofs = old_image_center_x - scene->r.xsch / 2;
   t->yofs = old_image_center_y - scene->r.ysch / 2;
 
-  /* Convert offset animation, but only if crop is not used. */
-  if ((seq->flag & use_transform_flag) != 0 && (seq->flag & use_crop_flag) == 0) {
-    char name_esc[(sizeof(seq->name) - 2) * 2], *path;
-    BLI_str_escape(name_esc, seq->name + 2, sizeof(name_esc));
+  char name_esc[(sizeof(seq->name) - 2) * 2], *path;
+  BLI_str_escape(name_esc, seq->name + 2, sizeof(name_esc));
 
-    path = BLI_sprintfN("sequence_editor.sequences_all[\"%s\"].transform.offset_x", name_esc);
-    seq_convert_transform_animation(scene, path, image_size_x);
-    MEM_freeN(path);
-    path = BLI_sprintfN("sequence_editor.sequences_all[\"%s\"].transform.offset_y", name_esc);
-    seq_convert_transform_animation(scene, path, image_size_y);
-    MEM_freeN(path);
-  }
+  path = BLI_sprintfN("sequence_editor.sequences_all[\"%s\"].transform.offset_x", name_esc);
+  seq_convert_transform_animation(seq, scene, path, image_size_x, scene->r.xsch);
+  MEM_freeN(path);
+  path = BLI_sprintfN("sequence_editor.sequences_all[\"%s\"].transform.offset_y", name_esc);
+  seq_convert_transform_animation(seq, scene, path, image_size_y, scene->r.ysch);
+  MEM_freeN(path);
 
   seq->flag &= ~use_transform_flag;
   seq->flag &= ~use_crop_flag;
@@ -675,7 +687,7 @@ void do_versions_after_linking_290(Main *bmain, ReportList *UNUSED(reports))
 
   if (!MAIN_VERSION_ATLEAST(bmain, 293, 16)) {
     LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
-      seq_update_meta_disp_range(SEQ_editing_get(scene, false));
+      seq_update_meta_disp_range(SEQ_editing_get(scene));
     }
 
     /* Add a separate socket for Grid node X and Y size. */
@@ -817,33 +829,6 @@ static void do_versions_strip_cache_settings_recursive(const ListBase *seqbase)
   }
 }
 
-static void version_node_socket_name(bNodeTree *ntree,
-                                     const int node_type,
-                                     const char *old_name,
-                                     const char *new_name)
-{
-  LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
-    if (node->type == node_type) {
-      LISTBASE_FOREACH (bNodeSocket *, socket, &node->inputs) {
-        if (STREQ(socket->name, old_name)) {
-          strcpy(socket->name, new_name);
-        }
-        if (STREQ(socket->identifier, old_name)) {
-          strcpy(socket->identifier, new_name);
-        }
-      }
-      LISTBASE_FOREACH (bNodeSocket *, socket, &node->outputs) {
-        if (STREQ(socket->name, old_name)) {
-          strcpy(socket->name, new_name);
-        }
-        if (STREQ(socket->identifier, old_name)) {
-          strcpy(socket->identifier, new_name);
-        }
-      }
-    }
-  }
-}
-
 static void version_node_join_geometry_for_multi_input_socket(bNodeTree *ntree)
 {
   LISTBASE_FOREACH_MUTABLE (bNodeLink *, link, &ntree->links) {
@@ -859,26 +844,6 @@ static void version_node_join_geometry_for_multi_input_socket(bNodeTree *ntree)
       nodeRemoveSocket(ntree, node, socket->next);
     }
   }
-}
-
-static ARegion *do_versions_add_region_if_not_found(ListBase *regionbase,
-                                                    int region_type,
-                                                    const char *name,
-                                                    int link_after_region_type)
-{
-  ARegion *link_after_region = NULL;
-  LISTBASE_FOREACH (ARegion *, region, regionbase) {
-    if (region->regiontype == region_type) {
-      return NULL;
-    }
-    if (region->regiontype == link_after_region_type) {
-      link_after_region = region;
-    }
-  }
-  ARegion *new_region = MEM_callocN(sizeof(ARegion), name);
-  new_region->regiontype = region_type;
-  BLI_insertlinkafter(regionbase, link_after_region, new_region);
-  return new_region;
 }
 
 /* NOLINTNEXTLINE: readability-function-size */
@@ -1458,7 +1423,7 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
       }
     }
 
-    /* Replace object hidden filter with inverted object visible filter.  */
+    /* Replace object hidden filter with inverted object visible filter. */
     LISTBASE_FOREACH (bScreen *, screen, &bmain->screens) {
       LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
         LISTBASE_FOREACH (SpaceLink *, space, &area->spacedata) {
@@ -1658,7 +1623,7 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
     }
 
     LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
-      Editing *ed = SEQ_editing_get(scene, false);
+      Editing *ed = SEQ_editing_get(scene);
       if (ed == NULL) {
         continue;
       }
@@ -2034,7 +1999,7 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
       }
     }
 
-    /* Initialize the spread parameter for area lights*/
+    /* Initialize the spread parameter for area lights. */
     if (!DNA_struct_elem_find(fd->filesdna, "Lamp", "float", "area_spread")) {
       LISTBASE_FOREACH (Light *, la, &bmain->lights) {
         la->area_spread = DEG2RADF(180.0f);

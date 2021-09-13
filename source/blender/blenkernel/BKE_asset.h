@@ -27,6 +27,7 @@
 extern "C" {
 #endif
 
+struct AssetLibraryReference;
 struct AssetMetaData;
 struct BlendDataReader;
 struct BlendWriter;
@@ -57,6 +58,8 @@ struct AssetTag *BKE_asset_metadata_tag_add(struct AssetMetaData *asset_data, co
 struct AssetTagEnsureResult BKE_asset_metadata_tag_ensure(struct AssetMetaData *asset_data,
                                                           const char *name);
 void BKE_asset_metadata_tag_remove(struct AssetMetaData *asset_data, struct AssetTag *tag);
+
+void BKE_asset_library_reference_init_default(struct AssetLibraryReference *library_ref);
 
 void BKE_asset_metadata_idprop_ensure(struct AssetMetaData *asset_data, struct IDProperty *prop);
 struct IDProperty *BKE_asset_metadata_idprop_find(const struct AssetMetaData *asset_data,

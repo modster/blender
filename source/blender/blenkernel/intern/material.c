@@ -135,7 +135,7 @@ static void material_copy_data(Main *bmain, ID *id_dst, const ID *id_src, const 
 
   BLI_listbase_clear(&material_dst->gpumaterial);
 
-  /* TODO Duplicate Engine Settings and set runtime to NULL */
+  /* TODO: Duplicate Engine Settings and set runtime to NULL. */
 }
 
 static void material_free_data(ID *id)
@@ -179,31 +179,30 @@ static void material_foreach_id(ID *id, LibraryForeachIDData *data)
 static void material_blend_write(BlendWriter *writer, ID *id, const void *id_address)
 {
   Material *ma = (Material *)id;
-  if (ma->id.us > 0 || BLO_write_is_undo(writer)) {
-    /* Clean up, important in undo case to reduce false detection of changed datablocks. */
-    ma->texpaintslot = NULL;
-    BLI_listbase_clear(&ma->gpumaterial);
 
-    /* write LibData */
-    BLO_write_id_struct(writer, Material, id_address, &ma->id);
-    BKE_id_blend_write(writer, &ma->id);
+  /* Clean up, important in undo case to reduce false detection of changed datablocks. */
+  ma->texpaintslot = NULL;
+  BLI_listbase_clear(&ma->gpumaterial);
 
-    if (ma->adt) {
-      BKE_animdata_blend_write(writer, ma->adt);
-    }
+  /* write LibData */
+  BLO_write_id_struct(writer, Material, id_address, &ma->id);
+  BKE_id_blend_write(writer, &ma->id);
 
-    /* nodetree is integral part of material, no libdata */
-    if (ma->nodetree) {
-      BLO_write_struct(writer, bNodeTree, ma->nodetree);
-      ntreeBlendWrite(writer, ma->nodetree);
-    }
+  if (ma->adt) {
+    BKE_animdata_blend_write(writer, ma->adt);
+  }
 
-    BKE_previewimg_blend_write(writer, ma->preview);
+  /* nodetree is integral part of material, no libdata */
+  if (ma->nodetree) {
+    BLO_write_struct(writer, bNodeTree, ma->nodetree);
+    ntreeBlendWrite(writer, ma->nodetree);
+  }
 
-    /* grease pencil settings */
-    if (ma->gp_style) {
-      BLO_write_struct(writer, MaterialGPencilStyle, ma->gp_style);
-    }
+  BKE_previewimg_blend_write(writer, ma->preview);
+
+  /* grease pencil settings */
+  if (ma->gp_style) {
+    BLO_write_struct(writer, MaterialGPencilStyle, ma->gp_style);
   }
 }
 
@@ -864,7 +863,7 @@ void BKE_object_material_resize(Main *bmain, Object *ob, const short totcol, boo
     ob->mat = newmatar;
     ob->matbits = newmatbits;
   }
-  /* XXX, why not realloc on shrink? - campbell */
+  /* XXX(campbell): why not realloc on shrink? */
 
   ob->totcol = totcol;
   if (ob->totcol && ob->actcol == 0) {
@@ -1168,7 +1167,7 @@ void BKE_object_material_from_eval_data(Main *bmain, Object *ob_orig, ID *data_e
   BKE_object_materials_test(bmain, ob_orig, data_orig);
 }
 
-/* XXX - this calls many more update calls per object then are needed, could be optimized */
+/* XXX: this calls many more update calls per object then are needed, could be optimized. */
 void BKE_object_material_array_assign(Main *bmain,
                                       struct Object *ob,
                                       struct Material ***matar,
@@ -1802,6 +1801,7 @@ void BKE_material_copybuf_free(void)
 {
   if (matcopybuf.nodetree) {
     ntreeFreeLocalTree(matcopybuf.nodetree);
+    BLI_assert(!matcopybuf.nodetree->id.py_instance); /* Or call #BKE_libblock_free_data_py. */
     MEM_freeN(matcopybuf.nodetree);
     matcopybuf.nodetree = NULL;
   }
@@ -1823,7 +1823,7 @@ void BKE_material_copybuf_copy(Main *bmain, Material *ma)
 
   matcopybuf.preview = NULL;
   BLI_listbase_clear(&matcopybuf.gpumaterial);
-  /* TODO Duplicate Engine Settings and set runtime to NULL */
+  /* TODO: Duplicate Engine Settings and set runtime to NULL. */
   matcopied = 1;
 }
 

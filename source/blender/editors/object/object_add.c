@@ -407,7 +407,7 @@ void ED_object_add_generic_props(wmOperatorType *ot, bool do_editmode)
                            "Enter edit mode when adding this object");
     RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
   }
-  /* note: this property gets hidden for add-camera operator */
+  /* NOTE: this property gets hidden for add-camera operator. */
   prop = RNA_def_enum(
       ot->srna, "align", align_options, ALIGN_WORLD, "Align", "The alignment of the new object");
   RNA_def_property_update_runtime(prop, view_align_update);
@@ -766,8 +766,6 @@ static int lightprobe_add_exec(bContext *C, wmOperator *op)
 
   BKE_lightprobe_type_set(probe, type);
 
-  DEG_relations_tag_update(CTX_data_main(C));
-
   return OPERATOR_FINISHED;
 }
 
@@ -883,8 +881,6 @@ static int effector_add_exec(bContext *C, wmOperator *op)
   }
 
   ob->pd = BKE_partdeflect_new(type);
-
-  DEG_relations_tag_update(CTX_data_main(C));
 
   return OPERATOR_FINISHED;
 }
@@ -1015,8 +1011,10 @@ static int object_metaball_add_exec(bContext *C, wmOperator *op)
   if (newob && !enter_editmode) {
     ED_object_editmode_exit_ex(bmain, scene, obedit, EM_FREEDATA);
   }
-
-  WM_event_add_notifier(C, NC_OBJECT | ND_DRAW, obedit);
+  else {
+    /* Only needed in edit-mode (#ED_object_add_type normally handles this). */
+    WM_event_add_notifier(C, NC_OBJECT | ND_DRAW, obedit);
+  }
 
   return OPERATOR_FINISHED;
 }
@@ -1066,8 +1064,6 @@ static int object_add_text_exec(bContext *C, wmOperator *op)
 
   obedit = ED_object_add_type(C, OB_FONT, NULL, loc, rot, enter_editmode, local_view_bits);
   BKE_object_obdata_size_init(obedit, RNA_float_get(op->ptr, "radius"));
-
-  WM_event_add_notifier(C, NC_OBJECT | ND_DRAW, obedit);
 
   return OPERATOR_FINISHED;
 }
@@ -1137,8 +1133,6 @@ static int object_armature_add_exec(bContext *C, wmOperator *op)
   if (newob && !enter_editmode) {
     ED_object_editmode_exit_ex(bmain, scene, obedit, EM_FREEDATA);
   }
-
-  WM_event_add_notifier(C, NC_OBJECT | ND_DRAW, obedit);
 
   return OPERATOR_FINISHED;
 }
@@ -1325,7 +1319,7 @@ static int object_gpencil_add_exec(bContext *C, wmOperator *op)
   float loc[3], rot[3];
   bool newob = false;
 
-  /* Note: We use 'Y' here (not 'Z'), as */
+  /* NOTE: We use 'Y' here (not 'Z'), as. */
   WM_operator_view3d_unit_defaults(C, op);
   if (!ED_object_add_generic_get_opts(C, op, 'Y', loc, rot, NULL, NULL, &local_view_bits, NULL)) {
     return OPERATOR_CANCELLED;
@@ -1670,7 +1664,6 @@ static int collection_instance_add_exec(bContext *C, wmOperator *op)
     return OPERATOR_CANCELLED;
   }
 
-  Scene *scene = CTX_data_scene(C);
   ViewLayer *view_layer = CTX_data_view_layer(C);
 
   /* Avoid dependency cycles. */
@@ -1685,12 +1678,6 @@ static int collection_instance_add_exec(bContext *C, wmOperator *op)
   ob->empty_drawsize = U.collection_instance_empty_size;
   ob->transflag |= OB_DUPLICOLLECTION;
   id_us_plus(&collection->id);
-
-  /* works without this except if you try render right after, see: 22027 */
-  DEG_relations_tag_update(bmain);
-  DEG_id_tag_update(&scene->id, ID_RECALC_SELECT);
-  WM_event_add_notifier(C, NC_SCENE | ND_OB_ACTIVE, scene);
-  WM_event_add_notifier(C, NC_SCENE | ND_LAYER_CONTENT, scene);
 
   return OPERATOR_FINISHED;
 }
@@ -1784,16 +1771,8 @@ static int object_data_instance_add_exec(bContext *C, wmOperator *op)
     return OPERATOR_CANCELLED;
   }
 
-  Scene *scene = CTX_data_scene(C);
-
   ED_object_add_type_with_obdata(
       C, object_type, id->name + 2, loc, rot, false, local_view_bits, id);
-
-  /* Works without this except if you try render right after, see: T22027. */
-  DEG_relations_tag_update(bmain);
-  DEG_id_tag_update(&scene->id, ID_RECALC_SELECT);
-  WM_event_add_notifier(C, NC_SCENE | ND_OB_ACTIVE, scene);
-  WM_event_add_notifier(C, NC_SCENE | ND_LAYER_CONTENT, scene);
 
   return OPERATOR_FINISHED;
 }
@@ -1845,7 +1824,7 @@ static int object_speaker_add_exec(bContext *C, wmOperator *op)
    * ready to be moved around to re-time the sound and/or make new sound clips. */
   {
     /* create new data for NLA hierarchy */
-    AnimData *adt = BKE_animdata_add_id(&ob->id);
+    AnimData *adt = BKE_animdata_ensure_id(&ob->id);
     NlaTrack *nlt = BKE_nlatrack_add(adt, NULL, is_liboverride);
     NlaStrip *strip = BKE_nla_add_soundstrip(bmain, scene, ob->data);
     strip->start = CFRA;
@@ -1854,7 +1833,7 @@ static int object_speaker_add_exec(bContext *C, wmOperator *op)
     /* hook them up */
     BKE_nlatrack_add_strip(nlt, strip, is_liboverride);
 
-    /* auto-name the strip, and give the track an interesting name  */
+    /* Auto-name the strip, and give the track an interesting name. */
     BLI_strncpy(nlt->name, DATA_("SoundTrack"), sizeof(nlt->name));
     BKE_nlastrip_validate_name(adt, strip);
 
@@ -1977,7 +1956,7 @@ void OBJECT_OT_pointcloud_add(wmOperatorType *ot)
 /** \name Delete Object Operator
  * \{ */
 /* remove base from a specific scene */
-/* note: now unlinks constraints as well */
+/* NOTE: now unlinks constraints as well. */
 void ED_object_base_free_and_unlink(Main *bmain, Scene *scene, Object *ob)
 {
   if (ID_REAL_USERS(ob) <= 1 && ID_EXTRA_USERS(ob) == 0 &&
@@ -2163,7 +2142,7 @@ static void copy_object_set_idnew(bContext *C)
 /** \name Make Instanced Objects Real Operator
  * \{ */
 
-/* XXX TODO That whole hierarchy handling based on persistent_id tricks is
+/* XXX TODO: That whole hierarchy handling based on persistent_id tricks is
  * very confusing and convoluted, and it will fail in many cases besides basic ones.
  * Think this should be replaced by a proper tree-like representation of the instantiations,
  * should help a lot in both readability, and precise consistent rebuilding of hierarchy.
@@ -2267,13 +2246,6 @@ static bool dupliobject_instancer_cmp(const void *a_, const void *b_)
   return false;
 }
 
-static bool object_has_geometry_set_instances(const Object *object_eval)
-{
-  struct GeometrySet *geometry_set = object_eval->runtime.geometry_set_eval;
-
-  return (geometry_set != NULL) && BKE_geometry_set_has_instances(geometry_set);
-}
-
 static void make_object_duplilist_real(bContext *C,
                                        Depsgraph *depsgraph,
                                        Scene *scene,
@@ -2287,7 +2259,8 @@ static void make_object_duplilist_real(bContext *C,
 
   Object *object_eval = DEG_get_evaluated_object(depsgraph, base->object);
 
-  if (!(base->object->transflag & OB_DUPLI) && !object_has_geometry_set_instances(object_eval)) {
+  if (!(base->object->transflag & OB_DUPLI) &&
+      !BKE_object_has_geometry_set_instances(object_eval)) {
     return;
   }
 
@@ -2442,7 +2415,7 @@ static void make_object_duplilist_real(bContext *C,
     }
 
     if (ob_dst->parent) {
-      /* note, this may be the parent of other objects, but it should
+      /* NOTE: this may be the parent of other objects, but it should
        * still work out ok */
       BKE_object_apply_mat4(ob_dst, dob->mat, false, true);
 
@@ -2575,7 +2548,7 @@ static void object_data_convert_ensure_curve_cache(Depsgraph *depsgraph, Scene *
     if (ELEM(ob->type, OB_SURF, OB_CURVE, OB_FONT)) {
       /* We need 'for render' ON here, to enable computing bevel dipslist if needed.
        * Also makes sense anyway, we would not want e.g. to lose hidden parts etc. */
-      BKE_displist_make_curveTypes(depsgraph, scene, ob, true, false);
+      BKE_displist_make_curveTypes(depsgraph, scene, ob, true);
     }
     else if (ob->type == OB_MBALL) {
       BKE_displist_make_mball(depsgraph, scene, ob);
@@ -2603,8 +2576,8 @@ static void object_data_convert_curve_to_mesh(Main *bmain, Depsgraph *depsgraph,
   /* Change objects which are using same curve.
    * A bit annoying, but:
    * - It's possible to have multiple curve objects selected which are sharing the same curve
-   *   datablock. We don't want mesh to be created for every of those objects.
-   * - This is how conversion worked for a long long time. */
+   *   data-block. We don't want mesh to be created for every of those objects.
+   * - This is how conversion worked for a long time. */
   LISTBASE_FOREACH (Object *, other_object, &bmain->objects) {
     if (other_object->data == curve) {
       other_object->type = OB_MESH;
@@ -2648,10 +2621,10 @@ static Base *duplibase_for_convert(
   ED_object_base_select(basen, BA_SELECT);
   ED_object_base_select(base, BA_DESELECT);
 
-  /* XXX An ugly hack needed because if we re-run depsgraph with some new MBall objects
-   * having same 'family name' as orig ones, they will affect end result of MBall computation...
+  /* XXX: An ugly hack needed because if we re-run depsgraph with some new meta-ball objects
+   * having same 'family name' as orig ones, they will affect end result of meta-ball computation.
    * For until we get rid of that name-based thingy in MBalls, that should do the trick
-   * (this is weak, but other solution (to change name of obn) is even worse imho).
+   * (this is weak, but other solution (to change name of `obn`) is even worse imho).
    * See T65996. */
   const bool is_meta_ball = (obn->type == OB_MBALL);
   void *obdata = obn->data;
@@ -2794,11 +2767,11 @@ static int object_convert_exec(bContext *C, wmOperator *op)
         basen = duplibase_for_convert(bmain, depsgraph, scene, view_layer, base, NULL);
         newob = basen->object;
 
-        /* decrement original mesh's usage count  */
+        /* Decrement original mesh's usage count. */
         Mesh *me = newob->data;
         id_us_min(&me->id);
 
-        /* make a new copy of the mesh */
+        /* Make a new copy of the mesh. */
         newob->data = BKE_id_copy(bmain, &me->id);
       }
       else {
@@ -2844,7 +2817,8 @@ static int object_convert_exec(bContext *C, wmOperator *op)
                                                    matrix,
                                                    0,
                                                    use_seams,
-                                                   use_faces);
+                                                   use_faces,
+                                                   true);
 
       /* Remove unused materials. */
       int actcol = ob_gpencil->actcol;
@@ -2868,11 +2842,11 @@ static int object_convert_exec(bContext *C, wmOperator *op)
         basen = duplibase_for_convert(bmain, depsgraph, scene, view_layer, base, NULL);
         newob = basen->object;
 
-        /* decrement original mesh's usage count  */
+        /* Decrement original mesh's usage count. */
         Mesh *me = newob->data;
         id_us_min(&me->id);
 
-        /* make a new copy of the mesh */
+        /* Make a new copy of the mesh. */
         newob->data = BKE_id_copy(bmain, &me->id);
       }
       else {
@@ -2893,11 +2867,11 @@ static int object_convert_exec(bContext *C, wmOperator *op)
         basen = duplibase_for_convert(bmain, depsgraph, scene, view_layer, base, NULL);
         newob = basen->object;
 
-        /* decrement original mesh's usage count  */
+        /* Decrement original mesh's usage count. */
         Mesh *me = newob->data;
         id_us_min(&me->id);
 
-        /* make a new copy of the mesh */
+        /* Make a new copy of the mesh. */
         newob->data = BKE_id_copy(bmain, &me->id);
       }
       else {
@@ -2906,7 +2880,7 @@ static int object_convert_exec(bContext *C, wmOperator *op)
       }
 
       /* make new mesh data from the original copy */
-      /* note: get the mesh from the original, not from the copy in some
+      /* NOTE: get the mesh from the original, not from the copy in some
        * cases this doesn't give correct results (when MDEF is used for eg)
        */
       Scene *scene_eval = (Scene *)DEG_get_evaluated_id(depsgraph, &scene->id);
@@ -2926,10 +2900,10 @@ static int object_convert_exec(bContext *C, wmOperator *op)
         basen = duplibase_for_convert(bmain, depsgraph, scene, view_layer, base, NULL);
         newob = basen->object;
 
-        /* decrement original curve's usage count  */
+        /* Decrement original curve's usage count. */
         id_us_min(&((Curve *)newob->data)->id);
 
-        /* make a new copy of the curve */
+        /* Make a new copy of the curve. */
         newob->data = BKE_id_copy(bmain, ob->data);
       }
       else {
@@ -3007,7 +2981,7 @@ static int object_convert_exec(bContext *C, wmOperator *op)
           basen = duplibase_for_convert(bmain, depsgraph, scene, view_layer, base, NULL);
           newob = basen->object;
 
-          /* decrement original curve's usage count  */
+          /* Decrement original curve's usage count. */
           id_us_min(&((Curve *)newob->data)->id);
 
           /* make a new copy of the curve */
@@ -3091,11 +3065,11 @@ static int object_convert_exec(bContext *C, wmOperator *op)
         basen = duplibase_for_convert(bmain, depsgraph, scene, view_layer, base, NULL);
         newob = basen->object;
 
-        /* decrement original pointclouds's usage count  */
+        /* Decrement original point-cloud's usage count. */
         PointCloud *pointcloud = newob->data;
         id_us_min(&pointcloud->id);
 
-        /* make a new copy of the pointcloud */
+        /* Make a new copy of the point-cloud. */
         newob->data = BKE_id_copy(bmain, &pointcloud->id);
       }
       else {
@@ -3349,8 +3323,8 @@ static Base *object_add_duplicate_internal(Main *bmain,
 
 /* single object duplicate, if dupflag==0, fully linked, else it uses the flags given */
 /* leaves selection of base/object unaltered.
- * note: don't call this within a loop since clear_* funcs loop over the entire database.
- * note: caller must do DAG_relations_tag_update(bmain);
+ * NOTE: don't call this within a loop since clear_* funcs loop over the entire database.
+ * NOTE: caller must do DAG_relations_tag_update(bmain);
  *       this is not done automatic since we may duplicate many objects in a batch */
 Base *ED_object_add_duplicate(
     Main *bmain, Scene *scene, ViewLayer *view_layer, Base *base, const eDupli_ID_Flags dupflag)
@@ -3358,8 +3332,13 @@ Base *ED_object_add_duplicate(
   Base *basen;
   Object *ob;
 
-  basen = object_add_duplicate_internal(
-      bmain, scene, view_layer, base->object, dupflag, LIB_ID_DUPLICATE_IS_SUBPROCESS);
+  basen = object_add_duplicate_internal(bmain,
+                                        scene,
+                                        view_layer,
+                                        base->object,
+                                        dupflag,
+                                        LIB_ID_DUPLICATE_IS_SUBPROCESS |
+                                            LIB_ID_DUPLICATE_IS_ROOT_ID);
   if (basen == NULL) {
     return NULL;
   }
@@ -3394,8 +3373,13 @@ static int duplicate_exec(bContext *C, wmOperator *op)
   BKE_main_id_newptr_and_tag_clear(bmain);
 
   CTX_DATA_BEGIN (C, Base *, base, selected_bases) {
-    Base *basen = object_add_duplicate_internal(
-        bmain, scene, view_layer, base->object, dupflag, LIB_ID_DUPLICATE_IS_SUBPROCESS);
+    Base *basen = object_add_duplicate_internal(bmain,
+                                                scene,
+                                                view_layer,
+                                                base->object,
+                                                dupflag,
+                                                LIB_ID_DUPLICATE_IS_SUBPROCESS |
+                                                    LIB_ID_DUPLICATE_IS_ROOT_ID);
 
     /* note that this is safe to do with this context iterator,
      * the list is made in advance */
@@ -3515,7 +3499,7 @@ static int object_add_named_exec(bContext *C, wmOperator *op)
          * the case here. So we have to do the new-ID relinking ourselves
          * (#copy_object_set_idnew()).
          */
-        LIB_ID_DUPLICATE_IS_SUBPROCESS);
+        LIB_ID_DUPLICATE_IS_SUBPROCESS | LIB_ID_DUPLICATE_IS_ROOT_ID);
   }
   else {
     /* basen is actually not a new base in this case. */
@@ -3530,7 +3514,7 @@ static int object_add_named_exec(bContext *C, wmOperator *op)
     return OPERATOR_CANCELLED;
   }
 
-  basen->object->restrictflag &= ~OB_RESTRICT_VIEWPORT;
+  basen->object->visibility_flag &= ~OB_HIDE_VIEWPORT;
 
   /* object_add_duplicate_internal() doesn't deselect other objects, unlike object_add_common() or
    * BKE_view_layer_base_deselect_all(). */

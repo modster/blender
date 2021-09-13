@@ -83,13 +83,13 @@ bool BKE_lib_query_foreachid_process(LibraryForeachIDData *data, ID **id_pp, int
     ID *old_id = *id_pp;
 
     /* Update the callback flags with the ones defined (or forbidden) in `data` by the generic
-     * caller code.  */
+     * caller code. */
     cb_flag = ((cb_flag | data->cb_flag) & ~data->cb_flag_clear);
 
     /* Update the callback flags with some extra information regarding overrides: all 'loopback',
      * 'internal', 'embedded' etc. ID pointers are never overridable. */
-    if (cb_flag & (IDWALK_CB_INTERNAL | IDWALK_CB_EMBEDDED | IDWALK_CB_LOOPBACK |
-                   IDWALK_CB_OVERRIDE_LIBRARY_REFERENCE)) {
+    if (cb_flag &
+        (IDWALK_CB_INTERNAL | IDWALK_CB_LOOPBACK | IDWALK_CB_OVERRIDE_LIBRARY_REFERENCE)) {
       cb_flag |= IDWALK_CB_OVERRIDE_LIBRARY_NOT_OVERRIDABLE;
     }
 
@@ -273,7 +273,7 @@ static void library_foreach_ID_link(Main *bmain,
       continue;
     }
 
-    /* Note: ID.lib pointer is purposefully fully ignored here...
+    /* NOTE: ID.lib pointer is purposefully fully ignored here...
      * We may want to add it at some point? */
 
     if (flag & IDWALK_DO_INTERNAL_RUNTIME_POINTERS) {
@@ -845,7 +845,7 @@ void BKE_library_indirectly_used_data_tag_clear(Main *bmain)
 
     while (i--) {
       LISTBASE_FOREACH (ID *, id, lb_array[i]) {
-        if (id->lib == NULL || id->tag & LIB_TAG_DOIT) {
+        if (!ID_IS_LINKED(id) || id->tag & LIB_TAG_DOIT) {
           /* Local or non-indirectly-used ID (so far), no need to check it further. */
           continue;
         }

@@ -240,14 +240,18 @@ static GVArrayPtr adapt_curve_domain_point_to_spline(const CurveEval &curve, GVA
  * unless it is necessary (in that case the materialize functions will be called).
  */
 template<typename T> class VArray_For_SplineToPoint final : public VArray<T> {
+  GVArrayPtr original_varray_;
   /* Store existing data materialized if it was not already a span. This is expected
    * to be worth it because a single spline's value will likely be accessed many times. */
-  VArray_Span<T> original_data_;
+  fn::GVArray_Span<T> original_data_;
   Array<int> offsets_;
 
  public:
-  VArray_For_SplineToPoint(const VArray<T> &original_varray, Array<int> offsets)
-      : VArray<T>(offsets.last()), original_data_(original_varray), offsets_(std::move(offsets))
+  VArray_For_SplineToPoint(GVArrayPtr original_varray, Array<int> offsets)
+      : VArray<T>(offsets.last()),
+        original_varray_(std::move(original_varray)),
+        original_data_(*original_varray_),
+        offsets_(std::move(offsets))
   {
   }
 
@@ -309,7 +313,7 @@ static GVArrayPtr adapt_curve_domain_spline_to_point(const CurveEval &curve, GVA
 
     Array<int> offsets = curve.control_point_offsets();
     new_varray = std::make_unique<fn::GVArray_For_EmbeddedVArray<T, VArray_For_SplineToPoint<T>>>(
-        offsets.last(), *varray->typed<T>(), std::move(offsets));
+        offsets.last(), std::move(varray), std::move(offsets));
   });
   return new_varray;
 }
@@ -850,17 +854,9 @@ class PositionAttributeProvider final : public BuiltinPointAttributeProvider<flo
       return {};
     }
 
-    bool curve_has_bezier_spline = false;
-    for (SplinePtr &spline : curve->splines()) {
-      if (spline->type() == Spline::Type::Bezier) {
-        curve_has_bezier_spline = true;
-        break;
-      }
-    }
-
     /* Use the regular position virtual array when there aren't any Bezier splines
      * to avoid the overhead of checking the spline type for every point. */
-    if (!curve_has_bezier_spline) {
+    if (!curve->has_spline_with_type(Spline::Type::Bezier)) {
       return BuiltinPointAttributeProvider<float3>::try_get_for_write(component);
     }
 
@@ -896,7 +892,7 @@ class DynamicPointAttributeProvider final : public DynamicAttributesProvider {
 
  public:
   ReadAttributeLookup try_get_for_read(const GeometryComponent &component,
-                                       const StringRef attribute_name) const final
+                                       const AttributeIDRef &attribute_id) const final
   {
     const CurveEval *curve = get_curve_from_component_for_read(component);
     if (curve == nullptr || curve->splines().size() == 0) {
@@ -906,13 +902,13 @@ class DynamicPointAttributeProvider final : public DynamicAttributesProvider {
     Span<SplinePtr> splines = curve->splines();
     Vector<GSpan> spans; /* GSpan has no default constructor. */
     spans.reserve(splines.size());
-    std::optional<GSpan> first_span = splines[0]->attributes.get_for_read(attribute_name);
+    std::optional<GSpan> first_span = splines[0]->attributes.get_for_read(attribute_id);
     if (!first_span) {
       return {};
     }
     spans.append(*first_span);
     for (const int i : IndexRange(1, splines.size() - 1)) {
-      std::optional<GSpan> span = splines[i]->attributes.get_for_read(attribute_name);
+      std::optional<GSpan> span = splines[i]->attributes.get_for_read(attribute_id);
       if (!span) {
         /* All splines should have the same set of data layers. It would be possible to recover
          * here and return partial data instead, but that would add a lot of complexity for a
@@ -949,7 +945,7 @@ class DynamicPointAttributeProvider final : public DynamicAttributesProvider {
 
   /* This function is almost the same as #try_get_for_read, but without const. */
   WriteAttributeLookup try_get_for_write(GeometryComponent &component,
-                                         const StringRef attribute_name) const final
+                                         const AttributeIDRef &attribute_id) const final
   {
     CurveEval *curve = get_curve_from_component_for_write(component);
     if (curve == nullptr || curve->splines().size() == 0) {
@@ -959,13 +955,13 @@ class DynamicPointAttributeProvider final : public DynamicAttributesProvider {
     MutableSpan<SplinePtr> splines = curve->splines();
     Vector<GMutableSpan> spans; /* GMutableSpan has no default constructor. */
     spans.reserve(splines.size());
-    std::optional<GMutableSpan> first_span = splines[0]->attributes.get_for_write(attribute_name);
+    std::optional<GMutableSpan> first_span = splines[0]->attributes.get_for_write(attribute_id);
     if (!first_span) {
       return {};
     }
     spans.append(*first_span);
     for (const int i : IndexRange(1, splines.size() - 1)) {
-      std::optional<GMutableSpan> span = splines[i]->attributes.get_for_write(attribute_name);
+      std::optional<GMutableSpan> span = splines[i]->attributes.get_for_write(attribute_id);
       if (!span) {
         /* All splines should have the same set of data layers. It would be possible to recover
          * here and return partial data instead, but that would add a lot of complexity for a
@@ -1000,16 +996,17 @@ class DynamicPointAttributeProvider final : public DynamicAttributesProvider {
     return attribute;
   }
 
-  bool try_delete(GeometryComponent &component, const StringRef attribute_name) const final
+  bool try_delete(GeometryComponent &component, const AttributeIDRef &attribute_id) const final
   {
     CurveEval *curve = get_curve_from_component_for_write(component);
     if (curve == nullptr) {
       return false;
     }
 
+    /* Reuse the boolean for all splines; we expect all splines to have the same attributes. */
     bool layer_freed = false;
     for (SplinePtr &spline : curve->splines()) {
-      spline->attributes.remove(attribute_name);
+      layer_freed = spline->attributes.remove(attribute_id);
     }
     return layer_freed;
   }
@@ -1037,7 +1034,7 @@ class DynamicPointAttributeProvider final : public DynamicAttributesProvider {
   }
 
   bool try_create(GeometryComponent &component,
-                  const StringRef attribute_name,
+                  const AttributeIDRef &attribute_id,
                   const AttributeDomain domain,
                   const CustomDataType data_type,
                   const AttributeInit &initializer) const final
@@ -1056,7 +1053,7 @@ class DynamicPointAttributeProvider final : public DynamicAttributesProvider {
     /* First check the one case that allows us to avoid copying the input data. */
     if (splines.size() == 1 && initializer.type == AttributeInit::Type::MoveArray) {
       void *source_data = static_cast<const AttributeInitMove &>(initializer).data;
-      if (!splines[0]->attributes.create_by_move(attribute_name, data_type, source_data)) {
+      if (!splines[0]->attributes.create_by_move(attribute_id, data_type, source_data)) {
         MEM_freeN(source_data);
         return false;
       }
@@ -1065,7 +1062,7 @@ class DynamicPointAttributeProvider final : public DynamicAttributesProvider {
 
     /* Otherwise just create a custom data layer on each of the splines. */
     for (const int i : splines.index_range()) {
-      if (!splines[i]->attributes.create(attribute_name, data_type)) {
+      if (!splines[i]->attributes.create(attribute_id, data_type)) {
         /* If attribute creation fails on one of the splines, we cannot leave the custom data
          * layers in the previous splines around, so delete them before returning. However,
          * this is not an expected case. */
@@ -1079,7 +1076,7 @@ class DynamicPointAttributeProvider final : public DynamicAttributesProvider {
       return true;
     }
 
-    WriteAttributeLookup write_attribute = this->try_get_for_write(component, attribute_name);
+    WriteAttributeLookup write_attribute = this->try_get_for_write(component, attribute_id);
     /* We just created the attribute, it should exist. */
     BLI_assert(write_attribute);
 

@@ -55,6 +55,8 @@ struct RenderResult *render_result_new(struct Render *re,
                                        const char *layername,
                                        const char *viewname);
 
+void render_result_passes_allocated_ensure(struct RenderResult *rr);
+
 struct RenderResult *render_result_new_from_exr(
     void *exrhandle, const char *colorspace, bool predivide, int rectx, int recty);
 
@@ -127,7 +129,7 @@ void render_result_rect_get_pixels(struct RenderResult *rr,
 
 void render_result_views_shallowcopy(struct RenderResult *dst, struct RenderResult *src);
 void render_result_views_shallowdelete(struct RenderResult *rr);
-bool render_result_has_views(struct RenderResult *rr);
+bool render_result_has_views(const struct RenderResult *rr);
 
 #define FOREACH_VIEW_LAYER_TO_RENDER_BEGIN(re_, iter_) \
   { \

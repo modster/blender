@@ -130,7 +130,7 @@ static void motion_path_cache(OVERLAY_Data *vedata,
   OVERLAY_PrivateData *pd = vedata->stl->pd;
   const DRWContextState *draw_ctx = DRW_context_state_get();
   struct DRWTextStore *dt = DRW_text_cache_ensure();
-  int txt_flag = DRW_TEXT_CACHE_GLOBALSPACE | DRW_TEXT_CACHE_ASCII;
+  int txt_flag = DRW_TEXT_CACHE_GLOBALSPACE;
   int cfra = (int)DEG_get_ctime(draw_ctx->depsgraph);
   bool selected = (pchan) ? (pchan->bone->flag & BONE_SELECTED) : (ob->base_flag & BASE_SELECTED);
   bool show_keyframes = (avs->path_viewflag & MOTIONPATH_VIEW_KFRAS) != 0;
@@ -177,7 +177,7 @@ static void motion_path_cache(OVERLAY_Data *vedata,
   if (show_frame_no || (show_keyframes_no && show_keyframes)) {
     int i;
     uchar col[4], col_kf[4];
-    /* Color Management: Exception here as texts are drawn in sRGB space directly.  */
+    /* Color Management: Exception here as texts are drawn in sRGB space directly. */
     UI_GetThemeColor3ubv(TH_TEXT_HI, col);
     UI_GetThemeColor3ubv(TH_VERTEX_SELECT, col_kf);
     col[3] = col_kf[3] = 255;

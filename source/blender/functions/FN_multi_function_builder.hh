@@ -398,7 +398,7 @@ template<typename T> class CustomMF_Constant : public MultiFunction {
     if (other2 != nullptr) {
       const CPPType &type = CPPType::get<T>();
       if (type == other2->type_) {
-        return type.is_equal(static_cast<const void *>(&value_), other2->value_);
+        return type.is_equal_or_false(static_cast<const void *>(&value_), other2->value_);
       }
     }
     return false;
@@ -414,6 +414,15 @@ class CustomMF_DefaultOutput : public MultiFunction {
   CustomMF_DefaultOutput(StringRef name,
                          Span<MFDataType> input_types,
                          Span<MFDataType> output_types);
+  void call(IndexMask mask, MFParams params, MFContext context) const override;
+};
+
+class CustomMF_GenericCopy : public MultiFunction {
+ private:
+  MFSignature signature_;
+
+ public:
+  CustomMF_GenericCopy(StringRef name, MFDataType data_type);
   void call(IndexMask mask, MFParams params, MFContext context) const override;
 };
 

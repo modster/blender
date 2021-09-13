@@ -112,8 +112,10 @@
 #include "DEG_depsgraph_build.h"
 
 #include "SEQ_iterator.h"
+#include "SEQ_sequencer.h"
 
 #include "intern/builder/deg_builder.h"
+#include "intern/builder/deg_builder_rna.h"
 #include "intern/depsgraph.h"
 #include "intern/depsgraph_tag.h"
 #include "intern/depsgraph_type.h"
@@ -226,7 +228,7 @@ OperationNode *DepsgraphNodeBuilder::add_operation_node(ComponentNode *comp_node
             comp_node->identifier().c_str(),
             op_node->identifier().c_str(),
             op_node);
-    BLI_assert(!"Should not happen!");
+    BLI_assert_msg(0, "Should not happen!");
   }
   return op_node;
 }
@@ -450,6 +452,22 @@ void DepsgraphNodeBuilder::update_invalid_cow_pointers()
       /* Node/ID already tagged for COW flush, no need to check it. */
       continue;
     }
+    if ((id_node->id_cow->flag & LIB_EMBEDDED_DATA) != 0) {
+      /* For now, we assume embedded data are managed by their owner IDs and do not need to be
+       * checked here.
+       *
+       * NOTE: This exception somewhat weak, and ideally should not be needed. Currently however,
+       * embedded data are handled as full local (private) data of their owner IDs in part of
+       * Blender (like read/write code, including undo/redo), while depsgraph generally treat them
+       * as regular independent IDs. This leads to inconsistencies that can lead to bad level
+       * memory accesses.
+       *
+       * E.g. when undoing creation/deletion of a collection directly child of a scene's master
+       * collection, the scene itself is re-read in place, but its master collection becomes a
+       * completely new different pointer, and the existing COW of the old master collection in the
+       * matching deg node is therefore pointing to fully invalid (freed) memory. */
+      continue;
+    }
     BKE_library_foreach_ID_link(nullptr,
                                 id_node->id_cow,
                                 deg::foreach_id_cow_detect_need_for_update_callback,
@@ -553,9 +571,10 @@ void DepsgraphNodeBuilder::build_id(ID *id)
       build_movieclip((MovieClip *)id);
       break;
     case ID_ME:
-    case ID_CU:
     case ID_MB:
+    case ID_CU:
     case ID_LT:
+    case ID_GD:
     case ID_HA:
     case ID_PT:
     case ID_VO:
@@ -585,9 +604,6 @@ void DepsgraphNodeBuilder::build_id(ID *id)
       break;
     case ID_PA:
       build_particle_settings((ParticleSettings *)id);
-      break;
-    case ID_GD:
-      build_gpencil((bGPdata *)id);
       break;
 
     case ID_LI:
@@ -631,9 +647,9 @@ void DepsgraphNodeBuilder::build_idproperties(IDProperty *id_property)
 void DepsgraphNodeBuilder::build_collection(LayerCollection *from_layer_collection,
                                             Collection *collection)
 {
-  const int restrict_flag = (graph_->mode == DAG_EVAL_VIEWPORT) ? COLLECTION_RESTRICT_VIEWPORT :
-                                                                  COLLECTION_RESTRICT_RENDER;
-  const bool is_collection_restricted = (collection->flag & restrict_flag);
+  const int visibility_flag = (graph_->mode == DAG_EVAL_VIEWPORT) ? COLLECTION_HIDE_VIEWPORT :
+                                                                    COLLECTION_HIDE_RENDER;
+  const bool is_collection_restricted = (collection->flag & visibility_flag);
   const bool is_collection_visible = !is_collection_restricted && is_parent_collection_visible_;
   IDNode *id_node;
   if (built_map_.checkIsBuiltAndTag(collection)) {
@@ -1183,7 +1199,7 @@ void DepsgraphNodeBuilder::build_driver_id_property(ID *id, const char *rna_path
   if (prop == nullptr) {
     return;
   }
-  if (!RNA_property_is_idprop(prop)) {
+  if (!rna_prop_affects_parameters_node(&ptr, prop)) {
     return;
   }
   const char *prop_identifier = RNA_property_identifier((PropertyRNA *)prop);
@@ -1199,7 +1215,19 @@ void DepsgraphNodeBuilder::build_parameters(ID *id)
   op_node = add_operation_node(id, NodeType::PARAMETERS, OperationCode::PARAMETERS_ENTRY);
   op_node->set_as_entry();
   /* Generic evaluation node. */
-  add_operation_node(id, NodeType::PARAMETERS, OperationCode::PARAMETERS_EVAL);
+
+  if (ID_TYPE_SUPPORTS_PARAMS_WITHOUT_COW(GS(id->name))) {
+    ID *id_cow = get_cow_id(id);
+    add_operation_node(
+        id,
+        NodeType::PARAMETERS,
+        OperationCode::PARAMETERS_EVAL,
+        [id_cow, id](::Depsgraph * /*depsgraph*/) { BKE_id_eval_properties_copy(id_cow, id); });
+  }
+  else {
+    add_operation_node(id, NodeType::PARAMETERS, OperationCode::PARAMETERS_EVAL);
+  }
+
   /* Explicit exit operation. */
   op_node = add_operation_node(id, NodeType::PARAMETERS, OperationCode::PARAMETERS_EXIT);
   op_node->set_as_exit();
@@ -1352,7 +1380,7 @@ void DepsgraphNodeBuilder::build_particle_systems(Object *object, bool is_object
     ParticleSettings *part = psys->part;
     /* Build particle settings operations.
      *
-     * NOTE: The call itself ensures settings are only build once.  */
+     * NOTE: The call itself ensures settings are only build once. */
     build_particle_settings(part);
     /* Particle system evaluation. */
     add_operation_node(psys_comp, OperationCode::PARTICLE_SYSTEM_EVAL, nullptr, psys->name);
@@ -1574,7 +1602,7 @@ void DepsgraphNodeBuilder::build_object_data_geometry_datablock(ID *obdata, bool
       break;
     }
     default:
-      BLI_assert(!"Should not happen");
+      BLI_assert_msg(0, "Should not happen");
       break;
   }
   op_node = add_operation_node(obdata, NodeType::GEOMETRY, OperationCode::GEOMETRY_EVAL_DONE);
@@ -1741,7 +1769,7 @@ void DepsgraphNodeBuilder::build_nodetree(bNodeTree *ntree)
       build_nodetree(group_ntree);
     }
     else {
-      BLI_assert(!"Unknown ID type used for node");
+      BLI_assert_msg(0, "Unknown ID type used for node");
     }
   }
 
@@ -1820,22 +1848,6 @@ void DepsgraphNodeBuilder::build_image(Image *image)
   build_idproperties(image->id.properties);
   add_operation_node(
       &image->id, NodeType::GENERIC_DATABLOCK, OperationCode::GENERIC_DATABLOCK_UPDATE);
-}
-
-void DepsgraphNodeBuilder::build_gpencil(bGPdata *gpd)
-{
-  if (built_map_.checkIsBuiltAndTag(gpd)) {
-    return;
-  }
-  ID *gpd_id = &gpd->id;
-
-  /* TODO(sergey): what about multiple users of same datablock? This should
-   * only get added once. */
-
-  /* The main reason Grease Pencil is included here is because the animation
-   * (and drivers) need to be hosted somewhere. */
-  build_animdata(gpd_id);
-  build_parameters(gpd_id);
 }
 
 void DepsgraphNodeBuilder::build_cachefile(CacheFile *cache_file)
@@ -2003,6 +2015,27 @@ void DepsgraphNodeBuilder::build_simulation(Simulation *simulation)
                      });
 }
 
+static bool seq_node_build_cb(Sequence *seq, void *user_data)
+{
+  DepsgraphNodeBuilder *nb = (DepsgraphNodeBuilder *)user_data;
+  nb->build_idproperties(seq->prop);
+  if (seq->sound != nullptr) {
+    nb->build_sound(seq->sound);
+  }
+  if (seq->scene != nullptr) {
+    nb->build_scene_parameters(seq->scene);
+  }
+  if (seq->type == SEQ_TYPE_SCENE && seq->scene != nullptr) {
+    if (seq->flag & SEQ_SCENE_STRIPS) {
+      nb->build_scene_sequencer(seq->scene);
+    }
+    ViewLayer *sequence_view_layer = BKE_view_layer_default_render(seq->scene);
+    nb->build_scene_speakers(seq->scene, sequence_view_layer);
+  }
+  /* TODO(sergey): Movie clip, scene, camera, mask. */
+  return true;
+}
+
 void DepsgraphNodeBuilder::build_scene_sequencer(Scene *scene)
 {
   if (scene->ed == nullptr) {
@@ -2017,28 +2050,10 @@ void DepsgraphNodeBuilder::build_scene_sequencer(Scene *scene)
                      NodeType::SEQUENCER,
                      OperationCode::SEQUENCES_EVAL,
                      [scene_cow](::Depsgraph *depsgraph) {
-                       BKE_scene_eval_sequencer_sequences(depsgraph, scene_cow);
+                       SEQ_eval_sequences(depsgraph, scene_cow, &scene_cow->ed->seqbase);
                      });
   /* Make sure data for sequences is in the graph. */
-  Sequence *seq;
-  SEQ_ALL_BEGIN (scene->ed, seq) {
-    build_idproperties(seq->prop);
-    if (seq->sound != nullptr) {
-      build_sound(seq->sound);
-    }
-    if (seq->scene != nullptr) {
-      build_scene_parameters(seq->scene);
-    }
-    if (seq->type == SEQ_TYPE_SCENE && seq->scene != nullptr) {
-      if (seq->flag & SEQ_SCENE_STRIPS) {
-        build_scene_sequencer(seq->scene);
-      }
-      ViewLayer *sequence_view_layer = BKE_view_layer_default_render(seq->scene);
-      build_scene_speakers(seq->scene, sequence_view_layer);
-    }
-    /* TODO(sergey): Movie clip, scene, camera, mask. */
-  }
-  SEQ_ALL_END;
+  SEQ_for_each_callback(&scene->ed->seqbase, seq_node_build_cb, this);
 }
 
 void DepsgraphNodeBuilder::build_scene_audio(Scene *scene)

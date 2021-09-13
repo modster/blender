@@ -29,9 +29,15 @@ extern "C" {
 
 #include "DNA_scene_types.h"
 
+struct BlendDataReader;
+struct BlendExpander;
+struct BlendLibReader;
+struct BlendWriter;
+struct Depsgraph;
 struct Editing;
 struct Scene;
 struct Sequence;
+struct SequenceLookup;
 struct SequencerToolSettings;
 
 /* RNA enums, just to be more readable */
@@ -54,8 +60,12 @@ struct SequencerToolSettings *SEQ_tool_settings_ensure(struct Scene *scene);
 void SEQ_tool_settings_free(struct SequencerToolSettings *tool_settings);
 eSeqImageFitMethod SEQ_tool_settings_fit_method_get(struct Scene *scene);
 void SEQ_tool_settings_fit_method_set(struct Scene *scene, eSeqImageFitMethod fit_method);
+short SEQ_tool_settings_snap_flag_get(struct Scene *scene);
+short SEQ_tool_settings_snap_mode_get(struct Scene *scene);
+int SEQ_tool_settings_snap_distance_get(struct Scene *scene);
+eSeqOverlapMode SEQ_tool_settings_overlap_mode_get(struct Scene *scene);
 struct SequencerToolSettings *SEQ_tool_settings_copy(struct SequencerToolSettings *tool_settings);
-struct Editing *SEQ_editing_get(struct Scene *scene, bool alloc);
+struct Editing *SEQ_editing_get(const struct Scene *scene);
 struct Editing *SEQ_editing_ensure(struct Scene *scene);
 void SEQ_editing_free(struct Scene *scene, const bool do_id_user);
 struct ListBase *SEQ_active_seqbase_get(const struct Editing *ed);
@@ -78,6 +88,31 @@ void SEQ_sequence_base_dupli_recursive(const struct Scene *scene_src,
                                        const struct ListBase *seqbase,
                                        int dupe_flag,
                                        const int flag);
+
+/* Read and Write functions for .blend file data */
+void SEQ_blend_write(struct BlendWriter *writer, struct ListBase *seqbase);
+void SEQ_blend_read(struct BlendDataReader *reader, struct ListBase *seqbase);
+
+void SEQ_blend_read_lib(struct BlendLibReader *reader,
+                        struct Scene *scene,
+                        struct ListBase *seqbase);
+
+void SEQ_blend_read_expand(struct BlendExpander *expander, struct ListBase *seqbase);
+
+/* Depsgraph update function */
+void SEQ_eval_sequences(struct Depsgraph *depsgraph,
+                        struct Scene *scene,
+                        struct ListBase *seqbase);
+
+/* Defined in sequence_lookup.c */
+
+typedef enum eSequenceLookupTag {
+  SEQ_LOOKUP_TAG_INVALID = (1 << 0),
+} eSequenceLookupTag;
+
+struct Sequence *SEQ_sequence_lookup_by_name(const struct Scene *scene, const char *key);
+void SEQ_sequence_lookup_free(const struct Scene *scene);
+void SEQ_sequence_lookup_tag(const struct Scene *scene, eSequenceLookupTag tag);
 
 #ifdef __cplusplus
 }
