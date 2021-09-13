@@ -303,14 +303,14 @@ const float (*BKE_mesh_ensure_vertex_normals(const Mesh *mesh))[3]
 const float (*BKE_mesh_ensure_face_normals(const Mesh *mesh))[3]
 {
   if (!(mesh->runtime.cd_dirty_poly & CD_MASK_NORMAL)) {
-    BLI_assert(CustomData_has_layer(mesh->vdata, CD_NORMAL));
+    BLI_assert(CustomData_has_layer(&mesh->vdata, CD_NORMAL));
     return (const float(*)[3])CustomData_get_layer(&mesh->vdata, CD_NORMAL);
   }
 
   ThreadMutex *mesh_eval_mutex = (ThreadMutex *)mesh->runtime.eval_mutex;
   BLI_mutex_lock(mesh_eval_mutex);
   if (!(mesh->runtime.cd_dirty_poly & CD_MASK_NORMAL)) {
-    BLI_assert(CustomData_has_layer(mesh->vdata, CD_NORMAL));
+    BLI_assert(CustomData_has_layer(&mesh->vdata, CD_NORMAL));
     return (const float(*)[3])CustomData_get_layer(&mesh->vdata, CD_NORMAL);
   }
 

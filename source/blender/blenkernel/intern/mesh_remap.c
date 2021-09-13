@@ -607,6 +607,7 @@ void BKE_mesh_remap_calc_verts_from_mesh(const int mode,
       MPoly *polys_src = me_src->mpoly;
       MLoop *loops_src = me_src->mloop;
       float(*vcos_src)[3] = BKE_mesh_vert_coords_alloc(me_src, NULL);
+      const float(*vert_normals_src)[3] = BKE_mesh_ensure_vertex_normals(me_src);
 
       size_t tmp_buff_size = MREMAP_DEFAULT_BUFSIZE;
       float(*vcos)[3] = MEM_mallocN(sizeof(*vcos) * tmp_buff_size, __func__);
@@ -618,7 +619,7 @@ void BKE_mesh_remap_calc_verts_from_mesh(const int mode,
       if (mode == MREMAP_MODE_VERT_POLYINTERP_VNORPROJ) {
         for (i = 0; i < numverts_dst; i++) {
           copy_v3_v3(tmp_co, verts_dst[i].co);
-          normal_short_to_float_v3(tmp_no, verts_dst[i].no);
+          copy_v3_v3(tmp_no, vert_normals_src[i]);
 
           /* Convert the vertex to tree coordinates, if needed. */
           if (space_transform) {
@@ -964,6 +965,8 @@ void BKE_mesh_remap_calc_edges_from_mesh(const int mode,
 
       BKE_bvhtree_from_mesh_get(&treedata, me_src, BVHTREE_FROM_EDGES, 2);
 
+      const float(*vert_normals_dst)[3] = BKE_mesh_ensure_vertex_normals(me_src);
+
       for (i = 0; i < numedges_dst; i++) {
         /* For each dst edge, we sample some rays from it (interpolated from its vertices)
          * and use their hits to interpolate from source edges. */
@@ -983,8 +986,8 @@ void BKE_mesh_remap_calc_edges_from_mesh(const int mode,
         copy_v3_v3(v1_co, verts_dst[me->v1].co);
         copy_v3_v3(v2_co, verts_dst[me->v2].co);
 
-        normal_short_to_float_v3(v1_no, verts_dst[me->v1].no);
-        normal_short_to_float_v3(v2_no, verts_dst[me->v2].no);
+        copy_v3_v3(v1_no, vert_normals_dst[me->v1]);
+        copy_v3_v3(v2_no, vert_normals_dst[me->v2]);
 
         /* We do our transform here, allows to interpolate from normals already in src space. */
         if (space_transform) {
@@ -1409,7 +1412,7 @@ void BKE_mesh_remap_calc_loops_from_mesh(const int mode,
                                       numloops_dst,
                                       polys_dst,
                                       (const float(*)[3])poly_nors_dst,
-                                      BKE_mesh_ensure_vertex_normals(mesh_dst),
+                                      vert_normals_dst,
                                       numpolys_dst,
                                       use_split_nors_dst,
                                       split_angle_dst,

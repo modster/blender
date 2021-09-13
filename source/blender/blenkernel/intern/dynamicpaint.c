@@ -1913,7 +1913,7 @@ static void dynamic_paint_apply_surface_wave_cb(void *__restrict userdata,
   PaintWavePoint *wPoint = (PaintWavePoint *)data->surface->data->type_data;
   MVert *mvert = data->mvert;
 
-  madd_v3_v3fl(mvert[i].co, data->vert_normals, wPoint[i].height);
+  madd_v3_v3fl(mvert[i].co, data->vert_normals[i], wPoint[i].height);
 }
 
 /*
@@ -5946,7 +5946,6 @@ static void dynamic_paint_generate_bake_data_cb(void *__restrict userdata,
 
   Object *ob = data->ob;
 
-  const MVert *mvert = data->mvert;
   const Vec3f *canvas_verts = data->canvas_verts;
 
   const bool do_velocity_data = data->do_velocity_data;

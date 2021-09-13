@@ -393,6 +393,7 @@ static void apply_weights_vertex_normal(WeightedNormalModifierData *wnmd,
       }
 
       BKE_mesh_normals_loop_custom_from_vertices_set(mvert,
+                                                     wn_data->vert_normals,
                                                      vert_normals,
                                                      numVerts,
                                                      medge,

@@ -34,7 +34,7 @@ static GVArrayPtr mesh_face_normals_gvarray(const Mesh &mesh)
   return std::make_unique<fn::GVArray_For_GSpan>(face_normals);
 }
 
-static GVArrayPtr mesh_face_normals_gvarray(const Mesh &mesh)
+static GVArrayPtr mesh_vert_normals_gvarray(const Mesh &mesh)
 {
   Span<float3> vert_normals{(float3 *)BKE_mesh_ensure_vertex_normals(&mesh), mesh.totvert};
   return std::make_unique<fn::GVArray_For_GSpan>(vert_normals);
@@ -51,7 +51,7 @@ static const GVArray *construct_mesh_normals_gvarray(const MeshComponent &mesh_c
       return scope.add_value(mesh_face_normals_gvarray(mesh), __func__).get();
     }
     case ATTR_DOMAIN_POINT: {
-      return scope.add_value(mesh_face_normals_gvarray(mesh), __func__).get();
+      return scope.add_value(mesh_vert_normals_gvarray(mesh), __func__).get();
     }
     case ATTR_DOMAIN_EDGE: {
       /* In this case, start with vertex normals and convert to the edge domain, since the

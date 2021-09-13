@@ -195,7 +195,6 @@ static void displaceModifier_do_task(void *__restrict userdata,
   bool use_global_direction = data->use_global_direction;
   float(*tex_co)[3] = data->tex_co;
   float(*vertexCos)[3] = data->vertexCos;
-  MVert *mvert = data->mvert;
   float(*vert_clnors)[3] = data->vert_clnors;
 
   const float delta_fixed = 1.0f -

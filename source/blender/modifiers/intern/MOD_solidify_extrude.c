@@ -1196,7 +1196,7 @@ Mesh *MOD_solidify_extrude_modifyMesh(ModifierData *md, const ModifierEvalContex
           copy_v3_v3(nor, mesh_vert_normals[*(&ed->v1 + k)]);
           add_v3_v3(nor, nor_cpy);
           normalize_v3(nor);
-          copy_v3_v3(mesh_vert_normals[*(&ed->v1 + k)], nor);
+          copy_v3_v3((float *)mesh_vert_normals[*(&ed->v1 + k)], nor);
         }
       }
 

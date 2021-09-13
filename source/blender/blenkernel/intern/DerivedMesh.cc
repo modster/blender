@@ -2303,6 +2303,7 @@ void DM_calc_loop_tangents(DerivedMesh *dm,
       calc_active_tangent,
       tangent_names,
       tangent_names_len,
+      (const float(*)[3])CustomData_get_layer(&dm->vertData, CD_NORMAL),
       (const float(*)[3])CustomData_get_layer(&dm->polyData, CD_NORMAL),
       (const float(*)[3])dm->getLoopDataArray(dm, CD_NORMAL),
       (const float(*)[3])dm->getVertDataArray(dm, CD_ORCO), /* may be nullptr */
