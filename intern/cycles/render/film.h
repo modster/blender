@@ -81,10 +81,6 @@ class Film : public Node {
 
   int get_aov_offset(Scene *scene, string name, bool &is_color);
 
-  /* Get display pass from its name.
-   * Will do special logic to replace combined pass with shadow catcher matte. */
-  const Pass *get_actual_display_pass(Scene *scene, const Pass *pass);
-
   /* Update passes so that they contain all passes required for the configured functionality.
    *
    * If `add_sample_count_pass` is true then the SAMPLE_COUNT pass is ensured to be added. */

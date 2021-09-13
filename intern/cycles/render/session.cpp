@@ -628,27 +628,31 @@ bool Session::copy_render_tile_from_device()
 
 bool Session::get_render_tile_pixels(const string &pass_name, int num_components, float *pixels)
 {
-  const Pass *pass = Pass::find(scene->passes, pass_name);
+  /* NOTE: The code relies on a fact that session is fully update and no scene/buffer modification
+   * is happenning while this function runs. */
+
+  const BufferPass *pass = buffer_params_.find_pass(pass_name);
   if (pass == nullptr) {
     return false;
   }
 
+  /* TODO(sergey): Avoid access to path trace here to allow accessing pixels from render buffers
+   * after the rendering is done (for the "Save Buffers" memory optimization implementation). */
   const bool has_denoised_result = path_trace_->has_denoised_result();
-  if (pass->get_mode() == PassMode::DENOISED && !has_denoised_result) {
-    pass = Pass::find(scene->passes, pass->get_type());
+  if (pass->mode == PassMode::DENOISED && !has_denoised_result) {
+    pass = buffer_params_.find_pass(pass->type);
     if (pass == nullptr) {
       /* Happens when denoised result pass is requested but is never written by the kernel. */
       return false;
     }
   }
 
-  pass = scene->film->get_actual_display_pass(scene, pass);
+  pass = buffer_params_.get_actual_display_pass(pass);
 
   const float exposure = scene->film->get_exposure();
   const int num_samples = path_trace_->get_num_render_tile_samples();
 
-  const PassAccessor::PassAccessInfo pass_access_info(
-      *pass, *scene->film, *scene->background, scene->passes);
+  const PassAccessor::PassAccessInfo pass_access_info(*pass, *scene->film, *scene->background);
   const PassAccessorCPU pass_accessor(pass_access_info, exposure, num_samples);
   const PassAccessor::Destination destination(pixels, num_components);
 
@@ -659,8 +663,10 @@ bool Session::set_render_tile_pixels(const string &pass_name,
                                      int num_components,
                                      const float *pixels)
 {
-  /* TODO(sergey): Do we write to alias? */
-  const Pass *pass = Pass::find(scene->passes, pass_name);
+  /* NOTE: The code relies on a fact that session is fully update and no scene/buffer modification
+   * is happenning while this function runs. */
+
+  const BufferPass *pass = buffer_params_.find_pass(pass_name);
   if (!pass) {
     return false;
   }
@@ -668,8 +674,7 @@ bool Session::set_render_tile_pixels(const string &pass_name,
   const float exposure = scene->film->get_exposure();
   const int num_samples = render_scheduler_.get_num_rendered_samples();
 
-  const PassAccessor::PassAccessInfo pass_access_info(
-      *pass, *scene->film, *scene->background, scene->passes);
+  const PassAccessor::PassAccessInfo pass_access_info(*pass, *scene->film, *scene->background);
   PassAccessorCPU pass_accessor(pass_access_info, exposure, num_samples);
   PassAccessor::Source source(pixels, num_components);
 

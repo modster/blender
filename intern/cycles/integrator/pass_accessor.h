@@ -20,13 +20,13 @@
 #include "util/util_half.h"
 #include "util/util_string.h"
 #include "util/util_types.h"
-#include "util/util_vector.h"
 
 CCL_NAMESPACE_BEGIN
 
 class Background;
 class Film;
 class RenderBuffers;
+class BufferPass;
 class BufferParams;
 struct KernelFilmConvert;
 
@@ -38,10 +38,7 @@ class PassAccessor {
   class PassAccessInfo {
    public:
     PassAccessInfo() = default;
-    PassAccessInfo(const Pass &pass,
-                   const Film &film,
-                   const Background &background,
-                   const vector<Pass *> &passes);
+    PassAccessInfo(const BufferPass &pass, const Film &film, const Background &background);
 
     PassType type = PASS_NONE;
     PassMode mode = PassMode::NOISY;

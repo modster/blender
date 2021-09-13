@@ -427,23 +427,6 @@ int Film::get_aov_offset(Scene *scene, string name, bool &is_color)
   return -1;
 }
 
-const Pass *Film::get_actual_display_pass(Scene *scene, const Pass *pass)
-{
-  if (!pass) {
-    return nullptr;
-  }
-
-  if (pass->get_type() == PASS_COMBINED && scene->has_shadow_catcher()) {
-    const Pass *shadow_catcher_matte_pass = Pass::find(
-        scene->passes, PASS_SHADOW_CATCHER_MATTE, pass->get_mode());
-    if (shadow_catcher_matte_pass) {
-      pass = shadow_catcher_matte_pass;
-    }
-  }
-
-  return pass;
-}
-
 void Film::update_passes(Scene *scene, bool add_sample_count_pass)
 {
   const Background *background = scene->background;

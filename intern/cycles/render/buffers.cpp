@@ -145,6 +145,22 @@ const BufferPass *BufferParams::find_pass(PassType type, PassMode mode) const
   return nullptr;
 }
 
+const BufferPass *BufferParams::get_actual_display_pass(const BufferPass *pass) const
+{
+  if (!pass) {
+    return nullptr;
+  }
+
+  if (pass->type == PASS_COMBINED) {
+    const BufferPass *shadow_catcher_matte_pass = find_pass(PASS_SHADOW_CATCHER_MATTE, pass->mode);
+    if (shadow_catcher_matte_pass) {
+      pass = shadow_catcher_matte_pass;
+    }
+  }
+
+  return pass;
+}
+
 void BufferParams::update_offset_stride()
 {
   offset = -(full_x + full_y * width);
