@@ -590,7 +590,7 @@ static uint64_t drw_shader_dependencies_get(const DRWShaderLibrary *lib,
       BLI_assert(0);
     }
     else {
-      deps |= 1lu << (uint64_t)dep;
+      deps |= 1llu << ((uint64_t)dep);
     }
   }
   return deps;
@@ -630,7 +630,7 @@ char *DRW_shader_library_create_shader_string(const DRWShaderLibrary *lib, const
   DynStr *ds = BLI_dynstr_new();
   /* Add all dependencies recursively. */
   for (int i = MAX_LIB - 1; i > -1; i--) {
-    if (lib->libs[i] && ((deps & (1lu << (uint64_t)i)) || (deps_post & (1lu << (uint64_t)i)))) {
+    if (lib->libs[i] && ((deps & (1llu << (uint64_t)i)) || (deps_post & (1llu << (uint64_t)i)))) {
       deps |= lib->libs_deps[i];
     }
   }
