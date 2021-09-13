@@ -145,6 +145,12 @@ const BufferPass *BufferParams::find_pass(PassType type, PassMode mode) const
   return nullptr;
 }
 
+const BufferPass *BufferParams::get_actual_display_pass(PassType type, PassMode mode) const
+{
+  const BufferPass *pass = find_pass(type, mode);
+  return get_actual_display_pass(pass);
+}
+
 const BufferPass *BufferParams::get_actual_display_pass(const BufferPass *pass) const
 {
   if (!pass) {

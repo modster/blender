@@ -162,8 +162,10 @@ PassAccessor::PassAccessInfo PathTraceWork::get_display_pass_access_info(PassMod
 
   const BufferParams &params = buffers_->params;
 
+  const BufferPass *display_pass = params.get_actual_display_pass(film_->get_display_pass());
+
   PassAccessor::PassAccessInfo pass_access_info;
-  pass_access_info.type = film_->get_display_pass();
+  pass_access_info.type = display_pass->type;
   pass_access_info.offset = PASS_UNUSED;
 
   if (pass_mode == PassMode::DENOISED) {

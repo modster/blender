@@ -94,6 +94,7 @@ class BufferParams {
 
   /* Get display pass from its name.
    * Will do special logic to replace combined pass with shadow catcher matte. */
+  const BufferPass *get_actual_display_pass(PassType type, PassMode mode = PassMode::NOISY) const;
   const BufferPass *get_actual_display_pass(const BufferPass *pass) const;
 
   void update_offset_stride();
