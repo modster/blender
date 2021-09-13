@@ -635,8 +635,8 @@ char *DRW_shader_library_create_shader_string(const DRWShaderLibrary *lib, const
     }
   }
   /* Concatenate all needed libs into one string. */
-  for (int i = 0; i < MAX_LIB && deps != 0lu; i++, deps >>= 1lu) {
-    if (deps & 1lu) {
+  for (int i = 0; i < MAX_LIB && deps != 0llu; i++, deps >>= 1llu) {
+    if (deps & 1llu) {
       BLI_dynstr_append(ds, lib->libs[i]);
     }
   }
@@ -644,8 +644,8 @@ char *DRW_shader_library_create_shader_string(const DRWShaderLibrary *lib, const
   BLI_dynstr_append(ds, shader_code);
 
   /* Concatenate all needed libs into one string. */
-  for (int i = 0; i < MAX_LIB && deps_post != 0lu; i++, deps_post >>= 1lu) {
-    if (deps_post & 1lu) {
+  for (int i = 0; i < MAX_LIB && deps_post != 0llu; i++, deps_post >>= 1llu) {
+    if (deps_post & 1llu) {
       BLI_dynstr_append(ds, lib->libs[i]);
     }
   }
