@@ -240,7 +240,6 @@ class VortexSheetMesh : public Mesh {
   VorticityChannel mVorticity;
   TexCoord3Channel mTex1, mTex2;
   TurbulenceChannel mTurb;
-
  public:
   PbArgs _args;
 }

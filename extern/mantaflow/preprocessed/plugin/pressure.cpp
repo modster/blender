@@ -138,9 +138,10 @@ struct MakeRhs : public KernelBase {
       }
     }
 
+    // TODO (sebbas): Disabled for now
     // per cell divergence correction (optional)
-    if (perCellCorr)
-      set += perCellCorr->get(i, j, k);
+    // if(perCellCorr)
+    // 	set += perCellCorr->get(i,j,k);
 
     // obtain sum, cell count
     sum += set;
@@ -198,19 +199,61 @@ struct MakeRhs : public KernelBase {
     return gfClamp;
   }
   typedef Real type9;
-  void runMessage()
-  {
-    debMsg("Executing kernel MakeRhs ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r)
+  void runMessage(){};
+  void run()
   {
     const int _maxX = maxX;
     const int _maxY = maxY;
     if (maxZ > 1) {
-      for (int k = __r.begin(); k != (int)__r.end(); k++)
+      const FlagGrid &flags = getArg0();
+      Grid<Real> &rhs = getArg1();
+      const MACGrid &vel = getArg2();
+      const Grid<Real> *perCellCorr = getArg3();
+      const MACGrid *fractions = getArg4();
+      const MACGrid *obvel = getArg5();
+      const Grid<Real> *phi = getArg6();
+      const Grid<Real> *curv = getArg7();
+      const Real &surfTens = getArg8();
+      const Real &gfClamp = getArg9();
+#pragma omp target teams distribute parallel for reduction(+:cnt, sum) collapse(3) schedule(static,1)
+      {
+        for (int k = minZ; k < maxZ; k++)
+          for (int j = 1; j < _maxY; j++)
+            for (int i = 1; i < _maxX; i++)
+              op(i,
+                 j,
+                 k,
+                 flags,
+                 rhs,
+                 vel,
+                 perCellCorr,
+                 fractions,
+                 obvel,
+                 phi,
+                 curv,
+                 surfTens,
+                 gfClamp,
+                 cnt,
+                 sum);
+      }
+      {
+        this->sum = sum;
+      }
+    }
+    else {
+      const int k = 0;
+      const FlagGrid &flags = getArg0();
+      Grid<Real> &rhs = getArg1();
+      const MACGrid &vel = getArg2();
+      const Grid<Real> *perCellCorr = getArg3();
+      const MACGrid *fractions = getArg4();
+      const MACGrid *obvel = getArg5();
+      const Grid<Real> *phi = getArg6();
+      const Grid<Real> *curv = getArg7();
+      const Real &surfTens = getArg8();
+      const Real &gfClamp = getArg9();
+#pragma omp target teams distribute parallel for reduction(+:cnt, sum) collapse(2) schedule(static,1)
+      {
         for (int j = 1; j < _maxY; j++)
           for (int i = 1; i < _maxX; i++)
             op(i,
@@ -228,55 +271,11 @@ struct MakeRhs : public KernelBase {
                gfClamp,
                cnt,
                sum);
+      }
+      {
+        this->sum = sum;
+      }
     }
-    else {
-      const int k = 0;
-      for (int j = __r.begin(); j != (int)__r.end(); j++)
-        for (int i = 1; i < _maxX; i++)
-          op(i,
-             j,
-             k,
-             flags,
-             rhs,
-             vel,
-             perCellCorr,
-             fractions,
-             obvel,
-             phi,
-             curv,
-             surfTens,
-             gfClamp,
-             cnt,
-             sum);
-    }
-  }
-  void run()
-  {
-    if (maxZ > 1)
-      tbb::parallel_reduce(tbb::blocked_range<IndexInt>(minZ, maxZ), *this);
-    else
-      tbb::parallel_reduce(tbb::blocked_range<IndexInt>(1, maxY), *this);
-  }
-  MakeRhs(MakeRhs &o, tbb::split)
-      : KernelBase(o),
-        flags(o.flags),
-        rhs(o.rhs),
-        vel(o.vel),
-        perCellCorr(o.perCellCorr),
-        fractions(o.fractions),
-        obvel(o.obvel),
-        phi(o.phi),
-        curv(o.curv),
-        surfTens(o.surfTens),
-        gfClamp(o.gfClamp),
-        cnt(0),
-        sum(0)
-  {
-  }
-  void join(const MakeRhs &o)
-  {
-    cnt += o.cnt;
-    sum += o.sum;
   }
   const FlagGrid &flags;
   Grid<Real> &rhs;
@@ -302,7 +301,7 @@ struct knCorrectVelocity : public KernelBase {
     run();
   }
   inline void op(
-      int i, int j, int k, const FlagGrid &flags, MACGrid &vel, const Grid<Real> &pressure) const
+      int i, int j, int k, const FlagGrid &flags, MACGrid &vel, const Grid<Real> &pressure)
   {
     const IndexInt idx = flags.index(i, j, k);
     if (flags.isFluid(idx)) {
@@ -353,36 +352,35 @@ struct knCorrectVelocity : public KernelBase {
     return pressure;
   }
   typedef Grid<Real> type2;
-  void runMessage()
-  {
-    debMsg("Executing kernel knCorrectVelocity ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
+  void runMessage(){};
+  void run()
   {
     const int _maxX = maxX;
     const int _maxY = maxY;
     if (maxZ > 1) {
-      for (int k = __r.begin(); k != (int)__r.end(); k++)
-        for (int j = 1; j < _maxY; j++)
-          for (int i = 1; i < _maxX; i++)
-            op(i, j, k, flags, vel, pressure);
+      const FlagGrid &flags = getArg0();
+      MACGrid &vel = getArg1();
+      const Grid<Real> &pressure = getArg2();
+#pragma omp target teams distribute parallel for collapse(3) schedule(static, 1)
+      {
+        for (int k = minZ; k < maxZ; k++)
+          for (int j = 1; j < _maxY; j++)
+            for (int i = 1; i < _maxX; i++)
+              op(i, j, k, flags, vel, pressure);
+      }
     }
     else {
       const int k = 0;
-      for (int j = __r.begin(); j != (int)__r.end(); j++)
-        for (int i = 1; i < _maxX; i++)
-          op(i, j, k, flags, vel, pressure);
+      const FlagGrid &flags = getArg0();
+      MACGrid &vel = getArg1();
+      const Grid<Real> &pressure = getArg2();
+#pragma omp target teams distribute parallel for collapse(2) schedule(static, 1)
+      {
+        for (int j = 1; j < _maxY; j++)
+          for (int i = 1; i < _maxX; i++)
+            op(i, j, k, flags, vel, pressure);
+      }
     }
-  }
-  void run()
-  {
-    if (maxZ > 1)
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(minZ, maxZ), *this);
-    else
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(1, maxY), *this);
   }
   const FlagGrid &flags;
   MACGrid &vel;
@@ -441,7 +439,7 @@ struct ApplyGhostFluidDiagonal : public KernelBase {
                  Grid<Real> &A0,
                  const FlagGrid &flags,
                  const Grid<Real> &phi,
-                 const Real gfClamp) const
+                 const Real gfClamp)
   {
     const int X = flags.getStrideX(), Y = flags.getStrideY(), Z = flags.getStrideZ();
     const IndexInt idx = flags.index(i, j, k);
@@ -483,36 +481,34 @@ struct ApplyGhostFluidDiagonal : public KernelBase {
     return gfClamp;
   }
   typedef Real type3;
-  void runMessage()
-  {
-    debMsg("Executing kernel ApplyGhostFluidDiagonal ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
+  void runMessage(){};
+  void run()
   {
     const int _maxX = maxX;
     const int _maxY = maxY;
     if (maxZ > 1) {
-      for (int k = __r.begin(); k != (int)__r.end(); k++)
-        for (int j = 1; j < _maxY; j++)
-          for (int i = 1; i < _maxX; i++)
-            op(i, j, k, A0, flags, phi, gfClamp);
+
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int k = minZ; k < maxZ; k++)
+          for (int j = 1; j < _maxY; j++)
+            for (int i = 1; i < _maxX; i++)
+              op(i, j, k, A0, flags, phi, gfClamp);
+      }
     }
     else {
       const int k = 0;
-      for (int j = __r.begin(); j != (int)__r.end(); j++)
-        for (int i = 1; i < _maxX; i++)
-          op(i, j, k, A0, flags, phi, gfClamp);
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int j = 1; j < _maxY; j++)
+          for (int i = 1; i < _maxX; i++)
+            op(i, j, k, A0, flags, phi, gfClamp);
+      }
     }
-  }
-  void run()
-  {
-    if (maxZ > 1)
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(minZ, maxZ), *this);
-    else
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(1, maxY), *this);
   }
   Grid<Real> &A0;
   const FlagGrid &flags;
@@ -551,7 +547,7 @@ struct knCorrectVelocityGhostFluid : public KernelBase {
                  const Grid<Real> &phi,
                  Real gfClamp,
                  const Grid<Real> *curv,
-                 const Real surfTens) const
+                 const Real surfTens)
   {
     const IndexInt X = flags.getStrideX(), Y = flags.getStrideY(), Z = flags.getStrideZ();
     const IndexInt idx = flags.index(i, j, k);
@@ -640,36 +636,34 @@ struct knCorrectVelocityGhostFluid : public KernelBase {
     return surfTens;
   }
   typedef Real type6;
-  void runMessage()
-  {
-    debMsg("Executing kernel knCorrectVelocityGhostFluid ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
+  void runMessage(){};
+  void run()
   {
     const int _maxX = maxX;
     const int _maxY = maxY;
     if (maxZ > 1) {
-      for (int k = __r.begin(); k != (int)__r.end(); k++)
-        for (int j = 1; j < _maxY; j++)
-          for (int i = 1; i < _maxX; i++)
-            op(i, j, k, vel, flags, pressure, phi, gfClamp, curv, surfTens);
+
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int k = minZ; k < maxZ; k++)
+          for (int j = 1; j < _maxY; j++)
+            for (int i = 1; i < _maxX; i++)
+              op(i, j, k, vel, flags, pressure, phi, gfClamp, curv, surfTens);
+      }
     }
     else {
       const int k = 0;
-      for (int j = __r.begin(); j != (int)__r.end(); j++)
-        for (int i = 1; i < _maxX; i++)
-          op(i, j, k, vel, flags, pressure, phi, gfClamp, curv, surfTens);
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int j = 1; j < _maxY; j++)
+          for (int i = 1; i < _maxX; i++)
+            op(i, j, k, vel, flags, pressure, phi, gfClamp, curv, surfTens);
+      }
     }
-  }
-  void run()
-  {
-    if (maxZ > 1)
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(minZ, maxZ), *this);
-    else
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(1, maxY), *this);
   }
   MACGrid &vel;
   const FlagGrid &flags;
@@ -710,7 +704,7 @@ struct knReplaceClampedGhostFluidVels : public KernelBase {
                  const FlagGrid &flags,
                  const Grid<Real> &pressure,
                  const Grid<Real> &phi,
-                 Real gfClamp) const
+                 Real gfClamp)
   {
     const IndexInt idx = flags.index(i, j, k);
     const IndexInt X = flags.getStrideX(), Y = flags.getStrideY(), Z = flags.getStrideZ();
@@ -758,36 +752,34 @@ struct knReplaceClampedGhostFluidVels : public KernelBase {
     return gfClamp;
   }
   typedef Real type4;
-  void runMessage()
-  {
-    debMsg("Executing kernel knReplaceClampedGhostFluidVels ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
+  void runMessage(){};
+  void run()
   {
     const int _maxX = maxX;
     const int _maxY = maxY;
     if (maxZ > 1) {
-      for (int k = __r.begin(); k != (int)__r.end(); k++)
-        for (int j = 1; j < _maxY; j++)
-          for (int i = 1; i < _maxX; i++)
-            op(i, j, k, vel, flags, pressure, phi, gfClamp);
+
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int k = minZ; k < maxZ; k++)
+          for (int j = 1; j < _maxY; j++)
+            for (int i = 1; i < _maxX; i++)
+              op(i, j, k, vel, flags, pressure, phi, gfClamp);
+      }
     }
     else {
       const int k = 0;
-      for (int j = __r.begin(); j != (int)__r.end(); j++)
-        for (int i = 1; i < _maxX; i++)
-          op(i, j, k, vel, flags, pressure, phi, gfClamp);
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int j = 1; j < _maxY; j++)
+          for (int i = 1; i < _maxX; i++)
+            op(i, j, k, vel, flags, pressure, phi, gfClamp);
+      }
     }
-  }
-  void run()
-  {
-    if (maxZ > 1)
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(minZ, maxZ), *this);
-    else
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(1, maxY), *this);
   }
   MACGrid &vel;
   const FlagGrid &flags;
@@ -822,28 +814,21 @@ struct CountEmptyCells : public KernelBase {
     return flags;
   }
   typedef FlagGrid type0;
-  void runMessage()
-  {
-    debMsg("Executing kernel CountEmptyCells ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r)
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, flags, numEmpty);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_reduce(tbb::blocked_range<IndexInt>(0, size), *this);
-  }
-  CountEmptyCells(CountEmptyCells &o, tbb::split) : KernelBase(o), flags(o.flags), numEmpty(0)
-  {
-  }
-  void join(const CountEmptyCells &o)
-  {
-    numEmpty += o.numEmpty;
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+      int numEmpty = 0;
+#pragma omp for nowait
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, flags, numEmpty);
+#pragma omp critical
+      {
+        this->numEmpty += numEmpty;
+      }
+    }
   }
   const FlagGrid &flags;
   int numEmpty;
@@ -964,11 +949,19 @@ void computePressureRhs(Grid<Real> &rhs,
                         const Real surfTens = 0.)
 {
   // compute divergence and init right hand side
-  MakeRhs kernMakeRhs(
-      flags, rhs, vel, perCellCorr, fractions, obvel, phi, curv, surfTens, gfClamp);
+  // auto kernMakeRhs = new MakeRhs(flags, rhs, vel, perCellCorr, fractions, obvel, phi, curv,
+  // surfTens, gfClamp );
+  printf("pressure = %p, flags = %p, rhs = %p, vel = %p\n",
+         pressure.mData,
+         flags.mData,
+         rhs.mData,
+         vel.mData);
+  MakeRhs(flags, rhs, vel, perCellCorr, fractions, obvel, phi, curv, surfTens, gfClamp);
 
-  if (enforceCompatibility)
-    rhs += (Real)(-kernMakeRhs.sum / (Real)kernMakeRhs.cnt);
+  // TODO (sebbas): Disabled for now
+  // if(enforceCompatibility)
+  // 	rhs += (Real)(-kernMakeRhs->sum / (Real)kernMakeRhs->cnt);
+  // delete kernMakeRhs;
 }
 static PyObject *_W_1(PyObject *_self, PyObject *_linargs, PyObject *_kwds)
 {
@@ -1050,6 +1043,13 @@ void solvePressureSystem(Grid<Real> &rhs,
                          MACGrid &vel,
                          Grid<Real> &pressure,
                          const FlagGrid &flags,
+                         Grid<Real> *residual = nullptr,
+                         Grid<Real> *search = nullptr,
+                         Grid<Real> *A0 = nullptr,
+                         Grid<Real> *Ai = nullptr,
+                         Grid<Real> *Aj = nullptr,
+                         Grid<Real> *Ak = nullptr,
+                         Grid<Real> *tmp = nullptr,
                          Real cgAccuracy = 1e-3,
                          const Grid<Real> *phi = nullptr,
                          const Grid<Real> *perCellCorr = nullptr,
@@ -1069,19 +1069,37 @@ void solvePressureSystem(Grid<Real> &rhs,
 
   // reserve temp grids
   FluidSolver *parent = flags.getParent();
-  Grid<Real> residual(parent);
-  Grid<Real> search(parent);
-  Grid<Real> A0(parent);
-  Grid<Real> Ai(parent);
-  Grid<Real> Aj(parent);
-  Grid<Real> Ak(parent);
-  Grid<Real> tmp(parent);
+
+  bool cleanUp = false;
+  if (!residual) {
+    residual = new Grid<Real>(parent, true, false, true);
+    search = new Grid<Real>(parent, true, false, true);
+    A0 = new Grid<Real>(parent, true, false, true);
+    Ai = new Grid<Real>(parent, true, false, true);
+    Aj = new Grid<Real>(parent, true, false, true);
+    Ak = new Grid<Real>(parent, true, false, true);
+    tmp = new Grid<Real>(parent, true, false, true);
+    cleanUp = true;
+  }
+  else {
+    residual->clear(true);
+    search->clear(true);
+    A0->clear(true);
+    Ai->clear(true);
+    Aj->clear(true);
+    Ak->clear(true);
+    tmp->clear(true);
+  }
+
+  std::cout << "HERE 5" << std::endl;
 
   // setup matrix and boundaries
-  MakeLaplaceMatrix(flags, A0, Ai, Aj, Ak, fractions);
+  MakeLaplaceMatrix(flags, *A0, *Ai, *Aj, *Ak, fractions);
+  // MakeLaplaceMatrix(flags, A0, Ai, Aj, Ak, fractions);
 
+  // TODO (sebbas): Disabled for now
   if (phi) {
-    ApplyGhostFluidDiagonal(A0, flags, *phi, gfClamp);
+    ApplyGhostFluidDiagonal(*A0, flags, *phi, gfClamp);
   }
 
   // check whether we need to fix some pressure value...
@@ -1125,7 +1143,8 @@ void solvePressureSystem(Grid<Real> &rhs,
       // debMsg("No empty cells! Fixing pressure of cell "<<fixPidx<<" to zero",1);
     }
     if (fixPidx >= 0) {
-      fixPressure(fixPidx, Real(0), rhs, A0, Ai, Aj, Ak);
+      fixPressure(fixPidx, Real(0), rhs, *A0, *Ai, *Aj, *Ak);
+      // fixPressure(fixPidx, Real(0), rhs, A0, Ai, Aj, Ak);
       static bool msgOnce = false;
       if (!msgOnce) {
         debMsg("Pinning pressure of cell " << fixPidx << " to zero", 2);
@@ -1133,20 +1152,21 @@ void solvePressureSystem(Grid<Real> &rhs,
       }
     }
   }
+  std::cout << "HERE 6" << std::endl;
 
   // CG setup
   // note: the last factor increases the max iterations for 2d, which right now can't use a
   // preconditioner
   GridCgInterface *gcg;
-  vector<Grid<Real> *> matA{&A0, &Ai, &Aj};
-
-  if (vel.is3D()) {
-    matA.push_back(&Ak);
-    gcg = new GridCg<ApplyMatrix>(pressure, rhs, residual, search, flags, tmp, matA);
-  }
-  else {
-    gcg = new GridCg<ApplyMatrix2D>(pressure, rhs, residual, search, flags, tmp, matA);
-  }
+  if (vel.is3D())
+    gcg = new GridCg<ApplyMatrix>(pressure, rhs, *residual, *search, flags, *tmp, A0, Ai, Aj, Ak);
+  // gcg = new GridCg<ApplyMatrix>  (pressure, rhs, residual, search, flags, tmp, &A0, &Ai, &Aj,
+  // &Ak);
+  else
+    gcg = new GridCg<ApplyMatrix2D>(
+        pressure, rhs, *residual, *search, flags, *tmp, A0, Ai, Aj, Ak);
+  // gcg = new GridCg<ApplyMatrix2D>(pressure, rhs, residual, search, flags, tmp, &A0, &Ai, &Aj,
+  // &Ak);
 
   gcg->setAccuracy(cgAccuracy);
   gcg->setUseL2Norm(useL2Norm);
@@ -1155,6 +1175,7 @@ void solvePressureSystem(Grid<Real> &rhs,
 
   Grid<Real> *pca0 = nullptr, *pca1 = nullptr, *pca2 = nullptr, *pca3 = nullptr;
   GridMg *pmg = nullptr;
+  std::cout << "HERE 7" << std::endl;
 
   // optional preconditioning
   if (preconditioner == PcMIC) {
@@ -1180,10 +1201,12 @@ void solvePressureSystem(Grid<Real> &rhs,
 
     gcg->setMGPreconditioner(GridCgInterface::PC_MGP, pmg);
   }
+  std::cout << "HERE 8" << std::endl;
 
   // CG solve
+  Real time = 0;
   for (int iter = 0; iter < maxIter; iter++) {
-    if (!gcg->iterate())
+    if (!gcg->iterate(time))
       iter = maxIter;
     if (iter < maxIter)
       debMsg("FluidSolver::solvePressure iteration " << iter
@@ -1193,8 +1216,26 @@ void solvePressureSystem(Grid<Real> &rhs,
   debMsg("FluidSolver::solvePressure done. Iterations:" << gcg->getIterations()
                                                         << ", residual:" << gcg->getResNorm(),
          2);
+  // std::cout << "TIME: " << time << std::endl;
 
   // Cleanup
+  if (cleanUp) {
+    if (residual)
+      delete residual;
+    if (search)
+      delete search;
+    if (A0)
+      delete A0;
+    if (Ai)
+      delete Ai;
+    if (Aj)
+      delete Aj;
+    if (Ak)
+      delete Ak;
+    if (tmp)
+      delete tmp;
+  }
+
   if (gcg)
     delete gcg;
   if (pca0)
@@ -1225,26 +1266,40 @@ static PyObject *_W_2(PyObject *_self, PyObject *_linargs, PyObject *_kwds)
       MACGrid &vel = *_args.getPtr<MACGrid>("vel", 1, &_lock);
       Grid<Real> &pressure = *_args.getPtr<Grid<Real>>("pressure", 2, &_lock);
       const FlagGrid &flags = *_args.getPtr<FlagGrid>("flags", 3, &_lock);
-      Real cgAccuracy = _args.getOpt<Real>("cgAccuracy", 4, 1e-3, &_lock);
-      const Grid<Real> *phi = _args.getPtrOpt<Grid<Real>>("phi", 5, nullptr, &_lock);
+      Grid<Real> *residual = _args.getPtrOpt<Grid<Real>>("residual", 4, nullptr, &_lock);
+      Grid<Real> *search = _args.getPtrOpt<Grid<Real>>("search", 5, nullptr, &_lock);
+      Grid<Real> *A0 = _args.getPtrOpt<Grid<Real>>("A0", 6, nullptr, &_lock);
+      Grid<Real> *Ai = _args.getPtrOpt<Grid<Real>>("Ai", 7, nullptr, &_lock);
+      Grid<Real> *Aj = _args.getPtrOpt<Grid<Real>>("Aj", 8, nullptr, &_lock);
+      Grid<Real> *Ak = _args.getPtrOpt<Grid<Real>>("Ak", 9, nullptr, &_lock);
+      Grid<Real> *tmp = _args.getPtrOpt<Grid<Real>>("tmp", 10, nullptr, &_lock);
+      Real cgAccuracy = _args.getOpt<Real>("cgAccuracy", 11, 1e-3, &_lock);
+      const Grid<Real> *phi = _args.getPtrOpt<Grid<Real>>("phi", 12, nullptr, &_lock);
       const Grid<Real> *perCellCorr = _args.getPtrOpt<Grid<Real>>(
-          "perCellCorr", 6, nullptr, &_lock);
-      const MACGrid *fractions = _args.getPtrOpt<MACGrid>("fractions", 7, nullptr, &_lock);
-      Real gfClamp = _args.getOpt<Real>("gfClamp", 8, 1e-04, &_lock);
-      Real cgMaxIterFac = _args.getOpt<Real>("cgMaxIterFac", 9, 1.5, &_lock);
-      bool precondition = _args.getOpt<bool>("precondition", 10, true, &_lock);
-      int preconditioner = _args.getOpt<int>("preconditioner", 11, PcMIC, &_lock);
+          "perCellCorr", 13, nullptr, &_lock);
+      const MACGrid *fractions = _args.getPtrOpt<MACGrid>("fractions", 14, nullptr, &_lock);
+      Real gfClamp = _args.getOpt<Real>("gfClamp", 15, 1e-04, &_lock);
+      Real cgMaxIterFac = _args.getOpt<Real>("cgMaxIterFac", 16, 1.5, &_lock);
+      bool precondition = _args.getOpt<bool>("precondition", 17, true, &_lock);
+      int preconditioner = _args.getOpt<int>("preconditioner", 18, PcMIC, &_lock);
       const bool enforceCompatibility = _args.getOpt<bool>(
-          "enforceCompatibility", 12, false, &_lock);
-      const bool useL2Norm = _args.getOpt<bool>("useL2Norm", 13, false, &_lock);
-      const bool zeroPressureFixing = _args.getOpt<bool>("zeroPressureFixing", 14, false, &_lock);
-      const Grid<Real> *curv = _args.getPtrOpt<Grid<Real>>("curv", 15, nullptr, &_lock);
-      const Real surfTens = _args.getOpt<Real>("surfTens", 16, 0., &_lock);
+          "enforceCompatibility", 19, false, &_lock);
+      const bool useL2Norm = _args.getOpt<bool>("useL2Norm", 20, false, &_lock);
+      const bool zeroPressureFixing = _args.getOpt<bool>("zeroPressureFixing", 21, false, &_lock);
+      const Grid<Real> *curv = _args.getPtrOpt<Grid<Real>>("curv", 22, nullptr, &_lock);
+      const Real surfTens = _args.getOpt<Real>("surfTens", 23, 0., &_lock);
       _retval = getPyNone();
       solvePressureSystem(rhs,
                           vel,
                           pressure,
                           flags,
+                          residual,
+                          search,
+                          A0,
+                          Ai,
+                          Aj,
+                          Ak,
+                          tmp,
                           cgAccuracy,
                           phi,
                           perCellCorr,
@@ -1370,6 +1425,13 @@ void PbRegister_correctVelocity()
 void solvePressure(MACGrid &vel,
                    Grid<Real> &pressure,
                    const FlagGrid &flags,
+                   Grid<Real> *residual = nullptr,
+                   Grid<Real> *search = nullptr,
+                   Grid<Real> *A0 = nullptr,
+                   Grid<Real> *Ai = nullptr,
+                   Grid<Real> *Aj = nullptr,
+                   Grid<Real> *Ak = nullptr,
+                   Grid<Real> *tmp = nullptr,
                    Real cgAccuracy = 1e-3,
                    const Grid<Real> *phi = nullptr,
                    const Grid<Real> *perCellCorr = nullptr,
@@ -1411,6 +1473,13 @@ void solvePressure(MACGrid &vel,
                       vel,
                       pressure,
                       flags,
+                      residual,
+                      search,
+                      A0,
+                      Ai,
+                      Aj,
+                      Aj,
+                      tmp,
                       cgAccuracy,
                       phi,
                       perCellCorr,
@@ -1442,10 +1511,11 @@ void solvePressure(MACGrid &vel,
                   curv,
                   surfTens);
 
+  // TODO (sebbas): Disabled for now
   // optionally , return RHS
-  if (retRhs) {
-    retRhs->copyFrom(rhs);
-  }
+  // if(retRhs) {
+  // 	retRhs->copyFrom(rhs);
+  // }
 }
 static PyObject *_W_4(PyObject *_self, PyObject *_linargs, PyObject *_kwds)
 {
@@ -1460,26 +1530,40 @@ static PyObject *_W_4(PyObject *_self, PyObject *_linargs, PyObject *_kwds)
       MACGrid &vel = *_args.getPtr<MACGrid>("vel", 0, &_lock);
       Grid<Real> &pressure = *_args.getPtr<Grid<Real>>("pressure", 1, &_lock);
       const FlagGrid &flags = *_args.getPtr<FlagGrid>("flags", 2, &_lock);
-      Real cgAccuracy = _args.getOpt<Real>("cgAccuracy", 3, 1e-3, &_lock);
-      const Grid<Real> *phi = _args.getPtrOpt<Grid<Real>>("phi", 4, nullptr, &_lock);
+      Grid<Real> *residual = _args.getPtrOpt<Grid<Real>>("residual", 3, nullptr, &_lock);
+      Grid<Real> *search = _args.getPtrOpt<Grid<Real>>("search", 4, nullptr, &_lock);
+      Grid<Real> *A0 = _args.getPtrOpt<Grid<Real>>("A0", 5, nullptr, &_lock);
+      Grid<Real> *Ai = _args.getPtrOpt<Grid<Real>>("Ai", 6, nullptr, &_lock);
+      Grid<Real> *Aj = _args.getPtrOpt<Grid<Real>>("Aj", 7, nullptr, &_lock);
+      Grid<Real> *Ak = _args.getPtrOpt<Grid<Real>>("Ak", 8, nullptr, &_lock);
+      Grid<Real> *tmp = _args.getPtrOpt<Grid<Real>>("tmp", 9, nullptr, &_lock);
+      Real cgAccuracy = _args.getOpt<Real>("cgAccuracy", 10, 1e-3, &_lock);
+      const Grid<Real> *phi = _args.getPtrOpt<Grid<Real>>("phi", 11, nullptr, &_lock);
       const Grid<Real> *perCellCorr = _args.getPtrOpt<Grid<Real>>(
-          "perCellCorr", 5, nullptr, &_lock);
-      const MACGrid *fractions = _args.getPtrOpt<MACGrid>("fractions", 6, nullptr, &_lock);
-      const MACGrid *obvel = _args.getPtrOpt<MACGrid>("obvel", 7, nullptr, &_lock);
-      Real gfClamp = _args.getOpt<Real>("gfClamp", 8, 1e-04, &_lock);
-      Real cgMaxIterFac = _args.getOpt<Real>("cgMaxIterFac", 9, 1.5, &_lock);
-      bool precondition = _args.getOpt<bool>("precondition", 10, true, &_lock);
-      int preconditioner = _args.getOpt<int>("preconditioner", 11, PcMIC, &_lock);
-      bool enforceCompatibility = _args.getOpt<bool>("enforceCompatibility", 12, false, &_lock);
-      bool useL2Norm = _args.getOpt<bool>("useL2Norm", 13, false, &_lock);
-      bool zeroPressureFixing = _args.getOpt<bool>("zeroPressureFixing", 14, false, &_lock);
-      const Grid<Real> *curv = _args.getPtrOpt<Grid<Real>>("curv", 15, nullptr, &_lock);
-      const Real surfTens = _args.getOpt<Real>("surfTens", 16, 0., &_lock);
-      Grid<Real> *retRhs = _args.getPtrOpt<Grid<Real>>("retRhs", 17, nullptr, &_lock);
+          "perCellCorr", 12, nullptr, &_lock);
+      const MACGrid *fractions = _args.getPtrOpt<MACGrid>("fractions", 13, nullptr, &_lock);
+      const MACGrid *obvel = _args.getPtrOpt<MACGrid>("obvel", 14, nullptr, &_lock);
+      Real gfClamp = _args.getOpt<Real>("gfClamp", 15, 1e-04, &_lock);
+      Real cgMaxIterFac = _args.getOpt<Real>("cgMaxIterFac", 16, 1.5, &_lock);
+      bool precondition = _args.getOpt<bool>("precondition", 17, true, &_lock);
+      int preconditioner = _args.getOpt<int>("preconditioner", 18, PcMIC, &_lock);
+      bool enforceCompatibility = _args.getOpt<bool>("enforceCompatibility", 19, false, &_lock);
+      bool useL2Norm = _args.getOpt<bool>("useL2Norm", 20, false, &_lock);
+      bool zeroPressureFixing = _args.getOpt<bool>("zeroPressureFixing", 21, false, &_lock);
+      const Grid<Real> *curv = _args.getPtrOpt<Grid<Real>>("curv", 22, nullptr, &_lock);
+      const Real surfTens = _args.getOpt<Real>("surfTens", 23, 0., &_lock);
+      Grid<Real> *retRhs = _args.getPtrOpt<Grid<Real>>("retRhs", 24, nullptr, &_lock);
       _retval = getPyNone();
       solvePressure(vel,
                     pressure,
                     flags,
+                    residual,
+                    search,
+                    A0,
+                    Ai,
+                    Aj,
+                    Ak,
+                    tmp,
                     cgAccuracy,
                     phi,
                     perCellCorr,

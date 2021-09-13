@@ -205,7 +205,6 @@ class ParticleBase : public PbClass {
   //! custom seed for particle systems, used by plugins
   int mSeed;  //! fix global random seed storage, used mainly by functions in this class
   static int globalSeed;
-
  public:
   PbArgs _args;
 }
@@ -629,7 +628,6 @@ template<class S> class ParticleSystem : public ParticleBase {
   std::vector<S> mData;
   //! reduce storage , called by doCompress
   virtual void compress();
-
  public:
   PbArgs _args;
 }
@@ -920,7 +918,6 @@ class ParticleIndexSystem : public ParticleSystem<ParticleIndexData> {
       return -1;
     }
   };
-
  public:
   PbArgs _args;
 }
@@ -985,7 +982,6 @@ template<class DATA, class CON> class ConnectedParticleSystem : public ParticleS
  protected:
   std::vector<CON> mSegments;
   virtual void compress();
-
  public:
   PbArgs _args;
 }
@@ -1075,7 +1071,6 @@ class ParticleDataBase : public PbClass {
 
  protected:
   ParticleBase *mpParticleSys;
-
  public:
   PbArgs _args;
 }
@@ -1848,7 +1843,6 @@ template<class T> class ParticleDataImpl : public ParticleDataBase {
   //! optionally , we might have an associated grid from which to grab new data
   Grid<T> *mpGridSource;  //! unfortunately , we need to distinguish mac vs regular vec3
   bool mGridSourceMAC;
-
  public:
   PbArgs _args;
 }
@@ -1912,19 +1906,17 @@ template<class S> void ParticleSystem<S>::transformPositions(Vec3i dimOld, Vec3i
 
 // check for deletion/invalid position, otherwise return velocity
 
-template<class S> struct _GridAdvectKernel : public KernelBase {
-  _GridAdvectKernel(const KernelBase &base,
-                    std::vector<S> &p,
-                    const MACGrid &vel,
-                    const FlagGrid &flags,
-                    const Real dt,
-                    const bool deleteInObstacle,
-                    const bool stopInObstacle,
-                    const bool skipNew,
-                    const ParticleDataImpl<int> *ptype,
-                    const int exclude,
-                    std::vector<Vec3> &u)
-      : KernelBase(base),
+template<class S> struct GridAdvectKernel : public KernelBase {
+  GridAdvectKernel(std::vector<S> &p,
+                   const MACGrid &vel,
+                   const FlagGrid &flags,
+                   const Real dt,
+                   const bool deleteInObstacle,
+                   const bool stopInObstacle,
+                   const bool skipNew,
+                   const ParticleDataImpl<int> *ptype,
+                   const int exclude)
+      : KernelBase(p.size()),
         p(p),
         vel(vel),
         flags(flags),
@@ -1934,8 +1926,10 @@ template<class S> struct _GridAdvectKernel : public KernelBase {
         skipNew(skipNew),
         ptype(ptype),
         exclude(exclude),
-        u(u)
+        u((size))
   {
+    runMessage();
+    run();
   }
   inline void op(IndexInt idx,
                  std::vector<S> &p,
@@ -1947,7 +1941,7 @@ template<class S> struct _GridAdvectKernel : public KernelBase {
                  const bool skipNew,
                  const ParticleDataImpl<int> *ptype,
                  const int exclude,
-                 std::vector<Vec3> &u) const
+                 std::vector<Vec3> &u)
   {
     if ((p[idx].flag & ParticleBase::PDELETE) || (ptype && ((*ptype)[idx] & exclude)) ||
         (skipNew && (p[idx].flag & ParticleBase::PNEW))) {
@@ -1967,66 +1961,6 @@ template<class S> struct _GridAdvectKernel : public KernelBase {
       }
     }
     u[idx] = vel.getInterpolated(p[idx].pos) * dt;
-  }
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, p, vel, flags, dt, deleteInObstacle, stopInObstacle, skipNew, ptype, exclude, u);
-  }
-  void run()
-  {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
-  }
-  std::vector<S> &p;
-  const MACGrid &vel;
-  const FlagGrid &flags;
-  const Real dt;
-  const bool deleteInObstacle;
-  const bool stopInObstacle;
-  const bool skipNew;
-  const ParticleDataImpl<int> *ptype;
-  const int exclude;
-  std::vector<Vec3> &u;
-};
-template<class S> struct GridAdvectKernel : public KernelBase {
-  GridAdvectKernel(std::vector<S> &p,
-                   const MACGrid &vel,
-                   const FlagGrid &flags,
-                   const Real dt,
-                   const bool deleteInObstacle,
-                   const bool stopInObstacle,
-                   const bool skipNew,
-                   const ParticleDataImpl<int> *ptype,
-                   const int exclude)
-      : KernelBase(p.size()),
-        _inner(KernelBase(p.size()),
-               p,
-               vel,
-               flags,
-               dt,
-               deleteInObstacle,
-               stopInObstacle,
-               skipNew,
-               ptype,
-               exclude,
-               u),
-        p(p),
-        vel(vel),
-        flags(flags),
-        dt(dt),
-        deleteInObstacle(deleteInObstacle),
-        stopInObstacle(stopInObstacle),
-        skipNew(skipNew),
-        ptype(ptype),
-        exclude(exclude),
-        u((size))
-  {
-    runMessage();
-    run();
-  }
-  void run()
-  {
-    _inner.run();
   }
   inline operator std::vector<Vec3>()
   {
@@ -2081,14 +2015,18 @@ template<class S> struct GridAdvectKernel : public KernelBase {
     return exclude;
   }
   typedef int type8;
-  void runMessage()
+  void runMessage(){};
+  void run()
   {
-    debMsg("Executing kernel GridAdvectKernel ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  _GridAdvectKernel<S> _inner;
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, p, vel, flags, dt, deleteInObstacle, stopInObstacle, skipNew, ptype, exclude, u);
+    }
+  }
   std::vector<S> &p;
   const MACGrid &vel;
   const FlagGrid &flags;
@@ -2112,7 +2050,7 @@ template<class S> struct KnDeleteInObstacle : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(IndexInt idx, std::vector<S> &p, const FlagGrid &flags) const
+  inline void op(IndexInt idx, std::vector<S> &p, const FlagGrid &flags)
   {
     if (p[idx].flag & ParticleBase::PDELETE)
       return;
@@ -2130,21 +2068,17 @@ template<class S> struct KnDeleteInObstacle : public KernelBase {
     return flags;
   }
   typedef FlagGrid type1;
-  void runMessage()
-  {
-    debMsg("Executing kernel KnDeleteInObstacle ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, p, flags);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, p, flags);
+    }
   }
   std::vector<S> &p;
   const FlagGrid &flags;
@@ -2189,7 +2123,7 @@ template<class S> struct KnClampPositions : public KernelBase {
                  ParticleDataImpl<Vec3> *posOld = nullptr,
                  bool stopInObstacle = true,
                  const ParticleDataImpl<int> *ptype = nullptr,
-                 const int exclude = 0) const
+                 const int exclude = 0)
   {
     if (p[idx].flag & ParticleBase::PDELETE)
       return;
@@ -2235,21 +2169,17 @@ template<class S> struct KnClampPositions : public KernelBase {
     return exclude;
   }
   typedef int type5;
-  void runMessage()
-  {
-    debMsg("Executing kernel KnClampPositions ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, p, flags, posOld, stopInObstacle, ptype, exclude);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, p, flags, posOld, stopInObstacle, ptype, exclude);
+    }
   }
   std::vector<S> &p;
   const FlagGrid &flags;
@@ -2341,13 +2271,7 @@ template<class S> struct KnProjectParticles : public KernelBase {
     return rand;
   }
   typedef RandomStream type2;
-  void runMessage()
-  {
-    debMsg("Executing kernel KnProjectParticles ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
+  void runMessage(){};
   void run()
   {
     const IndexInt _sz = size;
@@ -2389,7 +2313,7 @@ template<class S> struct KnProjectOutOfBnd : public KernelBase {
                  const Real bnd,
                  const bool *axis,
                  const ParticleDataImpl<int> *ptype,
-                 const int exclude) const
+                 const int exclude)
   {
     if (!part.isActive(idx) || (ptype && ((*ptype)[idx] & exclude)))
       return;
@@ -2438,21 +2362,17 @@ template<class S> struct KnProjectOutOfBnd : public KernelBase {
     return exclude;
   }
   typedef int type5;
-  void runMessage()
-  {
-    debMsg("Executing kernel KnProjectOutOfBnd ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, part, flags, bnd, axis, ptype, exclude);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, part, flags, bnd, axis, ptype, exclude);
+    }
   }
   ParticleSystem<S> &part;
   const FlagGrid &flags;

@@ -18,6 +18,8 @@
 
 #include "conjugategrad.h"
 #include "commonkernels.h"
+#include <chrono>
+using namespace std::chrono;
 
 using namespace std;
 namespace Manta {
@@ -213,9 +215,9 @@ struct GridDotProduct : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(IndexInt idx, const Grid<Real> &a, const Grid<Real> &b, double &result)
+  inline void op(int i, int j, int k, const Grid<Real> &a, const Grid<Real> &b, double &result)
   {
-    result += (a[idx] * b[idx]);
+    result += (a(i, j, k) * b(i, j, k));
   }
   inline operator double()
   {
@@ -235,28 +237,39 @@ struct GridDotProduct : public KernelBase {
     return b;
   }
   typedef Grid<Real> type1;
-  void runMessage()
-  {
-    debMsg("Executing kernel GridDotProduct ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r)
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, a, b, result);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_reduce(tbb::blocked_range<IndexInt>(0, size), *this);
-  }
-  GridDotProduct(GridDotProduct &o, tbb::split) : KernelBase(o), a(o.a), b(o.b), result(0.0)
-  {
-  }
-  void join(const GridDotProduct &o)
-  {
-    result += o.result;
+    const int _maxX = maxX;
+    const int _maxY = maxY;
+    if (maxZ > 1) {
+      const Grid<Real> &a = getArg0();
+      const Grid<Real> &b = getArg1();
+#pragma omp target teams distribute parallel for reduction(+:result) collapse(2) schedule(static,1)
+      {
+        for (int k = minZ; k < maxZ; k++)
+          for (int j = 0; j < _maxY; j++)
+            for (int i = 0; i < _maxX; i++)
+              op(i, j, k, a, b, result);
+      }
+      {
+        this->result = result;
+      }
+    }
+    else {
+      const int k = 0;
+      const Grid<Real> &a = getArg0();
+      const Grid<Real> &b = getArg1();
+#pragma omp target teams distribute parallel for reduction(+:result) collapse(1) schedule(static,1)
+      {
+        for (int j = 0; j < _maxY; j++)
+          for (int i = 0; i < _maxX; i++)
+            op(i, j, k, a, b, result);
+      }
+      {
+        this->result = result;
+      }
+    }
   }
   const Grid<Real> &a;
   const Grid<Real> &b;
@@ -315,29 +328,21 @@ struct InitSigma : public KernelBase {
     return temp;
   }
   typedef Grid<Real> type3;
-  void runMessage()
-  {
-    debMsg("Executing kernel InitSigma ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r)
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, flags, dst, rhs, temp, sigma);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_reduce(tbb::blocked_range<IndexInt>(0, size), *this);
-  }
-  InitSigma(InitSigma &o, tbb::split)
-      : KernelBase(o), flags(o.flags), dst(o.dst), rhs(o.rhs), temp(o.temp), sigma(0)
-  {
-  }
-  void join(const InitSigma &o)
-  {
-    sigma += o.sigma;
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+      double sigma = 0;
+#pragma omp for nowait
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, flags, dst, rhs, temp, sigma);
+#pragma omp critical
+      {
+        this->sigma += sigma;
+      }
+    }
   }
   const FlagGrid &flags;
   Grid<Real> &dst;
@@ -356,8 +361,9 @@ struct UpdateSearchVec : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(IndexInt idx, Grid<Real> &dst, Grid<Real> &src, Real factor) const
+  inline void op(int i, int j, int k, Grid<Real> &dst, Grid<Real> &src, Real factor)
   {
+    const IndexInt idx = dst.index(i, j, k);
     dst[idx] = src[idx] + factor * dst[idx];
   }
   inline Grid<Real> &getArg0()
@@ -375,21 +381,35 @@ struct UpdateSearchVec : public KernelBase {
     return factor;
   }
   typedef Real type2;
-  void runMessage()
-  {
-    debMsg("Executing kernel UpdateSearchVec ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, dst, src, factor);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const int _maxX = maxX;
+    const int _maxY = maxY;
+    if (maxZ > 1) {
+      Grid<Real> &dst = getArg0();
+      Grid<Real> &src = getArg1();
+      Real &factor = getArg2();
+#pragma omp target teams distribute parallel for collapse(3) schedule(static, 1)
+      {
+        for (int k = minZ; k < maxZ; k++)
+          for (int j = 0; j < _maxY; j++)
+            for (int i = 0; i < _maxX; i++)
+              op(i, j, k, dst, src, factor);
+      }
+    }
+    else {
+      const int k = 0;
+      Grid<Real> &dst = getArg0();
+      Grid<Real> &src = getArg1();
+      Real &factor = getArg2();
+#pragma omp target teams distribute parallel for collapse(2) schedule(static, 1)
+      {
+        for (int j = 0; j < _maxY; j++)
+          for (int i = 0; i < _maxX; i++)
+            op(i, j, k, dst, src, factor);
+      }
+    }
   }
   Grid<Real> &dst;
   Grid<Real> &src;
@@ -406,8 +426,10 @@ GridCg<APPLYMAT>::GridCg(Grid<Real> &dst,
                          Grid<Real> &search,
                          const FlagGrid &flags,
                          Grid<Real> &tmp,
-                         std::vector<Grid<Real> *> matrixAVec,
-                         std::vector<Grid<Real> *> rhsVec)
+                         Grid<Real> *pA0,
+                         Grid<Real> *pAi,
+                         Grid<Real> *pAj,
+                         Grid<Real> *pAk)
     : GridCgInterface(),
       mInited(false),
       mIterations(0),
@@ -417,8 +439,10 @@ GridCg<APPLYMAT>::GridCg(Grid<Real> &dst,
       mSearch(search),
       mFlags(flags),
       mTmp(tmp),
-      mMatrixA(matrixAVec),
-      mVecRhs(rhsVec),
+      mpA0(pA0),
+      mpAi(pAi),
+      mpAj(pAj),
+      mpAk(pAk),
       mPcMethod(PC_None),
       mpPCA0(nullptr),
       mpPCAi(nullptr),
@@ -436,54 +460,37 @@ template<class APPLYMAT> void GridCg<APPLYMAT>::doInit()
   mInited = true;
   mIterations = 0;
 
-  mDst.clear();
-  mResidual.copyFrom(mRhs);  // p=0, residual = b
+  mDst.clear(1);
+  mResidual.copyFrom(mRhs, true, 1);  // p=0, residual = b
 
   if (mPcMethod == PC_ICP) {
-    assertMsg(mDst.is3D(), "ICP only supports 3D grids so far");
-    InitPreconditionIncompCholesky(mFlags,
-                                   *mpPCA0,
-                                   *mpPCAi,
-                                   *mpPCAj,
-                                   *mpPCAk,
-                                   *mMatrixA[0],
-                                   *mMatrixA[1],
-                                   *mMatrixA[2],
-                                   *mMatrixA[3]);
-    ApplyPreconditionIncompCholesky(mTmp,
-                                    mResidual,
-                                    mFlags,
-                                    *mpPCA0,
-                                    *mpPCAi,
-                                    *mpPCAj,
-                                    *mpPCAk,
-                                    *mMatrixA[0],
-                                    *mMatrixA[1],
-                                    *mMatrixA[2],
-                                    *mMatrixA[3]);
+    // assertMsg(mDst.is3D(), "ICP only supports 3D grids so far");
+    InitPreconditionIncompCholesky(
+        mFlags, *mpPCA0, *mpPCAi, *mpPCAj, *mpPCAk, *mpA0, *mpAi, *mpAj, *mpAk);
+    ApplyPreconditionIncompCholesky(
+        mTmp, mResidual, mFlags, *mpPCA0, *mpPCAi, *mpPCAj, *mpPCAk, *mpA0, *mpAi, *mpAj, *mpAk);
   }
   else if (mPcMethod == PC_mICP) {
-    assertMsg(mDst.is3D(), "mICP only supports 3D grids so far");
-    InitPreconditionModifiedIncompCholesky2(
-        mFlags, *mpPCA0, *mMatrixA[0], *mMatrixA[1], *mMatrixA[2], *mMatrixA[3]);
+    // assertMsg(mDst.is3D(), "mICP only supports 3D grids so far");
+    InitPreconditionModifiedIncompCholesky2(mFlags, *mpPCA0, *mpA0, *mpAi, *mpAj, *mpAk);
     ApplyPreconditionModifiedIncompCholesky2(
-        mTmp, mResidual, mFlags, *mpPCA0, *mMatrixA[0], *mMatrixA[1], *mMatrixA[2], *mMatrixA[3]);
+        mTmp, mResidual, mFlags, *mpPCA0, *mpA0, *mpAi, *mpAj, *mpAk);
   }
   else if (mPcMethod == PC_MGP) {
-    InitPreconditionMultigrid(
-        mMG, *mMatrixA[0], *mMatrixA[1], *mMatrixA[2], *mMatrixA[3], mAccuracy);
+    InitPreconditionMultigrid(mMG, *mpA0, *mpAi, *mpAj, *mpAk, mAccuracy);
     ApplyPreconditionMultigrid(mMG, mTmp, mResidual);
   }
   else {
-    mTmp.copyFrom(mResidual);
+    mTmp.copyFrom(mResidual, true, 1);
   }
 
-  mSearch.copyFrom(mTmp);
+  mSearch.copyFrom(mTmp, true, 1);
   mSigma = GridDotProduct(mTmp, mResidual);
 }
 
-template<class APPLYMAT> bool GridCg<APPLYMAT>::iterate()
+template<class APPLYMAT> bool GridCg<APPLYMAT>::iterate(Real &time)
 {
+  auto start = high_resolution_clock::now();
   if (!mInited)
     doInit();
 
@@ -493,7 +500,14 @@ template<class APPLYMAT> bool GridCg<APPLYMAT>::iterate()
   // this could reinterpret the mpA pointers (not so clean right now)
   // tmp = applyMat(search)
 
-  APPLYMAT(mFlags, mTmp, mSearch, mMatrixA, mVecRhs);
+  APPLYMAT(mFlags, mTmp, mSearch, *mpA0, *mpAi, *mpAj, *mpAk);
+
+  auto stop = high_resolution_clock::now();
+  auto duration = duration_cast<microseconds>(stop - start);
+  time += duration.count();
+  // std::cout << "APPLYMAT Time taken: " << duration.count() << std::endl;
+
+  start = high_resolution_clock::now();
 
   // alpha = sigma/dot(tmp, search)
   Real dp = GridDotProduct(mTmp, mSearch);
@@ -501,35 +515,49 @@ template<class APPLYMAT> bool GridCg<APPLYMAT>::iterate()
   if (fabs(dp) > 0.)
     alpha = mSigma / (Real)dp;
 
+  stop = high_resolution_clock::now();
+  duration = duration_cast<microseconds>(stop - start);
+  time += duration.count();
+  // std::cout << "GridDotProduct Time taken: " << duration.count() << std::endl;
+
+  start = high_resolution_clock::now();
+
   gridScaledAdd<Real, Real>(mDst, mSearch, alpha);     // dst += search * alpha
   gridScaledAdd<Real, Real>(mResidual, mTmp, -alpha);  // residual += tmp * -alpha
 
+  stop = high_resolution_clock::now();
+  duration = duration_cast<microseconds>(stop - start);
+  time += duration.count();
+  // std::cout << "gridScaledAdd Time taken: " << duration.count() << std::endl;
+
+  start = high_resolution_clock::now();
+
   if (mPcMethod == PC_ICP)
-    ApplyPreconditionIncompCholesky(mTmp,
-                                    mResidual,
-                                    mFlags,
-                                    *mpPCA0,
-                                    *mpPCAi,
-                                    *mpPCAj,
-                                    *mpPCAk,
-                                    *mMatrixA[0],
-                                    *mMatrixA[1],
-                                    *mMatrixA[2],
-                                    *mMatrixA[3]);
+    ApplyPreconditionIncompCholesky(
+        mTmp, mResidual, mFlags, *mpPCA0, *mpPCAi, *mpPCAj, *mpPCAk, *mpA0, *mpAi, *mpAj, *mpAk);
   else if (mPcMethod == PC_mICP)
     ApplyPreconditionModifiedIncompCholesky2(
-        mTmp, mResidual, mFlags, *mpPCA0, *mMatrixA[0], *mMatrixA[1], *mMatrixA[2], *mMatrixA[3]);
+        mTmp, mResidual, mFlags, *mpPCA0, *mpA0, *mpAi, *mpAj, *mpAk);
   else if (mPcMethod == PC_MGP)
     ApplyPreconditionMultigrid(mMG, mTmp, mResidual);
   else
-    mTmp.copyFrom(mResidual);
+    mTmp.copyFrom(mResidual, true, 1);
+
+  stop = high_resolution_clock::now();
+  duration = duration_cast<microseconds>(stop - start);
+  time += duration.count();
+  // std::cout << "copyFrom Time taken: " << duration.count() << std::endl;
+
+  start = high_resolution_clock::now();
 
   // use the l2 norm of the residual for convergence check? (usually max norm is recommended
   // instead)
   if (this->mUseL2Norm) {
+    // std::cout << "USING L2" << std::endl;
     mResNorm = GridSumSqr(mResidual).sum;
   }
   else {
+    // std::cout << "NOT USING L2" << std::endl;
     mResNorm = mResidual.getMaxAbs();
   }
 
@@ -539,27 +567,43 @@ template<class APPLYMAT> bool GridCg<APPLYMAT>::iterate()
     return false;
   }
 
+  stop = high_resolution_clock::now();
+  duration = duration_cast<microseconds>(stop - start);
+  time += duration.count();
+  // std::cout << "GridSumSqr Time taken: " << duration.count() << std::endl;
+
+  start = high_resolution_clock::now();
+
   Real sigmaNew = GridDotProduct(mTmp, mResidual);
   Real beta = sigmaNew / mSigma;
+
+  stop = high_resolution_clock::now();
+  duration = duration_cast<microseconds>(stop - start);
+  time += duration.count();
+  // std::cout << "GridDotProduct Time taken: " << duration.count() << std::endl;
+
+  start = high_resolution_clock::now();
 
   // search =  tmp + beta * search
   UpdateSearchVec(mSearch, mTmp, beta);
 
-  debMsg("GridCg::iterate i=" << mIterations << " sigmaNew=" << sigmaNew << " sigmaLast=" << mSigma
-                              << " alpha=" << alpha << " beta=" << beta << " ",
-         CG_DEBUGLEVEL);
+  stop = high_resolution_clock::now();
+  duration = duration_cast<microseconds>(stop - start);
+  time += duration.count();
+  // std::cout << "UpdateSearchVec Time taken: " << duration.count() << std::endl;
+
+  // debMsg("GridCg::iterate i="<<mIterations<<" sigmaNew="<<sigmaNew<<" sigmaLast="<<mSigma<<"
+  // alpha="<<alpha<<" beta="<<beta<<" ", CG_DEBUGLEVEL);
   mSigma = sigmaNew;
 
   if (!(mResNorm < 1e35)) {
     if (mPcMethod == PC_MGP) {
       // diverging solves can be caused by the static multigrid mode, we cannot detect this here,
       // though only the pressure solve call "knows" whether the MG is static or dynamics...
-      debMsg(
-          "GridCg::iterate: Warning - this diverging solve can be caused by the 'static' mode of "
-          "the MG preconditioner. If the static mode is active, try switching to dynamic.",
-          1);
+      // debMsg("GridCg::iterate: Warning - this diverging solve can be caused by the 'static' mode
+      // of the MG preconditioner. If the static mode is active, try switching to dynamic.", 1);
     }
-    errMsg("GridCg::iterate: The CG solver diverged, residual norm > 1e30, stopping.");
+    // errMsg("GridCg::iterate: The CG solver diverged, residual norm > 1e30, stopping.");
   }
 
   // debMsg("PB-CG-Norms::p"<<sqrt( GridOpNormNosqrt(mpDst, mpFlags).getValue() ) <<"
@@ -571,8 +615,9 @@ template<class APPLYMAT> bool GridCg<APPLYMAT>::iterate()
 
 template<class APPLYMAT> void GridCg<APPLYMAT>::solve(int maxIter)
 {
+  Real time = 0;
   for (int iter = 0; iter < maxIter; iter++) {
-    if (!iterate())
+    if (!iterate(time))
       iter = maxIter;
   }
   return;
@@ -583,13 +628,13 @@ template<class APPLYMAT>
 void GridCg<APPLYMAT>::setICPreconditioner(
     PreconditionType method, Grid<Real> *A0, Grid<Real> *Ai, Grid<Real> *Aj, Grid<Real> *Ak)
 {
-  assertMsg(method == PC_ICP || method == PC_mICP,
-            "GridCg<APPLYMAT>::setICPreconditioner: Invalid method specified.");
+  // assertMsg(method==PC_ICP || method==PC_mICP, "GridCg<APPLYMAT>::setICPreconditioner: Invalid
+  // method specified.");
 
   mPcMethod = method;
   if ((!A0->is3D())) {
     if (gPrint2dWarning) {
-      debMsg("ICP/mICP pre-conditioning only supported in 3D for now, disabling it.", 1);
+      // debMsg("ICP/mICP pre-conditioning only supported in 3D for now, disabling it.", 1);
       gPrint2dWarning = false;
     }
     mPcMethod = PC_None;
@@ -603,7 +648,7 @@ void GridCg<APPLYMAT>::setICPreconditioner(
 template<class APPLYMAT>
 void GridCg<APPLYMAT>::setMGPreconditioner(PreconditionType method, GridMg *MG)
 {
-  assertMsg(method == PC_MGP, "GridCg<APPLYMAT>::setMGPreconditioner: Invalid method specified.");
+  // assertMsg(method==PC_MGP, "GridCg<APPLYMAT>::setMGPreconditioner: Invalid method specified.");
 
   mPcMethod = method;
   mMG = MG;
@@ -612,9 +657,6 @@ void GridCg<APPLYMAT>::setMGPreconditioner(PreconditionType method, GridMg *MG)
 // explicit instantiation
 template class GridCg<ApplyMatrix>;
 template class GridCg<ApplyMatrix2D>;
-template class GridCg<ApplyMatrixViscosityU>;
-template class GridCg<ApplyMatrixViscosityV>;
-template class GridCg<ApplyMatrixViscosityW>;
 
 //*****************************************************************************
 // diffusion for real and vec grids, e.g. for viscosity
@@ -655,44 +697,33 @@ void cgSolveDiffusion(const FlagGrid &flags,
     }
   }
 
-  GridCgInterface *gcg;
+  GridCgInterface *gcg = nullptr;
   // note , no preconditioning for now...
   const int maxIter = (int)(cgMaxIterFac * flags.getSize().max()) * (flags.is3D() ? 1 : 4);
 
   if (grid.getType() & GridBase::TypeReal) {
     Grid<Real> &u = ((Grid<Real> &)grid);
     rhs.copyFrom(u);
-    vector<Grid<Real> *> matA{&A0, &Ai, &Aj};
-
-    if (flags.is3D()) {
-      matA.push_back(&Ak);
-      gcg = new GridCg<ApplyMatrix>(u, rhs, residual, search, flags, tmp, matA);
-    }
-    else {
-      gcg = new GridCg<ApplyMatrix2D>(u, rhs, residual, search, flags, tmp, matA);
-    }
+    if (flags.is3D())
+      gcg = new GridCg<ApplyMatrix>(u, rhs, residual, search, flags, tmp, &A0, &Ai, &Aj, &Ak);
+    else
+      gcg = new GridCg<ApplyMatrix2D>(u, rhs, residual, search, flags, tmp, &A0, &Ai, &Aj, &Ak);
 
     gcg->setAccuracy(cgAccuracy);
     gcg->solve(maxIter);
 
-    debMsg("FluidSolver::solveDiffusion iterations:" << gcg->getIterations()
-                                                     << ", res:" << gcg->getSigma(),
-           CG_DEBUGLEVEL);
+    // debMsg("FluidSolver::solveDiffusion iterations:"<<gcg->getIterations()<<",
+    // res:"<<gcg->getSigma(), CG_DEBUGLEVEL);
   }
   else if ((grid.getType() & GridBase::TypeVec3) || (grid.getType() & GridBase::TypeMAC)) {
     Grid<Vec3> &vec = ((Grid<Vec3> &)grid);
     Grid<Real> u(parent);
-    vector<Grid<Real> *> matA{&A0, &Ai, &Aj};
 
     // core solve is same as for a regular real grid
-    if (flags.is3D()) {
-      matA.push_back(&Ak);
-      gcg = new GridCg<ApplyMatrix>(u, rhs, residual, search, flags, tmp, matA);
-    }
-    else {
-      gcg = new GridCg<ApplyMatrix2D>(u, rhs, residual, search, flags, tmp, matA);
-    }
-
+    if (flags.is3D())
+      gcg = new GridCg<ApplyMatrix>(u, rhs, residual, search, flags, tmp, &A0, &Ai, &Aj, &Ak);
+    else
+      gcg = new GridCg<ApplyMatrix2D>(u, rhs, residual, search, flags, tmp, &A0, &Ai, &Aj, &Ak);
     gcg->setAccuracy(cgAccuracy);
 
     // diffuse every component separately
@@ -702,15 +733,14 @@ void cgSolveDiffusion(const FlagGrid &flags,
 
       rhs.copyFrom(u);
       gcg->solve(maxIter);
-      debMsg("FluidSolver::solveDiffusion vec3, iterations:" << gcg->getIterations()
-                                                             << ", res:" << gcg->getSigma(),
-             CG_DEBUGLEVEL);
+      // debMsg("FluidSolver::solveDiffusion vec3, iterations:"<<gcg->getIterations()<<",
+      // res:"<<gcg->getSigma(), CG_DEBUGLEVEL);
 
       setComponent(u, vec, component);
     }
   }
   else {
-    errMsg("cgSolveDiffusion: Grid Type is not supported (only Real, Vec3, MAC, or Levelset)");
+    // errMsg("cgSolveDiffusion: Grid Type is not supported (only Real, Vec3, MAC, or Levelset)");
   }
 
   delete gcg;

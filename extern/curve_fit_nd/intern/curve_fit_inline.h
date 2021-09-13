@@ -45,12 +45,12 @@ MINLINE double sq(const double d)
 }
 
 #ifndef _MSC_VER
-MINLINE double min(const double a, const double b)
+MINLINE double minV(const double a, const double b)
 {
 	return b < a ? b : a;
 }
 
-MINLINE double max(const double a, const double b)
+MINLINE double maxV(const double a, const double b)
 {
 	return a < b ? b : a;
 }

@@ -127,7 +127,6 @@ class VortexParticleSystem : public ParticleSystem<VortexParticleData> {
   }
 
   virtual ParticleBase *clone();
-
  public:
   PbArgs _args;
 }

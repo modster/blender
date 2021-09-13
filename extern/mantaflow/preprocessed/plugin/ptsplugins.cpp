@@ -34,7 +34,7 @@ struct KnAddForcePvel : public KernelBase {
                  ParticleDataImpl<Vec3> &v,
                  const Vec3 &da,
                  const ParticleDataImpl<int> *ptype,
-                 const int exclude) const
+                 const int exclude)
   {
     if (ptype && ((*ptype)[idx] & exclude))
       return;
@@ -60,21 +60,17 @@ struct KnAddForcePvel : public KernelBase {
     return exclude;
   }
   typedef int type3;
-  void runMessage()
-  {
-    debMsg("Executing kernel KnAddForcePvel ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, v, da, ptype, exclude);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, v, da, ptype, exclude);
+    }
   }
   ParticleDataImpl<Vec3> &v;
   const Vec3 &da;
@@ -150,7 +146,7 @@ struct KnUpdateVelocityFromDeltaPos : public KernelBase {
                  const ParticleDataImpl<Vec3> &x_prev,
                  const Real over_dt,
                  const ParticleDataImpl<int> *ptype,
-                 const int exclude) const
+                 const int exclude)
   {
     if (ptype && ((*ptype)[idx] & exclude))
       return;
@@ -186,21 +182,17 @@ struct KnUpdateVelocityFromDeltaPos : public KernelBase {
     return exclude;
   }
   typedef int type5;
-  void runMessage()
-  {
-    debMsg("Executing kernel KnUpdateVelocityFromDeltaPos ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, p, v, x_prev, over_dt, ptype, exclude);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, p, v, x_prev, over_dt, ptype, exclude);
+    }
   }
   const BasicParticleSystem &p;
   ParticleDataImpl<Vec3> &v;
@@ -273,7 +265,7 @@ struct KnStepEuler : public KernelBase {
                  const ParticleDataImpl<Vec3> &v,
                  const Real dt,
                  const ParticleDataImpl<int> *ptype,
-                 const int exclude) const
+                 const int exclude)
   {
     if (ptype && ((*ptype)[idx] & exclude))
       return;
@@ -304,21 +296,17 @@ struct KnStepEuler : public KernelBase {
     return exclude;
   }
   typedef int type4;
-  void runMessage()
-  {
-    debMsg("Executing kernel KnStepEuler ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, p, v, dt, ptype, exclude);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, p, v, dt, ptype, exclude);
+    }
   }
   BasicParticleSystem &p;
   const ParticleDataImpl<Vec3> &v;
@@ -393,7 +381,7 @@ struct KnSetPartType : public KernelBase {
                  const int mark,
                  const int stype,
                  const FlagGrid &flags,
-                 const int cflag) const
+                 const int cflag)
   {
     if (flags.isInBounds(part.getPos(idx), 0) && (flags.getAt(part.getPos(idx)) & cflag) &&
         (ptype[idx] & stype))
@@ -429,21 +417,17 @@ struct KnSetPartType : public KernelBase {
     return cflag;
   }
   typedef int type5;
-  void runMessage()
-  {
-    debMsg("Executing kernel KnSetPartType ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, ptype, part, mark, stype, flags, cflag);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, ptype, part, mark, stype, flags, cflag);
+    }
   }
   ParticleDataImpl<int> &ptype;
   const BasicParticleSystem &part;

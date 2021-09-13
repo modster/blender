@@ -383,13 +383,15 @@ class GridBase : public PbClass {
     }
   }
 
- protected:
+  // TODO (sebbas): Moved attributes to public for now
   GridType mType;
   Vec3i mSize;
   Real mDx;
-  bool m3D;  // precomputed Z shift: to ensure 2D compatibility, always use this instead of sx*sy !
+  bool m3D;
+  // precomputed Z shift: to ensure 2D compatibility, always use this instead of sx*sy !
   IndexInt mStrideZ;
 
+ protected:
  public:
   PbArgs _args;
 }
@@ -401,7 +403,7 @@ class GridBase : public PbClass {
 template<class T> class Grid : public GridBase {
  public:
   //! init new grid, values are set to zero
-  Grid(FluidSolver *parent, bool show = true, bool sparse = false);
+  Grid(FluidSolver *parent, bool show = true, bool sparse = false, bool offload = false);
   static int _W_10(PyObject *_self, PyObject *_linargs, PyObject *_kwds)
   {
     PbClass *obj = Pb::objFromPy(_self);
@@ -416,7 +418,8 @@ template<class T> class Grid : public GridBase {
         FluidSolver *parent = _args.getPtr<FluidSolver>("parent", 0, &_lock);
         bool show = _args.getOpt<bool>("show", 1, true, &_lock);
         bool sparse = _args.getOpt<bool>("sparse", 2, false, &_lock);
-        obj = new Grid(parent, show, sparse);
+        bool offload = _args.getOpt<bool>("offload", 3, false, &_lock);
+        obj = new Grid(parent, show, sparse, offload);
         obj->registerObject(_self, &_args);
         _args.check();
       }
@@ -490,7 +493,7 @@ template<class T> class Grid : public GridBase {
   }
 
   //! set all cells to zero
-  void clear();
+  void clear(bool isOmp = false);
   static PyObject *_W_13(PyObject *_self, PyObject *_linargs, PyObject *_kwds)
   {
     try {
@@ -501,9 +504,10 @@ template<class T> class Grid : public GridBase {
       PyObject *_retval = nullptr;
       {
         ArgLocker _lock;
+        bool isOmp = _args.getOpt<bool>("isOmp", 0, false, &_lock);
         pbo->_args.copy(_args);
         _retval = getPyNone();
-        pbo->clear();
+        pbo->clear(isOmp);
         pbo->_args.check();
       }
       pbFinalizePlugin(pbo->getParent(), "Grid::clear", !noTiming);
@@ -591,6 +595,11 @@ template<class T> class Grid : public GridBase {
   {
     return mSaveSparse;
   }
+  //! query if this grid should be saved as a sparse grid
+  inline bool isOffload()
+  {
+    return mOffload;
+  }
 
   //! set data
   inline void set(int i, int j, int k, T &val)
@@ -616,9 +625,8 @@ template<class T> class Grid : public GridBase {
         return interpol<T>(mData, mSize, mStrideZ, pos);
       case 2:
         return interpolCubic<T>(mData, mSize, mStrideZ, pos);
-      default:
-        assertMsg(false, "Unknown interpolation order " << order);
     }
+    // default: assertMsg(false, "Unknown interpolation order "<<order); }
     return T(0.);  // should never be reached, just to prevent compiler warnings
   }
 
@@ -628,7 +636,7 @@ template<class T> class Grid : public GridBase {
   //! content...
   // Grid<T>& operator=(const Grid<T>& a);
   //! copy content from other grid (use this one instead of operator= !)
-  Grid<T> &copyFrom(const Grid<T> &a, bool copyType = true);
+  Grid<T> &copyFrom(const Grid<T> &a, bool copyType = true, bool isOmp = false);
   static PyObject *_W_14(PyObject *_self, PyObject *_linargs, PyObject *_kwds)
   {
     try {
@@ -641,8 +649,9 @@ template<class T> class Grid : public GridBase {
         ArgLocker _lock;
         const Grid<T> &a = *_args.getPtr<Grid<T>>("a", 0, &_lock);
         bool copyType = _args.getOpt<bool>("copyType", 1, true, &_lock);
+        bool isOmp = _args.getOpt<bool>("isOmp", 2, false, &_lock);
         pbo->_args.copy(_args);
-        _retval = toPy(pbo->copyFrom(a, copyType));
+        _retval = toPy(pbo->copyFrom(a, copyType, isOmp));
         pbo->_args.check();
       }
       pbFinalizePlugin(pbo->getParent(), "Grid::copyFrom", !noTiming);
@@ -1276,6 +1285,157 @@ template<class T> class Grid : public GridBase {
     }
   }
 
+  //! OpenMP data mapping from / to target device
+  void mapToOmp();
+  static PyObject *_W_38(PyObject *_self, PyObject *_linargs, PyObject *_kwds)
+  {
+    try {
+      PbArgs _args(_linargs, _kwds);
+      Grid *pbo = dynamic_cast<Grid *>(Pb::objFromPy(_self));
+      bool noTiming = _args.getOpt<bool>("notiming", -1, 0);
+      pbPreparePlugin(pbo->getParent(), "Grid::mapToOmp", !noTiming);
+      PyObject *_retval = nullptr;
+      {
+        ArgLocker _lock;
+        pbo->_args.copy(_args);
+        _retval = getPyNone();
+        pbo->mapToOmp();
+        pbo->_args.check();
+      }
+      pbFinalizePlugin(pbo->getParent(), "Grid::mapToOmp", !noTiming);
+      return _retval;
+    }
+    catch (std::exception &e) {
+      pbSetError("Grid::mapToOmp", e.what());
+      return 0;
+    }
+  }
+
+  void mapFromOmp();
+  static PyObject *_W_39(PyObject *_self, PyObject *_linargs, PyObject *_kwds)
+  {
+    try {
+      PbArgs _args(_linargs, _kwds);
+      Grid *pbo = dynamic_cast<Grid *>(Pb::objFromPy(_self));
+      bool noTiming = _args.getOpt<bool>("notiming", -1, 0);
+      pbPreparePlugin(pbo->getParent(), "Grid::mapFromOmp", !noTiming);
+      PyObject *_retval = nullptr;
+      {
+        ArgLocker _lock;
+        pbo->_args.copy(_args);
+        _retval = getPyNone();
+        pbo->mapFromOmp();
+        pbo->_args.check();
+      }
+      pbFinalizePlugin(pbo->getParent(), "Grid::mapFromOmp", !noTiming);
+      return _retval;
+    }
+    catch (std::exception &e) {
+      pbSetError("Grid::mapFromOmp", e.what());
+      return 0;
+    }
+  }
+
+  void mapAllocOmp();
+  static PyObject *_W_40(PyObject *_self, PyObject *_linargs, PyObject *_kwds)
+  {
+    try {
+      PbArgs _args(_linargs, _kwds);
+      Grid *pbo = dynamic_cast<Grid *>(Pb::objFromPy(_self));
+      bool noTiming = _args.getOpt<bool>("notiming", -1, 0);
+      pbPreparePlugin(pbo->getParent(), "Grid::mapAllocOmp", !noTiming);
+      PyObject *_retval = nullptr;
+      {
+        ArgLocker _lock;
+        pbo->_args.copy(_args);
+        _retval = getPyNone();
+        pbo->mapAllocOmp();
+        pbo->_args.check();
+      }
+      pbFinalizePlugin(pbo->getParent(), "Grid::mapAllocOmp", !noTiming);
+      return _retval;
+    }
+    catch (std::exception &e) {
+      pbSetError("Grid::mapAllocOmp", e.what());
+      return 0;
+    }
+  }
+
+  void mapDeleteOmp();
+  static PyObject *_W_41(PyObject *_self, PyObject *_linargs, PyObject *_kwds)
+  {
+    try {
+      PbArgs _args(_linargs, _kwds);
+      Grid *pbo = dynamic_cast<Grid *>(Pb::objFromPy(_self));
+      bool noTiming = _args.getOpt<bool>("notiming", -1, 0);
+      pbPreparePlugin(pbo->getParent(), "Grid::mapDeleteOmp", !noTiming);
+      PyObject *_retval = nullptr;
+      {
+        ArgLocker _lock;
+        pbo->_args.copy(_args);
+        _retval = getPyNone();
+        pbo->mapDeleteOmp();
+        pbo->_args.check();
+      }
+      pbFinalizePlugin(pbo->getParent(), "Grid::mapDeleteOmp", !noTiming);
+      return _retval;
+    }
+    catch (std::exception &e) {
+      pbSetError("Grid::mapDeleteOmp", e.what());
+      return 0;
+    }
+  }
+
+  void updateToOmp();
+  static PyObject *_W_42(PyObject *_self, PyObject *_linargs, PyObject *_kwds)
+  {
+    try {
+      PbArgs _args(_linargs, _kwds);
+      Grid *pbo = dynamic_cast<Grid *>(Pb::objFromPy(_self));
+      bool noTiming = _args.getOpt<bool>("notiming", -1, 0);
+      pbPreparePlugin(pbo->getParent(), "Grid::updateToOmp", !noTiming);
+      PyObject *_retval = nullptr;
+      {
+        ArgLocker _lock;
+        pbo->_args.copy(_args);
+        _retval = getPyNone();
+        pbo->updateToOmp();
+        pbo->_args.check();
+      }
+      pbFinalizePlugin(pbo->getParent(), "Grid::updateToOmp", !noTiming);
+      return _retval;
+    }
+    catch (std::exception &e) {
+      pbSetError("Grid::updateToOmp", e.what());
+      return 0;
+    }
+  }
+
+  void updateFromOmp();
+  static PyObject *_W_43(PyObject *_self, PyObject *_linargs, PyObject *_kwds)
+  {
+    try {
+      PbArgs _args(_linargs, _kwds);
+      Grid *pbo = dynamic_cast<Grid *>(Pb::objFromPy(_self));
+      bool noTiming = _args.getOpt<bool>("notiming", -1, 0);
+      pbPreparePlugin(pbo->getParent(), "Grid::updateFromOmp", !noTiming);
+      PyObject *_retval = nullptr;
+      {
+        ArgLocker _lock;
+        pbo->_args.copy(_args);
+        _retval = getPyNone();
+        pbo->updateFromOmp();
+        pbo->_args.check();
+      }
+      pbFinalizePlugin(pbo->getParent(), "Grid::updateFromOmp", !noTiming);
+      return _retval;
+    }
+    catch (std::exception &e) {
+      pbSetError("Grid::updateFromOmp", e.what());
+      return 0;
+    }
+  }
+
   // c++ only operators
   template<class S> Grid<T> &operator+=(const Grid<S> &a);
   template<class S> Grid<T> &operator+=(const S &a);
@@ -1299,10 +1459,12 @@ template<class T> class Grid : public GridBase {
     return mData[index(i, j, k)];
   }
 
- protected:
+  // TODO (sebbas): Moved attributes to public for now
   T *mData;
+ protected:
   bool mExternalData;  // True if mData is managed outside of the Fluidsolver
   bool mSaveSparse;    // True if this grid may be cached in a sparse structure
+  bool mOffload;       // True if this grid shall be allocated on an OpenMP offload device too
  public:
   PbArgs _args;
 }
@@ -1314,12 +1476,12 @@ template<class T> class Grid : public GridBase {
 //! Special function for staggered grids
 class MACGrid : public Grid<Vec3> {
  public:
-  MACGrid(FluidSolver *parent, bool show = true, bool sparse = false)
-      : Grid<Vec3>(parent, show, sparse)
+  MACGrid(FluidSolver *parent, bool show = true, bool sparse = false, bool offload = false)
+      : Grid<Vec3>(parent, show, sparse, offload)
   {
     mType = (GridType)(TypeMAC | TypeVec3);
   }
-  static int _W_38(PyObject *_self, PyObject *_linargs, PyObject *_kwds)
+  static int _W_44(PyObject *_self, PyObject *_linargs, PyObject *_kwds)
   {
     PbClass *obj = Pb::objFromPy(_self);
     if (obj)
@@ -1333,7 +1495,8 @@ class MACGrid : public Grid<Vec3> {
         FluidSolver *parent = _args.getPtr<FluidSolver>("parent", 0, &_lock);
         bool show = _args.getOpt<bool>("show", 1, true, &_lock);
         bool sparse = _args.getOpt<bool>("sparse", 2, false, &_lock);
-        obj = new MACGrid(parent, show, sparse);
+        bool offload = _args.getOpt<bool>("offload", 3, false, &_lock);
+        obj = new MACGrid(parent, show, sparse, offload);
         obj->registerObject(_self, &_args);
         _args.check();
       }
@@ -1392,17 +1555,16 @@ class MACGrid : public Grid<Vec3> {
       case 1:
         return interpolComponent<comp>(mData, mSize, mStrideZ, pos);
       case 2:
-        return interpolCubicMAC(mData, mSize, mStrideZ, pos)[comp];  // warning - not yet optimized
-      default:
-        assertMsg(false, "Unknown interpolation order " << order);
-    }
+        return interpolCubicMAC(mData, mSize, mStrideZ, pos)[comp];
+    }  // warning - not yet optimized
+    // default: assertMsg(false, "Unknown interpolation order "<<order); }
     return 0.;  // should never be reached, just to prevent compiler warnings
   }
 
   //! set all boundary cells of a MAC grid to certain value (Dirchlet). Respects staggered grid
   //! locations optionally, only set normal components
   void setBoundMAC(Vec3 value, int boundaryWidth, bool normalOnly = false);
-  static PyObject *_W_39(PyObject *_self, PyObject *_linargs, PyObject *_kwds)
+  static PyObject *_W_45(PyObject *_self, PyObject *_linargs, PyObject *_kwds)
   {
     try {
       PbArgs _args(_linargs, _kwds);
@@ -1439,12 +1601,16 @@ class MACGrid : public Grid<Vec3> {
 //! Special functions for FlagGrid
 class FlagGrid : public Grid<int> {
  public:
-  FlagGrid(FluidSolver *parent, int dim = 3, bool show = true, bool sparse = false)
-      : Grid<int>(parent, show, sparse)
+  FlagGrid(FluidSolver *parent,
+           int dim = 3,
+           bool show = true,
+           bool sparse = false,
+           bool offload = false)
+      : Grid<int>(parent, show, sparse, offload)
   {
     mType = (GridType)(TypeFlags | TypeInt);
   }
-  static int _W_40(PyObject *_self, PyObject *_linargs, PyObject *_kwds)
+  static int _W_46(PyObject *_self, PyObject *_linargs, PyObject *_kwds)
   {
     PbClass *obj = Pb::objFromPy(_self);
     if (obj)
@@ -1459,7 +1625,8 @@ class FlagGrid : public Grid<int> {
         int dim = _args.getOpt<int>("dim", 1, 3, &_lock);
         bool show = _args.getOpt<bool>("show", 2, true, &_lock);
         bool sparse = _args.getOpt<bool>("sparse", 3, false, &_lock);
-        obj = new FlagGrid(parent, dim, show, sparse);
+        bool offload = _args.getOpt<bool>("offload", 4, false, &_lock);
+        obj = new FlagGrid(parent, dim, show, sparse, offload);
         obj->registerObject(_self, &_args);
         _args.check();
       }
@@ -1625,7 +1792,7 @@ class FlagGrid : public Grid<int> {
                   const std::string &inflow = "      ",
                   const std::string &outflow = "      ",
                   Grid<Real> *phiWalls = 0x00);
-  static PyObject *_W_41(PyObject *_self, PyObject *_linargs, PyObject *_kwds)
+  static PyObject *_W_47(PyObject *_self, PyObject *_linargs, PyObject *_kwds)
   {
     try {
       PbArgs _args(_linargs, _kwds);
@@ -1659,7 +1826,7 @@ class FlagGrid : public Grid<int> {
 
   //! set fluid flags inside levelset (liquids)
   void updateFromLevelset(LevelsetGrid &levelset);
-  static PyObject *_W_42(PyObject *_self, PyObject *_linargs, PyObject *_kwds)
+  static PyObject *_W_48(PyObject *_self, PyObject *_linargs, PyObject *_kwds)
   {
     try {
       PbArgs _args(_linargs, _kwds);
@@ -1686,7 +1853,7 @@ class FlagGrid : public Grid<int> {
 
   //! set all cells (except obs/in/outflow) to type (fluid by default)
   void fillGrid(int type = TypeFluid);
-  static PyObject *_W_43(PyObject *_self, PyObject *_linargs, PyObject *_kwds)
+  static PyObject *_W_49(PyObject *_self, PyObject *_linargs, PyObject *_kwds)
   {
     try {
       PbArgs _args(_linargs, _kwds);
@@ -1715,7 +1882,7 @@ class FlagGrid : public Grid<int> {
   //! warning for large grids! only regular int returned (due to python interface)
   //! optionally creates mask in RealGrid (1 where flag matches, 0 otherwise)
   int countCells(int flag, int bnd = 0, Grid<Real> *mask = nullptr);
-  static PyObject *_W_44(PyObject *_self, PyObject *_linargs, PyObject *_kwds)
+  static PyObject *_W_50(PyObject *_self, PyObject *_linargs, PyObject *_kwds)
   {
     try {
       PbArgs _args(_linargs, _kwds);
@@ -1868,7 +2035,7 @@ template<class T, class S> struct gridAdd : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(IndexInt idx, Grid<T> &me, const Grid<S> &other) const
+  inline void op(IndexInt idx, Grid<T> &me, const Grid<S> &other)
   {
     me[idx] += other[idx];
   }
@@ -1882,21 +2049,17 @@ template<class T, class S> struct gridAdd : public KernelBase {
     return other;
   }
   typedef Grid<S> type1;
-  void runMessage()
-  {
-    debMsg("Executing kernel gridAdd ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, me, other);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, me, other);
+    }
   }
   Grid<T> &me;
   const Grid<S> &other;
@@ -1907,7 +2070,7 @@ template<class T, class S> struct gridSub : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(IndexInt idx, Grid<T> &me, const Grid<S> &other) const
+  inline void op(IndexInt idx, Grid<T> &me, const Grid<S> &other)
   {
     me[idx] -= other[idx];
   }
@@ -1921,21 +2084,17 @@ template<class T, class S> struct gridSub : public KernelBase {
     return other;
   }
   typedef Grid<S> type1;
-  void runMessage()
-  {
-    debMsg("Executing kernel gridSub ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, me, other);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, me, other);
+    }
   }
   Grid<T> &me;
   const Grid<S> &other;
@@ -1946,7 +2105,7 @@ template<class T, class S> struct gridMult : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(IndexInt idx, Grid<T> &me, const Grid<S> &other) const
+  inline void op(IndexInt idx, Grid<T> &me, const Grid<S> &other)
   {
     me[idx] *= other[idx];
   }
@@ -1960,21 +2119,17 @@ template<class T, class S> struct gridMult : public KernelBase {
     return other;
   }
   typedef Grid<S> type1;
-  void runMessage()
-  {
-    debMsg("Executing kernel gridMult ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, me, other);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, me, other);
+    }
   }
   Grid<T> &me;
   const Grid<S> &other;
@@ -1985,7 +2140,7 @@ template<class T, class S> struct gridDiv : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(IndexInt idx, Grid<T> &me, const Grid<S> &other) const
+  inline void op(IndexInt idx, Grid<T> &me, const Grid<S> &other)
   {
     me[idx] /= other[idx];
   }
@@ -1999,21 +2154,17 @@ template<class T, class S> struct gridDiv : public KernelBase {
     return other;
   }
   typedef Grid<S> type1;
-  void runMessage()
-  {
-    debMsg("Executing kernel gridDiv ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, me, other);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, me, other);
+    }
   }
   Grid<T> &me;
   const Grid<S> &other;
@@ -2024,7 +2175,7 @@ template<class T, class S> struct gridAddScalar : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(IndexInt idx, Grid<T> &me, const S &other) const
+  inline void op(IndexInt idx, Grid<T> &me, const S &other)
   {
     me[idx] += other;
   }
@@ -2038,21 +2189,17 @@ template<class T, class S> struct gridAddScalar : public KernelBase {
     return other;
   }
   typedef S type1;
-  void runMessage()
-  {
-    debMsg("Executing kernel gridAddScalar ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, me, other);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, me, other);
+    }
   }
   Grid<T> &me;
   const S &other;
@@ -2063,7 +2210,7 @@ template<class T, class S> struct gridMultScalar : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(IndexInt idx, Grid<T> &me, const S &other) const
+  inline void op(IndexInt idx, Grid<T> &me, const S &other)
   {
     me[idx] *= other;
   }
@@ -2077,25 +2224,22 @@ template<class T, class S> struct gridMultScalar : public KernelBase {
     return other;
   }
   typedef S type1;
-  void runMessage()
-  {
-    debMsg("Executing kernel gridMultScalar ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, me, other);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, me, other);
+    }
   }
   Grid<T> &me;
   const S &other;
 };
+
 template<class T, class S> struct gridScaledAdd : public KernelBase {
   gridScaledAdd(Grid<T> &me, const Grid<T> &other, const S &factor)
       : KernelBase(&me, 0), me(me), other(other), factor(factor)
@@ -2103,8 +2247,9 @@ template<class T, class S> struct gridScaledAdd : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(IndexInt idx, Grid<T> &me, const Grid<T> &other, const S &factor) const
+  inline void op(int i, int j, int k, Grid<T> &me, const Grid<T> &other, const S &factor)
   {
+    const IndexInt idx = me.index(i, j, k);
     me[idx] += factor * other[idx];
   }
   inline Grid<T> &getArg0()
@@ -2122,21 +2267,35 @@ template<class T, class S> struct gridScaledAdd : public KernelBase {
     return factor;
   }
   typedef S type2;
-  void runMessage()
-  {
-    debMsg("Executing kernel gridScaledAdd ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, me, other, factor);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const int _maxX = maxX;
+    const int _maxY = maxY;
+    if (maxZ > 1) {
+      Grid<T> &me = getArg0();
+      const Grid<T> &other = getArg1();
+      const S &factor = getArg2();
+#pragma omp target teams distribute parallel for collapse(3) schedule(static, 1)
+      {
+        for (int k = minZ; k < maxZ; k++)
+          for (int j = 0; j < _maxY; j++)
+            for (int i = 0; i < _maxX; i++)
+              op(i, j, k, me, other, factor);
+      }
+    }
+    else {
+      const int k = 0;
+      Grid<T> &me = getArg0();
+      const Grid<T> &other = getArg1();
+      const S &factor = getArg2();
+#pragma omp target teams distribute parallel for collapse(2) schedule(static, 1)
+      {
+        for (int j = 0; j < _maxY; j++)
+          for (int i = 0; i < _maxX; i++)
+            op(i, j, k, me, other, factor);
+      }
+    }
   }
   Grid<T> &me;
   const Grid<T> &other;
@@ -2149,7 +2308,7 @@ template<class T> struct gridSetConst : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(IndexInt idx, Grid<T> &grid, T value) const
+  inline void op(IndexInt idx, Grid<T> &grid, T value)
   {
     grid[idx] = value;
   }
@@ -2163,21 +2322,17 @@ template<class T> struct gridSetConst : public KernelBase {
     return value;
   }
   typedef T type1;
-  void runMessage()
-  {
-    debMsg("Executing kernel gridSetConst ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, grid, value);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, grid, value);
+    }
   }
   Grid<T> &grid;
   T value;
@@ -2279,7 +2434,7 @@ template<class S> struct knInterpolateGridTempl : public KernelBase {
                  const Grid<S> &source,
                  const Vec3 &sourceFactor,
                  Vec3 offset,
-                 int orderSpace = 1) const
+                 int orderSpace = 1)
   {
     Vec3 pos = Vec3(i, j, k) * sourceFactor + offset;
     if (!source.is3D())
@@ -2311,36 +2466,34 @@ template<class S> struct knInterpolateGridTempl : public KernelBase {
     return orderSpace;
   }
   typedef int type4;
-  void runMessage()
-  {
-    debMsg("Executing kernel knInterpolateGridTempl ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
+  void runMessage(){};
+  void run()
   {
     const int _maxX = maxX;
     const int _maxY = maxY;
     if (maxZ > 1) {
-      for (int k = __r.begin(); k != (int)__r.end(); k++)
-        for (int j = 0; j < _maxY; j++)
-          for (int i = 0; i < _maxX; i++)
-            op(i, j, k, target, source, sourceFactor, offset, orderSpace);
+
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int k = minZ; k < maxZ; k++)
+          for (int j = 0; j < _maxY; j++)
+            for (int i = 0; i < _maxX; i++)
+              op(i, j, k, target, source, sourceFactor, offset, orderSpace);
+      }
     }
     else {
       const int k = 0;
-      for (int j = __r.begin(); j != (int)__r.end(); j++)
-        for (int i = 0; i < _maxX; i++)
-          op(i, j, k, target, source, sourceFactor, offset, orderSpace);
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int j = 0; j < _maxY; j++)
+          for (int i = 0; i < _maxX; i++)
+            op(i, j, k, target, source, sourceFactor, offset, orderSpace);
+      }
     }
-  }
-  void run()
-  {
-    if (maxZ > 1)
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(minZ, maxZ), *this);
-    else
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(0, maxY), *this);
   }
   Grid<S> &target;
   const Grid<S> &source;

@@ -455,7 +455,7 @@ template<class T, class S> struct knPdataAdd : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(IndexInt idx, ParticleDataImpl<T> &me, const ParticleDataImpl<S> &other) const
+  inline void op(IndexInt idx, ParticleDataImpl<T> &me, const ParticleDataImpl<S> &other)
   {
     me[idx] += other[idx];
   }
@@ -469,21 +469,17 @@ template<class T, class S> struct knPdataAdd : public KernelBase {
     return other;
   }
   typedef ParticleDataImpl<S> type1;
-  void runMessage()
-  {
-    debMsg("Executing kernel knPdataAdd ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, me, other);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, me, other);
+    }
   }
   ParticleDataImpl<T> &me;
   const ParticleDataImpl<S> &other;
@@ -495,7 +491,7 @@ template<class T, class S> struct knPdataSub : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(IndexInt idx, ParticleDataImpl<T> &me, const ParticleDataImpl<S> &other) const
+  inline void op(IndexInt idx, ParticleDataImpl<T> &me, const ParticleDataImpl<S> &other)
   {
     me[idx] -= other[idx];
   }
@@ -509,21 +505,17 @@ template<class T, class S> struct knPdataSub : public KernelBase {
     return other;
   }
   typedef ParticleDataImpl<S> type1;
-  void runMessage()
-  {
-    debMsg("Executing kernel knPdataSub ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, me, other);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, me, other);
+    }
   }
   ParticleDataImpl<T> &me;
   const ParticleDataImpl<S> &other;
@@ -535,7 +527,7 @@ template<class T, class S> struct knPdataMult : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(IndexInt idx, ParticleDataImpl<T> &me, const ParticleDataImpl<S> &other) const
+  inline void op(IndexInt idx, ParticleDataImpl<T> &me, const ParticleDataImpl<S> &other)
   {
     me[idx] *= other[idx];
   }
@@ -549,21 +541,17 @@ template<class T, class S> struct knPdataMult : public KernelBase {
     return other;
   }
   typedef ParticleDataImpl<S> type1;
-  void runMessage()
-  {
-    debMsg("Executing kernel knPdataMult ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, me, other);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, me, other);
+    }
   }
   ParticleDataImpl<T> &me;
   const ParticleDataImpl<S> &other;
@@ -575,7 +563,7 @@ template<class T, class S> struct knPdataDiv : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(IndexInt idx, ParticleDataImpl<T> &me, const ParticleDataImpl<S> &other) const
+  inline void op(IndexInt idx, ParticleDataImpl<T> &me, const ParticleDataImpl<S> &other)
   {
     me[idx] /= other[idx];
   }
@@ -589,21 +577,17 @@ template<class T, class S> struct knPdataDiv : public KernelBase {
     return other;
   }
   typedef ParticleDataImpl<S> type1;
-  void runMessage()
-  {
-    debMsg("Executing kernel knPdataDiv ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, me, other);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, me, other);
+    }
   }
   ParticleDataImpl<T> &me;
   const ParticleDataImpl<S> &other;
@@ -615,7 +599,7 @@ template<class T> struct knPdataSafeDiv : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(IndexInt idx, ParticleDataImpl<T> &me, const ParticleDataImpl<T> &other) const
+  inline void op(IndexInt idx, ParticleDataImpl<T> &me, const ParticleDataImpl<T> &other)
   {
     me[idx] = safeDivide(me[idx], other[idx]);
   }
@@ -629,21 +613,17 @@ template<class T> struct knPdataSafeDiv : public KernelBase {
     return other;
   }
   typedef ParticleDataImpl<T> type1;
-  void runMessage()
-  {
-    debMsg("Executing kernel knPdataSafeDiv ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, me, other);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, me, other);
+    }
   }
   ParticleDataImpl<T> &me;
   const ParticleDataImpl<T> &other;
@@ -656,7 +636,7 @@ template<class T, class S> struct knPdataSetScalar : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(IndexInt idx, ParticleDataImpl<T> &me, const S &other) const
+  inline void op(IndexInt idx, ParticleDataImpl<T> &me, const S &other)
   {
     me[idx] = other;
   }
@@ -670,21 +650,17 @@ template<class T, class S> struct knPdataSetScalar : public KernelBase {
     return other;
   }
   typedef S type1;
-  void runMessage()
-  {
-    debMsg("Executing kernel knPdataSetScalar ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, me, other);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, me, other);
+    }
   }
   ParticleDataImpl<T> &me;
   const S &other;
@@ -696,7 +672,7 @@ template<class T, class S> struct knPdataAddScalar : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(IndexInt idx, ParticleDataImpl<T> &me, const S &other) const
+  inline void op(IndexInt idx, ParticleDataImpl<T> &me, const S &other)
   {
     me[idx] += other;
   }
@@ -710,21 +686,17 @@ template<class T, class S> struct knPdataAddScalar : public KernelBase {
     return other;
   }
   typedef S type1;
-  void runMessage()
-  {
-    debMsg("Executing kernel knPdataAddScalar ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, me, other);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, me, other);
+    }
   }
   ParticleDataImpl<T> &me;
   const S &other;
@@ -736,7 +708,7 @@ template<class T, class S> struct knPdataMultScalar : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(IndexInt idx, ParticleDataImpl<T> &me, const S &other) const
+  inline void op(IndexInt idx, ParticleDataImpl<T> &me, const S &other)
   {
     me[idx] *= other;
   }
@@ -750,21 +722,17 @@ template<class T, class S> struct knPdataMultScalar : public KernelBase {
     return other;
   }
   typedef S type1;
-  void runMessage()
-  {
-    debMsg("Executing kernel knPdataMultScalar ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, me, other);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, me, other);
+    }
   }
   ParticleDataImpl<T> &me;
   const S &other;
@@ -779,7 +747,7 @@ template<class T, class S> struct knPdataScaledAdd : public KernelBase {
   inline void op(IndexInt idx,
                  ParticleDataImpl<T> &me,
                  const ParticleDataImpl<T> &other,
-                 const S &factor) const
+                 const S &factor)
   {
     me[idx] += factor * other[idx];
   }
@@ -798,21 +766,17 @@ template<class T, class S> struct knPdataScaledAdd : public KernelBase {
     return factor;
   }
   typedef S type2;
-  void runMessage()
-  {
-    debMsg("Executing kernel knPdataScaledAdd ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, me, other, factor);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, me, other, factor);
+    }
   }
   ParticleDataImpl<T> &me;
   const ParticleDataImpl<T> &other;
@@ -826,7 +790,7 @@ template<class T> struct knPdataClamp : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(IndexInt idx, ParticleDataImpl<T> &me, const T vmin, const T vmax) const
+  inline void op(IndexInt idx, ParticleDataImpl<T> &me, const T vmin, const T vmax)
   {
     me[idx] = clamp(me[idx], vmin, vmax);
   }
@@ -845,21 +809,17 @@ template<class T> struct knPdataClamp : public KernelBase {
     return vmax;
   }
   typedef T type2;
-  void runMessage()
-  {
-    debMsg("Executing kernel knPdataClamp ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, me, vmin, vmax);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, me, vmin, vmax);
+    }
   }
   ParticleDataImpl<T> &me;
   const T vmin;
@@ -872,7 +832,7 @@ template<class T> struct knPdataClampMin : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(IndexInt idx, ParticleDataImpl<T> &me, const T vmin) const
+  inline void op(IndexInt idx, ParticleDataImpl<T> &me, const T vmin)
   {
     me[idx] = std::max(vmin, me[idx]);
   }
@@ -886,21 +846,17 @@ template<class T> struct knPdataClampMin : public KernelBase {
     return vmin;
   }
   typedef T type1;
-  void runMessage()
-  {
-    debMsg("Executing kernel knPdataClampMin ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, me, vmin);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, me, vmin);
+    }
   }
   ParticleDataImpl<T> &me;
   const T vmin;
@@ -912,7 +868,7 @@ template<class T> struct knPdataClampMax : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(IndexInt idx, ParticleDataImpl<T> &me, const T vmax) const
+  inline void op(IndexInt idx, ParticleDataImpl<T> &me, const T vmax)
   {
     me[idx] = std::min(vmax, me[idx]);
   }
@@ -926,21 +882,17 @@ template<class T> struct knPdataClampMax : public KernelBase {
     return vmax;
   }
   typedef T type1;
-  void runMessage()
-  {
-    debMsg("Executing kernel knPdataClampMax ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, me, vmax);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, me, vmax);
+    }
   }
   ParticleDataImpl<T> &me;
   const T vmax;
@@ -953,7 +905,7 @@ struct knPdataClampMinVec3 : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(IndexInt idx, ParticleDataImpl<Vec3> &me, const Real vmin) const
+  inline void op(IndexInt idx, ParticleDataImpl<Vec3> &me, const Real vmin)
   {
     me[idx].x = std::max(vmin, me[idx].x);
     me[idx].y = std::max(vmin, me[idx].y);
@@ -969,21 +921,17 @@ struct knPdataClampMinVec3 : public KernelBase {
     return vmin;
   }
   typedef Real type1;
-  void runMessage()
-  {
-    debMsg("Executing kernel knPdataClampMinVec3 ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, me, vmin);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, me, vmin);
+    }
   }
   ParticleDataImpl<Vec3> &me;
   const Real vmin;
@@ -996,7 +944,7 @@ struct knPdataClampMaxVec3 : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(IndexInt idx, ParticleDataImpl<Vec3> &me, const Real vmax) const
+  inline void op(IndexInt idx, ParticleDataImpl<Vec3> &me, const Real vmax)
   {
     me[idx].x = std::min(vmax, me[idx].x);
     me[idx].y = std::min(vmax, me[idx].y);
@@ -1012,21 +960,17 @@ struct knPdataClampMaxVec3 : public KernelBase {
     return vmax;
   }
   typedef Real type1;
-  void runMessage()
-  {
-    debMsg("Executing kernel knPdataClampMaxVec3 ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, me, vmax);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, me, vmax);
+    }
   }
   ParticleDataImpl<Vec3> &me;
   const Real vmax;
@@ -1071,7 +1015,7 @@ template<class T, class S> struct knPdataSetScalarIntFlag : public KernelBase {
                  ParticleDataImpl<T> &me,
                  const S &other,
                  const ParticleDataImpl<int> &t,
-                 const int itype) const
+                 const int itype)
   {
     if (t[idx] & itype)
       me[idx] = other;
@@ -1096,21 +1040,17 @@ template<class T, class S> struct knPdataSetScalarIntFlag : public KernelBase {
     return itype;
   }
   typedef int type3;
-  void runMessage()
-  {
-    debMsg("Executing kernel knPdataSetScalarIntFlag ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, me, other, t, itype);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, me, other, t, itype);
+    }
   }
   ParticleDataImpl<T> &me;
   const S &other;
@@ -1223,29 +1163,21 @@ template<typename T> struct KnPtsSum : public KernelBase {
     return itype;
   }
   typedef int type2;
-  void runMessage()
-  {
-    debMsg("Executing kernel KnPtsSum ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r)
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, val, t, itype, result);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_reduce(tbb::blocked_range<IndexInt>(0, size), *this);
-  }
-  KnPtsSum(KnPtsSum &o, tbb::split)
-      : KernelBase(o), val(o.val), t(o.t), itype(o.itype), result(T(0.))
-  {
-  }
-  void join(const KnPtsSum &o)
-  {
-    result += o.result;
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+      T result = T(0.);
+#pragma omp for nowait
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, val, t, itype, result);
+#pragma omp critical
+      {
+        this->result += result;
+      }
+    }
   }
   const ParticleDataImpl<T> &val;
   const ParticleDataImpl<int> *t;
@@ -1275,28 +1207,21 @@ template<typename T> struct KnPtsSumSquare : public KernelBase {
     return val;
   }
   typedef ParticleDataImpl<T> type0;
-  void runMessage()
-  {
-    debMsg("Executing kernel KnPtsSumSquare ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r)
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, val, result);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_reduce(tbb::blocked_range<IndexInt>(0, size), *this);
-  }
-  KnPtsSumSquare(KnPtsSumSquare &o, tbb::split) : KernelBase(o), val(o.val), result(0.)
-  {
-  }
-  void join(const KnPtsSumSquare &o)
-  {
-    result += o.result;
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+      Real result = 0.;
+#pragma omp for nowait
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, val, result);
+#pragma omp critical
+      {
+        this->result += result;
+      }
+    }
   }
   const ParticleDataImpl<T> &val;
   Real result;
@@ -1324,28 +1249,21 @@ template<typename T> struct KnPtsSumMagnitude : public KernelBase {
     return val;
   }
   typedef ParticleDataImpl<T> type0;
-  void runMessage()
-  {
-    debMsg("Executing kernel KnPtsSumMagnitude ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r)
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, val, result);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_reduce(tbb::blocked_range<IndexInt>(0, size), *this);
-  }
-  KnPtsSumMagnitude(KnPtsSumMagnitude &o, tbb::split) : KernelBase(o), val(o.val), result(0.)
-  {
-  }
-  void join(const KnPtsSumMagnitude &o)
-  {
-    result += o.result;
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+      Real result = 0.;
+#pragma omp for nowait
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, val, result);
+#pragma omp critical
+      {
+        this->result += result;
+      }
+    }
   }
   const ParticleDataImpl<T> &val;
   Real result;
@@ -1392,29 +1310,21 @@ struct CompPdata_Min : public KernelBase {
     return val;
   }
   typedef ParticleDataImpl<T> type0;
-  void runMessage()
-  {
-    debMsg("Executing kernel CompPdata_Min ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r)
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, val, minVal);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_reduce(tbb::blocked_range<IndexInt>(0, size), *this);
-  }
-  CompPdata_Min(CompPdata_Min &o, tbb::split)
-      : KernelBase(o), val(o.val), minVal(std::numeric_limits<Real>::max())
-  {
-  }
-  void join(const CompPdata_Min &o)
-  {
-    minVal = min(minVal, o.minVal);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+      Real minVal = std::numeric_limits<Real>::max();
+#pragma omp for nowait
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, val, minVal);
+#pragma omp critical
+      {
+        this->minVal = min(minVal, this->minVal);
+      }
+    }
   }
   const ParticleDataImpl<T> &val;
   Real minVal;
@@ -1447,29 +1357,21 @@ struct CompPdata_Max : public KernelBase {
     return val;
   }
   typedef ParticleDataImpl<T> type0;
-  void runMessage()
-  {
-    debMsg("Executing kernel CompPdata_Max ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r)
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, val, maxVal);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_reduce(tbb::blocked_range<IndexInt>(0, size), *this);
-  }
-  CompPdata_Max(CompPdata_Max &o, tbb::split)
-      : KernelBase(o), val(o.val), maxVal(-std::numeric_limits<Real>::max())
-  {
-  }
-  void join(const CompPdata_Max &o)
-  {
-    maxVal = max(maxVal, o.maxVal);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+      Real maxVal = -std::numeric_limits<Real>::max();
+#pragma omp for nowait
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, val, maxVal);
+#pragma omp critical
+      {
+        this->maxVal = max(maxVal, this->maxVal);
+      }
+    }
   }
   const ParticleDataImpl<T> &val;
   Real maxVal;
@@ -1545,29 +1447,21 @@ struct CompPdata_MinVec3 : public KernelBase {
     return val;
   }
   typedef ParticleDataImpl<Vec3> type0;
-  void runMessage()
-  {
-    debMsg("Executing kernel CompPdata_MinVec3 ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r)
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, val, minVal);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_reduce(tbb::blocked_range<IndexInt>(0, size), *this);
-  }
-  CompPdata_MinVec3(CompPdata_MinVec3 &o, tbb::split)
-      : KernelBase(o), val(o.val), minVal(std::numeric_limits<Real>::max())
-  {
-  }
-  void join(const CompPdata_MinVec3 &o)
-  {
-    minVal = min(minVal, o.minVal);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+      Real minVal = std::numeric_limits<Real>::max();
+#pragma omp for nowait
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, val, minVal);
+#pragma omp critical
+      {
+        this->minVal = min(minVal, this->minVal);
+      }
+    }
   }
   const ParticleDataImpl<Vec3> &val;
   Real minVal;
@@ -1599,29 +1493,21 @@ struct CompPdata_MaxVec3 : public KernelBase {
     return val;
   }
   typedef ParticleDataImpl<Vec3> type0;
-  void runMessage()
-  {
-    debMsg("Executing kernel CompPdata_MaxVec3 ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r)
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, val, maxVal);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_reduce(tbb::blocked_range<IndexInt>(0, size), *this);
-  }
-  CompPdata_MaxVec3(CompPdata_MaxVec3 &o, tbb::split)
-      : KernelBase(o), val(o.val), maxVal(-std::numeric_limits<Real>::max())
-  {
-  }
-  void join(const CompPdata_MaxVec3 &o)
-  {
-    maxVal = max(maxVal, o.maxVal);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+      Real maxVal = -std::numeric_limits<Real>::max();
+#pragma omp for nowait
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, val, maxVal);
+#pragma omp critical
+      {
+        this->maxVal = max(maxVal, this->maxVal);
+      }
+    }
   }
   const ParticleDataImpl<Vec3> &val;
   Real maxVal;

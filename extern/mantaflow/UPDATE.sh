@@ -7,8 +7,11 @@
 # ====================  1) ENVIRONMENT SETUP =============================================
 
 # YOUR INSTALLATION PATHS GO HERE:
-MANTA_INSTALLATION=/Users/sebbas/Developer/Mantaflow/mantaflowDevelop
-BLENDER_INSTALLATION=/Users/sebbas/Developer/Blender
+MANTA_INSTALLATION=/home/sebbas/Developer/Mantaflow
+BLENDER_INSTALLATION=/home/sebbas/Developer/Blender
+
+CC=/home/sebbas/Developer/LLVM-Project/install/bin/clang
+CXX=/home/sebbas/Developer/LLVM-Project/install/bin/clang++
 
 # Try to check out Mantaflow repository before building?
 CLEAN_REPOSITORY=0
@@ -20,8 +23,13 @@ WITH_DEPENDENCIES=0
 USE_NUMPY=0
 
 # Choose which multithreading platform to use for Mantaflow preprocessing
-USE_OMP=0
-USE_TBB=1
+USE_OMP=1
+USE_TBB=0
+
+# Use OpenMP offloading too?
+if [[ "$USE_OMP" -eq "1" ]]; then
+  USE_OMP_OFFLOAD=1
+fi
 
 if [[ "$USE_OMP" -eq "1" && "$USE_TBB" -eq "1" ]]; then
   echo "Cannot build Mantaflow for OpenMP and TBB at the same time"
@@ -56,7 +64,7 @@ fi
 MANTA_BUILD_PATH=$MANTA_INSTALLATION/build_blender/
 mkdir -p $MANTA_BUILD_PATH
 cd $MANTA_BUILD_PATH
-cmake ../mantaflowgit -DGUI=0 -DOPENMP=$USE_OMP -DTBB=$USE_TBB -DBLENDER=1 -DPREPDEBUG=1 -DNUMPY=$USE_NUMPY && make -j8
+cmake ../mantaflowgit -DGUI=0 -DOPENMP=$USE_OMP -DTBB=$USE_TBB -DOPENMP_OFFLOAD=$USE_OMP_OFFLOAD -DBLENDER=1 -DPREPDEBUG=1 -DNUMPY=$USE_NUMPY -DPYTHON_VERSION=3 -DCMAKE_C_COMPILER=$CC -DCMAKE_CXX_COMPILER=$CXX && make -j8
 
 # ==================== 3) COPY MANTAFLOW FILES TO BLENDER ROOT ===========================
 

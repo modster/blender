@@ -1256,7 +1256,7 @@ struct knQuantize : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(IndexInt idx, Grid<Real> &grid, Real step) const
+  inline void op(IndexInt idx, Grid<Real> &grid, Real step)
   {
     quantizeReal(grid(idx), step);
   }
@@ -1270,21 +1270,17 @@ struct knQuantize : public KernelBase {
     return step;
   }
   typedef Real type1;
-  void runMessage()
-  {
-    debMsg("Executing kernel knQuantize ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, grid, step);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, grid, step);
+    }
   }
   Grid<Real> &grid;
   Real step;
@@ -1331,7 +1327,7 @@ struct knQuantizeVec3 : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(IndexInt idx, Grid<Vec3> &grid, Real step) const
+  inline void op(IndexInt idx, Grid<Vec3> &grid, Real step)
   {
     for (int c = 0; c < 3; ++c)
       quantizeReal(grid(idx)[c], step);
@@ -1346,21 +1342,17 @@ struct knQuantizeVec3 : public KernelBase {
     return step;
   }
   typedef Real type1;
-  void runMessage()
-  {
-    debMsg("Executing kernel knQuantizeVec3 ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, grid, step);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, grid, step);
+    }
   }
   Grid<Vec3> &grid;
   Real step;

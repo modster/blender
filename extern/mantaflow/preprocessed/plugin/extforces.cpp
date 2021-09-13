@@ -52,7 +52,7 @@ struct KnApplyForceField : public KernelBase {
                  const Grid<Vec3> &force,
                  const Grid<Real> *include,
                  bool additive,
-                 bool isMAC) const
+                 bool isMAC)
   {
     bool curFluid = flags.isFluid(i, j, k);
     bool curEmpty = flags.isEmpty(i, j, k);
@@ -105,36 +105,34 @@ struct KnApplyForceField : public KernelBase {
     return isMAC;
   }
   typedef bool type5;
-  void runMessage()
-  {
-    debMsg("Executing kernel KnApplyForceField ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
+  void runMessage(){};
+  void run()
   {
     const int _maxX = maxX;
     const int _maxY = maxY;
     if (maxZ > 1) {
-      for (int k = __r.begin(); k != (int)__r.end(); k++)
-        for (int j = 1; j < _maxY; j++)
-          for (int i = 1; i < _maxX; i++)
-            op(i, j, k, flags, vel, force, include, additive, isMAC);
+
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int k = minZ; k < maxZ; k++)
+          for (int j = 1; j < _maxY; j++)
+            for (int i = 1; i < _maxX; i++)
+              op(i, j, k, flags, vel, force, include, additive, isMAC);
+      }
     }
     else {
       const int k = 0;
-      for (int j = __r.begin(); j != (int)__r.end(); j++)
-        for (int i = 1; i < _maxX; i++)
-          op(i, j, k, flags, vel, force, include, additive, isMAC);
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int j = 1; j < _maxY; j++)
+          for (int i = 1; i < _maxX; i++)
+            op(i, j, k, flags, vel, force, include, additive, isMAC);
+      }
     }
-  }
-  void run()
-  {
-    if (maxZ > 1)
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(minZ, maxZ), *this);
-    else
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(1, maxY), *this);
   }
   const FlagGrid &flags;
   MACGrid &vel;
@@ -165,7 +163,7 @@ struct KnApplyForce : public KernelBase {
                  MACGrid &vel,
                  Vec3 force,
                  const Grid<Real> *exclude,
-                 bool additive) const
+                 bool additive)
   {
     bool curFluid = flags.isFluid(i, j, k);
     bool curEmpty = flags.isEmpty(i, j, k);
@@ -206,36 +204,34 @@ struct KnApplyForce : public KernelBase {
     return additive;
   }
   typedef bool type4;
-  void runMessage()
-  {
-    debMsg("Executing kernel KnApplyForce ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
+  void runMessage(){};
+  void run()
   {
     const int _maxX = maxX;
     const int _maxY = maxY;
     if (maxZ > 1) {
-      for (int k = __r.begin(); k != (int)__r.end(); k++)
-        for (int j = 1; j < _maxY; j++)
-          for (int i = 1; i < _maxX; i++)
-            op(i, j, k, flags, vel, force, exclude, additive);
+
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int k = minZ; k < maxZ; k++)
+          for (int j = 1; j < _maxY; j++)
+            for (int i = 1; i < _maxX; i++)
+              op(i, j, k, flags, vel, force, exclude, additive);
+      }
     }
     else {
       const int k = 0;
-      for (int j = __r.begin(); j != (int)__r.end(); j++)
-        for (int i = 1; i < _maxX; i++)
-          op(i, j, k, flags, vel, force, exclude, additive);
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int j = 1; j < _maxY; j++)
+          for (int i = 1; i < _maxX; i++)
+            op(i, j, k, flags, vel, force, exclude, additive);
+      }
     }
-  }
-  void run()
-  {
-    if (maxZ > 1)
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(minZ, maxZ), *this);
-    else
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(1, maxY), *this);
   }
   const FlagGrid &flags;
   MACGrid &vel;
@@ -346,7 +342,7 @@ struct KnAddBuoyancy : public KernelBase {
                  const FlagGrid &flags,
                  const Grid<Real> &factor,
                  MACGrid &vel,
-                 Vec3 strength) const
+                 Vec3 strength)
   {
     if (!flags.isFluid(i, j, k))
       return;
@@ -377,36 +373,34 @@ struct KnAddBuoyancy : public KernelBase {
     return strength;
   }
   typedef Vec3 type3;
-  void runMessage()
-  {
-    debMsg("Executing kernel KnAddBuoyancy ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
+  void runMessage(){};
+  void run()
   {
     const int _maxX = maxX;
     const int _maxY = maxY;
     if (maxZ > 1) {
-      for (int k = __r.begin(); k != (int)__r.end(); k++)
-        for (int j = 1; j < _maxY; j++)
-          for (int i = 1; i < _maxX; i++)
-            op(i, j, k, flags, factor, vel, strength);
+
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int k = minZ; k < maxZ; k++)
+          for (int j = 1; j < _maxY; j++)
+            for (int i = 1; i < _maxX; i++)
+              op(i, j, k, flags, factor, vel, strength);
+      }
     }
     else {
       const int k = 0;
-      for (int j = __r.begin(); j != (int)__r.end(); j++)
-        for (int i = 1; i < _maxX; i++)
-          op(i, j, k, flags, factor, vel, strength);
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int j = 1; j < _maxY; j++)
+          for (int i = 1; i < _maxX; i++)
+            op(i, j, k, flags, factor, vel, strength);
+      }
     }
-  }
-  void run()
-  {
-    if (maxZ > 1)
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(minZ, maxZ), *this);
-    else
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(1, maxY), *this);
   }
   const FlagGrid &flags;
   const Grid<Real> &factor;
@@ -662,7 +656,7 @@ struct KnSetInflow : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(int i, int j, int k, MACGrid &vel, int dim, int p0, const Vec3 &val) const
+  inline void op(int i, int j, int k, MACGrid &vel, int dim, int p0, const Vec3 &val)
   {
     Vec3i p(i, j, k);
     if (p[dim] == p0 || p[dim] == p0 + 1)
@@ -688,36 +682,34 @@ struct KnSetInflow : public KernelBase {
     return val;
   }
   typedef Vec3 type3;
-  void runMessage()
-  {
-    debMsg("Executing kernel KnSetInflow ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
+  void runMessage(){};
+  void run()
   {
     const int _maxX = maxX;
     const int _maxY = maxY;
     if (maxZ > 1) {
-      for (int k = __r.begin(); k != (int)__r.end(); k++)
-        for (int j = 0; j < _maxY; j++)
-          for (int i = 0; i < _maxX; i++)
-            op(i, j, k, vel, dim, p0, val);
+
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int k = minZ; k < maxZ; k++)
+          for (int j = 0; j < _maxY; j++)
+            for (int i = 0; i < _maxX; i++)
+              op(i, j, k, vel, dim, p0, val);
+      }
     }
     else {
       const int k = 0;
-      for (int j = __r.begin(); j != (int)__r.end(); j++)
-        for (int i = 0; i < _maxX; i++)
-          op(i, j, k, vel, dim, p0, val);
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int j = 0; j < _maxY; j++)
+          for (int i = 0; i < _maxX; i++)
+            op(i, j, k, vel, dim, p0, val);
+      }
     }
-  }
-  void run()
-  {
-    if (maxZ > 1)
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(minZ, maxZ), *this);
-    else
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(0, maxY), *this);
   }
   MACGrid &vel;
   int dim;
@@ -784,8 +776,7 @@ struct KnSetWallBcs : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(
-      int i, int j, int k, const FlagGrid &flags, MACGrid &vel, const MACGrid *obvel) const
+  inline void op(int i, int j, int k, const FlagGrid &flags, MACGrid &vel, const MACGrid *obvel)
   {
 
     bool curFluid = flags.isFluid(i, j, k);
@@ -848,36 +839,34 @@ struct KnSetWallBcs : public KernelBase {
     return obvel;
   }
   typedef MACGrid type2;
-  void runMessage()
-  {
-    debMsg("Executing kernel KnSetWallBcs ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
+  void runMessage(){};
+  void run()
   {
     const int _maxX = maxX;
     const int _maxY = maxY;
     if (maxZ > 1) {
-      for (int k = __r.begin(); k != (int)__r.end(); k++)
-        for (int j = 0; j < _maxY; j++)
-          for (int i = 0; i < _maxX; i++)
-            op(i, j, k, flags, vel, obvel);
+
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int k = minZ; k < maxZ; k++)
+          for (int j = 0; j < _maxY; j++)
+            for (int i = 0; i < _maxX; i++)
+              op(i, j, k, flags, vel, obvel);
+      }
     }
     else {
       const int k = 0;
-      for (int j = __r.begin(); j != (int)__r.end(); j++)
-        for (int i = 0; i < _maxX; i++)
-          op(i, j, k, flags, vel, obvel);
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int j = 0; j < _maxY; j++)
+          for (int i = 0; i < _maxX; i++)
+            op(i, j, k, flags, vel, obvel);
+      }
     }
-  }
-  void run()
-  {
-    if (maxZ > 1)
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(minZ, maxZ), *this);
-    else
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(0, maxY), *this);
   }
   const FlagGrid &flags;
   MACGrid &vel;
@@ -912,7 +901,7 @@ struct KnSetWallBcsFrac : public KernelBase {
                  MACGrid &velTarget,
                  const MACGrid *obvel,
                  const Grid<Real> *phiObs,
-                 const int &boundaryWidth = 0) const
+                 const int &boundaryWidth = 0)
   {
     bool curFluid = flags.isFluid(i, j, k);
     bool curObs = flags.isObstacle(i, j, k);
@@ -1025,36 +1014,34 @@ struct KnSetWallBcsFrac : public KernelBase {
     return boundaryWidth;
   }
   typedef int type5;
-  void runMessage()
-  {
-    debMsg("Executing kernel KnSetWallBcsFrac ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
+  void runMessage(){};
+  void run()
   {
     const int _maxX = maxX;
     const int _maxY = maxY;
     if (maxZ > 1) {
-      for (int k = __r.begin(); k != (int)__r.end(); k++)
-        for (int j = 0; j < _maxY; j++)
-          for (int i = 0; i < _maxX; i++)
-            op(i, j, k, flags, vel, velTarget, obvel, phiObs, boundaryWidth);
+
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int k = minZ; k < maxZ; k++)
+          for (int j = 0; j < _maxY; j++)
+            for (int i = 0; i < _maxX; i++)
+              op(i, j, k, flags, vel, velTarget, obvel, phiObs, boundaryWidth);
+      }
     }
     else {
       const int k = 0;
-      for (int j = __r.begin(); j != (int)__r.end(); j++)
-        for (int i = 0; i < _maxX; i++)
-          op(i, j, k, flags, vel, velTarget, obvel, phiObs, boundaryWidth);
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int j = 0; j < _maxY; j++)
+          for (int i = 0; i < _maxX; i++)
+            op(i, j, k, flags, vel, velTarget, obvel, phiObs, boundaryWidth);
+      }
     }
-  }
-  void run()
-  {
-    if (maxZ > 1)
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(minZ, maxZ), *this);
-    else
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(0, maxY), *this);
   }
   const FlagGrid &flags;
   const MACGrid &vel;
@@ -1127,8 +1114,7 @@ struct KnAddForceIfLower : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(
-      int i, int j, int k, const FlagGrid &flags, MACGrid &vel, const Grid<Vec3> &force) const
+  inline void op(int i, int j, int k, const FlagGrid &flags, MACGrid &vel, const Grid<Vec3> &force)
   {
     bool curFluid = flags.isFluid(i, j, k);
     bool curEmpty = flags.isEmpty(i, j, k);
@@ -1173,36 +1159,34 @@ struct KnAddForceIfLower : public KernelBase {
     return force;
   }
   typedef Grid<Vec3> type2;
-  void runMessage()
-  {
-    debMsg("Executing kernel KnAddForceIfLower ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
+  void runMessage(){};
+  void run()
   {
     const int _maxX = maxX;
     const int _maxY = maxY;
     if (maxZ > 1) {
-      for (int k = __r.begin(); k != (int)__r.end(); k++)
-        for (int j = 1; j < _maxY; j++)
-          for (int i = 1; i < _maxX; i++)
-            op(i, j, k, flags, vel, force);
+
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int k = minZ; k < maxZ; k++)
+          for (int j = 1; j < _maxY; j++)
+            for (int i = 1; i < _maxX; i++)
+              op(i, j, k, flags, vel, force);
+      }
     }
     else {
       const int k = 0;
-      for (int j = __r.begin(); j != (int)__r.end(); j++)
-        for (int i = 1; i < _maxX; i++)
-          op(i, j, k, flags, vel, force);
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int j = 1; j < _maxY; j++)
+          for (int i = 1; i < _maxX; i++)
+            op(i, j, k, flags, vel, force);
+      }
     }
-  }
-  void run()
-  {
-    if (maxZ > 1)
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(minZ, maxZ), *this);
-    else
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(1, maxY), *this);
   }
   const FlagGrid &flags;
   MACGrid &vel;
@@ -1266,7 +1250,7 @@ struct KnConfForce : public KernelBase {
                  const Grid<Real> &grid,
                  const Grid<Vec3> &curl,
                  Real str,
-                 const Grid<Real> *strGrid) const
+                 const Grid<Real> *strGrid)
   {
     Vec3 grad = 0.5 * Vec3(grid(i + 1, j, k) - grid(i - 1, j, k),
                            grid(i, j + 1, k) - grid(i, j - 1, k),
@@ -1303,36 +1287,34 @@ struct KnConfForce : public KernelBase {
     return strGrid;
   }
   typedef Grid<Real> type4;
-  void runMessage()
-  {
-    debMsg("Executing kernel KnConfForce ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
+  void runMessage(){};
+  void run()
   {
     const int _maxX = maxX;
     const int _maxY = maxY;
     if (maxZ > 1) {
-      for (int k = __r.begin(); k != (int)__r.end(); k++)
-        for (int j = 1; j < _maxY; j++)
-          for (int i = 1; i < _maxX; i++)
-            op(i, j, k, force, grid, curl, str, strGrid);
+
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int k = minZ; k < maxZ; k++)
+          for (int j = 1; j < _maxY; j++)
+            for (int i = 1; i < _maxX; i++)
+              op(i, j, k, force, grid, curl, str, strGrid);
+      }
     }
     else {
       const int k = 0;
-      for (int j = __r.begin(); j != (int)__r.end(); j++)
-        for (int i = 1; i < _maxX; i++)
-          op(i, j, k, force, grid, curl, str, strGrid);
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int j = 1; j < _maxY; j++)
+          for (int i = 1; i < _maxX; i++)
+            op(i, j, k, force, grid, curl, str, strGrid);
+      }
     }
-  }
-  void run()
-  {
-    if (maxZ > 1)
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(minZ, maxZ), *this);
-    else
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(1, maxY), *this);
   }
   Grid<Vec3> &force;
   const Grid<Real> &grid;
@@ -1514,7 +1496,7 @@ struct KnDissolveSmoke : public KernelBase {
                  int speed,
                  bool logFalloff,
                  float dydx,
-                 float fac) const
+                 float fac)
   {
 
     bool curFluid = flags.isFluid(i, j, k);
@@ -1602,36 +1584,34 @@ struct KnDissolveSmoke : public KernelBase {
     return fac;
   }
   typedef float type9;
-  void runMessage()
-  {
-    debMsg("Executing kernel KnDissolveSmoke ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
+  void runMessage(){};
+  void run()
   {
     const int _maxX = maxX;
     const int _maxY = maxY;
     if (maxZ > 1) {
-      for (int k = __r.begin(); k != (int)__r.end(); k++)
-        for (int j = 0; j < _maxY; j++)
-          for (int i = 0; i < _maxX; i++)
-            op(i, j, k, flags, density, heat, red, green, blue, speed, logFalloff, dydx, fac);
+
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int k = minZ; k < maxZ; k++)
+          for (int j = 0; j < _maxY; j++)
+            for (int i = 0; i < _maxX; i++)
+              op(i, j, k, flags, density, heat, red, green, blue, speed, logFalloff, dydx, fac);
+      }
     }
     else {
       const int k = 0;
-      for (int j = __r.begin(); j != (int)__r.end(); j++)
-        for (int i = 0; i < _maxX; i++)
-          op(i, j, k, flags, density, heat, red, green, blue, speed, logFalloff, dydx, fac);
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int j = 0; j < _maxY; j++)
+          for (int i = 0; i < _maxX; i++)
+            op(i, j, k, flags, density, heat, red, green, blue, speed, logFalloff, dydx, fac);
+      }
     }
-  }
-  void run()
-  {
-    if (maxZ > 1)
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(minZ, maxZ), *this);
-    else
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(0, maxY), *this);
   }
   const FlagGrid &flags;
   Grid<Real> &density;

@@ -59,8 +59,8 @@ int MANTA::with_debug(0);
 MANTA::MANTA(int *res, FluidModifierData *fmd)
     : mCurrentID(++solverID), mMaxRes(fmd->domain->maxres)
 {
-  if (with_debug)
-    cout << "FLUID: " << mCurrentID << " with res(" << res[0] << ", " << res[1] << ", " << res[2]
+  //if (with_debug)
+    cout << "============= FLUID: " << mCurrentID << " with res(" << res[0] << ", " << res[1] << ", " << res[2]
          << ")" << endl;
 
   FluidDomainSettings *fds = fmd->domain;
@@ -279,6 +279,7 @@ MANTA::MANTA(int *res, FluidModifierData *fmd)
   }
   /* All requested initializations must not fail in constructor. */
   BLI_assert(initSuccess);
+  UNUSED_VARS(initSuccess);
   updatePointers(fmd);
 }
 

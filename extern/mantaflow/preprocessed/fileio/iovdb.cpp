@@ -29,10 +29,10 @@
 
 #if OPENVDB == 1
 #  include "openvdb/openvdb.h"
-#  include "openvdb/points/PointConversion.h"
-#  include "openvdb/points/PointCount.h"
-#  include "openvdb/tools/Clip.h"
-#  include "openvdb/tools/Dense.h"
+#  include <openvdb/points/PointConversion.h>
+#  include <openvdb/points/PointCount.h>
+#  include <openvdb/tools/Clip.h>
+#  include <openvdb/tools/Dense.h>
 #endif
 
 #define POSITION_NAME "P"
@@ -433,9 +433,9 @@ int writeObjectsVDB(const string &filename,
         debMsg("Writing int grid '" << mantaGrid->getName() << "' to vdb file " << filename, 1);
         Grid<int> *mantaIntGrid = (Grid<int> *)mantaGrid;
         if (clipGrid && mantaIntGrid->saveSparse()) {
-          assertMsg(clipGrid->getSize() == mantaGrid->getSize(),
-                    "writeObjectsVDB: Clip grid and exported grid must have the same size "
-                        << clipGrid->getSize() << " vs " << mantaGrid->getSize());
+          // assertMsg(clipGrid->getSize() == mantaGrid->getSize(), "writeObjectsVDB: Clip grid and
+          // exported grid must have the same size " << clipGrid->getSize() << " vs " <<
+          // mantaGrid->getSize());
         }
         vdbGrid = exportVDB<int, openvdb::Int32Grid>(mantaIntGrid, clip, vdbClipGrid);
         gridsVDB.push_back(vdbGrid);
@@ -448,9 +448,9 @@ int writeObjectsVDB(const string &filename,
         // Only supply clip grid if real grid is not equal to the clip grid
         openvdb::FloatGrid::Ptr tmpClipGrid = (mantaRealGrid == clipGrid) ? nullptr : vdbClipGrid;
         if (clipGrid && mantaRealGrid->saveSparse()) {
-          assertMsg(clipGrid->getSize() == mantaGrid->getSize(),
-                    "writeObjectsVDB: Clip grid and exported grid must have the same size "
-                        << clipGrid->getSize() << " vs " << mantaGrid->getSize());
+          // assertMsg(clipGrid->getSize() == mantaGrid->getSize(), "writeObjectsVDB: Clip grid and
+          // exported grid must have the same size " << clipGrid->getSize() << " vs " <<
+          // mantaGrid->getSize());
         }
         vdbGrid = exportVDB<Real, openvdb::FloatGrid>(mantaRealGrid, clip, tmpClipGrid);
         gridsVDB.push_back(vdbGrid);
@@ -461,9 +461,9 @@ int writeObjectsVDB(const string &filename,
                                                               openvdb::GRID_UNKNOWN;
         Grid<Vec3> *mantaVec3Grid = (Grid<Vec3> *)mantaGrid;
         if (clipGrid && mantaVec3Grid->saveSparse()) {
-          assertMsg(clipGrid->getSize() == mantaGrid->getSize(),
-                    "writeObjectsVDB: Clip grid and exported grid must have the same size "
-                        << clipGrid->getSize() << " vs " << mantaGrid->getSize());
+          // assertMsg(clipGrid->getSize() == mantaGrid->getSize(), "writeObjectsVDB: Clip grid and
+          // exported grid must have the same size " << clipGrid->getSize() << " vs " <<
+          // mantaGrid->getSize());
         }
         vdbGrid = exportVDB<Vec3, openvdb::Vec3SGrid>(mantaVec3Grid, clip, vdbClipGrid);
         gridsVDB.push_back(vdbGrid);
@@ -519,7 +519,7 @@ int writeObjectsVDB(const string &filename,
     }
   }
 
-  // Write only if there is at least one grid, optionally write with compression.
+  // Write only if the is at least one grid, optionally write with compression.
   if (gridsVDB.size()) {
     int vdb_flags = openvdb::io::COMPRESS_ACTIVE_MASK;
     switch (compression) {
@@ -534,8 +534,7 @@ int writeObjectsVDB(const string &filename,
       }
       case COMPRESSION_BLOSC: {
 #  if OPENVDB_BLOSC == 1
-        // Cannot use |= here, causes segfault with blosc 1.5.0 (== recommended version)
-        vdb_flags = openvdb::io::COMPRESS_BLOSC;
+        vdb_flags |= openvdb::io::COMPRESS_BLOSC;
 #  else
         debMsg("OpenVDB was built without Blosc support, using Zip compression instead", 1);
         vdb_flags |= openvdb::io::COMPRESS_ZIP;
@@ -696,36 +695,28 @@ int readObjectsVDB(const string &filename, std::vector<PbClass *> *objects, floa
 
       // Compare metadata with allocated grid setup. This prevents invalid index access.
       if (notZero(metaRes) && metaRes != origRes) {
-        debMsg("readObjectsVDB Warning: Grid '" << vdbGrid->getName()
-                                                << "' has not been read. Meta grid res " << metaRes
-                                                << " vs " << origRes << " current grid size",
-               1);
+        // debMsg("readObjectsVDB Warning: Grid '" << vdbGrid->getName() << "' has not been read.
+        // Meta grid res " << metaRes << " vs " << origRes << " current grid size", 1);
         readFailure++;
         break;
       }
       if (notZero(metaVoxelSize) && metaVoxelSize != voxelSize) {
-        debMsg("readObjectsVDB Warning: Grid '"
-                   << vdbGrid->getName() << "' has not been read. Meta voxel size "
-                   << metaVoxelSize << " vs " << voxelSize << " current voxel size",
-               1);
+        // debMsg("readObjectsVDB Warning: Grid '" << vdbGrid->getName() << "' has not been read.
+        // Meta voxel size " << metaVoxelSize << " vs " << voxelSize << " current voxel size", 1);
         readFailure++;
         break;
       }
       if (metaBBoxMax.x > origRes.x || metaBBoxMax.y > origRes.y || metaBBoxMax.z > origRes.z) {
-        debMsg("readObjectsVDB Warning: Grid '"
-                   << vdbGrid->getName() << "' has not been read. Vdb bbox max " << metaBBoxMax
-                   << " vs " << origRes << " current grid size",
-               1);
+        // debMsg("readObjectsVDB Warning: Grid '" << vdbGrid->getName() << "' has not been read.
+        // Vdb bbox max " << metaBBoxMax << " vs " << origRes << " current grid size", 1);
         readFailure++;
         break;
       }
       const Vec3i origOrigin(0);
       if (metaBBoxMin.x < origOrigin.x || metaBBoxMin.y < origOrigin.y ||
           metaBBoxMin.z < origOrigin.z) {
-        debMsg("readObjectsVDB Warning: Grid '"
-                   << vdbGrid->getName() << "' has not been read. Vdb bbox min " << metaBBoxMin
-                   << " vs " << origOrigin << " current grid origin",
-               1);
+        // debMsg("readObjectsVDB Warning: Grid '" << vdbGrid->getName() << "' has not been read.
+        // Vdb bbox min " << metaBBoxMin << " vs " << origOrigin << " current grid origin", 1);
         readFailure++;
         break;
       }

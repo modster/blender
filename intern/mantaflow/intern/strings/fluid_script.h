@@ -273,13 +273,32 @@ def fluid_adapt_time_step_$ID$():\n\
 const std::string fluid_alloc =
     "\n\
 mantaMsg('Fluid alloc data')\n\
-flags_s$ID$       = s$ID$.create(FlagGrid, name='$NAME_FLAGS$')\n\
-vel_s$ID$         = s$ID$.create(MACGrid, name='$NAME_VELOCITY$', sparse=True)\n\
+flags_s$ID$       = s$ID$.create(FlagGrid, name='$NAME_FLAGS$', offload=True)\n\
+mantaMsg('Fluid alloc data vel')\n\
+vel_s$ID$         = s$ID$.create(MACGrid, name='$NAME_VELOCITY$', sparse=True, offload=True)\n\
 velTmp_s$ID$      = s$ID$.create(MACGrid, name='$NAME_VELOCITYTMP$', sparse=True)\n\
 x_vel_s$ID$       = s$ID$.create(RealGrid, name='$NAME_VELOCITY_X$')\n\
 y_vel_s$ID$       = s$ID$.create(RealGrid, name='$NAME_VELOCITY_Y$')\n\
 z_vel_s$ID$       = s$ID$.create(RealGrid, name='$NAME_VELOCITY_Z$')\n\
-pressure_s$ID$    = s$ID$.create(RealGrid, name='$NAME_PRESSURE$')\n\
+mantaMsg('Fluid alloc data pressure')\n\
+pressure_s$ID$    = s$ID$.create(RealGrid, name='$NAME_PRESSURE$', offload=True)\n\
+mantaMsg('Fluid alloc data rhs')\n\
+rhs_s$ID$         = s$ID$.create(RealGrid, offload=True)\n\
+mantaMsg('Fluid alloc data A0')\n\
+A0_s$ID$          = s$ID$.create(RealGrid, offload=True)\n\
+mantaMsg('Fluid alloc data Ai')\n\
+Ai_s$ID$          = s$ID$.create(RealGrid, offload=True)\n\
+mantaMsg('Fluid alloc data Aj')\n\
+Aj_s$ID$          = s$ID$.create(RealGrid, offload=True)\n\
+mantaMsg('Fluid alloc data Ak')\n\
+Ak_s$ID$          = s$ID$.create(RealGrid, offload=True)\n\
+mantaMsg('Fluid alloc data search')\n\
+search_s$ID$      = s$ID$.create(RealGrid, offload=True)\n\
+mantaMsg('Fluid alloc data residual')\n\
+residual_s$ID$    = s$ID$.create(RealGrid, offload=True)\n\
+mantaMsg('Fluid alloc data tmp')\n\
+tmp_s$ID$         = s$ID$.create(RealGrid, offload=True)\n\
+mantaMsg('Fluid alloc data 6')\n\
 phiObs_s$ID$      = s$ID$.create(LevelsetGrid, name='$NAME_PHIOBS$')\n\
 phiSIn_s$ID$      = s$ID$.create(LevelsetGrid, name='$NAME_PHISIN$') # helper for static flow objects\n\
 phiIn_s$ID$       = s$ID$.create(LevelsetGrid, name='$NAME_PHIIN$')\n\
@@ -298,7 +317,8 @@ phiOut_s$ID$.setConst(9999)\n\
 \n\
 # Keep track of important objects in dict to load them later on\n\
 fluid_data_dict_final_s$ID$  = { 'vel' : vel_s$ID$ }\n\
-fluid_data_dict_resume_s$ID$ = { 'phiObs' : phiObs_s$ID$, 'phiIn' : phiIn_s$ID$, 'phiOut' : phiOut_s$ID$, 'flags' : flags_s$ID$, 'velTmp' : velTmp_s$ID$ }\n";
+fluid_data_dict_resume_s$ID$ = { 'phiObs' : phiObs_s$ID$, 'phiIn' : phiIn_s$ID$, 'phiOut' : phiOut_s$ID$, 'flags' : flags_s$ID$, 'velTmp' : velTmp_s$ID$ }\n\
+mantaMsg('Fluid alloc DONE')\n";
 
 const std::string fluid_alloc_obstacle =
     "\n\
@@ -477,7 +497,8 @@ mantaMsg('Delete guiding solver')\n\
 if 'sg$ID$' in globals(): del sg$ID$\n\
 \n\
 # Release unreferenced memory (if there is some left)\n\
-gc.collect()\n";
+gc.collect()\n\
+mantaMsg('Done deleting')\n";
 
 //////////////////////////////////////////////////////////////////////
 // BAKE

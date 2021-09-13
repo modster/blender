@@ -71,7 +71,7 @@ struct KnProcessBurn : public KernelBase {
                  Real ignitionTemp,
                  Real maxTemp,
                  Real dt,
-                 Vec3 flameSmokeColor) const
+                 Vec3 flameSmokeColor)
   {
     // Save initial values
     Real origFuel = fuel(i, j, k);
@@ -179,19 +179,44 @@ struct KnProcessBurn : public KernelBase {
     return flameSmokeColor;
   }
   typedef Vec3 type12;
-  void runMessage()
-  {
-    debMsg("Executing kernel KnProcessBurn ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
+  void runMessage(){};
+  void run()
   {
     const int _maxX = maxX;
     const int _maxY = maxY;
     if (maxZ > 1) {
-      for (int k = __r.begin(); k != (int)__r.end(); k++)
+
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int k = minZ; k < maxZ; k++)
+          for (int j = 1; j < _maxY; j++)
+            for (int i = 1; i < _maxX; i++)
+              op(i,
+                 j,
+                 k,
+                 fuel,
+                 density,
+                 react,
+                 red,
+                 green,
+                 blue,
+                 heat,
+                 burningRate,
+                 flameSmoke,
+                 ignitionTemp,
+                 maxTemp,
+                 dt,
+                 flameSmokeColor);
+      }
+    }
+    else {
+      const int k = 0;
+#pragma omp parallel
+      {
+
+#pragma omp for
         for (int j = 1; j < _maxY; j++)
           for (int i = 1; i < _maxX; i++)
             op(i,
@@ -210,35 +235,8 @@ struct KnProcessBurn : public KernelBase {
                maxTemp,
                dt,
                flameSmokeColor);
+      }
     }
-    else {
-      const int k = 0;
-      for (int j = __r.begin(); j != (int)__r.end(); j++)
-        for (int i = 1; i < _maxX; i++)
-          op(i,
-             j,
-             k,
-             fuel,
-             density,
-             react,
-             red,
-             green,
-             blue,
-             heat,
-             burningRate,
-             flameSmoke,
-             ignitionTemp,
-             maxTemp,
-             dt,
-             flameSmokeColor);
-    }
-  }
-  void run()
-  {
-    if (maxZ > 1)
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(minZ, maxZ), *this);
-    else
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(1, maxY), *this);
   }
   Grid<Real> &fuel;
   Grid<Real> &density;
@@ -344,7 +342,7 @@ struct KnUpdateFlame : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(int i, int j, int k, const Grid<Real> &react, Grid<Real> &flame) const
+  inline void op(int i, int j, int k, const Grid<Real> &react, Grid<Real> &flame)
   {
     if (react(i, j, k) > 0.0f)
       flame(i, j, k) = pow(react(i, j, k), 0.5f);
@@ -361,36 +359,34 @@ struct KnUpdateFlame : public KernelBase {
     return flame;
   }
   typedef Grid<Real> type1;
-  void runMessage()
-  {
-    debMsg("Executing kernel KnUpdateFlame ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
+  void runMessage(){};
+  void run()
   {
     const int _maxX = maxX;
     const int _maxY = maxY;
     if (maxZ > 1) {
-      for (int k = __r.begin(); k != (int)__r.end(); k++)
-        for (int j = 1; j < _maxY; j++)
-          for (int i = 1; i < _maxX; i++)
-            op(i, j, k, react, flame);
+
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int k = minZ; k < maxZ; k++)
+          for (int j = 1; j < _maxY; j++)
+            for (int i = 1; i < _maxX; i++)
+              op(i, j, k, react, flame);
+      }
     }
     else {
       const int k = 0;
-      for (int j = __r.begin(); j != (int)__r.end(); j++)
-        for (int i = 1; i < _maxX; i++)
-          op(i, j, k, react, flame);
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int j = 1; j < _maxY; j++)
+          for (int i = 1; i < _maxX; i++)
+            op(i, j, k, react, flame);
+      }
     }
-  }
-  void run()
-  {
-    if (maxZ > 1)
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(minZ, maxZ), *this);
-    else
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(1, maxY), *this);
   }
   const Grid<Real> &react;
   Grid<Real> &flame;

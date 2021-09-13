@@ -99,7 +99,7 @@ struct knFlipComputeSecondaryParticlePotentials : public KernelBase {
                  const Real scaleFromManta,
                  const int itype = FlagGrid::TypeFluid,
                  const int jtype = FlagGrid::TypeObstacle | FlagGrid::TypeOutflow |
-                                   FlagGrid::TypeInflow) const
+                                   FlagGrid::TypeInflow)
   {
 
     if (!(flags(i, j, k) & itype))
@@ -253,19 +253,48 @@ struct knFlipComputeSecondaryParticlePotentials : public KernelBase {
     return jtype;
   }
   typedef int type16;
-  void runMessage()
-  {
-    debMsg("Executing kernel knFlipComputeSecondaryParticlePotentials ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
+  void runMessage(){};
+  void run()
   {
     const int _maxX = maxX;
     const int _maxY = maxY;
     if (maxZ > 1) {
-      for (int k = __r.begin(); k != (int)__r.end(); k++)
+
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int k = minZ; k < maxZ; k++)
+          for (int j = radius; j < _maxY; j++)
+            for (int i = radius; i < _maxX; i++)
+              op(i,
+                 j,
+                 k,
+                 potTA,
+                 potWC,
+                 potKE,
+                 neighborRatio,
+                 flags,
+                 v,
+                 normal,
+                 radius,
+                 tauMinTA,
+                 tauMaxTA,
+                 tauMinWC,
+                 tauMaxWC,
+                 tauMinKE,
+                 tauMaxKE,
+                 scaleFromManta,
+                 itype,
+                 jtype);
+      }
+    }
+    else {
+      const int k = 0;
+#pragma omp parallel
+      {
+
+#pragma omp for
         for (int j = radius; j < _maxY; j++)
           for (int i = radius; i < _maxX; i++)
             op(i,
@@ -288,39 +317,8 @@ struct knFlipComputeSecondaryParticlePotentials : public KernelBase {
                scaleFromManta,
                itype,
                jtype);
+      }
     }
-    else {
-      const int k = 0;
-      for (int j = __r.begin(); j != (int)__r.end(); j++)
-        for (int i = radius; i < _maxX; i++)
-          op(i,
-             j,
-             k,
-             potTA,
-             potWC,
-             potKE,
-             neighborRatio,
-             flags,
-             v,
-             normal,
-             radius,
-             tauMinTA,
-             tauMaxTA,
-             tauMinWC,
-             tauMaxWC,
-             tauMinKE,
-             tauMaxKE,
-             scaleFromManta,
-             itype,
-             jtype);
-    }
-  }
-  void run()
-  {
-    if (maxZ > 1)
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(minZ, maxZ), *this);
-    else
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(radius, maxY), *this);
   }
   Grid<Real> &potTA;
   Grid<Real> &potWC;
@@ -670,13 +668,7 @@ struct knFlipSampleSecondaryParticlesMoreCylinders : public KernelBase {
     return rand;
   }
   typedef RandomStream type17;
-  void runMessage()
-  {
-    debMsg("Executing kernel knFlipSampleSecondaryParticlesMoreCylinders ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
+  void runMessage(){};
   void run()
   {
     const int _maxX = maxX;
@@ -930,13 +922,7 @@ struct knFlipSampleSecondaryParticles : public KernelBase {
     return rand;
   }
   typedef RandomStream type17;
-  void runMessage()
-  {
-    debMsg("Executing kernel knFlipSampleSecondaryParticles ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
+  void runMessage(){};
   void run()
   {
     const int _maxX = maxX;
@@ -1192,7 +1178,7 @@ struct knFlipUpdateSecondaryParticlesLinear : public KernelBase {
                  const Real c_b,
                  const Real dt,
                  const int exclude,
-                 const int antitunneling) const
+                 const int antitunneling)
   {
 
     if (!pts_sec.isActive(idx) || pts_sec[idx].flag & exclude)
@@ -1342,36 +1328,32 @@ struct knFlipUpdateSecondaryParticlesLinear : public KernelBase {
     return antitunneling;
   }
   typedef int type14;
-  void runMessage()
-  {
-    debMsg("Executing kernel knFlipUpdateSecondaryParticlesLinear ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx,
-         pts_sec,
-         v_sec,
-         l_sec,
-         f_sec,
-         flags,
-         v,
-         neighborRatio,
-         gravity,
-         k_b,
-         k_d,
-         c_s,
-         c_b,
-         dt,
-         exclude,
-         antitunneling);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i,
+           pts_sec,
+           v_sec,
+           l_sec,
+           f_sec,
+           flags,
+           v,
+           neighborRatio,
+           gravity,
+           k_b,
+           k_d,
+           c_s,
+           c_b,
+           dt,
+           exclude,
+           antitunneling);
+    }
   }
   BasicParticleSystem &pts_sec;
   ParticleDataImpl<Vec3> &v_sec;
@@ -1449,7 +1431,7 @@ struct knFlipUpdateSecondaryParticlesCubic : public KernelBase {
                  const Real dt,
                  const int exclude,
                  const int antitunneling,
-                 const int itype) const
+                 const int itype)
   {
 
     if (!pts_sec.isActive(idx) || pts_sec[idx].flag & exclude)
@@ -1655,38 +1637,34 @@ struct knFlipUpdateSecondaryParticlesCubic : public KernelBase {
     return itype;
   }
   typedef int type16;
-  void runMessage()
-  {
-    debMsg("Executing kernel knFlipUpdateSecondaryParticlesCubic ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx,
-         pts_sec,
-         v_sec,
-         l_sec,
-         f_sec,
-         flags,
-         v,
-         neighborRatio,
-         radius,
-         gravity,
-         k_b,
-         k_d,
-         c_s,
-         c_b,
-         dt,
-         exclude,
-         antitunneling,
-         itype);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i,
+           pts_sec,
+           v_sec,
+           l_sec,
+           f_sec,
+           flags,
+           v,
+           neighborRatio,
+           radius,
+           gravity,
+           k_b,
+           k_d,
+           c_s,
+           c_b,
+           dt,
+           exclude,
+           antitunneling,
+           itype);
+    }
   }
   BasicParticleSystem &pts_sec;
   ParticleDataImpl<Vec3> &v_sec;
@@ -1856,7 +1834,7 @@ struct knFlipDeleteParticlesInObstacle : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(IndexInt idx, BasicParticleSystem &pts, const FlagGrid &flags) const
+  inline void op(IndexInt idx, BasicParticleSystem &pts, const FlagGrid &flags)
   {
 
     if (!pts.isActive(idx))
@@ -1885,21 +1863,17 @@ struct knFlipDeleteParticlesInObstacle : public KernelBase {
     return flags;
   }
   typedef FlagGrid type1;
-  void runMessage()
-  {
-    debMsg("Executing kernel knFlipDeleteParticlesInObstacle ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, pts, flags);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, pts, flags);
+    }
   }
   BasicParticleSystem &pts;
   const FlagGrid &flags;
@@ -2031,7 +2005,7 @@ struct knSetFlagsFromLevelset : public KernelBase {
                  FlagGrid &flags,
                  const Grid<Real> &phi,
                  const int exclude = FlagGrid::TypeObstacle,
-                 const int itype = FlagGrid::TypeFluid) const
+                 const int itype = FlagGrid::TypeFluid)
   {
     if (phi(idx) < 0 && !(flags(idx) & exclude))
       flags(idx) = itype;
@@ -2056,21 +2030,17 @@ struct knSetFlagsFromLevelset : public KernelBase {
     return itype;
   }
   typedef int type3;
-  void runMessage()
-  {
-    debMsg("Executing kernel knSetFlagsFromLevelset ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, flags, phi, exclude, itype);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, flags, phi, exclude, itype);
+    }
   }
   FlagGrid &flags;
   const Grid<Real> &phi;
@@ -2126,7 +2096,7 @@ struct knSetMACFromLevelset : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(int i, int j, int k, MACGrid &v, const Grid<Real> &phi, const Vec3 c) const
+  inline void op(int i, int j, int k, MACGrid &v, const Grid<Real> &phi, const Vec3 c)
   {
     if (phi.getInterpolated(Vec3(i, j, k)) > 0)
       v(i, j, k) = c;
@@ -2146,36 +2116,34 @@ struct knSetMACFromLevelset : public KernelBase {
     return c;
   }
   typedef Vec3 type2;
-  void runMessage()
-  {
-    debMsg("Executing kernel knSetMACFromLevelset ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
+  void runMessage(){};
+  void run()
   {
     const int _maxX = maxX;
     const int _maxY = maxY;
     if (maxZ > 1) {
-      for (int k = __r.begin(); k != (int)__r.end(); k++)
-        for (int j = 0; j < _maxY; j++)
-          for (int i = 0; i < _maxX; i++)
-            op(i, j, k, v, phi, c);
+
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int k = minZ; k < maxZ; k++)
+          for (int j = 0; j < _maxY; j++)
+            for (int i = 0; i < _maxX; i++)
+              op(i, j, k, v, phi, c);
+      }
     }
     else {
       const int k = 0;
-      for (int j = __r.begin(); j != (int)__r.end(); j++)
-        for (int i = 0; i < _maxX; i++)
-          op(i, j, k, v, phi, c);
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int j = 0; j < _maxY; j++)
+          for (int i = 0; i < _maxX; i++)
+            op(i, j, k, v, phi, c);
+      }
     }
-  }
-  void run()
-  {
-    if (maxZ > 1)
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(minZ, maxZ), *this);
-    else
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(0, maxY), *this);
   }
   MACGrid &v;
   const Grid<Real> &phi;
@@ -2268,7 +2236,7 @@ struct knFlipComputePotentialTrappedAir : public KernelBase {
                  const Real tauMax,
                  const Real scaleFromManta,
                  const int itype = FlagGrid::TypeFluid,
-                 const int jtype = FlagGrid::TypeFluid) const
+                 const int jtype = FlagGrid::TypeFluid)
   {
 
     if (!(flags(i, j, k) & itype))
@@ -2342,36 +2310,34 @@ struct knFlipComputePotentialTrappedAir : public KernelBase {
     return jtype;
   }
   typedef int type8;
-  void runMessage()
-  {
-    debMsg("Executing kernel knFlipComputePotentialTrappedAir ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
+  void runMessage(){};
+  void run()
   {
     const int _maxX = maxX;
     const int _maxY = maxY;
     if (maxZ > 1) {
-      for (int k = __r.begin(); k != (int)__r.end(); k++)
-        for (int j = 1; j < _maxY; j++)
-          for (int i = 1; i < _maxX; i++)
-            op(i, j, k, pot, flags, v, radius, tauMin, tauMax, scaleFromManta, itype, jtype);
+
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int k = minZ; k < maxZ; k++)
+          for (int j = 1; j < _maxY; j++)
+            for (int i = 1; i < _maxX; i++)
+              op(i, j, k, pot, flags, v, radius, tauMin, tauMax, scaleFromManta, itype, jtype);
+      }
     }
     else {
       const int k = 0;
-      for (int j = __r.begin(); j != (int)__r.end(); j++)
-        for (int i = 1; i < _maxX; i++)
-          op(i, j, k, pot, flags, v, radius, tauMin, tauMax, scaleFromManta, itype, jtype);
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int j = 1; j < _maxY; j++)
+          for (int i = 1; i < _maxX; i++)
+            op(i, j, k, pot, flags, v, radius, tauMin, tauMax, scaleFromManta, itype, jtype);
+      }
     }
-  }
-  void run()
-  {
-    if (maxZ > 1)
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(minZ, maxZ), *this);
-    else
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(1, maxY), *this);
   }
   Grid<Real> &pot;
   const FlagGrid &flags;
@@ -2472,7 +2438,7 @@ struct knFlipComputePotentialKineticEnergy : public KernelBase {
                  const Real tauMin,
                  const Real tauMax,
                  const Real scaleFromManta,
-                 const int itype = FlagGrid::TypeFluid) const
+                 const int itype = FlagGrid::TypeFluid)
   {
 
     if (!(flags(i, j, k) & itype))
@@ -2520,36 +2486,34 @@ struct knFlipComputePotentialKineticEnergy : public KernelBase {
     return itype;
   }
   typedef int type6;
-  void runMessage()
-  {
-    debMsg("Executing kernel knFlipComputePotentialKineticEnergy ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
+  void runMessage(){};
+  void run()
   {
     const int _maxX = maxX;
     const int _maxY = maxY;
     if (maxZ > 1) {
-      for (int k = __r.begin(); k != (int)__r.end(); k++)
-        for (int j = 0; j < _maxY; j++)
-          for (int i = 0; i < _maxX; i++)
-            op(i, j, k, pot, flags, v, tauMin, tauMax, scaleFromManta, itype);
+
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int k = minZ; k < maxZ; k++)
+          for (int j = 0; j < _maxY; j++)
+            for (int i = 0; i < _maxX; i++)
+              op(i, j, k, pot, flags, v, tauMin, tauMax, scaleFromManta, itype);
+      }
     }
     else {
       const int k = 0;
-      for (int j = __r.begin(); j != (int)__r.end(); j++)
-        for (int i = 0; i < _maxX; i++)
-          op(i, j, k, pot, flags, v, tauMin, tauMax, scaleFromManta, itype);
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int j = 0; j < _maxY; j++)
+          for (int i = 0; i < _maxX; i++)
+            op(i, j, k, pot, flags, v, tauMin, tauMax, scaleFromManta, itype);
+      }
     }
-  }
-  void run()
-  {
-    if (maxZ > 1)
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(minZ, maxZ), *this);
-    else
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(0, maxY), *this);
   }
   Grid<Real> &pot;
   const FlagGrid &flags;
@@ -2650,7 +2614,7 @@ struct knFlipComputePotentialWaveCrest : public KernelBase {
                  const Real tauMax,
                  const Real scaleFromManta,
                  const int itype = FlagGrid::TypeFluid,
-                 const int jtype = FlagGrid::TypeFluid) const
+                 const int jtype = FlagGrid::TypeFluid)
   {
 
     if (!(flags(i, j, k) & itype))
@@ -2736,19 +2700,41 @@ struct knFlipComputePotentialWaveCrest : public KernelBase {
     return jtype;
   }
   typedef int type9;
-  void runMessage()
-  {
-    debMsg("Executing kernel knFlipComputePotentialWaveCrest ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
+  void runMessage(){};
+  void run()
   {
     const int _maxX = maxX;
     const int _maxY = maxY;
     if (maxZ > 1) {
-      for (int k = __r.begin(); k != (int)__r.end(); k++)
+
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int k = minZ; k < maxZ; k++)
+          for (int j = 1; j < _maxY; j++)
+            for (int i = 1; i < _maxX; i++)
+              op(i,
+                 j,
+                 k,
+                 pot,
+                 flags,
+                 v,
+                 radius,
+                 normal,
+                 tauMin,
+                 tauMax,
+                 scaleFromManta,
+                 itype,
+                 jtype);
+      }
+    }
+    else {
+      const int k = 0;
+#pragma omp parallel
+      {
+
+#pragma omp for
         for (int j = 1; j < _maxY; j++)
           for (int i = 1; i < _maxX; i++)
             op(i,
@@ -2764,20 +2750,8 @@ struct knFlipComputePotentialWaveCrest : public KernelBase {
                scaleFromManta,
                itype,
                jtype);
+      }
     }
-    else {
-      const int k = 0;
-      for (int j = __r.begin(); j != (int)__r.end(); j++)
-        for (int i = 1; i < _maxX; i++)
-          op(i, j, k, pot, flags, v, radius, normal, tauMin, tauMax, scaleFromManta, itype, jtype);
-    }
-  }
-  void run()
-  {
-    if (maxZ > 1)
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(minZ, maxZ), *this);
-    else
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(1, maxY), *this);
   }
   Grid<Real> &pot;
   const FlagGrid &flags;
@@ -2860,7 +2834,7 @@ struct knFlipComputeSurfaceNormals : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(IndexInt idx, Grid<Vec3> &normal, const Grid<Real> &phi) const
+  inline void op(IndexInt idx, Grid<Vec3> &normal, const Grid<Real> &phi)
   {
     normal[idx] = getNormalized(normal[idx]);
   }
@@ -2874,21 +2848,17 @@ struct knFlipComputeSurfaceNormals : public KernelBase {
     return phi;
   }
   typedef Grid<Real> type1;
-  void runMessage()
-  {
-    debMsg("Executing kernel knFlipComputeSurfaceNormals ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, normal, phi);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, normal, phi);
+    }
   }
   Grid<Vec3> &normal;
   const Grid<Real> &phi;
@@ -2958,7 +2928,7 @@ struct knFlipUpdateNeighborRatio : public KernelBase {
                  Grid<Real> &neighborRatio,
                  const int radius,
                  const int itype = FlagGrid::TypeFluid,
-                 const int jtype = FlagGrid::TypeObstacle) const
+                 const int jtype = FlagGrid::TypeObstacle)
   {
 
     if (!(flags(i, j, k) & itype))
@@ -3008,36 +2978,34 @@ struct knFlipUpdateNeighborRatio : public KernelBase {
     return jtype;
   }
   typedef int type4;
-  void runMessage()
-  {
-    debMsg("Executing kernel knFlipUpdateNeighborRatio ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
+  void runMessage(){};
+  void run()
   {
     const int _maxX = maxX;
     const int _maxY = maxY;
     if (maxZ > 1) {
-      for (int k = __r.begin(); k != (int)__r.end(); k++)
-        for (int j = 1; j < _maxY; j++)
-          for (int i = 1; i < _maxX; i++)
-            op(i, j, k, flags, neighborRatio, radius, itype, jtype);
+
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int k = minZ; k < maxZ; k++)
+          for (int j = 1; j < _maxY; j++)
+            for (int i = 1; i < _maxX; i++)
+              op(i, j, k, flags, neighborRatio, radius, itype, jtype);
+      }
     }
     else {
       const int k = 0;
-      for (int j = __r.begin(); j != (int)__r.end(); j++)
-        for (int i = 1; i < _maxX; i++)
-          op(i, j, k, flags, neighborRatio, radius, itype, jtype);
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int j = 1; j < _maxY; j++)
+          for (int i = 1; i < _maxX; i++)
+            op(i, j, k, flags, neighborRatio, radius, itype, jtype);
+      }
     }
-  }
-  void run()
-  {
-    if (maxZ > 1)
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(minZ, maxZ), *this);
-    else
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(1, maxY), *this);
   }
   const FlagGrid &flags;
   Grid<Real> &neighborRatio;

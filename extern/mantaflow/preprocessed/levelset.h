@@ -27,7 +27,7 @@ class Mesh;
 //! Special function for levelsets
 class LevelsetGrid : public Grid<Real> {
  public:
-  LevelsetGrid(FluidSolver *parent, bool show = true);
+  LevelsetGrid(FluidSolver *parent, bool show = true, bool offload = false);
   static int _W_0(PyObject *_self, PyObject *_linargs, PyObject *_kwds)
   {
     PbClass *obj = Pb::objFromPy(_self);
@@ -41,7 +41,8 @@ class LevelsetGrid : public Grid<Real> {
         ArgLocker _lock;
         FluidSolver *parent = _args.getPtr<FluidSolver>("parent", 0, &_lock);
         bool show = _args.getOpt<bool>("show", 1, true, &_lock);
-        obj = new LevelsetGrid(parent, show);
+        bool offload = _args.getOpt<bool>("offload", 2, false, &_lock);
+        obj = new LevelsetGrid(parent, show, offload);
         obj->registerObject(_self, &_args);
         _args.check();
       }
@@ -266,7 +267,6 @@ class LevelsetGrid : public Grid<Real> {
   }
 
   static Real invalidTimeValue();
-
  public:
   PbArgs _args;
 }

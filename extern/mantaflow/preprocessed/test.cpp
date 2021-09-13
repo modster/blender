@@ -50,28 +50,21 @@ struct reductionTest : public KernelBase {
     return v;
   }
   typedef Grid<Real> type0;
-  void runMessage()
-  {
-    debMsg("Executing kernel reductionTest ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r)
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, v, sum);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_reduce(tbb::blocked_range<IndexInt>(0, size), *this);
-  }
-  reductionTest(reductionTest &o, tbb::split) : KernelBase(o), v(o.v), sum(0)
-  {
-  }
-  void join(const reductionTest &o)
-  {
-    sum += o.sum;
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+      double sum = 0;
+#pragma omp for nowait
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, v, sum);
+#pragma omp critical
+      {
+        this->sum += sum;
+      }
+    }
   }
   const Grid<Real> &v;
   double sum;
@@ -101,28 +94,21 @@ struct minReduction : public KernelBase {
     return v;
   }
   typedef Grid<Real> type0;
-  void runMessage()
-  {
-    debMsg("Executing kernel minReduction ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r)
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, v, sum);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_reduce(tbb::blocked_range<IndexInt>(0, size), *this);
-  }
-  minReduction(minReduction &o, tbb::split) : KernelBase(o), v(o.v), sum(0)
-  {
-  }
-  void join(const minReduction &o)
-  {
-    sum = min(sum, o.sum);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+      double sum = 0;
+#pragma omp for nowait
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, v, sum);
+#pragma omp critical
+      {
+        this->sum = min(sum, this->sum);
+      }
+    }
   }
   const Grid<Real> &v;
   double sum;

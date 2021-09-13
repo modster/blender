@@ -136,7 +136,7 @@ struct KnSynthesizeTurbulence : public KernelBase {
                  int octaves,
                  Real scale,
                  Real invL0,
-                 Real kmin) const
+                 Real kmin)
   {
     const Real PERSISTENCE = 0.56123f;
 
@@ -217,21 +217,17 @@ struct KnSynthesizeTurbulence : public KernelBase {
     return kmin;
   }
   typedef Real type9;
-  void runMessage()
-  {
-    debMsg("Executing kernel KnSynthesizeTurbulence ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, p, flags, noise, kGrid, alpha, dt, octaves, scale, invL0, kmin);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, p, flags, noise, kGrid, alpha, dt, octaves, scale, invL0, kmin);
+    }
   }
   TurbulenceParticleSystem &p;
   FlagGrid &flags;

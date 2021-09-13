@@ -569,7 +569,7 @@ struct advectSurfacePoints : public KernelBase {
   inline void op(IndexInt idx,
                  BasicParticleSystemWrapper &surfacePoints,
                  const BasicParticleSystemWrapper &coarseParticles,
-                 const ParticleDataImplVec3Wrapper &coarseParticlesPrevPos) const
+                 const ParticleDataImplVec3Wrapper &coarseParticlesPrevPos)
   {
     if (surfacePoints.isActive(idx)) {
       Vec3 avgDisplacement(0, 0, 0);
@@ -606,21 +606,17 @@ struct advectSurfacePoints : public KernelBase {
     return coarseParticlesPrevPos;
   }
   typedef ParticleDataImplVec3Wrapper type2;
-  void runMessage()
-  {
-    debMsg("Executing kernel advectSurfacePoints ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, surfacePoints, coarseParticles, coarseParticlesPrevPos);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, surfacePoints, coarseParticles, coarseParticlesPrevPos);
+    }
   }
   BasicParticleSystemWrapper &surfacePoints;
   const BasicParticleSystemWrapper &coarseParticles;
@@ -673,7 +669,7 @@ struct computeSurfaceNormals : public KernelBase {
   inline void op(IndexInt idx,
                  const BasicParticleSystemWrapper &surfacePoints,
                  const BasicParticleSystemWrapper &coarseParticles,
-                 ParticleDataImpl<Vec3> &surfaceNormals) const
+                 ParticleDataImpl<Vec3> &surfaceNormals)
   {
     Vec3 pos = surfacePoints.getPos(idx);
 
@@ -743,21 +739,17 @@ struct computeSurfaceNormals : public KernelBase {
     return surfaceNormals;
   }
   typedef ParticleDataImpl<Vec3> type2;
-  void runMessage()
-  {
-    debMsg("Executing kernel computeSurfaceNormals ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, surfacePoints, coarseParticles, surfaceNormals);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, surfacePoints, coarseParticles, surfaceNormals);
+    }
   }
   const BasicParticleSystemWrapper &surfacePoints;
   const BasicParticleSystemWrapper &coarseParticles;
@@ -780,7 +772,7 @@ struct computeAveragedNormals : public KernelBase {
   }
   inline void op(IndexInt idx,
                  const BasicParticleSystemWrapper &surfacePoints,
-                 const ParticleDataImpl<Vec3> &surfaceNormals) const
+                 const ParticleDataImpl<Vec3> &surfaceNormals)
   {
     Vec3 pos = surfacePoints.getPos(idx);
     Vec3 newNormal = Vec3(0, 0, 0);
@@ -800,21 +792,17 @@ struct computeAveragedNormals : public KernelBase {
     return surfaceNormals;
   }
   typedef ParticleDataImpl<Vec3> type1;
-  void runMessage()
-  {
-    debMsg("Executing kernel computeAveragedNormals ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, surfacePoints, surfaceNormals);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, surfacePoints, surfaceNormals);
+    }
   }
   const BasicParticleSystemWrapper &surfacePoints;
   const ParticleDataImpl<Vec3> &surfaceNormals;
@@ -832,7 +820,7 @@ struct assignNormals : public KernelBase {
   }
   inline void op(IndexInt idx,
                  const BasicParticleSystemWrapper &surfacePoints,
-                 ParticleDataImpl<Vec3> &surfaceNormals) const
+                 ParticleDataImpl<Vec3> &surfaceNormals)
   {
     surfaceNormals[idx] = tempSurfaceVec3[idx];
   }
@@ -846,21 +834,17 @@ struct assignNormals : public KernelBase {
     return surfaceNormals;
   }
   typedef ParticleDataImpl<Vec3> type1;
-  void runMessage()
-  {
-    debMsg("Executing kernel assignNormals ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, surfacePoints, surfaceNormals);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, surfacePoints, surfaceNormals);
+    }
   }
   const BasicParticleSystemWrapper &surfacePoints;
   ParticleDataImpl<Vec3> &surfaceNormals;
@@ -963,7 +947,7 @@ struct computeSurfaceDensities : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(IndexInt idx, const BasicParticleSystemWrapper &surfacePoints, void *dummy) const
+  inline void op(IndexInt idx, const BasicParticleSystemWrapper &surfacePoints, void *dummy)
   {
     Vec3 pos = surfacePoints.getPos(idx);
     Real density = 0;
@@ -984,21 +968,17 @@ struct computeSurfaceDensities : public KernelBase {
     return dummy;
   }
   typedef void type1;
-  void runMessage()
-  {
-    debMsg("Executing kernel computeSurfaceDensities ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, surfacePoints, dummy);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, surfacePoints, dummy);
+    }
   }
   const BasicParticleSystemWrapper &surfacePoints;
   void *dummy;
@@ -1016,7 +996,7 @@ struct computeSurfaceDisplacements : public KernelBase {
   }
   inline void op(IndexInt idx,
                  const BasicParticleSystemWrapper &surfacePoints,
-                 const ParticleDataImpl<Vec3> &surfaceNormals) const
+                 const ParticleDataImpl<Vec3> &surfaceNormals)
   {
     Vec3 pos = surfacePoints.getPos(idx);
     Vec3 normal = surfaceNormals[idx];
@@ -1068,21 +1048,17 @@ struct computeSurfaceDisplacements : public KernelBase {
     return surfaceNormals;
   }
   typedef ParticleDataImpl<Vec3> type1;
-  void runMessage()
-  {
-    debMsg("Executing kernel computeSurfaceDisplacements ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, surfacePoints, surfaceNormals);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, surfacePoints, surfaceNormals);
+    }
   }
   const BasicParticleSystemWrapper &surfacePoints;
   const ParticleDataImpl<Vec3> &surfaceNormals;
@@ -1095,7 +1071,7 @@ struct applySurfaceDisplacements : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(IndexInt idx, BasicParticleSystemWrapper &surfacePoints, void *dummy) const
+  inline void op(IndexInt idx, BasicParticleSystemWrapper &surfacePoints, void *dummy)
   {
     surfacePoints.setPos(idx, surfacePoints.getPos(idx) + tempSurfaceVec3[idx]);
   }
@@ -1109,21 +1085,17 @@ struct applySurfaceDisplacements : public KernelBase {
     return dummy;
   }
   typedef void type1;
-  void runMessage()
-  {
-    debMsg("Executing kernel applySurfaceDisplacements ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, surfacePoints, dummy);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, surfacePoints, dummy);
+    }
   }
   BasicParticleSystemWrapper &surfacePoints;
   void *dummy;
@@ -1152,7 +1124,7 @@ struct constrainSurface : public KernelBase {
   }
   inline void op(IndexInt idx,
                  BasicParticleSystemWrapper &surfacePoints,
-                 const BasicParticleSystemWrapper &coarseParticles) const
+                 const BasicParticleSystemWrapper &coarseParticles)
   {
     Vec3 pos = surfacePoints.getPos(idx);
     Real level = computeConstraintLevel(coarseParticles, surfacePoints.getPos(idx));
@@ -1179,21 +1151,17 @@ struct constrainSurface : public KernelBase {
     return coarseParticles;
   }
   typedef BasicParticleSystemWrapper type1;
-  void runMessage()
-  {
-    debMsg("Executing kernel constrainSurface ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, surfacePoints, coarseParticles);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, surfacePoints, coarseParticles);
+    }
   }
   BasicParticleSystemWrapper &surfacePoints;
   const BasicParticleSystemWrapper &coarseParticles;
@@ -1220,7 +1188,7 @@ struct interpolateNewWaveData : public KernelBase {
                  ParticleDataImpl<Real> &surfaceWaveH,
                  ParticleDataImpl<Real> &surfaceWaveDtH,
                  ParticleDataImpl<Real> &surfaceWaveSeed,
-                 ParticleDataImpl<Real> &surfaceWaveSeedAmplitude) const
+                 ParticleDataImpl<Real> &surfaceWaveSeedAmplitude)
   {
     if (surfacePoints.getStatus(idx) & ParticleBase::PNEW) {
       Vec3 pos = surfacePoints.getPos(idx);
@@ -1270,26 +1238,22 @@ struct interpolateNewWaveData : public KernelBase {
     return surfaceWaveSeedAmplitude;
   }
   typedef ParticleDataImpl<Real> type4;
-  void runMessage()
-  {
-    debMsg("Executing kernel interpolateNewWaveData ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx,
-         surfacePoints,
-         surfaceWaveH,
-         surfaceWaveDtH,
-         surfaceWaveSeed,
-         surfaceWaveSeedAmplitude);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i,
+           surfacePoints,
+           surfaceWaveH,
+           surfaceWaveDtH,
+           surfaceWaveSeed,
+           surfaceWaveSeedAmplitude);
+    }
   }
   const BasicParticleSystemWrapper &surfacePoints;
   ParticleDataImpl<Real> &surfaceWaveH;
@@ -1345,7 +1309,7 @@ struct addSeed : public KernelBase {
   inline void op(IndexInt idx,
                  const BasicParticleSystemWrapper &surfacePoints,
                  ParticleDataImpl<Real> &surfaceWaveH,
-                 const ParticleDataImpl<Real> &surfaceWaveSeed) const
+                 const ParticleDataImpl<Real> &surfaceWaveSeed)
   {
     surfaceWaveH[idx] += surfaceWaveSeed[idx];
   }
@@ -1364,21 +1328,17 @@ struct addSeed : public KernelBase {
     return surfaceWaveSeed;
   }
   typedef ParticleDataImpl<Real> type2;
-  void runMessage()
-  {
-    debMsg("Executing kernel addSeed ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, surfacePoints, surfaceWaveH, surfaceWaveSeed);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, surfacePoints, surfaceWaveH, surfaceWaveSeed);
+    }
   }
   const BasicParticleSystemWrapper &surfacePoints;
   ParticleDataImpl<Real> &surfaceWaveH;
@@ -1400,7 +1360,7 @@ struct computeSurfaceWaveNormal : public KernelBase {
   inline void op(IndexInt idx,
                  const BasicParticleSystemWrapper &surfacePoints,
                  const ParticleDataImpl<Vec3> &surfaceNormals,
-                 const ParticleDataImpl<Real> &surfaceWaveH) const
+                 const ParticleDataImpl<Real> &surfaceWaveH)
   {
     Vec3 pos = surfacePoints.getPos(idx);
 
@@ -1464,21 +1424,17 @@ struct computeSurfaceWaveNormal : public KernelBase {
     return surfaceWaveH;
   }
   typedef ParticleDataImpl<Real> type2;
-  void runMessage()
-  {
-    debMsg("Executing kernel computeSurfaceWaveNormal ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, surfacePoints, surfaceNormals, surfaceWaveH);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, surfacePoints, surfaceNormals, surfaceWaveH);
+    }
   }
   const BasicParticleSystemWrapper &surfacePoints;
   const ParticleDataImpl<Vec3> &surfaceNormals;
@@ -1500,7 +1456,7 @@ struct computeSurfaceWaveLaplacians : public KernelBase {
   inline void op(IndexInt idx,
                  const BasicParticleSystemWrapper &surfacePoints,
                  const ParticleDataImpl<Vec3> &surfaceNormals,
-                 const ParticleDataImpl<Real> &surfaceWaveH) const
+                 const ParticleDataImpl<Real> &surfaceWaveH)
   {
     Real laplacian = 0;
     Real wTotal = 0;
@@ -1561,21 +1517,17 @@ struct computeSurfaceWaveLaplacians : public KernelBase {
     return surfaceWaveH;
   }
   typedef ParticleDataImpl<Real> type2;
-  void runMessage()
-  {
-    debMsg("Executing kernel computeSurfaceWaveLaplacians ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, surfacePoints, surfaceNormals, surfaceWaveH);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, surfacePoints, surfaceNormals, surfaceWaveH);
+    }
   }
   const BasicParticleSystemWrapper &surfacePoints;
   const ParticleDataImpl<Vec3> &surfaceNormals;
@@ -1600,7 +1552,7 @@ struct evolveWave : public KernelBase {
                  const BasicParticleSystemWrapper &surfacePoints,
                  ParticleDataImpl<Real> &surfaceWaveH,
                  ParticleDataImpl<Real> &surfaceWaveDtH,
-                 const ParticleDataImpl<Real> &surfaceWaveSeed) const
+                 const ParticleDataImpl<Real> &surfaceWaveSeed)
   {
     surfaceWaveDtH[idx] += params.waveSpeed * params.waveSpeed * params.dt * tempSurfaceFloat[idx];
     surfaceWaveDtH[idx] /= (1 + params.dt * params.waveDamping);
@@ -1635,21 +1587,17 @@ struct evolveWave : public KernelBase {
     return surfaceWaveSeed;
   }
   typedef ParticleDataImpl<Real> type3;
-  void runMessage()
-  {
-    debMsg("Executing kernel evolveWave ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, surfacePoints, surfaceWaveH, surfaceWaveDtH, surfaceWaveSeed);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, surfacePoints, surfaceWaveH, surfaceWaveDtH, surfaceWaveSeed);
+    }
   }
   const BasicParticleSystemWrapper &surfacePoints;
   ParticleDataImpl<Real> &surfaceWaveH;
@@ -1669,7 +1617,7 @@ struct computeSurfaceCurvature : public KernelBase {
   }
   inline void op(IndexInt idx,
                  const BasicParticleSystemWrapper &surfacePoints,
-                 const ParticleDataImpl<Vec3> &surfaceNormals) const
+                 const ParticleDataImpl<Vec3> &surfaceNormals)
   {
     Vec3 pPos = surfacePoints.getPos(idx);
     Real wTotal = 0;
@@ -1710,21 +1658,17 @@ struct computeSurfaceCurvature : public KernelBase {
     return surfaceNormals;
   }
   typedef ParticleDataImpl<Vec3> type1;
-  void runMessage()
-  {
-    debMsg("Executing kernel computeSurfaceCurvature ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, surfacePoints, surfaceNormals);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, surfacePoints, surfaceNormals);
+    }
   }
   const BasicParticleSystemWrapper &surfacePoints;
   const ParticleDataImpl<Vec3> &surfaceNormals;
@@ -1742,7 +1686,7 @@ struct smoothCurvature : public KernelBase {
   }
   inline void op(IndexInt idx,
                  const BasicParticleSystemWrapper &surfacePoints,
-                 ParticleDataImpl<Real> &surfaceWaveSource) const
+                 ParticleDataImpl<Real> &surfaceWaveSource)
   {
     Vec3 pPos = surfacePoints.getPos(idx);
     Real curv = 0;
@@ -1768,21 +1712,17 @@ struct smoothCurvature : public KernelBase {
     return surfaceWaveSource;
   }
   typedef ParticleDataImpl<Real> type1;
-  void runMessage()
-  {
-    debMsg("Executing kernel smoothCurvature ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, surfacePoints, surfaceWaveSource);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, surfacePoints, surfaceWaveSource);
+    }
   }
   const BasicParticleSystemWrapper &surfacePoints;
   ParticleDataImpl<Real> &surfaceWaveSource;
@@ -1806,7 +1746,7 @@ struct seedWaves : public KernelBase {
                  const BasicParticleSystemWrapper &surfacePoints,
                  ParticleDataImpl<Real> &surfaceWaveSeed,
                  ParticleDataImpl<Real> &surfaceWaveSeedAmplitude,
-                 ParticleDataImpl<Real> &surfaceWaveSource) const
+                 ParticleDataImpl<Real> &surfaceWaveSource)
   {
     Real source = smoothstep(params.waveSeedingCurvatureThresholdRegionCenter -
                                  params.waveSeedingCurvatureThresholdRegionRadius,
@@ -1850,21 +1790,17 @@ struct seedWaves : public KernelBase {
     return surfaceWaveSource;
   }
   typedef ParticleDataImpl<Real> type3;
-  void runMessage()
-  {
-    debMsg("Executing kernel seedWaves ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, surfacePoints, surfaceWaveSeed, surfaceWaveSeedAmplitude, surfaceWaveSource);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, surfacePoints, surfaceWaveSeed, surfaceWaveSeedAmplitude, surfaceWaveSource);
+    }
   }
   const BasicParticleSystemWrapper &surfacePoints;
   ParticleDataImpl<Real> &surfaceWaveSeed;

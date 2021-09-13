@@ -188,8 +188,7 @@ struct KnAcceleration : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(
-      IndexInt idx, MACGrid &a, const MACGrid &v1, const MACGrid &v0, const Real idt) const
+  inline void op(IndexInt idx, MACGrid &a, const MACGrid &v1, const MACGrid &v0, const Real idt)
   {
     a[idx] = (v1[idx] - v0[idx]) * idt;
   }
@@ -213,21 +212,17 @@ struct KnAcceleration : public KernelBase {
     return idt;
   }
   typedef Real type3;
-  void runMessage()
-  {
-    debMsg("Executing kernel KnAcceleration ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, a, v1, v0, idt);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, a, v1, v0, idt);
+    }
   }
   MACGrid &a;
   const MACGrid &v1;
@@ -576,18 +571,17 @@ void VICintegration(VortexSheetMesh &mesh,
 
     // prepare CG solver
     const int maxIter = (int)(cgMaxIterFac * vel.getSize().max());
-    vector<Grid<Real> *> matA{&A0, &Ai, &Aj, &Ak};
-
     GridCgInterface *gcg = new GridCg<ApplyMatrix>(
-        solution, rhs, residual, search, flags, temp1, matA);
+        solution, rhs, residual, search, flags, temp1, &A0, &Ai, &Aj, &Ak);
     gcg->setAccuracy(cgAccuracy);
     gcg->setUseL2Norm(true);
     gcg->setICPreconditioner(
         (GridCgInterface::PreconditionType)precondition, &pca0, &pca1, &pca2, &pca3);
 
     // iterations
+    Real time = 0;
     for (int iter = 0; iter < maxIter; iter++) {
-      if (!gcg->iterate())
+      if (!gcg->iterate(time))
         iter = maxIter;
     }
     debMsg("VICintegration CG iterations:" << gcg->getIterations() << ", res:" << gcg->getSigma(),

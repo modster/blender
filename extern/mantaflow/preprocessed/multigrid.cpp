@@ -428,7 +428,7 @@ struct knCopyA : public KernelBase {
                  const Grid<Real> *pA0,
                  const Grid<Real> *pAi,
                  const Grid<Real> *pAj,
-                 const Grid<Real> *pAk) const
+                 const Grid<Real> *pAk)
   {
     A0[idx * stencilSize0 + 0] = (*pA0)[idx];
     A0[idx * stencilSize0 + 1] = (*pAi)[idx];
@@ -476,21 +476,17 @@ struct knCopyA : public KernelBase {
     return pAk;
   }
   typedef Grid<Real> type7;
-  void runMessage()
-  {
-    debMsg("Executing kernel knCopyA ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, sizeRef, A0, stencilSize0, is3D, pA0, pAi, pAj, pAk);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, sizeRef, A0, stencilSize0, is3D, pA0, pAi, pAj, pAk);
+    }
   }
   std::vector<Real> &sizeRef;
   std::vector<Real> &A0;
@@ -523,7 +519,7 @@ struct knActivateVertices : public KernelBase {
                  std::vector<Real> &A0,
                  bool &nonZeroStencilSumFound,
                  bool &trivialEquationsFound,
-                 const GridMg &mg) const
+                 const GridMg &mg)
   {
     // active vertices on level 0 are vertices with non-zero diagonal entry in A
     type_0[idx] = GridMg::vtInactive;
@@ -572,21 +568,17 @@ struct knActivateVertices : public KernelBase {
     return mg;
   }
   typedef GridMg type4;
-  void runMessage()
-  {
-    debMsg("Executing kernel knActivateVertices ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, type_0, A0, nonZeroStencilSumFound, trivialEquationsFound, mg);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, type_0, A0, nonZeroStencilSumFound, trivialEquationsFound, mg);
+    }
   }
   std::vector<GridMg::VertexType> &type_0;
   std::vector<Real> &A0;
@@ -642,7 +634,7 @@ struct knSetRhs : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(IndexInt idx, std::vector<Real> &b, const Grid<Real> &rhs, const GridMg &mg) const
+  inline void op(IndexInt idx, std::vector<Real> &b, const Grid<Real> &rhs, const GridMg &mg)
   {
     b[idx] = rhs[idx];
 
@@ -666,21 +658,17 @@ struct knSetRhs : public KernelBase {
     return mg;
   }
   typedef GridMg type2;
-  void runMessage()
-  {
-    debMsg("Executing kernel knSetRhs ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, b, rhs, mg);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, b, rhs, mg);
+    }
   }
   std::vector<Real> &b;
   const Grid<Real> &rhs;
@@ -702,7 +690,7 @@ template<class T> struct knSet : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(IndexInt idx, std::vector<T> &data, T value) const
+  inline void op(IndexInt idx, std::vector<T> &data, T value)
   {
     data[idx] = value;
   }
@@ -716,21 +704,17 @@ template<class T> struct knSet : public KernelBase {
     return value;
   }
   typedef T type1;
-  void runMessage()
-  {
-    debMsg("Executing kernel knSet ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, data, value);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, data, value);
+    }
   }
   std::vector<T> &data;
   T value;
@@ -743,7 +727,7 @@ template<class T> struct knCopyToVector : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(IndexInt idx, std::vector<T> &dst, const Grid<T> &src) const
+  inline void op(IndexInt idx, std::vector<T> &dst, const Grid<T> &src)
   {
     dst[idx] = src[idx];
   }
@@ -757,21 +741,17 @@ template<class T> struct knCopyToVector : public KernelBase {
     return src;
   }
   typedef Grid<T> type1;
-  void runMessage()
-  {
-    debMsg("Executing kernel knCopyToVector ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, dst, src);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, dst, src);
+    }
   }
   std::vector<T> &dst;
   const Grid<T> &src;
@@ -784,7 +764,7 @@ template<class T> struct knCopyToGrid : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(IndexInt idx, const std::vector<T> &src, Grid<T> &dst) const
+  inline void op(IndexInt idx, const std::vector<T> &src, Grid<T> &dst)
   {
     dst[idx] = src[idx];
   }
@@ -798,21 +778,17 @@ template<class T> struct knCopyToGrid : public KernelBase {
     return dst;
   }
   typedef Grid<T> type1;
-  void runMessage()
-  {
-    debMsg("Executing kernel knCopyToGrid ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, src, dst);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, src, dst);
+    }
   }
   const std::vector<T> &src;
   Grid<T> &dst;
@@ -825,7 +801,7 @@ template<class T> struct knAddAssign : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(IndexInt idx, std::vector<T> &dst, const std::vector<T> &src) const
+  inline void op(IndexInt idx, std::vector<T> &dst, const std::vector<T> &src)
   {
     dst[idx] += src[idx];
   }
@@ -839,21 +815,17 @@ template<class T> struct knAddAssign : public KernelBase {
     return src;
   }
   typedef std::vector<T> type1;
-  void runMessage()
-  {
-    debMsg("Executing kernel knAddAssign ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, dst, src);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, dst, src);
+    }
   }
   std::vector<T> &dst;
   const std::vector<T> &src;
@@ -930,7 +902,7 @@ struct knActivateCoarseVertices : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(IndexInt idx, std::vector<GridMg::VertexType> &type, int unused) const
+  inline void op(IndexInt idx, std::vector<GridMg::VertexType> &type, int unused)
   {
     // set all remaining 'free' vertices to 'removed',
     if (type[idx] == GridMg::vtFree)
@@ -952,21 +924,17 @@ struct knActivateCoarseVertices : public KernelBase {
     return unused;
   }
   typedef int type1;
-  void runMessage()
-  {
-    debMsg("Executing kernel knActivateCoarseVertices ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, type, unused);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, type, unused);
+    }
   }
   std::vector<GridMg::VertexType> &type;
   int unused;
@@ -1052,11 +1020,8 @@ struct knGenCoarseGridOperator : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(IndexInt idx,
-                 std::vector<Real> &sizeRef,
-                 std::vector<Real> &A,
-                 int l,
-                 const GridMg &mg) const
+  inline void op(
+      IndexInt idx, std::vector<Real> &sizeRef, std::vector<Real> &A, int l, const GridMg &mg)
   {
     if (mg.mType[l][idx] == GridMg::vtInactive)
       return;
@@ -1178,21 +1143,17 @@ struct knGenCoarseGridOperator : public KernelBase {
     return mg;
   }
   typedef GridMg type3;
-  void runMessage()
-  {
-    debMsg("Executing kernel knGenCoarseGridOperator ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, sizeRef, A, l, mg);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for schedule(static, 1)
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, sizeRef, A, l, mg);
+    }
   }
   std::vector<Real> &sizeRef;
   std::vector<Real> &A;
@@ -1232,7 +1193,7 @@ struct knSmoothColor : public KernelBase {
                  const Vec3i &blockSize,
                  const std::vector<Vec3i> &colorOffs,
                  int l,
-                 const GridMg &mg) const
+                 const GridMg &mg)
   {
     Vec3i blockOff(int(idx) % blockSize.x,
                    (int(idx) % (blockSize.x * blockSize.y)) / blockSize.x,
@@ -1318,21 +1279,17 @@ struct knSmoothColor : public KernelBase {
     return mg;
   }
   typedef GridMg type5;
-  void runMessage()
-  {
-    debMsg("Executing kernel knSmoothColor ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, numBlocks, x, blockSize, colorOffs, l, mg);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for schedule(static, 1)
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, numBlocks, x, blockSize, colorOffs, l, mg);
+    }
   }
   ThreadSize &numBlocks;
   std::vector<Real> &x;
@@ -1386,7 +1343,7 @@ struct knCalcResidual : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(IndexInt idx, std::vector<Real> &r, int l, const GridMg &mg) const
+  inline void op(IndexInt idx, std::vector<Real> &r, int l, const GridMg &mg)
   {
     if (mg.mType[l][idx] == GridMg::vtInactive)
       return;
@@ -1443,21 +1400,17 @@ struct knCalcResidual : public KernelBase {
     return mg;
   }
   typedef GridMg type2;
-  void runMessage()
-  {
-    debMsg("Executing kernel knCalcResidual ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, r, l, mg);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for schedule(static, 1)
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, r, l, mg);
+    }
   }
   std::vector<Real> &r;
   int l;
@@ -1506,29 +1459,21 @@ struct knResidualNormSumSqr : public KernelBase {
     return mg;
   }
   typedef GridMg type2;
-  void runMessage()
-  {
-    debMsg("Executing kernel knResidualNormSumSqr ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r)
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, r, l, mg, result);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_reduce(tbb::blocked_range<IndexInt>(0, size), *this);
-  }
-  knResidualNormSumSqr(knResidualNormSumSqr &o, tbb::split)
-      : KernelBase(o), r(o.r), l(o.l), mg(o.mg), result(Real(0))
-  {
-  }
-  void join(const knResidualNormSumSqr &o)
-  {
-    result += o.result;
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+      Real result = Real(0);
+#pragma omp for nowait
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, r, l, mg, result);
+#pragma omp critical
+      {
+        this->result += result;
+      }
+    }
   }
   const vector<Real> &r;
   int l;
@@ -1700,7 +1645,7 @@ struct knRestrict : public KernelBase {
                  std::vector<Real> &dst,
                  const std::vector<Real> &src,
                  int l_dst,
-                 const GridMg &mg) const
+                 const GridMg &mg)
   {
     if (mg.mType[l_dst][idx] == GridMg::vtInactive)
       return;
@@ -1746,21 +1691,17 @@ struct knRestrict : public KernelBase {
     return mg;
   }
   typedef GridMg type3;
-  void runMessage()
-  {
-    debMsg("Executing kernel knRestrict ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, dst, src, l_dst, mg);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for schedule(static, 1)
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, dst, src, l_dst, mg);
+    }
   }
   std::vector<Real> &dst;
   const std::vector<Real> &src;
@@ -1784,7 +1725,7 @@ struct knInterpolate : public KernelBase {
                  std::vector<Real> &dst,
                  const std::vector<Real> &src,
                  int l_dst,
-                 const GridMg &mg) const
+                 const GridMg &mg)
   {
     if (mg.mType[l_dst][idx] == GridMg::vtInactive)
       return;
@@ -1827,21 +1768,17 @@ struct knInterpolate : public KernelBase {
     return mg;
   }
   typedef GridMg type3;
-  void runMessage()
-  {
-    debMsg("Executing kernel knInterpolate ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, dst, src, l_dst, mg);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for schedule(static, 1)
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, dst, src, l_dst, mg);
+    }
   }
   std::vector<Real> &dst;
   const std::vector<Real> &src;

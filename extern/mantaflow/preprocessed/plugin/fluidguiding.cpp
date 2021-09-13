@@ -62,7 +62,7 @@ struct apply1DKernelDirX : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(int i, int j, int k, const MACGrid &in, MACGrid &out, const Matrix &kernel) const
+  inline void op(int i, int j, int k, const MACGrid &in, MACGrid &out, const Matrix &kernel)
   {
     int nx = in.getSizeX();
     int kn = kernel.n;
@@ -91,36 +91,34 @@ struct apply1DKernelDirX : public KernelBase {
     return kernel;
   }
   typedef Matrix type2;
-  void runMessage()
-  {
-    debMsg("Executing kernel apply1DKernelDirX ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
+  void runMessage(){};
+  void run()
   {
     const int _maxX = maxX;
     const int _maxY = maxY;
     if (maxZ > 1) {
-      for (int k = __r.begin(); k != (int)__r.end(); k++)
-        for (int j = 0; j < _maxY; j++)
-          for (int i = 0; i < _maxX; i++)
-            op(i, j, k, in, out, kernel);
+
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int k = minZ; k < maxZ; k++)
+          for (int j = 0; j < _maxY; j++)
+            for (int i = 0; i < _maxX; i++)
+              op(i, j, k, in, out, kernel);
+      }
     }
     else {
       const int k = 0;
-      for (int j = __r.begin(); j != (int)__r.end(); j++)
-        for (int i = 0; i < _maxX; i++)
-          op(i, j, k, in, out, kernel);
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int j = 0; j < _maxY; j++)
+          for (int i = 0; i < _maxX; i++)
+            op(i, j, k, in, out, kernel);
+      }
     }
-  }
-  void run()
-  {
-    if (maxZ > 1)
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(minZ, maxZ), *this);
-    else
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(0, maxY), *this);
   }
   const MACGrid &in;
   MACGrid &out;
@@ -136,7 +134,7 @@ struct apply1DKernelDirY : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(int i, int j, int k, const MACGrid &in, MACGrid &out, const Matrix &kernel) const
+  inline void op(int i, int j, int k, const MACGrid &in, MACGrid &out, const Matrix &kernel)
   {
     int ny = in.getSizeY();
     int kn = kernel.n;
@@ -165,36 +163,34 @@ struct apply1DKernelDirY : public KernelBase {
     return kernel;
   }
   typedef Matrix type2;
-  void runMessage()
-  {
-    debMsg("Executing kernel apply1DKernelDirY ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
+  void runMessage(){};
+  void run()
   {
     const int _maxX = maxX;
     const int _maxY = maxY;
     if (maxZ > 1) {
-      for (int k = __r.begin(); k != (int)__r.end(); k++)
-        for (int j = 0; j < _maxY; j++)
-          for (int i = 0; i < _maxX; i++)
-            op(i, j, k, in, out, kernel);
+
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int k = minZ; k < maxZ; k++)
+          for (int j = 0; j < _maxY; j++)
+            for (int i = 0; i < _maxX; i++)
+              op(i, j, k, in, out, kernel);
+      }
     }
     else {
       const int k = 0;
-      for (int j = __r.begin(); j != (int)__r.end(); j++)
-        for (int i = 0; i < _maxX; i++)
-          op(i, j, k, in, out, kernel);
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int j = 0; j < _maxY; j++)
+          for (int i = 0; i < _maxX; i++)
+            op(i, j, k, in, out, kernel);
+      }
     }
-  }
-  void run()
-  {
-    if (maxZ > 1)
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(minZ, maxZ), *this);
-    else
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(0, maxY), *this);
   }
   const MACGrid &in;
   MACGrid &out;
@@ -210,7 +206,7 @@ struct apply1DKernelDirZ : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(int i, int j, int k, const MACGrid &in, MACGrid &out, const Matrix &kernel) const
+  inline void op(int i, int j, int k, const MACGrid &in, MACGrid &out, const Matrix &kernel)
   {
     int nz = in.getSizeZ();
     int kn = kernel.n;
@@ -239,36 +235,34 @@ struct apply1DKernelDirZ : public KernelBase {
     return kernel;
   }
   typedef Matrix type2;
-  void runMessage()
-  {
-    debMsg("Executing kernel apply1DKernelDirZ ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
+  void runMessage(){};
+  void run()
   {
     const int _maxX = maxX;
     const int _maxY = maxY;
     if (maxZ > 1) {
-      for (int k = __r.begin(); k != (int)__r.end(); k++)
-        for (int j = 0; j < _maxY; j++)
-          for (int i = 0; i < _maxX; i++)
-            op(i, j, k, in, out, kernel);
+
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int k = minZ; k < maxZ; k++)
+          for (int j = 0; j < _maxY; j++)
+            for (int i = 0; i < _maxX; i++)
+              op(i, j, k, in, out, kernel);
+      }
     }
     else {
       const int k = 0;
-      for (int j = __r.begin(); j != (int)__r.end(); j++)
-        for (int i = 0; i < _maxX; i++)
-          op(i, j, k, in, out, kernel);
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int j = 0; j < _maxY; j++)
+          for (int i = 0; i < _maxX; i++)
+            op(i, j, k, in, out, kernel);
+      }
     }
-  }
-  void run()
-  {
-    if (maxZ > 1)
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(minZ, maxZ), *this);
-    else
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(0, maxY), *this);
   }
   const MACGrid &in;
   MACGrid &out;
@@ -569,197 +563,88 @@ void prox_f(MACGrid &v,
 
 // *****************************************************************************
 
-// re-uses main pressure solve from pressure.cpp
-void solvePressure(MACGrid &vel,
-                   Grid<Real> &pressure,
-                   const FlagGrid &flags,
-                   Real cgAccuracy = 1e-3,
-                   const Grid<Real> *phi = nullptr,
-                   const Grid<Real> *perCellCorr = nullptr,
-                   const MACGrid *fractions = nullptr,
-                   const MACGrid *obvel = nullptr,
-                   Real gfClamp = 1e-04,
-                   Real cgMaxIterFac = 1.5,
-                   bool precondition = true,
-                   int preconditioner = 1,
-                   bool enforceCompatibility = false,
-                   bool useL2Norm = false,
-                   bool zeroPressureFixing = false,
-                   const Grid<Real> *curv = nullptr,
-                   const Real surfTens = 0.0,
-                   Grid<Real> *retRhs = nullptr);
+// TODO (sebbas): Disabled for now
+// // re-uses main pressure solve from pressure.cpp
+// void solvePressure(
+//         MACGrid& vel, Grid<Real>& pressure, const FlagGrid& flags, Real cgAccuracy = 1e-3,
+// 	const Grid<Real>* phi = nullptr,
+// 	const Grid<Real>* perCellCorr = nullptr,
+// 	const MACGrid* fractions = nullptr,
+// 	const MACGrid* obvel = nullptr,
+// 	Real gfClamp = 1e-04,
+// 	Real cgMaxIterFac = 1.5,
+// 	bool precondition = true,
+// 	int preconditioner = 1,
+// 	bool enforceCompatibility = false,
+// 	bool useL2Norm = false,
+// 	bool zeroPressureFixing = false,
+// 	const Grid<Real> *curv = nullptr,
+// 	const Real surfTens = 0.0,
+// 	Grid<Real>* retRhs = nullptr );
 
-//! Main function for fluid guiding , includes "regular" pressure solve
+// //! Main function for fluid guiding , includes "regular" pressure solve
+// PYTHON() void PD_fluid_guiding(MACGrid& vel, MACGrid& velT,
+// 	Grid<Real>& pressure, FlagGrid& flags, Grid<Real>& weight, int blurRadius = 5,
+// 	Real theta = 1.0, Real tau = 1.0, Real sigma = 1.0,
+// 	Real epsRel = 1e-3, Real epsAbs = 1e-3, int maxIters = 200,
+// 	// duplicated for pressure solve
+// 	Grid<Real>* phi = nullptr, Grid<Real>* perCellCorr = nullptr, MACGrid* fractions = nullptr,
+// MACGrid* obvel = nullptr, Real gfClamp = 1e-04, Real cgMaxIterFac = 1.5, Real cgAccuracy = 1e-3,
+// 	int preconditioner = 1, bool zeroPressureFixing = false, const Grid<Real> *curv = nullptr,
+// const Real surfTens = 0.)
+// {
+// 	FluidSolver* parent = vel.getParent();
 
-void PD_fluid_guiding(MACGrid &vel,
-                      MACGrid &velT,
-                      Grid<Real> &pressure,
-                      FlagGrid &flags,
-                      Grid<Real> &weight,
-                      int blurRadius = 5,
-                      Real theta = 1.0,
-                      Real tau = 1.0,
-                      Real sigma = 1.0,
-                      Real epsRel = 1e-3,
-                      Real epsAbs = 1e-3,
-                      int maxIters = 200,
-                      Grid<Real> *phi = nullptr,
-                      Grid<Real> *perCellCorr = nullptr,
-                      MACGrid *fractions = nullptr,
-                      MACGrid *obvel = nullptr,
-                      Real gfClamp = 1e-04,
-                      Real cgMaxIterFac = 1.5,
-                      Real cgAccuracy = 1e-3,
-                      int preconditioner = 1,
-                      bool zeroPressureFixing = false,
-                      const Grid<Real> *curv = nullptr,
-                      const Real surfTens = 0.)
-{
-  FluidSolver *parent = vel.getParent();
+// 	// initialize dual/slack variables
+// 	MACGrid velC = MACGrid(parent); velC.copyFrom(vel);
+// 	MACGrid x = MACGrid(parent);
+// 	MACGrid y = MACGrid(parent);
+// 	MACGrid z = MACGrid(parent);
+// 	MACGrid x0 = MACGrid(parent);
+// 	MACGrid z0 = MACGrid(parent);
 
-  // initialize dual/slack variables
-  MACGrid velC = MACGrid(parent);
-  velC.copyFrom(vel);
-  MACGrid x = MACGrid(parent);
-  MACGrid y = MACGrid(parent);
-  MACGrid z = MACGrid(parent);
-  MACGrid x0 = MACGrid(parent);
-  MACGrid z0 = MACGrid(parent);
+// 	// precomputation
+// 	ADMM_precompute_Separable(blurRadius);
+// 	MACGrid Q = MACGrid(parent);
+// 	precomputeQ(Q, flags, velT, velC, gBlurKernel, sigma);
+// 	MACGrid invA = MACGrid(parent);
+// 	precomputeInvA(invA, weight, sigma);
 
-  // precomputation
-  ADMM_precompute_Separable(blurRadius);
-  MACGrid Q = MACGrid(parent);
-  precomputeQ(Q, flags, velT, velC, gBlurKernel, sigma);
-  MACGrid invA = MACGrid(parent);
-  precomputeInvA(invA, weight, sigma);
+// 	// loop
+// 	int iter = 0;
+// 	for (iter = 0; iter < maxIters; iter++) {
+// 		// x-update
+// 		x0.copyFrom(x);
+// 		x.multConst(1.0 / sigma);
+// 		x.add(y);
+// 		prox_f(x, flags, Q, velC, sigma, invA);
+// 		x.multConst(-sigma); x.addScaled(y, sigma); x.add(x0);
 
-  // loop
-  int iter = 0;
-  for (iter = 0; iter < maxIters; iter++) {
-    // x-update
-    x0.copyFrom(x);
-    x.multConst(1.0 / sigma);
-    x.add(y);
-    prox_f(x, flags, Q, velC, sigma, invA);
-    x.multConst(-sigma);
-    x.addScaled(y, sigma);
-    x.add(x0);
+// 		// z-update
+// 		z0.copyFrom(z);
+// 		z.addScaled(x, -tau);
+// 		Real cgAccuracyAdaptive = cgAccuracy;
 
-    // z-update
-    z0.copyFrom(z);
-    z.addScaled(x, -tau);
-    Real cgAccuracyAdaptive = cgAccuracy;
+// 		solvePressure (z, pressure, flags, cgAccuracyAdaptive, phi, perCellCorr, fractions, obvel,
+// gfClamp, 		    cgMaxIterFac, true, preconditioner, false, false, zeroPressureFixing, curv, surfTens );
 
-    solvePressure(z,
-                  pressure,
-                  flags,
-                  cgAccuracyAdaptive,
-                  phi,
-                  perCellCorr,
-                  fractions,
-                  obvel,
-                  gfClamp,
-                  cgMaxIterFac,
-                  true,
-                  preconditioner,
-                  false,
-                  false,
-                  zeroPressureFixing,
-                  curv,
-                  surfTens);
+// 		// y-update
+// 		y.copyFrom(z);
+// 		y.sub(z0);
+// 		y.multConst(theta);
+// 		y.add(z);
 
-    // y-update
-    y.copyFrom(z);
-    y.sub(z0);
-    y.multConst(theta);
-    y.add(z);
+// 		// stopping criterion
+// 		bool stop = (iter > 0 && getRNorm(z, z0) < getEpsDual(epsAbs, epsRel, z));
 
-    // stopping criterion
-    bool stop = (iter > 0 && getRNorm(z, z0) < getEpsDual(epsAbs, epsRel, z));
+// 		if (stop || (iter == maxIters - 1)) break;
+// 	}
 
-    if (stop || (iter == maxIters - 1))
-      break;
-  }
+// 	// vel_new = z
+// 	vel.copyFrom(z);
 
-  // vel_new = z
-  vel.copyFrom(z);
-
-  debMsg("PD_fluid_guiding iterations:" << iter, 1);
-}
-static PyObject *_W_2(PyObject *_self, PyObject *_linargs, PyObject *_kwds)
-{
-  try {
-    PbArgs _args(_linargs, _kwds);
-    FluidSolver *parent = _args.obtainParent();
-    bool noTiming = _args.getOpt<bool>("notiming", -1, 0);
-    pbPreparePlugin(parent, "PD_fluid_guiding", !noTiming);
-    PyObject *_retval = nullptr;
-    {
-      ArgLocker _lock;
-      MACGrid &vel = *_args.getPtr<MACGrid>("vel", 0, &_lock);
-      MACGrid &velT = *_args.getPtr<MACGrid>("velT", 1, &_lock);
-      Grid<Real> &pressure = *_args.getPtr<Grid<Real>>("pressure", 2, &_lock);
-      FlagGrid &flags = *_args.getPtr<FlagGrid>("flags", 3, &_lock);
-      Grid<Real> &weight = *_args.getPtr<Grid<Real>>("weight", 4, &_lock);
-      int blurRadius = _args.getOpt<int>("blurRadius", 5, 5, &_lock);
-      Real theta = _args.getOpt<Real>("theta", 6, 1.0, &_lock);
-      Real tau = _args.getOpt<Real>("tau", 7, 1.0, &_lock);
-      Real sigma = _args.getOpt<Real>("sigma", 8, 1.0, &_lock);
-      Real epsRel = _args.getOpt<Real>("epsRel", 9, 1e-3, &_lock);
-      Real epsAbs = _args.getOpt<Real>("epsAbs", 10, 1e-3, &_lock);
-      int maxIters = _args.getOpt<int>("maxIters", 11, 200, &_lock);
-      Grid<Real> *phi = _args.getPtrOpt<Grid<Real>>("phi", 12, nullptr, &_lock);
-      Grid<Real> *perCellCorr = _args.getPtrOpt<Grid<Real>>("perCellCorr", 13, nullptr, &_lock);
-      MACGrid *fractions = _args.getPtrOpt<MACGrid>("fractions", 14, nullptr, &_lock);
-      MACGrid *obvel = _args.getPtrOpt<MACGrid>("obvel", 15, nullptr, &_lock);
-      Real gfClamp = _args.getOpt<Real>("gfClamp", 16, 1e-04, &_lock);
-      Real cgMaxIterFac = _args.getOpt<Real>("cgMaxIterFac", 17, 1.5, &_lock);
-      Real cgAccuracy = _args.getOpt<Real>("cgAccuracy", 18, 1e-3, &_lock);
-      int preconditioner = _args.getOpt<int>("preconditioner", 19, 1, &_lock);
-      bool zeroPressureFixing = _args.getOpt<bool>("zeroPressureFixing", 20, false, &_lock);
-      const Grid<Real> *curv = _args.getPtrOpt<Grid<Real>>("curv", 21, nullptr, &_lock);
-      const Real surfTens = _args.getOpt<Real>("surfTens", 22, 0., &_lock);
-      _retval = getPyNone();
-      PD_fluid_guiding(vel,
-                       velT,
-                       pressure,
-                       flags,
-                       weight,
-                       blurRadius,
-                       theta,
-                       tau,
-                       sigma,
-                       epsRel,
-                       epsAbs,
-                       maxIters,
-                       phi,
-                       perCellCorr,
-                       fractions,
-                       obvel,
-                       gfClamp,
-                       cgMaxIterFac,
-                       cgAccuracy,
-                       preconditioner,
-                       zeroPressureFixing,
-                       curv,
-                       surfTens);
-      _args.check();
-    }
-    pbFinalizePlugin(parent, "PD_fluid_guiding", !noTiming);
-    return _retval;
-  }
-  catch (std::exception &e) {
-    pbSetError("PD_fluid_guiding", e.what());
-    return 0;
-  }
-}
-static const Pb::Register _RP_PD_fluid_guiding("", "PD_fluid_guiding", _W_2);
-extern "C" {
-void PbRegister_PD_fluid_guiding()
-{
-  KEEP_UNUSED(_RP_PD_fluid_guiding);
-}
-}
+// 	debMsg("PD_fluid_guiding iterations:" << iter, 1);
+// }
 
 //! reset precomputation
 void releaseBlurPrecomp()
@@ -768,7 +653,7 @@ void releaseBlurPrecomp()
   gBlurKernelRadius = -1;
   gBlurKernel = 0.f;
 }
-static PyObject *_W_3(PyObject *_self, PyObject *_linargs, PyObject *_kwds)
+static PyObject *_W_2(PyObject *_self, PyObject *_linargs, PyObject *_kwds)
 {
   try {
     PbArgs _args(_linargs, _kwds);
@@ -790,7 +675,7 @@ static PyObject *_W_3(PyObject *_self, PyObject *_linargs, PyObject *_kwds)
     return 0;
   }
 }
-static const Pb::Register _RP_releaseBlurPrecomp("", "releaseBlurPrecomp", _W_3);
+static const Pb::Register _RP_releaseBlurPrecomp("", "releaseBlurPrecomp", _W_2);
 extern "C" {
 void PbRegister_releaseBlurPrecomp()
 {

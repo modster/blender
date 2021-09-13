@@ -179,29 +179,21 @@ struct kn4dMinReal : public KernelBase {
     return val;
   }
   typedef Grid4d<Real> type0;
-  void runMessage()
-  {
-    debMsg("Executing kernel kn4dMinReal ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r)
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, val, minVal);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_reduce(tbb::blocked_range<IndexInt>(0, size), *this);
-  }
-  kn4dMinReal(kn4dMinReal &o, tbb::split)
-      : KernelBase(o), val(o.val), minVal(std::numeric_limits<Real>::max())
-  {
-  }
-  void join(const kn4dMinReal &o)
-  {
-    minVal = min(minVal, o.minVal);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+      Real minVal = std::numeric_limits<Real>::max();
+#pragma omp for nowait
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, val, minVal);
+#pragma omp critical
+      {
+        this->minVal = min(minVal, this->minVal);
+      }
+    }
   }
   Grid4d<Real> &val;
   Real minVal;
@@ -234,29 +226,21 @@ struct kn4dMaxReal : public KernelBase {
     return val;
   }
   typedef Grid4d<Real> type0;
-  void runMessage()
-  {
-    debMsg("Executing kernel kn4dMaxReal ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r)
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, val, maxVal);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_reduce(tbb::blocked_range<IndexInt>(0, size), *this);
-  }
-  kn4dMaxReal(kn4dMaxReal &o, tbb::split)
-      : KernelBase(o), val(o.val), maxVal(-std::numeric_limits<Real>::max())
-  {
-  }
-  void join(const kn4dMaxReal &o)
-  {
-    maxVal = max(maxVal, o.maxVal);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+      Real maxVal = -std::numeric_limits<Real>::max();
+#pragma omp for nowait
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, val, maxVal);
+#pragma omp critical
+      {
+        this->maxVal = max(maxVal, this->maxVal);
+      }
+    }
   }
   Grid4d<Real> &val;
   Real maxVal;
@@ -289,29 +273,21 @@ struct kn4dMinInt : public KernelBase {
     return val;
   }
   typedef Grid4d<int> type0;
-  void runMessage()
-  {
-    debMsg("Executing kernel kn4dMinInt ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r)
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, val, minVal);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_reduce(tbb::blocked_range<IndexInt>(0, size), *this);
-  }
-  kn4dMinInt(kn4dMinInt &o, tbb::split)
-      : KernelBase(o), val(o.val), minVal(std::numeric_limits<int>::max())
-  {
-  }
-  void join(const kn4dMinInt &o)
-  {
-    minVal = min(minVal, o.minVal);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+      int minVal = std::numeric_limits<int>::max();
+#pragma omp for nowait
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, val, minVal);
+#pragma omp critical
+      {
+        this->minVal = min(minVal, this->minVal);
+      }
+    }
   }
   Grid4d<int> &val;
   int minVal;
@@ -344,29 +320,21 @@ struct kn4dMaxInt : public KernelBase {
     return val;
   }
   typedef Grid4d<int> type0;
-  void runMessage()
-  {
-    debMsg("Executing kernel kn4dMaxInt ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r)
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, val, maxVal);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_reduce(tbb::blocked_range<IndexInt>(0, size), *this);
-  }
-  kn4dMaxInt(kn4dMaxInt &o, tbb::split)
-      : KernelBase(o), val(o.val), maxVal(std::numeric_limits<int>::min())
-  {
-  }
-  void join(const kn4dMaxInt &o)
-  {
-    maxVal = max(maxVal, o.maxVal);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+      int maxVal = std::numeric_limits<int>::min();
+#pragma omp for nowait
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, val, maxVal);
+#pragma omp critical
+      {
+        this->maxVal = max(maxVal, this->maxVal);
+      }
+    }
   }
   Grid4d<int> &val;
   int maxVal;
@@ -400,29 +368,21 @@ template<class VEC> struct kn4dMinVec : public KernelBase {
     return val;
   }
   typedef Grid4d<VEC> type0;
-  void runMessage()
-  {
-    debMsg("Executing kernel kn4dMinVec ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r)
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, val, minVal);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_reduce(tbb::blocked_range<IndexInt>(0, size), *this);
-  }
-  kn4dMinVec(kn4dMinVec &o, tbb::split)
-      : KernelBase(o), val(o.val), minVal(std::numeric_limits<Real>::max())
-  {
-  }
-  void join(const kn4dMinVec &o)
-  {
-    minVal = min(minVal, o.minVal);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+      Real minVal = std::numeric_limits<Real>::max();
+#pragma omp for nowait
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, val, minVal);
+#pragma omp critical
+      {
+        this->minVal = min(minVal, this->minVal);
+      }
+    }
   }
   Grid4d<VEC> &val;
   Real minVal;
@@ -456,29 +416,21 @@ template<class VEC> struct kn4dMaxVec : public KernelBase {
     return val;
   }
   typedef Grid4d<VEC> type0;
-  void runMessage()
-  {
-    debMsg("Executing kernel kn4dMaxVec ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r)
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, val, maxVal);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_reduce(tbb::blocked_range<IndexInt>(0, size), *this);
-  }
-  kn4dMaxVec(kn4dMaxVec &o, tbb::split)
-      : KernelBase(o), val(o.val), maxVal(-std::numeric_limits<Real>::max())
-  {
-  }
-  void join(const kn4dMaxVec &o)
-  {
-    maxVal = max(maxVal, o.maxVal);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+      Real maxVal = -std::numeric_limits<Real>::max();
+#pragma omp for nowait
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, val, maxVal);
+#pragma omp critical
+      {
+        this->maxVal = max(maxVal, this->maxVal);
+      }
+    }
   }
   Grid4d<VEC> &val;
   Real maxVal;
@@ -507,7 +459,7 @@ template<class T> struct kn4dSetConstReal : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(IndexInt idx, Grid4d<T> &me, T val) const
+  inline void op(IndexInt idx, Grid4d<T> &me, T val)
   {
     me[idx] = val;
   }
@@ -521,21 +473,17 @@ template<class T> struct kn4dSetConstReal : public KernelBase {
     return val;
   }
   typedef T type1;
-  void runMessage()
-  {
-    debMsg("Executing kernel kn4dSetConstReal ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, me, val);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, me, val);
+    }
   }
   Grid4d<T> &me;
   T val;
@@ -546,7 +494,7 @@ template<class T> struct kn4dAddConstReal : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(IndexInt idx, Grid4d<T> &me, T val) const
+  inline void op(IndexInt idx, Grid4d<T> &me, T val)
   {
     me[idx] += val;
   }
@@ -560,21 +508,17 @@ template<class T> struct kn4dAddConstReal : public KernelBase {
     return val;
   }
   typedef T type1;
-  void runMessage()
-  {
-    debMsg("Executing kernel kn4dAddConstReal ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, me, val);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, me, val);
+    }
   }
   Grid4d<T> &me;
   T val;
@@ -585,7 +529,7 @@ template<class T> struct kn4dMultConst : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(IndexInt idx, Grid4d<T> &me, T val) const
+  inline void op(IndexInt idx, Grid4d<T> &me, T val)
   {
     me[idx] *= val;
   }
@@ -599,21 +543,17 @@ template<class T> struct kn4dMultConst : public KernelBase {
     return val;
   }
   typedef T type1;
-  void runMessage()
-  {
-    debMsg("Executing kernel kn4dMultConst ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, me, val);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, me, val);
+    }
   }
   Grid4d<T> &me;
   T val;
@@ -624,7 +564,7 @@ template<class T> struct kn4dClamp : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(IndexInt idx, Grid4d<T> &me, T min, T max) const
+  inline void op(IndexInt idx, Grid4d<T> &me, T min, T max)
   {
     me[idx] = clamp(me[idx], min, max);
   }
@@ -643,21 +583,17 @@ template<class T> struct kn4dClamp : public KernelBase {
     return max;
   }
   typedef T type2;
-  void runMessage()
-  {
-    debMsg("Executing kernel kn4dClamp ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, me, min, max);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, me, min, max);
+    }
   }
   Grid4d<T> &me;
   T min;
@@ -788,7 +724,7 @@ struct knGetComp4d : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(IndexInt idx, const Grid4d<Vec4> &src, Grid4d<Real> &dst, int c) const
+  inline void op(IndexInt idx, const Grid4d<Vec4> &src, Grid4d<Real> &dst, int c)
   {
     dst[idx] = src[idx][c];
   }
@@ -807,21 +743,17 @@ struct knGetComp4d : public KernelBase {
     return c;
   }
   typedef int type2;
-  void runMessage()
-  {
-    debMsg("Executing kernel knGetComp4d ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, src, dst, c);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, src, dst, c);
+    }
   }
   const Grid4d<Vec4> &src;
   Grid4d<Real> &dst;
@@ -835,7 +767,7 @@ struct knSetComp4d : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(IndexInt idx, const Grid4d<Real> &src, Grid4d<Vec4> &dst, int c) const
+  inline void op(IndexInt idx, const Grid4d<Real> &src, Grid4d<Vec4> &dst, int c)
   {
     dst[idx][c] = src[idx];
   }
@@ -854,21 +786,17 @@ struct knSetComp4d : public KernelBase {
     return c;
   }
   typedef int type2;
-  void runMessage()
-  {
-    debMsg("Executing kernel knSetComp4d ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, src, dst, c);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, src, dst, c);
+    }
   }
   const Grid4d<Real> &src;
   Grid4d<Vec4> &dst;
@@ -959,7 +887,7 @@ template<class T> struct knSetBnd4d : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(int i, int j, int k, int t, Grid4d<T> &grid, T value, int w) const
+  inline void op(int i, int j, int k, int t, Grid4d<T> &grid, T value, int w)
   {
     bool bnd = (i <= w || i >= grid.getSizeX() - 1 - w || j <= w || j >= grid.getSizeY() - 1 - w ||
                 k <= w || k >= grid.getSizeZ() - 1 - w || t <= w || t >= grid.getSizeT() - 1 - w);
@@ -981,50 +909,47 @@ template<class T> struct knSetBnd4d : public KernelBase {
     return w;
   }
   typedef int type2;
-  void runMessage()
+  void runMessage(){};
+  void run()
   {
-    debMsg("Executing kernel knSetBnd4d ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ
-               << " "
-                  " t "
-               << minT << " - " << maxT,
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
+    const int _maxX = maxX;
+    const int _maxY = maxY;
     if (maxT > 1) {
-      for (int t = __r.begin(); t != (int)__r.end(); t++)
-        for (int k = 0; k < maxZ; k++)
-          for (int j = 0; j < maxY; j++)
-            for (int i = 0; i < maxX; i++)
-              op(i, j, k, t, grid, value, w);
+      const int _maxZ = maxZ;
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int t = 0; t < maxT; t++)
+          for (int k = 0; k < _maxZ; k++)
+            for (int j = 0; j < _maxY; j++)
+              for (int i = 0; i < _maxX; i++)
+                op(i, j, k, t, grid, value, w);
+      }
     }
     else if (maxZ > 1) {
       const int t = 0;
-      for (int k = __r.begin(); k != (int)__r.end(); k++)
-        for (int j = 0; j < maxY; j++)
-          for (int i = 0; i < maxX; i++)
-            op(i, j, k, t, grid, value, w);
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int k = minZ; k < maxZ; k++)
+          for (int j = 0; j < _maxY; j++)
+            for (int i = 0; i < _maxX; i++)
+              op(i, j, k, t, grid, value, w);
+      }
     }
     else {
       const int t = 0;
       const int k = 0;
-      for (int j = __r.begin(); j != (int)__r.end(); j++)
-        for (int i = 0; i < maxX; i++)
-          op(i, j, k, t, grid, value, w);
-    }
-  }
-  void run()
-  {
-    if (maxT > 1) {
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(minT, maxT), *this);
-    }
-    else if (maxZ > 1) {
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(minZ, maxZ), *this);
-    }
-    else {
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(0, maxY), *this);
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int j = 0; j < _maxY; j++)
+          for (int i = 0; i < _maxX; i++)
+            op(i, j, k, t, grid, value, w);
+      }
     }
   }
   Grid4d<T> &grid;
@@ -1043,7 +968,7 @@ template<class T> struct knSetBnd4dNeumann : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(int i, int j, int k, int t, Grid4d<T> &grid, int w) const
+  inline void op(int i, int j, int k, int t, Grid4d<T> &grid, int w)
   {
     bool set = false;
     int si = i, sj = j, sk = k, st = t;
@@ -1092,50 +1017,47 @@ template<class T> struct knSetBnd4dNeumann : public KernelBase {
     return w;
   }
   typedef int type1;
-  void runMessage()
+  void runMessage(){};
+  void run()
   {
-    debMsg("Executing kernel knSetBnd4dNeumann ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ
-               << " "
-                  " t "
-               << minT << " - " << maxT,
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
+    const int _maxX = maxX;
+    const int _maxY = maxY;
     if (maxT > 1) {
-      for (int t = __r.begin(); t != (int)__r.end(); t++)
-        for (int k = 0; k < maxZ; k++)
-          for (int j = 0; j < maxY; j++)
-            for (int i = 0; i < maxX; i++)
-              op(i, j, k, t, grid, w);
+      const int _maxZ = maxZ;
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int t = 0; t < maxT; t++)
+          for (int k = 0; k < _maxZ; k++)
+            for (int j = 0; j < _maxY; j++)
+              for (int i = 0; i < _maxX; i++)
+                op(i, j, k, t, grid, w);
+      }
     }
     else if (maxZ > 1) {
       const int t = 0;
-      for (int k = __r.begin(); k != (int)__r.end(); k++)
-        for (int j = 0; j < maxY; j++)
-          for (int i = 0; i < maxX; i++)
-            op(i, j, k, t, grid, w);
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int k = minZ; k < maxZ; k++)
+          for (int j = 0; j < _maxY; j++)
+            for (int i = 0; i < _maxX; i++)
+              op(i, j, k, t, grid, w);
+      }
     }
     else {
       const int t = 0;
       const int k = 0;
-      for (int j = __r.begin(); j != (int)__r.end(); j++)
-        for (int i = 0; i < maxX; i++)
-          op(i, j, k, t, grid, w);
-    }
-  }
-  void run()
-  {
-    if (maxT > 1) {
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(minT, maxT), *this);
-    }
-    else if (maxZ > 1) {
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(minZ, maxZ), *this);
-    }
-    else {
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(0, maxY), *this);
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int j = 0; j < _maxY; j++)
+          for (int i = 0; i < _maxX; i++)
+            op(i, j, k, t, grid, w);
+      }
     }
   }
   Grid4d<T> &grid;
@@ -1329,7 +1251,7 @@ template<class S> struct knSetRegion4d : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(int i, int j, int k, int t, Grid4d<S> &dst, Vec4 start, Vec4 end, S value) const
+  inline void op(int i, int j, int k, int t, Grid4d<S> &dst, Vec4 start, Vec4 end, S value)
   {
     Vec4 p(i, j, k, t);
     for (int c = 0; c < 4; ++c)
@@ -1357,50 +1279,47 @@ template<class S> struct knSetRegion4d : public KernelBase {
     return value;
   }
   typedef S type3;
-  void runMessage()
+  void runMessage(){};
+  void run()
   {
-    debMsg("Executing kernel knSetRegion4d ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ
-               << " "
-                  " t "
-               << minT << " - " << maxT,
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
+    const int _maxX = maxX;
+    const int _maxY = maxY;
     if (maxT > 1) {
-      for (int t = __r.begin(); t != (int)__r.end(); t++)
-        for (int k = 0; k < maxZ; k++)
-          for (int j = 0; j < maxY; j++)
-            for (int i = 0; i < maxX; i++)
-              op(i, j, k, t, dst, start, end, value);
+      const int _maxZ = maxZ;
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int t = 0; t < maxT; t++)
+          for (int k = 0; k < _maxZ; k++)
+            for (int j = 0; j < _maxY; j++)
+              for (int i = 0; i < _maxX; i++)
+                op(i, j, k, t, dst, start, end, value);
+      }
     }
     else if (maxZ > 1) {
       const int t = 0;
-      for (int k = __r.begin(); k != (int)__r.end(); k++)
-        for (int j = 0; j < maxY; j++)
-          for (int i = 0; i < maxX; i++)
-            op(i, j, k, t, dst, start, end, value);
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int k = minZ; k < maxZ; k++)
+          for (int j = 0; j < _maxY; j++)
+            for (int i = 0; i < _maxX; i++)
+              op(i, j, k, t, dst, start, end, value);
+      }
     }
     else {
       const int t = 0;
       const int k = 0;
-      for (int j = __r.begin(); j != (int)__r.end(); j++)
-        for (int i = 0; i < maxX; i++)
-          op(i, j, k, t, dst, start, end, value);
-    }
-  }
-  void run()
-  {
-    if (maxT > 1) {
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(minT, maxT), *this);
-    }
-    else if (maxZ > 1) {
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(minZ, maxZ), *this);
-    }
-    else {
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(0, maxY), *this);
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int j = 0; j < _maxY; j++)
+          for (int i = 0; i < _maxX; i++)
+            op(i, j, k, t, dst, start, end, value);
+      }
     }
   }
   Grid4d<S> &dst;
@@ -1619,7 +1538,7 @@ template<class S> struct knInterpol4d : public KernelBase {
                  Grid4d<S> &target,
                  Grid4d<S> &source,
                  const Vec4 &srcFac,
-                 const Vec4 &offset) const
+                 const Vec4 &offset)
   {
     Vec4 pos = Vec4(i, j, k, t) * srcFac + offset;
     target(i, j, k, t) = source.getInterpolated(pos);
@@ -1644,50 +1563,47 @@ template<class S> struct knInterpol4d : public KernelBase {
     return offset;
   }
   typedef Vec4 type3;
-  void runMessage()
+  void runMessage(){};
+  void run()
   {
-    debMsg("Executing kernel knInterpol4d ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ
-               << " "
-                  " t "
-               << minT << " - " << maxT,
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
+    const int _maxX = maxX;
+    const int _maxY = maxY;
     if (maxT > 1) {
-      for (int t = __r.begin(); t != (int)__r.end(); t++)
-        for (int k = 0; k < maxZ; k++)
-          for (int j = 0; j < maxY; j++)
-            for (int i = 0; i < maxX; i++)
-              op(i, j, k, t, target, source, srcFac, offset);
+      const int _maxZ = maxZ;
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int t = 0; t < maxT; t++)
+          for (int k = 0; k < _maxZ; k++)
+            for (int j = 0; j < _maxY; j++)
+              for (int i = 0; i < _maxX; i++)
+                op(i, j, k, t, target, source, srcFac, offset);
+      }
     }
     else if (maxZ > 1) {
       const int t = 0;
-      for (int k = __r.begin(); k != (int)__r.end(); k++)
-        for (int j = 0; j < maxY; j++)
-          for (int i = 0; i < maxX; i++)
-            op(i, j, k, t, target, source, srcFac, offset);
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int k = minZ; k < maxZ; k++)
+          for (int j = 0; j < _maxY; j++)
+            for (int i = 0; i < _maxX; i++)
+              op(i, j, k, t, target, source, srcFac, offset);
+      }
     }
     else {
       const int t = 0;
       const int k = 0;
-      for (int j = __r.begin(); j != (int)__r.end(); j++)
-        for (int i = 0; i < maxX; i++)
-          op(i, j, k, t, target, source, srcFac, offset);
-    }
-  }
-  void run()
-  {
-    if (maxT > 1) {
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(minT, maxT), *this);
-    }
-    else if (maxZ > 1) {
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(minZ, maxZ), *this);
-    }
-    else {
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(0, maxY), *this);
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int j = 0; j < _maxY; j++)
+          for (int i = 0; i < _maxX; i++)
+            op(i, j, k, t, target, source, srcFac, offset);
+      }
     }
   }
   Grid4d<S> &target;

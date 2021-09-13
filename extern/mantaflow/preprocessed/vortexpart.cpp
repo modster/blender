@@ -60,55 +60,23 @@ inline Vec3 VortexKernel(const Vec3 &p, const vector<VortexParticleData> &vp, Re
   return u;
 }
 
-struct _KnVpAdvectMesh : public KernelBase {
-  _KnVpAdvectMesh(const KernelBase &base,
-                  vector<Node> &nodes,
-                  const vector<VortexParticleData> &vp,
-                  Real scale,
-                  vector<Vec3> &u)
-      : KernelBase(base), nodes(nodes), vp(vp), scale(scale), u(u)
+struct KnVpAdvectMesh : public KernelBase {
+  KnVpAdvectMesh(vector<Node> &nodes, const vector<VortexParticleData> &vp, Real scale)
+      : KernelBase(nodes.size()), nodes(nodes), vp(vp), scale(scale), u((size))
   {
+    runMessage();
+    run();
   }
   inline void op(IndexInt idx,
                  vector<Node> &nodes,
                  const vector<VortexParticleData> &vp,
                  Real scale,
-                 vector<Vec3> &u) const
+                 vector<Vec3> &u)
   {
     if (nodes[idx].flags & Mesh::NfFixed)
       u[idx] = 0.0;
     else
       u[idx] = VortexKernel(nodes[idx].pos, vp, scale);
-  }
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, nodes, vp, scale, u);
-  }
-  void run()
-  {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
-  }
-  vector<Node> &nodes;
-  const vector<VortexParticleData> &vp;
-  Real scale;
-  vector<Vec3> &u;
-};
-struct KnVpAdvectMesh : public KernelBase {
-  KnVpAdvectMesh(vector<Node> &nodes, const vector<VortexParticleData> &vp, Real scale)
-      : KernelBase(nodes.size()),
-        _inner(KernelBase(nodes.size()), nodes, vp, scale, u),
-        nodes(nodes),
-        vp(vp),
-        scale(scale),
-        u((size))
-  {
-    runMessage();
-    run();
-  }
-  void run()
-  {
-    _inner.run();
   }
   inline operator vector<Vec3>()
   {
@@ -133,62 +101,37 @@ struct KnVpAdvectMesh : public KernelBase {
     return scale;
   }
   typedef Real type2;
-  void runMessage()
+  void runMessage(){};
+  void run()
   {
-    debMsg("Executing kernel KnVpAdvectMesh ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  _KnVpAdvectMesh _inner;
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, nodes, vp, scale, u);
+    }
+  }
   vector<Node> &nodes;
   const vector<VortexParticleData> &vp;
   Real scale;
   vector<Vec3> u;
 };
 
-struct _KnVpAdvectSelf : public KernelBase {
-  _KnVpAdvectSelf(const KernelBase &base,
-                  vector<VortexParticleData> &vp,
-                  Real scale,
-                  vector<Vec3> &u)
-      : KernelBase(base), vp(vp), scale(scale), u(u)
+struct KnVpAdvectSelf : public KernelBase {
+  KnVpAdvectSelf(vector<VortexParticleData> &vp, Real scale)
+      : KernelBase(vp.size()), vp(vp), scale(scale), u((size))
   {
+    runMessage();
+    run();
   }
-  inline void op(IndexInt idx, vector<VortexParticleData> &vp, Real scale, vector<Vec3> &u) const
+  inline void op(IndexInt idx, vector<VortexParticleData> &vp, Real scale, vector<Vec3> &u)
   {
     if (vp[idx].flag & ParticleBase::PDELETE)
       u[idx] = 0.0;
     else
       u[idx] = VortexKernel(vp[idx].pos, vp, scale);
-  }
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, vp, scale, u);
-  }
-  void run()
-  {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
-  }
-  vector<VortexParticleData> &vp;
-  Real scale;
-  vector<Vec3> &u;
-};
-struct KnVpAdvectSelf : public KernelBase {
-  KnVpAdvectSelf(vector<VortexParticleData> &vp, Real scale)
-      : KernelBase(vp.size()),
-        _inner(KernelBase(vp.size()), vp, scale, u),
-        vp(vp),
-        scale(scale),
-        u((size))
-  {
-    runMessage();
-    run();
-  }
-  void run()
-  {
-    _inner.run();
   }
   inline operator vector<Vec3>()
   {
@@ -208,14 +151,18 @@ struct KnVpAdvectSelf : public KernelBase {
     return scale;
   }
   typedef Real type1;
-  void runMessage()
+  void runMessage(){};
+  void run()
   {
-    debMsg("Executing kernel KnVpAdvectSelf ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  _KnVpAdvectSelf _inner;
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, vp, scale, u);
+    }
+  }
   vector<VortexParticleData> &vp;
   Real scale;
   vector<Vec3> u;

@@ -154,7 +154,6 @@ class MovingObstacle : public PbClass {
   int mEmptyType;
   int mID;
   static int sIDcnt;
-
  public:
   PbArgs _args;
 }

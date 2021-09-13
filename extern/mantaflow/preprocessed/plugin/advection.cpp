@@ -59,7 +59,7 @@ template<class T> struct SemiLagrange : public KernelBase {
                  Real dt,
                  bool isLevelset,
                  int orderSpace,
-                 int orderTrace) const
+                 int orderTrace)
   {
     if (orderTrace == 1) {
       // traceback position
@@ -117,36 +117,34 @@ template<class T> struct SemiLagrange : public KernelBase {
     return orderTrace;
   }
   typedef int type7;
-  void runMessage()
-  {
-    debMsg("Executing kernel SemiLagrange ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
+  void runMessage(){};
+  void run()
   {
     const int _maxX = maxX;
     const int _maxY = maxY;
     if (maxZ > 1) {
-      for (int k = __r.begin(); k != (int)__r.end(); k++)
-        for (int j = 1; j < _maxY; j++)
-          for (int i = 1; i < _maxX; i++)
-            op(i, j, k, flags, vel, dst, src, dt, isLevelset, orderSpace, orderTrace);
+
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int k = minZ; k < maxZ; k++)
+          for (int j = 1; j < _maxY; j++)
+            for (int i = 1; i < _maxX; i++)
+              op(i, j, k, flags, vel, dst, src, dt, isLevelset, orderSpace, orderTrace);
+      }
     }
     else {
       const int k = 0;
-      for (int j = __r.begin(); j != (int)__r.end(); j++)
-        for (int i = 1; i < _maxX; i++)
-          op(i, j, k, flags, vel, dst, src, dt, isLevelset, orderSpace, orderTrace);
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int j = 1; j < _maxY; j++)
+          for (int i = 1; i < _maxX; i++)
+            op(i, j, k, flags, vel, dst, src, dt, isLevelset, orderSpace, orderTrace);
+      }
     }
-  }
-  void run()
-  {
-    if (maxZ > 1)
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(minZ, maxZ), *this);
-    else
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(1, maxY), *this);
   }
   const FlagGrid &flags;
   const MACGrid &vel;
@@ -189,7 +187,7 @@ struct SemiLagrangeMAC : public KernelBase {
                  const MACGrid &src,
                  Real dt,
                  int orderSpace,
-                 int orderTrace) const
+                 int orderTrace)
   {
     if (orderTrace == 1) {
       // get currect velocity at MAC position
@@ -259,36 +257,34 @@ struct SemiLagrangeMAC : public KernelBase {
     return orderTrace;
   }
   typedef int type6;
-  void runMessage()
-  {
-    debMsg("Executing kernel SemiLagrangeMAC ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
+  void runMessage(){};
+  void run()
   {
     const int _maxX = maxX;
     const int _maxY = maxY;
     if (maxZ > 1) {
-      for (int k = __r.begin(); k != (int)__r.end(); k++)
-        for (int j = 1; j < _maxY; j++)
-          for (int i = 1; i < _maxX; i++)
-            op(i, j, k, flags, vel, dst, src, dt, orderSpace, orderTrace);
+
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int k = minZ; k < maxZ; k++)
+          for (int j = 1; j < _maxY; j++)
+            for (int i = 1; i < _maxX; i++)
+              op(i, j, k, flags, vel, dst, src, dt, orderSpace, orderTrace);
+      }
     }
     else {
       const int k = 0;
-      for (int j = __r.begin(); j != (int)__r.end(); j++)
-        for (int i = 1; i < _maxX; i++)
-          op(i, j, k, flags, vel, dst, src, dt, orderSpace, orderTrace);
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int j = 1; j < _maxY; j++)
+          for (int i = 1; i < _maxX; i++)
+            op(i, j, k, flags, vel, dst, src, dt, orderSpace, orderTrace);
+      }
     }
-  }
-  void run()
-  {
-    if (maxZ > 1)
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(minZ, maxZ), *this);
-    else
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(1, maxY), *this);
   }
   const FlagGrid &flags;
   const MACGrid &vel;
@@ -331,7 +327,7 @@ template<class T> struct MacCormackCorrect : public KernelBase {
                  const Grid<T> &bwd,
                  Real strength,
                  bool isLevelSet,
-                 bool isMAC = false) const
+                 bool isMAC = false)
   {
     dst[idx] = fwd[idx];
 
@@ -380,21 +376,17 @@ template<class T> struct MacCormackCorrect : public KernelBase {
     return isMAC;
   }
   typedef bool type7;
-  void runMessage()
-  {
-    debMsg("Executing kernel MacCormackCorrect ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, flags, dst, old, fwd, bwd, strength, isLevelSet, isMAC);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, flags, dst, old, fwd, bwd, strength, isLevelSet, isMAC);
+    }
   }
   const FlagGrid &flags;
   Grid<T> &dst;
@@ -440,7 +432,7 @@ template<class T> struct MacCormackCorrectMAC : public KernelBase {
                  const Grid<T> &bwd,
                  Real strength,
                  bool isLevelSet,
-                 bool isMAC = false) const
+                 bool isMAC = false)
   {
     bool skip[3] = {false, false, false};
 
@@ -505,36 +497,34 @@ template<class T> struct MacCormackCorrectMAC : public KernelBase {
     return isMAC;
   }
   typedef bool type7;
-  void runMessage()
-  {
-    debMsg("Executing kernel MacCormackCorrectMAC ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
+  void runMessage(){};
+  void run()
   {
     const int _maxX = maxX;
     const int _maxY = maxY;
     if (maxZ > 1) {
-      for (int k = __r.begin(); k != (int)__r.end(); k++)
-        for (int j = 0; j < _maxY; j++)
-          for (int i = 0; i < _maxX; i++)
-            op(i, j, k, flags, dst, old, fwd, bwd, strength, isLevelSet, isMAC);
+
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int k = minZ; k < maxZ; k++)
+          for (int j = 0; j < _maxY; j++)
+            for (int i = 0; i < _maxX; i++)
+              op(i, j, k, flags, dst, old, fwd, bwd, strength, isLevelSet, isMAC);
+      }
     }
     else {
       const int k = 0;
-      for (int j = __r.begin(); j != (int)__r.end(); j++)
-        for (int i = 0; i < _maxX; i++)
-          op(i, j, k, flags, dst, old, fwd, bwd, strength, isLevelSet, isMAC);
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int j = 0; j < _maxY; j++)
+          for (int i = 0; i < _maxX; i++)
+            op(i, j, k, flags, dst, old, fwd, bwd, strength, isLevelSet, isMAC);
+      }
     }
-  }
-  void run()
-  {
-    if (maxZ > 1)
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(minZ, maxZ), *this);
-    else
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(0, maxY), *this);
   }
   const FlagGrid &flags;
   Grid<T> &dst;
@@ -762,7 +752,7 @@ template<class T> struct MacCormackClamp : public KernelBase {
                  const Grid<T> &orig,
                  const Grid<T> &fwd,
                  Real dt,
-                 const int clampMode) const
+                 const int clampMode)
   {
     T dval = dst(i, j, k);
     Vec3i gridUpper = flags.getSize() - 1;
@@ -830,36 +820,34 @@ template<class T> struct MacCormackClamp : public KernelBase {
     return clampMode;
   }
   typedef int type6;
-  void runMessage()
-  {
-    debMsg("Executing kernel MacCormackClamp ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
+  void runMessage(){};
+  void run()
   {
     const int _maxX = maxX;
     const int _maxY = maxY;
     if (maxZ > 1) {
-      for (int k = __r.begin(); k != (int)__r.end(); k++)
-        for (int j = 1; j < _maxY; j++)
-          for (int i = 1; i < _maxX; i++)
-            op(i, j, k, flags, vel, dst, orig, fwd, dt, clampMode);
+
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int k = minZ; k < maxZ; k++)
+          for (int j = 1; j < _maxY; j++)
+            for (int i = 1; i < _maxX; i++)
+              op(i, j, k, flags, vel, dst, orig, fwd, dt, clampMode);
+      }
     }
     else {
       const int k = 0;
-      for (int j = __r.begin(); j != (int)__r.end(); j++)
-        for (int i = 1; i < _maxX; i++)
-          op(i, j, k, flags, vel, dst, orig, fwd, dt, clampMode);
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int j = 1; j < _maxY; j++)
+          for (int i = 1; i < _maxX; i++)
+            op(i, j, k, flags, vel, dst, orig, fwd, dt, clampMode);
+      }
     }
-  }
-  void run()
-  {
-    if (maxZ > 1)
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(minZ, maxZ), *this);
-    else
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(1, maxY), *this);
   }
   const FlagGrid &flags;
   const MACGrid &vel;
@@ -901,7 +889,7 @@ struct MacCormackClampMAC : public KernelBase {
                  const MACGrid &orig,
                  const MACGrid &fwd,
                  Real dt,
-                 const int clampMode) const
+                 const int clampMode)
   {
     Vec3 pos(i, j, k);
     Vec3 dval = dst(i, j, k);
@@ -957,36 +945,34 @@ struct MacCormackClampMAC : public KernelBase {
     return clampMode;
   }
   typedef int type6;
-  void runMessage()
-  {
-    debMsg("Executing kernel MacCormackClampMAC ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
+  void runMessage(){};
+  void run()
   {
     const int _maxX = maxX;
     const int _maxY = maxY;
     if (maxZ > 1) {
-      for (int k = __r.begin(); k != (int)__r.end(); k++)
-        for (int j = 1; j < _maxY; j++)
-          for (int i = 1; i < _maxX; i++)
-            op(i, j, k, flags, vel, dst, orig, fwd, dt, clampMode);
+
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int k = minZ; k < maxZ; k++)
+          for (int j = 1; j < _maxY; j++)
+            for (int i = 1; i < _maxX; i++)
+              op(i, j, k, flags, vel, dst, orig, fwd, dt, clampMode);
+      }
     }
     else {
       const int k = 0;
-      for (int j = __r.begin(); j != (int)__r.end(); j++)
-        for (int i = 1; i < _maxX; i++)
-          op(i, j, k, flags, vel, dst, orig, fwd, dt, clampMode);
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int j = 1; j < _maxY; j++)
+          for (int i = 1; i < _maxX; i++)
+            op(i, j, k, flags, vel, dst, orig, fwd, dt, clampMode);
+      }
     }
-  }
-  void run()
-  {
-    if (maxZ > 1)
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(minZ, maxZ), *this);
-    else
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(1, maxY), *this);
   }
   const FlagGrid &flags;
   const MACGrid &vel;
@@ -1016,27 +1002,39 @@ void fnAdvectSemiLagrange(FluidSolver *parent,
   bool levelset = orig.getType() & GridBase::TypeLevelset;
 
   // forward step
-  GridType fwd(parent);
-  SemiLagrange<T>(flags, vel, fwd, orig, dt, levelset, orderSpace, orderTrace);
+  GridType *fwd = new GridType(parent, true, false, false);
+  SemiLagrange<T>(flags, vel, *fwd, orig, dt, levelset, orderSpace, orderTrace);
 
   if (order == 1) {
-    orig.swap(fwd);
+#if OPENMP && OPENMP_OFFLOAD
+    orig.copyFrom(*fwd, true, false);
+#else
+    orig.swap(*fwd);
+#endif
   }
   else if (order == 2) {  // MacCormack
     GridType bwd(parent);
-    GridType newGrid(parent);
+    GridType *newGrid = new GridType(parent, true, false, false);
 
     // bwd <- backwards step
-    SemiLagrange<T>(flags, vel, bwd, fwd, -dt, levelset, orderSpace, orderTrace);
+    SemiLagrange<T>(flags, vel, bwd, *fwd, -dt, levelset, orderSpace, orderTrace);
 
     // newGrid <- compute correction
-    MacCormackCorrect<T>(flags, newGrid, orig, fwd, bwd, strength, levelset);
+    MacCormackCorrect<T>(flags, *newGrid, orig, *fwd, bwd, strength, levelset);
 
     // clamp values
-    MacCormackClamp<T>(flags, vel, newGrid, orig, fwd, dt, clampMode);
+    MacCormackClamp<T>(flags, vel, *newGrid, orig, *fwd, dt, clampMode);
 
-    orig.swap(newGrid);
+#if OPENMP && OPENMP_OFFLOAD
+    orig.copyFrom(*newGrid, true, false);
+#else
+    orig.swap(*newGrid);
+#endif
+    if (newGrid)
+      delete newGrid;
   }
+  if (fwd)
+    delete fwd;
 }
 
 // outflow functions
@@ -1087,7 +1085,7 @@ struct extrapolateVelConvectiveBC : public KernelBase {
                  const MACGrid &vel,
                  MACGrid &velDst,
                  const MACGrid &velPrev,
-                 Real timeStep) const
+                 Real timeStep)
   {
     if (flags.isOutflow(i, j, k)) {
       const Vec3 bulkVel = getBulkVel(flags, vel, i, j, k);
@@ -1154,36 +1152,34 @@ struct extrapolateVelConvectiveBC : public KernelBase {
     return timeStep;
   }
   typedef Real type4;
-  void runMessage()
-  {
-    debMsg("Executing kernel extrapolateVelConvectiveBC ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
+  void runMessage(){};
+  void run()
   {
     const int _maxX = maxX;
     const int _maxY = maxY;
     if (maxZ > 1) {
-      for (int k = __r.begin(); k != (int)__r.end(); k++)
-        for (int j = 0; j < _maxY; j++)
-          for (int i = 0; i < _maxX; i++)
-            op(i, j, k, flags, vel, velDst, velPrev, timeStep);
+
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int k = minZ; k < maxZ; k++)
+          for (int j = 0; j < _maxY; j++)
+            for (int i = 0; i < _maxX; i++)
+              op(i, j, k, flags, vel, velDst, velPrev, timeStep);
+      }
     }
     else {
       const int k = 0;
-      for (int j = __r.begin(); j != (int)__r.end(); j++)
-        for (int i = 0; i < _maxX; i++)
-          op(i, j, k, flags, vel, velDst, velPrev, timeStep);
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int j = 0; j < _maxY; j++)
+          for (int i = 0; i < _maxX; i++)
+            op(i, j, k, flags, vel, velDst, velPrev, timeStep);
+      }
     }
-  }
-  void run()
-  {
-    if (maxZ > 1)
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(minZ, maxZ), *this);
-    else
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(0, maxY), *this);
   }
   const FlagGrid &flags;
   const MACGrid &vel;
@@ -1200,8 +1196,7 @@ struct copyChangedVels : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(
-      int i, int j, int k, const FlagGrid &flags, const MACGrid &velDst, MACGrid &vel) const
+  inline void op(int i, int j, int k, const FlagGrid &flags, const MACGrid &velDst, MACGrid &vel)
   {
     if (flags.isOutflow(i, j, k))
       vel(i, j, k) = velDst(i, j, k);
@@ -1221,36 +1216,34 @@ struct copyChangedVels : public KernelBase {
     return vel;
   }
   typedef MACGrid type2;
-  void runMessage()
-  {
-    debMsg("Executing kernel copyChangedVels ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
+  void runMessage(){};
+  void run()
   {
     const int _maxX = maxX;
     const int _maxY = maxY;
     if (maxZ > 1) {
-      for (int k = __r.begin(); k != (int)__r.end(); k++)
-        for (int j = 0; j < _maxY; j++)
-          for (int i = 0; i < _maxX; i++)
-            op(i, j, k, flags, velDst, vel);
+
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int k = minZ; k < maxZ; k++)
+          for (int j = 0; j < _maxY; j++)
+            for (int i = 0; i < _maxX; i++)
+              op(i, j, k, flags, velDst, vel);
+      }
     }
     else {
       const int k = 0;
-      for (int j = __r.begin(); j != (int)__r.end(); j++)
-        for (int i = 0; i < _maxX; i++)
-          op(i, j, k, flags, velDst, vel);
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int j = 0; j < _maxY; j++)
+          for (int i = 0; i < _maxX; i++)
+            op(i, j, k, flags, velDst, vel);
+      }
     }
-  }
-  void run()
-  {
-    if (maxZ > 1)
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(minZ, maxZ), *this);
-    else
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(0, maxY), *this);
   }
   const FlagGrid &flags;
   const MACGrid &velDst;
@@ -1275,7 +1268,7 @@ struct knResetPhiInObs : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(int i, int j, int k, const FlagGrid &flags, Grid<Real> &sdf) const
+  inline void op(int i, int j, int k, const FlagGrid &flags, Grid<Real> &sdf)
   {
     if (flags.isObstacle(i, j, k) && (sdf(i, j, k) < 0.)) {
       sdf(i, j, k) = 0.1;
@@ -1291,36 +1284,34 @@ struct knResetPhiInObs : public KernelBase {
     return sdf;
   }
   typedef Grid<Real> type1;
-  void runMessage()
-  {
-    debMsg("Executing kernel knResetPhiInObs ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
+  void runMessage(){};
+  void run()
   {
     const int _maxX = maxX;
     const int _maxY = maxY;
     if (maxZ > 1) {
-      for (int k = __r.begin(); k != (int)__r.end(); k++)
-        for (int j = 0; j < _maxY; j++)
-          for (int i = 0; i < _maxX; i++)
-            op(i, j, k, flags, sdf);
+
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int k = minZ; k < maxZ; k++)
+          for (int j = 0; j < _maxY; j++)
+            for (int i = 0; i < _maxX; i++)
+              op(i, j, k, flags, sdf);
+      }
     }
     else {
       const int k = 0;
-      for (int j = __r.begin(); j != (int)__r.end(); j++)
-        for (int i = 0; i < _maxX; i++)
-          op(i, j, k, flags, sdf);
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int j = 0; j < _maxY; j++)
+          for (int i = 0; i < _maxX; i++)
+            op(i, j, k, flags, sdf);
+      }
     }
-  }
-  void run()
-  {
-    if (maxZ > 1)
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(minZ, maxZ), *this);
-    else
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(0, maxY), *this);
   }
   const FlagGrid &flags;
   Grid<Real> &sdf;
@@ -1378,33 +1369,45 @@ void fnAdvectSemiLagrange<MACGrid>(FluidSolver *parent,
   Real dt = parent->getDt();
 
   // forward step
-  MACGrid fwd(parent);
-  SemiLagrangeMAC(flags, vel, fwd, orig, dt, orderSpace, orderTrace);
+  MACGrid *fwd = new MACGrid(parent, true, false, false);
+  SemiLagrangeMAC(flags, vel, *fwd, orig, dt, orderSpace, orderTrace);
 
   if (orderSpace != 1) {
     debMsg("Warning higher order for MAC grids not yet implemented...", 1);
   }
 
   if (order == 1) {
-    applyOutflowBC(flags, fwd, orig, dt);
-    orig.swap(fwd);
+    applyOutflowBC(flags, *fwd, orig, dt);
+#if OPENMP && OPENMP_OFFLOAD
+    orig.copyFrom(*fwd, true, false);
+#else
+    orig.swap(*fwd);
+#endif
   }
   else if (order == 2) {  // MacCormack
     MACGrid bwd(parent);
-    MACGrid newGrid(parent);
+    MACGrid *newGrid = new MACGrid(parent, true, false, false);
 
     // bwd <- backwards step
-    SemiLagrangeMAC(flags, vel, bwd, fwd, -dt, orderSpace, orderTrace);
+    SemiLagrangeMAC(flags, vel, bwd, *fwd, -dt, orderSpace, orderTrace);
 
     // newGrid <- compute correction
-    MacCormackCorrectMAC<Vec3>(flags, newGrid, orig, fwd, bwd, strength, false, true);
+    MacCormackCorrectMAC<Vec3>(flags, *newGrid, orig, *fwd, bwd, strength, false, true);
 
     // clamp values
-    MacCormackClampMAC(flags, vel, newGrid, orig, fwd, dt, clampMode);
+    MacCormackClampMAC(flags, vel, *newGrid, orig, *fwd, dt, clampMode);
 
-    applyOutflowBC(flags, newGrid, orig, dt);
-    orig.swap(newGrid);
+    applyOutflowBC(flags, *newGrid, orig, dt);
+#if OPENMP && OPENMP_OFFLOAD
+    orig.copyFrom(*newGrid, true, false);
+#else
+    orig.swap(*newGrid);
+#endif
+    if (newGrid)
+      delete newGrid;
   }
+  if (fwd)
+    delete fwd;
 }
 
 //! Perform semi-lagrangian advection of target Real- or Vec3 grid

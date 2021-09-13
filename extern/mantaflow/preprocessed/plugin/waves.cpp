@@ -38,7 +38,7 @@ struct knCalcSecDeriv2d : public KernelBase {
     runMessage();
     run();
   }
-  inline void op(int i, int j, int k, const Grid<Real> &v, Grid<Real> &ret) const
+  inline void op(int i, int j, int k, const Grid<Real> &v, Grid<Real> &ret)
   {
     ret(i, j, k) = (-4. * v(i, j, k) + v(i - 1, j, k) + v(i + 1, j, k) + v(i, j - 1, k) +
                     v(i, j + 1, k));
@@ -53,36 +53,34 @@ struct knCalcSecDeriv2d : public KernelBase {
     return ret;
   }
   typedef Grid<Real> type1;
-  void runMessage()
-  {
-    debMsg("Executing kernel knCalcSecDeriv2d ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
+  void runMessage(){};
+  void run()
   {
     const int _maxX = maxX;
     const int _maxY = maxY;
     if (maxZ > 1) {
-      for (int k = __r.begin(); k != (int)__r.end(); k++)
-        for (int j = 1; j < _maxY; j++)
-          for (int i = 1; i < _maxX; i++)
-            op(i, j, k, v, ret);
+
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int k = minZ; k < maxZ; k++)
+          for (int j = 1; j < _maxY; j++)
+            for (int i = 1; i < _maxX; i++)
+              op(i, j, k, v, ret);
+      }
     }
     else {
       const int k = 0;
-      for (int j = __r.begin(); j != (int)__r.end(); j++)
-        for (int i = 1; i < _maxX; i++)
-          op(i, j, k, v, ret);
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int j = 1; j < _maxY; j++)
+          for (int i = 1; i < _maxX; i++)
+            op(i, j, k, v, ret);
+      }
     }
-  }
-  void run()
-  {
-    if (maxZ > 1)
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(minZ, maxZ), *this);
-    else
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(1, maxY), *this);
   }
   const Grid<Real> &v;
   Grid<Real> &ret;
@@ -151,43 +149,42 @@ struct knTotalSum : public KernelBase {
     return h;
   }
   typedef Grid<Real> type0;
-  void runMessage()
-  {
-    debMsg("Executing kernel knTotalSum ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r)
+  void runMessage(){};
+  void run()
   {
     const int _maxX = maxX;
     const int _maxY = maxY;
     if (maxZ > 1) {
-      for (int k = __r.begin(); k != (int)__r.end(); k++)
-        for (int j = 1; j < _maxY; j++)
-          for (int i = 1; i < _maxX; i++)
-            op(i, j, k, h, sum);
+
+#pragma omp parallel
+      {
+        double sum = 0;
+#pragma omp for nowait
+        for (int k = minZ; k < maxZ; k++)
+          for (int j = 1; j < _maxY; j++)
+            for (int i = 1; i < _maxX; i++)
+              op(i, j, k, h, sum);
+#pragma omp critical
+        {
+          this->sum += sum;
+        }
+      }
     }
     else {
       const int k = 0;
-      for (int j = __r.begin(); j != (int)__r.end(); j++)
-        for (int i = 1; i < _maxX; i++)
-          op(i, j, k, h, sum);
+#pragma omp parallel
+      {
+        double sum = 0;
+#pragma omp for nowait
+        for (int j = 1; j < _maxY; j++)
+          for (int i = 1; i < _maxX; i++)
+            op(i, j, k, h, sum);
+#pragma omp critical
+        {
+          this->sum += sum;
+        }
+      }
     }
-  }
-  void run()
-  {
-    if (maxZ > 1)
-      tbb::parallel_reduce(tbb::blocked_range<IndexInt>(minZ, maxZ), *this);
-    else
-      tbb::parallel_reduce(tbb::blocked_range<IndexInt>(1, maxY), *this);
-  }
-  knTotalSum(knTotalSum &o, tbb::split) : KernelBase(o), h(o.h), sum(0)
-  {
-  }
-  void join(const knTotalSum &o)
-  {
-    sum += o.sum;
   }
   Grid<Real> &h;
   double sum;
@@ -296,7 +293,7 @@ struct MakeRhsWE : public KernelBase {
                  const Grid<Real> &ut,
                  const Grid<Real> &utm1,
                  Real s,
-                 bool crankNic = false) const
+                 bool crankNic = false)
   {
     rhs(i, j, k) = (2. * ut(i, j, k) - utm1(i, j, k));
     if (crankNic) {
@@ -334,36 +331,34 @@ struct MakeRhsWE : public KernelBase {
     return crankNic;
   }
   typedef bool type5;
-  void runMessage()
-  {
-    debMsg("Executing kernel MakeRhsWE ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
+  void runMessage(){};
+  void run()
   {
     const int _maxX = maxX;
     const int _maxY = maxY;
     if (maxZ > 1) {
-      for (int k = __r.begin(); k != (int)__r.end(); k++)
-        for (int j = 1; j < _maxY; j++)
-          for (int i = 1; i < _maxX; i++)
-            op(i, j, k, flags, rhs, ut, utm1, s, crankNic);
+
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int k = minZ; k < maxZ; k++)
+          for (int j = 1; j < _maxY; j++)
+            for (int i = 1; i < _maxX; i++)
+              op(i, j, k, flags, rhs, ut, utm1, s, crankNic);
+      }
     }
     else {
       const int k = 0;
-      for (int j = __r.begin(); j != (int)__r.end(); j++)
-        for (int i = 1; i < _maxX; i++)
-          op(i, j, k, flags, rhs, ut, utm1, s, crankNic);
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int j = 1; j < _maxY; j++)
+          for (int i = 1; i < _maxX; i++)
+            op(i, j, k, flags, rhs, ut, utm1, s, crankNic);
+      }
     }
-  }
-  void run()
-  {
-    if (maxZ > 1)
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(minZ, maxZ), *this);
-    else
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(1, maxY), *this);
   }
   const FlagGrid &flags;
   Grid<Real> &rhs;
@@ -423,21 +418,17 @@ void cgSolveWE(const FlagGrid &flags,
 
   const int maxIter = (int)(cgMaxIterFac * flags.getSize().max()) * (flags.is3D() ? 1 : 4);
   GridCgInterface *gcg;
-  vector<Grid<Real> *> matA{&A0, &Ai, &Aj};
-
-  if (flags.is3D()) {
-    matA.push_back(&Ak);
-    gcg = new GridCg<ApplyMatrix>(out, rhs, residual, search, flags, tmp, matA);
-  }
-  else {
-    gcg = new GridCg<ApplyMatrix2D>(out, rhs, residual, search, flags, tmp, matA);
-  }
+  if (flags.is3D())
+    gcg = new GridCg<ApplyMatrix>(out, rhs, residual, search, flags, tmp, &A0, &Ai, &Aj, &Ak);
+  else
+    gcg = new GridCg<ApplyMatrix2D>(out, rhs, residual, search, flags, tmp, &A0, &Ai, &Aj, &Ak);
 
   gcg->setAccuracy(cgAccuracy);
 
   // no preconditioning for now...
+  Real time = 0;
   for (int iter = 0; iter < maxIter; iter++) {
-    if (!gcg->iterate())
+    if (!gcg->iterate(time))
       iter = maxIter;
   }
   debMsg("cgSolveWaveEq iterations:" << gcg->getIterations() << ", res:" << gcg->getSigma(), 1);

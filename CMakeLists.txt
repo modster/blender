@@ -747,7 +747,7 @@ set_and_warn_dependency(WITH_TBB WITH_CYCLES            OFF)
 set_and_warn_dependency(WITH_TBB WITH_USD               OFF)
 set_and_warn_dependency(WITH_TBB WITH_OPENIMAGEDENOISE  OFF)
 set_and_warn_dependency(WITH_TBB WITH_OPENVDB           OFF)
-set_and_warn_dependency(WITH_TBB WITH_MOD_FLUID         OFF)
+#set_and_warn_dependency(WITH_TBB WITH_MOD_FLUID         OFF)
 
 # NanoVDB requires OpenVDB to convert the data structure
 set_and_warn_dependency(WITH_OPENVDB WITH_NANOVDB       OFF)
@@ -1239,15 +1239,29 @@ endif()
 if(WITH_OPENMP)
   if(NOT OPENMP_CUSTOM)
     find_package(OpenMP)
+
+    list(APPEND CMAKE_MODULE_PATH "${LLVM_LIBPATH}/cmake/openmp")
+    find_package(OpenMPTarget REQUIRED NVPTX)
   endif()
 
   if(OPENMP_FOUND)
     if(NOT WITH_OPENMP_STATIC)
+      message(STATUS "============ No Static OpenMP")
+      message(${OpenMPTarget_NVPTX_FLAGS})
+
       string(APPEND CMAKE_C_FLAGS " ${OpenMP_C_FLAGS}")
       string(APPEND CMAKE_CXX_FLAGS " ${OpenMP_CXX_FLAGS}")
       string(APPEND CMAKE_EXE_LINKER_FLAGS " ${OpenMP_LINKER_FLAGS}")
       string(APPEND CMAKE_MODULE_LINKER_FLAGS " ${OpenMP_LINKER_FLAGS}")
+
+      string(APPEND CMAKE_C_FLAGS " -gline-tables-only -fopenmp-targets=nvptx64-nvidia-cuda")
+      string(APPEND CMAKE_CXX_FLAGS " -gline-tables-only -fopenmp-targets=nvptx64-nvidia-cuda")
+      string(APPEND CMAKE_EXE_LINKER_FLAGS " -fopenmp-targets=nvptx64-nvidia-cuda")
+      string(APPEND CMAKE_MODULE_LINKER_FLAGS " -fopenmp-targets=nvptx64-nvidia-cuda")
+
+      set(PLATFORM_LINKLIBS "${PLATFORM_LINKLIBS};-fopenmp=libomp;-fopenmp-targets=nvptx64-nvidia-cuda")
     else()
+      message(STATUS "============= Static OpenMP")
       # Typically avoid adding flags as defines but we can't
       # pass OpenMP flags to the linker for static builds, meaning
       # we can't add any OpenMP related flags to CFLAGS variables

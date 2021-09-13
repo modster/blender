@@ -239,13 +239,7 @@ struct knApicMapLinearVec3ToMACGrid : public KernelBase {
     return boundaryWidth;
   }
   typedef int type9;
-  void runMessage()
-  {
-    debMsg("Executing kernel knApicMapLinearVec3ToMACGrid ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
+  void runMessage(){};
   void run()
   {
     const IndexInt _sz = size;
@@ -370,7 +364,7 @@ struct knApicMapLinearMACGridToVec3 : public KernelBase {
                  const FlagGrid &flags,
                  const ParticleDataImpl<int> *ptype,
                  const int exclude,
-                 const int boundaryWidth) const
+                 const int boundaryWidth)
   {
     if (!p.isActive(idx) || (ptype && ((*ptype)[idx] & exclude)))
       return;
@@ -509,21 +503,17 @@ struct knApicMapLinearMACGridToVec3 : public KernelBase {
     return boundaryWidth;
   }
   typedef int type9;
-  void runMessage()
-  {
-    debMsg("Executing kernel knApicMapLinearMACGridToVec3 ", 3);
-    debMsg("Kernel range"
-               << " size " << size << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, vp, cpx, cpy, cpz, p, vg, flags, ptype, exclude, boundaryWidth);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, vp, cpx, cpy, cpz, p, vg, flags, ptype, exclude, boundaryWidth);
+    }
   }
   ParticleDataImpl<Vec3> &vp;
   ParticleDataImpl<Vec3> &cpx;

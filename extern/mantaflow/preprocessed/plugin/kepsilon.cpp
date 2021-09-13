@@ -61,7 +61,7 @@ struct KnTurbulenceClamp : public KernelBase {
                  Real minK,
                  Real maxK,
                  Real minNu,
-                 Real maxNu) const
+                 Real maxNu)
   {
     Real eps = egrid[idx];
     Real ke = clamp(kgrid[idx], minK, maxK);
@@ -104,21 +104,17 @@ struct KnTurbulenceClamp : public KernelBase {
     return maxNu;
   }
   typedef Real type5;
-  void runMessage()
-  {
-    debMsg("Executing kernel KnTurbulenceClamp ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, kgrid, egrid, minK, maxK, minNu, maxNu);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, kgrid, egrid, minK, maxK, minNu, maxNu);
+    }
   }
   Grid<Real> &kgrid;
   Grid<Real> &egrid;
@@ -163,7 +159,7 @@ struct KnComputeProduction : public KernelBase {
                  Grid<Real> &prod,
                  Grid<Real> &nuT,
                  Grid<Real> *strain,
-                 Real pscale = 1.0f) const
+                 Real pscale = 1.0f)
   {
     Real curEps = eps(i, j, k);
     if (curEps > 0) {
@@ -234,36 +230,34 @@ struct KnComputeProduction : public KernelBase {
     return pscale;
   }
   typedef Real type7;
-  void runMessage()
-  {
-    debMsg("Executing kernel KnComputeProduction ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
+  void runMessage(){};
+  void run()
   {
     const int _maxX = maxX;
     const int _maxY = maxY;
     if (maxZ > 1) {
-      for (int k = __r.begin(); k != (int)__r.end(); k++)
-        for (int j = 1; j < _maxY; j++)
-          for (int i = 1; i < _maxX; i++)
-            op(i, j, k, vel, velCenter, ke, eps, prod, nuT, strain, pscale);
+
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int k = minZ; k < maxZ; k++)
+          for (int j = 1; j < _maxY; j++)
+            for (int i = 1; i < _maxX; i++)
+              op(i, j, k, vel, velCenter, ke, eps, prod, nuT, strain, pscale);
+      }
     }
     else {
       const int k = 0;
-      for (int j = __r.begin(); j != (int)__r.end(); j++)
-        for (int i = 1; i < _maxX; i++)
-          op(i, j, k, vel, velCenter, ke, eps, prod, nuT, strain, pscale);
+#pragma omp parallel
+      {
+
+#pragma omp for
+        for (int j = 1; j < _maxY; j++)
+          for (int i = 1; i < _maxX; i++)
+            op(i, j, k, vel, velCenter, ke, eps, prod, nuT, strain, pscale);
+      }
     }
-  }
-  void run()
-  {
-    if (maxZ > 1)
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(minZ, maxZ), *this);
-    else
-      tbb::parallel_for(tbb::blocked_range<IndexInt>(1, maxY), *this);
   }
   const MACGrid &vel;
   const Grid<Vec3> &velCenter;
@@ -345,7 +339,7 @@ struct KnAddTurbulenceSource : public KernelBase {
     run();
   }
   inline void op(
-      IndexInt idx, Grid<Real> &kgrid, Grid<Real> &egrid, const Grid<Real> &pgrid, Real dt) const
+      IndexInt idx, Grid<Real> &kgrid, Grid<Real> &egrid, const Grid<Real> &pgrid, Real dt)
   {
     Real eps = egrid[idx], prod = pgrid[idx], ke = kgrid[idx];
     if (ke <= 0)
@@ -379,21 +373,17 @@ struct KnAddTurbulenceSource : public KernelBase {
     return dt;
   }
   typedef Real type3;
-  void runMessage()
-  {
-    debMsg("Executing kernel KnAddTurbulenceSource ", 3);
-    debMsg("Kernel range"
-               << " x " << maxX << " y " << maxY << " z " << minZ << " - " << maxZ << " ",
-           4);
-  };
-  void operator()(const tbb::blocked_range<IndexInt> &__r) const
-  {
-    for (IndexInt idx = __r.begin(); idx != (IndexInt)__r.end(); idx++)
-      op(idx, kgrid, egrid, pgrid, dt);
-  }
+  void runMessage(){};
   void run()
   {
-    tbb::parallel_for(tbb::blocked_range<IndexInt>(0, size), *this);
+    const IndexInt _sz = size;
+#pragma omp parallel
+    {
+
+#pragma omp for
+      for (IndexInt i = 0; i < _sz; i++)
+        op(i, kgrid, egrid, pgrid, dt);
+    }
   }
   Grid<Real> &kgrid;
   Grid<Real> &egrid;

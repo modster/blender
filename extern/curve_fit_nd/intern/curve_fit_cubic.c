@@ -29,9 +29,9 @@
  *  \ingroup curve_fit
  */
 
-#ifdef _MSC_VER
+//#ifdef _MSC_VER
 #  define _USE_MATH_DEFINES
-#endif
+//#endif
 
 #include <math.h>
 #include <float.h>
@@ -456,7 +456,7 @@ static double points_calc_circumference_factor(
 	const double len_tangent = dot < 0.0 ? len_vnvn(tan_l, tan_r, dims) : len_negated_vnvn(tan_l, tan_r, dims);
 	if (len_tangent > DBL_EPSILON) {
 		/* only clamp to avoid precision error */
-		double angle = acos(max(-fabs(dot), -1.0));
+		double angle = acos(maxV(-fabs(dot), -1.0));
 		/* Angle may be less than the length when the tangents define >180 degrees of the circle,
 		 * (tangents that point away from each other).
 		 * We could try support this but will likely cause extreme >1 scales which could cause other issues. */
@@ -607,7 +607,7 @@ static void cubic_from_points_offset_fallback(
 		for (uint k = 0; k < 2; k++) {
 			sub_vn_vnvn(tmp, p0, pt, dims);
 			project_vn_vnvn_normalized(tmp, tmp, a[k], dims);
-			dists[k] = max(dists[k], dot_vnvn(tmp, a[k], dims));
+			dists[k] = maxV(dists[k], dot_vnvn(tmp, a[k], dims));
 		}
 	}
 
@@ -796,7 +796,7 @@ static void cubic_from_points(
 					dist_sq_test += sq((pt[j] - center[j]) * clamp_scale);
 				}
 #endif
-				dist_sq_max = max(dist_sq_max, dist_sq_test);
+				dist_sq_max = maxV(dist_sq_max, dist_sq_test);
 			}
 		}
 

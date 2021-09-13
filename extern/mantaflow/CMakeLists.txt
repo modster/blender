@@ -55,26 +55,30 @@ if(NOT WITH_MANTA_DEPENDENCIES)
   add_definitions(-DNO_CNPY=1)
 endif()
 
-set(MANTA_HLP
-  helper
-)
-set(MANTA_PP
-  preprocessed
-)
 if(WITH_MANTA_DEPENDENCIES)
   set(MANTA_DEP
     dependencies
   )
 endif()
 
-if(WITH_TBB)
-  add_definitions(-DTBB=1)
+if(WITH_OPENMP)
+  add_definitions(-DOPENMP=1)
+
+  if(WITH_OPENMP_STATIC)
+    list(APPEND LIB
+      ${OpenMP_LIBRARIES}
+    )
+  endif()
+endif()
+
+if(WITH_OPENMP)
+  add_definitions(-DOPENMP_OFFLOAD=1)
 endif()
 
 if(WITH_OPENVDB)
   add_definitions(-DOPENVDB=1)
   # OpenVDB headers use deprecated TBB headers, silence warning.
-  add_definitions(-DTBB_SUPPRESS_DEPRECATED_MESSAGES=1)
+  #add_definitions(-DTBB_SUPPRESS_DEPRECATED_MESSAGES=1)
 endif()
 
 if(WITH_OPENVDB_BLOSC)
@@ -90,12 +94,12 @@ if(WITH_MANTA_NUMPY AND WITH_PYTHON_NUMPY)
 endif()
 
 set(INC
-  ${MANTA_PP}
-  ${MANTA_PP}/fileio
-  ${MANTA_PP}/python
-  ${MANTA_PP}/plugin
-  ${MANTA_HLP}/pwrapper
-  ${MANTA_HLP}/util
+  preprocessed
+  preprocessed/fileio
+  preprocessed/python
+  preprocessed/plugin
+  helper/pwrapper
+  helper/util
 )
 
 if(WITH_MANTA_DEPENDENCIES)
@@ -112,15 +116,6 @@ set(INC_SYS
 if(WITH_MANTA_NUMPY AND WITH_PYTHON_NUMPY)
   list(APPEND INC_SYS
     ${PYTHON_NUMPY_INCLUDE_DIRS}
-  )
-endif()
-
-if(WITH_TBB)
-  list(APPEND INC_SYS
-    ${TBB_INCLUDE_DIRS}
-  )
-  list(APPEND LIB
-    ${TBB_LIBRARIES}
   )
 endif()
 
@@ -142,120 +137,120 @@ if(WITH_OPENVDB)
 endif()
 
 set(SRC
-  ${MANTA_PP}/commonkernels.h
-  ${MANTA_PP}/commonkernels.h.reg.cpp
-  ${MANTA_PP}/conjugategrad.cpp
-  ${MANTA_PP}/conjugategrad.h
-  ${MANTA_PP}/conjugategrad.h.reg.cpp
-  ${MANTA_PP}/edgecollapse.cpp
-  ${MANTA_PP}/edgecollapse.h
-  ${MANTA_PP}/edgecollapse.h.reg.cpp
-  ${MANTA_PP}/fastmarch.cpp
-  ${MANTA_PP}/fastmarch.h
-  ${MANTA_PP}/fastmarch.h.reg.cpp
-  ${MANTA_PP}/fileio/iogrids.cpp
-  ${MANTA_PP}/fileio/iomeshes.cpp
-  ${MANTA_PP}/fileio/ioparticles.cpp
-  ${MANTA_PP}/fileio/ioutil.cpp
-  ${MANTA_PP}/fileio/iovdb.cpp
-  ${MANTA_PP}/fileio/mantaio.cpp
-  ${MANTA_PP}/fileio/mantaio.h
-  ${MANTA_PP}/fileio/mantaio.h.reg.cpp
-  ${MANTA_PP}/fluidsolver.cpp
-  ${MANTA_PP}/fluidsolver.h
-  ${MANTA_PP}/fluidsolver.h.reg.cpp
-  ${MANTA_PP}/general.cpp
-  ${MANTA_PP}/general.h
-  ${MANTA_PP}/general.h.reg.cpp
-  ${MANTA_PP}/gitinfo.h
-  ${MANTA_PP}/grid.cpp
-  ${MANTA_PP}/grid.h
-  ${MANTA_PP}/grid.h.reg.cpp
-  ${MANTA_PP}/grid4d.cpp
-  ${MANTA_PP}/grid4d.h
-  ${MANTA_PP}/grid4d.h.reg.cpp
-  ${MANTA_PP}/kernel.cpp
-  ${MANTA_PP}/kernel.h
-  ${MANTA_PP}/kernel.h.reg.cpp
-  ${MANTA_PP}/levelset.cpp
-  ${MANTA_PP}/levelset.h
-  ${MANTA_PP}/levelset.h.reg.cpp
-  ${MANTA_PP}/mesh.cpp
-  ${MANTA_PP}/mesh.h
-  ${MANTA_PP}/mesh.h.reg.cpp
-  ${MANTA_PP}/movingobs.cpp
-  ${MANTA_PP}/movingobs.h
-  ${MANTA_PP}/movingobs.h.reg.cpp
-  ${MANTA_PP}/multigrid.cpp
-  ${MANTA_PP}/multigrid.h
-  ${MANTA_PP}/multigrid.h.reg.cpp
-  ${MANTA_PP}/noisefield.cpp
-  ${MANTA_PP}/noisefield.h
-  ${MANTA_PP}/noisefield.h.reg.cpp
-  ${MANTA_PP}/particle.cpp
-  ${MANTA_PP}/particle.h
-  ${MANTA_PP}/particle.h.reg.cpp
-  ${MANTA_PP}/plugin/advection.cpp
-  ${MANTA_PP}/plugin/apic.cpp
-  ${MANTA_PP}/plugin/extforces.cpp
-  ${MANTA_PP}/plugin/fire.cpp
-  ${MANTA_PP}/plugin/flip.cpp
-  ${MANTA_PP}/plugin/fluidguiding.cpp
-  ${MANTA_PP}/plugin/initplugins.cpp
-  ${MANTA_PP}/plugin/kepsilon.cpp
-  ${MANTA_PP}/plugin/meshplugins.cpp
-  ${MANTA_PP}/plugin/pressure.cpp
-  ${MANTA_PP}/plugin/ptsplugins.cpp
-  ${MANTA_PP}/plugin/secondaryparticles.cpp
-  ${MANTA_PP}/plugin/surfaceturbulence.cpp
-  ${MANTA_PP}/plugin/viscosity.cpp
-  ${MANTA_PP}/plugin/vortexplugins.cpp
-  ${MANTA_PP}/plugin/waveletturbulence.cpp
-  ${MANTA_PP}/plugin/waves.cpp
-  ${MANTA_PP}/python/defines.py
-  ${MANTA_PP}/python/defines.py.reg.cpp
-  ${MANTA_PP}/registration.cpp
-  ${MANTA_PP}/shapes.cpp
-  ${MANTA_PP}/shapes.h
-  ${MANTA_PP}/shapes.h.reg.cpp
-  ${MANTA_PP}/test.cpp
-  ${MANTA_PP}/timing.cpp
-  ${MANTA_PP}/timing.h
-  ${MANTA_PP}/timing.h.reg.cpp
-  ${MANTA_PP}/turbulencepart.cpp
-  ${MANTA_PP}/turbulencepart.h
-  ${MANTA_PP}/turbulencepart.h.reg.cpp
-  ${MANTA_PP}/vortexpart.cpp
-  ${MANTA_PP}/vortexpart.h
-  ${MANTA_PP}/vortexpart.h.reg.cpp
-  ${MANTA_PP}/vortexsheet.cpp
-  ${MANTA_PP}/vortexsheet.h
-  ${MANTA_PP}/vortexsheet.h.reg.cpp
+  preprocessed/commonkernels.h
+  preprocessed/commonkernels.h.reg.cpp
+  preprocessed/conjugategrad.cpp
+  preprocessed/conjugategrad.h
+  preprocessed/conjugategrad.h.reg.cpp
+  preprocessed/edgecollapse.cpp
+  preprocessed/edgecollapse.h
+  preprocessed/edgecollapse.h.reg.cpp
+  preprocessed/fastmarch.cpp
+  preprocessed/fastmarch.h
+  preprocessed/fastmarch.h.reg.cpp
+  preprocessed/fileio/iogrids.cpp
+  preprocessed/fileio/iomeshes.cpp
+  preprocessed/fileio/ioparticles.cpp
+  preprocessed/fileio/ioutil.cpp
+  preprocessed/fileio/iovdb.cpp
+  preprocessed/fileio/mantaio.cpp
+  preprocessed/fileio/mantaio.h
+  preprocessed/fileio/mantaio.h.reg.cpp
+  preprocessed/fluidsolver.cpp
+  preprocessed/fluidsolver.h
+  preprocessed/fluidsolver.h.reg.cpp
+  preprocessed/general.cpp
+  preprocessed/general.h
+  preprocessed/general.h.reg.cpp
+  preprocessed/gitinfo.h
+  preprocessed/grid.cpp
+  preprocessed/grid.h
+  preprocessed/grid.h.reg.cpp
+  preprocessed/grid4d.cpp
+  preprocessed/grid4d.h
+  preprocessed/grid4d.h.reg.cpp
+  preprocessed/kernel.cpp
+  preprocessed/kernel.h
+  preprocessed/kernel.h.reg.cpp
+  preprocessed/levelset.cpp
+  preprocessed/levelset.h
+  preprocessed/levelset.h.reg.cpp
+  preprocessed/mesh.cpp
+  preprocessed/mesh.h
+  preprocessed/mesh.h.reg.cpp
+  preprocessed/movingobs.cpp
+  preprocessed/movingobs.h
+  preprocessed/movingobs.h.reg.cpp
+  preprocessed/multigrid.cpp
+  preprocessed/multigrid.h
+  preprocessed/multigrid.h.reg.cpp
+  preprocessed/noisefield.cpp
+  preprocessed/noisefield.h
+  preprocessed/noisefield.h.reg.cpp
+  preprocessed/particle.cpp
+  preprocessed/particle.h
+  preprocessed/particle.h.reg.cpp
+  preprocessed/plugin/advection.cpp
+  preprocessed/plugin/apic.cpp
+  preprocessed/plugin/extforces.cpp
+  preprocessed/plugin/fire.cpp
+  preprocessed/plugin/flip.cpp
+  preprocessed/plugin/fluidguiding.cpp
+  preprocessed/plugin/initplugins.cpp
+  preprocessed/plugin/kepsilon.cpp
+  preprocessed/plugin/meshplugins.cpp
+  preprocessed/plugin/pressure.cpp
+  preprocessed/plugin/ptsplugins.cpp
+  preprocessed/plugin/secondaryparticles.cpp
+  preprocessed/plugin/surfaceturbulence.cpp
+#  preprocessed/plugin/viscosity.cpp
+  preprocessed/plugin/vortexplugins.cpp
+  preprocessed/plugin/waveletturbulence.cpp
+  preprocessed/plugin/waves.cpp
+  preprocessed/python/defines.py
+  preprocessed/python/defines.py.reg.cpp
+  preprocessed/registration.cpp
+  preprocessed/shapes.cpp
+  preprocessed/shapes.h
+  preprocessed/shapes.h.reg.cpp
+  preprocessed/test.cpp
+  preprocessed/timing.cpp
+  preprocessed/timing.h
+  preprocessed/timing.h.reg.cpp
+  preprocessed/turbulencepart.cpp
+  preprocessed/turbulencepart.h
+  preprocessed/turbulencepart.h.reg.cpp
+  preprocessed/vortexpart.cpp
+  preprocessed/vortexpart.h
+  preprocessed/vortexpart.h.reg.cpp
+  preprocessed/vortexsheet.cpp
+  preprocessed/vortexsheet.h
+  preprocessed/vortexsheet.h.reg.cpp
 
-  ${MANTA_HLP}/pwrapper/manta.h
-  ${MANTA_HLP}/pwrapper/pclass.cpp
-  ${MANTA_HLP}/pwrapper/pclass.h
-  ${MANTA_HLP}/pwrapper/pconvert.cpp
-  ${MANTA_HLP}/pwrapper/pconvert.h
-  ${MANTA_HLP}/pwrapper/pvec3.cpp
-  ${MANTA_HLP}/pwrapper/pythonInclude.h
-  ${MANTA_HLP}/pwrapper/registry.cpp
-  ${MANTA_HLP}/pwrapper/registry.h
-  ${MANTA_HLP}/util/integrator.h
-  ${MANTA_HLP}/util/interpol.h
-  ${MANTA_HLP}/util/interpolHigh.h
-  ${MANTA_HLP}/util/matrixbase.h
-  ${MANTA_HLP}/util/mcubes.h
-  ${MANTA_HLP}/util/quaternion.h
-  ${MANTA_HLP}/util/randomstream.h
-  ${MANTA_HLP}/util/rcmatrix.h
-  ${MANTA_HLP}/util/simpleimage.cpp
-  ${MANTA_HLP}/util/simpleimage.h
-  ${MANTA_HLP}/util/solvana.h
-  ${MANTA_HLP}/util/vector4d.cpp
-  ${MANTA_HLP}/util/vector4d.h
-  ${MANTA_HLP}/util/vectorbase.cpp
-  ${MANTA_HLP}/util/vectorbase.h
+  helper/pwrapper/manta.h
+  helper/pwrapper/pclass.cpp
+  helper/pwrapper/pclass.h
+  helper/pwrapper/pconvert.cpp
+  helper/pwrapper/pconvert.h
+  helper/pwrapper/pvec3.cpp
+  helper/pwrapper/pythonInclude.h
+  helper/pwrapper/registry.cpp
+  helper/pwrapper/registry.h
+  helper/util/integrator.h
+  helper/util/interpol.h
+  helper/util/interpolHigh.h
+  helper/util/matrixbase.h
+  helper/util/mcubes.h
+  helper/util/quaternion.h
+  helper/util/randomstream.h
+  helper/util/rcmatrix.h
+  helper/util/simpleimage.cpp
+  helper/util/simpleimage.h
+  helper/util/solvana.h
+  helper/util/vector4d.cpp
+  helper/util/vector4d.h
+  helper/util/vectorbase.cpp
+  helper/util/vectorbase.h
 )
 
 if(WITH_MANTA_DEPENDENCIES)
@@ -266,16 +261,34 @@ if(WITH_MANTA_DEPENDENCIES)
 endif()
 if(WITH_MANTA_NUMPY AND WITH_PYTHON_NUMPY)
   list(APPEND SRC
-    ${MANTA_PP}/plugin/numpyconvert.cpp
-    ${MANTA_PP}/plugin/tfplugins.cpp
-    ${MANTA_HLP}/pwrapper/numpyWrap.cpp
-    ${MANTA_HLP}/pwrapper/numpyWrap.h
+    preprocessed/plugin/numpyconvert.cpp
+    preprocessed/plugin/tfplugins.cpp
+    helper/pwrapper/numpyWrap.cpp
+    helper/pwrapper/numpyWrap.h
   )
 endif()
 
 set(LIB
   ${PYTHON_LINKFLAGS}
   ${PYTHON_LIBRARIES}
+  ${OPENVDB_LIBRARIES}  
 )
 
-blender_add_lib(extern_mantaflow "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
+#blender_add_lib(extern_mantaflow "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
+
+add_library(extern_mantaflow SHARED "${SRC}")
+
+include_directories(preprocessed)
+include_directories(preprocessed/fileio)
+include_directories(preprocessed/python)
+include_directories(preprocessed/plugin)
+include_directories(helper/pwrapper)
+include_directories(helper/util)
+include_directories(${PYTHON_INCLUDE_DIRS})
+include_directories(${ZLIB_INCLUDE_DIRS})
+include_directories(${OPENVDB_INCLUDE_DIRS})
+
+#target_include_directories(extern_mantaflow PRIVATE "${INC}")
+target_link_libraries(extern_mantaflow PRIVATE "${LIB}")
+
+blender_source_group(extern_mantaflow "${SRC}")

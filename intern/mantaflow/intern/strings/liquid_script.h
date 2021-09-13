@@ -274,9 +274,14 @@ def liquid_step_$ID$():\n\
         velTmp_s$ID$.copyFrom(vel_s$ID$)\n\
     \n\
     mantaMsg('Advecting phi')\n\
+    #phi_s$ID$.updateToOmp()\n\
+    #vel_s$ID$.updateToOmp()\n\
     advectSemiLagrange(flags=flags_s$ID$, vel=vel_s$ID$, grid=phi_s$ID$, order=1) # first order is usually enough\n\
+    \n\
     mantaMsg('Advecting velocity')\n\
     advectSemiLagrange(flags=flags_s$ID$, vel=vel_s$ID$, grid=vel_s$ID$, order=2)\n\
+    #phi_s$ID$.updateFromOmp()\n\
+    #vel_s$ID$.updateFromOmp()\n\
     \n\
     # create level set of particles\n\
     gridParticleIndex(parts=pp_s$ID$, flags=flags_s$ID$, indexSys=pindex_s$ID$, index=gpi_s$ID$)\n\
@@ -323,21 +328,45 @@ def liquid_step_$ID$():\n\
         getLaplacian(laplacian=curvature_s$ID$, grid=phi_s$ID$)\n\
         curvature_s$ID$.clamp(-1.0, 1.0)\n\
     \n\
+    #vel_s$ID$.updateToOmp()\n\
     setWallBcs(flags=flags_s$ID$, vel=vel_s$ID$, obvel=None if using_fractions_s$ID$ else obvel_s$ID$, phiObs=phiObs_s$ID$, fractions=fractions_s$ID$)\n\
+    #vel_s$ID$.updateFromOmp()\n\
+    \n\
     if using_viscosity_s$ID$:\n\
         viscosity_s$ID$.setConst(viscosityValue_s$ID$)\n\
         applyViscosity(flags=flags_s$ID$, phi=phi_s$ID$, vel=vel_s$ID$, volumes=volumes_s$ID$, viscosity=viscosity_s$ID$)\n\
     \n\
+    #vel_s$ID$.updateToOmp()\n\
     setWallBcs(flags=flags_s$ID$, vel=vel_s$ID$, obvel=None if using_fractions_s$ID$ else obvel_s$ID$, phiObs=phiObs_s$ID$, fractions=fractions_s$ID$)\n\
+    #vel_s$ID$.updateFromOmp()\n\
+    \n\
     if using_guiding_s$ID$:\n\
         mantaMsg('Guiding and pressure')\n\
         PD_fluid_guiding(vel=vel_s$ID$, velT=velT_s$ID$, flags=flags_s$ID$, phi=phi_s$ID$, curv=curvature_s$ID$, surfTens=surfaceTension_s$ID$, fractions=fractions_s$ID$, weight=weightGuide_s$ID$, blurRadius=beta_sg$ID$, pressure=pressure_s$ID$, tau=tau_sg$ID$, sigma=sigma_sg$ID$, theta=theta_sg$ID$, zeroPressureFixing=domainClosed_s$ID$)\n\
     else:\n\
-        mantaMsg('Pressure')\n\
-        solvePressure(flags=flags_s$ID$, vel=vel_s$ID$, pressure=pressure_s$ID$, curv=curvature_s$ID$, surfTens=surfaceTension_s$ID$, fractions=fractions_s$ID$, obvel=obvel_s$ID$ if using_fractions_s$ID$ else None, zeroPressureFixing=domainClosed_s$ID$)\n\
+        print('Pressure')\n\
+        # openmp sync to device\n\
+        flags_s$ID$.updateToOmp()\n\
+        vel_s$ID$.updateToOmp()\n\
+        print('Pressure 2')\n\
+        \n\
+        #solvePressure(flags=flags_s$ID$, vel=vel_s$ID$, pressure=pressure_s$ID$, curv=curvature_s$ID$, surfTens=surfaceTension_s$ID$, fractions=fractions_s$ID$, obvel=obvel_s$ID$ if using_fractions_s$ID$ else None, zeroPressureFixing=domainClosed_s$ID$)\n\
+        computePressureRhs(rhs=rhs_s$ID$, vel=vel_s$ID$, pressure=pressure_s$ID$, flags=flags_s$ID$, preconditioner=PcNone)\n\
+        print('Pressure 21')\n\
+        solvePressureSystem(rhs=rhs_s$ID$, vel=vel_s$ID$, pressure=pressure_s$ID$, flags=flags_s$ID$, useL2Norm=True, preconditioner=PcNone, residual=residual_s$ID$, search=search_s$ID$, A0=A0_s$ID$, Ai=Ai_s$ID$, Aj=Aj_s$ID$, Ak=Ak_s$ID$, tmp=tmp_s$ID$)\n\
+        print('Pressure 22')\n\
+        correctVelocity(vel=vel_s$ID$, pressure=pressure_s$ID$, flags=flags_s$ID$, preconditioner=PcNone)\n\
+        \n\
+        print('Pressure 3')\n\
+        # openmp sync from device\n\
+        pressure_s$ID$.updateFromOmp()\n\
+        vel_s$ID$.updateFromOmp()\n\
     \n\
     extrapolateMACSimple(flags=flags_s$ID$, vel=vel_s$ID$, distance=4, intoObs=True if using_fractions_s$ID$ else False)\n\
+    \n\
+    #vel_s$ID$.updateToOmp()\n\
     setWallBcs(flags=flags_s$ID$, vel=vel_s$ID$, obvel=None if using_fractions_s$ID$ else obvel_s$ID$, phiObs=phiObs_s$ID$, fractions=fractions_s$ID$)\n\
+    #vel_s$ID$.updateFromOmp()\n\
     \n\
     if not using_fractions_s$ID$:\n\
         extrapolateMACSimple(flags=flags_s$ID$, vel=vel_s$ID$)\n\

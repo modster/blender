@@ -13,6 +13,7 @@
 // limitations under the License.
 //
 #include "draco/animation/keyframe_animation.h"
+#include <iostream>
 
 namespace draco {
 

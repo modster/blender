@@ -76,7 +76,7 @@
     .adapt_margin = 4, \
     .adapt_res = 0, \
     .adapt_threshold = 0.02f, \
-    .maxres = 32, \
+    .maxres = 64, \
     .solver_res = 3, \
     .border_collisions = 0, \
     .flags = FLUID_DOMAIN_USE_DISSOLVE_LOG | FLUID_DOMAIN_USE_ADAPTIVE_TIME, \

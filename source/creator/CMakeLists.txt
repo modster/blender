@@ -688,6 +688,13 @@ if(UNIX AND NOT APPLE)
       DESTINATION ${TARGETDIR_VER}/python/lib/python${PYTHON_VERSION}/site-packages
     )
   endif()
+  if(WITH_MOD_FLUID)
+    message(STATUS "============== Here")
+    install(
+      PROGRAMS $<TARGET_FILE:extern_mantaflow>
+      DESTINATION ${TARGETDIR_VER}/python/lib/python${PYTHON_VERSION}/site-packages
+    )
+  endif()
 elseif(WIN32)
 
   set(BLENDER_TEXT_FILES_DESTINATION ".")

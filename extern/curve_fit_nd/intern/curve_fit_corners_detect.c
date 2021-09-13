@@ -81,7 +81,7 @@ static double cos_vnvnvn(
 	normalize_vn_vnvn(dvec1, v1, v2, dims);
 	double d = dot_vnvn(dvec0, dvec1, dims);
 	/* sanity check */
-	d = max(-1.0, min(1.0, d));
+	d = maxV(-1.0, minV(1.0, d));
 	return d;
 }
 

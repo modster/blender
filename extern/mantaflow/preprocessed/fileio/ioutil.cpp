@@ -66,7 +66,7 @@ void *safeGzopen(const char *filename, const char *mode)
 #endif  // NO_ZLIB != 1
 }
 
-#if defined(OPENVDB)
+#if OPENVDB == 1
 // Convert from OpenVDB value to Manta value.
 template<class S, class T> void convertFrom(S &in, T *out)
 {

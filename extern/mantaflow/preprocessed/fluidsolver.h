@@ -384,7 +384,6 @@ class FluidSolver : public PbClass {
   GridStorage<Real> mGrids4dReal;
   GridStorage<Vec3> mGrids4dVec;
   GridStorage<Vec4> mGrids4dVec4;
-
  public:
   PbArgs _args;
 }

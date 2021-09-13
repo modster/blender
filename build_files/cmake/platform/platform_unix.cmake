@@ -63,7 +63,8 @@ if(EXISTS ${LIBDIR})
   # OpenMP usually can't be statically linked into shared libraries,
   # due to not being compiled with position independent code.
   if(NOT WITH_PYTHON_MODULE)
-    set(WITH_OPENMP_STATIC ON)
+    #message(STATUS "============= ENABLING Static OpenMP")
+    #set(WITH_OPENMP_STATIC ON)
   endif()
   set(Boost_NO_BOOST_CMAKE ON)
   set(BOOST_ROOT ${LIBDIR}/boost)
