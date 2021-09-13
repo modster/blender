@@ -1375,12 +1375,12 @@ static void seq_get_thumb_image_dimensions(Sequence *seq,
 
 static float seq_thumbnail_get_start_frame(Sequence *seq, float frame_step, rctf *view_area)
 {
-  if (seq->start > view_area->xmin && seq->start < view_area->xmax) {
+  if (seq->start > view_area->xmin) {
     return seq->start;
   }
 
-  /* Drawing and caching both check to see if strip is in view area or not before calling this
-   * function so assuming strip/part of strip in view. */
+  /* Drawing and caching both check to see if stristart_framep is in view area or not before
+   * calling this function so assuming strip/part of strip in view. */
 
   int no_invisible_thumbs = (view_area->xmin - seq->start) / frame_step;
   return ((no_invisible_thumbs - 1) * frame_step) + seq->start;
@@ -1505,6 +1505,11 @@ static void sequencer_thumbnail_start_job_if_necessary(const bContext *C,
 {
   SpaceSeq *sseq = CTX_wm_space_seq(C);
 
+  if ((v2d->flag & V2D_IS_NAVIGATING) != 0) {
+    WM_event_add_notifier(C, NC_SCENE | ND_SEQUENCER, NULL);
+    return;
+  }
+
   /* Leftover is set to true if missing image in strip. False when normal call to all strips done.
    */
   if (v2d->cur.xmax != sseq->runtime.last_thumbnail_area.xmax ||
@@ -1519,6 +1524,24 @@ static void sequencer_thumbnail_start_job_if_necessary(const bContext *C,
     sequencer_thumbnail_init_job(C, v2d, ed);
     sseq->runtime.last_thumbnail_area = v2d->cur;
   }
+}
+
+/* Don't display thumbnails only when zooming. Panning doesn't cause issues. */
+static bool sequencer_thumbnail_v2d_is_navigating(const bContext *C)
+{
+  ARegion *region = CTX_wm_region(C);
+  View2D *v2d = &region->v2d;
+  SpaceSeq *sseq = CTX_wm_space_seq(C);
+
+  if ((v2d->flag & V2D_IS_NAVIGATING) == 0) {
+    return false;
+  }
+
+  double x_diff = fabs(BLI_rctf_size_x(&sseq->runtime.last_thumbnail_area) -
+                       BLI_rctf_size_x(&v2d->cur));
+  double y_diff = fabs(BLI_rctf_size_y(&sseq->runtime.last_thumbnail_area) -
+                       BLI_rctf_size_y(&v2d->cur));
+  return x_diff > 0.01 || y_diff > 0.01;
 }
 
 static void draw_seq_strip_thumbnail(View2D *v2d,
@@ -1537,6 +1560,11 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
   /* If width of the strip too small ignore drawing thumbnails. */
   if ((y2 - y1) / pixely <= 40 * U.dpi_fac)
     return;
+
+  if (sequencer_thumbnail_v2d_is_navigating(C)) {
+    WM_event_add_notifier(C, NC_SCENE | ND_SEQUENCER, NULL);
+    return;
+  }
 
   SeqRenderData context = sequencer_thumbnail_context_init(C);
   seq_get_thumb_image_dimensions(
@@ -1603,32 +1631,32 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
     /* Get the image. */
     ImBuf *ibuf = SEQ_get_thumbnail(&context, seq, roundf(thumb_x_start), &crop, clipped);
 
-    if (ibuf) {
-      /* Transparency on overlap. */
-      if (seq->flag & SEQ_OVERLAP) {
-        GPU_blend(GPU_BLEND_ALPHA);
-        unsigned char *buf = (unsigned char *)ibuf->rect;
-        for (int pixel = ibuf->x * ibuf->y; pixel--; buf += 4) {
-          buf[3] = OVERLAP_ALPHA;
-        }
-      }
-
-      ED_draw_imbuf_ctx_clipping(C,
-                                 ibuf,
-                                 thumb_x_start + cut_off,
-                                 y1,
-                                 true,
-                                 thumb_x_start + cut_off,
-                                 y1,
-                                 thumb_x_end,
-                                 thumb_y_end,
-                                 zoom_x,
-                                 zoom_y);
-      IMB_freeImBuf(ibuf);
-    }
-    else {
+    if (!ibuf) {
       sequencer_thumbnail_start_job_if_necessary(C, scene->ed, v2d, true);
+      break;
     }
+
+    /* Transparency on overlap. */
+    if (seq->flag & SEQ_OVERLAP) {
+      GPU_blend(GPU_BLEND_ALPHA);
+      unsigned char *buf = (unsigned char *)ibuf->rect;
+      for (int pixel = ibuf->x * ibuf->y; pixel--; buf += 4) {
+        buf[3] = OVERLAP_ALPHA;
+      }
+    }
+
+    ED_draw_imbuf_ctx_clipping(C,
+                               ibuf,
+                               thumb_x_start + cut_off,
+                               y1,
+                               true,
+                               thumb_x_start + cut_off,
+                               y1,
+                               thumb_x_end,
+                               thumb_y_end,
+                               zoom_x,
+                               zoom_y);
+    IMB_freeImBuf(ibuf);
     GPU_blend(GPU_BLEND_NONE);
     cut_off = 0;
     thumb_x_start = thumb_x_end;
