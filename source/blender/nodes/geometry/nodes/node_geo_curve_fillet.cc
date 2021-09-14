@@ -42,9 +42,7 @@ static void geo_node_curve_fillet_declare(NodeDeclarationBuilder &b)
 
 static void geo_node_curve_fillet_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 {
-  uiLayoutSetPropSep(layout, true);
-  uiLayoutSetPropDecorate(layout, false);
-  uiItemR(layout, ptr, "mode", 0, IFACE_("Mode"), ICON_NONE);
+  uiItemR(layout, ptr, "mode", 0, "", ICON_NONE);
 }
 
 static void geo_node_curve_fillet_init(bNodeTree *UNUSED(tree), bNode *node)
@@ -75,16 +73,6 @@ struct FilletData {
   Array<float3> directions, axes;
   Array<float> radii, angles;
   Array<int> counts;
-
-  FilletData(const int size)
-  {
-    directions.reinitialize(size);
-    // positions.reinitialize(size);
-    axes.reinitialize(size);
-    radii.reinitialize(size);
-    angles.reinitialize(size);
-    counts.reinitialize(size);
-  }
 };
 
 static void geo_node_curve_fillet_update(bNodeTree *UNUSED(ntree), bNode *node)
@@ -218,7 +206,6 @@ static int calculate_point_counts(MutableSpan<int> point_counts,
   return added_count;
 }
 
-/* Function to calculate and obtain the fillet data for the entire spline. */
 static FilletData calculate_fillet_data(const Spline &spline,
                                         const FilletParam &fillet_param,
                                         int &added_count,
@@ -227,7 +214,7 @@ static FilletData calculate_fillet_data(const Spline &spline,
 {
   const int size = spline.size();
 
-  FilletData fd(size);
+  FilletData fd;
   fd.directions = calculate_directions(spline.positions());
   fd.positions = spline.positions();
   fd.axes = calculate_axes(fd.directions);
@@ -240,7 +227,7 @@ static FilletData calculate_fillet_data(const Spline &spline,
   return fd;
 }
 
-/* Limit the radius based on angle and radii to prevent overlap. */
+/* Limit the radius based on angle and radii to prevent overlapping. */
 static void limit_radii(FilletData &fd, const bool cyclic)
 {
   MutableSpan<float> radii(fd.radii);
@@ -306,7 +293,7 @@ static void limit_radii(FilletData &fd, const bool cyclic)
 }
 
 /*
- * Create a mapping from each vertex in the resulting spline to that of the source spline.
+ * Create a mapping from each vertex in the destination spline to that of the source spline.
  * Used for copying the data from the source spline.
  */
 static Array<int> create_dst_to_src_map(const Span<int> point_counts, const int total_points)
@@ -325,7 +312,6 @@ static Array<int> create_dst_to_src_map(const Span<int> point_counts, const int 
   return map;
 }
 
-/* Copy attribute data from source spline's Span to destination spline's Span. */
 template<typename T>
 static void copy_attribute_by_mapping(const Span<T> src,
                                       MutableSpan<T> dst,
@@ -336,7 +322,6 @@ static void copy_attribute_by_mapping(const Span<T> src,
   }
 }
 
-/* Copy all attributes in Bezier splines. */
 static void copy_bezier_attributes_by_mapping(const BezierSpline &src,
                                               BezierSpline &dst,
                                               const Span<int> mapping)
@@ -350,7 +335,6 @@ static void copy_bezier_attributes_by_mapping(const BezierSpline &src,
   copy_attribute_by_mapping(src.handle_positions_right(), dst.handle_positions_right(), mapping);
 }
 
-/* Copy all attributes in Poly splines. */
 static void copy_poly_attributes_by_mapping(const PolySpline &src,
                                             PolySpline &dst,
                                             const Span<int> mapping)
@@ -360,7 +344,6 @@ static void copy_poly_attributes_by_mapping(const PolySpline &src,
   copy_attribute_by_mapping(src.tilts(), dst.tilts(), mapping);
 }
 
-/* Copy all attributes in NURBS splines. */
 static void copy_NURBS_attributes_by_mapping(const NURBSpline &src,
                                              NURBSpline &dst,
                                              const Span<int> mapping)
@@ -371,7 +354,7 @@ static void copy_NURBS_attributes_by_mapping(const NURBSpline &src,
   copy_attribute_by_mapping(src.weights(), dst.weights(), mapping);
 }
 
-/* Update the positions and handle positions of a Bezier spline based on fillet data. */
+/* Update the vertex positions and handle positions of a Bezier spline based on fillet data. */
 static void update_bezier_positions(const FilletData &fd,
                                     BezierSpline &dst_spline,
                                     const Span<int> point_counts,
@@ -453,12 +436,12 @@ static void update_bezier_positions(const FilletData &fd,
   }
 }
 
-/* Update the positions of a Poly spline based on fillet data. */
-static void update_poly_or_NURBS_positions(const FilletData &fd,
-                                           Spline &dst_spline,
-                                           const Span<int> point_counts,
-                                           const int start,
-                                           const int fillet_count)
+/* Update the vertex positions of a Poly spline based on fillet data. */
+static void update_poly_positions(const FilletData &fd,
+                                  Spline &dst_spline,
+                                  const Span<int> point_counts,
+                                  const int start,
+                                  const int fillet_count)
 {
   Span<float> radii(fd.radii);
   Span<float> angles(fd.angles);
@@ -506,7 +489,6 @@ static void update_poly_or_NURBS_positions(const FilletData &fd,
   }
 }
 
-/* Function to fillet a spline. */
 static SplinePtr fillet_spline(const Spline &spline,
                                const FilletParam &fillet_param,
                                const int spline_offset)
@@ -546,7 +528,7 @@ static SplinePtr fillet_spline(const Spline &spline,
       if (fillet_param.mode == GEO_NODE_CURVE_FILLET_POLY) {
         dst_spline.handle_types_left().fill(BezierSpline::HandleType::Vector);
         dst_spline.handle_types_right().fill(BezierSpline::HandleType::Vector);
-        update_poly_or_NURBS_positions(fd, dst_spline, point_counts, start, fillet_count);
+        update_poly_positions(fd, dst_spline, point_counts, start, fillet_count);
       }
       else {
         update_bezier_positions(fd, dst_spline, point_counts, start, fillet_count);
@@ -558,7 +540,7 @@ static SplinePtr fillet_spline(const Spline &spline,
       PolySpline &dst_spline = static_cast<PolySpline &>(*dst_spline_ptr);
       dst_spline.resize(total_points);
       copy_poly_attributes_by_mapping(src_spline, dst_spline, dst_to_src);
-      update_poly_or_NURBS_positions(fd, dst_spline, point_counts, start, fillet_count);
+      update_poly_positions(fd, dst_spline, point_counts, start, fillet_count);
       break;
     }
     case Spline::Type::NURBS: {
@@ -566,7 +548,7 @@ static SplinePtr fillet_spline(const Spline &spline,
       NURBSpline &dst_spline = static_cast<NURBSpline &>(*dst_spline_ptr);
       dst_spline.resize(total_points);
       copy_NURBS_attributes_by_mapping(src_spline, dst_spline, dst_to_src);
-      update_poly_or_NURBS_positions(fd, dst_spline, point_counts, start, fillet_count);
+      update_poly_positions(fd, dst_spline, point_counts, start, fillet_count);
       break;
     }
   }
@@ -574,7 +556,6 @@ static SplinePtr fillet_spline(const Spline &spline,
   return dst_spline_ptr;
 }
 
-/* Function to fillet a curve */
 static std::unique_ptr<CurveEval> fillet_curve(const CurveEval &input_curve,
                                                const FilletParam &fillet_param)
 {
@@ -611,7 +592,7 @@ static void geo_node_fillet_exec(GeoNodeExecParams params)
   FilletParam fillet_param;
   fillet_param.mode = mode;
 
-  GeometryComponent &component = geometry_set.get_component_for_write(GEO_COMPONENT_TYPE_CURVE);
+  CurveComponent &component = geometry_set.get_component_for_write<CurveComponent>();
   GeometryComponentFieldContext field_context{component, ATTR_DOMAIN_POINT};
   const int domain_size = component.attribute_domain_size(ATTR_DOMAIN_POINT);
 
@@ -636,7 +617,7 @@ static void geo_node_fillet_exec(GeoNodeExecParams params)
 
   fillet_param.limit_radius = params.extract_input<bool>("Limit Radius");
 
-  if (radius_array->is_single() && radius_array->get_internal_single() < 0) {
+  if (radius_array->is_single() && radius_array->get_internal_single() < 0.0f) {
     params.set_output("Geometry", geometry_set);
     return;
   }
