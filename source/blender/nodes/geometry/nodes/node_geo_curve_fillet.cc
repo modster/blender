@@ -58,10 +58,10 @@ struct FilletParam {
   GeometryNodeCurveFilletMode mode;
 
   /* Number of points to be added. */
-  GVArray_Typed<int> *counts;
+  const VArray<int> *counts;
 
   /* Radii for fillet arc at all vertices. */
-  GVArray_Typed<float> *radii;
+  const VArray<float> *radii;
 
   /* Whether or not fillets are allowed to overlap. */
   bool limit_radius;
@@ -595,32 +595,29 @@ static void geo_node_fillet_exec(GeoNodeExecParams params)
   CurveComponent &component = geometry_set.get_component_for_write<CurveComponent>();
   GeometryComponentFieldContext field_context{component, ATTR_DOMAIN_POINT};
   const int domain_size = component.attribute_domain_size(ATTR_DOMAIN_POINT);
+  fn::FieldEvaluator field_evaluator{field_context, domain_size};
+
+  Field<float> radius_field = params.extract_input<Field<float>>("Radius");
+  field_evaluator.add(std::move(radius_field));
 
   if (mode == GEO_NODE_CURVE_FILLET_POLY) {
     Field<int> count_field = params.extract_input<Field<int>>("Count");
-
-    fn::FieldEvaluator count_evaluator{field_context, domain_size};
-    count_evaluator.add(count_field);
-    count_evaluator.evaluate();
-    const GVArray &count = count_evaluator.get_evaluated(0);
-    GVArray_Typed<int> counts_array = GVArray_Typed<int>(count);
-    fillet_param.counts = &counts_array;
+    field_evaluator.add(std::move(count_field));
   }
 
-  Field<float> radius_field = params.extract_input<Field<float>>("Radius");
-  fn::FieldEvaluator radius_evaluator{field_context, domain_size};
-  radius_evaluator.add(radius_field);
-  radius_evaluator.evaluate();
-  const GVArray &radius = radius_evaluator.get_evaluated(0);
-  GVArray_Typed<float> radius_array = GVArray_Typed<float>(radius);
-  fillet_param.radii = &radius_array;
+  field_evaluator.evaluate();
 
-  fillet_param.limit_radius = params.extract_input<bool>("Limit Radius");
-
-  if (radius_array->is_single() && radius_array->get_internal_single() < 0.0f) {
+  fillet_param.radii = &field_evaluator.get_evaluated<float>(0);
+  if (fillet_param.radii->is_single() && fillet_param.radii->get_internal_single() < 0.0f) {
     params.set_output("Geometry", geometry_set);
     return;
   }
+
+  if (mode == GEO_NODE_CURVE_FILLET_POLY) {
+    fillet_param.counts = &field_evaluator.get_evaluated<int>(1);
+  }
+
+  fillet_param.limit_radius = params.extract_input<bool>("Limit Radius");
 
   const CurveEval &input_curve = *geometry_set.get_curve_for_read();
   std::unique_ptr<CurveEval> output_curve = fillet_curve(input_curve, fillet_param);
