@@ -407,7 +407,7 @@ void Session::do_delayed_reset()
 
   /* Update for new state of passes. */
   buffer_params_.update_passes(scene->passes);
-  tile_manager_.update_passes(buffer_params_, scene->passes);
+  tile_manager_.update_passes(buffer_params_);
 
   /* Progress. */
   progress.reset_sample();

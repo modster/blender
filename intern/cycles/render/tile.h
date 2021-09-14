@@ -20,11 +20,8 @@
 #include "util/util_image.h"
 #include "util/util_string.h"
 #include "util/util_unique_ptr.h"
-#include "util/util_vector.h"
 
 CCL_NAMESPACE_BEGIN
-
-class Pass;
 
 /* --------------------------------------------------------------------
  * Tile.
@@ -60,7 +57,7 @@ class TileManager {
    * cases of stretched renders. */
   void reset(const BufferParams &params, int2 tile_size);
 
-  void update_passes(const BufferParams &params, const vector<Pass *> &passes);
+  void update_passes(const BufferParams &params);
 
   inline int get_num_tiles() const
   {

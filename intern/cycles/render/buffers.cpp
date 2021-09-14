@@ -43,45 +43,101 @@ static int pass_type_mode_to_index(PassType pass_type, PassMode mode)
   return index;
 }
 
-static int scene_pass_to_index(const Pass *pass)
+static int pass_to_index(const BufferPass &pass)
 {
-  return pass_type_mode_to_index(pass->get_type(), pass->get_mode());
+  return pass_type_mode_to_index(pass.type, pass.mode);
 }
 
 /* --------------------------------------------------------------------
  * Buffer pass.
  */
 
+NODE_DEFINE(BufferPass)
+{
+  NodeType *type = NodeType::add("buffer_pass", create);
+
+  const NodeEnum *pass_type_enum = Pass::get_type_enum();
+  const NodeEnum *pass_mode_enum = Pass::get_mode_enum();
+
+  SOCKET_ENUM(type, "Type", *pass_type_enum, PASS_COMBINED);
+  SOCKET_ENUM(mode, "Mode", *pass_mode_enum, static_cast<int>(PassMode::DENOISED));
+  SOCKET_STRING(name, "Name", ustring());
+  SOCKET_BOOLEAN(include_albedo, "Include Albedo", false);
+
+  SOCKET_INT(offset, "Offset", -1);
+
+  return type;
+}
+
+BufferPass::BufferPass() : Node(get_node_type())
+{
+}
+
 BufferPass::BufferPass(const Pass *scene_pass)
-    : type(scene_pass->get_type()),
+    : Node(get_node_type()),
+      type(scene_pass->get_type()),
       mode(scene_pass->get_mode()),
       name(scene_pass->get_name()),
       include_albedo(scene_pass->get_include_albedo())
 {
 }
 
+PassInfo BufferPass::get_info() const
+{
+  return Pass::get_info(type, include_albedo);
+}
+
 /* --------------------------------------------------------------------
  * Buffer Params.
  */
 
-BufferParams::BufferParams()
+NODE_DEFINE(BufferParams)
 {
-  width = 0;
-  height = 0;
+  NodeType *type = NodeType::add("buffer_params", create);
 
-  full_x = 0;
-  full_y = 0;
-  full_width = 0;
-  full_height = 0;
+  SOCKET_INT(width, "Width", 0);
+  SOCKET_INT(height, "Height", 0);
 
+  SOCKET_INT(full_x, "Full X", 0);
+  SOCKET_INT(full_y, "Full Y", 0);
+  SOCKET_INT(full_width, "Full Width", 0);
+  SOCKET_INT(full_height, "Full Height", 0);
+
+  /* Notes:
+   *  - Skip passes since they do not follow typical container socket definition.
+   *    Might look into covering those as a socket in the future.
+   *
+   *  - Skip offset, stride, and pass stride since those can be delivered from the passes and
+   *    rest of the sockets. */
+
+  return type;
+}
+
+BufferParams::BufferParams() : Node(get_node_type())
+{
   reset_pass_offset();
 }
 
-void BufferParams::update_passes(const vector<Pass *> &scene_passes)
+void BufferParams::update_passes()
 {
   update_offset_stride();
   reset_pass_offset();
 
+  pass_stride = 0;
+  for (const BufferPass &pass : passes) {
+    if (pass.offset != PASS_UNUSED) {
+      const int index = pass_to_index(pass);
+      if (pass_offset_[index] == PASS_UNUSED) {
+        pass_offset_[index] = pass_stride;
+      }
+
+      pass_stride += pass.get_info().num_components;
+    }
+  }
+}
+
+void BufferParams::update_passes(const vector<Pass *> &scene_passes)
+{
   passes.clear();
 
   pass_stride = 0;
@@ -90,12 +146,6 @@ void BufferParams::update_passes(const vector<Pass *> &scene_passes)
 
     if (scene_pass->is_written()) {
       buffer_pass.offset = pass_stride;
-
-      const int index = scene_pass_to_index(scene_pass);
-      if (pass_offset_[index] == PASS_UNUSED) {
-        pass_offset_[index] = pass_stride;
-      }
-
       pass_stride += scene_pass->get_info().num_components;
     }
     else {
@@ -104,6 +154,8 @@ void BufferParams::update_passes(const vector<Pass *> &scene_passes)
 
     passes.emplace_back(std::move(buffer_pass));
   }
+
+  update_passes();
 }
 
 void BufferParams::reset_pass_offset()

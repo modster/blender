@@ -18,7 +18,7 @@
 #define __BUFFERS_H__
 
 #include "device/device_memory.h"
-
+#include "graph/node.h"
 #include "render/pass.h"
 
 #include "kernel/kernel_types.h"
@@ -34,8 +34,11 @@ class Device;
 struct DeviceDrawParams;
 struct float4;
 
-class BufferPass {
+/* NOTE: Is not a real scene node. Using Node API for ease of (de)serialization. */
+class BufferPass : public Node {
  public:
+  NODE_DECLARE
+
   PassType type = PASS_NONE;
   PassMode mode = PassMode::NOISY;
   ustring name;
@@ -43,7 +46,18 @@ class BufferPass {
 
   int offset = -1;
 
+  BufferPass();
   explicit BufferPass(const Pass *scene_pass);
+
+  BufferPass(BufferPass &&other) noexcept = default;
+  BufferPass(const BufferPass &other) = default;
+
+  BufferPass &operator=(BufferPass &&other) = default;
+  BufferPass &operator=(const BufferPass &other) = default;
+
+  ~BufferPass() = default;
+
+  PassInfo get_info() const;
 
   inline bool operator==(const BufferPass &other) const
   {
@@ -59,8 +73,11 @@ class BufferPass {
 /* Buffer Parameters
  * Size of render buffer and how it fits in the full image (border render). */
 
-class BufferParams {
+/* NOTE: Is not a real scene node. Using Node API for ease of (de)serialization. */
+class BufferParams : public Node {
  public:
+  NODE_DECLARE
+
   /* width/height of the physical buffer */
   int width = 0;
   int height = 0;
@@ -79,10 +96,23 @@ class BufferParams {
 
   vector<BufferPass> passes;
 
-  /* functions */
   BufferParams();
 
-  /* Pre-calculate all fields which depends on the scene passes. */
+  BufferParams(BufferParams &&other) noexcept = default;
+  BufferParams(const BufferParams &other) = default;
+
+  BufferParams &operator=(BufferParams &&other) = default;
+  BufferParams &operator=(const BufferParams &other) = default;
+
+  ~BufferParams() = default;
+
+  /* Pre-calculate all fields which depends on the passes.
+   *
+   * When the scene passes are given, the buffer passes will be created from them and stored in
+   * this params, and then params are updated for those passes.
+   * The `update_passes()` without parameters updates offsets and stries which are stored outside
+   * of the passes. */
+  void update_passes();
   void update_passes(const vector<Pass *> &scene_passes);
 
   /* Returns PASS_UNUSED if there is no such pass in the buffer. */

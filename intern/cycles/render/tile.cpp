@@ -33,11 +33,7 @@ CCL_NAMESPACE_BEGIN
 static const char *ATTR_PASSES_COUNT = "cycles.passes.count";
 
 static const char *ATTR_PASS_SOCKET_PREFIX_FORMAT = "cycles.passes.%d.";
-
-static const char *ATTR_BUFFER_FULL_X = "cycles.buffer.full_x";
-static const char *ATTR_BUFFER_FULL_Y = "cycles.buffer.full_y";
-static const char *ATTR_BUFFER_FULL_WIDTH = "cycles.buffer.full_width";
-static const char *ATTR_BUFFER_FULL_HEIGHT = "cycles.buffer.full_height";
+static const char *ATTR_BUFFER_SOCKET_PREFIX = "cycles.buffer.";
 
 /* Global counter of ToleManager object instances. */
 static std::atomic<uint64_t> g_instance_index = 0;
@@ -46,19 +42,19 @@ static std::atomic<uint64_t> g_instance_index = 0;
  * in render buffers corresponding to the given passes.
  *
  * Returns `std` datatypes so that it can be assigned directly to the OIIO's `ImageSpec`. */
-static std::vector<std::string> exr_channel_names_for_passes(const vector<Pass *> &passes)
+static std::vector<std::string> exr_channel_names_for_passes(const BufferParams &buffer_params)
 {
   static const char *component_suffixes[] = {"R", "G", "B", "A"};
 
   int pass_index = 0;
   int num_channels = 0;
   std::vector<std::string> channel_names;
-  for (const Pass *pass : passes) {
-    if (!pass->is_written()) {
+  for (const BufferPass &pass : buffer_params.passes) {
+    if (pass.offset == PASS_UNUSED) {
       continue;
     }
 
-    const PassInfo pass_info = pass->get_info();
+    const PassInfo pass_info = pass.get_info();
     num_channels += pass_info.num_components;
 
     /* EXR canonically expects first part of channel names to be sorted alphabetically, which is
@@ -67,7 +63,7 @@ static std::vector<std::string> exr_channel_names_for_passes(const vector<Pass *
      * buffers memory to disk and read it back without doing extra mapping. */
     const string prefix = string_printf("%08d", pass_index);
 
-    const string channel_name_prefix = prefix + string(pass->get_name()) + ".";
+    const string channel_name_prefix = prefix + string(pass.name) + ".";
 
     for (int i = 0; i < pass_info.num_components; ++i) {
       channel_names.push_back(channel_name_prefix + component_suffixes[i]);
@@ -77,32 +73,6 @@ static std::vector<std::string> exr_channel_names_for_passes(const vector<Pass *
   }
 
   return channel_names;
-}
-
-static bool buffer_params_to_image_spec_atttributes(ImageSpec *image_spec,
-                                                    const BufferParams &buffer_params)
-{
-  image_spec->attribute(ATTR_BUFFER_FULL_X, buffer_params.full_x);
-  image_spec->attribute(ATTR_BUFFER_FULL_Y, buffer_params.full_y);
-  image_spec->attribute(ATTR_BUFFER_FULL_WIDTH, buffer_params.full_width);
-  image_spec->attribute(ATTR_BUFFER_FULL_HEIGHT, buffer_params.full_height);
-
-  return true;
-}
-
-/* NOTE: The parameters needs to be updated with passes after this call still
- * (`buffer_params->update_passes()`). */
-static bool buffer_params_from_image_spec_atttributes(BufferParams *buffer_params,
-                                                      const ImageSpec &image_spec)
-{
-  buffer_params->width = image_spec.width;
-  buffer_params->height = image_spec.height;
-  buffer_params->full_x = image_spec.get_int_attribute(ATTR_BUFFER_FULL_X, 0);
-  buffer_params->full_y = image_spec.get_int_attribute(ATTR_BUFFER_FULL_Y, 0);
-  buffer_params->full_width = image_spec.get_int_attribute(ATTR_BUFFER_FULL_WIDTH, 0);
-  buffer_params->full_height = image_spec.get_int_attribute(ATTR_BUFFER_FULL_HEIGHT, 0);
-
-  return true;
 }
 
 inline string node_socket_attribute_name(const SocketType &socket, const string &attr_name_prefix)
@@ -156,6 +126,10 @@ static bool node_socket_to_image_spec_atttributes(ImageSpec *image_spec,
       image_spec->attribute(attr_name, node->get_string(socket));
       return true;
 
+    case SocketType::INT:
+      image_spec->attribute(attr_name, node->get_int(socket));
+      return true;
+
     case SocketType::BOOLEAN:
       image_spec->attribute(attr_name, node->get_bool(socket));
       return true;
@@ -195,6 +169,10 @@ static bool node_socket_from_image_spec_atttributes(Node *node,
       node->set(socket, ustring(image_spec.get_string_attribute(attr_name, "")));
       return true;
 
+    case SocketType::INT:
+      node->set(socket, image_spec.get_int_attribute(attr_name, 0));
+      return true;
+
     case SocketType::BOOLEAN:
       node->set(socket, static_cast<bool>(image_spec.get_int_attribute(attr_name, 0)));
       return true;
@@ -231,17 +209,22 @@ static bool node_from_image_spec_atttributes(Node *node,
   return true;
 }
 
-static bool passes_to_image_spec_atttributes(ImageSpec *image_spec, const vector<Pass *> &passes)
+static bool buffer_params_to_image_spec_atttributes(ImageSpec *image_spec,
+                                                    const BufferParams &buffer_params)
 {
-  const int num_passes = passes.size();
+  if (!node_to_image_spec_atttributes(image_spec, &buffer_params, ATTR_BUFFER_SOCKET_PREFIX)) {
+    return false;
+  }
 
+  /* Passes storage is not covered by the node socket. so "expand" the loop manually. */
+
+  const int num_passes = buffer_params.passes.size();
   image_spec->attribute(ATTR_PASSES_COUNT, num_passes);
 
   for (int pass_index = 0; pass_index < num_passes; ++pass_index) {
     const string attr_name_prefix = string_printf(ATTR_PASS_SOCKET_PREFIX_FORMAT, pass_index);
 
-    const Pass *pass = passes[pass_index];
-
+    const BufferPass *pass = &buffer_params.passes[pass_index];
     if (!node_to_image_spec_atttributes(image_spec, pass, attr_name_prefix)) {
       return false;
     }
@@ -250,10 +233,15 @@ static bool passes_to_image_spec_atttributes(ImageSpec *image_spec, const vector
   return true;
 }
 
-static bool passes_from_image_spec_atttributes(NodeOwner *passes_owner,
-                                               vector<Pass *> *passes,
-                                               const ImageSpec image_spec)
+static bool buffer_params_from_image_spec_atttributes(BufferParams *buffer_params,
+                                                      const ImageSpec &image_spec)
 {
+  if (!node_from_image_spec_atttributes(buffer_params, image_spec, ATTR_BUFFER_SOCKET_PREFIX)) {
+    return false;
+  }
+
+  /* Passes storage is not covered by the node socket. so "expand" the loop manually. */
+
   const int num_passes = image_spec.get_int_attribute(ATTR_PASSES_COUNT, 0);
   if (num_passes == 0) {
     LOG(ERROR) << "Missing passes count attribute.";
@@ -263,29 +251,16 @@ static bool passes_from_image_spec_atttributes(NodeOwner *passes_owner,
   for (int pass_index = 0; pass_index < num_passes; ++pass_index) {
     const string attr_name_prefix = string_printf(ATTR_PASS_SOCKET_PREFIX_FORMAT, pass_index);
 
-    Pass *pass = new Pass();
-    pass->set_owner(passes_owner);
-    passes->push_back(pass);
+    BufferPass pass;
 
-    if (!node_from_image_spec_atttributes(pass, image_spec, attr_name_prefix)) {
+    if (!node_from_image_spec_atttributes(&pass, image_spec, attr_name_prefix)) {
       return false;
     }
+
+    buffer_params->passes.emplace_back(std::move(pass));
   }
 
-  return true;
-}
-
-static bool configure_image_spec_attributes(ImageSpec *image_spec,
-                                            const BufferParams &buffer_params,
-                                            const vector<Pass *> &passes)
-{
-  if (!buffer_params_to_image_spec_atttributes(image_spec, buffer_params)) {
-    return false;
-  }
-
-  if (!passes_to_image_spec_atttributes(image_spec, passes)) {
-    return false;
-  }
+  buffer_params->update_passes();
 
   return true;
 }
@@ -299,10 +274,9 @@ static bool configure_image_spec_attributes(ImageSpec *image_spec,
  * given tile size for tiled IO. */
 static bool configure_image_spec_from_buffer(ImageSpec *image_spec,
                                              const BufferParams &buffer_params,
-                                             const vector<Pass *> &passes,
                                              const int2 tile_size = make_int2(0, 0))
 {
-  const std::vector<std::string> channel_names = exr_channel_names_for_passes(passes);
+  const std::vector<std::string> channel_names = exr_channel_names_for_passes(buffer_params);
   const int num_channels = channel_names.size();
 
   *image_spec = ImageSpec(
@@ -310,7 +284,7 @@ static bool configure_image_spec_from_buffer(ImageSpec *image_spec,
 
   image_spec->channelnames = move(channel_names);
 
-  if (!configure_image_spec_attributes(image_spec, buffer_params, passes)) {
+  if (!buffer_params_to_image_spec_atttributes(image_spec, buffer_params)) {
     return false;
   }
 
@@ -320,29 +294,6 @@ static bool configure_image_spec_from_buffer(ImageSpec *image_spec,
 
     image_spec->tile_width = tile_size.x;
     image_spec->tile_height = tile_size.y;
-  }
-
-  return true;
-}
-
-static bool configure_buffer_from_image_spec(BufferParams *buffer_params,
-                                             const ImageSpec &image_spec)
-{
-  NodeOwner passes_owner;
-  vector<Pass *> passes;
-  if (!passes_from_image_spec_atttributes(&passes_owner, &passes, image_spec)) {
-    return false;
-  }
-
-  if (!buffer_params_from_image_spec_atttributes(buffer_params, image_spec)) {
-    return false;
-  }
-
-  buffer_params->update_passes(passes);
-
-  /* The base NodeOwner does not take ownership over nodes, so need to free passes explicitly. */
-  foreach (Pass *pass, passes) {
-    delete pass;
   }
 
   return true;
@@ -386,7 +337,7 @@ void TileManager::reset(const BufferParams &params, int2 tile_size)
   tile_state_.current_tile = Tile();
 }
 
-void TileManager::update_passes(const BufferParams &params, const vector<Pass *> &passes)
+void TileManager::update_passes(const BufferParams &params)
 {
   DCHECK_NE(params.pass_stride, -1);
 
@@ -394,7 +345,7 @@ void TileManager::update_passes(const BufferParams &params, const vector<Pass *>
 
   /* TODO(sergey): Proper Error handling, so that if configuration has failed we dont' attempt to
    * write to a partially configured file. */
-  configure_image_spec_from_buffer(&write_state_.image_spec, buffer_params_, passes, tile_size_);
+  configure_image_spec_from_buffer(&write_state_.image_spec, buffer_params_, tile_size_);
 }
 
 bool TileManager::done()
@@ -594,7 +545,7 @@ bool TileManager::read_full_buffer_from_disk(RenderBuffers *buffers)
   }
 
   BufferParams buffer_params;
-  if (!configure_buffer_from_image_spec(&buffer_params, spec)) {
+  if (!buffer_params_from_image_spec_atttributes(&buffer_params, spec)) {
     return false;
   }
 
