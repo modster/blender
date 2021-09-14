@@ -1262,7 +1262,6 @@ static void panel_draw_aligned_backdrop(const Panel *panel,
   if (draw_box_style) {
     /* Use the theme for box widgets. */
     const uiWidgetColors *box_wcol = &UI_GetTheme()->tui.wcol_box;
-    const uiStyle *style = UI_style_get_dpi();
 
     if (is_subpanel) {
       /* Use rounded bottom corners for the last subpanel. */
