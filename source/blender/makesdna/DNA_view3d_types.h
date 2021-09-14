@@ -204,6 +204,7 @@ typedef struct View3DOverlay {
   /** Edit mode settings. */
   int edit_flag;
   float normals_length;
+  float normals_constant_screen_size;
   float backwire_opacity;
 
   /** Paint mode settings. */
@@ -238,6 +239,8 @@ typedef struct View3DOverlay {
   float gpencil_vertex_paint_opacity;
   /** Handles display type for curves. */
   int handle_display;
+
+  char _pad[4];
 } View3DOverlay;
 
 /* View3DOverlay->handle_display */
@@ -551,6 +554,7 @@ enum {
   // V3D_OVERLAY_EDIT_CU_HANDLES = (1 << 20),
 
   V3D_OVERLAY_EDIT_CU_NORMALS = (1 << 21),
+  V3D_OVERLAY_EDIT_CONSTANT_SCREEN_SIZE_NORMALS = (1 << 22),
 };
 
 /** #View3DOverlay.paint_flag */
@@ -605,6 +609,14 @@ enum {
   V3D_GIZMO_HIDE_CONTEXT = (1 << 2),
   V3D_GIZMO_HIDE_TOOL = (1 << 3),
 };
+
+/**
+ * Hide these gizmos when modal operators are active,
+ * the intention is to hide all gizmos except for navigation since from a user-perspective
+ * these are closer to UI-level interface elements. Hiding them makes the UI flicker, also,
+ * the 3D view-axis can be useful to see during interactions.
+ */
+#define V3D_GIZMO_HIDE_DEFAULT_MODAL (V3D_GIZMO_HIDE_CONTEXT | V3D_GIZMO_HIDE_TOOL)
 
 /** #View3d.gizmo_show_object */
 enum {

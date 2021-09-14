@@ -104,6 +104,7 @@ set(SRC
   composite/nodes/node_composite_outputFile.c
   composite/nodes/node_composite_pixelate.c
   composite/nodes/node_composite_planetrackdeform.c
+  composite/nodes/node_composite_posterize.c
   composite/nodes/node_composite_premulkey.c
   composite/nodes/node_composite_rgb.c
   composite/nodes/node_composite_rotate.c
@@ -141,6 +142,7 @@ set(SRC
   function/node_function_util.cc
 
   geometry/nodes/node_geo_align_rotation_to_vector.cc
+  geometry/nodes/node_geo_attribute_capture.cc
   geometry/nodes/node_geo_attribute_clamp.cc
   geometry/nodes/node_geo_attribute_color_ramp.cc
   geometry/nodes/node_geo_attribute_combine_xyz.cc
@@ -165,6 +167,7 @@ set(SRC
   geometry/nodes/node_geo_common.cc
   geometry/nodes/node_geo_convex_hull.cc
   geometry/nodes/node_geo_curve_endpoints.cc
+  geometry/nodes/node_geo_curve_fill.cc
   geometry/nodes/node_geo_curve_length.cc
   geometry/nodes/node_geo_curve_primitive_bezier_segment.cc
   geometry/nodes/node_geo_curve_primitive_circle.cc
@@ -175,7 +178,9 @@ set(SRC
   geometry/nodes/node_geo_curve_primitive_star.cc
   geometry/nodes/node_geo_curve_resample.cc
   geometry/nodes/node_geo_curve_reverse.cc
+  geometry/nodes/node_geo_curve_select_by_handle_type.cc
   geometry/nodes/node_geo_curve_set_handles.cc
+  geometry/nodes/node_geo_curve_spline_type.cc
   geometry/nodes/node_geo_curve_subdivide.cc
   geometry/nodes/node_geo_curve_to_mesh.cc
   geometry/nodes/node_geo_curve_to_points.cc
@@ -183,6 +188,9 @@ set(SRC
   geometry/nodes/node_geo_delete_geometry.cc
   geometry/nodes/node_geo_edge_split.cc
   geometry/nodes/node_geo_input_material.cc
+  geometry/nodes/node_geo_input_normal.cc
+  geometry/nodes/node_geo_input_position.cc
+  geometry/nodes/node_geo_input_index.cc
   geometry/nodes/node_geo_is_viewport.cc
   geometry/nodes/node_geo_join_geometry.cc
   geometry/nodes/node_geo_material_assign.cc
@@ -208,6 +216,7 @@ set(SRC
   geometry/nodes/node_geo_raycast.cc
   geometry/nodes/node_geo_select_by_material.cc
   geometry/nodes/node_geo_separate_components.cc
+  geometry/nodes/node_geo_set_position.cc
   geometry/nodes/node_geo_subdivision_surface.cc
   geometry/nodes/node_geo_switch.cc
   geometry/nodes/node_geo_transform.cc
@@ -283,16 +292,16 @@ set(SRC
   shader/nodes/node_shader_tex_checker.c
   shader/nodes/node_shader_tex_coord.c
   shader/nodes/node_shader_tex_environment.c
-  shader/nodes/node_shader_tex_gradient.c
+  shader/nodes/node_shader_tex_gradient.cc
   shader/nodes/node_shader_tex_image.c
   shader/nodes/node_shader_tex_magic.c
-  shader/nodes/node_shader_tex_musgrave.c
-  shader/nodes/node_shader_tex_noise.c
+  shader/nodes/node_shader_tex_musgrave.cc
+  shader/nodes/node_shader_tex_noise.cc
   shader/nodes/node_shader_tex_pointdensity.c
   shader/nodes/node_shader_tex_sky.c
-  shader/nodes/node_shader_tex_voronoi.c
+  shader/nodes/node_shader_tex_voronoi.cc
   shader/nodes/node_shader_tex_wave.c
-  shader/nodes/node_shader_tex_white_noise.c
+  shader/nodes/node_shader_tex_white_noise.cc
   shader/nodes/node_shader_uvAlongStroke.c
   shader/nodes/node_shader_uvmap.c
   shader/nodes/node_shader_valToRgb.cc
@@ -343,11 +352,12 @@ set(SRC
   intern/node_common.c
   intern/node_exec.cc
   intern/node_geometry_exec.cc
+  intern/node_multi_function.cc
+  intern/node_declaration.cc
+  intern/node_socket_declarations.cc
   intern/node_socket.cc
-  intern/node_tree_multi_function.cc
   intern/node_tree_ref.cc
   intern/node_util.c
-  intern/type_callbacks.cc
   intern/type_conversions.cc
 
   composite/node_composite_util.h
@@ -364,13 +374,14 @@ set(SRC
   NOD_geometry_exec.hh
   NOD_geometry_nodes_eval_log.hh
   NOD_math_functions.hh
-  NOD_node_tree_multi_function.hh
+  NOD_multi_function.hh
+  NOD_node_declaration.hh
+  NOD_socket_declarations.hh
   NOD_node_tree_ref.hh
   NOD_shader.h
   NOD_socket.h
   NOD_static_types.h
   NOD_texture.h
-  NOD_type_callbacks.hh
   NOD_type_conversions.hh
   intern/node_common.h
   intern/node_exec.h

@@ -60,6 +60,7 @@
 #include "UI_view2d.h"
 
 #include "transform.h"
+#include "transform_convert.h"
 #include "transform_mode.h"
 #include "transform_orientations.h"
 #include "transform_snap.h"
@@ -152,8 +153,7 @@ void initTransInfo(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 
   t->flag = 0;
 
-  if (obact && !(t->options & (CTX_CURSOR | CTX_TEXTURE_SPACE)) &&
-      ELEM(object_mode, OB_MODE_EDIT, OB_MODE_EDIT_GPENCIL)) {
+  if (obact && ELEM(object_mode, OB_MODE_EDIT, OB_MODE_EDIT_GPENCIL)) {
     t->obedit_type = obact->type;
   }
   else {
@@ -252,7 +252,7 @@ void initTransInfo(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
     /* turn gizmo off during transform */
     if (t->flag & T_MODAL) {
       t->gizmo_flag = v3d->gizmo_flag;
-      v3d->gizmo_flag = V3D_GIZMO_HIDE;
+      v3d->gizmo_flag |= V3D_GIZMO_HIDE_DEFAULT_MODAL;
     }
 
     if (t->scene->toolsettings->transform_flag & SCE_XFORM_AXIS_ALIGN) {
@@ -625,6 +625,11 @@ void initTransInfo(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
   }
 #endif
 
+  /* Disable cursor wrap when edge panning is enabled. */
+  if (t->options & CTX_VIEW2D_EDGE_PAN) {
+    t->flag |= T_NO_CURSOR_WRAP;
+  }
+
   setTransformViewAspect(t, t->aspect);
 
   if (op && (prop = RNA_struct_find_property(op->ptr, "center_override")) &&
@@ -786,7 +791,7 @@ static void restoreElement(TransData *td)
 {
   transdata_restore_basic((TransDataBasic *)td);
 
-  if (td->val) {
+  if (td->val && td->val != td->loc) {
     *td->val = td->ival;
   }
 

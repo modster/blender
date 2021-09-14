@@ -38,6 +38,7 @@
 #include "BLI_utildefines.h"
 
 #include "BKE_DerivedMesh.h"
+#include "BKE_deform.h"
 #include "BKE_displist.h"
 #include "BKE_editmesh.h"
 #include "BKE_key.h"
@@ -271,8 +272,8 @@ static int mesh_nurbs_displist_to_mdata(const Curve *cu,
   }
 
   if (totvert == 0) {
-    /* error("can't convert"); */
-    /* Make Sure you check ob->data is a curve */
+    /* Make Sure you check ob->data is a curve. */
+    // error("can't convert");
     return -1;
   }
 
@@ -482,8 +483,24 @@ static int mesh_nurbs_displist_to_mdata(const Curve *cu,
   return 0;
 }
 
+/**
+ * Copy evaluated texture space from curve to mesh.
+ *
+ * \note We disable auto texture space feature since that will cause texture space to evaluate
+ * differently for curve and mesh, since curves use control points and handles to calculate the
+ * bounding box, and mesh uses the tessellated curve.
+ */
+static void mesh_copy_texture_space_from_curve_type(const Curve *cu, Mesh *me)
+{
+  me->texflag = cu->texflag & ~CU_AUTOSPACE;
+  copy_v3_v3(me->loc, cu->loc);
+  copy_v3_v3(me->size, cu->size);
+  BKE_mesh_texspace_calc(me);
+}
+
 Mesh *BKE_mesh_new_nomain_from_curve_displist(const Object *ob, const ListBase *dispbase)
 {
+  const Curve *cu = ob->data;
   Mesh *mesh;
   MVert *allvert;
   MEdge *alledge;
@@ -492,7 +509,7 @@ Mesh *BKE_mesh_new_nomain_from_curve_displist(const Object *ob, const ListBase *
   MLoopUV *alluv = NULL;
   int totvert, totedge, totloop, totpoly;
 
-  if (mesh_nurbs_displist_to_mdata(ob->data,
+  if (mesh_nurbs_displist_to_mdata(cu,
                                    dispbase,
                                    &allvert,
                                    &totvert,
@@ -528,6 +545,12 @@ Mesh *BKE_mesh_new_nomain_from_curve_displist(const Object *ob, const ListBase *
     CustomData_add_layer_named(&mesh->ldata, CD_MLOOPUV, CD_ASSIGN, alluv, totloop, uvname);
   }
 
+  mesh_copy_texture_space_from_curve_type(cu, mesh);
+
+  /* Copy curve materials. */
+  mesh->mat = (Material **)MEM_dupallocN(cu->mat);
+  mesh->totcol = cu->totcol;
+
   MEM_freeN(allvert);
   MEM_freeN(alledge);
   MEM_freeN(allloop);
@@ -547,11 +570,12 @@ Mesh *BKE_mesh_new_nomain_from_curve(const Object *ob)
   return BKE_mesh_new_nomain_from_curve_displist(ob, &disp);
 }
 
-/* this may fail replacing ob->data, be sure to check ob->type */
-void BKE_mesh_from_nurbs_displist(
-    Main *bmain, Object *ob, ListBase *dispbase, const char *obdata_name, bool temporary)
+static void mesh_from_nurbs_displist(Object *ob, ListBase *dispbase, const char *obdata_name)
 {
-  Object *ob1;
+  if (ob->runtime.data_eval && GS(((ID *)ob->runtime.data_eval)->name) != ID_ME) {
+    return;
+  }
+
   Mesh *me_eval = (Mesh *)ob->runtime.data_eval;
   Mesh *me;
   MVert *allvert = NULL;
@@ -580,12 +604,7 @@ void BKE_mesh_from_nurbs_displist(
     }
 
     /* make mesh */
-    if (bmain != NULL) {
-      me = BKE_mesh_add(bmain, obdata_name);
-    }
-    else {
-      me = BKE_id_new_nomain(ID_ME, obdata_name);
-    }
+    me = BKE_id_new_nomain(ID_ME, obdata_name);
 
     me->totvert = totvert;
     me->totedge = totedge;
@@ -606,12 +625,7 @@ void BKE_mesh_from_nurbs_displist(
     BKE_mesh_calc_normals(me);
   }
   else {
-    if (bmain != NULL) {
-      me = BKE_mesh_add(bmain, obdata_name);
-    }
-    else {
-      me = BKE_id_new_nomain(ID_ME, obdata_name);
-    }
+    me = BKE_id_new_nomain(ID_ME, obdata_name);
 
     ob->runtime.data_eval = NULL;
     BKE_mesh_nomain_to_mesh(me_eval, me, ob, &CD_MASK_MESH, true);
@@ -620,17 +634,7 @@ void BKE_mesh_from_nurbs_displist(
   me->totcol = cu->totcol;
   me->mat = cu->mat;
 
-  /* Copy evaluated texture space from curve to mesh.
-   *
-   * Note that we disable auto texture space feature since that will cause
-   * texture space to evaluate differently for curve and mesh, since curve
-   * uses CV to calculate bounding box, and mesh uses what is coming from
-   * tessellated curve.
-   */
-  me->texflag = cu->texflag & ~CU_AUTOSPACE;
-  copy_v3_v3(me->loc, cu->loc);
-  copy_v3_v3(me->size, cu->size);
-  BKE_mesh_texspace_calc(me);
+  mesh_copy_texture_space_from_curve_type(cu, me);
 
   cu->mat = NULL;
   cu->totcol = 0;
@@ -640,30 +644,10 @@ void BKE_mesh_from_nurbs_displist(
   ob->data = me;
   ob->type = OB_MESH;
 
-  /* other users */
-  if (bmain != NULL) {
-    ob1 = bmain->objects.first;
-    while (ob1) {
-      if (ob1->data == cu) {
-        ob1->type = OB_MESH;
-
-        id_us_min((ID *)ob1->data);
-        ob1->data = ob->data;
-        id_us_plus((ID *)ob1->data);
-      }
-      ob1 = ob1->id.next;
-    }
-  }
-
-  if (temporary) {
-    /* For temporary objects in BKE_mesh_new_from_object don't remap
-     * the entire scene with associated depsgraph updates, which are
-     * problematic for renderers exporting data. */
-    BKE_id_free(NULL, cu);
-  }
-  else {
-    BKE_id_free_us(bmain, cu);
-  }
+  /* For temporary objects in BKE_mesh_new_from_object don't remap
+   * the entire scene with associated depsgraph updates, which are
+   * problematic for renderers exporting data. */
+  BKE_id_free(NULL, cu);
 }
 
 typedef struct EdgeLink {
@@ -964,7 +948,7 @@ void BKE_pointcloud_to_mesh(Main *bmain, Depsgraph *depsgraph, Scene *UNUSED(sce
 
 /* Create a temporary object to be used for nurbs-to-mesh conversion.
  *
- * This is more complex that it should be because BKE_mesh_from_nurbs_displist() will do more than
+ * This is more complex that it should be because #mesh_from_nurbs_displist will do more than
  * simply conversion and will attempt to take over ownership of evaluated result and will also
  * modify the input object. */
 static Object *object_for_curve_to_mesh_create(Object *object)
@@ -1062,7 +1046,7 @@ static void curve_to_mesh_eval_ensure(Object *object)
    * they are only used for modifier stack, which we have explicitly disabled for all objects.
    *
    * TODO(sergey): This is a very fragile logic, but proper solution requires re-writing quite a
-   * bit of internal functions (BKE_mesh_from_nurbs_displist, BKE_mesh_nomain_to_mesh) and also
+   * bit of internal functions (#mesh_from_nurbs_displist, BKE_mesh_nomain_to_mesh) and also
    * Mesh From Curve operator.
    * Brecht says hold off with that. */
   Mesh *mesh_eval = NULL;
@@ -1101,10 +1085,10 @@ static Mesh *mesh_new_from_curve_type_object(Object *object)
   temp_curve->editnurb = NULL;
 
   /* Convert to mesh. */
-  BKE_mesh_from_nurbs_displist(
-      NULL, temp_object, &temp_object->runtime.curve_cache->disp, curve->id.name + 2, true);
+  mesh_from_nurbs_displist(
+      temp_object, &temp_object->runtime.curve_cache->disp, curve->id.name + 2);
 
-  /* BKE_mesh_from_nurbs_displist changes the type to a mesh, check it worked. If it didn't
+  /* #mesh_from_nurbs_displist changes the type to a mesh, check it worked. If it didn't
    * the curve did not have any segments or otherwise would have generated an empty mesh. */
   if (temp_object->type != OB_MESH) {
     BKE_id_free(NULL, temp_object->data);
@@ -1116,7 +1100,7 @@ static Mesh *mesh_new_from_curve_type_object(Object *object)
 
   BKE_id_free(NULL, temp_object);
 
-  /* NOTE: Materials are copied in BKE_mesh_from_nurbs_displist(). */
+  /* NOTE: Materials are copied in #mesh_from_nurbs_displist(). */
 
   return mesh_result;
 }
@@ -1664,6 +1648,10 @@ void BKE_mesh_nomain_to_mesh(Mesh *mesh_src,
 
   /* skip the listbase */
   MEMCPY_STRUCT_AFTER(mesh_dst, &tmp, id.prev);
+
+  BLI_freelistN(&mesh_dst->vertex_group_names);
+  BKE_defgroup_copy_list(&mesh_dst->vertex_group_names, &mesh_src->vertex_group_names);
+  mesh_dst->vertex_group_active_index = mesh_src->vertex_group_active_index;
 
   if (take_ownership) {
     if (alloctype == CD_ASSIGN) {

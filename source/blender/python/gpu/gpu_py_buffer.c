@@ -37,7 +37,7 @@
 
 #include "gpu_py_buffer.h"
 
-//#define PYGPU_BUFFER_PROTOCOL
+#define PYGPU_BUFFER_PROTOCOL
 #define MAX_DIMENSIONS 64
 
 /* -------------------------------------------------------------------- */
@@ -485,7 +485,7 @@ static int pygpu_buffer__sq_ass_item(BPyGPUBuffer *self, int i, PyObject *v)
     case GPU_DATA_UINT:
     case GPU_DATA_UINT_24_8:
     case GPU_DATA_10_11_11_REV:
-      return PyArg_Parse(v, "b:Expected ints", &self->buf.as_uint[i]) ? 0 : -1;
+      return PyArg_Parse(v, "I:Expected unsigned ints", &self->buf.as_uint[i]) ? 0 : -1;
     default:
       return 0; /* should never happen */
   }
@@ -608,7 +608,7 @@ static void pygpu_buffer_strides_calc(const eGPUDataFormat format,
 }
 
 /* Here is the buffer interface function */
-static int pygpu_buffer__bf_getbuffer(BPyGPUBuffer *self, Py_buffer *view, int flags)
+static int pygpu_buffer__bf_getbuffer(BPyGPUBuffer *self, Py_buffer *view, int UNUSED(flags))
 {
   if (view == NULL) {
     PyErr_SetString(PyExc_ValueError, "NULL view in getbuffer");
@@ -620,7 +620,7 @@ static int pygpu_buffer__bf_getbuffer(BPyGPUBuffer *self, Py_buffer *view, int f
   view->len = bpygpu_Buffer_size(self);
   view->readonly = 0;
   view->itemsize = GPU_texture_dataformat_size(self->format);
-  view->format = pygpu_buffer_formatstr(self->format);
+  view->format = (char *)pygpu_buffer_formatstr(self->format);
   view->ndim = self->shape_len;
   view->shape = self->shape;
   view->strides = MEM_mallocN(view->ndim * sizeof(*view->strides), "BPyGPUBuffer strides");

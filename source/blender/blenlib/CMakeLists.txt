@@ -31,6 +31,7 @@ set(INC
 
 set(INC_SYS
   ${ZLIB_INCLUDE_DIRS}
+  ${ZSTD_INCLUDE_DIRS}
   ${FREETYPE_INCLUDE_DIRS}
   ${GMP_INCLUDE_DIRS}
 )
@@ -75,6 +76,10 @@ set(SRC
   intern/endian_switch.c
   intern/expr_pylike_eval.c
   intern/fileops.c
+  intern/filereader_file.c
+  intern/filereader_gzip.c
+  intern/filereader_memory.c
+  intern/filereader_zstd.c
   intern/fnmatch.c
   intern/freetypefont.c
   intern/gsqueue.c
@@ -111,6 +116,7 @@ set(SRC
   intern/mesh_boolean.cc
   intern/mesh_intersect.cc
   intern/noise.c
+  intern/noise.cc
   intern/path_util.c
   intern/polyfill_2d.c
   intern/polyfill_2d_beautify.c
@@ -195,8 +201,10 @@ set(SRC
   BLI_expr_pylike_eval.h
   BLI_fileops.h
   BLI_fileops_types.h
+  BLI_filereader.h
   BLI_float2.hh
   BLI_float3.hh
+  BLI_float4.hh
   BLI_float4x4.hh
   BLI_fnmatch.h
   BLI_function_ref.hh
@@ -258,6 +266,7 @@ set(SRC
   BLI_mpq3.hh
   BLI_multi_value_map.hh
   BLI_noise.h
+  BLI_noise.hh
   BLI_path_util.h
   BLI_polyfill_2d.h
   BLI_polyfill_2d_beautify.h
@@ -265,6 +274,7 @@ set(SRC
   BLI_quadric.h
   BLI_rand.h
   BLI_rand.hh
+  BLI_range.h
   BLI_rect.h
   BLI_resource_scope.hh
   BLI_scanfill.h
@@ -322,6 +332,7 @@ set(LIB
 
   ${FREETYPE_LIBRARY}
   ${ZLIB_LIBRARIES}
+  ${ZSTD_LIBRARIES}
 )
 
 if(WITH_MEM_VALGRIND)
