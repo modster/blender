@@ -377,16 +377,13 @@ static void update_bezier_positions(const FilletData &fd,
     dst_spline.positions()[end_i] = positions[i_src] + displacement * next_dir;
     dst_spline.handle_positions_right()[i_dst] = dst_spline.positions()[i_dst] -
                                                  handle_length * prev_dir;
-    dst_spline.handle_positions_left()[i_dst] = dst_spline.positions()[i_dst] +
-                                                handle_length * prev_dir;
     dst_spline.handle_positions_left()[end_i] = dst_spline.positions()[end_i] -
                                                 handle_length * next_dir;
-    dst_spline.handle_positions_right()[end_i] = dst_spline.positions()[end_i] +
-                                                 handle_length * next_dir;
     dst_spline.handle_types_right()[i_dst] = dst_spline.handle_types_left()[end_i] =
         BezierSpline::HandleType::Align;
     dst_spline.handle_types_left()[i_dst] = dst_spline.handle_types_right()[end_i] =
-        BezierSpline::HandleType::Align;
+        BezierSpline::HandleType::Vector;
+    dst_spline.mark_cache_invalid();
 
     /* Calculate the center of the radius to be formed. */
     const float3 center = get_center(dst_spline.positions()[i_dst] - positions[i_src], fd, i_src);
