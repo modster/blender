@@ -2654,7 +2654,7 @@ static void ed_panel_draw(const bContext *C,
 
   bool open;
   panel = UI_panel_begin(region, lb, block, pt, panel, &open);
-
+  const bool is_subpanel = (panel->type && panel->type->parent != NULL);
   const bool search_filter_active = search_filter != NULL && search_filter[0] != '\0';
 
   /* bad fixed values */
@@ -2719,8 +2719,12 @@ static void ed_panel_draw(const bContext *C,
     short panelContext;
 
     /* Extra offset and panel width adjustment to accomodate sides margin (style->panelouter). */
-    const int xofs = (pt->flag & PANEL_TYPE_NO_HEADER) ? 0 : style->panelouter;
     const int wofs = (pt->flag & PANEL_TYPE_NO_HEADER) ? style->panelouter : 0;
+    int xofs = (pt->flag & PANEL_TYPE_NO_HEADER) ? 0 : style->panelouter;
+
+    if (is_subpanel) {
+      xofs += style->panelouter;
+    }
 
     /* panel context can either be toolbar region or normal panels region */
     if (pt->flag & PANEL_TYPE_LAYOUT_VERT_BAR) {
@@ -2769,7 +2773,7 @@ static void ed_panel_draw(const bContext *C,
                       &panel->children,
                       child_pt,
                       child_panel,
-                      w,
+                      w - style->panelouter,
                       em,
                       unique_panel_str,
                       search_filter);

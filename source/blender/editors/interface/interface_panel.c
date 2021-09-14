@@ -1082,7 +1082,7 @@ void UI_panel_label_offset(const uiBlock *block, int *r_x, int *r_y)
   *r_y = UI_UNIT_Y * 1.5f;
 
   if (is_subpanel) {
-    *r_x += (0.7f * UI_UNIT_X);
+    *r_x += style->panelouter;
   }
 }
 
@@ -1161,7 +1161,7 @@ static void panel_draw_aligned_widgets(const uiStyle *style,
 
   /* Offset triangle and text to the right for subpanels. */
   const rcti widget_rect = {
-      .xmin = header_rect->xmin + (is_subpanel ? scaled_unit * 0.7f : 0),
+      .xmin = header_rect->xmin,
       .xmax = header_rect->xmax,
       .ymin = header_rect->ymin,
       .ymax = header_rect->ymax,
@@ -1255,11 +1255,6 @@ static void panel_draw_aligned_backdrop(const Panel *panel,
   const bool draw_box_style = panel->type->flag & PANEL_TYPE_DRAW_BOX;
   const bool is_subpanel = panel->type->parent != NULL;
   const bool is_open = !UI_panel_is_closed(panel);
-
-  if (is_subpanel && !is_open) {
-    return;
-  }
-
   const uint pos = GPU_vertformat_attr_add(
       immVertexFormat(), "pos", GPU_COMP_F32, 2, GPU_FETCH_FLOAT);
 
@@ -1267,6 +1262,7 @@ static void panel_draw_aligned_backdrop(const Panel *panel,
   if (draw_box_style) {
     /* Use the theme for box widgets. */
     const uiWidgetColors *box_wcol = &UI_GetTheme()->tui.wcol_box;
+    const uiStyle *style = UI_style_get_dpi();
 
     if (is_subpanel) {
       /* Use rounded bottom corners for the last subpanel. */
@@ -1353,21 +1349,26 @@ static void panel_draw_aligned_backdrop(const Panel *panel,
     }
 
     /* Panel header backdrops for non sub-panels. */
-    if (!is_subpanel) {
+    if (is_subpanel) {
+      UI_GetThemeColor4fv(UI_panel_matches_search_filter(panel) ? TH_MATCH : TH_PANEL_SUB_BACK,
+                          panel_headercolor);
+    }
+    else {
       UI_GetThemeColor4fv(UI_panel_matches_search_filter(panel) ? TH_MATCH : TH_PANEL_HEADER,
                           panel_headercolor);
-      UI_draw_roundbox_corner_set(is_open ? UI_CNR_TOP_RIGHT | UI_CNR_TOP_LEFT : UI_CNR_ALL);
-      UI_draw_roundbox_4fv(
-          &(const rctf){
-              .xmin = rect->xmin,
-              .xmax = rect->xmax,
-              .ymin = header_rect->ymin,
-              .ymax = header_rect->ymax - margin_y,
-          },
-          true,
-          PNL_CNR_RAD,
-          panel_headercolor);
     }
+
+    UI_draw_roundbox_corner_set(is_open ? UI_CNR_TOP_RIGHT | UI_CNR_TOP_LEFT : UI_CNR_ALL);
+    UI_draw_roundbox_4fv(
+        &(const rctf){
+            .xmin = rect->xmin,
+            .xmax = rect->xmax,
+            .ymin = header_rect->ymin,
+            .ymax = header_rect->ymax - margin_y,
+        },
+        true,
+        PNL_CNR_RAD,
+        panel_headercolor);
 
     GPU_blend(GPU_BLEND_NONE);
     immUnbindProgram();

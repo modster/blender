@@ -1995,8 +1995,7 @@ static void ui_but_to_pixelrect(rcti *rect, const ARegion *region, uiBlock *bloc
 /* uses local copy of style, to scale things down, and allow widgets to change stuff */
 void UI_block_draw(const bContext *C, uiBlock *block)
 {
-  uiStyle style = *UI_style_get_dpi(); /* XXX pass on as arg */
-  const uiStyle *stylo = UI_style_get_dpi();
+  const uiStyle *style = UI_style_get_dpi(); /* XXX pass on as arg */
 
   /* get menu region or area region */
   ARegion *region = CTX_wm_menu(C);
@@ -2012,10 +2011,10 @@ void UI_block_draw(const bContext *C, uiBlock *block)
   GPU_blend(GPU_BLEND_ALPHA);
 
   /* scale fonts */
-  ui_fontscale(&style.paneltitle.points, block->aspect);
-  ui_fontscale(&style.grouplabel.points, block->aspect);
-  ui_fontscale(&style.widgetlabel.points, block->aspect);
-  ui_fontscale(&style.widget.points, block->aspect);
+  ui_fontscale(&style->paneltitle.points, block->aspect);
+  ui_fontscale(&style->grouplabel.points, block->aspect);
+  ui_fontscale(&style->widgetlabel.points, block->aspect);
+  ui_fontscale(&style->widget.points, block->aspect);
 
   /* scale block min/max to rect */
   rcti rect;
@@ -2033,10 +2032,10 @@ void UI_block_draw(const bContext *C, uiBlock *block)
     ui_draw_pie_center(block);
   }
   else if (block->flag & UI_BLOCK_POPOVER) {
-    ui_draw_popover_back(region, &style, block, &rect);
+    ui_draw_popover_back(region, style, block, &rect);
   }
   else if (block->flag & UI_BLOCK_LOOP) {
-    ui_draw_menu_back(&style, block, &rect);
+    ui_draw_menu_back(style, block, &rect);
   }
   else if (block->panel) {
     bool show_background = region->alignment != RGN_ALIGN_FLOAT;
@@ -2052,9 +2051,13 @@ void UI_block_draw(const bContext *C, uiBlock *block)
         }
       }
 
-      rect.xmin += stylo->panelouter;
+      if (block->panel->type->parent != NULL) {
+        rect.xmin += style->panelouter;
+      }
+
+      rect.xmin += style->panelouter;
     }
-    ui_draw_aligned_panel(&style,
+    ui_draw_aligned_panel(style,
                           block,
                           &rect,
                           UI_panel_category_is_visible(region),
@@ -2074,7 +2077,7 @@ void UI_block_draw(const bContext *C, uiBlock *block)
       /* XXX: figure out why invalid coordinates happen when closing render window */
       /* and material preview is redrawn in main window (temp fix for bug T23848) */
       if (rect.xmin < rect.xmax && rect.ymin < rect.ymax) {
-        ui_draw_but(C, region, &style, but, &rect);
+        ui_draw_but(C, region, style, but, &rect);
       }
     }
   }
