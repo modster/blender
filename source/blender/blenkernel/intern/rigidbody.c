@@ -202,7 +202,7 @@ void BKE_rigidbody_free_object(Object *ob, RigidBodyWorld *rbw)
     }
 
     if (rbo->shared->col_shape_draw_data) {
-        BKE_mesh_free(rbo->shared->col_shape_draw_data);
+        BKE_mesh_clear_geometry(rbo->shared->col_shape_draw_data);
         BKE_id_free(NULL, rbo->shared->col_shape_draw_data);
         rbo->shared->col_shape_draw_data = NULL;
     }
@@ -639,7 +639,7 @@ static void rigidbody_validate_sim_shape(RigidBodyWorld *rbw, Object *ob, bool r
     }
     /* Delete old debug drawing mesh data if it exists. */
     if (rbo->shared->col_shape_draw_data) {
-        BKE_mesh_free(rbo->shared->col_shape_draw_data);
+        BKE_mesh_clear_geometry(rbo->shared->col_shape_draw_data);
         BKE_id_free(NULL, rbo->shared->col_shape_draw_data);
         rbo->shared->col_shape_draw_data = NULL;
     }
