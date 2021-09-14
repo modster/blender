@@ -10140,7 +10140,7 @@ static void def_geo_curve_fillet(StructRNA *srna)
        "BEZIER",
        0,
        "Bezier",
-       "Set Bezier align handles to create an arc as perfectly circular as possible."},
+       "Align Bezier handles to create circular arcs at each control point"},
       {GEO_NODE_CURVE_FILLET_POLY,
        "POLY",
        0,

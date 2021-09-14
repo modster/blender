@@ -30,11 +30,14 @@ namespace blender::nodes {
 static void geo_node_curve_fillet_declare(NodeDeclarationBuilder &b)
 {
   b.add_input<decl::Geometry>("Curve");
-  b.add_input<decl::Int>("Poly Count").default_value(1).min(1).max(1000);
-  b.add_input<decl::Bool>("Limit Radius");
-  b.add_input<decl::Float>("Radius").min(0.0f).max(FLT_MAX).subtype(
-      PropertySubType::PROP_DISTANCE);
+  b.add_input<decl::Int>("Count").default_value(1).min(1).max(1000);
+  b.add_input<decl::Float>("Radius")
+      .min(0.0f)
+      .max(FLT_MAX)
+      .subtype(PropertySubType::PROP_DISTANCE)
+      .default_value(0.2f);
   b.add_input<decl::String>("Radius");
+  b.add_input<decl::Bool>("Limit Radius");
   b.add_output<decl::Geometry>("Curve");
 }
 
@@ -618,7 +621,7 @@ static void geo_node_fillet_exec(GeoNodeExecParams params)
   fillet_param.mode = mode;
 
   if (mode == GEO_NODE_CURVE_FILLET_POLY) {
-    Field<int> count_field = params.extract_input<Field<int>>("Poly Count");
+    Field<int> count_field = params.extract_input<Field<int>>("Count");
     GeometryComponent &component = geometry_set.get_component_for_write(GEO_COMPONENT_TYPE_CURVE);
     GeometryComponentFieldContext field_context{component, ATTR_DOMAIN_POINT};
     const int domain_size = component.attribute_domain_size(ATTR_DOMAIN_POINT);
