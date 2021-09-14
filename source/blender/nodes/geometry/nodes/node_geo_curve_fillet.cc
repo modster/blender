@@ -36,7 +36,6 @@ static void geo_node_curve_fillet_declare(NodeDeclarationBuilder &b)
       .max(FLT_MAX)
       .subtype(PropertySubType::PROP_DISTANCE)
       .default_value(0.2f);
-  b.add_input<decl::String>("Radius");
   b.add_input<decl::Bool>("Limit Radius");
   b.add_output<decl::Geometry>("Curve");
 }
@@ -46,7 +45,6 @@ static void geo_node_curve_fillet_layout(uiLayout *layout, bContext *UNUSED(C), 
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetPropDecorate(layout, false);
   uiItemR(layout, ptr, "mode", 0, IFACE_("Mode"), ICON_NONE);
-  uiItemR(layout, ptr, "radius_mode", 0, IFACE_("Radius Mode"), ICON_NONE);
 }
 
 static void geo_node_curve_fillet_init(bNodeTree *UNUSED(tree), bNode *node)
@@ -55,8 +53,6 @@ static void geo_node_curve_fillet_init(bNodeTree *UNUSED(tree), bNode *node)
       sizeof(NodeGeometryCurveFillet), __func__);
 
   data->mode = GEO_NODE_CURVE_FILLET_BEZIER;
-  data->radius_mode = GEO_NODE_ATTRIBUTE_INPUT_FLOAT;
-
   node->storage = data;
 }
 
@@ -66,11 +62,11 @@ struct FilletParam {
   /* Number of points to be added. */
   GVArray_Typed<int> *counts;
 
-  /* Whether or not fillets are allowed to overlap. */
-  bool limit_radius;
-
   /* Radii for fillet arc at all vertices. */
   GVArray_Typed<float> *radii;
+
+  /* Whether or not fillets are allowed to overlap. */
+  bool limit_radius;
 };
 
 /* A data structure used to store fillet data about all vertices to be filleted. */
@@ -99,9 +95,6 @@ static void geo_node_curve_fillet_update(bNodeTree *UNUSED(ntree), bNode *node)
   bNodeSocket *poly_socket = ((bNodeSocket *)node->inputs.first)->next;
 
   nodeSetSocketAvailability(poly_socket, mode == GEO_NODE_CURVE_FILLET_POLY);
-
-  update_attribute_input_socket_availabilities(
-      *node, "Radius", (GeometryNodeAttributeInputMode)node_storage.radius_mode);
 }
 
 /* Function to get the center of a fillet. */
@@ -615,16 +608,15 @@ static void geo_node_fillet_exec(GeoNodeExecParams params)
 
   NodeGeometryCurveFillet &node_storage = *(NodeGeometryCurveFillet *)params.node().storage;
   const GeometryNodeCurveFilletMode mode = (GeometryNodeCurveFilletMode)node_storage.mode;
-  const GeometryNodeAttributeInputMode radius_mode = (GeometryNodeAttributeInputMode)
-                                                         node_storage.radius_mode;
   FilletParam fillet_param;
   fillet_param.mode = mode;
 
+  GeometryComponent &component = geometry_set.get_component_for_write(GEO_COMPONENT_TYPE_CURVE);
+  GeometryComponentFieldContext field_context{component, ATTR_DOMAIN_POINT};
+  const int domain_size = component.attribute_domain_size(ATTR_DOMAIN_POINT);
+
   if (mode == GEO_NODE_CURVE_FILLET_POLY) {
     Field<int> count_field = params.extract_input<Field<int>>("Count");
-    GeometryComponent &component = geometry_set.get_component_for_write(GEO_COMPONENT_TYPE_CURVE);
-    GeometryComponentFieldContext field_context{component, ATTR_DOMAIN_POINT};
-    const int domain_size = component.attribute_domain_size(ATTR_DOMAIN_POINT);
 
     fn::FieldEvaluator count_evaluator{field_context, domain_size};
     count_evaluator.add(count_field);
@@ -634,17 +626,20 @@ static void geo_node_fillet_exec(GeoNodeExecParams params)
     fillet_param.counts = &counts_array;
   }
 
+  Field<float> radius_field = params.extract_input<Field<float>>("Radius");
+  fn::FieldEvaluator radius_evaluator{field_context, domain_size};
+  radius_evaluator.add(radius_field);
+  radius_evaluator.evaluate();
+  const GVArray &radius = radius_evaluator.get_evaluated(0);
+  GVArray_Typed<float> radius_array = GVArray_Typed<float>(radius);
+  fillet_param.radii = &radius_array;
+
   fillet_param.limit_radius = params.extract_input<bool>("Limit Radius");
 
-  GVArray_Typed<float> radii_array = params.get_input_attribute<float>(
-      "Radius", *geometry_set.get_component_for_read<CurveComponent>(), ATTR_DOMAIN_POINT, 0.0f);
-
-  if (radii_array->is_single() && radii_array->get_internal_single() < 0) {
+  if (radius_array->is_single() && radius_array->get_internal_single() < 0) {
     params.set_output("Geometry", geometry_set);
     return;
   }
-
-  fillet_param.radii = &radii_array;
 
   const CurveEval &input_curve = *geometry_set.get_curve_for_read();
   std::unique_ptr<CurveEval> output_curve = fillet_curve(input_curve, fillet_param);

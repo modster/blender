@@ -10149,30 +10149,11 @@ static void def_geo_curve_fillet(StructRNA *srna)
       {0, NULL, 0, NULL, NULL},
   };
 
-  static EnumPropertyItem radius_mode_items[] = {
-      {GEO_NODE_ATTRIBUTE_INPUT_FLOAT,
-       "FLOAT",
-       0,
-       "Float",
-       "Define a common radius for all points."},
-      {GEO_NODE_ATTRIBUTE_INPUT_ATTRIBUTE,
-       "ATTRIBUTE",
-       0,
-       "Attribute",
-       "Specify radius based on an attribute"},
-      {0, NULL, 0, NULL, NULL},
-  };
-
   RNA_def_struct_sdna_from(srna, "NodeGeometryCurveFillet", "storage");
 
   prop = RNA_def_property(srna, "mode", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, mode_items);
   RNA_def_property_ui_text(prop, "Mode", "How to choose number of vertices on fillet");
-  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
-
-  prop = RNA_def_property(srna, "radius_mode", PROP_ENUM, PROP_NONE);
-  RNA_def_property_enum_items(prop, radius_mode_items);
-  RNA_def_property_ui_text(prop, "Radius Mode", "How the radius of the curvature is defined");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
 }
 

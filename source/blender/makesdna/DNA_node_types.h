@@ -1414,8 +1414,6 @@ typedef struct NodeGeometryCurveSubdivide {
 typedef struct NodeGeometryCurveFillet {
   /* GeometryNodeCurveFilletMode. */
   uint8_t mode;
-  /* GeometryNodeCurveFilletRadiusMode. */
-  uint8_t radius_mode;
 } NodeGeometryCurveFillet;
 
 typedef struct NodeGeometryCurveTrim {
