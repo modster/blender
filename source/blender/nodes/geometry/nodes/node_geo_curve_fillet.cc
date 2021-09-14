@@ -322,44 +322,21 @@ static void copy_attribute_by_mapping(const Span<T> src,
   }
 }
 
-static void copy_bezier_attributes_by_mapping(const BezierSpline &src,
-                                              BezierSpline &dst,
+/* Copy radii and tilts from source spline to destination. Positions are handled later in update
+ * positions methods. */
+static void copy_common_attributes_by_mapping(const Spline &src,
+                                              Spline &dst,
                                               const Span<int> mapping)
 {
-  copy_attribute_by_mapping(src.positions(), dst.positions(), mapping);
   copy_attribute_by_mapping(src.radii(), dst.radii(), mapping);
   copy_attribute_by_mapping(src.tilts(), dst.tilts(), mapping);
-  copy_attribute_by_mapping(src.handle_types_left(), dst.handle_types_left(), mapping);
-  copy_attribute_by_mapping(src.handle_types_right(), dst.handle_types_right(), mapping);
-  copy_attribute_by_mapping(src.handle_positions_left(), dst.handle_positions_left(), mapping);
-  copy_attribute_by_mapping(src.handle_positions_right(), dst.handle_positions_right(), mapping);
-}
-
-static void copy_poly_attributes_by_mapping(const PolySpline &src,
-                                            PolySpline &dst,
-                                            const Span<int> mapping)
-{
-  copy_attribute_by_mapping(src.positions(), dst.positions(), mapping);
-  copy_attribute_by_mapping(src.radii(), dst.radii(), mapping);
-  copy_attribute_by_mapping(src.tilts(), dst.tilts(), mapping);
-}
-
-static void copy_NURBS_attributes_by_mapping(const NURBSpline &src,
-                                             NURBSpline &dst,
-                                             const Span<int> mapping)
-{
-  copy_attribute_by_mapping(src.positions(), dst.positions(), mapping);
-  copy_attribute_by_mapping(src.radii(), dst.radii(), mapping);
-  copy_attribute_by_mapping(src.tilts(), dst.tilts(), mapping);
-  copy_attribute_by_mapping(src.weights(), dst.weights(), mapping);
 }
 
 /* Update the vertex positions and handle positions of a Bezier spline based on fillet data. */
 static void update_bezier_positions(const FilletData &fd,
                                     BezierSpline &dst_spline,
-                                    const Span<int> point_counts,
-                                    const int start,
-                                    const int fillet_count)
+                                    const BezierSpline &src_spline,
+                                    const Span<int> point_counts)
 {
   Span<float> radii(fd.radii);
   Span<float> angles(fd.angles);
@@ -369,12 +346,17 @@ static void update_bezier_positions(const FilletData &fd,
 
   const int size = radii.size();
 
-  int i_dst = start;
-  for (const int i_src : IndexRange(start, fillet_count)) {
+  int i_dst = 0;
+  for (const int i_src : IndexRange(size)) {
     const int count = point_counts[i_src];
 
     /* Skip if the point count for the vertex is 1. */
     if (count == 1) {
+      dst_spline.positions()[i_dst] = src_spline.positions()[i_src];
+      dst_spline.handle_types_left()[i_dst] = src_spline.handle_types_left()[i_src];
+      dst_spline.handle_types_right()[i_dst] = src_spline.handle_types_right()[i_src];
+      dst_spline.handle_positions_left()[i_dst] = src_spline.handle_positions_left()[i_src];
+      dst_spline.handle_positions_right()[i_dst] = src_spline.handle_positions_right()[i_src];
       i_dst++;
       continue;
     }
@@ -439,9 +421,8 @@ static void update_bezier_positions(const FilletData &fd,
 /* Update the vertex positions of a Poly spline based on fillet data. */
 static void update_poly_positions(const FilletData &fd,
                                   Spline &dst_spline,
-                                  const Span<int> point_counts,
-                                  const int start,
-                                  const int fillet_count)
+                                  const Spline &src_spline,
+                                  const Span<int> point_counts)
 {
   Span<float> radii(fd.radii);
   Span<float> angles(fd.angles);
@@ -451,12 +432,13 @@ static void update_poly_positions(const FilletData &fd,
 
   const int size = radii.size();
 
-  int i_dst = start;
-  for (const int i_src : IndexRange(start, fillet_count)) {
+  int i_dst = 0;
+  for (const int i_src : IndexRange(size)) {
     const int count = point_counts[i_src];
 
     /* Skip if the point count for the vertex is 1. */
     if (count == 1) {
+      dst_spline.positions()[i_dst] = src_spline.positions()[i_src];
       i_dst++;
       continue;
     }
@@ -524,31 +506,31 @@ static SplinePtr fillet_spline(const Spline &spline,
       const BezierSpline &src_spline = static_cast<const BezierSpline &>(spline);
       BezierSpline &dst_spline = static_cast<BezierSpline &>(*dst_spline_ptr);
       dst_spline.resize(total_points);
-      copy_bezier_attributes_by_mapping(src_spline, dst_spline, dst_to_src);
+      copy_common_attributes_by_mapping(src_spline, dst_spline, dst_to_src);
       if (fillet_param.mode == GEO_NODE_CURVE_FILLET_POLY) {
         dst_spline.handle_types_left().fill(BezierSpline::HandleType::Vector);
         dst_spline.handle_types_right().fill(BezierSpline::HandleType::Vector);
-        update_poly_positions(fd, dst_spline, point_counts, start, fillet_count);
+        update_poly_positions(fd, dst_spline, src_spline, point_counts);
       }
       else {
-        update_bezier_positions(fd, dst_spline, point_counts, start, fillet_count);
+        update_bezier_positions(fd, dst_spline, src_spline, point_counts);
       }
       break;
     }
     case Spline::Type::Poly: {
-      const PolySpline &src_spline = static_cast<const PolySpline &>(spline);
-      PolySpline &dst_spline = static_cast<PolySpline &>(*dst_spline_ptr);
+      Spline &dst_spline = static_cast<Spline &>(*dst_spline_ptr);
       dst_spline.resize(total_points);
-      copy_poly_attributes_by_mapping(src_spline, dst_spline, dst_to_src);
-      update_poly_positions(fd, dst_spline, point_counts, start, fillet_count);
+      copy_common_attributes_by_mapping(spline, dst_spline, dst_to_src);
+      update_poly_positions(fd, dst_spline, spline, point_counts);
       break;
     }
     case Spline::Type::NURBS: {
       const NURBSpline &src_spline = static_cast<const NURBSpline &>(spline);
       NURBSpline &dst_spline = static_cast<NURBSpline &>(*dst_spline_ptr);
       dst_spline.resize(total_points);
-      copy_NURBS_attributes_by_mapping(src_spline, dst_spline, dst_to_src);
-      update_poly_positions(fd, dst_spline, point_counts, start, fillet_count);
+      copy_common_attributes_by_mapping(src_spline, dst_spline, dst_to_src);
+      copy_attribute_by_mapping(src_spline.weights(), dst_spline.weights(), dst_to_src);
+      update_poly_positions(fd, dst_spline, src_spline, point_counts);
       break;
     }
   }
