@@ -1477,23 +1477,23 @@ static void widget_draw_submenu_tria(const uiBut *but,
                                      const uiWidgetColors *wcol)
 {
   const float aspect = but->block->aspect * U.inv_dpi_fac;
-  const int tria_height = (int)(ICON_DEFAULT_HEIGHT / aspect);
-  const int tria_width = (int)(ICON_DEFAULT_WIDTH / aspect) - 2 * U.pixelsize;
-  const int xs = rect->xmax - tria_width;
-  const int ys = (rect->ymin + rect->ymax - tria_height) / 2.0f;
+  const int icon_height = (int)(ICON_DEFAULT_HEIGHT / aspect);
+  const int icon_width = (int)(ICON_DEFAULT_WIDTH / aspect) * U.pixelsize;
+  const int xs = rect->xmax - icon_width;
+  const int ys = (rect->ymin + rect->ymax - icon_height) / 2.0f;
 
   float col[4];
   rgba_uchar_to_float(col, wcol->text);
   col[3] *= 0.8f;
 
-  rctf tria_rect;
-  BLI_rctf_init(&tria_rect, xs, xs + tria_width, ys, ys + tria_height);
-  BLI_rctf_scale(&tria_rect, 0.4f);
+  rctf icon_rect;
+  BLI_rctf_init(&icon_rect, xs, xs + icon_width, ys, ys + icon_height);
+  BLI_rctf_scale(&icon_rect, 0.4f);
 
   GPU_blend(GPU_BLEND_ALPHA);
   UI_widgetbase_draw_cache_flush();
+  UI_icon_draw_ex(xs, ys, ICON_RIGHTARROW, aspect * U.inv_dpi_fac, 0.5f, 0.0f, wcol->text, false);
   GPU_blend(GPU_BLEND_NONE);
-  ui_draw_anti_tria_rect(&tria_rect, 'h', col);
 }
 
 static void ui_text_clip_give_prev_off(uiBut *but, const char *str)
