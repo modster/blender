@@ -872,7 +872,7 @@ bool PathTrace::copy_render_tile_from_device()
 int PathTrace::get_num_render_tile_samples() const
 {
   if (full_frame_buffers_) {
-    /* When full frame resutl is read from fisk it has all tiles scaled up to the final number of
+    /* When full frame result is read from fisk it has all tiles scaled up to the final number of
      * samples. */
     return render_scheduler_.get_num_samples();
   }
