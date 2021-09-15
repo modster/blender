@@ -17,6 +17,7 @@
 #pragma once
 
 #include "device/device_memory.h"
+#include "graph/node.h"
 #include "render/buffers.h"
 
 CCL_NAMESPACE_BEGIN
@@ -51,8 +52,11 @@ enum DenoiserPrefilter {
   DENOISER_PREFILTER_NUM,
 };
 
-class DenoiseParams {
+/* NOTE: Is not a real scene node. Using Node API for ease of (de)serialization. */
+class DenoiseParams : public Node {
  public:
+  NODE_DECLARE
+
   /* Apply denoiser to image. */
   bool use = false;
 
@@ -70,7 +74,10 @@ class DenoiseParams {
 
   DenoiserPrefilter prefilter = DENOISER_PREFILTER_FAST;
 
-  DenoiseParams() = default;
+  static const NodeEnum *get_type_enum();
+  static const NodeEnum *get_prefilter_enum();
+
+  DenoiseParams();
 
   bool modified(const DenoiseParams &other) const
   {
