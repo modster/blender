@@ -203,7 +203,7 @@ void PathTrace::render_pipeline(RenderWork render_work)
   write_tile_buffer(render_work);
   update_display(render_work);
 
-  progress_update_if_needed();
+  progress_update_if_needed(render_work);
 
   process_full_buffer_from_disk(render_work);
 }
@@ -815,10 +815,14 @@ void PathTrace::read_full_buffer_from_disk()
   }
 }
 
-void PathTrace::progress_update_if_needed()
+void PathTrace::progress_update_if_needed(const RenderWork &render_work)
 {
   if (progress_ != nullptr) {
-    progress_->add_samples(0, get_num_samples_in_buffer());
+    const int2 tile_size = get_render_tile_size();
+    const int num_samples_added = tile_size.x * tile_size.y * render_work.path_trace.num_samples;
+    const int current_sample = render_work.path_trace.start_sample +
+                               render_work.path_trace.num_samples;
+    progress_->add_samples(num_samples_added, current_sample);
   }
 
   if (progress_update_cb) {

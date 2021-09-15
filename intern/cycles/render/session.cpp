@@ -411,12 +411,8 @@ void Session::do_delayed_reset()
 
   /* Progress. */
   progress.reset_sample();
-
-  /* TODO(sergey): Progress report needs to be worked on. */
-#if 0
-  bool show_progress = params.background || tile_manager_.get_num_effective_samples() != INT_MAX;
-  progress.set_total_pixel_samples(show_progress ? tile_manager_.state.total_pixel_samples : 0);
-#endif
+  progress.set_total_pixel_samples(delayed_reset_.params.width * delayed_reset_.params.height *
+                                   delayed_reset_.samples);
 
   if (!params.background) {
     progress.set_start_time();

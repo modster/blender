@@ -224,7 +224,7 @@ class PathTrace {
   void read_full_buffer_from_disk();
 
   /* Run the progress_update_cb callback if it is needed. */
-  void progress_update_if_needed();
+  void progress_update_if_needed(const RenderWork &render_work);
 
   /* Pointer to a device which is configured to be used for path tracing. If multiple devices
    * are configured this is a `MultiDevice`. */
