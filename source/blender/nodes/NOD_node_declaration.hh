@@ -31,6 +31,7 @@ class SocketDeclaration {
  protected:
   std::string name_;
   std::string identifier_;
+  bool is_field_ = false;
 
   friend NodeDeclarationBuilder;
 

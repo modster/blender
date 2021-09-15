@@ -131,6 +131,12 @@ class Vector : public SocketDeclaration {
     return *this;
   }
 
+  Vector &is_field(bool value)
+  {
+    is_field_ = value;
+    return *this;
+  }
+
   bNodeSocket &build(bNodeTree &ntree, bNode &node, eNodeSocketInOut in_out) const override;
   bool matches(const bNodeSocket &socket) const override;
   bNodeSocket &update_or_build(bNodeTree &ntree, bNode &node, bNodeSocket &socket) const override;
@@ -144,6 +150,12 @@ class Bool : public SocketDeclaration {
   Bool &default_value(const bool value)
   {
     default_value_ = value;
+    return *this;
+  }
+
+  Bool &is_field(bool value)
+  {
+    is_field_ = value;
     return *this;
   }
 

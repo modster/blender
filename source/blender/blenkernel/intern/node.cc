@@ -4465,6 +4465,11 @@ void ntreeUpdateAllUsers(Main *main, ID *id)
   }
 }
 
+static void update_socket_shapes_for_fields(bNodeTree &ntree)
+{
+  UNUSED_VARS(ntree);
+}
+
 void ntreeUpdateTree(Main *bmain, bNodeTree *ntree)
 {
   if (!ntree) {
@@ -4515,6 +4520,8 @@ void ntreeUpdateTree(Main *bmain, bNodeTree *ntree)
 
     /* update the node level from link dependencies */
     ntree_update_node_level(ntree);
+
+    update_socket_shapes_for_fields(*ntree);
 
     /* check link validity */
     ntree_validate_links(ntree);
