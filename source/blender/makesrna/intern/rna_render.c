@@ -179,6 +179,22 @@ static void engine_render(RenderEngine *engine, Depsgraph *depsgraph)
   RNA_parameter_list_free(&list);
 }
 
+static void engine_render_frame_finish(RenderEngine *engine)
+{
+  extern FunctionRNA rna_RenderEngine_render_frame_finish_func;
+  PointerRNA ptr;
+  ParameterList list;
+  FunctionRNA *func;
+
+  RNA_pointer_create(NULL, engine->type->rna_ext.srna, engine, &ptr);
+  func = &rna_RenderEngine_render_frame_finish_func;
+
+  RNA_parameter_list_create(&list, &ptr, func);
+  engine->type->rna_ext.call(NULL, &ptr, func, &list);
+
+  RNA_parameter_list_free(&list);
+}
+
 static void engine_draw(RenderEngine *engine, const struct bContext *context, Depsgraph *depsgraph)
 {
   extern FunctionRNA rna_RenderEngine_draw_func;
@@ -378,12 +394,13 @@ static StructRNA *rna_RenderEngine_register(Main *bmain,
 
   et->update = (have_function[0]) ? engine_update : NULL;
   et->render = (have_function[1]) ? engine_render : NULL;
-  et->draw = (have_function[2]) ? engine_draw : NULL;
-  et->bake = (have_function[3]) ? engine_bake : NULL;
-  et->view_update = (have_function[4]) ? engine_view_update : NULL;
-  et->view_draw = (have_function[5]) ? engine_view_draw : NULL;
-  et->update_script_node = (have_function[6]) ? engine_update_script_node : NULL;
-  et->update_render_passes = (have_function[7]) ? engine_update_render_passes : NULL;
+  et->render_frame_finish = (have_function[2]) ? engine_render_frame_finish : NULL;
+  et->draw = (have_function[3]) ? engine_draw : NULL;
+  et->bake = (have_function[4]) ? engine_bake : NULL;
+  et->view_update = (have_function[5]) ? engine_view_update : NULL;
+  et->view_draw = (have_function[6]) ? engine_view_draw : NULL;
+  et->update_script_node = (have_function[7]) ? engine_update_script_node : NULL;
+  et->update_render_passes = (have_function[8]) ? engine_update_render_passes : NULL;
 
   RE_engines_register(et);
 
@@ -539,6 +556,11 @@ static void rna_def_render_engine(BlenderRNA *brna)
   RNA_def_function_flag(func, FUNC_REGISTER_OPTIONAL | FUNC_ALLOW_WRITE);
   parm = RNA_def_pointer(func, "depsgraph", "Depsgraph", "", "");
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+
+  func = RNA_def_function(srna, "render_frame_finish", NULL);
+  RNA_def_function_ui_description(
+      func, "Perform finishing operations after all view layers in a frame were rendered");
+  RNA_def_function_flag(func, FUNC_REGISTER_OPTIONAL | FUNC_ALLOW_WRITE);
 
   func = RNA_def_function(srna, "draw", NULL);
   RNA_def_function_ui_description(func, "Draw render image");

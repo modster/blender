@@ -1010,6 +1010,10 @@ bool RE_engine_render(Render *re, bool do_all)
     FOREACH_VIEW_LAYER_TO_RENDER_END;
   }
 
+  if (type->render_frame_finish) {
+    type->render_frame_finish(engine);
+  }
+
   /* Clear tile data */
   engine->flag &= ~RE_ENGINE_RENDERING;
 

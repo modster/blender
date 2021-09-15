@@ -88,10 +88,20 @@ typedef struct RenderEngineType {
   int flag;
 
   void (*update)(struct RenderEngine *engine, struct Main *bmain, struct Depsgraph *depsgraph);
+
   void (*render)(struct RenderEngine *engine, struct Depsgraph *depsgraph);
+
+  /* Offline rendering is finished - no more view layers will be rendered.
+   *
+   * All the pending data is to be communicated from the engine back to Blender. In a possibly
+   * most memory-efficient manner (engine might free its database before making Blender to allocate
+   * full-frame render result). */
+  void (*render_frame_finish)(struct RenderEngine *engine);
+
   void (*draw)(struct RenderEngine *engine,
                const struct bContext *context,
                struct Depsgraph *depsgraph);
+
   void (*bake)(struct RenderEngine *engine,
                struct Depsgraph *depsgraph,
                struct Object *object,
