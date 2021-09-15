@@ -27,6 +27,9 @@ namespace blender::nodes {
 
 class NodeDeclarationBuilder;
 
+/**
+ * Describes a single input or output socket. This is subclassed for different socket types.
+ */
 class SocketDeclaration {
  protected:
   std::string name_;
@@ -45,11 +48,12 @@ class SocketDeclaration {
   virtual bool matches(const bNodeSocket &socket) const = 0;
   virtual bNodeSocket &update_or_build(bNodeTree &ntree, bNode &node, bNodeSocket &socket) const;
 
-  void set_common_flags(bNodeSocket &socket) const;
-  bool matches_common_data(const bNodeSocket &socket) const;
-
   StringRefNull name() const;
   StringRefNull identifier() const;
+
+ protected:
+  void set_common_flags(bNodeSocket &socket) const;
+  bool matches_common_data(const bNodeSocket &socket) const;
 };
 
 class BaseSocketDeclarationBuilder {
@@ -57,6 +61,11 @@ class BaseSocketDeclarationBuilder {
   virtual ~BaseSocketDeclarationBuilder() = default;
 };
 
+/**
+ * Wraps a #SocketDeclaration and provides methods to set it up correctly.
+ * This is separate from #SocketDeclaration, because it allows separating the API used by nodes to
+ * declare themselves from how the declaration is stored internally.
+ */
 template<typename SocketDecl>
 class SocketDeclarationBuilder : public BaseSocketDeclarationBuilder {
  protected:
@@ -117,6 +126,12 @@ class NodeDeclarationBuilder {
   typename DeclType::Builder &add_input(StringRef name, StringRef identifier = "");
   template<typename DeclType>
   typename DeclType::Builder &add_output(StringRef name, StringRef identifier = "");
+
+ private:
+  template<typename DeclType>
+  typename DeclType::Builder &add_socket(StringRef name,
+                                         StringRef identifier,
+                                         Vector<SocketDeclarationPtr> &r_decls);
 };
 
 /* --------------------------------------------------------------------
@@ -146,22 +161,19 @@ template<typename DeclType>
 inline typename DeclType::Builder &NodeDeclarationBuilder::add_input(StringRef name,
                                                                      StringRef identifier)
 {
-  static_assert(std::is_base_of_v<SocketDeclaration, DeclType>);
-  using Builder = typename DeclType::Builder;
-  std::unique_ptr<DeclType> socket_decl = std::make_unique<DeclType>();
-  std::unique_ptr<Builder> socket_decl_builder = std::make_unique<Builder>();
-  socket_decl_builder->decl_ = &*socket_decl;
-  socket_decl->name_ = name;
-  socket_decl->identifier_ = identifier.is_empty() ? name : identifier;
-  declaration_.inputs_.append(std::move(socket_decl));
-  Builder &socket_decl_builder_ref = *socket_decl_builder;
-  builders_.append(std::move(socket_decl_builder));
-  return socket_decl_builder_ref;
+  return this->add_socket<DeclType>(name, identifier, declaration_.inputs_);
 }
 
 template<typename DeclType>
 inline typename DeclType::Builder &NodeDeclarationBuilder::add_output(StringRef name,
                                                                       StringRef identifier)
+{
+  return this->add_socket<DeclType>(name, identifier, declaration_.outputs_);
+}
+
+template<typename DeclType>
+inline typename DeclType::Builder &NodeDeclarationBuilder::add_socket(
+    StringRef name, StringRef identifier, Vector<SocketDeclarationPtr> &r_decls)
 {
   static_assert(std::is_base_of_v<SocketDeclaration, DeclType>);
   using Builder = typename DeclType::Builder;
@@ -170,7 +182,7 @@ inline typename DeclType::Builder &NodeDeclarationBuilder::add_output(StringRef 
   socket_decl_builder->decl_ = &*socket_decl;
   socket_decl->name_ = name;
   socket_decl->identifier_ = identifier.is_empty() ? name : identifier;
-  declaration_.outputs_.append(std::move(socket_decl));
+  r_decls.append(std::move(socket_decl));
   Builder &socket_decl_builder_ref = *socket_decl_builder;
   builders_.append(std::move(socket_decl_builder));
   return socket_decl_builder_ref;
