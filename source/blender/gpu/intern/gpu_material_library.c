@@ -41,6 +41,7 @@
  * If a file uses functions from another file, it must be added to the list of
  * dependencies, and be placed after that file in the list. */
 
+extern char datatoc_gpu_shader_composite_alpha_over_glsl[];
 extern char datatoc_gpu_shader_composite_composite_glsl[];
 extern char datatoc_gpu_shader_composite_image_glsl[];
 extern char datatoc_gpu_shader_composite_invert_glsl[];
@@ -134,6 +135,11 @@ extern char datatoc_gpu_shader_material_volume_principled_glsl[];
 extern char datatoc_gpu_shader_material_volume_scatter_glsl[];
 extern char datatoc_gpu_shader_material_wireframe_glsl[];
 extern char datatoc_gpu_shader_material_world_normals_glsl[];
+
+static GPUMaterialLibrary gpu_shader_composite_alpha_over_library = {
+    .code = datatoc_gpu_shader_composite_alpha_over_glsl,
+    .dependencies = {NULL},
+};
 
 static GPUMaterialLibrary gpu_shader_composite_composite_library = {
     .code = datatoc_gpu_shader_composite_composite_glsl,
@@ -695,6 +701,7 @@ static GPUMaterialLibrary *gpu_material_libraries[] = {
     &gpu_shader_material_volume_scatter_library,
     &gpu_shader_material_wireframe_library,
     &gpu_shader_material_world_normals_library,
+    &gpu_shader_composite_alpha_over_library,
     &gpu_shader_composite_composite_library,
     &gpu_shader_composite_image_library,
     &gpu_shader_composite_invert_library,

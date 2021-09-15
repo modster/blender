@@ -40,6 +40,20 @@ static void node_alphaover_init(bNodeTree *UNUSED(ntree), bNode *node)
   node->storage = MEM_callocN(sizeof(NodeTwoFloats), "NodeTwoFloats");
 }
 
+static int node_composit_gpu_rlayers(GPUMaterial *mat,
+                                     bNode *node,
+                                     bNodeExecData *UNUSED(execdata),
+                                     GPUNodeStack *in,
+                                     GPUNodeStack *out)
+{
+  GPUNodeLink *premult_convert = GPU_constant(&((NodeTwoFloats *)node->storage)->x);
+  GPUNodeLink *premult_fac = GPU_uniform(&((NodeTwoFloats *)node->storage)->y);
+
+  GPU_stack_link(mat, node, "node_composite_alpha_over", in, out, premult_convert, premult_fac);
+
+  return true;
+}
+
 void register_node_type_cmp_alphaover(void)
 {
   static bNodeType ntype;
@@ -49,6 +63,7 @@ void register_node_type_cmp_alphaover(void)
   node_type_init(&ntype, node_alphaover_init);
   node_type_storage(
       &ntype, "NodeTwoFloats", node_free_standard_storage, node_copy_standard_storage);
+  node_type_gpu(&ntype, node_composit_gpu_rlayers);
 
   nodeRegisterType(&ntype);
 }
