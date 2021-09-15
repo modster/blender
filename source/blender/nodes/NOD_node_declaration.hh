@@ -31,7 +31,7 @@ class SocketDeclaration {
  protected:
   std::string name_;
   std::string identifier_;
-  bool hide_label = false;
+  bool hide_label_ = false;
   bool hide_value_ = false;
   bool is_multi_input_ = false;
 
@@ -44,6 +44,9 @@ class SocketDeclaration {
   virtual bNodeSocket &build(bNodeTree &ntree, bNode &node, eNodeSocketInOut in_out) const = 0;
   virtual bool matches(const bNodeSocket &socket) const = 0;
   virtual bNodeSocket &update_or_build(bNodeTree &ntree, bNode &node, bNodeSocket &socket) const;
+
+  void set_common_flags(bNodeSocket &socket) const;
+  bool matches_common_data(const bNodeSocket &socket) const;
 
   StringRefNull name() const;
   StringRefNull identifier() const;
@@ -66,7 +69,7 @@ class SocketDeclarationBuilder : public BaseSocketDeclarationBuilder {
  public:
   Self &hide_label(bool value)
   {
-    decl_->hide_label = value;
+    decl_->hide_label_ = value;
     return *(Self *)this;
   }
 

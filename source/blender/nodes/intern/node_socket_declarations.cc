@@ -38,6 +38,7 @@ bNodeSocket &Float::build(bNodeTree &ntree, bNode &node, eNodeSocketInOut in_out
 {
   bNodeSocket &socket = *nodeAddStaticSocket(
       &ntree, &node, in_out, SOCK_FLOAT, subtype_, identifier_.c_str(), name_.c_str());
+  this->set_common_flags(socket);
   bNodeSocketValueFloat &value = *(bNodeSocketValueFloat *)socket.default_value;
   value.min = soft_min_value_;
   value.max = soft_max_value_;
@@ -47,16 +48,13 @@ bNodeSocket &Float::build(bNodeTree &ntree, bNode &node, eNodeSocketInOut in_out
 
 bool Float::matches(const bNodeSocket &socket) const
 {
+  if (!this->matches_common_data(socket)) {
+    return false;
+  }
   if (socket.type != SOCK_FLOAT) {
     return false;
   }
   if (socket.typeinfo->subtype != subtype_) {
-    return false;
-  }
-  if (socket.name != name_) {
-    return false;
-  }
-  if (socket.identifier != identifier_) {
     return false;
   }
   bNodeSocketValueFloat &value = *(bNodeSocketValueFloat *)socket.default_value;
@@ -77,6 +75,7 @@ bNodeSocket &Float::update_or_build(bNodeTree &ntree, bNode &node, bNodeSocket &
   if (socket.typeinfo->subtype != subtype_) {
     modify_subtype_except_for_storage(socket, subtype_);
   }
+  this->set_common_flags(socket);
   bNodeSocketValueFloat &value = *(bNodeSocketValueFloat *)socket.default_value;
   value.min = soft_min_value_;
   value.max = soft_max_value_;
@@ -92,6 +91,7 @@ bNodeSocket &Int::build(bNodeTree &ntree, bNode &node, eNodeSocketInOut in_out) 
 {
   bNodeSocket &socket = *nodeAddStaticSocket(
       &ntree, &node, in_out, SOCK_INT, subtype_, identifier_.c_str(), name_.c_str());
+  this->set_common_flags(socket);
   bNodeSocketValueInt &value = *(bNodeSocketValueInt *)socket.default_value;
   value.min = soft_min_value_;
   value.max = soft_max_value_;
@@ -101,16 +101,13 @@ bNodeSocket &Int::build(bNodeTree &ntree, bNode &node, eNodeSocketInOut in_out) 
 
 bool Int::matches(const bNodeSocket &socket) const
 {
+  if (!this->matches_common_data(socket)) {
+    return false;
+  }
   if (socket.type != SOCK_INT) {
     return false;
   }
   if (socket.typeinfo->subtype != subtype_) {
-    return false;
-  }
-  if (socket.name != name_) {
-    return false;
-  }
-  if (socket.identifier != identifier_) {
     return false;
   }
   bNodeSocketValueInt &value = *(bNodeSocketValueInt *)socket.default_value;
@@ -131,6 +128,7 @@ bNodeSocket &Int::update_or_build(bNodeTree &ntree, bNode &node, bNodeSocket &so
   if (socket.typeinfo->subtype != subtype_) {
     modify_subtype_except_for_storage(socket, subtype_);
   }
+  this->set_common_flags(socket);
   bNodeSocketValueInt &value = *(bNodeSocketValueInt *)socket.default_value;
   value.min = soft_min_value_;
   value.max = soft_max_value_;
@@ -146,6 +144,7 @@ bNodeSocket &Vector::build(bNodeTree &ntree, bNode &node, eNodeSocketInOut in_ou
 {
   bNodeSocket &socket = *nodeAddStaticSocket(
       &ntree, &node, in_out, SOCK_VECTOR, subtype_, identifier_.c_str(), name_.c_str());
+  this->set_common_flags(socket);
   bNodeSocketValueVector &value = *(bNodeSocketValueVector *)socket.default_value;
   copy_v3_v3(value.value, default_value_);
   value.min = soft_min_value_;
@@ -155,16 +154,13 @@ bNodeSocket &Vector::build(bNodeTree &ntree, bNode &node, eNodeSocketInOut in_ou
 
 bool Vector::matches(const bNodeSocket &socket) const
 {
+  if (!this->matches_common_data(socket)) {
+    return false;
+  }
   if (socket.type != SOCK_VECTOR) {
     return false;
   }
   if (socket.typeinfo->subtype != subtype_) {
-    return false;
-  }
-  if (socket.name != name_) {
-    return false;
-  }
-  if (socket.identifier != identifier_) {
     return false;
   }
   return true;
@@ -178,6 +174,7 @@ bNodeSocket &Vector::update_or_build(bNodeTree &ntree, bNode &node, bNodeSocket 
   if (socket.typeinfo->subtype != subtype_) {
     modify_subtype_except_for_storage(socket, subtype_);
   }
+  this->set_common_flags(socket);
   bNodeSocketValueVector &value = *(bNodeSocketValueVector *)socket.default_value;
   value.subtype = subtype_;
   STRNCPY(socket.name, name_.c_str());
@@ -192,6 +189,7 @@ bNodeSocket &Bool::build(bNodeTree &ntree, bNode &node, eNodeSocketInOut in_out)
 {
   bNodeSocket &socket = *nodeAddStaticSocket(
       &ntree, &node, in_out, SOCK_BOOLEAN, PROP_NONE, identifier_.c_str(), name_.c_str());
+  this->set_common_flags(socket);
   bNodeSocketValueBoolean &value = *(bNodeSocketValueBoolean *)socket.default_value;
   value.value = default_value_;
   return socket;
@@ -199,13 +197,10 @@ bNodeSocket &Bool::build(bNodeTree &ntree, bNode &node, eNodeSocketInOut in_out)
 
 bool Bool::matches(const bNodeSocket &socket) const
 {
+  if (!this->matches_common_data(socket)) {
+    return false;
+  }
   if (socket.type != SOCK_BOOLEAN) {
-    return false;
-  }
-  if (socket.name != name_) {
-    return false;
-  }
-  if (socket.identifier != identifier_) {
     return false;
   }
   return true;
@@ -219,6 +214,7 @@ bNodeSocket &Color::build(bNodeTree &ntree, bNode &node, eNodeSocketInOut in_out
 {
   bNodeSocket &socket = *nodeAddStaticSocket(
       &ntree, &node, in_out, SOCK_RGBA, PROP_NONE, identifier_.c_str(), name_.c_str());
+  this->set_common_flags(socket);
   bNodeSocketValueRGBA &value = *(bNodeSocketValueRGBA *)socket.default_value;
   copy_v4_v4(value.value, default_value_);
   return socket;
@@ -226,13 +222,15 @@ bNodeSocket &Color::build(bNodeTree &ntree, bNode &node, eNodeSocketInOut in_out
 
 bool Color::matches(const bNodeSocket &socket) const
 {
+  if (!this->matches_common_data(socket)) {
+    if (socket.name != name_) {
+      return false;
+    }
+    if (socket.identifier != identifier_) {
+      return false;
+    }
+  }
   if (socket.type != SOCK_RGBA) {
-    return false;
-  }
-  if (socket.name != name_) {
-    return false;
-  }
-  if (socket.identifier != identifier_) {
     return false;
   }
   return true;
@@ -246,18 +244,16 @@ bNodeSocket &String::build(bNodeTree &ntree, bNode &node, eNodeSocketInOut in_ou
 {
   bNodeSocket &socket = *nodeAddStaticSocket(
       &ntree, &node, in_out, SOCK_STRING, PROP_NONE, identifier_.c_str(), name_.c_str());
+  this->set_common_flags(socket);
   return socket;
 }
 
 bool String::matches(const bNodeSocket &socket) const
 {
+  if (!this->matches_common_data(socket)) {
+    return false;
+  }
   if (socket.type != SOCK_STRING) {
-    return false;
-  }
-  if (socket.name != name_) {
-    return false;
-  }
-  if (socket.identifier != identifier_) {
     return false;
   }
   return true;
@@ -268,30 +264,26 @@ bool String::matches(const bNodeSocket &socket) const
  */
 
 namespace detail {
-bNodeSocket &build_id_socket(bNodeTree &ntree,
+bNodeSocket &build_id_socket(const SocketDeclaration &decl,
+                             bNodeTree &ntree,
                              bNode &node,
                              eNodeSocketInOut in_out,
-                             const CommonIDSocketData &data,
-                             StringRefNull name,
-                             StringRefNull identifier)
+                             const CommonIDSocketData &data)
 {
   bNodeSocket &socket = *nodeAddSocket(
-      &ntree, &node, in_out, data.idname, identifier.c_str(), name.c_str());
+      &ntree, &node, in_out, data.idname, decl.identifier().c_str(), decl.name().c_str());
+  decl.set_common_flags(socket);
   return socket;
 }
 
-bool matches_id_socket(const bNodeSocket &socket,
-                       const CommonIDSocketData &data,
-                       StringRefNull name,
-                       StringRefNull identifier)
+bool matches_id_socket(const SocketDeclaration &decl,
+                       const bNodeSocket &socket,
+                       const CommonIDSocketData &data)
 {
+  if (!decl.matches_common_data(socket)) {
+    return false;
+  }
   if (!STREQ(socket.idname, data.idname)) {
-    return false;
-  }
-  if (socket.name != name) {
-    return false;
-  }
-  if (socket.identifier != identifier) {
     return false;
   }
   return true;
@@ -306,18 +298,16 @@ bNodeSocket &Geometry::build(bNodeTree &ntree, bNode &node, eNodeSocketInOut in_
 {
   bNodeSocket &socket = *nodeAddSocket(
       &ntree, &node, in_out, "NodeSocketGeometry", identifier_.c_str(), name_.c_str());
+  this->set_common_flags(socket);
   return socket;
 }
 
 bool Geometry::matches(const bNodeSocket &socket) const
 {
+  if (!this->matches_common_data(socket)) {
+    return false;
+  }
   if (socket.type != SOCK_GEOMETRY) {
-    return false;
-  }
-  if (socket.name != name_) {
-    return false;
-  }
-  if (socket.identifier != identifier_) {
     return false;
   }
   return true;
