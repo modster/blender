@@ -31,8 +31,12 @@ class SocketDeclaration {
  protected:
   std::string name_;
   std::string identifier_;
+  bool hide_label = false;
+  bool hide_value_ = false;
+  bool is_multi_input_ = false;
 
   friend NodeDeclarationBuilder;
+  template<typename SocketDecl> friend class SocketDeclarationBuilder;
 
  public:
   virtual ~SocketDeclaration() = default;
@@ -43,6 +47,40 @@ class SocketDeclaration {
 
   StringRefNull name() const;
   StringRefNull identifier() const;
+};
+
+class BaseSocketDeclarationBuilder {
+ public:
+  virtual ~BaseSocketDeclarationBuilder() = default;
+};
+
+template<typename SocketDecl>
+class SocketDeclarationBuilder : public BaseSocketDeclarationBuilder {
+ protected:
+  using Self = typename SocketDecl::Builder;
+  static_assert(std::is_base_of_v<SocketDeclaration, SocketDecl>);
+  SocketDecl *decl_;
+
+  friend class NodeDeclarationBuilder;
+
+ public:
+  Self &hide_label(bool value)
+  {
+    decl_->hide_label = value;
+    return *(Self *)this;
+  }
+
+  Self &hide_value(bool value)
+  {
+    decl_->hide_value_ = value;
+    return *(Self *)this;
+  }
+
+  Self &multi_input(bool value)
+  {
+    decl_->is_multi_input = value;
+    return *(Self *)this;
+  }
 };
 
 using SocketDeclarationPtr = std::unique_ptr<SocketDeclaration>;
@@ -67,12 +105,15 @@ class NodeDeclaration {
 class NodeDeclarationBuilder {
  private:
   NodeDeclaration &declaration_;
+  Vector<std::unique_ptr<BaseSocketDeclarationBuilder>> builders_;
 
  public:
   NodeDeclarationBuilder(NodeDeclaration &declaration);
 
-  template<typename DeclType> DeclType &add_input(StringRef name, StringRef identifier = "");
-  template<typename DeclType> DeclType &add_output(StringRef name, StringRef identifier = "");
+  template<typename DeclType>
+  typename DeclType::Builder &add_input(StringRef name, StringRef identifier = "");
+  template<typename DeclType>
+  typename DeclType::Builder &add_output(StringRef name, StringRef identifier = "");
 };
 
 /* --------------------------------------------------------------------
@@ -99,27 +140,37 @@ inline NodeDeclarationBuilder::NodeDeclarationBuilder(NodeDeclaration &declarati
 }
 
 template<typename DeclType>
-inline DeclType &NodeDeclarationBuilder::add_input(StringRef name, StringRef identifier)
+inline typename DeclType::Builder &NodeDeclarationBuilder::add_input(StringRef name,
+                                                                     StringRef identifier)
 {
   static_assert(std::is_base_of_v<SocketDeclaration, DeclType>);
+  using Builder = typename DeclType::Builder;
   std::unique_ptr<DeclType> socket_decl = std::make_unique<DeclType>();
-  DeclType &ref = *socket_decl;
-  ref.name_ = name;
-  ref.identifier_ = identifier.is_empty() ? name : identifier;
+  std::unique_ptr<Builder> socket_decl_builder = std::make_unique<Builder>();
+  socket_decl_builder->decl_ = &*socket_decl;
+  socket_decl->name_ = name;
+  socket_decl->identifier_ = identifier.is_empty() ? name : identifier;
   declaration_.inputs_.append(std::move(socket_decl));
-  return ref;
+  Builder &socket_decl_builder_ref = *socket_decl_builder;
+  builders_.append(std::move(socket_decl_builder));
+  return socket_decl_builder_ref;
 }
 
 template<typename DeclType>
-inline DeclType &NodeDeclarationBuilder::add_output(StringRef name, StringRef identifier)
+inline typename DeclType::Builder &NodeDeclarationBuilder::add_output(StringRef name,
+                                                                      StringRef identifier)
 {
   static_assert(std::is_base_of_v<SocketDeclaration, DeclType>);
+  using Builder = typename DeclType::Builder;
   std::unique_ptr<DeclType> socket_decl = std::make_unique<DeclType>();
-  DeclType &ref = *socket_decl;
-  ref.name_ = name;
-  ref.identifier_ = identifier.is_empty() ? name : identifier;
+  std::unique_ptr<Builder> socket_decl_builder = std::make_unique<Builder>();
+  socket_decl_builder->decl_ = &*socket_decl;
+  socket_decl->name_ = name;
+  socket_decl->identifier_ = identifier.is_empty() ? name : identifier;
   declaration_.outputs_.append(std::move(socket_decl));
-  return ref;
+  Builder &socket_decl_builder_ref = *socket_decl_builder;
+  builders_.append(std::move(socket_decl_builder));
+  return socket_decl_builder_ref;
 }
 
 /* --------------------------------------------------------------------

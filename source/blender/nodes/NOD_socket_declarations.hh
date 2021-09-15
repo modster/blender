@@ -32,34 +32,41 @@ class Float : public SocketDeclaration {
   float soft_max_value_ = FLT_MAX;
   PropertySubType subtype_ = PROP_NONE;
 
+  friend class FloatBuilder;
+
  public:
-  Float &min(const float value)
-  {
-    soft_min_value_ = value;
-    return *this;
-  }
-
-  Float &max(const float value)
-  {
-    soft_max_value_ = value;
-    return *this;
-  }
-
-  Float &default_value(const float value)
-  {
-    default_value_ = value;
-    return *this;
-  }
-
-  Float &subtype(PropertySubType subtype)
-  {
-    subtype_ = subtype;
-    return *this;
-  }
+  using Builder = class FloatBuilder;
 
   bNodeSocket &build(bNodeTree &ntree, bNode &node, eNodeSocketInOut in_out) const override;
   bool matches(const bNodeSocket &socket) const override;
   bNodeSocket &update_or_build(bNodeTree &ntree, bNode &node, bNodeSocket &socket) const override;
+};
+
+class FloatBuilder : public SocketDeclarationBuilder<Float> {
+ public:
+  FloatBuilder &min(const float value)
+  {
+    decl_->soft_min_value_ = value;
+    return *this;
+  }
+
+  FloatBuilder &max(const float value)
+  {
+    decl_->soft_max_value_ = value;
+    return *this;
+  }
+
+  FloatBuilder &default_value(const float value)
+  {
+    decl_->default_value_ = value;
+    return *this;
+  }
+
+  FloatBuilder &subtype(PropertySubType subtype)
+  {
+    decl_->subtype_ = subtype;
+    return *this;
+  }
 };
 
 class Int : public SocketDeclaration {
@@ -69,34 +76,41 @@ class Int : public SocketDeclaration {
   int soft_max_value_ = INT32_MAX;
   PropertySubType subtype_ = PROP_NONE;
 
+  friend class IntBuilder;
+
  public:
-  Int &min(const int value)
-  {
-    soft_min_value_ = value;
-    return *this;
-  }
-
-  Int &max(const int value)
-  {
-    soft_max_value_ = value;
-    return *this;
-  }
-
-  Int &default_value(const int value)
-  {
-    default_value_ = value;
-    return *this;
-  }
-
-  Int &subtype(PropertySubType subtype)
-  {
-    subtype_ = subtype;
-    return *this;
-  }
+  using Builder = class IntBuilder;
 
   bNodeSocket &build(bNodeTree &ntree, bNode &node, eNodeSocketInOut in_out) const override;
   bool matches(const bNodeSocket &socket) const override;
   bNodeSocket &update_or_build(bNodeTree &ntree, bNode &node, bNodeSocket &socket) const override;
+};
+
+class IntBuilder : public SocketDeclarationBuilder<Int> {
+ public:
+  IntBuilder &min(const int value)
+  {
+    decl_->soft_min_value_ = value;
+    return *this;
+  }
+
+  IntBuilder &max(const int value)
+  {
+    decl_->soft_max_value_ = value;
+    return *this;
+  }
+
+  IntBuilder &default_value(const int value)
+  {
+    decl_->default_value_ = value;
+    return *this;
+  }
+
+  IntBuilder &subtype(PropertySubType subtype)
+  {
+    decl_->subtype_ = subtype;
+    return *this;
+  }
 };
 
 class Vector : public SocketDeclaration {
@@ -106,76 +120,100 @@ class Vector : public SocketDeclaration {
   float soft_max_value_ = FLT_MAX;
   PropertySubType subtype_ = PROP_NONE;
 
+  friend class VectorBuilder;
+
  public:
-  Vector &default_value(const float3 value)
-  {
-    default_value_ = value;
-    return *this;
-  }
-
-  Vector &subtype(PropertySubType subtype)
-  {
-    subtype_ = subtype;
-    return *this;
-  }
-
-  Vector &min(const float min)
-  {
-    soft_min_value_ = min;
-    return *this;
-  }
-
-  Vector &max(const float max)
-  {
-    soft_max_value_ = max;
-    return *this;
-  }
+  using Builder = class VectorBuilder;
 
   bNodeSocket &build(bNodeTree &ntree, bNode &node, eNodeSocketInOut in_out) const override;
   bool matches(const bNodeSocket &socket) const override;
   bNodeSocket &update_or_build(bNodeTree &ntree, bNode &node, bNodeSocket &socket) const override;
 };
 
-class Bool : public SocketDeclaration {
- private:
-  bool default_value_ = false;
-
+class VectorBuilder : public SocketDeclarationBuilder<Vector> {
  public:
-  Bool &default_value(const bool value)
+  VectorBuilder &default_value(const float3 value)
   {
-    default_value_ = value;
+    decl_->default_value_ = value;
     return *this;
   }
 
+  VectorBuilder &subtype(PropertySubType subtype)
+  {
+    decl_->subtype_ = subtype;
+    return *this;
+  }
+
+  VectorBuilder &min(const float min)
+  {
+    decl_->soft_min_value_ = min;
+    return *this;
+  }
+
+  VectorBuilder &max(const float max)
+  {
+    decl_->soft_max_value_ = max;
+    return *this;
+  }
+};
+
+class Bool : public SocketDeclaration {
+ private:
+  bool default_value_ = false;
+  friend class BoolBuilder;
+
+ public:
+  using Builder = class BoolBuilder;
+
   bNodeSocket &build(bNodeTree &ntree, bNode &node, eNodeSocketInOut in_out) const override;
   bool matches(const bNodeSocket &socket) const override;
+};
+
+class BoolBuilder : public SocketDeclarationBuilder<Bool> {
+ public:
+  BoolBuilder &default_value(const bool value)
+  {
+    decl_->default_value_ = value;
+    return *this;
+  }
 };
 
 class Color : public SocketDeclaration {
  private:
   ColorGeometry4f default_value_;
 
+  friend class ColorBuilder;
+
  public:
-  Color &default_value(const ColorGeometry4f value)
-  {
-    default_value_ = value;
-    return *this;
-  }
+  using Builder = class ColorBuilder;
 
   bNodeSocket &build(bNodeTree &ntree, bNode &node, eNodeSocketInOut in_out) const override;
   bool matches(const bNodeSocket &socket) const override;
 };
 
+class ColorBuilder : public SocketDeclarationBuilder<Color> {
+ public:
+  ColorBuilder &default_value(const ColorGeometry4f value)
+  {
+    decl_->default_value_ = value;
+    return *this;
+  }
+};
+
 class String : public SocketDeclaration {
  public:
+  using Builder = class StringBuilder;
+
   bNodeSocket &build(bNodeTree &ntree, bNode &node, eNodeSocketInOut in_out) const override;
   bool matches(const bNodeSocket &socket) const override;
+};
+
+class StringBuilder : public SocketDeclarationBuilder<String> {
 };
 
 namespace detail {
 struct CommonIDSocketData {
   const char *idname;
-  bool hide_label = false;
 };
 
 bNodeSocket &build_id_socket(bNodeTree &ntree,
@@ -198,12 +236,6 @@ template<typename Subtype> class IDSocketDeclaration : public SocketDeclaration 
   {
   }
 
-  Subtype &hide_label(bool value)
-  {
-    data_.hide_label = value;
-    return *(Subtype *)this;
-  }
-
   bNodeSocket &build(bNodeTree &ntree, bNode &node, eNodeSocketInOut in_out) const override
   {
     return build_id_socket(ntree, node, in_out, data_, name_, identifier_);
@@ -219,12 +251,6 @@ template<typename Subtype> class IDSocketDeclaration : public SocketDeclaration 
     if (StringRef(socket.idname) != data_.idname) {
       return this->build(ntree, node, (eNodeSocketInOut)socket.in_out);
     }
-    if (data_.hide_label) {
-      socket.flag |= SOCK_HIDE_LABEL;
-    }
-    else {
-      socket.flag &= ~SOCK_HIDE_LABEL;
-    }
     return socket;
   }
 };
@@ -232,36 +258,61 @@ template<typename Subtype> class IDSocketDeclaration : public SocketDeclaration 
 
 class Object : public detail::IDSocketDeclaration<Object> {
  public:
+  using Builder = class ObjectBuilder;
+
   Object() : detail::IDSocketDeclaration<Object>("NodeSocketObject")
   {
   }
 };
 
+class ObjectBuilder : public SocketDeclarationBuilder<Object> {
+};
+
 class Material : public detail::IDSocketDeclaration<Material> {
  public:
+  using Builder = class MaterialBuilder;
+
   Material() : detail::IDSocketDeclaration<Material>("NodeSocketMaterial")
   {
   }
 };
 
+class MaterialBuilder : public SocketDeclarationBuilder<Material> {
+};
+
 class Collection : public detail::IDSocketDeclaration<Collection> {
  public:
+  using Builder = class CollectionBuilder;
+
   Collection() : detail::IDSocketDeclaration<Collection>("NodeSocketCollection")
   {
   }
 };
 
+class CollectionBuilder : public SocketDeclarationBuilder<Collection> {
+};
+
 class Texture : public detail::IDSocketDeclaration<Texture> {
  public:
+  using Builder = class TextureBuilder;
+
   Texture() : detail::IDSocketDeclaration<Texture>("NodeSocketTexture")
   {
   }
 };
 
+class TextureBuilder : public SocketDeclarationBuilder<Texture> {
+};
+
 class Geometry : public SocketDeclaration {
  public:
+  using Builder = class GeometryBuilder;
+
   bNodeSocket &build(bNodeTree &ntree, bNode &node, eNodeSocketInOut in_out) const override;
   bool matches(const bNodeSocket &socket) const override;
+};
+
+class GeometryBuilder : public SocketDeclarationBuilder<Geometry> {
 };
 
 }  // namespace blender::nodes::decl

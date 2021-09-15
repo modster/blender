@@ -277,9 +277,6 @@ bNodeSocket &build_id_socket(bNodeTree &ntree,
 {
   bNodeSocket &socket = *nodeAddSocket(
       &ntree, &node, in_out, data.idname, identifier.c_str(), name.c_str());
-  if (data.hide_label) {
-    socket.flag |= SOCK_HIDE_LABEL;
-  }
   return socket;
 }
 
@@ -289,9 +286,6 @@ bool matches_id_socket(const bNodeSocket &socket,
                        StringRefNull identifier)
 {
   if (!STREQ(socket.idname, data.idname)) {
-    return false;
-  }
-  if (data.hide_label != ((socket.flag & SOCK_HIDE_LABEL) != 0)) {
     return false;
   }
   if (socket.name != name) {
