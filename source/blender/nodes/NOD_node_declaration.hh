@@ -81,7 +81,7 @@ class SocketDeclarationBuilder : public BaseSocketDeclarationBuilder {
 
   Self &multi_input(bool value)
   {
-    decl_->is_multi_input = value;
+    decl_->is_multi_input_ = value;
     return *(Self *)this;
   }
 };
