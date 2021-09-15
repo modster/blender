@@ -65,7 +65,7 @@ class Instance {
 
     /* Create temp double buffer to render to or copy source to. */
     /* TODO(fclem) with multipass compositing we might need more than one temp buffer. */
-    DrawEngineType *owner = (DrawEngineType *)this;
+    DrawEngineType *owner = (DrawEngineType *)g_shader_module;
     eGPUTextureFormat format = GPU_texture_format(DRW_viewport_texture_list_get()->color);
     tmp_buffer_ = DRW_texture_pool_query_fullscreen(format, owner);
   }
@@ -79,7 +79,7 @@ class Instance {
     pass_ = DRW_pass_create("Compositing", DRW_STATE_WRITE_COLOR);
     DRWShadingGroup *grp = DRW_shgroup_material_create(gpumat_, pass_);
     /* TODO(fclem) Find a way to identify the renderlayers. */
-    DRW_shgroup_uniform_texture_ex(grp, "samp0", tmp_buffer_, GPU_SAMPLER_FILTER);
+    DRW_shgroup_uniform_texture_ex(grp, "rl_combined", tmp_buffer_, GPU_SAMPLER_FILTER);
 
     DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
   }
@@ -94,6 +94,9 @@ class Instance {
     DefaultTextureList *dtxl = DRW_viewport_texture_list_get();
     /* TODO(fclem) only copy if we need to. Only possible in multipass. */
     GPU_texture_copy(tmp_buffer_, dtxl->color);
+
+    /* Reset default view. */
+    DRW_view_set_active(nullptr);
 
     GPU_framebuffer_bind(dfbl->color_only_fb);
     DRW_draw_pass(pass_);

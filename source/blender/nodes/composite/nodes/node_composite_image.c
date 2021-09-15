@@ -452,9 +452,11 @@ static int node_composit_gpu_image(GPUMaterial *mat,
                                    GPUNodeStack *UNUSED(in),
                                    GPUNodeStack *out)
 {
-
   Image *ima = (Image *)node->id;
-  ImageUser *iuser = node->storage;
+  /* We get the image user from the original node, since GPU image keeps
+   * a pointer to it and the dependency refreshes the original. */
+  bNode *node_original = node->original ? node->original : node;
+  ImageUser *iuser = node_original->storage;
 
   if (out[0].hasoutput) {
     if (ima) {

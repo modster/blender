@@ -30,6 +30,7 @@ class ShaderModule {
 
  public:
   ShaderModule();
+  ~ShaderModule();
 
   /** TODO(fclem) multipass. */
   GPUMaterial *material_get(Scene *scene);

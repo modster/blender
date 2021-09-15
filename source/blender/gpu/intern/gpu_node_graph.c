@@ -442,7 +442,12 @@ static GPUMaterialTexture *gpu_node_graph_add_texture(GPUNodeGraph *graph,
     tex->colorband = colorband;
     tex->sampler_state = sampler_state;
     tex->pass_type = pass_type;
-    BLI_snprintf(tex->sampler_name, sizeof(tex->sampler_name), "samp%d", num_textures);
+    if (pass_type != 0) {
+      BLI_snprintf(tex->sampler_name, sizeof(tex->sampler_name), "rl_combined");
+    }
+    else {
+      BLI_snprintf(tex->sampler_name, sizeof(tex->sampler_name), "samp%d", num_textures);
+    }
     if (ELEM(link_type, GPU_NODE_LINK_IMAGE_TILED, GPU_NODE_LINK_IMAGE_TILED_MAPPING)) {
       BLI_snprintf(
           tex->tiled_mapping_name, sizeof(tex->tiled_mapping_name), "tsamp%d", num_textures);

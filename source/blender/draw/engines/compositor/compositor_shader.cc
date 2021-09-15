@@ -44,6 +44,11 @@ ShaderModule::ShaderModule()
   DRW_SHADER_LIB_ADD(shader_lib_, compositor_nodetree_eval_lib);
 }
 
+ShaderModule::~ShaderModule()
+{
+  DRW_shader_library_free(shader_lib_);
+}
+
 char *ShaderModule::pass_shader_code_vert_get(const GPUCodegenOutput * /*codegen*/,
                                               GPUMaterial * /*gpumat*/)
 {
