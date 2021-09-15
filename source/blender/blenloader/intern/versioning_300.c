@@ -687,7 +687,7 @@ static bool geometry_node_is_293_legacy(const short node_type)
     case GEO_NODE_COLLECTION_INFO:
       return false;
 
-    /* Maybe legacy: Transfered *all* attributes before, will not transfer all built-ins now. */
+    /* Maybe legacy: Transferred *all* attributes before, will not transfer all built-ins now. */
     case GEO_NODE_CURVE_ENDPOINTS:
     case GEO_NODE_CURVE_TO_POINTS:
       return false;
@@ -734,7 +734,7 @@ static bool geometry_node_is_293_legacy(const short node_type)
       return true;
 
     /* Legacy: More complex attribute inputs or outputs. */
-    case GEO_NODE_LEGACY_DELETE_GEOMETRY:    /* Needs field input, domain dropdown. */
+    case GEO_NODE_LEGACY_DELETE_GEOMETRY:    /* Needs field input, domain drop-down. */
     case GEO_NODE_LEGACY_CURVE_SUBDIVIDE:    /* Needs field count input. */
     case GEO_NODE_LEGACY_POINTS_TO_VOLUME:   /* Needs field radius input. */
     case GEO_NODE_LEGACY_SELECT_BY_MATERIAL: /* Output anonymous attribute. */
@@ -1248,6 +1248,19 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
     LISTBASE_FOREACH (bNodeTree *, ntree, &bmain->nodetrees) {
       if (ntree->type == NTREE_GEOMETRY) {
         version_geometry_nodes_change_legacy_names(ntree);
+      }
+    }
+    if (!DNA_struct_elem_find(
+            fd->filesdna, "LineartGpencilModifierData", "bool", "use_crease_on_smooth")) {
+      LISTBASE_FOREACH (Object *, ob, &bmain->objects) {
+        if (ob->type == OB_GPENCIL) {
+          LISTBASE_FOREACH (GpencilModifierData *, md, &ob->greasepencil_modifiers) {
+            if (md->type == eGpencilModifierType_Lineart) {
+              LineartGpencilModifierData *lmd = (LineartGpencilModifierData *)md;
+              lmd->calculation_flags |= LRT_USE_CREASE_ON_SMOOTH_SURFACES;
+            }
+          }
+        }
       }
     }
   }

@@ -997,7 +997,7 @@ typedef struct LineartGpencilModifierData {
   /** `0..PI` angle, for splitting strokes at sharp points. */
   float angle_splitting_threshold;
 
-  /** Strength for smoothing jagged chains */
+  /** Strength for smoothing jagged chains. */
   float chain_smooth_tolerance;
 
   /* CPU mode */

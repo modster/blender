@@ -26,6 +26,7 @@
 #include "DNA_brush_types.h"
 #include "DNA_cachefile_types.h"
 #include "DNA_gpencil_modifier_types.h"
+#include "DNA_gpencil_types.h"
 #include "DNA_mesh_types.h"
 #include "DNA_object_force_types.h"
 #include "DNA_object_types.h"
@@ -3215,8 +3216,7 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
   prop = RNA_def_property(srna, "thickness", PROP_INT, PROP_NONE);
   RNA_def_property_ui_text(prop, "Thickness", "The thickness for the generated strokes");
   RNA_def_property_ui_range(prop, 1, 100, 1, 1);
-  /* GPencil internal limit, use hard coded value for now until we have a marco. */
-  RNA_def_property_range(prop, 1, 5000);
+  RNA_def_property_range(prop, 1, GPENCIL_MAX_THICKNESS);
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
 
   prop = RNA_def_property(srna, "opacity", PROP_FLOAT, PROP_FACTOR);
