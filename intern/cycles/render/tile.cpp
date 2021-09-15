@@ -16,6 +16,8 @@
 
 #include "render/tile.h"
 
+#include <atomic>
+
 #include "graph/node.h"
 #include "render/pass.h"
 #include "util/util_algorithm.h"
@@ -36,6 +38,9 @@ static const char *ATTR_BUFFER_FULL_X = "cycles.buffer.full_x";
 static const char *ATTR_BUFFER_FULL_Y = "cycles.buffer.full_y";
 static const char *ATTR_BUFFER_FULL_WIDTH = "cycles.buffer.full_width";
 static const char *ATTR_BUFFER_FULL_HEIGHT = "cycles.buffer.full_height";
+
+/* Global counter of ToleManager object instances. */
+static std::atomic<uint64_t> g_instance_index = 0;
 
 /* Construct names of EXR channels which will ensure order of all channels to match exact offsets
  * in render buffers corresponding to the given passes.
@@ -346,11 +351,17 @@ static bool configure_buffer_from_image_spec(BufferParams *buffer_params,
 TileManager::TileManager()
 {
   /* Append an unique part to the file name, so that if the temp directory is not set to be a
-   * process-specific there is no conflit between different Cycles process instances. Use process
-   * ID to separate different processes, and address of the tile manager to identify different
-   * Cycles sessions within the same process. */
+   * process-specific there is no conflit between different Cycles process instances.
+   *
+   * Use process ID to separate different processes.
+   * To ensure uniqueness from within a process use combination of object address and instance
+   * index. This solves problem of possible object re-allocation at the same time, and solves
+   * possible conflict when the counter overflows while there are still active instances of the
+   * class. */
+  const int tile_manager_id = g_instance_index.fetch_add(1, std::memory_order_relaxed);
   const string unique_part = to_string(system_self_process_id()) + "-" +
-                             to_string(reinterpret_cast<uintptr_t>(this));
+                             to_string(reinterpret_cast<uintptr_t>(this)) + "-" +
+                             to_string(tile_manager_id);
   tile_filepath_ = path_temp_get("cycles-tile-buffer-" + unique_part + ".exr");
 }
 
