@@ -41,14 +41,11 @@ ccl_device float3 integrator_eval_background_shader(INTEGRATOR_STATE_ARGS,
       return zero_float3();
   }
 
-  /* Fast path for constant color shader. */
+  /* Use fast constant background color if available. */
   float3 L = zero_float3();
-  if (shader_constant_emission_eval(kg, shader, &L)) {
-    return L;
-  }
+  if (!shader_constant_emission_eval(kg, shader, &L)) {
+    /* Evaluate background shader. */
 
-  /* Evaluate background shader. */
-  {
     /* TODO: does aliasing like this break automatic SoA in CUDA?
      * Should we instead store closures separate from ShaderData? */
     ShaderDataTinyStorage emission_sd_storage;
