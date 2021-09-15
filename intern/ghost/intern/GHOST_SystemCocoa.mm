@@ -1708,16 +1708,42 @@ GHOST_TSuccess GHOST_SystemCocoa::handleMouseEvent(void *eventPtr)
         double dx;
         double dy;
 
-        /* with 10.7 nice scrolling deltas are supported */
-        dx = [event scrollingDeltaX];
-        dy = [event scrollingDeltaY];
+        /* trying to pretend you have nice scrolls... */
+        dx = [event deltaX];
+        dy = [event deltaY];
+        if ((dx == 0) && (dy == 0))
+          break;
 
-        /* However, Wacom tablet (intuos5) needs old deltas,
-         * it then has momentum and phase at zero. */
-        if (phase == NSEventPhaseNone && momentumPhase == NSEventPhaseNone) {
-          dx = [event deltaX];
-          dy = [event deltaY];
+        const double deltaMax = 50.0;
+        /* Quadratic acceleration */
+        dx = dx * (fabs(dx) + 0.5);
+        if (dx < 0.0) {
+          dx -= 0.5;
         }
+        else {
+          dx += 0.5;
+        }
+        if (dx < -deltaMax) {
+          dx = -deltaMax;
+        }
+        else if (dx > deltaMax) {
+          dx = deltaMax;
+        }
+
+        dy = dy * (fabs(dy) + 0.5);
+        if (dy < 0.0) {
+          dy -= 0.5;
+        }
+        else {
+          dy += 0.5;
+        }
+        if (dy < -deltaMax) {
+          dy = -deltaMax;
+        }
+        else if (dy > deltaMax) {
+          dy = deltaMax;
+        }
+
         window->clientToScreenIntern(mousePos.x, mousePos.y, x, y);
 
         NSPoint delta = [[cocoawindow contentView] convertPointToBacking:NSMakePoint(dx, dy)];
