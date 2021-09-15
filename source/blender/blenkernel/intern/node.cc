@@ -4467,7 +4467,28 @@ void ntreeUpdateAllUsers(Main *main, ID *id)
 
 static void update_socket_shapes_for_fields(bNodeTree &ntree)
 {
-  UNUSED_VARS(ntree);
+  using namespace blender::nodes;
+  if (ntree.type != NTREE_GEOMETRY) {
+    return;
+  }
+  LISTBASE_FOREACH (bNode *, node, &ntree.nodes) {
+    nodeDeclarationEnsure(&ntree, node);
+    NodeDeclaration *declaration = node->declaration;
+    if (declaration == nullptr) {
+      continue;
+    }
+    int input_index;
+    LISTBASE_FOREACH_INDEX (bNodeSocket *, socket, &node->inputs, input_index) {
+      const SocketDeclaration &socket_decl = *declaration->inputs()[input_index];
+      bool is_field = socket_decl.get_is_field();
+      if (is_field) {
+        socket->display_shape = SOCK_DISPLAY_SHAPE_DIAMOND;
+      }
+      else {
+        socket->display_shape = SOCK_DISPLAY_SHAPE_CIRCLE;
+      }
+    }
+  }
 }
 
 void ntreeUpdateTree(Main *bmain, bNodeTree *ntree)

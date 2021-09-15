@@ -44,6 +44,11 @@ class SocketDeclaration {
 
   StringRefNull name() const;
   StringRefNull identifier() const;
+
+  bool get_is_field() const
+  {
+    return is_field_;
+  }
 };
 
 using SocketDeclarationPtr = std::unique_ptr<SocketDeclaration>;
