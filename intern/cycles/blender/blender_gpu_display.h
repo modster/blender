@@ -155,6 +155,8 @@ class BlenderGPUDisplay : public GPUDisplay {
   /* The when Blender RenderEngine side context is not available and the GPUDisplay is to create
    * its own context. */
   bool use_gl_context_ = false;
+  /* Mutex used to guard the `gl_context_`. */
+  thread_mutex gl_context_mutex_;
 
   /* Texture which contains pixels of the render result. */
   struct {

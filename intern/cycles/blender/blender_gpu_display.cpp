@@ -461,6 +461,10 @@ void BlenderGPUDisplay::do_draw(const GPUDisplayParams &params)
     return;
   }
 
+  if (use_gl_context_) {
+    gl_context_mutex_.lock();
+  }
+
   glWaitSync((GLsync)gl_upload_sync_, 0, GL_TIMEOUT_IGNORED);
 
   if (transparent) {
@@ -513,6 +517,10 @@ void BlenderGPUDisplay::do_draw(const GPUDisplayParams &params)
 
   gl_render_sync_ = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
   glFlush();
+
+  if (use_gl_context_) {
+    gl_context_mutex_.unlock();
+  }
 }
 
 void BlenderGPUDisplay::gl_context_create()
@@ -550,6 +558,7 @@ bool BlenderGPUDisplay::gl_context_enable()
     if (!gl_context_) {
       return false;
     }
+    gl_context_mutex_.lock();
     WM_opengl_context_activate(gl_context_);
     return true;
   }
@@ -563,6 +572,7 @@ void BlenderGPUDisplay::gl_context_disable()
   if (use_gl_context_) {
     if (gl_context_) {
       WM_opengl_context_release(gl_context_);
+      gl_context_mutex_.unlock();
     }
     return;
   }
