@@ -37,6 +37,7 @@ class SocketDeclaration {
   bool hide_label_ = false;
   bool hide_value_ = false;
   bool is_multi_input_ = false;
+  bool is_field_ = false;
 
   friend NodeDeclarationBuilder;
   template<typename SocketDecl> friend class SocketDeclarationBuilder;
@@ -50,6 +51,8 @@ class SocketDeclaration {
 
   StringRefNull name() const;
   StringRefNull identifier() const;
+
+  bool is_field() const;
 
  protected:
   void set_common_flags(bNodeSocket &socket) const;
@@ -91,6 +94,12 @@ class SocketDeclarationBuilder : public BaseSocketDeclarationBuilder {
   Self &multi_input(bool value)
   {
     decl_->is_multi_input_ = value;
+    return *(Self *)this;
+  }
+
+  Self &is_field(bool value)
+  {
+    decl_->is_field_ = value;
     return *(Self *)this;
   }
 };
@@ -146,6 +155,11 @@ inline StringRefNull SocketDeclaration::name() const
 inline StringRefNull SocketDeclaration::identifier() const
 {
   return identifier_;
+}
+
+inline bool SocketDeclaration::is_field() const
+{
+  return is_field_;
 }
 
 /* --------------------------------------------------------------------

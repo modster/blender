@@ -4480,7 +4480,7 @@ static void update_socket_shapes_for_fields(bNodeTree &ntree)
     int input_index;
     LISTBASE_FOREACH_INDEX (bNodeSocket *, socket, &node->inputs, input_index) {
       const SocketDeclaration &socket_decl = *declaration->inputs()[input_index];
-      bool is_field = socket_decl.get_is_field();
+      bool is_field = socket_decl.is_field();
       if (is_field) {
         socket->display_shape = SOCK_DISPLAY_SHAPE_DIAMOND;
       }
