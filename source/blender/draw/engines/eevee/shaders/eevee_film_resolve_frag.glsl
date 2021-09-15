@@ -8,11 +8,11 @@ layout(std140) uniform film_block
 
 uniform sampler2D data_tx;
 uniform sampler2D weight_tx;
+uniform sampler2D first_sample_tx;
 
 in vec4 uvcoordsvar;
 
-layout(location = 0, index = 0) out vec4 out_color;
-layout(location = 0, index = 1) out vec4 out_mul;
+layout(location = 0) out vec4 out_color;
 
 void main(void)
 {
@@ -23,6 +23,6 @@ void main(void)
 
   out_color = film_data_decode(film, color, weight);
 
-  out_color *= film.opacity;
-  out_mul = vec4(1.0 - film.opacity);
+  vec4 first_sample = textureLod(first_sample_tx, uv, 0.0);
+  out_color = mix(first_sample, out_color, film.opacity);
 }

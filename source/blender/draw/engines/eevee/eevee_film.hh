@@ -52,11 +52,15 @@ class Film {
   eevee::Framebuffer accumulation_fb_[2];
   eevee::Texture data_tx_[2];
   eevee::Texture weight_tx_[2];
+  /** First sample in case we need to blend using it or just reuse it. */
+  eevee::Texture first_sample_tx_;
+
+  /** Reference to first_sample_tx_ or data_tx_ depending on the context. */
+  GPUTexture *first_sample_ref_;
 
   DRWPass *clear_ps_ = nullptr;
   DRWPass *accumulate_ps_ = nullptr;
   DRWPass *resolve_ps_ = nullptr;
-  DRWPass *resolve_blend_ps_ = nullptr;
 
   /** Shader parameter, not allocated. */
   GPUTexture *input_tx_;
@@ -98,7 +102,8 @@ class Film {
  private:
   bool do_smooth_viewport_smooth_transition(void)
   {
-    return ELEM(data_.data_type, FILM_DATA_COLOR, FILM_DATA_COLOR_LOG);
+    return ELEM(data_.data_type, FILM_DATA_COLOR, FILM_DATA_COLOR_LOG) &&
+           !DRW_state_is_image_render();
   }
 };
 

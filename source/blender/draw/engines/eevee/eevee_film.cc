@@ -140,17 +140,10 @@ void Film::sync(void)
     GPUShader *sh = inst_.shaders.static_shader_get(sh_type);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, resolve_ps_);
     DRW_shgroup_uniform_block(grp, "film_block", data_.ubo_get());
+    DRW_shgroup_uniform_texture_ref_ex(grp, "first_sample_tx", &first_sample_ref_, no_filter);
     DRW_shgroup_uniform_texture_ref_ex(grp, "data_tx", &data_tx_[0], no_filter);
     DRW_shgroup_uniform_texture_ref_ex(grp, "weight_tx", &weight_tx_[0], no_filter);
     DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
-
-    if (do_smooth_viewport_smooth_transition()) {
-      resolve_blend_ps_ = DRW_pass_create_instance(
-          full_name, resolve_ps_, state | DRW_STATE_BLEND_CUSTOM);
-    }
-    else {
-      resolve_blend_ps_ = nullptr;
-    }
   }
 }
 
@@ -167,6 +160,20 @@ void Film::end_sync()
 
   if (data_.use_history == 0 || inst_.is_viewport()) {
     data_.push_update();
+  }
+
+  const bool is_first_sample = (inst_.sampling.sample_get() == 1);
+  if (do_smooth_viewport_smooth_transition() && (data_.opacity < 1.0f || is_first_sample)) {
+    char full_name[32];
+    SNPRINTF(full_name, "Film.%s.first_sample", name_.c_str());
+    eGPUTextureFormat tex_format = GPU_texture_format(DRW_viewport_texture_list_get()->color);
+    first_sample_tx_.ensure(full_name, UNPACK2(data_.extent), 1, tex_format);
+    first_sample_ref_ = first_sample_tx_;
+  }
+  else {
+    /* Reuse the data_tx since there is no need to blend. */
+    first_sample_tx_.release();
+    first_sample_ref_ = data_tx_[0];
   }
 }
 
@@ -192,10 +199,6 @@ void Film::accumulate(GPUTexture *input, const DRWView *view)
 
 void Film::resolve_viewport(GPUFrameBuffer *target)
 {
-  if (do_smooth_viewport_smooth_transition() && data_.opacity == 0.0f) {
-    return;
-  }
-
   int viewport[4];
 
   GPU_framebuffer_bind(target);
@@ -218,13 +221,15 @@ void Film::resolve_viewport(GPUFrameBuffer *target)
     GPU_framebuffer_viewport_set(target, UNPACK2(data_.offset), UNPACK2(data_.extent));
   }
 
-  if (do_smooth_viewport_smooth_transition() && data_.opacity != 1.0f) {
-    /* Viewport color is preserved from previous redraw and we blend on top. */
-    DRW_draw_pass(resolve_blend_ps_);
-  }
-  else {
-    /* Opaque pass that will clear any undefined values. */
-    DRW_draw_pass(resolve_ps_);
+  DRW_draw_pass(resolve_ps_);
+
+  /* Minus one because we already incremented it in step() which is the first
+   * thing to happen in the sample loop. */
+  const bool is_first_sample = (inst_.sampling.sample_get() - 1 == 1);
+  const bool is_only_one_sample = is_first_sample && inst_.sampling.finished();
+  if (is_first_sample && !is_only_one_sample && do_smooth_viewport_smooth_transition()) {
+    DefaultTextureList *dtxl = DRW_viewport_texture_list_get();
+    GPU_texture_copy(first_sample_tx_, dtxl->color);
   }
 
   if (use_render_border) {

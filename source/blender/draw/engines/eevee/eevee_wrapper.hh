@@ -272,6 +272,11 @@ class Texture {
     GPU_texture_clear(tx_, GPU_DATA_FLOAT, &color[0]);
   }
 
+  void release()
+  {
+    GPU_TEXTURE_FREE_SAFE(tx_);
+  }
+
   Texture &operator=(Texture &a)
   {
     if (*this != a) {
