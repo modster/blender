@@ -25,6 +25,8 @@
 
 namespace blender::nodes::decl {
 
+class FloatBuilder;
+
 class Float : public SocketDeclaration {
  private:
   float default_value_ = 0.0f;
@@ -32,10 +34,10 @@ class Float : public SocketDeclaration {
   float soft_max_value_ = FLT_MAX;
   PropertySubType subtype_ = PROP_NONE;
 
-  friend class FloatBuilder;
+  friend FloatBuilder;
 
  public:
-  using Builder = class FloatBuilder;
+  using Builder = FloatBuilder;
 
   bNodeSocket &build(bNodeTree &ntree, bNode &node, eNodeSocketInOut in_out) const override;
   bool matches(const bNodeSocket &socket) const override;
@@ -69,6 +71,8 @@ class FloatBuilder : public SocketDeclarationBuilder<Float> {
   }
 };
 
+class IntBuilder;
+
 class Int : public SocketDeclaration {
  private:
   int default_value_ = 0;
@@ -76,10 +80,10 @@ class Int : public SocketDeclaration {
   int soft_max_value_ = INT32_MAX;
   PropertySubType subtype_ = PROP_NONE;
 
-  friend class IntBuilder;
+  friend IntBuilder;
 
  public:
-  using Builder = class IntBuilder;
+  using Builder = IntBuilder;
 
   bNodeSocket &build(bNodeTree &ntree, bNode &node, eNodeSocketInOut in_out) const override;
   bool matches(const bNodeSocket &socket) const override;
@@ -113,6 +117,8 @@ class IntBuilder : public SocketDeclarationBuilder<Int> {
   }
 };
 
+class VectorBuilder;
+
 class Vector : public SocketDeclaration {
  private:
   float3 default_value_ = {0, 0, 0};
@@ -120,10 +126,10 @@ class Vector : public SocketDeclaration {
   float soft_max_value_ = FLT_MAX;
   PropertySubType subtype_ = PROP_NONE;
 
-  friend class VectorBuilder;
+  friend VectorBuilder;
 
  public:
-  using Builder = class VectorBuilder;
+  using Builder = VectorBuilder;
 
   bNodeSocket &build(bNodeTree &ntree, bNode &node, eNodeSocketInOut in_out) const override;
   bool matches(const bNodeSocket &socket) const override;
@@ -157,13 +163,15 @@ class VectorBuilder : public SocketDeclarationBuilder<Vector> {
   }
 };
 
+class BoolBuilder;
+
 class Bool : public SocketDeclaration {
  private:
   bool default_value_ = false;
-  friend class BoolBuilder;
+  friend BoolBuilder;
 
  public:
-  using Builder = class BoolBuilder;
+  using Builder = BoolBuilder;
 
   bNodeSocket &build(bNodeTree &ntree, bNode &node, eNodeSocketInOut in_out) const override;
   bool matches(const bNodeSocket &socket) const override;
@@ -178,14 +186,16 @@ class BoolBuilder : public SocketDeclarationBuilder<Bool> {
   }
 };
 
+class ColorBuilder;
+
 class Color : public SocketDeclaration {
  private:
   ColorGeometry4f default_value_;
 
-  friend class ColorBuilder;
+  friend ColorBuilder;
 
  public:
-  using Builder = class ColorBuilder;
+  using Builder = ColorBuilder;
 
   bNodeSocket &build(bNodeTree &ntree, bNode &node, eNodeSocketInOut in_out) const override;
   bool matches(const bNodeSocket &socket) const override;
@@ -202,13 +212,10 @@ class ColorBuilder : public SocketDeclarationBuilder<Color> {
 
 class String : public SocketDeclaration {
  public:
-  using Builder = class StringBuilder;
+  using Builder = SocketDeclarationBuilder<String>;
 
   bNodeSocket &build(bNodeTree &ntree, bNode &node, eNodeSocketInOut in_out) const override;
   bool matches(const bNodeSocket &socket) const override;
-};
-
-class StringBuilder : public SocketDeclarationBuilder<String> {
 };
 
 class IDSocketDeclaration : public SocketDeclaration {
@@ -227,61 +234,46 @@ class IDSocketDeclaration : public SocketDeclaration {
 
 class Object : public IDSocketDeclaration {
  public:
-  using Builder = class ObjectBuilder;
+  using Builder = SocketDeclarationBuilder<Object>;
 
   Object() : IDSocketDeclaration("NodeSocketObject")
   {
   }
 };
 
-class ObjectBuilder : public SocketDeclarationBuilder<Object> {
-};
-
 class Material : public IDSocketDeclaration {
  public:
-  using Builder = class MaterialBuilder;
+  using Builder = SocketDeclarationBuilder<Material>;
 
   Material() : IDSocketDeclaration("NodeSocketMaterial")
   {
   }
 };
 
-class MaterialBuilder : public SocketDeclarationBuilder<Material> {
-};
-
 class Collection : public IDSocketDeclaration {
  public:
-  using Builder = class CollectionBuilder;
+  using Builder = SocketDeclarationBuilder<Collection>;
 
   Collection() : IDSocketDeclaration("NodeSocketCollection")
   {
   }
 };
 
-class CollectionBuilder : public SocketDeclarationBuilder<Collection> {
-};
-
 class Texture : public IDSocketDeclaration {
  public:
-  using Builder = class TextureBuilder;
+  using Builder = SocketDeclarationBuilder<Texture>;
 
   Texture() : IDSocketDeclaration("NodeSocketTexture")
   {
   }
 };
 
-class TextureBuilder : public SocketDeclarationBuilder<Texture> {
-};
-
 class Geometry : public SocketDeclaration {
  public:
-  using Builder = class GeometryBuilder;
+  using Builder = SocketDeclarationBuilder<Geometry>;
 
   bNodeSocket &build(bNodeTree &ntree, bNode &node, eNodeSocketInOut in_out) const override;
   bool matches(const bNodeSocket &socket) const override;
-};
-
-class GeometryBuilder : public SocketDeclarationBuilder<Geometry> {
 };
 
 }  // namespace blender::nodes::decl
