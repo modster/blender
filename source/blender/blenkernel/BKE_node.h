@@ -1294,6 +1294,8 @@ void ntreeCompositRegisterPass(struct bNodeTree *ntree,
                                eNodeSocketDatatype type);
 void ntreeCompositClearTags(struct bNodeTree *ntree);
 
+void ntreeGPUCompositeNodes(struct bNodeTree *localtree, struct GPUMaterial *mat);
+
 struct bNodeSocket *ntreeCompositOutputFileAddSocket(struct bNodeTree *ntree,
                                                      struct bNode *node,
                                                      const char *name,

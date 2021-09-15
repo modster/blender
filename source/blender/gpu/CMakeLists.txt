@@ -275,6 +275,10 @@ data_to_c_simple(shaders/gpu_shader_codegen_lib.glsl SRC)
 
 data_to_c_simple(shaders/gpu_shader_geometry.glsl SRC)
 
+data_to_c_simple(shaders/composite/gpu_shader_composite_composite.glsl SRC)
+data_to_c_simple(shaders/composite/gpu_shader_composite_image.glsl SRC)
+data_to_c_simple(shaders/composite/gpu_shader_composite_invert.glsl SRC)
+
 data_to_c_simple(shaders/material/gpu_shader_material_add_shader.glsl SRC)
 data_to_c_simple(shaders/material/gpu_shader_material_ambient_occlusion.glsl SRC)
 data_to_c_simple(shaders/material/gpu_shader_material_anisotropic.glsl SRC)

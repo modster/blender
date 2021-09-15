@@ -31,50 +31,72 @@ namespace blender::compositor {
 static ShaderModule *g_shader_module = nullptr;
 
 class Instance {
- private:
+ public:
   ShaderModule &shaders;
 
-  Depsgraph *depsgraph;
-  Scene *scene;
+ private:
+  /** TODO(fclem) multipass. */
+  DRWPass *pass_;
+  GPUMaterial *gpumat_;
+  /** Temp buffers to hold intermediate results or the input color. */
+  GPUTexture *tmp_buffer_;
 
-  bool enabled;
+  bool enabled_;
 
  public:
-  Instance(ShaderModule &shader_module) : shaders(shader_module)
-  {
-  }
+  Instance(ShaderModule &shader_module) : shaders(shader_module){};
 
   void init()
   {
     const DRWContextState *ctx_state = DRW_context_state_get();
-    depsgraph = ctx_state->depsgraph;
-    scene = ctx_state->scene;
-    enabled = scene->use_nodes && scene->nodetree;
+    Scene *scene = ctx_state->scene;
+    enabled_ = scene->use_nodes && scene->nodetree;
 
-    if (!enabled) {
+    if (!enabled_) {
       return;
     }
+
+    gpumat_ = shaders.material_get(scene);
+    enabled_ = GPU_material_status(gpumat_) == GPU_MAT_SUCCESS;
+
+    if (!enabled_) {
+      return;
+    }
+
+    /* Create temp double buffer to render to or copy source to. */
+    /* TODO(fclem) with multipass compositing we might need more than one temp buffer. */
+    DrawEngineType *owner = (DrawEngineType *)this;
+    eGPUTextureFormat format = GPU_texture_format(DRW_viewport_texture_list_get()->color);
+    tmp_buffer_ = DRW_texture_pool_query_fullscreen(format, owner);
   }
 
   void sync()
   {
-    if (!enabled) {
+    if (!enabled_) {
       return;
     }
+
+    pass_ = DRW_pass_create("Compositing", DRW_STATE_WRITE_COLOR);
+    DRWShadingGroup *grp = DRW_shgroup_material_create(gpumat_, pass_);
+    /* TODO(fclem) Find a way to identify the renderlayers. */
+    DRW_shgroup_uniform_texture_ex(grp, "samp0", tmp_buffer_, GPU_SAMPLER_FILTER);
+
+    DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
   }
 
   void draw()
   {
-    if (!enabled) {
+    if (!enabled_) {
       return;
     }
 
     DefaultFramebufferList *dfbl = DRW_viewport_framebuffer_list_get();
+    DefaultTextureList *dtxl = DRW_viewport_texture_list_get();
+    /* TODO(fclem) only copy if we need to. Only possible in multipass. */
+    GPU_texture_copy(tmp_buffer_, dtxl->color);
 
-    float col[4] = {1, 0, 0, 1};
-    GPU_framebuffer_clear_color(dfbl->default_fb, col);
-
-    /* If compositor did not end on the input buffer, swap the buffer and the input buffer */
+    GPU_framebuffer_bind(dfbl->color_only_fb);
+    DRW_draw_pass(pass_);
   }
 };
 

@@ -45,6 +45,20 @@ static void node_composit_init_viewer(bNodeTree *UNUSED(ntree), bNode *node)
   node->id = (ID *)BKE_image_ensure_viewer(G.main, IMA_TYPE_COMPOSITE, "Viewer Node");
 }
 
+static int node_composit_gpu_viewer(GPUMaterial *mat,
+                                    bNode *node,
+                                    bNodeExecData *UNUSED(execdata),
+                                    GPUNodeStack *in,
+                                    GPUNodeStack *out)
+{
+  GPUNodeLink *outlink;
+
+  GPU_stack_link(mat, node, "node_composite", in, out, &outlink);
+  GPU_material_output_surface(mat, outlink);
+
+  return true;
+}
+
 void register_node_type_cmp_viewer(void)
 {
   static bNodeType ntype;
@@ -53,6 +67,7 @@ void register_node_type_cmp_viewer(void)
   node_type_socket_templates(&ntype, cmp_node_viewer_in, NULL);
   node_type_init(&ntype, node_composit_init_viewer);
   node_type_storage(&ntype, "ImageUser", node_free_standard_storage, node_copy_standard_storage);
+  node_type_gpu(&ntype, node_composit_gpu_viewer);
 
   node_type_internal_links(&ntype, NULL);
 

@@ -43,6 +43,10 @@
 #include "NOD_composite.h"
 #include "node_composite_util.h"
 
+/* For ntreeExecGPUNodes. */
+#include "node_exec.h"
+#include "node_shader_util.h"
+
 #ifdef WITH_COMPOSITOR
 #  include "COM_compositor.h"
 #endif
@@ -348,3 +352,107 @@ void ntreeCompositClearTags(bNodeTree *ntree)
     }
   }
 }
+
+/* -------------------------------------------------------------------- */
+/** \name GPU compositor
+ *
+ * \{ */
+
+/* Copied from shader tree. */
+static bNodeTreeExec *ntreeCompositeBeginExecTree(bNodeTree *ntree)
+{
+  /* XXX hack: prevent exec data from being generated twice.
+   * this should be handled by the renderer!
+   */
+  if (ntree->execdata) {
+    return ntree->execdata;
+  }
+
+  bNodeExecContext context;
+  context.previews = ntree->previews;
+
+  /* ensures only a single output node is enabled */
+  ntreeSetOutput(ntree);
+
+  /* common base initialization */
+  bNodeTreeExec *exec = ntree_exec_begin(&context, ntree, NODE_INSTANCE_KEY_BASE);
+
+  /* allocate the thread stack listbase array */
+  exec->threadstack = MEM_callocN(BLENDER_MAX_THREADS * sizeof(ListBase), "thread stack array");
+
+  LISTBASE_FOREACH (bNode *, node, &exec->nodetree->nodes) {
+    node->need_exec = 1;
+  }
+
+  /* XXX this should not be necessary, but is still used for cmp/sha/tex nodes,
+   * which only store the ntree pointer. Should be fixed at some point!
+   */
+  ntree->execdata = exec;
+
+  return exec;
+}
+
+/* Copied from shader tree. */
+static void ntreeCompositeEndExecTree(bNodeTreeExec *exec)
+{
+  if (exec) {
+    /* exec may get freed, so assign ntree */
+    bNodeTree *ntree = exec->nodetree;
+    ;
+
+    if (exec->threadstack) {
+      for (int a = 0; a < BLENDER_MAX_THREADS; a++) {
+        LISTBASE_FOREACH (bNodeThreadStack *, nts, &exec->threadstack[a]) {
+          if (nts->stack) {
+            MEM_freeN(nts->stack);
+          }
+        }
+        BLI_freelistN(&exec->threadstack[a]);
+      }
+
+      MEM_freeN(exec->threadstack);
+      exec->threadstack = NULL;
+    }
+
+    ntree_exec_end(exec);
+
+    /* XXX clear nodetree backpointer to exec data, same problem as noted in ntreeBeginExecTree */
+    ntree->execdata = NULL;
+  }
+}
+
+static bNode *ntreeCompositeViewportOutputNode(bNodeTree *ntree)
+{
+  /* Make sure we only have single node tagged as output. */
+  ntreeSetOutput(ntree);
+
+  /* Find output node that matches type and target. If there are
+   * multiple, we prefer exact target match and active nodes. */
+  bNode *output_node = NULL;
+
+  LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
+    if (!ELEM(node->type, CMP_NODE_VIEWER, CMP_NODE_COMPOSITE)) {
+      continue;
+    }
+
+    if (node->flag & NODE_DO_OUTPUT) {
+      output_node = node;
+      break;
+    }
+  }
+
+  return output_node;
+}
+
+/* This one needs to work on a local tree. */
+void ntreeGPUCompositeNodes(bNodeTree *localtree, GPUMaterial *mat)
+{
+  bNode *output = ntreeCompositeViewportOutputNode(localtree);
+
+  bNodeTreeExec *exec = ntreeCompositeBeginExecTree(localtree);
+  ntreeExecGPUNodes(exec, mat, output);
+
+  ntreeCompositeEndExecTree(exec);
+}
+
+/** \} */

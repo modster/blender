@@ -18,13 +18,27 @@
 
 #pragma once
 
-#include "GPU_shader.h"
+#include "DRW_render.h"
+
+#include "GPU_material.h"
 
 namespace blender::compositor {
 
 class ShaderModule {
+ private:
+  DRWShaderLibrary *shader_lib_ = nullptr;
+
  public:
   ShaderModule();
+
+  /** TODO(fclem) multipass. */
+  GPUMaterial *material_get(Scene *scene);
+
+  GPUShaderSource pass_shader_code_generate(const GPUCodegenOutput *codegen, GPUMaterial *gpumat);
+
+ private:
+  char *pass_shader_code_vert_get(const GPUCodegenOutput *codegen, GPUMaterial *gpumat);
+  char *pass_shader_code_frag_get(const GPUCodegenOutput *codegen, GPUMaterial *gpumat);
 };
 
 }  // namespace blender::compositor

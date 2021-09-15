@@ -446,6 +446,32 @@ static void node_composit_copy_image(bNodeTree *UNUSED(dest_ntree),
   }
 }
 
+static int node_composit_gpu_image(GPUMaterial *mat,
+                                   bNode *node,
+                                   bNodeExecData *UNUSED(execdata),
+                                   GPUNodeStack *UNUSED(in),
+                                   GPUNodeStack *out)
+{
+
+  Image *ima = (Image *)node->id;
+  ImageUser *iuser = node->storage;
+
+  if (out[0].hasoutput) {
+    if (ima) {
+      GPU_link(mat,
+               "node_composite_image",
+               GPU_image(mat, ima, iuser, GPU_SAMPLER_FILTER),
+               &out[0].link);
+    }
+    else {
+      GPU_link(mat, "node_composite_image_empty", &out[0].link);
+    }
+  }
+  /* TODO(fclem) other passes. */
+
+  return true;
+}
+
 void register_node_type_cmp_image(void)
 {
   static bNodeType ntype;
@@ -455,6 +481,7 @@ void register_node_type_cmp_image(void)
   node_type_storage(&ntype, "ImageUser", node_composit_free_image, node_composit_copy_image);
   node_type_update(&ntype, cmp_node_image_update);
   node_type_label(&ntype, node_image_label);
+  node_type_gpu(&ntype, node_composit_gpu_image);
 
   nodeRegisterType(&ntype);
 }
@@ -588,6 +615,20 @@ static void cmp_node_rlayers_update(bNodeTree *ntree, bNode *node)
   cmp_node_update_default(ntree, node);
 }
 
+static int node_composit_gpu_rlayers(GPUMaterial *mat,
+                                     bNode *UNUSED(node),
+                                     bNodeExecData *UNUSED(execdata),
+                                     GPUNodeStack *UNUSED(in),
+                                     GPUNodeStack *out)
+{
+  if (out[0].hasoutput) {
+    GPU_link(mat, "node_composite_rlayers", GPU_render_pass(mat, SCE_PASS_COMBINED), &out[0].link);
+  }
+  /* TODO(fclem) other passes. */
+
+  return true;
+}
+
 void register_node_type_cmp_rlayers(void)
 {
   static bNodeType ntype;
@@ -600,6 +641,7 @@ void register_node_type_cmp_rlayers(void)
   node_type_update(&ntype, cmp_node_rlayers_update);
   node_type_init(&ntype, node_cmp_rlayers_outputs);
   node_type_size_preset(&ntype, NODE_SIZE_LARGE);
+  node_type_gpu(&ntype, node_composit_gpu_rlayers);
 
   nodeRegisterType(&ntype);
 }

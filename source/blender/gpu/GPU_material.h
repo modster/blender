@@ -25,6 +25,7 @@
 
 #include "DNA_customdata_types.h" /* for CustomDataType */
 #include "DNA_listBase.h"
+#include "DNA_scene_types.h"
 
 #include "BLI_sys_types.h" /* for bool */
 
@@ -163,6 +164,7 @@ GPUNodeLink *GPU_color_band(GPUMaterial *mat, int size, float *pixels, float *ro
 GPUNodeLink *GPU_volume_grid(GPUMaterial *mat,
                              const char *name,
                              eGPUVolumeDefaultValue default_value);
+GPUNodeLink *GPU_render_pass(GPUMaterial *mat, eScenePassType pass_type);
 
 bool GPU_link(GPUMaterial *mat, const char *name, ...);
 bool GPU_stack_link(GPUMaterial *mat,
@@ -251,6 +253,8 @@ typedef struct GPUMaterialTexture {
   char tiled_mapping_name[32]; /* Name of tile mapping sampler in GLSL. */
   int users;
   int sampler_state; /* eGPUSamplerState */
+  /* Use for render layer inputs (compositor). */
+  eScenePassType pass_type;
 } GPUMaterialTexture;
 
 typedef struct GPUMaterialVolumeGrid {

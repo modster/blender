@@ -126,6 +126,8 @@
 #include "IMB_colormanagement.h"
 #include "IMB_imbuf.h"
 
+#include "GPU_material.h"
+
 #include "bmesh.h"
 
 static void scene_init_data(ID *id)
@@ -364,6 +366,8 @@ static void scene_copy_data(Main *bmain, ID *id_dst, const ID *id_src, const int
     scene_dst->preview = NULL;
   }
 
+  BLI_listbase_clear(&scene_dst->gpumaterial);
+
   BKE_scene_copy_data_eevee(scene_dst, scene_src);
 }
 
@@ -387,6 +391,9 @@ static void scene_free_data(ID *id)
   SEQ_editing_free(scene, do_id_user);
 
   BKE_keyingsets_free(&scene->keyingsets);
+
+  /* Free gpu material before the ntree */
+  GPU_material_free(&scene->gpumaterial);
 
   /* is no lib link block, but scene extension */
   if (scene->nodetree) {
@@ -809,6 +816,7 @@ static void scene_blend_write(BlendWriter *writer, ID *id, const void *id_addres
 
   if (BLO_write_is_undo(writer)) {
     /* Clean up, important in undo case to reduce false detection of changed data-blocks. */
+    BLI_listbase_clear(&sce->gpumaterial);
     /* XXX This UI data should not be stored in Scene at all... */
     memset(&sce->cursor, 0, sizeof(sce->cursor));
   }
@@ -1374,6 +1382,8 @@ static void scene_blend_read_data(BlendDataReader *reader, ID *id)
   EEVEE_lightcache_info_update(&sce->eevee);
 
   BKE_screen_view3d_shading_blend_read_data(reader, &sce->display.shading);
+
+  BLI_listbase_clear(&sce->gpumaterial);
 
   BLO_read_data_address(reader, &sce->layer_properties);
   IDP_BlendDataRead(reader, &sce->layer_properties);

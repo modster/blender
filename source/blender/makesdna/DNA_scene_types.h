@@ -1802,6 +1802,9 @@ typedef struct Scene {
   IDProperty *layer_properties;
   void *_pad9;
 
+  /** GPUMaterial for the compositing nodetree. */
+  ListBase gpumaterial;
+
   struct SceneDisplay display;
   struct SceneEEVEE eevee;
   struct SceneGpencil grease_pencil_settings;

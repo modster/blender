@@ -41,6 +41,9 @@
  * If a file uses functions from another file, it must be added to the list of
  * dependencies, and be placed after that file in the list. */
 
+extern char datatoc_gpu_shader_composite_composite_glsl[];
+extern char datatoc_gpu_shader_composite_image_glsl[];
+extern char datatoc_gpu_shader_composite_invert_glsl[];
 extern char datatoc_gpu_shader_material_add_shader_glsl[];
 extern char datatoc_gpu_shader_material_ambient_occlusion_glsl[];
 extern char datatoc_gpu_shader_material_anisotropic_glsl[];
@@ -131,6 +134,21 @@ extern char datatoc_gpu_shader_material_volume_principled_glsl[];
 extern char datatoc_gpu_shader_material_volume_scatter_glsl[];
 extern char datatoc_gpu_shader_material_wireframe_glsl[];
 extern char datatoc_gpu_shader_material_world_normals_glsl[];
+
+static GPUMaterialLibrary gpu_shader_composite_composite_library = {
+    .code = datatoc_gpu_shader_composite_composite_glsl,
+    .dependencies = {NULL},
+};
+
+static GPUMaterialLibrary gpu_shader_composite_image_library = {
+    .code = datatoc_gpu_shader_composite_image_glsl,
+    .dependencies = {NULL},
+};
+
+static GPUMaterialLibrary gpu_shader_composite_invert_library = {
+    .code = datatoc_gpu_shader_composite_invert_glsl,
+    .dependencies = {NULL},
+};
 
 static GPUMaterialLibrary gpu_shader_material_math_util_library = {
     .code = datatoc_gpu_shader_material_math_util_glsl,
@@ -677,6 +695,9 @@ static GPUMaterialLibrary *gpu_material_libraries[] = {
     &gpu_shader_material_volume_scatter_library,
     &gpu_shader_material_wireframe_library,
     &gpu_shader_material_world_normals_library,
+    &gpu_shader_composite_composite_library,
+    &gpu_shader_composite_image_library,
+    &gpu_shader_composite_invert_library,
     NULL};
 
 /* GLSL code parsing for finding function definitions.
@@ -884,8 +905,8 @@ char *gpu_material_library_generate_code(GSet *used_libraries)
   DynStr *ds = BLI_dynstr_new();
 
   /* Always include those because they may be needed by the execution function. */
-  gpu_material_use_library_with_dependencies(used_libraries,
-                                             &gpu_shader_material_world_normals_library);
+  //   gpu_material_use_library_with_dependencies(used_libraries,
+  //                                              &gpu_shader_material_world_normals_library);
 
   /* Add library code in order, for dependencies. */
   for (int i = 0; gpu_material_libraries[i]; i++) {

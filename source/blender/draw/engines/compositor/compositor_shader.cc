@@ -16,12 +16,85 @@
  * Copyright 2021, Blender Foundation.
  */
 
+#include "BLI_string.h"
+#include "BLI_string_ref.hh"
+
+#include "DRW_render.h"
+
 #include "compositor_shader.hh"
+
+extern "C" {
+extern char datatoc_common_fullscreen_vert_glsl[];
+extern char datatoc_common_math_lib_glsl[];
+extern char datatoc_common_view_lib_glsl[];
+extern char datatoc_compositor_frag_glsl[];
+extern char datatoc_compositor_nodetree_eval_lib_glsl[];
+extern char datatoc_gpu_shader_codegen_lib_glsl[];
+}
 
 namespace blender::compositor {
 
 ShaderModule::ShaderModule()
 {
+  shader_lib_ = DRW_shader_library_create();
+  /* NOTE: These need to be ordered by dependencies. */
+  DRW_SHADER_LIB_ADD(shader_lib_, common_math_lib);
+  DRW_SHADER_LIB_ADD(shader_lib_, common_view_lib);
+  DRW_SHADER_LIB_ADD(shader_lib_, gpu_shader_codegen_lib);
+  DRW_SHADER_LIB_ADD(shader_lib_, compositor_nodetree_eval_lib);
+}
+
+char *ShaderModule::pass_shader_code_vert_get(const GPUCodegenOutput * /*codegen*/,
+                                              GPUMaterial * /*gpumat*/)
+{
+  return BLI_strdup(datatoc_common_fullscreen_vert_glsl);
+}
+
+char *ShaderModule::pass_shader_code_frag_get(const GPUCodegenOutput *codegen,
+                                              GPUMaterial * /*gpumat*/)
+{
+  std::string output;
+
+  output += codegen->uniforms;
+  output += "\n";
+
+  output += codegen->library;
+  output += "\n";
+
+  output += "vec4 nodetree_composite() {\n";
+  output += codegen->surface;
+  output += "}\n";
+
+  output += datatoc_compositor_frag_glsl;
+
+  return DRW_shader_library_create_shader_string(shader_lib_, output.c_str());
+}
+
+/* WATCH: This can be called from another thread! Needs to not touch the shader module in any
+ * thread unsafe manner. */
+GPUShaderSource ShaderModule::pass_shader_code_generate(const GPUCodegenOutput *codegen,
+                                                        GPUMaterial *gpumat)
+{
+  GPUShaderSource source;
+  source.vertex = pass_shader_code_vert_get(codegen, gpumat);
+  source.fragment = pass_shader_code_frag_get(codegen, gpumat);
+  source.geometry = nullptr;
+  source.defines = nullptr;
+  return source;
+}
+
+static GPUShaderSource codegen_callback(void *thunk,
+                                        GPUMaterial *gpumat,
+                                        const GPUCodegenOutput *codegen)
+{
+  return ((ShaderModule *)thunk)->pass_shader_code_generate(codegen, gpumat);
+}
+
+GPUMaterial *ShaderModule::material_get(Scene *scene)
+{
+  /* TODO(fclem) We might have one shader per pass in the future. */
+  uint64_t shader_id = 0;
+  return DRW_shader_from_compositor(scene, shader_id, true, codegen_callback, this);
 }
 
 }  // namespace blender::compositor

@@ -31,12 +31,27 @@ static bNodeSocketTemplate cmp_node_composite_in[] = {
     {-1, ""},
 };
 
+static int node_composit_gpu_composite(GPUMaterial *mat,
+                                       bNode *node,
+                                       bNodeExecData *UNUSED(execdata),
+                                       GPUNodeStack *in,
+                                       GPUNodeStack *out)
+{
+  GPUNodeLink *outlink;
+
+  GPU_stack_link(mat, node, "node_composite", in, out, &outlink);
+  GPU_material_output_surface(mat, outlink);
+
+  return true;
+}
+
 void register_node_type_cmp_composite(void)
 {
   static bNodeType ntype;
 
   cmp_node_type_base(&ntype, CMP_NODE_COMPOSITE, "Composite", NODE_CLASS_OUTPUT, NODE_PREVIEW);
   node_type_socket_templates(&ntype, cmp_node_composite_in, NULL);
+  node_type_gpu(&ntype, node_composit_gpu_composite);
 
   /* Do not allow muting for this node. */
   node_type_internal_links(&ntype, NULL);

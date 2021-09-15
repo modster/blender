@@ -358,7 +358,12 @@ GPUMaterial *GPU_material_from_nodetree(Scene *scene,
 
   /* Localize tree to create links for reroute and mute. */
   bNodeTree *localtree = ntreeLocalize(ntree);
-  ntreeGPUMaterialNodes(localtree, mat);
+  if (localtree->type == NTREE_SHADER) {
+    ntreeGPUMaterialNodes(localtree, mat);
+  }
+  else {
+    ntreeGPUCompositeNodes(localtree, mat);
+  }
 
   gpu_material_ramp_texture_build(mat);
 

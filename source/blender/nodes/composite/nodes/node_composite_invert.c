@@ -36,6 +36,19 @@ static void node_composit_init_invert(bNodeTree *UNUSED(ntree), bNode *node)
   node->custom1 |= CMP_CHAN_RGB;
 }
 
+static int node_composit_gpu_invert(GPUMaterial *mat,
+                                    bNode *node,
+                                    bNodeExecData *UNUSED(execdata),
+                                    GPUNodeStack *in,
+                                    GPUNodeStack *out)
+{
+  float do_rgb = (node->custom1 & CMP_CHAN_RGB) ? 1.0f : 0.0f;
+  float do_alpha = (node->custom1 & CMP_CHAN_A) ? 1.0f : 0.0f;
+
+  return GPU_stack_link(
+      mat, node, "node_composite_invert", in, out, GPU_constant(&do_rgb), GPU_constant(&do_alpha));
+}
+
 /* custom1 = mix type */
 void register_node_type_cmp_invert(void)
 {
@@ -44,6 +57,7 @@ void register_node_type_cmp_invert(void)
   cmp_node_type_base(&ntype, CMP_NODE_INVERT, "Invert", NODE_CLASS_OP_COLOR, 0);
   node_type_socket_templates(&ntype, cmp_node_invert_in, cmp_node_invert_out);
   node_type_init(&ntype, node_composit_init_invert);
+  node_type_gpu(&ntype, node_composit_gpu_invert);
 
   nodeRegisterType(&ntype);
 }

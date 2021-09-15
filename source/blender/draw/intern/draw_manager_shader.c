@@ -504,6 +504,46 @@ GPUMaterial *DRW_shader_from_material(Material *ma,
   return mat;
 }
 
+GPUMaterial *DRW_shader_from_compositor(Scene *scene,
+                                        const uint64_t shader_id,
+                                        bool deferred,
+                                        GPUCodegenCallbackFn callback,
+                                        void *thunk)
+{
+  Scene *original_scene = (Scene *)DEG_get_original_id(&scene->id);
+  GPUMaterial *mat = GPU_material_from_nodetree(original_scene,
+                                                NULL,
+                                                scene->nodetree,
+                                                &scene->gpumaterial,
+                                                scene->id.name,
+                                                shader_id,
+                                                false,
+                                                false,
+                                                callback,
+                                                thunk);
+
+  if (DRW_state_is_image_render()) {
+    /* Do not deferred if doing render. */
+    deferred = false;
+  }
+
+  if (deferred && GPU_material_status(mat) == GPU_MAT_QUEUED) {
+    /* Shader has been already queued. */
+    return mat;
+  }
+
+  if (GPU_material_status(mat) == GPU_MAT_CREATED) {
+    GPU_material_status_set(mat, GPU_MAT_QUEUED);
+    drw_deferred_shader_add(mat, deferred);
+  }
+
+  if (!deferred && GPU_material_status(mat) == GPU_MAT_QUEUED) {
+    /* Force compilation for shaders already queued. */
+    drw_deferred_shader_add(mat, false);
+  }
+  return mat;
+}
+
 void DRW_shader_free(GPUShader *shader)
 {
   GPU_shader_free(shader);

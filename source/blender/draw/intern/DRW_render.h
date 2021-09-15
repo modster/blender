@@ -257,6 +257,11 @@ struct GPUMaterial *DRW_shader_from_material(struct Material *ma,
                                              bool deferred,
                                              GPUCodegenCallbackFn callback,
                                              void *thunk);
+struct GPUMaterial *DRW_shader_from_compositor(Scene *scene,
+                                               const uint64_t shader_id,
+                                               bool deferred,
+                                               GPUCodegenCallbackFn callback,
+                                               void *thunk);
 void DRW_shader_free(struct GPUShader *shader);
 #define DRW_SHADER_FREE_SAFE(shader) \
   do { \
