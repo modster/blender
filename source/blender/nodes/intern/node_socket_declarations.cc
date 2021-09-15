@@ -263,32 +263,37 @@ bool String::matches(const bNodeSocket &socket) const
  * IDSocketDeclaration.
  */
 
-namespace detail {
-bNodeSocket &build_id_socket(const SocketDeclaration &decl,
-                             bNodeTree &ntree,
-                             bNode &node,
-                             eNodeSocketInOut in_out,
-                             const CommonIDSocketData &data)
+bNodeSocket &IDSocketDeclaration::build(bNodeTree &ntree,
+                                        bNode &node,
+                                        eNodeSocketInOut in_out) const
 {
   bNodeSocket &socket = *nodeAddSocket(
-      &ntree, &node, in_out, data.idname, decl.identifier().c_str(), decl.name().c_str());
-  decl.set_common_flags(socket);
+      &ntree, &node, in_out, idname_, identifier_.c_str(), name_.c_str());
+  this->set_common_flags(socket);
   return socket;
 }
 
-bool matches_id_socket(const SocketDeclaration &decl,
-                       const bNodeSocket &socket,
-                       const CommonIDSocketData &data)
+bool IDSocketDeclaration::matches(const bNodeSocket &socket) const
 {
-  if (!decl.matches_common_data(socket)) {
+  if (!this->matches_common_data(socket)) {
     return false;
   }
-  if (!STREQ(socket.idname, data.idname)) {
+  if (!STREQ(socket.idname, idname_)) {
     return false;
   }
   return true;
 }
-}  // namespace detail
+
+bNodeSocket &IDSocketDeclaration::update_or_build(bNodeTree &ntree,
+                                                  bNode &node,
+                                                  bNodeSocket &socket) const
+{
+  if (StringRef(socket.idname) != idname_) {
+    return this->build(ntree, node, (eNodeSocketInOut)socket.in_out);
+  }
+  this->set_common_flags(socket);
+  return socket;
+}
 
 /* --------------------------------------------------------------------
  * Geometry.

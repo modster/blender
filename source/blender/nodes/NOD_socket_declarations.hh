@@ -211,54 +211,25 @@ class String : public SocketDeclaration {
 class StringBuilder : public SocketDeclarationBuilder<String> {
 };
 
-namespace detail {
-struct CommonIDSocketData {
-  const char *idname;
-};
-
-bNodeSocket &build_id_socket(const SocketDeclaration &decl,
-                             bNodeTree &ntree,
-                             bNode &node,
-                             eNodeSocketInOut in_out,
-                             const CommonIDSocketData &data);
-bool matches_id_socket(const SocketDeclaration &decl,
-                       const bNodeSocket &socket,
-                       const CommonIDSocketData &data);
-
 class IDSocketDeclaration : public SocketDeclaration {
  private:
-  CommonIDSocketData data_;
+  const char *idname_;
 
  public:
-  IDSocketDeclaration(const char *idname) : data_({idname})
+  IDSocketDeclaration(const char *idname) : idname_(idname)
   {
   }
 
-  bNodeSocket &build(bNodeTree &ntree, bNode &node, eNodeSocketInOut in_out) const override
-  {
-    return build_id_socket(*this, ntree, node, in_out, data_);
-  }
-
-  bool matches(const bNodeSocket &socket) const override
-  {
-    return matches_id_socket(*this, socket, data_);
-  }
-
-  bNodeSocket &update_or_build(bNodeTree &ntree, bNode &node, bNodeSocket &socket) const override
-  {
-    if (StringRef(socket.idname) != data_.idname) {
-      return this->build(ntree, node, (eNodeSocketInOut)socket.in_out);
-    }
-    return socket;
-  }
+  bNodeSocket &build(bNodeTree &ntree, bNode &node, eNodeSocketInOut in_out) const override;
+  bool matches(const bNodeSocket &socket) const override;
+  bNodeSocket &update_or_build(bNodeTree &ntree, bNode &node, bNodeSocket &socket) const override;
 };
-}  // namespace detail
 
-class Object : public detail::IDSocketDeclaration {
+class Object : public IDSocketDeclaration {
  public:
   using Builder = class ObjectBuilder;
 
-  Object() : detail::IDSocketDeclaration("NodeSocketObject")
+  Object() : IDSocketDeclaration("NodeSocketObject")
   {
   }
 };
@@ -266,11 +237,11 @@ class Object : public detail::IDSocketDeclaration {
 class ObjectBuilder : public SocketDeclarationBuilder<Object> {
 };
 
-class Material : public detail::IDSocketDeclaration {
+class Material : public IDSocketDeclaration {
  public:
   using Builder = class MaterialBuilder;
 
-  Material() : detail::IDSocketDeclaration("NodeSocketMaterial")
+  Material() : IDSocketDeclaration("NodeSocketMaterial")
   {
   }
 };
@@ -278,11 +249,11 @@ class Material : public detail::IDSocketDeclaration {
 class MaterialBuilder : public SocketDeclarationBuilder<Material> {
 };
 
-class Collection : public detail::IDSocketDeclaration {
+class Collection : public IDSocketDeclaration {
  public:
   using Builder = class CollectionBuilder;
 
-  Collection() : detail::IDSocketDeclaration("NodeSocketCollection")
+  Collection() : IDSocketDeclaration("NodeSocketCollection")
   {
   }
 };
@@ -290,11 +261,11 @@ class Collection : public detail::IDSocketDeclaration {
 class CollectionBuilder : public SocketDeclarationBuilder<Collection> {
 };
 
-class Texture : public detail::IDSocketDeclaration {
+class Texture : public IDSocketDeclaration {
  public:
   using Builder = class TextureBuilder;
 
-  Texture() : detail::IDSocketDeclaration("NodeSocketTexture")
+  Texture() : IDSocketDeclaration("NodeSocketTexture")
   {
   }
 };
