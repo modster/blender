@@ -630,7 +630,7 @@ static uint64_t drw_shader_dependencies_get(const DRWShaderLibrary *lib,
       BLI_assert(0);
     }
     else {
-      deps |= 1lu << (uint64_t)dep;
+      deps |= 1llu << ((uint64_t)dep);
     }
   }
   return deps;
@@ -670,13 +670,13 @@ char *DRW_shader_library_create_shader_string(const DRWShaderLibrary *lib, const
   DynStr *ds = BLI_dynstr_new();
   /* Add all dependencies recursively. */
   for (int i = MAX_LIB - 1; i > -1; i--) {
-    if (lib->libs[i] && ((deps & (1lu << (uint64_t)i)) || (deps_post & (1lu << (uint64_t)i)))) {
+    if (lib->libs[i] && ((deps & (1llu << (uint64_t)i)) || (deps_post & (1llu << (uint64_t)i)))) {
       deps |= lib->libs_deps[i];
     }
   }
   /* Concatenate all needed libs into one string. */
-  for (int i = 0; i < MAX_LIB && deps != 0lu; i++, deps >>= 1lu) {
-    if (deps & 1lu) {
+  for (int i = 0; i < MAX_LIB && deps != 0llu; i++, deps >>= 1llu) {
+    if (deps & 1llu) {
       BLI_dynstr_append(ds, lib->libs[i]);
     }
   }
@@ -684,8 +684,8 @@ char *DRW_shader_library_create_shader_string(const DRWShaderLibrary *lib, const
   BLI_dynstr_append(ds, shader_code);
 
   /* Concatenate all needed libs into one string. */
-  for (int i = 0; i < MAX_LIB && deps_post != 0lu; i++, deps_post >>= 1lu) {
-    if (deps_post & 1lu) {
+  for (int i = 0; i < MAX_LIB && deps_post != 0llu; i++, deps_post >>= 1llu) {
+    if (deps_post & 1llu) {
       BLI_dynstr_append(ds, lib->libs[i]);
     }
   }

@@ -59,8 +59,9 @@
 #include <sstream>
 #include <string>
 
+extern "C" {
 extern char datatoc_gpu_shader_codegen_lib_glsl[];
-
+}
 /* -------------------------------------------------------------------- */
 /** \name GPUPass Cache
  *
