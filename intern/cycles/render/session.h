@@ -118,6 +118,11 @@ class Session {
   function<void(void)> update_render_tile_cb;
   function<void(void)> read_render_tile_cb;
 
+  /* Callback is invoked by tile manager whenever on-dist tiles storage file is closed after
+   * writing. Allows an engine integration to keep track of those files without worry about
+   * transfering the information when it needs to re-create session during rendering. */
+  function<void(string_view)> full_buffer_written_cb;
+
   explicit Session(const SessionParams &params, const SceneParams &scene_params);
   ~Session();
 
@@ -156,13 +161,21 @@ class Session {
   int2 get_render_tile_size() const;
   int2 get_render_tile_offset() const;
 
-  bool get_render_tile_done() const;
-  bool has_multiple_render_tiles() const;
+  string_view get_render_tile_layer() const;
+  string_view get_render_tile_view() const;
 
   bool copy_render_tile_from_device();
 
   bool get_render_tile_pixels(const string &pass_name, int num_components, float *pixels);
   bool set_render_tile_pixels(const string &pass_name, int num_components, const float *pixels);
+
+  /* --------------------------------------------------------------------
+   * Full-frame on-disk storage.
+   */
+
+  /* Read given full-frame file from disk, perform needed processing and write it to the software
+   * via the write callback. */
+  void process_full_buffer_from_disk(string_view filename);
 
  protected:
   struct DelayedReset {

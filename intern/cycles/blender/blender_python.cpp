@@ -264,6 +264,26 @@ static PyObject *render_func(PyObject * /*self*/, PyObject *args)
   Py_RETURN_NONE;
 }
 
+static PyObject *render_frame_finish_func(PyObject * /*self*/, PyObject *args)
+{
+  PyObject *pysession;
+
+  if (!PyArg_ParseTuple(args, "O", &pysession)) {
+    return nullptr;
+  }
+
+  BlenderSession *session = (BlenderSession *)PyLong_AsVoidPtr(pysession);
+
+  /* Allow Blender to execute other Python scripts. */
+  python_thread_state_save(&session->python_thread_state);
+
+  session->render_frame_finish();
+
+  python_thread_state_restore(&session->python_thread_state);
+
+  Py_RETURN_NONE;
+}
+
 static PyObject *draw_func(PyObject * /*self*/, PyObject *args)
 {
   PyObject *py_session, *py_graph, *py_screen, *py_space_image;
@@ -1021,6 +1041,7 @@ static PyMethodDef methods[] = {
     {"create", create_func, METH_VARARGS, ""},
     {"free", free_func, METH_O, ""},
     {"render", render_func, METH_VARARGS, ""},
+    {"render_frame_finish", render_frame_finish_func, METH_VARARGS, ""},
     {"draw", draw_func, METH_VARARGS, ""},
     {"bake", bake_func, METH_VARARGS, ""},
     {"view_draw", view_draw_func, METH_VARARGS, ""},

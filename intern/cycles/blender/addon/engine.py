@@ -132,6 +132,13 @@ def render(engine, depsgraph):
         _cycles.render(engine.session, depsgraph.as_pointer())
 
 
+def render_frame_finish(engine):
+    if not engine.session:
+        return
+
+    import _cycles
+    _cycles.render_frame_finish(engine.session)
+
 def draw(engine, depsgraph, space_image):
     if not engine.session:
         return

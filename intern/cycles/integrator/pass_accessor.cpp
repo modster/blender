@@ -16,9 +16,7 @@
 
 #include "integrator/pass_accessor.h"
 
-#include "render/background.h"
 #include "render/buffers.h"
-#include "render/film.h"
 #include "util/util_logging.h"
 
 // clang-format off
@@ -32,16 +30,8 @@ CCL_NAMESPACE_BEGIN
  * Pass input information.
  */
 
-PassAccessor::PassAccessInfo::PassAccessInfo(const BufferPass &pass,
-                                             const Film &film,
-                                             const Background &background)
-    : type(pass.type),
-      mode(pass.mode),
-      include_albedo(pass.include_albedo),
-      offset(pass.offset),
-      use_approximate_shadow_catcher(film.get_use_approximate_shadow_catcher()),
-      use_approximate_shadow_catcher_background(use_approximate_shadow_catcher &&
-                                                !background.get_transparent())
+PassAccessor::PassAccessInfo::PassAccessInfo(const BufferPass &pass)
+    : type(pass.type), mode(pass.mode), include_albedo(pass.include_albedo), offset(pass.offset)
 {
 }
 

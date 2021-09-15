@@ -84,6 +84,9 @@ class CyclesRender(bpy.types.RenderEngine):
     def render(self, depsgraph):
         engine.render(self, depsgraph)
 
+    def render_frame_finish(self):
+        engine.render_frame_finish(self)
+
     def draw(self, context, depsgraph):
         engine.draw(self, depsgraph, context.space_data)
 

@@ -103,6 +103,12 @@ NODE_DEFINE(BufferParams)
   SOCKET_INT(full_width, "Full Width", 0);
   SOCKET_INT(full_height, "Full Height", 0);
 
+  SOCKET_STRING(layer, "Layer", ustring());
+  SOCKET_STRING(view, "View", ustring());
+  SOCKET_FLOAT(exposure, "Exposure", 1.0f);
+  SOCKET_BOOLEAN(use_approximate_shadow_catcher, "Use Approximate Shadow Catcher", false);
+  SOCKET_BOOLEAN(use_transparent_background, "Transparent Background", false);
+
   /* Notes:
    *  - Skip passes since they do not follow typical container socket definition.
    *    Might look into covering those as a socket in the future.
@@ -230,11 +236,14 @@ bool BufferParams::modified(const BufferParams &other) const
   if (!(width == other.width && height == other.height && full_x == other.full_x &&
         full_y == other.full_y && full_width == other.full_width &&
         full_height == other.full_height && offset == other.offset && stride == other.stride &&
-        pass_stride == other.pass_stride)) {
+        pass_stride == other.pass_stride && layer == other.layer && view == other.view &&
+        exposure == other.exposure &&
+        use_approximate_shadow_catcher == other.use_approximate_shadow_catcher &&
+        use_transparent_background == other.use_transparent_background)) {
     return true;
   }
 
-  return passes != other.passes;
+  return !(passes == other.passes);
 }
 
 /* --------------------------------------------------------------------

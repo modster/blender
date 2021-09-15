@@ -78,11 +78,11 @@ class BufferParams : public Node {
  public:
   NODE_DECLARE
 
-  /* width/height of the physical buffer */
+  /* Width/height of the physical buffer. */
   int width = 0;
   int height = 0;
 
-  /* offset into and width/height of the full buffer */
+  /* Offset into and width/height of the full buffer. */
   int full_x = 0;
   int full_y = 0;
   int full_width = 0;
@@ -94,7 +94,13 @@ class BufferParams : public Node {
   /* Runtime fields, only valid after `update_passes()`. */
   int pass_stride = -1;
 
+  /* Properties which are used for accessing buffer pixels outside of scene graph. */
   vector<BufferPass> passes;
+  ustring layer;
+  ustring view;
+  float exposure = 1.0f;
+  bool use_approximate_shadow_catcher = false;
+  bool use_transparent_background = false;
 
   BufferParams();
 

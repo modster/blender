@@ -60,6 +60,8 @@ class BlenderSession {
   /* offline render */
   void render(BL::Depsgraph &b_depsgraph);
 
+  void render_frame_finish();
+
   void bake(BL::Depsgraph &b_depsgrah,
             BL::Object &b_object,
             const string &pass_type,
@@ -69,6 +71,8 @@ class BlenderSession {
 
   void write_render_result(BL::RenderLayer &b_rlay);
   void write_render_tile();
+
+  void full_buffer_written(string_view filename);
 
   /* update functions are used to update display buffer only after sample was rendered
    * only needed for better visual feedback */
@@ -167,6 +171,8 @@ class BlenderSession {
     thread_mutex mutex;
     int last_pass_index = -1;
   } draw_state_;
+
+  vector<string> full_buffer_files_;
 };
 
 CCL_NAMESPACE_END

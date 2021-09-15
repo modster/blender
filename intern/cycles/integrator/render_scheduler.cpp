@@ -420,10 +420,6 @@ void RenderScheduler::set_full_frame_render_work(RenderWork *render_work)
   state_.full_frame_work_scheduled = true;
 
   render_work->full.write = true;
-
-  if (denoiser_params_.use) {
-    render_work->full.denoise = true;
-  }
 }
 
 /* Knowing time which it took to complete a task at the current resolution divider approximate how

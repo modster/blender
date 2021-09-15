@@ -23,8 +23,6 @@
 
 CCL_NAMESPACE_BEGIN
 
-class Background;
-class Film;
 class RenderBuffers;
 class BufferPass;
 class BufferParams;
@@ -38,7 +36,7 @@ class PassAccessor {
   class PassAccessInfo {
    public:
     PassAccessInfo() = default;
-    PassAccessInfo(const BufferPass &pass, const Film &film, const Background &background);
+    explicit PassAccessInfo(const BufferPass &pass);
 
     PassType type = PASS_NONE;
     PassMode mode = PassMode::NOISY;

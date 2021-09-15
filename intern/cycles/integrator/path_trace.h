@@ -72,6 +72,8 @@ class PathTrace {
 
   void reset(const BufferParams &full_params, const BufferParams &big_tile_params);
 
+  void device_free();
+
   /* Set progress tracker.
    * Used to communicate details about the progress to the outer world, check whether rendering is
    * to be canceled.
@@ -126,6 +128,10 @@ class PathTrace {
    * Return true if all copies are successful. */
   bool copy_render_tile_from_device();
 
+  /* Read given full-frame file from disk, perform needed processing and write it to the software
+   * via the write callback. */
+  void process_full_buffer_from_disk(string_view filename);
+
   /* Get number of samples in the current big tile render buffers. */
   int get_num_render_tile_samples() const;
 
@@ -146,11 +152,17 @@ class PathTrace {
 
   /* Get size and offset (relative to the buffer's full x/y) of the currently rendering tile.
    * In the case of tiled rendering this will return full-frame after all tiles has been rendered.
-   */
+   *
+   * NOTE: If the full-frame buffer processing is in progress, returns parameters of the full-frame
+   * instead. */
   int2 get_render_tile_size() const;
   int2 get_render_tile_offset() const;
 
-  bool get_render_tile_done() const;
+  /* Get buffer parameters of the current tile.
+   *
+   * NOTE: If the full-frame buffer processing is in progress, returns parameters of the full-frame
+   * instead. */
+  const BufferParams &get_render_tile_params() const;
 
   /* Generate full multi-line report of the rendering process, including rendering parameters,
    * times, and so on. */
@@ -205,7 +217,7 @@ class PathTrace {
   void update_display(const RenderWork &render_work);
   void rebalance(const RenderWork &render_work);
   void write_tile_buffer(const RenderWork &render_work);
-  void process_full_buffer_from_disk(const RenderWork &render_work);
+  void finalize_full_buffer_on_disk(const RenderWork &render_work);
 
   /* Get number of samples in the current state of the render buffers. */
   int get_num_samples_in_buffer();
@@ -222,9 +234,6 @@ class PathTrace {
 
   /* Write current tile into the file on disk. */
   void tile_buffer_write_to_disk();
-
-  /* Read full-frame render result from a file on disk. */
-  void read_full_buffer_from_disk();
 
   /* Run the progress_update_cb callback if it is needed. */
   void progress_update_if_needed(const RenderWork &render_work);
@@ -304,7 +313,10 @@ class PathTrace {
    * Used by `ready_to_reset()` to implement logic which feels the most interactive. */
   bool did_draw_after_reset_ = true;
 
-  unique_ptr<RenderBuffers> full_frame_buffers_;
+  /* State of the full frame processing and writing to the software. */
+  struct {
+    RenderBuffers *render_buffers = nullptr;
+  } full_frame_state_;
 };
 
 CCL_NAMESPACE_END

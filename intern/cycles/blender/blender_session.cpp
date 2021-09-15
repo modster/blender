@@ -38,6 +38,7 @@
 #include "util/util_hash.h"
 #include "util/util_logging.h"
 #include "util/util_murmurhash.h"
+#include "util/util_path.h"
 #include "util/util_progress.h"
 #include "util/util_time.h"
 
@@ -269,10 +270,15 @@ void BlenderSession::reset_session(BL::BlendData &b_data, BL::Depsgraph &b_depsg
 
 void BlenderSession::free_session()
 {
-  session->cancel(true);
+  if (session) {
+    session->cancel(true);
+  }
 
   delete sync;
+  sync = nullptr;
+
   delete session;
+  session = nullptr;
 }
 
 void BlenderSession::read_render_tile()
@@ -316,13 +322,16 @@ void BlenderSession::write_render_tile()
   const int2 tile_offset = session->get_render_tile_offset();
   const int2 tile_size = session->get_render_tile_size();
 
+  const string_view render_layer_name = session->get_render_tile_layer();
+  const string_view render_view_name = session->get_render_tile_view();
+
   /* get render result */
   BL::RenderResult b_rr = b_engine.begin_result(tile_offset.x,
                                                 tile_offset.y,
                                                 tile_size.x,
                                                 tile_size.y,
-                                                b_rlay_name.c_str(),
-                                                b_rview_name.c_str());
+                                                render_layer_name.c_str(),
+                                                render_view_name.c_str());
 
   /* can happen if the intersected rectangle gives 0 width or height */
   if (b_rr.ptr.data == NULL) {
@@ -333,14 +342,20 @@ void BlenderSession::write_render_tile()
   b_rr.layers.begin(b_single_rlay);
 
   /* layer will be missing if it was disabled in the UI */
-  if (b_single_rlay == b_rr.layers.end())
+  if (b_single_rlay == b_rr.layers.end()) {
     return;
+  }
 
   BL::RenderLayer b_rlay = *b_single_rlay;
 
   write_render_result(b_rlay);
 
   b_engine.end_result(b_rr, true, false, true);
+}
+
+void BlenderSession::full_buffer_written(string_view filename)
+{
+  full_buffer_files_.emplace_back(filename);
 }
 
 static void add_cryptomatte_layer(BL::RenderResult &b_rr, string name, string manifest)
@@ -421,6 +436,8 @@ void BlenderSession::render(BL::Depsgraph &b_depsgraph_)
     session->update_render_tile_cb = [&]() { write_render_tile(); };
   }
 
+  session->full_buffer_written_cb = [&](string_view filename) { full_buffer_written(filename); };
+
   BL::ViewLayer b_view_layer = b_depsgraph.view_layer_eval();
 
   /* get buffer parameters */
@@ -457,6 +474,9 @@ void BlenderSession::render(BL::Depsgraph &b_depsgraph_)
   for (b_rr.views.begin(b_view_iter); b_view_iter != b_rr.views.end();
        ++b_view_iter, ++view_index) {
     b_rview_name = b_view_iter->name();
+
+    buffer_params.layer = b_view_layer.name();
+    buffer_params.view = b_rview_name;
 
     /* set the current view */
     b_engine.active_view_set(b_rview_name.c_str());
@@ -529,10 +549,28 @@ void BlenderSession::render(BL::Depsgraph &b_depsgraph_)
   session->progress.get_time(total_time, render_time);
   VLOG(1) << "Total render time: " << total_time;
   VLOG(1) << "Render time (without synchronization): " << render_time;
+}
+
+void BlenderSession::render_frame_finish()
+{
+  if (!b_render.use_persistent_data()) {
+    /* Free the sync object so that it can properly dereference nodes from the scene graph before
+     * the graph is freed. */
+    delete sync;
+    sync = nullptr;
+
+    session->device_free();
+  }
+
+  for (string_view filename : full_buffer_files_) {
+    session->process_full_buffer_from_disk(filename);
+    path_remove(filename);
+  }
 
   /* clear callback */
   session->write_render_tile_cb = function_null;
   session->update_render_tile_cb = function_null;
+  session->full_buffer_written_cb = function_null;
 }
 
 static PassType bake_type_to_pass(const string &bake_type_str, const int bake_filter)

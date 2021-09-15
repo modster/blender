@@ -23,6 +23,9 @@
 
 CCL_NAMESPACE_BEGIN
 
+class DenoiseParams;
+class Scene;
+
 /* --------------------------------------------------------------------
  * Tile.
  */
@@ -43,6 +46,9 @@ class Tile {
 
 class TileManager {
  public:
+  /* This callback is invoked by whenever on-dist tiles storage file is closed after writing. */
+  function<void(string_view)> full_buffer_written_cb;
+
   TileManager();
   ~TileManager();
 
@@ -52,12 +58,15 @@ class TileManager {
   TileManager &operator=(TileManager &&other) = delete;
 
   /* Reset current progress and start new rendering of the full-frame parameters in tiles of the
-   * given size. */
+   * given size.
+   * Only touches scheduling-related state of the tile manager. */
   /* TODO(sergey): Consider using tile area instead of exact size to help dealing with extreme
    * cases of stretched renders. */
-  void reset(const BufferParams &params, int2 tile_size);
+  void reset_scheduling(const BufferParams &params, int2 tile_size);
 
-  void update_passes(const BufferParams &params);
+  /* Update for the known buffer passes and scene parameters.
+   * Will store all parameters needed for buffers access outside of the scene graph. */
+  void update(const BufferParams &params, const Scene *scene);
 
   inline int get_num_tiles() const
   {
@@ -76,8 +85,7 @@ class TileManager {
 
   /* Write render buffer of a tile to a file on disk.
    *
-   * Opens file for write when first tile is written, and closes the file when the last tile has
-   * been written.
+   * Opens file for write when first tile is written.
    *
    * Returns true on success. */
   bool write_tile(const RenderBuffers &tile_buffers);
@@ -94,13 +102,10 @@ class TileManager {
 
   /* Read full frame render buffer from tiles file on disk.
    *
-   * The render buffer is configured according to the metadata in the file.
-   *
    * Returns true on success. */
-  bool read_full_buffer_from_disk(RenderBuffers *buffers);
-
-  /* Remove file from disk which holds tiles results. */
-  void remove_tile_file() const;
+  bool read_full_buffer_from_disk(string_view filename,
+                                  RenderBuffers *buffers,
+                                  DenoiseParams *denoise_params);
 
  protected:
   /* Get tile configuration for its index.
@@ -110,8 +115,9 @@ class TileManager {
   bool open_tile_output();
   bool close_tile_output();
 
-  /* Full file name of a file which holds tile results on disk. */
-  string tile_filepath_;
+  /* Part of an on-disk tile file name which avoids conflicts between several Cycles instances or
+   * several sessions. */
+  string tile_file_unique_part_;
 
   int2 tile_size_ = make_int2(0, 0);
 
@@ -130,6 +136,14 @@ class TileManager {
 
   /* State of tiles writing to a file on disk. */
   struct {
+    /* Index of a tile file used during the current session.
+     * This number is used for the file name construction, making it possible to render several
+     * scenes throughout duration of the session and keep all results available for later read
+     * access. */
+    int tile_file_index = 0;
+
+    string filename;
+
     /* Specification of the tile image which corresponds to the buffer parameters.
      * Contains channels configured according to the passes configuration in the path traces.
      *

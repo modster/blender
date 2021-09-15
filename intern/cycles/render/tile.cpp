@@ -19,7 +19,10 @@
 #include <atomic>
 
 #include "graph/node.h"
-#include "render/pass.h"
+#include "render/background.h"
+#include "render/film.h"
+#include "render/integrator.h"
+#include "render/scene.h"
 #include "util/util_algorithm.h"
 #include "util/util_foreach.h"
 #include "util/util_logging.h"
@@ -30,10 +33,14 @@
 
 CCL_NAMESPACE_BEGIN
 
-static const char *ATTR_PASSES_COUNT = "cycles.passes.count";
+/* --------------------------------------------------------------------
+ * Internal functions.
+ */
 
+static const char *ATTR_PASSES_COUNT = "cycles.passes.count";
 static const char *ATTR_PASS_SOCKET_PREFIX_FORMAT = "cycles.passes.%d.";
 static const char *ATTR_BUFFER_SOCKET_PREFIX = "cycles.buffer.";
+static const char *ATTR_DENOISE_SOCKET_PREFIX = "cycles.denoise.";
 
 /* Global counter of ToleManager object instances. */
 static std::atomic<uint64_t> g_instance_index = 0;
@@ -130,6 +137,10 @@ static bool node_socket_to_image_spec_atttributes(ImageSpec *image_spec,
       image_spec->attribute(attr_name, node->get_int(socket));
       return true;
 
+    case SocketType::FLOAT:
+      image_spec->attribute(attr_name, node->get_float(socket));
+      return true;
+
     case SocketType::BOOLEAN:
       image_spec->attribute(attr_name, node->get_bool(socket));
       return true;
@@ -171,6 +182,10 @@ static bool node_socket_from_image_spec_atttributes(Node *node,
 
     case SocketType::INT:
       node->set(socket, image_spec.get_int_attribute(attr_name, 0));
+      return true;
+
+    case SocketType::FLOAT:
+      node->set(socket, image_spec.get_float_attribute(attr_name, 0));
       return true;
 
     case SocketType::BOOLEAN:
@@ -299,28 +314,28 @@ static bool configure_image_spec_from_buffer(ImageSpec *image_spec,
   return true;
 }
 
+/* --------------------------------------------------------------------
+ * Tile Manager.
+ */
+
 TileManager::TileManager()
 {
-  /* Append an unique part to the file name, so that if the temp directory is not set to be a
-   * process-specific there is no conflit between different Cycles process instances.
-   *
-   * Use process ID to separate different processes.
+  /* Use process ID to separate different processes.
    * To ensure uniqueness from within a process use combination of object address and instance
    * index. This solves problem of possible object re-allocation at the same time, and solves
    * possible conflict when the counter overflows while there are still active instances of the
    * class. */
   const int tile_manager_id = g_instance_index.fetch_add(1, std::memory_order_relaxed);
-  const string unique_part = to_string(system_self_process_id()) + "-" +
-                             to_string(reinterpret_cast<uintptr_t>(this)) + "-" +
-                             to_string(tile_manager_id);
-  tile_filepath_ = path_temp_get("cycles-tile-buffer-" + unique_part + ".exr");
+  tile_file_unique_part_ = to_string(system_self_process_id()) + "-" +
+                           to_string(reinterpret_cast<uintptr_t>(this)) + "-" +
+                           to_string(tile_manager_id);
 }
 
 TileManager::~TileManager()
 {
 }
 
-void TileManager::reset(const BufferParams &params, int2 tile_size)
+void TileManager::reset_scheduling(const BufferParams &params, int2 tile_size)
 {
   VLOG(3) << "Using tile size of " << tile_size;
 
@@ -337,7 +352,7 @@ void TileManager::reset(const BufferParams &params, int2 tile_size)
   tile_state_.current_tile = Tile();
 }
 
-void TileManager::update_passes(const BufferParams &params)
+void TileManager::update(const BufferParams &params, const Scene *scene)
 {
   DCHECK_NE(params.pass_stride, -1);
 
@@ -346,6 +361,10 @@ void TileManager::update_passes(const BufferParams &params)
   /* TODO(sergey): Proper Error handling, so that if configuration has failed we dont' attempt to
    * write to a partially configured file. */
   configure_image_spec_from_buffer(&write_state_.image_spec, buffer_params_, tile_size_);
+
+  const DenoiseParams denoise_params = scene->integrator->get_denoise_params();
+  node_to_image_spec_atttributes(
+      &write_state_.image_spec, &denoise_params, ATTR_DENOISE_SOCKET_PREFIX);
 }
 
 bool TileManager::done()
@@ -394,9 +413,12 @@ const Tile &TileManager::get_current_tile() const
 
 bool TileManager::open_tile_output()
 {
-  write_state_.tile_out = ImageOutput::create(tile_filepath_);
+  write_state_.filename = path_temp_get("cycles-tile-buffer-" + tile_file_unique_part_ + "-" +
+                                        to_string(write_state_.tile_file_index) + ".exr");
+
+  write_state_.tile_out = ImageOutput::create(write_state_.filename);
   if (!write_state_.tile_out) {
-    LOG(ERROR) << "Error creating image output for " << tile_filepath_;
+    LOG(ERROR) << "Error creating image output for " << write_state_.filename;
     return false;
   }
 
@@ -405,10 +427,10 @@ bool TileManager::open_tile_output()
     return false;
   }
 
-  write_state_.tile_out->open(tile_filepath_, write_state_.image_spec);
+  write_state_.tile_out->open(write_state_.filename, write_state_.image_spec);
   write_state_.num_tiles_written = 0;
 
-  VLOG(3) << "Opened tile file " << tile_filepath_;
+  VLOG(3) << "Opened tile file " << write_state_.filename;
 
   return true;
 }
@@ -475,12 +497,6 @@ bool TileManager::write_tile(const RenderBuffers &tile_buffers)
 
   ++write_state_.num_tiles_written;
 
-  if (done()) {
-    if (!close_tile_output()) {
-      return false;
-    }
-  }
-
   return true;
 }
 
@@ -492,64 +508,55 @@ void TileManager::finish_write_tiles()
     return;
   }
 
-  vector<float> pixel_storage(tile_size_.x * tile_size_.y * buffer_params_.pass_stride);
+  /* EXR expects all tiles to present in file. So explicitly write missing tiles as all-zero. */
+  if (write_state_.num_tiles_written < tile_state_.num_tiles) {
+    vector<float> pixel_storage(tile_size_.x * tile_size_.y * buffer_params_.pass_stride);
 
-  for (int tile_index = write_state_.num_tiles_written; tile_index < tile_state_.num_tiles;
-       ++tile_index) {
-    const Tile tile = get_tile_for_index(tile_index);
+    for (int tile_index = write_state_.num_tiles_written; tile_index < tile_state_.num_tiles;
+         ++tile_index) {
+      const Tile tile = get_tile_for_index(tile_index);
 
-    VLOG(3) << "Write dummy tile at " << tile.x << ", " << tile.y;
+      VLOG(3) << "Write dummy tile at " << tile.x << ", " << tile.y;
 
-    write_state_.tile_out->write_tile(tile.x, tile.y, 0, TypeDesc::FLOAT, pixel_storage.data());
+      write_state_.tile_out->write_tile(tile.x, tile.y, 0, TypeDesc::FLOAT, pixel_storage.data());
+    }
   }
 
   close_tile_output();
+
+  if (full_buffer_written_cb) {
+    full_buffer_written_cb(write_state_.filename);
+  }
+
+  /* Advance the counter upon explicit finish of the file.
+   * Makes it possible to re-use tile manager for another scene, and avoids unnecessary increments
+   * of the tile-file-within-session index. */
+  ++write_state_.tile_file_index;
+
+  write_state_.filename = "";
 }
 
-static bool check_image_spec_compatible(const ImageSpec &spec, const ImageSpec &expected_spec)
+bool TileManager::read_full_buffer_from_disk(const string_view filename,
+                                             RenderBuffers *buffers,
+                                             DenoiseParams *denoise_params)
 {
-  if (spec.width != expected_spec.width || spec.height != expected_spec.height ||
-      spec.depth != expected_spec.depth) {
-    LOG(ERROR) << "Mismatched image dimension.";
-    return false;
-  }
-
-  if (spec.format != expected_spec.format) {
-    LOG(ERROR) << "Mismatched image format.";
-  }
-
-  if (spec.nchannels != expected_spec.nchannels) {
-    LOG(ERROR) << "Mismatched number of channels.";
-    return false;
-  }
-
-  if (spec.channelnames != expected_spec.channelnames) {
-    LOG(ERROR) << "Mismatched channel names.";
-    return false;
-  }
-
-  return true;
-}
-
-bool TileManager::read_full_buffer_from_disk(RenderBuffers *buffers)
-{
-  unique_ptr<ImageInput> in(ImageInput::open(tile_filepath_));
+  unique_ptr<ImageInput> in(ImageInput::open(filename));
   if (!in) {
-    LOG(ERROR) << "Error opening tile file " << tile_filepath_;
+    LOG(ERROR) << "Error opening tile file " << filename;
     return false;
   }
 
-  const ImageSpec &spec = in->spec();
-  if (!check_image_spec_compatible(spec, write_state_.image_spec)) {
-    return false;
-  }
+  const ImageSpec &image_spec = in->spec();
 
   BufferParams buffer_params;
-  if (!buffer_params_from_image_spec_atttributes(&buffer_params, spec)) {
+  if (!buffer_params_from_image_spec_atttributes(&buffer_params, image_spec)) {
     return false;
   }
-
   buffers->reset(buffer_params);
+
+  if (!node_from_image_spec_atttributes(denoise_params, image_spec, ATTR_DENOISE_SOCKET_PREFIX)) {
+    return false;
+  }
 
   if (!in->read_image(TypeDesc::FLOAT, buffers->buffer.data())) {
     LOG(ERROR) << "Error reading pixels from the tile file " << in->geterror();
@@ -562,13 +569,6 @@ bool TileManager::read_full_buffer_from_disk(RenderBuffers *buffers)
   }
 
   return true;
-}
-
-void TileManager::remove_tile_file() const
-{
-  VLOG(3) << "Removing tile file " << tile_filepath_;
-
-  path_remove(tile_filepath_);
 }
 
 CCL_NAMESPACE_END

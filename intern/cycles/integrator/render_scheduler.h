@@ -71,8 +71,6 @@ class RenderWork {
     /* Write full render result.
      * Implies reading the partial file from disk. */
     bool write = false;
-
-    bool denoise = false;
   } full;
 
   /* Display which is used to visualize render result. */
@@ -94,7 +92,7 @@ class RenderWork {
   inline operator bool() const
   {
     return path_trace.num_samples || adaptive_sampling.filter || display.update || tile.denoise ||
-           tile.write || full.write || full.denoise;
+           tile.write || full.write;
   }
 };
 

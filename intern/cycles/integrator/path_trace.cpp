@@ -134,7 +134,18 @@ void PathTrace::reset(const BufferParams &full_params, const BufferParams &big_t
   render_state_.tile_written = false;
 
   did_draw_after_reset_ = false;
-  full_frame_buffers_ = nullptr;
+}
+
+void PathTrace::device_free()
+{
+  /* Free render buffers used by the path trace work to reduce memory peak. */
+  BufferParams empty_params;
+  empty_params.pass_stride = 0;
+  empty_params.update_offset_stride();
+  for (auto &&path_trace_work : path_trace_works_) {
+    path_trace_work->get_render_buffers()->reset(empty_params);
+  }
+  render_state_.need_reset_params = true;
 }
 
 void PathTrace::set_progress(Progress *progress)
@@ -205,7 +216,7 @@ void PathTrace::render_pipeline(RenderWork render_work)
 
   progress_update_if_needed(render_work);
 
-  process_full_buffer_from_disk(render_work);
+  finalize_full_buffer_on_disk(render_work);
 }
 
 void PathTrace::render_init_kernel_execution()
@@ -670,7 +681,7 @@ void PathTrace::write_tile_buffer(const RenderWork &render_work)
   }
 }
 
-void PathTrace::process_full_buffer_from_disk(const RenderWork &render_work)
+void PathTrace::finalize_full_buffer_on_disk(const RenderWork &render_work)
 {
   if (!render_work.full.write) {
     return;
@@ -683,41 +694,13 @@ void PathTrace::process_full_buffer_from_disk(const RenderWork &render_work)
     return;
   }
 
-  /* Free render buffers used by the path trace work to reduce memory peak. */
-  BufferParams empty_params;
-  empty_params.pass_stride = 0;
-  empty_params.update_offset_stride();
-  for (auto &&path_trace_work : path_trace_works_) {
-    path_trace_work->get_render_buffers()->reset(empty_params);
-  }
-  render_state_.need_reset_params = true;
+  /* Make sure writing to the file is fully finished.
+   * This will include writing all possible missing tiles, ensuring validness of the file. */
+  tile_manager_.finish_write_tiles();
 
-  /* TODO(sergey): Somehow free up session memory before readsing full frame. */
-
-  read_full_buffer_from_disk();
-
-  if (render_work.full.denoise) {
-    /* File is either scaled up to the final number of samples (when tile is cancelled) or
-     * contains samples count pass. In the former case use final number of samples for the
-     * denoising, and for the latter one the denoiser will sue sample count pass. */
-    const int num_samples = render_scheduler_.get_num_samples();
-    denoiser_->denoise_buffer(
-        full_frame_buffers_->params, full_frame_buffers_.get(), num_samples, false);
-
-    /* TODO(sergey): Report full-frame denoising time. It is different from the tile-based
-     * denoising since it wouldn't be fair to use it for average values. */
-  }
-
-  /* Write the full result pretending that there is a single tile.
-   * Requires some state change, but allows to use same communication API with the software. */
-
-  tile_buffer_write();
-
-  /* Full frame is no longer needed, free it to save up memory. */
-  full_frame_buffers_ = nullptr;
-
-  /* TODO(sergey): Only remove file if it is in the temporary directory. */
-  tile_manager_.remove_tile_file();
+  /* NOTE: The rest of full-frame post-processing (such as full-frame denoising) will be done after
+   * all scenes and layers are rendered by the Session (which happens after freeing Session memory,
+   * so that we never hold scene and full-frame buffer in memory at the same time). */
 }
 
 void PathTrace::cancel()
@@ -807,21 +790,6 @@ void PathTrace::tile_buffer_write_to_disk()
   }
 }
 
-void PathTrace::read_full_buffer_from_disk()
-{
-  VLOG(3) << "Reading full frame render buffer from file.";
-
-  /* Make sure writing to the file is fully finished.
-   * This will include writing all possible missing tiles, ensuring validness of the file. */
-  tile_manager_.finish_write_tiles();
-
-  full_frame_buffers_ = make_unique<RenderBuffers>(cpu_device_.get());
-
-  if (!tile_manager_.read_full_buffer_from_disk(full_frame_buffers_.get())) {
-    LOG(ERROR) << "Error reading tiles from file.";
-  }
-}
-
 void PathTrace::progress_update_if_needed(const RenderWork &render_work)
 {
   if (progress_ != nullptr) {
@@ -857,8 +825,8 @@ void PathTrace::copy_from_render_buffers(RenderBuffers *render_buffers)
 
 bool PathTrace::copy_render_tile_from_device()
 {
-  if (full_frame_buffers_) {
-    /* Full frame buffer is always on the host side. */
+  if (full_frame_state_.render_buffers) {
+    /* Full-frame buffer is always allocated on CPU. */
     return true;
   }
 
@@ -876,12 +844,51 @@ bool PathTrace::copy_render_tile_from_device()
   return success;
 }
 
+void PathTrace::process_full_buffer_from_disk(string_view filename)
+{
+  VLOG(3) << "Processing full frame buffer file " << filename;
+
+  RenderBuffers full_frame_buffers(cpu_device_.get());
+
+  DenoiseParams denoise_params;
+  if (!tile_manager_.read_full_buffer_from_disk(filename, &full_frame_buffers, &denoise_params)) {
+    LOG(ERROR) << "Error reading tiles from file.";
+    return;
+  }
+
+  render_state_.has_denoised_result = false;
+
+  if (denoise_params.use) {
+    /* Re-use the denoiser as much as possible, avoiding possible device re-initialization.
+     *
+     * It will not conflict with the regular rendering as:
+     *  - Rendering is supposed to be finished here.
+     *  - The next rendering will go via Session's `run_update_for_next_iteration` which will
+     *    ensure proper denoiser is used. */
+    set_denoiser_params(denoise_params);
+
+    /* Number of samples doesn't matter too much, since the sampels count pass will be used. */
+    denoiser_->denoise_buffer(full_frame_buffers.params, &full_frame_buffers, 0, false);
+
+    render_state_.has_denoised_result = true;
+  }
+
+  full_frame_state_.render_buffers = &full_frame_buffers;
+
+  /* Write the full result pretending that there is a single tile.
+   * Requires some state change, but allows to use same communication API with the software. */
+  tile_buffer_write();
+
+  full_frame_state_.render_buffers = nullptr;
+}
+
 int PathTrace::get_num_render_tile_samples() const
 {
-  if (full_frame_buffers_) {
-    /* When full frame result is read from fisk it has all tiles scaled up to the final number of
-     * samples. */
-    return render_scheduler_.get_num_samples();
+  if (full_frame_state_.render_buffers) {
+    /* If the full-frame buffer is read from disk the number of samples is not used as there is a
+     * sample count pass for that in the buffer. Just avoid access to badly defined state of the
+     * path state. */
+    return 0;
   }
 
   return render_scheduler_.get_num_rendered_samples();
@@ -890,8 +897,8 @@ int PathTrace::get_num_render_tile_samples() const
 bool PathTrace::get_render_tile_pixels(const PassAccessor &pass_accessor,
                                        const PassAccessor::Destination &destination)
 {
-  if (full_frame_buffers_) {
-    return pass_accessor.get_render_tile_pixels(full_frame_buffers_.get(), destination);
+  if (full_frame_state_.render_buffers) {
+    return pass_accessor.get_render_tile_pixels(full_frame_state_.render_buffers, destination);
   }
 
   bool success = true;
@@ -927,8 +934,9 @@ bool PathTrace::set_render_tile_pixels(PassAccessor &pass_accessor,
 
 int2 PathTrace::get_render_tile_size() const
 {
-  if (full_frame_buffers_) {
-    return make_int2(full_frame_buffers_->params.width, full_frame_buffers_->params.height);
+  if (full_frame_state_.render_buffers) {
+    return make_int2(full_frame_state_.render_buffers->params.width,
+                     full_frame_state_.render_buffers->params.height);
   }
 
   const Tile &tile = tile_manager_.get_current_tile();
@@ -937,21 +945,21 @@ int2 PathTrace::get_render_tile_size() const
 
 int2 PathTrace::get_render_tile_offset() const
 {
-  if (full_frame_buffers_) {
-    return make_int2(full_frame_buffers_->params.full_x, full_frame_buffers_->params.full_y);
+  if (full_frame_state_.render_buffers) {
+    return make_int2(0, 0);
   }
 
   const Tile &tile = tile_manager_.get_current_tile();
   return make_int2(tile.x, tile.y);
 }
 
-bool PathTrace::get_render_tile_done() const
+const BufferParams &PathTrace::get_render_tile_params() const
 {
-  if (full_frame_buffers_) {
-    return true;
+  if (full_frame_state_.render_buffers) {
+    return full_frame_state_.render_buffers->params;
   }
 
-  return render_state_.tile_written;
+  return big_tile_params_;
 }
 
 bool PathTrace::has_denoised_result() const
