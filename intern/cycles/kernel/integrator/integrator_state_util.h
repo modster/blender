@@ -54,6 +54,7 @@ ccl_device_forceinline void integrator_state_write_shadow_ray(INTEGRATOR_STATE_A
   INTEGRATOR_STATE_WRITE(shadow_ray, D) = ray->D;
   INTEGRATOR_STATE_WRITE(shadow_ray, t) = ray->t;
   INTEGRATOR_STATE_WRITE(shadow_ray, time) = ray->time;
+  INTEGRATOR_STATE_WRITE(shadow_ray, dP) = ray->dP;
 }
 
 ccl_device_forceinline void integrator_state_read_shadow_ray(INTEGRATOR_STATE_CONST_ARGS,
@@ -63,7 +64,7 @@ ccl_device_forceinline void integrator_state_read_shadow_ray(INTEGRATOR_STATE_CO
   ray->D = INTEGRATOR_STATE(shadow_ray, D);
   ray->t = INTEGRATOR_STATE(shadow_ray, t);
   ray->time = INTEGRATOR_STATE(shadow_ray, time);
-  ray->dP = differential_zero_compact();
+  ray->dP = INTEGRATOR_STATE(shadow_ray, dP);
   ray->dD = differential_zero_compact();
 }
 
