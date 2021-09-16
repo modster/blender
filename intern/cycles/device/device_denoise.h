@@ -52,7 +52,9 @@ enum DenoiserPrefilter {
   DENOISER_PREFILTER_NUM,
 };
 
-/* NOTE: Is not a real scene node. Using Node API for ease of (de)serialization. */
+/* NOTE: Is not a real scene node. Using Node API for ease of (de)serialization.
+ * The default values here do not really matter as they are always initialized from the
+ * Integrator node. */
 class DenoiseParams : public Node {
  public:
   NODE_DECLARE
@@ -66,11 +68,9 @@ class DenoiseParams : public Node {
   /* Viewport start sample. */
   int start_sample = 0;
 
-  /* Extra passes which are used by the denoiser (the color pass is always used).
-   * Default to color + albedo only, since normal input does not always have the desired effect
-   * when denoising with OptiX. */
+  /* Auxiliry passes. */
   bool use_pass_albedo = true;
-  bool use_pass_normal = false;
+  bool use_pass_normal = true;
 
   DenoiserPrefilter prefilter = DENOISER_PREFILTER_FAST;
 

@@ -90,22 +90,16 @@ NODE_DEFINE(Integrator)
   denoiser_prefilter_enum.insert("fast", DENOISER_PREFILTER_FAST);
   denoiser_prefilter_enum.insert("accurate", DENOISER_PREFILTER_ACCURATE);
 
-  /* Construct default parameters, so that they are the source of truth for defaults. */
-  const DenoiseParams default_denoise_params;
-
-  SOCKET_BOOLEAN(use_denoise, "Use Denoiser", default_denoise_params.use);
-  SOCKET_ENUM(denoiser_type, "Denoiser Type", denoiser_type_enum, default_denoise_params.type);
-  SOCKET_INT(denoise_start_sample, "Start Sample to Denoise", default_denoise_params.start_sample);
-  SOCKET_BOOLEAN(use_denoise_pass_albedo,
-                 "Use Albedo Pass for Denoiser",
-                 default_denoise_params.use_pass_albedo);
-  SOCKET_BOOLEAN(use_denoise_pass_normal,
-                 "Use Normal Pass for Denoiser Denoiser",
-                 default_denoise_params.use_pass_normal);
-  SOCKET_ENUM(denoiser_prefilter,
-              "Denoiser Type",
-              denoiser_prefilter_enum,
-              default_denoise_params.prefilter);
+  /* Default to accurate denoising with OpenImageDenoise. For interactive viewport
+   * it's best use OptiX and disable the normal pass since it does not always have
+   * the desired effect for that denoiser. */
+  SOCKET_BOOLEAN(use_denoise, "Use Denoiser", false);
+  SOCKET_ENUM(denoiser_type, "Denoiser Type", denoiser_type_enum, DENOISER_OPENIMAGEDENOISE);
+  SOCKET_INT(denoise_start_sample, "Start Sample to Denoise", 0);
+  SOCKET_BOOLEAN(use_denoise_pass_albedo, "Use Albedo Pass for Denoiser", true);
+  SOCKET_BOOLEAN(use_denoise_pass_normal, "Use Normal Pass for Denoiser", true);
+  SOCKET_ENUM(
+      denoiser_prefilter, "Denoiser Type", denoiser_prefilter_enum, DENOISER_PREFILTER_ACCURATE);
 
   return type;
 }
