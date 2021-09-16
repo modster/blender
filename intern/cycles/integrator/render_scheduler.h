@@ -75,8 +75,14 @@ class RenderWork {
     bool denoise = false;
   } full;
 
-  /* Display which is used to visualize render result is to be updated for the new render. */
-  bool update_display = false;
+  /* Display which is used to visualize render result. */
+  struct {
+    /* Display needs to be updated for the new render. */
+    bool update = false;
+
+    /* Display can use denoised result if available. */
+    bool use_denoised_result = true;
+  } display;
 
   /* Re-balance multi-device scheduling after rendering this work.
    * Note that the scheduler does not know anything abouce devices, so if there is only a single
@@ -87,7 +93,7 @@ class RenderWork {
    * work. */
   inline operator bool() const
   {
-    return path_trace.num_samples || adaptive_sampling.filter || update_display || tile.denoise ||
+    return path_trace.num_samples || adaptive_sampling.filter || display.update || tile.denoise ||
            tile.write || full.write || full.denoise;
   }
 };
@@ -253,8 +259,11 @@ class RenderScheduler {
    * often.
    *
    * The delayed will be true when the denoiser is configured for use, but it was delayed for a
-   * later sample, to reduce overhead. */
-  bool work_need_denoise(bool &delayed);
+   * later sample, to reduce overhead.
+   *
+   * ready_to_display will be false if we may have a denoised result that is outdated due to
+   * increased samples. */
+  bool work_need_denoise(bool &delayed, bool &ready_to_display);
 
   /* Check whether current work need to update display.
    *

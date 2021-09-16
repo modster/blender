@@ -522,7 +522,7 @@ void PathTrace::draw()
 
 void PathTrace::update_display(const RenderWork &render_work)
 {
-  if (!render_work.update_display) {
+  if (!render_work.display.update) {
     return;
   }
 
@@ -561,8 +561,10 @@ void PathTrace::update_display(const RenderWork &render_work)
     return;
   }
 
-  const PassMode pass_mode = render_state_.has_denoised_result ? PassMode::DENOISED :
-                                                                 PassMode::NOISY;
+  const PassMode pass_mode = render_work.display.use_denoised_result &&
+                                     render_state_.has_denoised_result ?
+                                 PassMode::DENOISED :
+                                 PassMode::NOISY;
 
   /* TODO(sergey): When using multi-device rendering map the GPUDisplay once and copy data from all
    * works in parallel. */

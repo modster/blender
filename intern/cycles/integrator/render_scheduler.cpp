@@ -185,10 +185,11 @@ bool RenderScheduler::render_work_reschedule_on_converge(RenderWork &render_work
 
   state_.path_trace_finished = true;
 
-  bool denoiser_delayed;
-  render_work.tile.denoise = work_need_denoise(denoiser_delayed);
+  bool denoiser_delayed, denoiser_ready_to_display;
+  render_work.tile.denoise = work_need_denoise(denoiser_delayed, denoiser_ready_to_display);
 
-  render_work.update_display = work_need_update_display(denoiser_delayed);
+  render_work.display.update = work_need_update_display(denoiser_delayed);
+  render_work.display.use_denoised_result = denoiser_ready_to_display;
 
   return false;
 }
@@ -261,7 +262,7 @@ void RenderScheduler::render_work_reschedule_on_cancel(RenderWork &render_work)
    * buffers. And the buffers might have been freed from the device, so display update is not
    * possible. */
   if (has_rendered_samples && !state_.full_frame_was_written) {
-    render_work.update_display = true;
+    render_work.display.update = true;
   }
 }
 
@@ -327,12 +328,13 @@ RenderWork RenderScheduler::get_render_work()
   render_work.adaptive_sampling.threshold = work_adaptive_threshold();
   render_work.adaptive_sampling.reset = false;
 
-  bool denoiser_delayed;
-  render_work.tile.denoise = work_need_denoise(denoiser_delayed);
+  bool denoiser_delayed, denoiser_ready_to_display;
+  render_work.tile.denoise = work_need_denoise(denoiser_delayed, denoiser_ready_to_display);
 
   render_work.tile.write = done();
 
-  render_work.update_display = work_need_update_display(denoiser_delayed);
+  render_work.display.update = work_need_update_display(denoiser_delayed);
+  render_work.display.use_denoised_result = denoiser_ready_to_display;
 
   if (done()) {
     set_postprocess_render_work(&render_work);
@@ -354,7 +356,7 @@ void RenderScheduler::update_state_for_render_work(const RenderWork &render_work
 
   /* A fallback display update time, for the case there is an error of display update, or when
    * there is no display at all. */
-  if (render_work.update_display) {
+  if (render_work.display.update) {
     state_.last_display_update_time = time_now;
     state_.last_display_update_sample = state_.num_rendered_samples;
   }
@@ -389,7 +391,7 @@ bool RenderScheduler::set_postprocess_render_work(RenderWork *render_work)
   }
 
   if (any_scheduled) {
-    render_work->update_display = true;
+    render_work->display.update = true;
   }
 
   return any_scheduled;
@@ -870,9 +872,10 @@ float RenderScheduler::work_adaptive_threshold() const
   return max(state_.adaptive_sampling_threshold, adaptive_sampling_.threshold);
 }
 
-bool RenderScheduler::work_need_denoise(bool &delayed)
+bool RenderScheduler::work_need_denoise(bool &delayed, bool &ready_to_display)
 {
   delayed = false;
+  ready_to_display = true;
 
   if (!denoiser_params_.use) {
     /* Denoising is disabled, no need to scheduler work for it. */
@@ -907,6 +910,7 @@ bool RenderScheduler::work_need_denoise(bool &delayed)
 
   /* Do not denoise until the sample at which denoising should start is reached. */
   if (num_samples_finished < denoiser_params_.start_sample) {
+    ready_to_display = false;
     return false;
   }
 
