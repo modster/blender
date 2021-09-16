@@ -99,6 +99,9 @@ class PathTrace {
   /* Set GPU display which takes care of drawing the render result. */
   void set_gpu_display(unique_ptr<GPUDisplay> gpu_display);
 
+  /* Clear the GPU display by filling it in with all zeroes. */
+  void clear_gpu_display();
+
   /* Perform drawing of the current state of the GPUDisplay. */
   void draw();
 

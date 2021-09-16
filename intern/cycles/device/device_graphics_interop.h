@@ -30,6 +30,9 @@ class DeviceGraphicsInteropDestination {
 
   /* OpenGL pixel buffer object. */
   int opengl_pbo_id = 0;
+
+  /* Clear the entire destination before doing partial write to it. */
+  bool need_clear = false;
 };
 
 /* Device-side graphics interoperability support.

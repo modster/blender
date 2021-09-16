@@ -158,6 +158,19 @@ class GPUDisplay {
    * Drawing.
    */
 
+  /* Clear the texture by filling it with all zeroes.
+   *
+   * This call might happen in parallel with draw, but can never happen in parallel with the
+   * update.
+   *
+   * The actual zero-ing can be deferred to a later moment. What is important is that after clear
+   * and before pixels update the drawing texture will be fully empty, and that partial update
+   * after clear will write new pixel values for an updating area, leaving everything else zeroed.
+   *
+   * If the GPU display supports graphics interoperability then the zeroing the display is to be
+   * delegated to the device via the `DeviceGraphicsInteropDestination`. */
+  virtual void clear() = 0;
+
   /* Draw the current state of the texture.
    *
    * Returns true if this call did draw an updated state of the texture. */

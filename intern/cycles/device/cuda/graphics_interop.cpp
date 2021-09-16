@@ -42,6 +42,8 @@ void CUDADeviceGraphicsInterop::set_destination(
 {
   const int64_t new_buffer_area = int64_t(destination.buffer_width) * destination.buffer_height;
 
+  need_clear_ = destination.need_clear;
+
   if (opengl_pbo_id_ == destination.opengl_pbo_id && buffer_area_ == new_buffer_area) {
     return;
   }
@@ -76,6 +78,13 @@ device_ptr CUDADeviceGraphicsInterop::map()
   cuda_device_assert(device_, cuGraphicsMapResources(1, &cu_graphics_resource_, queue_->stream()));
   cuda_device_assert(
       device_, cuGraphicsResourceGetMappedPointer(&cu_buffer, &bytes, cu_graphics_resource_));
+
+  if (need_clear_) {
+    cuda_device_assert(
+        device_, cuMemsetD8Async(static_cast<CUdeviceptr>(cu_buffer), 0, bytes, queue_->stream()));
+
+    need_clear_ = false;
+  }
 
   return static_cast<device_ptr>(cu_buffer);
 }

@@ -511,6 +511,11 @@ void PathTrace::set_gpu_display(unique_ptr<GPUDisplay> gpu_display)
   gpu_display_ = move(gpu_display);
 }
 
+void PathTrace::clear_gpu_display()
+{
+  gpu_display_->clear();
+}
+
 void PathTrace::draw()
 {
   if (!gpu_display_) {

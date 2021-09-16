@@ -325,6 +325,10 @@ bool BlenderGPUDisplay::do_update_begin(const GPUDisplayParams &params,
     texture_.width = texture_width;
     texture_.height = texture_height;
     glBindTexture(GL_TEXTURE_2D, 0);
+
+    /* Texture did change, and no pixel storage was provided. Tag for an explicit zeroing out to
+     * avoid undefined content. */
+    texture_.need_clear = true;
   }
 
   /* Update PBO dimensions if needed.
@@ -413,6 +417,15 @@ half4 *BlenderGPUDisplay::do_map_texture_buffer()
     LOG(ERROR) << "Error mapping BlenderGPUDisplay pixel buffer object.";
   }
 
+  if (texture_.need_clear) {
+    const int64_t texture_width = texture_.width;
+    const int64_t texture_height = texture_.height;
+    memset(reinterpret_cast<void *>(mapped_rgba_pixels),
+           0,
+           texture_width * texture_height * sizeof(half4));
+    texture_.need_clear = false;
+  }
+
   return mapped_rgba_pixels;
 }
 
@@ -435,6 +448,9 @@ DeviceGraphicsInteropDestination BlenderGPUDisplay::do_graphics_interop_get()
   interop_dst.buffer_height = texture_.buffer_height;
   interop_dst.opengl_pbo_id = texture_.gl_pbo_id;
 
+  interop_dst.need_clear = texture_.need_clear;
+  texture_.need_clear = false;
+
   return interop_dst;
 }
 
@@ -452,10 +468,21 @@ void BlenderGPUDisplay::graphics_interop_deactivate()
  * Drawing.
  */
 
+void BlenderGPUDisplay::clear()
+{
+  texture_.need_clear = true;
+}
+
 void BlenderGPUDisplay::do_draw(const GPUDisplayParams &params)
 {
   /* See do_update_begin() for why no locking is required here. */
   const bool transparent = true;  // TODO(sergey): Derive this from Film.
+
+  if (texture_.need_clear) {
+    /* Texture is requested to be cleared and was not yet cleared.
+     * Do early return which should be equivalent of drawing all-zero texture. */
+    return;
+  }
 
   if (!gl_draw_resources_ensure()) {
     return;

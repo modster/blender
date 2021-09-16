@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <atomic>
+
 #include "MEM_guardedalloc.h"
 
 #include "RNA_blender_cpp.h"
@@ -103,6 +105,8 @@ class BlenderGPUDisplay : public GPUDisplay {
   virtual void graphics_interop_activate() override;
   virtual void graphics_interop_deactivate() override;
 
+  virtual void clear() override;
+
  protected:
   virtual bool do_update_begin(const GPUDisplayParams &params,
                                int texture_width,
@@ -176,6 +180,9 @@ class BlenderGPUDisplay : public GPUDisplay {
     /* Is true when new data was written to the PBO, meaning, the texture might need to be resized
      * and new data is to be uploaded to the GPU. */
     bool need_update = false;
+
+    /* Content of the texture is to be filled with zeroes. */
+    std::atomic<bool> need_clear = true;
 
     /* Dimensions of the texture in pixels. */
     int width = 0;

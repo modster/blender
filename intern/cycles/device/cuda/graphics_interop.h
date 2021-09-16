@@ -55,6 +55,9 @@ class CUDADeviceGraphicsInterop : public DeviceGraphicsInterop {
   /* Buffer area in pixels of the corresponding PBO. */
   int64_t buffer_area_ = 0;
 
+  /* The destination was requested to be cleared. */
+  bool need_clear_ = false;
+
   CUgraphicsResource cu_graphics_resource_ = nullptr;
 };
 
