@@ -46,7 +46,7 @@ class DeviceQueue {
   /* Number of states which keeps the device occupied with work without loosing performance.
    * The renderer will add more work (when available) when number of active paths falls below this
    * value. */
-  virtual int num_concurrent_busy_states() = 0;
+  virtual int num_concurrent_busy_states() const = 0;
 
   /* Initialize execution of kernels on this queue.
    *

@@ -39,14 +39,24 @@ CUDADeviceQueue::~CUDADeviceQueue()
   cuStreamDestroy(cuda_stream_);
 }
 
-int CUDADeviceQueue::num_concurrent_states(const size_t /*state_size*/) const
+int CUDADeviceQueue::num_concurrent_states(const size_t state_size) const
 {
-  /* TODO: compute automatically. */
-  /* TODO: must have at least num_threads_per_block. */
-  return 1048576;
+  int num_states = max(cuda_device_->get_num_multiprocessors() *
+                           cuda_device_->get_max_num_threads_per_multiprocessor() * 16,
+                       1048576);
+
+  const char *factor_str = getenv("CYCLES_CONCURRENT_STATES_FACTOR");
+  if (factor_str) {
+    num_states = max((int)(num_states * atof(factor_str)), 1024);
+  }
+
+  VLOG(3) << "GPU queue concurrent states: " << num_states << ", using up to "
+          << string_human_readable_size(num_states * state_size);
+
+  return num_states;
 }
 
-int CUDADeviceQueue::num_concurrent_busy_states()
+int CUDADeviceQueue::num_concurrent_busy_states() const
 {
   const int max_num_threads = cuda_device_->get_num_multiprocessors() *
                               cuda_device_->get_max_num_threads_per_multiprocessor();
