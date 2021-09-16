@@ -122,10 +122,10 @@ BlenderSession::~BlenderSession()
 
 void BlenderSession::create_session()
 {
-  SessionParams session_params = BlenderSync::get_session_params(
+  const SessionParams session_params = BlenderSync::get_session_params(
       b_engine, b_userpref, b_scene, background);
-  SceneParams scene_params = BlenderSync::get_scene_params(b_scene, background);
-  bool session_pause = BlenderSync::get_session_pause(b_scene, background);
+  const SceneParams scene_params = BlenderSync::get_scene_params(b_scene, background);
+  const bool session_pause = BlenderSync::get_session_pause(b_scene, background);
 
   /* reset status/progress */
   last_status = "";
@@ -155,9 +155,9 @@ void BlenderSession::create_session()
   }
 
   /* set buffer parameters */
-  BufferParams buffer_params = BlenderSync::get_buffer_params(
+  const BufferParams buffer_params = BlenderSync::get_buffer_params(
       b_v3d, b_rv3d, scene->camera, width, height);
-  session->reset(buffer_params, session_params.samples);
+  session->reset(session_params, buffer_params);
 
   /* Create GPU display. */
   if (!b_engine.is_preview() && !headless) {
@@ -215,9 +215,9 @@ void BlenderSession::reset_session(BL::BlendData &b_data, BL::Depsgraph &b_depsg
     return;
   }
 
-  SessionParams session_params = BlenderSync::get_session_params(
+  const SessionParams session_params = BlenderSync::get_session_params(
       b_engine, b_userpref, b_scene, background);
-  SceneParams scene_params = BlenderSync::get_scene_params(b_scene, background);
+  const SceneParams scene_params = BlenderSync::get_scene_params(b_scene, background);
 
   if (scene->params.modified(scene_params) || session->params.modified(session_params) ||
       !this->b_render.use_persistent_data()) {
@@ -254,9 +254,9 @@ void BlenderSession::reset_session(BL::BlendData &b_data, BL::Depsgraph &b_depsg
 
   BL::SpaceView3D b_null_space_view3d(PointerRNA_NULL);
   BL::RegionView3D b_null_region_view3d(PointerRNA_NULL);
-  BufferParams buffer_params = BlenderSync::get_buffer_params(
+  const BufferParams buffer_params = BlenderSync::get_buffer_params(
       b_null_space_view3d, b_null_region_view3d, scene->camera, width, height);
-  session->reset(buffer_params, session_params.samples);
+  session->reset(session_params, buffer_params);
 
   /* reset time */
   start_resize_time = 0.0;
@@ -424,7 +424,7 @@ void BlenderSession::render(BL::Depsgraph &b_depsgraph_)
   BL::ViewLayer b_view_layer = b_depsgraph.view_layer_eval();
 
   /* get buffer parameters */
-  SessionParams session_params = BlenderSync::get_session_params(
+  const SessionParams session_params = BlenderSync::get_session_params(
       b_engine, b_userpref, b_scene, background);
   BufferParams buffer_params = BlenderSync::get_buffer_params(
       b_v3d, b_rv3d, scene->camera, width, height);
@@ -487,20 +487,19 @@ void BlenderSession::render(BL::Depsgraph &b_depsgraph_)
     }
 
     /* Update number of samples per layer. */
-    int samples = sync->get_layer_samples();
-    bool bound_samples = sync->get_layer_bound_samples();
-    int effective_layer_samples;
+    const int samples = sync->get_layer_samples();
+    const bool bound_samples = sync->get_layer_bound_samples();
 
-    if (samples != 0 && (!bound_samples || (samples < session_params.samples)))
-      effective_layer_samples = samples;
-    else
-      effective_layer_samples = session_params.samples;
+    SessionParams effective_session_params = session_params;
+    if (samples != 0 && (!bound_samples || (samples < session_params.samples))) {
+      effective_session_params.samples = samples;
+    }
 
     /* Update tile manager if we're doing resumable render. */
-    update_resumable_tile_manager(effective_layer_samples);
+    update_resumable_tile_manager(effective_session_params.samples);
 
     /* Update session itself. */
-    session->reset(buffer_params, effective_layer_samples);
+    session->reset(effective_session_params, buffer_params);
 
     /* render */
     if (!b_engine.is_preview() && background && print_render_stats) {
@@ -662,7 +661,7 @@ void BlenderSession::bake(BL::Depsgraph &b_depsgraph_,
 
   if (object_found && !session->progress.get_cancel()) {
     /* Get session and buffer parameters. */
-    SessionParams session_params = BlenderSync::get_session_params(
+    const SessionParams session_params = BlenderSync::get_session_params(
         b_engine, b_userpref, b_scene, background);
 
     BufferParams buffer_params;
@@ -670,7 +669,7 @@ void BlenderSession::bake(BL::Depsgraph &b_depsgraph_,
     buffer_params.height = bake_height;
 
     /* Update session. */
-    session->reset(buffer_params, session_params.samples);
+    session->reset(session_params, buffer_params);
 
     session->progress.set_update_callback(
         function_bind(&BlenderSession::update_bake_progress, this));
@@ -728,10 +727,10 @@ void BlenderSession::synchronize(BL::Depsgraph &b_depsgraph_)
     return;
 
   /* on session/scene parameter changes, we recreate session entirely */
-  SessionParams session_params = BlenderSync::get_session_params(
+  const SessionParams session_params = BlenderSync::get_session_params(
       b_engine, b_userpref, b_scene, background);
-  SceneParams scene_params = BlenderSync::get_scene_params(b_scene, background);
-  bool session_pause = BlenderSync::get_session_pause(b_scene, background);
+  const SceneParams scene_params = BlenderSync::get_scene_params(b_scene, background);
+  const bool session_pause = BlenderSync::get_session_pause(b_scene, background);
 
   if (session->params.modified(session_params) || scene->params.modified(scene_params)) {
     free_session();
@@ -772,12 +771,12 @@ void BlenderSession::synchronize(BL::Depsgraph &b_depsgraph_)
     sync->sync_camera(b_render, b_camera_override, width, height, "");
 
   /* get buffer parameters */
-  BufferParams buffer_params = BlenderSync::get_buffer_params(
+  const BufferParams buffer_params = BlenderSync::get_buffer_params(
       b_v3d, b_rv3d, scene->camera, width, height);
 
   /* reset if needed */
   if (scene->need_reset()) {
-    session->reset(buffer_params, session_params.samples);
+    session->reset(session_params, buffer_params);
 
     /* After session reset, so device is not accessing image data anymore. */
     builtin_images_load();
@@ -874,14 +873,14 @@ void BlenderSession::view_draw(int w, int h)
 
     /* reset if requested */
     if (reset) {
-      SessionParams session_params = BlenderSync::get_session_params(
+      const SessionParams session_params = BlenderSync::get_session_params(
           b_engine, b_userpref, b_scene, background);
-      BufferParams buffer_params = BlenderSync::get_buffer_params(
+      const BufferParams buffer_params = BlenderSync::get_buffer_params(
           b_v3d, b_rv3d, scene->camera, width, height);
-      bool session_pause = BlenderSync::get_session_pause(b_scene, background);
+      const bool session_pause = BlenderSync::get_session_pause(b_scene, background);
 
       if (session_pause == false) {
-        session->reset(buffer_params, session_params.samples);
+        session->reset(session_params, buffer_params);
         start_resize_time = 0.0;
       }
     }

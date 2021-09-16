@@ -50,7 +50,6 @@ Session::Session(const SessionParams &params_, const SceneParams &scene_params)
   session_thread_ = nullptr;
 
   delayed_reset_.do_reset = false;
-  delayed_reset_.samples = 0;
 
   pause_ = false;
   cancel_ = false;
@@ -392,11 +391,12 @@ void Session::do_delayed_reset()
   }
   delayed_reset_.do_reset = false;
 
-  buffer_params_ = delayed_reset_.params;
+  params = delayed_reset_.session_params;
+  buffer_params_ = delayed_reset_.buffer_params;
 
   /* Tile and work scheduling. */
   tile_manager_.reset(buffer_params_, get_effective_tile_size());
-  render_scheduler_.reset(buffer_params_, delayed_reset_.samples);
+  render_scheduler_.reset(buffer_params_, params.samples);
 
   /* Passes. */
   /* When multiple tiles are used SAMPLE_COUNT pass is used to keep track of possible partial
@@ -411,8 +411,7 @@ void Session::do_delayed_reset()
 
   /* Progress. */
   progress.reset_sample();
-  progress.set_total_pixel_samples(delayed_reset_.params.width * delayed_reset_.params.height *
-                                   delayed_reset_.samples);
+  progress.set_total_pixel_samples(buffer_params_.width * buffer_params_.height * params.samples);
 
   if (!params.background) {
     progress.set_start_time();
@@ -420,15 +419,15 @@ void Session::do_delayed_reset()
   progress.set_render_start_time();
 }
 
-void Session::reset(BufferParams &buffer_params, int samples)
+void Session::reset(const SessionParams &session_params, const BufferParams &buffer_params)
 {
   {
     thread_scoped_lock reset_lock(delayed_reset_.mutex);
     thread_scoped_lock pause_lock(pause_mutex_);
 
-    delayed_reset_.params = buffer_params;
-    delayed_reset_.samples = samples;
     delayed_reset_.do_reset = true;
+    delayed_reset_.session_params = session_params;
+    delayed_reset_.buffer_params = buffer_params;
 
     path_trace_->cancel();
   }

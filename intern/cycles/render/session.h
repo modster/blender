@@ -131,7 +131,7 @@ class Session {
   void wait();
 
   bool ready_to_reset();
-  void reset(BufferParams &params, int samples);
+  void reset(const SessionParams &session_params, const BufferParams &buffer_params);
 
   void set_pause(bool pause);
 
@@ -168,8 +168,8 @@ class Session {
   struct DelayedReset {
     thread_mutex mutex;
     bool do_reset;
-    BufferParams params;
-    int samples;
+    SessionParams session_params;
+    BufferParams buffer_params;
   } delayed_reset_;
 
   void run();
