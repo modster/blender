@@ -255,8 +255,12 @@ void RenderScheduler::render_work_reschedule_on_cancel(RenderWork &render_work)
    * Allows to have latest state of tile visible while full buffer is being processed.
    *
    * Note that if there are no samples in the current tile its render buffer might have pixels
-   * remained from previous state. */
-  if (has_rendered_samples) {
+   * remained from previous state.
+   *
+   * If the full result was written, then there is no way any updates were made to the render
+   * buffers. And the buffers might have been freed from the device, so display update is not
+   * possible. */
+  if (has_rendered_samples && !state_.full_frame_was_written) {
     render_work.update_display = true;
   }
 }

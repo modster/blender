@@ -678,6 +678,11 @@ void PathTraceWorkGPU::copy_to_gpu_display(GPUDisplay *gpu_display,
     return;
   }
 
+  if (!buffers_->buffer.device_pointer) {
+    LOG(WARNING) << "Request for GPU display update without allocated render buffers.";
+    return;
+  }
+
   if (should_use_graphics_interop()) {
     if (copy_to_gpu_display_interop(gpu_display, pass_mode, num_samples)) {
       return;
