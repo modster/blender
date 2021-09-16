@@ -29,6 +29,7 @@
 #include <cstddef>
 #include <cstdlib>
 #include <cstring>
+#include <queue>
 
 /* Allow using deprecated functionality for .blend file I/O. */
 #define DNA_DEPRECATED_ALLOW
@@ -52,6 +53,7 @@
 #include "BLI_map.hh"
 #include "BLI_math.h"
 #include "BLI_path_util.h"
+#include "BLI_stack.hh"
 #include "BLI_string.h"
 #include "BLI_string_utils.h"
 #include "BLI_utildefines.h"
@@ -80,6 +82,7 @@
 #include "NOD_function.h"
 #include "NOD_geometry.h"
 #include "NOD_node_declaration.hh"
+#include "NOD_node_tree_ref.hh"
 #include "NOD_shader.h"
 #include "NOD_socket.h"
 #include "NOD_texture.h"
@@ -1015,8 +1018,8 @@ IDTypeInfo IDType_ID_NT = {
 static void node_add_sockets_from_type(bNodeTree *ntree, bNode *node, bNodeType *ntype)
 {
   if (ntype->declare != nullptr) {
-    nodeDeclarationEnsure(ntree, node);
-    node->declaration->build(*ntree, *node);
+    blender::nodes::NodeDeclaration *node_decl = nodeDeclarationEnsure(ntree, node);
+    node_decl->build(*ntree, *node);
     return;
   }
   bNodeSocketTemplate *sockdef;
@@ -3942,15 +3945,16 @@ int nodeSocketLinkLimit(const bNodeSocket *sock)
  * If the node implements a `declare` function, this function makes sure that `node->declaration`
  * is up to date.
  */
-void nodeDeclarationEnsure(bNodeTree *UNUSED(ntree), bNode *node)
+NodeDeclarationHandle *nodeDeclarationEnsure(bNodeTree *UNUSED(ntree), bNode *node)
 {
   if (node->typeinfo->declare == nullptr) {
-    return;
+    return nullptr;
   }
 
   node->declaration = new blender::nodes::NodeDeclaration();
   blender::nodes::NodeDeclarationBuilder builder{*node->declaration};
   node->typeinfo->declare(builder);
+  return node->declaration;
 }
 
 /* ************** Node Clipboard *********** */
@@ -4465,28 +4469,102 @@ void ntreeUpdateAllUsers(Main *main, ID *id)
   }
 }
 
-static void update_socket_shapes_for_fields(bNodeTree &ntree)
+static void update_socket_shapes_for_fields(bNodeTree &btree)
 {
+  using namespace blender;
   using namespace blender::nodes;
-  if (ntree.type != NTREE_GEOMETRY) {
+  if (btree.type != NTREE_GEOMETRY) {
     return;
   }
-  LISTBASE_FOREACH (bNode *, node, &ntree.nodes) {
-    nodeDeclarationEnsure(&ntree, node);
-    NodeDeclaration *declaration = node->declaration;
-    if (declaration == nullptr) {
-      continue;
+
+  NodeTreeRef tree{&btree};
+  Vector<const NodeRef *> input_nodes;
+  Vector<const NodeRef *> output_nodes;
+
+  for (const NodeRef *node : tree.nodes()) {
+    if (node->inputs().is_empty()) {
+      input_nodes.append(node);
     }
-    int input_index;
-    LISTBASE_FOREACH_INDEX (bNodeSocket *, socket, &node->inputs, input_index) {
-      const SocketDeclaration &socket_decl = *declaration->inputs()[input_index];
-      bool is_field = socket_decl.is_field();
-      if (is_field) {
-        socket->display_shape = SOCK_DISPLAY_SHAPE_DIAMOND;
+    if (node->outputs().is_empty()) {
+      output_nodes.append(node);
+    }
+  }
+
+  Array<int> field_level_by_node_id(tree.nodes().size(), 0);
+  Array<int> field_level_by_socket_id(tree.sockets().size(), 0);
+  Array<bool> node_is_enqueued_by_id(tree.nodes().size(), false);
+  std::queue<const NodeRef *> nodes_to_check;
+
+  for (const NodeRef *node : input_nodes) {
+    nodes_to_check.push(node);
+    node_is_enqueued_by_id[node->id()] = true;
+  }
+
+  while (!nodes_to_check.empty()) {
+    const NodeRef &node = *nodes_to_check.front();
+    nodes_to_check.pop();
+    NodeDeclaration *node_decl = nodeDeclarationEnsure(&btree, node.bnode());
+
+    int max_node_field_level = 0;
+    StringRef node_idname = node.idname();
+    if (node_idname.startswith("ShaderNode") || node_idname.startswith("FunctionNode")) {
+      max_node_field_level = 1;
+    }
+
+    int node_field_level = 0;
+    for (const SocketRef *input_socket : node.inputs()) {
+      const int input_index = input_socket->index();
+      int normal_input_field_level = 0;
+      if (node_decl != nullptr) {
+        const SocketDeclaration &socket_decl = *node_decl->inputs()[input_index];
+        normal_input_field_level = socket_decl.is_field();
       }
-      else {
-        socket->display_shape = SOCK_DISPLAY_SHAPE_CIRCLE;
+
+      int input_field_level = normal_input_field_level;
+      for (const SocketRef *origin_socket : input_socket->directly_linked_sockets()) {
+        const int origin_field_level = field_level_by_socket_id[origin_socket->id()];
+        input_field_level = std::max(input_field_level, origin_field_level);
       }
+
+      const int field_level_increase = input_field_level - normal_input_field_level;
+      node_field_level = std::min(max_node_field_level,
+                                  std::max(node_field_level, field_level_increase));
+
+      field_level_by_socket_id[input_socket->id()] = input_field_level;
+    }
+
+    for (const SocketRef *output_socket : node.outputs()) {
+      const int output_index = output_socket->index();
+      int normal_output_field_level = 0;
+      if (node_decl != nullptr) {
+        const SocketDeclaration &socket_decl = *node_decl->outputs()[output_index];
+        normal_output_field_level = socket_decl.is_field();
+      }
+
+      const int output_field_level = normal_output_field_level + node_field_level;
+      field_level_by_socket_id[output_socket->id()] = output_field_level;
+
+      for (const SocketRef *target_socket : output_socket->directly_linked_sockets()) {
+        const NodeRef &target_node = target_socket->node();
+        if (!node_is_enqueued_by_id[target_node.id()]) {
+          nodes_to_check.push(&target_node);
+          node_is_enqueued_by_id[target_node.id()] = true;
+        }
+      }
+    }
+
+    std::cout << node.name() << ": " << node_field_level << "\n";
+  }
+  std::cout << "\n";
+
+  for (const SocketRef *socket : tree.sockets()) {
+    bNodeSocket *bsocket = socket->bsocket();
+    const int field_level = field_level_by_socket_id[socket->id()];
+    if (field_level == 0) {
+      bsocket->display_shape = SOCK_DISPLAY_SHAPE_CIRCLE;
+    }
+    else if (field_level == 1) {
+      bsocket->display_shape = SOCK_DISPLAY_SHAPE_DIAMOND;
     }
   }
 }

@@ -25,7 +25,7 @@ namespace blender::nodes {
 
 static void geo_node_input_normal_declare(NodeDeclarationBuilder &b)
 {
-  b.add_output<decl::Vector>("Normal");
+  b.add_output<decl::Vector>("Normal").is_field();
 }
 
 static GVArrayPtr mesh_face_normals(const Mesh &mesh,

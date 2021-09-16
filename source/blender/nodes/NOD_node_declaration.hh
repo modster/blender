@@ -97,7 +97,7 @@ class SocketDeclarationBuilder : public BaseSocketDeclarationBuilder {
     return *(Self *)this;
   }
 
-  Self &is_field(bool value)
+  Self &is_field(bool value = true)
   {
     decl_->is_field_ = value;
     return *(Self *)this;

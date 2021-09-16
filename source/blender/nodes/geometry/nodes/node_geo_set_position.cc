@@ -23,8 +23,8 @@ namespace blender::nodes {
 static void geo_node_set_position_declare(NodeDeclarationBuilder &b)
 {
   b.add_input<decl::Geometry>("Geometry");
-  b.add_input<decl::Vector>("Position").is_field(true);
-  b.add_input<decl::Bool>("Selection").default_value(true).is_field(true);
+  b.add_input<decl::Vector>("Position").is_field();
+  b.add_input<decl::Bool>("Selection").default_value(true).is_field();
   b.add_output<decl::Geometry>("Geometry");
 }
 
