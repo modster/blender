@@ -169,11 +169,13 @@ extern "C" __global__ void __anyhit__kernel_optix_local_hit()
 extern "C" __global__ void __anyhit__kernel_optix_shadow_all_hit()
 {
 #ifdef __SHADOW_RECORD_ALL__
+  bool ignore_intersection = false;
+
   const uint prim = optixGetPrimitiveIndex();
 #  ifdef __VISIBILITY_FLAG__
   const uint visibility = optixGetPayload_4();
   if ((kernel_tex_fetch(__prim_visibility, prim) & visibility) == 0) {
-    return optixIgnoreIntersection();
+    ignore_intersection = true;
   }
 #  endif
 
@@ -190,7 +192,7 @@ extern "C" __global__ void __anyhit__kernel_optix_shadow_all_hit()
 
     // Filter out curve endcaps
     if (u == 0.0f || u == 1.0f) {
-      return optixIgnoreIntersection();
+      ignore_intersection = true;
     }
   }
 #  endif
@@ -199,7 +201,9 @@ extern "C" __global__ void __anyhit__kernel_optix_shadow_all_hit()
   int record_index = num_hits;
   const int max_hits = optixGetPayload_3();
 
-  optixSetPayload_2(num_hits + 1);
+  if (!ignore_intersection) {
+    optixSetPayload_2(num_hits + 1);
+  }
 
   Intersection *const isect_array = get_payload_ptr_0<Intersection>();
 
@@ -218,37 +222,37 @@ extern "C" __global__ void __anyhit__kernel_optix_shadow_all_hit()
     }
 
     if (optixGetRayTmax() >= max_recorded_t) {
-      return optixIgnoreIntersection();
+      /* Accept hit, so that OptiX won't consider any more hits beyond it anymore. */
+      return;
     }
 
     record_index = max_recorded_hit;
   }
-
-  /* TODO: is there a way to shorten the ray length when max_hits is reached, so Optix
-   * can discard triangles beyond it? */
 #  endif
 
-  Intersection *const isect = isect_array + record_index;
-  isect->u = u;
-  isect->v = v;
-  isect->t = optixGetRayTmax();
-  isect->prim = prim;
-  isect->object = get_object_id();
-  isect->type = kernel_tex_fetch(__prim_type, prim);
+  if (!ignore_intersection) {
+    Intersection *const isect = isect_array + record_index;
+    isect->u = u;
+    isect->v = v;
+    isect->t = optixGetRayTmax();
+    isect->prim = prim;
+    isect->object = get_object_id();
+    isect->type = kernel_tex_fetch(__prim_type, prim);
 
 #  ifdef __TRANSPARENT_SHADOWS__
-  // Detect if this surface has a shader with transparent shadows
-  if (!shader_transparent_shadow(NULL, isect) || max_hits == 0) {
+    // Detect if this surface has a shader with transparent shadows
+    if (!shader_transparent_shadow(NULL, isect) || max_hits == 0) {
 #  endif
-    // If no transparent shadows, all light is blocked and we can stop immediately
-    optixSetPayload_5(true);
-    return optixTerminateRay();
+      // If no transparent shadows, all light is blocked and we can stop immediately
+      optixSetPayload_5(true);
+      return optixTerminateRay();
 #  ifdef __TRANSPARENT_SHADOWS__
+    }
+#  endif
   }
 
   // Continue tracing
   optixIgnoreIntersection();
-#  endif
 #endif
 }
 

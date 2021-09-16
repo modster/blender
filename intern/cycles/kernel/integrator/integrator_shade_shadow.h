@@ -23,6 +23,11 @@
 
 CCL_NAMESPACE_BEGIN
 
+ccl_device_inline bool shadow_intersections_has_remaining(const int num_hits)
+{
+  return num_hits >= INTEGRATOR_SHADOW_ISECT_SIZE;
+}
+
 #ifdef __TRANSPARENT_SHADOWS__
 ccl_device_inline float3 integrate_transparent_surface_shadow(INTEGRATOR_STATE_ARGS, const int hit)
 {
@@ -92,11 +97,6 @@ ccl_device_inline void integrate_transparent_volume_shadow(INTEGRATOR_STATE_ARGS
   volume_shadow_heterogeneous(INTEGRATOR_STATE_PASS, &ray, shadow_sd, throughput, step_size);
 }
 #  endif
-
-ccl_device_inline bool shadow_intersections_has_remaining(const int num_hits)
-{
-  return num_hits >= INTEGRATOR_SHADOW_ISECT_SIZE;
-}
 
 ccl_device_inline bool integrate_transparent_shadow(INTEGRATOR_STATE_ARGS, const int num_hits)
 {
