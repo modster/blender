@@ -1199,7 +1199,7 @@ static void drw_engines_enable_basic(void)
 
 static void drw_engine_enable_image_editor(void)
 {
-  if (DRW_engine_external_use_for_image_editor()) {
+  if (DRW_engine_external_acquire_for_image_editor()) {
     use_drw_engine(&draw_engine_external_type);
   }
   else {

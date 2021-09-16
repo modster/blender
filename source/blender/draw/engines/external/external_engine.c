@@ -296,24 +296,6 @@ static void external_draw_scene_do_v3d(void *vedata)
   }
 }
 
-/* Get render engine of the current scene.
- *
- * Note that existence of the engine does not correlate with the rendering scene of the scene:
- * the engine could be non-NULL if the scene used persistent data. Or, if the scene is just
- * beginning to render the engine might not be existing yet. */
-static RenderEngine *external_engine_get(void)
-{
-  const DRWContextState *draw_ctx = DRW_context_state_get();
-  Scene *scene = draw_ctx->scene;
-
-  Render *re = RE_GetSceneRender(scene);
-  if (re == NULL) {
-    return NULL;
-  }
-
-  return RE_engine_get(re);
-}
-
 /* Configure current matrix stack so that the external engine can use the same drawing code for
  * both viewport and image editor drawing.
  *
@@ -362,10 +344,14 @@ static void external_image_space_matrix_set(const RenderEngine *engine)
 
 static void external_draw_scene_do_image(void *UNUSED(vedata))
 {
-  RenderEngine *engine = external_engine_get();
-  if (engine == NULL) {
-    return;
-  }
+  const DRWContextState *draw_ctx = DRW_context_state_get();
+  Scene *scene = draw_ctx->scene;
+  Render *re = RE_GetSceneRender(scene);
+  RenderEngine *engine = RE_engine_get(re);
+
+  /* Is tested before enabling the drawing engine. */
+  BLI_assert(re != NULL);
+  BLI_assert(engine != NULL);
 
   const DefaultFramebufferList *dfbl = DRW_viewport_framebuffer_list_get();
 
@@ -387,7 +373,6 @@ static void external_draw_scene_do_image(void *UNUSED(vedata))
   BLI_assert(engine_type != NULL);
   BLI_assert(engine_type->draw != NULL);
 
-  const DRWContextState *draw_ctx = DRW_context_state_get();
   engine_type->draw(engine, draw_ctx->evil_C, draw_ctx->depsgraph);
 
   GPU_debug_group_end();
@@ -397,6 +382,8 @@ static void external_draw_scene_do_image(void *UNUSED(vedata))
 
   DRW_state_reset();
   GPU_bgl_end();
+
+  RE_engine_draw_release(re);
 }
 
 static void external_draw_scene_do(void *vedata)
@@ -496,10 +483,11 @@ RenderEngineType DRW_engine_viewport_external_type = {
     {NULL, NULL, NULL},
 };
 
-bool DRW_engine_external_use_for_image_editor(void)
+bool DRW_engine_external_acquire_for_image_editor(void)
 {
   const DRWContextState *draw_ctx = DRW_context_state_get();
   const SpaceLink *space_data = draw_ctx->space_data;
+  Scene *scene = draw_ctx->scene;
 
   if (space_data == NULL) {
     return false;
@@ -520,23 +508,10 @@ bool DRW_engine_external_use_for_image_editor(void)
     return false;
   }
 
-  RenderEngine *engine = external_engine_get();
-  if (engine == NULL) {
-    return false;
-  }
+  /* Render is allocated on main thread, so it is safe to access it from here. */
+  Render *re = RE_GetSceneRender(scene);
 
-  if (!RE_engine_is_rendering(engine->re)) {
-    return false;
-  }
-
-  const RenderEngineType *engine_type = engine->type;
-  BLI_assert(engine_type != NULL);
-
-  if (engine_type->draw == NULL) {
-    return false;
-  }
-
-  return true;
+  return RE_engine_draw_acquire(re);
 }
 
 #undef EXTERNAL_ENGINE

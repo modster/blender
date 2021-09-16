@@ -567,6 +567,7 @@ Render *RE_NewRender(const char *name)
     BLI_addtail(&RenderGlobal.renderlist, re);
     BLI_strncpy(re->name, name, RE_MAXNAME);
     BLI_rw_mutex_init(&re->resultmutex);
+    BLI_mutex_init(&re->engine_draw_mutex);
     BLI_mutex_init(&re->highlighted_tiles_mutex);
   }
 
@@ -631,6 +632,7 @@ void RE_FreeRender(Render *re)
   }
 
   BLI_rw_mutex_end(&re->resultmutex);
+  BLI_mutex_end(&re->engine_draw_mutex);
   BLI_mutex_end(&re->highlighted_tiles_mutex);
 
   BLI_freelistN(&re->view_layers);

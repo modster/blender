@@ -76,6 +76,7 @@ extern "C" {
 #define RE_ENGINE_DO_UPDATE 8
 #define RE_ENGINE_RENDERING 16
 #define RE_ENGINE_HIGHLIGHT_TILES 32
+#define RE_ENGINE_CAN_DRAW 64
 
 extern ListBase R_engines;
 
@@ -245,7 +246,15 @@ bool RE_engine_use_persistent_data(struct RenderEngine *engine);
 
 struct RenderEngine *RE_engine_get(const struct Render *re);
 
-bool RE_engine_is_rendering(const struct Render *re);
+/* Acquire render engine for drawing via its `draw()` callback.
+ *
+ * If drawing is not possible false is returned. If drawing is possible then the engine is
+ * "acquired" so that it can not be freed by the render pipeline.
+ *
+ * Drawing is possible if the engine has the `draw()` callback and it is in its `render()`
+ * callback. */
+bool RE_engine_draw_acquire(struct Render *re);
+void RE_engine_draw_release(struct Render *re);
 
 /* NOTE: Only used for Cycles's BLenderGPUDisplay integration with the draw manager. A subject
  * for re-consideration. Do not use this functionality. */

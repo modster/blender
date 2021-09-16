@@ -892,7 +892,15 @@ static void engine_render_view_layer(Render *re,
       DRW_render_context_enable(engine->re);
     }
 
+    BLI_mutex_lock(&engine->re->engine_draw_mutex);
+    re->engine->flag |= RE_ENGINE_CAN_DRAW;
+    BLI_mutex_unlock(&engine->re->engine_draw_mutex);
+
     engine->type->render(engine, engine->depsgraph);
+
+    BLI_mutex_lock(&engine->re->engine_draw_mutex);
+    re->engine->flag &= ~RE_ENGINE_CAN_DRAW;
+    BLI_mutex_unlock(&engine->re->engine_draw_mutex);
 
     if (use_gpu_context) {
       DRW_render_context_disable(engine->re);
@@ -1100,12 +1108,23 @@ struct RenderEngine *RE_engine_get(const Render *re)
   return re->engine;
 }
 
-bool RE_engine_is_rendering(const Render *re)
+bool RE_engine_draw_acquire(Render *re)
 {
-  if (re->engine == NULL) {
+  BLI_mutex_lock(&re->engine_draw_mutex);
+
+  RenderEngine *engine = re->engine;
+
+  if (engine == NULL || engine->type->draw == NULL || (engine->flag & RE_ENGINE_CAN_DRAW) == 0) {
+    BLI_mutex_unlock(&re->engine_draw_mutex);
     return false;
   }
-  return re->engine->flag & RE_ENGINE_RENDERING;
+
+  return true;
+}
+
+void RE_engine_draw_release(Render *re)
+{
+  BLI_mutex_unlock(&re->engine_draw_mutex);
 }
 
 /* -------------------------------------------------------------------- */
