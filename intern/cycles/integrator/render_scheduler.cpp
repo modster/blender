@@ -286,6 +286,7 @@ RenderWork RenderScheduler::get_render_work()
 
   if (done()) {
     RenderWork render_work;
+    render_work.resolution_divider = state_.resolution_divider;
 
     if (!set_postprocess_render_work(&render_work)) {
       set_full_frame_render_work(&render_work);
