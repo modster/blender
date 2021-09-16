@@ -325,6 +325,8 @@ void BlenderSession::write_render_tile()
   const string_view render_layer_name = session->get_render_tile_layer();
   const string_view render_view_name = session->get_render_tile_view();
 
+  b_engine.tile_highlight_clear_all();
+
   /* get render result */
   BL::RenderResult b_rr = b_engine.begin_result(tile_offset.x,
                                                 tile_offset.y,
@@ -351,6 +353,20 @@ void BlenderSession::write_render_tile()
   write_render_result(b_rlay);
 
   b_engine.end_result(b_rr, true, false, true);
+}
+
+void BlenderSession::update_render_tile()
+{
+  if (!session->has_multiple_render_tiles()) {
+    /* Don't highlight full-frame tile. */
+    return;
+  }
+
+  const int2 tile_offset = session->get_render_tile_offset();
+  const int2 tile_size = session->get_render_tile_size();
+
+  b_engine.tile_highlight_clear_all();
+  b_engine.tile_highlight_set(tile_offset.x, tile_offset.y, tile_size.x, tile_size.y, true);
 }
 
 void BlenderSession::full_buffer_written(string_view filename)
@@ -434,6 +450,9 @@ void BlenderSession::render(BL::Depsgraph &b_depsgraph_)
   /* TODO(sergey): Investigate whether GPUDisplay can be used for the preview as well. */
   if (b_engine.is_preview()) {
     session->update_render_tile_cb = [&]() { write_render_tile(); };
+  }
+  else {
+    session->update_render_tile_cb = [&]() { update_render_tile(); };
   }
 
   session->full_buffer_written_cb = [&](string_view filename) { full_buffer_written(filename); };

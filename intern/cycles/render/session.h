@@ -157,6 +157,8 @@ class Session {
    * Tile and tile pixels aceess.
    */
 
+  bool has_multiple_render_tiles() const;
+
   /* Get size and offset (relative to the buffer's full x/y) of the currently rendering tile. */
   int2 get_render_tile_size() const;
   int2 get_render_tile_offset() const;

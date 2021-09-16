@@ -291,6 +291,37 @@ static HighlightedTile highlighted_tile_from_result_get(Render *re, RenderResult
   return tile;
 }
 
+static void engine_tile_highlight_set(RenderEngine *engine,
+                                      const HighlightedTile *tile,
+                                      bool highlight)
+{
+  if ((engine->flag & RE_ENGINE_HIGHLIGHT_TILES) == 0) {
+    return;
+  }
+
+  Render *re = engine->re;
+
+  BLI_mutex_lock(&re->highlighted_tiles_mutex);
+
+  if (re->highlighted_tiles == NULL) {
+    re->highlighted_tiles = BLI_gset_new(
+        BLI_ghashutil_inthash_v4_p, BLI_ghashutil_inthash_v4_cmp, "highlighted tiles");
+  }
+
+  if (highlight) {
+    HighlightedTile **tile_in_set;
+    if (!BLI_gset_ensure_p_ex(re->highlighted_tiles, tile, (void ***)&tile_in_set)) {
+      *tile_in_set = MEM_mallocN(sizeof(HighlightedTile), __func__);
+      **tile_in_set = *tile;
+    }
+  }
+  else {
+    BLI_gset_remove(re->highlighted_tiles, tile, MEM_freeN);
+  }
+
+  BLI_mutex_unlock(&re->highlighted_tiles_mutex);
+}
+
 RenderResult *RE_engine_begin_result(
     RenderEngine *engine, int x, int y, int w, int h, const char *layername, const char *viewname)
 {
@@ -405,27 +436,9 @@ void RE_engine_end_result(
   re_ensure_passes_allocated_thread_safe(re);
 
   if (re->engine && (re->engine->flag & RE_ENGINE_HIGHLIGHT_TILES)) {
-    BLI_mutex_lock(&re->highlighted_tiles_mutex);
+    const HighlightedTile tile = highlighted_tile_from_result_get(re, result);
 
-    if (re->highlighted_tiles == NULL) {
-      re->highlighted_tiles = BLI_gset_new(
-          BLI_ghashutil_inthash_v4_p, BLI_ghashutil_inthash_v4_cmp, "highlighted tiles");
-    }
-
-    HighlightedTile tile = highlighted_tile_from_result_get(re, result);
-    if (highlight) {
-      void **tile_in_set;
-      if (!BLI_gset_ensure_p_ex(re->highlighted_tiles, &tile, &tile_in_set)) {
-        *tile_in_set = MEM_mallocN(sizeof(HighlightedTile), __func__);
-        memcpy(*tile_in_set, &tile, sizeof(tile));
-      }
-      BLI_gset_add(re->highlighted_tiles, &tile);
-    }
-    else {
-      BLI_gset_remove(re->highlighted_tiles, &tile, MEM_freeN);
-    }
-
-    BLI_mutex_unlock(&re->highlighted_tiles_mutex);
+    engine_tile_highlight_set(engine, &tile, highlight);
   }
 
   if (!cancel || merge_results) {
@@ -1125,6 +1138,32 @@ bool RE_engine_draw_acquire(Render *re)
 void RE_engine_draw_release(Render *re)
 {
   BLI_mutex_unlock(&re->engine_draw_mutex);
+}
+
+void RE_engine_tile_highlight_set(
+    RenderEngine *engine, int x, int y, int width, int height, bool highlight)
+{
+  HighlightedTile tile;
+  BLI_rcti_init(&tile.rect, x, x + width, y, y + height);
+
+  engine_tile_highlight_set(engine, &tile, highlight);
+}
+
+void RE_engine_tile_highlight_clear_all(RenderEngine *engine)
+{
+  if ((engine->flag & RE_ENGINE_HIGHLIGHT_TILES) == 0) {
+    return;
+  }
+
+  Render *re = engine->re;
+
+  BLI_mutex_lock(&re->highlighted_tiles_mutex);
+
+  if (re->highlighted_tiles != NULL) {
+    BLI_gset_clear(re->highlighted_tiles, MEM_freeN);
+  }
+
+  BLI_mutex_unlock(&re->highlighted_tiles_mutex);
 }
 
 /* -------------------------------------------------------------------- */

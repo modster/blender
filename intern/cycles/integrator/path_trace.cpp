@@ -544,22 +544,8 @@ void PathTrace::update_display(const RenderWork &render_work)
     return;
   }
 
-  if (!gpu_display_) {
-    /* TODO(sergey): Ideally the offline buffers update will be done using same API than the
-     * viewport GPU display. Seems to be a matter of moving pixels update API to a more abstract
-     * class and using it here instead of `GPUDisplay`. */
-    if (tile_buffer_update_cb) {
-      VLOG(3) << "Invoke buffer update callback.";
-
-      const double start_time = time_dt();
-      tile_buffer_update_cb();
-      render_scheduler_.report_display_update_time(render_work, time_dt() - start_time);
-    }
-    else {
-      VLOG(3) << "Ignore display update.";
-    }
-
-    return;
+  if (!gpu_display_ && !tile_buffer_update_cb) {
+    VLOG(3) << "Ignore display update.";
   }
 
   if (full_params_.width == 0 || full_params_.height == 0) {
@@ -567,9 +553,15 @@ void PathTrace::update_display(const RenderWork &render_work)
     return;
   }
 
-  VLOG(3) << "Perform copy to GPUDisplay work.";
-
   const double start_time = time_dt();
+
+  if (tile_buffer_update_cb) {
+    VLOG(3) << "Invoke buffer update callback.";
+
+    tile_buffer_update_cb();
+  }
+
+  VLOG(3) << "Perform copy to GPUDisplay work.";
 
   const int resolution_divider = render_work.resolution_divider;
   const int texture_width = max(1, full_params_.width / resolution_divider);

@@ -820,6 +820,22 @@ static void rna_def_render_engine(BlenderRNA *brna)
   func = RNA_def_function(srna, "free_blender_memory", "RE_engine_free_blender_memory");
   RNA_def_function_ui_description(func, "Free Blender side memory of render engine");
 
+  func = RNA_def_function(srna, "tile_highlight_set", "RE_engine_tile_highlight_set");
+  RNA_def_function_ui_description(func, "Set highlighted state of the given tile");
+  parm = RNA_def_int(func, "x", 0, 0, INT_MAX, "X", "", 0, INT_MAX);
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+  parm = RNA_def_int(func, "y", 0, 0, INT_MAX, "Y", "", 0, INT_MAX);
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+  parm = RNA_def_int(func, "width", 0, 0, INT_MAX, "Width", "", 0, INT_MAX);
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+  parm = RNA_def_int(func, "height", 0, 0, INT_MAX, "Height", "", 0, INT_MAX);
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+  parm = RNA_def_boolean(func, "highlight", 0, "Highlight", "");
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+
+  func = RNA_def_function(srna, "tile_highlight_clear_all", "RE_engine_tile_highlight_clear_all");
+  RNA_def_function_ui_description(func, "Clear highlight from all tiles");
+
   RNA_define_verify_sdna(0);
 
   prop = RNA_def_property(srna, "is_animation", PROP_BOOLEAN, PROP_NONE);

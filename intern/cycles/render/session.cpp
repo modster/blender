@@ -615,6 +615,11 @@ void Session::collect_statistics(RenderStats *render_stats)
  * Tile and tile pixels aceess.
  */
 
+bool Session::has_multiple_render_tiles() const
+{
+  return tile_manager_.has_multiple_tiles();
+}
+
 int2 Session::get_render_tile_size() const
 {
   return path_trace_->get_render_tile_size();

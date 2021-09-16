@@ -72,6 +72,8 @@ class BlenderSession {
   void write_render_result(BL::RenderLayer &b_rlay);
   void write_render_tile();
 
+  void update_render_tile();
+
   void full_buffer_written(string_view filename);
 
   /* update functions are used to update display buffer only after sample was rendered

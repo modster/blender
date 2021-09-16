@@ -286,6 +286,10 @@ void RE_bake_engine_set_engine_parameters(struct Render *re,
 
 void RE_engine_free_blender_memory(struct RenderEngine *engine);
 
+void RE_engine_tile_highlight_set(
+    struct RenderEngine *engine, int x, int y, int width, int height, bool highlight);
+void RE_engine_tile_highlight_clear_all(struct RenderEngine *engine);
+
 #ifdef __cplusplus
 }
 #endif
