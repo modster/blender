@@ -35,6 +35,7 @@
 
 #include "BLI_listbase.h"
 #include "BLI_math.h"
+#include "BLI_ghash.h"
 
 #ifdef WITH_BULLET
 #  include "RBI_api.h"
@@ -2201,7 +2202,7 @@ static void rigidbody_debug_draw_get_colliding_face(Object *ob, const float poin
     }
 }
 
-static void rigidbody_get_debug_draw_data(RigidBodyWorld *rbw, float substep, bool is_last_substep) {
+static void rigidbody_get_debug_draw_data(RigidBodyWorld *rbw, float substep, GHash *norm_forces_magnitudes, bool is_last_substep) {
     /*Loop through all rigid bodies and get the forces being applied in the substep (for drawing debug info).
      * Store average force acting on objects during all substeps.
      * We store the average of the forces and not the forces themselves, because storing forces
@@ -2216,6 +2217,7 @@ static void rigidbody_get_debug_draw_data(RigidBodyWorld *rbw, float substep, bo
       float vec_locations[3][3] = {{0.0f}};
 
       Object *ob = rbw->objects[j];
+      float *norm_forces_mag = (float *)BLI_ghash_lookup(norm_forces_magnitudes, ob);
       if (ob->rigidbody_object != NULL) {
         rbRigidBody *rbo = (rbRigidBody *)(ob->rigidbody_object->shared->physics_object);
 
@@ -2250,6 +2252,7 @@ static void rigidbody_get_debug_draw_data(RigidBodyWorld *rbw, float substep, bo
                if (norm_flag || fric_flag) {
 
                 mul_v3_fl(norm_forces[k], 1/num_substeps);
+                norm_forces_mag[k] += len_v3(norm_forces[k]);
                 add_v3_v3(ob->rigidbody_object->norm_forces[k].vector, norm_forces[k]);
                 mul_v3_fl(vec_locations[k], len_v3(norm_forces[k]));
                 add_v3_v3(ob->rigidbody_object->vec_locations[k].vector, vec_locations[k]);
@@ -2260,13 +2263,12 @@ static void rigidbody_get_debug_draw_data(RigidBodyWorld *rbw, float substep, bo
               }
 
               if(is_last_substep) {
-                  if(fabsf(len_v3(ob->rigidbody_object->norm_forces[k].vector))>0.0f) {
-                    mul_v3_fl(ob->rigidbody_object->vec_locations[k].vector, (1.0f/(float)(len_v3(ob->rigidbody_object->norm_forces[k].vector))));
+                  if(norm_forces_mag[k]>0.0f) {
+                    mul_v3_fl(ob->rigidbody_object->vec_locations[k].vector, (1.0f/norm_forces_mag[k]));
                   }
                   else {
                       zero_v3(ob->rigidbody_object->vec_locations[k].vector);
                   }
-
               }
           }
         }
@@ -2495,7 +2497,9 @@ void BKE_rigidbody_do_simulation(Depsgraph *depsgraph, Scene *scene, float ctime
 
     const float interp_step = 1.0f / rbw->substeps_per_frame;
     float cur_interp_val = interp_step;
-
+    printf("woo\n");
+    GHash *norm_forces_magnitudes = BLI_ghash_ptr_new(__func__);
+    printf("woo1\n");
     /* Set all contact forces and their locations to zero. (for drawing debug info) */
     for (int i = 0; i < rbw->numbodies; i++) {
         Object *ob = rbw->objects[i];
@@ -2505,6 +2509,14 @@ void BKE_rigidbody_do_simulation(Depsgraph *depsgraph, Scene *scene, float ctime
           zero_v3(ob->rigidbody_object->fric_forces[j].vector);
           ob->rigidbody_object->colliding_faces[j] = -1;
         }
+        if((ob->rigidbody_object->display_force_types & RB_SIM_NORMAL) ||
+            (ob->rigidbody_object->display_force_types & RB_SIM_FRICTION) ||
+               (ob->rigidbody_object->sim_display_options & RB_SIM_COLLISIONS)) {
+          printf("woo2\n");
+          float *arr = MEM_callocN(sizeof(float) * 3 ,__func__);
+          BLI_ghash_insert(norm_forces_magnitudes, ob, arr);
+          printf("w003\n");
+        }
     }
 
     for (int i = 0; i < rbw->substeps_per_frame; i++) {
@@ -2513,11 +2525,20 @@ void BKE_rigidbody_do_simulation(Depsgraph *depsgraph, Scene *scene, float ctime
       cur_interp_val += interp_step;
 
       if(i == rbw->substeps_per_frame-1) {
-        rigidbody_get_debug_draw_data(rbw, substep, true);
+        rigidbody_get_debug_draw_data(rbw, substep, norm_forces_magnitudes, true);
       }
       else {
-        rigidbody_get_debug_draw_data(rbw, substep, false);
+        rigidbody_get_debug_draw_data(rbw, substep, norm_forces_magnitudes, false);
       }
+    }
+
+    if (norm_forces_magnitudes) {
+      GHashIterator gh_iter;
+      GHASH_ITER(gh_iter, norm_forces_magnitudes) {
+        float *arr = BLI_ghashIterator_getValue(&gh_iter);
+        MEM_SAFE_FREE(arr);
+      }
+      BLI_ghash_free(norm_forces_magnitudes, NULL, NULL);
     }
 
     rigidbody_free_substep_data(&substep_targets);
