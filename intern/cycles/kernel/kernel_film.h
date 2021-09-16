@@ -62,7 +62,7 @@ ccl_device_inline float film_get_scale_exposure(const KernelFilmConvert *ccl_res
   return scale;
 }
 
-ccl_device_inline void film_get_scale_and_scale_exposure(
+ccl_device_inline bool film_get_scale_and_scale_exposure(
     const KernelFilmConvert *ccl_restrict kfilm_convert,
     ccl_global const float *ccl_restrict buffer,
     float *ccl_restrict scale,
@@ -71,11 +71,17 @@ ccl_device_inline void film_get_scale_and_scale_exposure(
   if (kfilm_convert->pass_sample_count == PASS_UNUSED) {
     *scale = kfilm_convert->scale;
     *scale_exposure = kfilm_convert->scale_exposure;
-    return;
+    return true;
+  }
+
+  const uint sample_count = *((const uint *)(buffer + kfilm_convert->pass_sample_count));
+  if (!sample_count) {
+    *scale = 0.0f;
+    *scale_exposure = 0.0f;
+    return false;
   }
 
   if (kfilm_convert->pass_use_filter) {
-    const uint sample_count = *((const uint *)(buffer + kfilm_convert->pass_sample_count));
     *scale = 1.0f / sample_count;
   }
   else {
@@ -88,6 +94,8 @@ ccl_device_inline void film_get_scale_and_scale_exposure(
   else {
     *scale_exposure = *scale;
   }
+
+  return true;
 }
 
 /* --------------------------------------------------------------------
@@ -303,8 +311,28 @@ ccl_device_inline void film_get_pass_pixel_combined(const KernelFilmConvert *ccl
   kernel_assert(kfilm_convert->num_components == 4);
 
   /* 3rd channel contains transparency = 1 - alpha for the combined pass. */
-  film_get_pass_pixel_float4(kfilm_convert, buffer, pixel);
-  pixel[3] = film_transparency_to_alpha(pixel[3]);
+
+  kernel_assert(kfilm_convert->num_components == 4);
+  kernel_assert(kfilm_convert->pass_offset != PASS_UNUSED);
+
+  float scale, scale_exposure;
+  if (!film_get_scale_and_scale_exposure(kfilm_convert, buffer, &scale, &scale_exposure)) {
+    pixel[0] = 0.0f;
+    pixel[1] = 0.0f;
+    pixel[2] = 0.0f;
+    pixel[3] = 0.0f;
+    return;
+  }
+
+  const float *in = buffer + kfilm_convert->pass_offset;
+
+  const float3 color = make_float3(in[0], in[1], in[2]) * scale_exposure;
+  const float alpha = in[3] * scale;
+
+  pixel[0] = color.x;
+  pixel[1] = color.y;
+  pixel[2] = color.z;
+  pixel[3] = film_transparency_to_alpha(alpha);
 }
 
 /* --------------------------------------------------------------------
@@ -417,7 +445,9 @@ ccl_device_inline float4 film_calculate_shadow_catcher_matte_with_shadow(
   kernel_assert(kfilm_convert->pass_shadow_catcher_matte != PASS_UNUSED);
 
   float scale, scale_exposure;
-  film_get_scale_and_scale_exposure(kfilm_convert, buffer, &scale, &scale_exposure);
+  if (!film_get_scale_and_scale_exposure(kfilm_convert, buffer, &scale, &scale_exposure)) {
+    return make_float4(0.0f, 0.0f, 0.0f, 0.0f);
+  }
 
   ccl_global const float *in_matte = buffer + kfilm_convert->pass_shadow_catcher_matte;
 
