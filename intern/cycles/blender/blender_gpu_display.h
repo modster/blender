@@ -170,8 +170,8 @@ class BlenderGPUDisplay : public GPUDisplay {
      * pixels to it.
      *
      * NOTE: Allocated on the engine's context. */
-    uint gl_id_ = 0;
-    uint gl_pbo_id_ = 0;
+    uint gl_id = 0;
+    uint gl_pbo_id = 0;
 
     /* Is true when new data was written to the PBO, meaning, the texture might need to be resized
      * and new data is to be uploaded to the GPU. */

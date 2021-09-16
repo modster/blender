@@ -319,7 +319,7 @@ bool BlenderGPUDisplay::do_update_begin(const GPUDisplayParams &params,
   /* Update texture dimensions if needed. */
   if (texture_.width != texture_width || texture_.height != texture_height) {
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, texture_.gl_id_);
+    glBindTexture(GL_TEXTURE_2D, texture_.gl_id);
     glTexImage2D(
         GL_TEXTURE_2D, 0, GL_RGBA16F, texture_width, texture_height, 0, GL_RGBA, GL_HALF_FLOAT, 0);
     texture_.width = texture_width;
@@ -340,7 +340,7 @@ bool BlenderGPUDisplay::do_update_begin(const GPUDisplayParams &params,
   const int buffer_height = params.full_size.y;
   if (texture_.buffer_width != buffer_width || texture_.buffer_height != buffer_height) {
     const size_t size_in_bytes = sizeof(half4) * buffer_width * buffer_height;
-    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, texture_.gl_pbo_id_);
+    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, texture_.gl_pbo_id);
     glBufferData(GL_PIXEL_UNPACK_BUFFER, size_in_bytes, 0, GL_DYNAMIC_DRAW);
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 
@@ -405,7 +405,7 @@ void BlenderGPUDisplay::do_copy_pixels_to_texture(
 
 half4 *BlenderGPUDisplay::do_map_texture_buffer()
 {
-  glBindBuffer(GL_PIXEL_UNPACK_BUFFER, texture_.gl_pbo_id_);
+  glBindBuffer(GL_PIXEL_UNPACK_BUFFER, texture_.gl_pbo_id);
 
   half4 *mapped_rgba_pixels = reinterpret_cast<half4 *>(
       glMapBuffer(GL_PIXEL_UNPACK_BUFFER, GL_WRITE_ONLY));
@@ -433,7 +433,7 @@ DeviceGraphicsInteropDestination BlenderGPUDisplay::do_graphics_interop_get()
 
   interop_dst.buffer_width = texture_.buffer_width;
   interop_dst.buffer_height = texture_.buffer_height;
-  interop_dst.opengl_pbo_id = texture_.gl_pbo_id_;
+  interop_dst.opengl_pbo_id = texture_.gl_pbo_id;
 
   return interop_dst;
 }
@@ -475,7 +475,7 @@ void BlenderGPUDisplay::do_draw(const GPUDisplayParams &params)
   display_shader_->bind(params.full_size.x, params.full_size.y);
 
   glActiveTexture(GL_TEXTURE0);
-  glBindTexture(GL_TEXTURE_2D, texture_.gl_id_);
+  glBindTexture(GL_TEXTURE_2D, texture_.gl_id);
 
   glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer_);
 
@@ -594,7 +594,7 @@ void BlenderGPUDisplay::gl_context_dispose()
 
 bool BlenderGPUDisplay::gl_draw_resources_ensure()
 {
-  if (!texture_.gl_id_) {
+  if (!texture_.gl_id) {
     /* If there is no texture allocated, there is nothing to draw. Inform the draw call that it can
      * can not continue. Note that this is not an unrecoverable error, so once the texture is known
      * we will come back here and create all the GPU resources needed for draw. */
@@ -627,14 +627,14 @@ void BlenderGPUDisplay::gl_resources_destroy()
     glDeleteBuffers(1, &vertex_buffer_);
   }
 
-  if (texture_.gl_pbo_id_) {
-    glDeleteBuffers(1, &texture_.gl_pbo_id_);
-    texture_.gl_pbo_id_ = 0;
+  if (texture_.gl_pbo_id) {
+    glDeleteBuffers(1, &texture_.gl_pbo_id);
+    texture_.gl_pbo_id = 0;
   }
 
-  if (texture_.gl_id_) {
-    glDeleteTextures(1, &texture_.gl_id_);
-    texture_.gl_id_ = 0;
+  if (texture_.gl_id) {
+    glDeleteTextures(1, &texture_.gl_id);
+    texture_.gl_id = 0;
   }
 
   gl_context_disable();
@@ -649,26 +649,26 @@ bool BlenderGPUDisplay::gl_texture_resources_ensure()
   }
   texture_.creation_attempted = true;
 
-  DCHECK(!texture_.gl_id_);
-  DCHECK(!texture_.gl_pbo_id_);
+  DCHECK(!texture_.gl_id);
+  DCHECK(!texture_.gl_pbo_id);
 
   /* Create texture. */
-  glGenTextures(1, &texture_.gl_id_);
-  if (!texture_.gl_id_) {
+  glGenTextures(1, &texture_.gl_id);
+  if (!texture_.gl_id) {
     LOG(ERROR) << "Error creating texture.";
     return false;
   }
 
   /* Configure the texture. */
   glActiveTexture(GL_TEXTURE0);
-  glBindTexture(GL_TEXTURE_2D, texture_.gl_id_);
+  glBindTexture(GL_TEXTURE_2D, texture_.gl_id);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   glBindTexture(GL_TEXTURE_2D, 0);
 
   /* Create PBO for the texture. */
-  glGenBuffers(1, &texture_.gl_pbo_id_);
-  if (!texture_.gl_pbo_id_) {
+  glGenBuffers(1, &texture_.gl_pbo_id);
+  if (!texture_.gl_pbo_id) {
     LOG(ERROR) << "Error creating texture pixel buffer object.";
     return false;
   }
@@ -685,7 +685,7 @@ void BlenderGPUDisplay::texture_update_if_needed()
     return;
   }
 
-  glBindBuffer(GL_PIXEL_UNPACK_BUFFER, texture_.gl_pbo_id_);
+  glBindBuffer(GL_PIXEL_UNPACK_BUFFER, texture_.gl_pbo_id);
   glTexSubImage2D(
       GL_TEXTURE_2D, 0, 0, 0, texture_.width, texture_.height, GL_RGBA, GL_HALF_FLOAT, 0);
   glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
