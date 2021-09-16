@@ -268,6 +268,8 @@ void BKE_scene_cursor_from_mat4(struct View3DCursor *cursor,
  */
 void BKE_scene_eval_sequencer_sequences(struct Depsgraph *depsgraph, struct Scene *scene);
 
+void BKE_scene_eval_compositor_nodetree(struct Depsgraph *depsgraph, struct Scene *scene);
+
 #ifdef __cplusplus
 }
 #endif

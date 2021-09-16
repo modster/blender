@@ -25,6 +25,8 @@
 
 #include "DNA_scene_types.h"
 
+#include "BKE_scene.h"
+
 namespace blender::deg {
 
 void DepsgraphNodeBuilder::build_scene_render(Scene *scene, ViewLayer *view_layer)
@@ -84,6 +86,14 @@ void DepsgraphNodeBuilder::build_scene_compositor(Scene *scene)
   if (scene->nodetree == nullptr) {
     return;
   }
+  Scene *scene_cow = get_cow_datablock(scene);
+  add_operation_node(&scene->id,
+                     NodeType::SHADING,
+                     OperationCode::COMPOSITOR_EVAL,
+                     [scene_cow](::Depsgraph *depsgraph) {
+                       BKE_scene_eval_compositor_nodetree(depsgraph, scene_cow);
+                     });
+
   build_nodetree(scene->nodetree);
 }
 

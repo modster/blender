@@ -3841,3 +3841,9 @@ void BKE_scene_eval_sequencer_sequences(Depsgraph *depsgraph, Scene *scene)
   SEQ_edit_update_muting(scene->ed);
   SEQ_sound_update_bounds_all(scene);
 }
+
+void BKE_scene_eval_compositor_nodetree(struct Depsgraph *depsgraph, Scene *scene)
+{
+  DEG_debug_print_eval(depsgraph, __func__, scene->id.name, scene);
+  GPU_material_free(&scene->gpumaterial);
+}

@@ -198,8 +198,10 @@ enum class OperationCode {
   GENERIC_DATABLOCK_UPDATE,
 
   /* Sequencer. ----------------------------------------------------------- */
-
   SEQUENCES_EVAL,
+
+  /* Sequencer. ----------------------------------------------------------- */
+  COMPOSITOR_EVAL,
 
   /* Duplication/instancing system. --------------------------------------- */
   DUPLI,
