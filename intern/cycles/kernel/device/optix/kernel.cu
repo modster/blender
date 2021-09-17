@@ -222,7 +222,8 @@ extern "C" __global__ void __anyhit__kernel_optix_shadow_all_hit()
     }
 
     if (optixGetRayTmax() >= max_recorded_t) {
-      /* Accept hit, so that OptiX won't consider any more hits beyond it anymore. */
+      /* Accept hit, so that OptiX won't consider any more hits beyond the distance of the current
+       * hit anymore. */
       return;
     }
 
