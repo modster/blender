@@ -309,7 +309,9 @@ bool BlenderGPUDisplay::do_update_begin(const GPUDisplayParams &params,
     return false;
   }
 
-  glWaitSync((GLsync)gl_render_sync_, 0, GL_TIMEOUT_IGNORED);
+  if (gl_render_sync_) {
+    glWaitSync((GLsync)gl_render_sync_, 0, GL_TIMEOUT_IGNORED);
+  }
 
   if (!gl_texture_resources_ensure()) {
     gl_context_disable();
@@ -492,7 +494,9 @@ void BlenderGPUDisplay::do_draw(const GPUDisplayParams &params)
     gl_context_mutex_.lock();
   }
 
-  glWaitSync((GLsync)gl_upload_sync_, 0, GL_TIMEOUT_IGNORED);
+  if (gl_upload_sync_) {
+    glWaitSync((GLsync)gl_upload_sync_, 0, GL_TIMEOUT_IGNORED);
+  }
 
   if (transparent) {
     glEnable(GL_BLEND);
