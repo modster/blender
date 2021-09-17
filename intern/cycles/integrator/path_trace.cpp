@@ -524,7 +524,9 @@ void PathTrace::set_gpu_display(unique_ptr<GPUDisplay> gpu_display)
 
 void PathTrace::clear_gpu_display()
 {
-  gpu_display_->clear();
+  if (gpu_display_) {
+    gpu_display_->clear();
+  }
 }
 
 void PathTrace::draw()
