@@ -511,6 +511,10 @@ bool DRW_engine_external_acquire_for_image_editor(void)
   /* Render is allocated on main thread, so it is safe to access it from here. */
   Render *re = RE_GetSceneRender(scene);
 
+  if (re == NULL) {
+    return false;
+  }
+
   return RE_engine_draw_acquire(re);
 }
 
