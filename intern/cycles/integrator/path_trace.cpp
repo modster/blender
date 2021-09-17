@@ -807,6 +807,13 @@ void PathTrace::progress_update_if_needed(const RenderWork &render_work)
   }
 }
 
+void PathTrace::progress_set_status(const string &status, const string &substatus)
+{
+  if (progress_ != nullptr) {
+    progress_->set_status(status, substatus);
+  }
+}
+
 void PathTrace::copy_to_render_buffers(RenderBuffers *render_buffers)
 {
   tbb::parallel_for_each(path_trace_works_,
@@ -846,9 +853,29 @@ bool PathTrace::copy_render_tile_from_device()
   return success;
 }
 
+static string get_layer_view_name(const RenderBuffers &buffers)
+{
+  string result;
+
+  if (buffers.params.layer.size()) {
+    result += string(buffers.params.layer);
+  }
+
+  if (buffers.params.view.size()) {
+    if (!result.empty()) {
+      result += ", ";
+    }
+    result += string(buffers.params.view);
+  }
+
+  return result;
+}
+
 void PathTrace::process_full_buffer_from_disk(string_view filename)
 {
   VLOG(3) << "Processing full frame buffer file " << filename;
+
+  progress_set_status("Reading full buffer from disk");
 
   RenderBuffers full_frame_buffers(cpu_device_.get());
 
@@ -858,9 +885,13 @@ void PathTrace::process_full_buffer_from_disk(string_view filename)
     return;
   }
 
+  const string layer_view_name = get_layer_view_name(full_frame_buffers);
+
   render_state_.has_denoised_result = false;
 
   if (denoise_params.use) {
+    progress_set_status(layer_view_name, "Denoising");
+
     /* Re-use the denoiser as much as possible, avoiding possible device re-initialization.
      *
      * It will not conflict with the regular rendering as:
@@ -876,6 +907,8 @@ void PathTrace::process_full_buffer_from_disk(string_view filename)
   }
 
   full_frame_state_.render_buffers = &full_frame_buffers;
+
+  progress_set_status(layer_view_name, "Finishing");
 
   /* Write the full result pretending that there is a single tile.
    * Requires some state change, but allows to use same communication API with the software. */

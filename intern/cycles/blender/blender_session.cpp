@@ -553,6 +553,11 @@ void BlenderSession::render(BL::Depsgraph &b_depsgraph_)
 
 void BlenderSession::render_frame_finish()
 {
+  /* Processing of all layers and views is done. Clear the strings so that we can communicate
+   * progress about reading files and denoising them. */
+  b_rlay_name = "";
+  b_rview_name = "";
+
   if (!b_render.use_persistent_data()) {
     /* Free the sync object so that it can properly dereference nodes from the scene graph before
      * the graph is freed. */

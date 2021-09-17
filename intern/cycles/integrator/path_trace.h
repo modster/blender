@@ -238,6 +238,8 @@ class PathTrace {
   /* Run the progress_update_cb callback if it is needed. */
   void progress_update_if_needed(const RenderWork &render_work);
 
+  void progress_set_status(const string &status, const string &substatus = "");
+
   /* Pointer to a device which is configured to be used for path tracing. If multiple devices
    * are configured this is a `MultiDevice`. */
   Device *device_ = nullptr;
