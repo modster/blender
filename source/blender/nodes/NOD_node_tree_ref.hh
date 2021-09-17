@@ -181,6 +181,7 @@ class NodeRef : NonCopyable, NonMovable {
 
   Span<const InputSocketRef *> inputs() const;
   Span<const OutputSocketRef *> outputs() const;
+  Span<const SocketRef *> inputs_or_outputs(bool get_inputs) const;
   Span<const InternalLinkRef *> internal_links() const;
 
   const InputSocketRef &input(int index) const;
@@ -494,6 +495,12 @@ inline Span<const InputSocketRef *> NodeRef::inputs() const
 inline Span<const OutputSocketRef *> NodeRef::outputs() const
 {
   return outputs_;
+}
+
+inline Span<const SocketRef *> NodeRef::inputs_or_outputs(bool get_inputs) const
+{
+  return get_inputs ? inputs_.as_span().cast<const SocketRef *>() :
+                      outputs_.as_span().cast<const SocketRef *>();
 }
 
 inline Span<const InternalLinkRef *> NodeRef::internal_links() const

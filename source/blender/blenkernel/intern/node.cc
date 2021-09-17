@@ -96,6 +96,12 @@
 
 #define NODE_DEFAULT_MAX_WIDTH 700
 
+using blender::Array;
+using blender::Span;
+using blender::Stack;
+using blender::Vector;
+using namespace blender::nodes::node_tree_ref_types;
+
 /* Fallback types for undefined tree, nodes, sockets */
 static bNodeTreeType NodeTreeTypeUndefined;
 bNodeType NodeTypeUndefined;
@@ -3950,6 +3956,9 @@ NodeDeclarationHandle *nodeDeclarationEnsure(bNodeTree *UNUSED(ntree), bNode *no
   if (node->typeinfo->declare == nullptr) {
     return nullptr;
   }
+  if (node->declaration != nullptr) {
+    return node->declaration;
+  }
 
   node->declaration = new blender::nodes::NodeDeclaration();
   blender::nodes::NodeDeclarationBuilder builder{*node->declaration};
@@ -4469,6 +4478,55 @@ void ntreeUpdateAllUsers(Main *main, ID *id)
   }
 }
 
+static bool is_field_socket_type(eNodeSocketDatatype type)
+{
+  return ELEM(type, SOCK_FLOAT, SOCK_INT, SOCK_BOOLEAN, SOCK_VECTOR, SOCK_RGBA);
+}
+
+static bool sockets_have_links(blender::Span<const SocketRef *> sockets)
+{
+  for (const SocketRef *socket : sockets) {
+    if (!socket->directly_linked_links().is_empty()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static Vector<const NodeRef *> toposort_nodes(const NodeTreeRef &tree, bool left_to_right = true)
+{
+  Vector<const NodeRef *> toposort;
+  toposort.reserve(tree.nodes().size());
+  Array<bool> node_is_pushed_by_id(tree.nodes().size(), false);
+  Stack<const NodeRef *> nodes_to_check;
+
+  for (const NodeRef *node : tree.nodes()) {
+    if (!sockets_have_links(node->inputs_or_outputs(!left_to_right))) {
+      node_is_pushed_by_id[node->id()] = true;
+      nodes_to_check.push(node);
+    }
+  }
+
+  while (!nodes_to_check.is_empty()) {
+    const NodeRef *node = nodes_to_check.pop();
+    toposort.append(node);
+
+    for (const SocketRef *input_socket : node->inputs_or_outputs(left_to_right)) {
+      for (const SocketRef *linked_socket : input_socket->directly_linked_sockets()) {
+        const NodeRef &linked_node = linked_socket->node();
+        const int linked_node_id = linked_node.id();
+        if (!node_is_pushed_by_id[linked_node_id]) {
+          node_is_pushed_by_id[linked_node_id] = true;
+          nodes_to_check.push(&linked_node);
+        }
+      }
+    }
+  }
+
+  toposort.as_mutable_span().reverse();
+  return toposort;
+}
+
 static void update_socket_shapes_for_fields(bNodeTree &btree)
 {
   using namespace blender;
@@ -4478,93 +4536,128 @@ static void update_socket_shapes_for_fields(bNodeTree &btree)
   }
 
   NodeTreeRef tree{&btree};
-  Vector<const NodeRef *> input_nodes;
-  Vector<const NodeRef *> output_nodes;
+  Vector<const NodeRef *> toposort_left_to_right = toposort_nodes(tree, true);
+  Vector<const NodeRef *> toposort_right_to_left = toposort_nodes(tree, false);
 
-  for (const NodeRef *node : tree.nodes()) {
-    if (node->inputs().is_empty()) {
-      input_nodes.append(node);
+  struct SocketFieldState {
+    bool requires_single = false;
+    bool is_field = false;
+    bool is_field_source = false;
+  };
+
+  Array<SocketFieldState> field_state_by_socket_id(tree.sockets().size());
+
+  auto check_if_node_is_fixed = [](const NodeRef &node) {
+    const StringRef node_idname = node.idname();
+    return node_idname.startswith("GeometryNode");
+  };
+
+  auto has_field_dependency = [&](const OutputSocketRef &output_socket,
+                                  const InputSocketRef &input_socket) {
+    if (!is_field_socket_type((eNodeSocketDatatype)output_socket.typeinfo()->type)) {
+      return false;
     }
-    if (node->outputs().is_empty()) {
-      output_nodes.append(node);
+    if (!is_field_socket_type((eNodeSocketDatatype)input_socket.typeinfo()->type)) {
+      return false;
     }
-  }
+    return true;
+  };
 
-  Array<int> field_level_by_node_id(tree.nodes().size(), 0);
-  Array<int> field_level_by_socket_id(tree.sockets().size(), 0);
-  Array<bool> node_is_enqueued_by_id(tree.nodes().size(), false);
-  std::queue<const NodeRef *> nodes_to_check;
+  for (const NodeRef *node : toposort_left_to_right) {
+    NodeDeclaration *node_decl = nodeDeclarationEnsure(&btree, node->bnode());
 
-  for (const NodeRef *node : input_nodes) {
-    nodes_to_check.push(node);
-    node_is_enqueued_by_id[node->id()] = true;
-  }
+    const bool node_is_fixed = check_if_node_is_fixed(*node);
 
-  while (!nodes_to_check.empty()) {
-    const NodeRef &node = *nodes_to_check.front();
-    nodes_to_check.pop();
-    NodeDeclaration *node_decl = nodeDeclarationEnsure(&btree, node.bnode());
-
-    int max_node_field_level = 0;
-    StringRef node_idname = node.idname();
-    if (node_idname.startswith("ShaderNode") || node_idname.startswith("FunctionNode")) {
-      max_node_field_level = 1;
-    }
-
-    int node_field_level = 0;
-    for (const SocketRef *input_socket : node.inputs()) {
-      const int input_index = input_socket->index();
-      int normal_input_field_level = 0;
+    auto input_supports_field = [&](const InputSocketRef &socket) {
+      if (!node_is_fixed) {
+        return true;
+      }
       if (node_decl != nullptr) {
-        const SocketDeclaration &socket_decl = *node_decl->inputs()[input_index];
-        normal_input_field_level = socket_decl.is_field();
+        const SocketDeclaration &socket_decl = *node_decl->inputs()[socket.index()];
+        return socket_decl.is_field();
       }
+      return false;
+    };
 
-      int input_field_level = normal_input_field_level;
-      for (const SocketRef *origin_socket : input_socket->directly_linked_sockets()) {
-        const int origin_field_level = field_level_by_socket_id[origin_socket->id()];
-        input_field_level = std::max(input_field_level, origin_field_level);
-      }
-
-      const int field_level_increase = input_field_level - normal_input_field_level;
-      node_field_level = std::min(max_node_field_level,
-                                  std::max(node_field_level, field_level_increase));
-
-      field_level_by_socket_id[input_socket->id()] = input_field_level;
-    }
-
-    for (const SocketRef *output_socket : node.outputs()) {
-      const int output_index = output_socket->index();
-      int normal_output_field_level = 0;
-      if (node_decl != nullptr) {
-        const SocketDeclaration &socket_decl = *node_decl->outputs()[output_index];
-        normal_output_field_level = socket_decl.is_field();
-      }
-
-      const int output_field_level = normal_output_field_level + node_field_level;
-      field_level_by_socket_id[output_socket->id()] = output_field_level;
-
-      for (const SocketRef *target_socket : output_socket->directly_linked_sockets()) {
-        const NodeRef &target_node = target_socket->node();
-        if (!node_is_enqueued_by_id[target_node.id()]) {
-          nodes_to_check.push(&target_node);
-          node_is_enqueued_by_id[target_node.id()] = true;
+    for (const InputSocketRef *input_socket : node->inputs()) {
+      bool is_field = false;
+      if (input_supports_field(*input_socket)) {
+        for (const SocketRef *origin_socket : input_socket->directly_linked_sockets()) {
+          is_field |= field_state_by_socket_id[origin_socket->id()].is_field;
         }
       }
+      field_state_by_socket_id[input_socket->id()].is_field = is_field;
     }
 
-    std::cout << node.name() << ": " << node_field_level << "\n";
+    for (const OutputSocketRef *output_socket : node->outputs()) {
+      const int output_index = output_socket->index();
+
+      bool output_is_field = false;
+
+      if (node_decl != nullptr) {
+        const SocketDeclaration &socket_decl = *node_decl->outputs()[output_index];
+        output_is_field = socket_decl.is_field();
+        field_state_by_socket_id[output_index].is_field_source = true;
+      }
+
+      if (!output_is_field) {
+        for (const InputSocketRef *input_socket : node->inputs()) {
+          if (has_field_dependency(*output_socket, *input_socket)) {
+            output_is_field |= field_state_by_socket_id[input_socket->id()].is_field;
+          }
+        }
+      }
+      field_state_by_socket_id[output_socket->id()].is_field = output_is_field;
+    }
   }
-  std::cout << "\n";
+
+  for (const NodeRef *node : toposort_right_to_left) {
+    NodeDeclaration *node_decl = nodeDeclarationEnsure(&btree, node->bnode());
+
+    const bool node_is_fixed = check_if_node_is_fixed(*node);
+
+    for (const OutputSocketRef *output_socket : node->outputs()) {
+      bool requires_single = false;
+      if (node_decl != nullptr && node_is_fixed) {
+        const SocketDeclaration &socket_decl = *node_decl->outputs()[output_socket->index()];
+        requires_single = !socket_decl.is_field();
+      }
+      for (const InputSocketRef *target_socket : output_socket->directly_linked_sockets()) {
+        requires_single |= field_state_by_socket_id[target_socket->id()].requires_single;
+      }
+      field_state_by_socket_id[output_socket->id()].requires_single = requires_single;
+    }
+    for (const InputSocketRef *input_socket : node->inputs()) {
+      bool requires_single = false;
+      if (node_decl != nullptr && node_is_fixed) {
+        const SocketDeclaration &socket_decl = *node_decl->inputs()[input_socket->index()];
+        requires_single = !socket_decl.is_field();
+      }
+      if (!requires_single) {
+        for (const OutputSocketRef *output_socket : node->outputs()) {
+          if (has_field_dependency(*output_socket, *input_socket)) {
+            requires_single |= field_state_by_socket_id[output_socket->id()].requires_single;
+          }
+        }
+      }
+      field_state_by_socket_id[input_socket->id()].requires_single = requires_single;
+    }
+  }
 
   for (const SocketRef *socket : tree.sockets()) {
     bNodeSocket *bsocket = socket->bsocket();
-    const int field_level = field_level_by_socket_id[socket->id()];
-    if (field_level == 0) {
-      bsocket->display_shape = SOCK_DISPLAY_SHAPE_CIRCLE;
-    }
-    else if (field_level == 1) {
+    SocketFieldState &state = field_state_by_socket_id[socket->id()];
+    if (state.is_field_source) {
       bsocket->display_shape = SOCK_DISPLAY_SHAPE_DIAMOND;
+    }
+    else if (state.requires_single) {
+      bsocket->display_shape = SOCK_DISPLAY_SHAPE_CIRCLE_DOT;
+    }
+    else if (state.is_field) {
+      bsocket->display_shape = SOCK_DISPLAY_SHAPE_DIAMOND;
+    }
+    else {
+      bsocket->display_shape = SOCK_DISPLAY_SHAPE_CIRCLE;
     }
   }
 }
