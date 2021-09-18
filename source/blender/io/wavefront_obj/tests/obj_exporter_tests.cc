@@ -201,6 +201,7 @@ TEST(obj_exporter_writer, header)
 {
   /* Because testing doesn't fully initialize Blender, we need the following. */
   BKE_tempdir_init(NULL);
+  std::string out_file_path = blender::tests::flags_test_release_dir() + "/" + temp_file_path;
   {
     OBJExportParamsDefault _export;
     std::unique_ptr<OBJWriter> writer = init_writer(_export.params, out_file_path);
