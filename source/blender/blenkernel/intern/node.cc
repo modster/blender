@@ -4493,12 +4493,12 @@ static bool sockets_have_links(blender::Span<const SocketRef *> sockets)
   return false;
 }
 
-static Vector<int> get_linked_field_output_indices(const InputSocketRef &input_socket)
+static Vector<int> get_linked_field_input_indices(const OutputSocketRef &output_socket)
 {
   Vector<int> indices;
-  for (const OutputSocketRef *output_socket : input_socket.node().outputs()) {
-    if (is_field_socket_type((eNodeSocketDatatype)output_socket->typeinfo()->type)) {
-      indices.append(output_socket->index());
+  for (const InputSocketRef *input_socket : output_socket.node().inputs()) {
+    if (is_field_socket_type((eNodeSocketDatatype)input_socket->typeinfo()->type)) {
+      indices.append(input_socket->index());
     }
   }
   return indices;
@@ -4569,28 +4569,32 @@ static void update_socket_shapes_for_fields(bNodeTree &btree)
     const bool node_is_adaptive = check_if_node_is_adaptive(*node);
 
     for (const OutputSocketRef *output_socket : node->outputs()) {
-      bool requires_single = false;
+      SocketFieldState &state = field_state_by_socket_id[output_socket->id()];
       for (const InputSocketRef *target_socket : output_socket->directly_linked_sockets()) {
-        requires_single |= field_state_by_socket_id[target_socket->id()].requires_single;
+        state.requires_single |= field_state_by_socket_id[target_socket->id()].requires_single;
       }
-      field_state_by_socket_id[output_socket->id()].requires_single = requires_single;
+
+      if (state.requires_single) {
+        const Vector<int> input_socket_indices = get_linked_field_input_indices(*output_socket);
+        for (const int input_index : input_socket_indices) {
+          const InputSocketRef &input_socket = node->input(input_index);
+          field_state_by_socket_id[input_socket.id()].requires_single = true;
+        }
+      }
     }
 
     for (const InputSocketRef *input_socket : node->inputs()) {
-      const Vector<int> output_socket_indices = get_linked_field_output_indices(*input_socket);
-      bool requires_single = false;
+      SocketFieldState &state = field_state_by_socket_id[input_socket->id()];
+      if (state.requires_single) {
+        continue;
+      }
       if (node_decl != nullptr && !node_is_adaptive) {
         const SocketDeclaration &socket_decl = *node_decl->inputs()[input_socket->index()];
-        requires_single |= !socket_decl.is_field();
-      }
-      for (const int output_index : output_socket_indices) {
-        const OutputSocketRef &output_socket = node->output(output_index);
-        requires_single |= field_state_by_socket_id[output_socket.id()].requires_single;
+        state.requires_single |= !socket_decl.is_field();
       }
       if (!is_field_socket_type((eNodeSocketDatatype)input_socket->bsocket()->type)) {
-        requires_single = true;
+        state.requires_single = true;
       }
-      field_state_by_socket_id[input_socket->id()].requires_single = requires_single;
     }
   }
 
@@ -4619,21 +4623,22 @@ static void update_socket_shapes_for_fields(bNodeTree &btree)
           break;
         }
       }
-
-      if (!state.is_single) {
-        const Vector<int> output_socket_indices = get_linked_field_output_indices(*input_socket);
-        for (const int output_index : output_socket_indices) {
-          const OutputSocketRef &output_socket = node->output(output_index);
-          field_state_by_socket_id[output_socket.id()].is_single = false;
-        }
-      }
     }
 
     for (const OutputSocketRef *output_socket : node->outputs()) {
+      SocketFieldState &state = field_state_by_socket_id[output_socket->id()];
       if (node_decl != nullptr) {
         const SocketDeclaration &socket_decl = *node_decl->outputs()[output_socket->index()];
         if (socket_decl.is_field()) {
           field_state_by_socket_id[output_socket->id()].is_single = false;
+        }
+      }
+      const Vector<int> input_socket_indices = get_linked_field_input_indices(*output_socket);
+      for (const int input_index : input_socket_indices) {
+        const InputSocketRef &input_socket = node->input(input_index);
+        if (!field_state_by_socket_id[input_socket.id()].is_single) {
+          state.is_single = false;
+          break;
         }
       }
     }
