@@ -401,10 +401,10 @@ ccl_device_inline void kernel_accum_light(INTEGRATOR_STATE_CONST_ARGS,
     if (path_flag & (PATH_RAY_REFLECT_PASS | PATH_RAY_TRANSMISSION_PASS)) {
       /* Indirectly visible through reflection. */
       const int glossy_pass_offset = (path_flag & PATH_RAY_REFLECT_PASS) ?
-                                         ((INTEGRATOR_STATE(shadow_path, bounce) == 1) ?
+                                         ((INTEGRATOR_STATE(shadow_path, bounce) == 0) ?
                                               kernel_data.film.pass_glossy_direct :
                                               kernel_data.film.pass_glossy_indirect) :
-                                         ((INTEGRATOR_STATE(shadow_path, bounce) == 1) ?
+                                         ((INTEGRATOR_STATE(shadow_path, bounce) == 0) ?
                                               kernel_data.film.pass_transmission_direct :
                                               kernel_data.film.pass_transmission_indirect);
 
