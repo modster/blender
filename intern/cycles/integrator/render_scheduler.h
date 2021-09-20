@@ -186,6 +186,7 @@ class RenderScheduler {
 
   /* Report time (in seconds) which corresponding part of work took. */
   void report_path_trace_time(const RenderWork &render_work, double time, bool is_cancelled);
+  void report_path_trace_occupancy(const RenderWork &render_work, float occupancy);
   void report_adaptive_filter_time(const RenderWork &render_work, double time, bool is_cancelled);
   void report_denoise_time(const RenderWork &render_work, double time);
   void report_display_update_time(const RenderWork &render_work, double time);
@@ -380,6 +381,13 @@ class RenderScheduler {
     /* Time at which rendering started and finished. */
     double start_render_time = 0.0;
     double end_render_time = 0.0;
+
+    /* Measured occupancy of the render devices measured normalized to the number of samples.
+     *
+     * In a way it is "trailing": when scheduling new work this occupancy is measured when the
+     * previous work was rendered. */
+    int occupancy_num_samples = 0;
+    float occupancy = 1.0f;
   } state_;
 
   /* Timing of tasks which were performed at the very first render work at 100% of the

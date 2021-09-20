@@ -44,7 +44,9 @@ class PathTraceWorkGPU : public PathTraceWork {
   virtual void alloc_work_memory() override;
   virtual void init_execution() override;
 
-  virtual void render_samples(int start_sample, int samples_num) override;
+  virtual void render_samples(RenderStatistics &statistics,
+                              int start_sample,
+                              int samples_num) override;
 
   virtual void copy_to_gpu_display(GPUDisplay *gpu_display,
                                    PassMode pass_mode,

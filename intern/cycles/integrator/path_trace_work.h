@@ -33,6 +33,10 @@ class RenderBuffers;
 
 class PathTraceWork {
  public:
+  struct RenderStatistics {
+    float occupancy = 1.0f;
+  };
+
   /* Create path trace work which fits best the device.
    *
    * The cancel request flag is used for a cheap check whether cancel is to berformed as soon as
@@ -71,7 +75,7 @@ class PathTraceWork {
 
   /* Render given number of samples as a synchronous blocking call.
    * The samples are added to the render buffer associated with this work. */
-  virtual void render_samples(int start_sample, int samples_num) = 0;
+  virtual void render_samples(RenderStatistics &statistics, int start_sample, int samples_num) = 0;
 
   /* Copy render result from this work to the corresponding place of the GPU display.
    *

@@ -155,6 +155,9 @@ void RenderScheduler::reset(const BufferParams &buffer_params, int num_samples)
   state_.end_render_time = 0.0;
   state_.time_limit_reached = false;
 
+  state_.occupancy_num_samples = 0;
+  state_.occupancy = 1.0f;
+
   first_render_time_.path_trace_per_sample = 0.0;
   first_render_time_.denoise_time = 0.0;
   first_render_time_.display_update_time = 0.0;
@@ -473,6 +476,13 @@ void RenderScheduler::report_path_trace_time(const RenderWork &render_work,
   path_trace_time_.add_average(final_time_approx, render_work.path_trace.num_samples);
 
   VLOG(4) << "Average path tracing time: " << path_trace_time_.get_average() << " seconds.";
+}
+
+void RenderScheduler::report_path_trace_occupancy(const RenderWork &render_work, float occupancy)
+{
+  state_.occupancy_num_samples = render_work.path_trace.num_samples;
+  state_.occupancy = occupancy;
+  VLOG(4) << "Measured path tracing occupancy: " << occupancy;
 }
 
 void RenderScheduler::report_adaptive_filter_time(const RenderWork &render_work,
@@ -803,8 +813,23 @@ int RenderScheduler::get_num_samples_to_path_trace() const
    * more than N samples. */
   const int num_samples_pot = round_num_samples_to_power_of_2(num_samples_per_update);
 
-  const int num_samples_to_render = min(num_samples_pot,
-                                        start_sample_ + num_samples_ - path_trace_start_sample);
+  const int max_num_samples_to_render = start_sample_ + num_samples_ - path_trace_start_sample;
+
+  int num_samples_to_render = min(num_samples_pot, max_num_samples_to_render);
+
+  /* When enough statistics is available and doing an offlien rendering prefer to keep device
+   * occupied. */
+  if (state_.occupancy_num_samples && (background_ || headless_)) {
+    /* Keep occupancy at about 0.5 (this is more of an empirical figure which seems to match scenes
+     * with good performance without forcing occupancy to be higher). */
+    int num_samples_to_occupy = state_.occupancy_num_samples;
+    if (state_.occupancy < 0.5f) {
+      num_samples_to_occupy = lround(state_.occupancy_num_samples * 0.7f / state_.occupancy);
+    }
+
+    num_samples_to_render = max(num_samples_to_render,
+                                min(num_samples_to_occupy, max_num_samples_to_render));
+  }
 
   /* If adaptive sampling is not use, render as many samples per update as possible, keeping the
    * device fully occupied, without much overhead of display updates. */

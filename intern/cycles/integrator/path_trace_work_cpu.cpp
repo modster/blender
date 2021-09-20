@@ -67,7 +67,9 @@ void PathTraceWorkCPU::init_execution()
   device_->get_cpu_kernel_thread_globals(kernel_thread_globals_);
 }
 
-void PathTraceWorkCPU::render_samples(int start_sample, int samples_num)
+void PathTraceWorkCPU::render_samples(RenderStatistics &statistics,
+                                      int start_sample,
+                                      int samples_num)
 {
   const int64_t image_width = effective_buffer_params_.width;
   const int64_t image_height = effective_buffer_params_.height;
@@ -106,6 +108,8 @@ void PathTraceWorkCPU::render_samples(int start_sample, int samples_num)
   for (CPUKernelThreadGlobals &kernel_globals : kernel_thread_globals_) {
     kernel_globals.stop_profiling();
   }
+
+  statistics.occupancy = 1.0f;
 }
 
 void PathTraceWorkCPU::render_samples_full_pipeline(KernelGlobals *kernel_globals,

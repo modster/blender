@@ -24,6 +24,9 @@ struct WorkBalanceInfo {
   /* Time spent performing corresponding work. */
   double time_spent = 0;
 
+  /* Average occupancy of the device while performing the work. */
+  float occupancy = 1.0f;
+
   /* Normalized weight, which is ready to be used for work balancing (like calculating fraction of
    * the big tile which is to be rendered on the device). */
   double weight = 1.0;

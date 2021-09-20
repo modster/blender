@@ -351,13 +351,31 @@ void PathTrace::path_trace(RenderWork &render_work)
   const double start_time = time_dt();
 
   const int num_works = path_trace_works_.size();
+
   tbb::parallel_for(0, num_works, [&](int i) {
     const double work_start_time = time_dt();
+    const int num_samples = render_work.path_trace.num_samples;
+
     PathTraceWork *path_trace_work = path_trace_works_[i].get();
-    path_trace_work->render_samples(render_work.path_trace.start_sample,
-                                    render_work.path_trace.num_samples);
-    work_balance_infos_[i].time_spent += time_dt() - work_start_time;
+
+    PathTraceWork::RenderStatistics statistics;
+    path_trace_work->render_samples(statistics, render_work.path_trace.start_sample, num_samples);
+
+    const double work_time = time_dt() - work_start_time;
+    work_balance_infos_[i].time_spent += work_time;
+    work_balance_infos_[i].occupancy = statistics.occupancy;
+
+    VLOG(3) << "Rendered " << num_samples << " samples in " << work_time << " seconds ("
+            << work_time / num_samples
+            << " seconds per sample), occupancy: " << statistics.occupancy;
   });
+
+  float occupancy_accum = 0.0f;
+  for (const WorkBalanceInfo &balance_info : work_balance_infos_) {
+    occupancy_accum += balance_info.occupancy;
+  }
+  const float occupancy = occupancy_accum / num_works;
+  render_scheduler_.report_path_trace_occupancy(render_work, occupancy);
 
   render_scheduler_.report_path_trace_time(
       render_work, time_dt() - start_time, is_cancel_requested());

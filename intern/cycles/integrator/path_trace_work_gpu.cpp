@@ -180,7 +180,9 @@ void PathTraceWorkGPU::init_execution()
       "__integrator_state", &integrator_state_gpu_, sizeof(integrator_state_gpu_));
 }
 
-void PathTraceWorkGPU::render_samples(int start_sample, int samples_num)
+void PathTraceWorkGPU::render_samples(RenderStatistics &statistics,
+                                      int start_sample,
+                                      int samples_num)
 {
   /* Limit number of states for the tile and rely on a greedy scheduling of tiles. This allows to
    * add more work (because tiles are smaller, so there is higher chance that more paths will
@@ -191,6 +193,9 @@ void PathTraceWorkGPU::render_samples(int start_sample, int samples_num)
   work_tile_scheduler_.reset(effective_buffer_params_, start_sample, samples_num);
 
   enqueue_reset();
+
+  int num_iterations = 0;
+  uint64_t num_busy_accum = 0;
 
   /* TODO: set a hard limit in case of undetected kernel failures? */
   while (true) {
@@ -228,7 +233,12 @@ void PathTraceWorkGPU::render_samples(int start_sample, int samples_num)
     if (is_cancel_requested()) {
       break;
     }
+
+    num_busy_accum += get_num_active_paths();
+    ++num_iterations;
   }
+
+  statistics.occupancy = static_cast<float>(num_busy_accum) / num_iterations / max_num_paths_;
 }
 
 DeviceKernel PathTraceWorkGPU::get_most_queued_kernel() const
