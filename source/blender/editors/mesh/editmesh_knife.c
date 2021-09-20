@@ -218,8 +218,8 @@ typedef struct KnifeTool_OpData {
   Scene *scene;
 
   /* Used for swapping current object when in multi-object edit mode. */
-  Base **bases;
-  uint bases_len;
+  Object **objects;
+  uint objects_len;
 
   MemArena *arena;
 
@@ -1195,9 +1195,9 @@ static void knife_bvh_init(KnifeTool_OpData *kcd)
   bool test_fn_ret = false;
 
   /* Calculate tottri. */
-  for (uint b = 0; b < kcd->bases_len; b++) {
+  for (uint b = 0; b < kcd->objects_len; b++) {
     ob_tottri = 0;
-    ob = kcd->bases[b]->object;
+    ob = kcd->objects[b];
     em = BKE_editmesh_from_object(ob);
 
     for (int i = 0; i < em->tottri; i++) {
@@ -1227,8 +1227,8 @@ static void knife_bvh_init(KnifeTool_OpData *kcd)
    * Don't forget to update #knife_bvh_intersect_plane!
    */
   tottri = 0;
-  for (uint b = 0; b < kcd->bases_len; b++) {
-    ob = kcd->bases[b]->object;
+  for (uint b = 0; b < kcd->objects_len; b++) {
+    ob = kcd->objects[b];
     em = BKE_editmesh_from_object(ob);
     looptris = em->looptris;
 
@@ -1289,9 +1289,9 @@ static void knife_bvh_raycast_cb(void *userdata,
   if (index != -1) {
     tottri = 0;
     uint b = 0;
-    for (; b < kcd->bases_len; b++) {
+    for (; b < kcd->objects_len; b++) {
       index -= tottri;
-      ob = kcd->bases[b]->object;
+      ob = kcd->objects[b];
       em = BKE_editmesh_from_object(ob);
       tottri = em->tottri;
       if (index < tottri) {
@@ -2620,8 +2620,8 @@ static void calc_ortho_extent(KnifeTool_OpData *kcd)
   float min[3], max[3];
   INIT_MINMAX(min, max);
 
-  for (uint b = 0; b < kcd->bases_len; b++) {
-    ob = kcd->bases[b]->object;
+  for (uint b = 0; b < kcd->objects_len; b++) {
+    ob = kcd->objects[b];
     em = BKE_editmesh_from_object(ob);
 
     if (kcd->cagecos[b]) {
@@ -2895,12 +2895,8 @@ static void knife_find_line_hits(KnifeTool_OpData *kcd)
   uint b = 0;
 
   for (i = 0, result = results; i < tot; i++, result++) {
-    if (*result == -1) {
-      continue;
-    }
-
-    for (b = 0; b < kcd->bases_len; b++) {
-      ob = kcd->bases[b]->object;
+    for (b = 0; b < kcd->objects_len; b++) {
+      ob = kcd->objects[b];
       em = BKE_editmesh_from_object(ob);
       if (*result >= 0 && *result < em->tottri) {
         ls = (BMLoop **)em->looptris[*result];
@@ -3090,7 +3086,7 @@ static void knife_find_line_hits(KnifeTool_OpData *kcd)
       float p[3], p_cage[3];
 
       uint base_index = (uint)(uintptr_t)BLI_smallhash_lookup(&fobs, (uintptr_t)f);
-      ob = kcd->bases[base_index]->object;
+      ob = kcd->objects[base_index];
 
       if (use_hit_prev &&
           knife_ray_intersect_face(kcd, s1, v1, v3, ob, base_index, f, face_tol_sq, p, p_cage)) {
@@ -3192,7 +3188,7 @@ static BMFace *knife_find_closest_face(KnifeTool_OpData *kcd,
   }
 
   if (f) {
-    *r_ob = kcd->bases[*r_base_index]->object;
+    *r_ob = kcd->objects[*r_base_index];
   }
   else {
     if (kcd->is_interactive) {
@@ -4039,16 +4035,16 @@ static void knifetool_init(bContext *C,
   kcd->scene = scene;
   kcd->region = vc->region;
 
-  kcd->bases = BKE_view_layer_array_from_bases_in_edit_mode(
-      CTX_data_view_layer(C), CTX_wm_view3d(C), &kcd->bases_len);
+  kcd->objects = BKE_view_layer_array_from_objects_in_edit_mode_unique_data(
+      CTX_data_view_layer(C), CTX_wm_view3d(C), &kcd->objects_len);
 
   Object *ob;
   BMEditMesh *em;
-  kcd->cagecos = MEM_callocN(sizeof(*kcd->cagecos) * kcd->bases_len, "knife cagecos");
-  for (int i = 0; i < kcd->bases_len; i++) {
-    ob = kcd->bases[i]->object;
+  kcd->cagecos = MEM_callocN(sizeof(*kcd->cagecos) * kcd->objects_len, "knife cagecos");
+  for (uint b = 0; b < kcd->objects_len; b++) {
+    ob = kcd->objects[b];
     em = BKE_editmesh_from_object(ob);
-    knifetool_init_cagecos(kcd, ob, i);
+    knifetool_init_cagecos(kcd, ob, b);
 
     /* Can't usefully select resulting edges in face mode. */
     kcd->select_result = (em->selectmode != SCE_SELECT_FACE);
@@ -4149,7 +4145,7 @@ static void knifetool_exit_ex(KnifeTool_OpData *kcd)
   ED_region_tag_redraw(kcd->region);
 
   /* Knife BVH cleanup. */
-  for (int i = 0; i < kcd->bases_len; i++) {
+  for (int i = 0; i < kcd->objects_len; i++) {
     knifetool_free_cagecos(kcd, i);
   }
   MEM_freeN(kcd->cagecos);
@@ -4161,7 +4157,7 @@ static void knifetool_exit_ex(KnifeTool_OpData *kcd)
   }
 
   /* Free object bases. */
-  MEM_freeN(kcd->bases);
+  MEM_freeN(kcd->objects);
 
   /* Destroy kcd itself. */
   MEM_freeN(kcd);
@@ -4235,8 +4231,8 @@ static void knifetool_finish_ex(KnifeTool_OpData *kcd)
 {
   Object *ob;
   BMEditMesh *em;
-  for (uint b = 0; b < kcd->bases_len; b++) {
-    ob = kcd->bases[b]->object;
+  for (uint b = 0; b < kcd->objects_len; b++) {
+    ob = kcd->objects[b];
     em = BKE_editmesh_from_object(ob);
 
     knife_make_cuts(kcd, ob);
@@ -4718,8 +4714,8 @@ static int knifetool_invoke(bContext *C, wmOperator *op, const wmEvent *event)
     BMEditMesh *em;
     bool faces_selected = false;
 
-    for (uint b = 0; b < kcd->bases_len; b++) {
-      obedit = kcd->bases[b]->object;
+    for (uint b = 0; b < kcd->objects_len; b++) {
+      obedit = kcd->objects[b];
       em = BKE_editmesh_from_object(obedit);
       if (em->bm->totfacesel != 0) {
         faces_selected = true;
@@ -4921,9 +4917,9 @@ void EDBM_mesh_knife(bContext *C, ViewContext *vc, LinkNode *polys, bool use_tag
   {
     Object *ob;
     BMEditMesh *em;
-    for (uint b = 0; b < kcd->bases_len; b++) {
+    for (uint b = 0; b < kcd->objects_len; b++) {
 
-      ob = kcd->bases[b]->object;
+      ob = kcd->objects[b];
       em = BKE_editmesh_from_object(ob);
 
       if (use_tag) {
