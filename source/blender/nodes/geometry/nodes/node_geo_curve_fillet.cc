@@ -35,14 +35,14 @@ static void geo_node_curve_fillet_declare(NodeDeclarationBuilder &b)
       .min(0.0f)
       .max(FLT_MAX)
       .subtype(PropertySubType::PROP_DISTANCE)
-      .default_value(0.2f);
+      .default_value(0.25f);
   b.add_input<decl::Bool>("Limit Radius");
   b.add_output<decl::Geometry>("Curve");
 }
 
 static void geo_node_curve_fillet_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 {
-  uiItemR(layout, ptr, "mode", 0, "", ICON_NONE);
+  uiItemR(layout, ptr, "mode", UI_ITEM_R_EXPAND, nullptr, ICON_NONE);
 }
 
 static void geo_node_curve_fillet_init(bNodeTree *UNUSED(tree), bNode *node)
@@ -330,6 +330,22 @@ static void copy_common_attributes_by_mapping(const Spline &src,
 {
   copy_attribute_by_mapping(src.radii(), dst.radii(), mapping);
   copy_attribute_by_mapping(src.tilts(), dst.tilts(), mapping);
+
+  dst.attributes.reallocate(1);
+  src.attributes.foreach_attribute(
+      [&](const AttributeIDRef &attribute_id, const AttributeMetaData &meta_data) {
+        std::optional<GSpan> src_attribute = src.attributes.get_for_read(attribute_id);
+        if (dst.attributes.create(attribute_id, meta_data.data_type)) {
+          std::optional<GMutableSpan> dst_attribute = dst.attributes.get_for_write(attribute_id);
+          if (dst_attribute) {
+            src_attribute->type().copy_assign(src_attribute->data(), dst_attribute->data());
+            return true;
+          }
+        }
+        BLI_assert_unreachable();
+        return false;
+      },
+      ATTR_DOMAIN_POINT);
 }
 
 /* Update the vertex positions and handle positions of a Bezier spline based on fillet data. */
@@ -475,10 +491,6 @@ static SplinePtr fillet_spline(const Spline &spline,
   const int size = spline.size();
   const bool cyclic = spline.is_cyclic();
 
-  /* Determine the number of vertices that can be filleted. */
-  const int fillet_count = cyclic ? size : size - 2;
-  const int start = cyclic ? 0 : 1;
-
   if (size < 3) {
     return spline.copy();
   }
@@ -497,13 +509,13 @@ static SplinePtr fillet_spline(const Spline &spline,
   const int total_points = added_count + size;
   const Array<int> dst_to_src = create_dst_to_src_map(point_counts, total_points);
   SplinePtr dst_spline_ptr = spline.copy_only_settings();
+  (*dst_spline_ptr).resize(total_points);
+  copy_common_attributes_by_mapping(spline, *dst_spline_ptr, dst_to_src);
 
   switch (spline.type()) {
     case Spline::Type::Bezier: {
       const BezierSpline &src_spline = static_cast<const BezierSpline &>(spline);
       BezierSpline &dst_spline = static_cast<BezierSpline &>(*dst_spline_ptr);
-      dst_spline.resize(total_points);
-      copy_common_attributes_by_mapping(src_spline, dst_spline, dst_to_src);
       if (fillet_param.mode == GEO_NODE_CURVE_FILLET_POLY) {
         dst_spline.handle_types_left().fill(BezierSpline::HandleType::Vector);
         dst_spline.handle_types_right().fill(BezierSpline::HandleType::Vector);
@@ -515,17 +527,12 @@ static SplinePtr fillet_spline(const Spline &spline,
       break;
     }
     case Spline::Type::Poly: {
-      Spline &dst_spline = static_cast<Spline &>(*dst_spline_ptr);
-      dst_spline.resize(total_points);
-      copy_common_attributes_by_mapping(spline, dst_spline, dst_to_src);
-      update_poly_positions(fd, dst_spline, spline, point_counts);
+      update_poly_positions(fd, *dst_spline_ptr, spline, point_counts);
       break;
     }
     case Spline::Type::NURBS: {
       const NURBSpline &src_spline = static_cast<const NURBSpline &>(spline);
       NURBSpline &dst_spline = static_cast<NURBSpline &>(*dst_spline_ptr);
-      dst_spline.resize(total_points);
-      copy_common_attributes_by_mapping(src_spline, dst_spline, dst_to_src);
       copy_attribute_by_mapping(src_spline.weights(), dst_spline.weights(), dst_to_src);
       update_poly_positions(fd, dst_spline, src_spline, point_counts);
       break;
@@ -551,6 +558,7 @@ static std::unique_ptr<CurveEval> fillet_curve(const CurveEval &input_curve,
       output_splines[i] = fillet_spline(*input_splines[i], fillet_param, spline_offsets[i]);
     }
   });
+  output_curve->attributes = input_curve.attributes;
 
   return output_curve;
 }
