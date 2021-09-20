@@ -104,21 +104,26 @@ static void rtc_filter_occluded_func(const RTCFilterFunctionNArguments *args)
         /* If maximum number of hits was reached, replace the intersection with the
          * highest distance. We want to find the N closest intersections. */
         int isect_index = num_recorded_hits;
-        if (isect_index >= ctx->max_hits) {
+        if (num_recorded_hits + 1 >= ctx->max_hits) {
           float max_t = ctx->isect_s[0].t;
-          isect_index = 0;
+          int max_recorded_hit = 0;
 
           for (int i = 1; i < num_recorded_hits; ++i) {
             if (ctx->isect_s[i].t > max_t) {
-              isect_index = i;
+              max_recorded_hit = i;
               max_t = ctx->isect_s[i].t;
             }
           }
 
-          /* TODO: is there some way we can tell Embree to stop intersecting beyond
+          if (num_recorded_hits >= ctx->max_hits) {
+            isect_index = max_recorded_hit;
+          }
+
+          /* Limit the ray distance and stop counting hits beyond this.
+           * TODO: is there some way we can tell Embree to stop intersecting beyond
            * this distance when max number of hits is reached?. Or maybe it will
            * become irrelevant if we make max_hits a very high number on the CPU. */
-          ctx->max_t = min(current_isect.t, max_t);
+          ctx->max_t = max(current_isect.t, max_t);
         }
 
         ctx->isect_s[isect_index] = current_isect;

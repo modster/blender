@@ -221,12 +221,8 @@ ccl_device_inline
 
                 isect = isect_array + max_recorded_hit;
 
-                /* If we already found more hits than we record, we can limit the
-                 * ray distance and stop counting hits beyond this, as we are sure to
-                 * need to another ray-trace call. */
-                if (*num_hits > max_hits) {
-                  isect_t = max_recorded_t * t_world_to_instance;
-                }
+                /* Limit the ray distance and stop counting hits beyond this. */
+                isect_t = max_recorded_t * t_world_to_instance;
               }
               else {
                 /* Still have space for intersection, use next hit. */
