@@ -53,10 +53,12 @@
 #include "BLI_map.hh"
 #include "BLI_math.h"
 #include "BLI_path_util.h"
+#include "BLI_set.hh"
 #include "BLI_stack.hh"
 #include "BLI_string.h"
 #include "BLI_string_utils.h"
 #include "BLI_utildefines.h"
+#include "BLI_vector_set.hh"
 
 #include "BLT_translation.h"
 
@@ -97,9 +99,11 @@
 #define NODE_DEFAULT_MAX_WIDTH 700
 
 using blender::Array;
+using blender::Set;
 using blender::Span;
 using blender::Stack;
 using blender::Vector;
+using blender::VectorSet;
 using namespace blender::nodes::node_tree_ref_types;
 
 /* Fallback types for undefined tree, nodes, sockets */
@@ -655,6 +659,8 @@ void ntreeBlendReadData(BlendDataReader *reader, bNodeTree *ntree)
 
   ntree->progress = nullptr;
   ntree->execdata = nullptr;
+
+  ntree->output_field_dependencies = nullptr;
 
   BLO_read_data_address(reader, &ntree->adt);
   BKE_animdata_blend_read_data(reader, ntree->adt);
@@ -4493,12 +4499,44 @@ static bool sockets_have_links(blender::Span<const SocketRef *> sockets)
   return false;
 }
 
+using OutputFieldDependencies = Vector<std::optional<Vector<int>>>;
+
+static const std::optional<Vector<int>> *get_group_output_field_dependencies(
+    const OutputSocketRef &output_socket)
+{
+  const NodeRef &node = output_socket.node();
+  BLI_assert(node.is_group_node());
+  bNodeTree *group = (bNodeTree *)node.bnode()->id;
+  if (group == nullptr) {
+    return nullptr;
+  }
+  if (group->output_field_dependencies == nullptr) {
+    return nullptr;
+  }
+  const OutputFieldDependencies *output_field_dependencies = (const OutputFieldDependencies *)
+                                                                 group->output_field_dependencies;
+  if (output_socket.index() >= output_field_dependencies->size()) {
+    return nullptr;
+  }
+  return &(*output_field_dependencies)[output_socket.index()];
+}
+
 static Vector<int> get_linked_field_input_indices(const OutputSocketRef &output_socket)
 {
   Vector<int> indices;
-  for (const InputSocketRef *input_socket : output_socket.node().inputs()) {
-    if (is_field_socket_type((eNodeSocketDatatype)input_socket->typeinfo()->type)) {
-      indices.append(input_socket->index());
+  const NodeRef &node = output_socket.node();
+  if (node.is_group_node()) {
+    const std::optional<Vector<int>> *optional_dependencies = get_group_output_field_dependencies(
+        output_socket);
+    if (optional_dependencies && optional_dependencies->has_value()) {
+      indices.extend(**optional_dependencies);
+    }
+  }
+  else {
+    for (const InputSocketRef *input_socket : output_socket.node().inputs()) {
+      if (is_field_socket_type((eNodeSocketDatatype)input_socket->typeinfo()->type)) {
+        indices.append(input_socket->index());
+      }
     }
   }
   return indices;
@@ -4539,6 +4577,53 @@ static Vector<const NodeRef *> toposort_nodes(const NodeTreeRef &tree, bool left
   return toposort;
 }
 
+struct SocketFieldState {
+  bool is_single = true;
+  bool is_field_source = false;
+  bool requires_single = false;
+};
+
+static std::optional<Vector<int>> find_dependent_group_input_indices(
+    const InputSocketRef &group_output_socket,
+    const Span<SocketFieldState> field_state_by_socket_id)
+{
+  Set<const InputSocketRef *> handled_sockets;
+  Stack<const InputSocketRef *> sockets_to_check;
+
+  handled_sockets.add(&group_output_socket);
+  sockets_to_check.push(&group_output_socket);
+
+  Set<int> found_input_indices;
+
+  while (!sockets_to_check.is_empty()) {
+    const InputSocketRef *input_socket = sockets_to_check.pop();
+    for (const OutputSocketRef *origin_socket : input_socket->logically_linked_sockets()) {
+      const NodeRef &origin_node = origin_socket->node();
+      const SocketFieldState &origin_state = field_state_by_socket_id[origin_socket->id()];
+      if (origin_state.is_field_source) {
+        if (origin_node.is_group_input_node()) {
+          found_input_indices.add(origin_socket->index());
+        }
+        else {
+          return std::nullopt;
+        }
+      }
+      else if (!origin_state.is_single) {
+        const Vector<int> input_socket_indices = get_linked_field_input_indices(*origin_socket);
+        for (const int input_index : input_socket_indices) {
+          const InputSocketRef &origin_input_socket = origin_node.input(input_index);
+          if (!field_state_by_socket_id[origin_input_socket.id()].is_single) {
+            if (handled_sockets.add(&origin_input_socket)) {
+              sockets_to_check.push(&origin_input_socket);
+            }
+          }
+        }
+      }
+    }
+  }
+  return Vector<int>(found_input_indices.begin(), found_input_indices.end());
+}
+
 static void update_socket_shapes_for_fields(bNodeTree &btree)
 {
   using namespace blender;
@@ -4550,11 +4635,6 @@ static void update_socket_shapes_for_fields(bNodeTree &btree)
   NodeTreeRef tree{&btree};
   Vector<const NodeRef *> toposort_left_to_right = toposort_nodes(tree, true);
   Vector<const NodeRef *> toposort_right_to_left = toposort_nodes(tree, false);
-
-  struct SocketFieldState {
-    bool is_single = true;
-    bool requires_single = false;
-  };
 
   Array<SocketFieldState> field_state_by_socket_id(tree.sockets().size());
 
@@ -4603,6 +4683,7 @@ static void update_socket_shapes_for_fields(bNodeTree &btree)
       SocketFieldState &state = field_state_by_socket_id[output_socket->id()];
       if (!state.requires_single) {
         state.is_single = false;
+        state.is_field_source = true;
       }
     }
   }
@@ -4630,7 +4711,16 @@ static void update_socket_shapes_for_fields(bNodeTree &btree)
       if (node_decl != nullptr) {
         const SocketDeclaration &socket_decl = *node_decl->outputs()[output_socket->index()];
         if (socket_decl.is_field()) {
-          field_state_by_socket_id[output_socket->id()].is_single = false;
+          state.is_single = false;
+          state.is_field_source = true;
+        }
+      }
+      if (output_socket->node().is_group_node()) {
+        const std::optional<Vector<int>> *optional_dependencies =
+            get_group_output_field_dependencies(*output_socket);
+        if (optional_dependencies && !optional_dependencies->has_value()) {
+          state.is_single = false;
+          state.is_field_source = true;
         }
       }
       const Vector<int> input_socket_indices = get_linked_field_input_indices(*output_socket);
@@ -4644,9 +4734,27 @@ static void update_socket_shapes_for_fields(bNodeTree &btree)
     }
   }
 
+  for (const NodeRef *group_output_node : tree.nodes_by_type("NodeGroupOutput")) {
+    if (!(group_output_node->bnode()->flag & NODE_DO_OUTPUT)) {
+      continue;
+    }
+
+    OutputFieldDependencies *output_field_dependencies = new OutputFieldDependencies();
+    for (const InputSocketRef *group_output_socket : group_output_node->inputs().drop_back(1)) {
+      std::optional<Vector<int>> dependent_input_indices = find_dependent_group_input_indices(
+          *group_output_socket, field_state_by_socket_id);
+      output_field_dependencies->append(std::move(dependent_input_indices));
+    }
+    if (btree.output_field_dependencies != nullptr) {
+      delete (OutputFieldDependencies *)btree.output_field_dependencies;
+    }
+    btree.output_field_dependencies = output_field_dependencies;
+    break;
+  }
+
   for (const InputSocketRef *socket : tree.input_sockets()) {
     bNodeSocket *bsocket = socket->bsocket();
-    SocketFieldState &state = field_state_by_socket_id[socket->id()];
+    const SocketFieldState &state = field_state_by_socket_id[socket->id()];
     if (state.requires_single) {
       bsocket->display_shape = SOCK_DISPLAY_SHAPE_CIRCLE;
     }
@@ -4656,7 +4764,7 @@ static void update_socket_shapes_for_fields(bNodeTree &btree)
   }
   for (const OutputSocketRef *socket : tree.output_sockets()) {
     bNodeSocket *bsocket = socket->bsocket();
-    SocketFieldState &state = field_state_by_socket_id[socket->id()];
+    const SocketFieldState &state = field_state_by_socket_id[socket->id()];
     if (state.is_single) {
       bsocket->display_shape = SOCK_DISPLAY_SHAPE_CIRCLE;
     }

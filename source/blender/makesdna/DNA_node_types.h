@@ -481,6 +481,8 @@ typedef struct bNodeTree {
   float view_center[2];
 
   ListBase nodes, links;
+  /* Vector<std::optional<Vector<int>>>. */
+  void *output_field_dependencies;
 
   /** Set init on fileread. */
   int type, init;
