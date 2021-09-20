@@ -385,7 +385,8 @@ void Session::draw()
 
 int2 Session::get_effective_tile_size() const
 {
-  if (!params.use_auto_tile) {
+  /* No support yet for baking with tiles. */
+  if (!params.use_auto_tile || scene->bake_manager->get_baking()) {
     return make_int2(buffer_params_.width, buffer_params_.height);
   }
 

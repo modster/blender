@@ -677,6 +677,7 @@ void BlenderSession::bake(BL::Depsgraph &b_depsgraph_,
 
   session->read_render_tile_cb = [&]() { read_render_tile(); };
   session->write_render_tile_cb = [&]() { write_render_tile(); };
+  session->set_gpu_display(nullptr);
 
   if (!session->progress.get_cancel()) {
     /* Sync scene. */
