@@ -564,6 +564,7 @@ void PathTrace::update_display(const RenderWork &render_work)
 
   if (!gpu_display_ && !tile_buffer_update_cb) {
     VLOG(3) << "Ignore display update.";
+    return;
   }
 
   if (full_params_.width == 0 || full_params_.height == 0) {
@@ -579,29 +580,31 @@ void PathTrace::update_display(const RenderWork &render_work)
     tile_buffer_update_cb();
   }
 
-  VLOG(3) << "Perform copy to GPUDisplay work.";
+  if (gpu_display_) {
+    VLOG(3) << "Perform copy to GPUDisplay work.";
 
-  const int resolution_divider = render_work.resolution_divider;
-  const int texture_width = max(1, full_params_.width / resolution_divider);
-  const int texture_height = max(1, full_params_.height / resolution_divider);
-  if (!gpu_display_->update_begin(texture_width, texture_height)) {
-    LOG(ERROR) << "Error beginning GPUDisplay update.";
-    return;
+    const int resolution_divider = render_work.resolution_divider;
+    const int texture_width = max(1, full_params_.width / resolution_divider);
+    const int texture_height = max(1, full_params_.height / resolution_divider);
+    if (!gpu_display_->update_begin(texture_width, texture_height)) {
+      LOG(ERROR) << "Error beginning GPUDisplay update.";
+      return;
+    }
+
+    const PassMode pass_mode = render_work.display.use_denoised_result &&
+                                       render_state_.has_denoised_result ?
+                                   PassMode::DENOISED :
+                                   PassMode::NOISY;
+
+    /* TODO(sergey): When using multi-device rendering map the GPUDisplay once and copy data from
+     * all works in parallel. */
+    const int num_samples = get_num_samples_in_buffer();
+    for (auto &&path_trace_work : path_trace_works_) {
+      path_trace_work->copy_to_gpu_display(gpu_display_.get(), pass_mode, num_samples);
+    }
+
+    gpu_display_->update_end();
   }
-
-  const PassMode pass_mode = render_work.display.use_denoised_result &&
-                                     render_state_.has_denoised_result ?
-                                 PassMode::DENOISED :
-                                 PassMode::NOISY;
-
-  /* TODO(sergey): When using multi-device rendering map the GPUDisplay once and copy data from all
-   * works in parallel. */
-  const int num_samples = get_num_samples_in_buffer();
-  for (auto &&path_trace_work : path_trace_works_) {
-    path_trace_work->copy_to_gpu_display(gpu_display_.get(), pass_mode, num_samples);
-  }
-
-  gpu_display_->update_end();
 
   render_scheduler_.report_display_update_time(render_work, time_dt() - start_time);
 }
