@@ -333,7 +333,7 @@ class CyclesRenderSettings(bpy.types.PropertyGroup):
         name="Sampling Pattern",
         description="Random sampling pattern used by the integrator",
         items=enum_sampling_pattern,
-        default='SOBOL',
+        default='PROGRESSIVE_MUTI_JITTER',
     )
 
     use_layer_samples: EnumProperty(
