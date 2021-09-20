@@ -4493,12 +4493,23 @@ static bool sockets_have_links(blender::Span<const SocketRef *> sockets)
   return false;
 }
 
+static Vector<int> get_linked_field_output_indices(const InputSocketRef &input_socket)
+{
+  Vector<int> indices;
+  for (const OutputSocketRef *output_socket : input_socket.node().outputs()) {
+    if (is_field_socket_type((eNodeSocketDatatype)output_socket->typeinfo()->type)) {
+      indices.append(output_socket->index());
+    }
+  }
+  return indices;
+}
+
 static Vector<const NodeRef *> toposort_nodes(const NodeTreeRef &tree, bool left_to_right = true)
 {
   Vector<const NodeRef *> toposort;
   toposort.reserve(tree.nodes().size());
   Array<bool> node_is_pushed_by_id(tree.nodes().size(), false);
-  Stack<const NodeRef *> nodes_to_check;
+  std::queue<const NodeRef *> nodes_to_check;
 
   for (const NodeRef *node : tree.nodes()) {
     if (!sockets_have_links(node->inputs_or_outputs(!left_to_right))) {
@@ -4507,8 +4518,9 @@ static Vector<const NodeRef *> toposort_nodes(const NodeTreeRef &tree, bool left
     }
   }
 
-  while (!nodes_to_check.is_empty()) {
-    const NodeRef *node = nodes_to_check.pop();
+  while (!nodes_to_check.empty()) {
+    const NodeRef *node = nodes_to_check.front();
+    nodes_to_check.pop();
     toposort.append(node);
 
     for (const SocketRef *input_socket : node->inputs_or_outputs(left_to_right)) {
@@ -4540,124 +4552,111 @@ static void update_socket_shapes_for_fields(bNodeTree &btree)
   Vector<const NodeRef *> toposort_right_to_left = toposort_nodes(tree, false);
 
   struct SocketFieldState {
+    bool is_single = true;
     bool requires_single = false;
-    bool is_field = false;
-    bool is_field_source = false;
   };
 
   Array<SocketFieldState> field_state_by_socket_id(tree.sockets().size());
 
-  auto check_if_node_is_fixed = [](const NodeRef &node) {
+  auto check_if_node_is_adaptive = [](const NodeRef &node) {
     const StringRef node_idname = node.idname();
-    return node_idname.startswith("GeometryNode");
+    return !node_idname.startswith("GeometryNode");
   };
-
-  auto has_field_dependency = [&](const OutputSocketRef &output_socket,
-                                  const InputSocketRef &input_socket) {
-    if (!is_field_socket_type((eNodeSocketDatatype)output_socket.typeinfo()->type)) {
-      return false;
-    }
-    if (!is_field_socket_type((eNodeSocketDatatype)input_socket.typeinfo()->type)) {
-      return false;
-    }
-    return true;
-  };
-
-  for (const NodeRef *node : toposort_left_to_right) {
-    NodeDeclaration *node_decl = nodeDeclarationEnsure(&btree, node->bnode());
-
-    const bool node_is_fixed = check_if_node_is_fixed(*node);
-
-    auto input_supports_field = [&](const InputSocketRef &socket) {
-      if (!node_is_fixed) {
-        return true;
-      }
-      if (node_decl != nullptr) {
-        const SocketDeclaration &socket_decl = *node_decl->inputs()[socket.index()];
-        return socket_decl.is_field();
-      }
-      return false;
-    };
-
-    for (const InputSocketRef *input_socket : node->inputs()) {
-      bool is_field = false;
-      if (input_supports_field(*input_socket)) {
-        for (const SocketRef *origin_socket : input_socket->directly_linked_sockets()) {
-          is_field |= field_state_by_socket_id[origin_socket->id()].is_field;
-        }
-      }
-      field_state_by_socket_id[input_socket->id()].is_field = is_field;
-    }
-
-    for (const OutputSocketRef *output_socket : node->outputs()) {
-      const int output_index = output_socket->index();
-
-      bool output_is_field = false;
-
-      if (node_decl != nullptr) {
-        const SocketDeclaration &socket_decl = *node_decl->outputs()[output_index];
-        output_is_field = socket_decl.is_field();
-        field_state_by_socket_id[output_index].is_field_source = true;
-      }
-
-      if (!output_is_field) {
-        for (const InputSocketRef *input_socket : node->inputs()) {
-          if (has_field_dependency(*output_socket, *input_socket)) {
-            output_is_field |= field_state_by_socket_id[input_socket->id()].is_field;
-          }
-        }
-      }
-      field_state_by_socket_id[output_socket->id()].is_field = output_is_field;
-    }
-  }
 
   for (const NodeRef *node : toposort_right_to_left) {
     NodeDeclaration *node_decl = nodeDeclarationEnsure(&btree, node->bnode());
 
-    const bool node_is_fixed = check_if_node_is_fixed(*node);
+    const bool node_is_adaptive = check_if_node_is_adaptive(*node);
 
     for (const OutputSocketRef *output_socket : node->outputs()) {
       bool requires_single = false;
-      if (node_decl != nullptr && node_is_fixed) {
-        const SocketDeclaration &socket_decl = *node_decl->outputs()[output_socket->index()];
-        requires_single = !socket_decl.is_field();
-      }
       for (const InputSocketRef *target_socket : output_socket->directly_linked_sockets()) {
         requires_single |= field_state_by_socket_id[target_socket->id()].requires_single;
       }
       field_state_by_socket_id[output_socket->id()].requires_single = requires_single;
     }
+
     for (const InputSocketRef *input_socket : node->inputs()) {
+      const Vector<int> output_socket_indices = get_linked_field_output_indices(*input_socket);
       bool requires_single = false;
-      if (node_decl != nullptr && node_is_fixed) {
+      if (node_decl != nullptr && !node_is_adaptive) {
         const SocketDeclaration &socket_decl = *node_decl->inputs()[input_socket->index()];
-        requires_single = !socket_decl.is_field();
+        requires_single |= !socket_decl.is_field();
       }
-      if (!requires_single) {
-        for (const OutputSocketRef *output_socket : node->outputs()) {
-          if (has_field_dependency(*output_socket, *input_socket)) {
-            requires_single |= field_state_by_socket_id[output_socket->id()].requires_single;
-          }
-        }
+      for (const int output_index : output_socket_indices) {
+        const OutputSocketRef &output_socket = node->output(output_index);
+        requires_single |= field_state_by_socket_id[output_socket.id()].requires_single;
+      }
+      if (!is_field_socket_type((eNodeSocketDatatype)input_socket->bsocket()->type)) {
+        requires_single = true;
       }
       field_state_by_socket_id[input_socket->id()].requires_single = requires_single;
     }
   }
 
-  for (const SocketRef *socket : tree.sockets()) {
+  for (const NodeRef *node : tree.nodes_by_type("NodeGroupInput")) {
+    for (const OutputSocketRef *output_socket : node->outputs().drop_back(1)) {
+      SocketFieldState &state = field_state_by_socket_id[output_socket->id()];
+      if (!state.requires_single) {
+        state.is_single = false;
+      }
+    }
+  }
+
+  for (const NodeRef *node : toposort_left_to_right) {
+    NodeDeclaration *node_decl = nodeDeclarationEnsure(&btree, node->bnode());
+
+    for (const InputSocketRef *input_socket : node->inputs()) {
+      SocketFieldState &state = field_state_by_socket_id[input_socket->id()];
+      if (state.requires_single) {
+        state.is_single = true;
+        continue;
+      }
+      state.is_single = true;
+      for (const OutputSocketRef *origin_socket : input_socket->logically_linked_sockets()) {
+        if (!field_state_by_socket_id[origin_socket->id()].is_single) {
+          state.is_single = false;
+          break;
+        }
+      }
+
+      if (!state.is_single) {
+        const Vector<int> output_socket_indices = get_linked_field_output_indices(*input_socket);
+        for (const int output_index : output_socket_indices) {
+          const OutputSocketRef &output_socket = node->output(output_index);
+          field_state_by_socket_id[output_socket.id()].is_single = false;
+        }
+      }
+    }
+
+    for (const OutputSocketRef *output_socket : node->outputs()) {
+      if (node_decl != nullptr) {
+        const SocketDeclaration &socket_decl = *node_decl->outputs()[output_socket->index()];
+        if (socket_decl.is_field()) {
+          field_state_by_socket_id[output_socket->id()].is_single = false;
+        }
+      }
+    }
+  }
+
+  for (const InputSocketRef *socket : tree.input_sockets()) {
     bNodeSocket *bsocket = socket->bsocket();
     SocketFieldState &state = field_state_by_socket_id[socket->id()];
-    if (state.is_field_source) {
-      bsocket->display_shape = SOCK_DISPLAY_SHAPE_DIAMOND;
-    }
-    else if (state.requires_single) {
-      bsocket->display_shape = SOCK_DISPLAY_SHAPE_CIRCLE_DOT;
-    }
-    else if (state.is_field) {
-      bsocket->display_shape = SOCK_DISPLAY_SHAPE_DIAMOND;
+    if (state.requires_single) {
+      bsocket->display_shape = SOCK_DISPLAY_SHAPE_CIRCLE;
     }
     else {
+      bsocket->display_shape = SOCK_DISPLAY_SHAPE_DIAMOND;
+    }
+  }
+  for (const OutputSocketRef *socket : tree.output_sockets()) {
+    bNodeSocket *bsocket = socket->bsocket();
+    SocketFieldState &state = field_state_by_socket_id[socket->id()];
+    if (state.is_single) {
       bsocket->display_shape = SOCK_DISPLAY_SHAPE_CIRCLE;
+    }
+    else {
+      bsocket->display_shape = SOCK_DISPLAY_SHAPE_DIAMOND;
     }
   }
 }
