@@ -141,27 +141,12 @@ class BlenderSession {
    */
   static bool headless;
 
-  /* ** Resumable render ** */
-
-  /* Overall number of chunks in which the sample range is to be divided. */
-  static int num_resumable_chunks;
-
-  /* Current resumable chunk index to render. */
-  static int current_resumable_chunk;
-
-  /* Alternative to single-chunk rendering to render a range of chunks. */
-  static int start_resumable_chunk;
-  static int end_resumable_chunk;
-
   static bool print_render_stats;
 
  protected:
   void stamp_view_layer_metadata(Scene *scene, const string &view_layer_name);
 
   void builtin_images_load();
-
-  /* Update tile manager to reflect resumable render settings. */
-  void update_resumable_tile_manager(int num_samples);
 
   /* Is used after each render layer synchronization is done with the goal
    * of freeing render engine data which is held from Blender side (for

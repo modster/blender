@@ -51,10 +51,6 @@ CCL_NAMESPACE_BEGIN
 
 DeviceTypeMask BlenderSession::device_override = DEVICE_MASK_ALL;
 bool BlenderSession::headless = false;
-int BlenderSession::num_resumable_chunks = 0;
-int BlenderSession::current_resumable_chunk = 0;
-int BlenderSession::start_resumable_chunk = 0;
-int BlenderSession::end_resumable_chunk = 0;
 bool BlenderSession::print_render_stats = false;
 
 BlenderSession::BlenderSession(BL::RenderEngine &b_engine,
@@ -173,8 +169,6 @@ void BlenderSession::create_session()
   if (!b_engine.is_preview() && !b_v3d) {
     b_engine.use_highlight_tiles(true);
   }
-
-  update_resumable_tile_manager(session_params.samples);
 }
 
 void BlenderSession::reset_session(BL::BlendData &b_data, BL::Depsgraph &b_depsgraph)
@@ -533,9 +527,6 @@ void BlenderSession::render(BL::Depsgraph &b_depsgraph_)
     if (samples != 0 && (!bound_samples || (samples < session_params.samples))) {
       effective_session_params.samples = samples;
     }
-
-    /* Update tile manager if we're doing resumable render. */
-    update_resumable_tile_manager(effective_session_params.samples);
 
     /* Update session itself. */
     session->reset(effective_session_params, buffer_params);
@@ -1078,59 +1069,6 @@ void BlenderSession::test_cancel()
   if (background)
     if (b_engine.test_break())
       session->progress.set_cancel("Cancelled");
-}
-
-void BlenderSession::update_resumable_tile_manager(int num_samples)
-{
-  const int num_resumable_chunks = BlenderSession::num_resumable_chunks,
-            current_resumable_chunk = BlenderSession::current_resumable_chunk;
-  if (num_resumable_chunks == 0) {
-    return;
-  }
-
-  if (num_resumable_chunks > num_samples) {
-    fprintf(stderr,
-            "Cycles warning: more sample chunks (%d) than samples (%d), "
-            "this will cause some samples to be included in multiple chunks.\n",
-            num_resumable_chunks,
-            num_samples);
-  }
-
-  const float num_samples_per_chunk = (float)num_samples / num_resumable_chunks;
-
-  float range_start_sample, range_num_samples;
-  if (current_resumable_chunk != 0) {
-    /* Single chunk rendering. */
-    range_start_sample = num_samples_per_chunk * (current_resumable_chunk - 1);
-    range_num_samples = num_samples_per_chunk;
-  }
-  else {
-    /* Ranged-chunks. */
-    const int num_chunks = end_resumable_chunk - start_resumable_chunk + 1;
-    range_start_sample = num_samples_per_chunk * (start_resumable_chunk - 1);
-    range_num_samples = num_chunks * num_samples_per_chunk;
-  }
-
-  /* Round after doing the multiplications with num_chunks and num_samples_per_chunk
-   * to allow for many small chunks. */
-  int rounded_range_start_sample = (int)floorf(range_start_sample + 0.5f);
-  int rounded_range_num_samples = max((int)floorf(range_num_samples + 0.5f), 1);
-
-  /* Make sure we don't overshoot. */
-  if (rounded_range_start_sample + rounded_range_num_samples > num_samples) {
-    rounded_range_num_samples = num_samples - rounded_range_num_samples;
-  }
-
-  VLOG(1) << "Samples range start is " << range_start_sample << ", "
-          << "number of samples to render is " << range_num_samples;
-
-  scene->integrator->set_start_sample(rounded_range_start_sample);
-
-  /* TODO(sergey): Need to be brought back. */
-#if 0
-  session->tile_manager.range_start_sample = rounded_range_start_sample;
-  session->tile_manager.range_num_samples = rounded_range_num_samples;
-#endif
 }
 
 void BlenderSession::free_blender_memory_if_possible()
