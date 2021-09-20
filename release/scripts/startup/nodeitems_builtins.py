@@ -500,8 +500,8 @@ geometry_node_categories = [
         NodeItem("GeometryNodeLegacyAttributeSeparateXYZ", poll=geometry_nodes_fields_legacy_poll),
         NodeItem("GeometryNodeLegacyAttributeMapRange", poll=geometry_nodes_fields_legacy_poll),
         NodeItem("GeometryNodeLegacyAttributeTransfer", poll=geometry_nodes_fields_legacy_poll),
+        NodeItem("GeometryNodeAttributeRemove", poll=geometry_nodes_fields_legacy_poll),
 
-        NodeItem("GeometryNodeAttributeRemove"),
         NodeItem("GeometryNodeAttributeCapture", poll=geometry_nodes_fields_poll),
     ]),
     GeometryNodeCategory("GEO_COLOR", "Color", items=[
@@ -546,6 +546,7 @@ geometry_node_categories = [
         NodeItem("GeometryNodeJoinGeometry"),
         NodeItem("GeometryNodeSeparateComponents"),
         NodeItem("GeometryNodeSetPosition", poll=geometry_nodes_fields_poll),
+        NodeItem("GeometryNodeRealizeInstances", poll=geometry_nodes_fields_poll),
     ]),
     GeometryNodeCategory("GEO_INPUT", "Input", items=[
         NodeItem("GeometryNodeObjectInfo"),

@@ -3947,6 +3947,9 @@ void nodeDeclarationEnsure(bNodeTree *UNUSED(ntree), bNode *node)
   if (node->typeinfo->declare == nullptr) {
     return;
   }
+  if (node->declaration != nullptr) {
+    return;
+  }
 
   node->declaration = new blender::nodes::NodeDeclaration();
   blender::nodes::NodeDeclarationBuilder builder{*node->declaration};
@@ -5226,6 +5229,7 @@ static void registerGeometryNodes()
   register_node_type_geo_point_translate();
   register_node_type_geo_points_to_volume();
   register_node_type_geo_raycast();
+  register_node_type_geo_realize_instances();
   register_node_type_geo_sample_texture();
   register_node_type_geo_select_by_handle_type();
   register_node_type_geo_material_selection();
