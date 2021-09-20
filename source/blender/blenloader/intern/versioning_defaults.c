@@ -52,6 +52,7 @@
 #include "BKE_brush.h"
 #include "BKE_colortools.h"
 #include "BKE_curveprofile.h"
+#include "BKE_customdata.h"
 #include "BKE_gpencil.h"
 #include "BKE_layer.h"
 #include "BKE_lib_id.h"
@@ -155,12 +156,10 @@ static void blo_update_defaults_screen(bScreen *screen,
     }
     else if (area->spacetype == SPACE_SEQ) {
       SpaceSeq *seq = area->spacedata.first;
-      seq->flag |= SEQ_SHOW_MARKERS | SEQ_SHOW_FCURVES | SEQ_ZOOM_TO_FIT | SEQ_SHOW_STRIP_OVERLAY |
-                   SEQ_SHOW_STRIP_SOURCE | SEQ_SHOW_STRIP_NAME | SEQ_SHOW_STRIP_DURATION |
-                   SEQ_SHOW_GRID;
-
+      seq->flag |= SEQ_SHOW_MARKERS | SEQ_ZOOM_TO_FIT | SEQ_USE_PROXIES | SEQ_SHOW_OVERLAY;
       seq->render_size = SEQ_RENDER_SIZE_PROXY_100;
-      seq->flag |= SEQ_USE_PROXIES;
+      seq->timeline_overlay.flag |= SEQ_TIMELINE_SHOW_STRIP_SOURCE | SEQ_TIMELINE_SHOW_STRIP_NAME |
+                                    SEQ_TIMELINE_SHOW_STRIP_DURATION | SEQ_TIMELINE_SHOW_GRID;
     }
     else if (area->spacetype == SPACE_TEXT) {
       /* Show syntax and line numbers in Script workspace text editor. */
@@ -551,6 +550,11 @@ void BLO_update_defaults_startup_blend(Main *bmain, const char *app_template)
       mesh->remesh_voxel_size = 0.035f;
       mesh->flag |= ME_REMESH_FIX_POLES | ME_REMESH_REPROJECT_VOLUME;
       BKE_mesh_smooth_flag_set(mesh, false);
+    }
+    else {
+      /* Remove sculpt-mask data in default mesh objects for all non-sculpt templates. */
+      CustomData_free_layers(&mesh->vdata, CD_PAINT_MASK, mesh->totvert);
+      CustomData_free_layers(&mesh->ldata, CD_GRID_PAINT_MASK, mesh->totloop);
     }
   }
 
