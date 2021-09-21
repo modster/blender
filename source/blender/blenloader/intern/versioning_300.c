@@ -239,6 +239,16 @@ static void do_versions_idproperty_bones_recursive(Bone *bone)
   }
 }
 
+static void do_versions_idproperty_seq_recursive(ListBase *seqbase)
+{
+  LISTBASE_FOREACH (Sequence *, seq, seqbase) {
+    version_idproperty_ui_data(seq->prop);
+    if (seq->type == SEQ_TYPE_META) {
+      do_versions_idproperty_seq_recursive(&seq->seqbase);
+    }
+  }
+}
+
 /**
  * For every data block that supports them, initialize the new IDProperty UI data struct based on
  * the old more complicated storage. Assumes only the top level of IDProperties below the parent
@@ -299,9 +309,7 @@ static void do_versions_idproperty_ui_data(Main *bmain)
   /* Sequences. */
   LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
     if (scene->ed != NULL) {
-      LISTBASE_FOREACH (Sequence *, seq, &scene->ed->seqbase) {
-        version_idproperty_ui_data(seq->prop);
-      }
+      do_versions_idproperty_seq_recursive(&scene->ed->seqbase);
     }
   }
 }
@@ -1081,7 +1089,7 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
         LISTBASE_FOREACH (SpaceLink *, sl, &area->spacedata) {
           if (sl->spacetype == SPACE_SEQ) {
             SpaceSeq *sseq = (SpaceSeq *)sl;
-            sseq->flag |= SEQ_SHOW_GRID;
+            sseq->flag |= SEQ_TIMELINE_SHOW_GRID;
           }
         }
       }
@@ -1249,6 +1257,46 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
               LineartGpencilModifierData *lmd = (LineartGpencilModifierData *)md;
               lmd->calculation_flags |= LRT_USE_CREASE_ON_SMOOTH_SURFACES;
             }
+          }
+        }
+      }
+    }
+  }
+
+  if (!MAIN_VERSION_ATLEAST(bmain, 300, 23)) {
+    for (bScreen *screen = bmain->screens.first; screen; screen = screen->id.next) {
+      LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
+        LISTBASE_FOREACH (SpaceLink *, sl, &area->spacedata) {
+          if (sl->spacetype == SPACE_FILE) {
+            SpaceFile *sfile = (SpaceFile *)sl;
+            if (sfile->asset_params) {
+              sfile->asset_params->base_params.recursion_level = FILE_SELECT_MAX_RECURSIONS;
+            }
+          }
+        }
+      }
+    }
+
+    LISTBASE_FOREACH (bScreen *, screen, &bmain->screens) {
+      LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
+        LISTBASE_FOREACH (SpaceLink *, sl, &area->spacedata) {
+          if (sl->spacetype == SPACE_SEQ) {
+            SpaceSeq *sseq = (SpaceSeq *)sl;
+            int seq_show_safe_margins = (sseq->flag & SEQ_PREVIEW_SHOW_SAFE_MARGINS);
+            int seq_show_gpencil = (sseq->flag & SEQ_PREVIEW_SHOW_GPENCIL);
+            int seq_show_fcurves = (sseq->flag & SEQ_TIMELINE_SHOW_FCURVES);
+            int seq_show_safe_center = (sseq->flag & SEQ_PREVIEW_SHOW_SAFE_CENTER);
+            int seq_show_metadata = (sseq->flag & SEQ_PREVIEW_SHOW_METADATA);
+            int seq_show_strip_name = (sseq->flag & SEQ_TIMELINE_SHOW_STRIP_NAME);
+            int seq_show_strip_source = (sseq->flag & SEQ_TIMELINE_SHOW_STRIP_SOURCE);
+            int seq_show_strip_duration = (sseq->flag & SEQ_TIMELINE_SHOW_STRIP_DURATION);
+            int seq_show_grid = (sseq->flag & SEQ_TIMELINE_SHOW_GRID);
+            int show_strip_offset = (sseq->draw_flag & SEQ_TIMELINE_SHOW_STRIP_OFFSETS);
+            sseq->preview_overlay.flag = (seq_show_safe_margins | seq_show_gpencil |
+                                          seq_show_safe_center | seq_show_metadata);
+            sseq->timeline_overlay.flag = (seq_show_fcurves | seq_show_strip_name |
+                                           seq_show_strip_source | seq_show_strip_duration |
+                                           seq_show_grid | show_strip_offset);
           }
         }
       }

@@ -3947,6 +3947,9 @@ void nodeDeclarationEnsure(bNodeTree *UNUSED(ntree), bNode *node)
   if (node->typeinfo->declare == nullptr) {
     return;
   }
+  if (node->declaration != nullptr) {
+    return;
+  }
 
   node->declaration = new blender::nodes::NodeDeclaration();
   blender::nodes::NodeDeclarationBuilder builder{*node->declaration};
@@ -5153,6 +5156,9 @@ static void registerGeometryNodes()
 {
   register_node_type_geo_group();
 
+  register_node_type_geo_legacy_material_assign();
+  register_node_type_geo_legacy_select_by_material();
+
   register_node_type_geo_align_rotation_to_vector();
   register_node_type_geo_attribute_clamp();
   register_node_type_geo_attribute_color_ramp();
@@ -5169,6 +5175,7 @@ static void registerGeometryNodes()
   register_node_type_geo_attribute_randomize();
   register_node_type_geo_attribute_remove();
   register_node_type_geo_attribute_separate_xyz();
+  register_node_type_geo_attribute_statistic();
   register_node_type_geo_attribute_transfer();
   register_node_type_geo_attribute_vector_math();
   register_node_type_geo_attribute_vector_rotate();
@@ -5176,6 +5183,7 @@ static void registerGeometryNodes()
   register_node_type_geo_bounding_box();
   register_node_type_geo_collection_info();
   register_node_type_geo_convex_hull();
+  register_node_type_geo_curve_sample();
   register_node_type_geo_curve_endpoints();
   register_node_type_geo_curve_fill();
   register_node_type_geo_curve_length();
@@ -5223,9 +5231,10 @@ static void registerGeometryNodes()
   register_node_type_geo_point_translate();
   register_node_type_geo_points_to_volume();
   register_node_type_geo_raycast();
+  register_node_type_geo_realize_instances();
   register_node_type_geo_sample_texture();
   register_node_type_geo_select_by_handle_type();
-  register_node_type_geo_select_by_material();
+  register_node_type_geo_material_selection();
   register_node_type_geo_separate_components();
   register_node_type_geo_set_position();
   register_node_type_geo_subdivision_surface();
