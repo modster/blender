@@ -3416,7 +3416,7 @@ void blo_do_versions_280(FileData *fd, Library *UNUSED(lib), Main *bmain)
             case SPACE_FILE: {
               SpaceFile *sfile = (SpaceFile *)sl;
               if (sfile->params) {
-                sfile->params->flag &= ~(FILE_PARAMS_FLAG_UNUSED_1 | FILE_PARAMS_FLAG_UNUSED_6 |
+                sfile->params->flag &= ~(FILE_APPEND_SET_FAKEUSER | FILE_APPEND_RECURSIVE |
                                          FILE_OBDATA_INSTANCE);
               }
               break;
@@ -4966,7 +4966,7 @@ void blo_do_versions_280(FileData *fd, Library *UNUSED(lib), Main *bmain)
         for (SpaceLink *sl = area->spacedata.first; sl; sl = sl->next) {
           if (sl->spacetype == SPACE_SEQ) {
             SpaceSeq *sseq = (SpaceSeq *)sl;
-            sseq->flag |= SEQ_SHOW_FCURVES;
+            sseq->flag |= SEQ_TIMELINE_SHOW_FCURVES;
           }
         }
       }
