@@ -1032,6 +1032,11 @@ typedef struct NodeShaderTexPointDensity {
   char _pad2[4];
 } NodeShaderTexPointDensity;
 
+typedef struct NodeShaderPrincipled {
+  char use_subsurface_auto_radius;
+  char _pad[3];
+} NodeShaderPrincipled;
+
 /* TEX_output */
 typedef struct TexNodeOutput {
   char name[64];
@@ -1167,6 +1172,7 @@ typedef struct NodeCryptomatte {
 
 typedef struct NodeDenoise {
   char hdr;
+  char prefilter;
 } NodeDenoise;
 
 typedef struct NodeAttributeClamp {
@@ -1450,6 +1456,11 @@ typedef struct NodeGeometryCurveToPoints {
   /* GeometryNodeCurveResampleMode. */
   uint8_t mode;
 } NodeGeometryCurveToPoints;
+
+typedef struct NodeGeometryCurveSample {
+  /* GeometryNodeCurveSampleMode. */
+  uint8_t mode;
+} NodeGeometryCurveSample;
 
 typedef struct NodeGeometryAttributeTransfer {
   /* AttributeDomain. */
@@ -1797,11 +1808,12 @@ enum {
 enum {
 #ifdef DNA_DEPRECATED_ALLOW
   SHD_SUBSURFACE_COMPATIBLE = 0, /* Deprecated */
-#endif
   SHD_SUBSURFACE_CUBIC = 1,
   SHD_SUBSURFACE_GAUSSIAN = 2,
-  SHD_SUBSURFACE_BURLEY = 3,
-  SHD_SUBSURFACE_RANDOM_WALK = 4,
+#endif
+  SHD_SUBSURFACE_DIFFUSION = 3,
+  SHD_SUBSURFACE_RANDOM_WALK_FIXED_RADIUS = 4,
+  SHD_SUBSURFACE_RANDOM_WALK = 5,
 };
 
 /* blur node */
@@ -1839,6 +1851,14 @@ typedef enum CMPNodeSetAlphaMode {
   CMP_NODE_SETALPHA_MODE_APPLY = 0,
   CMP_NODE_SETALPHA_MODE_REPLACE_ALPHA = 1,
 } CMPNodeSetAlphaMode;
+
+/* Denoise Node. */
+/* `NodeDenoise.prefilter` */
+typedef enum CMPNodeDenoisePrefilter {
+  CMP_NODE_DENOISE_PREFILTER_FAST = 0,
+  CMP_NODE_DENOISE_PREFILTER_NONE = 1,
+  CMP_NODE_DENOISE_PREFILTER_ACCURATE = 2
+} CMPNodeDenoisePrefilter;
 
 #define CMP_NODE_PLANETRACKDEFORM_MBLUR_SAMPLES_MAX 64
 
@@ -2030,14 +2050,14 @@ typedef enum GeometryNodeCurvePrimitiveBezierSegmentMode {
 } GeometryNodeCurvePrimitiveBezierSegmentMode;
 
 typedef enum GeometryNodeCurveResampleMode {
-  GEO_NODE_CURVE_SAMPLE_COUNT = 0,
-  GEO_NODE_CURVE_SAMPLE_LENGTH = 1,
-  GEO_NODE_CURVE_SAMPLE_EVALUATED = 2,
+  GEO_NODE_CURVE_RESAMPLE_COUNT = 0,
+  GEO_NODE_CURVE_RESAMPLE_LENGTH = 1,
+  GEO_NODE_CURVE_RESAMPLE_EVALUATED = 2,
 } GeometryNodeCurveResampleMode;
 
 typedef enum GeometryNodeCurveSampleMode {
-  GEO_NODE_CURVE_INTERPOLATE_FACTOR = 0,
-  GEO_NODE_CURVE_INTERPOLATE_LENGTH = 1,
+  GEO_NODE_CURVE_SAMPLE_FACTOR = 0,
+  GEO_NODE_CURVE_SAMPLE_LENGTH = 1,
 } GeometryNodeCurveSampleMode;
 
 typedef enum GeometryNodeAttributeTransferMapMode {

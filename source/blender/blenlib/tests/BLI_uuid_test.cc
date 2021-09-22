@@ -20,7 +20,7 @@
 
 TEST(BLI_uuid, generate_random)
 {
-  const UUID uuid = BLI_uuid_generate_random();
+  const bUUID uuid = BLI_uuid_generate_random();
 
   // The 4 MSbits represent the "version" of the UUID.
   const uint16_t version = uuid.time_hi_and_version >> 12;
@@ -33,11 +33,11 @@ TEST(BLI_uuid, generate_random)
 
 TEST(BLI_uuid, generate_many_random)
 {
-  const UUID first_uuid = BLI_uuid_generate_random();
+  const bUUID first_uuid = BLI_uuid_generate_random();
 
   /* Generate lots of UUIDs to get some indication that the randomness is okay. */
   for (int i = 0; i < 1000000; ++i) {
-    const UUID uuid = BLI_uuid_generate_random();
+    const bUUID uuid = BLI_uuid_generate_random();
     EXPECT_FALSE(BLI_uuid_equal(first_uuid, uuid));
 
     // Check that the non-random bits are set according to RFC4122.
@@ -48,10 +48,23 @@ TEST(BLI_uuid, generate_many_random)
   }
 }
 
+TEST(BLI_uuid, nil_value)
+{
+  const bUUID nil_uuid = BLI_uuid_nil();
+  const bUUID zeroes_uuid = {0, 0, 0, 0, 0, 0};
+
+  EXPECT_TRUE(BLI_uuid_equal(nil_uuid, zeroes_uuid));
+  EXPECT_TRUE(BLI_uuid_is_nil(nil_uuid));
+
+  std::string buffer(36, '\0');
+  BLI_uuid_format(buffer.data(), nil_uuid);
+  EXPECT_EQ("00000000-0000-0000-0000-000000000000", buffer);
+}
+
 TEST(BLI_uuid, equality)
 {
-  const UUID uuid1 = BLI_uuid_generate_random();
-  const UUID uuid2 = BLI_uuid_generate_random();
+  const bUUID uuid1 = BLI_uuid_generate_random();
+  const bUUID uuid2 = BLI_uuid_generate_random();
 
   EXPECT_TRUE(BLI_uuid_equal(uuid1, uuid1));
   EXPECT_FALSE(BLI_uuid_equal(uuid1, uuid2));
@@ -59,7 +72,7 @@ TEST(BLI_uuid, equality)
 
 TEST(BLI_uuid, string_formatting)
 {
-  UUID uuid;
+  bUUID uuid;
   std::string buffer(36, '\0');
 
   memset(&uuid, 0, sizeof(uuid));
@@ -78,20 +91,20 @@ TEST(BLI_uuid, string_formatting)
   EXPECT_EQ("00000001-0002-0003-0405-060000000007", buffer);
 
   /* Somewhat more complex bit patterns. This is a version 1 UUID generated from Python. */
-  const UUID uuid1 = {3540651616, 5282, 4588, 139, 153, 0xf7, 0x73, 0x69, 0x44, 0xdb, 0x8b};
+  const bUUID uuid1 = {3540651616, 5282, 4588, 139, 153, {0xf7, 0x73, 0x69, 0x44, 0xdb, 0x8b}};
   BLI_uuid_format(buffer.data(), uuid1);
   EXPECT_EQ("d30a0e60-14a2-11ec-8b99-f7736944db8b", buffer);
 
   /* Namespace UUID, example listed in RFC4211. */
-  const UUID namespace_dns = {
-      0x6ba7b810, 0x9dad, 0x11d1, 0x80, 0xb4, 0x00, 0xc0, 0x4f, 0xd4, 0x30, 0xc8};
+  const bUUID namespace_dns = {
+      0x6ba7b810, 0x9dad, 0x11d1, 0x80, 0xb4, {0x00, 0xc0, 0x4f, 0xd4, 0x30, 0xc8}};
   BLI_uuid_format(buffer.data(), namespace_dns);
   EXPECT_EQ("6ba7b810-9dad-11d1-80b4-00c04fd430c8", buffer);
 }
 
 TEST(BLI_uuid, string_parsing_ok)
 {
-  UUID uuid;
+  bUUID uuid;
   std::string buffer(36, '\0');
 
   const bool parsed_ok = BLI_uuid_parse_string(&uuid, "d30a0e60-14a2-11ec-8b99-f7736944db8b");
@@ -102,7 +115,7 @@ TEST(BLI_uuid, string_parsing_ok)
 
 TEST(BLI_uuid, string_parsing_capitalisation)
 {
-  UUID uuid;
+  bUUID uuid;
   std::string buffer(36, '\0');
 
   /* RFC4122 demands acceptance of upper-case hex digits. */
@@ -116,7 +129,7 @@ TEST(BLI_uuid, string_parsing_capitalisation)
 
 TEST(BLI_uuid, string_parsing_fail)
 {
-  UUID uuid;
+  bUUID uuid;
   std::string buffer(36, '\0');
 
   const bool parsed_ok = BLI_uuid_parse_string(&uuid, "d30a0e60!14a2-11ec-8b99-f7736944db8b");
@@ -126,7 +139,7 @@ TEST(BLI_uuid, string_parsing_fail)
 TEST(BLI_uuid, stream_operator)
 {
   std::stringstream ss;
-  const UUID uuid = {3540651616, 5282, 4588, 139, 153, 0xf7, 0x73, 0x69, 0x44, 0xdb, 0x8b};
+  const bUUID uuid = {3540651616, 5282, 4588, 139, 153, {0xf7, 0x73, 0x69, 0x44, 0xdb, 0x8b}};
   ss << uuid;
   EXPECT_EQ(ss.str(), "d30a0e60-14a2-11ec-8b99-f7736944db8b");
 }

@@ -27,9 +27,9 @@
 #include <string>
 
 /* Ensure the UUID struct doesn't have any padding, to be compatible with memcmp(). */
-static_assert(sizeof(UUID) == 16, "expect UUIDs to be 128 bit exactly");
+static_assert(sizeof(bUUID) == 16, "expect UUIDs to be 128 bit exactly");
 
-UUID BLI_uuid_generate_random()
+bUUID BLI_uuid_generate_random()
 {
   static std::mt19937_64 rng = []() {
     std::mt19937_64 rng;
@@ -39,13 +39,25 @@ UUID BLI_uuid_generate_random()
     static_assert(std::mt19937_64::max() == 0xffffffffffffffffLL);
 
     struct timespec ts;
+#ifdef __APPLE__
+    /* `timespec_get()` is only available on macOS 10.15+, so until that's the minimum version
+     * supported by Blender, use another function to get the timespec.
+     *
+     * `clock_gettime()` is only available on POSIX, so not on Windows; Linux uses the newer C++11
+     * function `timespec_get()` as well. */
+    clock_gettime(CLOCK_REALTIME, &ts);
+#else
     timespec_get(&ts, TIME_UTC);
-    rng.seed(ts.tv_nsec);
+#endif
+    /* XOR the nanosecond and second fields, just in case the clock only has seconds resolution. */
+    uint64_t seed = ts.tv_nsec;
+    seed ^= ts.tv_sec;
+    rng.seed(seed);
 
     return rng;
   }();
 
-  UUID uuid;
+  bUUID uuid;
 
   /* RFC4122 suggests setting certain bits to a fixed value, and then randomizing the remaining
    * bits. The opposite is easier to implement, though, so that's what's done here. */
@@ -66,12 +78,23 @@ UUID BLI_uuid_generate_random()
   return uuid;
 }
 
-bool BLI_uuid_equal(const UUID uuid1, const UUID uuid2)
+bUUID BLI_uuid_nil(void)
+{
+  const bUUID nil = {0, 0, 0, 0, 0, 0};
+  return nil;
+}
+
+bool BLI_uuid_is_nil(bUUID uuid)
+{
+  return BLI_uuid_equal(BLI_uuid_nil(), uuid);
+}
+
+bool BLI_uuid_equal(const bUUID uuid1, const bUUID uuid2)
 {
   return std::memcmp(&uuid1, &uuid2, sizeof(uuid1)) == 0;
 }
 
-void BLI_uuid_format(char *buffer, const UUID uuid)
+void BLI_uuid_format(char *buffer, const bUUID uuid)
 {
   std::sprintf(buffer,
                "%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x",
@@ -88,7 +111,7 @@ void BLI_uuid_format(char *buffer, const UUID uuid)
                uuid.node[5]);
 }
 
-bool BLI_uuid_parse_string(UUID *uuid, const char *buffer)
+bool BLI_uuid_parse_string(bUUID *uuid, const char *buffer)
 {
   const int num_fields_parsed = std::sscanf(
       buffer,
@@ -107,7 +130,7 @@ bool BLI_uuid_parse_string(UUID *uuid, const char *buffer)
   return num_fields_parsed == 11;
 }
 
-std::ostream &operator<<(std::ostream &stream, UUID uuid)
+std::ostream &operator<<(std::ostream &stream, bUUID uuid)
 {
   std::string buffer(36, '\0');
   BLI_uuid_format(buffer.data(), uuid);
