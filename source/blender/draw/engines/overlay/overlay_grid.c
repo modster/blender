@@ -63,6 +63,7 @@ void OVERLAY_grid_init(OVERLAY_Data *vedata)
 
   if (pd->space_type == SPACE_IMAGE) {
     SpaceImage *sima = (SpaceImage *)draw_ctx->space_data;
+    View2D *v2d = &draw_ctx->region->v2d;
     if (sima->mode == SI_MODE_UV || !ED_space_image_has_buffer(sima)) {
       shd->grid_flag = GRID_BACK | PLANE_IMAGE | SHOW_GRID;
     }
@@ -76,8 +77,22 @@ void OVERLAY_grid_init(OVERLAY_Data *vedata)
       shd->grid_size[0] = (float)sima->tile_grid_shape[0];
       shd->grid_size[1] = (float)sima->tile_grid_shape[1];
     }
-    for (int step = 0; step < 8; step++) {
-      shd->grid_steps[step] = powf(4, step) * (1.0f / 16.0f);
+    /**
+     * Previously the UV/Image Editor grid was static :
+     * - 0-1 UV space divided into 4x4 divisions marked by thick grid lines (1 grid unit = 0.25 UV
+     *   units)
+     * - 0-1 UV space divided into 16x16 divisions marked by thin grid lines (1 grid unit = 0.0625
+     *   UV units)
+     *
+     * The new UV/Image Editor grid now supports 2 grid types :
+     * - Subdividing grid : Similar to the 3D viewport grid (zooming in adds more divisions to the
+     *   grid) [T89789]
+     * - Dynamic grid : Users create a desired NxN grid by using options exposed in UI [T78389]
+     */
+    if (sima->flag & SI_DYNAMIC_GRID) {
+      shd->grid_flag |= DYNAMIC_GRID;
+      /* Temporary fix : dynamic_grid_size is not using the default value (=1) assignd in RNA */
+      sima->dynamic_grid_size = (sima->dynamic_grid_size == 0) ? 1 : sima->dynamic_grid_size;
     }
     /* N denotes the grid dimension when zoomed out (NxN grid).
      * While zooming in, each grid division further subdivides into smaller NxN divisions
