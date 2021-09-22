@@ -21,8 +21,12 @@
 
 #include "DEG_depsgraph_query.h"
 
+#include "FN_field.hh"
+#include "FN_field_cpp_type.hh"
 #include "FN_generic_value_map.hh"
 #include "FN_multi_function.hh"
+
+#include "BLT_translation.h"
 
 #include "BLI_enumerable_thread_specific.hh"
 #include "BLI_stack.hh"
@@ -33,6 +37,9 @@
 namespace blender::modifiers::geometry_nodes {
 
 using fn::CPPType;
+using fn::Field;
+using fn::FieldCPPType;
+using fn::GField;
 using fn::GValueMap;
 using nodes::GeoNodeExecParams;
 using namespace fn::multi_function_types;
@@ -316,6 +323,18 @@ static const CPPType *get_socket_cpp_type(const DSocket socket)
 
 static void get_socket_value(const SocketRef &socket, void *r_value)
 {
+  const bNodeSocket &bsocket = *socket.bsocket();
+  /* This is not supposed to be a long term solution. Eventually we want that nodes can specify
+   * more complex defaults (other than just single values) in their socket declarations. */
+  if (bsocket.flag & SOCK_HIDE_VALUE) {
+    const bNode &bnode = *socket.bnode();
+    if (bsocket.type == SOCK_VECTOR &&
+        ELEM(bnode.type, GEO_NODE_SET_POSITION, SH_NODE_TEX_NOISE)) {
+      new (r_value) Field<float3>(
+          std::make_shared<bke::AttributeFieldInput>("position", CPPType::get<float3>()));
+      return;
+    }
+  }
   const bNodeSocketType *typeinfo = socket.typeinfo();
   typeinfo->get_geometry_nodes_cpp_value(*socket.bsocket(), r_value);
 }
@@ -851,6 +870,12 @@ class GeometryNodesEvaluator {
 
     NodeParamsProvider params_provider{*this, node, node_state};
     GeoNodeExecParams params{params_provider};
+    if (USER_EXPERIMENTAL_TEST(&U, use_geometry_nodes_fields)) {
+      if (node->idname().find("Legacy") != StringRef::not_found) {
+        params.error_message_add(geo_log::NodeWarningType::Legacy,
+                                 TIP_("Legacy node will be removed before Blender 4.0"));
+      }
+    }
     bnode.typeinfo->geometry_node_execute(params);
   }
 
@@ -858,11 +883,10 @@ class GeometryNodesEvaluator {
                                    const MultiFunction &fn,
                                    NodeState &node_state)
   {
-    MFContextBuilder fn_context;
-    MFParamsBuilder fn_params{fn, 1};
     LinearAllocator<> &allocator = local_allocators_.local();
 
     /* Prepare the inputs for the multi function. */
+    Vector<GField> input_fields;
     for (const int i : node->inputs().index_range()) {
       const InputSocketRef &socket_ref = node->input(i);
       if (!socket_ref.is_available()) {
@@ -873,24 +897,12 @@ class GeometryNodesEvaluator {
       BLI_assert(input_state.was_ready_for_execution);
       SingleInputValue &single_value = *input_state.value.single;
       BLI_assert(single_value.value != nullptr);
-      fn_params.add_readonly_single_input(GPointer{*input_state.type, single_value.value});
-    }
-    /* Prepare the outputs for the multi function. */
-    Vector<GMutablePointer> outputs;
-    for (const int i : node->outputs().index_range()) {
-      const OutputSocketRef &socket_ref = node->output(i);
-      if (!socket_ref.is_available()) {
-        continue;
-      }
-      const CPPType &type = *get_socket_cpp_type(socket_ref);
-      void *buffer = allocator.allocate(type.size(), type.alignment());
-      fn_params.add_uninitialized_single_output(GMutableSpan{type, buffer, 1});
-      outputs.append({type, buffer});
+      input_fields.append(std::move(*(GField *)single_value.value));
     }
 
-    fn.call(IndexRange(1), fn_params, fn_context);
+    auto operation = std::make_shared<fn::FieldOperation>(fn, std::move(input_fields));
 
-    /* Forward the computed outputs. */
+    /* Forward outputs. */
     int output_index = 0;
     for (const int i : node->outputs().index_range()) {
       const OutputSocketRef &socket_ref = node->output(i);
@@ -899,8 +911,11 @@ class GeometryNodesEvaluator {
       }
       OutputState &output_state = node_state.outputs[i];
       const DOutputSocket socket{node.context(), &socket_ref};
-      GMutablePointer value = outputs[output_index];
-      this->forward_output(socket, value);
+      const CPPType *cpp_type = get_socket_cpp_type(socket_ref);
+      GField new_field{operation, output_index};
+      new_field = fn::make_field_constant_if_possible(std::move(new_field));
+      GField &field_to_forward = *allocator.construct<GField>(std::move(new_field)).release();
+      this->forward_output(socket, {cpp_type, &field_to_forward});
       output_state.has_been_computed = true;
       output_index++;
     }
@@ -922,7 +937,7 @@ class GeometryNodesEvaluator {
       OutputState &output_state = node_state.outputs[socket->index()];
       output_state.has_been_computed = true;
       void *buffer = allocator.allocate(type->size(), type->alignment());
-      type->copy_construct(type->default_value(), buffer);
+      this->construct_default_value(*type, buffer);
       this->forward_output({node.context(), socket}, {*type, buffer});
     }
   }
@@ -1389,14 +1404,42 @@ class GeometryNodesEvaluator {
       return;
     }
 
+    const FieldCPPType *from_field_type = dynamic_cast<const FieldCPPType *>(&from_type);
+    const FieldCPPType *to_field_type = dynamic_cast<const FieldCPPType *>(&to_type);
+
+    if (from_field_type != nullptr && to_field_type != nullptr) {
+      const CPPType &from_base_type = from_field_type->field_type();
+      const CPPType &to_base_type = to_field_type->field_type();
+      if (conversions_.is_convertible(from_base_type, to_base_type)) {
+        const MultiFunction &fn = *conversions_.get_conversion_multi_function(
+            MFDataType::ForSingle(from_base_type), MFDataType::ForSingle(to_base_type));
+        const GField &from_field = *(const GField *)from_value;
+        auto operation = std::make_shared<fn::FieldOperation>(fn, Vector<GField>{from_field});
+        new (to_value) GField(std::move(operation), 0);
+        return;
+      }
+    }
     if (conversions_.is_convertible(from_type, to_type)) {
       /* Do the conversion if possible. */
       conversions_.convert_to_uninitialized(from_type, to_type, from_value, to_value);
     }
     else {
       /* Cannot convert, use default value instead. */
-      to_type.copy_construct(to_type.default_value(), to_value);
+      this->construct_default_value(to_type, to_value);
     }
+  }
+
+  void construct_default_value(const CPPType &type, void *r_value)
+  {
+    if (const FieldCPPType *field_cpp_type = dynamic_cast<const FieldCPPType *>(&type)) {
+      const CPPType &base_type = field_cpp_type->field_type();
+      auto constant_fn = std::make_unique<fn::CustomMF_GenericConstant>(
+          base_type, base_type.default_value(), false);
+      auto operation = std::make_shared<fn::FieldOperation>(std::move(constant_fn));
+      new (r_value) GField(std::move(operation), 0);
+      return;
+    }
+    type.copy_construct(type.default_value(), r_value);
   }
 
   NodeState &get_node_state(const DNode node)

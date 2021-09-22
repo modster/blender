@@ -508,6 +508,7 @@ typedef struct uiAfterFunc {
   bContextStore *context;
 
   char undostr[BKE_UNDO_STR_MAX];
+  char drawstr[UI_MAX_DRAW_STR];
 } uiAfterFunc;
 
 static void button_activate_init(bContext *C,
@@ -790,6 +791,10 @@ static void ui_handle_afterfunc_add_operator_ex(wmOperatorType *ot,
   if (context_but && context_but->context) {
     after->context = CTX_store_copy(context_but->context);
   }
+
+  if (context_but) {
+    ui_but_drawstr_without_sep_char(context_but, after->drawstr, sizeof(after->drawstr));
+  }
 }
 
 void ui_handle_afterfunc_add_operator(wmOperatorType *ot, int opcontext)
@@ -899,6 +904,8 @@ static void ui_apply_but_func(bContext *C, uiBut *but)
   if (but->context) {
     after->context = CTX_store_copy(but->context);
   }
+
+  ui_but_drawstr_without_sep_char(but, after->drawstr, sizeof(after->drawstr));
 
   but->optype = NULL;
   but->opcontext = 0;
@@ -1021,7 +1028,8 @@ static void ui_apply_but_funcs_after(bContext *C)
     }
 
     if (after.optype) {
-      WM_operator_name_call_ptr(C, after.optype, after.opcontext, (after.opptr) ? &opptr : NULL);
+      WM_operator_name_call_ptr_with_depends_on_cursor(
+          C, after.optype, after.opcontext, (after.opptr) ? &opptr : NULL, after.drawstr);
     }
 
     if (after.opptr) {
@@ -2933,8 +2941,9 @@ static int ui_text_position_from_hidden(uiBut *but, int pos)
 {
   const char *butstr = (but->editstr) ? but->editstr : but->drawstr;
   const char *strpos = butstr;
+  const char *str_end = butstr + strlen(butstr);
   for (int i = 0; i < pos; i++) {
-    strpos = BLI_str_find_next_char_utf8(strpos, NULL);
+    strpos = BLI_str_find_next_char_utf8(strpos, str_end);
   }
 
   return (strpos - butstr);
@@ -4189,10 +4198,11 @@ static void ui_but_extra_operator_icon_apply(bContext *C, uiBut *but, uiButExtra
     ui_apply_but(C, but->block, but, but->active, true);
   }
   button_activate_state(C, but, BUTTON_STATE_EXIT);
-  WM_operator_name_call_ptr(C,
-                            op_icon->optype_params->optype,
-                            op_icon->optype_params->opcontext,
-                            op_icon->optype_params->opptr);
+  WM_operator_name_call_ptr_with_depends_on_cursor(C,
+                                                   op_icon->optype_params->optype,
+                                                   op_icon->optype_params->opcontext,
+                                                   op_icon->optype_params->opptr,
+                                                   NULL);
 
   /* Force recreation of extra operator icons (pseudo update). */
   ui_but_extra_operator_icons_free(but);

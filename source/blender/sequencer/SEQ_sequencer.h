@@ -63,8 +63,10 @@ void SEQ_tool_settings_fit_method_set(struct Scene *scene, eSeqImageFitMethod fi
 short SEQ_tool_settings_snap_flag_get(struct Scene *scene);
 short SEQ_tool_settings_snap_mode_get(struct Scene *scene);
 int SEQ_tool_settings_snap_distance_get(struct Scene *scene);
+eSeqOverlapMode SEQ_tool_settings_overlap_mode_get(struct Scene *scene);
+int SEQ_tool_settings_pivot_point_get(struct Scene *scene);
 struct SequencerToolSettings *SEQ_tool_settings_copy(struct SequencerToolSettings *tool_settings);
-struct Editing *SEQ_editing_get(struct Scene *scene, bool alloc);
+struct Editing *SEQ_editing_get(const struct Scene *scene);
 struct Editing *SEQ_editing_ensure(struct Scene *scene);
 void SEQ_editing_free(struct Scene *scene, const bool do_id_user);
 struct ListBase *SEQ_active_seqbase_get(const struct Editing *ed);

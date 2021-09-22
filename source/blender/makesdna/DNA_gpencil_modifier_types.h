@@ -56,6 +56,7 @@ typedef enum GpencilModifierType {
   eGpencilModifierType_Lineart = 19,
   eGpencilModifierType_Length = 20,
   eGpencilModifierType_Weight = 21,
+  eGpencilModifierType_Dash = 22,
   /* Keep last. */
   NUM_GREASEPENCIL_MODIFIER_TYPES,
 } GpencilModifierType;
@@ -492,7 +493,10 @@ typedef struct LengthGpencilModifierData {
   float overshoot_fac;
   /** Modifier mode. */
   int mode;
-  char _pad[4];
+  /* Curvature parameters. */
+  float point_density;
+  float segment_influence;
+  float max_angle;
 } LengthGpencilModifierData;
 
 typedef enum eLengthGpencil_Flag {
@@ -500,12 +504,47 @@ typedef enum eLengthGpencil_Flag {
   GP_LENGTH_INVERT_PASS = (1 << 1),
   GP_LENGTH_INVERT_LAYERPASS = (1 << 2),
   GP_LENGTH_INVERT_MATERIAL = (1 << 3),
+  GP_LENGTH_USE_CURVATURE = (1 << 4),
+  GP_LENGTH_INVERT_CURVATURE = (1 << 5),
 } eLengthGpencil_Flag;
 
 typedef enum eLengthGpencil_Type {
   GP_LENGTH_RELATIVE = 0,
   GP_LENGTH_ABSOLUTE = 1,
 } eLengthGpencil_Type;
+
+typedef struct DashGpencilModifierSegment {
+  char name[64];
+  /* For path reference. */
+  struct DashGpencilModifierData *dmd;
+  int dash;
+  int gap;
+  float radius;
+  float opacity;
+  int mat_nr;
+  int _pad;
+} DashGpencilModifierSegment;
+
+typedef struct DashGpencilModifierData {
+  GpencilModifierData modifier;
+  /** Material for filtering. */
+  struct Material *material;
+  /** Layer name. */
+  char layername[64];
+  /** Custom index for passes. */
+  int pass_index;
+  /** Flags. */
+  int flag;
+  /** Custom index for passes. */
+  int layer_pass;
+
+  int dash_offset;
+
+  DashGpencilModifierSegment *segments;
+  int segments_len;
+  int segment_active_index;
+
+} DashGpencilModifierData;
 
 typedef struct MirrorGpencilModifierData {
   GpencilModifierData modifier;

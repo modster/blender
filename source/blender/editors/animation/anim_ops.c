@@ -105,7 +105,7 @@ static void seq_frame_snap_update_best(const int position,
 static int seq_frame_apply_snap(bContext *C, Scene *scene, const int timeline_frame)
 {
 
-  ListBase *seqbase = SEQ_active_seqbase_get(SEQ_editing_get(scene, false));
+  ListBase *seqbase = SEQ_active_seqbase_get(SEQ_editing_get(scene));
   SeqCollection *strips = SEQ_query_all_strips(seqbase);
 
   int best_frame = 0;
@@ -241,6 +241,11 @@ static bool use_sequencer_snapping(bContext *C)
 /* Modal Operator init */
 static int change_frame_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
+  ARegion *region = CTX_wm_region(C);
+  if (CTX_wm_space_seq(C) != NULL && region->regiontype == RGN_TYPE_PREVIEW) {
+    return OPERATOR_CANCELLED;
+  }
+
   /* Change to frame that mouse is over before adding modal handler,
    * as user could click on a single frame (jump to frame) as well as
    * click-dragging over a range (modal scrubbing).

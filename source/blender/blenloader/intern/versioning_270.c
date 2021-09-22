@@ -291,7 +291,7 @@ static void do_version_hue_sat_node(bNodeTree *ntree, bNode *node)
   }
 
   /* Make sure new sockets are properly created. */
-  node_verify_socket_templates(ntree, node);
+  node_verify_sockets(ntree, node, false);
   /* Convert value from old storage to new sockets. */
   NodeHueSat *nhs = node->storage;
   bNodeSocket *hue = nodeFindSocket(node, SOCK_IN, "Hue"),
@@ -357,7 +357,7 @@ static void do_versions_compositor_render_passes(bNodeTree *ntree)
        */
       do_versions_compositor_render_passes_storage(node);
       /* Make sure new sockets are properly created. */
-      node_verify_socket_templates(ntree, node);
+      node_verify_sockets(ntree, node, false);
       /* Make sure all possibly created sockets have proper storage. */
       do_versions_compositor_render_passes_storage(node);
     }
@@ -651,13 +651,6 @@ void blo_do_versions_270(FileData *fd, Library *UNUSED(lib), Main *bmain)
         mat->line_col[3] = mat->alpha;
       }
     }
-
-    if (!DNA_struct_elem_find(fd->filesdna, "RenderData", "int", "preview_start_resolution")) {
-      Scene *scene;
-      for (scene = bmain->scenes.first; scene; scene = scene->id.next) {
-        scene->r.preview_start_resolution = 64;
-      }
-    }
   }
 
   if (!MAIN_VERSION_ATLEAST(bmain, 271, 3)) {
@@ -694,15 +687,6 @@ void blo_do_versions_270(FileData *fd, Library *UNUSED(lib), Main *bmain)
             pmd->psys->clmd->sim_parms->vel_damping = 1.0f;
           }
         }
-      }
-    }
-  }
-
-  if (!MAIN_VERSION_ATLEAST(bmain, 272, 0)) {
-    if (!DNA_struct_elem_find(fd->filesdna, "RenderData", "int", "preview_start_resolution")) {
-      Scene *scene;
-      for (scene = bmain->scenes.first; scene; scene = scene->id.next) {
-        scene->r.preview_start_resolution = 64;
       }
     }
   }

@@ -177,6 +177,7 @@ extern StructRNA RNA_CompositorNodeMixRGB;
 extern StructRNA RNA_CompositorNodeNormal;
 extern StructRNA RNA_CompositorNodeNormalize;
 extern StructRNA RNA_CompositorNodeOutputFile;
+extern StructRNA RNA_CompositorNodePosterize;
 extern StructRNA RNA_CompositorNodePremulKey;
 extern StructRNA RNA_CompositorNodeRGB;
 extern StructRNA RNA_CompositorNodeRGBToBW;
@@ -221,6 +222,8 @@ extern StructRNA RNA_CurvePoint;
 extern StructRNA RNA_CurveProfile;
 extern StructRNA RNA_CurveProfilePoint;
 extern StructRNA RNA_DampedTrackConstraint;
+extern StructRNA RNA_DashGpencilModifierData;
+extern StructRNA RNA_DashGpencilModifierSegment;
 extern StructRNA RNA_DataTransferModifier;
 extern StructRNA RNA_DecimateModifier;
 extern StructRNA RNA_Depsgraph;
@@ -1006,7 +1009,7 @@ int RNA_property_int_get_index(PointerRNA *ptr, PropertyRNA *prop, int index);
 void RNA_property_int_set_array(PointerRNA *ptr, PropertyRNA *prop, const int *values);
 void RNA_property_int_set_index(PointerRNA *ptr, PropertyRNA *prop, int index, int value);
 int RNA_property_int_get_default(PointerRNA *ptr, PropertyRNA *prop);
-bool RNA_property_int_set_default(PointerRNA *ptr, PropertyRNA *prop, int value);
+bool RNA_property_int_set_default(PropertyRNA *prop, int value);
 void RNA_property_int_get_default_array(PointerRNA *ptr, PropertyRNA *prop, int *values);
 int RNA_property_int_get_default_index(PointerRNA *ptr, PropertyRNA *prop, int index);
 
@@ -1018,7 +1021,7 @@ float RNA_property_float_get_index(PointerRNA *ptr, PropertyRNA *prop, int index
 void RNA_property_float_set_array(PointerRNA *ptr, PropertyRNA *prop, const float *values);
 void RNA_property_float_set_index(PointerRNA *ptr, PropertyRNA *prop, int index, float value);
 float RNA_property_float_get_default(PointerRNA *ptr, PropertyRNA *prop);
-bool RNA_property_float_set_default(PointerRNA *ptr, PropertyRNA *prop, float value);
+bool RNA_property_float_set_default(PropertyRNA *prop, float value);
 void RNA_property_float_get_default_array(PointerRNA *ptr, PropertyRNA *prop, float *values);
 float RNA_property_float_get_default_index(PointerRNA *ptr, PropertyRNA *prop, int index);
 
@@ -1028,7 +1031,7 @@ char *RNA_property_string_get_alloc(
 void RNA_property_string_set(PointerRNA *ptr, PropertyRNA *prop, const char *value);
 void RNA_property_string_set_bytes(PointerRNA *ptr, PropertyRNA *prop, const char *value, int len);
 int RNA_property_string_length(PointerRNA *ptr, PropertyRNA *prop);
-void RNA_property_string_get_default(PointerRNA *ptr, PropertyRNA *prop, char *value);
+void RNA_property_string_get_default(PropertyRNA *prop, char *value, int max_len);
 char *RNA_property_string_get_default_alloc(
     PointerRNA *ptr, PropertyRNA *prop, char *fixedbuf, int fixedlen, int *r_len);
 int RNA_property_string_default_length(PointerRNA *ptr, PropertyRNA *prop);
@@ -1117,12 +1120,16 @@ bool RNA_property_assign_default(PointerRNA *ptr, PropertyRNA *prop);
 
 char *RNA_path_append(
     const char *path, PointerRNA *ptr, PropertyRNA *prop, int intkey, const char *strkey);
+#if 0 /* UNUSED. */
 char *RNA_path_back(const char *path);
+#endif
 
 /* path_resolve() variants only ensure that a valid pointer (and optionally property) exist */
 bool RNA_path_resolve(PointerRNA *ptr, const char *path, PointerRNA *r_ptr, PropertyRNA **r_prop);
 
 bool RNA_path_resolve_full(
+    PointerRNA *ptr, const char *path, PointerRNA *r_ptr, PropertyRNA **r_prop, int *r_index);
+bool RNA_path_resolve_full_maybe_null(
     PointerRNA *ptr, const char *path, PointerRNA *r_ptr, PropertyRNA **r_prop, int *r_index);
 
 /* path_resolve_property() variants ensure that pointer + property both exist */
@@ -1162,7 +1169,7 @@ char *RNA_path_from_struct_to_idproperty(PointerRNA *ptr, struct IDProperty *nee
 
 struct ID *RNA_find_real_ID_and_path(struct Main *bmain, struct ID *id, const char **r_path);
 
-char *RNA_path_from_ID_to_struct(PointerRNA *ptr);
+char *RNA_path_from_ID_to_struct(const PointerRNA *ptr);
 
 char *RNA_path_from_real_ID_to_struct(struct Main *bmain, PointerRNA *ptr, struct ID **r_real);
 
@@ -1192,7 +1199,7 @@ char *RNA_path_full_property_py(struct Main *bmain,
                                 struct PropertyRNA *prop,
                                 int index);
 char *RNA_path_struct_property_py(struct PointerRNA *ptr, struct PropertyRNA *prop, int index);
-char *RNA_path_property_py(struct PointerRNA *ptr, struct PropertyRNA *prop, int index);
+char *RNA_path_property_py(const struct PointerRNA *ptr, struct PropertyRNA *prop, int index);
 
 /* Quick name based property access
  *

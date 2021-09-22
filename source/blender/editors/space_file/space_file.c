@@ -738,8 +738,18 @@ static void file_tools_region_draw(const bContext *C, ARegion *region)
   ED_region_panels(C, region);
 }
 
-static void file_tools_region_listener(const wmRegionListenerParams *UNUSED(listener_params))
+static void file_tools_region_listener(const wmRegionListenerParams *listener_params)
 {
+  const wmNotifier *wmn = listener_params->notifier;
+  ARegion *region = listener_params->region;
+
+  switch (wmn->category) {
+    case NC_SCENE:
+      if (ELEM(wmn->data, ND_MODE)) {
+        ED_region_tag_redraw(region);
+      }
+      break;
+  }
 }
 
 static void file_tool_props_region_listener(const wmRegionListenerParams *listener_params)
@@ -751,6 +761,11 @@ static void file_tool_props_region_listener(const wmRegionListenerParams *listen
     case NC_ID:
       if (ELEM(wmn->action, NA_RENAME)) {
         /* In case the filelist shows ID names. */
+        ED_region_tag_redraw(region);
+      }
+      break;
+    case NC_SCENE:
+      if (ELEM(wmn->data, ND_MODE)) {
         ED_region_tag_redraw(region);
       }
       break;
@@ -871,8 +886,9 @@ static void file_space_subtype_item_extend(bContext *UNUSED(C),
   RNA_enum_items_add(item, totitem, rna_enum_space_file_browse_mode_items);
 }
 
-static const char *file_context_dir[] = {
+const char *file_context_dir[] = {
     "active_file",
+    "selected_files",
     "asset_library_ref",
     "id",
     NULL,
@@ -907,6 +923,20 @@ static int /*eContextResult*/ file_context(const bContext *C,
     CTX_data_pointer_set(result, &screen->id, &RNA_FileSelectEntry, file);
     return CTX_RESULT_OK;
   }
+  if (CTX_data_equals(member, "selected_files")) {
+    const int num_files_filtered = filelist_files_ensure(sfile->files);
+
+    for (int file_index = 0; file_index < num_files_filtered; file_index++) {
+      if (filelist_entry_is_selected(sfile->files, file_index)) {
+        FileDirEntry *entry = filelist_file(sfile->files, file_index);
+        CTX_data_list_add(result, &screen->id, &RNA_FileSelectEntry, entry);
+      }
+    }
+
+    CTX_data_type_set(result, CTX_DATA_TYPE_COLLECTION);
+    return CTX_RESULT_OK;
+  }
+
   if (CTX_data_equals(member, "asset_library_ref")) {
     FileAssetSelectParams *asset_params = ED_fileselect_get_asset_params(sfile);
     if (!asset_params) {
