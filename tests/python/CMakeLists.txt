@@ -637,7 +637,6 @@ if(WITH_CYCLES OR WITH_OPENGL_RENDER_TESTS)
     set(render_tests
       bsdf
       denoise
-      denoise_animation
       displacement
       hair
       image_colorspace
@@ -766,7 +765,7 @@ foreach(geo_node_test ${geo_node_tests})
       )
       endforeach()
   else()
-    MESSAGE(STATUS "No directory named ${TEST_SRC_DIR}/modeling/geometry_nodes/${geo_node_test}/ found, disabling test.")
+    MESSAGE(STATUS "Directory named ${TEST_SRC_DIR}/modeling/geometry_nodes/${geo_node_test}/ Not Found, disabling test.")
   endif()
 endforeach()
 

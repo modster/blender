@@ -383,6 +383,12 @@ static void wm_append_loose_data_instantiate(WMLinkAppendData *lapp_data,
                                              ViewLayer *view_layer,
                                              const View3D *v3d)
 {
+  if (scene == NULL) {
+    /* In some cases, like the asset drag&drop e.g., the caller code manages instantiation itself.
+     */
+    return;
+  }
+
   LinkNode *itemlink;
   Collection *active_collection = NULL;
   const bool do_obdata = (lapp_data->flag & FILE_OBDATA_INSTANCE) != 0;
@@ -682,47 +688,29 @@ static void wm_append_do(WMLinkAppendData *lapp_data,
       continue;
     }
 
+    ID *local_appended_new_id = NULL;
     switch (item->append_action) {
       case WM_APPEND_ACT_COPY_LOCAL: {
         BKE_lib_id_make_local(
-            bmain, id, false, LIB_ID_MAKELOCAL_FULL_LIBRARY | LIB_ID_MAKELOCAL_FORCE_COPY);
-        if (id->newid != NULL) {
-          if (GS(id->newid->name) == ID_OB) {
-            BKE_rigidbody_ensure_local_object(bmain, (Object *)id->newid);
-          }
-          if (set_fakeuser) {
-            if (!ELEM(GS(id->name), ID_OB, ID_GR)) {
-              /* Do not set fake user on objects nor collections (instancing). */
-              id_fake_user_set(id->newid);
-            }
-          }
-        }
+            bmain, id, LIB_ID_MAKELOCAL_FULL_LIBRARY | LIB_ID_MAKELOCAL_FORCE_COPY);
+        local_appended_new_id = id->newid;
         break;
       }
       case WM_APPEND_ACT_MAKE_LOCAL:
         BKE_lib_id_make_local(bmain,
                               id,
-                              false,
                               LIB_ID_MAKELOCAL_FULL_LIBRARY | LIB_ID_MAKELOCAL_FORCE_LOCAL |
                                   LIB_ID_MAKELOCAL_OBJECT_NO_PROXY_CLEARING);
         BLI_assert(id->newid == NULL);
-        if (GS(id->name) == ID_OB) {
-          BKE_rigidbody_ensure_local_object(bmain, (Object *)id);
-        }
-        if (set_fakeuser) {
-          if (!ELEM(GS(id->name), ID_OB, ID_GR)) {
-            /* Do not set fake user on objects nor collections (instancing). */
-            id_fake_user_set(id);
-          }
-        }
+        local_appended_new_id = id;
         break;
       case WM_APPEND_ACT_KEEP_LINKED:
         /* Nothing to do here. */
         break;
       case WM_APPEND_ACT_REUSE_LOCAL:
         /* We only need to set `newid` to ID found in previous loop, for proper remapping. */
-        ID_NEW_SET(id->newid, item->customdata);
-        /* Do not set again fake user in case we reuse existing local ID. */
+        ID_NEW_SET(id, item->customdata);
+        /* This is not a 'new' local appended id, do not set `local_appended_new_id` here. */
         break;
       case WM_APPEND_ACT_UNSET:
         CLOG_ERROR(
@@ -730,6 +718,18 @@ static void wm_append_do(WMLinkAppendData *lapp_data,
         break;
       default:
         BLI_assert(0);
+    }
+
+    if (local_appended_new_id != NULL) {
+      if (GS(local_appended_new_id->name) == ID_OB) {
+        BKE_rigidbody_ensure_local_object(bmain, (Object *)local_appended_new_id);
+      }
+      if (set_fakeuser) {
+        if (!ELEM(GS(local_appended_new_id->name), ID_OB, ID_GR)) {
+          /* Do not set fake user on objects nor collections (instancing). */
+          id_fake_user_set(local_appended_new_id);
+        }
+      }
     }
   }
 
@@ -939,9 +939,8 @@ static bool wm_link_append_item_poll(ReportList *reports,
 
   idcode = BKE_idtype_idcode_from_name(group);
 
-  /* XXX For now, we do a nasty exception for workspace, forbid linking them.
-   *     Not nice, ultimately should be solved! */
-  if (!BKE_idtype_idcode_is_linkable(idcode) && (do_append || idcode != ID_WS)) {
+  if (!BKE_idtype_idcode_is_linkable(idcode) ||
+      (!do_append && BKE_idtype_idcode_is_only_appendable(idcode))) {
     if (reports) {
       if (do_append) {
         BKE_reportf(reports,
@@ -1281,6 +1280,10 @@ static ID *wm_file_link_append_datablock_ex(Main *bmain,
   return id;
 }
 
+/*
+ * NOTE: `scene` (and related `view_layer` and `v3d`) pointers may be NULL, in which case no
+ * instantiation of linked objects, collections etc. will be performed.
+ */
 ID *WM_file_link_datablock(Main *bmain,
                            Scene *scene,
                            ViewLayer *view_layer,
@@ -1293,6 +1296,10 @@ ID *WM_file_link_datablock(Main *bmain,
       bmain, scene, view_layer, v3d, filepath, id_code, id_name, false);
 }
 
+/*
+ * NOTE: `scene` (and related `view_layer` and `v3d`) pointers may be NULL, in which case no
+ * instantiation of appended objects, collections etc. will be performed.
+ */
 ID *WM_file_append_datablock(Main *bmain,
                              Scene *scene,
                              ViewLayer *view_layer,

@@ -3947,6 +3947,9 @@ void nodeDeclarationEnsure(bNodeTree *UNUSED(ntree), bNode *node)
   if (node->typeinfo->declare == nullptr) {
     return;
   }
+  if (node->declaration != nullptr) {
+    return;
+  }
 
   node->declaration = new blender::nodes::NodeDeclaration();
   blender::nodes::NodeDeclarationBuilder builder{*node->declaration};
@@ -5153,6 +5156,9 @@ static void registerGeometryNodes()
 {
   register_node_type_geo_group();
 
+  register_node_type_geo_legacy_material_assign();
+  register_node_type_geo_legacy_select_by_material();
+
   register_node_type_geo_align_rotation_to_vector();
   register_node_type_geo_attribute_clamp();
   register_node_type_geo_attribute_color_ramp();
@@ -5169,6 +5175,7 @@ static void registerGeometryNodes()
   register_node_type_geo_attribute_randomize();
   register_node_type_geo_attribute_remove();
   register_node_type_geo_attribute_separate_xyz();
+  register_node_type_geo_attribute_statistic();
   register_node_type_geo_attribute_transfer();
   register_node_type_geo_attribute_vector_math();
   register_node_type_geo_attribute_vector_rotate();
@@ -5176,9 +5183,11 @@ static void registerGeometryNodes()
   register_node_type_geo_bounding_box();
   register_node_type_geo_collection_info();
   register_node_type_geo_convex_hull();
+  register_node_type_geo_curve_sample();
   register_node_type_geo_curve_endpoints();
   register_node_type_geo_curve_fill();
   register_node_type_geo_curve_length();
+  register_node_type_geo_curve_parameter();
   register_node_type_geo_curve_primitive_bezier_segment();
   register_node_type_geo_curve_primitive_circle();
   register_node_type_geo_curve_primitive_line();
@@ -5200,6 +5209,7 @@ static void registerGeometryNodes()
   register_node_type_geo_input_material();
   register_node_type_geo_input_normal();
   register_node_type_geo_input_position();
+  register_node_type_geo_input_tangent();
   register_node_type_geo_is_viewport();
   register_node_type_geo_join_geometry();
   register_node_type_geo_material_assign();
@@ -5223,9 +5233,11 @@ static void registerGeometryNodes()
   register_node_type_geo_point_translate();
   register_node_type_geo_points_to_volume();
   register_node_type_geo_raycast();
+  register_node_type_geo_realize_instances();
   register_node_type_geo_sample_texture();
   register_node_type_geo_select_by_handle_type();
-  register_node_type_geo_select_by_material();
+  register_node_type_geo_string_join();
+  register_node_type_geo_material_selection();
   register_node_type_geo_separate_components();
   register_node_type_geo_set_position();
   register_node_type_geo_subdivision_surface();
@@ -5244,6 +5256,9 @@ static void registerFunctionNodes()
   register_node_type_fn_input_string();
   register_node_type_fn_input_vector();
   register_node_type_fn_random_float();
+  register_node_type_fn_string_length();
+  register_node_type_fn_string_substring();
+  register_node_type_fn_value_to_string();
 }
 
 void BKE_node_system_init(void)
