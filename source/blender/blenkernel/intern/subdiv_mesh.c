@@ -66,9 +66,7 @@ typedef struct SubdivMeshContext {
    * Displacement is being accumulated to a vertices coordinates, since those
    * are not needed during traversal of edge/corner vertices.
    *
-   * For normals we are using dedicated array, since we can not use same
-   * vertices (normals are `short`, which will cause a lot of precision
-   * issues). */
+   * This normal array is owned by #subdiv_mesh. */
   float (*accumulated_normals)[3];
   /* Per-subdivided vertex counter of averaged values. */
   int *accumulated_counters;
@@ -107,8 +105,9 @@ static void subdiv_mesh_prepare_accumulator(SubdivMeshContext *ctx, int num_vert
   }
   /* TODO(sergey): Technically, this is overallocating, we don't need memory
    * for an inner subdivision vertices. */
-  ctx->accumulated_normals = MEM_calloc_arrayN(
-      sizeof(*ctx->accumulated_normals), num_vertices, "subdiv accumulated normals");
+  ctx->accumulated_normals = (float(*)[3])CustomData_add_layer(
+      &ctx->subdiv_mesh->vdata, CD_NORMAL, CD_DEFAULT, NULL, num_vertices);
+  memset(ctx->accumulated_normals, 0, sizeof(float[3]) * num_vertices);
   ctx->accumulated_counters = MEM_calloc_arrayN(
       sizeof(*ctx->accumulated_counters), num_vertices, "subdiv accumulated counters");
 }
@@ -459,10 +458,10 @@ static void eval_final_point_and_vertex_normal(Subdiv *subdiv,
                                                const float u,
                                                const float v,
                                                float r_P[3],
-                                               short r_N[3])
+                                               float r_N[3])
 {
   if (subdiv->displacement_evaluator == NULL) {
-    BKE_subdiv_eval_limit_point_and_short_normal(subdiv, ptex_face_index, u, v, r_P, r_N);
+    BKE_subdiv_eval_limit_point_and_normal(subdiv, ptex_face_index, u, v, r_P, r_N);
   }
   else {
     BKE_subdiv_eval_final_point(subdiv, ptex_face_index, u, v, r_P);
@@ -586,15 +585,8 @@ static void evaluate_vertex_and_apply_displacement_copy(const SubdivMeshContext 
   /* Copy custom data and evaluate position. */
   subdiv_vertex_data_copy(ctx, coarse_vert, subdiv_vert);
   BKE_subdiv_eval_limit_point(ctx->subdiv, ptex_face_index, u, v, subdiv_vert->co);
-  /* Apply displacement. */
+  /* Apply displacement. The normals have already been accumulated. */
   add_v3_v3(subdiv_vert->co, D);
-  /* Copy normal from accumulated storage. */
-  if (ctx->can_evaluate_normals) {
-    float N[3];
-    copy_v3_v3(N, ctx->accumulated_normals[subdiv_vertex_index]);
-    normalize_v3(N);
-    normal_float_to_short_v3(subdiv_vert->no, N);
-  }
   /* Remove facedot flag. This can happen if there is more than one subsurf modifier. */
   subdiv_vert->flag &= ~ME_VERT_FACEDOT;
 }
@@ -624,11 +616,8 @@ static void evaluate_vertex_and_apply_displacement_interpolate(
   /* Copy normal from accumulated storage. */
   if (ctx->can_evaluate_normals) {
     const float inv_num_accumulated = 1.0f / ctx->accumulated_counters[subdiv_vertex_index];
-    float N[3];
-    copy_v3_v3(N, ctx->accumulated_normals[subdiv_vertex_index]);
-    mul_v3_fl(N, inv_num_accumulated);
-    normalize_v3(N);
-    normal_float_to_short_v3(subdiv_vert->no, N);
+    mul_v3_fl(ctx->accumulated_normals[subdiv_vertex_index], inv_num_accumulated);
+    normalize_v3(ctx->accumulated_normals[subdiv_vertex_index]);
   }
 }
 
@@ -792,8 +781,12 @@ static void subdiv_mesh_vertex_inner(const SubdivForeachContext *foreach_context
   MVert *subdiv_vert = &subdiv_mvert[subdiv_vertex_index];
   subdiv_mesh_ensure_vertex_interpolation(ctx, tls, coarse_poly, coarse_corner);
   subdiv_vertex_data_interpolate(ctx, subdiv_vert, &tls->vertex_interpolation, u, v);
-  eval_final_point_and_vertex_normal(
-      subdiv, ptex_face_index, u, v, subdiv_vert->co, subdiv_vert->no);
+  eval_final_point_and_vertex_normal(subdiv,
+                                     ptex_face_index,
+                                     u,
+                                     v,
+                                     subdiv_vert->co,
+                                     ctx->accumulated_normals[subdiv_vertex_index]);
   subdiv_mesh_tag_center_vertex(coarse_poly, subdiv_vert, u, v);
 }
 
@@ -1149,9 +1142,7 @@ static void subdiv_mesh_vertex_of_loose_edge(const struct SubdivForeachContext *
   /* Reset normal, initialize it in a similar way as edit mode does for a
    * vertices adjacent to a loose edges.
    * See `mesh_evaluate#mesh_calc_normals_vert_fallback` */
-  float no[3];
-  normalize_v3_v3(no, subdiv_vertex->co);
-  normal_float_to_short_v3(subdiv_vertex->no, no);
+  normalize_v3_v3(ctx->accumulated_normals[subdiv_vertex_index], subdiv_vertex->co);
 }
 
 /** \} */

@@ -552,7 +552,7 @@ static void shrinkwrap_calc_normal_projection_cb_ex(void *__restrict userdata,
      * (to get correct normals) for other cases calc->verts contains undeformed coordinates and
      * vertexCos should be used */
     copy_v3_v3(tmp_co, calc->vert[i].co);
-    normal_short_to_float_v3(tmp_no, calc->vert[i].no);
+    copy_v3_v3(tmp_no, calc->vert_normals[i]);
   }
   else {
     copy_v3_v3(tmp_co, co);
@@ -1217,9 +1217,9 @@ void BKE_shrinkwrap_compute_smooth_normal(const struct ShrinkwrapTreeData *tree,
 
   /* Interpolate smooth normals if enabled. */
   if ((tree->mesh->mpoly[tri->poly].flag & ME_SMOOTH) != 0) {
-    const int vert_indices[3] = {treeData->loop[tri->tri[0]].v,
-                                 treeData->loop[tri->tri[1]].v,
-                                 treeData->loop[tri->tri[2]].v};
+    const uint32_t vert_indices[3] = {treeData->loop[tri->tri[0]].v,
+                                      treeData->loop[tri->tri[1]].v,
+                                      treeData->loop[tri->tri[2]].v};
     float w[3], no[3][3], tmp_co[3];
 
     /* Custom and auto smooth split normals. */
