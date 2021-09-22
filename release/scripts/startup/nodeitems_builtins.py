@@ -503,6 +503,7 @@ geometry_node_categories = [
         NodeItem("GeometryNodeAttributeRemove", poll=geometry_nodes_fields_legacy_poll),
 
         NodeItem("GeometryNodeAttributeCapture", poll=geometry_nodes_fields_poll),
+        NodeItem("GeometryNodeAttributeStatistic", poll=geometry_nodes_fields_poll),
     ]),
     GeometryNodeCategory("GEO_COLOR", "Color", items=[
         NodeItem("ShaderNodeMixRGB"),
@@ -526,6 +527,9 @@ geometry_node_categories = [
         NodeItem("GeometryNodeCurveFill"),
         NodeItem("GeometryNodeCurveTrim"),
         NodeItem("GeometryNodeCurveLength"),
+        NodeItem("GeometryNodeCurveParameter", poll=geometry_nodes_fields_poll),
+        NodeItem("GeometryNodeInputTangent", poll=geometry_nodes_fields_poll),
+        NodeItem("GeometryNodeCurveSample", poll=geometry_nodes_fields_poll),
     ]),
     GeometryNodeCategory("GEO_PRIMITIVES_CURVE", "Curve Primitives", items=[
         NodeItem("GeometryNodeCurvePrimitiveLine"),
@@ -594,6 +598,12 @@ geometry_node_categories = [
         NodeItem("GeometryNodeLegacyPointTranslate", poll=geometry_nodes_fields_legacy_poll),
         NodeItem("GeometryNodeLegacyRotatePoints", poll=geometry_nodes_fields_legacy_poll),
         NodeItem("GeometryNodeLegacyAlignRotationToVector", poll=geometry_nodes_fields_legacy_poll),
+    ]),
+    GeometryNodeCategory("GEO_TEXT", "Text", items=[
+        NodeItem("FunctionNodeStringLength"),
+        NodeItem("FunctionNodeStringSubstring"),
+        NodeItem("FunctionNodeValueToString"),
+        NodeItem("GeometryNodeStringJoin"),
     ]),
     GeometryNodeCategory("GEO_UTILITIES", "Utilities", items=[
         NodeItem("ShaderNodeMapRange"),
