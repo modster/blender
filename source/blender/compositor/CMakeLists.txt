@@ -317,6 +317,8 @@ set(SRC
   nodes/COM_FilterNode.h
   nodes/COM_InpaintNode.cc
   nodes/COM_InpaintNode.h
+  nodes/COM_PosterizeNode.cc
+  nodes/COM_PosterizeNode.h
 
   operations/COM_BlurBaseOperation.cc
   operations/COM_BlurBaseOperation.h
@@ -328,10 +330,14 @@ set(SRC
   operations/COM_FastGaussianBlurOperation.h
   operations/COM_GammaCorrectOperation.cc
   operations/COM_GammaCorrectOperation.h
+  operations/COM_GaussianAlphaBlurBaseOperation.cc
+  operations/COM_GaussianAlphaBlurBaseOperation.h
   operations/COM_GaussianAlphaXBlurOperation.cc
   operations/COM_GaussianAlphaXBlurOperation.h
   operations/COM_GaussianAlphaYBlurOperation.cc
   operations/COM_GaussianAlphaYBlurOperation.h
+  operations/COM_GaussianBlurBaseOperation.cc
+  operations/COM_GaussianBlurBaseOperation.h
   operations/COM_GaussianBokehBlurOperation.cc
   operations/COM_GaussianBokehBlurOperation.h
   operations/COM_GaussianXBlurOperation.cc
@@ -342,6 +348,8 @@ set(SRC
   operations/COM_MovieClipAttributeOperation.h
   operations/COM_MovieDistortionOperation.cc
   operations/COM_MovieDistortionOperation.h
+  operations/COM_PosterizeOperation.cc
+  operations/COM_PosterizeOperation.h
   operations/COM_SMAAOperation.cc
   operations/COM_SMAAOperation.h
   operations/COM_VariableSizeBokehBlurOperation.cc
@@ -515,6 +523,8 @@ set(SRC
   operations/COM_ScaleOperation.h
   operations/COM_ScreenLensDistortionOperation.cc
   operations/COM_ScreenLensDistortionOperation.h
+  operations/COM_TransformOperation.cc
+  operations/COM_TransformOperation.h
   operations/COM_TranslateOperation.cc
   operations/COM_TranslateOperation.h
   operations/COM_WrapOperation.cc
@@ -641,6 +651,7 @@ if(WITH_GTESTS)
     tests/COM_BufferArea_test.cc
     tests/COM_BufferRange_test.cc
     tests/COM_BuffersIterator_test.cc
+    tests/COM_NodeOperation_test.cc
   )
   set(TEST_INC
   )

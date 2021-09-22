@@ -303,7 +303,7 @@ static void screen_opengl_render_doit(const bContext *C, OGLRender *oglrender, R
 
   if (oglrender->is_sequencer) {
     SpaceSeq *sseq = oglrender->sseq;
-    struct bGPdata *gpd = (sseq && (sseq->flag & SEQ_SHOW_GPENCIL)) ? sseq->gpd : NULL;
+    struct bGPdata *gpd = (sseq && (sseq->flag & SEQ_PREVIEW_SHOW_GPENCIL)) ? sseq->gpd : NULL;
 
     /* use pre-calculated ImBuf (avoids deadlock), see: */
     ImBuf *ibuf = oglrender->seq_data.ibufs_arr[oglrender->view_id];
@@ -697,7 +697,7 @@ static void gather_frames_to_render(bContext *C, OGLRender *oglrender)
     AnimData *adt = BKE_animdata_from_id(id);
     gather_frames_to_render_for_adt(oglrender, adt);
 
-    /* Gather the frames from linked datablocks (materials, shapkeys, etc.). */
+    /* Gather the frames from linked data-blocks (materials, shape-keys, etc.). */
     BKE_library_foreach_ID_link(
         NULL, id, gather_frames_to_render_for_id, oglrender, IDWALK_RECURSE);
   }

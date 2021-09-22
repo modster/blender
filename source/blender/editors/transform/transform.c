@@ -1373,11 +1373,7 @@ static void drawAutoKeyWarning(TransInfo *UNUSED(t), ARegion *region)
   uchar color[3];
   UI_GetThemeColorShade3ubv(TH_TEXT_HI, -50, color);
   BLF_color3ubv(font_id, color);
-#ifdef WITH_INTERNATIONAL
   BLF_draw_default(xco, yco, 0.0f, printable, BLF_DRAW_STR_DUMMY_MAX);
-#else
-  BLF_draw_default_ascii(xco, yco, 0.0f, printable, BLF_DRAW_STR_DUMMY_MAX);
-#endif
 
   /* autokey recording icon... */
   GPU_blend(GPU_BLEND_ALPHA);
@@ -1405,7 +1401,7 @@ static void drawTransformPixel(const struct bContext *C, ARegion *region, void *
 
     /* draw auto-key-framing hint in the corner
      * - only draw if enabled (advanced users may be distracted/annoyed),
-     *   for objects that will be autokeyframed (no point otherwise),
+     *   for objects that will be auto-keyframed (no point otherwise),
      *   AND only for the active region (as showing all is too overwhelming)
      */
     if ((U.autokey_flag & AUTOKEY_FLAG_NOWARNING) == 0) {
@@ -1685,6 +1681,13 @@ bool initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
     }
   }
 
+  if ((prop = RNA_struct_find_property(op->ptr, "view2d_edge_pan")) &&
+      RNA_property_is_set(op->ptr, prop)) {
+    if (RNA_property_boolean_get(op->ptr, prop)) {
+      options |= CTX_VIEW2D_EDGE_PAN;
+    }
+  }
+
   t->options = options;
 
   t->mode = mode;
@@ -1714,11 +1717,13 @@ bool initTransform(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
     t->draw_handle_cursor = WM_paint_cursor_activate(
         SPACE_TYPE_ANY, RGN_TYPE_ANY, transform_draw_cursor_poll, transform_draw_cursor_draw, t);
   }
-  else if (t->spacetype == SPACE_SEQ) {
-    t->draw_handle_view = ED_region_draw_cb_activate(
-        t->region->type, drawTransformView, t, REGION_DRAW_POST_VIEW);
-  }
-  else if (ELEM(t->spacetype, SPACE_IMAGE, SPACE_CLIP, SPACE_NODE, SPACE_GRAPH, SPACE_ACTION)) {
+  else if (ELEM(t->spacetype,
+                SPACE_IMAGE,
+                SPACE_CLIP,
+                SPACE_NODE,
+                SPACE_GRAPH,
+                SPACE_ACTION,
+                SPACE_SEQ)) {
     t->draw_handle_view = ED_region_draw_cb_activate(
         t->region->type, drawTransformView, t, REGION_DRAW_POST_VIEW);
     t->draw_handle_cursor = WM_paint_cursor_activate(

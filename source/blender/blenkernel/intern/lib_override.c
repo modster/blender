@@ -104,7 +104,7 @@ IDOverrideLibrary *BKE_lib_override_library_init(ID *local_id, ID *reference_id)
 {
   /* If reference_id is NULL, we are creating an override template for purely local data.
    * Else, reference *must* be linked data. */
-  BLI_assert(reference_id == NULL || reference_id->lib != NULL);
+  BLI_assert(reference_id == NULL || ID_IS_LINKED(reference_id));
   BLI_assert(local_id->override_library == NULL);
 
   ID *ancestor_id;
@@ -286,7 +286,7 @@ ID *BKE_lib_override_library_create_from_id(Main *bmain,
                                             const bool do_tagged_remap)
 {
   BLI_assert(reference_id != NULL);
-  BLI_assert(reference_id->lib != NULL);
+  BLI_assert(ID_IS_LINKED(reference_id));
 
   ID *local_id = lib_override_library_create_from(bmain, reference_id, 0);
 
@@ -299,7 +299,7 @@ ID *BKE_lib_override_library_create_from_id(Main *bmain,
 
     ID *other_id;
     FOREACH_MAIN_ID_BEGIN (bmain, other_id) {
-      if ((other_id->tag & LIB_TAG_DOIT) != 0 && other_id->lib == NULL) {
+      if ((other_id->tag & LIB_TAG_DOIT) != 0 && !ID_IS_LINKED(other_id)) {
         /* Note that using ID_REMAP_SKIP_INDIRECT_USAGE below is superfluous, as we only remap
          * local IDs usages anyway. */
         BKE_libblock_relink_ex(bmain,
@@ -333,11 +333,11 @@ ID *BKE_lib_override_library_create_from_id(Main *bmain,
  * main. You can add more local IDs to be remapped to use new overriding ones by setting their
  * LIB_TAG_DOIT tag.
  *
- * \param reference_library the library from which the linked data being overridden come from
+ * \param reference_library: the library from which the linked data being overridden come from
  * (i.e. the library of the linked reference ID).
  *
- * \param do_no_main Create the new override data outside of Main database. Used for resyncing of
- * linked overrides.
+ * \param do_no_main: Create the new override data outside of Main database.
+ * Used for resyncing of linked overrides.
  *
  * \return \a true on success, \a false otherwise.
  */
@@ -830,7 +830,7 @@ static void lib_override_library_create_post_process(Main *bmain,
   Collection *default_instantiating_collection = residual_storage;
   LISTBASE_FOREACH (Object *, ob, &bmain->objects) {
     Object *ob_new = (Object *)ob->id.newid;
-    if (ob_new == NULL || ob_new->id.lib != NULL) {
+    if (ob_new == NULL || ID_IS_LINKED(ob_new)) {
       continue;
     }
 
@@ -865,7 +865,9 @@ static void lib_override_library_create_post_process(Main *bmain,
             Object *ob_ref = (Object *)id_ref;
             LISTBASE_FOREACH (Collection *, collection, &bmain->collections) {
               if (BKE_collection_has_object(collection, ob_ref) &&
-                  BKE_view_layer_has_collection(view_layer, collection) &&
+                  (view_layer != NULL ?
+                       BKE_view_layer_has_collection(view_layer, collection) :
+                       BKE_collection_has_collection(scene->master_collection, collection)) &&
                   !ID_IS_LINKED(collection) && !ID_IS_OVERRIDE_LIBRARY(collection)) {
                 default_instantiating_collection = collection;
               }
@@ -897,11 +899,13 @@ static void lib_override_library_create_post_process(Main *bmain,
  * \note It will override all IDs tagged with \a LIB_TAG_DOIT, and it does not clear that tag at
  * its beginning, so caller code can add extra data-blocks to be overridden as well.
  *
+ * \param view_layer: the active view layer to search instantiated collections in, can be NULL (in
+ *                    which case \a scene's master collection children hierarchy is used instead).
  * \param id_root: The root ID to create an override from.
  * \param id_reference: Some reference ID used to do some post-processing after overrides have been
  * created, may be NULL. Typically, the Empty object instantiating the linked collection we
  * override, currently.
- * \param r_id_root_override if not NULL, the override generated for the given \a id_root.
+ * \param r_id_root_override: if not NULL, the override generated for the given \a id_root.
  * \return true if override was successfully created.
  */
 bool BKE_lib_override_library_create(Main *bmain,
@@ -960,6 +964,8 @@ bool BKE_lib_override_library_template_create(struct ID *id)
  * \note This is a thin wrapper around \a BKE_lib_override_library_create, only extra work is to
  * actually convert the proxy itself into an override first.
  *
+ * \param view_layer: the active view layer to search instantiated collections in, can be NULL (in
+ *                    which case \a scene's master collection children hierarchy is used instead).
  * \return true if override was successfully created.
  */
 bool BKE_lib_override_library_proxy_convert(Main *bmain,
@@ -1002,6 +1008,8 @@ bool BKE_lib_override_library_proxy_convert(Main *bmain,
  * data, from an existing override hierarchy.
  *
  * \param id_root: The root liboverride ID to resync from.
+ * \param view_layer: the active view layer to search instantiated collections in, can be NULL (in
+ *                    which case \a scene's master collection children hierarchy is used instead).
  * \return true if override was successfully resynced.
  */
 bool BKE_lib_override_library_resync(Main *bmain,
@@ -1148,7 +1156,7 @@ bool BKE_lib_override_library_resync(Main *bmain,
         /* We need to 'move back' newly created override into its proper library (since it was
          * duplicated from the reference ID with 'no main' option, it should currently be the same
          * as the reference ID one). */
-        BLI_assert(/*id_override_new->lib == NULL || */ id_override_new->lib == id->lib);
+        BLI_assert(/*!ID_IS_LINKED(id_override_new) || */ id_override_new->lib == id->lib);
         BLI_assert(id_override_old == NULL || id_override_old->lib == id_root->lib);
         id_override_new->lib = id_root->lib;
         /* Remap step below will tag directly linked ones properly as needed. */
@@ -1723,6 +1731,9 @@ static int lib_override_libraries_index_define(Main *bmain)
  *
  * Then it will handle the resync of necessary IDs (through calls to
  * #BKE_lib_override_library_resync).
+ *
+ * \param view_layer: the active view layer to search instantiated collections in, can be NULL (in
+ *                    which case \a scene's master collection children hierarchy is used instead).
  */
 void BKE_lib_override_library_main_resync(Main *bmain,
                                           Scene *scene,
@@ -1734,8 +1745,7 @@ void BKE_lib_override_library_main_resync(Main *bmain,
 #define OVERRIDE_RESYNC_RESIDUAL_STORAGE_NAME "OVERRIDE_RESYNC_LEFTOVERS"
   Collection *override_resync_residual_storage = BLI_findstring(
       &bmain->collections, OVERRIDE_RESYNC_RESIDUAL_STORAGE_NAME, offsetof(ID, name) + 2);
-  if (override_resync_residual_storage != NULL &&
-      override_resync_residual_storage->id.lib != NULL) {
+  if (override_resync_residual_storage != NULL && ID_IS_LINKED(override_resync_residual_storage)) {
     override_resync_residual_storage = NULL;
   }
   if (override_resync_residual_storage == NULL) {
@@ -2195,7 +2205,7 @@ void BKE_lib_override_library_validate(Main *UNUSED(bmain), ID *id, ReportList *
     id->override_library->reference = NULL;
     return;
   }
-  if (id->override_library->reference->lib == NULL) {
+  if (!ID_IS_LINKED(id->override_library->reference)) {
     /* Very serious data corruption, cannot do much about it besides removing the reference
      * (therefore making the id a local override template one only). */
     BKE_reportf(reports,

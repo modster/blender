@@ -63,6 +63,10 @@
 
 #include "DEG_depsgraph.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct GPUBatch;
 struct GPUMaterial;
 struct GPUShader;
@@ -619,6 +623,7 @@ const DRWView *DRW_view_default_get(void);
 void DRW_view_default_set(DRWView *view);
 void DRW_view_reset(void);
 void DRW_view_set_active(DRWView *view);
+const DRWView *DRW_view_get_active(void);
 
 void DRW_view_clip_planes_set(DRWView *view, float (*planes)[4], int plane_len);
 void DRW_view_camtexco_set(DRWView *view, float texco[4]);
@@ -727,9 +732,9 @@ void DRW_select_load_id(uint id);
 /* Draw State */
 bool DRW_state_is_fbo(void);
 bool DRW_state_is_select(void);
+bool DRW_state_is_material_select(void);
 bool DRW_state_is_depth(void);
 bool DRW_state_is_image_render(void);
-bool DRW_state_do_color_management(void);
 bool DRW_state_is_scene_render(void);
 bool DRW_state_is_opengl_render(void);
 bool DRW_state_is_playback(void);
@@ -775,3 +780,7 @@ typedef struct DRWContextState {
 } DRWContextState;
 
 const DRWContextState *DRW_context_state_get(void);
+
+#ifdef __cplusplus
+}
+#endif

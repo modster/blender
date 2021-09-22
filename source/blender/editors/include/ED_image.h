@@ -56,7 +56,6 @@ float ED_space_image_increment_snap_value(const int grid_dimesnions,
 struct Image *ED_space_image(struct SpaceImage *sima);
 void ED_space_image_set(struct Main *bmain,
                         struct SpaceImage *sima,
-                        struct Object *obedit,
                         struct Image *ima,
                         bool automatic);
 void ED_space_image_auto_set(const struct bContext *C, struct SpaceImage *sima);

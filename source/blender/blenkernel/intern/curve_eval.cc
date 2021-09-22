@@ -25,6 +25,7 @@
 
 #include "DNA_curve_types.h"
 
+#include "BKE_anonymous_attribute.hh"
 #include "BKE_curve.h"
 #include "BKE_spline.hh"
 
@@ -37,6 +38,7 @@ using blender::MutableSpan;
 using blender::Span;
 using blender::StringRefNull;
 using blender::Vector;
+using blender::bke::AttributeIDRef;
 
 blender::Span<SplinePtr> CurveEval::splines() const
 {
@@ -108,7 +110,7 @@ void CurveEval::bounds_min_max(float3 &min, float3 &max, const bool use_evaluate
 }
 
 /**
- * Return the start indices for each of the curve spline's evaluated points, as if they were part
+ * Return the start indices for each of the curve spline's control points, if they were part
  * of a flattened array. This can be used to facilitate parallelism by avoiding the need to
  * accumulate an offset while doing more complex calculations.
  *
@@ -139,6 +141,23 @@ blender::Array<int> CurveEval::evaluated_point_offsets() const
   }
   offsets.last() = offset;
   return offsets;
+}
+
+/**
+ * Return the accumulated length at the start of every spline in the curve.
+ *
+ * \note The result is one longer than the spline count; the last element is the total length.
+ */
+blender::Array<float> CurveEval::accumulated_spline_lengths() const
+{
+  Array<float> spline_lengths(splines_.size() + 1);
+  float spline_length = 0.0f;
+  for (const int i : splines_.index_range()) {
+    spline_lengths[i] = spline_length;
+    spline_length += splines_[i]->length();
+  }
+  spline_lengths.last() = spline_length;
+  return spline_lengths;
 }
 
 static BezierSpline::HandleType handle_type_from_dna_bezt(const eBezTriple_Handle dna_handle_type)
@@ -330,13 +349,13 @@ void CurveEval::assert_valid_point_attributes() const
     return;
   }
   const int layer_len = splines_.first()->attributes.data.totlayer;
-  Map<StringRefNull, AttributeMetaData> map;
+  Map<AttributeIDRef, AttributeMetaData> map;
   for (const SplinePtr &spline : splines_) {
     BLI_assert(spline->attributes.data.totlayer == layer_len);
     spline->attributes.foreach_attribute(
-        [&](StringRefNull name, const AttributeMetaData &meta_data) {
+        [&](const AttributeIDRef &attribute_id, const AttributeMetaData &meta_data) {
           map.add_or_modify(
-              name,
+              attribute_id,
               [&](AttributeMetaData *map_data) {
                 /* All unique attribute names should be added on the first spline. */
                 BLI_assert(spline == splines_.first());

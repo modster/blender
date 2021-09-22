@@ -135,7 +135,8 @@ static void fileselect_ensure_updated_asset_params(SpaceFile *sfile)
   base_params->filter_id = FILTER_ID_OB | FILTER_ID_GR;
   base_params->display = FILE_IMGDISPLAY;
   base_params->sort = FILE_SORT_ALPHA;
-  base_params->recursion_level = 1;
+  /* Asset libraries include all sub-directories, so enable maximal recursion. */
+  base_params->recursion_level = FILE_SELECT_MAX_RECURSIONS;
   /* 'SMALL' size by default. More reasonable since this is typically used as regular editor,
    * space is more of an issue here. */
   base_params->thumbnail_size = 96;
@@ -863,20 +864,8 @@ FileAttributeColumnType file_attribute_column_type_find_isect(const View2D *v2d,
 float file_string_width(const char *str)
 {
   const uiStyle *style = UI_style_get();
-  float width;
-
   UI_fontstyle_set(&style->widget);
-  if (style->widget.kerning == 1) { /* for BLF_width */
-    BLF_enable(style->widget.uifont_id, BLF_KERNING_DEFAULT);
-  }
-
-  width = BLF_width(style->widget.uifont_id, str, BLF_DRAW_STR_DUMMY_MAX);
-
-  if (style->widget.kerning == 1) {
-    BLF_disable(style->widget.uifont_id, BLF_KERNING_DEFAULT);
-  }
-
-  return width;
+  return BLF_width(style->widget.uifont_id, str, BLF_DRAW_STR_DUMMY_MAX);
 }
 
 float file_font_pointsize(void)
@@ -1282,7 +1271,7 @@ void file_params_rename_end(wmWindowManager *wm,
   /* Ensure smooth-scroll timer is active, even if not needed, because that way rename state is
    * handled properly. */
   file_params_invoke_rename_postscroll(wm, win, sfile);
-  /* Also always activate the rename file, even if renaming was cancelled. */
+  /* Also always activate the rename file, even if renaming was canceled. */
   file_params_renamefile_activate(sfile, params);
 }
 

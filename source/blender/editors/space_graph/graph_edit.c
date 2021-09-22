@@ -417,6 +417,8 @@ static int graphkeys_click_insert_invoke(bContext *C, wmOperator *op, const wmEv
 
 void GRAPH_OT_click_insert(wmOperatorType *ot)
 {
+  PropertyRNA *prop;
+
   /* Identifiers */
   ot->name = "Click-Insert Keyframes";
   ot->idname = "GRAPH_OT_click_insert";
@@ -443,11 +445,12 @@ void GRAPH_OT_click_insert(wmOperatorType *ot)
   RNA_def_float(
       ot->srna, "value", 1.0f, -FLT_MAX, FLT_MAX, "Value", "Value for keyframe on", 0, 100);
 
-  RNA_def_boolean(ot->srna,
-                  "extend",
-                  false,
-                  "Extend",
-                  "Extend selection instead of deselecting everything first");
+  prop = RNA_def_boolean(ot->srna,
+                         "extend",
+                         false,
+                         "Extend",
+                         "Extend selection instead of deselecting everything first");
+  RNA_def_property_flag(prop, PROP_SKIP_SAVE);
 }
 
 /** \} */
@@ -1095,7 +1098,8 @@ static int graphkeys_sound_bake_exec(bContext *C, wmOperator *op)
                                     RNA_boolean_get(op->ptr, "use_square"),
                                     RNA_float_get(op->ptr, "sthreshold"),
                                     FPS,
-                                    &sbi.length);
+                                    &sbi.length,
+                                    0);
 
   if (sbi.samples == NULL) {
     BKE_report(op->reports, RPT_ERROR, "Unsupported audio format");

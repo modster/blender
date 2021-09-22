@@ -175,6 +175,7 @@ int space_node_view_flag(struct bContext *C,
 
 void NODE_OT_view_all(struct wmOperatorType *ot);
 void NODE_OT_view_selected(struct wmOperatorType *ot);
+void NODE_OT_geometry_node_view_legacy(struct wmOperatorType *ot);
 
 void NODE_OT_backimage_move(struct wmOperatorType *ot);
 void NODE_OT_backimage_zoom(struct wmOperatorType *ot);
@@ -328,7 +329,7 @@ extern const char *node_context_dir[];
 #define BASIS_RAD (0.2f * U.widget_unit)
 #define NODE_DYS (U.widget_unit / 2)
 #define NODE_DY U.widget_unit
-#define NODE_SOCKDY (0.08f * U.widget_unit)
+#define NODE_SOCKDY (0.1f * U.widget_unit)
 #define NODE_WIDTH(node) (node->width * UI_DPI_FAC)
 #define NODE_HEIGHT(node) (node->height * UI_DPI_FAC)
 #define NODE_MARGIN_X (1.10f * U.widget_unit)

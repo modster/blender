@@ -1442,7 +1442,9 @@ static void filelist_cache_preview_runf(TaskPool *__restrict pool, void *taskdat
   if (preview->in_memory_preview) {
     if (BKE_previewimg_is_finished(preview->in_memory_preview, ICON_SIZE_PREVIEW)) {
       ImBuf *imbuf = BKE_previewimg_to_imbuf(preview->in_memory_preview, ICON_SIZE_PREVIEW);
-      preview->icon_id = BKE_icon_imbuf_create(imbuf);
+      if (imbuf) {
+        preview->icon_id = BKE_icon_imbuf_create(imbuf);
+      }
       done = true;
     }
   }
@@ -1590,7 +1592,7 @@ static void filelist_cache_previews_push(FileList *filelist, FileDirEntry *entry
   preview->flags = entry->typeflag;
   preview->in_memory_preview = intern_entry->local_data.preview_image;
   preview->icon_id = 0;
-  //      printf("%s: %d - %s - %p\n", __func__, preview->index, preview->path, preview->img);
+  // printf("%s: %d - %s\n", __func__, preview->index, preview->path);
 
   filelist_cache_preview_ensure_running(cache);
 
@@ -1953,7 +1955,9 @@ static FileDirEntry *filelist_file_create_entry(FileList *filelist, const int in
   if (entry->local_data.preview_image &&
       BKE_previewimg_is_finished(entry->local_data.preview_image, ICON_SIZE_PREVIEW)) {
     ImBuf *ibuf = BKE_previewimg_to_imbuf(entry->local_data.preview_image, ICON_SIZE_PREVIEW);
-    ret->preview_icon_id = BKE_icon_imbuf_create(ibuf);
+    if (ibuf) {
+      ret->preview_icon_id = BKE_icon_imbuf_create(ibuf);
+    }
   }
   BLI_addtail(&cache->cached_entries, ret);
   return ret;
@@ -3055,7 +3059,7 @@ static void filelist_readjob_main_recursive(Main *bmain, FileList *filelist)
       ok = 1;
       if (ok) {
         if (!(filelist->filter_data.flags & FLF_HIDE_DOT) || id->name[2] != '.') {
-          if (id->lib == NULL) {
+          if (!ID_IS_LINKED(id)) {
             files->entry->relpath = BLI_strdup(id->name + 2);
           }
           else {

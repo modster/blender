@@ -3900,7 +3900,11 @@ static void clampto_evaluate(bConstraint *con, bConstraintOb *cob, ListBase *tar
 
     unit_m4(targetMatrix);
     INIT_MINMAX(curveMin, curveMax);
-    /* XXX(campbell): don't think this is good calling this here. */
+    /* XXX(@campbellbarton): don't think this is good calling this here because
+     * the other object's data is lazily initializing bounding-box information.
+     * This could cause issues when evaluating from a thread.
+     * If the depsgraph ensures the bound-box is always available, a code-path could
+     * be used that doesn't lazy initialize to avoid thread safety issues in the future. */
     BKE_object_minmax(ct->tar, curveMin, curveMax, true);
 
     /* get targetmatrix */
@@ -5430,6 +5434,11 @@ static void transformcache_evaluate(bConstraint *con, bConstraintOb *cob, ListBa
     return;
   }
 
+  /* Do not process data if using a render time procedural. */
+  if (BKE_cache_file_uses_render_procedural(cache_file, scene, DEG_get_mode(cob->depsgraph))) {
+    return;
+  }
+
   const float frame = DEG_get_ctime(cob->depsgraph);
   const float time = BKE_cachefile_time_offset(cache_file, frame, FPS);
 
@@ -6652,7 +6661,7 @@ void BKE_constraint_blend_read_lib(BlendLibReader *reader, ID *id, ListBase *con
     BLO_read_id_address(reader, id->lib, &con->ipo); /* XXX deprecated - old animation system */
 
     /* If linking from a library, clear 'local' library override flag. */
-    if (id->lib != NULL) {
+    if (ID_IS_LINKED(id)) {
       con->flag &= ~CONSTRAINT_OVERRIDE_LIBRARY_LOCAL;
     }
   }
