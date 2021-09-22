@@ -3900,7 +3900,11 @@ static void clampto_evaluate(bConstraint *con, bConstraintOb *cob, ListBase *tar
 
     unit_m4(targetMatrix);
     INIT_MINMAX(curveMin, curveMax);
-    /* XXX(campbell): don't think this is good calling this here. */
+    /* XXX(@campbellbarton): don't think this is good calling this here because
+     * the other object's data is lazily initializing bounding-box information.
+     * This could cause issues when evaluating from a thread.
+     * If the depsgraph ensures the bound-box is always available, a code-path could
+     * be used that doesn't lazy initialize to avoid thread safety issues in the future. */
     BKE_object_minmax(ct->tar, curveMin, curveMax, true);
 
     /* get targetmatrix */
@@ -5430,6 +5434,11 @@ static void transformcache_evaluate(bConstraint *con, bConstraintOb *cob, ListBa
     return;
   }
 
+  /* Do not process data if using a render time procedural. */
+  if (BKE_cache_file_uses_render_procedural(cache_file, scene, DEG_get_mode(cob->depsgraph))) {
+    return;
+  }
+
   const float frame = DEG_get_ctime(cob->depsgraph);
   const float time = BKE_cachefile_time_offset(cache_file, frame, FPS);
 
@@ -5675,6 +5684,111 @@ bool BKE_constraint_remove_ex(ListBase *list, Object *ob, bConstraint *con, bool
   }
 
   return false;
+}
+
+/* Apply the specified constraint in the given constraint stack */
+bool BKE_constraint_apply_for_object(Depsgraph *depsgraph,
+                                     Scene *scene,
+                                     Object *ob,
+                                     bConstraint *con)
+{
+  if (!con) {
+    return false;
+  }
+
+  const float ctime = BKE_scene_frame_get(scene);
+
+  bConstraint *new_con = BKE_constraint_duplicate_ex(con, 0, !ID_IS_LINKED(ob));
+  ListBase single_con = {new_con, new_con};
+
+  bConstraintOb *cob = BKE_constraints_make_evalob(
+      depsgraph, scene, ob, NULL, CONSTRAINT_OBTYPE_OBJECT);
+  /* Undo the effect of the current constraint stack evaluation. */
+  mul_m4_m4m4(cob->matrix, ob->constinv, cob->matrix);
+
+  /* Evaluate single constraint. */
+  BKE_constraints_solve(depsgraph, &single_con, cob, ctime);
+  /* Copy transforms back. This will leave the object in a bad state
+   * as ob->constinv will be wrong until next evaluation. */
+  BKE_constraints_clear_evalob(cob);
+
+  /* Free the copied constraint. */
+  BKE_constraint_free_data(new_con);
+  BLI_freelinkN(&single_con, new_con);
+
+  /* Apply transform from matrix. */
+  BKE_object_apply_mat4(ob, ob->obmat, true, true);
+
+  return true;
+}
+
+bool BKE_constraint_apply_and_remove_for_object(Depsgraph *depsgraph,
+                                                Scene *scene,
+                                                ListBase /*bConstraint*/ *constraints,
+                                                Object *ob,
+                                                bConstraint *con)
+{
+  if (!BKE_constraint_apply_for_object(depsgraph, scene, ob, con)) {
+    return false;
+  }
+
+  return BKE_constraint_remove_ex(constraints, ob, con, true);
+}
+
+bool BKE_constraint_apply_for_pose(
+    Depsgraph *depsgraph, Scene *scene, Object *ob, bPoseChannel *pchan, bConstraint *con)
+{
+  if (!con) {
+    return false;
+  }
+
+  const float ctime = BKE_scene_frame_get(scene);
+
+  bConstraint *new_con = BKE_constraint_duplicate_ex(con, 0, !ID_IS_LINKED(ob));
+  ListBase single_con;
+  single_con.first = new_con;
+  single_con.last = new_con;
+
+  float vec[3];
+  copy_v3_v3(vec, pchan->pose_mat[3]);
+
+  bConstraintOb *cob = BKE_constraints_make_evalob(
+      depsgraph, scene, ob, pchan, CONSTRAINT_OBTYPE_BONE);
+  /* Undo the effects of currently applied constraints. */
+  mul_m4_m4m4(cob->matrix, pchan->constinv, cob->matrix);
+  /* Evaluate single constraint. */
+  BKE_constraints_solve(depsgraph, &single_con, cob, ctime);
+  BKE_constraints_clear_evalob(cob);
+
+  /* Free the copied constraint. */
+  BKE_constraint_free_data(new_con);
+  BLI_freelinkN(&single_con, new_con);
+
+  /* Prevent constraints breaking a chain. */
+  if (pchan->bone->flag & BONE_CONNECTED) {
+    copy_v3_v3(pchan->pose_mat[3], vec);
+  }
+
+  /* Apply transform from matrix. */
+  float mat[4][4];
+  BKE_armature_mat_pose_to_bone(pchan, pchan->pose_mat, mat);
+  BKE_pchan_apply_mat4(pchan, mat, true);
+
+  return true;
+}
+
+bool BKE_constraint_apply_and_remove_for_pose(Depsgraph *depsgraph,
+                                              Scene *scene,
+                                              ListBase /*bConstraint*/ *constraints,
+                                              Object *ob,
+                                              bConstraint *con,
+                                              bPoseChannel *pchan)
+{
+  if (!BKE_constraint_apply_for_pose(depsgraph, scene, ob, pchan, con)) {
+    return false;
+  }
+
+  return BKE_constraint_remove_ex(constraints, ob, con, true);
 }
 
 void BKE_constraint_panel_expand(bConstraint *con)
@@ -6547,7 +6661,7 @@ void BKE_constraint_blend_read_lib(BlendLibReader *reader, ID *id, ListBase *con
     BLO_read_id_address(reader, id->lib, &con->ipo); /* XXX deprecated - old animation system */
 
     /* If linking from a library, clear 'local' library override flag. */
-    if (id->lib != NULL) {
+    if (ID_IS_LINKED(id)) {
       con->flag &= ~CONSTRAINT_OVERRIDE_LIBRARY_LOCAL;
     }
   }

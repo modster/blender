@@ -882,7 +882,7 @@ static void area_azone_init(wmWindow *win, const bScreen *screen, ScrArea *area)
     return;
   }
 
-  if (U.app_flag & USER_APP_LOCK_UI_LAYOUT) {
+  if (U.app_flag & USER_APP_LOCK_CORNER_SPLIT) {
     return;
   }
 
@@ -1055,6 +1055,14 @@ static bool region_azone_edge_poll(const ARegion *region, const bool is_fullscre
     return false;
   }
   if (!is_hidden && ELEM(region->regiontype, RGN_TYPE_HEADER, RGN_TYPE_TOOL_HEADER)) {
+    return false;
+  }
+
+  if (is_hidden && (U.app_flag & USER_APP_HIDE_REGION_TOGGLE)) {
+    return false;
+  }
+
+  if (!is_hidden && (U.app_flag & USER_APP_LOCK_EDGE_RESIZE)) {
     return false;
   }
 
@@ -1727,10 +1735,14 @@ static void ed_default_handlers(
     WM_event_add_keymap_handler(handlers, keymap);
   }
   if (flag & ED_KEYMAP_TOOL) {
-    WM_event_add_keymap_handler_dynamic(
-        &region->handlers, WM_event_get_keymap_from_toolsystem_fallback, area);
-    WM_event_add_keymap_handler_dynamic(
-        &region->handlers, WM_event_get_keymap_from_toolsystem, area);
+    if (flag & ED_KEYMAP_GIZMO) {
+      WM_event_add_keymap_handler_dynamic(
+          &region->handlers, WM_event_get_keymap_from_toolsystem_fallback, area);
+    }
+    else {
+      WM_event_add_keymap_handler_dynamic(
+          &region->handlers, WM_event_get_keymap_from_toolsystem, area);
+    }
   }
   if (flag & ED_KEYMAP_FRAMES) {
     /* frame changing/jumping (for all spaces) */

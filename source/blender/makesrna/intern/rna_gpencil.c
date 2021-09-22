@@ -843,17 +843,17 @@ static float rna_GPencilStrokePoints_weight_get(bGPDstroke *stroke,
     return -1.0f;
   }
 
-  if (dvert->totweight <= vertex_group_index || vertex_group_index < 0) {
-    BKE_report(reports, RPT_ERROR, "Groups: index out of range");
-    return -1.0f;
-  }
-
   if (stroke->totpoints <= point_index || point_index < 0) {
     BKE_report(reports, RPT_ERROR, "GPencilStrokePoints: index out of range");
     return -1.0f;
   }
 
   MDeformVert *pt_dvert = stroke->dvert + point_index;
+  if ((pt_dvert) && (pt_dvert->totweight <= vertex_group_index || vertex_group_index < 0)) {
+    BKE_report(reports, RPT_ERROR, "Groups: index out of range");
+    return -1.0f;
+  }
+
   MDeformWeight *dw = BKE_defvert_find_index(pt_dvert, vertex_group_index);
   if (dw) {
     return dw->weight;
@@ -2003,6 +2003,14 @@ static void rna_def_gpencil_layer(BlenderRNA *brna)
   RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
   RNA_def_property_ui_text(
       prop, "Custom Channel Color", "Custom color for animation channel in Dopesheet");
+  RNA_def_property_update(prop, NC_GPENCIL | ND_DATA, "rna_GPencil_update");
+
+  /* Layer Opacity (Annotations). */
+  prop = RNA_def_property(srna, "annotation_opacity", PROP_FLOAT, PROP_NONE);
+  RNA_def_property_float_sdna(prop, NULL, "opacity");
+  RNA_def_property_range(prop, 0.0, 1.0f);
+  RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+  RNA_def_property_ui_text(prop, "Opacity", "Annotation Layer Opacity");
   RNA_def_property_update(prop, NC_GPENCIL | ND_DATA, "rna_GPencil_update");
 
   /* Stroke Drawing Color (Annotations) */

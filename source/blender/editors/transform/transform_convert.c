@@ -955,6 +955,7 @@ void special_aftertrans_update(bContext *C, TransInfo *t)
     case TC_OBJECT_TEXSPACE:
     case TC_PAINT_CURVE_VERTS:
     case TC_PARTICLE_VERTS:
+    case TC_SEQ_IMAGE_DATA:
     case TC_NONE:
     default:
       break;
@@ -1042,6 +1043,7 @@ static void init_proportional_edit(TransInfo *t)
     case TC_PAINT_CURVE_VERTS:
     case TC_SCULPT:
     case TC_SEQ_DATA:
+    case TC_SEQ_IMAGE_DATA:
     case TC_TRACKING_DATA:
     case TC_NONE:
     default:
@@ -1120,6 +1122,7 @@ static void init_TransDataContainers(TransInfo *t,
     case TC_PARTICLE_VERTS:
     case TC_SCULPT:
     case TC_SEQ_DATA:
+    case TC_SEQ_IMAGE_DATA:
     case TC_TRACKING_DATA:
     case TC_NONE:
     default:
@@ -1204,6 +1207,7 @@ static eTFlag flags_from_data_type(eTConvertType data_type)
     case TC_NODE_DATA:
     case TC_PAINT_CURVE_VERTS:
     case TC_SEQ_DATA:
+    case TC_SEQ_IMAGE_DATA:
     case TC_TRACKING_DATA:
       return T_POINTS | T_2D_EDIT;
     case TC_ARMATURE_VERTS:
@@ -1282,7 +1286,12 @@ static eTConvertType convert_type_get(const TransInfo *t, Object **r_obj_armatur
     convert_type = TC_NLA_DATA;
   }
   else if (t->spacetype == SPACE_SEQ) {
-    convert_type = TC_SEQ_DATA;
+    if (t->options & CTX_SEQUENCER_IMAGE) {
+      convert_type = TC_SEQ_IMAGE_DATA;
+    }
+    else {
+      convert_type = TC_SEQ_DATA;
+    }
   }
   else if (t->spacetype == SPACE_GRAPH) {
     convert_type = TC_GRAPH_EDIT_DATA;
@@ -1469,6 +1478,10 @@ void createTransData(bContext *C, TransInfo *t)
     case TC_SEQ_DATA:
       t->num.flag |= NUM_NO_FRACTION; /* sequencer has no use for floating point transform. */
       createTransSeqData(t);
+      break;
+    case TC_SEQ_IMAGE_DATA:
+      t->obedit_type = -1;
+      createTransSeqImageData(t);
       break;
     case TC_TRACKING_DATA:
       createTransTrackingData(C, t);
@@ -1662,6 +1675,26 @@ void animrecord_check_state(TransInfo *t, struct Object *ob)
   }
 }
 
+void transform_convert_flush_handle2D(TransData *td, TransData2D *td2d, const float y_fac)
+{
+  float delta_x = td->loc[0] - td->iloc[0];
+  float delta_y = (td->loc[1] - td->iloc[1]) * y_fac;
+
+  /* If the handles are to be moved too
+   * (as side-effect of keyframes moving, to keep the general effect)
+   * offset them by the same amount so that the general angles are maintained
+   * (i.e. won't change while handles are free-to-roam and keyframes are snap-locked).
+   */
+  if ((td->flag & TD_MOVEHANDLE1) && td2d->h1) {
+    td2d->h1[0] = td2d->ih1[0] + delta_x;
+    td2d->h1[1] = td2d->ih1[1] + delta_y;
+  }
+  if ((td->flag & TD_MOVEHANDLE2) && td2d->h2) {
+    td2d->h2[0] = td2d->ih2[0] + delta_x;
+    td2d->h2[1] = td2d->ih2[1] + delta_y;
+  }
+}
+
 /* called for updating while transform acts, once per redraw */
 void recalcData(TransInfo *t)
 {
@@ -1725,6 +1758,9 @@ void recalcData(TransInfo *t)
       break;
     case TC_SEQ_DATA:
       recalcData_sequencer(t);
+      break;
+    case TC_SEQ_IMAGE_DATA:
+      recalcData_sequencer_image(t);
       break;
     case TC_TRACKING_DATA:
       recalcData_tracking(t);

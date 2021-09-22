@@ -25,9 +25,12 @@
 
 #include <float.h>
 
+#include "MEM_guardedalloc.h"
+
 #include "BLI_dlrbTree.h"
 #include "BLI_listbase.h"
 #include "BLI_rect.h"
+#include "BLI_task.h"
 
 #include "DNA_anim_types.h"
 #include "DNA_gpencil_types.h"
@@ -55,11 +58,7 @@ void draw_keyframe_shape(float x,
                          short key_type,
                          short mode,
                          float alpha,
-                         uint pos_id,
-                         uint size_id,
-                         uint color_id,
-                         uint outline_color_id,
-                         uint flags_id,
+                         const KeyframeShaderBindings *sh_bindings,
                          short handle_type,
                          short extreme_type)
 {
@@ -176,11 +175,11 @@ void draw_keyframe_shape(float x,
     }
   }
 
-  immAttr1f(size_id, size);
-  immAttr4ubv(color_id, fill_col);
-  immAttr4ubv(outline_color_id, outline_col);
-  immAttr1u(flags_id, flags);
-  immVertex2f(pos_id, x, y);
+  immAttr1f(sh_bindings->size_id, size);
+  immAttr4ubv(sh_bindings->color_id, fill_col);
+  immAttr4ubv(sh_bindings->outline_color_id, outline_col);
+  immAttr1u(sh_bindings->flags_id, flags);
+  immVertex2f(sh_bindings->pos_id, x, y);
 }
 
 /* Common attributes shared between the draw calls. */
@@ -348,10 +347,12 @@ static void draw_keylist_block(const DrawKeylistUIData *ctx, const ActKeyColumn 
 }
 
 static void draw_keylist_blocks(const DrawKeylistUIData *ctx,
-                                const ListBase * /*ActKeyColumn*/ columns,
+                                const ActKeyColumn *keys,
+                                const int key_len,
                                 float ypos)
 {
-  LISTBASE_FOREACH (ActKeyColumn *, ab, columns) {
+  for (int i = 0; i < key_len; i++) {
+    const ActKeyColumn *ab = &keys[i];
     draw_keylist_block(ctx, ab, ypos);
   }
 }
@@ -361,7 +362,179 @@ static bool draw_keylist_is_visible_key(const View2D *v2d, const ActKeyColumn *a
   return IN_RANGE_INCL(ak->cfra, v2d->cur.xmin, v2d->cur.xmax);
 }
 
-static int draw_keylist_visible_key_len(View2D *v2d, const ListBase * /*ActKeyColumn*/ keys)
+static void draw_keylist_keys(const DrawKeylistUIData *ctx,
+                              View2D *v2d,
+                              const KeyframeShaderBindings *sh_bindings,
+                              const ActKeyColumn *keys,
+                              const int key_len,
+                              float ypos,
+                              eSAction_Flag saction_flag)
+{
+  short handle_type = KEYFRAME_HANDLE_NONE, extreme_type = KEYFRAME_EXTREME_NONE;
+
+  for (int i = 0; i < key_len; i++) {
+    const ActKeyColumn *ak = &keys[i];
+    if (draw_keylist_is_visible_key(v2d, ak)) {
+      if (ctx->show_ipo) {
+        handle_type = ak->handle_type;
+      }
+      if (saction_flag & SACTION_SHOW_EXTREMES) {
+        extreme_type = ak->extreme_type;
+      }
+
+      draw_keyframe_shape(ak->cfra,
+                          ypos,
+                          ctx->icon_sz,
+                          (ak->sel & SELECT),
+                          ak->key_type,
+                          KEYFRAME_SHAPE_BOTH,
+                          ctx->alpha,
+                          sh_bindings,
+                          handle_type,
+                          extreme_type);
+    }
+  }
+}
+
+/* *************************** Drawing Stack *************************** */
+typedef enum eAnimKeylistDrawListElemType {
+  ANIM_KEYLIST_SUMMARY,
+  ANIM_KEYLIST_SCENE,
+  ANIM_KEYLIST_OBJECT,
+  ANIM_KEYLIST_FCURVE,
+  ANIM_KEYLIST_ACTION,
+  ANIM_KEYLIST_AGROUP,
+  ANIM_KEYLIST_GP_LAYER,
+  ANIM_KEYLIST_MASK_LAYER,
+} eAnimKeylistDrawListElemType;
+
+typedef struct AnimKeylistDrawListElem {
+  struct AnimKeylistDrawListElem *next, *prev;
+  struct AnimKeylist *keylist;
+  eAnimKeylistDrawListElemType type;
+
+  float yscale_fac;
+  float ypos;
+  eSAction_Flag saction_flag;
+  bool channel_locked;
+
+  bAnimContext *ac;
+  bDopeSheet *ads;
+  Scene *sce;
+  Object *ob;
+  AnimData *adt;
+  FCurve *fcu;
+  bAction *act;
+  bActionGroup *agrp;
+  bGPDlayer *gpl;
+  MaskLayer *masklay;
+
+} AnimKeylistDrawListElem;
+
+static void ED_keylist_draw_list_elem_build_keylist(AnimKeylistDrawListElem *elem)
+{
+  switch (elem->type) {
+    case ANIM_KEYLIST_SUMMARY: {
+      summary_to_keylist(elem->ac, elem->keylist, elem->saction_flag);
+      break;
+    }
+    case ANIM_KEYLIST_SCENE: {
+      scene_to_keylist(elem->ads, elem->sce, elem->keylist, elem->saction_flag);
+      break;
+    }
+    case ANIM_KEYLIST_OBJECT: {
+      ob_to_keylist(elem->ads, elem->ob, elem->keylist, elem->saction_flag);
+      break;
+    }
+    case ANIM_KEYLIST_FCURVE: {
+      fcurve_to_keylist(elem->adt, elem->fcu, elem->keylist, elem->saction_flag);
+      break;
+    }
+    case ANIM_KEYLIST_ACTION: {
+      action_to_keylist(elem->adt, elem->act, elem->keylist, elem->saction_flag);
+      break;
+    }
+    case ANIM_KEYLIST_AGROUP: {
+      agroup_to_keylist(elem->adt, elem->agrp, elem->keylist, elem->saction_flag);
+      break;
+    }
+    case ANIM_KEYLIST_GP_LAYER: {
+      gpl_to_keylist(elem->ads, elem->gpl, elem->keylist);
+      break;
+    }
+    case ANIM_KEYLIST_MASK_LAYER: {
+      mask_to_keylist(elem->ads, elem->masklay, elem->keylist);
+      break;
+    }
+  }
+}
+
+static void ED_keylist_draw_list_elem_draw_blocks(AnimKeylistDrawListElem *elem, View2D *v2d)
+{
+  DrawKeylistUIData ctx;
+  draw_keylist_ui_data_init(&ctx, v2d, elem->yscale_fac, elem->channel_locked, elem->saction_flag);
+
+  const int key_len = ED_keylist_array_len(elem->keylist);
+  const ActKeyColumn *keys = ED_keylist_array(elem->keylist);
+  draw_keylist_blocks(&ctx, keys, key_len, elem->ypos);
+}
+
+static void ED_keylist_draw_list_elem_draw_keys(AnimKeylistDrawListElem *elem,
+                                                View2D *v2d,
+                                                const KeyframeShaderBindings *sh_bindings)
+{
+  DrawKeylistUIData ctx;
+  draw_keylist_ui_data_init(&ctx, v2d, elem->yscale_fac, elem->channel_locked, elem->saction_flag);
+
+  const int key_len = ED_keylist_array_len(elem->keylist);
+  const ActKeyColumn *keys = ED_keylist_array(elem->keylist);
+  draw_keylist_keys(&ctx, v2d, sh_bindings, keys, key_len, elem->ypos, elem->saction_flag);
+}
+
+static void ED_keylist_draw_list_elem_prepare_for_drawing(AnimKeylistDrawListElem *elem)
+{
+  ED_keylist_prepare_for_direct_access(elem->keylist);
+}
+
+typedef struct AnimKeylistDrawList {
+  ListBase /* AnimKeylistDrawListElem*/ channels;
+} AnimKeylistDrawList;
+
+AnimKeylistDrawList *ED_keylist_draw_list_create(void)
+{
+  return MEM_callocN(sizeof(AnimKeylistDrawList), __func__);
+}
+
+static void ED_keylist_draw_list_elem_build_task(void *__restrict UNUSED(userdata),
+                                                 void *item,
+                                                 int UNUSED(index),
+                                                 const TaskParallelTLS *__restrict UNUSED(tls))
+{
+  AnimKeylistDrawListElem *elem = item;
+  ED_keylist_draw_list_elem_build_keylist(elem);
+  ED_keylist_draw_list_elem_prepare_for_drawing(elem);
+}
+
+static void ED_keylist_draw_list_build_keylists(AnimKeylistDrawList *draw_list)
+{
+  TaskParallelSettings settings;
+  BLI_parallel_range_settings_defaults(&settings);
+  /* Create a task per item, a single item is complex enough to deserve its own task. */
+  settings.min_iter_per_thread = 1;
+
+  BLI_task_parallel_listbase(
+      &draw_list->channels, NULL, ED_keylist_draw_list_elem_build_task, &settings);
+}
+
+static void ED_keylist_draw_list_draw_blocks(AnimKeylistDrawList *draw_list, View2D *v2d)
+{
+  LISTBASE_FOREACH (AnimKeylistDrawListElem *, elem, &draw_list->channels) {
+    ED_keylist_draw_list_elem_draw_blocks(elem, v2d);
+  }
+}
+
+static int ED_keylist_draw_keylist_visible_key_len(const View2D *v2d,
+                                                   const ListBase * /*ActKeyColumn*/ keys)
 {
   /* count keys */
   uint len = 0;
@@ -379,215 +552,212 @@ static int draw_keylist_visible_key_len(View2D *v2d, const ListBase * /*ActKeyCo
   return len;
 }
 
-static void draw_keylist_keys(const DrawKeylistUIData *ctx,
-                              View2D *v2d,
-                              const ListBase * /*ActKeyColumn*/ keys,
-                              float ypos,
-                              eSAction_Flag saction_flag)
+static int ED_keylist_draw_list_visible_key_len(const AnimKeylistDrawList *draw_list,
+                                                const View2D *v2d)
 {
-  GPU_blend(GPU_BLEND_ALPHA);
-  const int key_len = draw_keylist_visible_key_len(v2d, keys);
-  if (key_len > 0) {
-    /* draw keys */
-    GPUVertFormat *format = immVertexFormat();
-    uint pos_id = GPU_vertformat_attr_add(format, "pos", GPU_COMP_F32, 2, GPU_FETCH_FLOAT);
-    uint size_id = GPU_vertformat_attr_add(format, "size", GPU_COMP_F32, 1, GPU_FETCH_FLOAT);
-    uint color_id = GPU_vertformat_attr_add(
-        format, "color", GPU_COMP_U8, 4, GPU_FETCH_INT_TO_FLOAT_UNIT);
-    uint outline_color_id = GPU_vertformat_attr_add(
-        format, "outlineColor", GPU_COMP_U8, 4, GPU_FETCH_INT_TO_FLOAT_UNIT);
-    uint flags_id = GPU_vertformat_attr_add(format, "flags", GPU_COMP_U32, 1, GPU_FETCH_INT);
-
-    GPU_program_point_size(true);
-    immBindBuiltinProgram(GPU_SHADER_KEYFRAME_DIAMOND);
-    immUniform1f("outline_scale", 1.0f);
-    immUniform2f("ViewportSize", BLI_rcti_size_x(&v2d->mask) + 1, BLI_rcti_size_y(&v2d->mask) + 1);
-    immBegin(GPU_PRIM_POINTS, key_len);
-
-    short handle_type = KEYFRAME_HANDLE_NONE, extreme_type = KEYFRAME_EXTREME_NONE;
-
-    LISTBASE_FOREACH (ActKeyColumn *, ak, keys) {
-      if (draw_keylist_is_visible_key(v2d, ak)) {
-        if (ctx->show_ipo) {
-          handle_type = ak->handle_type;
-        }
-        if (saction_flag & SACTION_SHOW_EXTREMES) {
-          extreme_type = ak->extreme_type;
-        }
-
-        draw_keyframe_shape(ak->cfra,
-                            ypos,
-                            ctx->icon_sz,
-                            (ak->sel & SELECT),
-                            ak->key_type,
-                            KEYFRAME_SHAPE_BOTH,
-                            ctx->alpha,
-                            pos_id,
-                            size_id,
-                            color_id,
-                            outline_color_id,
-                            flags_id,
-                            handle_type,
-                            extreme_type);
-      }
-    }
-
-    immEnd();
-    GPU_program_point_size(false);
-    immUnbindProgram();
+  uint len = 0;
+  LISTBASE_FOREACH (AnimKeylistDrawListElem *, elem, &draw_list->channels) {
+    const ListBase *keys = ED_keylist_listbase(elem->keylist);
+    len += ED_keylist_draw_keylist_visible_key_len(v2d, keys);
   }
+  return len;
+}
+
+static void ED_keylist_draw_list_draw_keys(AnimKeylistDrawList *draw_list, View2D *v2d)
+{
+  const int visible_key_len = ED_keylist_draw_list_visible_key_len(draw_list, v2d);
+  if (visible_key_len == 0) {
+    return;
+  }
+
+  GPU_blend(GPU_BLEND_ALPHA);
+
+  GPUVertFormat *format = immVertexFormat();
+  KeyframeShaderBindings sh_bindings;
+
+  sh_bindings.pos_id = GPU_vertformat_attr_add(format, "pos", GPU_COMP_F32, 2, GPU_FETCH_FLOAT);
+  sh_bindings.size_id = GPU_vertformat_attr_add(format, "size", GPU_COMP_F32, 1, GPU_FETCH_FLOAT);
+  sh_bindings.color_id = GPU_vertformat_attr_add(
+      format, "color", GPU_COMP_U8, 4, GPU_FETCH_INT_TO_FLOAT_UNIT);
+  sh_bindings.outline_color_id = GPU_vertformat_attr_add(
+      format, "outlineColor", GPU_COMP_U8, 4, GPU_FETCH_INT_TO_FLOAT_UNIT);
+  sh_bindings.flags_id = GPU_vertformat_attr_add(format, "flags", GPU_COMP_U32, 1, GPU_FETCH_INT);
+
+  GPU_program_point_size(true);
+  immBindBuiltinProgram(GPU_SHADER_KEYFRAME_DIAMOND);
+  immUniform1f("outline_scale", 1.0f);
+  immUniform2f("ViewportSize", BLI_rcti_size_x(&v2d->mask) + 1, BLI_rcti_size_y(&v2d->mask) + 1);
+  immBegin(GPU_PRIM_POINTS, visible_key_len);
+
+  LISTBASE_FOREACH (AnimKeylistDrawListElem *, elem, &draw_list->channels) {
+    ED_keylist_draw_list_elem_draw_keys(elem, v2d, &sh_bindings);
+  }
+
+  immEnd();
+  GPU_program_point_size(false);
+  immUnbindProgram();
 
   GPU_blend(GPU_BLEND_NONE);
 }
 
-static void draw_keylist(View2D *v2d,
-                         const struct AnimKeylist *keylist,
-                         float ypos,
-                         float yscale_fac,
-                         bool channelLocked,
-                         eSAction_Flag saction_flag)
+static void ED_keylist_draw_list_draw(AnimKeylistDrawList *draw_list, View2D *v2d)
 {
-  DrawKeylistUIData ctx;
-  draw_keylist_ui_data_init(&ctx, v2d, yscale_fac, channelLocked, saction_flag);
+  ED_keylist_draw_list_draw_blocks(draw_list, v2d);
+  ED_keylist_draw_list_draw_keys(draw_list, v2d);
+}
 
-  const ListBase *columns = ED_keylist_listbase(keylist);
-  draw_keylist_blocks(&ctx, columns, ypos);
-  draw_keylist_keys(&ctx, v2d, columns, ypos, saction_flag);
+void ED_keylist_draw_list_flush(AnimKeylistDrawList *draw_list, View2D *v2d)
+{
+  ED_keylist_draw_list_build_keylists(draw_list);
+  ED_keylist_draw_list_draw(draw_list, v2d);
+}
+
+void ED_keylist_draw_list_free(AnimKeylistDrawList *draw_list)
+{
+  LISTBASE_FOREACH (AnimKeylistDrawListElem *, elem, &draw_list->channels) {
+    ED_keylist_free(elem->keylist);
+  }
+  BLI_freelistN(&draw_list->channels);
+  MEM_freeN(draw_list);
+}
+
+static AnimKeylistDrawListElem *ed_keylist_draw_list_add_elem(
+    AnimKeylistDrawList *draw_list,
+    eAnimKeylistDrawListElemType elem_type,
+    float ypos,
+    float yscale_fac,
+    eSAction_Flag saction_flag)
+{
+  AnimKeylistDrawListElem *draw_elem = MEM_callocN(sizeof(AnimKeylistDrawListElem), __func__);
+  BLI_addtail(&draw_list->channels, draw_elem);
+  draw_elem->type = elem_type;
+  draw_elem->keylist = ED_keylist_create();
+  draw_elem->ypos = ypos;
+  draw_elem->yscale_fac = yscale_fac;
+  draw_elem->saction_flag = saction_flag;
+  return draw_elem;
 }
 
 /* *************************** Channel Drawing Funcs *************************** */
 
-void draw_summary_channel(
-    View2D *v2d, bAnimContext *ac, float ypos, float yscale_fac, int saction_flag)
+void draw_summary_channel(struct AnimKeylistDrawList *draw_list,
+                          bAnimContext *ac,
+                          float ypos,
+                          float yscale_fac,
+                          int saction_flag)
 {
-  struct AnimKeylist *keylist = ED_keylist_create();
-
   saction_flag &= ~SACTION_SHOW_EXTREMES;
-
-  summary_to_keylist(ac, keylist, saction_flag);
-
-  draw_keylist(v2d, keylist, ypos, yscale_fac, false, saction_flag);
-
-  ED_keylist_free(keylist);
+  AnimKeylistDrawListElem *draw_elem = ed_keylist_draw_list_add_elem(
+      draw_list, ANIM_KEYLIST_SUMMARY, ypos, yscale_fac, saction_flag);
+  draw_elem->ac = ac;
 }
 
-void draw_scene_channel(
-    View2D *v2d, bDopeSheet *ads, Scene *sce, float ypos, float yscale_fac, int saction_flag)
+void draw_scene_channel(AnimKeylistDrawList *draw_list,
+                        bDopeSheet *ads,
+                        Scene *sce,
+                        float ypos,
+                        float yscale_fac,
+                        int saction_flag)
 {
-  struct AnimKeylist *keylist = ED_keylist_create();
-
   saction_flag &= ~SACTION_SHOW_EXTREMES;
-
-  scene_to_keylist(ads, sce, keylist, saction_flag);
-
-  draw_keylist(v2d, keylist, ypos, yscale_fac, false, saction_flag);
-
-  ED_keylist_free(keylist);
+  AnimKeylistDrawListElem *draw_elem = ed_keylist_draw_list_add_elem(
+      draw_list, ANIM_KEYLIST_SCENE, ypos, yscale_fac, saction_flag);
+  draw_elem->ads = ads;
+  draw_elem->sce = sce;
 }
 
-void draw_object_channel(
-    View2D *v2d, bDopeSheet *ads, Object *ob, float ypos, float yscale_fac, int saction_flag)
+void draw_object_channel(AnimKeylistDrawList *draw_list,
+                         bDopeSheet *ads,
+                         Object *ob,
+                         float ypos,
+                         float yscale_fac,
+                         int saction_flag)
 {
-  struct AnimKeylist *keylist = ED_keylist_create();
-
   saction_flag &= ~SACTION_SHOW_EXTREMES;
-
-  ob_to_keylist(ads, ob, keylist, saction_flag);
-
-  draw_keylist(v2d, keylist, ypos, yscale_fac, false, saction_flag);
-
-  ED_keylist_free(keylist);
+  AnimKeylistDrawListElem *draw_elem = ed_keylist_draw_list_add_elem(
+      draw_list, ANIM_KEYLIST_OBJECT, ypos, yscale_fac, saction_flag);
+  draw_elem->ads = ads;
+  draw_elem->ob = ob;
 }
 
-void draw_fcurve_channel(
-    View2D *v2d, AnimData *adt, FCurve *fcu, float ypos, float yscale_fac, int saction_flag)
+void draw_fcurve_channel(AnimKeylistDrawList *draw_list,
+                         AnimData *adt,
+                         FCurve *fcu,
+                         float ypos,
+                         float yscale_fac,
+                         int saction_flag)
 {
-  struct AnimKeylist *keylist = ED_keylist_create();
+  const bool locked = (fcu->flag & FCURVE_PROTECTED) ||
+                      ((fcu->grp) && (fcu->grp->flag & AGRP_PROTECTED)) ||
+                      ((adt && adt->action) && ID_IS_LINKED(adt->action));
 
-  bool locked = (fcu->flag & FCURVE_PROTECTED) ||
-                ((fcu->grp) && (fcu->grp->flag & AGRP_PROTECTED)) ||
-                ((adt && adt->action) && ID_IS_LINKED(adt->action));
-
-  fcurve_to_keylist(adt, fcu, keylist, saction_flag);
-
-  draw_keylist(v2d, keylist, ypos, yscale_fac, locked, saction_flag);
-
-  ED_keylist_free(keylist);
+  AnimKeylistDrawListElem *draw_elem = ed_keylist_draw_list_add_elem(
+      draw_list, ANIM_KEYLIST_FCURVE, ypos, yscale_fac, saction_flag);
+  draw_elem->adt = adt;
+  draw_elem->fcu = fcu;
+  draw_elem->channel_locked = locked;
 }
 
-void draw_agroup_channel(
-    View2D *v2d, AnimData *adt, bActionGroup *agrp, float ypos, float yscale_fac, int saction_flag)
+void draw_agroup_channel(AnimKeylistDrawList *draw_list,
+                         AnimData *adt,
+                         bActionGroup *agrp,
+                         float ypos,
+                         float yscale_fac,
+                         int saction_flag)
 {
-  struct AnimKeylist *keylist = ED_keylist_create();
-
   bool locked = (agrp->flag & AGRP_PROTECTED) ||
                 ((adt && adt->action) && ID_IS_LINKED(adt->action));
 
-  agroup_to_keylist(adt, agrp, keylist, saction_flag);
-
-  draw_keylist(v2d, keylist, ypos, yscale_fac, locked, saction_flag);
-
-  ED_keylist_free(keylist);
+  AnimKeylistDrawListElem *draw_elem = ed_keylist_draw_list_add_elem(
+      draw_list, ANIM_KEYLIST_AGROUP, ypos, yscale_fac, saction_flag);
+  draw_elem->adt = adt;
+  draw_elem->agrp = agrp;
+  draw_elem->channel_locked = locked;
 }
 
-void draw_action_channel(
-    View2D *v2d, AnimData *adt, bAction *act, float ypos, float yscale_fac, int saction_flag)
+void draw_action_channel(AnimKeylistDrawList *draw_list,
+                         AnimData *adt,
+                         bAction *act,
+                         float ypos,
+                         float yscale_fac,
+                         int saction_flag)
 {
-  struct AnimKeylist *keylist = ED_keylist_create();
-
-  bool locked = (act && ID_IS_LINKED(act));
-
+  const bool locked = (act && ID_IS_LINKED(act));
   saction_flag &= ~SACTION_SHOW_EXTREMES;
 
-  action_to_keylist(adt, act, keylist, saction_flag);
-
-  draw_keylist(v2d, keylist, ypos, yscale_fac, locked, saction_flag);
-
-  ED_keylist_free(keylist);
+  AnimKeylistDrawListElem *draw_elem = ed_keylist_draw_list_add_elem(
+      draw_list, ANIM_KEYLIST_ACTION, ypos, yscale_fac, saction_flag);
+  draw_elem->adt = adt;
+  draw_elem->act = act;
+  draw_elem->channel_locked = locked;
 }
 
-void draw_gpencil_channel(
-    View2D *v2d, bDopeSheet *ads, bGPdata *gpd, float ypos, float yscale_fac, int saction_flag)
+void draw_gpl_channel(AnimKeylistDrawList *draw_list,
+                      bDopeSheet *ads,
+                      bGPDlayer *gpl,
+                      float ypos,
+                      float yscale_fac,
+                      int saction_flag)
 {
-  struct AnimKeylist *keylist = ED_keylist_create();
-
-  saction_flag &= ~SACTION_SHOW_EXTREMES;
-
-  gpencil_to_keylist(ads, gpd, keylist, false);
-
-  draw_keylist(v2d, keylist, ypos, yscale_fac, false, saction_flag);
-
-  ED_keylist_free(keylist);
-}
-
-void draw_gpl_channel(
-    View2D *v2d, bDopeSheet *ads, bGPDlayer *gpl, float ypos, float yscale_fac, int saction_flag)
-{
-  struct AnimKeylist *keylist = ED_keylist_create();
-
   bool locked = (gpl->flag & GP_LAYER_LOCKED) != 0;
-
-  gpl_to_keylist(ads, gpl, keylist);
-
-  draw_keylist(v2d, keylist, ypos, yscale_fac, locked, saction_flag);
-
-  ED_keylist_free(keylist);
+  AnimKeylistDrawListElem *draw_elem = ed_keylist_draw_list_add_elem(
+      draw_list, ANIM_KEYLIST_GP_LAYER, ypos, yscale_fac, saction_flag);
+  draw_elem->ads = ads;
+  draw_elem->gpl = gpl;
+  draw_elem->channel_locked = locked;
 }
 
-void draw_masklay_channel(View2D *v2d,
+void draw_masklay_channel(AnimKeylistDrawList *draw_list,
                           bDopeSheet *ads,
                           MaskLayer *masklay,
                           float ypos,
                           float yscale_fac,
                           int saction_flag)
 {
-  struct AnimKeylist *keylist = ED_keylist_create();
-
   bool locked = (masklay->flag & MASK_LAYERFLAG_LOCKED) != 0;
-
-  mask_to_keylist(ads, masklay, keylist);
-
-  draw_keylist(v2d, keylist, ypos, yscale_fac, locked, saction_flag);
-
-  ED_keylist_free(keylist);
+  AnimKeylistDrawListElem *draw_elem = ed_keylist_draw_list_add_elem(
+      draw_list, ANIM_KEYLIST_MASK_LAYER, ypos, yscale_fac, saction_flag);
+  draw_elem->ads = ads;
+  draw_elem->masklay = masklay;
+  draw_elem->channel_locked = locked;
 }

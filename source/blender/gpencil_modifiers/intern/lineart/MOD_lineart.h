@@ -208,7 +208,7 @@ typedef struct LineartChainRegisterEntry {
 enum eLineArtTileRecursiveLimit {
   /* If tile gets this small, it's already much smaller than a pixel. No need to continue
    * splitting. */
-  LRT_TILE_RECURSIVE_PERSPECTIVE = 30,
+  LRT_TILE_RECURSIVE_PERSPECTIVE = 16,
   /* This is a tried-and-true safe value for high poly models that also needed ortho rendering. */
   LRT_TILE_RECURSIVE_ORTHO = 10,
 };
@@ -303,6 +303,9 @@ typedef struct LineartRenderBuffer {
   bool filter_face_mark;
   bool filter_face_mark_invert;
   bool filter_face_mark_boundaries;
+
+  bool force_crease;
+  bool sharp_as_crease;
 
   /* Keep an copy of these data so when line art is running it's self-contained. */
   bool cam_is_persp;

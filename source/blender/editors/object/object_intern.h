@@ -191,6 +191,7 @@ void OBJECT_OT_skin_radii_equalize(struct wmOperatorType *ot);
 void OBJECT_OT_skin_armature_create(struct wmOperatorType *ot);
 void OBJECT_OT_laplaciandeform_bind(struct wmOperatorType *ot);
 void OBJECT_OT_surfacedeform_bind(struct wmOperatorType *ot);
+void OBJECT_OT_geometry_nodes_input_attribute_toggle(struct wmOperatorType *ot);
 
 /* object_gpencil_modifiers.c */
 void OBJECT_OT_gpencil_modifier_add(struct wmOperatorType *ot);
@@ -201,6 +202,10 @@ void OBJECT_OT_gpencil_modifier_move_to_index(struct wmOperatorType *ot);
 void OBJECT_OT_gpencil_modifier_apply(struct wmOperatorType *ot);
 void OBJECT_OT_gpencil_modifier_copy(struct wmOperatorType *ot);
 void OBJECT_OT_gpencil_modifier_copy_to_selected(struct wmOperatorType *ot);
+
+void GPENCIL_OT_segment_add(struct wmOperatorType *ot);
+void GPENCIL_OT_segment_remove(struct wmOperatorType *ot);
+void GPENCIL_OT_segment_move(struct wmOperatorType *ot);
 
 /* object_shader_fx.c */
 void OBJECT_OT_shaderfx_add(struct wmOperatorType *ot);
@@ -226,6 +231,9 @@ void POSE_OT_ik_add(struct wmOperatorType *ot);
 void POSE_OT_ik_clear(struct wmOperatorType *ot);
 
 void CONSTRAINT_OT_delete(struct wmOperatorType *ot);
+void CONSTRAINT_OT_apply(struct wmOperatorType *ot);
+void CONSTRAINT_OT_copy(struct wmOperatorType *ot);
+void CONSTRAINT_OT_copy_to_selected(struct wmOperatorType *ot);
 
 void CONSTRAINT_OT_move_up(struct wmOperatorType *ot);
 void CONSTRAINT_OT_move_to_index(struct wmOperatorType *ot);
