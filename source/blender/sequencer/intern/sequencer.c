@@ -79,6 +79,8 @@ static Strip *seq_strip_alloc(int type)
     strip->transform = MEM_callocN(sizeof(struct StripTransform), "StripTransform");
     strip->transform->scale_x = 1;
     strip->transform->scale_y = 1;
+    strip->transform->origin[0] = 0.5f;
+    strip->transform->origin[1] = 0.5f;
     strip->crop = MEM_callocN(sizeof(struct StripCrop), "StripCrop");
   }
 
@@ -240,11 +242,8 @@ void seq_free_sequence_recurse(Scene *scene,
   seq_sequence_free_ex(scene, seq, false, do_id_user, do_clean_animdata);
 }
 
-Editing *SEQ_editing_get(Scene *scene, bool alloc)
+Editing *SEQ_editing_get(const Scene *scene)
 {
-  if (alloc) {
-    SEQ_editing_ensure(scene);
-  }
   return scene->ed;
 }
 
@@ -324,6 +323,7 @@ SequencerToolSettings *SEQ_tool_settings_init(void)
                              SEQ_SNAP_TO_STRIP_HOLD;
   tool_settings->snap_distance = 15;
   tool_settings->overlap_mode = SEQ_OVERLAP_SHUFFLE;
+  tool_settings->pivot_point = V3D_AROUND_LOCAL_ORIGINS;
 
   return tool_settings;
 }
@@ -378,6 +378,12 @@ eSeqOverlapMode SEQ_tool_settings_overlap_mode_get(Scene *scene)
 {
   const SequencerToolSettings *tool_settings = SEQ_tool_settings_ensure(scene);
   return tool_settings->overlap_mode;
+}
+
+int SEQ_tool_settings_pivot_point_get(Scene *scene)
+{
+  const SequencerToolSettings *tool_settings = SEQ_tool_settings_ensure(scene);
+  return tool_settings->pivot_point;
 }
 
 /**
@@ -951,6 +957,8 @@ static bool seq_read_lib_cb(Sequence *seq, void *user_data)
   BLI_listbase_clear(&seq->anims);
 
   SEQ_modifier_blend_read_lib(reader, sce, &seq->modifiers);
+
+  seq->flag &= ~SEQ_FLAG_SKIP_THUMBNAILS;
   return true;
 }
 

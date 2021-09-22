@@ -76,6 +76,7 @@ set(SRC
   intern/anim_path.c
   intern/anim_sys.c
   intern/anim_visualization.c
+  intern/anonymous_attribute.cc
   intern/appdir.c
   intern/armature.c
   intern/armature_deform.c
@@ -115,6 +116,7 @@ set(SRC
   intern/curve_decimate.c
   intern/curve_deform.c
   intern/curve_eval.cc
+  intern/curve_to_mesh_convert.cc
   intern/curveprofile.c
   intern/customdata.c
   intern/customdata_file.c
@@ -185,7 +187,7 @@ set(SRC
   intern/mball_tessellate.c
   intern/mesh.c
   intern/mesh_boolean_convert.cc
-  intern/mesh_convert.c
+  intern/mesh_convert.cc
   intern/mesh_evaluate.cc
   intern/mesh_fair.cc
   intern/mesh_iterators.c
@@ -295,6 +297,8 @@ set(SRC
   BKE_anim_path.h
   BKE_anim_visualization.h
   BKE_animsys.h
+  BKE_anonymous_attribute.h
+  BKE_anonymous_attribute.hh
   BKE_appdir.h
   BKE_armature.h
   BKE_armature.hh
@@ -329,6 +333,7 @@ set(SRC
   BKE_cryptomatte.h
   BKE_cryptomatte.hh
   BKE_curve.h
+  BKE_curve_to_mesh.hh
   BKE_curveprofile.h
   BKE_customdata.h
   BKE_customdata_file.h

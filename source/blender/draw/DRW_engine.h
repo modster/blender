@@ -110,6 +110,7 @@ void DRW_draw_select_loop(struct Depsgraph *depsgraph,
                           bool use_obedit_skip,
                           bool draw_surface,
                           bool use_nearest,
+                          const bool do_material_sub_selection,
                           const struct rcti *rect,
                           DRW_SelectPassFn select_pass_fn,
                           void *select_pass_user_data,
@@ -174,6 +175,9 @@ void DRW_deferred_shader_remove(struct GPUMaterial *mat);
 
 struct DrawDataList *DRW_drawdatalist_from_id(struct ID *id);
 void DRW_drawdata_free(struct ID *id);
+
+bool DRW_opengl_context_release(void);
+void DRW_opengl_context_activate(bool drw_state);
 
 #ifdef __cplusplus
 }

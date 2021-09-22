@@ -101,7 +101,7 @@ bool BKE_gpencil_stroke_sample(struct bGPdata *gpd,
                                struct bGPDstroke *gps,
                                const float dist,
                                const bool select);
-bool BKE_gpencil_stroke_smooth(struct bGPDstroke *gps, int i, float inf);
+bool BKE_gpencil_stroke_smooth_point(struct bGPDstroke *gps, int i, float inf);
 bool BKE_gpencil_stroke_smooth_strength(struct bGPDstroke *gps, int point_index, float influence);
 bool BKE_gpencil_stroke_smooth_thickness(struct bGPDstroke *gps, int point_index, float influence);
 bool BKE_gpencil_stroke_smooth_uv(struct bGPDstroke *gps, int point_index, float influence);
@@ -114,7 +114,12 @@ void BKE_gpencil_dissolve_points(struct bGPdata *gpd,
 bool BKE_gpencil_stroke_stretch(struct bGPDstroke *gps,
                                 const float dist,
                                 const float overshoot_fac,
-                                const short mode);
+                                const short mode,
+                                const bool follow_curvature,
+                                const int extra_point_count,
+                                const float segment_influence,
+                                const float max_angle,
+                                const bool invert_curvature);
 bool BKE_gpencil_stroke_trim_points(struct bGPDstroke *gps,
                                     const int index_from,
                                     const int index_to);
@@ -151,7 +156,8 @@ void BKE_gpencil_stroke_set_random_color(struct bGPDstroke *gps);
 void BKE_gpencil_stroke_join(struct bGPDstroke *gps_a,
                              struct bGPDstroke *gps_b,
                              const bool leave_gaps,
-                             const bool fit_thickness);
+                             const bool fit_thickness,
+                             const bool smooth);
 void BKE_gpencil_stroke_copy_to_keyframes(struct bGPdata *gpd,
                                           struct bGPDlayer *gpl,
                                           struct bGPDframe *gpf,

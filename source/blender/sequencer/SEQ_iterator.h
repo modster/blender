@@ -41,7 +41,7 @@ struct Sequence;
  * The `__LINE__` is defined at the invocation of the `SEQ_ITERATOR_FOREACH` and is not changed
  * afterwards. This makes it safe to expand it several times in the `SEQ_ITERATOR_FOREACH`.
  *
- * This allows to have nested foreach loops.
+ * This allows to have nested `foreach` loops.
  *
  * NOTE: Putting nested loop to a wrapper macro is not supported. */
 #define _SEQ_ITERATOR_NAME_JOIN(x, y) x##_##y
@@ -94,11 +94,15 @@ SeqCollection *SEQ_query_by_reference(struct Sequence *seq_reference,
                                                           SeqCollection *collection));
 SeqCollection *SEQ_query_selected_strips(struct ListBase *seqbase);
 SeqCollection *SEQ_query_unselected_strips(struct ListBase *seqbase);
-SeqCollection *SEQ_query_all_strips(struct ListBase *seqbase);
-SeqCollection *SEQ_query_all_strips_recursive(struct ListBase *seqbase);
+SeqCollection *SEQ_query_all_strips(ListBase *seqbase);
+SeqCollection *SEQ_query_all_strips_recursive(ListBase *seqbase);
+SeqCollection *SEQ_query_rendered_strips(ListBase *seqbase,
+                                         const int timeline_frame,
+                                         const int displayed_channel);
 void SEQ_query_strip_effect_chain(struct Sequence *seq_reference,
                                   struct ListBase *seqbase,
                                   SeqCollection *collection);
+void SEQ_filter_selected_strips(SeqCollection *collection);
 
 #ifdef __cplusplus
 }

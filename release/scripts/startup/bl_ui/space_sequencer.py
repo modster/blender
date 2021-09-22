@@ -141,9 +141,14 @@ class SEQUENCER_HT_header(Header):
 
         layout.separator_spacer()
 
+        tool_settings = context.tool_settings
+        sequencer_tool_settings = tool_settings.sequencer_tool_settings
+
+        if st.view_type == 'PREVIEW':
+            layout.prop(sequencer_tool_settings, "pivot_point", text="", icon_only=True)
+            layout.separator_spacer()
+
         if st.view_type in {'SEQUENCER', 'SEQUENCER_PREVIEW'}:
-            tool_settings = context.tool_settings
-            sequencer_tool_settings = tool_settings.sequencer_tool_settings
             row = layout.row(align=True)
             row.prop(sequencer_tool_settings, "overlap_mode", text="")
             row = layout.row(align=True)
@@ -191,16 +196,6 @@ class SEQUENCER_PT_overlay(Panel):
         pass
 
 
-class SEQUENCER_PT_overlay(Panel):
-    bl_space_type = 'SEQUENCE_EDITOR'
-    bl_region_type = 'HEADER'
-    bl_label = "Overlays"
-    bl_ui_units_x = 7
-
-    def draw(self, _context):
-        pass
-
-
 class SEQUENCER_PT_preview_overlay(Panel):
     bl_space_type = 'SEQUENCE_EDITOR'
     bl_region_type = 'HEADER'
@@ -215,13 +210,15 @@ class SEQUENCER_PT_preview_overlay(Panel):
     def draw(self, context):
         ed = context.scene.sequence_editor
         st = context.space_data
+        overlay_settings = st.preview_overlay
         layout = self.layout
 
         layout.active = st.show_strip_overlay
+        layout.prop(overlay_settings, "show_image_outline")
         layout.prop(ed, "show_overlay", text="Frame Overlay")
-        layout.prop(st, "show_safe_areas", text="Safe Areas")
-        layout.prop(st, "show_metadata", text="Metadata")
-        layout.prop(st, "show_annotation", text="Annotations")
+        layout.prop(overlay_settings, "show_safe_areas", text="Safe Areas")
+        layout.prop(overlay_settings, "show_metadata", text="Metadata")
+        layout.prop(overlay_settings, "show_annotation", text="Annotations")
 
 
 class SEQUENCER_PT_sequencer_overlay(Panel):
@@ -237,23 +234,25 @@ class SEQUENCER_PT_sequencer_overlay(Panel):
 
     def draw(self, context):
         st = context.space_data
+        overlay_settings = st.timeline_overlay
         layout = self.layout
 
         layout.active = st.show_strip_overlay
 
-        layout.prop(st, "show_strip_name", text="Name")
-        layout.prop(st, "show_strip_source", text="Source")
-        layout.prop(st, "show_strip_duration", text="Duration")
+        layout.prop(overlay_settings, "show_strip_name", text="Name")
+        layout.prop(overlay_settings, "show_strip_source", text="Source")
+        layout.prop(overlay_settings, "show_strip_duration", text="Duration")
 
         layout.separator()
 
-        layout.prop(st, "show_strip_offset", text="Offsets")
-        layout.prop(st, "show_fcurves", text="F-Curves")
-        layout.prop(st, "show_grid", text="Grid")
+        layout.prop(overlay_settings, "show_strip_offset", text="Offsets")
+        layout.prop(overlay_settings, "show_fcurves", text="F-Curves")
+        layout.prop(overlay_settings, "show_thumbnails", text="Thumbnails")
+        layout.prop(overlay_settings, "show_grid", text="Grid")
 
         layout.separator()
 
-        layout.prop_menu_enum(st, "waveform_display_type")
+        layout.prop_menu_enum(overlay_settings, "waveform_display_type")
 
 
 class SEQUENCER_MT_view_cache(Menu):
@@ -1659,28 +1658,48 @@ class SEQUENCER_PT_adjust_sound(SequencerButtonsPanel, Panel):
 
     def draw(self, context):
         layout = self.layout
-        layout.use_property_split = True
+        layout.use_property_split = False
 
         st = context.space_data
+        overlay_settings = st.timeline_overlay
         strip = context.active_sequence_strip
         sound = strip.sound
 
         layout.active = not strip.mute
 
-        col = layout.column()
-
-        col.prop(strip, "volume", text="Volume")
-        col.prop(strip, "pitch")
-
-        col = layout.column()
-        col.prop(strip, "pan")
-        col.enabled = sound is not None and sound.use_mono
-
         if sound is not None:
             col = layout.column()
-            if st.waveform_display_type == 'DEFAULT_WAVEFORMS':
-                col.prop(strip, "show_waveform")
-            col.prop(sound, "use_mono")
+
+            split = col.split(factor=0.4)
+            split.label(text="")
+            split.prop(sound, "use_mono")
+            if overlay_settings.waveform_display_type == 'DEFAULT_WAVEFORMS':
+                split = col.split(factor=0.4)
+                split.label(text="")
+                split.prop(strip, "show_waveform")
+
+            col = layout.column()
+
+            split = col.split(factor=0.4)
+            split.alignment = 'RIGHT'
+            split.label(text="Volume")
+            split.prop(strip, "volume", text="")
+
+            split = col.split(factor=0.4)
+            split.alignment = 'RIGHT'
+            split.label(text="Pitch")
+            split.prop(strip, "pitch", text="")
+
+            split = col.split(factor=0.4)
+            split.alignment = 'RIGHT'
+            split.label(text="Pan")
+            audio_channels = context.scene.render.ffmpeg.audio_channels
+            pan_text = ""
+            if audio_channels != 'MONO' and audio_channels != 'STEREO':
+                pan_text = "%.2f°" % (strip.pan * 90)
+            split.prop(strip, "pan", text=pan_text)
+            split.enabled = sound.use_mono and audio_channels != 'MONO'
+
 
 
 class SEQUENCER_PT_adjust_comp(SequencerButtonsPanel, Panel):
@@ -1743,6 +1762,9 @@ class SEQUENCER_PT_adjust_transform(SequencerButtonsPanel, Panel):
 
         col = layout.column(align=True)
         col.prop(strip.transform, "rotation", text="Rotation")
+
+        col = layout.column(align=True)
+        col.prop(strip.transform, "origin")
 
         row = layout.row(heading="Mirror")
         sub = row.row(align=True)
@@ -2081,17 +2103,16 @@ class SEQUENCER_PT_view_safe_areas(SequencerButtonsPanel_Output, Panel):
         return is_preview and (st.display_mode == 'IMAGE')
 
     def draw_header(self, context):
-        st = context.space_data
-
-        self.layout.prop(st, "show_safe_areas", text="")
+        overlay_settings = context.space_data.preview_overlay
+        self.layout.prop(overlay_settings, "show_safe_areas", text="")
 
     def draw(self, context):
         layout = self.layout
         layout.use_property_split = True
-        st = context.space_data
+        overlay_settings = context.space_data.preview_overlay
         safe_data = context.scene.safe_areas
 
-        layout.active = st.show_safe_areas
+        layout.active = overlay_settings.show_safe_areas
 
         col = layout.column()
 
@@ -2107,19 +2128,18 @@ class SEQUENCER_PT_view_safe_areas_center_cut(SequencerButtonsPanel_Output, Pane
     bl_category = "View"
 
     def draw_header(self, context):
-        st = context.space_data
-
         layout = self.layout
-        layout.active = st.show_safe_areas
-        layout.prop(st, "show_safe_center", text="")
+        overlay_settings = context.space_data.preview_overlay
+        layout.active = overlay_settings.show_safe_areas
+        layout.prop(overlay_settings, "show_safe_center", text="")
 
     def draw(self, context):
         layout = self.layout
         layout.use_property_split = True
         safe_data = context.scene.safe_areas
-        st = context.space_data
+        overlay_settings = context.space_data.preview_overlay
 
-        layout.active = st.show_safe_areas and st.show_safe_center
+        layout.active = overlay_settings.show_safe_areas and overlay_settings.show_safe_center
 
         col = layout.column()
         col.prop(safe_data, "title_center", slider=True)

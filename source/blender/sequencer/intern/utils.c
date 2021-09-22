@@ -42,6 +42,7 @@
 #include "SEQ_edit.h"
 #include "SEQ_iterator.h"
 #include "SEQ_relations.h"
+#include "SEQ_render.h"
 #include "SEQ_select.h"
 #include "SEQ_sequencer.h"
 #include "SEQ_time.h"
@@ -257,7 +258,7 @@ ListBase *SEQ_get_seqbase_from_sequence(Sequence *seq, int *r_offset)
     }
     case SEQ_TYPE_SCENE: {
       if (seq->flag & SEQ_SCENE_STRIPS && seq->scene) {
-        Editing *ed = SEQ_editing_get(seq->scene, false);
+        Editing *ed = SEQ_editing_get(seq->scene);
         if (ed) {
           seqbase = &ed->seqbase;
           *r_offset = seq->scene->r.sfra;
