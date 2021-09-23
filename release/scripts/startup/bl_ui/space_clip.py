@@ -139,18 +139,24 @@ class CLIP_HT_tool_header(Header):
 
     def draw(self, context):
         layout = self.layout
+        sc = context.space_data
 
         layout.template_header()
+        
+        if sc.view == 'CLIP':
 
-        self.draw_tool_settings(context)
+            self.draw_tool_settings(context)
 
-        layout.separator_spacer()
+            layout.separator_spacer()
 
-        CLIP_HT_header.draw_xform_template(layout, context)
+            CLIP_HT_header.draw_xform_template(layout, context)
 
-        layout.separator_spacer()
+            layout.separator_spacer()
 
-        self.draw_mode_settings(context)
+            self.draw_mode_settings(context)
+
+        else:
+            sc.show_region_tool_header = False
 
     def draw_tool_settings(self, context):
         layout = self.layout
