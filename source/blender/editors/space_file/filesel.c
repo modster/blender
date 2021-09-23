@@ -135,7 +135,8 @@ static void fileselect_ensure_updated_asset_params(SpaceFile *sfile)
   base_params->filter_id = FILTER_ID_OB | FILTER_ID_GR;
   base_params->display = FILE_IMGDISPLAY;
   base_params->sort = FILE_SORT_ALPHA;
-  base_params->recursion_level = 1;
+  /* Asset libraries include all sub-directories, so enable maximal recursion. */
+  base_params->recursion_level = FILE_SELECT_MAX_RECURSIONS;
   /* 'SMALL' size by default. More reasonable since this is typically used as regular editor,
    * space is more of an issue here. */
   base_params->thumbnail_size = 96;
@@ -1270,7 +1271,7 @@ void file_params_rename_end(wmWindowManager *wm,
   /* Ensure smooth-scroll timer is active, even if not needed, because that way rename state is
    * handled properly. */
   file_params_invoke_rename_postscroll(wm, win, sfile);
-  /* Also always activate the rename file, even if renaming was cancelled. */
+  /* Also always activate the rename file, even if renaming was canceled. */
   file_params_renamefile_activate(sfile, params);
 }
 

@@ -59,6 +59,8 @@
 #include "UI_resources.h"
 #include "UI_view2d.h"
 
+#include "SEQ_sequencer.h"
+
 #include "transform.h"
 #include "transform_convert.h"
 #include "transform_mode.h"
@@ -249,12 +251,6 @@ void initTransInfo(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
     t->view = v3d;
     t->animtimer = (animscreen) ? animscreen->animtimer : NULL;
 
-    /* turn gizmo off during transform */
-    if (t->flag & T_MODAL) {
-      t->gizmo_flag = v3d->gizmo_flag;
-      v3d->gizmo_flag = V3D_GIZMO_HIDE;
-    }
-
     if (t->scene->toolsettings->transform_flag & SCE_XFORM_AXIS_ALIGN) {
       t->flag |= T_V3D_ALIGN;
     }
@@ -340,6 +336,11 @@ void initTransInfo(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
     else if (ED_space_clip_check_show_maskedit(sclip)) {
       t->options |= CTX_MASK;
     }
+  }
+  else if (t->spacetype == SPACE_SEQ && region->regiontype == RGN_TYPE_PREVIEW) {
+    t->view = &region->v2d;
+    t->around = SEQ_tool_settings_pivot_point_get(t->scene);
+    t->options |= CTX_SEQUENCER_IMAGE;
   }
   else {
     if (region) {
@@ -740,13 +741,6 @@ void postTrans(bContext *C, TransInfo *t)
       if (sima->flag & SI_LIVE_UNWRAP) {
         ED_uvedit_live_unwrap_end(t->state == TRANS_CANCEL);
       }
-    }
-  }
-  else if (t->spacetype == SPACE_VIEW3D) {
-    View3D *v3d = t->area->spacedata.first;
-    /* restore gizmo */
-    if (t->flag & T_MODAL) {
-      v3d->gizmo_flag = t->gizmo_flag;
     }
   }
 

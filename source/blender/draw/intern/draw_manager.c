@@ -696,7 +696,7 @@ static void duplidata_value_free(void *val)
 static void duplidata_key_free(void *key)
 {
   DupliKey *dupli_key = (DupliKey *)key;
-  if (dupli_key->ob_data == NULL) {
+  if (dupli_key->ob_data == dupli_key->ob->data) {
     drw_batch_cache_generate_requested(dupli_key->ob);
   }
   else {
@@ -1198,6 +1198,18 @@ static void drw_engines_enable_basic(void)
   use_drw_engine(&draw_engine_basic_type);
 }
 
+static void drw_engine_enable_image_editor(void)
+{
+  if (DRW_engine_external_acquire_for_image_editor()) {
+    use_drw_engine(&draw_engine_external_type);
+  }
+  else {
+    use_drw_engine(&draw_engine_image_type);
+  }
+
+  use_drw_engine(&draw_engine_overlay_type);
+}
+
 static void drw_engines_enable_editors(void)
 {
   SpaceLink *space_data = DST.draw_ctx.space_data;
@@ -1206,8 +1218,7 @@ static void drw_engines_enable_editors(void)
   }
 
   if (space_data->spacetype == SPACE_IMAGE) {
-    use_drw_engine(&draw_engine_image_type);
-    use_drw_engine(&draw_engine_overlay_type);
+    drw_engine_enable_image_editor();
   }
   else if (space_data->spacetype == SPACE_NODE) {
     /* Only enable when drawing the space image backdrop. */
@@ -3248,5 +3259,68 @@ void DRW_draw_state_init_gtests(eGPUShaderConfig sh_cfg)
 }
 
 #endif
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Draw manager context release/activation
+ *
+ * These functions are used in cases when an OpenGL context creation is needed during the draw.
+ * This happens, for example, when an external engine needs to create its own OpenGL context from
+ * the engine initialization.
+ *
+ * Example of context creation:
+ *
+ *   const bool drw_state = DRW_opengl_context_release();
+ *   gl_context = WM_opengl_context_create();
+ *   DRW_opengl_context_activate(drw_state);
+ *
+ * Example of context destruction:
+ *
+ *   const bool drw_state = DRW_opengl_context_release();
+ *   WM_opengl_context_activate(gl_context);
+ *   WM_opengl_context_dispose(gl_context);
+ *   DRW_opengl_context_activate(drw_state);
+ *
+ *
+ * NOTE: Will only perform context modification when on main thread. This way these functions can
+ * be used in an engine without check on whether it is a draw manager which manages OpenGL context
+ * on the current thread. The downside of this is that if the engine performs OpenGL creation from
+ * a non-main thread, that thread is supposed to not have OpenGL context ever bound by Blender.
+ *
+ * \{ */
+
+bool DRW_opengl_context_release(void)
+{
+  if (!BLI_thread_is_main()) {
+    return false;
+  }
+
+  if (GPU_context_active_get() != DST.gpu_context) {
+    /* Context release is requested from the outside of the draw manager main draw loop, indicate
+     * this to the `DRW_opengl_context_activate()` so that it restores drawable of the window. */
+    return false;
+  }
+
+  GPU_context_active_set(NULL);
+  WM_opengl_context_release(DST.gl_context);
+
+  return true;
+}
+
+void DRW_opengl_context_activate(bool drw_state)
+{
+  if (!BLI_thread_is_main()) {
+    return;
+  }
+
+  if (drw_state) {
+    WM_opengl_context_activate(DST.gl_context);
+    GPU_context_active_set(DST.gpu_context);
+  }
+  else {
+    wm_window_reset_drawable();
+  }
+}
 
 /** \} */

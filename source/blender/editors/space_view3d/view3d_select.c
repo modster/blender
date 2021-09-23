@@ -1438,7 +1438,7 @@ void VIEW3D_OT_select_lasso(wmOperatorType *ot)
   ot->cancel = WM_gesture_lasso_cancel;
 
   /* flags */
-  ot->flag = OPTYPE_UNDO;
+  ot->flag = OPTYPE_UNDO | OPTYPE_DEPENDS_ON_CURSOR;
 
   /* properties */
   WM_operator_properties_gesture_lasso(ot);
@@ -2813,7 +2813,9 @@ static int view3d_select_invoke(bContext *C, wmOperator *op, const wmEvent *even
 {
   RNA_int_set_array(op->ptr, "location", event->mval);
 
-  return view3d_select_exec(C, op);
+  const int retval = view3d_select_exec(C, op);
+
+  return WM_operator_flag_only_pass_through_on_press(retval, event);
 }
 
 static int view3d_select_invoke_3d(bContext *C, wmOperator *op, const wmEvent *event)

@@ -478,8 +478,8 @@ template<typename T> class MutableSpan {
   using size_type = int64_t;
 
  protected:
-  T *data_;
-  int64_t size_;
+  T *data_ = nullptr;
+  int64_t size_ = 0;
 
  public:
   constexpr MutableSpan() = default;
@@ -641,6 +641,16 @@ template<typename T> class MutableSpan {
     BLI_assert(n >= 0);
     const int64_t new_size = std::min<int64_t>(size_, n);
     return MutableSpan(data_ + size_ - new_size, new_size);
+  }
+
+  /**
+   * Reverse the data in the MutableSpan.
+   */
+  constexpr void reverse()
+  {
+    for (const int i : IndexRange(size_ / 2)) {
+      std::swap(data_[size_ - 1 - i], data_[i]);
+    }
   }
 
   /**

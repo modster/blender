@@ -68,6 +68,10 @@
 #include "UI_interface.h"
 #include "UI_resources.h"
 
+#include "BLT_translation.h"
+
+#include "WM_types.h"
+
 #include "RNA_access.h"
 #include "RNA_enum_types.h"
 
@@ -289,6 +293,17 @@ static bool logging_enabled(const ModifierEvalContext *ctx)
     return false;
   }
   return true;
+}
+
+static const std::string use_attribute_suffix = "_use_attribute";
+static const std::string attribute_name_suffix = "_attribute_name";
+
+/**
+ * \return Whether using an attribute to input values of this type is supported.
+ */
+static bool socket_type_has_attribute_toggle(const bNodeSocket &socket)
+{
+  return ELEM(socket.type, SOCK_FLOAT, SOCK_VECTOR, SOCK_BOOLEAN, SOCK_RGBA, SOCK_INT);
 }
 
 static IDProperty *id_property_create_from_socket(const bNodeSocket &socket)
@@ -546,6 +561,32 @@ void MOD_nodes_update_interface(Object *object, NodesModifierData *nmd)
         new_prop->ui_data = ui_data;
       }
     }
+
+    if (socket_type_has_attribute_toggle(*socket)) {
+      const std::string use_attribute_id = socket->identifier + use_attribute_suffix;
+      const std::string attribute_name_id = socket->identifier + attribute_name_suffix;
+
+      IDPropertyTemplate idprop = {0};
+      IDProperty *use_attribute_prop = IDP_New(IDP_INT, &idprop, use_attribute_id.c_str());
+      IDP_AddToGroup(nmd->settings.properties, use_attribute_prop);
+
+      IDProperty *attribute_prop = IDP_New(IDP_STRING, &idprop, attribute_name_id.c_str());
+      IDP_AddToGroup(nmd->settings.properties, attribute_prop);
+
+      if (old_properties != nullptr) {
+        IDProperty *old_prop_use_attribute = IDP_GetPropertyFromGroup(old_properties,
+                                                                      use_attribute_id.c_str());
+        if (old_prop_use_attribute != nullptr) {
+          IDP_CopyPropertyContent(use_attribute_prop, old_prop_use_attribute);
+        }
+
+        IDProperty *old_attribute_name_prop = IDP_GetPropertyFromGroup(old_properties,
+                                                                       attribute_name_id.c_str());
+        if (old_attribute_name_prop != nullptr) {
+          IDP_CopyPropertyContent(attribute_prop, old_attribute_name_prop);
+        }
+      }
+    }
   }
 
   if (old_properties != nullptr) {
@@ -601,8 +642,33 @@ static void initialize_group_input(NodesModifierData &nmd,
     return;
   }
 
-  init_socket_cpp_value_from_property(
-      *property, static_cast<eNodeSocketDatatype>(socket.type), r_value);
+  if (!socket_type_has_attribute_toggle(socket)) {
+    init_socket_cpp_value_from_property(
+        *property, static_cast<eNodeSocketDatatype>(socket.type), r_value);
+    return;
+  }
+
+  const IDProperty *property_use_attribute = IDP_GetPropertyFromGroup(
+      nmd.settings.properties, (socket.identifier + use_attribute_suffix).c_str());
+  const IDProperty *property_attribute_name = IDP_GetPropertyFromGroup(
+      nmd.settings.properties, (socket.identifier + attribute_name_suffix).c_str());
+  if (property_use_attribute == nullptr || property_attribute_name == nullptr) {
+    init_socket_cpp_value_from_property(
+        *property, static_cast<eNodeSocketDatatype>(socket.type), r_value);
+    return;
+  }
+
+  const bool use_attribute = IDP_Int(property_use_attribute) != 0;
+  if (use_attribute) {
+    const StringRef attribute_name{IDP_String(property_attribute_name)};
+    auto attribute_input = std::make_shared<blender::bke::AttributeFieldInput>(
+        attribute_name, *socket.typeinfo->get_base_cpp_type());
+    new (r_value) blender::fn::GField(std::move(attribute_input), 0);
+  }
+  else {
+    init_socket_cpp_value_from_property(
+        *property, static_cast<eNodeSocketDatatype>(socket.type), r_value);
+  }
 }
 
 static Vector<SpaceSpreadsheet *> find_spreadsheet_editors(Main *bmain)
@@ -912,13 +978,13 @@ static void modifyGeometrySet(ModifierData *md,
  * the node socket identifier for the property names, since they are unique, but also having
  * the correct label displayed in the UI. */
 static void draw_property_for_socket(uiLayout *layout,
+                                     NodesModifierData *nmd,
                                      PointerRNA *bmain_ptr,
                                      PointerRNA *md_ptr,
-                                     const IDProperty *modifier_props,
                                      const bNodeSocket &socket)
 {
   /* The property should be created in #MOD_nodes_update_interface with the correct type. */
-  IDProperty *property = IDP_GetPropertyFromGroup(modifier_props, socket.identifier);
+  IDProperty *property = IDP_GetPropertyFromGroup(nmd->settings.properties, socket.identifier);
 
   /* IDProperties can be removed with python, so there could be a situation where
    * there isn't a property for a socket or it doesn't have the correct type. */
@@ -959,8 +1025,38 @@ static void draw_property_for_socket(uiLayout *layout,
       uiItemPointerR(layout, md_ptr, rna_path, bmain_ptr, "textures", socket.name, ICON_TEXTURE);
       break;
     }
-    default:
-      uiItemR(layout, md_ptr, rna_path, 0, socket.name, ICON_NONE);
+    default: {
+      if (socket_type_has_attribute_toggle(socket) &&
+          USER_EXPERIMENTAL_TEST(&U, use_geometry_nodes_fields)) {
+        const std::string rna_path_use_attribute = "[\"" + std::string(socket_id_esc) +
+                                                   use_attribute_suffix + "\"]";
+        const std::string rna_path_attribute_name = "[\"" + std::string(socket_id_esc) +
+                                                    attribute_name_suffix + "\"]";
+
+        uiLayout *row = uiLayoutRow(layout, true);
+        const int use_attribute = RNA_int_get(md_ptr, rna_path_use_attribute.c_str()) != 0;
+        if (use_attribute) {
+          uiItemR(row, md_ptr, rna_path_attribute_name.c_str(), 0, socket.name, ICON_NONE);
+        }
+        else {
+          uiItemR(row, md_ptr, rna_path, 0, socket.name, ICON_NONE);
+        }
+        PointerRNA props;
+        uiItemFullO(row,
+                    "object.geometry_nodes_input_attribute_toggle",
+                    "",
+                    ICON_SPREADSHEET,
+                    nullptr,
+                    WM_OP_INVOKE_DEFAULT,
+                    0,
+                    &props);
+        RNA_string_set(&props, "modifier_name", nmd->modifier.name);
+        RNA_string_set(&props, "prop_path", rna_path_use_attribute.c_str());
+      }
+      else {
+        uiItemR(layout, md_ptr, rna_path, 0, socket.name, ICON_NONE);
+      }
+    }
   }
 }
 
@@ -991,20 +1087,32 @@ static void panel_draw(const bContext *C, Panel *panel)
     RNA_main_pointer_create(bmain, &bmain_ptr);
 
     LISTBASE_FOREACH (bNodeSocket *, socket, &nmd->node_group->inputs) {
-      draw_property_for_socket(layout, &bmain_ptr, ptr, nmd->settings.properties, *socket);
+      draw_property_for_socket(layout, nmd, &bmain_ptr, ptr, *socket);
     }
   }
 
   /* Draw node warnings. */
+  bool has_legacy_node = false;
   if (nmd->runtime_eval_log != nullptr) {
     const geo_log::ModifierLog &log = *static_cast<geo_log::ModifierLog *>(nmd->runtime_eval_log);
-    log.foreach_node_log([layout](const geo_log::NodeLog &node_log) {
+    log.foreach_node_log([&](const geo_log::NodeLog &node_log) {
       for (const geo_log::NodeWarning &warning : node_log.warnings()) {
-        if (warning.type != geo_log::NodeWarningType::Info) {
+        if (warning.type == geo_log::NodeWarningType::Legacy) {
+          has_legacy_node = true;
+        }
+        else if (warning.type != geo_log::NodeWarningType::Info) {
           uiItemL(layout, warning.message.c_str(), ICON_ERROR);
         }
       }
     });
+  }
+
+  if (USER_EXPERIMENTAL_TEST(&U, use_geometry_nodes_fields) && has_legacy_node) {
+    uiLayout *row = uiLayoutRow(layout, false);
+    uiItemL(row, IFACE_("Node tree has legacy node"), ICON_ERROR);
+    uiLayout *sub = uiLayoutRow(row, false);
+    uiLayoutSetAlignment(sub, UI_LAYOUT_ALIGN_RIGHT);
+    uiItemO(sub, "", ICON_VIEWZOOM, "NODE_OT_geometry_node_view_legacy");
   }
 
   modifier_panel_end(layout, ptr);
@@ -1075,9 +1183,10 @@ ModifierTypeInfo modifierType_Nodes = {
     /* srna */ &RNA_NodesModifier,
     /* type */ eModifierTypeType_Constructive,
     /* flags */
-    static_cast<ModifierTypeFlag>(
-        eModifierTypeFlag_AcceptsMesh | eModifierTypeFlag_SupportsEditmode |
-        eModifierTypeFlag_EnableInEditmode | eModifierTypeFlag_SupportsMapping),
+    static_cast<ModifierTypeFlag>(eModifierTypeFlag_AcceptsMesh | eModifierTypeFlag_AcceptsCVs |
+                                  eModifierTypeFlag_SupportsEditmode |
+                                  eModifierTypeFlag_EnableInEditmode |
+                                  eModifierTypeFlag_SupportsMapping),
     /* icon */ ICON_NODETREE,
 
     /* copyData */ copyData,

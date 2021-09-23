@@ -216,6 +216,16 @@ typedef enum eNodeSocketFlag {
   SOCK_HIDE_LABEL = (1 << 12),
 } eNodeSocketFlag;
 
+/** Workaround to forward-declare C++ type in C header. */
+#ifdef __cplusplus
+namespace blender::nodes {
+class NodeDeclaration;
+}
+using NodeDeclarationHandle = blender::nodes::NodeDeclaration;
+#else
+typedef struct NodeDeclarationHandle NodeDeclarationHandle;
+#endif
+
 /* TODO: Limit data in bNode to what we want to see saved. */
 typedef struct bNode {
   struct bNode *next, *prev, *new_node;
@@ -315,6 +325,26 @@ typedef struct bNode {
    * needs to be a float to feed GPU_uniform.
    */
   float sss_id;
+
+  /**
+   * Describes the desired interface of the node. This is run-time data only.
+   * The actual interface of the node may deviate from the declaration temporarily.
+   * It's possible to sync the actual state of the node to the desired state. Currently, this is
+   * only done when a node is created or loaded.
+   *
+   * In the future, we may want to keep more data only in the declaration, so that it does not have
+   * to be synced to other places that are stored in files. That especially applies to data that
+   * can't be edited by users directly (e.g. min/max values of sockets, tooltips, ...).
+   *
+   * The declaration of a node can be recreated at any time when it is used. Caching it here is
+   * just a bit more efficient when it is used a lot. To make sure that the cache is up-to-date,
+   * call #nodeDeclarationEnsure before using it.
+   *
+   * Currently, the declaration is the same for every node of the same type. Going forward, that is
+   * intended to change though. Especially when nodes become more dynamic with respect to how many
+   * sockets they have.
+   */
+  NodeDeclarationHandle *declaration;
 } bNode;
 
 /* node->flag */
@@ -1002,6 +1032,11 @@ typedef struct NodeShaderTexPointDensity {
   char _pad2[4];
 } NodeShaderTexPointDensity;
 
+typedef struct NodeShaderPrincipled {
+  char use_subsurface_auto_radius;
+  char _pad[3];
+} NodeShaderPrincipled;
+
 /* TEX_output */
 typedef struct TexNodeOutput {
   char name[64];
@@ -1137,6 +1172,7 @@ typedef struct NodeCryptomatte {
 
 typedef struct NodeDenoise {
   char hdr;
+  char prefilter;
 } NodeDenoise;
 
 typedef struct NodeAttributeClamp {
@@ -1402,7 +1438,7 @@ typedef struct NodeGeometryCurvePrimitiveQuad {
 } NodeGeometryCurvePrimitiveQuad;
 
 typedef struct NodeGeometryCurveResample {
-  /* GeometryNodeCurveSampleMode. */
+  /* GeometryNodeCurveResampleMode. */
   uint8_t mode;
 } NodeGeometryCurveResample;
 
@@ -1411,15 +1447,25 @@ typedef struct NodeGeometryCurveSubdivide {
   uint8_t cuts_type;
 } NodeGeometryCurveSubdivide;
 
+typedef struct NodeGeometryCurveFillet {
+  /* GeometryNodeCurveFilletMode. */
+  uint8_t mode;
+} NodeGeometryCurveFillet;
+
 typedef struct NodeGeometryCurveTrim {
-  /* GeometryNodeCurveInterpolateMode. */
+  /* GeometryNodeCurveSampleMode. */
   uint8_t mode;
 } NodeGeometryCurveTrim;
 
 typedef struct NodeGeometryCurveToPoints {
-  /* GeometryNodeCurveSampleMode. */
+  /* GeometryNodeCurveResampleMode. */
   uint8_t mode;
 } NodeGeometryCurveToPoints;
+
+typedef struct NodeGeometryCurveSample {
+  /* GeometryNodeCurveSampleMode. */
+  uint8_t mode;
+} NodeGeometryCurveSample;
 
 typedef struct NodeGeometryAttributeTransfer {
   /* AttributeDomain. */
@@ -1767,11 +1813,12 @@ enum {
 enum {
 #ifdef DNA_DEPRECATED_ALLOW
   SHD_SUBSURFACE_COMPATIBLE = 0, /* Deprecated */
-#endif
   SHD_SUBSURFACE_CUBIC = 1,
   SHD_SUBSURFACE_GAUSSIAN = 2,
-  SHD_SUBSURFACE_BURLEY = 3,
-  SHD_SUBSURFACE_RANDOM_WALK = 4,
+#endif
+  SHD_SUBSURFACE_DIFFUSION = 3,
+  SHD_SUBSURFACE_RANDOM_WALK_FIXED_RADIUS = 4,
+  SHD_SUBSURFACE_RANDOM_WALK = 5,
 };
 
 /* blur node */
@@ -1809,6 +1856,14 @@ typedef enum CMPNodeSetAlphaMode {
   CMP_NODE_SETALPHA_MODE_APPLY = 0,
   CMP_NODE_SETALPHA_MODE_REPLACE_ALPHA = 1,
 } CMPNodeSetAlphaMode;
+
+/* Denoise Node. */
+/* `NodeDenoise.prefilter` */
+typedef enum CMPNodeDenoisePrefilter {
+  CMP_NODE_DENOISE_PREFILTER_FAST = 0,
+  CMP_NODE_DENOISE_PREFILTER_NONE = 1,
+  CMP_NODE_DENOISE_PREFILTER_ACCURATE = 2
+} CMPNodeDenoisePrefilter;
 
 #define CMP_NODE_PLANETRACKDEFORM_MBLUR_SAMPLES_MAX 64
 
@@ -1999,16 +2054,21 @@ typedef enum GeometryNodeCurvePrimitiveBezierSegmentMode {
   GEO_NODE_CURVE_PRIMITIVE_BEZIER_SEGMENT_OFFSET = 1,
 } GeometryNodeCurvePrimitiveBezierSegmentMode;
 
+typedef enum GeometryNodeCurveResampleMode {
+  GEO_NODE_CURVE_RESAMPLE_COUNT = 0,
+  GEO_NODE_CURVE_RESAMPLE_LENGTH = 1,
+  GEO_NODE_CURVE_RESAMPLE_EVALUATED = 2,
+} GeometryNodeCurveResampleMode;
+
 typedef enum GeometryNodeCurveSampleMode {
-  GEO_NODE_CURVE_SAMPLE_COUNT = 0,
+  GEO_NODE_CURVE_SAMPLE_FACTOR = 0,
   GEO_NODE_CURVE_SAMPLE_LENGTH = 1,
-  GEO_NODE_CURVE_SAMPLE_EVALUATED = 2,
 } GeometryNodeCurveSampleMode;
 
-typedef enum GeometryNodeCurveInterpolateMode {
-  GEO_NODE_CURVE_INTERPOLATE_FACTOR = 0,
-  GEO_NODE_CURVE_INTERPOLATE_LENGTH = 1,
-} GeometryNodeCurveInterpolateMode;
+typedef enum GeometryNodeCurveFilletMode {
+  GEO_NODE_CURVE_FILLET_BEZIER = 0,
+  GEO_NODE_CURVE_FILLET_POLY = 1,
+} GeometryNodeCurveFilletMode;
 
 typedef enum GeometryNodeAttributeTransferMapMode {
   GEO_NODE_ATTRIBUTE_TRANSFER_NEAREST_FACE_INTERPOLATED = 0,

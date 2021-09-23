@@ -26,6 +26,8 @@
 #include "FN_generic_value_map.hh"
 #include "FN_multi_function.hh"
 
+#include "BLT_translation.h"
+
 #include "BLI_enumerable_thread_specific.hh"
 #include "BLI_stack.hh"
 #include "BLI_task.h"
@@ -321,6 +323,18 @@ static const CPPType *get_socket_cpp_type(const DSocket socket)
 
 static void get_socket_value(const SocketRef &socket, void *r_value)
 {
+  const bNodeSocket &bsocket = *socket.bsocket();
+  /* This is not supposed to be a long term solution. Eventually we want that nodes can specify
+   * more complex defaults (other than just single values) in their socket declarations. */
+  if (bsocket.flag & SOCK_HIDE_VALUE) {
+    const bNode &bnode = *socket.bnode();
+    if (bsocket.type == SOCK_VECTOR &&
+        ELEM(bnode.type, GEO_NODE_SET_POSITION, SH_NODE_TEX_NOISE)) {
+      new (r_value) Field<float3>(
+          std::make_shared<bke::AttributeFieldInput>("position", CPPType::get<float3>()));
+      return;
+    }
+  }
   const bNodeSocketType *typeinfo = socket.typeinfo();
   typeinfo->get_geometry_nodes_cpp_value(*socket.bsocket(), r_value);
 }
@@ -856,6 +870,12 @@ class GeometryNodesEvaluator {
 
     NodeParamsProvider params_provider{*this, node, node_state};
     GeoNodeExecParams params{params_provider};
+    if (USER_EXPERIMENTAL_TEST(&U, use_geometry_nodes_fields)) {
+      if (node->idname().find("Legacy") != StringRef::not_found) {
+        params.error_message_add(geo_log::NodeWarningType::Legacy,
+                                 TIP_("Legacy node will be removed before Blender 4.0"));
+      }
+    }
     bnode.typeinfo->geometry_node_execute(params);
   }
 
@@ -892,8 +912,10 @@ class GeometryNodesEvaluator {
       OutputState &output_state = node_state.outputs[i];
       const DOutputSocket socket{node.context(), &socket_ref};
       const CPPType *cpp_type = get_socket_cpp_type(socket_ref);
-      GField &field = *allocator.construct<GField>(operation, output_index).release();
-      this->forward_output(socket, {cpp_type, &field});
+      GField new_field{operation, output_index};
+      new_field = fn::make_field_constant_if_possible(std::move(new_field));
+      GField &field_to_forward = *allocator.construct<GField>(std::move(new_field)).release();
+      this->forward_output(socket, {cpp_type, &field_to_forward});
       output_state.has_been_computed = true;
       output_index++;
     }
@@ -1411,8 +1433,8 @@ class GeometryNodesEvaluator {
   {
     if (const FieldCPPType *field_cpp_type = dynamic_cast<const FieldCPPType *>(&type)) {
       const CPPType &base_type = field_cpp_type->field_type();
-      auto constant_fn = std::make_unique<fn::CustomMF_GenericConstant>(base_type,
-                                                                        base_type.default_value());
+      auto constant_fn = std::make_unique<fn::CustomMF_GenericConstant>(
+          base_type, base_type.default_value(), false);
       auto operation = std::make_shared<fn::FieldOperation>(std::move(constant_fn));
       new (r_value) GField(std::move(operation), 0);
       return;
