@@ -491,6 +491,7 @@ if(WITH_XR_OPENXR)
     intern/GHOST_Xr_openxr_includes.h
   )
   list(APPEND INC
+    ../../extern/json/include
     ../../extern/tinygltf
   )
   list(APPEND INC_SYS
