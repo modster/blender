@@ -56,6 +56,7 @@
 #endif
 
 #include "BKE_asset.h"
+#include "BKE_asset_library.h"
 #include "BKE_context.h"
 #include "BKE_global.h"
 #include "BKE_icons.h"
@@ -386,6 +387,7 @@ typedef struct FileList {
   eFileSelectType type;
   /* The library this list was created for. Stored here so we know when to re-read. */
   AssetLibraryReference *asset_library_ref;
+  struct AssetLibrary *asset_library;
 
   short flags;
 
@@ -1442,7 +1444,9 @@ static void filelist_cache_preview_runf(TaskPool *__restrict pool, void *taskdat
   if (preview->in_memory_preview) {
     if (BKE_previewimg_is_finished(preview->in_memory_preview, ICON_SIZE_PREVIEW)) {
       ImBuf *imbuf = BKE_previewimg_to_imbuf(preview->in_memory_preview, ICON_SIZE_PREVIEW);
-      preview->icon_id = BKE_icon_imbuf_create(imbuf);
+      if (imbuf) {
+        preview->icon_id = BKE_icon_imbuf_create(imbuf);
+      }
       done = true;
     }
   }
@@ -1590,7 +1594,7 @@ static void filelist_cache_previews_push(FileList *filelist, FileDirEntry *entry
   preview->flags = entry->typeflag;
   preview->in_memory_preview = intern_entry->local_data.preview_image;
   preview->icon_id = 0;
-  //      printf("%s: %d - %s - %p\n", __func__, preview->index, preview->path, preview->img);
+  // printf("%s: %d - %s\n", __func__, preview->index, preview->path);
 
   filelist_cache_preview_ensure_running(cache);
 
@@ -1755,6 +1759,13 @@ void filelist_clear_ex(struct FileList *filelist, const bool do_cache, const boo
 
   if (do_selection && filelist->selection_state) {
     BLI_ghash_clear(filelist->selection_state, NULL, NULL);
+  }
+
+  if (filelist->asset_library != NULL) {
+    /* There is no way to refresh the catalogs stored by the AssetLibrary struct, so instead of
+     * "clearing" it, the entire struct is freed. It will be reallocated when needed. */
+    BKE_asset_library_free(filelist->asset_library);
+    filelist->asset_library = NULL;
   }
 }
 
@@ -1953,7 +1964,9 @@ static FileDirEntry *filelist_file_create_entry(FileList *filelist, const int in
   if (entry->local_data.preview_image &&
       BKE_previewimg_is_finished(entry->local_data.preview_image, ICON_SIZE_PREVIEW)) {
     ImBuf *ibuf = BKE_previewimg_to_imbuf(entry->local_data.preview_image, ICON_SIZE_PREVIEW);
-    ret->preview_icon_id = BKE_icon_imbuf_create(ibuf);
+    if (ibuf) {
+      ret->preview_icon_id = BKE_icon_imbuf_create(ibuf);
+    }
   }
   BLI_addtail(&cache->cached_entries, ret);
   return ret;
@@ -3055,7 +3068,7 @@ static void filelist_readjob_main_recursive(Main *bmain, FileList *filelist)
       ok = 1;
       if (ok) {
         if (!(filelist->filter_data.flags & FLF_HIDE_DOT) || id->name[2] != '.') {
-          if (id->lib == NULL) {
+          if (!ID_IS_LINKED(id)) {
             files->entry->relpath = BLI_strdup(id->name + 2);
           }
           else {
@@ -3131,6 +3144,9 @@ typedef struct FileListReadJob {
    *
    * The job system calls #filelist_readjob_update which moves any read file from #tmp_filelist
    * into #filelist in a thread-safe way.
+   *
+   * #tmp_filelist also keeps an `AssetLibrary *` so that it can be loaded in the same thread, and
+   * moved to #filelist once all categories are loaded.
    *
    * NOTE: #tmp_filelist is freed in #filelist_readjob_free, so any copied pointers need to be set
    * to NULL to avoid double-freeing them. */
@@ -3262,6 +3278,13 @@ static void filelist_readjob_do(const bool do_lib,
     BLI_stack_discard(todo_dirs);
   }
   BLI_stack_free(todo_dirs);
+
+  /* Check whether assets catalogs need to be loaded. */
+  if (job_params->filelist->asset_library_ref != NULL) {
+    /* Load asset catalogs, into the temp filelist for thread-safety.
+     * #filelist_readjob_endjob() will move it into the real filelist. */
+    job_params->tmp_filelist->asset_library = BKE_asset_library_load(filelist->filelist.root);
+  }
 }
 
 static void filelist_readjob_dir(FileListReadJob *job_params,
@@ -3351,6 +3374,8 @@ static void filelist_readjob_startjob(void *flrjv, short *stop, short *do_update
   BLI_mutex_lock(&flrj->lock);
 
   BLI_assert((flrj->tmp_filelist == NULL) && flrj->filelist);
+  BLI_assert_msg(flrj->filelist->asset_library == NULL,
+                 "Asset library should not yet be assigned at start of read job");
 
   flrj->tmp_filelist = MEM_dupallocN(flrj->filelist);
 
@@ -3410,6 +3435,12 @@ static void filelist_readjob_endjob(void *flrjv)
 
   /* In case there would be some dangling update... */
   filelist_readjob_update(flrjv);
+
+  /* Move ownership of the asset library from the temporary list to the true filelist. */
+  BLI_assert_msg(flrj->filelist->asset_library == NULL,
+                 "asset library should not already have been allocated");
+  flrj->filelist->asset_library = flrj->tmp_filelist->asset_library;
+  flrj->tmp_filelist->asset_library = NULL; /* MUST be NULL to avoid double-free. */
 
   flrj->filelist->flags &= ~FL_IS_PENDING;
   flrj->filelist->flags |= FL_IS_READY;

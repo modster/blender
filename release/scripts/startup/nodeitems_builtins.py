@@ -180,6 +180,13 @@ def object_eevee_cycles_shader_nodes_poll(context):
             eevee_cycles_shader_nodes_poll(context))
 
 
+def geometry_nodes_fields_poll(context):
+    return context.preferences.experimental.use_geometry_nodes_fields
+
+def geometry_nodes_fields_legacy_poll(context):
+    return not context.preferences.experimental.use_geometry_nodes_fields
+
+
 # All standard node categories currently used in nodes.
 
 shader_node_categories = [
@@ -333,6 +340,7 @@ compositor_node_categories = [
         NodeItem("CompositorNodeGamma"),
         NodeItem("CompositorNodeExposure"),
         NodeItem("CompositorNodeColorCorrection"),
+        NodeItem("CompositorNodePosterize"),
         NodeItem("CompositorNodeTonemap"),
         NodeItem("CompositorNodeZcombine"),
     ]),
@@ -475,44 +483,54 @@ texture_node_categories = [
 geometry_node_categories = [
     # Geometry Nodes
     GeometryNodeCategory("GEO_ATTRIBUTE", "Attribute", items=[
-        NodeItem("GeometryNodeAttributeRandomize"),
-        NodeItem("GeometryNodeAttributeMath"),
-        NodeItem("GeometryNodeAttributeClamp"),
-        NodeItem("GeometryNodeAttributeCompare"),
-        NodeItem("GeometryNodeAttributeConvert"),
-        NodeItem("GeometryNodeAttributeCurveMap"),
-        NodeItem("GeometryNodeAttributeFill"),
-        NodeItem("GeometryNodeAttributeMix"),
-        NodeItem("GeometryNodeAttributeProximity"),
-        NodeItem("GeometryNodeAttributeColorRamp"),
-        NodeItem("GeometryNodeAttributeVectorMath"),
-        NodeItem("GeometryNodeAttributeVectorRotate"),
-        NodeItem("GeometryNodeAttributeSampleTexture"),
-        NodeItem("GeometryNodeAttributeCombineXYZ"),
-        NodeItem("GeometryNodeAttributeSeparateXYZ"),
-        NodeItem("GeometryNodeAttributeRemove"),
-        NodeItem("GeometryNodeAttributeMapRange"),
-        NodeItem("GeometryNodeAttributeTransfer"),
+        NodeItem("GeometryNodeLegacyAttributeRandomize", poll=geometry_nodes_fields_legacy_poll),
+        NodeItem("GeometryNodeLegacyAttributeMath", poll=geometry_nodes_fields_legacy_poll),
+        NodeItem("GeometryNodeLegacyAttributeClamp", poll=geometry_nodes_fields_legacy_poll),
+        NodeItem("GeometryNodeLegacyAttributeCompare", poll=geometry_nodes_fields_legacy_poll),
+        NodeItem("GeometryNodeLegacyAttributeConvert", poll=geometry_nodes_fields_legacy_poll),
+        NodeItem("GeometryNodeLegacyAttributeCurveMap", poll=geometry_nodes_fields_legacy_poll),
+        NodeItem("GeometryNodeLegacyAttributeFill", poll=geometry_nodes_fields_legacy_poll),
+        NodeItem("GeometryNodeLegacyAttributeMix", poll=geometry_nodes_fields_legacy_poll),
+        NodeItem("GeometryNodeLegacyAttributeProximity", poll=geometry_nodes_fields_legacy_poll),
+        NodeItem("GeometryNodeLegacyAttributeColorRamp", poll=geometry_nodes_fields_legacy_poll),
+        NodeItem("GeometryNodeLegacyAttributeVectorMath", poll=geometry_nodes_fields_legacy_poll),
+        NodeItem("GeometryNodeLegacyAttributeVectorRotate", poll=geometry_nodes_fields_legacy_poll),
+        NodeItem("GeometryNodeLegacyAttributeSampleTexture", poll=geometry_nodes_fields_legacy_poll),
+        NodeItem("GeometryNodeLegacyAttributeCombineXYZ", poll=geometry_nodes_fields_legacy_poll),
+        NodeItem("GeometryNodeLegacyAttributeSeparateXYZ", poll=geometry_nodes_fields_legacy_poll),
+        NodeItem("GeometryNodeLegacyAttributeMapRange", poll=geometry_nodes_fields_legacy_poll),
+        NodeItem("GeometryNodeLegacyAttributeTransfer", poll=geometry_nodes_fields_legacy_poll),
+        NodeItem("GeometryNodeAttributeRemove", poll=geometry_nodes_fields_legacy_poll),
+
+        NodeItem("GeometryNodeAttributeCapture", poll=geometry_nodes_fields_poll),
+        NodeItem("GeometryNodeAttributeStatistic", poll=geometry_nodes_fields_poll),
     ]),
     GeometryNodeCategory("GEO_COLOR", "Color", items=[
+        NodeItem("ShaderNodeMixRGB"),
         NodeItem("ShaderNodeRGBCurve"),
         NodeItem("ShaderNodeValToRGB"),
         NodeItem("ShaderNodeSeparateRGB"),
         NodeItem("ShaderNodeCombineRGB"),
     ]),
     GeometryNodeCategory("GEO_CURVE", "Curve", items=[
-        NodeItem("GeometryNodeCurveSubdivide"),
+        NodeItem("GeometryNodeLegacyCurveSubdivide", poll=geometry_nodes_fields_legacy_poll),
+        NodeItem("GeometryNodeLegacyCurveReverse", poll=geometry_nodes_fields_legacy_poll),
+        NodeItem("GeometryNodeLegacyCurveSplineType", poll=geometry_nodes_fields_legacy_poll),
+        NodeItem("GeometryNodeLegacyCurveSetHandles", poll=geometry_nodes_fields_legacy_poll),
+        NodeItem("GeometryNodeLegacyCurveSelectHandles", poll=geometry_nodes_fields_legacy_poll),
+        NodeItem("GeometryNodeLegacyMeshToCurve", poll=geometry_nodes_fields_legacy_poll),
+
         NodeItem("GeometryNodeCurveToMesh"),
         NodeItem("GeometryNodeCurveResample"),
-        NodeItem("GeometryNodeMeshToCurve"),
         NodeItem("GeometryNodeCurveToPoints"),
         NodeItem("GeometryNodeCurveEndpoints"),
+        NodeItem("GeometryNodeCurveFill"),
         NodeItem("GeometryNodeCurveTrim"),
         NodeItem("GeometryNodeCurveLength"),
-        NodeItem("GeometryNodeCurveReverse"),
-        NodeItem("GeometryNodeCurveSplineType"),
-        NodeItem("GeometryNodeCurveSetHandles"),
-        NodeItem("GeometryNodeCurveSelectHandles"),
+        NodeItem("GeometryNodeCurveParameter", poll=geometry_nodes_fields_poll),
+        NodeItem("GeometryNodeInputTangent", poll=geometry_nodes_fields_poll),
+        NodeItem("GeometryNodeCurveSample", poll=geometry_nodes_fields_poll),
+        NodeItem("GeometryNodeCurveFillet", poll=geometry_nodes_fields_poll),
     ]),
     GeometryNodeCategory("GEO_PRIMITIVES_CURVE", "Curve Primitives", items=[
         NodeItem("GeometryNodeCurvePrimitiveLine"),
@@ -524,13 +542,16 @@ geometry_node_categories = [
         NodeItem("GeometryNodeCurvePrimitiveBezierSegment"),
     ]),
     GeometryNodeCategory("GEO_GEOMETRY", "Geometry", items=[
+        NodeItem("GeometryNodeLegacyDeleteGeometry", poll=geometry_nodes_fields_legacy_poll),
+        NodeItem("GeometryNodeLegacyRaycast", poll=geometry_nodes_fields_legacy_poll),
+
         NodeItem("GeometryNodeBoundBox"),
         NodeItem("GeometryNodeConvexHull"),
-        NodeItem("GeometryNodeDeleteGeometry"),
         NodeItem("GeometryNodeTransform"),
         NodeItem("GeometryNodeJoinGeometry"),
         NodeItem("GeometryNodeSeparateComponents"),
-        NodeItem("GeometryNodeRaycast"),
+        NodeItem("GeometryNodeSetPosition", poll=geometry_nodes_fields_poll),
+        NodeItem("GeometryNodeRealizeInstances", poll=geometry_nodes_fields_poll),
         NodeItem("GeometryNodeMergeByDistance"),
     ]),
     GeometryNodeCategory("GEO_INPUT", "Input", items=[
@@ -542,10 +563,16 @@ geometry_node_categories = [
         NodeItem("FunctionNodeInputVector"),
         NodeItem("GeometryNodeInputMaterial"),
         NodeItem("GeometryNodeIsViewport"),
+        NodeItem("GeometryNodeInputPosition", poll=geometry_nodes_fields_poll),
+        NodeItem("GeometryNodeInputIndex", poll=geometry_nodes_fields_poll),
+        NodeItem("GeometryNodeInputNormal", poll=geometry_nodes_fields_poll),
     ]),
     GeometryNodeCategory("GEO_MATERIAL", "Material", items=[
-        NodeItem("GeometryNodeMaterialAssign"),
-        NodeItem("GeometryNodeSelectByMaterial"),
+        NodeItem("GeometryNodeLegacyMaterialAssign", poll=geometry_nodes_fields_legacy_poll),
+        NodeItem("GeometryNodeLegacySelectByMaterial", poll=geometry_nodes_fields_legacy_poll),
+
+        NodeItem("GeometryNodeMaterialAssign", poll=geometry_nodes_fields_poll),
+        NodeItem("GeometryNodeMaterialSelection", poll=geometry_nodes_fields_poll),
         NodeItem("GeometryNodeMaterialReplace"),
     ]),
     GeometryNodeCategory("GEO_MESH", "Mesh", items=[
@@ -565,15 +592,20 @@ geometry_node_categories = [
         NodeItem("GeometryNodeMeshLine"),
         NodeItem("GeometryNodeMeshUVSphere"),
     ]),
-
     GeometryNodeCategory("GEO_POINT", "Point", items=[
-        NodeItem("GeometryNodePointDistribute"),
-        NodeItem("GeometryNodePointInstance"),
-        NodeItem("GeometryNodePointSeparate"),
-        NodeItem("GeometryNodePointScale"),
-        NodeItem("GeometryNodePointTranslate"),
-        NodeItem("GeometryNodeRotatePoints"),
-        NodeItem("GeometryNodeAlignRotationToVector"),
+        NodeItem("GeometryNodeLegacyPointDistribute", poll=geometry_nodes_fields_legacy_poll),
+        NodeItem("GeometryNodeLegacyPointInstance", poll=geometry_nodes_fields_legacy_poll),
+        NodeItem("GeometryNodeLegacyPointSeparate", poll=geometry_nodes_fields_legacy_poll),
+        NodeItem("GeometryNodeLegacyPointScale", poll=geometry_nodes_fields_legacy_poll),
+        NodeItem("GeometryNodeLegacyPointTranslate", poll=geometry_nodes_fields_legacy_poll),
+        NodeItem("GeometryNodeLegacyRotatePoints", poll=geometry_nodes_fields_legacy_poll),
+        NodeItem("GeometryNodeLegacyAlignRotationToVector", poll=geometry_nodes_fields_legacy_poll),
+    ]),
+    GeometryNodeCategory("GEO_TEXT", "Text", items=[
+        NodeItem("FunctionNodeStringLength"),
+        NodeItem("FunctionNodeStringSubstring"),
+        NodeItem("FunctionNodeValueToString"),
+        NodeItem("GeometryNodeStringJoin"),
     ]),
     GeometryNodeCategory("GEO_UTILITIES", "Utilities", items=[
         NodeItem("ShaderNodeMapRange"),
@@ -583,6 +615,9 @@ geometry_node_categories = [
         NodeItem("FunctionNodeFloatCompare"),
         NodeItem("FunctionNodeFloatToInt"),
         NodeItem("GeometryNodeSwitch"),
+    ]),
+    GeometryNodeCategory("GEO_TEXTURE", "Texture", items=[
+        NodeItem("ShaderNodeTexNoise", poll=geometry_nodes_fields_poll),
     ]),
     GeometryNodeCategory("GEO_VECTOR", "Vector", items=[
         NodeItem("ShaderNodeVectorCurve"),
@@ -595,7 +630,8 @@ geometry_node_categories = [
         NodeItem("GeometryNodeViewer"),
     ]),
     GeometryNodeCategory("GEO_VOLUME", "Volume", items=[
-        NodeItem("GeometryNodePointsToVolume"),
+        NodeItem("GeometryNodeLegacyPointsToVolume", poll=geometry_nodes_fields_legacy_poll),
+
         NodeItem("GeometryNodeVolumeToMesh"),
     ]),
     GeometryNodeCategory("GEO_GROUP", "Group", items=node_group_items),

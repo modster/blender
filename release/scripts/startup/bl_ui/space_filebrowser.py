@@ -267,7 +267,7 @@ class FILEBROWSER_PT_bookmarks_system(Panel):
     @classmethod
     def poll(cls, context):
         return (
-            not context.preferences.filepaths.hide_system_bookmarks and
+            context.preferences.filepaths.show_system_bookmarks and
             panel_poll_is_upper_region(context.region) and
             not panel_poll_is_asset_browsing(context)
         )
@@ -300,7 +300,7 @@ class FILEBROWSER_PT_bookmarks_favorites(FileBrowserPanel, Panel):
     bl_space_type = 'FILE_BROWSER'
     bl_region_type = 'TOOLS'
     bl_category = "Bookmarks"
-    bl_label = "Favorites"
+    bl_label = "Bookmarks"
 
     @classmethod
     def poll(cls, context):
@@ -345,7 +345,7 @@ class FILEBROWSER_PT_bookmarks_recents(Panel):
     @classmethod
     def poll(cls, context):
         return (
-            not context.preferences.filepaths.hide_recent_locations and
+            context.preferences.filepaths.show_recent_locations and
             panel_poll_is_upper_region(context.region) and
             not panel_poll_is_asset_browsing(context)
         )
@@ -655,7 +655,10 @@ class ASSETBROWSER_PT_navigation_bar(asset_utils.AssetBrowserPanel, Panel):
 
     @classmethod
     def poll(cls, context):
-        return context.preferences.experimental.use_extended_asset_browser
+        return (
+            asset_utils.AssetBrowserPanel.poll(context) and
+            context.preferences.experimental.use_extended_asset_browser
+        )
 
     def draw(self, context):
         layout = self.layout
@@ -688,10 +691,23 @@ class ASSETBROWSER_PT_metadata(asset_utils.AssetBrowserPanel, Panel):
         if asset_file_handle.local_id:
             # If the active file is an ID, use its name directly so renaming is possible from right here.
             layout.prop(asset_file_handle.local_id, "name", text="")
+
+            col = layout.column(align=True)
+            col.label(text="Asset Catalog:")
+            col.prop(asset_file_handle.local_id.asset_data, "catalog_id", text="UUID")
+            col.prop(asset_file_handle.local_id.asset_data, "catalog_simple_name", text="Simple Name")
+
             row = layout.row()
             row.label(text="Source: Current File")
         else:
             layout.prop(asset_file_handle, "name", text="")
+
+            col = layout.column(align=True)
+            col.enabled = False
+            col.label(text="Asset Catalog:")
+            col.prop(asset_file_handle.asset_data, "catalog_id", text="UUID")
+            col.prop(asset_file_handle.asset_data, "catalog_simple_name", text="Simple Name")
+
             col = layout.column(align=True)  # Just to reduce margin.
             col.label(text="Source:")
             row = col.row()

@@ -329,7 +329,7 @@ void BKE_gpencil_modifier_init(void)
 
 #if 0
   /* Note that GPencil actually does not support these atm, but might do in the future. */
-  /* Initialize global cmmon storage used for virtual modifier list */
+  /* Initialize global common storage used for virtual modifier list. */
   GpencilModifierData *md;
   md = BKE_gpencil_modifier_new(eGpencilModifierType_Armature);
   virtualModifierCommonData.amd = *((ArmatureGpencilModifierData *)md);
@@ -518,7 +518,7 @@ static void gpencil_modifier_copy_data_id_us_cb(void *UNUSED(userData),
  * Copy grease pencil modifier data.
  * \param md: Source modifier data
  * \param target: Target modifier data
- * \parm flag: Flags
+ * \param flag: Flags
  */
 void BKE_gpencil_modifier_copydata_ex(GpencilModifierData *md,
                                       GpencilModifierData *target,
@@ -719,7 +719,7 @@ static void gpencil_copy_activeframe_to_eval(
       bGPDframe *gpf_orig = gpl_orig->actframe;
 
       int remap_cfra = gpencil_remap_time_get(depsgraph, scene, ob, gpl_orig);
-      if (gpf_orig && gpf_orig->framenum != remap_cfra) {
+      if ((gpf_orig == NULL) || (gpf_orig && gpf_orig->framenum != remap_cfra)) {
         gpf_orig = BKE_gpencil_layer_frame_get(gpl_orig, remap_cfra, GP_GETFRAME_USE_PREV);
       }
 
@@ -938,6 +938,11 @@ void BKE_gpencil_modifier_blend_write(BlendWriter *writer, ListBase *modbase)
         BKE_curvemapping_blend_write(writer, gpmd->curve_intensity);
       }
     }
+    else if (md->type == eGpencilModifierType_Dash) {
+      DashGpencilModifierData *gpmd = (DashGpencilModifierData *)md;
+      BLO_write_struct_array(
+          writer, DashGpencilModifierSegment, gpmd->segments_len, gpmd->segments);
+    }
   }
 }
 
@@ -1017,6 +1022,13 @@ void BKE_gpencil_modifier_blend_read_data(BlendDataReader *reader, ListBase *lb)
         BKE_curvemapping_init(gpmd->curve_intensity);
       }
     }
+    else if (md->type == eGpencilModifierType_Dash) {
+      DashGpencilModifierData *gpmd = (DashGpencilModifierData *)md;
+      BLO_read_data_address(reader, &gpmd->segments);
+      for (int i = 0; i < gpmd->segments_len; i++) {
+        gpmd->segments[i].dmd = gpmd;
+      }
+    }
   }
 }
 
@@ -1025,7 +1037,7 @@ void BKE_gpencil_modifier_blend_read_lib(BlendLibReader *reader, Object *ob)
   BKE_gpencil_modifiers_foreach_ID_link(ob, BKE_object_modifiers_lib_link_common, reader);
 
   /* If linking from a library, clear 'local' library override flag. */
-  if (ob->id.lib != NULL) {
+  if (ID_IS_LINKED(ob)) {
     LISTBASE_FOREACH (GpencilModifierData *, mod, &ob->greasepencil_modifiers) {
       mod->flag &= ~eGpencilModifierFlag_OverrideLibrary_Local;
     }

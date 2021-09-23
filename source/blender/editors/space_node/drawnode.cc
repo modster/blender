@@ -362,8 +362,12 @@ static void node_draw_frame_label(bNodeTree *ntree, bNode *node, const float asp
   float x = BLI_rctf_cent_x(rct) - (0.5f * width);
   float y = rct->ymax - label_height;
 
-  BLF_position(fontid, x, y, 0);
-  BLF_draw(fontid, label, BLF_DRAW_STR_DUMMY_MAX);
+  /* label */
+  const bool has_label = node->label[0] != '\0';
+  if (has_label) {
+    BLF_position(fontid, x, y, 0);
+    BLF_draw(fontid, label, BLF_DRAW_STR_DUMMY_MAX);
+  }
 
   /* draw text body */
   if (node->id) {
@@ -374,7 +378,8 @@ static void node_draw_frame_label(bNodeTree *ntree, bNode *node, const float asp
 
     /* 'x' doesn't need aspect correction */
     x = rct->xmin + margin;
-    y = rct->ymax - (label_height + line_spacing);
+    y = rct->ymax - label_height - (has_label ? line_spacing : 0);
+
     /* early exit */
     int y_min = y + ((margin * 2) - (y - rct->ymin));
 
@@ -455,10 +460,8 @@ static void node_draw_frame(const bContext *C,
     UI_draw_roundbox_aa(rct, false, BASIS_RAD, color);
   }
 
-  /* label */
-  if (node->label[0] != '\0') {
-    node_draw_frame_label(ntree, node, snode->runtime->aspect);
-  }
+  /* label and text */
+  node_draw_frame_label(ntree, node, snode->runtime->aspect);
 
   UI_block_end(C, node->block);
   UI_block_draw(C, node->block);
@@ -2862,6 +2865,8 @@ static void node_composit_buts_denoise(uiLayout *layout, bContext *UNUSED(C), Po
 #  endif
 #endif
 
+  uiItemL(layout, IFACE_("Prefilter:"), ICON_NONE);
+  uiItemR(layout, ptr, "prefilter", DEFAULT_FLAGS, nullptr, ICON_NONE);
   uiItemR(layout, ptr, "use_hdr", DEFAULT_FLAGS, nullptr, ICON_NONE);
 }
 
@@ -4275,6 +4280,13 @@ void node_draw_link(View2D *v2d, SpaceNode *snode, bNodeLink *link)
       /* Invalid link. */
       th_col1 = th_col2 = th_col3 = TH_REDALERT;
       // th_col3 = -1; /* no shadow */
+    }
+  }
+  /* Links from field to non-field sockets are not allowed. */
+  if (snode->edittree->type == NTREE_GEOMETRY && !(link->flag & NODE_LINK_DRAGGED)) {
+    if ((link->fromsock && link->fromsock->display_shape == SOCK_DISPLAY_SHAPE_DIAMOND) &&
+        (link->tosock && link->tosock->display_shape == SOCK_DISPLAY_SHAPE_CIRCLE)) {
+      th_col1 = th_col2 = th_col3 = TH_REDALERT;
     }
   }
 

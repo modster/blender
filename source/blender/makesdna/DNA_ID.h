@@ -59,6 +59,58 @@ typedef struct DrawDataList {
   struct DrawData *first, *last;
 } DrawDataList;
 
+typedef struct IDPropertyUIData {
+  /** Tooltip / property description pointer. Owned by the IDProperty. */
+  char *description;
+  /** RNA subtype, used for every type except string properties (PropertySubType). */
+  int rna_subtype;
+
+  char _pad[4];
+} IDPropertyUIData;
+
+/* IDP_UI_DATA_TYPE_INT */
+typedef struct IDPropertyUIDataInt {
+  IDPropertyUIData base;
+  int *default_array; /* Only for array properties. */
+  int default_array_len;
+  char _pad[4];
+
+  int min;
+  int max;
+  int soft_min;
+  int soft_max;
+  int step;
+  int default_value;
+} IDPropertyUIDataInt;
+
+/* IDP_UI_DATA_TYPE_FLOAT */
+typedef struct IDPropertyUIDataFloat {
+  IDPropertyUIData base;
+  double *default_array; /* Only for array properties. */
+  int default_array_len;
+  char _pad[4];
+
+  float step;
+  int precision;
+
+  double min;
+  double max;
+  double soft_min;
+  double soft_max;
+  double default_value;
+} IDPropertyUIDataFloat;
+
+/* IDP_UI_DATA_TYPE_STRING */
+typedef struct IDPropertyUIDataString {
+  IDPropertyUIData base;
+  char *default_value;
+} IDPropertyUIDataString;
+
+/* IDP_UI_DATA_TYPE_ID */
+typedef struct IDPropertyUIDataID {
+  IDPropertyUIData base;
+} IDPropertyUIDataID;
+
 typedef struct IDPropertyData {
   void *pointer;
   ListBase group;
@@ -87,6 +139,8 @@ typedef struct IDProperty {
   /* totallen is total length of allocated array/string, including a buffer.
    * Note that the buffering is mild; the code comes from python's list implementation. */
   int totallen;
+
+  IDPropertyUIData *ui_data;
 } IDProperty;
 
 #define MAX_IDPROP_NAME 64
@@ -338,7 +392,14 @@ typedef struct ID {
    *   that references this ID (the bones of an armature or the modifiers of an object for e.g.).
    */
   void *py_instance;
-  void *_pad1;
+
+  /**
+   * Weak reference to an ID in a given library file, used to allow re-using already appended data
+   * in some cases, instead of appending it again.
+   *
+   * May be NULL.
+   */
+  struct LibraryWeakReference *library_weak_reference;
 } ID;
 
 /**
@@ -371,6 +432,26 @@ typedef struct Library {
   /** See BLENDER_FILE_VERSION, BLENDER_FILE_SUBVERSION, needed for do_versions. */
   short versionfile, subversionfile;
 } Library;
+
+/**
+ * A weak library/ID reference for local data that has been appended, to allow re-using that local
+ * data instead of creating a new copy of it in future appends.
+ *
+ * NOTE: This is by design a week reference, in other words code should be totally fine and perform
+ * a regular append if it cannot find a valid matching local ID.
+ *
+ * NOTE: There should always be only one single ID in current Main matching a given linked
+ * reference.
+ */
+typedef struct LibraryWeakReference {
+  /**  Expected to match a `Library.filepath`. */
+  char library_filepath[1024];
+
+  /** MAX_ID_NAME. May be different from the current local ID name. */
+  char library_id_name[66];
+
+  char _pad[2];
+} LibraryWeakReference;
 
 /* for PreviewImage->flag */
 enum ePreviewImage_Flag {

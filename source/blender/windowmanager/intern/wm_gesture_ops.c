@@ -179,7 +179,8 @@ int WM_gesture_box_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
   wmWindow *win = CTX_wm_window(C);
   const ARegion *region = CTX_wm_region(C);
-  const bool wait_for_input = !ISTWEAK(event->type) && RNA_boolean_get(op->ptr, "wait_for_input");
+  const bool wait_for_input = !WM_event_is_mouse_drag_or_press(event) &&
+                              RNA_boolean_get(op->ptr, "wait_for_input");
 
   if (wait_for_input) {
     op->customdata = WM_gesture_new(win, region, event, WM_GESTURE_CROSS_RECT);
@@ -300,7 +301,8 @@ static void gesture_circle_apply(bContext *C, wmOperator *op);
 int WM_gesture_circle_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
   wmWindow *win = CTX_wm_window(C);
-  const bool wait_for_input = !ISTWEAK(event->type) && RNA_boolean_get(op->ptr, "wait_for_input");
+  const bool wait_for_input = !WM_event_is_mouse_drag_or_press(event) &&
+                              RNA_boolean_get(op->ptr, "wait_for_input");
 
   op->customdata = WM_gesture_new(win, CTX_wm_region(C), event, WM_GESTURE_CIRCLE);
   wmGesture *gesture = op->customdata;
@@ -818,6 +820,8 @@ void WM_OT_lasso_gesture(wmOperatorType *ot)
 
   ot->poll = WM_operator_winactive;
 
+  ot->flag = OPTYPE_DEPENDS_ON_CURSOR;
+
   prop = RNA_def_property(ot->srna, "path", PROP_COLLECTION, PROP_NONE);
   RNA_def_property_struct_runtime(ot->srna, prop, &RNA_OperatorMousePath);
 }
@@ -869,7 +873,7 @@ int WM_gesture_straightline_invoke(bContext *C, wmOperator *op, const wmEvent *e
 
   op->customdata = WM_gesture_new(win, CTX_wm_region(C), event, WM_GESTURE_STRAIGHTLINE);
 
-  if (ISTWEAK(event->type)) {
+  if (WM_event_is_mouse_drag_or_press(event)) {
     wmGesture *gesture = op->customdata;
     gesture->is_active = true;
   }
@@ -954,8 +958,9 @@ int WM_gesture_straightline_modal(bContext *C, wmOperator *op, const wmEvent *ev
         break;
       }
       case GESTURE_MODAL_FLIP: {
-        /* Toggle snapping on/off. */
+        /* Toggle flipping on/off. */
         gesture->use_flip = !gesture->use_flip;
+        gesture_straightline_apply(C, op);
         break;
       }
       case GESTURE_MODAL_SELECT: {
@@ -993,6 +998,7 @@ int WM_gesture_straightline_modal(bContext *C, wmOperator *op, const wmEvent *ev
 
         if (gesture->use_snap) {
           wm_gesture_straightline_do_angle_snap(rect);
+          gesture_straightline_apply(C, op);
         }
 
         wm_gesture_tag_redraw(win);

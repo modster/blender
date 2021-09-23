@@ -76,12 +76,15 @@ set(SRC
   intern/anim_path.c
   intern/anim_sys.c
   intern/anim_visualization.c
+  intern/anonymous_attribute.cc
   intern/appdir.c
   intern/armature.c
-  intern/armature_selection.cc
   intern/armature_deform.c
   intern/armature_pose.cc
+  intern/armature_selection.cc
   intern/armature_update.c
+  intern/asset_catalog.cc
+  intern/asset_library.cc
   intern/asset.cc
   intern/attribute.c
   intern/attribute_access.cc
@@ -115,6 +118,7 @@ set(SRC
   intern/curve_decimate.c
   intern/curve_deform.c
   intern/curve_eval.cc
+  intern/curve_to_mesh_convert.cc
   intern/curveprofile.c
   intern/customdata.c
   intern/customdata_file.c
@@ -185,7 +189,7 @@ set(SRC
   intern/mball_tessellate.c
   intern/mesh.c
   intern/mesh_boolean_convert.cc
-  intern/mesh_convert.c
+  intern/mesh_convert.cc
   intern/mesh_evaluate.cc
   intern/mesh_fair.cc
   intern/mesh_iterators.c
@@ -295,9 +299,14 @@ set(SRC
   BKE_anim_path.h
   BKE_anim_visualization.h
   BKE_animsys.h
+  BKE_anonymous_attribute.h
+  BKE_anonymous_attribute.hh
   BKE_appdir.h
   BKE_armature.h
   BKE_armature.hh
+  BKE_asset_catalog.hh
+  BKE_asset_library.h
+  BKE_asset_library.hh
   BKE_asset.h
   BKE_attribute.h
   BKE_attribute_access.hh
@@ -329,6 +338,7 @@ set(SRC
   BKE_cryptomatte.h
   BKE_cryptomatte.hh
   BKE_curve.h
+  BKE_curve_to_mesh.hh
   BKE_curveprofile.h
   BKE_customdata.h
   BKE_customdata_file.h
@@ -778,6 +788,9 @@ if(WITH_GTESTS)
   set(TEST_SRC
     intern/action_test.cc
     intern/armature_test.cc
+    intern/asset_catalog_test.cc
+    intern/asset_library_test.cc
+    intern/asset_test.cc
     intern/cryptomatte_test.cc
     intern/fcurve_test.cc
     intern/lattice_deform_test.cc

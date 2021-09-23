@@ -69,6 +69,10 @@ void BKE_libblock_free_data(ID *id, const bool do_id_user)
     BKE_asset_metadata_free(&id->asset_data);
   }
 
+  if (id->library_weak_reference != NULL) {
+    MEM_freeN(id->library_weak_reference);
+  }
+
   BKE_animdata_free(id, do_id_user);
 }
 
@@ -219,7 +223,7 @@ void BKE_id_free_us(Main *bmain, void *idv) /* test users */
    *     Otherwise, there is no real way to get rid of an object anymore -
    *     better handling of this is TODO.
    */
-  if ((GS(id->name) == ID_OB) && (id->us == 1) && (id->lib == NULL)) {
+  if ((GS(id->name) == ID_OB) && (id->us == 1) && !ID_IS_LINKED(id)) {
     id_us_clear_real(id);
   }
 

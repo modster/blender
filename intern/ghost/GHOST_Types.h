@@ -652,6 +652,11 @@ typedef struct {
 enum {
   GHOST_kXrContextDebug = (1 << 0),
   GHOST_kXrContextDebugTime = (1 << 1),
+#  ifdef WIN32
+  /* Needed to avoid issues with the SteamVR OpenGL graphics binding (use DirectX fallback
+     instead). */
+  GHOST_kXrContextGpuNVIDIA = (1 << 2),
+#  endif
 };
 
 typedef struct {
@@ -669,6 +674,14 @@ typedef struct {
   void *exit_customdata;
 } GHOST_XrSessionBeginInfo;
 
+/** Texture format for XR swapchain. */
+typedef enum GHOST_TXrSwapchainFormat {
+  GHOST_kXrSwapchainFormatRGBA8,
+  GHOST_kXrSwapchainFormatRGBA16,
+  GHOST_kXrSwapchainFormatRGBA16F,
+  GHOST_kXrSwapchainFormatRGB10_A2,
+} GHOST_TXrSwapchainFormat;
+
 typedef struct GHOST_XrDrawViewInfo {
   int ofsx, ofsy;
   int width, height;
@@ -681,6 +694,7 @@ typedef struct GHOST_XrDrawViewInfo {
     float angle_up, angle_down;
   } fov;
 
+  GHOST_TXrSwapchainFormat swapchain_format;
   /** Set if the buffer should be submitted with a SRGB transfer applied. */
   char expects_srgb_buffer;
 

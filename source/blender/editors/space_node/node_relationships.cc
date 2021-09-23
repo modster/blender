@@ -220,6 +220,7 @@ static LinkData *create_drag_link(Main *bmain, SpaceNode *snode, bNode *node, bN
   if (node_connected_to_output(bmain, snode->edittree, node)) {
     oplink->flag |= NODE_LINK_TEST;
   }
+  oplink->flag |= NODE_LINK_DRAGGED;
   return linkdata;
 }
 
@@ -880,6 +881,8 @@ static void node_link_exit(bContext *C, wmOperator *op, bool apply_links)
   bNodeTree *ntree = snode->edittree;
   bNodeLinkDrag *nldrag = (bNodeLinkDrag *)op->customdata;
   bool do_tag_update = false;
+  /* View will be reset if no links connect. */
+  bool reset_view = true;
 
   /* avoid updates while applying links */
   ntree->is_updating = true;
@@ -891,6 +894,8 @@ static void node_link_exit(bContext *C, wmOperator *op, bool apply_links)
      * output).
      */
     do_tag_update |= (link->flag & NODE_LINK_TEST) != 0;
+
+    link->flag &= ~NODE_LINK_DRAGGED;
 
     if (apply_links && link->tosock && link->fromsock) {
       /* before actually adding the link,
@@ -917,6 +922,8 @@ static void node_link_exit(bContext *C, wmOperator *op, bool apply_links)
       if (link->tonode) {
         do_tag_update |= (do_tag_update || node_connected_to_output(bmain, ntree, link->tonode));
       }
+
+      reset_view = false;
     }
     else {
       nodeRemLink(ntree, link);
@@ -928,6 +935,10 @@ static void node_link_exit(bContext *C, wmOperator *op, bool apply_links)
   snode_notify(C, snode);
   if (do_tag_update) {
     snode_dag_update(C, snode);
+  }
+
+  if (reset_view) {
+    UI_view2d_edge_pan_cancel(C, &nldrag->pan_data);
   }
 
   BLI_remlink(&snode->runtime->linkdrag, nldrag);
@@ -1089,6 +1100,7 @@ static bNodeLinkDrag *node_link_init(Main *bmain, SpaceNode *snode, float cursor
           *oplink = *link;
           oplink->next = oplink->prev = nullptr;
           oplink->flag |= NODE_LINK_VALID;
+          oplink->flag |= NODE_LINK_DRAGGED;
 
           /* The link could be disconnected and in that case we
            * wouldn't be able to check whether tag update is
@@ -1142,6 +1154,7 @@ static bNodeLinkDrag *node_link_init(Main *bmain, SpaceNode *snode, float cursor
         *oplink = *link_to_pick;
         oplink->next = oplink->prev = nullptr;
         oplink->flag |= NODE_LINK_VALID;
+        oplink->flag |= NODE_LINK_DRAGGED;
         oplink->flag &= ~NODE_LINK_TEST;
         if (node_connected_to_output(bmain, snode->edittree, link_to_pick->tonode)) {
           oplink->flag |= NODE_LINK_TEST;
@@ -1207,6 +1220,8 @@ static void node_link_cancel(bContext *C, wmOperator *op)
 
   BLI_remlink(&snode->runtime->linkdrag, nldrag);
 
+  UI_view2d_edge_pan_cancel(C, &nldrag->pan_data);
+
   BLI_freelistN(&nldrag->links);
   MEM_freeN(nldrag);
   clear_picking_highlight(&snode->edittree->links);
@@ -1258,7 +1273,8 @@ void NODE_OT_link(wmOperatorType *ot)
                                             NODE_EDGE_PAN_OUTSIDE_PAD,
                                             NODE_EDGE_PAN_SPEED_RAMP,
                                             NODE_EDGE_PAN_MAX_SPEED,
-                                            NODE_EDGE_PAN_DELAY);
+                                            NODE_EDGE_PAN_DELAY,
+                                            NODE_EDGE_PAN_ZOOM_INFLUENCE);
 }
 
 /** \} */
@@ -1416,7 +1432,7 @@ void NODE_OT_links_cut(wmOperatorType *ot)
   ot->poll = ED_operator_node_editable;
 
   /* flags */
-  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_DEPENDS_ON_CURSOR;
 
   /* properties */
   PropertyRNA *prop;
@@ -1522,7 +1538,7 @@ void NODE_OT_links_mute(wmOperatorType *ot)
   ot->poll = ED_operator_node_editable;
 
   /* flags */
-  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_DEPENDS_ON_CURSOR;
 
   /* properties */
   PropertyRNA *prop;
