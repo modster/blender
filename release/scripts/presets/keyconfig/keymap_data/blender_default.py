@@ -147,7 +147,6 @@ class Params:
             else:
                 self.tool_modifier = {}
 
-
         self.use_mouse_emulate_3_button = use_mouse_emulate_3_button
 
         # User preferences
@@ -280,6 +279,14 @@ def _template_items_select_actions(params, operator):
             (operator, {"type": 'A', "value": 'PRESS', "alt": True}, {"properties": [("action", 'DESELECT')]}),
             (operator, {"type": 'I', "value": 'PRESS', "ctrl": True}, {"properties": [("action", 'INVERT')]}),
         ]
+
+
+def _template_items_hide_reveal_actions(op_hide, op_reveal):
+    return [
+        (op_reveal, {"type": 'H', "value": 'PRESS', "alt": True}, None),
+        (op_hide, {"type": 'H', "value": 'PRESS'}, {"properties": [("unselected", False)]}),
+        (op_hide, {"type": 'H', "value": 'PRESS', "shift": True}, {"properties": [("unselected", True)]}),
+    ]
 
 
 def _template_items_object_subdivision_set():
@@ -816,10 +823,14 @@ def km_property_editor(_params):
         ("object.modifier_copy", {"type": 'D', "value": 'PRESS', "shift": True}, None),
         ("object.modifier_apply", {"type": 'A', "value": 'PRESS', "ctrl": True}, {"properties": [("report", True)]}),
         # Grease pencil modifier panels
-        ("object.gpencil_modifier_remove", {"type": 'X', "value": 'PRESS'}, {"properties": [("report", True)]}),
-        ("object.gpencil_modifier_remove", {"type": 'DEL', "value": 'PRESS'}, {"properties": [("report", True)]}),
-        ("object.gpencil_modifier_copy", {"type": 'D', "value": 'PRESS', "shift": True}, None),
-        ("object.gpencil_modifier_apply", {"type": 'A', "value": 'PRESS', "ctrl": True}, {"properties": [("report", True)]}),
+        ("object.gpencil_modifier_remove",
+         {"type": 'X', "value": 'PRESS'}, {"properties": [("report", True)]}),
+        ("object.gpencil_modifier_remove",
+         {"type": 'DEL', "value": 'PRESS'}, {"properties": [("report", True)]}),
+        ("object.gpencil_modifier_copy",
+         {"type": 'D', "value": 'PRESS', "shift": True}, None),
+        ("object.gpencil_modifier_apply",
+         {"type": 'A', "value": 'PRESS', "ctrl": True}, {"properties": [("report", True)]}),
         # ShaderFX panels
         ("object.shaderfx_remove", {"type": 'X', "value": 'PRESS'}, {"properties": [("report", True)]}),
         ("object.shaderfx_remove", {"type": 'DEL', "value": 'PRESS'}, {"properties": [("report", True)]}),
@@ -940,8 +951,10 @@ def km_uv_editor(params):
             legacy=params.legacy,
         ),
         ("uv.mark_seam", {"type": 'E', "value": 'PRESS', "ctrl": True}, None),
-        ("uv.select_loop", {"type": params.select_mouse, "value": params.select_mouse_value, "alt": True}, None),
-        ("uv.select_loop", {"type": params.select_mouse, "value": params.select_mouse_value, "shift": True, "alt": True},
+        ("uv.select_loop",
+         {"type": params.select_mouse, "value": params.select_mouse_value, "alt": True}, None),
+        ("uv.select_loop",
+         {"type": params.select_mouse, "value": params.select_mouse_value, "shift": True, "alt": True},
          {"properties": [("extend", True)]}),
         ("uv.select_edge_ring",
          {"type": params.select_mouse, "value": params.select_mouse_value, "ctrl": True, "alt": True}, None),
@@ -955,11 +968,15 @@ def km_uv_editor(params):
          {"type": params.select_mouse, "value": params.select_mouse_value_fallback, "ctrl": True, "shift": True},
          {"properties": [("use_fill", True)]}),
         ("uv.select_split", {"type": 'Y', "value": 'PRESS'}, None),
-        ("uv.select_box", {"type": 'B', "value": 'PRESS'},
-         {"properties": [("pinned", False)]}),
+        op_tool_optional(
+            ("uv.select_box", {"type": 'B', "value": 'PRESS'},
+             {"properties": [("pinned", False)]}),
+            (op_tool, "builtin.select_box"), params),
         ("uv.select_box", {"type": 'B', "value": 'PRESS', "ctrl": True},
          {"properties": [("pinned", True)]}),
-        ("uv.select_circle", {"type": 'C', "value": 'PRESS'}, None),
+        op_tool_optional(
+            ("uv.select_circle", {"type": 'C', "value": 'PRESS'}, None),
+            (op_tool, "builtin.select_circle"), params),
         ("uv.select_lasso", {"type": params.action_tweak, "value": 'ANY', "ctrl": True},
          {"properties": [("mode", 'ADD')]}),
         ("uv.select_lasso", {"type": params.action_tweak, "value": 'ANY', "shift": True, "ctrl": True},
@@ -972,6 +989,7 @@ def km_uv_editor(params):
         ("uv.select_more", {"type": 'NUMPAD_PLUS', "value": 'PRESS', "ctrl": True, "repeat": True}, None),
         ("uv.select_less", {"type": 'NUMPAD_MINUS', "value": 'PRESS', "ctrl": True, "repeat": True}, None),
         *_template_items_select_actions(params, "uv.select_all"),
+        *_template_items_hide_reveal_actions("uv.hide", "uv.reveal"),
         ("uv.select_pinned", {"type": 'P', "value": 'PRESS', "shift": True}, None),
         op_menu("IMAGE_MT_uvs_merge", {"type": 'M', "value": 'PRESS'}),
         op_menu("IMAGE_MT_uvs_split", {"type": 'M', "value": 'PRESS', "alt": True}),
@@ -983,11 +1001,6 @@ def km_uv_editor(params):
         ("uv.pin", {"type": 'P', "value": 'PRESS', "alt": True},
          {"properties": [("clear", True)]}),
         op_menu("IMAGE_MT_uvs_unwrap", {"type": 'U', "value": 'PRESS'}),
-        ("uv.hide", {"type": 'H', "value": 'PRESS'},
-         {"properties": [("unselected", False)]}),
-        ("uv.hide", {"type": 'H', "value": 'PRESS', "shift": True},
-         {"properties": [("unselected", True)]}),
-        ("uv.reveal", {"type": 'H', "value": 'PRESS', "alt": True}, None),
         (
             op_menu_pie("IMAGE_MT_uvs_snap_pie", {"type": 'S', "value": 'PRESS', "shift": True})
             if not params.legacy else
@@ -1264,12 +1277,16 @@ def km_view3d(params):
             value=params.select_mouse_value_fallback,
             legacy=params.legacy,
         ),
-        ("view3d.select_box", {"type": 'B', "value": 'PRESS'}, None),
+        op_tool_optional(
+            ("view3d.select_box", {"type": 'B', "value": 'PRESS'}, None),
+            (op_tool, "builtin.select_box"), params),
         ("view3d.select_lasso", {"type": params.action_tweak, "value": 'ANY', "ctrl": True},
          {"properties": [("mode", 'ADD')]}),
         ("view3d.select_lasso", {"type": params.action_tweak, "value": 'ANY', "shift": True, "ctrl": True},
          {"properties": [("mode", 'SUB')]}),
-        ("view3d.select_circle", {"type": 'C', "value": 'PRESS'}, None),
+        op_tool_optional(
+            ("view3d.select_circle", {"type": 'C', "value": 'PRESS'}, None),
+            (op_tool, "builtin.select_circle"), params),
         # Borders.
         ("view3d.clip_border", {"type": 'B', "value": 'PRESS', "alt": True}, None),
         ("view3d.zoom_border", {"type": 'B', "value": 'PRESS', "shift": True}, None),
@@ -1305,10 +1322,14 @@ def km_view3d(params):
         # Snapping.
         ("wm.context_toggle", {"type": 'TAB', "value": 'PRESS', "shift": True},
          {"properties": [("data_path", 'tool_settings.use_snap')]}),
-        op_panel("VIEW3D_PT_snapping", {"type": 'TAB', "value": 'PRESS', "shift": True, "ctrl": True}, [("keep_open", True)]),
+        op_panel(
+            "VIEW3D_PT_snapping",
+            {"type": 'TAB', "value": 'PRESS', "shift": True, "ctrl": True},
+            [("keep_open", True)],
+        ),
         (
             op_menu_pie("VIEW3D_MT_snap_pie", {"type": 'S', "value": 'PRESS', "shift": True})
-                if not params.legacy else
+            if not params.legacy else
             op_menu("VIEW3D_MT_snap", {"type": 'S', "value": 'PRESS', "shift": True})
         ),
     ])
@@ -1385,11 +1406,17 @@ def km_view3d(params):
              {"properties": [("data_path", 'tool_settings.transform_pivot_point'), ("value", 'ACTIVE_ELEMENT')]}),
             # Old shading.
             ("wm.context_toggle_enum", {"type": 'Z', "value": 'PRESS'},
-             {"properties": [("data_path", 'space_data.shading.type'), ("value_1", 'WIREFRAME'), ("value_2", 'SOLID')]}),
+             {"properties": [
+                 ("data_path", 'space_data.shading.type'), ("value_1", 'WIREFRAME'), ("value_2", 'SOLID'),
+             ]}),
             ("wm.context_toggle_enum", {"type": 'Z', "value": 'PRESS', "shift": True},
-             {"properties": [("data_path", 'space_data.shading.type'), ("value_1", 'RENDERED'), ("value_2", 'SOLID')]}),
+             {"properties": [
+                 ("data_path", 'space_data.shading.type'), ("value_1", 'RENDERED'), ("value_2", 'SOLID'),
+             ]}),
             ("wm.context_toggle_enum", {"type": 'Z', "value": 'PRESS', "alt": True},
-             {"properties": [("data_path", 'space_data.shading.type'), ("value_1", 'MATERIAL'), ("value_2", 'SOLID')]}),
+             {"properties": [
+                 ("data_path", 'space_data.shading.type'), ("value_1", 'MATERIAL'), ("value_2", 'SOLID'),
+             ]}),
         ])
 
     if params.select_mouse == 'LEFTMOUSE' and not params.legacy:
@@ -1444,17 +1471,14 @@ def km_mask_editing(params):
          {"properties": [("mode", 'SUB')]}),
         ("mask.select_more", {"type": 'NUMPAD_PLUS', "value": 'PRESS', "ctrl": True, "repeat": True}, None),
         ("mask.select_less", {"type": 'NUMPAD_MINUS', "value": 'PRESS', "ctrl": True, "repeat": True}, None),
-        ("mask.hide_view_clear", {"type": 'H', "value": 'PRESS', "alt": True}, None),
-        ("mask.hide_view_set", {"type": 'H', "value": 'PRESS'},
-         {"properties": [("unselected", False)]}),
-        ("mask.hide_view_set", {"type": 'H', "value": 'PRESS', "shift": True},
-         {"properties": [("unselected", True)]}),
+        *_template_items_hide_reveal_actions("mask.hide_view_set", "mask.hide_view_clear"),
         ("clip.select", {"type": params.select_mouse, "value": 'PRESS', "ctrl": True}, None),
         ("mask.cyclic_toggle", {"type": 'C', "value": 'PRESS', "alt": True}, None),
         ("mask.slide_point", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
         ("mask.slide_spline_curvature", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
         ("mask.handle_type_set", {"type": 'V', "value": 'PRESS'}, None),
-        ("mask.normals_make_consistent", {"type": 'N', "value": 'PRESS', "ctrl" if params.legacy else "shift": True}, None),
+        ("mask.normals_make_consistent",
+         {"type": 'N', "value": 'PRESS', "ctrl" if params.legacy else "shift": True}, None),
         ("mask.parent_set", {"type": 'P', "value": 'PRESS', "ctrl": True}, None),
         ("mask.parent_clear", {"type": 'P', "value": 'PRESS', "alt": True}, None),
         ("mask.shape_key_insert", {"type": 'I', "value": 'PRESS'}, None),
@@ -1565,11 +1589,7 @@ def km_graph_editor_generic(_params):
         ),
         ("graph.extrapolation_type", {"type": 'E', "value": 'PRESS', "shift": True}, None),
         ("anim.channels_find", {"type": 'F', "value": 'PRESS', "ctrl": True}, None),
-        ("graph.hide", {"type": 'H', "value": 'PRESS'},
-         {"properties": [("unselected", False)]}),
-        ("graph.hide", {"type": 'H', "value": 'PRESS', "shift": True},
-         {"properties": [("unselected", True)]}),
-        ("graph.reveal", {"type": 'H', "value": 'PRESS', "alt": True}, None),
+        *_template_items_hide_reveal_actions("graph.hide", "graph.reveal"),
         ("wm.context_set_enum", {"type": 'TAB', "value": 'PRESS', "ctrl": True},
          {"properties": [("data_path", 'area.type'), ("value", 'DOPESHEET_EDITOR')]}),
     ])
@@ -1896,14 +1916,22 @@ def km_node_editor(params):
          {"properties": [("mode", 'ADD')]}),
         ("node.select_lasso", {"type": 'EVT_TWEAK_L', "value": 'ANY', "shift": True, "ctrl": True, "alt": True},
          {"properties": [("mode", 'SUB')]}),
-        ("node.select_circle", {"type": 'C', "value": 'PRESS'}, None),
+        op_tool_optional(
+            ("node.select_box", {"type": 'B', "value": 'PRESS'},
+             {"properties": [("tweak", False)]}),
+            (op_tool, "builtin.select_box"), params),
+        op_tool_optional(
+            ("node.select_circle", {"type": 'C', "value": 'PRESS'}, None),
+            (op_tool, "builtin.select_circle"), params),
         ("node.link", {"type": 'EVT_TWEAK_L', "value": 'ANY'},
          {"properties": [("detach", False)]}),
         ("node.link", {"type": 'EVT_TWEAK_L', "value": 'ANY', "ctrl": True},
          {"properties": [("detach", True)]}),
         ("node.resize", {"type": 'EVT_TWEAK_L', "value": 'ANY'}, None),
-        ("node.add_reroute", {"type": 'EVT_TWEAK_L' if params.legacy else 'EVT_TWEAK_R', "value": 'ANY', "shift": True}, None),
-        ("node.links_cut", {"type": 'EVT_TWEAK_L' if params.legacy else 'EVT_TWEAK_R', "value": 'ANY', "ctrl": True}, None),
+        ("node.add_reroute",
+         {"type": 'EVT_TWEAK_L' if params.legacy else 'EVT_TWEAK_R', "value": 'ANY', "shift": True}, None),
+        ("node.links_cut",
+         {"type": 'EVT_TWEAK_L' if params.legacy else 'EVT_TWEAK_R', "value": 'ANY', "ctrl": True}, None),
         ("node.links_mute", {"type": 'EVT_TWEAK_R', "value": 'ANY', "ctrl": True, "alt": True}, None),
         ("node.select_link_viewer", {"type": 'LEFTMOUSE', "value": 'PRESS', "shift": True, "ctrl": True}, None),
         ("node.backimage_move", {"type": 'MIDDLEMOUSE', "value": 'PRESS', "alt": True}, None),
@@ -1930,8 +1958,6 @@ def km_node_editor(params):
         ("node.view_all", {"type": 'HOME', "value": 'PRESS'}, None),
         ("node.view_all", {"type": 'NDOF_BUTTON_FIT', "value": 'PRESS'}, None),
         ("node.view_selected", {"type": 'NUMPAD_PERIOD', "value": 'PRESS'}, None),
-        ("node.select_box", {"type": 'B', "value": 'PRESS'},
-         {"properties": [("tweak", False)]}),
         ("node.delete", {"type": 'X', "value": 'PRESS'}, None),
         ("node.delete", {"type": 'DEL', "value": 'PRESS'}, None),
         ("node.delete_reconnect", {"type": 'X', "value": 'PRESS', "ctrl": True}, None),
@@ -1960,9 +1986,15 @@ def km_node_editor(params):
         ("node.clipboard_paste", {"type": 'V', "value": 'PRESS', "ctrl": True}, None),
         ("node.viewer_border", {"type": 'B', "value": 'PRESS', "ctrl": True}, None),
         ("node.clear_viewer_border", {"type": 'B', "value": 'PRESS', "ctrl": True, "alt": True}, None),
-        ("node.translate_attach", {"type": 'G', "value": 'PRESS'}, {"properties": [("TRANSFORM_OT_translate", [("view2d_edge_pan", True)])]}),
-        ("node.translate_attach", {"type": 'EVT_TWEAK_L', "value": 'ANY'}, {"properties": [("TRANSFORM_OT_translate", [("view2d_edge_pan", True)])]}),
-        ("node.translate_attach", {"type": params.select_tweak, "value": 'ANY'}, {"properties": [("TRANSFORM_OT_translate", [("view2d_edge_pan", True)])]}),
+        ("node.translate_attach",
+         {"type": 'G', "value": 'PRESS'},
+         {"properties": [("TRANSFORM_OT_translate", [("view2d_edge_pan", True)])]}),
+        ("node.translate_attach",
+         {"type": 'EVT_TWEAK_L', "value": 'ANY'},
+         {"properties": [("TRANSFORM_OT_translate", [("view2d_edge_pan", True)])]}),
+        ("node.translate_attach",
+         {"type": params.select_tweak, "value": 'ANY'},
+         {"properties": [("TRANSFORM_OT_translate", [("view2d_edge_pan", True)])]}),
         ("transform.translate", {"type": 'G', "value": 'PRESS'}, {"properties": [("view2d_edge_pan", True)]}),
         ("transform.translate", {"type": 'EVT_TWEAK_L', "value": 'ANY'},
          {"properties": [("release_confirm", True), ("view2d_edge_pan", True)]}),
@@ -1970,9 +2002,15 @@ def km_node_editor(params):
          {"properties": [("release_confirm", True), ("view2d_edge_pan", True)]}),
         ("transform.rotate", {"type": 'R', "value": 'PRESS'}, None),
         ("transform.resize", {"type": 'S', "value": 'PRESS'}, None),
-        ("node.move_detach_links", {"type": 'D', "value": 'PRESS', "alt": True}, {"properties": [("TRANSFORM_OT_translate", [("view2d_edge_pan", True)])]}),
-        ("node.move_detach_links_release", {"type": params.action_tweak, "value": 'ANY', "alt": True}, {"properties": [("NODE_OT_translate_attach", [("TRANSFORM_OT_translate", [("view2d_edge_pan", True)])])]}),
-        ("node.move_detach_links", {"type": params.select_tweak, "value": 'ANY', "alt": True}, {"properties": [("TRANSFORM_OT_translate", [("view2d_edge_pan", True)])]}),
+        ("node.move_detach_links",
+         {"type": 'D', "value": 'PRESS', "alt": True},
+         {"properties": [("TRANSFORM_OT_translate", [("view2d_edge_pan", True)])]}),
+        ("node.move_detach_links_release",
+         {"type": params.action_tweak, "value": 'ANY', "alt": True},
+         {"properties": [("NODE_OT_translate_attach", [("TRANSFORM_OT_translate", [("view2d_edge_pan", True)])])]}),
+        ("node.move_detach_links",
+         {"type": params.select_tweak, "value": 'ANY', "alt": True},
+         {"properties": [("TRANSFORM_OT_translate", [("view2d_edge_pan", True)])]}),
         ("wm.context_toggle", {"type": 'TAB', "value": 'PRESS', "shift": True},
          {"properties": [("data_path", 'tool_settings.use_snap')]}),
         ("wm.context_menu_enum", {"type": 'TAB', "value": 'PRESS', "shift": True, "ctrl": True},
@@ -2022,7 +2060,7 @@ def km_file_browser(params):
             toolbar_key={"type": 'T', "value": 'PRESS'},
         ),
         ("wm.context_toggle", {"type": 'N', "value": 'PRESS'},
-          {"properties": [("data_path", 'space_data.show_region_tool_props')]}),
+         {"properties": [("data_path", 'space_data.show_region_tool_props')]}),
         ("file.parent", {"type": 'UP_ARROW', "value": 'PRESS', "alt": True}, None),
         ("file.previous", {"type": 'LEFT_ARROW', "value": 'PRESS', "alt": True}, None),
         ("file.next", {"type": 'RIGHT_ARROW', "value": 'PRESS', "alt": True}, None),
@@ -2055,7 +2093,10 @@ def km_file_browser(params):
 
         # Select file under cursor before spawning the context menu.
         ("file.select", {"type": 'RIGHTMOUSE', "value": 'PRESS'},
-         {"properties": [("open", False), ("only_activate_if_selected", params.select_mouse == 'LEFTMOUSE'), ("pass_through", True)]}),
+         {"properties": [
+             ("open", False),
+             ("only_activate_if_selected", params.select_mouse == 'LEFTMOUSE'), ("pass_through", True),
+         ]}),
         *_template_items_context_menu("FILEBROWSER_MT_context_menu", params.context_menu_event),
         *_template_items_context_menu("ASSETBROWSER_MT_context_menu", params.context_menu_event),
     ])
@@ -2181,17 +2222,23 @@ def km_dopesheet(params):
     )
 
     items.extend([
-        ("action.clickselect", {"type": params.select_mouse, "value": 'PRESS'},
+        ("action.clickselect",
+         {"type": params.select_mouse, "value": 'PRESS'},
          {"properties": [("deselect_all", not params.legacy)]}),
-        ("action.clickselect", {"type": params.select_mouse, "value": 'PRESS', "alt": True},
+        ("action.clickselect",
+         {"type": params.select_mouse, "value": 'PRESS', "alt": True},
          {"properties": [("column", True)]}),
-        ("action.clickselect", {"type": params.select_mouse, "value": 'PRESS', "shift": True},
+        ("action.clickselect",
+         {"type": params.select_mouse, "value": 'PRESS', "shift": True},
          {"properties": [("extend", True)]}),
-        ("action.clickselect", {"type": params.select_mouse, "value": 'PRESS', "shift": True, "alt": True},
+        ("action.clickselect",
+         {"type": params.select_mouse, "value": 'PRESS', "shift": True, "alt": True},
          {"properties": [("extend", True), ("column", True)]}),
-        ("action.clickselect", {"type": params.select_mouse, "value": 'PRESS', "ctrl": True, "alt": True},
+        ("action.clickselect",
+         {"type": params.select_mouse, "value": 'PRESS', "ctrl": True, "alt": True},
          {"properties": [("channel", True)]}),
-        ("action.clickselect", {"type": params.select_mouse, "value": 'PRESS', "shift": True, "ctrl": True, "alt": True},
+        ("action.clickselect",
+         {"type": params.select_mouse, "value": 'PRESS', "shift": True, "ctrl": True, "alt": True},
          {"properties": [("extend", True), ("channel", True)]}),
         ("action.select_leftright",
          {"type": params.select_mouse, "value": 'PRESS' if params.legacy else 'CLICK', "ctrl": True},
@@ -2749,9 +2796,15 @@ def km_sequencerpreview(params):
         ("sequencer.view_zoom_ratio", {"type": 'NUMPAD_8', "value": 'PRESS'},
          {"properties": [("ratio", 0.125)]}),
         ("sequencer.sample", {"type": params.action_mouse, "value": 'PRESS'}, None),
-        ("transform.translate", {"type": 'G', "value": 'PRESS'}, None),
-        ("transform.resize", {"type": 'S', "value": 'PRESS'}, None),
-        ("transform.rotate", {"type": 'R', "value": 'PRESS'}, None),
+        op_tool_optional(
+            ("transform.translate", {"type": 'G', "value": 'PRESS'}, None),
+            (op_tool_cycle, "builtin.move"), params),
+        op_tool_optional(
+            ("transform.rotate", {"type": 'R', "value": 'PRESS'}, None),
+            (op_tool_cycle, "builtin.rotate"), params),
+        op_tool_optional(
+            ("transform.resize", {"type": 'S', "value": 'PRESS'}, None),
+            (op_tool_cycle, "builtin.scale"), params),
         ("sequencer.strip_transform_clear", {"type": 'G', "alt": True, "value": 'PRESS'},
          {"properties": [("property", 'POSITION')]}),
         ("sequencer.strip_transform_clear", {"type": 'S', "alt": True, "value": 'PRESS'},
@@ -2940,11 +2993,7 @@ def km_clip_editor(params):
          {"properties": [("action", 'LOCK')]}),
         ("clip.lock_tracks", {"type": 'L', "value": 'PRESS', "alt": True},
          {"properties": [("action", 'UNLOCK')]}),
-        ("clip.hide_tracks", {"type": 'H', "value": 'PRESS'},
-         {"properties": [("unselected", False)]}),
-        ("clip.hide_tracks", {"type": 'H', "value": 'PRESS', "shift": True},
-         {"properties": [("unselected", True)]}),
-        ("clip.hide_tracks_clear", {"type": 'H', "value": 'PRESS', "alt": True}, None),
+        *_template_items_hide_reveal_actions("clip.hide_tracks", "clip.hide_tracks_clear"),
         ("clip.slide_plane_marker", {"type": 'LEFTMOUSE', "value": 'CLICK_DRAG'}, None),
         ("clip.keyframe_insert", {"type": 'I', "value": 'PRESS'}, None),
         ("clip.keyframe_delete", {"type": 'I', "value": 'PRESS', "alt": True}, None),
@@ -3059,6 +3108,7 @@ def km_clip_dopesheet_editor(_params):
     ])
 
     return keymap
+
 
 def km_spreadsheet_generic(_params):
     items = []
@@ -3248,7 +3298,7 @@ def km_animation_channels(params):
 # Modes
 
 
-def km_grease_pencil(_params):
+def km_grease_pencil(params):
     items = []
     keymap = (
         "Grease Pencil",
@@ -3256,22 +3306,32 @@ def km_grease_pencil(_params):
         {"items": items},
     )
 
-    items.extend([
-        # Draw
-        ("gpencil.annotate", {"type": 'LEFTMOUSE', "value": 'PRESS', "key_modifier": 'D'},
-         {"properties": [("mode", 'DRAW'), ("wait_for_input", False)]}),
-        ("gpencil.annotate", {"type": 'LEFTMOUSE', "value": 'PRESS', "key_modifier": 'D', "shift": True},
-         {"properties": [("mode", 'DRAW'), ("wait_for_input", False)]}),
-        # Draw - straight lines
-        ("gpencil.annotate", {"type": 'LEFTMOUSE', "value": 'PRESS', "alt": True, "key_modifier": 'D'},
-         {"properties": [("mode", 'DRAW_STRAIGHT'), ("wait_for_input", False)]}),
-        # Draw - poly lines
-        ("gpencil.annotate", {"type": 'LEFTMOUSE', "value": 'PRESS', "shift": True, "alt": True, "key_modifier": 'D'},
-         {"properties": [("mode", 'DRAW_POLY'), ("wait_for_input", False)]}),
-        # Erase
-        ("gpencil.annotate", {"type": 'RIGHTMOUSE', "value": 'PRESS', "key_modifier": 'D'},
-         {"properties": [("mode", 'ERASER'), ("wait_for_input", False)]}),
-    ])
+    if params.use_key_activate_tools:
+        items.extend([
+            op_tool_cycle("builtin.annotate", {"type": 'D', "value": 'PRESS'}),
+        ])
+    else:
+        items.extend([
+            # Draw
+            ("gpencil.annotate",
+             {"type": 'LEFTMOUSE', "value": 'PRESS', "key_modifier": 'D'},
+             {"properties": [("mode", 'DRAW'), ("wait_for_input", False)]}),
+            ("gpencil.annotate",
+             {"type": 'LEFTMOUSE', "value": 'PRESS', "key_modifier": 'D', "shift": True},
+             {"properties": [("mode", 'DRAW'), ("wait_for_input", False)]}),
+            # Draw - straight lines
+            ("gpencil.annotate",
+             {"type": 'LEFTMOUSE', "value": 'PRESS', "alt": True, "key_modifier": 'D'},
+             {"properties": [("mode", 'DRAW_STRAIGHT'), ("wait_for_input", False)]}),
+            # Draw - poly lines
+            ("gpencil.annotate",
+             {"type": 'LEFTMOUSE', "value": 'PRESS', "shift": True, "alt": True, "key_modifier": 'D'},
+             {"properties": [("mode", 'DRAW_POLY'), ("wait_for_input", False)]}),
+            # Erase
+            ("gpencil.annotate",
+             {"type": 'RIGHTMOUSE', "value": 'PRESS', "key_modifier": 'D'},
+             {"properties": [("mode", 'ERASER'), ("wait_for_input", False)]}),
+        ])
 
     return keymap
 
@@ -3281,9 +3341,13 @@ def _grease_pencil_selection(params, use_select_mouse=True):
         # Select all
         *_template_items_select_actions(params, "gpencil.select_all"),
         # Circle select
-        ("gpencil.select_circle", {"type": 'C', "value": 'PRESS'}, None),
+        op_tool_optional(
+            ("gpencil.select_circle", {"type": 'C', "value": 'PRESS'}, None),
+            (op_tool, "builtin.select_circle"), params),
         # Box select
-        ("gpencil.select_box", {"type": 'B', "value": 'PRESS'}, None),
+        op_tool_optional(
+            ("gpencil.select_box", {"type": 'B', "value": 'PRESS'}, None),
+            (op_tool, "builtin.select_box"), params),
         # Lasso select
         ("gpencil.select_lasso", {"type": params.action_tweak, "value": 'ANY', "ctrl": True},
          {"properties": [("mode", 'ADD')]}),
@@ -3294,9 +3358,11 @@ def _grease_pencil_selection(params, use_select_mouse=True):
         # There probably isn't too much harm adding this for other editors too
         # as part of standard GP editing keymap. This hotkey combo doesn't seem
         # to see much use under standard scenarios?
-        ("gpencil.select_lasso", {"type": params.action_tweak, "value": 'ANY', "ctrl": True, "alt": True},
+        ("gpencil.select_lasso",
+         {"type": params.action_tweak, "value": 'ANY', "ctrl": True, "alt": True},
          {"properties": [("mode", 'ADD')]}),
-        ("gpencil.select_lasso", {"type": params.action_tweak, "value": 'ANY', "shift": True, "ctrl": True, "alt": True},
+        ("gpencil.select_lasso",
+         {"type": params.action_tweak, "value": 'ANY', "shift": True, "ctrl": True, "alt": True},
          {"properties": [("mode", 'SUB')]}),
         *_template_view3d_gpencil_select(
             type=params.select_mouse,
@@ -3377,11 +3443,7 @@ def km_grease_pencil_stroke_edit_mode(params):
             op_menu("GPENCIL_MT_snap", {"type": 'S', "value": 'PRESS', "shift": True})
         ),
         # Show/hide
-        ("gpencil.reveal", {"type": 'H', "value": 'PRESS', "alt": True}, None),
-        ("gpencil.hide", {"type": 'H', "value": 'PRESS'},
-         {"properties": [("unselected", False)]}),
-        ("gpencil.hide", {"type": 'H', "value": 'PRESS', "shift": True},
-         {"properties": [("unselected", True)]}),
+        *_template_items_hide_reveal_actions("gpencil.hide", "gpencil.reveal"),
         ("gpencil.selection_opacity_toggle", {"type": 'H', "value": 'PRESS', "ctrl": True}, None),
         # Display
         *_grease_pencil_display(),
@@ -3451,6 +3513,7 @@ def km_grease_pencil_stroke_edit_mode(params):
 
     return keymap
 
+
 def km_grease_pencil_stroke_curve_edit_mode(_params):
     items = []
     keymap = (
@@ -3465,6 +3528,7 @@ def km_grease_pencil_stroke_curve_edit_mode(_params):
     ])
 
     return keymap
+
 
 def km_grease_pencil_stroke_paint_mode(params):
     items = []
@@ -3498,11 +3562,7 @@ def km_grease_pencil_stroke_paint_mode(params):
             (op_tool_cycle, "builtin.interpolate"), params),
         ("gpencil.interpolate_sequence", {"type": 'E', "value": 'PRESS', "shift": True, "ctrl": True}, None),
         # Show/hide
-        ("gpencil.reveal", {"type": 'H', "value": 'PRESS', "alt": True}, None),
-        ("gpencil.hide", {"type": 'H', "value": 'PRESS'},
-         {"properties": [("unselected", False)]}),
-        ("gpencil.hide", {"type": 'H', "value": 'PRESS', "shift": True},
-         {"properties": [("unselected", True)]}),
+        *_template_items_hide_reveal_actions("gpencil.hide", "gpencil.reveal"),
         # Active layer
         op_menu("GPENCIL_MT_layer_active", {"type": 'Y', "value": 'PRESS'}),
         # Merge Layer
@@ -3611,10 +3671,21 @@ def km_grease_pencil_stroke_paint_fill(_params):
          {"properties": [("on_back", False)]}),
         # If press alternate key, the brush now it's for drawing areas
         ("gpencil.draw", {"type": 'LEFTMOUSE', "value": 'PRESS', "shift": True},
-         {"properties": [("mode", 'DRAW'), ("wait_for_input", False), ("disable_straight", True), ("disable_stabilizer", True)]}),
+         {"properties": [
+             ("mode", 'DRAW'),
+             ("wait_for_input", False),
+             ("disable_straight", True),
+             ("disable_stabilizer", True),
+         ]}),
         # If press alternative key, the brush now it's for drawing lines
         ("gpencil.draw", {"type": 'LEFTMOUSE', "value": 'PRESS', "alt": True},
-         {"properties": [("mode", 'DRAW'), ("wait_for_input", False), ("disable_straight", True), ("disable_stabilizer", True), ("disable_fill", True)]}),
+         {"properties": [
+             ("mode", 'DRAW'),
+             ("wait_for_input", False),
+             ("disable_straight", True),
+             ("disable_stabilizer", True),
+             ("disable_fill", True),
+         ]}),
     ])
 
     return keymap
@@ -3938,7 +4009,9 @@ def km_grease_pencil_stroke_vertex_mode(params):
         *_grease_pencil_selection(params, use_select_mouse=False),
         # Brush strength
         ("wm.radial_control", {"type": 'F', "value": 'PRESS', "shift": True},
-         {"properties": [("data_path_primary", 'tool_settings.gpencil_vertex_paint.brush.gpencil_settings.pen_strength')]}),
+         {"properties": [
+             ("data_path_primary", 'tool_settings.gpencil_vertex_paint.brush.gpencil_settings.pen_strength'),
+         ]}),
         # Brush size
         ("wm.radial_control", {"type": 'F', "value": 'PRESS'},
          {"properties": [("data_path_primary", 'tool_settings.gpencil_vertex_paint.brush.size')]}),
@@ -3984,7 +4057,9 @@ def km_grease_pencil_stroke_vertex_draw(_params):
          {"properties": [("wait_for_input", False)]}),
         # Brush strength
         ("wm.radial_control", {"type": 'F', "value": 'PRESS', "shift": True},
-         {"properties": [("data_path_primary", 'tool_settings.gpencil_vertex_paint.brush.gpencil_settings.pen_strength')]}),
+         {"properties": [
+             ("data_path_primary", 'tool_settings.gpencil_vertex_paint.brush.gpencil_settings.pen_strength'),
+         ]}),
         # Brush size
         ("wm.radial_control", {"type": 'F', "value": 'PRESS'},
          {"properties": [("data_path_primary", 'tool_settings.gpencil_vertex_paint.brush.size')]}),
@@ -4007,7 +4082,9 @@ def km_grease_pencil_stroke_vertex_blur(_params):
          {"properties": [("wait_for_input", False)]}),
         # Brush strength
         ("wm.radial_control", {"type": 'F', "value": 'PRESS', "shift": True},
-         {"properties": [("data_path_primary", 'tool_settings.gpencil_vertex_paint.brush.gpencil_settings.pen_strength')]}),
+         {"properties": [
+             ("data_path_primary", 'tool_settings.gpencil_vertex_paint.brush.gpencil_settings.pen_strength'),
+         ]}),
         # Brush size
         ("wm.radial_control", {"type": 'F', "value": 'PRESS'},
          {"properties": [("data_path_primary", 'tool_settings.gpencil_vertex_paint.brush.size')]}),
@@ -4032,7 +4109,9 @@ def km_grease_pencil_stroke_vertex_average(_params):
          {"properties": [("wait_for_input", False)]}),
         # Brush strength
         ("wm.radial_control", {"type": 'F', "value": 'PRESS', "shift": True},
-         {"properties": [("data_path_primary", 'tool_settings.gpencil_vertex_paint.brush.gpencil_settings.pen_strength')]}),
+         {"properties": [
+             ("data_path_primary", 'tool_settings.gpencil_vertex_paint.brush.gpencil_settings.pen_strength')],
+          }),
         # Brush size
         ("wm.radial_control", {"type": 'F', "value": 'PRESS'},
          {"properties": [("data_path_primary", 'tool_settings.gpencil_vertex_paint.brush.size')]}),
@@ -4055,7 +4134,9 @@ def km_grease_pencil_stroke_vertex_smear(_params):
          {"properties": [("wait_for_input", False)]}),
         # Brush strength
         ("wm.radial_control", {"type": 'F', "value": 'PRESS', "shift": True},
-         {"properties": [("data_path_primary", 'tool_settings.gpencil_vertex_paint.brush.gpencil_settings.pen_strength')]}),
+         {"properties": [
+             ("data_path_primary", 'tool_settings.gpencil_vertex_paint.brush.gpencil_settings.pen_strength'),
+         ]}),
         # Brush size
         ("wm.radial_control", {"type": 'F', "value": 'PRESS'},
          {"properties": [("data_path_primary", 'tool_settings.gpencil_vertex_paint.brush.size')]}),
@@ -4094,11 +4175,7 @@ def km_face_mask(params):
 
     items.extend([
         *_template_items_select_actions(params, "paint.face_select_all"),
-        ("paint.face_select_hide", {"type": 'H', "value": 'PRESS'},
-         {"properties": [("unselected", False)]}),
-        ("paint.face_select_hide", {"type": 'H', "value": 'PRESS', "shift": True},
-         {"properties": [("unselected", True)]}),
-        ("paint.face_select_reveal", {"type": 'H', "value": 'PRESS', "alt": True}, None),
+        *_template_items_hide_reveal_actions("paint.face_select_hide", "paint.face_select_reveal"),
         ("paint.face_select_linked", {"type": 'L', "value": 'PRESS', "ctrl": True}, None),
         ("paint.face_select_linked_pick", {"type": 'L', "value": 'PRESS'},
          {"properties": [("deselect", False)]}),
@@ -4140,11 +4217,7 @@ def km_pose(params):
 
     items.extend([
         ("object.parent_set", {"type": 'P', "value": 'PRESS', "ctrl": True}, None),
-        ("pose.hide", {"type": 'H', "value": 'PRESS'},
-         {"properties": [("unselected", False)]}),
-        ("pose.hide", {"type": 'H', "value": 'PRESS', "shift": True},
-         {"properties": [("unselected", True)]}),
-        ("pose.reveal", {"type": 'H', "value": 'PRESS', "alt": True}, None),
+        *_template_items_hide_reveal_actions("pose.hide", "pose.reveal"),
         op_menu("VIEW3D_MT_pose_apply", {"type": 'A', "value": 'PRESS', "ctrl": True}),
         ("pose.rot_clear", {"type": 'R', "value": 'PRESS', "alt": True}, None),
         ("pose.loc_clear", {"type": 'G', "value": 'PRESS', "alt": True}, None),
@@ -4192,6 +4265,7 @@ def km_pose(params):
         ("pose.push", {"type": 'E', "value": 'PRESS', "ctrl": True}, None),
         ("pose.relax", {"type": 'E', "value": 'PRESS', "alt": True}, None),
         ("pose.breakdown", {"type": 'E', "value": 'PRESS', "shift": True}, None),
+        ("pose.blend_to_neighbour", {"type": 'E', "value": 'PRESS', "shift": True, "alt": True}, None),
         op_menu("VIEW3D_MT_pose_propagate", {"type": 'P', "value": 'PRESS', "alt": True}),
         *(
             (("object.hide_collection",
@@ -4259,17 +4333,15 @@ def km_object_mode(params):
         ("anim.keying_set_active_set", {"type": 'I', "value": 'PRESS', "shift": True, "ctrl": True, "alt": True}, None),
         ("collection.create", {"type": 'G', "value": 'PRESS', "ctrl": True}, None),
         ("collection.objects_remove", {"type": 'G', "value": 'PRESS', "ctrl": True, "alt": True}, None),
-        ("collection.objects_remove_all", {"type": 'G', "value": 'PRESS', "shift": True, "ctrl": True, "alt": True}, None),
-        ("collection.objects_add_active", {"type": 'G', "value": 'PRESS', "shift": True, "ctrl": True}, None),
+        ("collection.objects_remove_all",
+         {"type": 'G', "value": 'PRESS', "shift": True, "ctrl": True, "alt": True}, None),
+        ("collection.objects_add_active",
+         {"type": 'G', "value": 'PRESS', "shift": True, "ctrl": True}, None),
         ("collection.objects_remove_active", {"type": 'G', "value": 'PRESS', "shift": True, "alt": True}, None),
         *_template_items_object_subdivision_set(),
         ("object.move_to_collection", {"type": 'M', "value": 'PRESS'}, None),
         ("object.link_to_collection", {"type": 'M', "value": 'PRESS', "shift": True}, None),
-        ("object.hide_view_clear", {"type": 'H', "value": 'PRESS', "alt": True}, None),
-        ("object.hide_view_set", {"type": 'H', "value": 'PRESS'},
-         {"properties": [("unselected", False)]}),
-        ("object.hide_view_set", {"type": 'H', "value": 'PRESS', "shift": True},
-         {"properties": [("unselected", True)]}),
+        *_template_items_hide_reveal_actions("object.hide_view_set", "object.hide_view_clear"),
         ("object.hide_collection", {"type": 'H', "value": 'PRESS', "ctrl": True}, None),
         *(
             (("object.hide_collection",
@@ -4376,12 +4448,9 @@ def km_curve(params):
             (op_tool_cycle, "builtin.tilt"), params),
         ("transform.transform", {"type": 'S', "value": 'PRESS', "alt": True},
          {"properties": [("mode", 'CURVE_SHRINKFATTEN')]}),
-        ("curve.reveal", {"type": 'H', "value": 'PRESS', "alt": True}, None),
-        ("curve.hide", {"type": 'H', "value": 'PRESS'},
-         {"properties": [("unselected", False)]}),
-        ("curve.hide", {"type": 'H', "value": 'PRESS', "shift": True},
-         {"properties": [("unselected", True)]}),
-        ("curve.normals_make_consistent", {"type": 'N', "value": 'PRESS', "ctrl" if params.legacy else "shift": True}, None),
+        *_template_items_hide_reveal_actions("curve.hide", "curve.reveal"),
+        ("curve.normals_make_consistent",
+         {"type": 'N', "value": 'PRESS', "ctrl" if params.legacy else "shift": True}, None),
         ("object.vertex_parent_set", {"type": 'P', "value": 'PRESS', "ctrl": True}, None),
         op_menu("VIEW3D_MT_hook", {"type": 'H', "value": 'PRESS', "ctrl": True}),
         *_template_items_proportional_editing(
@@ -4422,9 +4491,11 @@ def _template_paint_radial_control(paint, rotation=False, secondary_rotation=Fal
 
     items.extend([
         ("wm.radial_control", {"type": 'F', "value": 'PRESS'},
-         radial_control_properties(paint, 'size', 'use_unified_size', secondary_rotation=secondary_rotation, color=color, zoom=zoom)),
+         radial_control_properties(
+             paint, 'size', 'use_unified_size', secondary_rotation=secondary_rotation, color=color, zoom=zoom)),
         ("wm.radial_control", {"type": 'F', "value": 'PRESS', "shift": True},
-         radial_control_properties(paint, 'strength', 'use_unified_strength', secondary_rotation=secondary_rotation, color=color)),
+         radial_control_properties(
+             paint, 'strength', 'use_unified_strength', secondary_rotation=secondary_rotation, color=color)),
     ])
 
     if rotation:
@@ -4436,7 +4507,8 @@ def _template_paint_radial_control(paint, rotation=False, secondary_rotation=Fal
     if secondary_rotation:
         items.extend([
             ("wm.radial_control", {"type": 'F', "value": 'PRESS', "ctrl": True, "alt": True},
-             radial_control_properties(paint, 'mask_texture_slot.angle', None, secondary_rotation=secondary_rotation, color=color)),
+             radial_control_properties(
+                 paint, 'mask_texture_slot.angle', None, secondary_rotation=secondary_rotation, color=color)),
         ])
 
     return items
@@ -4689,16 +4761,27 @@ def km_sculpt(params):
         ("sculpt.expand", {"type": 'A', "value": 'PRESS', "shift": True, "alt": True},
          {"properties": [("target", "MASK"), ("falloff_type", "NORMALS"), ("invert", False)]}),
         ("sculpt.expand", {"type": 'W', "value": 'PRESS', "shift": True},
-         {"properties": [("target", "FACE_SETS"), ("falloff_type", "GEODESIC"), ("invert", False), ("use_modify_active", False)]}),
+         {"properties": [
+             ("target", "FACE_SETS"),
+             ("falloff_type", "GEODESIC"),
+             ("invert", False),
+             ("use_modify_active", False)]}),
         ("sculpt.expand", {"type": 'W', "value": 'PRESS', "shift": True, "alt": True},
-         {"properties": [("target", "FACE_SETS"), ("falloff_type", "BOUNDARY_FACE_SET"),("invert", False), ("use_modify_active", True)]}),
+         {"properties": [
+             ("target", "FACE_SETS"),
+             ("falloff_type", "BOUNDARY_FACE_SET"),
+             ("invert", False),
+             ("use_modify_active", True),
+         ]}),
         # Partial Visibility Show/hide
+        # Match keys from: `_template_items_hide_reveal_actions`, cannot use because arguments aren't compatible.
         ("sculpt.face_set_change_visibility", {"type": 'H', "value": 'PRESS'},
          {"properties": [("mode", 'TOGGLE')]}),
         ("sculpt.face_set_change_visibility", {"type": 'H', "value": 'PRESS', "shift": True},
          {"properties": [("mode", 'HIDE_ACTIVE')]}),
         ("sculpt.face_set_change_visibility", {"type": 'H', "value": 'PRESS', "alt": True},
          {"properties": [("mode", 'SHOW_ALL')]}),
+
         ("sculpt.face_set_edit", {"type": 'W', "value": 'PRESS', "ctrl": True},
          {"properties": [("mode", 'GROW')]}),
         ("sculpt.face_set_edit", {"type": 'W', "value": 'PRESS', "ctrl": True, "alt": True},
@@ -4778,7 +4861,7 @@ def km_sculpt(params):
          {"properties": [("data_path", 'tool_settings.sculpt.brush.use_smooth_stroke')]}),
         op_menu("VIEW3D_MT_angle_control", {"type": 'R', "value": 'PRESS'}),
         op_menu_pie("VIEW3D_MT_sculpt_mask_edit_pie", {"type": 'A', "value": 'PRESS'}),
-        op_menu_pie("VIEW3D_MT_sculpt_automasking_pie", {"type": 'A', "alt": True,"value": 'PRESS'}),
+        op_menu_pie("VIEW3D_MT_sculpt_automasking_pie", {"type": 'A', "alt": True, "value": 'PRESS'}),
         op_menu_pie("VIEW3D_MT_sculpt_face_sets_edit_pie", {"type": 'W', "value": 'PRESS'}),
         *_template_items_context_panel("VIEW3D_PT_sculpt_context_menu", params.context_menu_event),
     ])
@@ -4820,12 +4903,16 @@ def km_mesh(params):
         # Selection modes.
         *_template_items_editmode_mesh_select_mode(params),
         # Loop Select with alt. Double click in case MMB emulation is on (below).
-        ("mesh.loop_select", {"type": params.select_mouse, "value": params.select_mouse_value, "alt": True}, None),
-        ("mesh.loop_select", {"type": params.select_mouse, "value": params.select_mouse_value, "shift": True, "alt": True},
+        ("mesh.loop_select",
+         {"type": params.select_mouse, "value": params.select_mouse_value, "alt": True}, None),
+        ("mesh.loop_select",
+         {"type": params.select_mouse, "value": params.select_mouse_value, "shift": True, "alt": True},
          {"properties": [("toggle", True)]}),
         # Selection
-        ("mesh.edgering_select", {"type": params.select_mouse, "value": params.select_mouse_value, "ctrl": True, "alt": True}, None),
-        ("mesh.edgering_select", {"type": params.select_mouse, "value": params.select_mouse_value, "shift": True, "ctrl": True, "alt": True},
+        ("mesh.edgering_select",
+         {"type": params.select_mouse, "value": params.select_mouse_value, "ctrl": True, "alt": True}, None),
+        ("mesh.edgering_select",
+         {"type": params.select_mouse, "value": params.select_mouse_value, "shift": True, "ctrl": True, "alt": True},
          {"properties": [("toggle", True)]}),
         ("mesh.shortest_path_pick",
          {"type": params.select_mouse, "value": params.select_mouse_value_fallback, "ctrl": True},
@@ -4836,8 +4923,10 @@ def km_mesh(params):
         *_template_items_select_actions(params, "mesh.select_all"),
         ("mesh.select_more", {"type": 'NUMPAD_PLUS', "value": 'PRESS', "ctrl": True, "repeat": True}, None),
         ("mesh.select_less", {"type": 'NUMPAD_MINUS', "value": 'PRESS', "ctrl": True, "repeat": True}, None),
-        ("mesh.select_next_item", {"type": 'NUMPAD_PLUS', "value": 'PRESS', "shift": True, "ctrl": True, "repeat": True}, None),
-        ("mesh.select_prev_item", {"type": 'NUMPAD_MINUS', "value": 'PRESS', "shift": True, "ctrl": True, "repeat": True}, None),
+        ("mesh.select_next_item",
+         {"type": 'NUMPAD_PLUS', "value": 'PRESS', "shift": True, "ctrl": True, "repeat": True}, None),
+        ("mesh.select_prev_item",
+         {"type": 'NUMPAD_MINUS', "value": 'PRESS', "shift": True, "ctrl": True, "repeat": True}, None),
         ("mesh.select_linked", {"type": 'L', "value": 'PRESS', "ctrl": True}, None),
         ("mesh.select_linked_pick", {"type": 'L', "value": 'PRESS'},
          {"properties": [("deselect", False)]}),
@@ -4846,11 +4935,7 @@ def km_mesh(params):
         ("mesh.select_mirror", {"type": 'M', "value": 'PRESS', "shift": True, "ctrl": True}, None),
         op_menu("VIEW3D_MT_edit_mesh_select_similar", {"type": 'G', "value": 'PRESS', "shift": True}),
         # Hide/reveal.
-        ("mesh.hide", {"type": 'H', "value": 'PRESS'},
-         {"properties": [("unselected", False)]}),
-        ("mesh.hide", {"type": 'H', "value": 'PRESS', "shift": True},
-         {"properties": [("unselected", True)]}),
-        ("mesh.reveal", {"type": 'H', "value": 'PRESS', "alt": True}, None),
+        *_template_items_hide_reveal_actions("mesh.hide", "mesh.reveal"),
         # Tools.
         ("mesh.normals_make_consistent", {"type": 'N', "value": 'PRESS', "ctrl" if params.legacy else "shift": True},
          {"properties": [("inside", False)]}),
@@ -4924,16 +5009,20 @@ def km_mesh(params):
              {"properties": [("extend", True)]}),
             ("mesh.loop_select", {"type": params.select_mouse, "value": 'DOUBLE_CLICK', "alt": True},
              {"properties": [("deselect", True)]}),
-            ("mesh.edgering_select", {"type": params.select_mouse, "value": 'DOUBLE_CLICK', "ctrl": True}, None),
-            ("mesh.edgering_select", {"type": params.select_mouse, "value": 'DOUBLE_CLICK', "shift": True, "ctrl": True},
+            ("mesh.edgering_select",
+             {"type": params.select_mouse, "value": 'DOUBLE_CLICK', "ctrl": True}, None),
+            ("mesh.edgering_select",
+             {"type": params.select_mouse, "value": 'DOUBLE_CLICK', "shift": True, "ctrl": True},
              {"properties": [("toggle", True)]}),
         ])
 
     if params.legacy:
         items.extend([
             ("mesh.poke", {"type": 'P', "value": 'PRESS', "alt": True}, None),
-            ("mesh.select_non_manifold", {"type": 'M', "value": 'PRESS', "shift": True, "ctrl": True, "alt": True}, None),
-            ("mesh.faces_select_linked_flat", {"type": 'F', "value": 'PRESS', "shift": True, "ctrl": True, "alt": True}, None),
+            ("mesh.select_non_manifold",
+             {"type": 'M', "value": 'PRESS', "shift": True, "ctrl": True, "alt": True}, None),
+            ("mesh.faces_select_linked_flat",
+             {"type": 'F', "value": 'PRESS', "shift": True, "ctrl": True, "alt": True}, None),
             ("mesh.spin", {"type": 'R', "value": 'PRESS', "alt": True}, None),
             ("mesh.beautify_fill", {"type": 'F', "value": 'PRESS', "shift": True, "alt": True}, None),
             *_template_items_object_subdivision_set(),
@@ -4953,11 +5042,7 @@ def km_armature(params):
 
     items.extend([
         # Hide/reveal.
-        ("armature.hide", {"type": 'H', "value": 'PRESS'},
-         {"properties": [("unselected", False)]}),
-        ("armature.hide", {"type": 'H', "value": 'PRESS', "shift": True},
-         {"properties": [("unselected", True)]}),
-        ("armature.reveal", {"type": 'H', "value": 'PRESS', "alt": True}, None),
+        *_template_items_hide_reveal_actions("armature.hide", "armature.reveal"),
         # Align & roll.
         ("armature.align", {"type": 'A', "value": 'PRESS', "ctrl": True, "alt": True}, None),
         ("armature.calculate_roll", {"type": 'N', "value": 'PRESS', "ctrl" if params.legacy else "shift": True}, None),
@@ -5042,11 +5127,7 @@ def km_metaball(params):
 
     items.extend([
         ("object.metaball_add", {"type": 'A', "value": 'PRESS', "shift": True}, None),
-        ("mball.reveal_metaelems", {"type": 'H', "value": 'PRESS', "alt": True}, None),
-        ("mball.hide_metaelems", {"type": 'H', "value": 'PRESS'},
-         {"properties": [("unselected", False)]}),
-        ("mball.hide_metaelems", {"type": 'H', "value": 'PRESS', "shift": True},
-         {"properties": [("unselected", True)]}),
+        *_template_items_hide_reveal_actions("mball.hide_metaelems", "mball.reveal_metaelems"),
         ("mball.delete_metaelems", {"type": 'X', "value": 'PRESS'}, None),
         ("mball.delete_metaelems", {"type": 'DEL', "value": 'PRESS'}, None),
         ("mball.duplicate_move", {"type": 'D', "value": 'PRESS', "shift": True}, None),
@@ -5104,11 +5185,7 @@ def km_particle(params):
         ("particle.select_linked", {"type": 'L', "value": 'PRESS', "ctrl": True}, None),
         ("particle.delete", {"type": 'X', "value": 'PRESS'}, None),
         ("particle.delete", {"type": 'DEL', "value": 'PRESS'}, None),
-        ("particle.reveal", {"type": 'H', "value": 'PRESS', "alt": True}, None),
-        ("particle.hide", {"type": 'H', "value": 'PRESS'},
-         {"properties": [("unselected", False)]}),
-        ("particle.hide", {"type": 'H', "value": 'PRESS', "shift": True},
-         {"properties": [("unselected", True)]}),
+        *_template_items_hide_reveal_actions("particle.hide", "particle.reveal"),
         ("particle.brush_edit", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
         ("particle.brush_edit", {"type": 'LEFTMOUSE', "value": 'PRESS', "shift": True}, None),
         ("wm.radial_control", {"type": 'F', "value": 'PRESS'},
@@ -5549,21 +5626,24 @@ def km_knife_tool_modal_map(_params):
         ("PANNING", {"type": 'MIDDLEMOUSE', "value": 'ANY', "any": True}, None),
         ("ADD_CUT_CLOSED", {"type": 'LEFTMOUSE', "value": 'DOUBLE_CLICK', "any": True}, None),
         ("ADD_CUT", {"type": 'LEFTMOUSE', "value": 'ANY', "any": True}, None),
-        ("CANCEL", {"type": 'RIGHTMOUSE', "value": 'PRESS', "any": True}, None),
+        ("UNDO", {"type": 'Z', "value": 'PRESS', "ctrl": True}, None),
         ("CONFIRM", {"type": 'RET', "value": 'PRESS', "any": True}, None),
         ("CONFIRM", {"type": 'NUMPAD_ENTER', "value": 'PRESS', "any": True}, None),
         ("CONFIRM", {"type": 'SPACE', "value": 'PRESS', "any": True}, None),
-        ("NEW_CUT", {"type": 'E', "value": 'PRESS'}, None),
-        ("SNAP_MIDPOINTS_ON", {"type": 'LEFT_CTRL', "value": 'PRESS', "any": True}, None),
-        ("SNAP_MIDPOINTS_OFF", {"type": 'LEFT_CTRL', "value": 'RELEASE', "any": True}, None),
-        ("SNAP_MIDPOINTS_ON", {"type": 'RIGHT_CTRL', "value": 'PRESS', "any": True}, None),
-        ("SNAP_MIDPOINTS_OFF", {"type": 'RIGHT_CTRL', "value": 'RELEASE', "any": True}, None),
-        ("IGNORE_SNAP_ON", {"type": 'LEFT_SHIFT', "value": 'PRESS', "any": True}, None),
-        ("IGNORE_SNAP_OFF", {"type": 'LEFT_SHIFT', "value": 'RELEASE', "any": True}, None),
-        ("IGNORE_SNAP_ON", {"type": 'RIGHT_SHIFT', "value": 'PRESS', "any": True}, None),
-        ("IGNORE_SNAP_OFF", {"type": 'RIGHT_SHIFT', "value": 'RELEASE', "any": True}, None),
-        ("ANGLE_SNAP_TOGGLE", {"type": 'C', "value": 'PRESS'}, None),
-        ("CUT_THROUGH_TOGGLE", {"type": 'Z', "value": 'PRESS'}, None),
+        ("NEW_CUT", {"type": 'RIGHTMOUSE', "value": 'PRESS'}, None),
+        ("SNAP_MIDPOINTS_ON", {"type": 'LEFT_SHIFT', "value": 'PRESS', "any": True}, None),
+        ("SNAP_MIDPOINTS_OFF", {"type": 'LEFT_SHIFT', "value": 'RELEASE', "any": True}, None),
+        ("SNAP_MIDPOINTS_ON", {"type": 'RIGHT_SHIFT', "value": 'PRESS', "any": True}, None),
+        ("SNAP_MIDPOINTS_OFF", {"type": 'RIGHT_SHIFT', "value": 'RELEASE', "any": True}, None),
+        ("IGNORE_SNAP_ON", {"type": 'LEFT_CTRL', "value": 'PRESS', "any": True}, None),
+        ("IGNORE_SNAP_OFF", {"type": 'LEFT_CTRL', "value": 'RELEASE', "any": True}, None),
+        ("IGNORE_SNAP_ON", {"type": 'RIGHT_CTRL', "value": 'PRESS', "any": True}, None),
+        ("IGNORE_SNAP_OFF", {"type": 'RIGHT_CTRL', "value": 'RELEASE', "any": True}, None),
+        ("ANGLE_SNAP_TOGGLE", {"type": 'A', "value": 'PRESS'}, None),
+        ("CYCLE_ANGLE_SNAP_EDGE", {"type": 'R', "value": 'PRESS'}, None),
+        ("CUT_THROUGH_TOGGLE", {"type": 'C', "value": 'PRESS'}, None),
+        ("SHOW_DISTANCE_ANGLE_TOGGLE", {"type": 'S', "value": 'PRESS'}, None),
+        ("DEPTH_TEST_TOGGLE", {"type": 'V', "value": 'PRESS'}, None),
     ])
 
     return keymap
@@ -5813,6 +5893,7 @@ def km_paint_stroke_modal(_params):
     ])
 
     return keymap
+
 
 def km_sculpt_expand_modal(_params):
     items = []
@@ -7091,11 +7172,15 @@ def km_3d_view_tool_paint_gpencil_eyedropper(params):
         "3D View Tool: Paint Gpencil, Eyedropper",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("ui.eyedropper_gpencil_color", {"type": params.tool_mouse, "value": 'PRESS'}, None),
-            ("ui.eyedropper_gpencil_color", {"type": params.tool_mouse, "value": 'PRESS', "shift": True}, None),
-            ("ui.eyedropper_gpencil_color", {"type": params.tool_mouse, "value": 'PRESS', "shift": True, "ctrl": True}, None),
+            ("ui.eyedropper_gpencil_color",
+             {"type": params.tool_mouse, "value": 'PRESS'}, None),
+            ("ui.eyedropper_gpencil_color",
+             {"type": params.tool_mouse, "value": 'PRESS', "shift": True}, None),
+            ("ui.eyedropper_gpencil_color",
+             {"type": params.tool_mouse, "value": 'PRESS', "shift": True, "ctrl": True}, None),
         ]},
     )
+
 
 def km_3d_view_tool_paint_gpencil_interpolate(params):
     return (
@@ -7106,6 +7191,7 @@ def km_3d_view_tool_paint_gpencil_interpolate(params):
              {"properties": [("release_confirm", True)]}),
         ]},
     )
+
 
 def km_3d_view_tool_edit_gpencil_select(params, *, fallback):
     return (
@@ -7119,6 +7205,7 @@ def km_3d_view_tool_edit_gpencil_select(params, *, fallback):
         ]},
     )
 
+
 def km_3d_view_tool_edit_gpencil_select_box(params, *, fallback):
     return (
         _fallback_id("3D View Tool: Edit Gpencil, Select Box", fallback),
@@ -7129,6 +7216,7 @@ def km_3d_view_tool_edit_gpencil_select_box(params, *, fallback):
             *_template_view3d_gpencil_select_for_fallback(params, fallback),
         ]},
     )
+
 
 def km_3d_view_tool_edit_gpencil_select_circle(params, *, fallback):
     return (
@@ -7277,9 +7365,10 @@ def km_3d_view_tool_sculpt_gpencil_select_lasso(params):
     )
 
 
-def km_sequencer_editor_tool_select(params):
+def km_sequencer_editor_tool_select(params, *, fallback):
     return (
-        "Sequencer Tool: Select",
+        # TODO, fall-back tool support.
+        _fallback_id("Sequencer Tool: Select", fallback),
         {"space_type": 'SEQUENCE_EDITOR', "region_type": 'WINDOW'},
         {"items": [
             ("sequencer.select", {"type": params.select_mouse, "value": 'PRESS'}, None),
@@ -7288,9 +7377,10 @@ def km_sequencer_editor_tool_select(params):
     )
 
 
-def km_sequencer_editor_tool_select_box(params):
+def km_sequencer_editor_tool_select_box(params, *, fallback):
     return (
-        "Sequencer Tool: Select Box",
+        # TODO, fall-back tool support.
+        _fallback_id("Sequencer Tool: Select Box", fallback),
         {"space_type": 'SEQUENCE_EDITOR', "region_type": 'WINDOW'},
         {"items": [
             *_template_items_tool_select_actions_simple(
@@ -7320,7 +7410,12 @@ def km_sequencer_editor_tool_blade(_params):
         {"space_type": 'SEQUENCE_EDITOR', "region_type": 'WINDOW'},
         {"items": [
             ("sequencer.split", {"type": 'LEFTMOUSE', "value": 'PRESS'},
-             {"properties": [("type", 'SOFT'), ("side", 'NO_CHANGE'), ("use_cursor_position", True), ("ignore_selection", True)]}),
+             {"properties": [
+                 ("type", 'SOFT'),
+                 ("side", 'NO_CHANGE'),
+                 ("use_cursor_position", True),
+                 ("ignore_selection", True),
+             ]}),
         ]},
     )
 
@@ -7607,8 +7702,8 @@ def generate_keymaps(params=None):
         km_3d_view_tool_sculpt_gpencil_select_box(params),
         km_3d_view_tool_sculpt_gpencil_select_circle(params),
         km_3d_view_tool_sculpt_gpencil_select_lasso(params),
-        km_sequencer_editor_tool_select(params),
-        km_sequencer_editor_tool_select_box(params),
+        *(km_sequencer_editor_tool_select(params, fallback=fallback) for fallback in (False, True)),
+        *(km_sequencer_editor_tool_select_box(params, fallback=fallback) for fallback in (False, True)),
         km_sequencer_editor_tool_blade(params),
         km_sequencer_editor_tool_generic_sample(params),
         km_sequencer_editor_tool_scale(params),
