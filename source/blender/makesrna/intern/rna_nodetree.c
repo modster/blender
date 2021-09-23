@@ -4665,16 +4665,18 @@ static const EnumPropertyItem node_principled_distribution_items[] = {
 };
 
 static const EnumPropertyItem node_subsurface_method_items[] = {
-    {SHD_SUBSURFACE_BURLEY,
-     "BURLEY",
+    {SHD_SUBSURFACE_RANDOM_WALK_FIXED_RADIUS,
+     "RANDOM_WALK_FIXED_RADIUS",
      0,
-     "Christensen-Burley",
-     "Approximation to physically based volume scattering"},
+     "Random Walk (Fixed Radius)",
+     "Volumetric approximation to physically based volume scattering, using the scattering radius "
+     "as specified"},
     {SHD_SUBSURFACE_RANDOM_WALK,
      "RANDOM_WALK",
      0,
      "Random Walk",
-     "Volumetric approximation to physically based volume scattering"},
+     "Volumetric approximation to physically based volume scattering, with scattering radius "
+     "automatically adjusted to match color textures"},
     {0, NULL, 0, NULL, NULL}};
 
 /* -- Common nodes ---------------------------------------------------------- */
@@ -6144,35 +6146,12 @@ static void def_sh_ambient_occlusion(StructRNA *srna)
 
 static void def_sh_subsurface(StructRNA *srna)
 {
-  static const EnumPropertyItem prop_subsurface_falloff_items[] = {
-      {SHD_SUBSURFACE_CUBIC, "CUBIC", 0, "Cubic", "Simple cubic falloff function"},
-      {SHD_SUBSURFACE_GAUSSIAN,
-       "GAUSSIAN",
-       0,
-       "Gaussian",
-       "Normal distribution, multiple can be combined to fit more complex profiles"},
-      {SHD_SUBSURFACE_BURLEY,
-       "BURLEY",
-       0,
-       "Christensen-Burley",
-       "Approximation to physically based volume scattering"},
-      {SHD_SUBSURFACE_RANDOM_WALK,
-       "RANDOM_WALK",
-       0,
-       "Random Walk",
-       "Volumetric approximation to physically based volume scattering"},
-      {0, NULL, 0, NULL, NULL},
-  };
-
   PropertyRNA *prop;
 
   prop = RNA_def_property(srna, "falloff", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_sdna(prop, NULL, "custom1");
-  RNA_def_property_enum_items(prop, prop_subsurface_falloff_items);
-  RNA_def_property_ui_text(prop,
-                           "Falloff",
-                           "Function to determine how much light nearby points contribute based "
-                           "on their distance to the shading point");
+  RNA_def_property_enum_items(prop, node_subsurface_method_items);
+  RNA_def_property_ui_text(prop, "Method", "Method for rendering subsurface scattering");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_ShaderNode_socket_update");
 }
 
@@ -10211,6 +10190,32 @@ static void def_geo_curve_subdivide(StructRNA *srna)
   prop = RNA_def_property(srna, "cuts_type", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, rna_node_geometry_attribute_input_type_items_int);
   RNA_def_property_ui_text(prop, "Cuts Type", "");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
+}
+
+static void def_geo_curve_fillet(StructRNA *srna)
+{
+  PropertyRNA *prop;
+
+  static EnumPropertyItem mode_items[] = {
+      {GEO_NODE_CURVE_FILLET_BEZIER,
+       "BEZIER",
+       0,
+       "Bezier",
+       "Align Bezier handles to create circular arcs at each control point"},
+      {GEO_NODE_CURVE_FILLET_POLY,
+       "POLY",
+       0,
+       "Poly",
+       "Add control points along a circular arc (handle type is vector if Bezier Spline)"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  RNA_def_struct_sdna_from(srna, "NodeGeometryCurveFillet", "storage");
+
+  prop = RNA_def_property(srna, "mode", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, mode_items);
+  RNA_def_property_ui_text(prop, "Mode", "How to choose number of vertices on fillet");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
 }
 

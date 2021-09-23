@@ -1032,6 +1032,11 @@ typedef struct NodeShaderTexPointDensity {
   char _pad2[4];
 } NodeShaderTexPointDensity;
 
+typedef struct NodeShaderPrincipled {
+  char use_subsurface_auto_radius;
+  char _pad[3];
+} NodeShaderPrincipled;
+
 /* TEX_output */
 typedef struct TexNodeOutput {
   char name[64];
@@ -1442,6 +1447,11 @@ typedef struct NodeGeometryCurveSubdivide {
   uint8_t cuts_type;
 } NodeGeometryCurveSubdivide;
 
+typedef struct NodeGeometryCurveFillet {
+  /* GeometryNodeCurveFilletMode. */
+  uint8_t mode;
+} NodeGeometryCurveFillet;
+
 typedef struct NodeGeometryCurveTrim {
   /* GeometryNodeCurveSampleMode. */
   uint8_t mode;
@@ -1803,11 +1813,12 @@ enum {
 enum {
 #ifdef DNA_DEPRECATED_ALLOW
   SHD_SUBSURFACE_COMPATIBLE = 0, /* Deprecated */
-#endif
   SHD_SUBSURFACE_CUBIC = 1,
   SHD_SUBSURFACE_GAUSSIAN = 2,
-  SHD_SUBSURFACE_BURLEY = 3,
-  SHD_SUBSURFACE_RANDOM_WALK = 4,
+#endif
+  SHD_SUBSURFACE_DIFFUSION = 3,
+  SHD_SUBSURFACE_RANDOM_WALK_FIXED_RADIUS = 4,
+  SHD_SUBSURFACE_RANDOM_WALK = 5,
 };
 
 /* blur node */
@@ -2053,6 +2064,11 @@ typedef enum GeometryNodeCurveSampleMode {
   GEO_NODE_CURVE_SAMPLE_FACTOR = 0,
   GEO_NODE_CURVE_SAMPLE_LENGTH = 1,
 } GeometryNodeCurveSampleMode;
+
+typedef enum GeometryNodeCurveFilletMode {
+  GEO_NODE_CURVE_FILLET_BEZIER = 0,
+  GEO_NODE_CURVE_FILLET_POLY = 1,
+} GeometryNodeCurveFilletMode;
 
 typedef enum GeometryNodeAttributeTransferMapMode {
   GEO_NODE_ATTRIBUTE_TRANSFER_NEAREST_FACE_INTERPOLATED = 0,

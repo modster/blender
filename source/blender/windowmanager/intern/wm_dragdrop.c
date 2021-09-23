@@ -34,6 +34,7 @@
 #include "BLT_translation.h"
 
 #include "BLI_blenlib.h"
+#include "BLI_math_color.h"
 
 #include "BIF_glutil.h"
 
@@ -50,6 +51,7 @@
 
 #include "UI_interface.h"
 #include "UI_interface_icons.h"
+#include "UI_resources.h"
 
 #include "RNA_access.h"
 
@@ -426,7 +428,7 @@ ID *WM_drag_get_local_ID_or_import_from_asset(const wmDrag *drag, int idcode)
 }
 
 /**
- * \brief Free asset ID imported for cancelled drop.
+ * \brief Free asset ID imported for canceled drop.
  *
  * If the asset was imported (linked/appended) using #WM_drag_get_local_ID_or_import_from_asset()`
  * (typically via a #wmDropBox.copy() callback), we want the ID to be removed again if the drop
@@ -463,8 +465,14 @@ void WM_drag_free_imported_drag_ID(struct Main *bmain, wmDrag *drag, wmDropBox *
 static void wm_drop_operator_draw(const char *name, int x, int y)
 {
   const uiFontStyle *fstyle = UI_FSTYLE_WIDGET;
-  const float col_fg[4] = {1.0f, 1.0f, 1.0f, 1.0f};
-  const float col_bg[4] = {0.0f, 0.0f, 0.0f, 0.2f};
+
+  /* Use the theme settings from tooltips. */
+  const bTheme *btheme = UI_GetTheme();
+  const uiWidgetColors *wcol = &btheme->tui.wcol_tooltip;
+
+  float col_fg[4], col_bg[4];
+  rgba_uchar_to_float(col_fg, wcol->text);
+  rgba_uchar_to_float(col_bg, wcol->inner);
 
   UI_fontstyle_draw_simple_backdrop(fstyle, x, y, name, col_fg, col_bg);
 }
