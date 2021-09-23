@@ -1451,7 +1451,7 @@ static int object_gpencil_add_exec(bContext *C, wmOperator *op)
         if (stroke_depth_order == GP_DRAWMODE_3D) {
           gpd->draw_mode = GP_DRAWMODE_3D;
         }
-        md->stroke_offset = stroke_offset;
+        md->stroke_depth_offset = stroke_offset;
       }
 
       break;
