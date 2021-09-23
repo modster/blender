@@ -3280,23 +3280,12 @@ static void wm_event_free_and_remove_from_queue_if_valid(wmEvent *event)
  * \{ */
 
 #ifdef WITH_XR_OPENXR
-static int wm_event_handle_xrevent(
+static void wm_event_handle_xrevent(
     bContext *C, wmWindowManager *wm, wmWindow *win, bScreen *screen, wmEvent *event)
 {
-  BLI_assert(event->val == KM_PRESS || event->val == KM_RELEASE);
-
   int action = 0;
 
-  if (event->val == KM_RELEASE) {
-    wmXrActionData *actiondata = event->customdata;
-    if (actiondata->ot->modal || actiondata->ot->modal_3d) {
-      /* Don't execute modal operators on release. */
-      action |= WM_HANDLER_BREAK;
-      return action;
-    }
-  }
-
-  /* Find a valid region for executing XR operators. */
+  /* Find a valid region for XR operator execution and modal handling. */
   ED_screen_areas_iter (win, screen, area) {
     CTX_wm_area_set(C, area);
     if (!CTX_wm_view3d(C)) {
@@ -3309,30 +3298,38 @@ static int wm_event_handle_xrevent(
       }
       CTX_wm_region_set(C, region);
 
-      wmXrActionData *actiondata = event->customdata;
-      PointerRNA properties = {.type = actiondata->ot->srna, .data = actiondata->op_properties};
+      action |= wm_handlers_do(C, event, &win->modalhandlers);
 
-      if (actiondata->ot->invoke || actiondata->ot->invoke_3d) {
-        /* Invoke operator, either executing operator or transferring responsibility to window
-         * modal handlers. */
-        wm_operator_invoke(C,
-                           actiondata->ot,
-                           event,
-                           actiondata->op_properties ? &properties : NULL,
-                           NULL,
-                           false,
-                           false);
-      }
-      else {
-        /* Execute operator. */
-        wmOperator *op = wm_operator_create(
-            wm, actiondata->ot, actiondata->op_properties ? &properties : NULL, NULL);
-        if ((WM_operator_call(C, op) & OPERATOR_HANDLED) == 0) {
-          WM_operator_free(op);
+      if ((action & WM_HANDLER_BREAK) == 0) {
+        wmXrActionData *actiondata = event->customdata;
+        if ((actiondata->ot->modal || actiondata->ot->modal_3d) && event->val == KM_RELEASE) {
+          /* Don't execute modal operators on release. */
         }
+        else {
+          PointerRNA properties = {.type = actiondata->ot->srna,
+                                   .data = actiondata->op_properties};
+          if (actiondata->ot->invoke || actiondata->ot->invoke_3d) {
+            /* Invoke operator, either executing operator or transferring responsibility to window
+             * modal handlers. */
+            wm_operator_invoke(C,
+                               actiondata->ot,
+                               event,
+                               actiondata->op_properties ? &properties : NULL,
+                               NULL,
+                               false,
+                               false);
+          }
+          else {
+            /* Execute operator. */
+            wmOperator *op = wm_operator_create(
+                wm, actiondata->ot, actiondata->op_properties ? &properties : NULL, NULL);
+            if ((WM_operator_call(C, op) & OPERATOR_HANDLED) == 0) {
+              WM_operator_free(op);
+            }
+          }
+        }
+        action |= WM_HANDLER_BREAK;
       }
-
-      action |= WM_HANDLER_BREAK;
 
       CTX_wm_region_set(C, NULL);
       break;
@@ -3344,8 +3341,6 @@ static int wm_event_handle_xrevent(
   }
 
   CTX_wm_area_set(C, NULL);
-
-  return action;
 }
 #endif /* WITH_XR_OPENXR */
 
@@ -3446,6 +3441,16 @@ void wm_event_do_handlers(bContext *C)
 
       CTX_wm_window_set(C, win);
 
+#ifdef WITH_XR_OPENXR
+      if (event->type == EVT_XR_ACTION) {
+        wm_event_handle_xrevent(C, wm, win, screen, event);
+        BLI_remlink(&win->event_queue, event);
+        wm_event_free(event);
+        /* Skip mouse event handling below, which is unnecessary for XR events. */
+        continue;
+      }
+#endif
+
       /* Clear tool-tip on mouse move. */
       if (screen->tool_tip && screen->tool_tip->exit_on_event) {
         if (ELEM(event->type, MOUSEMOVE, INBETWEEN_MOUSEMOVE)) {
@@ -3501,17 +3506,6 @@ void wm_event_do_handlers(bContext *C)
 #ifdef WITH_INPUT_NDOF
         else if (event->type == NDOF_MOTION) {
           win->addmousemove = true;
-        }
-#endif
-#ifdef WITH_XR_OPENXR
-        else if (event->type == EVT_XR_ACTION) {
-          action |= wm_event_handle_xrevent(C, wm, win, screen, event);
-          if (action & WM_HANDLER_BREAK) {
-            BLI_remlink(&win->event_queue, event);
-            wm_event_free(event);
-          }
-          /* Skip mouse event handling below, which is unnecessary for XR events. */
-          continue;
         }
 #endif
 

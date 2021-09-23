@@ -331,7 +331,8 @@ void wm_xr_draw_controllers(const bContext *UNUSED(C), ARegion *UNUSED(region), 
 
     GPUVertFormat *format = immVertexFormat();
     uint pos = GPU_vertformat_attr_add(format, "pos", GPU_COMP_F32, 3, GPU_FETCH_FLOAT);
-    uint col = GPU_vertformat_attr_add(format, "color", GPU_COMP_F32, 4, GPU_FETCH_FLOAT);
+    uint col = GPU_vertformat_attr_add(
+        format, "color", GPU_COMP_U8, 4, GPU_FETCH_INT_TO_FLOAT_UNIT);
     immBindBuiltinProgram(GPU_SHADER_3D_POLYLINE_FLAT_COLOR);
 
     float viewport[4];
@@ -341,7 +342,7 @@ void wm_xr_draw_controllers(const bContext *UNUSED(C), ARegion *UNUSED(region), 
     immUniform1f("lineWidth", 3.0f * U.pixelsize);
 
     if (draw_ray) {
-      const float color[4] = {0.35f, 0.35f, 1.0f, 0.5f};
+      const uchar color[4] = {89, 89, 255, 127};
       const float scale = settings->clip_end;
       float ray[3];
 
@@ -349,22 +350,23 @@ void wm_xr_draw_controllers(const bContext *UNUSED(C), ARegion *UNUSED(region), 
       GPU_blend(GPU_BLEND_ALPHA);
 
       immBegin(GPU_PRIM_LINES, (uint)BLI_listbase_count(&state->controllers) * 2);
-      immAttr4fv(col, color);
 
       LISTBASE_FOREACH (wmXrController *, controller, &state->controllers) {
         const float(*mat)[4] = controller->aim_mat;
         madd_v3_v3v3fl(ray, mat[3], mat[2], -scale);
 
+        immAttrSkip(col);
         immVertex3fv(pos, mat[3]);
+        immAttr4ubv(col, color);
         immVertex3fv(pos, ray);
       }
 
       immEnd();
     }
     else {
-      const float r[4] = {1.0f, 0.2f, 0.322f, 1.0f};
-      const float g[4] = {0.545f, 0.863f, 0.0f, 1.0f};
-      const float b[4] = {0.157f, 0.565f, 1.0f, 1.0f};
+      const uchar r[4] = {255, 51, 82, 255};
+      const uchar g[4] = {139, 220, 0, 255};
+      const uchar b[4] = {40, 144, 255, 255};
       const float scale = 0.01f;
       float x_axis[3], y_axis[3], z_axis[3];
 
@@ -379,16 +381,19 @@ void wm_xr_draw_controllers(const bContext *UNUSED(C), ARegion *UNUSED(region), 
         madd_v3_v3v3fl(y_axis, mat[3], mat[1], scale);
         madd_v3_v3v3fl(z_axis, mat[3], mat[2], scale);
 
-        immAttr4fv(col, r);
+        immAttrSkip(col);
         immVertex3fv(pos, mat[3]);
+        immAttr4ubv(col, r);
         immVertex3fv(pos, x_axis);
 
-        immAttr4fv(col, g);
+        immAttrSkip(col);
         immVertex3fv(pos, mat[3]);
+        immAttr4ubv(col, g);
         immVertex3fv(pos, y_axis);
 
-        immAttr4fv(col, b);
+        immAttrSkip(col);
         immVertex3fv(pos, mat[3]);
+        immAttr4ubv(col, b);
         immVertex3fv(pos, z_axis);
       }
 

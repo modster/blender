@@ -151,6 +151,7 @@ void wm_xr_session_toggle(wmWindowManager *wm,
 
   if (WM_xr_session_exists(xr_data)) {
     GHOST_XrSessionEnd(xr_data->runtime->context);
+    xr_data->runtime->session_state.is_started = false;
   }
   else {
     GHOST_XrSessionBeginInfo begin_info;
@@ -1353,11 +1354,9 @@ void wm_xr_session_controller_data_populate(const wmXrAction *grip_action,
   /* Activate draw callback. */
   if (g_xr_surface) {
     wmXrSurfaceData *surface_data = g_xr_surface->customdata;
-    if (surface_data && !surface_data->controller_draw_handle) {
-      if (surface_data->controller_art) {
-        surface_data->controller_draw_handle = ED_region_draw_cb_activate(
-            surface_data->controller_art, wm_xr_draw_controllers, xr, REGION_DRAW_POST_VIEW);
-      }
+    if (surface_data->controller_art && !surface_data->controller_draw_handle) {
+      surface_data->controller_draw_handle = ED_region_draw_cb_activate(
+          surface_data->controller_art, wm_xr_draw_controllers, xr, REGION_DRAW_POST_VIEW);
     }
   }
 }
@@ -1369,10 +1368,8 @@ void wm_xr_session_controller_data_clear(wmXrSessionState *state)
   /* Deactivate draw callback. */
   if (g_xr_surface) {
     wmXrSurfaceData *surface_data = g_xr_surface->customdata;
-    if (surface_data && surface_data->controller_draw_handle) {
-      if (surface_data->controller_art) {
-        ED_region_draw_cb_exit(surface_data->controller_art, surface_data->controller_draw_handle);
-      }
+    if (surface_data->controller_art && surface_data->controller_draw_handle) {
+      ED_region_draw_cb_exit(surface_data->controller_art, surface_data->controller_draw_handle);
       surface_data->controller_draw_handle = NULL;
     }
   }
@@ -1401,7 +1398,7 @@ static void wm_xr_session_surface_draw(bContext *C)
   Main *bmain = CTX_data_main(C);
   wmXrDrawData draw_data;
 
-  if (!GHOST_XrSessionIsRunning(wm->xr.runtime->context)) {
+  if (!WM_xr_session_is_ready(&wm->xr)) {
     return;
   }
 
@@ -1570,7 +1567,6 @@ ARegionType *WM_xr_surface_controller_region_type_get(void)
     wmXrSurfaceData *data = g_xr_surface->customdata;
     return data->controller_art;
   }
-
   return NULL;
 }
 

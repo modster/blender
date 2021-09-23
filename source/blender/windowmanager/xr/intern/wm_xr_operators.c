@@ -605,10 +605,11 @@ static void wm_xr_raycast_draw(const bContext *UNUSED(C),
 
   GPUVertFormat *format = immVertexFormat();
   uint pos = GPU_vertformat_attr_add(format, "pos", GPU_COMP_F32, 3, GPU_FETCH_FLOAT);
-  immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
-  immUniformColor4fv(data->color);
 
   if (data->from_viewer) {
+    immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
+    immUniformColor4fv(data->color);
+
     GPU_depth_test(GPU_DEPTH_NONE);
     GPU_point_size(7.0f);
 
@@ -617,11 +618,21 @@ static void wm_xr_raycast_draw(const bContext *UNUSED(C),
     immEnd();
   }
   else {
+    uint col = GPU_vertformat_attr_add(format, "color", GPU_COMP_F32, 4, GPU_FETCH_FLOAT);
+    immBindBuiltinProgram(GPU_SHADER_3D_POLYLINE_FLAT_COLOR);
+
+    float viewport[4];
+    GPU_viewport_size_get_f(viewport);
+    immUniform2fv("viewportSize", &viewport[2]);
+
+    immUniform1f("lineWidth", 3.0f * U.pixelsize);
+
     GPU_depth_test(GPU_DEPTH_LESS_EQUAL);
-    GPU_line_width(3.0f);
 
     immBegin(GPU_PRIM_LINES, 2);
+    immAttrSkip(col);
     immVertex3fv(pos, data->origin);
+    immAttr4fv(col, data->color);
     immVertex3fv(pos, data->end);
     immEnd();
   }
