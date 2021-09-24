@@ -104,6 +104,7 @@ using blender::Span;
 using blender::Stack;
 using blender::Vector;
 using blender::VectorSet;
+using blender::nodes::FieldInferencingInterface;
 using blender::nodes::InputSocketFieldType;
 using blender::nodes::NodeDeclaration;
 using blender::nodes::OutputFieldDependency;
@@ -132,6 +133,9 @@ static FieldInferencingInterface *node_field_inferencing_interface_copy(
     const FieldInferencingInterface &field_inferencing_interface);
 static void node_field_inferencing_interface_free(
     const FieldInferencingInterface *field_inferencing_interface);
+// namespace blender::bke::node_tree_inferencing {
+// bool update_field_inferencing(bNodeTree &btree);
+// }
 
 static void ntree_init_data(ID *id)
 {
@@ -677,6 +681,10 @@ void ntreeBlendReadData(BlendDataReader *reader, bNodeTree *ntree)
   ntree->execdata = nullptr;
 
   ntree->field_inferencing_interface = nullptr;
+  if (ntree->type == NTREE_GEOMETRY) {
+    ntree->update |= (NTREE_UPDATE | NTREE_UPDATE_FIELD_INFERENCING);
+    // blender::bke::node_field_inferencing::update_field_inferencing(*ntree);
+  }
 
   BLO_read_data_address(reader, &ntree->adt);
   BKE_animdata_blend_read_data(reader, ntree->adt);
@@ -4455,24 +4463,6 @@ void ntreeUpdateAllNew(Main *main)
   }
   FOREACH_NODETREE_END;
 }
-
-/**
- * Information about how a node interacts with fields.
- */
-struct FieldInferencingInterface {
-  Vector<InputSocketFieldType> inputs;
-  Vector<OutputFieldDependency> outputs;
-
-  friend bool operator==(const FieldInferencingInterface &a, const FieldInferencingInterface &b)
-  {
-    return a.inputs == b.inputs && a.outputs == b.outputs;
-  }
-
-  friend bool operator!=(const FieldInferencingInterface &a, const FieldInferencingInterface &b)
-  {
-    return !(a == b);
-  }
-};
 
 static FieldInferencingInterface *node_field_inferencing_interface_copy(
     const FieldInferencingInterface &field_inferencing_interface)
