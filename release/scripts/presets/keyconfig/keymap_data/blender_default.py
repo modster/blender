@@ -31,14 +31,14 @@ class Params:
         "action_tweak",
         "tool_mouse",
         "tool_tweak",
+        "tool_maybe_tweak",
+        "tool_maybe_tweak_value",
         "context_menu_event",
         "cursor_set_event",
         "cursor_tweak_event",
         "use_mouse_emulate_3_button",
-        # Experimental option.
-        "pie_value",
 
-        # User preferences.
+        # User preferences:
         #
         # Swap 'Space/Shift-Space'.
         "spacebar_action",
@@ -70,10 +70,14 @@ class Params:
         # (derived from other settings).
         #
         # This case needs to be checked often,
-        # convenience for: `params.use_fallback_tool if params.select_mouse == 'RIGHT' else False`.
+        # Shorthand for: `(params.use_fallback_tool if params.select_mouse == 'RIGHT' else False)`.
         "use_fallback_tool_rmb",
-        # Convenience for: `'CLICK' if params.use_fallback_tool_rmb else params.select_mouse_value`.
+        # Shorthand for: `('CLICK' if params.use_fallback_tool_rmb else params.select_mouse_value)`.
         "select_mouse_value_fallback",
+        # Shorthand for: `('CLICK_DRAG' if params.use_pie_click_drag else 'PRESS')`
+        "pie_value",
+        # Shorthand for: `{"type": params.tool_maybe_tweak, "value": params.tool_maybe_tweak_value}`.
+        "tool_maybe_tweak_event",
     )
 
     def __init__(
@@ -92,7 +96,7 @@ class Params:
             use_v3d_tab_menu=False,
             use_v3d_shade_ex_pie=False,
             use_v3d_mmb_pan=False,
-            use_alt_tool=False,
+            use_alt_tool_or_cursor=False,
             use_alt_click_leader=False,
             use_pie_click_drag=False,
             v3d_tilde_action='VIEW',
@@ -101,6 +105,9 @@ class Params:
         from sys import platform
         self.apple = (platform == 'darwin')
         self.legacy = legacy
+
+        if use_mouse_emulate_3_button:
+            assert(use_alt_tool_or_cursor is False)
 
         if select_mouse == 'RIGHT':
             # Right mouse select.
@@ -111,12 +118,23 @@ class Params:
             self.action_tweak = 'EVT_TWEAK_L'
             self.tool_mouse = 'LEFTMOUSE'
             self.tool_tweak = 'EVT_TWEAK_L'
+            if use_alt_tool_or_cursor:
+                self.tool_maybe_tweak = 'LEFTMOUSE'
+                self.tool_maybe_tweak_value = 'PRESS'
+            else:
+                self.tool_maybe_tweak = 'EVT_TWEAK_L'
+                self.tool_maybe_tweak_value = 'ANY'
+
             self.context_menu_event = {"type": 'W', "value": 'PRESS'}
-            self.cursor_set_event = {"type": 'LEFTMOUSE', "value": 'CLICK'}
+
+            # Use the "cursor" functionality for RMB select.
+            if use_alt_tool_or_cursor:
+                self.cursor_set_event = {"type": 'LEFTMOUSE', "value": 'PRESS', "alt": True}
+            else:
+                self.cursor_set_event = {"type": 'LEFTMOUSE', "value": 'CLICK'}
+
             self.cursor_tweak_event = None
             self.use_fallback_tool = use_fallback_tool
-            self.use_fallback_tool_rmb = use_fallback_tool
-            self.select_mouse_value_fallback = 'CLICK' if self.use_fallback_tool_rmb else self.select_mouse_value
             self.tool_modifier = {}
         else:
             # Left mouse select uses Click event for selection. This is a little
@@ -129,6 +147,8 @@ class Params:
             self.action_tweak = 'EVT_TWEAK_R'
             self.tool_mouse = 'LEFTMOUSE'
             self.tool_tweak = 'EVT_TWEAK_L'
+            self.tool_maybe_tweak = 'EVT_TWEAK_L'
+            self.tool_maybe_tweak_value = 'ANY'
 
             if self.legacy:
                 self.context_menu_event = {"type": 'W', "value": 'PRESS'}
@@ -138,10 +158,9 @@ class Params:
             self.cursor_set_event = {"type": 'RIGHTMOUSE', "value": 'PRESS', "shift": True}
             self.cursor_tweak_event = {"type": 'EVT_TWEAK_R', "value": 'ANY', "shift": True}
             self.use_fallback_tool = True
-            self.use_fallback_tool_rmb = False
-            self.select_mouse_value_fallback = self.select_mouse_value
 
-            if use_alt_tool:
+            # Use the "tool" functionality for LMB select.
+            if use_alt_tool_or_cursor:
                 # Allow `Alt` to be pressed or not.
                 self.tool_modifier = {"alt": -1}
             else:
@@ -149,7 +168,7 @@ class Params:
 
         self.use_mouse_emulate_3_button = use_mouse_emulate_3_button
 
-        # User preferences
+        # User preferences:
         self.spacebar_action = spacebar_action
         self.use_key_activate_tools = use_key_activate_tools
 
@@ -163,10 +182,12 @@ class Params:
 
         self.use_alt_click_leader = use_alt_click_leader
         self.use_pie_click_drag = use_pie_click_drag
-        if not use_pie_click_drag:
-            self.pie_value = 'PRESS'
-        else:
-            self.pie_value = 'CLICK_DRAG'
+
+        # Convenience variables:
+        self.use_fallback_tool_rmb = self.use_fallback_tool if self.select_mouse == 'RIGHT' else False
+        self.select_mouse_value_fallback = 'CLICK' if self.use_fallback_tool_rmb else self.select_mouse_value
+        self.pie_value = 'CLICK_DRAG' if use_pie_click_drag else 'PRESS'
+        self.tool_maybe_tweak_event = {"type": self.tool_maybe_tweak, "value": self.tool_maybe_tweak_value}
 
 
 # ------------------------------------------------------------------------------
@@ -186,6 +207,13 @@ def _fallback_id(text, fallback):
     if fallback:
         return text + " (fallback)"
     return text
+
+
+def any_except(*args):
+    mod = {"ctrl": -1, "alt": -1, "shift": -1, "oskey": -1}
+    for arg in args:
+        del mod[arg]
+    return mod
 
 
 # ------------------------------------------------------------------------------
@@ -300,20 +328,23 @@ def _template_items_object_subdivision_set():
 
 def _template_items_gizmo_tweak_value():
     return [
-        ("gizmogroup.gizmo_tweak", {"type": 'LEFTMOUSE', "value": 'PRESS', "any": True}, None),
+        ("gizmogroup.gizmo_tweak",
+         {"type": 'LEFTMOUSE', "value": 'PRESS', **any_except("alt")}, None),
     ]
 
 
 def _template_items_gizmo_tweak_value_click_drag():
     return [
-        ("gizmogroup.gizmo_tweak", {"type": 'LEFTMOUSE', "value": 'CLICK', "any": True}, None),
-        ("gizmogroup.gizmo_tweak", {"type": 'EVT_TWEAK_L', "value": 'ANY', "any": True}, None),
+        ("gizmogroup.gizmo_tweak",
+         {"type": 'LEFTMOUSE', "value": 'CLICK', **any_except("alt")}, None),
+        ("gizmogroup.gizmo_tweak",
+         {"type": 'EVT_TWEAK_L', "value": 'ANY', **any_except("alt")}, None),
     ]
 
 
 def _template_items_gizmo_tweak_value_drag():
     return [
-        ("gizmogroup.gizmo_tweak", {"type": 'EVT_TWEAK_L', "value": 'ANY', "any": True}, None),
+        ("gizmogroup.gizmo_tweak", {"type": 'EVT_TWEAK_L', "value": 'ANY', **any_except("alt")}, None),
     ]
 
 
@@ -6044,7 +6075,7 @@ def km_generic_tool_annotate_line(params):
         "Generic Tool: Annotate Line",
         {"space_type": 'EMPTY', "region_type": 'WINDOW'},
         {"items": [
-            ("gpencil.annotate", {"type": params.tool_tweak, "value": 'ANY'},
+            ("gpencil.annotate", params.tool_maybe_tweak_event,
              {"properties": [("mode", 'DRAW_STRAIGHT'), ("wait_for_input", False)]}),
             ("gpencil.annotate", {"type": params.tool_mouse, "value": 'PRESS', "ctrl": True},
              {"properties": [("mode", 'ERASER'), ("wait_for_input", False)]}),
@@ -6168,8 +6199,12 @@ def km_image_editor_tool_uv_cursor(params):
         "Image Editor Tool: Uv, Cursor",
         {"space_type": 'IMAGE_EDITOR', "region_type": 'WINDOW'},
         {"items": [
-            ("uv.cursor_set", {"type": params.tool_mouse, "value": 'PRESS'}, None),
-            ("transform.translate", {"type": params.tool_tweak, "value": 'ANY'},
+            ("uv.cursor_set",
+             {"type": params.tool_mouse, "value": 'PRESS'},
+             None),
+            # Don't use `tool_maybe_tweak_event` since it conflicts with `PRESS` that places the cursor.
+            ("transform.translate",
+             {"type": params.tool_tweak, "value": 'ANY'},
              {"properties": [("release_confirm", True), ("cursor_transform", True)]}),
         ]},
     )
@@ -6194,8 +6229,7 @@ def km_image_editor_tool_uv_select_box(params, *, fallback):
         {"items": [
             *([] if (fallback and not params.use_fallback_tool) else _template_items_tool_select_actions_simple(
                 "uv.select_box",
-                type=params.select_tweak if fallback else params.tool_tweak,
-                value='ANY')),
+                **({"type": params.select_tweak, "value": 'ANY'} if fallback else params.tool_maybe_tweak_event))),
             *_template_uv_select_for_fallback(params, fallback),
         ]},
     )
@@ -6224,9 +6258,7 @@ def km_image_editor_tool_uv_select_lasso(params, *, fallback):
         {"items": [
             *([] if (fallback and not params.use_fallback_tool) else _template_items_tool_select_actions_simple(
                 "uv.select_lasso",
-                type=params.select_tweak if fallback else params.tool_tweak,
-                value='ANY')
-              ),
+                **({"type": params.select_tweak, "value": 'ANY'} if fallback else params.tool_maybe_tweak_event))),
             *_template_uv_select_for_fallback(params, fallback),
         ]},
     )
@@ -6237,7 +6269,7 @@ def km_image_editor_tool_uv_rip_region(params):
         "Image Editor Tool: Uv, Rip Region",
         {"space_type": 'IMAGE_EDITOR', "region_type": 'WINDOW'},
         {"items": [
-            ("uv.rip_move", {"type": params.tool_tweak, "value": 'ANY', **params.tool_modifier},
+            ("uv.rip_move", {**params.tool_maybe_tweak_event, **params.tool_modifier},
              {"properties": [("TRANSFORM_OT_translate", [("release_confirm", True)])]}),
         ]},
     )
@@ -6267,7 +6299,7 @@ def km_image_editor_tool_uv_move(params):
         "Image Editor Tool: Uv, Move",
         {"space_type": 'IMAGE_EDITOR', "region_type": 'WINDOW'},
         {"items": [
-            ("transform.translate", {"type": params.tool_tweak, "value": 'ANY', **params.tool_modifier},
+            ("transform.translate", {**params.tool_maybe_tweak_event, **params.tool_modifier},
              {"properties": [("release_confirm", True)]}),
         ]},
     )
@@ -6278,7 +6310,7 @@ def km_image_editor_tool_uv_rotate(params):
         "Image Editor Tool: Uv, Rotate",
         {"space_type": 'IMAGE_EDITOR', "region_type": 'WINDOW'},
         {"items": [
-            ("transform.rotate", {"type": params.tool_tweak, "value": 'ANY', **params.tool_modifier},
+            ("transform.rotate", {**params.tool_maybe_tweak_event, **params.tool_modifier},
              {"properties": [("release_confirm", True)]}),
         ]},
     )
@@ -6289,7 +6321,7 @@ def km_image_editor_tool_uv_scale(params):
         "Image Editor Tool: Uv, Scale",
         {"space_type": 'IMAGE_EDITOR', "region_type": 'WINDOW'},
         {"items": [
-            ("transform.resize", {"type": params.tool_tweak, "value": 'ANY', **params.tool_modifier},
+            ("transform.resize", {**params.tool_maybe_tweak_event, **params.tool_modifier},
              {"properties": [("release_confirm", True)]}),
         ]},
     )
@@ -6364,7 +6396,8 @@ def km_node_editor_tool_select_box(params, *, fallback):
         {"space_type": 'NODE_EDITOR', "region_type": 'WINDOW'},
         {"items": [
             *([] if (fallback and not params.use_fallback_tool) else _template_items_tool_select_actions_simple(
-                "node.select_box", type=params.tool_tweak, value='ANY',
+                "node.select_box",
+                type=params.tool_maybe_tweak, value=params.tool_maybe_tweak_value,
                 properties=[("tweak", True)],
             )),
         ]},
@@ -6411,6 +6444,7 @@ def km_3d_view_tool_cursor(params):
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
             ("view3d.cursor3d", {"type": params.tool_mouse, "value": 'PRESS'}, None),
+            # Don't use `tool_maybe_tweak_event` since it conflicts with `PRESS` that places the cursor.
             ("transform.translate", {"type": params.tool_tweak, "value": 'ANY'},
              {"properties": [("release_confirm", True), ("cursor_transform", True)]}),
         ]},
@@ -6437,8 +6471,7 @@ def km_3d_view_tool_select_box(params, *, fallback):
         {"items": [
             *([] if (fallback and not params.use_fallback_tool) else _template_items_tool_select_actions(
                 "view3d.select_box",
-                type=params.select_tweak if fallback else params.tool_tweak,
-                value='ANY')),
+                **({"type": params.select_tweak, "value": 'ANY'} if fallback else params.tool_maybe_tweak_event))),
             *_template_view3d_select_for_fallback(params, fallback),
         ]},
     )
@@ -6468,8 +6501,7 @@ def km_3d_view_tool_select_lasso(params, *, fallback):
         {"items": [
             *([] if (fallback and not params.use_fallback_tool) else _template_items_tool_select_actions(
                 "view3d.select_lasso",
-                type=params.select_tweak if fallback else params.tool_tweak,
-                value='ANY')),
+                **({"type": params.select_tweak, "value": 'ANY'} if fallback else params.tool_maybe_tweak_event))),
             *_template_view3d_select_for_fallback(params, fallback),
         ]}
     )
@@ -6480,8 +6512,7 @@ def km_3d_view_tool_transform(params):
         "3D View Tool: Transform",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("transform.from_gizmo",
-             {"type": params.tool_tweak, "value": 'ANY', **params.tool_modifier}, None),
+            ("transform.from_gizmo", {**params.tool_maybe_tweak_event, **params.tool_modifier}, None),
         ]},
     )
 
@@ -6491,8 +6522,7 @@ def km_3d_view_tool_move(params):
         "3D View Tool: Move",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("transform.translate",
-             {"type": params.tool_tweak, "value": 'ANY', **params.tool_modifier},
+            ("transform.translate", {**params.tool_maybe_tweak_event, **params.tool_modifier},
              {"properties": [("release_confirm", True)]}),
         ]},
     )
@@ -6503,8 +6533,7 @@ def km_3d_view_tool_rotate(params):
         "3D View Tool: Rotate",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("transform.rotate",
-             {"type": params.tool_tweak, "value": 'ANY', **params.tool_modifier},
+            ("transform.rotate", {**params.tool_maybe_tweak_event, **params.tool_modifier},
              {"properties": [("release_confirm", True)]}),
         ]},
     )
@@ -6515,14 +6544,14 @@ def km_3d_view_tool_scale(params):
         "3D View Tool: Scale",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("transform.resize",
-             {"type": params.tool_tweak, "value": 'ANY', **params.tool_modifier},
+            ("transform.resize", {**params.tool_maybe_tweak_event, **params.tool_modifier},
              {"properties": [("release_confirm", True)]}),
         ]},
     )
 
 
 def km_3d_view_tool_shear(params):
+    # Don't use 'tool_maybe_tweak_value' since we would loose tweak direction support.
     return (
         "3D View Tool: Shear",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
@@ -6547,7 +6576,7 @@ def km_3d_view_tool_measure(params):
         "3D View Tool: Measure",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("view3d.ruler_add", {"type": params.tool_tweak, "value": 'ANY'}, None),
+            ("view3d.ruler_add", params.tool_maybe_tweak_event, None),
             ("view3d.ruler_remove", {"type": 'X', "value": 'PRESS'}, None),
             ("view3d.ruler_remove", {"type": 'DEL', "value": 'PRESS'}, None),
         ]},
@@ -6559,7 +6588,7 @@ def km_3d_view_tool_pose_breakdowner(params):
         "3D View Tool: Pose, Breakdowner",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("pose.breakdown", {"type": params.tool_tweak, "value": 'ANY', **params.tool_modifier}, None),
+            ("pose.breakdown", {**params.tool_maybe_tweak_event, **params.tool_modifier}, None),
         ]},
     )
 
@@ -6569,8 +6598,7 @@ def km_3d_view_tool_pose_push(params):
         "3D View Tool: Pose, Push",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("pose.push",
-             {"type": params.tool_tweak, "value": 'ANY', **params.tool_modifier}, None),
+            ("pose.push", {**params.tool_maybe_tweak_event, **params.tool_modifier}, None),
         ]},
     )
 
@@ -6580,8 +6608,7 @@ def km_3d_view_tool_pose_relax(params):
         "3D View Tool: Pose, Relax",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("pose.relax",
-             {"type": params.tool_tweak, "value": 'ANY', **params.tool_modifier}, None),
+            ("pose.relax", {**params.tool_maybe_tweak_event, **params.tool_modifier}, None),
         ]},
     )
 
@@ -6591,8 +6618,7 @@ def km_3d_view_tool_edit_armature_roll(params):
         "3D View Tool: Edit Armature, Roll",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("transform.transform",
-             {"type": params.tool_tweak, "value": 'ANY', **params.tool_modifier},
+            ("transform.transform", {**params.tool_maybe_tweak_event, **params.tool_modifier},
              {"properties": [("release_confirm", True), ("mode", 'BONE_ROLL')]}),
         ]},
     )
@@ -6603,7 +6629,7 @@ def km_3d_view_tool_edit_armature_bone_size(params):
         "3D View Tool: Edit Armature, Bone Size",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("transform.transform", {"type": params.tool_tweak, "value": 'ANY', **params.tool_modifier},
+            ("transform.transform", {**params.tool_maybe_tweak_event, **params.tool_modifier},
              {"properties": [("release_confirm", True), ("mode", 'BONE_ENVELOPE')]}),
         ]},
     )
@@ -6615,7 +6641,7 @@ def km_3d_view_tool_edit_armature_bone_envelope(params):
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
 
         {"items": [
-            ("transform.bbone_resize", {"type": params.tool_tweak, "value": 'ANY', **params.tool_modifier},
+            ("transform.bbone_resize", {**params.tool_maybe_tweak_event, **params.tool_modifier},
              {"properties": [("release_confirm", True)]}),
         ]},
     )
@@ -6626,7 +6652,7 @@ def km_3d_view_tool_edit_armature_extrude(params):
         "3D View Tool: Edit Armature, Extrude",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("armature.extrude_move", {"type": params.tool_tweak, "value": 'ANY', **params.tool_modifier},
+            ("armature.extrude_move", {**params.tool_maybe_tweak_event, **params.tool_modifier},
              {"properties": [("TRANSFORM_OT_translate", [("release_confirm", True)])]}),
         ]},
     )
@@ -6647,7 +6673,12 @@ def km_3d_view_tool_interactive_add(params):
         "3D View Tool: Object, Add Primitive",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("view3d.interactive_add", {"type": params.tool_tweak, "value": 'ANY', "any": True},
+            ("view3d.interactive_add",
+             {**params.tool_maybe_tweak_event,
+              # While "Alt" isn't an important shortcut to support,
+              # when the preferences to activate tools when "Alt" is held is used,
+              # it's illogical not to support holding "Alt", even though it is not required.
+              **({"any": True} if "alt" in params.tool_modifier else any_except("alt"))},
              {"properties": [("wait_for_input", False)]}),
         ]},
     )
@@ -6658,7 +6689,7 @@ def km_3d_view_tool_edit_mesh_extrude_region(params):
         "3D View Tool: Edit Mesh, Extrude Region",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("mesh.extrude_context_move", {"type": params.tool_tweak, "value": 'ANY', **params.tool_modifier},
+            ("mesh.extrude_context_move", {**params.tool_maybe_tweak_event, **params.tool_modifier},
              {"properties": [("TRANSFORM_OT_translate", [("release_confirm", True)])]}),
         ]},
     )
@@ -6669,7 +6700,7 @@ def km_3d_view_tool_edit_mesh_extrude_manifold(params):
         "3D View Tool: Edit Mesh, Extrude Manifold",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("mesh.extrude_manifold", {"type": params.tool_tweak, "value": 'ANY', **params.tool_modifier},
+            ("mesh.extrude_manifold", {**params.tool_maybe_tweak_event, **params.tool_modifier},
              {"properties": [
                  ("MESH_OT_extrude_region", [("use_dissolve_ortho_edges", True)]),
                  ("TRANSFORM_OT_translate", [
@@ -6688,7 +6719,7 @@ def km_3d_view_tool_edit_mesh_extrude_along_normals(params):
         "3D View Tool: Edit Mesh, Extrude Along Normals",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("mesh.extrude_region_shrink_fatten", {"type": params.tool_tweak, "value": 'ANY', **params.tool_modifier},
+            ("mesh.extrude_region_shrink_fatten", {**params.tool_maybe_tweak_event, **params.tool_modifier},
              {"properties": [("TRANSFORM_OT_shrink_fatten", [("release_confirm", True)])]}),
         ]},
     )
@@ -6699,7 +6730,7 @@ def km_3d_view_tool_edit_mesh_extrude_individual(params):
         "3D View Tool: Edit Mesh, Extrude Individual",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("mesh.extrude_faces_move", {"type": params.tool_tweak, "value": 'ANY', **params.tool_modifier},
+            ("mesh.extrude_faces_move", {**params.tool_maybe_tweak_event, **params.tool_modifier},
              {"properties": [("TRANSFORM_OT_shrink_fatten", [("release_confirm", True)])]}),
         ]},
     )
@@ -6721,7 +6752,7 @@ def km_3d_view_tool_edit_mesh_inset_faces(params):
         "3D View Tool: Edit Mesh, Inset Faces",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("mesh.inset", {"type": params.tool_tweak, "value": 'ANY', **params.tool_modifier},
+            ("mesh.inset", {**params.tool_maybe_tweak_event, **params.tool_modifier},
              {"properties": [("release_confirm", True)]}),
         ]},
     )
@@ -6732,7 +6763,7 @@ def km_3d_view_tool_edit_mesh_bevel(params):
         "3D View Tool: Edit Mesh, Bevel",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("mesh.bevel", {"type": params.tool_tweak, "value": 'ANY', **params.tool_modifier},
+            ("mesh.bevel", {**params.tool_maybe_tweak_event, **params.tool_modifier},
              {"properties": [("release_confirm", True)]}),
         ]},
     )
@@ -6779,7 +6810,7 @@ def km_3d_view_tool_edit_mesh_bisect(params):
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
             # No need for `tool_modifier` since this takes all input.
-            ("mesh.bisect", {"type": params.tool_tweak, "value": 'ANY'}, None),
+            ("mesh.bisect", params.tool_maybe_tweak_event, None),
         ]},
     )
 
@@ -6804,7 +6835,7 @@ def km_3d_view_tool_edit_mesh_spin(params):
         "3D View Tool: Edit Mesh, Spin",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("mesh.spin", {"type": params.tool_tweak, "value": 'ANY', **params.tool_modifier}, None),
+            ("mesh.spin", {**params.tool_maybe_tweak_event, **params.tool_modifier}, None),
         ]},
     )
 
@@ -6814,7 +6845,7 @@ def km_3d_view_tool_edit_mesh_spin_duplicate(params):
         "3D View Tool: Edit Mesh, Spin Duplicates",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("mesh.spin", {"type": params.tool_tweak, "value": 'ANY', **params.tool_modifier},
+            ("mesh.spin", {**params.tool_maybe_tweak_event, **params.tool_modifier},
              {"properties": [("dupli", True)]}),
         ]},
     )
@@ -6825,7 +6856,7 @@ def km_3d_view_tool_edit_mesh_smooth(params):
         "3D View Tool: Edit Mesh, Smooth",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("mesh.vertices_smooth", {"type": params.tool_tweak, "value": 'ANY', **params.tool_modifier},
+            ("mesh.vertices_smooth", {**params.tool_maybe_tweak_event, **params.tool_modifier},
              {"properties": [("wait_for_input", False)]}),
         ]},
     )
@@ -6836,7 +6867,7 @@ def km_3d_view_tool_edit_mesh_randomize(params):
         "3D View Tool: Edit Mesh, Randomize",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("transform.vertex_random", {"type": params.tool_tweak, "value": 'ANY', **params.tool_modifier},
+            ("transform.vertex_random", {**params.tool_maybe_tweak_event, **params.tool_modifier},
              {"properties": [("wait_for_input", False)]}),
         ]},
     )
@@ -6847,7 +6878,7 @@ def km_3d_view_tool_edit_mesh_edge_slide(params):
         "3D View Tool: Edit Mesh, Edge Slide",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("transform.edge_slide", {"type": params.tool_tweak, "value": 'ANY', **params.tool_modifier},
+            ("transform.edge_slide", {**params.tool_maybe_tweak_event, **params.tool_modifier},
              {"properties": [("release_confirm", True)]}),
         ]},
     )
@@ -6858,7 +6889,7 @@ def km_3d_view_tool_edit_mesh_vertex_slide(params):
         "3D View Tool: Edit Mesh, Vertex Slide",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("transform.vert_slide", {"type": params.tool_tweak, "value": 'ANY', **params.tool_modifier},
+            ("transform.vert_slide", {**params.tool_maybe_tweak_event, **params.tool_modifier},
              {"properties": [("release_confirm", True)]}),
         ]},
     )
@@ -6869,7 +6900,7 @@ def km_3d_view_tool_edit_mesh_shrink_fatten(params):
         "3D View Tool: Edit Mesh, Shrink/Fatten",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("transform.shrink_fatten", {"type": params.tool_tweak, "value": 'ANY', **params.tool_modifier},
+            ("transform.shrink_fatten", {**params.tool_maybe_tweak_event, **params.tool_modifier},
              {"properties": [("release_confirm", True)]}),
         ]},
     )
@@ -6880,7 +6911,7 @@ def km_3d_view_tool_edit_mesh_push_pull(params):
         "3D View Tool: Edit Mesh, Push/Pull",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("transform.push_pull", {"type": params.tool_tweak, "value": 'ANY', **params.tool_modifier},
+            ("transform.push_pull", {**params.tool_maybe_tweak_event, **params.tool_modifier},
              {"properties": [("release_confirm", True)]}),
         ]},
     )
@@ -6891,7 +6922,7 @@ def km_3d_view_tool_edit_mesh_to_sphere(params):
         "3D View Tool: Edit Mesh, To Sphere",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("transform.tosphere", {"type": params.tool_tweak, "value": 'ANY', **params.tool_modifier},
+            ("transform.tosphere", {**params.tool_maybe_tweak_event, **params.tool_modifier},
              {"properties": [("release_confirm", True)]}),
         ]},
     )
@@ -6902,7 +6933,7 @@ def km_3d_view_tool_edit_mesh_rip_region(params):
         "3D View Tool: Edit Mesh, Rip Region",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("mesh.rip_move", {"type": params.tool_tweak, "value": 'ANY', **params.tool_modifier},
+            ("mesh.rip_move", {**params.tool_maybe_tweak_event, **params.tool_modifier},
              {"properties": [("TRANSFORM_OT_translate", [("release_confirm", True)])]}),
         ]},
     )
@@ -6913,7 +6944,7 @@ def km_3d_view_tool_edit_mesh_rip_edge(params):
         "3D View Tool: Edit Mesh, Rip Edge",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("mesh.rip_edge_move", {"type": params.tool_tweak, "value": 'ANY', **params.tool_modifier},
+            ("mesh.rip_edge_move", {**params.tool_maybe_tweak_event, **params.tool_modifier},
              {"properties": [("TRANSFORM_OT_translate", [("release_confirm", True)])]}),
         ]},
     )
@@ -6936,7 +6967,7 @@ def km_3d_view_tool_edit_curve_tilt(params):
         "3D View Tool: Edit Curve, Tilt",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("transform.tilt", {"type": params.tool_tweak, "value": 'ANY', **params.tool_modifier},
+            ("transform.tilt", {**params.tool_maybe_tweak_event, **params.tool_modifier},
              {"properties": [("release_confirm", True)]}),
         ]},
     )
@@ -6947,7 +6978,7 @@ def km_3d_view_tool_edit_curve_radius(params):
         "3D View Tool: Edit Curve, Radius",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("transform.transform", {"type": params.tool_tweak, "value": 'ANY', **params.tool_modifier},
+            ("transform.transform", {**params.tool_maybe_tweak_event, **params.tool_modifier},
              {"properties": [("mode", 'CURVE_SHRINKFATTEN'), ("release_confirm", True)]}),
         ]},
     )
@@ -6958,7 +6989,7 @@ def km_3d_view_tool_edit_curve_randomize(params):
         "3D View Tool: Edit Curve, Randomize",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("transform.vertex_random", {"type": params.tool_tweak, "value": 'ANY', **params.tool_modifier},
+            ("transform.vertex_random", {**params.tool_maybe_tweak_event, **params.tool_modifier},
              {"properties": [("wait_for_input", False)]}),
         ]},
     )
@@ -6969,7 +7000,7 @@ def km_3d_view_tool_edit_curve_extrude(params):
         "3D View Tool: Edit Curve, Extrude",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("curve.extrude_move", {"type": params.tool_tweak, "value": 'ANY', **params.tool_modifier},
+            ("curve.extrude_move", {**params.tool_maybe_tweak_event, **params.tool_modifier},
              {"properties": [("TRANSFORM_OT_translate", [("release_confirm", True)])]}),
         ]},
     )
@@ -6991,9 +7022,9 @@ def km_3d_view_tool_sculpt_box_hide(params):
         "3D View Tool: Sculpt, Box Hide",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("paint.hide_show", {"type": params.tool_tweak, "value": 'ANY'},
+            ("paint.hide_show", params.tool_maybe_tweak_event,
              {"properties": [("action", 'HIDE')]}),
-            ("paint.hide_show", {"type": params.tool_tweak, "value": 'ANY', "ctrl": True},
+            ("paint.hide_show", {**params.tool_maybe_tweak_event, "ctrl": True},
              {"properties": [("action", 'SHOW')]}),
             ("paint.hide_show", {"type": params.select_mouse, "value": params.select_mouse_value},
              {"properties": [("action", 'SHOW'), ("area", 'ALL')]}),
@@ -7006,9 +7037,9 @@ def km_3d_view_tool_sculpt_box_mask(params):
         "3D View Tool: Sculpt, Box Mask",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("paint.mask_box_gesture", {"type": params.tool_tweak, "value": 'ANY'},
+            ("paint.mask_box_gesture", params.tool_maybe_tweak_event,
              {"properties": [("value", 1.0)]}),
-            ("paint.mask_box_gesture", {"type": params.tool_tweak, "value": 'ANY', "ctrl": True},
+            ("paint.mask_box_gesture", {**params.tool_maybe_tweak_event, "ctrl": True},
              {"properties": [("value", 0.0)]}),
         ]},
     )
@@ -7019,9 +7050,9 @@ def km_3d_view_tool_sculpt_lasso_mask(params):
         "3D View Tool: Sculpt, Lasso Mask",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("paint.mask_lasso_gesture", {"type": params.tool_tweak, "value": 'ANY'},
+            ("paint.mask_lasso_gesture", params.tool_maybe_tweak_event,
              {"properties": [("value", 1.0)]}),
-            ("paint.mask_lasso_gesture", {"type": params.tool_tweak, "value": 'ANY', "ctrl": True},
+            ("paint.mask_lasso_gesture", {**params.tool_maybe_tweak_event, "ctrl": True},
              {"properties": [("value", 0.0)]}),
         ]},
     )
@@ -7032,8 +7063,7 @@ def km_3d_view_tool_sculpt_box_face_set(params):
         "3D View Tool: Sculpt, Box Face Set",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("sculpt.face_set_box_gesture", {"type": params.tool_tweak, "value": 'ANY'},
-             None),
+            ("sculpt.face_set_box_gesture", params.tool_maybe_tweak_event, None),
         ]},
     )
 
@@ -7043,8 +7073,7 @@ def km_3d_view_tool_sculpt_lasso_face_set(params):
         "3D View Tool: Sculpt, Lasso Face Set",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("sculpt.face_set_lasso_gesture", {"type": params.tool_tweak, "value": 'ANY'},
-             None),
+            ("sculpt.face_set_lasso_gesture", params.tool_maybe_tweak_event, None),
         ]},
     )
 
@@ -7054,8 +7083,7 @@ def km_3d_view_tool_sculpt_box_trim(params):
         "3D View Tool: Sculpt, Box Trim",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("sculpt.trim_box_gesture", {"type": params.tool_tweak, "value": 'ANY'},
-             None),
+            ("sculpt.trim_box_gesture", params.tool_maybe_tweak_event, None),
         ]},
     )
 
@@ -7065,8 +7093,7 @@ def km_3d_view_tool_sculpt_lasso_trim(params):
         "3D View Tool: Sculpt, Lasso Trim",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("sculpt.trim_lasso_gesture", {"type": params.tool_tweak, "value": 'ANY'},
-             None),
+            ("sculpt.trim_lasso_gesture", params.tool_maybe_tweak_event, None),
         ]},
     )
 
@@ -7076,9 +7103,9 @@ def km_3d_view_tool_sculpt_line_mask(params):
         "3D View Tool: Sculpt, Line Mask",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("paint.mask_line_gesture", {"type": params.tool_tweak, "value": 'ANY'},
+            ("paint.mask_line_gesture", params.tool_maybe_tweak_event,
              {"properties": [("value", 1.0)]}),
-            ("paint.mask_line_gesture", {"type": params.tool_tweak, "value": 'ANY', "ctrl": True},
+            ("paint.mask_line_gesture", {**params.tool_maybe_tweak_event, "ctrl": True},
              {"properties": [("value", 0.0)]}),
         ]},
     )
@@ -7089,8 +7116,7 @@ def km_3d_view_tool_sculpt_line_project(params):
         "3D View Tool: Sculpt, Line Project",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("sculpt.project_line_gesture", {"type": params.tool_tweak, "value": 'ANY'},
-             None),
+            ("sculpt.project_line_gesture", params.tool_maybe_tweak_event, None),
         ]},
     )
 
@@ -7100,8 +7126,7 @@ def km_3d_view_tool_sculpt_mesh_filter(params):
         "3D View Tool: Sculpt, Mesh Filter",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("sculpt.mesh_filter", {"type": params.tool_tweak, "value": 'ANY'},
-             None)
+            ("sculpt.mesh_filter", params.tool_maybe_tweak_event, None)
         ]},
     )
 
@@ -7111,8 +7136,7 @@ def km_3d_view_tool_sculpt_cloth_filter(params):
         "3D View Tool: Sculpt, Cloth Filter",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("sculpt.cloth_filter", {"type": params.tool_tweak, "value": 'ANY'},
-             None)
+            ("sculpt.cloth_filter", params.tool_maybe_tweak_event, None)
         ]},
     )
 
@@ -7122,8 +7146,7 @@ def km_3d_view_tool_sculpt_color_filter(params):
         "3D View Tool: Sculpt, Color Filter",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("sculpt.color_filter", {"type": params.tool_tweak, "value": 'ANY'},
-             None)
+            ("sculpt.color_filter", params.tool_maybe_tweak_event, None)
         ]},
     )
 
@@ -7177,7 +7200,7 @@ def km_3d_view_tool_paint_weight_gradient(params):
         "3D View Tool: Paint Weight, Gradient",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("paint.weight_gradient", {"type": params.tool_tweak, "value": 'ANY'}, None),
+            ("paint.weight_gradient", params.tool_maybe_tweak_event, None),
         ]},
     )
 
@@ -7187,7 +7210,7 @@ def km_3d_view_tool_paint_gpencil_line(params):
         "3D View Tool: Paint Gpencil, Line",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("gpencil.primitive_line", {"type": params.tool_tweak, "value": 'ANY'},
+            ("gpencil.primitive_line", params.tool_maybe_tweak_event,
              {"properties": [("wait_for_input", False)]}),
             ("gpencil.primitive_line", {"type": 'LEFTMOUSE', "value": 'PRESS', "shift": True},
              {"properties": [("wait_for_input", False)]}),
@@ -7204,7 +7227,7 @@ def km_3d_view_tool_paint_gpencil_polyline(params):
         "3D View Tool: Paint Gpencil, Polyline",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("gpencil.primitive_polyline", {"type": params.tool_tweak, "value": 'ANY'},
+            ("gpencil.primitive_polyline", params.tool_maybe_tweak_event,
              {"properties": [("wait_for_input", False)]}),
             ("gpencil.primitive_polyline", {"type": 'LEFTMOUSE', "value": 'PRESS', "shift": True},
              {"properties": [("wait_for_input", False)]}),
@@ -7219,7 +7242,7 @@ def km_3d_view_tool_paint_gpencil_box(params):
         "3D View Tool: Paint Gpencil, Box",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("gpencil.primitive_box", {"type": params.tool_tweak, "value": 'ANY'},
+            ("gpencil.primitive_box", params.tool_maybe_tweak_event,
              {"properties": [("wait_for_input", False)]}),
             ("gpencil.primitive_box", {"type": 'LEFTMOUSE', "value": 'PRESS', "shift": True},
              {"properties": [("wait_for_input", False)]}),
@@ -7236,7 +7259,7 @@ def km_3d_view_tool_paint_gpencil_circle(params):
         "3D View Tool: Paint Gpencil, Circle",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("gpencil.primitive_circle", {"type": params.tool_tweak, "value": 'ANY'},
+            ("gpencil.primitive_circle", params.tool_maybe_tweak_event,
              {"properties": [("wait_for_input", False)]}),
             ("gpencil.primitive_circle", {"type": 'LEFTMOUSE', "value": 'PRESS', "shift": True},
              {"properties": [("wait_for_input", False)]}),
@@ -7253,7 +7276,7 @@ def km_3d_view_tool_paint_gpencil_arc(params):
         "3D View Tool: Paint Gpencil, Arc",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("gpencil.primitive_curve", {"type": params.tool_tweak, "value": 'ANY'},
+            ("gpencil.primitive_curve", params.tool_maybe_tweak_event,
              {"properties": [("type", 'ARC'), ("wait_for_input", False)]}),
             ("gpencil.primitive_curve", {"type": 'LEFTMOUSE', "value": 'PRESS', "shift": True},
              {"properties": [("type", 'ARC'), ("wait_for_input", False)]}),
@@ -7270,7 +7293,7 @@ def km_3d_view_tool_paint_gpencil_curve(params):
         "3D View Tool: Paint Gpencil, Curve",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("gpencil.primitive_curve", {"type": params.tool_tweak, "value": 'ANY'},
+            ("gpencil.primitive_curve", params.tool_maybe_tweak_event,
              {"properties": [("type", 'CURVE'), ("wait_for_input", False)]}),
             # Lasso select
             ("gpencil.select_lasso", {"type": params.action_tweak, "value": 'ANY', "ctrl": True, "alt": True}, None),
@@ -7310,7 +7333,7 @@ def km_3d_view_tool_paint_gpencil_interpolate(params):
         "3D View Tool: Paint Gpencil, Interpolate",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("gpencil.interpolate", {"type": params.tool_tweak, "value": 'ANY'},
+            ("gpencil.interpolate", params.tool_maybe_tweak_event,
              {"properties": [("release_confirm", True)]}),
         ]},
     )
@@ -7335,7 +7358,8 @@ def km_3d_view_tool_edit_gpencil_select_box(params, *, fallback):
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
             *([] if (fallback and not params.use_fallback_tool) else _template_items_tool_select_actions(
-                "gpencil.select_box", type=params.select_tweak if fallback else params.tool_tweak, value='ANY')),
+                "gpencil.select_box",
+                **({"type": params.select_tweak, "value": 'ANY'} if fallback else params.tool_maybe_tweak_event))),
             *_template_view3d_gpencil_select_for_fallback(params, fallback),
         ]},
     )
@@ -7365,8 +7389,7 @@ def km_3d_view_tool_edit_gpencil_select_lasso(params, *, fallback):
         {"items": [
             *([] if (fallback and not params.use_fallback_tool) else _template_items_tool_select_actions(
                 "gpencil.select_lasso",
-                type=params.select_tweak if fallback else params.tool_tweak,
-                value='ANY')),
+                **({"type": params.select_tweak, "value": 'ANY'} if fallback else params.tool_maybe_tweak_event))),
             *_template_view3d_gpencil_select_for_fallback(params, fallback),
         ]}
     )
@@ -7377,7 +7400,7 @@ def km_3d_view_tool_edit_gpencil_extrude(params):
         "3D View Tool: Edit Gpencil, Extrude",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("gpencil.extrude_move", {"type": params.tool_tweak, "value": 'ANY', **params.tool_modifier}, None),
+            ("gpencil.extrude_move", {**params.tool_maybe_tweak_event, **params.tool_modifier}, None),
         ]},
     )
 
@@ -7388,7 +7411,7 @@ def km_3d_view_tool_edit_gpencil_radius(params):
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
             # No need for `tool_modifier` since this takes all input.
-            ("transform.transform", {"type": params.tool_tweak, "value": 'ANY'},
+            ("transform.transform", params.tool_maybe_tweak_event,
              {"properties": [("mode", 'GPENCIL_SHRINKFATTEN'), ("release_confirm", True)]}),
         ]},
     )
@@ -7400,7 +7423,7 @@ def km_3d_view_tool_edit_gpencil_bend(params):
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
             # No need for `tool_modifier` since this takes all input.
-            ("transform.bend", {"type": params.tool_tweak, "value": 'ANY'},
+            ("transform.bend", params.tool_maybe_tweak_event,
              {"properties": [("release_confirm", True)]}),
         ]},
     )
@@ -7412,7 +7435,7 @@ def km_3d_view_tool_edit_gpencil_shear(params):
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
             # No need for `tool_modifier` since this takes all input.
-            ("transform.shear", {"type": params.tool_tweak, "value": 'ANY'},
+            ("transform.shear", params.tool_maybe_tweak_event,
              {"properties": [("release_confirm", True)]}),
         ]},
     )
@@ -7424,7 +7447,7 @@ def km_3d_view_tool_edit_gpencil_to_sphere(params):
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
             # No need for `tool_modifier` since this takes all input.
-            ("transform.tosphere", {"type": params.tool_tweak, "value": 'ANY'},
+            ("transform.tosphere", params.tool_maybe_tweak_event,
              {"properties": [("release_confirm", True)]}),
         ]},
     )
@@ -7436,7 +7459,7 @@ def km_3d_view_tool_edit_gpencil_transform_fill(params):
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
             # No need for `tool_modifier` since this takes all input.
-            ("gpencil.transform_fill", {"type": params.tool_tweak, "value": 'ANY'},
+            ("gpencil.transform_fill", params.tool_maybe_tweak_event,
              {"properties": [("release_confirm", True)]}),
         ]},
     )
@@ -7447,7 +7470,7 @@ def km_3d_view_tool_edit_gpencil_interpolate(params):
         "3D View Tool: Edit Gpencil, Interpolate",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("gpencil.interpolate", {"type": params.tool_tweak, "value": 'ANY'},
+            ("gpencil.interpolate", params.tool_maybe_tweak_event,
              {"properties": [("release_confirm", True)]}),
         ]},
     )
@@ -7465,7 +7488,7 @@ def km_3d_view_tool_sculpt_gpencil_select_box(params):
     return (
         "3D View Tool: Sculpt Gpencil, Select Box",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
-        {"items": _template_items_tool_select_actions("gpencil.select_box", type=params.tool_tweak, value='ANY')},
+        {"items": _template_items_tool_select_actions("gpencil.select_box", **params.tool_maybe_tweak_event)},
     )
 
 
@@ -7484,7 +7507,7 @@ def km_3d_view_tool_sculpt_gpencil_select_lasso(params):
     return (
         "3D View Tool: Sculpt Gpencil, Select Lasso",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
-        {"items": _template_items_tool_select_actions("gpencil.select_lasso", type=params.tool_tweak, value='ANY')},
+        {"items": _template_items_tool_select_actions("gpencil.select_lasso", **params.tool_maybe_tweak_event)},
     )
 
 
@@ -7507,7 +7530,7 @@ def km_sequencer_editor_tool_select_box(params, *, fallback):
         {"space_type": 'SEQUENCE_EDITOR', "region_type": 'WINDOW'},
         {"items": [
             *_template_items_tool_select_actions_simple(
-                "sequencer.select_box", type=params.tool_tweak, value='ANY',
+                "sequencer.select_box", **params.tool_maybe_tweak_event,
                 properties=[("tweak", params.select_mouse == 'LEFTMOUSE')],
             ),
             # RMB select can already set the frame, match the tweak tool.
@@ -7548,7 +7571,7 @@ def km_sequencer_editor_tool_move(params):
         "Sequencer Tool: Move",
         {"space_type": 'SEQUENCE_EDITOR', "region_type": 'WINDOW'},
         {"items": [
-            ("transform.translate", {"type": params.tool_tweak, "value": 'ANY'},
+            ("transform.translate", params.tool_maybe_tweak_event,
              {"properties": [("release_confirm", True)]}),
         ]},
     )
@@ -7559,7 +7582,7 @@ def km_sequencer_editor_tool_rotate(params):
         "Sequencer Tool: Rotate",
         {"space_type": 'SEQUENCE_EDITOR', "region_type": 'WINDOW'},
         {"items": [
-            ("transform.rotate", {"type": params.tool_tweak, "value": 'ANY'},
+            ("transform.rotate", params.tool_maybe_tweak_event,
              {"properties": [("release_confirm", True)]}),
         ]},
     )
@@ -7570,7 +7593,7 @@ def km_sequencer_editor_tool_scale(params):
         "Sequencer Tool: Scale",
         {"space_type": 'SEQUENCE_EDITOR', "region_type": 'WINDOW'},
         {"items": [
-            ("transform.resize", {"type": params.tool_tweak, "value": 'ANY'},
+            ("transform.resize", params.tool_maybe_tweak_event,
              {"properties": [("release_confirm", True)]}),
         ]},
     )
