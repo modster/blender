@@ -94,6 +94,7 @@
 #include "FN_field.hh"
 #include "FN_multi_function.hh"
 
+using blender::Array;
 using blender::ColorGeometry4f;
 using blender::destruct_ptr;
 using blender::float3;
@@ -304,6 +305,12 @@ static bool logging_enabled(const ModifierEvalContext *ctx)
 static const std::string use_attribute_suffix = "_use_attribute";
 static const std::string attribute_name_suffix = "_attribute_name";
 
+/* TODO: Use a better check for this. */
+static bool socket_type_can_be_attribute(const bNodeSocket &socket)
+{
+  return ELEM(socket.type, SOCK_FLOAT, SOCK_VECTOR, SOCK_BOOLEAN, SOCK_RGBA, SOCK_INT);
+}
+
 /**
  * \return Whether using an attribute to input values of this type is supported.
  */
@@ -315,6 +322,27 @@ static bool input_has_attribute_toggle(const bNodeTree &node_tree, const int soc
   BLI_assert(node_tree.field_inferencing_interface != nullptr);
   const FieldInferencingInterface &field_interface = *node_tree.field_inferencing_interface;
   return field_interface.inputs[socket_index] != InputSocketFieldType::None;
+}
+
+static Array<bool> inputs_use_attribute(const bNodeTree &node_tree, const NodesModifierData &nmd)
+{
+  Vector<bNodeSocket *> inputs = node_tree.inputs;
+  Array<bool> result(inputs.size(), false);
+  for (const int i : inputs.index_range()) {
+    if (!input_has_attribute_toggle(node_tree, i)) {
+      continue;
+    }
+    const std::string use_attribute_prop_name = inputs[i]->identifier + use_attribute_suffix;
+    const IDProperty *use_attribute_prop = IDP_GetPropertyFromGroup(
+        nmd.settings.properties, use_attribute_prop_name.c_str());
+    if (use_attribute_prop == nullptr) {
+      continue;
+    }
+    if (IDP_Int(use_attribute_prop) != 0) {
+      result[i] = true;
+    }
+  }
+  return result;
 }
 
 static IDProperty *id_property_create_from_socket(const bNodeSocket &socket)
@@ -791,14 +819,44 @@ static void clear_runtime_data(NodesModifierData *nmd)
   }
 }
 
+/* TODO: Somehow choose which domain to use. */
+static void evalaute_attributes_on_result_component(GeometryComponent &component,
+                                                    Span<GMutablePointer> attribute_outputs)
+{
+  GeometryComponentFieldContext field_context{component, ATTR_DOMAIN_POINT};
+  const int domain_size = component.attribute_domain_size(domain);
+  const IndexMask mask{IndexMask(domain_size)};
+
+  const CustomDataType data_type = bke::cpp_type_to_custom_data_type(field.cpp_type());
+  OutputAttribute output_attribute = component.attribute_try_get_for_output_only(
+      attribute_id, domain, data_type);
+
+  fn::FieldEvaluator evaluator{field_context, domain_size};
+  evaluator.add_with_destination(field, output_attribute.varray());
+  evaluator.evaluate();
+
+  output_attribute.save();
+}
+
+static void evaluate_attributes_on_result_geometry(GeometrySet &geometry_set,
+                                                   Span<GMutablePointer> attribute_outputs)
+{
+  for (const GeometryComponentType type :
+       {GEO_COMPONENT_TYPE_MESH, GEO_COMPONENT_TYPE_POINT_CLOUD, GEO_COMPONENT_TYPE_CURVE}) {
+    if (geometry_set.has(type)) {
+      GeometryComponent &component = geometry_set.get_component_for_write(type);
+      evalaute_attributes_on_result_component(component, attribute_outputs);
+    }
+  }
+}
+
 /**
  * Evaluate a node group to compute the output geometry.
- * Currently, this uses a fairly basic and inefficient algorithm that might compute things more
- * often than necessary. It's going to be replaced soon.
  */
 static GeometrySet compute_geometry(const DerivedNodeTree &tree,
                                     Span<const NodeRef *> group_input_nodes,
-                                    const InputSocketRef &socket_to_compute,
+                                    const InputSocketRef &result_geometry_socket,
+                                    Span<const InputSocketRef *> attribute_output_sockets,
                                     GeometrySet input_geometry_set,
                                     NodesModifierData *nmd,
                                     const ModifierEvalContext *ctx)
@@ -841,7 +899,10 @@ static GeometrySet compute_geometry(const DerivedNodeTree &tree,
   input_geometry_set.clear();
 
   Vector<DInputSocket> group_outputs;
-  group_outputs.append({root_context, &socket_to_compute});
+  group_outputs.append({root_context, &result_geometry_socket});
+  for (const InputSocketRef *attribute_output : attribute_output_sockets) {
+    group_outputs.append({root_context, attribute_output});
+  }
 
   std::optional<geo_log::GeoLogger> geo_logger;
 
@@ -869,9 +930,13 @@ static GeometrySet compute_geometry(const DerivedNodeTree &tree,
     nmd_orig->runtime_eval_log = new geo_log::ModifierLog(*geo_logger);
   }
 
-  BLI_assert(eval_params.r_output_values.size() == 1);
-  GMutablePointer result = eval_params.r_output_values[0];
-  return result.relocate_out<GeometrySet>();
+  BLI_assert(eval_params.r_output_values.size() >= 1);
+  GeometrySet geometry_set = eval_params.r_output_values[0].relocate_out<GeometrySet>();
+
+  evaluate_attributes_on_result_geometry(geometry_set,
+                                         eval_params.r_output_values.as_span().drop_front(1));
+
+  return geometry_set;
 }
 
 /**
@@ -952,13 +1017,27 @@ static void modifyGeometry(ModifierData *md,
     return;
   }
 
-  const InputSocketRef *group_output = group_outputs[0];
-  if (group_output->idname() != "NodeSocketGeometry") {
+  const InputSocketRef &first_group_output = *group_outputs[0];
+  if (first_group_output.idname() != "NodeSocketGeometry") {
     return;
   }
 
-  geometry_set = compute_geometry(
-      tree, input_nodes, *group_outputs[0], std::move(geometry_set), nmd, ctx);
+  /* TODO: Only add outputs that can be attributes and only outputs that have a corresponding name
+   * to put the data in. */
+  Vector<const InputSocketRef *> attribute_output_sockets;
+  for (const InputSocketRef *group_output : group_outputs) {
+    if (socket_type_can_be_attribute(*group_output->bsocket())) {
+      attribute_output_sockets.append(group_output);
+    }
+  }
+
+  geometry_set = compute_geometry(tree,
+                                  input_nodes,
+                                  first_group_output,
+                                  attribute_output_sockets,
+                                  std::move(geometry_set),
+                                  nmd,
+                                  ctx);
 }
 
 static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *mesh)
@@ -1133,9 +1212,27 @@ static void panel_draw(const bContext *C, Panel *panel)
   modifier_panel_end(layout, ptr);
 }
 
+static void output_attributes_panel_draw(const bContext *C, Panel *panel)
+{
+  uiLayout *layout = panel->layout;
+  Main *bmain = CTX_data_main(C);
+
+  PointerRNA *ptr = modifier_panel_get_property_pointers(panel, nullptr);
+  NodesModifierData *nmd = static_cast<NodesModifierData *>(ptr->data);
+
+  uiLayoutSetPropSep(layout, true);
+  uiLayoutSetPropDecorate(layout, true);
+}
+
 static void panelRegister(ARegionType *region_type)
 {
-  modifier_panel_register(region_type, eModifierType_Nodes, panel_draw);
+  PanelType *panel_type = modifier_panel_register(region_type, eModifierType_Nodes, panel_draw);
+  modifier_subpanel_register(region_type,
+                             "output_attributes",
+                             "Output Attributes",
+                             nullptr,
+                             output_attributes_panel_draw,
+                             panel_type);
 }
 
 static void blendWrite(BlendWriter *writer, const ModifierData *md)

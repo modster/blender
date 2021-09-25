@@ -100,13 +100,12 @@ static void try_capture_field_on_geometry(GeometryComponent &component,
 {
   GeometryComponentFieldContext field_context{component, domain};
   const int domain_size = component.attribute_domain_size(domain);
-  const IndexMask mask{IndexMask(domain_size)};
 
   const CustomDataType data_type = bke::cpp_type_to_custom_data_type(field.cpp_type());
   OutputAttribute output_attribute = component.attribute_try_get_for_output_only(
       attribute_id, domain, data_type);
 
-  fn::FieldEvaluator evaluator{field_context, &mask};
+  fn::FieldEvaluator evaluator{field_context, domain_size};
   evaluator.add_with_destination(field, output_attribute.varray());
   evaluator.evaluate();
 
