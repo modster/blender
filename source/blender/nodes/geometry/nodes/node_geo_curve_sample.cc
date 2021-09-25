@@ -28,12 +28,12 @@ namespace blender::nodes {
 static void geo_node_curve_sample_declare(NodeDeclarationBuilder &b)
 {
   b.add_input<decl::Geometry>("Curve");
-  b.add_input<decl::Float>("Factor").min(0.0f).max(1.0f).subtype(PROP_FACTOR);
-  b.add_input<decl::Float>("Length").min(0.0f).subtype(PROP_DISTANCE);
+  b.add_input<decl::Float>("Factor").min(0.0f).max(1.0f).subtype(PROP_FACTOR).supports_field();
+  b.add_input<decl::Float>("Length").min(0.0f).subtype(PROP_DISTANCE).supports_field();
 
-  b.add_output<decl::Vector>("Position");
-  b.add_output<decl::Vector>("Tangent");
-  b.add_output<decl::Vector>("Normal");
+  b.add_output<decl::Vector>("Position").dependent_field();
+  b.add_output<decl::Vector>("Tangent").dependent_field();
+  b.add_output<decl::Vector>("Normal").dependent_field();
 }
 
 static void geo_node_curve_sample_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
@@ -155,7 +155,7 @@ class SampleCurveFunction : public fn::MultiFunction {
       spline_indices[i] = std::max(index, 0);
     }
 
-    /* Storing lookups in an array is unecessary but will simplify custom attribute transfer. */
+    /* Storing lookups in an array is unnecessary but will simplify custom attribute transfer. */
     Array<Spline::LookupResult> lookups(mask.min_array_size());
     for (const int i : mask) {
       const float length_in_spline = lengths[i] - spline_lengths_[spline_indices[i]];

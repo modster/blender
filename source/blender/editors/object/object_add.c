@@ -1322,6 +1322,7 @@ static int object_gpencil_add_exec(bContext *C, wmOperator *op)
   const bool use_in_front = RNA_boolean_get(op->ptr, "use_in_front");
   const bool use_lights = RNA_boolean_get(op->ptr, "use_lights");
   const int stroke_depth_order = RNA_enum_get(op->ptr, "stroke_depth_order");
+  const float stroke_offset = RNA_float_get(op->ptr, "stroke_offset");
 
   ushort local_view_bits;
   float loc[3], rot[3];
@@ -1450,6 +1451,7 @@ static int object_gpencil_add_exec(bContext *C, wmOperator *op)
         if (stroke_depth_order == GP_DRAWMODE_3D) {
           gpd->draw_mode = GP_DRAWMODE_3D;
         }
+        md->stroke_depth_offset = stroke_offset;
       }
 
       break;
@@ -1487,9 +1489,10 @@ static void object_add_ui(bContext *UNUSED(C), wmOperator *op)
     uiItemR(layout, op->ptr, "use_lights", 0, NULL, ICON_NONE);
     uiItemR(layout, op->ptr, "use_in_front", 0, NULL, ICON_NONE);
     bool in_front = RNA_boolean_get(op->ptr, "use_in_front");
-    uiLayout *row = uiLayoutRow(layout, false);
-    uiLayoutSetActive(row, !in_front);
-    uiItemR(row, op->ptr, "stroke_depth_order", 0, NULL, ICON_NONE);
+    uiLayout *col = uiLayoutColumn(layout, false);
+    uiLayoutSetActive(col, !in_front);
+    uiItemR(col, op->ptr, "stroke_offset", 0, NULL, ICON_NONE);
+    uiItemR(col, op->ptr, "stroke_depth_order", 0, NULL, ICON_NONE);
   }
 }
 
@@ -1531,6 +1534,15 @@ void OBJECT_OT_gpencil_add(wmOperatorType *ot)
                   true,
                   "Show In Front",
                   "Show line art grease pencil in front of everything");
+  RNA_def_float(ot->srna,
+                "stroke_offset",
+                0.05f,
+                0.0f,
+                0.0f,
+                "Stroke Offset",
+                "Stroke offset for the line art modifier",
+                0.0f,
+                0.5f);
   RNA_def_boolean(
       ot->srna, "use_lights", false, "Use Lights", "Use lights for this grease pencil object");
   RNA_def_enum(
