@@ -32,6 +32,7 @@
 
 #include <map>
 #include <memory>
+#include <set>
 #include <string>
 
 namespace blender::bke {
@@ -254,5 +255,21 @@ class AssetCatalog {
   /** Generate a sensible catalog ID for the given path. */
   static std::string sensible_simple_name_for_path(const CatalogPath &path);
 };
+
+/** Comparator for asset catalogs, ordering by (path, UUID). */
+struct AssetCatalogPathCmp {
+  bool operator()(const AssetCatalog *lhs, const AssetCatalog *rhs) const
+  {
+    if (lhs->path == rhs->path) {
+      return lhs->catalog_id < rhs->catalog_id;
+    }
+    return lhs->path < rhs->path;
+  }
+};
+
+/**
+ * Set that stores catalogs ordered by (path, UUID).
+ * Being a set, duplicates are removed. The catalog's simple name is ignored in this. */
+using AssetCatalogOrderedSet = std::set<const AssetCatalog *, AssetCatalogPathCmp>;
 
 }  // namespace blender::bke

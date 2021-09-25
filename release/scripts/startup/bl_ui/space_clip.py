@@ -220,7 +220,7 @@ class CLIP_HT_header(Header):
         layout.separator_spacer()
 
         if not show_region_tool_header:
-            if not sc.view == 'CLIP':
+            if sc.view == 'CLIP':
                 CLIP_HT_header.draw_xform_template(layout, context)
 
         row = layout.row()
