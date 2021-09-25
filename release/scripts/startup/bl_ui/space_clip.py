@@ -422,10 +422,10 @@ class CLIP_PT_reconstruction_panel:
 
 class CLIP_PT_tools_clip(Panel):
     bl_space_type = 'CLIP_EDITOR'
-    bl_region_type = 'TOOLS'
+    bl_region_type = 'UI'
     bl_label = "Clip"
     bl_translation_context = bpy.app.translations.contexts.id_movieclip
-    bl_category = "Track"
+    bl_category = "Footage"
 
     @classmethod
     def poll(cls, context):
@@ -1992,6 +1992,7 @@ classes = (
     CLIP_PT_marker,
     CLIP_PT_proxy,
     CLIP_PT_footage,
+    CLIP_PT_tools_clip,
     CLIP_PT_stabilization,
     CLIP_PT_2d_cursor,
     CLIP_PT_mask,
