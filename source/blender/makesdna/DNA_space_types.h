@@ -965,7 +965,10 @@ enum eFileDetails {
 typedef enum eFileSelectType {
   FILE_LOADLIB = 1,
   FILE_MAIN = 2,
+  /** Load assets from #Main. */
   FILE_MAIN_ASSET = 3,
+  /** Load assets of an asset library containing external files. */
+  FILE_ASSET_LIBRARY = 4,
 
   FILE_UNIX = 8,
   FILE_BLENDER = 8, /* don't display relative paths */
@@ -984,17 +987,17 @@ typedef enum eFileSel_Action {
  * (WM and BLO code area, see #eBLOLibLinkFlags in BLO_readfile.h).
  */
 typedef enum eFileSel_Params_Flag {
-  FILE_APPEND_SET_FAKEUSER = (1 << 0),
+  FILE_PARAMS_FLAG_UNUSED_1 = (1 << 0),
   FILE_RELPATH = (1 << 1),
   FILE_LINK = (1 << 2),
   FILE_HIDE_DOT = (1 << 3),
   FILE_AUTOSELECT = (1 << 4),
   FILE_ACTIVE_COLLECTION = (1 << 5),
-  FILE_APPEND_RECURSIVE = (1 << 6),
+  FILE_PARAMS_FLAG_UNUSED_2 = (1 << 6),
   FILE_DIRSEL_ONLY = (1 << 7),
   FILE_FILTER = (1 << 8),
-  FILE_OBDATA_INSTANCE = (1 << 9),
-  FILE_COLLECTION_INSTANCE = (1 << 10),
+  FILE_PARAMS_FLAG_UNUSED_3 = (1 << 9),
+  FILE_PARAMS_FLAG_UNUSED_4 = (1 << 10),
   FILE_SORT_INVERT = (1 << 11),
   FILE_HIDE_TOOL_PROPS = (1 << 12),
   FILE_CHECK_EXISTING = (1 << 13),

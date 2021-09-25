@@ -518,6 +518,29 @@ void do_versions_after_linking_300(Main *bmain, ReportList *UNUSED(reports))
   {
     /* Keep this block, even when empty. */
     do_versions_idproperty_ui_data(bmain);
+
+    LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
+      ToolSettings *tool_settings = scene->toolsettings;
+      ImagePaintSettings *imapaint = &tool_settings->imapaint;
+      if (imapaint->canvas != NULL &&
+          ELEM(imapaint->canvas->type, IMA_TYPE_R_RESULT, IMA_TYPE_COMPOSITE)) {
+        imapaint->canvas = NULL;
+      }
+      if (imapaint->stencil != NULL &&
+          ELEM(imapaint->stencil->type, IMA_TYPE_R_RESULT, IMA_TYPE_COMPOSITE)) {
+        imapaint->stencil = NULL;
+      }
+      if (imapaint->clone != NULL &&
+          ELEM(imapaint->clone->type, IMA_TYPE_R_RESULT, IMA_TYPE_COMPOSITE)) {
+        imapaint->clone = NULL;
+      }
+    }
+    LISTBASE_FOREACH (Brush *, brush, &bmain->brushes) {
+      if (brush->clone.image != NULL &&
+          ELEM(brush->clone.image->type, IMA_TYPE_R_RESULT, IMA_TYPE_COMPOSITE)) {
+        brush->clone.image = NULL;
+      }
+    }
   }
 }
 
@@ -785,6 +808,7 @@ static void version_geometry_nodes_change_legacy_names(bNodeTree *ntree)
     }
   }
 }
+
 static bool seq_transform_origin_set(Sequence *seq, void *UNUSED(user_data))
 {
   StripTransform *transform = seq->strip->transform;
@@ -1449,6 +1473,49 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
         if (md->type == eModifierType_Nodes) {
           version_geometry_nodes_add_attribute_input_settings((NodesModifierData *)md);
         }
+      }
+    }
+
+    LISTBASE_FOREACH (bScreen *, screen, &bmain->screens) {
+      LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
+        LISTBASE_FOREACH (SpaceLink *, sl, &area->spacedata) {
+          switch (sl->spacetype) {
+            case SPACE_FILE: {
+              SpaceFile *sfile = (SpaceFile *)sl;
+              if (sfile->params) {
+                sfile->params->flag &= ~(FILE_PARAMS_FLAG_UNUSED_1 | FILE_PARAMS_FLAG_UNUSED_2 |
+                                         FILE_PARAMS_FLAG_UNUSED_3 | FILE_PARAMS_FLAG_UNUSED_4);
+              }
+              break;
+            }
+            default:
+              break;
+          }
+        }
+      }
+    }
+
+    /* Deprecate the random float node in favor of the random float node. */
+    LISTBASE_FOREACH (bNodeTree *, ntree, &bmain->nodetrees) {
+      if (ntree->type != NTREE_GEOMETRY) {
+        continue;
+      }
+      LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
+        if (node->type != FN_NODE_LEGACY_RANDOM_FLOAT) {
+          continue;
+        }
+        if (strstr(node->idname, "Legacy")) {
+          /* Make sure we haven't changed this idname already. */
+          continue;
+        }
+
+        char temp_idname[sizeof(node->idname)];
+        BLI_strncpy(temp_idname, node->idname, sizeof(node->idname));
+
+        BLI_snprintf(node->idname,
+                     sizeof(node->idname),
+                     "FunctionNodeLegacy%s",
+                     temp_idname + strlen("FunctionNode"));
       }
     }
   }
