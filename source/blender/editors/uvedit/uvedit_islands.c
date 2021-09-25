@@ -359,28 +359,17 @@ static int bm_mesh_calc_uv_islands(const Scene *scene,
  * \{ */
 
 void ED_uvedit_pack_islands_multi(const Scene *scene,
+                                  const SpaceImage *sima,
                                   Object **objects,
                                   const uint objects_len,
-                                  const SpaceImage *sima,
-                                  bool use_target,
+                                  const bool use_target_udim,
+                                  int target_udim,
                                   const struct UVPackIsland_Params *params)
 {
   /* Align to the Y axis, could make this configurable. */
   const int rotate_align_axis = 1;
   ListBase island_list = {NULL};
   int island_list_len = 0;
-
-  const Image *image;
-  bool is_tiled_image = false;
-  int udim_grid[2] = {1, 1};
-
-  /* To handle cases where sima=NULL - Smart UV project */
-  if (sima) {
-    image = sima->image;
-    is_tiled_image = image && (image->source == IMA_SRC_TILED);
-    udim_grid[0] = sima->tile_grid_shape[0];
-    udim_grid[1] = sima->tile_grid_shape[1];
-  }
 
   for (uint ob_index = 0; ob_index < objects_len; ob_index++) {
     Object *obedit = objects[ob_index];
@@ -423,26 +412,25 @@ void ED_uvedit_pack_islands_multi(const Scene *scene,
   BoxPack *boxarray = MEM_mallocN(sizeof(*boxarray) * island_list_len, __func__);
 
   int index;
-  /* Coordinates for the center of the all the selected islands */
-  float selection_center[2] = {0.0f, 0.0f};
-  float selection_min[2], selection_max[2];
-  INIT_MINMAX2(selection_min, selection_max);
+  float selection_min_co[2], selection_max_co[2];
+  INIT_MINMAX2(selection_min_co, selection_max_co);
 
   LISTBASE_FOREACH_INDEX (struct FaceIsland *, island, &island_list, index) {
 
-    /* Calculate bounding box of all selected islands */
-    float bounds_min[2], bounds_max[2];
-    INIT_MINMAX2(bounds_min, bounds_max);
-    for (int i = 0; i < island->faces_len; i++) {
-      BMFace *f = island->faces[i];
-      BM_face_uv_minmax(f, bounds_min, bounds_max, island->cd_loop_uv_offset);
+    /* Skip calculation if not using Specified UDIM option */
+    if (!use_target_udim) {
+      float bounds_min[2], bounds_max[2];
+      INIT_MINMAX2(bounds_min, bounds_max);
+      for (int i = 0; i < island->faces_len; i++) {
+        BMFace *f = island->faces[i];
+        BM_face_uv_minmax(f, bounds_min, bounds_max, island->cd_loop_uv_offset);
+      }
+
+      selection_min_co[0] = MIN2(bounds_min[0], selection_min_co[0]);
+      selection_min_co[1] = MIN2(bounds_min[1], selection_min_co[1]);
+      selection_max_co[0] = MAX2(bounds_max[0], selection_max_co[0]);
+      selection_max_co[1] = MAX2(bounds_max[1], selection_max_co[1]);
     }
-
-    selection_min[0] = MIN2(bounds_min[0], selection_min[0]);
-    selection_min[1] = MIN2(bounds_min[1], selection_min[1]);
-    selection_max[0] = MAX2(bounds_max[0], selection_max[0]);
-    selection_max[1] = MAX2(bounds_max[1], selection_max[1]);
-
     if (params->rotate) {
       if (island->aspect_y != 1.0f) {
         bm_face_array_uv_scale_y(
@@ -475,9 +463,12 @@ void ED_uvedit_pack_islands_multi(const Scene *scene,
     }
   }
 
-  /* Calculate the center of the bounding box */
-  selection_center[0] = (selection_min[0] + selection_max[0]) / 2.0f;
-  selection_center[1] = (selection_min[1] + selection_max[1]) / 2.0f;
+  /* Center of the selected UV bounding boxes */
+  float selection_center[2];
+  if (!use_target_udim) {
+    selection_center[0] = (selection_min_co[0] + selection_max_co[0]) / 2.0f;
+    selection_center[1] = (selection_min_co[1] + selection_max_co[1]) / 2.0f;
+  }
 
   if (margin > 0.0f) {
     /* Logic matches behavior from #param_pack,
@@ -505,55 +496,109 @@ void ED_uvedit_pack_islands_multi(const Scene *scene,
   /* Tile offset */
   float base_offset[2] = {0.0f, 0.0f};
 
-  /* (sima = NULL) or (use_target = false) would skip the calculation of base_offset - Smart UV
-   * project */
-  if (use_target) {
-    const int specified_tile_index = scene->toolsettings->target_udim - 1001;
+  /* CASE: Specified UDIM */
+  if (use_target_udim) {
+    const int specified_tile_index = target_udim - 1001;
     /* Calculate offset based on specified_tile_index */
     base_offset[0] = specified_tile_index % 10;
     base_offset[1] = specified_tile_index / 10;
   }
 
-  /* If tiled image then constrain to correct/closest UDIM tile */
-  else if (sima && is_tiled_image && !use_target) {
-    int nearest_tile_index = BKE_image_find_nearest_tile(image, selection_center);
-    if (nearest_tile_index != -1) {
-      nearest_tile_index -= 1001;
-      /* Calculate offset based on nearest_tile_index */
-      base_offset[0] = nearest_tile_index % 10;
-      base_offset[1] = nearest_tile_index / 10;
-    }
-  }
+  /* CASE: Closest UDIM */
+  else {
+    const Image *image;
+    bool is_tiled_image = false;
+    int udim_grid[2] = {1, 1};
 
-  /* If no image present then constrain to correct/closest tile on UDIM grid*/
-  else if (sima && !image && !use_target) {
-    const float co_floor[2] = {floorf(selection_center[0]), floorf(selection_center[1])};
+    /* To handle cases where sima=NULL - Smart UV project in 3D viewport */
+    if (sima != NULL) {
+      image = sima->image;
+      is_tiled_image = image && (image->source == IMA_SRC_TILED);
+      udim_grid[0] = sima->tile_grid_shape[0];
+      udim_grid[1] = sima->tile_grid_shape[1];
+    }
+
+    /* Check if selection lies on a valid UDIM grid tile */
+    bool is_valid_udim = false;
+    const float selection_co_floor[2] = {floorf(selection_center[0]), floorf(selection_center[1])};
     if (selection_center[0] < udim_grid[0] && selection_center[0] > 0 &&
         selection_center[1] < udim_grid[1] && selection_center[1] > 0) {
-      base_offset[0] = co_floor[0];
-      base_offset[1] = co_floor[1];
+      base_offset[0] = selection_co_floor[0];
+      base_offset[1] = selection_co_floor[1];
+      is_valid_udim = true;
     }
-    /* If Selected UVs lie outside the UDIM grid, constrain to closest tile on UDIM grid */
-    else {
+    /* Check if selection lies on a valid UDIM image tile */
+    else if (is_tiled_image) {
+      LISTBASE_FOREACH (const ImageTile *, tile, &image->tiles) {
+        const int tile_index = tile->tile_number - 1001;
+        const int target_x = (tile_index % 10);
+        const int target_y = (tile_index / 10);
+        if (selection_co_floor[0] == target_x && selection_co_floor[1] == target_y) {
+          base_offset[0] = selection_co_floor[0];
+          base_offset[1] = selection_co_floor[1];
+          is_valid_udim = true;
+        }
+      }
+    }
+    /* Probably not required since UDIM grid checks for 1001 */
+    else if (image && !is_tiled_image) {
+      if (is_zero_v2(selection_co_floor)) {
+        base_offset[0] = selection_co_floor[0];
+        base_offset[1] = selection_co_floor[1];
+        is_valid_udim = true;
+      }
+    }
+    /* If selection doesn't lie on any UDIM then compare both closest grid tile and image tile.
+     * Save the one that is closest */
+    if (!is_valid_udim) {
+      float nearest_image_tile_co[2] = {FLT_MAX, FLT_MAX};
+      if (image) {
+        int nearest_image_tile_index = BKE_image_find_nearest_tile(image, selection_center);
+        if (nearest_image_tile_index == -1) {
+          nearest_image_tile_index = 1001;
+        }
+        /* Calculate offset based on nearest_tile_index */
+
+        nearest_image_tile_co[0] = (nearest_image_tile_index - 1001) % 10;
+        nearest_image_tile_co[1] = (nearest_image_tile_index - 1001) / 10;
+        /* + 0.5f to get tile center coordinates */
+        nearest_image_tile_co[0] += 0.5f;
+        nearest_image_tile_co[1] += 0.5f;
+      }
+
+      float nearest_grid_tile_co[2] = {0.0f, 0.0f};
       if (selection_center[0] > udim_grid[0]) {
-        base_offset[0] = udim_grid[0] - 1;
+        nearest_grid_tile_co[0] = udim_grid[0] - 1;
       }
       else if (selection_center[0] < 0) {
-        base_offset[0] = 0;
+        nearest_grid_tile_co[0] = 0;
       }
       else {
-        base_offset[0] = co_floor[0];
+        nearest_grid_tile_co[0] = selection_co_floor[0];
       }
 
       if (selection_center[1] > udim_grid[1]) {
-        base_offset[1] = udim_grid[1] - 1;
+        nearest_grid_tile_co[1] = udim_grid[1] - 1;
       }
       else if (selection_center[1] < 0) {
-        base_offset[1] = 0;
+        nearest_grid_tile_co[1] = 0;
       }
       else {
-        base_offset[1] = co_floor[1];
+        nearest_grid_tile_co[1] = selection_co_floor[1];
       }
+      /* + 0.5f to get tile center coordinates */
+      nearest_grid_tile_co[0] += 0.5f;
+      nearest_grid_tile_co[1] += 0.5f;
+
+      float nearest_image_tile_dist = len_squared_v2v2(selection_center, nearest_image_tile_co);
+      float nearest_grid_tile_dist = len_squared_v2v2(selection_center, nearest_grid_tile_co);
+
+      base_offset[0] = (nearest_image_tile_dist < nearest_grid_tile_dist) ?
+                           (nearest_image_tile_co[0] - 0.5f) :
+                           (nearest_grid_tile_co[0] - 0.5f);
+      base_offset[1] = (nearest_image_tile_dist < nearest_grid_tile_dist) ?
+                           (nearest_image_tile_co[1] - 0.5f) :
+                           (nearest_grid_tile_co[1] - 0.5f);
     }
   }
 

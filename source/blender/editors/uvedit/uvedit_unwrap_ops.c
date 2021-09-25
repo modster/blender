@@ -1021,7 +1021,6 @@ static int pack_islands_exec(bContext *C, wmOperator *op)
 
   const Image *image = sima->image;
   const bool is_tiled_image = image && (image->source == IMA_SRC_TILED);
-  bool use_target = false;
 
   const UnwrapOptions options = {
       .topology_from_uvs = true,
@@ -1041,55 +1040,9 @@ static int pack_islands_exec(bContext *C, wmOperator *op)
     return OPERATOR_CANCELLED;
   }
 
+  /* Set RNA props */
   bool rotate = RNA_boolean_get(op->ptr, "rotate");
-
-  /* Check if specified UDIM is valid - specified tile exists in the udim grid or tiled image */
-  if (RNA_enum_get(op->ptr, "packTo") == SPECIFIED_UDIM) {
-    if (RNA_struct_property_is_set(op->ptr, "target_udim")) {
-      int target_udim = RNA_int_get(op->ptr, "target_udim");
-
-      /* If no image in the UV editor then check if target_UDIM lies within the UDIM grid*/
-      if (!image) {
-        target_udim -= 1001;
-        const int target_x = (target_udim % 10) + 1;
-        const int target_y = (target_udim / 10) + 1;
-        if (target_x <= sima->tile_grid_shape[0] && target_y <= sima->tile_grid_shape[1]) {
-          scene->toolsettings->target_udim = RNA_int_get(op->ptr, "target_udim");
-        }
-        else {
-          RNA_int_set(op->ptr, "target_udim", scene->toolsettings->target_udim);
-        }
-      }
-
-      /* If tiled image present then check if target_udim is valid */
-      else if (image && is_tiled_image) {
-        RNA_int_set(op->ptr, "target_udim", scene->toolsettings->target_udim);
-        LISTBASE_FOREACH (const ImageTile *, tile, &image->tiles) {
-          if (target_udim == tile->tile_number) {
-            scene->toolsettings->target_udim = target_udim;
-            RNA_int_set(op->ptr, "target_udim", target_udim);
-            break;
-          }
-        }
-      }
-
-      /* If non-tiled image present then always pack to UDIM 1001 */
-      else if (image && !is_tiled_image) {
-        scene->toolsettings->target_udim = 1001;
-        RNA_int_set(op->ptr, "target_udim", 1001);
-      }
-    }
-
-    else {
-      scene->toolsettings->target_udim = RNA_int_get(op->ptr, "target_udim");
-    }
-    use_target = true;
-  }
-
-  else {
-    use_target = false;
-  }
-
+  const bool use_target_udim = (RNA_enum_get(op->ptr, "packTo") == SPECIFIED_UDIM);
   if (RNA_struct_property_is_set(op->ptr, "margin")) {
     scene->toolsettings->uvcalc_margin = RNA_float_get(op->ptr, "margin");
   }
@@ -1097,11 +1050,64 @@ static int pack_islands_exec(bContext *C, wmOperator *op)
     RNA_float_set(op->ptr, "margin", scene->toolsettings->uvcalc_margin);
   }
 
+  int target_udim = 1001;
+  if (use_target_udim) {
+    target_udim = RNA_int_get(op->ptr, "target_udim");
+    if (target_udim > 2000 || target_udim < 1001) {
+      /* Early exit since invalid UDIM was specified.
+       * Before exit, set RNA prop to the value specified when the operator was last used */
+      RNA_int_set(op->ptr, "target_udim", scene->toolsettings->target_udim);
+      MEM_freeN(objects);
+      return OPERATOR_CANCELLED;
+    }
+
+    /* Check if specifed UDIM index is valid */
+    bool is_udim_valid = false;
+    const int target_x = ((target_udim - 1001) % 10) + 1;
+    const int target_y = ((target_udim - 1001) / 10) + 1;
+    if (target_x <= sima->tile_grid_shape[0] && target_y <= sima->tile_grid_shape[1]) {
+      scene->toolsettings->target_udim = target_udim;
+      is_udim_valid = true;
+    }
+    else if (is_tiled_image) {
+      LISTBASE_FOREACH (const ImageTile *, tile, &image->tiles) {
+        if (target_udim == tile->tile_number) {
+          scene->toolsettings->target_udim = target_udim;
+          is_udim_valid = true;
+          break;
+        }
+      }
+    }
+    else if (image && !is_tiled_image) {
+      /* Non-tiled image. Always 0-1 UV space */
+      if (target_udim == 1001) {
+        scene->toolsettings->target_udim = target_udim;
+        is_udim_valid = true;
+      }
+    }
+
+    if (!is_udim_valid) {
+      if (RNA_struct_property_is_set(op->ptr, "target_udim")) {
+        /* Early exit since invalid UDIM was specified */
+        RNA_int_set(op->ptr, "target_udim", scene->toolsettings->target_udim);
+        MEM_freeN(objects);
+        return OPERATOR_CANCELLED;
+      }
+      else {
+        /* Fallback */
+        target_udim = 1001;
+        scene->toolsettings->target_udim = target_udim;
+        RNA_int_set(op->ptr, "target_udim", scene->toolsettings->target_udim);
+      }
+    }
+  }
+
   ED_uvedit_pack_islands_multi(scene,
+                               sima,
                                objects,
                                objects_len,
-                               sima,
-                               use_target,
+                               use_target_udim,
+                               target_udim,
                                &(struct UVPackIsland_Params){
                                    .rotate = rotate,
                                    .rotate_align_axis = -1,
@@ -1114,7 +1120,7 @@ static int pack_islands_exec(bContext *C, wmOperator *op)
   return OPERATOR_FINISHED;
 }
 
-static void pack_islands_draw(bContext *C, wmOperator *op)
+static void pack_islands_ui_draw(bContext *C, wmOperator *op)
 {
   uiLayout *layout = op->layout;
   uiLayout *col;
@@ -1124,7 +1130,7 @@ static void pack_islands_draw(bContext *C, wmOperator *op)
 
   col = uiLayoutColumn(layout, false);
 
-  /* Expose target UDIM property only if packing target is specified UDIM */
+  /* Expose target UDIM property only if packing target is set to Specified UDIM */
   uiItemR(col, op->ptr, "packTo", 0, NULL, 0);
   if (RNA_enum_get(op->ptr, "packTo") == SPECIFIED_UDIM) {
     uiItemR(col, op->ptr, "target_udim", 0, NULL, 0);
@@ -1136,7 +1142,7 @@ static void pack_islands_draw(bContext *C, wmOperator *op)
 
 void UV_OT_pack_islands(wmOperatorType *ot)
 {
-  static const EnumPropertyItem pack_to[] = {
+  static const EnumPropertyItem pack_target[] = {
       {CLOSEST_UDIM, "CLOSEST_UDIM", 0, "Closest UDIM", "Pack islands to closest UDIM"},
       {SPECIFIED_UDIM, "SPECIFIED_UDIM", 0, "Specified UDIM", "Pack islands to specified UDIM"},
       {0, NULL, 0, NULL, NULL},
@@ -1144,23 +1150,24 @@ void UV_OT_pack_islands(wmOperatorType *ot)
   /* identifiers */
   ot->name = "Pack Islands";
   ot->idname = "UV_OT_pack_islands";
-  ot->description = "Transform all islands so that they fill up the UV space as much as possible";
+  ot->description =
+      "Transform all islands so that they fill up the UV/UDIM space as much as possible";
 
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 
   /* api callbacks */
   ot->exec = pack_islands_exec;
   ot->poll = ED_operator_uvedit;
-  ot->ui = pack_islands_draw;
+  ot->ui = pack_islands_ui_draw;
 
   /* properties */
-  RNA_def_enum(ot->srna, "packTo", pack_to, CLOSEST_UDIM, "Pack to", "");
+  RNA_def_enum(ot->srna, "packTo", pack_target, CLOSEST_UDIM, "Pack to", "");
   RNA_def_boolean(ot->srna, "rotate", true, "Rotate", "Rotate islands for best fit");
   RNA_def_int(ot->srna,
               "target_udim",
               1001,
               1001,
-              1100,
+              2000,
               "Target UDIM",
               "Pack islands to target UDIM",
               1001,
@@ -2366,6 +2373,8 @@ static int smart_project_exec(bContext *C, wmOperator *op)
 {
   Scene *scene = CTX_data_scene(C);
   ViewLayer *view_layer = CTX_data_view_layer(C);
+  /* sima=NULL cases are handled in ED_uvedit_pack_islands_multi() */
+  const SpaceImage *sima = CTX_wm_space_image(C);
 
   /* May be NULL. */
   View3D *v3d = CTX_wm_view3d(C);
@@ -2376,6 +2385,7 @@ static int smart_project_exec(bContext *C, wmOperator *op)
 
   const float project_angle_limit_cos = cosf(project_angle_limit);
   const float project_angle_limit_half_cos = cosf(project_angle_limit / 2);
+  const int target_udim = 1001; /* 0-1 UV space */
 
   /* Memory arena for list links (cleared for each object). */
   MemArena *arena = BLI_memarena_new(BLI_MEMARENA_STD_BUFSIZE, __func__);
@@ -2515,10 +2525,11 @@ static int smart_project_exec(bContext *C, wmOperator *op)
     /* Depsgraph refresh functions are called here. */
     const bool correct_aspect = RNA_boolean_get(op->ptr, "correct_aspect");
     ED_uvedit_pack_islands_multi(scene,
+                                 sima,
                                  objects_changed,
                                  object_changed_len,
-                                 NULL,
-                                 false,
+                                 true,
+                                 target_udim,
                                  &(struct UVPackIsland_Params){
                                      .rotate = true,
                                      /* We could make this optional. */

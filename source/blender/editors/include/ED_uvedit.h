@@ -247,10 +247,11 @@ struct UVPackIsland_Params {
   uint correct_aspect : 1;
 };
 void ED_uvedit_pack_islands_multi(const struct Scene *scene,
+                                  const struct SpaceImage *sima,
                                   Object **objects,
                                   const uint objects_len,
-                                  const struct SpaceImage *sima,
-                                  bool use_target,
+                                  const bool use_target_udim,
+                                  int target_udim,
                                   const struct UVPackIsland_Params *params);
 
 bool ED_uvedit_pack_islands_to_area_multi(const struct Scene *scene,

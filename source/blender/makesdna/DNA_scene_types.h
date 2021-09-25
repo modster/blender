@@ -1404,8 +1404,8 @@ typedef struct ToolSettings {
   char uv_selectmode;
 
   float uvcalc_margin;
-  int target_udim;
-  int _pad3[3];
+  int target_udim; /* Can be extended for unwrap operator as well */
+  int _pad3[1];
 
   /* Auto-IK */
   /** Runtime only. */
