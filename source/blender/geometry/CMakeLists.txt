@@ -33,10 +33,10 @@
          )
 
  set(SRC
-         intern/mesh_merge_by_distance.c
+     intern/mesh_merge_by_distance.cc
          intern/pointcloud_merge_by_distance.cc
-         GEO_mesh_merge_by_distance.h
-         GEO_pointcloud_merge_by_distance.h
+         GEO_mesh_merge_by_distance.hh
+         GEO_pointcloud_merge_by_distance.hh
          )
 
  set(LIB

@@ -37,7 +37,7 @@
 #include "BKE_mesh.h"
 #include "BKE_modifier.h"
 
-#include "GEO_mesh_merge_by_distance.h"  // Own include.
+#include "GEO_mesh_merge_by_distance.hh"
 
 /* Indicates when the element was not computed. */
 #define OUT_OF_CONTEXT (uint)(-1)
@@ -349,7 +349,7 @@ static void weld_vert_ctx_alloc_and_setup(const uint mvert_len,
   uint wvert_len = 0;
 
   WeldVert *wvert, *wv;
-  wvert = MEM_mallocN(sizeof(*wvert) * mvert_len, __func__);
+  wvert = (WeldVert *)MEM_mallocN(sizeof(*wvert) * mvert_len, __func__);
   wv = &wvert[0];
 
   uint *v_dest_iter = &r_vert_dest_map[0];
@@ -362,7 +362,7 @@ static void weld_vert_ctx_alloc_and_setup(const uint mvert_len,
     }
   }
 
-  *r_wvert = MEM_reallocN(wvert, sizeof(*wvert) * wvert_len);
+  *r_wvert = (WeldVert *)MEM_reallocN(wvert, sizeof(*wvert) * wvert_len);
   *r_wvert_len = wvert_len;
 }
 
@@ -395,7 +395,7 @@ static void weld_vert_groups_setup(const uint mvert_len,
     }
   }
 
-  struct WeldGroup *wgroups = MEM_callocN(sizeof(*wgroups) * wgroups_len, __func__);
+  struct WeldGroup *wgroups = (WeldGroup *)MEM_callocN(sizeof(*wgroups) * wgroups_len, __func__);
 
   const WeldVert *wv = &wvert[0];
   for (uint i = wvert_len; i--; wv++) {
@@ -412,7 +412,7 @@ static void weld_vert_groups_setup(const uint mvert_len,
 
   BLI_assert(ofs == wvert_len);
 
-  uint *groups_buffer = MEM_mallocN(sizeof(*groups_buffer) * ofs, __func__);
+  uint *groups_buffer = (uint *)MEM_mallocN(sizeof(*groups_buffer) * ofs, __func__);
   wv = &wvert[0];
   for (uint i = wvert_len; i--; wv++) {
     uint group_index = r_vert_groups_map[wv->vert_dest];
@@ -475,7 +475,7 @@ static void weld_edge_ctx_setup(const uint mvert_len,
   }
 
   if (link_len) {
-    uint *link_edge_buffer = MEM_mallocN(sizeof(*link_edge_buffer) * link_len, __func__);
+    uint *link_edge_buffer = (uint *)MEM_mallocN(sizeof(*link_edge_buffer) * link_len, __func__);
 
     we = &r_wedge[0];
     for (uint i = 0; i < wedge_len; i++, we++) {
@@ -566,11 +566,11 @@ static void weld_edge_ctx_alloc(const MEdge *medge,
                                 uint *r_wedge_len)
 {
   /* Edge Context. */
-  uint *edge_map = MEM_mallocN(sizeof(*edge_map) * medge_len, __func__);
+  uint *edge_map = (uint *)MEM_mallocN(sizeof(*edge_map) * medge_len, __func__);
   uint wedge_len = 0;
 
   WeldEdge *wedge, *we;
-  wedge = MEM_mallocN(sizeof(*wedge) * medge_len, __func__);
+  wedge = (WeldEdge *)MEM_mallocN(sizeof(*wedge) * medge_len, __func__);
   we = &wedge[0];
 
   const MEdge *me = &medge[0];
@@ -596,7 +596,7 @@ static void weld_edge_ctx_alloc(const MEdge *medge,
     }
   }
 
-  *r_wedge = MEM_reallocN(wedge, sizeof(*wedge) * wedge_len);
+  *r_wedge = (WeldEdge *)MEM_reallocN(wedge, sizeof(*wedge) * wedge_len);
   *r_wedge_len = wedge_len;
   *r_edge_ctx_map = edge_map;
 }
@@ -616,7 +616,7 @@ static void weld_edge_groups_setup(const uint medge_len,
   struct WeldGroupEdge *wegroups, *wegrp_iter;
 
   uint wgroups_len = wedge_len - edge_kill_len;
-  wegroups = MEM_callocN(sizeof(*wegroups) * wgroups_len, __func__);
+  wegroups = (WeldGroupEdge *)MEM_callocN(sizeof(*wegroups) * wgroups_len, __func__);
   wegrp_iter = &wegroups[0];
 
   wgroups_len = 0;
@@ -663,7 +663,7 @@ static void weld_edge_groups_setup(const uint medge_len,
     ofs += wegrp_iter->group.len;
   }
 
-  uint *groups_buffer = MEM_mallocN(sizeof(*groups_buffer) * ofs, __func__);
+  uint *groups_buffer = (uint *)MEM_mallocN(sizeof(*groups_buffer) * ofs, __func__);
   we = &wedge[0];
   for (uint i = wedge_len; i--; we++) {
     if (we->flag == ELEM_COLLAPSED) {
@@ -802,18 +802,18 @@ static void weld_poly_loop_ctx_alloc(const MPoly *mpoly,
                                      WeldMesh *r_weld_mesh)
 {
   /* Loop/Poly Context. */
-  uint *loop_map = MEM_mallocN(sizeof(*loop_map) * mloop_len, __func__);
-  uint *poly_map = MEM_mallocN(sizeof(*poly_map) * mpoly_len, __func__);
+  uint *loop_map = (uint *)MEM_mallocN(sizeof(*loop_map) * mloop_len, __func__);
+  uint *poly_map = (uint *)MEM_mallocN(sizeof(*poly_map) * mpoly_len, __func__);
   uint wloop_len = 0;
   uint wpoly_len = 0;
   uint max_ctx_poly_len = 4;
 
   WeldLoop *wloop, *wl;
-  wloop = MEM_mallocN(sizeof(*wloop) * mloop_len, __func__);
+  wloop = (WeldLoop *)MEM_mallocN(sizeof(*wloop) * mloop_len, __func__);
   wl = &wloop[0];
 
   WeldPoly *wpoly, *wp;
-  wpoly = MEM_mallocN(sizeof(*wpoly) * mpoly_len, __func__);
+  wpoly = (WeldPoly *)MEM_mallocN(sizeof(*wpoly) * mpoly_len, __func__);
   wp = &wpoly[0];
 
   uint maybe_new_poly = 0;
@@ -880,14 +880,15 @@ static void weld_poly_loop_ctx_alloc(const MPoly *mpoly,
 
   if (mpoly_len < (wpoly_len + maybe_new_poly)) {
     WeldPoly *wpoly_tmp = wpoly;
-    wpoly = MEM_mallocN(sizeof(*wpoly) * ((size_t)wpoly_len + maybe_new_poly), __func__);
+    wpoly = (WeldPoly *)MEM_mallocN(sizeof(*wpoly) * ((size_t)wpoly_len + maybe_new_poly),
+                                    __func__);
     memcpy(wpoly, wpoly_tmp, sizeof(*wpoly) * wpoly_len);
     MEM_freeN(wpoly_tmp);
   }
 
   WeldPoly *poly_new = &wpoly[wpoly_len];
 
-  r_weld_mesh->wloop = MEM_reallocN(wloop, sizeof(*wloop) * wloop_len);
+  r_weld_mesh->wloop = (WeldLoop *)MEM_reallocN(wloop, sizeof(*wloop) * wloop_len);
   r_weld_mesh->wpoly = wpoly;
   r_weld_mesh->wpoly_new = poly_new;
   r_weld_mesh->wloop_len = wloop_len;
@@ -1159,7 +1160,7 @@ static void weld_poly_loop_ctx_setup(const MLoop *mloop,
     }
 
     if (link_len) {
-      uint *link_poly_buffer = MEM_mallocN(sizeof(*link_poly_buffer) * link_len, __func__);
+      uint *link_poly_buffer = (uint *)MEM_mallocN(sizeof(*link_poly_buffer) * link_len, __func__);
 
       wp = &wpoly[0];
       for (uint i = 0; i < wpoly_and_new_len; i++, wp++) {
@@ -1301,8 +1302,8 @@ static void weld_mesh_context_create(const Mesh *mesh,
   const uint mloop_len = mesh->totloop;
   const uint mpoly_len = mesh->totpoly;
 
-  uint *edge_dest_map = MEM_mallocN(sizeof(*edge_dest_map) * medge_len, __func__);
-  struct WeldGroup *v_links = MEM_callocN(sizeof(*v_links) * mvert_len, __func__);
+  uint *edge_dest_map = (uint *)MEM_mallocN(sizeof(*edge_dest_map) * medge_len, __func__);
+  struct WeldGroup *v_links = (WeldGroup *)MEM_callocN(sizeof(*v_links) * mvert_len, __func__);
 
   WeldVert *wvert;
   uint wvert_len;
@@ -1539,9 +1540,13 @@ struct WeldVertexCluster {
   uint merged_verts;
 };
 
-Mesh *GEO_mesh_merge_by_distance(const Mesh *mesh, const bool *mask, const float merge_distance, const int weld_mode)
+namespace blender::geometry {
+Mesh *GEO_mesh_merge_by_distance(const Mesh *mesh,
+                                 const bool *mask,
+                                 const float merge_distance,
+                                 const int weld_mode)
 {
-  Mesh *result = mesh;
+  Mesh *result = BKE_mesh_copy_for_eval(mesh, false);
 
   const MVert *mvert;
   const MLoop *mloop;
@@ -1555,7 +1560,7 @@ Mesh *GEO_mesh_merge_by_distance(const Mesh *mesh, const bool *mask, const float
 
   /* From the original index of the vertex.
    * This indicates which vert it is or is going to be merged. */
-  uint *vert_dest_map = MEM_malloc_arrayN(totvert, sizeof(*vert_dest_map), __func__);
+  uint *vert_dest_map = (uint *)MEM_malloc_arrayN(totvert, sizeof(*vert_dest_map), __func__);
   uint vert_kill_len = 0;
   if (weld_mode == WELD_MODE_ALL)
 #ifdef USE_BVHTREEKDOP
@@ -1662,7 +1667,7 @@ Mesh *GEO_mesh_merge_by_distance(const Mesh *mesh, const bool *mask, const float
     totvert = mesh->totvert;
     totedge = mesh->totedge;
 
-    struct WeldVertexCluster *vert_clusters = MEM_malloc_arrayN(
+    struct WeldVertexCluster *vert_clusters = (WeldVertexCluster *)MEM_malloc_arrayN(
         totvert, sizeof(*vert_clusters), __func__);
     struct WeldVertexCluster *vc = &vert_clusters[0];
     for (uint i = 0; i < totvert; i++, vc++) {
@@ -1916,8 +1921,7 @@ Mesh *GEO_mesh_merge_by_distance(const Mesh *mesh, const bool *mask, const float
     BLI_assert(loop_cur == result_nloops);
 
     /* is this needed? */
-    /* recalculate normals */
-    result->runtime.cd_dirty_vert |= CD_MASK_NORMAL;
+    BKE_mesh_normals_tag_dirty(result);
 
     weld_mesh_context_free(&weld_mesh);
   }
@@ -1925,3 +1929,4 @@ Mesh *GEO_mesh_merge_by_distance(const Mesh *mesh, const bool *mask, const float
   MEM_freeN(vert_dest_map);
   return result;
 }
+}  // namespace blender::geometry

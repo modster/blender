@@ -20,20 +20,23 @@
  * \ingroup geo
  */
 
+namespace blender::geometry {
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-enum {
+typedef enum weld_mode {
   WELD_MODE_ALL = 0,
   WELD_MODE_CONNECTED = 1,
-};
+} weld_mode;
 
 struct Mesh *GEO_mesh_merge_by_distance(const struct Mesh *mesh,
-               const bool *mask,
-               const float merge_distance,
-               const int weld_mode);
-
+                                        const bool *mask,
+                                        const float merge_distance,
+                                        const int weld_mode);
 #ifdef __cplusplus
 }
 #endif
+
+}  // namespace blender::geometry

@@ -54,7 +54,7 @@
 #include "BKE_modifier.h"
 #include "BKE_screen.h"
 
-#include "GEO_mesh_merge_by_distance.h"
+#include "GEO_mesh_merge_by_distance.hh"
 
 #include "UI_interface.h"
 #include "UI_resources.h"
@@ -68,22 +68,17 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *UNUSED(ctx)
   WeldModifierData *wmd = (WeldModifierData *)md;
 
   uint totvert = mesh->totvert;
-  bool *mask = MEM_malloc_arrayN(totvert, sizeof(*mask), __func__);
+  bool *mask = (bool *)MEM_malloc_arrayN(totvert, sizeof(*mask), __func__);
   const int defgrp_index = BKE_id_defgroup_name_index(&mesh->id, wmd->defgrp_name);
   if (defgrp_index != -1) {
     MDeformVert *dvert, *dv;
-    dvert = CustomData_get_layer(&mesh->vdata, CD_MDEFORMVERT);
+    dvert = (MDeformVert *)CustomData_get_layer(&mesh->vdata, CD_MDEFORMVERT);
     if (dvert) {
       const bool invert_vgroup = (wmd->flag & MOD_WELD_INVERT_VGROUP) != 0;
       dv = &dvert[0];
       for (uint i = 0; i < totvert; i++, dv++) {
         const bool found = BKE_defvert_find_weight(dv, defgrp_index) > 0.0f;
-        if (found != invert_vgroup) {
-          mask[i] = true;
-        }
-        else {
-          mask[i] = false;
-        }
+        mask[i] = found != invert_vgroup;
       }
     }
   }
@@ -93,7 +88,8 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *UNUSED(ctx)
     }
   }
 
-  Mesh *result = GEO_mesh_merge_by_distance(mesh, mask, wmd->merge_dist, wmd->mode);
+  Mesh *result = blender::geometry::GEO_mesh_merge_by_distance(
+      mesh, mask, wmd->merge_dist, wmd->mode);
   MEM_freeN(mask);
 
   return result;
@@ -132,7 +128,7 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
 
   uiItemR(layout, ptr, "mode", 0, NULL, ICON_NONE);
   uiItemR(layout, ptr, "merge_threshold", 0, IFACE_("Distance"), ICON_NONE);
-  if (weld_mode == WELD_MODE_CONNECTED) {
+  if (weld_mode == blender::geometry::WELD_MODE_CONNECTED) {
     uiItemR(layout, ptr, "loose_edges", 0, NULL, ICON_NONE);
   }
   modifier_vgroup_ui(layout, ptr, &ob_ptr, "vertex_group", "invert_vertex_group", NULL);
@@ -151,9 +147,10 @@ ModifierTypeInfo modifierType_Weld = {
     /* structSize */ sizeof(WeldModifierData),
     /* srna */ &RNA_WeldModifier,
     /* type */ eModifierTypeType_Constructive,
-    /* flags */ eModifierTypeFlag_AcceptsMesh | eModifierTypeFlag_SupportsMapping |
-        eModifierTypeFlag_SupportsEditmode | eModifierTypeFlag_EnableInEditmode |
-        eModifierTypeFlag_AcceptsCVs,
+    /* flags */
+    (ModifierTypeFlag)(eModifierTypeFlag_AcceptsMesh | eModifierTypeFlag_SupportsMapping |
+                       eModifierTypeFlag_SupportsEditmode | eModifierTypeFlag_EnableInEditmode |
+                       eModifierTypeFlag_AcceptsCVs),
     /* icon */ ICON_AUTOMERGE_OFF, /* TODO: Use correct icon. */
 
     /* copyData */ BKE_modifier_copydata_generic,

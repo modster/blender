@@ -15,6 +15,7 @@
  */
 
 #include "BKE_pointcloud.h"
+#include <BKE_geometry_set.hh>
 
 #include "BLI_array.hh"
 #include "BLI_float3.hh"
@@ -24,14 +25,13 @@
 
 #include "DNA_pointcloud_types.h"
 
-#include "GEO_pointcloud_merge_by_distance.h" /* Own include. */
+#include "GEO_pointcloud_merge_by_distance.hh"
 
 #include "FN_generic_span.hh"
 
-using blender::Array;
-using blender::float3;
-using blender::Span;
-using blender::Vector;
+using blender::MutableSpan;
+
+namespace blender::geometry {
 
 static KDTree_3d *build_kdtree(Span<float3> positions, Span<bool> selection)
 {
@@ -50,7 +50,7 @@ static KDTree_3d *build_kdtree(Span<float3> positions, Span<bool> selection)
 }
 
 static void build_merge_map(Span<float3> &positions,
-                            Array<bool> &merge_map,
+                            MutableSpan<bool> merge_map,
                             int &total_merge_operations,
                             const float merge_threshold,
                             Span<bool> selection)
@@ -61,7 +61,7 @@ static void build_merge_map(Span<float3> &positions,
     struct CallbackData {
       int index;
       int &total_merge_operations;
-      Array<bool> &merge_map;
+      MutableSpan<bool> merge_map;
       Span<bool> selection;
     } callback_data = {i, total_merge_operations, merge_map, selection};
 
@@ -70,17 +70,17 @@ static void build_merge_map(Span<float3> &positions,
         positions[i],
         merge_threshold,
         [](void *user_data,
-           int source_vertex_index,
+           int source_point_index,
            const float *UNUSED(co),
            float UNUSED(distance_squared)) {
           CallbackData &callback_data = *static_cast<CallbackData *>(user_data);
-          int target_vertex_index = callback_data.index;
-          if (source_vertex_index != target_vertex_index &&
-              !callback_data.merge_map[source_vertex_index] &&
-              !callback_data.merge_map[target_vertex_index] &&
-              callback_data.selection[source_vertex_index] &&
-              callback_data.selection[target_vertex_index]) {
-            callback_data.merge_map[source_vertex_index] = true;
+          int target_point_index = callback_data.index;
+          if (source_point_index != target_point_index &&
+              !callback_data.merge_map[source_point_index] &&
+              !callback_data.merge_map[target_point_index] &&
+              callback_data.selection[source_point_index] &&
+              callback_data.selection[target_point_index]) {
+            callback_data.merge_map[source_point_index] = true;
             callback_data.total_merge_operations++;
           }
           return true;
@@ -91,30 +91,63 @@ static void build_merge_map(Span<float3> &positions,
   BLI_kdtree_3d_free(kdtree);
 }
 
-PointCloud *merge_by_distance_pointcloud(const PointCloud &point_cloud,
-                                         const float merge_threshold,
-                                         Span<bool> selection)
+PointCloud *GEO_merge_by_distance_pointcloud(PointCloudComponent &pointcloud_component,
+                                             const float merge_threshold,
+                                             Span<bool> selection)
 {
-
-  Array<bool> merge_map(point_cloud.totpoint, false);
-  Span<float3> positions((const float3 *)point_cloud.co, point_cloud.totpoint);
+  const PointCloud &original_src_pointcloud = *pointcloud_component.get_for_read();
+  Array<bool> merge_map(original_src_pointcloud.totpoint, false);
+  Span<float3> positions((const float3 *)original_src_pointcloud.co,
+                         original_src_pointcloud.totpoint);
 
   int total_merge_operations = 0;
 
-  BLI_assert(positions.size() == merge_map.size());
-
   build_merge_map(positions, merge_map, total_merge_operations, merge_threshold, selection);
 
-  PointCloud *result = BKE_pointcloud_new_nomain(positions.size() - total_merge_operations);
-  int offset = 0;
+  Vector<int64_t> copyMaskVector;
   for (const int i : positions.index_range()) {
-    /* Only copy the unmerged points to new pointcloud. */
     if (!merge_map[i]) {
-      copy_v3_v3(result->co[offset], positions[i]);
-      result->radius[offset] = point_cloud.radius[i];
-      offset++;
+      copyMaskVector.append(i);
     }
   }
+  IndexMask copyMask(copyMaskVector);
+
+  PointCloudComponent *src_pointcloud_component = (PointCloudComponent *)
+                                                      pointcloud_component.copy();
+  const PointCloud &src_pointcloud = *src_pointcloud_component->get_for_read();
+
+  PointCloud *result = BKE_pointcloud_new_nomain(copyMask.size());
+  pointcloud_component.replace(result);
+
+  for (const int i : copyMask.index_range()) {
+    copy_v3_v3(result->co[i], src_pointcloud.co[copyMask[i]]);
+    result->radius[i] = src_pointcloud.radius[copyMask[i]];
+  }
+  src_pointcloud_component->attribute_foreach(
+      [&](const bke::AttributeIDRef &attribute_id, const AttributeMetaData &meta_data) {
+        fn::GVArrayPtr read_attribute = src_pointcloud_component->attribute_get_for_read(
+            attribute_id, meta_data.domain, meta_data.data_type);
+
+        if (pointcloud_component.attribute_try_create(
+                attribute_id, meta_data.domain, meta_data.data_type, AttributeInitDefault())) {
+
+          bke::OutputAttribute target_attribute =
+              pointcloud_component.attribute_try_get_for_output_only(
+                  attribute_id, meta_data.domain, meta_data.data_type);
+
+          fn::GMutableSpan dst_span = target_attribute.as_span();
+          fn::GSpan src_span = read_attribute->get_internal_span();
+          for (const int i : copyMask.index_range()) {
+            const fn::CPPType *type = bke::custom_data_type_to_cpp_type(meta_data.data_type);
+            type->copy_assign(src_span[copyMask[i]], dst_span[i]);
+          }
+
+          target_attribute.save();
+        }
+        return true;
+      });
 
   return result;
 }
+
+}  // namespace blender::geometry

@@ -20,14 +20,10 @@
  * \ingroup geo
  */
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include "BKE_geometry_set.hh"
 
-PointCloud *merge_by_distance_pointcloud(const PointCloud &point_cloud,
-                                         const float merge_threshold,
-                                         blender::Span<bool> selection);
-
-#ifdef __cplusplus
+namespace blender::geometry {
+PointCloud *GEO_merge_by_distance_pointcloud(PointCloudComponent &pointcloud_component,
+                                             const float merge_threshold,
+                                             blender::Span<bool> selection);
 }
-#endif
