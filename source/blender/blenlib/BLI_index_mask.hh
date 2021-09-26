@@ -223,6 +223,11 @@ class IndexMask {
     return indices_.is_empty();
   }
 
+  IndexMask slice(IndexRange slice) const
+  {
+    return indices_.slice(slice);
+  }
+
   IndexMask slice_and_offset(IndexRange slice, Vector<int64_t> &r_new_indices) const;
 };
 
