@@ -658,6 +658,12 @@ class VArray_For_DerivedSpan : public VArray<ElemT> {
  private:
   const StructT *data_;
 
+  template<typename OtherStructT,
+           typename OtherElemT,
+           OtherElemT (*OtherGetFunc)(const OtherStructT &),
+           void (*OtherSetFunc)(OtherStructT &, OtherElemT)>
+  friend class VMutableArray_For_DerivedSpan;
+
  public:
   VArray_For_DerivedSpan(const Span<StructT> data) : VArray<ElemT>(data.size()), data_(data.data())
   {
@@ -698,6 +704,9 @@ template<typename StructT,
 class VMutableArray_For_DerivedSpan : public VMutableArray<ElemT> {
  private:
   StructT *data_;
+
+  using SelfT = VMutableArray_For_DerivedSpan;
+  using ConstSelfT = const VArray_For_DerivedSpan<StructT, ElemT, GetFunc>;
 
  public:
   VMutableArray_For_DerivedSpan(const MutableSpan<StructT> data)
@@ -747,6 +756,22 @@ class VMutableArray_For_DerivedSpan : public VMutableArray<ElemT> {
       const ElemT src_value = src_varray.get_internal_single();
       mask.foreach_index([&](const int64_t i) { SetFunc(data_[i], src_value); });
     }
+    else if (const SelfT *src_varray_typed = dynamic_cast<const SelfT *>(&src_varray)) {
+      if (src_varray_typed->data_ == data_) {
+        /* Nothing to do. */
+        return;
+      }
+      mask.foreach_index(
+          [&](const int64_t i) { SetFunc(data_[i], GetFunc(src_varray_typed->data_[i])); });
+    }
+    else if (const ConstSelfT *src_varray_typed = dynamic_cast<const ConstSelfT *>(&src_varray)) {
+      if (src_varray_typed->data_ == data_) {
+        /* Nothing to do. */
+        return;
+      }
+      mask.foreach_index(
+          [&](const int64_t i) { SetFunc(data_[i], GetFunc(src_varray_typed->data_[i])); });
+    }
     else {
       mask.foreach_index([&](const int64_t i) { SetFunc(data_[i], src_varray.get(i)); });
     }
@@ -754,7 +779,9 @@ class VMutableArray_For_DerivedSpan : public VMutableArray<ElemT> {
 
   virtual bool can_set_multiple_efficiently_impl(const VArray<ElemT> &src_varray) const
   {
-    return src_varray.is_span() || src_varray.is_single();
+    return src_varray.is_span() || src_varray.is_single() ||
+           dynamic_cast<const SelfT *>(&src_varray) != nullptr ||
+           dynamic_cast<const ConstSelfT *>(&src_varray) != nullptr;
   }
 };
 
