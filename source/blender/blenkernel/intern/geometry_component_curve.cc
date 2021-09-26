@@ -293,6 +293,49 @@ template<typename T> class VArray_For_SplineToPoint final : public VArray<T> {
     const PointIndices indices = lookup_point_indices(offsets_, index);
     return original_data_[indices.spline_index];
   }
+
+  void get_multiple_impl(VMutableArray<T> &dst_varray, const IndexMask mask) const final
+  {
+    const int total_size = offsets_.last();
+    if (mask.is_range() && mask.as_range() == IndexRange(total_size)) {
+      for (const int spline_index : original_data_.index_range()) {
+        const int offset = offsets_[spline_index];
+        const int next_offset = offsets_[spline_index + 1];
+        dst_varray.set_multiple(original_data_[spline_index],
+                                IndexRange{offset, next_offset - offset});
+      }
+    }
+    else {
+      int spline_index = 0;
+      for (const int dst_index : mask) {
+        while (offsets_[spline_index] < dst_index) {
+          spline_index++;
+        }
+        dst_varray.set(dst_index, original_data_[spline_index]);
+      }
+    }
+  }
+
+  void get_multiple_to_uninitialized_impl(T *dst, const IndexMask mask) const final
+  {
+    const int total_size = offsets_.last();
+    if (mask.is_range() && mask.as_range() == IndexRange(total_size)) {
+      for (const int spline_index : original_data_.index_range()) {
+        const int offset = offsets_[spline_index];
+        const int next_offset = offsets_[spline_index + 1];
+        uninitialized_fill_n(dst + offset, next_offset - offset, original_data_[spline_index]);
+      }
+    }
+    else {
+      int spline_index = 0;
+      for (const int dst_index : mask) {
+        while (offsets_[spline_index] < dst_index) {
+          spline_index++;
+        }
+        new (dst + dst_index) T(original_data_[spline_index]);
+      }
+    }
+  }
 };
 
 static GVArrayPtr adapt_curve_domain_spline_to_point(const CurveEval &curve, GVArrayPtr varray)

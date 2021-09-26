@@ -262,6 +262,10 @@ class GVArray_For_GSpan : public GVArray {
   void get_impl(const int64_t index, void *r_value) const override;
   void get_to_uninitialized_impl(const int64_t index, void *r_value) const override;
 
+  void get_multiple_impl(GVMutableArray &dst_varray, IndexMask mask) const override;
+  void get_multiple_to_uninitialized_impl(void *dst, IndexMask mask) const override;
+  bool can_get_multiple_efficiently_impl(const GVMutableArray &dst_varray) const override;
+
   bool is_span_impl() const override;
   GSpan get_internal_span_impl() const override;
 };
@@ -301,9 +305,16 @@ class GVMutableArray_For_GMutableSpan : public GVMutableArray {
   void get_impl(const int64_t index, void *r_value) const override;
   void get_to_uninitialized_impl(const int64_t index, void *r_value) const override;
 
+  void get_multiple_impl(GVMutableArray &dst_varray, IndexMask mask) const override;
+  void get_multiple_to_uninitialized_impl(void *dst, IndexMask mask) const override;
+  bool can_get_multiple_efficiently_impl(const GVMutableArray &dst_varray) const override;
+
   void set_by_copy_impl(const int64_t index, const void *value) override;
   void set_by_move_impl(const int64_t index, void *value) override;
   void set_by_relocate_impl(const int64_t index, void *value) override;
+
+  void set_multiple_by_copy_impl(const GVArray &src_varray, IndexMask mask) override;
+  bool can_set_multiple_efficiently_impl(const GVArray &src_varray) const override;
 
   bool is_span_impl() const override;
   GSpan get_internal_span_impl() const override;
@@ -327,6 +338,10 @@ class GVArray_For_SingleValueRef : public GVArray {
 
   void get_impl(const int64_t index, void *r_value) const override;
   void get_to_uninitialized_impl(const int64_t index, void *r_value) const override;
+
+  void get_multiple_impl(GVMutableArray &dst_varray, IndexMask mask) const override;
+  void get_multiple_to_uninitialized_impl(void *dst, IndexMask mask) const override;
+  bool can_get_multiple_efficiently_impl(const GVMutableArray &dst_varray) const override;
 
   bool is_span_impl() const override;
   GSpan get_internal_span_impl() const override;
@@ -368,6 +383,25 @@ template<typename T> class GVArray_For_VArray : public GVArray {
     new (r_value) T(varray_->get(index));
   }
 
+  void get_multiple_impl(GVMutableArray &dst_varray, IndexMask mask) const override
+  {
+    /* `const_cast` is ok because the data is not actually modified. */
+    GVMutableArray_Typed<T> dst_typed{const_cast<GVMutableArray &>(dst_varray)};
+    varray_->get_multiple(*dst_typed, mask);
+  }
+
+  void get_multiple_to_uninitialized_impl(void *dst, IndexMask mask) const override
+  {
+    varray_->get_multiple_to_uninitialized((T *)dst, mask);
+  }
+
+  bool can_get_multiple_efficiently_impl(const GVMutableArray &dst_varray) const override
+  {
+    /* `const_cast` is ok because the data is not actually modified. */
+    GVMutableArray_Typed<T> dst_typed{const_cast<GVMutableArray &>(dst_varray)};
+    return varray_->_can_get_multiple_efficiently(*dst_typed);
+  }
+
   bool is_span_impl() const override
   {
     return varray_->is_span();
@@ -394,6 +428,8 @@ template<typename T> class GVArray_For_VArray : public GVArray {
   }
 };
 
+template<typename T> class GVMutableArray_For_VMutableArray;
+
 /* Used to convert any generic virtual array into a typed one. */
 template<typename T> class VArray_For_GVArray : public VArray<T> {
  protected:
@@ -415,6 +451,23 @@ template<typename T> class VArray_For_GVArray : public VArray<T> {
     T value;
     varray_->get(index, &value);
     return value;
+  }
+
+  void get_multiple_impl(VMutableArray<T> &dst_varray, IndexMask mask) const override
+  {
+    GVMutableArray_For_VMutableArray<T> generic_dst{dst_varray};
+    varray_->get_multiple(generic_dst, mask);
+  }
+
+  void get_multiple_to_uninitialized_impl(T *dst, IndexMask mask) const override
+  {
+    varray_->get_multiple_to_uninitialized(dst, mask);
+  }
+
+  bool can_get_multiple_efficiently_impl(const VMutableArray<T> &dst_varray) const override
+  {
+    GVMutableArray_For_VMutableArray<T> generic_dst{const_cast<VMutableArray<T> &>(dst_varray)};
+    return varray_->_can_get_multiple_efficiently(generic_dst);
   }
 
   bool is_span_impl() const override
@@ -464,9 +517,38 @@ template<typename T> class VMutableArray_For_GVMutableArray : public VMutableArr
     return value;
   }
 
+  void get_multiple_impl(VMutableArray<T> &dst_varray, IndexMask mask) const override
+  {
+    GVMutableArray_For_VMutableArray<T> generic_dst{dst_varray};
+    varray_->get_multiple(generic_dst, mask);
+  }
+
+  void get_multiple_to_uninitialized_impl(T *dst, IndexMask mask) const override
+  {
+    varray_->get_multiple_to_uninitialized(dst, mask);
+  }
+
+  bool can_get_multiple_efficiently_impl(const VMutableArray<T> &dst_varray) const override
+  {
+    GVMutableArray_For_VMutableArray<T> generic_dst{const_cast<VMutableArray<T> &>(dst_varray)};
+    return varray_->_can_get_multiple_efficiently(generic_dst);
+  }
+
   void set_impl(const int64_t index, T value) override
   {
     varray_->set_by_relocate(index, &value);
+  }
+
+  void set_multiple_impl(const VArray<T> &src_varray, IndexMask mask) override
+  {
+    GVArray_For_VArray<T> generic_src{src_varray};
+    varray_->set_multiple_by_copy(generic_src, mask);
+  }
+
+  bool can_set_multiple_efficiently_impl(const VArray<T> &src_varray) const override
+  {
+    GVArray_For_VArray<T> generic_src{src_varray};
+    return varray_->_can_set_multiple_efficiently(generic_src);
   }
 
   bool is_span_impl() const override
@@ -518,6 +600,25 @@ template<typename T> class GVMutableArray_For_VMutableArray : public GVMutableAr
     new (r_value) T(varray_->get(index));
   }
 
+  void get_multiple_impl(GVMutableArray &dst_varray, IndexMask mask) const override
+  {
+    /* `const_cast` is ok because the data is not actually modified. */
+    GVMutableArray_Typed<T> dst_typed{const_cast<GVMutableArray &>(dst_varray)};
+    varray_->get_multiple(*dst_typed, mask);
+  }
+
+  void get_multiple_to_uninitialized_impl(void *dst, IndexMask mask) const override
+  {
+    varray_->get_multiple_to_uninitialized((T *)dst, mask);
+  }
+
+  bool can_get_multiple_efficiently_impl(const GVMutableArray &dst_varray) const override
+  {
+    /* `const_cast` is ok because the data is not actually modified. */
+    GVMutableArray_Typed<T> dst_typed{const_cast<GVMutableArray &>(dst_varray)};
+    return varray_->_can_get_multiple_efficiently(*dst_typed);
+  }
+
   bool is_span_impl() const override
   {
     return varray_->is_span();
@@ -556,6 +657,18 @@ template<typename T> class GVMutableArray_For_VMutableArray : public GVMutableAr
   {
     T &value_ = *(T *)value;
     varray_->set(index, std::move(value_));
+  }
+
+  void set_multiple_by_copy_impl(const GVArray &src_varray, IndexMask mask) override
+  {
+    GVArray_Typed<T> src_typed{src_varray};
+    varray_->set_multiple(*src_typed, mask);
+  }
+
+  bool can_set_multiple_efficiently_impl(const GVArray &src_varray) const override
+  {
+    GVArray_Typed<T> src_typed{src_varray};
+    return varray_->_can_set_multiple_efficiently(*src_typed);
   }
 
   const void *try_get_internal_varray_impl() const override

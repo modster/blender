@@ -264,6 +264,23 @@ void GVArray_For_GSpan::get_to_uninitialized_impl(const int64_t index, void *r_v
   type_->copy_construct(POINTER_OFFSET(data_, element_size_ * index), r_value);
 }
 
+void GVArray_For_GSpan::get_multiple_impl(GVMutableArray &dst_varray, IndexMask mask) const
+{
+  mask.foreach_index([&](const int64_t i) {
+    dst_varray.set_by_copy(i, POINTER_OFFSET(data_, element_size_ * i));
+  });
+}
+
+void GVArray_For_GSpan::get_multiple_to_uninitialized_impl(void *dst, IndexMask mask) const
+{
+  type_->copy_construct_indices(data_, dst, mask);
+}
+
+bool GVArray_For_GSpan::can_get_multiple_efficiently_impl(const GVMutableArray &dst_varray) const
+{
+  return dst_varray.is_span();
+}
+
 bool GVArray_For_GSpan::is_span_impl() const
 {
   return true;
@@ -289,6 +306,26 @@ void GVMutableArray_For_GMutableSpan::get_to_uninitialized_impl(const int64_t in
   type_->copy_construct(POINTER_OFFSET(data_, element_size_ * index), r_value);
 }
 
+void GVMutableArray_For_GMutableSpan::get_multiple_impl(GVMutableArray &dst_varray,
+                                                        IndexMask mask) const
+{
+  mask.foreach_index([&](const int64_t i) {
+    dst_varray.set_by_copy(i, POINTER_OFFSET(data_, element_size_ * i));
+  });
+}
+
+void GVMutableArray_For_GMutableSpan::get_multiple_to_uninitialized_impl(void *dst,
+                                                                         IndexMask mask) const
+{
+  type_->copy_construct_indices(data_, dst, mask);
+}
+
+bool GVMutableArray_For_GMutableSpan::can_get_multiple_efficiently_impl(
+    const GVMutableArray &dst_varray) const
+{
+  return dst_varray.is_span();
+}
+
 void GVMutableArray_For_GMutableSpan::set_by_copy_impl(const int64_t index, const void *value)
 {
   type_->copy_assign(value, POINTER_OFFSET(data_, element_size_ * index));
@@ -302,6 +339,34 @@ void GVMutableArray_For_GMutableSpan::set_by_move_impl(const int64_t index, void
 void GVMutableArray_For_GMutableSpan::set_by_relocate_impl(const int64_t index, void *value)
 {
   type_->relocate_assign(value, POINTER_OFFSET(data_, element_size_ * index));
+}
+
+void GVMutableArray_For_GMutableSpan::set_multiple_by_copy_impl(const GVArray &src_varray,
+                                                                IndexMask mask)
+{
+  if (src_varray.is_span()) {
+    const void *src_ptr = src_varray.get_internal_span().data();
+    type_->copy_assign_indices(src_ptr, data_, mask);
+  }
+  else if (src_varray.is_single()) {
+    BUFFER_FOR_CPP_TYPE_VALUE(*type_, buffer);
+    src_varray.get_internal_single(buffer);
+    type_->fill_assign_indices(buffer, data_, mask);
+    type_->destruct(buffer);
+  }
+  else {
+    BUFFER_FOR_CPP_TYPE_VALUE(*type_, buffer);
+    mask.foreach_index([&](const int64_t i) {
+      src_varray.get_to_uninitialized(i, buffer);
+      type_->relocate_assign(buffer, POINTER_OFFSET(data_, element_size_ * i));
+    });
+  }
+}
+
+bool GVMutableArray_For_GMutableSpan::can_set_multiple_efficiently_impl(
+    const GVArray &src_varray) const
+{
+  return src_varray.is_span() || src_varray.is_single();
 }
 
 bool GVMutableArray_For_GMutableSpan::is_span_impl() const
@@ -327,6 +392,30 @@ void GVArray_For_SingleValueRef::get_to_uninitialized_impl(const int64_t UNUSED(
                                                            void *r_value) const
 {
   type_->copy_construct(value_, r_value);
+}
+
+void GVArray_For_SingleValueRef::get_multiple_impl(GVMutableArray &dst_varray,
+                                                   IndexMask mask) const
+{
+  if (dst_varray.is_span()) {
+    void *dst_ptr = dst_varray.get_internal_span().data();
+    type_->fill_assign_indices(value_, dst_ptr, mask);
+  }
+  else {
+    mask.foreach_index([&](const int64_t i) { dst_varray.set_by_copy(i, value_); });
+  }
+}
+
+void GVArray_For_SingleValueRef::get_multiple_to_uninitialized_impl(void *dst,
+                                                                    IndexMask mask) const
+{
+  type_->fill_construct_indices(value_, dst, mask);
+}
+
+bool GVArray_For_SingleValueRef::can_get_multiple_efficiently_impl(
+    const GVMutableArray &dst_varray) const
+{
+  return dst_varray.is_span();
 }
 
 bool GVArray_For_SingleValueRef::is_span_impl() const

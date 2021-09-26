@@ -46,6 +46,7 @@ namespace blender {
 template<typename T> class VMutableArray;
 template<typename T> class VArray_For_Span;
 template<typename T> class VMutableArray_For_MutableSpan;
+template<typename T> class VArray_For_Single;
 
 /* An immutable virtual array. */
 template<typename T> class VArray {
@@ -249,6 +250,11 @@ template<typename T> class VMutableArray : public VArray<T> {
   void set_multiple(const Span<T> src)
   {
     this->set_multiple(VArray_For_Span<T>{src});
+  }
+
+  void set_multiple(const T &value, const IndexMask mask)
+  {
+    this->set_multiple(VArray_For_Single<T>{value, this->size_}, mask);
   }
 
   void set_multiple(const VArray<T> &src_varray, const IndexMask mask)
