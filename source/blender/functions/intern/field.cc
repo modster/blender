@@ -468,21 +468,7 @@ Vector<const GVArray *> evaluate_fields(ResourceScope &scope,
         /* The result has been written into the destination provided by the caller already. */
         continue;
       }
-      /* Still have to copy over the data in the destination provided by the caller. */
-      if (output_varray->is_span()) {
-        /* Materialize into a span. */
-        computed_varray->get_multiple_to_uninitialized(output_varray->get_internal_span().data(),
-                                                       mask);
-      }
-      else {
-        /* Slower materialize into a different structure. */
-        const CPPType &type = computed_varray->type();
-        BUFFER_FOR_CPP_TYPE_VALUE(type, buffer);
-        for (const int i : mask) {
-          computed_varray->get_to_uninitialized(i, buffer);
-          output_varray->set_by_relocate(i, buffer);
-        }
-      }
+      output_varray->set_multiple_by_copy(*computed_varray, mask);
       r_varrays[out_index] = output_varray;
     }
   }

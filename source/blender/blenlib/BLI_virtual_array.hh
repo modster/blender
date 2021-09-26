@@ -743,6 +743,10 @@ class VMutableArray_For_DerivedSpan : public VMutableArray<ElemT> {
       const ElemT *src_ptr = src_varray.get_internal_span().data();
       mask.foreach_index([&](const int64_t i) { SetFunc(data_[i], src_ptr[i]); });
     }
+    else if (src_varray.is_single()) {
+      const ElemT src_value = src_varray.get_internal_single();
+      mask.foreach_index([&](const int64_t i) { SetFunc(data_[i], src_value); });
+    }
     else {
       mask.foreach_index([&](const int64_t i) { SetFunc(data_[i], src_varray.get(i)); });
     }
@@ -750,7 +754,7 @@ class VMutableArray_For_DerivedSpan : public VMutableArray<ElemT> {
 
   virtual bool can_set_multiple_efficiently_impl(const VArray<ElemT> &src_varray) const
   {
-    return src_varray.is_span();
+    return src_varray.is_span() || src_varray.is_single();
   }
 };
 
