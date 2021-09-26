@@ -53,7 +53,7 @@ void ParallelMultiFunction::call(IndexMask full_mask, MFParams params, MFContext
     const int64_t input_slice_size = full_mask[mask_slice.last()] - input_slice_start + 1;
     const IndexRange input_slice_range{input_slice_start, input_slice_size};
 
-    MFParamsBuilder sub_params{fn_, sub_mask.min_array_size()};
+    MFParamsBuilder sub_params{fn_, &sub_mask};
     ResourceScope &scope = sub_params.resource_scope();
 
     /* All parameters are sliced so that the wrapped multi-function does not have to take care of
@@ -63,8 +63,32 @@ void ParallelMultiFunction::call(IndexMask full_mask, MFParams params, MFContext
       switch (param_type.category()) {
         case MFParamType::SingleInput: {
           const GVArray &varray = params.readonly_single_input(param_index);
-          const GVArray &sliced_varray = scope.construct<GVArray_Slice>(varray, input_slice_range);
-          sub_params.add_readonly_single_input(sliced_varray);
+          if (varray.is_single()) {
+            sub_params.add_readonly_single_input(varray);
+          }
+          else if (varray.is_span()) {
+            const GSpan span = varray.get_internal_span();
+            const GVArray &sliced_varray = scope.construct<GVArray_For_GSpan>(
+                span.slice(input_slice_start, input_slice_size));
+            sub_params.add_readonly_single_input(sliced_varray);
+          }
+          else {
+            /* Copy non-standard virtual arrays into array for faster access. */
+            const CPPType &type = param_type.data_type().single_type();
+
+            void *buffer = scope.linear_allocator().allocate(
+                sub_mask.min_array_size() * type.size(), type.alignment());
+            const IndexMask full_mask_slice = full_mask.slice(mask_slice);
+
+            void *fake_buffer_start = POINTER_OFFSET(buffer, -type.size() * full_mask_slice[0]);
+            varray.get_multiple_to_uninitialized(fake_buffer_start, full_mask_slice);
+            sub_params.add_readonly_single_input(GSpan(type, buffer, sub_mask.min_array_size()));
+
+            if (!type.is_trivially_destructible()) {
+              scope.add_destruct_call(
+                  [&type, buffer, &sub_mask]() { type.destruct_indices(buffer, sub_mask); });
+            }
+          }
           break;
         }
         case MFParamType::SingleMutable: {
