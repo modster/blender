@@ -18,6 +18,7 @@
 #include "BLI_multi_value_map.hh"
 #include "BLI_set.hh"
 #include "BLI_stack.hh"
+#include "BLI_task.hh"
 #include "BLI_vector_set.hh"
 
 #include "FN_field.hh"
@@ -468,7 +469,10 @@ Vector<const GVArray *> evaluate_fields(ResourceScope &scope,
         /* The result has been written into the destination provided by the caller already. */
         continue;
       }
-      output_varray->set_multiple_by_copy(*computed_varray, mask);
+      threading::parallel_for(mask.index_range(), 1024, [&](IndexRange range) {
+        const IndexMask sub_mask = mask.slice(range);
+        output_varray->set_multiple_by_copy(*computed_varray, sub_mask);
+      });
       r_varrays[out_index] = output_varray;
     }
   }
