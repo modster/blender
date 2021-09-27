@@ -4,4 +4,5 @@ void node_composite_alpha_over(
 {
   /* TODO(fclem) Finalize with all premult variant. */
   result = color1 * (1.0 - color2.a) + color2;
+  result = mix(color1, result, fac);
 }
