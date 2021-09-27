@@ -367,6 +367,7 @@ static void scene_copy_data(Main *bmain, ID *id_dst, const ID *id_src, const int
   }
 
   BLI_listbase_clear(&scene_dst->gpumaterial);
+  BLI_listbase_clear(&scene_dst->compositor_depsgraphs);
 
   BKE_scene_copy_data_eevee(scene_dst, scene_src);
 }
@@ -467,6 +468,11 @@ static void scene_free_data(ID *id)
     IDP_FreeProperty(scene->display.shading.prop);
     scene->display.shading.prop = NULL;
   }
+
+  LISTBASE_FOREACH_MUTABLE (LinkData *, link, &scene->compositor_depsgraphs) {
+    DEG_graph_free((Depsgraph *)link->data);
+  }
+  BLI_freelistN(&scene->compositor_depsgraphs);
 
   /* These are freed on doversion. */
   BLI_assert(scene->layer_properties == NULL);
@@ -817,6 +823,7 @@ static void scene_blend_write(BlendWriter *writer, ID *id, const void *id_addres
   if (BLO_write_is_undo(writer)) {
     /* Clean up, important in undo case to reduce false detection of changed data-blocks. */
     BLI_listbase_clear(&sce->gpumaterial);
+    BLI_listbase_clear(&sce->compositor_depsgraphs);
     /* XXX This UI data should not be stored in Scene at all... */
     memset(&sce->cursor, 0, sizeof(sce->cursor));
   }
@@ -1384,6 +1391,7 @@ static void scene_blend_read_data(BlendDataReader *reader, ID *id)
   BKE_screen_view3d_shading_blend_read_data(reader, &sce->display.shading);
 
   BLI_listbase_clear(&sce->gpumaterial);
+  BLI_listbase_clear(&sce->compositor_depsgraphs);
 
   BLO_read_data_address(reader, &sce->layer_properties);
   IDP_BlendDataRead(reader, &sce->layer_properties);
@@ -3846,4 +3854,9 @@ void BKE_scene_eval_compositor_nodetree(struct Depsgraph *depsgraph, Scene *scen
 {
   DEG_debug_print_eval(depsgraph, __func__, scene->id.name, scene);
   GPU_material_free(&scene->gpumaterial);
+
+  LISTBASE_FOREACH_MUTABLE (LinkData *, link, &scene->compositor_depsgraphs) {
+    DEG_graph_free((Depsgraph *)link->data);
+  }
+  BLI_freelistN(&scene->compositor_depsgraphs);
 }

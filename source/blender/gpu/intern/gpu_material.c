@@ -230,6 +230,11 @@ ListBase GPU_material_volume_grids(GPUMaterial *material)
   return material->graph.volume_grids;
 }
 
+ListBase GPU_material_render_passes(GPUMaterial *material)
+{
+  return material->graph.render_passes;
+}
+
 GPUUniformAttrList *GPU_material_uniform_attributes(GPUMaterial *material)
 {
   GPUUniformAttrList *attrs = &material->graph.uniform_attrs;

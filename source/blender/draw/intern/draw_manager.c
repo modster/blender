@@ -45,6 +45,7 @@
 #include "BKE_mball.h"
 #include "BKE_mesh.h"
 #include "BKE_modifier.h"
+#include "BKE_node.h"
 #include "BKE_object.h"
 #include "BKE_paint.h"
 #include "BKE_particle.h"
@@ -176,6 +177,82 @@ static void drw_task_graph_deinit(void)
 
   BLI_task_graph_free(DST.task_graph);
   DST.task_graph = NULL;
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name DRWRenderScene
+ * \{ */
+
+static DRWRenderScene *draw_render_scene_new(Depsgraph *UNUSED(depsgraph),
+                                             Scene *scene_orig,
+                                             int res_x,
+                                             int res_y)
+{
+  DRWRenderScene *drw_scene = MEM_callocN(sizeof(*drw_scene), __func__);
+  drw_scene->scene = scene_orig;
+  drw_scene->is_active_scene = false;
+  if (drw_scene->views[0].combined.pass_tx == NULL) {
+    drw_scene->views[0].combined.pass_tx = GPU_texture_create_2d(
+        scene_orig->id.name, res_x, res_y, 1, GPU_RGBA16F, NULL);
+  }
+  return drw_scene;
+}
+
+/* To become irrelevant once RenderEngine will fill the structure directly. */
+static DRWRenderScene *draw_render_scene_from_viewport(Depsgraph *UNUSED(depsgraph),
+                                                       Scene *scene_orig,
+                                                       GPUTexture *color_tx)
+{
+  DRWRenderScene *drw_scene = MEM_callocN(sizeof(*drw_scene), __func__);
+  /* NOTE(fclem): setting active scene as NULL. */
+  drw_scene->scene = scene_orig;
+  drw_scene->is_active_scene = true;
+  drw_scene->views[0].combined.pass_tx = color_tx;
+  return drw_scene;
+}
+
+static void draw_render_scene_free(DRWRenderScene *rscene)
+{
+  if (rscene->is_active_scene == false) {
+    GPU_TEXTURE_FREE_SAFE(rscene->views[0].combined.pass_tx);
+    GPU_FRAMEBUFFER_FREE_SAFE(rscene->views[0].combined.color_only_fb);
+    GPU_FRAMEBUFFER_FREE_SAFE(rscene->views[0].combined.pass_fb);
+    if (rscene->views[0].render_engine != NULL) {
+      RE_engine_free(rscene->views[0].render_engine);
+      rscene->views[0].render_engine = NULL;
+    }
+  }
+  MEM_freeN(rscene);
+}
+
+static DRWRenderScene *drw_render_scene_find(DRWData *draw_data,
+                                             const Scene *scene_orig,
+                                             int view_layer_index)
+{
+  LISTBASE_FOREACH (DRWRenderScene *, rscene, &draw_data->scene_renders) {
+    if (rscene->scene == scene_orig && rscene->view_layer_index == view_layer_index) {
+      return rscene;
+    }
+  }
+  return NULL;
+}
+
+DRWRenderPass *DRW_render_pass_find(const Scene *scene_orig,
+                                    const int view_layer_index,
+                                    const eScenePassType pass_type)
+{
+  DRWRenderScene *rscene = drw_render_scene_find(DST.vmempool, scene_orig, view_layer_index);
+  /* TODO(fclem) multiview. */
+  /* TODO(fclem) Other passes. */
+  switch (pass_type) {
+    default:
+      BLI_assert(!"Invalid pass type");
+      ATTR_FALLTHROUGH;
+    case SCE_PASS_COMBINED:
+      return &rscene->views[0].combined;
+  }
 }
 
 /** \} */
@@ -592,6 +669,12 @@ void DRW_viewport_data_free(DRWData *drw_data)
     MEM_freeN(drw_data->matrices_ubo);
     MEM_freeN(drw_data->obinfos_ubo);
   }
+
+  LISTBASE_FOREACH_MUTABLE (DRWRenderScene *, rscene, &drw_data->scene_renders) {
+    BLI_remlink(&drw_data->scene_renders, rscene);
+    draw_render_scene_free(rscene);
+  }
+
   MEM_freeN(drw_data);
 }
 
@@ -673,6 +756,15 @@ static void drw_manager_init(DRWManager *dst, GPUViewport *viewport, const int s
 
   DefaultFramebufferList *dfbl = DRW_view_data_default_framebuffer_list_get(dst->view_data_active);
   dst->default_framebuffer = dfbl->default_fb;
+
+  if (dst->options.is_compositor_scene_render) {
+    Scene *scene_orig = DEG_get_input_scene(dst->draw_ctx.depsgraph);
+    ViewLayer *view_layer = DEG_get_input_view_layer(dst->draw_ctx.depsgraph);
+    int viewlayer_index = BLI_findindex(&scene_orig->view_layers, view_layer);
+    DRWRenderScene *rscene = drw_render_scene_find(dst->vmempool, scene_orig, viewlayer_index);
+    BLI_assert(rscene);
+    DRW_view_data_color_from_compositor_scene(dst->view_data_active, rscene);
+  }
 
   draw_unit_state_create();
 
@@ -1290,6 +1382,155 @@ static void drw_engines_enable_editors(void)
   }
 }
 
+/* Beware: This can go recursive if not handled properly. */
+static void drw_compositor_scenes_render(DRWManager *drw,
+                                         Scene *scene_active,
+                                         ViewLayer *view_layer_active)
+{
+  const eDrawType drawtype = drw->draw_ctx.v3d->shading.type;
+  const bool use_compositor = ((drw->draw_ctx.v3d->shading.flag & V3D_SHADING_COMPOSITOR) != 0) &&
+                              (drawtype >= OB_MATERIAL);
+  if (!use_compositor) {
+    return;
+  }
+
+  /* Saving anything inside drw because it will be reused by the rendering loop.
+   * TODO(fclem): Instanciating DRWManager would solve the issue. */
+  DRWContextState prev_draw_ctx = drw->draw_ctx;
+  bNodeTree *comp_ntree = scene_active->nodetree;
+  ARegion *region = drw->draw_ctx.region;
+  Depsgraph *depsgraph = drw->draw_ctx.depsgraph;
+  View3D *v3d = drw->draw_ctx.v3d;
+  RegionView3D *rv3d = drw->draw_ctx.rv3d;
+  GPUViewport *viewport = drw->viewport;
+  DRWViewData *view_data_active = drw->view_data_active;
+  Main *bmain = DEG_get_bmain(drw->draw_ctx.depsgraph);
+  const bContext *evil_C = drw->draw_ctx.evil_C;
+  DRWData *drw_data = drw->vmempool;
+  int prev_flag2 = v3d->flag2;
+
+  /* Avoid infinite recursion. */
+  v3d->shading.flag &= ~V3D_SHADING_COMPOSITOR;
+  /* Remove overlay for composited scene to avoid overhead. */
+  v3d->flag2 |= V3D_HIDE_OVERLAYS;
+
+  LISTBASE_FOREACH (DRWRenderScene *, rscene, &drw_data->scene_renders) {
+    rscene->rendered = false;
+  }
+
+  /* TODO(fclem) Only render the scenes that are connected to the output. */
+  LISTBASE_FOREACH (bNode *, node, &comp_ntree->nodes) {
+    if (node->type == CMP_NODE_R_LAYERS && (node->flag & NODE_MUTED) == 0) {
+      if (node->id) {
+        Scene *scene_orig = (Scene *)DEG_get_original_id(node->id);
+        ViewLayer *view_layer = BLI_findlink(&scene_orig->view_layers, node->custom1);
+
+        /* Skip the main scene as it will be rendered afterwards. */
+        if (node->id == (ID *)scene_active) {
+          continue;
+        }
+
+        Depsgraph *deg = NULL;
+        /* Search for existing depsgraph matching this scene and layer. */
+        /* These are cached at scene level to be reused between viewports. */
+        LISTBASE_FOREACH (LinkData *, link, &scene_active->compositor_depsgraphs) {
+          Depsgraph *deg_candidate = (Depsgraph *)link->data;
+          if (DEG_get_input_scene(deg_candidate) == scene_orig &&
+              DEG_get_input_view_layer(deg_candidate) == view_layer) {
+            deg = deg_candidate;
+            break;
+          }
+        }
+        if (deg == NULL) {
+          deg = DEG_graph_new(bmain, scene_orig, view_layer, DAG_EVAL_VIEWPORT);
+          /* @fclem : Ask sergey if that's all right. */
+          DEG_graph_build_from_view_layer(deg);
+          DEG_graph_relations_update(deg);
+          DEG_evaluate_on_refresh(deg);
+
+          BLI_addtail(&scene_active->compositor_depsgraphs, BLI_genericNodeN(deg));
+        }
+
+        DefaultTextureList *dtxl = DRW_view_data_default_texture_list_get(view_data_active);
+
+        /* Find or create the render pass(es) that will contain the result of this scene. */
+        DRWRenderScene *rscene = drw_render_scene_find(drw_data, scene_orig, node->custom1);
+        if (rscene == NULL) {
+          rscene = draw_render_scene_new(
+              deg, scene_orig, GPU_texture_width(dtxl->color), GPU_texture_height(dtxl->color));
+          BLI_addtail(&drw_data->scene_renders, rscene);
+        }
+        rscene->is_active_scene = false;
+
+        if (rscene->rendered) {
+          continue;
+        }
+
+        RenderEngineType *engine_type = RE_engines_find(scene_orig->r.engine);
+        RenderEngine *prev_render_engine = rv3d->render_engine;
+        if (engine_type->draw_engine == NULL) {
+          /* TODO(@fclem): We swap the render engine inside the region.
+           * A better way would be to adjust the external draw engine code. */
+          rv3d->render_engine = rscene->views[0].render_engine;
+        }
+
+        /* Fix asserts. TODO(fclem) revisit this. */
+        drw_state_prepare_clean_for_draw(&DST);
+        DST.options.is_compositor_scene_render = true;
+        GPU_framebuffer_restore();
+
+        DRW_draw_render_loop_ex(deg, engine_type, region, v3d, viewport, evil_C);
+
+        /* Restore. */
+        if (engine_type->draw_engine == NULL) {
+          rv3d->render_engine = prev_render_engine;
+        }
+
+        rscene->rendered = true;
+      }
+    }
+  }
+
+  /* Prune unused layers. */
+  /* TODO(@fclem): This should be done in compositor tree updates to avoid using resources without
+   * needing them. Should be also cleared if changing active scene. */
+  bool has_rendered = false;
+  LISTBASE_FOREACH_MUTABLE (DRWRenderScene *, rscene, &drw_data->scene_renders) {
+    if (rscene->rendered == false) {
+      BLI_remlink(&drw_data->scene_renders, rscene);
+      draw_render_scene_free(rscene);
+    }
+    else {
+      has_rendered = true;
+    }
+  }
+
+  v3d->shading.flag |= V3D_SHADING_COMPOSITOR;
+  v3d->flag2 = prev_flag2;
+
+  /* Re-init the draw manager since it may have been shutdown by other scene renders. */
+  if (has_rendered) {
+    drw_state_prepare_clean_for_draw(&DST);
+    GPU_framebuffer_restore();
+    DST.draw_ctx = prev_draw_ctx;
+    DST.options.is_compositor_scene_render = false;
+    drw_manager_init(&DST, viewport, NULL);
+    drw_context_state_init();
+  }
+
+  {
+    /* Now setup the DRWRenderScene for the active scene. */
+    Scene *scene_orig = (Scene *)DEG_get_original_id(&scene_active->id);
+    int view_layer_index = BLI_findindex(&scene_active->view_layers, view_layer_active);
+    DRWRenderScene *rscene = drw_render_scene_find(drw_data, scene_orig, view_layer_index);
+    if (rscene == NULL) {
+      DefaultTextureList *dtxl = DRW_viewport_texture_list_get();
+      rscene = draw_render_scene_from_viewport(depsgraph, scene_orig, dtxl->color);
+      BLI_addtail(&drw_data->scene_renders, rscene);
+    }
+  }
+}
+
 static void drw_engines_enable(ViewLayer *UNUSED(view_layer),
                                RenderEngineType *engine_type,
                                bool gpencil_engine_needed)
@@ -1306,7 +1547,10 @@ static void drw_engines_enable(ViewLayer *UNUSED(view_layer),
   if (((v3d->shading.flag & V3D_SHADING_COMPOSITOR) != 0) && (drawtype >= OB_MATERIAL)) {
     use_drw_engine(&draw_engine_compositor_type);
   }
-  drw_engines_enable_overlays();
+
+  if (!DST.options.is_compositor_scene_render) {
+    drw_engines_enable_overlays();
+  }
 }
 
 static void drw_engines_disable(void)
@@ -1406,6 +1650,10 @@ void DRW_draw_callbacks_pre_scene(void)
 {
   RegionView3D *rv3d = DST.draw_ctx.rv3d;
 
+  if (DST.options.is_compositor_scene_render) {
+    return;
+  }
+
   GPU_matrix_projection_set(rv3d->winmat);
   GPU_matrix_set(rv3d->viewmat);
 
@@ -1423,6 +1671,10 @@ void DRW_draw_callbacks_post_scene(void)
   ARegion *region = DST.draw_ctx.region;
   View3D *v3d = DST.draw_ctx.v3d;
   Depsgraph *depsgraph = DST.draw_ctx.depsgraph;
+
+  if (DST.options.is_compositor_scene_render) {
+    return;
+  }
 
   const bool do_annotations = drw_draw_show_annotation();
 
@@ -1578,11 +1830,14 @@ void DRW_draw_render_loop_ex(struct Depsgraph *depsgraph,
       /* reuse if caller sets */
       .evil_C = DST.draw_ctx.evil_C,
   };
-  drw_task_graph_init();
   drw_context_state_init();
 
   drw_manager_init(&DST, viewport, NULL);
+
+  drw_compositor_scenes_render(&DST, scene, view_layer);
+
   drw_viewport_colormanagement_set();
+  drw_task_graph_init();
 
   const int object_type_exclude_viewport = v3d->object_type_exclude_viewport;
   /* Check if scene needs to perform the populate loop */

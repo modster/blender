@@ -61,6 +61,30 @@ DRWViewData *DRW_view_data_create(ListBase *engine_types)
   return view_data;
 }
 
+void DRW_view_data_color_from_compositor_scene(DRWViewData *view_data, DRWRenderScene *rscene)
+{
+  /* TODO(fclem): This is just a way to get something working quickly.
+   * Eventually, it would be the responsibility of the draw engine to fill each buffer
+   * directly. And we could drop the texture list and framebuffer list alltogether. */
+
+  DefaultFramebufferList *dfbl = &view_data->dfbl;
+  DefaultTextureList *dtxl = &view_data->dtxl;
+
+  GPU_framebuffer_ensure_config(&rscene->views[0].combined.pass_fb,
+                                {
+                                    GPU_ATTACHMENT_TEXTURE(dtxl->depth),
+                                    GPU_ATTACHMENT_TEXTURE(rscene->views[0].combined.pass_tx),
+                                });
+  GPU_framebuffer_ensure_config(&rscene->views[0].combined.color_only_fb,
+                                {
+                                    GPU_ATTACHMENT_NONE,
+                                    GPU_ATTACHMENT_TEXTURE(rscene->views[0].combined.pass_tx),
+                                });
+  dtxl->color = rscene->views[0].combined.pass_tx;
+  dfbl->default_fb = rscene->views[0].combined.pass_fb;
+  dfbl->color_only_fb = rscene->views[0].combined.color_only_fb;
+}
+
 void DRW_view_data_default_lists_from_viewport(DRWViewData *view_data, GPUViewport *viewport)
 {
   int active_view = GPU_viewport_active_view_get(viewport);

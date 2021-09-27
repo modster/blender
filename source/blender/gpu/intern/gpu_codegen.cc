@@ -160,6 +160,8 @@ static std::ostream &operator<<(std::ostream &stream, const GPUInput *input)
       return stream << input->texture->sampler_name;
     case GPU_SOURCE_TEX_TILED_MAPPING:
       return stream << input->texture->tiled_mapping_name;
+    case GPU_SOURCE_RENDER_RESULT:
+      return stream << input->render_pass->sampler_name;
     case GPU_SOURCE_VOLUME_GRID:
       return stream << input->volume_grid->sampler_name;
     case GPU_SOURCE_VOLUME_GRID_TRANSFORM:
@@ -369,6 +371,10 @@ void GPUCodegen::generate_resources()
     ss << "uniform sampler3D " << grid->sampler_name << ";\n";
     /* TODO(fclem) global uniform. To put in a UBO. */
     ss << "uniform mat4 " << grid->transform_name << " = mat4(0.0);\n";
+  }
+  /* Render Passes. */
+  LISTBASE_FOREACH (GPUMaterialRenderPass *, rlayer, &graph.render_passes) {
+    ss << "uniform sampler2D " << rlayer->sampler_name << ";\n";
   }
 
   if (!BLI_listbase_is_empty(&ubo_inputs_)) {

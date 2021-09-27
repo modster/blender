@@ -144,6 +144,41 @@ typedef struct DrawEngineType {
   int index;
 } DrawEngineType;
 
+typedef struct DRWRenderPass {
+  GPUTexture *pass_tx;
+  GPUFrameBuffer *pass_fb;
+  /** TODO(fclem): Remove when all engines are aware of the DRWRenderPass structure and populate
+   * it directly. */
+  GPUFrameBuffer *color_only_fb;
+} DRWRenderPass;
+
+typedef struct DRWRenderView {
+  /** TODO(fclem): Unused for now, should be what the engine use to render instead of relying on
+   * the DRW_view_default_get(). */
+  DRWView *view;
+  /** External engines. Created if needed. */
+  struct RenderEngine *render_engine;
+  /** TODO(fclem): multiple render passes. */
+  DRWRenderPass combined;
+} DRWRenderView;
+
+typedef struct DRWRenderScene {
+  struct DRWRenderScene *next, *prev;
+  /** Original Scene associated to this render. Used only as identifier. */
+  Scene *scene;
+  /** View layer index this render scene is from. */
+  int view_layer_index;
+  /** Marks a scene a rendered. */
+  bool rendered;
+  bool is_active_scene;
+  /* TODO(fclem): multiviews. */
+  DRWRenderView views[1];
+} DRWRenderScene;
+
+DRWRenderPass *DRW_render_pass_find(const Scene *scene_orig,
+                                    const int view_layer_index,
+                                    const eScenePassType pass_type);
+
 /* Textures */
 typedef enum {
   DRW_TEX_FILTER = (1 << 0),

@@ -26,6 +26,8 @@
 #include "BLI_linklist.h"
 #include "BLI_utildefines.h"
 
+#include "DEG_depsgraph_query.h"
+
 #include "DNA_scene_types.h"
 
 #include "RE_engine.h"
@@ -618,13 +620,24 @@ static void cmp_node_rlayers_update(bNodeTree *ntree, bNode *node)
 }
 
 static int node_composit_gpu_rlayers(GPUMaterial *mat,
-                                     bNode *UNUSED(node),
+                                     bNode *node,
                                      bNodeExecData *UNUSED(execdata),
                                      GPUNodeStack *UNUSED(in),
                                      GPUNodeStack *out)
 {
+  Scene *scene = (Scene *)node->id;
+
   if (out[0].hasoutput) {
-    GPU_link(mat, "node_composite_rlayers", GPU_render_pass(mat, SCE_PASS_COMBINED), &out[0].link);
+    if (scene) {
+      Scene *scene_orig = (Scene *)DEG_get_original_id(&scene->id);
+      GPU_link(mat,
+               "node_composite_rlayers",
+               GPU_render_pass(mat, scene_orig, node->custom1, SCE_PASS_COMBINED),
+               &out[0].link);
+    }
+    else {
+      GPU_link(mat, "node_composite_image_empty", &out[0].link);
+    }
   }
   /* TODO(fclem) other passes. */
 

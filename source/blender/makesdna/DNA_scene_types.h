@@ -1804,6 +1804,9 @@ typedef struct Scene {
 
   /** GPUMaterial for the compositing nodetree. */
   ListBase gpumaterial;
+  /** All depsgraphs needed by the realtime compositor of this scene.
+   *  Reused accross different viewports. */
+  ListBase compositor_depsgraphs;
 
   struct SceneDisplay display;
   struct SceneEEVEE eevee;

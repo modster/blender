@@ -520,6 +520,8 @@ typedef struct DRWData {
   struct DRWTexturePool *texture_pool;
   /** Per stereo view data. Contains engine data and default framebuffers. */
   struct DRWViewData *view_data[2];
+  /** Render results for viewport compositor. (DRWRenderScene *) */
+  ListBase scene_renders;
 } DRWData;
 
 /* ------------- DRAW MANAGER ------------ */
@@ -576,6 +578,7 @@ typedef struct DRWManager {
     uint is_depth : 1;
     uint is_image_render : 1;
     uint is_scene_render : 1;
+    uint is_compositor_scene_render : 1;
     uint do_color_management : 1;
     uint draw_background : 1;
     uint draw_text : 1;

@@ -164,7 +164,10 @@ GPUNodeLink *GPU_color_band(GPUMaterial *mat, int size, float *pixels, float *ro
 GPUNodeLink *GPU_volume_grid(GPUMaterial *mat,
                              const char *name,
                              eGPUVolumeDefaultValue default_value);
-GPUNodeLink *GPU_render_pass(GPUMaterial *mat, eScenePassType pass_type);
+GPUNodeLink *GPU_render_pass(GPUMaterial *mat,
+                             struct Scene *scene,
+                             int view_layer,
+                             eScenePassType pass_type);
 
 bool GPU_link(GPUMaterial *mat, const char *name, ...);
 bool GPU_stack_link(GPUMaterial *mat,
@@ -253,8 +256,6 @@ typedef struct GPUMaterialTexture {
   char tiled_mapping_name[32]; /* Name of tile mapping sampler in GLSL. */
   int users;
   int sampler_state; /* eGPUSamplerState */
-  /* Use for render layer inputs (compositor). */
-  eScenePassType pass_type;
 } GPUMaterialTexture;
 
 typedef struct GPUMaterialVolumeGrid {
@@ -266,9 +267,22 @@ typedef struct GPUMaterialVolumeGrid {
   int users;
 } GPUMaterialVolumeGrid;
 
+/* NOTE(fclem): Not to be confused with actual rendering passes.
+ * This is a reference to texture input which is the result of a rendering pass. */
+typedef struct GPUMaterialRenderPass {
+  struct GPUMaterialRenderPass *next, *prev;
+  struct Scene *scene;
+  int viewlayer;
+  eScenePassType pass_type;
+  char sampler_name[32]; /* Name of sampler in GLSL. */
+  int users;
+  eGPUSamplerState sampler_state;
+} GPUMaterialRenderPass;
+
 ListBase GPU_material_attributes(GPUMaterial *material);
 ListBase GPU_material_textures(GPUMaterial *material);
 ListBase GPU_material_volume_grids(GPUMaterial *material);
+ListBase GPU_material_render_passes(GPUMaterial *material);
 
 typedef struct GPUUniformAttr {
   struct GPUUniformAttr *next, *prev;

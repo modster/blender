@@ -50,6 +50,7 @@ typedef enum eGPUDataSource {
   GPU_SOURCE_STRUCT,
   GPU_SOURCE_TEX,
   GPU_SOURCE_TEX_TILED_MAPPING,
+  GPU_SOURCE_RENDER_RESULT,
   GPU_SOURCE_VOLUME_GRID,
   GPU_SOURCE_VOLUME_GRID_TRANSFORM,
 } eGPUDataSource;
@@ -112,6 +113,8 @@ struct GPUNodeLink {
     struct GPUUniformAttr *uniform_attr;
     /* GPU_NODE_LINK_IMAGE_BLENDER */
     struct GPUMaterialTexture *texture;
+    /* GPU_NODE_LINK_RENDER_RESULT */
+    struct GPUMaterialRenderPass *render_pass;
   };
 };
 
@@ -146,6 +149,8 @@ typedef struct GPUInput {
     struct GPUUniformAttr *uniform_attr;
     /* GPU_SOURCE_VOLUME_GRID | GPU_SOURCE_VOLUME_GRID_TRANSFORM */
     struct GPUMaterialVolumeGrid *volume_grid;
+    /* GPU_SOURCE_RENDER_RESULT */
+    struct GPUMaterialRenderPass *render_pass;
   };
 } GPUInput;
 
@@ -178,6 +183,7 @@ typedef struct GPUNodeGraph {
   ListBase attributes;
   ListBase textures;
   ListBase volume_grids;
+  ListBase render_passes;
 
   /* The list of uniform attributes. */
   GPUUniformAttrList uniform_attrs;
