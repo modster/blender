@@ -906,7 +906,7 @@ static void rna_GPencil_update(Main *bmain, Scene *UNUSED(scene), PointerRNA *UN
 static void rna_SpaceView3D_camera_update(Main *bmain, Scene *scene, PointerRNA *ptr)
 {
   View3D *v3d = (View3D *)(ptr->data);
-  if (v3d->scenelock) {
+  if (v3d->scenelock && scene != NULL) {
     wmWindowManager *wm = bmain->wm.first;
 
     scene->camera = v3d->camera;
@@ -1540,7 +1540,9 @@ static PointerRNA rna_SpaceImageEditor_uvedit_get(PointerRNA *ptr)
 
 static void rna_SpaceImageEditor_mode_update(Main *bmain, Scene *scene, PointerRNA *UNUSED(ptr))
 {
-  ED_space_image_paint_update(bmain, bmain->wm.first, scene);
+  if (scene != NULL) {
+    ED_space_image_paint_update(bmain, bmain->wm.first, scene);
+  }
 }
 
 static void rna_SpaceImageEditor_show_stereo_set(PointerRNA *ptr, int value)
@@ -2616,6 +2618,40 @@ static uint64_t rna_FileAssetSelectParams_asset_category_get(PointerRNA *ptr)
   return params->filter_id;
 }
 
+static PointerRNA rna_FileBrowser_FileSelectEntry_asset_data_get(PointerRNA *ptr)
+{
+  const FileDirEntry *entry = ptr->data;
+
+  /* Note that the owning ID of the RNA pointer (`ptr->owner_id`) has to be set carefully:
+   * Local IDs (`entry->id`) own their asset metadata themselves. Asset metadata from other blend
+   * files are owned by the file browser (`entry`). Only if this is set correctly, we can tell from
+   * the metadata RNA pointer if the metadata is stored locally and can thus be edited or not. */
+
+  if (entry->id) {
+    PointerRNA id_ptr;
+    RNA_id_pointer_create(entry->id, &id_ptr);
+    return rna_pointer_inherit_refine(&id_ptr, &RNA_AssetMetaData, entry->asset_data);
+  }
+
+  return rna_pointer_inherit_refine(ptr, &RNA_AssetMetaData, entry->asset_data);
+}
+
+static int rna_FileBrowser_FileSelectEntry_name_editable(PointerRNA *ptr, const char **r_info)
+{
+  const FileDirEntry *entry = ptr->data;
+
+  /* This actually always returns 0 (the name is never editable) but we want to get a disabled
+   * message returned to `r_info` in some cases. */
+
+  if (entry->asset_data) {
+    PointerRNA asset_data_ptr = rna_FileBrowser_FileSelectEntry_asset_data_get(ptr);
+    /* Get disabled hint from asset metadata polling. */
+    rna_AssetMetaData_editable(&asset_data_ptr, r_info);
+  }
+
+  return 0;
+}
+
 static void rna_FileBrowser_FileSelectEntry_name_get(PointerRNA *ptr, char *value)
 {
   const FileDirEntry *entry = ptr->data;
@@ -2670,12 +2706,6 @@ static int rna_FileBrowser_FileSelectEntry_preview_icon_id_get(PointerRNA *ptr)
 {
   const FileDirEntry *entry = ptr->data;
   return ED_file_icon(entry);
-}
-
-static PointerRNA rna_FileBrowser_FileSelectEntry_asset_data_get(PointerRNA *ptr)
-{
-  const FileDirEntry *entry = ptr->data;
-  return rna_pointer_inherit_refine(ptr, &RNA_AssetMetaData, entry->asset_data);
 }
 
 static StructRNA *rna_FileBrowser_params_typef(PointerRNA *ptr)
@@ -6260,12 +6290,13 @@ static void rna_def_fileselect_entry(BlenderRNA *brna)
   RNA_def_struct_ui_text(srna, "File Select Entry", "A file viewable in the File Browser");
 
   prop = RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
+  RNA_def_property_editable_func(prop, "rna_FileBrowser_FileSelectEntry_name_editable");
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
   RNA_def_property_string_funcs(prop,
                                 "rna_FileBrowser_FileSelectEntry_name_get",
                                 "rna_FileBrowser_FileSelectEntry_name_length",
                                 NULL);
   RNA_def_property_ui_text(prop, "Name", "");
-  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
   RNA_def_struct_name_property(srna, prop);
 
   prop = RNA_def_property(srna, "relative_path", PROP_STRING, PROP_NONE);
