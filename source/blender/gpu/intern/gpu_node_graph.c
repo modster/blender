@@ -479,7 +479,7 @@ static GPUMaterialRenderPass *gpu_node_graph_add_renderpass(GPUNodeGraph *graph,
     rpass->viewlayer = viewlayer;
     rpass->sampler_state = sampler_state;
     rpass->pass_type = pass_type;
-    BLI_snprintf(rpass->sampler_name, sizeof(rpass->sampler_name), "samp%d", num_rpasses);
+    BLI_snprintf(rpass->sampler_name, sizeof(rpass->sampler_name), "rpsamp%d", num_rpasses);
     BLI_addtail(&graph->render_passes, rpass);
   }
 
@@ -894,6 +894,7 @@ void gpu_node_graph_free(GPUNodeGraph *graph)
   }
   BLI_freelistN(&graph->volume_grids);
   BLI_freelistN(&graph->textures);
+  BLI_freelistN(&graph->render_passes);
   BLI_freelistN(&graph->attributes);
   GPU_uniform_attr_list_free(&graph->uniform_attrs);
 
