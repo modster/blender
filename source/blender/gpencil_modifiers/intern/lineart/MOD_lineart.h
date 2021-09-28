@@ -333,6 +333,8 @@ typedef struct LineartRenderBuffer {
   double light_vector[3];
   bool light_is_sun;
 
+  float chain_smooth_tolerance;
+
   /* FIXME(Yiming): Temporary solution for speeding up calculation by not including lines that
    * are not in the selected source. This will not be needed after we have a proper scene-wise
    * cache running because multiple modifiers can then select results from that without further
