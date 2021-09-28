@@ -25,6 +25,7 @@
 
 #include "BLI_float3.hh"
 #include "BLI_float4x4.hh"
+#include "BLI_function_ref.hh"
 #include "BLI_hash.hh"
 #include "BLI_map.hh"
 #include "BLI_set.hh"
@@ -293,6 +294,25 @@ struct GeometrySet {
   bool owns_direct_data() const;
   void ensure_owns_direct_data();
 
+  using AttributeForeachCallback =
+      blender::FunctionRef<void(const blender::bke::AttributeIDRef &attribute_id,
+                                const AttributeMetaData &meta_data,
+                                const GeometryComponent &component)>;
+
+  void attribute_foreach(blender::Span<GeometryComponentType> component_types,
+                         bool include_instances,
+                         AttributeForeachCallback callback) const;
+
+  void gather_attributes_for_propagation(
+      blender::Span<GeometryComponentType> component_types,
+      GeometryComponentType dst_component_type,
+      bool include_instances,
+      blender::Map<blender::bke::AttributeIDRef, AttributeKind> &r_attributes) const;
+
+  using ForeachSubGeometryCallback = blender::FunctionRef<void(GeometrySet &geometry_set)>;
+
+  void modify_geometry_sets(ForeachSubGeometryCallback callback);
+
   /* Utility methods for creation. */
   static GeometrySet create_with_mesh(
       Mesh *mesh, GeometryOwnershipType ownership = GeometryOwnershipType::Owned);
@@ -307,6 +327,7 @@ struct GeometrySet {
   bool has_instances() const;
   bool has_volume() const;
   bool has_curve() const;
+  bool has_realized_data() const;
 
   const Mesh *get_mesh_for_read() const;
   const PointCloud *get_pointcloud_for_read() const;
@@ -481,11 +502,21 @@ class InstanceReference {
   {
   }
 
-  InstanceReference(const InstanceReference &src) : type_(src.type_), data_(src.data_)
+  InstanceReference(const InstanceReference &other) : type_(other.type_), data_(other.data_)
   {
-    if (src.type_ == Type::GeometrySet) {
-      geometry_set_ = std::make_unique<GeometrySet>(*src.geometry_set_);
+    if (other.geometry_set_) {
+      geometry_set_ = std::make_unique<GeometrySet>(*other.geometry_set_);
     }
+  }
+
+  InstanceReference &operator=(const InstanceReference &other)
+  {
+    if (this == &other) {
+      return *this;
+    }
+    this->~InstanceReference();
+    new (this) InstanceReference(other);
+    return *this;
   }
 
   Type type() const
@@ -579,6 +610,7 @@ class InstancesComponent : public GeometryComponent {
   void add_instance(int instance_handle, const blender::float4x4 &transform, const int id = -1);
 
   blender::Span<InstanceReference> references() const;
+  void remove_unused_references();
 
   void ensure_geometry_instances();
   GeometrySet &geometry_set_from_reference(const int reference_index);
@@ -596,6 +628,9 @@ class InstancesComponent : public GeometryComponent {
   blender::Span<int> almost_unique_ids() const;
 
   int attribute_domain_size(const AttributeDomain domain) const final;
+
+  void foreach_referenced_geometry(
+      blender::FunctionRef<void(const GeometrySet &geometry_set)> callback) const;
 
   bool is_empty() const final;
 
@@ -694,6 +729,14 @@ class AnonymousAttributeFieldInput : public fn::FieldInput {
   AnonymousAttributeFieldInput(StrongAnonymousAttributeID anonymous_id, const CPPType &type)
       : fn::FieldInput(type, anonymous_id.debug_name()), anonymous_id_(std::move(anonymous_id))
   {
+  }
+
+  template<typename T> static fn::Field<T> Create(StrongAnonymousAttributeID anonymous_id)
+  {
+    const CPPType &type = CPPType::get<T>();
+    auto field_input = std::make_shared<AnonymousAttributeFieldInput>(std::move(anonymous_id),
+                                                                      type);
+    return fn::Field<T>{field_input};
   }
 
   const GVArray *get_varray_for_context(const fn::FieldContext &context,

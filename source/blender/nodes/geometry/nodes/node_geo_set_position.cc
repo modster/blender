@@ -23,8 +23,8 @@ namespace blender::nodes {
 static void geo_node_set_position_declare(NodeDeclarationBuilder &b)
 {
   b.add_input<decl::Geometry>("Geometry");
-  b.add_input<decl::Vector>("Position").hide_value();
-  b.add_input<decl::Bool>("Selection").default_value(true).hide_value();
+  b.add_input<decl::Vector>("Position").implicit_field();
+  b.add_input<decl::Bool>("Selection").default_value(true).hide_value().supports_field();
   b.add_output<decl::Geometry>("Geometry");
 }
 
@@ -34,6 +34,9 @@ static void set_position_in_component(GeometryComponent &component,
 {
   GeometryComponentFieldContext field_context{component, ATTR_DOMAIN_POINT};
   const int domain_size = component.attribute_domain_size(ATTR_DOMAIN_POINT);
+  if (domain_size == 0) {
+    return;
+  }
 
   fn::FieldEvaluator selection_evaluator{field_context, domain_size};
   selection_evaluator.add(selection_field);

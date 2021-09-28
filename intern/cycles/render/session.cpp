@@ -38,7 +38,6 @@
 #include "util/util_function.h"
 #include "util/util_logging.h"
 #include "util/util_math.h"
-#include "util/util_opengl.h"
 #include "util/util_task.h"
 #include "util/util_time.h"
 
@@ -261,6 +260,7 @@ RenderWork Session::run_update_for_next_iteration()
   bool have_tiles = true;
   bool switched_to_new_tile = false;
 
+  const bool did_reset = delayed_reset_.do_reset;
   if (delayed_reset_.do_reset) {
     thread_scoped_lock buffers_lock(buffers_mutex_);
     do_delayed_reset();
@@ -272,8 +272,12 @@ RenderWork Session::run_update_for_next_iteration()
 
   /* Update number of samples in the integrator.
    * Ideally this would need to happen once in `Session::set_samples()`, but the issue there is
-   * the initial configuration when Session is created where the `set_samples()` is not used. */
-  scene->integrator->set_aa_samples(params.samples);
+   * the initial configuration when Session is created where the `set_samples()` is not used.
+   *
+   * NOTE: Unless reset was requested only allow increasing number of samples. */
+  if (did_reset || scene->integrator->get_aa_samples() < params.samples) {
+    scene->integrator->set_aa_samples(params.samples);
+  }
 
   /* Update denoiser settings. */
   {
@@ -392,8 +396,8 @@ int2 Session::get_effective_tile_size() const
 
   /* TODO(sergey): Take available memory into account, and if there is enough memory do not tile
    * and prefer optimal performance. */
-
-  return make_int2(params.tile_size, params.tile_size);
+  const int tile_size = tile_manager_.compute_render_tile_size(params.tile_size);
+  return make_int2(tile_size, tile_size);
 }
 
 void Session::do_delayed_reset()
@@ -430,7 +434,8 @@ void Session::do_delayed_reset()
 
   /* Progress. */
   progress.reset_sample();
-  progress.set_total_pixel_samples(buffer_params_.width * buffer_params_.height * params.samples);
+  progress.set_total_pixel_samples(static_cast<uint64_t>(buffer_params_.width) *
+                                   buffer_params_.height * params.samples);
 
   if (!params.background) {
     progress.set_start_time();
@@ -512,6 +517,25 @@ void Session::set_pause(bool pause)
 void Session::set_gpu_display(unique_ptr<GPUDisplay> gpu_display)
 {
   path_trace_->set_gpu_display(move(gpu_display));
+}
+
+double Session::get_estimated_remaining_time() const
+{
+  const float completed = progress.get_progress();
+  if (completed == 0.0f) {
+    return 0.0;
+  }
+
+  double total_time, render_time;
+  progress.get_time(total_time, render_time);
+  double remaining = (1.0 - (double)completed) * (render_time / (double)completed);
+
+  const double time_limit = render_scheduler_.get_time_limit();
+  if (time_limit != 0.0) {
+    remaining = min(remaining, max(time_limit - render_time, 0.0));
+  }
+
+  return remaining;
 }
 
 void Session::wait()
