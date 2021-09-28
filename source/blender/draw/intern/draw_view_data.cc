@@ -61,8 +61,25 @@ DRWViewData *DRW_view_data_create(ListBase *engine_types)
   return view_data;
 }
 
-void DRW_view_data_color_from_compositor_scene(DRWViewData *view_data, DRWRenderScene *rscene)
+void DRW_view_data_color_from_compositor_scene(DRWViewData *view_data,
+                                               DRWRenderScene *rscene,
+                                               int view)
 {
+  /* Ensure correct size of the render buffers.
+   * Assumes DRW_view_data_texture_list_size_validate() was run first
+   * and texture_list_size is up to date. */
+  GPUTexture **tex_p = &rscene->views[view].combined.pass_tx;
+  if (*tex_p != NULL) {
+    int tex_size[2] = {GPU_texture_width(*tex_p), GPU_texture_height(*tex_p)};
+    if (!equals_v2v2_int(tex_size, view_data->texture_list_size)) {
+      GPU_TEXTURE_FREE_SAFE(*tex_p);
+    }
+  }
+  if (*tex_p == NULL) {
+    *tex_p = GPU_texture_create_2d(
+        rscene->scene->id.name, UNPACK2(view_data->texture_list_size), 1, GPU_RGBA16F, NULL);
+  }
+
   /* TODO(fclem): This is just a way to get something working quickly.
    * Eventually, it would be the responsibility of the draw engine to fill each buffer
    * directly. And we could drop the texture list and framebuffer list alltogether. */
@@ -70,19 +87,19 @@ void DRW_view_data_color_from_compositor_scene(DRWViewData *view_data, DRWRender
   DefaultFramebufferList *dfbl = &view_data->dfbl;
   DefaultTextureList *dtxl = &view_data->dtxl;
 
-  GPU_framebuffer_ensure_config(&rscene->views[0].combined.pass_fb,
+  GPU_framebuffer_ensure_config(&rscene->views[view].combined.pass_fb,
                                 {
                                     GPU_ATTACHMENT_TEXTURE(dtxl->depth),
-                                    GPU_ATTACHMENT_TEXTURE(rscene->views[0].combined.pass_tx),
+                                    GPU_ATTACHMENT_TEXTURE(rscene->views[view].combined.pass_tx),
                                 });
-  GPU_framebuffer_ensure_config(&rscene->views[0].combined.color_only_fb,
+  GPU_framebuffer_ensure_config(&rscene->views[view].combined.color_only_fb,
                                 {
                                     GPU_ATTACHMENT_NONE,
-                                    GPU_ATTACHMENT_TEXTURE(rscene->views[0].combined.pass_tx),
+                                    GPU_ATTACHMENT_TEXTURE(rscene->views[view].combined.pass_tx),
                                 });
-  dtxl->color = rscene->views[0].combined.pass_tx;
-  dfbl->default_fb = rscene->views[0].combined.pass_fb;
-  dfbl->color_only_fb = rscene->views[0].combined.color_only_fb;
+  dtxl->color = rscene->views[view].combined.pass_tx;
+  dfbl->default_fb = rscene->views[view].combined.pass_fb;
+  dfbl->color_only_fb = rscene->views[view].combined.color_only_fb;
 }
 
 void DRW_view_data_default_lists_from_viewport(DRWViewData *view_data, GPUViewport *viewport)

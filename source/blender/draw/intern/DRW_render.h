@@ -158,6 +158,8 @@ typedef struct DRWRenderView {
   DRWView *view;
   /** External engines. Created if needed. */
   struct RenderEngine *render_engine;
+  /** Contains DrawEngines data. */
+  struct DRWViewData *view_data;
   /** TODO(fclem): multiple render passes. */
   DRWRenderPass combined;
 } DRWRenderView;
@@ -166,13 +168,13 @@ typedef struct DRWRenderScene {
   struct DRWRenderScene *next, *prev;
   /** Original Scene associated to this render. Used only as identifier. */
   Scene *scene;
-  /** View layer index this render scene is from. */
+  /** View layer index this render scene is rendered with. */
   int view_layer_index;
   /** Marks a scene a rendered. */
   bool rendered;
   bool is_active_scene;
-  /* TODO(fclem): multiviews. */
-  DRWRenderView views[1];
+  /** One view for each stereo view. We might have more views in the future. */
+  DRWRenderView views[2];
 } DRWRenderScene;
 
 DRWRenderPass *DRW_render_pass_find(const Scene *scene_orig,

@@ -106,7 +106,8 @@ void DRW_view_data_default_lists_from_viewport(DRWViewData *view_data,
                                                struct GPUViewport *viewport);
 void DRW_view_data_texture_list_size_validate(DRWViewData *view_data, const int size[2]);
 void DRW_view_data_color_from_compositor_scene(DRWViewData *view_data,
-                                               struct DRWRenderScene *rscene);
+                                               struct DRWRenderScene *rscene,
+                                               int view);
 ViewportEngineData *DRW_view_data_engine_data_get_ensure(DRWViewData *view_data,
                                                          struct DrawEngineType *engine_type_);
 void DRW_view_data_use_engine(DRWViewData *view_data, struct DrawEngineType *engine_type);
