@@ -218,16 +218,17 @@ void LightProbeModule::cubemap_prepare(vec3 position, float near, float far, boo
 
   mat4 winmat;
   cubeface_winmat_get(winmat, near, far);
-  for (LightProbeView &view : probe_views_) {
-    view.sync(cube_color_tx_, cube_depth_tx_, winmat, viewmat, background_only);
+
+  for (auto i : IndexRange(ARRAY_SIZE(probe_views_))) {
+    probe_views_[i].sync(cube_color_tx_, cube_depth_tx_, winmat, viewmat, background_only);
   }
 }
 
 void LightProbeModule::cubemap_render(void)
 {
   DRW_stats_group_start("Cubemap Render");
-  for (LightProbeView &view : probe_views_) {
-    view.render();
+  for (auto i : IndexRange(ARRAY_SIZE(probe_views_))) {
+    probe_views_[i].render();
   }
   DRW_stats_group_end();
 

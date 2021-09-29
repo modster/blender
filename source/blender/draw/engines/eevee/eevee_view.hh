@@ -56,6 +56,10 @@ class Instance;
 class ShadingView {
  private:
   Instance &inst_;
+  /** Static srting pointer. Used as debug name and as UUID for texture pool. */
+  const char *name_;
+  /** Matrix to apply to the viewmat. */
+  const float (*face_matrix_)[4];
 
   /** Post-fx modules. */
   DepthOfField dof_;
@@ -82,21 +86,17 @@ class ShadingView {
 
   /** Render size of the view. Can change between scene sample eval. */
   ivec2 extent_ = {-1, -1};
-  /** Static srting pointer. Used as debug name and as UUID for texture pool. */
-  const char *name_;
-  /** Matrix to apply to the viewmat. */
-  const float (*face_matrix_)[4];
 
   bool is_enabled_ = false;
 
  public:
   ShadingView(Instance &inst, const char *name, const float (*face_matrix)[4])
       : inst_(inst),
+        name_(name),
+        face_matrix_(face_matrix),
         dof_(inst, name),
         mb_(inst, name),
-        velocity_(inst, name),
-        name_(name),
-        face_matrix_(face_matrix){};
+        velocity_(inst, name){};
 
   ~ShadingView(){};
 
@@ -123,6 +123,10 @@ class ShadingView {
 class LightProbeView {
  private:
   Instance &inst_;
+  /** Static string pointer. Used as debug name and as UUID for texture pool. */
+  const char *name_;
+  /** Matrix to apply to the viewmat. */
+  const float (*face_matrix_)[4];
   /** GBuffer for deferred passes. */
   GBuffer gbuffer_;
   /** Owned resources. */
@@ -131,13 +135,8 @@ class LightProbeView {
   DRWView *view_ = nullptr;
   /** Render size of the view. */
   ivec2 extent_ = {-1, -1};
-  /** Static string pointer. Used as debug name and as UUID for texture pool. */
-  const char *name_;
-  /** Matrix to apply to the viewmat. */
-  const float (*face_matrix_)[4];
 
   int layer_ = 0;
-  bool is_enabled_ = false;
   bool is_only_background_ = false;
 
  public:
@@ -168,20 +167,18 @@ class LightProbeView {
  */
 class MainView {
  private:
-  std::array<ShadingView, 6> shading_views_;
+  ShadingView shading_views_[6];
   /** Internal render size. */
   int render_extent_[2];
 
  public:
   MainView(Instance &inst)
-      : shading_views_({
-            ShadingView(inst, "posX_view", cubeface_mat[0]),
-            ShadingView(inst, "negX_view", cubeface_mat[1]),
-            ShadingView(inst, "posY_view", cubeface_mat[2]),
-            ShadingView(inst, "negY_view", cubeface_mat[3]),
-            ShadingView(inst, "posZ_view", cubeface_mat[4]),
-            ShadingView(inst, "negZ_view", cubeface_mat[5]),
-        })
+      : shading_views_{{inst, "posX_view", cubeface_mat[0]},
+                       {inst, "negX_view", cubeface_mat[1]},
+                       {inst, "posY_view", cubeface_mat[2]},
+                       {inst, "negY_view", cubeface_mat[3]},
+                       {inst, "posZ_view", cubeface_mat[4]},
+                       {inst, "negZ_view", cubeface_mat[5]}}
   {
   }
 
@@ -194,22 +191,22 @@ class MainView {
       render_extent_[i] = max_ii(1, roundf(full_extent_[i] * resolution_scale));
     }
 
-    for (ShadingView &view : shading_views_) {
-      view.init();
+    for (auto i : IndexRange(ARRAY_SIZE(shading_views_))) {
+      shading_views_[i].init();
     }
   }
 
   void sync(void)
   {
-    for (ShadingView &view : shading_views_) {
-      view.sync(render_extent_);
+    for (auto i : IndexRange(ARRAY_SIZE(shading_views_))) {
+      shading_views_[i].sync(render_extent_);
     }
   }
 
   void render(void)
   {
-    for (ShadingView &view : shading_views_) {
-      view.render();
+    for (auto i : IndexRange(ARRAY_SIZE(shading_views_))) {
+      shading_views_[i].render();
     }
   }
 };

@@ -25,6 +25,7 @@
 #pragma once
 
 #include "BLI_utildefines.h"
+#include "BLI_utility_mixins.hh"
 #include "GPU_framebuffer.h"
 #include "GPU_texture.h"
 #include "GPU_uniform_buffer.h"
@@ -36,7 +37,7 @@ template<
     typename T,
     /** The number of values that can be stored in this uniform buffer. */
     int64_t len>
-class StructArrayBuffer {
+class StructArrayBuffer : NonMovable, NonCopyable {
  private:
   T data_[len];
   GPUUniformBuf *ubo_;
