@@ -330,6 +330,7 @@ struct GeometrySet {
   bool has_volume() const;
   bool has_curve() const;
   bool has_realized_data() const;
+  bool is_empty() const;
 
   const Mesh *get_mesh_for_read() const;
   const PointCloud *get_pointcloud_for_read() const;
@@ -719,6 +720,13 @@ class AttributeFieldInput : public fn::FieldInput {
   AttributeFieldInput(std::string name, const CPPType &type)
       : fn::FieldInput(type, name), name_(std::move(name))
   {
+  }
+
+  template<typename T> static fn::Field<T> Create(std::string name)
+  {
+    const CPPType &type = CPPType::get<T>();
+    auto field_input = std::make_shared<AttributeFieldInput>(std::move(name), type);
+    return fn::Field<T>{field_input};
   }
 
   StringRefNull attribute_name() const

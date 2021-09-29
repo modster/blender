@@ -60,7 +60,7 @@ static void geo_node_curve_reverse_exec(GeoNodeExecParams params)
 
 }  // namespace blender::nodes
 
-void register_node_type_geo_curve_reverse()
+void register_node_type_geo_legacy_curve_reverse()
 {
   static bNodeType ntype;
   geo_node_type_base(
