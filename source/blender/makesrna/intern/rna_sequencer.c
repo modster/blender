@@ -81,6 +81,20 @@ const EnumPropertyItem rna_enum_sequence_modifier_type_items[] = {
     {0, NULL, 0, NULL, NULL},
 };
 
+const EnumPropertyItem rna_enum_strip_color_items[] = {
+    {SEQUENCE_COLOR_NONE, "NONE", ICON_X, "None", "Assign no color tag to the collection"},
+    {SEQUENCE_COLOR_01, "COLOR_01", ICON_SEQUENCE_COLOR_01, "Color 01", ""},
+    {SEQUENCE_COLOR_02, "COLOR_02", ICON_SEQUENCE_COLOR_02, "Color 02", ""},
+    {SEQUENCE_COLOR_03, "COLOR_03", ICON_SEQUENCE_COLOR_03, "Color 03", ""},
+    {SEQUENCE_COLOR_04, "COLOR_04", ICON_SEQUENCE_COLOR_04, "Color 04", ""},
+    {SEQUENCE_COLOR_05, "COLOR_05", ICON_SEQUENCE_COLOR_05, "Color 05", ""},
+    {SEQUENCE_COLOR_06, "COLOR_06", ICON_SEQUENCE_COLOR_06, "Color 06", ""},
+    {SEQUENCE_COLOR_07, "COLOR_07", ICON_SEQUENCE_COLOR_07, "Color 07", ""},
+    {SEQUENCE_COLOR_08, "COLOR_08", ICON_SEQUENCE_COLOR_08, "Color 08", ""},
+    {SEQUENCE_COLOR_09, "COLOR_09", ICON_SEQUENCE_COLOR_09, "Color 09", ""},
+    {0, NULL, 0, NULL, NULL},
+};
+
 #ifdef RNA_RUNTIME
 
 #  include "BKE_global.h"
@@ -840,9 +854,9 @@ static int rna_Sequence_proxy_filepath_length(PointerRNA *ptr)
   return strlen(path);
 }
 
-static void rna_Sequence_audio_update(Main *UNUSED(bmain), Scene *scene, PointerRNA *UNUSED(ptr))
+static void rna_Sequence_audio_update(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
 {
-  DEG_id_tag_update(&scene->id, ID_RECALC_SEQUENCER_STRIPS);
+  DEG_id_tag_update(ptr->owner_id, ID_RECALC_SEQUENCER_STRIPS);
 }
 
 static void rna_Sequence_pan_range(
@@ -940,8 +954,9 @@ static void rna_Sequence_filepath_update(Main *bmain, Scene *UNUSED(scene), Poin
   rna_Sequence_invalidate_raw_update(bmain, scene, ptr);
 }
 
-static void rna_Sequence_sound_update(Main *bmain, Scene *scene, PointerRNA *UNUSED(ptr))
+static void rna_Sequence_sound_update(Main *bmain, Scene *UNUSED(active_scene), PointerRNA *ptr)
 {
+  Scene *scene = (Scene *)ptr->owner_id;
   DEG_id_tag_update(&scene->id, ID_RECALC_SEQUENCER_STRIPS | ID_RECALC_AUDIO);
   DEG_relations_tag_update(bmain);
 }
@@ -997,6 +1012,18 @@ static void rna_Sequence_opacity_set(PointerRNA *ptr, float value)
   Sequence *seq = (Sequence *)(ptr->data);
   CLAMP(value, 0.0f, 1.0f);
   seq->blend_opacity = value * 100.0f;
+}
+
+static int rna_Sequence_color_tag_get(PointerRNA *ptr)
+{
+  Sequence *seq = (Sequence *)(ptr->data);
+  return seq->color_tag;
+}
+
+static void rna_Sequence_color_tag_set(PointerRNA *ptr, int value)
+{
+  Sequence *seq = (Sequence *)(ptr->data);
+  seq->color_tag = value;
 }
 
 static bool colbalance_seq_cmp_fn(Sequence *seq, void *arg_pt)
@@ -1936,6 +1963,14 @@ static void rna_def_sequence(BlenderRNA *brna)
       "effect strip)");
   RNA_def_property_update(
       prop, NC_SCENE | ND_SEQUENCER, "rna_Sequence_invalidate_preprocessed_update");
+
+  prop = RNA_def_property(srna, "color_tag", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_sdna(prop, NULL, "color_tag");
+  RNA_def_property_enum_funcs(
+      prop, "rna_Sequence_color_tag_get", "rna_Sequence_color_tag_set", NULL);
+  RNA_def_property_enum_items(prop, rna_enum_strip_color_items);
+  RNA_def_property_ui_text(prop, "Strip Color", "Color tag for a strip");
+  RNA_def_property_update(prop, NC_SCENE | ND_SEQUENCER, NULL);
 
   /* modifiers */
   prop = RNA_def_property(srna, "modifiers", PROP_COLLECTION, PROP_NONE);
