@@ -380,7 +380,7 @@ typedef enum PassType {
    * pass contains number of samples which contributed to the color components of the pass.
    *
    * PASS_SHADOW_CATCHER_SAMPLE_COUNT contains number of samples for which the path split
-   * happenned.
+   * happened.
    *
    * PASS_SHADOW_CATCHER_MATTE contains pass which contains non-catcher objects. This pass is to be
    * alpha-overed onto the backdrop (after multiplication). */
@@ -572,6 +572,7 @@ typedef enum AttributeStandard {
   ATTR_STD_MOTION_VERTEX_NORMAL,
   ATTR_STD_PARTICLE,
   ATTR_STD_CURVE_INTERCEPT,
+  ATTR_STD_CURVE_LENGTH,
   ATTR_STD_CURVE_RANDOM,
   ATTR_STD_PTEX_FACE_ID,
   ATTR_STD_PTEX_UV,

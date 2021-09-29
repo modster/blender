@@ -38,7 +38,6 @@
 #include "util/util_function.h"
 #include "util/util_logging.h"
 #include "util/util_math.h"
-#include "util/util_opengl.h"
 #include "util/util_task.h"
 #include "util/util_time.h"
 
@@ -116,7 +115,7 @@ Session::~Session()
   }
 #endif
 
-  /* Make sure path tracer is destroyed before the deviec. This is needed because destruction might
+  /* Make sure path tracer is destroyed before the device. This is needed because destruction might
    * need to access device for device memory free. */
   /* TODO(sergey): Convert device to be unique_ptr, and rely on C++ to destruct objects in the
    * pre-defined order. */
@@ -261,6 +260,7 @@ RenderWork Session::run_update_for_next_iteration()
   bool have_tiles = true;
   bool switched_to_new_tile = false;
 
+  const bool did_reset = delayed_reset_.do_reset;
   if (delayed_reset_.do_reset) {
     thread_scoped_lock buffers_lock(buffers_mutex_);
     do_delayed_reset();
@@ -272,8 +272,12 @@ RenderWork Session::run_update_for_next_iteration()
 
   /* Update number of samples in the integrator.
    * Ideally this would need to happen once in `Session::set_samples()`, but the issue there is
-   * the initial configuration when Session is created where the `set_samples()` is not used. */
-  scene->integrator->set_aa_samples(params.samples);
+   * the initial configuration when Session is created where the `set_samples()` is not used.
+   *
+   * NOTE: Unless reset was requested only allow increasing number of samples. */
+  if (did_reset || scene->integrator->get_aa_samples() < params.samples) {
+    scene->integrator->set_aa_samples(params.samples);
+  }
 
   /* Update denoiser settings. */
   {
@@ -392,8 +396,8 @@ int2 Session::get_effective_tile_size() const
 
   /* TODO(sergey): Take available memory into account, and if there is enough memory do not tile
    * and prefer optimal performance. */
-
-  return make_int2(params.tile_size, params.tile_size);
+  const int tile_size = tile_manager_.compute_render_tile_size(params.tile_size);
+  return make_int2(tile_size, tile_size);
 }
 
 void Session::do_delayed_reset()
@@ -407,6 +411,7 @@ void Session::do_delayed_reset()
   buffer_params_ = delayed_reset_.buffer_params;
 
   /* Store parameters used for buffers access outside of scene graph.  */
+  buffer_params_.samples = params.samples;
   buffer_params_.exposure = scene->film->get_exposure();
   buffer_params_.use_approximate_shadow_catcher =
       scene->film->get_use_approximate_shadow_catcher();
@@ -429,7 +434,8 @@ void Session::do_delayed_reset()
 
   /* Progress. */
   progress.reset_sample();
-  progress.set_total_pixel_samples(buffer_params_.width * buffer_params_.height * params.samples);
+  progress.set_total_pixel_samples(static_cast<uint64_t>(buffer_params_.width) *
+                                   buffer_params_.height * params.samples);
 
   if (!params.background) {
     progress.set_start_time();
@@ -511,6 +517,25 @@ void Session::set_pause(bool pause)
 void Session::set_gpu_display(unique_ptr<GPUDisplay> gpu_display)
 {
   path_trace_->set_gpu_display(move(gpu_display));
+}
+
+double Session::get_estimated_remaining_time() const
+{
+  const float completed = progress.get_progress();
+  if (completed == 0.0f) {
+    return 0.0;
+  }
+
+  double total_time, render_time;
+  progress.get_time(total_time, render_time);
+  double remaining = (1.0 - (double)completed) * (render_time / (double)completed);
+
+  const double time_limit = render_scheduler_.get_time_limit();
+  if (time_limit != 0.0) {
+    remaining = min(remaining, max(time_limit - render_time, 0.0));
+  }
+
+  return remaining;
 }
 
 void Session::wait()
@@ -612,7 +637,7 @@ void Session::collect_statistics(RenderStats *render_stats)
 }
 
 /* --------------------------------------------------------------------
- * Tile and tile pixels aceess.
+ * Tile and tile pixels access.
  */
 
 bool Session::has_multiple_render_tiles() const
@@ -650,7 +675,7 @@ bool Session::copy_render_tile_from_device()
 bool Session::get_render_tile_pixels(const string &pass_name, int num_components, float *pixels)
 {
   /* NOTE: The code relies on a fact that session is fully update and no scene/buffer modification
-   * is happenning while this function runs. */
+   * is happening while this function runs. */
 
   const BufferParams &buffer_params = path_trace_->get_render_tile_params();
 
@@ -689,7 +714,7 @@ bool Session::set_render_tile_pixels(const string &pass_name,
                                      const float *pixels)
 {
   /* NOTE: The code relies on a fact that session is fully update and no scene/buffer modification
-   * is happenning while this function runs. */
+   * is happening while this function runs. */
 
   const BufferPass *pass = buffer_params_.find_pass(pass_name);
   if (!pass) {

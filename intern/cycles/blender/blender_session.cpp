@@ -71,7 +71,8 @@ BlenderSession::BlenderSession(BL::RenderEngine &b_engine,
       width(0),
       height(0),
       preview_osl(preview_osl),
-      python_thread_state(NULL)
+      python_thread_state(NULL),
+      use_developer_ui(false)
 {
   /* offline render */
   background = true;
@@ -158,7 +159,9 @@ void BlenderSession::create_session()
 
   /* Create GPU display. */
   if (!b_engine.is_preview() && !headless) {
-    session->set_gpu_display(make_unique<BlenderGPUDisplay>(b_engine, b_scene));
+    unique_ptr<BlenderGPUDisplay> gpu_display = make_unique<BlenderGPUDisplay>(b_engine, b_scene);
+    gpu_display_ = gpu_display.get();
+    session->set_gpu_display(move(gpu_display));
   }
 
   /* Viewport and preview (as in, material preview) does not do tiled rendering, so can inform
@@ -309,6 +312,8 @@ void BlenderSession::read_render_tile()
   for (BL::RenderPass &b_pass : b_rlay.passes) {
     session->set_render_tile_pixels(b_pass.name(), b_pass.channels(), (float *)b_pass.rect());
   }
+
+  b_engine.end_result(b_rr, false, false, false);
 }
 
 void BlenderSession::write_render_tile()
@@ -555,6 +560,11 @@ void BlenderSession::render(BL::Depsgraph &b_depsgraph_)
   /* free result without merging */
   b_engine.end_result(b_rr, true, false, false);
 
+  /* When tiled rendering is used there will be no "write" done for the tile. Forcefully clear
+   * highlighted tiles now, so that the highlight will be removed while processing full frame from
+   * file. */
+  b_engine.tile_highlight_clear_all();
+
   double total_time, render_time;
   session->progress.get_time(total_time, render_time);
   VLOG(1) << "Total render time: " << total_time;
@@ -579,6 +589,12 @@ void BlenderSession::render_frame_finish()
 
   for (string_view filename : full_buffer_files_) {
     session->process_full_buffer_from_disk(filename);
+    if (check_and_report_session_error()) {
+      break;
+    }
+  }
+
+  for (string_view filename : full_buffer_files_) {
     path_remove(filename);
   }
 
@@ -878,6 +894,9 @@ void BlenderSession::draw(BL::SpaceImageEditor &space_image)
     draw_state_.last_pass_index = pass_index;
   }
 
+  BL::Array<float, 2> zoom = space_image.zoom();
+  gpu_display_->set_zoom(zoom[0], zoom[1]);
+
   session->draw();
 }
 
@@ -983,8 +1002,9 @@ void BlenderSession::update_status_progress()
   get_status(status, substatus);
   get_progress(progress, total_time, render_time);
 
-  if (progress > 0)
-    remaining_time = (1.0 - (double)progress) * (render_time / (double)progress);
+  if (progress > 0) {
+    remaining_time = session->get_estimated_remaining_time();
+  }
 
   if (background) {
     if (scene)
@@ -1022,20 +1042,27 @@ void BlenderSession::update_status_progress()
     last_progress = progress;
   }
 
-  if (session->progress.get_error()) {
-    string error = session->progress.get_error_message();
-    if (error != last_error) {
-      /* TODO(sergey): Currently C++ RNA API doesn't let us to
-       * use mnemonic name for the variable. Would be nice to
-       * have this figured out.
-       *
-       * For until then, 1 << 5 means RPT_ERROR.
-       */
-      b_engine.report(1 << 5, error.c_str());
-      b_engine.error_set(error.c_str());
-      last_error = error;
-    }
+  check_and_report_session_error();
+}
+
+bool BlenderSession::check_and_report_session_error()
+{
+  if (!session->progress.get_error()) {
+    return false;
   }
+
+  const string error = session->progress.get_error_message();
+  if (error != last_error) {
+    /* TODO(sergey): Currently C++ RNA API doesn't let us to use mnemonic name for the variable.
+     * Would be nice to have this figured out.
+     *
+     * For until then, 1 << 5 means RPT_ERROR. */
+    b_engine.report(1 << 5, error.c_str());
+    b_engine.error_set(error.c_str());
+    last_error = error;
+  }
+
+  return true;
 }
 
 void BlenderSession::tag_update()

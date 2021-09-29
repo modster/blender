@@ -99,8 +99,6 @@ class SEQUENCER_HT_tool_header(Header):
     def draw(self, context):
         layout = self.layout
 
-        layout.template_header()
-
         self.draw_tool_settings(context)
 
         # TODO: options popover.
@@ -132,8 +130,7 @@ class SEQUENCER_HT_header(Header):
 
         show_region_tool_header = st.show_region_tool_header
 
-        if not show_region_tool_header:
-            layout.template_header()
+        layout.template_header()
 
         layout.prop(st, "view_type", text="")
 
@@ -151,6 +148,8 @@ class SEQUENCER_HT_header(Header):
         if st.view_type in {'SEQUENCER', 'SEQUENCER_PREVIEW'}:
             row = layout.row(align=True)
             row.prop(sequencer_tool_settings, "overlap_mode", text="")
+            row = layout.row(align=True)
+            row.prop(sequencer_tool_settings, "pivot_point", text="", icon_only=True)
             row = layout.row(align=True)
             row.prop(tool_settings, "use_snap_sequencer", text="")
             sub = row.row(align=True)
@@ -375,9 +374,9 @@ class SEQUENCER_MT_view(Menu):
                 layout.operator("view2d.zoom_border", text="Zoom")
                 layout.menu("SEQUENCER_MT_preview_zoom")
 
-            if st.display_mode == 'IMAGE':
-                layout.prop(st, "use_zoom_to_fit")
-            elif st.display_mode == 'WAVEFORM':
+            layout.prop(st, "use_zoom_to_fit")
+
+            if st.display_mode == 'WAVEFORM':
                 layout.separator()
                 layout.prop(st, "show_separate_color", text="Show Separate Color Channels")
 

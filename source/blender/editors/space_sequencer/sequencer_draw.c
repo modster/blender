@@ -1393,7 +1393,10 @@ static float seq_thumbnail_get_start_frame(Sequence *seq, float frame_step, rctf
   return ((no_invisible_thumbs - 1) * frame_step) + seq->start;
 }
 
-static void thumbnail_start_job(void *data, const short *stop, const short *do_update, const float *progress)
+static void thumbnail_start_job(void *data,
+                                short *stop,
+                                short *UNUSED(do_update),
+                                float *UNUSED(progress))
 {
   ThumbnailDrawJob *tj = data;
   float start_frame, frame_step;
@@ -1414,7 +1417,6 @@ static void thumbnail_start_job(void *data, const short *stop, const short *do_u
     }
     BLI_ghashIterator_step(&gh_iter);
   }
-  UNUSED_VARS(do_update, progress);
 }
 
 static SeqRenderData sequencer_thumbnail_context_init(const bContext *C)
@@ -1755,7 +1757,7 @@ static void draw_seq_strip_thumbnail(View2D *v2d,
     }
     /* Store recently rendered frames, so they can be reused when zooming. */
     else if (!sequencer_thumbnail_v2d_is_navigating(C)) {
-      /* Clear images in frame range occupied bynew thumbnail. */
+      /* Clear images in frame range occupied by new thumbnail. */
       last_displayed_thumbnails_list_cleanup(
           last_displayed_thumbnails, thumb_x_start, thumb_x_end);
       /* Insert new thumbnail frame to list. */
@@ -2717,12 +2719,14 @@ void sequencer_draw_preview(const bContext *C,
     sequencer_draw_borders_overlay(sseq, v2d, scene);
   }
 
-  SeqCollection *collection = SEQ_query_rendered_strips(&scene->ed->seqbase, timeline_frame, 0);
-  Sequence *seq;
-  SEQ_ITERATOR_FOREACH (seq, collection) {
-    seq_draw_image_origin_and_outline(C, seq);
+  if (!draw_backdrop && scene->ed != NULL) {
+    SeqCollection *collection = SEQ_query_rendered_strips(&scene->ed->seqbase, timeline_frame, 0);
+    Sequence *seq;
+    SEQ_ITERATOR_FOREACH (seq, collection) {
+      seq_draw_image_origin_and_outline(C, seq);
+    }
+    SEQ_collection_free(collection);
   }
-  SEQ_collection_free(collection);
 
   if (draw_gpencil && show_imbuf && (sseq->flag & SEQ_SHOW_OVERLAY)) {
     sequencer_draw_gpencil_overlay(C);
@@ -3290,6 +3294,6 @@ void draw_timeline_seq_display(const bContext *C, ARegion *region)
     UI_view2d_view_restore(C);
   }
 
-  ED_time_scrub_draw_current_frame(region, scene, !(sseq->flag & SEQ_DRAWFRAMES), true);
+  ED_time_scrub_draw_current_frame(region, scene, !(sseq->flag & SEQ_DRAWFRAMES));
   UI_view2d_scrollers_draw(v2d, NULL);
 }

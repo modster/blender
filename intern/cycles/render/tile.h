@@ -94,7 +94,7 @@ class TileManager {
    * The file will be considered final, all handles to it will be closed. */
   void finish_write_tiles();
 
-  /* Check whether any tile ahs been written to disk. */
+  /* Check whether any tile has been written to disk. */
   inline bool has_written_tiles() const
   {
     return write_state_.num_tiles_written != 0;
@@ -106,6 +106,12 @@ class TileManager {
   bool read_full_buffer_from_disk(string_view filename,
                                   RenderBuffers *buffers,
                                   DenoiseParams *denoise_params);
+
+  /* Compute valid tile size compatible with image saving. */
+  int compute_render_tile_size(const int suggested_tile_size) const;
+
+  /* Tile size in the image file. */
+  static const int IMAGE_TILE_SIZE = 128;
 
  protected:
   /* Get tile configuration for its index.

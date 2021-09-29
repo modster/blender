@@ -30,7 +30,7 @@ CCL_NAMESPACE_BEGIN
 
 #ifdef __VOLUME__
 
-/* Events for probalistic scattering */
+/* Events for probabilistic scattering. */
 
 typedef enum VolumeIntegrateEvent {
   VOLUME_PATH_SCATTERED = 0,
@@ -74,7 +74,7 @@ ccl_device_inline bool shadow_volume_shader_sample(INTEGRATOR_STATE_ARGS,
                                                    ShaderData *ccl_restrict sd,
                                                    float3 *ccl_restrict extinction)
 {
-  shader_eval_volume(INTEGRATOR_STATE_PASS, sd, PATH_RAY_SHADOW, [=](const int i) {
+  shader_eval_volume<true>(INTEGRATOR_STATE_PASS, sd, PATH_RAY_SHADOW, [=](const int i) {
     return integrator_state_read_shadow_volume_stack(INTEGRATOR_STATE_PASS, i);
   });
 
@@ -93,7 +93,7 @@ ccl_device_inline bool volume_shader_sample(INTEGRATOR_STATE_ARGS,
                                             VolumeShaderCoefficients *coeff)
 {
   const int path_flag = INTEGRATOR_STATE(path, flag);
-  shader_eval_volume(INTEGRATOR_STATE_PASS, sd, path_flag, [=](const int i) {
+  shader_eval_volume<false>(INTEGRATOR_STATE_PASS, sd, path_flag, [=](const int i) {
     return integrator_state_read_volume_stack(INTEGRATOR_STATE_PASS, i);
   });
 
@@ -228,8 +228,8 @@ ccl_device void volume_shadow_heterogeneous(INTEGRATOR_STATE_ARGS,
     /* compute attenuation over segment */
     sd->P = new_P;
     if (shadow_volume_shader_sample(INTEGRATOR_STATE_PASS, sd, &sigma_t)) {
-      /* Compute expf() only for every Nth step, to save some calculations
-       * because exp(a)*exp(b) = exp(a+b), also do a quick VOLUME_THROUGHPUT_EPSILON
+      /* Compute `expf()` only for every Nth step, to save some calculations
+       * because `exp(a)*exp(b) = exp(a+b)`, also do a quick #VOLUME_THROUGHPUT_EPSILON
        * check then. */
       sum += (-sigma_t * dt);
       if ((i & 0x07) == 0) { /* ToDo: Other interval? */
@@ -648,7 +648,7 @@ ccl_device_forceinline void volume_integrate_heterogeneous(
     }
   }
 
-  /* Write accumulated emisison. */
+  /* Write accumulated emission. */
   if (!is_zero(accum_emission)) {
     kernel_accum_emission(
         INTEGRATOR_STATE_PASS, result.indirect_throughput, accum_emission, render_buffer);
@@ -724,6 +724,10 @@ ccl_device_forceinline void integrate_volume_direct_light(INTEGRATOR_STATE_ARGS,
             kg, light_u, light_v, sd->time, P, bounce, path_flag, ls)) {
       return;
     }
+  }
+
+  if (ls->shader & SHADER_EXCLUDE_SCATTER) {
+    return;
   }
 
   /* Evaluate light shader.
