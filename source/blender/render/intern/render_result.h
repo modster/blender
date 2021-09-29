@@ -93,7 +93,8 @@ struct RenderPass *render_layer_add_pass(struct RenderResult *rr,
                                          int channels,
                                          const char *name,
                                          const char *viewname,
-                                         const char *chan_id);
+                                         const char *chan_id,
+                                         const bool allocate);
 
 void render_result_exr_file_merge(struct RenderResult *rr,
                                   struct RenderResult *rrpart,
