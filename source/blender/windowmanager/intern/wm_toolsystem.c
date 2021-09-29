@@ -712,6 +712,8 @@ static const char *toolsystem_default_tool(const bToolKey *tkey)
       switch (tkey->mode) {
         case SI_MODE_PAINT:
           return "builtin_brush.Draw";
+        case SI_MODE_MASK:
+          return  "builtin.draw_mask";
       }
       break;
     case SPACE_NODE: {

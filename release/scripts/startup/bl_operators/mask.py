@@ -29,8 +29,11 @@ class MASK_OT_draw_mask(Operator):
 
     @classmethod
     def poll(cls, context):
-        clip = context.space_data.clip
-        return clip
+        if context.space_data.type == 'CLIP_EDITOR':
+            clip = context.space_data.clip
+            return clip
+        else:
+            return True
 
     type: EnumProperty(
         name="Type",

@@ -713,6 +713,16 @@ class IMAGE_HT_header(Header):
         if show_uvedit or show_maskedit:
             layout.prop(sima, "pivot_point", icon_only=True)
 
+        if show_maskedit:
+            # Proportional Editing
+            tool_settings = context.tool_settings
+            row = layout.row(align=True)
+            row = layout.row(align=True)
+            row.prop(tool_settings, "use_proportional_edit_mask", text="", icon_only=True)
+            sub = row.row(align=True)
+            sub.active = tool_settings.use_proportional_edit_mask
+            sub.prop(tool_settings, "proportional_edit_falloff", text="", icon_only=True)
+
         if show_uvedit:
             tool_settings = context.tool_settings
 
@@ -747,6 +757,7 @@ class IMAGE_HT_header(Header):
                 icon_only=True,
                 panel="IMAGE_PT_proportional_edit",
             )
+
 
     def draw(self, context):
         layout = self.layout
@@ -789,14 +800,17 @@ class IMAGE_HT_header(Header):
 
         layout.template_ID(sima, "image", new="image.new", open="image.open")
 
-        if show_maskedit:
-            row = layout.row()
-            row.template_ID(sima, "mask", new="mask.new")
 
         if not show_render:
             layout.prop(sima, "use_image_pin", text="", emboss=False)
 
         layout.separator_spacer()
+
+        # Masking
+        if show_maskedit:
+            row = layout.row()
+            row.template_ID(sima, "mask", new="mask.new")
+            row.popover(panel='IMAGE_PT_mask_display')
 
         # Overlay toggle & popover
         row = layout.row(align=True)

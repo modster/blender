@@ -2559,22 +2559,13 @@ class _defs_mask_tools:
     def add_feather_vertex_slide():
         def draw_settings(_context, layout, tool):
             row = layout.row()
-            row.label(text="Feather Vertex")
+            row.label(text="Slide / Feather")
         return dict(
             idname="builtin.add_feather_vertex_slide",
-            label="Add a Feather Vertex",
+            label="Slide Mask / Add a Feather Vertex",
             icon="ops.curve.radius",
             widget=None,
             keymap="Mask Editing: Add Feather Vertex and Slide"
-        )
-    @ToolDef.from_fn
-    def delete_vertex():
-        return dict(
-            idname="builtin.delete",
-            label="Delete a Feather Vertex",
-            icon="ops.curve.vertex_random",
-            widget=None,
-            keymap="Mask Editing: Delete"
         )
 
 
@@ -2845,12 +2836,11 @@ class IMAGE_PT_tools_active(ToolSelectPanelHelper, Panel):
             ),
         ],
         'MASK': [
-            # _defs_mask_tools.add_vertex_slide,
-            # _defs_mask_tools.add_feather_vertex_slide,
-            # _defs_mask_tools.delete_vertex,
-            # None,
-            # *_tools_select_mask,
-            # None,
+            _defs_mask_tools.add_vertex_slide,
+            _defs_mask_tools.add_feather_vertex_slide,
+            None,
+            *_tools_select_mask,
+            None,
             *_tools_annotate,
         ],
         'PAINT': [
@@ -2932,7 +2922,6 @@ class CLIP_PT_tools_active(ToolSelectPanelHelper, Panel):
         'MASK': [
             _defs_mask_tools.add_vertex_slide,
             _defs_mask_tools.add_feather_vertex_slide,
-            _defs_mask_tools.delete_vertex,
             None,
             *_tools_mask_select,
             None,
