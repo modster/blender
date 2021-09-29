@@ -1541,12 +1541,38 @@ struct WeldVertexCluster {
 };
 
 namespace blender::geometry {
-Mesh *GEO_mesh_merge_by_distance(const Mesh *mesh,
+
+WeldMode GEO_weld_mode_from_int(const short type)
+{
+  switch (static_cast<WeldMode>(type)) {
+    case WeldMode::all:
+      return WeldMode::all;
+    case WeldMode::connected:
+      return WeldMode::connected;
+  }
+  BLI_assert_unreachable();
+  return WeldMode::all;
+}
+
+int16_t GEO_weld_mode_to_short(const WeldMode weld_mode)
+{
+  switch (weld_mode) {
+    case WeldMode::all:
+      return static_cast<int16_t>(WeldMode::all);
+    case WeldMode::connected:
+      return static_cast<int16_t>(WeldMode::connected);
+  }
+
+  BLI_assert_unreachable();
+  return static_cast<int16_t>(WeldMode::all);
+}
+
+Mesh *GEO_mesh_merge_by_distance(Mesh *mesh,
                                  const bool *mask,
                                  const float merge_distance,
-                                 const int weld_mode)
+                                 const WeldMode weld_mode)
 {
-  Mesh *result = BKE_mesh_copy_for_eval(mesh, false);
+  Mesh *result = mesh;
 
   const MVert *mvert;
   const MLoop *mloop;
@@ -1562,7 +1588,7 @@ Mesh *GEO_mesh_merge_by_distance(const Mesh *mesh,
    * This indicates which vert it is or is going to be merged. */
   uint *vert_dest_map = (uint *)MEM_malloc_arrayN(totvert, sizeof(*vert_dest_map), __func__);
   uint vert_kill_len = 0;
-  if (weld_mode == WELD_MODE_ALL)
+  if (weld_mode == WeldMode::all)
 #ifdef USE_BVHTREEKDOP
   {
     /* Get overlap map. */
@@ -1659,7 +1685,7 @@ Mesh *GEO_mesh_merge_by_distance(const Mesh *mesh,
   }
 #endif
   else {
-    BLI_assert(weld_mode == WELD_MODE_CONNECTED);
+    BLI_assert(weld_mode == WeldMode::connected);
 
     MEdge *medge, *me;
 

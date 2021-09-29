@@ -89,7 +89,7 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *UNUSED(ctx)
   }
 
   Mesh *result = blender::geometry::GEO_mesh_merge_by_distance(
-      mesh, mask, wmd->merge_dist, wmd->mode);
+      mesh, mask, wmd->merge_dist, blender::geometry::GEO_weld_mode_from_int(wmd->mode));
   MEM_freeN(mask);
 
   return result;
@@ -128,7 +128,8 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
 
   uiItemR(layout, ptr, "mode", 0, NULL, ICON_NONE);
   uiItemR(layout, ptr, "merge_threshold", 0, IFACE_("Distance"), ICON_NONE);
-  if (weld_mode == blender::geometry::WELD_MODE_CONNECTED) {
+  if (blender::geometry::GEO_weld_mode_from_int(weld_mode) ==
+      blender::geometry::WeldMode::connected) {
     uiItemR(layout, ptr, "loose_edges", 0, NULL, ICON_NONE);
   }
   modifier_vgroup_ui(layout, ptr, &ob_ptr, "vertex_group", "invert_vertex_group", NULL);

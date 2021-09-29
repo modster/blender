@@ -55,16 +55,16 @@ static void geo_node_merge_by_distance_layout(uiLayout *layout,
 
 static void geo_merge_by_distance_init(bNodeTree *UNUSED(ntree), bNode *node)
 {
-  node->custom1 = geometry::WELD_MODE_ALL;
+  node->custom1 = GEO_weld_mode_to_short(geometry::WeldMode::all);
 }
 
 static void process_mesh(GeoNodeExecParams &params,
-                         const char weld_mode,
+                         const geometry::WeldMode weld_mode,
                          const float distance,
                          GeometrySet &geometry_set)
 {
   MeshComponent &mesh_component = geometry_set.get_component_for_write<MeshComponent>();
-  const Mesh *input_mesh = mesh_component.get_for_read();
+  Mesh *input_mesh = mesh_component.get_for_write();
 
   GeometryComponentFieldContext field_context{mesh_component, ATTR_DOMAIN_POINT};
   const Field<bool> selection_field = params.extract_input<Field<bool>>("Selection");
@@ -102,7 +102,7 @@ static void geo_node_merge_by_distance_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
 
-  const char weld_mode = params.node().custom1;
+  const geometry::WeldMode weld_mode = geometry::GEO_weld_mode_from_int(params.node().custom1);
   const float distance = params.extract_input<float>("Distance");
 
   if (geometry_set.has_instances()) {

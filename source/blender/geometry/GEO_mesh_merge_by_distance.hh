@@ -26,15 +26,18 @@ namespace blender::geometry {
 extern "C" {
 #endif
 
-typedef enum weld_mode {
-  WELD_MODE_ALL = 0,
-  WELD_MODE_CONNECTED = 1,
-} weld_mode;
+enum class WeldMode {
+  all = 0,
+  connected = 1,
+};
 
-struct Mesh *GEO_mesh_merge_by_distance(const struct Mesh *mesh,
+WeldMode GEO_weld_mode_from_int(const short type);
+int16_t GEO_weld_mode_to_short(const WeldMode weld_mode);
+
+struct Mesh *GEO_mesh_merge_by_distance(struct Mesh *mesh,
                                         const bool *mask,
                                         const float merge_distance,
-                                        const int weld_mode);
+                                        const WeldMode weld_mode);
 #ifdef __cplusplus
 }
 #endif
