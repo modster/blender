@@ -1543,7 +1543,7 @@ void DRW_draw_render_loop_ex(struct Depsgraph *depsgraph,
   drw_context_state_init();
 
   drw_manager_init(&DST, viewport, NULL);
-  drw_viewport_colormanagement_set(viewport);
+  DRW_viewport_colormanagement_set(viewport);
 
   const int object_type_exclude_viewport = v3d->object_type_exclude_viewport;
   /* Check if scene needs to perform the populate loop */
@@ -2031,7 +2031,7 @@ void DRW_draw_render_loop_2d_ex(struct Depsgraph *depsgraph,
 
   drw_context_state_init();
   drw_manager_init(&DST, viewport, NULL);
-  drw_viewport_colormanagement_set(viewport);
+  DRW_viewport_colormanagement_set(viewport);
 
   /* TODO(jbakker): Only populate when editor needs to draw object.
    * for the image editor this is when showing UV's. */
