@@ -28,15 +28,15 @@
 
 namespace blender::eevee {
 
-static void shgroup_hair_call(DRWShadingGroup *grp,
+static void shgroup_hair_call(MaterialPass &matpass,
                               Object *ob,
                               ParticleSystem *part_sys = nullptr,
                               ModifierData *modifier_data = nullptr)
 {
-  if (grp == nullptr) {
+  if (matpass.shgrp == nullptr) {
     return;
   }
-  DRW_shgroup_hair_create_sub(ob, part_sys, modifier_data, grp);
+  DRW_shgroup_hair_create_sub(ob, part_sys, modifier_data, matpass.shgrp, matpass.gpumat);
 }
 
 void Instance::hair_sync(Object *ob, ObjectHandle &ob_handle, ModifierData *modifier_data)
@@ -60,9 +60,9 @@ void Instance::hair_sync(Object *ob, ObjectHandle &ob_handle, ModifierData *modi
 
   Material &material = materials.material_get(ob, mat_nr - 1, MAT_GEOM_HAIR);
 
-  shgroup_hair_call(material.shading.shgrp, ob, part_sys, modifier_data);
-  shgroup_hair_call(material.prepass.shgrp, ob, part_sys, modifier_data);
-  shgroup_hair_call(material.shadow.shgrp, ob, part_sys, modifier_data);
+  shgroup_hair_call(material.shading, ob, part_sys, modifier_data);
+  shgroup_hair_call(material.prepass, ob, part_sys, modifier_data);
+  shgroup_hair_call(material.shadow, ob, part_sys, modifier_data);
   /* TODO(fclem) Hair velocity. */
   // shading_passes.velocity.gpencil_add(ob, ob_handle);
 

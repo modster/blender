@@ -48,6 +48,7 @@ struct BLI_mempool;
 struct BlendThumbnail;
 struct GHash;
 struct GSet;
+struct IDNameLib_Map;
 struct ImBuf;
 struct Library;
 struct MainLock;
@@ -191,6 +192,9 @@ typedef struct Main {
    */
   struct MainIDRelations *relations;
 
+  /* IDMap of IDs. Currently used when reading (expanding) libraries. */
+  struct IDNameLib_Map *id_map;
+
   struct MainLock *lock;
 } Main;
 
@@ -207,6 +211,32 @@ void BKE_main_relations_tag_set(struct Main *bmain,
                                 const bool value);
 
 struct GSet *BKE_main_gset_create(struct Main *bmain, struct GSet *gset);
+
+/*
+ * Temporary runtime API to allow re-using local (already appended) IDs instead of appending a new
+ * copy again.
+ */
+
+struct GHash *BKE_main_library_weak_reference_create(struct Main *bmain) ATTR_NONNULL();
+void BKE_main_library_weak_reference_destroy(struct GHash *library_weak_reference_mapping)
+    ATTR_NONNULL();
+struct ID *BKE_main_library_weak_reference_search_item(
+    struct GHash *library_weak_reference_mapping,
+    const char *library_filepath,
+    const char *library_id_name) ATTR_NONNULL();
+void BKE_main_library_weak_reference_add_item(struct GHash *library_weak_reference_mapping,
+                                              const char *library_filepath,
+                                              const char *library_id_name,
+                                              struct ID *new_id) ATTR_NONNULL();
+void BKE_main_library_weak_reference_update_item(struct GHash *library_weak_reference_mapping,
+                                                 const char *library_filepath,
+                                                 const char *library_id_name,
+                                                 struct ID *old_id,
+                                                 struct ID *new_id) ATTR_NONNULL();
+void BKE_main_library_weak_reference_remove_item(struct GHash *library_weak_reference_mapping,
+                                                 const char *library_filepath,
+                                                 const char *library_id_name,
+                                                 struct ID *old_id) ATTR_NONNULL();
 
 /* *** Generic utils to loop over whole Main database. *** */
 

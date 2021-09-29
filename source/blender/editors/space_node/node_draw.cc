@@ -41,10 +41,12 @@
 #include "BLI_span.hh"
 #include "BLI_string_ref.hh"
 #include "BLI_vector.hh"
+#include "BLI_vector_set.hh"
 
 #include "BLT_translation.h"
 
 #include "BKE_context.h"
+#include "BKE_geometry_set.hh"
 #include "BKE_idtype.h"
 #include "BKE_lib_id.h"
 #include "BKE_main.h"
@@ -77,6 +79,9 @@
 #include "RNA_access.h"
 
 #include "NOD_geometry_nodes_eval_log.hh"
+#include "NOD_node_declaration.hh"
+
+#include "FN_field_cpp_type.hh"
 
 #include "node_intern.h" /* own include */
 
@@ -88,7 +93,11 @@ using blender::Map;
 using blender::Set;
 using blender::Span;
 using blender::Vector;
+using blender::VectorSet;
 using blender::fn::CPPType;
+using blender::fn::FieldCPPType;
+using blender::fn::FieldInput;
+using blender::fn::GField;
 using blender::fn::GPointer;
 namespace geo_log = blender::nodes::geometry_nodes_eval_log;
 
@@ -360,7 +369,11 @@ static void node_update_basis(const bContext *C, bNodeTree *ntree, bNode *node)
   /* Get "global" coordinates. */
   float locx, locy;
   node_to_view(node, 0.0f, 0.0f, &locx, &locy);
-  float dy = locy;
+  /* Round the node origin because text contents are always pixel-aligned. */
+  locx = round(locx);
+  locy = round(locy);
+
+  int dy = locy;
 
   /* Header. */
   dy -= NODE_DY;
@@ -412,9 +425,9 @@ static void node_update_basis(const bContext *C, bNodeTree *ntree, bNode *node)
     /* Ensure minimum socket height in case layout is empty. */
     buty = min_ii(buty, dy - NODE_DY);
 
-    nsock->locx = locx + NODE_WIDTH(node);
-    /* Place the socket circle in the middle of the layout. */
-    nsock->locy = 0.5f * (dy + buty);
+    /* Round the socket location to stop it from jiggling. */
+    nsock->locx = round(locx + NODE_WIDTH(node));
+    nsock->locy = round(0.5f * (dy + buty));
 
     dy = buty;
     if (nsock->next) {
@@ -549,8 +562,8 @@ static void node_update_basis(const bContext *C, bNodeTree *ntree, bNode *node)
     buty = min_ii(buty, dy - NODE_DY);
 
     nsock->locx = locx;
-    /* Place the socket circle in the middle of the layout. */
-    nsock->locy = 0.5f * (dy + buty);
+    /* Round the socket vertical position to stop it from jiggling. */
+    nsock->locy = round(0.5f * (dy + buty));
 
     dy = buty - multi_input_socket_offset * 0.5;
     if (nsock->next) {
@@ -587,6 +600,9 @@ static void node_update_hidden(bNode *node)
   /* Get "global" coords. */
   float locx, locy;
   node_to_view(node, 0.0f, 0.0f, &locx, &locy);
+  /* Round the node origin because text contents are always pixel-aligned. */
+  locx = round(locx);
+  locy = round(locy);
 
   /* Calculate minimal radius. */
   LISTBASE_FOREACH (bNodeSocket *, nsock, &node->inputs) {
@@ -617,8 +633,9 @@ static void node_update_hidden(bNode *node)
 
   LISTBASE_FOREACH (bNodeSocket *, nsock, &node->outputs) {
     if (!nodeSocketIsHidden(nsock)) {
-      nsock->locx = node->totr.xmax - hiddenrad + sinf(rad) * hiddenrad;
-      nsock->locy = node->totr.ymin + hiddenrad + cosf(rad) * hiddenrad;
+      /* Round the socket location to stop it from jiggling. */
+      nsock->locx = round(node->totr.xmax - hiddenrad + sinf(rad) * hiddenrad);
+      nsock->locy = round(node->totr.ymin + hiddenrad + cosf(rad) * hiddenrad);
       rad += drad;
     }
   }
@@ -628,8 +645,9 @@ static void node_update_hidden(bNode *node)
 
   LISTBASE_FOREACH (bNodeSocket *, nsock, &node->inputs) {
     if (!nodeSocketIsHidden(nsock)) {
-      nsock->locx = node->totr.xmin + hiddenrad + sinf(rad) * hiddenrad;
-      nsock->locy = node->totr.ymin + hiddenrad + cosf(rad) * hiddenrad;
+      /* Round the socket location to stop it from jiggling. */
+      nsock->locx = round(node->totr.xmin + hiddenrad + sinf(rad) * hiddenrad);
+      nsock->locy = round(node->totr.ymin + hiddenrad + cosf(rad) * hiddenrad);
       rad += drad;
     }
   }
@@ -670,8 +688,8 @@ int node_get_colorid(bNode *node)
       return TH_NODE_INPUT;
     case NODE_CLASS_OUTPUT:
       return (node->flag & NODE_DO_OUTPUT) ? TH_NODE_OUTPUT : TH_NODE;
-    case NODE_CLASS_CONVERTOR:
-      return TH_NODE_CONVERTOR;
+    case NODE_CLASS_CONVERTER:
+      return TH_NODE_CONVERTER;
     case NODE_CLASS_OP_COLOR:
       return TH_NODE_COLOR;
     case NODE_CLASS_OP_VECTOR:
@@ -716,12 +734,6 @@ static void node_draw_mute_line(const View2D *v2d, const SpaceNode *snode, const
   GPU_blend(GPU_BLEND_NONE);
 }
 
-/* Flags used in gpu_shader_keyframe_diamond_frag.glsl. */
-#define MARKER_SHAPE_DIAMOND 0x1
-#define MARKER_SHAPE_SQUARE 0xC
-#define MARKER_SHAPE_CIRCLE 0x2
-#define MARKER_SHAPE_INNER_DOT 0x10
-
 static void node_socket_draw(const bNodeSocket *sock,
                              const float color[4],
                              const float color_outline[4],
@@ -740,16 +752,16 @@ static void node_socket_draw(const bNodeSocket *sock,
   switch (sock->display_shape) {
     case SOCK_DISPLAY_SHAPE_DIAMOND:
     case SOCK_DISPLAY_SHAPE_DIAMOND_DOT:
-      flags = MARKER_SHAPE_DIAMOND;
+      flags = GPU_KEYFRAME_SHAPE_DIAMOND;
       break;
     case SOCK_DISPLAY_SHAPE_SQUARE:
     case SOCK_DISPLAY_SHAPE_SQUARE_DOT:
-      flags = MARKER_SHAPE_SQUARE;
+      flags = GPU_KEYFRAME_SHAPE_SQUARE;
       break;
     default:
     case SOCK_DISPLAY_SHAPE_CIRCLE:
     case SOCK_DISPLAY_SHAPE_CIRCLE_DOT:
-      flags = MARKER_SHAPE_CIRCLE;
+      flags = GPU_KEYFRAME_SHAPE_CIRCLE;
       break;
   }
 
@@ -757,7 +769,7 @@ static void node_socket_draw(const bNodeSocket *sock,
            SOCK_DISPLAY_SHAPE_DIAMOND_DOT,
            SOCK_DISPLAY_SHAPE_SQUARE_DOT,
            SOCK_DISPLAY_SHAPE_CIRCLE_DOT)) {
-    flags |= MARKER_SHAPE_INNER_DOT;
+    flags |= GPU_KEYFRAME_SHAPE_INNER_DOT;
   }
 
   immAttr4fv(col_id, color);
@@ -836,38 +848,76 @@ struct SocketTooltipData {
 static void create_inspection_string_for_generic_value(const geo_log::GenericValueLog &value_log,
                                                        std::stringstream &ss)
 {
-  auto id_to_inspection_string = [&](ID *id) {
-    ss << (id ? id->name + 2 : TIP_("None")) << " (" << BKE_idtype_idcode_to_name(GS(id->name))
-       << ")";
+  auto id_to_inspection_string = [&](ID *id, short idcode) {
+    ss << (id ? id->name + 2 : TIP_("None")) << " (" << BKE_idtype_idcode_to_name(idcode) << ")";
   };
 
   const GPointer value = value_log.value();
-  if (value.is_type<int>()) {
-    ss << *value.get<int>() << TIP_(" (Integer)");
+  const CPPType &type = *value.type();
+  if (const FieldCPPType *field_type = dynamic_cast<const FieldCPPType *>(&type)) {
+    const CPPType &base_type = field_type->field_type();
+    BUFFER_FOR_CPP_TYPE_VALUE(base_type, buffer);
+    const GField &field = field_type->get_gfield(value.get());
+    if (field.node().depends_on_input()) {
+      if (base_type.is<int>()) {
+        ss << TIP_("Integer Field");
+      }
+      else if (base_type.is<float>()) {
+        ss << TIP_("Float Field");
+      }
+      else if (base_type.is<blender::float3>()) {
+        ss << TIP_("Vector Field");
+      }
+      else if (base_type.is<bool>()) {
+        ss << TIP_("Boolean Field");
+      }
+      else if (base_type.is<std::string>()) {
+        ss << TIP_("String Field");
+      }
+      ss << TIP_(" based on:\n");
+
+      /* Use vector set to deduplicate inputs. */
+      VectorSet<std::reference_wrapper<const FieldInput>> field_inputs;
+      field.node().foreach_field_input(
+          [&](const FieldInput &field_input) { field_inputs.add(field_input); });
+      for (const FieldInput &field_input : field_inputs) {
+        ss << "\u2022 " << field_input.socket_inspection_name();
+        if (field_input != field_inputs.as_span().last().get()) {
+          ss << ".\n";
+        }
+      }
+    }
+    else {
+      blender::fn::evaluate_constant_field(field, buffer);
+      if (base_type.is<int>()) {
+        ss << *(int *)buffer << TIP_(" (Integer)");
+      }
+      else if (base_type.is<float>()) {
+        ss << *(float *)buffer << TIP_(" (Float)");
+      }
+      else if (base_type.is<blender::float3>()) {
+        ss << *(blender::float3 *)buffer << TIP_(" (Vector)");
+      }
+      else if (base_type.is<bool>()) {
+        ss << ((*(bool *)buffer) ? TIP_("True") : TIP_("False")) << TIP_(" (Boolean)");
+      }
+      else if (base_type.is<std::string>()) {
+        ss << *(std::string *)buffer << TIP_(" (String)");
+      }
+      base_type.destruct(buffer);
+    }
   }
-  else if (value.is_type<float>()) {
-    ss << *value.get<float>() << TIP_(" (Float)");
+  else if (type.is<Object *>()) {
+    id_to_inspection_string((ID *)*value.get<Object *>(), ID_OB);
   }
-  else if (value.is_type<blender::float3>()) {
-    ss << *value.get<blender::float3>() << TIP_(" (Vector)");
+  else if (type.is<Material *>()) {
+    id_to_inspection_string((ID *)*value.get<Material *>(), ID_MA);
   }
-  else if (value.is_type<bool>()) {
-    ss << (*value.get<bool>() ? TIP_("True") : TIP_("False")) << TIP_(" (Boolean)");
+  else if (type.is<Tex *>()) {
+    id_to_inspection_string((ID *)*value.get<Tex *>(), ID_TE);
   }
-  else if (value.is_type<std::string>()) {
-    ss << *value.get<std::string>() << TIP_(" (String)");
-  }
-  else if (value.is_type<Object *>()) {
-    id_to_inspection_string((ID *)*value.get<Object *>());
-  }
-  else if (value.is_type<Material *>()) {
-    id_to_inspection_string((ID *)*value.get<Material *>());
-  }
-  else if (value.is_type<Tex *>()) {
-    id_to_inspection_string((ID *)*value.get<Tex *>());
-  }
-  else if (value.is_type<Collection *>()) {
-    id_to_inspection_string((ID *)*value.get<Collection *>());
+  else if (type.is<Collection *>()) {
+    id_to_inspection_string((ID *)*value.get<Collection *>(), ID_GR);
   }
 }
 
@@ -1036,12 +1086,37 @@ static void node_socket_draw_nested(const bContext *C,
       but,
       [](bContext *C, void *argN, const char *UNUSED(tip)) {
         SocketTooltipData *data = (SocketTooltipData *)argN;
-        std::optional<std::string> str = create_socket_inspection_string(
+        std::optional<std::string> socket_inspection_str = create_socket_inspection_string(
             C, *data->ntree, *data->node, *data->socket);
-        if (str.has_value()) {
-          return BLI_strdup(str->c_str());
+
+        std::stringstream output;
+        if (data->node->declaration != nullptr) {
+          ListBase *list;
+          Span<blender::nodes::SocketDeclarationPtr> decl_list;
+
+          if (data->socket->in_out == SOCK_IN) {
+            list = &data->node->inputs;
+            decl_list = data->node->declaration->inputs();
+          }
+          else {
+            list = &data->node->outputs;
+            decl_list = data->node->declaration->outputs();
+          }
+
+          const int socket_index = BLI_findindex(list, data->socket);
+          const blender::nodes::SocketDeclaration &socket_decl = *decl_list[socket_index];
+          blender::StringRef description = socket_decl.description();
+          if (!description.is_empty()) {
+            output << TIP_(description.data()) << ".\n\n";
+          }
+
+          if (socket_inspection_str.has_value()) {
+            output << *socket_inspection_str;
+            return BLI_strdup(output.str().c_str());
+          }
         }
-        return BLI_strdup(TIP_("The socket value has not been computed yet"));
+        output << TIP_("The socket value has not been computed yet");
+        return BLI_strdup(output.str().c_str());
       },
       data,
       MEM_freeN);
@@ -1077,7 +1152,7 @@ void ED_node_socket_draw(bNodeSocket *sock, const rcti *rect, const float color[
   GPU_blend(GPU_BLEND_ALPHA);
   GPU_program_point_size(true);
 
-  immBindBuiltinProgram(GPU_SHADER_KEYFRAME_DIAMOND);
+  immBindBuiltinProgram(GPU_SHADER_KEYFRAME_SHAPE);
   immUniform1f("outline_scale", 0.7f);
   immUniform2f("ViewportSize", -1.0f, -1.0f);
 
@@ -1222,7 +1297,7 @@ void node_draw_sockets(const View2D *v2d,
 
   GPU_blend(GPU_BLEND_ALPHA);
   GPU_program_point_size(true);
-  immBindBuiltinProgram(GPU_SHADER_KEYFRAME_DIAMOND);
+  immBindBuiltinProgram(GPU_SHADER_KEYFRAME_SHAPE);
   immUniform1f("outline_scale", 0.7f);
   immUniform2f("ViewportSize", -1.0f, -1.0f);
 
@@ -1391,6 +1466,8 @@ static int node_error_type_to_icon(const geo_log::NodeWarningType type)
       return ICON_ERROR;
     case geo_log::NodeWarningType::Info:
       return ICON_INFO;
+    case geo_log::NodeWarningType::Legacy:
+      return ICON_ERROR;
   }
 
   BLI_assert(false);
@@ -1401,6 +1478,8 @@ static uint8_t node_error_type_priority(const geo_log::NodeWarningType type)
 {
   switch (type) {
     case geo_log::NodeWarningType::Error:
+      return 4;
+    case geo_log::NodeWarningType::Legacy:
       return 3;
     case geo_log::NodeWarningType::Warning:
       return 2;
@@ -2125,7 +2204,7 @@ void node_draw_space(const bContext *C, ARegion *region)
   SpaceNode *snode = CTX_wm_space_node(C);
   View2D *v2d = &region->v2d;
 
-  /* Setup offscreen buffers. */
+  /* Setup off-screen buffers. */
   GPUViewport *viewport = WM_draw_region_get_viewport(region);
 
   GPUFrameBuffer *framebuffer_overlay = GPU_viewport_framebuffer_overlay_get(viewport);

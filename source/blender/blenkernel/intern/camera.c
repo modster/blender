@@ -92,11 +92,6 @@ static void camera_copy_data(Main *UNUSED(bmain),
   BLI_duplicatelist(&cam_dst->bg_images, &cam_src->bg_images);
 }
 
-static void camera_make_local(Main *bmain, ID *id, const int flags)
-{
-  BKE_lib_id_make_local_generic(bmain, id, flags);
-}
-
 /** Free (or release) any data used by this camera (does not free the camera itself). */
 static void camera_free_data(ID *id)
 {
@@ -122,18 +117,17 @@ static void camera_foreach_id(ID *id, LibraryForeachIDData *data)
 static void camera_blend_write(BlendWriter *writer, ID *id, const void *id_address)
 {
   Camera *cam = (Camera *)id;
-  if (cam->id.us > 0 || BLO_write_is_undo(writer)) {
-    /* write LibData */
-    BLO_write_id_struct(writer, Camera, id_address, &cam->id);
-    BKE_id_blend_write(writer, &cam->id);
 
-    if (cam->adt) {
-      BKE_animdata_blend_write(writer, cam->adt);
-    }
+  /* write LibData */
+  BLO_write_id_struct(writer, Camera, id_address, &cam->id);
+  BKE_id_blend_write(writer, &cam->id);
 
-    LISTBASE_FOREACH (CameraBGImage *, bgpic, &cam->bg_images) {
-      BLO_write_struct(writer, CameraBGImage, bgpic);
-    }
+  if (cam->adt) {
+    BKE_animdata_blend_write(writer, cam->adt);
+  }
+
+  LISTBASE_FOREACH (CameraBGImage *, bgpic, &cam->bg_images) {
+    BLO_write_struct(writer, CameraBGImage, bgpic);
   }
 }
 
@@ -188,12 +182,12 @@ IDTypeInfo IDType_ID_CA = {
     .name = "Camera",
     .name_plural = "cameras",
     .translation_context = BLT_I18NCONTEXT_ID_CAMERA,
-    .flags = 0,
+    .flags = IDTYPE_FLAGS_APPEND_IS_REUSABLE,
 
     .init_data = camera_init_data,
     .copy_data = camera_copy_data,
     .free_data = camera_free_data,
-    .make_local = camera_make_local,
+    .make_local = NULL,
     .foreach_id = camera_foreach_id,
     .foreach_cache = NULL,
     .owner_get = NULL,

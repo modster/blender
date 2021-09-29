@@ -34,10 +34,12 @@
 #include "DNA_gpencil_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
+#include "DNA_world_types.h"
 
 #include "MEM_guardedalloc.h"
 
 #include "BLI_blenlib.h"
+#include "BLI_dial_2d.h"
 #include "BLI_math.h"
 #include "BLI_utildefines.h"
 
@@ -210,6 +212,9 @@ typedef struct ViewOpsData {
      * If we want the value before running the operator, add a separate member.
      */
     char persp;
+
+    /** Used for roll */
+    Dial *dial;
   } init;
 
   /** Previous state (previous modal event handled). */
@@ -575,6 +580,10 @@ static void viewops_data_free(bContext *C, wmOperator *op)
 
     if (vod->timer) {
       WM_event_remove_timer(CTX_wm_manager(C), vod->timer->win, vod->timer);
+    }
+
+    if (vod->init.dial) {
+      MEM_freeN(vod->init.dial);
     }
 
     MEM_freeN(vod);
@@ -3961,9 +3970,10 @@ static int view_axis_exec(bContext *C, wmOperator *op)
     Object *obact = CTX_data_active_object(C);
     if (obact != NULL) {
       float twmat[3][3];
+      ViewLayer *view_layer = CTX_data_view_layer(C);
       Object *obedit = CTX_data_edit_object(C);
       /* same as transform gizmo when normal is set */
-      ED_getTransformOrientationMatrix(C, obact, obedit, V3D_AROUND_ACTIVE, twmat);
+      ED_getTransformOrientationMatrix(view_layer, v3d, obact, obedit, V3D_AROUND_ACTIVE, twmat);
       align_quat = align_quat_buf;
       mat3_to_quat(align_quat, twmat);
       invert_qt_normalized(align_quat);
@@ -4351,18 +4361,9 @@ static void view_roll_angle(
   rv3d->view = RV3D_VIEW_USER;
 }
 
-static void viewroll_apply(ViewOpsData *vod, int x, int UNUSED(y))
+static void viewroll_apply(ViewOpsData *vod, int x, int y)
 {
-  float angle = 0.0;
-
-  {
-    float len1, len2, tot;
-
-    tot = vod->region->winrct.xmax - vod->region->winrct.xmin;
-    len1 = (vod->region->winrct.xmax - x) / tot;
-    len2 = (vod->region->winrct.xmax - vod->init.event_xy[0]) / tot;
-    angle = (len1 - len2) * (float)M_PI * 4.0f;
-  }
+  float angle = BLI_dial_angle(vod->init.dial, (const float[2]){x, y});
 
   if (angle != 0.0f) {
     view_roll_angle(vod->region, vod->rv3d->viewquat, vod->init.quat, vod->init.mousevec, angle);
@@ -4407,6 +4408,13 @@ static int viewroll_modal(bContext *C, wmOperator *op, const wmEvent *event)
         event_code = VIEW_CONFIRM;
         break;
     }
+  }
+  else if (ELEM(event->type, EVT_ESCKEY, RIGHTMOUSE)) {
+    /* Note this does not remove auto-keys on locked cameras. */
+    copy_qt_qt(vod->rv3d->viewquat, vod->init.quat);
+    ED_view3d_camera_lock_sync(vod->depsgraph, vod->v3d, vod->rv3d);
+    viewops_data_free(C, op);
+    return OPERATOR_CANCELLED;
   }
   else if (event->type == vod->init.event_type && event->val == KM_RELEASE) {
     event_code = VIEW_CONFIRM;
@@ -4516,6 +4524,9 @@ static int viewroll_invoke(bContext *C, wmOperator *op, const wmEvent *event)
     viewops_data_alloc(C, op);
     viewops_data_create(C, op, event, viewops_flag_from_prefs());
     vod = op->customdata;
+    vod->init.dial = BLI_dial_init((const float[2]){BLI_rcti_cent_x(&vod->region->winrct),
+                                                    BLI_rcti_cent_y(&vod->region->winrct)},
+                                   FLT_EPSILON);
 
     ED_view3d_smooth_view_force_finish(C, vod->v3d, vod->region);
 
@@ -4864,6 +4875,59 @@ void VIEW3D_OT_background_image_remove(wmOperatorType *ot)
 /** \} */
 
 /* -------------------------------------------------------------------- */
+/** \name Drop World Operator
+ * \{ */
+
+static int drop_world_exec(bContext *C, wmOperator *op)
+{
+  Main *bmain = CTX_data_main(C);
+  Scene *scene = CTX_data_scene(C);
+
+  char name[MAX_ID_NAME - 2];
+
+  RNA_string_get(op->ptr, "name", name);
+  World *world = (World *)BKE_libblock_find_name(bmain, ID_WO, name);
+  if (world == NULL) {
+    return OPERATOR_CANCELLED;
+  }
+
+  id_us_plus(&world->id);
+  scene->world = world;
+
+  DEG_id_tag_update(&scene->id, 0);
+  DEG_relations_tag_update(bmain);
+
+  WM_event_add_notifier(C, NC_SCENE | ND_WORLD, scene);
+
+  return OPERATOR_FINISHED;
+}
+
+static bool drop_world_poll(bContext *C)
+{
+  return ED_operator_scene_editable(C);
+}
+
+void VIEW3D_OT_drop_world(wmOperatorType *ot)
+{
+  /* identifiers */
+  ot->name = "Drop World";
+  ot->description = "Drop a world into the scene";
+  ot->idname = "VIEW3D_OT_drop_world";
+
+  /* api callbacks */
+  ot->exec = drop_world_exec;
+  ot->poll = drop_world_poll;
+
+  /* flags */
+  ot->flag = OPTYPE_UNDO | OPTYPE_INTERNAL;
+
+  /* properties */
+  RNA_def_string(ot->srna, "name", "World", MAX_ID_NAME - 2, "Name", "World to assign");
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
 /** \name View Clipping Planes Operator
  *
  * Draw border or toggle off.
@@ -4917,10 +4981,7 @@ static int view3d_clipping_invoke(bContext *C, wmOperator *op, const wmEvent *ev
   if (rv3d->rflag & RV3D_CLIPPING) {
     rv3d->rflag &= ~RV3D_CLIPPING;
     ED_region_tag_redraw(region);
-    if (rv3d->clipbb) {
-      MEM_freeN(rv3d->clipbb);
-    }
-    rv3d->clipbb = NULL;
+    MEM_SAFE_FREE(rv3d->clipbb);
     return OPERATOR_FINISHED;
   }
   return WM_gesture_box_invoke(C, op, event);
@@ -5295,7 +5356,7 @@ static int toggle_shading_exec(bContext *C, wmOperator *op)
   }
 
   ED_view3d_shade_update(bmain, v3d, area);
-  WM_event_add_notifier(C, NC_SPACE | ND_SPACE_VIEW3D, v3d);
+  WM_event_add_notifier(C, NC_SPACE | ND_SPACE_VIEW3D | NS_VIEW3D_SHADING, v3d);
 
   return OPERATOR_FINISHED;
 }
@@ -5350,6 +5411,7 @@ static int toggle_xray_exec(bContext *C, wmOperator *op)
   }
 
   ED_area_tag_redraw(area);
+  WM_event_add_notifier(C, NC_SPACE | ND_SPACE_VIEW3D | NS_VIEW3D_SHADING, v3d);
 
   return OPERATOR_FINISHED;
 }

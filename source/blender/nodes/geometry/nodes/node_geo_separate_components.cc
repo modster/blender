@@ -16,33 +16,27 @@
 
 #include "node_geometry_util.hh"
 
-static bNodeSocketTemplate geo_node_join_geometry_in[]{
-    {SOCK_GEOMETRY, N_("Geometry")},
-    {-1, ""},
-};
-
-static bNodeSocketTemplate geo_node_join_geometry_out[]{
-    {SOCK_GEOMETRY, N_("Mesh")},
-    {SOCK_GEOMETRY, N_("Point Cloud")},
-    {SOCK_GEOMETRY, N_("Curve")},
-    {SOCK_GEOMETRY, N_("Volume")},
-    {-1, ""},
-};
-
 namespace blender::nodes {
+
+static void geo_node_join_geometry_declare(NodeDeclarationBuilder &b)
+{
+  b.add_input<decl::Geometry>("Geometry");
+  b.add_output<decl::Geometry>("Mesh");
+  b.add_output<decl::Geometry>("Point Cloud");
+  b.add_output<decl::Geometry>("Curve");
+  b.add_output<decl::Geometry>("Volume");
+  b.add_output<decl::Geometry>("Instances");
+}
 
 static void geo_node_separate_components_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
 
-  /* Note that it will be possible to skip realizing instances here when instancing
-   * geometry directly is supported by creating corresponding geometry instances. */
-  geometry_set = bke::geometry_set_realize_instances(geometry_set);
-
   GeometrySet meshes;
   GeometrySet point_clouds;
   GeometrySet volumes;
   GeometrySet curves;
+  GeometrySet instances;
 
   if (geometry_set.has<MeshComponent>()) {
     meshes.add(*geometry_set.get_component_for_read<MeshComponent>());
@@ -56,11 +50,15 @@ static void geo_node_separate_components_exec(GeoNodeExecParams params)
   if (geometry_set.has<VolumeComponent>()) {
     volumes.add(*geometry_set.get_component_for_read<VolumeComponent>());
   }
+  if (geometry_set.has<InstancesComponent>()) {
+    instances.add(*geometry_set.get_component_for_read<InstancesComponent>());
+  }
 
   params.set_output("Mesh", meshes);
   params.set_output("Point Cloud", point_clouds);
   params.set_output("Curve", curves);
   params.set_output("Volume", volumes);
+  params.set_output("Instances", instances);
 }
 
 }  // namespace blender::nodes
@@ -71,7 +69,7 @@ void register_node_type_geo_separate_components()
 
   geo_node_type_base(
       &ntype, GEO_NODE_SEPARATE_COMPONENTS, "Separate Components", NODE_CLASS_GEOMETRY, 0);
-  node_type_socket_templates(&ntype, geo_node_join_geometry_in, geo_node_join_geometry_out);
+  ntype.declare = blender::nodes::geo_node_join_geometry_declare;
   ntype.geometry_node_execute = blender::nodes::geo_node_separate_components_exec;
   nodeRegisterType(&ntype);
 }

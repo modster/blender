@@ -18,11 +18,11 @@
 
 #pragma once
 
-#include "COM_NodeOperation.h"
+#include "COM_MultiThreadedOperation.h"
 
 namespace blender::compositor {
 
-class CropBaseOperation : public NodeOperation {
+class CropBaseOperation : public MultiThreadedOperation {
  protected:
   SocketReader *m_inputOperation;
   NodeTwoXYs *m_settings;
@@ -53,6 +53,10 @@ class CropOperation : public CropBaseOperation {
  public:
   CropOperation();
   void executePixelSampled(float output[4], float x, float y, PixelSampler sampler) override;
+
+  void update_memory_buffer_partial(MemoryBuffer *output,
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
 };
 
 class CropImageOperation : public CropBaseOperation {
@@ -62,9 +66,13 @@ class CropImageOperation : public CropBaseOperation {
   bool determineDependingAreaOfInterest(rcti *input,
                                         ReadBufferOperation *readOperation,
                                         rcti *output) override;
-  void determineResolution(unsigned int resolution[2],
-                           unsigned int preferredResolution[2]) override;
+  void determine_canvas(const rcti &preferred_area, rcti &r_area) override;
   void executePixelSampled(float output[4], float x, float y, PixelSampler sampler) override;
+
+  void get_area_of_interest(int input_idx, const rcti &output_area, rcti &r_input_area) override;
+  void update_memory_buffer_partial(MemoryBuffer *output,
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
 };
 
 }  // namespace blender::compositor

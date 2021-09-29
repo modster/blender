@@ -35,10 +35,78 @@ namespace blender::compositor {
 
 NodeOperation::NodeOperation()
 {
-  this->m_resolutionInputSocketIndex = 0;
-  this->m_width = 0;
-  this->m_height = 0;
+  canvas_input_index_ = 0;
+  canvas_ = COM_AREA_NONE;
   this->m_btree = nullptr;
+}
+
+/** Get constant value when operation is constant, otherwise return default_value. */
+float NodeOperation::get_constant_value_default(float default_value)
+{
+  BLI_assert(m_outputs.size() > 0 && getOutputSocket()->getDataType() == DataType::Value);
+  return *get_constant_elem_default(&default_value);
+}
+
+/** Get constant elem when operation is constant, otherwise return default_elem. */
+const float *NodeOperation::get_constant_elem_default(const float *default_elem)
+{
+  BLI_assert(m_outputs.size() > 0);
+  if (get_flags().is_constant_operation) {
+    return static_cast<ConstantOperation *>(this)->get_constant_elem();
+  }
+
+  return default_elem;
+}
+
+/**
+ * Generate a hash that identifies the operation result in the current execution.
+ * Requires `hash_output_params` to be implemented, otherwise `std::nullopt` is returned.
+ * If the operation parameters or its linked inputs change, the hash must be re-generated.
+ */
+std::optional<NodeOperationHash> NodeOperation::generate_hash()
+{
+  params_hash_ = get_default_hash_2(canvas_.xmin, canvas_.xmax);
+
+  /* Hash subclasses params. */
+  is_hash_output_params_implemented_ = true;
+  hash_output_params();
+  if (!is_hash_output_params_implemented_) {
+    return std::nullopt;
+  }
+
+  hash_params(canvas_.ymin, canvas_.ymax);
+  if (m_outputs.size() > 0) {
+    BLI_assert(m_outputs.size() == 1);
+    hash_param(this->getOutputSocket()->getDataType());
+  }
+  NodeOperationHash hash;
+  hash.params_hash_ = params_hash_;
+
+  hash.parents_hash_ = 0;
+  for (NodeOperationInput &socket : m_inputs) {
+    if (!socket.isConnected()) {
+      continue;
+    }
+
+    NodeOperation &input = socket.getLink()->getOperation();
+    const bool is_constant = input.get_flags().is_constant_operation;
+    combine_hashes(hash.parents_hash_, get_default_hash(is_constant));
+    if (is_constant) {
+      const float *elem = ((ConstantOperation *)&input)->get_constant_elem();
+      const int num_channels = COM_data_type_num_channels(socket.getDataType());
+      for (const int i : IndexRange(num_channels)) {
+        combine_hashes(hash.parents_hash_, get_default_hash(elem[i]));
+      }
+    }
+    else {
+      combine_hashes(hash.parents_hash_, get_default_hash(input.get_id()));
+    }
+  }
+
+  hash.type_hash_ = typeid(*this).hash_code();
+  hash.operation_ = this;
+
+  return hash;
 }
 
 NodeOperationOutput *NodeOperation::getOutputSocket(unsigned int index)
@@ -61,44 +129,51 @@ void NodeOperation::addOutputSocket(DataType datatype)
   m_outputs.append(NodeOperationOutput(this, datatype));
 }
 
-void NodeOperation::determineResolution(unsigned int resolution[2],
-                                        unsigned int preferredResolution[2])
+void NodeOperation::determine_canvas(const rcti &preferred_area, rcti &r_area)
 {
-  unsigned int used_resolution_index = 0;
-  if (m_resolutionInputSocketIndex == RESOLUTION_INPUT_ANY) {
+  unsigned int used_canvas_index = 0;
+  if (canvas_input_index_ == RESOLUTION_INPUT_ANY) {
     for (NodeOperationInput &input : m_inputs) {
-      unsigned int any_resolution[2] = {0, 0};
-      input.determineResolution(any_resolution, preferredResolution);
-      if (any_resolution[0] * any_resolution[1] > 0) {
-        resolution[0] = any_resolution[0];
-        resolution[1] = any_resolution[1];
+      rcti any_area = COM_AREA_NONE;
+      const bool determined = input.determine_canvas(preferred_area, any_area);
+      if (determined) {
+        r_area = any_area;
         break;
       }
-      used_resolution_index += 1;
+      used_canvas_index += 1;
     }
   }
-  else if (m_resolutionInputSocketIndex < m_inputs.size()) {
-    NodeOperationInput &input = m_inputs[m_resolutionInputSocketIndex];
-    input.determineResolution(resolution, preferredResolution);
-    used_resolution_index = m_resolutionInputSocketIndex;
+  else if (canvas_input_index_ < m_inputs.size()) {
+    NodeOperationInput &input = m_inputs[canvas_input_index_];
+    input.determine_canvas(preferred_area, r_area);
+    used_canvas_index = canvas_input_index_;
   }
-  unsigned int temp2[2] = {resolution[0], resolution[1]};
 
-  unsigned int temp[2];
+  if (modify_determined_canvas_fn_) {
+    modify_determined_canvas_fn_(r_area);
+  }
+
+  rcti unused_area;
+  const rcti &local_preferred_area = r_area;
   for (unsigned int index = 0; index < m_inputs.size(); index++) {
-    if (index == used_resolution_index) {
+    if (index == used_canvas_index) {
       continue;
     }
     NodeOperationInput &input = m_inputs[index];
     if (input.isConnected()) {
-      input.determineResolution(temp, temp2);
+      input.determine_canvas(local_preferred_area, unused_area);
     }
   }
 }
 
-void NodeOperation::setResolutionInputSocketIndex(unsigned int index)
+void NodeOperation::set_canvas_input_index(unsigned int index)
 {
-  this->m_resolutionInputSocketIndex = index;
+  this->canvas_input_index_ = index;
+}
+
+void NodeOperation::init_data()
+{
+  /* Pass. */
 }
 void NodeOperation::initExecution()
 {
@@ -129,6 +204,28 @@ void NodeOperation::deinitExecution()
 {
   /* pass */
 }
+
+void NodeOperation::set_canvas(const rcti &canvas_area)
+{
+  canvas_ = canvas_area;
+  flags.is_canvas_set = true;
+}
+
+const rcti &NodeOperation::get_canvas() const
+{
+  return canvas_;
+}
+
+/**
+ * Mainly used for re-determining canvas of constant operations in cases where preferred canvas
+ * depends on the constant element.
+ */
+void NodeOperation::unset_canvas()
+{
+  BLI_assert(m_inputs.size() == 0);
+  flags.is_canvas_set = false;
+}
+
 SocketReader *NodeOperation::getInputSocketReader(unsigned int inputSocketIndex)
 {
   return this->getInputSocket(inputSocketIndex)->getReader();
@@ -204,7 +301,7 @@ void NodeOperation::get_area_of_interest(const int input_idx,
     /* Non full-frame operations never implement this method. To ensure correctness assume
      * whole area is used. */
     NodeOperation *input_op = getInputOperation(input_idx);
-    BLI_rcti_init(&r_input_area, 0, input_op->getWidth(), 0, input_op->getHeight());
+    r_input_area = input_op->get_canvas();
   }
 }
 
@@ -364,12 +461,16 @@ SocketReader *NodeOperationInput::getReader()
   return nullptr;
 }
 
-void NodeOperationInput::determineResolution(unsigned int resolution[2],
-                                             unsigned int preferredResolution[2])
+/**
+ * \return Whether canvas area could be determined.
+ */
+bool NodeOperationInput::determine_canvas(const rcti &preferred_area, rcti &r_area)
 {
   if (m_link) {
-    m_link->determineResolution(resolution, preferredResolution);
+    m_link->determine_canvas(preferred_area, r_area);
+    return !BLI_rcti_is_empty(&r_area);
   }
+  return false;
 }
 
 /******************
@@ -381,18 +482,16 @@ NodeOperationOutput::NodeOperationOutput(NodeOperation *op, DataType datatype)
 {
 }
 
-void NodeOperationOutput::determineResolution(unsigned int resolution[2],
-                                              unsigned int preferredResolution[2])
+void NodeOperationOutput::determine_canvas(const rcti &preferred_area, rcti &r_area)
 {
   NodeOperation &operation = getOperation();
-  if (operation.get_flags().is_resolution_set) {
-    resolution[0] = operation.getWidth();
-    resolution[1] = operation.getHeight();
+  if (operation.get_flags().is_canvas_set) {
+    r_area = operation.get_canvas();
   }
   else {
-    operation.determineResolution(resolution, preferredResolution);
-    if (resolution[0] > 0 && resolution[1] > 0) {
-      operation.setResolution(resolution);
+    operation.determine_canvas(preferred_area, r_area);
+    if (!BLI_rcti_is_empty(&r_area)) {
+      operation.set_canvas(r_area);
     }
   }
 }
@@ -414,8 +513,8 @@ std::ostream &operator<<(std::ostream &os, const NodeOperationFlags &node_operat
   if (node_operation_flags.use_viewer_border) {
     os << "view_border,";
   }
-  if (node_operation_flags.is_resolution_set) {
-    os << "resolution_set,";
+  if (node_operation_flags.is_canvas_set) {
+    os << "canvas_set,";
   }
   if (node_operation_flags.is_set_operation) {
     os << "set_operation,";

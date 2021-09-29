@@ -165,7 +165,7 @@ static void node_buts_curvevec(uiLayout *layout, bContext *UNUSED(C), PointerRNA
 }
 
 #define SAMPLE_FLT_ISNONE FLT_MAX
-/* bad bad, 2.5 will do better?... no it won't... */
+/* Bad bad, 2.5 will do better? ... no it won't! */
 static float _sample_col[4] = {SAMPLE_FLT_ISNONE};
 void ED_node_sample_set(const float col[4])
 {
@@ -362,8 +362,12 @@ static void node_draw_frame_label(bNodeTree *ntree, bNode *node, const float asp
   float x = BLI_rctf_cent_x(rct) - (0.5f * width);
   float y = rct->ymax - label_height;
 
-  BLF_position(fontid, x, y, 0);
-  BLF_draw(fontid, label, BLF_DRAW_STR_DUMMY_MAX);
+  /* label */
+  const bool has_label = node->label[0] != '\0';
+  if (has_label) {
+    BLF_position(fontid, x, y, 0);
+    BLF_draw(fontid, label, BLF_DRAW_STR_DUMMY_MAX);
+  }
 
   /* draw text body */
   if (node->id) {
@@ -374,7 +378,8 @@ static void node_draw_frame_label(bNodeTree *ntree, bNode *node, const float asp
 
     /* 'x' doesn't need aspect correction */
     x = rct->xmin + margin;
-    y = rct->ymax - (label_height + line_spacing);
+    y = rct->ymax - label_height - (has_label ? line_spacing : 0);
+
     /* early exit */
     int y_min = y + ((margin * 2) - (y - rct->ymin));
 
@@ -455,10 +460,8 @@ static void node_draw_frame(const bContext *C,
     UI_draw_roundbox_aa(rct, false, BASIS_RAD, color);
   }
 
-  /* label */
-  if (node->label[0] != '\0') {
-    node_draw_frame_label(ntree, node, snode->runtime->aspect);
-  }
+  /* label and text */
+  node_draw_frame_label(ntree, node, snode->runtime->aspect);
 
   UI_block_end(C, node->block);
   UI_block_draw(C, node->block);
@@ -1560,7 +1563,7 @@ static void node_composit_buts_antialiasing(uiLayout *layout, bContext *UNUSED(C
   uiItemR(col, ptr, "corner_rounding", 0, nullptr, ICON_NONE);
 }
 
-/* qdn: glare node */
+/* glare node */
 static void node_composit_buts_glare(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 {
   uiItemR(layout, ptr, "glare_type", DEFAULT_FLAGS, "", ICON_NONE);
@@ -2076,7 +2079,7 @@ static void node_composit_buts_premulkey(uiLayout *layout, bContext *UNUSED(C), 
 
 static void node_composit_buts_view_levels(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 {
-  uiItemR(layout, ptr, "channel", DEFAULT_FLAGS | UI_ITEM_R_EXPAND, nullptr, ICON_NONE);
+  uiItemR(layout, ptr, "channel", DEFAULT_FLAGS, "", ICON_NONE);
 }
 
 static void node_composit_buts_colorbalance(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
@@ -2862,6 +2865,8 @@ static void node_composit_buts_denoise(uiLayout *layout, bContext *UNUSED(C), Po
 #  endif
 #endif
 
+  uiItemL(layout, IFACE_("Prefilter:"), ICON_NONE);
+  uiItemR(layout, ptr, "prefilter", DEFAULT_FLAGS, nullptr, ICON_NONE);
   uiItemR(layout, ptr, "use_hdr", DEFAULT_FLAGS, nullptr, ICON_NONE);
 }
 
@@ -3596,8 +3601,26 @@ static void std_node_socket_draw(
       break;
     }
     case SOCK_TEXTURE: {
-      uiTemplateID(
-          layout, C, ptr, "default_value", "texture.new", nullptr, nullptr, 0, ICON_NONE, nullptr);
+      if (text[0] == '\0') {
+        uiTemplateID(layout,
+                     C,
+                     ptr,
+                     "default_value",
+                     "texture.new",
+                     nullptr,
+                     nullptr,
+                     0,
+                     ICON_NONE,
+                     nullptr);
+      }
+      else {
+        /* 0.3 split ratio is inconsistent, but use it here because the "New" button is large. */
+        uiLayout *row = uiLayoutSplit(layout, 0.3f, false);
+        uiItemL(row, text, 0);
+        uiTemplateID(
+            row, C, ptr, "default_value", "texture.new", nullptr, nullptr, 0, ICON_NONE, nullptr);
+      }
+
       break;
     }
     case SOCK_MATERIAL: {
@@ -3910,9 +3933,13 @@ static struct {
   uint p0_id, p1_id, p2_id, p3_id;
   uint colid_id, muted_id;
   uint dim_factor_id;
+  uint thickness_id;
+  uint dash_factor_id;
   GPUVertBufRaw p0_step, p1_step, p2_step, p3_step;
   GPUVertBufRaw colid_step, muted_step;
   GPUVertBufRaw dim_factor_step;
+  GPUVertBufRaw thickness_step;
+  GPUVertBufRaw dash_factor_step;
   uint count;
   bool enabled;
 } g_batch_link;
@@ -3929,6 +3956,10 @@ static void nodelink_batch_reset()
       g_batch_link.inst_vbo, g_batch_link.muted_id, &g_batch_link.muted_step);
   GPU_vertbuf_attr_get_raw_data(
       g_batch_link.inst_vbo, g_batch_link.dim_factor_id, &g_batch_link.dim_factor_step);
+  GPU_vertbuf_attr_get_raw_data(
+      g_batch_link.inst_vbo, g_batch_link.thickness_id, &g_batch_link.thickness_step);
+  GPU_vertbuf_attr_get_raw_data(
+      g_batch_link.inst_vbo, g_batch_link.dash_factor_id, &g_batch_link.dash_factor_step);
   g_batch_link.count = 0;
 }
 
@@ -4048,6 +4079,10 @@ static void nodelink_batch_init()
       &format_inst, "domuted", GPU_COMP_U8, 2, GPU_FETCH_INT);
   g_batch_link.dim_factor_id = GPU_vertformat_attr_add(
       &format_inst, "dim_factor", GPU_COMP_F32, 1, GPU_FETCH_FLOAT);
+  g_batch_link.thickness_id = GPU_vertformat_attr_add(
+      &format_inst, "thickness", GPU_COMP_F32, 1, GPU_FETCH_FLOAT);
+  g_batch_link.dash_factor_id = GPU_vertformat_attr_add(
+      &format_inst, "dash_factor", GPU_COMP_F32, 1, GPU_FETCH_FLOAT);
   g_batch_link.inst_vbo = GPU_vertbuf_create_with_format_ex(&format_inst, GPU_USAGE_STREAM);
   /* Alloc max count but only draw the range we need. */
   GPU_vertbuf_data_alloc(g_batch_link.inst_vbo, NODELINK_GROUP_SIZE);
@@ -4124,7 +4159,9 @@ static void nodelink_batch_add_link(const SpaceNode *snode,
                                     int th_col3,
                                     bool drawarrow,
                                     bool drawmuted,
-                                    float dim_factor)
+                                    float dim_factor,
+                                    float thickness,
+                                    float dash_factor)
 {
   /* Only allow these colors. If more is needed, you need to modify the shader accordingly. */
   BLI_assert(ELEM(th_col1, TH_WIRE_INNER, TH_WIRE, TH_ACTIVE, TH_EDGE_SELECT, TH_REDALERT));
@@ -4144,6 +4181,8 @@ static void nodelink_batch_add_link(const SpaceNode *snode,
   char *muted = (char *)GPU_vertbuf_raw_step(&g_batch_link.muted_step);
   muted[0] = drawmuted;
   *(float *)GPU_vertbuf_raw_step(&g_batch_link.dim_factor_step) = dim_factor;
+  *(float *)GPU_vertbuf_raw_step(&g_batch_link.thickness_step) = thickness;
+  *(float *)GPU_vertbuf_raw_step(&g_batch_link.dash_factor_step) = dash_factor;
 
   if (g_batch_link.count == NODELINK_GROUP_SIZE) {
     nodelink_batch_draw(snode);
@@ -4159,6 +4198,16 @@ void node_draw_link_bezier(const View2D *v2d,
                            int th_col3)
 {
   const float dim_factor = node_link_dim_factor(v2d, link);
+  float thickness = 1.5f;
+  float dash_factor = 1.0f;
+  if (snode->edittree->type == NTREE_GEOMETRY) {
+    if (link->fromsock && link->fromsock->display_shape == SOCK_DISPLAY_SHAPE_DIAMOND) {
+      /* Make field links a bit thinner. */
+      thickness = 1.0f;
+      /* Draw field as dashes. */
+      dash_factor = 0.75f;
+    }
+  }
 
   float vec[4][2];
   const bool highlighted = link->flag & NODE_LINK_TEMP_HIGHLIGHT;
@@ -4182,7 +4231,9 @@ void node_draw_link_bezier(const View2D *v2d,
                               th_col3,
                               drawarrow,
                               drawmuted,
-                              dim_factor);
+                              dim_factor,
+                              thickness,
+                              dash_factor);
     }
     else {
       /* Draw single link. */
@@ -4208,6 +4259,8 @@ void node_draw_link_bezier(const View2D *v2d,
       GPU_batch_uniform_1i(batch, "doArrow", drawarrow);
       GPU_batch_uniform_1i(batch, "doMuted", drawmuted);
       GPU_batch_uniform_1f(batch, "dim_factor", dim_factor);
+      GPU_batch_uniform_1f(batch, "thickness", thickness);
+      GPU_batch_uniform_1f(batch, "dash_factor", dash_factor);
       GPU_batch_draw(batch);
     }
   }
@@ -4257,6 +4310,13 @@ void node_draw_link(View2D *v2d, SpaceNode *snode, bNodeLink *link)
       /* Invalid link. */
       th_col1 = th_col2 = th_col3 = TH_REDALERT;
       // th_col3 = -1; /* no shadow */
+    }
+  }
+  /* Links from field to non-field sockets are not allowed. */
+  if (snode->edittree->type == NTREE_GEOMETRY && !(link->flag & NODE_LINK_DRAGGED)) {
+    if ((link->fromsock && link->fromsock->display_shape == SOCK_DISPLAY_SHAPE_DIAMOND) &&
+        (link->tosock && link->tosock->display_shape == SOCK_DISPLAY_SHAPE_CIRCLE)) {
+      th_col1 = th_col2 = th_col3 = TH_REDALERT;
     }
   }
 

@@ -47,6 +47,7 @@
 #include "DNA_collection_types.h"
 #include "DNA_light_types.h"
 #include "DNA_material_types.h"
+#include "DNA_mesh_types.h"
 #include "DNA_node_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
@@ -234,7 +235,7 @@ static Scene *preview_get_scene(Main *pr_main)
   return pr_main->scenes.first;
 }
 
-static const char *preview_collection_name(const char pr_type)
+static const char *preview_collection_name(const ePreviewType pr_type)
 {
   switch (pr_type) {
     case MA_FLAT:
@@ -265,10 +266,12 @@ static const char *preview_collection_name(const char pr_type)
   }
 }
 
-static void set_preview_visibility(Scene *scene,
-                                   ViewLayer *view_layer,
-                                   char pr_type,
-                                   int pr_method)
+static bool render_engine_supports_ray_visibility(const Scene *sce)
+{
+  return !STREQ(sce->r.engine, RE_engine_id_BLENDER_EEVEE);
+}
+
+static void switch_preview_collection_visibilty(ViewLayer *view_layer, const ePreviewType pr_type)
 {
   /* Set appropriate layer as visible. */
   LayerCollection *lc = view_layer->layer_collections.first;
@@ -276,25 +279,68 @@ static void set_preview_visibility(Scene *scene,
 
   for (lc = lc->layer_collections.first; lc; lc = lc->next) {
     if (STREQ(lc->collection->id.name + 2, collection_name)) {
-      lc->collection->flag &= ~COLLECTION_RESTRICT_RENDER;
+      lc->collection->flag &= ~COLLECTION_HIDE_RENDER;
     }
     else {
-      lc->collection->flag |= COLLECTION_RESTRICT_RENDER;
+      lc->collection->flag |= COLLECTION_HIDE_RENDER;
     }
   }
+}
 
+static const char *preview_floor_material_name(const Scene *scene,
+                                               const ePreviewRenderMethod pr_method)
+{
+  if (pr_method == PR_ICON_RENDER && render_engine_supports_ray_visibility(scene)) {
+    return "FloorHidden";
+  }
+  return "Floor";
+}
+
+static void switch_preview_floor_material(Main *pr_main,
+                                          Mesh *me,
+                                          const Scene *scene,
+                                          const ePreviewRenderMethod pr_method)
+{
+  if (me->totcol == 0) {
+    return;
+  }
+
+  const char *material_name = preview_floor_material_name(scene, pr_method);
+  Material *mat = BLI_findstring(&pr_main->materials, material_name, offsetof(ID, name) + 2);
+  if (mat) {
+    me->mat[0] = mat;
+  }
+}
+
+static void switch_preview_floor_visibility(Main *pr_main,
+                                            const Scene *scene,
+                                            ViewLayer *view_layer,
+                                            const ePreviewRenderMethod pr_method)
+{
   /* Hide floor for icon renders. */
   LISTBASE_FOREACH (Base *, base, &view_layer->object_bases) {
     if (STREQ(base->object->id.name + 2, "Floor")) {
+      base->object->visibility_flag &= ~OB_HIDE_RENDER;
       if (pr_method == PR_ICON_RENDER) {
-        base->object->restrictflag |= OB_RESTRICT_RENDER;
+        if (!render_engine_supports_ray_visibility(scene)) {
+          base->object->visibility_flag |= OB_HIDE_RENDER;
+        }
       }
-      else {
-        base->object->restrictflag &= ~OB_RESTRICT_RENDER;
+      if (base->object->type == OB_MESH) {
+        switch_preview_floor_material(pr_main, base->object->data, scene, pr_method);
       }
     }
   }
+}
 
+static void set_preview_visibility(Main *pr_main,
+                                   Scene *scene,
+                                   ViewLayer *view_layer,
+                                   const ePreviewType pr_type,
+                                   const ePreviewRenderMethod pr_method)
+{
+  switch_preview_collection_visibilty(view_layer, pr_type);
+  switch_preview_floor_visibility(pr_main, scene, view_layer, pr_method);
   BKE_layer_collection_sync(scene, view_layer);
 }
 
@@ -348,6 +394,63 @@ static ID *duplicate_ids(ID *id, const bool allow_failure)
   }
 }
 
+static const char *preview_world_name(const Scene *sce,
+                                      const ID_Type id_type,
+                                      const ePreviewRenderMethod pr_method)
+{
+  /* When rendering material icons the floor will not be shown in the output. Cycles will use a
+   * material trick to show the floor in the reflections, but hide the floor for camera rays. For
+   * Eevee we use a transparent world that has a projected grid.
+   *
+   * In the future when Eevee supports vulkan raytracing we can re-evaluate and perhaps remove this
+   * approximation.
+   */
+  if (id_type == ID_MA && pr_method == PR_ICON_RENDER &&
+      !render_engine_supports_ray_visibility(sce)) {
+    return "WorldFloor";
+  }
+  return "World";
+}
+
+static World *preview_get_world(Main *pr_main,
+                                const Scene *sce,
+                                const ID_Type id_type,
+                                const ePreviewRenderMethod pr_method)
+{
+  World *result = NULL;
+  const char *world_name = preview_world_name(sce, id_type, pr_method);
+  result = BLI_findstring(&pr_main->worlds, world_name, offsetof(ID, name) + 2);
+
+  /* No world found return first world. */
+  if (result == NULL) {
+    result = pr_main->worlds.first;
+  }
+
+  BLI_assert_msg(result, "Preview file has no world.");
+  return result;
+}
+
+static void preview_sync_exposure(World *dst, const World *src)
+{
+  BLI_assert(dst);
+  BLI_assert(src);
+  dst->exp = src->exp;
+  dst->range = src->range;
+}
+
+static World *preview_prepare_world(Main *pr_main,
+                                    const Scene *sce,
+                                    const World *world,
+                                    const ID_Type id_type,
+                                    const ePreviewRenderMethod pr_method)
+{
+  World *result = preview_get_world(pr_main, sce, id_type, pr_method);
+  if (world) {
+    preview_sync_exposure(result, world);
+  }
+  return result;
+}
+
 /* call this with a pointer to initialize preview scene */
 /* call this with NULL to restore assigned ID pointers in preview scene */
 static Scene *preview_prepare_scene(
@@ -368,28 +471,13 @@ static Scene *preview_prepare_scene(
 
     /* this flag tells render to not execute depsgraph or ipos etc */
     sce->r.scemode |= R_BUTS_PREVIEW;
-    /* set world always back, is used now */
-    sce->world = pr_main->worlds.first;
-    /* now: exposure copy */
-    if (scene->world) {
-      sce->world->exp = scene->world->exp;
-      sce->world->range = scene->world->range;
-    }
+    BLI_strncpy(sce->r.engine, scene->r.engine, sizeof(sce->r.engine));
 
     sce->r.color_mgt_flag = scene->r.color_mgt_flag;
     BKE_color_managed_display_settings_copy(&sce->display_settings, &scene->display_settings);
 
     BKE_color_managed_view_settings_free(&sce->view_settings);
     BKE_color_managed_view_settings_copy(&sce->view_settings, &scene->view_settings);
-
-    /* prevent overhead for small renders and icons (32) */
-    if (id && sp->sizex < 40) {
-      sce->r.tilex = sce->r.tiley = 64;
-    }
-    else {
-      sce->r.tilex = sce->r.xsch / 4;
-      sce->r.tiley = sce->r.ysch / 4;
-    }
 
     if ((id && sp->pr_method == PR_ICON_RENDER) && id_type != ID_WO) {
       sce->r.alphamode = R_ALPHAPREMUL;
@@ -400,12 +488,12 @@ static Scene *preview_prepare_scene(
 
     sce->r.cfra = scene->r.cfra;
 
+    /* Setup the world. */
+    sce->world = preview_prepare_world(pr_main, sce, scene->world, id_type, sp->pr_method);
+
     if (id_type == ID_TE) {
       /* Texture is not actually rendered with engine, just set dummy value. */
       BLI_strncpy(sce->r.engine, RE_engine_id_BLENDER_EEVEE, sizeof(sce->r.engine));
-    }
-    else {
-      BLI_strncpy(sce->r.engine, scene->r.engine, sizeof(sce->r.engine));
     }
 
     if (id_type == ID_MA) {
@@ -423,7 +511,7 @@ static Scene *preview_prepare_scene(
           /* Use current scene world to light sphere. */
           sce->world = preview_get_localized_world(sp, scene->world);
         }
-        else if (sce->world) {
+        else if (sce->world && sp->pr_method != PR_ICON_RENDER) {
           /* Use a default world color. Using the current
            * scene world can be slow if it has big textures. */
           sce->world->use_nodes = false;
@@ -432,14 +520,12 @@ static Scene *preview_prepare_scene(
           sce->world->horb = 0.05f;
         }
 
-        if (sp->pr_method == PR_ICON_RENDER && sp->pr_main == G_pr_main_grease_pencil) {
-          /* For grease pencil, always use sphere for icon renders. */
-          set_preview_visibility(sce, view_layer, MA_SPHERE_A, sp->pr_method);
-        }
-        else {
-          /* Use specified preview shape for both preview panel and icon previews. */
-          set_preview_visibility(sce, view_layer, mat->pr_type, sp->pr_method);
-        }
+        /* For grease pencil, always use sphere for icon renders. */
+        const ePreviewType preview_type = (sp->pr_method == PR_ICON_RENDER &&
+                                           sp->pr_main == G_pr_main_grease_pencil) ?
+                                              MA_SPHERE_A :
+                                              mat->pr_type;
+        set_preview_visibility(pr_main, sce, view_layer, preview_type, sp->pr_method);
 
         if (sp->pr_method != PR_ICON_RENDER) {
           if (mat->nodetree && sp->pr_method == PR_NODE_RENDER) {
@@ -503,7 +589,7 @@ static Scene *preview_prepare_scene(
         BLI_addtail(&pr_main->lights, la);
       }
 
-      set_preview_visibility(sce, view_layer, MA_LAMP, sp->pr_method);
+      set_preview_visibility(pr_main, sce, view_layer, MA_LAMP, sp->pr_method);
 
       if (sce->world) {
         /* Only use lighting from the light. */
@@ -538,7 +624,7 @@ static Scene *preview_prepare_scene(
         BLI_addtail(&pr_main->worlds, wrld);
       }
 
-      set_preview_visibility(sce, view_layer, MA_SKY, sp->pr_method);
+      set_preview_visibility(pr_main, sce, view_layer, MA_SKY, sp->pr_method);
       sce->world = wrld;
 
       if (wrld && wrld->nodetree && sp->pr_method == PR_NODE_RENDER) {
@@ -691,9 +777,11 @@ void ED_preview_draw(const bContext *C, void *idp, void *parentp, void *slotp, r
 struct ObjectPreviewData {
   /* The main for the preview, not of the current file. */
   Main *pr_main;
-  /* Copy of the object to create the preview for. The copy is for thread safety (and to insert it
-   * into an own main). */
+  /* Copy of the object to create the preview for. The copy is for thread safety (and to insert
+   * it into an own main). */
   Object *object;
+  /* Current frame. */
+  int cfra;
   int sizex;
   int sizey;
 };
@@ -727,6 +815,10 @@ static Scene *object_preview_scene_create(const struct ObjectPreviewData *previe
                                           Depsgraph **r_depsgraph)
 {
   Scene *scene = BKE_scene_add(preview_data->pr_main, "Object preview scene");
+  /* Preview need to be in the current frame to get a thumbnail similar of what
+   * viewport displays. */
+  CFRA = preview_data->cfra;
+
   ViewLayer *view_layer = scene->view_layers.first;
   Depsgraph *depsgraph = DEG_graph_new(
       preview_data->pr_main, scene, view_layer, DAG_EVAL_VIEWPORT);
@@ -771,6 +863,7 @@ static void object_preview_render(IconPreview *preview, IconPreviewSize *preview
       .pr_main = preview_main,
       /* Act on a copy. */
       .object = (Object *)preview->id_copy,
+      .cfra = preview->scene->r.cfra,
       .sizex = preview_sized->sizex,
       .sizey = preview_sized->sizey,
   };
@@ -1551,8 +1644,8 @@ static void icon_preview_startjob_all_sizes(void *customdata,
 
     /* check_engine_supports_preview() checks whether the engine supports "preview mode" (think:
      * Material Preview). This check is only relevant when the render function called below is
-     * going to use such a mode. Object and Action render functions use Solid mode, though, so they
-     * can skip this test. */
+     * going to use such a mode. Object and Action render functions use Solid mode, though, so
+     * they can skip this test. */
     /* TODO: Decouple the ID-type-specific render functions from this function, so that it's not
      * necessary to know here what happens inside lower-level functions. */
     const bool use_solid_render_mode = (ip->id != NULL) && ELEM(GS(ip->id->name), ID_OB, ID_AC);

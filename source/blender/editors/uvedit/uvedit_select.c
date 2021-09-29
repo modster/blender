@@ -1126,7 +1126,7 @@ static void uv_select_edgeloop_single_side_tag(const Scene *scene,
     while (l_step != NULL) {
 
       if (!uvedit_face_visible_test(scene, l_step->f) ||
-          /* Check the boundary is still a  boundary. */
+          /* Check the boundary is still a boundary. */
           (uvedit_loop_find_other_radial_loop_with_visible_face(
                scene, l_step, cd_loop_uv_offset) != NULL)) {
         break;
@@ -2122,7 +2122,9 @@ static int uv_select_invoke(bContext *C, wmOperator *op, const wmEvent *event)
   UI_view2d_region_to_view(&region->v2d, event->mval[0], event->mval[1], &co[0], &co[1]);
   RNA_float_set_array(op->ptr, "location", co);
 
-  return uv_select_exec(C, op);
+  const int retval = uv_select_exec(C, op);
+
+  return WM_operator_flag_only_pass_through_on_press(retval, event);
 }
 
 void UV_OT_select(wmOperatorType *ot)
@@ -2140,11 +2142,12 @@ void UV_OT_select(wmOperatorType *ot)
 
   /* properties */
   PropertyRNA *prop;
-  RNA_def_boolean(ot->srna,
-                  "extend",
-                  0,
-                  "Extend",
-                  "Extend selection rather than clearing the existing selection");
+  prop = RNA_def_boolean(ot->srna,
+                         "extend",
+                         0,
+                         "Extend",
+                         "Extend selection rather than clearing the existing selection");
+  RNA_def_property_flag(prop, PROP_SKIP_SAVE);
   prop = RNA_def_boolean(ot->srna,
                          "deselect_all",
                          false,
@@ -2152,7 +2155,7 @@ void UV_OT_select(wmOperatorType *ot)
                          "Deselect all when nothing under the cursor");
   RNA_def_property_flag(prop, PROP_SKIP_SAVE);
 
-  RNA_def_float_vector(
+  prop = RNA_def_float_vector(
       ot->srna,
       "location",
       2,
@@ -2163,6 +2166,7 @@ void UV_OT_select(wmOperatorType *ot)
       "Mouse location in normalized coordinates, 0.0 to 1.0 is within the image bounds",
       -100.0f,
       100.0f);
+  RNA_def_property_flag(prop, PROP_SKIP_SAVE);
 }
 
 /** \} */
@@ -2279,7 +2283,9 @@ static int uv_select_loop_invoke(bContext *C, wmOperator *op, const wmEvent *eve
   UI_view2d_region_to_view(&region->v2d, event->mval[0], event->mval[1], &co[0], &co[1]);
   RNA_float_set_array(op->ptr, "location", co);
 
-  return uv_select_loop_exec(C, op);
+  const int retval = uv_select_loop_exec(C, op);
+
+  return WM_operator_flag_only_pass_through_on_press(retval, event);
 }
 
 void UV_OT_select_loop(wmOperatorType *ot)
@@ -2296,12 +2302,14 @@ void UV_OT_select_loop(wmOperatorType *ot)
   ot->poll = ED_operator_uvedit; /* requires space image */
 
   /* properties */
-  RNA_def_boolean(ot->srna,
-                  "extend",
-                  0,
-                  "Extend",
-                  "Extend selection rather than clearing the existing selection");
-  RNA_def_float_vector(
+  PropertyRNA *prop;
+  prop = RNA_def_boolean(ot->srna,
+                         "extend",
+                         0,
+                         "Extend",
+                         "Extend selection rather than clearing the existing selection");
+  RNA_def_property_flag(prop, PROP_SKIP_SAVE);
+  prop = RNA_def_float_vector(
       ot->srna,
       "location",
       2,
@@ -2312,6 +2320,7 @@ void UV_OT_select_loop(wmOperatorType *ot)
       "Mouse location in normalized coordinates, 0.0 to 1.0 is within the image bounds",
       -100.0f,
       100.0f);
+  RNA_def_property_flag(prop, PROP_SKIP_SAVE);
 }
 
 /** \} */
@@ -2336,7 +2345,9 @@ static int uv_select_edge_ring_invoke(bContext *C, wmOperator *op, const wmEvent
   UI_view2d_region_to_view(&region->v2d, event->mval[0], event->mval[1], &co[0], &co[1]);
   RNA_float_set_array(op->ptr, "location", co);
 
-  return uv_select_edge_ring_exec(C, op);
+  const int retval = uv_select_edge_ring_exec(C, op);
+
+  return WM_operator_flag_only_pass_through_on_press(retval, event);
 }
 
 void UV_OT_select_edge_ring(wmOperatorType *ot)
@@ -2494,17 +2505,20 @@ void UV_OT_select_linked_pick(wmOperatorType *ot)
   ot->poll = ED_operator_uvedit; /* requires space image */
 
   /* properties */
-  RNA_def_boolean(ot->srna,
-                  "extend",
-                  0,
-                  "Extend",
-                  "Extend selection rather than clearing the existing selection");
-  RNA_def_boolean(ot->srna,
-                  "deselect",
-                  0,
-                  "Deselect",
-                  "Deselect linked UV vertices rather than selecting them");
-  RNA_def_float_vector(
+  PropertyRNA *prop;
+  prop = RNA_def_boolean(ot->srna,
+                         "extend",
+                         0,
+                         "Extend",
+                         "Extend selection rather than clearing the existing selection");
+  RNA_def_property_flag(prop, PROP_SKIP_SAVE);
+  prop = RNA_def_boolean(ot->srna,
+                         "deselect",
+                         0,
+                         "Deselect",
+                         "Deselect linked UV vertices rather than selecting them");
+  RNA_def_property_flag(prop, PROP_SKIP_SAVE);
+  prop = RNA_def_float_vector(
       ot->srna,
       "location",
       2,
@@ -2515,6 +2529,7 @@ void UV_OT_select_linked_pick(wmOperatorType *ot)
       "Mouse location in normalized coordinates, 0.0 to 1.0 is within the image bounds",
       -100.0f,
       100.0f);
+  RNA_def_property_flag(prop, PROP_SKIP_SAVE);
 }
 
 /** \} */
@@ -3441,7 +3456,7 @@ void UV_OT_select_lasso(wmOperatorType *ot)
   ot->cancel = WM_gesture_lasso_cancel;
 
   /* flags */
-  ot->flag = OPTYPE_UNDO;
+  ot->flag = OPTYPE_UNDO | OPTYPE_DEPENDS_ON_CURSOR;
 
   /* properties */
   WM_operator_properties_gesture_lasso(ot);
@@ -3903,7 +3918,7 @@ BMLoop **ED_uvedit_selected_verts(Scene *scene, BMesh *bm, int len_max, int *r_v
       BM_ITER_ELEM (l_iter, &liter, f, BM_LOOPS_OF_FACE) {
         if (!BM_elem_flag_test(l_iter, BM_ELEM_TAG)) {
           const MLoopUV *luv = BM_ELEM_CD_GET_VOID_P(l_iter, cd_loop_uv_offset);
-          if ((luv->flag & MLOOPUV_VERTSEL)) {
+          if (luv->flag & MLOOPUV_VERTSEL) {
             BM_elem_flag_enable(l_iter->v, BM_ELEM_TAG);
 
             verts[verts_len++] = l_iter;

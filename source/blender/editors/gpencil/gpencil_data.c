@@ -1347,6 +1347,8 @@ static int gpencil_merge_layer_exec(bContext *C, wmOperator *op)
     bGPDframe *gpf_dst = BLI_ghash_lookup(gh_frames_dst, POINTER_FROM_INT(gpf_src->framenum));
     if (!gpf_dst) {
       gpf_dst = BKE_gpencil_layer_frame_get(gpl_dst, gpf_src->framenum, GP_GETFRAME_ADD_COPY);
+      /* Use same frame type. */
+      gpf_dst->key_type = gpf_src->key_type;
       BLI_ghash_insert(gh_frames_dst, POINTER_FROM_INT(gpf_src->framenum), gpf_dst);
     }
   }
@@ -1355,6 +1357,14 @@ static int gpencil_merge_layer_exec(bContext *C, wmOperator *op)
   LISTBASE_FOREACH (bGPDframe *, gpf_src, &gpl_src->frames) {
     /* Try to find frame in destination layer hash table. */
     bGPDframe *gpf_dst = BLI_ghash_lookup(gh_frames_dst, POINTER_FROM_INT(gpf_src->framenum));
+    /* Apply layer transformation. */
+    LISTBASE_FOREACH (bGPDstroke *, gps_src, &gpf_src->strokes) {
+      for (int p = 0; p < gps_src->totpoints; p++) {
+        bGPDspoint *pt = &gps_src->points[p];
+        mul_v3_m4v3(&pt->x, gpl_src->layer_mat, &pt->x);
+      }
+    }
+
     /* Add to tail all strokes. */
     if (gpf_dst) {
       BLI_movelisttolist(&gpf_dst->strokes, &gpf_src->strokes);

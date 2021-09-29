@@ -25,8 +25,8 @@ static bNodeSocketTemplate sh_node_subsurface_scattering_in[] = {
     {SOCK_RGBA, N_("Color"), 0.8f, 0.8f, 0.8f, 1.0f, 0.0f, 1.0f},
     {SOCK_FLOAT, N_("Scale"), 1.0, 0.0f, 0.0f, 0.0f, 0.0f, 1000.0f},
     {SOCK_VECTOR, N_("Radius"), 1.0f, 0.2f, 0.1f, 0.0f, 0.0f, 100.0f, PROP_NONE, SOCK_COMPACT},
-    {SOCK_FLOAT, N_("Sharpness"), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, PROP_FACTOR},
-    {SOCK_FLOAT, N_("Texture Blur"), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, PROP_FACTOR},
+    {SOCK_FLOAT, N_("IOR"), 1.4f, 0.0f, 0.0f, 0.0f, 1.01f, 3.8f, PROP_FACTOR},
+    {SOCK_FLOAT, N_("Anisotropy"), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, PROP_FACTOR},
     {SOCK_VECTOR, N_("Normal"), 0.0f, 0.0f, 0.0f, 1.0f, -1.0f, 1.0f, PROP_NONE, SOCK_HIDE_VALUE},
     {SOCK_FLOAT, N_("Weight"), 1.0f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f, PROP_NONE, SOCK_UNAVAIL},
     {-1, ""},
@@ -39,7 +39,8 @@ static bNodeSocketTemplate sh_node_subsurface_scattering_out[] = {
 
 static void node_shader_init_subsurface_scattering(bNodeTree *UNUSED(ntree), bNode *node)
 {
-  node->custom1 = SHD_SUBSURFACE_BURLEY;
+  node->custom1 = SHD_SUBSURFACE_RANDOM_WALK;
+  node->custom2 = true;
 }
 
 static int node_shader_gpu_subsurface_scattering(GPUMaterial *mat,
@@ -53,26 +54,8 @@ static int node_shader_gpu_subsurface_scattering(GPUMaterial *mat,
   }
 
   GPU_material_flag_set(mat, GPU_MATFLAG_DIFFUSE | GPU_MATFLAG_SUBSURFACE);
-
   GPU_stack_link(mat, node, "node_subsurface_scattering", in, out);
   return GPU_stack_eval_link(mat, node, "node_subsurface_scattering_eval", in, out);
-}
-
-static void node_shader_update_subsurface_scattering(bNodeTree *UNUSED(ntree), bNode *node)
-{
-  bNodeSocket *sock;
-  int falloff = node->custom1;
-
-  for (sock = node->inputs.first; sock; sock = sock->next) {
-    if (STREQ(sock->name, "Sharpness")) {
-      if (falloff == SHD_SUBSURFACE_CUBIC) {
-        sock->flag &= ~SOCK_UNAVAIL;
-      }
-      else {
-        sock->flag |= SOCK_UNAVAIL;
-      }
-    }
-  }
 }
 
 /* node type definition */
@@ -88,7 +71,6 @@ void register_node_type_sh_subsurface_scattering(void)
   node_type_init(&ntype, node_shader_init_subsurface_scattering);
   node_type_storage(&ntype, "", NULL, NULL);
   node_type_gpu(&ntype, node_shader_gpu_subsurface_scattering);
-  node_type_update(&ntype, node_shader_update_subsurface_scattering);
 
   nodeRegisterType(&ntype);
 }

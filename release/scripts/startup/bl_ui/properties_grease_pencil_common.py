@@ -54,7 +54,7 @@ class AnnotationDrawingToolsPanel:
         col.label(text="Stroke Placement:")
         row = col.row(align=True)
         row.prop_enum(tool_settings, "annotation_stroke_placement_view2d", 'VIEW')
-        row.prop_enum(tool_settings, "annotation_stroke_placement_view2d", 'CURSOR', text="Cursor")
+        row.prop_enum(tool_settings, "annotation_stroke_placement_view2d", 'IMAGE', text="Image")
 
 
 class GreasePencilSculptOptionsPanel:
@@ -84,9 +84,6 @@ class GreasePencilSculptOptionsPanel:
             layout.prop(gp_settings, "use_edit_position", text="Affect Position")
             layout.prop(gp_settings, "use_edit_strength", text="Affect Strength")
             layout.prop(gp_settings, "use_edit_thickness", text="Affect Thickness")
-
-            if tool == 'SMOOTH':
-                layout.prop(gp_settings, "use_edit_pressure")
 
             layout.prop(gp_settings, "use_edit_uv", text="Affect UV")
 
@@ -454,7 +451,7 @@ class AnnotationDataPanel:
 
         tool_settings = context.tool_settings
         if gpd and gpl:
-            layout.prop(gpl, "opacity", text="Opacity", slider=True)
+            layout.prop(gpl, "annotation_opacity", text="Opacity", slider=True)
             layout.prop(gpl, "thickness")
         else:
             layout.prop(tool_settings, "annotation_thickness", text="Thickness")
@@ -528,7 +525,7 @@ class GreasePencilMaterialsPanel:
         is_view3d = (self.bl_space_type == 'VIEW_3D')
         tool_settings = context.scene.tool_settings
         gpencil_paint = tool_settings.gpencil_paint
-        brush = gpencil_paint.brush
+        brush = gpencil_paint.brush if gpencil_paint else None
 
         ob = context.object
         row = layout.row()
@@ -590,6 +587,9 @@ class GreasePencilMaterialsPanel:
                         ma = ob.material_slots[ob.active_material_index].material
                 else:
                     ma = gp_settings.material
+            else:
+                if len(ob.material_slots) > 0 and ob.active_material_index >= 0:
+                    ma = ob.material_slots[ob.active_material_index].material
 
             if ma is not None and ma.grease_pencil is not None:
                 gpcolor = ma.grease_pencil

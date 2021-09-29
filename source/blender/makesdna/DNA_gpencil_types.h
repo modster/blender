@@ -52,6 +52,8 @@ struct MDeformVert;
 /* Used to convert pixel scale. */
 #define GPENCIL_PIXEL_FACTOR 2000.0f
 
+#define GPENCIL_MAX_THICKNESS 5000
+
 /* ***************************************** */
 /* GP Stroke Points */
 
@@ -327,6 +329,7 @@ typedef struct bGPDstroke {
   struct bGPDcurve *editcurve;
 
   bGPDstroke_Runtime runtime;
+  void *_pad5;
 } bGPDstroke;
 
 /** #bGPDstroke.flag */

@@ -29,6 +29,15 @@
 extern "C" {
 #endif
 
+/** #bToolRef_Runtime.flag */
+enum {
+  /**
+   * This tool should use the fallback key-map.
+   * Typically gizmos handle this but some tools (such as the knife tool) don't use a gizmo.
+   */
+  TOOLREF_FLAG_FALLBACK_KEYMAP = (1 << 0),
+};
+
 #
 #
 typedef struct bToolRef_Runtime {
@@ -47,6 +56,8 @@ typedef struct bToolRef_Runtime {
 
   /** Index when a tool is a member of a group. */
   int index;
+  /** Options: `TOOLREF_FLAG_*`. */
+  int flag;
 } bToolRef_Runtime;
 
 /* Stored per mode. */
@@ -139,7 +150,7 @@ typedef struct WorkSpace {
 
   /** Workspace-wide active asset library, for asset UIs to use (e.g. asset view UI template). The
    * Asset Browser has its own and doesn't use this. */
-  AssetLibraryReference active_asset_library;
+  AssetLibraryReference asset_library_ref;
 } WorkSpace;
 
 /**

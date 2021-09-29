@@ -34,6 +34,7 @@ struct Mask;
 struct Scene;
 struct Sequence;
 struct StripElem;
+struct SeqRenderData;
 
 void SEQ_sort(struct ListBase *seqbase);
 void SEQ_sequence_base_unique_name_recursive(struct Scene *scene,
@@ -56,14 +57,7 @@ void SEQ_set_scale_to_fit(const struct Sequence *seq,
                           const int preview_width,
                           const int preview_height,
                           const eSeqImageFitMethod fit_method);
-int SEQ_seqbase_recursive_apply(struct ListBase *seqbase,
-                                int (*apply_fn)(struct Sequence *seq, void *),
-                                void *arg);
-int SEQ_recursive_apply(struct Sequence *seq,
-                        int (*apply_fn)(struct Sequence *, void *),
-                        void *arg);
 void SEQ_ensure_unique_name(struct Sequence *seq, struct Scene *scene);
-
 #ifdef __cplusplus
 }
 #endif

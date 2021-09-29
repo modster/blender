@@ -286,6 +286,15 @@ static void do_versions_theme(const UserDef *userdef, bTheme *btheme)
     FROM_DEFAULT_V4_UCHAR(space_spreadsheet.selected_highlight);
   }
 
+  if (!USER_VERSION_ATLEAST(300, 15)) {
+    copy_v4_uchar(btheme->space_sequencer.grid, 33);
+    btheme->space_sequencer.grid[3] = 255;
+  }
+
+  if (!USER_VERSION_ATLEAST(300, 30)) {
+    FROM_DEFAULT_V4_UCHAR(space_node.wire);
+  }
+
   /**
    * Versioning code until next subversion bump goes here.
    *
@@ -723,7 +732,7 @@ void blo_do_versions_userdef(UserDef *userdef)
     }
   }
 
-  /* patch to set Dupli Lightprobes and Grease Pencil */
+  /* Patch to set dupli light-probes and grease-pencil. */
   if (!USER_VERSION_ATLEAST(280, 58)) {
     userdef->dupflag |= USER_DUP_LIGHTPROBE;
     userdef->dupflag |= USER_DUP_GPENCIL;
@@ -868,19 +877,24 @@ void blo_do_versions_userdef(UserDef *userdef)
     }
   }
 
-  if (!USER_VERSION_ATLEAST(293, 2)) {
-    /* Enable asset browser features by default for alpha testing.
-     * BLO_sanitize_experimental_features_userpref_blend() will disable it again for non-alpha
-     * builds. */
-    userdef->experimental.use_asset_browser = true;
-  }
-
   if (!USER_VERSION_ATLEAST(293, 12)) {
     if (userdef->gizmo_size_navigate_v3d == 0) {
       userdef->gizmo_size_navigate_v3d = 80;
     }
 
     userdef->sequencer_proxy_setup = USER_SEQ_PROXY_SETUP_AUTOMATIC;
+  }
+
+  if (!USER_VERSION_ATLEAST(293, 13)) {
+    BKE_addon_ensure(&userdef->addons, "pose_library");
+  }
+
+  if (!USER_VERSION_ATLEAST(300, 21)) {
+    /* Deprecated userdef->flag USER_SAVE_PREVIEWS */
+    userdef->file_preview_type = (userdef->flag & USER_FLAG_UNUSED_5) ? USER_FILE_PREVIEW_AUTO :
+                                                                        USER_FILE_PREVIEW_NONE;
+    /* Clear for reuse. */
+    userdef->flag &= ~USER_FLAG_UNUSED_5;
   }
 
   /**
@@ -894,7 +908,6 @@ void blo_do_versions_userdef(UserDef *userdef)
    */
   {
     /* Keep this block, even when empty. */
-    BKE_addon_ensure(&userdef->addons, "pose_library");
   }
 
   LISTBASE_FOREACH (bTheme *, btheme, &userdef->themes) {

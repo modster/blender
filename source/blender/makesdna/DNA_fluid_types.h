@@ -198,11 +198,6 @@ enum {
   FLUID_DOMAIN_TYPE_LIQUID = 1,
 };
 
-/* Smoke noise types. */
-enum {
-  FLUID_NOISE_TYPE_WAVELET = (1 << 0),
-};
-
 /* Mesh levelset generator types. */
 enum {
   FLUID_DOMAIN_MESH_IMPROVED = 0,
@@ -485,10 +480,6 @@ enum {
   SM_HRES_FULLSAMPLE = 2,
 };
 
-typedef struct FluidDomainVertexVelocity {
-  float vel[3];
-} FluidDomainVertexVelocity;
-
 typedef struct FluidDomainSettings {
 
   /* -- Runtime-only fields (from here on). -- */
@@ -514,8 +505,6 @@ typedef struct FluidDomainSettings {
   struct GPUTexture *tex_flags;
   struct GPUTexture *tex_range_field;
   struct Object *guide_parent;
-  /** Vertex velocities of simulated fluid mesh. */
-  struct FluidDomainVertexVelocity *mesh_velocities;
   struct EffectorWeights *effector_weights;
 
   /* Domain object data. */
@@ -580,8 +569,7 @@ typedef struct FluidDomainSettings {
   float noise_time_anim;
   int res_noise[3];
   int noise_scale;
-  short noise_type; /* Noise type: wave, curl, anisotropic. */
-  char _pad3[2];    /* Unused. */
+  char _pad3[4]; /* Unused. */
 
   /* Liquid domain options. */
   float particle_randomness;
@@ -613,9 +601,8 @@ typedef struct FluidDomainSettings {
   int mesh_smoothen_pos;
   int mesh_smoothen_neg;
   int mesh_scale;
-  int totvert;
   short mesh_generator;
-  char _pad6[6]; /* Unused. */
+  char _pad6[2]; /* Unused. */
 
   /* Secondary particle options. */
   int particle_type;

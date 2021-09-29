@@ -50,6 +50,7 @@ struct bContext;
 struct bFaceMap;
 struct bPoseChannel;
 struct uiLayout;
+struct wmEvent;
 struct wmKeyConfig;
 struct wmOperator;
 struct wmOperatorType;
@@ -199,6 +200,9 @@ void ED_object_parent(struct Object *ob,
                       struct Object *parent,
                       const int type,
                       const char *substr);
+char *ED_object_ot_drop_named_material_tooltip(struct bContext *C,
+                                               struct PointerRNA *properties,
+                                               const struct wmEvent *event);
 
 /* bitflags for enter/exit editmode */
 enum {
@@ -282,6 +286,7 @@ float ED_object_new_primitive_matrix(struct bContext *C,
                                      struct Object *obedit,
                                      const float loc[3],
                                      const float rot[3],
+                                     const float scale[3],
                                      float primmat[4][4]);
 
 /* Avoid allowing too much insane values even by typing

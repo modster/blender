@@ -51,7 +51,7 @@
 /**
  * Orient the handles towards the selection (can be slow with high-poly mesh!).
  */
-// Disable for now, issues w/ refresh and '+' icons overlap.
+/* Disable for now, issues w/ refresh and '+' icons overlap. */
 // #define USE_SELECT_CENTER
 
 #ifdef USE_SELECT_CENTER
@@ -461,14 +461,16 @@ void MESH_GGT_spin(struct wmGizmoGroupType *gzgt)
   gzgt->name = "Mesh Spin Init";
   gzgt->idname = "MESH_GGT_spin";
 
-  gzgt->flag = WM_GIZMOGROUPTYPE_3D;
+  gzgt->flag = WM_GIZMOGROUPTYPE_TOOL_FALLBACK_KEYMAP | WM_GIZMOGROUPTYPE_3D;
 
   gzgt->gzmap_params.spaceid = SPACE_VIEW3D;
   gzgt->gzmap_params.regionid = RGN_TYPE_WINDOW;
 
   gzgt->poll = ED_gizmo_poll_or_unlink_delayed_from_tool;
   gzgt->setup = gizmo_mesh_spin_init_setup;
-  gzgt->setup_keymap = WM_gizmogroup_setup_keymap_generic_maybe_drag;
+  /* This works well with right click selection but overrides left-mouse selection
+   * when clicking which is needed to create a full 360 degree revolution, see: T89912. */
+  // gzgt->setup_keymap = WM_gizmogroup_setup_keymap_generic_maybe_drag;
   gzgt->refresh = gizmo_mesh_spin_init_refresh;
   gzgt->message_subscribe = gizmo_mesh_spin_init_message_subscribe;
   gzgt->draw_prepare = gizmo_mesh_spin_init_draw_prepare;
@@ -1061,7 +1063,7 @@ void MESH_GGT_spin_redo(struct wmGizmoGroupType *gzgt)
   gzgt->name = "Mesh Spin Redo";
   gzgt->idname = "MESH_GGT_spin_redo";
 
-  gzgt->flag = WM_GIZMOGROUPTYPE_3D;
+  gzgt->flag = WM_GIZMOGROUPTYPE_TOOL_FALLBACK_KEYMAP | WM_GIZMOGROUPTYPE_3D;
 
   gzgt->gzmap_params.spaceid = SPACE_VIEW3D;
   gzgt->gzmap_params.regionid = RGN_TYPE_WINDOW;

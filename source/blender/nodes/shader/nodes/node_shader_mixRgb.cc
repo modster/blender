@@ -23,17 +23,18 @@
 
 #include "node_shader_util.h"
 
-/* **************** MIX RGB ******************** */
-static bNodeSocketTemplate sh_node_mix_rgb_in[] = {
-    {SOCK_FLOAT, N_("Fac"), 0.5f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, PROP_FACTOR},
-    {SOCK_RGBA, N_("Color1"), 0.5f, 0.5f, 0.5f, 1.0f},
-    {SOCK_RGBA, N_("Color2"), 0.5f, 0.5f, 0.5f, 1.0f},
-    {-1, ""},
+namespace blender::nodes {
+
+static void sh_node_mix_rgb_declare(NodeDeclarationBuilder &b)
+{
+  b.is_function_node();
+  b.add_input<decl::Float>("Fac").default_value(0.5f).min(0.0f).max(1.0f).subtype(PROP_FACTOR);
+  b.add_input<decl::Color>("Color1").default_value({0.5f, 0.5f, 0.5f, 1.0f});
+  b.add_input<decl::Color>("Color2").default_value({0.5f, 0.5f, 0.5f, 1.0f});
+  b.add_output<decl::Color>("Color");
 };
-static bNodeSocketTemplate sh_node_mix_rgb_out[] = {
-    {SOCK_RGBA, N_("Color")},
-    {-1, ""},
-};
+
+}  // namespace blender::nodes
 
 static void node_shader_exec_mix_rgb(void *UNUSED(data),
                                      int UNUSED(thread),
@@ -127,15 +128,71 @@ static int gpu_shader_mix_rgb(GPUMaterial *mat,
   return 0;
 }
 
+class MixRGBFunction : public blender::fn::MultiFunction {
+ private:
+  bool clamp_;
+  int type_;
+
+ public:
+  MixRGBFunction(bool clamp, int type) : clamp_(clamp), type_(type)
+  {
+    static blender::fn::MFSignature signature = create_signature();
+    this->set_signature(&signature);
+  }
+
+  static blender::fn::MFSignature create_signature()
+  {
+    blender::fn::MFSignatureBuilder signature{"MixRGB"};
+    signature.single_input<float>("Fac");
+    signature.single_input<blender::ColorGeometry4f>("Color1");
+    signature.single_input<blender::ColorGeometry4f>("Color2");
+    signature.single_output<blender::ColorGeometry4f>("Color");
+    return signature.build();
+  }
+
+  void call(blender::IndexMask mask,
+            blender::fn::MFParams params,
+            blender::fn::MFContext UNUSED(context)) const override
+  {
+    const blender::VArray<float> &fac = params.readonly_single_input<float>(0, "Fac");
+    const blender::VArray<blender::ColorGeometry4f> &col1 =
+        params.readonly_single_input<blender::ColorGeometry4f>(1, "Color1");
+    const blender::VArray<blender::ColorGeometry4f> &col2 =
+        params.readonly_single_input<blender::ColorGeometry4f>(2, "Color2");
+    blender::MutableSpan<blender::ColorGeometry4f> results =
+        params.uninitialized_single_output<blender::ColorGeometry4f>(3, "Color");
+
+    for (int64_t i : mask) {
+      results[i] = col1[i];
+      ramp_blend(type_, results[i], clamp_f(fac[i], 0.0f, 1.0f), col2[i]);
+    }
+
+    if (clamp_) {
+      for (int64_t i : mask) {
+        clamp_v3(results[i], 0.0f, 1.0f);
+      }
+    }
+  }
+};
+
+static void sh_node_mix_rgb_build_multi_function(blender::nodes::NodeMultiFunctionBuilder &builder)
+{
+  bNode &node = builder.node();
+  bool clamp = node.custom2 & SHD_MIXRGB_CLAMP;
+  int mix_type = node.custom1;
+  builder.construct_and_set_matching_fn<MixRGBFunction>(clamp, mix_type);
+}
+
 void register_node_type_sh_mix_rgb(void)
 {
   static bNodeType ntype;
 
-  sh_node_type_base(&ntype, SH_NODE_MIX_RGB, "Mix", NODE_CLASS_OP_COLOR, 0);
-  node_type_socket_templates(&ntype, sh_node_mix_rgb_in, sh_node_mix_rgb_out);
+  sh_fn_node_type_base(&ntype, SH_NODE_MIX_RGB, "Mix", NODE_CLASS_OP_COLOR, 0);
+  ntype.declare = blender::nodes::sh_node_mix_rgb_declare;
   node_type_label(&ntype, node_blend_label);
   node_type_exec(&ntype, nullptr, nullptr, node_shader_exec_mix_rgb);
   node_type_gpu(&ntype, gpu_shader_mix_rgb);
+  ntype.build_multi_function = sh_node_mix_rgb_build_multi_function;
 
   nodeRegisterType(&ntype);
 }

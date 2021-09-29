@@ -118,8 +118,8 @@ static void fileselect_ensure_updated_asset_params(SpaceFile *sfile)
     asset_params = sfile->asset_params = MEM_callocN(sizeof(*asset_params),
                                                      "FileAssetSelectParams");
     asset_params->base_params.details_flags = U_default.file_space_data.details_flags;
-    asset_params->asset_library.type = ASSET_LIBRARY_LOCAL;
-    asset_params->asset_library.custom_library_index = -1;
+    asset_params->asset_library_ref.type = ASSET_LIBRARY_LOCAL;
+    asset_params->asset_library_ref.custom_library_index = -1;
     asset_params->import_type = FILE_ASSET_IMPORT_APPEND;
   }
 
@@ -135,7 +135,8 @@ static void fileselect_ensure_updated_asset_params(SpaceFile *sfile)
   base_params->filter_id = FILTER_ID_OB | FILTER_ID_GR;
   base_params->display = FILE_IMGDISPLAY;
   base_params->sort = FILE_SORT_ALPHA;
-  base_params->recursion_level = 1;
+  /* Asset libraries include all sub-directories, so enable maximal recursion. */
+  base_params->recursion_level = FILE_SELECT_MAX_RECURSIONS;
   /* 'SMALL' size by default. More reasonable since this is typically used as regular editor,
    * space is more of an issue here. */
   base_params->thumbnail_size = 96;
@@ -415,7 +416,7 @@ FileAssetSelectParams *ED_fileselect_get_asset_params(const SpaceFile *sfile)
 
 static void fileselect_refresh_asset_params(FileAssetSelectParams *asset_params)
 {
-  FileSelectAssetLibraryUID *library = &asset_params->asset_library;
+  AssetLibraryReference *library = &asset_params->asset_library_ref;
   FileSelectParams *base_params = &asset_params->base_params;
   bUserAssetLibrary *user_library = NULL;
 
@@ -439,7 +440,8 @@ static void fileselect_refresh_asset_params(FileAssetSelectParams *asset_params)
       BLI_strncpy(base_params->dir, user_library->path, sizeof(base_params->dir));
       break;
   }
-  base_params->type = (library->type == ASSET_LIBRARY_LOCAL) ? FILE_MAIN_ASSET : FILE_LOADLIB;
+  base_params->type = (library->type == ASSET_LIBRARY_LOCAL) ? FILE_MAIN_ASSET :
+                                                               FILE_ASSET_LIBRARY;
 }
 
 void fileselect_refresh_params(SpaceFile *sfile)
@@ -448,6 +450,11 @@ void fileselect_refresh_params(SpaceFile *sfile)
   if (asset_params) {
     fileselect_refresh_asset_params(asset_params);
   }
+}
+
+bool ED_fileselect_is_file_browser(const SpaceFile *sfile)
+{
+  return (sfile->browse_mode == FILE_BROWSE_MODE_FILES);
 }
 
 bool ED_fileselect_is_asset_browser(const SpaceFile *sfile)
@@ -858,20 +865,8 @@ FileAttributeColumnType file_attribute_column_type_find_isect(const View2D *v2d,
 float file_string_width(const char *str)
 {
   const uiStyle *style = UI_style_get();
-  float width;
-
   UI_fontstyle_set(&style->widget);
-  if (style->widget.kerning == 1) { /* for BLF_width */
-    BLF_enable(style->widget.uifont_id, BLF_KERNING_DEFAULT);
-  }
-
-  width = BLF_width(style->widget.uifont_id, str, BLF_DRAW_STR_DUMMY_MAX);
-
-  if (style->widget.kerning == 1) {
-    BLF_disable(style->widget.uifont_id, BLF_KERNING_DEFAULT);
-  }
-
-  return width;
+  return BLF_width(style->widget.uifont_id, str, BLF_DRAW_STR_DUMMY_MAX);
 }
 
 float file_font_pointsize(void)
@@ -1277,7 +1272,7 @@ void file_params_rename_end(wmWindowManager *wm,
   /* Ensure smooth-scroll timer is active, even if not needed, because that way rename state is
    * handled properly. */
   file_params_invoke_rename_postscroll(wm, win, sfile);
-  /* Also always activate the rename file, even if renaming was cancelled. */
+  /* Also always activate the rename file, even if renaming was canceled. */
   file_params_renamefile_activate(sfile, params);
 }
 

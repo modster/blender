@@ -239,6 +239,12 @@ class CompositorContext {
     this->m_hasActiveOpenCLDevices = hasAvtiveOpenCLDevices;
   }
 
+  /** Whether it has a view with a specific name and not the default one. */
+  bool has_explicit_view() const
+  {
+    return m_viewName && m_viewName[0] != '\0';
+  }
+
   /**
    * \brief get the active rendering view
    */
@@ -281,6 +287,8 @@ class CompositorContext {
   {
     return m_rd->size * 0.01f;
   }
+
+  Size2f get_render_size() const;
 
   /**
    * Get active execution model.

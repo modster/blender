@@ -194,8 +194,8 @@ static void dm_mvert_map_doubles(int *doubles_map,
   i_target_low_bound = 0;
   target_scan_completed = false;
 
-  /* Scan source vertices, in SortVertsElem sorted array, */
-  /* all the while maintaining the lower bound of possible doubles in target vertices */
+  /* Scan source vertices, in #SortVertsElem sorted array,
+   * all the while maintaining the lower bound of possible doubles in target vertices. */
   for (i_source = 0, sve_source = sorted_verts_source; i_source < source_num_verts;
        i_source++, sve_source++) {
     int best_target_vertex = -1;
@@ -786,7 +786,7 @@ static Mesh *arrayModifier_doArray(ArrayModifierData *amd,
    * TODO: we may need to set other dirty flags as well?
    */
   if (use_recalc_normals) {
-    result->runtime.cd_dirty_vert |= CD_MASK_NORMAL;
+    BKE_mesh_normals_tag_dirty(result);
   }
 
   if (vgroup_start_cap_remap) {

@@ -41,7 +41,7 @@ PreviewOperation::PreviewOperation(const ColorManagedViewSettings *viewSettings,
                                    const unsigned int defaultHeight)
 
 {
-  this->addInputSocket(DataType::Color, ResizeMode::None);
+  this->addInputSocket(DataType::Color, ResizeMode::Align);
   this->m_preview = nullptr;
   this->m_outputBuffer = nullptr;
   this->m_input = nullptr;
@@ -130,14 +130,14 @@ bool PreviewOperation::determineDependingAreaOfInterest(rcti *input,
 
   return NodeOperation::determineDependingAreaOfInterest(&newInput, readOperation, output);
 }
-void PreviewOperation::determineResolution(unsigned int resolution[2],
-                                           unsigned int /*preferredResolution*/[2])
+void PreviewOperation::determine_canvas(const rcti &UNUSED(preferred_area), rcti &r_area)
 {
   /* Use default preview resolution as preferred ensuring it has size so that
    * generated inputs (which don't have resolution on their own) are displayed */
   BLI_assert(this->m_defaultWidth > 0 && this->m_defaultHeight > 0);
-  unsigned int previewPreferredRes[2] = {this->m_defaultWidth, this->m_defaultHeight};
-  NodeOperation::determineResolution(resolution, previewPreferredRes);
+  rcti local_preferred;
+  BLI_rcti_init(&local_preferred, 0, m_defaultWidth, 0, m_defaultHeight);
+  NodeOperation::determine_canvas(local_preferred, r_area);
 
   /* If resolution is 0 there are two possible scenarios:
    * - Either node is not connected at all
@@ -148,8 +148,8 @@ void PreviewOperation::determineResolution(unsigned int resolution[2],
    * The latter case would only happen if an input doesn't set any resolution ignoring output
    * preferred resolution. In such case preview size will be 0 too.
    */
-  int width = resolution[0];
-  int height = resolution[1];
+  int width = BLI_rcti_size_x(&r_area);
+  int height = BLI_rcti_size_y(&r_area);
   this->m_divider = 0.0f;
   if (width > 0 && height > 0) {
     if (width > height) {
@@ -162,13 +162,51 @@ void PreviewOperation::determineResolution(unsigned int resolution[2],
   width = width * this->m_divider;
   height = height * this->m_divider;
 
-  resolution[0] = width;
-  resolution[1] = height;
+  BLI_rcti_init(&r_area, r_area.xmin, r_area.xmin + width, r_area.ymin, r_area.ymin + height);
 }
 
 eCompositorPriority PreviewOperation::getRenderPriority() const
 {
   return eCompositorPriority::Low;
+}
+
+void PreviewOperation::get_area_of_interest(const int input_idx,
+                                            const rcti &output_area,
+                                            rcti &r_input_area)
+{
+  BLI_assert(input_idx == 0);
+  UNUSED_VARS_NDEBUG(input_idx);
+
+  r_input_area.xmin = output_area.xmin / m_divider;
+  r_input_area.xmax = output_area.xmax / m_divider;
+  r_input_area.ymin = output_area.ymin / m_divider;
+  r_input_area.ymax = output_area.ymax / m_divider;
+}
+
+void PreviewOperation::update_memory_buffer_partial(MemoryBuffer *UNUSED(output),
+                                                    const rcti &area,
+                                                    Span<MemoryBuffer *> inputs)
+{
+  MemoryBuffer *input = inputs[0];
+  struct ColormanageProcessor *cm_processor = IMB_colormanagement_display_processor_new(
+      m_viewSettings, m_displaySettings);
+
+  rcti buffer_area;
+  BLI_rcti_init(&buffer_area, 0, this->getWidth(), 0, this->getHeight());
+  BuffersIteratorBuilder<uchar> it_builder(
+      m_outputBuffer, buffer_area, area, COM_data_type_num_channels(DataType::Color));
+
+  for (BuffersIterator<uchar> it = it_builder.build(); !it.is_end(); ++it) {
+    const float rx = it.x / m_divider;
+    const float ry = it.y / m_divider;
+
+    float color[4];
+    input->read_elem_checked(rx, ry, color);
+    IMB_colormanagement_processor_apply_v4(cm_processor, color);
+    rgba_float_to_uchar(it.out, color);
+  }
+
+  IMB_colormanagement_processor_free(cm_processor);
 }
 
 }  // namespace blender::compositor

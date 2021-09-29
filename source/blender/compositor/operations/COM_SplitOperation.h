@@ -18,11 +18,11 @@
 
 #pragma once
 
-#include "COM_NodeOperation.h"
+#include "COM_MultiThreadedOperation.h"
 
 namespace blender::compositor {
 
-class SplitOperation : public NodeOperation {
+class SplitOperation : public MultiThreadedOperation {
  private:
   SocketReader *m_image1Input;
   SocketReader *m_image2Input;
@@ -35,8 +35,7 @@ class SplitOperation : public NodeOperation {
   void initExecution() override;
   void deinitExecution() override;
   void executePixelSampled(float output[4], float x, float y, PixelSampler sampler) override;
-  void determineResolution(unsigned int resolution[2],
-                           unsigned int preferredResolution[2]) override;
+  void determine_canvas(const rcti &preferred_area, rcti &r_area) override;
   void setSplitPercentage(float splitPercentage)
   {
     this->m_splitPercentage = splitPercentage;
@@ -45,6 +44,10 @@ class SplitOperation : public NodeOperation {
   {
     this->m_xSplit = xsplit;
   }
+
+  void update_memory_buffer_partial(MemoryBuffer *output,
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
 };
 
 }  // namespace blender::compositor

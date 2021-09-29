@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "COM_NodeOperation.h"
+#include "COM_MultiThreadedOperation.h"
 
 namespace blender::compositor {
 
@@ -49,7 +49,7 @@ namespace blender::compositor {
  * With a simple compare it can be detected if the evaluated pixel is between the outer and inner
  *edge.
  */
-class BokehImageOperation : public NodeOperation {
+class BokehImageOperation : public MultiThreadedOperation {
  private:
   /**
    * \brief Settings of the bokeh image
@@ -128,8 +128,7 @@ class BokehImageOperation : public NodeOperation {
    * \brief determine the resolution of this operation. currently fixed at [COM_BLUR_BOKEH_PIXELS,
    * COM_BLUR_BOKEH_PIXELS] \param resolution: \param preferredResolution:
    */
-  void determineResolution(unsigned int resolution[2],
-                           unsigned int preferredResolution[2]) override;
+  void determine_canvas(const rcti &preferred_area, rcti &r_area) override;
 
   /**
    * \brief set the node data
@@ -151,6 +150,10 @@ class BokehImageOperation : public NodeOperation {
   {
     this->m_deleteData = true;
   }
+
+  void update_memory_buffer_partial(MemoryBuffer *output,
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
 };
 
 }  // namespace blender::compositor

@@ -384,6 +384,8 @@ typedef struct uiHandleButtonData {
   /* booleans (could be made into flags) */
   bool cancel, escapecancel;
   bool applied, applied_interactive;
+  /* Button is being applied through an extra icon. */
+  bool apply_through_extra_icon;
   bool changed_cursor;
   wmTimer *flashtimer;
 
@@ -508,6 +510,7 @@ typedef struct uiAfterFunc {
   bContextStore *context;
 
   char undostr[BKE_UNDO_STR_MAX];
+  char drawstr[UI_MAX_DRAW_STR];
 } uiAfterFunc;
 
 static void button_activate_init(bContext *C,
@@ -790,6 +793,10 @@ static void ui_handle_afterfunc_add_operator_ex(wmOperatorType *ot,
   if (context_but && context_but->context) {
     after->context = CTX_store_copy(context_but->context);
   }
+
+  if (context_but) {
+    ui_but_drawstr_without_sep_char(context_but, after->drawstr, sizeof(after->drawstr));
+  }
 }
 
 void ui_handle_afterfunc_add_operator(wmOperatorType *ot, int opcontext)
@@ -899,6 +906,8 @@ static void ui_apply_but_func(bContext *C, uiBut *but)
   if (but->context) {
     after->context = CTX_store_copy(but->context);
   }
+
+  ui_but_drawstr_without_sep_char(but, after->drawstr, sizeof(after->drawstr));
 
   but->optype = NULL;
   but->opcontext = 0;
@@ -1021,7 +1030,8 @@ static void ui_apply_but_funcs_after(bContext *C)
     }
 
     if (after.optype) {
-      WM_operator_name_call_ptr(C, after.optype, after.opcontext, (after.opptr) ? &opptr : NULL);
+      WM_operator_name_call_ptr_with_depends_on_cursor(
+          C, after.optype, after.opcontext, (after.opptr) ? &opptr : NULL, after.drawstr);
     }
 
     if (after.opptr) {
@@ -1154,6 +1164,16 @@ static void ui_apply_but_ROW(bContext *C, uiBlock *block, uiBut *but, uiHandleBu
 
   data->retval = but->retval;
   data->applied = true;
+}
+
+static void ui_apply_but_TREEROW(bContext *C, uiBlock *block, uiBut *but, uiHandleButtonData *data)
+{
+  if (data->apply_through_extra_icon) {
+    /* Don't apply this, it would cause unintended tree-row toggling when clicking on extra icons.
+     */
+    return;
+  }
+  ui_apply_but_ROW(C, block, but, data);
 }
 
 /**
@@ -2299,6 +2319,9 @@ static void ui_apply_but(
     case UI_BTYPE_ROW:
       ui_apply_but_ROW(C, block, but, data);
       break;
+    case UI_BTYPE_TREEROW:
+      ui_apply_but_TREEROW(C, block, but, data);
+      break;
     case UI_BTYPE_LISTROW:
       ui_apply_but_LISTROW(C, block, but, data);
       break;
@@ -2933,8 +2956,9 @@ static int ui_text_position_from_hidden(uiBut *but, int pos)
 {
   const char *butstr = (but->editstr) ? but->editstr : but->drawstr;
   const char *strpos = butstr;
+  const char *str_end = butstr + strlen(butstr);
   for (int i = 0; i < pos; i++) {
-    strpos = BLI_str_find_next_char_utf8(strpos, NULL);
+    strpos = BLI_str_find_next_char_utf8(strpos, str_end);
   }
 
   return (strpos - butstr);
@@ -3066,7 +3090,7 @@ static bool ui_textedit_set_cursor_pos_foreach_glyph(const char *UNUSED(str),
 /**
  * \param x: Screen space cursor location - #wmEvent.x
  *
- * \note ``but->block->aspect`` is used here, so drawing button style is getting scaled too.
+ * \note `but->block->aspect` is used here, so drawing button style is getting scaled too.
  */
 static void ui_textedit_set_cursor_pos(uiBut *but, uiHandleButtonData *data, const float x)
 {
@@ -3085,11 +3109,6 @@ static void ui_textedit_set_cursor_pos(uiBut *but, uiHandleButtonData *data, con
   ui_fontscale(&fstyle.points, aspect);
 
   UI_fontstyle_set(&fstyle);
-
-  if (fstyle.kerning == 1) {
-    /* for BLF_width */
-    BLF_enable(fstyle.uifont_id, BLF_KERNING_DEFAULT);
-  }
 
   ui_but_text_password_hide(password_str, but, false);
 
@@ -3139,10 +3158,6 @@ static void ui_textedit_set_cursor_pos(uiBut *but, uiHandleButtonData *data, con
       glyph_data[1] = str_last_len;
     }
     but->pos = glyph_data[1] + but->ofs;
-  }
-
-  if (fstyle.kerning == 1) {
-    BLF_disable(fstyle.uifont_id, BLF_KERNING_DEFAULT);
   }
 
   ui_but_text_password_hide(password_str, but, true);
@@ -3359,7 +3374,7 @@ static bool ui_textedit_copypaste(uiBut *but, uiHandleButtonData *data, const in
 
     if (pbuf) {
       if (UI_but_is_utf8(but)) {
-        buf_len -= BLI_utf8_invalid_strip(pbuf, (size_t)buf_len);
+        buf_len -= BLI_str_utf8_invalid_strip(pbuf, (size_t)buf_len);
       }
 
       ui_textedit_insert_buf(but, data, pbuf, buf_len);
@@ -3438,10 +3453,7 @@ static void ui_textedit_begin(bContext *C, uiBut *but, uiHandleButtonData *data)
   const bool is_num_but = ELEM(but->type, UI_BTYPE_NUM, UI_BTYPE_NUM_SLIDER);
   bool no_zero_strip = false;
 
-  if (data->str) {
-    MEM_freeN(data->str);
-    data->str = NULL;
-  }
+  MEM_SAFE_FREE(data->str);
 
 #ifdef USE_DRAG_MULTINUM
   /* this can happen from multi-drag */
@@ -3539,7 +3551,7 @@ static void ui_textedit_end(bContext *C, uiBut *but, uiHandleButtonData *data)
 
   if (but) {
     if (UI_but_is_utf8(but)) {
-      const int strip = BLI_utf8_invalid_strip(but->editstr, strlen(but->editstr));
+      const int strip = BLI_str_utf8_invalid_strip(but->editstr, strlen(but->editstr));
       /* not a file?, strip non utf-8 chars */
       if (strip) {
         /* won't happen often so isn't that annoying to keep it here for a while */
@@ -3929,7 +3941,7 @@ static void ui_do_but_textedit(
 
       /* exception that's useful for number buttons, some keyboard
        * numpads have a comma instead of a period */
-      if (ELEM(but->type, UI_BTYPE_NUM, UI_BTYPE_NUM_SLIDER)) { /* could use data->min*/
+      if (ELEM(but->type, UI_BTYPE_NUM, UI_BTYPE_NUM_SLIDER)) { /* Could use `data->min`. */
         if (event->type == EVT_PADPERIOD && ascii == ',') {
           ascii = '.';
           utf8_buf = NULL; /* force ascii fallback */
@@ -4197,14 +4209,17 @@ static void ui_numedit_apply(bContext *C, uiBlock *block, uiBut *but, uiHandleBu
 
 static void ui_but_extra_operator_icon_apply(bContext *C, uiBut *but, uiButExtraOpIcon *op_icon)
 {
+  but->active->apply_through_extra_icon = true;
+
   if (but->active->interactive) {
     ui_apply_but(C, but->block, but, but->active, true);
   }
   button_activate_state(C, but, BUTTON_STATE_EXIT);
-  WM_operator_name_call_ptr(C,
-                            op_icon->optype_params->optype,
-                            op_icon->optype_params->opcontext,
-                            op_icon->optype_params->opptr);
+  WM_operator_name_call_ptr_with_depends_on_cursor(C,
+                                                   op_icon->optype_params->optype,
+                                                   op_icon->optype_params->opcontext,
+                                                   op_icon->optype_params->opptr,
+                                                   NULL);
 
   /* Force recreation of extra operator icons (pseudo update). */
   ui_but_extra_operator_icons_free(but);
@@ -4739,7 +4754,7 @@ static int ui_do_but_TOG(bContext *C, uiBut *but, uiHandleButtonData *data, cons
         /* Behave like other menu items. */
         do_activate = (event->val == KM_RELEASE);
       }
-      else {
+      else if (!ui_do_but_extra_operator_icon(C, but, data, event)) {
         /* Also use double-clicks to prevent fast clicks to leak to other handlers (T76481). */
         do_activate = ELEM(event->val, KM_PRESS, KM_DBL_CLICK);
       }
@@ -6037,7 +6052,7 @@ static int ui_do_but_BLOCK(bContext *C, uiBut *but, uiHandleButtonData *data, co
          * the slot menu fails to switch a second time.
          *
          * The active state of the button could be maintained some other way
-         * and remove this mousemove event.
+         * and remove this mouse-move event.
          */
         WM_event_add_mousemove(data->window);
 
@@ -6779,7 +6794,7 @@ static bool ui_numedit_but_HSVCIRCLE(uiBut *but,
 
   ui_color_picker_hsv_to_rgb(hsv, rgb);
 
-  if ((cpicker->use_luminosity_lock)) {
+  if (cpicker->use_luminosity_lock) {
     if (!is_zero_v3(rgb)) {
       normalize_v3_length(rgb, cpicker->luminosity_lock_value);
     }
@@ -7968,6 +7983,7 @@ static int ui_do_button(bContext *C, uiBlock *block, uiBut *but, const wmEvent *
     case UI_BTYPE_CHECKBOX:
     case UI_BTYPE_CHECKBOX_N:
     case UI_BTYPE_ROW:
+    case UI_BTYPE_TREEROW:
     case UI_BTYPE_DATASETROW:
       retval = ui_do_but_TOG(C, but, data, event);
       break;
@@ -8376,7 +8392,7 @@ static void button_activate_state(bContext *C, uiBut *but, uiHandleButtonState s
     }
   }
 
-  /* wait for mousemove to enable drag */
+  /* Wait for mouse-move to enable drag. */
   if (state == BUTTON_STATE_WAIT_DRAG) {
     but->flag &= ~UI_SELECT;
   }
@@ -8635,10 +8651,7 @@ static void button_activate_exit(
   }
 
   /* clean up button */
-  if (but->active) {
-    MEM_freeN(but->active);
-    but->active = NULL;
-  }
+  MEM_SAFE_FREE(but->active);
 
   but->flag &= ~(UI_ACTIVE | UI_SELECT);
   but->flag |= UI_BUT_LAST_ACTIVE;
@@ -8646,9 +8659,9 @@ static void button_activate_exit(
     ui_but_update(but);
   }
 
-  /* adds empty mousemove in queue for re-init handler, in case mouse is
+  /* Adds empty mouse-move in queue for re-initialize handler, in case mouse is
    * still over a button. We cannot just check for this ourselves because
-   * at this point the mouse may be over a button in another region */
+   * at this point the mouse may be over a button in another region. */
   if (mousemove) {
     WM_event_add_mousemove(CTX_wm_window(C));
   }
@@ -9486,7 +9499,7 @@ static void ui_list_activate_row_from_index(
     /* A bit ugly, set the active index in RNA directly. That's because a button that's
      * scrolled away in the list box isn't created at all.
      * The custom activate operator (#uiList.custom_activate_opname) is not called in this case
-     * (which may need the row button context).*/
+     * (which may need the row button context). */
     RNA_property_int_set(&listbox->rnapoin, listbox->rnaprop, index);
     RNA_property_update(C, &listbox->rnapoin, listbox->rnaprop);
     ui_apply_but_undo(listbox);
@@ -9505,7 +9518,7 @@ static int ui_list_get_increment(const uiList *ui_list, const int type, const in
     increment = (type == EVT_UPARROWKEY) ? -columns : columns;
   }
   else {
-    /* Left or right in grid layouts or any direction in single column layouts increments by 1.  */
+    /* Left or right in grid layouts or any direction in single column layouts increments by 1. */
     increment = ELEM(type, EVT_UPARROWKEY, EVT_LEFTARROWKEY, WHEELUPMOUSE) ? -1 : 1;
   }
 

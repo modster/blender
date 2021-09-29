@@ -40,7 +40,7 @@ SplitOperation::SplitOperation()
 
 void SplitOperation::initExecution()
 {
-  // When initializing the tree during initial load the width and height can be zero.
+  /* When initializing the tree during initial load the width and height can be zero. */
   this->m_image1Input = getInputSocketReader(0);
   this->m_image2Input = getInputSocketReader(1);
 }
@@ -67,16 +67,27 @@ void SplitOperation::executePixelSampled(float output[4],
   }
 }
 
-void SplitOperation::determineResolution(unsigned int resolution[2],
-                                         unsigned int preferredResolution[2])
+void SplitOperation::determine_canvas(const rcti &preferred_area, rcti &r_area)
 {
-  unsigned int tempPreferredResolution[2] = {0, 0};
-  unsigned int tempResolution[2];
+  rcti unused_area;
 
-  this->getInputSocket(0)->determineResolution(tempResolution, tempPreferredResolution);
-  this->setResolutionInputSocketIndex((tempResolution[0] && tempResolution[1]) ? 0 : 1);
+  const bool determined = this->getInputSocket(0)->determine_canvas(COM_AREA_NONE, unused_area);
+  this->set_canvas_input_index(determined ? 0 : 1);
 
-  NodeOperation::determineResolution(resolution, preferredResolution);
+  NodeOperation::determine_canvas(preferred_area, r_area);
+}
+
+void SplitOperation::update_memory_buffer_partial(MemoryBuffer *output,
+                                                  const rcti &area,
+                                                  Span<MemoryBuffer *> inputs)
+{
+  const int percent = this->m_xSplit ? this->m_splitPercentage * this->getWidth() / 100.0f :
+                                       this->m_splitPercentage * this->getHeight() / 100.0f;
+  const size_t elem_bytes = COM_data_type_bytes_len(getOutputSocket()->getDataType());
+  for (BuffersIterator<float> it = output->iterate_with(inputs, area); !it.is_end(); ++it) {
+    const bool is_image1 = this->m_xSplit ? it.x > percent : it.y > percent;
+    memcpy(it.out, it.in(is_image1 ? 0 : 1), elem_bytes);
+  }
 }
 
 }  // namespace blender::compositor

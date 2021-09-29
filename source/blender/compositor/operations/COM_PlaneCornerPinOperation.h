@@ -31,18 +31,21 @@ namespace blender::compositor {
 
 class PlaneCornerPinMaskOperation : public PlaneDistortMaskOperation {
  private:
+  /* TODO(manzanilla): to be removed with tiled implementation. */
   bool m_corners_ready;
 
  public:
   PlaneCornerPinMaskOperation();
 
+  void init_data() override;
   void initExecution() override;
   void deinitExecution() override;
 
   void *initializeTileData(rcti *rect) override;
 
-  void determineResolution(unsigned int resolution[2],
-                           unsigned int preferredResolution[2]) override;
+  void determine_canvas(const rcti &preferred_area, rcti &r_area) override;
+
+  void get_area_of_interest(int input_idx, const rcti &output_area, rcti &r_input_area) override;
 };
 
 class PlaneCornerPinWarpImageOperation : public PlaneDistortWarpImageOperation {
@@ -52,6 +55,7 @@ class PlaneCornerPinWarpImageOperation : public PlaneDistortWarpImageOperation {
  public:
   PlaneCornerPinWarpImageOperation();
 
+  void init_data() override;
   void initExecution() override;
   void deinitExecution() override;
 
@@ -60,6 +64,8 @@ class PlaneCornerPinWarpImageOperation : public PlaneDistortWarpImageOperation {
   bool determineDependingAreaOfInterest(rcti *input,
                                         ReadBufferOperation *readOperation,
                                         rcti *output) override;
+
+  void get_area_of_interest(int input_idx, const rcti &output_area, rcti &r_input_area) override;
 };
 
 }  // namespace blender::compositor

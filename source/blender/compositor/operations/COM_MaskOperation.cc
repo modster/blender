@@ -109,22 +109,15 @@ void MaskOperation::deinitExecution()
   }
 }
 
-void MaskOperation::determineResolution(unsigned int resolution[2],
-                                        unsigned int preferredResolution[2])
+void MaskOperation::determine_canvas(const rcti &preferred_area, rcti &r_area)
 {
   if (this->m_maskWidth == 0 || this->m_maskHeight == 0) {
-    NodeOperation::determineResolution(resolution, preferredResolution);
+    r_area = COM_AREA_NONE;
   }
   else {
-    unsigned int nr[2];
-
-    nr[0] = this->m_maskWidth;
-    nr[1] = this->m_maskHeight;
-
-    NodeOperation::determineResolution(resolution, nr);
-
-    resolution[0] = this->m_maskWidth;
-    resolution[1] = this->m_maskHeight;
+    r_area = preferred_area;
+    r_area.xmax = r_area.xmin + m_maskWidth;
+    r_area.ymax = r_area.ymin + m_maskHeight;
   }
 }
 
@@ -159,6 +152,43 @@ void MaskOperation::executePixelSampled(float output[4],
     /* until we get better falloff */
     output[0] /= this->m_rasterMaskHandleTot;
   }
+}
+
+void MaskOperation::update_memory_buffer_partial(MemoryBuffer *output,
+                                                 const rcti &area,
+                                                 Span<MemoryBuffer *> UNUSED(inputs))
+{
+  Vector<MaskRasterHandle *> handles = get_non_null_handles();
+  if (handles.size() == 0) {
+    output->fill(area, COM_VALUE_ZERO);
+    return;
+  }
+
+  float xy[2];
+  for (BuffersIterator<float> it = output->iterate_with({}, area); !it.is_end(); ++it) {
+    xy[0] = it.x * m_maskWidthInv + m_mask_px_ofs[0];
+    xy[1] = it.y * m_maskHeightInv + m_mask_px_ofs[1];
+    *it.out = 0.0f;
+    for (MaskRasterHandle *handle : handles) {
+      *it.out += BKE_maskrasterize_handle_sample(handle, xy);
+    }
+
+    /* Until we get better falloff. */
+    *it.out /= m_rasterMaskHandleTot;
+  }
+}
+
+Vector<MaskRasterHandle *> MaskOperation::get_non_null_handles() const
+{
+  Vector<MaskRasterHandle *> handles;
+  for (int i = 0; i < m_rasterMaskHandleTot; i++) {
+    MaskRasterHandle *handle = m_rasterMaskHandles[i];
+    if (handle == nullptr) {
+      continue;
+    }
+    handles.append(handle);
+  }
+  return handles;
 }
 
 }  // namespace blender::compositor

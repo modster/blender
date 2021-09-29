@@ -23,21 +23,37 @@ namespace blender::compositor {
 
 MapUVOperation::MapUVOperation()
 {
-  this->addInputSocket(DataType::Color, ResizeMode::None);
+  this->addInputSocket(DataType::Color, ResizeMode::Align);
   this->addInputSocket(DataType::Vector);
   this->addOutputSocket(DataType::Color);
   this->m_alpha = 0.0f;
   this->flags.complex = true;
-  setResolutionInputSocketIndex(1);
+  set_canvas_input_index(UV_INPUT_INDEX);
 
   this->m_inputUVProgram = nullptr;
   this->m_inputColorProgram = nullptr;
+}
+
+void MapUVOperation::init_data()
+{
+  NodeOperation *image_input = get_input_operation(IMAGE_INPUT_INDEX);
+  image_width_ = image_input->getWidth();
+  image_height_ = image_input->getHeight();
+
+  NodeOperation *uv_input = get_input_operation(UV_INPUT_INDEX);
+  uv_width_ = uv_input->getWidth();
+  uv_height_ = uv_input->getHeight();
 }
 
 void MapUVOperation::initExecution()
 {
   this->m_inputColorProgram = this->getInputSocketReader(0);
   this->m_inputUVProgram = this->getInputSocketReader(1);
+  if (execution_model_ == eExecutionModel::Tiled) {
+    uv_input_read_fn_ = [=](float x, float y, float *out) {
+      this->m_inputUVProgram->readSampled(out, x, y, PixelSampler::Bilinear);
+    };
+  }
 }
 
 void MapUVOperation::executePixelSampled(float output[4],
@@ -81,9 +97,7 @@ void MapUVOperation::executePixelSampled(float output[4],
 
 bool MapUVOperation::read_uv(float x, float y, float &r_u, float &r_v, float &r_alpha)
 {
-  float width = m_inputUVProgram->getWidth();
-  float height = m_inputUVProgram->getHeight();
-  if (x < 0.0f || x >= width || y < 0.0f || y >= height) {
+  if (x < 0.0f || x >= uv_width_ || y < 0.0f || y >= uv_height_) {
     r_u = 0.0f;
     r_v = 0.0f;
     r_alpha = 0.0f;
@@ -91,9 +105,9 @@ bool MapUVOperation::read_uv(float x, float y, float &r_u, float &r_v, float &r_
   }
 
   float vector[3];
-  m_inputUVProgram->readSampled(vector, x, y, PixelSampler::Bilinear);
-  r_u = vector[0] * m_inputColorProgram->getWidth();
-  r_v = vector[1] * m_inputColorProgram->getHeight();
+  uv_input_read_fn_(x, y, vector);
+  r_u = vector[0] * image_width_;
+  r_v = vector[1] * image_height_;
   r_alpha = vector[2];
   return true;
 }
@@ -184,6 +198,74 @@ bool MapUVOperation::determineDependingAreaOfInterest(rcti *input,
   }
 
   return false;
+}
+
+void MapUVOperation::get_area_of_interest(const int input_idx,
+                                          const rcti &output_area,
+                                          rcti &r_input_area)
+{
+  switch (input_idx) {
+    case IMAGE_INPUT_INDEX: {
+      r_input_area = get_input_operation(IMAGE_INPUT_INDEX)->get_canvas();
+      break;
+    }
+    case UV_INPUT_INDEX: {
+      r_input_area = output_area;
+      expand_area_for_sampler(r_input_area, PixelSampler::Bilinear);
+      break;
+    }
+  }
+}
+
+void MapUVOperation::update_memory_buffer_started(MemoryBuffer *UNUSED(output),
+                                                  const rcti &UNUSED(area),
+                                                  Span<MemoryBuffer *> inputs)
+{
+  const MemoryBuffer *uv_input = inputs[UV_INPUT_INDEX];
+  uv_input_read_fn_ = [=](float x, float y, float *out) {
+    uv_input->read_elem_bilinear(x, y, out);
+  };
+}
+
+void MapUVOperation::update_memory_buffer_partial(MemoryBuffer *output,
+                                                  const rcti &area,
+                                                  Span<MemoryBuffer *> inputs)
+{
+  const MemoryBuffer *input_image = inputs[IMAGE_INPUT_INDEX];
+  for (BuffersIterator<float> it = output->iterate_with({}, area); !it.is_end(); ++it) {
+    float xy[2] = {(float)it.x, (float)it.y};
+    float uv[2];
+    float deriv[2][2];
+    float alpha;
+    pixelTransform(xy, uv, deriv, alpha);
+    if (alpha == 0.0f) {
+      zero_v4(it.out);
+      continue;
+    }
+
+    /* EWA filtering. */
+    input_image->read_elem_filtered(uv[0], uv[1], deriv[0], deriv[1], it.out);
+
+    /* UV to alpha threshold. */
+    const float threshold = this->m_alpha * 0.05f;
+    /* XXX alpha threshold is used to fade out pixels on boundaries with invalid derivatives.
+     * this calculation is not very well defined, should be looked into if it becomes a problem ...
+     */
+    const float du = len_v2(deriv[0]);
+    const float dv = len_v2(deriv[1]);
+    const float factor = 1.0f - threshold * (du / image_width_ + dv / image_height_);
+    if (factor < 0.0f) {
+      alpha = 0.0f;
+    }
+    else {
+      alpha *= factor;
+    }
+
+    /* "premul" */
+    if (alpha < 1.0f) {
+      mul_v4_fl(it.out, alpha);
+    }
+  }
 }
 
 }  // namespace blender::compositor
