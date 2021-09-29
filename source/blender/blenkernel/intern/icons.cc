@@ -1,4 +1,4 @@
-﻿/*
+/*
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -633,12 +633,6 @@ void BKE_previewimg_blend_write(BlendWriter *writer, const PreviewImage *prv)
   }
 
   PreviewImage prv_copy = *prv;
-  /* don't write out large previews if not requested */
-  if (!(U.flag & USER_SAVE_PREVIEWS)) {
-    prv_copy.w[1] = 0;
-    prv_copy.h[1] = 0;
-    prv_copy.rect[1] = nullptr;
-  }
   BLO_write_struct_at_address(writer, PreviewImage, prv, &prv_copy);
   if (prv_copy.rect[0]) {
     BLO_write_uint32_array(writer, prv_copy.w[0] * prv_copy.h[0], prv_copy.rect[0]);
@@ -667,7 +661,7 @@ void BKE_previewimg_blend_read(BlendDataReader *reader, PreviewImage *prv)
       BKE_previewimg_finish(prv, i);
     }
     else {
-      /* Only for old files that didn't write the flag . */
+      /* Only for old files that didn't write the flag. */
       prv->flag[i] |= PRV_UNFINISHED;
     }
   }

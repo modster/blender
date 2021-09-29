@@ -49,6 +49,8 @@ struct MDeformVert;
 #define GPENCIL_MIN_FILL_FAC 0.05f
 #define GPENCIL_MAX_FILL_FAC 8.0f
 
+#define GPENCIL_MAX_THICKNESS 5000
+
 /* ***************************************** */
 /* GP Stroke Points */
 
@@ -324,6 +326,7 @@ typedef struct bGPDstroke {
   struct bGPDcurve *editcurve;
 
   bGPDstroke_Runtime runtime;
+  void *_pad5;
 } bGPDstroke;
 
 /** #bGPDstroke.flag */

@@ -74,6 +74,8 @@ typedef struct StripTransform {
   float scale_x;
   float scale_y;
   float rotation;
+  /** 0-1 range, use SEQ_image_transform_origin_offset_pixelspace_get to convert to pixel space. */
+  float origin[2];
 } StripTransform;
 
 typedef struct StripColorBalance {
@@ -201,6 +203,7 @@ typedef struct Sequence {
   ListBase anims;
 
   float effect_fader;
+  /* DEPRECATED, only used for versioning. */
   float speed_fader;
 
   /* pointers for effects: */
@@ -295,6 +298,7 @@ typedef struct Editing {
   int64_t disk_cache_timestamp;
 
   EditingRuntime runtime;
+  void *_pad1;
 } Editing;
 
 /* ************* Effect Variable Structs ********* */
@@ -335,11 +339,24 @@ typedef struct SolidColorVars {
 
 typedef struct SpeedControlVars {
   float *frameMap;
+  /* DEPRECATED, only used for versioning. */
   float globalSpeed;
   int flags;
-  int length;
-  int lastValidFrame;
+
+  int speed_control_type;
+
+  float speed_fader;
+  float speed_fader_length;
+  float speed_fader_frame_number;
 } SpeedControlVars;
+
+/* SpeedControlVars.speed_control_type */
+enum {
+  SEQ_SPEED_STRETCH = 0,
+  SEQ_SPEED_MULTIPLY = 1,
+  SEQ_SPEED_LENGTH = 2,
+  SEQ_SPEED_FRAME_NUMBER = 3,
+};
 
 typedef struct GaussianBlurVars {
   float size_x;
@@ -469,7 +486,7 @@ typedef struct SequencerScopes {
   struct ImBuf *histogram_ibuf;
 } SequencerScopes;
 
-#define MAXSEQ 32
+#define MAXSEQ 128
 
 #define SELECT 1
 
@@ -485,9 +502,9 @@ typedef struct SequencerScopes {
 #define SEQ_EDIT_PROXY_DIR_STORAGE 1
 
 /* SpeedControlVars->flags */
-#define SEQ_SPEED_INTEGRATE (1 << 0)
+#define SEQ_SPEED_UNUSED_2 (1 << 0) /* cleared */
 #define SEQ_SPEED_UNUSED_1 (1 << 1) /* cleared */
-#define SEQ_SPEED_COMPRESS_IPO_Y (1 << 2)
+#define SEQ_SPEED_UNUSED_3 (1 << 2) /* cleared */
 #define SEQ_SPEED_USE_INTERPOLATION (1 << 3)
 
 /* ***************** SEQUENCE ****************** */
@@ -501,7 +518,7 @@ enum {
   SEQ_OVERLAP = (1 << 3),
   SEQ_FILTERY = (1 << 4),
   SEQ_MUTE = (1 << 5),
-  SEQ_FLAG_UNUSED_6 = (1 << 6), /* cleared */
+  SEQ_FLAG_SKIP_THUMBNAILS = (1 << 6),
   SEQ_REVERSE_FRAMES = (1 << 7),
   SEQ_IPO_FRAME_LOCKED = (1 << 8),
   SEQ_EFFECT_NOT_LOADED = (1 << 9),
@@ -707,6 +724,7 @@ enum {
 
   SEQ_CACHE_PREFETCH_ENABLE = (1 << 10),
   SEQ_CACHE_DISK_CACHE_ENABLE = (1 << 11),
+  SEQ_CACHE_STORE_THUMBNAIL = (1 << 12),
 };
 
 #ifdef __cplusplus

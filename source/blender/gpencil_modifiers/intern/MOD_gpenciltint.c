@@ -281,7 +281,7 @@ static void bakeModifier(Main *UNUSED(bmain),
   bGPdata *gpd = ob->data;
   int oldframe = (int)DEG_get_ctime(depsgraph);
 
-  if (mmd->object == NULL) {
+  if ((mmd->type == GP_TINT_GRADIENT) && (mmd->object == NULL)) {
     return;
   }
 
@@ -308,10 +308,7 @@ static void bakeModifier(Main *UNUSED(bmain),
 static void freeData(GpencilModifierData *md)
 {
   TintGpencilModifierData *mmd = (TintGpencilModifierData *)md;
-  if (mmd->colorband) {
-    MEM_freeN(mmd->colorband);
-    mmd->colorband = NULL;
-  }
+  MEM_SAFE_FREE(mmd->colorband);
   if (mmd->curve_intensity) {
     BKE_curvemapping_free(mmd->curve_intensity);
   }

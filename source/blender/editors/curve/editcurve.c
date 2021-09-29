@@ -1848,10 +1848,7 @@ static void ed_surf_delete_selected(Object *obedit)
             nu->pntsv = 1;
             SWAP(short, nu->orderu, nu->orderv);
             BKE_nurb_order_clamp_u(nu);
-            if (nu->knotsv) {
-              MEM_freeN(nu->knotsv);
-            }
-            nu->knotsv = NULL;
+            MEM_SAFE_FREE(nu->knotsv);
           }
           else {
             nu->pntsu = newu;
@@ -4650,10 +4647,7 @@ static int make_segment_exec(bContext *C, wmOperator *op)
 
           /* now join the knots */
           if (nu1->type == CU_NURBS) {
-            if (nu1->knotsu != NULL) {
-              MEM_freeN(nu1->knotsu);
-              nu1->knotsu = NULL;
-            }
+            MEM_SAFE_FREE(nu1->knotsu);
 
             BKE_nurb_knot_calc_u(nu1);
           }
@@ -5626,7 +5620,7 @@ static int add_vertex_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 void CURVE_OT_vertex_add(wmOperatorType *ot)
 {
   /* identifiers */
-  ot->name = "Add Vertex";
+  ot->name = "Extrude to Cursor or Add";
   ot->idname = "CURVE_OT_vertex_add";
   ot->description = "Add a new control point (linked to only selected end-curve one, if any)";
 
@@ -5636,7 +5630,7 @@ void CURVE_OT_vertex_add(wmOperatorType *ot)
   ot->poll = ED_operator_editcurve;
 
   /* flags */
-  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_DEPENDS_ON_CURSOR;
 
   /* properties */
   RNA_def_float_vector_xyz(ot->srna,

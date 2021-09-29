@@ -24,7 +24,6 @@ SetColorOperation::SetColorOperation()
 {
   this->addOutputSocket(DataType::Color);
   flags.is_set_operation = true;
-  flags.is_fullframe_operation = true;
 }
 
 void SetColorOperation::executePixelSampled(float output[4],
@@ -35,20 +34,9 @@ void SetColorOperation::executePixelSampled(float output[4],
   copy_v4_v4(output, this->m_color);
 }
 
-void SetColorOperation::determineResolution(unsigned int resolution[2],
-                                            unsigned int preferredResolution[2])
+void SetColorOperation::determine_canvas(const rcti &preferred_area, rcti &r_area)
 {
-  resolution[0] = preferredResolution[0];
-  resolution[1] = preferredResolution[1];
-}
-
-void SetColorOperation::update_memory_buffer(MemoryBuffer *output,
-                                             const rcti &area,
-                                             Span<MemoryBuffer *> UNUSED(inputs))
-{
-  BLI_assert(output->is_a_single_elem());
-  float *out_elem = output->get_elem(area.xmin, area.ymin);
-  copy_v4_v4(out_elem, m_color);
+  r_area = preferred_area;
 }
 
 }  // namespace blender::compositor

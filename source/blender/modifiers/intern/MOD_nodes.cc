@@ -10,7 +10,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software  Foundation,
+ * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  * The Original Code is Copyright (C) 2005 by the Blender Foundation.
@@ -68,6 +68,10 @@
 #include "UI_interface.h"
 #include "UI_resources.h"
 
+#include "BLT_translation.h"
+
+#include "WM_types.h"
+
 #include "RNA_access.h"
 #include "RNA_enum_types.h"
 
@@ -84,8 +88,12 @@
 #include "NOD_derived_node_tree.hh"
 #include "NOD_geometry.h"
 #include "NOD_geometry_nodes_eval_log.hh"
-#include "NOD_node_tree_multi_function.hh"
+#include "NOD_node_declaration.hh"
 
+#include "FN_field.hh"
+#include "FN_multi_function.hh"
+
+using blender::ColorGeometry4f;
 using blender::destruct_ptr;
 using blender::float3;
 using blender::FunctionRef;
@@ -96,9 +104,13 @@ using blender::Span;
 using blender::StringRef;
 using blender::StringRefNull;
 using blender::Vector;
+using blender::bke::OutputAttribute;
+using blender::fn::GField;
 using blender::fn::GMutablePointer;
 using blender::fn::GPointer;
+using blender::nodes::FieldInferencingInterface;
 using blender::nodes::GeoNodeExecParams;
+using blender::nodes::InputSocketFieldType;
 using blender::threading::EnumerableThreadSpecific;
 using namespace blender::fn::multi_function_types;
 using namespace blender::nodes::derived_node_tree_types;
@@ -288,348 +300,232 @@ static bool logging_enabled(const ModifierEvalContext *ctx)
   return true;
 }
 
+static const std::string use_attribute_suffix = "_use_attribute";
+static const std::string attribute_name_suffix = "_attribute_name";
+
 /**
- * This code is responsible for creating the new property and also creating the group of
- * properties in the prop_ui_container group for the UI info, the mapping for which is
- * scattered about in RNA_access.c.
- *
- * TODO(Hans): Codify this with some sort of table or refactor IDProperty use in RNA_access.c.
+ * \return Whether using an attribute to input values of this type is supported.
  */
-struct SocketPropertyType {
-  /* Create the actual property used to store the data for the modifier. */
-  IDProperty *(*create_prop)(const bNodeSocket &socket, const char *name);
-  /* Reused to build the "soft_min" property too. */
-  IDProperty *(*create_min_ui_prop)(const bNodeSocket &socket, const char *name);
-  /* Reused to build the "soft_max" property too. */
-  IDProperty *(*create_max_ui_prop)(const bNodeSocket &socket, const char *name);
-  /* This uses the same values as #create_prop, but sometimes the type is different, so it can't
-   * be the same function. */
-  IDProperty *(*create_default_ui_prop)(const bNodeSocket &socket, const char *name);
-  PropertyType (*rna_subtype_get)(const bNodeSocket &socket);
-  bool (*is_correct_type)(const IDProperty &property);
-  void (*init_cpp_value)(const IDProperty &property, void *r_value);
-};
-
-static IDProperty *socket_add_property(IDProperty *settings_prop_group,
-                                       IDProperty *ui_container,
-                                       const SocketPropertyType &property_type,
-                                       const bNodeSocket &socket)
+static bool socket_type_has_attribute_toggle(const bNodeSocket &socket)
 {
-  const char *new_prop_name = socket.identifier;
-  /* Add the property actually storing the data to the modifier's group. */
-  IDProperty *prop = property_type.create_prop(socket, new_prop_name);
-  IDP_AddToGroup(settings_prop_group, prop);
-
-  prop->flag |= IDP_FLAG_OVERRIDABLE_LIBRARY;
-
-  /* Make the group in the UI container group to hold the property's UI settings. */
-  IDProperty *prop_ui_group;
-  {
-    IDPropertyTemplate idprop = {0};
-    prop_ui_group = IDP_New(IDP_GROUP, &idprop, new_prop_name);
-    IDP_AddToGroup(ui_container, prop_ui_group);
-  }
-
-  /* Set property description (tooltip). */
-  IDPropertyTemplate property_description_template;
-  property_description_template.string.str = socket.description;
-  property_description_template.string.len = BLI_strnlen(socket.description, MAX_NAME) + 1;
-  property_description_template.string.subtype = IDP_STRING_SUB_UTF8;
-  IDProperty *description = IDP_New(IDP_STRING, &property_description_template, "description");
-  IDP_AddToGroup(prop_ui_group, description);
-
-  /* Create the properties for the socket's UI settings. */
-  if (property_type.create_min_ui_prop != nullptr) {
-    IDP_AddToGroup(prop_ui_group, property_type.create_min_ui_prop(socket, "min"));
-    IDP_AddToGroup(prop_ui_group, property_type.create_min_ui_prop(socket, "soft_min"));
-  }
-  if (property_type.create_max_ui_prop != nullptr) {
-    IDP_AddToGroup(prop_ui_group, property_type.create_max_ui_prop(socket, "max"));
-    IDP_AddToGroup(prop_ui_group, property_type.create_max_ui_prop(socket, "soft_max"));
-  }
-  if (property_type.create_default_ui_prop != nullptr) {
-    IDP_AddToGroup(prop_ui_group, property_type.create_default_ui_prop(socket, "default"));
-  }
-  if (property_type.rna_subtype_get != nullptr) {
-    const char *subtype_identifier = nullptr;
-    RNA_enum_identifier(rna_enum_property_subtype_items,
-                        property_type.rna_subtype_get(socket),
-                        &subtype_identifier);
-
-    if (subtype_identifier != nullptr) {
-      IDPropertyTemplate idprop = {0};
-      idprop.string.str = subtype_identifier;
-      idprop.string.len = BLI_strnlen(subtype_identifier, MAX_NAME) + 1;
-      IDP_AddToGroup(prop_ui_group, IDP_New(IDP_STRING, &idprop, "subtype"));
-    }
-  }
-
-  return prop;
+  return ELEM(socket.type, SOCK_FLOAT, SOCK_VECTOR, SOCK_BOOLEAN, SOCK_RGBA, SOCK_INT);
 }
 
-static const SocketPropertyType *get_socket_property_type(const bNodeSocket &bsocket)
+/**
+ * \return Whether using an attribute to input values of this type is supported, and the node
+ * group's input for this socket accepts a field rather than just single values.
+ */
+static bool input_has_attribute_toggle(const bNodeTree &node_tree, const int socket_index)
 {
-  switch (bsocket.type) {
+  BLI_assert(node_tree.field_inferencing_interface != nullptr);
+  const FieldInferencingInterface &field_interface = *node_tree.field_inferencing_interface;
+  return field_interface.inputs[socket_index] != InputSocketFieldType::None;
+}
+
+static IDProperty *id_property_create_from_socket(const bNodeSocket &socket)
+{
+  switch (socket.type) {
     case SOCK_FLOAT: {
-      static const SocketPropertyType float_type = {
-          [](const bNodeSocket &socket, const char *name) {
-            bNodeSocketValueFloat *value = (bNodeSocketValueFloat *)socket.default_value;
-            IDPropertyTemplate idprop = {0};
-            idprop.f = value->value;
-            return IDP_New(IDP_FLOAT, &idprop, name);
-          },
-          [](const bNodeSocket &socket, const char *name) {
-            bNodeSocketValueFloat *value = (bNodeSocketValueFloat *)socket.default_value;
-            IDPropertyTemplate idprop = {0};
-            idprop.d = value->min;
-            return IDP_New(IDP_DOUBLE, &idprop, name);
-          },
-          [](const bNodeSocket &socket, const char *name) {
-            bNodeSocketValueFloat *value = (bNodeSocketValueFloat *)socket.default_value;
-            IDPropertyTemplate idprop = {0};
-            idprop.d = value->max;
-            return IDP_New(IDP_DOUBLE, &idprop, name);
-          },
-          [](const bNodeSocket &socket, const char *name) {
-            bNodeSocketValueFloat *value = (bNodeSocketValueFloat *)socket.default_value;
-            IDPropertyTemplate idprop = {0};
-            idprop.d = value->value;
-            return IDP_New(IDP_DOUBLE, &idprop, name);
-          },
-          [](const bNodeSocket &socket) {
-            return (PropertyType)((bNodeSocketValueFloat *)socket.default_value)->subtype;
-          },
-          [](const IDProperty &property) { return ELEM(property.type, IDP_FLOAT, IDP_DOUBLE); },
-          [](const IDProperty &property, void *r_value) {
-            if (property.type == IDP_FLOAT) {
-              *(float *)r_value = IDP_Float(&property);
-            }
-            else if (property.type == IDP_DOUBLE) {
-              *(float *)r_value = (float)IDP_Double(&property);
-            }
-          },
-      };
-      return &float_type;
+      bNodeSocketValueFloat *value = (bNodeSocketValueFloat *)socket.default_value;
+      IDPropertyTemplate idprop = {0};
+      idprop.f = value->value;
+      IDProperty *property = IDP_New(IDP_FLOAT, &idprop, socket.identifier);
+      IDPropertyUIDataFloat *ui_data = (IDPropertyUIDataFloat *)IDP_ui_data_ensure(property);
+      ui_data->base.rna_subtype = value->subtype;
+      ui_data->min = ui_data->soft_min = (double)value->min;
+      ui_data->max = ui_data->soft_max = (double)value->max;
+      ui_data->default_value = value->value;
+      return property;
     }
     case SOCK_INT: {
-      static const SocketPropertyType int_type = {
-          [](const bNodeSocket &socket, const char *name) {
-            bNodeSocketValueInt *value = (bNodeSocketValueInt *)socket.default_value;
-            IDPropertyTemplate idprop = {0};
-            idprop.i = value->value;
-            return IDP_New(IDP_INT, &idprop, name);
-          },
-          [](const bNodeSocket &socket, const char *name) {
-            bNodeSocketValueInt *value = (bNodeSocketValueInt *)socket.default_value;
-            IDPropertyTemplate idprop = {0};
-            idprop.i = value->min;
-            return IDP_New(IDP_INT, &idprop, name);
-          },
-          [](const bNodeSocket &socket, const char *name) {
-            bNodeSocketValueInt *value = (bNodeSocketValueInt *)socket.default_value;
-            IDPropertyTemplate idprop = {0};
-            idprop.i = value->max;
-            return IDP_New(IDP_INT, &idprop, name);
-          },
-          [](const bNodeSocket &socket, const char *name) {
-            bNodeSocketValueInt *value = (bNodeSocketValueInt *)socket.default_value;
-            IDPropertyTemplate idprop = {0};
-            idprop.i = value->value;
-            return IDP_New(IDP_INT, &idprop, name);
-          },
-          [](const bNodeSocket &socket) {
-            return (PropertyType)((bNodeSocketValueInt *)socket.default_value)->subtype;
-          },
-          [](const IDProperty &property) { return property.type == IDP_INT; },
-          [](const IDProperty &property, void *r_value) { *(int *)r_value = IDP_Int(&property); },
-      };
-      return &int_type;
+      bNodeSocketValueInt *value = (bNodeSocketValueInt *)socket.default_value;
+      IDPropertyTemplate idprop = {0};
+      idprop.i = value->value;
+      IDProperty *property = IDP_New(IDP_INT, &idprop, socket.identifier);
+      IDPropertyUIDataInt *ui_data = (IDPropertyUIDataInt *)IDP_ui_data_ensure(property);
+      ui_data->base.rna_subtype = value->subtype;
+      ui_data->min = ui_data->soft_min = value->min;
+      ui_data->max = ui_data->soft_max = value->max;
+      ui_data->default_value = value->value;
+      return property;
     }
     case SOCK_VECTOR: {
-      static const SocketPropertyType vector_type = {
-          [](const bNodeSocket &socket, const char *name) {
-            bNodeSocketValueVector *value = (bNodeSocketValueVector *)socket.default_value;
-            IDPropertyTemplate idprop = {0};
-            idprop.array.len = 3;
-            idprop.array.type = IDP_FLOAT;
-            IDProperty *property = IDP_New(IDP_ARRAY, &idprop, name);
-            copy_v3_v3((float *)IDP_Array(property), value->value);
-            return property;
-          },
-          [](const bNodeSocket &socket, const char *name) {
-            bNodeSocketValueVector *value = (bNodeSocketValueVector *)socket.default_value;
-            IDPropertyTemplate idprop = {0};
-            idprop.d = value->min;
-            return IDP_New(IDP_DOUBLE, &idprop, name);
-          },
-          [](const bNodeSocket &socket, const char *name) {
-            bNodeSocketValueVector *value = (bNodeSocketValueVector *)socket.default_value;
-            IDPropertyTemplate idprop = {0};
-            idprop.d = value->max;
-            return IDP_New(IDP_DOUBLE, &idprop, name);
-          },
-          [](const bNodeSocket &socket, const char *name) {
-            bNodeSocketValueVector *value = (bNodeSocketValueVector *)socket.default_value;
-            IDPropertyTemplate idprop = {0};
-            idprop.array.len = 3;
-            idprop.array.type = IDP_FLOAT;
-            IDProperty *property = IDP_New(IDP_ARRAY, &idprop, name);
-            copy_v3_v3((float *)IDP_Array(property), value->value);
-            return property;
-          },
-          [](const bNodeSocket &socket) {
-            return (PropertyType)((bNodeSocketValueVector *)socket.default_value)->subtype;
-          },
-          [](const IDProperty &property) {
-            return property.type == IDP_ARRAY && property.subtype == IDP_FLOAT &&
-                   property.len == 3;
-          },
-          [](const IDProperty &property, void *r_value) {
-            copy_v3_v3((float *)r_value, (const float *)IDP_Array(&property));
-          },
-      };
-      return &vector_type;
+      bNodeSocketValueVector *value = (bNodeSocketValueVector *)socket.default_value;
+      IDPropertyTemplate idprop = {0};
+      idprop.array.len = 3;
+      idprop.array.type = IDP_FLOAT;
+      IDProperty *property = IDP_New(IDP_ARRAY, &idprop, socket.identifier);
+      copy_v3_v3((float *)IDP_Array(property), value->value);
+      IDPropertyUIDataFloat *ui_data = (IDPropertyUIDataFloat *)IDP_ui_data_ensure(property);
+      ui_data->base.rna_subtype = value->subtype;
+      ui_data->min = ui_data->soft_min = (double)value->min;
+      ui_data->max = ui_data->soft_max = (double)value->max;
+      ui_data->default_array = (double *)MEM_mallocN(sizeof(double[3]), "mod_prop_default");
+      ui_data->default_array_len = 3;
+      for (const int i : IndexRange(3)) {
+        ui_data->default_array[i] = double(value->value[i]);
+      }
+      return property;
+    }
+    case SOCK_RGBA: {
+      bNodeSocketValueRGBA *value = (bNodeSocketValueRGBA *)socket.default_value;
+      IDPropertyTemplate idprop = {0};
+      idprop.array.len = 4;
+      idprop.array.type = IDP_FLOAT;
+      IDProperty *property = IDP_New(IDP_ARRAY, &idprop, socket.identifier);
+      copy_v4_v4((float *)IDP_Array(property), value->value);
+      IDPropertyUIDataFloat *ui_data = (IDPropertyUIDataFloat *)IDP_ui_data_ensure(property);
+      ui_data->base.rna_subtype = PROP_COLOR;
+      ui_data->default_array = (double *)MEM_mallocN(sizeof(double[4]), __func__);
+      ui_data->default_array_len = 4;
+      for (const int i : IndexRange(4)) {
+        ui_data->default_array[i] = double(value->value[i]);
+      }
+      return property;
     }
     case SOCK_BOOLEAN: {
-      static const SocketPropertyType boolean_type = {
-          [](const bNodeSocket &socket, const char *name) {
-            bNodeSocketValueBoolean *value = (bNodeSocketValueBoolean *)socket.default_value;
-            IDPropertyTemplate idprop = {0};
-            idprop.i = value->value != 0;
-            return IDP_New(IDP_INT, &idprop, name);
-          },
-          [](const bNodeSocket &UNUSED(socket), const char *name) {
-            IDPropertyTemplate idprop = {0};
-            idprop.i = 0;
-            return IDP_New(IDP_INT, &idprop, name);
-          },
-          [](const bNodeSocket &UNUSED(socket), const char *name) {
-            IDPropertyTemplate idprop = {0};
-            idprop.i = 1;
-            return IDP_New(IDP_INT, &idprop, name);
-          },
-          [](const bNodeSocket &socket, const char *name) {
-            bNodeSocketValueBoolean *value = (bNodeSocketValueBoolean *)socket.default_value;
-            IDPropertyTemplate idprop = {0};
-            idprop.i = value->value != 0;
-            return IDP_New(IDP_INT, &idprop, name);
-          },
-          nullptr,
-          [](const IDProperty &property) { return property.type == IDP_INT; },
-          [](const IDProperty &property, void *r_value) {
-            *(bool *)r_value = IDP_Int(&property) != 0;
-          },
-      };
-      return &boolean_type;
+      bNodeSocketValueBoolean *value = (bNodeSocketValueBoolean *)socket.default_value;
+      IDPropertyTemplate idprop = {0};
+      idprop.i = value->value != 0;
+      IDProperty *property = IDP_New(IDP_INT, &idprop, socket.identifier);
+      IDPropertyUIDataInt *ui_data = (IDPropertyUIDataInt *)IDP_ui_data_ensure(property);
+      ui_data->min = ui_data->soft_min = 0;
+      ui_data->max = ui_data->soft_max = 1;
+      ui_data->default_value = value->value != 0;
+      return property;
     }
     case SOCK_STRING: {
-      static const SocketPropertyType string_type = {
-          [](const bNodeSocket &socket, const char *name) {
-            bNodeSocketValueString *value = (bNodeSocketValueString *)socket.default_value;
-            return IDP_NewString(
-                value->value, name, BLI_strnlen(value->value, sizeof(value->value)) + 1);
-          },
-          nullptr,
-          nullptr,
-          [](const bNodeSocket &socket, const char *name) {
-            bNodeSocketValueString *value = (bNodeSocketValueString *)socket.default_value;
-            return IDP_NewString(
-                value->value, name, BLI_strnlen(value->value, sizeof(value->value)) + 1);
-          },
-          nullptr,
-          [](const IDProperty &property) { return property.type == IDP_STRING; },
-          [](const IDProperty &property, void *r_value) {
-            new (r_value) std::string(IDP_String(&property));
-          },
-      };
-      return &string_type;
+      bNodeSocketValueString *value = (bNodeSocketValueString *)socket.default_value;
+      IDProperty *property = IDP_NewString(
+          value->value, socket.identifier, BLI_strnlen(value->value, sizeof(value->value)) + 1);
+      IDPropertyUIDataString *ui_data = (IDPropertyUIDataString *)IDP_ui_data_ensure(property);
+      ui_data->default_value = BLI_strdup(value->value);
+      return property;
     }
     case SOCK_OBJECT: {
-      static const SocketPropertyType object_type = {
-          [](const bNodeSocket &socket, const char *name) {
-            bNodeSocketValueObject *value = (bNodeSocketValueObject *)socket.default_value;
-            IDPropertyTemplate idprop = {0};
-            idprop.id = (ID *)value->value;
-            return IDP_New(IDP_ID, &idprop, name);
-          },
-          nullptr,
-          nullptr,
-          nullptr,
-          nullptr,
-          [](const IDProperty &property) { return property.type == IDP_ID; },
-          [](const IDProperty &property, void *r_value) {
-            ID *id = IDP_Id(&property);
-            Object *object = (id && GS(id->name) == ID_OB) ? (Object *)id : nullptr;
-            *(Object **)r_value = object;
-          },
-      };
-      return &object_type;
+      bNodeSocketValueObject *value = (bNodeSocketValueObject *)socket.default_value;
+      IDPropertyTemplate idprop = {0};
+      idprop.id = (ID *)value->value;
+      return IDP_New(IDP_ID, &idprop, socket.identifier);
     }
     case SOCK_COLLECTION: {
-      static const SocketPropertyType collection_type = {
-          [](const bNodeSocket &socket, const char *name) {
-            bNodeSocketValueCollection *value = (bNodeSocketValueCollection *)socket.default_value;
-            IDPropertyTemplate idprop = {0};
-            idprop.id = (ID *)value->value;
-            return IDP_New(IDP_ID, &idprop, name);
-          },
-          nullptr,
-          nullptr,
-          nullptr,
-          nullptr,
-          [](const IDProperty &property) { return property.type == IDP_ID; },
-          [](const IDProperty &property, void *r_value) {
-            ID *id = IDP_Id(&property);
-            Collection *collection = (id && GS(id->name) == ID_GR) ? (Collection *)id : nullptr;
-            *(Collection **)r_value = collection;
-          },
-      };
-      return &collection_type;
+      bNodeSocketValueCollection *value = (bNodeSocketValueCollection *)socket.default_value;
+      IDPropertyTemplate idprop = {0};
+      idprop.id = (ID *)value->value;
+      return IDP_New(IDP_ID, &idprop, socket.identifier);
     }
     case SOCK_TEXTURE: {
-      static const SocketPropertyType texture_type = {
-          [](const bNodeSocket &socket, const char *name) {
-            bNodeSocketValueTexture *value = (bNodeSocketValueTexture *)socket.default_value;
-            IDPropertyTemplate idprop = {0};
-            idprop.id = (ID *)value->value;
-            return IDP_New(IDP_ID, &idprop, name);
-          },
-          nullptr,
-          nullptr,
-          nullptr,
-          nullptr,
-          [](const IDProperty &property) { return property.type == IDP_ID; },
-          [](const IDProperty &property, void *r_value) {
-            ID *id = IDP_Id(&property);
-            Tex *texture = (id && GS(id->name) == ID_TE) ? (Tex *)id : nullptr;
-            *(Tex **)r_value = texture;
-          },
-      };
-      return &texture_type;
+      bNodeSocketValueTexture *value = (bNodeSocketValueTexture *)socket.default_value;
+      IDPropertyTemplate idprop = {0};
+      idprop.id = (ID *)value->value;
+      return IDP_New(IDP_ID, &idprop, socket.identifier);
     }
     case SOCK_MATERIAL: {
-      static const SocketPropertyType material_type = {
-          [](const bNodeSocket &socket, const char *name) {
-            bNodeSocketValueMaterial *value = (bNodeSocketValueMaterial *)socket.default_value;
-            IDPropertyTemplate idprop = {0};
-            idprop.id = (ID *)value->value;
-            return IDP_New(IDP_ID, &idprop, name);
-          },
-          nullptr,
-          nullptr,
-          nullptr,
-          nullptr,
-          [](const IDProperty &property) { return property.type == IDP_ID; },
-          [](const IDProperty &property, void *r_value) {
-            ID *id = IDP_Id(&property);
-            Material *material = (id && GS(id->name) == ID_MA) ? (Material *)id : nullptr;
-            *(Material **)r_value = material;
-          },
-      };
-      return &material_type;
+      bNodeSocketValueMaterial *value = (bNodeSocketValueMaterial *)socket.default_value;
+      IDPropertyTemplate idprop = {0};
+      idprop.id = (ID *)value->value;
+      return IDP_New(IDP_ID, &idprop, socket.identifier);
+    }
+  }
+  return nullptr;
+}
+
+static bool id_property_type_matches_socket(const bNodeSocket &socket, const IDProperty &property)
+{
+  switch (socket.type) {
+    case SOCK_FLOAT:
+      return ELEM(property.type, IDP_FLOAT, IDP_DOUBLE);
+    case SOCK_INT:
+      return property.type == IDP_INT;
+    case SOCK_VECTOR:
+      return property.type == IDP_ARRAY && property.subtype == IDP_FLOAT && property.len == 3;
+    case SOCK_RGBA:
+      return property.type == IDP_ARRAY && property.subtype == IDP_FLOAT && property.len == 4;
+    case SOCK_BOOLEAN:
+      return property.type == IDP_INT;
+    case SOCK_STRING:
+      return property.type == IDP_STRING;
+    case SOCK_OBJECT:
+    case SOCK_COLLECTION:
+    case SOCK_TEXTURE:
+    case SOCK_MATERIAL:
+      return property.type == IDP_ID;
+  }
+  BLI_assert_unreachable();
+  return false;
+}
+
+static void init_socket_cpp_value_from_property(const IDProperty &property,
+                                                const eNodeSocketDatatype socket_value_type,
+                                                void *r_value)
+{
+  switch (socket_value_type) {
+    case SOCK_FLOAT: {
+      float value = 0.0f;
+      if (property.type == IDP_FLOAT) {
+        value = IDP_Float(&property);
+      }
+      else if (property.type == IDP_DOUBLE) {
+        value = (float)IDP_Double(&property);
+      }
+      new (r_value) blender::fn::Field<float>(blender::fn::make_constant_field(value));
+      break;
+    }
+    case SOCK_INT: {
+      int value = IDP_Int(&property);
+      new (r_value) blender::fn::Field<int>(blender::fn::make_constant_field(value));
+      break;
+    }
+    case SOCK_VECTOR: {
+      float3 value;
+      copy_v3_v3(value, (const float *)IDP_Array(&property));
+      new (r_value) blender::fn::Field<float3>(blender::fn::make_constant_field(value));
+      break;
+    }
+    case SOCK_RGBA: {
+      blender::ColorGeometry4f value;
+      copy_v4_v4((float *)value, (const float *)IDP_Array(&property));
+      new (r_value) blender::fn::Field<ColorGeometry4f>(blender::fn::make_constant_field(value));
+      break;
+    }
+    case SOCK_BOOLEAN: {
+      bool value = IDP_Int(&property) != 0;
+      new (r_value) blender::fn::Field<bool>(blender::fn::make_constant_field(value));
+      break;
+    }
+    case SOCK_STRING: {
+      std::string value = IDP_String(&property);
+      new (r_value)
+          blender::fn::Field<std::string>(blender::fn::make_constant_field(std::move(value)));
+      break;
+    }
+    case SOCK_OBJECT: {
+      ID *id = IDP_Id(&property);
+      Object *object = (id && GS(id->name) == ID_OB) ? (Object *)id : nullptr;
+      *(Object **)r_value = object;
+      break;
+    }
+    case SOCK_COLLECTION: {
+      ID *id = IDP_Id(&property);
+      Collection *collection = (id && GS(id->name) == ID_GR) ? (Collection *)id : nullptr;
+      *(Collection **)r_value = collection;
+      break;
+    }
+    case SOCK_TEXTURE: {
+      ID *id = IDP_Id(&property);
+      Tex *texture = (id && GS(id->name) == ID_TE) ? (Tex *)id : nullptr;
+      *(Tex **)r_value = texture;
+      break;
+    }
+    case SOCK_MATERIAL: {
+      ID *id = IDP_Id(&property);
+      Material *material = (id && GS(id->name) == ID_MA) ? (Material *)id : nullptr;
+      *(Material **)r_value = material;
+      break;
     }
     default: {
-      return nullptr;
+      BLI_assert_unreachable();
+      break;
     }
   }
 }
@@ -646,32 +542,95 @@ void MOD_nodes_update_interface(Object *object, NodesModifierData *nmd)
   }
 
   IDProperty *old_properties = nmd->settings.properties;
-
   {
     IDPropertyTemplate idprop = {0};
     nmd->settings.properties = IDP_New(IDP_GROUP, &idprop, "Nodes Modifier Settings");
   }
 
-  IDProperty *ui_container_group;
-  {
-    IDPropertyTemplate idprop = {0};
-    ui_container_group = IDP_New(IDP_GROUP, &idprop, "_RNA_UI");
-    IDP_AddToGroup(nmd->settings.properties, ui_container_group);
-  }
-
-  LISTBASE_FOREACH (bNodeSocket *, socket, &nmd->node_group->inputs) {
-    const SocketPropertyType *property_type = get_socket_property_type(*socket);
-    if (property_type == nullptr) {
+  int socket_index;
+  LISTBASE_FOREACH_INDEX (bNodeSocket *, socket, &nmd->node_group->inputs, socket_index) {
+    IDProperty *new_prop = id_property_create_from_socket(*socket);
+    if (new_prop == nullptr) {
+      /* Out of the set of supported input sockets, only
+       * geometry sockets aren't added to the modifier. */
+      BLI_assert(socket->type == SOCK_GEOMETRY);
       continue;
     }
 
-    IDProperty *new_prop = socket_add_property(
-        nmd->settings.properties, ui_container_group, *property_type, *socket);
+    new_prop->flag |= IDP_FLAG_OVERRIDABLE_LIBRARY;
+    if (socket->description[0] != '\0') {
+      IDPropertyUIData *ui_data = IDP_ui_data_ensure(new_prop);
+      ui_data->description = BLI_strdup(socket->description);
+    }
+    IDP_AddToGroup(nmd->settings.properties, new_prop);
 
     if (old_properties != nullptr) {
       IDProperty *old_prop = IDP_GetPropertyFromGroup(old_properties, socket->identifier);
-      if (old_prop != nullptr && property_type->is_correct_type(*old_prop)) {
+      if (old_prop != nullptr && id_property_type_matches_socket(*socket, *old_prop)) {
+        /* #IDP_CopyPropertyContent replaces the UI data as well, which we don't (we only
+         * want to replace the values). So release it temporarily and replace it after. */
+        IDPropertyUIData *ui_data = new_prop->ui_data;
+        new_prop->ui_data = nullptr;
         IDP_CopyPropertyContent(new_prop, old_prop);
+        if (new_prop->ui_data != nullptr) {
+          IDP_ui_data_free(new_prop);
+        }
+        new_prop->ui_data = ui_data;
+      }
+    }
+
+    if (input_has_attribute_toggle(*nmd->node_group, socket_index)) {
+      const std::string use_attribute_id = socket->identifier + use_attribute_suffix;
+      const std::string attribute_name_id = socket->identifier + attribute_name_suffix;
+
+      IDPropertyTemplate idprop = {0};
+      IDProperty *use_attribute_prop = IDP_New(IDP_INT, &idprop, use_attribute_id.c_str());
+      IDP_AddToGroup(nmd->settings.properties, use_attribute_prop);
+
+      IDProperty *attribute_prop = IDP_New(IDP_STRING, &idprop, attribute_name_id.c_str());
+      IDP_AddToGroup(nmd->settings.properties, attribute_prop);
+
+      if (old_properties != nullptr) {
+        IDProperty *old_prop_use_attribute = IDP_GetPropertyFromGroup(old_properties,
+                                                                      use_attribute_id.c_str());
+        if (old_prop_use_attribute != nullptr) {
+          IDP_CopyPropertyContent(use_attribute_prop, old_prop_use_attribute);
+        }
+
+        IDProperty *old_attribute_name_prop = IDP_GetPropertyFromGroup(old_properties,
+                                                                       attribute_name_id.c_str());
+        if (old_attribute_name_prop != nullptr) {
+          IDP_CopyPropertyContent(attribute_prop, old_attribute_name_prop);
+        }
+      }
+    }
+  }
+
+  LISTBASE_FOREACH (bNodeSocket *, socket, &nmd->node_group->outputs) {
+    if (!socket_type_has_attribute_toggle(*socket)) {
+      continue;
+    }
+
+    const std::string idprop_name = socket->identifier + attribute_name_suffix;
+    IDProperty *new_prop = IDP_NewString("", idprop_name.c_str(), MAX_NAME);
+    if (socket->description[0] != '\0') {
+      IDPropertyUIData *ui_data = IDP_ui_data_ensure(new_prop);
+      ui_data->description = BLI_strdup(socket->description);
+    }
+    IDP_AddToGroup(nmd->settings.properties, new_prop);
+
+    if (old_properties != nullptr) {
+      IDProperty *old_prop = IDP_GetPropertyFromGroup(old_properties, idprop_name.c_str());
+      if (old_prop != nullptr) {
+        /* #IDP_CopyPropertyContent replaces the UI data as well, which we don't (we only
+         * want to replace the values). So release it temporarily and replace it after. */
+        IDPropertyUIData *ui_data = new_prop->ui_data;
+        new_prop->ui_data = nullptr;
+        IDP_CopyPropertyContent(new_prop, old_prop);
+        if (new_prop->ui_data != nullptr) {
+          IDP_ui_data_free(new_prop);
+        }
+        new_prop->ui_data = ui_data;
       }
     }
   }
@@ -711,30 +670,53 @@ void MOD_nodes_init(Main *bmain, NodesModifierData *nmd)
 }
 
 static void initialize_group_input(NodesModifierData &nmd,
-                                   const bNodeSocket &socket,
-                                   const CPPType &cpp_type,
+                                   const OutputSocketRef &socket,
                                    void *r_value)
 {
-  const SocketPropertyType *property_type = get_socket_property_type(socket);
-  if (property_type == nullptr) {
-    cpp_type.copy_construct(cpp_type.default_value(), r_value);
-    return;
-  }
+  const bNodeSocketType &socket_type = *socket.typeinfo();
+  const bNodeSocket &bsocket = *socket.bsocket();
   if (nmd.settings.properties == nullptr) {
-    blender::nodes::socket_cpp_value_get(socket, r_value);
+    socket_type.get_geometry_nodes_cpp_value(bsocket, r_value);
     return;
   }
   const IDProperty *property = IDP_GetPropertyFromGroup(nmd.settings.properties,
-                                                        socket.identifier);
+                                                        socket.identifier().c_str());
   if (property == nullptr) {
-    blender::nodes::socket_cpp_value_get(socket, r_value);
+    socket_type.get_geometry_nodes_cpp_value(bsocket, r_value);
     return;
   }
-  if (!property_type->is_correct_type(*property)) {
-    blender::nodes::socket_cpp_value_get(socket, r_value);
+  if (!id_property_type_matches_socket(bsocket, *property)) {
+    socket_type.get_geometry_nodes_cpp_value(bsocket, r_value);
     return;
   }
-  property_type->init_cpp_value(*property, r_value);
+
+  if (!input_has_attribute_toggle(*nmd.node_group, socket.index())) {
+    init_socket_cpp_value_from_property(
+        *property, static_cast<eNodeSocketDatatype>(bsocket.type), r_value);
+    return;
+  }
+
+  const IDProperty *property_use_attribute = IDP_GetPropertyFromGroup(
+      nmd.settings.properties, (socket.identifier() + use_attribute_suffix).c_str());
+  const IDProperty *property_attribute_name = IDP_GetPropertyFromGroup(
+      nmd.settings.properties, (socket.identifier() + attribute_name_suffix).c_str());
+  if (property_use_attribute == nullptr || property_attribute_name == nullptr) {
+    init_socket_cpp_value_from_property(
+        *property, static_cast<eNodeSocketDatatype>(bsocket.type), r_value);
+    return;
+  }
+
+  const bool use_attribute = IDP_Int(property_use_attribute) != 0;
+  if (use_attribute) {
+    const StringRef attribute_name{IDP_String(property_attribute_name)};
+    auto attribute_input = std::make_shared<blender::bke::AttributeFieldInput>(
+        attribute_name, *socket_type.get_base_cpp_type());
+    new (r_value) blender::fn::GField(std::move(attribute_input), 0);
+  }
+  else {
+    init_socket_cpp_value_from_property(
+        *property, static_cast<eNodeSocketDatatype>(bsocket.type), r_value);
+  }
 }
 
 static Vector<SpaceSpreadsheet *> find_spreadsheet_editors(Main *bmain)
@@ -844,21 +826,85 @@ static void clear_runtime_data(NodesModifierData *nmd)
   }
 }
 
+static void store_field_on_geometry_component(GeometryComponent &component,
+                                              const StringRef attribute_name,
+                                              AttributeDomain domain,
+                                              const GField &field)
+{
+  /* If the attribute name corresponds to a built-in attribute, use the domain of the built-in
+   * attribute instead. */
+  if (component.attribute_is_builtin(attribute_name)) {
+    component.attribute_try_create_builtin(attribute_name, AttributeInitDefault());
+    std::optional<AttributeMetaData> meta_data = component.attribute_get_meta_data(attribute_name);
+    if (meta_data.has_value()) {
+      domain = meta_data->domain;
+    }
+    else {
+      return;
+    }
+  }
+  const CustomDataType data_type = blender::bke::cpp_type_to_custom_data_type(field.cpp_type());
+  OutputAttribute attribute = component.attribute_try_get_for_output_only(
+      attribute_name, domain, data_type);
+  if (attribute) {
+    /* In the future we could also evaluate all output fields at once. */
+    const int domain_size = component.attribute_domain_size(domain);
+    blender::bke::GeometryComponentFieldContext field_context{component, domain};
+    blender::fn::FieldEvaluator field_evaluator{field_context, domain_size};
+    field_evaluator.add_with_destination(field, attribute.varray());
+    field_evaluator.evaluate();
+    attribute.save();
+  }
+}
+
+static void store_output_value_in_geometry(GeometrySet &geometry_set,
+                                           NodesModifierData *nmd,
+                                           const InputSocketRef &socket,
+                                           const GPointer value)
+{
+  if (!socket_type_has_attribute_toggle(*socket.bsocket())) {
+    return;
+  }
+  const std::string prop_name = socket.identifier() + attribute_name_suffix;
+  const IDProperty *prop = IDP_GetPropertyFromGroup(nmd->settings.properties, prop_name.c_str());
+  if (prop == nullptr) {
+    return;
+  }
+  const StringRefNull attribute_name = IDP_String(prop);
+  if (attribute_name.is_empty()) {
+    return;
+  }
+  const GField &field = *(const GField *)value.get();
+  const bNodeSocket *interface_socket = (bNodeSocket *)BLI_findlink(&nmd->node_group->outputs,
+                                                                    socket.index());
+  const AttributeDomain domain = (AttributeDomain)interface_socket->attribute_domain;
+  if (geometry_set.has_mesh()) {
+    MeshComponent &component = geometry_set.get_component_for_write<MeshComponent>();
+    store_field_on_geometry_component(component, attribute_name, domain, field);
+  }
+  if (geometry_set.has_pointcloud()) {
+    PointCloudComponent &component = geometry_set.get_component_for_write<PointCloudComponent>();
+    store_field_on_geometry_component(component, attribute_name, domain, field);
+  }
+  if (geometry_set.has_curve()) {
+    CurveComponent &component = geometry_set.get_component_for_write<CurveComponent>();
+    store_field_on_geometry_component(component, attribute_name, domain, field);
+  }
+}
+
 /**
  * Evaluate a node group to compute the output geometry.
- * Currently, this uses a fairly basic and inefficient algorithm that might compute things more
- * often than necessary. It's going to be replaced soon.
  */
 static GeometrySet compute_geometry(const DerivedNodeTree &tree,
                                     Span<const NodeRef *> group_input_nodes,
-                                    const InputSocketRef &socket_to_compute,
+                                    const NodeRef &output_node,
                                     GeometrySet input_geometry_set,
                                     NodesModifierData *nmd,
                                     const ModifierEvalContext *ctx)
 {
   blender::ResourceScope scope;
   blender::LinearAllocator<> &allocator = scope.linear_allocator();
-  blender::nodes::MultiFunctionByNode mf_by_node = get_multi_function_per_node(tree, scope);
+  blender::nodes::NodeMultiFunctions mf_by_node{tree, scope};
 
   Map<DOutputSocket, GMutablePointer> group_inputs;
 
@@ -883,9 +929,9 @@ static GeometrySet compute_geometry(const DerivedNodeTree &tree,
 
     /* Initialize remaining group inputs. */
     for (const OutputSocketRef *socket : remaining_input_sockets) {
-      const CPPType &cpp_type = *blender::nodes::socket_cpp_type_get(*socket->typeinfo());
+      const CPPType &cpp_type = *socket->typeinfo()->get_geometry_nodes_cpp_type();
       void *value_in = allocator.allocate(cpp_type.size(), cpp_type.alignment());
-      initialize_group_input(*nmd, *socket->bsocket(), cpp_type, value_in);
+      initialize_group_input(*nmd, *socket, value_in);
       group_inputs.add_new({root_context, socket}, {cpp_type, value_in});
     }
   }
@@ -894,7 +940,9 @@ static GeometrySet compute_geometry(const DerivedNodeTree &tree,
   input_geometry_set.clear();
 
   Vector<DInputSocket> group_outputs;
-  group_outputs.append({root_context, &socket_to_compute});
+  for (const InputSocketRef *socket_ref : output_node.inputs().drop_back(1)) {
+    group_outputs.append({root_context, socket_ref});
+  }
 
   std::optional<geo_log::GeoLogger> geo_logger;
 
@@ -922,9 +970,15 @@ static GeometrySet compute_geometry(const DerivedNodeTree &tree,
     nmd_orig->runtime_eval_log = new geo_log::ModifierLog(*geo_logger);
   }
 
-  BLI_assert(eval_params.r_output_values.size() == 1);
-  GMutablePointer result = eval_params.r_output_values[0];
-  return result.relocate_out<GeometrySet>();
+  GeometrySet output_geometry_set = eval_params.r_output_values[0].relocate_out<GeometrySet>();
+
+  for (const InputSocketRef *socket : output_node.inputs().drop_front(1).drop_back(1)) {
+    GMutablePointer socket_value = eval_params.r_output_values[socket->index()];
+    store_output_value_in_geometry(output_geometry_set, nmd, *socket, socket_value);
+    socket_value.destruct();
+  }
+
+  return output_geometry_set;
 }
 
 /**
@@ -953,8 +1007,7 @@ static void check_property_socket_sync(const Object *ob, ModifierData *md)
       continue;
     }
 
-    const SocketPropertyType *property_type = get_socket_property_type(*socket);
-    if (!property_type->is_correct_type(*property)) {
+    if (!id_property_type_matches_socket(*socket, *property)) {
       BKE_modifier_set_error(
           ob, md, "Property type does not match input socket \"(%s)\"", socket->name);
       continue;
@@ -995,24 +1048,23 @@ static void modifyGeometry(ModifierData *md,
   const NodeTreeRef &root_tree_ref = tree.root_context().tree();
   Span<const NodeRef *> input_nodes = root_tree_ref.nodes_by_type("NodeGroupInput");
   Span<const NodeRef *> output_nodes = root_tree_ref.nodes_by_type("NodeGroupOutput");
-
   if (output_nodes.size() != 1) {
     return;
   }
 
-  Span<const InputSocketRef *> group_outputs = output_nodes[0]->inputs().drop_back(1);
-
-  if (group_outputs.size() == 0) {
+  const NodeRef &output_node = *output_nodes[0];
+  Span<const InputSocketRef *> group_outputs = output_node.inputs().drop_back(1);
+  if (group_outputs.is_empty()) {
     return;
   }
 
-  const InputSocketRef *group_output = group_outputs[0];
-  if (group_output->idname() != "NodeSocketGeometry") {
+  const InputSocketRef *first_output_socket = group_outputs[0];
+  if (first_output_socket->idname() != "NodeSocketGeometry") {
     return;
   }
 
   geometry_set = compute_geometry(
-      tree, input_nodes, *group_outputs[0], std::move(geometry_set), nmd, ctx);
+      tree, input_nodes, output_node, std::move(geometry_set), nmd, ctx);
 }
 
 static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *mesh)
@@ -1045,22 +1097,18 @@ static void modifyGeometrySet(ModifierData *md,
  * the node socket identifier for the property names, since they are unique, but also having
  * the correct label displayed in the UI. */
 static void draw_property_for_socket(uiLayout *layout,
+                                     NodesModifierData *nmd,
                                      PointerRNA *bmain_ptr,
                                      PointerRNA *md_ptr,
-                                     const IDProperty *modifier_props,
-                                     const bNodeSocket &socket)
+                                     const bNodeSocket &socket,
+                                     const int socket_index)
 {
-  const SocketPropertyType *property_type = get_socket_property_type(socket);
-  if (property_type == nullptr) {
-    return;
-  }
-
   /* The property should be created in #MOD_nodes_update_interface with the correct type. */
-  IDProperty *property = IDP_GetPropertyFromGroup(modifier_props, socket.identifier);
+  IDProperty *property = IDP_GetPropertyFromGroup(nmd->settings.properties, socket.identifier);
 
   /* IDProperties can be removed with python, so there could be a situation where
    * there isn't a property for a socket or it doesn't have the correct type. */
-  if (property == nullptr || !property_type->is_correct_type(*property)) {
+  if (property == nullptr || !id_property_type_matches_socket(socket, *property)) {
     return;
   }
 
@@ -1097,9 +1145,50 @@ static void draw_property_for_socket(uiLayout *layout,
       uiItemPointerR(layout, md_ptr, rna_path, bmain_ptr, "textures", socket.name, ICON_TEXTURE);
       break;
     }
-    default:
-      uiItemR(layout, md_ptr, rna_path, 0, socket.name, ICON_NONE);
+    default: {
+      if (input_has_attribute_toggle(*nmd->node_group, socket_index)) {
+        const std::string rna_path_use_attribute = "[\"" + std::string(socket_id_esc) +
+                                                   use_attribute_suffix + "\"]";
+        const std::string rna_path_attribute_name = "[\"" + std::string(socket_id_esc) +
+                                                    attribute_name_suffix + "\"]";
+
+        uiLayout *row = uiLayoutRow(layout, true);
+        const int use_attribute = RNA_int_get(md_ptr, rna_path_use_attribute.c_str()) != 0;
+        if (use_attribute) {
+          uiItemR(row, md_ptr, rna_path_attribute_name.c_str(), 0, socket.name, ICON_NONE);
+        }
+        else {
+          uiItemR(row, md_ptr, rna_path, 0, socket.name, ICON_NONE);
+        }
+        PointerRNA props;
+        uiItemFullO(row,
+                    "object.geometry_nodes_input_attribute_toggle",
+                    "",
+                    ICON_SPREADSHEET,
+                    nullptr,
+                    WM_OP_INVOKE_DEFAULT,
+                    0,
+                    &props);
+        RNA_string_set(&props, "modifier_name", nmd->modifier.name);
+        RNA_string_set(&props, "prop_path", rna_path_use_attribute.c_str());
+      }
+      else {
+        uiItemR(layout, md_ptr, rna_path, 0, socket.name, ICON_NONE);
+      }
+    }
   }
+}
+
+static void draw_property_for_output_socket(uiLayout *layout,
+                                            PointerRNA *md_ptr,
+                                            const bNodeSocket &socket)
+{
+  char socket_id_esc[sizeof(socket.identifier) * 2];
+  BLI_str_escape(socket_id_esc, socket.identifier, sizeof(socket_id_esc));
+  const std::string rna_path_attribute_name = "[\"" + StringRef(socket_id_esc) +
+                                              attribute_name_suffix + "\"]";
+
+  uiItemR(layout, md_ptr, rna_path_attribute_name.c_str(), 0, socket.name, ICON_NONE);
 }
 
 static void panel_draw(const bContext *C, Panel *panel)
@@ -1128,17 +1217,67 @@ static void panel_draw(const bContext *C, Panel *panel)
     PointerRNA bmain_ptr;
     RNA_main_pointer_create(bmain, &bmain_ptr);
 
-    LISTBASE_FOREACH (bNodeSocket *, socket, &nmd->node_group->inputs) {
-      draw_property_for_socket(layout, &bmain_ptr, ptr, nmd->settings.properties, *socket);
+    int socket_index;
+    LISTBASE_FOREACH_INDEX (bNodeSocket *, socket, &nmd->node_group->inputs, socket_index) {
+      draw_property_for_socket(layout, nmd, &bmain_ptr, ptr, *socket, socket_index);
     }
+  }
+
+  /* Draw node warnings. */
+  bool has_legacy_node = false;
+  if (nmd->runtime_eval_log != nullptr) {
+    const geo_log::ModifierLog &log = *static_cast<geo_log::ModifierLog *>(nmd->runtime_eval_log);
+    log.foreach_node_log([&](const geo_log::NodeLog &node_log) {
+      for (const geo_log::NodeWarning &warning : node_log.warnings()) {
+        if (warning.type == geo_log::NodeWarningType::Legacy) {
+          has_legacy_node = true;
+        }
+        else if (warning.type != geo_log::NodeWarningType::Info) {
+          uiItemL(layout, warning.message.c_str(), ICON_ERROR);
+        }
+      }
+    });
+  }
+
+  if (has_legacy_node) {
+    uiLayout *row = uiLayoutRow(layout, false);
+    uiItemL(row, IFACE_("Node tree has legacy node"), ICON_ERROR);
+    uiLayout *sub = uiLayoutRow(row, false);
+    uiLayoutSetAlignment(sub, UI_LAYOUT_ALIGN_RIGHT);
+    uiItemO(sub, "", ICON_VIEWZOOM, "NODE_OT_geometry_node_view_legacy");
   }
 
   modifier_panel_end(layout, ptr);
 }
 
+static void output_attribute_panel_draw(const bContext *UNUSED(C), Panel *panel)
+{
+  uiLayout *layout = panel->layout;
+
+  PointerRNA *ptr = modifier_panel_get_property_pointers(panel, nullptr);
+  NodesModifierData *nmd = static_cast<NodesModifierData *>(ptr->data);
+
+  uiLayoutSetPropSep(layout, true);
+  uiLayoutSetPropDecorate(layout, true);
+
+  if (nmd->node_group != nullptr && nmd->settings.properties != nullptr) {
+    LISTBASE_FOREACH (bNodeSocket *, socket, &nmd->node_group->outputs) {
+      if (socket_type_has_attribute_toggle(*socket)) {
+        draw_property_for_output_socket(layout, ptr, *socket);
+      }
+    }
+  }
+}
+
 static void panelRegister(ARegionType *region_type)
 {
-  modifier_panel_register(region_type, eModifierType_Nodes, panel_draw);
+  PanelType *panel_type = modifier_panel_register(region_type, eModifierType_Nodes, panel_draw);
+  modifier_subpanel_register(region_type,
+                             "output_attributes",
+                             N_("Output Attributes"),
+                             nullptr,
+                             output_attribute_panel_draw,
+                             panel_type);
 }
 
 static void blendWrite(BlendWriter *writer, const ModifierData *md)
@@ -1201,9 +1340,10 @@ ModifierTypeInfo modifierType_Nodes = {
     /* srna */ &RNA_NodesModifier,
     /* type */ eModifierTypeType_Constructive,
     /* flags */
-    static_cast<ModifierTypeFlag>(
-        eModifierTypeFlag_AcceptsMesh | eModifierTypeFlag_SupportsEditmode |
-        eModifierTypeFlag_EnableInEditmode | eModifierTypeFlag_SupportsMapping),
+    static_cast<ModifierTypeFlag>(eModifierTypeFlag_AcceptsMesh | eModifierTypeFlag_AcceptsCVs |
+                                  eModifierTypeFlag_SupportsEditmode |
+                                  eModifierTypeFlag_EnableInEditmode |
+                                  eModifierTypeFlag_SupportsMapping),
     /* icon */ ICON_NODETREE,
 
     /* copyData */ copyData,

@@ -317,7 +317,7 @@ static bool setError(DynamicPaintCanvasSettings *canvas, const char *string)
 static int dynamicPaint_surfaceNumOfPoints(DynamicPaintSurface *surface)
 {
   if (surface->format == MOD_DPAINT_SURFACE_F_PTEX) {
-    return 0; /* not supported atm */
+    return 0; /* Not supported at the moment. */
   }
   if (surface->format == MOD_DPAINT_SURFACE_F_VERTEX) {
     const Mesh *canvas_mesh = dynamicPaint_canvas_mesh_get(surface->canvas);
@@ -844,10 +844,7 @@ static void surfaceGenerateGrid(struct DynamicPaintSurface *surface)
     if (temp_s_num) {
       MEM_freeN(temp_s_num);
     }
-    if (temp_t_index) {
-      MEM_freeN(temp_t_index);
-    }
-    grid->temp_t_index = NULL;
+    MEM_SAFE_FREE(temp_t_index);
 
     if (error || !grid->s_num) {
       setError(surface->canvas, N_("Not enough free memory"));
@@ -988,10 +985,7 @@ void dynamicPaint_freeSurface(const DynamicPaintModifierData *pmd, DynamicPaintS
   }
   surface->pointcache = NULL;
 
-  if (surface->effector_weights) {
-    MEM_freeN(surface->effector_weights);
-  }
-  surface->effector_weights = NULL;
+  MEM_SAFE_FREE(surface->effector_weights);
 
   BLI_remlink(&(surface->canvas->surfaces), surface);
   dynamicPaint_freeSurfaceData(surface);
@@ -1237,7 +1231,7 @@ void dynamicPaint_Modifier_copy(const struct DynamicPaintModifierData *pmd,
     /* copy existing surfaces */
     for (surface = pmd->canvas->surfaces.first; surface; surface = surface->next) {
       DynamicPaintSurface *t_surface = dynamicPaint_createNewSurface(tpmd->canvas, NULL);
-      if (flag & LIB_ID_CREATE_NO_MAIN) {
+      if (flag & LIB_ID_COPY_SET_COPIED_ON_WRITE) {
         /* TODO(sergey): Consider passing some tips to the surface
          * creation to avoid this allocate-and-free cache behavior. */
         BKE_ptcache_free_list(&t_surface->ptcaches);
@@ -2070,7 +2064,7 @@ static Mesh *dynamicPaint_Modifier_apply(DynamicPaintModifierData *pmd, Object *
     }
 
     if (update_normals) {
-      result->runtime.cd_dirty_vert |= CD_MASK_NORMAL;
+      BKE_mesh_normals_tag_dirty(result);
     }
   }
   /* make a copy of mesh to use as brush data */
@@ -3984,7 +3978,7 @@ static void dynamic_paint_paint_mesh_cell_point_cb_ex(
     total_sample = gaussianTotal;
   }
 
-  /* Supersampling */
+  /* Super-sampling */
   for (ss = 0; ss < samples; ss++) {
     float ray_start[3], ray_dir[3];
     float sample_factor = 0.0f;
@@ -4005,7 +3999,7 @@ static void dynamic_paint_paint_mesh_cell_point_cb_ex(
     float hitCoord[3];
     int hitTri = -1;
 
-    /* Supersampling factor */
+    /* Super-sampling factor. */
     if (samples > 1 && surface->format == MOD_DPAINT_SURFACE_F_IMAGESEQ) {
       sample_factor = gaussianFactors[ss];
     }
@@ -4246,25 +4240,25 @@ static void dynamic_paint_paint_mesh_cell_point_cb_ex(
       numOfHits++;
     }
 
-    /* apply sample strength */
+    /* Apply sample strength. */
     brushStrength += sampleStrength;
-  }  // end supersampling
+  } /* End super-sampling. */
 
-  /* if any sample was inside paint range */
+  /* If any sample was inside paint range. */
   if (brushStrength > 0.0f || depth > 0.0f) {
-    /* apply supersampling results */
+    /* Apply super-sampling results. */
     if (samples > 1) {
       brushStrength /= total_sample;
     }
     CLAMP(brushStrength, 0.0f, 1.0f);
 
     if (surface->type == MOD_DPAINT_SURFACE_T_PAINT) {
-      /* Get final pixel color and alpha */
+      /* Get final pixel color and alpha. */
       paintColor[0] /= numOfHits;
       paintColor[1] /= numOfHits;
       paintColor[2] /= numOfHits;
     }
-    /* get final object space depth */
+    /* Get final object space depth. */
     else if (ELEM(surface->type, MOD_DPAINT_SURFACE_T_DISPLACE, MOD_DPAINT_SURFACE_T_WAVE)) {
       depth /= bData->bNormal[index].normal_scale * total_sample;
     }

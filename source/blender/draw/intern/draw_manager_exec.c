@@ -283,11 +283,11 @@ void DRW_state_reset_ex(DRWState state)
 static void drw_state_validate(void)
 {
   /* Cannot write to stencil buffer without stencil test. */
-  if ((DST.state & DRW_STATE_WRITE_STENCIL_ENABLED)) {
+  if (DST.state & DRW_STATE_WRITE_STENCIL_ENABLED) {
     BLI_assert(DST.state & DRW_STATE_STENCIL_TEST_ENABLED);
   }
   /* Cannot write to depth buffer without depth test. */
-  if ((DST.state & DRW_STATE_WRITE_DEPTH)) {
+  if (DST.state & DRW_STATE_WRITE_DEPTH) {
     BLI_assert(DST.state & DRW_STATE_DEPTH_TEST_ENABLED);
   }
 }
@@ -365,6 +365,11 @@ static bool draw_call_is_culled(const DRWResourceHandle *handle, DRWView *view)
 void DRW_view_set_active(DRWView *view)
 {
   DST.view_active = (view) ? view : DST.view_default;
+}
+
+const DRWView *DRW_view_get_active(void)
+{
+  return DST.view_active;
 }
 
 /* Return True if the given BoundSphere intersect the current view frustum */

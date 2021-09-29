@@ -24,19 +24,15 @@
 
 #include "BKE_material.h"
 
-static bNodeSocketTemplate geo_node_material_replace_in[] = {
-    {SOCK_GEOMETRY, N_("Geometry")},
-    {SOCK_MATERIAL, N_("Old")},
-    {SOCK_MATERIAL, N_("New")},
-    {-1, ""},
-};
-
-static bNodeSocketTemplate geo_node_material_replace_out[] = {
-    {SOCK_GEOMETRY, N_("Geometry")},
-    {-1, ""},
-};
-
 namespace blender::nodes {
+
+static void geo_node_material_replace_declare(NodeDeclarationBuilder &b)
+{
+  b.add_input<decl::Geometry>("Geometry");
+  b.add_input<decl::Material>("Old");
+  b.add_input<decl::Material>("New");
+  b.add_output<decl::Geometry>("Geometry");
+}
 
 static void geo_node_material_replace_exec(GeoNodeExecParams params)
 {
@@ -44,11 +40,9 @@ static void geo_node_material_replace_exec(GeoNodeExecParams params)
   Material *new_material = params.extract_input<Material *>("New");
 
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
-  geometry_set = geometry_set_realize_instances(geometry_set);
 
-  if (geometry_set.has<MeshComponent>()) {
-    MeshComponent &mesh_component = geometry_set.get_component_for_write<MeshComponent>();
-    Mesh *mesh = mesh_component.get_for_write();
+  geometry_set.modify_geometry_sets([&](GeometrySet &geometry_set) {
+    Mesh *mesh = geometry_set.get_mesh_for_write();
     if (mesh != nullptr) {
       for (const int i : IndexRange(mesh->totcol)) {
         if (mesh->mat[i] == old_material) {
@@ -56,7 +50,7 @@ static void geo_node_material_replace_exec(GeoNodeExecParams params)
         }
       }
     }
-  }
+  });
 
   params.set_output("Geometry", std::move(geometry_set));
 }
@@ -69,7 +63,7 @@ void register_node_type_geo_material_replace()
 
   geo_node_type_base(
       &ntype, GEO_NODE_MATERIAL_REPLACE, "Material Replace", NODE_CLASS_GEOMETRY, 0);
-  node_type_socket_templates(&ntype, geo_node_material_replace_in, geo_node_material_replace_out);
+  ntype.declare = blender::nodes::geo_node_material_replace_declare;
   ntype.geometry_node_execute = blender::nodes::geo_node_material_replace_exec;
   nodeRegisterType(&ntype);
 }

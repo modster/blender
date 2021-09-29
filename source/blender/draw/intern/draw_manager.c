@@ -149,7 +149,7 @@ static bool drw_draw_show_annotation(void)
        * the draw manager is only used to draw the background. */
       return false;
     default:
-      BLI_assert("");
+      BLI_assert(0);
       return false;
   }
 }
@@ -314,90 +314,6 @@ struct DupliObject *DRW_object_get_dupli(const Object *UNUSED(ob))
 /** \} */
 
 /* -------------------------------------------------------------------- */
-/** \name Color Management
- * \{ */
-
-/* TODO(fclem): This should be a render engine callback to determine if we need CM or not. */
-static void drw_viewport_colormanagement_set(void)
-{
-  Scene *scene = DST.draw_ctx.scene;
-  View3D *v3d = DST.draw_ctx.v3d;
-
-  ColorManagedDisplaySettings *display_settings = &scene->display_settings;
-  ColorManagedViewSettings view_settings;
-  float dither = 0.0f;
-
-  bool use_render_settings = false;
-  bool use_view_transform = false;
-
-  if (v3d) {
-    bool use_workbench = BKE_scene_uses_blender_workbench(scene);
-
-    bool use_scene_lights = (!v3d ||
-                             ((v3d->shading.type == OB_MATERIAL) &&
-                              (v3d->shading.flag & V3D_SHADING_SCENE_LIGHTS)) ||
-                             ((v3d->shading.type == OB_RENDER) &&
-                              (v3d->shading.flag & V3D_SHADING_SCENE_LIGHTS_RENDER)));
-    bool use_scene_world = (!v3d ||
-                            ((v3d->shading.type == OB_MATERIAL) &&
-                             (v3d->shading.flag & V3D_SHADING_SCENE_WORLD)) ||
-                            ((v3d->shading.type == OB_RENDER) &&
-                             (v3d->shading.flag & V3D_SHADING_SCENE_WORLD_RENDER)));
-    use_view_transform = v3d && (v3d->shading.type >= OB_MATERIAL);
-    use_render_settings = v3d && ((use_workbench && use_view_transform) || use_scene_lights ||
-                                  use_scene_world);
-  }
-  else if (DST.draw_ctx.space_data && DST.draw_ctx.space_data->spacetype == SPACE_IMAGE) {
-    SpaceImage *sima = (SpaceImage *)DST.draw_ctx.space_data;
-    Image *image = sima->image;
-
-    /* Use inverse logic as there isn't a setting for `Color And Alpha`. */
-    const eSpaceImage_Flag display_channels_mode = sima->flag;
-    const bool display_color_channel = (display_channels_mode & (SI_SHOW_ALPHA | SI_SHOW_ZBUF)) ==
-                                       0;
-    if (display_color_channel && image && (image->source != IMA_SRC_GENERATED) &&
-        ((image->flag & IMA_VIEW_AS_RENDER) != 0)) {
-      use_render_settings = true;
-    }
-  }
-  else if (DST.draw_ctx.space_data && DST.draw_ctx.space_data->spacetype == SPACE_NODE) {
-    SpaceNode *snode = (SpaceNode *)DST.draw_ctx.space_data;
-    const eSpaceNode_Flag display_channels_mode = snode->flag;
-    const bool display_color_channel = (display_channels_mode & SNODE_SHOW_ALPHA) == 0;
-    if (display_color_channel) {
-      use_render_settings = true;
-    }
-  }
-  else {
-    use_render_settings = true;
-    use_view_transform = false;
-  }
-
-  if (use_render_settings) {
-    /* Use full render settings, for renders with scene lighting. */
-    view_settings = scene->view_settings;
-    dither = scene->r.dither_intensity;
-  }
-  else if (use_view_transform) {
-    /* Use only view transform + look and nothing else for lookdev without
-     * scene lighting, as exposure depends on scene light intensity. */
-    BKE_color_managed_view_settings_init_render(&view_settings, display_settings, NULL);
-    STRNCPY(view_settings.view_transform, scene->view_settings.view_transform);
-    STRNCPY(view_settings.look, scene->view_settings.look);
-    dither = scene->r.dither_intensity;
-  }
-  else {
-    /* For workbench use only default view transform in configuration,
-     * using no scene settings. */
-    BKE_color_managed_view_settings_init_render(&view_settings, display_settings, NULL);
-  }
-
-  GPU_viewport_colorspace_set(DST.viewport, &view_settings, display_settings, dither);
-}
-
-/** \} */
-
-/* -------------------------------------------------------------------- */
 /** \name Viewport (DRW_viewport)
  * \{ */
 
@@ -452,7 +368,7 @@ static void drw_context_state_init(void)
   if (DST.draw_ctx.object_mode & OB_MODE_POSE) {
     DST.draw_ctx.object_pose = DST.draw_ctx.obact;
   }
-  else if ((DST.draw_ctx.object_mode & OB_MODE_ALL_WEIGHT_PAINT)) {
+  else if (DST.draw_ctx.object_mode & OB_MODE_ALL_WEIGHT_PAINT) {
     DST.draw_ctx.object_pose = BKE_object_pose_armature_get(DST.draw_ctx.obact);
   }
   else {
@@ -771,14 +687,29 @@ void DRW_viewport_request_redraw(void)
 /** \name Duplis
  * \{ */
 
-static void drw_duplidata_load(DupliObject *dupli)
+static uint dupli_key_hash(const void *key)
 {
+  const DupliKey *dupli_key = (const DupliKey *)key;
+  return BLI_ghashutil_ptrhash(dupli_key->ob) ^ BLI_ghashutil_ptrhash(dupli_key->ob_data);
+}
+
+static bool dupli_key_cmp(const void *key1, const void *key2)
+{
+  const DupliKey *dupli_key1 = (const DupliKey *)key1;
+  const DupliKey *dupli_key2 = (const DupliKey *)key2;
+  return dupli_key1->ob != dupli_key2->ob || dupli_key1->ob_data != dupli_key2->ob_data;
+}
+
+static void drw_duplidata_load(Object *ob)
+{
+  DupliObject *dupli = DST.dupli_source;
   if (dupli == NULL) {
     return;
   }
 
-  if (DST.dupli_origin != dupli->ob) {
+  if (DST.dupli_origin != dupli->ob || (DST.dupli_origin_data != dupli->ob_data)) {
     DST.dupli_origin = dupli->ob;
+    DST.dupli_origin_data = dupli->ob_data;
   }
   else {
     /* Same data as previous iter. No need to poll ghash for this. */
@@ -786,16 +717,23 @@ static void drw_duplidata_load(DupliObject *dupli)
   }
 
   if (DST.dupli_ghash == NULL) {
-    DST.dupli_ghash = BLI_ghash_ptr_new(__func__);
+    DST.dupli_ghash = BLI_ghash_new(dupli_key_hash, dupli_key_cmp, __func__);
   }
 
+  DupliKey *key = MEM_callocN(sizeof(DupliKey), __func__);
+  key->ob = dupli->ob;
+  key->ob_data = dupli->ob_data;
+
   void **value;
-  if (!BLI_ghash_ensure_p(DST.dupli_ghash, DST.dupli_origin, &value)) {
+  if (!BLI_ghash_ensure_p(DST.dupli_ghash, key, &value)) {
     *value = MEM_callocN(sizeof(void *) * g_registered_engine_len, __func__);
 
     /* TODO: Meh a bit out of place but this is nice as it is
-     * only done once per "original" object. */
-    drw_batch_cache_validate(DST.dupli_origin);
+     * only done once per instance type. */
+    drw_batch_cache_validate(ob);
+  }
+  else {
+    MEM_freeN(key);
   }
   DST.dupli_datas = *(void ***)value;
 }
@@ -809,12 +747,24 @@ static void duplidata_value_free(void *val)
   MEM_freeN(val);
 }
 
+static void duplidata_key_free(void *key)
+{
+  DupliKey *dupli_key = (DupliKey *)key;
+  if (dupli_key->ob_data == dupli_key->ob->data) {
+    drw_batch_cache_generate_requested(dupli_key->ob);
+  }
+  else {
+    Object temp_object = *dupli_key->ob;
+    BKE_object_replace_data_on_shallow_copy(&temp_object, dupli_key->ob_data);
+    drw_batch_cache_generate_requested(&temp_object);
+  }
+  MEM_freeN(key);
+}
+
 static void drw_duplidata_free(void)
 {
   if (DST.dupli_ghash != NULL) {
-    BLI_ghash_free(DST.dupli_ghash,
-                   (void (*)(void *key))drw_batch_cache_generate_requested,
-                   duplidata_value_free);
+    BLI_ghash_free(DST.dupli_ghash, duplidata_key_free, duplidata_value_free);
     DST.dupli_ghash = NULL;
   }
 }
@@ -1268,6 +1218,18 @@ static void drw_engines_enable_basic(void)
   use_drw_engine(&draw_engine_basic_type);
 }
 
+static void drw_engine_enable_image_editor(void)
+{
+  if (DRW_engine_external_acquire_for_image_editor()) {
+    use_drw_engine(&draw_engine_external_type);
+  }
+  else {
+    use_drw_engine(&draw_engine_image_type);
+  }
+
+  use_drw_engine(&draw_engine_overlay_type);
+}
+
 static void drw_engines_enable_editors(void)
 {
   SpaceLink *space_data = DST.draw_ctx.space_data;
@@ -1276,8 +1238,7 @@ static void drw_engines_enable_editors(void)
   }
 
   if (space_data->spacetype == SPACE_IMAGE) {
-    use_drw_engine(&draw_engine_image_type);
-    use_drw_engine(&draw_engine_overlay_type);
+    drw_engine_enable_image_editor();
   }
   else if (space_data->spacetype == SPACE_NODE) {
     /* Only enable when drawing the space image backdrop. */
@@ -1302,6 +1263,12 @@ static void drw_engines_enable(ViewLayer *UNUSED(view_layer),
     use_drw_engine(&draw_engine_gpencil_type);
   }
   drw_engines_enable_overlays();
+
+#ifdef WITH_DRAW_DEBUG
+  if (G.debug_value == 31) {
+    use_drw_engine(&draw_engine_debug_select_type);
+  }
+#endif
 }
 
 static void drw_engines_disable(void)
@@ -1531,7 +1498,6 @@ void DRW_draw_view(const bContext *C)
                              (v3d->overlay.flag & V3D_OVERLAY_HIDE_TEXT) != 0);
     DST.options.draw_background = (scene->r.alphamode == R_ADDSKY) ||
                                   (v3d->shading.type != OB_RENDER);
-    DST.options.do_color_management = true;
     DRW_draw_render_loop_ex(depsgraph, engine_type, region, v3d, viewport, C);
   }
   else {
@@ -1577,7 +1543,7 @@ void DRW_draw_render_loop_ex(struct Depsgraph *depsgraph,
   drw_context_state_init();
 
   drw_manager_init(&DST, viewport, NULL);
-  drw_viewport_colormanagement_set();
+  drw_viewport_colormanagement_set(viewport);
 
   const int object_type_exclude_viewport = v3d->object_type_exclude_viewport;
   /* Check if scene needs to perform the populate loop */
@@ -1613,6 +1579,7 @@ void DRW_draw_render_loop_ex(struct Depsgraph *depsgraph,
     /* Only iterate over objects for internal engines or when overlays are enabled */
     if (do_populate_loop) {
       DST.dupli_origin = NULL;
+      DST.dupli_origin_data = NULL;
       DEG_OBJECT_ITER_FOR_RENDER_ENGINE_BEGIN (depsgraph, ob) {
         if ((object_type_exclude_viewport & (1 << ob->type)) != 0) {
           continue;
@@ -1622,7 +1589,7 @@ void DRW_draw_render_loop_ex(struct Depsgraph *depsgraph,
         }
         DST.dupli_parent = data_.dupli_parent;
         DST.dupli_source = data_.dupli_object_current;
-        drw_duplidata_load(DST.dupli_source);
+        drw_duplidata_load(ob);
         drw_engines_cache_populate(ob);
       }
       DEG_OBJECT_ITER_FOR_RENDER_ENGINE_END;
@@ -1719,7 +1686,6 @@ void DRW_draw_render_loop_offscreen(struct Depsgraph *depsgraph,
   /* Reset before using it. */
   drw_state_prepare_clean_for_draw(&DST);
   DST.options.is_image_render = is_image_render;
-  DST.options.do_color_management = do_color_management;
   DST.options.draw_background = draw_background;
   DRW_draw_render_loop_ex(depsgraph, engine_type, region, v3d, render_viewport, NULL);
 
@@ -1960,12 +1926,13 @@ void DRW_render_object_iter(
                                                draw_ctx->v3d->object_type_exclude_viewport :
                                                0;
   DST.dupli_origin = NULL;
+  DST.dupli_origin_data = NULL;
   DEG_OBJECT_ITER_FOR_RENDER_ENGINE_BEGIN (depsgraph, ob) {
     if ((object_type_exclude_viewport & (1 << ob->type)) == 0) {
       DST.dupli_parent = data_.dupli_parent;
       DST.dupli_source = data_.dupli_object_current;
       DST.ob_handle = 0;
-      drw_duplidata_load(DST.dupli_source);
+      drw_duplidata_load(ob);
 
       if (!DST.dupli_source) {
         drw_batch_cache_validate(ob);
@@ -2064,7 +2031,7 @@ void DRW_draw_render_loop_2d_ex(struct Depsgraph *depsgraph,
 
   drw_context_state_init();
   drw_manager_init(&DST, viewport, NULL);
-  drw_viewport_colormanagement_set();
+  drw_viewport_colormanagement_set(viewport);
 
   /* TODO(jbakker): Only populate when editor needs to draw object.
    * for the image editor this is when showing UV's. */
@@ -2225,7 +2192,7 @@ static void draw_select_framebuffer_depth_only_setup(const int size[2])
 /* Must run after all instance datas have been added. */
 void DRW_render_instance_buffer_finish(void)
 {
-  BLI_assert(!DST.buffer_finish_called && "DRW_render_instance_buffer_finish called twice!");
+  BLI_assert_msg(!DST.buffer_finish_called, "DRW_render_instance_buffer_finish called twice!");
   DST.buffer_finish_called = true;
   DRW_instance_buffer_finish(DST.vmempool->idatalist);
   drw_resource_buffer_finish(DST.vmempool);
@@ -2248,6 +2215,7 @@ void DRW_draw_select_loop(struct Depsgraph *depsgraph,
                           bool use_obedit_skip,
                           bool draw_surface,
                           bool UNUSED(use_nearest),
+                          const bool do_material_sub_selection,
                           const rcti *rect,
                           DRW_SelectPassFn select_pass_fn,
                           void *select_pass_user_data,
@@ -2326,6 +2294,7 @@ void DRW_draw_select_loop(struct Depsgraph *depsgraph,
   drw_manager_init(&DST, NULL, viewport_size);
 
   DST.options.is_select = true;
+  DST.options.is_material_select = do_material_sub_selection;
   drw_task_graph_init();
   /* Get list of enabled engines */
   if (use_obedit) {
@@ -2377,6 +2346,7 @@ void DRW_draw_select_loop(struct Depsgraph *depsgraph,
                                               v3d->object_type_exclude_select);
       bool filter_exclude = false;
       DST.dupli_origin = NULL;
+      DST.dupli_origin_data = NULL;
       DEG_OBJECT_ITER_FOR_RENDER_ENGINE_BEGIN (depsgraph, ob) {
         if (!BKE_object_is_visible_in_viewport(v3d, ob)) {
           continue;
@@ -2409,7 +2379,7 @@ void DRW_draw_select_loop(struct Depsgraph *depsgraph,
           DRW_select_load_id(ob->runtime.select_id);
           DST.dupli_parent = data_.dupli_parent;
           DST.dupli_source = data_.dupli_object_current;
-          drw_duplidata_load(DST.dupli_source);
+          drw_duplidata_load(ob);
           drw_engines_cache_populate(ob);
         }
       }
@@ -2520,6 +2490,7 @@ static void drw_draw_depth_loop_impl(struct Depsgraph *depsgraph,
 
     const int object_type_exclude_viewport = v3d->object_type_exclude_viewport;
     DST.dupli_origin = NULL;
+    DST.dupli_origin_data = NULL;
     DEG_OBJECT_ITER_FOR_RENDER_ENGINE_BEGIN (DST.draw_ctx.depsgraph, ob) {
       if ((object_type_exclude_viewport & (1 << ob->type)) != 0) {
         continue;
@@ -2529,7 +2500,7 @@ static void drw_draw_depth_loop_impl(struct Depsgraph *depsgraph,
       }
       DST.dupli_parent = data_.dupli_parent;
       DST.dupli_source = data_.dupli_object_current;
-      drw_duplidata_load(DST.dupli_source);
+      drw_duplidata_load(ob);
       drw_engines_cache_populate(ob);
     }
     DEG_OBJECT_ITER_FOR_RENDER_ENGINE_END;
@@ -2651,6 +2622,7 @@ void DRW_draw_select_id(Depsgraph *depsgraph, ARegion *region, View3D *v3d, cons
   drw_manager_init(&DST, viewport, NULL);
 
   /* Update UBO's */
+  UI_SetTheme(SPACE_VIEW3D, RGN_TYPE_WINDOW);
   DRW_globals_update();
 
   /* Init Select Engine */
@@ -2791,6 +2763,11 @@ bool DRW_state_is_select(void)
   return DST.options.is_select;
 }
 
+bool DRW_state_is_material_select(void)
+{
+  return DST.options.is_material_select;
+}
+
 bool DRW_state_is_depth(void)
 {
   return DST.options.is_depth;
@@ -2802,14 +2779,6 @@ bool DRW_state_is_depth(void)
 bool DRW_state_is_image_render(void)
 {
   return DST.options.is_image_render;
-}
-
-/**
- * Whether the view transform should be applied.
- */
-bool DRW_state_do_color_management(void)
-{
-  return DST.options.do_color_management;
 }
 
 /**
@@ -2915,6 +2884,9 @@ void DRW_engines_register(void)
   DRW_engine_register(&draw_engine_overlay_type);
   DRW_engine_register(&draw_engine_select_type);
   DRW_engine_register(&draw_engine_basic_type);
+#ifdef WITH_DRAW_DEBUG
+  DRW_engine_register(&draw_engine_debug_select_type);
+#endif
 
   DRW_engine_register(&draw_engine_image_type);
   DRW_engine_register(DRW_engine_viewport_external_type.draw_engine);
@@ -3201,5 +3173,68 @@ void DRW_draw_state_init_gtests(eGPUShaderConfig sh_cfg)
 }
 
 #endif
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Draw manager context release/activation
+ *
+ * These functions are used in cases when an OpenGL context creation is needed during the draw.
+ * This happens, for example, when an external engine needs to create its own OpenGL context from
+ * the engine initialization.
+ *
+ * Example of context creation:
+ *
+ *   const bool drw_state = DRW_opengl_context_release();
+ *   gl_context = WM_opengl_context_create();
+ *   DRW_opengl_context_activate(drw_state);
+ *
+ * Example of context destruction:
+ *
+ *   const bool drw_state = DRW_opengl_context_release();
+ *   WM_opengl_context_activate(gl_context);
+ *   WM_opengl_context_dispose(gl_context);
+ *   DRW_opengl_context_activate(drw_state);
+ *
+ *
+ * NOTE: Will only perform context modification when on main thread. This way these functions can
+ * be used in an engine without check on whether it is a draw manager which manages OpenGL context
+ * on the current thread. The downside of this is that if the engine performs OpenGL creation from
+ * a non-main thread, that thread is supposed to not have OpenGL context ever bound by Blender.
+ *
+ * \{ */
+
+bool DRW_opengl_context_release(void)
+{
+  if (!BLI_thread_is_main()) {
+    return false;
+  }
+
+  if (GPU_context_active_get() != DST.gpu_context) {
+    /* Context release is requested from the outside of the draw manager main draw loop, indicate
+     * this to the `DRW_opengl_context_activate()` so that it restores drawable of the window. */
+    return false;
+  }
+
+  GPU_context_active_set(NULL);
+  WM_opengl_context_release(DST.gl_context);
+
+  return true;
+}
+
+void DRW_opengl_context_activate(bool drw_state)
+{
+  if (!BLI_thread_is_main()) {
+    return;
+  }
+
+  if (drw_state) {
+    WM_opengl_context_activate(DST.gl_context);
+    GPU_context_active_set(DST.gpu_context);
+  }
+  else {
+    wm_window_reset_drawable();
+  }
+}
 
 /** \} */

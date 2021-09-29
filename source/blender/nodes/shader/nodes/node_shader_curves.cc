@@ -23,17 +23,17 @@
 
 #include "node_shader_util.h"
 
-/* **************** CURVE VEC  ******************** */
-static bNodeSocketTemplate sh_node_curve_vec_in[] = {
-    {SOCK_FLOAT, N_("Fac"), 1.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f, PROP_FACTOR},
-    {SOCK_VECTOR, N_("Vector"), 0.0f, 0.0f, 0.0f, 1.0f, -1.0f, 1.0f, PROP_NONE},
-    {-1, ""},
+namespace blender::nodes {
+
+static void sh_node_curve_vec_declare(NodeDeclarationBuilder &b)
+{
+  b.is_function_node();
+  b.add_input<decl::Float>("Fac").min(0.0f).max(1.0f).default_value(1.0f).subtype(PROP_FACTOR);
+  b.add_input<decl::Vector>("Vector").min(-1.0f).max(1.0f);
+  b.add_output<decl::Vector>("Vector");
 };
 
-static bNodeSocketTemplate sh_node_curve_vec_out[] = {
-    {SOCK_VECTOR, N_("Vector")},
-    {-1, ""},
-};
+}  // namespace blender::nodes
 
 static void node_shader_exec_curve_vec(void *UNUSED(data),
                                        int UNUSED(thread),
@@ -143,9 +143,10 @@ class CurveVecFunction : public blender::fn::MultiFunction {
   }
 };
 
-static void sh_node_curve_vec_expand_in_mf_network(blender::nodes::NodeMFNetworkBuilder &builder)
+static void sh_node_curve_vec_build_multi_function(
+    blender::nodes::NodeMultiFunctionBuilder &builder)
 {
-  bNode &bnode = builder.bnode();
+  bNode &bnode = builder.node();
   CurveMapping *cumap = (CurveMapping *)bnode.storage;
   BKE_curvemapping_init(cumap);
   builder.construct_and_set_matching_fn<CurveVecFunction>(*cumap);
@@ -156,28 +157,29 @@ void register_node_type_sh_curve_vec(void)
   static bNodeType ntype;
 
   sh_fn_node_type_base(&ntype, SH_NODE_CURVE_VEC, "Vector Curves", NODE_CLASS_OP_VECTOR, 0);
-  node_type_socket_templates(&ntype, sh_node_curve_vec_in, sh_node_curve_vec_out);
+  ntype.declare = blender::nodes::sh_node_curve_vec_declare;
   node_type_init(&ntype, node_shader_init_curve_vec);
   node_type_size_preset(&ntype, NODE_SIZE_LARGE);
   node_type_storage(&ntype, "CurveMapping", node_free_curves, node_copy_curves);
   node_type_exec(&ntype, node_initexec_curves, nullptr, node_shader_exec_curve_vec);
   node_type_gpu(&ntype, gpu_shader_curve_vec);
-  ntype.expand_in_mf_network = sh_node_curve_vec_expand_in_mf_network;
+  ntype.build_multi_function = sh_node_curve_vec_build_multi_function;
 
   nodeRegisterType(&ntype);
 }
 
 /* **************** CURVE RGB  ******************** */
-static bNodeSocketTemplate sh_node_curve_rgb_in[] = {
-    {SOCK_FLOAT, N_("Fac"), 1.0f, 0.0f, 0.0f, 1.0f, -1.0f, 1.0f, PROP_FACTOR},
-    {SOCK_RGBA, N_("Color"), 0.0f, 0.0f, 0.0f, 1.0f},
-    {-1, ""},
+
+namespace blender::nodes {
+
+static void sh_node_curve_rgb_declare(NodeDeclarationBuilder &b)
+{
+  b.add_input<decl::Float>("Fac").min(0.0f).max(1.0f).default_value(1.0f).subtype(PROP_FACTOR);
+  b.add_input<decl::Color>("Color").default_value({1.0f, 1.0f, 1.0f, 1.0f});
+  b.add_output<decl::Color>("Color");
 };
 
-static bNodeSocketTemplate sh_node_curve_rgb_out[] = {
-    {SOCK_RGBA, N_("Color")},
-    {-1, ""},
-};
+}  // namespace blender::nodes
 
 static void node_shader_exec_curve_rgb(void *UNUSED(data),
                                        int UNUSED(thread),
@@ -317,9 +319,10 @@ class CurveRGBFunction : public blender::fn::MultiFunction {
   }
 };
 
-static void sh_node_curve_rgb_expand_in_mf_network(blender::nodes::NodeMFNetworkBuilder &builder)
+static void sh_node_curve_rgb_build_multi_function(
+    blender::nodes::NodeMultiFunctionBuilder &builder)
 {
-  bNode &bnode = builder.bnode();
+  bNode &bnode = builder.node();
   CurveMapping *cumap = (CurveMapping *)bnode.storage;
   BKE_curvemapping_init(cumap);
   builder.construct_and_set_matching_fn<CurveRGBFunction>(*cumap);
@@ -330,13 +333,13 @@ void register_node_type_sh_curve_rgb(void)
   static bNodeType ntype;
 
   sh_fn_node_type_base(&ntype, SH_NODE_CURVE_RGB, "RGB Curves", NODE_CLASS_OP_COLOR, 0);
-  node_type_socket_templates(&ntype, sh_node_curve_rgb_in, sh_node_curve_rgb_out);
+  ntype.declare = blender::nodes::sh_node_curve_rgb_declare;
   node_type_init(&ntype, node_shader_init_curve_rgb);
   node_type_size_preset(&ntype, NODE_SIZE_LARGE);
   node_type_storage(&ntype, "CurveMapping", node_free_curves, node_copy_curves);
   node_type_exec(&ntype, node_initexec_curves, nullptr, node_shader_exec_curve_rgb);
   node_type_gpu(&ntype, gpu_shader_curve_rgb);
-  ntype.expand_in_mf_network = sh_node_curve_rgb_expand_in_mf_network;
+  ntype.build_multi_function = sh_node_curve_rgb_build_multi_function;
 
   nodeRegisterType(&ntype);
 }

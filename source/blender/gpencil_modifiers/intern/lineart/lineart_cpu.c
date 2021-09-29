@@ -41,6 +41,7 @@
 #include "BKE_gpencil.h"
 #include "BKE_gpencil_geom.h"
 #include "BKE_gpencil_modifier.h"
+#include "BKE_lib_id.h"
 #include "BKE_material.h"
 #include "BKE_mesh.h"
 #include "BKE_object.h"
@@ -380,7 +381,7 @@ static void lineart_occlusion_single_line(LineartRenderBuffer *rb, LineartEdge *
           /* Ignore this triangle if an intersection line directly comes from it, */
           lineart_occlusion_is_adjacent_intersection(e, (LineartTriangle *)tri) ||
           /* Or if this triangle isn't effectively occluding anything nor it's providing a
-            material flag. */
+           * material flag. */
           ((!tri->base.mat_occlusion) && (!tri->base.material_mask_bits))) {
         continue;
       }
@@ -1452,7 +1453,7 @@ static uint16_t lineart_identify_feature_line(LineartRenderBuffer *rb,
                                               LineartTriangle *rt_array,
                                               LineartVert *rv_array,
                                               float crease_threshold,
-                                              bool no_crease,
+                                              bool use_auto_smooth,
                                               bool use_freestyle_edge,
                                               bool use_freestyle_face,
                                               BMesh *bm_if_freestyle)
@@ -1532,9 +1533,19 @@ static uint16_t lineart_identify_feature_line(LineartRenderBuffer *rb,
     edge_flag_result |= LRT_EDGE_FLAG_CONTOUR;
   }
 
-  if (rb->use_crease && (dot_v3v3_db(tri1->gn, tri2->gn) < crease_threshold)) {
-    if (!no_crease) {
+  if (rb->use_crease) {
+    if (rb->sharp_as_crease && !BM_elem_flag_test(e, BM_ELEM_SMOOTH)) {
       edge_flag_result |= LRT_EDGE_FLAG_CREASE;
+    }
+    else {
+      bool do_crease = true;
+      if (!rb->force_crease && !use_auto_smooth &&
+          (BM_elem_flag_test(ll->f, BM_ELEM_SMOOTH) && BM_elem_flag_test(lr->f, BM_ELEM_SMOOTH))) {
+        do_crease = false;
+      }
+      if (do_crease && (dot_v3v3_db(tri1->gn, tri2->gn) < crease_threshold)) {
+        edge_flag_result |= LRT_EDGE_FLAG_CREASE;
+      }
     }
   }
   if (rb->use_material && (ll->f->mat_nr != lr->f->mat_nr)) {
@@ -1691,8 +1702,7 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
   }
 
   if (obi->free_use_mesh) {
-    BKE_mesh_free(obi->original_me);
-    MEM_freeN(obi->original_me);
+    BKE_id_free(NULL, obi->original_me);
   }
 
   if (rb->remove_doubles) {
@@ -1746,8 +1756,13 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
   eln->object_ref = orig_ob;
   obi->v_eln = eln;
 
+  bool use_auto_smooth = false;
   if (orig_ob->lineart.flags & OBJECT_LRT_OWN_CREASE) {
     use_crease = cosf(M_PI - orig_ob->lineart.crease_threshold);
+  }
+  if (obi->original_me->flag & ME_AUTOSMOOTH) {
+    use_crease = cosf(obi->original_me->smoothresh);
+    use_auto_smooth = true;
   }
   else {
     use_crease = rb->crease_threshold;
@@ -1803,10 +1818,7 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
     tri->material_mask_bits |= ((mat && (mat->lineart.flags & LRT_MATERIAL_MASK_ENABLED)) ?
                                     mat->lineart.material_mask_bits :
                                     0);
-    tri->mat_occlusion |= ((mat &&
-                            (mat->lineart.flags & LRT_MATERIAL_CUSTOM_OCCLUSION_EFFECTIVENESS)) ?
-                               mat->lineart.mat_occlusion :
-                               1);
+    tri->mat_occlusion |= (mat ? mat->lineart.mat_occlusion : 1);
 
     tri->intersection_mask = obi->override_intersection_mask;
 
@@ -1835,15 +1847,15 @@ static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBu
     e = BM_edge_at_index(bm, i);
 
     /* Because e->head.hflag is char, so line type flags should not exceed positive 7 bits. */
-    char eflag = lineart_identify_feature_line(rb,
-                                               e,
-                                               ort,
-                                               orv,
-                                               use_crease,
-                                               orig_ob->type == OB_FONT,
-                                               can_find_freestyle_edge,
-                                               can_find_freestyle_face,
-                                               bm);
+    uint16_t eflag = lineart_identify_feature_line(rb,
+                                                   e,
+                                                   ort,
+                                                   orv,
+                                                   use_crease,
+                                                   use_auto_smooth,
+                                                   can_find_freestyle_edge,
+                                                   can_find_freestyle_face,
+                                                   bm);
     if (eflag) {
       /* Only allocate for feature lines (instead of all lines) to save memory.
        * If allow duplicated edges, one edge gets added multiple times if it has multiple types. */
@@ -1956,7 +1968,7 @@ static uchar lineart_intersection_mask_check(Collection *c, Object *ob)
  * See if this object in such collection is used for generating line art,
  * Disabling a collection for line art will doable all objects inside.
  */
-static int lineart_usage_check(Collection *c, Object *ob)
+static int lineart_usage_check(Collection *c, Object *ob, bool is_render)
 {
 
   if (!c) {
@@ -1969,8 +1981,12 @@ static int lineart_usage_check(Collection *c, Object *ob)
     return ob->lineart.usage;
   }
 
-  if (c->children.first == NULL) {
+  if (c->gobject.first) {
     if (BKE_collection_has_object(c, (Object *)(ob->id.orig_id))) {
+      if ((is_render && (c->flag & COLLECTION_HIDE_RENDER)) ||
+          ((!is_render) && (c->flag & COLLECTION_HIDE_VIEWPORT))) {
+        return OBJECT_LRT_EXCLUDE;
+      }
       if (ob->lineart.usage == OBJECT_LRT_INHERIT) {
         switch (c->lineart_usage) {
           case COLLECTION_LRT_OCCLUSION_ONLY:
@@ -1989,7 +2005,7 @@ static int lineart_usage_check(Collection *c, Object *ob)
   }
 
   LISTBASE_FOREACH (CollectionChild *, cc, &c->children) {
-    int result = lineart_usage_check(cc->collection, ob);
+    int result = lineart_usage_check(cc->collection, ob, is_render);
     if (result > OBJECT_LRT_INHERIT) {
       return result;
     }
@@ -2016,7 +2032,10 @@ static void lineart_geometry_load_assign_thread(LineartObjectLoadTaskInfo *olti_
   use_olti->pending = obi;
 }
 
-static bool lineart_geometry_check_visible(double (*model_view_proj)[4], Object *use_ob)
+static bool lineart_geometry_check_visible(double (*model_view_proj)[4],
+                                           double shift_x,
+                                           double shift_y,
+                                           Object *use_ob)
 {
   BoundBox *bb = BKE_object_boundbox_get(use_ob);
   if (!bb) {
@@ -2030,6 +2049,8 @@ static bool lineart_geometry_check_visible(double (*model_view_proj)[4], Object 
     copy_v3db_v3fl(co[i], bb->vec[i]);
     copy_v3_v3_db(tmp, co[i]);
     mul_v4_m4v3_db(co[i], model_view_proj, tmp);
+    co[i][0] -= shift_x * 2 * co[i][3];
+    co[i][1] -= shift_y * 2 * co[i][3];
   }
 
   bool cond[6] = {true, true, true, true, true, true};
@@ -2065,11 +2086,6 @@ static void lineart_main_load_geometries(
   int fit = BKE_camera_sensor_fit(cam->sensor_fit, rb->w, rb->h);
   double asp = ((double)rb->w / (double)rb->h);
 
-  double t_start;
-
-  if (G.debug_value == 4000) {
-    t_start = PIL_check_seconds_timer();
-  }
   int bound_box_discard_count = 0;
 
   if (cam->type == CAM_PERSP) {
@@ -2079,12 +2095,18 @@ static void lineart_main_load_geometries(
     if (fit == CAMERA_SENSOR_FIT_HOR && asp < 1) {
       sensor /= asp;
     }
-    double fov = focallength_to_fov(cam->lens, sensor);
+    const double fov = focallength_to_fov(cam->lens / (1 + rb->overscan), sensor);
     lineart_matrix_perspective_44d(proj, fov, asp, cam->clip_start, cam->clip_end);
   }
   else if (cam->type == CAM_ORTHO) {
-    double w = cam->ortho_scale / 2;
+    const double w = cam->ortho_scale / 2;
     lineart_matrix_ortho_44d(proj, -w, w, -w / asp, w / asp, cam->clip_start, cam->clip_end);
+  }
+
+  double t_start;
+
+  if (G.debug_value == 4000) {
+    t_start = PIL_check_seconds_timer();
   }
 
   invert_m4_m4(inv, rb->cam_obmat);
@@ -2112,9 +2134,11 @@ static void lineart_main_load_geometries(
   LineartObjectLoadTaskInfo *olti = lineart_mem_acquire(
       &rb->render_data_pool, sizeof(LineartObjectLoadTaskInfo) * thread_count);
 
+  bool is_render = DEG_get_mode(depsgraph) == DAG_EVAL_RENDER;
+
   DEG_OBJECT_ITER_BEGIN (depsgraph, ob, flags) {
     LineartObjectInfo *obi = lineart_mem_acquire(&rb->render_data_pool, sizeof(LineartObjectInfo));
-    obi->usage = lineart_usage_check(scene->master_collection, ob);
+    obi->usage = lineart_usage_check(scene->master_collection, ob, is_render);
     obi->override_intersection_mask = lineart_intersection_mask_check(scene->master_collection,
                                                                       ob);
     Mesh *use_mesh;
@@ -2125,7 +2149,7 @@ static void lineart_main_load_geometries(
 
     Object *use_ob = DEG_get_evaluated_object(depsgraph, ob);
     /* Prepare the matrix used for transforming this specific object (instance). This has to be
-     * done before mesh boundbox check because the function needs that.  */
+     * done before mesh boundbox check because the function needs that. */
     mul_m4db_m4db_m4fl_uniq(obi->model_view_proj, rb->view_projection, ob->obmat);
     mul_m4db_m4db_m4fl_uniq(obi->model_view, rb->view, ob->obmat);
 
@@ -2133,7 +2157,7 @@ static void lineart_main_load_geometries(
       continue;
     }
 
-    if (!lineart_geometry_check_visible(obi->model_view_proj, use_ob)) {
+    if (!lineart_geometry_check_visible(obi->model_view_proj, rb->shift_x, rb->shift_y, use_ob)) {
       if (G.debug_value == 4000) {
         bound_box_discard_count++;
       }
@@ -2156,7 +2180,7 @@ static void lineart_main_load_geometries(
       obi->free_use_mesh = true;
     }
 
-    /* Make normal matrix.  */
+    /* Make normal matrix. */
     float imat[4][4];
     invert_m4_m4(imat, ob->obmat);
     transpose_m4(imat);
@@ -2478,8 +2502,8 @@ static bool lineart_triangle_edge_image_space_occlusion(SpinLock *UNUSED(spl),
       }
     }
     else if (st_r == 0) {
-      INTERSECT_JUST_GREATER(is, order, 0, LCross);
-      if (LRT_ABC(LCross) && is[LCross] > 0) {
+      INTERSECT_JUST_GREATER(is, order, DBL_TRIANGLE_LIM, LCross);
+      if (LRT_ABC(LCross) && is[LCross] > DBL_TRIANGLE_LIM) {
         INTERSECT_JUST_GREATER(is, order, is[LCross], RCross);
       }
       else {
@@ -3026,9 +3050,15 @@ static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
   rb->shift_x = fit == CAMERA_SENSOR_FIT_HOR ? c->shiftx : c->shiftx / asp;
   rb->shift_y = fit == CAMERA_SENSOR_FIT_VERT ? c->shifty : c->shifty * asp;
 
+  rb->overscan = lmd->overscan;
+
+  rb->shift_x /= (1 + rb->overscan);
+  rb->shift_y /= (1 + rb->overscan);
+
   rb->crease_threshold = cos(M_PI - lmd->crease_threshold);
-  rb->angle_splitting_threshold = lmd->angle_splitting_threshold;
   rb->chaining_image_threshold = lmd->chaining_image_threshold;
+  rb->angle_splitting_threshold = lmd->angle_splitting_threshold;
+  rb->chain_smooth_tolerance = lmd->chain_smooth_tolerance;
 
   rb->fuzzy_intersections = (lmd->calculation_flags & LRT_INTERSECTION_AS_CONTOUR) != 0;
   rb->fuzzy_everything = (lmd->calculation_flags & LRT_EVERYTHING_AS_CONTOUR) != 0;
@@ -3042,6 +3072,9 @@ static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
   rb->allow_overlapping_edges = (lmd->calculation_flags & LRT_ALLOW_OVERLAPPING_EDGES) != 0;
 
   rb->allow_duplicated_types = (lmd->calculation_flags & LRT_ALLOW_OVERLAP_EDGE_TYPES) != 0;
+
+  rb->force_crease = (lmd->calculation_flags & LRT_USE_CREASE_ON_SMOOTH_SURFACES) != 0;
+  rb->sharp_as_crease = (lmd->calculation_flags & LRT_USE_CREASE_ON_SHARP_EDGES) != 0;
 
   int16_t edge_types = lmd->edge_types_override;
 
@@ -4139,6 +4172,13 @@ bool MOD_lineart_compute_feature_lines(Depsgraph *depsgraph,
     float *t_image = &lmd->chaining_image_threshold;
     /* This configuration ensures there won't be accidental lost of short unchained segments. */
     MOD_lineart_chain_discard_short(rb, MIN2(*t_image, 0.001f) - FLT_EPSILON);
+
+    if (rb->chain_smooth_tolerance > FLT_EPSILON) {
+      /* Keeping UI range of 0-1 for ease of read while scaling down the actual value for best
+       * effective range in image-space (Coordinate only goes from -1 to 1). This value is somewhat
+       * arbitrary, but works best for the moment.  */
+      MOD_lineart_smooth_chains(rb, rb->chain_smooth_tolerance / 50);
+    }
 
     if (rb->angle_splitting_threshold > FLT_EPSILON) {
       MOD_lineart_chain_split_angle(rb, rb->angle_splitting_threshold);

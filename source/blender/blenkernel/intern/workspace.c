@@ -58,7 +58,7 @@ static void workspace_init_data(ID *id)
 {
   WorkSpace *workspace = (WorkSpace *)id;
 
-  BKE_asset_library_reference_init_default(&workspace->active_asset_library);
+  BKE_asset_library_reference_init_default(&workspace->asset_library_ref);
 }
 
 static void workspace_free_data(ID *id)
@@ -186,7 +186,7 @@ IDTypeInfo IDType_ID_WS = {
     .name = "WorkSpace",
     .name_plural = "workspaces",
     .translation_context = BLT_I18NCONTEXT_ID_WORKSPACE,
-    .flags = IDTYPE_FLAGS_NO_COPY | IDTYPE_FLAGS_NO_MAKELOCAL | IDTYPE_FLAGS_NO_ANIMDATA,
+    .flags = IDTYPE_FLAGS_NO_COPY | IDTYPE_FLAGS_ONLY_APPEND | IDTYPE_FLAGS_NO_ANIMDATA,
 
     .init_data = workspace_init_data,
     .copy_data = NULL,

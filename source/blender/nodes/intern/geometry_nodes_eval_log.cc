@@ -99,6 +99,13 @@ SocketLog &ModifierLog::lookup_or_add_socket_log(LogByTreeContext &log_by_tree_c
   return socket_log;
 }
 
+void ModifierLog::foreach_node_log(FunctionRef<void(const NodeLog &)> fn) const
+{
+  if (root_tree_logs_) {
+    root_tree_logs_->foreach_node_log(fn);
+  }
+}
+
 const NodeLog *TreeLog::lookup_node_log(StringRef node_name) const
 {
   const destruct_ptr<NodeLog> *node_log = node_logs_.lookup_ptr_as(node_name);
@@ -122,6 +129,17 @@ const TreeLog *TreeLog::lookup_child_log(StringRef node_name) const
   return tree_log->get();
 }
 
+void TreeLog::foreach_node_log(FunctionRef<void(const NodeLog &)> fn) const
+{
+  for (auto node_log : node_logs_.items()) {
+    fn(*node_log.value);
+  }
+
+  for (auto child : child_logs_.items()) {
+    child.value->foreach_node_log(fn);
+  }
+}
+
 const SocketLog *NodeLog::lookup_socket_log(eNodeSocketInOut in_out, int index) const
 {
   BLI_assert(index >= 0);
@@ -141,13 +159,22 @@ const SocketLog *NodeLog::lookup_socket_log(const bNode &node, const bNodeSocket
 
 GeometryValueLog::GeometryValueLog(const GeometrySet &geometry_set, bool log_full_geometry)
 {
-  bke::geometry_set_instances_attribute_foreach(
-      geometry_set,
-      [&](StringRefNull attribute_name, const AttributeMetaData &meta_data) {
-        this->attributes_.append({attribute_name, meta_data.domain, meta_data.data_type});
-        return true;
-      },
-      8);
+  static std::array all_component_types = {GEO_COMPONENT_TYPE_CURVE,
+                                           GEO_COMPONENT_TYPE_INSTANCES,
+                                           GEO_COMPONENT_TYPE_MESH,
+                                           GEO_COMPONENT_TYPE_POINT_CLOUD,
+                                           GEO_COMPONENT_TYPE_VOLUME};
+  geometry_set.attribute_foreach(
+      all_component_types,
+      true,
+      [&](const bke::AttributeIDRef &attribute_id,
+          const AttributeMetaData &meta_data,
+          const GeometryComponent &UNUSED(component)) {
+        if (attribute_id.is_named()) {
+          this->attributes_.append({attribute_id.name(), meta_data.domain, meta_data.data_type});
+        }
+      });
+
   for (const GeometryComponent *component : geometry_set.get_components_for_read()) {
     component_types_.append(component->type());
     switch (component->type()) {

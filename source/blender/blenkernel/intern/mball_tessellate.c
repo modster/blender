@@ -305,7 +305,7 @@ static void build_bvh_spatial(PROCESS *process,
 
 /**
  * Computes density from given metaball at given position.
- * Metaball equation is: ``(1 - r^2 / R^2)^3 * s``
+ * Metaball equation is: `(1 - r^2 / R^2)^3 * s`
  *
  * r = distance from center
  * R = metaball radius
@@ -454,7 +454,7 @@ static void make_face(PROCESS *process, int i1, int i2, int i3, int i4)
 
   cur = process->indices[process->curindex++];
 
-  /* displists now support array drawing, we treat tri's as fake quad */
+  /* #DispList supports array drawing, treat tri's as fake quad. */
 
   cur[0] = i1;
   cur[1] = i2;

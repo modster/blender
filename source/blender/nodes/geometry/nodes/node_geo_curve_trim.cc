@@ -24,19 +24,17 @@
 
 using blender::attribute_math::mix2;
 
-static bNodeSocketTemplate geo_node_curve_trim_in[] = {
-    {SOCK_GEOMETRY, N_("Curve")},
-    {SOCK_FLOAT, N_("Start"), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, PROP_FACTOR},
-    {SOCK_FLOAT, N_("End"), 1.0f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f, PROP_FACTOR},
-    {SOCK_FLOAT, N_("Start"), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 10000.0f, PROP_DISTANCE},
-    {SOCK_FLOAT, N_("End"), 1.0f, 1.0f, 1.0f, 1.0f, 0.0f, 10000.0f, PROP_DISTANCE},
-    {-1, ""},
-};
+namespace blender::nodes {
 
-static bNodeSocketTemplate geo_node_curve_trim_out[] = {
-    {SOCK_GEOMETRY, N_("Curve")},
-    {-1, ""},
-};
+static void geo_node_curve_trim_declare(NodeDeclarationBuilder &b)
+{
+  b.add_input<decl::Geometry>("Curve");
+  b.add_input<decl::Float>("Start").min(0.0f).max(1.0f).subtype(PROP_FACTOR);
+  b.add_input<decl::Float>("End").min(0.0f).max(1.0f).default_value(1.0f).subtype(PROP_FACTOR);
+  b.add_input<decl::Float>("Start", "Start_001").min(0.0f).subtype(PROP_DISTANCE);
+  b.add_input<decl::Float>("End", "End_001").min(0.0f).default_value(1.0f).subtype(PROP_DISTANCE);
+  b.add_output<decl::Geometry>("Curve");
+}
 
 static void geo_node_curve_trim_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 {
@@ -48,33 +46,30 @@ static void geo_node_curve_trim_init(bNodeTree *UNUSED(tree), bNode *node)
   NodeGeometryCurveTrim *data = (NodeGeometryCurveTrim *)MEM_callocN(sizeof(NodeGeometryCurveTrim),
                                                                      __func__);
 
-  data->mode = GEO_NODE_CURVE_INTERPOLATE_FACTOR;
+  data->mode = GEO_NODE_CURVE_SAMPLE_FACTOR;
   node->storage = data;
 }
 
 static void geo_node_curve_trim_update(bNodeTree *UNUSED(ntree), bNode *node)
 {
   const NodeGeometryCurveTrim &node_storage = *(NodeGeometryCurveTrim *)node->storage;
-  const GeometryNodeCurveInterpolateMode mode = (GeometryNodeCurveInterpolateMode)
-                                                    node_storage.mode;
+  const GeometryNodeCurveSampleMode mode = (GeometryNodeCurveSampleMode)node_storage.mode;
 
   bNodeSocket *start_fac = ((bNodeSocket *)node->inputs.first)->next;
   bNodeSocket *end_fac = start_fac->next;
   bNodeSocket *start_len = end_fac->next;
   bNodeSocket *end_len = start_len->next;
 
-  nodeSetSocketAvailability(start_fac, mode == GEO_NODE_CURVE_INTERPOLATE_FACTOR);
-  nodeSetSocketAvailability(end_fac, mode == GEO_NODE_CURVE_INTERPOLATE_FACTOR);
-  nodeSetSocketAvailability(start_len, mode == GEO_NODE_CURVE_INTERPOLATE_LENGTH);
-  nodeSetSocketAvailability(end_len, mode == GEO_NODE_CURVE_INTERPOLATE_LENGTH);
+  nodeSetSocketAvailability(start_fac, mode == GEO_NODE_CURVE_SAMPLE_FACTOR);
+  nodeSetSocketAvailability(end_fac, mode == GEO_NODE_CURVE_SAMPLE_FACTOR);
+  nodeSetSocketAvailability(start_len, mode == GEO_NODE_CURVE_SAMPLE_LENGTH);
+  nodeSetSocketAvailability(end_len, mode == GEO_NODE_CURVE_SAMPLE_LENGTH);
 }
-
-namespace blender::nodes {
 
 struct TrimLocation {
   /* Control point index at the start side of the trim location. */
   int left_index;
-  /* Control point intex at the end of the trim location's segment. */
+  /* Control point index at the end of the trim location's segment. */
   int right_index;
   /* The factor between the left and right indices. */
   float factor;
@@ -106,8 +101,10 @@ static void linear_trim_data(const TrimLocation &start,
   data[size - 1] = end_data;
 }
 
-/* Identical operation as #linear_trim_data, but opy data to a new MutableSpan rather than
- * modifying the original data. */
+/**
+ * Identical operation as #linear_trim_data, but copy data to a new #MutableSpan rather than
+ * modifying the original data.
+ */
 template<typename T>
 static void linear_trim_to_output_data(const TrimLocation &start,
                                        const TrimLocation &end,
@@ -160,8 +157,8 @@ static void trim_poly_spline(Spline &spline,
   linear_trim_data<float>(start, end, spline.tilts());
 
   spline.attributes.foreach_attribute(
-      [&](StringRefNull name, const AttributeMetaData &UNUSED(meta_data)) {
-        std::optional<GMutableSpan> src = spline.attributes.get_for_write(name);
+      [&](const AttributeIDRef &attribute_id, const AttributeMetaData &UNUSED(meta_data)) {
+        std::optional<GMutableSpan> src = spline.attributes.get_for_write(attribute_id);
         BLI_assert(src);
         attribute_math::convert_to_static_type(src->type(), [&](auto dummy) {
           using T = decltype(dummy);
@@ -195,14 +192,14 @@ static PolySpline trim_nurbs_spline(const Spline &spline,
 
   /* Copy generic attribute data. */
   spline.attributes.foreach_attribute(
-      [&](StringRefNull name, const AttributeMetaData &meta_data) {
-        std::optional<GSpan> src = spline.attributes.get_for_read(name);
+      [&](const AttributeIDRef &attribute_id, const AttributeMetaData &meta_data) {
+        std::optional<GSpan> src = spline.attributes.get_for_read(attribute_id);
         BLI_assert(src);
-        if (!new_spline.attributes.create(name, meta_data.data_type)) {
+        if (!new_spline.attributes.create(attribute_id, meta_data.data_type)) {
           BLI_assert_unreachable();
           return false;
         }
-        std::optional<GMutableSpan> dst = new_spline.attributes.get_for_write(name);
+        std::optional<GMutableSpan> dst = new_spline.attributes.get_for_write(attribute_id);
         BLI_assert(dst);
 
         attribute_math::convert_to_static_type(src->type(), [&](auto dummy) {
@@ -251,8 +248,8 @@ static void trim_bezier_spline(Spline &spline,
   linear_trim_data<float>(start, end, bezier_spline.radii());
   linear_trim_data<float>(start, end, bezier_spline.tilts());
   spline.attributes.foreach_attribute(
-      [&](StringRefNull name, const AttributeMetaData &UNUSED(meta_data)) {
-        std::optional<GMutableSpan> src = spline.attributes.get_for_write(name);
+      [&](const AttributeIDRef &attribute_id, const AttributeMetaData &UNUSED(meta_data)) {
+        std::optional<GMutableSpan> src = spline.attributes.get_for_write(attribute_id);
         BLI_assert(src);
         attribute_math::convert_to_static_type(src->type(), [&](auto dummy) {
           using T = decltype(dummy);
@@ -323,29 +320,17 @@ static void trim_bezier_spline(Spline &spline,
   bezier_spline.resize(size);
 }
 
-static void geo_node_curve_trim_exec(GeoNodeExecParams params)
+static void geometry_set_curve_trim(GeometrySet &geometry_set,
+                                    const GeometryNodeCurveSampleMode mode,
+                                    const float start,
+                                    const float end)
 {
-  const NodeGeometryCurveTrim &node_storage = *(NodeGeometryCurveTrim *)params.node().storage;
-  const GeometryNodeCurveInterpolateMode mode = (GeometryNodeCurveInterpolateMode)
-                                                    node_storage.mode;
-
-  GeometrySet geometry_set = params.extract_input<GeometrySet>("Curve");
-  geometry_set = bke::geometry_set_realize_instances(geometry_set);
   if (!geometry_set.has_curve()) {
-    params.set_output("Curve", std::move(geometry_set));
     return;
   }
 
-  CurveComponent &curve_component = geometry_set.get_component_for_write<CurveComponent>();
-  CurveEval &curve = *curve_component.get_for_write();
+  CurveEval &curve = *geometry_set.get_curve_for_write();
   MutableSpan<SplinePtr> splines = curve.splines();
-
-  const float start = mode == GEO_NODE_CURVE_INTERPOLATE_FACTOR ?
-                          params.extract_input<float>("Start") :
-                          params.extract_input<float>("Start_001");
-  const float end = mode == GEO_NODE_CURVE_INTERPOLATE_FACTOR ?
-                        params.extract_input<float>("End") :
-                        params.extract_input<float>("End_001");
 
   threading::parallel_for(splines.index_range(), 128, [&](IndexRange range) {
     for (const int i : range) {
@@ -357,18 +342,18 @@ static void geo_node_curve_trim_exec(GeoNodeExecParams params)
       }
 
       /* Return a spline with one point instead of implicitly
-       * reversing the sline or switching the parameters. */
+       * reversing the spline or switching the parameters. */
       if (end < start) {
         spline.resize(1);
         continue;
       }
 
       const Spline::LookupResult start_lookup =
-          (mode == GEO_NODE_CURVE_INTERPOLATE_LENGTH) ?
+          (mode == GEO_NODE_CURVE_SAMPLE_LENGTH) ?
               spline.lookup_evaluated_length(std::clamp(start, 0.0f, spline.length())) :
               spline.lookup_evaluated_factor(std::clamp(start, 0.0f, 1.0f));
       const Spline::LookupResult end_lookup =
-          (mode == GEO_NODE_CURVE_INTERPOLATE_LENGTH) ?
+          (mode == GEO_NODE_CURVE_SAMPLE_LENGTH) ?
               spline.lookup_evaluated_length(std::clamp(end, 0.0f, spline.length())) :
               spline.lookup_evaluated_factor(std::clamp(end, 0.0f, 1.0f));
 
@@ -387,6 +372,29 @@ static void geo_node_curve_trim_exec(GeoNodeExecParams params)
       splines[i]->mark_cache_invalid();
     }
   });
+}
+
+static void geo_node_curve_trim_exec(GeoNodeExecParams params)
+{
+  const NodeGeometryCurveTrim &node_storage = *(NodeGeometryCurveTrim *)params.node().storage;
+  const GeometryNodeCurveSampleMode mode = (GeometryNodeCurveSampleMode)node_storage.mode;
+
+  GeometrySet geometry_set = params.extract_input<GeometrySet>("Curve");
+
+  if (mode == GEO_NODE_CURVE_SAMPLE_FACTOR) {
+    const float start = params.extract_input<float>("Start");
+    const float end = params.extract_input<float>("End");
+    geometry_set.modify_geometry_sets([&](GeometrySet &geometry_set) {
+      geometry_set_curve_trim(geometry_set, mode, start, end);
+    });
+  }
+  else if (mode == GEO_NODE_CURVE_SAMPLE_LENGTH) {
+    const float start = params.extract_input<float>("Start_001");
+    const float end = params.extract_input<float>("End_001");
+    geometry_set.modify_geometry_sets([&](GeometrySet &geometry_set) {
+      geometry_set_curve_trim(geometry_set, mode, start, end);
+    });
+  }
 
   params.set_output("Curve", std::move(geometry_set));
 }
@@ -397,12 +405,12 @@ void register_node_type_geo_curve_trim()
 {
   static bNodeType ntype;
   geo_node_type_base(&ntype, GEO_NODE_CURVE_TRIM, "Curve Trim", NODE_CLASS_GEOMETRY, 0);
-  node_type_socket_templates(&ntype, geo_node_curve_trim_in, geo_node_curve_trim_out);
   ntype.geometry_node_execute = blender::nodes::geo_node_curve_trim_exec;
-  ntype.draw_buttons = geo_node_curve_trim_layout;
+  ntype.draw_buttons = blender::nodes::geo_node_curve_trim_layout;
+  ntype.declare = blender::nodes::geo_node_curve_trim_declare;
   node_type_storage(
       &ntype, "NodeGeometryCurveTrim", node_free_standard_storage, node_copy_standard_storage);
-  node_type_init(&ntype, geo_node_curve_trim_init);
-  node_type_update(&ntype, geo_node_curve_trim_update);
+  node_type_init(&ntype, blender::nodes::geo_node_curve_trim_init);
+  node_type_update(&ntype, blender::nodes::geo_node_curve_trim_update);
   nodeRegisterType(&ntype);
 }

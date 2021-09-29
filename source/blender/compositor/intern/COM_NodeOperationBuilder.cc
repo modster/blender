@@ -33,6 +33,7 @@
 #include "COM_SetValueOperation.h"
 #include "COM_SetVectorOperation.h"
 #include "COM_SocketProxyOperation.h"
+#include "COM_TranslateOperation.h"
 #include "COM_ViewerOperation.h"
 #include "COM_WriteBufferOperation.h"
 
@@ -101,15 +102,15 @@ void NodeOperationBuilder::convertToOperations(ExecutionSystem *system)
   add_datatype_conversions();
 
   if (m_context->get_execution_model() == eExecutionModel::FullFrame) {
-    /* Copy operations to system. Needed for graphviz. */
-    system->set_operations(m_operations, {});
-
-    DebugInfo::graphviz(system, "compositor_prior_folding");
+    save_graphviz("compositor_prior_folding");
     ConstantFolder folder(*this);
     folder.fold_operations();
   }
 
-  determineResolutions();
+  determine_canvases();
+
+  save_graphviz("compositor_prior_merging");
+  merge_equal_operations();
 
   if (m_context->get_execution_model() == eExecutionModel::Tiled) {
     /* surround complex ops with read/write buffer */
@@ -149,22 +150,28 @@ void NodeOperationBuilder::replace_operation_with_constant(NodeOperation *operat
                                                            ConstantOperation *constant_operation)
 {
   BLI_assert(constant_operation->getNumberOfInputSockets() == 0);
+  unlink_inputs_and_relink_outputs(operation, constant_operation);
+  addOperation(constant_operation);
+}
+
+void NodeOperationBuilder::unlink_inputs_and_relink_outputs(NodeOperation *unlinked_op,
+                                                            NodeOperation *linked_op)
+{
   int i = 0;
   while (i < m_links.size()) {
     Link &link = m_links[i];
-    if (&link.to()->getOperation() == operation) {
+    if (&link.to()->getOperation() == unlinked_op) {
       link.to()->setLink(nullptr);
       m_links.remove(i);
       continue;
     }
 
-    if (&link.from()->getOperation() == operation) {
-      link.to()->setLink(constant_operation->getOutputSocket());
-      m_links[i] = Link(constant_operation->getOutputSocket(), link.to());
+    if (&link.from()->getOperation() == unlinked_op) {
+      link.to()->setLink(linked_op->getOutputSocket());
+      m_links[i] = Link(linked_op->getOutputSocket(), link.to());
     }
     i++;
   }
-  addOperation(constant_operation);
 }
 
 void NodeOperationBuilder::mapInputSocket(NodeInput *node_socket,
@@ -417,43 +424,96 @@ void NodeOperationBuilder::resolve_proxies()
   }
 }
 
-void NodeOperationBuilder::determineResolutions()
+void NodeOperationBuilder::determine_canvases()
 {
-  /* determine all resolutions of the operations (Width/Height) */
+  /* Determine all canvas areas of the operations. */
+  const rcti &preferred_area = COM_AREA_NONE;
   for (NodeOperation *op : m_operations) {
     if (op->isOutputOperation(m_context->isRendering()) && !op->get_flags().is_preview_operation) {
-      unsigned int resolution[2] = {0, 0};
-      unsigned int preferredResolution[2] = {0, 0};
-      op->determineResolution(resolution, preferredResolution);
-      op->setResolution(resolution);
+      rcti canvas = COM_AREA_NONE;
+      op->determine_canvas(preferred_area, canvas);
+      op->set_canvas(canvas);
     }
   }
 
   for (NodeOperation *op : m_operations) {
     if (op->isOutputOperation(m_context->isRendering()) && op->get_flags().is_preview_operation) {
-      unsigned int resolution[2] = {0, 0};
-      unsigned int preferredResolution[2] = {0, 0};
-      op->determineResolution(resolution, preferredResolution);
-      op->setResolution(resolution);
+      rcti canvas = COM_AREA_NONE;
+      op->determine_canvas(preferred_area, canvas);
+      op->set_canvas(canvas);
     }
   }
 
-  /* add convert resolution operations when needed */
+  /* Convert operation canvases when needed. */
   {
     Vector<Link> convert_links;
     for (const Link &link : m_links) {
       if (link.to()->getResizeMode() != ResizeMode::None) {
-        NodeOperation &from_op = link.from()->getOperation();
-        NodeOperation &to_op = link.to()->getOperation();
-        if (from_op.getWidth() != to_op.getWidth() || from_op.getHeight() != to_op.getHeight()) {
+        const rcti &from_canvas = link.from()->getOperation().get_canvas();
+        const rcti &to_canvas = link.to()->getOperation().get_canvas();
+
+        bool needs_conversion;
+        if (link.to()->getResizeMode() == ResizeMode::Align) {
+          needs_conversion = from_canvas.xmin != to_canvas.xmin ||
+                             from_canvas.ymin != to_canvas.ymin;
+        }
+        else {
+          needs_conversion = !BLI_rcti_compare(&from_canvas, &to_canvas);
+        }
+
+        if (needs_conversion) {
           convert_links.append(link);
         }
       }
     }
     for (const Link &link : convert_links) {
-      COM_convert_resolution(*this, link.from(), link.to());
+      COM_convert_canvas(*this, link.from(), link.to());
     }
   }
+}
+
+static Vector<NodeOperationHash> generate_hashes(Span<NodeOperation *> operations)
+{
+  Vector<NodeOperationHash> hashes;
+  for (NodeOperation *op : operations) {
+    std::optional<NodeOperationHash> hash = op->generate_hash();
+    if (hash) {
+      hashes.append(std::move(*hash));
+    }
+  }
+  return hashes;
+}
+
+/** Merge operations with same type, inputs and parameters that produce the same result. */
+void NodeOperationBuilder::merge_equal_operations()
+{
+  bool check_for_next_merge = true;
+  while (check_for_next_merge) {
+    /* Re-generate hashes with any change. */
+    Vector<NodeOperationHash> hashes = generate_hashes(m_operations);
+
+    /* Make hashes be consecutive when they are equal. */
+    std::sort(hashes.begin(), hashes.end());
+
+    bool any_merged = false;
+    const NodeOperationHash *prev_hash = nullptr;
+    for (const NodeOperationHash &hash : hashes) {
+      if (prev_hash && *prev_hash == hash) {
+        merge_equal_operations(prev_hash->get_operation(), hash.get_operation());
+        any_merged = true;
+      }
+      prev_hash = &hash;
+    }
+
+    check_for_next_merge = any_merged;
+  }
+}
+
+void NodeOperationBuilder::merge_equal_operations(NodeOperation *from, NodeOperation *into)
+{
+  unlink_inputs_and_relink_outputs(from, into);
+  m_operations.remove_first_occurrence_and_reorder(from);
+  delete from;
 }
 
 Vector<NodeOperationInput *> NodeOperationBuilder::cache_output_links(
@@ -725,6 +785,14 @@ void NodeOperationBuilder::group_operations()
         memproxy->setExecutor(group);
       }
     }
+  }
+}
+
+void NodeOperationBuilder::save_graphviz(StringRefNull name)
+{
+  if (COM_EXPORT_GRAPHVIZ) {
+    exec_system_->set_operations(m_operations, m_groups);
+    DebugInfo::graphviz(exec_system_, name);
   }
 }
 

@@ -23,8 +23,8 @@
 
 namespace blender::compositor {
 
-/* utility functions used by glare, tonemap and lens distortion */
-/* soms macros for color handling */
+/* Utility functions used by glare, tone-map and lens distortion. */
+/* Some macros for color handling. */
 typedef float fRGB[4];
 
 /* TODO: replace with BLI_math_vector. */
@@ -49,6 +49,8 @@ class GlareBaseOperation : public SingleThreadedOperation {
    */
   NodeGlare *m_settings;
 
+  bool is_output_rendered_;
+
  public:
   /**
    * Initialize the execution
@@ -67,6 +69,14 @@ class GlareBaseOperation : public SingleThreadedOperation {
   bool determineDependingAreaOfInterest(rcti *input,
                                         ReadBufferOperation *readOperation,
                                         rcti *output) override;
+
+  void get_area_of_interest(const int input_idx,
+                            const rcti &output_area,
+                            rcti &r_input_area) final;
+
+  void update_memory_buffer(MemoryBuffer *output,
+                            const rcti &area,
+                            Span<MemoryBuffer *> inputs) final;
 
  protected:
   GlareBaseOperation();

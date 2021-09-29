@@ -110,6 +110,10 @@ if(POLICY CMP0074)
   cmake_policy(SET CMP0074 NEW)
 endif()
 
+# Install CODE|SCRIPT allow the use of generator expressions.
+if(POLICY CMP0087)
+  cmake_policy(SET CMP0087 NEW)
+endif()
 #-----------------------------------------------------------------------------
 # Load some macros.
 include(build_files/cmake/macros.cmake)
@@ -399,30 +403,32 @@ option(WITH_CYCLES_CUDA_BINARIES    "Build Cycles CUDA binaries" OFF)
 option(WITH_CYCLES_CUBIN_COMPILER   "Build cubins with nvrtc based compiler instead of nvcc" OFF)
 option(WITH_CYCLES_CUDA_BUILD_SERIAL "Build cubins one after another (useful on machines with limited RAM)" OFF)
 mark_as_advanced(WITH_CYCLES_CUDA_BUILD_SERIAL)
-set(CYCLES_TEST_DEVICES CPU CACHE STRING "Run regression tests on the specified device types (CPU CUDA OPTIX OPENCL)" )
+set(CYCLES_TEST_DEVICES CPU CACHE STRING "Run regression tests on the specified device types (CPU CUDA OPTIX)" )
 set(CYCLES_CUDA_BINARIES_ARCH sm_30 sm_35 sm_37 sm_50 sm_52 sm_60 sm_61 sm_70 sm_75 sm_86 compute_75 CACHE STRING "CUDA architectures to build binaries for")
 mark_as_advanced(CYCLES_CUDA_BINARIES_ARCH)
 unset(PLATFORM_DEFAULT)
-option(WITH_CYCLES_LOGGING  "Build Cycles with logging support" ON)
-option(WITH_CYCLES_DEBUG    "Build Cycles with extra debug capabilities" OFF)
+option(WITH_CYCLES_LOGGING      "Build Cycles with logging support" ON)
+option(WITH_CYCLES_DEBUG_NAN    "Build Cycles with additional asserts for detecting NaNs and invalid values" OFF)
 option(WITH_CYCLES_NATIVE_ONLY  "Build Cycles with native kernel only (which fits current CPU, use for development only)" OFF)
 option(WITH_CYCLES_KERNEL_ASAN  "Build Cycles kernels with address sanitizer when WITH_COMPILER_ASAN is on, even if it's very slow" OFF)
 mark_as_advanced(WITH_CYCLES_KERNEL_ASAN)
 mark_as_advanced(WITH_CYCLES_CUBIN_COMPILER)
 mark_as_advanced(WITH_CYCLES_LOGGING)
-mark_as_advanced(WITH_CYCLES_DEBUG)
+mark_as_advanced(WITH_CYCLES_DEBUG_NAN)
 mark_as_advanced(WITH_CYCLES_NATIVE_ONLY)
 
 option(WITH_CYCLES_DEVICE_CUDA              "Enable Cycles CUDA compute support" ON)
-option(WITH_CYCLES_DEVICE_OPTIX             "Enable Cycles OptiX support" OFF)
-option(WITH_CYCLES_DEVICE_OPENCL            "Enable Cycles OpenCL compute support" ON)
-option(WITH_CYCLES_NETWORK              "Enable Cycles compute over network support (EXPERIMENTAL and unfinished)" OFF)
+option(WITH_CYCLES_DEVICE_OPTIX             "Enable Cycles OptiX support" ON)
+option(WITH_CYCLES_DEVICE_HIP               "Enable Cycles HIP support" OFF)
+mark_as_advanced(WITH_CYCLES_DEVICE_HIP)
 mark_as_advanced(WITH_CYCLES_DEVICE_CUDA)
-mark_as_advanced(WITH_CYCLES_DEVICE_OPENCL)
-mark_as_advanced(WITH_CYCLES_NETWORK)
 
 option(WITH_CUDA_DYNLOAD "Dynamically load CUDA libraries at runtime" ON)
 mark_as_advanced(WITH_CUDA_DYNLOAD)
+
+# Draw Manager
+option(WITH_DRAW_DEBUG "Add extra debug capabilities to Draw Manager" OFF)
+mark_as_advanced(WITH_DRAW_DEBUG)
 
 # LLVM
 option(WITH_LLVM                    "Use LLVM" OFF)
@@ -604,12 +610,6 @@ if(WIN32)
   option(WITH_WINDOWS_FIND_MODULES "Use find_package to locate libraries" OFF)
   mark_as_advanced(WITH_WINDOWS_FIND_MODULES)
 
-  option(WINDOWS_USE_VISUAL_STUDIO_PROJECT_FOLDERS "Organize the visual studio projects according to source folder structure." ON)
-  mark_as_advanced(WINDOWS_USE_VISUAL_STUDIO_PROJECT_FOLDERS)
-
-  option(WINDOWS_USE_VISUAL_STUDIO_SOURCE_FOLDERS "Organize the source files in filters matching the source folders." ON)
-  mark_as_advanced(WINDOWS_USE_VISUAL_STUDIO_SOURCE_FOLDERS)
-
   option(WINDOWS_PYTHON_DEBUG "Include the files needed for debugging python scripts with visual studio 2017+." OFF)
   mark_as_advanced(WINDOWS_PYTHON_DEBUG)
 
@@ -625,6 +625,18 @@ if(WIN32)
   option(WITH_WINDOWS_STRIPPED_PDB "Use a stripped PDB file" On)
   mark_as_advanced(WITH_WINDOWS_STRIPPED_PDB)
 
+endif()
+
+if(WIN32 OR XCODE)
+  option(IDE_GROUP_SOURCES_IN_FOLDERS "Organize the source files in filters matching the source folders." ON)
+  mark_as_advanced(IDE_GROUP_SOURCES_IN_FOLDERS)
+
+  option(IDE_GROUP_PROJECTS_IN_FOLDERS "Organize the projects according to source folder structure." ON)
+  mark_as_advanced(IDE_GROUP_PROJECTS_IN_FOLDERS)
+
+  if (IDE_GROUP_PROJECTS_IN_FOLDERS)
+    set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+  endif()
 endif()
 
 if(UNIX)
@@ -809,6 +821,11 @@ if(NOT WITH_CUDA_DYNLOAD)
     message(STATUS "CUDA toolkit not found, using dynamic runtime loading of libraries (WITH_CUDA_DYNLOAD) instead")
     set(WITH_CUDA_DYNLOAD ON)
   endif()
+endif()
+
+if(WITH_CYCLES_DEVICE_HIP)
+  # Currently HIP must be dynamically loaded, this may change in future toolkits
+  set(WITH_HIP_DYNLOAD ON)
 endif()
 
 #-----------------------------------------------------------------------------
@@ -1584,6 +1601,9 @@ elseif(CMAKE_C_COMPILER_ID MATCHES "Clang")
   ADD_CHECK_C_COMPILER_FLAG(C_WARNINGS C_WARN_UNUSED_PARAMETER -Wunused-parameter)
 
   ADD_CHECK_CXX_COMPILER_FLAG(CXX_WARNINGS CXX_WARN_ALL -Wall)
+  # Using C++20 features while having C++17 as the project language isn't allowed by MSVC.
+  ADD_CHECK_CXX_COMPILER_FLAG(CXX_WARNINGS CXX_CXX20_DESIGNATOR -Wc++20-designator)
+
   ADD_CHECK_CXX_COMPILER_FLAG(CXX_WARNINGS CXX_WARN_NO_AUTOLOGICAL_COMPARE -Wno-tautological-compare)
   ADD_CHECK_CXX_COMPILER_FLAG(CXX_WARNINGS CXX_WARN_NO_UNKNOWN_PRAGMAS     -Wno-unknown-pragmas)
   ADD_CHECK_CXX_COMPILER_FLAG(CXX_WARNINGS CXX_WARN_NO_CHAR_SUBSCRIPTS     -Wno-char-subscripts)
@@ -1836,6 +1856,9 @@ elseif(WITH_CYCLES_STANDALONE)
   endif()
   if(WITH_CUDA_DYNLOAD)
     add_subdirectory(extern/cuew)
+  endif()
+  if(WITH_HIP_DYNLOAD)
+    add_subdirectory(extern/hipew)
   endif()
   if(NOT WITH_SYSTEM_GLEW)
     add_subdirectory(extern/glew)

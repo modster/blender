@@ -36,8 +36,10 @@ extern "C" {
 
 struct ARegion;
 struct AssetFilterSettings;
+struct AssetHandle;
 struct AutoComplete;
 struct EnumPropertyItem;
+struct FileDirEntry;
 struct FileSelectParams;
 struct ID;
 struct IDProperty;
@@ -82,6 +84,10 @@ typedef struct uiBlock uiBlock;
 typedef struct uiBut uiBut;
 typedef struct uiLayout uiLayout;
 typedef struct uiPopupBlockHandle uiPopupBlockHandle;
+/* C handle for C++ #ui::AbstractTreeView type. */
+typedef struct uiTreeViewHandle uiTreeViewHandle;
+/* C handle for C++ #ui::AbstractTreeViewItem type. */
+typedef struct uiTreeViewItemHandle uiTreeViewItemHandle;
 
 /* Defines */
 
@@ -387,6 +393,8 @@ typedef enum {
   UI_BTYPE_GRIP = 57 << 9,
   UI_BTYPE_DECORATOR = 58 << 9,
   UI_BTYPE_DATASETROW = 59 << 9,
+  /* An item in a tree view. Parent items may be collapsible. */
+  UI_BTYPE_TREEROW = 60 << 9,
 } eButType;
 
 #define BUTTYPE (63 << 9)
@@ -769,9 +777,8 @@ int UI_but_return_value_get(uiBut *but);
 
 void UI_but_drag_set_id(uiBut *but, struct ID *id);
 void UI_but_drag_set_asset(uiBut *but,
-                           const char *name,
+                           const struct AssetHandle *asset,
                            const char *path,
-                           int id_type,
                            int import_type, /* eFileAssetImportType */
                            int icon,
                            struct ImBuf *imb,
@@ -1671,6 +1678,7 @@ void UI_but_datasetrow_component_set(uiBut *but, uint8_t geometry_component_type
 void UI_but_datasetrow_domain_set(uiBut *but, uint8_t attribute_domain);
 uint8_t UI_but_datasetrow_component_get(uiBut *but);
 uint8_t UI_but_datasetrow_domain_get(uiBut *but);
+void UI_but_treerow_indentation_set(uiBut *but, int indentation);
 
 void UI_but_node_link_set(uiBut *but, struct bNodeSocket *socket, const float draw_color[4]);
 
@@ -2208,6 +2216,11 @@ enum uiTemplateListFlags {
   UI_TEMPLATE_LIST_SORT_LOCK = (1 << 1),
   /* Don't allow resizing the list, i.e. don't add the grip button. */
   UI_TEMPLATE_LIST_NO_GRIP = (1 << 2),
+  /** Do not show filtering options, not even the button to expand/collapse them. Also hides the
+   * grip button. */
+  UI_TEMPLATE_LIST_NO_FILTER_OPTIONS = (1 << 3),
+  /** For #UILST_LAYOUT_BIG_PREVIEW_GRID, don't reserve space for the name label. */
+  UI_TEMPLATE_LIST_NO_NAMES = (1 << 4),
 
   UI_TEMPLATE_LIST_FLAGS_LAST
 };
@@ -2288,6 +2301,12 @@ int uiTemplateRecentFiles(struct uiLayout *layout, int rows);
 void uiTemplateFileSelectPath(uiLayout *layout,
                               struct bContext *C,
                               struct FileSelectParams *params);
+
+enum {
+  UI_TEMPLATE_ASSET_DRAW_NO_NAMES = (1 << 0),
+  UI_TEMPLATE_ASSET_DRAW_NO_FILTER = (1 << 1),
+  UI_TEMPLATE_ASSET_DRAW_NO_LIBRARY = (1 << 2),
+};
 void uiTemplateAssetView(struct uiLayout *layout,
                          struct bContext *C,
                          const char *list_id,
@@ -2298,6 +2317,7 @@ void uiTemplateAssetView(struct uiLayout *layout,
                          struct PointerRNA *active_dataptr,
                          const char *active_propname,
                          const struct AssetFilterSettings *filter_settings,
+                         const int display_flags,
                          const char *activate_opname,
                          struct PointerRNA *r_activate_op_properties,
                          const char *drag_opname,
@@ -2576,10 +2596,7 @@ void ED_keymap_ui(struct wmKeyConfig *keyconf);
 void ED_uilisttypes_ui(void);
 
 void UI_drop_color_copy(struct wmDrag *drag, struct wmDropBox *drop);
-bool UI_drop_color_poll(struct bContext *C,
-                        struct wmDrag *drag,
-                        const struct wmEvent *event,
-                        const char **r_tooltip);
+bool UI_drop_color_poll(struct bContext *C, struct wmDrag *drag, const struct wmEvent *event);
 
 bool UI_context_copy_to_selected_list(struct bContext *C,
                                       struct PointerRNA *ptr,
@@ -2743,6 +2760,8 @@ void UI_interface_tag_script_reload(void);
 
 /* Support click-drag motion which presses the button and closes a popover (like a menu). */
 #define USE_UI_POPOVER_ONCE
+
+bool UI_tree_view_item_is_active(uiTreeViewItemHandle *item_);
 
 #ifdef __cplusplus
 }

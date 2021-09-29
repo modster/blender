@@ -111,6 +111,8 @@
 struct ID;
 struct ImBuf;
 struct bContext;
+struct wmDrag;
+struct wmDropBox;
 struct wmEvent;
 struct wmOperator;
 struct wmWindowManager;
@@ -182,6 +184,17 @@ enum {
   OPTYPE_LOCK_BYPASS = (1 << 9),
   /** Special type of undo which doesn't store itself multiple times. */
   OPTYPE_UNDO_GROUPED = (1 << 10),
+
+  /**
+   * Depends on the cursor location, when activated from a menu wait for mouse press.
+   *
+   * In practice these operators often end up being accessed:
+   * - Directly from key bindings.
+   * - As tools in the toolbar.
+   *
+   * Even so, accessing from the menu should behave usefully.
+   */
+  OPTYPE_DEPENDS_ON_CURSOR = (1 << 11),
 };
 
 /** For #WM_cursor_grab_enable wrap axis. */
@@ -226,16 +239,16 @@ typedef enum eOperatorPropTags {
 #define KM_CTRL 2
 #define KM_ALT 4
 #define KM_OSKEY 8
-/* means modifier should be pressed 2nd */
-#define KM_SHIFT2 16
-#define KM_CTRL2 32
-#define KM_ALT2 64
-#define KM_OSKEY2 128
+
+/* Used for key-map item creation function arguments (never stored in DNA). */
+#define KM_SHIFT_ANY 16
+#define KM_CTRL_ANY 32
+#define KM_ALT_ANY 64
+#define KM_OSKEY_ANY 128
 
 /* KM_MOD_ flags for `wmKeyMapItem` and `wmEvent.alt/shift/oskey/ctrl`. */
 /* note that KM_ANY and KM_NOTHING are used with these defines too */
-#define KM_MOD_FIRST 1
-#define KM_MOD_SECOND 2
+#define KM_MOD_HELD 1
 
 /* type: defined in wm_event_types.c */
 #define KM_TEXTINPUT -2
@@ -326,11 +339,10 @@ typedef struct wmNotifier {
 #define ND_LAYOUTDELETE (2 << 16)
 #define ND_ANIMPLAY (4 << 16)
 #define ND_GPENCIL (5 << 16)
-#define ND_EDITOR_CHANGED (6 << 16) /* Sent to new editors after switching to them. */
-#define ND_LAYOUTSET (7 << 16)
-#define ND_SKETCH (8 << 16)
-#define ND_WORKSPACE_SET (9 << 16)
-#define ND_WORKSPACE_DELETE (10 << 16)
+#define ND_LAYOUTSET (6 << 16)
+#define ND_SKETCH (7 << 16)
+#define ND_WORKSPACE_SET (8 << 16)
+#define ND_WORKSPACE_DELETE (9 << 16)
 
 /* NC_SCENE Scene */
 #define ND_SCENEBROWSE (1 << 16)
@@ -924,12 +936,20 @@ typedef struct wmDragID {
 } wmDragID;
 
 typedef struct wmDragAsset {
+  /* NOTE: Can't store the #AssetHandle here, since the #FileDirEntry it wraps may be freed while
+   * dragging. So store necessary data here directly. */
+
   char name[64]; /* MAX_NAME */
   /* Always freed. */
   const char *path;
   int id_type;
   int import_type; /* eFileAssetImportType */
 } wmDragAsset;
+
+typedef char *(*WMDropboxTooltipFunc)(struct bContext *,
+                                      struct wmDrag *,
+                                      const struct wmEvent *event,
+                                      struct wmDropBox *drop);
 
 typedef struct wmDrag {
   struct wmDrag *next, *prev;
@@ -946,8 +966,8 @@ typedef struct wmDrag {
   float scale;
   int sx, sy;
 
-  /** If set, draws operator name. */
-  char opname[200];
+  /** If filled, draws operator tooltip/operator name. */
+  char tooltip[200];
   unsigned int flags;
 
   /** List of wmDragIDs, all are guaranteed to have the same ID type. */
@@ -961,8 +981,8 @@ typedef struct wmDrag {
 typedef struct wmDropBox {
   struct wmDropBox *next, *prev;
 
-  /** Test if the dropbox is active, then can print optype name. */
-  bool (*poll)(struct bContext *, struct wmDrag *, const wmEvent *, const char **);
+  /** Test if the dropbox is active. */
+  bool (*poll)(struct bContext *, struct wmDrag *, const wmEvent *);
 
   /** Before exec, this copies drag info to #wmDrop properties. */
   void (*copy)(struct wmDrag *, struct wmDropBox *);
@@ -972,6 +992,9 @@ typedef struct wmDropBox {
    * `copy()` resources.
    */
   void (*cancel)(struct Main *, struct wmDrag *, struct wmDropBox *);
+
+  /** Custom tooltip shown during dragging. */
+  WMDropboxTooltipFunc tooltip;
 
   /**
    * If poll succeeds, operator is called.

@@ -269,7 +269,7 @@ void BKE_nla_tracks_copy(Main *bmain, ListBase *dst, const ListBase *src, const 
   /* copy each NLA-track, one at a time */
   for (nlt = src->first; nlt; nlt = nlt->next) {
     /* make a copy, and add the copy to the destination list */
-    // XXX: we need to fix this sometime
+    /* XXX: we need to fix this sometime. */
     nlt_d = BKE_nlatrack_copy(bmain, nlt, true, flag);
     BLI_addtail(dst, nlt_d);
   }
@@ -516,7 +516,7 @@ static float nlastrip_get_frame_actionclip(NlaStrip *strip, float cframe, short 
   if (IS_EQF(strip->repeat, 0.0f)) {
     strip->repeat = 1.0f;
   }
-  // repeat = strip->repeat; // UNUSED
+  // repeat = strip->repeat; /* UNUSED */
 
   /* scaling */
   if (IS_EQF(strip->scale, 0.0f)) {
@@ -1484,7 +1484,7 @@ void BKE_nlastrip_recalculate_bounds(NlaStrip *strip)
 }
 
 /* Is the given NLA-strip the first one to occur for the given AnimData block */
-// TODO: make this an api method if necessary, but need to add prefix first
+/* TODO: make this an api method if necessary, but need to add prefix first */
 static bool nlastrip_is_first(AnimData *adt, NlaStrip *strip)
 {
   NlaTrack *nlt;
@@ -2344,7 +2344,7 @@ void BKE_nla_blend_read_lib(BlendLibReader *reader, ID *id, ListBase *tracks)
   /* we only care about the NLA strips inside the tracks */
   LISTBASE_FOREACH (NlaTrack *, nlt, tracks) {
     /* If linking from a library, clear 'local' library override flag. */
-    if (id->lib != NULL) {
+    if (ID_IS_LINKED(id)) {
       nlt->flag &= ~NLATRACK_OVERRIDELIBRARY_LOCAL;
     }
 

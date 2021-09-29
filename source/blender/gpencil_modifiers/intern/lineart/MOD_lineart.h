@@ -208,7 +208,7 @@ typedef struct LineartChainRegisterEntry {
 enum eLineArtTileRecursiveLimit {
   /* If tile gets this small, it's already much smaller than a pixel. No need to continue
    * splitting. */
-  LRT_TILE_RECURSIVE_PERSPECTIVE = 30,
+  LRT_TILE_RECURSIVE_PERSPECTIVE = 16,
   /* This is a tried-and-true safe value for high poly models that also needed ortho rendering. */
   LRT_TILE_RECURSIVE_ORTHO = 10,
 };
@@ -227,6 +227,8 @@ typedef struct LineartRenderBuffer {
   double width_per_tile, height_per_tile;
   double view_projection[4][4];
   double view[4][4];
+
+  float overscan;
 
   struct LineartBoundingArea *initial_bounding_areas;
   unsigned int bounding_area_count;
@@ -302,6 +304,9 @@ typedef struct LineartRenderBuffer {
   bool filter_face_mark_invert;
   bool filter_face_mark_boundaries;
 
+  bool force_crease;
+  bool sharp_as_crease;
+
   /* Keep an copy of these data so when line art is running it's self-contained. */
   bool cam_is_persp;
   float cam_obmat[4][4];
@@ -311,6 +316,8 @@ typedef struct LineartRenderBuffer {
   float crease_threshold;
   float chaining_image_threshold;
   float angle_splitting_threshold;
+
+  float chain_smooth_tolerance;
 
   /* FIXME(Yiming): Temporary solution for speeding up calculation by not including lines that
    * are not in the selected source. This will not be needed after we have a proper scene-wise
@@ -473,7 +480,8 @@ typedef struct LineartBoundingArea {
 BLI_INLINE int lineart_LineIntersectTest2d(
     const double *a1, const double *a2, const double *b1, const double *b2, double *aRatio)
 {
-#define USE_VECTOR_LINE_INTERSECTION
+/* Legacy intersection math aligns better with occlusion function quirks. */
+/* #define USE_VECTOR_LINE_INTERSECTION */
 #ifdef USE_VECTOR_LINE_INTERSECTION
 
   /* from isect_line_line_v2_point() */
@@ -549,7 +557,7 @@ BLI_INLINE int lineart_LineIntersectTest2d(
       k1 = (a2[1] - a1[1]) / x_diff;
       k2 = (b2[1] - b1[1]) / x_diff2;
 
-      if ((k1 == k2))
+      if (k1 == k2)
         return 0;
 
       x = (a1[1] - b1[1] - k1 * a1[0] + k2 * b1[0]) / (k2 - k1);
@@ -586,6 +594,7 @@ void MOD_lineart_chain_split_for_fixed_occlusion(LineartRenderBuffer *rb);
 void MOD_lineart_chain_connect(LineartRenderBuffer *rb);
 void MOD_lineart_chain_discard_short(LineartRenderBuffer *rb, const float threshold);
 void MOD_lineart_chain_split_angle(LineartRenderBuffer *rb, float angle_threshold_rad);
+void MOD_lineart_smooth_chains(LineartRenderBuffer *rb, float tolerance);
 
 int MOD_lineart_chain_count(const LineartEdgeChain *ec);
 void MOD_lineart_chain_clear_picked_flag(LineartCache *lc);
