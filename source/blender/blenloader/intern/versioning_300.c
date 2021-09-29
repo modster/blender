@@ -449,6 +449,12 @@ static void do_versions_sequencer_speed_effect_recursive(Scene *scene, const Lis
 #undef SEQ_SPEED_COMPRESS_IPO_Y
 }
 
+static bool do_versions_sequencer_color_tags(Sequence *seq, void *UNUSED(user_data))
+{
+  seq->color_tag = SEQUENCE_COLOR_NONE;
+  return true;
+}
+
 static bNodeLink *find_connected_link(bNodeTree *ntree, bNodeSocket *in_socket)
 {
   LISTBASE_FOREACH (bNodeLink *, link, &ntree->links) {
@@ -1610,6 +1616,52 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
     LISTBASE_FOREACH (bNodeTree *, ntree, &bmain->nodetrees) {
       if (ntree->type == NTREE_GEOMETRY) {
         version_geometry_nodes_change_legacy_names(ntree);
+      }
+    }
+  }
+
+  if (!MAIN_VERSION_ATLEAST(bmain, 300, 31)) {
+    /* Swap header with the tool header so the regular header is always on the edge. */
+    for (bScreen *screen = bmain->screens.first; screen; screen = screen->id.next) {
+      LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
+        LISTBASE_FOREACH (SpaceLink *, sl, &area->spacedata) {
+          ListBase *regionbase = (sl == area->spacedata.first) ? &area->regionbase :
+                                                                 &sl->regionbase;
+          ARegion *region_tool = NULL, *region_head = NULL;
+          int region_tool_index = -1, region_head_index = -1, i;
+          LISTBASE_FOREACH_INDEX (ARegion *, region, regionbase, i) {
+            if (region->regiontype == RGN_TYPE_TOOL_HEADER) {
+              region_tool = region;
+              region_tool_index = i;
+            }
+            else if (region->regiontype == RGN_TYPE_HEADER) {
+              region_head = region;
+              region_head_index = i;
+            }
+          }
+          if ((region_tool && region_head) && (region_head_index > region_tool_index)) {
+            BLI_listbase_swaplinks(regionbase, region_tool, region_head);
+          }
+        }
+      }
+    }
+
+    /* Set strip color tags to SEQUENCE_COLOR_NONE. */
+    LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
+      if (scene->ed != NULL) {
+        SEQ_for_each_callback(&scene->ed->seqbase, do_versions_sequencer_color_tags, NULL);
+      }
+    }
+
+    /* Show vse color tags by default. */
+    LISTBASE_FOREACH (bScreen *, screen, &bmain->screens) {
+      LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
+        LISTBASE_FOREACH (SpaceLink *, sl, &area->spacedata) {
+          if (sl->spacetype == SPACE_SEQ) {
+            SpaceSeq *sseq = (SpaceSeq *)sl;
+            sseq->timeline_overlay.flag |= SEQ_TIMELINE_SHOW_STRIP_COLOR_TAG;
+          }
+        }
       }
     }
   }
