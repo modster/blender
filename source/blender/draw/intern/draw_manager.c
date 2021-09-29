@@ -189,13 +189,16 @@ static void draw_render_scene_free(DRWRenderScene *rscene)
 {
   if (rscene->is_active_scene == false) {
     for (int i = 0; i < 2; i++) {
-      GPU_TEXTURE_FREE_SAFE(rscene->views[i].combined.pass_tx);
-      GPU_FRAMEBUFFER_FREE_SAFE(rscene->views[i].combined.color_only_fb);
-      GPU_FRAMEBUFFER_FREE_SAFE(rscene->views[i].combined.pass_fb);
+      /* TODO(fclem) he texture is currently owned by the view_data instead. */
+      // GPU_TEXTURE_FREE_SAFE(rscene->views[i].combined.pass_tx);
+
       if (rscene->views[i].render_engine != NULL) {
         RE_engine_free(rscene->views[i].render_engine);
-        DRW_view_data_free(rscene->views[i].view_data);
         rscene->views[i].render_engine = NULL;
+      }
+      if (rscene->views[i].view_data != NULL) {
+        DRW_view_data_free(rscene->views[i].view_data);
+        rscene->views[i].view_data = NULL;
       }
     }
   }
@@ -672,17 +675,16 @@ static void drw_manager_init(DRWManager *dst, GPUViewport *viewport, const int s
 
   DRW_view_data_texture_list_size_validate(dst->view_data_active, (int[2]){UNPACK2(dst->size)});
 
-  if (viewport) {
+  if (viewport && dst->options.is_compositor_scene_render) {
+    /* Override the dtxl with the correct output texture. */
+    DRW_view_data_color_from_compositor_scene(dst->view_data_active, rscene, view);
+  }
+  else if (viewport) {
     DRW_view_data_default_lists_from_viewport(dst->view_data_active, viewport);
   }
 
   DefaultFramebufferList *dfbl = DRW_view_data_default_framebuffer_list_get(dst->view_data_active);
   dst->default_framebuffer = dfbl->default_fb;
-
-  if (dst->options.is_compositor_scene_render) {
-    /* Override the dtxl with the correct output texture. */
-    DRW_view_data_color_from_compositor_scene(dst->view_data_active, rscene, view);
-  }
 
   draw_unit_state_create();
 
