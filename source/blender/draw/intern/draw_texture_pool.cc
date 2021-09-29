@@ -80,7 +80,7 @@ GPUTexture *DRW_texture_pool_query(
   }
   pool->last_user_id = user_id;
 
-  uint64_t user_bit = 1u << user_id;
+  uint64_t user_bit = 1llu << user_id;
   for (DRWTexturePoolHandle &handle : pool->handles) {
     /* Skip if the user is already using this texture. */
     if (user_bit & handle.users_bits) {
