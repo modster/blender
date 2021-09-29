@@ -30,6 +30,7 @@ class TestGraph:
 
         data = []
         for device_name, device_entries in devices.items():
+
             # Gather used categories.
             categories = {}
             for entry in device_entries:
@@ -41,7 +42,7 @@ class TestGraph:
 
             # Generate one graph for every device x category x result key combination.
             for category, category_entries in categories.items():
-                entries = sorted(category_entries, key=lambda entry: (entry.revision, entry.test))
+                entries = sorted(category_entries, key=lambda entry: (entry.date, entry.revision, entry.test))
 
                 outputs = set()
                 for entry in entries:

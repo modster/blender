@@ -46,6 +46,7 @@
 #include "DNA_meta_types.h"
 #include "DNA_node_types.h"
 #include "DNA_object_types.h"
+#include "DNA_particle_types.h"
 #include "DNA_pointcloud_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_volume_types.h"
@@ -73,6 +74,7 @@
 #include "BKE_material.h"
 #include "BKE_mesh.h"
 #include "BKE_node.h"
+#include "BKE_object.h"
 #include "BKE_scene.h"
 
 #include "DEG_depsgraph.h"
@@ -179,31 +181,30 @@ static void material_foreach_id(ID *id, LibraryForeachIDData *data)
 static void material_blend_write(BlendWriter *writer, ID *id, const void *id_address)
 {
   Material *ma = (Material *)id;
-  if (ma->id.us > 0 || BLO_write_is_undo(writer)) {
-    /* Clean up, important in undo case to reduce false detection of changed datablocks. */
-    ma->texpaintslot = NULL;
-    BLI_listbase_clear(&ma->gpumaterial);
 
-    /* write LibData */
-    BLO_write_id_struct(writer, Material, id_address, &ma->id);
-    BKE_id_blend_write(writer, &ma->id);
+  /* Clean up, important in undo case to reduce false detection of changed datablocks. */
+  ma->texpaintslot = NULL;
+  BLI_listbase_clear(&ma->gpumaterial);
 
-    if (ma->adt) {
-      BKE_animdata_blend_write(writer, ma->adt);
-    }
+  /* write LibData */
+  BLO_write_id_struct(writer, Material, id_address, &ma->id);
+  BKE_id_blend_write(writer, &ma->id);
 
-    /* nodetree is integral part of material, no libdata */
-    if (ma->nodetree) {
-      BLO_write_struct(writer, bNodeTree, ma->nodetree);
-      ntreeBlendWrite(writer, ma->nodetree);
-    }
+  if (ma->adt) {
+    BKE_animdata_blend_write(writer, ma->adt);
+  }
 
-    BKE_previewimg_blend_write(writer, ma->preview);
+  /* nodetree is integral part of material, no libdata */
+  if (ma->nodetree) {
+    BLO_write_struct(writer, bNodeTree, ma->nodetree);
+    ntreeBlendWrite(writer, ma->nodetree);
+  }
 
-    /* grease pencil settings */
-    if (ma->gp_style) {
-      BLO_write_struct(writer, MaterialGPencilStyle, ma->gp_style);
-    }
+  BKE_previewimg_blend_write(writer, ma->preview);
+
+  /* grease pencil settings */
+  if (ma->gp_style) {
+    BLO_write_struct(writer, MaterialGPencilStyle, ma->gp_style);
   }
 }
 
@@ -260,7 +261,7 @@ IDTypeInfo IDType_ID_MA = {
     .name = "Material",
     .name_plural = "materials",
     .translation_context = BLT_I18NCONTEXT_ID_MATERIAL,
-    .flags = 0,
+    .flags = IDTYPE_FLAGS_APPEND_IS_REUSABLE,
 
     .init_data = material_init_data,
     .copy_data = material_copy_data,
@@ -463,21 +464,33 @@ static void material_data_index_remove_id(ID *id, short index)
   }
 }
 
-bool BKE_object_material_slot_used(ID *id, short actcol)
+bool BKE_object_material_slot_used(Object *object, short actcol)
 {
-  /* ensure we don't try get materials from non-obdata */
-  BLI_assert(OB_DATA_SUPPORT_ID(GS(id->name)));
+  if (!BKE_object_supports_material_slots(object)) {
+    return false;
+  }
 
-  switch (GS(id->name)) {
+  LISTBASE_FOREACH (ParticleSystem *, psys, &object->particlesystem) {
+    if (psys->part->omat == actcol) {
+      return true;
+    }
+  }
+
+  ID *ob_data = object->data;
+  if (ob_data == NULL || !OB_DATA_SUPPORT_ID(GS(ob_data->name))) {
+    return false;
+  }
+
+  switch (GS(ob_data->name)) {
     case ID_ME:
-      return BKE_mesh_material_index_used((Mesh *)id, actcol - 1);
+      return BKE_mesh_material_index_used((Mesh *)ob_data, actcol - 1);
     case ID_CU:
-      return BKE_curve_material_index_used((Curve *)id, actcol - 1);
+      return BKE_curve_material_index_used((Curve *)ob_data, actcol - 1);
     case ID_MB:
-      /* meta-elems don't have materials atm */
+      /* Meta-elements don't support materials at the moment. */
       return false;
     case ID_GD:
-      return BKE_gpencil_material_index_used((bGPdata *)id, actcol - 1);
+      return BKE_gpencil_material_index_used((bGPdata *)ob_data, actcol - 1);
     default:
       return false;
   }
@@ -1802,6 +1815,7 @@ void BKE_material_copybuf_free(void)
 {
   if (matcopybuf.nodetree) {
     ntreeFreeLocalTree(matcopybuf.nodetree);
+    BLI_assert(!matcopybuf.nodetree->id.py_instance); /* Or call #BKE_libblock_free_data_py. */
     MEM_freeN(matcopybuf.nodetree);
     matcopybuf.nodetree = NULL;
   }

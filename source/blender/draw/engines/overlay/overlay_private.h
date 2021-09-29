@@ -139,9 +139,10 @@ typedef struct OVERLAY_ShadingData {
   /** Grid */
   float grid_axes[3], grid_distance;
   float zplane_axes[3], grid_size[3];
-  float grid_steps[8];
+  float grid_steps[SI_GRID_STEPS_LEN];
   float inv_viewport_size[2];
   float grid_line_size;
+  float zoom_factor; /* Only for UV editor */
   int grid_flag;
   int zpos_flag;
   int zneg_flag;
@@ -722,6 +723,7 @@ GPUShader *OVERLAY_shader_extra_point(void);
 GPUShader *OVERLAY_shader_facing(void);
 GPUShader *OVERLAY_shader_gpencil_canvas(void);
 GPUShader *OVERLAY_shader_grid(void);
+GPUShader *OVERLAY_shader_grid_background(void);
 GPUShader *OVERLAY_shader_grid_image(void);
 GPUShader *OVERLAY_shader_image(void);
 GPUShader *OVERLAY_shader_motion_path_line(void);
@@ -736,7 +738,7 @@ GPUShader *OVERLAY_shader_paint_face(void);
 GPUShader *OVERLAY_shader_paint_point(void);
 GPUShader *OVERLAY_shader_paint_texture(void);
 GPUShader *OVERLAY_shader_paint_vertcol(void);
-GPUShader *OVERLAY_shader_paint_weight(void);
+GPUShader *OVERLAY_shader_paint_weight(bool shading);
 GPUShader *OVERLAY_shader_paint_wire(void);
 GPUShader *OVERLAY_shader_particle_dot(void);
 GPUShader *OVERLAY_shader_particle_shape(void);

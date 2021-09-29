@@ -42,14 +42,24 @@ TrackPositionOperation::TrackPositionOperation()
   this->m_relativeFrame = 0;
   this->m_speed_output = false;
   flags.is_set_operation = true;
+  is_track_position_calculated_ = false;
 }
 
 void TrackPositionOperation::initExecution()
 {
+  if (!is_track_position_calculated_) {
+    calc_track_position();
+  }
+}
+
+void TrackPositionOperation::calc_track_position()
+{
+  is_track_position_calculated_ = true;
   MovieTracking *tracking = nullptr;
   MovieClipUser user = {0};
   MovieTrackingObject *object;
 
+  track_position_ = 0;
   zero_v2(this->m_markerPos);
   zero_v2(this->m_relativePos);
 
@@ -114,6 +124,14 @@ void TrackPositionOperation::initExecution()
       }
     }
   }
+
+  track_position_ = this->m_markerPos[this->m_axis] - this->m_relativePos[this->m_axis];
+  if (this->m_axis == 0) {
+    track_position_ *= this->m_width;
+  }
+  else {
+    track_position_ *= this->m_height;
+  }
 }
 
 void TrackPositionOperation::executePixelSampled(float output[4],
@@ -131,11 +149,17 @@ void TrackPositionOperation::executePixelSampled(float output[4],
   }
 }
 
-void TrackPositionOperation::determineResolution(unsigned int resolution[2],
-                                                 unsigned int preferredResolution[2])
+const float *TrackPositionOperation::get_constant_elem()
 {
-  resolution[0] = preferredResolution[0];
-  resolution[1] = preferredResolution[1];
+  if (!is_track_position_calculated_) {
+    calc_track_position();
+  }
+  return &track_position_;
+}
+
+void TrackPositionOperation::determine_canvas(const rcti &preferred_area, rcti &r_area)
+{
+  r_area = preferred_area;
 }
 
 }  // namespace blender::compositor

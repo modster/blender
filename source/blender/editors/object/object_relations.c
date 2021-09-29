@@ -331,167 +331,6 @@ void OBJECT_OT_vertex_parent_set(wmOperatorType *ot)
 /** \} */
 
 /* ------------------------------------------------------------------- */
-/** \name Make Proxy Operator
- * \{ */
-
-/* set the object to proxify */
-static int make_proxy_invoke(bContext *C, wmOperator *op, const wmEvent *event)
-{
-  Scene *scene = CTX_data_scene(C);
-  Object *ob = ED_object_active_context(C);
-
-  /* sanity checks */
-  if (!scene || ID_IS_LINKED(scene) || !ob) {
-    return OPERATOR_CANCELLED;
-  }
-
-  /* Get object to work on - use a menu if we need to... */
-  if (ob->instance_collection && ID_IS_LINKED(ob->instance_collection)) {
-    /* gives menu with list of objects in group */
-    /* proxy_group_objects_menu(C, op, ob, ob->instance_collection); */
-    WM_enum_search_invoke(C, op, event);
-    return OPERATOR_CANCELLED;
-  }
-  if (ID_IS_LINKED(ob)) {
-    uiPopupMenu *pup = UI_popup_menu_begin(C, IFACE_("OK?"), ICON_QUESTION);
-    uiLayout *layout = UI_popup_menu_layout(pup);
-
-    /* create operator menu item with relevant properties filled in */
-    PointerRNA opptr_dummy;
-    uiItemFullO_ptr(
-        layout, op->type, op->type->name, ICON_NONE, NULL, WM_OP_EXEC_REGION_WIN, 0, &opptr_dummy);
-
-    /* present the menu and be done... */
-    UI_popup_menu_end(C, pup);
-
-    /* this invoke just calls another instance of this operator... */
-    return OPERATOR_INTERFACE;
-  }
-
-  /* error.. cannot continue */
-  BKE_report(op->reports, RPT_ERROR, "Can only make proxy for a referenced object or collection");
-  return OPERATOR_CANCELLED;
-}
-
-static int make_proxy_exec(bContext *C, wmOperator *op)
-{
-  Main *bmain = CTX_data_main(C);
-  Object *ob, *gob = ED_object_active_context(C);
-  Scene *scene = CTX_data_scene(C);
-  ViewLayer *view_layer = CTX_data_view_layer(C);
-
-  if (gob->instance_collection != NULL) {
-    const ListBase instance_collection_objects = BKE_collection_object_cache_get(
-        gob->instance_collection);
-    Base *base = BLI_findlink(&instance_collection_objects, RNA_enum_get(op->ptr, "object"));
-    ob = base->object;
-  }
-  else {
-    ob = gob;
-    gob = NULL;
-  }
-
-  if (ob) {
-    Object *newob;
-    char name[MAX_ID_NAME + 4];
-
-    BLI_snprintf(name, sizeof(name), "%s_proxy", ((ID *)(gob ? gob : ob))->name + 2);
-
-    /* Add new object for the proxy */
-    newob = BKE_object_add_from(bmain, scene, view_layer, OB_EMPTY, name, gob ? gob : ob);
-
-    /* set layers OK */
-    BKE_object_make_proxy(bmain, newob, ob, gob);
-
-    /* Set back pointer immediately so dependency graph knows that this is
-     * is a proxy and will act accordingly. Otherwise correctness of graph
-     * will depend on order of bases.
-     *
-     * TODO(sergey): We really need to get rid of this bi-directional links
-     * in proxies with something like library overrides.
-     */
-    if (newob->proxy != NULL) {
-      newob->proxy->proxy_from = newob;
-    }
-    else {
-      BKE_report(op->reports, RPT_ERROR, "Unable to assign proxy");
-    }
-
-    /* depsgraph flushes are needed for the new data */
-    DEG_relations_tag_update(bmain);
-    DEG_id_tag_update(&newob->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY | ID_RECALC_ANIMATION);
-    WM_event_add_notifier(C, NC_OBJECT | ND_DRAW, newob);
-  }
-  else {
-    BKE_report(op->reports, RPT_ERROR, "No object to make proxy for");
-    return OPERATOR_CANCELLED;
-  }
-
-  return OPERATOR_FINISHED;
-}
-
-/* Generic itemf's for operators that take library args */
-static const EnumPropertyItem *proxy_collection_object_itemf(bContext *C,
-                                                             PointerRNA *UNUSED(ptr),
-                                                             PropertyRNA *UNUSED(prop),
-                                                             bool *r_free)
-{
-  EnumPropertyItem item_tmp = {0}, *item = NULL;
-  int totitem = 0;
-  int i = 0;
-  Object *ob = ED_object_active_context(C);
-
-  if (!ob || !ob->instance_collection) {
-    return DummyRNA_DEFAULT_items;
-  }
-
-  /* find the object to affect */
-  FOREACH_COLLECTION_OBJECT_RECURSIVE_BEGIN (ob->instance_collection, object) {
-    item_tmp.identifier = item_tmp.name = object->id.name + 2;
-    item_tmp.value = i++;
-    RNA_enum_item_add(&item, &totitem, &item_tmp);
-  }
-  FOREACH_COLLECTION_OBJECT_RECURSIVE_END;
-
-  RNA_enum_item_end(&item, &totitem);
-  *r_free = true;
-
-  return item;
-}
-
-void OBJECT_OT_proxy_make(wmOperatorType *ot)
-{
-  PropertyRNA *prop;
-
-  /* identifiers */
-  ot->name = "Make Proxy";
-  ot->idname = "OBJECT_OT_proxy_make";
-  ot->description = "Add empty object to become local replacement data of a library-linked object";
-
-  /* callbacks */
-  ot->invoke = make_proxy_invoke;
-  ot->exec = make_proxy_exec;
-  ot->poll = ED_operator_object_active;
-
-  /* flags */
-  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
-
-  /* properties */
-  /* XXX, relies on hard coded ID at the moment */
-  prop = RNA_def_enum(ot->srna,
-                      "object",
-                      DummyRNA_DEFAULT_items,
-                      0,
-                      "Proxy Object",
-                      "Name of library-linked/collection object to make a proxy for");
-  RNA_def_enum_funcs(prop, proxy_collection_object_itemf);
-  RNA_def_property_flag(prop, PROP_ENUM_NO_TRANSLATE);
-  ot->prop = prop;
-}
-
-/** \} */
-
-/* ------------------------------------------------------------------- */
 /** \name Clear Parent Operator
  * \{ */
 
@@ -570,6 +409,8 @@ void ED_object_parent_clear(Object *ob, const int type)
 
       /* clear parenting relationship completely */
       ob->parent = NULL;
+      ob->partype = PAROBJECT;
+      ob->parsubstr[0] = 0;
       break;
     }
     case CLEAR_PARENT_KEEP_TRANSFORM: {
@@ -2723,24 +2564,55 @@ void OBJECT_OT_make_single_user(wmOperatorType *ot)
 /** \name Drop Named Material on Object Operator
  * \{ */
 
+char *ED_object_ot_drop_named_material_tooltip(bContext *C,
+                                               PointerRNA *properties,
+                                               const wmEvent *event)
+{
+  int mat_slot = 0;
+  Object *ob = ED_view3d_give_material_slot_under_cursor(C, event->mval, &mat_slot);
+  if (ob == NULL) {
+    return BLI_strdup("");
+  }
+  mat_slot = max_ii(mat_slot, 1);
+
+  char name[MAX_ID_NAME - 2];
+  RNA_string_get(properties, "name", name);
+
+  Material *prev_mat = BKE_object_material_get(ob, mat_slot);
+
+  char *result;
+  if (prev_mat) {
+    const char *tooltip = TIP_("Drop %s on %s (slot %d, replacing %s)");
+    result = BLI_sprintfN(tooltip, name, ob->id.name + 2, mat_slot, prev_mat->id.name + 2);
+  }
+  else {
+    const char *tooltip = TIP_("Drop %s on %s (slot %d)");
+    result = BLI_sprintfN(tooltip, name, ob->id.name + 2, mat_slot);
+  }
+  return result;
+}
+
 static int drop_named_material_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
   Main *bmain = CTX_data_main(C);
-  Base *base = ED_view3d_give_base_under_cursor(C, event->mval);
+  int mat_slot = 0;
+  Object *ob = ED_view3d_give_material_slot_under_cursor(C, event->mval, &mat_slot);
+  mat_slot = max_ii(mat_slot, 1);
+
   Material *ma;
   char name[MAX_ID_NAME - 2];
 
   RNA_string_get(op->ptr, "name", name);
   ma = (Material *)BKE_libblock_find_name(bmain, ID_MA, name);
-  if (base == NULL || ma == NULL) {
+  if (ob == NULL || ma == NULL) {
     return OPERATOR_CANCELLED;
   }
 
-  BKE_object_material_assign(CTX_data_main(C), base->object, ma, 1, BKE_MAT_ASSIGN_USERPREF);
+  BKE_object_material_assign(CTX_data_main(C), ob, ma, mat_slot, BKE_MAT_ASSIGN_USERPREF);
 
-  DEG_id_tag_update(&base->object->id, ID_RECALC_TRANSFORM);
+  DEG_id_tag_update(&ob->id, ID_RECALC_TRANSFORM);
 
-  WM_event_add_notifier(C, NC_OBJECT | ND_OB_SHADING, base->object);
+  WM_event_add_notifier(C, NC_OBJECT | ND_OB_SHADING, ob);
   WM_event_add_notifier(C, NC_SPACE | ND_SPACE_VIEW3D, NULL);
   WM_event_add_notifier(C, NC_MATERIAL | ND_SHADING_LINKS, ma);
 

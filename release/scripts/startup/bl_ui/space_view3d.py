@@ -46,13 +46,7 @@ class VIEW3D_HT_tool_header(Header):
     def draw(self, context):
         layout = self.layout
 
-        layout.row(align=True).template_header()
-
         self.draw_tool_settings(context)
-
-        layout.separator_spacer()
-
-        VIEW3D_HT_header.draw_xform_template(layout, context)
 
         layout.separator_spacer()
 
@@ -604,10 +598,8 @@ class VIEW3D_HT_header(Header):
         tool_settings = context.tool_settings
         view = context.space_data
         shading = view.shading
-        show_region_tool_header = view.show_region_tool_header
 
-        if not show_region_tool_header:
-            layout.row(align=True).template_header()
+        layout.row(align=True).template_header()
 
         row = layout.row(align=True)
         obj = context.active_object
@@ -754,7 +746,7 @@ class VIEW3D_HT_header(Header):
                     )
 
             layout.separator_spacer()
-        elif not show_region_tool_header:
+        else:
             # Transform settings depending on tool header visibility
             VIEW3D_HT_header.draw_xform_template(layout, context)
 
@@ -1362,6 +1354,7 @@ class VIEW3D_MT_select_object(Menu):
 
         layout.operator("view3d.select_box")
         layout.operator("view3d.select_circle")
+        layout.operator_menu_enum("view3d.select_lasso", "mode")
 
         layout.separator()
 
@@ -1422,6 +1415,7 @@ class VIEW3D_MT_select_pose(Menu):
 
         layout.operator("view3d.select_box")
         layout.operator("view3d.select_circle")
+        layout.operator_menu_enum("view3d.select_lasso", "mode")
 
         layout.separator()
 
@@ -1456,6 +1450,7 @@ class VIEW3D_MT_select_particle(Menu):
 
         layout.operator("view3d.select_box")
         layout.operator("view3d.select_circle")
+        layout.operator_menu_enum("view3d.select_lasso", "mode")
 
         layout.separator()
 
@@ -1562,6 +1557,7 @@ class VIEW3D_MT_select_edit_mesh(Menu):
 
         layout.operator("view3d.select_box")
         layout.operator("view3d.select_circle")
+        layout.operator_menu_enum("view3d.select_lasso", "mode")
 
         layout.separator()
 
@@ -1615,6 +1611,7 @@ class VIEW3D_MT_select_edit_curve(Menu):
 
         layout.operator("view3d.select_box")
         layout.operator("view3d.select_circle")
+        layout.operator_menu_enum("view3d.select_lasso", "mode")
 
         layout.separator()
 
@@ -1650,6 +1647,7 @@ class VIEW3D_MT_select_edit_surface(Menu):
 
         layout.operator("view3d.select_box")
         layout.operator("view3d.select_circle")
+        layout.operator_menu_enum("view3d.select_lasso", "mode")
 
         layout.separator()
 
@@ -1711,6 +1709,7 @@ class VIEW3D_MT_select_edit_metaball(Menu):
 
         layout.operator("view3d.select_box")
         layout.operator("view3d.select_circle")
+        layout.operator_menu_enum("view3d.select_lasso", "mode")
 
         layout.separator()
 
@@ -1752,6 +1751,7 @@ class VIEW3D_MT_select_edit_lattice(Menu):
 
         layout.operator("view3d.select_box")
         layout.operator("view3d.select_circle")
+        layout.operator_menu_enum("view3d.select_lasso", "mode")
 
         layout.separator()
 
@@ -1782,6 +1782,7 @@ class VIEW3D_MT_select_edit_armature(Menu):
 
         layout.operator("view3d.select_box")
         layout.operator("view3d.select_circle")
+        layout.operator_menu_enum("view3d.select_lasso", "mode")
 
         layout.separator()
 
@@ -1849,11 +1850,13 @@ class VIEW3D_MT_select_gpencil(Menu):
 
         layout.operator("gpencil.select_box")
         layout.operator("gpencil.select_circle")
+        layout.operator_menu_enum("gpencil.select_lasso", "mode")
 
         layout.separator()
 
         layout.operator("gpencil.select_linked", text="Linked")
         layout.operator("gpencil.select_alternate")
+        layout.operator("gpencil.select_random")
         layout.operator_menu_enum("gpencil.select_grouped", "type", text="Grouped")
 
         if context.mode == 'VERTEX_GPENCIL':
@@ -1884,6 +1887,7 @@ class VIEW3D_MT_select_paint_mask(Menu):
 
         layout.operator("view3d.select_box")
         layout.operator("view3d.select_circle")
+        layout.operator_menu_enum("view3d.select_lasso", "mode")
 
         layout.separator()
 
@@ -1904,6 +1908,7 @@ class VIEW3D_MT_select_paint_mask_vertex(Menu):
 
         layout.operator("view3d.select_box")
         layout.operator("view3d.select_circle")
+        layout.operator_menu_enum("view3d.select_lasso", "mode")
 
         layout.separator()
 
@@ -2220,8 +2225,6 @@ class VIEW3D_MT_object_relations(Menu):
 
     def draw(self, _context):
         layout = self.layout
-
-        layout.operator("object.proxy_make", text="Make Proxy...")
 
         layout.operator("object.make_override_library", text="Make Library Override...")
 
@@ -3440,6 +3443,7 @@ class VIEW3D_MT_pose_slide(Menu):
         layout.operator("pose.push")
         layout.operator("pose.relax")
         layout.operator("pose.breakdown")
+        layout.operator("pose.blend_to_neighbour")
 
 
 class VIEW3D_MT_pose_propagate(Menu):
@@ -3592,6 +3596,7 @@ class VIEW3D_MT_pose_context_menu(Menu):
         layout.operator("pose.push")
         layout.operator("pose.relax")
         layout.operator("pose.breakdown")
+        layout.operator("pose.blend_to_neighbour")
 
         layout.separator()
 
@@ -3982,6 +3987,7 @@ class VIEW3D_MT_edit_mesh_vertices(Menu):
         layout.operator_context = 'INVOKE_REGION_WIN'
 
         layout.operator("mesh.extrude_vertices_move", text="Extrude Vertices")
+        layout.operator("mesh.dupli_extrude_cursor").rotate_source = True
         layout.operator("mesh.bevel", text="Bevel Vertices").affect = 'VERTICES'
 
         layout.separator()
@@ -4413,6 +4419,7 @@ class VIEW3D_MT_edit_curve_ctrlpoints(Menu):
 
         if edit_object.type in {'CURVE', 'SURFACE'}:
             layout.operator("curve.extrude_move")
+            layout.operator("curve.vertex_add")
 
             layout.separator()
 
@@ -4741,6 +4748,7 @@ class VIEW3D_MT_edit_armature(Menu):
         layout.separator()
 
         layout.operator("armature.extrude_move")
+        layout.operator("armature.click_extrude")
 
         if arm.use_mirror_x:
             layout.operator("armature.extrude_forked")
@@ -6406,7 +6414,13 @@ class VIEW3D_PT_overlay_edit_mesh_normals(Panel):
 
         sub = row.row(align=True)
         sub.active = overlay.show_vertex_normals or overlay.show_face_normals or overlay.show_split_normals
-        sub.prop(overlay, "normals_length", text="Size")
+        if overlay.use_normals_constant_screen_size:
+            sub.prop(overlay, "normals_constant_screen_size", text="Size")
+        else:
+            sub.prop(overlay, "normals_length", text="Size")
+
+        row.prop(overlay, "use_normals_constant_screen_size", text="", icon='FIXED_SIZE')
+
 
 
 class VIEW3D_PT_overlay_edit_mesh_freestyle(Panel):

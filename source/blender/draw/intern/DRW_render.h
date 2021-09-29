@@ -353,7 +353,7 @@ typedef enum {
   /** Culling test */
   DRW_STATE_CULL_BACK = (1 << 7),
   DRW_STATE_CULL_FRONT = (1 << 8),
-  /** Stencil test . These options are mutually exclusive and packed into 2 bits. */
+  /** Stencil test. These options are mutually exclusive and packed into 2 bits. */
   DRW_STATE_STENCIL_ALWAYS = (1 << 9),
   DRW_STATE_STENCIL_EQUAL = (2 << 9),
   DRW_STATE_STENCIL_NEQUAL = (3 << 9),
@@ -762,9 +762,9 @@ void DRW_select_load_id(uint id);
 /* Draw State */
 bool DRW_state_is_fbo(void);
 bool DRW_state_is_select(void);
+bool DRW_state_is_material_select(void);
 bool DRW_state_is_depth(void);
 bool DRW_state_is_image_render(void);
-bool DRW_state_do_color_management(void);
 bool DRW_state_is_scene_render(void);
 bool DRW_state_is_opengl_render(void);
 bool DRW_state_is_playback(void);

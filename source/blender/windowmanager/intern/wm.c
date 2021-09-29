@@ -266,8 +266,7 @@ IDTypeInfo IDType_ID_WM = {
     .name = "WindowManager",
     .name_plural = "window_managers",
     .translation_context = BLT_I18NCONTEXT_ID_WINDOWMANAGER,
-    .flags = IDTYPE_FLAGS_NO_COPY | IDTYPE_FLAGS_NO_LIBLINKING | IDTYPE_FLAGS_NO_MAKELOCAL |
-             IDTYPE_FLAGS_NO_ANIMDATA,
+    .flags = IDTYPE_FLAGS_NO_COPY | IDTYPE_FLAGS_NO_LIBLINKING | IDTYPE_FLAGS_NO_ANIMDATA,
 
     .init_data = NULL,
     .copy_data = NULL,
@@ -628,6 +627,7 @@ void wm_close_and_free_all(bContext *C, ListBase *wmlist)
     wm_close_and_free(C, wm);
     BLI_remlink(wmlist, wm);
     BKE_libblock_free_data(&wm->id, true);
+    BKE_libblock_free_data_py(&wm->id);
     MEM_freeN(wm);
   }
 }

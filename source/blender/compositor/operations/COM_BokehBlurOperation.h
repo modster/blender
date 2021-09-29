@@ -18,12 +18,12 @@
 
 #pragma once
 
-#include "COM_NodeOperation.h"
+#include "COM_MultiThreadedOperation.h"
 #include "COM_QualityStepHelper.h"
 
 namespace blender::compositor {
 
-class BokehBlurOperation : public NodeOperation, public QualityStepHelper {
+class BokehBlurOperation : public MultiThreadedOperation, public QualityStepHelper {
  private:
   SocketReader *m_inputProgram;
   SocketReader *m_inputBokehProgram;
@@ -31,6 +31,7 @@ class BokehBlurOperation : public NodeOperation, public QualityStepHelper {
   void updateSize();
   float m_size;
   bool m_sizeavailable;
+
   float m_bokehMidX;
   float m_bokehMidY;
   float m_bokehDimension;
@@ -38,6 +39,8 @@ class BokehBlurOperation : public NodeOperation, public QualityStepHelper {
 
  public:
   BokehBlurOperation();
+
+  void init_data() override;
 
   void *initializeTileData(rcti *rect) override;
   /**
@@ -77,8 +80,12 @@ class BokehBlurOperation : public NodeOperation, public QualityStepHelper {
     this->m_extend_bounds = extend_bounds;
   }
 
-  void determineResolution(unsigned int resolution[2],
-                           unsigned int preferredResolution[2]) override;
+  void determine_canvas(const rcti &preferred_area, rcti &r_area) override;
+
+  void get_area_of_interest(int input_idx, const rcti &output_area, rcti &r_input_area) override;
+  void update_memory_buffer_partial(MemoryBuffer *output,
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
 };
 
 }  // namespace blender::compositor

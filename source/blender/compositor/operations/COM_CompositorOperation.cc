@@ -62,7 +62,7 @@ void CompositorOperation::initExecution()
     return;
   }
 
-  // When initializing the tree during initial load the width and height can be zero.
+  /* When initializing the tree during initial load the width and height can be zero. */
   this->m_imageInput = getInputSocketReader(0);
   this->m_alphaInput = getInputSocketReader(1);
   this->m_depthInput = getInputSocketReader(2);
@@ -220,14 +220,29 @@ void CompositorOperation::executeRegion(rcti *rect, unsigned int /*tileNumber*/)
   }
 }
 
-void CompositorOperation::determineResolution(unsigned int resolution[2],
-                                              unsigned int preferredResolution[2])
+void CompositorOperation::update_memory_buffer_partial(MemoryBuffer *UNUSED(output),
+                                                       const rcti &area,
+                                                       Span<MemoryBuffer *> inputs)
+{
+  if (!m_outputBuffer) {
+    return;
+  }
+  MemoryBuffer output_buf(m_outputBuffer, COM_DATA_TYPE_COLOR_CHANNELS, getWidth(), getHeight());
+  output_buf.copy_from(inputs[0], area);
+  if (this->m_useAlphaInput) {
+    output_buf.copy_from(inputs[1], area, 0, COM_DATA_TYPE_VALUE_CHANNELS, 3);
+  }
+  MemoryBuffer depth_buf(m_depthBuffer, COM_DATA_TYPE_VALUE_CHANNELS, getWidth(), getHeight());
+  depth_buf.copy_from(inputs[2], area);
+}
+
+void CompositorOperation::determine_canvas(const rcti &UNUSED(preferred_area), rcti &r_area)
 {
   int width = this->m_rd->xsch * this->m_rd->size / 100;
   int height = this->m_rd->ysch * this->m_rd->size / 100;
 
-  // check actual render resolution with cropping it may differ with cropped border.rendering
-  // FIX for: [31777] Border Crop gives black (easy)
+  /* Check actual render resolution with cropping it may differ with cropped border.rendering
+   * Fix for T31777 Border Crop gives black (easy). */
   Render *re = RE_GetSceneRender(this->m_scene);
   if (re) {
     RenderResult *rr = RE_AcquireResultRead(re);
@@ -238,13 +253,11 @@ void CompositorOperation::determineResolution(unsigned int resolution[2],
     RE_ReleaseResult(re);
   }
 
-  preferredResolution[0] = width;
-  preferredResolution[1] = height;
+  rcti local_preferred;
+  BLI_rcti_init(&local_preferred, 0, width, 0, height);
 
-  NodeOperation::determineResolution(resolution, preferredResolution);
-
-  resolution[0] = width;
-  resolution[1] = height;
+  NodeOperation::determine_canvas(local_preferred, r_area);
+  r_area = local_preferred;
 }
 
 }  // namespace blender::compositor

@@ -59,7 +59,6 @@ class Sampling {
   uint64_t motion_blur_steps_ = 1;
   /** Used for viewport smooth transition. */
   int64_t sample_viewport_ = 1;
-  int64_t sample_count_viewport_ = 64;
   int64_t viewport_smoothing_start = 0;
   int64_t viewport_smoothing_duration = 0;
   /** Tag to reset sampling for the next sample. */

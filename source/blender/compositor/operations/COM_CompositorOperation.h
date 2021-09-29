@@ -20,7 +20,7 @@
 
 #include "BLI_rect.h"
 #include "BLI_string.h"
-#include "COM_NodeOperation.h"
+#include "COM_MultiThreadedOperation.h"
 
 struct Scene;
 
@@ -29,7 +29,7 @@ namespace blender::compositor {
 /**
  * \brief Compositor output operation
  */
-class CompositorOperation : public NodeOperation {
+class CompositorOperation : public MultiThreadedOperation {
  private:
   const struct Scene *m_scene;
   /**
@@ -115,8 +115,7 @@ class CompositorOperation : public NodeOperation {
   {
     return eCompositorPriority::Medium;
   }
-  void determineResolution(unsigned int resolution[2],
-                           unsigned int preferredResolution[2]) override;
+  void determine_canvas(const rcti &preferred_area, rcti &r_area) override;
   void setUseAlphaInput(bool value)
   {
     this->m_useAlphaInput = value;
@@ -125,6 +124,10 @@ class CompositorOperation : public NodeOperation {
   {
     this->m_active = active;
   }
+
+  void update_memory_buffer_partial(MemoryBuffer *output,
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
 };
 
 }  // namespace blender::compositor

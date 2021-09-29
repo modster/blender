@@ -31,7 +31,7 @@ extern "C" {
 #endif
 
 #define MAX_FUNCTION_NAME 64
-#define MAX_PARAMETER 32
+#define MAX_PARAMETER 36
 
 struct GSet;
 

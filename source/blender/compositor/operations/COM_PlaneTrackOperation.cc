@@ -83,36 +83,56 @@ void PlaneTrackCommon::readCornersFromTrack(float corners[4][2], float frame)
   }
 }
 
-void PlaneTrackCommon::determineResolution(unsigned int resolution[2],
-                                           unsigned int /*preferredResolution*/[2])
+void PlaneTrackCommon::determine_canvas(const rcti &preferred_area, rcti &r_area)
 {
-  resolution[0] = 0;
-  resolution[1] = 0;
-
+  r_area = COM_AREA_NONE;
   if (this->m_movieClip) {
     int width, height;
     MovieClipUser user = {0};
     BKE_movieclip_user_set_frame(&user, this->m_framenumber);
     BKE_movieclip_get_size(this->m_movieClip, &user, &width, &height);
-    resolution[0] = width;
-    resolution[1] = height;
+    r_area = preferred_area;
+    r_area.xmax = r_area.xmin + width;
+    r_area.ymax = r_area.ymin + height;
   }
 }
 
 /* ******** PlaneTrackMaskOperation ******** */
 
+void PlaneTrackMaskOperation::init_data()
+{
+  PlaneDistortMaskOperation::init_data();
+  if (execution_model_ == eExecutionModel::FullFrame) {
+    PlaneTrackCommon::read_and_calculate_corners(this);
+  }
+}
+
+/* TODO(manzanilla): to be removed with tiled implementation. */
 void PlaneTrackMaskOperation::initExecution()
 {
   PlaneDistortMaskOperation::initExecution();
-  PlaneTrackCommon::read_and_calculate_corners(this);
+  if (execution_model_ == eExecutionModel::Tiled) {
+    PlaneTrackCommon::read_and_calculate_corners(this);
+  }
 }
 
 /* ******** PlaneTrackWarpImageOperation ******** */
 
+void PlaneTrackWarpImageOperation::init_data()
+{
+  PlaneDistortWarpImageOperation::init_data();
+  if (execution_model_ == eExecutionModel::FullFrame) {
+    PlaneTrackCommon::read_and_calculate_corners(this);
+  }
+}
+
+/* TODO(manzanilla): to be removed with tiled implementation. */
 void PlaneTrackWarpImageOperation::initExecution()
 {
   PlaneDistortWarpImageOperation::initExecution();
-  PlaneTrackCommon::read_and_calculate_corners(this);
+  if (execution_model_ == eExecutionModel::Tiled) {
+    PlaneTrackCommon::read_and_calculate_corners(this);
+  }
 }
 
 }  // namespace blender::compositor

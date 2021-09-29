@@ -741,6 +741,58 @@ static void rna_ID_override_template_create(ID *id, ReportList *reports)
   BKE_lib_override_library_template_create(id);
 }
 
+static void rna_ID_override_library_operations_update(ID *id,
+                                                      IDOverrideLibrary *UNUSED(override_library),
+                                                      Main *bmain,
+                                                      ReportList *reports)
+{
+  if (!ID_IS_OVERRIDE_LIBRARY_REAL(id)) {
+    BKE_reportf(reports, RPT_ERROR, "ID '%s' isn't an override", id->name);
+    return;
+  }
+
+  BKE_lib_override_library_operations_create(bmain, id);
+}
+
+static void rna_ID_override_library_reset(ID *id,
+                                          IDOverrideLibrary *UNUSED(override_library),
+                                          Main *bmain,
+                                          ReportList *reports,
+                                          bool do_hierarchy)
+{
+  if (!ID_IS_OVERRIDE_LIBRARY_REAL(id)) {
+    BKE_reportf(reports, RPT_ERROR, "ID '%s' isn't an override", id->name);
+    return;
+  }
+
+  if (do_hierarchy) {
+    BKE_lib_override_library_id_hierarchy_reset(bmain, id);
+  }
+  else {
+    BKE_lib_override_library_id_reset(bmain, id);
+  }
+}
+
+static void rna_ID_override_library_destroy(ID *id,
+                                            IDOverrideLibrary *UNUSED(override_library),
+                                            Main *bmain,
+                                            ReportList *reports,
+                                            bool do_hierarchy)
+{
+  if (!ID_IS_OVERRIDE_LIBRARY_REAL(id)) {
+    BKE_reportf(reports, RPT_ERROR, "ID '%s' isn't an override", id->name);
+    return;
+  }
+
+  if (do_hierarchy) {
+    BKE_lib_override_library_delete(bmain, id);
+  }
+  else {
+    BKE_libblock_remap(bmain, id, id->override_library->reference, ID_REMAP_SKIP_INDIRECT_USAGE);
+    BKE_id_delete(bmain, id);
+  }
+}
+
 static IDOverrideLibraryProperty *rna_ID_override_library_properties_add(
     IDOverrideLibrary *override_library, ReportList *reports, const char rna_path[])
 {
@@ -753,6 +805,18 @@ static IDOverrideLibraryProperty *rna_ID_override_library_properties_add(
   }
 
   return result;
+}
+
+static void rna_ID_override_library_properties_remove(IDOverrideLibrary *override_library,
+                                                      ReportList *reports,
+                                                      IDOverrideLibraryProperty *override_property)
+{
+  if (BLI_findindex(&override_library->properties, override_property) == -1) {
+    BKE_report(reports, RPT_ERROR, "Override property cannot be removed");
+    return;
+  }
+
+  BKE_lib_override_library_property_delete(override_library, override_property);
 }
 
 static IDOverrideLibraryPropertyOperation *rna_ID_override_library_property_operations_add(
@@ -780,6 +844,19 @@ static IDOverrideLibraryPropertyOperation *rna_ID_override_library_property_oper
     BKE_report(reports, RPT_DEBUG, "No new override operation created, operation already exists");
   }
   return result;
+}
+
+static void rna_ID_override_library_property_operations_remove(
+    IDOverrideLibraryProperty *override_property,
+    ReportList *reports,
+    IDOverrideLibraryPropertyOperation *override_operation)
+{
+  if (BLI_findindex(&override_property->operations, override_operation) == -1) {
+    BKE_report(reports, RPT_ERROR, "Override operation cannot be removed");
+    return;
+  }
+
+  BKE_lib_override_library_property_operation_delete(override_property, override_operation);
 }
 
 static void rna_ID_update_tag(ID *id, Main *bmain, ReportList *reports, int flag)
@@ -854,11 +931,10 @@ static void rna_ID_user_remap(ID *id, Main *bmain, ID *new_id)
 
 static struct ID *rna_ID_make_local(struct ID *self, Main *bmain, bool clear_proxy)
 {
-  BKE_lib_id_make_local(
-      bmain, self, false, clear_proxy ? 0 : LIB_ID_MAKELOCAL_OBJECT_NO_PROXY_CLEARING);
+  BKE_lib_id_make_local(bmain, self, clear_proxy ? 0 : LIB_ID_MAKELOCAL_OBJECT_NO_PROXY_CLEARING);
 
   ID *ret_id = self->newid ? self->newid : self;
-  BKE_id_clear_newpoin(self);
+  BKE_id_newptr_and_tag_clear(self);
   return ret_id;
 }
 
@@ -1633,6 +1709,16 @@ static void rna_def_ID_override_library_property_operations(BlenderRNA *brna, Pr
                          "New Operation",
                          "Created operation");
   RNA_def_function_return(func, parm);
+
+  func = RNA_def_function(srna, "remove", "rna_ID_override_library_property_operations_remove");
+  RNA_def_function_ui_description(func, "Remove and delete an operation");
+  RNA_def_function_flag(func, FUNC_USE_REPORTS);
+  parm = RNA_def_pointer(func,
+                         "operation",
+                         "IDOverrideLibraryPropertyOperation",
+                         "Operation",
+                         "Override operation to be deleted");
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
 }
 
 static void rna_def_ID_override_library_property(BlenderRNA *brna)
@@ -1689,12 +1775,23 @@ static void rna_def_ID_override_library_properties(BlenderRNA *brna, PropertyRNA
   parm = RNA_def_string(
       func, "rna_path", NULL, 256, "RNA Path", "RNA-Path of the property to add");
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+
+  func = RNA_def_function(srna, "remove", "rna_ID_override_library_properties_remove");
+  RNA_def_function_ui_description(func, "Remove and delete a property");
+  RNA_def_function_flag(func, FUNC_USE_REPORTS);
+  parm = RNA_def_pointer(func,
+                         "property",
+                         "IDOverrideLibraryProperty",
+                         "Property",
+                         "Override property to be deleted");
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
 }
 
 static void rna_def_ID_override_library(BlenderRNA *brna)
 {
   StructRNA *srna;
   PropertyRNA *prop;
+  FunctionRNA *func;
 
   srna = RNA_def_struct(brna, "IDOverrideLibrary", NULL);
   RNA_def_struct_ui_text(
@@ -1709,6 +1806,35 @@ static void rna_def_ID_override_library(BlenderRNA *brna)
                             "Properties",
                             "List of overridden properties");
   rna_def_ID_override_library_properties(brna, prop);
+
+  /* Update function. */
+  func = RNA_def_function(srna, "operations_update", "rna_ID_override_library_operations_update");
+  RNA_def_function_flag(func, FUNC_USE_MAIN | FUNC_USE_SELF_ID | FUNC_USE_REPORTS);
+  RNA_def_function_ui_description(func,
+                                  "Update the library override operations based on the "
+                                  "differences between this override ID and its reference");
+
+  func = RNA_def_function(srna, "reset", "rna_ID_override_library_reset");
+  RNA_def_function_ui_description(func,
+                                  "Reset this override to match again its linked reference ID");
+  RNA_def_function_flag(func, FUNC_USE_MAIN | FUNC_USE_SELF_ID | FUNC_USE_REPORTS);
+  RNA_def_boolean(
+      func,
+      "do_hierarchy",
+      true,
+      "",
+      "Also reset all the dependencies of this override to match their reference linked IDs");
+
+  func = RNA_def_function(srna, "destroy", "rna_ID_override_library_destroy");
+  RNA_def_function_ui_description(
+      func, "Delete this override ID and remap its usages to its linked reference ID instead");
+  RNA_def_function_flag(func, FUNC_USE_MAIN | FUNC_USE_SELF_ID | FUNC_USE_REPORTS);
+  RNA_def_boolean(func,
+                  "do_hierarchy",
+                  true,
+                  "",
+                  "Also delete all the dependencies of this override and remap their usages to "
+                  "their reference linked IDs");
 
   rna_def_ID_override_library_property(brna);
 }
@@ -1809,6 +1935,15 @@ static void rna_def_ID(BlenderRNA *brna)
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
   RNA_def_property_override_flag(prop, PROPOVERRIDE_NO_COMPARISON);
   RNA_def_property_ui_text(prop, "Library", "Library file the data-block is linked from");
+
+  prop = RNA_def_pointer(srna,
+                         "library_weak_reference",
+                         "LibraryWeakReference",
+                         "Library Weak Reference",
+                         "Weak reference to a data-block in another library .blend file (used to "
+                         "re-use already appended data instead of appending new copies)");
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_override_flag(prop, PROPOVERRIDE_NO_COMPARISON);
 
   prop = RNA_def_property(srna, "asset_data", PROP_POINTER, PROP_NONE);
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
@@ -2017,6 +2152,31 @@ static void rna_def_library(BlenderRNA *brna)
   RNA_def_function_ui_description(func, "Reload this library and all its linked data-blocks");
 }
 
+static void rna_def_library_weak_reference(BlenderRNA *brna)
+{
+  StructRNA *srna;
+  PropertyRNA *prop;
+
+  srna = RNA_def_struct(brna, "LibraryWeakReference", NULL);
+  RNA_def_struct_ui_text(
+      srna,
+      "LibraryWeakReference",
+      "Read-only external reference to a linked data-block and its library file");
+
+  prop = RNA_def_property(srna, "filepath", PROP_STRING, PROP_FILEPATH);
+  RNA_def_property_string_sdna(prop, NULL, "library_filepath");
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_ui_text(prop, "File Path", "Path to the library .blend file");
+
+  prop = RNA_def_property(srna, "id_name", PROP_STRING, PROP_FILEPATH);
+  RNA_def_property_string_sdna(prop, NULL, "library_id_name");
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_ui_text(
+      prop,
+      "ID name",
+      "Full ID name in the library .blend file (including the two leading 'id type' chars)");
+}
+
 /**
  * \attention This is separate from the above. It allows for RNA functions to
  * return an IDProperty *. See MovieClip.metadata for a usage example.
@@ -2049,6 +2209,7 @@ void RNA_def_ID(BlenderRNA *brna)
   rna_def_ID_properties(brna);
   rna_def_ID_materials(brna);
   rna_def_library(brna);
+  rna_def_library_weak_reference(brna);
   rna_def_idproperty_wrap_ptr(brna);
 }
 

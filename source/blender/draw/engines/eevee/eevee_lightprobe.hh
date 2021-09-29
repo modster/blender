@@ -51,7 +51,7 @@ class LightProbeModule {
   /* OPTI(fclem) Share for the whole scene? Only allocate temporary? */
   Texture cube_depth_tx_ = Texture("CubemapDepth");
   Texture cube_color_tx_ = Texture("CubemapColor");
-  std::array<LightProbeView, 6> probe_views_;
+  LightProbeView probe_views_[6];
 
   Framebuffer cube_downsample_fb_ = Framebuffer("cube_downsample");
   Framebuffer filter_cube_fb_ = Framebuffer("filter_cube");
@@ -78,14 +78,14 @@ class LightProbeModule {
  public:
   LightProbeModule(Instance &inst)
       : inst_(inst),
-        probe_views_({
-            LightProbeView(inst, "posX_view", cubeface_mat[0], 0),
-            LightProbeView(inst, "negX_view", cubeface_mat[1], 1),
-            LightProbeView(inst, "posY_view", cubeface_mat[2], 2),
-            LightProbeView(inst, "negY_view", cubeface_mat[3], 3),
-            LightProbeView(inst, "posZ_view", cubeface_mat[4], 4),
-            LightProbeView(inst, "negZ_view", cubeface_mat[5], 5),
-        }){};
+        probe_views_{{inst, "posX_view", cubeface_mat[0], 0},
+                     {inst, "negX_view", cubeface_mat[1], 1},
+                     {inst, "posY_view", cubeface_mat[2], 2},
+                     {inst, "negY_view", cubeface_mat[3], 3},
+                     {inst, "posZ_view", cubeface_mat[4], 4},
+                     {inst, "negZ_view", cubeface_mat[5], 5}}
+  {
+  }
 
   ~LightProbeModule()
   {

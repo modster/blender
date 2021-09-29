@@ -71,19 +71,13 @@ void MovieClipBaseOperation::deinitExecution()
   }
 }
 
-void MovieClipBaseOperation::determineResolution(unsigned int resolution[2],
-                                                 unsigned int /*preferredResolution*/[2])
+void MovieClipBaseOperation::determine_canvas(const rcti &UNUSED(preferred_area), rcti &r_area)
 {
-  resolution[0] = 0;
-  resolution[1] = 0;
-
+  r_area = COM_AREA_NONE;
   if (this->m_movieClip) {
     int width, height;
-
     BKE_movieclip_get_size(this->m_movieClip, this->m_movieClipUser, &width, &height);
-
-    resolution[0] = width;
-    resolution[1] = height;
+    BLI_rcti_init(&r_area, 0, width, 0, height);
   }
 }
 
@@ -116,6 +110,18 @@ void MovieClipBaseOperation::executePixelSampled(float output[4],
   }
 }
 
+void MovieClipBaseOperation::update_memory_buffer_partial(MemoryBuffer *output,
+                                                          const rcti &area,
+                                                          Span<MemoryBuffer *> UNUSED(inputs))
+{
+  if (m_movieClipBuffer) {
+    output->copy_from(m_movieClipBuffer, area);
+  }
+  else {
+    output->fill(area, COM_COLOR_TRANSPARENT);
+  }
+}
+
 MovieClipOperation::MovieClipOperation() : MovieClipBaseOperation()
 {
   this->addOutputSocket(DataType::Color);
@@ -134,6 +140,18 @@ void MovieClipAlphaOperation::executePixelSampled(float output[4],
   float result[4];
   MovieClipBaseOperation::executePixelSampled(result, x, y, sampler);
   output[0] = result[3];
+}
+
+void MovieClipAlphaOperation::update_memory_buffer_partial(MemoryBuffer *output,
+                                                           const rcti &area,
+                                                           Span<MemoryBuffer *> UNUSED(inputs))
+{
+  if (m_movieClipBuffer) {
+    output->copy_from(m_movieClipBuffer, area, 3, COM_DATA_TYPE_VALUE_CHANNELS, 0);
+  }
+  else {
+    output->fill(area, COM_VALUE_ZERO);
+  }
 }
 
 }  // namespace blender::compositor

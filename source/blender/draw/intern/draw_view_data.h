@@ -35,21 +35,24 @@ struct GPUViewport;
 struct DrawEngineType;
 struct DRWRenderScene;
 
-/* All FramebufferLists are just the same pointers with different names */
+/* NOTE these structs are only here for reading the actual lists from the engine.
+ * The actual length of them is stored in a ViewportEngineData_Info.
+ * The length of 1 is just here to avoid compiler warning. */
 typedef struct FramebufferList {
-  struct GPUFrameBuffer *framebuffers[0];
+  struct GPUFrameBuffer *framebuffers[1];
 } FramebufferList;
 
 typedef struct TextureList {
-  struct GPUTexture *textures[0];
+  struct GPUTexture *textures[1];
 } TextureList;
 
 typedef struct PassList {
-  struct DRWPass *passes[0];
+  struct DRWPass *passes[1];
 } PassList;
 
+/* Stores custom structs from the engine that have been MEM_(m/c)allocN'ed. */
 typedef struct StorageList {
-  void *storage[0]; /* custom structs from the engine */
+  void *storage[1];
 } StorageList;
 
 typedef struct ViewportEngineData {

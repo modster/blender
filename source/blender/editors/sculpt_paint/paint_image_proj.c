@@ -270,7 +270,7 @@ typedef struct ProjPaintState {
   float stencil_value;
 
   /* projection painting only */
-  /** for multithreading, the first item is sometimes used for non threaded cases too. */
+  /** For multi-threading, the first item is sometimes used for non threaded cases too. */
   MemArena *arena_mt[BLENDER_MAX_THREADS];
   /** screen sized 2D array, each pixel has a linked list of ProjPixel's */
   LinkNode **bucketRect;
@@ -375,7 +375,7 @@ typedef struct ProjPaintState {
   /* -------------------------------------------------------------------- */
   /* Vars shared between multiple views (keep last) */
   /**
-   * This data is owned by ``ProjStrokeHandle.ps_views[0]``,
+   * This data is owned by `ProjStrokeHandle.ps_views[0]`,
    * all other views re-use the data.
    */
 
@@ -1659,7 +1659,9 @@ static float project_paint_uvpixel_mask(const ProjPaintState *ps,
 
     if (other_tpage && (ibuf_other = BKE_image_acquire_ibuf(other_tpage, NULL, NULL))) {
       const MLoopTri *lt_other = &ps->mlooptri_eval[tri_index];
-      const float *lt_other_tri_uv[3] = {PS_LOOPTRI_AS_UV_3(ps->poly_to_loop_uv, lt_other)};
+      const float *lt_other_tri_uv[3] = {ps->mloopuv_stencil_eval[lt_other->tri[0]].uv,
+                                         ps->mloopuv_stencil_eval[lt_other->tri[1]].uv,
+                                         ps->mloopuv_stencil_eval[lt_other->tri[2]].uv};
 
       /* #BKE_image_acquire_ibuf - TODO: this may be slow. */
       uchar rgba_ub[4];
@@ -4449,7 +4451,7 @@ static void project_paint_begin(const bContext *C,
   ProjPaintFaceLookup face_lookup;
   const MLoopUV *mloopuv_base = NULL;
 
-  /* at the moment this is just ps->arena_mt[0], but use this to show were not multithreading */
+  /* At the moment this is just ps->arena_mt[0], but use this to show were not multi-threading. */
   MemArena *arena;
 
   const int diameter = 2 * BKE_brush_size_get(ps->scene, ps->brush);
@@ -4512,7 +4514,7 @@ static void project_paint_begin(const bContext *C,
   ps->buckets_x = (int)(ps->screen_width / (((float)diameter) / PROJ_BUCKET_BRUSH_DIV));
   ps->buckets_y = (int)(ps->screen_height / (((float)diameter) / PROJ_BUCKET_BRUSH_DIV));
 
-  /* printf("\tscreenspace bucket division x:%d y:%d\n", ps->buckets_x, ps->buckets_y); */
+  // printf("\tscreenspace bucket division x:%d y:%d\n", ps->buckets_x, ps->buckets_y);
 
   if (ps->buckets_x > PROJ_BUCKET_RECT_MAX || ps->buckets_y > PROJ_BUCKET_RECT_MAX) {
     reset_threads = true;
@@ -5194,8 +5196,8 @@ static void do_projectpaint_thread(TaskPool *__restrict UNUSED(pool), void *ph_v
     softenArena = BLI_memarena_new(MEM_SIZE_OPTIMAL(1 << 16), "paint soften arena");
   }
 
-  /* printf("brush bounds %d %d %d %d\n",
-   *        bucketMin[0], bucketMin[1], bucketMax[0], bucketMax[1]); */
+  // printf("brush bounds %d %d %d %d\n",
+  //        bucketMin[0], bucketMin[1], bucketMax[0], bucketMax[1]);
 
   while (project_bucket_iter_next(ps, &bucket_index, &bucket_bounds, pos)) {
 

@@ -119,7 +119,7 @@ class LightModule {
   const GPUUniformBuf *active_culling_ubo_;
   GPUTexture *active_culling_tx_;
 
-  uint64_t active_batch_count_;
+  // uint64_t active_batch_count_;
 
   float light_threshold_;
 

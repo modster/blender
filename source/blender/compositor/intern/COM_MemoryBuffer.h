@@ -18,6 +18,9 @@
 
 #pragma once
 
+#include "COM_BufferArea.h"
+#include "COM_BufferRange.h"
+#include "COM_BuffersIterator.h"
 #include "COM_ExecutionGroup.h"
 #include "COM_MemoryProxy.h"
 
@@ -111,6 +114,12 @@ class MemoryBuffer {
    */
   bool owns_data_;
 
+  /** Stride to make any x coordinate within buffer positive (non-zero). */
+  int to_positive_x_stride_;
+
+  /** Stride to make any y coordinate within buffer positive (non-zero). */
+  int to_positive_y_stride_;
+
  public:
   /**
    * \brief construct new temporarily MemoryBuffer for an area
@@ -163,9 +172,9 @@ class MemoryBuffer {
   /**
    * Get offset needed to jump from buffer start to given coordinates.
    */
-  int get_coords_offset(int x, int y) const
+  intptr_t get_coords_offset(int x, int y) const
   {
-    return (y - m_rect.ymin) * row_stride + (x - m_rect.xmin) * elem_stride;
+    return ((intptr_t)y - m_rect.ymin) * row_stride + ((intptr_t)x - m_rect.xmin) * elem_stride;
   }
 
   /**
@@ -173,7 +182,7 @@ class MemoryBuffer {
    */
   float *get_elem(int x, int y)
   {
-    BLI_assert(x >= m_rect.xmin && x < m_rect.xmax && y >= m_rect.ymin && y < m_rect.ymax);
+    BLI_assert(has_coords(x, y));
     return m_buffer + get_coords_offset(x, y);
   }
 
@@ -182,17 +191,103 @@ class MemoryBuffer {
    */
   const float *get_elem(int x, int y) const
   {
-    BLI_assert(x >= m_rect.xmin && x < m_rect.xmax && y >= m_rect.ymin && y < m_rect.ymax);
+    BLI_assert(has_coords(x, y));
     return m_buffer + get_coords_offset(x, y);
   }
+
+  void read_elem(int x, int y, float *out) const
+  {
+    memcpy(out, get_elem(x, y), get_elem_bytes_len());
+  }
+
+  void read_elem_checked(int x, int y, float *out) const
+  {
+    if (!has_coords(x, y)) {
+      clear_elem(out);
+    }
+    else {
+      read_elem(x, y, out);
+    }
+  }
+
+  void read_elem_checked(float x, float y, float *out) const
+  {
+    read_elem_checked(floor_x(x), floor_y(y), out);
+  }
+
+  void read_elem_bilinear(float x, float y, float *out) const
+  {
+    /* Only clear past +/-1 borders to be able to smooth edges. */
+    if (x <= m_rect.xmin - 1.0f || x >= m_rect.xmax || y <= m_rect.ymin - 1.0f ||
+        y >= m_rect.ymax) {
+      clear_elem(out);
+      return;
+    }
+
+    if (m_is_a_single_elem) {
+      if (x >= m_rect.xmin && x < m_rect.xmax - 1.0f && y >= m_rect.ymin &&
+          y < m_rect.ymax - 1.0f) {
+        memcpy(out, m_buffer, get_elem_bytes_len());
+        return;
+      }
+
+      /* Do sampling at borders to smooth edges. */
+      const float last_x = getWidth() - 1.0f;
+      const float rel_x = get_relative_x(x);
+      float single_x = 0.0f;
+      if (rel_x < 0.0f) {
+        single_x = rel_x;
+      }
+      else if (rel_x > last_x) {
+        single_x = rel_x - last_x;
+      }
+
+      const float last_y = getHeight() - 1.0f;
+      const float rel_y = get_relative_y(y);
+      float single_y = 0.0f;
+      if (rel_y < 0.0f) {
+        single_y = rel_y;
+      }
+      else if (rel_y > last_y) {
+        single_y = rel_y - last_y;
+      }
+
+      BLI_bilinear_interpolation_fl(m_buffer, out, 1, 1, m_num_channels, single_x, single_y);
+      return;
+    }
+
+    BLI_bilinear_interpolation_fl(m_buffer,
+                                  out,
+                                  getWidth(),
+                                  getHeight(),
+                                  m_num_channels,
+                                  get_relative_x(x),
+                                  get_relative_y(y));
+  }
+
+  void read_elem_sampled(float x, float y, PixelSampler sampler, float *out) const
+  {
+    switch (sampler) {
+      case PixelSampler::Nearest:
+        read_elem_checked(x, y, out);
+        break;
+      case PixelSampler::Bilinear:
+      case PixelSampler::Bicubic:
+        /* No bicubic. Current implementation produces fuzzy results. */
+        read_elem_bilinear(x, y, out);
+        break;
+    }
+  }
+
+  void read_elem_filtered(
+      const float x, const float y, float dx[2], float dy[2], float *out) const;
 
   /**
    * Get channel value at given coordinates.
    */
   float &get_value(int x, int y, int channel)
   {
-    BLI_assert(x >= m_rect.xmin && x < m_rect.xmax && y >= m_rect.ymin && y < m_rect.ymax &&
-               channel >= 0 && channel < m_num_channels);
+    BLI_assert(has_coords(x, y) && channel >= 0 && channel < m_num_channels);
     return m_buffer[get_coords_offset(x, y) + channel];
   }
 
@@ -201,8 +296,7 @@ class MemoryBuffer {
    */
   const float &get_value(int x, int y, int channel) const
   {
-    BLI_assert(x >= m_rect.xmin && x < m_rect.xmax && y >= m_rect.ymin && y < m_rect.ymax &&
-               channel >= 0 && channel < m_num_channels);
+    BLI_assert(has_coords(x, y) && channel >= 0 && channel < m_num_channels);
     return m_buffer[get_coords_offset(x, y) + channel];
   }
 
@@ -211,7 +305,7 @@ class MemoryBuffer {
    */
   const float *get_row_end(int y) const
   {
-    BLI_assert(y >= 0 && y < getHeight());
+    BLI_assert(has_y(y));
     return m_buffer + (is_a_single_elem() ? m_num_channels : get_coords_offset(getWidth(), y));
   }
 
@@ -238,12 +332,49 @@ class MemoryBuffer {
     return this->m_num_channels;
   }
 
+  uint8_t get_elem_bytes_len() const
+  {
+    return this->m_num_channels * sizeof(float);
+  }
+
+  /**
+   * Get all buffer elements as a range with no offsets.
+   */
+  BufferRange<float> as_range()
+  {
+    return BufferRange<float>(m_buffer, 0, buffer_len(), elem_stride);
+  }
+
+  BufferRange<const float> as_range() const
+  {
+    return BufferRange<const float>(m_buffer, 0, buffer_len(), elem_stride);
+  }
+
+  BufferArea<float> get_buffer_area(const rcti &area)
+  {
+    return BufferArea<float>(m_buffer, getWidth(), area, elem_stride);
+  }
+
+  BufferArea<const float> get_buffer_area(const rcti &area) const
+  {
+    return BufferArea<const float>(m_buffer, getWidth(), area, elem_stride);
+  }
+
+  BuffersIterator<float> iterate_with(Span<MemoryBuffer *> inputs);
+  BuffersIterator<float> iterate_with(Span<MemoryBuffer *> inputs, const rcti &area);
+
   /**
    * \brief get the data of this MemoryBuffer
    * \note buffer should already be available in memory
    */
   float *getBuffer()
   {
+    return this->m_buffer;
+  }
+
+  float *release_ownership_buffer()
+  {
+    owns_data_ = false;
     return this->m_buffer;
   }
 
@@ -301,7 +432,7 @@ class MemoryBuffer {
   inline void wrap_pixel(float &x,
                          float &y,
                          MemoryBufferExtend extend_x,
-                         MemoryBufferExtend extend_y)
+                         MemoryBufferExtend extend_y) const
   {
     const float w = (float)getWidth();
     const float h = (float)getHeight();
@@ -350,6 +481,8 @@ class MemoryBuffer {
     y = y + m_rect.ymin;
   }
 
+  /* TODO(manzanilla): to be removed with tiled implementation. For applying #MemoryBufferExtend
+   * use #wrap_pixel. */
   inline void read(float *result,
                    int x,
                    int y,
@@ -372,6 +505,7 @@ class MemoryBuffer {
     }
   }
 
+  /* TODO(manzanilla): to be removed with tiled implementation. */
   inline void readNoCheck(float *result,
                           int x,
                           int y,
@@ -398,7 +532,7 @@ class MemoryBuffer {
                            float x,
                            float y,
                            MemoryBufferExtend extend_x = MemoryBufferExtend::Clip,
-                           MemoryBufferExtend extend_y = MemoryBufferExtend::Clip)
+                           MemoryBufferExtend extend_y = MemoryBufferExtend::Clip) const
   {
     float u = x;
     float v = y;
@@ -454,12 +588,14 @@ class MemoryBuffer {
                  int channel_offset,
                  int elem_size,
                  int elem_stride,
+                 int row_stride,
                  int to_channel_offset);
   void copy_from(const uchar *src,
                  const rcti &area,
                  int channel_offset,
                  int elem_size,
                  int elem_stride,
+                 int row_stride,
                  int to_x,
                  int to_y,
                  int to_channel_offset);
@@ -527,6 +663,49 @@ class MemoryBuffer {
   const int buffer_len() const
   {
     return get_memory_width() * get_memory_height();
+  }
+
+  void clear_elem(float *out) const
+  {
+    memset(out, 0, this->m_num_channels * sizeof(float));
+  }
+
+  template<typename T> T get_relative_x(T x) const
+  {
+    return x - m_rect.xmin;
+  }
+
+  template<typename T> T get_relative_y(T y) const
+  {
+    return y - m_rect.ymin;
+  }
+
+  template<typename T> bool has_coords(T x, T y) const
+  {
+    return has_x(x) && has_y(y);
+  }
+
+  template<typename T> bool has_x(T x) const
+  {
+    return x >= m_rect.xmin && x < m_rect.xmax;
+  }
+
+  template<typename T> bool has_y(T y) const
+  {
+    return y >= m_rect.ymin && y < m_rect.ymax;
+  }
+
+  /* Fast `floor(..)` functions. The caller should check result is within buffer bounds.
+   * It `ceil(..)` in near cases and when given coordinate
+   * is negative and less than buffer rect `min - 1`. */
+  int floor_x(float x) const
+  {
+    return (int)(x + to_positive_x_stride_) - to_positive_x_stride_;
+  }
+
+  int floor_y(float y) const
+  {
+    return (int)(y + to_positive_y_stride_) - to_positive_y_stride_;
   }
 
   void copy_single_elem_from(const MemoryBuffer *src,

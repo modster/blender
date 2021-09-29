@@ -1165,8 +1165,8 @@ static int filter_plane_side(const double3 &p,
  * interesect_tri_tri and helper functions.
  * This code uses the algorithm of Guigue and Devillers, as described
  * in "Faster Triangle-Triangle Intersection Tests".
- * Adapted from github code by Eric Haines:
- * github.com/erich666/jgt-code/tree/master/Volume_08/Number_1/Guigue2003
+ * Adapted from code by Eric Haines:
+ * https://github.com/erich666/jgt-code/tree/master/Volume_08/Number_1/Guigue2003
  */
 
 /**
@@ -1946,7 +1946,7 @@ static int get_cdt_edge_orig(
   if (face_eorig != NO_INDEX) {
     return face_eorig;
   }
-  else if (have_non_face_eorig) {
+  if (have_non_face_eorig) {
     /* This must have been an input to the CDT problem that was an intersection edge. */
     /* TODO: maybe there is an orig index:
      * This happens if an input edge was formed by an input face having

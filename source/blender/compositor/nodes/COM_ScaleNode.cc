@@ -43,7 +43,7 @@ void ScaleNode::convertToOperations(NodeConverter &converter,
 
   switch (bnode->custom1) {
     case CMP_SCALE_RELATIVE: {
-      ScaleOperation *operation = new ScaleOperation();
+      ScaleRelativeOperation *operation = new ScaleRelativeOperation();
       converter.addOperation(operation);
 
       converter.mapInputSocket(inputSocket, operation->getInputSocket(0));
@@ -52,6 +52,8 @@ void ScaleNode::convertToOperations(NodeConverter &converter,
       converter.mapOutputSocket(outputSocket, operation->getOutputSocket(0));
 
       operation->setVariableSize(inputXSocket->isLinked() || inputYSocket->isLinked());
+      operation->set_scale_canvas_max_size(context.get_render_size() * 1.5f);
+
       break;
     }
     case CMP_SCALE_SCENEPERCENT: {
@@ -59,7 +61,7 @@ void ScaleNode::convertToOperations(NodeConverter &converter,
       scaleFactorOperation->setValue(context.getRenderPercentageAsFactor());
       converter.addOperation(scaleFactorOperation);
 
-      ScaleOperation *operation = new ScaleOperation();
+      ScaleRelativeOperation *operation = new ScaleRelativeOperation();
       converter.addOperation(operation);
 
       converter.mapInputSocket(inputSocket, operation->getInputSocket(0));
@@ -68,6 +70,7 @@ void ScaleNode::convertToOperations(NodeConverter &converter,
       converter.mapOutputSocket(outputSocket, operation->getOutputSocket(0));
 
       operation->setVariableSize(inputXSocket->isLinked() || inputYSocket->isLinked());
+      operation->set_scale_canvas_max_size(context.get_render_size() * 1.5f);
 
       break;
     }
@@ -81,13 +84,13 @@ void ScaleNode::convertToOperations(NodeConverter &converter,
       operation->setOffset(bnode->custom3, bnode->custom4);
       operation->setNewWidth(rd->xsch * render_size_factor);
       operation->setNewHeight(rd->ysch * render_size_factor);
-      operation->getInputSocket(0)->setResizeMode(ResizeMode::None);
       converter.addOperation(operation);
 
       converter.mapInputSocket(inputSocket, operation->getInputSocket(0));
       converter.mapOutputSocket(outputSocket, operation->getOutputSocket(0));
 
       operation->setVariableSize(inputXSocket->isLinked() || inputYSocket->isLinked());
+      operation->set_scale_canvas_max_size(context.get_render_size() * 3.0f);
 
       break;
     }
@@ -102,6 +105,7 @@ void ScaleNode::convertToOperations(NodeConverter &converter,
       converter.mapOutputSocket(outputSocket, operation->getOutputSocket(0));
 
       operation->setVariableSize(inputXSocket->isLinked() || inputYSocket->isLinked());
+      operation->set_scale_canvas_max_size(context.get_render_size() * 1.5f);
 
       break;
     }

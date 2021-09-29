@@ -424,7 +424,7 @@ void LightCache::update_info(SceneEEVEE *eevee)
 
   BLI_snprintf(eevee->light_cache_info,
                sizeof(eevee->light_cache_info),
-               TIP_("%d Ref. Cubemaps, %ld Irr. Samples (%s in memory)"),
+               TIP_("%d Ref. Cubemaps, %lld Irr. Samples (%s in memory)"),
                lcache->cube_len - 1,
                lcache->irradiance_sample_count(),
                formatted_mem);

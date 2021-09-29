@@ -58,16 +58,16 @@ class Film {
   /** Reference to first_sample_tx_ or data_tx_ depending on the context. */
   GPUTexture *first_sample_ref_;
 
-  DRWPass *clear_ps_ = nullptr;
+  // DRWPass *clear_ps_ = nullptr;
   DRWPass *accumulate_ps_ = nullptr;
   DRWPass *resolve_ps_ = nullptr;
 
   /** Shader parameter, not allocated. */
   GPUTexture *input_tx_;
   /** ViewProjection matrix used to render the input. */
-  float src_persmat_[4][4];
+  // float src_persmat_[4][4];
   /** ViewProjection matrix Inverse used to render the input. */
-  float src_persinv_[4][4];
+  // float src_persinv_[4][4];
 
   StructBuffer<FilmData> data_;
 

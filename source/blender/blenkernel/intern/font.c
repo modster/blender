@@ -34,6 +34,7 @@
 #include "BLI_ghash.h"
 #include "BLI_listbase.h"
 #include "BLI_math.h"
+#include "BLI_math_base_safe.h"
 #include "BLI_path_util.h"
 #include "BLI_string.h"
 #include "BLI_string_utf8.h"
@@ -126,23 +127,22 @@ static void vfont_blend_write(BlendWriter *writer, ID *id, const void *id_addres
 {
   VFont *vf = (VFont *)id;
   const bool is_undo = BLO_write_is_undo(writer);
-  if (vf->id.us > 0 || is_undo) {
-    /* Clean up, important in undo case to reduce false detection of changed datablocks. */
-    vf->data = NULL;
-    vf->temp_pf = NULL;
 
-    /* Do not store packed files in case this is a library override ID. */
-    if (ID_IS_OVERRIDE_LIBRARY(vf) && !is_undo) {
-      vf->packedfile = NULL;
-    }
+  /* Clean up, important in undo case to reduce false detection of changed datablocks. */
+  vf->data = NULL;
+  vf->temp_pf = NULL;
 
-    /* write LibData */
-    BLO_write_id_struct(writer, VFont, id_address, &vf->id);
-    BKE_id_blend_write(writer, &vf->id);
-
-    /* direct data */
-    BKE_packedfile_blend_write(writer, vf->packedfile);
+  /* Do not store packed files in case this is a library override ID. */
+  if (ID_IS_OVERRIDE_LIBRARY(vf) && !is_undo) {
+    vf->packedfile = NULL;
   }
+
+  /* write LibData */
+  BLO_write_id_struct(writer, VFont, id_address, &vf->id);
+  BKE_id_blend_write(writer, &vf->id);
+
+  /* direct data */
+  BKE_packedfile_blend_write(writer, vf->packedfile);
 }
 
 static void vfont_blend_read_data(BlendDataReader *reader, ID *id)
@@ -161,7 +161,7 @@ IDTypeInfo IDType_ID_VF = {
     .name = "Font",
     .name_plural = "fonts",
     .translation_context = BLT_I18NCONTEXT_ID_VFONT,
-    .flags = IDTYPE_FLAGS_NO_ANIMDATA,
+    .flags = IDTYPE_FLAGS_NO_ANIMDATA | IDTYPE_FLAGS_APPEND_IS_REUSABLE,
 
     .init_data = vfont_init_data,
     .copy_data = vfont_copy_data,
@@ -337,13 +337,9 @@ VFont *BKE_vfont_load(Main *bmain, const char *filepath)
 
     vfd = BLI_vfontdata_from_freetypefont(pf);
     if (vfd) {
-      vfont = BKE_libblock_alloc(bmain, ID_VF, filename, 0);
+      /* If there's a font name, use it for the ID name. */
+      vfont = BKE_libblock_alloc(bmain, ID_VF, vfd->name[0] ? vfd->name : filename, 0);
       vfont->data = vfd;
-
-      /* if there's a font name, use it for the ID name */
-      if (vfd->name[0] != '\0') {
-        BLI_strncpy(vfont->id.name + 2, vfd->name, sizeof(vfont->id.name) - 2);
-      }
       BLI_strncpy(vfont->filepath, filepath, sizeof(vfont->filepath));
 
       /* if autopack is on store the packedfile in de font structure */
@@ -495,15 +491,15 @@ static void build_underline(Curve *cu,
   mul_v2_fl(bp[3].vec, font_size);
 }
 
-static void buildchar(Curve *cu,
-                      ListBase *nubase,
-                      unsigned int character,
-                      CharInfo *info,
-                      float ofsx,
-                      float ofsy,
-                      float rot,
-                      int charidx,
-                      const float fsize)
+void BKE_vfont_build_char(Curve *cu,
+                          ListBase *nubase,
+                          unsigned int character,
+                          CharInfo *info,
+                          float ofsx,
+                          float ofsy,
+                          float rot,
+                          int charidx,
+                          const float fsize)
 {
   VFontData *vfd = vfont_get_data(which_vfont(cu, info));
   if (!vfd) {
@@ -719,6 +715,16 @@ typedef struct VFontToCurveIter {
     float max;
   } bisect;
   bool ok;
+  /**
+   * Wrap words that extends beyond the text-box width (enabled by default).
+   *
+   * Currently only disabled when scale-to-fit is enabled,
+   * so floating-point error doesn't cause unexpected wrapping, see T89241.
+   *
+   * \note This should only be set once, in the #VFONT_TO_CURVE_INIT pass
+   * otherwise iterations wont behave predictably, see T91401.
+   */
+  bool word_wrap;
   int status;
 } VFontToCurveIter;
 
@@ -748,8 +754,15 @@ enum {
  *
  * The em_height here is relative to FT_Face->bbox.
  */
-#define ASCENT(vfd) ((vfd)->ascender * (vfd)->em_height)
-#define DESCENT(vfd) ((vfd)->em_height - ASCENT(vfd))
+
+static float vfont_ascent(const VFontData *vfd)
+{
+  return vfd->ascender * vfd->em_height;
+}
+static float vfont_descent(const VFontData *vfd)
+{
+  return vfd->em_height - vfont_ascent(vfd);
+}
 
 static bool vfont_to_curve(Object *ob,
                            Curve *cu,
@@ -781,8 +794,9 @@ static bool vfont_to_curve(Object *ob,
   char32_t ascii;
   bool ok = false;
   const float font_size = cu->fsize * iter_data->scale_to_fit;
-  const float xof_scale = cu->xof / font_size;
-  const float yof_scale = cu->yof / font_size;
+  const bool word_wrap = iter_data->word_wrap;
+  const float xof_scale = safe_divide(cu->xof, font_size);
+  const float yof_scale = safe_divide(cu->yof, font_size);
   int last_line = -1;
   /* Length of the text disregarding \n breaks. */
   float current_line_length = 0.0f;
@@ -876,7 +890,7 @@ static bool vfont_to_curve(Object *ob,
   linedist = cu->linedist;
 
   curbox = 0;
-  textbox_scale(&tb_scale, &cu->tb[curbox], 1.0f / font_size);
+  textbox_scale(&tb_scale, &cu->tb[curbox], safe_divide(1.0f, font_size));
   use_textbox = (tb_scale.w != 0.0f);
 
   xof = MARGIN_X_MIN;
@@ -951,43 +965,59 @@ static bool vfont_to_curve(Object *ob,
 
     twidth = char_width(cu, che, info);
 
-    /* Calculate positions */
-    if ((tb_scale.w != 0.0f) && (ct->dobreak == 0) &&
-        (((xof - tb_scale.x) + twidth) > xof_scale + tb_scale.w)) {
-      //      CLOG_WARN(&LOG, "linewidth exceeded: %c%c%c...", mem[i], mem[i+1], mem[i+2]);
-      for (j = i; j && (mem[j] != '\n') && (chartransdata[j].dobreak == 0); j--) {
-        bool dobreak = false;
-        if (ELEM(mem[j], ' ', '-')) {
-          ct -= (i - (j - 1));
-          cnr -= (i - (j - 1));
-          if (mem[j] == ' ') {
-            wsnr--;
-          }
-          if (mem[j] == '-') {
-            wsnr++;
-          }
-          i = j - 1;
-          xof = ct->xof;
-          ct[1].dobreak = 1;
-          custrinfo[i + 1].flag |= CU_CHINFO_WRAP;
-          dobreak = true;
+    /* Calculate positions. */
+
+    if ((tb_scale.w != 0.0f) && (ct->dobreak == 0)) { /* May need wrapping. */
+      const float x_available = xof_scale + tb_scale.w;
+      const float x_used = (xof - tb_scale.x) + twidth;
+
+      if (word_wrap == false) {
+        /* When scale to fit is used, don't do any wrapping.
+         *
+         * Floating precision error can cause the text to be slightly larger.
+         * Assert this is a small value as large values indicate incorrect
+         * calculations with scale-to-fit which shouldn't be ignored. See T89241. */
+        if (x_used > x_available) {
+          BLI_assert_msg(compare_ff_relative(x_used, x_available, FLT_EPSILON, 64),
+                         "VFontToCurveIter.scale_to_fit not set correctly!");
         }
-        else if (chartransdata[j].dobreak) {
-          //              CLOG_WARN(&LOG, "word too long: %c%c%c...", mem[j], mem[j+1], mem[j+2]);
-          ct->dobreak = 1;
-          custrinfo[i + 1].flag |= CU_CHINFO_WRAP;
-          ct -= 1;
-          cnr -= 1;
-          i--;
-          xof = ct->xof;
-          dobreak = true;
-        }
-        if (dobreak) {
-          if (tb_scale.h == 0.0f) {
-            /* NOTE: If underlined text is truncated away, the extra space is also truncated. */
-            custrinfo[i + 1].flag |= CU_CHINFO_OVERFLOW;
+      }
+      else if (x_used > x_available) {
+        // CLOG_WARN(&LOG, "linewidth exceeded: %c%c%c...", mem[i], mem[i+1], mem[i+2]);
+        for (j = i; j && (mem[j] != '\n') && (chartransdata[j].dobreak == 0); j--) {
+          bool dobreak = false;
+          if (ELEM(mem[j], ' ', '-')) {
+            ct -= (i - (j - 1));
+            cnr -= (i - (j - 1));
+            if (mem[j] == ' ') {
+              wsnr--;
+            }
+            if (mem[j] == '-') {
+              wsnr++;
+            }
+            i = j - 1;
+            xof = ct->xof;
+            ct[1].dobreak = 1;
+            custrinfo[i + 1].flag |= CU_CHINFO_WRAP;
+            dobreak = true;
           }
-          goto makebreak;
+          else if (chartransdata[j].dobreak) {
+            // CLOG_WARN(&LOG, "word too long: %c%c%c...", mem[j], mem[j+1], mem[j+2]);
+            ct->dobreak = 1;
+            custrinfo[i + 1].flag |= CU_CHINFO_WRAP;
+            ct -= 1;
+            cnr -= 1;
+            i--;
+            xof = ct->xof;
+            dobreak = true;
+          }
+          if (dobreak) {
+            if (tb_scale.h == 0.0f) {
+              /* NOTE: If underlined text is truncated away, the extra space is also truncated. */
+              custrinfo[i + 1].flag |= CU_CHINFO_OVERFLOW;
+            }
+            goto makebreak;
+          }
         }
       }
     }
@@ -1215,17 +1245,17 @@ static bool vfont_to_curve(Object *ob,
           case CU_ALIGN_Y_TOP_BASELINE:
             break;
           case CU_ALIGN_Y_TOP:
-            yoff = textbox_y_origin - ASCENT(vfd);
+            yoff = textbox_y_origin - vfont_ascent(vfd);
             break;
           case CU_ALIGN_Y_CENTER:
-            yoff = ((((vfd->em_height + (lines - 1) * linedist) * 0.5f) - ASCENT(vfd)) -
+            yoff = ((((vfd->em_height + (lines - 1) * linedist) * 0.5f) - vfont_ascent(vfd)) -
                     (tb_scale.h * 0.5f) + textbox_y_origin);
             break;
           case CU_ALIGN_Y_BOTTOM_BASELINE:
             yoff = textbox_y_origin + ((lines - 1) * linedist) - tb_scale.h;
             break;
           case CU_ALIGN_Y_BOTTOM:
-            yoff = textbox_y_origin + ((lines - 1) * linedist) - tb_scale.h + DESCENT(vfd);
+            yoff = textbox_y_origin + ((lines - 1) * linedist) - tb_scale.h + vfont_descent(vfd);
             break;
         }
 
@@ -1246,16 +1276,16 @@ static bool vfont_to_curve(Object *ob,
         case CU_ALIGN_Y_TOP_BASELINE:
           break;
         case CU_ALIGN_Y_TOP:
-          yoff = -ASCENT(vfd);
+          yoff = -vfont_ascent(vfd);
           break;
         case CU_ALIGN_Y_CENTER:
-          yoff = ((vfd->em_height + (lnr - 1) * linedist) * 0.5f) - ASCENT(vfd);
+          yoff = ((vfd->em_height + (lnr - 1) * linedist) * 0.5f) - vfont_ascent(vfd);
           break;
         case CU_ALIGN_Y_BOTTOM_BASELINE:
           yoff = (lnr - 1) * linedist;
           break;
         case CU_ALIGN_Y_BOTTOM:
-          yoff = (lnr - 1) * linedist + DESCENT(vfd);
+          yoff = (lnr - 1) * linedist + vfont_descent(vfd);
           break;
       }
 
@@ -1496,7 +1526,7 @@ static bool vfont_to_curve(Object *ob,
       }
       /* We do not want to see any character for \n or \r */
       if (cha != '\n') {
-        buildchar(cu, r_nubase, cha, info, ct->xof, ct->yof, ct->rot, i, font_size);
+        BKE_vfont_build_char(cu, r_nubase, cha, info, ct->xof, ct->yof, ct->rot, i, font_size);
       }
 
       if ((info->flag & CU_CHINFO_UNDERLINE) && (cha != '\n')) {
@@ -1549,6 +1579,7 @@ static bool vfont_to_curve(Object *ob,
           const float total_text_height = lnr * linedist;
           iter_data->scale_to_fit = tb_scale.h / total_text_height;
           iter_data->status = VFONT_TO_CURVE_SCALE_ONCE;
+          iter_data->word_wrap = false;
         }
       }
       else if (tb_scale.h == 0.0f) {
@@ -1556,10 +1587,10 @@ static bool vfont_to_curve(Object *ob,
         if (longest_line_length > tb_scale.w) {
           /* We make sure longest line before it broke can fit here. */
           float scale_to_fit = tb_scale.w / longest_line_length;
-          scale_to_fit -= FLT_EPSILON;
 
           iter_data->scale_to_fit = scale_to_fit;
           iter_data->status = VFONT_TO_CURVE_SCALE_ONCE;
+          iter_data->word_wrap = false;
         }
       }
     }
@@ -1689,6 +1720,7 @@ bool BKE_vfont_to_curve_ex(Object *ob,
   VFontToCurveIter data = {
       .iteraction = cu->totbox * FONT_TO_CURVE_SCALE_ITERATIONS,
       .scale_to_fit = 1.0f,
+      .word_wrap = true,
       .ok = true,
       .status = VFONT_TO_CURVE_INIT,
   };

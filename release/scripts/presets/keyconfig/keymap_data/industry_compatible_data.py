@@ -139,12 +139,12 @@ def _template_items_basic_tools(*, connected=False):
     ]
 
 def _template_items_tool_select(params, operator, *, extend):
-        return [
-            (operator, {"type": 'LEFTMOUSE', "value": 'PRESS'},
-             {"properties": [("deselect_all", True)]}),
-            (operator, {"type": 'LEFTMOUSE', "value": 'PRESS', "shift": True},
-             {"properties": [(extend, True)]}),
-        ]
+    return [
+        (operator, {"type": 'LEFTMOUSE', "value": 'PRESS'},
+         {"properties": [("deselect_all", True)]}),
+        (operator, {"type": 'LEFTMOUSE', "value": 'PRESS', "shift": True},
+         {"properties": [(extend, True)]}),
+    ]
 
 
 def _template_items_tool_select_actions(operator, *, type, value):
@@ -465,6 +465,7 @@ def km_property_editor(params):
         # Constraint panels
         ("constraint.delete", {"type": 'BACK_SPACE', "value": 'PRESS'}, {"properties": [("report", True)]}),
         ("constraint.delete", {"type": 'DEL', "value": 'PRESS'}, {"properties": [("report", True)]}),
+        ("constraint.copy", {"type": 'D', "value": 'PRESS', "ctrl": True}, None),
     ])
 
     return keymap
@@ -1248,7 +1249,12 @@ def km_file_browser(params):
          {"properties": [("increment", -10)]}),
         ("file.filenum", {"type": 'NUMPAD_MINUS', "value": 'PRESS', "ctrl": True, "repeat": True},
          {"properties": [("increment", -100)]}),
+
+        # Select file under cursor before spawning the context menu.
+        ("file.select", {"type": 'RIGHTMOUSE', "value": 'PRESS'},
+         {"properties": [("open", False), ("only_activate_if_selected", True), ("pass_through", True)]}),
         *_template_items_context_menu("FILEBROWSER_MT_context_menu", {"type": 'RIGHTMOUSE', "value": 'PRESS'}),
+        *_template_items_context_menu("ASSETBROWSER_MT_context_menu", {"type": 'RIGHTMOUSE', "value": 'PRESS'}),
     ])
 
     return keymap
@@ -1808,8 +1814,7 @@ def km_sequencer(params):
              for i in range(10)
              )
         ),
-        ("sequencer.select", {"type": 'LEFTMOUSE', "value": 'PRESS'},
-         {"properties": [("deselect_all", True)]}),
+        ("sequencer.select", {"type": 'LEFTMOUSE', "value": 'PRESS'}, None),
         ("sequencer.select", {"type": 'LEFTMOUSE', "value": 'PRESS', "shift": True},
          {"properties": [("extend", True)]}),
         ("sequencer.select", {"type": 'LEFTMOUSE', "value": 'PRESS', "alt": True},
@@ -3861,7 +3866,8 @@ def km_knife_tool_modal_map(_params):
         ("CONFIRM", {"type": 'NUMPAD_ENTER', "value": 'PRESS', "any": True}, None),
         ("ADD_CUT_CLOSED", {"type": 'LEFTMOUSE', "value": 'DOUBLE_CLICK', "any": True}, None),
         ("ADD_CUT", {"type": 'LEFTMOUSE', "value": 'ANY', "any": True}, None),
-        ("NEW_CUT", {"type": 'E', "value": 'PRESS'}, None),
+        ("UNDO", {"type": 'Z', "value": 'PRESS', "ctrl": True}, None),
+        ("NEW_CUT", {"type": 'RIGHTMOUSE', "value": 'PRESS'}, None),
         ("SNAP_MIDPOINTS_ON", {"type": 'LEFT_CTRL', "value": 'PRESS'}, None),
         ("SNAP_MIDPOINTS_OFF", {"type": 'LEFT_CTRL', "value": 'RELEASE'}, None),
         ("SNAP_MIDPOINTS_ON", {"type": 'RIGHT_CTRL', "value": 'PRESS'}, None),
@@ -3870,11 +3876,16 @@ def km_knife_tool_modal_map(_params):
         ("IGNORE_SNAP_OFF", {"type": 'LEFT_SHIFT', "value": 'RELEASE', "any": True}, None),
         ("IGNORE_SNAP_ON", {"type": 'RIGHT_SHIFT', "value": 'PRESS', "any": True}, None),
         ("IGNORE_SNAP_OFF", {"type": 'RIGHT_SHIFT', "value": 'RELEASE', "any": True}, None),
-        ("ANGLE_SNAP_TOGGLE", {"type": 'C', "value": 'PRESS'}, None),
-        ("CUT_THROUGH_TOGGLE", {"type": 'X', "value": 'PRESS'}, None),
+        ("X_AXIS", {"type": 'X', "value": 'PRESS'}, None),
+        ("Y_AXIS", {"type": 'Y', "value": 'PRESS'}, None),
+        ("Z_AXIS", {"type": 'Z', "value": 'PRESS'}, None),
+        ("ANGLE_SNAP_TOGGLE", {"type": 'A', "value": 'PRESS'}, None),
+        ("CYCLE_ANGLE_SNAP_EDGE", {"type": 'R', "value": 'PRESS'}, None),
+        ("CUT_THROUGH_TOGGLE", {"type": 'C', "value": 'PRESS'}, None),
         ("PANNING", {"type": 'MIDDLEMOUSE', "value": 'PRESS', "alt": True}, None),
         ("PANNING", {"type": 'RIGHTMOUSE', "value": 'PRESS', "alt": True}, None),
-        ("CONFIRM", {"type": 'RIGHTMOUSE', "value": 'PRESS'}, None),
+        ("SHOW_DISTANCE_ANGLE_TOGGLE", {"type": 'D', "value": 'PRESS'}, None),
+        ("DEPTH_TEST_TOGGLE", {"type": 'V', "value": 'PRESS'}, None),
     ])
 
     return keymap

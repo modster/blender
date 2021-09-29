@@ -834,9 +834,8 @@ void ED_area_status_text(ScrArea *area, const char *str)
         BLI_strncpy(region->headerstr, str, UI_MAX_DRAW_STR);
         BLI_str_rstrip(region->headerstr);
       }
-      else if (region->headerstr) {
-        MEM_freeN(region->headerstr);
-        region->headerstr = NULL;
+      else {
+        MEM_SAFE_FREE(region->headerstr);
       }
       ED_region_tag_redraw(region);
     }
@@ -859,9 +858,8 @@ void ED_workspace_status_text(bContext *C, const char *str)
     }
     BLI_strncpy(workspace->status_text, str, UI_MAX_DRAW_STR);
   }
-  else if (workspace->status_text) {
-    MEM_freeN(workspace->status_text);
-    workspace->status_text = NULL;
+  else {
+    MEM_SAFE_FREE(workspace->status_text);
   }
 
   /* Redraw status bar. */
@@ -884,7 +882,7 @@ static void area_azone_init(wmWindow *win, const bScreen *screen, ScrArea *area)
     return;
   }
 
-  if (U.app_flag & USER_APP_LOCK_UI_LAYOUT) {
+  if (U.app_flag & USER_APP_LOCK_CORNER_SPLIT) {
     return;
   }
 
@@ -1057,6 +1055,14 @@ static bool region_azone_edge_poll(const ARegion *region, const bool is_fullscre
     return false;
   }
   if (!is_hidden && ELEM(region->regiontype, RGN_TYPE_HEADER, RGN_TYPE_TOOL_HEADER)) {
+    return false;
+  }
+
+  if (is_hidden && (U.app_flag & USER_APP_HIDE_REGION_TOGGLE)) {
+    return false;
+  }
+
+  if (!is_hidden && (U.app_flag & USER_APP_LOCK_EDGE_RESIZE)) {
     return false;
   }
 
@@ -1278,8 +1284,8 @@ bool ED_region_is_overlap(int spacetype, int regiontype)
                RGN_TYPE_TOOLS,
                RGN_TYPE_UI,
                RGN_TYPE_TOOL_PROPS,
-               RGN_TYPE_HEADER,
-               RGN_TYPE_FOOTER)) {
+               RGN_TYPE_FOOTER,
+               RGN_TYPE_TOOL_HEADER)) {
         return true;
       }
     }
@@ -1729,10 +1735,14 @@ static void ed_default_handlers(
     WM_event_add_keymap_handler(handlers, keymap);
   }
   if (flag & ED_KEYMAP_TOOL) {
-    WM_event_add_keymap_handler_dynamic(
-        &region->handlers, WM_event_get_keymap_from_toolsystem_fallback, area);
-    WM_event_add_keymap_handler_dynamic(
-        &region->handlers, WM_event_get_keymap_from_toolsystem, area);
+    if (flag & ED_KEYMAP_GIZMO) {
+      WM_event_add_keymap_handler_dynamic(
+          &region->handlers, WM_event_get_keymap_from_toolsystem_fallback, area);
+    }
+    else {
+      WM_event_add_keymap_handler_dynamic(
+          &region->handlers, WM_event_get_keymap_from_toolsystem, area);
+    }
   }
   if (flag & ED_KEYMAP_FRAMES) {
     /* frame changing/jumping (for all spaces) */
@@ -2990,7 +3000,7 @@ void ED_region_panels_layout_ex(const bContext *C,
 
   /* before setting the view */
   if (region_layout_based) {
-    /* XXX, only single panel support atm.
+    /* XXX, only single panel support at the moment.
      * Can't use x/y values calculated above because they're not using the real height of panels,
      * instead they calculate offsets for the next panel to start drawing. */
     Panel *panel = region->panels.last;

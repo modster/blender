@@ -2107,10 +2107,12 @@ static int delete_key_using_keying_set(bContext *C, wmOperator *op, KeyingSet *k
     return OPERATOR_CANCELLED;
   }
 
+  PropertyRNA *prop = RNA_struct_find_property(op->ptr, "confirm_success");
+  bool confirm = (prop != NULL && RNA_property_boolean_get(op->ptr, prop));
+
   if (num_channels > 0) {
     /* if the appropriate properties have been set, make a note that we've inserted something */
-    PropertyRNA *prop = RNA_struct_find_property(op->ptr, "confirm_success");
-    if (prop != NULL && RNA_property_boolean_get(op->ptr, prop)) {
+    if (confirm) {
       BKE_reportf(op->reports,
                   RPT_INFO,
                   "Successfully removed %d keyframes for keying set '%s'",
@@ -2121,7 +2123,7 @@ static int delete_key_using_keying_set(bContext *C, wmOperator *op, KeyingSet *k
     /* send notifiers that keyframes have been changed */
     WM_event_add_notifier(C, NC_ANIMATION | ND_KEYFRAME | NA_REMOVED, NULL);
   }
-  else {
+  else if (confirm) {
     BKE_report(op->reports, RPT_WARNING, "Keying set failed to remove any keyframes");
   }
 
@@ -2216,14 +2218,13 @@ static int clear_anim_v3d_exec(bContext *C, wmOperator *UNUSED(op))
 
         /* in pose mode, only delete the F-Curve if it belongs to a selected bone */
         if (ob->mode & OB_MODE_POSE) {
-          if ((fcu->rna_path) && strstr(fcu->rna_path, "pose.bones[")) {
-
-            /* get bone-name, and check if this bone is selected */
-            char *bone_name = BLI_str_quoted_substrN(fcu->rna_path, "pose.bones[");
-            if (bone_name) {
-              bPoseChannel *pchan = BKE_pose_channel_find_name(ob->pose, bone_name);
-              MEM_freeN(bone_name);
-
+          if (fcu->rna_path) {
+            /* Get bone-name, and check if this bone is selected. */
+            bPoseChannel *pchan = NULL;
+            char bone_name[sizeof(pchan->name)];
+            if (BLI_str_quoted_substr(
+                    fcu->rna_path, "pose.bones[", bone_name, sizeof(bone_name))) {
+              pchan = BKE_pose_channel_find_name(ob->pose, bone_name);
               /* Delete if bone is selected. */
               if ((pchan) && (pchan->bone)) {
                 if (pchan->bone->flag & BONE_SELECTED) {
@@ -2290,6 +2291,8 @@ static int delete_key_v3d_without_keying_set(bContext *C, wmOperator *op)
   int selected_objects_success_len = 0;
   int success_multi = 0;
 
+  bool confirm = op->flag & OP_IS_INVOKE;
+
   CTX_DATA_BEGIN (C, Object *, ob, selected_objects) {
     ID *id = &ob->id;
     int success = 0;
@@ -2320,15 +2323,15 @@ static int delete_key_v3d_without_keying_set(bContext *C, wmOperator *op)
          * NOTE: This is only done in pose mode.
          * In object mode, we're dealing with the entire object.
          */
-        if ((ob->mode & OB_MODE_POSE) && strstr(fcu->rna_path, "pose.bones[\"")) {
+        if (ob->mode & OB_MODE_POSE) {
           bPoseChannel *pchan = NULL;
 
-          /* get bone-name, and check if this bone is selected */
-          char *bone_name = BLI_str_quoted_substrN(fcu->rna_path, "pose.bones[");
-          if (bone_name) {
-            pchan = BKE_pose_channel_find_name(ob->pose, bone_name);
-            MEM_freeN(bone_name);
+          /* Get bone-name, and check if this bone is selected. */
+          char bone_name[sizeof(pchan->name)];
+          if (!BLI_str_quoted_substr(fcu->rna_path, "pose.bones[", bone_name, sizeof(bone_name))) {
+            continue;
           }
+          pchan = BKE_pose_channel_find_name(ob->pose, bone_name);
 
           /* skip if bone is not selected */
           if ((pchan) && (pchan->bone)) {
@@ -2371,20 +2374,20 @@ static int delete_key_v3d_without_keying_set(bContext *C, wmOperator *op)
 
   /* report success (or failure) */
   if (selected_objects_success_len) {
-    BKE_reportf(op->reports,
-                RPT_INFO,
-                "%d object(s) successfully had %d keyframes removed",
-                selected_objects_success_len,
-                success_multi);
+    if (confirm) {
+      BKE_reportf(op->reports,
+                  RPT_INFO,
+                  "%d object(s) successfully had %d keyframes removed",
+                  selected_objects_success_len,
+                  success_multi);
+    }
+    /* send updates */
+    WM_event_add_notifier(C, NC_OBJECT | ND_KEYS, NULL);
   }
-  else {
+  else if (confirm) {
     BKE_reportf(
         op->reports, RPT_ERROR, "No keyframes removed from %d object(s)", selected_objects_len);
   }
-
-  /* send updates */
-  WM_event_add_notifier(C, NC_OBJECT | ND_KEYS, NULL);
-
   return OPERATOR_FINISHED;
 }
 

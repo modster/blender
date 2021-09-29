@@ -31,6 +31,7 @@
  */
 
 #include "BLI_enumerable_thread_specific.hh"
+#include "BLI_function_ref.hh"
 #include "BLI_linear_allocator.hh"
 #include "BLI_map.hh"
 
@@ -130,6 +131,7 @@ enum class NodeWarningType {
   Error,
   Warning,
   Info,
+  Legacy,
 };
 
 struct NodeWarning {
@@ -267,6 +269,7 @@ class TreeLog {
   const NodeLog *lookup_node_log(StringRef node_name) const;
   const NodeLog *lookup_node_log(const bNode &node) const;
   const TreeLog *lookup_child_log(StringRef node_name) const;
+  void foreach_node_log(FunctionRef<void(const NodeLog &)> fn) const;
 };
 
 /** Contains information about an entire geometry nodes evaluation. */
@@ -296,6 +299,7 @@ class ModifierLog {
                                                              const bNodeSocket &socket);
   static const NodeLog *find_node_by_spreadsheet_editor_context(
       const SpaceSpreadsheet &sspreadsheet);
+  void foreach_node_log(FunctionRef<void(const NodeLog &)> fn) const;
 
  private:
   using LogByTreeContext = Map<const DTreeContext *, TreeLog *>;

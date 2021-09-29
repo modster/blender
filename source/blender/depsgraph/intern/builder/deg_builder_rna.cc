@@ -153,8 +153,8 @@ bool RNANodeQuery::contains(const char *prop_identifier, const char *rna_path_co
     return false;
   }
 
-  // If substr != prop_identifier, it means that the substring is found further in prop_identifier,
-  // and that thus index -1 is a valid memory location.
+  /* If substr != prop_identifier, it means that the substring is found further in prop_identifier,
+   * and that thus index -1 is a valid memory location. */
   const bool start_ok = substr == prop_identifier || substr[-1] == '.';
   if (!start_ok) {
     return false;
@@ -400,8 +400,8 @@ RNANodeQueryIDData *RNANodeQuery::ensure_id_data(const ID *id)
 bool rna_prop_affects_parameters_node(const PointerRNA *ptr, const PropertyRNA *prop)
 {
   return prop != nullptr && RNA_property_is_idprop(prop) &&
-         /* ID properties in the geometry nodes modifier don't affect that parameters node. Instead
-            they affect the modifier and therefore the geometry node directly. */
+         /* ID properties in the geometry nodes modifier don't affect that parameters node.
+          * Instead they affect the modifier and therefore the geometry node directly. */
          !RNA_struct_is_a(ptr->type, &RNA_NodesModifier);
 }
 

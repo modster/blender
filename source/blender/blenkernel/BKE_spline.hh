@@ -109,6 +109,7 @@ class Spline {
   SplinePtr copy() const;
   SplinePtr copy_only_settings() const;
   SplinePtr copy_without_attributes() const;
+  static void copy_base_settings(const Spline &src, Spline &dst);
 
   Spline::Type type() const;
 
@@ -128,6 +129,11 @@ class Spline {
 
   virtual void translate(const blender::float3 &translation);
   virtual void transform(const blender::float4x4 &matrix);
+
+  /**
+   * Change the direction of the spline (switch the start and end) without changing its shape.
+   */
+  void reverse();
 
   /**
    * Mark all caches for re-computation. This must be called after any operation that would
@@ -209,8 +215,7 @@ class Spline {
   virtual void correct_end_tangents() const = 0;
   virtual void copy_settings(Spline &dst) const = 0;
   virtual void copy_data(Spline &dst) const = 0;
-
-  static void copy_base_settings(const Spline &src, Spline &dst);
+  virtual void reverse_impl() = 0;
 };
 
 /**
@@ -306,6 +311,7 @@ class BezierSpline final : public Spline {
   blender::MutableSpan<HandleType> handle_types_right();
   blender::Span<blender::float3> handle_positions_right() const;
   blender::MutableSpan<blender::float3> handle_positions_right();
+  void ensure_auto_handles() const;
 
   void translate(const blender::float3 &translation) override;
   void transform(const blender::float4x4 &matrix) override;
@@ -354,7 +360,8 @@ class BezierSpline final : public Spline {
   void copy_settings(Spline &dst) const final;
   void copy_data(Spline &dst) const final;
 
-  void ensure_auto_handles() const;
+ protected:
+  void reverse_impl() override;
 };
 
 /**
@@ -471,6 +478,7 @@ class NURBSpline final : public Spline {
   void correct_end_tangents() const final;
   void copy_settings(Spline &dst) const final;
   void copy_data(Spline &dst) const final;
+  void reverse_impl() override;
 
   void calculate_knots() const;
   blender::Span<BasisCache> calculate_basis_cache() const;
@@ -521,6 +529,7 @@ class PolySpline final : public Spline {
   void correct_end_tangents() const final;
   void copy_settings(Spline &dst) const final;
   void copy_data(Spline &dst) const final;
+  void reverse_impl() override;
 };
 
 /**
@@ -544,6 +553,7 @@ struct CurveEval {
 
   blender::Span<SplinePtr> splines() const;
   blender::MutableSpan<SplinePtr> splines();
+  bool has_spline_with_type(const Spline::Type type) const;
 
   void resize(const int size);
   void add_spline(SplinePtr spline);
@@ -555,6 +565,7 @@ struct CurveEval {
 
   blender::Array<int> control_point_offsets() const;
   blender::Array<int> evaluated_point_offsets() const;
+  blender::Array<float> accumulated_spline_lengths() const;
 
   void assert_valid_point_attributes() const;
 };

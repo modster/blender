@@ -34,6 +34,7 @@
 #include "DNA_scene_types.h"
 #include "DNA_sequence_types.h"
 #include "DNA_shader_fx_types.h"
+#include "DNA_text_types.h"
 
 #include "BLI_listbase.h"
 #include "BLI_utildefines.h"
@@ -63,6 +64,7 @@
 #include "ED_screen.h"
 #include "ED_select_utils.h"
 #include "ED_sequencer.h"
+#include "ED_text.h"
 #include "ED_undo.h"
 
 #include "SEQ_select.h"
@@ -673,7 +675,7 @@ static void tree_element_sequence_activate(bContext *C,
                                            const eOLSetState set)
 {
   Sequence *seq = (Sequence *)te->directdata;
-  Editing *ed = SEQ_editing_get(scene, false);
+  Editing *ed = SEQ_editing_get(scene);
 
   if (BLI_findindex(ed->seqbasep, seq) != -1) {
     if (set == OL_SETSEL_EXTEND) {
@@ -695,9 +697,11 @@ static void tree_element_sequence_activate(bContext *C,
 
 static void tree_element_sequence_dup_activate(Scene *scene, TreeElement *UNUSED(te))
 {
-  Editing *ed = SEQ_editing_get(scene, false);
+  Editing *ed = SEQ_editing_get(scene);
 
-  /* XXX  select_single_seq(seq, 1); */
+#if 0
+  select_single_seq(seq, 1);
+#endif
   Sequence *p = ed->seqbasep->first;
   while (p) {
     if ((!p->strip) || (!p->strip->stripdata) || (p->strip->stripdata->name[0] == '\0')) {
@@ -705,8 +709,11 @@ static void tree_element_sequence_dup_activate(Scene *scene, TreeElement *UNUSED
       continue;
     }
 
-    /* XXX: if (STREQ(p->strip->stripdata->name, seq->strip->stripdata->name)) select_single_seq(p,
-     * 0); */
+#if 0
+    if (STREQ(p->strip->stripdata->name, seq->strip->stripdata->name)) {
+      select_single_seq(p, 0);
+    }
+#endif
     p = p->next;
   }
 }
@@ -730,6 +737,12 @@ static void tree_element_layer_collection_activate(bContext *C, TreeElement *te)
   /* A very precise notifier - ND_LAYER alone is quite vague, we want to avoid unnecessary work
    * when only the active collection changes. */
   WM_main_add_notifier(NC_SCENE | ND_LAYER | NS_LAYER_COLLECTION | NA_ACTIVATED, NULL);
+}
+
+static void tree_element_text_activate(bContext *C, TreeElement *te)
+{
+  Text *text = (Text *)te->store_elem->id;
+  ED_text_activate_in_screen(C, text);
 }
 
 /* ---------------------------------------------- */
@@ -758,6 +771,9 @@ void tree_element_activate(bContext *C,
       break;
     case ID_CA:
       tree_element_camera_activate(C, tvc->scene, te);
+      break;
+    case ID_TXT:
+      tree_element_text_activate(C, te);
       break;
   }
 }
@@ -1677,7 +1693,8 @@ void OUTLINER_OT_item_activate(wmOperatorType *ot)
   ot->flag |= OPTYPE_REGISTER | OPTYPE_UNDO;
 
   PropertyRNA *prop;
-  RNA_def_boolean(ot->srna, "extend", true, "Extend", "Extend selection for activation");
+  prop = RNA_def_boolean(ot->srna, "extend", false, "Extend", "Extend selection for activation");
+  RNA_def_property_flag(prop, PROP_SKIP_SAVE);
   prop = RNA_def_boolean(
       ot->srna, "extend_range", false, "Extend Range", "Select a range from active element");
   RNA_def_property_flag(prop, PROP_SKIP_SAVE);

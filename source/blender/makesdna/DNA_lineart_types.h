@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,19 +15,12 @@
  *
  * The Original Code is Copyright (C) 2010 Blender Foundation.
  * All rights reserved.
- *
- * The Original Code is: all of this file.
- *
- * Contributor(s): none yet.
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-#ifndef __DNA_LRT_TYPES_H__
-#define __DNA_LRT_TYPES_H__
+#pragma once
 
-/** \file DNA_lineart_types.h
- *  \ingroup DNA
+/** \file
+ * \ingroup DNA
  */
 
 #include "DNA_ID.h"
@@ -56,6 +47,8 @@ typedef enum eLineartMainFlags {
   LRT_CHAIN_LOOSE_EDGES = (1 << 12),
   LRT_CHAIN_GEOMETRY_SPACE = (1 << 13),
   LRT_ALLOW_OVERLAP_EDGE_TYPES = (1 << 14),
+  LRT_USE_CREASE_ON_SMOOTH_SURFACES = (1 << 15),
+  LRT_USE_CREASE_ON_SHARP_EDGES = (1 << 16),
 } eLineartMainFlags;
 
 typedef enum eLineartEdgeFlag {
@@ -71,5 +64,3 @@ typedef enum eLineartEdgeFlag {
 } eLineartEdgeFlag;
 
 #define LRT_EDGE_FLAG_ALL_TYPE 0x3f
-
-#endif

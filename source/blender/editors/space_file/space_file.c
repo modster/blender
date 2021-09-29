@@ -176,10 +176,7 @@ static void file_free(SpaceLink *sl)
   MEM_SAFE_FREE(sfile->asset_params);
   MEM_SAFE_FREE(sfile->runtime);
 
-  if (sfile->layout) {
-    MEM_freeN(sfile->layout);
-    sfile->layout = NULL;
-  }
+  MEM_SAFE_FREE(sfile->layout);
 }
 
 /* spacetype; init callback, area size changes, screen set, etc */
@@ -337,11 +334,17 @@ static void file_refresh(const bContext *C, ScrArea *area)
     sfile->files = filelist_new(params->type);
     params->highlight_file = -1; /* added this so it opens nicer (ton) */
   }
+
+  if (!U.experimental.use_extended_asset_browser && ED_fileselect_is_asset_browser(sfile)) {
+    /* Only poses supported as non-experimental right now. */
+    params->filter_id = FILTER_ID_AC;
+  }
+
   filelist_settype(sfile->files, params->type);
   filelist_setdir(sfile->files, params->dir);
   filelist_setrecursion(sfile->files, params->recursion_level);
   filelist_setsorting(sfile->files, params->sort, params->flag & FILE_SORT_INVERT);
-  filelist_setlibrary(sfile->files, asset_params ? &asset_params->asset_library : NULL);
+  filelist_setlibrary(sfile->files, asset_params ? &asset_params->asset_library_ref : NULL);
   filelist_setfilter_options(
       sfile->files,
       (params->flag & FILE_FILTER) != 0,
@@ -578,6 +581,16 @@ static void file_main_region_message_subscribe(const wmRegionMessageSubscribePar
     /* All properties for this space type. */
     WM_msg_subscribe_rna(mbus, &ptr, NULL, &msg_sub_value_area_tag_refresh, __func__);
   }
+
+  /* Experimental Asset Browser features option. */
+  {
+    PointerRNA ptr;
+    RNA_pointer_create(NULL, &RNA_PreferencesExperimental, &U.experimental, &ptr);
+    PropertyRNA *prop = RNA_struct_find_property(&ptr, "use_extended_asset_browser");
+
+    /* All properties for this space type. */
+    WM_msg_subscribe_rna(mbus, &ptr, prop, &msg_sub_value_area_tag_refresh, __func__);
+  }
 }
 
 static bool file_main_region_needs_refresh_before_draw(SpaceFile *sfile)
@@ -685,7 +698,6 @@ static void file_operatortypes(void)
   WM_operatortype_append(FILE_OT_bookmark_move);
   WM_operatortype_append(FILE_OT_reset_recent);
   WM_operatortype_append(FILE_OT_hidedot);
-  WM_operatortype_append(FILE_OT_associate_blend);
   WM_operatortype_append(FILE_OT_filenum);
   WM_operatortype_append(FILE_OT_directory_new);
   WM_operatortype_append(FILE_OT_delete);
@@ -726,8 +738,18 @@ static void file_tools_region_draw(const bContext *C, ARegion *region)
   ED_region_panels(C, region);
 }
 
-static void file_tools_region_listener(const wmRegionListenerParams *UNUSED(listener_params))
+static void file_tools_region_listener(const wmRegionListenerParams *listener_params)
 {
+  const wmNotifier *wmn = listener_params->notifier;
+  ARegion *region = listener_params->region;
+
+  switch (wmn->category) {
+    case NC_SCENE:
+      if (ELEM(wmn->data, ND_MODE)) {
+        ED_region_tag_redraw(region);
+      }
+      break;
+  }
 }
 
 static void file_tool_props_region_listener(const wmRegionListenerParams *listener_params)
@@ -739,6 +761,11 @@ static void file_tool_props_region_listener(const wmRegionListenerParams *listen
     case NC_ID:
       if (ELEM(wmn->action, NA_RENAME)) {
         /* In case the filelist shows ID names. */
+        ED_region_tag_redraw(region);
+      }
+      break;
+    case NC_SCENE:
+      if (ELEM(wmn->data, ND_MODE)) {
         ED_region_tag_redraw(region);
       }
       break;
@@ -816,10 +843,7 @@ static void file_ui_region_listener(const wmRegionListenerParams *listener_param
   }
 }
 
-static bool filepath_drop_poll(bContext *C,
-                               wmDrag *drag,
-                               const wmEvent *UNUSED(event),
-                               const char **UNUSED(r_tooltip))
+static bool filepath_drop_poll(bContext *C, wmDrag *drag, const wmEvent *UNUSED(event))
 {
   if (drag->type == WM_DRAG_PATH) {
     SpaceFile *sfile = CTX_wm_space_file(C);
@@ -840,7 +864,7 @@ static void file_dropboxes(void)
 {
   ListBase *lb = WM_dropboxmap_find("Window", SPACE_EMPTY, RGN_TYPE_WINDOW);
 
-  WM_dropbox_add(lb, "FILE_OT_filepath_drop", filepath_drop_poll, filepath_drop_copy, NULL);
+  WM_dropbox_add(lb, "FILE_OT_filepath_drop", filepath_drop_poll, filepath_drop_copy, NULL, NULL);
 }
 
 static int file_space_subtype_get(ScrArea *area)
@@ -859,18 +883,13 @@ static void file_space_subtype_item_extend(bContext *UNUSED(C),
                                            EnumPropertyItem **item,
                                            int *totitem)
 {
-  if (U.experimental.use_asset_browser) {
-    RNA_enum_items_add(item, totitem, rna_enum_space_file_browse_mode_items);
-  }
-  else {
-    RNA_enum_items_add_value(
-        item, totitem, rna_enum_space_file_browse_mode_items, FILE_BROWSE_MODE_FILES);
-  }
+  RNA_enum_items_add(item, totitem, rna_enum_space_file_browse_mode_items);
 }
 
-static const char *file_context_dir[] = {
+const char *file_context_dir[] = {
     "active_file",
-    "asset_library",
+    "selected_files",
+    "asset_library_ref",
     "id",
     NULL,
 };
@@ -904,21 +923,28 @@ static int /*eContextResult*/ file_context(const bContext *C,
     CTX_data_pointer_set(result, &screen->id, &RNA_FileSelectEntry, file);
     return CTX_RESULT_OK;
   }
-  if (CTX_data_equals(member, "asset_library")) {
+  if (CTX_data_equals(member, "selected_files")) {
+    const int num_files_filtered = filelist_files_ensure(sfile->files);
+
+    for (int file_index = 0; file_index < num_files_filtered; file_index++) {
+      if (filelist_entry_is_selected(sfile->files, file_index)) {
+        FileDirEntry *entry = filelist_file(sfile->files, file_index);
+        CTX_data_list_add(result, &screen->id, &RNA_FileSelectEntry, entry);
+      }
+    }
+
+    CTX_data_type_set(result, CTX_DATA_TYPE_COLLECTION);
+    return CTX_RESULT_OK;
+  }
+
+  if (CTX_data_equals(member, "asset_library_ref")) {
     FileAssetSelectParams *asset_params = ED_fileselect_get_asset_params(sfile);
     if (!asset_params) {
       return CTX_RESULT_NO_DATA;
     }
 
-    BLI_STATIC_ASSERT(offsetof(FileSelectAssetLibraryUID, type) ==
-                          offsetof(AssetLibraryReference, type),
-                      "Expected FileSelectAssetLibraryUID to match AssetLibraryReference");
-    BLI_STATIC_ASSERT(offsetof(FileSelectAssetLibraryUID, custom_library_index) ==
-                          offsetof(AssetLibraryReference, custom_library_index),
-                      "Expected FileSelectAssetLibraryUID to match AssetLibraryReference");
-
     CTX_data_pointer_set(
-        result, &screen->id, &RNA_AssetLibraryReference, &asset_params->asset_library);
+        result, &screen->id, &RNA_AssetLibraryReference, &asset_params->asset_library_ref);
     return CTX_RESULT_OK;
   }
   if (CTX_data_equals(member, "id")) {

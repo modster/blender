@@ -53,6 +53,7 @@
 #include "BKE_screen.h"
 #include "BKE_workspace.h"
 
+#include "ED_object.h"
 #include "ED_render.h"
 #include "ED_screen.h"
 #include "ED_space_api.h"
@@ -275,6 +276,13 @@ static SpaceLink *view3d_create(const ScrArea *UNUSED(area), const Scene *scene)
     v3d->camera = scene->camera;
   }
 
+  /* header */
+  region = MEM_callocN(sizeof(ARegion), "header for view3d");
+
+  BLI_addtail(&v3d->regionbase, region);
+  region->regiontype = RGN_TYPE_HEADER;
+  region->alignment = (U.uiflag & USER_HEADER_BOTTOM) ? RGN_ALIGN_BOTTOM : RGN_ALIGN_TOP;
+
   /* tool header */
   region = MEM_callocN(sizeof(ARegion), "tool header for view3d");
 
@@ -282,13 +290,6 @@ static SpaceLink *view3d_create(const ScrArea *UNUSED(area), const Scene *scene)
   region->regiontype = RGN_TYPE_TOOL_HEADER;
   region->alignment = (U.uiflag & USER_HEADER_BOTTOM) ? RGN_ALIGN_BOTTOM : RGN_ALIGN_TOP;
   region->flag = RGN_FLAG_HIDDEN | RGN_FLAG_HIDDEN_BY_USER;
-
-  /* header */
-  region = MEM_callocN(sizeof(ARegion), "header for view3d");
-
-  BLI_addtail(&v3d->regionbase, region);
-  region->regiontype = RGN_TYPE_HEADER;
-  region->alignment = (U.uiflag & USER_HEADER_BOTTOM) ? RGN_ALIGN_BOTTOM : RGN_ALIGN_TOP;
 
   /* tool shelf */
   region = MEM_callocN(sizeof(ARegion), "toolshelf for view3d");
@@ -513,49 +514,54 @@ static bool view3d_drop_id_in_main_region_poll(bContext *C,
   return WM_drag_is_ID_type(drag, id_type);
 }
 
-static bool view3d_ob_drop_poll(bContext *C,
-                                wmDrag *drag,
-                                const wmEvent *event,
-                                const char **UNUSED(r_tooltip))
+static bool view3d_ob_drop_poll(bContext *C, wmDrag *drag, const wmEvent *event)
 {
   return view3d_drop_id_in_main_region_poll(C, drag, event, ID_OB);
 }
 
-static bool view3d_collection_drop_poll(bContext *C,
-                                        wmDrag *drag,
-                                        const wmEvent *event,
-                                        const char **UNUSED(r_tooltip))
+static bool view3d_collection_drop_poll(bContext *C, wmDrag *drag, const wmEvent *event)
 {
   return view3d_drop_id_in_main_region_poll(C, drag, event, ID_GR);
 }
 
-static bool view3d_mat_drop_poll(bContext *C,
-                                 wmDrag *drag,
-                                 const wmEvent *event,
-                                 const char **UNUSED(r_tooltip))
+static bool view3d_mat_drop_poll(bContext *C, wmDrag *drag, const wmEvent *event)
 {
   return view3d_drop_id_in_main_region_poll(C, drag, event, ID_MA);
 }
 
-static bool view3d_object_data_drop_poll(bContext *C,
-                                         wmDrag *drag,
-                                         const wmEvent *event,
-                                         const char **r_tooltip)
+static char *view3d_mat_drop_tooltip(bContext *C,
+                                     wmDrag *drag,
+                                     const wmEvent *event,
+                                     struct wmDropBox *drop)
+{
+  const char *name = WM_drag_get_item_name(drag);
+  RNA_string_set(drop->ptr, "name", name);
+  return ED_object_ot_drop_named_material_tooltip(C, drop->ptr, event);
+}
+
+static bool view3d_world_drop_poll(bContext *C, wmDrag *drag, const wmEvent *event)
+{
+  return view3d_drop_id_in_main_region_poll(C, drag, event, ID_WO);
+}
+
+static bool view3d_object_data_drop_poll(bContext *C, wmDrag *drag, const wmEvent *event)
 {
   ID_Type id_type = view3d_drop_id_in_main_region_poll_get_id_type(C, drag, event);
-  if (id_type) {
-    if (OB_DATA_SUPPORT_ID(id_type)) {
-      *r_tooltip = TIP_("Create object instance from object-data");
-      return true;
-    }
+  if (id_type && OB_DATA_SUPPORT_ID(id_type)) {
+    return true;
   }
   return false;
 }
 
-static bool view3d_ima_drop_poll(bContext *C,
-                                 wmDrag *drag,
-                                 const wmEvent *event,
-                                 const char **UNUSED(r_tooltip))
+static char *view3d_object_data_drop_tooltip(bContext *UNUSED(C),
+                                             wmDrag *UNUSED(drag),
+                                             const wmEvent *UNUSED(event),
+                                             wmDropBox *UNUSED(drop))
+{
+  return BLI_strdup(TIP_("Create object instance from object-data"));
+}
+
+static bool view3d_ima_drop_poll(bContext *C, wmDrag *drag, const wmEvent *event)
 {
   if (ED_region_overlap_isect_any_xy(CTX_wm_area(C), &event->x)) {
     return false;
@@ -580,12 +586,9 @@ static bool view3d_ima_bg_is_camera_view(bContext *C)
   return false;
 }
 
-static bool view3d_ima_bg_drop_poll(bContext *C,
-                                    wmDrag *drag,
-                                    const wmEvent *event,
-                                    const char **r_tooltip)
+static bool view3d_ima_bg_drop_poll(bContext *C, wmDrag *drag, const wmEvent *event)
 {
-  if (!view3d_ima_drop_poll(C, drag, event, r_tooltip)) {
+  if (!view3d_ima_drop_poll(C, drag, event)) {
     return false;
   }
 
@@ -596,12 +599,9 @@ static bool view3d_ima_bg_drop_poll(bContext *C,
   return view3d_ima_bg_is_camera_view(C);
 }
 
-static bool view3d_ima_empty_drop_poll(bContext *C,
-                                       wmDrag *drag,
-                                       const wmEvent *event,
-                                       const char **r_tooltip)
+static bool view3d_ima_empty_drop_poll(bContext *C, wmDrag *drag, const wmEvent *event)
 {
-  if (!view3d_ima_drop_poll(C, drag, event, r_tooltip)) {
+  if (!view3d_ima_drop_poll(C, drag, event)) {
     return false;
   }
 
@@ -620,8 +620,7 @@ static bool view3d_ima_empty_drop_poll(bContext *C,
 
 static bool view3d_volume_drop_poll(bContext *UNUSED(C),
                                     wmDrag *drag,
-                                    const wmEvent *UNUSED(event),
-                                    const char **UNUSED(r_tooltip))
+                                    const wmEvent *UNUSED(event))
 {
   return (drag->type == WM_DRAG_PATH) && (drag->icon == ICON_FILE_VOLUME);
 }
@@ -700,37 +699,50 @@ static void view3d_dropboxes(void)
                  "OBJECT_OT_add_named",
                  view3d_ob_drop_poll,
                  view3d_ob_drop_copy,
-                 WM_drag_free_imported_drag_ID);
+                 WM_drag_free_imported_drag_ID,
+                 NULL);
   WM_dropbox_add(lb,
                  "OBJECT_OT_drop_named_material",
                  view3d_mat_drop_poll,
                  view3d_id_drop_copy,
-                 WM_drag_free_imported_drag_ID);
+                 WM_drag_free_imported_drag_ID,
+                 view3d_mat_drop_tooltip);
   WM_dropbox_add(lb,
                  "VIEW3D_OT_background_image_add",
                  view3d_ima_bg_drop_poll,
                  view3d_id_path_drop_copy,
-                 WM_drag_free_imported_drag_ID);
+                 WM_drag_free_imported_drag_ID,
+                 NULL);
   WM_dropbox_add(lb,
                  "OBJECT_OT_drop_named_image",
                  view3d_ima_empty_drop_poll,
                  view3d_id_path_drop_copy,
-                 WM_drag_free_imported_drag_ID);
+                 WM_drag_free_imported_drag_ID,
+                 NULL);
   WM_dropbox_add(lb,
                  "OBJECT_OT_volume_import",
                  view3d_volume_drop_poll,
                  view3d_id_path_drop_copy,
-                 WM_drag_free_imported_drag_ID);
+                 WM_drag_free_imported_drag_ID,
+                 NULL);
   WM_dropbox_add(lb,
                  "OBJECT_OT_collection_instance_add",
                  view3d_collection_drop_poll,
                  view3d_collection_drop_copy,
-                 WM_drag_free_imported_drag_ID);
+                 WM_drag_free_imported_drag_ID,
+                 NULL);
   WM_dropbox_add(lb,
                  "OBJECT_OT_data_instance_add",
                  view3d_object_data_drop_poll,
                  view3d_id_drop_copy_with_type,
-                 WM_drag_free_imported_drag_ID);
+                 WM_drag_free_imported_drag_ID,
+                 view3d_object_data_drop_tooltip);
+  WM_dropbox_add(lb,
+                 "VIEW3D_OT_drop_world",
+                 view3d_world_drop_poll,
+                 view3d_id_drop_copy,
+                 WM_drag_free_imported_drag_ID,
+                 NULL);
 }
 
 static void view3d_widgets(void)
@@ -1557,11 +1569,16 @@ static void space_view3d_listener(const wmSpaceTypeListenerParams *params)
   switch (wmn->category) {
     case NC_SCENE:
       switch (wmn->data) {
-        case ND_WORLD:
-          if (v3d->flag2 & V3D_HIDE_OVERLAYS) {
+        case ND_WORLD: {
+          const bool use_scene_world = ((v3d->shading.type == OB_MATERIAL) &&
+                                        (v3d->shading.flag & V3D_SHADING_SCENE_WORLD)) ||
+                                       ((v3d->shading.type == OB_RENDER) &&
+                                        (v3d->shading.flag & V3D_SHADING_SCENE_WORLD_RENDER));
+          if (v3d->flag2 & V3D_HIDE_OVERLAYS || use_scene_world) {
             ED_area_tag_redraw_regiontype(area, RGN_TYPE_WINDOW);
           }
           break;
+        }
       }
       break;
     case NC_WORLD:

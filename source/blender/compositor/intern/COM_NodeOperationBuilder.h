@@ -145,8 +145,8 @@ class NodeOperationBuilder {
   /** Replace proxy operations with direct links */
   void resolve_proxies();
 
-  /** Calculate resolution for each operation */
-  void determineResolutions();
+  /** Calculate canvas area for each operation. */
+  void determine_canvases();
 
   /** Helper function to store connected inputs for replacement */
   Vector<NodeOperationInput *> cache_output_links(NodeOperationOutput *output) const;
@@ -169,7 +169,10 @@ class NodeOperationBuilder {
 
  private:
   PreviewOperation *make_preview_operation() const;
-
+  void unlink_inputs_and_relink_outputs(NodeOperation *unlinked_op, NodeOperation *linked_op);
+  void merge_equal_operations();
+  void merge_equal_operations(NodeOperation *from, NodeOperation *into);
+  void save_graphviz(StringRefNull name = "");
 #ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("COM:NodeCompilerImpl")
 #endif

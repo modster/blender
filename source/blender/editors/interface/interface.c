@@ -57,6 +57,8 @@
 #include "BKE_screen.h"
 #include "BKE_unit.h"
 
+#include "ED_asset.h"
+
 #include "GPU_matrix.h"
 #include "GPU_state.h"
 
@@ -854,10 +856,21 @@ static void ui_but_update_old_active_from_new(uiBut *oldbut, uiBut *but)
     oldbut->hardmax = but->hardmax;
   }
 
-  if (oldbut->type == UI_BTYPE_PROGRESS_BAR) {
-    uiButProgressbar *progress_oldbut = (uiButProgressbar *)oldbut;
-    uiButProgressbar *progress_but = (uiButProgressbar *)but;
-    progress_oldbut->progress = progress_but->progress;
+  switch (oldbut->type) {
+    case UI_BTYPE_PROGRESS_BAR: {
+      uiButProgressbar *progress_oldbut = (uiButProgressbar *)oldbut;
+      uiButProgressbar *progress_but = (uiButProgressbar *)but;
+      progress_oldbut->progress = progress_but->progress;
+      break;
+    }
+    case UI_BTYPE_TREEROW: {
+      uiButTreeRow *treerow_oldbut = (uiButTreeRow *)oldbut;
+      uiButTreeRow *treerow_newbut = (uiButTreeRow *)but;
+      SWAP(uiTreeViewItemHandle *, treerow_newbut->tree_item, treerow_oldbut->tree_item);
+      break;
+    }
+    default:
+      break;
   }
 
   /* move/copy string from the new button to the old */
@@ -2201,6 +2214,15 @@ int ui_but_is_pushed_ex(uiBut *but, double *value)
           }
         }
         break;
+      case UI_BTYPE_TREEROW: {
+        uiButTreeRow *tree_row_but = (uiButTreeRow *)but;
+
+        is_push = -1;
+        if (tree_row_but->tree_item) {
+          is_push = UI_tree_view_item_is_active(tree_row_but->tree_item);
+        }
+        break;
+      }
       default:
         is_push = -1;
         break;
@@ -2650,7 +2672,7 @@ static double ui_get_but_scale_unit(uiBut *but, double value)
   const int unit_type = UI_but_unit_type_get(but);
 
   /* Time unit is a bit special, not handled by BKE_scene_unit_scale() for now. */
-  if (unit_type == PROP_UNIT_TIME) { /* WARNING - using evil_C :| */
+  if (unit_type == PROP_UNIT_TIME) { /* WARNING: using evil_C :| */
     Scene *scene = CTX_data_scene(but->block->evil_C);
     return FRA2TIME(value);
   }
@@ -3445,6 +3467,7 @@ void UI_block_free(const bContext *C, uiBlock *block)
   BLI_freelistN(&block->color_pickers.list);
 
   ui_block_free_button_groups(block);
+  ui_block_free_views(block);
 
   MEM_freeN(block);
 }
@@ -3940,6 +3963,10 @@ static void ui_but_alloc_info(const eButType type,
       alloc_size = sizeof(uiButDatasetRow);
       alloc_str = "uiButDatasetRow";
       break;
+    case UI_BTYPE_TREEROW:
+      alloc_size = sizeof(uiButTreeRow);
+      alloc_str = "uiButTreeRow";
+      break;
     default:
       alloc_size = sizeof(uiBut);
       alloc_str = "uiBut";
@@ -4015,9 +4042,11 @@ uiBut *ui_but_change_type(uiBut *but, eButType new_type)
       UNUSED_VARS_NDEBUG(found_layout);
       ui_button_group_replace_but_ptr(uiLayoutGetBlock(but->layout), old_but_ptr, but);
     }
+#ifdef WITH_PYTHON
     if (UI_editsource_enable_check()) {
       UI_editsource_but_replace(old_but_ptr, but);
     }
+#endif
   }
 
   return but;
@@ -4137,6 +4166,7 @@ static uiBut *ui_def_but(uiBlock *block,
                 UI_BTYPE_BUT_MENU,
                 UI_BTYPE_SEARCH_MENU,
                 UI_BTYPE_DATASETROW,
+                UI_BTYPE_TREEROW,
                 UI_BTYPE_POPOVER)) {
     but->drawflag |= (UI_BUT_TEXT_LEFT | UI_BUT_ICON_LEFT);
   }
@@ -6169,17 +6199,19 @@ int UI_but_return_value_get(uiBut *but)
 void UI_but_drag_set_id(uiBut *but, ID *id)
 {
   but->dragtype = WM_DRAG_ID;
-  if ((but->dragflag & UI_BUT_DRAGPOIN_FREE)) {
+  if (but->dragflag & UI_BUT_DRAGPOIN_FREE) {
     WM_drag_data_free(but->dragtype, but->dragpoin);
     but->dragflag &= ~UI_BUT_DRAGPOIN_FREE;
   }
   but->dragpoin = (void *)id;
 }
 
+/**
+ * \param asset: May be passed from a temporary variable, drag data only stores a copy of this.
+ */
 void UI_but_drag_set_asset(uiBut *but,
-                           const char *name,
+                           const AssetHandle *asset,
                            const char *path,
-                           int id_type,
                            int import_type,
                            int icon,
                            struct ImBuf *imb,
@@ -6187,14 +6219,14 @@ void UI_but_drag_set_asset(uiBut *but,
 {
   wmDragAsset *asset_drag = MEM_mallocN(sizeof(*asset_drag), "wmDragAsset");
 
-  BLI_strncpy(asset_drag->name, name, sizeof(asset_drag->name));
+  BLI_strncpy(asset_drag->name, ED_asset_handle_get_name(asset), sizeof(asset_drag->name));
   asset_drag->path = path;
-  asset_drag->id_type = id_type;
+  asset_drag->id_type = ED_asset_handle_get_id_type(asset);
   asset_drag->import_type = import_type;
 
   but->dragtype = WM_DRAG_ASSET;
   ui_def_but_icon(but, icon, 0); /* no flag UI_HAS_ICON, so icon doesn't draw in button */
-  if ((but->dragflag & UI_BUT_DRAGPOIN_FREE)) {
+  if (but->dragflag & UI_BUT_DRAGPOIN_FREE) {
     WM_drag_data_free(but->dragtype, but->dragpoin);
   }
   but->dragpoin = asset_drag;
@@ -6206,7 +6238,7 @@ void UI_but_drag_set_asset(uiBut *but,
 void UI_but_drag_set_rna(uiBut *but, PointerRNA *ptr)
 {
   but->dragtype = WM_DRAG_RNA;
-  if ((but->dragflag & UI_BUT_DRAGPOIN_FREE)) {
+  if (but->dragflag & UI_BUT_DRAGPOIN_FREE) {
     WM_drag_data_free(but->dragtype, but->dragpoin);
     but->dragflag &= ~UI_BUT_DRAGPOIN_FREE;
   }
@@ -6216,7 +6248,7 @@ void UI_but_drag_set_rna(uiBut *but, PointerRNA *ptr)
 void UI_but_drag_set_path(uiBut *but, const char *path, const bool use_free)
 {
   but->dragtype = WM_DRAG_PATH;
-  if ((but->dragflag & UI_BUT_DRAGPOIN_FREE)) {
+  if (but->dragflag & UI_BUT_DRAGPOIN_FREE) {
     WM_drag_data_free(but->dragtype, but->dragpoin);
     but->dragflag &= ~UI_BUT_DRAGPOIN_FREE;
   }
@@ -6229,7 +6261,7 @@ void UI_but_drag_set_path(uiBut *but, const char *path, const bool use_free)
 void UI_but_drag_set_name(uiBut *but, const char *name)
 {
   but->dragtype = WM_DRAG_NAME;
-  if ((but->dragflag & UI_BUT_DRAGPOIN_FREE)) {
+  if (but->dragflag & UI_BUT_DRAGPOIN_FREE) {
     WM_drag_data_free(but->dragtype, but->dragpoin);
     but->dragflag &= ~UI_BUT_DRAGPOIN_FREE;
   }
@@ -6247,7 +6279,7 @@ void UI_but_drag_set_image(
 {
   but->dragtype = WM_DRAG_PATH;
   ui_def_but_icon(but, icon, 0); /* no flag UI_HAS_ICON, so icon doesn't draw in button */
-  if ((but->dragflag & UI_BUT_DRAGPOIN_FREE)) {
+  if (but->dragflag & UI_BUT_DRAGPOIN_FREE) {
     WM_drag_data_free(but->dragtype, but->dragpoin);
     but->dragflag &= ~UI_BUT_DRAGPOIN_FREE;
   }
@@ -6869,6 +6901,15 @@ void UI_but_datasetrow_indentation_set(uiBut *but, int indentation)
   BLI_assert(but->type == UI_BTYPE_DATASETROW);
 
   but_dataset->indentation = indentation;
+  BLI_assert(indentation >= 0);
+}
+
+void UI_but_treerow_indentation_set(uiBut *but, int indentation)
+{
+  uiButTreeRow *but_row = (uiButTreeRow *)but;
+  BLI_assert(but->type == UI_BTYPE_TREEROW);
+
+  but_row->indentation = indentation;
   BLI_assert(indentation >= 0);
 }
 

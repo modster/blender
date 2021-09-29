@@ -40,7 +40,7 @@
  * There are two coordinate systems:
  *
  * - The screen coordinate system. The origin of the screen is located in the
- *   upper left corner of the screen.</li>
+ *   upper left corner of the screen.
  * - The client rectangle coordinate system. The client rectangle of a window
  *   is the area that is drawable by the application (excluding title bars etc.).
  */
@@ -133,7 +133,7 @@ class GHOST_IWindow {
   virtual void screenToClient(int32_t inX, int32_t inY, int32_t &outX, int32_t &outY) const = 0;
 
   /**
-   * Converts a point in screen coordinates to client rectangle coordinates
+   * Converts a point in client rectangle coordinates to screen coordinates.
    * \param inX: The x-coordinate in the client rectangle.
    * \param inY: The y-coordinate in the client rectangle.
    * \param outX: The x-coordinate on the screen.

@@ -543,7 +543,7 @@ void BKE_gpencil_convert_curve(Main *bmain,
   int actcol = ob_gp->actcol;
 
   for (int slot = 1; slot <= ob_gp->totcol; slot++) {
-    while (slot <= ob_gp->totcol && !BKE_object_material_slot_used(ob_gp->data, slot)) {
+    while (slot <= ob_gp->totcol && !BKE_object_material_slot_used(ob_gp, slot)) {
       ob_gp->actcol = slot;
       BKE_object_material_slot_remove(bmain, ob_gp);
 
@@ -883,7 +883,7 @@ static void gpencil_interpolate_fl_from_to(
   float *r = point_offset;
   for (int i = 0; i <= it; i++) {
     float fac = (float)i / (float)it;
-    fac = 3.0f * fac * fac - 2.0f * fac * fac * fac;  // smooth
+    fac = 3.0f * fac * fac - 2.0f * fac * fac * fac; /* Smooth. */
     *r = interpf(to, from, fac);
     r = POINTER_OFFSET(r, stride);
   }
@@ -896,7 +896,7 @@ static void gpencil_interpolate_v4_from_to(
   float *r = point_offset;
   for (int i = 0; i <= it; i++) {
     float fac = (float)i / (float)it;
-    fac = 3.0f * fac * fac - 2.0f * fac * fac * fac;  // smooth
+    fac = 3.0f * fac * fac - 2.0f * fac * fac * fac; /* Smooth. */
     interp_v4_v4v4(r, from, to, fac);
     r = POINTER_OFFSET(r, stride);
   }
