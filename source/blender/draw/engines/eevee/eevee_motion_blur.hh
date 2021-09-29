@@ -85,7 +85,6 @@ class MotionBlurModule {
   /** Copy of scene settings. */
   int motion_blur_position_;
   float motion_blur_shutter_;
-  float motion_blur_fx_depth_scale_;
 
   bool enabled_ = false;
   float motion_blur_fx_enabled_ = false;

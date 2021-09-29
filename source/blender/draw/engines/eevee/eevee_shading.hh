@@ -271,9 +271,10 @@ class DeferredLayer {
  private:
   Instance &inst_;
 
-  GPUTexture *input_emission_data_tx_ = nullptr;
-  GPUTexture *input_diffuse_data_tx_ = nullptr;
-  GPUTexture *input_depth_tx_ = nullptr;
+  /* TODO */
+  // GPUTexture *input_emission_data_tx_ = nullptr;
+  // GPUTexture *input_diffuse_data_tx_ = nullptr;
+  // GPUTexture *input_depth_tx_ = nullptr;
 
   DRWPass *prepass_ps_ = nullptr;
   DRWPass *prepass_culled_ps_ = nullptr;
@@ -306,7 +307,7 @@ class DeferredPass {
   DRWPass *eval_diffuse_ps_ = nullptr;
   DRWPass *eval_transparency_ps_ = nullptr;
   DRWPass *eval_holdout_ps_ = nullptr;
-  DRWPass *eval_volume_heterogeneous_ps_ = nullptr;
+  // DRWPass *eval_volume_heterogeneous_ps_ = nullptr;
   DRWPass *eval_volume_homogeneous_ps_ = nullptr;
 
   /* References only. */
@@ -321,8 +322,8 @@ class DeferredPass {
   GPUTexture *input_reflect_normal_tx_ = nullptr;
   GPUTexture *input_transparency_data_tx_ = nullptr;
   GPUTexture *input_volume_data_tx_ = nullptr;
-  GPUTexture *input_volume_radiance_tx_ = nullptr;
-  GPUTexture *input_volume_transmittance_tx_ = nullptr;
+  // GPUTexture *input_volume_radiance_tx_ = nullptr;
+  // GPUTexture *input_volume_transmittance_tx_ = nullptr;
 
  public:
   DeferredPass(Instance &inst)
