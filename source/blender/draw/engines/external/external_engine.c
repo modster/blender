@@ -255,23 +255,16 @@ static void external_cache_finish(void *UNUSED(vedata))
 static void external_draw_scene_do_v3d(void *vedata)
 {
   const DRWContextState *draw_ctx = DRW_context_state_get();
-  RegionView3D *rv3d = draw_ctx->rv3d;
   ARegion *region = draw_ctx->region;
+
+  RenderEngineType *engine_type = draw_ctx->engine_type;
+  if (engine_type->view_update == NULL || engine_type->view_draw == NULL) {
+    return;
+  }
 
   DRW_state_reset_ex(DRW_STATE_DEFAULT & ~DRW_STATE_DEPTH_LESS_EQUAL);
 
-  /* Create render engine. */
-  if (!rv3d->render_engine) {
-    RenderEngineType *engine_type = draw_ctx->engine_type;
-
-    if (!(engine_type->view_update && engine_type->view_draw)) {
-      return;
-    }
-
-    RenderEngine *engine = RE_engine_create(engine_type);
-    engine_type->view_update(engine, draw_ctx->evil_C, draw_ctx->depsgraph);
-    rv3d->render_engine = engine;
-  }
+  RenderEngine *engine = DRW_external_engine_ensure(engine_type);
 
   /* Rendered draw. */
   GPU_matrix_push_projection();
@@ -279,8 +272,8 @@ static void external_draw_scene_do_v3d(void *vedata)
   ED_region_pixelspace(region);
 
   /* Render result draw. */
-  const RenderEngineType *type = rv3d->render_engine->type;
-  type->view_draw(rv3d->render_engine, draw_ctx->evil_C, draw_ctx->depsgraph);
+  const RenderEngineType *type = engine->type;
+  type->view_draw(engine, draw_ctx->evil_C, draw_ctx->depsgraph);
 
   GPU_bgl_end();
 
@@ -289,8 +282,8 @@ static void external_draw_scene_do_v3d(void *vedata)
 
   /* Set render info. */
   EXTERNAL_Data *data = vedata;
-  if (rv3d->render_engine->text[0] != '\0') {
-    BLI_strncpy(data->info, rv3d->render_engine->text, sizeof(data->info));
+  if (engine->text[0] != '\0') {
+    BLI_strncpy(data->info, engine->text, sizeof(data->info));
   }
   else {
     data->info[0] = '\0';

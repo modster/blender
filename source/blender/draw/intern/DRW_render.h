@@ -156,8 +156,6 @@ typedef struct DRWRenderView {
   /** TODO(fclem): Unused for now, should be what the engine use to render instead of relying on
    * the DRW_view_default_get(). */
   DRWView *view;
-  /** External engines. Created if needed. */
-  struct RenderEngine *render_engine;
   /** Contains DrawEngines data. */
   struct DRWViewData *view_data;
   /** TODO(fclem): multiple render passes. */
@@ -173,6 +171,8 @@ typedef struct DRWRenderScene {
   /** Marks a scene a rendered. */
   bool rendered;
   bool is_active_scene;
+  /** External engines. Created if needed. */
+  struct RenderEngine *render_engine;
   /** One view for each stereo view. We might have more views in the future. */
   DRWRenderView views[2];
 } DRWRenderScene;
@@ -180,6 +180,8 @@ typedef struct DRWRenderScene {
 DRWRenderPass *DRW_render_pass_find(const Scene *scene_orig,
                                     const int view_layer_index,
                                     const eScenePassType pass_type);
+
+struct RenderEngine *DRW_external_engine_ensure(RenderEngineType *engine_type);
 
 /* Textures */
 typedef enum {

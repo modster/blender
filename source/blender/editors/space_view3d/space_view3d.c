@@ -225,9 +225,10 @@ void ED_view3d_check_mats_rv3d(struct RegionView3D *rv3d)
 
 void ED_view3d_stop_render_preview(wmWindowManager *wm, ARegion *region)
 {
-  RegionView3D *rv3d = region->regiondata;
+  struct GPUViewport *viewport = WM_draw_region_get_viewport(region);
+  bool viewport_has_external_engine = viewport && DRW_viewport_has_external_engine(viewport);
 
-  if (rv3d->render_engine) {
+  if (viewport_has_external_engine) {
 #ifdef WITH_PYTHON
     BPy_BEGIN_ALLOW_THREADS;
 #endif
@@ -238,8 +239,7 @@ void ED_view3d_stop_render_preview(wmWindowManager *wm, ARegion *region)
     BPy_END_ALLOW_THREADS;
 #endif
 
-    RE_engine_free(rv3d->render_engine);
-    rv3d->render_engine = NULL;
+    DRW_viewport_free_external_engines(viewport);
   }
 
   /* A bit overkill but this make sure the viewport is reset completely. (fclem) */
@@ -794,10 +794,6 @@ static void view3d_main_region_free(ARegion *region)
       MEM_freeN(rv3d->clipbb);
     }
 
-    if (rv3d->render_engine) {
-      RE_engine_free(rv3d->render_engine);
-    }
-
     if (rv3d->sms) {
       MEM_freeN(rv3d->sms);
     }
@@ -821,7 +817,6 @@ static void *view3d_main_region_duplicate(void *poin)
       new->clipbb = MEM_dupallocN(rv3d->clipbb);
     }
 
-    new->render_engine = NULL;
     new->sms = NULL;
     new->smooth_timer = NULL;
 

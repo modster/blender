@@ -72,9 +72,6 @@ struct DRWData **GPU_viewport_data_get(GPUViewport *viewport);
 
 void GPU_viewport_stereo_composite(GPUViewport *viewport, Stereo3dFormat *stereo_format);
 
-void GPU_viewport_tag_update(GPUViewport *viewport);
-bool GPU_viewport_do_update(GPUViewport *viewport);
-
 int GPU_viewport_active_view_get(GPUViewport *viewport);
 bool GPU_viewport_is_stereo_get(GPUViewport *viewport);
 

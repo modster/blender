@@ -60,6 +60,8 @@
 #include "GPU_texture.h"
 #include "GPU_viewport.h"
 
+#include "DRW_engine.h"
+
 #include "RE_engine.h"
 
 #include "WM_api.h"
@@ -174,9 +176,8 @@ static bool wm_draw_region_stereo_set(Main *bmain,
       if (region->regiontype == RGN_TYPE_WINDOW) {
         View3D *v3d = area->spacedata.first;
         if (v3d->camera && v3d->camera->type == OB_CAMERA) {
-          RegionView3D *rv3d = region->regiondata;
-          RenderEngine *engine = rv3d->render_engine;
-          if (engine && !(engine->type->flag & RE_USE_STEREO_VIEWPORT)) {
+          struct GPUViewport *viewport = WM_draw_region_get_viewport(region);
+          if (!DRW_viewport_engines_stereo_support(viewport)) {
             return false;
           }
 
@@ -256,33 +257,16 @@ static void wm_region_test_gizmo_do_draw(bContext *C,
   }
 }
 
-static void wm_region_test_render_do_draw(const Scene *scene,
-                                          struct Depsgraph *depsgraph,
+static void wm_region_test_render_do_draw(const Scene *UNUSED(scene),
+                                          struct Depsgraph *UNUSED(depsgraph),
                                           ScrArea *area,
                                           ARegion *region)
 {
   /* tag region for redraw from render engine preview running inside of it */
   if (area->spacetype == SPACE_VIEW3D && region->regiontype == RGN_TYPE_WINDOW) {
-    RegionView3D *rv3d = region->regiondata;
-    RenderEngine *engine = rv3d->render_engine;
     GPUViewport *viewport = WM_draw_region_get_viewport(region);
-
-    if (engine && (engine->flag & RE_ENGINE_DO_DRAW)) {
-      View3D *v3d = area->spacedata.first;
-      rcti border_rect;
-
-      /* do partial redraw when possible */
-      if (ED_view3d_calc_render_border(scene, depsgraph, v3d, region, &border_rect)) {
-        ED_region_tag_redraw_partial(region, &border_rect, false);
-      }
-      else {
-        ED_region_tag_redraw_no_rebuild(region);
-      }
-
-      engine->flag &= ~RE_ENGINE_DO_DRAW;
-    }
-    else if (viewport && GPU_viewport_do_update(viewport)) {
-      ED_region_tag_redraw_no_rebuild(region);
+    if (viewport) {
+      DRW_viewport_tag_redraw(viewport, region);
     }
   }
 }
@@ -317,7 +301,6 @@ static const char *wm_area_name(ScrArea *area)
 #define SPACE_NAME(space) \
   case space: \
     return #space;
-
   switch (area->spacetype) {
     SPACE_NAME(SPACE_EMPTY);
     SPACE_NAME(SPACE_VIEW3D);

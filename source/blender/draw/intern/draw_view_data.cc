@@ -248,6 +248,17 @@ void DRW_view_data_use_engine(DRWViewData *view_data, DrawEngineType *engine_typ
   view_data->enabled_engines.append(engine);
 }
 
+/* Enable all engines that have been previously enabled. */
+void DRW_view_data_use_engines_with_data(DRWViewData *view_data)
+{
+  for (ViewportEngineData &engine : view_data->engines) {
+    bool has_data = engine.fbl != nullptr;
+    if (has_data) {
+      view_data->enabled_engines.append(&engine);
+    }
+  }
+}
+
 void DRW_view_data_reset(DRWViewData *view_data)
 {
   view_data->enabled_engines.clear();

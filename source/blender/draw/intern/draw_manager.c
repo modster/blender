@@ -192,9 +192,9 @@ static void draw_render_scene_free(DRWRenderScene *rscene)
       /* TODO(fclem) he texture is currently owned by the view_data instead. */
       // GPU_TEXTURE_FREE_SAFE(rscene->views[i].combined.pass_tx);
 
-      if (rscene->views[i].render_engine != NULL) {
-        RE_engine_free(rscene->views[i].render_engine);
-        rscene->views[i].render_engine = NULL;
+      if (rscene->render_engine != NULL) {
+        RE_engine_free(rscene->render_engine);
+        rscene->render_engine = NULL;
       }
       if (rscene->views[i].view_data != NULL) {
         DRW_view_data_free(rscene->views[i].view_data);
@@ -245,6 +245,21 @@ DRWRenderPass *DRW_render_pass_find(const Scene *scene_orig,
     case SCE_PASS_COMBINED:
       return &rscene->views[0].combined;
   }
+}
+
+/* Returns a render engine instance for the active DRWRenderScene. */
+struct RenderEngine *DRW_external_engine_ensure(RenderEngineType *engine_type)
+{
+  Scene *scene_orig = DEG_get_input_scene(DST.draw_ctx.depsgraph);
+  ViewLayer *view_layer = DEG_get_input_view_layer(DST.draw_ctx.depsgraph);
+  int viewlayer_index = BLI_findindex(&scene_orig->view_layers, view_layer);
+
+  DRWRenderScene *rscene = draw_render_scene_ensure(DST.vmempool, scene_orig, viewlayer_index);
+  if (rscene->render_engine == NULL) {
+    rscene->render_engine = RE_engine_create(engine_type);
+    engine_type->view_update(rscene->render_engine, DST.draw_ctx.evil_C, DST.draw_ctx.depsgraph);
+  }
+  return rscene->render_engine;
 }
 
 /** \} */
@@ -597,6 +612,89 @@ static DRWData *drw_viewport_data_ensure(GPUViewport *viewport)
   return vmempool;
 }
 
+bool DRW_viewport_has_external_engine(GPUViewport *viewport)
+{
+  DRWData *drw_data = *GPU_viewport_data_get(viewport);
+  if (drw_data == NULL) {
+    return false;
+  }
+
+  LISTBASE_FOREACH (DRWRenderScene *, rscene, &drw_data->scene_renders) {
+    if (rscene->render_engine != NULL) {
+      return true;
+    }
+  }
+  return false;
+}
+
+void DRW_viewport_free_external_engines(GPUViewport *viewport)
+{
+  DRWData *drw_data = *GPU_viewport_data_get(viewport);
+  if (drw_data == NULL) {
+    return;
+  }
+
+  LISTBASE_FOREACH (DRWRenderScene *, rscene, &drw_data->scene_renders) {
+    if (rscene->render_engine != NULL) {
+      RE_engine_free(rscene->render_engine);
+      rscene->render_engine = NULL;
+    }
+  }
+}
+
+/* Checks if all engines used by this viewport supports stereo view.
+ * Only checks external engines since internal (draw) engines are supported using 2 instances. */
+bool DRW_viewport_engines_stereo_support(GPUViewport *viewport)
+{
+  DRWData *drw_data = *GPU_viewport_data_get(viewport);
+  if (drw_data == NULL) {
+    return false;
+  }
+
+  LISTBASE_FOREACH (DRWRenderScene *, rscene, &drw_data->scene_renders) {
+    RenderEngine *engine = rscene->render_engine;
+    if (engine != NULL && !(engine->type->flag & RE_USE_STEREO_VIEWPORT)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+void DRW_viewport_tag_redraw(GPUViewport *viewport, ARegion *region)
+{
+  DRWData *drw_data = *GPU_viewport_data_get(viewport);
+  if (drw_data == NULL) {
+    return;
+  }
+
+  LISTBASE_FOREACH (DRWRenderScene *, rscene, &drw_data->scene_renders) {
+    RenderEngine *engine = rscene->render_engine;
+
+    if (engine && (engine->flag & RE_ENGINE_DO_DRAW)) {
+
+#if 0 /* TODO(fclem) Port back when partial redraw is supported by draw manager & engines. */
+      /* Do partial redraw when possible. */
+      View3D *v3d = area->spacedata.first;
+      rcti border_rect;
+      if (ED_view3d_calc_render_border(scene, depsgraph, v3d, region, &border_rect)) {
+        ED_region_tag_redraw_partial(region, &border_rect, false);
+      }
+      else {
+        ED_region_tag_redraw_no_rebuild(region);
+      }
+#else
+      ED_region_tag_redraw_no_rebuild(region);
+#endif
+
+      engine->flag &= ~RE_ENGINE_DO_DRAW;
+    }
+  }
+
+  if (drw_data->do_update) {
+    ED_region_tag_redraw_no_rebuild(region);
+  }
+}
+
 /**
  * Sets DST.viewport, DST.size and a lot of other important variables.
  * Needs to be called before enabling any draw engine.
@@ -773,9 +871,7 @@ DefaultTextureList *DRW_viewport_texture_list_get(void)
 
 void DRW_viewport_request_redraw(void)
 {
-  if (DST.viewport) {
-    GPU_viewport_tag_update(DST.viewport);
-  }
+  DST.vmempool->do_update = true;
 }
 
 /** \} */
@@ -1366,7 +1462,6 @@ static void drw_compositor_scenes_render(DRWManager *drw,
   bNodeTree *comp_ntree = scene_active->nodetree;
   ARegion *region = drw->draw_ctx.region;
   View3D *v3d = drw->draw_ctx.v3d;
-  RegionView3D *rv3d = drw->draw_ctx.rv3d;
   GPUViewport *viewport = drw->viewport;
   Main *bmain = DEG_get_bmain(drw->draw_ctx.depsgraph);
   const bContext *evil_C = drw->draw_ctx.evil_C;
@@ -1389,6 +1484,7 @@ static void drw_compositor_scenes_render(DRWManager *drw,
       if (node->id) {
         Scene *scene_orig = (Scene *)DEG_get_original_id(node->id);
         ViewLayer *view_layer = BLI_findlink(&scene_orig->view_layers, node->custom1);
+        RenderEngineType *engine_type = RE_engines_find(scene_orig->r.engine);
 
         /* Skip the main scene as it will be rendered afterwards. */
         if (node->id == (ID *)scene_active) {
@@ -1422,25 +1518,12 @@ static void drw_compositor_scenes_render(DRWManager *drw,
           continue;
         }
 
-        RenderEngineType *engine_type = RE_engines_find(scene_orig->r.engine);
-        RenderEngine *prev_render_engine = rv3d->render_engine;
-        if (engine_type->draw_engine == NULL) {
-          /* TODO(@fclem): We swap the render engine inside the region.
-           * A better way would be to adjust the external draw engine code. */
-          rv3d->render_engine = rscene->views[0].render_engine;
-        }
-
         /* Fix asserts. TODO(fclem) revisit this. */
         drw_state_prepare_clean_for_draw(&DST);
         DST.options.is_compositor_scene_render = true;
         GPU_framebuffer_restore();
 
         DRW_draw_render_loop_ex(deg, engine_type, region, v3d, viewport, evil_C);
-
-        /* Restore. */
-        if (engine_type->draw_engine == NULL) {
-          rv3d->render_engine = prev_render_engine;
-        }
 
         rscene->rendered = true;
         rscene->is_active_scene = false;
@@ -1537,7 +1620,7 @@ static bool drw_gpencil_engine_needed(Depsgraph *depsgraph, View3D *v3d)
 /** \name View Update
  * \{ */
 
-void DRW_notify_view_update(const DRWUpdateContext *update_ctx)
+void DRW_notify_view_update(const DRWUpdateContext *update_ctx, bool do_update)
 {
   RenderEngineType *engine_type = update_ctx->engine_type;
   ARegion *region = update_ctx->region;
@@ -1545,14 +1628,15 @@ void DRW_notify_view_update(const DRWUpdateContext *update_ctx)
   RegionView3D *rv3d = region->regiondata;
   Depsgraph *depsgraph = update_ctx->depsgraph;
   Scene *scene = update_ctx->scene;
+  Main *bmain = update_ctx->bmain;
+  ScrArea *area = update_ctx->area;
   ViewLayer *view_layer = update_ctx->view_layer;
+  wmWindow *window = update_ctx->window;
 
   GPUViewport *viewport = WM_draw_region_get_viewport(region);
   if (!viewport) {
     return;
   }
-
-  const bool gpencil_engine_needed = drw_gpencil_engine_needed(depsgraph, v3d);
 
   /* XXX Really nasty locking. But else this could
    * be executed by the material previews thread
@@ -1578,21 +1662,52 @@ void DRW_notify_view_update(const DRWUpdateContext *update_ctx)
   DST.viewport = viewport;
   DST.vmempool = drw_viewport_data_ensure(DST.viewport);
 
-  /* Separate update for each stereo view. */
   int view_count = GPU_viewport_is_stereo_get(viewport) ? 2 : 1;
-  for (int view = 0; view < view_count; view++) {
-    DST.view_data_active = DST.vmempool->view_data[view];
 
-    drw_engines_enable(view_layer, engine_type, gpencil_engine_needed);
-    drw_engines_data_validate();
+  bContext *C = NULL;
 
-    DRW_ENABLED_ENGINE_ITER (DST.view_data_active, draw_engine, data) {
-      if (draw_engine->view_update) {
-        draw_engine->view_update(data);
+  LISTBASE_FOREACH (DRWRenderScene *, rscene, &DST.vmempool->scene_renders) {
+    RenderEngine *engine = rscene->render_engine;
+
+    if (engine && (do_update || (engine->flag & RE_ENGINE_DO_UPDATE))) {
+      if (C == NULL) {
+        /* Create temporary context to execute callback in. */
+        C = CTX_create();
+        CTX_data_main_set(C, bmain);
+        CTX_data_scene_set(C, scene);
+        CTX_wm_manager_set(C, bmain->wm.first);
+        CTX_wm_window_set(C, window);
+        CTX_wm_screen_set(C, WM_window_get_active_screen(window));
+        CTX_wm_area_set(C, area);
+        CTX_wm_region_set(C, region);
       }
+
+      engine->flag &= ~RE_ENGINE_DO_UPDATE;
+      /* NOTE: Important to pass non-updated depsgraph, This is because this function is called
+       * from inside dependency graph evaluation. Additionally, if we pass fully evaluated one
+       * we will lose updates stored in the graph. */
+      engine->type->view_update(engine, C, CTX_data_depsgraph_pointer(C));
     }
 
-    drw_engines_disable();
+    if (do_update) {
+      for (int view = 0; view < view_count; view++) {
+        DST.view_data_active = (rscene->is_active_scene) ? DST.vmempool->view_data[view] :
+                                                           rscene->views[view].view_data;
+        DRW_view_data_use_engines_with_data(DST.view_data_active);
+
+        DRW_ENABLED_ENGINE_ITER (DST.view_data_active, draw_engine, data) {
+          if (draw_engine->view_update) {
+            draw_engine->view_update(data);
+          }
+        }
+
+        DRW_view_data_reset(DST.view_data_active);
+      }
+    }
+  }
+
+  if (C != NULL) {
+    CTX_free(C);
   }
 
   drw_manager_exit(&DST);

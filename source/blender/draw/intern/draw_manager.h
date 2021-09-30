@@ -526,6 +526,8 @@ typedef struct DRWData {
   struct DRWViewData *view_data[2];
   /** Render results for viewport compositor. (DRWRenderScene *) */
   ListBase scene_renders;
+  /** Set to true to ask for a redraw by draw engines. */
+  bool do_update;
 } DRWData;
 
 /* ------------- DRAW MANAGER ------------ */

@@ -114,6 +114,7 @@ void DRW_view_data_color_from_compositor_scene(DRWViewData *view_data,
 ViewportEngineData *DRW_view_data_engine_data_get_ensure(DRWViewData *view_data,
                                                          struct DrawEngineType *engine_type_);
 void DRW_view_data_use_engine(DRWViewData *view_data, struct DrawEngineType *engine_type);
+void DRW_view_data_use_engines_with_data(DRWViewData *view_data);
 void DRW_view_data_reset(DRWViewData *view_data);
 void DRW_view_data_free_unused(DRWViewData *view_data);
 double *DRW_view_data_cache_time_get(DRWViewData *view_data);

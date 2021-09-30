@@ -97,21 +97,8 @@ struct GPUViewport {
 };
 
 enum {
-  DO_UPDATE = (1 << 0),
-  GPU_VIEWPORT_STEREO = (1 << 1),
+  GPU_VIEWPORT_STEREO = (1 << 0),
 };
-
-void GPU_viewport_tag_update(GPUViewport *viewport)
-{
-  viewport->flag |= DO_UPDATE;
-}
-
-bool GPU_viewport_do_update(GPUViewport *viewport)
-{
-  bool ret = (viewport->flag & DO_UPDATE);
-  viewport->flag &= ~DO_UPDATE;
-  return ret;
-}
 
 GPUViewport *GPU_viewport_create(void)
 {

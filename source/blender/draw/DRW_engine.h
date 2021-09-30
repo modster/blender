@@ -46,8 +46,10 @@ struct Render;
 struct RenderEngine;
 struct RenderEngineType;
 struct Scene;
+struct ScrArea;
 struct View3D;
 struct ViewLayer;
+struct wmWindow;
 struct bContext;
 struct rcti;
 
@@ -62,11 +64,13 @@ typedef struct DRWUpdateContext {
   struct Depsgraph *depsgraph;
   struct Scene *scene;
   struct ViewLayer *view_layer;
+  struct ScrArea *area;
   struct ARegion *region;
   struct View3D *v3d;
   struct RenderEngineType *engine_type;
+  struct wmWindow *window;
 } DRWUpdateContext;
-void DRW_notify_view_update(const DRWUpdateContext *update_ctx);
+void DRW_notify_view_update(const DRWUpdateContext *update_ctx, bool do_update);
 
 typedef enum eDRWSelectStage {
   DRW_SELECT_PASS_PRE = 1,
@@ -175,6 +179,10 @@ void DRW_drawdata_free(struct ID *id);
 
 struct DRWData *DRW_viewport_data_create(void);
 void DRW_viewport_data_free(struct DRWData *drw_data);
+bool DRW_viewport_has_external_engine(struct GPUViewport *viewport);
+void DRW_viewport_free_external_engines(struct GPUViewport *viewport);
+bool DRW_viewport_engines_stereo_support(struct GPUViewport *viewport);
+void DRW_viewport_tag_redraw(struct GPUViewport *viewport, struct ARegion *region);
 
 bool DRW_opengl_context_release(void);
 void DRW_opengl_context_activate(bool drw_state);
