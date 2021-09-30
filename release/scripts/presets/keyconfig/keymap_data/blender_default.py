@@ -7755,7 +7755,6 @@ def generate_keymaps(params=None):
         km_generic_tool_mask_select_circle(params),
         km_generic_tool_mask_add_vertex(params),
         km_generic_tool_mask_add_feather_vertex(params),
-        km_generic_tool_mask_delete_vertex(params),
 
         km_image_editor_tool_generic_sample(params),
         km_image_editor_tool_uv_cursor(params),
