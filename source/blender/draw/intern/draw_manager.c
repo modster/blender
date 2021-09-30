@@ -236,12 +236,16 @@ DRWRenderPass *DRW_render_pass_find(const Scene *scene_orig,
                                     const eScenePassType pass_type)
 {
   DRWRenderScene *rscene = drw_render_scene_find(DST.vmempool, scene_orig, view_layer_index);
+  BLI_assert(rscene);
+  if (rscene == NULL) {
+    return NULL;
+  }
   /* TODO(fclem) multiview. */
   /* TODO(fclem) Other passes. */
   switch (pass_type) {
     default:
       BLI_assert(!"Invalid pass type");
-      ATTR_FALLTHROUGH;
+      return NULL;
     case SCE_PASS_COMBINED:
       return &rscene->views[0].combined;
   }
@@ -1448,6 +1452,10 @@ static void drw_compositor_scenes_render(DRWManager *drw,
                                          Scene *scene_active,
                                          ViewLayer *view_layer_active)
 {
+  if (drw->options.is_compositor_scene_render) {
+    /* Avoid recursion. */
+    return;
+  }
   /* Saving anything inside drw because it will be reused by the rendering loop.
    * TODO(fclem): Instanciating DRWManager would solve the issue. */
   DRWContextState prev_draw_ctx = drw->draw_ctx;
@@ -1463,7 +1471,7 @@ static void drw_compositor_scenes_render(DRWManager *drw,
 
   const eDrawType drawtype = drw->draw_ctx.v3d->shading.type;
   const bool use_compositor = ((drw->draw_ctx.v3d->shading.flag & V3D_SHADING_COMPOSITOR) != 0) &&
-                              (drawtype >= OB_MATERIAL) && (scene_active->nodetree != NULL) &&
+                              (drawtype > OB_MATERIAL) && (scene_active->nodetree != NULL) &&
                               (scene_active->use_nodes != false);
 
   if (!use_compositor) {
@@ -1489,7 +1497,7 @@ static void drw_compositor_scenes_render(DRWManager *drw,
         RenderEngineType *engine_type = RE_engines_find(scene_orig->r.engine);
 
         /* Skip the main scene as it will be rendered afterwards. */
-        if (node->id == (ID *)scene_active) {
+        if (node->id == (ID *)scene_active && STREQ(view_layer->name, view_layer_active->name)) {
           continue;
         }
 
@@ -1521,8 +1529,8 @@ static void drw_compositor_scenes_render(DRWManager *drw,
         }
 
         /* Fix asserts. TODO(fclem) revisit this. */
-        drw_state_prepare_clean_for_draw(&DST);
-        DST.options.is_compositor_scene_render = true;
+        drw_state_prepare_clean_for_draw(drw);
+        drw->options.is_compositor_scene_render = true;
         GPU_framebuffer_restore();
 
         DRW_draw_render_loop_ex(deg, engine_type, region, v3d, viewport, evil_C);
@@ -1552,18 +1560,20 @@ static void drw_compositor_scenes_render(DRWManager *drw,
 
   /* Re-init the draw manager since it may have been shutdown by other scene renders. */
   if (has_rendered) {
-    drw_state_prepare_clean_for_draw(&DST);
+    drw_state_prepare_clean_for_draw(drw);
     GPU_framebuffer_restore();
-    DST.draw_ctx = prev_draw_ctx;
-    DST.options.is_compositor_scene_render = false;
-    drw_manager_init(&DST, viewport, NULL);
+    drw->draw_ctx = prev_draw_ctx;
+    drw->options.is_compositor_scene_render = false;
+    drw_manager_init(drw, viewport, NULL);
     drw_context_state_init();
   }
 
 finally : {
   /* Now setup the DRWRenderScene for the active scene. */
   Scene *scene_orig = (Scene *)DEG_get_original_id(&scene_active->id);
-  int view_layer_index = BLI_findindex(&scene_active->view_layers, view_layer_active);
+  ViewLayer *view_layer_orig = (ViewLayer *)BLI_findstring(
+      &scene_orig->view_layers, view_layer_active->name, offsetof(ViewLayer, name));
+  int view_layer_index = BLI_findindex(&scene_orig->view_layers, view_layer_orig);
   DRWRenderScene *rscene = draw_render_scene_ensure(drw_data, scene_orig, view_layer_index);
   rscene->is_active_scene = true;
   rscene->views[view].combined.pass_tx = DRW_viewport_texture_list_get()->color;
@@ -1583,11 +1593,11 @@ static void drw_engines_enable(ViewLayer *UNUSED(view_layer),
     use_drw_engine(&draw_engine_gpencil_type);
   }
 
-  if (((v3d->shading.flag & V3D_SHADING_COMPOSITOR) != 0) && (drawtype >= OB_MATERIAL)) {
-    use_drw_engine(&draw_engine_compositor_type);
-  }
-
   if (!DST.options.is_compositor_scene_render) {
+    if (((v3d->shading.flag & V3D_SHADING_COMPOSITOR) != 0) && (drawtype > OB_MATERIAL)) {
+      use_drw_engine(&draw_engine_compositor_type);
+    }
+
     drw_engines_enable_overlays();
 
 #ifdef WITH_DRAW_DEBUG

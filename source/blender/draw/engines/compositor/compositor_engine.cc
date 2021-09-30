@@ -91,11 +91,13 @@ class Instance {
     DRWShadingGroup *grp = DRW_shgroup_material_create(gpumat_, pass_);
 
     ListBase rpasses = GPU_material_render_passes(gpumat_);
-    LISTBASE_FOREACH (GPUMaterialRenderPass *, rpass, &rpasses) {
-      DRWRenderPass *render_pass = DRW_render_pass_find(
-          rpass->scene, rpass->viewlayer, rpass->pass_type);
-      DRW_shgroup_uniform_texture_ex(
-          grp, rpass->sampler_name, render_pass->pass_tx, rpass->sampler_state);
+    LISTBASE_FOREACH (GPUMaterialRenderPass *, gpu_rp, &rpasses) {
+      DRWRenderPass *drw_rp = DRW_render_pass_find(
+          gpu_rp->scene, gpu_rp->viewlayer, gpu_rp->pass_type);
+      if (drw_rp) {
+        DRW_shgroup_uniform_texture_ex(
+            grp, gpu_rp->sampler_name, drw_rp->pass_tx, gpu_rp->sampler_state);
+      }
     }
 
     DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
