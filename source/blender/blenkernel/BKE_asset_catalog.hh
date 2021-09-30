@@ -30,6 +30,8 @@
 #include "BLI_uuid.h"
 #include "BLI_vector.hh"
 
+#include "BKE_asset_catalog_path.hh"
+
 #include <map>
 #include <memory>
 #include <set>
@@ -38,7 +40,6 @@
 namespace blender::bke {
 
 using CatalogID = bUUID;
-using CatalogPath = std::string;
 using CatalogPathComponent = std::string;
 /* Would be nice to be able to use `std::filesystem::path` for this, but it's currently not
  * available on the minimum macOS target version. */
@@ -52,7 +53,6 @@ class AssetCatalogTree;
  * directory hierarchy). */
 class AssetCatalogService {
  public:
-  static const char PATH_SEPARATOR;
   static const CatalogFilePath DEFAULT_CATALOG_FILENAME;
 
  public:
@@ -63,15 +63,6 @@ class AssetCatalogService {
   void load_from_disk();
   /** Load asset catalog definitions from the given file or directory. */
   void load_from_disk(const CatalogFilePath &file_or_directory_path);
-
-  /**
-   * Write the catalog definitions to disk.
-   * The provided directory path is only used when there is no CDF loaded from disk yet but assets
-   * still have to be saved.
-   *
-   * Return true on success, which either means there were no in-memory categories to save, or the
-   * save was successful. */
-  bool write_to_disk(const CatalogFilePath &directory_for_new_files);
 
   /**
    * Write the catalog definitions to disk in response to the blend file being saved.
@@ -90,7 +81,7 @@ class AssetCatalogService {
    *
    * Return true on success, which either means there were no in-memory categories to save,
    * or the save was successful. */
-  bool write_to_disk_on_blendfile_save(const char *blend_file_path);
+  bool write_to_disk_on_blendfile_save(const CatalogFilePath &blend_file_path);
 
   /**
    * Merge on-disk changes into the in-memory asset catalogs.
@@ -107,16 +98,21 @@ class AssetCatalogService {
 
   /** Return first catalog with the given path. Return nullptr if not found. This is not an
    * efficient call as it's just a linear search over the catalogs. */
-  AssetCatalog *find_catalog_by_path(const CatalogPath &path) const;
+  AssetCatalog *find_catalog_by_path(const AssetCatalogPath &path) const;
 
   /** Create a catalog with some sensible auto-generated catalog ID.
    * The catalog will be saved to the default catalog file.*/
-  AssetCatalog *create_catalog(const CatalogPath &catalog_path);
+  AssetCatalog *create_catalog(const AssetCatalogPath &catalog_path);
 
   /**
    * Soft-delete the catalog, ensuring it actually gets deleted when the catalog definition file is
    * written. */
   void delete_catalog(CatalogID catalog_id);
+
+  /**
+   * Update the catalog path, also updating the catalog path of all sub-catalogs.
+   */
+  void update_catalog_path(CatalogID catalog_id, const AssetCatalogPath &new_catalog_path);
 
   AssetCatalogTree *get_catalog_tree();
 
@@ -154,6 +150,11 @@ class AssetCatalogService {
 
   std::unique_ptr<AssetCatalogTree> read_into_tree();
   void rebuild_tree();
+
+  /**
+   * For every catalog, ensure that its parent path also has a known catalog.
+   */
+  void create_missing_catalogs();
 };
 
 /**
@@ -176,7 +177,7 @@ class AssetCatalogTreeItem {
   StringRef get_name() const;
   /** Return the full catalog path, defined as the name of this catalog prefixed by the full
    * catalog path of its parent and a separator. */
-  CatalogPath catalog_path() const;
+  AssetCatalogPath catalog_path() const;
   int count_parents() const;
   bool has_children() const;
 
@@ -235,6 +236,7 @@ class AssetCatalogDefinitionFile {
    * Later versioning code may be added to handle older files. */
   const static int SUPPORTED_VERSION;
   const static std::string VERSION_MARKER;
+  const static std::string HEADER;
 
   CatalogFilePath file_path;
 
@@ -283,10 +285,10 @@ class AssetCatalogDefinitionFile {
 class AssetCatalog {
  public:
   AssetCatalog() = default;
-  AssetCatalog(CatalogID catalog_id, const CatalogPath &path, const std::string &simple_name);
+  AssetCatalog(CatalogID catalog_id, const AssetCatalogPath &path, const std::string &simple_name);
 
   CatalogID catalog_id;
-  CatalogPath path;
+  AssetCatalogPath path;
   /**
    * Simple, human-readable name for the asset catalog. This is stored on assets alongside the
    * catalog ID; the catalog ID is a UUID that is not human-readable,
@@ -306,12 +308,11 @@ class AssetCatalog {
    * NOTE: the given path will be cleaned up (trailing spaces removed, etc.), so the returned
    * `AssetCatalog`'s path differ from the given one.
    */
-  static std::unique_ptr<AssetCatalog> from_path(const CatalogPath &path);
-  static CatalogPath cleanup_path(const CatalogPath &path);
+  static std::unique_ptr<AssetCatalog> from_path(const AssetCatalogPath &path);
 
  protected:
   /** Generate a sensible catalog ID for the given path. */
-  static std::string sensible_simple_name_for_path(const CatalogPath &path);
+  static std::string sensible_simple_name_for_path(const AssetCatalogPath &path);
 };
 
 /** Comparator for asset catalogs, ordering by (path, UUID). */
