@@ -33,9 +33,9 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "BLI_array.hh"
 #include "BLI_math.h"
 #include "BLI_utildefines.h"
-
 #include "BLT_translation.h"
 
 #include "DNA_defaults.h"
@@ -68,7 +68,7 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *UNUSED(ctx)
   WeldModifierData *wmd = (WeldModifierData *)md;
 
   uint totvert = mesh->totvert;
-  bool *mask = (bool *)MEM_malloc_arrayN(totvert, sizeof(*mask), __func__);
+  blender::Array<bool> mask(totvert);
   const int defgrp_index = BKE_id_defgroup_name_index(&mesh->id, wmd->defgrp_name);
   if (defgrp_index != -1) {
     MDeformVert *dvert, *dv;
@@ -88,9 +88,8 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *UNUSED(ctx)
     }
   }
 
-  Mesh *result = blender::geometry::GEO_mesh_merge_by_distance(
-      mesh, mask, wmd->merge_dist, blender::geometry::GEO_weld_mode_from_int(wmd->mode));
-  MEM_freeN(mask);
+  Mesh *result = blender::geometry::mesh_merge_by_distance(
+      mesh, mask, wmd->merge_dist, blender::geometry::weld_mode_from_int(wmd->mode));
 
   return result;
 }
@@ -128,8 +127,7 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
 
   uiItemR(layout, ptr, "mode", 0, NULL, ICON_NONE);
   uiItemR(layout, ptr, "merge_threshold", 0, IFACE_("Distance"), ICON_NONE);
-  if (blender::geometry::GEO_weld_mode_from_int(weld_mode) ==
-      blender::geometry::WeldMode::connected) {
+  if (blender::geometry::weld_mode_from_int(weld_mode) == blender::geometry::WeldMode::connected) {
     uiItemR(layout, ptr, "loose_edges", 0, NULL, ICON_NONE);
   }
   modifier_vgroup_ui(layout, ptr, &ob_ptr, "vertex_group", "invert_vertex_group", NULL);

@@ -23,7 +23,7 @@
 #include "BKE_geometry_set.hh"
 
 namespace blender::geometry {
-PointCloud *GEO_merge_by_distance_pointcloud(PointCloudComponent &pointcloud_component,
-                                             const float merge_threshold,
-                                             blender::Span<bool> selection);
+PointCloud *pointcloud_merge_by_distance(PointCloudComponent &pointcloud_component,
+                                         const float merge_threshold,
+                                         blender::Span<bool> selection);
 }

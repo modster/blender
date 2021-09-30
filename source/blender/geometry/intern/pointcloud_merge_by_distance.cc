@@ -14,8 +14,8 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
+#include "BKE_geometry_set.hh"
 #include "BKE_pointcloud.h"
-#include <BKE_geometry_set.hh>
 
 #include "BLI_array.hh"
 #include "BLI_float3.hh"
@@ -49,9 +49,8 @@ static KDTree_3d *build_kdtree(Span<float3> positions, Span<bool> selection)
   return kdtree;
 }
 
-static void build_merge_map(Span<float3> &positions,
+static void build_merge_map(Span<float3> positions,
                             MutableSpan<bool> merge_map,
-                            int &total_merge_operations,
                             const float merge_threshold,
                             Span<bool> selection)
 {
@@ -60,10 +59,9 @@ static void build_merge_map(Span<float3> &positions,
   for (int i : positions.index_range()) {
     struct CallbackData {
       int index;
-      int &total_merge_operations;
       MutableSpan<bool> merge_map;
       Span<bool> selection;
-    } callback_data = {i, total_merge_operations, merge_map, selection};
+    } callback_data = {i, merge_map, selection};
 
     BLI_kdtree_3d_range_search_cb(
         kdtree,
@@ -81,7 +79,6 @@ static void build_merge_map(Span<float3> &positions,
               callback_data.selection[source_point_index] &&
               callback_data.selection[target_point_index]) {
             callback_data.merge_map[source_point_index] = true;
-            callback_data.total_merge_operations++;
           }
           return true;
         },
@@ -91,26 +88,24 @@ static void build_merge_map(Span<float3> &positions,
   BLI_kdtree_3d_free(kdtree);
 }
 
-PointCloud *GEO_merge_by_distance_pointcloud(PointCloudComponent &pointcloud_component,
-                                             const float merge_threshold,
-                                             Span<bool> selection)
+PointCloud *pointcloud_merge_by_distance(PointCloudComponent &pointcloud_component,
+                                         const float merge_threshold,
+                                         Span<bool> selection)
 {
   const PointCloud &original_src_pointcloud = *pointcloud_component.get_for_read();
   Array<bool> merge_map(original_src_pointcloud.totpoint, false);
   Span<float3> positions((const float3 *)original_src_pointcloud.co,
                          original_src_pointcloud.totpoint);
 
-  int total_merge_operations = 0;
+  build_merge_map(positions, merge_map, merge_threshold, selection);
 
-  build_merge_map(positions, merge_map, total_merge_operations, merge_threshold, selection);
-
-  Vector<int64_t> copyMaskVector;
+  Vector<int64_t> copy_mask_vector;
   for (const int i : positions.index_range()) {
     if (!merge_map[i]) {
-      copyMaskVector.append(i);
+      copy_mask_vector.append(i);
     }
   }
-  IndexMask copyMask(copyMaskVector);
+  IndexMask copyMask(copy_mask_vector);
 
   PointCloudComponent *src_pointcloud_component = (PointCloudComponent *)
                                                       pointcloud_component.copy();

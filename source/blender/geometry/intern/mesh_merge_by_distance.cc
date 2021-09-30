@@ -1542,7 +1542,7 @@ struct WeldVertexCluster {
 
 namespace blender::geometry {
 
-WeldMode GEO_weld_mode_from_int(const short type)
+WeldMode weld_mode_from_int(const short type)
 {
   switch (static_cast<WeldMode>(type)) {
     case WeldMode::all:
@@ -1554,7 +1554,7 @@ WeldMode GEO_weld_mode_from_int(const short type)
   return WeldMode::all;
 }
 
-int16_t GEO_weld_mode_to_short(const WeldMode weld_mode)
+int16_t weld_mode_to_int(const WeldMode weld_mode)
 {
   switch (weld_mode) {
     case WeldMode::all:
@@ -1567,10 +1567,10 @@ int16_t GEO_weld_mode_to_short(const WeldMode weld_mode)
   return static_cast<int16_t>(WeldMode::all);
 }
 
-Mesh *GEO_mesh_merge_by_distance(Mesh *mesh,
-                                 const bool *mask,
-                                 const float merge_distance,
-                                 const WeldMode weld_mode)
+Mesh *mesh_merge_by_distance(Mesh *mesh,
+                             const Span<bool> mask,
+                             const float merge_distance,
+                             const WeldMode weld_mode)
 {
   Mesh *result = mesh;
 
@@ -1672,7 +1672,7 @@ Mesh *GEO_mesh_merge_by_distance(Mesh *mesh,
   {
     KDTree_3d *tree = BLI_kdtree_3d_new(totvert);
     for (uint i = 0; i < totvert; i++) {
-      if (!mask || mask[i]) {
+      if (mask.size() == 0 || mask[i]) {
         BLI_kdtree_3d_insert(tree, i, mvert[i].co);
       }
       vert_dest_map[i] = OUT_OF_CONTEXT;
@@ -1719,7 +1719,7 @@ Mesh *GEO_mesh_merge_by_distance(Mesh *mesh,
       if (v1 == v2) {
         continue;
       }
-      if (mask && (!mask[v1] || !mask[v2])) {
+      if (mask.size() > 0 && (!mask[v1] || !mask[v2])) {
         continue;
       }
       if (v1 > v2) {

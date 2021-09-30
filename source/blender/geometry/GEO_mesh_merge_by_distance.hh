@@ -20,26 +20,21 @@
  * \ingroup geo
  */
 
-namespace blender::geometry {
+#include "BLI_span.hh"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+namespace blender::geometry {
 
 enum class WeldMode {
   all = 0,
   connected = 1,
 };
 
-WeldMode GEO_weld_mode_from_int(const short type);
-int16_t GEO_weld_mode_to_short(const WeldMode weld_mode);
+WeldMode weld_mode_from_int(const int16_t type);
+int16_t weld_mode_to_int(const WeldMode weld_mode);
 
-struct Mesh *GEO_mesh_merge_by_distance(struct Mesh *mesh,
-                                        const bool *mask,
-                                        const float merge_distance,
-                                        const WeldMode weld_mode);
-#ifdef __cplusplus
-}
-#endif
+struct Mesh *mesh_merge_by_distance(struct Mesh *mesh,
+                                    const Span<bool> mask,
+                                    const float merge_distance,
+                                    const WeldMode weld_mode);
 
 }  // namespace blender::geometry

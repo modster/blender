@@ -55,7 +55,7 @@ static void geo_node_merge_by_distance_layout(uiLayout *layout,
 
 static void geo_merge_by_distance_init(bNodeTree *UNUSED(ntree), bNode *node)
 {
-  node->custom1 = GEO_weld_mode_to_short(geometry::WeldMode::all);
+  node->custom1 = weld_mode_to_int(geometry::WeldMode::all);
 }
 
 static void process_mesh(GeoNodeExecParams &params,
@@ -73,8 +73,7 @@ static void process_mesh(GeoNodeExecParams &params,
   selection_evaluator.evaluate();
   const VArray_Span<bool> selection = selection_evaluator.get_evaluated<bool>(0);
 
-  Mesh *result = geometry::GEO_mesh_merge_by_distance(
-      input_mesh, selection.data(), distance, weld_mode);
+  Mesh *result = geometry::mesh_merge_by_distance(input_mesh, selection, distance, weld_mode);
   if (result != input_mesh) {
     geometry_set.replace_mesh(result);
   }
@@ -95,14 +94,14 @@ static void process_pointcloud(GeoNodeExecParams &params,
   selection_evaluator.evaluate();
   const VArray_Span<bool> selection = selection_evaluator.get_evaluated<bool>(0);
 
-  geometry::GEO_merge_by_distance_pointcloud(pointcloud_component, distance, selection);
+  geometry::pointcloud_merge_by_distance(pointcloud_component, distance, selection);
 }
 
 static void geo_node_merge_by_distance_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
 
-  const geometry::WeldMode weld_mode = geometry::GEO_weld_mode_from_int(params.node().custom1);
+  const geometry::WeldMode weld_mode = geometry::weld_mode_from_int(params.node().custom1);
   const float distance = params.extract_input<float>("Distance");
 
   if (geometry_set.has_instances()) {
