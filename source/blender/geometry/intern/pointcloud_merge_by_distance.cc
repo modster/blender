@@ -104,22 +104,15 @@ PointCloud *pointcloud_merge_by_distance(PointCloudComponent &pointcloud_compone
       copy_mask_vector.append(i);
     }
   }
-  IndexMask copyMask(copy_mask_vector);
-
-  // PointCloudComponent *src_pointcloud_component = (PointCloudComponent *)
-  // pointcloud_component.copy(); const PointCloud &src_pointcloud =
-  // *src_pointcloud_component->get_for_read();
-
-  // PointCloud *result = BKE_pointcloud_new_nomain(copyMask.size());
-  // pointcloud_component.replace(result);
+  IndexMask copy_mask(copy_mask_vector);
 
   PointCloud *pointcloud = BKE_pointcloud_new_nomain(src_pointcloud.totpoint);
   PointCloudComponent dst_component;
   dst_component.replace(pointcloud, GeometryOwnershipType::Editable);
 
-  for (const int i : copyMask.index_range()) {
-    copy_v3_v3(pointcloud->co[i], src_pointcloud.co[copyMask[i]]);
-    pointcloud->radius[i] = src_pointcloud.radius[copyMask[i]];
+  for (const int i : copy_mask.index_range()) {
+    copy_v3_v3(pointcloud->co[i], src_pointcloud.co[copy_mask[i]]);
+    pointcloud->radius[i] = src_pointcloud.radius[copy_mask[i]];
   }
 
   pointcloud_component.attribute_foreach(
@@ -135,9 +128,9 @@ PointCloud *pointcloud_merge_by_distance(PointCloudComponent &pointcloud_compone
 
           fn::GMutableSpan dst_span = target_attribute.as_span();
           fn::GSpan src_span = read_attribute->get_internal_span();
-          for (const int i : copyMask.index_range()) {
+          for (const int i : copy_mask.index_range()) {
             const fn::CPPType *type = bke::custom_data_type_to_cpp_type(meta_data.data_type);
-            type->copy_assign(src_span[copyMask[i]], dst_span[i]);
+            type->copy_assign(src_span[copy_mask[i]], dst_span[i]);
           }
 
           target_attribute.save();

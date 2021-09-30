@@ -94,7 +94,8 @@ static void process_pointcloud(GeoNodeExecParams &params,
   selection_evaluator.evaluate();
   const VArray_Span<bool> selection = selection_evaluator.get_evaluated<bool>(0);
 
-  geometry::pointcloud_merge_by_distance(pointcloud_component, distance, selection);
+  pointcloud_component.replace(
+      geometry::pointcloud_merge_by_distance(pointcloud_component, distance, selection));
 }
 
 static void geo_node_merge_by_distance_exec(GeoNodeExecParams params)

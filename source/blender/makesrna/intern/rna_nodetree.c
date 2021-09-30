@@ -10636,6 +10636,7 @@ static void def_geo_string_to_curves(StructRNA *srna)
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 }
 
+/* Weld mode is only used when welding mesh data. */
 const EnumPropertyItem rna_enum_geometry_nodes_weld_mode_items[] = {
     {0, "ALL", 0, "All", "Full merge by distance"},
     {1, "CONNECTED", 0, "Connected", "Only merge along the edges"},
