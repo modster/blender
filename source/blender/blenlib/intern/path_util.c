@@ -1951,13 +1951,18 @@ bool BLI_path_contains(const char *container_path, const char *containee_path)
   BLI_path_normalize(NULL, container_native);
   BLI_path_normalize(NULL, containee_native);
 
+#ifdef WIN32
+  BLI_str_tolower_ascii(container_native, PATH_MAX);
+  BLI_str_tolower_ascii(containee_native, PATH_MAX);
+#endif
+
   if (STREQ(container_native, containee_native)) {
     /* The paths are equal, they contain each other. */
     return true;
   }
 
   /* Add a trailing slash to prevent same-prefix directories from matching.
-   * e.g. "/some/path" doesn't contain "/some/pathlib". */
+   * e.g. "/some/path" doesn't contain "/some/path_lib". */
   BLI_path_slash_ensure(container_native);
 
   return BLI_str_startswith(containee_native, container_native);

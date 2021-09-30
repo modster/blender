@@ -19,6 +19,7 @@
  */
 
 #include "BKE_asset_catalog.hh"
+#include "BKE_asset_library.h"
 #include "BKE_preferences.h"
 
 #include "BLI_fileops.h"
@@ -47,6 +48,13 @@ const int AssetCatalogDefinitionFile::SUPPORTED_VERSION = 1;
  * declaration. It has to start with a space to ensure it won't match any hypothetical future field
  * that starts with "VERSION". */
 const std::string AssetCatalogDefinitionFile::VERSION_MARKER = "VERSION ";
+
+const std::string AssetCatalogDefinitionFile::HEADER =
+    "# This is an Asset Catalog Definition file for Blender.\n"
+    "#\n"
+    "# Empty lines and lines starting with `#` will be ignored.\n"
+    "# The first non-ignored line should be the version indicator.\n"
+    "# Other lines are of the format \"UUID:catalog/path/for/assets:simple catalog name\"\n";
 
 AssetCatalogService::AssetCatalogService(const CatalogFilePath &asset_library_root)
     : asset_library_root_(asset_library_root)
@@ -95,6 +103,25 @@ void AssetCatalogService::delete_catalog(CatalogID catalog_id)
 
   /* The catalog can now be removed from the map without freeing the actual AssetCatalog. */
   this->catalogs_.remove(catalog_id);
+
+  this->rebuild_tree();
+}
+
+void AssetCatalogService::update_catalog_path(CatalogID catalog_id,
+                                              const CatalogPath &new_catalog_path)
+{
+  AssetCatalog *renamed_cat = this->find_catalog(catalog_id);
+  const CatalogPath old_cat_path = renamed_cat->path;
+
+  for (auto &catalog_uptr : catalogs_.values()) {
+    AssetCatalog *cat = catalog_uptr.get();
+    if (!cat->is_contained_in(old_cat_path)) {
+      continue;
+    }
+
+    const CatalogPath path_suffix = cat->path.substr(old_cat_path.length());
+    cat->path = new_catalog_path + path_suffix;
+  }
 
   this->rebuild_tree();
 }
@@ -249,30 +276,9 @@ void AssetCatalogService::merge_from_disk_before_writing()
                                                catalog_parsed_callback);
 }
 
-bool AssetCatalogService::write_to_disk(const CatalogFilePath &directory_for_new_files)
+bool AssetCatalogService::write_to_disk_on_blendfile_save(const CatalogFilePath &blend_file_path)
 {
   /* TODO(Sybren): expand to support multiple CDFs. */
-
-  if (!catalog_definition_file_) {
-    if (catalogs_.is_empty() && deleted_catalogs_.is_empty()) {
-      /* Avoid saving anything, when there is nothing to save. */
-      return true; /* Writing nothing when there is nothing to write is still a success. */
-    }
-
-    /* A CDF has to be created to contain all current in-memory catalogs. */
-    const CatalogFilePath cdf_path = asset_definition_default_file_path_from_dir(
-        directory_for_new_files);
-    catalog_definition_file_ = construct_cdf_in_memory(cdf_path);
-  }
-
-  merge_from_disk_before_writing();
-  return catalog_definition_file_->write_to_disk();
-}
-
-bool AssetCatalogService::write_to_disk_on_blendfile_save(const char *blend_file_path)
-{
-  /* TODO(Sybren): deduplicate this and write_to_disk(...); maybe the latter function isn't even
-   * necessary any more. */
 
   /* - Already loaded a CDF from disk? -> Always write to that file. */
   if (this->catalog_definition_file_) {
@@ -294,6 +300,10 @@ bool AssetCatalogService::write_to_disk_on_blendfile_save(const char *blend_file
 CatalogFilePath AssetCatalogService::find_suitable_cdf_path_for_writing(
     const CatalogFilePath &blend_file_path)
 {
+  BLI_assert_msg(!blend_file_path.empty(),
+                 "A non-empty .blend file path is required to be able to determine where the "
+                 "catalog definition file should be put");
+
   /* Determine the default CDF path in the same directory of the blend file. */
   char blend_dir_path[PATH_MAX];
   BLI_split_dir_part(blend_file_path.c_str(), blend_dir_path, sizeof(blend_dir_path));
@@ -306,26 +316,19 @@ CatalogFilePath AssetCatalogService::find_suitable_cdf_path_for_writing(
     return cdf_path_next_to_blend;
   }
 
-  const bUserAssetLibrary *asset_lib_pref = BKE_preferences_asset_library_containing_path(
-      &U, blend_file_path.c_str());
-  if (asset_lib_pref) {
-    /* - The directory containing the blend file is part of an asset library, as per
-     *   the user's preferences?
-     *    -> Merge with & write to ${ASSET_LIBRARY_ROOT}/blender_assets.cats.txt  */
+  /* - There's no definition file next to the .blend file.
+   *    -> Ask the asset library API for an appropriate location.  */
+  char suitable_root_path[PATH_MAX];
+  BKE_asset_library_find_suitable_root_path_from_path(blend_file_path.c_str(),
+                                                          suitable_root_path);
+  char asset_lib_cdf_path[PATH_MAX];
+  BLI_path_join(asset_lib_cdf_path,
+                sizeof(asset_lib_cdf_path),
+                suitable_root_path,
+                DEFAULT_CATALOG_FILENAME.c_str(),
+                NULL);
 
-    char asset_lib_cdf_path[PATH_MAX];
-    BLI_path_join(asset_lib_cdf_path,
-                  sizeof(asset_lib_cdf_path),
-                  asset_lib_pref->path,
-                  DEFAULT_CATALOG_FILENAME.c_str(),
-                  NULL);
-
-    return asset_lib_cdf_path;
-  }
-
-  /* - Otherwise
-   *    -> Create a new file blender_assets.cats.txt next to the blend file. */
-  return cdf_path_next_to_blend;
+  return asset_lib_cdf_path;
 }
 
 std::unique_ptr<AssetCatalogDefinitionFile> AssetCatalogService::construct_cdf_in_memory(
@@ -654,20 +657,12 @@ bool AssetCatalogDefinitionFile::write_to_disk_unsafe(const CatalogFilePath &des
   // the file again.
 
   // Write the header.
-  // TODO(@sybren): move the header definition to some other place.
-  output << "# This is an Asset Catalog Definition file for Blender." << std::endl;
-  output << "#" << std::endl;
-  output << "# Empty lines and lines starting with `#` will be ignored." << std::endl;
-  output << "# The first non-ignored line should be the version indicator." << std::endl;
-  output << "# Other lines are of the format \"UUID:catalog/path/for/assets:simple catalog name\""
-         << std::endl;
+  output << HEADER;
   output << "" << std::endl;
   output << VERSION_MARKER << SUPPORTED_VERSION << std::endl;
   output << "" << std::endl;
 
-  // Write the catalogs.
-  // TODO(@sybren): order them by Catalog ID or Catalog Path.
-
+  // Write the catalogs, ordered by path (primary) and UUID (secondary).
   AssetCatalogOrderedSet catalogs_by_path;
   for (const AssetCatalog *catalog : catalogs_.values()) {
     if (catalog->flags.is_deleted) {
@@ -754,6 +749,28 @@ CatalogPath AssetCatalog::cleanup_path(const CatalogPath &path)
   /* TODO(@sybren): maybe go over each element of the path, and trim those? */
   CatalogPath clean_path = StringRef(path).trim().trim(AssetCatalogService::PATH_SEPARATOR).trim();
   return clean_path;
+}
+
+bool AssetCatalog::is_contained_in(const CatalogPath &other_path) const
+{
+  if (other_path.empty()) {
+    return true;
+  }
+
+  if (this->path == other_path) {
+    return true;
+  }
+
+  /* To be a child path of 'other_path', our path must be at least a separator and another
+   * character longer. */
+  if (this->path.length() < other_path.length() + 2) {
+    return false;
+  }
+
+  const StringRef this_path(this->path);
+  const bool prefix_ok = this_path.startswith(other_path);
+  const char next_char = this_path[other_path.length()];
+  return prefix_ok && next_char == AssetCatalogService::PATH_SEPARATOR;
 }
 
 }  // namespace blender::bke
