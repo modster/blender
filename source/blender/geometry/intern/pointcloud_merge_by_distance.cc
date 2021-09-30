@@ -92,10 +92,9 @@ PointCloud *pointcloud_merge_by_distance(PointCloudComponent &pointcloud_compone
                                          const float merge_threshold,
                                          Span<bool> selection)
 {
-  const PointCloud &original_src_pointcloud = *pointcloud_component.get_for_read();
-  Array<bool> merge_map(original_src_pointcloud.totpoint, false);
-  Span<float3> positions((const float3 *)original_src_pointcloud.co,
-                         original_src_pointcloud.totpoint);
+  const PointCloud &src_pointcloud = *pointcloud_component.get_for_read();
+  Array<bool> merge_map(src_pointcloud.totpoint, false);
+  Span<float3> positions((const float3 *)src_pointcloud.co, src_pointcloud.totpoint);
 
   build_merge_map(positions, merge_map, merge_threshold, selection);
 
@@ -107,28 +106,32 @@ PointCloud *pointcloud_merge_by_distance(PointCloudComponent &pointcloud_compone
   }
   IndexMask copyMask(copy_mask_vector);
 
-  PointCloudComponent *src_pointcloud_component = (PointCloudComponent *)
-                                                      pointcloud_component.copy();
-  const PointCloud &src_pointcloud = *src_pointcloud_component->get_for_read();
+  // PointCloudComponent *src_pointcloud_component = (PointCloudComponent *)
+  // pointcloud_component.copy(); const PointCloud &src_pointcloud =
+  // *src_pointcloud_component->get_for_read();
 
-  PointCloud *result = BKE_pointcloud_new_nomain(copyMask.size());
-  pointcloud_component.replace(result);
+  // PointCloud *result = BKE_pointcloud_new_nomain(copyMask.size());
+  // pointcloud_component.replace(result);
+
+  PointCloud *pointcloud = BKE_pointcloud_new_nomain(src_pointcloud.totpoint);
+  PointCloudComponent dst_component;
+  dst_component.replace(pointcloud, GeometryOwnershipType::Editable);
 
   for (const int i : copyMask.index_range()) {
-    copy_v3_v3(result->co[i], src_pointcloud.co[copyMask[i]]);
-    result->radius[i] = src_pointcloud.radius[copyMask[i]];
+    copy_v3_v3(pointcloud->co[i], src_pointcloud.co[copyMask[i]]);
+    pointcloud->radius[i] = src_pointcloud.radius[copyMask[i]];
   }
-  src_pointcloud_component->attribute_foreach(
+
+  pointcloud_component.attribute_foreach(
       [&](const bke::AttributeIDRef &attribute_id, const AttributeMetaData &meta_data) {
-        fn::GVArrayPtr read_attribute = src_pointcloud_component->attribute_get_for_read(
+        fn::GVArrayPtr read_attribute = pointcloud_component.attribute_get_for_read(
             attribute_id, meta_data.domain, meta_data.data_type);
 
-        if (pointcloud_component.attribute_try_create(
+        if (dst_component.attribute_try_create(
                 attribute_id, meta_data.domain, meta_data.data_type, AttributeInitDefault())) {
 
-          bke::OutputAttribute target_attribute =
-              pointcloud_component.attribute_try_get_for_output_only(
-                  attribute_id, meta_data.domain, meta_data.data_type);
+          bke::OutputAttribute target_attribute = dst_component.attribute_try_get_for_output_only(
+              attribute_id, meta_data.domain, meta_data.data_type);
 
           fn::GMutableSpan dst_span = target_attribute.as_span();
           fn::GSpan src_span = read_attribute->get_internal_span();
@@ -142,7 +145,7 @@ PointCloud *pointcloud_merge_by_distance(PointCloudComponent &pointcloud_compone
         return true;
       });
 
-  return result;
+  return pointcloud;
 }
 
 }  // namespace blender::geometry
