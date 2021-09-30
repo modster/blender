@@ -599,6 +599,7 @@ typedef struct SequencerTimelineOverlay {
 typedef enum eSpaceSeq_SequencerTimelineOverlay_Flag {
   SEQ_TIMELINE_SHOW_STRIP_OFFSETS = (1 << 1),
   SEQ_TIMELINE_SHOW_THUMBNAILS = (1 << 2),
+  SEQ_TIMELINE_SHOW_STRIP_COLOR_TAG = (1 << 3), /* use Sequence->color_tag */
   SEQ_TIMELINE_SHOW_FCURVES = (1 << 5),
   SEQ_TIMELINE_ALL_WAVEFORMS = (1 << 7), /* draw all waveforms */
   SEQ_TIMELINE_NO_WAVEFORMS = (1 << 8),  /* draw no waveforms */
@@ -805,14 +806,25 @@ typedef struct FileAssetSelectParams {
   FileSelectParams base_params;
 
   AssetLibraryReference asset_library_ref;
+  short asset_catalog_visibility; /* eFileSel_Params_AssetCatalogVisibility */
+  char _pad[6];
+  /** If #asset_catalog_visibility is #FILE_SHOW_ASSETS_FROM_CATALOG, this sets the ID of the
+   * catalog to show. */
+  bUUID catalog_id;
 
   short import_type; /* eFileAssetImportType */
-  char _pad[6];
+  char _pad2[6];
 } FileAssetSelectParams;
 
 typedef enum eFileAssetImportType {
+  /** Regular data-block linking. */
   FILE_ASSET_IMPORT_LINK = 0,
+  /** Regular data-block appending (basically linking + "Make Local"). */
   FILE_ASSET_IMPORT_APPEND = 1,
+  /** Append data-block with the #BLO_LIBLINK_APPEND_LOCAL_ID_REUSE flag enabled. Some typically
+   * heavy data dependencies (e.g. the image data-blocks of a material, the mesh of an object) may
+   * be reused from an earlier append. */
+  FILE_ASSET_IMPORT_APPEND_REUSE = 2,
 } eFileAssetImportType;
 
 /**
@@ -1002,7 +1014,15 @@ typedef enum eFileSel_Params_Flag {
   FILE_HIDE_TOOL_PROPS = (1 << 12),
   FILE_CHECK_EXISTING = (1 << 13),
   FILE_ASSETS_ONLY = (1 << 14),
+  /** Enables filtering by asset catalog. */
+  FILE_FILTER_ASSET_CATALOG = (1 << 15),
 } eFileSel_Params_Flag;
+
+typedef enum eFileSel_Params_AssetCatalogVisibility {
+  FILE_SHOW_ASSETS_ALL_CATALOGS,
+  FILE_SHOW_ASSETS_FROM_CATALOG,
+  FILE_SHOW_ASSETS_WITHOUT_CATALOG,
+} eFileSel_Params_AssetCatalogVisibility;
 
 /* sfile->params->rename_flag */
 /* NOTE: short flag. Defined as bitflags, but currently only used as exclusive status markers... */
@@ -1178,13 +1198,10 @@ typedef struct SpaceImage {
   char mode_prev;
 
   char pin;
-  char _pad1;
-  /**
-   * The currently active tile of the image when tile is enabled,
-   * is kept in sync with the active faces tile.
-   */
-  short curtile;
-  short lock;
+
+  char pixel_snap_mode;
+
+  char lock;
   /** UV draw type. */
   char dt_uv;
   /** Sticky selection type. */
@@ -1192,10 +1209,9 @@ typedef struct SpaceImage {
   char dt_uvstretch;
   char around;
 
-  int flag;
+  char _pad1[3];
 
-  char pixel_snap_mode;
-  char _pad2[7];
+  int flag;
 
   float uv_opacity;
 
