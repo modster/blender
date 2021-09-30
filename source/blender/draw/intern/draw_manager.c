@@ -1448,14 +1448,6 @@ static void drw_compositor_scenes_render(DRWManager *drw,
                                          Scene *scene_active,
                                          ViewLayer *view_layer_active)
 {
-  const eDrawType drawtype = drw->draw_ctx.v3d->shading.type;
-  const bool use_compositor = ((drw->draw_ctx.v3d->shading.flag & V3D_SHADING_COMPOSITOR) != 0) &&
-                              (drawtype >= OB_MATERIAL) && (scene_active->nodetree != NULL) &&
-                              (scene_active->use_nodes != false);
-  if (!use_compositor) {
-    return;
-  }
-
   /* Saving anything inside drw because it will be reused by the rendering loop.
    * TODO(fclem): Instanciating DRWManager would solve the issue. */
   DRWContextState prev_draw_ctx = drw->draw_ctx;
@@ -1468,6 +1460,16 @@ static void drw_compositor_scenes_render(DRWManager *drw,
   DRWData *drw_data = drw->vmempool;
   int view = GPU_viewport_active_view_get(viewport);
   int prev_flag2 = v3d->flag2;
+
+  const eDrawType drawtype = drw->draw_ctx.v3d->shading.type;
+  const bool use_compositor = ((drw->draw_ctx.v3d->shading.flag & V3D_SHADING_COMPOSITOR) != 0) &&
+                              (drawtype >= OB_MATERIAL) && (scene_active->nodetree != NULL) &&
+                              (scene_active->use_nodes != false);
+
+  if (!use_compositor) {
+    /* Still setup the current active view. This way we get correct update without compositor. */
+    goto finally;
+  }
 
   /* Avoid infinite recursion. */
   v3d->shading.flag &= ~V3D_SHADING_COMPOSITOR;
@@ -1558,14 +1560,14 @@ static void drw_compositor_scenes_render(DRWManager *drw,
     drw_context_state_init();
   }
 
-  {
-    /* Now setup the DRWRenderScene for the active scene. */
-    Scene *scene_orig = (Scene *)DEG_get_original_id(&scene_active->id);
-    int view_layer_index = BLI_findindex(&scene_active->view_layers, view_layer_active);
-    DRWRenderScene *rscene = draw_render_scene_ensure(drw_data, scene_orig, view_layer_index);
-    rscene->is_active_scene = true;
-    rscene->views[view].combined.pass_tx = DRW_viewport_texture_list_get()->color;
-  }
+finally : {
+  /* Now setup the DRWRenderScene for the active scene. */
+  Scene *scene_orig = (Scene *)DEG_get_original_id(&scene_active->id);
+  int view_layer_index = BLI_findindex(&scene_active->view_layers, view_layer_active);
+  DRWRenderScene *rscene = draw_render_scene_ensure(drw_data, scene_orig, view_layer_index);
+  rscene->is_active_scene = true;
+  rscene->views[view].combined.pass_tx = DRW_viewport_texture_list_get()->color;
+}
 }
 
 static void drw_engines_enable(ViewLayer *UNUSED(view_layer),
@@ -1632,6 +1634,9 @@ void DRW_notify_view_update(const DRWUpdateContext *update_ctx, bool do_update)
   ScrArea *area = update_ctx->area;
   ViewLayer *view_layer = update_ctx->view_layer;
   wmWindow *window = update_ctx->window;
+  float ctime = DEG_get_ctime(depsgraph);
+
+  Scene *scene_eval = (Scene *)DEG_get_evaluated_id(depsgraph, &scene->id);
 
   GPUViewport *viewport = WM_draw_region_get_viewport(region);
   if (!viewport) {
@@ -1650,7 +1655,7 @@ void DRW_notify_view_update(const DRWUpdateContext *update_ctx, bool do_update)
       .region = region,
       .rv3d = rv3d,
       .v3d = v3d,
-      .scene = scene,
+      .scene = scene_eval,
       .view_layer = view_layer,
       .obact = OBACT(view_layer),
       .engine_type = engine_type,
@@ -1668,13 +1673,31 @@ void DRW_notify_view_update(const DRWUpdateContext *update_ctx, bool do_update)
 
   LISTBASE_FOREACH (DRWRenderScene *, rscene, &DST.vmempool->scene_renders) {
     RenderEngine *engine = rscene->render_engine;
+    Depsgraph *deg = depsgraph;
+
+    if (!rscene->is_active_scene) {
+      ViewLayer *rscene_view_layer = BLI_findlink(&rscene->scene->view_layers,
+                                                  rscene->view_layer_index);
+      LISTBASE_FOREACH (LinkData *, link, &scene_eval->compositor_depsgraphs) {
+        Depsgraph *deg_candidate = (Depsgraph *)link->data;
+        if (DEG_get_input_scene(deg_candidate) == rscene->scene &&
+            DEG_get_input_view_layer(deg_candidate) == rscene_view_layer) {
+          deg = deg_candidate;
+
+          if (DEG_get_ctime(deg) != ctime) {
+            /*  NOTE: Sync time here. I have no idea if that's the right place. */
+            DEG_evaluate_on_framechange(deg, ctime);
+          }
+          break;
+        }
+      }
+    }
 
     if (engine && (do_update || (engine->flag & RE_ENGINE_DO_UPDATE))) {
       if (C == NULL) {
         /* Create temporary context to execute callback in. */
         C = CTX_create();
         CTX_data_main_set(C, bmain);
-        CTX_data_scene_set(C, scene);
         CTX_wm_manager_set(C, bmain->wm.first);
         CTX_wm_window_set(C, window);
         CTX_wm_screen_set(C, WM_window_get_active_screen(window));
@@ -1682,15 +1705,20 @@ void DRW_notify_view_update(const DRWUpdateContext *update_ctx, bool do_update)
         CTX_wm_region_set(C, region);
       }
 
+      CTX_data_scene_set(C, DEG_get_input_scene(deg));
+
       engine->flag &= ~RE_ENGINE_DO_UPDATE;
       /* NOTE: Important to pass non-updated depsgraph, This is because this function is called
        * from inside dependency graph evaluation. Additionally, if we pass fully evaluated one
        * we will lose updates stored in the graph. */
-      engine->type->view_update(engine, C, CTX_data_depsgraph_pointer(C));
+      engine->type->view_update(engine, C, deg);
     }
 
     if (do_update) {
       for (int view = 0; view < view_count; view++) {
+        DST.draw_ctx.scene = DEG_get_evaluated_scene(deg);
+        DST.draw_ctx.view_layer = DEG_get_evaluated_view_layer(deg);
+        DST.draw_ctx.depsgraph = deg;
         DST.view_data_active = (rscene->is_active_scene) ? DST.vmempool->view_data[view] :
                                                            rscene->views[view].view_data;
         DRW_view_data_use_engines_with_data(DST.view_data_active);
