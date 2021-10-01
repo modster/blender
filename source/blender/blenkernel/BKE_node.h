@@ -1102,6 +1102,7 @@ void BKE_nodetree_remove_layer_n(struct bNodeTree *ntree,
 #define SH_NODE_VERTEX_COLOR 706
 #define SH_NODE_OUTPUT_AOV 707
 #define SH_NODE_VECTOR_ROTATE 708
+#define SH_NODE_CURVE_FLOAT 709
 
 /* custom defines options for Material node */
 // #define SH_NODE_MAT_DIFF 1
@@ -1507,7 +1508,9 @@ int ntreeTexExecTree(struct bNodeTree *ntree,
 #define GEO_NODE_POINTS_TO_VERTICES 1094
 #define GEO_NODE_CURVE_REVERSE 1095
 #define GEO_NODE_PROXIMITY 1096
-
+#define GEO_NODE_CURVE_SUBDIVIDE 1097
+#define GEO_NODE_INPUT_SPLINE_LENGTH 1098
+#define GEO_NODE_CURVE_SPLINE_TYPE 1099
 /** \} */
 
 /* -------------------------------------------------------------------- */
