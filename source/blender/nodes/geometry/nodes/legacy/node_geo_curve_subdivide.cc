@@ -373,7 +373,7 @@ static void geo_node_subdivide_exec(GeoNodeExecParams params)
 
 }  // namespace blender::nodes
 
-void register_node_type_geo_curve_subdivide()
+void register_node_type_geo_legacy_curve_subdivide()
 {
   static bNodeType ntype;
 

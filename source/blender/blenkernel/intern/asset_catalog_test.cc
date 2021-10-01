@@ -57,6 +57,22 @@ class TestableAssetCatalogService : public AssetCatalogService {
   {
     return catalog_definition_file_.get();
   }
+
+  void create_missing_catalogs()
+  {
+    AssetCatalogService::create_missing_catalogs();
+  }
+
+  int64_t count_catalogs_with_path(const CatalogFilePath &path)
+  {
+    int64_t count = 0;
+    for (auto &catalog_uptr : catalogs_.values()) {
+      if (catalog_uptr->path == path) {
+        count++;
+      }
+    }
+    return count;
+  }
 };
 
 class AssetCatalogTest : public testing::Test {
@@ -106,7 +122,7 @@ class AssetCatalogTest : public testing::Test {
     EXPECT_EQ(expected_filename, actual_item.get_name());
     /* Does the computed number of parents match? */
     EXPECT_EQ(expected_path.parent_count, actual_item.count_parents());
-    EXPECT_EQ(expected_path.name, actual_item.catalog_path());
+    EXPECT_EQ(expected_path.name, actual_item.catalog_path().str());
   }
 
   /**
@@ -186,21 +202,21 @@ TEST_F(AssetCatalogTest, load_single_file)
   AssetCatalog *poses_ellie = service.find_catalog(UUID_POSES_ELLIE);
   ASSERT_NE(nullptr, poses_ellie);
   EXPECT_EQ(UUID_POSES_ELLIE, poses_ellie->catalog_id);
-  EXPECT_EQ("character/Ellie/poselib", poses_ellie->path);
+  EXPECT_EQ("character/Ellie/poselib", poses_ellie->path.str());
   EXPECT_EQ("POSES_ELLIE", poses_ellie->simple_name);
 
   /* Test white-space stripping and support in the path. */
   AssetCatalog *poses_whitespace = service.find_catalog(UUID_POSES_ELLIE_WHITESPACE);
   ASSERT_NE(nullptr, poses_whitespace);
   EXPECT_EQ(UUID_POSES_ELLIE_WHITESPACE, poses_whitespace->catalog_id);
-  EXPECT_EQ("character/Ellie/poselib/white space", poses_whitespace->path);
+  EXPECT_EQ("character/Ellie/poselib/white space", poses_whitespace->path.str());
   EXPECT_EQ("POSES_ELLIE WHITESPACE", poses_whitespace->simple_name);
 
   /* Test getting a UTF-8 catalog ID. */
   AssetCatalog *poses_ruzena = service.find_catalog(UUID_POSES_RUZENA);
   ASSERT_NE(nullptr, poses_ruzena);
   EXPECT_EQ(UUID_POSES_RUZENA, poses_ruzena->catalog_id);
-  EXPECT_EQ("character/Ružena/poselib", poses_ruzena->path);
+  EXPECT_EQ("character/Ružena/poselib", poses_ruzena->path.str());
   EXPECT_EQ("POSES_RUŽENA", poses_ruzena->simple_name);
 }
 
@@ -429,7 +445,7 @@ TEST_F(AssetCatalogTest, on_blendfile_save__with_existing_cdf)
   const AssetCatalog *cat = service.create_catalog("some/catalog/path");
 
   const CatalogFilePath blendfilename = top_level_dir + "subdir/some_file.blend";
-  ASSERT_TRUE(service.write_to_disk_on_blendfile_save(blendfilename.c_str()));
+  ASSERT_TRUE(service.write_to_disk_on_blendfile_save(blendfilename));
   EXPECT_EQ(cdf_filename, service.get_catalog_definition_file()->file_path);
 
   /* Test that the CDF was created in the expected location. */
@@ -456,7 +472,7 @@ TEST_F(AssetCatalogTest, on_blendfile_save__from_memory_into_empty_directory)
   const AssetCatalog *cat = service.create_catalog("some/catalog/path");
 
   const CatalogFilePath blendfilename = target_dir + "some_file.blend";
-  ASSERT_TRUE(service.write_to_disk_on_blendfile_save(blendfilename.c_str()));
+  ASSERT_TRUE(service.write_to_disk_on_blendfile_save(blendfilename));
 
   /* Test that the CDF was created in the expected location. */
   const CatalogFilePath expected_cdf_path = target_dir +
@@ -489,7 +505,7 @@ TEST_F(AssetCatalogTest, on_blendfile_save__from_memory_into_existing_cdf_and_me
 
   /* Mock that the blend file is written to a subdirectory of the asset library. */
   const CatalogFilePath blendfilename = target_dir + "some_file.blend";
-  ASSERT_TRUE(service.write_to_disk_on_blendfile_save(blendfilename.c_str()));
+  ASSERT_TRUE(service.write_to_disk_on_blendfile_save(blendfilename));
 
   /* Test that the CDF still exists in the expected location. */
   const CatalogFilePath backup_filename = writable_cdf_file + "~";
@@ -534,7 +550,7 @@ TEST_F(AssetCatalogTest, on_blendfile_save__from_memory_into_existing_asset_lib)
   const AssetCatalog *cat = service.create_catalog("some/catalog/path");
 
   /* Mock that the blend file is written to the directory already containing a CDF. */
-  ASSERT_TRUE(service.write_to_disk_on_blendfile_save(blendfilename.c_str()));
+  ASSERT_TRUE(service.write_to_disk_on_blendfile_save(blendfilename));
 
   /* Test that the CDF still exists in the expected location. */
   EXPECT_TRUE(BLI_exists(writable_cdf_file.c_str()));
@@ -588,7 +604,7 @@ TEST_F(AssetCatalogTest, create_first_catalog_from_scratch)
   AssetCatalog *written_cat = loaded_service.find_catalog(cat->catalog_id);
   ASSERT_NE(nullptr, written_cat);
   EXPECT_EQ(written_cat->catalog_id, cat->catalog_id);
-  EXPECT_EQ(written_cat->path, cat->path);
+  EXPECT_EQ(written_cat->path, cat->path.str());
 }
 
 TEST_F(AssetCatalogTest, create_catalog_after_loading_file)
@@ -640,7 +656,7 @@ TEST_F(AssetCatalogTest, create_catalog_path_cleanup)
   AssetCatalog *cat = service.create_catalog(" /some/path  /  ");
 
   EXPECT_FALSE(BLI_uuid_is_nil(cat->catalog_id));
-  EXPECT_EQ("some/path", cat->path);
+  EXPECT_EQ("some/path", cat->path.str());
   EXPECT_EQ("some-path", cat->simple_name);
 }
 
@@ -652,7 +668,7 @@ TEST_F(AssetCatalogTest, create_catalog_simple_name)
 
   EXPECT_FALSE(BLI_uuid_is_nil(cat->catalog_id));
   EXPECT_EQ("production/Spite Fright/Characters/Victora/Pose Library/Approved/Body Parts/Hands",
-            cat->path);
+            cat->path.str());
   EXPECT_EQ("...ht-Characters-Victora-Pose Library-Approved-Body Parts-Hands", cat->simple_name);
 }
 
@@ -718,7 +734,7 @@ TEST_F(AssetCatalogTest, update_catalog_path)
                          AssetCatalogService::DEFAULT_CATALOG_FILENAME);
 
   const AssetCatalog *orig_cat = service.find_catalog(UUID_POSES_RUZENA);
-  const CatalogPath orig_path = orig_cat->path;
+  const AssetCatalogPath orig_path = orig_cat->path;
 
   service.update_catalog_path(UUID_POSES_RUZENA, "charlib/Ružena");
 
@@ -733,12 +749,12 @@ TEST_F(AssetCatalogTest, update_catalog_path)
   EXPECT_EQ(orig_cat->catalog_id, renamed_cat->catalog_id)
       << "Changing the path should not change the catalog ID.";
 
-  EXPECT_EQ("charlib/Ružena", renamed_cat->path)
+  EXPECT_EQ("charlib/Ružena", renamed_cat->path.str())
       << "Changing the path should change the path. Surprise.";
 
-  EXPECT_EQ("charlib/Ružena/hand", service.find_catalog(UUID_POSES_RUZENA_HAND)->path)
+  EXPECT_EQ("charlib/Ružena/hand", service.find_catalog(UUID_POSES_RUZENA_HAND)->path.str())
       << "Changing the path should update children.";
-  EXPECT_EQ("charlib/Ružena/face", service.find_catalog(UUID_POSES_RUZENA_FACE)->path)
+  EXPECT_EQ("charlib/Ružena/face", service.find_catalog(UUID_POSES_RUZENA_FACE)->path.str())
       << "Changing the path should update children.";
 }
 
@@ -775,7 +791,7 @@ TEST_F(AssetCatalogTest, merge_catalog_files)
 
   /* When there are overlaps, the in-memory (i.e. last-saved) paths should win. */
   const AssetCatalog *ruzena_face = loaded_service.find_catalog(UUID_POSES_RUZENA_FACE);
-  EXPECT_EQ("character/Ružena/poselib/face", ruzena_face->path);
+  EXPECT_EQ("character/Ružena/poselib/face", ruzena_face->path.str());
 }
 
 TEST_F(AssetCatalogTest, backups)
@@ -846,21 +862,104 @@ TEST_F(AssetCatalogTest, order_by_path)
   }
 }
 
-TEST_F(AssetCatalogTest, is_contained_in)
+TEST_F(AssetCatalogTest, create_missing_catalogs)
 {
-  const AssetCatalog cat(BLI_uuid_generate_random(), "simple/path/child", "");
+  TestableAssetCatalogService new_service;
+  new_service.create_catalog("path/with/missing/parents");
 
-  EXPECT_FALSE(cat.is_contained_in("unrelated"));
-  EXPECT_FALSE(cat.is_contained_in("sim"));
-  EXPECT_FALSE(cat.is_contained_in("simple/pathx"));
-  EXPECT_FALSE(cat.is_contained_in("simple/path/c"));
-  EXPECT_FALSE(cat.is_contained_in("simple/path/child/grandchild"));
-  EXPECT_FALSE(cat.is_contained_in("simple/path/"))
-      << "Non-normalized paths are not expected to work.";
+  EXPECT_EQ(nullptr, new_service.find_catalog_by_path("path/with/missing"))
+      << "Missing parents should not be immediately created.";
+  EXPECT_EQ(nullptr, new_service.find_catalog_by_path("")) << "Empty path should never be valid";
 
-  EXPECT_TRUE(cat.is_contained_in(""));
-  EXPECT_TRUE(cat.is_contained_in("simple"));
-  EXPECT_TRUE(cat.is_contained_in("simple/path"));
+  new_service.create_missing_catalogs();
+
+  EXPECT_NE(nullptr, new_service.find_catalog_by_path("path/with/missing"));
+  EXPECT_NE(nullptr, new_service.find_catalog_by_path("path/with"));
+  EXPECT_NE(nullptr, new_service.find_catalog_by_path("path"));
+  EXPECT_EQ(nullptr, new_service.find_catalog_by_path(""))
+      << "Empty path should never be valid, even when after missing catalogs";
+}
+
+TEST_F(AssetCatalogTest, create_missing_catalogs_after_loading)
+{
+  TestableAssetCatalogService loaded_service(asset_library_root_);
+  loaded_service.load_from_disk();
+
+  const AssetCatalog *cat_char = loaded_service.find_catalog_by_path("character");
+  const AssetCatalog *cat_ellie = loaded_service.find_catalog_by_path("character/Ellie");
+  const AssetCatalog *cat_ruzena = loaded_service.find_catalog_by_path("character/Ružena");
+  ASSERT_NE(nullptr, cat_char) << "Missing parents should be created immediately after loading.";
+  ASSERT_NE(nullptr, cat_ellie) << "Missing parents should be created immediately after loading.";
+  ASSERT_NE(nullptr, cat_ruzena) << "Missing parents should be created immediately after loading.";
+
+  AssetCatalogDefinitionFile *cdf = loaded_service.get_catalog_definition_file();
+  ASSERT_NE(nullptr, cdf);
+  EXPECT_TRUE(cdf->contains(cat_char->catalog_id)) << "Missing parents should be saved to a CDF.";
+  EXPECT_TRUE(cdf->contains(cat_ellie->catalog_id)) << "Missing parents should be saved to a CDF.";
+  EXPECT_TRUE(cdf->contains(cat_ruzena->catalog_id))
+      << "Missing parents should be saved to a CDF.";
+
+  /* Check that each missing parent is only created once. The CDF contains multiple paths that
+   * could trigger the creation of missing parents, so this test makes sense. */
+  EXPECT_EQ(1, loaded_service.count_catalogs_with_path("character"));
+  EXPECT_EQ(1, loaded_service.count_catalogs_with_path("character/Ellie"));
+  EXPECT_EQ(1, loaded_service.count_catalogs_with_path("character/Ružena"));
+}
+
+TEST_F(AssetCatalogTest, create_catalog_filter)
+{
+  AssetCatalogService service(asset_library_root_);
+  service.load_from_disk();
+
+  /* Alias for the same catalog as the main one. */
+  AssetCatalog *alias_ruzena = service.create_catalog("character/Ružena/poselib");
+  /* Alias for a sub-catalog. */
+  AssetCatalog *alias_ruzena_hand = service.create_catalog("character/Ružena/poselib/hand");
+
+  AssetCatalogFilter filter = service.create_catalog_filter(UUID_POSES_RUZENA);
+
+  /* Positive test for loaded-from-disk catalogs. */
+  EXPECT_TRUE(filter.contains(UUID_POSES_RUZENA))
+      << "Main catalog should be included in the filter.";
+  EXPECT_TRUE(filter.contains(UUID_POSES_RUZENA_HAND))
+      << "Sub-catalog should be included in the filter.";
+  EXPECT_TRUE(filter.contains(UUID_POSES_RUZENA_FACE))
+      << "Sub-catalog should be included in the filter.";
+
+  /* Positive test for newly-created catalogs. */
+  EXPECT_TRUE(filter.contains(alias_ruzena->catalog_id))
+      << "Alias of main catalog should be included in the filter.";
+  EXPECT_TRUE(filter.contains(alias_ruzena_hand->catalog_id))
+      << "Alias of sub-catalog should be included in the filter.";
+
+  /* Negative test for unrelated catalogs. */
+  EXPECT_FALSE(filter.contains(BLI_uuid_nil())) << "Nil catalog should not be included.";
+  EXPECT_FALSE(filter.contains(UUID_ID_WITHOUT_PATH));
+  EXPECT_FALSE(filter.contains(UUID_POSES_ELLIE));
+  EXPECT_FALSE(filter.contains(UUID_POSES_ELLIE_WHITESPACE));
+  EXPECT_FALSE(filter.contains(UUID_POSES_ELLIE_TRAILING_SLASH));
+  EXPECT_FALSE(filter.contains(UUID_WITHOUT_SIMPLENAME));
+}
+
+TEST_F(AssetCatalogTest, create_catalog_filter_for_unknown_uuid)
+{
+  AssetCatalogService service;
+  const bUUID unknown_uuid = BLI_uuid_generate_random();
+
+  AssetCatalogFilter filter = service.create_catalog_filter(unknown_uuid);
+  EXPECT_TRUE(filter.contains(unknown_uuid));
+
+  EXPECT_FALSE(filter.contains(BLI_uuid_nil())) << "Nil catalog should not be included.";
+  EXPECT_FALSE(filter.contains(UUID_POSES_ELLIE));
+}
+
+TEST_F(AssetCatalogTest, create_catalog_filter_for_unassigned_assets)
+{
+  AssetCatalogService service;
+
+  AssetCatalogFilter filter = service.create_catalog_filter(BLI_uuid_nil());
+  EXPECT_TRUE(filter.contains(BLI_uuid_nil()));
+  EXPECT_FALSE(filter.contains(UUID_POSES_ELLIE));
 }
 
 }  // namespace blender::bke::tests

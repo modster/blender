@@ -210,6 +210,9 @@ set(SRC
   geometry/nodes/node_geo_curve_resample.cc
   geometry/nodes/node_geo_curve_reverse.cc
   geometry/nodes/node_geo_curve_sample.cc
+  geometry/nodes/node_geo_curve_set_handles.cc
+  geometry/nodes/node_geo_curve_spline_type.cc
+  geometry/nodes/node_geo_curve_subdivide.cc
   geometry/nodes/node_geo_curve_to_mesh.cc
   geometry/nodes/node_geo_curve_trim.cc
   geometry/nodes/node_geo_distribute_points_on_faces.cc
@@ -217,6 +220,7 @@ set(SRC
   geometry/nodes/node_geo_input_material.cc
   geometry/nodes/node_geo_input_normal.cc
   geometry/nodes/node_geo_input_position.cc
+  geometry/nodes/node_geo_input_spline_length.cc
   geometry/nodes/node_geo_input_tangent.cc
   geometry/nodes/node_geo_instance_on_points.cc
   geometry/nodes/node_geo_is_viewport.cc
@@ -375,7 +379,7 @@ set(SRC
   intern/derived_node_tree.cc
   intern/geometry_nodes_eval_log.cc
   intern/math_functions.cc
-  intern/node_common.c
+  intern/node_common.cc
   intern/node_declaration.cc
   intern/node_exec.cc
   intern/node_geometry_exec.cc
