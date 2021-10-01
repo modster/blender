@@ -14,13 +14,14 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
+#include "BKE_attribute_math.hh"
 #include "BKE_geometry_set.hh"
 #include "BKE_pointcloud.h"
-#include <BKE_attribute_math.hh>
 
 #include "BLI_array.hh"
 #include "BLI_float3.hh"
 #include "BLI_kdtree.h"
+#include "BLI_multi_value_map.hh"
 #include "BLI_span.hh"
 #include "BLI_vector.hh"
 
@@ -99,21 +100,34 @@ PointCloud *pointcloud_merge_by_distance(PointCloudComponent &pointcloud_compone
 
   build_merge_map(positions, merge_map, merge_threshold, selection);
 
-  Vector<int64_t> copy_mask_vector;
-  for (const int i : positions.index_range()) {
-    if (merge_map[i] == -1) {
-      copy_mask_vector.append(i);
+  MultiValueMap<int, int> copy_map;
+  for (const int i : merge_map.index_range()) {
+    if (merge_map[i] != -1) {
+      copy_map.add(merge_map[i], i);
     }
   }
-  IndexMask copy_mask(copy_mask_vector);
 
-  PointCloud *pointcloud = BKE_pointcloud_new_nomain(src_pointcloud.totpoint);
+  int copy_count = std::distance(copy_map.keys().begin(), copy_map.keys().end());
+
+  PointCloud *pointcloud = BKE_pointcloud_new_nomain(copy_count);
   PointCloudComponent dst_component;
   dst_component.replace(pointcloud, GeometryOwnershipType::Editable);
 
-  for (const int i : copy_mask.index_range()) {
-    copy_v3_v3(pointcloud->co[i], src_pointcloud.co[copy_mask[i]]);
-    pointcloud->radius[i] = src_pointcloud.radius[copy_mask[i]];
+  int index_new = 0;
+  for (const int index_old : copy_map.keys()) {
+    Span<int> merged_points = copy_map.lookup(index_old);
+    if (merged_points.size() > 0) {
+      copy_v3_v3(pointcloud->co[index_new], src_pointcloud.co[index_old]);
+      pointcloud->radius[index_new] = src_pointcloud.radius[index_old];
+      float weight = 1 / (float(merged_points.size() + 1));
+      for (const int j : merged_points) {
+        add_v3_v3(pointcloud->co[index_new], src_pointcloud.co[j]);
+        pointcloud->radius[index_new] += src_pointcloud.radius[j];
+      }
+      mul_v3_fl(pointcloud->co[index_new], weight);
+      pointcloud->radius[index_new] *= weight;
+    }
+    index_new++;
   }
 
   pointcloud_component.attribute_foreach(
@@ -129,31 +143,25 @@ PointCloud *pointcloud_merge_by_distance(PointCloudComponent &pointcloud_compone
 
           blender::attribute_math::convert_to_static_type(meta_data.data_type, [&](auto dummy) {
             using T = decltype(dummy);
-            // fn::GVMutableArray_Typed<T> dst_span = target_attribute->typed<T>();
-            // const fn::GVArray_Typed<T> src_span = read_attribute->typed<T>();
-            // target_attribute.template as_span<>()
-            // dst_span->materialize_to_uninitialized(buffer);
+            const fn::GVArray_Typed<T> src_span = read_attribute->typed<T>();
             attribute_math::DefaultMixer<T> mixer(target_attribute.as_span<T>());
 
-            // for (const int j : merge_map.index_range()) {
-            //   if (merge_map[j] == src_index) {
-            //     mixer.mix_in(src_span[j], 0.1f);
-            //    }
-            // }
+            index_new = 0;
+            for (const int index_old : copy_map.keys()) {
+              Span<int> merged_points = copy_map.lookup(index_old);
+              if (merged_points.size() > 0) {
+                float weight = 1 / (float(merged_points.size() + 1));
+                mixer.mix_in(index_new, src_span[index_old], weight);
+                for (const int j : merged_points) {
+                  mixer.mix_in(index_new, src_span[j], weight);
+                }
+              }
+              index_new++;
+            }
             mixer.finalize();
           });
 
           target_attribute.save();
-
-          //          fn::GMutableSpan dst_span = target_attribute.as_span();
-          //          const fn::GSpan src_span = read_attribute->get_internal_span();
-          //          for (const int i : copy_mask.index_range()) {
-          //            const int src_index = copy_mask[i];
-          //            const fn::CPPType *type =
-          //            bke::custom_data_type_to_cpp_type(meta_data.data_type);
-          //            type->copy_assign(src_span[src_index], dst_span[i]);
-          //            target_attribute.save();
-          //          }
         }
         return true;
       });
