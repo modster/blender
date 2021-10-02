@@ -82,6 +82,7 @@ class TileManager {
   bool done();
 
   const Tile &get_current_tile() const;
+  const int2 get_size() const;
 
   /* Write render buffer of a tile to a file on disk.
    *
@@ -106,6 +107,12 @@ class TileManager {
   bool read_full_buffer_from_disk(string_view filename,
                                   RenderBuffers *buffers,
                                   DenoiseParams *denoise_params);
+
+  /* Compute valid tile size compatible with image saving. */
+  int compute_render_tile_size(const int suggested_tile_size) const;
+
+  /* Tile size in the image file. */
+  static const int IMAGE_TILE_SIZE = 128;
 
  protected:
   /* Get tile configuration for its index.

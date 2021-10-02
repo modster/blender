@@ -89,7 +89,18 @@ class DebugFlags {
     void reset();
 
     /* Whether adaptive feature based runtime compile is enabled or not.
-     * Requires the CUDA Toolkit and only works on Linux atm. */
+     * Requires the CUDA Toolkit and only works on Linux at the moment. */
+    bool adaptive_compile;
+  };
+
+  /* Descriptor of HIP feature-set to be used. */
+  struct HIP {
+    HIP();
+
+    /* Reset flags to their defaults. */
+    void reset();
+
+    /* Whether adaptive feature based runtime compile is enabled or not.*/
     bool adaptive_compile;
   };
 
@@ -123,6 +134,9 @@ class DebugFlags {
 
   /* Requested OptiX flags. */
   OptiX optix;
+
+  /* Requested HIP flags. */
+  HIP hip;
 
  private:
   DebugFlags();

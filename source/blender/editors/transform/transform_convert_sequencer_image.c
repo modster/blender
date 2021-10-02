@@ -102,7 +102,9 @@ static TransData *SeqToTransData(const Scene *scene,
   return td;
 }
 
-static void freeSeqData(TransInfo *UNUSED(t), TransDataContainer *tc, TransCustomData *UNUSED(custom_data))
+static void freeSeqData(TransInfo *UNUSED(t),
+                        TransDataContainer *tc,
+                        TransCustomData *UNUSED(custom_data))
 {
   TransData *td = (TransData *)tc->data;
   MEM_freeN(td->extra);
@@ -111,12 +113,17 @@ static void freeSeqData(TransInfo *UNUSED(t), TransDataContainer *tc, TransCusto
 void createTransSeqImageData(TransInfo *t)
 {
   Editing *ed = SEQ_editing_get(t->scene);
+
+  if (ed == NULL) {
+    return;
+  }
+
   ListBase *seqbase = SEQ_active_seqbase_get(ed);
   SeqCollection *strips = SEQ_query_rendered_strips(seqbase, t->scene->r.cfra, 0);
   SEQ_filter_selected_strips(strips);
 
   const int count = SEQ_collection_len(strips);
-  if (ed == NULL || count == 0) {
+  if (count == 0) {
     SEQ_collection_free(strips);
     return;
   }
