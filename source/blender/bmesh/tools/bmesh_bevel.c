@@ -111,7 +111,7 @@ typedef struct EdgeHalf {
   bool is_bev;
   /** Is e->v2 the vertex at this end? */
   bool is_rev;
-  /** Is e a seam for custom loopdata (e.g., UVs)? */
+  /** Is e a seam for custom loop-data (e.g., UV's). */
   bool is_seam;
   /** Used during the custom profile orientation pass. */
   bool visited_rpo;
@@ -3582,7 +3582,7 @@ static void adjust_the_cycle_or_chain(BoundVert *vstart, bool iscycle)
       }
 
       /* Residue np + 2*i (if cycle) else np - 1 + 2*i:
-       * right offset for parm i matches its spec; weighted. */
+       * right offset for parameter i matches its spec; weighted. */
       int row = iscycle ? np + 2 * i : np - 1 + 2 * i;
       EIG_linear_solver_matrix_add(solver, row, i, weight);
       EIG_linear_solver_right_hand_side_add(solver, 0, row, weight * eright->offset_r);
@@ -3595,7 +3595,7 @@ static void adjust_the_cycle_or_chain(BoundVert *vstart, bool iscycle)
 #endif
 
       /* Residue np + 2*i + 1 (if cycle) else np - 1 + 2*i + 1:
-       * left offset for parm i matches its spec; weighted. */
+       * left offset for parameter i matches its spec; weighted. */
       row = row + 1;
       EIG_linear_solver_matrix_add(
           solver, row, (i == np - 1) ? 0 : i + 1, weight * v->adjchain->sinratio);

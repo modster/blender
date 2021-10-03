@@ -497,18 +497,14 @@ class _defs_view3d_add:
         props = tool.operator_properties("view3d.interactive_add")
         if not extra:
             row = layout.row()
-            row.scale_x = 0.8
             row.label(text="Depth:")
             row = layout.row()
-            row.scale_x = 0.9
             row.prop(props, "plane_depth", text="")
             row = layout.row()
-            row.scale_x = 0.8
             row.label(text="Orientation:")
             row = layout.row()
             row.prop(props, "plane_orientation", text="")
             row = layout.row()
-            row.scale_x = 0.8
             row.prop(props, "snap_target")
 
             region_is_header = bpy.context.region.type == 'TOOL_HEADER'
@@ -1691,6 +1687,7 @@ class _defs_weight_paint:
 
             props = tool.operator_properties("paint.weight_gradient")
             layout.prop(props, "type", expand=True)
+            layout.popover("VIEW3D_PT_tools_weight_gradient")
 
         return dict(
             idname="builtin.gradient",

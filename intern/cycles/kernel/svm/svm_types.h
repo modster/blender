@@ -122,6 +122,7 @@ typedef enum ShaderNodeType {
   NODE_AOV_START,
   NODE_AOV_COLOR,
   NODE_AOV_VALUE,
+  NODE_FLOAT_CURVE,
   /* NOTE: for best OpenCL performance, item definition in the enum must
    * match the switch case order in svm.h. */
 } ShaderNodeType;
@@ -173,6 +174,7 @@ typedef enum NodeParticleInfo {
 typedef enum NodeHairInfo {
   NODE_INFO_CURVE_IS_STRAND,
   NODE_INFO_CURVE_INTERCEPT,
+  NODE_INFO_CURVE_LENGTH,
   NODE_INFO_CURVE_THICKNESS,
   /* Fade for minimum hair width transiency. */
   // NODE_INFO_CURVE_FADE,

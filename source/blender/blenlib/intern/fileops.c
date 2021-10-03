@@ -570,6 +570,7 @@ bool BLI_dir_create_recursive(const char *dirname)
    * blah1/blah2 (without slash) */
 
   BLI_strncpy(tmp, dirname, sizeof(tmp));
+  BLI_path_slash_native(tmp);
   BLI_path_slash_rstrip(tmp);
 
   /* check special case "c:\foo", don't try create "c:", harmless but prints an error below */
@@ -760,7 +761,7 @@ static int recursive_operation(const char *startfrom,
 #  endif
 
       if (is_dir) {
-        /* recursively dig into a subfolder */
+        /* Recurse into sub-directories. */
         ret = recursive_operation(
             from_path, to_path, callback_dir_pre, callback_file, callback_dir_post);
       }
