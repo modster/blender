@@ -53,8 +53,10 @@ struct GHOST_XrPrimitive {
   std::vector<uint32_t> indices;
 };
 
-/* Validate that an accessor does not go out of bounds of the buffer view that it references and
-   that the buffer view does not exceed the bounds of the buffer that it references. */
+/**
+ * Validate that an accessor does not go out of bounds of the buffer view that it references and
+ * that the buffer view does not exceed the bounds of the buffer that it references
+ */
 static void validate_accessor(const tinygltf::Accessor &accessor,
                               const tinygltf::BufferView &buffer_view,
                               const tinygltf::Buffer &buffer,
@@ -135,9 +137,10 @@ static void load_attribute_accessor(const tinygltf::Model &gltf_model,
   }
 }
 
-/* Reads index data from a glTF primitive into a GHOST_XrPrimitive. glTF indices may be 8bit,
-   16bit or 32bit integers. This will coalesce indices from the source type(s) into a 32bit
-   integer. */
+/**
+ * Reads index data from a glTF primitive into a GHOST_XrPrimitive. glTF indices may be 8bit, 16bit
+ * or 32bit integers. This will coalesce indices from the source type(s) into a 32bit integer.
+ */
 template<typename TSrcIndex>
 static void read_indices(const tinygltf::Accessor &accessor,
                          const tinygltf::BufferView &buffer_view,
@@ -173,7 +176,9 @@ static void read_indices(const tinygltf::Accessor &accessor,
   }
 }
 
-/* Reads index data from a glTF primitive into a GHOST_XrPrimitive. */
+/**
+ * Reads index data from a glTF primitive into a GHOST_XrPrimitive.
+ */
 static void load_index_accessor(const tinygltf::Model &gltf_model,
                                 const tinygltf::Accessor &accessor,
                                 GHOST_XrPrimitive &primitive)
@@ -227,7 +232,9 @@ static GHOST_XrPrimitive read_primitive(const tinygltf::Model &gltf_model,
   return primitive;
 }
 
-/* Calculate node local and world transforms. */
+/**
+ * Calculate node local and world transforms.
+ */
 static void calc_node_transforms(const tinygltf::Node &gltf_node,
                                  const float parent_transform[4][4],
                                  float r_local_transform[4][4],

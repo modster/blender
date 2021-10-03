@@ -2261,18 +2261,26 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
   RNA_def_property_array(prop, 3);
   RNA_def_property_float_funcs(
       prop, "rna_XrSessionState_nav_location_get", "rna_XrSessionState_nav_location_set", NULL);
-  RNA_def_property_ui_text(prop, "Navigation Location", "VR navigation location in world space");
+  RNA_def_property_ui_text(
+      prop,
+      "Navigation Location",
+      "Location offset to apply to base pose when determining viewer location");
 
   prop = RNA_def_property(srna, "navigation_rotation", PROP_FLOAT, PROP_QUATERNION);
   RNA_def_property_array(prop, 4);
   RNA_def_property_float_funcs(
       prop, "rna_XrSessionState_nav_rotation_get", "rna_XrSessionState_nav_rotation_set", NULL);
-  RNA_def_property_ui_text(prop, "Navigation Rotation", "VR navigation rotation in world space");
+  RNA_def_property_ui_text(
+      prop,
+      "Navigation Rotation",
+      "Rotation offset to apply to base pose when determining viewer rotation");
 
   prop = RNA_def_property(srna, "navigation_scale", PROP_FLOAT, PROP_NONE);
   RNA_def_property_float_funcs(
       prop, "rna_XrSessionState_nav_scale_get", "rna_XrSessionState_nav_scale_set", NULL);
-  RNA_def_property_ui_text(prop, "Navigation Scale", "VR navigation scale in world space");
+  RNA_def_property_ui_text(prop,
+                           "Navigation Scale",
+                           "Scale multiplier to apply to base pose when determining viewer scale");
 }
 
 /** \} */
