@@ -484,6 +484,31 @@ void GHOST_XrControllerModel::loadControllerModel(XrSession session)
   tinygltf::TinyGLTF gltf_loader;
   tinygltf::Model gltf_model;
   std::string err_msg;
+  {
+    /* Workaround for TINYGLTF_NO_STB_IMAGE define. Set custom image loader to prevent failure when
+     * parsing image data. */
+    auto load_img_func = [](tinygltf::Image *img,
+                            const int p0,
+                            std::string *p1,
+                            std::string *p2,
+                            int p3,
+                            int p4,
+                            const unsigned char *p5,
+                            int p6,
+                            void *user_pointer) -> bool {
+      (void)img;
+      (void)p0;
+      (void)p1;
+      (void)p2;
+      (void)p3;
+      (void)p4;
+      (void)p5;
+      (void)p6;
+      (void)user_pointer;
+      return true;
+    };
+    gltf_loader.SetImageLoader(load_img_func, nullptr);
+  }
 
   if (!gltf_loader.LoadBinaryFromMemory(&gltf_model, &err_msg, nullptr, buf.data(), buf_size)) {
     throw GHOST_XrException(("Failed to load glTF controller model: " + err_msg).c_str());
