@@ -166,8 +166,10 @@ void Film::end_sync()
   if (do_smooth_viewport_smooth_transition() && (data_.opacity < 1.0f || is_first_sample)) {
     char full_name[32];
     SNPRINTF(full_name, "Film.%s.first_sample", name_.c_str());
-    eGPUTextureFormat tex_format = GPU_texture_format(DRW_viewport_texture_list_get()->color);
-    first_sample_tx_.ensure(full_name, UNPACK2(data_.extent), 1, tex_format);
+    GPUTexture *dtxl_color = DRW_viewport_texture_list_get()->color;
+    eGPUTextureFormat tex_format = GPU_texture_format(dtxl_color);
+    int extent[2] = {GPU_texture_width(dtxl_color), GPU_texture_height(dtxl_color)};
+    first_sample_tx_.ensure(full_name, UNPACK2(extent), 1, tex_format);
     first_sample_ref_ = first_sample_tx_;
   }
   else {
