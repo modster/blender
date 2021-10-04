@@ -142,6 +142,7 @@ set(SRC
   function/nodes/node_fn_input_string.cc
   function/nodes/node_fn_input_vector.cc
   function/nodes/node_fn_random_value.cc
+  function/nodes/node_fn_rotate_euler.cc
   function/nodes/node_fn_string_length.cc
   function/nodes/node_fn_string_substring.cc
   function/nodes/node_fn_value_to_string.cc
@@ -197,6 +198,7 @@ set(SRC
   geometry/nodes/node_geo_convex_hull.cc
   geometry/nodes/node_geo_curve_fill.cc
   geometry/nodes/node_geo_curve_fillet.cc
+  geometry/nodes/node_geo_curve_handle_type_selection.cc
   geometry/nodes/node_geo_curve_length.cc
   geometry/nodes/node_geo_curve_parameter.cc
   geometry/nodes/node_geo_curve_primitive_bezier_segment.cc
@@ -209,6 +211,9 @@ set(SRC
   geometry/nodes/node_geo_curve_resample.cc
   geometry/nodes/node_geo_curve_reverse.cc
   geometry/nodes/node_geo_curve_sample.cc
+  geometry/nodes/node_geo_curve_set_handles.cc
+  geometry/nodes/node_geo_curve_spline_type.cc
+  geometry/nodes/node_geo_curve_subdivide.cc
   geometry/nodes/node_geo_curve_to_mesh.cc
   geometry/nodes/node_geo_curve_trim.cc
   geometry/nodes/node_geo_distribute_points_on_faces.cc
@@ -216,6 +221,7 @@ set(SRC
   geometry/nodes/node_geo_input_material.cc
   geometry/nodes/node_geo_input_normal.cc
   geometry/nodes/node_geo_input_position.cc
+  geometry/nodes/node_geo_input_spline_length.cc
   geometry/nodes/node_geo_input_tangent.cc
   geometry/nodes/node_geo_instance_on_points.cc
   geometry/nodes/node_geo_is_viewport.cc
@@ -235,6 +241,7 @@ set(SRC
   geometry/nodes/node_geo_mesh_to_points.cc
   geometry/nodes/node_geo_object_info.cc
   geometry/nodes/node_geo_points_to_vertices.cc
+  geometry/nodes/node_geo_points_to_volume.cc
   geometry/nodes/node_geo_proximity.cc
   geometry/nodes/node_geo_realize_instances.cc
   geometry/nodes/node_geo_separate_components.cc
@@ -371,9 +378,10 @@ set(SRC
   texture/node_texture_util.c
 
   intern/derived_node_tree.cc
+  intern/extern_implementations.cc
   intern/geometry_nodes_eval_log.cc
   intern/math_functions.cc
-  intern/node_common.c
+  intern/node_common.cc
   intern/node_declaration.cc
   intern/node_exec.cc
   intern/node_geometry_exec.cc
