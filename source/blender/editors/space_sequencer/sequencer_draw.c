@@ -676,8 +676,8 @@ float sequence_handle_size_get_clamped(Sequence *seq, const float pixelx)
 {
   const float maxhandle = (pixelx * SEQ_HANDLE_SIZE) * U.pixelsize;
 
-  /* Ensure that handle is not wider, than quarter of strip. */
-  return min_ff(maxhandle, ((float)(seq->enddisp - seq->startdisp) / 4.0f));
+  /* Ensure that handle is not wider, than third of strip. */
+  return min_ff(maxhandle, ((float)(seq->enddisp - seq->startdisp) / 3.0f));
 }
 
 /* Draw a handle, on left or right side of strip. */
@@ -688,6 +688,7 @@ static void draw_seq_handle(View2D *v2d,
                             uint pos,
                             bool seq_active,
                             float pixelx,
+                            float pixely,
                             bool y_threshold)
 {
   float rx1 = 0, rx2 = 0;
@@ -716,25 +717,56 @@ static void draw_seq_handle(View2D *v2d,
   if (!(seq->type & SEQ_TYPE_EFFECT) || SEQ_effect_get_num_inputs(seq->type) == 0) {
     GPU_blend(GPU_BLEND_ALPHA);
 
-    GPU_blend(GPU_BLEND_ALPHA);
-
     if (seq->flag & whichsel) {
       if (seq_active) {
         UI_GetThemeColor3ubv(TH_SEQ_ACTIVE, col);
       }
       else {
         UI_GetThemeColor3ubv(TH_SEQ_SELECTED, col);
-        /* Make handles slightly brighter than the outlines. */
-        UI_GetColorPtrShade3ubv(col, col, 50);
       }
+      UI_GetColorPtrShade3ubv(col, col, 50);
       col[3] = 255;
       immUniformColor4ubv(col);
-    }
-    else {
-      immUniformColor4ub(0, 0, 0, 50);
-    }
 
-    immRectf(pos, rx1, y1, rx2, y2);
+      if ((((pixelx * SEQ_HANDLE_SIZE) * U.pixelsize) * 3.0f) <= (x2 - x1)) {
+        /* Square brackets for bigger strips. */
+        /* XXX: some platforms don't support OpenGL lines wider than 1px (see T57570),
+         * draw handles as three boxes instead. */
+        if (direction == SEQ_LEFTHANDLE) {
+          /* Left */
+          immRectf(pos,
+                   rx1,
+                   y1 + (3.0f * pixely),
+                   rx1 + (handsize_clamped / 2.0f),
+                   y2 - (3.0f * pixely));
+          /* Bottom */
+          immRectf(pos, rx1, y1, rx1 + (handsize_clamped / 1.0f), y1 + (3.0f * pixely));
+          /* Top */
+          immRectf(pos, rx1, y2 - (3.0f * pixely), rx1 + (handsize_clamped / 1.0f), y2);
+        }
+        else if (direction == SEQ_RIGHTHANDLE) {
+          /* Right */
+          immRectf(pos,
+                   rx2 - (handsize_clamped / 2.0f),
+                   y1 + (3.0f * pixely),
+                   rx2,
+                   y2 - (3.0f * pixely));
+          /* Bottom */
+          immRectf(pos, rx2 - (handsize_clamped / 1.0f), y1, rx2, y1 + (3.0f * pixely));
+          /* Top */
+          immRectf(pos, rx2 - (handsize_clamped / 1.0f), y2 - (3.0f * pixely), rx2, y2);
+        }
+      }
+      else {
+        /* Use regtangular box for small strips. */
+        if (direction == SEQ_LEFTHANDLE) {
+          immRectf(pos, rx1, y1, rx1 + handsize_clamped, y2);
+        }
+        else if (direction == SEQ_RIGHTHANDLE) {
+          immRectf(pos, rx2 - handsize_clamped, y1, rx2, y2);
+        }
+      }
+    }
     GPU_blend(GPU_BLEND_NONE);
   }
 
@@ -752,7 +784,7 @@ static void draw_seq_handle(View2D *v2d,
     float tot_width = BLF_width(fontid, numstr, numstr_len);
 
     if ((x2 - x1) / pixelx > 20 + tot_width) {
-      col[0] = col[1] = col[2] = col[3] = 255;
+      col[0] = col[1] = col[2] = col[3] = 200;
       float text_margin = 1.2f * handsize_clamped;
 
       if (direction == SEQ_LEFTHANDLE) {
@@ -784,15 +816,12 @@ static void draw_seq_outline(Scene *scene,
   uchar col[3];
 
   /* Get the color for the outline. */
-  if (seq_active && (seq->flag & SELECT)) {
+  if (seq_active && (seq->flag & SELECT) && !(seq->flag & SEQ_LEFTSEL) &&
+      !(seq->flag & SEQ_RIGHTSEL)) {
     UI_GetThemeColor3ubv(TH_SEQ_ACTIVE, col);
   }
-  else if (seq->flag & SELECT) {
+  else if (seq->flag & SELECT && !(seq->flag & SEQ_LEFTSEL) && !(seq->flag & SEQ_RIGHTSEL)) {
     UI_GetThemeColor3ubv(TH_SEQ_SELECTED, col);
-  }
-  else {
-    /* Color for unselected strips is a bit darker than the background. */
-    UI_GetThemeColorShade3ubv(TH_BACK, -40, col);
   }
 
   /* Outline while translating strips:
@@ -810,25 +839,28 @@ static void draw_seq_outline(Scene *scene,
       UI_GetColorPtrShade3ubv(col, col, 70);
     }
   }
-  immUniformColor3ubv(col);
-
-  /* 2px wide outline for selected strips. */
+  /* 2px wide outline. */
   /* XXX: some platforms don't support OpenGL lines wider than 1px (see T57570),
    * draw outline as four boxes instead. */
-  if (seq->flag & SELECT) {
-    /* Left */
-    immRectf(pos, x1 - pixelx, y1, x1 + pixelx, y2);
-    /* Bottom */
-    immRectf(pos, x1 - pixelx, y1, x2 + pixelx, y1 + 2 * pixely);
-    /* Right */
-    immRectf(pos, x2 - pixelx, y1, x2 + pixelx, y2);
-    /* Top */
-    immRectf(pos, x1 - pixelx, y2 - 2 * pixely, x2 + pixelx, y2);
+  if ((seq->flag & SELECT) && !(seq->flag & SEQ_LEFTSEL) && !(seq->flag & SEQ_RIGHTSEL)) {
+    immUniformColor3ubv(col);
   }
   else {
-    /* 1px wide outline for unselected strips. */
-    imm_draw_box_wire_2d(pos, x1, y1, x2, y2);
+    col[0] = col[1] = col[2] = 20;
+    immUniformColor3ubv(col);
   }
+  /* Left */
+  if (!(seq->flag & SEQ_LEFTSEL)) {
+    immRectf(pos, x1 - pixelx, y1, x1 + pixelx, y2);
+  }
+  /* Bottom */
+  immRectf(pos, x1 + pixelx, y1, x2 - pixelx, y1 + (2.0f * pixely));
+  /* Right */
+  if (!(seq->flag & SEQ_RIGHTSEL)) {
+    immRectf(pos, x2 - pixelx, y1, x2 + pixelx, y2);
+  }
+  /* Top */
+  immRectf(pos, x1 + (pixelx * 1.0f), y2 - (2.0f * pixely), x2 - pixelx, y2);
 }
 
 static const char *draw_seq_text_get_name(Sequence *seq)
@@ -956,8 +988,8 @@ static void draw_seq_text_overlay(View2D *v2d,
 
   /* White text for the active strip. */
   uchar col[4];
-  col[0] = col[1] = col[2] = seq_active ? 255 : 10;
-  col[3] = 255;
+  col[0] = col[1] = col[2] = seq_active ? 230 : 25;
+  col[3] = 230;
 
   /* Make the text duller when the strip is muted. */
   if (seq->flag & SEQ_MUTE) {
@@ -1193,7 +1225,7 @@ static void calculate_seq_text_offsets(
     View2D *v2d, Sequence *seq, float *x1, float *x2, float pixelx)
 {
   const float handsize_clamped = sequence_handle_size_get_clamped(seq, pixelx);
-  float text_margin = 2.0f * handsize_clamped;
+  float text_margin = 1.2f * handsize_clamped;
 
   *x1 += text_margin;
   *x2 -= text_margin;
@@ -1870,7 +1902,7 @@ static void draw_seq_strip(const bContext *C,
       (sseq->flag & SEQ_TIMELINE_SHOW_STRIP_DURATION)) {
 
     /* Calculate height needed for drawing text on strip. */
-    text_margin_y = y2 - min_ff(0.40f, 20 * U.dpi_fac * pixely);
+    text_margin_y = y2 - min_ff(0.60f, 20 * U.dpi_fac * pixely);
 
     /* Is there enough space for drawing something else than text? */
     y_threshold = ((y2 - y1) / pixely) > 20 * U.dpi_fac;
@@ -1947,14 +1979,14 @@ static void draw_seq_strip(const bContext *C,
   pos = GPU_vertformat_attr_add(immVertexFormat(), "pos", GPU_COMP_F32, 2, GPU_FETCH_FLOAT);
   immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 
+  draw_seq_outline(scene, seq, pos, x1, x2, y1, y2, pixelx, pixely, seq_active);
+
   if ((seq->flag & SEQ_LOCK) == 0) {
     draw_seq_handle(
-        v2d, seq, handsize_clamped, SEQ_LEFTHANDLE, pos, seq_active, pixelx, y_threshold);
+        v2d, seq, handsize_clamped, SEQ_LEFTHANDLE, pos, seq_active, pixelx, pixely, y_threshold);
     draw_seq_handle(
-        v2d, seq, handsize_clamped, SEQ_RIGHTHANDLE, pos, seq_active, pixelx, y_threshold);
+        v2d, seq, handsize_clamped, SEQ_RIGHTHANDLE, pos, seq_active, pixelx, pixely, y_threshold);
   }
-
-  draw_seq_outline(scene, seq, pos, x1, x2, y1, y2, pixelx, pixely, seq_active);
 
   immUnbindProgram();
 
@@ -1971,7 +2003,7 @@ static void draw_seq_strip(const bContext *C,
 
   if (sseq->flag & SEQ_SHOW_OVERLAY) {
     /* Don't draw strip if there is not enough vertical or horizontal space. */
-    if (((x2 - x1) > 32 * pixelx * U.dpi_fac) && ((y2 - y1) > 8 * pixely * U.dpi_fac)) {
+    if (((x2 - x1) > 32.0f * pixelx * U.dpi_fac) && ((y2 - y1) > 8.0f * pixely * U.dpi_fac)) {
       /* Depending on the vertical space, draw text on top or in the center of strip. */
       draw_seq_text_overlay(
           v2d, seq, sseq, x1, x2, y_threshold ? text_margin_y : y1, y2, seq_active);
