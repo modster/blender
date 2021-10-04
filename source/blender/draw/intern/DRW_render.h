@@ -135,10 +135,6 @@ typedef struct DrawEngineType {
                           struct RenderLayer *layer,
                           const struct rcti *rect);
   void (*store_metadata)(void *vedata, struct RenderResult *render_result);
-
-  /** Index of the type in the list. Used for dupli data. Set at runtime. */
-  /** TODO(fclem) Can we avoid this? */
-  int index;
 } DrawEngineType;
 
 /* Textures */

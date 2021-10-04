@@ -84,6 +84,7 @@
 #include "wm_window.h"
 
 #include "draw_color_management.h"
+#include "draw_manager.h"
 #include "draw_manager_profiling.h"
 #include "draw_manager_testing.h"
 #include "draw_manager_text.h"
@@ -776,7 +777,7 @@ void **DRW_duplidata_get(void *vedata)
     return NULL;
   }
   ViewportEngineData *ved = (ViewportEngineData *)vedata;
-  DrawEngineType *engine_type = (DrawEngineType *)ved->engine_type;
+  DRWRegisteredDrawEngine *engine_type = (DRWRegisteredDrawEngine *)ved->engine_type;
   return &DST.dupli_datas[engine_type->index];
 }
 
@@ -2869,9 +2870,12 @@ bool DRW_engine_render_support(DrawEngineType *draw_engine_type)
 
 void DRW_engine_register(DrawEngineType *draw_engine_type)
 {
-  BLI_addtail(&DRW_engines, draw_engine_type);
+  DRWRegisteredDrawEngine *draw_engine = MEM_mallocN(sizeof(DRWRegisteredDrawEngine), __func__);
+  draw_engine->draw_engine = draw_engine_type;
+  draw_engine->index = g_registered_engine_len;
+
+  BLI_addtail(&DRW_engines, draw_engine);
   g_registered_engine_len = BLI_listbase_count(&DRW_engines);
-  draw_engine_type->index = g_registered_engine_len - 1;
 }
 
 void DRW_engines_register(void)
@@ -2942,14 +2946,15 @@ void DRW_engines_free(void)
   DRW_stats_free();
   DRW_globals_free();
 
-  DrawEngineType *next;
-  for (DrawEngineType *type = DRW_engines.first; type; type = next) {
+  DRWRegisteredDrawEngine *next;
+  for (DRWRegisteredDrawEngine *type = DRW_engines.first; type; type = next) {
     next = type->next;
     BLI_remlink(&R_engines, type);
 
-    if (type->engine_free) {
-      type->engine_free();
+    if (type->draw_engine->engine_free) {
+      type->draw_engine->engine_free();
     }
+    MEM_freeN(type);
   }
 
   DRW_UBO_FREE_SAFE(G_draw.block_ubo);

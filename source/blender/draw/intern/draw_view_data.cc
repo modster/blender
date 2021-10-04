@@ -30,6 +30,7 @@
 
 #include "draw_manager_text.h"
 
+#include "draw_manager.h"
 #include "draw_view_data.h"
 
 using namespace blender;
@@ -50,12 +51,12 @@ struct DRWViewData {
 };
 
 /* Creates a view data with all possible engines type for this view. */
-DRWViewData *DRW_view_data_create(ListBase *engine_types)
+DRWViewData *DRW_view_data_create(ListBase * /* DRWRegisteredDrawEngine */ engine_types)
 {
   DRWViewData *view_data = new DRWViewData();
-  LISTBASE_FOREACH (DrawEngineType *, type, engine_types) {
+  LISTBASE_FOREACH (DRWRegisteredDrawEngine *, type, engine_types) {
     ViewportEngineData engine = {};
-    engine.engine_type = static_cast<void *>(type);
+    engine.engine_type = type;
     view_data->engines.append(engine);
   }
   return view_data;
@@ -102,7 +103,7 @@ void DRW_view_data_default_lists_from_viewport(DRWViewData *view_data, GPUViewpo
 
 static void draw_viewport_engines_data_clear(ViewportEngineData *data)
 {
-  DrawEngineType *engine_type = static_cast<DrawEngineType *>(data->engine_type);
+  DrawEngineType *engine_type = data->engine_type->draw_engine;
   const DrawEngineDataSize *data_size = engine_type->vedata_size;
 
   for (int i = 0; data->fbl && i < data_size->fbl_len; i++) {
@@ -165,13 +166,12 @@ void DRW_view_data_texture_list_size_validate(DRWViewData *view_data, const int 
 }
 
 ViewportEngineData *DRW_view_data_engine_data_get_ensure(DRWViewData *view_data,
-                                                         DrawEngineType *engine_type_)
+                                                         DrawEngineType *engine_type)
 {
-  void *engine_type = static_cast<void *>(engine_type_);
   for (ViewportEngineData &engine : view_data->engines) {
-    if (engine.engine_type == engine_type) {
+    if (engine.engine_type->draw_engine == engine_type) {
       if (engine.fbl == nullptr) {
-        const DrawEngineDataSize *data_size = engine_type_->vedata_size;
+        const DrawEngineDataSize *data_size = engine_type->vedata_size;
         engine.fbl = (FramebufferList *)MEM_calloc_arrayN(
             data_size->fbl_len, sizeof(GPUFrameBuffer *), "FramebufferList");
         engine.txl = (TextureList *)MEM_calloc_arrayN(
