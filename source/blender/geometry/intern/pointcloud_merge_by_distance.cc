@@ -141,9 +141,15 @@ PointCloud *pointcloud_merge_by_distance(PointCloudComponent &pointcloud_compone
           bke::OutputAttribute target_attribute = dst_component.attribute_try_get_for_output_only(
               attribute_id, meta_data.domain, meta_data.data_type);
 
+          if (target_attribute->is_empty()) {
+            target_attribute.save();
+            return true;
+          }
+
           blender::attribute_math::convert_to_static_type(meta_data.data_type, [&](auto dummy) {
             using T = decltype(dummy);
             const fn::GVArray_Typed<T> src_span = read_attribute->typed<T>();
+
             attribute_math::DefaultMixer<T> mixer(target_attribute.as_span<T>());
 
             index_new = 0;
