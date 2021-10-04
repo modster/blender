@@ -120,7 +120,7 @@ set(SRC
   intern/curve_deform.c
   intern/curve_eval.cc
   intern/curve_to_mesh_convert.cc
-  intern/curveprofile.c
+  intern/curveprofile.cc
   intern/customdata.c
   intern/customdata_file.c
   intern/data_transfer.c
@@ -134,6 +134,7 @@ set(SRC
   intern/editmesh_cache.c
   intern/editmesh_tangent.c
   intern/effect.c
+  intern/extern_implementations.cc
   intern/fcurve.c
   intern/fcurve_cache.c
   intern/fcurve_driver.c
