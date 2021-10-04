@@ -113,8 +113,10 @@
 /** Render State: No persistent data between draw calls. */
 DRWManager DST = {NULL};
 
-static ListBase DRW_engines = {NULL, NULL};
-static int g_registered_engine_len = 0;
+static struct {
+  ListBase /*DRWRegisteredDrawEngine*/ engines;
+  int len;
+} g_registered_engines = {{NULL}};
 
 static void drw_state_prepare_clean_for_draw(DRWManager *dst)
 {
@@ -440,7 +442,7 @@ DRWData *DRW_viewport_data_create(void)
   }
 
   for (int i = 0; i < 2; i++) {
-    drw_data->view_data[i] = DRW_view_data_create(&DRW_engines);
+    drw_data->view_data[i] = DRW_view_data_create(&g_registered_engines.engines);
   }
   return drw_data;
 }
@@ -727,7 +729,7 @@ static void drw_duplidata_load(Object *ob)
 
   void **value;
   if (!BLI_ghash_ensure_p(DST.dupli_ghash, key, &value)) {
-    *value = MEM_callocN(sizeof(void *) * g_registered_engine_len, __func__);
+    *value = MEM_callocN(sizeof(void *) * g_registered_engines.len, __func__);
 
     /* TODO: Meh a bit out of place but this is nice as it is
      * only done once per instance type. */
@@ -742,7 +744,7 @@ static void drw_duplidata_load(Object *ob)
 static void duplidata_value_free(void *val)
 {
   void **dupli_datas = val;
-  for (int i = 0; i < g_registered_engine_len; i++) {
+  for (int i = 0; i < g_registered_engines.len; i++) {
     MEM_SAFE_FREE(dupli_datas[i]);
   }
   MEM_freeN(val);
@@ -2872,10 +2874,10 @@ void DRW_engine_register(DrawEngineType *draw_engine_type)
 {
   DRWRegisteredDrawEngine *draw_engine = MEM_mallocN(sizeof(DRWRegisteredDrawEngine), __func__);
   draw_engine->draw_engine = draw_engine_type;
-  draw_engine->index = g_registered_engine_len;
+  draw_engine->index = g_registered_engines.len;
 
-  BLI_addtail(&DRW_engines, draw_engine);
-  g_registered_engine_len = BLI_listbase_count(&DRW_engines);
+  BLI_addtail(&g_registered_engines.engines, draw_engine);
+  g_registered_engines.len = BLI_listbase_count(&g_registered_engines.engines);
 }
 
 void DRW_engines_register(void)
@@ -2947,7 +2949,7 @@ void DRW_engines_free(void)
   DRW_globals_free();
 
   DRWRegisteredDrawEngine *next;
-  for (DRWRegisteredDrawEngine *type = DRW_engines.first; type; type = next) {
+  for (DRWRegisteredDrawEngine *type = g_registered_engines.engines.first; type; type = next) {
     next = type->next;
     BLI_remlink(&R_engines, type);
 
