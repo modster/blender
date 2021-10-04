@@ -66,11 +66,12 @@ class Params:
         # Alt-MMB axis switching 'RELATIVE' or 'ABSOLUTE' axis switching.
         "v3d_alt_mmb_drag_action",
 
+        "use_file_single_click",
         # Convenience variables:
         # (derived from other settings).
         #
         # This case needs to be checked often,
-        # Shorthand for: `(params.use_fallback_tool if params.select_mouse == 'RIGHT' else False)`.
+        # Shorthand for: `(params.use_fallback_tool if params.select_mouse == 'RIGHTMOUSE' else False)`.
         "use_fallback_tool_rmb",
         # Shorthand for: `('CLICK' if params.use_fallback_tool_rmb else params.select_mouse_value)`.
         "select_mouse_value_fallback",
@@ -106,6 +107,7 @@ class Params:
             use_alt_tool_or_cursor=False,
             use_alt_click_leader=False,
             use_pie_click_drag=False,
+            use_file_single_click=False,
             v3d_tilde_action='VIEW',
             v3d_alt_mmb_drag_action='RELATIVE',
     ):
@@ -190,8 +192,10 @@ class Params:
         self.use_alt_click_leader = use_alt_click_leader
         self.use_pie_click_drag = use_pie_click_drag
 
+        self.use_file_single_click = use_file_single_click
+
         # Convenience variables:
-        self.use_fallback_tool_rmb = self.use_fallback_tool if self.select_mouse == 'RIGHT' else False
+        self.use_fallback_tool_rmb = self.use_fallback_tool if select_mouse == 'RIGHT' else False
         self.select_mouse_value_fallback = 'CLICK' if self.use_fallback_tool_rmb else self.select_mouse_value
         self.pie_value = 'CLICK_DRAG' if use_pie_click_drag else 'PRESS'
         self.tool_tweak_event = {"type": self.tool_tweak, "value": 'ANY'}
@@ -2151,16 +2155,20 @@ def km_file_browser_main(params):
         {"items": items},
     )
 
+    if not params.use_file_single_click:
+        items.extend([
+            ("file.select", {"type": 'LEFTMOUSE', "value": 'DOUBLE_CLICK'},
+            {"properties": [("open", True), ("deselect_all", not params.legacy)]}),
+        ])
+
     items.extend([
         ("file.mouse_execute", {"type": 'LEFTMOUSE', "value": 'DOUBLE_CLICK'}, None),
         # Both .execute and .select are needed here. The former only works if
         # there's a file operator (i.e. not in regular editor mode) but is
         # needed to load files. The latter makes selection work if there's no
         # operator (i.e. in regular editor mode).
-        ("file.select", {"type": 'LEFTMOUSE', "value": 'DOUBLE_CLICK'},
-         {"properties": [("open", True), ("deselect_all", not params.legacy)]}),
         ("file.select", {"type": 'LEFTMOUSE', "value": 'PRESS'},
-         {"properties": [("open", False), ("deselect_all", not params.legacy)]}),
+         {"properties": [("open", params.use_file_single_click), ("deselect_all", not params.legacy)]}),
         ("file.select", {"type": 'LEFTMOUSE', "value": 'CLICK', "ctrl": True},
          {"properties": [("extend", True), ("open", False)]}),
         ("file.select", {"type": 'LEFTMOUSE', "value": 'CLICK', "shift": True},
@@ -4304,7 +4312,7 @@ def km_pose(params):
         ("pose.push", {"type": 'E', "value": 'PRESS', "ctrl": True}, None),
         ("pose.relax", {"type": 'E', "value": 'PRESS', "alt": True}, None),
         ("pose.breakdown", {"type": 'E', "value": 'PRESS', "shift": True}, None),
-        ("pose.blend_to_neighbour", {"type": 'E', "value": 'PRESS', "shift": True, "alt": True}, None),
+        ("pose.blend_to_neighbor", {"type": 'E', "value": 'PRESS', "shift": True, "alt": True}, None),
         op_menu("VIEW3D_MT_pose_propagate", {"type": 'P', "value": 'PRESS', "alt": True}),
         *(
             (("object.hide_collection",

@@ -5394,7 +5394,7 @@ void ui_draw_menu_item(const uiFontStyle *fstyle,
         }
       }
       else {
-        BLI_assert_msg(0, "Unknwon menu item separator type");
+        BLI_assert_msg(0, "Unknown menu item separator type");
       }
     }
   }

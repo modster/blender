@@ -253,6 +253,13 @@ struct GeometrySet {
   blender::Map<GeometryComponentType, GeometryComponentPtr> components_;
 
  public:
+  GeometrySet();
+  GeometrySet(const GeometrySet &other);
+  GeometrySet(GeometrySet &&other);
+  ~GeometrySet();
+  GeometrySet &operator=(const GeometrySet &other);
+  GeometrySet &operator=(GeometrySet &&other);
+
   GeometryComponent &get_component_for_write(GeometryComponentType component_type);
   template<typename Component> Component &get_component_for_write()
   {
@@ -280,6 +287,8 @@ struct GeometrySet {
     BLI_STATIC_ASSERT(is_geometry_component_v<Component>, "");
     return this->remove(Component::static_type);
   }
+
+  void keep_only(const blender::Span<GeometryComponentType> component_types);
 
   void add(const GeometryComponent &component);
 
@@ -309,6 +318,10 @@ struct GeometrySet {
       bool include_instances,
       blender::Map<blender::bke::AttributeIDRef, AttributeKind> &r_attributes) const;
 
+  using ForeachSubGeometryCallback = blender::FunctionRef<void(GeometrySet &geometry_set)>;
+
+  void modify_geometry_sets(ForeachSubGeometryCallback callback);
+
   /* Utility methods for creation. */
   static GeometrySet create_with_mesh(
       Mesh *mesh, GeometryOwnershipType ownership = GeometryOwnershipType::Owned);
@@ -324,6 +337,7 @@ struct GeometrySet {
   bool has_volume() const;
   bool has_curve() const;
   bool has_realized_data() const;
+  bool is_empty() const;
 
   const Mesh *get_mesh_for_read() const;
   const PointCloud *get_pointcloud_for_read() const;
@@ -479,7 +493,7 @@ class InstanceReference {
   Type type_ = Type::None;
   /** Depending on the type this is either null, an Object or Collection pointer. */
   void *data_ = nullptr;
-  std::shared_ptr<GeometrySet> geometry_set_;
+  std::unique_ptr<GeometrySet> geometry_set_;
 
  public:
   InstanceReference() = default;
@@ -494,8 +508,42 @@ class InstanceReference {
 
   InstanceReference(GeometrySet geometry_set)
       : type_(Type::GeometrySet),
-        geometry_set_(std::make_shared<GeometrySet>(std::move(geometry_set)))
+        geometry_set_(std::make_unique<GeometrySet>(std::move(geometry_set)))
   {
+  }
+
+  InstanceReference(const InstanceReference &other) : type_(other.type_), data_(other.data_)
+  {
+    if (other.geometry_set_) {
+      geometry_set_ = std::make_unique<GeometrySet>(*other.geometry_set_);
+    }
+  }
+
+  InstanceReference(InstanceReference &&other)
+      : type_(other.type_), data_(other.data_), geometry_set_(std::move(other.geometry_set_))
+  {
+    other.type_ = Type::None;
+    other.data_ = nullptr;
+  }
+
+  InstanceReference &operator=(const InstanceReference &other)
+  {
+    if (this == &other) {
+      return *this;
+    }
+    this->~InstanceReference();
+    new (this) InstanceReference(other);
+    return *this;
+  }
+
+  InstanceReference &operator=(InstanceReference &&other)
+  {
+    if (this == &other) {
+      return *this;
+    }
+    this->~InstanceReference();
+    new (this) InstanceReference(std::move(other));
+    return *this;
   }
 
   Type type() const
@@ -679,6 +727,13 @@ class AttributeFieldInput : public fn::FieldInput {
   AttributeFieldInput(std::string name, const CPPType &type)
       : fn::FieldInput(type, name), name_(std::move(name))
   {
+  }
+
+  template<typename T> static fn::Field<T> Create(std::string name)
+  {
+    const CPPType &type = CPPType::get<T>();
+    auto field_input = std::make_shared<AttributeFieldInput>(std::move(name), type);
+    return fn::Field<T>{field_input};
   }
 
   StringRefNull attribute_name() const
