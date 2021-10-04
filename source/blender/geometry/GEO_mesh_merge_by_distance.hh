@@ -24,6 +24,7 @@
 
 namespace blender::geometry {
 
+/* Weld mode is only used when welding mesh data. */
 enum class WeldMode {
   all = 0,
   connected = 1,
