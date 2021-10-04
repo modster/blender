@@ -490,7 +490,6 @@ static void filelist_readjob_main_assets(struct FileListReadJob *job_params,
 static int groupname_to_code(const char *group);
 static uint64_t groupname_to_filter_id(const char *group);
 
-static void filelist_filter_clear(FileList *filelist);
 static void filelist_cache_clear(FileListEntryCache *cache, size_t new_size);
 
 /* ********** Sort helpers ********** */
@@ -720,7 +719,7 @@ void filelist_sort(struct FileList *filelist)
         sort_cb,
         &(struct FileSortData){.inverted = (filelist->flags & FL_SORT_INVERT) != 0});
 
-    filelist_filter_clear(filelist);
+    filelist_tag_needs_filtering(filelist);
     filelist->flags &= ~FL_NEED_SORTING;
   }
 }
@@ -970,7 +969,7 @@ static bool is_filtered_main_assets(FileListInternEntry *file,
          is_filtered_asset(file, filter);
 }
 
-static void filelist_filter_clear(FileList *filelist)
+void filelist_tag_needs_filtering(FileList *filelist)
 {
   filelist->flags |= FL_NEED_FILTERING;
 }
@@ -1078,7 +1077,7 @@ void filelist_setfilter_options(FileList *filelist,
 
   if (update) {
     /* And now, free filtered data so that we know we have to filter again. */
-    filelist_filter_clear(filelist);
+    filelist_tag_needs_filtering(filelist);
   }
 }
 
@@ -1105,7 +1104,7 @@ void filelist_set_asset_catalog_filter_options(
   }
 
   if (update) {
-    filelist_filter_clear(filelist);
+    filelist_tag_needs_filtering(filelist);
   }
 }
 
@@ -1831,7 +1830,7 @@ void filelist_clear_ex(struct FileList *filelist,
     return;
   }
 
-  filelist_filter_clear(filelist);
+  filelist_tag_needs_filtering(filelist);
 
   if (do_cache) {
     filelist_cache_clear(&filelist->filelist_cache, filelist->filelist_cache.size);
@@ -3296,6 +3295,7 @@ typedef struct FileListReadJob {
 } FileListReadJob;
 
 static bool filelist_readjob_should_recurse_into_entry(const int max_recursion,
+                                                       const bool is_lib,
                                                        const int current_recursion_level,
                                                        FileListInternEntry *entry)
 {
@@ -3303,8 +3303,14 @@ static bool filelist_readjob_should_recurse_into_entry(const int max_recursion,
     /* Recursive loading is disabled. */
     return false;
   }
-  if (current_recursion_level >= max_recursion) {
+  if (!is_lib && current_recursion_level > max_recursion) {
     /* No more levels of recursion left. */
+    return false;
+  }
+  /* Show entries when recursion is set to `Blend file` even when `current_recursion_level` exceeds
+   * `max_recursion`. */
+  if (!is_lib && (current_recursion_level >= max_recursion) &&
+      ((entry->typeflag & (FILE_TYPE_BLENDER | FILE_TYPE_BLENDER_BACKUP)) == 0)) {
     return false;
   }
   if (entry->typeflag & FILE_TYPE_BLENDERLIB) {
@@ -3422,7 +3428,8 @@ static void filelist_readjob_do(const bool do_lib,
       entry->name = fileentry_uiname(root, entry->relpath, entry->typeflag, dir);
       entry->free_name = true;
 
-      if (filelist_readjob_should_recurse_into_entry(max_recursion, recursion_level, entry)) {
+      if (filelist_readjob_should_recurse_into_entry(
+              max_recursion, is_lib, recursion_level, entry)) {
         /* We have a directory we want to list, add it to todo list! */
         BLI_join_dirfile(dir, sizeof(dir), root, entry->relpath);
         BLI_path_normalize_dir(job_params->main_name, dir);
