@@ -405,8 +405,13 @@ class OBJECT_PT_visibility(ObjectButtonsPanel, Panel):
 
         if context.object.type == 'GPENCIL':
             col = layout.column(heading="Grease Pencil")
-            col.prop(ob, "use_grease_pencil_lights", toggle=False)
+            subcol = layout.column()
+            subcol.prop(ob, "use_grease_pencil_lights", toggle=False)
+            subcol.active = not ob.use_grease_pencil_scene_engine
 
+            subcol = layout.column()
+            subcol.prop(ob, "use_grease_pencil_scene_engine", toggle=False)
+            subcol.active = context.scene.render.engine == 'BLENDER_EEVEE'
         layout.separator()
         col = layout.column(heading="Mask")
         col.prop(ob, "is_holdout")

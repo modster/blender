@@ -231,6 +231,9 @@ enum eObjectLineArt_Flags {
   OBJECT_LRT_OWN_CREASE = (1 << 0),
 };
 
+#define GP_OBJECT_USE_SCENE_RENDER(ob) \
+((ob) && ((ob->dtx & OB_USE_GPENCIL_SCENE_ENGINE) != 0))
+
 typedef struct Object {
   ID id;
   /** Animation data (must be immediately after id for utilities to use it). */
@@ -601,6 +604,8 @@ enum {
   OB_DRAW_NO_SHADOW_CAST = 1 << 9,
   /* Enable lights for grease pencil. */
   OB_USE_GPENCIL_LIGHTS = 1 << 10,
+  /* Use Scene Render Engine for grease pencil. */
+  OB_USE_GPENCIL_SCENE_ENGINE = 1 << 11,
 };
 
 /* empty_drawtype: no flags */
