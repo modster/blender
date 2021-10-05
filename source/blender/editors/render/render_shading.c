@@ -767,7 +767,7 @@ static int new_material_exec(bContext *C, wmOperator *UNUSED(op))
   }
   else {
     const char *name = DATA_("Material");
-    if (!(ob != NULL && ob->type == OB_GPENCIL)) {
+    if ((!(ob != NULL && ob->type == OB_GPENCIL)) || (GP_OBJECT_USE_SCENE_RENDER(ob))) {
       ma = BKE_material_add(bmain, name);
     }
     else {

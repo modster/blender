@@ -231,6 +231,9 @@ enum eObjectLineArt_Flags {
   OBJECT_LRT_OWN_CREASE = (1 << 0),
 };
 
+#define GP_OBJECT_USE_SCENE_RENDER(ob) \
+((ob) && ((ob->dtx & OB_USE_GPENCIL_SCENE_ENGINE) != 0))
+
 typedef struct Object {
   ID id;
   /** Animation data (must be immediately after id for utilities to use it). */
