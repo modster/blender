@@ -264,8 +264,15 @@ void BKE_mesh_calc_normals_poly_and_vertex(MVert *mvert,
 /** \name Mesh Normal Calculation
  * \{ */
 
+/**
+ * \warning May still return null if the mesh is empty.
+ */
 const float (*BKE_mesh_ensure_vertex_normals(const Mesh *mesh))[3]
 {
+  if (mesh->totvert == 0) {
+    return nullptr;
+  }
+
   if (!(mesh->runtime.cd_dirty_vert & CD_MASK_NORMAL ||
         mesh->runtime.cd_dirty_poly & CD_MASK_NORMAL)) {
     BLI_assert(CustomData_has_layer(&mesh->vdata, CD_NORMAL));
@@ -294,14 +301,22 @@ const float (*BKE_mesh_ensure_vertex_normals(const Mesh *mesh))[3]
        me.totpoly},
       vert_normals);
 
-  BLI_assert(!(me.runtime.cd_dirty_vert & CD_MASK_NORMAL ||
-               mesh->runtime.cd_dirty_poly & CD_MASK_NORMAL));
+  /* Clear the dirty flags, since the normals have been calculated. */
+  me.runtime.cd_dirty_vert &= ~CD_MASK_NORMAL;
+  me.runtime.cd_dirty_poly &= ~CD_MASK_NORMAL;
 
   return (const float(*)[3])vert_normals.data();
 }
 
+/**
+ * \warning May still return null if the mesh has no faces.
+ */
 const float (*BKE_mesh_ensure_face_normals(const Mesh *mesh))[3]
 {
+  if (mesh->totpoly == 0) {
+    return nullptr;
+  }
+
   if (!(mesh->runtime.cd_dirty_poly & CD_MASK_NORMAL)) {
     BLI_assert(CustomData_has_layer(&mesh->vdata, CD_NORMAL));
     return (const float(*)[3])CustomData_get_layer(&mesh->vdata, CD_NORMAL);
@@ -322,7 +337,9 @@ const float (*BKE_mesh_ensure_face_normals(const Mesh *mesh))[3]
   BKE_mesh_calc_normals_poly(
       me.mvert, me.totvert, me.mloop, me.totloop, me.mpoly, me.totpoly, poly_normals);
 
-  BLI_assert(!(mesh->runtime.cd_dirty_poly & CD_MASK_NORMAL));
+  /* Clear the dirty flags, since the normals have been calculated. */
+  me.runtime.cd_dirty_poly &= ~CD_MASK_NORMAL;
+
   return poly_normals;
 }
 
