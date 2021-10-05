@@ -46,44 +46,85 @@ def selected_sequences_len(context):
 
 def draw_color_balance(layout, color_balance):
 
+    layout.prop(color_balance, "correction_method")
+
     layout.use_property_split = False
 
     flow = layout.grid_flow(row_major=True, columns=0, even_columns=True, even_rows=False, align=False)
-    col = flow.column()
 
-    box = col.box()
-    split = box.split(factor=0.35)
-    col = split.column(align=True)
-    col.label(text="Lift:")
-    col.separator()
-    col.separator()
-    col.prop(color_balance, "lift", text="")
-    col.prop(color_balance, "invert_lift", text="Invert", icon='ARROW_LEFTRIGHT')
-    split.template_color_picker(color_balance, "lift", value_slider=True, cubic=True)
+    if color_balance.correction_method == 'LIFT_GAMMA_GAIN':
+        col = flow.column()
 
-    col = flow.column()
+        box = col.box()
+        split = box.split(factor=0.35)
+        col = split.column(align=True)
+        col.label(text="Lift:")
+        col.separator()
+        col.separator()
+        col.prop(color_balance, "lift", text="")
+        col.prop(color_balance, "invert_lift", text="Invert", icon='ARROW_LEFTRIGHT')
+        split.template_color_picker(color_balance, "lift", value_slider=True, cubic=True)
 
-    box = col.box()
-    split = box.split(factor=0.35)
-    col = split.column(align=True)
-    col.label(text="Gamma:")
-    col.separator()
-    col.separator()
-    col.prop(color_balance, "gamma", text="")
-    col.prop(color_balance, "invert_gamma", text="Invert", icon='ARROW_LEFTRIGHT')
-    split.template_color_picker(color_balance, "gamma", value_slider=True, lock_luminosity=True, cubic=True)
+        col = flow.column()
 
-    col = flow.column()
+        box = col.box()
+        split = box.split(factor=0.35)
+        col = split.column(align=True)
+        col.label(text="Gamma:")
+        col.separator()
+        col.separator()
+        col.prop(color_balance, "gamma", text="")
+        col.prop(color_balance, "invert_gamma", text="Invert", icon='ARROW_LEFTRIGHT')
+        split.template_color_picker(color_balance, "gamma", value_slider=True, lock_luminosity=True, cubic=True)
 
-    box = col.box()
-    split = box.split(factor=0.35)
-    col = split.column(align=True)
-    col.label(text="Gain:")
-    col.separator()
-    col.separator()
-    col.prop(color_balance, "gain", text="")
-    col.prop(color_balance, "invert_gain", text="Invert", icon='ARROW_LEFTRIGHT')
-    split.template_color_picker(color_balance, "gain", value_slider=True, lock_luminosity=True, cubic=True)
+        col = flow.column()
+
+        box = col.box()
+        split = box.split(factor=0.35)
+        col = split.column(align=True)
+        col.label(text="Gain:")
+        col.separator()
+        col.separator()
+        col.prop(color_balance, "gain", text="")
+        col.prop(color_balance, "invert_gain", text="Invert", icon='ARROW_LEFTRIGHT')
+        split.template_color_picker(color_balance, "gain", value_slider=True, lock_luminosity=True, cubic=True)
+
+    elif color_balance.correction_method == 'OFFSET_POWER_SLOPE':
+        col = flow.column()
+
+        box = col.box()
+        split = box.split(factor=0.35)
+        col = split.column(align=True)
+        col.label(text="Offset:")
+        col.separator()
+        col.separator()
+        col.prop(color_balance, "offset", text="")
+        col.prop(color_balance, "invert_offset", text="Invert", icon='ARROW_LEFTRIGHT')
+        split.template_color_picker(color_balance, "offset", value_slider=True, cubic=True)
+
+        col = flow.column()
+
+        box = col.box()
+        split = box.split(factor=0.35)
+        col = split.column(align=True)
+        col.label(text="Power:")
+        col.separator()
+        col.separator()
+        col.prop(color_balance, "power", text="")
+        col.prop(color_balance, "invert_power", text="Invert", icon='ARROW_LEFTRIGHT')
+        split.template_color_picker(color_balance, "power", value_slider=True, cubic=True)
+
+        col = flow.column()
+
+        box = col.box()
+        split = box.split(factor=0.35)
+        col = split.column(align=True)
+        col.label(text="Slope:")
+        col.separator()
+        col.separator()
+        col.prop(color_balance, "slope", text="")
+        col.prop(color_balance, "invert_slope", text="Invert", icon='ARROW_LEFTRIGHT')
+        split.template_color_picker(color_balance, "slope", value_slider=True, cubic=True)
 
 
 class SEQUENCER_PT_active_tool(ToolActivePanelHelper, Panel):
@@ -98,8 +139,6 @@ class SEQUENCER_HT_tool_header(Header):
 
     def draw(self, context):
         layout = self.layout
-
-        layout.template_header()
 
         self.draw_tool_settings(context)
 
@@ -132,8 +171,7 @@ class SEQUENCER_HT_header(Header):
 
         show_region_tool_header = st.show_region_tool_header
 
-        if not show_region_tool_header:
-            layout.template_header()
+        layout.template_header()
 
         layout.prop(st, "view_type", text="")
 
@@ -151,6 +189,12 @@ class SEQUENCER_HT_header(Header):
         if st.view_type in {'SEQUENCER', 'SEQUENCER_PREVIEW'}:
             row = layout.row(align=True)
             row.prop(sequencer_tool_settings, "overlap_mode", text="")
+
+        if st.view_type == 'SEQUENCER_PREVIEW':
+            row = layout.row(align=True)
+            row.prop(sequencer_tool_settings, "pivot_point", text="", icon_only=True)
+
+        if st.view_type in {'SEQUENCER', 'SEQUENCER_PREVIEW'}:
             row = layout.row(align=True)
             row.prop(tool_settings, "use_snap_sequencer", text="")
             sub = row.row(align=True)
@@ -242,6 +286,7 @@ class SEQUENCER_PT_sequencer_overlay(Panel):
         layout.prop(overlay_settings, "show_strip_name", text="Name")
         layout.prop(overlay_settings, "show_strip_source", text="Source")
         layout.prop(overlay_settings, "show_strip_duration", text="Duration")
+        layout.prop(overlay_settings, "show_strip_tag_color", text="Color Tags")
 
         layout.separator()
 
@@ -375,9 +420,9 @@ class SEQUENCER_MT_view(Menu):
                 layout.operator("view2d.zoom_border", text="Zoom")
                 layout.menu("SEQUENCER_MT_preview_zoom")
 
-            if st.display_mode == 'IMAGE':
-                layout.prop(st, "use_zoom_to_fit")
-            elif st.display_mode == 'WAVEFORM':
+            layout.prop(st, "use_zoom_to_fit")
+
+            if st.display_mode == 'WAVEFORM':
                 layout.separator()
                 layout.prop(st, "show_separate_color", text="Show Separate Color Channels")
 
@@ -870,6 +915,9 @@ class SEQUENCER_MT_strip(Menu):
                 layout.operator("sequencer.meta_toggle", text="Toggle Meta")
 
         layout.separator()
+        layout.menu("SEQUENCER_MT_color_tag_picker")
+
+        layout.separator()
         layout.menu("SEQUENCER_MT_strip_lock_mute")
 
         layout.separator()
@@ -966,6 +1014,9 @@ class SEQUENCER_MT_context_menu(Menu):
                 layout.operator("sequencer.meta_toggle", text="Toggle Meta")
 
         layout.separator()
+        layout.menu("SEQUENCER_MT_color_tag_picker")
+
+        layout.separator()
 
         layout.menu("SEQUENCER_MT_strip_lock_mute")
 
@@ -995,6 +1046,44 @@ class SequencerButtonsPanel_Output:
     @classmethod
     def poll(cls, context):
         return cls.has_preview(context)
+
+
+class SequencerColorTagPicker:
+    bl_space_type = 'SEQUENCE_EDITOR'
+    bl_region_type = 'UI'
+
+    @staticmethod
+    def has_sequencer(context):
+        return (context.space_data.view_type in {'SEQUENCER', 'SEQUENCER_PREVIEW'})
+
+    @classmethod
+    def poll(cls, context):
+        return cls.has_sequencer(context) and context.active_sequence_strip is not None
+
+
+class SEQUENCER_PT_color_tag_picker(SequencerColorTagPicker, Panel):
+    bl_label = "Color Tag"
+    bl_category = "Strip"
+    bl_options = {'HIDE_HEADER', 'INSTANCED'}
+
+    def draw(self, context):
+        layout = self.layout
+
+        row = layout.row(align=True)
+        row.operator("sequencer.strip_color_tag_set", icon="X").color = 'NONE'
+        for i in range(1, 10):
+            icon = 'SEQUENCE_COLOR_%02d' % i
+            row.operator("sequencer.strip_color_tag_set", icon=icon).color = 'COLOR_%02d' % i
+
+
+class SEQUENCER_MT_color_tag_picker(SequencerColorTagPicker, Menu):
+    bl_label = "Set Color Tag"
+
+    def draw(self, context):
+        layout = self.layout
+
+        row = layout.row(align=True)
+        row.operator_enum("sequencer.strip_color_tag_set", "color", icon_only=True)
 
 
 class SEQUENCER_PT_strip(SequencerButtonsPanel, Panel):
@@ -1040,9 +1129,20 @@ class SEQUENCER_PT_strip(SequencerButtonsPanel, Panel):
         else:
             icon_header = 'SEQ_SEQUENCER'
 
-        row = layout.row()
+        row = layout.row(align=True)
+        row.use_property_decorate = False
         row.label(text="", icon=icon_header)
+        row.separator()
         row.prop(strip, "name", text="")
+
+        sub = row.row(align=True)
+        if strip.color_tag == 'NONE':
+            sub.popover(panel="SEQUENCER_PT_color_tag_picker", text="", icon='COLOR')
+        else:
+            icon = 'SEQUENCE_' + strip.color_tag
+            sub.popover(panel="SEQUENCER_PT_color_tag_picker", text="", icon=icon)
+
+        row.separator()
         row.prop(strip, "mute", toggle=True, icon_only=True, emboss=False)
 
 
@@ -1658,7 +1758,6 @@ class SEQUENCER_PT_adjust_sound(SequencerButtonsPanel, Panel):
 
     def draw(self, context):
         layout = self.layout
-        layout.use_property_split = False
 
         st = context.space_data
         overlay_settings = st.timeline_overlay
@@ -1668,16 +1767,7 @@ class SEQUENCER_PT_adjust_sound(SequencerButtonsPanel, Panel):
         layout.active = not strip.mute
 
         if sound is not None:
-            col = layout.column()
-
-            split = col.split(factor=0.4)
-            split.label(text="")
-            split.prop(sound, "use_mono")
-            if overlay_settings.waveform_display_type == 'DEFAULT_WAVEFORMS':
-                split = col.split(factor=0.4)
-                split.label(text="")
-                split.prop(strip, "show_waveform")
-
+            layout.use_property_split = True
             col = layout.column()
 
             split = col.split(factor=0.4)
@@ -1699,6 +1789,17 @@ class SEQUENCER_PT_adjust_sound(SequencerButtonsPanel, Panel):
                 pan_text = "%.2f°" % (strip.pan * 90)
             split.prop(strip, "pan", text=pan_text)
             split.enabled = sound.use_mono and audio_channels != 'MONO'
+
+            layout.use_property_split = False
+            col = layout.column()
+
+            split = col.split(factor=0.4)
+            split.label(text="")
+            split.prop(sound, "use_mono")
+            if overlay_settings.waveform_display_type == 'DEFAULT_WAVEFORMS':
+                split = col.split(factor=0.4)
+                split.label(text="")
+                split.prop(strip, "show_waveform")
 
 
 
@@ -2328,7 +2429,10 @@ classes = (
     SEQUENCER_MT_strip_transform,
     SEQUENCER_MT_strip_input,
     SEQUENCER_MT_strip_lock_mute,
+    SEQUENCER_MT_color_tag_picker,
     SEQUENCER_MT_context_menu,
+
+    SEQUENCER_PT_color_tag_picker,
 
     SEQUENCER_PT_active_tool,
     SEQUENCER_PT_strip,

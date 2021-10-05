@@ -3394,7 +3394,7 @@ void blo_do_versions_280(FileData *fd, Library *UNUSED(lib), Main *bmain)
               SpaceImage *sima = (SpaceImage *)sl;
               sima->flag &= ~(SI_FLAG_UNUSED_0 | SI_FLAG_UNUSED_1 | SI_FLAG_UNUSED_3 |
                               SI_FLAG_UNUSED_6 | SI_FLAG_UNUSED_7 | SI_FLAG_UNUSED_8 |
-                              SI_FLAG_UNUSED_17 | SI_FLAG_UNUSED_18 | SI_FLAG_UNUSED_23 |
+                              SI_FLAG_UNUSED_17 | SI_CUSTOM_GRID | SI_FLAG_UNUSED_23 |
                               SI_FLAG_UNUSED_24);
               break;
             }
@@ -3416,8 +3416,8 @@ void blo_do_versions_280(FileData *fd, Library *UNUSED(lib), Main *bmain)
             case SPACE_FILE: {
               SpaceFile *sfile = (SpaceFile *)sl;
               if (sfile->params) {
-                sfile->params->flag &= ~(FILE_APPEND_SET_FAKEUSER | FILE_APPEND_RECURSIVE |
-                                         FILE_OBDATA_INSTANCE);
+                sfile->params->flag &= ~(FILE_PARAMS_FLAG_UNUSED_1 | FILE_PARAMS_FLAG_UNUSED_2 |
+                                         FILE_PARAMS_FLAG_UNUSED_3);
               }
               break;
             }

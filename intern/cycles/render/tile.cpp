@@ -307,8 +307,8 @@ static bool configure_image_spec_from_buffer(ImageSpec *image_spec,
     DCHECK_GT(tile_size.x, 0);
     DCHECK_GT(tile_size.y, 0);
 
-    image_spec->tile_width = tile_size.x;
-    image_spec->tile_height = tile_size.y;
+    image_spec->tile_width = min(TileManager::IMAGE_TILE_SIZE, tile_size.x);
+    image_spec->tile_height = min(TileManager::IMAGE_TILE_SIZE, tile_size.y);
   }
 
   return true;
@@ -333,6 +333,15 @@ TileManager::TileManager()
 
 TileManager::~TileManager()
 {
+}
+
+int TileManager::compute_render_tile_size(const int suggested_tile_size) const
+{
+  /* Must be a multiple of IMAGE_TILE_SIZE so that we can write render tiles into the image file
+   * aligned on image tile boundaries. We can't set IMAGE_TILE_SIZE equal to the render tile size
+   * because too big tile size leads to integer overflow inside OpenEXR. */
+  return (suggested_tile_size <= IMAGE_TILE_SIZE) ? suggested_tile_size :
+                                                    align_up(suggested_tile_size, IMAGE_TILE_SIZE);
 }
 
 void TileManager::reset_scheduling(const BufferParams &params, int2 tile_size)
@@ -363,8 +372,17 @@ void TileManager::update(const BufferParams &params, const Scene *scene)
   configure_image_spec_from_buffer(&write_state_.image_spec, buffer_params_, tile_size_);
 
   const DenoiseParams denoise_params = scene->integrator->get_denoise_params();
+  const AdaptiveSampling adaptive_sampling = scene->integrator->get_adaptive_sampling();
+
   node_to_image_spec_atttributes(
       &write_state_.image_spec, &denoise_params, ATTR_DENOISE_SOCKET_PREFIX);
+
+  if (adaptive_sampling.use) {
+    overscan_ = 4;
+  }
+  else {
+    overscan_ = 0;
+  }
 }
 
 bool TileManager::done()
@@ -390,18 +408,28 @@ Tile TileManager::get_tile_for_index(int index) const
   /* TODO(sergey): Consider using hilbert spiral, or. maybe, even configurable. Not sure this
    * brings a lot of value since this is only applicable to BIG tiles. */
 
-  const int tile_y = index / tile_state_.num_tiles_x;
-  const int tile_x = index - tile_y * tile_state_.num_tiles_x;
+  const int tile_index_y = index / tile_state_.num_tiles_x;
+  const int tile_index_x = index - tile_index_y * tile_state_.num_tiles_x;
+
+  const int tile_x = tile_index_x * tile_size_.x;
+  const int tile_y = tile_index_y * tile_size_.y;
 
   Tile tile;
 
-  tile.x = tile_x * tile_size_.x;
-  tile.y = tile_y * tile_size_.y;
-  tile.width = tile_size_.x;
-  tile.height = tile_size_.y;
+  tile.x = tile_x - overscan_;
+  tile.y = tile_y - overscan_;
+  tile.width = tile_size_.x + 2 * overscan_;
+  tile.height = tile_size_.y + 2 * overscan_;
 
+  tile.x = max(tile.x, 0);
+  tile.y = max(tile.y, 0);
   tile.width = min(tile.width, buffer_params_.width - tile.x);
   tile.height = min(tile.height, buffer_params_.height - tile.y);
+
+  tile.window_x = tile_x - tile.x;
+  tile.window_y = tile_y - tile.y;
+  tile.window_width = min(tile_size_.x, buffer_params_.width - (tile.x + tile.window_x));
+  tile.window_height = min(tile_size_.y, buffer_params_.height - (tile.y + tile.window_y));
 
   return tile;
 }
@@ -409,6 +437,11 @@ Tile TileManager::get_tile_for_index(int index) const
 const Tile &TileManager::get_current_tile() const
 {
   return tile_state_.current_tile;
+}
+
+const int2 TileManager::get_size() const
+{
+  return make_int2(buffer_params_.width, buffer_params_.height);
 }
 
 bool TileManager::open_tile_output()
@@ -427,7 +460,12 @@ bool TileManager::open_tile_output()
     return false;
   }
 
-  write_state_.tile_out->open(write_state_.filename, write_state_.image_spec);
+  if (!write_state_.tile_out->open(write_state_.filename, write_state_.image_spec)) {
+    LOG(ERROR) << "Error opening tile file: " << write_state_.tile_out->geterror();
+    write_state_.tile_out = nullptr;
+    return false;
+  }
+
   write_state_.num_tiles_written = 0;
 
   VLOG(3) << "Opened tile file " << write_state_.filename;
@@ -464,35 +502,45 @@ bool TileManager::write_tile(const RenderBuffers &tile_buffers)
 
   DCHECK_EQ(tile_buffers.params.pass_stride, buffer_params_.pass_stride);
 
+  vector<float> pixel_storage;
+
   const BufferParams &tile_params = tile_buffers.params;
 
-  vector<float> pixel_storage;
-  const float *pixels = tile_buffers.buffer.data();
+  const int tile_x = tile_params.full_x - buffer_params_.full_x + tile_params.window_x;
+  const int tile_y = tile_params.full_y - buffer_params_.full_y + tile_params.window_y;
 
-  /* Tiled writing expects pixels to contain data for an entire tile. Pad the render buffers with
-   * empty pixels for tiles which are on the image boundary. */
-  if (tile_params.width != tile_size_.x || tile_params.height != tile_size_.y) {
-    const int64_t pass_stride = tile_params.pass_stride;
-    const int64_t src_row_stride = tile_params.width * pass_stride;
+  const int64_t pass_stride = tile_params.pass_stride;
+  const int64_t tile_row_stride = tile_params.width * pass_stride;
 
-    const int64_t dst_row_stride = tile_size_.x * pass_stride;
-    pixel_storage.resize(dst_row_stride * tile_size_.y);
+  const int64_t xstride = pass_stride * sizeof(float);
+  const int64_t ystride = xstride * tile_params.width;
+  const int64_t zstride = ystride * tile_params.height;
 
-    const float *src = tile_buffers.buffer.data();
-    float *dst = pixel_storage.data();
-    pixels = dst;
-
-    for (int y = 0; y < tile_params.height; ++y, src += src_row_stride, dst += dst_row_stride) {
-      memcpy(dst, src, src_row_stride * sizeof(float));
-    }
-  }
-
-  const int tile_x = tile_params.full_x - buffer_params_.full_x;
-  const int tile_y = tile_params.full_y - buffer_params_.full_y;
+  const float *pixels = tile_buffers.buffer.data() + tile_params.window_x * pass_stride +
+                        tile_params.window_y * tile_row_stride;
 
   VLOG(3) << "Write tile at " << tile_x << ", " << tile_y;
-  if (!write_state_.tile_out->write_tile(tile_x, tile_y, 0, TypeDesc::FLOAT, pixels)) {
+
+  /* The image tile sizes in the OpenEXR file are different from the size of our big tiles. The
+   * write_tiles() method expects a contiguous image region that will be split into tiles
+   * internally. OpenEXR expects the size of this region to be a multiple of the tile size,
+   * however OpenImageIO automatically adds the required padding.
+   *
+   * The only thing we have to ensure is that the tile_x and tile_y are a multiple of the
+   * image tile size, which happens in compute_render_tile_size. */
+  if (!write_state_.tile_out->write_tiles(tile_x,
+                                          tile_x + tile_params.window_width,
+                                          tile_y,
+                                          tile_y + tile_params.window_height,
+                                          0,
+                                          1,
+                                          TypeDesc::FLOAT,
+                                          pixels,
+                                          xstride,
+                                          ystride,
+                                          zstride)) {
     LOG(ERROR) << "Error writing tile " << write_state_.tile_out->geterror();
+    return false;
   }
 
   ++write_state_.num_tiles_written;
@@ -516,9 +564,19 @@ void TileManager::finish_write_tiles()
          ++tile_index) {
       const Tile tile = get_tile_for_index(tile_index);
 
-      VLOG(3) << "Write dummy tile at " << tile.x << ", " << tile.y;
+      const int tile_x = tile.x + tile.window_x;
+      const int tile_y = tile.y + tile.window_y;
 
-      write_state_.tile_out->write_tile(tile.x, tile.y, 0, TypeDesc::FLOAT, pixel_storage.data());
+      VLOG(3) << "Write dummy tile at " << tile_x << ", " << tile_y;
+
+      write_state_.tile_out->write_tiles(tile_x,
+                                         tile_x + tile.window_width,
+                                         tile_y,
+                                         tile_y + tile.window_height,
+                                         0,
+                                         1,
+                                         TypeDesc::FLOAT,
+                                         pixel_storage.data());
     }
   }
 

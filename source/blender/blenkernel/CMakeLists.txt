@@ -84,6 +84,9 @@ set(SRC
   intern/armature_selection.cc
   intern/armature_update.c
   intern/asset.cc
+  intern/asset_catalog.cc
+  intern/asset_catalog_path.cc
+  intern/asset_library.cc
   intern/attribute.c
   intern/attribute_access.cc
   intern/attribute_math.cc
@@ -117,7 +120,7 @@ set(SRC
   intern/curve_deform.c
   intern/curve_eval.cc
   intern/curve_to_mesh_convert.cc
-  intern/curveprofile.c
+  intern/curveprofile.cc
   intern/customdata.c
   intern/customdata_file.c
   intern/data_transfer.c
@@ -131,6 +134,7 @@ set(SRC
   intern/editmesh_cache.c
   intern/editmesh_tangent.c
   intern/effect.c
+  intern/extern_implementations.cc
   intern/fcurve.c
   intern/fcurve_cache.c
   intern/fcurve_driver.c
@@ -303,6 +307,10 @@ set(SRC
   BKE_armature.h
   BKE_armature.hh
   BKE_asset.h
+  BKE_asset_catalog.hh
+  BKE_asset_catalog_path.hh
+  BKE_asset_library.h
+  BKE_asset_library.hh
   BKE_attribute.h
   BKE_attribute_access.hh
   BKE_attribute_math.hh
@@ -783,6 +791,10 @@ if(WITH_GTESTS)
   set(TEST_SRC
     intern/action_test.cc
     intern/armature_test.cc
+    intern/asset_catalog_test.cc
+    intern/asset_catalog_path_test.cc
+    intern/asset_library_test.cc
+    intern/asset_test.cc
     intern/cryptomatte_test.cc
     intern/fcurve_test.cc
     intern/lattice_deform_test.cc

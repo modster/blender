@@ -51,6 +51,7 @@ enum DeviceType {
   DEVICE_CUDA,
   DEVICE_MULTI,
   DEVICE_OPTIX,
+  DEVICE_HIP,
   DEVICE_DUMMY,
 };
 
@@ -58,6 +59,7 @@ enum DeviceTypeMask {
   DEVICE_MASK_CPU = (1 << DEVICE_CPU),
   DEVICE_MASK_CUDA = (1 << DEVICE_CUDA),
   DEVICE_MASK_OPTIX = (1 << DEVICE_OPTIX),
+  DEVICE_MASK_HIP = (1 << DEVICE_HIP),
   DEVICE_MASK_ALL = ~0
 };
 
@@ -119,7 +121,7 @@ class Device {
 
   string error_msg;
 
-  virtual device_ptr mem_alloc_sub_ptr(device_memory & /*mem*/, int /*offset*/, int /*size*/)
+  virtual device_ptr mem_alloc_sub_ptr(device_memory & /*mem*/, size_t /*offset*/, size_t /*size*/)
   {
     /* Only required for devices that implement denoising. */
     assert(false);
@@ -273,7 +275,7 @@ class Device {
 
   virtual void mem_alloc(device_memory &mem) = 0;
   virtual void mem_copy_to(device_memory &mem) = 0;
-  virtual void mem_copy_from(device_memory &mem, int y, int w, int h, int elem) = 0;
+  virtual void mem_copy_from(device_memory &mem, size_t y, size_t w, size_t h, size_t elem) = 0;
   virtual void mem_zero(device_memory &mem) = 0;
   virtual void mem_free(device_memory &mem) = 0;
 
@@ -284,6 +286,7 @@ class Device {
   static vector<DeviceInfo> cuda_devices;
   static vector<DeviceInfo> optix_devices;
   static vector<DeviceInfo> cpu_devices;
+  static vector<DeviceInfo> hip_devices;
   static uint devices_initialized_mask;
 };
 

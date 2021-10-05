@@ -973,8 +973,8 @@ void GHOST_SystemX11::processEvent(XEvent *xe)
         if (window->getCursorGrabBounds(bounds) == GHOST_kFailure)
           window->getClientBounds(bounds);
 
-        /* Could also clamp to screen bounds wrap with a window outside the view will fail atm.
-         * Use offset of 8 in case the window is at screen bounds. */
+        /* Could also clamp to screen bounds wrap with a window outside the view will
+         * fail at the moment. Use offset of 8 in case the window is at screen bounds. */
         bounds.wrapPoint(x_new, y_new, 8, window->getCursorGrabAxis());
 
         window->getCursorGrabAccum(x_accum, y_accum);
@@ -1528,13 +1528,13 @@ void GHOST_SystemX11::processEvent(XEvent *xe)
             window->GetTabletData().Pressure = axis_value / ((float)xtablet.PressureLevels);
           }
 
-          /* the (short) cast and the & 0xffff is bizarre and unexplained anywhere,
-           * but I got garbage data without it. Found it in the xidump.c source --matt
+          /* NOTE(@broken): the (short) cast and the & 0xffff is bizarre and unexplained anywhere,
+           * but I got garbage data without it. Found it in the `xidump.c` source.
            *
-           * The '& 0xffff' just truncates the value to its two lowest bytes, this probably means
-           * some drivers do not properly set the whole int value? Since we convert to float
-           * afterward, I don't think we need to cast to short here, but do not have a device to
-           * check this. --mont29
+           * NOTE(@mont29): The '& 0xffff' just truncates the value to its two lowest bytes,
+           * this probably means some drivers do not properly set the whole int value?
+           * Since we convert to float afterward,
+           * I don't think we need to cast to short here, but do not have a device to check this.
            */
           if (AXIS_VALUE_GET(3, axis_value)) {
             window->GetTabletData().Xtilt = (short)(axis_value & 0xffff) /

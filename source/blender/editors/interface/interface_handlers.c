@@ -384,6 +384,8 @@ typedef struct uiHandleButtonData {
   /* booleans (could be made into flags) */
   bool cancel, escapecancel;
   bool applied, applied_interactive;
+  /* Button is being applied through an extra icon. */
+  bool apply_through_extra_icon;
   bool changed_cursor;
   wmTimer *flashtimer;
 
@@ -1162,6 +1164,16 @@ static void ui_apply_but_ROW(bContext *C, uiBlock *block, uiBut *but, uiHandleBu
 
   data->retval = but->retval;
   data->applied = true;
+}
+
+static void ui_apply_but_TREEROW(bContext *C, uiBlock *block, uiBut *but, uiHandleButtonData *data)
+{
+  if (data->apply_through_extra_icon) {
+    /* Don't apply this, it would cause unintended tree-row toggling when clicking on extra icons.
+     */
+    return;
+  }
+  ui_apply_but_ROW(C, block, but, data);
 }
 
 /**
@@ -2154,6 +2166,12 @@ static bool ui_but_drag_init(bContext *C,
                             BLI_rctf_size_x(&but->rect),
                             BLI_rctf_size_y(&but->rect));
       }
+
+      /* Special feature for assets: We add another drag item that supports multiple assets. It
+       * gets the assets from context. */
+      if (ELEM(but->dragtype, WM_DRAG_ASSET, WM_DRAG_ID)) {
+        WM_event_start_drag(C, ICON_NONE, WM_DRAG_ASSET_LIST, NULL, 0, WM_DRAG_NOP);
+      }
     }
     return true;
   }
@@ -2306,6 +2324,9 @@ static void ui_apply_but(
       break;
     case UI_BTYPE_ROW:
       ui_apply_but_ROW(C, block, but, data);
+      break;
+    case UI_BTYPE_TREEROW:
+      ui_apply_but_TREEROW(C, block, but, data);
       break;
     case UI_BTYPE_LISTROW:
       ui_apply_but_LISTROW(C, block, but, data);
@@ -4194,6 +4215,8 @@ static void ui_numedit_apply(bContext *C, uiBlock *block, uiBut *but, uiHandleBu
 
 static void ui_but_extra_operator_icon_apply(bContext *C, uiBut *but, uiButExtraOpIcon *op_icon)
 {
+  but->active->apply_through_extra_icon = true;
+
   if (but->active->interactive) {
     ui_apply_but(C, but->block, but, but->active, true);
   }
@@ -4737,7 +4760,7 @@ static int ui_do_but_TOG(bContext *C, uiBut *but, uiHandleButtonData *data, cons
         /* Behave like other menu items. */
         do_activate = (event->val == KM_RELEASE);
       }
-      else {
+      else if (!ui_do_but_extra_operator_icon(C, but, data, event)) {
         /* Also use double-clicks to prevent fast clicks to leak to other handlers (T76481). */
         do_activate = ELEM(event->val, KM_PRESS, KM_DBL_CLICK);
       }
@@ -7564,7 +7587,7 @@ static int ui_do_but_CURVEPROFILE(
         dist_min_sq = square_f(U.dpi_fac * 8.0f); /* 8 pixel radius from each table point. */
 
         /* Loop through the path's high resolution table and find what's near the click. */
-        for (int i = 1; i <= PROF_TABLE_LEN(profile->path_len); i++) {
+        for (int i = 1; i <= BKE_curveprofile_table_size(profile); i++) {
           copy_v2_v2(f_xy_prev, f_xy);
           BLI_rctf_transform_pt_v(&but->rect, &profile->view_rect, f_xy, &table[i].x);
 
@@ -7966,6 +7989,7 @@ static int ui_do_button(bContext *C, uiBlock *block, uiBut *but, const wmEvent *
     case UI_BTYPE_CHECKBOX:
     case UI_BTYPE_CHECKBOX_N:
     case UI_BTYPE_ROW:
+    case UI_BTYPE_TREEROW:
     case UI_BTYPE_DATASETROW:
       retval = ui_do_but_TOG(C, but, data, event);
       break;

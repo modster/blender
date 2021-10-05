@@ -41,6 +41,8 @@ extern "C" {
 #endif
 
 struct ARegion;
+struct AssetHandle;
+struct AssetLibraryReference;
 struct GHashIterator;
 struct GPUViewport;
 struct ID;
@@ -212,14 +214,16 @@ struct ID *WM_file_link_datablock(struct Main *bmain,
                                   struct View3D *v3d,
                                   const char *filepath,
                                   const short id_code,
-                                  const char *id_name);
+                                  const char *id_name,
+                                  int flag);
 struct ID *WM_file_append_datablock(struct Main *bmain,
                                     struct Scene *scene,
                                     struct ViewLayer *view_layer,
                                     struct View3D *v3d,
                                     const char *filepath,
                                     const short id_code,
-                                    const char *id_name);
+                                    const char *id_name,
+                                    int flag);
 void WM_lib_reload(struct Library *lib, struct bContext *C, struct ReportList *reports);
 
 /* mouse cursors */
@@ -739,12 +743,21 @@ struct ID *WM_drag_get_local_ID(const struct wmDrag *drag, short idcode);
 struct ID *WM_drag_get_local_ID_from_event(const struct wmEvent *event, short idcode);
 bool WM_drag_is_ID_type(const struct wmDrag *drag, int idcode);
 
+wmDragAsset *WM_drag_create_asset_data(const struct AssetHandle *asset,
+                                       const char *path,
+                                       int import_type);
 struct wmDragAsset *WM_drag_get_asset_data(const struct wmDrag *drag, int idcode);
 struct ID *WM_drag_get_local_ID_or_import_from_asset(const struct wmDrag *drag, int idcode);
 
 void WM_drag_free_imported_drag_ID(struct Main *bmain,
                                    struct wmDrag *drag,
                                    struct wmDropBox *drop);
+
+void WM_drag_add_asset_list_item(wmDrag *drag,
+                                 const struct bContext *C,
+                                 const struct AssetLibraryReference *asset_library_ref,
+                                 const struct AssetHandle *asset);
+const ListBase *WM_drag_asset_list_get(const wmDrag *drag);
 
 const char *WM_drag_get_item_name(struct wmDrag *drag);
 
@@ -904,6 +917,7 @@ int WM_event_modifier_flag(const struct wmEvent *event);
 bool WM_event_is_modal_tweak_exit(const struct wmEvent *event, int tweak_event);
 bool WM_event_is_last_mousemove(const struct wmEvent *event);
 bool WM_event_is_mouse_drag(const struct wmEvent *event);
+bool WM_event_is_mouse_drag_or_press(const wmEvent *event);
 
 int WM_event_drag_threshold(const struct wmEvent *event);
 bool WM_event_drag_test(const struct wmEvent *event, const int prev_xy[2]);
@@ -975,6 +989,7 @@ bool WM_region_use_viewport(struct ScrArea *area, struct ARegion *region);
 bool WM_xr_session_exists(const wmXrData *xr);
 bool WM_xr_session_is_ready(const wmXrData *xr);
 struct wmXrSessionState *WM_xr_session_state_handle_get(const wmXrData *xr);
+struct ScrArea *WM_xr_session_area_get(const wmXrData *xr);
 void WM_xr_session_base_pose_reset(wmXrData *xr);
 bool WM_xr_session_state_viewer_pose_location_get(const wmXrData *xr, float r_location[3]);
 bool WM_xr_session_state_viewer_pose_rotation_get(const wmXrData *xr, float r_rotation[4]);

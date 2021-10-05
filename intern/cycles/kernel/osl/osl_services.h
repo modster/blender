@@ -294,8 +294,10 @@ class OSLRenderServices : public OSL::RendererServices {
   static ustring u_is_smooth;
   static ustring u_is_curve;
   static ustring u_curve_thickness;
+  static ustring u_curve_length;
   static ustring u_curve_tangent_normal;
   static ustring u_curve_random;
+  static ustring u_normal_map_normal;
   static ustring u_path_ray_length;
   static ustring u_path_ray_depth;
   static ustring u_path_diffuse_depth;

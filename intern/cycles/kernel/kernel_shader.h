@@ -186,8 +186,8 @@ ccl_device_inline float _shader_bsdf_multi_eval(const KernelGlobals *kg,
                                                 float sum_sample_weight,
                                                 const uint light_shader_flags)
 {
-  /* this is the veach one-sample model with balance heuristic, some pdf
-   * factors drop out when using balance heuristic weighting */
+  /* This is the veach one-sample model with balance heuristic,
+   * some PDF factors drop out when using balance heuristic weighting. */
   for (int i = 0; i < sd->num_closure; i++) {
     const ShaderClosure *sc = &sd->closure[i];
 
@@ -750,7 +750,7 @@ ccl_device int shader_phase_sample_closure(const KernelGlobals *kg,
 
 /* Volume Evaluation */
 
-template<typename StackReadOp>
+template<const bool shadow, typename StackReadOp>
 ccl_device_inline void shader_eval_volume(INTEGRATOR_STATE_CONST_ARGS,
                                           ShaderData *ccl_restrict sd,
                                           const int path_flag,
@@ -815,8 +815,11 @@ ccl_device_inline void shader_eval_volume(INTEGRATOR_STATE_CONST_ARGS,
 #  endif
 
     /* Merge closures to avoid exceeding number of closures limit. */
-    if (i > 0)
-      shader_merge_volume_closures(sd);
+    if (!shadow) {
+      if (i > 0) {
+        shader_merge_volume_closures(sd);
+      }
+    }
   }
 }
 

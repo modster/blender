@@ -1,4 +1,4 @@
-﻿/*
+/*
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -335,9 +335,9 @@ static void file_refresh(const bContext *C, ScrArea *area)
     params->highlight_file = -1; /* added this so it opens nicer (ton) */
   }
 
-  if (!U.experimental.use_extended_asset_browser && ED_fileselect_is_asset_browser(sfile)) {
+  if (ED_fileselect_is_asset_browser(sfile)) {
     /* Only poses supported as non-experimental right now. */
-    params->filter_id = FILTER_ID_AC;
+    params->filter_id = U.experimental.use_extended_asset_browser ? FILTER_ID_ALL : FILTER_ID_AC;
   }
 
   filelist_settype(sfile->files, params->type);
@@ -355,6 +355,10 @@ static void file_refresh(const bContext *C, ScrArea *area)
       (params->flag & FILE_ASSETS_ONLY) != 0,
       params->filter_glob,
       params->filter_search);
+  if (asset_params) {
+    filelist_set_asset_catalog_filter_options(
+        sfile->files, asset_params->asset_catalog_visibility, &asset_params->catalog_id);
+  }
 
   /* Update the active indices of bookmarks & co. */
   sfile->systemnr = fsmenu_get_active_indices(fsmenu, FS_CATEGORY_SYSTEM, params->dir);
@@ -890,6 +894,7 @@ const char *file_context_dir[] = {
     "active_file",
     "selected_files",
     "asset_library_ref",
+    "selected_asset_files",
     "id",
     NULL,
 };
@@ -945,6 +950,24 @@ static int /*eContextResult*/ file_context(const bContext *C,
 
     CTX_data_pointer_set(
         result, &screen->id, &RNA_AssetLibraryReference, &asset_params->asset_library_ref);
+    return CTX_RESULT_OK;
+  }
+  /** TODO temporary AssetHandle design: For now this returns the file entry. Would be better if it
+   * was `"selected_assets"` and returned the assets (e.g. as `AssetHandle`) directly. See comment
+   * for #AssetHandle for more info. */
+  if (CTX_data_equals(member, "selected_asset_files")) {
+    const int num_files_filtered = filelist_files_ensure(sfile->files);
+
+    for (int file_index = 0; file_index < num_files_filtered; file_index++) {
+      if (filelist_entry_is_selected(sfile->files, file_index)) {
+        FileDirEntry *entry = filelist_file(sfile->files, file_index);
+        if (entry->asset_data) {
+          CTX_data_list_add(result, &screen->id, &RNA_FileSelectEntry, entry);
+        }
+      }
+    }
+
+    CTX_data_type_set(result, CTX_DATA_TYPE_COLLECTION);
     return CTX_RESULT_OK;
   }
   if (CTX_data_equals(member, "id")) {
@@ -1050,6 +1073,7 @@ void ED_spacetype_file(void)
   art->init = file_tools_region_init;
   art->draw = file_tools_region_draw;
   BLI_addhead(&st->regiontypes, art);
+  file_tools_region_panels_register(art);
 
   /* regions: tool properties */
   art = MEM_callocN(sizeof(ARegionType), "spacetype file operator region");
