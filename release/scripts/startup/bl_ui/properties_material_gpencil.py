@@ -120,12 +120,19 @@ class MATERIAL_PT_gpencil_slots(GreasePencilMaterialsPanel, Panel):
 class MATERIAL_PT_gpencil_surface(GPMaterialButtonsPanel, Panel):
     bl_label = "Surface"
 
+    @classmethod
+    def poll(cls, context):
+        mat = context.material
+        return (mat and mat.use_nodes is False)
+
     def draw_header_preset(self, _context):
         MATERIAL_PT_gpencil_material_presets.draw_panel_header(self.layout)
 
-    def draw(self, _context):
+    def draw(self, context):
         layout = self.layout
-        layout.use_property_split = True
+        mat = context.material
+        layout.prop(mat, "use_nodes", icon='NODETREE')
+        layout.separator()
 
 
 class MATERIAL_PT_gpencil_strokecolor(GPMaterialButtonsPanel, Panel):
@@ -239,6 +246,11 @@ class MATERIAL_PT_gpencil_preview(GPMaterialButtonsPanel, Panel):
     COMPAT_ENGINES = {'BLENDER_EEVEE'}
     bl_options = {'DEFAULT_CLOSED'}
 
+    @classmethod
+    def poll(cls, context):
+        mat = context.material
+        return (mat and mat.grease_pencil and mat.use_nodes is False)
+
     def draw(self, context):
         ma = context.material
         self.layout.label(text=ma.name)
@@ -250,15 +262,51 @@ class MATERIAL_PT_gpencil_custom_props(GPMaterialButtonsPanel, PropertyPanel, Pa
     _context_path = "object.active_material"
     _property_type = bpy.types.Material
 
+    @classmethod
+    def poll(cls, context):
+        mat = context.material
+        return (mat and mat.grease_pencil and mat.use_nodes is False)
+
+
+def draw_material_settings(self, context):
+    layout = self.layout
+    layout.use_property_split = True
+    layout.use_property_decorate = False
+
+    mat = context.material
+
+    layout.prop(mat, "use_backface_culling")
+    layout.prop(mat, "blend_method")
+    layout.prop(mat, "shadow_method")
+
+    row = layout.row()
+    row.active = ((mat.blend_method == 'CLIP') or (mat.shadow_method == 'CLIP'))
+    row.prop(mat, "alpha_threshold")
+
+    if mat.blend_method not in {'OPAQUE', 'CLIP', 'HASHED'}:
+        layout.prop(mat, "show_transparent_back")
+
+    layout.prop(mat, "use_screen_refraction")
+    layout.prop(mat, "refraction_depth")
+    layout.prop(mat, "use_sss_translucency")
+    layout.prop(mat, "pass_index")
+
 
 class MATERIAL_PT_gpencil_settings(GPMaterialButtonsPanel, Panel):
     bl_label = "Settings"
     bl_options = {'DEFAULT_CLOSED'}
 
+    @classmethod
+    def poll(cls, context):
+        mat = context.material
+        return (mat and mat.grease_pencil and mat.use_nodes is False)
+
     def draw(self, context):
+        draw_material_settings(self, context)
+
+        # TODO: Remove prop pass_index and move to material struct
         layout = self.layout
         layout.use_property_split = True
-
         ma = context.material
         gpcolor = ma.grease_pencil
         layout.prop(gpcolor, "pass_index")

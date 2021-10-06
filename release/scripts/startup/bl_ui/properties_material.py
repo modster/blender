@@ -64,13 +64,18 @@ class MaterialButtonsPanel:
     @classmethod
     def poll(cls, context):
         mat = context.material
-        return mat and (context.engine in cls.COMPAT_ENGINES) and not mat.grease_pencil
+        return mat and (((context.engine in cls.COMPAT_ENGINES) and not mat.grease_pencil) or (mat.grease_pencil and mat.use_nodes)) 
 
 
 class MATERIAL_PT_preview(MaterialButtonsPanel, Panel):
     bl_label = "Preview"
     bl_options = {'DEFAULT_CLOSED'}
     COMPAT_ENGINES = {'BLENDER_EEVEE'}
+
+    @classmethod
+    def poll(cls, context):
+        mat = context.material
+        return mat and (((context.engine in cls.COMPAT_ENGINES) and not mat.grease_pencil) or (mat.grease_pencil and mat.use_nodes)) 
 
     def draw(self, context):
         self.layout.template_preview(context.material)
