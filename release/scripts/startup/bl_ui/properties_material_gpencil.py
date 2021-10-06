@@ -97,11 +97,6 @@ class GPMaterialButtonsPanel:
 
     @classmethod
     def poll(cls, context):
-        ob = context.active_object
-        # If using scene engine, don't use this type of materials
-        if ob and ob.type == 'GPENCIL' and ob.use_grease_pencil_scene_engine:
-            return False
-
         ma = context.material
         return ma and ma.grease_pencil
 
@@ -117,9 +112,6 @@ class MATERIAL_PT_gpencil_slots(GreasePencilMaterialsPanel, Panel):
     def poll(cls, context):
         ob = context.object
         ma = context.material
-        # If using scene engine, don't use this type of materials
-        if ob and ob.type == 'GPENCIL' and ob.use_grease_pencil_scene_engine:
-            return False
 
         return (ma and ma.grease_pencil) or (ob and ob.type == 'GPENCIL')
 
