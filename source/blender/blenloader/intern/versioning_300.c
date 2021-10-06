@@ -1682,5 +1682,14 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
    */
   {
     /* Keep this block, even when empty. */
+    /* Fix grease pencil material index. */
+    {
+      LISTBASE_FOREACH (Material *, mat, &bmain->materials) {
+        if (mat->gp_style != NULL) {
+          mat->index = mat->gp_style->index;
+        }
+      }
+
+    }
   }
 }

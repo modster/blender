@@ -304,13 +304,6 @@ class MATERIAL_PT_gpencil_settings(GPMaterialButtonsPanel, Panel):
     def draw(self, context):
         draw_material_settings(self, context)
 
-        # TODO: Remove prop pass_index and move to material struct
-        layout = self.layout
-        layout.use_property_split = True
-        ma = context.material
-        gpcolor = ma.grease_pencil
-        layout.prop(gpcolor, "pass_index")
-
 
 class MATERIAL_PT_gpencil_material_presets(PresetPanel, Panel):
     """Material settings"""

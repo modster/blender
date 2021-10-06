@@ -67,7 +67,7 @@ typedef struct MaterialGPencilStyle {
   /** Settings. */
   short flag;
   /** Custom index for passes. */
-  short index;
+  short index DNA_DEPRECATED;
   /** Style for drawing strokes (used to select shader type). */
   short stroke_style;
   /** Style for filling areas (used to select shader type). */

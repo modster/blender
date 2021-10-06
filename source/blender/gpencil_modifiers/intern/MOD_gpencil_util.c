@@ -85,7 +85,6 @@ bool is_stroke_affected_by_modifier(Object *ob,
                                     const bool inv4)
 {
   Material *ma = BKE_gpencil_material(ob, gps->mat_nr + 1);
-  MaterialGPencilStyle *gp_style = ma->gp_style;
 
   /* omit if filter by layer */
   if (mlayername[0] != '\0') {
@@ -129,12 +128,12 @@ bool is_stroke_affected_by_modifier(Object *ob,
   /* verify material pass */
   if (mpassindex > 0) {
     if (inv2 == false) {
-      if (gp_style->index != mpassindex) {
+      if (material->index != mpassindex) {
         return false;
       }
     }
     else {
-      if (gp_style->index == mpassindex) {
+      if (material->index == mpassindex) {
         return false;
       }
     }
