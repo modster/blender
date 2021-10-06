@@ -90,6 +90,11 @@ static void mesh_init_data(ID *id)
 
   BKE_mesh_runtime_reset(mesh);
 
+  /* A newly created mesh does not have normals, so tag them dirty. This will be cleared by
+   * retrieving the normal layer for manually writing to it, or calling functions like
+   * #BKE_mesh_ensure_face_normals. */
+  BKE_mesh_normals_tag_dirty(mesh);
+
   mesh->face_sets_color_seed = BLI_hash_int(PIL_check_seconds_timer_i() & UINT_MAX);
 }
 
@@ -145,6 +150,11 @@ static void mesh_copy_data(Main *bmain, ID *id_dst, const ID *id_src, const int 
   mesh_dst->edit_mesh = NULL;
 
   mesh_dst->mselect = MEM_dupallocN(mesh_dst->mselect);
+
+  /* Copy dirty flags, essential for normal layers to avoid recomputation and
+   * to ensure that when no normal layers exist, they are marked as dirty. */
+  mesh_dst->runtime.cd_dirty_poly = mesh_src->runtime.cd_dirty_poly;
+  mesh_dst->runtime.cd_dirty_vert = mesh_src->runtime.cd_dirty_vert;
 
   /* TODO: Do we want to add flag to prevent this? */
   if (mesh_src->key && (flag & LIB_ID_COPY_SHAPEKEY)) {
@@ -1083,6 +1093,11 @@ Mesh *BKE_mesh_new_nomain_from_template_ex(const Mesh *me_src,
     mesh_tessface_clear_intern(me_dst, false);
   }
 
+  /* Copy dirty flags, essential for normal layers to avoid recomputation and
+   * to ensure that when no normal layers exist, they are marked as dirty. */
+  me_dst->runtime.cd_dirty_poly = me_src->runtime.cd_dirty_poly;
+  me_dst->runtime.cd_dirty_vert = me_src->runtime.cd_dirty_vert;
+
   /* The destination mesh should at least have valid primary CD layers,
    * even in cases where the source mesh does not. */
   mesh_ensure_cdlayers_primary(me_dst, do_tessface);
@@ -1922,8 +1937,6 @@ void BKE_mesh_calc_normals_split_ex(Mesh *mesh, MLoopNorSpaceArray *r_lnors_spac
                               clnors,
                               NULL);
 
-  mesh->runtime.cd_dirty_vert &= ~CD_MASK_NORMAL;
-  mesh->runtime.cd_dirty_poly &= ~CD_MASK_NORMAL;
   mesh->runtime.cd_dirty_loop &= ~CD_MASK_NORMAL;
 }
 
@@ -2097,8 +2110,7 @@ static void split_faces_split_new_verts(Mesh *mesh,
 {
   const int verts_len = mesh->totvert - num_new_verts;
   MVert *mvert = mesh->mvert;
-  float(*vert_normals)[3] = (float(*)[3])CustomData_add_layer(
-      &mesh->vdata, CD_NORMAL, CD_DEFAULT, NULL, mesh->totvert);
+  float(*vert_normals)[3] = BKE_mesh_vertex_normals_for_write(mesh);
 
   /* Remember new_verts is a single linklist, so its items are in reversed order... */
   MVert *new_mv = &mvert[mesh->totvert - 1];

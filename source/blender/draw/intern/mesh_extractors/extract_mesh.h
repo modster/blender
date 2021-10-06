@@ -99,8 +99,8 @@ typedef struct MeshRenderData {
   /* Data created on-demand (usually not for #BMesh based data). */
   MLoopTri *mlooptri;
   const float (*vert_normals)[3];
+  const float (*poly_normals)[3];
   float (*loop_normals)[3];
-  float (*poly_normals)[3];
   int *lverts, *ledges;
 
   struct {

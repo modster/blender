@@ -225,13 +225,13 @@ typedef struct {
 
   struct SculptUndoNode *unode;
   float (*coords)[3];
-  short (*normals)[3];
+  float (*normals)[3];
   const float *vmasks;
   float (*colors)[4];
 
   /* Original coordinate, normal, and mask. */
   const float *co;
-  const short *no;
+  const float *no;
   float mask;
   const float *col;
 } SculptOrigVertData;

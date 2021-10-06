@@ -1056,7 +1056,6 @@ static void obstacles_from_mesh(Object *coll_ob,
     BKE_mesh_ensure_vertex_normals(me);
     float(*vert_normals)[3] = (float(*)[3])CustomData_get_layer(&me->vdata, CD_NORMAL);
     for (i = 0; i < numverts; i++) {
-      float n[3];
       float co[3];
 
       /* Vertex position. */
@@ -2143,8 +2142,6 @@ static void emit_from_mesh(
     BKE_mesh_ensure_vertex_normals(me);
     float(*vert_normals)[3] = (float(*)[3])CustomData_get_layer(&me->vdata, CD_NORMAL);
     for (i = 0; i < numverts; i++) {
-      float n[3];
-
       /* Vertex position. */
       mul_m4_v3(flow_ob->obmat, mvert[i].co);
       manta_pos_to_cell(fds, mvert[i].co);
@@ -2183,8 +2180,6 @@ static void emit_from_mesh(
       max[i] = bb->max[i];
       res[i] = bb->res[i];
     }
-
-    const float(*vert_normals)[3] = BKE_mesh_ensure_vertex_normals(me);
 
     /* Skip flow sampling loop if object has disabled flow. */
     bool use_flow = ffs->flags & FLUID_FLOW_USE_INFLOW;

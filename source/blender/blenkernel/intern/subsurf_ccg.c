@@ -870,15 +870,13 @@ static CCGElem *get_vertex_elem(CCGDerivedMesh *ccgdm, int vertNum)
     x = vertNum - ccgdm->edgeMap[i].startVert + 1;
     return ccgSubSurf_getEdgeData(ss, e, x);
   }
-  else {
-    /* this vert comes from vert data */
-    CCGVert *v;
-    i = vertNum - ccgdm->vertMap[0].startVert;
 
-    v = ccgdm->vertMap[i].vert;
-    return ccgSubSurf_getVertData(ss, v);
-  }
-  return NULL;
+  /* this vert comes from vert data */
+  CCGVert *v;
+  i = vertNum - ccgdm->vertMap[0].startVert;
+
+  v = ccgdm->vertMap[i].vert;
+  return ccgSubSurf_getVertData(ss, v);
 }
 
 static void ccgDM_getFinalVertCo(DerivedMesh *dm, int vertNum, float r_co[3])
@@ -887,11 +885,9 @@ static void ccgDM_getFinalVertCo(DerivedMesh *dm, int vertNum, float r_co[3])
   CCGSubSurf *ss = ccgdm->ss;
 
   CCGElem *vd = get_vertex_elem(ccgdm, vertNum);
-  if (vd != NULL) {
-    CCGKey key;
-    CCG_key_top_level(&key, ss);
-    copy_v3_v3(r_co, CCG_elem_co(&key, vd));
-  }
+  CCGKey key;
+  CCG_key_top_level(&key, ss);
+  copy_v3_v3(r_co, CCG_elem_co(&key, vd));
 }
 
 static void ccgDM_getFinalVertNo(DerivedMesh *dm, int vertNum, float r_no[3])
@@ -900,11 +896,9 @@ static void ccgDM_getFinalVertNo(DerivedMesh *dm, int vertNum, float r_no[3])
   CCGSubSurf *ss = ccgdm->ss;
 
   CCGElem *vd = get_vertex_elem(ccgdm, vertNum);
-  if (vd != NULL) {
-    CCGKey key;
-    CCG_key_top_level(&key, ss);
-    copy_v3_v3(r_no, CCG_elem_no(&key, vd));
-  }
+  CCGKey key;
+  CCG_key_top_level(&key, ss);
+  copy_v3_v3(r_no, CCG_elem_no(&key, vd));
 }
 
 /* Translate GridHidden into the ME_HIDE flag for MVerts. Assumes

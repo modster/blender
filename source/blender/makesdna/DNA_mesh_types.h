@@ -81,12 +81,14 @@ typedef struct Mesh_Runtime {
    * Since modifier stack evaluation is threaded on object level we need some synchronization. */
   struct Mesh *mesh_eval;
   void *eval_mutex;
+  /* A separate mutex is needed for normal calculation, because sometimes
+   * the normals are needed while #eval_mutex is already locked. */
+  void *normals_mutex;
 
   struct EditMeshData *edit_data;
   void *batch_cache;
 
   struct SubdivCCG *subdiv_ccg;
-  void *_pad1;
   int subdiv_ccg_tot_level;
   char _pad2[4];
 

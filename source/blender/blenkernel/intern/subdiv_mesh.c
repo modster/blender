@@ -114,7 +114,6 @@ static void subdiv_mesh_prepare_accumulator(SubdivMeshContext *ctx, int num_vert
 
 static void subdiv_mesh_context_free(SubdivMeshContext *ctx)
 {
-  MEM_SAFE_FREE(ctx->accumulated_normals);
   MEM_SAFE_FREE(ctx->accumulated_counters);
 }
 

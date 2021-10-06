@@ -1496,10 +1496,10 @@ static void paint_mesh_restore_co_task_cb(void *__restrict userdata,
     if (orig_data.unode->type == SCULPT_UNDO_COORDS) {
       copy_v3_v3(vd.co, orig_data.co);
       if (vd.no) {
-        normal_short_to_float_v3(vd.no, orig_data.no);
+        copy_v3_v3(vd.no, orig_data.no);
       }
       else {
-        normal_short_to_float_v3(vd.fno, orig_data.no);
+        copy_v3_v3(vd.fno, orig_data.no);
       }
     }
     else if (orig_data.unode->type == SCULPT_UNDO_MASK) {
@@ -2057,7 +2057,7 @@ static void calc_area_normal_and_center_task_cb(void *__restrict userdata,
       if (use_original) {
         if (unode->bm_entry) {
           const float *temp_co;
-          const short *temp_no_s;
+          const float *temp_no_s;
           BM_log_original_vert_data(ss->bm_log, vd.bm_vert, &temp_co, &temp_no_s);
           copy_v3_v3(co, temp_co);
           copy_v3_v3(no_s, temp_no_s);
@@ -4011,9 +4011,7 @@ static void do_grab_brush_task_cb_ex(void *__restrict userdata,
       if (dot_v3v3(ss->cache->initial_normal, ss->cache->grab_delta_symmetry) < 0.0f) {
         mul_v3_fl(silhouette_test_dir, -1.0f);
       }
-      float vno[3];
-      normal_short_to_float_v3(vno, orig_data.no);
-      fade *= max_ff(dot_v3v3(vno, silhouette_test_dir), 0.0f);
+      fade *= max_ff(dot_v3v3(orig_data.no, silhouette_test_dir), 0.0f);
     }
 
     mul_v3_v3fl(proxy[vd.i], grab_delta, fade);
@@ -4735,7 +4733,7 @@ static void do_layer_brush_task_cb_ex(void *__restrict userdata,
       madd_v3_v3v3fl(final_co, SCULPT_vertex_persistent_co_get(ss, vi), normal, *disp_factor);
     }
     else {
-      normal_short_to_float_v3(normal, orig_data.no);
+      copy_v3_v3(normal, orig_data.no);
       mul_v3_fl(normal, brush->height);
       madd_v3_v3v3fl(final_co, orig_data.co, normal, *disp_factor);
     }

@@ -767,7 +767,7 @@ void BKE_mesh_calc_loop_tangents(Mesh *me_eval,
                                 tangent_names,
                                 tangent_names_len,
                                 BKE_mesh_ensure_vertex_normals(me_eval),
-                                CustomData_get_layer(&me_eval->pdata, CD_NORMAL),
+                                BKE_mesh_ensure_face_normals(me_eval),
                                 CustomData_get_layer(&me_eval->ldata, CD_NORMAL),
                                 CustomData_get_layer(&me_eval->vdata, CD_ORCO), /* may be NULL */
                                 /* result */

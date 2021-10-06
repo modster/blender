@@ -133,9 +133,7 @@ static Mesh *create_circle_mesh(const float radius,
   }
 
   /* Fill vertex normal data here since it is trivial and can avoid calculations later. */
-  MutableSpan<float3> vert_normals{
-      (float3 *)CustomData_add_layer(&mesh->vdata, CD_NORMAL, CD_DEFAULT, NULL, mesh->totvert),
-      mesh->totvert};
+  MutableSpan vert_normals{(float3 *)BKE_mesh_vertex_normals_for_write(mesh), mesh->totvert};
   vert_normals.fill(float3(0.0f, 0.0f, 1.0f));
 
   /* Create outer edges. */

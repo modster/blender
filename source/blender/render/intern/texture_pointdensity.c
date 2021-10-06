@@ -369,10 +369,7 @@ static void pointdensity_cache_vertex_weight(PointDensity *pd,
   }
 }
 
-static void pointdensity_cache_vertex_normal(PointDensity *pd,
-                                             Object *UNUSED(ob),
-                                             Mesh *mesh,
-                                             float *data_color)
+static void pointdensity_cache_vertex_normal(Mesh *mesh, float *data_color)
 {
   BLI_assert(data_color);
   const float(*vert_normals)[3] = BKE_mesh_ensure_vertex_normals(mesh);
@@ -438,7 +435,7 @@ static void pointdensity_cache_object(PointDensity *pd, Object *ob)
       pointdensity_cache_vertex_weight(pd, ob, mesh, data_color);
       break;
     case TEX_PD_COLOR_VERTNOR:
-      pointdensity_cache_vertex_normal(pd, ob, mesh, data_color);
+      pointdensity_cache_vertex_normal(mesh, data_color);
       break;
   }
 

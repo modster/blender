@@ -684,9 +684,7 @@ void BlenderStrokeRenderer::GenerateStrokeMesh(StrokeGroup *group, bool hasTex)
             vertices->co[0] = svRep[0]->point2d()[0];
             vertices->co[1] = svRep[0]->point2d()[1];
             vertices->co[2] = get_stroke_vertex_z();
-            vertices->no[0] = 0;
-            vertices->no[1] = 0;
-            vertices->no[2] = SHRT_MAX;
+
             ++vertices;
             ++vertex_index;
 
@@ -694,9 +692,7 @@ void BlenderStrokeRenderer::GenerateStrokeMesh(StrokeGroup *group, bool hasTex)
             vertices->co[0] = svRep[1]->point2d()[0];
             vertices->co[1] = svRep[1]->point2d()[1];
             vertices->co[2] = get_stroke_vertex_z();
-            vertices->no[0] = 0;
-            vertices->no[1] = 0;
-            vertices->no[2] = SHRT_MAX;
+
             ++vertices;
             ++vertex_index;
 
@@ -712,9 +708,6 @@ void BlenderStrokeRenderer::GenerateStrokeMesh(StrokeGroup *group, bool hasTex)
           vertices->co[0] = svRep[2]->point2d()[0];
           vertices->co[1] = svRep[2]->point2d()[1];
           vertices->co[2] = get_stroke_vertex_z();
-          vertices->no[0] = 0;
-          vertices->no[1] = 0;
-          vertices->no[2] = SHRT_MAX;
           ++vertices;
           ++vertex_index;
 
@@ -820,6 +813,7 @@ void BlenderStrokeRenderer::GenerateStrokeMesh(StrokeGroup *group, bool hasTex)
   }      // loop over strokes
 
   BKE_object_materials_test(freestyle_bmain, object_mesh, (ID *)mesh);
+  BKE_mesh_normals_tag_dirty(mesh);
 
 #if 0  // XXX
   BLI_assert(mesh->totvert == vertex_index);

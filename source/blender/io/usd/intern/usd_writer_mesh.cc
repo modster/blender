@@ -381,12 +381,10 @@ void USDGenericMeshWriter::write_normals(const Mesh *mesh, pxr::UsdGeomMesh usd_
     const float(*vert_normals)[3] = BKE_mesh_ensure_vertex_normals(mesh);
     const float(*face_normals)[3] = BKE_mesh_ensure_face_normals(mesh);
     MPoly *mpoly = mesh->mpoly;
-    const MVert *mvert = mesh->mvert;
     for (int poly_idx = 0, totpoly = mesh->totpoly; poly_idx < totpoly; ++poly_idx, ++mpoly) {
       MLoop *mloop = mesh->mloop + mpoly->loopstart;
 
       if ((mpoly->flag & ME_SMOOTH) == 0) {
-
         /* Flat shaded, use common normal for all verts. */
         pxr::GfVec3f pxr_normal(face_normals[poly_idx]);
         for (int loop_idx = 0; loop_idx < mpoly->totloop; ++loop_idx) {

@@ -1179,22 +1179,8 @@ class NormalAttributeProvider final : public BuiltinAttributeProvider {
       return {};
     }
 
-    /* Use existing normals if possible. */
-    if (!(mesh->runtime.cd_dirty_poly & CD_MASK_NORMAL) &&
-        CustomData_has_layer(&mesh->pdata, CD_NORMAL)) {
-      const void *data = CustomData_get_layer(&mesh->pdata, CD_NORMAL);
-
-      return std::make_unique<fn::GVArray_For_Span<float3>>(
-          Span<float3>((const float3 *)data, mesh->totpoly));
-    }
-
-    Array<float3> normals(mesh->totpoly);
-    for (const int i : IndexRange(mesh->totpoly)) {
-      const MPoly *poly = &mesh->mpoly[i];
-      BKE_mesh_calc_poly_normal(poly, &mesh->mloop[poly->loopstart], mesh->mvert, normals[i]);
-    }
-
-    return std::make_unique<fn::GVArray_For_ArrayContainer<Array<float3>>>(std::move(normals));
+    Span<float3> face_normals{(float3 *)BKE_mesh_ensure_face_normals(mesh), mesh->totpoly};
+    return std::make_unique<fn::GVArray_For_GSpan>(face_normals);
   }
 
   GVMutableArrayPtr try_get_for_write(GeometryComponent &UNUSED(component)) const final

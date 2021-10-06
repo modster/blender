@@ -160,7 +160,7 @@ static void read_mverts(CDStreamConfig &config, const AbcMeshData &mesh_data)
     return;
   }
 
-  read_mverts(mverts, positions, nullptr);
+  read_mverts(mverts, config.vert_normals, positions, nullptr);
 }
 
 void read_mverts(MVert *mverts,
@@ -524,8 +524,7 @@ CDStreamConfig get_config(Mesh *mesh, const bool use_vertex_interpolation)
 
   config.mesh = mesh;
   config.mvert = mesh->mvert;
-  config.vert_normals = (float(*)[3])CustomData_add_layer(
-      &mesh->vdata, CD_NORMAL, CD_DEFAULT, NULL, mesh->totvert);
+  config.vert_normals = BKE_mesh_vertex_normals_for_write(mesh);
   config.mloop = mesh->mloop;
   config.mpoly = mesh->mpoly;
   config.totvert = mesh->totvert;

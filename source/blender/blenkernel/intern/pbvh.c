@@ -1087,7 +1087,6 @@ static void pbvh_update_normals_store_task_cb(void *__restrict userdata,
        * so we know only this thread will handle this vertex. */
       if (mvert->flag & ME_VERT_PBVH_UPDATE) {
         normalize_v3(vnors[v]);
-        copy_v3_v3(pbvh->vert_normals[v], vnors[v]);
         mvert->flag &= ~ME_VERT_PBVH_UPDATE;
       }
     }
@@ -1100,7 +1099,8 @@ static void pbvh_faces_update_normals(PBVH *pbvh, PBVHNode **nodes, int totnode)
 {
   /* could be per node to save some memory, but also means
    * we have to store for each vertex which node it is in */
-  float(*vnors)[3] = MEM_callocN(sizeof(*vnors) * pbvh->totvert, __func__);
+  MEM_SAFE_FREE(pbvh->vert_normals);
+  pbvh->vert_normals = MEM_calloc_arrayN(pbvh->totvert, sizeof(float[3]), __func__);
 
   /* subtle assumptions:
    * - We know that for all edited vertices, the nodes with faces
@@ -1115,7 +1115,7 @@ static void pbvh_faces_update_normals(PBVH *pbvh, PBVHNode **nodes, int totnode)
   PBVHUpdateData data = {
       .pbvh = pbvh,
       .nodes = nodes,
-      .vnors = vnors,
+      .vnors = pbvh->vert_normals,
   };
 
   TaskParallelSettings settings;
@@ -1123,8 +1123,6 @@ static void pbvh_faces_update_normals(PBVH *pbvh, PBVHNode **nodes, int totnode)
 
   BLI_task_parallel_range(0, totnode, &data, pbvh_update_normals_accum_task_cb, &settings);
   BLI_task_parallel_range(0, totnode, &data, pbvh_update_normals_store_task_cb, &settings);
-
-  MEM_freeN(vnors);
 }
 
 static void pbvh_update_mask_redraw_task_cb(void *__restrict userdata,

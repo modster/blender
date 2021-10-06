@@ -576,8 +576,7 @@ static Mesh *arrayModifier_doArray(ArrayModifierData *amd,
   float(*dst_vert_normals)[3] = NULL;
   if (!use_recalc_normals) {
     src_vert_normals = BKE_mesh_ensure_vertex_normals(mesh);
-    dst_vert_normals = (float(*)[3])CustomData_add_layer(
-        &result->vdata, CD_NORMAL, CD_DEFAULT, NULL, mesh->totvert);
+    dst_vert_normals = BKE_mesh_vertex_normals_for_write(result);
   }
 
   for (c = 1; c < count; c++) {
@@ -789,6 +788,7 @@ static Mesh *arrayModifier_doArray(ArrayModifierData *amd,
   }
 
   /* In case org dm has dirty normals, or we made some merging, mark normals as dirty in new mesh!
+   * TODO: we may need to set other dirty flags as well?
    */
   if (use_recalc_normals) {
     BKE_mesh_normals_tag_dirty(result);

@@ -32,6 +32,7 @@
 #include "DNA_scene_types.h"
 
 #include "BLI_edgehash.h"
+#include "BLI_index_range.hh"
 #include "BLI_listbase.h"
 #include "BLI_math.h"
 #include "BLI_string.h"
@@ -65,6 +66,8 @@
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_query.h"
 
+using blender::IndexRange;
+
 /* Define for cases when you want extra validation of mesh
  * after certain modifications.
  */
@@ -85,7 +88,6 @@ void BKE_mesh_from_metaball(ListBase *lb, Mesh *me)
   MVert *mvert;
   MLoop *mloop, *allloop;
   MPoly *mpoly;
-  const float *nors, *verts;
   int a, *index;
 
   dl = (DispList *)lb->first;
@@ -94,12 +96,11 @@ void BKE_mesh_from_metaball(ListBase *lb, Mesh *me)
   }
 
   if (dl->type == DL_INDEX4) {
-    mvert = (MVert *)CustomData_add_layer(&me->vdata, CD_MVERT, CD_CALLOC, NULL, dl->nr);
+    mvert = (MVert *)CustomData_add_layer(&me->vdata, CD_MVERT, CD_CALLOC, nullptr, dl->nr);
     allloop = mloop = (MLoop *)CustomData_add_layer(
-        &me->ldata, CD_MLOOP, CD_CALLOC, NULL, dl->parts * 4);
-    mpoly = (MPoly *)CustomData_add_layer(&me->pdata, CD_MPOLY, CD_CALLOC, NULL, dl->parts);
-    float(*vert_normals)[3] = (float(*)[3])CustomData_add_layer(
-        &me->vdata, CD_NORMAL, CD_DEFAULT, NULL, me->totvert);
+        &me->ldata, CD_MLOOP, CD_CALLOC, nullptr, dl->parts * 4);
+    mpoly = (MPoly *)CustomData_add_layer(&me->pdata, CD_MPOLY, CD_CALLOC, nullptr, dl->parts);
+    float(*vert_normals)[3] = BKE_mesh_vertex_normals_for_write(me);
 
     me->mvert = mvert;
     me->mloop = mloop;
@@ -107,16 +108,9 @@ void BKE_mesh_from_metaball(ListBase *lb, Mesh *me)
     me->totvert = dl->nr;
     me->totpoly = dl->parts;
 
-    a = dl->nr;
-    nors = dl->nors;
-    verts = dl->verts;
-    while (a--) {
-      copy_v3_v3(mvert->co, verts);
-
-      copy_v3_v3(vert_normals[a], nors);
-      mvert++;
-      nors += 3;
-      verts += 3;
+    for (const int i : IndexRange(dl->nr)) {
+      copy_v3_v3(me->mvert[i].co, &dl->verts[3 * i]);
+      copy_v3_v3(vert_normals[i], &dl->nors[3 * i]);
     }
 
     a = dl->parts;

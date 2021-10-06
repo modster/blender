@@ -282,15 +282,9 @@ void BKE_mesh_calc_normals_poly(const struct MVert *mvert,
                                 const struct MPoly *mpoly,
                                 int mpoly_len,
                                 float (*r_poly_normals)[3]);
-void BKE_mesh_calc_normals_poly_and_vertex(struct MVert *mvert,
-                                           int mvert_len,
-                                           const struct MLoop *mloop,
-                                           int mloop_len,
-                                           const struct MPoly *mpolys,
-                                           int mpoly_len,
-                                           float (*r_poly_normals)[3],
-                                           float (*r_vert_normals)[3]);
 void BKE_mesh_calc_normals(struct Mesh *me);
+float (*BKE_mesh_vertex_normals_for_write(struct Mesh *mesh))[3];
+float (*BKE_mesh_face_normals_for_write(struct Mesh *mesh))[3];
 const float (*BKE_mesh_ensure_vertex_normals(const struct Mesh *mesh))[3];
 const float (*BKE_mesh_ensure_face_normals(const struct Mesh *mesh))[3];
 void BKE_mesh_ensure_normals_for_display(struct Mesh *mesh);

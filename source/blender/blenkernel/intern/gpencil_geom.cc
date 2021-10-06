@@ -2456,7 +2456,6 @@ static void gpencil_generate_edgeloops(Object *ob,
   if (me->totedge == 0) {
     return;
   }
-
   const float(*vert_normals)[3] = BKE_mesh_ensure_vertex_normals(me);
 
   /* Arrays for all edge vertices (forward and backward) that form a edge loop.

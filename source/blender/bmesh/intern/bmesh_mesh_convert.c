@@ -183,8 +183,6 @@ static BMFace *bm_face_create_from_mpoly(
  * Note the custom-data layout isn't used.
  * If more comprehensive merging is needed we should move this into a separate function
  * since this should be kept fast for edit-mode switching and storing undo steps.
- *
- * \warning This function doesn't calculate face normals.
  */
 void BM_mesh_bm_from_me(BMesh *bm, const Mesh *me, const struct BMeshFromMeshParams *params)
 {
@@ -648,13 +646,13 @@ void BM_mesh_bm_to_me(Main *bmain, BMesh *bm, Mesh *me, const struct BMeshToMesh
   MEdge *medge = bm->totedge ? MEM_callocN(sizeof(MEdge) * bm->totedge, "bm_to_me.edge") : NULL;
   MLoop *mloop = bm->totloop ? MEM_callocN(sizeof(MLoop) * bm->totloop, "bm_to_me.loop") : NULL;
   MPoly *mpoly = bm->totface ? MEM_callocN(sizeof(MPoly) * bm->totface, "bm_to_me.poly") : NULL;
-  float(*vert_normals)[3] = (float(*)[3])CustomData_add_layer(
-      &me->vdata, CD_NORMAL, CD_DEFAULT, NULL, me->totvert);
 
   CustomData_add_layer(&me->vdata, CD_MVERT, CD_ASSIGN, mvert, me->totvert);
   CustomData_add_layer(&me->edata, CD_MEDGE, CD_ASSIGN, medge, me->totedge);
   CustomData_add_layer(&me->ldata, CD_MLOOP, CD_ASSIGN, mloop, me->totloop);
   CustomData_add_layer(&me->pdata, CD_MPOLY, CD_ASSIGN, mpoly, me->totpoly);
+  float(*face_normals)[3] = BKE_mesh_face_normals_for_write(me);
+  float(*vert_normals)[3] = BKE_mesh_vertex_normals_for_write(me);
 
   me->cd_flag = BM_mesh_cd_flag_from_bmesh(bm);
 
@@ -720,6 +718,7 @@ void BM_mesh_bm_to_me(Main *bmain, BMesh *bm, Mesh *me, const struct BMeshToMesh
     mpoly->totloop = f->len;
     mpoly->mat_nr = f->mat_nr;
     mpoly->flag = BM_face_flag_to_mflag(f);
+    copy_v3_v3(face_normals[i], f->no);
 
     l_iter = l_first = BM_FACE_FIRST_LOOP(f);
     do {
@@ -1075,8 +1074,7 @@ void BM_mesh_bm_to_me_for_eval(BMesh *bm, Mesh *me, const CustomData_MeshMasks *
   const int cd_edge_bweight_offset = CustomData_get_offset(&bm->edata, CD_BWEIGHT);
   const int cd_edge_crease_offset = CustomData_get_offset(&bm->edata, CD_CREASE);
 
-  float(*vert_normals)[3] = (float(*)[3])CustomData_add_layer(
-      &me->vdata, CD_NORMAL, CD_DEFAULT, NULL, me->totvert);
+  BKE_mesh_normals_tag_dirty(me);
 
   me->runtime.deformed_only = true;
 
@@ -1091,8 +1089,6 @@ void BM_mesh_bm_to_me_for_eval(BMesh *bm, Mesh *me, const CustomData_MeshMasks *
     copy_v3_v3(mv->co, eve->co);
 
     BM_elem_index_set(eve, i); /* set_inline */
-
-    copy_v3_v3(vert_normals[i], eve->no);
 
     mv->flag = BM_vert_flag_to_mflag(eve);
 

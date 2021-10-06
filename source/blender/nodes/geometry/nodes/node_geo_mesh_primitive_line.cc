@@ -104,9 +104,7 @@ Mesh *create_line_mesh(const float3 start, const float3 delta, const int count)
   MutableSpan<MEdge> edges{mesh->medge, mesh->totedge};
 
   /* Fill vertex normal data here since it is trivial and can avoid calculations later. */
-  MutableSpan<float3> vert_normals{
-      (float3 *)CustomData_add_layer(&mesh->vdata, CD_NORMAL, CD_DEFAULT, NULL, mesh->totvert),
-      mesh->totvert};
+  MutableSpan vert_normals{(float3 *)BKE_mesh_vertex_normals_for_write(mesh), mesh->totvert};
   vert_normals.fill(delta.normalized());
 
   for (const int i : verts.index_range()) {

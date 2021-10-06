@@ -60,8 +60,8 @@ static int sphere_face_total(const int segments, const int rings)
 }
 
 /**
- * Also calculate vertex normals here, since the calculation is trivial,
- * the vertex normals are just the normalized positions.
+ * Also calculate vertex normals here, since the calculation is trivial, and it allows avoiding the
+ * calculation later, if it's necessary. The vertex normals are just the normalized positions.
  */
 static void calculate_sphere_vertex_data(MutableSpan<MVert> verts,
                                          MutableSpan<float3> vert_normals,
@@ -271,10 +271,8 @@ static Mesh *create_uv_sphere_mesh(const float radius, const int segments, const
   MutableSpan<MLoop> loops{mesh->mloop, mesh->totloop};
   MutableSpan<MEdge> edges{mesh->medge, mesh->totedge};
   MutableSpan<MPoly> polys{mesh->mpoly, mesh->totpoly};
-  MutableSpan<float3> vert_normals{
-      (float3 *)CustomData_add_layer(&mesh->vdata, CD_NORMAL, CD_DEFAULT, NULL, mesh->totvert),
-      mesh->totvert};
 
+  MutableSpan vert_normals{(float3 *)BKE_mesh_vertex_normals_for_write(mesh), mesh->totvert};
   calculate_sphere_vertex_data(verts, vert_normals, radius, segments, rings);
 
   calculate_sphere_edge_indices(edges, segments, rings);

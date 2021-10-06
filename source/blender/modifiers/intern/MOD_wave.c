@@ -163,11 +163,11 @@ static void waveModifier_do(WaveModifierData *md,
   float falloff_fac = 1.0f; /* when falloff == 0.0f this stays at 1.0f */
   const bool invert_group = (wmd->flag & MOD_WAVE_INVERT_VGROUP) != 0;
 
+  const float(*vert_normals)[3] = NULL;
   if ((wmd->flag & MOD_WAVE_NORM) && (mesh != NULL)) {
     mvert = mesh->mvert;
+    vert_normals = BKE_mesh_ensure_vertex_normals(mesh);
   }
-
-  const float(*vert_normals)[3] = BKE_mesh_ensure_vertex_normals(mesh);
 
   if (wmd->objectcenter != NULL) {
     float mat[4][4];

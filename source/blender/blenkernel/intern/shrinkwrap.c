@@ -148,7 +148,7 @@ bool BKE_shrinkwrap_init_tree(
   }
 
   if (force_normals || BKE_shrinkwrap_needs_normals(shrinkType, shrinkMode)) {
-    data->pnors = CustomData_get_layer(&mesh->pdata, CD_NORMAL);
+    data->pnors = BKE_mesh_ensure_face_normals(mesh);
     if ((mesh->flag & ME_AUTOSMOOTH) != 0) {
       data->clnors = CustomData_get_layer(&mesh->ldata, CD_NORMAL);
     }
@@ -1566,6 +1566,7 @@ void BKE_shrinkwrap_remesh_target_project(Mesh *src_me, Mesh *target_me, Object 
   calc.smd = &ssmd;
   calc.numVerts = src_me->totvert;
   calc.vertexCos = vertexCos;
+  calc.vert_normals = BKE_mesh_ensure_vertex_normals(src_me);
   calc.vgroup = -1;
   calc.target = target_me;
   calc.keepDist = ssmd.keepDist;

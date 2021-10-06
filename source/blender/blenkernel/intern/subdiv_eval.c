@@ -276,12 +276,6 @@ static void buffer_write_float_value(void **buffer, const float *values_buffer, 
   memcpy(*buffer, values_buffer, sizeof(float) * num_values);
 }
 
-/* Similar to above, just operates with short values. */
-static void buffer_write_short_value(void **buffer, const short *values_buffer, int num_values)
-{
-  memcpy(*buffer, values_buffer, sizeof(short) * num_values);
-}
-
 void BKE_subdiv_eval_limit_patch_resolution_point(Subdiv *subdiv,
                                                   const int ptex_face_index,
                                                   const int resolution,

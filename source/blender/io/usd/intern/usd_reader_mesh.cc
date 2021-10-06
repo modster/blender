@@ -539,12 +539,9 @@ void USDMeshReader::process_normals_vertex_varying(Mesh *mesh)
     return;
   }
 
-  MutableSpan<float3> vert_normals{
-      (float3 *)CustomData_add_layer(&mesh->vdata, CD_NORMAL, CD_DEFAULT, NULL, mesh->totvert),
-      mesh->totvert};
-
+  MutableSpan vert_normals{(float3 *)BKE_mesh_vertex_normals_for_write(mesh), mesh->totvert};
   BLI_STATIC_ASSERT(sizeof(normals_[0]) == sizeof(float3), "Expected float3 item size");
-  vert_normals.copy_from({(float3 *)normals_.data(), normals_.size()});
+  vert_normals.copy_from({(float3 *)normals_.data(), static_cast<int64_t>(normals_.size())});
 }
 
 void USDMeshReader::process_normals_face_varying(Mesh *mesh)
