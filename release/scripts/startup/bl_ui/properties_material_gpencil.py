@@ -130,9 +130,11 @@ class MATERIAL_PT_gpencil_surface(GPMaterialButtonsPanel, Panel):
 
     def draw(self, context):
         layout = self.layout
+        ob = context.active_object
+        is_scene_render = ob.use_grease_pencil_scene_engine
         mat = context.material
-        layout.prop(mat, "use_nodes", icon='NODETREE')
-        layout.separator()
+        if is_scene_render:
+            layout.prop(mat, "use_nodes", icon='NODETREE')
 
 
 class MATERIAL_PT_gpencil_strokecolor(GPMaterialButtonsPanel, Panel):
@@ -276,26 +278,29 @@ class MATERIAL_PT_gpencil_custom_props(GPMaterialButtonsPanel, PropertyPanel, Pa
 
 
 def draw_material_settings(self, context):
+    ob = context.active_object
+    is_scene_render = ob.use_grease_pencil_scene_engine
     layout = self.layout
     layout.use_property_split = True
     layout.use_property_decorate = False
-
     mat = context.material
 
-    layout.prop(mat, "use_backface_culling")
-    layout.prop(mat, "blend_method")
-    layout.prop(mat, "shadow_method")
+    if is_scene_render:
+        layout.prop(mat, "use_backface_culling")
+        layout.prop(mat, "blend_method")
+        layout.prop(mat, "shadow_method")
 
-    row = layout.row()
-    row.active = ((mat.blend_method == 'CLIP') or (mat.shadow_method == 'CLIP'))
-    row.prop(mat, "alpha_threshold")
+        row = layout.row()
+        row.active = ((mat.blend_method == 'CLIP') or (mat.shadow_method == 'CLIP'))
+        row.prop(mat, "alpha_threshold")
 
-    if mat.blend_method not in {'OPAQUE', 'CLIP', 'HASHED'}:
-        layout.prop(mat, "show_transparent_back")
+        if mat.blend_method not in {'OPAQUE', 'CLIP', 'HASHED'}:
+            layout.prop(mat, "show_transparent_back")
 
-    layout.prop(mat, "use_screen_refraction")
-    layout.prop(mat, "refraction_depth")
-    layout.prop(mat, "use_sss_translucency")
+        layout.prop(mat, "use_screen_refraction")
+        layout.prop(mat, "refraction_depth")
+        layout.prop(mat, "use_sss_translucency")
+
     layout.prop(mat, "pass_index")
 
 
