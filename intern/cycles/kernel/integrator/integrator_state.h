@@ -59,8 +59,14 @@ CCL_NAMESPACE_BEGIN
  *
  * TODO: these could be made dynamic depending on the features used in the scene. */
 
-#define INTEGRATOR_VOLUME_STACK_SIZE VOLUME_STACK_SIZE
-#define INTEGRATOR_SHADOW_ISECT_SIZE 4
+#define INTEGRATOR_SHADOW_ISECT_SIZE_CPU 1024
+#define INTEGRATOR_SHADOW_ISECT_SIZE_GPU 4
+
+#ifdef __KERNEL_CPU__
+#  define INTEGRATOR_SHADOW_ISECT_SIZE INTEGRATOR_SHADOW_ISECT_SIZE_CPU
+#else
+#  define INTEGRATOR_SHADOW_ISECT_SIZE INTEGRATOR_SHADOW_ISECT_SIZE_GPU
+#endif
 
 /* Data structures */
 
@@ -74,15 +80,17 @@ typedef struct IntegratorStateCPU {
 #define KERNEL_STRUCT_END(name) \
   } \
   name;
-#define KERNEL_STRUCT_END_ARRAY(name, size) \
+#define KERNEL_STRUCT_END_ARRAY(name, cpu_size, gpu_size) \
   } \
-  name[size];
+  name[cpu_size];
+#define KERNEL_STRUCT_VOLUME_STACK_SIZE MAX_VOLUME_STACK_SIZE
 #include "kernel/integrator/integrator_state_template.h"
 #undef KERNEL_STRUCT_BEGIN
 #undef KERNEL_STRUCT_MEMBER
 #undef KERNEL_STRUCT_ARRAY_MEMBER
 #undef KERNEL_STRUCT_END
 #undef KERNEL_STRUCT_END_ARRAY
+#undef KERNEL_STRUCT_VOLUME_STACK_SIZE
 } IntegratorStateCPU;
 
 /* Path Queue
@@ -103,15 +111,17 @@ typedef struct IntegratorStateGPU {
 #define KERNEL_STRUCT_END(name) \
   } \
   name;
-#define KERNEL_STRUCT_END_ARRAY(name, size) \
+#define KERNEL_STRUCT_END_ARRAY(name, cpu_size, gpu_size) \
   } \
-  name[size];
+  name[gpu_size];
+#define KERNEL_STRUCT_VOLUME_STACK_SIZE MAX_VOLUME_STACK_SIZE
 #include "kernel/integrator/integrator_state_template.h"
 #undef KERNEL_STRUCT_BEGIN
 #undef KERNEL_STRUCT_MEMBER
 #undef KERNEL_STRUCT_ARRAY_MEMBER
 #undef KERNEL_STRUCT_END
 #undef KERNEL_STRUCT_END_ARRAY
+#undef KERNEL_STRUCT_VOLUME_STACK_SIZE
 
   /* Count number of queued kernels. */
   IntegratorQueueCounter *queue_counter;

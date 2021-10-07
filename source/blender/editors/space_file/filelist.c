@@ -50,6 +50,7 @@
 #include "BLI_task.h"
 #include "BLI_threads.h"
 #include "BLI_utildefines.h"
+#include "BLI_uuid.h"
 
 #ifdef WIN32
 #  include "BLI_winstuff.h"
@@ -88,6 +89,7 @@
 
 #include "atomic_ops.h"
 
+#include "file_intern.h"
 #include "filelist.h"
 
 #define FILEDIR_NBR_ENTRIES_UNSET -1
@@ -369,6 +371,8 @@ typedef struct FileListFilter {
   char filter_glob[FILE_MAXFILE];
   char filter_search[66]; /* + 2 for heading/trailing implicit '*' wildcards. */
   short flags;
+
+  FileAssetCatalogFilterSettingsHandle *asset_catalog_filter;
 } FileListFilter;
 
 /* FileListFilter.flags */
@@ -422,6 +426,8 @@ typedef struct FileList {
 
   /* Filter an entry of current filelist. */
   bool (*filter_fn)(struct FileListInternEntry *, const char *, FileListFilter *);
+  /* Executed before filtering individual items, to set up additional filter data. */
+  void (*prepare_filter_fn)(const struct FileList *, FileListFilter *);
 
   short tags; /* FileListTags */
 } FileList;
@@ -486,7 +492,6 @@ static void filelist_readjob_main_assets(struct FileListReadJob *job_params,
 static int groupname_to_code(const char *group);
 static uint64_t groupname_to_filter_id(const char *group);
 
-static void filelist_filter_clear(FileList *filelist);
 static void filelist_cache_clear(FileListEntryCache *cache, size_t new_size);
 
 /* ********** Sort helpers ********** */
@@ -716,7 +721,7 @@ void filelist_sort(struct FileList *filelist)
         sort_cb,
         &(struct FileSortData){.inverted = (filelist->flags & FL_SORT_INVERT) != 0});
 
-    filelist_filter_clear(filelist);
+    filelist_tag_needs_filtering(filelist);
     filelist->flags &= ~FL_NEED_SORTING;
   }
 }
@@ -893,6 +898,38 @@ static bool is_filtered_id_file(const FileListInternEntry *file,
   return is_filtered;
 }
 
+/**
+ * Get the asset metadata of a file, if it represents an asset. This may either be of a local ID
+ * (ID in the current #Main) or read from an external asset library.
+ */
+static AssetMetaData *filelist_file_internal_get_asset_data(const FileListInternEntry *file)
+{
+  const ID *local_id = file->local_data.id;
+  return local_id ? local_id->asset_data : file->imported_asset_data;
+}
+
+static void prepare_filter_asset_library(const FileList *filelist, FileListFilter *filter)
+{
+  /* Not used yet for the asset view template. */
+  if (!filter->asset_catalog_filter) {
+    return;
+  }
+
+  file_ensure_updated_catalog_filter_data(filter->asset_catalog_filter, filelist->asset_library);
+}
+
+static bool is_filtered_asset(FileListInternEntry *file, FileListFilter *filter)
+{
+  /* Not used yet for the asset view template. */
+  if (!filter->asset_catalog_filter) {
+    return true;
+  }
+
+  const AssetMetaData *asset_data = filelist_file_internal_get_asset_data(file);
+  return file_is_asset_visible_in_catalog_filter_settings(filter->asset_catalog_filter,
+                                                          asset_data);
+}
+
 static bool is_filtered_lib(FileListInternEntry *file, const char *root, FileListFilter *filter)
 {
   bool is_filtered;
@@ -910,6 +947,13 @@ static bool is_filtered_lib(FileListInternEntry *file, const char *root, FileLis
   return is_filtered;
 }
 
+static bool is_filtered_asset_library(FileListInternEntry *file,
+                                      const char *root,
+                                      FileListFilter *filter)
+{
+  return is_filtered_lib(file, root, filter) && is_filtered_asset(file, filter);
+}
+
 static bool is_filtered_main(FileListInternEntry *file,
                              const char *UNUSED(dir),
                              FileListFilter *filter)
@@ -922,10 +966,11 @@ static bool is_filtered_main_assets(FileListInternEntry *file,
                                     FileListFilter *filter)
 {
   /* "Filtered" means *not* being filtered out... So return true if the file should be visible. */
-  return is_filtered_id_file(file, file->relpath, file->name, filter);
+  return is_filtered_id_file(file, file->relpath, file->name, filter) &&
+         is_filtered_asset(file, filter);
 }
 
-static void filelist_filter_clear(FileList *filelist)
+void filelist_tag_needs_filtering(FileList *filelist)
 {
   filelist->flags |= FL_NEED_FILTERING;
 }
@@ -953,6 +998,10 @@ void filelist_filter(FileList *filelist)
     if (!filelist_islibrary(filelist, dir, NULL)) {
       filelist->filter_data.flags |= FLF_HIDE_LIB_DIR;
     }
+  }
+
+  if (filelist->prepare_filter_fn) {
+    filelist->prepare_filter_fn(filelist, &filelist->filter_data);
   }
 
   filtered_tmp = MEM_mallocN(sizeof(*filtered_tmp) * (size_t)num_files, __func__);
@@ -1033,7 +1082,29 @@ void filelist_setfilter_options(FileList *filelist,
 
   if (update) {
     /* And now, free filtered data so that we know we have to filter again. */
-    filelist_filter_clear(filelist);
+    filelist_tag_needs_filtering(filelist);
+  }
+}
+
+/**
+ * \param catalog_id: The catalog that should be filtered by if \a catalog_visibility is
+ *                    #FILE_SHOW_ASSETS_FROM_CATALOG. May be NULL otherwise.
+ */
+void filelist_set_asset_catalog_filter_options(
+    FileList *filelist,
+    eFileSel_Params_AssetCatalogVisibility catalog_visibility,
+    const bUUID *catalog_id)
+{
+  if (!filelist->filter_data.asset_catalog_filter) {
+    /* There's no filter data yet. */
+    filelist->filter_data.asset_catalog_filter = file_create_asset_catalog_filter_settings();
+  }
+
+  const bool needs_update = file_set_asset_catalog_filter_settings(
+      filelist->filter_data.asset_catalog_filter, catalog_visibility, *catalog_id);
+
+  if (needs_update) {
+    filelist_tag_needs_filtering(filelist);
   }
 }
 
@@ -1732,11 +1803,13 @@ void filelist_settype(FileList *filelist, short type)
     case FILE_ASSET_LIBRARY:
       filelist->check_dir_fn = filelist_checkdir_lib;
       filelist->read_job_fn = filelist_readjob_asset_library;
-      filelist->filter_fn = is_filtered_lib;
+      filelist->prepare_filter_fn = prepare_filter_asset_library;
+      filelist->filter_fn = is_filtered_asset_library;
       break;
     case FILE_MAIN_ASSET:
       filelist->check_dir_fn = filelist_checkdir_main_assets;
       filelist->read_job_fn = filelist_readjob_main_assets;
+      filelist->prepare_filter_fn = prepare_filter_asset_library;
       filelist->filter_fn = is_filtered_main_assets;
       filelist->tags |= FILELIST_TAGS_USES_MAIN_DATA | FILELIST_TAGS_NO_THREADS;
       break;
@@ -1759,7 +1832,7 @@ void filelist_clear_ex(struct FileList *filelist,
     return;
   }
 
-  filelist_filter_clear(filelist);
+  filelist_tag_needs_filtering(filelist);
 
   if (do_cache) {
     filelist_cache_clear(&filelist->filelist_cache, filelist->filelist_cache.size);
@@ -1802,11 +1875,17 @@ void filelist_free(struct FileList *filelist)
     filelist->selection_state = NULL;
   }
 
+  file_delete_asset_catalog_filter_settings(&filelist->filter_data.asset_catalog_filter);
   MEM_SAFE_FREE(filelist->asset_library_ref);
 
   memset(&filelist->filter_data, 0, sizeof(filelist->filter_data));
 
   filelist->flags &= ~(FL_NEED_SORTING | FL_NEED_FILTERING);
+}
+
+AssetLibrary *filelist_asset_library(FileList *filelist)
+{
+  return filelist->asset_library;
 }
 
 void filelist_freelib(struct FileList *filelist)
@@ -3219,6 +3298,7 @@ typedef struct FileListReadJob {
 } FileListReadJob;
 
 static bool filelist_readjob_should_recurse_into_entry(const int max_recursion,
+                                                       const bool is_lib,
                                                        const int current_recursion_level,
                                                        FileListInternEntry *entry)
 {
@@ -3226,8 +3306,14 @@ static bool filelist_readjob_should_recurse_into_entry(const int max_recursion,
     /* Recursive loading is disabled. */
     return false;
   }
-  if (current_recursion_level >= max_recursion) {
+  if (!is_lib && current_recursion_level > max_recursion) {
     /* No more levels of recursion left. */
+    return false;
+  }
+  /* Show entries when recursion is set to `Blend file` even when `current_recursion_level` exceeds
+   * `max_recursion`. */
+  if (!is_lib && (current_recursion_level >= max_recursion) &&
+      ((entry->typeflag & (FILE_TYPE_BLENDER | FILE_TYPE_BLENDER_BACKUP)) == 0)) {
     return false;
   }
   if (entry->typeflag & FILE_TYPE_BLENDERLIB) {
@@ -3345,7 +3431,8 @@ static void filelist_readjob_do(const bool do_lib,
       entry->name = fileentry_uiname(root, entry->relpath, entry->typeflag, dir);
       entry->free_name = true;
 
-      if (filelist_readjob_should_recurse_into_entry(max_recursion, recursion_level, entry)) {
+      if (filelist_readjob_should_recurse_into_entry(
+              max_recursion, is_lib, recursion_level, entry)) {
         /* We have a directory we want to list, add it to todo list! */
         BLI_join_dirfile(dir, sizeof(dir), root, entry->relpath);
         BLI_path_normalize_dir(job_params->main_name, dir);
@@ -3398,15 +3485,34 @@ static void filelist_readjob_lib(FileListReadJob *job_params,
   filelist_readjob_do(true, job_params, stop, do_update, progress);
 }
 
+static void filelist_asset_library_path(const FileListReadJob *job_params,
+                                        char r_library_root_path[FILE_MAX])
+{
+  if (job_params->filelist->type == FILE_MAIN_ASSET) {
+    /* For the "Current File" library (#FILE_MAIN_ASSET) we get the asset library root path based
+     * on main. */
+    BKE_asset_library_find_suitable_root_path_from_main(job_params->current_main,
+                                                        r_library_root_path);
+  }
+  else {
+    BLI_strncpy(r_library_root_path, job_params->tmp_filelist->filelist.root, FILE_MAX);
+  }
+}
+
+/**
+ * Load asset library data, which currently means loading the asset catalogs for the library.
+ */
 static void filelist_readjob_load_asset_library_data(FileListReadJob *job_params, short *do_update)
 {
   FileList *tmp_filelist = job_params->tmp_filelist; /* Use the thread-safe filelist queue. */
 
-  /* Check whether assets catalogs need to be loaded. */
   if (job_params->filelist->asset_library_ref != NULL) {
+    char library_root_path[FILE_MAX];
+    filelist_asset_library_path(job_params, library_root_path);
+
     /* Load asset catalogs, into the temp filelist for thread-safety.
      * #filelist_readjob_endjob() will move it into the real filelist. */
-    tmp_filelist->asset_library = BKE_asset_library_load(tmp_filelist->filelist.root);
+    tmp_filelist->asset_library = BKE_asset_library_load(library_root_path);
     *do_update = true;
   }
 }
@@ -3509,6 +3615,7 @@ static void filelist_readjob_startjob(void *flrjv, short *stop, short *do_update
   memset(&flrj->tmp_filelist->filelist_cache, 0, sizeof(flrj->tmp_filelist->filelist_cache));
   flrj->tmp_filelist->selection_state = NULL;
   flrj->tmp_filelist->asset_library_ref = NULL;
+  flrj->tmp_filelist->filter_data.asset_catalog_filter = NULL;
 
   BLI_mutex_unlock(&flrj->lock);
 

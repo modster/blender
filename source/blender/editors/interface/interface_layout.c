@@ -295,6 +295,7 @@ static bool ui_layout_variable_size(uiLayout *layout)
 struct uiTextIconPadFactor {
   float text;
   float icon;
+  float icon_only;
 };
 
 /**
@@ -309,18 +310,21 @@ struct uiTextIconPadFactor {
 static const struct uiTextIconPadFactor ui_text_pad_default = {
     .text = 1.50f,
     .icon = 0.25f,
+    .icon_only = 0.0f,
 };
 
 /** #ui_text_pad_default scaled down. */
 static const struct uiTextIconPadFactor ui_text_pad_compact = {
     .text = 1.25f,
-    .icon = 0.35,
+    .icon = 0.35f,
+    .icon_only = 0.0f,
 };
 
 /** Least amount of padding not to clip the text or icon. */
 static const struct uiTextIconPadFactor ui_text_pad_none = {
-    .text = 0.25,
+    .text = 0.25f,
     .icon = 1.50f,
+    .icon_only = 0.0f,
 };
 
 /**
@@ -333,14 +337,17 @@ static int ui_text_icon_width_ex(uiLayout *layout,
 {
   const int unit_x = UI_UNIT_X * (layout->scale[0] ? layout->scale[0] : 1.0f);
 
+  /* When there is no text, always behave as if this is an icon-only button
+   * since it's not useful to return empty space. */
   if (icon && !name[0]) {
-    return unit_x; /* icon only */
+    return unit_x * (1.0f + pad_factor->icon_only);
   }
 
   if (ui_layout_variable_size(layout)) {
     if (!icon && !name[0]) {
-      return unit_x; /* No icon or name. */
+      return unit_x * (1.0f + pad_factor->icon_only);
     }
+
     if (layout->alignment != UI_LAYOUT_ALIGN_EXPAND) {
       layout->item.flag |= UI_ITEM_FIXED_SIZE;
     }
@@ -2907,11 +2914,10 @@ static uiBut *ui_item_menu(uiLayout *layout,
     }
     else if (force_menu) {
       pad_factor.text = 1.85;
+      pad_factor.icon_only = 0.6f;
     }
     else {
-      if (name[0]) {
-        pad_factor.text = 0.75;
-      }
+      pad_factor.text = 0.75f;
     }
   }
 
@@ -5599,28 +5605,52 @@ void ui_layout_add_but(uiLayout *layout, uiBut *but)
   ui_button_group_add_but(uiLayoutGetBlock(layout), but);
 }
 
-bool ui_layout_replace_but_ptr(uiLayout *layout, const void *old_but_ptr, uiBut *new_but)
+static uiButtonItem *ui_layout_find_button_item(const uiLayout *layout, const uiBut *but)
 {
-  ListBase *child_list = layout->child_items_layout ? &layout->child_items_layout->items :
-                                                      &layout->items;
+  const ListBase *child_list = layout->child_items_layout ? &layout->child_items_layout->items :
+                                                            &layout->items;
 
   LISTBASE_FOREACH (uiItem *, item, child_list) {
     if (item->type == ITEM_BUTTON) {
       uiButtonItem *bitem = (uiButtonItem *)item;
 
-      if (bitem->but == old_but_ptr) {
-        bitem->but = new_but;
-        return true;
+      if (bitem->but == but) {
+        return bitem;
       }
     }
     else {
-      if (ui_layout_replace_but_ptr((uiLayout *)item, old_but_ptr, new_but)) {
-        return true;
+      uiButtonItem *nested_item = ui_layout_find_button_item((uiLayout *)item, but);
+      if (nested_item) {
+        return nested_item;
       }
     }
   }
 
-  return false;
+  return NULL;
+}
+
+void ui_layout_remove_but(uiLayout *layout, const uiBut *but)
+{
+  uiButtonItem *bitem = ui_layout_find_button_item(layout, but);
+  if (!bitem) {
+    return;
+  }
+
+  BLI_freelinkN(&layout->items, bitem);
+}
+
+/**
+ * \return true if the button was successfully replaced.
+ */
+bool ui_layout_replace_but_ptr(uiLayout *layout, const void *old_but_ptr, uiBut *new_but)
+{
+  uiButtonItem *bitem = ui_layout_find_button_item(layout, old_but_ptr);
+  if (!bitem) {
+    return false;
+  }
+
+  bitem->but = new_but;
+  return true;
 }
 
 void uiLayoutSetFixedSize(uiLayout *layout, bool fixed_size)

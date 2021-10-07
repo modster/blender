@@ -326,8 +326,6 @@ void Film::device_update(Device *device, DeviceScene *dscene, Scene *scene)
         kfilm->pass_bake_differential = kfilm->pass_stride;
         break;
 
-      case PASS_RENDER_TIME:
-        break;
       case PASS_CRYPTOMATTE:
         kfilm->pass_cryptomatte = have_cryptomatte ?
                                       min(kfilm->pass_cryptomatte, kfilm->pass_stride) :
@@ -434,7 +432,8 @@ void Film::update_passes(Scene *scene, bool add_sample_count_pass)
   const ObjectManager *object_manager = scene->object_manager;
   Integrator *integrator = scene->integrator;
 
-  if (!is_modified() && !object_manager->need_update() && !integrator->is_modified()) {
+  if (!is_modified() && !object_manager->need_update() && !integrator->is_modified() &&
+      !background->is_modified()) {
     return;
   }
 

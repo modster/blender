@@ -155,7 +155,7 @@ ccl_device_forceinline void integrator_state_read_shadow_isect(INTEGRATOR_STATE_
 ccl_device_forceinline void integrator_state_copy_volume_stack_to_shadow(INTEGRATOR_STATE_ARGS)
 {
   if (kernel_data.kernel_features & KERNEL_FEATURE_VOLUME) {
-    for (int i = 0; i < INTEGRATOR_VOLUME_STACK_SIZE; i++) {
+    for (int i = 0; i < kernel_data.volume_stack_size; i++) {
       INTEGRATOR_STATE_ARRAY_WRITE(shadow_volume_stack, i, object) = INTEGRATOR_STATE_ARRAY(
           volume_stack, i, object);
       INTEGRATOR_STATE_ARRAY_WRITE(shadow_volume_stack, i, shader) = INTEGRATOR_STATE_ARRAY(
@@ -217,11 +217,13 @@ ccl_device_inline void integrator_state_copy_only(const IntegratorState to_state
     while (false) \
       ;
 
-#  define KERNEL_STRUCT_END_ARRAY(name, array_size) \
+#  define KERNEL_STRUCT_END_ARRAY(name, cpu_array_size, gpu_array_size) \
     ++index; \
     } \
-    while (index < array_size) \
+    while (index < gpu_array_size) \
       ;
+
+#  define KERNEL_STRUCT_VOLUME_STACK_SIZE kernel_data.volume_stack_size
 
 #  include "kernel/integrator/integrator_state_template.h"
 
@@ -230,6 +232,7 @@ ccl_device_inline void integrator_state_copy_only(const IntegratorState to_state
 #  undef KERNEL_STRUCT_ARRAY_MEMBER
 #  undef KERNEL_STRUCT_END
 #  undef KERNEL_STRUCT_END_ARRAY
+#  undef KERNEL_STRUCT_VOLUME_STACK_SIZE
 }
 
 ccl_device_inline void integrator_state_move(const IntegratorState to_state,
@@ -264,7 +267,12 @@ ccl_device_inline void integrator_state_shadow_catcher_split(INTEGRATOR_STATE_AR
 
   IntegratorStateCPU *ccl_restrict split_state = state + 1;
 
-  *split_state = *state;
+  /* Only copy the required subset, since shadow intersections are big and irrelevant here. */
+  split_state->path = state->path;
+  split_state->ray = state->ray;
+  split_state->isect = state->isect;
+  memcpy(split_state->volume_stack, state->volume_stack, sizeof(state->volume_stack));
+  split_state->shadow_path = state->shadow_path;
 
   split_state->path.flag |= PATH_RAY_SHADOW_CATCHER_PASS;
 #endif

@@ -35,6 +35,9 @@ class Tile {
   int x = 0, y = 0;
   int width = 0, height = 0;
 
+  int window_x = 0, window_y = 0;
+  int window_width = 0, window_height = 0;
+
   Tile()
   {
   }
@@ -78,10 +81,16 @@ class TileManager {
     return tile_state_.num_tiles > 1;
   }
 
+  inline int get_tile_overscan() const
+  {
+    return overscan_;
+  }
+
   bool next();
   bool done();
 
   const Tile &get_current_tile() const;
+  const int2 get_size() const;
 
   /* Write render buffer of a tile to a file on disk.
    *
@@ -126,6 +135,9 @@ class TileManager {
   string tile_file_unique_part_;
 
   int2 tile_size_ = make_int2(0, 0);
+
+  /* Number of extra pixels around the actual tile to render. */
+  int overscan_ = 0;
 
   BufferParams buffer_params_;
 

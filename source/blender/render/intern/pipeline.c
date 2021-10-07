@@ -1015,10 +1015,10 @@ static void render_result_uncrop(Render *re)
       render_result_disprect_to_full_resolution(re);
 
       rres = render_result_new(re, &re->disprect, RR_ALL_LAYERS, RR_ALL_VIEWS);
-      render_result_passes_allocated_ensure(rres);
       rres->stamp_data = BKE_stamp_data_copy(re->result->stamp_data);
 
       render_result_clone_passes(re, rres, NULL);
+      render_result_passes_allocated_ensure(rres);
 
       render_result_merge(rres, re->result);
       render_result_free(re->result);
@@ -1440,7 +1440,7 @@ static void do_render_full_pipeline(Render *re)
 
   /* ensure no images are in memory from previous animated sequences */
   BKE_image_all_free_anim_ibufs(re->main, re->r.cfra);
-  SEQ_relations_free_all_anim_ibufs(re->scene, re->r.cfra);
+  SEQ_cache_cleanup(re->scene);
 
   if (RE_engine_render(re, true)) {
     /* in this case external render overrides all */
@@ -2817,7 +2817,7 @@ RenderPass *RE_create_gp_pass(RenderResult *rr, const char *layername, const cha
     BLI_freelinkN(&rl->passes, rp);
   }
   /* create a totally new pass */
-  return render_layer_add_pass(rr, rl, 4, RE_PASSNAME_COMBINED, viewname, "RGBA");
+  return render_layer_add_pass(rr, rl, 4, RE_PASSNAME_COMBINED, viewname, "RGBA", true);
 }
 
 bool RE_allow_render_generic_object(Object *ob)

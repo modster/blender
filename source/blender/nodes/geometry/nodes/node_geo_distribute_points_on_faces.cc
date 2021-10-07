@@ -50,6 +50,7 @@ static void geo_node_point_distribute_points_on_faces_declare(NodeDeclarationBui
       .default_value(1.0f)
       .min(0.0f)
       .max(1.0f)
+      .subtype(PROP_FACTOR)
       .supports_field();
   b.add_input<decl::Int>("Seed");
   b.add_input<decl::Bool>("Selection").default_value(true).hide_value().supports_field();
@@ -330,28 +331,28 @@ BLI_NOINLINE static void compute_attribute_outputs(const MeshComponent &mesh_com
                                                    const Span<int> looptri_indices,
                                                    const AttributeOutputs &attribute_outputs)
 {
-  std::optional<OutputAttribute_Typed<int>> id_attribute;
-  std::optional<OutputAttribute_Typed<float3>> normal_attribute;
-  std::optional<OutputAttribute_Typed<float3>> rotation_attribute;
+  OutputAttribute_Typed<int> id_attribute;
+  OutputAttribute_Typed<float3> normal_attribute;
+  OutputAttribute_Typed<float3> rotation_attribute;
 
   MutableSpan<int> ids;
   MutableSpan<float3> normals;
   MutableSpan<float3> rotations;
 
   if (attribute_outputs.stable_id_id) {
-    id_attribute.emplace(point_component.attribute_try_get_for_output_only<int>(
-        attribute_outputs.stable_id_id.get(), ATTR_DOMAIN_POINT));
-    ids = id_attribute->as_span();
+    id_attribute = point_component.attribute_try_get_for_output_only<int>(
+        attribute_outputs.stable_id_id.get(), ATTR_DOMAIN_POINT);
+    ids = id_attribute.as_span();
   }
   if (attribute_outputs.normal_id) {
-    normal_attribute.emplace(point_component.attribute_try_get_for_output_only<float3>(
-        attribute_outputs.normal_id.get(), ATTR_DOMAIN_POINT));
-    normals = normal_attribute->as_span();
+    normal_attribute = point_component.attribute_try_get_for_output_only<float3>(
+        attribute_outputs.normal_id.get(), ATTR_DOMAIN_POINT);
+    normals = normal_attribute.as_span();
   }
   if (attribute_outputs.rotation_id) {
-    rotation_attribute.emplace(point_component.attribute_try_get_for_output_only<float3>(
-        attribute_outputs.rotation_id.get(), ATTR_DOMAIN_POINT));
-    rotations = rotation_attribute->as_span();
+    rotation_attribute = point_component.attribute_try_get_for_output_only<float3>(
+        attribute_outputs.rotation_id.get(), ATTR_DOMAIN_POINT);
+    rotations = rotation_attribute.as_span();
   }
 
   const Mesh &mesh = *mesh_component.get_for_read();
@@ -386,13 +387,13 @@ BLI_NOINLINE static void compute_attribute_outputs(const MeshComponent &mesh_com
   }
 
   if (id_attribute) {
-    id_attribute->save();
+    id_attribute.save();
   }
   if (normal_attribute) {
-    normal_attribute->save();
+    normal_attribute.save();
   }
   if (rotation_attribute) {
-    rotation_attribute->save();
+    rotation_attribute.save();
   }
 }
 
@@ -523,8 +524,6 @@ static void point_distribution_calculate(GeometrySet &geometry_set,
 
   compute_attribute_outputs(
       mesh_component, point_component, bary_coords, looptri_indices, attribute_outputs);
-
-  geometry_set.replace_mesh(nullptr);
 }
 
 static void geo_node_point_distribute_points_on_faces_exec(GeoNodeExecParams params)
@@ -551,6 +550,9 @@ static void geo_node_point_distribute_points_on_faces_exec(GeoNodeExecParams par
   geometry_set.modify_geometry_sets([&](GeometrySet &geometry_set) {
     point_distribution_calculate(
         geometry_set, selection_field, method, seed, attribute_outputs, params);
+    /* Keep instances because the original geometry set may contain instances that are processed as
+     * well. */
+    geometry_set.keep_only({GEO_COMPONENT_TYPE_POINT_CLOUD, GEO_COMPONENT_TYPE_INSTANCES});
   });
 
   params.set_output("Points", std::move(geometry_set));

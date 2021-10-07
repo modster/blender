@@ -99,6 +99,11 @@ def use_cuda(context):
     return (get_device_type(context) == 'CUDA' and cscene.device == 'GPU')
 
 
+def use_hip(context):
+    cscene = context.scene.cycles
+
+    return (get_device_type(context) == 'HIP' and cscene.device == 'GPU')
+
 def use_optix(context):
     cscene = context.scene.cycles
 
@@ -787,7 +792,6 @@ class CYCLES_RENDER_PT_passes_data(CyclesButtonsPanel, Panel):
         col.prop(view_layer, "use_pass_material_index")
 
         col = layout.column(heading="Debug", align=True)
-        col.prop(cycles_view_layer, "pass_debug_render_time", text="Render Time")
         col.prop(cycles_view_layer, "pass_debug_sample_count", text="Sample Count")
 
         layout.prop(view_layer, "pass_alpha_threshold")
