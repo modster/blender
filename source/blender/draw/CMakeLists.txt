@@ -134,6 +134,7 @@ set(SRC
   engines/eevee/eevee_shader.cc
   engines/eevee/eevee_shading.cc
   engines/eevee/eevee_shadow.cc
+  engines/eevee/eevee_subsurface.cc
   engines/eevee/eevee_velocity.cc
   engines/eevee/eevee_view.cc
   engines/eevee/eevee_world.cc
@@ -299,6 +300,7 @@ data_to_c_simple(engines/eevee/shaders/eevee_motion_blur_tiles_flatten_frag.glsl
 data_to_c_simple(engines/eevee/shaders/eevee_nodetree_eval_lib.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_sampling_lib.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_shadow_lib.glsl SRC)
+data_to_c_simple(engines/eevee/shaders/eevee_subsurface_eval_frag.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_surface_background_frag.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_surface_deferred_frag.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_surface_depth_frag.glsl SRC)

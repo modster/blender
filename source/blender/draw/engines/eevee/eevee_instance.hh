@@ -40,6 +40,7 @@
 #include "eevee_shader.hh"
 #include "eevee_shading.hh"
 #include "eevee_shadow.hh"
+#include "eevee_subsurface.hh"
 #include "eevee_view.hh"
 #include "eevee_world.hh"
 
@@ -70,6 +71,7 @@ class Instance {
   LightProbeModule lightprobes;
   /* TODO(fclem) Move it to scene layer data. */
   ShadowModule shadows;
+  SubsurfaceModule subsurface;
   SyncModule sync;
   MaterialModule materials;
   /** Lookdev own lightweight instance. May not be allocated. */
@@ -109,6 +111,7 @@ class Instance {
         lights(*this),
         lightprobes(*this),
         shadows(*this),
+        subsurface(*this),
         sync(*this),
         materials(*this),
         lookdev(*this){};

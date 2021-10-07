@@ -93,6 +93,8 @@ enum eShaderType {
 
   SHADOW_CLEAR,
 
+  SUBSURFACE_EVAL,
+
   VELOCITY_CAMERA,
   VELOCITY_MESH,
 

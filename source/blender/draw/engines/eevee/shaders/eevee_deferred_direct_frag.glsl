@@ -65,7 +65,7 @@ utility_tx_sample_define(utility_tx)
 in vec4 uvcoordsvar;
 
 layout(location = 0) out vec4 out_combined;
-layout(location = 1) out vec3 out_diffuse;
+layout(location = 1) out vec4 out_diffuse;
 layout(location = 2) out vec3 out_specular;
 
 /* Prototypes. */
@@ -112,9 +112,17 @@ void main(void)
   radiance_reflection += lightprobe_cubemap_eval(P, R, reflection.roughness, random_probe);
   radiance_refraction += lightprobe_cubemap_eval(P, T, sqr(refraction.roughness), random_probe);
 
-  out_diffuse = radiance_diffuse * diffuse.color;
+  out_combined = vec4(emission.emission, 0.0);
+  out_diffuse.rgb = radiance_diffuse;
+  /* FIXME(fclem): This won't work after the first light batch since we use additive blending. */
+  out_diffuse.a = fract(float(diffuse.sss_id) / 1024.0);
+  /* Do not apply color to diffuse term for SSS material. */
+  if (diffuse.sss_id == 0u) {
+    out_diffuse.rgb *= diffuse.color;
+    out_combined.rgb += out_diffuse.rgb;
+  }
   out_specular = radiance_reflection * reflection.color + radiance_refraction * refraction.color;
-  out_combined = vec4(out_diffuse + out_specular + emission.emission, 0.0);
+  out_combined.rgb += out_specular;
 }
 
 #pragma BLENDER_REQUIRE_POST(eevee_light_eval_lib.glsl)

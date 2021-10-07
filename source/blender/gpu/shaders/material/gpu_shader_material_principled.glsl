@@ -133,6 +133,7 @@ void node_bsdf_principled_eval(vec4 base_color,
     g_diffuse_data.color *= diffuse_weight;
     g_diffuse_data.N = N;
     g_diffuse_data.sss_radius = subsurface_radius * subsurface;
+    g_diffuse_data.sss_id = uint(resource_handle + 1);
   }
 
   /* Reflection. */

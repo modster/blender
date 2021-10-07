@@ -45,12 +45,13 @@
 
 #  include "BLI_float2.hh"
 #  include "BLI_float3.hh"
+#  include "BLI_float4.hh"
 #  include "BLI_float4x4.hh"
 #  include "BLI_int2.hh"
 #  include "BLI_int3.hh"
 
 typedef float mat4[4][4];
-typedef float vec4[4];
+using vec4 = blender::float4;
 using vec3 = blender::float3;
 using vec2 = blender::float2;
 using ivec3 = blender::int3;
@@ -88,11 +89,13 @@ enum eSamplingDimension : uint32_t {
   SAMPLING_SHADOW_Y = 9u,
   SAMPLING_CLOSURE = 10u,
   SAMPLING_LIGHTPROBE = 11u,
-  SAMPLING_TRANSPARENCY = 12u
+  SAMPLING_TRANSPARENCY = 12u,
+  SAMPLING_SSS_U = 13u,
+  SAMPLING_SSS_V = 14u
 };
 
 /** IMPORTANT: Make sure the array can contain all sampling dimensions. */
-#define SAMPLING_DIMENSION_COUNT 13
+#define SAMPLING_DIMENSION_COUNT 15
 
 struct SamplingData {
   /** Array containing random values from Low Discrepency Sequence in [0..1) range. */
@@ -610,6 +613,29 @@ BLI_STATIC_ASSERT_ALIGN(LightProbeInfoData, 16)
 /** \} */
 
 /* -------------------------------------------------------------------- */
+/** \name Subsurface
+ * \{ */
+
+#define SSS_SAMPLE_MAX 64
+#define BURLEY_TRUNCATE 16.0
+#define BURLEY_TRUNCATE_CDF 0.9963790093708328
+
+struct SubsurfaceData {
+  /** xy: 2D sample position [-1..1], zw: sample_bounds. */
+  /* NOTE(fclem) Using vec4 for alignment. */
+  vec4 samples[SSS_SAMPLE_MAX];
+  /** Sample index after which samples are not randomly rotated anymore. */
+  int jitter_threshold;
+  /** Number of samples precomputed in the set. */
+  int sample_len;
+  int _pad0;
+  int _pad1;
+};
+BLI_STATIC_ASSERT_ALIGN(SubsurfaceData, 16)
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
 /** \name Utility Texture
  * \{ */
 
@@ -672,6 +698,7 @@ using LightDataBuf = StructArrayBuffer<LightData, CULLING_ITEM_BATCH>;
 using LightProbeFilterDataBuf = StructBuffer<LightProbeFilterData>;
 using LightProbeInfoDataBuf = StructBuffer<LightProbeInfoData>;
 using ShadowPunctualDataBuf = StructArrayBuffer<ShadowPunctualData, CULLING_ITEM_BATCH>;
+using SubsurfaceDataBuf = StructBuffer<SubsurfaceData>;
 using VelocityObjectBuf = StructBuffer<VelocityObjectData>;
 
 #  undef bool

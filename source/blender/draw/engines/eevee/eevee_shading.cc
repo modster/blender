@@ -219,7 +219,8 @@ void DeferredLayer::sync(void)
 
 DRWShadingGroup *DeferredLayer::material_add(::Material *blender_mat, GPUMaterial *gpumat)
 {
-  uint stencil_mask = CLOSURE_DIFFUSE | CLOSURE_REFLECTION | CLOSURE_TRANSPARENCY |
+  /* TODO/OPTI(fclem) Set the right mask for each effect based on gpumat flags. */
+  uint stencil_mask = CLOSURE_DIFFUSE | CLOSURE_SSS | CLOSURE_REFLECTION | CLOSURE_TRANSPARENCY |
                       CLOSURE_EMISSION;
   DRWPass *pass = (blender_mat->blend_flag & MA_BL_CULL_BACKFACE) ? gbuffer_culled_ps_ :
                                                                     gbuffer_ps_;
@@ -264,7 +265,7 @@ void DeferredLayer::render(GBuffer &gbuffer, GPUFrameBuffer *view_fb)
     return;
   }
 
-  gbuffer.bind((eClosureBits)0xFFFFFFFF);
+  gbuffer.bind((eClosureBits)0xFFFFFFFFu);
 
   if (!no_surfaces) {
     DRW_draw_pass(prepass_ps_);
@@ -279,6 +280,7 @@ void DeferredLayer::render(GBuffer &gbuffer, GPUFrameBuffer *view_fb)
   deferred_pass.input_transmit_data_tx_ = gbuffer.transmit_data_tx;
   deferred_pass.input_reflect_color_tx_ = gbuffer.reflect_color_tx;
   deferred_pass.input_reflect_normal_tx_ = gbuffer.reflect_normal_tx;
+  deferred_pass.input_diffuse_tx_ = gbuffer.diffuse_tx;
   deferred_pass.input_transparency_data_tx_ = gbuffer.transparency_tx;
   deferred_pass.input_volume_data_tx_ = gbuffer.volume_tx;
   deferred_pass.input_depth_tx_ = gbuffer.depth_copy_tx;
@@ -310,15 +312,25 @@ void DeferredLayer::render(GBuffer &gbuffer, GPUFrameBuffer *view_fb)
     DRW_draw_pass(deferred_pass.eval_transparency_ps_);
   }
 
+  gbuffer.clear_radiance();
+
   for (auto index : inst_.lights.index_range()) {
     inst_.lights.bind_batch(index);
 
     if (!no_volumes) {
+      /* TODO(fclem) volume fb. */
+      GPU_framebuffer_bind(view_fb);
       DRW_draw_pass(deferred_pass.eval_volume_homogeneous_ps_);
     }
     if (!no_surfaces) {
+      gbuffer.bind_radiance();
       DRW_draw_pass(deferred_pass.eval_diffuse_ps_);
     }
+  }
+
+  if (!no_surfaces) {
+    GPU_framebuffer_bind(view_fb);
+    DRW_draw_pass(deferred_pass.eval_subsurface_ps_);
   }
 }
 
@@ -371,6 +383,24 @@ void DeferredPass::sync(void)
     DRW_shgroup_uniform_texture_ref(grp, "depth_tx", &input_depth_tx_);
     DRW_shgroup_stencil_set(
         grp, 0x0, 0x0, CLOSURE_DIFFUSE | CLOSURE_REFLECTION | CLOSURE_EMISSION);
+    DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
+  }
+  {
+    DRWState state = DRW_STATE_WRITE_COLOR | DRW_STATE_STENCIL_EQUAL | DRW_STATE_BLEND_ADD_FULL;
+    eval_subsurface_ps_ = DRW_pass_create("DeferredSubsurface", state);
+    GPUShader *sh = inst_.shaders.static_shader_get(SUBSURFACE_EVAL);
+    DRWShadingGroup *grp = DRW_shgroup_create(sh, eval_subsurface_ps_);
+    DRW_shgroup_uniform_block(grp, "subsurface_block", inst_.subsurface.ubo_get());
+    DRW_shgroup_uniform_block(grp, "sampling_block", inst_.sampling.ubo_get());
+    DRW_shgroup_uniform_texture_ref(grp, "depth_tx", &input_depth_tx_);
+    DRW_shgroup_uniform_texture_ref_ex(grp, "radiance_tx", &input_diffuse_tx_, no_interp);
+    DRW_shgroup_uniform_texture_ref_ex(
+        grp, "transmit_color_tx", &input_transmit_color_tx_, no_interp);
+    DRW_shgroup_uniform_texture_ref_ex(
+        grp, "transmit_normal_tx", &input_transmit_normal_tx_, no_interp);
+    DRW_shgroup_uniform_texture_ref_ex(
+        grp, "transmit_data_tx", &input_transmit_data_tx_, no_interp);
+    DRW_shgroup_stencil_set(grp, 0x0, 0xFF, CLOSURE_SSS);
     DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
   }
   {

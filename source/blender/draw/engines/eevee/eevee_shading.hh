@@ -107,6 +107,7 @@ class ForwardPass {
 /** \name Deferred lighting.
  * \{ */
 
+/** NOTE: Theses are used as stencil bits. So we are limited to 8bits. */
 enum eClosureBits {
   CLOSURE_DIFFUSE = 1 << 0,
   CLOSURE_SSS = 1 << 1,
@@ -131,6 +132,10 @@ struct GBuffer {
   Framebuffer volume_fb = Framebuffer("VolumeHeterogeneous");
 
   Texture holdout_tx = Texture("HoldoutRadiance");
+  Texture diffuse_tx = Texture("DiffuseRadiance");
+
+  Framebuffer radiance_fb = Framebuffer("Radiance");
+  Framebuffer radiance_clear_fb = Framebuffer("RadianceClear");
 
   Framebuffer holdout_fb = Framebuffer("Holdout");
 
@@ -163,6 +168,7 @@ struct GBuffer {
     emission_tx.sync_tmp();
     transparency_tx.sync_tmp();
     holdout_tx.sync_tmp();
+    diffuse_tx.sync_tmp();
     depth_behind_tx.sync_tmp();
     depth_copy_tx.sync_tmp();
   }
@@ -182,8 +188,11 @@ struct GBuffer {
     else if (closures_used & CLOSURE_DIFFUSE) {
       transmit_normal_tx.acquire_tmp(UNPACK2(extent), GPU_RG16F, owner);
     }
+    if (closures_used & CLOSURE_SSS) {
+      diffuse_tx.acquire_tmp(UNPACK2(extent), GPU_RGBA16F, owner);
+    }
 
-    if (closures_used & CLOSURE_DIFFUSE) {
+    if (closures_used & CLOSURE_REFLECTION) {
       reflect_color_tx.acquire_tmp(UNPACK2(extent), GPU_R11F_G11F_B10F, owner);
       reflect_normal_tx.acquire_tmp(UNPACK2(extent), GPU_RGBA16, owner);
     }
@@ -221,9 +230,19 @@ struct GBuffer {
     GPU_framebuffer_clear_stencil(gbuffer_fb, 0x0);
   }
 
+  void bind_radiance(void)
+  {
+    /* Layer attachement also works with cubemap. */
+    radiance_fb.ensure(GPU_ATTACHMENT_TEXTURE_LAYER(depth_tx, layer),
+                       GPU_ATTACHMENT_TEXTURE(combined_tx),
+                       GPU_ATTACHMENT_TEXTURE(diffuse_tx));
+    GPU_framebuffer_bind(radiance_fb);
+  }
+
   void bind_volume(void)
   {
-    volume_fb.ensure(GPU_ATTACHMENT_TEXTURE(depth_tx),
+    /* Layer attachement also works with cubemap. */
+    volume_fb.ensure(GPU_ATTACHMENT_TEXTURE_LAYER(depth_tx, layer),
                      GPU_ATTACHMENT_TEXTURE(volume_tx),
                      GPU_ATTACHMENT_TEXTURE(transparency_tx));
     GPU_framebuffer_bind(volume_fb);
@@ -251,6 +270,15 @@ struct GBuffer {
     GPU_framebuffer_blit(gbuffer_fb, 0, depth_copy_fb, 0, GPU_DEPTH_BIT);
   }
 
+  void clear_radiance(void)
+  {
+    radiance_clear_fb.ensure(GPU_ATTACHMENT_NONE, GPU_ATTACHMENT_TEXTURE(diffuse_tx));
+    GPU_framebuffer_bind(radiance_clear_fb);
+
+    float color[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+    GPU_framebuffer_clear_color(radiance_clear_fb, color);
+  }
+
   void render_end(void)
   {
     transmit_color_tx.release_tmp();
@@ -262,6 +290,7 @@ struct GBuffer {
     emission_tx.release_tmp();
     transparency_tx.release_tmp();
     holdout_tx.release_tmp();
+    diffuse_tx.release_tmp();
     depth_behind_tx.release_tmp();
     depth_copy_tx.release_tmp();
   }
@@ -305,6 +334,7 @@ class DeferredPass {
   DeferredLayer volumetric_layer_;
 
   DRWPass *eval_diffuse_ps_ = nullptr;
+  DRWPass *eval_subsurface_ps_ = nullptr;
   DRWPass *eval_transparency_ps_ = nullptr;
   DRWPass *eval_holdout_ps_ = nullptr;
   // DRWPass *eval_volume_heterogeneous_ps_ = nullptr;
@@ -320,6 +350,7 @@ class DeferredPass {
   GPUTexture *input_transmit_data_tx_ = nullptr;
   GPUTexture *input_reflect_color_tx_ = nullptr;
   GPUTexture *input_reflect_normal_tx_ = nullptr;
+  GPUTexture *input_diffuse_tx_ = nullptr;
   GPUTexture *input_transparency_data_tx_ = nullptr;
   GPUTexture *input_volume_data_tx_ = nullptr;
   // GPUTexture *input_volume_radiance_tx_ = nullptr;

@@ -225,6 +225,7 @@ void Instance::end_sync(void)
   sampling.end_sync();
   render_passes.end_sync();
   lightprobes.end_sync();
+  subsurface.end_sync();
 }
 
 void Instance::render_sync(void)

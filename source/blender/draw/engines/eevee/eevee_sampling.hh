@@ -170,6 +170,9 @@ class Sampling {
       BLI_halton_2d(primes, offset, (sample_ - 1) * leap, r);
       data_.dimensions[SAMPLING_SHADOW_X][0] = r[0];
       data_.dimensions[SAMPLING_SHADOW_Y][0] = r[1];
+      /* TODO decorelate. */
+      data_.dimensions[SAMPLING_SSS_U][0] = r[0];
+      data_.dimensions[SAMPLING_SSS_V][0] = r[1];
     }
 
     data_.push_update();

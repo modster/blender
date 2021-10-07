@@ -102,6 +102,7 @@ extern char datatoc_eevee_motion_blur_tiles_flatten_frag_glsl[];
 extern char datatoc_eevee_nodetree_eval_lib_glsl[];
 extern char datatoc_eevee_sampling_lib_glsl[];
 extern char datatoc_eevee_shadow_lib_glsl[];
+extern char datatoc_eevee_subsurface_eval_frag_glsl[];
 extern char datatoc_eevee_surface_background_frag_glsl[];
 extern char datatoc_eevee_surface_deferred_frag_glsl[];
 extern char datatoc_eevee_surface_depth_frag_glsl[];
@@ -328,6 +329,8 @@ ShaderModule::ShaderModule()
   SHADER_FULLSCREEN(MOTION_BLUR_TILE_FLATTEN, eevee_motion_blur_tiles_flatten_frag);
 
   SHADER_FULLSCREEN(SHADOW_CLEAR, eevee_depth_clear_frag);
+
+  SHADER_FULLSCREEN(SUBSURFACE_EVAL, eevee_subsurface_eval_frag);
 
   SHADER(VELOCITY_MESH,
          eevee_surface_velocity_mesh_vert,
