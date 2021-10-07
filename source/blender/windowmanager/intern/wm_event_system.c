@@ -3461,6 +3461,70 @@ static void wm_event_free_and_remove_from_queue_if_valid(wmEvent *event)
  * Handle events for all windows, run from the #WM_main event loop.
  * \{ */
 
+#ifdef WITH_XR_OPENXR
+/**
+ * Special handling for XR events.
+ *
+ * Although XR events are added to regular window queues, they are handled in an "off-screen area"
+ * context that is owned entirely by XR runtime data and not tied to a window.
+ */
+static void wm_event_handle_xrevent(bContext *C,
+                                    wmWindowManager *wm,
+                                    wmWindow *win,
+                                    wmEvent *event)
+{
+  ScrArea *area = WM_xr_session_area_get(&wm->xr);
+  if (!area) {
+    return;
+  }
+  BLI_assert(area->spacetype == SPACE_VIEW3D && area->spacedata.first);
+
+  /* Find a valid region for XR operator execution and modal handling. */
+  ARegion *region = BKE_area_find_region_type(area, RGN_TYPE_WINDOW);
+  if (!region) {
+    return;
+  }
+  BLI_assert(WM_region_use_viewport(area, region)); /* For operators using GPU-based selection. */
+
+  CTX_wm_area_set(C, area);
+  CTX_wm_region_set(C, region);
+
+  int action = wm_handlers_do(C, event, &win->modalhandlers);
+
+  if ((action & WM_HANDLER_BREAK) == 0) {
+    wmXrActionData *actiondata = event->customdata;
+    if (actiondata->ot->modal && event->val == KM_RELEASE) {
+      /* Don't execute modal operators on release. */
+    }
+    else {
+      PointerRNA properties = {.type = actiondata->ot->srna, .data = actiondata->op_properties};
+      if (actiondata->ot->invoke) {
+        /* Invoke operator, either executing operator or transferring responsibility to window
+         * modal handlers. */
+        wm_operator_invoke(C,
+                           actiondata->ot,
+                           event,
+                           actiondata->op_properties ? &properties : NULL,
+                           NULL,
+                           false,
+                           false);
+      }
+      else {
+        /* Execute operator. */
+        wmOperator *op = wm_operator_create(
+            wm, actiondata->ot, actiondata->op_properties ? &properties : NULL, NULL);
+        if ((WM_operator_call(C, op) & OPERATOR_HANDLED) == 0) {
+          WM_operator_free(op);
+        }
+      }
+    }
+  }
+
+  CTX_wm_region_set(C, NULL);
+  CTX_wm_area_set(C, NULL);
+}
+#endif /* WITH_XR_OPENXR */
+
 /* Called in main loop. */
 /* Goes over entire hierarchy:  events -> window -> screen -> area -> region. */
 void wm_event_do_handlers(bContext *C)
@@ -3557,6 +3621,16 @@ void wm_event_do_handlers(bContext *C)
       }
 
       CTX_wm_window_set(C, win);
+
+#ifdef WITH_XR_OPENXR
+      if (event->type == EVT_XR_ACTION) {
+        wm_event_handle_xrevent(C, wm, win, event);
+        BLI_remlink(&win->event_queue, event);
+        wm_event_free(event);
+        /* Skip mouse event handling below, which is unnecessary for XR events. */
+        continue;
+      }
+#endif
 
       /* Clear tool-tip on mouse move. */
       if (screen->tool_tip && screen->tool_tip->exit_on_event) {
@@ -3951,6 +4025,7 @@ void WM_event_get_keymap_from_toolsystem_fallback(wmWindowManager *wm,
   const char *keymap_id_list[ARRAY_SIZE(km_result->keymaps)];
   int keymap_id_list_len = 0;
 
+  const Scene *scene = wm->winactive->scene;
   ScrArea *area = handler->dynamic.user_data;
   handler->keymap_tool = NULL;
   bToolRef_Runtime *tref_rt = area->runtime.tool ? area->runtime.tool->runtime : NULL;
@@ -3962,7 +4037,8 @@ void WM_event_get_keymap_from_toolsystem_fallback(wmWindowManager *wm,
   bool is_gizmo_visible = false;
   bool is_gizmo_highlight = false;
 
-  if (tref_rt && tref_rt->keymap_fallback[0]) {
+  if ((tref_rt && tref_rt->keymap_fallback[0]) &&
+      (scene->toolsettings->workspace_tool_type == SCE_WORKSPACE_TOOL_FALLBACK)) {
     bool add_keymap = false;
     /* Support for the gizmo owning the tool keymap. */
 
@@ -3984,14 +4060,12 @@ void WM_event_get_keymap_from_toolsystem_fallback(wmWindowManager *wm,
       if (gzgroup != NULL) {
         if (gzgroup->type->flag & WM_GIZMOGROUPTYPE_TOOL_FALLBACK_KEYMAP) {
           /* If all are hidden, don't override. */
-          if (gzgroup->use_fallback_keymap) {
-            is_gizmo_visible = true;
-            wmGizmo *highlight = wm_gizmomap_highlight_get(gzmap);
-            if (highlight) {
-              is_gizmo_highlight = true;
-            }
-            add_keymap = true;
+          is_gizmo_visible = true;
+          wmGizmo *highlight = wm_gizmomap_highlight_get(gzmap);
+          if (highlight) {
+            is_gizmo_highlight = true;
           }
+          add_keymap = true;
         }
       }
     }
@@ -5109,6 +5183,24 @@ void wm_event_add_ghostevent(wmWindowManager *wm, wmWindow *win, int type, void 
   WM_event_print(&event);
 #endif
 }
+
+#ifdef WITH_XR_OPENXR
+void wm_event_add_xrevent(wmWindow *win, wmXrActionData *actiondata, short val)
+{
+  BLI_assert(val == KM_PRESS || val == KM_RELEASE);
+
+  wmEvent event = {
+      .type = EVT_XR_ACTION,
+      .val = val,
+      .is_repeat = false,
+      .custom = EVT_DATA_XR,
+      .customdata = actiondata,
+      .customdatafree = 1,
+  };
+
+  wm_event_add(win, &event);
+}
+#endif /* WITH_XR_OPENXR */
 
 /** \} */
 
