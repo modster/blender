@@ -262,7 +262,8 @@ class MATERIAL_PT_gpencil_preview(GPMaterialButtonsPanel, Panel):
         mat = context.material
         ob = context.active_object
         is_scene_render = ob and ob.use_grease_pencil_scene_engine
-        return (mat and mat.grease_pencil and (mat.use_nodes is False or is_scene_render is False))
+        return (mat and mat.grease_pencil and
+                (mat.use_nodes is False or is_scene_render is False))
 
     def draw(self, context):
         ma = context.material
@@ -280,7 +281,8 @@ class MATERIAL_PT_gpencil_custom_props(GPMaterialButtonsPanel, PropertyPanel, Pa
         mat = context.material
         ob = context.active_object
         is_scene_render = ob and ob.use_grease_pencil_scene_engine
-        return (mat and mat.grease_pencil and (mat.use_nodes is False or is_scene_render is False))
+        return (mat and mat.grease_pencil and
+                (mat.use_nodes is False or is_scene_render is False))
 
 
 def draw_material_settings(self, context):
@@ -319,7 +321,8 @@ class MATERIAL_PT_gpencil_settings(GPMaterialButtonsPanel, Panel):
         mat = context.material
         ob = context.active_object
         is_scene_render = ob and ob.use_grease_pencil_scene_engine
-        return (mat and mat.grease_pencil and (mat.use_nodes is False or is_scene_render is False))
+        return (mat and mat.grease_pencil and
+                (mat.use_nodes is False or is_scene_render is False))
 
     def draw(self, context):
         draw_material_settings(self, context)
