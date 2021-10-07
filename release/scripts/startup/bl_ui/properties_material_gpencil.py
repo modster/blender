@@ -123,7 +123,9 @@ class MATERIAL_PT_gpencil_surface(GPMaterialButtonsPanel, Panel):
     @classmethod
     def poll(cls, context):
         mat = context.material
-        return (mat and mat.use_nodes is False)
+        ob = context.active_object
+        is_scene_render = ob and ob.use_grease_pencil_scene_engine
+        return (mat and (mat.use_nodes is False or is_scene_render is False))
 
     def draw_header_preset(self, _context):
         MATERIAL_PT_gpencil_material_presets.draw_panel_header(self.layout)
@@ -131,7 +133,7 @@ class MATERIAL_PT_gpencil_surface(GPMaterialButtonsPanel, Panel):
     def draw(self, context):
         layout = self.layout
         ob = context.active_object
-        is_scene_render = ob.use_grease_pencil_scene_engine
+        is_scene_render = ob and ob.use_grease_pencil_scene_engine
         mat = context.material
         if is_scene_render:
             layout.prop(mat, "use_nodes", icon='NODETREE')
@@ -152,7 +154,7 @@ class MATERIAL_PT_gpencil_strokecolor(GPMaterialButtonsPanel, Panel):
         layout = self.layout
         layout.use_property_split = True
         ob = context.active_object
-        is_scene_render = ob.use_grease_pencil_scene_engine
+        is_scene_render = ob and ob.use_grease_pencil_scene_engine
         ma = context.material
         if ma is not None and ma.grease_pencil is not None:
             gpcolor = ma.grease_pencil
@@ -203,7 +205,7 @@ class MATERIAL_PT_gpencil_fillcolor(GPMaterialButtonsPanel, Panel):
         layout.use_property_split = True
 
         ob = context.active_object
-        is_scene_render = ob.use_grease_pencil_scene_engine
+        is_scene_render = ob and ob.use_grease_pencil_scene_engine
         ma = context.material
         gpcolor = ma.grease_pencil
 
@@ -258,7 +260,9 @@ class MATERIAL_PT_gpencil_preview(GPMaterialButtonsPanel, Panel):
     @classmethod
     def poll(cls, context):
         mat = context.material
-        return (mat and mat.grease_pencil and mat.use_nodes is False)
+        ob = context.active_object
+        is_scene_render = ob and ob.use_grease_pencil_scene_engine
+        return (mat and mat.grease_pencil and (mat.use_nodes is False or is_scene_render is False))
 
     def draw(self, context):
         ma = context.material
@@ -274,12 +278,14 @@ class MATERIAL_PT_gpencil_custom_props(GPMaterialButtonsPanel, PropertyPanel, Pa
     @classmethod
     def poll(cls, context):
         mat = context.material
-        return (mat and mat.grease_pencil and mat.use_nodes is False)
+        ob = context.active_object
+        is_scene_render = ob and ob.use_grease_pencil_scene_engine
+        return (mat and mat.grease_pencil and (mat.use_nodes is False or is_scene_render is False))
 
 
 def draw_material_settings(self, context):
     ob = context.active_object
-    is_scene_render = ob.use_grease_pencil_scene_engine
+    is_scene_render = ob and ob.use_grease_pencil_scene_engine
     layout = self.layout
     layout.use_property_split = True
     layout.use_property_decorate = False
@@ -311,7 +317,9 @@ class MATERIAL_PT_gpencil_settings(GPMaterialButtonsPanel, Panel):
     @classmethod
     def poll(cls, context):
         mat = context.material
-        return (mat and mat.grease_pencil and mat.use_nodes is False)
+        ob = context.active_object
+        is_scene_render = ob and ob.use_grease_pencil_scene_engine
+        return (mat and mat.grease_pencil and (mat.use_nodes is False or is_scene_render is False))
 
     def draw(self, context):
         draw_material_settings(self, context)

@@ -63,8 +63,10 @@ class MaterialButtonsPanel:
 
     @classmethod
     def poll(cls, context):
+        ob = context.active_object
+        is_scene_render = ob and ob.use_grease_pencil_scene_engine
         mat = context.material
-        return mat and (((context.engine in cls.COMPAT_ENGINES) and not mat.grease_pencil) or (mat.grease_pencil and mat.use_nodes)) 
+        return mat and (((context.engine in cls.COMPAT_ENGINES) and not mat.grease_pencil) or (mat.grease_pencil and mat.use_nodes and is_scene_render))
 
 
 class MATERIAL_PT_preview(MaterialButtonsPanel, Panel):
@@ -74,8 +76,10 @@ class MATERIAL_PT_preview(MaterialButtonsPanel, Panel):
 
     @classmethod
     def poll(cls, context):
+        ob = context.active_object
+        is_scene_render = ob and ob.use_grease_pencil_scene_engine
         mat = context.material
-        return mat and (((context.engine in cls.COMPAT_ENGINES) and not mat.grease_pencil) or (mat.grease_pencil and mat.use_nodes)) 
+        return mat and (((context.engine in cls.COMPAT_ENGINES) and not mat.grease_pencil) or (mat.grease_pencil and mat.use_nodes and is_scene_render))
 
     def draw(self, context):
         self.layout.template_preview(context.material)
