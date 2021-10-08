@@ -31,6 +31,10 @@ void Instance::mesh_sync(Object *ob, ObjectHandle &ob_handle)
   GPUBatch **mat_geom = DRW_cache_object_surface_material_get(
       ob, material_array.gpu_materials.data(), material_array.gpu_materials.size());
 
+  if (mat_geom == nullptr) {
+    return;
+  }
+
   for (auto i : material_array.gpu_materials.index_range()) {
     GPUBatch *geom = mat_geom[i];
     if (geom == nullptr) {
