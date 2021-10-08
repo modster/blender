@@ -538,7 +538,7 @@ void ntreeBlendWrite(BlendWriter *writer, bNodeTree *ntree)
     if (node->storage) {
       /* could be handlerized at some point, now only 1 exception still */
       if (ELEM(ntree->type, NTREE_SHADER, NTREE_GEOMETRY) &&
-          ELEM(node->type, SH_NODE_CURVE_VEC, SH_NODE_CURVE_RGB)) {
+          ELEM(node->type, SH_NODE_CURVE_VEC, SH_NODE_CURVE_RGB, SH_NODE_CURVE_FLOAT)) {
         BKE_curvemapping_blend_write(writer, (const CurveMapping *)node->storage);
       }
       else if ((ntree->type == NTREE_GEOMETRY) &&
@@ -714,6 +714,7 @@ void ntreeBlendReadData(BlendDataReader *reader, bNodeTree *ntree)
       switch (node->type) {
         case SH_NODE_CURVE_VEC:
         case SH_NODE_CURVE_RGB:
+        case SH_NODE_CURVE_FLOAT:
         case CMP_NODE_TIME:
         case CMP_NODE_CURVE_VEC:
         case CMP_NODE_CURVE_RGB:
@@ -5574,6 +5575,7 @@ static void registerShaderNodes()
   register_node_type_sh_shadertorgb();
   register_node_type_sh_normal();
   register_node_type_sh_mapping();
+  register_node_type_sh_curve_float();
   register_node_type_sh_curve_vec();
   register_node_type_sh_curve_rgb();
   register_node_type_sh_map_range();
@@ -5707,12 +5709,16 @@ static void registerGeometryNodes()
 {
   register_node_type_geo_group();
 
+  register_node_type_geo_legacy_curve_set_handles();
   register_node_type_geo_legacy_attribute_proximity();
   register_node_type_geo_legacy_attribute_randomize();
   register_node_type_geo_legacy_material_assign();
+  register_node_type_geo_legacy_points_to_volume();
   register_node_type_geo_legacy_select_by_material();
+  register_node_type_geo_legacy_curve_spline_type();
   register_node_type_geo_legacy_curve_reverse();
-
+  register_node_type_geo_legacy_select_by_handle_type();
+  register_node_type_geo_legacy_curve_subdivide();
   register_node_type_geo_align_rotation_to_vector();
   register_node_type_geo_attribute_capture();
   register_node_type_geo_attribute_clamp();
@@ -5738,6 +5744,7 @@ static void registerGeometryNodes()
   register_node_type_geo_curve_endpoints();
   register_node_type_geo_curve_fill();
   register_node_type_geo_curve_fillet();
+  register_node_type_geo_curve_handle_type_selection();
   register_node_type_geo_curve_length();
   register_node_type_geo_curve_parameter();
   register_node_type_geo_curve_primitive_bezier_segment();
@@ -5764,6 +5771,7 @@ static void registerGeometryNodes()
   register_node_type_geo_input_normal();
   register_node_type_geo_input_position();
   register_node_type_geo_input_tangent();
+  register_node_type_geo_input_spline_length();
   register_node_type_geo_instance_on_points();
   register_node_type_geo_is_viewport();
   register_node_type_geo_join_geometry();
@@ -5794,7 +5802,6 @@ static void registerGeometryNodes()
   register_node_type_geo_raycast();
   register_node_type_geo_realize_instances();
   register_node_type_geo_sample_texture();
-  register_node_type_geo_select_by_handle_type();
   register_node_type_geo_separate_components();
   register_node_type_geo_set_position();
   register_node_type_geo_string_join();
@@ -5818,6 +5825,7 @@ static void registerFunctionNodes()
   register_node_type_fn_input_string();
   register_node_type_fn_input_vector();
   register_node_type_fn_random_value();
+  register_node_type_fn_rotate_euler();
   register_node_type_fn_string_length();
   register_node_type_fn_string_substring();
   register_node_type_fn_value_to_string();

@@ -41,6 +41,8 @@
 #include "BKE_screen.h"
 #include "BKE_sequencer_offscreen.h"
 
+#include "GPU_state.h"
+
 #include "ED_screen.h"
 #include "ED_space_api.h"
 #include "ED_transform.h"
@@ -53,6 +55,7 @@
 
 #include "RNA_access.h"
 
+#include "SEQ_transform.h"
 #include "SEQ_utils.h"
 
 #include "UI_interface.h"
@@ -60,6 +63,9 @@
 #include "UI_view2d.h"
 
 #include "IMB_imbuf.h"
+
+/* Only for cursor drawing. */
+#include "DRW_engine.h"
 
 /* Own include. */
 #include "sequencer_intern.h"
@@ -778,11 +784,6 @@ static void sequencer_preview_region_draw(const bContext *C, ARegion *region)
   const bool draw_overlay = (scene->ed && (scene->ed->over_flag & SEQ_EDIT_OVERLAY_SHOW) &&
                              (sseq->flag & SEQ_SHOW_OVERLAY));
 
-  /* XXX temp fix for wrong setting in sseq->mainb */
-  if (sseq->mainb == SEQ_DRAW_SEQUENCE) {
-    sseq->mainb = SEQ_DRAW_IMG_IMBUF;
-  }
-
   if (!draw_overlay || sseq->overlay_type != SEQ_DRAW_OVERLAY_REFERENCE) {
     sequencer_draw_preview(C, scene, region, sseq, scene->r.cfra, 0, false, false);
   }
@@ -803,7 +804,21 @@ static void sequencer_preview_region_draw(const bContext *C, ARegion *region)
     }
   }
 
-  WM_gizmomap_draw(region->gizmo_map, C, WM_GIZMOMAP_DRAWSTEP_2D);
+  /* No need to show the cursor for scopes. */
+  if (draw_overlay && (sseq->mainb == SEQ_DRAW_IMG_IMBUF)) {
+    GPU_color_mask(true, true, true, true);
+    GPU_depth_mask(false);
+    GPU_depth_test(GPU_DEPTH_NONE);
+
+    float cursor_pixel[2];
+    SEQ_image_preview_unit_to_px(scene, sseq->cursor, cursor_pixel);
+
+    DRW_draw_cursor_2d_ex(region, cursor_pixel);
+  }
+
+  if ((sseq->gizmo_flag & SEQ_GIZMO_HIDE) == 0) {
+    WM_gizmomap_draw(region->gizmo_map, C, WM_GIZMOMAP_DRAWSTEP_2D);
+  }
 
   if ((U.uiflag & USER_SHOW_FPS) && ED_screen_animation_no_scrub(wm)) {
     const rcti *rect = ED_region_visible_rect(region);

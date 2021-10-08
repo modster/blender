@@ -965,7 +965,13 @@ static bool ui_but_update_from_old_block(const bContext *C,
     found_active = true;
   }
   else {
-    const int flag_copy = UI_BUT_DRAG_MULTI;
+    int flag_copy = UI_BUT_DRAG_MULTI;
+
+    /* Stupid special case: The active button may be inside (as in, overlapped on top) a tree-row
+     * button which we also want to keep highlighted then. */
+    if (but->type == UI_BTYPE_TREEROW) {
+      flag_copy |= UI_ACTIVE;
+    }
 
     but->flag = (but->flag & ~flag_copy) | (oldbut->flag & flag_copy);
 
@@ -1014,6 +1020,9 @@ bool UI_but_active_only_ex(
   else if ((found == true) && (isactive == false)) {
     if (remove_on_failure) {
       BLI_remlink(&block->buttons, but);
+      if (but->layout) {
+        ui_layout_remove_but(but->layout, but);
+      }
       ui_but_free(C, but);
     }
     return false;
@@ -2557,7 +2566,7 @@ double ui_but_value_get(uiBut *but)
 
 void ui_but_value_set(uiBut *but, double value)
 {
-  /* value is a hsv value: convert to rgb */
+  /* Value is a HSV value: convert to RGB. */
   if (but->rnaprop) {
     PropertyRNA *prop = but->rnaprop;
 
@@ -6226,12 +6235,7 @@ void UI_but_drag_set_asset(uiBut *but,
                            struct ImBuf *imb,
                            float scale)
 {
-  wmDragAsset *asset_drag = MEM_mallocN(sizeof(*asset_drag), "wmDragAsset");
-
-  BLI_strncpy(asset_drag->name, ED_asset_handle_get_name(asset), sizeof(asset_drag->name));
-  asset_drag->path = path;
-  asset_drag->id_type = ED_asset_handle_get_id_type(asset);
-  asset_drag->import_type = import_type;
+  wmDragAsset *asset_drag = WM_drag_create_asset_data(asset, path, import_type);
 
   /* FIXME: This is temporary evil solution to get scene/viewlayer/etc in the copy callback of the
    * #wmDropBox.

@@ -32,6 +32,7 @@
 #include "DNA_view3d_types.h"
 
 #include "BKE_context.h"
+#include "BKE_global.h"
 #include "BKE_layer.h"
 
 #include "RNA_access.h"
@@ -70,14 +71,37 @@ static bool gizmo2d_generic_poll(const bContext *C, wmGizmoGroupType *gzgt)
     return false;
   }
 
+  if (G.moving) {
+    return false;
+  }
+
   ScrArea *area = CTX_wm_area(C);
+  if (area == NULL) {
+    return false;
+  }
+
+  /* NOTE: below this is assumed to be a tool gizmo.
+   * If there are cases that need to check other flags - this function could be split. */
   switch (area->spacetype) {
     case SPACE_IMAGE: {
-      SpaceImage *sima = area->spacedata.first;
+      const SpaceImage *sima = area->spacedata.first;
       Object *obedit = CTX_data_edit_object(C);
       if (!ED_space_image_show_uvedit(sima, obedit)) {
         return false;
       }
+      break;
+    }
+    case SPACE_SEQ: {
+      const SpaceSeq *sseq = area->spacedata.first;
+      if (sseq->gizmo_flag & (SEQ_GIZMO_HIDE | SEQ_GIZMO_HIDE_TOOL)) {
+        return false;
+      }
+      Scene *scene = CTX_data_scene(C);
+      Editing *ed = SEQ_editing_get(scene);
+      if (ed == NULL) {
+        return false;
+      }
+      break;
     }
   }
 
@@ -279,23 +303,25 @@ static bool gizmo2d_calc_center(const bContext *C, float r_center[2])
     ED_uvedit_center_from_pivot_ex(sima, scene, view_layer, r_center, sima->around, &has_select);
   }
   else if (area->spacetype == SPACE_SEQ) {
+    SpaceSeq *sseq = area->spacedata.first;
+    const int pivot_point = scene->toolsettings->sequencer_tool_settings->pivot_point;
     ListBase *seqbase = SEQ_active_seqbase_get(SEQ_editing_get(scene));
     SeqCollection *strips = SEQ_query_rendered_strips(seqbase, scene->r.cfra, 0);
     SEQ_filter_selected_strips(strips);
+    has_select = SEQ_collection_len(strips) != 0;
 
-    if (SEQ_collection_len(strips) <= 0) {
-      SEQ_collection_free(strips);
-      return false;
+    if (pivot_point == V3D_AROUND_CURSOR) {
+      SEQ_image_preview_unit_to_px(scene, sseq->cursor, r_center);
     }
-
-    has_select = true;
-    Sequence *seq;
-    SEQ_ITERATOR_FOREACH (seq, strips) {
-      float origin[2];
-      SEQ_image_transform_origin_offset_pixelspace_get(scene, seq, origin);
-      add_v2_v2(r_center, origin);
+    else if (has_select) {
+      Sequence *seq;
+      SEQ_ITERATOR_FOREACH (seq, strips) {
+        float origin[2];
+        SEQ_image_transform_origin_offset_pixelspace_get(scene, seq, origin);
+        add_v2_v2(r_center, origin);
+      }
+      mul_v2_fl(r_center, 1.0f / SEQ_collection_len(strips));
     }
-    mul_v2_fl(r_center, 1.0f / SEQ_collection_len(strips));
 
     SEQ_collection_free(strips);
   }
@@ -459,16 +485,6 @@ static void gizmo2d_xform_refresh(const bContext *C, wmGizmoGroup *gzgroup)
   }
   copy_v2_v2(ggd->origin, origin);
   bool show_cage = !ggd->no_cage && !equals_v2v2(ggd->min, ggd->max);
-
-  if (gzgroup->type->flag & WM_GIZMOGROUPTYPE_TOOL_FALLBACK_KEYMAP) {
-    Scene *scene = CTX_data_scene(C);
-    if (scene->toolsettings->workspace_tool_type == SCE_WORKSPACE_TOOL_FALLBACK) {
-      gzgroup->use_fallback_keymap = true;
-    }
-    else {
-      gzgroup->use_fallback_keymap = false;
-    }
-  }
 
   if (has_select == false) {
     for (int i = 0; i < ARRAY_SIZE(ggd->translate_xy); i++) {
@@ -636,16 +652,6 @@ static void gizmo2d_resize_draw_prepare(const bContext *C, wmGizmoGroup *gzgroup
   GizmoGroup_Resize2D *ggd = gzgroup->customdata;
   float origin[3] = {UNPACK2(ggd->origin), 0.0f};
 
-  if (gzgroup->type->flag & WM_GIZMOGROUPTYPE_TOOL_FALLBACK_KEYMAP) {
-    Scene *scene = CTX_data_scene(C);
-    if (scene->toolsettings->workspace_tool_type == SCE_WORKSPACE_TOOL_FALLBACK) {
-      gzgroup->use_fallback_keymap = true;
-    }
-    else {
-      gzgroup->use_fallback_keymap = false;
-    }
-  }
-
   gizmo2d_origin_to_region(region, origin);
 
   for (int i = 0; i < ARRAY_SIZE(ggd->gizmo_xy); i++) {
@@ -787,16 +793,6 @@ static void gizmo2d_rotate_draw_prepare(const bContext *C, wmGizmoGroup *gzgroup
   ARegion *region = CTX_wm_region(C);
   GizmoGroup_Rotate2D *ggd = gzgroup->customdata;
   float origin[3] = {UNPACK2(ggd->origin), 0.0f};
-
-  if (gzgroup->type->flag & WM_GIZMOGROUPTYPE_TOOL_FALLBACK_KEYMAP) {
-    Scene *scene = CTX_data_scene(C);
-    if (scene->toolsettings->workspace_tool_type == SCE_WORKSPACE_TOOL_FALLBACK) {
-      gzgroup->use_fallback_keymap = true;
-    }
-    else {
-      gzgroup->use_fallback_keymap = false;
-    }
-  }
 
   gizmo2d_origin_to_region(region, origin);
 

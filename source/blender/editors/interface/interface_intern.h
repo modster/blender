@@ -1107,6 +1107,7 @@ void ui_resources_free(void);
 
 /* interface_layout.c */
 void ui_layout_add_but(uiLayout *layout, uiBut *but);
+void ui_layout_remove_but(uiLayout *layout, const uiBut *but);
 bool ui_layout_replace_but_ptr(uiLayout *layout, const void *old_but_ptr, uiBut *new_but);
 uiBut *ui_but_add_search(uiBut *but,
                          PointerRNA *ptr,
@@ -1171,6 +1172,7 @@ uiBut *ui_list_row_find_mouse_over(const struct ARegion *region,
 uiBut *ui_list_row_find_from_index(const struct ARegion *region,
                                    const int index,
                                    uiBut *listbox) ATTR_WARN_UNUSED_RESULT;
+uiBut *ui_tree_row_find_mouse_over(const struct ARegion *region, const int x, const int y);
 
 typedef bool (*uiButFindPollFn)(const uiBut *but, const void *customdata);
 uiBut *ui_but_find_mouse_over_ex(const struct ARegion *region,
@@ -1291,6 +1293,8 @@ void ui_interface_tag_script_reload_queries(void);
 void ui_block_free_views(struct uiBlock *block);
 uiTreeViewHandle *ui_block_view_find_matching_in_old_block(const uiBlock *new_block,
                                                            const uiTreeViewHandle *new_view);
+uiButTreeRow *ui_block_view_find_treerow_in_old_block(const uiBlock *new_block,
+                                                      const uiTreeViewItemHandle *new_item_handle);
 
 #ifdef __cplusplus
 }

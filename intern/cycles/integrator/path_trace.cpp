@@ -19,8 +19,9 @@
 #include "device/cpu/device.h"
 #include "device/device.h"
 #include "integrator/pass_accessor.h"
+#include "integrator/path_trace_display.h"
+#include "integrator/path_trace_tile.h"
 #include "integrator/render_scheduler.h"
-#include "render/gpu_display.h"
 #include "render/pass.h"
 #include "render/scene.h"
 #include "render/tile.h"
@@ -67,11 +68,11 @@ PathTrace::PathTrace(Device *device,
 PathTrace::~PathTrace()
 {
   /* Destroy any GPU resource which was used for graphics interop.
-   * Need to have access to the GPUDisplay as it is the only source of drawing context which is
-   * used for interop. */
-  if (gpu_display_) {
+   * Need to have access to the PathTraceDisplay as it is the only source of drawing context which
+   * is used for interop. */
+  if (display_) {
     for (auto &&path_trace_work : path_trace_works_) {
-      path_trace_work->destroy_gpu_resources(gpu_display_.get());
+      path_trace_work->destroy_gpu_resources(display_.get());
     }
   }
 }
@@ -94,7 +95,7 @@ bool PathTrace::ready_to_reset()
 {
   /* The logic here is optimized for the best feedback in the viewport, which implies having a GPU
    * display. Of there is no such display, the logic here will break. */
-  DCHECK(gpu_display_);
+  DCHECK(display_);
 
   /* The logic here tries to provide behavior which feels the most interactive feel to artists.
    * General idea is to be able to reset as quickly as possible, while still providing interactive
@@ -126,8 +127,8 @@ void PathTrace::reset(const BufferParams &full_params, const BufferParams &big_t
   /* NOTE: GPU display checks for buffer modification and avoids unnecessary re-allocation.
    * It is requires to inform about reset whenever it happens, so that the redraw state tracking is
    * properly updated. */
-  if (gpu_display_) {
-    gpu_display_->reset(full_params);
+  if (display_) {
+    display_->reset(full_params);
   }
 
   render_state_.has_denoised_result = false;
@@ -233,42 +234,53 @@ template<typename Callback>
 static void foreach_sliced_buffer_params(const vector<unique_ptr<PathTraceWork>> &path_trace_works,
                                          const vector<WorkBalanceInfo> &work_balance_infos,
                                          const BufferParams &buffer_params,
+                                         const int overscan,
                                          const Callback &callback)
 {
   const int num_works = path_trace_works.size();
-  const int height = buffer_params.height;
+  const int window_height = buffer_params.window_height;
 
   int current_y = 0;
   for (int i = 0; i < num_works; ++i) {
     const double weight = work_balance_infos[i].weight;
-    const int slice_height = max(lround(height * weight), 1);
+    const int slice_window_full_y = buffer_params.full_y + buffer_params.window_y + current_y;
+    const int slice_window_height = max(lround(window_height * weight), 1);
 
     /* Disallow negative values to deal with situations when there are more compute devices than
      * scan-lines. */
-    const int remaining_height = max(0, height - current_y);
+    const int remaining_window_height = max(0, window_height - current_y);
 
-    BufferParams slide_params = buffer_params;
-    slide_params.full_y = buffer_params.full_y + current_y;
+    BufferParams slice_params = buffer_params;
+
+    slice_params.full_y = max(slice_window_full_y - overscan, buffer_params.full_y);
+    slice_params.window_y = slice_window_full_y - slice_params.full_y;
+
     if (i < num_works - 1) {
-      slide_params.height = min(slice_height, remaining_height);
+      slice_params.window_height = min(slice_window_height, remaining_window_height);
     }
     else {
-      slide_params.height = remaining_height;
+      slice_params.window_height = remaining_window_height;
     }
 
-    slide_params.update_offset_stride();
+    slice_params.height = slice_params.window_y + slice_params.window_height + overscan;
+    slice_params.height = min(slice_params.height,
+                              buffer_params.height + buffer_params.full_y - slice_params.full_y);
 
-    callback(path_trace_works[i].get(), slide_params);
+    slice_params.update_offset_stride();
 
-    current_y += slide_params.height;
+    callback(path_trace_works[i].get(), slice_params);
+
+    current_y += slice_params.window_height;
   }
 }
 
 void PathTrace::update_allocated_work_buffer_params()
 {
+  const int overscan = tile_manager_.get_tile_overscan();
   foreach_sliced_buffer_params(path_trace_works_,
                                work_balance_infos_,
                                big_tile_params_,
+                               overscan,
                                [](PathTraceWork *path_trace_work, const BufferParams &params) {
                                  RenderBuffers *buffers = path_trace_work->get_render_buffers();
                                  buffers->reset(params);
@@ -281,6 +293,12 @@ static BufferParams scale_buffer_params(const BufferParams &params, int resoluti
 
   scaled_params.width = max(1, params.width / resolution_divider);
   scaled_params.height = max(1, params.height / resolution_divider);
+
+  scaled_params.window_x = params.window_x / resolution_divider;
+  scaled_params.window_y = params.window_y / resolution_divider;
+  scaled_params.window_width = params.window_width / resolution_divider;
+  scaled_params.window_height = params.window_height / resolution_divider;
+
   scaled_params.full_x = params.full_x / resolution_divider;
   scaled_params.full_y = params.full_y / resolution_divider;
   scaled_params.full_width = params.full_width / resolution_divider;
@@ -299,9 +317,12 @@ void PathTrace::update_effective_work_buffer_params(const RenderWork &render_wor
   const BufferParams scaled_big_tile_params = scale_buffer_params(big_tile_params_,
                                                                   resolution_divider);
 
+  const int overscan = tile_manager_.get_tile_overscan();
+
   foreach_sliced_buffer_params(path_trace_works_,
                                work_balance_infos_,
                                scaled_big_tile_params,
+                               overscan,
                                [&](PathTraceWork *path_trace_work, const BufferParams params) {
                                  path_trace_work->set_effective_buffer_params(
                                      scaled_full_params, scaled_big_tile_params, params);
@@ -535,25 +556,35 @@ void PathTrace::denoise(const RenderWork &render_work)
   render_scheduler_.report_denoise_time(render_work, time_dt() - start_time);
 }
 
-void PathTrace::set_gpu_display(unique_ptr<GPUDisplay> gpu_display)
+void PathTrace::set_output_driver(unique_ptr<OutputDriver> driver)
 {
-  gpu_display_ = move(gpu_display);
+  output_driver_ = move(driver);
 }
 
-void PathTrace::clear_gpu_display()
+void PathTrace::set_display_driver(unique_ptr<DisplayDriver> driver)
 {
-  if (gpu_display_) {
-    gpu_display_->clear();
+  if (driver) {
+    display_ = make_unique<PathTraceDisplay>(move(driver));
+  }
+  else {
+    display_ = nullptr;
+  }
+}
+
+void PathTrace::clear_display()
+{
+  if (display_) {
+    display_->clear();
   }
 }
 
 void PathTrace::draw()
 {
-  if (!gpu_display_) {
+  if (!display_) {
     return;
   }
 
-  did_draw_after_reset_ |= gpu_display_->draw();
+  did_draw_after_reset_ |= display_->draw();
 }
 
 void PathTrace::update_display(const RenderWork &render_work)
@@ -562,31 +593,32 @@ void PathTrace::update_display(const RenderWork &render_work)
     return;
   }
 
-  if (!gpu_display_ && !tile_buffer_update_cb) {
+  if (!display_ && !output_driver_) {
     VLOG(3) << "Ignore display update.";
     return;
   }
 
   if (full_params_.width == 0 || full_params_.height == 0) {
-    VLOG(3) << "Skipping GPUDisplay update due to 0 size of the render buffer.";
+    VLOG(3) << "Skipping PathTraceDisplay update due to 0 size of the render buffer.";
     return;
   }
 
   const double start_time = time_dt();
 
-  if (tile_buffer_update_cb) {
+  if (output_driver_) {
     VLOG(3) << "Invoke buffer update callback.";
 
-    tile_buffer_update_cb();
+    PathTraceTile tile(*this);
+    output_driver_->update_render_tile(tile);
   }
 
-  if (gpu_display_) {
+  if (display_) {
     VLOG(3) << "Perform copy to GPUDisplay work.";
 
     const int resolution_divider = render_work.resolution_divider;
     const int texture_width = max(1, full_params_.width / resolution_divider);
     const int texture_height = max(1, full_params_.height / resolution_divider);
-    if (!gpu_display_->update_begin(texture_width, texture_height)) {
+    if (!display_->update_begin(texture_width, texture_height)) {
       LOG(ERROR) << "Error beginning GPUDisplay update.";
       return;
     }
@@ -600,10 +632,10 @@ void PathTrace::update_display(const RenderWork &render_work)
      * all works in parallel. */
     const int num_samples = get_num_samples_in_buffer();
     for (auto &&path_trace_work : path_trace_works_) {
-      path_trace_work->copy_to_gpu_display(gpu_display_.get(), pass_mode, num_samples);
+      path_trace_work->copy_to_display(display_.get(), pass_mode, num_samples);
     }
 
-    gpu_display_->update_end();
+    display_->update_end();
   }
 
   render_scheduler_.report_display_update_time(render_work, time_dt() - start_time);
@@ -753,20 +785,26 @@ bool PathTrace::is_cancel_requested()
 
 void PathTrace::tile_buffer_write()
 {
-  if (!tile_buffer_write_cb) {
+  if (!output_driver_) {
     return;
   }
 
-  tile_buffer_write_cb();
+  PathTraceTile tile(*this);
+  output_driver_->write_render_tile(tile);
 }
 
 void PathTrace::tile_buffer_read()
 {
-  if (!tile_buffer_read_cb) {
+  if (!device_scene_->data.bake.use) {
     return;
   }
 
-  if (tile_buffer_read_cb()) {
+  if (!output_driver_) {
+    return;
+  }
+
+  PathTraceTile tile(*this);
+  if (output_driver_->read_render_tile(tile)) {
     tbb::parallel_for_each(path_trace_works_, [](unique_ptr<PathTraceWork> &path_trace_work) {
       path_trace_work->copy_render_buffers_to_device();
     });
@@ -987,12 +1025,12 @@ bool PathTrace::set_render_tile_pixels(PassAccessor &pass_accessor,
 int2 PathTrace::get_render_tile_size() const
 {
   if (full_frame_state_.render_buffers) {
-    return make_int2(full_frame_state_.render_buffers->params.width,
-                     full_frame_state_.render_buffers->params.height);
+    return make_int2(full_frame_state_.render_buffers->params.window_width,
+                     full_frame_state_.render_buffers->params.window_height);
   }
 
   const Tile &tile = tile_manager_.get_current_tile();
-  return make_int2(tile.width, tile.height);
+  return make_int2(tile.window_width, tile.window_height);
 }
 
 int2 PathTrace::get_render_tile_offset() const
@@ -1002,7 +1040,12 @@ int2 PathTrace::get_render_tile_offset() const
   }
 
   const Tile &tile = tile_manager_.get_current_tile();
-  return make_int2(tile.x, tile.y);
+  return make_int2(tile.x + tile.window_x, tile.y + tile.window_y);
+}
+
+int2 PathTrace::get_render_size() const
+{
+  return tile_manager_.get_size();
 }
 
 const BufferParams &PathTrace::get_render_tile_params() const
