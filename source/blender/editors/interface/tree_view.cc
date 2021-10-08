@@ -198,12 +198,12 @@ void AbstractTreeViewItem::add_indent(uiLayout &row) const
   uiLayoutSetFixedSize(subrow, true);
 
   const float indent_size = count_parents() * UI_DPI_ICON_SIZE;
-  uiDefBut(block, UI_BTYPE_SEPR, 0, "", 0, 0, indent_size, 0, NULL, 0.0, 0.0, 0, 0, "");
+  uiDefBut(block, UI_BTYPE_SEPR, 0, "", 0, 0, indent_size, 0, nullptr, 0.0, 0.0, 0, 0, "");
 
   /* Indent items without collapsing icon some more within their parent. Makes it clear that they
    * are actually nested and not just a row at the same level without a chevron. */
   if (!is_collapsible() && parent_) {
-    uiDefBut(block, UI_BTYPE_SEPR, 0, "", 0, 0, 0.2f * UI_UNIT_X, 0, NULL, 0.0, 0.0, 0, 0, "");
+    uiDefBut(block, UI_BTYPE_SEPR, 0, "", 0, 0, 0.2f * UI_UNIT_X, 0, nullptr, 0.0, 0.0, 0, 0, "");
   }
 
   /* Restore. */
@@ -246,6 +246,7 @@ void AbstractTreeViewItem::add_collapse_chevron(uiBlock &block) const
       &block, UI_BTYPE_BUT_TOGGLE, 0, icon, 0, 0, UI_UNIT_X, UI_UNIT_Y, nullptr, 0, 0, 0, 0, "");
   /* Note that we're passing the tree-row button here, not the chevron one. */
   UI_but_func_set(but, collapse_chevron_click_fn, nullptr, nullptr);
+  UI_but_flag_disable(but, UI_BUT_UNDO);
 
   /* Check if the query for the button matches the created button. */
   BLI_assert(is_collapse_chevron_but(but));
@@ -313,6 +314,7 @@ void AbstractTreeViewItem::add_rename_button(uiLayout &row)
   /* Gotta be careful with what's passed to the `arg1` here. Any tree data will be freed once the
    * callback is executed. */
   UI_but_func_rename_set(rename_but, AbstractTreeViewItem::rename_button_fn, rename_but);
+  UI_but_flag_disable(rename_but, UI_BUT_UNDO);
 
   const bContext *evil_C = static_cast<bContext *>(block->evil_C);
   ARegion *region = CTX_wm_region(evil_C);
