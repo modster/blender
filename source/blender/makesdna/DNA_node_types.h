@@ -2032,6 +2032,11 @@ typedef enum GeometryNodeRotatePointsType {
   GEO_NODE_POINT_ROTATE_TYPE_AXIS_ANGLE = 1,
 } GeometryNodeRotatePointsType;
 
+typedef enum FunctionNodeRotatePointsType {
+  FN_NODE_ROTATE_EULER_TYPE_EULER = 0,
+  FN_NODE_ROTATE_EULER_TYPE_AXIS_ANGLE = 1,
+} FunctionNodeRotatePointsType;
+
 typedef enum GeometryNodeAttributeVectorRotateMode {
   GEO_NODE_VECTOR_ROTATE_TYPE_AXIS = 0,
   GEO_NODE_VECTOR_ROTATE_TYPE_AXIS_X = 1,
@@ -2051,6 +2056,11 @@ typedef enum GeometryNodeRotatePointsSpace {
   GEO_NODE_POINT_ROTATE_SPACE_OBJECT = 0,
   GEO_NODE_POINT_ROTATE_SPACE_POINT = 1,
 } GeometryNodeRotatePointsSpace;
+
+typedef enum FunctionNodeRotateEulerSpace {
+  FN_NODE_ROTATE_EULER_SPACE_OBJECT = 0,
+  FN_NODE_ROTATE_EULER_SPACE_POINT = 1,
+} FunctionNodeRotateEulerSpace;
 
 typedef enum GeometryNodeAlignRotationToVectorAxis {
   GEO_NODE_ALIGN_ROTATION_TO_VECTOR_AXIS_X = 0,
@@ -2126,8 +2136,8 @@ typedef enum GeometryNodeCurveFilletMode {
 } GeometryNodeCurveFilletMode;
 
 typedef enum GeometryNodeAttributeTransferMapMode {
-  GEO_NODE_ATTRIBUTE_TRANSFER_NEAREST_FACE_INTERPOLATED = 0,
-  GEO_NODE_ATTRIBUTE_TRANSFER_NEAREST = 1,
+  GEO_NODE_LEGACY_ATTRIBUTE_TRANSFER_NEAREST_FACE_INTERPOLATED = 0,
+  GEO_NODE_LEGACY_ATTRIBUTE_TRANSFER_NEAREST = 1,
 } GeometryNodeAttributeTransferMapMode;
 
 typedef enum GeometryNodeRaycastMapMode {

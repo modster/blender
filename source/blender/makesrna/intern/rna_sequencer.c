@@ -303,7 +303,7 @@ static void do_sequence_frame_change_update(Scene *scene, Sequence *seq)
   Editing *ed = SEQ_editing_get(scene);
   ListBase *seqbase = SEQ_get_seqbase_by_seq(&ed->seqbase, seq);
   Sequence *tseq;
-  SEQ_time_update_sequence_bounds(scene, seq);
+  SEQ_time_update_sequence(scene, seqbase, seq);
 
   /* ensure effects are always fit in length to their input */
 
@@ -312,7 +312,7 @@ static void do_sequence_frame_change_update(Scene *scene, Sequence *seq)
    */
   for (tseq = seqbase->first; tseq; tseq = tseq->next) {
     if (tseq->seq1 || tseq->seq2 || tseq->seq3) {
-      SEQ_time_update_sequence(scene, tseq);
+      SEQ_time_update_sequence(scene, seqbase, tseq);
     }
   }
 
@@ -756,13 +756,16 @@ static IDProperty **rna_Sequence_idprops(PointerRNA *ptr)
 static bool rna_MovieSequence_reload_if_needed(ID *scene_id, Sequence *seq, Main *bmain)
 {
   Scene *scene = (Scene *)scene_id;
+  Editing *ed = SEQ_editing_get(scene);
+  ListBase *seqbase = SEQ_get_seqbase_by_seq(&ed->seqbase, seq);
+
   bool has_reloaded;
   bool can_produce_frames;
 
   SEQ_add_movie_reload_if_needed(bmain, scene, seq, &has_reloaded, &can_produce_frames);
 
   if (has_reloaded && can_produce_frames) {
-    SEQ_time_update_sequence(scene, seq);
+    SEQ_time_update_sequence(scene, seqbase, seq);
     SEQ_relations_invalidate_cache_raw(scene, seq);
 
     DEG_id_tag_update(&scene->id, ID_RECALC_SEQUENCER_STRIPS);
@@ -950,7 +953,9 @@ static void rna_Sequence_filepath_update(Main *bmain, Scene *UNUSED(scene), Poin
   Scene *scene = (Scene *)ptr->owner_id;
   Sequence *seq = (Sequence *)(ptr->data);
   SEQ_add_reload_new_file(bmain, scene, seq, true);
-  SEQ_time_update_sequence(scene, seq);
+  Editing *ed = SEQ_editing_get(scene);
+  ListBase *seqbase = SEQ_get_seqbase_by_seq(&ed->seqbase, seq);
+  SEQ_time_update_sequence(scene, seqbase, seq);
   rna_Sequence_invalidate_raw_update(bmain, scene, ptr);
 }
 
@@ -1591,11 +1596,27 @@ static void rna_def_color_balance(BlenderRNA *brna)
   StructRNA *srna;
   PropertyRNA *prop;
 
+  static const EnumPropertyItem method_items[] = {
+      {SEQ_COLOR_BALANCE_METHOD_LIFTGAMMAGAIN, "LIFT_GAMMA_GAIN", 0, "Lift/Gamma/Gain", ""},
+      {SEQ_COLOR_BALANCE_METHOD_SLOPEOFFSETPOWER,
+       "OFFSET_POWER_SLOPE",
+       0,
+       "Offset/Power/Slope (ASC-CDL)",
+       "ASC-CDL standard color correction"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
   srna = RNA_def_struct(brna, "SequenceColorBalanceData", NULL);
   RNA_def_struct_ui_text(srna,
                          "Sequence Color Balance Data",
                          "Color balance parameters for a sequence strip and its modifiers");
   RNA_def_struct_sdna(srna, "StripColorBalance");
+
+  prop = RNA_def_property(srna, "correction_method", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_sdna(prop, NULL, "method");
+  RNA_def_property_enum_items(prop, method_items);
+  RNA_def_property_ui_text(prop, "Correction Method", "");
+  RNA_def_property_update(prop, NC_SCENE | ND_SEQUENCER, "rna_SequenceColorBalance_update");
 
   prop = RNA_def_property(srna, "lift", PROP_FLOAT, PROP_COLOR_GAMMA);
   RNA_def_property_ui_text(prop, "Lift", "Color balance lift (shadows)");
@@ -1615,9 +1636,27 @@ static void rna_def_color_balance(BlenderRNA *brna)
   RNA_def_property_float_default(prop, 1.0f);
   RNA_def_property_update(prop, NC_SCENE | ND_SEQUENCER, "rna_SequenceColorBalance_update");
 
-  prop = RNA_def_property(srna, "invert_gain", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_boolean_sdna(prop, NULL, "flag", SEQ_COLOR_BALANCE_INVERSE_GAIN);
-  RNA_def_property_ui_text(prop, "Inverse Gain", "Invert the gain color`");
+  prop = RNA_def_property(srna, "slope", PROP_FLOAT, PROP_COLOR_GAMMA);
+  RNA_def_property_ui_text(prop, "Slope", "Correction for highlights");
+  RNA_def_property_ui_range(prop, 0, 2, 0.1, 3);
+  RNA_def_property_float_default(prop, 1.0f);
+  RNA_def_property_update(prop, NC_SCENE | ND_SEQUENCER, "rna_SequenceColorBalance_update");
+
+  prop = RNA_def_property(srna, "offset", PROP_FLOAT, PROP_COLOR_GAMMA);
+  RNA_def_property_ui_text(prop, "Offset", "Correction for entire tonal range");
+  RNA_def_property_ui_range(prop, 0, 2, 0.1, 3);
+  RNA_def_property_float_default(prop, 1.0f);
+  RNA_def_property_update(prop, NC_SCENE | ND_SEQUENCER, "rna_SequenceColorBalance_update");
+
+  prop = RNA_def_property(srna, "power", PROP_FLOAT, PROP_COLOR_GAMMA);
+  RNA_def_property_ui_text(prop, "Power", "Correction for midtones");
+  RNA_def_property_ui_range(prop, 0, 2, 0.1, 3);
+  RNA_def_property_float_default(prop, 1.0f);
+  RNA_def_property_update(prop, NC_SCENE | ND_SEQUENCER, "rna_SequenceColorBalance_update");
+
+  prop = RNA_def_property(srna, "invert_lift", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "flag", SEQ_COLOR_BALANCE_INVERSE_LIFT);
+  RNA_def_property_ui_text(prop, "Inverse Lift", "Invert the lift color");
   RNA_def_property_update(prop, NC_SCENE | ND_SEQUENCER, "rna_SequenceColorBalance_update");
 
   prop = RNA_def_property(srna, "invert_gamma", PROP_BOOLEAN, PROP_NONE);
@@ -1625,9 +1664,24 @@ static void rna_def_color_balance(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Inverse Gamma", "Invert the gamma color");
   RNA_def_property_update(prop, NC_SCENE | ND_SEQUENCER, "rna_SequenceColorBalance_update");
 
-  prop = RNA_def_property(srna, "invert_lift", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_boolean_sdna(prop, NULL, "flag", SEQ_COLOR_BALANCE_INVERSE_LIFT);
-  RNA_def_property_ui_text(prop, "Inverse Lift", "Invert the lift color");
+  prop = RNA_def_property(srna, "invert_gain", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "flag", SEQ_COLOR_BALANCE_INVERSE_GAIN);
+  RNA_def_property_ui_text(prop, "Inverse Gain", "Invert the gain color`");
+  RNA_def_property_update(prop, NC_SCENE | ND_SEQUENCER, "rna_SequenceColorBalance_update");
+
+  prop = RNA_def_property(srna, "invert_slope", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "flag", SEQ_COLOR_BALANCE_INVERSE_SLOPE);
+  RNA_def_property_ui_text(prop, "Inverse Slope", "Invert the slope color`");
+  RNA_def_property_update(prop, NC_SCENE | ND_SEQUENCER, "rna_SequenceColorBalance_update");
+
+  prop = RNA_def_property(srna, "invert_offset", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "flag", SEQ_COLOR_BALANCE_INVERSE_OFFSET);
+  RNA_def_property_ui_text(prop, "Inverse Offset", "Invert the offset color");
+  RNA_def_property_update(prop, NC_SCENE | ND_SEQUENCER, "rna_SequenceColorBalance_update");
+
+  prop = RNA_def_property(srna, "invert_power", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "flag", SEQ_COLOR_BALANCE_INVERSE_POWER);
+  RNA_def_property_ui_text(prop, "Inverse Power", "Invert the power color");
   RNA_def_property_update(prop, NC_SCENE | ND_SEQUENCER, "rna_SequenceColorBalance_update");
 
   /* not yet used */

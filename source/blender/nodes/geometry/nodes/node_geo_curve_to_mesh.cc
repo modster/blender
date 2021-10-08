@@ -32,18 +32,8 @@ static void geo_node_curve_to_mesh_declare(NodeDeclarationBuilder &b)
   b.add_output<decl::Geometry>("Mesh");
 }
 
-static void geometry_set_curve_to_mesh(GeometrySet &geometry_set,
-                                       const GeometrySet &profile_set,
-                                       const GeoNodeExecParams &params)
+static void geometry_set_curve_to_mesh(GeometrySet &geometry_set, const GeometrySet &profile_set)
 {
-  if (!geometry_set.has_curve()) {
-    if (!geometry_set.is_empty()) {
-      params.error_message_add(NodeWarningType::Warning,
-                               TIP_("No curve data available in curve input"));
-    }
-    return;
-  }
-
   const CurveEval *profile_curve = profile_set.get_curve_for_read();
 
   if (profile_curve == nullptr) {
@@ -73,9 +63,19 @@ static void geo_node_curve_to_mesh_exec(GeoNodeExecParams params)
                              TIP_("No curve data available in the profile input"));
   }
 
+  bool has_curve = false;
   curve_set.modify_geometry_sets([&](GeometrySet &geometry_set) {
-    geometry_set_curve_to_mesh(geometry_set, profile_set, params);
+    if (geometry_set.has_curve()) {
+      has_curve = true;
+      geometry_set_curve_to_mesh(geometry_set, profile_set);
+    }
+    geometry_set.keep_only({GEO_COMPONENT_TYPE_MESH, GEO_COMPONENT_TYPE_INSTANCES});
   });
+
+  if (!has_curve && !curve_set.is_empty()) {
+    params.error_message_add(NodeWarningType::Warning,
+                             TIP_("No curve data available in curve input"));
+  }
 
   params.set_output("Mesh", std::move(curve_set));
 }

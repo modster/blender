@@ -279,6 +279,7 @@ shader_node_categories = [
     ]),
     ShaderNodeCategory("SH_NEW_CONVERTOR", "Converter", items=[
         NodeItem("ShaderNodeMapRange"),
+        NodeItem("ShaderNodeFloatCurve"),
         NodeItem("ShaderNodeClamp"),
         NodeItem("ShaderNodeMath"),
         NodeItem("ShaderNodeValToRGB"),
@@ -524,9 +525,14 @@ geometry_node_categories = [
         NodeItem("GeometryNodeCurveFill"),
         NodeItem("GeometryNodeCurveTrim"),
         NodeItem("GeometryNodeCurveLength"),
+        NodeItem("GeometryNodeCurveSplineType"),
+        NodeItem("GeometryNodeSplineLength"),
+        NodeItem("GeometryNodeCurveSubdivide"),
         NodeItem("GeometryNodeCurveParameter"),
+        NodeItem("GeometryNodeCurveSetHandles"),
         NodeItem("GeometryNodeInputTangent"),
         NodeItem("GeometryNodeCurveSample"),
+        NodeItem("GeometryNodeCurveHandleTypeSelection"),
         NodeItem("GeometryNodeCurveFillet"),
         NodeItem("GeometryNodeCurveReverse"),
     ]),
@@ -615,9 +621,11 @@ geometry_node_categories = [
     ]),
     GeometryNodeCategory("GEO_UTILITIES", "Utilities", items=[
         NodeItem("ShaderNodeMapRange"),
+        NodeItem("ShaderNodeFloatCurve"),
         NodeItem("ShaderNodeClamp"),
         NodeItem("ShaderNodeMath"),
         NodeItem("FunctionNodeBooleanMath"),
+        NodeItem("FunctionNodeRotateEuler"),
         NodeItem("FunctionNodeFloatCompare"),
         NodeItem("FunctionNodeFloatToInt"),
         NodeItem("GeometryNodeSwitch"),
@@ -639,6 +647,7 @@ geometry_node_categories = [
     GeometryNodeCategory("GEO_VOLUME", "Volume", items=[
         NodeItem("GeometryNodeLegacyPointsToVolume", poll=geometry_nodes_legacy_poll),
 
+        NodeItem("GeometryNodePointsToVolume"),
         NodeItem("GeometryNodeVolumeToMesh"),
     ]),
     GeometryNodeCategory("GEO_GROUP", "Group", items=node_group_items),

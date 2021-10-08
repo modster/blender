@@ -39,6 +39,7 @@
 
 #include "BLI_listbase.h"
 #include "BLI_math.h"
+#include "BLI_uuid.h"
 
 #include "DNA_action_types.h"
 #include "DNA_gpencil_types.h"
@@ -3179,6 +3180,17 @@ static void rna_SpaceSpreadsheet_context_path_guess(SpaceSpreadsheet *sspreadshe
   WM_main_add_notifier(NC_SPACE | ND_SPACE_SPREADSHEET, NULL);
 }
 
+static void rna_FileAssetSelectParams_catalog_id_get(PointerRNA *ptr, char *value)
+{
+  const FileAssetSelectParams *params = ptr->data;
+  BLI_uuid_format(value, params->catalog_id);
+}
+
+static int rna_FileAssetSelectParams_catalog_id_length(PointerRNA *UNUSED(ptr))
+{
+  return UUID_STRING_LEN - 1;
+}
+
 #else
 
 static const EnumPropertyItem dt_uv_items[] = {
@@ -5658,6 +5670,27 @@ static void rna_def_space_sequencer(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Transform Preview", "Show preview of the transformed frames");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_SEQUENCER, NULL);
 
+  /* Gizmo toggles. */
+  prop = RNA_def_property(srna, "show_gizmo", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_negative_sdna(prop, NULL, "gizmo_flag", SEQ_GIZMO_HIDE);
+  RNA_def_property_ui_text(prop, "Show Gizmo", "Show gizmos of all types");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_SEQUENCER, NULL);
+
+  prop = RNA_def_property(srna, "show_gizmo_navigate", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_negative_sdna(prop, NULL, "gizmo_flag", SEQ_GIZMO_HIDE_NAVIGATE);
+  RNA_def_property_ui_text(prop, "Navigate Gizmo", "Viewport navigation gizmo");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_SEQUENCER, NULL);
+
+  prop = RNA_def_property(srna, "show_gizmo_context", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_negative_sdna(prop, NULL, "gizmo_flag", SEQ_GIZMO_HIDE_CONTEXT);
+  RNA_def_property_ui_text(prop, "Context Gizmo", "Context sensitive gizmos for the active item");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_SEQUENCER, NULL);
+
+  prop = RNA_def_property(srna, "show_gizmo_tool", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_negative_sdna(prop, NULL, "gizmo_flag", SEQ_GIZMO_HIDE_TOOL);
+  RNA_def_property_ui_text(prop, "Tool Gizmo", "Active tool gizmo");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_SEQUENCER, NULL);
+
   /* Overlay settings. */
   prop = RNA_def_property(srna, "show_strip_overlay", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flag", SEQ_SHOW_OVERLAY);
@@ -5678,6 +5711,13 @@ static void rna_def_space_sequencer(BlenderRNA *brna)
 
   rna_def_space_sequencer_preview_overlay(brna);
   rna_def_space_sequencer_timeline_overlay(brna);
+
+  /* transform */
+  prop = RNA_def_property(srna, "cursor_location", PROP_FLOAT, PROP_XYZ);
+  RNA_def_property_float_sdna(prop, NULL, "cursor");
+  RNA_def_property_array(prop, 2);
+  RNA_def_property_ui_text(prop, "2D Cursor Location", "2D cursor location for this view");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_CLIP, NULL);
 }
 
 static void rna_def_space_text(BlenderRNA *brna)
@@ -6610,6 +6650,14 @@ static void rna_def_fileselect_asset_params(BlenderRNA *brna)
                                                 "rna_FileAssetSelectParams_asset_library_set");
   RNA_def_property_ui_text(prop, "Asset Library", "");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_FILE_PARAMS, NULL);
+
+  prop = RNA_def_property(srna, "catalog_id", PROP_STRING, PROP_NONE);
+  RNA_def_property_string_funcs(prop,
+                                "rna_FileAssetSelectParams_catalog_id_get",
+                                "rna_FileAssetSelectParams_catalog_id_length",
+                                NULL);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_ui_text(prop, "Catalog UUID", "The UUID of the catalog shown in the browser");
 
   prop = RNA_def_property(srna, "import_type", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, asset_import_type_items);
