@@ -53,14 +53,16 @@ uniform sampler2D transmit_normal_tx;
 uniform sampler2D transmit_data_tx;
 uniform sampler2D reflect_color_tx;
 uniform sampler2D reflect_normal_tx;
+uniform sampler1D sss_transmittance_tx;
 uniform usampler2D lights_culling_tx;
 uniform sampler2DArray utility_tx;
 uniform sampler2DShadow shadow_atlas_tx;
+uniform sampler2D shadow_depth_tx;
 uniform sampler2DArray lightprobe_grid_tx;
 uniform samplerCubeArray lightprobe_cube_tx;
 
-utility_tx_fetch_define(utility_tx)
-utility_tx_sample_define(utility_tx)
+utility_tx_fetch_define(utility_tx);
+utility_tx_sample_define(utility_tx);
 
 in vec4 uvcoordsvar;
 
@@ -74,6 +76,7 @@ void light_eval(ClosureDiffuse diffuse,
                 vec3 P,
                 vec3 V,
                 float vP_z,
+                float thickness,
                 inout vec3 out_diffuse,
                 inout vec3 out_specular);
 vec3 lightprobe_grid_eval(vec3 P, vec3 N, float random_threshold);
@@ -97,6 +100,9 @@ void main(void)
   ClosureReflection reflection = gbuffer_load_reflection_data(ref_col_in, ref_nor_in);
   ClosureRefraction refraction = gbuffer_load_refraction_data(tra_col_in, tra_nor_in, tra_dat_in);
 
+  float thickness;
+  gbuffer_load_global_data(tra_nor_in, thickness);
+
   float noise_offset = sampling_rng_1D_get(sampling, SAMPLING_LIGHTPROBE);
   float noise = utility_tx_fetch(gl_FragCoord.xy, UTIL_BLUE_NOISE_LAYER).r;
   float random_probe = fract(noise + noise_offset);
@@ -107,7 +113,7 @@ void main(void)
   vec3 R = -reflect(V, reflection.N);
   vec3 T = refract(-V, refraction.N, refraction.ior);
 
-  light_eval(diffuse, reflection, P, V, vP.z, radiance_diffuse, radiance_reflection);
+  light_eval(diffuse, reflection, P, V, vP.z, thickness, radiance_diffuse, radiance_reflection);
   radiance_diffuse += lightprobe_grid_eval(P, diffuse.N, random_probe);
   radiance_reflection += lightprobe_cubemap_eval(P, R, reflection.roughness, random_probe);
   radiance_refraction += lightprobe_cubemap_eval(P, T, sqr(refraction.roughness), random_probe);

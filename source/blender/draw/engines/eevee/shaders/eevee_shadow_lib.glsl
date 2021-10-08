@@ -26,16 +26,12 @@ vec3 shadow_punctual_local_position_to_face_local(int face_id, vec3 lL)
   switch (face_id) {
     case 1:
       return vec3(-lL.y, lL.z, -lL.x);
-      break;
     case 2:
       return vec3(lL.y, lL.z, lL.x);
-      break;
     case 3:
       return vec3(lL.x, lL.z, -lL.y);
-      break;
     case 4:
       return vec3(-lL.x, lL.z, lL.y);
-      break;
     case 5:
       return vec3(lL.x, -lL.y, -lL.z);
     default:
@@ -56,6 +52,18 @@ vec3 shadow_punctual_coordinates_get(ShadowPunctualData data, vec3 lL)
   float offset_fac = float(face_id > 0 && !data.is_omni) + float(face_id);
   shadow_co.y += offset_fac * data.region_offset;
   return shadow_co;
+}
+
+/* Returns world distance delta from light between shading point (lL) and shadow depth. */
+float shadow_punctual_depth_delta(ShadowPunctualData data, vec3 lL, float depth)
+{
+  lL -= data.shadow_offset;
+  /* Revert the constant bias from shadow rendering. (Tweaked for 16bit shadowmaps) */
+  const float depth_bias = 3.1e-5;
+  depth = saturate(depth - depth_bias);
+  depth = linear_depth(true, depth, data.shadow_far, data.shadow_near);
+  depth *= length(lL / max_v3(abs(lL)));
+  return length(lL) - depth;
 }
 
 /** \} */

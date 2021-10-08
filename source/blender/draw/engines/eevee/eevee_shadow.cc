@@ -271,6 +271,8 @@ ShadowPunctual::operator ShadowPunctualData()
   data.is_omni = is_omni_;
   data.shadow_bias = bias_;
   data.region_offset = (is_omni_ ? cube_res_ : (cube_res_ / 2)) / float(shadows_.atlas_extent_.y);
+  data.shadow_near = near_;
+  data.shadow_far = far_;
   return data;
 }
 

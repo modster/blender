@@ -15,8 +15,8 @@ layout(std140) uniform sampling_block
 
 uniform sampler2DArray utility_tx;
 
-utility_tx_fetch_define(utility_tx)
-utility_tx_sample_define(utility_tx)
+utility_tx_fetch_define(utility_tx);
+utility_tx_sample_define(utility_tx);
 
 /* Diffuse or Transmission Color. */
 layout(location = 0) out vec3 out_transmit_color;
@@ -47,10 +47,9 @@ void main(void)
   /* TODO(fclem) other RNG. */
   g_data.transmit_rand = fract(g_data.closure_rand * 6.1803398875);
 
-  nodetree_surface();
+  float thickness = nodetree_thickness();
 
-  /* TODO(fclem) Textured minimal thickness. */
-  // nodetree_thickness();
+  nodetree_surface();
 
   float alpha = saturate(1.0 - avg(g_transparency_data.transmittance));
 
@@ -68,8 +67,8 @@ void main(void)
   if (g_data.transmit_rand == 0.0) {
     out_transmit_color = g_refraction_data.color;
     out_transmit_normal.xy = -gbuffer_encode_normal(g_refraction_data.N);
-    out_transmit_normal.z = 1.0;
-    // out_transmit_normal.w = g_data.thickness;
+    out_transmit_normal.z = -1.0;
+    out_transmit_normal.w = thickness;
     out_transmit_data.x = g_refraction_data.ior;
     out_transmit_data.y = g_refraction_data.roughness;
   }
@@ -78,7 +77,7 @@ void main(void)
     out_transmit_color = g_diffuse_data.color;
     out_transmit_normal.xy = gbuffer_encode_normal(g_diffuse_data.N);
     out_transmit_normal.z = fract(float(g_diffuse_data.sss_id) / 1024.0);
-    // out_transmit_normal.w = g_data.thickness;
+    out_transmit_normal.w = thickness;
     out_transmit_data = g_diffuse_data.sss_radius;
   }
 

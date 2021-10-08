@@ -9,6 +9,8 @@
  * - lights
  * - shadows_punctual
  * - shadow_atlas_tx
+ * - shadow_depth_tx
+ * - sss_transmittance_tx
  * - utility_tx
  *
  * All of this is needed to avoid using macros and performance issues with large
@@ -22,6 +24,7 @@ void light_eval(ClosureDiffuse diffuse,
                 vec3 P,
                 vec3 V,
                 float vP_z,
+                float thickness,
                 inout vec3 out_diffuse,
                 inout vec3 out_specular)
 {
@@ -38,9 +41,23 @@ void light_eval(ClosureDiffuse diffuse,
 
     float visibility = light_attenuation(light, L, dist);
 
-    if (light.shadow_id != LIGHT_NO_SHADOW && (light.diffuse_power > 0.0 || visibility > 0.0)) {
+    if ((light.shadow_id != LIGHT_NO_SHADOW) && (light.diffuse_power > 0.0 || visibility > 0.0)) {
       vec3 lL = light_world_to_local(light, -L) * dist;
       vec3 shadow_co = shadow_punctual_coordinates_get(shadows_punctual[l_idx], lL);
+
+      /* Transmittance evaluation first to use initial visibility. */
+      if (diffuse.sss_id != 0u && light.diffuse_power > 0.0) {
+        float sh_depth = texture(shadow_depth_tx, shadow_co.xy).r;
+        float delta = shadow_punctual_depth_delta(shadows_punctual[l_idx], lL, sh_depth);
+        delta = max(thickness, delta);
+
+        vec3 intensity =
+            visibility * light.transmit_power *
+            light_translucent(
+                sss_transmittance_tx, light, diffuse.N, L, dist, diffuse.sss_radius, delta);
+        out_diffuse += light.color * intensity;
+      }
+
       visibility *= texture(shadow_atlas_tx, shadow_co);
     }
 

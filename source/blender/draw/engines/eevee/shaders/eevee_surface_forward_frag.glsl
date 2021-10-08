@@ -53,11 +53,13 @@ layout(std140) uniform lightprobes_info_block
 uniform usampler2D lights_culling_tx;
 uniform sampler2DArray utility_tx;
 uniform sampler2DShadow shadow_atlas_tx;
+uniform sampler2D shadow_depth_tx;
+uniform sampler1D sss_transmittance_tx;
 uniform sampler2DArray lightprobe_grid_tx;
 uniform samplerCubeArray lightprobe_cube_tx;
 
-utility_tx_fetch_define(utility_tx)
-utility_tx_sample_define(utility_tx)
+utility_tx_fetch_define(utility_tx);
+utility_tx_sample_define(utility_tx);
 
 layout(location = 0, index = 0) out vec4 out_radiance;
 layout(location = 0, index = 1) out vec4 out_transmittance;
@@ -68,6 +70,7 @@ void light_eval(ClosureDiffuse diffuse,
                 vec3 P,
                 vec3 V,
                 float vP_z,
+                float thickness,
                 inout vec3 out_diffuse,
                 inout vec3 out_specular);
 vec3 lightprobe_grid_eval(vec3 P, vec3 N, float random_threshold);
@@ -80,6 +83,8 @@ void main(void)
   float noise = utility_tx_fetch(gl_FragCoord.xy, UTIL_BLUE_NOISE_LAYER).r;
   g_data.closure_rand = fract(noise + sampling_rng_1D_get(sampling, SAMPLING_CLOSURE));
   g_data.transmit_rand = -1.0;
+
+  float thickness = nodetree_thickness();
 
   nodetree_surface();
 
@@ -100,7 +105,14 @@ void main(void)
   vec3 R = -reflect(V, g_reflection_data.N);
   vec3 T = refract(-V, g_refraction_data.N, g_refraction_data.ior);
 
-  light_eval(g_diffuse_data, g_reflection_data, P, V, vP_z, radiance_diffuse, radiance_reflection);
+  light_eval(g_diffuse_data,
+             g_reflection_data,
+             P,
+             V,
+             vP_z,
+             thickness,
+             radiance_diffuse,
+             radiance_reflection);
   radiance_diffuse += lightprobe_grid_eval(P, g_diffuse_data.N, random_probe);
   radiance_reflection += lightprobe_cubemap_eval(P, R, g_reflection_data.roughness, random_probe);
   radiance_refraction += lightprobe_cubemap_eval(

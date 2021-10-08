@@ -97,6 +97,7 @@ DRWShadingGroup *ForwardPass::material_opaque_add(::Material *blender_mat, GPUMa
   DRWPass *pass = (blender_mat->blend_flag & MA_BL_CULL_BACKFACE) ? opaque_culled_ps_ : opaque_ps_;
   LightModule &lights = inst_.lights;
   LightProbeModule &lightprobes = inst_.lightprobes;
+  eGPUSamplerState depth_read = GPU_SAMPLER_FILTER;
   DRWShadingGroup *grp = DRW_shgroup_material_create(gpumat, pass);
   DRW_shgroup_uniform_block_ref(grp, "lights_block", lights.lights_ubo_ref_get());
   DRW_shgroup_uniform_block_ref(grp, "shadows_punctual_block", lights.shadows_ubo_ref_get());
@@ -110,6 +111,13 @@ DRWShadingGroup *ForwardPass::material_opaque_add(::Material *blender_mat, GPUMa
   DRW_shgroup_uniform_texture_ref(grp, "lights_culling_tx", lights.culling_tx_ref_get());
   DRW_shgroup_uniform_texture(grp, "utility_tx", inst_.shading_passes.utility_tx);
   DRW_shgroup_uniform_texture_ref(grp, "shadow_atlas_tx", inst_.shadows.atlas_ref_get());
+  /* TODO(fclem): Make this only needed if material uses it ... somehow. */
+  if (true) {
+    DRW_shgroup_uniform_texture_ref_ex(
+        grp, "shadow_depth_tx", inst_.shadows.atlas_ref_get(), depth_read);
+    DRW_shgroup_uniform_texture_ref(
+        grp, "sss_transmittance_tx", inst_.subsurface.transmittance_ref_get());
+  }
   return grp;
 }
 
@@ -126,6 +134,7 @@ DRWShadingGroup *ForwardPass::material_transparent_add(::Material *blender_mat,
 {
   LightModule &lights = inst_.lights;
   LightProbeModule &lightprobes = inst_.lightprobes;
+  eGPUSamplerState depth_read = GPU_SAMPLER_FILTER;
   DRWShadingGroup *grp = DRW_shgroup_material_create(gpumat, transparent_ps_);
   DRW_shgroup_uniform_block_ref(grp, "lights_block", lights.lights_ubo_ref_get());
   DRW_shgroup_uniform_block_ref(grp, "shadows_punctual_block", lights.shadows_ubo_ref_get());
@@ -139,6 +148,13 @@ DRWShadingGroup *ForwardPass::material_transparent_add(::Material *blender_mat,
   DRW_shgroup_uniform_texture_ref(grp, "lights_culling_tx", lights.culling_tx_ref_get());
   DRW_shgroup_uniform_texture(grp, "utility_tx", inst_.shading_passes.utility_tx);
   DRW_shgroup_uniform_texture_ref(grp, "shadow_atlas_tx", inst_.shadows.atlas_ref_get());
+  /* TODO(fclem): Make this only needed if material uses it ... somehow. */
+  if (true) {
+    DRW_shgroup_uniform_texture_ref_ex(
+        grp, "shadow_depth_tx", inst_.shadows.atlas_ref_get(), depth_read);
+    DRW_shgroup_uniform_texture_ref(
+        grp, "sss_transmittance_tx", inst_.subsurface.transmittance_ref_get());
+  }
 
   DRWState state_disable = DRW_STATE_WRITE_DEPTH;
   DRWState state_enable = DRW_STATE_WRITE_COLOR | DRW_STATE_BLEND_CUSTOM;
@@ -350,6 +366,7 @@ void DeferredPass::sync(void)
   LightProbeModule &lightprobes = inst_.lightprobes;
 
   eGPUSamplerState no_interp = GPU_SAMPLER_DEFAULT;
+  eGPUSamplerState depth_read = GPU_SAMPLER_FILTER;
 
   {
     DRWState state = DRW_STATE_WRITE_COLOR | DRW_STATE_STENCIL_NEQUAL | DRW_STATE_BLEND_ADD_FULL;
@@ -369,6 +386,8 @@ void DeferredPass::sync(void)
     DRW_shgroup_uniform_texture(grp, "utility_tx", inst_.shading_passes.utility_tx);
     DRW_shgroup_uniform_texture_ref(grp, "shadow_atlas_tx", inst_.shadows.atlas_ref_get());
     DRW_shgroup_uniform_texture_ref_ex(
+        grp, "shadow_depth_tx", inst_.shadows.atlas_ref_get(), depth_read);
+    DRW_shgroup_uniform_texture_ref_ex(
         grp, "emission_data_tx", &input_emission_data_tx_, no_interp);
     DRW_shgroup_uniform_texture_ref_ex(
         grp, "transmit_color_tx", &input_transmit_color_tx_, no_interp);
@@ -381,6 +400,8 @@ void DeferredPass::sync(void)
     DRW_shgroup_uniform_texture_ref_ex(
         grp, "reflect_normal_tx", &input_reflect_normal_tx_, no_interp);
     DRW_shgroup_uniform_texture_ref(grp, "depth_tx", &input_depth_tx_);
+    DRW_shgroup_uniform_texture_ref(
+        grp, "sss_transmittance_tx", inst_.subsurface.transmittance_ref_get());
     DRW_shgroup_stencil_set(
         grp, 0x0, 0x0, CLOSURE_DIFFUSE | CLOSURE_REFLECTION | CLOSURE_EMISSION);
     DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);

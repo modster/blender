@@ -84,9 +84,11 @@ void Light::sync(ShadowModule &shadows, const Object *ob, float threshold)
   shape_parameters_set(la, scale);
 
   float shape_power = shape_power_get(la);
+  float point_power = point_power_get(la);
   this->diffuse_power = la->diff_fac * shape_power;
+  this->transmit_power = la->diff_fac * point_power;
   this->specular_power = la->spec_fac * shape_power;
-  this->volume_power = la->volume_fac * shape_power_volume_get(la);
+  this->volume_power = la->volume_fac * point_power;
 
   eLightType new_type = to_light_type(la->type, la->area_shape);
   if (this->type != new_type) {
@@ -217,7 +219,7 @@ float Light::shape_power_get(const ::Light *la)
   return power;
 }
 
-float Light::shape_power_volume_get(const ::Light *la)
+float Light::point_power_get(const ::Light *la)
 {
   /* Volume light is evaluated as point lights. Remove the shape power. */
   if (la->type == LA_AREA) {

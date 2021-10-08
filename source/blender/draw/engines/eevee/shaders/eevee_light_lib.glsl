@@ -169,4 +169,29 @@ float light_ltc(
   }
 }
 
+vec3 light_translucent(sampler1D transmittance_tx,
+                       LightData ld,
+                       vec3 N,
+                       vec3 L,
+                       float dist,
+                       vec3 sss_radius,
+                       float delta)
+{
+  /* TODO(fclem): We should compute the power at the entry point. */
+  /* NOTE(fclem): we compute the light attenuation using the light vector but the transmittance
+   * using the shadow depth delta. */
+  float power = light_point_light(ld, L, dist);
+  /* Do not add more energy on front faces. Also apply lambertian BSDF. */
+  power *= max(0.0, dot(-N, L)) * M_1_PI;
+
+  sss_radius *= SSS_TRANSMIT_LUT_RADIUS;
+  vec3 channels_co = saturate(delta / sss_radius) * SSS_TRANSMIT_LUT_SCALE + SSS_TRANSMIT_LUT_BIAS;
+
+  vec3 translucency;
+  translucency.x = (sss_radius.x > 0.0) ? texture(transmittance_tx, channels_co.x).r : 0.0;
+  translucency.y = (sss_radius.y > 0.0) ? texture(transmittance_tx, channels_co.y).r : 0.0;
+  translucency.z = (sss_radius.z > 0.0) ? texture(transmittance_tx, channels_co.z).r : 0.0;
+  return translucency * power;
+}
+
 /** \} */

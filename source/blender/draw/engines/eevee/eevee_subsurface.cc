@@ -46,7 +46,7 @@ void SubsurfaceModule::end_sync()
     data_.sample_len = 55;
   }
 
-  if (translucency_tx == nullptr) {
+  if (transmittance_tx == nullptr) {
     precompute_transmittance_profile();
   }
 
@@ -77,12 +77,51 @@ void SubsurfaceModule::precompute_samples_location()
 
 void SubsurfaceModule::precompute_transmittance_profile()
 {
-  Vector<float> profile(data_.sample_len);
+  Vector<float> profile(SSS_TRANSMIT_LUT_SIZE);
 
-  /* TODO */
+  /* Precompute sample position with white albedo. */
+  float radius = 1.0f;
+  float d = burley_setup(radius, 1.0f);
 
-  translucency_tx = new Texture(
-      "SSSTransmittanceProfile", data_.sample_len, 0, 0, 1, GPU_R16F, profile.data());
+  /* For each distance d we compute the radiance incoming from an hypothetical parallel plane. */
+  for (auto i : IndexRange(SSS_TRANSMIT_LUT_SIZE)) {
+    /* Distance from the lit surface plane.
+     * Compute to a larger maximum distance to have a smoother falloff for all channels. */
+    float lut_radius = SSS_TRANSMIT_LUT_RADIUS * radius;
+    float distance = lut_radius * (i + 1e-5f) / profile.size();
+    /* Compute radius of the footprint on the hypothetical plane. */
+    float r_fp = sqrtf(square_f(lut_radius) - square_f(distance));
+
+    profile[i] = 0.0f;
+    float area_accum = 0.0f;
+    for (auto j : IndexRange(SSS_TRANSMIT_LUT_STEP_RES)) {
+      /* Compute distance to the "shading" point through the medium. */
+      float r = (r_fp * (j + 0.5f)) / SSS_TRANSMIT_LUT_STEP_RES;
+      float r_prev = (r_fp * (j + 0.0f)) / SSS_TRANSMIT_LUT_STEP_RES;
+      float r_next = (r_fp * (j + 1.0f)) / SSS_TRANSMIT_LUT_STEP_RES;
+      r = hypotf(r, distance);
+      float R = burley_eval(d, r);
+      /* Since the profile and configuration are radially symmetrical we
+       * can just evaluate it once and weight it accordingly */
+      float disk_area = square_f(r_next) - square_f(r_prev);
+
+      profile[i] += R * disk_area;
+      area_accum += disk_area;
+    }
+    /* Normalize over the disk. */
+    profile[i] /= area_accum;
+  }
+  /* Make a smooth gradient from 1 to 0. */
+  float range = profile.first() - profile.last();
+  float offset = profile.last();
+  for (float &value : profile) {
+    value = (value - offset) / range;
+  }
+  profile.first() = 1;
+  profile.last() = 0;
+
+  transmittance_tx = GPU_texture_create_1d(
+      "SSSTransmittanceProfile", profile.size(), 1, GPU_R16F, profile.data());
 }
 
 /** \} */
@@ -108,7 +147,7 @@ float SubsurfaceModule::burley_setup(float radius, float albedo)
 
 float SubsurfaceModule::burley_sample(float d, float x_rand)
 {
-  x_rand *= BURLEY_TRUNCATE_CDF;
+  x_rand *= SSS_BURLEY_TRUNCATE_CDF;
 
   const float tolerance = 1e-6;
   const int max_iteration_count = 10;
@@ -147,7 +186,7 @@ float SubsurfaceModule::burley_sample(float d, float x_rand)
 
 float SubsurfaceModule::burley_eval(float d, float r)
 {
-  if (r >= BURLEY_TRUNCATE * d) {
+  if (r >= SSS_BURLEY_TRUNCATE * d) {
     return 0.0;
   }
   /* Slide 33. */
@@ -158,7 +197,7 @@ float SubsurfaceModule::burley_eval(float d, float r)
 
 float SubsurfaceModule::burley_pdf(float d, float r)
 {
-  return burley_eval(d, r) / BURLEY_TRUNCATE_CDF;
+  return burley_eval(d, r) / SSS_BURLEY_TRUNCATE_CDF;
 }
 
 /** \} */

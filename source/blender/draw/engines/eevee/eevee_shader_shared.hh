@@ -426,15 +426,15 @@ struct LightData {
   float diffuse_power;
   float specular_power;
   float volume_power;
+  float transmit_power;
   /** Special radius factor for point lighting. */
   float radius_squared;
   /** Light Type. */
   eLightType type;
+  /** Padding to sizeof(vec2). */
+  float _pad1;
   /** Spot size. Aligned to size of vec2. */
   vec2 spot_size_inv;
-  /** Padding to sizeof(vec4). */
-  float _pad0;
-  float _pad1;
 };
 BLI_STATIC_ASSERT_ALIGN(LightData, 16)
 
@@ -462,9 +462,9 @@ struct ShadowPunctualData {
   float region_offset;
   /** True if shadow is omnidirectional and there is 6 fullsized shadow regions.  */
   bool is_omni;
-  /** Padding to sizeof(vec4). */
-  int _pad0;
-  int _pad1;
+  /** Near and far clipping distance. */
+  float shadow_near;
+  float shadow_far;
 };
 BLI_STATIC_ASSERT_ALIGN(ShadowPunctualData, 16)
 
@@ -617,8 +617,13 @@ BLI_STATIC_ASSERT_ALIGN(LightProbeInfoData, 16)
  * \{ */
 
 #define SSS_SAMPLE_MAX 64
-#define BURLEY_TRUNCATE 16.0
-#define BURLEY_TRUNCATE_CDF 0.9963790093708328
+#define SSS_BURLEY_TRUNCATE 16.0
+#define SSS_BURLEY_TRUNCATE_CDF 0.9963790093708328
+#define SSS_TRANSMIT_LUT_SIZE 64.0
+#define SSS_TRANSMIT_LUT_RADIUS 1.218
+#define SSS_TRANSMIT_LUT_SCALE ((SSS_TRANSMIT_LUT_SIZE - 1.0) / float(SSS_TRANSMIT_LUT_SIZE))
+#define SSS_TRANSMIT_LUT_BIAS (0.5 / float(SSS_TRANSMIT_LUT_SIZE))
+#define SSS_TRANSMIT_LUT_STEP_RES 64.0
 
 struct SubsurfaceData {
   /** xy: 2D sample position [-1..1], zw: sample_bounds. */
