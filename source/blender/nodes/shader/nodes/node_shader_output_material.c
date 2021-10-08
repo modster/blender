@@ -36,6 +36,7 @@ static bNodeSocketTemplate sh_node_output_material_in[] = {
      1.0f,
      PROP_NONE,
      SOCK_HIDE_VALUE},
+    {SOCK_FLOAT, N_("Thickness"), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, PROP_NONE, SOCK_HIDE_VALUE},
     {-1, ""},
 };
 
@@ -45,7 +46,7 @@ static int node_shader_gpu_output_material(GPUMaterial *mat,
                                            GPUNodeStack *in,
                                            GPUNodeStack *UNUSED(out))
 {
-  GPUNodeLink *outlink_surface, *outlink_volume, *outlink_displacement;
+  GPUNodeLink *outlink_surface, *outlink_volume, *outlink_displacement, *outlink_thickness;
   /* Passthrough node in order to do the right socket conversions (important for displacement). */
   if (in[0].link) {
     GPU_link(mat, "node_output_material_surface", in[0].link, &outlink_surface);
@@ -58,6 +59,10 @@ static int node_shader_gpu_output_material(GPUMaterial *mat,
   if (in[2].link) {
     GPU_link(mat, "node_output_material_displacement", in[2].link, &outlink_displacement);
     GPU_material_output_displacement(mat, outlink_displacement);
+  }
+  if (in[3].link) {
+    GPU_link(mat, "node_output_material_thickness", in[3].link, &outlink_thickness);
+    GPU_material_output_thickness(mat, outlink_thickness);
   }
   return true;
 }

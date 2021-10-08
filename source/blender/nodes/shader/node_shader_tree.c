@@ -929,6 +929,13 @@ static void ntree_shader_weight_tree_invert(bNodeTree *ntree, bNode *output_node
     displace_link = displace_output->link;
     displace_output->link = NULL;
   }
+  bNodeLink *thickness_link = NULL;
+  bNodeSocket *thickness_output = ntree_shader_node_find_input(output_node, "Thickness");
+  if (thickness_output && thickness_output->link) {
+    /* Remove any thickness link to avoid tagging it later on. */
+    thickness_link = thickness_output->link;
+    thickness_output->link = NULL;
+  }
   /* Init tmp flag. */
   LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
     node->tmp_flag = -1;
@@ -1129,10 +1136,14 @@ static void ntree_shader_weight_tree_invert(bNodeTree *ntree, bNode *output_node
       }
     }
   }
-  /* Restore displacement link. */
+  /* Restore displacement & thickness link. */
   if (displace_link) {
     nodeAddLink(
         ntree, displace_link->fromnode, displace_link->fromsock, output_node, displace_output);
+  }
+  if (thickness_link) {
+    nodeAddLink(
+        ntree, thickness_link->fromnode, thickness_link->fromsock, output_node, thickness_output);
   }
   ntreeUpdateTree(G.main, ntree);
 

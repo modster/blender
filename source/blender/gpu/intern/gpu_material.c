@@ -257,6 +257,13 @@ void GPU_material_output_displacement(GPUMaterial *material, GPUNodeLink *link)
   }
 }
 
+void GPU_material_output_thickness(GPUMaterial *material, GPUNodeLink *link)
+{
+  if (!material->graph.outlink_thickness) {
+    material->graph.outlink_thickness = link;
+  }
+}
+
 void GPU_material_add_output_link_aov(GPUMaterial *material, GPUNodeLink *link, int hash)
 {
   GPUNodeGraphOutputLink *aov_link = MEM_callocN(sizeof(GPUNodeGraphOutputLink), __func__);

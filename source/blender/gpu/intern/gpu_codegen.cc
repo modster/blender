@@ -233,6 +233,7 @@ class GPUCodegen {
     MEM_SAFE_FREE(output.attribs_passthrough);
     MEM_SAFE_FREE(output.surface);
     MEM_SAFE_FREE(output.volume);
+    MEM_SAFE_FREE(output.thickness);
     MEM_SAFE_FREE(output.displacement);
     MEM_SAFE_FREE(output.uniforms);
     MEM_SAFE_FREE(output.library);
@@ -536,6 +537,7 @@ void GPUCodegen::generate_graphs()
   output.surface = graph_serialize(GPU_NODE_TAG_SURFACE, graph.outlink_surface);
   output.volume = graph_serialize(GPU_NODE_TAG_VOLUME, graph.outlink_volume);
   output.displacement = graph_serialize(GPU_NODE_TAG_DISPLACEMENT, graph.outlink_displacement);
+  output.thickness = graph_serialize(GPU_NODE_TAG_THICKNESS, graph.outlink_thickness);
 
   LISTBASE_FOREACH (GPUMaterialAttribute *, attr, &graph.attributes) {
     BLI_hash_mm2a_add(&hm2a_, (uchar *)attr->name, strlen(attr->name));

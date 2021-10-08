@@ -686,6 +686,17 @@ char *ShaderModule::material_shader_code_frag_get(const GPUCodegenOutput *codege
   }
   output += "}\n\n";
 
+  output += "float nodetree_thickness(void)\n";
+  output += "{\n";
+  if (codegen->thickness) {
+    output += codegen->thickness;
+  }
+  else {
+    /* TODO(fclem): Better default. */
+    output += "return 0.1;\n";
+  }
+  output += "}\n\n";
+
   switch (geometry_type) {
     case MAT_GEOM_WORLD:
       output += datatoc_eevee_surface_background_frag_glsl;

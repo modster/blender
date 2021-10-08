@@ -13,3 +13,8 @@ void node_output_material_displacement(vec3 displacement, out vec3 out_displacem
 {
   out_displacement = displacement;
 }
+
+void node_output_material_thickness(float thickness, out float out_thickness)
+{
+  out_thickness = thickness;
+}

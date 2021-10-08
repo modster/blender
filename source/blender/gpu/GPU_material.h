@@ -140,6 +140,7 @@ typedef struct GPUCodegenOutput {
   char *displacement;
   char *surface;
   char *volume;
+  char *thickness;
 } GPUCodegenOutput;
 
 typedef GPUShaderSource (*GPUCodegenCallbackFn)(void *thunk,
@@ -185,6 +186,7 @@ GPUNodeLink *GPU_uniformbuf_link_out(struct GPUMaterial *mat,
 void GPU_material_output_surface(GPUMaterial *material, GPUNodeLink *link);
 void GPU_material_output_volume(GPUMaterial *material, GPUNodeLink *link);
 void GPU_material_output_displacement(GPUMaterial *material, GPUNodeLink *link);
+void GPU_material_output_thickness(GPUMaterial *material, GPUNodeLink *link);
 
 void GPU_material_add_output_link_aov(GPUMaterial *material, GPUNodeLink *link, int hash);
 
