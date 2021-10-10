@@ -34,6 +34,7 @@
 using blender::MutableSpan;
 
 namespace blender::geometry {
+const static int POINT_NOT_MERGED = -1;
 
 static KDTree_3d *build_kdtree(Span<float3> positions, Span<bool> selection)
 {
@@ -76,8 +77,8 @@ static void build_merge_map(Span<float3> positions,
           CallbackData &callback_data = *static_cast<CallbackData *>(user_data);
           int target_point_index = callback_data.index;
           if (source_point_index != target_point_index &&
-              callback_data.merge_map[source_point_index] == -1 &&
-              callback_data.merge_map[target_point_index] == -1 &&
+              callback_data.merge_map[source_point_index] == POINT_NOT_MERGED &&
+              callback_data.merge_map[target_point_index] == POINT_NOT_MERGED &&
               callback_data.selection[source_point_index] &&
               callback_data.selection[target_point_index]) {
             callback_data.merge_map[source_point_index] = target_point_index;
@@ -95,80 +96,58 @@ PointCloud *pointcloud_merge_by_distance(PointCloudComponent &pointcloud_compone
                                          Span<bool> selection)
 {
   const PointCloud &src_pointcloud = *pointcloud_component.get_for_read();
-  Array<int> merge_map(src_pointcloud.totpoint, -1);
+  Array<int> merge_map(src_pointcloud.totpoint, POINT_NOT_MERGED);
   Span<float3> positions((const float3 *)src_pointcloud.co, src_pointcloud.totpoint);
 
   build_merge_map(positions, merge_map, merge_threshold, selection);
 
   MultiValueMap<int, int> copy_map;
   for (const int i : merge_map.index_range()) {
-    if (merge_map[i] != -1) {
+    if (merge_map[i] != POINT_NOT_MERGED) {
       copy_map.add(merge_map[i], i);
     }
   }
 
-  int copy_count = std::distance(copy_map.keys().begin(), copy_map.keys().end());
-
-  PointCloud *pointcloud = BKE_pointcloud_new_nomain(copy_count);
+  PointCloud *pointcloud = BKE_pointcloud_new_nomain(copy_map.size());
   PointCloudComponent dst_component;
   dst_component.replace(pointcloud, GeometryOwnershipType::Editable);
-
-  int index_new = 0;
-  for (const int index_old : copy_map.keys()) {
-    Span<int> merged_points = copy_map.lookup(index_old);
-    if (merged_points.size() > 0) {
-      copy_v3_v3(pointcloud->co[index_new], src_pointcloud.co[index_old]);
-      pointcloud->radius[index_new] = src_pointcloud.radius[index_old];
-      float weight = 1 / (float(merged_points.size() + 1));
-      for (const int j : merged_points) {
-        add_v3_v3(pointcloud->co[index_new], src_pointcloud.co[j]);
-        pointcloud->radius[index_new] += src_pointcloud.radius[j];
-      }
-      mul_v3_fl(pointcloud->co[index_new], weight);
-      pointcloud->radius[index_new] *= weight;
-    }
-    index_new++;
-  }
 
   pointcloud_component.attribute_foreach(
       [&](const bke::AttributeIDRef &attribute_id, const AttributeMetaData &meta_data) {
         fn::GVArrayPtr read_attribute = pointcloud_component.attribute_get_for_read(
             attribute_id, meta_data.domain, meta_data.data_type);
 
-        if (dst_component.attribute_try_create(
+        if (!dst_component.attribute_exists(attribute_id) &&
+            !dst_component.attribute_try_create(
                 attribute_id, meta_data.domain, meta_data.data_type, AttributeInitDefault())) {
-
-          bke::OutputAttribute target_attribute = dst_component.attribute_try_get_for_output_only(
-              attribute_id, meta_data.domain, meta_data.data_type);
-
-          if (target_attribute->is_empty()) {
-            target_attribute.save();
-            return true;
-          }
-
-          blender::attribute_math::convert_to_static_type(meta_data.data_type, [&](auto dummy) {
-            using T = decltype(dummy);
-            const fn::GVArray_Typed<T> src_span = read_attribute->typed<T>();
-
-            attribute_math::DefaultMixer<T> mixer(target_attribute.as_span<T>());
-
-            index_new = 0;
-            for (const int index_old : copy_map.keys()) {
-              Span<int> merged_points = copy_map.lookup(index_old);
-              if (merged_points.size() > 0) {
-                float weight = 1 / (float(merged_points.size() + 1));
-                mixer.mix_in(index_new, src_span[index_old], weight);
-                for (const int j : merged_points) {
-                  mixer.mix_in(index_new, src_span[j], weight);
-                }
-              }
-              index_new++;
-            }
-            mixer.finalize();
-          });
-
-          target_attribute.save();
+          return true;
         }
+
+        bke::OutputAttribute target_attribute = dst_component.attribute_try_get_for_output_only(
+            attribute_id, meta_data.domain, meta_data.data_type);
+
+        blender::attribute_math::convert_to_static_type(meta_data.data_type, [&](auto dummy) {
+          using T = decltype(dummy);
+          const fn::GVArray_Typed<T> src_span = read_attribute->typed<T>();
+
+          attribute_math::DefaultMixer<T> mixer(target_attribute.as_span<T>());
+
+          int index_new = 0;
+          for (const int index_old : copy_map.keys()) {
+            Span<int> merged_points = copy_map.lookup(index_old);
+            if (merged_points.size() > 0) {
+              float weight = 1.0f / (float(merged_points.size() + 1.0f));
+              mixer.mix_in(index_new, src_span[index_old], weight);
+              for (const int j : merged_points) {
+                mixer.mix_in(index_new, src_span[j], weight);
+              }
+            }
+            index_new++;
+          }
+          mixer.finalize();
+        });
+
+        target_attribute.save();
         return true;
       });
 

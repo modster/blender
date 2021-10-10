@@ -35,12 +35,39 @@ using blender::Array;
 using blender::float3;
 using blender::Span;
 using blender::Vector;
+using blender::geometry::WeldMode;
+
+static WeldMode weld_mode_from_int(const short type)
+{
+  switch (static_cast<WeldMode>(type)) {
+    case WeldMode::all:
+      return WeldMode::all;
+    case WeldMode::connected:
+      return WeldMode::connected;
+  }
+  BLI_assert_unreachable();
+  return WeldMode::all;
+}
+
+static int16_t weld_mode_to_int(const WeldMode weld_mode)
+{
+  switch (weld_mode) {
+    case WeldMode::all:
+      return static_cast<int16_t>(WeldMode::all);
+    case WeldMode::connected:
+      return static_cast<int16_t>(WeldMode::connected);
+  }
+
+  BLI_assert_unreachable();
+  return static_cast<int16_t>(WeldMode::all);
+}
 
 namespace blender::nodes {
+
 static void geo_node_merge_by_distance_declare(NodeDeclarationBuilder &b)
 {
   b.add_input<decl::Geometry>("Geometry");
-  b.add_input<decl::Float>("Distance").min(0.0f).max(10000.0f);
+  b.add_input<decl::Float>("Distance").min(0.0f).max(10000.0f).subtype(PROP_DISTANCE);
   b.add_input<decl::Bool>("Selection").default_value(true).hide_value().supports_field();
 
   b.add_output<decl::Geometry>("Geometry");
@@ -55,11 +82,11 @@ static void geo_node_merge_by_distance_layout(uiLayout *layout,
 
 static void geo_merge_by_distance_init(bNodeTree *UNUSED(ntree), bNode *node)
 {
-  node->custom1 = weld_mode_to_int(geometry::WeldMode::all);
+  node->custom1 = weld_mode_to_int(WeldMode::all);
 }
 
 static void process_mesh(GeoNodeExecParams &params,
-                         const geometry::WeldMode weld_mode,
+                         const WeldMode weld_mode,
                          const float distance,
                          GeometrySet &geometry_set)
 {
@@ -102,29 +129,10 @@ static void geo_node_merge_by_distance_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
 
-  const geometry::WeldMode weld_mode = geometry::weld_mode_from_int(params.node().custom1);
+  const geometry::WeldMode weld_mode = weld_mode_from_int(params.node().custom1);
   const float distance = params.extract_input<float>("Distance");
 
-  if (geometry_set.has_instances()) {
-    InstancesComponent &instances = geometry_set.get_component_for_write<InstancesComponent>();
-    instances.ensure_geometry_instances();
-
-    threading::parallel_for(IndexRange(instances.references_amount()), 16, [&](IndexRange range) {
-      for (int i : range) {
-        GeometrySet &geometry_set = instances.geometry_set_from_reference(i);
-        geometry_set = bke::geometry_set_realize_instances(geometry_set);
-
-        if (geometry_set.has_mesh()) {
-          process_mesh(params, weld_mode, distance, geometry_set);
-        }
-
-        if (geometry_set.has_pointcloud()) {
-          process_pointcloud(params, distance, geometry_set);
-        }
-      }
-    });
-  }
-  else {
+  geometry_set.modify_geometry_sets([&](GeometrySet &geometry_set) {
     if (geometry_set.has_mesh()) {
       process_mesh(params, weld_mode, distance, geometry_set);
     }
@@ -132,7 +140,7 @@ static void geo_node_merge_by_distance_exec(GeoNodeExecParams params)
     if (geometry_set.has_pointcloud()) {
       process_pointcloud(params, distance, geometry_set);
     }
-  }
+  });
 
   params.set_output("Geometry", std::move(geometry_set));
 }

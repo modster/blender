@@ -1542,31 +1542,6 @@ struct WeldVertexCluster {
 
 namespace blender::geometry {
 
-WeldMode weld_mode_from_int(const short type)
-{
-  switch (static_cast<WeldMode>(type)) {
-    case WeldMode::all:
-      return WeldMode::all;
-    case WeldMode::connected:
-      return WeldMode::connected;
-  }
-  BLI_assert_unreachable();
-  return WeldMode::all;
-}
-
-int16_t weld_mode_to_int(const WeldMode weld_mode)
-{
-  switch (weld_mode) {
-    case WeldMode::all:
-      return static_cast<int16_t>(WeldMode::all);
-    case WeldMode::connected:
-      return static_cast<int16_t>(WeldMode::connected);
-  }
-
-  BLI_assert_unreachable();
-  return static_cast<int16_t>(WeldMode::all);
-}
-
 Mesh *mesh_merge_by_distance(Mesh *mesh,
                              const Span<bool> mask,
                              const float merge_distance,

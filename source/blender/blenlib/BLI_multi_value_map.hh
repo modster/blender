@@ -145,6 +145,14 @@ template<typename Key, typename Value> class MultiValueMap {
   }
 
   /**
+   * Return how many keys are currently stored in the Map.
+   */
+  int64_t size() const
+  {
+    return std::distance(this->keys().begin(), this->keys().end());
+  }
+
+  /**
    * NOTE: This signature will change when the implementation changes.
    */
   typename MapType::ValueIterator values() const

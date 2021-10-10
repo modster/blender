@@ -62,6 +62,32 @@
 #include "RNA_access.h"
 
 #include "MOD_ui_common.h"
+using blender::geometry::WeldMode;
+
+static WeldMode weld_mode_from_int(const short type)
+{
+  switch (static_cast<WeldMode>(type)) {
+    case WeldMode::all:
+      return WeldMode::all;
+    case WeldMode::connected:
+      return WeldMode::connected;
+  }
+  BLI_assert_unreachable();
+  return WeldMode::all;
+}
+
+static int16_t weld_mode_to_int(const WeldMode weld_mode)
+{
+  switch (weld_mode) {
+    case WeldMode::all:
+      return static_cast<int16_t>(WeldMode::all);
+    case WeldMode::connected:
+      return static_cast<int16_t>(WeldMode::connected);
+  }
+
+  BLI_assert_unreachable();
+  return static_cast<int16_t>(WeldMode::all);
+}
 
 static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *UNUSED(ctx), Mesh *mesh)
 {
@@ -89,7 +115,7 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *UNUSED(ctx)
   }
 
   Mesh *result = blender::geometry::mesh_merge_by_distance(
-      mesh, mask, wmd->merge_dist, blender::geometry::weld_mode_from_int(wmd->mode));
+      mesh, mask, wmd->merge_dist, weld_mode_from_int(wmd->mode));
 
   return result;
 }
@@ -125,12 +151,12 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
 
   uiLayoutSetPropSep(layout, true);
 
-  uiItemR(layout, ptr, "mode", 0, NULL, ICON_NONE);
+  uiItemR(layout, ptr, "mode", 0, nullptr, ICON_NONE);
   uiItemR(layout, ptr, "merge_threshold", 0, IFACE_("Distance"), ICON_NONE);
-  if (blender::geometry::weld_mode_from_int(weld_mode) == blender::geometry::WeldMode::connected) {
-    uiItemR(layout, ptr, "loose_edges", 0, NULL, ICON_NONE);
+  if (weld_mode_from_int(weld_mode) == blender::geometry::WeldMode::connected) {
+    uiItemR(layout, ptr, "loose_edges", 0, nullptr, ICON_NONE);
   }
-  modifier_vgroup_ui(layout, ptr, &ob_ptr, "vertex_group", "invert_vertex_group", NULL);
+  modifier_vgroup_ui(layout, ptr, &ob_ptr, "vertex_group", "invert_vertex_group", nullptr);
 
   modifier_panel_end(layout, ptr);
 }
@@ -154,27 +180,27 @@ ModifierTypeInfo modifierType_Weld = {
 
     /* copyData */ BKE_modifier_copydata_generic,
 
-    /* deformVerts */ NULL,
-    /* deformMatrices */ NULL,
-    /* deformVertsEM */ NULL,
-    /* deformMatricesEM */ NULL,
+    /* deformVerts */ nullptr,
+    /* deformMatrices */ nullptr,
+    /* deformVertsEM */ nullptr,
+    /* deformMatricesEM */ nullptr,
     /* modifyMesh */ modifyMesh,
-    /* modifyHair */ NULL,
-    /* modifyGeometrySet */ NULL,
+    /* modifyHair */ nullptr,
+    /* modifyGeometrySet */ nullptr,
 
     /* initData */ initData,
     /* requiredDataMask */ requiredDataMask,
-    /* freeData */ NULL,
-    /* isDisabled */ NULL,
-    /* updateDepsgraph */ NULL,
-    /* dependsOnTime */ NULL,
-    /* dependsOnNormals */ NULL,
-    /* foreachIDLink */ NULL,
-    /* foreachTexLink */ NULL,
-    /* freeRuntimeData */ NULL,
+    /* freeData */ nullptr,
+    /* isDisabled */ nullptr,
+    /* updateDepsgraph */ nullptr,
+    /* dependsOnTime */ nullptr,
+    /* dependsOnNormals */ nullptr,
+    /* foreachIDLink */ nullptr,
+    /* foreachTexLink */ nullptr,
+    /* freeRuntimeData */ nullptr,
     /* panelRegister */ panelRegister,
-    /* blendWrite */ NULL,
-    /* blendRead */ NULL,
+    /* blendWrite */ nullptr,
+    /* blendRead */ nullptr,
 };
 
 /** \} */

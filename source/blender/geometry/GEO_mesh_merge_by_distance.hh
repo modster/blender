@@ -24,14 +24,10 @@
 
 namespace blender::geometry {
 
-/* Weld mode is only used when welding mesh data. */
 enum class WeldMode {
   all = 0,
   connected = 1,
 };
-
-WeldMode weld_mode_from_int(const int16_t type);
-int16_t weld_mode_to_int(const WeldMode weld_mode);
 
 struct Mesh *mesh_merge_by_distance(struct Mesh *mesh,
                                     const Span<bool> mask,
