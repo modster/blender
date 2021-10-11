@@ -3561,8 +3561,7 @@ static int object_add_named_exec(bContext *C, wmOperator *op)
     ED_view3d_placement_plane_boundbox_calc(
         C, mval, boundbox, PLACE_DIRECTION_NEG, scale, basen->object->loc, rotmat);
 
-    BLI_assert(basen->object->rotmode == ROT_MODE_XYZ);
-    mat3_to_eul(basen->object->rot, rotmat);
+    BKE_object_mat3_to_rot(basen->object, rotmat, true);
     DEG_id_tag_update(&basen->object->id, ID_RECALC_TRANSFORM);
   }
 
