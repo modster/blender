@@ -489,11 +489,15 @@ bool WM_drag_is_ID_type(const wmDrag *drag, int idcode)
 /**
  * \note: Does not store \a asset in any way, so it's fine to pass a temporary.
  */
-wmDragAsset *WM_drag_create_asset_data(const AssetHandle *asset, const char *path, int import_type)
+wmDragAsset *WM_drag_create_asset_data(const AssetHandle *asset,
+                                       AssetMetaData *metadata,
+                                       const char *path,
+                                       int import_type)
 {
   wmDragAsset *asset_drag = MEM_mallocN(sizeof(*asset_drag), "wmDragAsset");
 
   BLI_strncpy(asset_drag->name, ED_asset_handle_get_name(asset), sizeof(asset_drag->name));
+  asset_drag->metadata = metadata;
   asset_drag->path = path;
   asset_drag->id_type = ED_asset_handle_get_id_type(asset);
   asset_drag->import_type = import_type;
@@ -663,11 +667,12 @@ void WM_drag_add_asset_list_item(
     drag_asset->asset_data.local_id = local_id;
   }
   else {
+    AssetMetaData *metadata = ED_asset_handle_get_metadata(asset);
     char asset_blend_path[FILE_MAX_LIBEXTRA];
     ED_asset_handle_get_full_library_path(C, asset_library_ref, asset, asset_blend_path);
     drag_asset->is_external = true;
     drag_asset->asset_data.external_info = WM_drag_create_asset_data(
-        asset, BLI_strdup(asset_blend_path), FILE_ASSET_IMPORT_APPEND);
+        asset, metadata, BLI_strdup(asset_blend_path), FILE_ASSET_IMPORT_APPEND);
   }
   BLI_addtail(&drag->asset_items, drag_asset);
 }

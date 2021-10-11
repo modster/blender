@@ -6285,7 +6285,7 @@ void UI_but_drag_set_asset(uiBut *but,
                            struct ImBuf *imb,
                            float scale)
 {
-  wmDragAsset *asset_drag = WM_drag_create_asset_data(asset, path, import_type);
+  wmDragAsset *asset_drag = WM_drag_create_asset_data(asset, metadata, path, import_type);
 
   /* FIXME: This is temporary evil solution to get scene/viewlayer/etc in the copy callback of the
    * #wmDropBox.
@@ -6293,12 +6293,6 @@ void UI_but_drag_set_asset(uiBut *but,
    * copy callback.
    * */
   asset_drag->evil_C = but->block->evil_C;
-
-  BLI_strncpy(asset_drag->name, ED_asset_handle_get_name(asset), sizeof(asset_drag->name));
-  asset_drag->metadata = metadata;
-  asset_drag->path = path;
-  asset_drag->id_type = ED_asset_handle_get_id_type(asset);
-  asset_drag->import_type = import_type;
 
   but->dragtype = WM_DRAG_ASSET;
   ui_def_but_icon(but, icon, 0); /* no flag UI_HAS_ICON, so icon doesn't draw in button */
