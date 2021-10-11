@@ -226,7 +226,7 @@ set(ZSTANDARD_VERSION 0.15.2 )
 set(NUMPY_VERSION 1.21.2)
 set(NUMPY_SHORT_VERSION 1.21)
 set(NUMPY_URI https://github.com/numpy/numpy/releases/download/v${NUMPY_VERSION}/numpy-${NUMPY_VERSION}.zip)
-set(NUMPY_HASH f6a1b48717c552bbc18f1adc3cc1fe0e)
+set(NUMPY_HASH 5638d5dae3ca387be562912312db842e)
 set(NUMPY_HASH_TYPE MD5)
 set(NUMPY_FILE numpy-${NUMPY_VERSION}.zip)
 
