@@ -1032,7 +1032,7 @@ typedef struct wmDrag {
   float scale;
   int sx, sy;
 
-  /** Don't draw the icon or image (`imb`). */
+  /** Don't draw the icon or image (`imb`). Can be set in the `poll()` callback of the drop-box. */
   bool no_preview;
 
   /** If filled, draws operator tooltip/operator name. */

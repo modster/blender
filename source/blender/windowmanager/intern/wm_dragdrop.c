@@ -392,6 +392,8 @@ static void wm_drop_operator_options(bContext *C, wmDrag *drag, const wmEvent *e
   }
 
   drag->tooltip[0] = 0;
+  /* Allow setting this in the `poll()`. */
+  drag->no_preview = false;
 
   /* check buttons (XXX todo rna and value) */
   if (UI_but_active_drop_name(C)) {
