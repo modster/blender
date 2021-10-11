@@ -1311,7 +1311,7 @@ static bool annotation_session_initdata(bContext *C, tGPsdata *p)
       p->align_flag = &ts->gpencil_v2d_align;
 
       /* check that gpencil data is allowed to be drawn */
-      if (sseq->mainb == SEQ_DRAW_SEQUENCE) {
+      if (!((sseq->mainb == SEQ_DRAW_IMG_IMBUF) && (region->regiontype == RGN_TYPE_PREVIEW))) {
         p->status = GP_STATUS_ERROR;
         return 0;
       }
@@ -1418,7 +1418,7 @@ static void annotation_visible_on_space(tGPsdata *p)
     }
     case SPACE_SEQ: {
       SpaceSeq *sseq = (SpaceSeq *)area->spacedata.first;
-      sseq->flag |= SEQ_SHOW_GPENCIL;
+      sseq->flag |= SEQ_PREVIEW_SHOW_GPENCIL;
       break;
     }
     case SPACE_IMAGE: {
@@ -2104,7 +2104,7 @@ static void annotation_draw_apply_event(
         p->flags |= GP_PAINTFLAG_USE_STABILIZER_TEMP;
       }
     }
-    /* We are using the temporal stabilizer flag atm,
+    /* We are using the temporal stabilizer flag at the moment,
      * but shift is not pressed as well as the permanent flag is not used,
      * so we don't need the cursor anymore. */
     else if (p->flags & GP_PAINTFLAG_USE_STABILIZER_TEMP) {

@@ -75,9 +75,9 @@ class NodeMultiFunctions {
   const MultiFunction *try_get(const DNode &node) const;
 };
 
-/* --------------------------------------------------------------------
- * NodeMultiFunctionBuilder inline methods.
- */
+/* -------------------------------------------------------------------- */
+/** \name #NodeMultiFunctionBuilder Inline Methods
+ * \{ */
 
 inline NodeMultiFunctionBuilder::NodeMultiFunctionBuilder(ResourceScope &resource_scope,
                                                           bNode &node,
@@ -114,17 +114,21 @@ inline void NodeMultiFunctionBuilder::set_matching_fn(const MultiFunction &fn)
 template<typename T, typename... Args>
 inline void NodeMultiFunctionBuilder::construct_and_set_matching_fn(Args &&...args)
 {
-  const T &fn = resource_scope_.construct<T>(__func__, std::forward<Args>(args)...);
+  const T &fn = resource_scope_.construct<T>(std::forward<Args>(args)...);
   this->set_matching_fn(&fn);
 }
 
-/* --------------------------------------------------------------------
- * NodeMultiFunctions inline methods.
- */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name #NodeMultiFunctions Inline Methods
+ * \{ */
 
 inline const MultiFunction *NodeMultiFunctions::try_get(const DNode &node) const
 {
   return map_.lookup_default(node->bnode(), nullptr);
 }
+
+/** \} */
 
 }  // namespace blender::nodes

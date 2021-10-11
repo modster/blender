@@ -4729,7 +4729,7 @@ static int gpencil_stroke_separate_exec(bContext *C, wmOperator *op)
   /* Remove unused slots. */
   int actcol = ob_dst->actcol;
   for (int slot = 1; slot <= ob_dst->totcol; slot++) {
-    while (slot <= ob_dst->totcol && !BKE_object_material_slot_used(ob_dst->data, slot)) {
+    while (slot <= ob_dst->totcol && !BKE_object_material_slot_used(ob_dst, slot)) {
       ob_dst->actcol = slot;
       BKE_object_material_slot_remove(bmain, ob_dst);
       if (actcol >= slot) {
@@ -5243,7 +5243,7 @@ void GPENCIL_OT_stroke_cutter(wmOperatorType *ot)
   ot->cancel = WM_gesture_lasso_cancel;
 
   /* flag */
-  ot->flag = OPTYPE_UNDO;
+  ot->flag = OPTYPE_UNDO | OPTYPE_DEPENDS_ON_CURSOR;
 
   /* properties */
   WM_operator_properties_gesture_lasso(ot);

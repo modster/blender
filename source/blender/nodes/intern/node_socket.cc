@@ -269,11 +269,9 @@ void node_verify_sockets(bNodeTree *ntree, bNode *node, bool do_id_user)
     return;
   }
   if (ntype->declare != nullptr) {
-    blender::nodes::NodeDeclaration node_decl;
-    blender::nodes::NodeDeclarationBuilder builder{node_decl};
-    ntype->declare(builder);
-    if (!node_decl.matches(*node)) {
-      refresh_node(*ntree, *node, node_decl, do_id_user);
+    nodeDeclarationEnsure(ntree, node);
+    if (!node->declaration->matches(*node)) {
+      refresh_node(*ntree, *node, *node->declaration, do_id_user);
     }
     return;
   }
@@ -874,7 +872,7 @@ static bNodeSocketType *make_socket_type_material()
 
 void register_standard_node_socket_types(void)
 {
-  /* draw callbacks are set in drawnode.c to avoid bad-level calls */
+  /* Draw callbacks are set in `drawnode.c` to avoid bad-level calls. */
 
   nodeRegisterSocketType(make_socket_type_float(PROP_NONE));
   nodeRegisterSocketType(make_socket_type_float(PROP_UNSIGNED));

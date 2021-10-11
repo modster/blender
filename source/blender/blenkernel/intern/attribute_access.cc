@@ -55,6 +55,21 @@ using blender::fn::GVArray_For_SingleValue;
 
 namespace blender::bke {
 
+std::ostream &operator<<(std::ostream &stream, const AttributeIDRef &attribute_id)
+{
+  if (attribute_id.is_named()) {
+    stream << attribute_id.name();
+  }
+  else if (attribute_id.is_anonymous()) {
+    const AnonymousAttributeID &anonymous_id = attribute_id.anonymous_id();
+    stream << "<" << BKE_anonymous_attribute_id_debug_name(&anonymous_id) << ">";
+  }
+  else {
+    stream << "<none>";
+  }
+  return stream;
+}
+
 const blender::fn::CPPType *custom_data_type_to_cpp_type(const CustomDataType type)
 {
   switch (type) {
@@ -187,10 +202,21 @@ AttributeDomain attribute_domain_highest_priority(Span<AttributeDomain> domains)
   return highest_priority_domain;
 }
 
+fn::GMutableSpan OutputAttribute::as_span()
+{
+  if (!optional_span_varray_) {
+    const bool materialize_old_values = !ignore_old_values_;
+    optional_span_varray_ = std::make_unique<fn::GVMutableArray_GSpan>(*varray_,
+                                                                       materialize_old_values);
+  }
+  fn::GVMutableArray_GSpan &span_varray = *optional_span_varray_;
+  return span_varray;
+}
+
 void OutputAttribute::save()
 {
   save_has_been_called_ = true;
-  if (optional_span_varray_.has_value()) {
+  if (optional_span_varray_) {
     optional_span_varray_->save();
   }
   if (save_) {
@@ -817,6 +843,12 @@ bool GeometryComponent::attribute_is_builtin(const blender::StringRef attribute_
   return providers->builtin_attribute_providers().contains_as(attribute_name);
 }
 
+bool GeometryComponent::attribute_is_builtin(const AttributeIDRef &attribute_id) const
+{
+  /* Anonymous attributes cannot be built-in. */
+  return attribute_id.is_named() && this->attribute_is_builtin(attribute_id.name());
+}
+
 blender::bke::ReadAttributeLookup GeometryComponent::attribute_try_get_for_read(
     const AttributeIDRef &attribute_id) const
 {
@@ -1210,7 +1242,7 @@ static OutputAttribute create_output_attribute(GeometryComponent &component,
   BLI_assert(cpp_type != nullptr);
   const nodes::DataTypeConversions &conversions = nodes::get_implicit_type_conversions();
 
-  if (attribute_id.is_named() && component.attribute_is_builtin(attribute_id.name())) {
+  if (component.attribute_is_builtin(attribute_id)) {
     const StringRef attribute_name = attribute_id.name();
     WriteAttributeLookup attribute = component.attribute_try_get_for_write(attribute_name);
     if (!attribute) {
@@ -1315,7 +1347,9 @@ const GVArray *AttributeFieldInput::get_varray_for_context(const fn::FieldContex
     const AttributeDomain domain = geometry_context->domain();
     const CustomDataType data_type = cpp_type_to_custom_data_type(*type_);
     GVArrayPtr attribute = component.attribute_try_get_for_read(name_, domain, data_type);
-    return scope.add(std::move(attribute), __func__);
+    if (attribute) {
+      return scope.add(std::move(attribute));
+    }
   }
   return nullptr;
 }
@@ -1350,7 +1384,7 @@ const GVArray *AnonymousAttributeFieldInput::get_varray_for_context(
     const CustomDataType data_type = cpp_type_to_custom_data_type(*type_);
     GVArrayPtr attribute = component.attribute_try_get_for_read(
         anonymous_id_.get(), domain, data_type);
-    return scope.add(std::move(attribute), __func__);
+    return scope.add(std::move(attribute));
   }
   return nullptr;
 }

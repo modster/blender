@@ -56,7 +56,6 @@
 #include "BKE_blendfile.h"
 #include "BKE_callbacks.h"
 #include "BKE_context.h"
-#include "BKE_font.h"
 #include "BKE_global.h"
 #include "BKE_icons.h"
 #include "BKE_image.h"
@@ -69,6 +68,7 @@
 #include "BKE_scene.h"
 #include "BKE_screen.h"
 #include "BKE_sound.h"
+#include "BKE_vfont.h"
 
 #include "BKE_addon.h"
 #include "BKE_appdir.h"
@@ -372,13 +372,6 @@ void WM_init(bContext *C, int argc, const char **argv)
   wm_history_file_read();
 
   BLI_strncpy(G.lib, BKE_main_blendfile_path_from_global(), sizeof(G.lib));
-
-#ifdef WITH_COMPOSITOR
-  if (1) {
-    extern void *COM_linker_hack;
-    COM_linker_hack = COM_execute;
-  }
-#endif
 
   wm_homefile_read_post(C, params_file_read_post);
 }

@@ -52,13 +52,13 @@
 #include "BKE_curve.h"
 #include "BKE_curveprofile.h"
 #include "BKE_displist.h"
-#include "BKE_font.h"
 #include "BKE_idtype.h"
 #include "BKE_key.h"
 #include "BKE_lib_id.h"
 #include "BKE_lib_query.h"
 #include "BKE_main.h"
 #include "BKE_object.h"
+#include "BKE_vfont.h"
 
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_query.h"
@@ -311,7 +311,7 @@ IDTypeInfo IDType_ID_CU = {
     .name = "Curve",
     .name_plural = "curves",
     .translation_context = BLT_I18NCONTEXT_ID_CURVE,
-    .flags = 0,
+    .flags = IDTYPE_FLAGS_APPEND_IS_REUSABLE,
 
     .init_data = curve_init_data,
     .copy_data = curve_copy_data,
@@ -404,6 +404,7 @@ void BKE_curve_init(Curve *cu, const short curve_type)
   }
   else if (cu->type == OB_SURF) {
     cu->flag |= CU_3D;
+    cu->resolu = 4;
     cu->resolv = 4;
   }
   cu->bevel_profile = NULL;

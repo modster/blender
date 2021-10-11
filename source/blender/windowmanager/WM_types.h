@@ -120,6 +120,7 @@ struct wmWindowManager;
 #include "BLI_compiler_attrs.h"
 #include "DNA_listBase.h"
 #include "DNA_vec_types.h"
+#include "DNA_xr_types.h"
 #include "RNA_types.h"
 
 /* exported types for WM */
@@ -184,6 +185,17 @@ enum {
   OPTYPE_LOCK_BYPASS = (1 << 9),
   /** Special type of undo which doesn't store itself multiple times. */
   OPTYPE_UNDO_GROUPED = (1 << 10),
+
+  /**
+   * Depends on the cursor location, when activated from a menu wait for mouse press.
+   *
+   * In practice these operators often end up being accessed:
+   * - Directly from key bindings.
+   * - As tools in the toolbar.
+   *
+   * Even so, accessing from the menu should behave usefully.
+   */
+  OPTYPE_DEPENDS_ON_CURSOR = (1 << 11),
 };
 
 /** For #WM_cursor_grab_enable wrap axis. */
@@ -215,6 +227,10 @@ enum {
   WM_OP_EXEC_SCREEN,
 };
 
+#define WM_OP_CONTEXT_HAS_AREA(type) (!ELEM(type, WM_OP_INVOKE_SCREEN, WM_OP_EXEC_SCREEN))
+#define WM_OP_CONTEXT_HAS_REGION(type) \
+  (WM_OP_CONTEXT_HAS_AREA(type) && !ELEM(type, WM_OP_INVOKE_AREA, WM_OP_EXEC_AREA))
+
 /* property tags for RNA_OperatorProperties */
 typedef enum eOperatorPropTags {
   OP_PROP_TAG_ADVANCED = (1 << 0),
@@ -228,16 +244,16 @@ typedef enum eOperatorPropTags {
 #define KM_CTRL 2
 #define KM_ALT 4
 #define KM_OSKEY 8
-/* means modifier should be pressed 2nd */
-#define KM_SHIFT2 16
-#define KM_CTRL2 32
-#define KM_ALT2 64
-#define KM_OSKEY2 128
+
+/* Used for key-map item creation function arguments (never stored in DNA). */
+#define KM_SHIFT_ANY 16
+#define KM_CTRL_ANY 32
+#define KM_ALT_ANY 64
+#define KM_OSKEY_ANY 128
 
 /* KM_MOD_ flags for `wmKeyMapItem` and `wmEvent.alt/shift/oskey/ctrl`. */
 /* note that KM_ANY and KM_NOTHING are used with these defines too */
-#define KM_MOD_FIRST 1
-#define KM_MOD_SECOND 2
+#define KM_MOD_HELD 1
 
 /* type: defined in wm_event_types.c */
 #define KM_TEXTINPUT -2
@@ -710,11 +726,41 @@ typedef struct wmXrActionState {
   };
   int type; /* eXrActionType */
 } wmXrActionState;
+
+typedef struct wmXrActionData {
+  /** Action set name. */
+  char action_set[64];
+  /** Action name. */
+  char action[64];
+  /** Type. */
+  eXrActionType type;
+  /** State. Set appropriately based on type. */
+  float state[2];
+  /** State of the other sub-action path for bimanual actions. */
+  float state_other[2];
+
+  /** Input threshold for float/vector2f actions. */
+  float float_threshold;
+
+  /** Controller aim pose corresponding to the action's sub-action path. */
+  float controller_loc[3];
+  float controller_rot[4];
+  /** Controller aim pose of the other sub-action path for bimanual actions. */
+  float controller_loc_other[3];
+  float controller_rot_other[4];
+
+  /** Operator. */
+  struct wmOperatorType *ot;
+  struct IDProperty *op_properties;
+
+  /** Whether bimanual interaction is occurring. */
+  bool bimanual;
+} wmXrActionData;
 #endif
 
 /** Timer flags. */
 typedef enum {
-  /** Do not attempt to free customdata pointer even if non-NULL. */
+  /** Do not attempt to free custom-data pointer even if non-NULL. */
   WM_TIMER_NO_FREE_CUSTOM_DATA = 1 << 0,
 } wmTimerFlags;
 
@@ -904,12 +950,16 @@ typedef void (*wmPaintCursorDraw)(struct bContext *C, int, int, void *customdata
 
 #define WM_DRAG_ID 0
 #define WM_DRAG_ASSET 1
-#define WM_DRAG_RNA 2
-#define WM_DRAG_PATH 3
-#define WM_DRAG_NAME 4
-#define WM_DRAG_VALUE 5
-#define WM_DRAG_COLOR 6
-#define WM_DRAG_DATASTACK 7
+/** The user is dragging multiple assets. This is only supported in few specific cases, proper
+ * multi-item support for dragging isn't supported well yet. Therefore this is kept separate from
+ * #WM_DRAG_ASSET. */
+#define WM_DRAG_ASSET_LIST 2
+#define WM_DRAG_RNA 3
+#define WM_DRAG_PATH 4
+#define WM_DRAG_NAME 5
+#define WM_DRAG_VALUE 6
+#define WM_DRAG_COLOR 7
+#define WM_DRAG_DATASTACK 8
 
 typedef enum wmDragFlags {
   WM_DRAG_NOP = 0,
@@ -925,7 +975,7 @@ typedef struct wmDragID {
 } wmDragID;
 
 typedef struct wmDragAsset {
-  /* Note: Can't store the AssetHandle here, since the FileDirEntry it wraps may be freed while
+  /* NOTE: Can't store the #AssetHandle here, since the #FileDirEntry it wraps may be freed while
    * dragging. So store necessary data here directly. */
 
   char name[64]; /* MAX_NAME */
@@ -934,7 +984,33 @@ typedef struct wmDragAsset {
   int id_type;
   struct AssetMetaData *metadata;
   int import_type; /* eFileAssetImportType */
+
+  /* FIXME: This is temporary evil solution to get scene/view-layer/etc in the copy callback of the
+   * #wmDropBox.
+   * TODO: Handle link/append in operator called at the end of the drop process, and NOT in its
+   * copy callback.
+   * */
+  struct bContext *evil_C;
 } wmDragAsset;
+
+/**
+ * For some specific cases we support dragging multiple assets (#WM_DRAG_ASSET_LIST). There is no
+ * proper support for dragging multiple items in the `wmDrag`/`wmDrop` API yet, so this is really
+ * just to enable specific features for assets.
+ *
+ * This struct basically contains a tagged union to either store a local ID pointer, or information
+ * about an externally stored asset.
+ */
+typedef struct wmDragAssetListItem {
+  struct wmDragAssetListItem *next, *prev;
+
+  union {
+    struct ID *local_id;
+    wmDragAsset *external_info;
+  } asset_data;
+
+  bool is_external;
+} wmDragAssetListItem;
 
 typedef char *(*WMDropboxTooltipFunc)(struct bContext *,
                                       struct wmDrag *,
@@ -969,6 +1045,8 @@ typedef struct wmDrag {
 
   /** List of wmDragIDs, all are guaranteed to have the same ID type. */
   ListBase ids;
+  /** List of `wmDragAssetListItem`s. */
+  ListBase asset_items;
 } wmDrag;
 
 typedef void (*wmDropBoxCopyFn)(struct wmDrag *, struct wmDropBox *);

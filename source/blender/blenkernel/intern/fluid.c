@@ -3573,7 +3573,7 @@ static Mesh *create_smoke_geometry(FluidDomainSettings *fds, Mesh *orgmesh, Obje
   }
 
   BKE_mesh_calc_edges(result, false, false);
-  result->runtime.cd_dirty_vert |= CD_MASK_NORMAL;
+  BKE_mesh_normals_tag_dirty(result);
   return result;
 }
 
@@ -5094,7 +5094,7 @@ void BKE_fluid_modifier_copy(const struct FluidModifierData *fmd,
 
     /* pointcache options */
     BKE_ptcache_free_list(&(tfds->ptcaches[0]));
-    if (flag & LIB_ID_CREATE_NO_MAIN) {
+    if (flag & LIB_ID_COPY_SET_COPIED_ON_WRITE) {
       /* Share the cache with the original object's modifier. */
       tfmd->modifier.flag |= eModifierFlag_SharedCaches;
       tfds->point_cache[0] = fds->point_cache[0];

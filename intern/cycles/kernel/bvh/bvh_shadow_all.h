@@ -36,7 +36,7 @@ ccl_device
 #else
 ccl_device_inline
 #endif
-    bool BVH_FUNCTION_FULL_NAME(BVH)(KernelGlobals *kg,
+    bool BVH_FUNCTION_FULL_NAME(BVH)(const KernelGlobals *kg,
                                      const Ray *ray,
                                      Intersection *isect_array,
                                      const uint visibility,
@@ -68,10 +68,10 @@ ccl_device_inline
   Transform ob_itfm;
 #endif
 
-  int num_hits_in_instance = 0;
+  float t_world_to_instance = 1.0f;
 
   *num_hits = 0;
-  isect_array->t = tmax;
+  Intersection *isect = isect_array;
 
   /* traversal loop */
   do {
@@ -130,7 +130,6 @@ ccl_device_inline
         if (prim_addr >= 0) {
           const int prim_addr2 = __float_as_int(leaf.y);
           const uint type = __float_as_int(leaf.w);
-          const uint p_type = type & PRIMITIVE_ALL;
 
           /* pop */
           node_addr = traversal_stack[stack_ptr];
@@ -138,22 +137,24 @@ ccl_device_inline
 
           /* primitive intersection */
           while (prim_addr < prim_addr2) {
-            kernel_assert((kernel_tex_fetch(__prim_type, prim_addr) & PRIMITIVE_ALL) == p_type);
+            kernel_assert((kernel_tex_fetch(__prim_type, prim_addr) & PRIMITIVE_ALL) ==
+                          (type & PRIMITIVE_ALL));
             bool hit;
 
             /* todo: specialized intersect functions which don't fill in
              * isect unless needed and check SD_HAS_TRANSPARENT_SHADOW?
              * might give a few % performance improvement */
 
-            switch (p_type) {
+            switch (type & PRIMITIVE_ALL) {
               case PRIMITIVE_TRIANGLE: {
-                hit = triangle_intersect(kg, isect_array, P, dir, visibility, object, prim_addr);
+                hit = triangle_intersect(
+                    kg, isect, P, dir, isect_t, visibility, object, prim_addr);
                 break;
               }
 #if BVH_FEATURE(BVH_MOTION)
               case PRIMITIVE_MOTION_TRIANGLE: {
                 hit = motion_triangle_intersect(
-                    kg, isect_array, P, dir, ray->time, visibility, object, prim_addr);
+                    kg, isect, P, dir, isect_t, ray->time, visibility, object, prim_addr);
                 break;
               }
 #endif
@@ -162,9 +163,20 @@ ccl_device_inline
               case PRIMITIVE_MOTION_CURVE_THICK:
               case PRIMITIVE_CURVE_RIBBON:
               case PRIMITIVE_MOTION_CURVE_RIBBON: {
-                const uint curve_type = kernel_tex_fetch(__prim_type, prim_addr);
+                if ((type & PRIMITIVE_ALL_MOTION) && kernel_data.bvh.use_bvh_steps) {
+                  const float2 prim_time = kernel_tex_fetch(__prim_time, prim_addr);
+                  if (ray->time < prim_time.x || ray->time > prim_time.y) {
+                    hit = false;
+                    break;
+                  }
+                }
+
+                const int curve_object = kernel_tex_fetch(__prim_object, prim_addr);
+                const int curve_type = kernel_tex_fetch(__prim_type, prim_addr);
+                const int curve_prim = kernel_tex_fetch(__prim_index, prim_addr);
                 hit = curve_intersect(
-                    kg, isect_array, P, dir, visibility, object, prim_addr, ray->time, curve_type);
+                    kg, isect, P, dir, isect_t, curve_object, curve_prim, ray->time, curve_type);
+
                 break;
               }
 #endif
@@ -176,27 +188,49 @@ ccl_device_inline
 
             /* shadow ray early termination */
             if (hit) {
+              /* Convert intersection distance to world space. */
+              isect->t /= t_world_to_instance;
+
               /* detect if this surface has a shader with transparent shadows */
 
               /* todo: optimize so primitive visibility flag indicates if
                * the primitive has a transparent shadow shader? */
-              const int flags = intersection_get_shader_flags(kg, isect_array);
+              const int flags = intersection_get_shader_flags(kg, isect);
 
-              /* if no transparent shadows, all light is blocked */
-              if (!(flags & SD_HAS_TRANSPARENT_SHADOW)) {
-                return true;
-              }
-              /* if maximum number of hits reached, block all light */
-              else if (*num_hits == max_hits) {
+              if (!(flags & SD_HAS_TRANSPARENT_SHADOW) || max_hits == 0) {
+                /* If no transparent shadows, all light is blocked and we can
+                 * stop immediately. */
                 return true;
               }
 
-              /* move on to next entry in intersections array */
-              isect_array++;
+              /* Increase the number of hits, possibly beyond max_hits, we will
+               * simply not record those and only keep the max_hits closest. */
               (*num_hits)++;
-              num_hits_in_instance++;
 
-              isect_array->t = isect_t;
+              if (*num_hits >= max_hits) {
+                /* If maximum number of hits reached, find the intersection with
+                 * the largest distance to potentially replace when another hit
+                 * is found. */
+                const int num_recorded_hits = min(max_hits, *num_hits);
+                float max_recorded_t = isect_array[0].t;
+                int max_recorded_hit = 0;
+
+                for (int i = 1; i < num_recorded_hits; i++) {
+                  if (isect_array[i].t > max_recorded_t) {
+                    max_recorded_t = isect_array[i].t;
+                    max_recorded_hit = i;
+                  }
+                }
+
+                isect = isect_array + max_recorded_hit;
+
+                /* Limit the ray distance and stop counting hits beyond this. */
+                isect_t = max_recorded_t * t_world_to_instance;
+              }
+              else {
+                /* Still have space for intersection, use next hit. */
+                isect = isect + 1;
+              }
             }
 
             prim_addr++;
@@ -207,13 +241,14 @@ ccl_device_inline
           object = kernel_tex_fetch(__prim_object, -prim_addr - 1);
 
 #if BVH_FEATURE(BVH_MOTION)
-          isect_t = bvh_instance_motion_push(kg, object, ray, &P, &dir, &idir, isect_t, &ob_itfm);
+          t_world_to_instance = bvh_instance_motion_push(
+              kg, object, ray, &P, &dir, &idir, &ob_itfm);
 #else
-          isect_t = bvh_instance_push(kg, object, ray, &P, &dir, &idir, isect_t);
+          t_world_to_instance = bvh_instance_push(kg, object, ray, &P, &dir, &idir);
 #endif
 
-          num_hits_in_instance = 0;
-          isect_array->t = isect_t;
+          /* Convert intersection to object space. */
+          isect_t *= t_world_to_instance;
 
           ++stack_ptr;
           kernel_assert(stack_ptr < BVH_STACK_SIZE);
@@ -228,32 +263,19 @@ ccl_device_inline
       kernel_assert(object != OBJECT_NONE);
 
       /* Instance pop. */
-      if (num_hits_in_instance) {
-        float t_fac;
-
 #if BVH_FEATURE(BVH_MOTION)
-        bvh_instance_motion_pop_factor(kg, object, ray, &P, &dir, &idir, &t_fac, &ob_itfm);
+      bvh_instance_motion_pop(kg, object, ray, &P, &dir, &idir, FLT_MAX, &ob_itfm);
 #else
-        bvh_instance_pop_factor(kg, object, ray, &P, &dir, &idir, &t_fac);
+      bvh_instance_pop(kg, object, ray, &P, &dir, &idir, FLT_MAX);
 #endif
 
-        /* scale isect->t to adjust for instancing */
-        for (int i = 0; i < num_hits_in_instance; i++) {
-          (isect_array - i - 1)->t *= t_fac;
-        }
-      }
-      else {
-#if BVH_FEATURE(BVH_MOTION)
-        bvh_instance_motion_pop(kg, object, ray, &P, &dir, &idir, FLT_MAX, &ob_itfm);
-#else
-        bvh_instance_pop(kg, object, ray, &P, &dir, &idir, FLT_MAX);
-#endif
-      }
-
-      isect_t = tmax;
-      isect_array->t = isect_t;
+      /* Restore world space ray length. If max number of hits exceeded this
+       * distance is reduced to recorded only the closest hits. If not use
+       * the original ray length. */
+      isect_t = (max_hits && *num_hits > max_hits) ? isect->t : tmax;
 
       object = OBJECT_NONE;
+      t_world_to_instance = 1.0f;
       node_addr = traversal_stack[stack_ptr];
       --stack_ptr;
     }
@@ -262,7 +284,7 @@ ccl_device_inline
   return false;
 }
 
-ccl_device_inline bool BVH_FUNCTION_NAME(KernelGlobals *kg,
+ccl_device_inline bool BVH_FUNCTION_NAME(const KernelGlobals *kg,
                                          const Ray *ray,
                                          Intersection *isect_array,
                                          const uint visibility,

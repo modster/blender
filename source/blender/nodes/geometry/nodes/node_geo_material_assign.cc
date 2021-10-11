@@ -29,12 +29,12 @@ namespace blender::nodes {
 static void geo_node_material_assign_declare(NodeDeclarationBuilder &b)
 {
   b.add_input<decl::Geometry>("Geometry");
-  b.add_input<decl::Material>("Material").hide_label(true);
-  b.add_input<decl::String>("Selection");
+  b.add_input<decl::Material>("Material").hide_label();
+  b.add_input<decl::Bool>("Selection").default_value(true).hide_value().supports_field();
   b.add_output<decl::Geometry>("Geometry");
 }
 
-static void assign_material_to_faces(Mesh &mesh, const VArray<bool> &face_mask, Material *material)
+static void assign_material_to_faces(Mesh &mesh, const IndexMask selection, Material *material)
 {
   int new_material_index = -1;
   for (const int i : IndexRange(mesh.totcol)) {
@@ -51,32 +51,35 @@ static void assign_material_to_faces(Mesh &mesh, const VArray<bool> &face_mask, 
   }
 
   mesh.mpoly = (MPoly *)CustomData_duplicate_referenced_layer(&mesh.pdata, CD_MPOLY, mesh.totpoly);
-  for (const int i : IndexRange(mesh.totpoly)) {
-    if (face_mask[i]) {
-      MPoly &poly = mesh.mpoly[i];
-      poly.mat_nr = new_material_index;
-    }
+  for (const int i : selection) {
+    MPoly &poly = mesh.mpoly[i];
+    poly.mat_nr = new_material_index;
   }
 }
 
 static void geo_node_material_assign_exec(GeoNodeExecParams params)
 {
   Material *material = params.extract_input<Material *>("Material");
-  const std::string mask_name = params.extract_input<std::string>("Selection");
+  const Field<bool> selection_field = params.extract_input<Field<bool>>("Selection");
 
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
 
-  geometry_set = geometry_set_realize_instances(geometry_set);
+  geometry_set.modify_geometry_sets([&](GeometrySet &geometry_set) {
+    if (geometry_set.has<MeshComponent>()) {
+      MeshComponent &mesh_component = geometry_set.get_component_for_write<MeshComponent>();
+      Mesh *mesh = mesh_component.get_for_write();
+      if (mesh != nullptr) {
+        GeometryComponentFieldContext field_context{mesh_component, ATTR_DOMAIN_FACE};
 
-  if (geometry_set.has<MeshComponent>()) {
-    MeshComponent &mesh_component = geometry_set.get_component_for_write<MeshComponent>();
-    Mesh *mesh = mesh_component.get_for_write();
-    if (mesh != nullptr) {
-      GVArray_Typed<bool> face_mask = mesh_component.attribute_get_for_read<bool>(
-          mask_name, ATTR_DOMAIN_FACE, true);
-      assign_material_to_faces(*mesh, face_mask, material);
+        fn::FieldEvaluator selection_evaluator{field_context, mesh->totpoly};
+        selection_evaluator.add(selection_field);
+        selection_evaluator.evaluate();
+        const IndexMask selection = selection_evaluator.get_evaluated_as_mask(0);
+
+        assign_material_to_faces(*mesh, selection, material);
+      }
     }
-  }
+  });
 
   params.set_output("Geometry", std::move(geometry_set));
 }
@@ -87,8 +90,7 @@ void register_node_type_geo_material_assign()
 {
   static bNodeType ntype;
 
-  geo_node_type_base(
-      &ntype, GEO_NODE_LEGACY_MATERIAL_ASSIGN, "Material Assign", NODE_CLASS_GEOMETRY, 0);
+  geo_node_type_base(&ntype, GEO_NODE_MATERIAL_ASSIGN, "Material Assign", NODE_CLASS_GEOMETRY, 0);
   ntype.declare = blender::nodes::geo_node_material_assign_declare;
   ntype.geometry_node_execute = blender::nodes::geo_node_material_assign_exec;
   nodeRegisterType(&ntype);

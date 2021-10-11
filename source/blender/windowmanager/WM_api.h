@@ -41,6 +41,8 @@ extern "C" {
 #endif
 
 struct ARegion;
+struct AssetHandle;
+struct AssetLibraryReference;
 struct GHashIterator;
 struct GPUViewport;
 struct ID;
@@ -212,14 +214,16 @@ struct ID *WM_file_link_datablock(struct Main *bmain,
                                   struct View3D *v3d,
                                   const char *filepath,
                                   const short id_code,
-                                  const char *id_name);
+                                  const char *id_name,
+                                  int flag);
 struct ID *WM_file_append_datablock(struct Main *bmain,
                                     struct Scene *scene,
                                     struct ViewLayer *view_layer,
                                     struct View3D *v3d,
                                     const char *filepath,
                                     const short id_code,
-                                    const char *id_name);
+                                    const char *id_name,
+                                    int flag);
 void WM_lib_reload(struct Library *lib, struct bContext *C, struct ReportList *reports);
 
 /* mouse cursors */
@@ -262,14 +266,21 @@ struct wmEventHandler_Keymap *WM_event_add_keymap_handler_priority(ListBase *han
                                                                    wmKeyMap *keymap,
                                                                    int priority);
 
-typedef struct wmKeyMap *(wmEventHandler_KeymapDynamicFn)(wmWindowManager *wm,
-                                                          struct wmEventHandler_Keymap *handler)
-    ATTR_WARN_UNUSED_RESULT;
+typedef struct wmEventHandler_KeymapResult {
+  wmKeyMap *keymaps[3];
+  int keymaps_len;
+} wmEventHandler_KeymapResult;
 
-struct wmKeyMap *WM_event_get_keymap_from_toolsystem_fallback(
-    struct wmWindowManager *wm, struct wmEventHandler_Keymap *handler);
-struct wmKeyMap *WM_event_get_keymap_from_toolsystem(struct wmWindowManager *wm,
-                                                     struct wmEventHandler_Keymap *handler);
+typedef void(wmEventHandler_KeymapDynamicFn)(wmWindowManager *wm,
+                                             struct wmEventHandler_Keymap *handler,
+                                             struct wmEventHandler_KeymapResult *km_result);
+
+void WM_event_get_keymap_from_toolsystem_fallback(struct wmWindowManager *wm,
+                                                  struct wmEventHandler_Keymap *handler,
+                                                  wmEventHandler_KeymapResult *km_result);
+void WM_event_get_keymap_from_toolsystem(struct wmWindowManager *wm,
+                                         struct wmEventHandler_Keymap *handler,
+                                         wmEventHandler_KeymapResult *km_result);
 
 struct wmEventHandler_Keymap *WM_event_add_keymap_handler_dynamic(
     ListBase *handlers, wmEventHandler_KeymapDynamicFn *keymap_fn, void *user_data);
@@ -281,8 +292,9 @@ void WM_event_set_keymap_handler_post_callback(struct wmEventHandler_Keymap *han
                                                                 wmKeyMapItem *kmi,
                                                                 void *user_data),
                                                void *user_data);
-wmKeyMap *WM_event_get_keymap_from_handler(wmWindowManager *wm,
-                                           struct wmEventHandler_Keymap *handler);
+void WM_event_get_keymaps_from_handler(wmWindowManager *wm,
+                                       struct wmEventHandler_Keymap *handler,
+                                       struct wmEventHandler_KeymapResult *km_result);
 
 wmKeyMapItem *WM_event_match_keymap_item(struct bContext *C,
                                          wmKeyMap *keymap,
@@ -471,6 +483,12 @@ int WM_operator_call_py(struct bContext *C,
                         struct PointerRNA *properties,
                         struct ReportList *reports,
                         const bool is_undo);
+
+void WM_operator_name_call_ptr_with_depends_on_cursor(struct bContext *C,
+                                                      wmOperatorType *ot,
+                                                      short opcontext,
+                                                      PointerRNA *properties,
+                                                      const char *drawstr);
 
 /* Used for keymap and macro items. */
 void WM_operator_properties_alloc(struct PointerRNA **ptr,
@@ -701,6 +719,8 @@ void WM_event_fileselect_event(struct wmWindowManager *wm, void *ophandle, int e
 
 void WM_operator_region_active_win_set(struct bContext *C);
 
+int WM_operator_flag_only_pass_through_on_press(int retval, const struct wmEvent *event);
+
 /* drag and drop */
 struct wmDrag *WM_event_start_drag(
     struct bContext *C, int icon, int type, void *poin, double value, unsigned int flags);
@@ -726,6 +746,9 @@ struct ID *WM_drag_get_local_ID(const struct wmDrag *drag, short idcode);
 struct ID *WM_drag_get_local_ID_from_event(const struct wmEvent *event, short idcode);
 bool WM_drag_is_ID_type(const struct wmDrag *drag, int idcode);
 
+wmDragAsset *WM_drag_create_asset_data(const struct AssetHandle *asset,
+                                       const char *path,
+                                       int import_type);
 struct wmDragAsset *WM_drag_get_asset_data(const struct wmDrag *drag, int idcode);
 struct AssetMetaData *WM_drag_get_asset_meta_data(const struct wmDrag *drag, int idcode);
 struct ID *WM_drag_get_local_ID_or_import_from_asset(const struct wmDrag *drag, int idcode);
@@ -733,6 +756,12 @@ struct ID *WM_drag_get_local_ID_or_import_from_asset(const struct wmDrag *drag, 
 void WM_drag_free_imported_drag_ID(struct Main *bmain,
                                    struct wmDrag *drag,
                                    struct wmDropBox *drop);
+
+void WM_drag_add_asset_list_item(wmDrag *drag,
+                                 const struct bContext *C,
+                                 const struct AssetLibraryReference *asset_library_ref,
+                                 const struct AssetHandle *asset);
+const ListBase *WM_drag_asset_list_get(const wmDrag *drag);
 
 const struct wmDrag *WM_drag_with_gizmogroup_find(
     const struct wmWindowManager *wm, const char name[MAX_NAME]) ATTR_WARN_UNUSED_RESULT;
@@ -788,6 +817,7 @@ enum {
   WM_JOB_TYPE_QUADRIFLOW_REMESH,
   WM_JOB_TYPE_TRACE_IMAGE,
   WM_JOB_TYPE_LINEART,
+  WM_JOB_TYPE_SEQ_DRAW_THUMBNAIL,
   /* add as needed, bake, seq proxy build
    * if having hard coded values is a problem */
 };
@@ -894,6 +924,7 @@ int WM_event_modifier_flag(const struct wmEvent *event);
 bool WM_event_is_modal_tweak_exit(const struct wmEvent *event, int tweak_event);
 bool WM_event_is_last_mousemove(const struct wmEvent *event);
 bool WM_event_is_mouse_drag(const struct wmEvent *event);
+bool WM_event_is_mouse_drag_or_press(const wmEvent *event);
 
 int WM_event_drag_threshold(const struct wmEvent *event);
 bool WM_event_drag_test(const struct wmEvent *event, const int prev_xy[2]);
@@ -965,6 +996,7 @@ bool WM_region_use_viewport(struct ScrArea *area, struct ARegion *region);
 bool WM_xr_session_exists(const wmXrData *xr);
 bool WM_xr_session_is_ready(const wmXrData *xr);
 struct wmXrSessionState *WM_xr_session_state_handle_get(const wmXrData *xr);
+struct ScrArea *WM_xr_session_area_get(const wmXrData *xr);
 void WM_xr_session_base_pose_reset(wmXrData *xr);
 bool WM_xr_session_state_viewer_pose_location_get(const wmXrData *xr, float r_location[3]);
 bool WM_xr_session_state_viewer_pose_rotation_get(const wmXrData *xr, float r_rotation[4]);
