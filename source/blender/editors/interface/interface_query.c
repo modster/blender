@@ -69,7 +69,8 @@ bool ui_but_is_toggle(const uiBut *but)
               UI_BTYPE_CHECKBOX,
               UI_BTYPE_CHECKBOX_N,
               UI_BTYPE_ROW,
-              UI_BTYPE_DATASETROW);
+              UI_BTYPE_DATASETROW,
+              UI_BTYPE_TREEROW);
 }
 
 /**
@@ -460,6 +461,31 @@ uiBut *ui_list_row_find_from_index(const ARegion *region, const int index, uiBut
       .listbox = listbox,
   };
   return ui_but_find(region, ui_but_is_listrow_at_index, &data);
+}
+
+static bool ui_but_is_treerow(const uiBut *but, const void *UNUSED(customdata))
+{
+  return but->type == UI_BTYPE_TREEROW;
+}
+
+uiBut *ui_tree_row_find_mouse_over(const ARegion *region, const int x, const int y)
+{
+  return ui_but_find_mouse_over_ex(region, x, y, false, ui_but_is_treerow, NULL);
+}
+
+static bool ui_but_is_active_treerow(const uiBut *but, const void *customdata)
+{
+  if (!ui_but_is_treerow(but, customdata)) {
+    return false;
+  }
+
+  const uiButTreeRow *treerow_but = (const uiButTreeRow *)but;
+  return UI_tree_view_item_is_active(treerow_but->tree_item);
+}
+
+uiBut *ui_tree_row_find_active(const ARegion *region)
+{
+  return ui_but_find(region, ui_but_is_active_treerow, NULL);
 }
 
 /** \} */

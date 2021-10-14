@@ -270,6 +270,12 @@ bool WM_event_is_mouse_drag(const wmEvent *event)
   return ISTWEAK(event->type) || (ISMOUSE_BUTTON(event->type) && (event->val == KM_CLICK_DRAG));
 }
 
+bool WM_event_is_mouse_drag_or_press(const wmEvent *event)
+{
+  return WM_event_is_mouse_drag(event) ||
+         (ISMOUSE_BUTTON(event->type) && (event->val == KM_PRESS));
+}
+
 /** \} */
 
 /* -------------------------------------------------------------------- */
@@ -401,6 +407,19 @@ void WM_event_ndof_to_quat(const struct wmNDOFMotionData *ndof, float q[4])
   axis_angle_to_quat(q, axis, angle);
 }
 #endif /* WITH_INPUT_NDOF */
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Event XR Input Access
+ * \{ */
+
+#ifdef WITH_XR_OPENXR
+bool WM_event_is_xr(const struct wmEvent *event)
+{
+  return (event->type == EVT_XR_ACTION && event->custom == EVT_DATA_XR);
+}
+#endif
 
 /** \} */
 

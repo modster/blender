@@ -319,7 +319,7 @@ IDTypeInfo IDType_ID_GD = {
     .name = "GPencil",
     .name_plural = "grease_pencils",
     .translation_context = BLT_I18NCONTEXT_ID_GPENCIL,
-    .flags = 0,
+    .flags = IDTYPE_FLAGS_APPEND_IS_REUSABLE,
 
     .init_data = NULL,
     .copy_data = greasepencil_copy_data,
@@ -1044,7 +1044,6 @@ bGPDlayer *BKE_gpencil_layer_duplicate(const bGPDlayer *gpl_src,
                                        const bool dup_frames,
                                        const bool dup_strokes)
 {
-  const bGPDframe *gpf_src;
   bGPDframe *gpf_dst;
   bGPDlayer *gpl_dst;
 
@@ -1063,7 +1062,7 @@ bGPDlayer *BKE_gpencil_layer_duplicate(const bGPDlayer *gpl_src,
   /* copy frames */
   BLI_listbase_clear(&gpl_dst->frames);
   if (dup_frames) {
-    for (gpf_src = gpl_src->frames.first; gpf_src; gpf_src = gpf_src->next) {
+    LISTBASE_FOREACH (bGPDframe *, gpf_src, &gpl_src->frames) {
       /* make a copy of source frame */
       gpf_dst = BKE_gpencil_frame_duplicate(gpf_src, dup_strokes);
       BLI_addtail(&gpl_dst->frames, gpf_dst);

@@ -204,6 +204,16 @@ static void wm_window_match_init(bContext *C, ListBase *wmlist)
       WM_event_remove_handlers(C, &win->modalhandlers);
       ED_screen_exit(C, win, WM_window_get_active_screen(win));
     }
+
+    /* NOTE(@campbellbarton): Clear the message bus so it's always cleared on file load.
+     * Otherwise it's cleared when "Load UI" is set (see #USER_FILENOUI & #wm_close_and_free).
+     * However it's _not_ cleared when the UI is kept. This complicates use from add-ons
+     * which can re-register subscribers on file-load. To support this use case,
+     * it's best to have predictable behavior - always clear. */
+    if (wm->message_bus != NULL) {
+      WM_msgbus_destroy(wm->message_bus);
+      wm->message_bus = NULL;
+    }
   }
 
   /* reset active window */
@@ -855,6 +865,28 @@ static void file_read_reports_finalize(BlendFileReadReport *bf_reports)
                 bf_reports->resynced_lib_overrides_libraries_count,
                 duration_lib_override_recursive_resync_minutes,
                 duration_lib_override_recursive_resync_seconds);
+  }
+
+  if (bf_reports->count.linked_proxies != 0 ||
+      bf_reports->count.proxies_to_lib_overrides_success != 0 ||
+      bf_reports->count.proxies_to_lib_overrides_failures != 0) {
+    BKE_reportf(bf_reports->reports,
+                RPT_WARNING,
+                "Proxies are deprecated (%d proxies were automatically converted to library "
+                "overrides, %d proxies could not be converted and %d linked proxies were kept "
+                "untouched). If you need to keep proxies for the time being, please disable the "
+                "`Proxy to Override Auto Conversion` in Experimental user preferences",
+                bf_reports->count.proxies_to_lib_overrides_success,
+                bf_reports->count.proxies_to_lib_overrides_failures,
+                bf_reports->count.linked_proxies);
+  }
+
+  if (bf_reports->count.vse_strips_skipped != 0) {
+    BKE_reportf(bf_reports->reports,
+                RPT_ERROR,
+                "%d sequence strips were not read because they were in a channel larger than %d",
+                bf_reports->count.vse_strips_skipped,
+                MAXSEQ);
   }
 
   BLI_linklist_free(bf_reports->resynced_lib_overrides_libraries, NULL);

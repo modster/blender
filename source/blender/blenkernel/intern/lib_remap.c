@@ -345,7 +345,7 @@ static void libblock_remap_data_postprocess_obdata_relink(Main *bmain, Object *o
 static void libblock_remap_data_postprocess_nodetree_update(Main *bmain, ID *new_id)
 {
   /* Update all group nodes using a node group. */
-  ntreeUpdateAllUsers(bmain, new_id);
+  ntreeUpdateAllUsers(bmain, new_id, 0);
 }
 
 /**
@@ -719,7 +719,7 @@ void BKE_libblock_relink_to_newid(ID *id)
 static int id_relink_to_newid_looper_new(LibraryIDLinkCallbackData *cb_data)
 {
   const int cb_flag = cb_data->cb_flag;
-  if (cb_flag & IDWALK_CB_EMBEDDED) {
+  if (cb_flag & (IDWALK_CB_EMBEDDED | IDWALK_CB_OVERRIDE_LIBRARY_REFERENCE)) {
     return IDWALK_RET_NOP;
   }
 
@@ -730,7 +730,11 @@ static int id_relink_to_newid_looper_new(LibraryIDLinkCallbackData *cb_data)
   if (id) {
     /* See: NEW_ID macro */
     if (id->newid != NULL) {
-      BKE_libblock_relink_ex(bmain, id_owner, id, id->newid, ID_REMAP_SKIP_INDIRECT_USAGE);
+      BKE_libblock_relink_ex(bmain,
+                             id_owner,
+                             id,
+                             id->newid,
+                             ID_REMAP_SKIP_INDIRECT_USAGE | ID_REMAP_SKIP_OVERRIDE_LIBRARY);
       id = id->newid;
     }
     if (id->tag & LIB_TAG_NEW) {

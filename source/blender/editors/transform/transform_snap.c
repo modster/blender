@@ -374,6 +374,8 @@ void applyProject(TransInfo *t)
         if (ED_transform_snap_object_project_view3d(
                 t->tsnap.object_context,
                 t->depsgraph,
+                t->region,
+                t->view,
                 SCE_SNAP_MODE_FACE,
                 &(const struct SnapObjectParams){
                     .snap_select = t->tsnap.modeSelect,
@@ -590,6 +592,11 @@ static void initSnappingMode(TransInfo *t)
     t->tsnap.project = 0;
 
     t->tsnap.mode = ts->snap_uv_mode;
+    if ((t->tsnap.mode & SCE_SNAP_MODE_INCREMENT) && (ts->snap_uv_flag & SCE_SNAP_ABS_GRID) &&
+        (t->mode == TFM_TRANSLATION)) {
+      t->tsnap.mode &= ~SCE_SNAP_MODE_INCREMENT;
+      t->tsnap.mode |= SCE_SNAP_MODE_GRID;
+    }
   }
   else if (t->spacetype == SPACE_SEQ) {
     t->tsnap.mode = SEQ_tool_settings_snap_mode_get(t->scene);
@@ -608,7 +615,7 @@ static void initSnappingMode(TransInfo *t)
       t->tsnap.mode |= SCE_SNAP_MODE_GRID;
     }
   }
-  else if (ELEM(t->spacetype, SPACE_GRAPH, SPACE_ACTION, SPACE_NLA)) {
+  else if (ELEM(t->spacetype, SPACE_ACTION, SPACE_NLA)) {
     /* No incremental snapping. */
     t->tsnap.mode = 0;
   }
@@ -666,8 +673,7 @@ static void initSnappingMode(TransInfo *t)
   if (t->spacetype == SPACE_VIEW3D) {
     if (t->tsnap.object_context == NULL) {
       t->tsnap.use_backface_culling = snap_use_backface_culling(t);
-      t->tsnap.object_context = ED_transform_snap_object_context_create_view3d(
-          t->scene, 0, t->region, t->view);
+      t->tsnap.object_context = ED_transform_snap_object_context_create(t->scene, 0);
 
       if (t->data_type == TC_MESH_VERTS) {
         /* Ignore elements being transformed. */
@@ -1240,6 +1246,8 @@ short snapObjectsTransform(
   return ED_transform_snap_object_project_view3d_ex(
       t->tsnap.object_context,
       t->depsgraph,
+      t->region,
+      t->view,
       t->settings->snap_mode,
       &(const struct SnapObjectParams){
           .snap_select = t->tsnap.modeSelect,
@@ -1275,6 +1283,8 @@ bool peelObjectsTransform(TransInfo *t,
   ED_transform_snap_object_project_all_view3d_ex(
       t->tsnap.object_context,
       t->depsgraph,
+      t->region,
+      t->view,
       &(const struct SnapObjectParams){
           .snap_select = t->tsnap.modeSelect,
           .edit_mode_type = (t->flag & T_EDIT) != 0 ? SNAP_GEOM_EDIT : SNAP_GEOM_FINAL,
@@ -1502,7 +1512,8 @@ bool transform_snap_grid(TransInfo *t, float *val)
     return false;
   }
 
-  if (t->spacetype != SPACE_VIEW3D) {
+  /* Don't do grid snapping if not in 3D viewport or UV editor */
+  if (!ELEM(t->spacetype, SPACE_VIEW3D, SPACE_IMAGE)) {
     return false;
   }
 
