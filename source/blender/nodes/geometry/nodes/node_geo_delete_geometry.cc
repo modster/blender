@@ -371,7 +371,7 @@ static std::unique_ptr<CurveEval> curve_separate(const CurveEval &input_curve,
 
       indices_to_copy.clear();
       for (const int i_point : IndexRange(spline.size())) {
-        if (selection[selection_index] == invert) {
+        if (selection[selection_index] != invert) {
           /* Append i_point instead of selection_index because we need indices local to the spline
            * for copying. */
           indices_to_copy.append(i_point);
@@ -923,10 +923,10 @@ static void do_mesh_separation(GeometrySet &geometry_set,
   switch (mode) {
     case GEO_NODE_DELETE_GEOMETRY_MODE_ALL: {
       Array<int> vertex_map(mesh_in.totvert);
-      int num_selected_vertices;
+      int num_selected_vertices = 0;
 
       Array<int> edge_map(mesh_in.totedge);
-      int num_selected_edges;
+      int num_selected_edges = 0;
 
       /* Fill all the maps based on the selection. */
       switch (domain) {
@@ -990,7 +990,7 @@ static void do_mesh_separation(GeometrySet &geometry_set,
     }
     case GEO_NODE_DELETE_GEOMETRY_MODE_EDGE_FACE: {
       Array<int> edge_map(mesh_in.totedge);
-      int num_selected_edges;
+      int num_selected_edges = 0;
 
       /* Fill all the maps based on the selection. */
       switch (domain) {
@@ -1156,19 +1156,19 @@ void separate_geometry(GeometrySet &geometry_set,
                        bool &r_is_error)
 {
   bool some_valid_domain = false;
-  if (geometry_set.has<PointCloudComponent>()) {
+  if (geometry_set.has_pointcloud()) {
     if (domain == ATTR_DOMAIN_POINT) {
       separate_point_cloud_selection(geometry_set, selection_field, invert);
       some_valid_domain = true;
     }
   }
-  if (geometry_set.has<MeshComponent>()) {
+  if (geometry_set.has_mesh()) {
     if (domain != ATTR_DOMAIN_CURVE) {
       separate_mesh_selection(geometry_set, selection_field, domain, mode, invert);
       some_valid_domain = true;
     }
   }
-  if (geometry_set.has<CurveComponent>()) {
+  if (geometry_set.has_curve()) {
     if (ELEM(domain, ATTR_DOMAIN_POINT, ATTR_DOMAIN_CURVE)) {
       separate_curve_selection(geometry_set, selection_field, domain, invert);
       some_valid_domain = true;

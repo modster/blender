@@ -1445,8 +1445,9 @@ int RNA_property_int_clamp(PointerRNA *ptr, PropertyRNA *prop, int *value)
   return 0;
 }
 
-/* this is the max length including \0 terminator.
- * '0' used when their is no maximum */
+/**
+ * \return the maximum length including the \0 terminator. '0' is used when there is no maximum.
+ */
 int RNA_property_string_maxlength(PropertyRNA *prop)
 {
   StringPropertyRNA *sprop = (StringPropertyRNA *)rna_ensure_property(prop);
@@ -2198,7 +2199,11 @@ static void rna_property_update(
  * but this isn't likely to be a performance problem. */
 bool RNA_property_update_check(PropertyRNA *prop)
 {
-  return (prop->magic != RNA_MAGIC || prop->update || prop->noteflag);
+  return
+      /* Always update ID properties. */
+      (prop->magic != RNA_MAGIC || (prop->flag & PROP_IDPROPERTY)) ||
+      /* For native RNA properties only update if there is a callback or notifier. */
+      (prop->update || prop->noteflag);
 }
 
 void RNA_property_update(bContext *C, PointerRNA *ptr, PropertyRNA *prop)

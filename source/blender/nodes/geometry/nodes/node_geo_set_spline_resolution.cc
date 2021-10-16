@@ -23,8 +23,8 @@ namespace blender::nodes {
 static void geo_node_set_spline_resolution_declare(NodeDeclarationBuilder &b)
 {
   b.add_input<decl::Geometry>("Geometry");
-  b.add_input<decl::Int>("Resolution").default_value(12).supports_field();
   b.add_input<decl::Bool>("Selection").default_value(true).hide_value().supports_field();
+  b.add_input<decl::Int>("Resolution").default_value(12).supports_field();
   b.add_output<decl::Geometry>("Geometry");
 }
 
@@ -60,7 +60,7 @@ static void geo_node_set_spline_resolution_exec(GeoNodeExecParams params)
   bool only_poly = true;
   geometry_set.modify_geometry_sets([&](GeometrySet &geometry_set) {
     if (geometry_set.has_curve()) {
-      if (!only_poly) {
+      if (only_poly) {
         for (const SplinePtr &spline : geometry_set.get_curve_for_read()->splines()) {
           if (ELEM(spline->type(), Spline::Type::Bezier, Spline::Type::NURBS)) {
             only_poly = false;
