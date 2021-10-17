@@ -47,10 +47,8 @@ class obj_exporter_test : public BlendfileLoadingBaseTest {
   }
 };
 
-// https://developer.blender.org/F9260238
-const std::string all_objects_file = "io_tests/blend_scene/all_objects_2_92.blend";
-// https://developer.blender.org/F9278970
-const std::string all_curve_objects_file = "io_tests/blend_scene/all_curves_2_92.blend";
+const std::string all_objects_file = "io_tests/blend_scene/all_objects.blend";
+const std::string all_curve_objects_file = "io_tests/blend_scene/all_curves.blend";
 
 TEST_F(obj_exporter_test, filter_objects_curves_as_mesh)
 {
@@ -59,9 +57,8 @@ TEST_F(obj_exporter_test, filter_objects_curves_as_mesh)
     ADD_FAILURE();
     return;
   }
-
   auto [objmeshes, objcurves]{filter_supported_objects(depsgraph, _export.params)};
-  EXPECT_EQ(objmeshes.size(), 22);
+  EXPECT_EQ(objmeshes.size(), 17);
   EXPECT_EQ(objcurves.size(), 0);
 }
 
@@ -74,8 +71,8 @@ TEST_F(obj_exporter_test, filter_objects_curves_as_nurbs)
   }
   _export.params.export_curves_as_nurbs = true;
   auto [objmeshes, objcurves]{filter_supported_objects(depsgraph, _export.params)};
-  EXPECT_EQ(objmeshes.size(), 18);
-  EXPECT_EQ(objcurves.size(), 4);
+  EXPECT_EQ(objmeshes.size(), 16);
+  EXPECT_EQ(objcurves.size(), 2);
 }
 
 TEST_F(obj_exporter_test, filter_objects_selected)
@@ -88,8 +85,8 @@ TEST_F(obj_exporter_test, filter_objects_selected)
   _export.params.export_selected_objects = true;
   _export.params.export_curves_as_nurbs = true;
   auto [objmeshes, objcurves]{filter_supported_objects(depsgraph, _export.params)};
-  EXPECT_EQ(objmeshes.size(), 8);
-  EXPECT_EQ(objcurves.size(), 2);
+  EXPECT_EQ(objmeshes.size(), 1);
+  EXPECT_EQ(objcurves.size(), 0);
 }
 
 TEST(obj_exporter_utils, append_negative_frame_to_filename)
@@ -237,12 +234,31 @@ TEST(obj_exporter_writer, mtllib)
 /* Return true if string #a and string #b are equal after their first newline. */
 static bool strings_equal_after_first_lines(const std::string &a, const std::string &b)
 {
+  bool dbg_level = 0;
   size_t a_len = a.size();
   size_t b_len = b.size();
   size_t a_next = a.find_first_of('\n');
   size_t b_next = b.find_first_of('\n');
   if (a_next == std::string::npos || b_next == std::string::npos) {
+    if (dbg_level > 0) {
+      std::cout << "Couldn't find newline in one of args\n";
+    }
     return false;
+  }
+  if (dbg_level > 0) {
+    if (a.compare(a_next, a_len - a_next, b, b_next, b_len - b_next) != 0) {
+      for (int i = 0; i < a_len - a_next && i < b_len - b_next; ++i) {
+        if (a[a_next + i] != b[b_next + i]) {
+          std::cout << "Difference found at pos " << a_next + i << " of a\n";
+          std::cout << "a: " << a.substr(a_next + i, 100) << " ...\n";
+          std::cout << "b: " << b.substr(b_next + i, 100) << " ... \n";
+          return false;
+        }
+      }
+    }
+    else {
+      return true;
+    }
   }
   return a.compare(a_next, a_len - a_next, b, b_next, b_len - b_next) == 0;
 }
@@ -295,6 +311,105 @@ TEST_F(obj_exporter_regression_test, all_tris)
   compare_obj_export_to_golden("io_tests/blend_geometry/all_tris.blend",
                                "io_tests/obj/all_tris.obj",
                                "io_tests/obj/all_tris.mtl",
+                               _export.params);
+}
+
+TEST_F(obj_exporter_regression_test, all_quads)
+{
+  OBJExportParamsDefault _export;
+  _export.params.scaling_factor = 2.0f;
+  _export.params.export_materials = false;
+  compare_obj_export_to_golden(
+      "io_tests/blend_geometry/all_quads.blend", "io_tests/obj/all_quads.obj", "", _export.params);
+}
+
+TEST_F(obj_exporter_regression_test, fgons)
+{
+  OBJExportParamsDefault _export;
+  _export.params.forward_axis = OBJ_AXIS_Y_FORWARD;
+  _export.params.up_axis = OBJ_AXIS_Z_UP;
+  _export.params.export_materials = false;
+  compare_obj_export_to_golden(
+      "io_tests/blend_geometry/fgons.blend", "io_tests/obj/fgons.obj", "", _export.params);
+}
+
+TEST_F(obj_exporter_regression_test, edges)
+{
+  OBJExportParamsDefault _export;
+  _export.params.forward_axis = OBJ_AXIS_Y_FORWARD;
+  _export.params.up_axis = OBJ_AXIS_Z_UP;
+  _export.params.export_materials = false;
+  compare_obj_export_to_golden(
+      "io_tests/blend_geometry/edges.blend", "io_tests/obj/edges.obj", "", _export.params);
+}
+
+TEST_F(obj_exporter_regression_test, vertices)
+{
+  OBJExportParamsDefault _export;
+  _export.params.forward_axis = OBJ_AXIS_Y_FORWARD;
+  _export.params.up_axis = OBJ_AXIS_Z_UP;
+  _export.params.export_materials = false;
+  compare_obj_export_to_golden(
+      "io_tests/blend_geometry/vertices.blend", "io_tests/obj/vertices.obj", "", _export.params);
+}
+
+TEST_F(obj_exporter_regression_test, nurbs_as_nurbs)
+{
+  OBJExportParamsDefault _export;
+  _export.params.forward_axis = OBJ_AXIS_Y_FORWARD;
+  _export.params.up_axis = OBJ_AXIS_Z_UP;
+  _export.params.export_materials = false;
+  _export.params.export_curves_as_nurbs = true;
+  compare_obj_export_to_golden(
+      "io_tests/blend_geometry/nurbs.blend", "io_tests/obj/nurbs.obj", "", _export.params);
+}
+
+TEST_F(obj_exporter_regression_test, nurbs_as_mesh)
+{
+  OBJExportParamsDefault _export;
+  _export.params.forward_axis = OBJ_AXIS_Y_FORWARD;
+  _export.params.up_axis = OBJ_AXIS_Z_UP;
+  _export.params.export_materials = false;
+  _export.params.export_curves_as_nurbs = false;
+  compare_obj_export_to_golden(
+      "io_tests/blend_geometry/nurbs.blend", "io_tests/obj/nurbs_mesh.obj", "", _export.params);
+}
+
+TEST_F(obj_exporter_regression_test, cube_all_data_triangulated)
+{
+  OBJExportParamsDefault _export;
+  _export.params.forward_axis = OBJ_AXIS_Y_FORWARD;
+  _export.params.up_axis = OBJ_AXIS_Z_UP;
+  _export.params.export_materials = false;
+  _export.params.export_triangulated_mesh = true;
+  compare_obj_export_to_golden("io_tests/blend_geometry/cube_all_data.blend",
+                               "io_tests/obj/cube_all_data_triangulated.obj",
+                               "",
+                               _export.params);
+}
+
+TEST_F(obj_exporter_regression_test, suzanne_all_data)
+{
+  OBJExportParamsDefault _export;
+  _export.params.forward_axis = OBJ_AXIS_Y_FORWARD;
+  _export.params.up_axis = OBJ_AXIS_Z_UP;
+  _export.params.export_materials = false;
+  _export.params.export_smooth_groups = true;
+  compare_obj_export_to_golden("io_tests/blend_geometry/suzanne_all_data.blend",
+                               "io_tests/obj/suzanne_all_data.obj",
+                               "",
+                               _export.params);
+}
+
+TEST_F(obj_exporter_regression_test, all_objects)
+{
+  OBJExportParamsDefault _export;
+  _export.params.forward_axis = OBJ_AXIS_Y_FORWARD;
+  _export.params.up_axis = OBJ_AXIS_Z_UP;
+  _export.params.export_smooth_groups = true;
+  compare_obj_export_to_golden("io_tests/blend_scene/all_objects.blend",
+                               "io_tests/obj/all_objects.obj",
+                               "io_tests/obj/all_objects.mtl",
                                _export.params);
 }
 

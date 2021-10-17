@@ -112,6 +112,14 @@ filter_supported_objects(Depsgraph *depsgraph, const OBJExportParams &export_par
       case OB_CURVE: {
         Curve *curve = static_cast<Curve *>(object_in_layer->data);
         Nurb *nurb{static_cast<Nurb *>(curve->nurb.first)};
+        if (!nurb) {
+          /* An empty curve. Not yet supported to export these as meshes. */
+          if (export_params.export_curves_as_nurbs) {
+            r_exportable_nurbs.append(
+                std::make_unique<OBJCurve>(depsgraph, export_params, object_in_layer));
+          }
+          break;
+        }
         switch (nurb->type) {
           case CU_NURBS: {
             if (export_params.export_curves_as_nurbs) {
@@ -137,6 +145,7 @@ filter_supported_objects(Depsgraph *depsgraph, const OBJExportParams &export_par
             break;
           }
         }
+        break;
       }
       default: {
         /* Other object types are not supported. */
