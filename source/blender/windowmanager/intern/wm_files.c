@@ -204,6 +204,16 @@ static void wm_window_match_init(bContext *C, ListBase *wmlist)
       WM_event_remove_handlers(C, &win->modalhandlers);
       ED_screen_exit(C, win, WM_window_get_active_screen(win));
     }
+
+    /* NOTE(@campbellbarton): Clear the message bus so it's always cleared on file load.
+     * Otherwise it's cleared when "Load UI" is set (see #USER_FILENOUI & #wm_close_and_free).
+     * However it's _not_ cleared when the UI is kept. This complicates use from add-ons
+     * which can re-register subscribers on file-load. To support this use case,
+     * it's best to have predictable behavior - always clear. */
+    if (wm->message_bus != NULL) {
+      WM_msgbus_destroy(wm->message_bus);
+      wm->message_bus = NULL;
+    }
   }
 
   /* reset active window */
@@ -516,7 +526,7 @@ static int wm_read_exotic(const char *name)
   /* check for compressed .blend */
   FileReader *compressed_file = NULL;
   if (BLI_file_magic_is_gzip(header)) {
-    /* In earlier versions of Blender (before 3.0), compressed files used Gzip instead of Zstd.
+    /* In earlier versions of Blender (before 3.0), compressed files used `Gzip` instead of `Zstd`.
      * While these files will no longer be written, there still needs to be reading support. */
     compressed_file = BLI_filereader_new_gzip(rawfile);
   }

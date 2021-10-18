@@ -1546,9 +1546,9 @@ DNA_ReconstructInfo *DNA_reconstruct_info_create(const SDNA *oldsdna,
   reconstruct_info->oldsdna = oldsdna;
   reconstruct_info->newsdna = newsdna;
   reconstruct_info->compare_flags = compare_flags;
-  reconstruct_info->step_counts = MEM_malloc_arrayN(sizeof(int), newsdna->structs_len, __func__);
+  reconstruct_info->step_counts = MEM_malloc_arrayN(newsdna->structs_len, sizeof(int), __func__);
   reconstruct_info->steps = MEM_malloc_arrayN(
-      sizeof(ReconstructStep *), newsdna->structs_len, __func__);
+      newsdna->structs_len, sizeof(ReconstructStep *), __func__);
 
   /* Generate reconstruct steps for all structs. */
   for (int new_struct_nr = 0; new_struct_nr < newsdna->structs_len; new_struct_nr++) {
@@ -1800,7 +1800,7 @@ static void sdna_expand_names(SDNA *sdna)
 
   int names_expand_index = 0;
   for (int struct_nr = 0; struct_nr < sdna->structs_len; struct_nr++) {
-    /* We can't edit this memory 'sdna->structs' points to (readonly datatoc file). */
+    /* We can't edit this memory 'sdna->structs' points to (read-only `datatoc` file). */
     const SDNA_Struct *struct_old = sdna->structs[struct_nr];
 
     const int array_size = sizeof(short) * 2 + sizeof(SDNA_StructMember) * struct_old->members_len;

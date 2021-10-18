@@ -916,6 +916,9 @@ static void create_inspection_string_for_generic_value(const geo_log::GenericVal
   else if (type.is<Tex *>()) {
     id_to_inspection_string((ID *)*value.get<Tex *>(), ID_TE);
   }
+  else if (type.is<Image *>()) {
+    id_to_inspection_string((ID *)*value.get<Image *>(), ID_IM);
+  }
   else if (type.is<Collection *>()) {
     id_to_inspection_string((ID *)*value.get<Collection *>(), ID_GR);
   }
@@ -2176,6 +2179,27 @@ static void draw_nodetree(const bContext *C,
   node_draw_nodetree(C, region, snode, ntree, parent_key);
 }
 
+/**
+ * Make the background slightly brighter to indicate that users are inside a node-group.
+ */
+static void draw_background_color(const SpaceNode *snode)
+{
+  const int max_tree_length = 3;
+  const float bright_factor = 0.25f;
+
+  /* We ignore the first element of the path since it is the top-most tree and it doesn't need to
+   * be brighter. We also set a cap to how many levels we want to set apart, to avoid the
+   * background from getting too bright. */
+  const int clamped_tree_path_length = BLI_listbase_count_at_most(&snode->treepath,
+                                                                  max_tree_length);
+  const int depth = max_ii(0, clamped_tree_path_length - 1);
+
+  float color[3];
+  UI_GetThemeColor3fv(TH_BACK, color);
+  mul_v3_fl(color, 1.0f + bright_factor * depth);
+  GPU_clear_color(color[0], color[1], color[2], 1.0);
+}
+
 void node_draw_space(const bContext *C, ARegion *region)
 {
   wmWindow *win = CTX_wm_window(C);
@@ -2189,7 +2213,7 @@ void node_draw_space(const bContext *C, ARegion *region)
   GPU_framebuffer_bind_no_srgb(framebuffer_overlay);
 
   UI_view2d_view_ortho(v2d);
-  UI_ThemeClearColor(TH_BACK);
+  draw_background_color(snode);
   GPU_depth_test(GPU_DEPTH_NONE);
   GPU_scissor_test(true);
 
