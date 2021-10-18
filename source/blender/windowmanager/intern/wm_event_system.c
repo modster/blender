@@ -581,7 +581,7 @@ void wm_event_do_notifiers(bContext *C)
           if ((note->category == NC_SPACE) && note->reference) {
             /* Filter out notifiers sent to other spaces. RNA sets the reference to the owning ID
              * though, the screen, so let notifiers through that reference the entire screen. */
-            if (!ELEM(note->reference, area->spacedata.first, screen)) {
+            if (!ELEM(note->reference, area->spacedata.first, screen, scene)) {
               continue;
             }
           }
@@ -1809,7 +1809,7 @@ void WM_operator_name_call_ptr_with_depends_on_cursor(
     }
   }
 
-  WM_cursor_modal_set(win, WM_CURSOR_PICK_AREA);
+  WM_cursor_modal_set(win, ot->cursor_pending);
 
   uiOperatorWaitForInput *opwait = MEM_callocN(sizeof(*opwait), __func__);
   opwait->optype_params.optype = ot;
@@ -3837,7 +3837,7 @@ void WM_event_fileselect_event(wmWindowManager *wm, void *ophandle, int eventval
 }
 
 /* Operator is supposed to have a filled "path" property. */
-/* Optional property: filetype (XXX enum?) */
+/* Optional property: file-type (XXX enum?) */
 
 /**
  * The idea here is to keep a handler alive on window queue, owning the operator.
