@@ -613,6 +613,20 @@ BLI_STATIC_ASSERT_ALIGN(LightProbeInfoData, 16)
 /** \} */
 
 /* -------------------------------------------------------------------- */
+/** \name Hierarchical-Z Buffer
+ * \{ */
+
+struct HiZData {
+  /** Scale factor to remove HiZBuffer padding. */
+  vec2 uv_scale;
+  int _pad0;
+  int _pad1;
+};
+BLI_STATIC_ASSERT_ALIGN(HiZData, 16)
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
 /** \name Subsurface
  * \{ */
 
@@ -699,6 +713,7 @@ using CubemapDataBuf = StructArrayBuffer<CubemapData, CULLING_ITEM_BATCH>;
 using CullingDataBuf = StructBuffer<CullingData>;
 using DepthOfFieldDataBuf = StructBuffer<DepthOfFieldData>;
 using GridDataBuf = StructArrayBuffer<GridData, GRID_MAX>;
+using HiZDataBuf = StructBuffer<HiZData>;
 using LightDataBuf = StructArrayBuffer<LightData, CULLING_ITEM_BATCH>;
 using LightProbeFilterDataBuf = StructBuffer<LightProbeFilterData>;
 using LightProbeInfoDataBuf = StructBuffer<LightProbeInfoData>;

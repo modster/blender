@@ -37,6 +37,7 @@
 #include "DRW_render.h"
 
 #include "eevee_depth_of_field.hh"
+#include "eevee_hizbuffer.hh"
 #include "eevee_motion_blur.hh"
 #include "eevee_renderpasses.hh"
 #include "eevee_shader.hh"
@@ -56,7 +57,7 @@ class Instance;
 class ShadingView {
  private:
   Instance &inst_;
-  /** Static srting pointer. Used as debug name and as UUID for texture pool. */
+  /** Static string pointer. Used as debug name and as UUID for texture pool. */
   const char *name_;
   /** Matrix to apply to the viewmat. */
   const float (*face_matrix_)[4];
@@ -66,7 +67,10 @@ class ShadingView {
   MotionBlur mb_;
   Velocity velocity_;
 
+  /** GBuffer for deferred passes. */
   GBuffer gbuffer_;
+  /** HiZBuffer for screenspace effects. */
+  HiZBuffer hiz_;
 
   /** Owned resources. */
   eevee::Framebuffer view_fb_;
@@ -96,7 +100,8 @@ class ShadingView {
         face_matrix_(face_matrix),
         dof_(inst, name),
         mb_(inst, name),
-        velocity_(inst, name){};
+        velocity_(inst, name),
+        hiz_(inst){};
 
   ~ShadingView(){};
 
@@ -129,6 +134,8 @@ class LightProbeView {
   const float (*face_matrix_)[4];
   /** GBuffer for deferred passes. */
   GBuffer gbuffer_;
+  /** HiZBuffer for screenspace effects. */
+  HiZBuffer hiz_;
   /** Owned resources. */
   Framebuffer view_fb_;
   /** DRWView of this face. */
@@ -141,7 +148,7 @@ class LightProbeView {
 
  public:
   LightProbeView(Instance &inst, const char *name, const float (*face_matrix)[4], int layer_)
-      : inst_(inst), name_(name), face_matrix_(face_matrix), layer_(layer_){};
+      : inst_(inst), name_(name), face_matrix_(face_matrix), hiz_(inst), layer_(layer_){};
 
   ~LightProbeView(){};
 

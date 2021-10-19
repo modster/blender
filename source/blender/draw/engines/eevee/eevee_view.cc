@@ -134,7 +134,7 @@ void ShadingView::render(void)
     inst_.shading_passes.background.render();
   }
 
-  inst_.shading_passes.deferred.render(gbuffer_, view_fb_);
+  inst_.shading_passes.deferred.render(gbuffer_, hiz_, view_fb_);
 
   inst_.lightprobes.draw_cache_display();
 
@@ -248,7 +248,7 @@ void LightProbeView::render(void)
   if (!is_only_background_) {
     GPU_framebuffer_clear_depth(view_fb_, 1.0f);
 
-    inst_.shading_passes.deferred.render(gbuffer_, view_fb_);
+    inst_.shading_passes.deferred.render(gbuffer_, hiz_, view_fb_);
     inst_.shading_passes.forward.render();
   }
   DRW_stats_group_end();

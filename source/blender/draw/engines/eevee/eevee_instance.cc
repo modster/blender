@@ -125,6 +125,7 @@ void Instance::begin_sync()
   shading_passes.sync();
   main_view.sync();
   world.sync();
+  hiz.sync();
 
   lookdev.sync_background();
   lookdev.sync_overlay();

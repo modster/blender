@@ -23,7 +23,12 @@ layout(std140) uniform subsurface_block
   SubsurfaceData sss;
 };
 
-uniform sampler2D depth_tx;
+layout(std140) uniform hiz_block
+{
+  HiZData hiz;
+};
+
+uniform sampler2D hiz_tx;
 uniform sampler2D radiance_tx;
 uniform sampler2D transmit_color_tx;
 uniform sampler2D transmit_normal_tx;
@@ -63,7 +68,8 @@ void main(void)
 {
   vec2 center_uv = uvcoordsvar.xy;
 
-  vec3 vP = get_view_space_from_depth(center_uv, texture(depth_tx, center_uv).r);
+  float gbuffer_depth = texelFetch(hiz_tx, ivec2(gl_FragCoord.xy), 0).r;
+  vec3 vP = get_view_space_from_depth(center_uv, gbuffer_depth);
   vec4 tra_col_in = texture(transmit_color_tx, center_uv);
   vec4 tra_nor_in = texture(transmit_normal_tx, center_uv);
   vec4 tra_dat_in = texture(transmit_data_tx, center_uv);
@@ -111,7 +117,7 @@ void main(void)
     vec2 sample_uv = center_uv + sample_space * sss.samples[i].xy;
     float pdf = sss.samples[i].z;
 
-    float sample_depth = texture(depth_tx, sample_uv).r;
+    float sample_depth = texture(hiz_tx, sample_uv * hiz.uv_scale).r;
     vec3 sample_vP = get_view_space_from_depth(sample_uv, sample_depth);
 
     vec4 sample_data = texture(radiance_tx, sample_uv);

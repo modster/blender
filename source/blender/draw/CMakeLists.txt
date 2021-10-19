@@ -120,6 +120,7 @@ set(SRC
   engines/eevee/eevee_film.cc
   engines/eevee/eevee_gpencil.cc
   engines/eevee/eevee_hair.cc
+  engines/eevee/eevee_hizbuffer.cc
   engines/eevee/eevee_id_map.cc
   engines/eevee/eevee_instance.cc
   engines/eevee/eevee_light.cc
@@ -253,6 +254,8 @@ data_to_c_simple(engines/eevee/shaders/eevee_deferred_holdout_frag.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_deferred_transparent_frag.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_deferred_volume_frag.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_depth_clear_frag.glsl SRC)
+data_to_c_simple(engines/eevee/shaders/eevee_hiz_copy_frag.glsl SRC)
+data_to_c_simple(engines/eevee/shaders/eevee_hiz_downsample_frag.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_depth_of_field_accumulator_lib.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_depth_of_field_bokeh_lut_frag.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_depth_of_field_filter_frag.glsl SRC)

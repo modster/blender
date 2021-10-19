@@ -46,7 +46,7 @@ layout(std140) uniform lightprobes_info_block
   LightProbeInfoData probes_info;
 };
 
-uniform sampler2D depth_tx;
+uniform sampler2D hiz_tx;
 uniform sampler2D emission_data_tx;
 uniform sampler2D transmit_color_tx;
 uniform sampler2D transmit_normal_tx;
@@ -84,7 +84,7 @@ vec3 lightprobe_cubemap_eval(vec3 P, vec3 R, float roughness, float random_thres
 
 void main(void)
 {
-  float gbuffer_depth = texture(depth_tx, uvcoordsvar.xy).r;
+  float gbuffer_depth = texelFetch(hiz_tx, ivec2(gl_FragCoord.xy), 0).r;
   vec3 vP = get_view_space_from_depth(uvcoordsvar.xy, gbuffer_depth);
   vec3 P = point_view_to_world(vP);
   vec3 V = cameraVec(P);

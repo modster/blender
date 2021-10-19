@@ -54,6 +54,8 @@ extern char datatoc_eevee_deferred_holdout_frag_glsl[];
 extern char datatoc_eevee_deferred_transparent_frag_glsl[];
 extern char datatoc_eevee_deferred_volume_frag_glsl[];
 extern char datatoc_eevee_depth_clear_frag_glsl[];
+extern char datatoc_eevee_hiz_copy_frag_glsl[];
+extern char datatoc_eevee_hiz_downsample_frag_glsl[];
 extern char datatoc_eevee_depth_of_field_accumulator_lib_glsl[];
 extern char datatoc_eevee_depth_of_field_bokeh_lut_frag_glsl[];
 extern char datatoc_eevee_depth_of_field_downsample_frag_glsl[];
@@ -214,6 +216,8 @@ ShaderModule::ShaderModule()
   SHADER_FULLSCREEN(DEFERRED_EVAL_VOLUME, eevee_deferred_volume_frag);
   SHADER(DEFERRED_MESH, eevee_surface_mesh_vert, nullptr, eevee_surface_deferred_frag, nullptr);
   SHADER(DEFERRED_VOLUME, eevee_volume_vert, nullptr, eevee_volume_deferred_frag, nullptr);
+  SHADER_FULLSCREEN(HIZ_COPY, eevee_hiz_copy_frag);
+  SHADER_FULLSCREEN(HIZ_DOWNSAMPLE, eevee_hiz_downsample_frag);
   SHADER_FULLSCREEN(DOF_BOKEH_LUT, eevee_depth_of_field_bokeh_lut_frag);
   SHADER_FULLSCREEN(DOF_FILTER, eevee_depth_of_field_filter_frag);
   SHADER_FULLSCREEN_DEFINES(DOF_GATHER_BACKGROUND_LUT,

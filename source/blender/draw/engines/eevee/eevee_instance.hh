@@ -29,6 +29,7 @@
 #include "DRW_render.h"
 
 #include "eevee_film.hh"
+#include "eevee_hizbuffer.hh"
 #include "eevee_id_map.hh"
 #include "eevee_light.hh"
 #include "eevee_lightprobe.hh"
@@ -69,6 +70,7 @@ class Instance {
   MotionBlurModule motion_blur;
   LightModule lights;
   LightProbeModule lightprobes;
+  HiZBufferModule hiz;
   /* TODO(fclem) Move it to scene layer data. */
   ShadowModule shadows;
   SubsurfaceModule subsurface;
@@ -110,6 +112,7 @@ class Instance {
         motion_blur(*this),
         lights(*this),
         lightprobes(*this),
+        hiz(*this),
         shadows(*this),
         subsurface(*this),
         sync(*this),
