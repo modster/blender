@@ -914,7 +914,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
 
   if (event->type == EVT_MODAL_MAP) {
     if (event->val == PEN_MODAL_FREE_MOVE_HANDLE) {
-      select_and_get_point(&vc, &nu, &bezt, &bp, event->mval, event->prevval != KM_PRESS);
+      select_and_get_point(&vc, &nu, &bezt, &bp, event->mval, event->prev_val != KM_PRESS);
       picked = true;
 
       if (bezt) {
@@ -924,8 +924,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   }
 
   if (ELEM(event->type, MOUSEMOVE, INBETWEEN_MOUSEMOVE) && !cut_or_delete) {
-    int prev_xy[2] = {event->prevclickx, event->prevclicky};
-    if (!dragging && WM_event_drag_test(event, prev_xy) && event->val == KM_PRESS) {
+    if (!dragging && WM_event_drag_test(event, event->prev_click_xy) && event->val == KM_PRESS) {
       RNA_boolean_set(op->ptr, "dragging", true);
       dragging = true;
     }
@@ -939,7 +938,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
        * control point. */
       else if (is_new_point) {
         if (!picked) {
-          select_and_get_point(&vc, &nu, &bezt, &bp, event->mval, event->prevval != KM_PRESS);
+          select_and_get_point(&vc, &nu, &bezt, &bp, event->mval, event->prev_val != KM_PRESS);
         }
         if (bezt) {
           /* Move opposite handle if last vertex. */
@@ -950,7 +949,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
         }
       }
       else {
-        select_and_get_point(&vc, &nu, &bezt, &bp, event->mval, event->prevval != KM_PRESS);
+        select_and_get_point(&vc, &nu, &bezt, &bp, event->mval, event->prev_val != KM_PRESS);
         if (bezt) {
           move_selected_bezt_to_mouse(bezt, &vc, event);
         }
