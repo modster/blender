@@ -19,8 +19,10 @@
  */
 
 #include "BKE_asset_catalog.hh"
+#include "BKE_asset_library.hh"
 #include "BKE_context.h"
 #include "BKE_lib_id.h"
+#include "BKE_main.h"
 #include "BKE_report.h"
 
 #include "BLI_string_ref.hh"
@@ -47,7 +49,7 @@ static PointerRNAVec asset_operation_get_ids_from_context(const bContext *C);
 static PointerRNAVec asset_operation_get_nonexperimental_ids_from_context(const bContext *C);
 static bool asset_type_is_nonexperimental(const ID_Type id_type);
 
-static bool asset_operation_poll(bContext * /*C*/)
+static bool asset_operation_experimental_feature_poll(bContext * /*C*/)
 {
   /* At this moment only the pose library is non-experimental. Still, directly marking arbitrary
    * Actions as asset is not part of the stable functionality; instead, the pose library "Create
@@ -59,7 +61,7 @@ static bool asset_operation_poll(bContext * /*C*/)
 
 static bool asset_clear_poll(bContext *C)
 {
-  if (asset_operation_poll(C)) {
+  if (asset_operation_experimental_feature_poll(C)) {
     return true;
   }
 
@@ -144,7 +146,9 @@ void AssetMarkHelper::operator()(const bContext &C, PointerRNAVec &ids)
       continue;
     }
 
-    if (ED_asset_mark_id(&C, id)) {
+    if (ED_asset_mark_id(id)) {
+      ED_asset_generate_preview(&C, id);
+
       stats.last_id = id;
       stats.tot_created++;
     }
@@ -208,7 +212,7 @@ static void ASSET_OT_mark(wmOperatorType *ot)
   ot->idname = "ASSET_OT_mark";
 
   ot->exec = asset_mark_exec;
-  ot->poll = asset_operation_poll;
+  ot->poll = asset_operation_experimental_feature_poll;
 
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 }
@@ -382,7 +386,7 @@ static void ASSET_OT_list_refresh(struct wmOperatorType *ot)
 static bool asset_catalog_operator_poll(bContext *C)
 {
   const SpaceFile *sfile = CTX_wm_space_file(C);
-  return asset_operation_poll(C) && sfile && ED_fileselect_active_asset_library_get(sfile);
+  return sfile && ED_fileselect_active_asset_library_get(sfile);
 }
 
 static int asset_catalog_new_exec(bContext *C, wmOperator *op)
@@ -395,7 +399,8 @@ static int asset_catalog_new_exec(bContext *C, wmOperator *op)
 
   MEM_freeN(parent_path);
 
-  WM_main_add_notifier(NC_SPACE | ND_SPACE_ASSET_PARAMS, nullptr);
+  WM_event_add_notifier_ex(
+      CTX_wm_manager(C), CTX_wm_window(C), NC_ASSET | ND_ASSET_CATALOGS, nullptr);
 
   return OPERATOR_FINISHED;
 }
@@ -433,7 +438,8 @@ static int asset_catalog_delete_exec(bContext *C, wmOperator *op)
 
   MEM_freeN(catalog_id_str);
 
-  WM_main_add_notifier(NC_SPACE | ND_SPACE_ASSET_PARAMS, nullptr);
+  WM_event_add_notifier_ex(
+      CTX_wm_manager(C), CTX_wm_window(C), NC_ASSET | ND_ASSET_CATALOGS, nullptr);
 
   return OPERATOR_FINISHED;
 }
@@ -449,10 +455,160 @@ static void ASSET_OT_catalog_delete(struct wmOperatorType *ot)
 
   /* api callbacks */
   ot->exec = asset_catalog_delete_exec;
-  ot->invoke = WM_operator_confirm;
   ot->poll = asset_catalog_operator_poll;
 
   RNA_def_string(ot->srna, "catalog_id", nullptr, 0, "Catalog ID", "ID of the catalog to delete");
+}
+
+static bke::AssetCatalogService *get_catalog_service(bContext *C)
+{
+  const SpaceFile *sfile = CTX_wm_space_file(C);
+  if (!sfile) {
+    return nullptr;
+  }
+
+  AssetLibrary *asset_lib = ED_fileselect_active_asset_library_get(sfile);
+  return BKE_asset_library_get_catalog_service(asset_lib);
+}
+
+static int asset_catalog_undo_exec(bContext *C, wmOperator * /*op*/)
+{
+  bke::AssetCatalogService *catalog_service = get_catalog_service(C);
+  if (!catalog_service) {
+    return OPERATOR_CANCELLED;
+  }
+
+  catalog_service->undo();
+  WM_event_add_notifier(C, NC_SPACE | ND_SPACE_ASSET_PARAMS, nullptr);
+  return OPERATOR_FINISHED;
+}
+
+static bool asset_catalog_undo_poll(bContext *C)
+{
+  const bke::AssetCatalogService *catalog_service = get_catalog_service(C);
+  return catalog_service && catalog_service->is_undo_possbile();
+}
+
+static void ASSET_OT_catalog_undo(struct wmOperatorType *ot)
+{
+  /* identifiers */
+  ot->name = "Undo Catalog Edits";
+  ot->description = "Undo the last edit to the asset catalogs";
+  ot->idname = "ASSET_OT_catalog_undo";
+
+  /* api callbacks */
+  ot->exec = asset_catalog_undo_exec;
+  ot->poll = asset_catalog_undo_poll;
+}
+
+static int asset_catalog_redo_exec(bContext *C, wmOperator * /*op*/)
+{
+  bke::AssetCatalogService *catalog_service = get_catalog_service(C);
+  if (!catalog_service) {
+    return OPERATOR_CANCELLED;
+  }
+
+  catalog_service->redo();
+  WM_event_add_notifier(C, NC_SPACE | ND_SPACE_ASSET_PARAMS, nullptr);
+  return OPERATOR_FINISHED;
+}
+
+static bool asset_catalog_redo_poll(bContext *C)
+{
+  const bke::AssetCatalogService *catalog_service = get_catalog_service(C);
+  return catalog_service && catalog_service->is_redo_possbile();
+}
+
+static void ASSET_OT_catalog_redo(struct wmOperatorType *ot)
+{
+  /* identifiers */
+  ot->name = "redo Catalog Edits";
+  ot->description = "Redo the last undone edit to the asset catalogs";
+  ot->idname = "ASSET_OT_catalog_redo";
+
+  /* api callbacks */
+  ot->exec = asset_catalog_redo_exec;
+  ot->poll = asset_catalog_redo_poll;
+}
+
+static int asset_catalog_undo_push_exec(bContext *C, wmOperator * /*op*/)
+{
+  bke::AssetCatalogService *catalog_service = get_catalog_service(C);
+  if (!catalog_service) {
+    return OPERATOR_CANCELLED;
+  }
+
+  catalog_service->undo_push();
+  return OPERATOR_FINISHED;
+}
+
+static bool asset_catalog_undo_push_poll(bContext *C)
+{
+  return get_catalog_service(C) != nullptr;
+}
+
+static void ASSET_OT_catalog_undo_push(struct wmOperatorType *ot)
+{
+  /* identifiers */
+  ot->name = "Store undo snapshot for asset catalog edits";
+  ot->description = "Store the current state of the asset catalogs in the undo buffer";
+  ot->idname = "ASSET_OT_catalog_undo_push";
+
+  /* api callbacks */
+  ot->exec = asset_catalog_undo_push_exec;
+  ot->poll = asset_catalog_undo_push_poll;
+
+  /* Generally artists don't need to find & use this operator, it's meant for scripts only. */
+  ot->flag = OPTYPE_INTERNAL;
+}
+
+/* -------------------------------------------------------------------- */
+
+static bool asset_catalogs_save_poll(bContext *C)
+{
+  if (!asset_catalog_operator_poll(C)) {
+    return false;
+  }
+
+  const Main *bmain = CTX_data_main(C);
+  if (!bmain->name[0]) {
+    CTX_wm_operator_poll_msg_set(C, "Cannot save asset catalogs before the Blender file is saved");
+    return false;
+  }
+
+  if (!BKE_asset_library_has_any_unsaved_catalogs()) {
+    CTX_wm_operator_poll_msg_set(C, "No changes to be saved");
+    return false;
+  }
+
+  return true;
+}
+
+static int asset_catalogs_save_exec(bContext *C, wmOperator * /*op*/)
+{
+  const SpaceFile *sfile = CTX_wm_space_file(C);
+  ::AssetLibrary *asset_library = ED_fileselect_active_asset_library_get(sfile);
+
+  ED_asset_catalogs_save_from_main_path(asset_library, CTX_data_main(C));
+
+  WM_event_add_notifier_ex(
+      CTX_wm_manager(C), CTX_wm_window(C), NC_ASSET | ND_ASSET_CATALOGS, nullptr);
+
+  return OPERATOR_FINISHED;
+}
+
+static void ASSET_OT_catalogs_save(struct wmOperatorType *ot)
+{
+  /* identifiers */
+  ot->name = "Save Asset Catalogs";
+  ot->description =
+      "Make any edits to any catalogs permanent by writing the current set up to the asset "
+      "library";
+  ot->idname = "ASSET_OT_catalogs_save";
+
+  /* api callbacks */
+  ot->exec = asset_catalogs_save_exec;
+  ot->poll = asset_catalogs_save_poll;
 }
 
 /* -------------------------------------------------------------------- */
@@ -464,6 +620,10 @@ void ED_operatortypes_asset(void)
 
   WM_operatortype_append(ASSET_OT_catalog_new);
   WM_operatortype_append(ASSET_OT_catalog_delete);
+  WM_operatortype_append(ASSET_OT_catalogs_save);
+  WM_operatortype_append(ASSET_OT_catalog_undo);
+  WM_operatortype_append(ASSET_OT_catalog_redo);
+  WM_operatortype_append(ASSET_OT_catalog_undo_push);
 
   WM_operatortype_append(ASSET_OT_list_refresh);
 }

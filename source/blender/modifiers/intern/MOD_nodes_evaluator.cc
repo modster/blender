@@ -17,6 +17,7 @@
 #include "MOD_nodes_evaluator.hh"
 
 #include "NOD_geometry_exec.hh"
+#include "NOD_socket_declarations.hh"
 #include "NOD_type_conversions.hh"
 
 #include "DEG_depsgraph_query.h"
@@ -321,29 +322,48 @@ static const CPPType *get_socket_cpp_type(const DSocket socket)
   return get_socket_cpp_type(*socket.socket_ref());
 }
 
+/**
+ * \note This is not supposed to be a long term solution. Eventually we want that nodes can
+ * specify more complex defaults (other than just single values) in their socket declarations.
+ */
+static bool get_implicit_socket_input(const SocketRef &socket, void *r_value)
+{
+  const NodeRef &node = socket.node();
+  const nodes::NodeDeclaration *node_declaration = node.declaration();
+  if (node_declaration == nullptr) {
+    return false;
+  }
+  const nodes::SocketDeclaration &socket_declaration = *node_declaration->inputs()[socket.index()];
+  if (socket_declaration.input_field_type() == nodes::InputSocketFieldType::Implicit) {
+    const bNode &bnode = *socket.bnode();
+    if (socket.typeinfo()->type == SOCK_VECTOR) {
+      if (bnode.type == GEO_NODE_SET_CURVE_HANDLES) {
+        StringRef side = ((NodeGeometrySetCurveHandlePositions *)bnode.storage)->mode ==
+                                 GEO_NODE_CURVE_HANDLE_LEFT ?
+                             "handle_left" :
+                             "handle_right";
+        new (r_value) Field<float3>(bke::AttributeFieldInput::Create<float3>(side));
+        return true;
+      }
+      new (r_value) Field<float3>(bke::AttributeFieldInput::Create<float3>("position"));
+      return true;
+    }
+    if (socket.typeinfo()->type == SOCK_INT) {
+      if (ELEM(bnode.type, FN_NODE_RANDOM_VALUE, GEO_NODE_INSTANCE_ON_POINTS)) {
+        new (r_value) Field<int>(std::make_shared<bke::IDAttributeFieldInput>());
+        return true;
+      }
+      new (r_value) Field<int>(std::make_shared<fn::IndexFieldInput>());
+      return true;
+    }
+  }
+  return false;
+}
+
 static void get_socket_value(const SocketRef &socket, void *r_value)
 {
-  const bNodeSocket &bsocket = *socket.bsocket();
-  /* This is not supposed to be a long term solution. Eventually we want that nodes can specify
-   * more complex defaults (other than just single values) in their socket declarations. */
-  if (bsocket.flag & SOCK_HIDE_VALUE) {
-    const bNode &bnode = *socket.bnode();
-    if (bsocket.type == SOCK_VECTOR) {
-      if (ELEM(bnode.type,
-               GEO_NODE_SET_POSITION,
-               SH_NODE_TEX_NOISE,
-               GEO_NODE_MESH_TO_POINTS,
-               GEO_NODE_PROXIMITY)) {
-        new (r_value) Field<float3>(bke::AttributeFieldInput::Create<float3>("position"));
-        return;
-      }
-    }
-    else if (bsocket.type == SOCK_INT) {
-      if (ELEM(bnode.type, FN_NODE_RANDOM_VALUE, GEO_NODE_INSTANCE_ON_POINTS)) {
-        new (r_value) Field<int>(std::make_shared<fn::IndexFieldInput>());
-        return;
-      }
-    }
+  if (get_implicit_socket_input(socket, r_value)) {
+    return;
   }
 
   const bNodeSocketType *typeinfo = socket.typeinfo();
@@ -866,9 +886,9 @@ class GeometryNodesEvaluator {
     }
 
     /* Use the multi-function implementation if it exists. */
-    const MultiFunction *multi_function = params_.mf_by_node->try_get(node);
-    if (multi_function != nullptr) {
-      this->execute_multi_function_node(node, *multi_function, node_state);
+    const nodes::NodeMultiFunctions::Item &fn_item = params_.mf_by_node->try_get(node);
+    if (fn_item.fn != nullptr) {
+      this->execute_multi_function_node(node, fn_item, node_state);
       return;
     }
 
@@ -889,7 +909,7 @@ class GeometryNodesEvaluator {
   }
 
   void execute_multi_function_node(const DNode node,
-                                   const MultiFunction &fn,
+                                   const nodes::NodeMultiFunctions::Item &fn_item,
                                    NodeState &node_state)
   {
     if (node->idname().find("Legacy") != StringRef::not_found) {
@@ -917,7 +937,13 @@ class GeometryNodesEvaluator {
       input_fields.append(std::move(*(GField *)single_value.value));
     }
 
-    auto operation = std::make_shared<fn::FieldOperation>(fn, std::move(input_fields));
+    std::shared_ptr<fn::FieldOperation> operation;
+    if (fn_item.owned_fn) {
+      operation = std::make_shared<fn::FieldOperation>(fn_item.owned_fn, std::move(input_fields));
+    }
+    else {
+      operation = std::make_shared<fn::FieldOperation>(*fn_item.fn, std::move(input_fields));
+    }
 
     /* Forward outputs. */
     int output_index = 0;
@@ -1100,7 +1126,7 @@ class GeometryNodesEvaluator {
       return;
     }
     bool will_be_triggered_by_other_node = false;
-    for (const DSocket origin_socket : origin_sockets) {
+    for (const DSocket &origin_socket : origin_sockets) {
       if (origin_socket->is_input()) {
         /* Load the value directly from the origin socket. In most cases this is an unlinked
          * group input. */

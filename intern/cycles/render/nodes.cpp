@@ -2736,6 +2736,7 @@ NODE_DEFINE(PrincipledBsdfNode)
       distribution, "Distribution", distribution_enum, CLOSURE_BSDF_MICROFACET_MULTI_GGX_GLASS_ID);
 
   static NodeEnum subsurface_method_enum;
+  subsurface_method_enum.insert("burley", CLOSURE_BSSRDF_BURLEY_ID);
   subsurface_method_enum.insert("random_walk_fixed_radius",
                                 CLOSURE_BSSRDF_RANDOM_WALK_FIXED_RADIUS_ID);
   subsurface_method_enum.insert("random_walk", CLOSURE_BSSRDF_RANDOM_WALK_ID);
@@ -3060,6 +3061,7 @@ NODE_DEFINE(SubsurfaceScatteringNode)
   SOCKET_IN_FLOAT(surface_mix_weight, "SurfaceMixWeight", 0.0f, SocketType::SVM_INTERNAL);
 
   static NodeEnum method_enum;
+  method_enum.insert("burley", CLOSURE_BSSRDF_BURLEY_ID);
   method_enum.insert("random_walk_fixed_radius", CLOSURE_BSSRDF_RANDOM_WALK_FIXED_RADIUS_ID);
   method_enum.insert("random_walk", CLOSURE_BSSRDF_RANDOM_WALK_ID);
   SOCKET_ENUM(method, "Method", method_enum, CLOSURE_BSSRDF_RANDOM_WALK_ID);
@@ -6382,7 +6384,7 @@ void BumpNode::constant_fold(const ConstantFolder &folder)
   /* TODO(sergey): Ignore bump with zero strength. */
 }
 
-/* Curve node */
+/* Curves node */
 
 CurvesNode::CurvesNode(const NodeType *node_type) : ShaderNode(node_type)
 {
@@ -6529,6 +6531,83 @@ void VectorCurvesNode::compile(SVMCompiler &compiler)
 void VectorCurvesNode::compile(OSLCompiler &compiler)
 {
   CurvesNode::compile(compiler, "node_vector_curves");
+}
+
+/* FloatCurveNode */
+
+NODE_DEFINE(FloatCurveNode)
+{
+  NodeType *type = NodeType::add("float_curve", create, NodeType::SHADER);
+
+  SOCKET_FLOAT_ARRAY(curve, "Curve", array<float>());
+  SOCKET_FLOAT(min_x, "Min X", 0.0f);
+  SOCKET_FLOAT(max_x, "Max X", 1.0f);
+
+  SOCKET_IN_FLOAT(fac, "Factor", 0.0f);
+  SOCKET_IN_FLOAT(value, "Value", 0.0f);
+
+  SOCKET_OUT_FLOAT(value, "Value");
+
+  return type;
+}
+
+FloatCurveNode::FloatCurveNode() : ShaderNode(get_node_type())
+{
+}
+
+void FloatCurveNode::constant_fold(const ConstantFolder &folder)
+{
+  ShaderInput *value_in = input("Value");
+  ShaderInput *fac_in = input("Factor");
+
+  /* evaluate fully constant node */
+  if (folder.all_inputs_constant()) {
+    if (curve.size() == 0) {
+      return;
+    }
+
+    float pos = (value - min_x) / (max_x - min_x);
+    float result = float_ramp_lookup(curve.data(), pos, true, true, curve.size());
+
+    folder.make_constant(value + fac * (result - value));
+  }
+  /* remove no-op node */
+  else if (!fac_in->link && fac == 0.0f) {
+    /* link is not null because otherwise all inputs are constant */
+    folder.bypass(value_in->link);
+  }
+}
+
+void FloatCurveNode::compile(SVMCompiler &compiler)
+{
+  if (curve.size() == 0)
+    return;
+
+  ShaderInput *value_in = input("Value");
+  ShaderInput *fac_in = input("Factor");
+  ShaderOutput *value_out = output("Value");
+
+  compiler.add_node(NODE_FLOAT_CURVE,
+                    compiler.encode_uchar4(compiler.stack_assign(fac_in),
+                                           compiler.stack_assign(value_in),
+                                           compiler.stack_assign(value_out)),
+                    __float_as_int(min_x),
+                    __float_as_int(max_x));
+
+  compiler.add_node(curve.size());
+  for (int i = 0; i < curve.size(); i++)
+    compiler.add_node(make_float4(curve[i]));
+}
+
+void FloatCurveNode::compile(OSLCompiler &compiler)
+{
+  if (curve.size() == 0)
+    return;
+
+  compiler.parameter_array("ramp", curve.data(), curve.size());
+  compiler.parameter(this, "min_x");
+  compiler.parameter(this, "max_x");
+  compiler.add(this, "node_float_curve");
 }
 
 /* RGBRampNode */

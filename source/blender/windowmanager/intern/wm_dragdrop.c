@@ -46,6 +46,8 @@
 
 #include "BLO_readfile.h"
 
+#include "ED_asset.h"
+
 #include "GPU_shader.h"
 #include "GPU_state.h"
 #include "GPU_viewport.h"
@@ -65,6 +67,8 @@
 /* ****************************************************** */
 
 static ListBase dropboxes = {NULL, NULL};
+
+static void wm_drag_free_asset_data(wmDragAsset **asset_data);
 
 /* drop box maps are stored global for now */
 /* these are part of blender's UI/space specs, and not like keymaps */
@@ -176,6 +180,19 @@ wmDrag *WM_event_start_drag(
       drag->poin = poin;
       drag->flags |= WM_DRAG_FREE_DATA;
       break;
+      /* The asset-list case is special: We get multiple assets from context and attach them to the
+       * drag item. */
+    case WM_DRAG_ASSET_LIST: {
+      const AssetLibraryReference *asset_library = CTX_wm_asset_library_ref(C);
+      ListBase asset_file_links = CTX_data_collection_get(C, "selected_asset_files");
+      LISTBASE_FOREACH (const CollectionPointerLink *, link, &asset_file_links) {
+        const FileDirEntry *asset_file = link->ptr.data;
+        const AssetHandle asset_handle = {asset_file};
+        WM_drag_add_asset_list_item(drag, C, asset_library, &asset_handle);
+      }
+      BLI_freelistN(&asset_file_links);
+      break;
+    }
     default:
       drag->poin = poin;
       break;
@@ -202,10 +219,12 @@ void WM_drag_data_free(int dragtype, void *poin)
 
   /* Not too nice, could become a callback. */
   if (dragtype == WM_DRAG_ASSET) {
-    wmDragAsset *asset_drag = poin;
-    MEM_freeN((void *)asset_drag->path);
+    wmDragAsset *asset_data = poin;
+    wm_drag_free_asset_data(&asset_data);
   }
-  MEM_freeN(poin);
+  else {
+    MEM_freeN(poin);
+  }
 }
 
 void WM_drag_free(wmDrag *drag)
@@ -214,6 +233,12 @@ void WM_drag_free(wmDrag *drag)
     WM_drag_data_free(drag->type, drag->poin);
   }
   BLI_freelistN(&drag->ids);
+  LISTBASE_FOREACH_MUTABLE (wmDragAssetListItem *, asset_item, &drag->asset_items) {
+    if (asset_item->is_external) {
+      wm_drag_free_asset_data(&asset_item->asset_data.external_info);
+    }
+    BLI_freelinkN(&drag->asset_items, asset_item);
+  }
   MEM_freeN(drag);
 }
 
@@ -286,7 +311,8 @@ static void wm_drop_operator_options(bContext *C, wmDrag *drag, const wmEvent *e
   const int winsize_y = WM_window_pixels_y(win);
 
   /* for multiwin drags, we only do this if mouse inside */
-  if (event->x < 0 || event->y < 0 || event->x > winsize_x || event->y > winsize_y) {
+  if (event->xy[0] < 0 || event->xy[1] < 0 || event->xy[0] > winsize_x ||
+      event->xy[1] > winsize_y) {
     return;
   }
 
@@ -378,6 +404,27 @@ bool WM_drag_is_ID_type(const wmDrag *drag, int idcode)
   return WM_drag_get_local_ID(drag, idcode) || WM_drag_get_asset_data(drag, idcode);
 }
 
+/**
+ * \note: Does not store \a asset in any way, so it's fine to pass a temporary.
+ */
+wmDragAsset *WM_drag_create_asset_data(const AssetHandle *asset, const char *path, int import_type)
+{
+  wmDragAsset *asset_drag = MEM_mallocN(sizeof(*asset_drag), "wmDragAsset");
+
+  BLI_strncpy(asset_drag->name, ED_asset_handle_get_name(asset), sizeof(asset_drag->name));
+  asset_drag->path = path;
+  asset_drag->id_type = ED_asset_handle_get_id_type(asset);
+  asset_drag->import_type = import_type;
+
+  return asset_drag;
+}
+
+static void wm_drag_free_asset_data(wmDragAsset **asset_data)
+{
+  MEM_freeN((char *)(*asset_data)->path);
+  MEM_SAFE_FREE(*asset_data);
+}
+
 wmDragAsset *WM_drag_get_asset_data(const wmDrag *drag, int idcode)
 {
   if (drag->type != WM_DRAG_ASSET) {
@@ -419,7 +466,8 @@ static ID *wm_drag_asset_id_import(wmDragAsset *asset_drag)
                                       asset_drag->path,
                                       idtype,
                                       name,
-                                      BLO_LIBLINK_APPEND_RECURSIVE | FILE_ACTIVE_COLLECTION);
+                                      BLO_LIBLINK_APPEND_RECURSIVE | FILE_ACTIVE_COLLECTION |
+                                          BLO_LIBLINK_APPEND_ASSET_DATA_CLEAR);
     case FILE_ASSET_IMPORT_APPEND_REUSE:
       return WM_file_append_datablock(G_MAIN,
                                       scene,
@@ -429,6 +477,7 @@ static ID *wm_drag_asset_id_import(wmDragAsset *asset_drag)
                                       idtype,
                                       name,
                                       BLO_LIBLINK_APPEND_RECURSIVE | FILE_ACTIVE_COLLECTION |
+                                          BLO_LIBLINK_APPEND_ASSET_DATA_CLEAR |
                                           BLO_LIBLINK_APPEND_LOCAL_ID_REUSE);
   }
 
@@ -493,6 +542,48 @@ void WM_drag_free_imported_drag_ID(struct Main *bmain, wmDrag *drag, wmDropBox *
   if (id) {
     BKE_id_delete(bmain, id);
   }
+}
+
+/**
+ * \note: Does not store \a asset in any way, so it's fine to pass a temporary.
+ */
+void WM_drag_add_asset_list_item(
+    wmDrag *drag,
+    /* Context only needed for the hack in #ED_asset_handle_get_full_library_path(). */
+    const bContext *C,
+    const AssetLibraryReference *asset_library_ref,
+    const AssetHandle *asset)
+{
+  if (drag->type != WM_DRAG_ASSET_LIST) {
+    return;
+  }
+
+  /* No guarantee that the same asset isn't added twice. */
+
+  /* Add to list. */
+  wmDragAssetListItem *drag_asset = MEM_callocN(sizeof(*drag_asset), __func__);
+  ID *local_id = ED_asset_handle_get_local_id(asset);
+  if (local_id) {
+    drag_asset->is_external = false;
+    drag_asset->asset_data.local_id = local_id;
+  }
+  else {
+    char asset_blend_path[FILE_MAX_LIBEXTRA];
+    ED_asset_handle_get_full_library_path(C, asset_library_ref, asset, asset_blend_path);
+    drag_asset->is_external = true;
+    drag_asset->asset_data.external_info = WM_drag_create_asset_data(
+        asset, BLI_strdup(asset_blend_path), FILE_ASSET_IMPORT_APPEND);
+  }
+  BLI_addtail(&drag->asset_items, drag_asset);
+}
+
+const ListBase *WM_drag_asset_list_get(const wmDrag *drag)
+{
+  if (drag->type != WM_DRAG_ASSET_LIST) {
+    return NULL;
+  }
+
+  return &drag->asset_items;
 }
 
 /* ************** draw ***************** */
@@ -562,8 +653,8 @@ void wm_drags_draw(bContext *C, wmWindow *win, rcti *rect)
   wmWindowManager *wm = CTX_wm_manager(C);
   const int winsize_y = WM_window_pixels_y(win);
 
-  int cursorx = win->eventstate->x;
-  int cursory = win->eventstate->y;
+  int cursorx = win->eventstate->xy[0];
+  int cursory = win->eventstate->xy[1];
   if (rect) {
     rect->xmin = rect->xmax = cursorx;
     rect->ymin = rect->ymax = cursory;

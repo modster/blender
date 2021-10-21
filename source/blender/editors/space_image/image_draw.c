@@ -112,13 +112,6 @@ static void draw_render_info(
       GPU_matrix_translate_2f(x, y);
       GPU_matrix_scale_2f(zoomx, zoomy);
 
-      RenderData *rd = RE_engine_get_render_data(re);
-      if (rd->mode & R_BORDER) {
-        /* TODO: round or floor instead of casting to int */
-        GPU_matrix_translate_2f((int)(-rd->border.xmin * rd->xsch * rd->size * 0.01f),
-                                (int)(-rd->border.ymin * rd->ysch * rd->size * 0.01f));
-      }
-
       uint pos = GPU_vertformat_attr_add(
           immVertexFormat(), "pos", GPU_COMP_F32, 2, GPU_FETCH_FLOAT);
       immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
@@ -507,7 +500,7 @@ void draw_image_main_helpers(const bContext *C, ARegion *region)
   }
 }
 
-bool ED_space_image_show_cache(SpaceImage *sima)
+bool ED_space_image_show_cache(const SpaceImage *sima)
 {
   Image *image = ED_space_image(sima);
   Mask *mask = NULL;
@@ -521,6 +514,17 @@ bool ED_space_image_show_cache(SpaceImage *sima)
     return ELEM(image->source, IMA_SRC_SEQUENCE, IMA_SRC_MOVIE);
   }
   return true;
+}
+
+bool ED_space_image_show_cache_and_mval_over(const SpaceImage *sima,
+                                             ARegion *region,
+                                             const int mval[2])
+{
+  const rcti *rect_visible = ED_region_visible_rect(region);
+  if (mval[1] > rect_visible->ymin + (16 * UI_DPI_FAC)) {
+    return false;
+  }
+  return ED_space_image_show_cache(sima);
 }
 
 void draw_image_cache(const bContext *C, ARegion *region)

@@ -634,7 +634,7 @@ static void pose_slide_apply_quat(tPoseSlideOp *pso, tPChanFCurveLink *pfl)
 
       interp_qt_qtqt(quat_final, quat_prev, quat_next, ED_slider_factor_get(pso->slider));
     }
-    else if (pso->mode == POSESLIDE_PUSH || pso->mode == POSESLIDE_RELAX) {
+    else if (ELEM(pso->mode, POSESLIDE_PUSH, POSESLIDE_RELAX)) {
       float quat_breakdown[4];
       float quat_curr[4];
 
@@ -914,7 +914,7 @@ static void pose_slide_draw_status(bContext *C, tPoseSlideOp *pso)
       strcpy(mode_str, TIP_("Breakdown"));
       break;
     case POSESLIDE_BLEND:
-      strcpy(mode_str, TIP_("Blend To Neighbour"));
+      strcpy(mode_str, TIP_("Blend To Neighbor"));
       break;
 
     default:
@@ -1042,7 +1042,7 @@ static int pose_slide_invoke_common(bContext *C, wmOperator *op, const wmEvent *
     const ActKeyColumn *nk = ED_keylist_find_next(pso->keylist, cframe);
 
     /* New set the frames. */
-    /* Prev frame. */
+    /* Previous frame. */
     pso->prevFrame = (pk) ? (pk->cfra) : (pso->cframe - 1);
     RNA_int_set(op->ptr, "prev_frame", pso->prevFrame);
     /* Next frame. */
@@ -1051,7 +1051,7 @@ static int pose_slide_invoke_common(bContext *C, wmOperator *op, const wmEvent *
   }
   else {
     /* Current frame itself is a keyframe, so just take keyframes on either side. */
-    /* Prev frame. */
+    /* Previous frame. */
     pso->prevFrame = (ak->prev) ? (ak->prev->cfra) : (pso->cframe - 1);
     RNA_int_set(op->ptr, "prev_frame", pso->prevFrame);
     /* Next frame. */
@@ -1709,7 +1709,7 @@ void POSE_OT_breakdown(wmOperatorType *ot)
 }
 
 /* ........................ */
-static int pose_slide_blend_to_neighbours_invoke(bContext *C, wmOperator *op, const wmEvent *event)
+static int pose_slide_blend_to_neighbors_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
   /* Initialize data. */
   if (pose_slide_init(C, op, POSESLIDE_BLEND) == 0) {
@@ -1721,7 +1721,7 @@ static int pose_slide_blend_to_neighbours_invoke(bContext *C, wmOperator *op, co
   return pose_slide_invoke_common(C, op, event);
 }
 
-static int pose_slide_blend_to_neighbours_exec(bContext *C, wmOperator *op)
+static int pose_slide_blend_to_neighbors_exec(bContext *C, wmOperator *op)
 {
   tPoseSlideOp *pso;
 
@@ -1737,16 +1737,16 @@ static int pose_slide_blend_to_neighbours_exec(bContext *C, wmOperator *op)
   return pose_slide_exec_common(C, op, pso);
 }
 
-void POSE_OT_blend_to_neighbours(wmOperatorType *ot)
+void POSE_OT_blend_to_neighbors(wmOperatorType *ot)
 {
   /* Identifiers. */
-  ot->name = "Blend To Neighbour";
-  ot->idname = "POSE_OT_blend_to_neighbour";
+  ot->name = "Blend To Neighbor";
+  ot->idname = "POSE_OT_blend_to_neighbor";
   ot->description = "Blend from current position to previous or next keyframe";
 
   /* Callbacks. */
-  ot->exec = pose_slide_blend_to_neighbours_exec;
-  ot->invoke = pose_slide_blend_to_neighbours_invoke;
+  ot->exec = pose_slide_blend_to_neighbors_exec;
+  ot->invoke = pose_slide_blend_to_neighbors_invoke;
   ot->modal = pose_slide_modal;
   ot->cancel = pose_slide_cancel;
   ot->poll = ED_operator_posemode;

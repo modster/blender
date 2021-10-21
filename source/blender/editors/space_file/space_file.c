@@ -303,15 +303,6 @@ static void file_ensure_valid_region_state(bContext *C,
   }
 }
 
-/**
- * Tag the space to recreate the file-list.
- */
-static void file_tag_reset_list(ScrArea *area, SpaceFile *sfile)
-{
-  filelist_tag_force_reset(sfile->files);
-  ED_area_tag_refresh(area);
-}
-
 static void file_refresh(const bContext *C, ScrArea *area)
 {
   wmWindowManager *wm = CTX_wm_manager(C);
@@ -326,7 +317,7 @@ static void file_refresh(const bContext *C, ScrArea *area)
 
   if (sfile->files && (sfile->tags & FILE_TAG_REBUILD_MAIN_FILES) &&
       filelist_needs_reset_on_main_changes(sfile->files)) {
-    filelist_tag_force_reset(sfile->files);
+    filelist_tag_force_reset_mainfiles(sfile->files);
   }
   sfile->tags &= ~FILE_TAG_REBUILD_MAIN_FILES;
 
@@ -369,7 +360,7 @@ static void file_refresh(const bContext *C, ScrArea *area)
 
   if (filelist_needs_force_reset(sfile->files)) {
     filelist_readjob_stop(sfile->files, wm);
-    filelist_clear(sfile->files);
+    filelist_clear_from_reset_tag(sfile->files);
   }
 
   if (filelist_needs_reading(sfile->files)) {
@@ -431,9 +422,8 @@ static void file_on_reload_callback_call(SpaceFile *sfile)
 static void file_reset_filelist_showing_main_data(ScrArea *area, SpaceFile *sfile)
 {
   if (sfile->files && filelist_needs_reset_on_main_changes(sfile->files)) {
-    /* Full refresh of the file list if local asset data was changed. Refreshing this view
-     * is cheap and users expect this to be updated immediately. */
-    file_tag_reset_list(area, sfile);
+    filelist_tag_force_reset_mainfiles(sfile->files);
+    ED_area_tag_refresh(area);
   }
 }
 
@@ -664,7 +654,7 @@ static void file_main_region_draw(const bContext *C, ARegion *region)
   /* on first read, find active file */
   if (params->highlight_file == -1) {
     wmEvent *event = CTX_wm_window(C)->eventstate;
-    file_highlight_set(sfile, region, event->x, event->y);
+    file_highlight_set(sfile, region, event->xy[0], event->xy[1]);
   }
 
   if (!file_draw_hint_if_invalid(sfile, region)) {
@@ -894,6 +884,7 @@ const char *file_context_dir[] = {
     "active_file",
     "selected_files",
     "asset_library_ref",
+    "selected_asset_files",
     "id",
     NULL,
 };
@@ -949,6 +940,24 @@ static int /*eContextResult*/ file_context(const bContext *C,
 
     CTX_data_pointer_set(
         result, &screen->id, &RNA_AssetLibraryReference, &asset_params->asset_library_ref);
+    return CTX_RESULT_OK;
+  }
+  /** TODO temporary AssetHandle design: For now this returns the file entry. Would be better if it
+   * was `"selected_assets"` and returned the assets (e.g. as `AssetHandle`) directly. See comment
+   * for #AssetHandle for more info. */
+  if (CTX_data_equals(member, "selected_asset_files")) {
+    const int num_files_filtered = filelist_files_ensure(sfile->files);
+
+    for (int file_index = 0; file_index < num_files_filtered; file_index++) {
+      if (filelist_entry_is_selected(sfile->files, file_index)) {
+        FileDirEntry *entry = filelist_file(sfile->files, file_index);
+        if (entry->asset_data) {
+          CTX_data_list_add(result, &screen->id, &RNA_FileSelectEntry, entry);
+        }
+      }
+    }
+
+    CTX_data_type_set(result, CTX_DATA_TYPE_COLLECTION);
     return CTX_RESULT_OK;
   }
   if (CTX_data_equals(member, "id")) {

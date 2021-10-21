@@ -82,6 +82,7 @@ struct wmWindow;
 
 typedef struct uiBlock uiBlock;
 typedef struct uiBut uiBut;
+typedef struct uiButExtraOpIcon uiButExtraOpIcon;
 typedef struct uiLayout uiLayout;
 typedef struct uiPopupBlockHandle uiPopupBlockHandle;
 /* C handle for C++ #ui::AbstractTreeView type. */
@@ -251,7 +252,8 @@ enum {
 
 #define UI_PANEL_CATEGORY_MARGIN_WIDTH (U.widget_unit * 1.0f)
 
-#define UI_PANEL_BOX_STYLE_MARGIN (U.widget_unit * 0.2f)
+#define UI_PANEL_MARGIN_X (U.widget_unit * 0.4f)
+#define UI_PANEL_MARGIN_Y (U.widget_unit * 0.1f)
 
 /* but->drawflag - these flags should only affect how the button is drawn. */
 /* NOTE: currently, these flags *are not passed* to the widget's state() or draw() functions
@@ -1432,6 +1434,8 @@ typedef struct uiStringInfo {
  *       Will fill them with translated strings, when possible.
  *       Strings in uiStringInfo must be MEM_freeN'ed by caller. */
 void UI_but_string_info_get(struct bContext *C, uiBut *but, ...) ATTR_SENTINEL(0);
+void UI_but_extra_icon_string_info_get(struct bContext *C, uiButExtraOpIcon *extra_icon, ...)
+    ATTR_SENTINEL(0);
 
 /* Edit i18n stuff. */
 /* Name of the main py op from i18n addon. */
@@ -1724,6 +1728,8 @@ struct PointerRNA *UI_but_extra_operator_icon_add(uiBut *but,
                                                   const char *opname,
                                                   short opcontext,
                                                   int icon);
+struct wmOperatorType *UI_but_extra_operator_icon_optype_get(struct uiButExtraOpIcon *extra_icon);
+struct PointerRNA *UI_but_extra_operator_icon_opptr_get(struct uiButExtraOpIcon *extra_icon);
 
 /* Autocomplete
  *
@@ -2593,6 +2599,7 @@ typedef struct uiDragColorHandle {
 
 void ED_operatortypes_ui(void);
 void ED_keymap_ui(struct wmKeyConfig *keyconf);
+void ED_dropboxes_ui(void);
 void ED_uilisttypes_ui(void);
 
 void UI_drop_color_copy(struct wmDrag *drag, struct wmDropBox *drop);
@@ -2712,6 +2719,11 @@ struct ARegion *UI_tooltip_create_from_button(struct bContext *C,
                                               struct ARegion *butregion,
                                               uiBut *but,
                                               bool is_label);
+struct ARegion *UI_tooltip_create_from_button_or_extra_icon(struct bContext *C,
+                                                            struct ARegion *butregion,
+                                                            uiBut *but,
+                                                            uiButExtraOpIcon *extra_icon,
+                                                            bool is_label);
 struct ARegion *UI_tooltip_create_from_gizmo(struct bContext *C, struct wmGizmo *gz);
 void UI_tooltip_free(struct bContext *C, struct bScreen *screen, struct ARegion *region);
 
@@ -2763,6 +2775,22 @@ void UI_interface_tag_script_reload(void);
 
 bool UI_tree_view_item_is_active(const uiTreeViewItemHandle *item);
 bool UI_tree_view_item_matches(const uiTreeViewItemHandle *a, const uiTreeViewItemHandle *b);
+bool UI_tree_view_item_can_drop(const uiTreeViewItemHandle *item_, const struct wmDrag *drag);
+bool UI_tree_view_item_drop_handle(uiTreeViewItemHandle *item_, const struct ListBase *drags);
+char *UI_tree_view_item_drop_tooltip(const uiTreeViewItemHandle *item,
+                                     const struct bContext *C,
+                                     const struct wmDrag *drag,
+                                     const struct wmEvent *event);
+bool UI_tree_view_item_can_rename(const uiTreeViewItemHandle *item_handle);
+void UI_tree_view_item_begin_rename(uiTreeViewItemHandle *item_handle);
+
+void UI_tree_view_item_context_menu_build(struct bContext *C,
+                                          const uiTreeViewItemHandle *item,
+                                          uiLayout *column);
+
+uiTreeViewItemHandle *UI_block_tree_view_find_item_at(const struct ARegion *region,
+                                                      const int xy[2]) ATTR_NONNULL(1, 2);
+uiTreeViewItemHandle *UI_block_tree_view_find_active_item(const struct ARegion *region);
 
 #ifdef __cplusplus
 }

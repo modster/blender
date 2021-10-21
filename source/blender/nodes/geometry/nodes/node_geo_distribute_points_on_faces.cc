@@ -43,6 +43,7 @@ namespace blender::nodes {
 static void geo_node_point_distribute_points_on_faces_declare(NodeDeclarationBuilder &b)
 {
   b.add_input<decl::Geometry>("Geometry");
+  b.add_input<decl::Bool>("Selection").default_value(true).hide_value().supports_field();
   b.add_input<decl::Float>("Distance Min").min(0.0f).subtype(PROP_DISTANCE);
   b.add_input<decl::Float>("Density Max").default_value(10.0f).min(0.0f);
   b.add_input<decl::Float>("Density").default_value(10.0f).supports_field();
@@ -53,12 +54,10 @@ static void geo_node_point_distribute_points_on_faces_declare(NodeDeclarationBui
       .subtype(PROP_FACTOR)
       .supports_field();
   b.add_input<decl::Int>("Seed");
-  b.add_input<decl::Bool>("Selection").default_value(true).hide_value().supports_field();
 
   b.add_output<decl::Geometry>("Points");
   b.add_output<decl::Vector>("Normal").field_source();
   b.add_output<decl::Vector>("Rotation").subtype(PROP_EULER).field_source();
-  b.add_output<decl::Int>("Stable ID").field_source();
 }
 
 static void geo_node_point_distribute_points_on_faces_layout(uiLayout *layout,
@@ -70,7 +69,7 @@ static void geo_node_point_distribute_points_on_faces_layout(uiLayout *layout,
 
 static void node_point_distribute_points_on_faces_update(bNodeTree *UNUSED(ntree), bNode *node)
 {
-  bNodeSocket *sock_distance_min = (bNodeSocket *)BLI_findlink(&node->inputs, 1);
+  bNodeSocket *sock_distance_min = (bNodeSocket *)BLI_findlink(&node->inputs, 2);
   bNodeSocket *sock_density_max = (bNodeSocket *)sock_distance_min->next;
   bNodeSocket *sock_density = sock_density_max->next;
   bNodeSocket *sock_density_factor = sock_density->next;
@@ -255,18 +254,26 @@ BLI_NOINLINE static void interpolate_attribute(const Mesh &mesh,
 {
   switch (source_domain) {
     case ATTR_DOMAIN_POINT: {
-      bke::mesh_surface_sample::sample_point_attribute(
-          mesh, looptri_indices, bary_coords, source_data, output_data);
+      bke::mesh_surface_sample::sample_point_attribute(mesh,
+                                                       looptri_indices,
+                                                       bary_coords,
+                                                       source_data,
+                                                       IndexMask(output_data.size()),
+                                                       output_data);
       break;
     }
     case ATTR_DOMAIN_CORNER: {
-      bke::mesh_surface_sample::sample_corner_attribute(
-          mesh, looptri_indices, bary_coords, source_data, output_data);
+      bke::mesh_surface_sample::sample_corner_attribute(mesh,
+                                                        looptri_indices,
+                                                        bary_coords,
+                                                        source_data,
+                                                        IndexMask(output_data.size()),
+                                                        output_data);
       break;
     }
     case ATTR_DOMAIN_FACE: {
       bke::mesh_surface_sample::sample_face_attribute(
-          mesh, looptri_indices, source_data, output_data);
+          mesh, looptri_indices, source_data, IndexMask(output_data.size()), output_data);
       break;
     }
     default: {
@@ -321,7 +328,6 @@ namespace {
 struct AttributeOutputs {
   StrongAnonymousAttributeID normal_id;
   StrongAnonymousAttributeID rotation_id;
-  StrongAnonymousAttributeID stable_id_id;
 };
 }  // namespace
 
@@ -331,28 +337,25 @@ BLI_NOINLINE static void compute_attribute_outputs(const MeshComponent &mesh_com
                                                    const Span<int> looptri_indices,
                                                    const AttributeOutputs &attribute_outputs)
 {
-  std::optional<OutputAttribute_Typed<int>> id_attribute;
-  std::optional<OutputAttribute_Typed<float3>> normal_attribute;
-  std::optional<OutputAttribute_Typed<float3>> rotation_attribute;
+  OutputAttribute_Typed<int> id_attribute = point_component.attribute_try_get_for_output_only<int>(
+      "id", ATTR_DOMAIN_POINT);
+  MutableSpan<int> ids = id_attribute.as_span();
 
-  MutableSpan<int> ids;
+  OutputAttribute_Typed<float3> normal_attribute;
+  OutputAttribute_Typed<float3> rotation_attribute;
+
   MutableSpan<float3> normals;
   MutableSpan<float3> rotations;
 
-  if (attribute_outputs.stable_id_id) {
-    id_attribute.emplace(point_component.attribute_try_get_for_output_only<int>(
-        attribute_outputs.stable_id_id.get(), ATTR_DOMAIN_POINT));
-    ids = id_attribute->as_span();
-  }
   if (attribute_outputs.normal_id) {
-    normal_attribute.emplace(point_component.attribute_try_get_for_output_only<float3>(
-        attribute_outputs.normal_id.get(), ATTR_DOMAIN_POINT));
-    normals = normal_attribute->as_span();
+    normal_attribute = point_component.attribute_try_get_for_output_only<float3>(
+        attribute_outputs.normal_id.get(), ATTR_DOMAIN_POINT);
+    normals = normal_attribute.as_span();
   }
   if (attribute_outputs.rotation_id) {
-    rotation_attribute.emplace(point_component.attribute_try_get_for_output_only<float3>(
-        attribute_outputs.rotation_id.get(), ATTR_DOMAIN_POINT));
-    rotations = rotation_attribute->as_span();
+    rotation_attribute = point_component.attribute_try_get_for_output_only<float3>(
+        attribute_outputs.rotation_id.get(), ATTR_DOMAIN_POINT);
+    rotations = rotation_attribute.as_span();
   }
 
   const Mesh &mesh = *mesh_component.get_for_read();
@@ -371,9 +374,8 @@ BLI_NOINLINE static void compute_attribute_outputs(const MeshComponent &mesh_com
     const float3 v1_pos = float3(mesh.mvert[v1_index].co);
     const float3 v2_pos = float3(mesh.mvert[v2_index].co);
 
-    if (!ids.is_empty()) {
-      ids[i] = noise::hash(noise::hash_float(bary_coord), looptri_index);
-    }
+    ids[i] = noise::hash(noise::hash_float(bary_coord), looptri_index);
+
     float3 normal;
     if (!normals.is_empty() || !rotations.is_empty()) {
       normal_tri_v3(normal, v0_pos, v1_pos, v2_pos);
@@ -386,14 +388,13 @@ BLI_NOINLINE static void compute_attribute_outputs(const MeshComponent &mesh_com
     }
   }
 
-  if (id_attribute) {
-    id_attribute->save();
-  }
+  id_attribute.save();
+
   if (normal_attribute) {
-    normal_attribute->save();
+    normal_attribute.save();
   }
   if (rotation_attribute) {
-    rotation_attribute->save();
+    rotation_attribute.save();
   }
 }
 
@@ -504,6 +505,10 @@ static void point_distribution_calculate(GeometrySet &geometry_set,
     }
   }
 
+  if (positions.is_empty()) {
+    return;
+  }
+
   PointCloud *pointcloud = BKE_pointcloud_new_nomain(positions.size());
   memcpy(pointcloud->co, positions.data(), sizeof(float3) * positions.size());
   uninitialized_fill_n(pointcloud->radius, pointcloud->totpoint, 0.05f);
@@ -543,9 +548,6 @@ static void geo_node_point_distribute_points_on_faces_exec(GeoNodeExecParams par
   if (params.output_is_required("Rotation")) {
     attribute_outputs.rotation_id = StrongAnonymousAttributeID("rotation");
   }
-  if (params.output_is_required("Stable ID")) {
-    attribute_outputs.stable_id_id = StrongAnonymousAttributeID("stable id");
-  }
 
   geometry_set.modify_geometry_sets([&](GeometrySet &geometry_set) {
     point_distribution_calculate(
@@ -566,11 +568,6 @@ static void geo_node_point_distribute_points_on_faces_exec(GeoNodeExecParams par
     params.set_output(
         "Rotation",
         AnonymousAttributeFieldInput::Create<float3>(std::move(attribute_outputs.rotation_id)));
-  }
-  if (attribute_outputs.stable_id_id) {
-    params.set_output(
-        "Stable ID",
-        AnonymousAttributeFieldInput::Create<int>(std::move(attribute_outputs.stable_id_id)));
   }
 }
 

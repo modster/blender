@@ -86,11 +86,11 @@ ccl_device_inline bool cylinder_intersect(const float3 cylinder_start,
                                           const float3 cylinder_end,
                                           const float cylinder_radius,
                                           const float3 ray_dir,
-                                          float2 *t_o,
-                                          float *u0_o,
-                                          float3 *Ng0_o,
-                                          float *u1_o,
-                                          float3 *Ng1_o)
+                                          ccl_private float2 *t_o,
+                                          ccl_private float *u0_o,
+                                          ccl_private float3 *Ng0_o,
+                                          ccl_private float *u1_o,
+                                          ccl_private float3 *Ng1_o)
 {
   /* Calculate quadratic equation to solve. */
   const float rl = 1.0f / len(cylinder_end - cylinder_start);
@@ -169,13 +169,13 @@ ccl_device_inline float2 half_plane_intersect(const float3 P, const float3 N, co
 }
 
 ccl_device bool curve_intersect_iterative(const float3 ray_dir,
-                                          float *ray_tfar,
+                                          ccl_private float *ray_tfar,
                                           const float dt,
                                           const float4 curve[4],
                                           float u,
                                           float t,
                                           const bool use_backfacing,
-                                          Intersection *isect)
+                                          ccl_private Intersection *isect)
 {
   const float length_ray_dir = len(ray_dir);
 
@@ -265,7 +265,7 @@ ccl_device bool curve_intersect_recursive(const float3 ray_orig,
                                           const float3 ray_dir,
                                           float ray_tfar,
                                           float4 curve[4],
-                                          Intersection *isect)
+                                          ccl_private Intersection *isect)
 {
   /* Move ray closer to make intersection stable. */
   const float3 center = float4_to_float3(0.25f * (curve[0] + curve[1] + curve[2] + curve[3]));
@@ -474,9 +474,9 @@ ccl_device_inline bool ribbon_intersect_quad(const float ray_tfar,
                                              const float3 quad_v1,
                                              const float3 quad_v2,
                                              const float3 quad_v3,
-                                             float *u_o,
-                                             float *v_o,
-                                             float *t_o)
+                                             ccl_private float *u_o,
+                                             ccl_private float *v_o,
+                                             ccl_private float *t_o)
 {
   /* Calculate vertices relative to ray origin? */
   const float3 O = make_float3(0.0f, 0.0f, 0.0f);
@@ -550,7 +550,7 @@ ccl_device_inline bool ribbon_intersect(const float3 ray_org,
                                         float ray_tfar,
                                         const int N,
                                         float4 curve[4],
-                                        Intersection *isect)
+                                        ccl_private Intersection *isect)
 {
   /* Transform control points into ray space. */
   float3 ray_space[3];
@@ -625,38 +625,24 @@ ccl_device_inline bool ribbon_intersect(const float3 ray_org,
   return false;
 }
 
-ccl_device_forceinline bool curve_intersect(const KernelGlobals *kg,
-                                            Intersection *isect,
+ccl_device_forceinline bool curve_intersect(KernelGlobals kg,
+                                            ccl_private Intersection *isect,
                                             const float3 P,
                                             const float3 dir,
                                             const float tmax,
-                                            uint visibility,
                                             int object,
-                                            int curveAddr,
+                                            int prim,
                                             float time,
                                             int type)
 {
   const bool is_motion = (type & PRIMITIVE_ALL_MOTION);
 
-#  ifndef __KERNEL_OPTIX__ /* See OptiX motion flag OPTIX_MOTION_FLAG_[START|END]_VANISH */
-  if (is_motion && kernel_data.bvh.use_bvh_steps) {
-    const float2 prim_time = kernel_tex_fetch(__prim_time, curveAddr);
-    if (time < prim_time.x || time > prim_time.y) {
-      return false;
-    }
-  }
-#  endif
+  KernelCurve kcurve = kernel_tex_fetch(__curves, prim);
 
-  int segment = PRIMITIVE_UNPACK_SEGMENT(type);
-  int prim = kernel_tex_fetch(__prim_index, curveAddr);
-
-  float4 v00 = kernel_tex_fetch(__curves, prim);
-
-  int k0 = __float_as_int(v00.x) + segment;
+  int k0 = kcurve.first_key + PRIMITIVE_UNPACK_SEGMENT(type);
   int k1 = k0 + 1;
-
-  int ka = max(k0 - 1, __float_as_int(v00.x));
-  int kb = min(k1 + 1, __float_as_int(v00.x) + __float_as_int(v00.y) - 1);
+  int ka = max(k0 - 1, kcurve.first_key);
+  int kb = min(k1 + 1, kcurve.first_key + kcurve.num_keys - 1);
 
   float4 curve[4];
   if (!is_motion) {
@@ -666,21 +652,14 @@ ccl_device_forceinline bool curve_intersect(const KernelGlobals *kg,
     curve[3] = kernel_tex_fetch(__curve_keys, kb);
   }
   else {
-    int fobject = (object == OBJECT_NONE) ? kernel_tex_fetch(__prim_object, curveAddr) : object;
-    motion_curve_keys(kg, fobject, prim, time, ka, k0, k1, kb, curve);
+    motion_curve_keys(kg, object, prim, time, ka, k0, k1, kb, curve);
   }
-
-#  ifdef __VISIBILITY_FLAG__
-  if (!(kernel_tex_fetch(__prim_visibility, curveAddr) & visibility)) {
-    return false;
-  }
-#  endif
 
   if (type & (PRIMITIVE_CURVE_RIBBON | PRIMITIVE_MOTION_CURVE_RIBBON)) {
     /* todo: adaptive number of subdivisions could help performance here. */
     const int subdivisions = kernel_data.bvh.curve_subdivisions;
     if (ribbon_intersect(P, dir, tmax, subdivisions, curve, isect)) {
-      isect->prim = curveAddr;
+      isect->prim = prim;
       isect->object = object;
       isect->type = type;
       return true;
@@ -690,7 +669,7 @@ ccl_device_forceinline bool curve_intersect(const KernelGlobals *kg,
   }
   else {
     if (curve_intersect_recursive(P, dir, tmax, curve, isect)) {
-      isect->prim = curveAddr;
+      isect->prim = prim;
       isect->object = object;
       isect->type = type;
       return true;
@@ -700,15 +679,15 @@ ccl_device_forceinline bool curve_intersect(const KernelGlobals *kg,
   }
 }
 
-ccl_device_inline void curve_shader_setup(const KernelGlobals *kg,
-                                          ShaderData *sd,
+ccl_device_inline void curve_shader_setup(KernelGlobals kg,
+                                          ccl_private ShaderData *sd,
                                           float3 P,
                                           float3 D,
                                           float t,
                                           const int isect_object,
                                           const int isect_prim)
 {
-  if (isect_object != OBJECT_NONE) {
+  if (!(sd->object_flag & SD_OBJECT_TRANSFORM_APPLIED)) {
     const Transform tfm = object_get_inverse_transform(kg, sd);
 
     P = transform_point(&tfm, P);
@@ -716,14 +695,12 @@ ccl_device_inline void curve_shader_setup(const KernelGlobals *kg,
     D = safe_normalize_len(D, &t);
   }
 
-  int prim = kernel_tex_fetch(__prim_index, isect_prim);
-  float4 v00 = kernel_tex_fetch(__curves, prim);
+  KernelCurve kcurve = kernel_tex_fetch(__curves, isect_prim);
 
-  int k0 = __float_as_int(v00.x) + PRIMITIVE_UNPACK_SEGMENT(sd->type);
+  int k0 = kcurve.first_key + PRIMITIVE_UNPACK_SEGMENT(sd->type);
   int k1 = k0 + 1;
-
-  int ka = max(k0 - 1, __float_as_int(v00.x));
-  int kb = min(k1 + 1, __float_as_int(v00.x) + __float_as_int(v00.y) - 1);
+  int ka = max(k0 - 1, kcurve.first_key);
+  int kb = min(k1 + 1, kcurve.first_key + kcurve.num_keys - 1);
 
   float4 P_curve[4];
 
@@ -780,15 +757,13 @@ ccl_device_inline void curve_shader_setup(const KernelGlobals *kg,
   sd->dPdv = cross(dPdu, sd->Ng);
 #  endif
 
-  if (isect_object != OBJECT_NONE) {
+  if (!(sd->object_flag & SD_OBJECT_TRANSFORM_APPLIED)) {
     const Transform tfm = object_get_transform(kg, sd);
     P = transform_point(&tfm, P);
   }
 
   sd->P = P;
-
-  float4 curvedata = kernel_tex_fetch(__curves, sd->prim);
-  sd->shader = __float_as_int(curvedata.z);
+  sd->shader = kernel_tex_fetch(__curves, sd->prim).shader_id;
 }
 
 #endif

@@ -51,8 +51,8 @@ ccl_gpu_kernel(GPU_KERNEL_BLOCK_NUM_THREADS, GPU_KERNEL_MAX_REGISTERS)
   const int state = ccl_gpu_global_id_x();
 
   if (state < num_states) {
-    INTEGRATOR_STATE_WRITE(path, queued_kernel) = 0;
-    INTEGRATOR_STATE_WRITE(shadow_path, queued_kernel) = 0;
+    INTEGRATOR_STATE_WRITE(state, path, queued_kernel) = 0;
+    INTEGRATOR_STATE_WRITE(state, shadow_path, queued_kernel) = 0;
   }
 }
 
@@ -244,7 +244,7 @@ extern "C" __global__ void __launch_bounds__(GPU_PARALLEL_ACTIVE_INDEX_DEFAULT_B
 {
   gpu_parallel_active_index_array<GPU_PARALLEL_ACTIVE_INDEX_DEFAULT_BLOCK_SIZE>(
       num_states, indices, num_indices, [kernel](const int state) {
-        return (INTEGRATOR_STATE(path, queued_kernel) == kernel);
+        return (INTEGRATOR_STATE(state, path, queued_kernel) == kernel);
       });
 }
 
@@ -256,7 +256,7 @@ extern "C" __global__ void __launch_bounds__(GPU_PARALLEL_ACTIVE_INDEX_DEFAULT_B
 {
   gpu_parallel_active_index_array<GPU_PARALLEL_ACTIVE_INDEX_DEFAULT_BLOCK_SIZE>(
       num_states, indices, num_indices, [kernel](const int state) {
-        return (INTEGRATOR_STATE(shadow_path, queued_kernel) == kernel);
+        return (INTEGRATOR_STATE(state, shadow_path, queued_kernel) == kernel);
       });
 }
 
@@ -265,8 +265,7 @@ extern "C" __global__ void __launch_bounds__(GPU_PARALLEL_ACTIVE_INDEX_DEFAULT_B
 {
   gpu_parallel_active_index_array<GPU_PARALLEL_ACTIVE_INDEX_DEFAULT_BLOCK_SIZE>(
       num_states, indices, num_indices, [](const int state) {
-        return (INTEGRATOR_STATE(path, queued_kernel) != 0) ||
-               (INTEGRATOR_STATE(shadow_path, queued_kernel) != 0);
+        return (INTEGRATOR_STATE(state, path, queued_kernel) != 0);
       });
 }
 
@@ -278,19 +277,29 @@ extern "C" __global__ void __launch_bounds__(GPU_PARALLEL_ACTIVE_INDEX_DEFAULT_B
 {
   gpu_parallel_active_index_array<GPU_PARALLEL_ACTIVE_INDEX_DEFAULT_BLOCK_SIZE>(
       num_states, indices + indices_offset, num_indices, [](const int state) {
-        return (INTEGRATOR_STATE(path, queued_kernel) == 0) &&
-               (INTEGRATOR_STATE(shadow_path, queued_kernel) == 0);
+        return (INTEGRATOR_STATE(state, path, queued_kernel) == 0);
       });
 }
 
 extern "C" __global__ void __launch_bounds__(GPU_PARALLEL_SORTED_INDEX_DEFAULT_BLOCK_SIZE)
-    kernel_gpu_integrator_sorted_paths_array(
-        int num_states, int *indices, int *num_indices, int *key_prefix_sum, int kernel)
+    kernel_gpu_integrator_sorted_paths_array(int num_states,
+                                             int num_states_limit,
+                                             int *indices,
+                                             int *num_indices,
+                                             int *key_counter,
+                                             int *key_prefix_sum,
+                                             int kernel)
 {
   gpu_parallel_sorted_index_array<GPU_PARALLEL_SORTED_INDEX_DEFAULT_BLOCK_SIZE>(
-      num_states, indices, num_indices, key_prefix_sum, [kernel](const int state) {
-        return (INTEGRATOR_STATE(path, queued_kernel) == kernel) ?
-                   INTEGRATOR_STATE(path, shader_sort_key) :
+      num_states,
+      num_states_limit,
+      indices,
+      num_indices,
+      key_counter,
+      key_prefix_sum,
+      [kernel](const int state) {
+        return (INTEGRATOR_STATE(state, path, queued_kernel) == kernel) ?
+                   INTEGRATOR_STATE(state, path, shader_sort_key) :
                    GPU_PARALLEL_SORTED_INDEX_INACTIVE_KEY;
       });
 }
@@ -303,9 +312,7 @@ extern "C" __global__ void __launch_bounds__(GPU_PARALLEL_ACTIVE_INDEX_DEFAULT_B
 {
   gpu_parallel_active_index_array<GPU_PARALLEL_ACTIVE_INDEX_DEFAULT_BLOCK_SIZE>(
       num_states, indices, num_indices, [num_active_paths](const int state) {
-        return (state >= num_active_paths) &&
-               ((INTEGRATOR_STATE(path, queued_kernel) != 0) ||
-                (INTEGRATOR_STATE(shadow_path, queued_kernel) != 0));
+        return (state >= num_active_paths) && (INTEGRATOR_STATE(state, path, queued_kernel) != 0);
       });
 }
 
@@ -321,14 +328,15 @@ extern "C" __global__ void __launch_bounds__(GPU_PARALLEL_SORTED_INDEX_DEFAULT_B
     const int from_state = active_terminated_states[active_states_offset + global_index];
     const int to_state = active_terminated_states[terminated_states_offset + global_index];
 
-    integrator_state_move(to_state, from_state);
+    integrator_state_move(NULL, to_state, from_state);
   }
 }
 
 extern "C" __global__ void __launch_bounds__(GPU_PARALLEL_PREFIX_SUM_DEFAULT_BLOCK_SIZE)
-    kernel_gpu_prefix_sum(int *values, int num_values)
+    kernel_gpu_prefix_sum(int *counter, int *prefix_sum, int num_values)
 {
-  gpu_parallel_prefix_sum<GPU_PARALLEL_PREFIX_SUM_DEFAULT_BLOCK_SIZE>(values, num_values);
+  gpu_parallel_prefix_sum<GPU_PARALLEL_PREFIX_SUM_DEFAULT_BLOCK_SIZE>(
+      counter, prefix_sum, num_values);
 }
 
 /* --------------------------------------------------------------------
@@ -424,8 +432,12 @@ ccl_device_inline void kernel_gpu_film_convert_common(const KernelFilmConvert *k
     return;
   }
 
-  const uint64_t render_buffer_offset = (uint64_t)render_pixel_index * kfilm_convert->pass_stride;
-  ccl_global const float *buffer = render_buffer + render_buffer_offset;
+  const int x = render_pixel_index % width;
+  const int y = render_pixel_index / width;
+
+  ccl_global const float *buffer = render_buffer + offset + x * kfilm_convert->pass_stride +
+                                   y * stride * kfilm_convert->pass_stride;
+
   ccl_global float *pixel = pixels +
                             (render_pixel_index + dst_offset) * kfilm_convert->pixel_stride;
 
@@ -451,16 +463,16 @@ ccl_device_inline void kernel_gpu_film_convert_half_rgba_common_rgba(
     return;
   }
 
-  const uint64_t render_buffer_offset = (uint64_t)render_pixel_index * kfilm_convert->pass_stride;
-  ccl_global const float *buffer = render_buffer + render_buffer_offset;
+  const int x = render_pixel_index % width;
+  const int y = render_pixel_index / width;
+
+  ccl_global const float *buffer = render_buffer + offset + x * kfilm_convert->pass_stride +
+                                   y * stride * kfilm_convert->pass_stride;
 
   float pixel[4];
   processor(kfilm_convert, buffer, pixel);
 
   film_apply_pass_pixel_overlays_rgba(kfilm_convert, buffer, pixel);
-
-  const int x = render_pixel_index % width;
-  const int y = render_pixel_index / width;
 
   ccl_global half4 *out = ((ccl_global half4 *)rgba) + rgba_offset + y * rgba_stride + x;
   float4_store_half((ccl_global half *)out, make_float4(pixel[0], pixel[1], pixel[2], pixel[3]));
@@ -611,7 +623,7 @@ KERNEL_FILM_CONVERT_DEFINE(float4, rgba)
 
 ccl_gpu_kernel(GPU_KERNEL_BLOCK_NUM_THREADS, GPU_KERNEL_MAX_REGISTERS)
     kernel_gpu_shader_eval_displace(KernelShaderEvalInput *input,
-                                    float4 *output,
+                                    float *output,
                                     const int offset,
                                     const int work_size)
 {
@@ -621,17 +633,31 @@ ccl_gpu_kernel(GPU_KERNEL_BLOCK_NUM_THREADS, GPU_KERNEL_MAX_REGISTERS)
   }
 }
 
-/* Background Shader Evaluation */
+/* Background */
 
 ccl_gpu_kernel(GPU_KERNEL_BLOCK_NUM_THREADS, GPU_KERNEL_MAX_REGISTERS)
     kernel_gpu_shader_eval_background(KernelShaderEvalInput *input,
-                                      float4 *output,
+                                      float *output,
                                       const int offset,
                                       const int work_size)
 {
   int i = ccl_gpu_global_id_x();
   if (i < work_size) {
     kernel_background_evaluate(NULL, input, output, offset + i);
+  }
+}
+
+/* Curve Shadow Transparency */
+
+ccl_gpu_kernel(GPU_KERNEL_BLOCK_NUM_THREADS, GPU_KERNEL_MAX_REGISTERS)
+    kernel_gpu_shader_eval_curve_shadow_transparency(KernelShaderEvalInput *input,
+                                                     float *output,
+                                                     const int offset,
+                                                     const int work_size)
+{
+  int i = ccl_gpu_global_id_x();
+  if (i < work_size) {
+    kernel_curve_shadow_transparency_evaluate(NULL, input, output, offset + i);
   }
 }
 

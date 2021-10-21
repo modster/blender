@@ -18,8 +18,8 @@
 #include "DNA_vfont_types.h"
 
 #include "BKE_curve.h"
-#include "BKE_font.h"
 #include "BKE_spline.hh"
+#include "BKE_vfont.h"
 
 #include "BLI_hash.h"
 #include "BLI_string_utf8.h"
@@ -136,7 +136,7 @@ static TextLayout get_text_layout(GeoNodeExecParams &params)
                               params.extract_input<float>("Text Box Height");
   VFont *vfont = (VFont *)params.node().id;
 
-  Curve cu = {nullptr};
+  Curve cu = {{nullptr}};
   cu.type = OB_FONT;
   /* Set defaults */
   cu.resolu = 12;
@@ -214,7 +214,7 @@ static Map<int, int> create_curve_instances(GeoNodeExecParams &params,
     if (handles.contains(charcodes[i])) {
       continue;
     }
-    Curve cu = {nullptr};
+    Curve cu = {{nullptr}};
     cu.type = OB_FONT;
     cu.resolu = 12;
     cu.vfont = vfont;

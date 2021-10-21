@@ -19,11 +19,16 @@
  */
 
 #include "BKE_asset_catalog.hh"
+#include "BKE_asset_catalog_path.hh"
 #include "BKE_asset_library.hh"
+#include "BKE_main.h"
 
 #include "BLI_string_utils.h"
 
+#include "ED_asset_catalog.h"
 #include "ED_asset_catalog.hh"
+
+#include "WM_api.h"
 
 using namespace blender;
 using namespace blender::bke;
@@ -33,17 +38,10 @@ struct CatalogUniqueNameFnData {
   StringRef parent_path;
 };
 
-static std::string to_full_path(StringRef parent_path, StringRef name)
-{
-  return parent_path.is_empty() ?
-             std::string(name) :
-             std::string(parent_path) + AssetCatalogService::PATH_SEPARATOR + name;
-}
-
 static bool catalog_name_exists_fn(void *arg, const char *name)
 {
   CatalogUniqueNameFnData &fn_data = *static_cast<CatalogUniqueNameFnData *>(arg);
-  std::string fullpath = to_full_path(fn_data.parent_path, name);
+  AssetCatalogPath fullpath = AssetCatalogPath(fn_data.parent_path) / name;
   return fn_data.catalog_service.find_catalog_by_path(fullpath);
 }
 
@@ -70,9 +68,16 @@ AssetCatalog *ED_asset_catalog_add(::AssetLibrary *library,
   }
 
   std::string unique_name = catalog_name_ensure_unique(*catalog_service, name, parent_path);
-  std::string fullpath = to_full_path(parent_path, unique_name);
+  AssetCatalogPath fullpath = AssetCatalogPath(parent_path) / unique_name;
 
-  return catalog_service->create_catalog(fullpath);
+  catalog_service->undo_push();
+  catalog_service->tag_has_unsaved_changes();
+  bke::AssetCatalog *new_catalog = catalog_service->create_catalog(fullpath);
+  if (!new_catalog) {
+    return nullptr;
+  }
+
+  return new_catalog;
 }
 
 void ED_asset_catalog_remove(::AssetLibrary *library, const CatalogID &catalog_id)
@@ -83,5 +88,48 @@ void ED_asset_catalog_remove(::AssetLibrary *library, const CatalogID &catalog_i
     return;
   }
 
-  catalog_service->delete_catalog(catalog_id);
+  catalog_service->undo_push();
+  catalog_service->tag_has_unsaved_changes();
+  catalog_service->prune_catalogs_by_id(catalog_id);
+}
+
+void ED_asset_catalog_rename(::AssetLibrary *library,
+                             const CatalogID catalog_id,
+                             const StringRefNull new_name)
+{
+  bke::AssetCatalogService *catalog_service = BKE_asset_library_get_catalog_service(library);
+  if (!catalog_service) {
+    BLI_assert_unreachable();
+    return;
+  }
+
+  const AssetCatalog *catalog = catalog_service->find_catalog(catalog_id);
+
+  AssetCatalogPath new_path = catalog->path.parent();
+  new_path = new_path / StringRef(new_name);
+
+  catalog_service->undo_push();
+  catalog_service->tag_has_unsaved_changes();
+  catalog_service->update_catalog_path(catalog_id, new_path);
+}
+
+void ED_asset_catalogs_save_from_main_path(::AssetLibrary *library, const Main *bmain)
+{
+  bke::AssetCatalogService *catalog_service = BKE_asset_library_get_catalog_service(library);
+  if (!catalog_service) {
+    BLI_assert_unreachable();
+    return;
+  }
+
+  catalog_service->write_to_disk(bmain->name);
+}
+
+void ED_asset_catalogs_set_save_catalogs_when_file_is_saved(const bool should_save)
+{
+  bke::AssetLibrary::save_catalogs_when_file_is_saved = should_save;
+}
+
+bool ED_asset_catalogs_get_save_catalogs_when_file_is_saved()
+{
+  return bke::AssetLibrary::save_catalogs_when_file_is_saved;
 }

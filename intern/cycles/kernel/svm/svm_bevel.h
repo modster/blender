@@ -77,7 +77,10 @@ ccl_device_forceinline float svm_bevel_cubic_quintic_root_find(float xi)
   return x;
 }
 
-ccl_device void svm_bevel_cubic_sample(const float radius, float xi, float *r, float *h)
+ccl_device void svm_bevel_cubic_sample(const float radius,
+                                       float xi,
+                                       ccl_private float *r,
+                                       ccl_private float *h)
 {
   float Rm = radius;
   float r_ = svm_bevel_cubic_quintic_root_find(xi);
@@ -96,13 +99,15 @@ ccl_device void svm_bevel_cubic_sample(const float radius, float xi, float *r, f
  */
 
 #  ifdef __KERNEL_OPTIX__
-extern "C" __device__ float3 __direct_callable__svm_node_bevel(INTEGRATOR_STATE_CONST_ARGS,
+extern "C" __device__ float3 __direct_callable__svm_node_bevel(
 #  else
-ccl_device float3 svm_bevel(INTEGRATOR_STATE_CONST_ARGS,
+ccl_device float3 svm_bevel(
 #  endif
-                                                               ShaderData *sd,
-                                                               float radius,
-                                                               int num_samples)
+    KernelGlobals kg,
+    ConstIntegratorState state,
+    ccl_private ShaderData *sd,
+    float radius,
+    int num_samples)
 {
   /* Early out if no sampling needed. */
   if (radius <= 0.0f || num_samples < 1 || sd->object == OBJECT_NONE) {
@@ -115,15 +120,15 @@ ccl_device float3 svm_bevel(INTEGRATOR_STATE_CONST_ARGS,
   }
 
   /* Don't bevel for blurry indirect rays. */
-  if (INTEGRATOR_STATE(path, min_ray_pdf) < 8.0f) {
+  if (INTEGRATOR_STATE(state, path, min_ray_pdf) < 8.0f) {
     return sd->N;
   }
 
   /* Setup for multi intersection. */
   LocalIntersection isect;
-  uint lcg_state = lcg_state_init(INTEGRATOR_STATE(path, rng_hash),
-                                  INTEGRATOR_STATE(path, rng_offset),
-                                  INTEGRATOR_STATE(path, sample),
+  uint lcg_state = lcg_state_init(INTEGRATOR_STATE(state, path, rng_hash),
+                                  INTEGRATOR_STATE(state, path, rng_offset),
+                                  INTEGRATOR_STATE(state, path, sample),
                                   0x64c6a40e);
 
   /* Sample normals from surrounding points on surface. */
@@ -131,7 +136,7 @@ ccl_device float3 svm_bevel(INTEGRATOR_STATE_CONST_ARGS,
 
   /* TODO: support ray-tracing in shadow shader evaluation? */
   RNGState rng_state;
-  path_state_rng_load(INTEGRATOR_STATE_PASS, &rng_state);
+  path_state_rng_load(state, &rng_state);
 
   for (int sample = 0; sample < num_samples; sample++) {
     float disk_u, disk_v;
@@ -182,17 +187,17 @@ ccl_device float3 svm_bevel(INTEGRATOR_STATE_CONST_ARGS,
     float3 disk_P = (disk_r * cosf(phi)) * disk_T + (disk_r * sinf(phi)) * disk_B;
 
     /* Create ray. */
-    Ray *ray = &isect.ray;
-    ray->P = sd->P + disk_N * disk_height + disk_P;
-    ray->D = -disk_N;
-    ray->t = 2.0f * disk_height;
-    ray->dP = differential_zero_compact();
-    ray->dD = differential_zero_compact();
-    ray->time = sd->time;
+    Ray ray ccl_optional_struct_init;
+    ray.P = sd->P + disk_N * disk_height + disk_P;
+    ray.D = -disk_N;
+    ray.t = 2.0f * disk_height;
+    ray.dP = differential_zero_compact();
+    ray.dD = differential_zero_compact();
+    ray.time = sd->time;
 
     /* Intersect with the same object. if multiple intersections are found it
      * will use at most LOCAL_MAX_HITS hits, a random subset of all hits. */
-    scene_intersect_local(kg, ray, &isect, sd->object, &lcg_state, LOCAL_MAX_HITS);
+    scene_intersect_local(kg, &ray, &isect, sd->object, &lcg_state, LOCAL_MAX_HITS);
 
     int num_eval_hits = min(isect.num_hits, LOCAL_MAX_HITS);
 
@@ -201,23 +206,20 @@ ccl_device float3 svm_bevel(INTEGRATOR_STATE_CONST_ARGS,
       float3 hit_P;
       if (sd->type & PRIMITIVE_TRIANGLE) {
         hit_P = triangle_refine_local(
-            kg, sd, ray->P, ray->D, ray->t, isect.hits[hit].object, isect.hits[hit].prim);
+            kg, sd, ray.P, ray.D, ray.t, isect.hits[hit].object, isect.hits[hit].prim);
       }
 #  ifdef __OBJECT_MOTION__
       else if (sd->type & PRIMITIVE_MOTION_TRIANGLE) {
         float3 verts[3];
-        motion_triangle_vertices(
-            kg, sd->object, kernel_tex_fetch(__prim_index, isect.hits[hit].prim), sd->time, verts);
+        motion_triangle_vertices(kg, sd->object, isect.hits[hit].prim, sd->time, verts);
         hit_P = motion_triangle_refine_local(
-            kg, sd, ray->P, ray->D, ray->t, isect.hits[hit].object, isect.hits[hit].prim, verts);
+            kg, sd, ray.P, ray.D, ray.t, isect.hits[hit].object, isect.hits[hit].prim, verts);
       }
 #  endif /* __OBJECT_MOTION__ */
 
       /* Get geometric normal. */
       float3 hit_Ng = isect.Ng[hit];
-      int object = (isect.hits[hit].object == OBJECT_NONE) ?
-                       kernel_tex_fetch(__prim_object, isect.hits[hit].prim) :
-                       isect.hits[hit].object;
+      int object = isect.hits[hit].object;
       int object_flag = kernel_tex_fetch(__object_flag, object);
       if (object_flag & SD_OBJECT_NEGATIVE_SCALE_APPLIED) {
         hit_Ng = -hit_Ng;
@@ -225,7 +227,7 @@ ccl_device float3 svm_bevel(INTEGRATOR_STATE_CONST_ARGS,
 
       /* Compute smooth normal. */
       float3 N = hit_Ng;
-      int prim = kernel_tex_fetch(__prim_index, isect.hits[hit].prim);
+      int prim = isect.hits[hit].prim;
       int shader = kernel_tex_fetch(__tri_shader, prim);
 
       if (shader & SHADER_SMOOTH_NORMAL) {
@@ -280,27 +282,32 @@ ccl_device float3 svm_bevel(INTEGRATOR_STATE_CONST_ARGS,
   return is_zero(N) ? sd->N : (sd->flag & SD_BACKFACING) ? -N : N;
 }
 
-template<uint node_feature_mask>
+template<uint node_feature_mask, typename ConstIntegratorGenericState>
 #  if defined(__KERNEL_OPTIX__)
 ccl_device_inline
 #  else
 ccl_device_noinline
 #  endif
     void
-    svm_node_bevel(INTEGRATOR_STATE_CONST_ARGS, ShaderData *sd, float *stack, uint4 node)
+    svm_node_bevel(KernelGlobals kg,
+                   ConstIntegratorGenericState state,
+                   ccl_private ShaderData *sd,
+                   ccl_private float *stack,
+                   uint4 node)
 {
   uint num_samples, radius_offset, normal_offset, out_offset;
   svm_unpack_node_uchar4(node.y, &num_samples, &radius_offset, &normal_offset, &out_offset);
 
-  float radius = stack_load_float(stack, radius_offset);
-
   float3 bevel_N = sd->N;
 
-  if (KERNEL_NODES_FEATURE(RAYTRACE)) {
+  IF_KERNEL_NODES_FEATURE(RAYTRACE)
+  {
+    float radius = stack_load_float(stack, radius_offset);
+
 #  ifdef __KERNEL_OPTIX__
-    bevel_N = optixDirectCall<float3>(1, INTEGRATOR_STATE_PASS, sd, radius, num_samples);
+    bevel_N = optixDirectCall<float3>(1, kg, state, sd, radius, num_samples);
 #  else
-    bevel_N = svm_bevel(INTEGRATOR_STATE_PASS, sd, radius, num_samples);
+    bevel_N = svm_bevel(kg, state, sd, radius, num_samples);
 #  endif
 
     if (stack_valid(normal_offset)) {

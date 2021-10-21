@@ -1295,6 +1295,10 @@ typedef struct NodeInputVector {
   float vector[3];
 } NodeInputVector;
 
+typedef struct NodeInputColor {
+  float color[4];
+} NodeInputColor;
+
 typedef struct NodeInputString {
   char *string;
 } NodeInputString;
@@ -1432,6 +1436,11 @@ typedef struct NodeGeometryCurveSplineType {
   uint8_t spline_type;
 } NodeGeometryCurveSplineType;
 
+typedef struct NodeGeometrySetCurveHandlePositions {
+  /* GeometryNodeCurveHandleMode. */
+  uint8_t mode;
+} NodeGeometrySetCurveHandlePositions;
+
 typedef struct NodeGeometryCurveSetHandles {
   /* GeometryNodeCurveHandleType. */
   uint8_t handle_type;
@@ -1503,13 +1512,27 @@ typedef struct NodeGeometryAttributeTransfer {
   uint8_t mapping;
 } NodeGeometryAttributeTransfer;
 
+typedef struct NodeGeometryTransferAttribute {
+  /* CustomDataType. */
+  int8_t data_type;
+  /* AttributeDomain. */
+  int8_t domain;
+  /* GeometryNodeAttributeTransferMode. */
+  uint8_t mode;
+  char _pad[1];
+} NodeGeometryTransferAttribute;
+
 typedef struct NodeGeometryRaycast {
   /* GeometryNodeRaycastMapMode. */
   uint8_t mapping;
 
+  /* CustomDataType. */
+  int8_t data_type;
+
+  /* Deprecated input types in new Ray-cast node. Can be removed when legacy nodes are no longer
+   * supported. */
   uint8_t input_type_ray_direction;
   uint8_t input_type_ray_length;
-  char _pad[1];
 } NodeGeometryRaycast;
 
 typedef struct NodeGeometryCurveFill {
@@ -1537,6 +1560,18 @@ typedef struct NodeGeometryStringToCurves {
   uint8_t align_y;
   char _pad[1];
 } NodeGeometryStringToCurves;
+
+typedef struct NodeGeometryDeleteGeometry {
+  /* AttributeDomain. */
+  int8_t domain;
+  /* GeometryNodeDeleteGeometryMode. */
+  int8_t mode;
+} NodeGeometryDeleteGeometry;
+
+typedef struct NodeGeometrySeparateGeometry {
+  /* AttributeDomain. */
+  int8_t domain;
+} NodeGeometrySeparateGeometry;
 
 /* script node mode */
 #define NODE_SCRIPT_INTERNAL 0
@@ -1860,7 +1895,7 @@ enum {
   SHD_SUBSURFACE_CUBIC = 1,
   SHD_SUBSURFACE_GAUSSIAN = 2,
 #endif
-  SHD_SUBSURFACE_DIFFUSION = 3,
+  SHD_SUBSURFACE_BURLEY = 3,
   SHD_SUBSURFACE_RANDOM_WALK_FIXED_RADIUS = 4,
   SHD_SUBSURFACE_RANDOM_WALK = 5,
 };
@@ -2032,6 +2067,11 @@ typedef enum GeometryNodeRotatePointsType {
   GEO_NODE_POINT_ROTATE_TYPE_AXIS_ANGLE = 1,
 } GeometryNodeRotatePointsType;
 
+typedef enum FunctionNodeRotatePointsType {
+  FN_NODE_ROTATE_EULER_TYPE_EULER = 0,
+  FN_NODE_ROTATE_EULER_TYPE_AXIS_ANGLE = 1,
+} FunctionNodeRotatePointsType;
+
 typedef enum GeometryNodeAttributeVectorRotateMode {
   GEO_NODE_VECTOR_ROTATE_TYPE_AXIS = 0,
   GEO_NODE_VECTOR_ROTATE_TYPE_AXIS_X = 1,
@@ -2052,6 +2092,11 @@ typedef enum GeometryNodeRotatePointsSpace {
   GEO_NODE_POINT_ROTATE_SPACE_POINT = 1,
 } GeometryNodeRotatePointsSpace;
 
+typedef enum FunctionNodeRotateEulerSpace {
+  FN_NODE_ROTATE_EULER_SPACE_OBJECT = 0,
+  FN_NODE_ROTATE_EULER_SPACE_LOCAL = 1,
+} FunctionNodeRotateEulerSpace;
+
 typedef enum GeometryNodeAlignRotationToVectorAxis {
   GEO_NODE_ALIGN_ROTATION_TO_VECTOR_AXIS_X = 0,
   GEO_NODE_ALIGN_ROTATION_TO_VECTOR_AXIS_Y = 1,
@@ -2064,6 +2109,19 @@ typedef enum GeometryNodeAlignRotationToVectorPivotAxis {
   GEO_NODE_ALIGN_ROTATION_TO_VECTOR_PIVOT_AXIS_Y = 2,
   GEO_NODE_ALIGN_ROTATION_TO_VECTOR_PIVOT_AXIS_Z = 3,
 } GeometryNodeAlignRotationToVectorPivotAxis;
+
+typedef enum NodeAlignEulerToVectorAxis {
+  FN_NODE_ALIGN_EULER_TO_VECTOR_AXIS_X = 0,
+  FN_NODE_ALIGN_EULER_TO_VECTOR_AXIS_Y = 1,
+  FN_NODE_ALIGN_EULER_TO_VECTOR_AXIS_Z = 2,
+} NodeAlignEulerToVectorAxis;
+
+typedef enum NodeAlignEulerToVectorPivotAxis {
+  FN_NODE_ALIGN_EULER_TO_VECTOR_PIVOT_AXIS_AUTO = 0,
+  FN_NODE_ALIGN_EULER_TO_VECTOR_PIVOT_AXIS_X = 1,
+  FN_NODE_ALIGN_EULER_TO_VECTOR_PIVOT_AXIS_Y = 2,
+  FN_NODE_ALIGN_EULER_TO_VECTOR_PIVOT_AXIS_Z = 3,
+} NodeAlignEulerToVectorPivotAxis;
 
 typedef enum GeometryNodeTransformSpace {
   GEO_NODE_TRANSFORM_SPACE_ORIGINAL = 0,
@@ -2126,9 +2184,15 @@ typedef enum GeometryNodeCurveFilletMode {
 } GeometryNodeCurveFilletMode;
 
 typedef enum GeometryNodeAttributeTransferMapMode {
+  GEO_NODE_LEGACY_ATTRIBUTE_TRANSFER_NEAREST_FACE_INTERPOLATED = 0,
+  GEO_NODE_LEGACY_ATTRIBUTE_TRANSFER_NEAREST = 1,
+} GeometryNodeAttributeTransferMapMode;
+
+typedef enum GeometryNodeAttributeTransferMode {
   GEO_NODE_ATTRIBUTE_TRANSFER_NEAREST_FACE_INTERPOLATED = 0,
   GEO_NODE_ATTRIBUTE_TRANSFER_NEAREST = 1,
-} GeometryNodeAttributeTransferMapMode;
+  GEO_NODE_ATTRIBUTE_TRANSFER_INDEX = 2,
+} GeometryNodeAttributeTransferMode;
 
 typedef enum GeometryNodeRaycastMapMode {
   GEO_NODE_RAYCAST_INTERPOLATED = 0,
@@ -2168,6 +2232,12 @@ typedef enum GeometryNodeStringToCurvesAlignYMode {
   GEO_NODE_STRING_TO_CURVES_ALIGN_Y_BOTTOM_BASELINE = 3,
   GEO_NODE_STRING_TO_CURVES_ALIGN_Y_BOTTOM = 4,
 } GeometryNodeStringToCurvesAlignYMode;
+
+typedef enum GeometryNodeDeleteGeometryMode {
+  GEO_NODE_DELETE_GEOMETRY_MODE_ALL = 0,
+  GEO_NODE_DELETE_GEOMETRY_MODE_EDGE_FACE = 1,
+  GEO_NODE_DELETE_GEOMETRY_MODE_ONLY_FACE = 2,
+} GeometryNodeDeleteGeometryMode;
 
 #ifdef __cplusplus
 }

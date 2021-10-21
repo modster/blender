@@ -21,11 +21,32 @@
 #include "BKE_asset_catalog.hh"
 #include "BKE_asset_library.hh"
 
+#include "asset_library_service.hh"
+
+#include "CLG_log.h"
+
 #include "testing/testing.h"
 
 namespace blender::bke::tests {
 
-TEST(AssetLibraryTest, load_and_free_c_functions)
+class AssetLibraryTest : public testing::Test {
+ public:
+  static void SetUpTestSuite()
+  {
+    CLG_init();
+  }
+  static void TearDownTestSuite()
+  {
+    CLG_exit();
+  }
+
+  void TearDown() override
+  {
+    AssetLibraryService::destroy();
+  }
+};
+
+TEST_F(AssetLibraryTest, bke_asset_library_load)
 {
   const std::string test_files_dir = blender::tests::flags_test_asset_dir();
   if (test_files_dir.empty()) {
@@ -49,12 +70,10 @@ TEST(AssetLibraryTest, load_and_free_c_functions)
   const bUUID uuid_poses_ellie("df60e1f6-2259-475b-93d9-69a1b4a8db78");
   AssetCatalog *poses_ellie = service->find_catalog(uuid_poses_ellie);
   ASSERT_NE(nullptr, poses_ellie) << "unable to find POSES_ELLIE catalog";
-  EXPECT_EQ("character/Ellie/poselib", poses_ellie->path);
-
-  BKE_asset_library_free(library_c_ptr);
+  EXPECT_EQ("character/Ellie/poselib", poses_ellie->path.str());
 }
 
-TEST(AssetLibraryTest, load_nonexistent_directory)
+TEST_F(AssetLibraryTest, load_nonexistent_directory)
 {
   const std::string test_files_dir = blender::tests::flags_test_asset_dir();
   if (test_files_dir.empty()) {
@@ -75,8 +94,6 @@ TEST(AssetLibraryTest, load_nonexistent_directory)
 
   /* Check that the catalog service doesn't have any catalogs. */
   EXPECT_TRUE(service->is_empty());
-
-  BKE_asset_library_free(library_c_ptr);
 }
 
 }  // namespace blender::bke::tests

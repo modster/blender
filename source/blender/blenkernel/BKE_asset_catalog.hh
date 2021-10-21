@@ -26,9 +26,12 @@
 
 #include "BLI_function_ref.hh"
 #include "BLI_map.hh"
+#include "BLI_set.hh"
 #include "BLI_string_ref.hh"
 #include "BLI_uuid.h"
 #include "BLI_vector.hh"
+
+#include "BKE_asset_catalog_path.hh"
 
 #include <map>
 #include <memory>
@@ -37,27 +40,36 @@
 
 namespace blender::bke {
 
+class AssetCatalog;
+class AssetCatalogCollection;
+class AssetCatalogDefinitionFile;
+class AssetCatalogFilter;
+class AssetCatalogTree;
+
 using CatalogID = bUUID;
-using CatalogPath = std::string;
 using CatalogPathComponent = std::string;
 /* Would be nice to be able to use `std::filesystem::path` for this, but it's currently not
  * available on the minimum macOS target version. */
 using CatalogFilePath = std::string;
-
-class AssetCatalog;
-class AssetCatalogDefinitionFile;
-class AssetCatalogTree;
+using OwningAssetCatalogMap = Map<CatalogID, std::unique_ptr<AssetCatalog>>;
 
 /* Manages the asset catalogs of a single asset library (i.e. of catalogs defined in a single
  * directory hierarchy). */
 class AssetCatalogService {
  public:
-  static const char PATH_SEPARATOR;
   static const CatalogFilePath DEFAULT_CATALOG_FILENAME;
 
  public:
-  AssetCatalogService() = default;
+  AssetCatalogService();
   explicit AssetCatalogService(const CatalogFilePath &asset_library_root);
+
+  /**
+   * Set global tag indicating that some catalog modifications are unsaved that could get lost
+   * on exit. This tag is not set by internal catalog code, the catalog service user is responsible
+   * for it. It is cleared by #write_to_disk().
+   */
+  void tag_has_unsaved_changes();
+  bool has_unsaved_changes() const;
 
   /** Load asset catalog definitions from the files found in the asset library. */
   void load_from_disk();
@@ -65,7 +77,7 @@ class AssetCatalogService {
   void load_from_disk(const CatalogFilePath &file_or_directory_path);
 
   /**
-   * Write the catalog definitions to disk in response to the blend file being saved.
+   * Write the catalog definitions to disk.
    *
    * The location where the catalogs are saved is variable, and depends on the location of the
    * blend file. The first matching rule wins:
@@ -81,7 +93,7 @@ class AssetCatalogService {
    *
    * Return true on success, which either means there were no in-memory categories to save,
    * or the save was successful. */
-  bool write_to_disk_on_blendfile_save(const CatalogFilePath &blend_file_path);
+  bool write_to_disk(const CatalogFilePath &blend_file_path);
 
   /**
    * Merge on-disk changes into the in-memory asset catalogs.
@@ -94,41 +106,82 @@ class AssetCatalogService {
   void merge_from_disk_before_writing();
 
   /** Return catalog with the given ID. Return nullptr if not found. */
-  AssetCatalog *find_catalog(CatalogID catalog_id);
+  AssetCatalog *find_catalog(CatalogID catalog_id) const;
 
   /** Return first catalog with the given path. Return nullptr if not found. This is not an
    * efficient call as it's just a linear search over the catalogs. */
-  AssetCatalog *find_catalog_by_path(const CatalogPath &path) const;
+  AssetCatalog *find_catalog_by_path(const AssetCatalogPath &path) const;
+
+  /**
+   * Create a filter object that can be used to determine whether an asset belongs to the given
+   * catalog, or any of the catalogs in the sub-tree rooted at the given catalog.
+   *
+   * \see #AssetCatalogFilter
+   */
+  AssetCatalogFilter create_catalog_filter(CatalogID active_catalog_id) const;
 
   /** Create a catalog with some sensible auto-generated catalog ID.
    * The catalog will be saved to the default catalog file.*/
-  AssetCatalog *create_catalog(const CatalogPath &catalog_path);
+  AssetCatalog *create_catalog(const AssetCatalogPath &catalog_path);
 
   /**
-   * Soft-delete the catalog, ensuring it actually gets deleted when the catalog definition file is
-   * written. */
-  void delete_catalog(CatalogID catalog_id);
+   * Delete all catalogs with the given path, and their children.
+   */
+  void prune_catalogs_by_path(const AssetCatalogPath &path);
+
+  /**
+   * Delete all catalogs with the same path as the identified catalog, and their children.
+   * This call is the same as calling `prune_catalogs_by_path(find_catalog(catalog_id)->path)`.
+   */
+  void prune_catalogs_by_id(CatalogID catalog_id);
+
+  /**
+   * Delete a catalog, without deleting any of its children and without rebuilding the catalog
+   * tree. This is a lower-level function than #prune_catalogs_by_path.
+   */
+  void delete_catalog_by_id(CatalogID catalog_id);
 
   /**
    * Update the catalog path, also updating the catalog path of all sub-catalogs.
    */
-  void update_catalog_path(CatalogID catalog_id, const CatalogPath &new_catalog_path);
+  void update_catalog_path(CatalogID catalog_id, const AssetCatalogPath &new_catalog_path);
 
   AssetCatalogTree *get_catalog_tree();
 
   /** Return true only if there are no catalogs known. */
   bool is_empty() const;
 
+  /**
+   * Store the current catalogs in the undo stack.
+   * This snapshots everything in the #AssetCatalogCollection. */
+  void undo_push();
+  /**
+   * Restore the last-saved undo snapshot, pushing the current state onto the redo stack.
+   * The caller is responsible for first checking that undoing is possible.
+   */
+  void undo();
+  bool is_undo_possbile() const;
+  /**
+   * Restore the last-saved redo snapshot, pushing the current state onto the undo stack.
+   * The caller is responsible for first checking that undoing is possible. */
+  void redo();
+  bool is_redo_possbile() const;
+
  protected:
-  /* These pointers are owned by this AssetCatalogService. */
-  Map<CatalogID, std::unique_ptr<AssetCatalog>> catalogs_;
-  Map<CatalogID, std::unique_ptr<AssetCatalog>> deleted_catalogs_;
-  std::unique_ptr<AssetCatalogDefinitionFile> catalog_definition_file_;
-  std::unique_ptr<AssetCatalogTree> catalog_tree_;
+  std::unique_ptr<AssetCatalogCollection> catalog_collection_;
+  std::unique_ptr<AssetCatalogTree> catalog_tree_ = std::make_unique<AssetCatalogTree>();
   CatalogFilePath asset_library_root_;
+
+  Vector<std::unique_ptr<AssetCatalogCollection>> undo_snapshots_;
+  Vector<std::unique_ptr<AssetCatalogCollection>> redo_snapshots_;
+  bool has_unsaved_changes_ = false;
 
   void load_directory_recursive(const CatalogFilePath &directory_path);
   void load_single_file(const CatalogFilePath &catalog_definition_file_path);
+
+  /** Implementation of #write_to_disk() that doesn't clear the "has unsaved changes" tag. */
+  bool write_to_disk_ex(const CatalogFilePath &blend_file_path);
+  void untag_has_unsaved_changes();
 
   std::unique_ptr<AssetCatalogDefinitionFile> parse_catalog_file(
       const CatalogFilePath &catalog_definition_file_path);
@@ -150,6 +203,46 @@ class AssetCatalogService {
 
   std::unique_ptr<AssetCatalogTree> read_into_tree();
   void rebuild_tree();
+
+  /**
+   * For every catalog, ensure that its parent path also has a known catalog.
+   */
+  void create_missing_catalogs();
+
+  /* For access by subclasses, as those will not be marked as friend by #AssetCatalogCollection. */
+  AssetCatalogDefinitionFile *get_catalog_definition_file();
+  OwningAssetCatalogMap &get_catalogs();
+};
+
+/**
+ * All catalogs that are owned by a single asset library, and managed by a single instance of
+ * #AssetCatalogService. The undo system for asset catalog edits contains historical copies of this
+ * struct.
+ */
+class AssetCatalogCollection {
+  friend AssetCatalogService;
+
+ public:
+  AssetCatalogCollection() = default;
+  AssetCatalogCollection(const AssetCatalogCollection &other) = delete;
+  AssetCatalogCollection(AssetCatalogCollection &&other) noexcept = default;
+
+  std::unique_ptr<AssetCatalogCollection> deep_copy() const;
+
+ protected:
+  /** All catalogs known, except the known-but-deleted ones. */
+  OwningAssetCatalogMap catalogs_;
+
+  /** Catalogs that have been deleted. They are kept around so that the load-merge-save of catalog
+   * definition files can actually delete them if they already existed on disk (instead of the
+   * merge operation resurrecting them). */
+  OwningAssetCatalogMap deleted_catalogs_;
+
+  /* For now only a single catalog definition file is supported.
+   * The aim is to support an arbitrary number of such files per asset library in the future. */
+  std::unique_ptr<AssetCatalogDefinitionFile> catalog_definition_file_;
+
+  static OwningAssetCatalogMap copy_catalog_map(const OwningAssetCatalogMap &orig);
 };
 
 /**
@@ -166,13 +259,15 @@ class AssetCatalogTreeItem {
 
   AssetCatalogTreeItem(StringRef name,
                        CatalogID catalog_id,
+                       StringRef simple_name,
                        const AssetCatalogTreeItem *parent = nullptr);
 
   CatalogID get_catalog_id() const;
-  StringRef get_name() const;
+  StringRefNull get_simple_name() const;
+  StringRefNull get_name() const;
   /** Return the full catalog path, defined as the name of this catalog prefixed by the full
    * catalog path of its parent and a separator. */
-  CatalogPath catalog_path() const;
+  AssetCatalogPath catalog_path() const;
   int count_parents() const;
   bool has_children() const;
 
@@ -186,6 +281,8 @@ class AssetCatalogTreeItem {
   /** The user visible name of this component. */
   CatalogPathComponent name_;
   CatalogID catalog_id_;
+  /** Copy of #AssetCatalog::simple_name. */
+  std::string simple_name_;
 
   /** Pointer back to the parent item. Used to reconstruct the hierarchy from an item (e.g. to
    * build a path). */
@@ -259,6 +356,9 @@ class AssetCatalogDefinitionFile {
   void parse_catalog_file(const CatalogFilePath &catalog_definition_file_path,
                           AssetCatalogParsedFn callback);
 
+  std::unique_ptr<AssetCatalogDefinitionFile> copy_and_remap(
+      const OwningAssetCatalogMap &catalogs, const OwningAssetCatalogMap &deleted_catalogs) const;
+
  protected:
   /* Catalogs stored in this file. They are mapped by ID to make it possible to query whether a
    * catalog is already known, without having to find the corresponding `AssetCatalog*`. */
@@ -280,10 +380,10 @@ class AssetCatalogDefinitionFile {
 class AssetCatalog {
  public:
   AssetCatalog() = default;
-  AssetCatalog(CatalogID catalog_id, const CatalogPath &path, const std::string &simple_name);
+  AssetCatalog(CatalogID catalog_id, const AssetCatalogPath &path, const std::string &simple_name);
 
   CatalogID catalog_id;
-  CatalogPath path;
+  AssetCatalogPath path;
   /**
    * Simple, human-readable name for the asset catalog. This is stored on assets alongside the
    * catalog ID; the catalog ID is a UUID that is not human-readable,
@@ -298,26 +398,16 @@ class AssetCatalog {
   } flags;
 
   /**
-   * \return true only if this catalog's path is contained within the given path.
-   * When this catalog's path is equal to the given path, return true as well.
-   *
-   * Note that non-normalized paths (so for example starting or ending with a slash) are not
-   * supported, and result in undefined behavior.
-   */
-  bool is_contained_in(const CatalogPath &other_path) const;
-
-  /**
    * Create a new Catalog with the given path, auto-generating a sensible catalog simple-name.
    *
    * NOTE: the given path will be cleaned up (trailing spaces removed, etc.), so the returned
    * `AssetCatalog`'s path differ from the given one.
    */
-  static std::unique_ptr<AssetCatalog> from_path(const CatalogPath &path);
-  static CatalogPath cleanup_path(const CatalogPath &path);
+  static std::unique_ptr<AssetCatalog> from_path(const AssetCatalogPath &path);
 
  protected:
   /** Generate a sensible catalog ID for the given path. */
-  static std::string sensible_simple_name_for_path(const CatalogPath &path);
+  static std::string sensible_simple_name_for_path(const AssetCatalogPath &path);
 };
 
 /** Comparator for asset catalogs, ordering by (path, UUID). */
@@ -335,5 +425,21 @@ struct AssetCatalogPathCmp {
  * Set that stores catalogs ordered by (path, UUID).
  * Being a set, duplicates are removed. The catalog's simple name is ignored in this. */
 using AssetCatalogOrderedSet = std::set<const AssetCatalog *, AssetCatalogPathCmp>;
+
+/**
+ * Filter that can determine whether an asset should be visible or not, based on its catalog ID.
+ *
+ * \see AssetCatalogService::create_filter()
+ */
+class AssetCatalogFilter {
+ public:
+  bool contains(CatalogID asset_catalog_id) const;
+
+ protected:
+  friend AssetCatalogService;
+  const Set<CatalogID> matching_catalog_ids;
+
+  explicit AssetCatalogFilter(Set<CatalogID> &&matching_catalog_ids);
+};
 
 }  // namespace blender::bke

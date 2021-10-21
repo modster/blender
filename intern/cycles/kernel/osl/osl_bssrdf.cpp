@@ -50,6 +50,7 @@ CCL_NAMESPACE_BEGIN
 
 using namespace OSL;
 
+static ustring u_burley("burley");
 static ustring u_random_walk_fixed_radius("random_walk_fixed_radius");
 static ustring u_random_walk("random_walk");
 
@@ -66,9 +67,12 @@ class CBSSRDFClosure : public CClosurePrimitive {
     ior = 1.4f;
   }
 
-  void setup(ShaderData *sd, int path_flag, float3 weight)
+  void setup(ShaderData *sd, uint32_t path_flag, float3 weight)
   {
-    if (method == u_random_walk_fixed_radius) {
+    if (method == u_burley) {
+      alloc(sd, path_flag, weight, CLOSURE_BSSRDF_BURLEY_ID);
+    }
+    else if (method == u_random_walk_fixed_radius) {
       alloc(sd, path_flag, weight, CLOSURE_BSSRDF_RANDOM_WALK_FIXED_RADIUS_ID);
     }
     else if (method == u_random_walk) {
@@ -76,7 +80,7 @@ class CBSSRDFClosure : public CClosurePrimitive {
     }
   }
 
-  void alloc(ShaderData *sd, int path_flag, float3 weight, ClosureType type)
+  void alloc(ShaderData *sd, uint32_t path_flag, float3 weight, ClosureType type)
   {
     Bssrdf *bssrdf = bssrdf_alloc(sd, weight);
 

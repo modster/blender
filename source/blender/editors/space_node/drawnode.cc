@@ -164,6 +164,11 @@ static void node_buts_curvevec(uiLayout *layout, bContext *UNUSED(C), PointerRNA
   uiTemplateCurveMapping(layout, ptr, "mapping", 'v', false, false, false, false);
 }
 
+static void node_buts_curvefloat(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
+{
+  uiTemplateCurveMapping(layout, ptr, "mapping", 0, false, false, false, false);
+}
+
 #define SAMPLE_FLT_ISNONE FLT_MAX
 /* Bad bad, 2.5 will do better? ... no it won't! */
 static float _sample_col[4] = {SAMPLE_FLT_ISNONE};
@@ -446,7 +451,7 @@ static void node_draw_frame(const bContext *C,
 
   const rctf *rct = &node->totr;
   UI_draw_roundbox_corner_set(UI_CNR_ALL);
-  UI_draw_roundbox_aa(rct, true, BASIS_RAD, color);
+  UI_draw_roundbox_4fv(rct, true, BASIS_RAD, color);
 
   /* outline active and selected emphasis */
   if (node->flag & SELECT) {
@@ -1182,6 +1187,9 @@ static void node_shader_set_butfunc(bNodeType *ntype)
       break;
     case SH_NODE_CURVE_RGB:
       ntype->draw_buttons = node_buts_curvecol;
+      break;
+    case SH_NODE_CURVE_FLOAT:
+      ntype->draw_buttons = node_buts_curvefloat;
       break;
     case SH_NODE_MAPPING:
       ntype->draw_buttons = node_shader_buts_mapping;
@@ -3569,9 +3577,14 @@ static void std_node_socket_draw(
       }
       break;
     case SOCK_RGBA: {
-      uiLayout *row = uiLayoutSplit(layout, 0.4f, false);
-      uiItemL(row, text, 0);
-      uiItemR(row, ptr, "default_value", DEFAULT_FLAGS, "", 0);
+      if (text[0] == '\0') {
+        uiItemR(layout, ptr, "default_value", DEFAULT_FLAGS, "", 0);
+      }
+      else {
+        uiLayout *row = uiLayoutSplit(layout, 0.4f, false);
+        uiItemL(row, text, 0);
+        uiItemR(row, ptr, "default_value", DEFAULT_FLAGS, "", 0);
+      }
       break;
     }
     case SOCK_STRING: {

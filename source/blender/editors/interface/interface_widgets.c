@@ -2263,7 +2263,10 @@ static void widget_draw_extra_icons(const uiWidgetColors *wcol,
 
     temp.xmin = temp.xmax - icon_size;
 
-    if (!op_icon->highlighted) {
+    if (op_icon->disabled) {
+      alpha_this *= 0.4f;
+    }
+    else if (!op_icon->highlighted) {
       alpha_this *= 0.75f;
     }
 
@@ -4049,9 +4052,15 @@ static void widget_menu_itembut(uiWidgetColors *wcol,
   uiWidgetBase wtb;
   widget_init(&wtb);
 
-  /* not rounded, no outline */
+  /* Padding on the sides. */
+  const float padding = 0.125f * BLI_rcti_size_y(rect);
+  rect->xmin += padding;
+  rect->xmax -= padding;
+
+  /* No outline. */
   wtb.draw_outline = false;
-  round_box_edges(&wtb, 0, rect, 0.0f);
+  const float rad = wcol->roundness * BLI_rcti_size_y(rect);
+  round_box_edges(&wtb, UI_CNR_ALL, rect, rad);
 
   widgetbase_draw(&wtb, wcol);
 }
@@ -4822,9 +4831,6 @@ void ui_draw_but(const bContext *C, struct ARegion *region, uiStyle *style, uiBu
         break;
 
       case UI_BTYPE_CURVE:
-        /* do not draw right to edge of rect */
-        rect->xmin += (0.2f * UI_UNIT_X);
-        rect->xmax -= (0.2f * UI_UNIT_X);
         ui_draw_but_CURVE(region, but, &tui->wcol_regular, rect);
         break;
 
@@ -5371,7 +5377,7 @@ void ui_draw_menu_item(const uiFontStyle *fstyle,
         }
       }
       else {
-        BLI_assert_msg(0, "Unknwon menu item separator type");
+        BLI_assert_msg(0, "Unknown menu item separator type");
       }
     }
   }

@@ -156,6 +156,16 @@ get_blender_version()
 option(WITH_BLENDER "Build blender (disable to build only the blender player)" ON)
 mark_as_advanced(WITH_BLENDER)
 
+if(APPLE)
+  # Currently this causes a build error linking, disable.
+  set(WITH_BLENDER_THUMBNAILER OFF)
+elseif(WIN32)
+  # Building the thumbnail extraction DLL could be made optional.
+  set(WITH_BLENDER_THUMBNAILER ON)
+else()
+  option(WITH_BLENDER_THUMBNAILER "Build \"blender-thumbnailer\" thumbnail extraction utility" ON)
+endif()
+
 option(WITH_INTERNATIONAL "Enable I18N (International fonts and text)" ON)
 
 option(WITH_PYTHON        "Enable Embedded Python API  (only disable for development)" ON)
@@ -388,6 +398,10 @@ if(WITH_PYTHON_INSTALL)
     set(PYTHON_REQUESTS_PATH "" CACHE PATH "Path to python site-packages or dist-packages containing 'requests' module")
     mark_as_advanced(PYTHON_REQUESTS_PATH)
   endif()
+
+  option(WITH_PYTHON_INSTALL_ZSTANDARD "Copy zstandard into the blender install folder" ON)
+  set(PYTHON_ZSTANDARD_PATH "" CACHE PATH "Path to python site-packages or dist-packages containing 'zstandard' module")
+  mark_as_advanced(PYTHON_ZSTANDARD_PATH)
 endif()
 
 option(WITH_CPU_SIMD              "Enable SIMD instruction if they're detected on the host machine" ON)
@@ -406,6 +420,7 @@ mark_as_advanced(WITH_CYCLES_CUDA_BUILD_SERIAL)
 set(CYCLES_TEST_DEVICES CPU CACHE STRING "Run regression tests on the specified device types (CPU CUDA OPTIX)" )
 set(CYCLES_CUDA_BINARIES_ARCH sm_30 sm_35 sm_37 sm_50 sm_52 sm_60 sm_61 sm_70 sm_75 sm_86 compute_75 CACHE STRING "CUDA architectures to build binaries for")
 mark_as_advanced(CYCLES_CUDA_BINARIES_ARCH)
+option(WITH_CYCLES_HIP_BINARIES     "Build Cycles HIP binaries" OFF)
 unset(PLATFORM_DEFAULT)
 option(WITH_CYCLES_LOGGING      "Build Cycles with logging support" ON)
 option(WITH_CYCLES_DEBUG_NAN    "Build Cycles with additional asserts for detecting NaNs and invalid values" OFF)
@@ -419,7 +434,7 @@ mark_as_advanced(WITH_CYCLES_NATIVE_ONLY)
 
 option(WITH_CYCLES_DEVICE_CUDA              "Enable Cycles CUDA compute support" ON)
 option(WITH_CYCLES_DEVICE_OPTIX             "Enable Cycles OptiX support" ON)
-option(WITH_CYCLES_DEVICE_HIP               "Enable Cycles HIP support" OFF)
+option(WITH_CYCLES_DEVICE_HIP               "Enable Cycles HIP support" ON)
 mark_as_advanced(WITH_CYCLES_DEVICE_HIP)
 mark_as_advanced(WITH_CYCLES_DEVICE_CUDA)
 
@@ -1723,6 +1738,12 @@ if(WITH_PYTHON)
   elseif(WITH_PYTHON_INSTALL_REQUESTS)
     find_python_package(requests "")
   endif()
+
+  if(WIN32 OR APPLE)
+    # pass, we have this in lib/python/site-packages
+  elseif(WITH_PYTHON_INSTALL_ZSTANDARD)
+    find_python_package(zstandard "")
+  endif()
 endif()
 
 # Select C++17 as the standard for C++ projects.
@@ -1994,6 +2015,7 @@ if(FIRST_RUN)
   endif()
   info_cfg_option(WITH_PYTHON_INSTALL)
   info_cfg_option(WITH_PYTHON_INSTALL_NUMPY)
+  info_cfg_option(WITH_PYTHON_INSTALL_ZSTANDARD)
   info_cfg_option(WITH_PYTHON_MODULE)
   info_cfg_option(WITH_PYTHON_SAFETY)
 

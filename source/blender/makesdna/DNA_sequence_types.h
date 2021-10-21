@@ -79,9 +79,13 @@ typedef struct StripTransform {
 } StripTransform;
 
 typedef struct StripColorBalance {
+  int method;
   float lift[3];
   float gamma[3];
   float gain[3];
+  float slope[3];
+  float offset[3];
+  float power[3];
   int flag;
   char _pad[4];
   /* float exposure; */
@@ -285,9 +289,11 @@ typedef struct Editing {
   /** 1024 = FILE_MAX. */
   char proxy_dir[1024];
 
-  int over_ofs, over_cfra;
-  int over_flag, proxy_storage;
-  rctf over_border;
+  int proxy_storage;
+
+  int overlay_frame_ofs, overlay_frame_abs;
+  int overlay_frame_flag;
+  rctf overlay_frame_rect;
 
   struct SeqCache *cache;
 
@@ -434,6 +440,11 @@ typedef struct ColorBalanceModifierData {
   float color_multiply;
 } ColorBalanceModifierData;
 
+enum {
+  SEQ_COLOR_BALANCE_METHOD_LIFTGAMMAGAIN = 0,
+  SEQ_COLOR_BALANCE_METHOD_SLOPEOFFSETPOWER = 1,
+};
+
 typedef struct CurvesModifierData {
   SequenceModifierData modifier;
 
@@ -493,9 +504,9 @@ typedef struct SequencerScopes {
 
 #define SELECT 1
 
-/* Editor->over_flag */
-#define SEQ_EDIT_OVERLAY_SHOW 1
-#define SEQ_EDIT_OVERLAY_ABS 2
+/** #Editor.overlay_frame_flag */
+#define SEQ_EDIT_OVERLAY_FRAME_SHOW 1
+#define SEQ_EDIT_OVERLAY_FRAME_ABS 2
 
 #define SEQ_STRIP_OFSBOTTOM 0.05f
 #define SEQ_STRIP_OFSTOP 0.95f
@@ -571,6 +582,9 @@ enum {
 #define SEQ_COLOR_BALANCE_INVERSE_GAIN 1
 #define SEQ_COLOR_BALANCE_INVERSE_GAMMA 2
 #define SEQ_COLOR_BALANCE_INVERSE_LIFT 4
+#define SEQ_COLOR_BALANCE_INVERSE_SLOPE 8
+#define SEQ_COLOR_BALANCE_INVERSE_OFFSET 16
+#define SEQ_COLOR_BALANCE_INVERSE_POWER 32
 
 /* !!! has to be same as IMB_imbuf.h IMB_PROXY_... and IMB_TC_... */
 
