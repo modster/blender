@@ -68,7 +68,7 @@ void ED_region_do_layout(struct bContext *C, struct ARegion *region);
 void ED_region_do_draw(struct bContext *C, struct ARegion *region);
 void ED_region_exit(struct bContext *C, struct ARegion *region);
 void ED_region_remove(struct bContext *C, struct ScrArea *area, struct ARegion *region);
-void ED_region_pixelspace(struct ARegion *region);
+void ED_region_pixelspace(const struct ARegion *region);
 void ED_region_update_rect(struct ARegion *region);
 void ED_region_floating_init(struct ARegion *region);
 void ED_region_tag_redraw(struct ARegion *region);
@@ -210,7 +210,10 @@ void ED_screen_ensure_updated(struct wmWindowManager *wm,
                               struct bScreen *screen);
 void ED_screen_do_listen(struct bContext *C, struct wmNotifier *note);
 bool ED_screen_change(struct bContext *C, struct bScreen *screen);
-void ED_screen_scene_change(struct bContext *C, struct wmWindow *win, struct Scene *scene);
+void ED_screen_scene_change(struct bContext *C,
+                            struct wmWindow *win,
+                            struct Scene *scene,
+                            const bool refresh_toolsystem);
 void ED_screen_set_active_region(struct bContext *C, struct wmWindow *win, const int xy[2]);
 void ED_screen_exit(struct bContext *C, struct wmWindow *window, struct bScreen *screen);
 void ED_screen_animation_timer(struct bContext *C, int redraws, int sync, int enable);

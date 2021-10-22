@@ -237,6 +237,12 @@ static void geo_node_curve_sample_exec(GeoNodeExecParams params)
     params.set_output("Normal", fn::make_constant_field<float3>({0.0f, 0.0f, 0.0f}));
   };
 
+  if (geometry_set.has_instances()) {
+    params.error_message_add(
+        NodeWarningType::Info,
+        TIP_("The node only supports realized curve data, instances are ignored"));
+  }
+
   const CurveComponent *component = geometry_set.get_component_for_read<CurveComponent>();
   if (component == nullptr) {
     return return_default();
@@ -275,7 +281,7 @@ void register_node_type_geo_curve_sample()
 {
   static bNodeType ntype;
 
-  geo_node_type_base(&ntype, GEO_NODE_CURVE_SAMPLE, "Curve Sample", NODE_CLASS_GEOMETRY, 0);
+  geo_node_type_base(&ntype, GEO_NODE_SAMPLE_CURVE, " Sample Curve", NODE_CLASS_GEOMETRY, 0);
   ntype.geometry_node_execute = blender::nodes::geo_node_curve_sample_exec;
   ntype.declare = blender::nodes::geo_node_curve_sample_declare;
   node_type_init(&ntype, blender::nodes::geo_node_curve_sample_type_init);

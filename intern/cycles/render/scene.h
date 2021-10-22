@@ -251,6 +251,8 @@ class Scene : public NodeOwner {
   Scene(const SceneParams &params, Device *device);
   ~Scene();
 
+  void host_update(Progress &progress);
+
   void device_update(Device *device, Progress &progress);
 
   bool need_global_attribute(AttributeStandard std);

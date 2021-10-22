@@ -234,6 +234,7 @@ class AbstractTreeViewItem : public TreeViewItemContainer {
   virtual ~AbstractTreeViewItem() = default;
 
   virtual void build_row(uiLayout &row) = 0;
+  virtual void build_context_menu(bContext &C, uiLayout &column) const;
 
   virtual void on_activate();
   /**
@@ -336,6 +337,8 @@ class AbstractTreeViewItem : public TreeViewItemContainer {
   void add_indent(uiLayout &row) const;
   void add_collapse_chevron(uiBlock &block) const;
   void add_rename_button(uiLayout &row);
+
+  bool has_active_child() const;
 };
 
 /** \} */

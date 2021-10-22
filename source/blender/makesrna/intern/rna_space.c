@@ -2348,6 +2348,15 @@ static char *rna_SpaceSequencerTimelineOverlay_path(PointerRNA *UNUSED(ptr))
 }
 
 /* Space Node Editor */
+static PointerRNA rna_SpaceNode_overlay_get(PointerRNA *ptr)
+{
+  return rna_pointer_inherit_refine(ptr, &RNA_SpaceNodeOverlay, ptr->data);
+}
+
+static char *rna_SpaceNodeOverlay_path(PointerRNA *UNUSED(ptr))
+{
+  return BLI_strdup("overlay");
+}
 
 static void rna_SpaceNodeEditor_node_tree_set(PointerRNA *ptr,
                                               const PointerRNA value,
@@ -2652,7 +2661,7 @@ static int rna_FileBrowser_FileSelectEntry_name_editable(PointerRNA *ptr, const 
 static void rna_FileBrowser_FileSelectEntry_name_get(PointerRNA *ptr, char *value)
 {
   const FileDirEntry *entry = ptr->data;
-  strcpy(value, entry->name);
+  BLI_strncpy_utf8(value, entry->name, strlen(entry->name) + 1);
 }
 
 static int rna_FileBrowser_FileSelectEntry_name_length(PointerRNA *ptr)
@@ -2664,7 +2673,7 @@ static int rna_FileBrowser_FileSelectEntry_name_length(PointerRNA *ptr)
 static void rna_FileBrowser_FileSelectEntry_relative_path_get(PointerRNA *ptr, char *value)
 {
   const FileDirEntry *entry = ptr->data;
-  strcpy(value, entry->relpath);
+  BLI_strncpy_utf8(value, entry->relpath, strlen(entry->relpath) + 1);
 }
 
 static int rna_FileBrowser_FileSelectEntry_relative_path_length(PointerRNA *ptr)
@@ -5427,6 +5436,11 @@ static void rna_def_space_sequencer_preview_overlay(BlenderRNA *brna)
   RNA_def_property_boolean_sdna(prop, NULL, "flag", SEQ_PREVIEW_SHOW_OUTLINE_SELECTED);
   RNA_def_property_ui_text(prop, "Image Outline", "");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_SEQUENCER, NULL);
+
+  prop = RNA_def_property(srna, "show_cursor", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "flag", SEQ_PREVIEW_SHOW_2D_CURSOR);
+  RNA_def_property_ui_text(prop, "2D cursor", "");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_SEQUENCER, NULL);
 }
 
 static void rna_def_space_sequencer_timeline_overlay(BlenderRNA *brna)
@@ -5531,10 +5545,10 @@ static void rna_def_space_sequencer(BlenderRNA *brna)
       {0, NULL, 0, NULL, NULL},
   };
 
-  static const EnumPropertyItem overlay_type_items[] = {
-      {SEQ_DRAW_OVERLAY_RECT, "RECTANGLE", 0, "Rectangle", "Show rectangle area overlay"},
-      {SEQ_DRAW_OVERLAY_REFERENCE, "REFERENCE", 0, "Reference", "Show reference frame only"},
-      {SEQ_DRAW_OVERLAY_CURRENT, "CURRENT", 0, "Current", "Show current frame only"},
+  static const EnumPropertyItem overlay_frame_type_items[] = {
+      {SEQ_OVERLAY_FRAME_TYPE_RECT, "RECTANGLE", 0, "Rectangle", "Show rectangle area overlay"},
+      {SEQ_OVERLAY_FRAME_TYPE_REFERENCE, "REFERENCE", 0, "Reference", "Show reference frame only"},
+      {SEQ_OVERLAY_FRAME_TYPE_CURRENT, "CURRENT", 0, "Current", "Show current frame only"},
       {0, NULL, 0, NULL, NULL},
   };
 
@@ -5654,9 +5668,9 @@ static void rna_def_space_sequencer(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Grease Pencil", "Grease Pencil data for this Preview region");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_SEQUENCER, NULL);
 
-  prop = RNA_def_property(srna, "overlay_type", PROP_ENUM, PROP_NONE);
-  RNA_def_property_enum_sdna(prop, NULL, "overlay_type");
-  RNA_def_property_enum_items(prop, overlay_type_items);
+  prop = RNA_def_property(srna, "overlay_frame_type", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_sdna(prop, NULL, "overlay_frame_type");
+  RNA_def_property_enum_items(prop, overlay_frame_type_items);
   RNA_def_property_ui_text(prop, "Overlay Type", "Overlay display method");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_SEQUENCER, NULL);
 
@@ -5670,8 +5684,29 @@ static void rna_def_space_sequencer(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Transform Preview", "Show preview of the transformed frames");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_SEQUENCER, NULL);
 
+  /* Gizmo toggles. */
+  prop = RNA_def_property(srna, "show_gizmo", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_negative_sdna(prop, NULL, "gizmo_flag", SEQ_GIZMO_HIDE);
+  RNA_def_property_ui_text(prop, "Show Gizmo", "Show gizmos of all types");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_SEQUENCER, NULL);
+
+  prop = RNA_def_property(srna, "show_gizmo_navigate", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_negative_sdna(prop, NULL, "gizmo_flag", SEQ_GIZMO_HIDE_NAVIGATE);
+  RNA_def_property_ui_text(prop, "Navigate Gizmo", "Viewport navigation gizmo");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_SEQUENCER, NULL);
+
+  prop = RNA_def_property(srna, "show_gizmo_context", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_negative_sdna(prop, NULL, "gizmo_flag", SEQ_GIZMO_HIDE_CONTEXT);
+  RNA_def_property_ui_text(prop, "Context Gizmo", "Context sensitive gizmos for the active item");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_SEQUENCER, NULL);
+
+  prop = RNA_def_property(srna, "show_gizmo_tool", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_negative_sdna(prop, NULL, "gizmo_flag", SEQ_GIZMO_HIDE_TOOL);
+  RNA_def_property_ui_text(prop, "Tool Gizmo", "Active tool gizmo");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_SEQUENCER, NULL);
+
   /* Overlay settings. */
-  prop = RNA_def_property(srna, "show_strip_overlay", PROP_BOOLEAN, PROP_NONE);
+  prop = RNA_def_property(srna, "show_overlays", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flag", SEQ_SHOW_OVERLAY);
   RNA_def_property_ui_text(prop, "Show Overlay", "");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_SEQUENCER, NULL);
@@ -5690,6 +5725,13 @@ static void rna_def_space_sequencer(BlenderRNA *brna)
 
   rna_def_space_sequencer_preview_overlay(brna);
   rna_def_space_sequencer_timeline_overlay(brna);
+
+  /* transform */
+  prop = RNA_def_property(srna, "cursor_location", PROP_FLOAT, PROP_XYZ);
+  RNA_def_property_float_sdna(prop, NULL, "cursor");
+  RNA_def_property_array(prop, 2);
+  RNA_def_property_ui_text(prop, "2D Cursor Location", "2D cursor location for this view");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_SEQUENCER, NULL);
 }
 
 static void rna_def_space_text(BlenderRNA *brna)
@@ -6316,7 +6358,7 @@ static void rna_def_fileselect_entry(BlenderRNA *brna)
   RNA_def_struct_sdna(srna, "FileDirEntry");
   RNA_def_struct_ui_text(srna, "File Select Entry", "A file viewable in the File Browser");
 
-  prop = RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
+  prop = RNA_def_property(srna, "name", PROP_STRING, PROP_FILENAME);
   RNA_def_property_editable_func(prop, "rna_FileBrowser_FileSelectEntry_name_editable");
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
   RNA_def_property_string_funcs(prop,
@@ -6326,7 +6368,7 @@ static void rna_def_fileselect_entry(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Name", "");
   RNA_def_struct_name_property(srna, prop);
 
-  prop = RNA_def_property(srna, "relative_path", PROP_STRING, PROP_NONE);
+  prop = RNA_def_property(srna, "relative_path", PROP_STRING, PROP_FILEPATH);
   RNA_def_property_string_funcs(prop,
                                 "rna_FileBrowser_FileSelectEntry_relative_path_get",
                                 "rna_FileBrowser_FileSelectEntry_relative_path_length",
@@ -6971,6 +7013,32 @@ static void rna_def_space_node_path_api(BlenderRNA *brna, PropertyRNA *cprop)
   RNA_def_function_flag(func, FUNC_USE_CONTEXT);
 }
 
+static void rna_def_space_node_overlay(BlenderRNA *brna)
+{
+  StructRNA *srna;
+  PropertyRNA *prop;
+
+  srna = RNA_def_struct(brna, "SpaceNodeOverlay", NULL);
+  RNA_def_struct_sdna(srna, "SpaceNode");
+  RNA_def_struct_nested(brna, srna, "SpaceNodeEditor");
+  RNA_def_struct_path_func(srna, "rna_SpaceNodeOverlay_path");
+  RNA_def_struct_ui_text(
+      srna, "Overlay Settings", "Settings for display of overlays in the Node Editor");
+
+  prop = RNA_def_property(srna, "show_overlays", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "overlay.flag", SN_OVERLAY_SHOW_OVERLAYS);
+  RNA_def_property_boolean_default(prop, true);
+  RNA_def_property_ui_text(prop, "Show Overlays", "Display overlays like colored or dashed wires");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_NODE, NULL);
+
+  prop = RNA_def_property(srna, "show_wire_color", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "overlay.flag", SN_OVERLAY_SHOW_WIRE_COLORS);
+  RNA_def_property_boolean_default(prop, true);
+  RNA_def_property_ui_text(
+      prop, "Show Wire Colors", "Color node links based on their connected sockets");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_NODE, NULL);
+}
+
 static void rna_def_space_node(BlenderRNA *brna)
 {
   StructRNA *srna;
@@ -7154,6 +7222,15 @@ static void rna_def_space_node(BlenderRNA *brna)
       prop, "Auto-offset Direction", "Direction to offset nodes on insertion");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_NODE_VIEW, NULL);
 
+  /* Overlays */
+  prop = RNA_def_property(srna, "overlay", PROP_POINTER, PROP_NONE);
+  RNA_def_property_flag(prop, PROP_NEVER_NULL);
+  RNA_def_property_struct_type(prop, "SpaceNodeOverlay");
+  RNA_def_property_pointer_funcs(prop, "rna_SpaceNode_overlay_get", NULL, NULL, NULL);
+  RNA_def_property_ui_text(
+      prop, "Overlay Settings", "Settings for display of overlays in the Node Editor");
+
+  rna_def_space_node_overlay(brna);
   RNA_api_space_node(srna);
 }
 

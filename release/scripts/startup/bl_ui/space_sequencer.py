@@ -169,8 +169,6 @@ class SEQUENCER_HT_header(Header):
 
         st = context.space_data
 
-        show_region_tool_header = st.show_region_tool_header
-
         layout.template_header()
 
         layout.prop(st, "view_type", text="")
@@ -205,11 +203,22 @@ class SEQUENCER_HT_header(Header):
             layout.prop(st, "display_mode", text="", icon_only=True)
             layout.prop(st, "preview_channels", text="", icon_only=True)
 
+            # Gizmo toggle & popover.
+            row = layout.row(align=True)
+            # FIXME: place-holder icon.
+            row.prop(st, "show_gizmo", text="", toggle=True, icon='GIZMO')
+            sub = row.row(align=True)
+            sub.active = st.show_gizmo
+            sub.popover(
+                panel="SEQUENCER_PT_gizmo_display",
+                text="",
+            )
+
         row = layout.row(align=True)
-        row.prop(st, "show_strip_overlay", text="", icon='OVERLAY')
+        row.prop(st, "show_overlays", text="", icon='OVERLAY')
         sub = row.row(align=True)
         sub.popover(panel="SEQUENCER_PT_overlay", text="")
-        sub.active = st.show_strip_overlay
+        sub.active = st.show_overlays
 
 
 class SEQUENCER_MT_editor_menus(Menu):
@@ -228,6 +237,29 @@ class SEQUENCER_MT_editor_menus(Menu):
                 layout.menu("SEQUENCER_MT_marker")
             layout.menu("SEQUENCER_MT_add")
             layout.menu("SEQUENCER_MT_strip")
+
+
+class SEQUENCER_PT_gizmo_display(Panel):
+    bl_space_type = 'SEQUENCE_EDITOR'
+    bl_region_type = 'HEADER'
+    bl_label = "Gizmo"
+    bl_ui_units_x = 8
+
+    def draw(self, context):
+        layout = self.layout
+
+        scene = context.scene
+        st = context.space_data
+
+        col = layout.column()
+        col.label(text="Viewport Gizmos")
+        col.separator()
+
+        col.active = st.show_gizmo
+        colsub = col.column()
+        colsub.prop(st, "show_gizmo_navigate", text="Navigate")
+        colsub.prop(st, "show_gizmo_tool", text="Active Tools")
+        # colsub.prop(st, "show_gizmo_context", text="Active Object")  # Currently unused.
 
 
 class SEQUENCER_PT_overlay(Panel):
@@ -257,9 +289,10 @@ class SEQUENCER_PT_preview_overlay(Panel):
         overlay_settings = st.preview_overlay
         layout = self.layout
 
-        layout.active = st.show_strip_overlay
+        layout.active = st.show_overlays
         layout.prop(overlay_settings, "show_image_outline")
-        layout.prop(ed, "show_overlay", text="Frame Overlay")
+        layout.prop(overlay_settings, "show_cursor")
+        layout.prop(ed, "show_overlay_frame", text="Frame Overlay")
         layout.prop(overlay_settings, "show_safe_areas", text="Safe Areas")
         layout.prop(overlay_settings, "show_metadata", text="Metadata")
         layout.prop(overlay_settings, "show_annotation", text="Annotations")
@@ -281,7 +314,7 @@ class SEQUENCER_PT_sequencer_overlay(Panel):
         overlay_settings = st.timeline_overlay
         layout = self.layout
 
-        layout.active = st.show_strip_overlay
+        layout.active = st.show_overlays
 
         layout.prop(overlay_settings, "show_strip_name", text="Name")
         layout.prop(overlay_settings, "show_strip_source", text="Source")
@@ -387,6 +420,7 @@ class SEQUENCER_MT_view(Menu):
             # wm_keymap_item_find_props() (see T32595).
             layout.operator_context = 'INVOKE_REGION_PREVIEW'
         layout.prop(st, "show_region_ui")
+        layout.prop(st, "show_region_tool_header")
         layout.prop(st, "show_region_toolbar")
         layout.operator_context = 'INVOKE_DEFAULT'
 
@@ -1042,6 +1076,22 @@ class SEQUENCER_MT_preview_context_menu(Menu):
             pass
 
 
+class SEQUENCER_MT_pivot_pie(Menu):
+    bl_label = "Pivot Point"
+
+    def draw(self, context):
+        layout = self.layout
+        pie = layout.menu_pie()
+
+        tool_settings = context.tool_settings
+        sequencer_tool_settings = context.tool_settings.sequencer_tool_settings
+
+        pie.prop_enum(sequencer_tool_settings, "pivot_point", value='CENTER')
+        pie.prop_enum(sequencer_tool_settings, "pivot_point", value='CURSOR')
+        pie.prop_enum(sequencer_tool_settings, "pivot_point", value='INDIVIDUAL_ORIGINS')
+        pie.prop_enum(sequencer_tool_settings, "pivot_point", value='MEDIAN')
+
+
 class SequencerButtonsPanel:
     bl_space_type = 'SEQUENCE_EDITOR'
     bl_region_type = 'UI'
@@ -1091,7 +1141,7 @@ class SEQUENCER_PT_color_tag_picker(SequencerColorTagPicker, Panel):
         layout = self.layout
 
         row = layout.row(align=True)
-        row.operator("sequencer.strip_color_tag_set", icon="X").color = 'NONE'
+        row.operator("sequencer.strip_color_tag_set", icon='X').color = 'NONE'
         for i in range(1, 10):
             icon = 'SEQUENCE_COLOR_%02d' % i
             row.operator("sequencer.strip_color_tag_set", icon=icon).color = 'COLOR_%02d' % i
@@ -1264,15 +1314,15 @@ class SEQUENCER_PT_effect(SequencerButtonsPanel, Panel):
         elif strip_type == 'SPEED':
             col = layout.column(align=True)
             col.prop(strip, "speed_control", text="Speed Control")
-            if strip.speed_control == "MULTIPLY":
+            if strip.speed_control == 'MULTIPLY':
                 col.prop(strip, "speed_factor", text=" ")
-            elif strip.speed_control == "LENGTH":
+            elif strip.speed_control == 'LENGTH':
                 col.prop(strip, "speed_length", text=" ")
-            elif strip.speed_control == "FRAME_NUMBER":
+            elif strip.speed_control == 'FRAME_NUMBER':
                 col.prop(strip, "speed_frame_number", text=" ")
 
             row = layout.row(align=True)
-            row.enabled = strip.speed_control != "STRETCH"
+            row.enabled = strip.speed_control != 'STRETCH'
             row = layout.row(align=True, heading="Interpolation")
             row.prop(strip, "use_frame_interpolate", text="")
 
@@ -2185,6 +2235,22 @@ class SEQUENCER_PT_view(SequencerButtonsPanel_Output, Panel):
             col.prop(st, "show_separate_color")
 
 
+class SEQUENCER_PT_view_cursor(SequencerButtonsPanel_Output, Panel):
+    bl_category = "View"
+    bl_label = "2D Cursor"
+
+    def draw(self, context):
+        layout = self.layout
+
+        st = context.space_data
+
+        layout.use_property_split = True
+        layout.use_property_decorate = False
+
+        col = layout.column()
+        col.prop(st, "cursor_location", text="Location")
+
+
 class SEQUENCER_PT_frame_overlay(SequencerButtonsPanel_Output, Panel):
     bl_label = "Frame Overlay"
     bl_category = "View"
@@ -2200,7 +2266,7 @@ class SEQUENCER_PT_frame_overlay(SequencerButtonsPanel_Output, Panel):
         scene = context.scene
         ed = scene.sequence_editor
 
-        self.layout.prop(ed, "show_overlay", text="")
+        self.layout.prop(ed, "show_overlay_frame", text="")
 
     def draw(self, context):
         layout = self.layout
@@ -2216,12 +2282,12 @@ class SEQUENCER_PT_frame_overlay(SequencerButtonsPanel_Output, Panel):
         scene = context.scene
         ed = scene.sequence_editor
 
-        layout.active = ed.show_overlay
+        layout.active = ed.show_overlay_frame
 
         col = layout.column()
         col.prop(ed, "overlay_frame", text="Frame Offset")
-        col.prop(st, "overlay_type")
-        col.prop(ed, "use_overlay_lock")
+        col.prop(st, "overlay_frame_type")
+        col.prop(ed, "use_overlay_frame_lock")
 
 
 class SEQUENCER_PT_view_safe_areas(SequencerButtonsPanel_Output, Panel):
@@ -2464,12 +2530,14 @@ classes = (
     SEQUENCER_MT_color_tag_picker,
     SEQUENCER_MT_context_menu,
     SEQUENCER_MT_preview_context_menu,
+    SEQUENCER_MT_pivot_pie,
 
     SEQUENCER_PT_color_tag_picker,
 
     SEQUENCER_PT_active_tool,
     SEQUENCER_PT_strip,
 
+    SEQUENCER_PT_gizmo_display,
     SEQUENCER_PT_overlay,
     SEQUENCER_PT_preview_overlay,
     SEQUENCER_PT_sequencer_overlay,
@@ -2500,6 +2568,7 @@ classes = (
     SEQUENCER_PT_custom_props,
 
     SEQUENCER_PT_view,
+    SEQUENCER_PT_view_cursor,
     SEQUENCER_PT_frame_overlay,
     SEQUENCER_PT_view_safe_areas,
     SEQUENCER_PT_view_safe_areas_center_cut,

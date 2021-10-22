@@ -58,7 +58,6 @@ typedef unsigned long long uint64_t;
 #define ccl_gpu_shared __shared__
 #define ccl_private
 #define ccl_may_alias
-#define ccl_addr_space
 #define ccl_restrict __restrict__
 #define ccl_loop_no_unroll
 #define ccl_align(n) __align__(n)
@@ -118,6 +117,13 @@ __device__ half __float2half(const float f)
 {
   half val;
   asm("{  cvt.rn.f16.f32 %0, %1;}\n" : "=h"(val) : "f"(f));
+  return val;
+}
+
+__device__ float __half2float(const half h)
+{
+  float val;
+  asm("{  cvt.f32.f16 %0, %1;}\n" : "=f"(val) : "h"(h));
   return val;
 }
 

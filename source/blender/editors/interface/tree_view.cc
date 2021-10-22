@@ -198,12 +198,12 @@ void AbstractTreeViewItem::add_indent(uiLayout &row) const
   uiLayoutSetFixedSize(subrow, true);
 
   const float indent_size = count_parents() * UI_DPI_ICON_SIZE;
-  uiDefBut(block, UI_BTYPE_SEPR, 0, "", 0, 0, indent_size, 0, NULL, 0.0, 0.0, 0, 0, "");
+  uiDefBut(block, UI_BTYPE_SEPR, 0, "", 0, 0, indent_size, 0, nullptr, 0.0, 0.0, 0, 0, "");
 
   /* Indent items without collapsing icon some more within their parent. Makes it clear that they
    * are actually nested and not just a row at the same level without a chevron. */
   if (!is_collapsible() && parent_) {
-    uiDefBut(block, UI_BTYPE_SEPR, 0, "", 0, 0, 0.2f * UI_UNIT_X, 0, NULL, 0.0, 0.0, 0, 0, "");
+    uiDefBut(block, UI_BTYPE_SEPR, 0, "", 0, 0, 0.2f * UI_UNIT_X, 0, nullptr, 0.0, 0.0, 0, 0, "");
   }
 
   /* Restore. */
@@ -220,13 +220,18 @@ void AbstractTreeViewItem::collapse_chevron_click_fn(struct bContext *C,
 
   const wmWindow *win = CTX_wm_window(C);
   const ARegion *region = CTX_wm_region(C);
-  uiTreeViewItemHandle *hovered_item_handle = UI_block_tree_view_find_item_at(
-      region, win->eventstate->x, win->eventstate->y);
+  uiTreeViewItemHandle *hovered_item_handle = UI_block_tree_view_find_item_at(region,
+                                                                              win->eventstate->xy);
   AbstractTreeViewItem *hovered_item = reinterpret_cast<AbstractTreeViewItem *>(
       hovered_item_handle);
   BLI_assert(hovered_item != nullptr);
 
   hovered_item->toggle_collapsed();
+  /* When collapsing an item with an active child, make this collapsed item active instead so the
+   * active item stays visible. */
+  if (hovered_item->has_active_child()) {
+    hovered_item->activate();
+  }
 }
 
 bool AbstractTreeViewItem::is_collapse_chevron_but(const uiBut *but)
@@ -246,6 +251,7 @@ void AbstractTreeViewItem::add_collapse_chevron(uiBlock &block) const
       &block, UI_BTYPE_BUT_TOGGLE, 0, icon, 0, 0, UI_UNIT_X, UI_UNIT_Y, nullptr, 0, 0, 0, 0, "");
   /* Note that we're passing the tree-row button here, not the chevron one. */
   UI_but_func_set(but, collapse_chevron_click_fn, nullptr, nullptr);
+  UI_but_flag_disable(but, UI_BUT_UNDO);
 
   /* Check if the query for the button matches the created button. */
   BLI_assert(is_collapse_chevron_but(but));
@@ -313,6 +319,7 @@ void AbstractTreeViewItem::add_rename_button(uiLayout &row)
   /* Gotta be careful with what's passed to the `arg1` here. Any tree data will be freed once the
    * callback is executed. */
   UI_but_func_rename_set(rename_but, AbstractTreeViewItem::rename_button_fn, rename_but);
+  UI_but_flag_disable(rename_but, UI_BUT_UNDO);
 
   const bContext *evil_C = static_cast<bContext *>(block->evil_C);
   ARegion *region = CTX_wm_region(evil_C);
@@ -323,6 +330,18 @@ void AbstractTreeViewItem::add_rename_button(uiLayout &row)
 
   UI_block_emboss_set(block, previous_emboss);
   UI_block_layout_set_current(block, &row);
+}
+
+bool AbstractTreeViewItem::has_active_child() const
+{
+  bool found = false;
+  foreach_item_recursive([&found](const AbstractTreeViewItem &item) {
+    if (item.is_active()) {
+      found = true;
+    }
+  });
+
+  return found;
 }
 
 void AbstractTreeViewItem::on_activate()
@@ -365,6 +384,11 @@ bool AbstractTreeViewItem::rename(StringRefNull new_name)
    * recognizes the item. (It only compares labels by default.) */
   label_ = new_name;
   return true;
+}
+
+void AbstractTreeViewItem::build_context_menu(bContext & /*C*/, uiLayout & /*column*/) const
+{
+  /* No context menu by default. */
 }
 
 void AbstractTreeViewItem::update_from_old(const AbstractTreeViewItem &old)
@@ -704,4 +728,12 @@ void UI_tree_view_item_begin_rename(uiTreeViewItemHandle *item_handle)
 {
   AbstractTreeViewItem &item = reinterpret_cast<AbstractTreeViewItem &>(*item_handle);
   item.begin_renaming();
+}
+
+void UI_tree_view_item_context_menu_build(bContext *C,
+                                          const uiTreeViewItemHandle *item_handle,
+                                          uiLayout *column)
+{
+  const AbstractTreeViewItem &item = reinterpret_cast<const AbstractTreeViewItem &>(*item_handle);
+  item.build_context_menu(*C, *column);
 }

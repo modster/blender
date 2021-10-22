@@ -25,6 +25,7 @@
 #include "node_function_util.hh"
 
 namespace blender::nodes {
+
 static void fn_node_rotate_euler_declare(NodeDeclarationBuilder &b)
 {
   b.is_function_node();
@@ -82,8 +83,8 @@ static const fn::MultiFunction *get_multi_function(bNode &bnode)
         mat3_to_eul(result, mat_res);
         return result;
       }};
-  static fn::CustomMF_SI_SI_SO<float3, float3, float3> point_euler_rot{
-      "Rotate Euler by Euler/Point", [](const float3 &input, const float3 &rotation) {
+  static fn::CustomMF_SI_SI_SO<float3, float3, float3> local_euler_rot{
+      "Rotate Euler by Euler/Local", [](const float3 &input, const float3 &rotation) {
         float input_mat[3][3];
         eul_to_mat3(input_mat, input);
         float rot_mat[3][3];
@@ -94,8 +95,8 @@ static const fn::MultiFunction *get_multi_function(bNode &bnode)
         mat3_to_eul(result, mat_res);
         return result;
       }};
-  static fn::CustomMF_SI_SI_SI_SO<float3, float3, float, float3> point_AA_rot{
-      "Rotate Euler by AxisAngle/Point", [](const float3 &input, const float3 &axis, float angle) {
+  static fn::CustomMF_SI_SI_SI_SO<float3, float3, float, float3> local_AA_rot{
+      "Rotate Euler by AxisAngle/Local", [](const float3 &input, const float3 &axis, float angle) {
         float input_mat[3][3];
         eul_to_mat3(input_mat, input);
         float rot_mat[3][3];
@@ -109,10 +110,10 @@ static const fn::MultiFunction *get_multi_function(bNode &bnode)
   short type = bnode.custom1;
   short space = bnode.custom2;
   if (type == FN_NODE_ROTATE_EULER_TYPE_AXIS_ANGLE) {
-    return space == FN_NODE_ROTATE_EULER_SPACE_OBJECT ? &obj_AA_rot : &point_AA_rot;
+    return space == FN_NODE_ROTATE_EULER_SPACE_OBJECT ? &obj_AA_rot : &local_AA_rot;
   }
   if (type == FN_NODE_ROTATE_EULER_TYPE_EULER) {
-    return space == FN_NODE_ROTATE_EULER_SPACE_OBJECT ? &obj_euler_rot : &point_euler_rot;
+    return space == FN_NODE_ROTATE_EULER_SPACE_OBJECT ? &obj_euler_rot : &local_euler_rot;
   }
   BLI_assert_unreachable();
   return nullptr;

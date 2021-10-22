@@ -185,23 +185,18 @@ class _defs_annotate:
         tool_settings = context.tool_settings
 
         if space_type == 'VIEW_3D':
-            layout.separator()
-
             row = layout.row(align=True)
             row.prop(tool_settings, "annotation_stroke_placement_view3d", text="Placement")
             if tool_settings.gpencil_stroke_placement_view3d == 'CURSOR':
                 row.prop(tool_settings.gpencil_sculpt, "lockaxis")
             elif tool_settings.gpencil_stroke_placement_view3d in {'SURFACE', 'STROKE'}:
                 row.prop(tool_settings, "use_gpencil_stroke_endpoints")
-        elif space_type in {'IMAGE_EDITOR', 'NODE_EDITOR', 'SEQUENCE_EDITOR', 'CLIP_EDITOR'}:
-            layout.separator()
 
+        elif space_type in {'IMAGE_EDITOR', 'NODE_EDITOR', 'SEQUENCE_EDITOR', 'CLIP_EDITOR'}:
             row = layout.row(align=True)
             row.prop(tool_settings, "annotation_stroke_placement_view2d", text="Placement")
 
         if tool.idname == "builtin.annotate_line":
-            layout.separator()
-
             props = tool.operator_properties("gpencil.annotate")
             if region_type == 'TOOL_HEADER':
                 row = layout.row()
@@ -223,7 +218,6 @@ class _defs_annotate:
                 subrow.prop(props, "stabilizer_radius", text="Radius", slider=True)
                 subrow.prop(props, "stabilizer_factor", text="Factor", slider=True)
             else:
-                layout.separator()
                 layout.prop(props, "use_stabilizer", text="Stabilize Stroke")
                 col = layout.column(align=False)
                 col.active = props.use_stabilizer
@@ -2441,6 +2435,19 @@ class _defs_node_edit:
 class _defs_sequencer_generic:
 
     @ToolDef.from_fn
+    def cursor():
+        return dict(
+            idname="builtin.cursor",
+            label="Cursor",
+            description=(
+                "Set the cursor location, drag to transform"
+            ),
+            icon="ops.generic.cursor",
+            keymap="Sequencer Tool: Cursor",
+            options={'KEYMAP_FALLBACK'},
+        )
+
+    @ToolDef.from_fn
     def blade():
         def draw_settings(_context, layout, tool):
             props = tool.operator_properties("sequencer.split")
@@ -2502,6 +2509,18 @@ class _defs_sequencer_generic:
             keymap="Sequencer Tool: Scale",
         )
 
+    @ToolDef.from_fn
+    def transform():
+        return dict(
+            idname="builtin.transform",
+            label="Transform",
+            description=(
+                "Supports any combination of grab, rotate, and scale at once"
+            ),
+            icon="ops.transform.transform",
+            widget="SEQUENCER_GGT_gizmo2d",
+            # No keymap default action, only for gizmo!
+       )
 
 class _defs_sequencer_select:
     @ToolDef.from_fn
@@ -3094,9 +3113,13 @@ class SEQUENCER_PT_tools_active(ToolSelectPanelHelper, Panel):
         ],
         'PREVIEW': [
             *_tools_select,
+            _defs_sequencer_generic.cursor,
+            None,
             _defs_sequencer_generic.translate,
             _defs_sequencer_generic.rotate,
             _defs_sequencer_generic.scale,
+            _defs_sequencer_generic.transform,
+            None,
             _defs_sequencer_generic.sample,
             *_tools_annotate,
         ],
@@ -3106,12 +3129,17 @@ class SEQUENCER_PT_tools_active(ToolSelectPanelHelper, Panel):
         ],
         'SEQUENCER_PREVIEW': [
             *_tools_select,
+            _defs_sequencer_generic.cursor,
+            None,
             _defs_sequencer_generic.translate,
             _defs_sequencer_generic.rotate,
             _defs_sequencer_generic.scale,
-            _defs_sequencer_generic.blade,
+            _defs_sequencer_generic.transform,
+            None,
             _defs_sequencer_generic.sample,
             *_tools_annotate,
+            None,
+            _defs_sequencer_generic.blade,
         ],
     }
 

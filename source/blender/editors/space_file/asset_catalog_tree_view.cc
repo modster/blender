@@ -21,8 +21,6 @@
  * \ingroup spfile
  */
 
-#include "ED_fileselect.h"
-
 #include "DNA_space_types.h"
 
 #include "BKE_asset.h"
@@ -32,6 +30,9 @@
 #include "BLI_string_ref.hh"
 
 #include "BLT_translation.h"
+
+#include "ED_asset.h"
+#include "ED_fileselect.h"
 
 #include "RNA_access.h"
 
@@ -52,7 +53,7 @@ using namespace blender::bke;
 namespace blender::ed::asset_browser {
 
 class AssetCatalogTreeView : public ui::AbstractTreeView {
-  bke::AssetCatalogService *catalog_service_;
+  ::AssetLibrary *asset_library_;
   /** The asset catalog tree this tree-view represents. */
   bke::AssetCatalogTree *catalog_tree_;
   FileAssetSelectParams *params_;
@@ -94,6 +95,7 @@ class AssetCatalogTreeViewItem : public ui::BasicTreeViewItem {
   void on_activate() override;
 
   void build_row(uiLayout &row) override;
+  void build_context_menu(bContext &C, uiLayout &column) const override;
 
   bool can_drop(const wmDrag &drag) const override;
   std::string drop_tooltip(const bContext &C,
@@ -128,7 +130,7 @@ class AssetCatalogTreeViewUnassignedItem : public ui::BasicTreeViewItem {
 AssetCatalogTreeView::AssetCatalogTreeView(::AssetLibrary *library,
                                            FileAssetSelectParams *params,
                                            SpaceFile &space_file)
-    : catalog_service_(BKE_asset_library_get_catalog_service(library)),
+    : asset_library_(library),
       catalog_tree_(BKE_asset_library_get_catalog_tree(library)),
       params_(params),
       space_file_(space_file)
@@ -217,7 +219,12 @@ void AssetCatalogTreeViewItem::on_activate()
 
 void AssetCatalogTreeViewItem::build_row(uiLayout &row)
 {
-  ui::BasicTreeViewItem::build_row(row);
+  if (catalog_item_.has_unsaved_changes()) {
+    uiItemL(&row, (label_ + "*").c_str(), icon);
+  }
+  else {
+    uiItemL(&row, label_.c_str(), icon);
+  }
 
   if (!is_hovered()) {
     return;
@@ -225,23 +232,47 @@ void AssetCatalogTreeViewItem::build_row(uiLayout &row)
 
   uiButTreeRow *tree_row_but = tree_row_button();
   PointerRNA *props;
-  const CatalogID catalog_id = catalog_item_.get_catalog_id();
 
   props = UI_but_extra_operator_icon_add(
       (uiBut *)tree_row_but, "ASSET_OT_catalog_new", WM_OP_INVOKE_DEFAULT, ICON_ADD);
   RNA_string_set(props, "parent_path", catalog_item_.catalog_path().c_str());
+}
 
-  /* Tree items without a catalog ID represent components of catalog paths that are not
-   * associated with an actual catalog. They exist merely by the presence of a child catalog, and
-   * thus cannot be deleted themselves. */
-  if (!BLI_uuid_is_nil(catalog_id)) {
-    char catalog_id_str_buffer[UUID_STRING_LEN] = "";
-    BLI_uuid_format(catalog_id_str_buffer, catalog_id);
+void AssetCatalogTreeViewItem::build_context_menu(bContext &C, uiLayout &column) const
+{
+  PointerRNA props;
 
-    props = UI_but_extra_operator_icon_add(
-        (uiBut *)tree_row_but, "ASSET_OT_catalog_delete", WM_OP_INVOKE_DEFAULT, ICON_X);
-    RNA_string_set(props, "catalog_id", catalog_id_str_buffer);
+  uiItemFullO(&column,
+              "ASSET_OT_catalog_new",
+              "New Catalog",
+              ICON_NONE,
+              nullptr,
+              WM_OP_INVOKE_DEFAULT,
+              0,
+              &props);
+  RNA_string_set(&props, "parent_path", catalog_item_.catalog_path().c_str());
+
+  char catalog_id_str_buffer[UUID_STRING_LEN] = "";
+  BLI_uuid_format(catalog_id_str_buffer, catalog_item_.get_catalog_id());
+  uiItemFullO(&column,
+              "ASSET_OT_catalog_delete",
+              "Delete Catalog",
+              ICON_NONE,
+              nullptr,
+              WM_OP_INVOKE_DEFAULT,
+              0,
+              &props);
+  RNA_string_set(&props, "catalog_id", catalog_id_str_buffer);
+  uiItemO(&column, "Rename", ICON_NONE, "UI_OT_tree_view_item_rename");
+
+  /* Doesn't actually exist right now, but could be defined in Python. Reason that this isn't done
+   * in Python yet is that catalogs are not exposed in BPY, and we'd somehow pass the clicked on
+   * catalog to the menu draw callback (via context probably).*/
+  MenuType *mt = WM_menutype_find("ASSETBROWSER_MT_catalog_context_menu", true);
+  if (!mt) {
+    return;
   }
+  UI_menutype_draw(&C, mt, &column);
 }
 
 bool AssetCatalogTreeViewItem::has_droppable_item(const wmDrag &drag)
@@ -328,10 +359,7 @@ bool AssetCatalogTreeViewItem::rename(StringRefNull new_name)
 
   const AssetCatalogTreeView &tree_view = static_cast<const AssetCatalogTreeView &>(
       get_tree_view());
-
-  AssetCatalogPath new_path = catalog_item_.catalog_path().parent();
-  new_path = new_path / StringRef(new_name);
-  tree_view.catalog_service_->update_catalog_path(catalog_item_.get_catalog_id(), new_path);
+  ED_asset_catalog_rename(tree_view.asset_library_, catalog_item_.get_catalog_id(), new_name);
   return true;
 }
 
@@ -342,6 +370,10 @@ void AssetCatalogTreeViewAllItem::build_row(uiLayout &row)
   ui::BasicTreeViewItem::build_row(row);
 
   PointerRNA *props;
+
+  UI_but_extra_operator_icon_add(
+      (uiBut *)tree_row_button(), "ASSET_OT_catalogs_save", WM_OP_INVOKE_DEFAULT, ICON_FILE_TICK);
+
   props = UI_but_extra_operator_icon_add(
       (uiBut *)tree_row_button(), "ASSET_OT_catalog_new", WM_OP_INVOKE_DEFAULT, ICON_ADD);
   /* No parent path to use the root level. */
@@ -443,7 +475,7 @@ void file_ensure_updated_catalog_filter_data(
   const AssetCatalogService *catalog_service = BKE_asset_library_get_catalog_service(
       asset_library);
 
-  if (filter_settings->asset_catalog_visibility == FILE_SHOW_ASSETS_FROM_CATALOG) {
+  if (filter_settings->asset_catalog_visibility != FILE_SHOW_ASSETS_ALL_CATALOGS) {
     filter_settings->catalog_filter = std::make_unique<AssetCatalogFilter>(
         catalog_service->create_catalog_filter(filter_settings->asset_catalog_id));
   }
@@ -458,7 +490,7 @@ bool file_is_asset_visible_in_catalog_filter_settings(
 
   switch (filter_settings->asset_catalog_visibility) {
     case FILE_SHOW_ASSETS_WITHOUT_CATALOG:
-      return BLI_uuid_is_nil(asset_data->catalog_id);
+      return !filter_settings->catalog_filter->is_known(asset_data->catalog_id);
     case FILE_SHOW_ASSETS_FROM_CATALOG:
       return filter_settings->catalog_filter->contains(asset_data->catalog_id);
     case FILE_SHOW_ASSETS_ALL_CATALOGS:
@@ -478,6 +510,8 @@ void file_create_asset_catalog_tree_view_in_layout(::AssetLibrary *asset_library
                                                    FileAssetSelectParams *params)
 {
   uiBlock *block = uiLayoutGetBlock(layout);
+
+  UI_block_layout_set_current(block, layout);
 
   ui::AbstractTreeView *tree_view = UI_block_add_view(
       *block,
