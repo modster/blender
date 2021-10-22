@@ -96,6 +96,9 @@ typedef struct uiTreeViewItemHandle uiTreeViewItemHandle;
 #define UI_SEP_CHAR '|'
 #define UI_SEP_CHAR_S "|"
 
+/* Separator for text in search menus. */
+#define UI_MENU_ARROW_SEP "▶"
+
 /* names */
 #define UI_MAX_DRAW_STR 400
 #define UI_MAX_NAME_STR 128
@@ -253,7 +256,7 @@ enum {
 #define UI_PANEL_CATEGORY_MARGIN_WIDTH (U.widget_unit * 1.0f)
 
 #define UI_PANEL_MARGIN_X (U.widget_unit * 0.4f)
-#define UI_PANEL_MARGIN_Y (U.widget_unit * 0.2f)
+#define UI_PANEL_MARGIN_Y (U.widget_unit * 0.1f)
 
 /* but->drawflag - these flags should only affect how the button is drawn. */
 /* NOTE: currently, these flags *are not passed* to the widget's state() or draw() functions
@@ -2788,7 +2791,8 @@ void UI_tree_view_item_context_menu_build(struct bContext *C,
                                           const uiTreeViewItemHandle *item,
                                           uiLayout *column);
 
-uiTreeViewItemHandle *UI_block_tree_view_find_item_at(const struct ARegion *region, int x, int y);
+uiTreeViewItemHandle *UI_block_tree_view_find_item_at(const struct ARegion *region,
+                                                      const int xy[2]) ATTR_NONNULL(1, 2);
 uiTreeViewItemHandle *UI_block_tree_view_find_active_item(const struct ARegion *region);
 
 #ifdef __cplusplus
