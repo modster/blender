@@ -182,7 +182,8 @@ void node_bsdf_principled_eval(vec4 base_color,
 
     g_refraction_data.color = base_color.rgb * (btdf * glass_transmission_weight);
     g_refraction_data.N = N;
-    g_refraction_data.roughness = do_multiscatter != 0.0 ? roughness : transmission_roughness;
+    g_refraction_data.roughness = do_multiscatter != 0.0 ? roughness :
+                                                           max(roughness, transmission_roughness);
     g_refraction_data.ior = ior;
   }
 }
