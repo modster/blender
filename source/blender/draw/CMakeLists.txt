@@ -49,6 +49,25 @@ set(INC
   ${CMAKE_CURRENT_BINARY_DIR}/../makesdna/intern
 )
 
+set(EEVEE_BUILD_DIR
+  ${CMAKE_CURRENT_BINARY_DIR}/engines/eevee
+)
+
+set(EEVEE_BUILD_SRC
+  engines/eevee/eevee_build.cc
+  engines/eevee/eevee_lut.c
+)
+add_executable(eevee_build ${EEVEE_BUILD_SRC})
+target_include_directories(eevee_build PRIVATE ${INC})
+
+add_custom_command(
+  OUTPUT
+    ${EEVEE_BUILD_DIR}/shaders/eevee_raytrace_resolve_lib.glsl
+  COMMAND
+    "$<TARGET_FILE:eevee_build>" --resolve_sample_table ${EEVEE_BUILD_DIR}/shaders/eevee_raytrace_resolve_lib.glsl
+  DEPENDS eevee_build
+)
+
 set(SRC
   intern/draw_cache.c
   intern/draw_cache_extract_mesh.cc
@@ -236,6 +255,8 @@ set(LIB
   bf_blenlib
   bf_windowmanager
 )
+
+data_to_c(${EEVEE_BUILD_DIR}/shaders/eevee_raytrace_resolve_lib.glsl ${EEVEE_BUILD_DIR}/shaders/eevee_raytrace_resolve_lib.glsl.c SRC)
 
 data_to_c_simple(engines/eevee/shaders/eevee_bsdf_lib.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_bsdf_microfacet_lib.glsl SRC)
