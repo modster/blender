@@ -19,7 +19,7 @@ layout(std140) uniform filter_block
   LightProbeFilterData probe;
 };
 
-out vec4 out_irradiance;
+layout(location = 0) out vec4 out_irradiance;
 
 vec3 octahedral_to_cubemap_proj(vec2 co)
 {

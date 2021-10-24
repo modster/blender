@@ -84,18 +84,19 @@ vec3 lightprobe_cubemap_eval(vec3 P, vec3 R, float roughness, float random_thres
 
 void main(void)
 {
+  vec2 uv = uvcoordsvar.xy;
   float gbuffer_depth = texelFetch(hiz_tx, ivec2(gl_FragCoord.xy), 0).r;
-  vec3 vP = get_view_space_from_depth(uvcoordsvar.xy, gbuffer_depth);
+  vec3 vP = get_view_space_from_depth(uv, gbuffer_depth);
   vec3 P = point_view_to_world(vP);
   vec3 V = cameraVec(P);
 
-  vec4 tra_col_in = texture(transmit_color_tx, uvcoordsvar.xy);
-  vec4 tra_nor_in = texture(transmit_normal_tx, uvcoordsvar.xy);
-  vec4 tra_dat_in = texture(transmit_data_tx, uvcoordsvar.xy);
-  vec4 ref_col_in = texture(reflect_color_tx, uvcoordsvar.xy);
-  vec4 ref_nor_in = texture(reflect_normal_tx, uvcoordsvar.xy);
+  vec4 tra_col_in = texture(transmit_color_tx, uv);
+  vec4 tra_nor_in = texture(transmit_normal_tx, uv);
+  vec4 tra_dat_in = texture(transmit_data_tx, uv);
+  vec4 ref_col_in = texture(reflect_color_tx, uv);
+  vec4 ref_nor_in = texture(reflect_normal_tx, uv);
 
-  ClosureEmission emission = gbuffer_load_emission_data(emission_data_tx, uvcoordsvar.xy);
+  ClosureEmission emission = gbuffer_load_emission_data(emission_data_tx, uv);
   ClosureDiffuse diffuse = gbuffer_load_diffuse_data(tra_col_in, tra_nor_in, tra_dat_in);
   ClosureReflection reflection = gbuffer_load_reflection_data(ref_col_in, ref_nor_in);
 

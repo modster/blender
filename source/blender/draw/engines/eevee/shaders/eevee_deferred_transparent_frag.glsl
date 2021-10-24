@@ -11,7 +11,6 @@
 #pragma BLENDER_REQUIRE(eevee_volume_eval_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_gbuffer_lib.glsl)
 
-uniform sampler2D depth_max_tx;
 uniform usampler2D volume_data_tx;
 uniform sampler2D transparency_data_tx;
 

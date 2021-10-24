@@ -12,7 +12,7 @@ layout(std140) uniform lightprobes_info_block
 uniform sampler2DArray lightprobe_grid_tx;
 uniform int grid_id;
 
-out vec4 out_color;
+layout(location = 0) out vec4 out_color;
 
 void main()
 {

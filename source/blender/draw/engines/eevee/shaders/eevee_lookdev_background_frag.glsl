@@ -21,7 +21,7 @@ uniform float blur;
 
 in vec4 uvcoordsvar;
 
-out vec4 out_background;
+layout(location = 0) out vec4 out_background;
 
 void main()
 {
