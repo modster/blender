@@ -54,8 +54,6 @@ extern char datatoc_eevee_deferred_holdout_frag_glsl[];
 extern char datatoc_eevee_deferred_transparent_frag_glsl[];
 extern char datatoc_eevee_deferred_volume_frag_glsl[];
 extern char datatoc_eevee_depth_clear_frag_glsl[];
-extern char datatoc_eevee_hiz_copy_frag_glsl[];
-extern char datatoc_eevee_hiz_downsample_frag_glsl[];
 extern char datatoc_eevee_depth_of_field_accumulator_lib_glsl[];
 extern char datatoc_eevee_depth_of_field_bokeh_lut_frag_glsl[];
 extern char datatoc_eevee_depth_of_field_downsample_frag_glsl[];
@@ -75,9 +73,11 @@ extern char datatoc_eevee_depth_of_field_tiles_dilate_frag_glsl[];
 extern char datatoc_eevee_depth_of_field_tiles_flatten_frag_glsl[];
 extern char datatoc_eevee_film_filter_frag_glsl[];
 extern char datatoc_eevee_film_lib_glsl[];
-extern char datatoc_eevee_film_resolve_frag_glsl[];
 extern char datatoc_eevee_film_resolve_depth_frag_glsl[];
+extern char datatoc_eevee_film_resolve_frag_glsl[];
 extern char datatoc_eevee_gbuffer_lib_glsl[];
+extern char datatoc_eevee_hiz_copy_frag_glsl[];
+extern char datatoc_eevee_hiz_downsample_frag_glsl[];
 extern char datatoc_eevee_irradiance_lib_glsl[];
 extern char datatoc_eevee_light_eval_lib_glsl[];
 extern char datatoc_eevee_light_lib_glsl[];
@@ -102,6 +102,11 @@ extern char datatoc_eevee_motion_blur_lib_glsl[];
 extern char datatoc_eevee_motion_blur_tiles_dilate_frag_glsl[];
 extern char datatoc_eevee_motion_blur_tiles_flatten_frag_glsl[];
 extern char datatoc_eevee_nodetree_eval_lib_glsl[];
+extern char datatoc_eevee_raytrace_raygen_frag_glsl[];
+extern char datatoc_eevee_raytrace_raygen_lib_glsl[];
+extern char datatoc_eevee_raytrace_resolve_frag_glsl[];
+extern char datatoc_eevee_raytrace_resolve_lib_glsl[];
+extern char datatoc_eevee_raytrace_trace_lib_glsl[];
 extern char datatoc_eevee_sampling_lib_glsl[];
 extern char datatoc_eevee_shadow_lib_glsl[];
 extern char datatoc_eevee_subsurface_eval_frag_glsl[];
@@ -188,6 +193,9 @@ ShaderModule::ShaderModule()
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_depth_of_field_scatter_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_film_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_motion_blur_lib);
+  DRW_SHADER_LIB_ADD(shader_lib_, eevee_raytrace_trace_lib);
+  DRW_SHADER_LIB_ADD(shader_lib_, eevee_raytrace_raygen_lib);
+  DRW_SHADER_LIB_ADD(shader_lib_, eevee_raytrace_resolve_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_surface_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_surface_velocity_lib);
 
@@ -331,6 +339,23 @@ ShaderModule::ShaderModule()
   SHADER_FULLSCREEN(MOTION_BLUR_GATHER, eevee_motion_blur_gather_frag);
   SHADER_FULLSCREEN(MOTION_BLUR_TILE_DILATE, eevee_motion_blur_tiles_dilate_frag);
   SHADER_FULLSCREEN(MOTION_BLUR_TILE_FLATTEN, eevee_motion_blur_tiles_flatten_frag);
+
+  SHADER_FULLSCREEN_DEFINES(
+      RAYTRACE_REFLECTION, eevee_raytrace_raygen_frag, "#define REFLECTION\n");
+  SHADER_FULLSCREEN_DEFINES(RAYTRACE_REFLECTION_FALLBACK,
+                            eevee_raytrace_raygen_frag,
+                            "#define REFLECTION\n"
+                            "#define SKIP_TRACE\n");
+  SHADER_FULLSCREEN_DEFINES(
+      RAYTRACE_REFRACTION, eevee_raytrace_raygen_frag, "#define REFRACTION\n");
+  SHADER_FULLSCREEN_DEFINES(RAYTRACE_REFRACTION_FALLBACK,
+                            eevee_raytrace_raygen_frag,
+                            "#define REFRACTION\n"
+                            "#define SKIP_TRACE\n");
+  SHADER_FULLSCREEN_DEFINES(
+      RAYTRACE_RESOLVE_REFLECTION, eevee_raytrace_resolve_frag, "#define REFLECTION\n");
+  SHADER_FULLSCREEN_DEFINES(
+      RAYTRACE_RESOLVE_REFRACTION, eevee_raytrace_resolve_frag, "#define REFRACTION\n");
 
   SHADER_FULLSCREEN(SHADOW_CLEAR, eevee_depth_clear_frag);
 

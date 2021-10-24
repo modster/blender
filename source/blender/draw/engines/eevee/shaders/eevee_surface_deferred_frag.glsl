@@ -52,6 +52,7 @@ void main(void)
   nodetree_surface();
 
   float alpha = saturate(1.0 - avg(g_transparency_data.transmittance));
+  vec3 V = cameraVec(g_data.P);
 
   if (alpha > 0.0) {
     g_diffuse_data.color /= alpha;
@@ -62,6 +63,14 @@ void main(void)
 
   if (gl_FrontFacing) {
     g_refraction_data.ior = safe_rcp(g_refraction_data.ior);
+  }
+
+  g_reflection_data.N = ensure_valid_reflection(g_data.Ng, V, g_reflection_data.N);
+
+  {
+    out_reflection_color = g_reflection_data.color;
+    out_reflection_normal.xy = gbuffer_encode_normal(g_reflection_data.N);
+    out_reflection_normal.z = max(1e-4, g_reflection_data.roughness);
   }
 
   if (g_data.transmit_rand == 0.0) {
@@ -79,12 +88,6 @@ void main(void)
     out_transmit_normal.z = fract(float(g_diffuse_data.sss_id) / 1024.0);
     out_transmit_normal.w = thickness;
     out_transmit_data = g_diffuse_data.sss_radius;
-  }
-
-  {
-    out_reflection_color = g_reflection_data.color;
-    out_reflection_normal.xy = gbuffer_encode_normal(g_reflection_data.N);
-    out_reflection_normal.z = g_reflection_data.roughness;
   }
 
   out_volume_data = gbuffer_store_volume_data(g_volume_data);

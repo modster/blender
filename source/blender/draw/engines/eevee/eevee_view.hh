@@ -70,7 +70,7 @@ class ShadingView {
   /** GBuffer for deferred passes. */
   GBuffer gbuffer_;
   /** HiZBuffer for screenspace effects. */
-  HiZBuffer hiz_;
+  HiZBuffer hiz_front_, hiz_back_;
 
   /** Owned resources. */
   eevee::Framebuffer view_fb_;
@@ -101,7 +101,8 @@ class ShadingView {
         dof_(inst, name),
         mb_(inst, name),
         velocity_(inst, name),
-        hiz_(inst){};
+        hiz_front_(inst),
+        hiz_back_(inst){};
 
   ~ShadingView(){};
 
@@ -135,7 +136,7 @@ class LightProbeView {
   /** GBuffer for deferred passes. */
   GBuffer gbuffer_;
   /** HiZBuffer for screenspace effects. */
-  HiZBuffer hiz_;
+  HiZBuffer hiz_front_, hiz_back_;
   /** Owned resources. */
   Framebuffer view_fb_;
   /** DRWView of this face. */
@@ -148,7 +149,12 @@ class LightProbeView {
 
  public:
   LightProbeView(Instance &inst, const char *name, const float (*face_matrix)[4], int layer_)
-      : inst_(inst), name_(name), face_matrix_(face_matrix), hiz_(inst), layer_(layer_){};
+      : inst_(inst),
+        name_(name),
+        face_matrix_(face_matrix),
+        hiz_front_(inst),
+        hiz_back_(inst),
+        layer_(layer_){};
 
   ~LightProbeView(){};
 

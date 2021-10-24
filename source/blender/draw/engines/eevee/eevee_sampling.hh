@@ -141,6 +141,7 @@ class Sampling {
       /* TODO decorelate. */
       data_.dimensions[SAMPLING_TIME][0] = r[0];
       data_.dimensions[SAMPLING_CLOSURE][0] = r[1];
+      data_.dimensions[SAMPLING_RAYTRACE_X][0] = r[0];
     }
     {
       double r[2], offset[2] = {0, 0};
@@ -161,6 +162,10 @@ class Sampling {
       data_.dimensions[SAMPLING_SHADOW_U][0] = r[0];
       data_.dimensions[SAMPLING_SHADOW_V][0] = r[1];
       data_.dimensions[SAMPLING_SHADOW_W][0] = r[2];
+      /* TODO decorelate. */
+      data_.dimensions[SAMPLING_RAYTRACE_U][0] = r[0];
+      data_.dimensions[SAMPLING_RAYTRACE_V][0] = r[1];
+      data_.dimensions[SAMPLING_RAYTRACE_W][0] = r[2];
     }
     {
       /* Using leaped halton sequence so we can reused the same primes. */

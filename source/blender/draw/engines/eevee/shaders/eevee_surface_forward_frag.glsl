@@ -99,6 +99,8 @@ void main(void)
     g_refraction_data.ior = safe_rcp(g_refraction_data.ior);
   }
 
+  g_reflection_data.N = ensure_valid_reflection(g_data.Ng, V, g_reflection_data.N);
+
   vec3 radiance_diffuse = vec3(0);
   vec3 radiance_reflection = vec3(0);
   vec3 radiance_refraction = vec3(0);

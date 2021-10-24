@@ -36,6 +36,7 @@
 #include "eevee_lookdev.hh"
 #include "eevee_material.hh"
 #include "eevee_motion_blur.hh"
+#include "eevee_raytracing.hh"
 #include "eevee_renderpasses.hh"
 #include "eevee_sampling.hh"
 #include "eevee_shader.hh"
@@ -70,6 +71,7 @@ class Instance {
   MotionBlurModule motion_blur;
   LightModule lights;
   LightProbeModule lightprobes;
+  RaytracingModule raytracing;
   HiZBufferModule hiz;
   /* TODO(fclem) Move it to scene layer data. */
   ShadowModule shadows;
@@ -112,6 +114,7 @@ class Instance {
         motion_blur(*this),
         lights(*this),
         lightprobes(*this),
+        raytracing(*this),
         hiz(*this),
         shadows(*this),
         subsurface(*this),

@@ -12,19 +12,27 @@
 
 #define USE_VISIBLE_NORMAL 1
 
-float sample_pdf_ggx_reflect(float NH, float NV, float VH, float alpha)
+float sample_pdf_ggx_reflect(float NH, float NV, float VH, float G1, float alpha)
 {
   float a2 = sqr(alpha);
 #if USE_VISIBLE_NORMAL
   float D = a2 / D_ggx_opti(NH, a2);
-  float G1 = NV * 2.0 / G1_Smith_GGX_opti(NV, a2);
   return G1 * VH * D / NV;
 #else
   return NH * a2 / D_ggx_opti(NH, a2);
 #endif
 }
 
-vec3 sample_ggx(vec3 rand, float alpha, vec3 Vt)
+float sample_pdf_ggx_refract(
+    float NH, float NV, float VH, float LH, float G1, float alpha, float eta)
+{
+  float a2 = sqr(alpha);
+  float D = D_ggx_opti(NH, a2);
+  float Ht2 = sqr(eta * LH + VH);
+  return VH * abs(LH) * ((G1 * D) * sqr(eta) * a2 / (D * NV * Ht2));
+}
+
+vec3 sample_ggx(vec3 rand, float alpha, vec3 Vt, out float G1)
 {
 #if USE_VISIBLE_NORMAL
   /* From:
@@ -41,6 +49,7 @@ vec3 sample_ggx(vec3 rand, float alpha, vec3 Vt)
   float x = r * rand.y;
   float y = r * rand.z;
   float s = 0.5 * (1.0 + Vh.z);
+  G1 = 1.0 / s;
   y = (1.0 - s) * sqrt(1.0 - x * x) + s * y;
   float z = sqrt(saturate(1.0 - x * x - y * y));
   /* Compute normal. */
@@ -60,15 +69,49 @@ vec3 sample_ggx(vec3 rand, float alpha, vec3 Vt)
 #endif
 }
 
-vec3 sample_ggx(vec3 rand, float alpha, vec3 V, vec3 N, vec3 T, vec3 B, out float pdf)
+vec3 sample_ggx_reflect(vec3 rand, float alpha, vec3 V, vec3 N, vec3 T, vec3 B, out float pdf)
 {
+  float G1;
   vec3 Vt = world_to_tangent(V, N, T, B);
-  vec3 Ht = sample_ggx(rand, alpha, Vt);
+  vec3 Ht = sample_ggx(rand, alpha, Vt, G1);
   float NH = saturate(Ht.z);
   float NV = saturate(Vt.z);
-  float VH = saturate(dot(Vt, Ht));
-  pdf = sample_pdf_ggx_reflect(NH, NV, VH, alpha);
-  return tangent_to_world(Ht, N, T, B);
+  float VH = dot(Vt, Ht);
+  vec3 H = tangent_to_world(Ht, N, T, B);
+
+  if (VH > 0.0) {
+    vec3 L = reflect(-V, H);
+    pdf = sample_pdf_ggx_reflect(NH, NV, VH, G1, alpha);
+    return L;
+  }
+  else {
+    pdf = 0.0;
+    return vec3(1.0, 0.0, 0.0);
+  }
+}
+
+vec3 sample_ggx_refract(
+    vec3 rand, float alpha, float ior, vec3 V, vec3 N, vec3 T, vec3 B, out float pdf)
+{
+  float G1;
+  vec3 Vt = world_to_tangent(V, N, T, B);
+  vec3 Ht = sample_ggx(rand, alpha, Vt, G1);
+  float NH = saturate(Ht.z);
+  float NV = saturate(Vt.z);
+  float VH = dot(Vt, Ht);
+  vec3 H = tangent_to_world(Ht, N, T, B);
+
+  if (VH > 0.0) {
+    /* NOTE: Ior is already inverted for front faces. */
+    vec3 L = refract(-V, H, ior);
+    float LH = dot(L, H);
+    pdf = sample_pdf_ggx_refract(NH, NV, VH, LH, G1, alpha, ior);
+    return L;
+  }
+  else {
+    pdf = 0.0;
+    return vec3(1.0, 0.0, 0.0);
+  }
 }
 
 /** \} */

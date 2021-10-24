@@ -91,11 +91,15 @@ enum eSamplingDimension : uint32_t {
   SAMPLING_LIGHTPROBE = 11u,
   SAMPLING_TRANSPARENCY = 12u,
   SAMPLING_SSS_U = 13u,
-  SAMPLING_SSS_V = 14u
+  SAMPLING_SSS_V = 14u,
+  SAMPLING_RAYTRACE_U = 15u,
+  SAMPLING_RAYTRACE_V = 16u,
+  SAMPLING_RAYTRACE_W = 17u,
+  SAMPLING_RAYTRACE_X = 18u
 };
 
 /** IMPORTANT: Make sure the array can contain all sampling dimensions. */
-#define SAMPLING_DIMENSION_COUNT 15
+#define SAMPLING_DIMENSION_COUNT 19
 
 struct SamplingData {
   /** Array containing random values from Low Discrepency Sequence in [0..1) range. */
@@ -619,10 +623,34 @@ BLI_STATIC_ASSERT_ALIGN(LightProbeInfoData, 16)
 struct HiZData {
   /** Scale factor to remove HiZBuffer padding. */
   vec2 uv_scale;
+  /** Scale factor to convert from pixel space to Normalized Device Coordinates [-1..1]. */
+  vec2 pixel_to_ndc;
+};
+BLI_STATIC_ASSERT_ALIGN(HiZData, 16)
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Raytracing
+ * \{ */
+
+struct RaytraceData {
+  /** View space thickness the objects.  */
+  float thickness;
+  /** Determine how fast the sample steps are getting bigger. */
+  float quality;
+  /** Importance sample bias. Lower values will make the render less noisy. */
+  float bias;
+  /** Maximum brightness during lighting evaluation. */
+  float brightness_clamp;
+  /** Maximum roughness for which we will trace a ray. */
+  float max_roughness;
+  /** Resolve sample pool offset, based on scene current sample. */
+  int pool_offset;
   int _pad0;
   int _pad1;
 };
-BLI_STATIC_ASSERT_ALIGN(HiZData, 16)
+BLI_STATIC_ASSERT_ALIGN(RaytraceData, 16)
 
 /** \} */
 
@@ -717,6 +745,7 @@ using HiZDataBuf = StructBuffer<HiZData>;
 using LightDataBuf = StructArrayBuffer<LightData, CULLING_ITEM_BATCH>;
 using LightProbeFilterDataBuf = StructBuffer<LightProbeFilterData>;
 using LightProbeInfoDataBuf = StructBuffer<LightProbeInfoData>;
+using RaytraceDataBuf = StructBuffer<RaytraceData>;
 using ShadowPunctualDataBuf = StructArrayBuffer<ShadowPunctualData, CULLING_ITEM_BATCH>;
 using SubsurfaceDataBuf = StructBuffer<SubsurfaceData>;
 using VelocityObjectBuf = StructBuffer<VelocityObjectData>;

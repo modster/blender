@@ -237,7 +237,7 @@ DRWShadingGroup *DeferredLayer::material_add(::Material *blender_mat, GPUMateria
 {
   /* TODO/OPTI(fclem) Set the right mask for each effect based on gpumat flags. */
   uint stencil_mask = CLOSURE_DIFFUSE | CLOSURE_SSS | CLOSURE_REFLECTION | CLOSURE_TRANSPARENCY |
-                      CLOSURE_EMISSION;
+                      CLOSURE_EMISSION | CLOSURE_REFRACTION;
   DRWPass *pass = (blender_mat->blend_flag & MA_BL_CULL_BACKFACE) ? gbuffer_culled_ps_ :
                                                                     gbuffer_ps_;
   DRWShadingGroup *grp = DRW_shgroup_material_create(gpumat, pass);
@@ -273,7 +273,10 @@ void DeferredLayer::volume_add(Object *ob)
   DRW_shgroup_call(grp, DRW_cache_cube_get(), ob);
 }
 
-void DeferredLayer::render(GBuffer &gbuffer, HiZBuffer &hiz, GPUFrameBuffer *view_fb)
+void DeferredLayer::render(GBuffer &gbuffer,
+                           HiZBuffer &hiz_front,
+                           HiZBuffer &hiz_back,
+                           GPUFrameBuffer *view_fb)
 {
   DeferredPass &deferred_pass = inst_.shading_passes.deferred;
 
@@ -283,19 +286,27 @@ void DeferredLayer::render(GBuffer &gbuffer, HiZBuffer &hiz, GPUFrameBuffer *vie
     return;
   }
   /* TODO(fclem): detect these cases. */
+  const bool use_subsurface = true;
+  const bool use_transparency = true;
+  const bool use_holdout = true;
   const bool use_refraction = true;
   const bool use_glossy = true;
   const bool use_ao = false;
 
   gbuffer.prepare((eClosureBits)0xFFFFFFFFu);
-  hiz.prepare(gbuffer.depth_tx);
+  if (use_ao || use_glossy) {
+    hiz_front.prepare(gbuffer.depth_tx);
+  }
+  if (use_refraction) {
+    hiz_back.prepare(gbuffer.depth_tx);
+  }
 
-  update_pass_inputs(gbuffer, hiz);
+  update_pass_inputs(gbuffer, hiz_front, hiz_back);
 
   if (use_refraction) {
     /* TODO(fclem) Only update if needed.
      * i.e: No need when SSR from previous layer has already updated hiz. */
-    hiz.update(gbuffer.depth_tx);
+    hiz_back.update(gbuffer.depth_tx);
   }
 
   gbuffer.bind();
@@ -304,20 +315,12 @@ void DeferredLayer::render(GBuffer &gbuffer, HiZBuffer &hiz, GPUFrameBuffer *vie
     DRW_draw_pass(prepass_ps_);
 
     /* TODO(fclem): Ambient Occlusion texture node. */
-    /* NOTE(fclem): Needs a separate hiz if used at the same time as refraction. */
     if (use_ao) {
-      hiz.update(gbuffer.depth_tx);
+      hiz_front.update(gbuffer.depth_tx);
       gbuffer.bind();
     }
 
     DRW_draw_pass(gbuffer_ps_);
-  }
-
-  if (use_refraction) {
-    // if (inst_.raytracing.enabled()) {
-    // DRW_draw_pass(deferred_pass.trace_refraction_ps_);
-    // }
-    // DRW_draw_pass(deferred_pass.eval_refraction_ps_);
   }
 
   if (!no_volumes) {
@@ -332,17 +335,26 @@ void DeferredLayer::render(GBuffer &gbuffer, HiZBuffer &hiz, GPUFrameBuffer *vie
     }
   }
 
-  hiz.update(gbuffer.depth_tx);
-
-  if (true) {
+  if (use_holdout) {
     gbuffer.bind_holdout();
     DRW_draw_pass(deferred_pass.eval_holdout_ps_);
   }
 
-  GPU_framebuffer_bind(view_fb);
+  /* TODO(fclem) We could bypass update if ao already updated it and if there is no volume. */
+  hiz_front.update(gbuffer.depth_tx);
 
-  if (true) {
+  if (!no_surfaces && use_refraction) {
+    /* Launch and shade refraction rays before transparency changes the combined pass. */
+    gbuffer.bind_tracing();
+    DRW_draw_pass(deferred_pass.trace_refraction_ps_);
+  }
+
+  GPU_framebuffer_bind(view_fb);
+  if (use_transparency) {
     DRW_draw_pass(deferred_pass.eval_transparency_ps_);
+  }
+  if (!no_surfaces && use_refraction) {
+    DRW_draw_pass(deferred_pass.resolve_refraction_ps_);
   }
 
   gbuffer.clear_radiance();
@@ -355,23 +367,30 @@ void DeferredLayer::render(GBuffer &gbuffer, HiZBuffer &hiz, GPUFrameBuffer *vie
       GPU_framebuffer_bind(view_fb);
       DRW_draw_pass(deferred_pass.eval_volume_homogeneous_ps_);
     }
+
     if (!no_surfaces) {
       gbuffer.bind_radiance();
-      DRW_draw_pass(deferred_pass.eval_diffuse_ps_);
+      DRW_draw_pass(deferred_pass.eval_direct_ps_);
     }
   }
 
   if (!no_surfaces) {
-    GPU_framebuffer_bind(view_fb);
-    DRW_draw_pass(deferred_pass.eval_subsurface_ps_);
-  }
+    if (use_subsurface) {
+      GPU_framebuffer_bind(view_fb);
+      DRW_draw_pass(deferred_pass.eval_subsurface_ps_);
+    }
 
-  // if (use_glossy && inst_.raytracing.enabled()) {
-  //   inst_.raytracing.trace_reflection(gbuffer);
-  // }
+    if (use_glossy) {
+      gbuffer.bind_tracing();
+      DRW_draw_pass(deferred_pass.trace_reflection_ps_);
+
+      GPU_framebuffer_bind(view_fb);
+      DRW_draw_pass(deferred_pass.resolve_reflection_ps_);
+    }
+  }
 }
 
-void DeferredLayer::update_pass_inputs(GBuffer &gbuffer, HiZBuffer &hiz)
+void DeferredLayer::update_pass_inputs(GBuffer &gbuffer, HiZBuffer &hiz_front, HiZBuffer &hiz_back)
 {
   DeferredPass &deferred_pass = inst_.shading_passes.deferred;
   deferred_pass.input_combined_tx_ = gbuffer.combined_tx;
@@ -384,7 +403,10 @@ void DeferredLayer::update_pass_inputs(GBuffer &gbuffer, HiZBuffer &hiz)
   deferred_pass.input_diffuse_tx_ = gbuffer.diffuse_tx;
   deferred_pass.input_transparency_data_tx_ = gbuffer.transparency_tx;
   deferred_pass.input_volume_data_tx_ = gbuffer.volume_tx;
-  deferred_pass.input_hiz_tx_ = hiz.texture_get();
+  deferred_pass.input_ray_data_tx_ = gbuffer.ray_data_tx;
+  deferred_pass.input_ray_radiance_tx_ = gbuffer.ray_radiance_tx;
+  deferred_pass.input_hiz_front_tx_ = hiz_front.texture_get();
+  deferred_pass.input_hiz_back_tx_ = hiz_back.texture_get();
 }
 
 /** \} */
@@ -407,9 +429,9 @@ void DeferredPass::sync(void)
 
   {
     DRWState state = DRW_STATE_WRITE_COLOR | DRW_STATE_STENCIL_NEQUAL | DRW_STATE_BLEND_ADD_FULL;
-    eval_diffuse_ps_ = DRW_pass_create("DeferredDirect", state);
+    eval_direct_ps_ = DRW_pass_create("DeferredDirect", state);
     GPUShader *sh = inst_.shaders.static_shader_get(DEFERRED_EVAL_DIRECT);
-    DRWShadingGroup *grp = DRW_shgroup_create(sh, eval_diffuse_ps_);
+    DRWShadingGroup *grp = DRW_shgroup_create(sh, eval_direct_ps_);
     DRW_shgroup_uniform_block_ref(grp, "lights_block", lights.lights_ubo_ref_get());
     DRW_shgroup_uniform_block_ref(grp, "shadows_punctual_block", lights.shadows_ubo_ref_get());
     DRW_shgroup_uniform_block_ref(grp, "lights_culling_block", lights.culling_ubo_ref_get());
@@ -436,7 +458,7 @@ void DeferredPass::sync(void)
         grp, "reflect_color_tx", &input_reflect_color_tx_, no_interp);
     DRW_shgroup_uniform_texture_ref_ex(
         grp, "reflect_normal_tx", &input_reflect_normal_tx_, no_interp);
-    DRW_shgroup_uniform_texture_ref(grp, "hiz_tx", &input_hiz_tx_);
+    DRW_shgroup_uniform_texture_ref(grp, "hiz_tx", &input_hiz_front_tx_);
     DRW_shgroup_uniform_texture_ref(
         grp, "sss_transmittance_tx", inst_.subsurface.transmittance_ref_get());
     DRW_shgroup_stencil_set(
@@ -451,7 +473,7 @@ void DeferredPass::sync(void)
     DRW_shgroup_uniform_block(grp, "subsurface_block", inst_.subsurface.ubo_get());
     DRW_shgroup_uniform_block(grp, "sampling_block", inst_.sampling.ubo_get());
     DRW_shgroup_uniform_block(grp, "hiz_block", inst_.hiz.ubo_get());
-    DRW_shgroup_uniform_texture_ref(grp, "hiz_tx", &input_hiz_tx_);
+    DRW_shgroup_uniform_texture_ref(grp, "hiz_tx", &input_hiz_front_tx_);
     DRW_shgroup_uniform_texture_ref_ex(grp, "radiance_tx", &input_diffuse_tx_, no_interp);
     DRW_shgroup_uniform_texture_ref_ex(
         grp, "transmit_color_tx", &input_transmit_color_tx_, no_interp);
@@ -476,7 +498,7 @@ void DeferredPass::sync(void)
     DRW_shgroup_uniform_texture_ref_ex(
         grp, "transparency_data_tx", &input_transparency_data_tx_, no_interp);
     DRW_shgroup_uniform_texture_ref_ex(grp, "volume_data_tx", &input_volume_data_tx_, no_interp);
-    DRW_shgroup_uniform_texture_ref(grp, "hiz_tx", &input_hiz_tx_);
+    DRW_shgroup_uniform_texture_ref(grp, "hiz_tx", &input_hiz_front_tx_);
     DRW_shgroup_stencil_set(grp, 0x0, 0x0, CLOSURE_VOLUME);
     DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
   }
@@ -487,7 +509,6 @@ void DeferredPass::sync(void)
     DRWShadingGroup *grp = DRW_shgroup_create(sh, eval_transparency_ps_);
     DRW_shgroup_uniform_texture_ref(grp, "transparency_data_tx", &input_transparency_data_tx_);
     DRW_shgroup_uniform_texture_ref_ex(grp, "volume_data_tx", &input_volume_data_tx_, no_interp);
-    DRW_shgroup_uniform_texture_ref(grp, "hiz_tx", &input_hiz_tx_);
     DRW_shgroup_stencil_set(grp, 0x0, 0x0, CLOSURE_TRANSPARENCY);
     DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
   }
@@ -499,6 +520,90 @@ void DeferredPass::sync(void)
     DRW_shgroup_uniform_texture_ref(grp, "combined_tx", &input_combined_tx_);
     DRW_shgroup_uniform_texture_ref(grp, "transparency_data_tx", &input_transparency_data_tx_);
     DRW_shgroup_stencil_set(grp, 0x0, 0x0, CLOSURE_TRANSPARENCY);
+    DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
+  }
+  {
+    DRWState state = DRW_STATE_WRITE_COLOR | DRW_STATE_STENCIL_NEQUAL;
+    trace_reflection_ps_ = DRW_pass_create("TraceReflection", state);
+    eShaderType sh_type = (inst_.raytracing.enabled()) ? RAYTRACE_REFLECTION :
+                                                         RAYTRACE_REFLECTION_FALLBACK;
+    GPUShader *sh = inst_.shaders.static_shader_get(sh_type);
+    DRWShadingGroup *grp = DRW_shgroup_create(sh, trace_reflection_ps_);
+    DRW_shgroup_uniform_block(grp, "sampling_block", inst_.sampling.ubo_get());
+    DRW_shgroup_uniform_block(grp, "raytrace_block", inst_.raytracing.reflection_ubo_get());
+    DRW_shgroup_uniform_block(grp, "hiz_block", inst_.hiz.ubo_get());
+    DRW_shgroup_uniform_block(grp, "cubes_block", lightprobes.cube_ubo_get());
+    DRW_shgroup_uniform_block(grp, "lightprobes_info_block", lightprobes.info_ubo_get());
+    DRW_shgroup_uniform_texture(grp, "utility_tx", inst_.shading_passes.utility_tx);
+    DRW_shgroup_uniform_texture_ref(grp, "hiz_tx", &input_hiz_front_tx_);
+    DRW_shgroup_uniform_texture_ref(grp, "depth_tx", &input_hiz_front_tx_);
+    DRW_shgroup_uniform_texture_ref_ex(grp, "radiance_tx", &input_combined_tx_, no_interp);
+    DRW_shgroup_uniform_texture_ref(grp, "lightprobe_cube_tx", lightprobes.cube_tx_ref_get());
+    DRW_shgroup_uniform_texture_ref_ex(
+        grp, "reflect_color_tx", &input_reflect_color_tx_, no_interp);
+    DRW_shgroup_uniform_texture_ref_ex(
+        grp, "reflect_normal_tx", &input_reflect_normal_tx_, no_interp);
+    DRW_shgroup_stencil_set(grp, 0x0, 0x0, CLOSURE_REFLECTION);
+    DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
+  }
+  {
+    DRWState state = DRW_STATE_WRITE_COLOR | DRW_STATE_STENCIL_NEQUAL;
+    trace_refraction_ps_ = DRW_pass_create("TraceRefraction", state);
+    eShaderType sh_type = (inst_.raytracing.enabled()) ? RAYTRACE_REFRACTION :
+                                                         RAYTRACE_REFRACTION_FALLBACK;
+    GPUShader *sh = inst_.shaders.static_shader_get(sh_type);
+    DRWShadingGroup *grp = DRW_shgroup_create(sh, trace_refraction_ps_);
+    DRW_shgroup_uniform_block(grp, "sampling_block", inst_.sampling.ubo_get());
+    DRW_shgroup_uniform_block(grp, "raytrace_block", inst_.raytracing.refraction_ubo_get());
+    DRW_shgroup_uniform_block(grp, "hiz_block", inst_.hiz.ubo_get());
+    DRW_shgroup_uniform_block(grp, "cubes_block", lightprobes.cube_ubo_get());
+    DRW_shgroup_uniform_block(grp, "lightprobes_info_block", lightprobes.info_ubo_get());
+    DRW_shgroup_uniform_texture(grp, "utility_tx", inst_.shading_passes.utility_tx);
+    DRW_shgroup_uniform_texture_ref(grp, "hiz_tx", &input_hiz_back_tx_);
+    DRW_shgroup_uniform_texture_ref(grp, "depth_tx", &input_hiz_front_tx_);
+    DRW_shgroup_uniform_texture_ref_ex(grp, "radiance_tx", &input_combined_tx_, no_interp);
+    DRW_shgroup_uniform_texture_ref(grp, "lightprobe_cube_tx", lightprobes.cube_tx_ref_get());
+    DRW_shgroup_uniform_texture_ref_ex(
+        grp, "transmit_color_tx", &input_transmit_color_tx_, no_interp);
+    DRW_shgroup_uniform_texture_ref_ex(
+        grp, "transmit_normal_tx", &input_transmit_normal_tx_, no_interp);
+    DRW_shgroup_uniform_texture_ref_ex(
+        grp, "transmit_data_tx", &input_transmit_data_tx_, no_interp);
+    DRW_shgroup_stencil_set(grp, 0x0, 0x0, CLOSURE_REFRACTION);
+    DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
+  }
+  {
+    DRWState state = DRW_STATE_WRITE_COLOR | DRW_STATE_STENCIL_NEQUAL | DRW_STATE_BLEND_ADD_FULL;
+    resolve_reflection_ps_ = DRW_pass_create("ResolveReflection", state);
+    GPUShader *sh = inst_.shaders.static_shader_get(RAYTRACE_RESOLVE_REFLECTION);
+    DRWShadingGroup *grp = DRW_shgroup_create(sh, resolve_reflection_ps_);
+    DRW_shgroup_uniform_block(grp, "raytrace_block", inst_.raytracing.refraction_ubo_get());
+    DRW_shgroup_uniform_block(grp, "hiz_block", inst_.hiz.ubo_get());
+    DRW_shgroup_uniform_texture_ref_ex(grp, "ray_data_tx", &input_ray_data_tx_, no_interp);
+    DRW_shgroup_uniform_texture_ref_ex(grp, "ray_radiance_tx", &input_ray_radiance_tx_, no_interp);
+    DRW_shgroup_uniform_texture_ref_ex(
+        grp, "reflect_color_tx", &input_reflect_color_tx_, no_interp);
+    DRW_shgroup_uniform_texture_ref_ex(
+        grp, "reflect_normal_tx", &input_reflect_normal_tx_, no_interp);
+    DRW_shgroup_stencil_set(grp, 0x0, 0x0, CLOSURE_REFLECTION);
+    DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
+  }
+  {
+    DRWState state = DRW_STATE_WRITE_COLOR | DRW_STATE_STENCIL_NEQUAL | DRW_STATE_BLEND_ADD_FULL;
+    resolve_refraction_ps_ = DRW_pass_create("ResolveRefraction", state);
+    GPUShader *sh = inst_.shaders.static_shader_get(RAYTRACE_RESOLVE_REFRACTION);
+    DRWShadingGroup *grp = DRW_shgroup_create(sh, resolve_refraction_ps_);
+    DRW_shgroup_uniform_block(grp, "raytrace_block", inst_.raytracing.refraction_ubo_get());
+    DRW_shgroup_uniform_block(grp, "hiz_block", inst_.hiz.ubo_get());
+    DRW_shgroup_uniform_texture_ref_ex(grp, "ray_data_tx", &input_ray_data_tx_, no_interp);
+    DRW_shgroup_uniform_texture_ref_ex(grp, "ray_radiance_tx", &input_ray_radiance_tx_, no_interp);
+    DRW_shgroup_uniform_texture_ref_ex(
+        grp, "transmit_color_tx", &input_transmit_color_tx_, no_interp);
+    DRW_shgroup_uniform_texture_ref_ex(
+        grp, "transmit_normal_tx", &input_transmit_normal_tx_, no_interp);
+    DRW_shgroup_uniform_texture_ref_ex(
+        grp, "transmit_data_tx", &input_transmit_data_tx_, no_interp);
+    DRW_shgroup_stencil_set(grp, 0x0, 0x0, CLOSURE_REFRACTION);
     DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
   }
 }
@@ -528,11 +633,22 @@ void DeferredPass::volume_add(Object *ob)
   volumetric_layer_.volume_add(ob);
 }
 
-void DeferredPass::render(GBuffer &gbuffer, HiZBuffer &hiz, GPUFrameBuffer *view_fb)
+void DeferredPass::render(GBuffer &gbuffer,
+                          HiZBuffer &hiz_front,
+                          HiZBuffer &hiz_back,
+                          GPUFrameBuffer *view_fb)
 {
-  opaque_layer_.render(gbuffer, hiz, view_fb);
-  refraction_layer_.render(gbuffer, hiz, view_fb);
-  volumetric_layer_.render(gbuffer, hiz, view_fb);
+  DRW_stats_group_start("OpaqueLayer");
+  opaque_layer_.render(gbuffer, hiz_front, hiz_back, view_fb);
+  DRW_stats_group_end();
+
+  DRW_stats_group_start("RefractionLayer");
+  refraction_layer_.render(gbuffer, hiz_front, hiz_back, view_fb);
+  DRW_stats_group_end();
+
+  DRW_stats_group_start("VolumetricLayer");
+  volumetric_layer_.render(gbuffer, hiz_front, hiz_back, view_fb);
+  DRW_stats_group_end();
 
   gbuffer.render_end();
 }

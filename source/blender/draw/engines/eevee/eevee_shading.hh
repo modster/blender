@@ -143,6 +143,11 @@ struct GBuffer {
 
   Framebuffer depth_behind_fb = Framebuffer("DepthCopy");
 
+  /** Raytracing. */
+  Texture ray_data_tx = Texture("RayData");
+  Texture ray_radiance_tx = Texture("RayRadiance");
+  Framebuffer ray_data_fb = Framebuffer("RayData");
+
   /* Owner of this GBuffer. Used to query temp textures. */
   void *owner;
 
@@ -168,6 +173,8 @@ struct GBuffer {
     holdout_tx.sync_tmp();
     diffuse_tx.sync_tmp();
     depth_behind_tx.sync_tmp();
+    ray_data_tx.sync_tmp();
+    ray_radiance_tx.sync_tmp();
   }
 
   void prepare(eClosureBits closures_used)
@@ -209,6 +216,11 @@ struct GBuffer {
       transparency_tx.acquire_tmp(UNPACK2(extent), GPU_RGBA16, owner);
     }
 
+    if (closures_used & (CLOSURE_DIFFUSE | CLOSURE_REFLECTION | CLOSURE_REFRACTION)) {
+      ray_data_tx.acquire_tmp(UNPACK2(extent), GPU_RGBA16F, owner);
+      ray_radiance_tx.acquire_tmp(UNPACK2(extent), GPU_RGBA16F, owner);
+    }
+
     holdout_tx.acquire_tmp(UNPACK2(extent), GPU_R11F_G11F_B10F, owner);
     depth_behind_tx.acquire_tmp(UNPACK2(extent), GPU_DEPTH24_STENCIL8, owner);
 
@@ -248,6 +260,19 @@ struct GBuffer {
     GPU_framebuffer_bind(volume_fb);
   }
 
+  void bind_tracing(void)
+  {
+    /* Layer attachement also works with cubemap. */
+    /* Attach depth_stencil buffer to only trace the surfaces that need it. */
+    ray_data_fb.ensure(GPU_ATTACHMENT_TEXTURE_LAYER(depth_tx, layer),
+                       GPU_ATTACHMENT_TEXTURE(ray_data_tx),
+                       GPU_ATTACHMENT_TEXTURE(ray_radiance_tx));
+    GPU_framebuffer_bind(ray_data_fb);
+
+    float color[4] = {0.0f};
+    GPU_framebuffer_clear_color(ray_data_fb, color);
+  }
+
   void bind_holdout(void)
   {
     holdout_fb.ensure(GPU_ATTACHMENT_NONE, GPU_ATTACHMENT_TEXTURE(holdout_tx));
@@ -284,6 +309,8 @@ struct GBuffer {
     holdout_tx.release_tmp();
     diffuse_tx.release_tmp();
     depth_behind_tx.release_tmp();
+    ray_data_tx.release_tmp();
+    ray_radiance_tx.release_tmp();
   }
 };
 
@@ -309,10 +336,13 @@ class DeferredLayer {
   DRWShadingGroup *material_add(::Material *blender_mat, GPUMaterial *gpumat);
   DRWShadingGroup *prepass_add(::Material *blender_mat, GPUMaterial *gpumat);
   void volume_add(Object *ob);
-  void render(GBuffer &gbuffer, HiZBuffer &hiz, GPUFrameBuffer *view_fb);
+  void render(GBuffer &gbuffer,
+              HiZBuffer &hiz_front,
+              HiZBuffer &hiz_back,
+              GPUFrameBuffer *view_fb);
 
  private:
-  void update_pass_inputs(GBuffer &gbuffer, HiZBuffer &hiz);
+  void update_pass_inputs(GBuffer &gbuffer, HiZBuffer &hiz_front, HiZBuffer &hiz_back);
 };
 
 class DeferredPass {
@@ -327,19 +357,25 @@ class DeferredPass {
   DeferredLayer refraction_layer_;
   DeferredLayer volumetric_layer_;
 
-  DRWPass *eval_diffuse_ps_ = nullptr;
+  DRWPass *eval_direct_ps_ = nullptr;
   DRWPass *eval_subsurface_ps_ = nullptr;
   DRWPass *eval_transparency_ps_ = nullptr;
   DRWPass *eval_holdout_ps_ = nullptr;
   // DRWPass *eval_volume_heterogeneous_ps_ = nullptr;
   DRWPass *eval_volume_homogeneous_ps_ = nullptr;
 
+  DRWPass *resolve_reflection_ps_ = nullptr;
+  DRWPass *resolve_refraction_ps_ = nullptr;
+  DRWPass *trace_reflection_ps_ = nullptr;
+  DRWPass *trace_refraction_ps_ = nullptr;
+
   /* References only. */
   GPUTexture *input_combined_tx_ = nullptr;
   GPUTexture *input_depth_behind_tx_ = nullptr;
   GPUTexture *input_diffuse_tx_ = nullptr;
   GPUTexture *input_emission_data_tx_ = nullptr;
-  GPUTexture *input_hiz_tx_ = nullptr;
+  GPUTexture *input_hiz_front_tx_ = nullptr;
+  GPUTexture *input_hiz_back_tx_ = nullptr;
   GPUTexture *input_reflect_color_tx_ = nullptr;
   GPUTexture *input_reflect_normal_tx_ = nullptr;
   GPUTexture *input_transmit_color_tx_ = nullptr;
@@ -349,6 +385,8 @@ class DeferredPass {
   GPUTexture *input_volume_data_tx_ = nullptr;
   // GPUTexture *input_volume_radiance_tx_ = nullptr;
   // GPUTexture *input_volume_transmittance_tx_ = nullptr;
+  GPUTexture *input_ray_data_tx_ = nullptr;
+  GPUTexture *input_ray_radiance_tx_ = nullptr;
 
  public:
   DeferredPass(Instance &inst)
@@ -358,7 +396,10 @@ class DeferredPass {
   DRWShadingGroup *material_add(::Material *material, GPUMaterial *gpumat);
   DRWShadingGroup *prepass_add(::Material *material, GPUMaterial *gpumat);
   void volume_add(Object *ob);
-  void render(GBuffer &gbuffer, HiZBuffer &hiz, GPUFrameBuffer *view_fb);
+  void render(GBuffer &gbuffer,
+              HiZBuffer &hiz_front,
+              HiZBuffer &hiz_back,
+              GPUFrameBuffer *view_fb);
 };
 
 /** \} */

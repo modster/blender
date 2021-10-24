@@ -103,7 +103,7 @@ static void raytrace_sample_reuse_table(string &output_name, bool debug)
     std::sort(pool.begin(), pool.end(), sort);
 
     for (int j = 0; j < samples_per_pool; j++) {
-      int pos[2] = {pool[j].x - center[pool_id][0], pool[j].y - center[pool_id][1]};
+      int pos[2] = {pool[j].x + center[pool_id][0], pool[j].y + center[pool_id][1]};
       int px = pos[1] * 64 + pos[0];
       for (int i = 0; i < 3; i++) {
         debug_image[px][i] = pools_color[pool_id][i];

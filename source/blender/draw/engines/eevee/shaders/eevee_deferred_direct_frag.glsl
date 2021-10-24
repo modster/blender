@@ -98,7 +98,6 @@ void main(void)
   ClosureEmission emission = gbuffer_load_emission_data(emission_data_tx, uvcoordsvar.xy);
   ClosureDiffuse diffuse = gbuffer_load_diffuse_data(tra_col_in, tra_nor_in, tra_dat_in);
   ClosureReflection reflection = gbuffer_load_reflection_data(ref_col_in, ref_nor_in);
-  ClosureRefraction refraction = gbuffer_load_refraction_data(tra_col_in, tra_nor_in, tra_dat_in);
 
   float thickness;
   gbuffer_load_global_data(tra_nor_in, thickness);
@@ -109,14 +108,10 @@ void main(void)
 
   vec3 radiance_diffuse = vec3(0);
   vec3 radiance_reflection = vec3(0);
-  vec3 radiance_refraction = vec3(0);
   vec3 R = -reflect(V, reflection.N);
-  vec3 T = refract(-V, refraction.N, refraction.ior);
 
   light_eval(diffuse, reflection, P, V, vP.z, thickness, radiance_diffuse, radiance_reflection);
   radiance_diffuse += lightprobe_grid_eval(P, diffuse.N, random_probe);
-  radiance_reflection += lightprobe_cubemap_eval(P, R, reflection.roughness, random_probe);
-  radiance_refraction += lightprobe_cubemap_eval(P, T, sqr(refraction.roughness), random_probe);
 
   out_combined = vec4(emission.emission, 0.0);
   out_diffuse.rgb = radiance_diffuse;
@@ -127,7 +122,7 @@ void main(void)
     out_diffuse.rgb *= diffuse.color;
     out_combined.rgb += out_diffuse.rgb;
   }
-  out_specular = radiance_reflection * reflection.color + radiance_refraction * refraction.color;
+  out_specular = radiance_reflection * reflection.color;
   out_combined.rgb += out_specular;
 }
 

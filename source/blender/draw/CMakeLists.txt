@@ -150,6 +150,7 @@ set(SRC
   engines/eevee/eevee_material.cc
   engines/eevee/eevee_mesh.cc
   engines/eevee/eevee_motion_blur.cc
+  engines/eevee/eevee_raytracing.cc
   engines/eevee/eevee_renderpasses.cc
   engines/eevee/eevee_shader.cc
   engines/eevee/eevee_shading.cc
@@ -322,6 +323,10 @@ data_to_c_simple(engines/eevee/shaders/eevee_motion_blur_lib.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_motion_blur_tiles_dilate_frag.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_motion_blur_tiles_flatten_frag.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_nodetree_eval_lib.glsl SRC)
+data_to_c_simple(engines/eevee/shaders/eevee_raytrace_raygen_frag.glsl SRC)
+data_to_c_simple(engines/eevee/shaders/eevee_raytrace_raygen_lib.glsl SRC)
+data_to_c_simple(engines/eevee/shaders/eevee_raytrace_resolve_frag.glsl SRC)
+data_to_c_simple(engines/eevee/shaders/eevee_raytrace_trace_lib.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_sampling_lib.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_shadow_lib.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_subsurface_eval_frag.glsl SRC)

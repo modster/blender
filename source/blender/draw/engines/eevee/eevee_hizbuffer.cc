@@ -60,6 +60,7 @@ void HiZBuffer::prepare(GPUTexture *depth_src_tx)
   vec2 extent_src(GPU_texture_width(depth_src_tx), GPU_texture_height(depth_src_tx));
   vec2 extent_hiz(divide_ceil_u(extent_src.x, div) * div, divide_ceil_u(extent_src.y, div) * div);
 
+  inst_.hiz.data_.pixel_to_ndc = 2.0f / extent_src;
   inst_.hiz.texel_size_ = 1.0f / extent_hiz;
   inst_.hiz.data_.uv_scale = extent_src / extent_hiz;
 

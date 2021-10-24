@@ -115,7 +115,7 @@ class StructArrayBuffer : NonMovable, NonCopyable {
 };
 
 /** Simpler version where data is not an array. */
-template<typename T> class StructBuffer : public T {
+template<typename T> class StructBuffer : public T, NonMovable, NonCopyable {
  private:
   GPUUniformBuf *ubo_;
 

@@ -118,6 +118,15 @@ ClosureReflection gbuffer_load_reflection_data(vec4 color_in, vec4 normal_in)
   return data_out;
 }
 
+ClosureReflection gbuffer_load_reflection_data(sampler2D reflect_color_tx,
+                                               sampler2D reflect_normal_tx,
+                                               vec2 uv)
+{
+  vec4 ref_col_in = texture(reflect_color_tx, uv);
+  vec4 ref_nor_in = texture(reflect_normal_tx, uv);
+  return gbuffer_load_reflection_data(ref_col_in, ref_nor_in);
+}
+
 /** \} */
 
 /* -------------------------------------------------------------------- */
@@ -131,14 +140,28 @@ ClosureRefraction gbuffer_load_refraction_data(vec4 color_in, vec4 normal_in, ve
   if (normal_in.x < 0.0) {
     data_out.color = color_in.rgb;
     data_out.N = gbuffer_decode_normal(-normal_in.xy);
+    data_out.ior = data_in.x;
+    data_out.roughness = data_in.y;
   }
   else {
+    /* Transmission data is Diffuse/SSS data. */
     data_out.color = vec3(0.0);
     data_out.N = vec3(1.0);
+    data_out.ior = -1.0;
+    data_out.roughness = 0.0;
   }
-  data_out.ior = data_in.x;
-  data_out.roughness = data_in.y;
   return data_out;
+}
+
+ClosureRefraction gbuffer_load_refraction_data(sampler2D transmit_color_tx,
+                                               sampler2D transmit_normal_tx,
+                                               sampler2D transmit_data_tx,
+                                               vec2 uv)
+{
+  vec4 tra_col_in = texture(transmit_color_tx, uv);
+  vec4 tra_nor_in = texture(transmit_normal_tx, uv);
+  vec4 tra_dat_in = texture(transmit_data_tx, uv);
+  return gbuffer_load_refraction_data(tra_col_in, tra_nor_in, tra_dat_in);
 }
 
 /** \} */
