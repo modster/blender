@@ -119,17 +119,20 @@ class GeometryComponent {
   /* Get a read-only attribute for the domain based on the given attribute. This can be used to
    * interpolate from one domain to another.
    * Returns null if the interpolation is not implemented. */
-  virtual blender::fn::GVArray attribute_try_adapt_domain(blender::fn::GVArray varray,
-                                                          const AttributeDomain from_domain,
-                                                          const AttributeDomain to_domain) const;
+  blender::fn::GVArray attribute_try_adapt_domain(const blender::fn::GVArray &varray,
+                                                  const AttributeDomain from_domain,
+                                                  const AttributeDomain to_domain) const
+  {
+    return this->attribute_try_adapt_domain_impl(varray, from_domain, to_domain);
+  }
 
   template<typename T>
-  blender::VArray<T> attribute_try_adapt_domain_typed(blender::VArray<T> varray,
-                                                      const AttributeDomain from_domain,
-                                                      const AttributeDomain to_domain) const
+  blender::VArray<T> attribute_try_adapt_domain(const blender::VArray<T> &varray,
+                                                const AttributeDomain from_domain,
+                                                const AttributeDomain to_domain) const
   {
-    return this->attribute_try_adapt_domain(blender::fn::GVArray(varray), from_domain, to_domain)
-        .typed<T>();
+    return this->attribute_try_adapt_domain_impl(varray, from_domain, to_domain)
+        .template typed<T>();
   }
 
   /* Returns true when the attribute has been deleted. */
@@ -238,6 +241,11 @@ class GeometryComponent {
 
  private:
   virtual const blender::bke::ComponentAttributeProviders *get_attribute_providers() const;
+
+  virtual blender::fn::GVArray attribute_try_adapt_domain_impl(
+      const blender::fn::GVArray &varray,
+      const AttributeDomain from_domain,
+      const AttributeDomain to_domain) const;
 };
 
 template<typename T>
@@ -392,9 +400,6 @@ class MeshComponent : public GeometryComponent {
   Mesh *get_for_write();
 
   int attribute_domain_size(const AttributeDomain domain) const final;
-  blender::fn::GVArray attribute_try_adapt_domain(blender::fn::GVArray varray,
-                                                  const AttributeDomain from_domain,
-                                                  const AttributeDomain to_domain) const final;
 
   bool is_empty() const final;
 
@@ -405,6 +410,11 @@ class MeshComponent : public GeometryComponent {
 
  private:
   const blender::bke::ComponentAttributeProviders *get_attribute_providers() const final;
+
+  blender::fn::GVArray attribute_try_adapt_domain_impl(
+      const blender::fn::GVArray &varray,
+      const AttributeDomain from_domain,
+      const AttributeDomain to_domain) const final;
 };
 
 /** A geometry component that stores a point cloud. */
@@ -469,9 +479,6 @@ class CurveComponent : public GeometryComponent {
   CurveEval *get_for_write();
 
   int attribute_domain_size(const AttributeDomain domain) const final;
-  blender::fn::GVArray attribute_try_adapt_domain(blender::fn::GVArray varray,
-                                                  const AttributeDomain from_domain,
-                                                  const AttributeDomain to_domain) const final;
 
   bool is_empty() const final;
 
@@ -484,6 +491,11 @@ class CurveComponent : public GeometryComponent {
 
  private:
   const blender::bke::ComponentAttributeProviders *get_attribute_providers() const final;
+
+  blender::fn::GVArray attribute_try_adapt_domain_impl(
+      const blender::fn::GVArray &varray,
+      const AttributeDomain from_domain,
+      const AttributeDomain to_domain) const final;
 };
 
 class InstanceReference {

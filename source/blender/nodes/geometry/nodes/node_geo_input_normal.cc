@@ -136,7 +136,7 @@ static VArray<float3> construct_mesh_normals_gvarray(const MeshComponent &mesh_c
 
       /* In this case using the mesh component's generic domain interpolation is fine, the data
        * will still be normalized, since the face normal is just copied to every corner. */
-      return mesh_component.attribute_try_adapt_domain_typed<float3>(
+      return mesh_component.attribute_try_adapt_domain<float3>(
           std::move(face_normals), ATTR_DOMAIN_FACE, ATTR_DOMAIN_CORNER);
     }
     default:
@@ -224,7 +224,7 @@ static VArray<float3> construct_curve_normal_gvarray(const CurveComponent &compo
   if (domain == ATTR_DOMAIN_CURVE) {
     Array<float3> point_normals = curve_normal_point_domain(*curve);
     VArray<float3> varray = VArray<float3>::ForContainer(std::move(point_normals));
-    return component.attribute_try_adapt_domain_typed<float3>(
+    return component.attribute_try_adapt_domain<float3>(
         std::move(varray), ATTR_DOMAIN_POINT, ATTR_DOMAIN_CURVE);
   }
 

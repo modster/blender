@@ -899,8 +899,8 @@ blender::bke::ReadAttributeLookup GeometryComponent::attribute_try_get_for_read(
   return {};
 }
 
-blender::fn::GVArray GeometryComponent::attribute_try_adapt_domain(
-    blender::fn::GVArray varray,
+blender::fn::GVArray GeometryComponent::attribute_try_adapt_domain_impl(
+    const blender::fn::GVArray &varray,
     const AttributeDomain from_domain,
     const AttributeDomain to_domain) const
 {

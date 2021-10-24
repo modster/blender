@@ -351,9 +351,9 @@ static GVArray adapt_curve_domain_spline_to_point(const CurveEval &curve, GVArra
 
 }  // namespace blender::bke
 
-GVArray CurveComponent::attribute_try_adapt_domain(GVArray varray,
-                                                   const AttributeDomain from_domain,
-                                                   const AttributeDomain to_domain) const
+GVArray CurveComponent::attribute_try_adapt_domain_impl(const GVArray &varray,
+                                                        const AttributeDomain from_domain,
+                                                        const AttributeDomain to_domain) const
 {
   if (!varray) {
     return {};

@@ -42,7 +42,7 @@ static VArray<float> construct_spline_length_gvarray(const CurveComponent &compo
   }
   if (domain == ATTR_DOMAIN_POINT) {
     VArray<float> length = VArray<float>::ForFunc(splines.size(), length_fn);
-    return component.attribute_try_adapt_domain_typed<float>(
+    return component.attribute_try_adapt_domain<float>(
         std::move(length), ATTR_DOMAIN_CURVE, ATTR_DOMAIN_POINT);
   }
 

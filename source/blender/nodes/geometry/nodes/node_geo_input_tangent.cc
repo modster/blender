@@ -109,7 +109,7 @@ static VArray<float3> construct_curve_tangent_gvarray(const CurveComponent &comp
 
   if (domain == ATTR_DOMAIN_CURVE) {
     Array<float3> point_tangents = curve_tangent_point_domain(*curve);
-    return component.attribute_try_adapt_domain_typed<float3>(
+    return component.attribute_try_adapt_domain<float3>(
         VArray<float3>::ForContainer(std::move(point_tangents)),
         ATTR_DOMAIN_POINT,
         ATTR_DOMAIN_CURVE);
