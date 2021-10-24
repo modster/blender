@@ -1327,7 +1327,10 @@ class WM_OT_properties_edit(Operator):
 
     use_soft_limits: BoolProperty(
         name="Use Soft Limits",
-        description="Limits the Property Value slider to a range, values outside the range must be inputted numerically",
+        description=(
+            "Limits the Property Value slider to a range, "
+            "values outside the range must be inputted numerically"
+        ),
     )
     array_length: IntProperty(
         name="Array Length",
@@ -2840,12 +2843,13 @@ class WM_MT_splash_quick_setup(Menu):
 
         col = split.column()
 
-        sub = col.split(factor=0.35)
-        row = sub.row()
-        row.alignment = 'RIGHT'
-        row.label(text="Language")
-        prefs = context.preferences
-        sub.prop(prefs.view, "language", text="")
+        if bpy.app.build_options.international:
+            sub = col.split(factor=0.35)
+            row = sub.row()
+            row.alignment = 'RIGHT'
+            row.label(text="Language")
+            prefs = context.preferences
+            sub.prop(prefs.view, "language", text="")
 
         col.separator()
 

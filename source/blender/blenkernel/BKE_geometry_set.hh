@@ -357,6 +357,15 @@ struct GeometrySet {
                       GeometryOwnershipType ownership = GeometryOwnershipType::Owned);
   void replace_curve(CurveEval *curve,
                      GeometryOwnershipType ownership = GeometryOwnershipType::Owned);
+
+ private:
+  /* Utility to retrieve a mutable component without creating it. */
+  GeometryComponent *get_component_ptr(GeometryComponentType type);
+  template<typename Component> Component *get_component_ptr()
+  {
+    BLI_STATIC_ASSERT(is_geometry_component_v<Component>, "");
+    return static_cast<Component *>(get_component_ptr(Component::static_type));
+  }
 };
 
 /** A geometry component that can store a mesh. */
@@ -740,6 +749,24 @@ class AttributeFieldInput : public fn::FieldInput {
   {
     return name_;
   }
+
+  const GVArray *get_varray_for_context(const fn::FieldContext &context,
+                                        IndexMask mask,
+                                        ResourceScope &scope) const override;
+
+  std::string socket_inspection_name() const override;
+
+  uint64_t hash() const override;
+  bool is_equal_to(const fn::FieldNode &other) const override;
+};
+
+class IDAttributeFieldInput : public fn::FieldInput {
+ public:
+  IDAttributeFieldInput() : fn::FieldInput(CPPType::get<int>())
+  {
+  }
+
+  static fn::Field<int> Create();
 
   const GVArray *get_varray_for_context(const fn::FieldContext &context,
                                         IndexMask mask,

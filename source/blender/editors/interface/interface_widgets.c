@@ -4831,9 +4831,6 @@ void ui_draw_but(const bContext *C, struct ARegion *region, uiStyle *style, uiBu
         break;
 
       case UI_BTYPE_CURVE:
-        /* do not draw right to edge of rect */
-        rect->xmin += (0.2f * UI_UNIT_X);
-        rect->xmax -= (0.2f * UI_UNIT_X);
         ui_draw_but_CURVE(region, but, &tui->wcol_regular, rect);
         break;
 
@@ -4987,30 +4984,6 @@ void ui_draw_menu_back(uiStyle *UNUSED(style), uiBlock *block, rcti *rect)
   }
 
   ui_draw_clip_tri(block, rect, wt);
-}
-
-/**
- * Uses the widget base drawing and colors from the box widget, but ensures an opaque
- * inner color.
- */
-void ui_draw_box_opaque(rcti *rect, int roundboxalign)
-{
-  uiWidgetType *wt = widget_type(UI_WTYPE_BOX);
-
-  /* Alpha blend with the region's background color to force an opaque background. */
-  uiWidgetColors *wcol = &wt->wcol;
-  wt->state(wt, 0, 0, UI_EMBOSS_UNDEFINED);
-  float background[4];
-  UI_GetThemeColor4fv(TH_BACK, background);
-  float new_inner[4];
-  rgba_uchar_to_float(new_inner, wcol->inner);
-  new_inner[0] = (new_inner[0] * new_inner[3]) + (background[0] * (1.0f - new_inner[3]));
-  new_inner[1] = (new_inner[1] * new_inner[3]) + (background[1] * (1.0f - new_inner[3]));
-  new_inner[2] = (new_inner[2] * new_inner[3]) + (background[2] * (1.0f - new_inner[3]));
-  new_inner[3] = 1.0f;
-  rgba_float_to_uchar(wcol->inner, new_inner);
-
-  wt->custom(NULL, wcol, rect, 0, roundboxalign);
 }
 
 /**
