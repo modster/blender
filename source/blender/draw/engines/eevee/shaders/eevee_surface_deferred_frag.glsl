@@ -75,7 +75,7 @@ void main(void)
 
   if (g_data.transmit_rand == 0.0) {
     out_transmit_color = g_refraction_data.color;
-    out_transmit_normal.xy = -gbuffer_encode_normal(g_refraction_data.N);
+    out_transmit_normal.xy = gbuffer_encode_normal(g_refraction_data.N);
     out_transmit_normal.z = -1.0;
     out_transmit_normal.w = thickness;
     out_transmit_data.x = g_refraction_data.ior;

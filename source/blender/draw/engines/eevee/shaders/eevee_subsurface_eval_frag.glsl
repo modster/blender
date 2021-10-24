@@ -74,13 +74,14 @@ void main(void)
   vec4 tra_nor_in = texture(transmit_normal_tx, center_uv);
   vec4 tra_dat_in = texture(transmit_data_tx, center_uv);
 
-  if (tra_nor_in.x < 0.0) {
-    /* Refraction transmission case. */
+  ClosureDiffuse diffuse = gbuffer_load_diffuse_data(tra_col_in, tra_nor_in, tra_dat_in);
+
+  if (diffuse.sss_id <= 0u) {
+    /* Normal diffuse is already in combined pass. */
+    /* Refraction also go into this case. */
     out_combined = vec4(0.0);
     return;
   }
-
-  ClosureDiffuse diffuse = gbuffer_load_diffuse_data(tra_col_in, tra_nor_in, tra_dat_in);
 
   float max_radius = max_v3(diffuse.sss_radius);
 

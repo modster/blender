@@ -108,7 +108,7 @@ void make_orthonormal_basis(vec3 N, out vec3 T, out vec3 B)
  * Using Method #4: Spheremap Transform */
 vec2 normal_encode(vec3 n)
 {
-  float p = sqrt(n.z * 8.0 + 8.0);
+  float p = safe_sqrt(n.z * 8.0 + 8.0);
   return n.xy / p + 0.5;
 }
 
@@ -116,7 +116,7 @@ vec3 normal_decode(vec2 enc)
 {
   vec2 fenc = enc * 4.0 - 2.0;
   float f = dot(fenc, fenc);
-  float g = sqrt(1.0 - f / 4.0);
+  float g = safe_sqrt(1.0 - f / 4.0);
   vec3 n;
   n.xy = fenc * g;
   n.z = 1 - f / 2;

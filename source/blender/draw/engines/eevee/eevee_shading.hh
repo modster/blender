@@ -198,7 +198,7 @@ struct GBuffer {
 
     if (closures_used & CLOSURE_REFLECTION) {
       reflect_color_tx.acquire_tmp(UNPACK2(extent), GPU_R11F_G11F_B10F, owner);
-      reflect_normal_tx.acquire_tmp(UNPACK2(extent), GPU_RGBA16, owner);
+      reflect_normal_tx.acquire_tmp(UNPACK2(extent), GPU_RGBA16F, owner);
     }
 
     if (closures_used & CLOSURE_VOLUME) {
