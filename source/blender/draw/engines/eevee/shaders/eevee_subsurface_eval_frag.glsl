@@ -117,7 +117,7 @@ void main(void)
     vec2 sample_uv = center_uv + sample_space * sss.samples[i].xy;
     float pdf = sss.samples[i].z;
 
-    float sample_depth = texture(hiz_tx, sample_uv * hiz.uv_scale).r;
+    float sample_depth = textureLod(hiz_tx, sample_uv * hiz.uv_scale, 0.0).r;
     vec3 sample_vP = get_view_space_from_depth(sample_uv, sample_depth);
 
     vec4 sample_data = texture(radiance_tx, sample_uv);
