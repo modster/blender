@@ -76,7 +76,7 @@ void main(void)
 
   ClosureDiffuse diffuse = gbuffer_load_diffuse_data(tra_col_in, tra_nor_in, tra_dat_in);
 
-  if (diffuse.sss_id <= 0u) {
+  if (diffuse.sss_id == 0u) {
     /* Normal diffuse is already in combined pass. */
     /* Refraction also go into this case. */
     out_combined = vec4(0.0);
@@ -116,14 +116,14 @@ void main(void)
 
   for (int i = 0; i < sss.sample_len; i++) {
     vec2 sample_uv = center_uv + sample_space * sss.samples[i].xy;
-    float pdf = sss.samples[i].z;
+    float pdf_inv = sss.samples[i].z;
 
     float sample_depth = textureLod(hiz_tx, sample_uv * hiz.uv_scale, 0.0).r;
     vec3 sample_vP = get_view_space_from_depth(sample_uv, sample_depth);
 
     vec4 sample_data = texture(radiance_tx, sample_uv);
     vec3 sample_radiance = sample_data.rgb;
-    uint sample_sss_id = uint(sample_data.a * 1024.0);
+    uint sample_sss_id = uint(sample_data.a);
 
     if (sample_sss_id != diffuse.sss_id) {
       continue;
@@ -136,7 +136,7 @@ void main(void)
 
     /* Slide 34. */
     float r = distance(sample_vP, vP);
-    vec3 weight = burley_eval(d, r) / pdf;
+    vec3 weight = burley_eval(d, r) * pdf_inv;
 
     accum += sample_radiance * weight;
     accum_weight += weight;

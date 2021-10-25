@@ -71,7 +71,7 @@ void SubsurfaceModule::precompute_samples_location()
     float r = burley_sample(d, x);
     data_.samples[i].x = cosf(theta) * r;
     data_.samples[i].y = sinf(theta) * r;
-    data_.samples[i].z = burley_pdf(d, r);
+    data_.samples[i].z = 1.0f / burley_pdf(d, r);
   }
 }
 
