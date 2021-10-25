@@ -104,23 +104,22 @@ void BlenderSync::sync_object_motion_init(BL::Object &b_parent, BL::Object &b_ob
   array<Transform> motion;
   object->set_motion(motion);
 
-  Scene::MotionType need_motion = scene->need_motion();
-  if (need_motion == Scene::MOTION_NONE || !object->get_geometry()) {
+  Geometry *geom = object->get_geometry();
+  if (!geom) {
     return;
   }
-
-  Geometry *geom = object->get_geometry();
 
   int motion_steps = 0;
   bool use_motion_blur = false;
 
+  Scene::MotionType need_motion = scene->need_motion();
   if (need_motion == Scene::MOTION_BLUR) {
     motion_steps = object_motion_steps(b_parent, b_ob, Object::MAX_MOTION_STEPS);
     if (motion_steps && object_use_deform_motion(b_parent, b_ob)) {
       use_motion_blur = true;
     }
   }
-  else {
+  else if (need_motion != Scene::MOTION_NONE) {
     motion_steps = 3;
   }
 
@@ -568,7 +567,7 @@ void BlenderSync::sync_objects(BL::Depsgraph &b_depsgraph,
   /* object loop */
   bool cancel = false;
   bool use_portal = false;
-  const bool show_lights = BlenderViewportParameters(b_v3d).use_scene_lights;
+  const bool show_lights = BlenderViewportParameters(b_v3d, use_developer_ui).use_scene_lights;
 
   BL::ViewLayer b_view_layer = b_depsgraph.view_layer_eval();
   BL::Depsgraph::object_instances_iterator b_instance_iter;
@@ -604,7 +603,7 @@ void BlenderSync::sync_objects(BL::Depsgraph &b_depsgraph,
        * only available in preview renders since currently do not have a good cache policy, the
        * data being loaded at once for all the frames. */
       if (experimental && b_v3d) {
-        b_mesh_cache = object_mesh_cache_find(b_ob, false, &has_subdivision_modifier);
+        b_mesh_cache = object_mesh_cache_find(b_ob, &has_subdivision_modifier);
         use_procedural = b_mesh_cache && b_mesh_cache.cache_file().use_render_procedural();
       }
 
@@ -719,6 +718,14 @@ void BlenderSync::sync_motion(BL::RenderSettings &b_render,
     }
   }
 
+  /* Check which geometry already has motion blur so it can be skipped. */
+  geometry_motion_attribute_synced.clear();
+  for (Geometry *geom : scene->geometry) {
+    if (geom->attributes.find(ATTR_STD_MOTION_VERTEX_POSITION)) {
+      geometry_motion_attribute_synced.insert(geom);
+    }
+  }
+
   /* note iteration over motion_times set happens in sorted order */
   foreach (float relative_time, motion_times) {
     /* center time is already handled. */
@@ -748,6 +755,8 @@ void BlenderSync::sync_motion(BL::RenderSettings &b_render,
     /* sync object */
     sync_objects(b_depsgraph, b_v3d, relative_time);
   }
+
+  geometry_motion_attribute_synced.clear();
 
   /* we need to set the python thread state again because this
    * function assumes it is being executed from python and will

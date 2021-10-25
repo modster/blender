@@ -614,20 +614,25 @@ static bool rna_property_override_operation_apply(Main *bmain,
   }
 
   /* get and set the default values as appropriate for the various types */
-  return override_apply(bmain,
-                        ptr_dst,
-                        ptr_src,
-                        ptr_storage,
-                        prop_dst,
-                        prop_src,
-                        prop_storage,
-                        len_dst,
-                        len_src,
-                        len_storage,
-                        ptr_item_dst,
-                        ptr_item_src,
-                        ptr_item_storage,
-                        opop);
+  const bool sucess = override_apply(bmain,
+                                     ptr_dst,
+                                     ptr_src,
+                                     ptr_storage,
+                                     prop_dst,
+                                     prop_src,
+                                     prop_storage,
+                                     len_dst,
+                                     len_src,
+                                     len_storage,
+                                     ptr_item_dst,
+                                     ptr_item_src,
+                                     ptr_item_storage,
+                                     opop);
+  if (sucess) {
+    RNA_property_update_main(bmain, NULL, ptr_dst, prop_dst);
+  }
+
+  return sucess;
 }
 
 /**
@@ -788,7 +793,7 @@ bool RNA_struct_override_matches(Main *bmain,
       continue;
     }
 
-    CLOG_INFO(&LOG, 5, "Override Checking %s\n", rna_path);
+    CLOG_INFO(&LOG, 5, "Override Checking %s", rna_path);
 
     IDOverrideLibraryProperty *op = BKE_lib_override_library_property_find(override, rna_path);
     if (ignore_overridden && op != NULL) {

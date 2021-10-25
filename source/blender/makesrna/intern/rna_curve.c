@@ -30,7 +30,7 @@
 
 #include "BLT_translation.h"
 
-#include "BKE_font.h"
+#include "BKE_vfont.h"
 
 #include "RNA_access.h"
 #include "RNA_define.h"
@@ -1807,12 +1807,6 @@ static void rna_def_curve(BlenderRNA *brna)
   RNA_def_property_float_sdna(prop, NULL, "twist_smooth");
   RNA_def_property_ui_range(prop, 0, 100.0, 1, 2);
   RNA_def_property_ui_text(prop, "Twist Smooth", "Smoothing iteration for tangents");
-  RNA_def_property_update(prop, 0, "rna_Curve_update_data");
-
-  prop = RNA_def_property(srna, "use_fill_deform", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_boolean_sdna(prop, NULL, "flag", CU_DEFORM_FILL);
-  RNA_def_property_ui_text(
-      prop, "Fill Deformed", "Fill curve after applying shape keys and all modifiers");
   RNA_def_property_update(prop, 0, "rna_Curve_update_data");
 
   prop = RNA_def_property(srna, "use_fill_caps", PROP_BOOLEAN, PROP_NONE);

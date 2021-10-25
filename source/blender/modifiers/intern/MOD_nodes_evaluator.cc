@@ -17,12 +17,17 @@
 #include "MOD_nodes_evaluator.hh"
 
 #include "NOD_geometry_exec.hh"
+#include "NOD_socket_declarations.hh"
 #include "NOD_type_conversions.hh"
 
 #include "DEG_depsgraph_query.h"
 
+#include "FN_field.hh"
+#include "FN_field_cpp_type.hh"
 #include "FN_generic_value_map.hh"
 #include "FN_multi_function.hh"
+
+#include "BLT_translation.h"
 
 #include "BLI_enumerable_thread_specific.hh"
 #include "BLI_stack.hh"
@@ -33,6 +38,9 @@
 namespace blender::modifiers::geometry_nodes {
 
 using fn::CPPType;
+using fn::Field;
+using fn::FieldCPPType;
+using fn::GField;
 using fn::GValueMap;
 using nodes::GeoNodeExecParams;
 using namespace fn::multi_function_types;
@@ -118,6 +126,12 @@ struct InputState {
    * changed by others anymore.
    */
   bool was_ready_for_execution = false;
+
+  /**
+   * True when this input has to be computed for logging/debugging purposes, regardless of whether
+   * it is needed for some output.
+   */
+  bool force_compute = false;
 };
 
 struct OutputState {
@@ -314,8 +328,50 @@ static const CPPType *get_socket_cpp_type(const DSocket socket)
   return get_socket_cpp_type(*socket.socket_ref());
 }
 
+/**
+ * \note This is not supposed to be a long term solution. Eventually we want that nodes can
+ * specify more complex defaults (other than just single values) in their socket declarations.
+ */
+static bool get_implicit_socket_input(const SocketRef &socket, void *r_value)
+{
+  const NodeRef &node = socket.node();
+  const nodes::NodeDeclaration *node_declaration = node.declaration();
+  if (node_declaration == nullptr) {
+    return false;
+  }
+  const nodes::SocketDeclaration &socket_declaration = *node_declaration->inputs()[socket.index()];
+  if (socket_declaration.input_field_type() == nodes::InputSocketFieldType::Implicit) {
+    const bNode &bnode = *socket.bnode();
+    if (socket.typeinfo()->type == SOCK_VECTOR) {
+      if (bnode.type == GEO_NODE_SET_CURVE_HANDLES) {
+        StringRef side = ((NodeGeometrySetCurveHandlePositions *)bnode.storage)->mode ==
+                                 GEO_NODE_CURVE_HANDLE_LEFT ?
+                             "handle_left" :
+                             "handle_right";
+        new (r_value) Field<float3>(bke::AttributeFieldInput::Create<float3>(side));
+        return true;
+      }
+      new (r_value) Field<float3>(bke::AttributeFieldInput::Create<float3>("position"));
+      return true;
+    }
+    if (socket.typeinfo()->type == SOCK_INT) {
+      if (ELEM(bnode.type, FN_NODE_RANDOM_VALUE, GEO_NODE_INSTANCE_ON_POINTS)) {
+        new (r_value) Field<int>(std::make_shared<bke::IDAttributeFieldInput>());
+        return true;
+      }
+      new (r_value) Field<int>(std::make_shared<fn::IndexFieldInput>());
+      return true;
+    }
+  }
+  return false;
+}
+
 static void get_socket_value(const SocketRef &socket, void *r_value)
 {
+  if (get_implicit_socket_input(socket, r_value)) {
+    return;
+  }
+
   const bNodeSocketType *typeinfo = socket.typeinfo();
   typeinfo->get_geometry_nodes_cpp_value(*socket.bsocket(), r_value);
 }
@@ -447,6 +503,14 @@ class GeometryNodesEvaluator {
             this->initialize_node_state(item.node, *item.state, allocator);
           }
         });
+
+    /* Mark input sockets that have to be computed. */
+    for (const DSocket &socket : params_.force_compute_sockets) {
+      NodeState &node_state = *node_states_.lookup_key_as(socket.node()).state;
+      if (socket->is_input()) {
+        node_state.inputs[socket->index()].force_compute = true;
+      }
+    }
   }
 
   void initialize_node_state(const DNode node, NodeState &node_state, LinearAllocator<> &allocator)
@@ -693,7 +757,8 @@ class GeometryNodesEvaluator {
     return do_execute_node;
   }
 
-  /* A node is finished when it has computed all outputs that may be used. */
+  /* A node is finished when it has computed all outputs that may be used have been computed and
+   * when no input is still forced to be computed. */
   bool finish_node_if_possible(LockedNode &locked_node)
   {
     if (locked_node.node_state.node_has_finished) {
@@ -702,35 +767,41 @@ class GeometryNodesEvaluator {
     }
 
     /* Check if there is any output that might be used but has not been computed yet. */
-    bool has_remaining_output = false;
     for (OutputState &output_state : locked_node.node_state.outputs) {
       if (output_state.has_been_computed) {
         continue;
       }
       if (output_state.output_usage != ValueUsage::Unused) {
-        has_remaining_output = true;
-        break;
+        return false;
       }
     }
-    if (!has_remaining_output) {
-      /* If there are no remaining outputs, all the inputs can be destructed and/or can become
-       * unused. This can also trigger a chain reaction where nodes to the left become finished
-       * too. */
-      for (const int i : locked_node.node->inputs().index_range()) {
-        const DInputSocket socket = locked_node.node.input(i);
-        InputState &input_state = locked_node.node_state.inputs[i];
-        if (input_state.usage == ValueUsage::Maybe) {
-          this->set_input_unused(locked_node, socket);
-        }
-        else if (input_state.usage == ValueUsage::Required) {
-          /* The value was required, so it cannot become unused. However, we can destruct the
-           * value. */
-          this->destruct_input_value_if_exists(locked_node, socket);
+
+    /* Check if there is an input that still has to be computed. */
+    for (InputState &input_state : locked_node.node_state.inputs) {
+      if (input_state.force_compute) {
+        if (!input_state.was_ready_for_execution) {
+          return false;
         }
       }
-      locked_node.node_state.node_has_finished = true;
     }
-    return locked_node.node_state.node_has_finished;
+
+    /* If there are no remaining outputs, all the inputs can be destructed and/or can become
+     * unused. This can also trigger a chain reaction where nodes to the left become finished
+     * too. */
+    for (const int i : locked_node.node->inputs().index_range()) {
+      const DInputSocket socket = locked_node.node.input(i);
+      InputState &input_state = locked_node.node_state.inputs[i];
+      if (input_state.usage == ValueUsage::Maybe) {
+        this->set_input_unused(locked_node, socket);
+      }
+      else if (input_state.usage == ValueUsage::Required) {
+        /* The value was required, so it cannot become unused. However, we can destruct the
+         * value. */
+        this->destruct_input_value_if_exists(locked_node, socket);
+      }
+    }
+    locked_node.node_state.node_has_finished = true;
+    return true;
   }
 
   bool prepare_node_outputs_for_execution(LockedNode &locked_node)
@@ -836,9 +907,9 @@ class GeometryNodesEvaluator {
     }
 
     /* Use the multi-function implementation if it exists. */
-    const MultiFunction *multi_function = params_.mf_by_node->try_get(node);
-    if (multi_function != nullptr) {
-      this->execute_multi_function_node(node, *multi_function, node_state);
+    const nodes::NodeMultiFunctions::Item &fn_item = params_.mf_by_node->try_get(node);
+    if (fn_item.fn != nullptr) {
+      this->execute_multi_function_node(node, fn_item, node_state);
       return;
     }
 
@@ -851,18 +922,29 @@ class GeometryNodesEvaluator {
 
     NodeParamsProvider params_provider{*this, node, node_state};
     GeoNodeExecParams params{params_provider};
+    if (node->idname().find("Legacy") != StringRef::not_found) {
+      params.error_message_add(geo_log::NodeWarningType::Legacy,
+                               TIP_("Legacy node will be removed before Blender 4.0"));
+    }
     bnode.typeinfo->geometry_node_execute(params);
   }
 
   void execute_multi_function_node(const DNode node,
-                                   const MultiFunction &fn,
+                                   const nodes::NodeMultiFunctions::Item &fn_item,
                                    NodeState &node_state)
   {
-    MFContextBuilder fn_context;
-    MFParamsBuilder fn_params{fn, 1};
+    if (node->idname().find("Legacy") != StringRef::not_found) {
+      /* Create geometry nodes params just for creating an error message. */
+      NodeParamsProvider params_provider{*this, node, node_state};
+      GeoNodeExecParams params{params_provider};
+      params.error_message_add(geo_log::NodeWarningType::Legacy,
+                               TIP_("Legacy node will be removed before Blender 4.0"));
+    }
+
     LinearAllocator<> &allocator = local_allocators_.local();
 
     /* Prepare the inputs for the multi function. */
+    Vector<GField> input_fields;
     for (const int i : node->inputs().index_range()) {
       const InputSocketRef &socket_ref = node->input(i);
       if (!socket_ref.is_available()) {
@@ -873,24 +955,18 @@ class GeometryNodesEvaluator {
       BLI_assert(input_state.was_ready_for_execution);
       SingleInputValue &single_value = *input_state.value.single;
       BLI_assert(single_value.value != nullptr);
-      fn_params.add_readonly_single_input(GPointer{*input_state.type, single_value.value});
-    }
-    /* Prepare the outputs for the multi function. */
-    Vector<GMutablePointer> outputs;
-    for (const int i : node->outputs().index_range()) {
-      const OutputSocketRef &socket_ref = node->output(i);
-      if (!socket_ref.is_available()) {
-        continue;
-      }
-      const CPPType &type = *get_socket_cpp_type(socket_ref);
-      void *buffer = allocator.allocate(type.size(), type.alignment());
-      fn_params.add_uninitialized_single_output(GMutableSpan{type, buffer, 1});
-      outputs.append({type, buffer});
+      input_fields.append(std::move(*(GField *)single_value.value));
     }
 
-    fn.call(IndexRange(1), fn_params, fn_context);
+    std::shared_ptr<fn::FieldOperation> operation;
+    if (fn_item.owned_fn) {
+      operation = std::make_shared<fn::FieldOperation>(fn_item.owned_fn, std::move(input_fields));
+    }
+    else {
+      operation = std::make_shared<fn::FieldOperation>(*fn_item.fn, std::move(input_fields));
+    }
 
-    /* Forward the computed outputs. */
+    /* Forward outputs. */
     int output_index = 0;
     for (const int i : node->outputs().index_range()) {
       const OutputSocketRef &socket_ref = node->output(i);
@@ -899,8 +975,11 @@ class GeometryNodesEvaluator {
       }
       OutputState &output_state = node_state.outputs[i];
       const DOutputSocket socket{node.context(), &socket_ref};
-      GMutablePointer value = outputs[output_index];
-      this->forward_output(socket, value);
+      const CPPType *cpp_type = get_socket_cpp_type(socket_ref);
+      GField new_field{operation, output_index};
+      new_field = fn::make_field_constant_if_possible(std::move(new_field));
+      GField &field_to_forward = *allocator.construct<GField>(std::move(new_field)).release();
+      this->forward_output(socket, {cpp_type, &field_to_forward});
       output_state.has_been_computed = true;
       output_index++;
     }
@@ -922,7 +1001,7 @@ class GeometryNodesEvaluator {
       OutputState &output_state = node_state.outputs[socket->index()];
       output_state.has_been_computed = true;
       void *buffer = allocator.allocate(type->size(), type->alignment());
-      type->copy_construct(type->default_value(), buffer);
+      this->construct_default_value(*type, buffer);
       this->forward_output({node.context(), socket}, {*type, buffer});
     }
   }
@@ -1068,7 +1147,7 @@ class GeometryNodesEvaluator {
       return;
     }
     bool will_be_triggered_by_other_node = false;
-    for (const DSocket origin_socket : origin_sockets) {
+    for (const DSocket &origin_socket : origin_sockets) {
       if (origin_socket->is_input()) {
         /* Load the value directly from the origin socket. In most cases this is an unlinked
          * group input. */
@@ -1376,6 +1455,7 @@ class GeometryNodesEvaluator {
     }
     void *converted_buffer = allocator.allocate(required_type.size(), required_type.alignment());
     this->convert_value(type, required_type, buffer, converted_buffer);
+    type.destruct(buffer);
     return {required_type, converted_buffer};
   }
 
@@ -1389,14 +1469,42 @@ class GeometryNodesEvaluator {
       return;
     }
 
+    const FieldCPPType *from_field_type = dynamic_cast<const FieldCPPType *>(&from_type);
+    const FieldCPPType *to_field_type = dynamic_cast<const FieldCPPType *>(&to_type);
+
+    if (from_field_type != nullptr && to_field_type != nullptr) {
+      const CPPType &from_base_type = from_field_type->field_type();
+      const CPPType &to_base_type = to_field_type->field_type();
+      if (conversions_.is_convertible(from_base_type, to_base_type)) {
+        const MultiFunction &fn = *conversions_.get_conversion_multi_function(
+            MFDataType::ForSingle(from_base_type), MFDataType::ForSingle(to_base_type));
+        const GField &from_field = *(const GField *)from_value;
+        auto operation = std::make_shared<fn::FieldOperation>(fn, Vector<GField>{from_field});
+        new (to_value) GField(std::move(operation), 0);
+        return;
+      }
+    }
     if (conversions_.is_convertible(from_type, to_type)) {
       /* Do the conversion if possible. */
       conversions_.convert_to_uninitialized(from_type, to_type, from_value, to_value);
     }
     else {
       /* Cannot convert, use default value instead. */
-      to_type.copy_construct(to_type.default_value(), to_value);
+      this->construct_default_value(to_type, to_value);
     }
+  }
+
+  void construct_default_value(const CPPType &type, void *r_value)
+  {
+    if (const FieldCPPType *field_cpp_type = dynamic_cast<const FieldCPPType *>(&type)) {
+      const CPPType &base_type = field_cpp_type->field_type();
+      auto constant_fn = std::make_unique<fn::CustomMF_GenericConstant>(
+          base_type, base_type.default_value(), false);
+      auto operation = std::make_shared<fn::FieldOperation>(std::move(constant_fn));
+      new (r_value) GField(std::move(operation), 0);
+      return;
+    }
+    type.copy_construct(type.default_value(), r_value);
   }
 
   NodeState &get_node_state(const DNode node)

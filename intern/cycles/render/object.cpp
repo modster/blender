@@ -60,6 +60,7 @@ struct UpdateObjectTransformState {
 
   /* Packed object arrays. Those will be filled in. */
   uint *object_flag;
+  uint *object_visibility;
   KernelObject *objects;
   Transform *object_motion_pass;
   DecomposedTransform *object_motion;
@@ -113,6 +114,7 @@ Object::Object() : Node(get_node_type())
   particle_index = 0;
   attr_map_offset = 0;
   bounds = BoundBox::empty;
+  intersects_volume = false;
 }
 
 Object::~Object()
@@ -216,6 +218,10 @@ void Object::tag_update(Scene *scene)
     if (use_holdout_is_modified()) {
       flag |= ObjectManager::HOLDOUT_MODIFIED;
     }
+
+    if (is_shadow_catcher_is_modified()) {
+      scene->tag_shadow_catcher_modified();
+    }
   }
 
   if (geometry) {
@@ -273,14 +279,7 @@ bool Object::is_traceable() const
 
 uint Object::visibility_for_tracing() const
 {
-  uint trace_visibility = visibility;
-  if (is_shadow_catcher) {
-    trace_visibility &= ~PATH_RAY_SHADOW_NON_CATCHER;
-  }
-  else {
-    trace_visibility &= ~PATH_RAY_SHADOW_CATCHER;
-  }
-  return trace_visibility;
+  return SHADOW_CATCHER_OBJECT_VISIBILITY(is_shadow_catcher, visibility & PATH_RAY_ALL_VISIBILITY);
 }
 
 float Object::compute_volume_step_size() const
@@ -515,6 +514,9 @@ void ObjectManager::device_update_object_transform(UpdateObjectTransformState *s
                                              (1.0f - 0.5f * ob->shadow_terminator_shading_offset);
   kobject.shadow_terminator_geometry_offset = ob->shadow_terminator_geometry_offset;
 
+  kobject.visibility = ob->visibility_for_tracing();
+  kobject.primitive_type = geom->primitive_type();
+
   /* Object flag. */
   if (ob->use_holdout) {
     flag |= SD_OBJECT_HOLDOUT_MASK;
@@ -680,7 +682,7 @@ void ObjectManager::device_update(Device *device,
 
   /* prepare for static BVH building */
   /* todo: do before to support getting object level coords? */
-  if (scene->params.bvh_type == SceneParams::BVH_STATIC) {
+  if (scene->params.bvh_type == BVH_TYPE_STATIC) {
     scoped_callback_timer timer([scene](double time) {
       if (scene->update_stats) {
         scene->update_stats->object.times.add_entry(
@@ -758,12 +760,14 @@ void ObjectManager::device_update_flags(
     }
 
     if (bounds_valid) {
+      object->intersects_volume = false;
       foreach (Object *volume_object, volume_objects) {
         if (object == volume_object) {
           continue;
         }
         if (object->bounds.intersects(volume_object->bounds)) {
           object_flag[object->index] |= SD_OBJECT_INTERSECTS_VOLUME;
+          object->intersects_volume = true;
           break;
         }
       }
@@ -932,6 +936,11 @@ void ObjectManager::tag_update(Scene *scene, uint32_t flag)
   }
 
   scene->light_manager->tag_update(scene, LightManager::OBJECT_MANAGER);
+
+  /* Integrator's shadow catcher settings depends on object visibility settings. */
+  if (flag & (OBJECT_ADDED | OBJECT_REMOVED | OBJECT_MODIFIED)) {
+    scene->integrator->tag_update(scene, Integrator::OBJECT_MANAGER);
+  }
 }
 
 bool ObjectManager::need_update() const

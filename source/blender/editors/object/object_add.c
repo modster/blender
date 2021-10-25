@@ -65,7 +65,6 @@
 #include "BKE_displist.h"
 #include "BKE_duplilist.h"
 #include "BKE_effect.h"
-#include "BKE_font.h"
 #include "BKE_geometry_set.h"
 #include "BKE_gpencil_curve.h"
 #include "BKE_gpencil_geom.h"
@@ -75,6 +74,7 @@
 #include "BKE_lattice.h"
 #include "BKE_layer.h"
 #include "BKE_lib_id.h"
+#include "BKE_lib_override.h"
 #include "BKE_lib_query.h"
 #include "BKE_lib_remap.h"
 #include "BKE_light.h"
@@ -91,6 +91,7 @@
 #include "BKE_report.h"
 #include "BKE_scene.h"
 #include "BKE_speaker.h"
+#include "BKE_vfont.h"
 #include "BKE_volume.h"
 
 #include "DEG_depsgraph.h"
@@ -258,8 +259,8 @@ static bool object_add_drop_xy_get(bContext *C, wmOperator *op, int (*r_mval)[2]
 static int object_add_drop_xy_generic_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
   if (!object_add_drop_xy_is_set(op)) {
-    RNA_int_set(op->ptr, "drop_x", event->x);
-    RNA_int_set(op->ptr, "drop_y", event->y);
+    RNA_int_set(op->ptr, "drop_x", event->xy[0]);
+    RNA_int_set(op->ptr, "drop_y", event->xy[1]);
   }
   return op->type->exec(C, op);
 }
@@ -332,8 +333,12 @@ void ED_object_base_init_transform_on_add(Object *object, const float loc[3], co
 
 /* Uses context to figure out transform for primitive.
  * Returns standard diameter. */
-float ED_object_new_primitive_matrix(
-    bContext *C, Object *obedit, const float loc[3], const float rot[3], float r_primmat[4][4])
+float ED_object_new_primitive_matrix(bContext *C,
+                                     Object *obedit,
+                                     const float loc[3],
+                                     const float rot[3],
+                                     const float scale[3],
+                                     float r_primmat[4][4])
 {
   Scene *scene = CTX_data_scene(C);
   View3D *v3d = CTX_wm_view3d(C);
@@ -355,6 +360,10 @@ float ED_object_new_primitive_matrix(
   sub_v3_v3v3(r_primmat[3], r_primmat[3], obedit->obmat[3]);
   invert_m3_m3(imat, mat);
   mul_m3_v3(imat, r_primmat[3]);
+
+  if (scale != NULL) {
+    rescale_m4(r_primmat, scale);
+  }
 
   {
     const float dia = v3d ? ED_view3d_grid_scale(scene, v3d, NULL) :
@@ -863,7 +872,7 @@ static int effector_add_exec(bContext *C, wmOperator *op)
     ED_object_editmode_enter_ex(bmain, scene, ob, 0);
 
     float mat[4][4];
-    ED_object_new_primitive_matrix(C, ob, loc, rot, mat);
+    ED_object_new_primitive_matrix(C, ob, loc, rot, NULL, mat);
     mul_mat3_m4_fl(mat, dia);
     BLI_addtail(&cu->editnurb->nurbs,
                 ED_curve_add_nurbs_primitive(C, ob, mat, CU_NURBS | CU_PRIM_PATH, 1));
@@ -999,7 +1008,7 @@ static int object_metaball_add_exec(bContext *C, wmOperator *op)
   }
 
   float mat[4][4];
-  ED_object_new_primitive_matrix(C, obedit, loc, rot, mat);
+  ED_object_new_primitive_matrix(C, obedit, loc, rot, NULL, mat);
   /* Halving here is done to account for constant values from #BKE_mball_element_add.
    * While the default radius of the resulting meta element is 2,
    * we want to pass in 1 so other values such as resolution are scaled by 1.0. */
@@ -1365,30 +1374,28 @@ static int object_gpencil_add_exec(bContext *C, wmOperator *op)
     case GP_EMPTY: {
       float mat[4][4];
 
-      ED_object_new_primitive_matrix(C, ob, loc, rot, mat);
+      ED_object_new_primitive_matrix(C, ob, loc, rot, NULL, mat);
       ED_gpencil_create_blank(C, ob, mat);
       break;
     }
     case GP_STROKE: {
       float radius = RNA_float_get(op->ptr, "radius");
+      float scale[3];
+      copy_v3_fl(scale, radius);
       float mat[4][4];
 
-      ED_object_new_primitive_matrix(C, ob, loc, rot, mat);
-      mul_v3_fl(mat[0], radius);
-      mul_v3_fl(mat[1], radius);
-      mul_v3_fl(mat[2], radius);
+      ED_object_new_primitive_matrix(C, ob, loc, rot, scale, mat);
 
       ED_gpencil_create_stroke(C, ob, mat);
       break;
     }
     case GP_MONKEY: {
       float radius = RNA_float_get(op->ptr, "radius");
+      float scale[3];
+      copy_v3_fl(scale, radius);
       float mat[4][4];
 
-      ED_object_new_primitive_matrix(C, ob, loc, rot, mat);
-      mul_v3_fl(mat[0], radius);
-      mul_v3_fl(mat[1], radius);
-      mul_v3_fl(mat[2], radius);
+      ED_object_new_primitive_matrix(C, ob, loc, rot, scale, mat);
 
       ED_gpencil_create_monkey(C, ob, mat);
       break;
@@ -1397,12 +1404,11 @@ static int object_gpencil_add_exec(bContext *C, wmOperator *op)
     case GP_LRT_COLLECTION:
     case GP_LRT_OBJECT: {
       float radius = RNA_float_get(op->ptr, "radius");
+      float scale[3];
+      copy_v3_fl(scale, radius);
       float mat[4][4];
 
-      ED_object_new_primitive_matrix(C, ob, loc, rot, mat);
-      mul_v3_fl(mat[0], radius);
-      mul_v3_fl(mat[1], radius);
-      mul_v3_fl(mat[2], radius);
+      ED_object_new_primitive_matrix(C, ob, loc, rot, scale, mat);
 
       ED_gpencil_create_lineart(C, ob);
 
@@ -1481,7 +1487,7 @@ static void object_add_ui(bContext *UNUSED(C), wmOperator *op)
   uiItemR(layout, op->ptr, "type", 0, NULL, ICON_NONE);
 
   int type = RNA_enum_get(op->ptr, "type");
-  if (type == GP_LRT_COLLECTION || type == GP_LRT_OBJECT || type == GP_LRT_SCENE) {
+  if (ELEM(type, GP_LRT_COLLECTION, GP_LRT_OBJECT, GP_LRT_SCENE)) {
     uiItemR(layout, op->ptr, "use_lights", 0, NULL, ICON_NONE);
     uiItemR(layout, op->ptr, "use_in_front", 0, NULL, ICON_NONE);
     bool in_front = RNA_boolean_get(op->ptr, "use_in_front");
@@ -1685,8 +1691,8 @@ static int collection_instance_add_exec(bContext *C, wmOperator *op)
 static int object_instance_add_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
   if (!object_add_drop_xy_is_set(op)) {
-    RNA_int_set(op->ptr, "drop_x", event->x);
-    RNA_int_set(op->ptr, "drop_y", event->y);
+    RNA_int_set(op->ptr, "drop_x", event->xy[0]);
+    RNA_int_set(op->ptr, "drop_y", event->xy[1]);
   }
 
   if (!RNA_struct_property_is_set(op->ptr, "name")) {
@@ -1991,6 +1997,7 @@ static int object_delete_exec(bContext *C, wmOperator *op)
   Scene *scene = CTX_data_scene(C);
   wmWindowManager *wm = CTX_wm_manager(C);
   const bool use_global = RNA_boolean_get(op->ptr, "use_global");
+  const bool confirm = op->flag & OP_IS_INVOKE;
   uint changed_count = 0;
   uint tagged_count = 0;
 
@@ -2006,6 +2013,15 @@ static int object_delete_exec(bContext *C, wmOperator *op)
       BKE_reportf(op->reports,
                   RPT_WARNING,
                   "Cannot delete indirectly linked object '%s'",
+                  ob->id.name + 2);
+      continue;
+    }
+
+    if (!BKE_lib_override_library_id_is_user_deletable(bmain, &ob->id)) {
+      /* Can this case ever happen? */
+      BKE_reportf(op->reports,
+                  RPT_WARNING,
+                  "Cannot delete object '%s' as it used by override collections",
                   ob->id.name + 2);
       continue;
     }
@@ -2060,7 +2076,9 @@ static int object_delete_exec(bContext *C, wmOperator *op)
     BKE_id_multi_tagged_delete(bmain);
   }
 
-  BKE_reportf(op->reports, RPT_INFO, "Deleted %u object(s)", (changed_count + tagged_count));
+  if (confirm) {
+    BKE_reportf(op->reports, RPT_INFO, "Deleted %u object(s)", (changed_count + tagged_count));
+  }
 
   /* delete has to handle all open scenes */
   BKE_main_id_tag_listbase(&bmain->scenes, LIB_TAG_DOIT, true);
@@ -2823,8 +2841,7 @@ static int object_convert_exec(bContext *C, wmOperator *op)
       /* Remove unused materials. */
       int actcol = ob_gpencil->actcol;
       for (int slot = 1; slot <= ob_gpencil->totcol; slot++) {
-        while (slot <= ob_gpencil->totcol &&
-               !BKE_object_material_slot_used(ob_gpencil->data, slot)) {
+        while (slot <= ob_gpencil->totcol && !BKE_object_material_slot_used(ob_gpencil, slot)) {
           ob_gpencil->actcol = slot;
           BKE_object_material_slot_remove(CTX_data_main(C), ob_gpencil);
 
@@ -3516,12 +3533,6 @@ static int object_add_named_exec(bContext *C, wmOperator *op)
 
   basen->object->visibility_flag &= ~OB_HIDE_VIEWPORT;
 
-  int mval[2];
-  if (object_add_drop_xy_get(C, op, &mval)) {
-    ED_object_location_from_view(C, basen->object->loc);
-    ED_view3d_cursor3d_position(C, mval, false, basen->object->loc);
-  }
-
   /* object_add_duplicate_internal() doesn't deselect other objects, unlike object_add_common() or
    * BKE_view_layer_base_deselect_all(). */
   ED_object_base_deselect_all(view_layer, NULL, SEL_DESELECT);
@@ -3539,13 +3550,29 @@ static int object_add_named_exec(bContext *C, wmOperator *op)
   WM_event_add_notifier(C, NC_SCENE | ND_LAYER_CONTENT, scene);
   ED_outliner_select_sync_from_object_tag(C);
 
+  PropertyRNA *prop_matrix = RNA_struct_find_property(op->ptr, "matrix");
+  if (RNA_property_is_set(op->ptr, prop_matrix)) {
+    Object *ob_add = basen->object;
+    RNA_property_float_get_array(op->ptr, prop_matrix, &ob_add->obmat[0][0]);
+    BKE_object_apply_mat4(ob_add, ob_add->obmat, true, true);
+
+    DEG_id_tag_update(&ob_add->id, ID_RECALC_TRANSFORM);
+  }
+  else {
+    int mval[2];
+    if (object_add_drop_xy_get(C, op, &mval)) {
+      ED_object_location_from_view(C, basen->object->loc);
+      ED_view3d_cursor3d_position(C, mval, false, basen->object->loc);
+    }
+  }
+
   return OPERATOR_FINISHED;
 }
 
 void OBJECT_OT_add_named(wmOperatorType *ot)
 {
   /* identifiers */
-  ot->name = "Add Named Object";
+  ot->name = "Add Object";
   ot->description = "Add named object";
   ot->idname = "OBJECT_OT_add_named";
 
@@ -3576,6 +3603,10 @@ void OBJECT_OT_add_named(wmOperatorType *ot)
                   "'duplicate' is false)");
 
   RNA_def_string(ot->srna, "name", NULL, MAX_ID_NAME - 2, "Name", "Object name to add");
+
+  prop = RNA_def_float_matrix(
+      ot->srna, "matrix", 4, 4, NULL, 0.0f, 0.0f, "Matrix", "", 0.0f, 0.0f);
+  RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
 
   object_add_drop_xy_props(ot);
 }

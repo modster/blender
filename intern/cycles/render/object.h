@@ -75,6 +75,9 @@ class Object : public Node {
 
   NODE_SOCKET_API(float, ao_distance)
 
+  /* Set during device update. */
+  bool intersects_volume;
+
   Object();
   ~Object();
 

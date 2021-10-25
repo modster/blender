@@ -359,22 +359,30 @@ void BKE_previewimg_id_copy(ID *new_id, const ID *old_id)
 PreviewImage **BKE_previewimg_id_get_p(const ID *id)
 {
   switch (GS(id->name)) {
+    case ID_OB: {
+      Object *ob = (Object *)id;
+      /* Currently, only object types with real geometry can be rendered as preview. */
+      if (!OB_TYPE_IS_GEOMETRY(ob->type)) {
+        return NULL;
+      }
+      return &ob->preview;
+    }
+
 #define ID_PRV_CASE(id_code, id_struct) \
   case id_code: { \
     return &((id_struct *)id)->preview; \
   } \
     ((void)0)
-    ID_PRV_CASE(ID_MA, Material);
-    ID_PRV_CASE(ID_TE, Tex);
-    ID_PRV_CASE(ID_WO, World);
-    ID_PRV_CASE(ID_LA, Light);
-    ID_PRV_CASE(ID_IM, Image);
-    ID_PRV_CASE(ID_BR, Brush);
-    ID_PRV_CASE(ID_OB, Object);
-    ID_PRV_CASE(ID_GR, Collection);
-    ID_PRV_CASE(ID_SCE, Scene);
-    ID_PRV_CASE(ID_SCR, bScreen);
-    ID_PRV_CASE(ID_AC, bAction);
+      ID_PRV_CASE(ID_MA, Material);
+      ID_PRV_CASE(ID_TE, Tex);
+      ID_PRV_CASE(ID_WO, World);
+      ID_PRV_CASE(ID_LA, Light);
+      ID_PRV_CASE(ID_IM, Image);
+      ID_PRV_CASE(ID_BR, Brush);
+      ID_PRV_CASE(ID_GR, Collection);
+      ID_PRV_CASE(ID_SCE, Scene);
+      ID_PRV_CASE(ID_SCR, bScreen);
+      ID_PRV_CASE(ID_AC, bAction);
 #undef ID_PRV_CASE
     default:
       break;
@@ -633,12 +641,6 @@ void BKE_previewimg_blend_write(BlendWriter *writer, const PreviewImage *prv)
   }
 
   PreviewImage prv_copy = *prv;
-  /* don't write out large previews if not requested */
-  if (U.file_preview_type == USER_FILE_PREVIEW_NONE) {
-    prv_copy.w[1] = 0;
-    prv_copy.h[1] = 0;
-    prv_copy.rect[1] = nullptr;
-  }
   BLO_write_struct_at_address(writer, PreviewImage, prv, &prv_copy);
   if (prv_copy.rect[0]) {
     BLO_write_uint32_array(writer, prv_copy.w[0] * prv_copy.h[0], prv_copy.rect[0]);

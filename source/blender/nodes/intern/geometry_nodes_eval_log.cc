@@ -26,6 +26,8 @@ namespace blender::nodes::geometry_nodes_eval_log {
 using fn::CPPType;
 
 ModifierLog::ModifierLog(GeoLogger &logger)
+    : input_geometry_log_(std::move(logger.input_geometry_log_)),
+      output_geometry_log_(std::move(logger.output_geometry_log_))
 {
   root_tree_logs_ = allocator_.construct<TreeLog>();
 
@@ -106,6 +108,15 @@ void ModifierLog::foreach_node_log(FunctionRef<void(const NodeLog &)> fn) const
   }
 }
 
+const GeometryValueLog *ModifierLog::input_geometry_log() const
+{
+  return input_geometry_log_.get();
+}
+const GeometryValueLog *ModifierLog::output_geometry_log() const
+{
+  return output_geometry_log_.get();
+}
+
 const NodeLog *TreeLog::lookup_node_log(StringRef node_name) const
 {
   const destruct_ptr<NodeLog> *node_log = node_logs_.lookup_ptr_as(node_name);
@@ -159,13 +170,28 @@ const SocketLog *NodeLog::lookup_socket_log(const bNode &node, const bNodeSocket
 
 GeometryValueLog::GeometryValueLog(const GeometrySet &geometry_set, bool log_full_geometry)
 {
-  bke::geometry_set_instances_attribute_foreach(
-      geometry_set,
-      [&](StringRefNull attribute_name, const AttributeMetaData &meta_data) {
-        this->attributes_.append({attribute_name, meta_data.domain, meta_data.data_type});
-        return true;
-      },
-      8);
+  static std::array all_component_types = {GEO_COMPONENT_TYPE_CURVE,
+                                           GEO_COMPONENT_TYPE_INSTANCES,
+                                           GEO_COMPONENT_TYPE_MESH,
+                                           GEO_COMPONENT_TYPE_POINT_CLOUD,
+                                           GEO_COMPONENT_TYPE_VOLUME};
+
+  /* Keep track handled attribute names to make sure that we do not return the same name twice.
+   * Currently #GeometrySet::attribute_foreach does not do that. Note that this will merge
+   * attributes with the same name but different domains or data types on separate components. */
+  Set<StringRef> names;
+
+  geometry_set.attribute_foreach(
+      all_component_types,
+      true,
+      [&](const bke::AttributeIDRef &attribute_id,
+          const AttributeMetaData &meta_data,
+          const GeometryComponent &UNUSED(component)) {
+        if (attribute_id.is_named() && names.add(attribute_id.name())) {
+          this->attributes_.append({attribute_id.name(), meta_data.domain, meta_data.data_type});
+        }
+      });
+
   for (const GeometryComponent *component : geometry_set.get_components_for_read()) {
     component_types_.append(component->type());
     switch (component->type()) {
@@ -345,7 +371,7 @@ void LocalGeoLogger::log_value_for_sockets(Span<DSocket> sockets, GPointer value
   if (type.is<GeometrySet>()) {
     bool log_full_geometry = false;
     for (const DSocket &socket : sockets) {
-      if (main_logger_->log_full_geometry_sockets_.contains(socket)) {
+      if (main_logger_->log_full_sockets_.contains(socket)) {
         log_full_geometry = true;
         break;
       }

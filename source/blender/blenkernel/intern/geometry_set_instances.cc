@@ -14,6 +14,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
+#include "BKE_collection.h"
 #include "BKE_geometry_set_instances.hh"
 #include "BKE_material.h"
 #include "BKE_mesh.h"
@@ -23,6 +24,7 @@
 #include "BKE_spline.hh"
 
 #include "DNA_collection_types.h"
+#include "DNA_layer_types.h"
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
 #include "DNA_object_types.h"
@@ -51,20 +53,10 @@ static void add_final_mesh_as_geometry_component(const Object &object, GeometryS
   }
 }
 
-static void add_curve_data_as_geometry_component(const Object &object, GeometrySet &geometry_set)
-{
-  BLI_assert(object.type == OB_CURVE);
-  if (object.data != nullptr) {
-    std::unique_ptr<CurveEval> curve = curve_eval_from_dna_curve(*(const Curve *)object.data);
-    CurveComponent &curve_component = geometry_set.get_component_for_write<CurveComponent>();
-    curve_component.replace(curve.release(), GeometryOwnershipType::Owned);
-  }
-}
-
 /**
  * \note This doesn't extract instances from the "dupli" system for non-geometry-nodes instances.
  */
-static GeometrySet object_get_geometry_set_for_read(const Object &object)
+GeometrySet object_get_evaluated_geometry_set(const Object &object)
 {
   if (object.type == OB_MESH && object.mode == OB_MODE_EDIT) {
     GeometrySet geometry_set;
@@ -83,9 +75,6 @@ static GeometrySet object_get_geometry_set_for_read(const Object &object)
   GeometrySet geometry_set;
   if (object.type == OB_MESH) {
     add_final_mesh_as_geometry_component(object, geometry_set);
-  }
-  else if (object.type == OB_CURVE) {
-    add_curve_data_as_geometry_component(object, geometry_set);
   }
 
   /* TODO: Cover the case of point-clouds without modifiers-- they may not be covered by the
@@ -111,7 +100,7 @@ static void geometry_set_collect_recursive_object(const Object &object,
                                                   const float4x4 &transform,
                                                   Vector<GeometryInstanceGroup> &r_sets)
 {
-  GeometrySet instance_geometry_set = object_get_geometry_set_for_read(object);
+  GeometrySet instance_geometry_set = object_get_evaluated_geometry_set(object);
   geometry_set_collect_recursive(instance_geometry_set, transform, r_sets);
 
   if (object.type == OB_EMPTY) {
@@ -200,138 +189,10 @@ void geometry_set_gather_instances(const GeometrySet &geometry_set,
   geometry_set_collect_recursive(geometry_set, unit_transform, r_instance_groups);
 }
 
-static bool collection_instance_attribute_foreach(const Collection &collection,
-                                                  const AttributeForeachCallback callback,
-                                                  const int limit,
-                                                  int &count);
-
-static bool instances_attribute_foreach_recursive(const GeometrySet &geometry_set,
-                                                  const AttributeForeachCallback callback,
-                                                  const int limit,
-                                                  int &count);
-
-static bool object_instance_attribute_foreach(const Object &object,
-                                              const AttributeForeachCallback callback,
-                                              const int limit,
-                                              int &count)
-{
-  GeometrySet instance_geometry_set = object_get_geometry_set_for_read(object);
-  if (!instances_attribute_foreach_recursive(instance_geometry_set, callback, limit, count)) {
-    return false;
-  }
-
-  if (object.type == OB_EMPTY) {
-    const Collection *collection_instance = object.instance_collection;
-    if (collection_instance != nullptr) {
-      if (!collection_instance_attribute_foreach(*collection_instance, callback, limit, count)) {
-        return false;
-      }
-    }
-  }
-  return true;
-}
-
-static bool collection_instance_attribute_foreach(const Collection &collection,
-                                                  const AttributeForeachCallback callback,
-                                                  const int limit,
-                                                  int &count)
-{
-  LISTBASE_FOREACH (const CollectionObject *, collection_object, &collection.gobject) {
-    BLI_assert(collection_object->ob != nullptr);
-    const Object &object = *collection_object->ob;
-    if (!object_instance_attribute_foreach(object, callback, limit, count)) {
-      return false;
-    }
-  }
-  LISTBASE_FOREACH (const CollectionChild *, collection_child, &collection.children) {
-    BLI_assert(collection_child->collection != nullptr);
-    const Collection &collection = *collection_child->collection;
-    if (!collection_instance_attribute_foreach(collection, callback, limit, count)) {
-      return false;
-    }
-  }
-  return true;
-}
-
-/**
- * \return True if the recursive iteration should continue, false if the limit is reached or the
- * callback has returned false indicating it should stop.
- */
-static bool instances_attribute_foreach_recursive(const GeometrySet &geometry_set,
-                                                  const AttributeForeachCallback callback,
-                                                  const int limit,
-                                                  int &count)
-{
-  for (const GeometryComponent *component : geometry_set.get_components_for_read()) {
-    if (!component->attribute_foreach(callback)) {
-      return false;
-    }
-  }
-
-  /* Now that this geometry set is visited, increase the count and check with the limit. */
-  if (limit > 0 && count++ > limit) {
-    return false;
-  }
-
-  const InstancesComponent *instances_component =
-      geometry_set.get_component_for_read<InstancesComponent>();
-  if (instances_component == nullptr) {
-    return true;
-  }
-
-  for (const InstanceReference &reference : instances_component->references()) {
-    switch (reference.type()) {
-      case InstanceReference::Type::Object: {
-        const Object &object = reference.object();
-        if (!object_instance_attribute_foreach(object, callback, limit, count)) {
-          return false;
-        }
-        break;
-      }
-      case InstanceReference::Type::Collection: {
-        const Collection &collection = reference.collection();
-        if (!collection_instance_attribute_foreach(collection, callback, limit, count)) {
-          return false;
-        }
-        break;
-      }
-      case InstanceReference::Type::GeometrySet: {
-        const GeometrySet &geometry_set = reference.geometry_set();
-        if (!instances_attribute_foreach_recursive(geometry_set, callback, limit, count)) {
-          return false;
-        }
-        break;
-      }
-      case InstanceReference::Type::None: {
-        break;
-      }
-    }
-  }
-
-  return true;
-}
-
-/**
- * Call the callback on all of this geometry set's components, including geometry sets from
- * instances and recursive instances. This is necessary to access available attributes without
- * making all of the set's geometry real.
- *
- * \param limit: The total number of geometry sets to visit before returning early. This is used
- * to avoid looking through too many geometry sets recursively, as an explicit tradeoff in favor
- * of performance at the cost of visiting every unique attribute.
- */
-void geometry_set_instances_attribute_foreach(const GeometrySet &geometry_set,
-                                              const AttributeForeachCallback callback,
-                                              const int limit)
-{
-  int count = 0;
-  instances_attribute_foreach_recursive(geometry_set, callback, limit, count);
-}
-
 void geometry_set_gather_instances_attribute_info(Span<GeometryInstanceGroup> set_groups,
                                                   Span<GeometryComponentType> component_types,
                                                   const Set<std::string> &ignored_attributes,
-                                                  Map<std::string, AttributeKind> &r_attributes)
+                                                  Map<AttributeIDRef, AttributeKind> &r_attributes)
 {
   for (const GeometryInstanceGroup &set_group : set_groups) {
     const GeometrySet &set = set_group.geometry_set;
@@ -341,29 +202,29 @@ void geometry_set_gather_instances_attribute_info(Span<GeometryInstanceGroup> se
       }
       const GeometryComponent &component = *set.get_component_for_read(component_type);
 
-      component.attribute_foreach([&](StringRefNull name, const AttributeMetaData &meta_data) {
-        if (ignored_attributes.contains(name)) {
-          return true;
-        }
-        auto add_info = [&](AttributeKind *attribute_kind) {
-          attribute_kind->domain = meta_data.domain;
-          attribute_kind->data_type = meta_data.data_type;
-        };
-        auto modify_info = [&](AttributeKind *attribute_kind) {
-          attribute_kind->domain = meta_data.domain; /* TODO: Use highest priority domain. */
-          attribute_kind->data_type = bke::attribute_data_type_highest_complexity(
-              {attribute_kind->data_type, meta_data.data_type});
-        };
+      component.attribute_foreach(
+          [&](const AttributeIDRef &attribute_id, const AttributeMetaData &meta_data) {
+            if (attribute_id.is_named() && ignored_attributes.contains(attribute_id.name())) {
+              return true;
+            }
+            auto add_info = [&](AttributeKind *attribute_kind) {
+              attribute_kind->domain = meta_data.domain;
+              attribute_kind->data_type = meta_data.data_type;
+            };
+            auto modify_info = [&](AttributeKind *attribute_kind) {
+              attribute_kind->domain = meta_data.domain; /* TODO: Use highest priority domain. */
+              attribute_kind->data_type = bke::attribute_data_type_highest_complexity(
+                  {attribute_kind->data_type, meta_data.data_type});
+            };
 
-        r_attributes.add_or_modify(name, add_info, modify_info);
-        return true;
-      });
+            r_attributes.add_or_modify(attribute_id, add_info, modify_info);
+            return true;
+          });
     }
   }
 }
 
-static Mesh *join_mesh_topology_and_builtin_attributes(Span<GeometryInstanceGroup> set_groups,
-                                                       const bool convert_points_to_vertices)
+static Mesh *join_mesh_topology_and_builtin_attributes(Span<GeometryInstanceGroup> set_groups)
 {
   int totverts = 0;
   int totloops = 0;
@@ -392,10 +253,6 @@ static Mesh *join_mesh_topology_and_builtin_attributes(Span<GeometryInstanceGrou
         Material *material = mesh.mat[slot_index];
         materials.add(material);
       }
-    }
-    if (convert_points_to_vertices && set.has_pointcloud()) {
-      const PointCloud &pointcloud = *set.get_pointcloud_for_read();
-      totverts += pointcloud.totpoint * tot_transforms;
     }
   }
 
@@ -483,24 +340,6 @@ static Mesh *join_mesh_topology_and_builtin_attributes(Span<GeometryInstanceGrou
         poly_offset += mesh.totpoly;
       }
     }
-
-    const float3 point_normal{0.0f, 0.0f, 1.0f};
-    short point_normal_short[3];
-    normal_float_to_short_v3(point_normal_short, point_normal);
-
-    if (convert_points_to_vertices && set.has_pointcloud()) {
-      const PointCloud &pointcloud = *set.get_pointcloud_for_read();
-      for (const float4x4 &transform : set_group.transforms) {
-        for (const int i : IndexRange(pointcloud.totpoint)) {
-          MVert &new_vert = new_mesh->mvert[vert_offset + i];
-          const float3 old_position = pointcloud.co[i];
-          const float3 new_position = transform * old_position;
-          copy_v3_v3(new_vert.co, new_position);
-          memcpy(&new_vert.no, point_normal_short, sizeof(point_normal_short));
-        }
-        vert_offset += pointcloud.totpoint;
-      }
-    }
   }
 
   /* A possible optimization is to only tag the normals dirty when there are transforms that change
@@ -512,11 +351,11 @@ static Mesh *join_mesh_topology_and_builtin_attributes(Span<GeometryInstanceGrou
 
 static void join_attributes(Span<GeometryInstanceGroup> set_groups,
                             Span<GeometryComponentType> component_types,
-                            const Map<std::string, AttributeKind> &attribute_info,
+                            const Map<AttributeIDRef, AttributeKind> &attribute_info,
                             GeometryComponent &result)
 {
-  for (Map<std::string, AttributeKind>::Item entry : attribute_info.items()) {
-    StringRef name = entry.key;
+  for (Map<AttributeIDRef, AttributeKind>::Item entry : attribute_info.items()) {
+    const AttributeIDRef attribute_id = entry.key;
     const AttributeDomain domain_output = entry.value.domain;
     const CustomDataType data_type_output = entry.value.data_type;
     const CPPType *cpp_type = bke::custom_data_type_to_cpp_type(data_type_output);
@@ -524,7 +363,7 @@ static void join_attributes(Span<GeometryInstanceGroup> set_groups,
 
     result.attribute_try_create(
         entry.key, domain_output, data_type_output, AttributeInitDefault());
-    WriteAttributeLookup write_attribute = result.attribute_try_get_for_write(name);
+    WriteAttributeLookup write_attribute = result.attribute_try_get_for_write(attribute_id);
     if (!write_attribute || &write_attribute.varray->type() != cpp_type ||
         write_attribute.domain != domain_output) {
       continue;
@@ -543,7 +382,7 @@ static void join_attributes(Span<GeometryInstanceGroup> set_groups,
             continue; /* Domain size is 0, so no need to increment the offset. */
           }
           GVArrayPtr source_attribute = component.attribute_try_get_for_read(
-              name, domain_output, data_type_output);
+              attribute_id, domain_output, data_type_output);
 
           if (source_attribute) {
             fn::GVArray_GSpan src_span{*source_attribute};
@@ -633,12 +472,9 @@ static CurveEval *join_curve_splines_and_builtin_attributes(Span<GeometryInstanc
   return new_curve;
 }
 
-static void join_instance_groups_mesh(Span<GeometryInstanceGroup> set_groups,
-                                      bool convert_points_to_vertices,
-                                      GeometrySet &result)
+static void join_instance_groups_mesh(Span<GeometryInstanceGroup> set_groups, GeometrySet &result)
 {
-  Mesh *new_mesh = join_mesh_topology_and_builtin_attributes(set_groups,
-                                                             convert_points_to_vertices);
+  Mesh *new_mesh = join_mesh_topology_and_builtin_attributes(set_groups);
   if (new_mesh == nullptr) {
     return;
   }
@@ -646,21 +482,17 @@ static void join_instance_groups_mesh(Span<GeometryInstanceGroup> set_groups,
   MeshComponent &dst_component = result.get_component_for_write<MeshComponent>();
   dst_component.replace(new_mesh);
 
-  Vector<GeometryComponentType> component_types;
-  component_types.append(GEO_COMPONENT_TYPE_MESH);
-  if (convert_points_to_vertices) {
-    component_types.append(GEO_COMPONENT_TYPE_POINT_CLOUD);
-  }
-
   /* Don't copy attributes that are stored directly in the mesh data structs. */
-  Map<std::string, AttributeKind> attributes;
+  Map<AttributeIDRef, AttributeKind> attributes;
   geometry_set_gather_instances_attribute_info(
       set_groups,
-      component_types,
+      {GEO_COMPONENT_TYPE_MESH},
       {"position", "material_index", "normal", "shade_smooth", "crease"},
       attributes);
-  join_attributes(
-      set_groups, component_types, attributes, static_cast<GeometryComponent &>(dst_component));
+  join_attributes(set_groups,
+                  {GEO_COMPONENT_TYPE_MESH},
+                  attributes,
+                  static_cast<GeometryComponent &>(dst_component));
 }
 
 static void join_instance_groups_pointcloud(Span<GeometryInstanceGroup> set_groups,
@@ -674,7 +506,7 @@ static void join_instance_groups_pointcloud(Span<GeometryInstanceGroup> set_grou
   PointCloudComponent &dst_component = result.get_component_for_write<PointCloudComponent>();
   dst_component.replace(new_pointcloud);
 
-  Map<std::string, AttributeKind> attributes;
+  Map<AttributeIDRef, AttributeKind> attributes;
   geometry_set_gather_instances_attribute_info(
       set_groups, {GEO_COMPONENT_TYPE_POINT_CLOUD}, {"position"}, attributes);
   join_attributes(set_groups,
@@ -708,34 +540,16 @@ static void join_instance_groups_curve(Span<GeometryInstanceGroup> set_groups, G
   CurveComponent &dst_component = result.get_component_for_write<CurveComponent>();
   dst_component.replace(curve);
 
-  Map<std::string, AttributeKind> attributes;
+  Map<AttributeIDRef, AttributeKind> attributes;
   geometry_set_gather_instances_attribute_info(
       set_groups,
       {GEO_COMPONENT_TYPE_CURVE},
-      {"position", "radius", "tilt", "cyclic", "resolution"},
+      {"position", "radius", "tilt", "handle_left", "handle_right", "cyclic", "resolution"},
       attributes);
   join_attributes(set_groups,
                   {GEO_COMPONENT_TYPE_CURVE},
                   attributes,
                   static_cast<GeometryComponent &>(dst_component));
-}
-
-GeometrySet geometry_set_realize_mesh_for_modifier(const GeometrySet &geometry_set)
-{
-  if (!geometry_set.has_instances() && !geometry_set.has_pointcloud()) {
-    return geometry_set;
-  }
-
-  GeometrySet new_geometry_set = geometry_set;
-  Vector<GeometryInstanceGroup> set_groups;
-  geometry_set_gather_instances(geometry_set, set_groups);
-  join_instance_groups_mesh(set_groups, true, new_geometry_set);
-  /* Remove all instances, even though some might contain other non-mesh data. We can't really
-   * keep only non-mesh instances in general. */
-  new_geometry_set.remove<InstancesComponent>();
-  /* If there was a point cloud, it is now part of the mesh. */
-  new_geometry_set.remove<PointCloudComponent>();
-  return new_geometry_set;
 }
 
 GeometrySet geometry_set_realize_instances(const GeometrySet &geometry_set)
@@ -748,7 +562,7 @@ GeometrySet geometry_set_realize_instances(const GeometrySet &geometry_set)
 
   Vector<GeometryInstanceGroup> set_groups;
   geometry_set_gather_instances(geometry_set, set_groups);
-  join_instance_groups_mesh(set_groups, false, new_geometry_set);
+  join_instance_groups_mesh(set_groups, new_geometry_set);
   join_instance_groups_pointcloud(set_groups, new_geometry_set);
   join_instance_groups_volume(set_groups, new_geometry_set);
   join_instance_groups_curve(set_groups, new_geometry_set);
@@ -757,3 +571,91 @@ GeometrySet geometry_set_realize_instances(const GeometrySet &geometry_set)
 }
 
 }  // namespace blender::bke
+
+void InstancesComponent::foreach_referenced_geometry(
+    blender::FunctionRef<void(const GeometrySet &geometry_set)> callback) const
+{
+  using namespace blender::bke;
+  for (const InstanceReference &reference : references_) {
+    switch (reference.type()) {
+      case InstanceReference::Type::Object: {
+        const Object &object = reference.object();
+        const GeometrySet object_geometry_set = object_get_evaluated_geometry_set(object);
+        callback(object_geometry_set);
+        break;
+      }
+      case InstanceReference::Type::Collection: {
+        Collection &collection = reference.collection();
+        FOREACH_COLLECTION_OBJECT_RECURSIVE_BEGIN (&collection, object) {
+          const GeometrySet object_geometry_set = object_get_evaluated_geometry_set(*object);
+          callback(object_geometry_set);
+        }
+        FOREACH_COLLECTION_OBJECT_RECURSIVE_END;
+        break;
+      }
+      case InstanceReference::Type::GeometrySet: {
+        const GeometrySet &instance_geometry_set = reference.geometry_set();
+        callback(instance_geometry_set);
+        break;
+      }
+      case InstanceReference::Type::None: {
+        break;
+      }
+    }
+  }
+}
+
+/**
+ * If references have a collection or object type, convert them into geometry instances
+ * recursively. After that, the geometry sets can be edited. There may still be instances of other
+ * types of they can't be converted to geometry sets.
+ */
+void InstancesComponent::ensure_geometry_instances()
+{
+  using namespace blender;
+  using namespace blender::bke;
+  VectorSet<InstanceReference> new_references;
+  new_references.reserve(references_.size());
+  for (const InstanceReference &reference : references_) {
+    switch (reference.type()) {
+      case InstanceReference::Type::None:
+      case InstanceReference::Type::GeometrySet: {
+        /* Those references can stay as their were. */
+        new_references.add_new(reference);
+        break;
+      }
+      case InstanceReference::Type::Object: {
+        /* Create a new reference that contains the geometry set of the object. We may want to
+         * treat e.g. lamps and similar object types separately here. */
+        const Object &object = reference.object();
+        GeometrySet object_geometry_set = object_get_evaluated_geometry_set(object);
+        if (object_geometry_set.has_instances()) {
+          InstancesComponent &component =
+              object_geometry_set.get_component_for_write<InstancesComponent>();
+          component.ensure_geometry_instances();
+        }
+        new_references.add_new(std::move(object_geometry_set));
+        break;
+      }
+      case InstanceReference::Type::Collection: {
+        /* Create a new reference that contains a geometry set that contains all objects from the
+         * collection as instances. */
+        GeometrySet collection_geometry_set;
+        InstancesComponent &component =
+            collection_geometry_set.get_component_for_write<InstancesComponent>();
+        Collection &collection = reference.collection();
+        FOREACH_COLLECTION_OBJECT_RECURSIVE_BEGIN (&collection, object) {
+          const int handle = component.add_reference(*object);
+          component.add_instance(handle, object->obmat);
+          float4x4 &transform = component.instance_transforms().last();
+          sub_v3_v3(transform.values[3], collection.instance_offset);
+        }
+        FOREACH_COLLECTION_OBJECT_RECURSIVE_END;
+        component.ensure_geometry_instances();
+        new_references.add_new(std::move(collection_geometry_set));
+        break;
+      }
+    }
+  }
+  references_ = std::move(new_references);
+}

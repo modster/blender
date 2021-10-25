@@ -41,10 +41,12 @@
 #include "BLI_span.hh"
 #include "BLI_string_ref.hh"
 #include "BLI_vector.hh"
+#include "BLI_vector_set.hh"
 
 #include "BLT_translation.h"
 
 #include "BKE_context.h"
+#include "BKE_geometry_set.hh"
 #include "BKE_idtype.h"
 #include "BKE_lib_id.h"
 #include "BKE_main.h"
@@ -77,6 +79,9 @@
 #include "RNA_access.h"
 
 #include "NOD_geometry_nodes_eval_log.hh"
+#include "NOD_node_declaration.hh"
+
+#include "FN_field_cpp_type.hh"
 
 #include "node_intern.h" /* own include */
 
@@ -88,7 +93,11 @@ using blender::Map;
 using blender::Set;
 using blender::Span;
 using blender::Vector;
+using blender::VectorSet;
 using blender::fn::CPPType;
+using blender::fn::FieldCPPType;
+using blender::fn::FieldInput;
+using blender::fn::GField;
 using blender::fn::GPointer;
 namespace geo_log = blender::nodes::geometry_nodes_eval_log;
 
@@ -725,12 +734,6 @@ static void node_draw_mute_line(const View2D *v2d, const SpaceNode *snode, const
   GPU_blend(GPU_BLEND_NONE);
 }
 
-/* Flags used in gpu_shader_keyframe_diamond_frag.glsl. */
-#define MARKER_SHAPE_DIAMOND 0x1
-#define MARKER_SHAPE_SQUARE 0xC
-#define MARKER_SHAPE_CIRCLE 0x2
-#define MARKER_SHAPE_INNER_DOT 0x10
-
 static void node_socket_draw(const bNodeSocket *sock,
                              const float color[4],
                              const float color_outline[4],
@@ -749,16 +752,16 @@ static void node_socket_draw(const bNodeSocket *sock,
   switch (sock->display_shape) {
     case SOCK_DISPLAY_SHAPE_DIAMOND:
     case SOCK_DISPLAY_SHAPE_DIAMOND_DOT:
-      flags = MARKER_SHAPE_DIAMOND;
+      flags = GPU_KEYFRAME_SHAPE_DIAMOND;
       break;
     case SOCK_DISPLAY_SHAPE_SQUARE:
     case SOCK_DISPLAY_SHAPE_SQUARE_DOT:
-      flags = MARKER_SHAPE_SQUARE;
+      flags = GPU_KEYFRAME_SHAPE_SQUARE;
       break;
     default:
     case SOCK_DISPLAY_SHAPE_CIRCLE:
     case SOCK_DISPLAY_SHAPE_CIRCLE_DOT:
-      flags = MARKER_SHAPE_CIRCLE;
+      flags = GPU_KEYFRAME_SHAPE_CIRCLE;
       break;
   }
 
@@ -766,7 +769,7 @@ static void node_socket_draw(const bNodeSocket *sock,
            SOCK_DISPLAY_SHAPE_DIAMOND_DOT,
            SOCK_DISPLAY_SHAPE_SQUARE_DOT,
            SOCK_DISPLAY_SHAPE_CIRCLE_DOT)) {
-    flags |= MARKER_SHAPE_INNER_DOT;
+    flags |= GPU_KEYFRAME_SHAPE_INNER_DOT;
   }
 
   immAttr4fv(col_id, color);
@@ -850,31 +853,73 @@ static void create_inspection_string_for_generic_value(const geo_log::GenericVal
   };
 
   const GPointer value = value_log.value();
-  if (value.is_type<int>()) {
-    ss << *value.get<int>() << TIP_(" (Integer)");
+  const CPPType &type = *value.type();
+  if (const FieldCPPType *field_type = dynamic_cast<const FieldCPPType *>(&type)) {
+    const CPPType &base_type = field_type->field_type();
+    BUFFER_FOR_CPP_TYPE_VALUE(base_type, buffer);
+    const GField &field = field_type->get_gfield(value.get());
+    if (field.node().depends_on_input()) {
+      if (base_type.is<int>()) {
+        ss << TIP_("Integer Field");
+      }
+      else if (base_type.is<float>()) {
+        ss << TIP_("Float Field");
+      }
+      else if (base_type.is<blender::float3>()) {
+        ss << TIP_("Vector Field");
+      }
+      else if (base_type.is<bool>()) {
+        ss << TIP_("Boolean Field");
+      }
+      else if (base_type.is<std::string>()) {
+        ss << TIP_("String Field");
+      }
+      ss << TIP_(" based on:\n");
+
+      /* Use vector set to deduplicate inputs. */
+      VectorSet<std::reference_wrapper<const FieldInput>> field_inputs;
+      field.node().foreach_field_input(
+          [&](const FieldInput &field_input) { field_inputs.add(field_input); });
+      for (const FieldInput &field_input : field_inputs) {
+        ss << "\u2022 " << field_input.socket_inspection_name();
+        if (field_input != field_inputs.as_span().last().get()) {
+          ss << ".\n";
+        }
+      }
+    }
+    else {
+      blender::fn::evaluate_constant_field(field, buffer);
+      if (base_type.is<int>()) {
+        ss << *(int *)buffer << TIP_(" (Integer)");
+      }
+      else if (base_type.is<float>()) {
+        ss << *(float *)buffer << TIP_(" (Float)");
+      }
+      else if (base_type.is<blender::float3>()) {
+        ss << *(blender::float3 *)buffer << TIP_(" (Vector)");
+      }
+      else if (base_type.is<bool>()) {
+        ss << ((*(bool *)buffer) ? TIP_("True") : TIP_("False")) << TIP_(" (Boolean)");
+      }
+      else if (base_type.is<std::string>()) {
+        ss << *(std::string *)buffer << TIP_(" (String)");
+      }
+      base_type.destruct(buffer);
+    }
   }
-  else if (value.is_type<float>()) {
-    ss << *value.get<float>() << TIP_(" (Float)");
-  }
-  else if (value.is_type<blender::float3>()) {
-    ss << *value.get<blender::float3>() << TIP_(" (Vector)");
-  }
-  else if (value.is_type<bool>()) {
-    ss << (*value.get<bool>() ? TIP_("True") : TIP_("False")) << TIP_(" (Boolean)");
-  }
-  else if (value.is_type<std::string>()) {
-    ss << *value.get<std::string>() << TIP_(" (String)");
-  }
-  else if (value.is_type<Object *>()) {
+  else if (type.is<Object *>()) {
     id_to_inspection_string((ID *)*value.get<Object *>(), ID_OB);
   }
-  else if (value.is_type<Material *>()) {
+  else if (type.is<Material *>()) {
     id_to_inspection_string((ID *)*value.get<Material *>(), ID_MA);
   }
-  else if (value.is_type<Tex *>()) {
+  else if (type.is<Tex *>()) {
     id_to_inspection_string((ID *)*value.get<Tex *>(), ID_TE);
   }
-  else if (value.is_type<Collection *>()) {
+  else if (type.is<Image *>()) {
+    id_to_inspection_string((ID *)*value.get<Image *>(), ID_IM);
+  }
+  else if (type.is<Collection *>()) {
     id_to_inspection_string((ID *)*value.get<Collection *>(), ID_GR);
   }
 }
@@ -1044,12 +1089,37 @@ static void node_socket_draw_nested(const bContext *C,
       but,
       [](bContext *C, void *argN, const char *UNUSED(tip)) {
         SocketTooltipData *data = (SocketTooltipData *)argN;
-        std::optional<std::string> str = create_socket_inspection_string(
+        std::optional<std::string> socket_inspection_str = create_socket_inspection_string(
             C, *data->ntree, *data->node, *data->socket);
-        if (str.has_value()) {
-          return BLI_strdup(str->c_str());
+
+        std::stringstream output;
+        if (data->node->declaration != nullptr) {
+          ListBase *list;
+          Span<blender::nodes::SocketDeclarationPtr> decl_list;
+
+          if (data->socket->in_out == SOCK_IN) {
+            list = &data->node->inputs;
+            decl_list = data->node->declaration->inputs();
+          }
+          else {
+            list = &data->node->outputs;
+            decl_list = data->node->declaration->outputs();
+          }
+
+          const int socket_index = BLI_findindex(list, data->socket);
+          const blender::nodes::SocketDeclaration &socket_decl = *decl_list[socket_index];
+          blender::StringRef description = socket_decl.description();
+          if (!description.is_empty()) {
+            output << TIP_(description.data()) << ".\n\n";
+          }
         }
-        return BLI_strdup(TIP_("The socket value has not been computed yet"));
+        if (socket_inspection_str.has_value()) {
+          output << *socket_inspection_str;
+        }
+        else {
+          output << TIP_("The socket value has not been computed yet");
+        }
+        return BLI_strdup(output.str().c_str());
       },
       data,
       MEM_freeN);
@@ -1085,7 +1155,7 @@ void ED_node_socket_draw(bNodeSocket *sock, const rcti *rect, const float color[
   GPU_blend(GPU_BLEND_ALPHA);
   GPU_program_point_size(true);
 
-  immBindBuiltinProgram(GPU_SHADER_KEYFRAME_DIAMOND);
+  immBindBuiltinProgram(GPU_SHADER_KEYFRAME_SHAPE);
   immUniform1f("outline_scale", 0.7f);
   immUniform2f("ViewportSize", -1.0f, -1.0f);
 
@@ -1230,7 +1300,7 @@ void node_draw_sockets(const View2D *v2d,
 
   GPU_blend(GPU_BLEND_ALPHA);
   GPU_program_point_size(true);
-  immBindBuiltinProgram(GPU_SHADER_KEYFRAME_DIAMOND);
+  immBindBuiltinProgram(GPU_SHADER_KEYFRAME_SHAPE);
   immUniform1f("outline_scale", 0.7f);
   immUniform2f("ViewportSize", -1.0f, -1.0f);
 
@@ -1399,6 +1469,8 @@ static int node_error_type_to_icon(const geo_log::NodeWarningType type)
       return ICON_ERROR;
     case geo_log::NodeWarningType::Info:
       return ICON_INFO;
+    case geo_log::NodeWarningType::Legacy:
+      return ICON_ERROR;
   }
 
   BLI_assert(false);
@@ -1409,6 +1481,8 @@ static uint8_t node_error_type_priority(const geo_log::NodeWarningType type)
 {
   switch (type) {
     case geo_log::NodeWarningType::Error:
+      return 4;
+    case geo_log::NodeWarningType::Legacy:
       return 3;
     case geo_log::NodeWarningType::Warning:
       return 2;
@@ -2105,26 +2179,25 @@ static void draw_nodetree(const bContext *C,
   node_draw_nodetree(C, region, snode, ntree, parent_key);
 }
 
-/* Shade the parent node group and add a `uiBlock` to clip mouse events. */
-static void draw_group_overlay(const bContext *C, ARegion *region)
+/**
+ * Make the background slightly brighter to indicate that users are inside a node-group.
+ */
+static void draw_background_color(const SpaceNode *snode)
 {
-  const View2D *v2d = &region->v2d;
-  const rctf rect = v2d->cur;
-  float color[4];
+  const int max_tree_length = 3;
+  const float bright_factor = 0.25f;
 
-  /* Shade node groups to separate them visually. */
-  GPU_blend(GPU_BLEND_ALPHA);
+  /* We ignore the first element of the path since it is the top-most tree and it doesn't need to
+   * be brighter. We also set a cap to how many levels we want to set apart, to avoid the
+   * background from getting too bright. */
+  const int clamped_tree_path_length = BLI_listbase_count_at_most(&snode->treepath,
+                                                                  max_tree_length);
+  const int depth = max_ii(0, clamped_tree_path_length - 1);
 
-  UI_GetThemeColorShadeAlpha4fv(TH_NODE_GROUP, 0, 0, color);
-  UI_draw_roundbox_corner_set(UI_CNR_NONE);
-  UI_draw_roundbox_4fv(&rect, true, 0, color);
-  GPU_blend(GPU_BLEND_NONE);
-
-  /* Set the block bounds to clip mouse events from underlying nodes. */
-  uiBlock *block = UI_block_begin(C, region, "node tree bounds block", UI_EMBOSS);
-  UI_block_bounds_set_explicit(block, rect.xmin, rect.ymin, rect.xmax, rect.ymax);
-  UI_block_flag_enable(block, UI_BLOCK_CLIP_EVENTS);
-  UI_block_end(C, block);
+  float color[3];
+  UI_GetThemeColor3fv(TH_BACK, color);
+  mul_v3_fl(color, 1.0f + bright_factor * depth);
+  GPU_clear_color(color[0], color[1], color[2], 1.0);
 }
 
 void node_draw_space(const bContext *C, ARegion *region)
@@ -2140,15 +2213,15 @@ void node_draw_space(const bContext *C, ARegion *region)
   GPU_framebuffer_bind_no_srgb(framebuffer_overlay);
 
   UI_view2d_view_ortho(v2d);
-  UI_ThemeClearColor(TH_BACK);
+  draw_background_color(snode);
   GPU_depth_test(GPU_DEPTH_NONE);
   GPU_scissor_test(true);
 
   /* XXX `snode->runtime->cursor` set in coordinate-space for placing new nodes,
    * used for drawing noodles too. */
   UI_view2d_region_to_view(&region->v2d,
-                           win->eventstate->x - region->winrct.xmin,
-                           win->eventstate->y - region->winrct.ymin,
+                           win->eventstate->xy[0] - region->winrct.xmin,
+                           win->eventstate->xy[1] - region->winrct.ymin,
                            &snode->runtime->cursor[0],
                            &snode->runtime->cursor[1]);
   snode->runtime->cursor[0] /= UI_DPI_FAC;
@@ -2166,8 +2239,6 @@ void node_draw_space(const bContext *C, ARegion *region)
 
   /* Draw parent node trees. */
   if (snode->treepath.last) {
-    static const int max_depth = 2;
-
     bNodeTreePath *path = (bNodeTreePath *)snode->treepath.last;
 
     /* Update tree path name (drawn in the bottom left). */
@@ -2188,35 +2259,13 @@ void node_draw_space(const bContext *C, ARegion *region)
       copy_v2_v2(snode->edittree->view_center, center);
     }
 
-    int depth = 0;
-    while (path->prev && depth < max_depth) {
-      path = path->prev;
-      depth++;
-    }
-
-    /* Parent node trees in the background. */
-    for (int curdepth = depth; curdepth > 0; path = path->next, curdepth--) {
-      bNodeTree *ntree = path->nodetree;
-      if (ntree) {
-        snode_setup_v2d(snode, region, path->view_center);
-
-        draw_nodetree(C, region, ntree, path->parent_key);
-
-        draw_group_overlay(C, region);
-      }
-    }
-
     /* Top-level edit tree. */
     bNodeTree *ntree = path->nodetree;
     if (ntree) {
       snode_setup_v2d(snode, region, center);
 
-      /* Grid, uses theme color based on node path depth. */
-      UI_view2d_multi_grid_draw(v2d,
-                                (depth > 0 ? TH_NODE_GROUP : TH_GRID),
-                                ED_node_grid_size(),
-                                NODE_GRID_STEPS,
-                                grid_levels);
+      /* Grid. */
+      UI_view2d_multi_grid_draw(v2d, TH_GRID, ED_node_grid_size(), NODE_GRID_STEPS, grid_levels);
 
       /* Backdrop. */
       draw_nodespace_back_pix(C, region, snode, path->parent_key);
@@ -2250,7 +2299,7 @@ void node_draw_space(const bContext *C, ARegion *region)
     GPU_line_smooth(false);
     GPU_blend(GPU_BLEND_NONE);
 
-    if (snode->flag & SNODE_SHOW_GPENCIL) {
+    if (snode->overlay.flag & SN_OVERLAY_SHOW_OVERLAYS && snode->flag & SNODE_SHOW_GPENCIL) {
       /* Draw grease-pencil annotations. */
       ED_annotation_draw_view2d(C, true);
     }
@@ -2269,7 +2318,7 @@ void node_draw_space(const bContext *C, ARegion *region)
   UI_view2d_view_restore(C);
 
   if (snode->treepath.last) {
-    if (snode->flag & SNODE_SHOW_GPENCIL) {
+    if (snode->overlay.flag & SN_OVERLAY_SHOW_OVERLAYS && snode->flag & SNODE_SHOW_GPENCIL) {
       /* Draw grease-pencil (screen strokes, and also paint-buffer). */
       ED_annotation_draw_view2d(C, false);
     }

@@ -46,6 +46,7 @@
 
 #include "BLT_translation.h"
 
+#include "BKE_anonymous_attribute.h"
 #include "BKE_customdata.h"
 #include "BKE_customdata_file.h"
 #include "BKE_deform.h"
@@ -1855,6 +1856,8 @@ static const LayerTypeInfo LAYERTYPEINFO[CD_NUMTYPES] = {
      NULL,
      NULL,
      NULL},
+    /* 51: CD_HAIRLENGTH */
+    {sizeof(float), "float", 1, NULL, NULL, NULL, NULL, NULL, NULL},
 };
 
 static const char *LAYERTYPENAMES[CD_NUMTYPES] = {
@@ -1911,6 +1914,7 @@ static const char *LAYERTYPENAMES[CD_NUMTYPES] = {
     "CDPropFloat3",
     "CDPropFloat2",
     "CDPropBoolean",
+    "CDHairLength",
 };
 
 const CustomData_MeshMasks CD_MASK_BAREMESH = {
@@ -2127,6 +2131,11 @@ bool CustomData_merge(const struct CustomData *source,
     if (flag & CD_FLAG_NOCOPY) {
       continue;
     }
+    if (layer->anonymous_id &&
+        !BKE_anonymous_attribute_id_has_strong_references(layer->anonymous_id)) {
+      /* This attribute is not referenced anymore, so it can be treated as if it didn't exist. */
+      continue;
+    }
     if (!(mask & CD_TYPE_AS_MASK(type))) {
       continue;
     }
@@ -2166,6 +2175,11 @@ bool CustomData_merge(const struct CustomData *source,
       newlayer->active_mask = lastmask;
       newlayer->flag |= flag & (CD_FLAG_EXTERNAL | CD_FLAG_IN_MEMORY);
       changed = true;
+
+      if (layer->anonymous_id != NULL) {
+        BKE_anonymous_attribute_id_increment_weak(layer->anonymous_id);
+        newlayer->anonymous_id = layer->anonymous_id;
+      }
     }
   }
 
@@ -2206,6 +2220,10 @@ static void customData_free_layer__internal(CustomDataLayer *layer, int totelem)
 {
   const LayerTypeInfo *typeInfo;
 
+  if (layer->anonymous_id != NULL) {
+    BKE_anonymous_attribute_id_decrement_weak(layer->anonymous_id);
+    layer->anonymous_id = NULL;
+  }
   if (!(layer->flag & CD_FLAG_NOFREE) && layer->data) {
     typeInfo = layerType_getInfo(layer->type);
 
@@ -2577,6 +2595,11 @@ static CustomDataLayer *customData_add_layer__internal(CustomData *data,
     data->layers[index] = data->layers[index - 1];
   }
 
+  /* Clear remaining data on the layer. The original data on the layer has been moved to another
+   * index. Without this, it can happen that information from the previous layer at that index
+   * leaks into the new layer. */
+  memset(data->layers + index, 0, sizeof(CustomDataLayer));
+
   data->layers[index].type = type;
   data->layers[index].flag = flag;
   data->layers[index].data = newlayerdata;
@@ -2647,6 +2670,27 @@ void *CustomData_add_layer_named(CustomData *data,
   }
 
   return NULL;
+}
+
+void *CustomData_add_layer_anonymous(struct CustomData *data,
+                                     int type,
+                                     eCDAllocType alloctype,
+                                     void *layerdata,
+                                     int totelem,
+                                     const AnonymousAttributeID *anonymous_id)
+{
+  const char *name = BKE_anonymous_attribute_id_internal_name(anonymous_id);
+  CustomDataLayer *layer = customData_add_layer__internal(
+      data, type, alloctype, layerdata, totelem, name);
+  CustomData_update_typemap(data);
+
+  if (layer == NULL) {
+    return NULL;
+  }
+
+  BKE_anonymous_attribute_id_increment_weak(anonymous_id);
+  layer->anonymous_id = anonymous_id;
+  return layer->data;
 }
 
 bool CustomData_free_layer(CustomData *data, int type, int totelem, int index)
@@ -2810,6 +2854,20 @@ void *CustomData_duplicate_referenced_layer_named(CustomData *data,
   int layer_index = CustomData_get_named_layer_index(data, type, name);
 
   return customData_duplicate_referenced_layer_index(data, layer_index, totelem);
+}
+
+void *CustomData_duplicate_referenced_layer_anonymous(CustomData *data,
+                                                      const int UNUSED(type),
+                                                      const AnonymousAttributeID *anonymous_id,
+                                                      const int totelem)
+{
+  for (int i = 0; i < data->totlayer; i++) {
+    if (data->layers[i].anonymous_id == anonymous_id) {
+      return customData_duplicate_referenced_layer_index(data, i, totelem);
+    }
+  }
+  BLI_assert_unreachable();
+  return NULL;
 }
 
 void CustomData_duplicate_referenced_layers(CustomData *data, int totelem)
@@ -4244,7 +4302,8 @@ void CustomData_blend_write_prepare(CustomData *data,
 
   for (i = 0, j = 0; i < totlayer; i++) {
     CustomDataLayer *layer = &data->layers[i];
-    if (layer->flag & CD_FLAG_NOCOPY) { /* Layers with this flag set are not written to file. */
+    /* Layers with this flag set are not written to file. */
+    if ((layer->flag & CD_FLAG_NOCOPY) || layer->anonymous_id != NULL) {
       data->totlayer--;
       // CLOG_WARN(&LOG, "skipping layer %p (%s)", layer, layer->name);
     }

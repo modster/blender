@@ -115,6 +115,7 @@ typedef enum {
   UI_WTYPE_PROGRESSBAR,
   UI_WTYPE_NODESOCKET,
   UI_WTYPE_DATASETROW,
+  UI_WTYPE_TREEROW,
 } uiWidgetTypeEnum;
 
 /* Button state argument shares bits with 'uiBut.flag'.
@@ -2262,7 +2263,10 @@ static void widget_draw_extra_icons(const uiWidgetColors *wcol,
 
     temp.xmin = temp.xmax - icon_size;
 
-    if (!op_icon->highlighted) {
+    if (op_icon->disabled) {
+      alpha_this *= 0.4f;
+    }
+    else if (!op_icon->highlighted) {
       alpha_this *= 0.75f;
     }
 
@@ -3679,10 +3683,9 @@ static void widget_progressbar(
   widgetbase_draw(&wtb_bar, wcol);
 }
 
-static void widget_datasetrow(
-    uiBut *but, uiWidgetColors *wcol, rcti *rect, int state, int UNUSED(roundboxalign))
+static void widget_treerow_exec(
+    uiWidgetColors *wcol, rcti *rect, int state, int UNUSED(roundboxalign), int indentation)
 {
-  uiButDatasetRow *but_componentrow = (uiButDatasetRow *)but;
   uiWidgetBase wtb;
   widget_init(&wtb);
 
@@ -3695,10 +3698,24 @@ static void widget_datasetrow(
     widgetbase_draw(&wtb, wcol);
   }
 
-  BLI_rcti_resize(rect,
-                  BLI_rcti_size_x(rect) - UI_UNIT_X * but_componentrow->indentation,
-                  BLI_rcti_size_y(rect));
-  BLI_rcti_translate(rect, 0.5f * UI_UNIT_X * but_componentrow->indentation, 0);
+  BLI_rcti_resize(rect, BLI_rcti_size_x(rect) - UI_UNIT_X * indentation, BLI_rcti_size_y(rect));
+  BLI_rcti_translate(rect, 0.5f * UI_UNIT_X * indentation, 0);
+}
+
+static void widget_treerow(
+    uiBut *but, uiWidgetColors *wcol, rcti *rect, int state, int roundboxalign)
+{
+  uiButTreeRow *tree_row = (uiButTreeRow *)but;
+  BLI_assert(but->type == UI_BTYPE_TREEROW);
+  widget_treerow_exec(wcol, rect, state, roundboxalign, tree_row->indentation);
+}
+
+static void widget_datasetrow(
+    uiBut *but, uiWidgetColors *wcol, rcti *rect, int state, int roundboxalign)
+{
+  uiButDatasetRow *dataset_row = (uiButDatasetRow *)but;
+  BLI_assert(but->type == UI_BTYPE_DATASETROW);
+  widget_treerow_exec(wcol, rect, state, roundboxalign, dataset_row->indentation);
 }
 
 static void widget_nodesocket(
@@ -4035,9 +4052,15 @@ static void widget_menu_itembut(uiWidgetColors *wcol,
   uiWidgetBase wtb;
   widget_init(&wtb);
 
-  /* not rounded, no outline */
+  /* Padding on the sides. */
+  const float padding = 0.125f * BLI_rcti_size_y(rect);
+  rect->xmin += padding;
+  rect->xmax -= padding;
+
+  /* No outline. */
   wtb.draw_outline = false;
-  round_box_edges(&wtb, 0, rect, 0.0f);
+  const float rad = wcol->roundness * BLI_rcti_size_y(rect);
+  round_box_edges(&wtb, UI_CNR_ALL, rect, rad);
 
   widgetbase_draw(&wtb, wcol);
 }
@@ -4492,6 +4515,10 @@ static uiWidgetType *widget_type(uiWidgetTypeEnum type)
       wt.custom = widget_datasetrow;
       break;
 
+    case UI_WTYPE_TREEROW:
+      wt.custom = widget_treerow;
+      break;
+
     case UI_WTYPE_NODESOCKET:
       wt.custom = widget_nodesocket;
       break;
@@ -4605,6 +4632,9 @@ void ui_draw_but(const bContext *C, struct ARegion *region, uiStyle *style, uiBu
     switch (but->type) {
       case UI_BTYPE_LABEL:
         wt = widget_type(UI_WTYPE_ICON_LABEL);
+        if (!(but->flag & UI_HAS_ICON)) {
+          but->drawflag |= UI_BUT_NO_TEXT_PADDING;
+        }
         break;
       default:
         wt = widget_type(UI_WTYPE_ICON);
@@ -4804,9 +4834,6 @@ void ui_draw_but(const bContext *C, struct ARegion *region, uiStyle *style, uiBu
         break;
 
       case UI_BTYPE_CURVE:
-        /* do not draw right to edge of rect */
-        rect->xmin += (0.2f * UI_UNIT_X);
-        rect->xmax -= (0.2f * UI_UNIT_X);
         ui_draw_but_CURVE(region, but, &tui->wcol_regular, rect);
         break;
 
@@ -4821,6 +4848,11 @@ void ui_draw_but(const bContext *C, struct ARegion *region, uiStyle *style, uiBu
 
       case UI_BTYPE_DATASETROW:
         wt = widget_type(UI_WTYPE_DATASETROW);
+        fstyle = &style->widgetlabel;
+        break;
+
+      case UI_BTYPE_TREEROW:
+        wt = widget_type(UI_WTYPE_TREEROW);
         fstyle = &style->widgetlabel;
         break;
 
@@ -4955,30 +4987,6 @@ void ui_draw_menu_back(uiStyle *UNUSED(style), uiBlock *block, rcti *rect)
   }
 
   ui_draw_clip_tri(block, rect, wt);
-}
-
-/**
- * Uses the widget base drawing and colors from the box widget, but ensures an opaque
- * inner color.
- */
-void ui_draw_box_opaque(rcti *rect, int roundboxalign)
-{
-  uiWidgetType *wt = widget_type(UI_WTYPE_BOX);
-
-  /* Alpha blend with the region's background color to force an opaque background. */
-  uiWidgetColors *wcol = &wt->wcol;
-  wt->state(wt, 0, 0, UI_EMBOSS_UNDEFINED);
-  float background[4];
-  UI_GetThemeColor4fv(TH_BACK, background);
-  float new_inner[4];
-  rgba_uchar_to_float(new_inner, wcol->inner);
-  new_inner[0] = (new_inner[0] * new_inner[3]) + (background[0] * (1.0f - new_inner[3]));
-  new_inner[1] = (new_inner[1] * new_inner[3]) + (background[1] * (1.0f - new_inner[3]));
-  new_inner[2] = (new_inner[2] * new_inner[3]) + (background[2] * (1.0f - new_inner[3]));
-  new_inner[3] = 1.0f;
-  rgba_float_to_uchar(wcol->inner, new_inner);
-
-  wt->custom(NULL, wcol, rect, 0, roundboxalign);
 }
 
 /**
@@ -5348,7 +5356,7 @@ void ui_draw_menu_item(const uiFontStyle *fstyle,
         }
       }
       else {
-        BLI_assert_msg(0, "Unknwon menu item separator type");
+        BLI_assert_msg(0, "Unknown menu item separator type");
       }
     }
   }
@@ -5443,12 +5451,19 @@ void ui_draw_preview_item_stateless(const uiFontStyle *fstyle,
   rcti trect = *rect;
   const float text_size = UI_UNIT_Y;
   float font_dims[2] = {0.0f, 0.0f};
+  const bool has_text = name && name[0];
 
-  /* draw icon in rect above the space reserved for the label */
-  rect->ymin += text_size;
+  if (has_text) {
+    /* draw icon in rect above the space reserved for the label */
+    rect->ymin += text_size;
+  }
   GPU_blend(GPU_BLEND_ALPHA);
   widget_draw_preview(iconid, 1.0f, rect);
   GPU_blend(GPU_BLEND_NONE);
+
+  if (!has_text) {
+    return;
+  }
 
   BLF_width_and_height(
       fstyle->uifont_id, name, BLF_DRAW_STR_DUMMY_MAX, &font_dims[0], &font_dims[1]);

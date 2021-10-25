@@ -84,7 +84,7 @@ Depsgraph *animviz_depsgraph_build(Main *bmain,
 
   /* Make a flat array of IDs for the DEG API. */
   const int num_ids = BLI_listbase_count(targets);
-  ID **ids = MEM_malloc_arrayN(sizeof(ID *), num_ids, "animviz IDS");
+  ID **ids = MEM_malloc_arrayN(num_ids, sizeof(ID *), "animviz IDS");
   int current_id_index = 0;
   for (MPathTarget *mpt = targets->first; mpt != NULL; mpt = mpt->next) {
     ids[current_id_index++] = &mpt->ob->id;
@@ -329,6 +329,7 @@ static void motionpath_calculate_update_range(MPathTarget *mpt,
   for (FCurve *fcu = fcurve_list->first; fcu != NULL; fcu = fcu->next) {
     struct AnimKeylist *keylist = ED_keylist_create();
     fcurve_to_keylist(adt, fcu, keylist, 0);
+    ED_keylist_prepare_for_direct_access(keylist);
 
     int fcu_sfra = motionpath_get_prev_prev_keyframe(mpt, keylist, current_frame);
     int fcu_efra = motionpath_get_next_next_keyframe(mpt, keylist, current_frame);
@@ -443,6 +444,7 @@ void animviz_calc_motionpaths(Depsgraph *depsgraph,
         action_to_keylist(adt, adt->action, mpt->keylist, 0);
       }
     }
+    ED_keylist_prepare_for_direct_access(mpt->keylist);
 
     if (range == ANIMVIZ_CALC_RANGE_CHANGED) {
       int mpt_sfra, mpt_efra;

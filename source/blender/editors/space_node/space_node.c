@@ -256,6 +256,8 @@ static SpaceLink *node_create(const ScrArea *UNUSED(area), const Scene *UNUSED(s
   snode->spacetype = SPACE_NODE;
 
   snode->flag = SNODE_SHOW_GPENCIL | SNODE_USE_ALPHA;
+  snode->overlay.flag |= SN_OVERLAY_SHOW_OVERLAYS;
+  snode->overlay.flag |= SN_OVERLAY_SHOW_WIRE_COLORS;
 
   /* backdrop */
   snode->zoom = 1.0f;
@@ -619,8 +621,8 @@ static void node_cursor(wmWindow *win, ScrArea *area, ARegion *region)
 
   /* convert mouse coordinates to v2d space */
   UI_view2d_region_to_view(&region->v2d,
-                           win->eventstate->x - region->winrct.xmin,
-                           win->eventstate->y - region->winrct.ymin,
+                           win->eventstate->xy[0] - region->winrct.xmin,
+                           win->eventstate->xy[1] - region->winrct.ymin,
                            &snode->runtime->cursor[0],
                            &snode->runtime->cursor[1]);
 

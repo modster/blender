@@ -192,7 +192,7 @@ static bool get_keyframe_extents(bAnimContext *ac, float *min, float *max, const
         bGPDlayer *gpl = ale->data;
         bGPDframe *gpf;
 
-        /* find gp-frame which is less than or equal to cframe */
+        /* Find gp-frame which is less than or equal to current-frame. */
         for (gpf = gpl->frames.first; gpf; gpf = gpf->next) {
           const float framenum = (float)gpf->framenum;
           *min = min_ff(*min, framenum);
@@ -204,7 +204,7 @@ static bool get_keyframe_extents(bAnimContext *ac, float *min, float *max, const
         MaskLayer *masklay = ale->data;
         MaskLayerShape *masklay_shape;
 
-        /* find mask layer which is less than or equal to cframe */
+        /* Find mask layer which is less than or equal to current-frame. */
         for (masklay_shape = masklay->splines_shapes.first; masklay_shape;
              masklay_shape = masklay_shape->next) {
           const float framenum = (float)masklay_shape->frame;
@@ -276,7 +276,7 @@ static int actkeys_previewrange_exec(bContext *C, wmOperator *UNUSED(op))
   scene = ac.scene;
 
   /* set the range directly */
-  get_keyframe_extents(&ac, &min, &max, false);
+  get_keyframe_extents(&ac, &min, &max, true);
   scene->r.flag |= SCER_PRV_RANGE;
   scene->r.psfra = floorf(min);
   scene->r.pefra = ceilf(max);
@@ -295,7 +295,7 @@ static int actkeys_previewrange_exec(bContext *C, wmOperator *UNUSED(op))
 void ACTION_OT_previewrange_set(wmOperatorType *ot)
 {
   /* identifiers */
-  ot->name = "Auto-Set Preview Range";
+  ot->name = "Set Preview Range to Selected";
   ot->idname = "ACTION_OT_previewrange_set";
   ot->description = "Set Preview Range based on extents of selected Keyframes";
 

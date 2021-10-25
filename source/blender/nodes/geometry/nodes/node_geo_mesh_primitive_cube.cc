@@ -26,7 +26,7 @@ namespace blender::nodes {
 
 static void geo_node_mesh_primitive_cube_declare(NodeDeclarationBuilder &b)
 {
-  b.add_input<decl::Vector>("Size").default_value({1.0f, 1.0f, 1.0f}).subtype(PROP_TRANSLATION);
+  b.add_input<decl::Vector>("Size").default_value(float3(1)).min(0.0f).subtype(PROP_TRANSLATION);
   b.add_input<decl::Int>("Vertices X").default_value(2).min(2).max(1000);
   b.add_input<decl::Int>("Vertices Y").default_value(2).min(2).max(1000);
   b.add_input<decl::Int>("Vertices Z").default_value(2).min(2).max(1000);
@@ -456,12 +456,12 @@ static Mesh *create_cube_mesh(const float3 size,
     }
     if (verts_y == 1) { /* XZ plane. */
       Mesh *mesh = create_grid_mesh(verts_x, verts_z, size.x, size.z);
-      transform_mesh(mesh, float3(0), float3(M_PI_2, 0.0f, 0.0f), float3(1));
+      transform_mesh(*mesh, float3(0), float3(M_PI_2, 0.0f, 0.0f), float3(1));
       return mesh;
     }
     /* YZ plane. */
     Mesh *mesh = create_grid_mesh(verts_z, verts_y, size.z, size.y);
-    transform_mesh(mesh, float3(0), float3(0.0f, M_PI_2, 0.0f), float3(1));
+    transform_mesh(*mesh, float3(0), float3(0.0f, M_PI_2, 0.0f), float3(1));
     return mesh;
   }
 

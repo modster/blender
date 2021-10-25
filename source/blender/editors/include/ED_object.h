@@ -202,7 +202,7 @@ void ED_object_parent(struct Object *ob,
                       const char *substr);
 char *ED_object_ot_drop_named_material_tooltip(struct bContext *C,
                                                struct PointerRNA *properties,
-                                               const struct wmEvent *event);
+                                               const int mval[2]);
 
 /* bitflags for enter/exit editmode */
 enum {
@@ -286,6 +286,7 @@ float ED_object_new_primitive_matrix(struct bContext *C,
                                      struct Object *obedit,
                                      const float loc[3],
                                      const float rot[3],
+                                     const float scale[3],
                                      float primmat[4][4]);
 
 /* Avoid allowing too much insane values even by typing
@@ -338,7 +339,16 @@ typedef enum eObjectPathCalcRange {
 
 void ED_objects_recalculate_paths(struct bContext *C,
                                   struct Scene *scene,
-                                  eObjectPathCalcRange range);
+                                  eObjectPathCalcRange range,
+                                  struct ListBase *ld_objects);
+
+void ED_objects_recalculate_paths_selected(struct bContext *C,
+                                           struct Scene *scene,
+                                           eObjectPathCalcRange range);
+
+void ED_objects_recalculate_paths_visible(struct bContext *C,
+                                          struct Scene *scene,
+                                          eObjectPathCalcRange range);
 
 /* constraints */
 struct ListBase *ED_object_constraint_active_list(struct Object *ob);

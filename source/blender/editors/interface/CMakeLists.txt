@@ -25,9 +25,11 @@ set(INC
   ../../depsgraph
   ../../draw
   ../../gpu
+  ../../functions
   ../../imbuf
   ../../makesdna
   ../../makesrna
+  ../../nodes
   ../../python
   ../../render
   ../../windowmanager
@@ -42,6 +44,7 @@ set(SRC
   interface_button_group.c
   interface_context_menu.c
   interface_draw.c
+  interface_dropboxes.cc
   interface_eyedropper.c
   interface_eyedropper_color.c
   interface_eyedropper_colorband.c
@@ -68,13 +71,16 @@ set(SRC
   interface_style.c
   interface_template_asset_view.cc
   interface_template_list.cc
+  interface_template_attribute_search.cc
   interface_template_search_menu.c
   interface_template_search_operator.c
   interface_templates.c
   interface_undo.c
   interface_utils.c
+  interface_view.cc
   interface_widgets.c
   resources.c
+  tree_view.cc
   view2d.c
   view2d_draw.c
   view2d_edge_pan.c

@@ -100,7 +100,7 @@ void BKE_modifier_init(void)
   /* Initialize modifier types */
   modifier_type_init(modifier_types); /* MOD_utils.c */
 
-  /* Initialize global cmmon storage used for virtual modifier list */
+  /* Initialize global common storage used for virtual modifier list. */
   md = BKE_modifier_new(eModifierType_Armature);
   virtualModifierCommonData.amd = *((ArmatureModifierData *)md);
   BKE_modifier_free(md);
@@ -1473,7 +1473,6 @@ void BKE_modifier_blend_read_data(BlendDataReader *reader, ListBase *lb, Object 
         fmd->domain->tex_velocity_y = NULL;
         fmd->domain->tex_velocity_z = NULL;
         fmd->domain->tex_wt = NULL;
-        fmd->domain->mesh_velocities = NULL;
         BLO_read_data_address(reader, &fmd->domain->coba);
 
         BLO_read_data_address(reader, &fmd->domain->effector_weights);

@@ -80,7 +80,11 @@ Geometry *BlenderSync::sync_geometry(BL::Depsgraph &b_depsgraph,
 {
   /* Test if we can instance or if the object is modified. */
   Geometry::Type geom_type = determine_geom_type(b_ob_info, use_particle_hair);
-  GeometryKey key(b_ob_info.object_data, geom_type);
+  BL::ID b_key_id = (b_ob_info.is_real_object_data() &&
+                     BKE_object_is_modified(b_ob_info.real_object)) ?
+                        b_ob_info.real_object :
+                        b_ob_info.object_data;
+  GeometryKey key(b_key_id.ptr.data, geom_type);
 
   /* Find shader indices. */
   array<Node *> used_shaders = find_used_shaders(b_ob_info.iter_object);
@@ -110,7 +114,7 @@ Geometry *BlenderSync::sync_geometry(BL::Depsgraph &b_depsgraph,
   }
   else {
     /* Test if we need to update existing geometry. */
-    sync = geometry_map.update(geom, b_ob_info.object_data);
+    sync = geometry_map.update(geom, b_key_id);
   }
 
   if (!sync) {
@@ -189,8 +193,10 @@ void BlenderSync::sync_geometry_motion(BL::Depsgraph &b_depsgraph,
   /* Ensure we only sync instanced geometry once. */
   Geometry *geom = object->get_geometry();
 
-  if (geometry_motion_synced.find(geom) != geometry_motion_synced.end())
+  if (geometry_motion_synced.find(geom) != geometry_motion_synced.end() ||
+      geometry_motion_attribute_synced.find(geom) != geometry_motion_attribute_synced.end()) {
     return;
+  }
 
   geometry_motion_synced.insert(geom);
 
