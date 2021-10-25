@@ -379,6 +379,8 @@ DefNode(GeometryNode, GEO_NODE_LEVEL_SET_PRIMITIVE_SPHERE , 0, "LEVEL_SET_PRIMIT
 DefNode(GeometryNode, GEO_NODE_LEVEL_SET_PRIMITIVE_PLATONIC , def_geo_level_set_primitive_platonic, "LEVEL_SET_PRIMITIVE_PLATONIC", LevelSetPlatonic, "Level Set Platonic", "")
 DefNode(GeometryNode, GEO_NODE_LEVEL_SET_TO_FOG_VOLUME , 0, "LEVEL_SET_TO_FOG", LevelSetToFogVolume, "Level Set to Fog Volume", "")
 DefNode(GeometryNode, GEO_NODE_LEVEL_SET_TO_MASK , 0, "LEVEL_SET_TO_Mask", LevelSetToMask, "Level Set to Mask", "")
+DefNode(GeometryNode, GEO_NODE_REPLACE_MATERIAL, 0, "REPLACE_MATERIAL", ReplaceMaterial, "Replace Material", "")
+DefNode(GeometryNode, GEO_NODE_MATERIAL_SELECTION, 0, "MATERIAL_SELECTION", MaterialSelection, "Material Selection", "")
 DefNode(GeometryNode, GEO_NODE_MESH_PRIMITIVE_CIRCLE, def_geo_mesh_circle, "MESH_PRIMITIVE_CIRCLE", MeshCircle, "Mesh Circle", "")
 DefNode(GeometryNode, GEO_NODE_MESH_PRIMITIVE_CONE, def_geo_mesh_cone, "MESH_PRIMITIVE_CONE", MeshCone, "Cone", "")
 DefNode(GeometryNode, GEO_NODE_MESH_PRIMITIVE_CUBE, 0, "MESH_PRIMITIVE_CUBE", MeshCube, "Cube", "")

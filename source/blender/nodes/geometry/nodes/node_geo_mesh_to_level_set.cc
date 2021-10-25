@@ -135,13 +135,13 @@ static void geo_node_mesh_to_level_set_exec(GeoNodeExecParams params)
     return;
   }
 
-  GeometrySet geometry_set_out;
 #ifdef WITH_OPENVDB
   const float voxel_size = params.get_input<float>("Voxel Size");
   Volume *volume = meshes_to_level_set_volume(set_groups, voxel_size);
-#endif
-
   params.set_output("Level Set", GeometrySet::create_with_volume(volume));
+#else
+  params.set_output("Level Set", GeometrySet());
+#endif
 }
 
 }  // namespace blender::nodes
