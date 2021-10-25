@@ -17,6 +17,8 @@
 #ifndef __BLENDER_SESSION_H__
 #define __BLENDER_SESSION_H__
 
+#include "MEM_guardedalloc.h"
+
 #include "RNA_blender_cpp.h"
 
 #include "device/device.h"

@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-#include "scene/mesh.h"
-#include "scene/camera.h"
-#include "scene/colorspace.h"
-#include "scene/object.h"
-#include "scene/scene.h"
-
 #include "blender/session.h"
 #include "blender/sync.h"
 #include "blender/util.h"
+
+#include "scene/camera.h"
+#include "scene/colorspace.h"
+#include "scene/mesh.h"
+#include "scene/object.h"
+#include "scene/scene.h"
 
 #include "subd/patch.h"
 #include "subd/split.h"

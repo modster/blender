@@ -14,21 +14,21 @@
  * limitations under the License.
  */
 
-#include "scene/object.h"
+#include "blender/object_cull.h"
+#include "blender/sync.h"
+#include "blender/util.h"
+
 #include "scene/alembic.h"
 #include "scene/camera.h"
 #include "scene/integrator.h"
 #include "scene/light.h"
 #include "scene/mesh.h"
+#include "scene/object.h"
 #include "scene/particles.h"
 #include "scene/scene.h"
 #include "scene/shader.h"
 #include "scene/shader_graph.h"
 #include "scene/shader_nodes.h"
-
-#include "blender/object_cull.h"
-#include "blender/sync.h"
-#include "blender/util.h"
 
 #include "util/foreach.h"
 #include "util/hash.h"

@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-#include "scene/curves.h"
+#include "blender/sync.h"
+#include "blender/util.h"
+
 #include "scene/attribute.h"
 #include "scene/camera.h"
+#include "scene/curves.h"
 #include "scene/hair.h"
 #include "scene/object.h"
 #include "scene/scene.h"
-
-#include "blender/sync.h"
-#include "blender/util.h"
 
 #include "util/color.h"
 #include "util/foreach.h"
