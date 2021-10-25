@@ -140,7 +140,7 @@ void ShadingView::render(void)
 
   inst_.lookdev.render_overlay(view_fb_);
 
-  inst_.shading_passes.forward.render();
+  inst_.shading_passes.forward.render(gbuffer_, hiz_front_, view_fb_);
 
   velocity_.render(depth_tx_);
 
@@ -249,7 +249,7 @@ void LightProbeView::render(void)
     GPU_framebuffer_clear_depth(view_fb_, 1.0f);
 
     inst_.shading_passes.deferred.render(gbuffer_, hiz_front_, hiz_back_, view_fb_);
-    inst_.shading_passes.forward.render();
+    inst_.shading_passes.forward.render(gbuffer_, hiz_front_, view_fb_);
   }
   DRW_stats_group_end();
 }

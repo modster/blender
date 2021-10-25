@@ -67,3 +67,17 @@ Ray raytrace_create_diffuse_ray(
   ray.direction = sample_cosine_hemisphere(Xi, N, T, B, pdf);
   return ray;
 }
+
+Ray raytrace_world_ray_to_view(Ray ray)
+{
+  ray.origin = transform_point(ViewMatrix, ray.origin);
+  ray.direction = transform_direction(ViewMatrix, ray.direction);
+  return ray;
+}
+
+Ray raytrace_view_ray_to_world(Ray ray)
+{
+  ray.origin = transform_point(ViewMatrixInverse, ray.origin);
+  ray.direction = transform_direction(ViewMatrixInverse, ray.direction);
+  return ray;
+}

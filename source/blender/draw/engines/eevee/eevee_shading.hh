@@ -76,6 +76,9 @@ class ForwardPass {
   DRWPass *opaque_culled_ps_ = nullptr;
   DRWPass *transparent_ps_ = nullptr;
 
+  GPUTexture *input_hiz_tx_ = nullptr;
+  GPUTexture *input_radiance_tx_ = nullptr;
+
  public:
   ForwardPass(Instance &inst) : inst_(inst){};
 
@@ -99,7 +102,8 @@ class ForwardPass {
   DRWShadingGroup *prepass_opaque_add(::Material *blender_mat, GPUMaterial *gpumat);
   DRWShadingGroup *material_transparent_add(::Material *blender_mat, GPUMaterial *gpumat);
   DRWShadingGroup *prepass_transparent_add(::Material *blender_mat, GPUMaterial *gpumat);
-  void render(void);
+
+  void render(GBuffer &gbuffer, HiZBuffer &hiz, GPUFrameBuffer *view_fb);
 };
 
 /** \} */

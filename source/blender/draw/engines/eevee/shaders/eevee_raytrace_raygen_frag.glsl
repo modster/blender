@@ -115,9 +115,7 @@ void main()
 #else
   Ray ray = raytrace_create_reflection_ray(sampling, noise.xy, reflection, V, P, pdf);
 #endif
-
-  ray.origin = transform_point(ViewMatrix, ray.origin);
-  ray.direction = transform_direction(ViewMatrix, ray.direction);
+  ray = raytrace_world_ray_to_view(ray);
 
   bool hit = false;
 
@@ -164,12 +162,11 @@ void main()
     float noise_offset = sampling_rng_1D_get(sampling, SAMPLING_LIGHTPROBE);
     float random_probe = fract(noise.w + noise_offset);
 
-    vec3 R = transform_direction(ViewMatrixInverse, ray.direction);
-    vec3 P = transform_point(ViewMatrixInverse, ray.origin);
+    ray = raytrace_view_ray_to_world(ray);
     /* TOOD(fclem): We could reduce noise by mapping ray pdf to roughness. */
     float roughness = 0.0;
 
-    radiance = lightprobe_cubemap_eval(P, R, roughness, random_probe);
+    radiance = lightprobe_cubemap_eval(ray.origin, ray.direction, roughness, random_probe);
   }
   /* Apply brightness clamping. */
   float luma = max_v3(radiance);

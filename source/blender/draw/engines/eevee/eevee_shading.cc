@@ -97,6 +97,7 @@ DRWShadingGroup *ForwardPass::material_opaque_add(::Material *blender_mat, GPUMa
   DRWPass *pass = (blender_mat->blend_flag & MA_BL_CULL_BACKFACE) ? opaque_culled_ps_ : opaque_ps_;
   LightModule &lights = inst_.lights;
   LightProbeModule &lightprobes = inst_.lightprobes;
+  eGPUSamplerState no_interp = GPU_SAMPLER_DEFAULT;
   eGPUSamplerState depth_read = GPU_SAMPLER_FILTER;
   DRWShadingGroup *grp = DRW_shgroup_material_create(gpumat, pass);
   DRW_shgroup_uniform_block_ref(grp, "lights_block", lights.lights_ubo_ref_get());
@@ -118,6 +119,16 @@ DRWShadingGroup *ForwardPass::material_opaque_add(::Material *blender_mat, GPUMa
     DRW_shgroup_uniform_texture_ref(
         grp, "sss_transmittance_tx", inst_.subsurface.transmittance_ref_get());
   }
+  if (true) {
+    DRW_shgroup_uniform_block(grp, "rt_diffuse_block", inst_.raytracing.diffuse_ubo_get());
+    DRW_shgroup_uniform_block(grp, "rt_reflection_block", inst_.raytracing.reflection_ubo_get());
+    DRW_shgroup_uniform_block(grp, "rt_refraction_block", inst_.raytracing.refraction_ubo_get());
+    DRW_shgroup_uniform_texture_ref_ex(grp, "radiance_tx", &input_radiance_tx_, no_interp);
+  }
+  if (true) {
+    DRW_shgroup_uniform_block(grp, "hiz_block", inst_.hiz.ubo_get());
+    DRW_shgroup_uniform_texture_ref(grp, "hiz_tx", &input_hiz_tx_);
+  }
   return grp;
 }
 
@@ -134,6 +145,7 @@ DRWShadingGroup *ForwardPass::material_transparent_add(::Material *blender_mat,
 {
   LightModule &lights = inst_.lights;
   LightProbeModule &lightprobes = inst_.lightprobes;
+  eGPUSamplerState no_interp = GPU_SAMPLER_DEFAULT;
   eGPUSamplerState depth_read = GPU_SAMPLER_FILTER;
   DRWShadingGroup *grp = DRW_shgroup_material_create(gpumat, transparent_ps_);
   DRW_shgroup_uniform_block_ref(grp, "lights_block", lights.lights_ubo_ref_get());
@@ -154,6 +166,16 @@ DRWShadingGroup *ForwardPass::material_transparent_add(::Material *blender_mat,
         grp, "shadow_depth_tx", inst_.shadows.atlas_ref_get(), depth_read);
     DRW_shgroup_uniform_texture_ref(
         grp, "sss_transmittance_tx", inst_.subsurface.transmittance_ref_get());
+  }
+  if (true) {
+    DRW_shgroup_uniform_block(grp, "rt_diffuse_block", inst_.raytracing.diffuse_ubo_get());
+    DRW_shgroup_uniform_block(grp, "rt_reflection_block", inst_.raytracing.reflection_ubo_get());
+    DRW_shgroup_uniform_block(grp, "rt_refraction_block", inst_.raytracing.refraction_ubo_get());
+    DRW_shgroup_uniform_texture_ref_ex(grp, "radiance_tx", &input_radiance_tx_, no_interp);
+  }
+  if (true) {
+    DRW_shgroup_uniform_block(grp, "hiz_block", inst_.hiz.ubo_get());
+    DRW_shgroup_uniform_texture_ref(grp, "hiz_tx", &input_hiz_tx_);
   }
 
   DRWState state_disable = DRW_STATE_WRITE_DEPTH;
@@ -184,8 +206,26 @@ DRWShadingGroup *ForwardPass::prepass_transparent_add(::Material *blender_mat, G
   return grp;
 }
 
-void ForwardPass::render(void)
+void ForwardPass::render(GBuffer &gbuffer, HiZBuffer &hiz, GPUFrameBuffer *view_fb)
 {
+  if (inst_.raytracing.enabled()) {
+    ivec2 extent = {GPU_texture_width(gbuffer.depth_tx), GPU_texture_height(gbuffer.depth_tx)};
+    /* Reuse texture. */
+    gbuffer.ray_radiance_tx.acquire_tmp(UNPACK2(extent), GPU_RGBA16F, gbuffer.owner);
+    /* Copy combined buffer so we can sample from it. */
+    GPU_texture_copy(gbuffer.ray_radiance_tx, gbuffer.combined_tx);
+
+    input_radiance_tx_ = gbuffer.ray_radiance_tx;
+
+    hiz.prepare(gbuffer.depth_tx);
+    /* TODO(fclem): Avoid this if possible. */
+    hiz.update(gbuffer.depth_tx);
+
+    input_hiz_tx_ = hiz.texture_get();
+
+    GPU_framebuffer_bind(view_fb);
+  }
+
   /* Only one batch of light is supported. */
   inst_.lights.bind_batch(0);
 
@@ -197,6 +237,10 @@ void ForwardPass::render(void)
    * to sort by distance to camera, not by z. */
   DRW_pass_sort_shgroup_z(transparent_ps_);
   DRW_draw_pass(transparent_ps_);
+
+  if (inst_.raytracing.enabled()) {
+    gbuffer.ray_radiance_tx.release_tmp();
+  }
 }
 
 /** \} */
