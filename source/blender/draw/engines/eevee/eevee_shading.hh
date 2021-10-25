@@ -364,8 +364,10 @@ class DeferredPass {
   // DRWPass *eval_volume_heterogeneous_ps_ = nullptr;
   DRWPass *eval_volume_homogeneous_ps_ = nullptr;
 
+  DRWPass *resolve_diffuse_ps_ = nullptr;
   DRWPass *resolve_reflection_ps_ = nullptr;
   DRWPass *resolve_refraction_ps_ = nullptr;
+  DRWPass *trace_diffuse_ps_ = nullptr;
   DRWPass *trace_reflection_ps_ = nullptr;
   DRWPass *trace_refraction_ps_ = nullptr;
 

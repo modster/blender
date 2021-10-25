@@ -38,16 +38,14 @@ layout(std140) uniform lightprobes_info_block
 uniform sampler2D hiz_tx;
 uniform sampler2D depth_tx;
 uniform sampler2D radiance_tx;
+uniform sampler2D radiance_combined_tx;
 uniform sampler2DArray utility_tx;
 uniform samplerCubeArray lightprobe_cube_tx;
-#ifdef REFRACTION
 uniform sampler2D transmit_color_tx;
 uniform sampler2D transmit_normal_tx;
 uniform sampler2D transmit_data_tx;
-#else
 uniform sampler2D reflect_color_tx;
 uniform sampler2D reflect_normal_tx;
-#endif
 
 utility_tx_fetch_define(utility_tx);
 utility_tx_sample_define(utility_tx);
@@ -69,8 +67,24 @@ void main()
 
   vec4 noise = utility_tx_fetch(gl_FragCoord.xy, UTIL_BLUE_NOISE_LAYER).gbar;
 
-#ifdef REFRACTION
-  vec4 tra_col_in = texture(transmit_color_tx, uv);
+  out_ray_data = vec4(0.0);
+  out_ray_radiance = vec4(0.0);
+
+#if defined(DIFFUSE)
+  vec4 tra_col_in = vec4(0.0); /* UNUSED */
+  vec4 tra_nor_in = texture(transmit_normal_tx, uv);
+  vec4 tra_dat_in = vec4(0.0); /* UNUSED */
+
+  ClosureDiffuse diffuse = gbuffer_load_diffuse_data(tra_col_in, tra_nor_in, tra_dat_in);
+
+  if (diffuse.sss_radius.r < 0.0) {
+    /* Refraction pixel. */
+    return;
+  }
+  float roughness = 1.0;
+
+#elif defined(REFRACTION)
+  vec4 tra_col_in = vec4(0.0); /* UNUSED */
   vec4 tra_nor_in = texture(transmit_normal_tx, uv);
   vec4 tra_dat_in = texture(transmit_data_tx, uv);
 
@@ -81,11 +95,10 @@ void main()
 
   if (refraction.ior == -1.0) {
     /* Diffuse/SSS pixel. */
-    out_ray_data = vec4(0.0);
-    out_ray_radiance = vec4(0.0);
     return;
   }
   float roughness = refraction.roughness;
+
 #else
   ClosureReflection reflection = gbuffer_load_reflection_data(
       reflect_color_tx, reflect_normal_tx, uv);
@@ -95,10 +108,12 @@ void main()
 
   /* Generate ray. */
   float pdf;
-#ifdef REFRACTION
-  Ray ray = raytrace_create_refraction_ray(sampling, noise.xy, raytrace, refraction, V, P, pdf);
+#if defined(DIFFUSE)
+  Ray ray = raytrace_create_diffuse_ray(sampling, noise.xy, diffuse, P, pdf);
+#elif defined(REFRACTION)
+  Ray ray = raytrace_create_refraction_ray(sampling, noise.xy, refraction, V, P, pdf);
 #else
-  Ray ray = raytrace_create_reflection_ray(sampling, noise.xy, raytrace, reflection, V, P, pdf);
+  Ray ray = raytrace_create_reflection_ray(sampling, noise.xy, reflection, V, P, pdf);
 #endif
 
   ray.origin = transform_point(ViewMatrix, ray.origin);
@@ -129,6 +144,20 @@ void main()
     vec2 hit_uv = get_uvs_from_view(ray.origin + ray.direction);
 
     radiance = textureLod(radiance_tx, hit_uv, 0.0).rgb;
+
+#if defined(DIFFUSE)
+    /* For diffuse, the radiance is still split and SSS materials don't have the color applied. */
+    vec4 tra_col_in = texture(transmit_color_tx, hit_uv);
+    vec4 tra_nor_in = texture(transmit_normal_tx, hit_uv);
+    vec4 tra_dat_in = vec4(0.0); /* UNUSED */
+    ClosureDiffuse hit_diffuse = gbuffer_load_diffuse_data(tra_col_in, tra_nor_in, tra_dat_in);
+
+    if (hit_diffuse.sss_id > 0u) {
+      /* Refraction pixel. */
+      radiance *= hit_diffuse.color;
+    }
+    radiance += textureLod(radiance_combined_tx, hit_uv, 0.0).rgb;
+#endif
   }
   else {
     /* Evaluate fallback lightprobe. */

@@ -127,6 +127,10 @@ bool raytrace_screen(RaytraceData raytrace,
   ScreenSpaceRay ssray = raytrace_screenspace_ray_create(hiz, ray, raytrace.thickness);
   /* Avoid no iteration. */
   if (!allow_self_intersection && ssray.max_time < 1.1) {
+    /* Still output the clipped ray. */
+    vec3 hit_ssP = ssray.origin.xyz + ssray.direction.xyz * ssray.max_time;
+    vec3 hit_P = get_view_space_from_depth(hit_ssP.xy, saturate(hit_ssP.z));
+    ray.direction = hit_P - ray.origin;
     return false;
   }
 

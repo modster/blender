@@ -144,6 +144,33 @@ vec3 sample_uniform_hemisphere(vec3 rand, vec3 N, vec3 T, vec3 B, out float pdf)
 /** \} */
 
 /* -------------------------------------------------------------------- */
+/** \name Cosine Hemisphere
+ * \{ */
+
+float sample_pdf_cosine_hemisphere(float cos_theta)
+{
+  return cos_theta * M_1_PI;
+}
+
+vec3 sample_cosine_hemisphere(vec3 rand)
+{
+  float z = sqrt(max(1e-16, rand.x));    /* cos theta */
+  float r = sqrt(max(0.0, 1.0 - z * z)); /* sin theta */
+  float x = r * rand.y;
+  float y = r * rand.z;
+  return vec3(x, y, z);
+}
+
+vec3 sample_cosine_hemisphere(vec3 rand, vec3 N, vec3 T, vec3 B, out float pdf)
+{
+  vec3 Ht = sample_cosine_hemisphere(rand);
+  pdf = sample_pdf_cosine_hemisphere(Ht.z);
+  return tangent_to_world(Ht, N, T, B);
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
 /** \name Uniform Cone sampling
  * \{ */
 

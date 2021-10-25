@@ -286,6 +286,7 @@ void DeferredLayer::render(GBuffer &gbuffer,
     return;
   }
   /* TODO(fclem): detect these cases. */
+  const bool use_diffuse = true;
   const bool use_subsurface = true;
   const bool use_transparency = true;
   const bool use_holdout = true;
@@ -375,6 +376,14 @@ void DeferredLayer::render(GBuffer &gbuffer,
   }
 
   if (!no_surfaces) {
+    if (use_diffuse) {
+      gbuffer.bind_tracing();
+      DRW_draw_pass(deferred_pass.trace_diffuse_ps_);
+
+      gbuffer.bind_radiance();
+      DRW_draw_pass(deferred_pass.resolve_diffuse_ps_);
+    }
+
     if (use_subsurface) {
       GPU_framebuffer_bind(view_fb);
       DRW_draw_pass(deferred_pass.eval_subsurface_ps_);
@@ -573,6 +582,34 @@ void DeferredPass::sync(void)
     DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
   }
   {
+    DRWState state = DRW_STATE_WRITE_COLOR | DRW_STATE_STENCIL_NEQUAL;
+    trace_diffuse_ps_ = DRW_pass_create("TraceDiffuse", state);
+    eShaderType sh_type = (inst_.raytracing.enabled()) ? RAYTRACE_DIFFUSE :
+                                                         RAYTRACE_DIFFUSE_FALLBACK;
+    GPUShader *sh = inst_.shaders.static_shader_get(sh_type);
+    DRWShadingGroup *grp = DRW_shgroup_create(sh, trace_diffuse_ps_);
+    DRW_shgroup_uniform_block(grp, "sampling_block", inst_.sampling.ubo_get());
+    DRW_shgroup_uniform_block(grp, "raytrace_block", inst_.raytracing.diffuse_ubo_get());
+    DRW_shgroup_uniform_block(grp, "hiz_block", inst_.hiz.ubo_get());
+    DRW_shgroup_uniform_block(grp, "cubes_block", lightprobes.cube_ubo_get());
+    DRW_shgroup_uniform_block(grp, "lightprobes_info_block", lightprobes.info_ubo_get());
+    DRW_shgroup_uniform_texture(grp, "utility_tx", inst_.shading_passes.utility_tx);
+    DRW_shgroup_uniform_texture_ref(grp, "hiz_tx", &input_hiz_front_tx_);
+    DRW_shgroup_uniform_texture_ref(grp, "depth_tx", &input_hiz_front_tx_);
+    DRW_shgroup_uniform_texture_ref_ex(grp, "radiance_tx", &input_diffuse_tx_, no_interp);
+    DRW_shgroup_uniform_texture_ref_ex(
+        grp, "radiance_combined_tx", &input_combined_tx_, no_interp);
+    DRW_shgroup_uniform_texture_ref(grp, "lightprobe_cube_tx", lightprobes.cube_tx_ref_get());
+    DRW_shgroup_uniform_texture_ref_ex(
+        grp, "transmit_color_tx", &input_transmit_color_tx_, no_interp);
+    DRW_shgroup_uniform_texture_ref_ex(
+        grp, "transmit_normal_tx", &input_transmit_normal_tx_, no_interp);
+    DRW_shgroup_uniform_texture_ref_ex(
+        grp, "transmit_data_tx", &input_transmit_data_tx_, no_interp);
+    DRW_shgroup_stencil_set(grp, 0x0, 0x0, CLOSURE_DIFFUSE);
+    DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
+  }
+  {
     DRWState state = DRW_STATE_WRITE_COLOR | DRW_STATE_STENCIL_NEQUAL | DRW_STATE_BLEND_ADD_FULL;
     resolve_reflection_ps_ = DRW_pass_create("ResolveReflection", state);
     GPUShader *sh = inst_.shaders.static_shader_get(RAYTRACE_RESOLVE_REFLECTION);
@@ -604,6 +641,24 @@ void DeferredPass::sync(void)
     DRW_shgroup_uniform_texture_ref_ex(
         grp, "transmit_data_tx", &input_transmit_data_tx_, no_interp);
     DRW_shgroup_stencil_set(grp, 0x0, 0x0, CLOSURE_REFRACTION);
+    DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
+  }
+  {
+    DRWState state = DRW_STATE_WRITE_COLOR | DRW_STATE_STENCIL_NEQUAL | DRW_STATE_BLEND_ADD_FULL;
+    resolve_diffuse_ps_ = DRW_pass_create("ResolveDiffuse", state);
+    GPUShader *sh = inst_.shaders.static_shader_get(RAYTRACE_RESOLVE_DIFFUSE);
+    DRWShadingGroup *grp = DRW_shgroup_create(sh, resolve_diffuse_ps_);
+    DRW_shgroup_uniform_block(grp, "raytrace_block", inst_.raytracing.diffuse_ubo_get());
+    DRW_shgroup_uniform_block(grp, "hiz_block", inst_.hiz.ubo_get());
+    DRW_shgroup_uniform_texture_ref_ex(grp, "ray_data_tx", &input_ray_data_tx_, no_interp);
+    DRW_shgroup_uniform_texture_ref_ex(grp, "ray_radiance_tx", &input_ray_radiance_tx_, no_interp);
+    DRW_shgroup_uniform_texture_ref_ex(
+        grp, "transmit_color_tx", &input_transmit_color_tx_, no_interp);
+    DRW_shgroup_uniform_texture_ref_ex(
+        grp, "transmit_normal_tx", &input_transmit_normal_tx_, no_interp);
+    DRW_shgroup_uniform_texture_ref_ex(
+        grp, "transmit_data_tx", &input_transmit_data_tx_, no_interp);
+    DRW_shgroup_stencil_set(grp, 0x0, 0x0, CLOSURE_DIFFUSE);
     DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
   }
 }

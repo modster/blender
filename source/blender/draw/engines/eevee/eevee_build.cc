@@ -38,7 +38,7 @@ using namespace std;
 typedef unsigned char uchar;
 typedef float vec3[3];
 
-const int samples_per_pool = 16;
+const int samples_per_pool = 32;
 
 static void raytrace_sample_reuse_table(string &output_name, bool debug)
 {

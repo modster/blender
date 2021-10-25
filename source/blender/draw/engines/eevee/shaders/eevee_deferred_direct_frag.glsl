@@ -112,12 +112,11 @@ void main(void)
   vec3 R = -reflect(V, reflection.N);
 
   light_eval(diffuse, reflection, P, V, vP.z, thickness, radiance_diffuse, radiance_reflection);
-  radiance_diffuse += lightprobe_grid_eval(P, diffuse.N, random_probe);
 
   out_combined = vec4(emission.emission, 0.0);
   out_diffuse.rgb = radiance_diffuse;
   /* FIXME(fclem): This won't work after the first light batch since we use additive blending. */
-  out_diffuse.a = fract(float(diffuse.sss_id) / 1024.0);
+  out_diffuse.a = fract(float(diffuse.sss_id) / 1024.0) * 1024.0;
   /* Do not apply color to diffuse term for SSS material. */
   if (diffuse.sss_id == 0u) {
     out_diffuse.rgb *= diffuse.color;

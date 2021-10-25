@@ -37,6 +37,7 @@ class RaytracingModule {
 
   RaytraceDataBuf reflection_data_;
   RaytraceDataBuf refraction_data_;
+  RaytraceDataBuf diffuse_data_;
 
   bool enabled_ = false;
 
@@ -53,14 +54,15 @@ class RaytracingModule {
   {
     return refraction_data_.ubo_get();
   }
+  const GPUUniformBuf *diffuse_ubo_get(void) const
+  {
+    return diffuse_data_.ubo_get();
+  }
 
   bool enabled(void) const
   {
     return enabled_;
   }
-
- private:
-  void generate_sample_reuse_table(void);
 };
 
 /** \} */

@@ -106,13 +106,14 @@ ClosureDiffuse gbuffer_load_diffuse_data(vec4 color_in, vec4 normal_in, vec4 dat
     data_out.color = vec3(0.0);
     data_out.N = vec3(1.0);
     data_out.sss_id = 0u;
+    data_out.sss_radius = vec3(-1.0);
   }
   else {
     data_out.color = color_in.rgb;
     data_out.N = gbuffer_decode_normal(normal_in.xy);
     data_out.sss_id = uint(normal_in.z * 1024.0);
+    data_out.sss_radius = data_in.rgb;
   }
-  data_out.sss_radius = data_in.rgb;
   return data_out;
 }
 

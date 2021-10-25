@@ -340,6 +340,11 @@ ShaderModule::ShaderModule()
   SHADER_FULLSCREEN(MOTION_BLUR_TILE_DILATE, eevee_motion_blur_tiles_dilate_frag);
   SHADER_FULLSCREEN(MOTION_BLUR_TILE_FLATTEN, eevee_motion_blur_tiles_flatten_frag);
 
+  SHADER_FULLSCREEN_DEFINES(RAYTRACE_DIFFUSE, eevee_raytrace_raygen_frag, "#define DIFFUSE\n");
+  SHADER_FULLSCREEN_DEFINES(RAYTRACE_DIFFUSE_FALLBACK,
+                            eevee_raytrace_raygen_frag,
+                            "#define DIFFUSE\n"
+                            "#define SKIP_TRACE\n");
   SHADER_FULLSCREEN_DEFINES(
       RAYTRACE_REFLECTION, eevee_raytrace_raygen_frag, "#define REFLECTION\n");
   SHADER_FULLSCREEN_DEFINES(RAYTRACE_REFLECTION_FALLBACK,
@@ -352,6 +357,8 @@ ShaderModule::ShaderModule()
                             eevee_raytrace_raygen_frag,
                             "#define REFRACTION\n"
                             "#define SKIP_TRACE\n");
+  SHADER_FULLSCREEN_DEFINES(
+      RAYTRACE_RESOLVE_DIFFUSE, eevee_raytrace_resolve_frag, "#define DIFFUSE\n");
   SHADER_FULLSCREEN_DEFINES(
       RAYTRACE_RESOLVE_REFLECTION, eevee_raytrace_resolve_frag, "#define REFLECTION\n");
   SHADER_FULLSCREEN_DEFINES(
