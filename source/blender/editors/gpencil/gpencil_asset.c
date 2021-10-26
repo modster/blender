@@ -360,8 +360,8 @@ static bool gpencil_asset_create(const bContext *C,
   BKE_gpencil_frame_min_max(gpd, &f_min, &f_max);
 
   /* Mark as asset. */
-  if (ED_asset_mark_id(C, &gpd->id)) {
-
+  if (ED_asset_mark_id(&gpd->id)) {
+    ED_asset_generate_preview(C, &gpd->id);
     /* Retime frame number to start by 1. Must be done after generate the render preview. */
     LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
       LISTBASE_FOREACH (bGPDframe *, gpf, &gpl->frames) {
@@ -1424,7 +1424,6 @@ static void gpencil_asset_import_cancel(bContext *C, wmOperator *op)
   /* this is just a wrapper around exit() */
   gpencil_asset_import_exit(C, op);
 }
-
 
 static bool gpencil_asset_import_poll(bContext *C)
 {
