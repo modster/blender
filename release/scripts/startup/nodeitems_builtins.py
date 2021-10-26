@@ -171,8 +171,8 @@ def geometry_input_node_items(context):
         yield NodeItem("FunctionNodeLegacyRandomFloat")
         yield NodeItemCustom(draw=lambda self, layout, context: layout.separator())
 
-    yield NodeItem("GeometryNodeCollectionInfo")
     yield NodeItem("FunctionNodeInputBool")
+    yield NodeItem("GeometryNodeCollectionInfo")
     yield NodeItem("FunctionNodeInputColor")
     yield NodeItem("FunctionNodeInputInt")
     yield NodeItem("GeometryNodeIsViewport")
@@ -719,7 +719,7 @@ geometry_node_categories = [
     GeometryNodeCategory("GEO_POINT", "Point", items=point_node_items),
     GeometryNodeCategory("GEO_TEXT", "Text", items=[
         NodeItem("FunctionNodeStringLength"),
-        NodeItem("FunctionNodeStringSubstring"),
+        NodeItem("FunctionNodeSliceString"),
         NodeItem("FunctionNodeValueToString"),
         NodeItem("GeometryNodeStringJoin"),
         NodeItem("FunctionNodeInputSpecialCharacters"),
@@ -735,6 +735,7 @@ geometry_node_categories = [
         NodeItem("ShaderNodeTexVoronoi"),
         NodeItem("ShaderNodeTexWave"),
         NodeItem("ShaderNodeTexWhiteNoise"),
+        NodeItem("GeometryNodeImageTexture"),
     ]),
     GeometryNodeCategory("GEO_UTILITIES", "Utilities", items=[
         NodeItem("ShaderNodeMapRange"),
