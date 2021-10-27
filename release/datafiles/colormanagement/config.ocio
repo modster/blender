@@ -59,12 +59,13 @@ displays:
   XYZ:
     - !<View> {name: Standard, colorspace: XYZ}
     - !<View> {name: DCI, colorspace: dci_xyz}
+    - !<View> {name: DCI Filmic, colorspace: dci_xyz_filmic}
     - !<View> {name: Raw, colorspace: Raw}
   None:
     - !<View> {name: Standard, colorspace: Raw}
 
 active_displays: [sRGB, XYZ, None]
-active_views: [Standard, Filmic, Filmic Log, Raw, False Color]
+active_views: [Standard, Filmic, Filmic Log, Raw, False Color, DCI, DCI Filmic]
 
 colorspaces:
   - !<ColorSpace>
@@ -141,6 +142,26 @@ colorspaces:
     allocationvars: [0, 1]
     from_reference: !<GroupTransform>
       children:
+        - !<FileTransform> {src: srgb_inv.spi1d, interpolation: linear}
+        - !<FileTransform> {src: dcp_in.spi1d, interpolation: linear}
+        - !<FileTransform> {src: srgb_to_xyz.spimtx, interpolation: linear}
+        - !<FileTransform> {src: dci_xyz.spi1d, interpolation: linear}
+
+  - !<ColorSpace>
+    name: dci_xyz_filmic
+    family: display
+    equalitygroup:
+    bitdepth: 16f
+    description: |
+      OpenDCP output LUT with DCI reference white and Gamma 2.6
+    isdata: false
+    allocation: uniform
+    allocationvars: [0, 1]
+    from_reference: !<GroupTransform>
+      children:
+        - !<ColorSpaceTransform> {src: Linear, dst: Filmic Log}
+        - !<FileTransform> {src: filmic_to_0-70_1-03.spi1d, interpolation: linear}
+        - !<FileTransform> {src: dcp_in.spi1d, interpolation: linear}
         - !<FileTransform> {src: srgb_to_xyz.spimtx, interpolation: linear}
         - !<FileTransform> {src: dci_xyz.spi1d, interpolation: linear}
 
