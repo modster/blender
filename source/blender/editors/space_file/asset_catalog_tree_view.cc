@@ -106,11 +106,11 @@ class AssetCatalogDropController : public ui::AbstractTreeViewItemDropController
   explicit AssetCatalogDropController(AssetCatalogTreeView &tree_view,
                                       AssetCatalogTreeItem &catalog_item);
 
-  bool can_drop(const wmDrag &drag) const override;
+  bool can_drop(const wmDrag &drag, const char **r_disabled_hint) const override;
   std::string drop_tooltip(const wmDrag &drag) const override;
   bool on_drop(const wmDrag &drag) override;
 
-  static bool has_droppable_item(const wmDrag &drag);
+  static bool has_droppable_item(const wmDrag &drag, const char **r_disabled_hint);
   static bool drop_into_catalog(const AssetCatalogTreeView &tree_view,
                                 const wmDrag &drag,
                                 CatalogID catalog_id,
@@ -131,7 +131,7 @@ class AssetCatalogTreeViewUnassignedItem : public ui::BasicTreeViewItem {
   struct DropController : public ui::AbstractTreeViewItemDropController {
     DropController(AssetCatalogTreeView &tree_view);
 
-    bool can_drop(const wmDrag &drag) const override;
+    bool can_drop(const wmDrag &drag, const char **r_disabled_hint) const override;
     std::string drop_tooltip(const wmDrag &drag) const override;
     bool on_drop(const wmDrag &drag) override;
   };
@@ -233,12 +233,8 @@ void AssetCatalogTreeViewItem::on_activate()
 
 void AssetCatalogTreeViewItem::build_row(uiLayout &row)
 {
-  if (catalog_item_.has_unsaved_changes()) {
-    uiItemL(&row, (label_ + "*").c_str(), icon);
-  }
-  else {
-    uiItemL(&row, label_.c_str(), icon);
-  }
+  const std::string label_override = catalog_item_.has_unsaved_changes() ? (label_ + "*") : label_;
+  add_label(row, label_override);
 
   if (!is_hovered()) {
     return;
@@ -320,12 +316,12 @@ AssetCatalogDropController::AssetCatalogDropController(AssetCatalogTreeView &tre
 {
 }
 
-bool AssetCatalogDropController::can_drop(const wmDrag &drag) const
+bool AssetCatalogDropController::can_drop(const wmDrag &drag, const char **r_disabled_hint) const
 {
   if (drag.type != WM_DRAG_ASSET_LIST) {
     return false;
   }
-  return has_droppable_item(drag);
+  return has_droppable_item(drag, r_disabled_hint);
 }
 
 std::string AssetCatalogDropController::drop_tooltip(const wmDrag &drag) const
@@ -377,16 +373,20 @@ bool AssetCatalogDropController::drop_into_catalog(const AssetCatalogTreeView &t
   return true;
 }
 
-bool AssetCatalogDropController::has_droppable_item(const wmDrag &drag)
+bool AssetCatalogDropController::has_droppable_item(const wmDrag &drag,
+                                                    const char **r_disabled_hint)
 {
   const ListBase *asset_drags = WM_drag_asset_list_get(&drag);
 
+  *r_disabled_hint = nullptr;
   /* There needs to be at least one asset from the current file. */
   LISTBASE_FOREACH (const wmDragAssetListItem *, asset_item, asset_drags) {
     if (!asset_item->is_external) {
       return true;
     }
   }
+
+  *r_disabled_hint = "Only assets from this current file can be moved between catalogs";
   return false;
 }
 
@@ -421,12 +421,13 @@ AssetCatalogTreeViewUnassignedItem::DropController::DropController(AssetCatalogT
 {
 }
 
-bool AssetCatalogTreeViewUnassignedItem::DropController::can_drop(const wmDrag &drag) const
+bool AssetCatalogTreeViewUnassignedItem::DropController::can_drop(
+    const wmDrag &drag, const char **r_disabled_hint) const
 {
   if (drag.type != WM_DRAG_ASSET_LIST) {
     return false;
   }
-  return AssetCatalogDropController::has_droppable_item(drag);
+  return AssetCatalogDropController::has_droppable_item(drag, r_disabled_hint);
 }
 
 std::string AssetCatalogTreeViewUnassignedItem::DropController::drop_tooltip(

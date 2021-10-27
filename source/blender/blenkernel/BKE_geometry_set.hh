@@ -318,6 +318,9 @@ struct GeometrySet {
       bool include_instances,
       blender::Map<blender::bke::AttributeIDRef, AttributeKind> &r_attributes) const;
 
+  blender::Vector<GeometryComponentType> gather_component_types(bool include_instances,
+                                                                bool ignore_empty) const;
+
   using ForeachSubGeometryCallback = blender::FunctionRef<void(GeometrySet &geometry_set)>;
 
   void modify_geometry_sets(ForeachSubGeometryCallback callback);
@@ -621,7 +624,9 @@ class InstancesComponent : public GeometryComponent {
   blender::Vector<blender::float4x4> instance_transforms_;
   /**
    * IDs of the instances. They are used for consistency over multiple frames for things like
-   * motion blur.
+   * motion blur. Proper stable ID data that actually helps when rendering can only be generated
+   * in some situations, so this vector is allowed to be empty, in which case the index of each
+   * instance will be used for the final ID.
    */
   blender::Vector<int> instance_ids_;
 
@@ -643,7 +648,7 @@ class InstancesComponent : public GeometryComponent {
   void resize(int capacity);
 
   int add_reference(const InstanceReference &reference);
-  void add_instance(int instance_handle, const blender::float4x4 &transform, const int id = -1);
+  void add_instance(int instance_handle, const blender::float4x4 &transform);
 
   blender::Span<InstanceReference> references() const;
   void remove_unused_references();
@@ -657,6 +662,9 @@ class InstancesComponent : public GeometryComponent {
   blender::Span<blender::float4x4> instance_transforms() const;
   blender::MutableSpan<int> instance_ids();
   blender::Span<int> instance_ids() const;
+
+  blender::MutableSpan<int> instance_ids_ensure();
+  void instance_ids_clear();
 
   int instances_amount() const;
   int references_amount() const;
