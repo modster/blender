@@ -33,7 +33,7 @@ namespace blender::nodes {
 
 static void geo_node_curve_subdivide_declare(NodeDeclarationBuilder &b)
 {
-  b.add_input<decl::Geometry>("Geometry");
+  b.add_input<decl::Geometry>("Geometry").supported_type(GEO_COMPONENT_TYPE_CURVE);
   b.add_input<decl::Int>("Cuts").default_value(1).min(0).max(1000).supports_field();
   b.add_output<decl::Geometry>("Geometry");
 }
@@ -283,8 +283,12 @@ static SplinePtr subdivide_spline(const Spline &spline,
                                   const VArray<int> &cuts,
                                   const int spline_offset)
 {
-  /* Since we expect to access each value many times, it should be worth it to make sure the
-   * attribute is a real span (especially considering the note below). Using the offset at each
+  if (spline.size() <= 1) {
+    return spline.copy();
+  }
+
+  /* Since we expect to access each value many times, it should be worth it to make sure count
+   * of cuts is a real span (especially considering the note below). Using the offset at each
    * point facilitates subdividing in parallel later. */
   Array<int> offsets = get_subdivided_offsets(spline, cuts, spline_offset);
   const int result_size = offsets.last() + int(!spline.is_cyclic());

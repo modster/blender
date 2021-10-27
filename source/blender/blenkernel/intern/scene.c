@@ -530,7 +530,7 @@ static void scene_foreach_toolsettings_id_pointer_process(
           (ID **)&(__id), __action, __reader, (ID **)&(__id_old), __cb_flag); \
     } \
     else { \
-      BKE_LIB_FOREACHID_PROCESS(__data, __id, __cb_flag); \
+      BKE_LIB_FOREACHID_PROCESS_IDSUPER(__data, __id, __cb_flag); \
     } \
   } \
   (void)0
@@ -695,7 +695,7 @@ static void scene_foreach_layer_collection(LibraryForeachIDData *data, ListBase 
                          (lc->collection->id.flag & LIB_EMBEDDED_DATA) != 0) ?
                             IDWALK_CB_EMBEDDED :
                             IDWALK_CB_NOP;
-    BKE_LIB_FOREACHID_PROCESS(data, lc->collection, cb_flag);
+    BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, lc->collection, cb_flag);
     scene_foreach_layer_collection(data, &lc->layer_collections);
   }
 }
@@ -704,7 +704,7 @@ static bool seq_foreach_member_id_cb(Sequence *seq, void *user_data)
 {
   LibraryForeachIDData *data = (LibraryForeachIDData *)user_data;
 
-#define FOREACHID_PROCESS(_data, _id_super, _cb_flag) \
+#define FOREACHID_PROCESS_IDSUPER(_data, _id_super, _cb_flag) \
   { \
     CHECK_TYPE(&((_id_super)->id), ID *); \
     if (!BKE_lib_query_foreachid_process((_data), (ID **)&(_id_super), (_cb_flag))) { \
@@ -713,23 +713,23 @@ static bool seq_foreach_member_id_cb(Sequence *seq, void *user_data)
   } \
   ((void)0)
 
-  FOREACHID_PROCESS(data, seq->scene, IDWALK_CB_NEVER_SELF);
-  FOREACHID_PROCESS(data, seq->scene_camera, IDWALK_CB_NOP);
-  FOREACHID_PROCESS(data, seq->clip, IDWALK_CB_USER);
-  FOREACHID_PROCESS(data, seq->mask, IDWALK_CB_USER);
-  FOREACHID_PROCESS(data, seq->sound, IDWALK_CB_USER);
+  FOREACHID_PROCESS_IDSUPER(data, seq->scene, IDWALK_CB_NEVER_SELF);
+  FOREACHID_PROCESS_IDSUPER(data, seq->scene_camera, IDWALK_CB_NOP);
+  FOREACHID_PROCESS_IDSUPER(data, seq->clip, IDWALK_CB_USER);
+  FOREACHID_PROCESS_IDSUPER(data, seq->mask, IDWALK_CB_USER);
+  FOREACHID_PROCESS_IDSUPER(data, seq->sound, IDWALK_CB_USER);
   IDP_foreach_property(
       seq->prop, IDP_TYPE_FILTER_ID, BKE_lib_query_idpropertiesForeachIDLink_callback, data);
   LISTBASE_FOREACH (SequenceModifierData *, smd, &seq->modifiers) {
-    FOREACHID_PROCESS(data, smd->mask_id, IDWALK_CB_USER);
+    FOREACHID_PROCESS_IDSUPER(data, smd->mask_id, IDWALK_CB_USER);
   }
 
   if (seq->type == SEQ_TYPE_TEXT && seq->effectdata) {
     TextVars *text_data = seq->effectdata;
-    FOREACHID_PROCESS(data, text_data->text_font, IDWALK_CB_USER);
+    FOREACHID_PROCESS_IDSUPER(data, text_data->text_font, IDWALK_CB_USER);
   }
 
-#undef FOREACHID_PROCESS
+#undef FOREACHID_PROCESS_IDSUPER
 
   return true;
 }
@@ -738,12 +738,12 @@ static void scene_foreach_id(ID *id, LibraryForeachIDData *data)
 {
   Scene *scene = (Scene *)id;
 
-  BKE_LIB_FOREACHID_PROCESS(data, scene->camera, IDWALK_CB_NOP);
-  BKE_LIB_FOREACHID_PROCESS(data, scene->world, IDWALK_CB_USER);
-  BKE_LIB_FOREACHID_PROCESS(data, scene->set, IDWALK_CB_NEVER_SELF);
-  BKE_LIB_FOREACHID_PROCESS(data, scene->clip, IDWALK_CB_USER);
-  BKE_LIB_FOREACHID_PROCESS(data, scene->gpd, IDWALK_CB_USER);
-  BKE_LIB_FOREACHID_PROCESS(data, scene->r.bake.cage_object, IDWALK_CB_NOP);
+  BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, scene->camera, IDWALK_CB_NOP);
+  BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, scene->world, IDWALK_CB_USER);
+  BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, scene->set, IDWALK_CB_NEVER_SELF);
+  BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, scene->clip, IDWALK_CB_USER);
+  BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, scene->gpd, IDWALK_CB_USER);
+  BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, scene->r.bake.cage_object, IDWALK_CB_NOP);
   if (scene->nodetree) {
     /* nodetree **are owned by IDs**, treat them as mere sub-data and not real ID! */
     BKE_library_foreach_ID_embedded(data, (ID **)&scene->nodetree);
@@ -758,10 +758,10 @@ static void scene_foreach_id(ID *id, LibraryForeachIDData *data)
   }
 
   LISTBASE_FOREACH (ViewLayer *, view_layer, &scene->view_layers) {
-    BKE_LIB_FOREACHID_PROCESS(data, view_layer->mat_override, IDWALK_CB_USER);
+    BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, view_layer->mat_override, IDWALK_CB_USER);
 
     LISTBASE_FOREACH (Base *, base, &view_layer->object_bases) {
-      BKE_LIB_FOREACHID_PROCESS(
+      BKE_LIB_FOREACHID_PROCESS_IDSUPER(
           data, base->object, IDWALK_CB_NOP | IDWALK_CB_OVERRIDE_LIBRARY_NOT_OVERRIDABLE);
     }
 
@@ -769,23 +769,23 @@ static void scene_foreach_id(ID *id, LibraryForeachIDData *data)
 
     LISTBASE_FOREACH (FreestyleModuleConfig *, fmc, &view_layer->freestyle_config.modules) {
       if (fmc->script) {
-        BKE_LIB_FOREACHID_PROCESS(data, fmc->script, IDWALK_CB_NOP);
+        BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, fmc->script, IDWALK_CB_NOP);
       }
     }
 
     LISTBASE_FOREACH (FreestyleLineSet *, fls, &view_layer->freestyle_config.linesets) {
       if (fls->group) {
-        BKE_LIB_FOREACHID_PROCESS(data, fls->group, IDWALK_CB_USER);
+        BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, fls->group, IDWALK_CB_USER);
       }
 
       if (fls->linestyle) {
-        BKE_LIB_FOREACHID_PROCESS(data, fls->linestyle, IDWALK_CB_USER);
+        BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, fls->linestyle, IDWALK_CB_USER);
       }
     }
   }
 
   LISTBASE_FOREACH (TimeMarker *, marker, &scene->markers) {
-    BKE_LIB_FOREACHID_PROCESS(data, marker->camera, IDWALK_CB_NOP);
+    BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, marker->camera, IDWALK_CB_NOP);
     IDP_foreach_property(
         marker->prop, IDP_TYPE_FILTER_ID, BKE_lib_query_idpropertiesForeachIDLink_callback, data);
   }

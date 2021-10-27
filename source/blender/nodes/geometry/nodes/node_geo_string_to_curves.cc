@@ -242,13 +242,11 @@ static void add_instances_from_handles(InstancesComponent &instances,
   instances.resize(positions.size());
   MutableSpan<int> handles = instances.instance_reference_handles();
   MutableSpan<float4x4> transforms = instances.instance_transforms();
-  MutableSpan<int> instance_ids = instances.instance_ids();
 
   threading::parallel_for(IndexRange(positions.size()), 256, [&](IndexRange range) {
     for (const int i : range) {
       handles[i] = char_handles.lookup(charcodes[i]);
       transforms[i] = float4x4::from_location({positions[i].x, positions[i].y, 0});
-      instance_ids[i] = i;
     }
   });
 }
@@ -271,8 +269,9 @@ static void geo_node_string_to_curves_exec(GeoNodeExecParams params)
   /* Convert UTF-8 encoded string to UTF-32. */
   size_t len_bytes;
   size_t len_chars = BLI_strlen_utf8_ex(layout.text.c_str(), &len_bytes);
-  Array<char32_t> char_codes(len_chars + 1);
-  BLI_str_utf8_as_utf32(char_codes.data(), layout.text.c_str(), len_chars + 1);
+  Array<char32_t> char_codes_with_null(len_chars + 1);
+  BLI_str_utf8_as_utf32(char_codes_with_null.data(), layout.text.c_str(), len_chars + 1);
+  const Span<char32_t> char_codes = char_codes_with_null.as_span().drop_back(1);
 
   /* Create and add instances. */
   GeometrySet geometry_set_out;

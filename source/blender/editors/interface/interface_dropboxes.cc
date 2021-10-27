@@ -22,6 +22,8 @@
 
 #include "DNA_space_types.h"
 
+#include "MEM_guardedalloc.h"
+
 #include "WM_api.h"
 
 #include "UI_interface.h"
@@ -35,22 +37,26 @@ static bool ui_tree_view_drop_poll(bContext *C, wmDrag *drag, const wmEvent *eve
     return false;
   }
 
-  return UI_tree_view_item_can_drop(hovered_tree_item, drag);
+  if (drag->free_disabled_info) {
+    MEM_SAFE_FREE(drag->disabled_info);
+  }
+
+  drag->free_disabled_info = false;
+  return UI_tree_view_item_can_drop(hovered_tree_item, drag, &drag->disabled_info);
 }
 
 static char *ui_tree_view_drop_tooltip(bContext *C,
                                        wmDrag *drag,
-                                       const wmEvent *event,
+                                       const int xy[2],
                                        wmDropBox *UNUSED(drop))
 {
   const ARegion *region = CTX_wm_region(C);
-  const uiTreeViewItemHandle *hovered_tree_item = UI_block_tree_view_find_item_at(region,
-                                                                                  event->xy);
+  const uiTreeViewItemHandle *hovered_tree_item = UI_block_tree_view_find_item_at(region, xy);
   if (!hovered_tree_item) {
     return nullptr;
   }
 
-  return UI_tree_view_item_drop_tooltip(hovered_tree_item, C, drag, event);
+  return UI_tree_view_item_drop_tooltip(hovered_tree_item, drag);
 }
 
 void ED_dropboxes_ui()

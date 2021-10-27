@@ -34,7 +34,7 @@ namespace blender::nodes {
 
 static void geo_node_curve_resample_declare(NodeDeclarationBuilder &b)
 {
-  b.add_input<decl::Geometry>("Geometry");
+  b.add_input<decl::Geometry>("Geometry").supported_type(GEO_COMPONENT_TYPE_CURVE);
   b.add_input<decl::Int>("Count").default_value(10).min(1).max(100000).supports_field();
   b.add_input<decl::Float>("Length").default_value(0.1f).min(0.001f).supports_field().subtype(
       PROP_DISTANCE);
@@ -79,7 +79,7 @@ static SplinePtr resample_spline(const Spline &src, const int count)
   Spline::copy_base_settings(src, *dst);
 
   if (src.evaluated_edges_size() < 1 || count == 1) {
-    dst->add_point(src.positions().first(), src.tilts().first(), src.radii().first());
+    dst->add_point(src.positions().first(), src.radii().first(), src.tilts().first());
     dst->attributes.reallocate(1);
     src.attributes.foreach_attribute(
         [&](const AttributeIDRef &attribute_id, const AttributeMetaData &meta_data) {
@@ -171,8 +171,6 @@ static std::unique_ptr<CurveEval> resample_curve(const CurveComponent *component
   GeometryComponentFieldContext field_context{*component, ATTR_DOMAIN_CURVE};
   const int domain_size = component->attribute_domain_size(ATTR_DOMAIN_CURVE);
 
-  fn::FieldEvaluator evaluator{field_context, domain_size};
-
   Span<SplinePtr> input_splines = input_curve->splines();
 
   std::unique_ptr<CurveEval> output_curve = std::make_unique<CurveEval>();
@@ -180,6 +178,7 @@ static std::unique_ptr<CurveEval> resample_curve(const CurveComponent *component
   MutableSpan<SplinePtr> output_splines = output_curve->splines();
 
   if (mode_param.mode == GEO_NODE_CURVE_RESAMPLE_COUNT) {
+    fn::FieldEvaluator evaluator{field_context, domain_size};
     evaluator.add(*mode_param.count);
     evaluator.evaluate();
     const VArray<int> &cuts = evaluator.get_evaluated<int>(0);
@@ -192,6 +191,7 @@ static std::unique_ptr<CurveEval> resample_curve(const CurveComponent *component
     });
   }
   else if (mode_param.mode == GEO_NODE_CURVE_RESAMPLE_LENGTH) {
+    fn::FieldEvaluator evaluator{field_context, domain_size};
     evaluator.add(*mode_param.length);
     evaluator.evaluate();
     const VArray<float> &lengths = evaluator.get_evaluated<float>(0);
