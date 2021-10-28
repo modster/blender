@@ -56,7 +56,7 @@ static void geo_node_string_to_curves_declare(NodeDeclarationBuilder &b)
       .default_value(0.0f)
       .min(0.0f)
       .subtype(PROP_DISTANCE);
-  b.add_output<decl::Geometry>(N_("Curve"));
+  b.add_output<decl::Geometry>(N_("Curves"));
   b.add_output<decl::String>(N_("Remainder"));
   b.add_output<decl::Int>(N_("Line")).field_source();
   b.add_output<decl::Vector>(N_("Pivot Point")).field_source();
