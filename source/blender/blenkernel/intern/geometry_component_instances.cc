@@ -503,7 +503,21 @@ static ComponentAttributeProviders create_attribute_providers_for_instances()
   static InstancePositionAttributeProvider position;
   static InstanceIDAttributeProvider id;
 
-  return ComponentAttributeProviders({&position, &id}, {});
+  static CustomDataAccessInfo instance_custom_data_access = {
+      [](GeometryComponent &component) -> CustomData * {
+        InstancesComponent &inst = static_cast<InstancesComponent &>(component);
+        return &inst.attributes.data;
+      },
+      [](const GeometryComponent &component) -> const CustomData * {
+        const InstancesComponent &inst = static_cast<const InstancesComponent &>(component);
+        return &inst.attributes.data;
+      },
+      nullptr};
+
+  static CustomDataAttributeProvider instance_custom_data(ATTR_DOMAIN_POINT,
+                                                          instance_custom_data_access);
+
+  return ComponentAttributeProviders({&position, &id}, {&instance_custom_data});
 }
 }  // namespace blender::bke
 
