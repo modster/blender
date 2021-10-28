@@ -4452,7 +4452,7 @@ bool MOD_lineart_compute_feature_lines(Depsgraph *depsgraph,
       MOD_lineart_chain_split_angle(rb, rb->angle_splitting_threshold);
     }
 
-    if (enable_stroke_depth_offset && (!compare_ff(lmd->stroke_depth_offset, 0.0f, 1e-7))) {
+    if (enable_stroke_depth_offset && lmd->stroke_depth_offset > FLT_EPSILON) {
       MOD_lineart_chain_offset_towards_camera(
           rb, lmd->stroke_depth_offset, lmd->flags & LRT_GPENCIL_OFFSET_TOWARDS_CUSTOM_CAMERA);
     }

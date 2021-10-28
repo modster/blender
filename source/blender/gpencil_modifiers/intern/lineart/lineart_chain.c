@@ -1190,32 +1190,34 @@ void MOD_lineart_chain_offset_towards_camera(LineartRenderBuffer *rb,
   float cam[3];
   float view[3];
   float view_clamp[3];
+
   if (use_custom_camera) {
     copy_v3fl_v3db(cam, rb->camera_pos);
   }
   else {
     copy_v3fl_v3db(cam, rb->active_camera_pos);
   }
-  copy_v3fl_v3db(view, rb->view_vector);
+
   if (rb->cam_is_persp) {
-    LISTBASE_FOREACH (LineartEdgeChain *, rlc, &rb->chains) {
-      LISTBASE_FOREACH (LineartEdgeChainItem *, rlci, &rlc->chain) {
-        sub_v3_v3v3(dir, cam, rlci->gpos);
+    LISTBASE_FOREACH (LineartEdgeChain *, ec, &rb->chains) {
+      LISTBASE_FOREACH (LineartEdgeChainItem *, eci, &ec->chain) {
+        sub_v3_v3v3(dir, cam, eci->gpos);
         float orig_len = len_v3(dir);
         normalize_v3(dir);
         mul_v3_fl(dir, MIN2(dist, orig_len - rb->near_clip));
-        add_v3_v3(rlci->gpos, dir);
+        add_v3_v3(eci->gpos, dir);
       }
     }
   }
   else {
-    LISTBASE_FOREACH (LineartEdgeChain *, rlc, &rb->chains) {
-      LISTBASE_FOREACH (LineartEdgeChainItem *, rlci, &rlc->chain) {
-        sub_v3_v3v3(dir, cam, rlci->gpos);
+    copy_v3fl_v3db(view, rb->view_vector);
+    LISTBASE_FOREACH (LineartEdgeChain *, ec, &rb->chains) {
+      LISTBASE_FOREACH (LineartEdgeChainItem *, eci, &ec->chain) {
+        sub_v3_v3v3(dir, cam, eci->gpos);
         float len_lim = dot_v3v3(view, dir) - rb->near_clip;
         normalize_v3_v3(view_clamp, view);
         mul_v3_fl(view_clamp, MIN2(dist, len_lim));
-        add_v3_v3(rlci->gpos, view_clamp);
+        add_v3_v3(eci->gpos, view_clamp);
       }
     }
   }
