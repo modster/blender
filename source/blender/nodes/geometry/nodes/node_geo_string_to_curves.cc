@@ -56,8 +56,10 @@ static void geo_node_string_to_curves_declare(NodeDeclarationBuilder &b)
       .default_value(0.0f)
       .min(0.0f)
       .subtype(PROP_DISTANCE);
-  b.add_output<decl::Geometry>(N_("Curves"));
+  b.add_output<decl::Geometry>(N_("Curve"));
   b.add_output<decl::String>(N_("Remainder"));
+  b.add_output<decl::Int>(N_("Line")).field_source();
+  b.add_output<decl::Vector>(N_("Pivot Point")).field_source();
 }
 
 static void geo_node_string_to_curves_layout(uiLayout *layout, struct bContext *C, PointerRNA *ptr)
@@ -77,6 +79,7 @@ static void geo_node_string_to_curves_layout(uiLayout *layout, struct bContext *
   uiItemR(layout, ptr, "overflow", 0, "", ICON_NONE);
   uiItemR(layout, ptr, "align_x", 0, "", ICON_NONE);
   uiItemR(layout, ptr, "align_y", 0, "", ICON_NONE);
+  uiItemR(layout, ptr, "pivot_mode", 0, IFACE_("Pivot Point"), ICON_NONE);
 }
 
 static void geo_node_string_to_curves_init(bNodeTree *UNUSED(ntree), bNode *node)
@@ -87,6 +90,7 @@ static void geo_node_string_to_curves_init(bNodeTree *UNUSED(ntree), bNode *node
   data->overflow = GEO_NODE_STRING_TO_CURVES_MODE_OVERFLOW;
   data->align_x = GEO_NODE_STRING_TO_CURVES_ALIGN_X_LEFT;
   data->align_y = GEO_NODE_STRING_TO_CURVES_ALIGN_Y_TOP_BASELINE;
+  data->pivot_mode = GEO_NODE_STRING_TO_CURVES_PIVOT_MODE_BOTTOM_LEFT;
   node->storage = data;
   node->id = (ID *)BKE_vfont_builtin_get();
 }
@@ -107,9 +111,60 @@ static void geo_node_string_to_curves_update(bNodeTree *UNUSED(ntree), bNode *no
                                                                         N_("Text Box Width"));
 }
 
+static float3 get_pivot_point(GeoNodeExecParams &params, CurveEval &curve)
+{
+  const NodeGeometryStringToCurves &storage =
+      *(const NodeGeometryStringToCurves *)params.node().storage;
+  const GeometryNodeStringToCurvesPivotMode pivot_mode = (GeometryNodeStringToCurvesPivotMode)
+                                                             storage.pivot_mode;
+
+  float3 min(FLT_MAX), max(FLT_MIN), pivot;
+  curve.bounds_min_max(min, max, false);
+
+  /* Check if curve is empty. */
+  if (min.x == FLT_MAX) {
+    return {0.0f, 0.0f, 0.0f};
+  }
+
+  switch (pivot_mode) {
+    case GEO_NODE_STRING_TO_CURVES_PIVOT_MODE_MIDPOINT:
+      pivot = (min + max) / 2;
+      break;
+    case GEO_NODE_STRING_TO_CURVES_PIVOT_MODE_BOTTOM_LEFT:
+      pivot = float3(min.x, min.y, 0.0f);
+      break;
+    case GEO_NODE_STRING_TO_CURVES_PIVOT_MODE_BOTTOM_CENTER:
+      pivot = float3((min.x + max.x) / 2, min.y, 0.0f);
+      break;
+    case GEO_NODE_STRING_TO_CURVES_PIVOT_MODE_BOTTOM_RIGHT:
+      pivot = float3(max.x, min.y, 0.0f);
+      break;
+    case GEO_NODE_STRING_TO_CURVES_PIVOT_MODE_TOP_LEFT:
+      pivot = float3(min.x, max.y, 0.0f);
+      break;
+    case GEO_NODE_STRING_TO_CURVES_PIVOT_MODE_TOP_CENTER:
+      pivot = float3((min.x + max.x) / 2, max.y, 0.0f);
+      break;
+    case GEO_NODE_STRING_TO_CURVES_PIVOT_MODE_TOP_RIGHT:
+      pivot = float3(max.x, max.y, 0.0f);
+      break;
+  }
+
+  return pivot;
+}
+
 struct TextLayout {
   /* Position of each character. */
   Vector<float2> positions;
+
+  /* Line number of each character. */
+  Vector<int> line_numbers;
+
+  /* Map of Pivot point for each character code. */
+  Map<int, float3> pivot_points;
+
+  /* UTF-32 Character codes. */
+  Array<char32_t> char_codes;
 
   /* The text that fit into the text box, with newline character sequences replaced. */
   std::string text;
@@ -192,10 +247,12 @@ static TextLayout get_text_layout(GeoNodeExecParams &params)
   Span<CharInfo> info{cu.strinfo, text_len};
   layout.final_font_size = cu.fsize_realtime;
   layout.positions.reserve(text_len);
+  layout.line_numbers.reserve(text_len);
 
   for (const int i : IndexRange(text_len)) {
     CharTrans &ct = chartransdata[i];
     layout.positions.append(float2(ct.xof, ct.yof) * layout.final_font_size);
+    layout.line_numbers.append(ct.linenr);
 
     if ((info[i].flag & CU_CHINFO_OVERFLOW) && (cu.overflow == CU_OVERFLOW_TRUNCATE)) {
       const int offset = BLI_str_utf8_offset_from_index(layout.text.c_str(), i + 1);
@@ -204,6 +261,12 @@ static TextLayout get_text_layout(GeoNodeExecParams &params)
       break;
     }
   }
+
+  /* Convert UTF-8 encoded string to UTF-32. */
+  len_chars = BLI_strlen_utf8_ex(layout.text.c_str(), &len_bytes);
+  Array<char32_t> char_codes_with_null(len_chars + 1);
+  BLI_str_utf8_as_utf32(char_codes_with_null.data(), layout.text.c_str(), len_chars + 1);
+  layout.char_codes = char_codes_with_null.as_span().drop_back(1);
 
   MEM_SAFE_FREE(chartransdata);
   MEM_SAFE_FREE(cu.str);
@@ -215,15 +278,14 @@ static TextLayout get_text_layout(GeoNodeExecParams &params)
 
 /* Returns a mapping of UTF-32 character code to instance handle. */
 static Map<int, int> create_curve_instances(GeoNodeExecParams &params,
-                                            const float fontsize,
-                                            const Span<char32_t> charcodes,
+                                            TextLayout &layout,
                                             InstancesComponent &instance_component)
 {
   VFont *vfont = (VFont *)params.node().id;
   Map<int, int> handles;
 
-  for (int i : charcodes.index_range()) {
-    if (handles.contains(charcodes[i])) {
+  for (int i : layout.char_codes.index_range()) {
+    if (handles.contains(layout.char_codes[i])) {
       continue;
     }
     Curve cu = {{nullptr}};
@@ -233,34 +295,101 @@ static Map<int, int> create_curve_instances(GeoNodeExecParams &params,
     CharInfo charinfo = {0};
     charinfo.mat_nr = 1;
 
-    BKE_vfont_build_char(&cu, &cu.nurb, charcodes[i], &charinfo, 0, 0, 0, i, 1);
+    BKE_vfont_build_char(&cu, &cu.nurb, layout.char_codes[i], &charinfo, 0, 0, 0, i, 1);
     std::unique_ptr<CurveEval> curve_eval = curve_eval_from_dna_curve(cu);
     BKE_nurbList_free(&cu.nurb);
+
+    float3 pivot_point = get_pivot_point(params, *curve_eval);
+    layout.pivot_points.add_new(layout.char_codes[i], pivot_point);
+
     float4x4 size_matrix = float4x4::identity();
-    size_matrix.apply_scale(fontsize);
+    size_matrix.apply_scale(layout.final_font_size);
     curve_eval->transform(size_matrix);
 
     GeometrySet geometry_set_curve = GeometrySet::create_with_curve(curve_eval.release());
-    handles.add_new(charcodes[i], instance_component.add_reference(std::move(geometry_set_curve)));
+    handles.add_new(layout.char_codes[i],
+                    instance_component.add_reference(std::move(geometry_set_curve)));
   }
   return handles;
 }
 
 static void add_instances_from_handles(InstancesComponent &instances,
                                        const Map<int, int> &char_handles,
-                                       const Span<char32_t> charcodes,
-                                       const Span<float2> positions)
+                                       const TextLayout &layout)
 {
-  instances.resize(positions.size());
+  instances.resize(layout.positions.size());
   MutableSpan<int> handles = instances.instance_reference_handles();
   MutableSpan<float4x4> transforms = instances.instance_transforms();
 
-  threading::parallel_for(IndexRange(positions.size()), 256, [&](IndexRange range) {
+  threading::parallel_for(IndexRange(layout.positions.size()), 256, [&](IndexRange range) {
     for (const int i : range) {
-      handles[i] = char_handles.lookup(charcodes[i]);
-      transforms[i] = float4x4::from_location({positions[i].x, positions[i].y, 0});
+      handles[i] = char_handles.lookup(layout.char_codes[i]);
+      transforms[i] = float4x4::from_location({layout.positions[i].x, layout.positions[i].y, 0});
     }
   });
+}
+
+static void create_attributes(GeoNodeExecParams &params,
+                              TextLayout &layout,
+                              InstancesComponent &instances)
+{
+  StrongAnonymousAttributeID line_id;
+  StrongAnonymousAttributeID pivot_id;
+  if (params.output_is_required("Line")) {
+    line_id = StrongAnonymousAttributeID("Line");
+  }
+  if (params.output_is_required("Pivot Point")) {
+    pivot_id = StrongAnonymousAttributeID("Pivot");
+  }
+
+  MutableSpan<int> lines;
+  MutableSpan<float3> pivots;
+  OutputAttribute_Typed<int> line_attribute;
+  OutputAttribute_Typed<float3> pivot_attribute;
+
+  if (line_id) {
+    line_attribute = instances.attribute_try_get_for_output_only<int>(line_id.get(),
+                                                                      ATTR_DOMAIN_POINT);
+    lines = line_attribute.as_span();
+  }
+
+  if (!lines.is_empty()) {
+    for (const int i : layout.line_numbers.index_range()) {
+      lines[i] = layout.line_numbers[i];
+    }
+  }
+
+  if (pivot_id) {
+    pivot_attribute = instances.attribute_try_get_for_output_only<float3>(pivot_id.get(),
+                                                                          ATTR_DOMAIN_POINT);
+    pivots = pivot_attribute.as_span();
+  }
+
+  if (!pivots.is_empty()) {
+    for (const int i : layout.char_codes.index_range()) {
+      pivots[i] = layout.pivot_points.lookup(layout.char_codes[i]);
+    }
+  }
+
+  if (line_attribute) {
+    line_attribute.save();
+  }
+
+  if (pivot_attribute) {
+    pivot_attribute.save();
+  }
+
+  if (line_id) {
+    params.set_output("Line",
+                      AnonymousAttributeFieldInput::Create<int>(std::move(line_id),
+                                                                params.attribute_producer_name()));
+  }
+
+  if (pivot_id) {
+    params.set_output("Pivot Point",
+                      AnonymousAttributeFieldInput::Create<float3>(
+                          std::move(pivot_id), params.attribute_producer_name()));
+  }
 }
 
 static void geo_node_string_to_curves_exec(GeoNodeExecParams params)
@@ -278,19 +407,12 @@ static void geo_node_string_to_curves_exec(GeoNodeExecParams params)
     return;
   }
 
-  /* Convert UTF-8 encoded string to UTF-32. */
-  size_t len_bytes;
-  size_t len_chars = BLI_strlen_utf8_ex(layout.text.c_str(), &len_bytes);
-  Array<char32_t> char_codes_with_null(len_chars + 1);
-  BLI_str_utf8_as_utf32(char_codes_with_null.data(), layout.text.c_str(), len_chars + 1);
-  const Span<char32_t> char_codes = char_codes_with_null.as_span().drop_back(1);
-
   /* Create and add instances. */
   GeometrySet geometry_set_out;
   InstancesComponent &instances = geometry_set_out.get_component_for_write<InstancesComponent>();
-  Map<int, int> char_handles = create_curve_instances(
-      params, layout.final_font_size, char_codes, instances);
-  add_instances_from_handles(instances, char_handles, char_codes, layout.positions);
+  Map<int, int> char_handles = create_curve_instances(params, layout, instances);
+  add_instances_from_handles(instances, char_handles, layout);
+  create_attributes(params, layout, instances);
 
   params.set_output("Curves", std::move(geometry_set_out));
 }
