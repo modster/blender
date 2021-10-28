@@ -34,7 +34,7 @@ namespace blender::nodes {
 
 static void geo_node_string_to_curves_declare(NodeDeclarationBuilder &b)
 {
-  b.add_input<decl::String>(N_("String"));
+  b.add_input<decl::String>(N_("String")).default_value("Text");
   b.add_input<decl::Float>(N_("Size")).default_value(1.0f).min(0.0f).subtype(PROP_DISTANCE);
   b.add_input<decl::Float>(N_("Character Spacing"))
       .default_value(1.0f)
