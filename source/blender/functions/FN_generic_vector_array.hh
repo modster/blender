@@ -123,10 +123,9 @@ template<typename T> class GVectorArray_TypedMutableRef {
     vector_array_->extend(index, values);
   }
 
-  void extend(const int64_t index, const VArrayImpl<T> &values)
+  void extend(const int64_t index, const VArray<T> &values)
   {
-    GVArrayImpl_For_VArray<T> array{values};
-    this->extend(index, array);
+    vector_array_->extend(index, values);
   }
 
   MutableSpan<T> operator[](const int64_t index)
