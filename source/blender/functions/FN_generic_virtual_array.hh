@@ -251,8 +251,10 @@ class GVArray : public GVArrayCommon {
   GVArray &operator=(const GVArray &other);
   GVArray &operator=(GVArray &&other);
 
-  const GVArrayImpl *operator->() const;
-  const GVArrayImpl &operator*() const;
+  const GVArrayImpl *get_implementation() const
+  {
+    return impl_;
+  }
 };
 
 class GVMutableArray : public GVArrayCommon {
@@ -275,9 +277,6 @@ class GVMutableArray : public GVArrayCommon {
   GVMutableArray &operator=(const GVMutableArray &other);
   GVMutableArray &operator=(GVMutableArray &&other);
 
-  GVMutableArrayImpl *operator->() const;
-  GVMutableArrayImpl &operator*() const;
-
   GMutableSpan get_internal_span() const;
 
   template<typename T> bool try_assign_VMutableArray(VMutableArray<T> &varray) const;
@@ -288,6 +287,11 @@ class GVMutableArray : public GVArrayCommon {
 
   void fill(const void *value);
   void set_all(const void *src);
+
+  GVMutableArrayImpl *get_implementation() const
+  {
+    return this->get_impl();
+  }
 
  private:
   GVMutableArrayImpl *get_impl() const
@@ -405,11 +409,10 @@ template<typename T> class VArrayImpl_For_GVArray : public VArrayImpl<T> {
   GVArray varray_;
 
  public:
-  VArrayImpl_For_GVArray(GVArray varray)
-      : VArrayImpl<T>(varray->size()), varray_(std::move(varray))
+  VArrayImpl_For_GVArray(GVArray varray) : VArrayImpl<T>(varray.size()), varray_(std::move(varray))
   {
     BLI_assert(varray_);
-    BLI_assert(varray_->type().is<T>());
+    BLI_assert(varray_.type().is<T>());
   }
 
  protected:
@@ -556,10 +559,10 @@ template<typename T> class VMutableArrayImpl_For_GVMutableArray : public VMutabl
 
  public:
   VMutableArrayImpl_For_GVMutableArray(GVMutableArray varray)
-      : VMutableArrayImpl<T>(varray->size()), varray_(varray)
+      : VMutableArrayImpl<T>(varray.size()), varray_(varray)
   {
     BLI_assert(varray_);
-    BLI_assert(varray_->type().is<T>());
+    BLI_assert(varray_.type().is<T>());
   }
 
  private:
@@ -863,18 +866,6 @@ template<typename ImplT, typename... Args> inline GVArray GVArray::For(Args &&..
   return varray;
 }
 
-inline const GVArrayImpl *GVArray::operator->() const
-{
-  BLI_assert(*this);
-  return impl_;
-}
-
-inline const GVArrayImpl &GVArray::operator*() const
-{
-  BLI_assert(*this);
-  return *impl_;
-}
-
 template<typename T> inline GVArray::GVArray(const VArray<T> &varray)
 {
   if (!varray) {
@@ -954,18 +945,6 @@ inline GVMutableArray GVMutableArray::For(Args &&...args)
   GVMutableArray varray;
   varray.emplace<ImplT>(std::forward<Args>(args)...);
   return varray;
-}
-
-inline GVMutableArrayImpl *GVMutableArray::operator->() const
-{
-  BLI_assert(*this);
-  return this->get_impl();
-}
-
-inline GVMutableArrayImpl &GVMutableArray::operator*() const
-{
-  BLI_assert(*this);
-  return *this->get_impl();
 }
 
 template<typename T> inline GVMutableArray::GVMutableArray(const VMutableArray<T> &varray)

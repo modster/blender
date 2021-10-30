@@ -696,7 +696,7 @@ static void interpolate_to_evaluated_impl(const BezierSpline &spline,
 
 blender::fn::GVArray BezierSpline::interpolate_to_evaluated(const blender::fn::GVArray &src) const
 {
-  BLI_assert(src->size() == this->size());
+  BLI_assert(src.size() == this->size());
 
   if (src.is_single()) {
     return src;
@@ -708,7 +708,7 @@ blender::fn::GVArray BezierSpline::interpolate_to_evaluated(const blender::fn::G
   }
 
   blender::fn::GVArray new_varray;
-  blender::attribute_math::convert_to_static_type(src->type(), [&](auto dummy) {
+  blender::attribute_math::convert_to_static_type(src.type(), [&](auto dummy) {
     using T = decltype(dummy);
     if constexpr (!std::is_void_v<blender::attribute_math::DefaultMixer<T>>) {
       Array<T> values(eval_size);

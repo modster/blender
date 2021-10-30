@@ -493,7 +493,7 @@ inline AttributeDomain OutputAttribute::domain() const
 
 inline const CPPType &OutputAttribute::cpp_type() const
 {
-  return (*varray_)->type();
+  return varray_->type();
 }
 
 inline CustomDataType OutputAttribute::custom_data_type() const

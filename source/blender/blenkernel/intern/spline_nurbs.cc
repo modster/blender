@@ -408,7 +408,7 @@ void interpolate_to_evaluated_impl(Span<NURBSpline::BasisCache> weights,
 
 blender::fn::GVArray NURBSpline::interpolate_to_evaluated(const blender::fn::GVArray &src) const
 {
-  BLI_assert(src->size() == this->size());
+  BLI_assert(src.size() == this->size());
 
   if (src.is_single()) {
     return src;
@@ -417,7 +417,7 @@ blender::fn::GVArray NURBSpline::interpolate_to_evaluated(const blender::fn::GVA
   Span<BasisCache> basis_cache = this->calculate_basis_cache();
 
   blender::fn::GVArray new_varray;
-  blender::attribute_math::convert_to_static_type(src->type(), [&](auto dummy) {
+  blender::attribute_math::convert_to_static_type(src.type(), [&](auto dummy) {
     using T = decltype(dummy);
     if constexpr (!std::is_void_v<blender::attribute_math::DefaultMixer<T>>) {
       Array<T> values(this->evaluated_points_size());

@@ -204,7 +204,7 @@ void adapt_mesh_domain_corner_to_point_impl(const Mesh &mesh,
 static GVArray adapt_mesh_domain_corner_to_point(const Mesh &mesh, const GVArray &varray)
 {
   GVArray new_varray;
-  attribute_math::convert_to_static_type(varray->type(), [&](auto dummy) {
+  attribute_math::convert_to_static_type(varray.type(), [&](auto dummy) {
     using T = decltype(dummy);
     if constexpr (!std::is_void_v<attribute_math::DefaultMixer<T>>) {
       /* We compute all interpolated values at once, because for this interpolation, one has to
@@ -240,7 +240,7 @@ static void adapt_mesh_domain_point_to_corner_impl(const Mesh &mesh,
 static GVArray adapt_mesh_domain_point_to_corner(const Mesh &mesh, const GVArray &varray)
 {
   GVArray new_varray;
-  attribute_math::convert_to_static_type(varray->type(), [&](auto dummy) {
+  attribute_math::convert_to_static_type(varray.type(), [&](auto dummy) {
     using T = decltype(dummy);
     Array<T> values(mesh.totloop);
     adapt_mesh_domain_point_to_corner_impl<T>(mesh, varray.typed<T>(), values);
@@ -296,7 +296,7 @@ void adapt_mesh_domain_corner_to_face_impl(const Mesh &mesh,
 static GVArray adapt_mesh_domain_corner_to_face(const Mesh &mesh, const GVArray &varray)
 {
   GVArray new_varray;
-  attribute_math::convert_to_static_type(varray->type(), [&](auto dummy) {
+  attribute_math::convert_to_static_type(varray.type(), [&](auto dummy) {
     using T = decltype(dummy);
     if constexpr (!std::is_void_v<attribute_math::DefaultMixer<T>>) {
       Array<T> values(mesh.totpoly);
@@ -369,7 +369,7 @@ void adapt_mesh_domain_corner_to_edge_impl(const Mesh &mesh,
 static GVArray adapt_mesh_domain_corner_to_edge(const Mesh &mesh, const GVArray &varray)
 {
   GVArray new_varray;
-  attribute_math::convert_to_static_type(varray->type(), [&](auto dummy) {
+  attribute_math::convert_to_static_type(varray.type(), [&](auto dummy) {
     using T = decltype(dummy);
     if constexpr (!std::is_void_v<attribute_math::DefaultMixer<T>>) {
       Array<T> values(mesh.totedge);
@@ -425,7 +425,7 @@ void adapt_mesh_domain_face_to_point_impl(const Mesh &mesh,
 static GVArray adapt_mesh_domain_face_to_point(const Mesh &mesh, const GVArray &varray)
 {
   GVArray new_varray;
-  attribute_math::convert_to_static_type(varray->type(), [&](auto dummy) {
+  attribute_math::convert_to_static_type(varray.type(), [&](auto dummy) {
     using T = decltype(dummy);
     if constexpr (!std::is_void_v<attribute_math::DefaultMixer<T>>) {
       Array<T> values(mesh.totvert);
@@ -454,7 +454,7 @@ void adapt_mesh_domain_face_to_corner_impl(const Mesh &mesh,
 static GVArray adapt_mesh_domain_face_to_corner(const Mesh &mesh, const GVArray &varray)
 {
   GVArray new_varray;
-  attribute_math::convert_to_static_type(varray->type(), [&](auto dummy) {
+  attribute_math::convert_to_static_type(varray.type(), [&](auto dummy) {
     using T = decltype(dummy);
     if constexpr (!std::is_void_v<attribute_math::DefaultMixer<T>>) {
       Array<T> values(mesh.totloop);
@@ -508,7 +508,7 @@ void adapt_mesh_domain_face_to_edge_impl(const Mesh &mesh,
 static GVArray adapt_mesh_domain_face_to_edge(const Mesh &mesh, const GVArray &varray)
 {
   GVArray new_varray;
-  attribute_math::convert_to_static_type(varray->type(), [&](auto dummy) {
+  attribute_math::convert_to_static_type(varray.type(), [&](auto dummy) {
     using T = decltype(dummy);
     if constexpr (!std::is_void_v<attribute_math::DefaultMixer<T>>) {
       Array<T> values(mesh.totedge);
@@ -568,7 +568,7 @@ void adapt_mesh_domain_point_to_face_impl(const Mesh &mesh,
 static GVArray adapt_mesh_domain_point_to_face(const Mesh &mesh, const GVArray &varray)
 {
   GVArray new_varray;
-  attribute_math::convert_to_static_type(varray->type(), [&](auto dummy) {
+  attribute_math::convert_to_static_type(varray.type(), [&](auto dummy) {
     using T = decltype(dummy);
     if constexpr (!std::is_void_v<attribute_math::DefaultMixer<T>>) {
       Array<T> values(mesh.totpoly);
@@ -618,7 +618,7 @@ void adapt_mesh_domain_point_to_edge_impl(const Mesh &mesh,
 static GVArray adapt_mesh_domain_point_to_edge(const Mesh &mesh, const GVArray &varray)
 {
   GVArray new_varray;
-  attribute_math::convert_to_static_type(varray->type(), [&](auto dummy) {
+  attribute_math::convert_to_static_type(varray.type(), [&](auto dummy) {
     using T = decltype(dummy);
     if constexpr (!std::is_void_v<attribute_math::DefaultMixer<T>>) {
       Array<T> values(mesh.totedge);
@@ -679,7 +679,7 @@ void adapt_mesh_domain_edge_to_corner_impl(const Mesh &mesh,
 static GVArray adapt_mesh_domain_edge_to_corner(const Mesh &mesh, const GVArray &varray)
 {
   GVArray new_varray;
-  attribute_math::convert_to_static_type(varray->type(), [&](auto dummy) {
+  attribute_math::convert_to_static_type(varray.type(), [&](auto dummy) {
     using T = decltype(dummy);
     if constexpr (!std::is_void_v<attribute_math::DefaultMixer<T>>) {
       Array<T> values(mesh.totloop);
@@ -729,7 +729,7 @@ void adapt_mesh_domain_edge_to_point_impl(const Mesh &mesh,
 static GVArray adapt_mesh_domain_edge_to_point(const Mesh &mesh, const GVArray &varray)
 {
   GVArray new_varray;
-  attribute_math::convert_to_static_type(varray->type(), [&](auto dummy) {
+  attribute_math::convert_to_static_type(varray.type(), [&](auto dummy) {
     using T = decltype(dummy);
     if constexpr (!std::is_void_v<attribute_math::DefaultMixer<T>>) {
       Array<T> values(mesh.totvert);
@@ -789,7 +789,7 @@ void adapt_mesh_domain_edge_to_face_impl(const Mesh &mesh,
 static GVArray adapt_mesh_domain_edge_to_face(const Mesh &mesh, const GVArray &varray)
 {
   GVArray new_varray;
-  attribute_math::convert_to_static_type(varray->type(), [&](auto dummy) {
+  attribute_math::convert_to_static_type(varray.type(), [&](auto dummy) {
     using T = decltype(dummy);
     if constexpr (!std::is_void_v<attribute_math::DefaultMixer<T>>) {
       Array<T> values(mesh.totpoly);
@@ -810,7 +810,7 @@ blender::fn::GVArray MeshComponent::attribute_try_adapt_domain_impl(
   if (!varray) {
     return {};
   }
-  if (varray->size() == 0) {
+  if (varray.size() == 0) {
     return {};
   }
   if (from_domain == to_domain) {

@@ -539,13 +539,13 @@ void Spline::sample_with_index_factors(const blender::fn::GVArray &src,
                                        Span<float> index_factors,
                                        GMutableSpan dst) const
 {
-  BLI_assert(src->size() == this->evaluated_points_size());
+  BLI_assert(src.size() == this->evaluated_points_size());
 
-  blender::attribute_math::convert_to_static_type(src->type(), [&](auto dummy) {
+  blender::attribute_math::convert_to_static_type(src.type(), [&](auto dummy) {
     using T = decltype(dummy);
     const blender::VArray<T> src_typed = src.typed<T>();
     MutableSpan<T> dst_typed = dst.typed<T>();
-    if (src->size() == 1) {
+    if (src.size() == 1) {
       dst_typed.fill(src_typed[0]);
       return;
     }

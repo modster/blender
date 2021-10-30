@@ -359,9 +359,9 @@ class GVArrayImpl_For_SingleValue : public GVArrayImpl_For_SingleValueRef,
 /** \name #GVArray_GSpan
  * \{ */
 
-GVArray_GSpan::GVArray_GSpan(GVArray varray) : GSpan(varray->type()), varray_(std::move(varray))
+GVArray_GSpan::GVArray_GSpan(GVArray varray) : GSpan(varray.type()), varray_(std::move(varray))
 {
-  size_ = varray_->size();
+  size_ = varray_.size();
   if (varray_.is_span()) {
     data_ = varray_.get_internal_span().data();
   }
@@ -387,9 +387,9 @@ GVArray_GSpan::~GVArray_GSpan()
  * \{ */
 
 GVMutableArray_GSpan::GVMutableArray_GSpan(GVMutableArray varray, const bool copy_values_to_span)
-    : GMutableSpan(varray->type()), varray_(std::move(varray))
+    : GMutableSpan(varray.type()), varray_(std::move(varray))
 {
-  size_ = varray_->size();
+  size_ = varray_.size();
   if (varray_.is_span()) {
     data_ = varray_.get_internal_span().data();
   }
@@ -448,11 +448,11 @@ class GVArrayImpl_For_SlicedGVArray : public GVArrayImpl {
 
  public:
   GVArrayImpl_For_SlicedGVArray(GVArray varray, const IndexRange slice)
-      : GVArrayImpl(varray->type(), slice.size()),
+      : GVArrayImpl(varray.type(), slice.size()),
         varray_(std::move(varray)),
         offset_(slice.start())
   {
-    BLI_assert(slice.one_after_last() <= varray_->size());
+    BLI_assert(slice.one_after_last() <= varray_.size());
   }
 
   void get(const int64_t index, void *r_value) const override

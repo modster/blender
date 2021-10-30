@@ -163,8 +163,8 @@ std::unique_ptr<ColumnValues> GeometryDataSource::get_column_values(
   if (attribute.domain != domain_) {
     return {};
   }
-  int domain_size = varray->size();
-  const CustomDataType type = bke::cpp_type_to_custom_data_type(varray->type());
+  int domain_size = varray.size();
+  const CustomDataType type = bke::cpp_type_to_custom_data_type(varray.type());
   switch (type) {
     case CD_PROP_FLOAT:
       return column_values_from_function(SPREADSHEET_VALUE_TYPE_FLOAT,

@@ -183,8 +183,8 @@ Array<uint32_t> get_geometry_element_ids_as_uints(const GeometryComponent &compo
   GVArray hash_attribute = component.attribute_try_get_for_read("id", domain);
   Array<uint32_t> hashes(domain_size);
   if (hash_attribute) {
-    BLI_assert(hashes.size() == hash_attribute->size());
-    const CPPType &cpp_type = hash_attribute->type();
+    BLI_assert(hashes.size() == hash_attribute.size());
+    const CPPType &cpp_type = hash_attribute.type();
     BLI_assert(cpp_type.is_hashable());
     GVArray_GSpan items{hash_attribute};
     threading::parallel_for(hashes.index_range(), 512, [&](IndexRange range) {

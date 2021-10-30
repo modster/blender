@@ -304,7 +304,7 @@ Vector<GVArray> evaluate_fields(ResourceScope &scope,
     if (!varray) {
       return {};
     }
-    BLI_assert(varray->size() >= array_size);
+    BLI_assert(varray.size() >= array_size);
     return varray;
   };
 
@@ -456,7 +456,7 @@ Vector<GVArray> evaluate_fields(ResourceScope &scope,
         continue;
       }
       const GVArray &computed_varray = r_varrays[out_index];
-      BLI_assert(computed_varray->type() == dst_varray->type());
+      BLI_assert(computed_varray.type() == dst_varray.type());
       if (is_output_written_to_dst[out_index]) {
         /* The result has been written into the destination provided by the caller already. */
         continue;
@@ -468,7 +468,7 @@ Vector<GVArray> evaluate_fields(ResourceScope &scope,
       }
       else {
         /* Slower materialize into a different structure. */
-        const CPPType &type = computed_varray->type();
+        const CPPType &type = computed_varray.type();
         BUFFER_FOR_CPP_TYPE_VALUE(type, buffer);
         for (const int i : mask) {
           computed_varray.get_to_uninitialized(i, buffer);

@@ -265,13 +265,13 @@ static void copy_spline_domain_attributes(const CurveComponent &curve_component,
         }
         GVArray spline_attribute = curve_component.attribute_get_for_read(
             attribute_id, ATTR_DOMAIN_CURVE, meta_data.data_type);
-        const CPPType &type = spline_attribute->type();
+        const CPPType &type = spline_attribute.type();
 
         OutputAttribute result_attribute = points.attribute_try_get_for_output_only(
             attribute_id, ATTR_DOMAIN_POINT, meta_data.data_type);
         GMutableSpan result = result_attribute.as_span();
 
-        for (const int i : IndexRange(spline_attribute->size())) {
+        for (const int i : IndexRange(spline_attribute.size())) {
           const int offset = offsets[i];
           const int size = offsets[i + 1] - offsets[i];
           if (size != 0) {

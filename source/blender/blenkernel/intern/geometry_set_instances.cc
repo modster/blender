@@ -364,7 +364,7 @@ static void join_attributes(Span<GeometryInstanceGroup> set_groups,
     result.attribute_try_create(
         entry.key, domain_output, data_type_output, AttributeInitDefault());
     WriteAttributeLookup write_attribute = result.attribute_try_get_for_write(attribute_id);
-    if (!write_attribute || &write_attribute.varray->type() != cpp_type ||
+    if (!write_attribute || &write_attribute.varray.type() != cpp_type ||
         write_attribute.domain != domain_output) {
       continue;
     }

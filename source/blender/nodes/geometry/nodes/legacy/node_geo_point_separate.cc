@@ -55,7 +55,7 @@ void copy_point_attributes_based_on_mask(const GeometryComponent &in_component,
 {
   for (const AttributeIDRef &attribute_id : in_component.attribute_ids()) {
     ReadAttributeLookup attribute = in_component.attribute_try_get_for_read(attribute_id);
-    const CustomDataType data_type = bke::cpp_type_to_custom_data_type(attribute.varray->type());
+    const CustomDataType data_type = bke::cpp_type_to_custom_data_type(attribute.varray.type());
 
     /* Only copy point attributes. Theoretically this could interpolate attributes on other
      * domains to the point domain, but that would conflict with attributes that are built-in

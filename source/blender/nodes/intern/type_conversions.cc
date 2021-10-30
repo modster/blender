@@ -249,9 +249,9 @@ class GVArray_For_ConvertedGVArray : public fn::GVArrayImpl {
   GVArray_For_ConvertedGVArray(fn::GVArray varray,
                                const CPPType &to_type,
                                const DataTypeConversions &conversions)
-      : fn::GVArrayImpl(to_type, varray->size()),
+      : fn::GVArrayImpl(to_type, varray.size()),
         varray_(std::move(varray)),
-        from_type_(varray_->type())
+        from_type_(varray_.type())
   {
     old_to_new_conversions_ = *conversions.get_conversion_functions(from_type_, to_type);
   }
@@ -285,9 +285,9 @@ class GVMutableArray_For_ConvertedGVMutableArray : public fn::GVMutableArrayImpl
   GVMutableArray_For_ConvertedGVMutableArray(fn::GVMutableArray varray,
                                              const CPPType &to_type,
                                              const DataTypeConversions &conversions)
-      : fn::GVMutableArrayImpl(to_type, varray->size()),
+      : fn::GVMutableArrayImpl(to_type, varray.size()),
         varray_(std::move(varray)),
-        from_type_(varray_->type())
+        from_type_(varray_.type())
   {
     old_to_new_conversions_ = *conversions.get_conversion_functions(from_type_, to_type);
     new_to_old_conversions_ = *conversions.get_conversion_functions(to_type, from_type_);
@@ -320,7 +320,7 @@ class GVMutableArray_For_ConvertedGVMutableArray : public fn::GVMutableArrayImpl
 
 fn::GVArray DataTypeConversions::try_convert(fn::GVArray varray, const CPPType &to_type) const
 {
-  const CPPType &from_type = varray->type();
+  const CPPType &from_type = varray.type();
   if (from_type == to_type) {
     return varray;
   }
@@ -333,7 +333,7 @@ fn::GVArray DataTypeConversions::try_convert(fn::GVArray varray, const CPPType &
 fn::GVMutableArray DataTypeConversions::try_convert(fn::GVMutableArray varray,
                                                     const CPPType &to_type) const
 {
-  const CPPType &from_type = varray->type();
+  const CPPType &from_type = varray.type();
   if (from_type == to_type) {
     return varray;
   }

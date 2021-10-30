@@ -254,7 +254,7 @@ void adapt_curve_domain_point_to_spline_impl(const CurveEval &curve,
 static GVArray adapt_curve_domain_point_to_spline(const CurveEval &curve, GVArray varray)
 {
   GVArray new_varray;
-  attribute_math::convert_to_static_type(varray->type(), [&](auto dummy) {
+  attribute_math::convert_to_static_type(varray.type(), [&](auto dummy) {
     using T = decltype(dummy);
     if constexpr (!std::is_void_v<attribute_math::DefaultMixer<T>>) {
       Array<T> values(curve.splines().size());
@@ -339,7 +339,7 @@ template<typename T> class VArray_For_SplineToPoint final : public VArrayImpl<T>
 static GVArray adapt_curve_domain_spline_to_point(const CurveEval &curve, GVArray varray)
 {
   GVArray new_varray;
-  attribute_math::convert_to_static_type(varray->type(), [&](auto dummy) {
+  attribute_math::convert_to_static_type(varray.type(), [&](auto dummy) {
     using T = decltype(dummy);
 
     Array<int> offsets = curve.control_point_offsets();
@@ -358,7 +358,7 @@ GVArray CurveComponent::attribute_try_adapt_domain_impl(const GVArray &varray,
   if (!varray) {
     return {};
   }
-  if (varray->size() == 0) {
+  if (varray.is_empty()) {
     return {};
   }
   if (from_domain == to_domain) {

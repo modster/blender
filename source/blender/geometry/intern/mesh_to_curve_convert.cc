@@ -90,7 +90,7 @@ static void copy_attributes_to_points(CurveEval &curve,
       continue;
     }
 
-    const CustomDataType data_type = bke::cpp_type_to_custom_data_type(mesh_attribute->type());
+    const CustomDataType data_type = bke::cpp_type_to_custom_data_type(mesh_attribute.type());
 
     threading::parallel_for(splines.index_range(), 128, [&](IndexRange range) {
       for (const int i : range) {
@@ -101,7 +101,7 @@ static void copy_attributes_to_points(CurveEval &curve,
         BLI_assert(spline_attribute);
 
         /* Copy attribute based on the map for this spline. */
-        attribute_math::convert_to_static_type(mesh_attribute->type(), [&](auto dummy) {
+        attribute_math::convert_to_static_type(mesh_attribute.type(), [&](auto dummy) {
           using T = decltype(dummy);
           copy_attribute_to_points<T>(
               mesh_attribute.typed<T>(), point_to_vert_maps[i], spline_attribute->typed<T>());

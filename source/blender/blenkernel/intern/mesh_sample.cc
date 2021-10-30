@@ -60,10 +60,10 @@ void sample_point_attribute(const Mesh &mesh,
                             const IndexMask mask,
                             const GMutableSpan data_out)
 {
-  BLI_assert(data_in->size() == mesh.totvert);
-  BLI_assert(data_in->type() == data_out.type());
+  BLI_assert(data_in.size() == mesh.totvert);
+  BLI_assert(data_in.type() == data_out.type());
 
-  const CPPType &type = data_in->type();
+  const CPPType &type = data_in.type();
   attribute_math::convert_to_static_type(type, [&](auto dummy) {
     using T = decltype(dummy);
     sample_point_attribute<T>(
@@ -107,10 +107,10 @@ void sample_corner_attribute(const Mesh &mesh,
                              const IndexMask mask,
                              const GMutableSpan data_out)
 {
-  BLI_assert(data_in->size() == mesh.totloop);
-  BLI_assert(data_in->type() == data_out.type());
+  BLI_assert(data_in.size() == mesh.totloop);
+  BLI_assert(data_in.type() == data_out.type());
 
-  const CPPType &type = data_in->type();
+  const CPPType &type = data_in.type();
   attribute_math::convert_to_static_type(type, [&](auto dummy) {
     using T = decltype(dummy);
     sample_corner_attribute<T>(
@@ -142,10 +142,10 @@ void sample_face_attribute(const Mesh &mesh,
                            const IndexMask mask,
                            const GMutableSpan data_out)
 {
-  BLI_assert(data_in->size() == mesh.totpoly);
-  BLI_assert(data_in->type() == data_out.type());
+  BLI_assert(data_in.size() == mesh.totpoly);
+  BLI_assert(data_in.type() == data_out.type());
 
-  const CPPType &type = data_in->type();
+  const CPPType &type = data_in.type();
   attribute_math::convert_to_static_type(type, [&](auto dummy) {
     using T = decltype(dummy);
     sample_face_attribute<T>(mesh, looptri_indices, data_in.typed<T>(), mask, data_out.typed<T>());

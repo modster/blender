@@ -233,7 +233,7 @@ class RaycastFunction : public fn::MultiFunction {
     signature.single_output<float3>("Hit Normal");
     signature.single_output<float>("Distance");
     if (target_data_) {
-      signature.single_output("Attribute", (*target_data_)->type());
+      signature.single_output("Attribute", target_data_->type());
     }
     return signature.build();
   }

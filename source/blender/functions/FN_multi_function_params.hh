@@ -81,8 +81,8 @@ class MFParamsBuilder {
   }
   void add_readonly_single_input(GVArray varray, StringRef expected_name = "")
   {
-    this->assert_current_param_type(MFParamType::ForSingleInput(varray->type()), expected_name);
-    BLI_assert(varray->size() >= min_array_size_);
+    this->assert_current_param_type(MFParamType::ForSingleInput(varray.type()), expected_name);
+    BLI_assert(varray.size() >= min_array_size_);
     virtual_arrays_.append(varray);
   }
 

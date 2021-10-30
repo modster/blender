@@ -248,7 +248,7 @@ static bool add_builtin_type_custom_data_layer_from_init(CustomData &custom_data
         return false;
       }
       const GVArray &varray = static_cast<const AttributeInitVArray &>(initializer).varray;
-      varray.materialize_to_uninitialized(IndexRange(varray->size()), data);
+      varray.materialize_to_uninitialized(IndexRange(varray.size()), data);
       return true;
     }
     case AttributeInit::Type::MoveArray: {
@@ -304,7 +304,7 @@ static bool add_custom_data_layer_from_attribute_init(const AttributeIDRef &attr
         return false;
       }
       const GVArray &varray = static_cast<const AttributeInitVArray &>(initializer).varray;
-      varray.materialize_to_uninitialized(IndexRange(varray->size()), data);
+      varray.materialize_to_uninitialized(IndexRange(varray.size()), data);
       return true;
     }
     case AttributeInit::Type::MoveArray: {
@@ -1119,7 +1119,7 @@ blender::fn::GVArray GeometryComponent::attribute_try_get_for_read(
 
   const blender::fn::CPPType *cpp_type = blender::bke::custom_data_type_to_cpp_type(data_type);
   BLI_assert(cpp_type != nullptr);
-  if (varray->type() != *cpp_type) {
+  if (varray.type() != *cpp_type) {
     varray = try_adapt_data_type(std::move(varray), *cpp_type);
     if (!varray) {
       return {};
@@ -1157,7 +1157,7 @@ blender::bke::ReadAttributeLookup GeometryComponent::attribute_try_get_for_read(
   }
   const blender::fn::CPPType *type = blender::bke::custom_data_type_to_cpp_type(data_type);
   BLI_assert(type != nullptr);
-  if (attribute.varray->type() == *type) {
+  if (attribute.varray.type() == *type) {
     return attribute;
   }
   const blender::nodes::DataTypeConversions &conversions =
@@ -1218,7 +1218,8 @@ static void save_output_attribute(OutputAttribute &output_attribute)
   using namespace blender::bke;
 
   GVMutableAttribute_For_OutputAttribute &varray =
-      dynamic_cast<GVMutableAttribute_For_OutputAttribute &>(*output_attribute.varray());
+      dynamic_cast<GVMutableAttribute_For_OutputAttribute &>(
+          *output_attribute.varray().get_implementation());
 
   GeometryComponent &component = *varray.component;
   AttributeIDRef attribute_id;
@@ -1307,7 +1308,7 @@ static OutputAttribute create_output_attribute(GeometryComponent &component,
       return {};
     }
     GVMutableArray varray = std::move(attribute.varray);
-    if (varray->type() == *cpp_type) {
+    if (varray.type() == *cpp_type) {
       /* Builtin attribute matches exactly. */
       return OutputAttribute(std::move(varray),
                              domain,
@@ -1343,7 +1344,7 @@ static OutputAttribute create_output_attribute(GeometryComponent &component,
       return {};
     }
   }
-  if (attribute.domain == domain && attribute.varray->type() == *cpp_type) {
+  if (attribute.domain == domain && attribute.varray.type() == *cpp_type) {
     /* Existing generic attribute matches exactly. */
 
     return OutputAttribute(std::move(attribute.varray),
@@ -1448,7 +1449,7 @@ GVArray IDAttributeFieldInput::get_varray_for_context(const fn::FieldContext &co
     const StringRef name = get_random_id_attribute_name(domain);
     GVArray attribute = component.attribute_try_get_for_read(name, domain, CD_PROP_INT32);
     if (attribute) {
-      BLI_assert(attribute->size() == component.attribute_domain_size(domain));
+      BLI_assert(attribute.size() == component.attribute_domain_size(domain));
       return attribute;
     }
 

@@ -122,6 +122,6 @@ Span<float3> PolySpline::evaluated_positions() const
  */
 blender::fn::GVArray PolySpline::interpolate_to_evaluated(const blender::fn::GVArray &src) const
 {
-  BLI_assert(src->size() == this->size());
+  BLI_assert(src.size() == this->size());
   return src;
 }

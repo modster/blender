@@ -674,7 +674,7 @@ class IndexTransferFieldInput : public FieldInput {
 
     GArray dst(src_field_.cpp_type(), mask.min_array_size());
 
-    attribute_math::convert_to_static_type(src_data->type(), [&](auto dummy) {
+    attribute_math::convert_to_static_type(src_data.type(), [&](auto dummy) {
       using T = decltype(dummy);
       copy_with_indices_clamped(
           src_data.typed<T>(), mask, indices, dst.as_mutable_span().typed<T>());
