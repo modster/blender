@@ -896,7 +896,7 @@ namespace blender::bke {
 template<typename StructT, typename ElemT, ElemT (*GetFunc)(const StructT &)>
 static GVArray make_derived_read_attribute(const void *data, const int domain_size)
 {
-  return VArray<ElemT>::template ForDerivedSpan<StructT, ElemT, GetFunc>(
+  return VArray<ElemT>::template ForDerivedSpan<StructT, GetFunc>(
       Span<StructT>((const StructT *)data, domain_size));
 }
 
@@ -906,7 +906,7 @@ template<typename StructT,
          void (*SetFunc)(StructT &, ElemT)>
 static GVMutableArray make_derived_write_attribute(void *data, const int domain_size)
 {
-  return VMutableArray<ElemT>::template ForDerivedSpan<StructT, ElemT, GetFunc, SetFunc>(
+  return VMutableArray<ElemT>::template ForDerivedSpan<StructT, GetFunc, SetFunc>(
       MutableSpan<StructT>((StructT *)data, domain_size));
 }
 

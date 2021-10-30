@@ -134,14 +134,14 @@ TEST(virtual_array, DerivedSpan)
   vector.append({3, 4, 5});
   vector.append({1, 1, 1});
   {
-    VArray<int> varray = VArray<int>::ForDerivedSpan<std::array<int, 3>, int, get_x>(vector);
+    VArray<int> varray = VArray<int>::ForDerivedSpan<std::array<int, 3>, get_x>(vector);
     EXPECT_EQ(varray.size(), 2);
     EXPECT_EQ(varray[0], 3);
     EXPECT_EQ(varray[1], 1);
   }
   {
     VMutableArray<int> varray =
-        VMutableArray<int>::ForDerivedSpan<std::array<int, 3>, int, get_x, set_x>(vector);
+        VMutableArray<int>::ForDerivedSpan<std::array<int, 3>, get_x, set_x>(vector);
     EXPECT_EQ(varray.size(), 2);
     EXPECT_EQ(varray[0], 3);
     EXPECT_EQ(varray[1], 1);

@@ -707,10 +707,10 @@ template<typename T> class VArray : public VArrayCommon<T> {
     return VArray::For<VArrayImpl_For_Func<T, decltype(get_func)>>(size, std::move(get_func));
   }
 
-  template<typename StructT, typename ElemT, ElemT (*GetFunc)(const StructT &)>
+  template<typename StructT, T (*GetFunc)(const StructT &)>
   static VArray ForDerivedSpan(Span<StructT> values)
   {
-    return VArray::For<VArrayImpl_For_DerivedSpan<StructT, ElemT, GetFunc>>(values);
+    return VArray::For<VArrayImpl_For_DerivedSpan<StructT, T, GetFunc>>(values);
   }
 
   template<typename ContainerT> static VArray ForContainer(ContainerT container)
@@ -765,13 +765,10 @@ template<typename T> class VMutableArray : public VArrayCommon<T> {
     return VMutableArray::For<VMutableArrayImpl_For_MutableSpan_final<T>>(values);
   }
 
-  template<typename StructT,
-           typename ElemT,
-           ElemT (*GetFunc)(const StructT &),
-           void (*SetFunc)(StructT &, ElemT)>
+  template<typename StructT, T (*GetFunc)(const StructT &), void (*SetFunc)(StructT &, T)>
   static VMutableArray ForDerivedSpan(MutableSpan<StructT> values)
   {
-    return VMutableArray::For<VMutableArrayImpl_For_DerivedSpan<StructT, ElemT, GetFunc, SetFunc>>(
+    return VMutableArray::For<VMutableArrayImpl_For_DerivedSpan<StructT, T, GetFunc, SetFunc>>(
         values);
   }
 

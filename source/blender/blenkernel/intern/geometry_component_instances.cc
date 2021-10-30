@@ -394,16 +394,16 @@ class InstancePositionAttributeProvider final : public BuiltinAttributeProvider 
     const InstancesComponent &instances_component = static_cast<const InstancesComponent &>(
         component);
     Span<float4x4> transforms = instances_component.instance_transforms();
-    return VArray<float3>::ForDerivedSpan<float4x4, float3, get_transform_position>(transforms);
+    return VArray<float3>::ForDerivedSpan<float4x4, get_transform_position>(transforms);
   }
 
   WriteAttributeLookup try_get_for_write(GeometryComponent &component) const final
   {
     InstancesComponent &instances_component = static_cast<InstancesComponent &>(component);
     MutableSpan<float4x4> transforms = instances_component.instance_transforms();
-    return {VMutableArray<float3>::
-                ForDerivedSpan<float4x4, float3, get_transform_position, set_transform_position>(
-                    transforms),
+    return {VMutableArray<float3>::ForDerivedSpan<float4x4,
+                                                  get_transform_position,
+                                                  set_transform_position>(transforms),
             domain_};
   }
 

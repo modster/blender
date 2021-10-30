@@ -483,14 +483,13 @@ static void set_spline_resolution(SplinePtr &spline, const int resolution)
 
 static GVArray make_resolution_read_attribute(const CurveEval &curve)
 {
-  return VArray<int>::ForDerivedSpan<SplinePtr, int, get_spline_resolution>(curve.splines());
+  return VArray<int>::ForDerivedSpan<SplinePtr, get_spline_resolution>(curve.splines());
 }
 
 static GVMutableArray make_resolution_write_attribute(CurveEval &curve)
 {
   return VMutableArray<int>::
-      ForDerivedSpan<SplinePtr, int, get_spline_resolution, set_spline_resolution>(
-          curve.splines());
+      ForDerivedSpan<SplinePtr, get_spline_resolution, set_spline_resolution>(curve.splines());
 }
 
 static bool get_cyclic_value(const SplinePtr &spline)
@@ -508,12 +507,12 @@ static void set_cyclic_value(SplinePtr &spline, const bool value)
 
 static GVArray make_cyclic_read_attribute(const CurveEval &curve)
 {
-  return VArray<bool>::ForDerivedSpan<SplinePtr, bool, get_cyclic_value>(curve.splines());
+  return VArray<bool>::ForDerivedSpan<SplinePtr, get_cyclic_value>(curve.splines());
 }
 
 static GVMutableArray make_cyclic_write_attribute(CurveEval &curve)
 {
-  return VMutableArray<bool>::ForDerivedSpan<SplinePtr, bool, get_cyclic_value, set_cyclic_value>(
+  return VMutableArray<bool>::ForDerivedSpan<SplinePtr, get_cyclic_value, set_cyclic_value>(
       curve.splines());
 }
 
