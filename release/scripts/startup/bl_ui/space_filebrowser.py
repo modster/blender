@@ -52,7 +52,9 @@ class FILEBROWSER_HT_header(Header):
             icon_only=True,
         )
 
-        layout.prop(params, "filter_search", text="", icon='VIEWZOOM')
+        sub = layout.row()
+        sub.ui_units_x = 8
+        sub.prop(params, "filter_search", text="", icon='VIEWZOOM')
 
         layout.popover(
             panel="ASSETBROWSER_PT_filter",
@@ -734,6 +736,7 @@ class ASSETBROWSER_PT_metadata(asset_utils.AssetBrowserPanel, Panel):
         row.operator("asset.open_containing_blend_file", text="", icon='TOOL_SETTINGS')
 
         layout.prop(asset_file_handle.asset_data, "description")
+        layout.prop(asset_file_handle.asset_data, "author")
 
 
 class ASSETBROWSER_PT_metadata_preview(asset_utils.AssetMetaDataPanel, Panel):
@@ -789,7 +792,7 @@ class ASSETBROWSER_MT_context_menu(AssetBrowserMenu, Menu):
         st = context.space_data
         params = st.params
 
-        layout.operator("file.refresh", text="Refresh")
+        layout.operator("file.asset_library_refresh")
 
         layout.separator()
 
