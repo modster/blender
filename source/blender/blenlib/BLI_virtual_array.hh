@@ -69,26 +69,26 @@ template<typename T> class VArrayImpl {
 
   virtual T get(const int64_t index) const = 0;
 
-  virtual bool is_span_impl() const
+  virtual bool is_span() const
   {
     return false;
   }
 
-  virtual Span<T> get_internal_span_impl() const
+  virtual Span<T> get_internal_span() const
   {
     BLI_assert_unreachable();
     return {};
   }
 
-  virtual bool is_single_impl() const
+  virtual bool is_single() const
   {
     return false;
   }
 
-  virtual T get_internal_single_impl() const
+  virtual T get_internal_single() const
   {
     /* Provide a default implementation, so that subclasses don't have to provide it. This method
-     * should never be called because `is_single_impl` returns false by default. */
+     * should never be called because `is_single` returns false by default. */
     BLI_assert_unreachable();
     return T();
   }
@@ -96,12 +96,12 @@ template<typename T> class VArrayImpl {
   virtual void materialize_impl(IndexMask mask, MutableSpan<T> r_span) const
   {
     T *dst = r_span.data();
-    if (this->is_span_impl()) {
-      const T *src = this->get_internal_span_impl().data();
+    if (this->is_span()) {
+      const T *src = this->get_internal_span().data();
       mask.foreach_index([&](const int64_t i) { dst[i] = src[i]; });
     }
-    else if (this->is_single_impl()) {
-      const T single = this->get_internal_single_impl();
+    else if (this->is_single()) {
+      const T single = this->get_internal_single();
       mask.foreach_index([&](const int64_t i) { dst[i] = single; });
     }
     else {
@@ -109,15 +109,15 @@ template<typename T> class VArrayImpl {
     }
   }
 
-  virtual void materialize_to_uninitialized_impl(IndexMask mask, MutableSpan<T> r_span) const
+  virtual void materialize_to_uninitialized(IndexMask mask, MutableSpan<T> r_span) const
   {
     T *dst = r_span.data();
-    if (this->is_span_impl()) {
-      const T *src = this->get_internal_span_impl().data();
+    if (this->is_span()) {
+      const T *src = this->get_internal_span().data();
       mask.foreach_index([&](const int64_t i) { new (dst + i) T(src[i]); });
     }
-    else if (this->is_single_impl()) {
-      const T single = this->get_internal_single_impl();
+    else if (this->is_single()) {
+      const T single = this->get_internal_single();
       mask.foreach_index([&](const int64_t i) { new (dst + i) T(single); });
     }
     else {
@@ -125,12 +125,12 @@ template<typename T> class VArrayImpl {
     }
   }
 
-  virtual bool try_assign_GVArray_impl(fn::GVArray &UNUSED(varray)) const
+  virtual bool try_assign_GVArray(fn::GVArray &UNUSED(varray)) const
   {
     return false;
   }
 
-  virtual bool has_ownership_impl() const
+  virtual bool has_ownership() const
   {
     /* Use true by default to be on the safe side. */
     return true;
@@ -145,24 +145,24 @@ template<typename T> class VMutableArrayImpl : public VArrayImpl<T> {
   }
 
  public:
-  virtual void set_impl(const int64_t index, T value) = 0;
+  virtual void set(const int64_t index, T value) = 0;
 
-  virtual void set_all_impl(Span<T> src)
+  virtual void set_all(Span<T> src)
   {
-    if (this->is_span_impl()) {
-      const Span<T> const_span = this->get_internal_span_impl();
+    if (this->is_span()) {
+      const Span<T> const_span = this->get_internal_span();
       const MutableSpan<T> span{(T *)const_span.data(), const_span.size()};
       initialized_copy_n(src.data(), this->size_, span.data());
     }
     else {
       const int64_t size = this->size_;
       for (int64_t i = 0; i < size; i++) {
-        this->set_impl(i, src[i]);
+        this->set(i, src[i]);
       }
     }
   }
 
-  virtual bool try_assign_GVMutableArray_impl(fn::GVMutableArray &UNUSED(varray)) const
+  virtual bool try_assign_GVMutableArray(fn::GVMutableArray &UNUSED(varray)) const
   {
     return false;
   }
@@ -191,12 +191,12 @@ template<typename T> class VArrayImpl_For_Span : public VArrayImpl<T> {
     return data_[index];
   }
 
-  bool is_span_impl() const final
+  bool is_span() const final
   {
     return true;
   }
 
-  Span<T> get_internal_span_impl() const final
+  Span<T> get_internal_span() const final
   {
     return Span<T>(data_, this->size_);
   }
@@ -207,7 +207,7 @@ template<typename T> class VArrayImpl_For_Span_final final : public VArrayImpl_F
   using VArrayImpl_For_Span<T>::VArrayImpl_For_Span;
 
  private:
-  bool has_ownership_impl() const override
+  bool has_ownership() const override
   {
     return false;
   }
@@ -233,17 +233,17 @@ template<typename T> class VMutableArrayImpl_For_MutableSpan : public VMutableAr
     return data_[index];
   }
 
-  void set_impl(const int64_t index, T value) final
+  void set(const int64_t index, T value) final
   {
     data_[index] = value;
   }
 
-  bool is_span_impl() const override
+  bool is_span() const override
   {
     return true;
   }
 
-  Span<T> get_internal_span_impl() const override
+  Span<T> get_internal_span() const override
   {
     return Span<T>(data_, this->size_);
   }
@@ -255,7 +255,7 @@ class VMutableArrayImpl_For_MutableSpan_final final : public VMutableArrayImpl_F
   using VMutableArrayImpl_For_MutableSpan<T>::VMutableArrayImpl_For_MutableSpan;
 
  private:
-  bool has_ownership_impl() const override
+  bool has_ownership() const override
   {
     return false;
   }
@@ -301,22 +301,22 @@ template<typename T> class VArrayImpl_For_Single final : public VArrayImpl<T> {
     return value_;
   }
 
-  bool is_span_impl() const override
+  bool is_span() const override
   {
     return this->size_ == 1;
   }
 
-  Span<T> get_internal_span_impl() const override
+  Span<T> get_internal_span() const override
   {
     return Span<T>(&value_, 1);
   }
 
-  bool is_single_impl() const override
+  bool is_single() const override
   {
     return true;
   }
 
-  T get_internal_single_impl() const override
+  T get_internal_single() const override
   {
     return value_;
   }
@@ -348,7 +348,7 @@ template<typename T, typename GetFunc> class VArrayImpl_For_Func final : public 
     mask.foreach_index([&](const int64_t i) { dst[i] = get_func_(i); });
   }
 
-  void materialize_to_uninitialized_impl(IndexMask mask, MutableSpan<T> r_span) const override
+  void materialize_to_uninitialized(IndexMask mask, MutableSpan<T> r_span) const override
   {
     T *dst = r_span.data();
     mask.foreach_index([&](const int64_t i) { new (dst + i) T(get_func_(i)); });
@@ -356,7 +356,7 @@ template<typename T, typename GetFunc> class VArrayImpl_For_Func final : public 
 };
 
 /**
- * \note: This is `final` so that `has_ownership_impl` can be implemented reliably.
+ * \note: This is `final` so that `has_ownership` can be implemented reliably.
  */
 template<typename StructT, typename ElemT, ElemT (*GetFunc)(const StructT &)>
 class VArrayImpl_For_DerivedSpan final : public VArrayImpl<ElemT> {
@@ -381,20 +381,20 @@ class VArrayImpl_For_DerivedSpan final : public VArrayImpl<ElemT> {
     mask.foreach_index([&](const int64_t i) { dst[i] = GetFunc(data_[i]); });
   }
 
-  void materialize_to_uninitialized_impl(IndexMask mask, MutableSpan<ElemT> r_span) const override
+  void materialize_to_uninitialized(IndexMask mask, MutableSpan<ElemT> r_span) const override
   {
     ElemT *dst = r_span.data();
     mask.foreach_index([&](const int64_t i) { new (dst + i) ElemT(GetFunc(data_[i])); });
   }
 
-  bool has_ownership_impl() const override
+  bool has_ownership() const override
   {
     return false;
   }
 };
 
 /**
- * \note: This is `final` so that `has_ownership_impl` can be implemented reliably.
+ * \note: This is `final` so that `has_ownership` can be implemented reliably.
  */
 template<typename StructT,
          typename ElemT,
@@ -416,7 +416,7 @@ class VMutableArrayImpl_For_DerivedSpan final : public VMutableArrayImpl<ElemT> 
     return GetFunc(data_[index]);
   }
 
-  void set_impl(const int64_t index, ElemT value) override
+  void set(const int64_t index, ElemT value) override
   {
     SetFunc(data_[index], std::move(value));
   }
@@ -427,13 +427,13 @@ class VMutableArrayImpl_For_DerivedSpan final : public VMutableArrayImpl<ElemT> 
     mask.foreach_index([&](const int64_t i) { dst[i] = GetFunc(data_[i]); });
   }
 
-  void materialize_to_uninitialized_impl(IndexMask mask, MutableSpan<ElemT> r_span) const override
+  void materialize_to_uninitialized(IndexMask mask, MutableSpan<ElemT> r_span) const override
   {
     ElemT *dst = r_span.data();
     mask.foreach_index([&](const int64_t i) { new (dst + i) ElemT(GetFunc(data_[i])); });
   }
 
-  bool has_ownership_impl() const override
+  bool has_ownership() const override
   {
     return false;
   }
@@ -589,7 +589,7 @@ template<typename T> class VArrayCommon {
     if (this->is_empty()) {
       return true;
     }
-    return impl_->is_span_impl();
+    return impl_->is_span();
   }
 
   /* Returns the internally used span of the virtual array. This invokes undefined behavior is the
@@ -600,7 +600,7 @@ template<typename T> class VArrayCommon {
     if (this->is_empty()) {
       return {};
     }
-    return impl_->get_internal_span_impl();
+    return impl_->get_internal_span();
   }
 
   /* Returns true when the virtual array returns the same value for every index. */
@@ -610,7 +610,7 @@ template<typename T> class VArrayCommon {
     if (impl_->size() == 1) {
       return true;
     }
-    return impl_->is_single_impl();
+    return impl_->is_single();
   }
 
   /* Returns the value that is returned for every index. This invokes undefined behavior if the
@@ -621,7 +621,7 @@ template<typename T> class VArrayCommon {
     if (impl_->size() == 1) {
       return impl_->get(0);
     }
-    return impl_->get_internal_single_impl();
+    return impl_->get_internal_single();
   }
 
   /* Copy the entire virtual array into a span. */
@@ -645,17 +645,17 @@ template<typename T> class VArrayCommon {
   void materialize_to_uninitialized(IndexMask mask, MutableSpan<T> r_span) const
   {
     BLI_assert(mask.min_array_size() <= this->size());
-    impl_->materialize_to_uninitialized_impl(mask, r_span);
+    impl_->materialize_to_uninitialized(mask, r_span);
   }
 
   bool try_assign_GVArray(fn::GVArray &varray) const
   {
-    return impl_->try_assign_GVArray_impl(varray);
+    return impl_->try_assign_GVArray(varray);
   }
 
   bool has_ownership() const
   {
-    return impl_->has_ownership_impl();
+    return impl_->has_ownership();
   }
 };
 
@@ -805,7 +805,7 @@ template<typename T> class VMutableArray : public detail::VArrayCommon<T> {
   MutableSpan<T> get_internal_span() const
   {
     BLI_assert(this->is_span());
-    const Span<T> span = this->impl_->get_internal_span_impl();
+    const Span<T> span = this->impl_->get_internal_span();
     return MutableSpan<T>(const_cast<T *>(span.data()), span.size());
   }
 
@@ -813,19 +813,19 @@ template<typename T> class VMutableArray : public detail::VArrayCommon<T> {
   {
     BLI_assert(index >= 0);
     BLI_assert(index < this->size());
-    this->get_impl()->set_impl(index, std::move(value));
+    this->get_impl()->set(index, std::move(value));
   }
 
   /* Copy the values from the source span to all elements in the virtual array. */
   void set_all(Span<T> src)
   {
     BLI_assert(src.size() == this->size());
-    this->get_impl()->set_all_impl(src);
+    this->get_impl()->set_all(src);
   }
 
   bool try_assign_GVMutableArray(fn::GVMutableArray &varray) const
   {
-    return this->get_impl()->try_assign_GVMutableArray_impl(varray);
+    return this->get_impl()->try_assign_GVMutableArray(varray);
   }
 
  private:

@@ -1012,7 +1012,7 @@ class VMutableArray_For_VertexWeights final : public VMutableArrayImpl<float> {
     return get_internal(dverts_, dvert_index_, index);
   }
 
-  void set_impl(const int64_t index, const float value) override
+  void set(const int64_t index, const float value) override
   {
     MDeformWeight *weight = BKE_defvert_ensure_index(&dverts_[index], dvert_index_);
     weight->weight = value;

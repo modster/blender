@@ -48,10 +48,10 @@ void GVArrayCommon::materialize_to_uninitialized(void *dst) const
 void GVArrayCommon::materialize_to_uninitialized(const IndexMask mask, void *dst) const
 {
   BLI_assert(mask.min_array_size() <= impl_->size());
-  impl_->materialize_to_uninitialized_impl(mask, dst);
+  impl_->materialize_to_uninitialized(mask, dst);
 }
 
-void GVArrayImpl::materialize_to_uninitialized_impl(const IndexMask mask, void *dst) const
+void GVArrayImpl::materialize_to_uninitialized(const IndexMask mask, void *dst) const
 {
   for (const int64_t i : mask) {
     void *elem_dst = POINTER_OFFSET(dst, type_->size() * i);
@@ -65,23 +65,23 @@ void GVArrayImpl::get(const int64_t index, void *r_value) const
   this->get_to_uninitialized_impl(index, r_value);
 }
 
-bool GVArrayImpl::is_span_impl() const
+bool GVArrayImpl::is_span() const
 {
   return false;
 }
 
-GSpan GVArrayImpl::get_internal_span_impl() const
+GSpan GVArrayImpl::get_internal_span() const
 {
   BLI_assert(false);
   return GSpan(*type_);
 }
 
-bool GVArrayImpl::is_single_impl() const
+bool GVArrayImpl::is_single() const
 {
   return false;
 }
 
-void GVArrayImpl::get_internal_single_impl(void *UNUSED(r_value)) const
+void GVArrayImpl::get_internal_single(void *UNUSED(r_value)) const
 {
   BLI_assert(false);
 }
@@ -93,10 +93,10 @@ bool GVArrayImpl::try_assign_VArray_impl(void *UNUSED(varray)) const
 
 bool GVArrayCommon::has_ownership() const
 {
-  return impl_->has_ownership_impl();
+  return impl_->has_ownership();
 }
 
-bool GVArrayImpl::has_ownership_impl() const
+bool GVArrayImpl::has_ownership() const
 {
   /* Use true as default to be on the safe side. */
   return true;
@@ -122,10 +122,10 @@ void GVMutableArrayImpl::set_by_relocate_impl(const int64_t index, void *value)
   type_->destruct(value);
 }
 
-void GVMutableArrayImpl::set_all_impl(const void *src)
+void GVMutableArrayImpl::set_all(const void *src)
 {
-  if (this->is_span_impl()) {
-    const GSpan span = this->get_internal_span_impl();
+  if (this->is_span()) {
+    const GSpan span = this->get_internal_span();
     type_->copy_assign_n(src, const_cast<void *>(span.data()), size_);
   }
   else {
@@ -179,12 +179,12 @@ void GVArrayImpl_For_GSpan::get_to_uninitialized_impl(const int64_t index, void 
   type_->copy_construct(POINTER_OFFSET(data_, element_size_ * index), r_value);
 }
 
-bool GVArrayImpl_For_GSpan::is_span_impl() const
+bool GVArrayImpl_For_GSpan::is_span() const
 {
   return true;
 }
 
-GSpan GVArrayImpl_For_GSpan::get_internal_span_impl() const
+GSpan GVArrayImpl_For_GSpan::get_internal_span() const
 {
   return GSpan(*type_, data_, size_);
 }
@@ -194,7 +194,7 @@ class GVArrayImpl_For_GSpan_final final : public GVArrayImpl_For_GSpan {
   using GVArrayImpl_For_GSpan::GVArrayImpl_For_GSpan;
 
  private:
-  bool has_ownership_impl() const override
+  bool has_ownership() const override
   {
     return false;
   }
@@ -245,12 +245,12 @@ void GVMutableArrayImpl_For_GMutableSpan::set_by_relocate_impl(const int64_t ind
   type_->relocate_assign(value, POINTER_OFFSET(data_, element_size_ * index));
 }
 
-bool GVMutableArrayImpl_For_GMutableSpan::is_span_impl() const
+bool GVMutableArrayImpl_For_GMutableSpan::is_span() const
 {
   return true;
 }
 
-GSpan GVMutableArrayImpl_For_GMutableSpan::get_internal_span_impl() const
+GSpan GVMutableArrayImpl_For_GMutableSpan::get_internal_span() const
 {
   return GSpan(*type_, data_, size_);
 }
@@ -261,7 +261,7 @@ class GVMutableArrayImpl_For_GMutableSpan_final final
   using GVMutableArrayImpl_For_GMutableSpan::GVMutableArrayImpl_For_GMutableSpan;
 
  private:
-  bool has_ownership_impl() const override
+  bool has_ownership() const override
   {
     return false;
   }
@@ -298,20 +298,20 @@ class GVArrayImpl_For_SingleValueRef : public GVArrayImpl {
     type_->copy_construct(value_, r_value);
   }
 
-  bool is_span_impl() const override
+  bool is_span() const override
   {
     return size_ == 1;
   }
-  GSpan get_internal_span_impl() const override
+  GSpan get_internal_span() const override
   {
     return GSpan{*type_, value_, 1};
   }
 
-  bool is_single_impl() const override
+  bool is_single() const override
   {
     return true;
   }
-  void get_internal_single_impl(void *r_value) const override
+  void get_internal_single(void *r_value) const override
   {
     type_->copy_assign(value_, r_value);
   }
@@ -322,7 +322,7 @@ class GVArrayImpl_For_SingleValueRef_final final : public GVArrayImpl_For_Single
   using GVArrayImpl_For_SingleValueRef::GVArrayImpl_For_SingleValueRef;
 
  private:
-  bool has_ownership_impl() const override
+  bool has_ownership() const override
   {
     return false;
   }

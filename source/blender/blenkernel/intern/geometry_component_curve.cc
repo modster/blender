@@ -313,7 +313,7 @@ template<typename T> class VArray_For_SplineToPoint final : public VArrayImpl<T>
     }
   }
 
-  void materialize_to_uninitialized_impl(const IndexMask mask, MutableSpan<T> r_span) const final
+  void materialize_to_uninitialized(const IndexMask mask, MutableSpan<T> r_span) const final
   {
     T *dst = r_span.data();
     const int total_size = offsets_.last();
@@ -737,7 +737,7 @@ template<typename T> class VArray_For_SplinePoints : public VArrayImpl<T> {
     point_attribute_materialize(data_.as_span(), offsets_, mask, r_span);
   }
 
-  void materialize_to_uninitialized_impl(const IndexMask mask, MutableSpan<T> r_span) const final
+  void materialize_to_uninitialized(const IndexMask mask, MutableSpan<T> r_span) const final
   {
     point_attribute_materialize_to_uninitialized(data_.as_span(), offsets_, mask, r_span);
   }
@@ -763,13 +763,13 @@ template<typename T> class VMutableArray_For_SplinePoints final : public VMutabl
     return data_[indices.spline_index][indices.point_index];
   }
 
-  void set_impl(const int64_t index, T value) final
+  void set(const int64_t index, T value) final
   {
     const PointIndices indices = lookup_point_indices(offsets_, index);
     data_[indices.spline_index][indices.point_index] = value;
   }
 
-  void set_all_impl(Span<T> src) final
+  void set_all(Span<T> src) final
   {
     for (const int spline_index : data_.index_range()) {
       const int offset = offsets_[spline_index];
@@ -783,7 +783,7 @@ template<typename T> class VMutableArray_For_SplinePoints final : public VMutabl
     point_attribute_materialize({(Span<T> *)data_.data(), data_.size()}, offsets_, mask, r_span);
   }
 
-  void materialize_to_uninitialized_impl(const IndexMask mask, MutableSpan<T> r_span) const final
+  void materialize_to_uninitialized(const IndexMask mask, MutableSpan<T> r_span) const final
   {
     point_attribute_materialize_to_uninitialized(
         {(Span<T> *)data_.data(), data_.size()}, offsets_, mask, r_span);
@@ -827,7 +827,7 @@ class VMutableArray_For_SplinePosition final : public VMutableArrayImpl<float3> 
     return splines_[indices.spline_index]->positions()[indices.point_index];
   }
 
-  void set_impl(const int64_t index, float3 value) final
+  void set(const int64_t index, float3 value) final
   {
     const PointIndices indices = lookup_point_indices(offsets_, index);
     Spline &spline = *splines_[indices.spline_index];
@@ -842,7 +842,7 @@ class VMutableArray_For_SplinePosition final : public VMutableArrayImpl<float3> 
     }
   }
 
-  void set_all_impl(Span<float3> src) final
+  void set_all(Span<float3> src) final
   {
     for (const int spline_index : splines_.index_range()) {
       Spline &spline = *splines_[spline_index];
@@ -881,8 +881,7 @@ class VMutableArray_For_SplinePosition final : public VMutableArrayImpl<float3> 
     point_attribute_materialize(spans.as_span(), offsets_, mask, r_span);
   }
 
-  void materialize_to_uninitialized_impl(const IndexMask mask,
-                                         MutableSpan<float3> r_span) const final
+  void materialize_to_uninitialized(const IndexMask mask, MutableSpan<float3> r_span) const final
   {
     Array<Span<float3>> spans = this->get_position_spans();
     point_attribute_materialize_to_uninitialized(spans.as_span(), offsets_, mask, r_span);
@@ -971,8 +970,7 @@ class VArray_For_BezierHandle final : public VArrayImpl<float3> {
     materialize_internal(mask, splines_, offsets_, is_right_, r_span);
   }
 
-  void materialize_to_uninitialized_impl(const IndexMask mask,
-                                         MutableSpan<float3> r_span) const final
+  void materialize_to_uninitialized(const IndexMask mask, MutableSpan<float3> r_span) const final
   {
     materialize_to_uninitialized_internal(mask, splines_, offsets_, is_right_, r_span);
   }
@@ -1000,7 +998,7 @@ class VMutableArray_For_BezierHandles final : public VMutableArrayImpl<float3> {
     return VArray_For_BezierHandle::get_internal(index, splines_, offsets_, is_right_);
   }
 
-  void set_impl(const int64_t index, float3 value) final
+  void set(const int64_t index, float3 value) final
   {
     const PointIndices indices = lookup_point_indices(offsets_, index);
     Spline &spline = *splines_[indices.spline_index];
@@ -1016,7 +1014,7 @@ class VMutableArray_For_BezierHandles final : public VMutableArrayImpl<float3> {
     }
   }
 
-  void set_all_impl(Span<float3> src) final
+  void set_all(Span<float3> src) final
   {
     for (const int spline_index : splines_.index_range()) {
       Spline &spline = *splines_[spline_index];
@@ -1044,8 +1042,7 @@ class VMutableArray_For_BezierHandles final : public VMutableArrayImpl<float3> {
     VArray_For_BezierHandle::materialize_internal(mask, splines_, offsets_, is_right_, r_span);
   }
 
-  void materialize_to_uninitialized_impl(const IndexMask mask,
-                                         MutableSpan<float3> r_span) const final
+  void materialize_to_uninitialized(const IndexMask mask, MutableSpan<float3> r_span) const final
   {
     VArray_For_BezierHandle::materialize_to_uninitialized_internal(
         mask, splines_, offsets_, is_right_, r_span);
