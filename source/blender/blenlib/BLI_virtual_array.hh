@@ -468,6 +468,8 @@ template<typename T> struct VArrayAnyExtraInfo {
   }
 };
 
+}  // namespace detail
+
 template<typename T> class VArrayCommon {
  protected:
   using ExtraInfo = detail::VArrayAnyExtraInfo<T>;
@@ -658,29 +660,27 @@ template<typename T> class VArrayCommon {
   }
 };
 
-}  // namespace detail
-
 template<typename T> class VMutableArray;
 
-template<typename T> class VArray : public detail::VArrayCommon<T> {
+template<typename T> class VArray : public VArrayCommon<T> {
   friend VMutableArray<T>;
 
  public:
   VArray() = default;
 
-  VArray(const VArray &other) : detail::VArrayCommon<T>(other)
+  VArray(const VArray &other) : VArrayCommon<T>(other)
   {
   }
 
-  VArray(VArray &&other) : detail::VArrayCommon<T>(std::move(other))
+  VArray(VArray &&other) : VArrayCommon<T>(std::move(other))
   {
   }
 
-  VArray(const VArrayImpl<T> *impl) : detail::VArrayCommon<T>(impl)
+  VArray(const VArrayImpl<T> *impl) : VArrayCommon<T>(impl)
   {
   }
 
-  VArray(std::shared_ptr<const VArrayImpl<T>> impl) : detail::VArrayCommon<T>(std::move(impl))
+  VArray(std::shared_ptr<const VArrayImpl<T>> impl) : VArrayCommon<T>(std::move(impl))
   {
   }
 
@@ -731,24 +731,24 @@ template<typename T> class VArray : public detail::VArrayCommon<T> {
   }
 };
 
-template<typename T> class VMutableArray : public detail::VArrayCommon<T> {
+template<typename T> class VMutableArray : public VArrayCommon<T> {
  public:
   VMutableArray() = default;
 
-  VMutableArray(const VMutableArray &other) : detail::VArrayCommon<T>(other)
+  VMutableArray(const VMutableArray &other) : VArrayCommon<T>(other)
   {
   }
 
-  VMutableArray(VMutableArray &&other) : detail::VArrayCommon<T>(std::move(other))
+  VMutableArray(VMutableArray &&other) : VArrayCommon<T>(std::move(other))
   {
   }
 
-  VMutableArray(const VMutableArrayImpl<T> *impl) : detail::VArrayCommon<T>(impl)
+  VMutableArray(const VMutableArrayImpl<T> *impl) : VArrayCommon<T>(impl)
   {
   }
 
   VMutableArray(std::shared_ptr<const VMutableArrayImpl<T>> impl)
-      : detail::VArrayCommon<T>(std::move(impl))
+      : VArrayCommon<T>(std::move(impl))
   {
   }
 
