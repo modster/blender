@@ -190,8 +190,14 @@ template<typename T> class VMutableArrayImpl : public VArrayImpl<T> {
  public:
   using VArrayImpl<T>::VArrayImpl;
 
+  /**
+   * Assign the provided #value to the #index.
+   */
   virtual void set(const int64_t index, T value) = 0;
 
+  /**
+   * Copy all elements from the provided span into the virtual array.
+   */
   virtual void set_all(Span<T> src)
   {
     if (this->is_span()) {
@@ -207,6 +213,9 @@ template<typename T> class VMutableArrayImpl : public VArrayImpl<T> {
     }
   }
 
+  /**
+   * Similar to #VArrayImpl::try_assign_GVArray but for mutable virtual arrays.
+   */
   virtual bool try_assign_GVMutableArray(fn::GVMutableArray &UNUSED(varray)) const
   {
     return false;
@@ -247,6 +256,10 @@ template<typename T> class VArrayImpl_For_Span : public VArrayImpl<T> {
   }
 };
 
+/**
+ * A version of #VArrayImpl_For_Span that can not be subclassed. This allows safely overwriting the
+ * #may_have_ownership method.
+ */
 template<typename T> class VArrayImpl_For_Span_final final : public VArrayImpl_For_Span<T> {
  public:
   using VArrayImpl_For_Span<T>::VArrayImpl_For_Span;
@@ -258,6 +271,9 @@ template<typename T> class VArrayImpl_For_Span_final final : public VArrayImpl_F
   }
 };
 
+/**
+ * Like #VArrayImpl_For_Span but for mutable data.
+ */
 template<typename T> class VMutableArrayImpl_For_MutableSpan : public VMutableArrayImpl<T> {
  protected:
   T *data_ = nullptr;
@@ -294,6 +310,9 @@ template<typename T> class VMutableArrayImpl_For_MutableSpan : public VMutableAr
   }
 };
 
+/**
+ * Like #VArrayImpl_For_Span_final but for mutable data.
+ */
 template<typename T>
 class VMutableArrayImpl_For_MutableSpan_final final : public VMutableArrayImpl_For_MutableSpan<T> {
  public:
@@ -401,7 +420,7 @@ template<typename T, typename GetFunc> class VArrayImpl_For_Func final : public 
 };
 
 /**
- * \note: This is `final` so that `may_have_ownership` can be implemented reliably.
+ * \note: This is `final` so that #may_have_ownership can be implemented reliably.
  */
 template<typename StructT, typename ElemT, ElemT (*GetFunc)(const StructT &)>
 class VArrayImpl_For_DerivedSpan final : public VArrayImpl<ElemT> {
@@ -439,7 +458,7 @@ class VArrayImpl_For_DerivedSpan final : public VArrayImpl<ElemT> {
 };
 
 /**
- * \note: This is `final` so that `may_have_ownership` can be implemented reliably.
+ * \note: This is `final` so that #may_have_ownership can be implemented reliably.
  */
 template<typename StructT,
          typename ElemT,
@@ -486,16 +505,26 @@ class VMutableArrayImpl_For_DerivedSpan final : public VMutableArrayImpl<ElemT> 
 
 namespace detail {
 
+/**
+ * Struct that can be passed as `ExtraInfo` into an #Any.
+ * This struct is only intended to be used by #VArrayCommon.
+ */
 template<typename T> struct VArrayAnyExtraInfo {
+  /**
+   * Gets the virtual array that is stored at the given pointer.
+   */
   const VArrayImpl<T> *(*get_varray)(const void *buffer) =
       [](const void *UNUSED(buffer)) -> const VArrayImpl<T> * { return nullptr; };
 
   template<typename StorageT> static VArrayAnyExtraInfo get()
   {
+    /* These are the only allowed types in the #Any. */
     static_assert(std::is_base_of_v<VArrayImpl<T>, StorageT> ||
                   std::is_same_v<StorageT, const VArrayImpl<T> *> ||
                   std::is_same_v<StorageT, std::shared_ptr<const VArrayImpl<T>>>);
 
+    /* Depending on how the virtual array implementation is stored in the #Any, a different
+     * #get_varray function is required. */
     if constexpr (std::is_base_of_v<VArrayImpl<T>, StorageT>) {
       return {[](const void *buffer) {
         return static_cast<const VArrayImpl<T> *>((const StorageT *)buffer);
@@ -516,22 +545,47 @@ template<typename T> struct VArrayAnyExtraInfo {
 
 }  // namespace detail
 
+/**
+ * Utility class to reduce code duplication for methods available on #VArray and #VMutableArray.
+ * Deriving #VMutableArray from #VArray would have some issues:
+ * - Static methods on #VArray would also be available on #VMutableArray.
+ * - It would allow assigning a #VArray to a #VMutableArray under some circumstances which is not
+ *   allowed and could result in hard to find bugs.
+ */
 template<typename T> class VArrayCommon {
  protected:
-  using ExtraInfo = detail::VArrayAnyExtraInfo<T>;
-  using Storage = Any<ExtraInfo, 24, 8>;
+  /**
+   * Store the virtual array implementation in an #Any. This makes it easy to avoid a memory
+   * allocation if the implementation is small enough and is copyable. This is the case for the
+   * most common virtual arrays.
+   * Other virtual array implementations are typically stored as #std::shared_ptr. That works even
+   * when the implementation itself is not copyable and makes copying #VArrayCommon cheaper.
+   */
+  using Storage = Any<detail::VArrayAnyExtraInfo<T>, 24, 8>;
 
+  /**
+   * Pointer to the currently contained virtual array implementation. This is allowed to be null.
+   */
   const VArrayImpl<T> *impl_ = nullptr;
+  /**
+   * Does the memory management for the virtual array implementation. It contains one of the
+   * following:
+   * - Inlined subclass of #VArrayImpl.
+   * - Non-owning pointer to a #VArrayImpl.
+   * - Shared pointer to a #VArrayImpl.
+   */
   Storage storage_;
 
  protected:
   VArrayCommon() = default;
 
+  /** Copy constructor. */
   VArrayCommon(const VArrayCommon &other) : storage_(other.storage_)
   {
     impl_ = this->impl_from_storage();
   }
 
+  /** Move constructor. */
   VArrayCommon(VArrayCommon &&other) : storage_(std::move(other.storage_))
   {
     impl_ = this->impl_from_storage();
@@ -539,11 +593,18 @@ template<typename T> class VArrayCommon {
     other.impl_ = nullptr;
   }
 
+  /**
+   * Wrap an existing #VArrayImpl and don't take ownership of it. This should rarely be used in
+   * practice.
+   */
   VArrayCommon(const VArrayImpl<T> *impl) : impl_(impl)
   {
     storage_ = impl_;
   }
 
+  /**
+   * Wrap an existing #VArrayImpl that is contained in a #std::shared_ptr. This takes ownership.
+   */
   VArrayCommon(std::shared_ptr<const VArrayImpl<T>> impl) : impl_(impl.get())
   {
     if (impl) {
@@ -551,13 +612,21 @@ template<typename T> class VArrayCommon {
     }
   }
 
+  /**
+   * Replace the contained #VArrayImpl.
+   */
   template<typename ImplT, typename... Args> void emplace(Args &&...args)
   {
+    /* Make sure we are actually constructing a #VArrayImpl. */
     static_assert(std::is_base_of_v<VArrayImpl<T>, ImplT>);
     if constexpr (std::is_copy_constructible_v<ImplT> && Storage::template is_inline_v<ImplT>) {
+      /* Only inline the implementatiton when it is copyable and when it fits into the inline
+       * buffer of the storage. */
       impl_ = &storage_.template emplace<ImplT>(std::forward<Args>(args)...);
     }
     else {
+      /* If it can't be inlined, create a new #std::shared_ptr instead and store that in the
+       * storage. */
       std::shared_ptr<const VArrayImpl<T>> ptr = std::make_shared<ImplT>(
           std::forward<Args>(args)...);
       impl_ = &*ptr;
@@ -565,6 +634,7 @@ template<typename T> class VArrayCommon {
     }
   }
 
+  /** Utility to implement a copy assignment operator in a subclass. */
   void copy_from(const VArrayCommon &other)
   {
     if (this == &other) {
@@ -574,6 +644,7 @@ template<typename T> class VArrayCommon {
     impl_ = this->impl_from_storage();
   }
 
+  /** Utility to implement a move assignment operator in a subclass. */
   void move_from(VArrayCommon &&other)
   {
     if (this == &other) {
@@ -585,32 +656,46 @@ template<typename T> class VArrayCommon {
     other.impl_ = nullptr;
   }
 
+  /** Get a pointer to the virtual array implementation that is currently stored in #storage_, or
+   * null. */
   const VArrayImpl<T> *impl_from_storage() const
   {
     return storage_.extra_info().get_varray(storage_.get());
   }
 
  public:
+  /** Return false when there is no virtual array implementation currently. */
   operator bool() const
   {
     return impl_ != nullptr;
   }
 
-  /* Get the element at a specific index. Note that this operator cannot be used to assign values
-   * to an index, because the return value is not a reference. */
+  /**
+   * Get the element at a specific index.
+   * \note: This can't return a reference because the value may be computed on the fly. This also
+   * implies that one can not use this method for assignments.
+   */
   T operator[](const int64_t index) const
   {
     BLI_assert(*this);
-    return impl_->get(index);
-  }
-
-  T get(const int64_t index) const
-  {
     BLI_assert(index >= 0);
     BLI_assert(index < this->size());
     return impl_->get(index);
   }
 
+  /**
+   * Same as the #operator[] but is sometimes easier to use when one has a pointer to a virtual
+   * array.
+   */
+  T get(const int64_t index) const
+  {
+    return (*this)[index];
+  }
+
+  /**
+   * Return the size of the virtual array. It's allowed to call this method even when there is no
+   * virtual array. In this case 0 is returned.
+   */
   int64_t size() const
   {
     if (impl_ == nullptr) {
@@ -619,6 +704,7 @@ template<typename T> class VArrayCommon {
     return impl_->size();
   }
 
+  /** True when the size is zero or when there is no virtual array. */
   bool is_empty() const
   {
     return this->size() == 0;
@@ -629,7 +715,7 @@ template<typename T> class VArrayCommon {
     return IndexRange(this->size());
   }
 
-  /* Returns true when the virtual array is stored as a span internally. */
+  /** Return true when the virtual array is stored as a span internally. */
   bool is_span() const
   {
     BLI_assert(*this);
@@ -639,8 +725,10 @@ template<typename T> class VArrayCommon {
     return impl_->is_span();
   }
 
-  /* Returns the internally used span of the virtual array. This invokes undefined behavior is the
-   * virtual array is not stored as a span internally. */
+  /**
+   * Returns the internally used span of the virtual array. This invokes undefined behavior is the
+   * virtual array is not stored as a span internally.
+   */
   Span<T> get_internal_span() const
   {
     BLI_assert(this->is_span());
@@ -650,7 +738,7 @@ template<typename T> class VArrayCommon {
     return impl_->get_internal_span();
   }
 
-  /* Returns true when the virtual array returns the same value for every index. */
+  /** Return true when the virtual array returns the same value for every index. */
   bool is_single() const
   {
     BLI_assert(*this);
@@ -660,8 +748,10 @@ template<typename T> class VArrayCommon {
     return impl_->is_single();
   }
 
-  /* Returns the value that is returned for every index. This invokes undefined behavior if the
-   * virtual array would not return the same value for every index. */
+  /**
+   * Return the value that is returned for every index. This invokes undefined behavior if the
+   * virtual array would not return the same value for every index.
+   */
   T get_internal_single() const
   {
     BLI_assert(this->is_single());
@@ -671,13 +761,13 @@ template<typename T> class VArrayCommon {
     return impl_->get_internal_single();
   }
 
-  /* Copy the entire virtual array into a span. */
+  /** Copy the entire virtual array into a span. */
   void materialize(MutableSpan<T> r_span) const
   {
     this->materialize(IndexMask(this->size()), r_span);
   }
 
-  /* Copy some indices of the virtual array into a span. */
+  /** Copy some indices of the virtual array into a span. */
   void materialize(IndexMask mask, MutableSpan<T> r_span) const
   {
     BLI_assert(mask.min_array_size() <= this->size());
@@ -695,11 +785,13 @@ template<typename T> class VArrayCommon {
     impl_->materialize_to_uninitialized(mask, r_span);
   }
 
+  /** See #GVArrayImpl::try_assign_GVArray. */
   bool try_assign_GVArray(fn::GVArray &varray) const
   {
     return impl_->try_assign_GVArray(varray);
   }
 
+  /** See #GVArrayImpl::may_have_ownership. */
   bool may_have_ownership() const
   {
     return impl_->may_have_ownership();
@@ -708,6 +800,11 @@ template<typename T> class VArrayCommon {
 
 template<typename T> class VMutableArray;
 
+/**
+ * A #VArray wraps a virtual array implementation and provides easy access to its elements. It can
+ * be copied and moved. While it is relatively small, it should still be passed by reference if
+ * possible (other than e.g. #Span).
+ */
 template<typename T> class VArray : public VArrayCommon<T> {
   friend VMutableArray<T>;
 
@@ -730,6 +827,9 @@ template<typename T> class VArray : public VArrayCommon<T> {
   {
   }
 
+  /**
+   * Construct a new virtual array for a custom #VArrayImpl.
+   */
   template<typename ImplT, typename... Args> static VArray For(Args &&...args)
   {
     static_assert(std::is_base_of_v<VArrayImpl<T>, ImplT>);
@@ -738,27 +838,47 @@ template<typename T> class VArray : public VArrayCommon<T> {
     return varray;
   }
 
+  /**
+   * Construct a new virtual array that has the same value at every index.
+   */
   static VArray ForSingle(T value, const int64_t size)
   {
     return VArray::For<VArrayImpl_For_Single<T>>(std::move(value), size);
   }
 
+  /**
+   * Construct a new virtual array for an existing span. This does not take ownership of the
+   * underlying memory.
+   */
   static VArray ForSpan(Span<T> values)
   {
     return VArray::For<VArrayImpl_For_Span_final<T>>(values);
   }
 
+  /**
+   * Construct a new virtual that will invoke the provided function whenever an element is
+   * accessed.
+   */
   template<typename GetFunc> static VArray ForFunc(const int64_t size, GetFunc get_func)
   {
     return VArray::For<VArrayImpl_For_Func<T, decltype(get_func)>>(size, std::move(get_func));
   }
 
+  /**
+   * Construct a new virtual array for an existing span with a mapping function. This does not take
+   * ownership of the span.
+   */
   template<typename StructT, T (*GetFunc)(const StructT &)>
   static VArray ForDerivedSpan(Span<StructT> values)
   {
     return VArray::For<VArrayImpl_For_DerivedSpan<StructT, T, GetFunc>>(values);
   }
 
+  /**
+   * Construct a new virtual array for an existing container. Every container that lays out the
+   * elements in a plain array works. This takes ownership of the passed in container. If that is
+   * not desired, use #ForSpan instead.
+   */
   template<typename ContainerT> static VArray ForContainer(ContainerT container)
   {
     return VArray::For<VArrayImpl_For_ArrayContainer<ContainerT>>(std::move(container));
@@ -777,6 +897,9 @@ template<typename T> class VArray : public VArrayCommon<T> {
   }
 };
 
+/**
+ * Similar to #VArray but references a virtual array that can be modified.
+ */
 template<typename T> class VMutableArray : public VArrayCommon<T> {
  public:
   VMutableArray() = default;
@@ -798,6 +921,9 @@ template<typename T> class VMutableArray : public VArrayCommon<T> {
   {
   }
 
+  /**
+   * Construct a new virtual array for a custom #VMutableArrayImpl.
+   */
   template<typename ImplT, typename... Args> static VMutableArray For(Args &&...args)
   {
     static_assert(std::is_base_of_v<VMutableArrayImpl<T>, ImplT>);
@@ -806,11 +932,18 @@ template<typename T> class VMutableArray : public VArrayCommon<T> {
     return varray;
   }
 
+  /**
+   * Construct a new virtual array for an existing span. This does not take ownership of the span.
+   */
   static VMutableArray ForSpan(MutableSpan<T> values)
   {
     return VMutableArray::For<VMutableArrayImpl_For_MutableSpan_final<T>>(values);
   }
 
+  /**
+   * Construct a new virtual array for an existing span with a mapping function. This does not take
+   * ownership of the span.
+   */
   template<typename StructT, T (*GetFunc)(const StructT &), void (*SetFunc)(StructT &, T)>
   static VMutableArray ForDerivedSpan(MutableSpan<StructT> values)
   {
@@ -818,6 +951,7 @@ template<typename T> class VMutableArray : public VArrayCommon<T> {
         values);
   }
 
+  /** Convert to a #VArray by copying. */
   operator VArray<T>() const &
   {
     VArray<T> varray;
@@ -825,6 +959,7 @@ template<typename T> class VMutableArray : public VArrayCommon<T> {
     return varray;
   }
 
+  /** Convert to a #VArray by moving. */
   operator VArray<T>() const &&
   {
     VArray<T> varray;
@@ -844,6 +979,10 @@ template<typename T> class VMutableArray : public VArrayCommon<T> {
     return *this;
   }
 
+  /**
+   * Get access to the internal span. This invokes undefined behavior if the #is_span returned
+   * false.
+   */
   MutableSpan<T> get_internal_span() const
   {
     BLI_assert(this->is_span());
@@ -851,6 +990,9 @@ template<typename T> class VMutableArray : public VArrayCommon<T> {
     return MutableSpan<T>(const_cast<T *>(span.data()), span.size());
   }
 
+  /**
+   * Set the value at the given index.
+   */
   void set(const int64_t index, T value)
   {
     BLI_assert(index >= 0);
@@ -858,21 +1000,27 @@ template<typename T> class VMutableArray : public VArrayCommon<T> {
     this->get_impl()->set(index, std::move(value));
   }
 
-  /* Copy the values from the source span to all elements in the virtual array. */
+  /**
+   * Copy the values from the source span to all elements in the virtual array.
+   */
   void set_all(Span<T> src)
   {
     BLI_assert(src.size() == this->size());
     this->get_impl()->set_all(src);
   }
 
+  /** See #GVMutableArrayImpl::try_assign_GVMutableArray. */
   bool try_assign_GVMutableArray(fn::GVMutableArray &varray) const
   {
     return this->get_impl()->try_assign_GVMutableArray(varray);
   }
 
  private:
+  /** Utility to get the pointer to the wrapped #VMutableArrayImpl. */
   VMutableArrayImpl<T> *get_impl() const
   {
+    /* This cast is valid by the invariant that a #VMutableArray->impl_ is always a
+     * #VMutableArrayImpl. */
     return (VMutableArrayImpl<T> *)this->impl_;
   }
 };
@@ -910,7 +1058,7 @@ template<typename T> class VArray_Span final : public Span<T> {
 };
 
 /**
- * Same as VArray_Span, but for a mutable span.
+ * Same as #VArray_Span, but for a mutable span.
  * The important thing to note is that when changing this span, the results might not be
  * immediately reflected in the underlying virtual array (only when the virtual array is a span
  * internally). The #save method can be used to write all changes to the underlying virtual array,
