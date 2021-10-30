@@ -29,10 +29,10 @@ void GVArrayCommon::materialize(void *dst) const
 
 void GVArrayCommon::materialize(const IndexMask mask, void *dst) const
 {
-  impl_->materialize_impl(mask, dst);
+  impl_->materialize(mask, dst);
 }
 
-void GVArrayImpl::materialize_impl(const IndexMask mask, void *dst) const
+void GVArrayImpl::materialize(const IndexMask mask, void *dst) const
 {
   for (const int64_t i : mask) {
     void *elem_dst = POINTER_OFFSET(dst, type_->size() * i);
@@ -55,14 +55,14 @@ void GVArrayImpl::materialize_to_uninitialized(const IndexMask mask, void *dst) 
 {
   for (const int64_t i : mask) {
     void *elem_dst = POINTER_OFFSET(dst, type_->size() * i);
-    this->get_to_uninitialized_impl(i, elem_dst);
+    this->get_to_uninitialized(i, elem_dst);
   }
 }
 
 void GVArrayImpl::get(const int64_t index, void *r_value) const
 {
   type_->destruct(r_value);
-  this->get_to_uninitialized_impl(index, r_value);
+  this->get_to_uninitialized(index, r_value);
 }
 
 bool GVArrayImpl::is_span() const
@@ -86,7 +86,7 @@ void GVArrayImpl::get_internal_single(void *UNUSED(r_value)) const
   BLI_assert(false);
 }
 
-bool GVArrayImpl::try_assign_VArray_impl(void *UNUSED(varray)) const
+bool GVArrayImpl::try_assign_VArray(void *UNUSED(varray)) const
 {
   return false;
 }
@@ -108,17 +108,17 @@ bool GVArrayImpl::has_ownership() const
 /** \name #GVMutableArrayImpl
  * \{ */
 
-void GVMutableArrayImpl::set_by_copy_impl(const int64_t index, const void *value)
+void GVMutableArrayImpl::set_by_copy(const int64_t index, const void *value)
 {
   BUFFER_FOR_CPP_TYPE_VALUE(*type_, buffer);
   type_->copy_construct(value, buffer);
-  this->set_by_move_impl(index, buffer);
+  this->set_by_move(index, buffer);
   type_->destruct(buffer);
 }
 
-void GVMutableArrayImpl::set_by_relocate_impl(const int64_t index, void *value)
+void GVMutableArrayImpl::set_by_relocate(const int64_t index, void *value)
 {
-  this->set_by_move_impl(index, value);
+  this->set_by_move(index, value);
   type_->destruct(value);
 }
 
@@ -130,7 +130,7 @@ void GVMutableArrayImpl::set_all(const void *src)
   }
   else {
     for (int64_t i : IndexRange(size_)) {
-      this->set_by_copy_impl(i, POINTER_OFFSET(src, type_->size() * i));
+      this->set_by_copy(i, POINTER_OFFSET(src, type_->size() * i));
     }
   }
 }
@@ -148,7 +148,7 @@ void GVMutableArray::fill(const void *value)
   }
 }
 
-bool GVMutableArrayImpl::try_assign_VMutableArray_impl(void *UNUSED(varray)) const
+bool GVMutableArrayImpl::try_assign_VMutableArray(void *UNUSED(varray)) const
 {
   return false;
 }
@@ -174,7 +174,7 @@ void GVArrayImpl_For_GSpan::get(const int64_t index, void *r_value) const
   type_->copy_assign(POINTER_OFFSET(data_, element_size_ * index), r_value);
 }
 
-void GVArrayImpl_For_GSpan::get_to_uninitialized_impl(const int64_t index, void *r_value) const
+void GVArrayImpl_For_GSpan::get_to_uninitialized(const int64_t index, void *r_value) const
 {
   type_->copy_construct(POINTER_OFFSET(data_, element_size_ * index), r_value);
 }
@@ -224,23 +224,23 @@ void GVMutableArrayImpl_For_GMutableSpan::get(const int64_t index, void *r_value
   type_->copy_assign(POINTER_OFFSET(data_, element_size_ * index), r_value);
 }
 
-void GVMutableArrayImpl_For_GMutableSpan::get_to_uninitialized_impl(const int64_t index,
-                                                                    void *r_value) const
+void GVMutableArrayImpl_For_GMutableSpan::get_to_uninitialized(const int64_t index,
+                                                               void *r_value) const
 {
   type_->copy_construct(POINTER_OFFSET(data_, element_size_ * index), r_value);
 }
 
-void GVMutableArrayImpl_For_GMutableSpan::set_by_copy_impl(const int64_t index, const void *value)
+void GVMutableArrayImpl_For_GMutableSpan::set_by_copy(const int64_t index, const void *value)
 {
   type_->copy_assign(value, POINTER_OFFSET(data_, element_size_ * index));
 }
 
-void GVMutableArrayImpl_For_GMutableSpan::set_by_move_impl(const int64_t index, void *value)
+void GVMutableArrayImpl_For_GMutableSpan::set_by_move(const int64_t index, void *value)
 {
   type_->move_construct(value, POINTER_OFFSET(data_, element_size_ * index));
 }
 
-void GVMutableArrayImpl_For_GMutableSpan::set_by_relocate_impl(const int64_t index, void *value)
+void GVMutableArrayImpl_For_GMutableSpan::set_by_relocate(const int64_t index, void *value)
 {
   type_->relocate_assign(value, POINTER_OFFSET(data_, element_size_ * index));
 }
@@ -293,7 +293,7 @@ class GVArrayImpl_For_SingleValueRef : public GVArrayImpl {
   {
     type_->copy_assign(value_, r_value);
   }
-  void get_to_uninitialized_impl(const int64_t UNUSED(index), void *r_value) const override
+  void get_to_uninitialized(const int64_t UNUSED(index), void *r_value) const override
   {
     type_->copy_construct(value_, r_value);
   }
@@ -460,7 +460,7 @@ class GVArrayImpl_For_SlicedGVArray : public GVArrayImpl {
     varray_.get(index + offset_, r_value);
   }
 
-  void get_to_uninitialized_impl(const int64_t index, void *r_value) const override
+  void get_to_uninitialized(const int64_t index, void *r_value) const override
   {
     varray_.get_to_uninitialized(index + offset_, r_value);
   }

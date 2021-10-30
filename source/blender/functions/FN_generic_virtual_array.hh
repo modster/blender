@@ -55,9 +55,8 @@ class GVArrayImpl {
 
   int64_t size() const;
 
- public:
   virtual void get(const int64_t index, void *r_value) const;
-  virtual void get_to_uninitialized_impl(const int64_t index, void *r_value) const = 0;
+  virtual void get_to_uninitialized(const int64_t index, void *r_value) const = 0;
 
   virtual bool is_span() const;
   virtual GSpan get_internal_span() const;
@@ -65,10 +64,10 @@ class GVArrayImpl {
   virtual bool is_single() const;
   virtual void get_internal_single(void *UNUSED(r_value)) const;
 
-  virtual void materialize_impl(const IndexMask mask, void *dst) const;
+  virtual void materialize(const IndexMask mask, void *dst) const;
   virtual void materialize_to_uninitialized(const IndexMask mask, void *dst) const;
 
-  virtual bool try_assign_VArray_impl(void *varray) const;
+  virtual bool try_assign_VArray(void *varray) const;
   virtual bool has_ownership() const;
 };
 
@@ -77,14 +76,13 @@ class GVMutableArrayImpl : public GVArrayImpl {
  public:
   GVMutableArrayImpl(const CPPType &type, const int64_t size);
 
- public:
-  virtual void set_by_copy_impl(const int64_t index, const void *value);
-  virtual void set_by_relocate_impl(const int64_t index, void *value);
-  virtual void set_by_move_impl(const int64_t index, void *value) = 0;
+  virtual void set_by_copy(const int64_t index, const void *value);
+  virtual void set_by_relocate(const int64_t index, void *value);
+  virtual void set_by_move(const int64_t index, void *value) = 0;
 
   virtual void set_all(const void *src);
 
-  virtual bool try_assign_VMutableArray_impl(void *varray) const;
+  virtual bool try_assign_VMutableArray(void *varray) const;
 };
 
 /** \} */
@@ -361,7 +359,7 @@ template<typename T> class GVArrayImpl_For_VArray : public GVArrayImpl {
     *(T *)r_value = varray_[index];
   }
 
-  void get_to_uninitialized_impl(const int64_t index, void *r_value) const override
+  void get_to_uninitialized(const int64_t index, void *r_value) const override
   {
     new (r_value) T(varray_[index]);
   }
@@ -386,7 +384,7 @@ template<typename T> class GVArrayImpl_For_VArray : public GVArrayImpl {
     *(T *)r_value = varray_.get_internal_single();
   }
 
-  void materialize_impl(const IndexMask mask, void *dst) const override
+  void materialize(const IndexMask mask, void *dst) const override
   {
     varray_.materialize(mask, MutableSpan((T *)dst, mask.min_array_size()));
   }
@@ -396,7 +394,7 @@ template<typename T> class GVArrayImpl_For_VArray : public GVArrayImpl {
     varray_.materialize_to_uninitialized(mask, MutableSpan((T *)dst, mask.min_array_size()));
   }
 
-  bool try_assign_VArray_impl(void *varray) const override
+  bool try_assign_VArray(void *varray) const override
   {
     *(VArray<T> *)varray = varray_;
     return true;
@@ -479,7 +477,7 @@ template<typename T> class GVMutableArrayImpl_For_VMutableArray : public GVMutab
     *(T *)r_value = varray_[index];
   }
 
-  void get_to_uninitialized_impl(const int64_t index, void *r_value) const override
+  void get_to_uninitialized(const int64_t index, void *r_value) const override
   {
     new (r_value) T(varray_[index]);
   }
@@ -505,20 +503,20 @@ template<typename T> class GVMutableArrayImpl_For_VMutableArray : public GVMutab
     *(T *)r_value = varray_.get_internal_single();
   }
 
-  void set_by_copy_impl(const int64_t index, const void *value) override
+  void set_by_copy(const int64_t index, const void *value) override
   {
     const T &value_ = *(const T *)value;
     varray_.set(index, value_);
   }
 
-  void set_by_relocate_impl(const int64_t index, void *value) override
+  void set_by_relocate(const int64_t index, void *value) override
   {
     T &value_ = *(T *)value;
     varray_.set(index, std::move(value_));
     value_.~T();
   }
 
-  void set_by_move_impl(const int64_t index, void *value) override
+  void set_by_move(const int64_t index, void *value) override
   {
     T &value_ = *(T *)value;
     varray_.set(index, std::move(value_));
@@ -529,7 +527,7 @@ template<typename T> class GVMutableArrayImpl_For_VMutableArray : public GVMutab
     varray_.set_all(Span((T *)src, size_));
   }
 
-  void materialize_impl(const IndexMask mask, void *dst) const override
+  void materialize(const IndexMask mask, void *dst) const override
   {
     varray_.materialize(mask, MutableSpan((T *)dst, mask.min_array_size()));
   }
@@ -539,13 +537,13 @@ template<typename T> class GVMutableArrayImpl_For_VMutableArray : public GVMutab
     varray_.materialize_to_uninitialized(mask, MutableSpan((T *)dst, mask.min_array_size()));
   }
 
-  bool try_assign_VArray_impl(void *varray) const override
+  bool try_assign_VArray(void *varray) const override
   {
     *(VArray<T> *)varray = varray_;
     return true;
   }
 
-  bool try_assign_VMutableArray_impl(void *varray) const override
+  bool try_assign_VMutableArray(void *varray) const override
   {
     *(VMutableArray<T> *)varray = varray_;
     return true;
@@ -641,7 +639,7 @@ class GVArrayImpl_For_GSpan : public GVArrayImpl {
   GVArrayImpl_For_GSpan(const CPPType &type, const int64_t size);
 
   void get(const int64_t index, void *r_value) const override;
-  void get_to_uninitialized_impl(const int64_t index, void *r_value) const override;
+  void get_to_uninitialized(const int64_t index, void *r_value) const override;
 
   bool is_span() const override;
   GSpan get_internal_span() const override;
@@ -660,11 +658,11 @@ class GVMutableArrayImpl_For_GMutableSpan : public GVMutableArrayImpl {
 
  public:
   void get(const int64_t index, void *r_value) const override;
-  void get_to_uninitialized_impl(const int64_t index, void *r_value) const override;
+  void get_to_uninitialized(const int64_t index, void *r_value) const override;
 
-  void set_by_copy_impl(const int64_t index, const void *value) override;
-  void set_by_move_impl(const int64_t index, void *value) override;
-  void set_by_relocate_impl(const int64_t index, void *value) override;
+  void set_by_copy(const int64_t index, const void *value) override;
+  void set_by_move(const int64_t index, void *value) override;
+  void set_by_relocate(const int64_t index, void *value) override;
 
   bool is_span() const override;
   GSpan get_internal_span() const override;
@@ -706,7 +704,7 @@ inline void GVArrayCommon::get_to_uninitialized(const int64_t index, void *r_val
 {
   BLI_assert(index >= 0);
   BLI_assert(index < this->size());
-  impl_->get_to_uninitialized_impl(index, r_value);
+  impl_->get_to_uninitialized(index, r_value);
 }
 
 /* Returns true when the virtual array is stored as a span internally. */
@@ -761,7 +759,7 @@ inline void GVArrayCommon::get_internal_single_to_uninitialized(void *r_value) c
 template<typename T> inline bool GVArrayCommon::try_assign_VArray(VArray<T> &varray) const
 {
   BLI_assert(impl_->type().is<T>());
-  return impl_->try_assign_VArray_impl(&varray);
+  return impl_->try_assign_VArray(&varray);
 }
 
 /** \} */
@@ -779,21 +777,21 @@ inline void GVMutableArray::set_by_copy(const int64_t index, const void *value)
 {
   BLI_assert(index >= 0);
   BLI_assert(index < this->size());
-  this->get_impl()->set_by_copy_impl(index, value);
+  this->get_impl()->set_by_copy(index, value);
 }
 
 inline void GVMutableArray::set_by_move(const int64_t index, void *value)
 {
   BLI_assert(index >= 0);
   BLI_assert(index < this->size());
-  this->get_impl()->set_by_move_impl(index, value);
+  this->get_impl()->set_by_move(index, value);
 }
 
 inline void GVMutableArray::set_by_relocate(const int64_t index, void *value)
 {
   BLI_assert(index >= 0);
   BLI_assert(index < this->size());
-  this->get_impl()->set_by_relocate_impl(index, value);
+  this->get_impl()->set_by_relocate(index, value);
 }
 
 inline GMutableSpan GVMutableArray::get_internal_span() const
@@ -813,7 +811,7 @@ template<typename T>
 inline bool GVMutableArray::try_assign_VMutableArray(VMutableArray<T> &varray) const
 {
   BLI_assert(impl_->type().is<T>());
-  return this->get_impl()->try_assign_VMutableArray_impl(&varray);
+  return this->get_impl()->try_assign_VMutableArray(&varray);
 }
 
 /** \} */

@@ -93,7 +93,7 @@ template<typename T> class VArrayImpl {
     return T();
   }
 
-  virtual void materialize_impl(IndexMask mask, MutableSpan<T> r_span) const
+  virtual void materialize(IndexMask mask, MutableSpan<T> r_span) const
   {
     T *dst = r_span.data();
     if (this->is_span()) {
@@ -144,7 +144,6 @@ template<typename T> class VMutableArrayImpl : public VArrayImpl<T> {
   {
   }
 
- public:
   virtual void set(const int64_t index, T value) = 0;
 
   virtual void set_all(Span<T> src)
@@ -342,7 +341,7 @@ template<typename T, typename GetFunc> class VArrayImpl_For_Func final : public 
     return get_func_(index);
   }
 
-  void materialize_impl(IndexMask mask, MutableSpan<T> r_span) const override
+  void materialize(IndexMask mask, MutableSpan<T> r_span) const override
   {
     T *dst = r_span.data();
     mask.foreach_index([&](const int64_t i) { dst[i] = get_func_(i); });
@@ -375,7 +374,7 @@ class VArrayImpl_For_DerivedSpan final : public VArrayImpl<ElemT> {
     return GetFunc(data_[index]);
   }
 
-  void materialize_impl(IndexMask mask, MutableSpan<ElemT> r_span) const override
+  void materialize(IndexMask mask, MutableSpan<ElemT> r_span) const override
   {
     ElemT *dst = r_span.data();
     mask.foreach_index([&](const int64_t i) { dst[i] = GetFunc(data_[i]); });
@@ -421,7 +420,7 @@ class VMutableArrayImpl_For_DerivedSpan final : public VMutableArrayImpl<ElemT> 
     SetFunc(data_[index], std::move(value));
   }
 
-  void materialize_impl(IndexMask mask, MutableSpan<ElemT> r_span) const override
+  void materialize(IndexMask mask, MutableSpan<ElemT> r_span) const override
   {
     ElemT *dst = r_span.data();
     mask.foreach_index([&](const int64_t i) { dst[i] = GetFunc(data_[i]); });
@@ -634,7 +633,7 @@ template<typename T> class VArrayCommon {
   void materialize(IndexMask mask, MutableSpan<T> r_span) const
   {
     BLI_assert(mask.min_array_size() <= this->size());
-    impl_->materialize_impl(mask, r_span);
+    impl_->materialize(mask, r_span);
   }
 
   void materialize_to_uninitialized(MutableSpan<T> r_span) const

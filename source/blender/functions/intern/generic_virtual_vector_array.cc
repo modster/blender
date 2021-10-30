@@ -23,8 +23,8 @@ void GVArray_For_GVVectorArrayIndex::get(const int64_t index_in_vector, void *r_
   vector_array_.get_vector_element(index_, index_in_vector, r_value);
 }
 
-void GVArray_For_GVVectorArrayIndex::get_to_uninitialized_impl(const int64_t index_in_vector,
-                                                               void *r_value) const
+void GVArray_For_GVVectorArrayIndex::get_to_uninitialized(const int64_t index_in_vector,
+                                                          void *r_value) const
 {
   type_->default_construct(r_value);
   vector_array_.get_vector_element(index_, index_in_vector, r_value);

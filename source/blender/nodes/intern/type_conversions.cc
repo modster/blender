@@ -265,7 +265,7 @@ class GVArray_For_ConvertedGVArray : public fn::GVArrayImpl {
     from_type_.destruct(buffer);
   }
 
-  void get_to_uninitialized_impl(const int64_t index, void *r_value) const override
+  void get_to_uninitialized(const int64_t index, void *r_value) const override
   {
     BUFFER_FOR_CPP_TYPE_VALUE(from_type_, buffer);
     varray_.get(index, buffer);
@@ -302,7 +302,7 @@ class GVMutableArray_For_ConvertedGVMutableArray : public fn::GVMutableArrayImpl
     from_type_.destruct(buffer);
   }
 
-  void get_to_uninitialized_impl(const int64_t index, void *r_value) const override
+  void get_to_uninitialized(const int64_t index, void *r_value) const override
   {
     BUFFER_FOR_CPP_TYPE_VALUE(from_type_, buffer);
     varray_.get(index, buffer);
@@ -310,7 +310,7 @@ class GVMutableArray_For_ConvertedGVMutableArray : public fn::GVMutableArrayImpl
     from_type_.destruct(buffer);
   }
 
-  void set_by_move_impl(const int64_t index, void *value) override
+  void set_by_move(const int64_t index, void *value) override
   {
     BUFFER_FOR_CPP_TYPE_VALUE(from_type_, buffer);
     new_to_old_conversions_.convert_single_to_uninitialized(value, buffer);
