@@ -520,21 +520,13 @@ GVArray GVArray::slice(IndexRange slice) const
 
 GVArray &GVArray::operator=(const GVArray &other)
 {
-  if (this == &other) {
-    return *this;
-  }
-  this->~GVArray();
-  new (this) GVArray(other);
+  this->copy_from(other);
   return *this;
 }
 
 GVArray &GVArray::operator=(GVArray &&other)
 {
-  if (this == &other) {
-    return *this;
-  }
-  this->~GVArray();
-  new (this) GVArray(std::move(other));
+  this->move_from(std::move(other));
   return *this;
 }
 
@@ -559,21 +551,13 @@ GVMutableArray::operator GVArray() const
 
 GVMutableArray &GVMutableArray::operator=(const GVMutableArray &other)
 {
-  if (this == &other) {
-    return *this;
-  }
-  this->~GVMutableArray();
-  new (this) GVMutableArray(other);
+  this->copy_from(other);
   return *this;
 }
 
 GVMutableArray &GVMutableArray::operator=(GVMutableArray &&other)
 {
-  if (this == &other) {
-    return *this;
-  }
-  this->~GVMutableArray();
-  new (this) GVMutableArray(std::move(other));
+  this->move_from(std::move(other));
   return *this;
 }
 
