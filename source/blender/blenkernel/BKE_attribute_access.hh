@@ -207,7 +207,7 @@ class OutputAttribute {
   using SaveFn = std::function<void(OutputAttribute &)>;
 
  private:
-  std::unique_ptr<GVMutableArray> varray_;
+  GVMutableArray varray_;
   AttributeDomain domain_ = ATTR_DOMAIN_AUTO;
   SaveFn save_;
   std::unique_ptr<fn::GVMutableArray_GSpan> optional_span_varray_;
@@ -459,7 +459,7 @@ inline OutputAttribute::OutputAttribute(GVMutableArray varray,
                                         AttributeDomain domain,
                                         SaveFn save,
                                         const bool ignore_old_values)
-    : varray_(std::make_unique<GVMutableArray>(std::move(varray))),
+    : varray_(std::move(varray)),
       domain_(domain),
       save_(std::move(save)),
       ignore_old_values_(ignore_old_values)
@@ -468,22 +468,22 @@ inline OutputAttribute::OutputAttribute(GVMutableArray varray,
 
 inline OutputAttribute::operator bool() const
 {
-  return varray_ && *varray_;
+  return varray_;
 }
 
 inline GVMutableArray &OutputAttribute::operator*()
 {
-  return *varray_;
+  return varray_;
 }
 
 inline fn::GVMutableArray *OutputAttribute::operator->()
 {
-  return &*varray_;
+  return &varray_;
 }
 
 inline GVMutableArray &OutputAttribute::varray()
 {
-  return *varray_;
+  return varray_;
 }
 
 inline AttributeDomain OutputAttribute::domain() const
@@ -493,7 +493,7 @@ inline AttributeDomain OutputAttribute::domain() const
 
 inline const CPPType &OutputAttribute::cpp_type() const
 {
-  return varray_->type();
+  return varray_.type();
 }
 
 inline CustomDataType OutputAttribute::custom_data_type() const
