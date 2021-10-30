@@ -120,11 +120,11 @@ class GVArray_For_GVVectorArrayIndex : public GVArrayImpl {
 
 class GVVectorArray_For_SingleGVArray : public GVVectorArray {
  private:
-  const GVArrayImpl &array_;
+  GVArray varray_;
 
  public:
-  GVVectorArray_For_SingleGVArray(const GVArrayImpl &array, const int64_t size)
-      : GVVectorArray(array.type(), size), array_(array)
+  GVVectorArray_For_SingleGVArray(GVArray varray, const int64_t size)
+      : GVVectorArray(varray.type(), size), varray_(std::move(varray))
   {
   }
 

@@ -32,14 +32,14 @@ void GVArray_For_GVVectorArrayIndex::get_to_uninitialized_impl(const int64_t ind
 
 int64_t GVVectorArray_For_SingleGVArray::get_vector_size_impl(const int64_t UNUSED(index)) const
 {
-  return array_.size();
+  return varray_.size();
 }
 
 void GVVectorArray_For_SingleGVArray::get_vector_element_impl(const int64_t UNUSED(index),
                                                               const int64_t index_in_vector,
                                                               void *r_value) const
 {
-  array_.get_impl(index_in_vector, r_value);
+  varray_.get(index_in_vector, r_value);
 }
 
 bool GVVectorArray_For_SingleGVArray::is_single_vector_impl() const
