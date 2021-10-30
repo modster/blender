@@ -1202,7 +1202,7 @@ class NormalAttributeProvider final : public BuiltinAttributeProvider {
     return VArray<float3>::ForContainer(std::move(normals));
   }
 
-  GVMutableArray try_get_for_write(GeometryComponent &UNUSED(component)) const final
+  WriteAttributeLookup try_get_for_write(GeometryComponent &UNUSED(component)) const final
   {
     return {};
   }

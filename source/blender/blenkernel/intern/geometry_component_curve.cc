@@ -431,7 +431,7 @@ class BuiltinSplineAttributeProvider final : public BuiltinAttributeProvider {
     return as_read_attribute_(*curve);
   }
 
-  GVMutableArray try_get_for_write(GeometryComponent &component) const final
+  WriteAttributeLookup try_get_for_write(GeometryComponent &component) const final
   {
     if (writable_ != Writable) {
       return {};
@@ -440,7 +440,7 @@ class BuiltinSplineAttributeProvider final : public BuiltinAttributeProvider {
     if (curve == nullptr) {
       return {};
     }
-    return as_write_attribute_(*curve);
+    return {as_write_attribute_(*curve), domain_};
   }
 
   bool try_delete(GeometryComponent &UNUSED(component)) const final
@@ -1112,7 +1112,7 @@ template<typename T> class BuiltinPointAttributeProvider : public BuiltinAttribu
     return point_data_varray(spans, offsets);
   }
 
-  GVMutableArray try_get_for_write(GeometryComponent &component) const override
+  WriteAttributeLookup try_get_for_write(GeometryComponent &component) const override
   {
     CurveEval *curve = get_curve_from_component_for_write(component);
     if (curve == nullptr) {
@@ -1123,21 +1123,29 @@ template<typename T> class BuiltinPointAttributeProvider : public BuiltinAttribu
       return {};
     }
 
+    std::function<void()> tag_modified_fn;
+    if (update_on_write_ != nullptr) {
+      tag_modified_fn = [curve, update = update_on_write_]() {
+        for (SplinePtr &spline : curve->splines()) {
+          update(*spline);
+        }
+      };
+    }
+
     MutableSpan<SplinePtr> splines = curve->splines();
     if (splines.size() == 1) {
-      return GVMutableArray::ForSpan(get_mutable_span_(*splines.first()));
+      return {GVMutableArray::ForSpan(get_mutable_span_(*splines.first())),
+              domain_,
+              std::move(tag_modified_fn)};
     }
 
     Array<int> offsets = curve->control_point_offsets();
     Array<MutableSpan<T>> spans(splines.size());
     for (const int i : splines.index_range()) {
       spans[i] = get_mutable_span_(*splines[i]);
-      if (update_on_write_) {
-        update_on_write_(*splines[i]);
-      }
     }
 
-    return point_data_varray(spans, offsets);
+    return {point_data_varray(spans, offsets), domain_, tag_modified_fn};
   }
 
   bool try_delete(GeometryComponent &component) const final
@@ -1209,7 +1217,7 @@ class PositionAttributeProvider final : public BuiltinPointAttributeProvider<flo
   {
   }
 
-  GVMutableArray try_get_for_write(GeometryComponent &component) const final
+  WriteAttributeLookup try_get_for_write(GeometryComponent &component) const final
   {
     CurveEval *curve = get_curve_from_component_for_write(component);
     if (curve == nullptr) {
@@ -1222,15 +1230,17 @@ class PositionAttributeProvider final : public BuiltinPointAttributeProvider<flo
       return BuiltinPointAttributeProvider<float3>::try_get_for_write(component);
     }
 
-    /* Changing the positions requires recalculation of cached evaluated data in many cases.
-     * This could set more specific flags in the future to avoid unnecessary recomputation. */
-    for (SplinePtr &spline : curve->splines()) {
-      spline->mark_cache_invalid();
-    }
+    auto tag_modified_fn = [curve]() {
+      /* Changing the positions requires recalculation of cached evaluated data in many cases.
+       * This could set more specific flags in the future to avoid unnecessary recomputation. */
+      curve->mark_cache_invalid();
+    };
 
     Array<int> offsets = curve->control_point_offsets();
-    return VMutableArray<float3>::For<VMutableArray_For_SplinePosition>(curve->splines(),
-                                                                        std::move(offsets));
+    return {VMutableArray<float3>::For<VMutableArray_For_SplinePosition>(curve->splines(),
+                                                                         std::move(offsets)),
+            domain_,
+            tag_modified_fn};
   }
 };
 
@@ -1266,7 +1276,7 @@ class BezierHandleAttributeProvider : public BuiltinAttributeProvider {
         curve->splines(), std::move(offsets), is_right_);
   }
 
-  GVMutableArray try_get_for_write(GeometryComponent &component) const override
+  WriteAttributeLookup try_get_for_write(GeometryComponent &component) const override
   {
     CurveEval *curve = get_curve_from_component_for_write(component);
     if (curve == nullptr) {
@@ -1277,9 +1287,13 @@ class BezierHandleAttributeProvider : public BuiltinAttributeProvider {
       return {};
     }
 
+    auto tag_modified_fn = [curve]() { curve->mark_cache_invalid(); };
+
     Array<int> offsets = curve->control_point_offsets();
-    return VMutableArray<float3>::For<VMutableArray_For_BezierHandles>(
-        curve->splines(), std::move(offsets), is_right_);
+    return {VMutableArray<float3>::For<VMutableArray_For_BezierHandles>(
+                curve->splines(), std::move(offsets), is_right_),
+            domain_,
+            tag_modified_fn};
   }
 
   bool try_delete(GeometryComponent &UNUSED(component)) const final

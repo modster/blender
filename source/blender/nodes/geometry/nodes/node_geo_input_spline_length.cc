@@ -22,7 +22,7 @@ namespace blender::nodes {
 
 static void geo_node_input_spline_length_declare(NodeDeclarationBuilder &b)
 {
-  b.add_output<decl::Float>("Length").field_source();
+  b.add_output<decl::Float>(N_("Length")).field_source();
 }
 
 static VArray<float> construct_spline_length_gvarray(const CurveComponent &component,
@@ -51,8 +51,9 @@ static VArray<float> construct_spline_length_gvarray(const CurveComponent &compo
 
 class SplineLengthFieldInput final : public fn::FieldInput {
  public:
-  SplineLengthFieldInput() : fn::FieldInput(CPPType::get<float>(), "Spline Length")
+  SplineLengthFieldInput() : fn::FieldInput(CPPType::get<float>(), "Spline Length node")
   {
+    category_ = Category::Generated;
   }
 
   GVArray get_varray_for_context(const fn::FieldContext &context,
