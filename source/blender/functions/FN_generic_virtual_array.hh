@@ -853,8 +853,7 @@ template<typename T> inline VMutableArray<T> GVMutableArray::typed() const
   if (!*this) {
     return {};
   }
-  GVMutableArrayImpl *impl = this->get_impl();
-  BLI_assert(impl->type().is<T>());
+  BLI_assert(this->type().is<T>());
   VMutableArray<T> varray;
   if (this->try_assign_VMutableArray(varray)) {
     return varray;
