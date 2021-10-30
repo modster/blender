@@ -248,7 +248,7 @@ static bool add_builtin_type_custom_data_layer_from_init(CustomData &custom_data
         return false;
       }
       const GVArray &varray = static_cast<const AttributeInitVArray &>(initializer).varray;
-      varray.materialize_to_uninitialized(IndexRange(varray.size()), data);
+      varray.materialize_to_uninitialized(varray.index_range(), data);
       return true;
     }
     case AttributeInit::Type::MoveArray: {
@@ -304,7 +304,7 @@ static bool add_custom_data_layer_from_attribute_init(const AttributeIDRef &attr
         return false;
       }
       const GVArray &varray = static_cast<const AttributeInitVArray &>(initializer).varray;
-      varray.materialize_to_uninitialized(IndexRange(varray.size()), data);
+      varray.materialize_to_uninitialized(varray.index_range(), data);
       return true;
     }
     case AttributeInit::Type::MoveArray: {

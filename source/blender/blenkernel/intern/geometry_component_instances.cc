@@ -474,7 +474,7 @@ class InstanceIDAttributeProvider final : public BuiltinAttributeProvider {
       }
       case AttributeInit::Type::VArray: {
         const GVArray &varray = static_cast<const AttributeInitVArray &>(initializer).varray;
-        varray.materialize_to_uninitialized(IndexRange(varray.size()), ids.data());
+        varray.materialize_to_uninitialized(varray.index_range(), ids.data());
         break;
       }
       case AttributeInit::Type::MoveArray: {

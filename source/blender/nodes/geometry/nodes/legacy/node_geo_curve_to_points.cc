@@ -271,7 +271,7 @@ static void copy_spline_domain_attributes(const CurveComponent &curve_component,
             attribute_id, ATTR_DOMAIN_POINT, meta_data.data_type);
         GMutableSpan result = result_attribute.as_span();
 
-        for (const int i : IndexRange(spline_attribute.size())) {
+        for (const int i : spline_attribute.index_range()) {
           const int offset = offsets[i];
           const int size = offsets[i + 1] - offsets[i];
           if (size != 0) {

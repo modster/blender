@@ -202,6 +202,11 @@ class GVArrayCommon {
     return this->size() == 0;
   }
 
+  IndexRange index_range() const
+  {
+    return IndexRange(this->size());
+  }
+
   template<typename T> bool try_assign_VArray(VArray<T> &varray) const;
   bool has_ownership() const;
 
