@@ -675,52 +675,125 @@ template<typename T> struct VArrayAnyExtraInfo {
   }
 };
 
-}  // namespace detail
-
-template<typename T> class VMutableArray;
-
-template<typename T> class VArray {
- private:
+template<typename T> class VArrayCommon {
+ protected:
   using ExtraInfo = detail::VArrayAnyExtraInfo<T>;
   using Storage = Any<ExtraInfo, 24, 8>;
-  using Impl = VArrayImpl<T>;
 
-  const Impl *impl_ = nullptr;
+  const VArrayImpl<T> *impl_ = nullptr;
   Storage storage_;
 
-  friend class VMutableArray<T>;
+ protected:
+  VArrayCommon() = default;
 
- public:
-  VArray() = default;
-
-  VArray(const VArray &other) : storage_(other.storage_)
+  VArrayCommon(const VArrayCommon &other) : storage_(other.storage_)
   {
-    impl_ = storage_.extra_info().get_varray(storage_.get());
+    impl_ = this->impl_from_storage();
   }
 
-  VArray(const Impl *impl) : impl_(impl)
+  VArrayCommon(VArrayCommon &&other) : storage_(std::move(other.storage_))
+  {
+    impl_ = this->impl_from_storage();
+    other.storage_.reset();
+    other.impl_ = nullptr;
+  }
+
+  VArrayCommon(const VArrayImpl<T> *impl) : impl_(impl)
   {
     storage_ = impl_;
   }
 
-  VArray(std::shared_ptr<const Impl> impl) : impl_(impl.get())
+  VArrayCommon(std::shared_ptr<const VArrayImpl<T>> impl) : impl_(impl.get())
   {
     if (impl) {
       storage_ = std::move(impl);
     }
   }
 
-  template<typename ImplT, typename... Args> static VArray For(Args &&...args)
+  template<typename ImplT, typename... Args> void emplace(Args &&...args)
   {
-    static_assert(std::is_base_of_v<Impl, ImplT>);
+    static_assert(std::is_base_of_v<VArrayImpl<T>, ImplT>);
     if constexpr (std::is_copy_constructible_v<ImplT> && Storage::template is_inline_v<ImplT>) {
-      VArray varray;
-      varray.impl_ = &varray.storage_.template emplace<ImplT>(std::forward<Args>(args)...);
-      return varray;
+      impl_ = &storage_.template emplace<ImplT>(std::forward<Args>(args)...);
     }
     else {
-      return VArray(std::make_shared<ImplT>(std::forward<Args>(args)...));
+      std::shared_ptr<const VArrayImpl<T>> ptr = std::make_shared<ImplT>(
+          std::forward<Args>(args)...);
+      impl_ = &*ptr;
+      storage_ = std::move(ptr);
     }
+  }
+
+  void copy_from(const VArrayCommon &other)
+  {
+    if (this == &other) {
+      return;
+    }
+    storage_ = other.storage_;
+    impl_ = this->impl_from_storage();
+  }
+
+  void move_from(VArrayCommon &&other)
+  {
+    if (this == &other) {
+      return;
+    }
+    storage_ = std::move(other.storage_);
+    impl_ = this->impl_from_storage();
+    other.storage_.reset();
+    other.impl_ = nullptr;
+  }
+
+  const VArrayImpl<T> *impl_from_storage() const
+  {
+    return storage_.extra_info().get_varray(storage_.get());
+  }
+
+ public:
+  operator bool() const
+  {
+    return impl_ != nullptr;
+  }
+
+  T operator[](const int64_t index) const
+  {
+    BLI_assert(*this);
+    return impl_->get(index);
+  }
+};
+
+}  // namespace detail
+
+template<typename T> class VMutableArray;
+
+template<typename T> class VArray : public detail::VArrayCommon<T> {
+  friend VMutableArray<T>;
+
+ public:
+  VArray() = default;
+
+  VArray(const VArray &other) : detail::VArrayCommon<T>(other)
+  {
+  }
+
+  VArray(VArray &&other) : detail::VArrayCommon<T>(std::move(other))
+  {
+  }
+
+  VArray(const VArrayImpl<T> *impl) : detail::VArrayCommon<T>(impl)
+  {
+  }
+
+  VArray(std::shared_ptr<const VArrayImpl<T>> impl) : detail::VArrayCommon<T>(std::move(impl))
+  {
+  }
+
+  template<typename ImplT, typename... Args> static VArray For(Args &&...args)
+  {
+    static_assert(std::is_base_of_v<VArrayImpl<T>, ImplT>);
+    VArray varray;
+    varray.template emplace<ImplT>(std::forward<Args>(args)...);
+    return varray;
   }
 
   static VArray ForSingle(T value, const int64_t size)
@@ -749,91 +822,58 @@ template<typename T> class VArray {
     return VArray::For<VArrayImpl_For_ArrayContainer<ContainerT>>(std::move(container));
   }
 
-  operator bool() const
-  {
-    return impl_ != nullptr;
-  }
-
   VArray &operator=(const VArray &other)
   {
-    if (this == &other) {
-      return *this;
-    }
-    this->~VArray();
-    new (this) VArray(other);
+    this->copy_from(other);
     return *this;
   }
 
   VArray &operator=(VArray &&other)
   {
-    if (this == &other) {
-      return *this;
-    }
-    this->~VArray();
-    new (this) VArray(std::move(other));
+    this->move_from(std::move(other));
     return *this;
   }
 
-  const Impl *operator->() const
+  const VArrayImpl<T> *operator->() const
   {
     BLI_assert(*this);
-    return impl_;
+    return this->impl_;
   }
 
-  const Impl &operator*() const
+  const VArrayImpl<T> &operator*() const
   {
     BLI_assert(*this);
-    return *impl_;
-  }
-
-  T operator[](const int64_t index) const
-  {
-    BLI_assert(*this);
-    return impl_->get(index);
+    return *this->impl_;
   }
 };
 
-template<typename T> class VMutableArray {
- private:
-  using ExtraInfo = detail::VArrayAnyExtraInfo<T>;
-  using Storage = Any<ExtraInfo, 24, 8>;
-  using Impl = VMutableArrayImpl<T>;
-
-  Impl *impl_ = nullptr;
-  Storage storage_;
-
+template<typename T> class VMutableArray : public detail::VArrayCommon<T> {
  public:
   VMutableArray() = default;
 
-  VMutableArray(const VMutableArray &other) : storage_(other.storage_)
+  VMutableArray(const VMutableArray &other) : detail::VArrayCommon<T>(other)
   {
-    impl_ = const_cast<Impl *>(
-        static_cast<const Impl *>(storage_.extra_info().get_varray(storage_.get())));
   }
 
-  VMutableArray(Impl *impl) : impl_(impl)
+  VMutableArray(VMutableArray &&other) : detail::VArrayCommon<T>(std::move(other))
   {
-    storage_ = static_cast<const VArrayImpl<T> *>(impl);
   }
 
-  VMutableArray(std::shared_ptr<Impl> impl) : impl_(impl.get())
+  VMutableArray(const VMutableArrayImpl<T> *impl) : detail::VArrayCommon<T>(impl)
   {
-    if (impl) {
-      storage_ = std::shared_ptr<const VArrayImpl<T>>(std::move(impl));
-    }
+  }
+
+  VMutableArray(std::shared_ptr<const VMutableArrayImpl<T>> impl)
+      : detail::VArrayCommon<T>(std::move(impl))
+  {
   }
 
   template<typename ImplT, typename... Args> static VMutableArray For(Args &&...args)
   {
-    static_assert(std::is_base_of_v<Impl, ImplT>);
-    if constexpr (std::is_copy_constructible_v<ImplT> && Storage::template is_inline_v<ImplT>) {
-      VMutableArray varray;
-      varray.impl_ = &varray.storage_.template emplace<ImplT>(std::forward<Args>(args)...);
-      return varray;
-    }
-    else {
-      return VMutableArray(std::make_shared<ImplT>(std::forward<Args>(args)...));
-    }
+    static_assert(std::is_base_of_v<VMutableArrayImpl<T>, ImplT>);
+    VMutableArray varray;
+    varray.template emplace<ImplT>(std::forward<Args>(args)...);
+    return varray;
   }
 
   static VMutableArray ForSpan(MutableSpan<T> values)
@@ -851,55 +891,42 @@ template<typename T> class VMutableArray {
         values);
   }
 
-  operator bool() const
-  {
-    return impl_ != nullptr;
-  }
-
-  operator VArray<T>() const
+  operator VArray<T>() const &
   {
     VArray<T> varray;
-    varray.storage_ = storage_;
-    varray.impl_ = impl_;
+    varray.copy_from(*this);
+    return varray;
+  }
+
+  operator VArray<T>() const &&
+  {
+    VArray<T> varray;
+    varray.move_from(*this);
     return varray;
   }
 
   VMutableArray &operator=(const VMutableArray &other)
   {
-    if (this == &other) {
-      return *this;
-    }
-    this->~VMutableArray();
-    new (this) VMutableArray(other);
+    this->copy_from(other);
     return *this;
   }
 
   VMutableArray &operator=(VMutableArray &&other)
   {
-    if (this == &other) {
-      return *this;
-    }
-    this->~VMutableArray();
-    new (this) VMutableArray(std::move(other));
+    this->move_from(std::move(other));
     return *this;
   }
 
-  Impl *operator->() const
+  VMutableArrayImpl<T> *operator->() const
   {
     BLI_assert(*this);
-    return impl_;
+    return (VMutableArrayImpl<T> *)this->impl_;
   }
 
-  Impl &operator*() const
+  VMutableArrayImpl<T> &operator*() const
   {
     BLI_assert(*this);
-    return *impl_;
-  }
-
-  T operator[](const int64_t index) const
-  {
-    BLI_assert(*this);
-    return impl_->get(index);
+    return *(VMutableArrayImpl<T> *)this->impl_;
   }
 };
 
