@@ -18,7 +18,7 @@
 
 namespace blender::fn {
 
-void GVArray_For_GVVectorArrayIndex::get_impl(const int64_t index_in_vector, void *r_value) const
+void GVArray_For_GVVectorArrayIndex::get(const int64_t index_in_vector, void *r_value) const
 {
   vector_array_.get_vector_element(index_, index_in_vector, r_value);
 }

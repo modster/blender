@@ -67,7 +67,7 @@ template<typename T> class VArrayImpl {
     return size_;
   }
 
-  virtual T get_impl(const int64_t index) const = 0;
+  virtual T get(const int64_t index) const = 0;
 
   virtual bool is_span_impl() const
   {
@@ -105,7 +105,7 @@ template<typename T> class VArrayImpl {
       mask.foreach_index([&](const int64_t i) { dst[i] = single; });
     }
     else {
-      mask.foreach_index([&](const int64_t i) { dst[i] = this->get_impl(i); });
+      mask.foreach_index([&](const int64_t i) { dst[i] = this->get(i); });
     }
   }
 
@@ -121,7 +121,7 @@ template<typename T> class VArrayImpl {
       mask.foreach_index([&](const int64_t i) { new (dst + i) T(single); });
     }
     else {
-      mask.foreach_index([&](const int64_t i) { new (dst + i) T(this->get_impl(i)); });
+      mask.foreach_index([&](const int64_t i) { new (dst + i) T(this->get(i)); });
     }
   }
 
@@ -186,7 +186,7 @@ template<typename T> class VArrayImpl_For_Span : public VArrayImpl<T> {
   {
   }
 
-  T get_impl(const int64_t index) const final
+  T get(const int64_t index) const final
   {
     return data_[index];
   }
@@ -228,7 +228,7 @@ template<typename T> class VMutableArrayImpl_For_MutableSpan : public VMutableAr
   {
   }
 
-  T get_impl(const int64_t index) const final
+  T get(const int64_t index) const final
   {
     return data_[index];
   }
@@ -296,7 +296,7 @@ template<typename T> class VArrayImpl_For_Single final : public VArrayImpl<T> {
   }
 
  protected:
-  T get_impl(const int64_t UNUSED(index)) const override
+  T get(const int64_t UNUSED(index)) const override
   {
     return value_;
   }
@@ -337,7 +337,7 @@ template<typename T, typename GetFunc> class VArrayImpl_For_Func final : public 
   }
 
  private:
-  T get_impl(const int64_t index) const override
+  T get(const int64_t index) const override
   {
     return get_func_(index);
   }
@@ -370,7 +370,7 @@ class VArrayImpl_For_DerivedSpan final : public VArrayImpl<ElemT> {
   }
 
  private:
-  ElemT get_impl(const int64_t index) const override
+  ElemT get(const int64_t index) const override
   {
     return GetFunc(data_[index]);
   }
@@ -411,7 +411,7 @@ class VMutableArrayImpl_For_DerivedSpan final : public VMutableArrayImpl<ElemT> 
   }
 
  private:
-  ElemT get_impl(const int64_t index) const override
+  ElemT get(const int64_t index) const override
   {
     return GetFunc(data_[index]);
   }
@@ -554,14 +554,14 @@ template<typename T> class VArrayCommon {
   T operator[](const int64_t index) const
   {
     BLI_assert(*this);
-    return impl_->get_impl(index);
+    return impl_->get(index);
   }
 
   T get(const int64_t index) const
   {
     BLI_assert(index >= 0);
     BLI_assert(index < this->size());
-    return impl_->get_impl(index);
+    return impl_->get(index);
   }
 
   int64_t size() const
@@ -619,7 +619,7 @@ template<typename T> class VArrayCommon {
   {
     BLI_assert(this->is_single());
     if (impl_->size() == 1) {
-      return impl_->get_impl(0);
+      return impl_->get(0);
     }
     return impl_->get_internal_single_impl();
   }

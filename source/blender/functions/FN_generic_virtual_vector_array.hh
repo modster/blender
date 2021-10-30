@@ -114,7 +114,7 @@ class GVArray_For_GVVectorArrayIndex : public GVArrayImpl {
   }
 
  protected:
-  void get_impl(const int64_t index_in_vector, void *r_value) const override;
+  void get(const int64_t index_in_vector, void *r_value) const override;
   void get_to_uninitialized_impl(const int64_t index_in_vector, void *r_value) const override;
 };
 

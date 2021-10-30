@@ -1007,7 +1007,7 @@ class VMutableArray_For_VertexWeights final : public VMutableArrayImpl<float> {
   {
   }
 
-  float get_impl(const int64_t index) const override
+  float get(const int64_t index) const override
   {
     return get_internal(dverts_, dvert_index_, index);
   }
@@ -1044,7 +1044,7 @@ class VArray_For_VertexWeights final : public VArrayImpl<float> {
   {
   }
 
-  float get_impl(const int64_t index) const override
+  float get(const int64_t index) const override
   {
     return VMutableArray_For_VertexWeights::get_internal(dverts_, dvert_index_, index);
   }

@@ -257,7 +257,7 @@ class GVArray_For_ConvertedGVArray : public fn::GVArrayImpl {
   }
 
  private:
-  void get_impl(const int64_t index, void *r_value) const override
+  void get(const int64_t index, void *r_value) const override
   {
     BUFFER_FOR_CPP_TYPE_VALUE(from_type_, buffer);
     varray_.get(index, buffer);
@@ -294,7 +294,7 @@ class GVMutableArray_For_ConvertedGVMutableArray : public fn::GVMutableArrayImpl
   }
 
  private:
-  void get_impl(const int64_t index, void *r_value) const override
+  void get(const int64_t index, void *r_value) const override
   {
     BUFFER_FOR_CPP_TYPE_VALUE(from_type_, buffer);
     varray_.get(index, buffer);

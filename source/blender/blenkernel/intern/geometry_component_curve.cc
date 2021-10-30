@@ -286,7 +286,7 @@ template<typename T> class VArray_For_SplineToPoint final : public VArrayImpl<T>
   {
   }
 
-  T get_impl(const int64_t index) const final
+  T get(const int64_t index) const final
   {
     const PointIndices indices = lookup_point_indices(offsets_, index);
     return original_data_[indices.spline_index];
@@ -726,7 +726,7 @@ template<typename T> class VArray_For_SplinePoints : public VArrayImpl<T> {
   {
   }
 
-  T get_impl(const int64_t index) const final
+  T get(const int64_t index) const final
   {
     const PointIndices indices = lookup_point_indices(offsets_, index);
     return data_[indices.spline_index][indices.point_index];
@@ -757,7 +757,7 @@ template<typename T> class VMutableArray_For_SplinePoints final : public VMutabl
   {
   }
 
-  T get_impl(const int64_t index) const final
+  T get(const int64_t index) const final
   {
     const PointIndices indices = lookup_point_indices(offsets_, index);
     return data_[indices.spline_index][indices.point_index];
@@ -821,7 +821,7 @@ class VMutableArray_For_SplinePosition final : public VMutableArrayImpl<float3> 
   {
   }
 
-  float3 get_impl(const int64_t index) const final
+  float3 get(const int64_t index) const final
   {
     const PointIndices indices = lookup_point_indices(offsets_, index);
     return splines_[indices.spline_index]->positions()[indices.point_index];
@@ -919,7 +919,7 @@ class VArray_For_BezierHandle final : public VArrayImpl<float3> {
     return float3(0);
   }
 
-  float3 get_impl(const int64_t index) const final
+  float3 get(const int64_t index) const final
   {
     return get_internal(index, splines_, offsets_, is_right_);
   }
@@ -995,7 +995,7 @@ class VMutableArray_For_BezierHandles final : public VMutableArrayImpl<float3> {
   {
   }
 
-  float3 get_impl(const int64_t index) const final
+  float3 get(const int64_t index) const final
   {
     return VArray_For_BezierHandle::get_internal(index, splines_, offsets_, is_right_);
   }

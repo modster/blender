@@ -56,7 +56,7 @@ class GVArrayImpl {
   int64_t size() const;
 
  public:
-  virtual void get_impl(const int64_t index, void *r_value) const;
+  virtual void get(const int64_t index, void *r_value) const;
   virtual void get_to_uninitialized_impl(const int64_t index, void *r_value) const = 0;
 
   virtual bool is_span_impl() const;
@@ -347,7 +347,7 @@ template<typename T> class GVArrayImpl_For_VArray : public GVArrayImpl {
   }
 
  protected:
-  void get_impl(const int64_t index, void *r_value) const override
+  void get(const int64_t index, void *r_value) const override
   {
     *(T *)r_value = varray_[index];
   }
@@ -413,7 +413,7 @@ template<typename T> class VArrayImpl_For_GVArray : public VArrayImpl<T> {
   }
 
  protected:
-  T get_impl(const int64_t index) const override
+  T get(const int64_t index) const override
   {
     T value;
     varray_.get(index, &value);
@@ -466,7 +466,7 @@ template<typename T> class GVMutableArrayImpl_For_VMutableArray : public GVMutab
   }
 
  protected:
-  void get_impl(const int64_t index, void *r_value) const override
+  void get(const int64_t index, void *r_value) const override
   {
     *(T *)r_value = varray_[index];
   }
@@ -563,7 +563,7 @@ template<typename T> class VMutableArrayImpl_For_GVMutableArray : public VMutabl
   }
 
  private:
-  T get_impl(const int64_t index) const override
+  T get(const int64_t index) const override
   {
     T value;
     varray_.get(index, &value);
@@ -632,7 +632,7 @@ class GVArrayImpl_For_GSpan : public GVArrayImpl {
  protected:
   GVArrayImpl_For_GSpan(const CPPType &type, const int64_t size);
 
-  void get_impl(const int64_t index, void *r_value) const override;
+  void get(const int64_t index, void *r_value) const override;
   void get_to_uninitialized_impl(const int64_t index, void *r_value) const override;
 
   bool is_span_impl() const override;
@@ -651,7 +651,7 @@ class GVMutableArrayImpl_For_GMutableSpan : public GVMutableArrayImpl {
   GVMutableArrayImpl_For_GMutableSpan(const CPPType &type, const int64_t size);
 
  public:
-  void get_impl(const int64_t index, void *r_value) const override;
+  void get(const int64_t index, void *r_value) const override;
   void get_to_uninitialized_impl(const int64_t index, void *r_value) const override;
 
   void set_by_copy_impl(const int64_t index, const void *value) override;
@@ -690,7 +690,7 @@ inline void GVArrayCommon::get(const int64_t index, void *r_value) const
 {
   BLI_assert(index >= 0);
   BLI_assert(index < this->size());
-  impl_->get_impl(index, r_value);
+  impl_->get(index, r_value);
 }
 
 /* Same as `get`, but `r_value` is expected to point to uninitialized memory. */
@@ -737,7 +737,7 @@ inline void GVArrayCommon::get_internal_single(void *r_value) const
 {
   BLI_assert(this->is_single());
   if (impl_->size() == 1) {
-    impl_->get_impl(0, r_value);
+    impl_->get(0, r_value);
     return;
   }
   impl_->get_internal_single_impl(r_value);
