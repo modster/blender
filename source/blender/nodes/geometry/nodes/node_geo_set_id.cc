@@ -58,7 +58,7 @@ static void set_id_in_component(GeometryComponent &component,
     const VArray<int> &result_ids = id_evaluator.get_evaluated<int>(0);
     OutputAttribute_Typed<int> id_attribute = component.attribute_try_get_for_output_only<int>(
         "id", ATTR_DOMAIN_POINT);
-    result_ids.materialize(selection, id_attribute.as_span());
+    result_ids->materialize(selection, id_attribute.as_span());
     id_attribute.save();
   }
 }
