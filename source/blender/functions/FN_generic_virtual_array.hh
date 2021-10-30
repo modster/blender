@@ -77,13 +77,6 @@ class GVMutableArrayImpl : public GVArrayImpl {
  public:
   GVMutableArrayImpl(const CPPType &type, const int64_t size);
 
-  void set_by_copy(const int64_t index, const void *value);
-  void set_by_move(const int64_t index, void *value);
-  void set_by_relocate(const int64_t index, void *value);
-
-  void fill(const void *value);
-  void set_all(const void *src);
-
  public:
   virtual void set_by_copy_impl(const int64_t index, const void *value);
   virtual void set_by_relocate_impl(const int64_t index, void *value);
@@ -288,6 +281,13 @@ class GVMutableArray : public GVArrayCommon {
   GMutableSpan get_internal_span() const;
 
   template<typename T> bool try_assign_VMutableArray(VMutableArray<T> &varray) const;
+
+  void set_by_copy(const int64_t index, const void *value);
+  void set_by_move(const int64_t index, void *value);
+  void set_by_relocate(const int64_t index, void *value);
+
+  void fill(const void *value);
+  void set_all(const void *src);
 
  private:
   GVMutableArrayImpl *get_impl() const
@@ -572,7 +572,7 @@ template<typename T> class VMutableArrayImpl_For_GVMutableArray : public VMutabl
 
   void set_impl(const int64_t index, T value) override
   {
-    varray_->set_by_relocate(index, &value);
+    varray_.set_by_relocate(index, &value);
   }
 
   bool is_span_impl() const override
@@ -767,25 +767,25 @@ inline GVMutableArrayImpl::GVMutableArrayImpl(const CPPType &type, const int64_t
 {
 }
 
-inline void GVMutableArrayImpl::set_by_copy(const int64_t index, const void *value)
+inline void GVMutableArray::set_by_copy(const int64_t index, const void *value)
 {
   BLI_assert(index >= 0);
-  BLI_assert(index < size_);
-  this->set_by_copy_impl(index, value);
+  BLI_assert(index < this->size());
+  this->get_impl()->set_by_copy_impl(index, value);
 }
 
-inline void GVMutableArrayImpl::set_by_move(const int64_t index, void *value)
+inline void GVMutableArray::set_by_move(const int64_t index, void *value)
 {
   BLI_assert(index >= 0);
-  BLI_assert(index < size_);
-  this->set_by_move_impl(index, value);
+  BLI_assert(index < this->size());
+  this->get_impl()->set_by_move_impl(index, value);
 }
 
-inline void GVMutableArrayImpl::set_by_relocate(const int64_t index, void *value)
+inline void GVMutableArray::set_by_relocate(const int64_t index, void *value)
 {
   BLI_assert(index >= 0);
-  BLI_assert(index < size_);
-  this->set_by_relocate_impl(index, value);
+  BLI_assert(index < this->size());
+  this->get_impl()->set_by_relocate_impl(index, value);
 }
 
 inline GMutableSpan GVMutableArray::get_internal_span() const
@@ -796,9 +796,9 @@ inline GMutableSpan GVMutableArray::get_internal_span() const
 }
 
 /* Copy the values from the source buffer to all elements in the virtual array. */
-inline void GVMutableArrayImpl::set_all(const void *src)
+inline void GVMutableArray::set_all(const void *src)
 {
-  this->set_all_impl(src);
+  this->get_impl()->set_all_impl(src);
 }
 
 template<typename T>

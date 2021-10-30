@@ -687,7 +687,7 @@ static bool create_point_attribute(GeometryComponent &component,
   /* TODO: When we can call a variant of #set_all with a virtual array argument,
    * this theoretically unnecessary materialize step could be removed. */
   GVArray_GSpan source_varray_span{source_varray};
-  write_attribute.varray->set_all(source_varray_span.data());
+  write_attribute.varray.set_all(source_varray_span.data());
 
   if (initializer.type == AttributeInit::Type::MoveArray) {
     MEM_freeN(static_cast<const AttributeInitMove &>(initializer).data);

@@ -472,7 +472,7 @@ Vector<GVArray> evaluate_fields(ResourceScope &scope,
         BUFFER_FOR_CPP_TYPE_VALUE(type, buffer);
         for (const int i : mask) {
           computed_varray.get_to_uninitialized(i, buffer);
-          dst_varray->set_by_relocate(i, buffer);
+          dst_varray.set_by_relocate(i, buffer);
         }
       }
       r_varrays[out_index] = dst_varray;

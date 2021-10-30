@@ -130,19 +130,19 @@ void GVMutableArrayImpl::set_all_impl(const void *src)
   }
   else {
     for (int64_t i : IndexRange(size_)) {
-      this->set_by_copy(i, POINTER_OFFSET(src, type_->size() * i));
+      this->set_by_copy_impl(i, POINTER_OFFSET(src, type_->size() * i));
     }
   }
 }
 
-void GVMutableArrayImpl::fill(const void *value)
+void GVMutableArray::fill(const void *value)
 {
-  if (this->is_span_impl()) {
-    const GSpan span = this->get_internal_span_impl();
-    type_->fill_assign_n(value, const_cast<void *>(span.data()), size_);
+  if (this->is_span()) {
+    const GSpan span = this->get_internal_span();
+    this->type().fill_assign_n(value, const_cast<void *>(span.data()), this->size());
   }
   else {
-    for (int64_t i : IndexRange(size_)) {
+    for (int64_t i : IndexRange(this->size())) {
       this->set_by_copy(i, value);
     }
   }
@@ -426,7 +426,7 @@ void GVMutableArray_GSpan::save()
   }
   const int64_t element_size = type_->size();
   for (int64_t i : IndexRange(size_)) {
-    varray_->set_by_copy(i, POINTER_OFFSET(owned_data_, element_size * i));
+    varray_.set_by_copy(i, POINTER_OFFSET(owned_data_, element_size * i));
   }
 }
 

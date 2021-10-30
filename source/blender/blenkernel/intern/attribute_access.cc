@@ -1246,7 +1246,7 @@ static void save_output_attribute(OutputAttribute &output_attribute)
   BUFFER_FOR_CPP_TYPE_VALUE(varray.type(), buffer);
   for (const int i : IndexRange(varray.size())) {
     varray.get_impl(i, buffer);
-    write_attribute.varray->set_by_relocate(i, buffer);
+    write_attribute.varray.set_by_relocate(i, buffer);
   }
   if (write_attribute.tag_modified_fn) {
     write_attribute.tag_modified_fn();

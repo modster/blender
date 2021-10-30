@@ -314,7 +314,7 @@ class GVMutableArray_For_ConvertedGVMutableArray : public fn::GVMutableArrayImpl
   {
     BUFFER_FOR_CPP_TYPE_VALUE(from_type_, buffer);
     new_to_old_conversions_.convert_single_to_uninitialized(value, buffer);
-    varray_->set_by_relocate(index, buffer);
+    varray_.set_by_relocate(index, buffer);
   }
 };
 

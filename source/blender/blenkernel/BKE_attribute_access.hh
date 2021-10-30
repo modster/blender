@@ -227,7 +227,7 @@ class OutputAttribute {
   operator bool() const;
 
   GVMutableArray &operator*();
-  fn::GVMutableArrayImpl *operator->();
+  fn::GVMutableArray *operator->();
   GVMutableArray &varray();
   AttributeDomain domain() const;
   const CPPType &cpp_type() const;
@@ -476,9 +476,9 @@ inline GVMutableArray &OutputAttribute::operator*()
   return *varray_;
 }
 
-inline fn::GVMutableArrayImpl *OutputAttribute::operator->()
+inline fn::GVMutableArray *OutputAttribute::operator->()
 {
-  return &**varray_;
+  return &*varray_;
 }
 
 inline GVMutableArray &OutputAttribute::varray()
