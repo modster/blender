@@ -44,14 +44,22 @@
 
 namespace blender {
 
+/* Forward declarations for generic virtual arrays. */
 namespace fn {
 class GVArray;
 class GVMutableArray;
 };  // namespace fn
 
-/* An immutable virtual array. */
+/**
+ * Implements the specifics of how the elements of a virtual array are accessed. It contains a
+ * bunch of virtual methods that are wrapped by #VArray.
+ */
 template<typename T> class VArrayImpl {
  protected:
+  /**
+   * Number of elements in the virtual array. All virtual arrays have a size, but in some cases it
+   * may make sense to set it to the max value.
+   */
   int64_t size_;
 
  public:
@@ -67,35 +75,60 @@ template<typename T> class VArrayImpl {
     return size_;
   }
 
+  /**
+   * Get the element at #index. This does not return a reference, because the value may be computed
+   * on the fly.
+   */
   virtual T get(const int64_t index) const = 0;
 
+  /**
+   * Return true when the virtual array is a plain array internally.
+   */
   virtual bool is_span() const
   {
     return false;
   }
 
+  /**
+   * Return the span of the virtual array.
+   * This invokes undefined behavior when #is_span returned false.
+   */
   virtual Span<T> get_internal_span() const
   {
+    /* Provide a default implementation, so that subclasses don't have to provide it. This method
+     * should never be called because #is_span returns false by default. */
     BLI_assert_unreachable();
     return {};
   }
 
+  /**
+   * Return true when the virtual array has the same value at every index.
+   */
   virtual bool is_single() const
   {
     return false;
   }
 
+  /**
+   * Return the value that is used at every index.
+   * This invokes undefined behavior when #is_single returned false.
+   */
   virtual T get_internal_single() const
   {
     /* Provide a default implementation, so that subclasses don't have to provide it. This method
-     * should never be called because `is_single` returns false by default. */
+     * should never be called because #is_single returns false by default. */
     BLI_assert_unreachable();
     return T();
   }
 
+  /**
+   * Copy values from the virtual array into the provided span. The index of the value in the
+   * virtual is the same as the index in the span.
+   */
   virtual void materialize(IndexMask mask, MutableSpan<T> r_span) const
   {
     T *dst = r_span.data();
+    /* Optimize for a few different common cases. */
     if (this->is_span()) {
       const T *src = this->get_internal_span().data();
       mask.foreach_index([&](const int64_t i) { dst[i] = src[i]; });
@@ -109,9 +142,13 @@ template<typename T> class VArrayImpl {
     }
   }
 
+  /**
+   * Same as #materialize but #r_span is expected to be uninitialized.
+   */
   virtual void materialize_to_uninitialized(IndexMask mask, MutableSpan<T> r_span) const
   {
     T *dst = r_span.data();
+    /* Optimize for a few different common cases. */
     if (this->is_span()) {
       const T *src = this->get_internal_span().data();
       mask.foreach_index([&](const int64_t i) { new (dst + i) T(src[i]); });
@@ -125,24 +162,33 @@ template<typename T> class VArrayImpl {
     }
   }
 
+  /**
+   * If this virtual wraps another #GVArray, this method should assign the wrapped array to the
+   * provided reference. This allows losslessly converting between generic and typed virtual
+   * arrays in all cases.
+   * Return true when the virtual array was assigned and false when nothing was done.
+   */
   virtual bool try_assign_GVArray(fn::GVArray &UNUSED(varray)) const
   {
     return false;
   }
 
-  virtual bool has_ownership() const
+  /**
+   * Return true when this virtual array may own any of the memory it references. This can be used
+   * for optimization purposes when converting or copying the virtual array.
+   */
+  virtual bool may_have_ownership() const
   {
-    /* Use true by default to be on the safe side. */
+    /* Use true by default to be on the safe side. Subclasses that know for sure that they don't
+     * own anything can overwrite this with false. */
     return true;
   }
 };
 
-/* Similar to VArrayImpl, but the elements are mutable. */
+/* Similar to #VArrayImpl, but adds methods that allow modifying the referenced elements. */
 template<typename T> class VMutableArrayImpl : public VArrayImpl<T> {
  public:
-  VMutableArrayImpl(const int64_t size) : VArrayImpl<T>(size)
-  {
-  }
+  using VArrayImpl<T>::VArrayImpl;
 
   virtual void set(const int64_t index, T value) = 0;
 
@@ -206,7 +252,7 @@ template<typename T> class VArrayImpl_For_Span_final final : public VArrayImpl_F
   using VArrayImpl_For_Span<T>::VArrayImpl_For_Span;
 
  private:
-  bool has_ownership() const override
+  bool may_have_ownership() const override
   {
     return false;
   }
@@ -254,7 +300,7 @@ class VMutableArrayImpl_For_MutableSpan_final final : public VMutableArrayImpl_F
   using VMutableArrayImpl_For_MutableSpan<T>::VMutableArrayImpl_For_MutableSpan;
 
  private:
-  bool has_ownership() const override
+  bool may_have_ownership() const override
   {
     return false;
   }
@@ -355,7 +401,7 @@ template<typename T, typename GetFunc> class VArrayImpl_For_Func final : public 
 };
 
 /**
- * \note: This is `final` so that `has_ownership` can be implemented reliably.
+ * \note: This is `final` so that `may_have_ownership` can be implemented reliably.
  */
 template<typename StructT, typename ElemT, ElemT (*GetFunc)(const StructT &)>
 class VArrayImpl_For_DerivedSpan final : public VArrayImpl<ElemT> {
@@ -386,14 +432,14 @@ class VArrayImpl_For_DerivedSpan final : public VArrayImpl<ElemT> {
     mask.foreach_index([&](const int64_t i) { new (dst + i) ElemT(GetFunc(data_[i])); });
   }
 
-  bool has_ownership() const override
+  bool may_have_ownership() const override
   {
     return false;
   }
 };
 
 /**
- * \note: This is `final` so that `has_ownership` can be implemented reliably.
+ * \note: This is `final` so that `may_have_ownership` can be implemented reliably.
  */
 template<typename StructT,
          typename ElemT,
@@ -432,7 +478,7 @@ class VMutableArrayImpl_For_DerivedSpan final : public VMutableArrayImpl<ElemT> 
     mask.foreach_index([&](const int64_t i) { new (dst + i) ElemT(GetFunc(data_[i])); });
   }
 
-  bool has_ownership() const override
+  bool may_have_ownership() const override
   {
     return false;
   }
@@ -654,9 +700,9 @@ template<typename T> class VArrayCommon {
     return impl_->try_assign_GVArray(varray);
   }
 
-  bool has_ownership() const
+  bool may_have_ownership() const
   {
-    return impl_->has_ownership();
+    return impl_->may_have_ownership();
   }
 };
 

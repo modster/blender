@@ -91,12 +91,12 @@ bool GVArrayImpl::try_assign_VArray(void *UNUSED(varray)) const
   return false;
 }
 
-bool GVArrayCommon::has_ownership() const
+bool GVArrayCommon::may_have_ownership() const
 {
-  return impl_->has_ownership();
+  return impl_->may_have_ownership();
 }
 
-bool GVArrayImpl::has_ownership() const
+bool GVArrayImpl::may_have_ownership() const
 {
   /* Use true as default to be on the safe side. */
   return true;
@@ -194,7 +194,7 @@ class GVArrayImpl_For_GSpan_final final : public GVArrayImpl_For_GSpan {
   using GVArrayImpl_For_GSpan::GVArrayImpl_For_GSpan;
 
  private:
-  bool has_ownership() const override
+  bool may_have_ownership() const override
   {
     return false;
   }
@@ -261,7 +261,7 @@ class GVMutableArrayImpl_For_GMutableSpan_final final
   using GVMutableArrayImpl_For_GMutableSpan::GVMutableArrayImpl_For_GMutableSpan;
 
  private:
-  bool has_ownership() const override
+  bool may_have_ownership() const override
   {
     return false;
   }
@@ -322,7 +322,7 @@ class GVArrayImpl_For_SingleValueRef_final final : public GVArrayImpl_For_Single
   using GVArrayImpl_For_SingleValueRef::GVArrayImpl_For_SingleValueRef;
 
  private:
-  bool has_ownership() const override
+  bool may_have_ownership() const override
   {
     return false;
   }

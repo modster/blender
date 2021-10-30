@@ -68,7 +68,7 @@ class GVArrayImpl {
   virtual void materialize_to_uninitialized(const IndexMask mask, void *dst) const;
 
   virtual bool try_assign_VArray(void *varray) const;
-  virtual bool has_ownership() const;
+  virtual bool may_have_ownership() const;
 };
 
 /* Similar to GVArrayImpl, but supports changing the elements in the virtual array. */
@@ -206,7 +206,7 @@ class GVArrayCommon {
   }
 
   template<typename T> bool try_assign_VArray(VArray<T> &varray) const;
-  bool has_ownership() const;
+  bool may_have_ownership() const;
 
   void materialize(void *dst) const;
   void materialize(const IndexMask mask, void *dst) const;
@@ -400,9 +400,9 @@ template<typename T> class GVArrayImpl_For_VArray : public GVArrayImpl {
     return true;
   }
 
-  bool has_ownership() const
+  bool may_have_ownership() const
   {
-    return varray_.has_ownership();
+    return varray_.may_have_ownership();
   }
 };
 
@@ -454,9 +454,9 @@ template<typename T> class VArrayImpl_For_GVArray : public VArrayImpl<T> {
     return true;
   }
 
-  bool has_ownership() const override
+  bool may_have_ownership() const override
   {
-    return varray_.has_ownership();
+    return varray_.may_have_ownership();
   }
 };
 
@@ -549,9 +549,9 @@ template<typename T> class GVMutableArrayImpl_For_VMutableArray : public GVMutab
     return true;
   }
 
-  bool has_ownership() const
+  bool may_have_ownership() const
   {
-    return varray_.has_ownership();
+    return varray_.may_have_ownership();
   }
 };
 
@@ -615,9 +615,9 @@ template<typename T> class VMutableArrayImpl_For_GVMutableArray : public VMutabl
     return true;
   }
 
-  bool has_ownership() const override
+  bool may_have_ownership() const override
   {
-    return varray_.has_ownership();
+    return varray_.may_have_ownership();
   }
 };
 
@@ -877,7 +877,7 @@ template<typename T> inline GVArray::GVArray(const VArray<T> &varray)
   if (varray.try_assign_GVArray(*this)) {
     return;
   }
-  if (varray.has_ownership()) {
+  if (varray.may_have_ownership()) {
     *this = GVArray::For<GVArrayImpl_For_VArray<T>>(varray);
   }
   else if (varray.is_span()) {
@@ -903,7 +903,7 @@ template<typename T> inline VArray<T> GVArray::typed() const
   if (this->try_assign_VArray(varray)) {
     return varray;
   }
-  if (this->has_ownership()) {
+  if (this->may_have_ownership()) {
     return VArray<T>::template For<VArrayImpl_For_GVArray<T>>(*this);
   }
   if (this->is_span()) {
@@ -958,7 +958,7 @@ template<typename T> inline GVMutableArray::GVMutableArray(const VMutableArray<T
   if (varray.try_assign_GVMutableArray(*this)) {
     return;
   }
-  if (varray.has_ownership()) {
+  if (varray.may_have_ownership()) {
     *this = GVMutableArray::For<GVMutableArrayImpl_For_VMutableArray<T>>(varray);
   }
   else if (varray.is_span()) {
@@ -981,7 +981,7 @@ template<typename T> inline VMutableArray<T> GVMutableArray::typed() const
   if (this->try_assign_VMutableArray(varray)) {
     return varray;
   }
-  if (this->has_ownership()) {
+  if (this->may_have_ownership()) {
     return VMutableArray<T>::template For<VMutableArrayImpl_For_GVMutableArray<T>>(*this);
   }
   if (this->is_span()) {
