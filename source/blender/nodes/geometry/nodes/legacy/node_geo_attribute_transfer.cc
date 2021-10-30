@@ -108,7 +108,7 @@ static void get_closest_in_bvhtree(BVHTreeFromMesh &tree_data,
   BLI_assert(positions->size() == r_distances_sq.size() || r_distances_sq.is_empty());
   BLI_assert(positions->size() == r_positions.size() || r_positions.is_empty());
 
-  for (const int i : positions->index_range()) {
+  for (const int i : positions.index_range()) {
     BVHTreeNearest nearest;
     nearest.dist_sq = FLT_MAX;
     const float3 position = positions[i];
@@ -137,7 +137,7 @@ static void get_closest_pointcloud_points(const PointCloud &pointcloud,
   BVHTreeFromPointCloud tree_data;
   BKE_bvhtree_from_pointcloud_get(&tree_data, &pointcloud, 2);
 
-  for (const int i : positions->index_range()) {
+  for (const int i : positions.index_range()) {
     BVHTreeNearest nearest;
     nearest.dist_sq = FLT_MAX;
     const float3 position = positions[i];
@@ -202,7 +202,7 @@ static void get_closest_mesh_polygons(const Mesh &mesh,
 
   const Span<MLoopTri> looptris{BKE_mesh_runtime_looptri_ensure(&mesh),
                                 BKE_mesh_runtime_looptri_len(&mesh)};
-  for (const int i : positions->index_range()) {
+  for (const int i : positions.index_range()) {
     const MLoopTri &looptri = looptris[looptri_indices[i]];
     r_poly_indices[i] = looptri.poly;
   }
@@ -219,7 +219,7 @@ static void get_closest_mesh_corners(const Mesh &mesh,
   Array<int> poly_indices(positions->size());
   get_closest_mesh_polygons(mesh, positions, poly_indices, {}, {});
 
-  for (const int i : positions->index_range()) {
+  for (const int i : positions.index_range()) {
     const float3 position = positions[i];
     const int poly_index = poly_indices[i];
     const MPoly &poly = mesh.mpoly[poly_index];

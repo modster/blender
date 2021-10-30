@@ -627,7 +627,7 @@ static Vector<int64_t> indices_from_selection(const VArray<bool> &selection)
     }
   }
   else {
-    for (const int i : selection->index_range()) {
+    for (const int i : selection.index_range()) {
       if (selection[i]) {
         indices.append(i);
       }

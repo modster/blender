@@ -79,11 +79,6 @@ template<typename T> class VArrayImpl {
     return size_ == 0;
   }
 
-  IndexRange index_range() const
-  {
-    return IndexRange(size_);
-  }
-
   /* Returns true when the virtual array is stored as a span internally. */
   bool is_span() const
   {
@@ -759,6 +754,24 @@ template<typename T> class VArrayCommon {
   {
     BLI_assert(*this);
     return impl_->get(index);
+  }
+
+  int64_t size() const
+  {
+    if (impl_ == nullptr) {
+      return 0;
+    }
+    return impl_->size();
+  }
+
+  bool is_empty() const
+  {
+    return this->size() == 0;
+  }
+
+  IndexRange index_range() const
+  {
+    return IndexRange(this->size());
   }
 };
 

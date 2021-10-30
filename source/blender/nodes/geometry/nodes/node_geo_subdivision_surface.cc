@@ -102,7 +102,7 @@ static void geo_node_subdivision_surface_exec(GeoNodeExecParams params)
     OutputAttribute_Typed<float> crease = mesh_component.attribute_try_get_for_output_only<float>(
         "crease", domain);
     MutableSpan<float> crease_span = crease.as_span();
-    for (auto i : creases->index_range()) {
+    for (auto i : creases.index_range()) {
       crease_span[i] = std::clamp(creases[i], 0.0f, 1.0f);
     }
     crease.save();

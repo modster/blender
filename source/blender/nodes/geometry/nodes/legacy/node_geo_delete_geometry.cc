@@ -595,7 +595,7 @@ static void delete_mesh_selection(MeshComponent &component,
 
   /* Check if there is anything to delete. */
   bool delete_nothing = true;
-  for (const int i : selection->index_range()) {
+  for (const int i : selection.index_range()) {
     if (selection[i] != invert) {
       delete_nothing = false;
       break;

@@ -101,7 +101,7 @@ static void raycast_to_mesh(const Mesh &mesh,
     return;
   }
 
-  for (const int i : ray_origins->index_range()) {
+  for (const int i : ray_origins.index_range()) {
     const float ray_length = ray_lengths[i];
     const float3 ray_origin = ray_origins[i];
     const float3 ray_direction = ray_directions[i].normalized();

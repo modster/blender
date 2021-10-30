@@ -76,7 +76,7 @@ static void calculate_mesh_proximity(const VArray<float3> &positions,
     return;
   }
 
-  threading::parallel_for(positions->index_range(), 512, [&](IndexRange range) {
+  threading::parallel_for(positions.index_range(), 512, [&](IndexRange range) {
     BVHTreeNearest nearest;
     copy_v3_fl(nearest.co, FLT_MAX);
     nearest.index = -1;
@@ -111,7 +111,7 @@ static void calculate_pointcloud_proximity(const VArray<float3> &positions,
     return;
   }
 
-  threading::parallel_for(positions->index_range(), 512, [&](IndexRange range) {
+  threading::parallel_for(positions.index_range(), 512, [&](IndexRange range) {
     BVHTreeNearest nearest;
     copy_v3_fl(nearest.co, FLT_MAX);
     nearest.index = -1;
