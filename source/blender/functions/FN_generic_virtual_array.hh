@@ -41,7 +41,7 @@ class GVArrayImpl;
 class GVMutableArray;
 class GVMutableArrayImpl;
 
-/* A generically typed version of `VArrayImpl<T>`. */
+/* A generically typed version of #VArrayImpl. */
 class GVArrayImpl {
  protected:
   const CPPType *type_;
@@ -71,7 +71,7 @@ class GVArrayImpl {
   virtual bool may_have_ownership() const;
 };
 
-/* Similar to GVArrayImpl, but supports changing the elements in the virtual array. */
+/* A generic version of #VMutableArrayImpl. */
 class GVMutableArrayImpl : public GVArrayImpl {
  public:
   GVMutableArrayImpl(const CPPType &type, const int64_t size);
@@ -102,10 +102,17 @@ struct GVArrayAnyExtraInfo {
 
 class GVMutableArray;
 
+/**
+ * Utility class to reduce code duplication between #GVArray and #GVMutableArray.
+ * It pretty much follows #VArrayCommon.
+ */
 class GVArrayCommon {
  protected:
-  using ExtraInfo = detail::GVArrayAnyExtraInfo;
-  using Storage = Any<ExtraInfo, 32, 8>;
+  /**
+   * See #VArrayCommon for more information. The inline buffer is a bit larger here, because the
+   * virtual array implementation contains an additional pointer to #CPPType.
+   */
+  using Storage = Any<detail::GVArrayAnyExtraInfo, 32, 8>;
 
   const GVArrayImpl *impl_ = nullptr;
   Storage storage_;
@@ -153,6 +160,7 @@ class GVArrayCommon {
   void get_to_uninitialized(const int64_t index, void *r_value) const;
 };
 
+/** Generic version of #VArray. */
 class GVArray : public GVArrayCommon {
  private:
   friend GVMutableArray;
@@ -188,6 +196,7 @@ class GVArray : public GVArrayCommon {
   }
 };
 
+/** Generic version of #VMutableArray. */
 class GVMutableArray : public GVArrayCommon {
  public:
   GVMutableArray() = default;

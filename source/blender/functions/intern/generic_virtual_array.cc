@@ -72,7 +72,8 @@ bool GVArrayImpl::try_assign_VArray(void *UNUSED(varray)) const
 
 bool GVArrayImpl::may_have_ownership() const
 {
-  /* Use true as default to be on the safe side. */
+  /* Use true as default to avoid accidentally creating subclasses that have this set to false but
+   * actually own data. Subclasses should set the to false instead. */
   return true;
 }
 
