@@ -22,6 +22,7 @@
 using blender::float3;
 using blender::MutableSpan;
 using blender::Span;
+using blender::fn::GVArray;
 
 void PolySpline::copy_settings(Spline &UNUSED(dst)) const
 {
@@ -116,11 +117,11 @@ Span<float3> PolySpline::evaluated_positions() const
 
 /**
  * Poly spline interpolation from control points to evaluated points is a special case, since
- * the result data is the same as the input data. This function returns a GVArray that points
- * to the original data. Therefore the lifetime of the returned virtual array must not be longer
- * than the source data.
+ * the result data is the same as the input data. This function returns a GVArray that points to
+ * the original data. Therefore the lifetime of the returned virtual array must not be longer than
+ * the source data.
  */
-blender::fn::GVArray PolySpline::interpolate_to_evaluated(const blender::fn::GVArray &src) const
+GVArray PolySpline::interpolate_to_evaluated(const GVArray &src) const
 {
   BLI_assert(src.size() == this->size());
   return src;

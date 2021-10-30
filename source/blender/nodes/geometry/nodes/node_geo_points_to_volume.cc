@@ -173,7 +173,7 @@ static void gather_point_data_from_component(GeoNodeExecParams &params,
   const int domain_size = component.attribute_domain_size(ATTR_DOMAIN_POINT);
 
   r_positions.resize(r_positions.size() + domain_size);
-  positions->materialize(r_positions.as_mutable_span().take_back(domain_size));
+  positions.materialize(r_positions.as_mutable_span().take_back(domain_size));
 
   r_radii.resize(r_radii.size() + domain_size);
   fn::FieldEvaluator evaluator{field_context, domain_size};

@@ -30,10 +30,12 @@ using blender::float3;
 using blender::IndexRange;
 using blender::MutableSpan;
 using blender::Span;
+using blender::VArray;
 using blender::attribute_math::convert_to_static_type;
 using blender::bke::AttributeIDRef;
 using blender::fn::GMutableSpan;
 using blender::fn::GSpan;
+using blender::fn::GVArray;
 
 Spline::Type Spline::type() const
 {
@@ -412,7 +414,7 @@ Span<float3> Spline::evaluated_normals() const
   }
 
   /* Rotate the generated normals with the interpolated tilt data. */
-  blender::VArray<float> tilts = this->interpolate_to_evaluated(this->tilts());
+  VArray<float> tilts = this->interpolate_to_evaluated(this->tilts());
   for (const int i : normals.index_range()) {
     normals[i] = rotate_direction_around_axis(normals[i], tangents[i], tilts[i]);
   }
@@ -525,9 +527,9 @@ void Spline::bounds_min_max(float3 &min, float3 &max, const bool use_evaluated) 
   }
 }
 
-blender::fn::GVArray Spline::interpolate_to_evaluated(GSpan data) const
+GVArray Spline::interpolate_to_evaluated(GSpan data) const
 {
-  return this->interpolate_to_evaluated(blender::fn::GVArray::ForSpan(data));
+  return this->interpolate_to_evaluated(GVArray::ForSpan(data));
 }
 
 /**
@@ -535,7 +537,7 @@ blender::fn::GVArray Spline::interpolate_to_evaluated(GSpan data) const
  * points) to arbitrary parameters in between the evaluated points. The interpolation is quite
  * simple, but this handles the cyclic and end point special cases.
  */
-void Spline::sample_with_index_factors(const blender::fn::GVArray &src,
+void Spline::sample_with_index_factors(const GVArray &src,
                                        Span<float> index_factors,
                                        GMutableSpan dst) const
 {
@@ -543,7 +545,7 @@ void Spline::sample_with_index_factors(const blender::fn::GVArray &src,
 
   blender::attribute_math::convert_to_static_type(src.type(), [&](auto dummy) {
     using T = decltype(dummy);
-    const blender::VArray<T> src_typed = src.typed<T>();
+    const VArray<T> src_typed = src.typed<T>();
     MutableSpan<T> dst_typed = dst.typed<T>();
     if (src.size() == 1) {
       dst_typed.fill(src_typed[0]);

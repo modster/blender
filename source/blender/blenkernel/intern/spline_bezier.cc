@@ -25,6 +25,8 @@ using blender::float3;
 using blender::IndexRange;
 using blender::MutableSpan;
 using blender::Span;
+using blender::VArray;
+using blender::fn::GVArray;
 
 void BezierSpline::copy_settings(Spline &dst) const
 {
@@ -694,7 +696,7 @@ static void interpolate_to_evaluated_impl(const BezierSpline &spline,
   }
 }
 
-blender::fn::GVArray BezierSpline::interpolate_to_evaluated(const blender::fn::GVArray &src) const
+GVArray BezierSpline::interpolate_to_evaluated(const GVArray &src) const
 {
   BLI_assert(src.size() == this->size());
 
@@ -707,13 +709,13 @@ blender::fn::GVArray BezierSpline::interpolate_to_evaluated(const blender::fn::G
     return src;
   }
 
-  blender::fn::GVArray new_varray;
+  GVArray new_varray;
   blender::attribute_math::convert_to_static_type(src.type(), [&](auto dummy) {
     using T = decltype(dummy);
     if constexpr (!std::is_void_v<blender::attribute_math::DefaultMixer<T>>) {
       Array<T> values(eval_size);
       interpolate_to_evaluated_impl<T>(*this, src.typed<T>(), values);
-      new_varray = blender::VArray<T>::ForContainer(std::move(values));
+      new_varray = VArray<T>::ForContainer(std::move(values));
     }
   });
 
