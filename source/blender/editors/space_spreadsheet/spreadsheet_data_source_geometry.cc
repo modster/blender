@@ -172,7 +172,7 @@ std::unique_ptr<ColumnValues> GeometryDataSource::get_column_values(
                                          domain_size,
                                          [varray](int index, CellValue &r_cell_value) {
                                            float value;
-                                           varray->get(index, &value);
+                                           varray.get(index, &value);
                                            r_cell_value.value_float = value;
                                          });
     case CD_PROP_INT32:
@@ -182,7 +182,7 @@ std::unique_ptr<ColumnValues> GeometryDataSource::get_column_values(
           domain_size,
           [varray](int index, CellValue &r_cell_value) {
             int value;
-            varray->get(index, &value);
+            varray.get(index, &value);
             r_cell_value.value_int = value;
           },
           STREQ(column_id.name, "id") ? 5.5f : 0.0f);
@@ -192,7 +192,7 @@ std::unique_ptr<ColumnValues> GeometryDataSource::get_column_values(
                                          domain_size,
                                          [varray](int index, CellValue &r_cell_value) {
                                            bool value;
-                                           varray->get(index, &value);
+                                           varray.get(index, &value);
                                            r_cell_value.value_bool = value;
                                          });
     case CD_PROP_FLOAT2: {
@@ -201,7 +201,7 @@ std::unique_ptr<ColumnValues> GeometryDataSource::get_column_values(
                                          domain_size,
                                          [varray](int index, CellValue &r_cell_value) {
                                            float2 value;
-                                           varray->get(index, &value);
+                                           varray.get(index, &value);
                                            r_cell_value.value_float2 = value;
                                          });
     }
@@ -211,7 +211,7 @@ std::unique_ptr<ColumnValues> GeometryDataSource::get_column_values(
                                          domain_size,
                                          [varray](int index, CellValue &r_cell_value) {
                                            float3 value;
-                                           varray->get(index, &value);
+                                           varray.get(index, &value);
                                            r_cell_value.value_float3 = value;
                                          });
     }
@@ -221,7 +221,7 @@ std::unique_ptr<ColumnValues> GeometryDataSource::get_column_values(
                                          domain_size,
                                          [varray](int index, CellValue &r_cell_value) {
                                            ColorGeometry4f value;
-                                           varray->get(index, &value);
+                                           varray.get(index, &value);
                                            r_cell_value.value_color = value;
                                          });
     }

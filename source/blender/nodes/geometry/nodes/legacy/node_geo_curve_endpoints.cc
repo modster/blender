@@ -70,7 +70,7 @@ static void copy_spline_domain_attributes(const CurveComponent &curve_component,
 
         /* Only copy the attributes of splines in the offsets. */
         for (const int i : offsets.index_range()) {
-          spline_attribute->get(offsets[i], result[i]);
+          spline_attribute.get(offsets[i], result[i]);
         }
 
         result_attribute.save();

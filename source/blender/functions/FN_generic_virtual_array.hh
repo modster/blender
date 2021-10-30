@@ -55,9 +55,6 @@ class GVArrayImpl {
 
   int64_t size() const;
 
-  void get(const int64_t index, void *r_value) const;
-  void get_to_uninitialized(const int64_t index, void *r_value) const;
-
  public:
   virtual void get_impl(const int64_t index, void *r_value) const;
   virtual void get_to_uninitialized_impl(const int64_t index, void *r_value) const = 0;
@@ -189,6 +186,11 @@ class GVArrayCommon {
   }
 
  public:
+  const CPPType &type() const
+  {
+    return impl_->type();
+  }
+
   operator bool() const
   {
     return impl_ != nullptr;
@@ -222,6 +224,9 @@ class GVArrayCommon {
   bool is_single() const;
   void get_internal_single(void *r_value) const;
   void get_internal_single_to_uninitialized(void *r_value) const;
+
+  void get(const int64_t index, void *r_value) const;
+  void get_to_uninitialized(const int64_t index, void *r_value) const;
 };
 
 class GVArray : public GVArrayCommon {
@@ -411,7 +416,7 @@ template<typename T> class VArrayImpl_For_GVArray : public VArrayImpl<T> {
   T get_impl(const int64_t index) const override
   {
     T value;
-    varray_->get(index, &value);
+    varray_.get(index, &value);
     return value;
   }
 
@@ -561,7 +566,7 @@ template<typename T> class VMutableArrayImpl_For_GVMutableArray : public VMutabl
   T get_impl(const int64_t index) const override
   {
     T value;
-    varray_->get(index, &value);
+    varray_.get(index, &value);
     return value;
   }
 
@@ -645,6 +650,7 @@ class GVMutableArrayImpl_For_GMutableSpan : public GVMutableArrayImpl {
  protected:
   GVMutableArrayImpl_For_GMutableSpan(const CPPType &type, const int64_t size);
 
+ public:
   void get_impl(const int64_t index, void *r_value) const override;
   void get_to_uninitialized_impl(const int64_t index, void *r_value) const override;
 
@@ -680,19 +686,19 @@ inline int64_t GVArrayImpl::size() const
 
 /* Copies the value at the given index into the provided storage. The `r_value` pointer is
  * expected to point to initialized memory. */
-inline void GVArrayImpl::get(const int64_t index, void *r_value) const
+inline void GVArrayCommon::get(const int64_t index, void *r_value) const
 {
   BLI_assert(index >= 0);
-  BLI_assert(index < size_);
-  this->get_impl(index, r_value);
+  BLI_assert(index < this->size());
+  impl_->get_impl(index, r_value);
 }
 
 /* Same as `get`, but `r_value` is expected to point to uninitialized memory. */
-inline void GVArrayImpl::get_to_uninitialized(const int64_t index, void *r_value) const
+inline void GVArrayCommon::get_to_uninitialized(const int64_t index, void *r_value) const
 {
   BLI_assert(index >= 0);
-  BLI_assert(index < size_);
-  this->get_to_uninitialized_impl(index, r_value);
+  BLI_assert(index < this->size());
+  impl_->get_to_uninitialized_impl(index, r_value);
 }
 
 /* Returns true when the virtual array is stored as a span internally. */

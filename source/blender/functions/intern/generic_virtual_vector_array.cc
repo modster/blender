@@ -39,7 +39,7 @@ void GVVectorArray_For_SingleGVArray::get_vector_element_impl(const int64_t UNUS
                                                               const int64_t index_in_vector,
                                                               void *r_value) const
 {
-  array_.get(index_in_vector, r_value);
+  array_.get_impl(index_in_vector, r_value);
 }
 
 bool GVVectorArray_For_SingleGVArray::is_single_vector_impl() const

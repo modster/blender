@@ -36,7 +36,7 @@ void GVArrayImpl::materialize_impl(const IndexMask mask, void *dst) const
 {
   for (const int64_t i : mask) {
     void *elem_dst = POINTER_OFFSET(dst, type_->size() * i);
-    this->get(i, elem_dst);
+    this->get_impl(i, elem_dst);
   }
 }
 
@@ -55,7 +55,7 @@ void GVArrayImpl::materialize_to_uninitialized_impl(const IndexMask mask, void *
 {
   for (const int64_t i : mask) {
     void *elem_dst = POINTER_OFFSET(dst, type_->size() * i);
-    this->get_to_uninitialized(i, elem_dst);
+    this->get_to_uninitialized_impl(i, elem_dst);
   }
 }
 
@@ -457,12 +457,12 @@ class GVArrayImpl_For_SlicedGVArray : public GVArrayImpl {
 
   void get_impl(const int64_t index, void *r_value) const override
   {
-    varray_->get(index + offset_, r_value);
+    varray_.get(index + offset_, r_value);
   }
 
   void get_to_uninitialized_impl(const int64_t index, void *r_value) const override
   {
-    varray_->get_to_uninitialized(index + offset_, r_value);
+    varray_.get_to_uninitialized(index + offset_, r_value);
   }
 };
 

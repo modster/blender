@@ -260,7 +260,7 @@ class GVArray_For_ConvertedGVArray : public fn::GVArrayImpl {
   void get_impl(const int64_t index, void *r_value) const override
   {
     BUFFER_FOR_CPP_TYPE_VALUE(from_type_, buffer);
-    varray_->get(index, buffer);
+    varray_.get(index, buffer);
     old_to_new_conversions_.convert_single_to_initialized(buffer, r_value);
     from_type_.destruct(buffer);
   }
@@ -268,7 +268,7 @@ class GVArray_For_ConvertedGVArray : public fn::GVArrayImpl {
   void get_to_uninitialized_impl(const int64_t index, void *r_value) const override
   {
     BUFFER_FOR_CPP_TYPE_VALUE(from_type_, buffer);
-    varray_->get(index, buffer);
+    varray_.get(index, buffer);
     old_to_new_conversions_.convert_single_to_uninitialized(buffer, r_value);
     from_type_.destruct(buffer);
   }
@@ -297,7 +297,7 @@ class GVMutableArray_For_ConvertedGVMutableArray : public fn::GVMutableArrayImpl
   void get_impl(const int64_t index, void *r_value) const override
   {
     BUFFER_FOR_CPP_TYPE_VALUE(from_type_, buffer);
-    varray_->get(index, buffer);
+    varray_.get(index, buffer);
     old_to_new_conversions_.convert_single_to_initialized(buffer, r_value);
     from_type_.destruct(buffer);
   }
@@ -305,7 +305,7 @@ class GVMutableArray_For_ConvertedGVMutableArray : public fn::GVMutableArrayImpl
   void get_to_uninitialized_impl(const int64_t index, void *r_value) const override
   {
     BUFFER_FOR_CPP_TYPE_VALUE(from_type_, buffer);
-    varray_->get(index, buffer);
+    varray_.get(index, buffer);
     old_to_new_conversions_.convert_single_to_uninitialized(buffer, r_value);
     from_type_.destruct(buffer);
   }

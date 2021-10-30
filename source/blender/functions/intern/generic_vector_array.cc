@@ -52,7 +52,7 @@ void GVectorArray::extend(const int64_t index, const GVArray &values)
   BLI_assert(values->type() == type_);
   for (const int i : IndexRange(values->size())) {
     BUFFER_FOR_CPP_TYPE_VALUE(type_, buffer);
-    values->get(i, buffer);
+    values.get(i, buffer);
     this->append(index, buffer);
     type_.destruct(buffer);
   }
