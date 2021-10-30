@@ -444,7 +444,7 @@ template<typename T> class GVMutableArrayImpl_For_VMutableArray : public GVMutab
 
  public:
   GVMutableArrayImpl_For_VMutableArray(VMutableArray<T> varray)
-      : GVMutableArrayImpl(CPPType::get<T>(), varray->size()), varray_(std::move(varray))
+      : GVMutableArrayImpl(CPPType::get<T>(), varray.size()), varray_(std::move(varray))
   {
   }
 

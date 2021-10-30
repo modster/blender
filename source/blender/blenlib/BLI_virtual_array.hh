@@ -730,18 +730,6 @@ template<typename T> class VArray : public detail::VArrayCommon<T> {
     this->move_from(std::move(other));
     return *this;
   }
-
-  const VArrayImpl<T> *operator->() const
-  {
-    BLI_assert(*this);
-    return this->impl_;
-  }
-
-  const VArrayImpl<T> &operator*() const
-  {
-    BLI_assert(*this);
-    return *this->impl_;
-  }
 };
 
 template<typename T> class VMutableArray : public detail::VArrayCommon<T> {
@@ -814,18 +802,6 @@ template<typename T> class VMutableArray : public detail::VArrayCommon<T> {
     return *this;
   }
 
-  VMutableArrayImpl<T> *operator->() const
-  {
-    BLI_assert(*this);
-    return (VMutableArrayImpl<T> *)this->impl_;
-  }
-
-  VMutableArrayImpl<T> &operator*() const
-  {
-    BLI_assert(*this);
-    return *(VMutableArrayImpl<T> *)this->impl_;
-  }
-
   MutableSpan<T> get_internal_span() const
   {
     BLI_assert(this->is_span());
@@ -878,13 +854,13 @@ template<typename T> class VArray_Span final : public Span<T> {
  public:
   VArray_Span(VArray<T> varray) : Span<T>(), varray_(std::move(varray))
   {
-    this->size_ = varray_->size();
+    this->size_ = varray_.size();
     if (varray_.is_span()) {
       this->data_ = varray_.get_internal_span().data();
     }
     else {
       owned_data_.~Array();
-      new (&owned_data_) Array<T>(varray_->size(), NoInitialization{});
+      new (&owned_data_) Array<T>(varray_.size(), NoInitialization{});
       varray_.materialize_to_uninitialized(owned_data_);
       this->data_ = owned_data_.data();
     }
@@ -911,18 +887,18 @@ template<typename T> class VMutableArray_Span final : public MutableSpan<T> {
   VMutableArray_Span(VMutableArray<T> varray, const bool copy_values_to_span = true)
       : MutableSpan<T>(), varray_(std::move(varray))
   {
-    this->size_ = varray_->size();
+    this->size_ = varray_.size();
     if (varray_.is_span()) {
       this->data_ = varray_.get_internal_span().data();
     }
     else {
       if (copy_values_to_span) {
         owned_data_.~Array();
-        new (&owned_data_) Array<T>(varray_->size(), NoInitialization{});
+        new (&owned_data_) Array<T>(varray_.size(), NoInitialization{});
         varray_.materialize_to_uninitialized(owned_data_);
       }
       else {
-        owned_data_.reinitialize(varray_->size());
+        owned_data_.reinitialize(varray_.size());
       }
       this->data_ = owned_data_.data();
     }

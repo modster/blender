@@ -222,7 +222,7 @@ static void compute_selected_vertices_from_vertex_selection(const VArray<bool> &
                                                             MutableSpan<int> r_vertex_map,
                                                             uint *r_num_selected_vertices)
 {
-  BLI_assert(vertex_selection->size() == r_vertex_map.size());
+  BLI_assert(vertex_selection.size() == r_vertex_map.size());
 
   uint num_selected_vertices = 0;
   for (const int i : r_vertex_map.index_range()) {
@@ -271,7 +271,7 @@ static void compute_selected_polygons_from_vertex_selection(const Mesh &mesh,
                                                             uint *r_num_selected_polys,
                                                             uint *r_num_selected_loops)
 {
-  BLI_assert(mesh.totvert == vertex_selection->size());
+  BLI_assert(mesh.totvert == vertex_selection.size());
 
   r_selected_poly_indices.reserve(mesh.totpoly);
   r_loop_starts.reserve(mesh.totloop);
@@ -313,7 +313,7 @@ static void compute_selected_vertices_and_edges_from_edge_selection(
     uint *r_num_selected_vertices,
     uint *r_num_selected_edges)
 {
-  BLI_assert(mesh.totedge == edge_selection->size());
+  BLI_assert(mesh.totedge == edge_selection.size());
 
   uint num_selected_edges = 0;
   uint num_selected_vertices = 0;
@@ -459,7 +459,7 @@ static void compute_selected_mesh_data_from_poly_selection(const Mesh &mesh,
                                                            uint *r_num_selected_polys,
                                                            uint *r_num_selected_loops)
 {
-  BLI_assert(mesh.totpoly == poly_selection->size());
+  BLI_assert(mesh.totpoly == poly_selection.size());
   BLI_assert(mesh.totedge == r_edge_map.size());
   r_vertex_map.fill(-1);
   r_edge_map.fill(-1);

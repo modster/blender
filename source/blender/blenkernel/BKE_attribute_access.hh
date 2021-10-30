@@ -279,9 +279,9 @@ template<typename T> class OutputAttribute_Typed {
     return varray_;
   }
 
-  VMutableArrayImpl<T> *operator->()
+  VMutableArray<T> *operator->()
   {
-    return &*varray_;
+    return &varray_;
   }
 
   VMutableArray<T> &varray()

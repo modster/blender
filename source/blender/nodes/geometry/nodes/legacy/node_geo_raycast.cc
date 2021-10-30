@@ -86,13 +86,13 @@ static void raycast_to_mesh(const Mesh &mesh,
                             const MutableSpan<float3> r_hit_normals,
                             const MutableSpan<float> r_hit_distances)
 {
-  BLI_assert(ray_origins->size() == ray_directions->size());
-  BLI_assert(ray_origins->size() == ray_lengths->size());
-  BLI_assert(ray_origins->size() == r_hit.size() || r_hit.is_empty());
-  BLI_assert(ray_origins->size() == r_hit_indices.size() || r_hit_indices.is_empty());
-  BLI_assert(ray_origins->size() == r_hit_positions.size() || r_hit_positions.is_empty());
-  BLI_assert(ray_origins->size() == r_hit_normals.size() || r_hit_normals.is_empty());
-  BLI_assert(ray_origins->size() == r_hit_distances.size() || r_hit_distances.is_empty());
+  BLI_assert(ray_origins.size() == ray_directions.size());
+  BLI_assert(ray_origins.size() == ray_lengths.size());
+  BLI_assert(ray_origins.size() == r_hit.size() || r_hit.is_empty());
+  BLI_assert(ray_origins.size() == r_hit_indices.size() || r_hit_indices.is_empty());
+  BLI_assert(ray_origins.size() == r_hit_positions.size() || r_hit_positions.is_empty());
+  BLI_assert(ray_origins.size() == r_hit_normals.size() || r_hit_normals.is_empty());
+  BLI_assert(ray_origins.size() == r_hit_distances.size() || r_hit_distances.is_empty());
 
   BVHTreeFromMesh tree_data;
   BKE_bvhtree_from_mesh_get(&tree_data, &mesh, BVHTREE_FROM_LOOPTRI, 4);
@@ -218,10 +218,10 @@ static void raycast_from_points(const GeoNodeExecParams &params,
   Array<int> hit_indices;
   Array<float3> hit_positions_internal;
   if (!hit_attribute_names.is_empty()) {
-    hit_indices.reinitialize(ray_origins->size());
+    hit_indices.reinitialize(ray_origins.size());
 
     if (!hit_position_attribute) {
-      hit_positions_internal.reinitialize(ray_origins->size());
+      hit_positions_internal.reinitialize(ray_origins.size());
     }
   }
   const MutableSpan<bool> is_hit = hit_attribute ? hit_attribute.as_span() : MutableSpan<bool>();
@@ -251,7 +251,7 @@ static void raycast_from_points(const GeoNodeExecParams &params,
 
   /* Custom interpolated attributes */
   bke::mesh_surface_sample::MeshAttributeInterpolator interp(
-      src_mesh, IndexMask(ray_origins->size()), hit_positions, hit_indices);
+      src_mesh, IndexMask(ray_origins.size()), hit_positions, hit_indices);
   for (const int i : hit_attribute_names.index_range()) {
     const std::optional<AttributeMetaData> meta_data = src_mesh_component->attribute_get_meta_data(
         hit_attribute_names[i]);

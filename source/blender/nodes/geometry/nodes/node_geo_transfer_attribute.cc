@@ -131,9 +131,9 @@ static void get_closest_in_bvhtree(BVHTreeFromMesh &tree_data,
                                    const MutableSpan<float> r_distances_sq,
                                    const MutableSpan<float3> r_positions)
 {
-  BLI_assert(positions->size() == r_indices.size() || r_indices.is_empty());
-  BLI_assert(positions->size() == r_distances_sq.size() || r_distances_sq.is_empty());
-  BLI_assert(positions->size() == r_positions.size() || r_positions.is_empty());
+  BLI_assert(positions.size() == r_indices.size() || r_indices.is_empty());
+  BLI_assert(positions.size() == r_distances_sq.size() || r_distances_sq.is_empty());
+  BLI_assert(positions.size() == r_positions.size() || r_positions.is_empty());
 
   for (const int i : mask) {
     BVHTreeNearest nearest;
@@ -159,7 +159,7 @@ static void get_closest_pointcloud_points(const PointCloud &pointcloud,
                                           const MutableSpan<int> r_indices,
                                           const MutableSpan<float> r_distances_sq)
 {
-  BLI_assert(positions->size() == r_indices.size());
+  BLI_assert(positions.size() == r_indices.size());
   BLI_assert(pointcloud.totpoint > 0);
 
   BVHTreeFromPointCloud tree_data;
@@ -232,7 +232,7 @@ static void get_closest_mesh_polygons(const Mesh &mesh,
 {
   BLI_assert(mesh.totpoly > 0);
 
-  Array<int> looptri_indices(positions->size());
+  Array<int> looptri_indices(positions.size());
   get_closest_mesh_looptris(mesh, positions, mask, looptri_indices, r_distances_sq, r_positions);
 
   const Span<MLoopTri> looptris{BKE_mesh_runtime_looptri_ensure(&mesh),
@@ -253,7 +253,7 @@ static void get_closest_mesh_corners(const Mesh &mesh,
                                      const MutableSpan<float3> r_positions)
 {
   BLI_assert(mesh.totloop > 0);
-  Array<int> poly_indices(positions->size());
+  Array<int> poly_indices(positions.size());
   get_closest_mesh_polygons(mesh, positions, mask, poly_indices, {}, {});
 
   for (const int i : mask) {
@@ -311,7 +311,7 @@ void copy_with_indices_clamped(const VArray<T> &src,
   if (src.is_empty()) {
     return;
   }
-  const int max_index = src->size() - 1;
+  const int max_index = src.size() - 1;
   threading::parallel_for(mask.index_range(), 4096, [&](IndexRange range) {
     for (const int i : range) {
       const int index = mask[i];

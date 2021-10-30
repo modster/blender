@@ -46,8 +46,8 @@ static void execute_on_component(GeoNodeExecParams params, GeometryComponent &co
   VArray<float3> attribute = params.get_input_attribute<float3>(
       "Translation", component, ATTR_DOMAIN_POINT, {0, 0, 0});
 
-  for (const int i : IndexRange(attribute->size())) {
-    position_attribute->set_impl(i, position_attribute->get_impl(i) + attribute[i]);
+  for (const int i : IndexRange(attribute.size())) {
+    position_attribute->set(i, position_attribute->get(i) + attribute[i]);
   }
 
   position_attribute.save();

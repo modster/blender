@@ -82,7 +82,7 @@ static void do_math_operation(const VArray<float> &input_a,
                               const FloatCompareOperation operation,
                               MutableSpan<bool> span_result)
 {
-  const int size = input_a->size();
+  const int size = input_a.size();
 
   if (try_dispatch_float_math_fl_fl_to_bool(
           operation, [&](auto math_function, const FloatMathOperationInfo &UNUSED(info)) {
@@ -105,7 +105,7 @@ static void do_equal_operation_float(const VArray<float> &input_a,
                                      const float threshold,
                                      MutableSpan<bool> span_result)
 {
-  const int size = input_a->size();
+  const int size = input_a.size();
   for (const int i : IndexRange(size)) {
     const float a = input_a[i];
     const float b = input_b[i];
@@ -119,7 +119,7 @@ static void do_equal_operation_float3(const VArray<float3> &input_a,
                                       MutableSpan<bool> span_result)
 {
   const float threshold_squared = pow2f(threshold);
-  const int size = input_a->size();
+  const int size = input_a.size();
   for (const int i : IndexRange(size)) {
     const float3 a = input_a[i];
     const float3 b = input_b[i];
@@ -133,7 +133,7 @@ static void do_equal_operation_color4f(const VArray<ColorGeometry4f> &input_a,
                                        MutableSpan<bool> span_result)
 {
   const float threshold_squared = pow2f(threshold);
-  const int size = input_a->size();
+  const int size = input_a.size();
   for (const int i : IndexRange(size)) {
     const ColorGeometry4f a = input_a[i];
     const ColorGeometry4f b = input_b[i];
@@ -146,7 +146,7 @@ static void do_equal_operation_bool(const VArray<bool> &input_a,
                                     const float UNUSED(threshold),
                                     MutableSpan<bool> span_result)
 {
-  const int size = input_a->size();
+  const int size = input_a.size();
   for (const int i : IndexRange(size)) {
     const bool a = input_a[i];
     const bool b = input_b[i];
@@ -159,7 +159,7 @@ static void do_not_equal_operation_float(const VArray<float> &input_a,
                                          const float threshold,
                                          MutableSpan<bool> span_result)
 {
-  const int size = input_a->size();
+  const int size = input_a.size();
   for (const int i : IndexRange(size)) {
     const float a = input_a[i];
     const float b = input_b[i];
@@ -173,7 +173,7 @@ static void do_not_equal_operation_float3(const VArray<float3> &input_a,
                                           MutableSpan<bool> span_result)
 {
   const float threshold_squared = pow2f(threshold);
-  const int size = input_a->size();
+  const int size = input_a.size();
   for (const int i : IndexRange(size)) {
     const float3 a = input_a[i];
     const float3 b = input_b[i];
@@ -187,7 +187,7 @@ static void do_not_equal_operation_color4f(const VArray<ColorGeometry4f> &input_
                                            MutableSpan<bool> span_result)
 {
   const float threshold_squared = pow2f(threshold);
-  const int size = input_a->size();
+  const int size = input_a.size();
   for (const int i : IndexRange(size)) {
     const ColorGeometry4f a = input_a[i];
     const ColorGeometry4f b = input_b[i];
@@ -200,7 +200,7 @@ static void do_not_equal_operation_bool(const VArray<bool> &input_a,
                                         const float UNUSED(threshold),
                                         MutableSpan<bool> span_result)
 {
-  const int size = input_a->size();
+  const int size = input_a.size();
   for (const int i : IndexRange(size)) {
     const bool a = input_a[i];
     const bool b = input_b[i];

@@ -104,9 +104,9 @@ static void get_closest_in_bvhtree(BVHTreeFromMesh &tree_data,
                                    const MutableSpan<float> r_distances_sq,
                                    const MutableSpan<float3> r_positions)
 {
-  BLI_assert(positions->size() == r_indices.size() || r_indices.is_empty());
-  BLI_assert(positions->size() == r_distances_sq.size() || r_distances_sq.is_empty());
-  BLI_assert(positions->size() == r_positions.size() || r_positions.is_empty());
+  BLI_assert(positions.size() == r_indices.size() || r_indices.is_empty());
+  BLI_assert(positions.size() == r_distances_sq.size() || r_distances_sq.is_empty());
+  BLI_assert(positions.size() == r_positions.size() || r_positions.is_empty());
 
   for (const int i : positions.index_range()) {
     BVHTreeNearest nearest;
@@ -131,7 +131,7 @@ static void get_closest_pointcloud_points(const PointCloud &pointcloud,
                                           const MutableSpan<int> r_indices,
                                           const MutableSpan<float> r_distances_sq)
 {
-  BLI_assert(positions->size() == r_indices.size());
+  BLI_assert(positions.size() == r_indices.size());
   BLI_assert(pointcloud.totpoint > 0);
 
   BVHTreeFromPointCloud tree_data;
@@ -197,7 +197,7 @@ static void get_closest_mesh_polygons(const Mesh &mesh,
 {
   BLI_assert(mesh.totpoly > 0);
 
-  Array<int> looptri_indices(positions->size());
+  Array<int> looptri_indices(positions.size());
   get_closest_mesh_looptris(mesh, positions, looptri_indices, r_distances_sq, r_positions);
 
   const Span<MLoopTri> looptris{BKE_mesh_runtime_looptri_ensure(&mesh),
@@ -216,7 +216,7 @@ static void get_closest_mesh_corners(const Mesh &mesh,
                                      const MutableSpan<float3> r_positions)
 {
   BLI_assert(mesh.totloop > 0);
-  Array<int> poly_indices(positions->size());
+  Array<int> poly_indices(positions.size());
   get_closest_mesh_polygons(mesh, positions, poly_indices, {}, {});
 
   for (const int i : positions.index_range()) {
@@ -259,7 +259,7 @@ static void transfer_attribute_nearest_face_interpolated(const GeometrySet &src_
                                                          const StringRef src_name,
                                                          const StringRef dst_name)
 {
-  const int tot_samples = dst_positions->size();
+  const int tot_samples = dst_positions.size();
   const MeshComponent *component = src_geometry.get_component_for_read<MeshComponent>();
   if (component == nullptr) {
     return;
@@ -312,7 +312,7 @@ static void transfer_attribute_nearest(const GeometrySet &src_geometry,
   const MeshComponent *mesh_component = src_geometry.get_component_for_read<MeshComponent>();
   const Mesh *mesh = mesh_component ? mesh_component->get_for_read() : nullptr;
 
-  const int tot_samples = dst_positions->size();
+  const int tot_samples = dst_positions.size();
 
   Array<int> pointcloud_indices;
   Array<float> pointcloud_distances_sq;

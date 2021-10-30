@@ -692,7 +692,7 @@ IndexMask FieldEvaluator::get_evaluated_as_mask(const int field_index)
 
   if (varray.is_single()) {
     if (varray.get_internal_single()) {
-      return IndexRange(varray->size());
+      return IndexRange(varray.size());
     }
     return IndexRange(0);
   }

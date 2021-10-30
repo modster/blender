@@ -190,7 +190,7 @@ static void do_math_operation_fl3_fl3_to_fl3(const VArray<float3> &input_a,
                                              const VMutableArray<float3> &result,
                                              const NodeVectorMathOperation operation)
 {
-  const int size = input_a->size();
+  const int size = input_a.size();
 
   VArray_Span<float3> span_a{input_a};
   VArray_Span<float3> span_b{input_b};
@@ -221,7 +221,7 @@ static void do_math_operation_fl3_fl3_fl3_to_fl3(const VArray<float3> &input_a,
                                                  const VMutableArray<float3> &result,
                                                  const NodeVectorMathOperation operation)
 {
-  const int size = input_a->size();
+  const int size = input_a.size();
 
   VArray_Span<float3> span_a{input_a};
   VArray_Span<float3> span_b{input_b};
@@ -254,7 +254,7 @@ static void do_math_operation_fl3_fl3_fl_to_fl3(const VArray<float3> &input_a,
                                                 const VMutableArray<float3> &result,
                                                 const NodeVectorMathOperation operation)
 {
-  const int size = input_a->size();
+  const int size = input_a.size();
 
   VArray_Span<float3> span_a{input_a};
   VArray_Span<float3> span_b{input_b};
@@ -286,7 +286,7 @@ static void do_math_operation_fl3_fl3_to_fl(const VArray<float3> &input_a,
                                             const VMutableArray<float> &result,
                                             const NodeVectorMathOperation operation)
 {
-  const int size = input_a->size();
+  const int size = input_a.size();
 
   VArray_Span<float3> span_a{input_a};
   VArray_Span<float3> span_b{input_b};
@@ -316,7 +316,7 @@ static void do_math_operation_fl3_fl_to_fl3(const VArray<float3> &input_a,
                                             const VMutableArray<float3> &result,
                                             const NodeVectorMathOperation operation)
 {
-  const int size = input_a->size();
+  const int size = input_a.size();
 
   VArray_Span<float3> span_a{input_a};
   VArray_Span<float> span_b{input_b};
@@ -345,7 +345,7 @@ static void do_math_operation_fl3_to_fl3(const VArray<float3> &input_a,
                                          const VMutableArray<float3> &result,
                                          const NodeVectorMathOperation operation)
 {
-  const int size = input_a->size();
+  const int size = input_a.size();
 
   VArray_Span<float3> span_a{input_a};
   VMutableArray_Span<float3> span_result{result, false};
@@ -372,7 +372,7 @@ static void do_math_operation_fl3_to_fl(const VArray<float3> &input_a,
                                         const VMutableArray<float> &result,
                                         const NodeVectorMathOperation operation)
 {
-  const int size = input_a->size();
+  const int size = input_a.size();
 
   VArray_Span<float3> span_a{input_a};
   VMutableArray_Span<float> span_result{result, false};

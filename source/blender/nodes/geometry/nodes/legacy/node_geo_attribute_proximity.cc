@@ -166,7 +166,7 @@ static void attribute_calc_proximity(GeometryComponent &component,
     /* Theoretically it would be possible to avoid using the distance array when it's not required
      * and there is only one component. However, this only adds an allocation and a single float
      * comparison per vertex, so it's likely not worth it. */
-    distances_internal.reinitialize(positions->size());
+    distances_internal.reinitialize(positions.size());
     distances = distances_internal;
   }
   distances.fill(FLT_MAX);
