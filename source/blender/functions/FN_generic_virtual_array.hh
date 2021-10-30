@@ -54,7 +54,6 @@ class GVArrayImpl {
   const CPPType &type() const;
 
   int64_t size() const;
-  bool is_empty() const;
 
   void get(const int64_t index, void *r_value) const;
   void get_to_uninitialized(const int64_t index, void *r_value) const;
@@ -204,6 +203,19 @@ class GVArrayCommon {
   operator bool() const
   {
     return impl_ != nullptr;
+  }
+
+  int64_t size() const
+  {
+    if (impl_ == nullptr) {
+      return 0;
+    }
+    return impl_->size();
+  }
+
+  bool is_empty() const
+  {
+    return this->size() == 0;
   }
 
   template<typename T> bool try_assign_VArray(VArray<T> &varray) const;
@@ -664,11 +676,6 @@ inline const CPPType &GVArrayImpl::type() const
 inline int64_t GVArrayImpl::size() const
 {
   return size_;
-}
-
-inline bool GVArrayImpl::is_empty() const
-{
-  return size_ == 0;
 }
 
 /* Copies the value at the given index into the provided storage. The `r_value` pointer is

@@ -222,7 +222,7 @@ void MeshAttributeInterpolator::sample_data(const GVArray &src,
                                             const eAttributeMapMode mode,
                                             const GMutableSpan dst)
 {
-  if (src->is_empty() || dst.is_empty()) {
+  if (src.is_empty() || dst.is_empty()) {
     return;
   }
 
