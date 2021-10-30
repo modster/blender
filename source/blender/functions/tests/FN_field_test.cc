@@ -244,14 +244,14 @@ TEST(field, TwoFunctionsTwoOutputs)
   field_evaluator.add(result_field_2, &result_2);
   field_evaluator.evaluate();
 
-  EXPECT_EQ(result_1->get(2), 4);
-  EXPECT_EQ(result_1->get(4), 8);
-  EXPECT_EQ(result_1->get(6), 12);
-  EXPECT_EQ(result_1->get(8), 16);
-  EXPECT_EQ(result_2->get(2), 24);
-  EXPECT_EQ(result_2->get(4), 28);
-  EXPECT_EQ(result_2->get(6), 32);
-  EXPECT_EQ(result_2->get(8), 36);
+  EXPECT_EQ(result_1.get(2), 4);
+  EXPECT_EQ(result_1.get(4), 8);
+  EXPECT_EQ(result_1.get(6), 12);
+  EXPECT_EQ(result_1.get(8), 16);
+  EXPECT_EQ(result_2.get(2), 24);
+  EXPECT_EQ(result_2.get(4), 28);
+  EXPECT_EQ(result_2.get(6), 32);
+  EXPECT_EQ(result_2.get(8), 36);
 }
 
 TEST(field, SameFieldTwice)
@@ -268,10 +268,10 @@ TEST(field, SameFieldTwice)
   VArray<int> varray1 = results[0].typed<int>();
   VArray<int> varray2 = results[1].typed<int>();
 
-  EXPECT_EQ(varray1->get(0), 10);
-  EXPECT_EQ(varray1->get(1), 10);
-  EXPECT_EQ(varray2->get(0), 10);
-  EXPECT_EQ(varray2->get(1), 10);
+  EXPECT_EQ(varray1.get(0), 10);
+  EXPECT_EQ(varray1.get(1), 10);
+  EXPECT_EQ(varray2.get(0), 10);
+  EXPECT_EQ(varray2.get(1), 10);
 }
 
 TEST(field, IgnoredOutput)
@@ -285,8 +285,8 @@ TEST(field, IgnoredOutput)
   field_evaluator.add(field, &results);
   field_evaluator.evaluate();
 
-  EXPECT_EQ(results->get(0), 5);
-  EXPECT_EQ(results->get(3), 5);
+  EXPECT_EQ(results.get(0), 5);
+  EXPECT_EQ(results.get(3), 5);
 }
 
 }  // namespace blender::fn::tests

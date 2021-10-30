@@ -81,10 +81,10 @@ class GenericAppendFunction : public MultiFunction {
     const GVArray &values = params.readonly_single_input(1, "Value");
 
     for (int64_t i : mask) {
-      BUFFER_FOR_CPP_TYPE_VALUE(values->type(), buffer);
-      values->get(i, buffer);
+      BUFFER_FOR_CPP_TYPE_VALUE(values.type(), buffer);
+      values.get(i, buffer);
       vectors.append(i, buffer);
-      values->type().destruct(buffer);
+      values.type().destruct(buffer);
     }
   }
 };
