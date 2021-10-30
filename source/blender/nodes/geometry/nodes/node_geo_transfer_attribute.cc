@@ -294,7 +294,7 @@ void copy_with_indices(const VArray<T> &src,
                        const Span<int> indices,
                        const MutableSpan<T> dst)
 {
-  if (src->is_empty()) {
+  if (src.is_empty()) {
     return;
   }
   for (const int i : mask) {
@@ -308,7 +308,7 @@ void copy_with_indices_clamped(const VArray<T> &src,
                                const Span<int> indices,
                                const MutableSpan<T> dst)
 {
-  if (src->is_empty()) {
+  if (src.is_empty()) {
     return;
   }
   const int max_index = src->size() - 1;
@@ -330,7 +330,7 @@ void copy_with_indices_and_comparison(const VArray<T> &src_1,
                                       const Span<int> indices_2,
                                       const MutableSpan<T> dst)
 {
-  if (src_1->is_empty() || src_2->is_empty()) {
+  if (src_1.is_empty() || src_2.is_empty()) {
     return;
   }
   for (const int i : mask) {

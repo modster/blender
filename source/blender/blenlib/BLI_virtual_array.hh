@@ -62,31 +62,11 @@ template<typename T> class VArrayImpl {
 
   virtual ~VArrayImpl() = default;
 
-  T get(const int64_t index) const
-  {
-    BLI_assert(index >= 0);
-    BLI_assert(index < size_);
-    return this->get_impl(index);
-  }
-
   int64_t size() const
   {
     return size_;
   }
 
-  bool is_empty() const
-  {
-    return size_ == 0;
-  }
-
-  /* Get the element at a specific index. Note that this operator cannot be used to assign values
-   * to an index, because the return value is not a reference. */
-  T operator[](const int64_t index) const
-  {
-    return this->get(index);
-  }
-
- public:
   virtual T get_impl(const int64_t index) const = 0;
 
   virtual bool is_span_impl() const
@@ -125,7 +105,7 @@ template<typename T> class VArrayImpl {
       mask.foreach_index([&](const int64_t i) { dst[i] = single; });
     }
     else {
-      mask.foreach_index([&](const int64_t i) { dst[i] = this->get(i); });
+      mask.foreach_index([&](const int64_t i) { dst[i] = this->get_impl(i); });
     }
   }
 
@@ -141,7 +121,7 @@ template<typename T> class VArrayImpl {
       mask.foreach_index([&](const int64_t i) { new (dst + i) T(single); });
     }
     else {
-      mask.foreach_index([&](const int64_t i) { new (dst + i) T(this->get(i)); });
+      mask.foreach_index([&](const int64_t i) { new (dst + i) T(this->get_impl(i)); });
     }
   }
 
@@ -459,89 +439,6 @@ class VMutableArrayImpl_For_DerivedSpan final : public VMutableArrayImpl<ElemT> 
   }
 };
 
-/**
- * Generate multiple versions of the given function optimized for different virtual arrays.
- * One has to be careful with nesting multiple devirtualizations, because that results in an
- * exponential number of function instantiations (increasing compile time and binary size).
- *
- * Generally, this function should only be used when the virtual method call overhead to get an
- * element from a virtual array is significant.
- */
-template<typename T, typename Func>
-inline void devirtualize_varray(const VArrayImpl<T> &varray, const Func &func, bool enable = true)
-{
-  /* Support disabling the devirtualization to simplify benchmarking. */
-  if (enable) {
-    if (varray.is_single_impl()) {
-      /* `VArrayImpl_For_Single` can be used for devirtualization, because it is declared `final`.
-       */
-      const VArrayImpl_For_Single<T> varray_single{varray.get_internal_single_impl(),
-                                                   varray.size()};
-      func(varray_single);
-      return;
-    }
-    if (varray.is_span_impl()) {
-      /* `VArrayImpl_For_Span` can be used for devirtualization, because it is declared `final`. */
-      const VArrayImpl_For_Span<T> varray_span{varray.get_internal_span_impl()};
-      func(varray_span);
-      return;
-    }
-  }
-  func(varray);
-}
-
-/**
- * Same as `devirtualize_varray`, but devirtualizes two virtual arrays at the same time.
- * This is better than nesting two calls to `devirtualize_varray`, because it instantiates fewer
- * cases.
- */
-template<typename T1, typename T2, typename Func>
-inline void devirtualize_varray2(const VArrayImpl<T1> &varray1,
-                                 const VArrayImpl<T2> &varray2,
-                                 const Func &func,
-                                 bool enable = true)
-{
-  /* Support disabling the devirtualization to simplify benchmarking. */
-  if (enable) {
-    const bool is_span1 = varray1.is_span_impl();
-    const bool is_span2 = varray2.is_span_impl();
-    const bool is_single1 = varray1.is_single_impl();
-    const bool is_single2 = varray2.is_single_impl();
-    if (is_span1 && is_span2) {
-      const VArrayImpl_For_Span<T1> varray1_span{varray1.get_internal_span_impl()};
-      const VArrayImpl_For_Span<T2> varray2_span{varray2.get_internal_span_impl()};
-      func(varray1_span, varray2_span);
-      return;
-    }
-    if (is_span1 && is_single2) {
-      const VArrayImpl_For_Span<T1> varray1_span{varray1.get_internal_span_impl()};
-      const VArrayImpl_For_Single<T2> varray2_single{varray2.get_internal_single_impl(),
-                                                     varray2.size()};
-      func(varray1_span, varray2_single);
-      return;
-    }
-    if (is_single1 && is_span2) {
-      const VArrayImpl_For_Single<T1> varray1_single{varray1.get_internal_single_impl(),
-                                                     varray1.size()};
-      const VArrayImpl_For_Span<T2> varray2_span{varray2.get_internal_span_impl()};
-      func(varray1_single, varray2_span);
-      return;
-    }
-    if (is_single1 && is_single2) {
-      const VArrayImpl_For_Single<T1> varray1_single{varray1.get_internal_single_impl(),
-                                                     varray1.size()};
-      const VArrayImpl_For_Single<T2> varray2_single{varray2.get_internal_single_impl(),
-                                                     varray2.size()};
-      func(varray1_single, varray2_single);
-      return;
-    }
-  }
-  /* This fallback is used even when one of the inputs could be optimized. It's probably not worth
-   * it to optimize just one of the inputs, because then the compiler still has to call into
-   * unknown code, which inhibits many compiler optimizations. */
-  func(varray1, varray2);
-}
-
 namespace detail {
 
 template<typename T> struct VArrayAnyExtraInfo {
@@ -652,10 +549,19 @@ template<typename T> class VArrayCommon {
     return impl_ != nullptr;
   }
 
+  /* Get the element at a specific index. Note that this operator cannot be used to assign values
+   * to an index, because the return value is not a reference. */
   T operator[](const int64_t index) const
   {
     BLI_assert(*this);
-    return impl_->get(index);
+    return impl_->get_impl(index);
+  }
+
+  T get(const int64_t index) const
+  {
+    BLI_assert(index >= 0);
+    BLI_assert(index < this->size());
+    return impl_->get_impl(index);
   }
 
   int64_t size() const
@@ -1046,5 +952,77 @@ template<typename T> class VMutableArray_Span final : public MutableSpan<T> {
     show_not_saved_warning_ = false;
   }
 };
+
+/**
+ * Generate multiple versions of the given function optimized for different virtual arrays.
+ * One has to be careful with nesting multiple devirtualizations, because that results in an
+ * exponential number of function instantiations (increasing compile time and binary size).
+ *
+ * Generally, this function should only be used when the virtual method call overhead to get an
+ * element from a virtual array is significant.
+ */
+template<typename T, typename Func>
+inline void devirtualize_varray(const VArray<T> &varray, const Func &func, bool enable = true)
+{
+  /* Support disabling the devirtualization to simplify benchmarking. */
+  if (enable) {
+    if (varray.is_single()) {
+      /* `VArrayImpl_For_Single` can be used for devirtualization, because it is declared `final`.
+       */
+      func(VArray<T>::ForSingle(varray.get_internal_single(), varray.size()));
+      return;
+    }
+    if (varray.is_span()) {
+      /* `VArrayImpl_For_Span` can be used for devirtualization, because it is declared `final`. */
+      func(VArray<T>::ForSpan(varray.get_internal_span()));
+      return;
+    }
+  }
+  func(varray);
+}
+
+/**
+ * Same as `devirtualize_varray`, but devirtualizes two virtual arrays at the same time.
+ * This is better than nesting two calls to `devirtualize_varray`, because it instantiates fewer
+ * cases.
+ */
+template<typename T1, typename T2, typename Func>
+inline void devirtualize_varray2(const VArray<T1> &varray1,
+                                 const VArray<T2> &varray2,
+                                 const Func &func,
+                                 bool enable = true)
+{
+  /* Support disabling the devirtualization to simplify benchmarking. */
+  if (enable) {
+    const bool is_span1 = varray1.is_span();
+    const bool is_span2 = varray2.is_span();
+    const bool is_single1 = varray1.is_single();
+    const bool is_single2 = varray2.is_single();
+    if (is_span1 && is_span2) {
+      func(VArray<T1>::ForSpan(varray1.get_internal_span()),
+           VArray<T2>::ForSpan(varray2.get_internal_span()));
+      return;
+    }
+    if (is_span1 && is_single2) {
+      func(VArray<T1>::ForSpan(varray1.get_internal_span()),
+           VArray<T2>::ForSingle(varray2.get_internal_single(), varray2.size()));
+      return;
+    }
+    if (is_single1 && is_span2) {
+      func(VArray<T1>::ForSingle(varray1.get_internal_single(), varray1.size()),
+           VArray<T2>::ForSpan(varray2.get_internal_span()));
+      return;
+    }
+    if (is_single1 && is_single2) {
+      func(VArray<T1>::ForSingle(varray1.get_internal_single(), varray1.size()),
+           VArray<T2>::ForSingle(varray2.get_internal_single(), varray2.size()));
+      return;
+    }
+  }
+  /* This fallback is used even when one of the inputs could be optimized. It's probably not worth
+   * it to optimize just one of the inputs, because then the compiler still has to call into
+   * unknown code, which inhibits many compiler optimizations. */
+  func(varray1, varray2);
+}
 
 }  // namespace blender

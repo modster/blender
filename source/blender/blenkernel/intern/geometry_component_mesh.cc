@@ -158,7 +158,7 @@ namespace blender::bke {
 
 template<typename T>
 static void adapt_mesh_domain_corner_to_point_impl(const Mesh &mesh,
-                                                   const VArrayImpl<T> &old_values,
+                                                   const VArray<T> &old_values,
                                                    MutableSpan<T> r_values)
 {
   BLI_assert(r_values.size() == mesh.totvert);
@@ -176,7 +176,7 @@ static void adapt_mesh_domain_corner_to_point_impl(const Mesh &mesh,
 /* A vertex is selected if all connected face corners were selected and it is not loose. */
 template<>
 void adapt_mesh_domain_corner_to_point_impl(const Mesh &mesh,
-                                            const VArrayImpl<bool> &old_values,
+                                            const VArray<bool> &old_values,
                                             MutableSpan<bool> r_values)
 {
   BLI_assert(r_values.size() == mesh.totvert);
@@ -210,7 +210,7 @@ static GVArray adapt_mesh_domain_corner_to_point(const Mesh &mesh, const GVArray
       /* We compute all interpolated values at once, because for this interpolation, one has to
        * iterate over all loops anyway. */
       Array<T> values(mesh.totvert);
-      adapt_mesh_domain_corner_to_point_impl<T>(mesh, *varray.typed<T>(), values);
+      adapt_mesh_domain_corner_to_point_impl<T>(mesh, varray.typed<T>(), values);
       new_varray = VArray<T>::ForContainer(std::move(values));
     }
   });
@@ -226,7 +226,7 @@ static GVArray adapt_mesh_domain_corner_to_point(const Mesh &mesh, const GVArray
  */
 template<typename T>
 static void adapt_mesh_domain_point_to_corner_impl(const Mesh &mesh,
-                                                   const VArrayImpl<T> &old_values,
+                                                   const VArray<T> &old_values,
                                                    MutableSpan<T> r_values)
 {
   BLI_assert(r_values.size() == mesh.totloop);
@@ -243,7 +243,7 @@ static GVArray adapt_mesh_domain_point_to_corner(const Mesh &mesh, const GVArray
   attribute_math::convert_to_static_type(varray->type(), [&](auto dummy) {
     using T = decltype(dummy);
     Array<T> values(mesh.totloop);
-    adapt_mesh_domain_point_to_corner_impl<T>(mesh, *varray.typed<T>(), values);
+    adapt_mesh_domain_point_to_corner_impl<T>(mesh, varray.typed<T>(), values);
     new_varray = VArray<T>::ForContainer(std::move(values));
   });
   return new_varray;
@@ -256,7 +256,7 @@ static GVArray adapt_mesh_domain_point_to_corner(const Mesh &mesh, const GVArray
  */
 template<typename T>
 static void adapt_mesh_domain_corner_to_face_impl(const Mesh &mesh,
-                                                  const VArrayImpl<T> &old_values,
+                                                  const VArray<T> &old_values,
                                                   MutableSpan<T> r_values)
 {
   BLI_assert(r_values.size() == mesh.totpoly);
@@ -276,7 +276,7 @@ static void adapt_mesh_domain_corner_to_face_impl(const Mesh &mesh,
 /* A face is selected if all of its corners were selected. */
 template<>
 void adapt_mesh_domain_corner_to_face_impl(const Mesh &mesh,
-                                           const VArrayImpl<bool> &old_values,
+                                           const VArray<bool> &old_values,
                                            MutableSpan<bool> r_values)
 {
   BLI_assert(r_values.size() == mesh.totpoly);
@@ -300,7 +300,7 @@ static GVArray adapt_mesh_domain_corner_to_face(const Mesh &mesh, const GVArray 
     using T = decltype(dummy);
     if constexpr (!std::is_void_v<attribute_math::DefaultMixer<T>>) {
       Array<T> values(mesh.totpoly);
-      adapt_mesh_domain_corner_to_face_impl<T>(mesh, *varray.typed<T>(), values);
+      adapt_mesh_domain_corner_to_face_impl<T>(mesh, varray.typed<T>(), values);
       new_varray = VArray<T>::ForContainer(std::move(values));
     }
   });
@@ -309,7 +309,7 @@ static GVArray adapt_mesh_domain_corner_to_face(const Mesh &mesh, const GVArray 
 
 template<typename T>
 static void adapt_mesh_domain_corner_to_edge_impl(const Mesh &mesh,
-                                                  const VArrayImpl<T> &old_values,
+                                                  const VArray<T> &old_values,
                                                   MutableSpan<T> r_values)
 {
   BLI_assert(r_values.size() == mesh.totedge);
@@ -334,7 +334,7 @@ static void adapt_mesh_domain_corner_to_edge_impl(const Mesh &mesh,
 /* An edge is selected if all corners on adjacent faces were selected. */
 template<>
 void adapt_mesh_domain_corner_to_edge_impl(const Mesh &mesh,
-                                           const VArrayImpl<bool> &old_values,
+                                           const VArray<bool> &old_values,
                                            MutableSpan<bool> r_values)
 {
   BLI_assert(r_values.size() == mesh.totedge);
@@ -373,7 +373,7 @@ static GVArray adapt_mesh_domain_corner_to_edge(const Mesh &mesh, const GVArray 
     using T = decltype(dummy);
     if constexpr (!std::is_void_v<attribute_math::DefaultMixer<T>>) {
       Array<T> values(mesh.totedge);
-      adapt_mesh_domain_corner_to_edge_impl<T>(mesh, *varray.typed<T>(), values);
+      adapt_mesh_domain_corner_to_edge_impl<T>(mesh, varray.typed<T>(), values);
       new_varray = VArray<T>::ForContainer(std::move(values));
     }
   });
@@ -382,7 +382,7 @@ static GVArray adapt_mesh_domain_corner_to_edge(const Mesh &mesh, const GVArray 
 
 template<typename T>
 void adapt_mesh_domain_face_to_point_impl(const Mesh &mesh,
-                                          const VArrayImpl<T> &old_values,
+                                          const VArray<T> &old_values,
                                           MutableSpan<T> r_values)
 {
   BLI_assert(r_values.size() == mesh.totvert);
@@ -404,7 +404,7 @@ void adapt_mesh_domain_face_to_point_impl(const Mesh &mesh,
 /* A vertex is selected if any of the connected faces were selected. */
 template<>
 void adapt_mesh_domain_face_to_point_impl(const Mesh &mesh,
-                                          const VArrayImpl<bool> &old_values,
+                                          const VArray<bool> &old_values,
                                           MutableSpan<bool> r_values)
 {
   BLI_assert(r_values.size() == mesh.totvert);
@@ -429,7 +429,7 @@ static GVArray adapt_mesh_domain_face_to_point(const Mesh &mesh, const GVArray &
     using T = decltype(dummy);
     if constexpr (!std::is_void_v<attribute_math::DefaultMixer<T>>) {
       Array<T> values(mesh.totvert);
-      adapt_mesh_domain_face_to_point_impl<T>(mesh, *varray.typed<T>(), values);
+      adapt_mesh_domain_face_to_point_impl<T>(mesh, varray.typed<T>(), values);
       new_varray = VArray<T>::ForContainer(std::move(values));
     }
   });
@@ -439,7 +439,7 @@ static GVArray adapt_mesh_domain_face_to_point(const Mesh &mesh, const GVArray &
 /* Each corner's value is simply a copy of the value at its face. */
 template<typename T>
 void adapt_mesh_domain_face_to_corner_impl(const Mesh &mesh,
-                                           const VArrayImpl<T> &old_values,
+                                           const VArray<T> &old_values,
                                            MutableSpan<T> r_values)
 {
   BLI_assert(r_values.size() == mesh.totloop);
@@ -458,7 +458,7 @@ static GVArray adapt_mesh_domain_face_to_corner(const Mesh &mesh, const GVArray 
     using T = decltype(dummy);
     if constexpr (!std::is_void_v<attribute_math::DefaultMixer<T>>) {
       Array<T> values(mesh.totloop);
-      adapt_mesh_domain_face_to_corner_impl<T>(mesh, *varray.typed<T>(), values);
+      adapt_mesh_domain_face_to_corner_impl<T>(mesh, varray.typed<T>(), values);
       new_varray = VArray<T>::ForContainer(std::move(values));
     }
   });
@@ -467,7 +467,7 @@ static GVArray adapt_mesh_domain_face_to_corner(const Mesh &mesh, const GVArray 
 
 template<typename T>
 void adapt_mesh_domain_face_to_edge_impl(const Mesh &mesh,
-                                         const VArrayImpl<T> &old_values,
+                                         const VArray<T> &old_values,
                                          MutableSpan<T> r_values)
 {
   BLI_assert(r_values.size() == mesh.totedge);
@@ -487,7 +487,7 @@ void adapt_mesh_domain_face_to_edge_impl(const Mesh &mesh,
 /* An edge is selected if any connected face was selected. */
 template<>
 void adapt_mesh_domain_face_to_edge_impl(const Mesh &mesh,
-                                         const VArrayImpl<bool> &old_values,
+                                         const VArray<bool> &old_values,
                                          MutableSpan<bool> r_values)
 {
   BLI_assert(r_values.size() == mesh.totedge);
@@ -512,7 +512,7 @@ static GVArray adapt_mesh_domain_face_to_edge(const Mesh &mesh, const GVArray &v
     using T = decltype(dummy);
     if constexpr (!std::is_void_v<attribute_math::DefaultMixer<T>>) {
       Array<T> values(mesh.totedge);
-      adapt_mesh_domain_face_to_edge_impl<T>(mesh, *varray.typed<T>(), values);
+      adapt_mesh_domain_face_to_edge_impl<T>(mesh, varray.typed<T>(), values);
       new_varray = VArray<T>::ForContainer(std::move(values));
     }
   });
@@ -526,7 +526,7 @@ static GVArray adapt_mesh_domain_face_to_edge(const Mesh &mesh, const GVArray &v
  */
 template<typename T>
 static void adapt_mesh_domain_point_to_face_impl(const Mesh &mesh,
-                                                 const VArrayImpl<T> &old_values,
+                                                 const VArray<T> &old_values,
                                                  MutableSpan<T> r_values)
 {
   BLI_assert(r_values.size() == mesh.totpoly);
@@ -546,7 +546,7 @@ static void adapt_mesh_domain_point_to_face_impl(const Mesh &mesh,
 /* A face is selected if all of its vertices were selected too. */
 template<>
 void adapt_mesh_domain_point_to_face_impl(const Mesh &mesh,
-                                          const VArrayImpl<bool> &old_values,
+                                          const VArray<bool> &old_values,
                                           MutableSpan<bool> r_values)
 {
   BLI_assert(r_values.size() == mesh.totpoly);
@@ -572,7 +572,7 @@ static GVArray adapt_mesh_domain_point_to_face(const Mesh &mesh, const GVArray &
     using T = decltype(dummy);
     if constexpr (!std::is_void_v<attribute_math::DefaultMixer<T>>) {
       Array<T> values(mesh.totpoly);
-      adapt_mesh_domain_point_to_face_impl<T>(mesh, *varray.typed<T>(), values);
+      adapt_mesh_domain_point_to_face_impl<T>(mesh, varray.typed<T>(), values);
       new_varray = VArray<T>::ForContainer(std::move(values));
     }
   });
@@ -586,7 +586,7 @@ static GVArray adapt_mesh_domain_point_to_face(const Mesh &mesh, const GVArray &
  */
 template<typename T>
 static void adapt_mesh_domain_point_to_edge_impl(const Mesh &mesh,
-                                                 const VArrayImpl<T> &old_values,
+                                                 const VArray<T> &old_values,
                                                  MutableSpan<T> r_values)
 {
   BLI_assert(r_values.size() == mesh.totedge);
@@ -604,7 +604,7 @@ static void adapt_mesh_domain_point_to_edge_impl(const Mesh &mesh,
 /* An edge is selected if both of its vertices were selected. */
 template<>
 void adapt_mesh_domain_point_to_edge_impl(const Mesh &mesh,
-                                          const VArrayImpl<bool> &old_values,
+                                          const VArray<bool> &old_values,
                                           MutableSpan<bool> r_values)
 {
   BLI_assert(r_values.size() == mesh.totedge);
@@ -622,7 +622,7 @@ static GVArray adapt_mesh_domain_point_to_edge(const Mesh &mesh, const GVArray &
     using T = decltype(dummy);
     if constexpr (!std::is_void_v<attribute_math::DefaultMixer<T>>) {
       Array<T> values(mesh.totedge);
-      adapt_mesh_domain_point_to_edge_impl<T>(mesh, *varray.typed<T>(), values);
+      adapt_mesh_domain_point_to_edge_impl<T>(mesh, varray.typed<T>(), values);
       new_varray = VArray<T>::ForContainer(std::move(values));
     }
   });
@@ -631,7 +631,7 @@ static GVArray adapt_mesh_domain_point_to_edge(const Mesh &mesh, const GVArray &
 
 template<typename T>
 void adapt_mesh_domain_edge_to_corner_impl(const Mesh &mesh,
-                                           const VArrayImpl<T> &old_values,
+                                           const VArray<T> &old_values,
                                            MutableSpan<T> r_values)
 {
   BLI_assert(r_values.size() == mesh.totloop);
@@ -656,7 +656,7 @@ void adapt_mesh_domain_edge_to_corner_impl(const Mesh &mesh,
 /* A corner is selected if its two adjacent edges were selected. */
 template<>
 void adapt_mesh_domain_edge_to_corner_impl(const Mesh &mesh,
-                                           const VArrayImpl<bool> &old_values,
+                                           const VArray<bool> &old_values,
                                            MutableSpan<bool> r_values)
 {
   BLI_assert(r_values.size() == mesh.totloop);
@@ -683,7 +683,7 @@ static GVArray adapt_mesh_domain_edge_to_corner(const Mesh &mesh, const GVArray 
     using T = decltype(dummy);
     if constexpr (!std::is_void_v<attribute_math::DefaultMixer<T>>) {
       Array<T> values(mesh.totloop);
-      adapt_mesh_domain_edge_to_corner_impl<T>(mesh, *varray.typed<T>(), values);
+      adapt_mesh_domain_edge_to_corner_impl<T>(mesh, varray.typed<T>(), values);
       new_varray = VArray<T>::ForContainer(std::move(values));
     }
   });
@@ -692,7 +692,7 @@ static GVArray adapt_mesh_domain_edge_to_corner(const Mesh &mesh, const GVArray 
 
 template<typename T>
 static void adapt_mesh_domain_edge_to_point_impl(const Mesh &mesh,
-                                                 const VArrayImpl<T> &old_values,
+                                                 const VArray<T> &old_values,
                                                  MutableSpan<T> r_values)
 {
   BLI_assert(r_values.size() == mesh.totvert);
@@ -711,7 +711,7 @@ static void adapt_mesh_domain_edge_to_point_impl(const Mesh &mesh,
 /* A vertex is selected if any connected edge was selected. */
 template<>
 void adapt_mesh_domain_edge_to_point_impl(const Mesh &mesh,
-                                          const VArrayImpl<bool> &old_values,
+                                          const VArray<bool> &old_values,
                                           MutableSpan<bool> r_values)
 {
   BLI_assert(r_values.size() == mesh.totvert);
@@ -733,7 +733,7 @@ static GVArray adapt_mesh_domain_edge_to_point(const Mesh &mesh, const GVArray &
     using T = decltype(dummy);
     if constexpr (!std::is_void_v<attribute_math::DefaultMixer<T>>) {
       Array<T> values(mesh.totvert);
-      adapt_mesh_domain_edge_to_point_impl<T>(mesh, *varray.typed<T>(), values);
+      adapt_mesh_domain_edge_to_point_impl<T>(mesh, varray.typed<T>(), values);
       new_varray = VArray<T>::ForContainer(std::move(values));
     }
   });
@@ -747,7 +747,7 @@ static GVArray adapt_mesh_domain_edge_to_point(const Mesh &mesh, const GVArray &
  */
 template<typename T>
 static void adapt_mesh_domain_edge_to_face_impl(const Mesh &mesh,
-                                                const VArrayImpl<T> &old_values,
+                                                const VArray<T> &old_values,
                                                 MutableSpan<T> r_values)
 {
   BLI_assert(r_values.size() == mesh.totpoly);
@@ -767,7 +767,7 @@ static void adapt_mesh_domain_edge_to_face_impl(const Mesh &mesh,
 /* A face is selected if all of its edges are selected. */
 template<>
 void adapt_mesh_domain_edge_to_face_impl(const Mesh &mesh,
-                                         const VArrayImpl<bool> &old_values,
+                                         const VArray<bool> &old_values,
                                          MutableSpan<bool> r_values)
 {
   BLI_assert(r_values.size() == mesh.totpoly);
@@ -793,7 +793,7 @@ static GVArray adapt_mesh_domain_edge_to_face(const Mesh &mesh, const GVArray &v
     using T = decltype(dummy);
     if constexpr (!std::is_void_v<attribute_math::DefaultMixer<T>>) {
       Array<T> values(mesh.totpoly);
-      adapt_mesh_domain_edge_to_face_impl<T>(mesh, *varray.typed<T>(), values);
+      adapt_mesh_domain_edge_to_face_impl<T>(mesh, varray.typed<T>(), values);
       new_varray = VArray<T>::ForContainer(std::move(values));
     }
   });

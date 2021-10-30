@@ -28,7 +28,7 @@ template<typename T>
 BLI_NOINLINE static void sample_point_attribute(const Mesh &mesh,
                                                 const Span<int> looptri_indices,
                                                 const Span<float3> bary_coords,
-                                                const VArrayImpl<T> &data_in,
+                                                const VArray<T> &data_in,
                                                 const IndexMask mask,
                                                 const MutableSpan<T> data_out)
 {
@@ -67,7 +67,7 @@ void sample_point_attribute(const Mesh &mesh,
   attribute_math::convert_to_static_type(type, [&](auto dummy) {
     using T = decltype(dummy);
     sample_point_attribute<T>(
-        mesh, looptri_indices, bary_coords, *data_in.typed<T>(), mask, data_out.typed<T>());
+        mesh, looptri_indices, bary_coords, data_in.typed<T>(), mask, data_out.typed<T>());
   });
 }
 
@@ -75,7 +75,7 @@ template<typename T>
 BLI_NOINLINE static void sample_corner_attribute(const Mesh &mesh,
                                                  const Span<int> looptri_indices,
                                                  const Span<float3> bary_coords,
-                                                 const VArrayImpl<T> &data_in,
+                                                 const VArray<T> &data_in,
                                                  const IndexMask mask,
                                                  const MutableSpan<T> data_out)
 {
@@ -114,14 +114,14 @@ void sample_corner_attribute(const Mesh &mesh,
   attribute_math::convert_to_static_type(type, [&](auto dummy) {
     using T = decltype(dummy);
     sample_corner_attribute<T>(
-        mesh, looptri_indices, bary_coords, *data_in.typed<T>(), mask, data_out.typed<T>());
+        mesh, looptri_indices, bary_coords, data_in.typed<T>(), mask, data_out.typed<T>());
   });
 }
 
 template<typename T>
 void sample_face_attribute(const Mesh &mesh,
                            const Span<int> looptri_indices,
-                           const VArrayImpl<T> &data_in,
+                           const VArray<T> &data_in,
                            const IndexMask mask,
                            const MutableSpan<T> data_out)
 {
@@ -148,8 +148,7 @@ void sample_face_attribute(const Mesh &mesh,
   const CPPType &type = data_in->type();
   attribute_math::convert_to_static_type(type, [&](auto dummy) {
     using T = decltype(dummy);
-    sample_face_attribute<T>(
-        mesh, looptri_indices, *data_in.typed<T>(), mask, data_out.typed<T>());
+    sample_face_attribute<T>(mesh, looptri_indices, data_in.typed<T>(), mask, data_out.typed<T>());
   });
 }
 

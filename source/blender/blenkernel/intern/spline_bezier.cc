@@ -676,7 +676,7 @@ BezierSpline::InterpolationData BezierSpline::interpolation_data_from_index_fact
 /* Use a spline argument to avoid adding this to the header. */
 template<typename T>
 static void interpolate_to_evaluated_impl(const BezierSpline &spline,
-                                          const blender::VArrayImpl<T> &src,
+                                          const blender::VArray<T> &src,
                                           MutableSpan<T> dst)
 {
   BLI_assert(src.size() == spline.size());
@@ -712,7 +712,7 @@ blender::fn::GVArray BezierSpline::interpolate_to_evaluated(const blender::fn::G
     using T = decltype(dummy);
     if constexpr (!std::is_void_v<blender::attribute_math::DefaultMixer<T>>) {
       Array<T> values(eval_size);
-      interpolate_to_evaluated_impl<T>(*this, *src.typed<T>(), values);
+      interpolate_to_evaluated_impl<T>(*this, src.typed<T>(), values);
       new_varray = blender::VArray<T>::ForContainer(std::move(values));
     }
   });

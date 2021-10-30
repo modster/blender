@@ -255,19 +255,19 @@ template<typename T> class GVArrayImpl_For_VArray : public GVArrayImpl {
 
  public:
   GVArrayImpl_For_VArray(VArray<T> varray)
-      : GVArrayImpl(CPPType::get<T>(), varray->size()), varray_(std::move(varray))
+      : GVArrayImpl(CPPType::get<T>(), varray.size()), varray_(std::move(varray))
   {
   }
 
  protected:
   void get_impl(const int64_t index, void *r_value) const override
   {
-    *(T *)r_value = varray_->get(index);
+    *(T *)r_value = varray_[index];
   }
 
   void get_to_uninitialized_impl(const int64_t index, void *r_value) const override
   {
-    new (r_value) T(varray_->get(index));
+    new (r_value) T(varray_[index]);
   }
 
   bool is_span_impl() const override
@@ -381,12 +381,12 @@ template<typename T> class GVMutableArrayImpl_For_VMutableArray : public GVMutab
  protected:
   void get_impl(const int64_t index, void *r_value) const override
   {
-    *(T *)r_value = varray_->get(index);
+    *(T *)r_value = varray_[index];
   }
 
   void get_to_uninitialized_impl(const int64_t index, void *r_value) const override
   {
-    new (r_value) T(varray_->get(index));
+    new (r_value) T(varray_[index]);
   }
 
   bool is_span_impl() const override
@@ -820,7 +820,7 @@ template<typename T> inline GVArray::GVArray(const VArray<T> &varray)
   }
   else if (varray.is_single()) {
     T value = varray.get_internal_single();
-    *this = GVArray::ForSingle(CPPType::get<T>(), varray->size(), &value);
+    *this = GVArray::ForSingle(CPPType::get<T>(), varray.size(), &value);
   }
   else {
     *this = GVArray::For<GVArrayImpl_For_VArray<T>>(varray);

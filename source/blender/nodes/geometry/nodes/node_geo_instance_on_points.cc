@@ -121,17 +121,16 @@ static void add_instances_from_component(InstancesComponent &dst_component,
 
       /* Compute base transform for every instances. */
       float4x4 &dst_transform = dst_transforms[range_i];
-      dst_transform = float4x4::from_loc_eul_scale(
-          positions[i], rotations->get(i), scales->get(i));
+      dst_transform = float4x4::from_loc_eul_scale(positions[i], rotations[i], scales[i]);
 
       /* Reference that will be used by this new instance. */
       int dst_handle = empty_reference_handle;
 
-      const bool use_individual_instance = pick_instance->get(i);
+      const bool use_individual_instance = pick_instance[i];
       if (use_individual_instance) {
         if (src_instances != nullptr) {
           const int src_instances_amount = src_instances->instances_amount();
-          const int original_index = indices->get(i);
+          const int original_index = indices[i];
           /* Use #mod_i instead of `%` to get the desirable wrap around behavior where -1
            * refers to the last element. */
           const int index = mod_i(original_index, std::max(src_instances_amount, 1));

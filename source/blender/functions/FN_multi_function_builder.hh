@@ -62,7 +62,7 @@ template<typename In1, typename Out1> class CustomMF_SI_SO : public MultiFunctio
   {
     return [=](IndexMask mask, const VArray<In1> &in1, MutableSpan<Out1> out1) {
       /* Devirtualization results in a 2-3x speedup for some simple functions. */
-      devirtualize_varray(*in1, [&](const auto &in1) {
+      devirtualize_varray(in1, [&](const auto &in1) {
         mask.foreach_index(
             [&](int i) { new (static_cast<void *>(&out1[i])) Out1(element_fn(in1[i])); });
       });
@@ -115,7 +115,7 @@ class CustomMF_SI_SI_SO : public MultiFunction {
                const VArray<In2> &in2,
                MutableSpan<Out1> out1) {
       /* Devirtualization results in a 2-3x speedup for some simple functions. */
-      devirtualize_varray2(*in1, *in2, [&](const auto &in1, const auto &in2) {
+      devirtualize_varray2(in1, in2, [&](const auto &in1, const auto &in2) {
         mask.foreach_index(
             [&](int i) { new (static_cast<void *>(&out1[i])) Out1(element_fn(in1[i], in2[i])); });
       });

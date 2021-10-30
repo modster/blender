@@ -47,7 +47,7 @@ static void execute_on_component(GeoNodeExecParams params, GeometryComponent &co
       "Translation", component, ATTR_DOMAIN_POINT, {0, 0, 0});
 
   for (const int i : IndexRange(attribute->size())) {
-    position_attribute->set_impl(i, position_attribute->get(i) + attribute[i]);
+    position_attribute->set_impl(i, position_attribute->get_impl(i) + attribute[i]);
   }
 
   position_attribute.save();

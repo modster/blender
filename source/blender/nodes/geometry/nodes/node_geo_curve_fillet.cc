@@ -160,7 +160,7 @@ static Array<int> calculate_counts(const FilletParam &fillet_param,
   Array<int> counts(size, 1);
   if (fillet_param.mode == GEO_NODE_CURVE_FILLET_POLY) {
     for (const int i : IndexRange(size)) {
-      counts[i] = (*fillet_param.counts)[spline_offset + i];
+      counts[i] = fillet_param.counts[spline_offset + i];
     }
   }
   if (!cyclic) {
@@ -178,12 +178,12 @@ static Array<float> calculate_radii(const FilletParam &fillet_param,
   Array<float> radii(size, 0.0f);
   if (fillet_param.limit_radius) {
     for (const int i : IndexRange(size)) {
-      radii[i] = std::max((*fillet_param.radii)[spline_offset + i], 0.0f);
+      radii[i] = std::max(fillet_param.radii[spline_offset + i], 0.0f);
     }
   }
   else {
     for (const int i : IndexRange(size)) {
-      radii[i] = (*fillet_param.radii)[spline_offset + i];
+      radii[i] = fillet_param.radii[spline_offset + i];
     }
   }
 

@@ -31,7 +31,7 @@
 namespace blender::geometry {
 
 template<typename T>
-static void copy_attribute_to_points(const VArrayImpl<T> &source_data,
+static void copy_attribute_to_points(const VArray<T> &source_data,
                                      Span<int> map,
                                      MutableSpan<T> dest_data)
 {
@@ -55,7 +55,7 @@ static void copy_attributes_to_points(CurveEval &curve,
     threading::parallel_for(splines.index_range(), 256, [&](IndexRange range) {
       for (const int i : range) {
         copy_attribute_to_points<float>(
-            *tilt_attribute, point_to_vert_maps[i], splines[i]->tilts());
+            tilt_attribute, point_to_vert_maps[i], splines[i]->tilts());
       }
     });
     source_attribute_ids.remove_contained("tilt");
@@ -66,7 +66,7 @@ static void copy_attributes_to_points(CurveEval &curve,
     threading::parallel_for(splines.index_range(), 256, [&](IndexRange range) {
       for (const int i : range) {
         copy_attribute_to_points<float>(
-            *radius_attribute, point_to_vert_maps[i], splines[i]->radii());
+            radius_attribute, point_to_vert_maps[i], splines[i]->radii());
       }
     });
     source_attribute_ids.remove_contained("radius");
@@ -104,7 +104,7 @@ static void copy_attributes_to_points(CurveEval &curve,
         attribute_math::convert_to_static_type(mesh_attribute->type(), [&](auto dummy) {
           using T = decltype(dummy);
           copy_attribute_to_points<T>(
-              *mesh_attribute.typed<T>(), point_to_vert_maps[i], spline_attribute->typed<T>());
+              mesh_attribute.typed<T>(), point_to_vert_maps[i], spline_attribute->typed<T>());
         });
       }
     });

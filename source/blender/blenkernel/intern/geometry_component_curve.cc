@@ -200,7 +200,7 @@ static PointIndices lookup_point_indices(Span<int> offsets, const int index)
  */
 template<typename T>
 static void adapt_curve_domain_point_to_spline_impl(const CurveEval &curve,
-                                                    const VArrayImpl<T> &old_values,
+                                                    const VArray<T> &old_values,
                                                     MutableSpan<T> r_values)
 {
   const int splines_len = curve.splines().size();
@@ -229,7 +229,7 @@ static void adapt_curve_domain_point_to_spline_impl(const CurveEval &curve,
  */
 template<>
 void adapt_curve_domain_point_to_spline_impl(const CurveEval &curve,
-                                             const VArrayImpl<bool> &old_values,
+                                             const VArray<bool> &old_values,
                                              MutableSpan<bool> r_values)
 {
   const int splines_len = curve.splines().size();
@@ -258,7 +258,7 @@ static GVArray adapt_curve_domain_point_to_spline(const CurveEval &curve, GVArra
     using T = decltype(dummy);
     if constexpr (!std::is_void_v<attribute_math::DefaultMixer<T>>) {
       Array<T> values(curve.splines().size());
-      adapt_curve_domain_point_to_spline_impl<T>(curve, *varray.typed<T>(), values);
+      adapt_curve_domain_point_to_spline_impl<T>(curve, varray.typed<T>(), values);
       new_varray = VArray<T>::ForContainer(std::move(values));
     }
   });

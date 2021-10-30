@@ -387,7 +387,7 @@ Span<NURBSpline::BasisCache> NURBSpline::calculate_basis_cache() const
 
 template<typename T>
 void interpolate_to_evaluated_impl(Span<NURBSpline::BasisCache> weights,
-                                   const blender::VArrayImpl<T> &src,
+                                   const blender::VArray<T> &src,
                                    MutableSpan<T> dst)
 {
   const int size = src.size();
@@ -421,7 +421,7 @@ blender::fn::GVArray NURBSpline::interpolate_to_evaluated(const blender::fn::GVA
     using T = decltype(dummy);
     if constexpr (!std::is_void_v<blender::attribute_math::DefaultMixer<T>>) {
       Array<T> values(this->evaluated_points_size());
-      interpolate_to_evaluated_impl<T>(basis_cache, *src.typed<T>(), values);
+      interpolate_to_evaluated_impl<T>(basis_cache, src.typed<T>(), values);
       new_varray = blender::VArray<T>::ForContainer(std::move(values));
     }
   });
