@@ -22,33 +22,12 @@ namespace blender::fn {
 /** \name #GVArrayImpl
  * \{ */
 
-void GVArrayCommon::materialize(void *dst) const
-{
-  this->materialize(IndexMask(impl_->size()), dst);
-}
-
-void GVArrayCommon::materialize(const IndexMask mask, void *dst) const
-{
-  impl_->materialize(mask, dst);
-}
-
 void GVArrayImpl::materialize(const IndexMask mask, void *dst) const
 {
   for (const int64_t i : mask) {
     void *elem_dst = POINTER_OFFSET(dst, type_->size() * i);
     this->get(i, elem_dst);
   }
-}
-
-void GVArrayCommon::materialize_to_uninitialized(void *dst) const
-{
-  this->materialize_to_uninitialized(IndexMask(impl_->size()), dst);
-}
-
-void GVArrayCommon::materialize_to_uninitialized(const IndexMask mask, void *dst) const
-{
-  BLI_assert(mask.min_array_size() <= impl_->size());
-  impl_->materialize_to_uninitialized(mask, dst);
 }
 
 void GVArrayImpl::materialize_to_uninitialized(const IndexMask mask, void *dst) const
@@ -91,11 +70,6 @@ bool GVArrayImpl::try_assign_VArray(void *UNUSED(varray)) const
   return false;
 }
 
-bool GVArrayCommon::may_have_ownership() const
-{
-  return impl_->may_have_ownership();
-}
-
 bool GVArrayImpl::may_have_ownership() const
 {
   /* Use true as default to be on the safe side. */
@@ -107,6 +81,11 @@ bool GVArrayImpl::may_have_ownership() const
 /* -------------------------------------------------------------------- */
 /** \name #GVMutableArrayImpl
  * \{ */
+
+GVMutableArrayImpl::GVMutableArrayImpl(const CPPType &type, const int64_t size)
+    : GVArrayImpl(type, size)
+{
+}
 
 void GVMutableArrayImpl::set_by_copy(const int64_t index, const void *value)
 {
@@ -469,8 +448,163 @@ class GVArrayImpl_For_SlicedGVArray : public GVArrayImpl {
 /** \} */
 
 /* -------------------------------------------------------------------- */
+/** \name #GVArrayCommon
+ * \{ */
+
+GVArrayCommon::GVArrayCommon() = default;
+
+GVArrayCommon::GVArrayCommon(const GVArrayCommon &other) : storage_(other.storage_)
+{
+  impl_ = this->impl_from_storage();
+}
+
+GVArrayCommon::GVArrayCommon(GVArrayCommon &&other) : storage_(std::move(other.storage_))
+{
+  impl_ = this->impl_from_storage();
+  other.storage_.reset();
+  other.impl_ = nullptr;
+}
+
+GVArrayCommon::GVArrayCommon(const GVArrayImpl *impl) : impl_(impl)
+{
+  storage_ = impl_;
+}
+
+GVArrayCommon::GVArrayCommon(std::shared_ptr<const GVArrayImpl> impl) : impl_(impl.get())
+{
+  if (impl) {
+    storage_ = std::move(impl);
+  }
+}
+
+GVArrayCommon::~GVArrayCommon() = default;
+
+void GVArrayCommon::materialize(void *dst) const
+{
+  this->materialize(IndexMask(impl_->size()), dst);
+}
+
+void GVArrayCommon::materialize(const IndexMask mask, void *dst) const
+{
+  impl_->materialize(mask, dst);
+}
+
+void GVArrayCommon::materialize_to_uninitialized(void *dst) const
+{
+  this->materialize_to_uninitialized(IndexMask(impl_->size()), dst);
+}
+
+void GVArrayCommon::materialize_to_uninitialized(const IndexMask mask, void *dst) const
+{
+  BLI_assert(mask.min_array_size() <= impl_->size());
+  impl_->materialize_to_uninitialized(mask, dst);
+}
+
+bool GVArrayCommon::may_have_ownership() const
+{
+  return impl_->may_have_ownership();
+}
+
+void GVArrayCommon::copy_from(const GVArrayCommon &other)
+{
+  if (this == &other) {
+    return;
+  }
+  storage_ = other.storage_;
+  impl_ = this->impl_from_storage();
+}
+
+void GVArrayCommon::move_from(GVArrayCommon &&other)
+{
+  if (this == &other) {
+    return;
+  }
+  storage_ = std::move(other.storage_);
+  impl_ = this->impl_from_storage();
+  other.storage_.reset();
+  other.impl_ = nullptr;
+}
+
+/* Returns true when the virtual array is stored as a span internally. */
+bool GVArrayCommon::is_span() const
+{
+  if (this->is_empty()) {
+    return true;
+  }
+  return impl_->is_span();
+}
+
+/* Returns the internally used span of the virtual array. This invokes undefined behavior is the
+ * virtual array is not stored as a span internally. */
+GSpan GVArrayCommon::get_internal_span() const
+{
+  BLI_assert(this->is_span());
+  if (this->is_empty()) {
+    return GSpan(impl_->type());
+  }
+  return impl_->get_internal_span();
+}
+
+/* Returns true when the virtual array returns the same value for every index. */
+bool GVArrayCommon::is_single() const
+{
+  if (impl_->size() == 1) {
+    return true;
+  }
+  return impl_->is_single();
+}
+
+/* Copies the value that is used for every element into `r_value`, which is expected to point to
+ * initialized memory. This invokes undefined behavior if the virtual array would not return the
+ * same value for every index. */
+void GVArrayCommon::get_internal_single(void *r_value) const
+{
+  BLI_assert(this->is_single());
+  if (impl_->size() == 1) {
+    impl_->get(0, r_value);
+    return;
+  }
+  impl_->get_internal_single(r_value);
+}
+
+/* Same as `get_internal_single`, but `r_value` points to initialized memory. */
+void GVArrayCommon::get_internal_single_to_uninitialized(void *r_value) const
+{
+  impl_->type().default_construct(r_value);
+  this->get_internal_single(r_value);
+}
+
+const GVArrayImpl *GVArrayCommon::impl_from_storage() const
+{
+  return storage_.extra_info().get_varray(storage_.get());
+}
+
+IndexRange GVArrayCommon::index_range() const
+{
+  return IndexRange(this->size());
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
 /** \name #GVArray
  * \{ */
+
+GVArray::GVArray(const GVArray &other) : GVArrayCommon(other)
+{
+}
+
+GVArray::GVArray(GVArray &&other) : GVArrayCommon(std::move(other))
+{
+}
+
+GVArray::GVArray(const GVArrayImpl *impl) : GVArrayCommon(impl)
+{
+}
+
+GVArray::GVArray(std::shared_ptr<const GVArrayImpl> impl) : GVArrayCommon(std::move(impl))
+{
+}
 
 GVArray GVArray::ForSingle(const CPPType &type, const int64_t size, const void *value)
 {
@@ -536,6 +670,23 @@ GVArray &GVArray::operator=(GVArray &&other)
 /** \name #GVMutableArray
  * \{ */
 
+GVMutableArray::GVMutableArray(const GVMutableArray &other) : GVArrayCommon(other)
+{
+}
+
+GVMutableArray::GVMutableArray(GVMutableArray &&other) : GVArrayCommon(std::move(other))
+{
+}
+
+GVMutableArray::GVMutableArray(GVMutableArrayImpl *impl) : GVArrayCommon(impl)
+{
+}
+
+GVMutableArray::GVMutableArray(std::shared_ptr<GVMutableArrayImpl> impl)
+    : GVArrayCommon(std::move(impl))
+{
+}
+
 GVMutableArray GVMutableArray::ForSpan(GMutableSpan span)
 {
   return GVMutableArray::For<GVMutableArrayImpl_For_GMutableSpan_final>(span);
@@ -559,6 +710,24 @@ GVMutableArray &GVMutableArray::operator=(GVMutableArray &&other)
 {
   this->move_from(std::move(other));
   return *this;
+}
+
+GVMutableArrayImpl *GVMutableArray::get_implementation() const
+{
+  return this->get_impl();
+}
+
+/* Copy the values from the source buffer to all elements in the virtual array. */
+void GVMutableArray::set_all(const void *src)
+{
+  this->get_impl()->set_all(src);
+}
+
+GMutableSpan GVMutableArray::get_internal_span() const
+{
+  BLI_assert(this->is_span());
+  const GSpan span = impl_->get_internal_span();
+  return GMutableSpan(span.type(), const_cast<void *>(span.data()), span.size());
 }
 
 /** \} */
