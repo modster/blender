@@ -79,46 +79,6 @@ template<typename T> class VArrayImpl {
     return size_ == 0;
   }
 
-  /* Returns true when the virtual array is stored as a span internally. */
-  bool is_span() const
-  {
-    if (size_ == 0) {
-      return true;
-    }
-    return this->is_span_impl();
-  }
-
-  /* Returns the internally used span of the virtual array. This invokes undefined behavior is the
-   * virtual array is not stored as a span internally. */
-  Span<T> get_internal_span() const
-  {
-    BLI_assert(this->is_span());
-    if (size_ == 0) {
-      return {};
-    }
-    return this->get_internal_span_impl();
-  }
-
-  /* Returns true when the virtual array returns the same value for every index. */
-  bool is_single() const
-  {
-    if (size_ == 1) {
-      return true;
-    }
-    return this->is_single_impl();
-  }
-
-  /* Returns the value that is returned for every index. This invokes undefined behavior if the
-   * virtual array would not return the same value for every index. */
-  T get_internal_single() const
-  {
-    BLI_assert(this->is_single());
-    if (size_ == 1) {
-      return this->get(0);
-    }
-    return this->get_internal_single_impl();
-  }
-
   /* Get the element at a specific index. Note that this operator cannot be used to assign values
    * to an index, because the return value is not a reference. */
   T operator[](const int64_t index) const
@@ -160,7 +120,7 @@ template<typename T> class VArrayImpl {
     return this->has_ownership_impl();
   }
 
- protected:
+ public:
   virtual T get_impl(const int64_t index) const = 0;
 
   virtual bool is_span_impl() const
@@ -190,12 +150,12 @@ template<typename T> class VArrayImpl {
   virtual void materialize_impl(IndexMask mask, MutableSpan<T> r_span) const
   {
     T *dst = r_span.data();
-    if (this->is_span()) {
-      const T *src = this->get_internal_span().data();
+    if (this->is_span_impl()) {
+      const T *src = this->get_internal_span_impl().data();
       mask.foreach_index([&](const int64_t i) { dst[i] = src[i]; });
     }
-    else if (this->is_single()) {
-      const T single = this->get_internal_single();
+    else if (this->is_single_impl()) {
+      const T single = this->get_internal_single_impl();
       mask.foreach_index([&](const int64_t i) { dst[i] = single; });
     }
     else {
@@ -206,12 +166,12 @@ template<typename T> class VArrayImpl {
   virtual void materialize_to_uninitialized_impl(IndexMask mask, MutableSpan<T> r_span) const
   {
     T *dst = r_span.data();
-    if (this->is_span()) {
-      const T *src = this->get_internal_span().data();
+    if (this->is_span_impl()) {
+      const T *src = this->get_internal_span_impl().data();
       mask.foreach_index([&](const int64_t i) { new (dst + i) T(src[i]); });
     }
-    else if (this->is_single()) {
-      const T single = this->get_internal_single();
+    else if (this->is_single_impl()) {
+      const T single = this->get_internal_single_impl();
       mask.foreach_index([&](const int64_t i) { new (dst + i) T(single); });
     }
     else {
@@ -252,25 +212,19 @@ template<typename T> class VMutableArrayImpl : public VArrayImpl<T> {
     this->set_all_impl(src);
   }
 
-  MutableSpan<T> get_internal_span()
-  {
-    BLI_assert(this->is_span());
-    Span<T> span = static_cast<const VArrayImpl<T> *>(this)->get_internal_span();
-    return MutableSpan<T>(const_cast<T *>(span.data()), span.size());
-  }
-
   bool try_assign_GVMutableArray(fn::GVMutableArray &varray) const
   {
     return this->try_assign_GVMutableArray_impl(varray);
   }
 
- protected:
+ public:
   virtual void set_impl(const int64_t index, T value) = 0;
 
   virtual void set_all_impl(Span<T> src)
   {
-    if (this->is_span()) {
-      const MutableSpan<T> span = this->get_internal_span();
+    if (this->is_span_impl()) {
+      const Span<T> const_span = this->get_internal_span_impl();
+      const MutableSpan<T> span{(T *)const_span.data(), const_span.size()};
       initialized_copy_n(src.data(), this->size_, span.data());
     }
     else {
@@ -571,16 +525,17 @@ inline void devirtualize_varray(const VArrayImpl<T> &varray, const Func &func, b
 {
   /* Support disabling the devirtualization to simplify benchmarking. */
   if (enable) {
-    if (varray.is_single()) {
+    if (varray.is_single_impl()) {
       /* `VArrayImpl_For_Single` can be used for devirtualization, because it is declared `final`.
        */
-      const VArrayImpl_For_Single<T> varray_single{varray.get_internal_single(), varray.size()};
+      const VArrayImpl_For_Single<T> varray_single{varray.get_internal_single_impl(),
+                                                   varray.size()};
       func(varray_single);
       return;
     }
-    if (varray.is_span()) {
+    if (varray.is_span_impl()) {
       /* `VArrayImpl_For_Span` can be used for devirtualization, because it is declared `final`. */
-      const VArrayImpl_For_Span<T> varray_span{varray.get_internal_span()};
+      const VArrayImpl_For_Span<T> varray_span{varray.get_internal_span_impl()};
       func(varray_span);
       return;
     }
@@ -601,34 +556,34 @@ inline void devirtualize_varray2(const VArrayImpl<T1> &varray1,
 {
   /* Support disabling the devirtualization to simplify benchmarking. */
   if (enable) {
-    const bool is_span1 = varray1.is_span();
-    const bool is_span2 = varray2.is_span();
-    const bool is_single1 = varray1.is_single();
-    const bool is_single2 = varray2.is_single();
+    const bool is_span1 = varray1.is_span_impl();
+    const bool is_span2 = varray2.is_span_impl();
+    const bool is_single1 = varray1.is_single_impl();
+    const bool is_single2 = varray2.is_single_impl();
     if (is_span1 && is_span2) {
-      const VArrayImpl_For_Span<T1> varray1_span{varray1.get_internal_span()};
-      const VArrayImpl_For_Span<T2> varray2_span{varray2.get_internal_span()};
+      const VArrayImpl_For_Span<T1> varray1_span{varray1.get_internal_span_impl()};
+      const VArrayImpl_For_Span<T2> varray2_span{varray2.get_internal_span_impl()};
       func(varray1_span, varray2_span);
       return;
     }
     if (is_span1 && is_single2) {
-      const VArrayImpl_For_Span<T1> varray1_span{varray1.get_internal_span()};
-      const VArrayImpl_For_Single<T2> varray2_single{varray2.get_internal_single(),
+      const VArrayImpl_For_Span<T1> varray1_span{varray1.get_internal_span_impl()};
+      const VArrayImpl_For_Single<T2> varray2_single{varray2.get_internal_single_impl(),
                                                      varray2.size()};
       func(varray1_span, varray2_single);
       return;
     }
     if (is_single1 && is_span2) {
-      const VArrayImpl_For_Single<T1> varray1_single{varray1.get_internal_single(),
+      const VArrayImpl_For_Single<T1> varray1_single{varray1.get_internal_single_impl(),
                                                      varray1.size()};
-      const VArrayImpl_For_Span<T2> varray2_span{varray2.get_internal_span()};
+      const VArrayImpl_For_Span<T2> varray2_span{varray2.get_internal_span_impl()};
       func(varray1_single, varray2_span);
       return;
     }
     if (is_single1 && is_single2) {
-      const VArrayImpl_For_Single<T1> varray1_single{varray1.get_internal_single(),
+      const VArrayImpl_For_Single<T1> varray1_single{varray1.get_internal_single_impl(),
                                                      varray1.size()};
-      const VArrayImpl_For_Single<T2> varray2_single{varray2.get_internal_single(),
+      const VArrayImpl_For_Single<T2> varray2_single{varray2.get_internal_single_impl(),
                                                      varray2.size()};
       func(varray1_single, varray2_single);
       return;
@@ -772,6 +727,48 @@ template<typename T> class VArrayCommon {
   IndexRange index_range() const
   {
     return IndexRange(this->size());
+  }
+
+  /* Returns true when the virtual array is stored as a span internally. */
+  bool is_span() const
+  {
+    BLI_assert(*this);
+    if (this->is_empty()) {
+      return true;
+    }
+    return impl_->is_span_impl();
+  }
+
+  /* Returns the internally used span of the virtual array. This invokes undefined behavior is the
+   * virtual array is not stored as a span internally. */
+  Span<T> get_internal_span() const
+  {
+    BLI_assert(this->is_span());
+    if (this->is_empty()) {
+      return {};
+    }
+    return impl_->get_internal_span_impl();
+  }
+
+  /* Returns true when the virtual array returns the same value for every index. */
+  bool is_single() const
+  {
+    BLI_assert(*this);
+    if (impl_->size() == 1) {
+      return true;
+    }
+    return impl_->is_single_impl();
+  }
+
+  /* Returns the value that is returned for every index. This invokes undefined behavior if the
+   * virtual array would not return the same value for every index. */
+  T get_internal_single() const
+  {
+    BLI_assert(this->is_single());
+    if (impl_->size() == 1) {
+      return impl_->get_impl(0);
+    }
+    return impl_->get_internal_single_impl();
   }
 };
 
@@ -941,6 +938,13 @@ template<typename T> class VMutableArray : public detail::VArrayCommon<T> {
     BLI_assert(*this);
     return *(VMutableArrayImpl<T> *)this->impl_;
   }
+
+  MutableSpan<T> get_internal_span() const
+  {
+    BLI_assert(this->is_span());
+    const Span<T> span = this->impl_->get_internal_span_impl();
+    return MutableSpan<T>(const_cast<T *>(span.data()), span.size());
+  }
 };
 
 /**
@@ -963,8 +967,8 @@ template<typename T> class VArray_Span final : public Span<T> {
   VArray_Span(VArray<T> varray) : Span<T>(), varray_(std::move(varray))
   {
     this->size_ = varray_->size();
-    if (varray_->is_span()) {
-      this->data_ = varray_->get_internal_span().data();
+    if (varray_.is_span()) {
+      this->data_ = varray_.get_internal_span().data();
     }
     else {
       owned_data_.~Array();
@@ -996,8 +1000,8 @@ template<typename T> class VMutableArray_Span final : public MutableSpan<T> {
       : MutableSpan<T>(), varray_(std::move(varray))
   {
     this->size_ = varray_->size();
-    if (varray_->is_span()) {
-      this->data_ = varray_->get_internal_span().data();
+    if (varray_.is_span()) {
+      this->data_ = varray_.get_internal_span().data();
     }
     else {
       if (copy_values_to_span) {

@@ -615,11 +615,11 @@ static Vector<int64_t> indices_from_selection(const VArray<bool> &selection)
 {
   /* If the selection is just a single value, it's best to avoid calling this
    * function when constructing an IndexMask and use an IndexRange instead. */
-  BLI_assert(!selection->is_single());
+  BLI_assert(!selection.is_single());
 
   Vector<int64_t> indices;
-  if (selection->is_span()) {
-    Span<bool> span = selection->get_internal_span();
+  if (selection.is_span()) {
+    Span<bool> span = selection.get_internal_span();
     for (const int64_t i : span.index_range()) {
       if (span[i]) {
         indices.append(i);
@@ -690,8 +690,8 @@ IndexMask FieldEvaluator::get_evaluated_as_mask(const int field_index)
 {
   VArray<bool> varray = this->get_evaluated(field_index).typed<bool>();
 
-  if (varray->is_single()) {
-    if (varray->get_internal_single()) {
+  if (varray.is_single()) {
+    if (varray.get_internal_single()) {
       return IndexRange(varray->size());
     }
     return IndexRange(0);

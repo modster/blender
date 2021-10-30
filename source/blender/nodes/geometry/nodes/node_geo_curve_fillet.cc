@@ -591,7 +591,7 @@ static void calculate_curve_fillet(GeometrySet &geometry_set,
   field_evaluator.evaluate();
 
   fillet_param.radii = field_evaluator.get_evaluated<float>(0);
-  if (fillet_param.radii->is_single() && fillet_param.radii->get_internal_single() < 0.0f) {
+  if (fillet_param.radii.is_single() && fillet_param.radii.get_internal_single() < 0.0f) {
     return;
   }
 

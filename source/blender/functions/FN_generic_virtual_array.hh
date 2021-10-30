@@ -272,22 +272,22 @@ template<typename T> class GVArrayImpl_For_VArray : public GVArrayImpl {
 
   bool is_span_impl() const override
   {
-    return varray_->is_span();
+    return varray_.is_span();
   }
 
   GSpan get_internal_span_impl() const override
   {
-    return GSpan(varray_->get_internal_span());
+    return GSpan(varray_.get_internal_span());
   }
 
   bool is_single_impl() const override
   {
-    return varray_->is_single();
+    return varray_.is_single();
   }
 
   void get_internal_single_impl(void *r_value) const override
   {
-    *(T *)r_value = varray_->get_internal_single();
+    *(T *)r_value = varray_.get_internal_single();
   }
 
   void materialize_impl(const IndexMask mask, void *dst) const override
@@ -391,23 +391,23 @@ template<typename T> class GVMutableArrayImpl_For_VMutableArray : public GVMutab
 
   bool is_span_impl() const override
   {
-    return varray_->is_span();
+    return varray_.is_span();
   }
 
   GSpan get_internal_span_impl() const override
   {
-    Span<T> span = varray_->get_internal_span();
+    Span<T> span = varray_.get_internal_span();
     return span;
   }
 
   bool is_single_impl() const override
   {
-    return varray_->is_single();
+    return varray_.is_single();
   }
 
   void get_internal_single_impl(void *r_value) const override
   {
-    *(T *)r_value = varray_->get_internal_single();
+    *(T *)r_value = varray_.get_internal_single();
   }
 
   void set_by_copy_impl(const int64_t index, const void *value) override
@@ -814,12 +814,12 @@ template<typename T> inline GVArray::GVArray(const VArray<T> &varray)
   if (varray->has_ownership()) {
     *this = GVArray::For<GVArrayImpl_For_VArray<T>>(varray);
   }
-  else if (varray->is_span()) {
-    Span<T> data = varray->get_internal_span();
+  else if (varray.is_span()) {
+    Span<T> data = varray.get_internal_span();
     *this = GVArray::ForSpan(data);
   }
-  else if (varray->is_single()) {
-    T value = varray->get_internal_single();
+  else if (varray.is_single()) {
+    T value = varray.get_internal_single();
     *this = GVArray::ForSingle(CPPType::get<T>(), varray->size(), &value);
   }
   else {
@@ -918,8 +918,8 @@ template<typename T> inline GVMutableArray::GVMutableArray(const VMutableArray<T
   if (varray->has_ownership()) {
     *this = GVMutableArray::For<GVMutableArrayImpl_For_VMutableArray<T>>(varray);
   }
-  else if (varray->is_span()) {
-    MutableSpan<T> data = varray->get_internal_span();
+  else if (varray.is_span()) {
+    MutableSpan<T> data = varray.get_internal_span();
     *this = GVMutableArray::ForSpan(data);
   }
   else {

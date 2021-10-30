@@ -116,8 +116,7 @@ static void geo_node_subdivision_surface_exec(GeoNodeExecParams params)
     SubdivSettings subdiv_settings;
     subdiv_settings.is_simple = false;
     subdiv_settings.is_adaptive = false;
-    subdiv_settings.use_creases = !(creases->is_single() &&
-                                    creases->get_internal_single() == 0.0f);
+    subdiv_settings.use_creases = !(creases.is_single() && creases.get_internal_single() == 0.0f);
     subdiv_settings.level = subdiv_level;
 
     subdiv_settings.vtx_boundary_interpolation =

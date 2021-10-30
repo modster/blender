@@ -171,8 +171,8 @@ static Mesh *compute_hull(const GeometrySet &geometry_set)
         geometry_set.get_component_for_read<PointCloudComponent>();
     VArray<float3> varray = component->attribute_get_for_read<float3>(
         "position", ATTR_DOMAIN_POINT, {0, 0, 0});
-    total_size += varray->size();
-    positions_span = varray->get_internal_span();
+    total_size += varray.size();
+    positions_span = varray.get_internal_span();
   }
 
   if (geometry_set.has_curve()) {

@@ -360,7 +360,7 @@ static void geo_node_subdivide_exec(GeoNodeExecParams params)
 
   const CurveComponent &component = *geometry_set.get_component_for_read<CurveComponent>();
   VArray<int> cuts = params.get_input_attribute<int>("Cuts", component, ATTR_DOMAIN_POINT, 0);
-  if (cuts->is_single() && cuts->get_internal_single() < 1) {
+  if (cuts.is_single() && cuts.get_internal_single() < 1) {
     params.set_output("Geometry", geometry_set);
     return;
   }

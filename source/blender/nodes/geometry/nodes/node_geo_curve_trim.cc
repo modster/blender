@@ -218,7 +218,7 @@ static PolySpline trim_nurbs_spline(const Spline &spline,
           using T = decltype(dummy);
           VArray<T> eval_data = spline.interpolate_to_evaluated<T>(src->typed<T>());
           linear_trim_to_output_data<T>(
-              start, end, eval_data->get_internal_span(), dst->typed<T>());
+              start, end, eval_data.get_internal_span(), dst->typed<T>());
         });
         return true;
       },
@@ -229,11 +229,11 @@ static PolySpline trim_nurbs_spline(const Spline &spline,
 
   VArray<float> evaluated_radii = spline.interpolate_to_evaluated(spline.radii());
   linear_trim_to_output_data<float>(
-      start, end, evaluated_radii->get_internal_span(), new_spline.radii());
+      start, end, evaluated_radii.get_internal_span(), new_spline.radii());
 
   VArray<float> evaluated_tilts = spline.interpolate_to_evaluated(spline.tilts());
   linear_trim_to_output_data<float>(
-      start, end, evaluated_tilts->get_internal_span(), new_spline.tilts());
+      start, end, evaluated_tilts.get_internal_span(), new_spline.tilts());
 
   return new_spline;
 }
@@ -428,7 +428,7 @@ static PolySpline to_single_point_nurbs(const Spline &spline, const Spline::Look
         attribute_math::convert_to_static_type(src->type(), [&](auto dummy) {
           using T = decltype(dummy);
           VArray<T> eval_data = spline.interpolate_to_evaluated<T>(src->typed<T>());
-          to_single_point_data<T>(trim, eval_data->get_internal_span(), dst->typed<T>());
+          to_single_point_data<T>(trim, eval_data.get_internal_span(), dst->typed<T>());
         });
         return true;
       },
@@ -437,10 +437,10 @@ static PolySpline to_single_point_nurbs(const Spline &spline, const Spline::Look
   to_single_point_data<float3>(trim, spline.evaluated_positions(), new_spline.positions());
 
   VArray<float> evaluated_radii = spline.interpolate_to_evaluated(spline.radii());
-  to_single_point_data<float>(trim, evaluated_radii->get_internal_span(), new_spline.radii());
+  to_single_point_data<float>(trim, evaluated_radii.get_internal_span(), new_spline.radii());
 
   VArray<float> evaluated_tilts = spline.interpolate_to_evaluated(spline.tilts());
-  to_single_point_data<float>(trim, evaluated_tilts->get_internal_span(), new_spline.tilts());
+  to_single_point_data<float>(trim, evaluated_tilts.get_internal_span(), new_spline.tilts());
 
   return new_spline;
 }

@@ -341,7 +341,7 @@ static void geo_node_subdivide_exec(GeoNodeExecParams params)
     evaluator.evaluate();
     const VArray<int> &cuts = evaluator.get_evaluated<int>(0);
 
-    if (cuts->is_single() && cuts->get_internal_single() < 1) {
+    if (cuts.is_single() && cuts.get_internal_single() < 1) {
       return;
     }
 
