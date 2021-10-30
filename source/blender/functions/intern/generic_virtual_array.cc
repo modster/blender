@@ -91,9 +91,9 @@ bool GVArrayImpl::try_assign_VArray_impl(void *UNUSED(varray)) const
   return false;
 }
 
-bool GVArrayImpl::has_ownership() const
+bool GVArrayCommon::has_ownership() const
 {
-  return this->has_ownership_impl();
+  return impl_->has_ownership_impl();
 }
 
 bool GVArrayImpl::has_ownership_impl() const
