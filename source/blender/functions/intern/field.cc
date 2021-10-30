@@ -315,8 +315,8 @@ Vector<GVArray> evaluate_fields(ResourceScope &scope,
   Vector<GVArray> field_context_inputs = get_field_context_inputs(
       scope, mask, context, field_tree_info.deduplicated_field_inputs);
 
-  /* Finish fields that output an input varray directly. For those we don't have to do any
-   * further processing. */
+  /* Finish fields that output an input varray directly. For those we don't have to do any further
+   * processing. */
   for (const int out_index : fields_to_evaluate.index_range()) {
     const GFieldRef &field = fields_to_evaluate[out_index];
     if (!field.node().is_input()) {
