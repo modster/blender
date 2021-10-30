@@ -177,8 +177,8 @@ static void copy_evaluated_point_attributes(Span<SplinePtr> splines,
       const int size = offsets[i + 1] - offsets[i];
 
       data.positions.slice(offset, size).copy_from(spline.evaluated_positions());
-      spline.interpolate_to_evaluated(spline.radii())->materialize(data.radii.slice(offset, size));
-      spline.interpolate_to_evaluated(spline.tilts())->materialize(data.tilts.slice(offset, size));
+      spline.interpolate_to_evaluated(spline.radii()).materialize(data.radii.slice(offset, size));
+      spline.interpolate_to_evaluated(spline.tilts()).materialize(data.tilts.slice(offset, size));
 
       for (const Map<AttributeIDRef, GMutableSpan>::Item item : data.point_attributes.items()) {
         const AttributeIDRef attribute_id = item.key;

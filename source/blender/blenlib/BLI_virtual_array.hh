@@ -86,40 +86,6 @@ template<typename T> class VArrayImpl {
     return this->get(index);
   }
 
-  /* Copy the entire virtual array into a span. */
-  void materialize(MutableSpan<T> r_span) const
-  {
-    this->materialize(IndexMask(size_), r_span);
-  }
-
-  /* Copy some indices of the virtual array into a span. */
-  void materialize(IndexMask mask, MutableSpan<T> r_span) const
-  {
-    BLI_assert(mask.min_array_size() <= size_);
-    this->materialize_impl(mask, r_span);
-  }
-
-  void materialize_to_uninitialized(MutableSpan<T> r_span) const
-  {
-    this->materialize_to_uninitialized(IndexMask(size_), r_span);
-  }
-
-  void materialize_to_uninitialized(IndexMask mask, MutableSpan<T> r_span) const
-  {
-    BLI_assert(mask.min_array_size() <= size_);
-    this->materialize_to_uninitialized_impl(mask, r_span);
-  }
-
-  bool try_assign_GVArray(fn::GVArray &varray) const
-  {
-    return this->try_assign_GVArray_impl(varray);
-  }
-
-  bool has_ownership() const
-  {
-    return this->has_ownership_impl();
-  }
-
  public:
   virtual T get_impl(const int64_t index) const = 0;
 
@@ -198,25 +164,6 @@ template<typename T> class VMutableArrayImpl : public VArrayImpl<T> {
   {
   }
 
-  void set(const int64_t index, T value)
-  {
-    BLI_assert(index >= 0);
-    BLI_assert(index < this->size_);
-    this->set_impl(index, std::move(value));
-  }
-
-  /* Copy the values from the source span to all elements in the virtual array. */
-  void set_all(Span<T> src)
-  {
-    BLI_assert(src.size() == this->size_);
-    this->set_all_impl(src);
-  }
-
-  bool try_assign_GVMutableArray(fn::GVMutableArray &varray) const
-  {
-    return this->try_assign_GVMutableArray_impl(varray);
-  }
-
  public:
   virtual void set_impl(const int64_t index, T value) = 0;
 
@@ -230,7 +177,7 @@ template<typename T> class VMutableArrayImpl : public VArrayImpl<T> {
     else {
       const int64_t size = this->size_;
       for (int64_t i = 0; i < size; i++) {
-        this->set(i, src[i]);
+        this->set_impl(i, src[i]);
       }
     }
   }
@@ -770,6 +717,40 @@ template<typename T> class VArrayCommon {
     }
     return impl_->get_internal_single_impl();
   }
+
+  /* Copy the entire virtual array into a span. */
+  void materialize(MutableSpan<T> r_span) const
+  {
+    this->materialize(IndexMask(this->size()), r_span);
+  }
+
+  /* Copy some indices of the virtual array into a span. */
+  void materialize(IndexMask mask, MutableSpan<T> r_span) const
+  {
+    BLI_assert(mask.min_array_size() <= this->size());
+    impl_->materialize_impl(mask, r_span);
+  }
+
+  void materialize_to_uninitialized(MutableSpan<T> r_span) const
+  {
+    this->materialize_to_uninitialized(IndexMask(this->size()), r_span);
+  }
+
+  void materialize_to_uninitialized(IndexMask mask, MutableSpan<T> r_span) const
+  {
+    BLI_assert(mask.min_array_size() <= this->size());
+    impl_->materialize_to_uninitialized_impl(mask, r_span);
+  }
+
+  bool try_assign_GVArray(fn::GVArray &varray) const
+  {
+    return impl_->try_assign_GVArray_impl(varray);
+  }
+
+  bool has_ownership() const
+  {
+    return impl_->has_ownership_impl();
+  }
 };
 
 }  // namespace detail
@@ -945,6 +926,31 @@ template<typename T> class VMutableArray : public detail::VArrayCommon<T> {
     const Span<T> span = this->impl_->get_internal_span_impl();
     return MutableSpan<T>(const_cast<T *>(span.data()), span.size());
   }
+
+  void set(const int64_t index, T value)
+  {
+    BLI_assert(index >= 0);
+    BLI_assert(index < this->size());
+    this->get_impl()->set_impl(index, std::move(value));
+  }
+
+  /* Copy the values from the source span to all elements in the virtual array. */
+  void set_all(Span<T> src)
+  {
+    BLI_assert(src.size() == this->size());
+    this->get_impl()->set_all_impl(src);
+  }
+
+  bool try_assign_GVMutableArray(fn::GVMutableArray &varray) const
+  {
+    return this->get_impl()->try_assign_GVMutableArray_impl(varray);
+  }
+
+ private:
+  VMutableArrayImpl<T> *get_impl() const
+  {
+    return (VMutableArrayImpl<T> *)this->impl_;
+  }
 };
 
 /**
@@ -973,7 +979,7 @@ template<typename T> class VArray_Span final : public Span<T> {
     else {
       owned_data_.~Array();
       new (&owned_data_) Array<T>(varray_->size(), NoInitialization{});
-      varray_->materialize_to_uninitialized(owned_data_);
+      varray_.materialize_to_uninitialized(owned_data_);
       this->data_ = owned_data_.data();
     }
   }
@@ -1007,7 +1013,7 @@ template<typename T> class VMutableArray_Span final : public MutableSpan<T> {
       if (copy_values_to_span) {
         owned_data_.~Array();
         new (&owned_data_) Array<T>(varray_->size(), NoInitialization{});
-        varray_->materialize_to_uninitialized(owned_data_);
+        varray_.materialize_to_uninitialized(owned_data_);
       }
       else {
         owned_data_.reinitialize(varray_->size());
@@ -1032,7 +1038,7 @@ template<typename T> class VMutableArray_Span final : public MutableSpan<T> {
     if (this->data_ != owned_data_.data()) {
       return;
     }
-    varray_->set_all(owned_data_);
+    varray_.set_all(owned_data_);
   }
 
   void disable_not_applied_warning()

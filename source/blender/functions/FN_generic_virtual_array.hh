@@ -292,12 +292,12 @@ template<typename T> class GVArrayImpl_For_VArray : public GVArrayImpl {
 
   void materialize_impl(const IndexMask mask, void *dst) const override
   {
-    varray_->materialize(mask, MutableSpan((T *)dst, mask.min_array_size()));
+    varray_.materialize(mask, MutableSpan((T *)dst, mask.min_array_size()));
   }
 
   void materialize_to_uninitialized_impl(const IndexMask mask, void *dst) const override
   {
-    varray_->materialize_to_uninitialized(mask, MutableSpan((T *)dst, mask.min_array_size()));
+    varray_.materialize_to_uninitialized(mask, MutableSpan((T *)dst, mask.min_array_size()));
   }
 
   bool try_assign_VArray_impl(void *varray) const override
@@ -308,7 +308,7 @@ template<typename T> class GVArrayImpl_For_VArray : public GVArrayImpl {
 
   bool has_ownership_impl() const
   {
-    return varray_->has_ownership();
+    return varray_.has_ownership();
   }
 };
 
@@ -413,35 +413,35 @@ template<typename T> class GVMutableArrayImpl_For_VMutableArray : public GVMutab
   void set_by_copy_impl(const int64_t index, const void *value) override
   {
     const T &value_ = *(const T *)value;
-    varray_->set(index, value_);
+    varray_.set(index, value_);
   }
 
   void set_by_relocate_impl(const int64_t index, void *value) override
   {
     T &value_ = *(T *)value;
-    varray_->set(index, std::move(value_));
+    varray_.set(index, std::move(value_));
     value_.~T();
   }
 
   void set_by_move_impl(const int64_t index, void *value) override
   {
     T &value_ = *(T *)value;
-    varray_->set(index, std::move(value_));
+    varray_.set(index, std::move(value_));
   }
 
   void set_all_impl(const void *src) override
   {
-    varray_->set_all(Span((T *)src, size_));
+    varray_.set_all(Span((T *)src, size_));
   }
 
   void materialize_impl(const IndexMask mask, void *dst) const override
   {
-    varray_->materialize(mask, MutableSpan((T *)dst, mask.min_array_size()));
+    varray_.materialize(mask, MutableSpan((T *)dst, mask.min_array_size()));
   }
 
   void materialize_to_uninitialized_impl(const IndexMask mask, void *dst) const override
   {
-    varray_->materialize_to_uninitialized(mask, MutableSpan((T *)dst, mask.min_array_size()));
+    varray_.materialize_to_uninitialized(mask, MutableSpan((T *)dst, mask.min_array_size()));
   }
 
   bool try_assign_VArray_impl(void *varray) const override
@@ -458,7 +458,7 @@ template<typename T> class GVMutableArrayImpl_For_VMutableArray : public GVMutab
 
   bool has_ownership_impl() const
   {
-    return varray_->has_ownership();
+    return varray_.has_ownership();
   }
 };
 
@@ -808,10 +808,10 @@ template<typename T> inline GVArray::GVArray(const VArray<T> &varray)
   if (!varray) {
     return;
   }
-  if (varray->try_assign_GVArray(*this)) {
+  if (varray.try_assign_GVArray(*this)) {
     return;
   }
-  if (varray->has_ownership()) {
+  if (varray.has_ownership()) {
     *this = GVArray::For<GVArrayImpl_For_VArray<T>>(varray);
   }
   else if (varray.is_span()) {
@@ -912,10 +912,10 @@ template<typename T> inline GVMutableArray::GVMutableArray(const VMutableArray<T
   if (!varray) {
     return;
   }
-  if (varray->try_assign_GVMutableArray(*this)) {
+  if (varray.try_assign_GVMutableArray(*this)) {
     return;
   }
-  if (varray->has_ownership()) {
+  if (varray.has_ownership()) {
     *this = GVMutableArray::For<GVMutableArrayImpl_For_VMutableArray<T>>(varray);
   }
   else if (varray.is_span()) {

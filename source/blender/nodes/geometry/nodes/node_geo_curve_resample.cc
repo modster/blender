@@ -141,8 +141,8 @@ static SplinePtr resample_spline_evaluated(const Spline &src)
 
   dst->positions().copy_from(src.evaluated_positions());
   dst->positions().copy_from(src.evaluated_positions());
-  src.interpolate_to_evaluated(src.radii())->materialize(dst->radii());
-  src.interpolate_to_evaluated(src.tilts())->materialize(dst->tilts());
+  src.interpolate_to_evaluated(src.radii()).materialize(dst->radii());
+  src.interpolate_to_evaluated(src.tilts()).materialize(dst->tilts());
 
   src.attributes.foreach_attribute(
       [&](const AttributeIDRef &attribute_id, const AttributeMetaData &meta_data) {
