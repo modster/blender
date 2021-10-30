@@ -114,7 +114,7 @@ static Set<GFieldRef> find_varying_fields(const FieldTreeInfo &field_tree_info,
    * depend on them. */
   for (const int i : field_context_inputs.index_range()) {
     const GVArray &varray = field_context_inputs[i];
-    if (varray->is_single()) {
+    if (varray.is_single()) {
       continue;
     }
     const FieldInput &field_input = field_tree_info.deduplicated_field_inputs[i];
@@ -381,7 +381,7 @@ Vector<GVArray> evaluate_fields(ResourceScope &scope,
       /* Try to get an existing virtual array that the result should be written into. */
       GVMutableArray dst_varray = get_dst_varray(out_index);
       void *buffer;
-      if (!dst_varray || !dst_varray->is_span()) {
+      if (!dst_varray || !dst_varray.is_span()) {
         /* Allocate a new buffer for the computed result. */
         buffer = scope.linear_allocator().allocate(type.size() * array_size, type.alignment());
 
@@ -395,7 +395,7 @@ Vector<GVArray> evaluate_fields(ResourceScope &scope,
       }
       else {
         /* Write the result into the existing span. */
-        buffer = dst_varray->get_internal_span().data();
+        buffer = dst_varray.get_internal_span().data();
 
         r_varrays[out_index] = dst_varray;
         is_output_written_to_dst[out_index] = true;
@@ -462,9 +462,9 @@ Vector<GVArray> evaluate_fields(ResourceScope &scope,
         continue;
       }
       /* Still have to copy over the data in the destination provided by the caller. */
-      if (dst_varray->is_span()) {
+      if (dst_varray.is_span()) {
         /* Materialize into a span. */
-        computed_varray.materialize_to_uninitialized(mask, dst_varray->get_internal_span().data());
+        computed_varray.materialize_to_uninitialized(mask, dst_varray.get_internal_span().data());
       }
       else {
         /* Slower materialize into a different structure. */

@@ -121,7 +121,7 @@ static GMutableSpan create_attribute_and_retrieve_span(PointCloudComponent &poin
   points.attribute_try_create(attribute_id, ATTR_DOMAIN_POINT, data_type, AttributeInitDefault());
   WriteAttributeLookup attribute = points.attribute_try_get_for_write(attribute_id);
   BLI_assert(attribute);
-  return attribute.varray->get_internal_span();
+  return attribute.varray.get_internal_span();
 }
 
 template<typename T>

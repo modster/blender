@@ -114,7 +114,7 @@ static VArray<float3> construct_mesh_normals_gvarray(const MeshComponent &mesh_c
        * might use the vertex normal from any index. */
       GVArray vert_normals = mesh_vertex_normals(
           mesh, verts, polys, loops, IndexRange(verts.size()));
-      Span<float3> vert_normals_span = vert_normals->get_internal_span().typed<float3>();
+      Span<float3> vert_normals_span = vert_normals.get_internal_span().typed<float3>();
       Array<float3> edge_normals(mask.min_array_size());
 
       /* Use "manual" domain interpolation instead of the GeometryComponent API to avoid

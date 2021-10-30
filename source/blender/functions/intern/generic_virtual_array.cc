@@ -124,9 +124,9 @@ void GVMutableArrayImpl::set_by_relocate_impl(const int64_t index, void *value)
 
 void GVMutableArrayImpl::set_all_impl(const void *src)
 {
-  if (this->is_span()) {
-    const GMutableSpan span = this->get_internal_span();
-    type_->copy_assign_n(src, span.data(), size_);
+  if (this->is_span_impl()) {
+    const GSpan span = this->get_internal_span_impl();
+    type_->copy_assign_n(src, const_cast<void *>(span.data()), size_);
   }
   else {
     for (int64_t i : IndexRange(size_)) {
@@ -137,9 +137,9 @@ void GVMutableArrayImpl::set_all_impl(const void *src)
 
 void GVMutableArrayImpl::fill(const void *value)
 {
-  if (this->is_span()) {
-    const GMutableSpan span = this->get_internal_span();
-    type_->fill_assign_n(value, span.data(), size_);
+  if (this->is_span_impl()) {
+    const GSpan span = this->get_internal_span_impl();
+    type_->fill_assign_n(value, const_cast<void *>(span.data()), size_);
   }
   else {
     for (int64_t i : IndexRange(size_)) {
@@ -362,8 +362,8 @@ class GVArrayImpl_For_SingleValue : public GVArrayImpl_For_SingleValueRef,
 GVArray_GSpan::GVArray_GSpan(GVArray varray) : GSpan(varray->type()), varray_(std::move(varray))
 {
   size_ = varray_->size();
-  if (varray_->is_span()) {
-    data_ = varray_->get_internal_span().data();
+  if (varray_.is_span()) {
+    data_ = varray_.get_internal_span().data();
   }
   else {
     owned_data_ = MEM_mallocN_aligned(type_->size() * size_, type_->alignment(), __func__);
@@ -390,8 +390,8 @@ GVMutableArray_GSpan::GVMutableArray_GSpan(GVMutableArray varray, const bool cop
     : GMutableSpan(varray->type()), varray_(std::move(varray))
 {
   size_ = varray_->size();
-  if (varray_->is_span()) {
-    data_ = varray_->get_internal_span().data();
+  if (varray_.is_span()) {
+    data_ = varray_.get_internal_span().data();
   }
   else {
     owned_data_ = MEM_mallocN_aligned(type_->size() * size_, type_->alignment(), __func__);

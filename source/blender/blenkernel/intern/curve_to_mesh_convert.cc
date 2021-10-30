@@ -485,7 +485,7 @@ static void copy_curve_point_attribute_to_mesh(const GSpan src,
                                                ResultAttributeData &dst)
 {
   GVArray interpolated_gvarray = info.spline.interpolate_to_evaluated(src);
-  GSpan interpolated = interpolated_gvarray->get_internal_span();
+  GSpan interpolated = interpolated_gvarray.get_internal_span();
 
   attribute_math::convert_to_static_type(src.type(), [&](auto dummy) {
     using T = decltype(dummy);
@@ -551,7 +551,7 @@ static void copy_profile_point_attribute_to_mesh(const GSpan src,
                                                  ResultAttributeData &dst)
 {
   GVArray interpolated_gvarray = info.profile.interpolate_to_evaluated(src);
-  GSpan interpolated = interpolated_gvarray->get_internal_span();
+  GSpan interpolated = interpolated_gvarray.get_internal_span();
 
   attribute_math::convert_to_static_type(src.type(), [&](auto dummy) {
     using T = decltype(dummy);

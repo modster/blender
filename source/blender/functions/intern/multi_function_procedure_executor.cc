@@ -326,7 +326,7 @@ class VariableState : NonCopyable, NonMovable {
   {
     switch (value_->type) {
       case ValueType::GVArray:
-        return this->value_as<VariableValue_GVArray>()->data->is_single();
+        return this->value_as<VariableValue_GVArray>()->data.is_single();
       case ValueType::Span:
         return tot_initialized_ == 0;
       case ValueType::GVVectorArray:
@@ -569,7 +569,7 @@ class VariableState : NonCopyable, NonMovable {
         const CPPType &type = data_type.single_type();
         VariableValue_OneSingle *new_value = value_allocator.obtain_OneSingle(type);
         if (value_->type == ValueType::GVArray) {
-          this->value_as<VariableValue_GVArray>()->data->get_internal_single_to_uninitialized(
+          this->value_as<VariableValue_GVArray>()->data.get_internal_single_to_uninitialized(
               new_value->data);
           new_value->is_initialized = true;
         }

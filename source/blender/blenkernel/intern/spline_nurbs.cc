@@ -410,7 +410,7 @@ blender::fn::GVArray NURBSpline::interpolate_to_evaluated(const blender::fn::GVA
 {
   BLI_assert(src->size() == this->size());
 
-  if (src->is_single()) {
+  if (src.is_single()) {
     return src;
   }
 
