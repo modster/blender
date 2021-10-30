@@ -414,7 +414,7 @@ class VariableState : NonCopyable, NonMovable {
         }
         if (value_->type == ValueType::GVArray) {
           /* Fill new buffer with data from virtual array. */
-          this->value_as<VariableValue_GVArray>()->data->materialize_to_uninitialized(
+          this->value_as<VariableValue_GVArray>()->data.materialize_to_uninitialized(
               full_mask, new_value->data);
         }
         else if (value_->type == ValueType::OneSingle) {

@@ -203,7 +203,7 @@ static void copy_evaluated_point_attributes(const Span<SplinePtr> splines,
         BLI_assert(spline.attributes.get_for_read(attribute_id));
         GSpan spline_span = *spline.attributes.get_for_read(attribute_id);
 
-        spline.interpolate_to_evaluated(spline_span)->materialize(dst.slice(offset, size).data());
+        spline.interpolate_to_evaluated(spline_span).materialize(dst.slice(offset, size).data());
       }
 
       if (!data.tangents.is_empty()) {

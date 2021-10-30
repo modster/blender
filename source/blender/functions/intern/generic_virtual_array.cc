@@ -22,14 +22,14 @@ namespace blender::fn {
 /** \name #GVArrayImpl
  * \{ */
 
-void GVArrayImpl::materialize(void *dst) const
+void GVArrayCommon::materialize(void *dst) const
 {
-  this->materialize(IndexMask(size_), dst);
+  this->materialize(IndexMask(impl_->size()), dst);
 }
 
-void GVArrayImpl::materialize(const IndexMask mask, void *dst) const
+void GVArrayCommon::materialize(const IndexMask mask, void *dst) const
 {
-  this->materialize_impl(mask, dst);
+  impl_->materialize_impl(mask, dst);
 }
 
 void GVArrayImpl::materialize_impl(const IndexMask mask, void *dst) const
@@ -40,15 +40,15 @@ void GVArrayImpl::materialize_impl(const IndexMask mask, void *dst) const
   }
 }
 
-void GVArrayImpl::materialize_to_uninitialized(void *dst) const
+void GVArrayCommon::materialize_to_uninitialized(void *dst) const
 {
-  this->materialize_to_uninitialized(IndexMask(size_), dst);
+  this->materialize_to_uninitialized(IndexMask(impl_->size()), dst);
 }
 
-void GVArrayImpl::materialize_to_uninitialized(const IndexMask mask, void *dst) const
+void GVArrayCommon::materialize_to_uninitialized(const IndexMask mask, void *dst) const
 {
-  BLI_assert(mask.min_array_size() <= size_);
-  this->materialize_to_uninitialized_impl(mask, dst);
+  BLI_assert(mask.min_array_size() <= impl_->size());
+  impl_->materialize_to_uninitialized_impl(mask, dst);
 }
 
 void GVArrayImpl::materialize_to_uninitialized_impl(const IndexMask mask, void *dst) const
@@ -367,7 +367,7 @@ GVArray_GSpan::GVArray_GSpan(GVArray varray) : GSpan(varray->type()), varray_(st
   }
   else {
     owned_data_ = MEM_mallocN_aligned(type_->size() * size_, type_->alignment(), __func__);
-    varray_->materialize_to_uninitialized(IndexRange(size_), owned_data_);
+    varray_.materialize_to_uninitialized(IndexRange(size_), owned_data_);
     data_ = owned_data_;
   }
 }
@@ -396,7 +396,7 @@ GVMutableArray_GSpan::GVMutableArray_GSpan(GVMutableArray varray, const bool cop
   else {
     owned_data_ = MEM_mallocN_aligned(type_->size() * size_, type_->alignment(), __func__);
     if (copy_values_to_span) {
-      varray_->materialize_to_uninitialized(IndexRange(size_), owned_data_);
+      varray_.materialize_to_uninitialized(IndexRange(size_), owned_data_);
     }
     else {
       type_->default_construct_n(owned_data_, size_);
@@ -452,7 +452,7 @@ class GVArrayImpl_For_SlicedGVArray : public GVArrayImpl {
         varray_(std::move(varray)),
         offset_(slice.start())
   {
-    BLI_assert(slice.one_after_last() <= varray->size());
+    BLI_assert(slice.one_after_last() <= varray_->size());
   }
 
   void get_impl(const int64_t index, void *r_value) const override

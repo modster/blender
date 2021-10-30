@@ -66,12 +66,6 @@ class GVArrayImpl {
   void get_internal_single(void *r_value) const;
   void get_internal_single_to_uninitialized(void *r_value) const;
 
-  void materialize(void *dst) const;
-  void materialize(const IndexMask mask, void *dst) const;
-
-  void materialize_to_uninitialized(void *dst) const;
-  void materialize_to_uninitialized(const IndexMask mask, void *dst) const;
-
  public:
   virtual void get_impl(const int64_t index, void *r_value) const;
   virtual void get_to_uninitialized_impl(const int64_t index, void *r_value) const = 0;
@@ -214,6 +208,12 @@ class GVArrayCommon {
 
   template<typename T> bool try_assign_VArray(VArray<T> &varray) const;
   bool has_ownership() const;
+
+  void materialize(void *dst) const;
+  void materialize(const IndexMask mask, void *dst) const;
+
+  void materialize_to_uninitialized(void *dst) const;
+  void materialize_to_uninitialized(const IndexMask mask, void *dst) const;
 };
 
 class GVArray : public GVArrayCommon {

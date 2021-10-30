@@ -188,7 +188,7 @@ static void copy_evaluated_point_attributes(Span<SplinePtr> splines,
         GSpan spline_span = *spline.attributes.get_for_read(attribute_id);
 
         spline.interpolate_to_evaluated(spline_span)
-            ->materialize(point_span.slice(offset, size).data());
+            .materialize(point_span.slice(offset, size).data());
       }
 
       data.tangents.slice(offset, size).copy_from(spline.evaluated_tangents());

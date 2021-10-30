@@ -317,7 +317,7 @@ static void ensure_control_point_attribute(const AttributeIDRef &attribute_id,
             spline->size() * type.size(), type.alignment(), __func__);
 
         const DataTypeConversions &conversions = blender::nodes::get_implicit_type_conversions();
-        conversions.try_convert(GVArray::ForSpan(*attribute), type)->materialize(converted_buffer);
+        conversions.try_convert(GVArray::ForSpan(*attribute), type).materialize(converted_buffer);
 
         spline->attributes.remove(attribute_id);
         spline->attributes.create_by_move(attribute_id, data_type, converted_buffer);
