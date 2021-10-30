@@ -558,7 +558,7 @@ static void volume_foreach_id(ID *id, LibraryForeachIDData *data)
 {
   Volume *volume = (Volume *)id;
   for (int i = 0; i < volume->totcol; i++) {
-    BKE_LIB_FOREACHID_PROCESS(data, volume->mat[i], IDWALK_CB_USER);
+    BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, volume->mat[i], IDWALK_CB_USER);
   }
 }
 
@@ -1467,12 +1467,12 @@ VolumeGrid *BKE_volume_grid_add(Volume *volume, const char *name, VolumeGridType
 }
 
 #ifdef WITH_OPENVDB
-VolumeGrid *BKE_volume_grid_add_vdb(Volume *volume,
+VolumeGrid *BKE_volume_grid_add_vdb(Volume &volume,
                                     const StringRef name,
                                     openvdb::GridBase::Ptr vdb_grid)
 {
-  VolumeGridVector &grids = *volume->runtime.grids;
-  BLI_assert(BKE_volume_grid_find_for_read(volume, name.data()) == nullptr);
+  VolumeGridVector &grids = *volume.runtime.grids;
+  BLI_assert(BKE_volume_grid_find_for_read(&volume, name.data()) == nullptr);
   BLI_assert(BKE_volume_grid_type_openvdb(*vdb_grid) != VOLUME_GRID_UNKNOWN);
 
   vdb_grid->setName(name);

@@ -36,6 +36,9 @@ struct VolumeToMeshResolution {
 
 #ifdef WITH_OPENVDB
 
+/**
+ * The result of converting a volume grid to mesh data, in the format used by the OpenVDB API.
+ */
 struct OpenVDBMeshData {
   std::vector<openvdb::Vec3s> verts;
   std::vector<openvdb::Vec3I> tris;

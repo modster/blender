@@ -169,7 +169,7 @@ bool BKE_volume_min_max(const Volume *volume, blender::float3 &r_min, blender::f
 #    include <openvdb/openvdb.h>
 #    include <openvdb/points/PointDataGrid.h>
 
-VolumeGrid *BKE_volume_grid_add_vdb(Volume *volume,
+VolumeGrid *BKE_volume_grid_add_vdb(Volume &volume,
                                     blender::StringRef name,
                                     openvdb::GridBase::Ptr vdb_grid);
 
