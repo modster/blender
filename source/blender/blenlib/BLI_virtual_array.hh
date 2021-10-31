@@ -963,7 +963,7 @@ template<typename T> class VMutableArray : public VArrayCommon<T> {
   operator VArray<T>() &&noexcept
   {
     VArray<T> varray;
-    varray.move_from(*this);
+    varray.move_from(std::move(*this));
     return varray;
   }
 

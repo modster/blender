@@ -152,33 +152,32 @@ TEST(virtual_array, DerivedSpan)
   }
 }
 
-TEST(virtual_array, Test)
+TEST(virtual_array, MutableToImmutable)
 {
-  VArray<int> a = VArray<int>::ForContainer(Array<int>({4, 6, 2, 4}));
-  EXPECT_EQ(a[0], 4);
-  EXPECT_EQ(a[1], 6);
-
-  VArray<int> b = VArray<int>::ForFunc(10, [](int64_t i) { return (int)(i * i); });
-  EXPECT_EQ(b[3], 9);
-  EXPECT_EQ(b[5], 25);
-
-  std::array<int, 5> values = {1, 6, 3, 7, 5};
-  VArray<int> c = VArray<int>::ForSpan(values);
-  EXPECT_EQ(c[0], 1);
-  EXPECT_EQ(c[4], 5);
-
-  VArray<float> d = VArray<float>::ForSingle(10.0f, 4);
-  EXPECT_EQ(d[0], 10.0f);
-  EXPECT_EQ(d.size(), 4);
-
-  VMutableArray<int> e = VMutableArray<int>::ForSpan(values);
-  EXPECT_EQ(e[0], 1);
-  EXPECT_EQ(e[1], 6);
-  e.set(0, 10);
-  EXPECT_EQ(values[0], 10);
-
-  VArray<int> f = e;
-  EXPECT_EQ(f[3], 7);
+  std::array<int, 4> array = {4, 2, 6, 4};
+  {
+    VMutableArray<int> mutable_varray = VMutableArray<int>::ForSpan(array);
+    VArray<int> varray = mutable_varray;
+    EXPECT_TRUE(varray.is_span());
+    EXPECT_EQ(varray.size(), 4);
+    EXPECT_EQ(varray[1], 2);
+    EXPECT_EQ(mutable_varray.size(), 4);
+  }
+  {
+    VMutableArray<int> mutable_varray = VMutableArray<int>::ForSpan(array);
+    EXPECT_EQ(mutable_varray.size(), 4);
+    VArray<int> varray = std::move(mutable_varray);
+    EXPECT_TRUE(varray.is_span());
+    EXPECT_EQ(varray.size(), 4);
+    EXPECT_EQ(varray[1], 2);
+    EXPECT_EQ(mutable_varray.size(), 0);
+  }
+  {
+    VArray<int> varray = VMutableArray<int>::ForSpan(array);
+    EXPECT_TRUE(varray.is_span());
+    EXPECT_EQ(varray.size(), 4);
+    EXPECT_EQ(varray[1], 2);
+  }
 }
 
 }  // namespace blender::tests
