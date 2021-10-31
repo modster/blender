@@ -129,7 +129,7 @@ class Any {
    * Inline buffer that either contains nothing, the stored value directly, or a #std::unique_ptr
    * to the value.
    */
-  AlignedBuffer<std::max(InlineBufferCapacity, sizeof(std::unique_ptr<int>)), Alignment> buffer_;
+  AlignedBuffer<std::max(InlineBufferCapacity, sizeof(std::unique_ptr<int>)), Alignment> buffer_{};
 
   /**
    * Information about the type that is currently stored.
@@ -254,6 +254,11 @@ class Any {
 
   operator bool() const
   {
+    return this->has_value();
+  }
+
+  bool has_value() const
+  {
     return info_ != &Info::get_for_empty();
   }
 
@@ -283,7 +288,7 @@ class Any {
   }
 
   /**
-   * Get a pointer to the stored value. This invokes undefined behavior when #T does not have the
+   * Get a reference to the stored value. This invokes undefined behavior when #T does not have the
    * correct type.
    */
   template<typename T> std::decay_t<T> &get()
@@ -293,7 +298,7 @@ class Any {
   }
 
   /**
-   * Get a pointer to the stored value. This invokes undefined behavior when #T does not have the
+   * Get a reference to the stored value. This invokes undefined behavior when #T does not have the
    * correct type.
    */
   template<typename T> const std::decay_t<T> &get() const

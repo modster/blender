@@ -10,13 +10,13 @@ namespace blender::tests {
 TEST(any, DefaultConstructor)
 {
   Any a;
-  EXPECT_FALSE(a);
+  EXPECT_FALSE(a.has_value());
 }
 
 TEST(any, AssignInt)
 {
-  Any a = 5;
-  EXPECT_TRUE(a);
+  Any<> a = 5;
+  EXPECT_TRUE(a.has_value());
   EXPECT_TRUE(a.is<int>());
   EXPECT_FALSE(a.is<float>());
   const int &value = a.get<int>();
@@ -25,7 +25,7 @@ TEST(any, AssignInt)
   EXPECT_EQ(value, 10);
 
   Any b = a;
-  EXPECT_TRUE(b);
+  EXPECT_TRUE(b.has_value());
   EXPECT_EQ(b.get<int>(), 10);
 
   Any c = std::move(a);
@@ -40,8 +40,8 @@ TEST(any, AssignInt)
 
 TEST(any, AssignMap)
 {
-  Any a = Map<int, int>();
-  EXPECT_TRUE(a);
+  Any<> a = Map<int, int>();
+  EXPECT_TRUE(a.has_value());
   EXPECT_TRUE((a.is<Map<int, int>>()));
   EXPECT_FALSE((a.is<Map<int, float>>()));
   Map<int, int> &map = a.get<Map<int, int>>();
@@ -62,22 +62,22 @@ TEST(any, AssignMap)
 
 TEST(any, AssignAny)
 {
-  Any a = 5;
-  Any b = std::string("hello");
+  Any<> a = 5;
+  Any<> b = std::string("hello");
   Any c;
 
   Any z;
-  EXPECT_FALSE(z);
+  EXPECT_FALSE(z.has_value());
 
   z = a;
-  EXPECT_TRUE(z);
+  EXPECT_TRUE(z.has_value());
   EXPECT_EQ(z.get<int>(), 5);
 
   z = b;
   EXPECT_EQ(z.get<std::string>(), "hello");
 
   z = c;
-  EXPECT_FALSE(z);
+  EXPECT_FALSE(z.has_value());
 
   z = Any(std::in_place_type<Any<>>, a);
   EXPECT_FALSE(z.is<int>());
