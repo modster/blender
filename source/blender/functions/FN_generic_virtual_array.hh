@@ -23,8 +23,6 @@
  * the data type is only known at runtime.
  */
 
-#include <optional>
-
 #include "BLI_virtual_array.hh"
 
 #include "FN_generic_array.hh"
