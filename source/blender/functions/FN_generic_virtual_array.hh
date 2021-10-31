@@ -23,6 +23,7 @@
  * the data type is only known at runtime.
  */
 
+#include "BLI_timeit.hh"
 #include "BLI_virtual_array.hh"
 
 #include "FN_generic_array.hh"
@@ -107,8 +108,8 @@ class GVMutableArray;
 class GVArrayCommon {
  protected:
   /**
-   * See #VArrayCommon for more information. The inline buffer is a bit larger here, because the
-   * virtual array implementation contains an additional pointer to #CPPType.
+   * See #VArrayCommon for more information. The inline buffer is a bit larger here, because
+   * generic virtual array implementations often require a bit more space than typed ones.
    */
   using Storage = Any<detail::GVArrayAnyExtraInfo, 32, 8>;
 
