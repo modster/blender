@@ -111,7 +111,7 @@ class GVArrayCommon {
    * See #VArrayCommon for more information. The inline buffer is a bit larger here, because
    * generic virtual array implementations often require a bit more space than typed ones.
    */
-  using Storage = Any<detail::GVArrayAnyExtraInfo, 32, 8>;
+  using Storage = Any<detail::GVArrayAnyExtraInfo, 40, 8>;
 
   const GVArrayImpl *impl_ = nullptr;
   Storage storage_;
@@ -673,6 +673,7 @@ template<typename ImplT, typename... Args> inline void GVArrayCommon::emplace(Ar
     impl_ = &storage_.template emplace<ImplT>(std::forward<Args>(args)...);
   }
   else {
+    std::cout << typeid(ImplT).name() << "\n";
     std::shared_ptr<const GVArrayImpl> ptr = std::make_shared<ImplT>(std::forward<Args>(args)...);
     impl_ = &*ptr;
     storage_ = std::move(ptr);
