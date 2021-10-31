@@ -252,7 +252,7 @@ template<typename T> class OutputAttribute_Typed {
   OutputAttribute_Typed(OutputAttribute attribute) : attribute_(std::move(attribute))
   {
     if (attribute_) {
-      varray_ = attribute_.varray().typed<T>();
+      varray_ = attribute_.varray().template typed<T>();
     }
   }
 
