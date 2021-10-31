@@ -591,13 +591,9 @@ IndexRange GVArrayCommon::index_range() const
 /** \name #GVArray
  * \{ */
 
-GVArray::GVArray(const GVArray &other) : GVArrayCommon(other)
-{
-}
+GVArray::GVArray(const GVArray &other) = default;
 
-GVArray::GVArray(GVArray &&other) noexcept : GVArrayCommon(std::move(other))
-{
-}
+GVArray::GVArray(GVArray &&other) noexcept = default;
 
 GVArray::GVArray(const GVArrayImpl *impl) : GVArrayCommon(impl)
 {
@@ -671,13 +667,8 @@ GVArray &GVArray::operator=(GVArray &&other) noexcept
 /** \name #GVMutableArray
  * \{ */
 
-GVMutableArray::GVMutableArray(const GVMutableArray &other) : GVArrayCommon(other)
-{
-}
-
-GVMutableArray::GVMutableArray(GVMutableArray &&other) noexcept : GVArrayCommon(std::move(other))
-{
-}
+GVMutableArray::GVMutableArray(const GVMutableArray &other) = default;
+GVMutableArray::GVMutableArray(GVMutableArray &&other) noexcept = default;
 
 GVMutableArray::GVMutableArray(GVMutableArrayImpl *impl) : GVArrayCommon(impl)
 {

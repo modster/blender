@@ -810,14 +810,8 @@ template<typename T> class VArray : public VArrayCommon<T> {
 
  public:
   VArray() = default;
-
-  VArray(const VArray &other) : VArrayCommon<T>(other)
-  {
-  }
-
-  VArray(VArray &&other) noexcept : VArrayCommon<T>(std::move(other))
-  {
-  }
+  VArray(const VArray &other) = default;
+  VArray(VArray &&other) noexcept = default;
 
   VArray(const VArrayImpl<T> *impl) : VArrayCommon<T>(impl)
   {
@@ -903,14 +897,8 @@ template<typename T> class VArray : public VArrayCommon<T> {
 template<typename T> class VMutableArray : public VArrayCommon<T> {
  public:
   VMutableArray() = default;
-
-  VMutableArray(const VMutableArray &other) : VArrayCommon<T>(other)
-  {
-  }
-
-  VMutableArray(VMutableArray &&other) noexcept : VArrayCommon<T>(std::move(other))
-  {
-  }
+  VMutableArray(const VMutableArray &other) = default;
+  VMutableArray(VMutableArray &&other) noexcept = default;
 
   VMutableArray(const VMutableArrayImpl<T> *impl) : VArrayCommon<T>(impl)
   {
