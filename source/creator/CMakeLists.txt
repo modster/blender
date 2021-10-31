@@ -639,6 +639,18 @@ if(UNIX AND NOT APPLE)
           PATTERN "*.h" EXCLUDE                   # some includes are not in include dirs
           PATTERN "*.a" EXCLUDE                   # ./core/lib/libnpymath.a - for linking, we don't need.
         )
+        install(
+          DIRECTORY ${PYTHON_NUMPY_PATH}/Cython
+          DESTINATION ${TARGETDIR_VER}/python/${_target_LIB}/python${PYTHON_VERSION}/${_suffix}
+          PATTERN ".svn" EXCLUDE
+          PATTERN "__pycache__" EXCLUDE           # * any cache *
+          PATTERN "*.pyc" EXCLUDE                 # * any cache *
+          PATTERN "*.pyo" EXCLUDE                 # * any cache *
+        )
+        install(
+          FILES ${PYTHON_NUMPY_PATH}/cython.py
+          DESTINATION ${TARGETDIR_VER}/python/${_target_LIB}/python${PYTHON_VERSION}/${_suffix}
+        )
         unset(_suffix)
       endif()
 
@@ -977,6 +989,13 @@ elseif(WIN32)
       ${CMAKE_SOURCE_DIR}/release/windows/batch/oculus.json
     DESTINATION "."
   )
+
+  if(WITH_BLENDER_THUMBNAILER)
+    install(
+      TARGETS BlendThumb
+      DESTINATION "."
+    )
+  endif()
 
   if(WITH_DRACO)
     install(

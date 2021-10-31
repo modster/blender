@@ -19,27 +19,28 @@
 #include "kernel/device/gpu/parallel_active_index.h"
 #include "kernel/device/gpu/parallel_prefix_sum.h"
 #include "kernel/device/gpu/parallel_sorted_index.h"
+#include "kernel/device/gpu/work_stealing.h"
 
-#include "kernel/integrator/integrator_state.h"
-#include "kernel/integrator/integrator_state_flow.h"
-#include "kernel/integrator/integrator_state_util.h"
+#include "kernel/integrator/state.h"
+#include "kernel/integrator/state_flow.h"
+#include "kernel/integrator/state_util.h"
 
-#include "kernel/integrator/integrator_init_from_bake.h"
-#include "kernel/integrator/integrator_init_from_camera.h"
-#include "kernel/integrator/integrator_intersect_closest.h"
-#include "kernel/integrator/integrator_intersect_shadow.h"
-#include "kernel/integrator/integrator_intersect_subsurface.h"
-#include "kernel/integrator/integrator_intersect_volume_stack.h"
-#include "kernel/integrator/integrator_shade_background.h"
-#include "kernel/integrator/integrator_shade_light.h"
-#include "kernel/integrator/integrator_shade_shadow.h"
-#include "kernel/integrator/integrator_shade_surface.h"
-#include "kernel/integrator/integrator_shade_volume.h"
+#include "kernel/integrator/init_from_bake.h"
+#include "kernel/integrator/init_from_camera.h"
+#include "kernel/integrator/intersect_closest.h"
+#include "kernel/integrator/intersect_shadow.h"
+#include "kernel/integrator/intersect_subsurface.h"
+#include "kernel/integrator/intersect_volume_stack.h"
+#include "kernel/integrator/shade_background.h"
+#include "kernel/integrator/shade_light.h"
+#include "kernel/integrator/shade_shadow.h"
+#include "kernel/integrator/shade_surface.h"
+#include "kernel/integrator/shade_volume.h"
 
-#include "kernel/kernel_adaptive_sampling.h"
-#include "kernel/kernel_bake.h"
-#include "kernel/kernel_film.h"
-#include "kernel/kernel_work_stealing.h"
+#include "kernel/bake/bake.h"
+
+#include "kernel/film/adaptive_sampling.h"
+#include "kernel/film/read.h"
 
 /* --------------------------------------------------------------------
  * Integrator.
@@ -516,7 +517,7 @@ ccl_device_inline void kernel_gpu_film_convert_half_rgba_common_rgba(
   film_apply_pass_pixel_overlays_rgba(kfilm_convert, buffer, pixel);
 
   ccl_global half4 *out = ((ccl_global half4 *)rgba) + rgba_offset + y * rgba_stride + x;
-  float4_store_half((ccl_global half *)out, make_float4(pixel[0], pixel[1], pixel[2], pixel[3]));
+  *out = float4_to_half4_display(make_float4(pixel[0], pixel[1], pixel[2], pixel[3]));
 }
 
 /* Common implementation for half4 destination and 3-channel input pass. */

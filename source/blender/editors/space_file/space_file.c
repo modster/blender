@@ -328,8 +328,9 @@ static void file_refresh(const bContext *C, ScrArea *area)
   }
 
   if (ED_fileselect_is_asset_browser(sfile)) {
-    /* Ask the asset code for appropriate ID filter flags for the supported assets. */
-    params->filter_id = ED_asset_types_supported_as_filter_flags();
+    /* Ask the asset code for appropriate ID filter flags for the supported assets, and mask others
+     * out. */
+    params->filter_id &= ED_asset_types_supported_as_filter_flags();
   }
 
   filelist_settype(sfile->files, params->type);
@@ -658,7 +659,7 @@ static void file_main_region_draw(const bContext *C, ARegion *region)
     file_highlight_set(sfile, region, event->xy[0], event->xy[1]);
   }
 
-  if (!file_draw_hint_if_invalid(sfile, region)) {
+  if (!file_draw_hint_if_invalid(C, sfile, region)) {
     file_draw_list(C, region);
   }
 
@@ -687,6 +688,7 @@ static void file_operatortypes(void)
   WM_operatortype_append(FILE_OT_previous);
   WM_operatortype_append(FILE_OT_next);
   WM_operatortype_append(FILE_OT_refresh);
+  WM_operatortype_append(FILE_OT_asset_library_refresh);
   WM_operatortype_append(FILE_OT_bookmark_add);
   WM_operatortype_append(FILE_OT_bookmark_delete);
   WM_operatortype_append(FILE_OT_bookmark_cleanup);

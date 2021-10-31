@@ -1550,7 +1550,7 @@ void UI_panel_category_draw_all(ARegion *region, const char *category_id_active)
     }
 
     BLF_position(fontid, rct->xmax - text_v_ofs, rct->ymin + tab_v_pad_text, 0.0f);
-    BLF_color3ubv(fontid, theme_col_text);
+    BLF_color3ubv(fontid, is_active ? theme_col_text_hi : theme_col_text);
     BLF_draw(fontid, category_id_draw, category_draw_len);
 
     GPU_blend(GPU_BLEND_NONE);
@@ -2100,7 +2100,7 @@ static void ui_handle_panel_header(const bContext *C,
   BLI_assert(!(panel->type->flag & PANEL_TYPE_NO_HEADER));
 
   const bool is_subpanel = (panel->type->parent != NULL);
-  const bool use_pin = UI_panel_category_is_visible(region) && !is_subpanel;
+  const bool use_pin = UI_panel_category_is_visible(region) && UI_panel_can_be_pinned(panel);
   const bool show_pin = use_pin && (panel->flag & PNL_PIN);
   const bool show_drag = !is_subpanel;
 
@@ -2495,6 +2495,11 @@ PointerRNA *UI_region_panel_custom_data_under_cursor(const bContext *C, const wm
   }
 
   return NULL;
+}
+
+bool UI_panel_can_be_pinned(const Panel *panel)
+{
+  return (panel->type->parent == NULL) && !(panel->type->flag & PANEL_TYPE_INSTANCED);
 }
 
 /** \} */

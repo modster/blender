@@ -128,7 +128,14 @@ __device__ half __float2half(const float f)
   return val;
 }
 
+__device__ float __half2float(const half h)
+{
+  float val;
+  asm("{  cvt.f32.f16 %0, %1;}\n" : "=f"(val) : "h"(h));
+  return val;
+}
+
 /* Types */
 
-#include "util/util_half.h"
-#include "util/util_types.h"
+#include "util/half.h"
+#include "util/types.h"

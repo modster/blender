@@ -16,15 +16,15 @@
 
 #include "integrator/pass_accessor_cpu.h"
 
-#include "render/buffers.h"
-#include "util/util_logging.h"
-#include "util/util_tbb.h"
+#include "session/buffers.h"
+#include "util/log.h"
+#include "util/tbb.h"
 
 // clang-format off
 #include "kernel/device/cpu/compat.h"
 #include "kernel/device/cpu/globals.h"
-#include "kernel/kernel_types.h"
-#include "kernel/kernel_film.h"
+#include "kernel/types.h"
+#include "kernel/film/read.h"
 // clang-format on
 
 CCL_NAMESPACE_BEGIN
@@ -148,8 +148,8 @@ inline void PassAccessorCPU::run_get_pass_kernel_processor_half_rgba(
 
       film_apply_pass_pixel_overlays_rgba(kfilm_convert, buffer, pixel_rgba);
 
-      float4_store_half(&pixel->x,
-                        make_float4(pixel_rgba[0], pixel_rgba[1], pixel_rgba[2], pixel_rgba[3]));
+      *pixel = float4_to_half4_display(
+          make_float4(pixel_rgba[0], pixel_rgba[1], pixel_rgba[2], pixel_rgba[3]));
     }
   });
 }
