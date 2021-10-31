@@ -673,7 +673,6 @@ template<typename ImplT, typename... Args> inline void GVArrayCommon::emplace(Ar
     impl_ = &storage_.template emplace<ImplT>(std::forward<Args>(args)...);
   }
   else {
-    std::cout << typeid(ImplT).name() << "\n";
     std::shared_ptr<const GVArrayImpl> ptr = std::make_shared<ImplT>(std::forward<Args>(args)...);
     impl_ = &*ptr;
     storage_ = std::move(ptr);
