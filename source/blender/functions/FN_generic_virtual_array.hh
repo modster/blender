@@ -331,7 +331,7 @@ template<typename T> class GVArrayImpl_For_VArray : public GVArrayImpl {
     return true;
   }
 
-  bool may_have_ownership() const
+  bool may_have_ownership() const override
   {
     return varray_.may_have_ownership();
   }
@@ -480,7 +480,7 @@ template<typename T> class GVMutableArrayImpl_For_VMutableArray : public GVMutab
     return true;
   }
 
-  bool may_have_ownership() const
+  bool may_have_ownership() const override
   {
     return varray_.may_have_ownership();
   }

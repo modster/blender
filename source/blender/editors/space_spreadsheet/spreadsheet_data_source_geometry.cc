@@ -72,7 +72,7 @@ static std::optional<eSpreadsheetColumnValueType> cpp_type_to_column_value_type(
 void ExtraColumns::foreach_default_column_ids(
     FunctionRef<void(const SpreadsheetColumnID &, bool is_extra)> fn) const
 {
-  for (const auto &item : columns_.items()) {
+  for (const auto item : columns_.items()) {
     SpreadsheetColumnID column_id;
     column_id.name = (char *)item.key.c_str();
     fn(column_id, true);
@@ -644,7 +644,7 @@ static void add_fields_as_extra_columns(SpaceSpreadsheet *sspreadsheet,
 
   const AttributeDomain domain = (AttributeDomain)sspreadsheet->attribute_domain;
   const int domain_size = component.attribute_domain_size(domain);
-  for (const auto &item : fields_to_show.items()) {
+  for (const auto item : fields_to_show.items()) {
     StringRef name = item.key;
     const GField &field = item.value;
 

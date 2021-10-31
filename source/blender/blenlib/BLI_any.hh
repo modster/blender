@@ -26,6 +26,7 @@
  * - Can store additional user-defined type information without increasing the stack size of #Any.
  */
 
+#include <algorithm>
 #include <utility>
 
 #include "BLI_memory_utils.hh"
