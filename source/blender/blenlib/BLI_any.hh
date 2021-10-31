@@ -181,7 +181,7 @@ class Any {
    * \note: The #other #Any will not be empty afterwards if it was not before. Just its value is in
    * a moved-from state.
    */
-  Any(Any &&other) : info_(other.info_)
+  Any(Any &&other) noexcept : info_(other.info_)
   {
     info_->move_construct(&buffer_, &other.buffer_);
   }

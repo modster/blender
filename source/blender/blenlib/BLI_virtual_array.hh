@@ -586,7 +586,7 @@ template<typename T> class VArrayCommon {
   }
 
   /** Move constructor. */
-  VArrayCommon(VArrayCommon &&other) : storage_(std::move(other.storage_))
+  VArrayCommon(VArrayCommon &&other) noexcept : storage_(std::move(other.storage_))
   {
     impl_ = this->impl_from_storage();
     other.storage_.reset();
@@ -645,7 +645,7 @@ template<typename T> class VArrayCommon {
   }
 
   /** Utility to implement a move assignment operator in a subclass. */
-  void move_from(VArrayCommon &&other)
+  void move_from(VArrayCommon &&other) noexcept
   {
     if (this == &other) {
       return;
@@ -815,7 +815,7 @@ template<typename T> class VArray : public VArrayCommon<T> {
   {
   }
 
-  VArray(VArray &&other) : VArrayCommon<T>(std::move(other))
+  VArray(VArray &&other) noexcept : VArrayCommon<T>(std::move(other))
   {
   }
 
@@ -890,7 +890,7 @@ template<typename T> class VArray : public VArrayCommon<T> {
     return *this;
   }
 
-  VArray &operator=(VArray &&other)
+  VArray &operator=(VArray &&other) noexcept
   {
     this->move_from(std::move(other));
     return *this;
@@ -908,7 +908,7 @@ template<typename T> class VMutableArray : public VArrayCommon<T> {
   {
   }
 
-  VMutableArray(VMutableArray &&other) : VArrayCommon<T>(std::move(other))
+  VMutableArray(VMutableArray &&other) noexcept : VArrayCommon<T>(std::move(other))
   {
   }
 
@@ -960,7 +960,7 @@ template<typename T> class VMutableArray : public VArrayCommon<T> {
   }
 
   /** Convert to a #VArray by moving. */
-  operator VArray<T>() const &&
+  operator VArray<T>() &&noexcept
   {
     VArray<T> varray;
     varray.move_from(*this);
@@ -973,7 +973,7 @@ template<typename T> class VMutableArray : public VArrayCommon<T> {
     return *this;
   }
 
-  VMutableArray &operator=(VMutableArray &&other)
+  VMutableArray &operator=(VMutableArray &&other) noexcept
   {
     this->move_from(std::move(other));
     return *this;

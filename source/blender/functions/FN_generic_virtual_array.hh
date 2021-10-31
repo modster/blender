@@ -120,7 +120,7 @@ class GVArrayCommon {
  protected:
   GVArrayCommon();
   GVArrayCommon(const GVArrayCommon &other);
-  GVArrayCommon(GVArrayCommon &&other);
+  GVArrayCommon(GVArrayCommon &&other) noexcept;
   GVArrayCommon(const GVArrayImpl *impl);
   GVArrayCommon(std::shared_ptr<const GVArrayImpl> impl);
   ~GVArrayCommon();
@@ -128,7 +128,7 @@ class GVArrayCommon {
   template<typename ImplT, typename... Args> void emplace(Args &&...args);
 
   void copy_from(const GVArrayCommon &other);
-  void move_from(GVArrayCommon &&other);
+  void move_from(GVArrayCommon &&other) noexcept;
 
   const GVArrayImpl *impl_from_storage() const;
 
@@ -169,7 +169,7 @@ class GVArray : public GVArrayCommon {
   GVArray() = default;
 
   GVArray(const GVArray &other);
-  GVArray(GVArray &&other);
+  GVArray(GVArray &&other) noexcept;
   GVArray(const GVArrayImpl *impl);
   GVArray(std::shared_ptr<const GVArrayImpl> impl);
 
@@ -188,7 +188,7 @@ class GVArray : public GVArrayCommon {
   GVArray slice(IndexRange slice) const;
 
   GVArray &operator=(const GVArray &other);
-  GVArray &operator=(GVArray &&other);
+  GVArray &operator=(GVArray &&other) noexcept;
 
   const GVArrayImpl *get_implementation() const
   {
@@ -201,7 +201,7 @@ class GVMutableArray : public GVArrayCommon {
  public:
   GVMutableArray() = default;
   GVMutableArray(const GVMutableArray &other);
-  GVMutableArray(GVMutableArray &&other);
+  GVMutableArray(GVMutableArray &&other) noexcept;
   GVMutableArray(GVMutableArrayImpl *impl);
   GVMutableArray(std::shared_ptr<GVMutableArrayImpl> impl);
 
@@ -212,10 +212,11 @@ class GVMutableArray : public GVArrayCommon {
 
   static GVMutableArray ForSpan(GMutableSpan span);
 
-  operator GVArray() const;
+  operator GVArray() const &;
+  operator GVArray() &&noexcept;
 
   GVMutableArray &operator=(const GVMutableArray &other);
-  GVMutableArray &operator=(GVMutableArray &&other);
+  GVMutableArray &operator=(GVMutableArray &&other) noexcept;
 
   GMutableSpan get_internal_span() const;
 

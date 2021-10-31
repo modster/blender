@@ -459,7 +459,7 @@ GVArrayCommon::GVArrayCommon(const GVArrayCommon &other) : storage_(other.storag
   impl_ = this->impl_from_storage();
 }
 
-GVArrayCommon::GVArrayCommon(GVArrayCommon &&other) : storage_(std::move(other.storage_))
+GVArrayCommon::GVArrayCommon(GVArrayCommon &&other) noexcept : storage_(std::move(other.storage_))
 {
   impl_ = this->impl_from_storage();
   other.storage_.reset();
@@ -515,7 +515,7 @@ void GVArrayCommon::copy_from(const GVArrayCommon &other)
   impl_ = this->impl_from_storage();
 }
 
-void GVArrayCommon::move_from(GVArrayCommon &&other)
+void GVArrayCommon::move_from(GVArrayCommon &&other) noexcept
 {
   if (this == &other) {
     return;
@@ -595,7 +595,7 @@ GVArray::GVArray(const GVArray &other) : GVArrayCommon(other)
 {
 }
 
-GVArray::GVArray(GVArray &&other) : GVArrayCommon(std::move(other))
+GVArray::GVArray(GVArray &&other) noexcept : GVArrayCommon(std::move(other))
 {
 }
 
@@ -659,7 +659,7 @@ GVArray &GVArray::operator=(const GVArray &other)
   return *this;
 }
 
-GVArray &GVArray::operator=(GVArray &&other)
+GVArray &GVArray::operator=(GVArray &&other) noexcept
 {
   this->move_from(std::move(other));
   return *this;
@@ -675,7 +675,7 @@ GVMutableArray::GVMutableArray(const GVMutableArray &other) : GVArrayCommon(othe
 {
 }
 
-GVMutableArray::GVMutableArray(GVMutableArray &&other) : GVArrayCommon(std::move(other))
+GVMutableArray::GVMutableArray(GVMutableArray &&other) noexcept : GVArrayCommon(std::move(other))
 {
 }
 
@@ -693,11 +693,17 @@ GVMutableArray GVMutableArray::ForSpan(GMutableSpan span)
   return GVMutableArray::For<GVMutableArrayImpl_For_GMutableSpan_final>(span);
 }
 
-GVMutableArray::operator GVArray() const
+GVMutableArray::operator GVArray() const &
 {
   GVArray varray;
-  varray.impl_ = impl_;
-  varray.storage_ = storage_;
+  varray.copy_from(*this);
+  return varray;
+}
+
+GVMutableArray::operator GVArray() &&noexcept
+{
+  GVArray varray;
+  varray.move_from(std::move(*this));
   return varray;
 }
 
@@ -707,7 +713,7 @@ GVMutableArray &GVMutableArray::operator=(const GVMutableArray &other)
   return *this;
 }
 
-GVMutableArray &GVMutableArray::operator=(GVMutableArray &&other)
+GVMutableArray &GVMutableArray::operator=(GVMutableArray &&other) noexcept
 {
   this->move_from(std::move(other));
   return *this;
