@@ -93,6 +93,8 @@ void ShadingView::sync(ivec2 render_extent_)
   dof_.sync(winmat_p, extent_);
   mb_.sync(extent_);
   velocity_.sync(extent_);
+  rt_buffer_opaque_.sync(extent_);
+  rt_buffer_refract_.sync(extent_);
 
   {
     /* Query temp textures and create framebuffers. */
@@ -134,7 +136,13 @@ void ShadingView::render(void)
     inst_.shading_passes.background.render();
   }
 
-  inst_.shading_passes.deferred.render(gbuffer_, hiz_front_, hiz_back_, view_fb_);
+  inst_.shading_passes.deferred.render(render_view_,
+                                       gbuffer_,
+                                       hiz_front_,
+                                       hiz_back_,
+                                       rt_buffer_opaque_,
+                                       rt_buffer_refract_,
+                                       view_fb_);
 
   inst_.lightprobes.draw_cache_display();
 
@@ -228,6 +236,8 @@ void LightProbeView::sync(Texture &color_tx,
      * With this, we can reuse the same texture across views. */
     DrawEngineType *owner = (DrawEngineType *)name_;
     gbuffer_.sync(depth_tx, color_tx, owner, layer_);
+    rt_buffer_opaque_.sync(extent_);
+    rt_buffer_refract_.sync(extent_);
   }
 }
 
@@ -248,7 +258,8 @@ void LightProbeView::render(void)
   if (!is_only_background_) {
     GPU_framebuffer_clear_depth(view_fb_, 1.0f);
 
-    inst_.shading_passes.deferred.render(gbuffer_, hiz_front_, hiz_back_, view_fb_);
+    inst_.shading_passes.deferred.render(
+        view_, gbuffer_, hiz_front_, hiz_back_, rt_buffer_opaque_, rt_buffer_refract_, view_fb_);
     inst_.shading_passes.forward.render(gbuffer_, hiz_front_, view_fb_);
   }
   DRW_stats_group_end();

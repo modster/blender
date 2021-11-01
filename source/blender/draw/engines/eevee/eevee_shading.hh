@@ -32,6 +32,7 @@
 
 #include "eevee_culling.hh"
 #include "eevee_gbuffer.hh"
+#include "eevee_raytracing.hh"
 #include "eevee_shadow.hh"
 #include "eevee_velocity.hh"
 
@@ -137,6 +138,7 @@ class DeferredLayer {
   void render(GBuffer &gbuffer,
               HiZBuffer &hiz_front,
               HiZBuffer &hiz_back,
+              RaytraceBuffer &rtbuffer,
               GPUFrameBuffer *view_fb);
 
  private:
@@ -150,7 +152,7 @@ class DeferredPass {
   Instance &inst_;
 
   /* Gbuffer filling passes. We could have an arbitrary number of them but for now we just have
-   * a harcoded number of them. */
+   * a hardcoded number of them. */
   DeferredLayer opaque_layer_;
   DeferredLayer refraction_layer_;
   DeferredLayer volumetric_layer_;
@@ -161,13 +163,6 @@ class DeferredPass {
   DRWPass *eval_holdout_ps_ = nullptr;
   // DRWPass *eval_volume_heterogeneous_ps_ = nullptr;
   DRWPass *eval_volume_homogeneous_ps_ = nullptr;
-
-  DRWPass *resolve_diffuse_ps_ = nullptr;
-  DRWPass *resolve_reflection_ps_ = nullptr;
-  DRWPass *resolve_refraction_ps_ = nullptr;
-  DRWPass *trace_diffuse_ps_ = nullptr;
-  DRWPass *trace_reflection_ps_ = nullptr;
-  DRWPass *trace_refraction_ps_ = nullptr;
 
   /* References only. */
   GPUTexture *input_combined_tx_ = nullptr;
@@ -185,8 +180,6 @@ class DeferredPass {
   GPUTexture *input_volume_data_tx_ = nullptr;
   // GPUTexture *input_volume_radiance_tx_ = nullptr;
   // GPUTexture *input_volume_transmittance_tx_ = nullptr;
-  GPUTexture *input_ray_data_tx_ = nullptr;
-  GPUTexture *input_ray_radiance_tx_ = nullptr;
 
  public:
   DeferredPass(Instance &inst)
@@ -196,9 +189,12 @@ class DeferredPass {
   DRWShadingGroup *material_add(::Material *material, GPUMaterial *gpumat);
   DRWShadingGroup *prepass_add(::Material *material, GPUMaterial *gpumat);
   void volume_add(Object *ob);
-  void render(GBuffer &gbuffer,
+  void render(const DRWView *drw_view,
+              GBuffer &gbuffer,
               HiZBuffer &hiz_front,
               HiZBuffer &hiz_back,
+              RaytraceBuffer &rtbuffer_opaque,
+              RaytraceBuffer &rtbuffer_refract,
               GPUFrameBuffer *view_fb);
 };
 

@@ -39,6 +39,7 @@
 #include "eevee_depth_of_field.hh"
 #include "eevee_hizbuffer.hh"
 #include "eevee_motion_blur.hh"
+#include "eevee_raytracing.hh"
 #include "eevee_renderpasses.hh"
 #include "eevee_shader.hh"
 #include "eevee_shading.hh"
@@ -71,6 +72,9 @@ class ShadingView {
   GBuffer gbuffer_;
   /** HiZBuffer for screenspace effects. */
   HiZBuffer hiz_front_, hiz_back_;
+  /** Raytracing persistent buffers. Only opaque and refraction can have surface tracing. */
+  RaytraceBuffer rt_buffer_opaque_;
+  RaytraceBuffer rt_buffer_refract_;
 
   /** Owned resources. */
   eevee::Framebuffer view_fb_;
@@ -102,7 +106,9 @@ class ShadingView {
         mb_(inst, name),
         velocity_(inst, name),
         hiz_front_(inst),
-        hiz_back_(inst){};
+        hiz_back_(inst),
+        rt_buffer_opaque_(inst),
+        rt_buffer_refract_(inst){};
 
   ~ShadingView(){};
 
@@ -137,6 +143,9 @@ class LightProbeView {
   GBuffer gbuffer_;
   /** HiZBuffer for screenspace effects. */
   HiZBuffer hiz_front_, hiz_back_;
+  /** Raytracing persistent buffers. Only opaque and refraction can have surface tracing. */
+  RaytraceBuffer rt_buffer_opaque_;
+  RaytraceBuffer rt_buffer_refract_;
   /** Owned resources. */
   Framebuffer view_fb_;
   /** DRWView of this face. */
@@ -154,6 +163,8 @@ class LightProbeView {
         face_matrix_(face_matrix),
         hiz_front_(inst),
         hiz_back_(inst),
+        rt_buffer_opaque_(inst),
+        rt_buffer_refract_(inst),
         layer_(layer_){};
 
   ~LightProbeView(){};

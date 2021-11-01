@@ -117,6 +117,17 @@ ClosureDiffuse gbuffer_load_diffuse_data(vec4 color_in, vec4 normal_in, vec4 dat
   return data_out;
 }
 
+ClosureDiffuse gbuffer_load_diffuse_data(sampler2D transmit_color_tx,
+                                         sampler2D transmit_normal_tx,
+                                         sampler2D transmit_data_tx,
+                                         vec2 uv)
+{
+  vec4 tra_col_in = texture(transmit_color_tx, uv);
+  vec4 tra_nor_in = texture(transmit_normal_tx, uv);
+  vec4 tra_dat_in = texture(transmit_data_tx, uv);
+  return gbuffer_load_diffuse_data(tra_col_in, tra_nor_in, tra_dat_in);
+}
+
 /** \} */
 
 /* -------------------------------------------------------------------- */

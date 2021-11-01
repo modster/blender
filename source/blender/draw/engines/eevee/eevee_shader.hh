@@ -100,6 +100,9 @@ enum eShaderType {
   RAYTRACE_REFLECTION_FALLBACK,
   RAYTRACE_REFRACTION,
   RAYTRACE_REFRACTION_FALLBACK,
+  RAYTRACE_DENOISE_DIFFUSE,
+  RAYTRACE_DENOISE_REFLECTION,
+  RAYTRACE_DENOISE_REFRACTION,
   RAYTRACE_RESOLVE_DIFFUSE,
   RAYTRACE_RESOLVE_REFLECTION,
   RAYTRACE_RESOLVE_REFRACTION,
@@ -120,11 +123,12 @@ enum eShaderType {
 class ShaderModule {
  private:
   struct ShaderDescription {
-    const char *name;
-    const char *vertex_shader_code;
-    const char *geometry_shader_code;
-    const char *fragment_shader_code;
-    const char *defines_shader_code;
+    const char *name = nullptr;
+    const char *vertex_shader_code = nullptr;
+    const char *geometry_shader_code = nullptr;
+    const char *fragment_shader_code = nullptr;
+    const char *compute_shader_code = nullptr;
+    const char *defines_shader_code = nullptr;
   };
 
   DRWShaderLibrary *shader_lib_ = nullptr;

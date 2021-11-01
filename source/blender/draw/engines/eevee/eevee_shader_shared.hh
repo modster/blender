@@ -652,6 +652,17 @@ struct RaytraceData {
 };
 BLI_STATIC_ASSERT_ALIGN(RaytraceData, 16)
 
+struct RaytraceBufferData {
+  /** ViewProjection matrix used to render the previous frame. */
+  mat4 history_persmat;
+  /** False if the history buffer was just allocated and contains uninitialized data. */
+  bool valid_history_diffuse;
+  bool valid_history_reflection;
+  bool valid_history_refraction;
+  int _pad0;
+};
+BLI_STATIC_ASSERT_ALIGN(RaytraceData, 16)
+
 /** \} */
 
 /* -------------------------------------------------------------------- */
@@ -745,6 +756,7 @@ using HiZDataBuf = StructBuffer<HiZData>;
 using LightDataBuf = StructArrayBuffer<LightData, CULLING_ITEM_BATCH>;
 using LightProbeFilterDataBuf = StructBuffer<LightProbeFilterData>;
 using LightProbeInfoDataBuf = StructBuffer<LightProbeInfoData>;
+using RaytraceBufferDataBuf = StructBuffer<RaytraceBufferData>;
 using RaytraceDataBuf = StructBuffer<RaytraceData>;
 using ShadowPunctualDataBuf = StructArrayBuffer<ShadowPunctualData, CULLING_ITEM_BATCH>;
 using SubsurfaceDataBuf = StructBuffer<SubsurfaceData>;

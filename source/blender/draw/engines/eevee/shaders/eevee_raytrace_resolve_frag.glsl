@@ -1,7 +1,11 @@
 
 /**
- * Denoise raytrace result using ratio estimator.
+ * Final denoise step using a bilateral filter. Filter radius is controled by variance estimate.
  *
+ * Inputs: Ray radiance (denoised), Mean hit depth, Extimated variance from ray reconstruction
+ * Outputs: Ray radiance (filtered).
+ *
+ * Linear depth is packed in ray_radiance for this step.
  * Following "Stochastic All The Things: Raytracing in Hybrid Real-Time Rendering"
  * by Tomasz Stachowiak
  * https://www.ea.com/seed/news/seed-dd18-presentation-slides-raytracing
@@ -11,27 +15,19 @@
 #pragma BLENDER_REQUIRE(common_view_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_bsdf_microfacet_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_gbuffer_lib.glsl)
-#pragma BLENDER_REQUIRE(eevee_raytrace_resolve_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_sampling_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
-
-layout(std140) uniform raytrace_block
-{
-  RaytraceData raytrace;
-};
 
 layout(std140) uniform hiz_block
 {
   HiZData hiz;
 };
 
-uniform sampler2D ray_data_tx;
 uniform sampler2D ray_radiance_tx;
-uniform sampler2D transmit_color_tx;
-uniform sampler2D transmit_normal_tx;
-uniform sampler2D transmit_data_tx;
-uniform sampler2D reflect_color_tx;
-uniform sampler2D reflect_normal_tx;
+uniform sampler2D ray_variance_tx;
+uniform sampler2D cl_color_tx;
+uniform sampler2D cl_normal_tx;
+uniform sampler2D cl_data_tx;
 
 in vec4 uvcoordsvar;
 
@@ -39,117 +35,89 @@ layout(location = 0) out vec4 out_combined;
 layout(location = 1) out vec4 out_diffuse;
 layout(location = 2) out vec3 out_specular;
 
+#if defined(DIFFUSE)
+#  define RADIUS 4
+#elif defined(REFRACTION)
+#  define RADIUS 1
+#else
+#  define RADIUS 1
+#endif
+
+float normal_pdf(float x_sqr, float sigma_inv, float sigma_inv_sqr)
+{
+  return exp(-0.5 * x_sqr * sigma_inv_sqr) * sigma_inv;
+}
+
 void main(void)
 {
   vec2 uv = uvcoordsvar.xy;
-  vec3 vP = get_view_space_from_depth(uv, 0.5);
-  vec3 vV = viewCameraVec(vP);
+  float ray_variance = texture(ray_variance_tx, uv).r;
+  vec4 ray_data = texture(ray_radiance_tx, uv);
+  float center_depth = ray_data.w;
+  vec2 texel_size = hiz.pixel_to_ndc * 0.5;
 
   out_combined = vec4(0.0);
   out_diffuse = vec4(0.0);
   out_specular = vec3(0.0);
 
-  /* Blue noise categorised into 4 sets of samples.
-   * See "Stochastic all the things" presentation slide 32-37. */
-  int sample_pool = int((uint(gl_FragCoord.x) & 1u) + (uint(gl_FragCoord.y) & 1u) * 2u);
-  sample_pool = (sample_pool + raytrace.pool_offset) % 4;
-  int sample_id = sample_pool * resolve_sample_max;
-  int sample_count = resolve_sample_max;
-
 #if defined(DIFFUSE)
-  vec4 tra_col_in = texture(transmit_color_tx, uv);
-  vec4 tra_nor_in = texture(transmit_normal_tx, uv);
-  vec4 tra_dat_in = vec4(0.0); /* UNUSED */
-
-  ClosureDiffuse diffuse = gbuffer_load_diffuse_data(tra_col_in, tra_nor_in, tra_dat_in);
-
-  if (diffuse.sss_radius.r < 0.0) {
-    /* Refraction pixel. */
+  ClosureDiffuse closure = gbuffer_load_diffuse_data(cl_color_tx, cl_normal_tx, cl_data_tx, uv);
+  if (closure.sss_radius.r < 0.0) {
     return;
   }
-
-  vec3 vN = transform_direction(ViewMatrix, diffuse.N);
-  vec3 color = diffuse.color;
-
+  float sigma_pixel = 3.0;
 #elif defined(REFRACTION)
-  vec4 tra_col_in = texture(transmit_color_tx, uv);
-  vec4 tra_nor_in = texture(transmit_normal_tx, uv);
-  vec4 tra_dat_in = texture(transmit_data_tx, uv);
-
-  ClosureRefraction refraction = gbuffer_load_refraction_data(tra_col_in, tra_nor_in, tra_dat_in);
-
-  if (refraction.ior == -1.0) {
-    /* Diffuse/SSS pixel. */
+  ClosureRefraction closure = gbuffer_load_refraction_data(
+      cl_color_tx, cl_normal_tx, cl_data_tx, uv);
+  if (closure.ior == -1.0) {
     return;
   }
-  float thickness;
-  gbuffer_load_global_data(tra_nor_in, thickness);
-
-  vec3 vN = transform_direction(ViewMatrix, refraction.N);
-  float roughness_sqr = max(1e-3, sqr(refraction.roughness));
-  vec3 color = refraction.color;
-
-  /* TODO(fclem): Unfortunately Refraction ray reuse does not work great for some reasons.
-   * To investigate. */
-  sample_count = 1;
+  float sigma_pixel = 1.0;
 #else
-  ClosureReflection reflection = gbuffer_load_reflection_data(
-      reflect_color_tx, reflect_normal_tx, uv);
-
-  vec3 vN = transform_direction(ViewMatrix, reflection.N);
-  float roughness_sqr = max(1e-3, sqr(reflection.roughness));
-  vec3 color = reflection.color;
-
-  if (roughness_sqr == 1e-3) {
-    sample_count = 1;
-  }
+  ClosureReflection closure = gbuffer_load_reflection_data(cl_color_tx, cl_normal_tx, uv);
+  float sigma_pixel = 1.0;
 #endif
+  /* TODO(fclem): Sigma based on variance. */
+  float sigma_depth = 0.1; /* TODO user option? */
 
-  vec3 radiance_accum = vec3(0.0);
-  float weight_accum = 0.0;
-  for (int i = 0; i < sample_count; i++, sample_id++) {
-    vec2 sample_uv = uv + resolve_sample_offsets[sample_id] * hiz.pixel_to_ndc * 0.5;
+  float px_sigma_inv = 1.0 / sigma_pixel;
+  float px_sigma_inv_sqr = sqr(px_sigma_inv);
+  float depth_sigma_inv = 1.0 / sigma_depth;
+  float depth_sigma_inv_sqr = sqr(depth_sigma_inv);
 
-    vec4 ray_data = texture(ray_data_tx, sample_uv);
-    vec4 ray_radiance = texture(ray_radiance_tx, sample_uv);
+  float weight_accum = normal_pdf(0.0, px_sigma_inv, px_sigma_inv_sqr);
+  vec3 radiance_accum = ray_data.rgb * weight_accum;
+  for (int x = -RADIUS; x <= RADIUS; x++) {
+    for (int y = -RADIUS; y <= RADIUS; y++) {
+      /* Skip center pixels. */
+      if (x == 0 && y == 0) {
+        continue;
+      }
+      vec2 sample_uv = uv + vec2(x, y) * texel_size;
+      vec4 ray_data = texture(ray_radiance_tx, sample_uv);
+      /* Skip unprocessed pixels. */
+      if (ray_data.w == 0.0) {
+        continue;
+      }
+      float delta_pixel_sqr = len_squared(vec2(x, y));
+      float delta_depth_sqr = sqr(abs(center_depth - ray_data.w));
+      /* TODO(fclem): OPTI might be a good idea to compare view normal to avoid one matrix mult. */
+      vec3 sample_N = gbuffer_decode_normal(texture(cl_normal_tx, sample_uv).xy);
+      /* Bilateral weight. */
+      float weight = saturate(dot(sample_N, closure.N)) *
+                     normal_pdf(delta_pixel_sqr, px_sigma_inv, px_sigma_inv_sqr) *
+                     normal_pdf(delta_depth_sqr, depth_sigma_inv, depth_sigma_inv_sqr);
 
-    vec3 vR = normalize(ray_data.xyz);
-    float ray_pdf_inv = ray_data.w;
-    /* Skip invalid pixels. */
-    if (ray_pdf_inv == 0.0) {
-      continue;
+      radiance_accum += ray_data.rgb * weight;
+      weight_accum += weight;
     }
-
-    /* Slide 54. */
-#if defined(DIFFUSE)
-    float bsdf = saturate(dot(vN, vR));
-#elif defined(REFRACTION)
-    float bsdf = btdf_ggx(vN, vR, vV, roughness_sqr, refraction.ior);
-#else
-    float bsdf = bsdf_ggx(vN, vR, vV, roughness_sqr);
-#endif
-    float weight = bsdf * ray_pdf_inv;
-
-#ifdef REFRACTION
-    /* Transmit twice if thickness is set and ray is longer than thickness. */
-    if (thickness > 0.0 && length(ray_data.xyz) > thickness) {
-      ray_radiance.rgb *= color;
-    }
-#endif
-
-    radiance_accum += ray_radiance.rgb * weight;
-    weight_accum += weight;
   }
-
   radiance_accum *= safe_rcp(weight_accum);
-  radiance_accum *= color;
+  radiance_accum *= closure.color;
 
   out_combined = vec4(radiance_accum, 0.0);
-#ifdef DIFFUSE
+#if defined(DIFFUSE)
   out_diffuse.rgb = radiance_accum;
-  if (diffuse.sss_id != 0u) {
-    out_combined.rgb = vec3(0.0);
-  }
 #else
   out_specular = radiance_accum;
 #endif

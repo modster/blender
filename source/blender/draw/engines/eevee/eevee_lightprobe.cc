@@ -412,7 +412,7 @@ void LightProbeModule::bake(Depsgraph *depsgraph,
 
   /* Disable screenspace effects. */
   SceneEEVEE &sce_eevee = DEG_get_evaluated_scene(depsgraph)->eevee;
-  sce_eevee.flag &= ~(SCE_EEVEE_GTAO_ENABLED | SCE_EEVEE_SSR_ENABLED);
+  sce_eevee.flag &= ~(SCE_EEVEE_GTAO_ENABLED | SCE_EEVEE_RAYTRACING_ENABLED);
 
   inst_.init(ivec2(1), &rect, nullptr, depsgraph, probe);
   inst_.sampling.reset();

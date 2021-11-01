@@ -34,6 +34,11 @@ class Instance;
 
 /* -------------------------------------------------------------------- */
 /** \name Gbuffer
+ *
+ * Fullscreen textures containing geometric, surface and volume data.
+ * Used by deferred shading layers. Only one gbuffer is allocated per view
+ * and is reused for each deferred layer. This is why there can only be temporary
+ * texture inside it.
  * \{ */
 
 /** NOTE: Theses are used as stencil bits. So we are limited to 8bits. */
@@ -75,7 +80,9 @@ struct GBuffer {
   /** Raytracing. */
   Texture ray_data_tx = Texture("RayData");
   Texture ray_radiance_tx = Texture("RayRadiance");
+  Texture ray_variance_tx = Texture("RayVariance");
   Framebuffer ray_data_fb = Framebuffer("RayData");
+  Framebuffer ray_denoise_fb = Framebuffer("RayDenoise");
 
   /* Owner of this GBuffer. Used to query temp textures. */
   void *owner;
@@ -104,6 +111,7 @@ struct GBuffer {
     depth_behind_tx.sync_tmp();
     ray_data_tx.sync_tmp();
     ray_radiance_tx.sync_tmp();
+    ray_variance_tx.sync_tmp();
   }
 
   void prepare(eClosureBits closures_used)
@@ -148,6 +156,7 @@ struct GBuffer {
     if (closures_used & (CLOSURE_DIFFUSE | CLOSURE_REFLECTION | CLOSURE_REFRACTION)) {
       ray_data_tx.acquire_tmp(UNPACK2(extent), GPU_RGBA16F, owner);
       ray_radiance_tx.acquire_tmp(UNPACK2(extent), GPU_RGBA16F, owner);
+      ray_variance_tx.acquire_tmp(UNPACK2(extent), GPU_R8, owner);
     }
 
     holdout_tx.acquire_tmp(UNPACK2(extent), GPU_R11F_G11F_B10F, owner);
@@ -240,6 +249,7 @@ struct GBuffer {
     depth_behind_tx.release_tmp();
     ray_data_tx.release_tmp();
     ray_radiance_tx.release_tmp();
+    ray_variance_tx.release_tmp();
   }
 };
 

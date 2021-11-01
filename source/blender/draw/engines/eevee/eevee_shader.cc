@@ -102,6 +102,7 @@ extern char datatoc_eevee_motion_blur_lib_glsl[];
 extern char datatoc_eevee_motion_blur_tiles_dilate_frag_glsl[];
 extern char datatoc_eevee_motion_blur_tiles_flatten_frag_glsl[];
 extern char datatoc_eevee_nodetree_eval_lib_glsl[];
+extern char datatoc_eevee_raytrace_denoise_comp_glsl[];
 extern char datatoc_eevee_raytrace_raygen_frag_glsl[];
 extern char datatoc_eevee_raytrace_raygen_lib_glsl[];
 extern char datatoc_eevee_raytrace_resolve_frag_glsl[];
@@ -207,6 +208,10 @@ ShaderModule::ShaderModule()
   shader_descriptions_[enum_].vertex_shader_code = datatoc_##vert_##_glsl; \
   shader_descriptions_[enum_].geometry_shader_code = datatoc_##geom_##_glsl; \
   shader_descriptions_[enum_].fragment_shader_code = datatoc_##frag_##_glsl; \
+  shader_descriptions_[enum_].defines_shader_code = defs_;
+#define SHADER_COMPUTE(enum_, comp_, defs_) \
+  shader_descriptions_[enum_].name = STRINGIFY(enum_); \
+  shader_descriptions_[enum_].compute_shader_code = datatoc_##comp_##_glsl; \
   shader_descriptions_[enum_].defines_shader_code = defs_;
 
 #define SHADER_FULLSCREEN_DEFINES(enum_, frag_, defs_) \
@@ -357,6 +362,9 @@ ShaderModule::ShaderModule()
                             eevee_raytrace_raygen_frag,
                             "#define REFRACTION\n"
                             "#define SKIP_TRACE\n");
+  SHADER_COMPUTE(RAYTRACE_DENOISE_DIFFUSE, eevee_raytrace_denoise_comp, "#define DIFFUSE\n");
+  SHADER_COMPUTE(RAYTRACE_DENOISE_REFLECTION, eevee_raytrace_denoise_comp, "#define REFLECTION\n");
+  SHADER_COMPUTE(RAYTRACE_DENOISE_REFRACTION, eevee_raytrace_denoise_comp, "#define REFRACTION\n");
   SHADER_FULLSCREEN_DEFINES(
       RAYTRACE_RESOLVE_DIFFUSE, eevee_raytrace_resolve_frag, "#define DIFFUSE\n");
   SHADER_FULLSCREEN_DEFINES(
@@ -377,13 +385,17 @@ ShaderModule::ShaderModule()
 
 #undef SHADER
 #undef SHADER_FULLSCREEN
+#undef SHADER_FULLSCREEN_DEFINES
+#undef SHADER_COMPUTE
 
 #ifdef DEBUG
   /* Ensure all shader are described. */
   for (ShaderDescription &desc : shader_descriptions_) {
     BLI_assert(desc.name != nullptr);
-    BLI_assert(desc.vertex_shader_code != nullptr);
-    BLI_assert(desc.fragment_shader_code != nullptr);
+    if (desc.compute_shader_code == nullptr) {
+      BLI_assert(desc.vertex_shader_code != nullptr);
+      BLI_assert(desc.fragment_shader_code != nullptr);
+    }
   }
 #endif
 }
@@ -400,12 +412,23 @@ GPUShader *ShaderModule::static_shader_get(eShaderType shader_type)
 {
   if (shaders_[shader_type] == nullptr) {
     ShaderDescription &desc = shader_descriptions_[shader_type];
-    shaders_[shader_type] = DRW_shader_create_with_shaderlib_ex(desc.vertex_shader_code,
-                                                                desc.geometry_shader_code,
-                                                                desc.fragment_shader_code,
-                                                                shader_lib_,
-                                                                desc.defines_shader_code,
-                                                                desc.name);
+    if (desc.compute_shader_code != nullptr) {
+      char *comp_with_lib = DRW_shader_library_create_shader_string(shader_lib_,
+                                                                    desc.compute_shader_code);
+
+      shaders_[shader_type] = GPU_shader_create_compute(
+          comp_with_lib, nullptr, desc.defines_shader_code, desc.name);
+
+      MEM_SAFE_FREE(comp_with_lib);
+    }
+    else {
+      shaders_[shader_type] = DRW_shader_create_with_shaderlib_ex(desc.vertex_shader_code,
+                                                                  desc.geometry_shader_code,
+                                                                  desc.fragment_shader_code,
+                                                                  shader_lib_,
+                                                                  desc.defines_shader_code,
+                                                                  desc.name);
+    }
     if (shaders_[shader_type] == nullptr) {
       fprintf(stderr, "EEVEE: error: Could not compile static shader \"%s\"\n", desc.name);
     }

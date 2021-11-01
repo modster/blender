@@ -36,16 +36,14 @@ layout(std140) uniform lightprobes_info_block
 };
 
 uniform sampler2D hiz_tx;
-uniform sampler2D depth_tx;
-uniform sampler2D radiance_tx;
-uniform sampler2D radiance_combined_tx;
-uniform sampler2DArray utility_tx;
+uniform sampler2D hiz_front_tx;
 uniform samplerCubeArray lightprobe_cube_tx;
-uniform sampler2D transmit_color_tx;
-uniform sampler2D transmit_normal_tx;
-uniform sampler2D transmit_data_tx;
-uniform sampler2D reflect_color_tx;
-uniform sampler2D reflect_normal_tx;
+uniform sampler2D radiance_tx;
+uniform sampler2D combined_tx;
+uniform sampler2D cl_color_tx;
+uniform sampler2D cl_normal_tx;
+uniform sampler2D cl_data_tx;
+uniform sampler2DArray utility_tx;
 
 utility_tx_fetch_define(utility_tx);
 utility_tx_sample_define(utility_tx);
@@ -61,7 +59,7 @@ vec3 lightprobe_cubemap_eval(vec3 P, vec3 R, float roughness, float random_thres
 void main()
 {
   vec2 uv = uvcoordsvar.xy;
-  float gbuffer_depth = texelFetch(depth_tx, ivec2(gl_FragCoord.xy), 0).r;
+  float gbuffer_depth = texelFetch(hiz_front_tx, ivec2(gl_FragCoord.xy), 0).r;
   vec3 P = get_world_space_from_depth(uv, gbuffer_depth);
   vec3 V = cameraVec(P);
 
@@ -72,7 +70,7 @@ void main()
 
 #if defined(DIFFUSE)
   vec4 tra_col_in = vec4(0.0); /* UNUSED */
-  vec4 tra_nor_in = texture(transmit_normal_tx, uv);
+  vec4 tra_nor_in = texture(cl_normal_tx, uv);
   vec4 tra_dat_in = vec4(0.0); /* UNUSED */
 
   ClosureDiffuse diffuse = gbuffer_load_diffuse_data(tra_col_in, tra_nor_in, tra_dat_in);
@@ -85,8 +83,8 @@ void main()
 
 #elif defined(REFRACTION)
   vec4 tra_col_in = vec4(0.0); /* UNUSED */
-  vec4 tra_nor_in = texture(transmit_normal_tx, uv);
-  vec4 tra_dat_in = texture(transmit_data_tx, uv);
+  vec4 tra_nor_in = texture(cl_normal_tx, uv);
+  vec4 tra_dat_in = texture(cl_data_tx, uv);
 
   ClosureRefraction refraction = gbuffer_load_refraction_data(tra_col_in, tra_nor_in, tra_dat_in);
 
@@ -100,8 +98,7 @@ void main()
   float roughness = refraction.roughness;
 
 #else
-  ClosureReflection reflection = gbuffer_load_reflection_data(
-      reflect_color_tx, reflect_normal_tx, uv);
+  ClosureReflection reflection = gbuffer_load_reflection_data(cl_color_tx, cl_normal_tx, uv);
 
   float roughness = reflection.roughness;
 #endif
@@ -126,13 +123,16 @@ void main()
   ray.direction *= 1e16;
 
   if (roughness - rand.y * 0.2 < raytrace.max_roughness) {
-    /* Trace the ray. */
 #  ifdef REFRACTION
+    const bool discard_backface = false;
+    const bool allow_self_intersection = true;
     /* TODO(fclem): Take IOR into account in the roughness LOD bias. */
-    hit = raytrace_screen(raytrace, hiz, hiz_tx, rand.x, roughness, false, true, ray);
 #  else
-    hit = raytrace_screen(raytrace, hiz, hiz_tx, rand.x, roughness, true, false, ray);
+    const bool discard_backface = true;
+    const bool allow_self_intersection = false;
 #  endif
+    hit = raytrace_screen(
+        raytrace, hiz, hiz_tx, rand.x, roughness, discard_backface, allow_self_intersection, ray);
   }
 #endif
 
@@ -145,8 +145,8 @@ void main()
 
 #if defined(DIFFUSE)
     /* For diffuse, the radiance is still split and SSS materials don't have the color applied. */
-    vec4 tra_col_in = texture(transmit_color_tx, hit_uv);
-    vec4 tra_nor_in = texture(transmit_normal_tx, hit_uv);
+    vec4 tra_col_in = texture(cl_color_tx, hit_uv);
+    vec4 tra_nor_in = texture(cl_normal_tx, hit_uv);
     vec4 tra_dat_in = vec4(0.0); /* UNUSED */
     ClosureDiffuse hit_diffuse = gbuffer_load_diffuse_data(tra_col_in, tra_nor_in, tra_dat_in);
 
@@ -154,7 +154,7 @@ void main()
       /* Refraction pixel. */
       radiance *= hit_diffuse.color;
     }
-    radiance += textureLod(radiance_combined_tx, hit_uv, 0.0).rgb;
+    radiance += textureLod(combined_tx, hit_uv, 0.0).rgb;
 #endif
   }
   else {
@@ -174,9 +174,10 @@ void main()
   /* Limit to the smallest non-0 value that the format can encode.
    * Strangely it does not correspond to the IEEE spec. */
   float inv_pdf = (pdf == 0.0) ? 0.0 : max(6e-8, 1.0 / pdf);
+  float hit_depth = saturate(get_depth_from_view_z(ray.origin.z + ray.direction.z));
   /* Output the ray. */
   out_ray_data = vec4(ray.direction, inv_pdf);
-  out_ray_radiance = vec4(radiance, gbuffer_depth);
+  out_ray_radiance = vec4(radiance, hit_depth);
 }
 
 #pragma BLENDER_REQUIRE_POST(eevee_lightprobe_eval_cubemap_lib.glsl)
