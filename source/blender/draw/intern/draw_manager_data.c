@@ -750,6 +750,18 @@ static void drw_command_compute(DRWShadingGroup *shgroup,
   cmd->groups_z_len = groups_z_len;
 }
 
+static void drw_command_compute_ref(DRWShadingGroup *shgroup, int groups_ref[3])
+{
+  DRWCommandComputeRef *cmd = drw_command_create(shgroup, DRW_CMD_COMPUTE_REF);
+  cmd->groups_ref = groups_ref;
+}
+
+static void drw_command_barrier(DRWShadingGroup *shgroup, eGPUBarrier type)
+{
+  DRWCommandBarrier *cmd = drw_command_create(shgroup, DRW_CMD_BARRIER);
+  cmd->type = type;
+}
+
 static void drw_command_draw_procedural(DRWShadingGroup *shgroup,
                                         GPUBatch *batch,
                                         DRWResourceHandle handle,
@@ -874,6 +886,20 @@ void DRW_shgroup_call_compute(DRWShadingGroup *shgroup,
   BLI_assert(GPU_compute_shader_support());
 
   drw_command_compute(shgroup, groups_x_len, groups_y_len, groups_z_len);
+}
+
+void DRW_shgroup_call_compute_ref(DRWShadingGroup *shgroup, int groups_ref[3])
+{
+  BLI_assert(GPU_compute_shader_support());
+
+  drw_command_compute_ref(shgroup, groups_ref);
+}
+
+void DRW_shgroup_barrier(DRWShadingGroup *shgroup, eGPUBarrier type)
+{
+  BLI_assert(GPU_compute_shader_support());
+
+  drw_command_barrier(shgroup, type);
 }
 
 static void drw_shgroup_call_procedural_add_ex(DRWShadingGroup *shgroup,
