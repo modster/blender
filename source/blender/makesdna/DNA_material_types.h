@@ -213,7 +213,7 @@ typedef struct Material {
 
   /* Transparency. */
   float alpha_threshold;
-  float refract_depth;
+  char _pad4[4];
   char blend_method;
   char blend_shadow;
   char blend_flag;

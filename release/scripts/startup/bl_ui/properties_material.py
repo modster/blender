@@ -227,7 +227,6 @@ def draw_material_settings(self, context):
         layout.prop(mat, "show_transparent_back")
 
     layout.prop(mat, "use_screen_refraction")
-    layout.prop(mat, "refraction_depth")
     layout.prop(mat, "pass_index")
 
 

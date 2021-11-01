@@ -807,15 +807,6 @@ void RNA_def_material(BlenderRNA *brna)
       prop, "Screen Space Refraction", "Use raytraced screen space refractions");
   RNA_def_property_update(prop, 0, "rna_Material_draw_update");
 
-  prop = RNA_def_property(srna, "refraction_depth", PROP_FLOAT, PROP_DISTANCE);
-  RNA_def_property_float_sdna(prop, NULL, "refract_depth");
-  RNA_def_property_range(prop, 0.0f, FLT_MAX);
-  RNA_def_property_ui_text(prop,
-                           "Refraction Depth",
-                           "Approximate the thickness of the object to compute two refraction "
-                           "event (0 is disabled)");
-  RNA_def_property_update(prop, 0, "rna_Material_draw_update");
-
   /* For Preview Render */
   prop = RNA_def_property(srna, "preview_render_type", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_sdna(prop, NULL, "pr_type");

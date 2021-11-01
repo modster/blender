@@ -360,8 +360,8 @@ class RENDER_PT_eevee_subsurface_scattering(RenderButtonsPanel, Panel):
         col.prop(props, "sss_jitter_threshold")
 
 
-class RENDER_PT_eevee_screen_space_reflections(RenderButtonsPanel, Panel):
-    bl_label = "Screen Space Reflections"
+class RENDER_PT_eevee_raytracing(RenderButtonsPanel, Panel):
+    bl_label = "Raytracing"
     bl_options = {'DEFAULT_CLOSED'}
     COMPAT_ENGINES = {'BLENDER_EEVEE'}
 
@@ -383,12 +383,9 @@ class RENDER_PT_eevee_screen_space_reflections(RenderButtonsPanel, Panel):
 
         col = layout.column()
         col.active = props.use_ssr
-        col.prop(props, "use_ssr_refraction", text="Refraction")
-        col.prop(props, "use_ssr_halfres")
         col.prop(props, "ssr_quality")
         col.prop(props, "ssr_max_roughness")
         col.prop(props, "ssr_thickness")
-        col.prop(props, "ssr_border_fade")
         col.prop(props, "ssr_firefly_fac")
 
 
@@ -735,7 +732,7 @@ classes = (
     RENDER_PT_eevee_bloom,
     RENDER_PT_eevee_depth_of_field,
     RENDER_PT_eevee_subsurface_scattering,
-    RENDER_PT_eevee_screen_space_reflections,
+    RENDER_PT_eevee_raytracing,
     RENDER_PT_eevee_motion_blur,
     RENDER_PT_eevee_motion_blur_curve,
     RENDER_PT_eevee_volumetric,

@@ -234,7 +234,7 @@
  \
     .flag = SCE_EEVEE_VOLUMETRIC_LIGHTS | SCE_EEVEE_GTAO_BENT_NORMALS | \
                     SCE_EEVEE_GTAO_BOUNCE | SCE_EEVEE_TAA_REPROJECTION | \
-                    SCE_EEVEE_SSR_HALF_RESOLUTION | SCE_EEVEE_SHADOW_SOFT | \
+                    SCE_EEVEE_SHADOW_SOFT | \
                     SCE_EEVEE_FILM_LOG_ENCODING, \
   }
 

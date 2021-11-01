@@ -1627,7 +1627,7 @@ typedef struct SceneEEVEE {
   float ssr_quality;
   float ssr_max_roughness;
   float ssr_thickness;
-  float ssr_border_fade;
+  float ssr_border_fade DNA_DEPRECATED;
   float ssr_firefly_fac;
 
   float volumetric_start;
@@ -2431,9 +2431,9 @@ enum {
   SCE_EEVEE_TAA_REPROJECTION = (1 << 11),
   // SCE_EEVEE_SSS_ENABLED = (1 << 12), /* Unused */
   // SCE_EEVEE_SSS_SEPARATE_ALBEDO = (1 << 13), /* Unused */
-  SCE_EEVEE_SSR_ENABLED = (1 << 14),
-  SCE_EEVEE_SSR_REFRACTION = (1 << 15),
-  SCE_EEVEE_SSR_HALF_RESOLUTION = (1 << 16),
+  SCE_EEVEE_RAYTRACING_ENABLED = (1 << 14),
+  // SCE_EEVEE_SSR_REFRACTION = (1 << 15),
+  // SCE_EEVEE_SSR_HALF_RESOLUTION = (1 << 16), /* Unused */
   SCE_EEVEE_SHOW_IRRADIANCE = (1 << 17),
   SCE_EEVEE_SHOW_CUBEMAPS = (1 << 18),
   SCE_EEVEE_GI_AUTOBAKE = (1 << 19),
