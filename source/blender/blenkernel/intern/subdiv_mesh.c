@@ -109,7 +109,7 @@ static void subdiv_mesh_prepare_accumulator(SubdivMeshContext *ctx, int num_vert
       &ctx->subdiv_mesh->vdata, CD_NORMAL, CD_DEFAULT, NULL, num_vertices);
   memset(ctx->accumulated_normals, 0, sizeof(float[3]) * num_vertices);
   ctx->accumulated_counters = MEM_calloc_arrayN(
-      sizeof(*ctx->accumulated_counters), num_vertices, "subdiv accumulated counters");
+      num_vertices, sizeof(*ctx->accumulated_counters), "subdiv accumulated counters");
 }
 
 static void subdiv_mesh_context_free(SubdivMeshContext *ctx)

@@ -195,7 +195,7 @@ static int sequencer_generic_invoke_xy_guess_channel(bContext *C, int type)
   }
 
   for (seq = ed->seqbasep->first; seq; seq = seq->next) {
-    if ((type == -1 || seq->type == type) && (seq->enddisp < timeline_frame) &&
+    if ((ELEM(type, -1, seq->type)) && (seq->enddisp < timeline_frame) &&
         (timeline_frame - seq->enddisp < proximity)) {
       tgt = seq;
       proximity = timeline_frame - seq->enddisp;
@@ -1111,7 +1111,7 @@ static int sequencer_add_image_strip_exec(bContext *C, wmOperator *op)
   /* Adjust length. */
   if (load_data.image.len == 1) {
     SEQ_transform_set_right_handle_frame(seq, load_data.image.end_frame);
-    SEQ_time_update_sequence(scene, seq);
+    SEQ_time_update_sequence(scene, SEQ_active_seqbase_get(ed), seq);
   }
 
   seq_load_apply_generic_options(C, op, seq);

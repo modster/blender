@@ -17,6 +17,7 @@
 #include "MOD_nodes_evaluator.hh"
 
 #include "NOD_geometry_exec.hh"
+#include "NOD_socket_declarations.hh"
 #include "NOD_type_conversions.hh"
 
 #include "DEG_depsgraph_query.h"
@@ -125,6 +126,12 @@ struct InputState {
    * changed by others anymore.
    */
   bool was_ready_for_execution = false;
+
+  /**
+   * True when this input has to be computed for logging/debugging purposes, regardless of whether
+   * it is needed for some output.
+   */
+  bool force_compute = false;
 };
 
 struct OutputState {
@@ -321,29 +328,48 @@ static const CPPType *get_socket_cpp_type(const DSocket socket)
   return get_socket_cpp_type(*socket.socket_ref());
 }
 
+/**
+ * \note This is not supposed to be a long term solution. Eventually we want that nodes can
+ * specify more complex defaults (other than just single values) in their socket declarations.
+ */
+static bool get_implicit_socket_input(const SocketRef &socket, void *r_value)
+{
+  const NodeRef &node = socket.node();
+  const nodes::NodeDeclaration *node_declaration = node.declaration();
+  if (node_declaration == nullptr) {
+    return false;
+  }
+  const nodes::SocketDeclaration &socket_declaration = *node_declaration->inputs()[socket.index()];
+  if (socket_declaration.input_field_type() == nodes::InputSocketFieldType::Implicit) {
+    const bNode &bnode = *socket.bnode();
+    if (socket.typeinfo()->type == SOCK_VECTOR) {
+      if (bnode.type == GEO_NODE_SET_CURVE_HANDLES) {
+        StringRef side = ((NodeGeometrySetCurveHandlePositions *)bnode.storage)->mode ==
+                                 GEO_NODE_CURVE_HANDLE_LEFT ?
+                             "handle_left" :
+                             "handle_right";
+        new (r_value) Field<float3>(bke::AttributeFieldInput::Create<float3>(side));
+        return true;
+      }
+      new (r_value) Field<float3>(bke::AttributeFieldInput::Create<float3>("position"));
+      return true;
+    }
+    if (socket.typeinfo()->type == SOCK_INT) {
+      if (ELEM(bnode.type, FN_NODE_RANDOM_VALUE, GEO_NODE_INSTANCE_ON_POINTS)) {
+        new (r_value) Field<int>(std::make_shared<bke::IDAttributeFieldInput>());
+        return true;
+      }
+      new (r_value) Field<int>(std::make_shared<fn::IndexFieldInput>());
+      return true;
+    }
+  }
+  return false;
+}
+
 static void get_socket_value(const SocketRef &socket, void *r_value)
 {
-  const bNodeSocket &bsocket = *socket.bsocket();
-  /* This is not supposed to be a long term solution. Eventually we want that nodes can specify
-   * more complex defaults (other than just single values) in their socket declarations. */
-  if (bsocket.flag & SOCK_HIDE_VALUE) {
-    const bNode &bnode = *socket.bnode();
-    if (bsocket.type == SOCK_VECTOR) {
-      if (ELEM(bnode.type,
-               GEO_NODE_SET_POSITION,
-               SH_NODE_TEX_NOISE,
-               GEO_NODE_MESH_TO_POINTS,
-               GEO_NODE_PROXIMITY)) {
-        new (r_value) Field<float3>(bke::AttributeFieldInput::Create<float3>("position"));
-        return;
-      }
-    }
-    else if (bsocket.type == SOCK_INT) {
-      if (ELEM(bnode.type, FN_NODE_RANDOM_VALUE, GEO_NODE_INSTANCE_ON_POINTS)) {
-        new (r_value) Field<int>(std::make_shared<fn::IndexFieldInput>());
-        return;
-      }
-    }
+  if (get_implicit_socket_input(socket, r_value)) {
+    return;
   }
 
   const bNodeSocketType *typeinfo = socket.typeinfo();
@@ -477,6 +503,14 @@ class GeometryNodesEvaluator {
             this->initialize_node_state(item.node, *item.state, allocator);
           }
         });
+
+    /* Mark input sockets that have to be computed. */
+    for (const DSocket &socket : params_.force_compute_sockets) {
+      NodeState &node_state = *node_states_.lookup_key_as(socket.node()).state;
+      if (socket->is_input()) {
+        node_state.inputs[socket->index()].force_compute = true;
+      }
+    }
   }
 
   void initialize_node_state(const DNode node, NodeState &node_state, LinearAllocator<> &allocator)
@@ -723,7 +757,8 @@ class GeometryNodesEvaluator {
     return do_execute_node;
   }
 
-  /* A node is finished when it has computed all outputs that may be used. */
+  /* A node is finished when it has computed all outputs that may be used have been computed and
+   * when no input is still forced to be computed. */
   bool finish_node_if_possible(LockedNode &locked_node)
   {
     if (locked_node.node_state.node_has_finished) {
@@ -732,35 +767,41 @@ class GeometryNodesEvaluator {
     }
 
     /* Check if there is any output that might be used but has not been computed yet. */
-    bool has_remaining_output = false;
     for (OutputState &output_state : locked_node.node_state.outputs) {
       if (output_state.has_been_computed) {
         continue;
       }
       if (output_state.output_usage != ValueUsage::Unused) {
-        has_remaining_output = true;
-        break;
+        return false;
       }
     }
-    if (!has_remaining_output) {
-      /* If there are no remaining outputs, all the inputs can be destructed and/or can become
-       * unused. This can also trigger a chain reaction where nodes to the left become finished
-       * too. */
-      for (const int i : locked_node.node->inputs().index_range()) {
-        const DInputSocket socket = locked_node.node.input(i);
-        InputState &input_state = locked_node.node_state.inputs[i];
-        if (input_state.usage == ValueUsage::Maybe) {
-          this->set_input_unused(locked_node, socket);
-        }
-        else if (input_state.usage == ValueUsage::Required) {
-          /* The value was required, so it cannot become unused. However, we can destruct the
-           * value. */
-          this->destruct_input_value_if_exists(locked_node, socket);
+
+    /* Check if there is an input that still has to be computed. */
+    for (InputState &input_state : locked_node.node_state.inputs) {
+      if (input_state.force_compute) {
+        if (!input_state.was_ready_for_execution) {
+          return false;
         }
       }
-      locked_node.node_state.node_has_finished = true;
     }
-    return locked_node.node_state.node_has_finished;
+
+    /* If there are no remaining outputs, all the inputs can be destructed and/or can become
+     * unused. This can also trigger a chain reaction where nodes to the left become finished
+     * too. */
+    for (const int i : locked_node.node->inputs().index_range()) {
+      const DInputSocket socket = locked_node.node.input(i);
+      InputState &input_state = locked_node.node_state.inputs[i];
+      if (input_state.usage == ValueUsage::Maybe) {
+        this->set_input_unused(locked_node, socket);
+      }
+      else if (input_state.usage == ValueUsage::Required) {
+        /* The value was required, so it cannot become unused. However, we can destruct the
+         * value. */
+        this->destruct_input_value_if_exists(locked_node, socket);
+      }
+    }
+    locked_node.node_state.node_has_finished = true;
+    return true;
   }
 
   bool prepare_node_outputs_for_execution(LockedNode &locked_node)
@@ -866,9 +907,9 @@ class GeometryNodesEvaluator {
     }
 
     /* Use the multi-function implementation if it exists. */
-    const MultiFunction *multi_function = params_.mf_by_node->try_get(node);
-    if (multi_function != nullptr) {
-      this->execute_multi_function_node(node, *multi_function, node_state);
+    const nodes::NodeMultiFunctions::Item &fn_item = params_.mf_by_node->try_get(node);
+    if (fn_item.fn != nullptr) {
+      this->execute_multi_function_node(node, fn_item, node_state);
       return;
     }
 
@@ -889,7 +930,7 @@ class GeometryNodesEvaluator {
   }
 
   void execute_multi_function_node(const DNode node,
-                                   const MultiFunction &fn,
+                                   const nodes::NodeMultiFunctions::Item &fn_item,
                                    NodeState &node_state)
   {
     if (node->idname().find("Legacy") != StringRef::not_found) {
@@ -917,7 +958,13 @@ class GeometryNodesEvaluator {
       input_fields.append(std::move(*(GField *)single_value.value));
     }
 
-    auto operation = std::make_shared<fn::FieldOperation>(fn, std::move(input_fields));
+    std::shared_ptr<fn::FieldOperation> operation;
+    if (fn_item.owned_fn) {
+      operation = std::make_shared<fn::FieldOperation>(fn_item.owned_fn, std::move(input_fields));
+    }
+    else {
+      operation = std::make_shared<fn::FieldOperation>(*fn_item.fn, std::move(input_fields));
+    }
 
     /* Forward outputs. */
     int output_index = 0;
@@ -1100,7 +1147,7 @@ class GeometryNodesEvaluator {
       return;
     }
     bool will_be_triggered_by_other_node = false;
-    for (const DSocket origin_socket : origin_sockets) {
+    for (const DSocket &origin_socket : origin_sockets) {
       if (origin_socket->is_input()) {
         /* Load the value directly from the origin socket. In most cases this is an unlinked
          * group input. */
@@ -1408,6 +1455,7 @@ class GeometryNodesEvaluator {
     }
     void *converted_buffer = allocator.allocate(required_type.size(), required_type.alignment());
     this->convert_value(type, required_type, buffer, converted_buffer);
+    type.destruct(buffer);
     return {required_type, converted_buffer};
   }
 

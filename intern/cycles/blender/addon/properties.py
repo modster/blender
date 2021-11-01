@@ -86,8 +86,8 @@ enum_use_layer_samples = (
 )
 
 enum_sampling_pattern = (
-    ('SOBOL', "Sobol", "Use Sobol random sampling pattern"),
-    ('PROGRESSIVE_MUTI_JITTER', "Progressive Multi-Jitter", "Use Progressive Multi-Jitter random sampling pattern"),
+    ('SOBOL', "Sobol", "Use Sobol random sampling pattern", 0),
+    ('PROGRESSIVE_MUTI_JITTER', "Progressive Multi-Jitter", "Use Progressive Multi-Jitter random sampling pattern", 1),
 )
 
 enum_volume_sampling = (
@@ -123,6 +123,11 @@ enum_texture_limit = (
     ('2048', "2048", "Limit texture size to 2048 pixels", 5),
     ('4096', "4096", "Limit texture size to 4096 pixels", 6),
     ('8192', "8192", "Limit texture size to 8192 pixels", 7),
+)
+
+enum_fast_gi_method = (
+    ('REPLACE', "Replace", "Replace global illumination with ambient occlusion after a specified number of bounces"),
+    ('ADD', "Add", "Add ambient occlusion to diffuse surfaces"),
 )
 
 # NOTE: Identifiers are expected to be an upper case version of identifiers from  `Pass::get_type_enum()`
@@ -332,9 +337,27 @@ class CyclesRenderSettings(bpy.types.PropertyGroup):
 
     sampling_pattern: EnumProperty(
         name="Sampling Pattern",
-        description="Random sampling pattern used by the integrator",
+        description="Random sampling pattern used by the integrator. When adaptive sampling is enabled, Progressive Multi-Jitter is always used instead of Sobol",
         items=enum_sampling_pattern,
         default='PROGRESSIVE_MUTI_JITTER',
+    )
+
+    scrambling_distance: FloatProperty(
+        name="Scrambling Distance",
+        default=1.0,
+        min=0.0, max=1.0,
+        description="Lower values give faster rendering with GPU rendering and less noise with all devices at the cost of possible artifacts if set too low. Only works when not using adaptive sampling",
+    )
+    preview_scrambling_distance: BoolProperty(
+        name="Scrambling Distance viewport",
+        default=False,
+        description="Uses the Scrambling Distance value for the viewport. Faster but may flicker",
+    )
+
+    adaptive_scrambling_distance: BoolProperty(
+        name="Adaptive Scrambling Distance",
+        default=False,
+        description="Uses a formula to adapt the scrambling distance strength based on the sample count",
     )
 
     use_layer_samples: EnumProperty(
@@ -724,6 +747,14 @@ class CyclesRenderSettings(bpy.types.PropertyGroup):
         description="Approximate diffuse indirect light with background tinted ambient occlusion. This provides fast alternative to full global illumination, for interactive viewport rendering or final renders with reduced quality",
         default=False,
     )
+
+    fast_gi_method: EnumProperty(
+        name="Fast GI Method",
+        default='REPLACE',
+        description="Fast GI approximation method",
+        items=enum_fast_gi_method
+    )
+
     ao_bounces: IntProperty(
         name="AO Bounces",
         default=1,
@@ -1329,7 +1360,7 @@ class CyclesPreferences(bpy.types.AddonPreferences):
             elif entry.type == 'CPU':
                 cpu_devices.append(entry)
         # Extend all GPU devices with CPU.
-        if compute_device_type != 'CPU' and compute_device_type != 'HIP':
+        if compute_device_type != 'CPU':
             devices.extend(cpu_devices)
         return devices
 
@@ -1373,8 +1404,18 @@ class CyclesPreferences(bpy.types.AddonPreferences):
 
         if not found_device:
             col = box.column(align=True)
-            col.label(text="No compatible GPUs found for path tracing", icon='INFO')
-            col.label(text="Cycles will render on the CPU", icon='BLANK1')
+            col.label(text="No compatible GPUs found for Cycles", icon='INFO')
+
+            if device_type == 'CUDA':
+                col.label(text="Requires NVIDIA GPU with compute capability 3.0", icon='BLANK1')
+            elif device_type == 'OPTIX':
+                col.label(text="Requires NVIDIA GPU with compute capability 5.0", icon='BLANK1')
+                col.label(text="and NVIDIA driver version 470 or newer", icon='BLANK1')
+            elif device_type == 'HIP':
+                import sys
+                col.label(text="Requires discrete AMD GPU with ??? architecture", icon='BLANK1')
+                if sys.platform[:3] == "win":
+                    col.label(text="and AMD driver version ??? or newer", icon='BLANK1')
             return
 
         for device in devices:

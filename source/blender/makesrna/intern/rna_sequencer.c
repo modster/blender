@@ -303,7 +303,7 @@ static void do_sequence_frame_change_update(Scene *scene, Sequence *seq)
   Editing *ed = SEQ_editing_get(scene);
   ListBase *seqbase = SEQ_get_seqbase_by_seq(&ed->seqbase, seq);
   Sequence *tseq;
-  SEQ_time_update_sequence_bounds(scene, seq);
+  SEQ_time_update_sequence(scene, seqbase, seq);
 
   /* ensure effects are always fit in length to their input */
 
@@ -312,7 +312,7 @@ static void do_sequence_frame_change_update(Scene *scene, Sequence *seq)
    */
   for (tseq = seqbase->first; tseq; tseq = tseq->next) {
     if (tseq->seq1 || tseq->seq2 || tseq->seq3) {
-      SEQ_time_update_sequence(scene, tseq);
+      SEQ_time_update_sequence(scene, seqbase, tseq);
     }
   }
 
@@ -756,13 +756,16 @@ static IDProperty **rna_Sequence_idprops(PointerRNA *ptr)
 static bool rna_MovieSequence_reload_if_needed(ID *scene_id, Sequence *seq, Main *bmain)
 {
   Scene *scene = (Scene *)scene_id;
+  Editing *ed = SEQ_editing_get(scene);
+  ListBase *seqbase = SEQ_get_seqbase_by_seq(&ed->seqbase, seq);
+
   bool has_reloaded;
   bool can_produce_frames;
 
   SEQ_add_movie_reload_if_needed(bmain, scene, seq, &has_reloaded, &can_produce_frames);
 
   if (has_reloaded && can_produce_frames) {
-    SEQ_time_update_sequence(scene, seq);
+    SEQ_time_update_sequence(scene, seqbase, seq);
     SEQ_relations_invalidate_cache_raw(scene, seq);
 
     DEG_id_tag_update(&scene->id, ID_RECALC_SEQUENCER_STRIPS);
@@ -950,7 +953,9 @@ static void rna_Sequence_filepath_update(Main *bmain, Scene *UNUSED(scene), Poin
   Scene *scene = (Scene *)ptr->owner_id;
   Sequence *seq = (Sequence *)(ptr->data);
   SEQ_add_reload_new_file(bmain, scene, seq, true);
-  SEQ_time_update_sequence(scene, seq);
+  Editing *ed = SEQ_editing_get(scene);
+  ListBase *seqbase = SEQ_get_seqbase_by_seq(&ed->seqbase, seq);
+  SEQ_time_update_sequence(scene, seqbase, seq);
   rna_Sequence_invalidate_raw_update(bmain, scene, ptr);
 }
 
@@ -1116,13 +1121,13 @@ static void rna_SequenceEditor_overlay_lock_set(PointerRNA *ptr, bool value)
   }
 
   /* convert from abs to relative and back */
-  if ((ed->over_flag & SEQ_EDIT_OVERLAY_ABS) == 0 && value) {
-    ed->over_cfra = scene->r.cfra + ed->over_ofs;
-    ed->over_flag |= SEQ_EDIT_OVERLAY_ABS;
+  if ((ed->overlay_frame_flag & SEQ_EDIT_OVERLAY_FRAME_ABS) == 0 && value) {
+    ed->overlay_frame_abs = scene->r.cfra + ed->overlay_frame_ofs;
+    ed->overlay_frame_flag |= SEQ_EDIT_OVERLAY_FRAME_ABS;
   }
-  else if ((ed->over_flag & SEQ_EDIT_OVERLAY_ABS) && !value) {
-    ed->over_ofs = ed->over_cfra - scene->r.cfra;
-    ed->over_flag &= ~SEQ_EDIT_OVERLAY_ABS;
+  else if ((ed->overlay_frame_flag & SEQ_EDIT_OVERLAY_FRAME_ABS) && !value) {
+    ed->overlay_frame_ofs = ed->overlay_frame_abs - scene->r.cfra;
+    ed->overlay_frame_flag &= ~SEQ_EDIT_OVERLAY_FRAME_ABS;
   }
 }
 
@@ -1135,11 +1140,11 @@ static int rna_SequenceEditor_overlay_frame_get(PointerRNA *ptr)
     return scene->r.cfra;
   }
 
-  if (ed->over_flag & SEQ_EDIT_OVERLAY_ABS) {
-    return ed->over_cfra - scene->r.cfra;
+  if (ed->overlay_frame_flag & SEQ_EDIT_OVERLAY_FRAME_ABS) {
+    return ed->overlay_frame_abs - scene->r.cfra;
   }
   else {
-    return ed->over_ofs;
+    return ed->overlay_frame_ofs;
   }
 }
 
@@ -1152,11 +1157,11 @@ static void rna_SequenceEditor_overlay_frame_set(PointerRNA *ptr, int value)
     return;
   }
 
-  if (ed->over_flag & SEQ_EDIT_OVERLAY_ABS) {
-    ed->over_cfra = (scene->r.cfra + value);
+  if (ed->overlay_frame_flag & SEQ_EDIT_OVERLAY_FRAME_ABS) {
+    ed->overlay_frame_abs = (scene->r.cfra + value);
   }
   else {
-    ed->over_ofs = value;
+    ed->overlay_frame_ofs = value;
   }
 }
 
@@ -2108,14 +2113,14 @@ static void rna_def_editor(BlenderRNA *brna)
   RNA_def_property_flag(prop, PROP_EDITABLE);
   RNA_def_property_ui_text(prop, "Active Strip", "Sequencer's active strip");
 
-  prop = RNA_def_property(srna, "show_overlay", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_boolean_sdna(prop, NULL, "over_flag", SEQ_EDIT_OVERLAY_SHOW);
+  prop = RNA_def_property(srna, "show_overlay_frame", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "overlay_frame_flag", SEQ_EDIT_OVERLAY_FRAME_SHOW);
   RNA_def_property_ui_text(
       prop, "Show Overlay", "Partial overlay on top of the sequencer with a frame offset");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_SEQUENCER, NULL);
 
-  prop = RNA_def_property(srna, "use_overlay_lock", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_boolean_sdna(prop, NULL, "over_flag", SEQ_EDIT_OVERLAY_ABS);
+  prop = RNA_def_property(srna, "use_overlay_frame_lock", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "overlay_frame_flag", SEQ_EDIT_OVERLAY_FRAME_ABS);
   RNA_def_property_ui_text(prop, "Overlay Lock", "");
   RNA_def_property_boolean_funcs(prop, NULL, "rna_SequenceEditor_overlay_lock_set");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_SEQUENCER, NULL);

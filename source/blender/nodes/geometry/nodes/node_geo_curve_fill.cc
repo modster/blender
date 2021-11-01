@@ -35,8 +35,8 @@ namespace blender::nodes {
 
 static void geo_node_curve_fill_declare(NodeDeclarationBuilder &b)
 {
-  b.add_input<decl::Geometry>("Curve");
-  b.add_output<decl::Geometry>("Mesh");
+  b.add_input<decl::Geometry>(N_("Curve")).supported_type(GEO_COMPONENT_TYPE_CURVE);
+  b.add_output<decl::Geometry>(N_("Mesh"));
 }
 
 static void geo_node_curve_fill_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
@@ -166,7 +166,7 @@ void register_node_type_geo_curve_fill()
 {
   static bNodeType ntype;
 
-  geo_node_type_base(&ntype, GEO_NODE_CURVE_FILL, "Curve Fill", NODE_CLASS_GEOMETRY, 0);
+  geo_node_type_base(&ntype, GEO_NODE_FILL_CURVE, "Fill Curve", NODE_CLASS_GEOMETRY, 0);
 
   node_type_init(&ntype, blender::nodes::geo_node_curve_fill_init);
   node_type_storage(

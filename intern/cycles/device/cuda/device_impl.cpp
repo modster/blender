@@ -24,19 +24,17 @@
 
 #  include "device/cuda/device_impl.h"
 
-#  include "render/buffers.h"
-
-#  include "util/util_debug.h"
-#  include "util/util_foreach.h"
-#  include "util/util_logging.h"
-#  include "util/util_map.h"
-#  include "util/util_md5.h"
-#  include "util/util_path.h"
-#  include "util/util_string.h"
-#  include "util/util_system.h"
-#  include "util/util_time.h"
-#  include "util/util_types.h"
-#  include "util/util_windows.h"
+#  include "util/debug.h"
+#  include "util/foreach.h"
+#  include "util/log.h"
+#  include "util/map.h"
+#  include "util/md5.h"
+#  include "util/path.h"
+#  include "util/string.h"
+#  include "util/system.h"
+#  include "util/time.h"
+#  include "util/types.h"
+#  include "util/windows.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -454,7 +452,7 @@ bool CUDADevice::load_kernels(const uint kernel_features)
   return (result == CUDA_SUCCESS);
 }
 
-void CUDADevice::reserve_local_memory(const uint /* kernel_features */)
+void CUDADevice::reserve_local_memory(const uint kernel_features)
 {
   /* Together with CU_CTX_LMEM_RESIZE_TO_MAX, this reserves local memory
    * needed for kernel launches, so that we can reliably figure out when
@@ -468,7 +466,9 @@ void CUDADevice::reserve_local_memory(const uint /* kernel_features */)
 
   {
     /* Use the biggest kernel for estimation. */
-    const DeviceKernel test_kernel = DEVICE_KERNEL_INTEGRATOR_SHADE_SURFACE_RAYTRACE;
+    const DeviceKernel test_kernel = (kernel_features & KERNEL_FEATURE_NODE_RAYTRACE) ?
+                                         DEVICE_KERNEL_INTEGRATOR_SHADE_SURFACE_RAYTRACE :
+                                         DEVICE_KERNEL_INTEGRATOR_SHADE_SURFACE;
 
     /* Launch kernel, using just 1 block appears sufficient to reserve memory for all
      * multiprocessors. It would be good to do this in parallel for the multi GPU case

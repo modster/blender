@@ -211,8 +211,12 @@ static void image_foreach_cache(ID *id,
   for (int eye = 0; eye < 2; eye++) {
     for (int a = 0; a < TEXTARGET_COUNT; a++) {
       for (int resolution = 0; resolution < IMA_TEXTURE_RESOLUTION_LEN; resolution++) {
+        GPUTexture *texture = image->gputexture[a][eye][resolution];
+        if (texture == NULL) {
+          continue;
+        }
         key.offset_in_ID = offsetof(Image, gputexture[a][eye][resolution]);
-        key.cache_v = image->gputexture[a][eye];
+        key.cache_v = texture;
         function_callback(id, &key, (void **)&image->gputexture[a][eye][resolution], 0, user_data);
       }
     }
@@ -1560,9 +1564,9 @@ bool BKE_imtype_requires_linear_float(const char imtype)
 
 char BKE_imtype_valid_channels(const char imtype, bool write_file)
 {
-  char chan_flag = IMA_CHAN_FLAG_RGB; /* assume all support rgb */
+  char chan_flag = IMA_CHAN_FLAG_RGB; /* Assume all support RGB. */
 
-  /* alpha */
+  /* Alpha. */
   switch (imtype) {
     case R_IMF_IMTYPE_BMP:
       if (write_file) {
@@ -1583,7 +1587,7 @@ char BKE_imtype_valid_channels(const char imtype, bool write_file)
       break;
   }
 
-  /* bw */
+  /* BW. */
   switch (imtype) {
     case R_IMF_IMTYPE_BMP:
     case R_IMF_IMTYPE_PNG:
@@ -3078,8 +3082,7 @@ int BKE_imbuf_write_as(ImBuf *ibuf, const char *name, ImageFormatData *imf, cons
   ImBuf ibuf_back = *ibuf;
   int ok;
 
-  /* all data is rgba anyway,
-   * this just controls how to save for some formats */
+  /* All data is RGBA anyway, this just controls how to save for some formats. */
   ibuf->planes = imf->planes;
 
   ok = BKE_imbuf_write(ibuf, name, imf);
@@ -4611,7 +4614,7 @@ static ImBuf *load_image_single(Image *ima,
       image_init_after_load(ima, iuser, ibuf);
       *r_assign = true;
 
-      /* make packed file for autopack */
+      /* Make packed file for auto-pack. */
       if ((has_packed == false) && (G.fileflags & G_FILE_AUTOPACK)) {
         ImagePackedFile *imapf = MEM_mallocN(sizeof(ImagePackedFile), "Image Pack-file");
         BLI_addtail(&ima->packedfiles, imapf);
@@ -5750,7 +5753,7 @@ bool BKE_image_has_anim(Image *ima)
   return (BLI_listbase_is_empty(&ima->anims) == false);
 }
 
-bool BKE_image_has_packedfile(Image *ima)
+bool BKE_image_has_packedfile(const Image *ima)
 {
   return (BLI_listbase_is_empty(&ima->packedfiles) == false);
 }

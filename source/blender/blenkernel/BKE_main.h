@@ -90,12 +90,12 @@ typedef struct MainIDRelationsEntry {
 } MainIDRelationsEntry;
 
 /* MainIDRelationsEntry.tags */
-typedef enum MainIDRelationsEntryTags {
+typedef enum eMainIDRelationsEntryTags {
   /* Generic tag marking the entry as to be processed. */
   MAINIDRELATIONS_ENTRY_TAGS_DOIT = 1 << 0,
   /* Generic tag marking the entry as processed. */
   MAINIDRELATIONS_ENTRY_TAGS_PROCESSED = 1 << 1,
-} MainIDRelationsEntryTags;
+} eMainIDRelationsEntryTags;
 
 typedef struct MainIDRelations {
   /* Mapping from an ID pointer to all of its parents (IDs using it) and children (IDs it uses).
@@ -201,13 +201,15 @@ typedef struct Main {
 struct Main *BKE_main_new(void);
 void BKE_main_free(struct Main *mainvar);
 
+bool BKE_main_is_empty(struct Main *bmain);
+
 void BKE_main_lock(struct Main *bmain);
 void BKE_main_unlock(struct Main *bmain);
 
 void BKE_main_relations_create(struct Main *bmain, const short flag);
 void BKE_main_relations_free(struct Main *bmain);
 void BKE_main_relations_tag_set(struct Main *bmain,
-                                const MainIDRelationsEntryTags tag,
+                                const eMainIDRelationsEntryTags tag,
                                 const bool value);
 
 struct GSet *BKE_main_gset_create(struct Main *bmain, struct GSet *gset);
@@ -242,9 +244,9 @@ void BKE_main_library_weak_reference_remove_item(struct GHash *library_weak_refe
 
 #define FOREACH_MAIN_LISTBASE_ID_BEGIN(_lb, _id) \
   { \
-    ID *_id_next = (_lb)->first; \
+    ID *_id_next = (ID *)(_lb)->first; \
     for ((_id) = _id_next; (_id) != NULL; (_id) = _id_next) { \
-      _id_next = (_id)->next;
+      _id_next = (ID *)(_id)->next;
 
 #define FOREACH_MAIN_LISTBASE_ID_END \
   } \

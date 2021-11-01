@@ -33,11 +33,11 @@ namespace blender::nodes {
 
 static void geo_node_attribute_transfer_declare(NodeDeclarationBuilder &b)
 {
-  b.add_input<decl::Geometry>("Geometry");
-  b.add_input<decl::Geometry>("Source Geometry");
-  b.add_input<decl::String>("Source");
-  b.add_input<decl::String>("Destination");
-  b.add_output<decl::Geometry>("Geometry");
+  b.add_input<decl::Geometry>(N_("Geometry"));
+  b.add_input<decl::Geometry>(N_("Source Geometry"));
+  b.add_input<decl::String>(N_("Source"));
+  b.add_input<decl::String>(N_("Destination"));
+  b.add_output<decl::Geometry>(N_("Geometry"));
 }
 
 static void geo_node_attribute_transfer_layout(uiLayout *layout,
@@ -284,7 +284,8 @@ static void transfer_attribute_nearest_face_interpolated(const GeometrySet &src_
   Array<float3> positions(tot_samples);
   get_closest_mesh_looptris(*mesh, dst_positions, looptri_indices, {}, positions);
 
-  bke::mesh_surface_sample::MeshAttributeInterpolator interp(mesh, positions, looptri_indices);
+  bke::mesh_surface_sample::MeshAttributeInterpolator interp(
+      mesh, IndexMask(tot_samples), positions, looptri_indices);
   interp.sample_attribute(
       src_attribute, dst_attribute, bke::mesh_surface_sample::eAttributeMapMode::INTERPOLATED);
 
@@ -463,12 +464,12 @@ static void transfer_attribute(const GeoNodeExecParams &params,
       "position", dst_domain, {0, 0, 0});
 
   switch (mapping) {
-    case GEO_NODE_ATTRIBUTE_TRANSFER_NEAREST_FACE_INTERPOLATED: {
+    case GEO_NODE_LEGACY_ATTRIBUTE_TRANSFER_NEAREST_FACE_INTERPOLATED: {
       transfer_attribute_nearest_face_interpolated(
           src_geometry, dst_component, dst_positions, dst_domain, data_type, src_name, dst_name);
       break;
     }
-    case GEO_NODE_ATTRIBUTE_TRANSFER_NEAREST: {
+    case GEO_NODE_LEGACY_ATTRIBUTE_TRANSFER_NEAREST: {
       transfer_attribute_nearest(
           src_geometry, dst_component, dst_positions, dst_domain, data_type, src_name, dst_name);
       break;
@@ -511,7 +512,7 @@ static void geo_node_attribute_transfer_exec(GeoNodeExecParams params)
 
 }  // namespace blender::nodes
 
-void register_node_type_geo_attribute_transfer()
+void register_node_type_geo_legacy_attribute_transfer()
 {
   static bNodeType ntype;
 

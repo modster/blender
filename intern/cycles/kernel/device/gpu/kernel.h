@@ -19,27 +19,28 @@
 #include "kernel/device/gpu/parallel_active_index.h"
 #include "kernel/device/gpu/parallel_prefix_sum.h"
 #include "kernel/device/gpu/parallel_sorted_index.h"
+#include "kernel/device/gpu/work_stealing.h"
 
-#include "kernel/integrator/integrator_state.h"
-#include "kernel/integrator/integrator_state_flow.h"
-#include "kernel/integrator/integrator_state_util.h"
+#include "kernel/integrator/state.h"
+#include "kernel/integrator/state_flow.h"
+#include "kernel/integrator/state_util.h"
 
-#include "kernel/integrator/integrator_init_from_bake.h"
-#include "kernel/integrator/integrator_init_from_camera.h"
-#include "kernel/integrator/integrator_intersect_closest.h"
-#include "kernel/integrator/integrator_intersect_shadow.h"
-#include "kernel/integrator/integrator_intersect_subsurface.h"
-#include "kernel/integrator/integrator_intersect_volume_stack.h"
-#include "kernel/integrator/integrator_shade_background.h"
-#include "kernel/integrator/integrator_shade_light.h"
-#include "kernel/integrator/integrator_shade_shadow.h"
-#include "kernel/integrator/integrator_shade_surface.h"
-#include "kernel/integrator/integrator_shade_volume.h"
+#include "kernel/integrator/init_from_bake.h"
+#include "kernel/integrator/init_from_camera.h"
+#include "kernel/integrator/intersect_closest.h"
+#include "kernel/integrator/intersect_shadow.h"
+#include "kernel/integrator/intersect_subsurface.h"
+#include "kernel/integrator/intersect_volume_stack.h"
+#include "kernel/integrator/shade_background.h"
+#include "kernel/integrator/shade_light.h"
+#include "kernel/integrator/shade_shadow.h"
+#include "kernel/integrator/shade_surface.h"
+#include "kernel/integrator/shade_volume.h"
 
-#include "kernel/kernel_adaptive_sampling.h"
-#include "kernel/kernel_bake.h"
-#include "kernel/kernel_film.h"
-#include "kernel/kernel_work_stealing.h"
+#include "kernel/bake/bake.h"
+
+#include "kernel/film/adaptive_sampling.h"
+#include "kernel/film/read.h"
 
 /* --------------------------------------------------------------------
  * Integrator.
@@ -51,8 +52,8 @@ ccl_gpu_kernel(GPU_KERNEL_BLOCK_NUM_THREADS, GPU_KERNEL_MAX_REGISTERS)
   const int state = ccl_gpu_global_id_x();
 
   if (state < num_states) {
-    INTEGRATOR_STATE_WRITE(path, queued_kernel) = 0;
-    INTEGRATOR_STATE_WRITE(shadow_path, queued_kernel) = 0;
+    INTEGRATOR_STATE_WRITE(state, path, queued_kernel) = 0;
+    INTEGRATOR_STATE_WRITE(state, shadow_path, queued_kernel) = 0;
   }
 }
 
@@ -244,7 +245,7 @@ extern "C" __global__ void __launch_bounds__(GPU_PARALLEL_ACTIVE_INDEX_DEFAULT_B
 {
   gpu_parallel_active_index_array<GPU_PARALLEL_ACTIVE_INDEX_DEFAULT_BLOCK_SIZE>(
       num_states, indices, num_indices, [kernel](const int state) {
-        return (INTEGRATOR_STATE(path, queued_kernel) == kernel);
+        return (INTEGRATOR_STATE(state, path, queued_kernel) == kernel);
       });
 }
 
@@ -256,7 +257,7 @@ extern "C" __global__ void __launch_bounds__(GPU_PARALLEL_ACTIVE_INDEX_DEFAULT_B
 {
   gpu_parallel_active_index_array<GPU_PARALLEL_ACTIVE_INDEX_DEFAULT_BLOCK_SIZE>(
       num_states, indices, num_indices, [kernel](const int state) {
-        return (INTEGRATOR_STATE(shadow_path, queued_kernel) == kernel);
+        return (INTEGRATOR_STATE(state, shadow_path, queued_kernel) == kernel);
       });
 }
 
@@ -265,8 +266,7 @@ extern "C" __global__ void __launch_bounds__(GPU_PARALLEL_ACTIVE_INDEX_DEFAULT_B
 {
   gpu_parallel_active_index_array<GPU_PARALLEL_ACTIVE_INDEX_DEFAULT_BLOCK_SIZE>(
       num_states, indices, num_indices, [](const int state) {
-        return (INTEGRATOR_STATE(path, queued_kernel) != 0) ||
-               (INTEGRATOR_STATE(shadow_path, queued_kernel) != 0);
+        return (INTEGRATOR_STATE(state, path, queued_kernel) != 0);
       });
 }
 
@@ -278,19 +278,41 @@ extern "C" __global__ void __launch_bounds__(GPU_PARALLEL_ACTIVE_INDEX_DEFAULT_B
 {
   gpu_parallel_active_index_array<GPU_PARALLEL_ACTIVE_INDEX_DEFAULT_BLOCK_SIZE>(
       num_states, indices + indices_offset, num_indices, [](const int state) {
-        return (INTEGRATOR_STATE(path, queued_kernel) == 0) &&
-               (INTEGRATOR_STATE(shadow_path, queued_kernel) == 0);
+        return (INTEGRATOR_STATE(state, path, queued_kernel) == 0);
+      });
+}
+
+extern "C" __global__ void __launch_bounds__(GPU_PARALLEL_ACTIVE_INDEX_DEFAULT_BLOCK_SIZE)
+    kernel_gpu_integrator_terminated_shadow_paths_array(int num_states,
+                                                        int *indices,
+                                                        int *num_indices,
+                                                        int indices_offset)
+{
+  gpu_parallel_active_index_array<GPU_PARALLEL_ACTIVE_INDEX_DEFAULT_BLOCK_SIZE>(
+      num_states, indices + indices_offset, num_indices, [](const int state) {
+        return (INTEGRATOR_STATE(state, shadow_path, queued_kernel) == 0);
       });
 }
 
 extern "C" __global__ void __launch_bounds__(GPU_PARALLEL_SORTED_INDEX_DEFAULT_BLOCK_SIZE)
-    kernel_gpu_integrator_sorted_paths_array(
-        int num_states, int *indices, int *num_indices, int *key_prefix_sum, int kernel)
+    kernel_gpu_integrator_sorted_paths_array(int num_states,
+                                             int num_states_limit,
+                                             int *indices,
+                                             int *num_indices,
+                                             int *key_counter,
+                                             int *key_prefix_sum,
+                                             int kernel)
 {
   gpu_parallel_sorted_index_array<GPU_PARALLEL_SORTED_INDEX_DEFAULT_BLOCK_SIZE>(
-      num_states, indices, num_indices, key_prefix_sum, [kernel](const int state) {
-        return (INTEGRATOR_STATE(path, queued_kernel) == kernel) ?
-                   INTEGRATOR_STATE(path, shader_sort_key) :
+      num_states,
+      num_states_limit,
+      indices,
+      num_indices,
+      key_counter,
+      key_prefix_sum,
+      [kernel](const int state) {
+        return (INTEGRATOR_STATE(state, path, queued_kernel) == kernel) ?
+                   INTEGRATOR_STATE(state, path, shader_sort_key) :
                    GPU_PARALLEL_SORTED_INDEX_INACTIVE_KEY;
       });
 }
@@ -303,9 +325,7 @@ extern "C" __global__ void __launch_bounds__(GPU_PARALLEL_ACTIVE_INDEX_DEFAULT_B
 {
   gpu_parallel_active_index_array<GPU_PARALLEL_ACTIVE_INDEX_DEFAULT_BLOCK_SIZE>(
       num_states, indices, num_indices, [num_active_paths](const int state) {
-        return (state >= num_active_paths) &&
-               ((INTEGRATOR_STATE(path, queued_kernel) != 0) ||
-                (INTEGRATOR_STATE(shadow_path, queued_kernel) != 0));
+        return (state >= num_active_paths) && (INTEGRATOR_STATE(state, path, queued_kernel) != 0);
       });
 }
 
@@ -321,14 +341,44 @@ extern "C" __global__ void __launch_bounds__(GPU_PARALLEL_SORTED_INDEX_DEFAULT_B
     const int from_state = active_terminated_states[active_states_offset + global_index];
     const int to_state = active_terminated_states[terminated_states_offset + global_index];
 
-    integrator_state_move(to_state, from_state);
+    integrator_state_move(NULL, to_state, from_state);
+  }
+}
+
+extern "C" __global__ void __launch_bounds__(GPU_PARALLEL_ACTIVE_INDEX_DEFAULT_BLOCK_SIZE)
+    kernel_gpu_integrator_compact_shadow_paths_array(int num_states,
+                                                     int *indices,
+                                                     int *num_indices,
+                                                     int num_active_paths)
+{
+  gpu_parallel_active_index_array<GPU_PARALLEL_ACTIVE_INDEX_DEFAULT_BLOCK_SIZE>(
+      num_states, indices, num_indices, [num_active_paths](const int state) {
+        return (state >= num_active_paths) &&
+               (INTEGRATOR_STATE(state, shadow_path, queued_kernel) != 0);
+      });
+}
+
+extern "C" __global__ void __launch_bounds__(GPU_PARALLEL_SORTED_INDEX_DEFAULT_BLOCK_SIZE)
+    kernel_gpu_integrator_compact_shadow_states(const int *active_terminated_states,
+                                                const int active_states_offset,
+                                                const int terminated_states_offset,
+                                                const int work_size)
+{
+  const int global_index = ccl_gpu_global_id_x();
+
+  if (global_index < work_size) {
+    const int from_state = active_terminated_states[active_states_offset + global_index];
+    const int to_state = active_terminated_states[terminated_states_offset + global_index];
+
+    integrator_shadow_state_move(NULL, to_state, from_state);
   }
 }
 
 extern "C" __global__ void __launch_bounds__(GPU_PARALLEL_PREFIX_SUM_DEFAULT_BLOCK_SIZE)
-    kernel_gpu_prefix_sum(int *values, int num_values)
+    kernel_gpu_prefix_sum(int *counter, int *prefix_sum, int num_values)
 {
-  gpu_parallel_prefix_sum<GPU_PARALLEL_PREFIX_SUM_DEFAULT_BLOCK_SIZE>(values, num_values);
+  gpu_parallel_prefix_sum<GPU_PARALLEL_PREFIX_SUM_DEFAULT_BLOCK_SIZE>(
+      counter, prefix_sum, num_values);
 }
 
 /* --------------------------------------------------------------------
@@ -467,7 +517,7 @@ ccl_device_inline void kernel_gpu_film_convert_half_rgba_common_rgba(
   film_apply_pass_pixel_overlays_rgba(kfilm_convert, buffer, pixel);
 
   ccl_global half4 *out = ((ccl_global half4 *)rgba) + rgba_offset + y * rgba_stride + x;
-  float4_store_half((ccl_global half *)out, make_float4(pixel[0], pixel[1], pixel[2], pixel[3]));
+  *out = float4_to_half4_display(make_float4(pixel[0], pixel[1], pixel[2], pixel[3]));
 }
 
 /* Common implementation for half4 destination and 3-channel input pass. */
@@ -615,7 +665,7 @@ KERNEL_FILM_CONVERT_DEFINE(float4, rgba)
 
 ccl_gpu_kernel(GPU_KERNEL_BLOCK_NUM_THREADS, GPU_KERNEL_MAX_REGISTERS)
     kernel_gpu_shader_eval_displace(KernelShaderEvalInput *input,
-                                    float4 *output,
+                                    float *output,
                                     const int offset,
                                     const int work_size)
 {
@@ -625,17 +675,31 @@ ccl_gpu_kernel(GPU_KERNEL_BLOCK_NUM_THREADS, GPU_KERNEL_MAX_REGISTERS)
   }
 }
 
-/* Background Shader Evaluation */
+/* Background */
 
 ccl_gpu_kernel(GPU_KERNEL_BLOCK_NUM_THREADS, GPU_KERNEL_MAX_REGISTERS)
     kernel_gpu_shader_eval_background(KernelShaderEvalInput *input,
-                                      float4 *output,
+                                      float *output,
                                       const int offset,
                                       const int work_size)
 {
   int i = ccl_gpu_global_id_x();
   if (i < work_size) {
     kernel_background_evaluate(NULL, input, output, offset + i);
+  }
+}
+
+/* Curve Shadow Transparency */
+
+ccl_gpu_kernel(GPU_KERNEL_BLOCK_NUM_THREADS, GPU_KERNEL_MAX_REGISTERS)
+    kernel_gpu_shader_eval_curve_shadow_transparency(KernelShaderEvalInput *input,
+                                                     float *output,
+                                                     const int offset,
+                                                     const int work_size)
+{
+  int i = ccl_gpu_global_id_x();
+  if (i < work_size) {
+    kernel_curve_shadow_transparency_evaluate(NULL, input, output, offset + i);
   }
 }
 

@@ -20,12 +20,12 @@ struct Mesh;
 struct CurveEval;
 
 /** \file
- * \ingroup geo
+ * \ingroup bke
  */
 
 namespace blender::bke {
 
-Mesh *curve_to_mesh_sweep(const CurveEval &curve, const CurveEval &profile);
+Mesh *curve_to_mesh_sweep(const CurveEval &curve, const CurveEval &profile, bool fill_caps);
 Mesh *curve_to_wire_mesh(const CurveEval &curve);
 
 }  // namespace blender::bke

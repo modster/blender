@@ -307,34 +307,36 @@ static void ntree_free_data(ID *id)
 
 static void library_foreach_node_socket(LibraryForeachIDData *data, bNodeSocket *sock)
 {
-  IDP_foreach_property(
-      sock->prop, IDP_TYPE_FILTER_ID, BKE_lib_query_idpropertiesForeachIDLink_callback, data);
+  BKE_LIB_FOREACHID_PROCESS_FUNCTION_CALL(
+      data,
+      IDP_foreach_property(
+          sock->prop, IDP_TYPE_FILTER_ID, BKE_lib_query_idpropertiesForeachIDLink_callback, data));
 
   switch ((eNodeSocketDatatype)sock->type) {
     case SOCK_OBJECT: {
       bNodeSocketValueObject *default_value = (bNodeSocketValueObject *)sock->default_value;
-      BKE_LIB_FOREACHID_PROCESS(data, default_value->value, IDWALK_CB_USER);
+      BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, default_value->value, IDWALK_CB_USER);
       break;
     }
     case SOCK_IMAGE: {
       bNodeSocketValueImage *default_value = (bNodeSocketValueImage *)sock->default_value;
-      BKE_LIB_FOREACHID_PROCESS(data, default_value->value, IDWALK_CB_USER);
+      BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, default_value->value, IDWALK_CB_USER);
       break;
     }
     case SOCK_COLLECTION: {
       bNodeSocketValueCollection *default_value = (bNodeSocketValueCollection *)
                                                       sock->default_value;
-      BKE_LIB_FOREACHID_PROCESS(data, default_value->value, IDWALK_CB_USER);
+      BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, default_value->value, IDWALK_CB_USER);
       break;
     }
     case SOCK_TEXTURE: {
       bNodeSocketValueTexture *default_value = (bNodeSocketValueTexture *)sock->default_value;
-      BKE_LIB_FOREACHID_PROCESS(data, default_value->value, IDWALK_CB_USER);
+      BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, default_value->value, IDWALK_CB_USER);
       break;
     }
     case SOCK_MATERIAL: {
       bNodeSocketValueMaterial *default_value = (bNodeSocketValueMaterial *)sock->default_value;
-      BKE_LIB_FOREACHID_PROCESS(data, default_value->value, IDWALK_CB_USER);
+      BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, default_value->value, IDWALK_CB_USER);
       break;
     }
     case SOCK_FLOAT:
@@ -355,26 +357,30 @@ static void node_foreach_id(ID *id, LibraryForeachIDData *data)
 {
   bNodeTree *ntree = (bNodeTree *)id;
 
-  BKE_LIB_FOREACHID_PROCESS(data, ntree->gpd, IDWALK_CB_USER);
+  BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, ntree->gpd, IDWALK_CB_USER);
 
   LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
     BKE_LIB_FOREACHID_PROCESS_ID(data, node->id, IDWALK_CB_USER);
 
-    IDP_foreach_property(
-        node->prop, IDP_TYPE_FILTER_ID, BKE_lib_query_idpropertiesForeachIDLink_callback, data);
+    BKE_LIB_FOREACHID_PROCESS_FUNCTION_CALL(
+        data,
+        IDP_foreach_property(node->prop,
+                             IDP_TYPE_FILTER_ID,
+                             BKE_lib_query_idpropertiesForeachIDLink_callback,
+                             data));
     LISTBASE_FOREACH (bNodeSocket *, sock, &node->inputs) {
-      library_foreach_node_socket(data, sock);
+      BKE_LIB_FOREACHID_PROCESS_FUNCTION_CALL(data, library_foreach_node_socket(data, sock));
     }
     LISTBASE_FOREACH (bNodeSocket *, sock, &node->outputs) {
-      library_foreach_node_socket(data, sock);
+      BKE_LIB_FOREACHID_PROCESS_FUNCTION_CALL(data, library_foreach_node_socket(data, sock));
     }
   }
 
   LISTBASE_FOREACH (bNodeSocket *, sock, &ntree->inputs) {
-    library_foreach_node_socket(data, sock);
+    BKE_LIB_FOREACHID_PROCESS_FUNCTION_CALL(data, library_foreach_node_socket(data, sock));
   }
   LISTBASE_FOREACH (bNodeSocket *, sock, &ntree->outputs) {
-    library_foreach_node_socket(data, sock);
+    BKE_LIB_FOREACHID_PROCESS_FUNCTION_CALL(data, library_foreach_node_socket(data, sock));
   }
 }
 
@@ -1379,6 +1385,9 @@ static void node_free_type(void *nodetype_v)
     free_dynamic_typeinfo(nodetype);
   }
 
+  delete nodetype->fixed_declaration;
+  nodetype->fixed_declaration = nullptr;
+
   /* Can be null when the type is not dynamically allocated. */
   if (nodetype->free_self) {
     nodetype->free_self(nodetype);
@@ -1390,6 +1399,14 @@ void nodeRegisterType(bNodeType *nt)
   /* debug only: basic verification of registered types */
   BLI_assert(nt->idname[0] != '\0');
   BLI_assert(nt->poll != nullptr);
+
+  if (nt->declare && !nt->declaration_is_dynamic) {
+    if (nt->fixed_declaration == nullptr) {
+      nt->fixed_declaration = new blender::nodes::NodeDeclaration();
+      blender::nodes::NodeDeclarationBuilder builder{*nt->fixed_declaration};
+      nt->declare(builder);
+    }
+  }
 
   BLI_ghash_insert(nodetypes_hash, nt->idname, nt);
   /* XXX pass Main to register function? */
@@ -1406,7 +1423,7 @@ void nodeUnregisterType(bNodeType *nt)
 bool nodeTypeUndefined(bNode *node)
 {
   return (node->typeinfo == &NodeTypeUndefined) ||
-         ((node->type == NODE_GROUP || node->type == NODE_CUSTOM_GROUP) && node->id &&
+         ((ELEM(node->type, NODE_GROUP, NODE_CUSTOM_GROUP)) && node->id &&
           ID_IS_LINKED(node->id) && (node->id->tag & LIB_TAG_MISSING));
 }
 
@@ -2254,9 +2271,6 @@ bNode *BKE_node_copy_ex(bNodeTree *ntree,
 
   *node_dst = *node_src;
 
-  /* Reset the declaration of the new node. */
-  node_dst->declaration = nullptr;
-
   /* can be called for nodes outside a node tree (e.g. clipboard) */
   if (ntree) {
     if (unique_name) {
@@ -2326,6 +2340,10 @@ bNode *BKE_node_copy_ex(bNodeTree *ntree,
   if (ntree) {
     ntree->update |= NTREE_UPDATE_NODES;
   }
+
+  /* Reset the declaration of the new node. */
+  node_dst->declaration = nullptr;
+  nodeDeclarationEnsure(ntree, node_dst);
 
   return node_dst;
 }
@@ -3144,7 +3162,9 @@ static void node_free_node(bNodeTree *ntree, bNode *node)
     MEM_freeN(node->prop);
   }
 
-  delete node->declaration;
+  if (node->typeinfo->declaration_is_dynamic) {
+    delete node->declaration;
+  }
 
   MEM_freeN(node);
 
@@ -3982,16 +4002,22 @@ int nodeSocketLinkLimit(const bNodeSocket *sock)
  */
 void nodeDeclarationEnsure(bNodeTree *UNUSED(ntree), bNode *node)
 {
-  if (node->typeinfo->declare == nullptr) {
-    return;
-  }
   if (node->declaration != nullptr) {
     return;
   }
-
-  node->declaration = new blender::nodes::NodeDeclaration();
-  blender::nodes::NodeDeclarationBuilder builder{*node->declaration};
-  node->typeinfo->declare(builder);
+  if (node->typeinfo->declare == nullptr) {
+    return;
+  }
+  if (node->typeinfo->declaration_is_dynamic) {
+    node->declaration = new blender::nodes::NodeDeclaration();
+    blender::nodes::NodeDeclarationBuilder builder{*node->declaration};
+    node->typeinfo->declare(builder);
+  }
+  else {
+    /* Declaration should have been created in #nodeRegisterType. */
+    BLI_assert(node->typeinfo->fixed_declaration != nullptr);
+    node->declaration = node->typeinfo->fixed_declaration;
+  }
 }
 
 /* ************** Node Clipboard *********** */
@@ -4595,12 +4621,16 @@ static FieldInferencingInterface get_node_field_inferencing_interface(const Node
  * network.
  */
 struct SocketFieldState {
-  /* This socket is currently a single value. It could become a field though. */
-  bool is_single = true;
-  /* This socket is required to be a single value. It must not be a field. */
-  bool requires_single = false;
   /* This socket starts a new field. */
   bool is_field_source = false;
+  /* This socket can never become a field, because the node itself does not support it. */
+  bool is_always_single = false;
+  /* This socket is currently a single value. It could become a field though. */
+  bool is_single = true;
+  /* This socket is required to be a single value. This can be because the node itself only
+   * supports this socket to be a single value, or because a node afterwards requires this to be a
+   * single value. */
+  bool requires_single = false;
 };
 
 static Vector<const InputSocketRef *> gather_input_socket_dependencies(
@@ -4655,7 +4685,7 @@ static OutputFieldDependency find_group_output_dependencies(
   while (!sockets_to_check.is_empty()) {
     const InputSocketRef *input_socket = sockets_to_check.pop();
 
-    for (const OutputSocketRef *origin_socket : input_socket->logically_linked_sockets()) {
+    for (const OutputSocketRef *origin_socket : input_socket->directly_linked_sockets()) {
       const NodeRef &origin_node = origin_socket->node();
       const SocketFieldState &origin_state = field_state_by_socket_id[origin_socket->id()];
 
@@ -4693,10 +4723,10 @@ static OutputFieldDependency find_group_output_dependencies(
 static void propagate_data_requirements_from_right_to_left(
     const NodeTreeRef &tree, const MutableSpan<SocketFieldState> field_state_by_socket_id)
 {
-  const Vector<const NodeRef *> sorted_nodes = tree.toposort(
+  const NodeTreeRef::ToposortResult toposort_result = tree.toposort(
       NodeTreeRef::ToposortDirection::RightToLeft);
 
-  for (const NodeRef *node : sorted_nodes) {
+  for (const NodeRef *node : toposort_result.sorted_nodes) {
     const FieldInferencingInterface inferencing_interface = get_node_field_inferencing_interface(
         *node);
 
@@ -4711,6 +4741,7 @@ static void propagate_data_requirements_from_right_to_left(
       }
       if (field_dependency.field_type() == OutputSocketFieldType::None) {
         state.requires_single = true;
+        state.is_always_single = true;
         continue;
       }
 
@@ -4752,6 +4783,7 @@ static void propagate_data_requirements_from_right_to_left(
       SocketFieldState &state = field_state_by_socket_id[input_socket->id()];
       if (inferencing_interface.inputs[input_socket->index()] == InputSocketFieldType::None) {
         state.requires_single = true;
+        state.is_always_single = true;
       }
     }
   }
@@ -4803,10 +4835,10 @@ static void determine_group_input_states(
 static void propagate_field_status_from_left_to_right(
     const NodeTreeRef &tree, const MutableSpan<SocketFieldState> field_state_by_socket_id)
 {
-  Vector<const NodeRef *> sorted_nodes = tree.toposort(
+  const NodeTreeRef::ToposortResult toposort_result = tree.toposort(
       NodeTreeRef::ToposortDirection::LeftToRight);
 
-  for (const NodeRef *node : sorted_nodes) {
+  for (const NodeRef *node : toposort_result.sorted_nodes) {
     if (node->is_group_input_node()) {
       continue;
     }
@@ -4817,19 +4849,19 @@ static void propagate_field_status_from_left_to_right(
     /* Update field state of input sockets, also taking into account linked origin sockets. */
     for (const InputSocketRef *input_socket : node->inputs()) {
       SocketFieldState &state = field_state_by_socket_id[input_socket->id()];
-      if (state.requires_single) {
+      if (state.is_always_single) {
         state.is_single = true;
         continue;
       }
       state.is_single = true;
-      if (input_socket->logically_linked_sockets().is_empty()) {
+      if (input_socket->directly_linked_sockets().is_empty()) {
         if (inferencing_interface.inputs[input_socket->index()] ==
             InputSocketFieldType::Implicit) {
           state.is_single = false;
         }
       }
       else {
-        for (const OutputSocketRef *origin_socket : input_socket->logically_linked_sockets()) {
+        for (const OutputSocketRef *origin_socket : input_socket->directly_linked_sockets()) {
           if (!field_state_by_socket_id[origin_socket->id()].is_single) {
             state.is_single = false;
             break;
@@ -4858,6 +4890,9 @@ static void propagate_field_status_from_left_to_right(
         case OutputSocketFieldType::DependentField: {
           for (const InputSocketRef *input_socket :
                gather_input_socket_dependencies(field_dependency, *node)) {
+            if (!input_socket->is_available()) {
+              continue;
+            }
             if (!field_state_by_socket_id[input_socket->id()].is_single) {
               state.is_single = false;
               break;
@@ -4897,31 +4932,28 @@ static void update_socket_shapes(const NodeTreeRef &tree,
   const eNodeSocketDisplayShape data_but_can_be_field_shape = SOCK_DISPLAY_SHAPE_DIAMOND_DOT;
   const eNodeSocketDisplayShape is_field_shape = SOCK_DISPLAY_SHAPE_DIAMOND;
 
+  auto get_shape_for_state = [&](const SocketFieldState &state) {
+    if (state.is_always_single) {
+      return requires_data_shape;
+    }
+    if (!state.is_single) {
+      return is_field_shape;
+    }
+    if (state.requires_single) {
+      return requires_data_shape;
+    }
+    return data_but_can_be_field_shape;
+  };
+
   for (const InputSocketRef *socket : tree.input_sockets()) {
     bNodeSocket *bsocket = socket->bsocket();
     const SocketFieldState &state = field_state_by_socket_id[socket->id()];
-    if (state.requires_single) {
-      bsocket->display_shape = requires_data_shape;
-    }
-    else if (state.is_single) {
-      bsocket->display_shape = data_but_can_be_field_shape;
-    }
-    else {
-      bsocket->display_shape = is_field_shape;
-    }
+    bsocket->display_shape = get_shape_for_state(state);
   }
   for (const OutputSocketRef *socket : tree.output_sockets()) {
     bNodeSocket *bsocket = socket->bsocket();
     const SocketFieldState &state = field_state_by_socket_id[socket->id()];
-    if (state.requires_single) {
-      bsocket->display_shape = requires_data_shape;
-    }
-    else if (state.is_single) {
-      bsocket->display_shape = data_but_can_be_field_shape;
-    }
-    else {
-      bsocket->display_shape = is_field_shape;
-    }
+    bsocket->display_shape = get_shape_for_state(state);
   }
 }
 
@@ -5709,16 +5741,26 @@ static void registerGeometryNodes()
 {
   register_node_type_geo_group();
 
-  register_node_type_geo_legacy_curve_set_handles();
   register_node_type_geo_legacy_attribute_proximity();
   register_node_type_geo_legacy_attribute_randomize();
-  register_node_type_geo_legacy_material_assign();
-  register_node_type_geo_legacy_points_to_volume();
-  register_node_type_geo_legacy_select_by_material();
-  register_node_type_geo_legacy_curve_spline_type();
+  register_node_type_geo_legacy_attribute_transfer();
+  register_node_type_geo_legacy_curve_endpoints();
   register_node_type_geo_legacy_curve_reverse();
-  register_node_type_geo_legacy_select_by_handle_type();
+  register_node_type_geo_legacy_curve_set_handles();
+  register_node_type_geo_legacy_curve_spline_type();
   register_node_type_geo_legacy_curve_subdivide();
+  register_node_type_geo_legacy_curve_to_points();
+  register_node_type_geo_legacy_delete_geometry();
+  register_node_type_geo_legacy_edge_split();
+  register_node_type_geo_legacy_material_assign();
+  register_node_type_geo_legacy_mesh_to_curve();
+  register_node_type_geo_legacy_points_to_volume();
+  register_node_type_geo_legacy_raycast();
+  register_node_type_geo_legacy_select_by_handle_type();
+  register_node_type_geo_legacy_select_by_material();
+  register_node_type_geo_legacy_subdivision_surface();
+  register_node_type_geo_legacy_volume_to_mesh();
+
   register_node_type_geo_align_rotation_to_vector();
   register_node_type_geo_attribute_capture();
   register_node_type_geo_attribute_clamp();
@@ -5734,14 +5776,13 @@ static void registerGeometryNodes()
   register_node_type_geo_attribute_remove();
   register_node_type_geo_attribute_separate_xyz();
   register_node_type_geo_attribute_statistic();
-  register_node_type_geo_attribute_transfer();
   register_node_type_geo_attribute_vector_math();
   register_node_type_geo_attribute_vector_rotate();
   register_node_type_geo_boolean();
   register_node_type_geo_bounding_box();
   register_node_type_geo_collection_info();
   register_node_type_geo_convex_hull();
-  register_node_type_geo_curve_endpoints();
+  register_node_type_geo_curve_endpoint_selection();
   register_node_type_geo_curve_fill();
   register_node_type_geo_curve_fillet();
   register_node_type_geo_curve_handle_type_selection();
@@ -5766,16 +5807,25 @@ static void registerGeometryNodes()
   register_node_type_geo_delete_geometry();
   register_node_type_geo_distribute_points_on_faces();
   register_node_type_geo_edge_split();
+  register_node_type_geo_image_texture();
+  register_node_type_geo_input_curve_handles();
+  register_node_type_geo_input_curve_tilt();
+  register_node_type_geo_input_id();
   register_node_type_geo_input_index();
+  register_node_type_geo_input_material_index();
   register_node_type_geo_input_material();
   register_node_type_geo_input_normal();
   register_node_type_geo_input_position();
-  register_node_type_geo_input_tangent();
+  register_node_type_geo_input_radius();
+  register_node_type_geo_input_shade_smooth();
+  register_node_type_geo_input_spline_cyclic();
   register_node_type_geo_input_spline_length();
+  register_node_type_geo_input_spline_resolution();
+  register_node_type_geo_input_tangent();
   register_node_type_geo_instance_on_points();
+  register_node_type_geo_instances_to_points();
   register_node_type_geo_is_viewport();
   register_node_type_geo_join_geometry();
-  register_node_type_geo_material_assign();
   register_node_type_geo_material_replace();
   register_node_type_geo_material_selection();
   register_node_type_geo_mesh_primitive_circle();
@@ -5801,14 +5851,29 @@ static void registerGeometryNodes()
   register_node_type_geo_proximity();
   register_node_type_geo_raycast();
   register_node_type_geo_realize_instances();
+  register_node_type_geo_rotate_instances();
   register_node_type_geo_sample_texture();
+  register_node_type_geo_scale_instances();
   register_node_type_geo_separate_components();
+  register_node_type_geo_separate_geometry();
+  register_node_type_geo_set_curve_handles();
+  register_node_type_geo_set_curve_radius();
+  register_node_type_geo_set_curve_tilt();
+  register_node_type_geo_set_id();
+  register_node_type_geo_set_material_index();
+  register_node_type_geo_set_material();
+  register_node_type_geo_set_point_radius();
   register_node_type_geo_set_position();
+  register_node_type_geo_set_shade_smooth();
+  register_node_type_geo_set_spline_cyclic();
+  register_node_type_geo_set_spline_resolution();
   register_node_type_geo_string_join();
   register_node_type_geo_string_to_curves();
   register_node_type_geo_subdivision_surface();
   register_node_type_geo_switch();
+  register_node_type_geo_transfer_attribute();
   register_node_type_geo_transform();
+  register_node_type_geo_translate_instances();
   register_node_type_geo_triangulate();
   register_node_type_geo_viewer();
   register_node_type_geo_volume_to_mesh();
@@ -5818,16 +5883,21 @@ static void registerFunctionNodes()
 {
   register_node_type_fn_legacy_random_float();
 
+  register_node_type_fn_align_euler_to_vector();
   register_node_type_fn_boolean_math();
   register_node_type_fn_float_compare();
   register_node_type_fn_float_to_int();
+  register_node_type_fn_input_bool();
+  register_node_type_fn_input_color();
+  register_node_type_fn_input_int();
   register_node_type_fn_input_special_characters();
   register_node_type_fn_input_string();
   register_node_type_fn_input_vector();
   register_node_type_fn_random_value();
+  register_node_type_fn_replace_string();
   register_node_type_fn_rotate_euler();
+  register_node_type_fn_slice_string();
   register_node_type_fn_string_length();
-  register_node_type_fn_string_substring();
   register_node_type_fn_value_to_string();
 }
 

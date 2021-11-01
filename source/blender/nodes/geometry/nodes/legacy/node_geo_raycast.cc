@@ -28,23 +28,23 @@ namespace blender::nodes {
 
 static void geo_node_raycast_declare(NodeDeclarationBuilder &b)
 {
-  b.add_input<decl::Geometry>("Geometry");
-  b.add_input<decl::Geometry>("Target Geometry");
-  b.add_input<decl::String>("Ray Direction");
-  b.add_input<decl::Vector>("Ray Direction", "Ray Direction_001")
+  b.add_input<decl::Geometry>(N_("Geometry"));
+  b.add_input<decl::Geometry>(N_("Target Geometry"));
+  b.add_input<decl::String>(N_("Ray Direction"));
+  b.add_input<decl::Vector>(N_("Ray Direction"), "Ray Direction_001")
       .default_value({0.0f, 0.0f, 1.0f});
-  b.add_input<decl::String>("Ray Length");
-  b.add_input<decl::Float>("Ray Length", "Ray Length_001")
+  b.add_input<decl::String>(N_("Ray Length"));
+  b.add_input<decl::Float>(N_("Ray Length"), "Ray Length_001")
       .default_value(100.0f)
       .min(0.0f)
       .subtype(PROP_DISTANCE);
-  b.add_input<decl::String>("Target Attribute");
-  b.add_input<decl::String>("Is Hit");
-  b.add_input<decl::String>("Hit Position");
-  b.add_input<decl::String>("Hit Normal");
-  b.add_input<decl::String>("Hit Distance");
-  b.add_input<decl::String>("Hit Attribute");
-  b.add_output<decl::Geometry>("Geometry");
+  b.add_input<decl::String>(N_("Target Attribute"));
+  b.add_input<decl::String>(N_("Is Hit"));
+  b.add_input<decl::String>(N_("Hit Position"));
+  b.add_input<decl::String>(N_("Hit Normal"));
+  b.add_input<decl::String>(N_("Hit Distance"));
+  b.add_input<decl::String>(N_("Hit Attribute"));
+  b.add_output<decl::Geometry>(N_("Geometry"));
 }
 
 static void geo_node_raycast_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
@@ -250,7 +250,8 @@ static void raycast_from_points(const GeoNodeExecParams &params,
   hit_distance_attribute.save();
 
   /* Custom interpolated attributes */
-  bke::mesh_surface_sample::MeshAttributeInterpolator interp(src_mesh, hit_positions, hit_indices);
+  bke::mesh_surface_sample::MeshAttributeInterpolator interp(
+      src_mesh, IndexMask(ray_origins.size()), hit_positions, hit_indices);
   for (const int i : hit_attribute_names.index_range()) {
     const std::optional<AttributeMetaData> meta_data = src_mesh_component->attribute_get_meta_data(
         hit_attribute_names[i]);
@@ -304,7 +305,7 @@ static void geo_node_raycast_exec(GeoNodeExecParams params)
 
 }  // namespace blender::nodes
 
-void register_node_type_geo_raycast()
+void register_node_type_geo_legacy_raycast()
 {
   static bNodeType ntype;
 
