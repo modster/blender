@@ -346,4 +346,25 @@ fn::GVMutableArrayPtr DataTypeConversions::try_convert(fn::GVMutableArrayPtr var
       std::move(varray), to_type, *this);
 }
 
+void DataTypeConversions::try_convert(fn::GSpan src, fn::GMutableSpan dst, IndexMask mask) const
+{
+  BLI_assert(src.size() == dst.size());
+  const CPPType &from_type = src.type();
+  const CPPType &to_type = dst.type();
+  if (from_type == to_type) {
+    return dst.type().copy_assign_n(src.data(), dst.data(), src.size());
+  }
+  const fn::MultiFunction *fn = this->get_conversion_multi_function(
+      fn::MFDataType::ForSingle(from_type), fn::MFDataType::ForSingle(to_type));
+  if (fn == nullptr) {
+    return to_type.fill_assign_n(to_type.default_value(), dst.data(), dst.size());
+  }
+  fn::MFParamsBuilder mf_params{*fn, &mask};
+  fn::MFContextBuilder mf_context;
+  mf_params.add_readonly_single_input(src);
+  mf_params.add_uninitialized_single_output(dst);
+
+  fn->call(mask, mf_params, mf_context);
+}
+
 }  // namespace blender::nodes

@@ -298,7 +298,7 @@ set(SRC
   geometry/nodes/node_geo_translate_instances.cc
   geometry/nodes/node_geo_triangulate.cc
   geometry/nodes/node_geo_viewer.cc
-  geometry/nodes/node_geo_volume_sample.cc
+  geometry/nodes/node_geo_sample_volume.cc
   geometry/nodes/node_geo_volume_to_mesh.cc
 
   geometry/node_geometry_exec.cc

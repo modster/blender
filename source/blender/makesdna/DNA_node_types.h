@@ -1384,6 +1384,13 @@ typedef struct NodeGeometryVolumeToMesh {
   uint8_t resolution_mode;
 } NodeGeometryVolumeToMesh;
 
+typedef struct NodeGeometrySampleVolume {
+  /* CustomDataType. */
+  int8_t data_type;
+  /* GeometryNodeSampleVolumeInterpolation. */
+  int8_t interpolation;
+} NodeGeometrySampleVolume;
+
 typedef struct NodeGeometryLevelSetBoolean {
   /* GeometryNodeBooleanOperation */
   uint8_t operation;
@@ -2250,6 +2257,12 @@ typedef enum GeometryNodeLevelSetTemporalScheme {
   GEO_NODE_LEVEL_SET_MORPH_SPATIAL_2ND = 1,
   GEO_NODE_LEVEL_SET_MORPH_SPATIAL_3RD = 2,
 } GeometryNodeLevelSetTemporalScheme;
+
+typedef enum GeometryNodeSampleVolumeInterpolation {
+  GEO_NODE_VOLUME_SAMPLE_NEAREST = 0,
+  GEO_NODE_VOLUME_SAMPLE_LINEAR = 1,
+  GEO_NODE_VOLUME_SAMPLE_QUADRATIC = 2,
+} GeometryNodeSampleVolumeInterpolation;
 
 typedef enum GeometryNodeAttributeTransferMapMode {
   GEO_NODE_LEGACY_ATTRIBUTE_TRANSFER_NEAREST_FACE_INTERPOLATED = 0,

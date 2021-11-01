@@ -5884,7 +5884,7 @@ static void registerGeometryNodes()
   register_node_type_geo_translate_instances();
   register_node_type_geo_triangulate();
   register_node_type_geo_viewer();
-  register_node_type_geo_volume_sample();
+  register_node_type_geo_sample_volume();
   register_node_type_geo_volume_to_mesh();
 }
 

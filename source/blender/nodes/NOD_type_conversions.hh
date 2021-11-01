@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include "BLI_index_mask.hh"
+
 #include "FN_multi_function.hh"
 
 namespace blender::nodes {
@@ -76,6 +78,8 @@ class DataTypeConversions {
   fn::GVArrayPtr try_convert(fn::GVArrayPtr varray, const CPPType &to_type) const;
 
   fn::GVMutableArrayPtr try_convert(fn::GVMutableArrayPtr varray, const CPPType &to_type) const;
+
+  void try_convert(fn::GSpan src, fn::GMutableSpan dst, IndexMask mask) const;
 };
 
 const DataTypeConversions &get_implicit_type_conversions();
