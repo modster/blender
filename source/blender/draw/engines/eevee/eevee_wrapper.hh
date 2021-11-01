@@ -227,7 +227,8 @@ class Texture {
     tx_ = nullptr;
   }
 
-  void ensure(const char *name, int w, int h, int mips, eGPUTextureFormat format)
+  /* Return true is a texture has been created. */
+  bool ensure(const char *name, int w, int h, int mips, eGPUTextureFormat format)
   {
     /* TODO(fclem) In the future, we need to check if mip_count did not change.
      * For now it's ok as we always define all mip level.*/
@@ -242,10 +243,13 @@ class Texture {
          * generated on creation. */
         GPU_texture_generate_mipmap(tx_);
       }
+      return true;
     }
+    return false;
   }
 
-  void ensure_cubemap(const char *name, int w, int mips, eGPUTextureFormat format)
+  /* Return true is a texture has been created. */
+  bool ensure_cubemap(const char *name, int w, int mips, eGPUTextureFormat format)
   {
     /* TODO(fclem) In the future, we need to check if mip_count did not change.
      * For now it's ok as we always define all mip level.*/
@@ -260,12 +264,15 @@ class Texture {
          * generated on creation. */
         GPU_texture_generate_mipmap(tx_);
       }
+      return true;
     }
+    return false;
   }
 
-  void ensure(int w, int h, int mips, eGPUTextureFormat format)
+  /* Return true is a texture has been created. */
+  bool ensure(int w, int h, int mips, eGPUTextureFormat format)
   {
-    ensure(name_, w, h, mips, format);
+    return ensure(name_, w, h, mips, format);
   }
 
   void clear(vec4 color)
