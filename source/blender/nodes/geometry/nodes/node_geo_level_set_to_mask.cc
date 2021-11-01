@@ -40,30 +40,33 @@ static void geo_node_level_set_to_mask_declare(NodeDeclarationBuilder &b)
 
 static Volume *level_set_to_mask(const Volume &volume, const GeoNodeExecParams &params)
 {
+  if (BKE_volume_num_grids(&volume) == 0) {
+    params.error_message_add(NodeWarningType::Error, TIP_("Volume is empty"));
+    return nullptr;
+  }
+
   Volume *mask_volume = (Volume *)BKE_id_new_nomain(ID_VO, nullptr);
   BKE_volume_init_grids(mask_volume);
 
-  const VolumeGrid *volume_grid = BKE_volume_grid_get_for_read(&volume, 0);
-  if (volume_grid == nullptr) {
-    params.error_message_add(NodeWarningType::Error, TIP_("Volume is empty"));
-    return mask_volume;
-  }
+  for (const int i : IndexRange(BKE_volume_num_grids(&volume))) {
+    const VolumeGrid *volume_grid = BKE_volume_grid_get_for_read(&volume, i);
 
-  openvdb::GridBase::ConstPtr grid_base = BKE_volume_grid_openvdb_for_read(&volume, volume_grid);
-  if (grid_base->getGridClass() != openvdb::GridClass::GRID_LEVEL_SET) {
-    params.error_message_add(NodeWarningType::Error, TIP_("Volume is not a level set"));
-  }
-
-  openvdb::BoolGrid::Ptr mask_grid;
-  bke::volume::to_static_type(BKE_volume_grid_type(volume_grid), [&](auto dummy) {
-    using GridType = decltype(dummy);
-    if constexpr (std::is_same_v<GridType, openvdb::FloatGrid>) {
-      const GridType &grid = static_cast<const GridType &>(*grid_base);
-      mask_grid = openvdb::tools::sdfInteriorMask(grid);
+    openvdb::GridBase::ConstPtr grid_base = BKE_volume_grid_openvdb_for_read(&volume, volume_grid);
+    if (grid_base->getGridClass() != openvdb::GridClass::GRID_LEVEL_SET) {
+      params.error_message_add(NodeWarningType::Error,
+                               std::string(TIP_("Volume grid is not a level set: ")) +
+                                   BKE_volume_grid_name(volume_grid));
     }
-  });
 
-  BKE_volume_grid_add_vdb(mask_volume, "mask", std::move(mask_grid));
+    bke::volume::to_static_type(BKE_volume_grid_type(volume_grid), [&](auto dummy) {
+      using GridType = decltype(dummy);
+      if constexpr (std::is_same_v<GridType, openvdb::FloatGrid>) {
+        const GridType &grid = static_cast<const GridType &>(*grid_base);
+        openvdb::BoolGrid::Ptr mask_grid = openvdb::tools::sdfInteriorMask(grid);
+        BKE_volume_grid_add_vdb(*mask_volume, "mask_" + i, std::move(mask_grid));
+      }
+    });
+  }
 
   return mask_volume;
 }
@@ -74,18 +77,23 @@ static void geo_node_level_set_to_mask_exec(GeoNodeExecParams params)
 {
 #ifdef WITH_OPENVDB
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Level Set");
-  const Volume *volume = geometry_set.get_volume_for_read();
 
-  if (volume == nullptr) {
-    params.set_output("Mask Volume", std::move(geometry_set));
-    return;
-  }
+  geometry_set.modify_geometry_sets([&](GeometrySet &geometry_set) {
+    const Volume *volume = geometry_set.get_volume_for_read();
 
-  const Main *bmain = DEG_get_bmain(params.depsgraph());
-  BKE_volume_load(volume, bmain);
+    if (volume == nullptr) {
+      params.set_output("Mask Volume", std::move(geometry_set));
+      return;
+    }
 
-  Volume *mask_volume = level_set_to_mask(*volume, params);
-  params.set_output("Mask Volume", GeometrySet::create_with_volume(mask_volume));
+    const Main *bmain = DEG_get_bmain(params.depsgraph());
+    BKE_volume_load(volume, bmain);
+
+    Volume *mask_volume = level_set_to_mask(*volume, params);
+    geometry_set.replace_volume(mask_volume);
+  });
+
+  params.set_output("Mask Volume", geometry_set);
 #else
   params.set_output("Mask Volume", GeometrySet());
 #endif
