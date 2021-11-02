@@ -80,6 +80,36 @@ static void node_composit_init_colorbalance(bNodeTree *UNUSED(ntree), bNode *nod
   node->storage = n;
 }
 
+static int node_composite_gpu_colorbalance(GPUMaterial *mat,
+                                           bNode *node,
+                                           bNodeExecData *UNUSED(execdata),
+                                           GPUNodeStack *in,
+                                           GPUNodeStack *out)
+{
+  NodeColorBalance *n = (NodeColorBalance *)node->storage;
+
+  if (node->custom1 == 0) {
+    return GPU_stack_link(mat,
+                          node,
+                          "node_composite_color_balance_lgg",
+                          in,
+                          out,
+                          GPU_uniform(n->lift),
+                          GPU_uniform(n->gamma),
+                          GPU_uniform(n->gain));
+  }
+
+  return GPU_stack_link(mat,
+                        node,
+                        "node_composite_color_balance_asc_cdl",
+                        in,
+                        out,
+                        GPU_uniform(n->offset),
+                        GPU_uniform(n->power),
+                        GPU_uniform(n->slope),
+                        GPU_uniform(&n->offset_basis));
+}
+
 void register_node_type_cmp_colorbalance(void)
 {
   static bNodeType ntype;
@@ -90,6 +120,7 @@ void register_node_type_cmp_colorbalance(void)
   node_type_init(&ntype, node_composit_init_colorbalance);
   node_type_storage(
       &ntype, "NodeColorBalance", node_free_standard_storage, node_copy_standard_storage);
+  node_type_gpu(&ntype, node_composite_gpu_colorbalance);
 
   nodeRegisterType(&ntype);
 }

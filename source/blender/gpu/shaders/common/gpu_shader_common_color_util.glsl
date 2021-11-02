@@ -109,3 +109,33 @@ void color_alpha_unpremultiply(vec4 color, out vec4 result)
     result = vec4(color.rgb / color.a, color.a);
   }
 }
+
+float linear_rgb_to_srgb(float color)
+{
+  if (color < 0.0031308) {
+    return (color < 0.0) ? 0.0 : color * 12.92;
+  }
+
+  return 1.055 * pow(color, 1.0 / 2.4) - 0.055;
+}
+
+vec3 linear_rgb_to_srgb(vec3 color)
+{
+  return vec3(
+      linear_rgb_to_srgb(color.r), linear_rgb_to_srgb(color.g), linear_rgb_to_srgb(color.b));
+}
+
+float srgb_to_linear_rgb(float color)
+{
+  if (color < 0.04045) {
+    return (color < 0.0) ? 0.0 : color * (1.0 / 12.92);
+  }
+
+  return pow((color + 0.055) * (1.0 / 1.055), 2.4);
+}
+
+vec3 srgb_to_linear_rgb(vec3 color)
+{
+  return vec3(
+      srgb_to_linear_rgb(color.r), srgb_to_linear_rgb(color.g), srgb_to_linear_rgb(color.b));
+}
