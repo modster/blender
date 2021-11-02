@@ -42,6 +42,18 @@ static void node_composit_init_brightcontrast(bNodeTree *UNUSED(ntree), bNode *n
   node->custom1 = 1;
 }
 
+static int node_composite_gpu_brightcontrast(GPUMaterial *mat,
+                                             bNode *node,
+                                             bNodeExecData *UNUSED(execdata),
+                                             GPUNodeStack *in,
+                                             GPUNodeStack *out)
+{
+  float use_premultiply = node->custom1 ? 1.0f : 0.0f;
+
+  return GPU_stack_link(
+      mat, node, "node_composite_bright_contrast", in, out, GPU_constant(&use_premultiply));
+}
+
 void register_node_type_cmp_brightcontrast(void)
 {
   static bNodeType ntype;
@@ -49,6 +61,7 @@ void register_node_type_cmp_brightcontrast(void)
   cmp_node_type_base(&ntype, CMP_NODE_BRIGHTCONTRAST, "Bright/Contrast", NODE_CLASS_OP_COLOR, 0);
   ntype.declare = blender::nodes::cmp_node_brightcontrast_declare;
   node_type_init(&ntype, node_composit_init_brightcontrast);
+  node_type_gpu(&ntype, node_composite_gpu_brightcontrast);
 
   nodeRegisterType(&ntype);
 }

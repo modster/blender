@@ -1,3 +1,7 @@
+/* Limits. */
+
+#define FLT_EPSILON 1.192092896e-07F
+
 /* Float Math */
 
 float safe_divide(float a, float b)
