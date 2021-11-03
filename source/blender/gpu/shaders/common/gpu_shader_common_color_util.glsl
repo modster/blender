@@ -139,3 +139,8 @@ vec3 srgb_to_linear_rgb(vec3 color)
   return vec3(
       srgb_to_linear_rgb(color.r), srgb_to_linear_rgb(color.g), srgb_to_linear_rgb(color.b));
 }
+
+float get_luminance(vec3 color, vec3 luminance_coefficients)
+{
+  return dot(color, luminance_coefficients);
+}

@@ -69,6 +69,7 @@ bool IMB_colormanagement_space_name_is_data(const char *name);
 
 BLI_INLINE float IMB_colormanagement_get_luminance(const float rgb[3]);
 BLI_INLINE unsigned char IMB_colormanagement_get_luminance_byte(const unsigned char[3]);
+BLI_INLINE void IMB_colormanagement_get_luminance_coefficients(float rgb[3]);
 BLI_INLINE void IMB_colormanagement_xyz_to_rgb(float rgb[3], const float xyz[3]);
 BLI_INLINE void IMB_colormanagement_rgb_to_xyz(float xyz[3], const float rgb[3]);
 const float *IMB_colormanagement_get_xyz_to_rgb(void);

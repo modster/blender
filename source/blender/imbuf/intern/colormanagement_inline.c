@@ -55,6 +55,11 @@ unsigned char IMB_colormanagement_get_luminance_byte(const unsigned char rgb[3])
   return unit_float_to_uchar_clamp(val);
 }
 
+void IMB_colormanagement_get_luminance_coefficients(float rgb[3])
+{
+  return copy_v3_v3(rgb, imbuf_luma_coefficients);
+}
+
 void IMB_colormanagement_xyz_to_rgb(float rgb[3], const float xyz[3])
 {
   mul_v3_m3v3(rgb, imbuf_xyz_to_rgb, xyz);

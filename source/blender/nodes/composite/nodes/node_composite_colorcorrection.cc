@@ -21,6 +21,7 @@
  * \ingroup cmpnodes
  */
 
+#include "IMB_colormanagement.h"
 #include "node_composite_util.hh"
 
 /* ******************* Color Correction ********************************* */
@@ -66,6 +67,53 @@ static void node_composit_init_colorcorrection(bNodeTree *UNUSED(ntree), bNode *
   node->storage = n;
 }
 
+static int node_composite_gpu_colorcorrection(GPUMaterial *mat,
+                                              bNode *node,
+                                              bNodeExecData *UNUSED(execdata),
+                                              GPUNodeStack *in,
+                                              GPUNodeStack *out)
+{
+  NodeColorCorrection *n = (NodeColorCorrection *)node->storage;
+
+  float enabled_channels[3];
+  for (int i = 0; i < 3; i++) {
+    enabled_channels[i] = (node->custom1 & (1 << i)) ? 1.0f : 0.0f;
+  }
+
+  float luminance_coefficients[3];
+  IMB_colormanagement_get_luminance_coefficients(luminance_coefficients);
+
+  return GPU_stack_link(mat,
+                        node,
+                        "node_composite_color_correction",
+                        in,
+                        out,
+                        GPU_constant(enabled_channels),
+                        GPU_constant(luminance_coefficients),
+                        GPU_uniform(&n->startmidtones),
+                        GPU_uniform(&n->endmidtones),
+                        GPU_uniform(&n->master.saturation),
+                        GPU_uniform(&n->master.contrast),
+                        GPU_uniform(&n->master.gamma),
+                        GPU_uniform(&n->master.gain),
+                        GPU_uniform(&n->master.lift),
+                        GPU_uniform(&n->shadows.saturation),
+                        GPU_uniform(&n->shadows.contrast),
+                        GPU_uniform(&n->shadows.gamma),
+                        GPU_uniform(&n->shadows.gain),
+                        GPU_uniform(&n->shadows.lift),
+                        GPU_uniform(&n->midtones.saturation),
+                        GPU_uniform(&n->midtones.contrast),
+                        GPU_uniform(&n->midtones.gamma),
+                        GPU_uniform(&n->midtones.gain),
+                        GPU_uniform(&n->midtones.lift),
+                        GPU_uniform(&n->highlights.saturation),
+                        GPU_uniform(&n->highlights.contrast),
+                        GPU_uniform(&n->highlights.gamma),
+                        GPU_uniform(&n->highlights.gain),
+                        GPU_uniform(&n->highlights.lift));
+}
+
 void register_node_type_cmp_colorcorrection(void)
 {
   static bNodeType ntype;
@@ -76,6 +124,7 @@ void register_node_type_cmp_colorcorrection(void)
   node_type_init(&ntype, node_composit_init_colorcorrection);
   node_type_storage(
       &ntype, "NodeColorCorrection", node_free_standard_storage, node_copy_standard_storage);
+  node_type_gpu(&ntype, node_composite_gpu_colorcorrection);
 
   nodeRegisterType(&ntype);
 }
