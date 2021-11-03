@@ -36,12 +36,22 @@ static void cmp_node_exposure_declare(NodeDeclarationBuilder &b)
 
 }  // namespace blender::nodes
 
+static int node_composite_gpu_exposure(GPUMaterial *mat,
+                                       bNode *node,
+                                       bNodeExecData *UNUSED(execdata),
+                                       GPUNodeStack *in,
+                                       GPUNodeStack *out)
+{
+  return GPU_stack_link(mat, node, "node_composite_exposure", in, out);
+}
+
 void register_node_type_cmp_exposure(void)
 {
   static bNodeType ntype;
 
   cmp_node_type_base(&ntype, CMP_NODE_EXPOSURE, "Exposure", NODE_CLASS_OP_COLOR, 0);
   ntype.declare = blender::nodes::cmp_node_exposure_declare;
+  node_type_gpu(&ntype, node_composite_gpu_exposure);
 
   nodeRegisterType(&ntype);
 }
