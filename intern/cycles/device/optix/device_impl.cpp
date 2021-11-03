@@ -20,21 +20,22 @@
 #  include "device/optix/device_impl.h"
 
 #  include "bvh/bvh.h"
-#  include "bvh/bvh_optix.h"
-#  include "integrator/pass_accessor_gpu.h"
-#  include "render/buffers.h"
-#  include "render/hair.h"
-#  include "render/mesh.h"
-#  include "render/object.h"
-#  include "render/pass.h"
-#  include "render/scene.h"
+#  include "bvh/optix.h"
 
-#  include "util/util_debug.h"
-#  include "util/util_logging.h"
-#  include "util/util_md5.h"
-#  include "util/util_path.h"
-#  include "util/util_progress.h"
-#  include "util/util_time.h"
+#  include "integrator/pass_accessor_gpu.h"
+
+#  include "scene/hair.h"
+#  include "scene/mesh.h"
+#  include "scene/object.h"
+#  include "scene/pass.h"
+#  include "scene/scene.h"
+
+#  include "util/debug.h"
+#  include "util/log.h"
+#  include "util/md5.h"
+#  include "util/path.h"
+#  include "util/progress.h"
+#  include "util/time.h"
 
 #  undef __KERNEL_CPU__
 #  define __KERNEL_OPTIX__
@@ -90,6 +91,7 @@ OptiXDevice::OptiXDevice(const DeviceInfo &info, Stats &stats, Profiler &profile
   };
 #  endif
   if (DebugFlags().optix.use_debug) {
+    VLOG(1) << "Using OptiX debug mode.";
     options.validationMode = OPTIX_DEVICE_CONTEXT_VALIDATION_MODE_ALL;
   }
   optix_assert(optixDeviceContextCreate(cuContext, &options, &context));
@@ -377,9 +379,6 @@ bool OptiXDevice::load_kernels(const uint kernel_features)
     group_descs[PG_CALL_SVM_BEVEL].callables.moduleDC = optix_module;
     group_descs[PG_CALL_SVM_BEVEL].callables.entryFunctionNameDC =
         "__direct_callable__svm_node_bevel";
-    group_descs[PG_CALL_AO_PASS].kind = OPTIX_PROGRAM_GROUP_KIND_CALLABLES;
-    group_descs[PG_CALL_AO_PASS].callables.moduleDC = optix_module;
-    group_descs[PG_CALL_AO_PASS].callables.entryFunctionNameDC = "__direct_callable__ao_pass";
   }
 
   optix_assert(optixProgramGroupCreate(
@@ -768,7 +767,13 @@ void OptiXDevice::denoise_color_read(DenoiseContext &context, const DenoisePass 
   destination.num_components = 3;
   destination.pixel_stride = context.buffer_params.pass_stride;
 
-  pass_accessor.get_render_tile_pixels(context.render_buffers, context.buffer_params, destination);
+  BufferParams buffer_params = context.buffer_params;
+  buffer_params.window_x = 0;
+  buffer_params.window_y = 0;
+  buffer_params.window_width = buffer_params.width;
+  buffer_params.window_height = buffer_params.height;
+
+  pass_accessor.get_render_tile_pixels(context.render_buffers, buffer_params, destination);
 }
 
 bool OptiXDevice::denoise_filter_color_preprocess(DenoiseContext &context, const DenoisePass &pass)
@@ -1246,7 +1251,7 @@ void OptiXDevice::build_bvh(BVH *bvh, Progress &progress, bool refit)
         build_input.curveArray.indexBuffer = (CUdeviceptr)index_data.device_pointer;
         build_input.curveArray.indexStrideInBytes = sizeof(int);
         build_input.curveArray.flag = build_flags;
-        build_input.curveArray.primitiveIndexOffset = hair->optix_prim_offset;
+        build_input.curveArray.primitiveIndexOffset = hair->curve_segment_offset;
       }
       else {
         /* Disable visibility test any-hit program, since it is already checked during
@@ -1259,7 +1264,7 @@ void OptiXDevice::build_bvh(BVH *bvh, Progress &progress, bool refit)
         build_input.customPrimitiveArray.strideInBytes = sizeof(OptixAabb);
         build_input.customPrimitiveArray.flags = &build_flags;
         build_input.customPrimitiveArray.numSbtRecords = 1;
-        build_input.customPrimitiveArray.primitiveIndexOffset = hair->optix_prim_offset;
+        build_input.customPrimitiveArray.primitiveIndexOffset = hair->curve_segment_offset;
       }
 
       if (!build_optix_bvh(bvh_optix, operation, build_input, num_motion_steps)) {
@@ -1328,7 +1333,7 @@ void OptiXDevice::build_bvh(BVH *bvh, Progress &progress, bool refit)
        * buffers for that purpose. OptiX does not allow this to be zero though, so just pass in
        * one and rely on that having the same meaning in this case. */
       build_input.triangleArray.numSbtRecords = 1;
-      build_input.triangleArray.primitiveIndexOffset = mesh->optix_prim_offset;
+      build_input.triangleArray.primitiveIndexOffset = mesh->prim_offset;
 
       if (!build_optix_bvh(bvh_optix, operation, build_input, num_motion_steps)) {
         progress.set_error("Failed to build OptiX acceleration structure");
@@ -1395,8 +1400,8 @@ void OptiXDevice::build_bvh(BVH *bvh, Progress &progress, bool refit)
       instance.transform[5] = 1.0f;
       instance.transform[10] = 1.0f;
 
-      /* Set user instance ID to object index (but leave low bit blank). */
-      instance.instanceId = ob->get_device_index() << 1;
+      /* Set user instance ID to object index. */
+      instance.instanceId = ob->get_device_index();
 
       /* Add some of the object visibility bits to the mask.
        * __prim_visibility contains the combined visibility bits of all instances, so is not
@@ -1508,9 +1513,6 @@ void OptiXDevice::build_bvh(BVH *bvh, Progress &progress, bool refit)
         else {
           /* Disable instance transform if geometry already has it applied to vertex data. */
           instance.flags |= OPTIX_INSTANCE_FLAG_DISABLE_TRANSFORM;
-          /* Non-instanced objects read ID from 'prim_object', so distinguish
-           * them from instanced objects with the low bit set. */
-          instance.instanceId |= 1;
         }
       }
     }
@@ -1573,7 +1575,7 @@ void OptiXDevice::const_copy_to(const char *name, void *host, size_t size)
       return; \
     }
   KERNEL_TEX(IntegratorStateGPU, __integrator_state)
-#  include "kernel/kernel_textures.h"
+#  include "kernel/textures.h"
 #  undef KERNEL_TEX
 }
 

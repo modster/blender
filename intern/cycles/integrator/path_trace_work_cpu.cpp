@@ -19,17 +19,17 @@
 #include "device/cpu/kernel.h"
 #include "device/device.h"
 
-#include "kernel/kernel_path_state.h"
+#include "kernel/integrator/path_state.h"
 
 #include "integrator/pass_accessor_cpu.h"
 #include "integrator/path_trace_display.h"
 
-#include "render/buffers.h"
-#include "render/scene.h"
+#include "scene/scene.h"
+#include "session/buffers.h"
 
-#include "util/util_atomic.h"
-#include "util/util_logging.h"
-#include "util/util_tbb.h"
+#include "util/atomic.h"
+#include "util/log.h"
+#include "util/tbb.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -114,7 +114,7 @@ void PathTraceWorkCPU::render_samples(RenderStatistics &statistics,
   statistics.occupancy = 1.0f;
 }
 
-void PathTraceWorkCPU::render_samples_full_pipeline(KernelGlobals *kernel_globals,
+void PathTraceWorkCPU::render_samples_full_pipeline(KernelGlobalsCPU *kernel_globals,
                                                     const KernelWorkTile &work_tile,
                                                     const int samples_num)
 {
@@ -127,7 +127,7 @@ void PathTraceWorkCPU::render_samples_full_pipeline(KernelGlobals *kernel_global
 
   if (device_scene_->data.integrator.has_shadow_catcher) {
     shadow_catcher_state = &integrator_states[1];
-    path_state_init_queues(kernel_globals, shadow_catcher_state);
+    path_state_init_queues(shadow_catcher_state);
   }
 
   KernelWorkTile sample_work_tile = work_tile;

@@ -222,7 +222,7 @@ typedef struct BHeadN {
  * bit kludge but better than doubling up on prints,
  * we could alternatively have a versions of a report function which forces printing - campbell
  */
-void BLO_reportf_wrap(BlendFileReadReport *reports, ReportType type, const char *format, ...)
+void BLO_reportf_wrap(BlendFileReadReport *reports, eReportType type, const char *format, ...)
 {
   char fixed_buf[1024]; /* should be long enough */
 
@@ -1230,13 +1230,13 @@ static FileData *blo_filedata_from_file_descriptor(const char *filepath,
   else if (BLI_file_magic_is_gzip(header)) {
     file = BLI_filereader_new_gzip(rawfile);
     if (file != NULL) {
-      rawfile = NULL; /* The Gzip FileReader takes ownership of `rawfile`. */
+      rawfile = NULL; /* The `Gzip` #FileReader takes ownership of `rawfile`. */
     }
   }
   else if (BLI_file_magic_is_zstd(header)) {
     file = BLI_filereader_new_zstd(rawfile);
     if (file != NULL) {
-      rawfile = NULL; /* The Zstd FileReader takes ownership of `rawfile`. */
+      rawfile = NULL; /* The `Zstd` #FileReader takes ownership of `rawfile`. */
     }
   }
 
@@ -1351,7 +1351,6 @@ FileData *blo_filedata_from_memfile(MemFile *memfile,
 void blo_filedata_free(FileData *fd)
 {
   if (fd) {
-    fd->file->close(fd->file);
 
     /* Free all BHeadN data blocks */
 #ifndef NDEBUG
@@ -1365,6 +1364,7 @@ void blo_filedata_free(FileData *fd)
       MEM_freeN(new_bhead);
     }
 #endif
+    fd->file->close(fd->file);
 
     if (fd->filesdna) {
       DNA_sdna_free(fd->filesdna);
@@ -2211,6 +2211,9 @@ static void direct_link_id_common(
   if (id->asset_data) {
     BLO_read_data_address(reader, &id->asset_data);
     BKE_asset_metadata_read(reader, id->asset_data);
+    /* Restore runtime asset type info. */
+    const IDTypeInfo *id_type = BKE_idtype_get_info_from_id(id);
+    id->asset_data->local_type_info = id_type->asset_type_info;
   }
 
   /* Link direct data of ID properties. */
@@ -4027,10 +4030,12 @@ BlendFileData *blo_read_file_internal(FileData *fd, const char *filepath)
        * does not always properly handle user counts, and/or that function does not take into
        * account old, deprecated data. */
       BKE_main_id_refcount_recompute(bfd->main, false);
-
-      /* After all data has been read and versioned, uses LIB_TAG_NEW. */
-      ntreeUpdateAllNew(bfd->main);
     }
+
+    /* After all data has been read and versioned, uses LIB_TAG_NEW. Theoretically this should
+     * not be calculated in the undo case, but it is currently needed even on undo to recalculate
+     * a cache. */
+    ntreeUpdateAllNew(bfd->main);
 
     placeholders_ensure_valid(bfd->main);
 
@@ -4469,7 +4474,7 @@ static bool object_in_any_collection(Main *bmain, Object *ob)
  * Shared operations to perform on the object's base after adding it to the scene.
  */
 static void object_base_instance_init(
-    Object *ob, bool set_selected, bool set_active, ViewLayer *view_layer, const View3D *v3d)
+    Object *ob, ViewLayer *view_layer, const View3D *v3d, const int flag, bool set_active)
 {
   Base *base = BKE_view_layer_base_find(view_layer, ob);
 
@@ -4477,7 +4482,9 @@ static void object_base_instance_init(
     base->local_view_bits |= v3d->local_view_uuid;
   }
 
-  if (set_selected) {
+  if (flag & FILE_AUTOSELECT) {
+    /* All objects that use #FILE_AUTOSELECT must be selectable (unless linking data). */
+    BLI_assert((base->flag & BASE_SELECTABLE) || (flag & FILE_LINK));
     if (base->flag & BASE_SELECTABLE) {
       base->flag |= BASE_SELECTED;
     }
@@ -4488,6 +4495,29 @@ static void object_base_instance_init(
   }
 
   BKE_scene_object_base_flag_sync_from_base(base);
+}
+
+/**
+ * Exported for link/append to create objects as well.
+ */
+void BLO_object_instantiate_object_base_instance_init(Main *bmain,
+                                                      Collection *collection,
+                                                      Object *ob,
+                                                      ViewLayer *view_layer,
+                                                      const View3D *v3d,
+                                                      const int flag,
+                                                      bool set_active)
+{
+  /* Auto-select and appending. */
+  if ((flag & FILE_AUTOSELECT) && ((flag & FILE_LINK) == 0)) {
+    /* While in general the object should not be manipulated,
+     * when the user requests the object to be selected, ensure it's visible and selectable. */
+    ob->visibility_flag &= ~(OB_HIDE_VIEWPORT | OB_HIDE_SELECT);
+  }
+
+  BKE_collection_object_add(bmain, collection, ob);
+
+  object_base_instance_init(ob, view_layer, v3d, flag, set_active);
 }
 
 static void add_loose_objects_to_scene(Main *mainvar,
@@ -4538,13 +4568,11 @@ static void add_loose_objects_to_scene(Main *mainvar,
         CLAMP_MIN(ob->id.us, 0);
         ob->mode = OB_MODE_OBJECT;
 
-        BKE_collection_object_add(bmain, active_collection, ob);
-
-        const bool set_selected = (flag & FILE_AUTOSELECT) != 0;
         /* Do NOT make base active here! screws up GUI stuff,
          * if you want it do it at the editor level. */
         const bool set_active = false;
-        object_base_instance_init(ob, set_selected, set_active, view_layer, v3d);
+        BLO_object_instantiate_object_base_instance_init(
+            bmain, active_collection, ob, view_layer, v3d, flag, set_active);
 
         ob->id.tag &= ~LIB_TAG_INDIRECT;
         ob->id.flag &= ~LIB_INDIRECT_WEAK_LINK;
@@ -4600,13 +4628,11 @@ static void add_loose_object_data_to_scene(Main *mainvar,
         id_us_plus(id);
         BKE_object_materials_test(bmain, ob, ob->data);
 
-        BKE_collection_object_add(bmain, active_collection, ob);
-
-        const bool set_selected = (flag & FILE_AUTOSELECT) != 0;
         /* Do NOT make base active here! screws up GUI stuff,
          * if you want it do it at the editor level. */
         bool set_active = false;
-        object_base_instance_init(ob, set_selected, set_active, view_layer, v3d);
+        BLO_object_instantiate_object_base_instance_init(
+            bmain, active_collection, ob, view_layer, v3d, flag, set_active);
 
         copy_v3_v3(ob->loc, scene->cursor.location);
       }
@@ -4639,13 +4665,12 @@ static void add_collections_to_scene(Main *mainvar,
       ob->type = OB_EMPTY;
       ob->empty_drawsize = U.collection_instance_empty_size;
 
-      BKE_collection_object_add(bmain, active_collection, ob);
-
       const bool set_selected = (flag & FILE_AUTOSELECT) != 0;
       /* TODO: why is it OK to make this active here but not in other situations?
        * See other callers of #object_base_instance_init */
       const bool set_active = set_selected;
-      object_base_instance_init(ob, set_selected, set_active, view_layer, v3d);
+      BLO_object_instantiate_object_base_instance_init(
+          bmain, active_collection, ob, view_layer, v3d, flag, set_active);
 
       DEG_id_tag_update(&ob->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY | ID_RECALC_ANIMATION);
 
@@ -5040,7 +5065,6 @@ static void library_link_end(Main *mainl,
     add_main_to_main(mainvar, main_newid);
   }
 
-  BKE_main_free(main_newid);
   blo_join_main((*fd)->mainlist);
   mainvar = (*fd)->mainlist->first;
   MEM_freeN((*fd)->mainlist);
@@ -5053,6 +5077,15 @@ static void library_link_end(Main *mainl,
   ntreeUpdateAllNew(mainvar);
 
   placeholders_ensure_valid(mainvar);
+
+  /* Apply overrides of newly linked data if needed. Already existing IDs need to split out, to
+   * avoid re-applying their own overrides. */
+  BLI_assert(BKE_main_is_empty(main_newid));
+  split_main_newid(mainvar, main_newid);
+  BKE_lib_override_library_main_validate(main_newid, (*fd)->reports->reports);
+  BKE_lib_override_library_main_update(main_newid);
+  add_main_to_main(mainvar, main_newid);
+  BKE_main_free(main_newid);
 
   BKE_main_id_tag_all(mainvar, LIB_TAG_NEW, false);
 

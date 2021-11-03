@@ -139,6 +139,40 @@ static IDProperty **rna_AssetMetaData_idprops(PointerRNA *ptr)
   return &asset_data->properties;
 }
 
+static void rna_AssetMetaData_author_get(PointerRNA *ptr, char *value)
+{
+  AssetMetaData *asset_data = ptr->data;
+
+  if (asset_data->author) {
+    strcpy(value, asset_data->author);
+  }
+  else {
+    value[0] = '\0';
+  }
+}
+
+static int rna_AssetMetaData_author_length(PointerRNA *ptr)
+{
+  AssetMetaData *asset_data = ptr->data;
+  return asset_data->author ? strlen(asset_data->author) : 0;
+}
+
+static void rna_AssetMetaData_author_set(PointerRNA *ptr, const char *value)
+{
+  AssetMetaData *asset_data = ptr->data;
+
+  if (asset_data->author) {
+    MEM_freeN(asset_data->author);
+  }
+
+  if (value[0]) {
+    asset_data->author = BLI_strdup(value);
+  }
+  else {
+    asset_data->author = NULL;
+  }
+}
+
 static void rna_AssetMetaData_description_get(PointerRNA *ptr, char *value)
 {
   AssetMetaData *asset_data = ptr->data;
@@ -213,6 +247,25 @@ static void rna_AssetMetaData_catalog_id_set(PointerRNA *ptr, const char *value)
    * needs the asset library from the context. */
   /* TODO(Sybren): write that update function. */
   BKE_asset_metadata_catalog_id_set(asset_data, new_uuid, "");
+}
+
+void rna_AssetMetaData_catalog_id_update(struct bContext *C, struct PointerRNA *ptr)
+{
+  SpaceFile *sfile = CTX_wm_space_file(C);
+  if (sfile == NULL) {
+    /* Until there is a proper Asset Service available, it's only possible to get the asset library
+     * from within the asset browser context. */
+    return;
+  }
+
+  AssetLibrary *asset_library = ED_fileselect_active_asset_library_get(sfile);
+  if (asset_library == NULL) {
+    /* The SpaceFile may not be an asset browser but a regular file browser. */
+    return;
+  }
+
+  AssetMetaData *asset_data = ptr->data;
+  BKE_asset_library_refresh_catalog_simplename(asset_library, asset_data);
 }
 
 static PointerRNA rna_AssetHandle_file_data_get(PointerRNA *ptr)
@@ -328,6 +381,14 @@ static void rna_def_asset_data(BlenderRNA *brna)
   RNA_def_struct_idprops_func(srna, "rna_AssetMetaData_idprops");
   RNA_def_struct_flag(srna, STRUCT_NO_DATABLOCK_IDPROPERTIES); /* Mandatory! */
 
+  prop = RNA_def_property(srna, "author", PROP_STRING, PROP_NONE);
+  RNA_def_property_editable_func(prop, "rna_AssetMetaData_editable");
+  RNA_def_property_string_funcs(prop,
+                                "rna_AssetMetaData_author_get",
+                                "rna_AssetMetaData_author_length",
+                                "rna_AssetMetaData_author_set");
+  RNA_def_property_ui_text(prop, "Author", "Name of the creator of the asset");
+
   prop = RNA_def_property(srna, "description", PROP_STRING, PROP_NONE);
   RNA_def_property_editable_func(prop, "rna_AssetMetaData_editable");
   RNA_def_property_string_funcs(prop,
@@ -356,6 +417,7 @@ static void rna_def_asset_data(BlenderRNA *brna)
                                 "rna_AssetMetaData_catalog_id_length",
                                 "rna_AssetMetaData_catalog_id_set");
   RNA_def_property_flag(prop, PROP_CONTEXT_UPDATE);
+  RNA_def_property_update(prop, 0, "rna_AssetMetaData_catalog_id_update");
   RNA_def_property_ui_text(prop,
                            "Catalog UUID",
                            "Identifier for the asset's catalog, used by Blender to look up the "

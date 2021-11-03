@@ -52,13 +52,13 @@
 #include "BKE_curve.h"
 #include "BKE_curveprofile.h"
 #include "BKE_displist.h"
-#include "BKE_font.h"
 #include "BKE_idtype.h"
 #include "BKE_key.h"
 #include "BKE_lib_id.h"
 #include "BKE_lib_query.h"
 #include "BKE_main.h"
 #include "BKE_object.h"
+#include "BKE_vfont.h"
 
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_query.h"
@@ -130,17 +130,17 @@ static void curve_free_data(ID *id)
 static void curve_foreach_id(ID *id, LibraryForeachIDData *data)
 {
   Curve *curve = (Curve *)id;
-  BKE_LIB_FOREACHID_PROCESS(data, curve->bevobj, IDWALK_CB_NOP);
-  BKE_LIB_FOREACHID_PROCESS(data, curve->taperobj, IDWALK_CB_NOP);
-  BKE_LIB_FOREACHID_PROCESS(data, curve->textoncurve, IDWALK_CB_NOP);
-  BKE_LIB_FOREACHID_PROCESS(data, curve->key, IDWALK_CB_USER);
+  BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, curve->bevobj, IDWALK_CB_NOP);
+  BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, curve->taperobj, IDWALK_CB_NOP);
+  BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, curve->textoncurve, IDWALK_CB_NOP);
+  BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, curve->key, IDWALK_CB_USER);
   for (int i = 0; i < curve->totcol; i++) {
-    BKE_LIB_FOREACHID_PROCESS(data, curve->mat[i], IDWALK_CB_USER);
+    BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, curve->mat[i], IDWALK_CB_USER);
   }
-  BKE_LIB_FOREACHID_PROCESS(data, curve->vfont, IDWALK_CB_USER);
-  BKE_LIB_FOREACHID_PROCESS(data, curve->vfontb, IDWALK_CB_USER);
-  BKE_LIB_FOREACHID_PROCESS(data, curve->vfonti, IDWALK_CB_USER);
-  BKE_LIB_FOREACHID_PROCESS(data, curve->vfontbi, IDWALK_CB_USER);
+  BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, curve->vfont, IDWALK_CB_USER);
+  BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, curve->vfontb, IDWALK_CB_USER);
+  BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, curve->vfonti, IDWALK_CB_USER);
+  BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, curve->vfontbi, IDWALK_CB_USER);
 }
 
 static void curve_blend_write(BlendWriter *writer, ID *id, const void *id_address)
@@ -3347,7 +3347,7 @@ static void calchandleNurb_intern(BezTriple *bezt,
 
   if (skip_align ||
       /* when one handle is free, alignming makes no sense, see: T35952 */
-      (ELEM(HD_FREE, bezt->h1, bezt->h2)) ||
+      ELEM(HD_FREE, bezt->h1, bezt->h2) ||
       /* also when no handles are aligned, skip this step */
       (!ELEM(HD_ALIGN, bezt->h1, bezt->h2) && !ELEM(HD_ALIGN_DOUBLESIDE, bezt->h1, bezt->h2))) {
     /* handles need to be updated during animation and applying stuff like hooks,

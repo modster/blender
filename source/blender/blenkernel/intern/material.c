@@ -63,7 +63,6 @@
 #include "BKE_curve.h"
 #include "BKE_displist.h"
 #include "BKE_editmesh.h"
-#include "BKE_font.h"
 #include "BKE_gpencil.h"
 #include "BKE_icons.h"
 #include "BKE_idtype.h"
@@ -76,6 +75,7 @@
 #include "BKE_node.h"
 #include "BKE_object.h"
 #include "BKE_scene.h"
+#include "BKE_vfont.h"
 
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_build.h"
@@ -166,15 +166,14 @@ static void material_foreach_id(ID *id, LibraryForeachIDData *data)
 {
   Material *material = (Material *)id;
   /* Nodetrees **are owned by IDs**, treat them as mere sub-data and not real ID! */
-  if (!BKE_library_foreach_ID_embedded(data, (ID **)&material->nodetree)) {
-    return;
-  }
+  BKE_LIB_FOREACHID_PROCESS_FUNCTION_CALL(
+      data, BKE_library_foreach_ID_embedded(data, (ID **)&material->nodetree));
   if (material->texpaintslot != NULL) {
-    BKE_LIB_FOREACHID_PROCESS(data, material->texpaintslot->ima, IDWALK_CB_NOP);
+    BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, material->texpaintslot->ima, IDWALK_CB_NOP);
   }
   if (material->gp_style != NULL) {
-    BKE_LIB_FOREACHID_PROCESS(data, material->gp_style->sima, IDWALK_CB_USER);
-    BKE_LIB_FOREACHID_PROCESS(data, material->gp_style->ima, IDWALK_CB_USER);
+    BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, material->gp_style->sima, IDWALK_CB_USER);
+    BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, material->gp_style->ima, IDWALK_CB_USER);
   }
 }
 

@@ -205,6 +205,17 @@ void BKE_main_free(Main *mainvar)
   MEM_freeN(mainvar);
 }
 
+/* Check whether given `bmain` is empty or contains some IDs. */
+bool BKE_main_is_empty(struct Main *bmain)
+{
+  ID *id_iter;
+  FOREACH_MAIN_ID_BEGIN (bmain, id_iter) {
+    return false;
+  }
+  FOREACH_MAIN_ID_END;
+  return true;
+}
+
 void BKE_main_lock(struct Main *bmain)
 {
   BLI_spin_lock((SpinLock *)bmain->lock);
@@ -317,7 +328,7 @@ void BKE_main_relations_free(Main *bmain)
 
 /** Set or clear given `tag` in all relation entries of given `bmain`. */
 void BKE_main_relations_tag_set(struct Main *bmain,
-                                const MainIDRelationsEntryTags tag,
+                                const eMainIDRelationsEntryTags tag,
                                 const bool value)
 {
   if (bmain->relations == NULL) {

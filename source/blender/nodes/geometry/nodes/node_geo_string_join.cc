@@ -20,9 +20,9 @@ namespace blender::nodes {
 
 static void geo_node_string_join_declare(NodeDeclarationBuilder &b)
 {
-  b.add_input<decl::String>("Delimiter");
-  b.add_input<decl::String>("Strings").multi_input().hide_value();
-  b.add_output<decl::String>("String");
+  b.add_input<decl::String>(N_("Delimiter"));
+  b.add_input<decl::String>(N_("Strings")).multi_input().hide_value();
+  b.add_output<decl::String>(N_("String"));
 };
 
 static void geo_node_string_join_exec(GeoNodeExecParams params)
@@ -46,7 +46,7 @@ void register_node_type_geo_string_join()
 {
   static bNodeType ntype;
 
-  geo_node_type_base(&ntype, GEO_NODE_STRING_JOIN, "String Join", NODE_CLASS_CONVERTER, 0);
+  geo_node_type_base(&ntype, GEO_NODE_STRING_JOIN, "Join Strings", NODE_CLASS_CONVERTER, 0);
   ntype.geometry_node_execute = blender::nodes::geo_node_string_join_exec;
   ntype.declare = blender::nodes::geo_node_string_join_declare;
   nodeRegisterType(&ntype);

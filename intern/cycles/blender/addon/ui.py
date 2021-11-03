@@ -26,27 +26,31 @@ from bpy.types import Panel
 from bl_ui.properties_grease_pencil_common import GreasePencilSimplifyPanel
 from bl_ui.properties_view_layer import ViewLayerCryptomattePanel, ViewLayerAOVPanel
 
+class CyclesPresetPanel(PresetPanel, Panel):
+    COMPAT_ENGINES = {'CYCLES'}
+    preset_operator = "script.execute_preset"
 
-class CYCLES_PT_sampling_presets(PresetPanel, Panel):
+    @staticmethod
+    def post_cb(context):
+        # Modify an arbitrary built-in scene property to force a depsgraph
+        # update, because add-on properties don't. (see T62325)
+        render = context.scene.render
+        render.filter_size = render.filter_size
+
+class CYCLES_PT_sampling_presets(CyclesPresetPanel):
     bl_label = "Sampling Presets"
     preset_subdir = "cycles/sampling"
-    preset_operator = "script.execute_preset"
     preset_add_operator = "render.cycles_sampling_preset_add"
-    COMPAT_ENGINES = {'CYCLES'}
 
-class CYCLES_PT_viewport_sampling_presets(PresetPanel, Panel):
+class CYCLES_PT_viewport_sampling_presets(CyclesPresetPanel):
     bl_label = "Viewport Sampling Presets"
     preset_subdir = "cycles/viewport_sampling"
-    preset_operator = "script.execute_preset"
     preset_add_operator = "render.cycles_viewport_sampling_preset_add"
-    COMPAT_ENGINES = {'CYCLES'}
 
-class CYCLES_PT_integrator_presets(PresetPanel, Panel):
+class CYCLES_PT_integrator_presets(CyclesPresetPanel):
     bl_label = "Integrator Presets"
     preset_subdir = "cycles/integrator"
-    preset_operator = "script.execute_preset"
     preset_add_operator = "render.cycles_integrator_preset_add"
-    COMPAT_ENGINES = {'CYCLES'}
 
 
 class CyclesButtonsPanel:
@@ -283,8 +287,18 @@ class CYCLES_RENDER_PT_sampling_advanced(CyclesButtonsPanel, Panel):
         row.prop(cscene, "use_animated_seed", text="", icon='TIME')
 
         col = layout.column(align=True)
-        col.active = not(cscene.use_adaptive_sampling)
+        col.active = not (cscene.use_adaptive_sampling and cscene.use_preview_adaptive_sampling)
         col.prop(cscene, "sampling_pattern", text="Pattern")
+
+        layout.separator()
+
+        col = layout.column(align=True)
+        col.active = not (cscene.use_adaptive_sampling and cscene.use_preview_adaptive_sampling)
+        col.prop(cscene, "scrambling_distance", text="Scrambling Distance")
+        col.prop(cscene, "adaptive_scrambling_distance", text="Adaptive")
+        sub = col.row(align=True)
+        sub.active = not cscene.use_preview_adaptive_sampling
+        sub.prop(cscene, "preview_scrambling_distance", text="Viewport")
 
         layout.separator()
 
@@ -461,14 +475,18 @@ class CYCLES_RENDER_PT_light_paths_fast_gi(CyclesButtonsPanel, Panel):
         layout.active = cscene.use_fast_gi
 
         col = layout.column(align=True)
-        col.prop(cscene, "ao_bounces", text="Viewport Bounces")
-        col.prop(cscene, "ao_bounces_render", text="Render Bounces")
+        col.prop(cscene, "fast_gi_method", text="Method")
 
         if world:
           light = world.light_settings
           col = layout.column(align=True)
           col.prop(light, "ao_factor", text="AO Factor")
           col.prop(light, "distance", text="AO Distance")
+
+        if cscene.fast_gi_method == 'REPLACE':
+            col = layout.column(align=True)
+            col.prop(cscene, "ao_bounces", text="Viewport Bounces")
+            col.prop(cscene, "ao_bounces_render", text="Render Bounces")
 
 
 class CYCLES_RENDER_PT_motion_blur(CyclesButtonsPanel, Panel):
@@ -792,7 +810,6 @@ class CYCLES_RENDER_PT_passes_data(CyclesButtonsPanel, Panel):
         col.prop(view_layer, "use_pass_material_index")
 
         col = layout.column(heading="Debug", align=True)
-        col.prop(cycles_view_layer, "pass_debug_render_time", text="Render Time")
         col.prop(cycles_view_layer, "pass_debug_sample_count", text="Sample Count")
 
         layout.prop(view_layer, "pass_alpha_threshold")
@@ -982,8 +999,8 @@ class CYCLES_PT_context_material(CyclesButtonsPanel, Panel):
                 row.prop(slot, "link", text="", icon=icon_link, icon_only=True)
 
         elif mat:
-            split.template_ID(space, "pin_id")
-            split.separator()
+            layout.template_ID(space, "pin_id")
+            layout.separator()
 
 
 class CYCLES_OBJECT_PT_motion_blur(CyclesButtonsPanel, Panel):

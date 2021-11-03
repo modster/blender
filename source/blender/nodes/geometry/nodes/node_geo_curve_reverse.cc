@@ -24,9 +24,9 @@ namespace blender::nodes {
 
 static void geo_node_curve_reverse_declare(NodeDeclarationBuilder &b)
 {
-  b.add_input<decl::Geometry>("Curve");
-  b.add_input<decl::Bool>("Selection").default_value(true).hide_value().supports_field();
-  b.add_output<decl::Geometry>("Curve");
+  b.add_input<decl::Geometry>(N_("Curve")).supported_type(GEO_COMPONENT_TYPE_CURVE);
+  b.add_input<decl::Bool>(N_("Selection")).default_value(true).hide_value().supports_field();
+  b.add_output<decl::Geometry>(N_("Curve"));
 }
 
 static void geo_node_curve_reverse_exec(GeoNodeExecParams params)
@@ -38,7 +38,7 @@ static void geo_node_curve_reverse_exec(GeoNodeExecParams params)
       return;
     }
 
-    Field<bool> selection_field = params.extract_input<Field<bool>>("Selection");
+    Field<bool> selection_field = params.get_input<Field<bool>>("Selection");
     CurveComponent &component = geometry_set.get_component_for_write<CurveComponent>();
     GeometryComponentFieldContext field_context{component, ATTR_DOMAIN_CURVE};
     const int domain_size = component.attribute_domain_size(ATTR_DOMAIN_CURVE);
@@ -65,7 +65,7 @@ static void geo_node_curve_reverse_exec(GeoNodeExecParams params)
 void register_node_type_geo_curve_reverse()
 {
   static bNodeType ntype;
-  geo_node_type_base(&ntype, GEO_NODE_CURVE_REVERSE, "Curve Reverse", NODE_CLASS_GEOMETRY, 0);
+  geo_node_type_base(&ntype, GEO_NODE_REVERSE_CURVE, "Reverse Curve", NODE_CLASS_GEOMETRY, 0);
   ntype.declare = blender::nodes::geo_node_curve_reverse_declare;
   ntype.geometry_node_execute = blender::nodes::geo_node_curve_reverse_exec;
   nodeRegisterType(&ntype);

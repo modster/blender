@@ -208,7 +208,8 @@ static void blo_update_defaults_screen(bScreen *screen,
 
       LISTBASE_FOREACH (ARegion *, region, regionbase) {
         if (region->regiontype == RGN_TYPE_TOOL_HEADER) {
-          if ((sl->spacetype == SPACE_IMAGE) && hide_image_tool_header) {
+          if (((sl->spacetype == SPACE_IMAGE) && hide_image_tool_header) ||
+              sl->spacetype == SPACE_SEQ) {
             region->flag |= RGN_FLAG_HIDDEN;
           }
           else {
@@ -293,7 +294,7 @@ static void blo_update_defaults_scene(Main *bmain, Scene *scene)
   }
 
   /* Rename render layers. */
-  BKE_view_layer_rename(bmain, scene, scene->view_layers.first, "View Layer");
+  BKE_view_layer_rename(bmain, scene, scene->view_layers.first, "ViewLayer");
 
   /* Disable Z pass by default. */
   LISTBASE_FOREACH (ViewLayer *, view_layer, &scene->view_layers) {
@@ -591,9 +592,11 @@ void BLO_update_defaults_startup_blend(Main *bmain, const char *app_template)
           bNodeSocketValueFloat *roughness_data = roughness_socket->default_value;
           roughness_data->value = 0.4f;
           node->custom2 = SHD_SUBSURFACE_RANDOM_WALK;
+          nodeUpdate(ma->nodetree, node);
         }
         else if (node->type == SH_NODE_SUBSURFACE_SCATTERING) {
           node->custom1 = SHD_SUBSURFACE_RANDOM_WALK;
+          nodeUpdate(ma->nodetree, node);
         }
       }
     }

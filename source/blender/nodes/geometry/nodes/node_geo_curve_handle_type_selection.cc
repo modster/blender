@@ -14,8 +14,6 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-#include "BLI_task.hh"
-
 #include "BKE_spline.hh"
 
 #include "UI_interface.h"
@@ -27,7 +25,7 @@ namespace blender::nodes {
 
 static void geo_node_curve_handle_type_selection_declare(NodeDeclarationBuilder &b)
 {
-  b.add_output<decl::Bool>("Selection").field_source();
+  b.add_output<decl::Bool>(N_("Selection")).field_source();
 }
 
 static void geo_node_curve_handle_type_selection_layout(uiLayout *layout,
@@ -67,7 +65,6 @@ static BezierSpline::HandleType handle_type_from_input_type(const GeometryNodeCu
 static void select_by_handle_type(const CurveEval &curve,
                                   const BezierSpline::HandleType type,
                                   const GeometryNodeCurveHandleMode mode,
-                                  const IndexMask UNUSED(mask),
                                   const MutableSpan<bool> r_selection)
 {
   int offset = 0;
@@ -79,12 +76,10 @@ static void select_by_handle_type(const CurveEval &curve,
     else {
       BezierSpline *b = static_cast<BezierSpline *>(spline.get());
       for (int i : IndexRange(b->size())) {
-        if (mode & GeometryNodeCurveHandleMode::GEO_NODE_CURVE_HANDLE_LEFT) {
-          r_selection[offset++] = b->handle_types_left()[i] == type;
-        }
-        else if (mode & GeometryNodeCurveHandleMode::GEO_NODE_CURVE_HANDLE_RIGHT) {
-          r_selection[offset++] = b->handle_types_right()[i] == type;
-        }
+        r_selection[offset++] = (mode & GEO_NODE_CURVE_HANDLE_LEFT &&
+                                 b->handle_types_left()[i] == type) ||
+                                (mode & GEO_NODE_CURVE_HANDLE_RIGHT &&
+                                 b->handle_types_right()[i] == type);
       }
     }
   }
@@ -96,8 +91,9 @@ class HandleTypeFieldInput final : public fn::FieldInput {
 
  public:
   HandleTypeFieldInput(BezierSpline::HandleType type, GeometryNodeCurveHandleMode mode)
-      : FieldInput(CPPType::get<bool>(), "Selection"), type_(type), mode_(mode)
+      : FieldInput(CPPType::get<bool>(), "Handle Type Selection node"), type_(type), mode_(mode)
   {
+    category_ = Category::Generated;
   }
 
   const GVArray *get_varray_for_context(const fn::FieldContext &context,
@@ -121,7 +117,7 @@ class HandleTypeFieldInput final : public fn::FieldInput {
 
       if (domain == ATTR_DOMAIN_POINT) {
         Array<bool> selection(mask.min_array_size());
-        select_by_handle_type(*curve, type_, mode_, mask, selection);
+        select_by_handle_type(*curve, type_, mode_, selection);
         return &scope.construct<fn::GVArray_For_ArrayContainer<Array<bool>>>(std::move(selection));
       }
     }

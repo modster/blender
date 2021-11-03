@@ -25,19 +25,19 @@ namespace blender::nodes {
 
 static void geo_node_attribute_capture_declare(NodeDeclarationBuilder &b)
 {
-  b.add_input<decl::Geometry>("Geometry");
-  b.add_input<decl::Vector>("Value").supports_field();
-  b.add_input<decl::Float>("Value", "Value_001").supports_field();
-  b.add_input<decl::Color>("Value", "Value_002").supports_field();
-  b.add_input<decl::Bool>("Value", "Value_003").supports_field();
-  b.add_input<decl::Int>("Value", "Value_004").supports_field();
+  b.add_input<decl::Geometry>(N_("Geometry"));
+  b.add_input<decl::Vector>(N_("Value")).supports_field();
+  b.add_input<decl::Float>(N_("Value"), "Value_001").supports_field();
+  b.add_input<decl::Color>(N_("Value"), "Value_002").supports_field();
+  b.add_input<decl::Bool>(N_("Value"), "Value_003").supports_field();
+  b.add_input<decl::Int>(N_("Value"), "Value_004").supports_field();
 
-  b.add_output<decl::Geometry>("Geometry");
-  b.add_output<decl::Vector>("Attribute").field_source();
-  b.add_output<decl::Float>("Attribute", "Attribute_001").field_source();
-  b.add_output<decl::Color>("Attribute", "Attribute_002").field_source();
-  b.add_output<decl::Bool>("Attribute", "Attribute_003").field_source();
-  b.add_output<decl::Int>("Attribute", "Attribute_004").field_source();
+  b.add_output<decl::Geometry>(N_("Geometry"));
+  b.add_output<decl::Vector>(N_("Attribute")).field_source();
+  b.add_output<decl::Float>(N_("Attribute"), "Attribute_001").field_source();
+  b.add_output<decl::Color>(N_("Attribute"), "Attribute_002").field_source();
+  b.add_output<decl::Bool>(N_("Attribute"), "Attribute_003").field_source();
+  b.add_output<decl::Int>(N_("Attribute"), "Attribute_004").field_source();
 }
 
 static void geo_node_attribute_capture_layout(uiLayout *layout,
@@ -144,20 +144,22 @@ static void geo_node_attribute_capture_exec(GeoNodeExecParams params)
       break;
   }
 
-  WeakAnonymousAttributeID anonymous_id{"Attribute Capture"};
+  WeakAnonymousAttributeID anonymous_id{"Attribute"};
   const CPPType &type = field.cpp_type();
 
   static const Array<GeometryComponentType> types = {
       GEO_COMPONENT_TYPE_MESH, GEO_COMPONENT_TYPE_POINT_CLOUD, GEO_COMPONENT_TYPE_CURVE};
-  for (const GeometryComponentType type : types) {
-    if (geometry_set.has(type)) {
-      GeometryComponent &component = geometry_set.get_component_for_write(type);
-      try_capture_field_on_geometry(component, anonymous_id.get(), domain, field);
+  geometry_set.modify_geometry_sets([&](GeometrySet &geometry_set) {
+    for (const GeometryComponentType type : types) {
+      if (geometry_set.has(type)) {
+        GeometryComponent &component = geometry_set.get_component_for_write(type);
+        try_capture_field_on_geometry(component, anonymous_id.get(), domain, field);
+      }
     }
-  }
+  });
 
-  GField output_field{
-      std::make_shared<bke::AnonymousAttributeFieldInput>(std::move(anonymous_id), type)};
+  GField output_field{std::make_shared<bke::AnonymousAttributeFieldInput>(
+      std::move(anonymous_id), type, params.attribute_producer_name())};
 
   switch (data_type) {
     case CD_PROP_FLOAT: {
@@ -194,7 +196,7 @@ void register_node_type_geo_attribute_capture()
   static bNodeType ntype;
 
   geo_node_type_base(
-      &ntype, GEO_NODE_ATTRIBUTE_CAPTURE, "Attribute Capture", NODE_CLASS_ATTRIBUTE, 0);
+      &ntype, GEO_NODE_CAPTURE_ATTRIBUTE, "Capture Attribute", NODE_CLASS_ATTRIBUTE, 0);
   node_type_storage(&ntype,
                     "NodeGeometryAttributeCapture",
                     node_free_standard_storage,

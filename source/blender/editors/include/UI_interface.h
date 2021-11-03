@@ -37,6 +37,7 @@ extern "C" {
 struct ARegion;
 struct AssetFilterSettings;
 struct AssetHandle;
+struct AssetMetaData;
 struct AutoComplete;
 struct EnumPropertyItem;
 struct FileDirEntry;
@@ -82,6 +83,7 @@ struct wmWindow;
 
 typedef struct uiBlock uiBlock;
 typedef struct uiBut uiBut;
+typedef struct uiButExtraOpIcon uiButExtraOpIcon;
 typedef struct uiLayout uiLayout;
 typedef struct uiPopupBlockHandle uiPopupBlockHandle;
 /* C handle for C++ #ui::AbstractTreeView type. */
@@ -94,6 +96,10 @@ typedef struct uiTreeViewItemHandle uiTreeViewItemHandle;
 /* char for splitting strings, aligning shortcuts in menus, users never see */
 #define UI_SEP_CHAR '|'
 #define UI_SEP_CHAR_S "|"
+
+/* Separator for text in search menus (right pointing arrow).
+ * keep in sync with `string_search.cc`. */
+#define UI_MENU_ARROW_SEP "\xe2\x96\xb6"
 
 /* names */
 #define UI_MAX_DRAW_STR 400
@@ -241,7 +247,7 @@ enum {
 #define UI_DEFAULT_TEXT_POINTS 11
 
 /* Larger size used for title text. */
-#define UI_DEFAULT_TITLE_POINTS 12
+#define UI_DEFAULT_TITLE_POINTS 11
 
 #define UI_PANEL_WIDTH 340
 #define UI_COMPACT_PANEL_WIDTH 160
@@ -251,7 +257,8 @@ enum {
 
 #define UI_PANEL_CATEGORY_MARGIN_WIDTH (U.widget_unit * 1.0f)
 
-#define UI_PANEL_BOX_STYLE_MARGIN (U.widget_unit * 0.2f)
+#define UI_PANEL_MARGIN_X (U.widget_unit * 0.4f)
+#define UI_PANEL_MARGIN_Y (U.widget_unit * 0.1f)
 
 /* but->drawflag - these flags should only affect how the button is drawn. */
 /* NOTE: currently, these flags *are not passed* to the widget's state() or draw() functions
@@ -417,10 +424,6 @@ typedef enum eButGradientType {
  * Functions to draw various shapes, taking theme settings into account.
  * Used for code that draws its own UI style elements. */
 
-void UI_draw_anti_tria(
-    float x1, float y1, float x2, float y2, float x3, float y3, const float color[4]);
-void UI_draw_anti_fan(float tri_array[][2], unsigned int length, const float color[4]);
-
 void UI_draw_roundbox_corner_set(int type);
 void UI_draw_roundbox_aa(const struct rctf *rect, bool filled, float rad, const float color[4]);
 void UI_draw_roundbox_4fv(const struct rctf *rect, bool filled, float rad, const float col[4]);
@@ -431,12 +434,6 @@ void UI_draw_roundbox_3ub_alpha(const struct rctf *rect,
                                 unsigned char alpha);
 void UI_draw_roundbox_3fv_alpha(
     const struct rctf *rect, bool filled, float rad, const float col[3], float alpha);
-void UI_draw_roundbox_shade_x(const struct rctf *rect,
-                              bool filled,
-                              float rad,
-                              float shadetop,
-                              float shadedown,
-                              const float col[4]);
 void UI_draw_roundbox_4fv_ex(const struct rctf *rect,
                              const float inner1[4],
                              const float inner2[4],
@@ -779,6 +776,7 @@ void UI_but_drag_set_id(uiBut *but, struct ID *id);
 void UI_but_drag_set_asset(uiBut *but,
                            const struct AssetHandle *asset,
                            const char *path,
+                           struct AssetMetaData *metadata,
                            int import_type, /* eFileAssetImportType */
                            int icon,
                            struct ImBuf *imb,
@@ -790,7 +788,8 @@ void UI_but_drag_set_value(uiBut *but);
 void UI_but_drag_set_image(
     uiBut *but, const char *path, int icon, struct ImBuf *imb, float scale, const bool use_free);
 
-bool UI_but_active_drop_name(struct bContext *C);
+uiBut *UI_but_active_drop_name_button(const struct bContext *C);
+bool UI_but_active_drop_name(const struct bContext *C);
 bool UI_but_active_drop_color(struct bContext *C);
 
 void UI_but_flag_enable(uiBut *but, int flag);
@@ -1432,6 +1431,8 @@ typedef struct uiStringInfo {
  *       Will fill them with translated strings, when possible.
  *       Strings in uiStringInfo must be MEM_freeN'ed by caller. */
 void UI_but_string_info_get(struct bContext *C, uiBut *but, ...) ATTR_SENTINEL(0);
+void UI_but_extra_icon_string_info_get(struct bContext *C, uiButExtraOpIcon *extra_icon, ...)
+    ATTR_SENTINEL(0);
 
 /* Edit i18n stuff. */
 /* Name of the main py op from i18n addon. */
@@ -1724,6 +1725,8 @@ struct PointerRNA *UI_but_extra_operator_icon_add(uiBut *but,
                                                   const char *opname,
                                                   short opcontext,
                                                   int icon);
+struct wmOperatorType *UI_but_extra_operator_icon_optype_get(struct uiButExtraOpIcon *extra_icon);
+struct PointerRNA *UI_but_extra_operator_icon_opptr_get(struct uiButExtraOpIcon *extra_icon);
 
 /* Autocomplete
  *
@@ -1768,6 +1771,7 @@ void UI_panel_label_offset(const struct uiBlock *block, int *r_x, int *r_y);
 int UI_panel_size_y(const struct Panel *panel);
 bool UI_panel_is_dragging(const struct Panel *panel);
 bool UI_panel_matches_search_filter(const struct Panel *panel);
+bool UI_panel_can_be_pinned(const struct Panel *panel);
 
 bool UI_panel_category_is_visible(const struct ARegion *region);
 void UI_panel_category_add(struct ARegion *region, const char *name);
@@ -2676,7 +2680,12 @@ void UI_fontstyle_draw_simple_backdrop(const struct uiFontStyle *fs,
                                        const float col_fg[4],
                                        const float col_bg[4]);
 
-int UI_fontstyle_string_width(const struct uiFontStyle *fs, const char *str);
+int UI_fontstyle_string_width(const struct uiFontStyle *fs,
+                              const char *str) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL(1, 2);
+int UI_fontstyle_string_width_with_block_aspect(const struct uiFontStyle *fs,
+                                                const char *str,
+                                                const float aspect) ATTR_WARN_UNUSED_RESULT
+    ATTR_NONNULL(1, 2);
 int UI_fontstyle_height_max(const struct uiFontStyle *fs);
 
 void UI_draw_icon_tri(float x, float y, char dir, const float[4]);
@@ -2713,6 +2722,11 @@ struct ARegion *UI_tooltip_create_from_button(struct bContext *C,
                                               struct ARegion *butregion,
                                               uiBut *but,
                                               bool is_label);
+struct ARegion *UI_tooltip_create_from_button_or_extra_icon(struct bContext *C,
+                                                            struct ARegion *butregion,
+                                                            uiBut *but,
+                                                            uiButExtraOpIcon *extra_icon,
+                                                            bool is_label);
 struct ARegion *UI_tooltip_create_from_gizmo(struct bContext *C, struct wmGizmo *gz);
 void UI_tooltip_free(struct bContext *C, struct bScreen *screen, struct ARegion *region);
 
@@ -2764,14 +2778,22 @@ void UI_interface_tag_script_reload(void);
 
 bool UI_tree_view_item_is_active(const uiTreeViewItemHandle *item);
 bool UI_tree_view_item_matches(const uiTreeViewItemHandle *a, const uiTreeViewItemHandle *b);
-bool UI_tree_view_item_can_drop(const uiTreeViewItemHandle *item_, const struct wmDrag *drag);
+bool UI_tree_view_item_drag_start(struct bContext *C, uiTreeViewItemHandle *item_);
+bool UI_tree_view_item_can_drop(const uiTreeViewItemHandle *item_,
+                                const struct wmDrag *drag,
+                                const char **r_disabled_hint);
+char *UI_tree_view_item_drop_tooltip(const uiTreeViewItemHandle *item, const struct wmDrag *drag);
 bool UI_tree_view_item_drop_handle(uiTreeViewItemHandle *item_, const struct ListBase *drags);
-char *UI_tree_view_item_drop_tooltip(const uiTreeViewItemHandle *item,
-                                     const struct bContext *C,
-                                     const struct wmDrag *drag,
-                                     const struct wmEvent *event);
+bool UI_tree_view_item_can_rename(const uiTreeViewItemHandle *item_handle);
+void UI_tree_view_item_begin_rename(uiTreeViewItemHandle *item_handle);
 
-uiTreeViewItemHandle *UI_block_tree_view_find_item_at(const struct ARegion *region, int x, int y);
+void UI_tree_view_item_context_menu_build(struct bContext *C,
+                                          const uiTreeViewItemHandle *item,
+                                          uiLayout *column);
+
+uiTreeViewItemHandle *UI_block_tree_view_find_item_at(const struct ARegion *region,
+                                                      const int xy[2]) ATTR_NONNULL(1, 2);
+uiTreeViewItemHandle *UI_block_tree_view_find_active_item(const struct ARegion *region);
 
 #ifdef __cplusplus
 }

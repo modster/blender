@@ -134,7 +134,7 @@ static void region_draw_emboss(const ARegion *region, const rcti *scirct, int si
   GPU_blend(GPU_BLEND_NONE);
 }
 
-void ED_region_pixelspace(ARegion *region)
+void ED_region_pixelspace(const ARegion *region)
 {
   wmOrtho2_region_pixelspace(region);
   GPU_matrix_identity_set();
@@ -972,29 +972,33 @@ static void fullscreen_azone_init(ScrArea *area, ARegion *region)
 #define AZONEPAD_ICON (0.45f * U.widget_unit)
 static void region_azone_edge(AZone *az, ARegion *region)
 {
+  /* If region is overlapped (transparent background), move #AZone to content.
+   * Note this is an arbitrary amount that matches nicely with numbers elsewhere. */
+  int overlap_padding = (region->overlap) ? (int)(0.4f * U.widget_unit) : 0;
+
   switch (az->edge) {
     case AE_TOP_TO_BOTTOMRIGHT:
       az->x1 = region->winrct.xmin;
-      az->y1 = region->winrct.ymax - AZONEPAD_EDGE;
+      az->y1 = region->winrct.ymax - AZONEPAD_EDGE - overlap_padding;
       az->x2 = region->winrct.xmax;
-      az->y2 = region->winrct.ymax + AZONEPAD_EDGE;
+      az->y2 = region->winrct.ymax + AZONEPAD_EDGE - overlap_padding;
       break;
     case AE_BOTTOM_TO_TOPLEFT:
       az->x1 = region->winrct.xmin;
-      az->y1 = region->winrct.ymin + AZONEPAD_EDGE;
+      az->y1 = region->winrct.ymin + AZONEPAD_EDGE + overlap_padding;
       az->x2 = region->winrct.xmax;
-      az->y2 = region->winrct.ymin - AZONEPAD_EDGE;
+      az->y2 = region->winrct.ymin - AZONEPAD_EDGE + overlap_padding;
       break;
     case AE_LEFT_TO_TOPRIGHT:
-      az->x1 = region->winrct.xmin - AZONEPAD_EDGE;
+      az->x1 = region->winrct.xmin - AZONEPAD_EDGE + overlap_padding;
       az->y1 = region->winrct.ymin;
-      az->x2 = region->winrct.xmin + AZONEPAD_EDGE;
+      az->x2 = region->winrct.xmin + AZONEPAD_EDGE + overlap_padding;
       az->y2 = region->winrct.ymax;
       break;
     case AE_RIGHT_TO_TOPLEFT:
-      az->x1 = region->winrct.xmax + AZONEPAD_EDGE;
+      az->x1 = region->winrct.xmax + AZONEPAD_EDGE - overlap_padding;
       az->y1 = region->winrct.ymin;
-      az->x2 = region->winrct.xmax - AZONEPAD_EDGE;
+      az->x2 = region->winrct.xmax - AZONEPAD_EDGE - overlap_padding;
       az->y2 = region->winrct.ymax;
       break;
   }
@@ -1681,7 +1685,7 @@ static bool event_in_markers_region(const ARegion *region, const wmEvent *event)
 {
   rcti rect = region->winrct;
   rect.ymax = rect.ymin + UI_MARKER_MARGIN_Y;
-  return BLI_rcti_isect_pt(&rect, event->x, event->y);
+  return BLI_rcti_isect_pt(&rect, event->xy[0], event->xy[1]);
 }
 
 /**
@@ -1740,7 +1744,7 @@ static void ed_default_handlers(
   if (flag & ED_KEYMAP_TOOL) {
     if (flag & ED_KEYMAP_GIZMO) {
       WM_event_add_keymap_handler_dynamic(
-          &region->handlers, WM_event_get_keymap_from_toolsystem_fallback, area);
+          &region->handlers, WM_event_get_keymap_from_toolsystem_with_gizmos, area);
     }
     else {
       WM_event_add_keymap_handler_dynamic(
@@ -1912,7 +1916,7 @@ void ED_area_update_region_sizes(wmWindowManager *wm, wmWindow *win, ScrArea *ar
     /* Some AZones use View2D data which is only updated in region init, so call that first! */
     region_azones_add(screen, area, region);
   }
-  ED_area_azones_update(area, &win->eventstate->x);
+  ED_area_azones_update(area, win->eventstate->xy);
 
   area->flag &= ~AREA_FLAG_REGION_SIZE_UPDATE;
 }
@@ -1936,7 +1940,7 @@ void ED_area_init(wmWindowManager *wm, wmWindow *win, ScrArea *area)
   rcti window_rect;
   WM_window_rect_calc(win, &window_rect);
 
-  /* set typedefinitions */
+  /* Set type-definitions. */
   area->type = BKE_spacetype_from_id(area->spacetype);
 
   if (area->type == NULL) {
@@ -1999,6 +2003,68 @@ void ED_area_init(wmWindowManager *wm, wmWindow *win, ScrArea *area)
       area->runtime.is_tool_set = true;
     }
   }
+}
+
+static void area_offscreen_init(ScrArea *area)
+{
+  area->type = BKE_spacetype_from_id(area->spacetype);
+
+  if (area->type == NULL) {
+    area->spacetype = SPACE_VIEW3D;
+    area->type = BKE_spacetype_from_id(area->spacetype);
+  }
+
+  LISTBASE_FOREACH (ARegion *, region, &area->regionbase) {
+    region->type = BKE_regiontype_from_id_or_first(area->type, region->regiontype);
+  }
+}
+
+ScrArea *ED_area_offscreen_create(wmWindow *win, eSpace_Type space_type)
+{
+  ScrArea *area = MEM_callocN(sizeof(*area), __func__);
+  area->spacetype = space_type;
+
+  screen_area_spacelink_add(WM_window_get_active_scene(win), area, space_type);
+  area_offscreen_init(area);
+
+  return area;
+}
+
+static void area_offscreen_exit(wmWindowManager *wm, wmWindow *win, ScrArea *area)
+{
+  if (area->type && area->type->exit) {
+    area->type->exit(wm, area);
+  }
+
+  LISTBASE_FOREACH (ARegion *, region, &area->regionbase) {
+    if (region->type && region->type->exit) {
+      region->type->exit(wm, region);
+    }
+
+    WM_event_modal_handler_region_replace(win, region, NULL);
+    WM_draw_region_free(region, true);
+
+    MEM_SAFE_FREE(region->headerstr);
+
+    if (region->regiontimer) {
+      WM_event_remove_timer(wm, win, region->regiontimer);
+      region->regiontimer = NULL;
+    }
+
+    if (wm->message_bus) {
+      WM_msgbus_clear_by_owner(wm->message_bus, region);
+    }
+  }
+
+  WM_event_modal_handler_area_replace(win, area, NULL);
+}
+
+void ED_area_offscreen_free(wmWindowManager *wm, wmWindow *win, ScrArea *area)
+{
+  area_offscreen_exit(wm, win, area);
+
+  BKE_screen_area_free(area);
+  MEM_freeN(area);
 }
 
 static void region_update_rect(ARegion *region)
@@ -2596,10 +2662,10 @@ static ThemeColorID region_background_color_id(const bContext *C, const ARegion 
     case RGN_TYPE_HEADER:
     case RGN_TYPE_TOOL_HEADER:
       if (ED_screen_area_active(C) || ED_area_is_global(area)) {
-        return TH_HEADER;
+        return TH_HEADER_ACTIVE;
       }
       else {
-        return TH_HEADERDESEL;
+        return TH_HEADER;
       }
     case RGN_TYPE_PREVIEW:
       return TH_PREVIEW_BACK;
@@ -2915,11 +2981,10 @@ void ED_region_panels_layout_ex(const bContext *C,
     margin_x = category_tabs_width;
   }
 
-  const int w = BLI_rctf_size_x(&v2d->cur) - margin_x;
+  const int width_no_header = BLI_rctf_size_x(&v2d->cur) - margin_x;
+  const int width = width_no_header - UI_PANEL_MARGIN_X * 2.0f;
   /* Works out to 10 * UI_UNIT_X or 20 * UI_UNIT_X. */
   const int em = (region->type->prefsizex) ? 10 : 20;
-
-  const int w_box_panel = w - UI_PANEL_BOX_STYLE_MARGIN * 2.0f;
 
   /* create panels */
   UI_panels_begin(C, region);
@@ -2956,13 +3021,13 @@ void ED_region_panels_layout_ex(const bContext *C,
                   &region->panels,
                   pt,
                   panel,
-                  (pt->flag & PANEL_TYPE_DRAW_BOX) ? w_box_panel : w,
+                  (pt->flag & PANEL_TYPE_NO_HEADER) ? width_no_header : width,
                   em,
                   NULL,
                   search_filter);
   }
 
-  /* Draw "polyinstantaited" panels that don't have a 1 to 1 correspondence with their types. */
+  /* Draw "poly-instantiated" panels that don't have a 1 to 1 correspondence with their types. */
   if (has_instanced_panel) {
     LISTBASE_FOREACH (Panel *, panel, &region->panels) {
       if (panel->type == NULL) {
@@ -2990,7 +3055,7 @@ void ED_region_panels_layout_ex(const bContext *C,
                     &region->panels,
                     panel->type,
                     panel,
-                    (panel->type->flag & PANEL_TYPE_DRAW_BOX) ? w_box_panel : w,
+                    (panel->type->flag & PANEL_TYPE_NO_HEADER) ? width_no_header : width,
                     em,
                     unique_panel_str,
                     search_filter);

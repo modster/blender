@@ -1343,7 +1343,7 @@ static ImBuf *icon_preview_imbuf_from_brush(Brush *brush)
         BLI_strncpy(path, brush->icon_filepath, sizeof(brush->icon_filepath));
         BLI_path_abs(path, ID_BLEND_PATH_FROM_GLOBAL(&brush->id));
 
-        /* use default colorspaces for brushes */
+        /* Use default color-spaces for brushes. */
         brush->icon_imbuf = IMB_loadiffname(path, flags, NULL);
 
         /* otherwise lets try to find it in other directories */
@@ -1476,14 +1476,8 @@ static void icon_preview_startjob(void *customdata, short *stop, short *do_updat
         return;
       }
 
-      ImageTile *tile = BKE_image_get_tile(ima, 0);
-      /* tile->ok is zero when Image cannot load */
-      if (tile->ok == 0) {
-        return;
-      }
-
       /* setup dummy image user */
-      iuser.ok = iuser.framenr = 1;
+      iuser.framenr = 1;
       iuser.scene = sp->scene;
 
       /* elubie: this needs to be changed: here image is always loaded if not

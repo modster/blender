@@ -31,10 +31,12 @@ namespace blender::nodes {
 
 static void geo_node_proximity_declare(NodeDeclarationBuilder &b)
 {
-  b.add_input<decl::Geometry>("Target");
-  b.add_input<decl::Vector>("Source Position").implicit_field();
-  b.add_output<decl::Vector>("Position").dependent_field();
-  b.add_output<decl::Float>("Distance").dependent_field();
+  b.add_input<decl::Geometry>(N_("Target"))
+      .only_realized_data()
+      .supported_type({GEO_COMPONENT_TYPE_MESH, GEO_COMPONENT_TYPE_POINT_CLOUD});
+  b.add_input<decl::Vector>(N_("Source Position")).implicit_field();
+  b.add_output<decl::Vector>(N_("Position")).dependent_field();
+  b.add_output<decl::Float>(N_("Distance")).dependent_field();
 }
 
 static void geo_node_proximity_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
@@ -50,7 +52,7 @@ static void geo_proximity_init(bNodeTree *UNUSED(ntree), bNode *node)
   node->storage = node_storage;
 }
 
-static void calculate_mesh_proximity(const VArray<float3> &positions,
+static bool calculate_mesh_proximity(const VArray<float3> &positions,
                                      const IndexMask mask,
                                      const Mesh &mesh,
                                      const GeometryNodeProximityTargetType type,
@@ -71,7 +73,7 @@ static void calculate_mesh_proximity(const VArray<float3> &positions,
   }
 
   if (bvh_data.tree == nullptr) {
-    return;
+    return false;
   }
 
   threading::parallel_for(mask.index_range(), 512, [&](IndexRange range) {
@@ -97,18 +99,19 @@ static void calculate_mesh_proximity(const VArray<float3> &positions,
   });
 
   free_bvhtree_from_mesh(&bvh_data);
+  return true;
 }
 
-static void calculate_pointcloud_proximity(const VArray<float3> &positions,
+static bool calculate_pointcloud_proximity(const VArray<float3> &positions,
                                            const IndexMask mask,
                                            const PointCloud &pointcloud,
-                                           const MutableSpan<float> r_distances,
-                                           const MutableSpan<float3> r_locations)
+                                           MutableSpan<float> r_distances,
+                                           MutableSpan<float3> r_locations)
 {
   BVHTreeFromPointCloud bvh_data;
   BKE_bvhtree_from_pointcloud_get(&bvh_data, &pointcloud, 2);
   if (bvh_data.tree == nullptr) {
-    return;
+    return false;
   }
 
   threading::parallel_for(mask.index_range(), 512, [&](IndexRange range) {
@@ -136,6 +139,7 @@ static void calculate_pointcloud_proximity(const VArray<float3> &positions,
   });
 
   free_bvhtree_from_pointcloud(&bvh_data);
+  return true;
 }
 
 class ProximityFunction : public fn::MultiFunction {
@@ -174,14 +178,21 @@ class ProximityFunction : public fn::MultiFunction {
 
     distances.fill(FLT_MAX);
 
+    bool success = false;
     if (target_.has_mesh()) {
-      calculate_mesh_proximity(
+      success |= calculate_mesh_proximity(
           src_positions, mask, *target_.get_mesh_for_read(), type_, distances, positions);
     }
 
     if (target_.has_pointcloud() && type_ == GEO_NODE_PROX_TARGET_POINTS) {
-      calculate_pointcloud_proximity(
+      success |= calculate_pointcloud_proximity(
           src_positions, mask, *target_.get_pointcloud_for_read(), distances, positions);
+    }
+
+    if (!success) {
+      positions.fill(float3(0));
+      distances.fill(0.0f);
+      return;
     }
 
     if (params.single_output_is_required(2, "Distance")) {
@@ -198,11 +209,15 @@ class ProximityFunction : public fn::MultiFunction {
 static void geo_node_proximity_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set_target = params.extract_input<GeometrySet>("Target");
+  geometry_set_target.ensure_owns_direct_data();
+
+  auto return_default = [&]() {
+    params.set_output("Position", fn::make_constant_field<float3>({0.0f, 0.0f, 0.0f}));
+    params.set_output("Distance", fn::make_constant_field<float>(0.0f));
+  };
 
   if (!geometry_set_target.has_mesh() && !geometry_set_target.has_pointcloud()) {
-    params.set_output("Position", fn::make_constant_field<float3>({0.0f, 0.0f, 0.0f}));
-    params.set_output("Distance", fn::make_constant_field<float>({0.0f}));
-    return;
+    return return_default();
   }
 
   const NodeGeometryProximity &storage = *(const NodeGeometryProximity *)params.node().storage;

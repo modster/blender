@@ -64,6 +64,16 @@ const std::string &AssetCatalogPath::str() const
   return this->path_;
 }
 
+StringRefNull AssetCatalogPath::name() const
+{
+  const size_t last_sep_index = this->path_.rfind(SEPARATOR);
+  if (last_sep_index == std::string::npos) {
+    return StringRefNull(this->path_);
+  }
+
+  return StringRefNull(this->path_.c_str() + last_sep_index + 1);
+}
+
 /* In-class operators, because of the implicit `AssetCatalogPath(StringRef)` constructor.
  * Otherwise `string == string` could cast both sides to `AssetCatalogPath`. */
 bool AssetCatalogPath::operator==(const AssetCatalogPath &other_path) const
@@ -187,6 +197,8 @@ void AssetCatalogPath::iterate_components(ComponentIteratorFn callback) const
   for (const char *path_component = this->path_.data(); path_component && path_component[0];
        /* Jump to one after the next slash if there is any. */
        path_component = next_slash_ptr ? next_slash_ptr + 1 : nullptr) {
+    /* Note that this also treats backslashes as component separators, which
+     * helps in cleaning up backslash-separated paths. */
     next_slash_ptr = BLI_path_slash_find(path_component);
 
     const bool is_last_component = next_slash_ptr == nullptr;

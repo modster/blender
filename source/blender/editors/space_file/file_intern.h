@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include "DNA_space_types.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -45,7 +47,7 @@ struct View2D;
 
 void file_calc_previews(const bContext *C, ARegion *region);
 void file_draw_list(const bContext *C, ARegion *region);
-bool file_draw_hint_if_invalid(const SpaceFile *sfile, const ARegion *region);
+bool file_draw_hint_if_invalid(const bContext *C, const SpaceFile *sfile, ARegion *region);
 
 void file_draw_check_ex(bContext *C, struct ScrArea *area);
 void file_draw_check(bContext *C);
@@ -77,6 +79,7 @@ void FILE_OT_directory_new(struct wmOperatorType *ot);
 void FILE_OT_previous(struct wmOperatorType *ot);
 void FILE_OT_next(struct wmOperatorType *ot);
 void FILE_OT_refresh(struct wmOperatorType *ot);
+void FILE_OT_asset_library_refresh(struct wmOperatorType *ot);
 void FILE_OT_filenum(struct wmOperatorType *ot);
 void FILE_OT_delete(struct wmOperatorType *ot);
 void FILE_OT_rename(struct wmOperatorType *ot);
@@ -162,6 +165,26 @@ void file_tile_boundbox(const ARegion *region, FileLayout *layout, const int fil
 void file_path_to_ui_path(const char *path, char *r_pathi, int max_size);
 
 /* asset_catalog_tree_view.cc */
+
+/* C-handle for #ed::asset_browser::AssetCatalogFilterSettings. */
+typedef struct FileAssetCatalogFilterSettingsHandle FileAssetCatalogFilterSettingsHandle;
+
+FileAssetCatalogFilterSettingsHandle *file_create_asset_catalog_filter_settings(void);
+void file_delete_asset_catalog_filter_settings(
+    FileAssetCatalogFilterSettingsHandle **filter_settings_handle);
+/**
+ * \return True if the stored filter settings were modified.
+ */
+bool file_set_asset_catalog_filter_settings(
+    FileAssetCatalogFilterSettingsHandle *filter_settings_handle,
+    eFileSel_Params_AssetCatalogVisibility catalog_visibility,
+    bUUID catalog_id);
+void file_ensure_updated_catalog_filter_data(
+    FileAssetCatalogFilterSettingsHandle *filter_settings_handle,
+    const struct AssetLibrary *asset_library);
+bool file_is_asset_visible_in_catalog_filter_settings(
+    const FileAssetCatalogFilterSettingsHandle *filter_settings_handle,
+    const AssetMetaData *asset_data);
 
 void file_create_asset_catalog_tree_view_in_layout(struct AssetLibrary *asset_library,
                                                    struct uiLayout *layout,

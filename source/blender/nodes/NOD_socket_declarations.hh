@@ -145,12 +145,24 @@ class ColorBuilder : public SocketDeclarationBuilder<Color> {
   ColorBuilder &default_value(const ColorGeometry4f value);
 };
 
+class StringBuilder;
+
 class String : public SocketDeclaration {
+ private:
+  std::string default_value_;
+
+  friend StringBuilder;
+
  public:
-  using Builder = SocketDeclarationBuilder<String>;
+  using Builder = StringBuilder;
 
   bNodeSocket &build(bNodeTree &ntree, bNode &node, eNodeSocketInOut in_out) const override;
   bool matches(const bNodeSocket &socket) const override;
+};
+
+class StringBuilder : public SocketDeclarationBuilder<String> {
+ public:
+  StringBuilder &default_value(const std::string value);
 };
 
 class IDSocketDeclaration : public SocketDeclaration {
@@ -193,17 +205,16 @@ class Texture : public IDSocketDeclaration {
   Texture();
 };
 
-class Geometry : public SocketDeclaration {
+class Image : public IDSocketDeclaration {
  public:
-  using Builder = SocketDeclarationBuilder<Geometry>;
+  using Builder = SocketDeclarationBuilder<Image>;
 
-  bNodeSocket &build(bNodeTree &ntree, bNode &node, eNodeSocketInOut in_out) const override;
-  bool matches(const bNodeSocket &socket) const override;
+  Image();
 };
 
-/* --------------------------------------------------------------------
- * #FloatBuilder inline methods.
- */
+/* -------------------------------------------------------------------- */
+/** \name #FloatBuilder Inline Methods
+ * \{ */
 
 inline FloatBuilder &FloatBuilder::min(const float value)
 {
@@ -229,9 +240,11 @@ inline FloatBuilder &FloatBuilder::subtype(PropertySubType subtype)
   return *this;
 }
 
-/* --------------------------------------------------------------------
- * #IntBuilder inline methods.
- */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name #IntBuilder Inline Methods
+ * \{ */
 
 inline IntBuilder &IntBuilder::min(const int value)
 {
@@ -257,9 +270,11 @@ inline IntBuilder &IntBuilder::subtype(PropertySubType subtype)
   return *this;
 }
 
-/* --------------------------------------------------------------------
- * #VectorBuilder inline methods.
- */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name #VectorBuilder Inline Methods
+ * \{ */
 
 inline VectorBuilder &VectorBuilder::default_value(const float3 value)
 {
@@ -285,9 +300,11 @@ inline VectorBuilder &VectorBuilder::max(const float max)
   return *this;
 }
 
-/* --------------------------------------------------------------------
- * #BoolBuilder inline methods.
- */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name #BoolBuilder Inline Methods
+ * \{ */
 
 inline BoolBuilder &BoolBuilder::default_value(const bool value)
 {
@@ -295,9 +312,11 @@ inline BoolBuilder &BoolBuilder::default_value(const bool value)
   return *this;
 }
 
-/* --------------------------------------------------------------------
- * #ColorBuilder inline methods.
- */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name #ColorBuilder Inline Methods
+ * \{ */
 
 inline ColorBuilder &ColorBuilder::default_value(const ColorGeometry4f value)
 {
@@ -305,9 +324,23 @@ inline ColorBuilder &ColorBuilder::default_value(const ColorGeometry4f value)
   return *this;
 }
 
-/* --------------------------------------------------------------------
- * #IDSocketDeclaration and children inline methods.
- */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name #StringBuilder Inline Methods
+ * \{ */
+
+inline StringBuilder &StringBuilder::default_value(std::string value)
+{
+  decl_->default_value_ = std::move(value);
+  return *this;
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name #IDSocketDeclaration and Children Inline Methods
+ * \{ */
 
 inline IDSocketDeclaration::IDSocketDeclaration(const char *idname) : idname_(idname)
 {
@@ -329,11 +362,19 @@ inline Texture::Texture() : IDSocketDeclaration("NodeSocketTexture")
 {
 }
 
+inline Image::Image() : IDSocketDeclaration("NodeSocketImage")
+{
+}
+
+/** \} */
+
 }  // namespace blender::nodes::decl
 
-/* --------------------------------------------------------------------
- * Extern template instantiations that are defined in `intern/extern_implementations.cc`.
- */
+/* -------------------------------------------------------------------- */
+/** \name External Template Instantiations
+ *
+ * Defined in `intern/extern_implementations.cc`.
+ * \{ */
 
 namespace blender::nodes {
 #define MAKE_EXTERN_SOCKET_DECLARATION(TYPE) \
@@ -347,7 +388,7 @@ MAKE_EXTERN_SOCKET_DECLARATION(decl::Vector)
 MAKE_EXTERN_SOCKET_DECLARATION(decl::Bool)
 MAKE_EXTERN_SOCKET_DECLARATION(decl::Color)
 MAKE_EXTERN_SOCKET_DECLARATION(decl::String)
-MAKE_EXTERN_SOCKET_DECLARATION(decl::Geometry)
 
-#undef MAKE_EXTERN_SOCKET_DECLARATION
 }  // namespace blender::nodes
+
+/** \} */

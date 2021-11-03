@@ -20,7 +20,7 @@
 #include "bvh/bvh2.h"
 
 #include "device/device.h"
-#include "device/device_queue.h"
+#include "device/queue.h"
 
 #include "device/cpu/device.h"
 #include "device/cuda/device.h"
@@ -29,15 +29,15 @@
 #include "device/multi/device.h"
 #include "device/optix/device.h"
 
-#include "util/util_foreach.h"
-#include "util/util_half.h"
-#include "util/util_logging.h"
-#include "util/util_math.h"
-#include "util/util_string.h"
-#include "util/util_system.h"
-#include "util/util_time.h"
-#include "util/util_types.h"
-#include "util/util_vector.h"
+#include "util/foreach.h"
+#include "util/half.h"
+#include "util/log.h"
+#include "util/math.h"
+#include "util/string.h"
+#include "util/system.h"
+#include "util/time.h"
+#include "util/types.h"
+#include "util/vector.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -71,14 +71,12 @@ void Device::build_bvh(BVH *bvh, Progress &progress, bool refit)
 
 Device *Device::create(const DeviceInfo &info, Stats &stats, Profiler &profiler)
 {
-#ifdef WITH_MULTI
   if (!info.multi_devices.empty()) {
     /* Always create a multi device when info contains multiple devices.
      * This is done so that the type can still be e.g. DEVICE_CPU to indicate
      * that it is a homogeneous collection of devices, which simplifies checks. */
     return device_multi_create(info, stats, profiler);
   }
-#endif
 
   Device *device = NULL;
 
@@ -287,7 +285,6 @@ DeviceInfo Device::get_multi_device(const vector<DeviceInfo> &subdevices,
   info.description = "Multi Device";
   info.num = 0;
 
-  info.has_half_images = true;
   info.has_nanovdb = true;
   info.has_osl = true;
   info.has_profiling = true;
@@ -334,7 +331,6 @@ DeviceInfo Device::get_multi_device(const vector<DeviceInfo> &subdevices,
     }
 
     /* Accumulate device info. */
-    info.has_half_images &= device.has_half_images;
     info.has_nanovdb &= device.has_nanovdb;
     info.has_osl &= device.has_osl;
     info.has_profiling &= device.has_profiling;

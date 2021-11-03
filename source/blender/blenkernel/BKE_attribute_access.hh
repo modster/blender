@@ -55,6 +55,7 @@ class AttributeIDRef {
   bool is_anonymous() const;
   StringRef name() const;
   const AnonymousAttributeID &anonymous_id() const;
+  bool should_be_kept() const;
 
   friend bool operator==(const AttributeIDRef &a, const AttributeIDRef &b);
   friend std::ostream &operator<<(std::ostream &stream, const AttributeIDRef &attribute_id);
@@ -182,6 +183,8 @@ struct WriteAttributeLookup {
   GVMutableArrayPtr varray;
   /* Domain the attributes lives on in the geometry. */
   AttributeDomain domain;
+  /* Call this after changing the attribute to invalidate caches that depend on this attribute. */
+  std::function<void()> tag_modified_fn;
 
   /* Convenience function to check if the attribute has been found. */
   operator bool() const
@@ -207,7 +210,7 @@ class OutputAttribute {
 
  private:
   GVMutableArrayPtr varray_;
-  AttributeDomain domain_;
+  AttributeDomain domain_ = ATTR_DOMAIN_AUTO;
   SaveFn save_;
   std::unique_ptr<fn::GVMutableArray_GSpan> optional_span_varray_;
   bool ignore_old_values_ = false;
@@ -369,13 +372,18 @@ class CustomDataAttributes {
                       void *buffer);
   bool remove(const AttributeIDRef &attribute_id);
 
+  /**
+   * Change the order of the attributes to match the order of IDs in the argument.
+   */
+  void reorder(Span<AttributeIDRef> new_order);
+
   bool foreach_attribute(const AttributeForeachCallback callback,
                          const AttributeDomain domain) const;
 };
 
-/* --------------------------------------------------------------------
- * #AttributeIDRef inline methods.
- */
+/* -------------------------------------------------------------------- */
+/** \name #AttributeIDRef Inline Methods
+ * \{ */
 
 inline AttributeIDRef::AttributeIDRef() = default;
 
@@ -438,9 +446,21 @@ inline const AnonymousAttributeID &AttributeIDRef::anonymous_id() const
   return *anonymous_id_;
 }
 
-/* --------------------------------------------------------------------
- * #OutputAttribute inline methods.
+/**
+ * \return True if the attribute should not be removed automatically as an optimization during
+ * processing or copying. Anonymous attributes can be removed when they no longer have any
+ * references.
  */
+inline bool AttributeIDRef::should_be_kept() const
+{
+  return this->is_named() || BKE_anonymous_attribute_id_has_strong_references(anonymous_id_);
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name #OutputAttribute Inline Methods
+ * \{ */
 
 inline OutputAttribute::OutputAttribute() = default;
 inline OutputAttribute::OutputAttribute(OutputAttribute &&other) = default;
@@ -496,11 +516,15 @@ template<typename T> inline MutableSpan<T> OutputAttribute::as_span()
   return this->as_span().typed<T>();
 }
 
+/** \} */
+
 }  // namespace blender::bke
 
-/* --------------------------------------------------------------------
- * Extern template instantiations that are defined in `intern/extern_implementations.cc`.
- */
+/* -------------------------------------------------------------------- */
+/** \name External Template Instantiations
+ *
+ * Defined in `intern/extern_implementations.cc`.
+ * \{ */
 
 namespace blender::bke {
 extern template class OutputAttribute_Typed<float>;
@@ -509,3 +533,5 @@ extern template class OutputAttribute_Typed<float3>;
 extern template class OutputAttribute_Typed<bool>;
 extern template class OutputAttribute_Typed<ColorGeometry4f>;
 }  // namespace blender::bke
+
+/** \} */

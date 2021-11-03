@@ -52,7 +52,6 @@ typedef unsigned long long uint64_t;
 #define ccl_gpu_shared __shared__
 #define ccl_private
 #define ccl_may_alias
-#define ccl_addr_space
 #define ccl_restrict __restrict__
 #define ccl_loop_no_unroll
 #define ccl_align(n) __align__(n)
@@ -117,5 +116,5 @@ ccl_device_forceinline T ccl_gpu_tex_object_read_3D(const ccl_gpu_tex_object tex
 
 /* Types */
 
-#include "util/util_half.h"
-#include "util/util_types.h"
+#include "util/half.h"
+#include "util/types.h"

@@ -25,18 +25,21 @@
 
 #include "node_geometry_util.hh"
 
+#include <algorithm>
+
 namespace blender::nodes {
 
 static void geo_node_collection_info_declare(NodeDeclarationBuilder &b)
 {
-  b.add_input<decl::Collection>("Collection").hide_label();
-  b.add_input<decl::Bool>("Separate Children")
-      .description("Output each child of the collection as a separate instance");
-  b.add_input<decl::Bool>("Reset Children")
+  b.add_input<decl::Collection>(N_("Collection")).hide_label();
+  b.add_input<decl::Bool>(N_("Separate Children"))
       .description(
-          "Reset the transforms of every child instance in the output. Only used when Separate "
-          "Children is enabled");
-  b.add_output<decl::Geometry>("Geometry");
+          N_("Output each child of the collection as a separate instance, sorted alphabetically"));
+  b.add_input<decl::Bool>(N_("Reset Children"))
+      .description(
+          N_("Reset the transforms of every child instance in the output. Only used when Separate "
+          "Children is enabled"));
+  b.add_output<decl::Geometry>(N_("Geometry"));
 }
 
 static void geo_node_collection_info_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
@@ -52,6 +55,12 @@ static void geo_node_collection_info_node_init(bNodeTree *UNUSED(tree), bNode *n
   node->storage = data;
 }
 
+struct InstanceListEntry {
+  int handle;
+  char *name;
+  float4x4 transform;
+};
+
 static void geo_node_collection_info_exec(GeoNodeExecParams params)
 {
   Collection *collection = params.get_input<Collection *>("Collection");
@@ -62,6 +71,14 @@ static void geo_node_collection_info_exec(GeoNodeExecParams params)
     params.set_output("Geometry", geometry_set_out);
     return;
   }
+  const Object *self_object = params.self_object();
+  const bool is_recursive = BKE_collection_has_object_recursive_instanced(collection,
+                                                                          (Object *)self_object);
+  if (is_recursive) {
+    params.error_message_add(NodeWarningType::Error, "Collection contains current object");
+    params.set_output("Geometry", geometry_set_out);
+    return;
+  }
 
   const bNode &bnode = params.node();
   NodeGeometryCollectionInfo *node_storage = (NodeGeometryCollectionInfo *)bnode.storage;
@@ -69,8 +86,6 @@ static void geo_node_collection_info_exec(GeoNodeExecParams params)
                                        GEO_NODE_TRANSFORM_SPACE_RELATIVE);
 
   InstancesComponent &instances = geometry_set_out.get_component_for_write<InstancesComponent>();
-
-  const Object *self_object = params.self_object();
 
   const bool separate_children = params.get_input<bool>("Separate Children");
   if (separate_children) {
@@ -85,6 +100,8 @@ static void geo_node_collection_info_exec(GeoNodeExecParams params)
     }
 
     instances.reserve(children_collections.size() + children_objects.size());
+    Vector<InstanceListEntry> entries;
+    entries.reserve(children_collections.size() + children_objects.size());
 
     for (Collection *child_collection : children_collections) {
       float4x4 transform = float4x4::identity();
@@ -98,7 +115,7 @@ static void geo_node_collection_info_exec(GeoNodeExecParams params)
         }
       }
       const int handle = instances.add_reference(*child_collection);
-      instances.add_instance(handle, transform);
+      entries.append({handle, &(child_collection->id.name[2]), transform});
     }
     for (Object *child_object : children_objects) {
       const int handle = instances.add_reference(*child_object);
@@ -112,7 +129,16 @@ static void geo_node_collection_info_exec(GeoNodeExecParams params)
         }
         mul_m4_m4_post(transform.values, child_object->obmat);
       }
-      instances.add_instance(handle, transform);
+      entries.append({handle, &(child_object->id.name[2]), transform});
+    }
+
+    std::sort(entries.begin(),
+              entries.end(),
+              [](const InstanceListEntry &a, const InstanceListEntry &b) {
+                return BLI_strcasecmp_natural(a.name, b.name) <= 0;
+              });
+    for (const InstanceListEntry &entry : entries) {
+      instances.add_instance(entry.handle, entry.transform);
     }
   }
   else {
