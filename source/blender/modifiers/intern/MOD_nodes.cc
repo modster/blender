@@ -1409,7 +1409,7 @@ static void panel_draw(const bContext *C, Panel *panel)
 
   if (has_legacy_node) {
     uiLayout *row = uiLayoutRow(layout, false);
-    uiItemL(row, IFACE_("Node tree has legacy node"), ICON_ERROR);
+    uiItemL(row, TIP_("Node tree has legacy node"), ICON_ERROR);
     uiLayout *sub = uiLayoutRow(row, false);
     uiLayoutSetAlignment(sub, UI_LAYOUT_ALIGN_RIGHT);
     uiItemO(sub, "", ICON_VIEWZOOM, "NODE_OT_geometry_node_view_legacy");
@@ -1428,12 +1428,17 @@ static void output_attribute_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetPropDecorate(layout, true);
 
+  bool has_output_attribute = false;
   if (nmd->node_group != nullptr && nmd->settings.properties != nullptr) {
     LISTBASE_FOREACH (bNodeSocket *, socket, &nmd->node_group->outputs) {
       if (socket_type_has_attribute_toggle(*socket)) {
+        has_output_attribute = true;
         draw_property_for_output_socket(layout, *nmd, ptr, *socket);
       }
     }
+  }
+  if (!has_output_attribute) {
+    uiItemL(layout, TIP_("No group output attributes connected"), ICON_INFO);
   }
 }
 

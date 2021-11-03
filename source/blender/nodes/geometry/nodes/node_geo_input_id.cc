@@ -20,12 +20,12 @@ namespace blender::nodes {
 
 static void geo_node_input_id_declare(NodeDeclarationBuilder &b)
 {
-  b.add_output<decl::Int>("ID").field_source();
+  b.add_output<decl::Int>(N_("ID")).field_source();
 }
 
 static void geo_node_input_id_exec(GeoNodeExecParams params)
 {
-  Field<int> position_field{AttributeFieldInput::Create<int>("id")};
+  Field<int> position_field{std::make_shared<bke::IDAttributeFieldInput>()};
   params.set_output("ID", std::move(position_field));
 }
 

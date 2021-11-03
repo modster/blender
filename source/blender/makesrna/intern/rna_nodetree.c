@@ -2056,7 +2056,8 @@ static bool switch_type_supported(const EnumPropertyItem *item)
               SOCK_OBJECT,
               SOCK_COLLECTION,
               SOCK_TEXTURE,
-              SOCK_MATERIAL);
+              SOCK_MATERIAL,
+              SOCK_IMAGE);
 }
 
 static const EnumPropertyItem *rna_GeometryNodeSwitch_type_itemf(bContext *UNUSED(C),
@@ -12772,6 +12773,8 @@ static void rna_def_nodetree(BlenderRNA *brna)
   prop = RNA_def_property(srna, "view_center", PROP_FLOAT, PROP_XYZ);
   RNA_def_property_array(prop, 2);
   RNA_def_property_float_sdna(prop, NULL, "view_center");
+  RNA_def_property_ui_text(
+      prop, "", "The current location (offset) of the view for this Node Tree");
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
 
   /* AnimData */
