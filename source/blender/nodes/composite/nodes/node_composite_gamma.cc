@@ -37,12 +37,22 @@ static void cmp_node_gamma_declare(NodeDeclarationBuilder &b)
 
 }  // namespace blender::nodes
 
+static int node_composite_gpu_gamma(GPUMaterial *mat,
+                                    bNode *node,
+                                    bNodeExecData *UNUSED(execdata),
+                                    GPUNodeStack *in,
+                                    GPUNodeStack *out)
+{
+  return GPU_stack_link(mat, node, "node_composite_gamma", in, out);
+}
+
 void register_node_type_cmp_gamma(void)
 {
   static bNodeType ntype;
 
   cmp_node_type_base(&ntype, CMP_NODE_GAMMA, "Gamma", NODE_CLASS_OP_COLOR, 0);
   ntype.declare = blender::nodes::cmp_node_gamma_declare;
+  node_type_gpu(&ntype, node_composite_gpu_gamma);
 
   nodeRegisterType(&ntype);
 }
