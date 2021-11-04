@@ -43,12 +43,22 @@ static void cmp_node_huesatval_declare(NodeDeclarationBuilder &b)
 
 }  // namespace blender::nodes
 
+static int node_composite_gpu_hue_saturation_value(GPUMaterial *mat,
+                                                   bNode *node,
+                                                   bNodeExecData *UNUSED(execdata),
+                                                   GPUNodeStack *in,
+                                                   GPUNodeStack *out)
+{
+  return GPU_stack_link(mat, node, "node_composite_hue_saturation_value", in, out);
+}
+
 void register_node_type_cmp_hue_sat(void)
 {
   static bNodeType ntype;
 
   cmp_node_type_base(&ntype, CMP_NODE_HUE_SAT, "Hue Saturation Value", NODE_CLASS_OP_COLOR, 0);
   ntype.declare = blender::nodes::cmp_node_huesatval_declare;
+  node_type_gpu(&ntype, node_composite_gpu_hue_saturation_value);
 
   nodeRegisterType(&ntype);
 }
