@@ -43,6 +43,7 @@
 
 extern char datatoc_gpu_shader_common_color_util_glsl[];
 extern char datatoc_gpu_shader_common_math_util_glsl[];
+extern char datatoc_gpu_shader_common_mix_rgb_glsl[];
 extern char datatoc_gpu_shader_common_hash_glsl[];
 
 extern char datatoc_gpu_shader_composite_alpha_over_glsl[];
@@ -93,7 +94,6 @@ extern char datatoc_gpu_shader_material_light_path_glsl[];
 extern char datatoc_gpu_shader_material_mapping_glsl[];
 extern char datatoc_gpu_shader_material_map_range_glsl[];
 extern char datatoc_gpu_shader_material_math_glsl[];
-extern char datatoc_gpu_shader_material_mix_rgb_glsl[];
 extern char datatoc_gpu_shader_material_mix_shader_glsl[];
 extern char datatoc_gpu_shader_material_noise_glsl[];
 extern char datatoc_gpu_shader_material_normal_glsl[];
@@ -153,6 +153,11 @@ static GPUMaterialLibrary gpu_shader_common_math_util_library = {
 static GPUMaterialLibrary gpu_shader_common_color_util_library = {
     .code = datatoc_gpu_shader_common_color_util_glsl,
     .dependencies = {NULL},
+};
+
+static GPUMaterialLibrary gpu_shader_common_mix_rgb_library = {
+    .code = datatoc_gpu_shader_common_mix_rgb_glsl,
+    .dependencies = {&gpu_shader_common_color_util_library, NULL},
 };
 
 static GPUMaterialLibrary gpu_shader_common_hash_library = {
@@ -411,11 +416,6 @@ static GPUMaterialLibrary gpu_shader_material_math_library = {
     .dependencies = {&gpu_shader_common_math_util_library, NULL},
 };
 
-static GPUMaterialLibrary gpu_shader_material_mix_rgb_library = {
-    .code = datatoc_gpu_shader_material_mix_rgb_glsl,
-    .dependencies = {&gpu_shader_common_color_util_library, NULL},
-};
-
 static GPUMaterialLibrary gpu_shader_material_mix_shader_library = {
     .code = datatoc_gpu_shader_material_mix_shader_glsl,
     .dependencies = {NULL},
@@ -659,6 +659,7 @@ static GPUMaterialLibrary gpu_shader_material_world_normals_library = {
 static GPUMaterialLibrary *gpu_material_libraries[] = {
     &gpu_shader_common_math_util_library,
     &gpu_shader_common_color_util_library,
+    &gpu_shader_common_mix_rgb_library,
     &gpu_shader_common_hash_library,
     &gpu_shader_material_noise_library,
     &gpu_shader_material_fractal_noise_library,
@@ -698,7 +699,6 @@ static GPUMaterialLibrary *gpu_material_libraries[] = {
     &gpu_shader_material_mapping_library,
     &gpu_shader_material_map_range_library,
     &gpu_shader_material_math_library,
-    &gpu_shader_material_mix_rgb_library,
     &gpu_shader_material_mix_shader_library,
     &gpu_shader_material_normal_library,
     &gpu_shader_material_normal_map_library,

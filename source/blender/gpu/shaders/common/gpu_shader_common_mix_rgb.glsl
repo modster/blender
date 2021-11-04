@@ -276,6 +276,7 @@ void mix_soft(float fac, vec4 col1, vec4 col2, out vec4 outcol)
   vec4 one = vec4(1.0);
   vec4 scr = one - (one - col2) * (one - col1);
   outcol = facm * col1 + fac * ((one - col1) * col2 * col1 + col1 * scr);
+  outcol.a = col1.a;
 }
 
 void mix_linear(float fac, vec4 col1, vec4 col2, out vec4 outcol)
@@ -283,9 +284,15 @@ void mix_linear(float fac, vec4 col1, vec4 col2, out vec4 outcol)
   fac = clamp(fac, 0.0, 1.0);
 
   outcol = col1 + fac * (2.0 * (col2 - vec4(0.5)));
+  outcol.a = col1.a;
 }
 
-void clamp_color(vec3 vec, vec3 min, vec3 max, out vec3 out_vec)
+void clamp_color(vec4 vec, const vec4 min, const vec4 max, out vec4 out_vec)
 {
   out_vec = clamp(vec, min, max);
+}
+
+void multiply_by_alpha(float factor, vec4 color, out float result)
+{
+  result = factor * color.a;
 }
