@@ -51,6 +51,40 @@ static void node_composit_init_huecorrect(bNodeTree *UNUSED(ntree), bNode *node)
   cumapping->cur = 1;
 }
 
+static int node_composite_gpu_huecorrect(GPUMaterial *mat,
+                                         bNode *node,
+                                         bNodeExecData *UNUSED(execdata),
+                                         GPUNodeStack *in,
+                                         GPUNodeStack *out)
+{
+  CurveMapping *curve_mapping = (CurveMapping *)node->storage;
+
+  BKE_curvemapping_init(curve_mapping);
+  float *band_values;
+  int band_size;
+  BKE_curvemapping_table_RGBA(curve_mapping, &band_values, &band_size);
+  float band_layer;
+  GPUNodeLink *band_texture = GPU_color_band(mat, band_size, band_values, &band_layer);
+
+  float min_hsv[3];
+  float range_hsv[3];
+  for (int i = 0; i < 3; i++) {
+    const CurveMap &curve_map = curve_mapping->cm[i];
+    min_hsv[i] = curve_map.mintable;
+    range_hsv[i] = 1.0f / max_ff(1e-8f, curve_map.maxtable - curve_map.mintable);
+  }
+
+  return GPU_stack_link(mat,
+                        node,
+                        "node_composite_hue_correct",
+                        in,
+                        out,
+                        band_texture,
+                        GPU_constant(&band_layer),
+                        GPU_uniform(min_hsv),
+                        GPU_uniform(range_hsv));
+}
+
 void register_node_type_cmp_huecorrect(void)
 {
   static bNodeType ntype;
@@ -60,6 +94,7 @@ void register_node_type_cmp_huecorrect(void)
   node_type_size(&ntype, 320, 140, 500);
   node_type_init(&ntype, node_composit_init_huecorrect);
   node_type_storage(&ntype, "CurveMapping", node_free_curves, node_copy_curves);
+  node_type_gpu(&ntype, node_composite_gpu_huecorrect);
 
   nodeRegisterType(&ntype);
 }

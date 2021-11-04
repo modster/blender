@@ -286,6 +286,7 @@ data_to_c_simple(shaders/composite/gpu_shader_composite_color_correction.glsl SR
 data_to_c_simple(shaders/composite/gpu_shader_composite_composite.glsl SRC)
 data_to_c_simple(shaders/composite/gpu_shader_composite_exposure.glsl SRC)
 data_to_c_simple(shaders/composite/gpu_shader_composite_gamma.glsl SRC)
+data_to_c_simple(shaders/composite/gpu_shader_composite_hue_correct.glsl SRC)
 data_to_c_simple(shaders/composite/gpu_shader_composite_image.glsl SRC)
 data_to_c_simple(shaders/composite/gpu_shader_composite_invert.glsl SRC)
 
