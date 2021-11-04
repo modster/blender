@@ -3417,7 +3417,10 @@ void ED_gpencil_stroke_close_by_distance(bGPDstroke *gps, const float threshold)
 }
 
 /* Merge two layers. */
-void ED_gpencil_layer_merge(bGPdata *gpd, bGPDlayer *gpl_src, bGPDlayer *gpl_dst)
+void ED_gpencil_layer_merge(bGPdata *gpd,
+                            bGPDlayer *gpl_src,
+                            bGPDlayer *gpl_dst,
+                            const bool reverse)
 {
   /* Collect frames of gpl_dst in hash table to avoid O(n^2) lookups. */
   GHash *gh_frames_dst = BLI_ghash_int_new_ex(__func__, 64);
@@ -3443,16 +3446,14 @@ void ED_gpencil_layer_merge(bGPdata *gpd, bGPDlayer *gpl_src, bGPDlayer *gpl_dst
   LISTBASE_FOREACH (bGPDframe *, gpf_src, &gpl_src->frames) {
     /* Try to find frame in destination layer hash table. */
     bGPDframe *gpf_dst = BLI_ghash_lookup(gh_frames_dst, POINTER_FROM_INT(gpf_src->framenum));
-    /* Apply layer transformation. */
-    LISTBASE_FOREACH (bGPDstroke *, gps_src, &gpf_src->strokes) {
-      for (int p = 0; p < gps_src->totpoints; p++) {
-        bGPDspoint *pt = &gps_src->points[p];
-        mul_v3_m4v3(&pt->x, gpl_src->layer_mat, &pt->x);
-      }
-    }
     /* Add to tail all strokes. */
     if (gpf_dst) {
-      BLI_movelisttolist(&gpf_dst->strokes, &gpf_src->strokes);
+      if (reverse) {
+        BLI_movelisttolist_reverse(&gpf_dst->strokes, &gpf_src->strokes);
+      }
+      else {
+        BLI_movelisttolist(&gpf_dst->strokes, &gpf_src->strokes);
+      }
     }
   }
 
@@ -3469,10 +3470,11 @@ void ED_gpencil_layer_merge(bGPdata *gpd, bGPDlayer *gpl_src, bGPDlayer *gpl_dst
       gpl_dst->act_mask++;
     }
   }
+
   /* Set destination layer as active. */
   BKE_gpencil_layer_active_set(gpd, gpl_dst);
 
-  /* Now delete next layer */
+  /* Now delete merged layer. */
   BKE_gpencil_layer_delete(gpd, gpl_src);
   BLI_ghash_free(gh_frames_dst, NULL, NULL);
 

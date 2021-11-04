@@ -207,7 +207,8 @@ void ED_gpencil_layer_frames_duplicate(struct bGPDlayer *gpl);
 
 void ED_gpencil_layer_merge(struct bGPdata *gpd,
                             struct bGPDlayer *gpl_src,
-                            struct bGPDlayer *gpl_dst);
+                            struct bGPDlayer *gpl_dst,
+                            const bool reverse);
 
 void ED_gpencil_layer_frames_keytype_set(struct bGPDlayer *gpl, short type);
 

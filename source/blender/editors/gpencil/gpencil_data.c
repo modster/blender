@@ -1321,19 +1321,102 @@ void GPENCIL_OT_layer_isolate(wmOperatorType *ot)
 }
 
 /* ********************** Merge Layer with the next layer **************************** */
+enum {
+  GP_LAYER_MERGE_ACTIVE = 0,
+  GP_LAYER_MERGE_ALL = 1,
+};
+
+static void apply_layer_settings(bGPDlayer *gpl)
+{
+  /* Apply layer attributes. */
+  LISTBASE_FOREACH (bGPDframe *, gpf, &gpl->frames) {
+    LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
+      gps->fill_opacity_fac *= gpl->opacity;
+      gps->vert_color_fill[3] *= gpl->opacity;
+      for (int p = 0; p < gps->totpoints; p++) {
+        bGPDspoint *pt = &gps->points[p];
+        float factor = (((float)gps->thickness * pt->pressure) + (float)gpl->line_change) /
+                       ((float)gps->thickness * pt->pressure);
+        pt->pressure *= factor;
+        pt->strength *= gpl->opacity;
+
+        /* Layer transformation. */
+        mul_v3_m4v3(&pt->x, gpl->layer_mat, &pt->x);
+        zero_v3(gpl->location);
+        zero_v3(gpl->rotation);
+        copy_v3_fl(gpl->scale, 1.0f);
+      }
+    }
+  }
+
+  gpl->line_change = 0;
+  gpl->opacity = 1.0f;
+  unit_m4(gpl->layer_mat);
+  invert_m4_m4(gpl->layer_invmat, gpl->layer_mat);
+}
 
 static int gpencil_merge_layer_exec(bContext *C, wmOperator *op)
 {
   bGPdata *gpd = ED_gpencil_data_get_active(C);
-  bGPDlayer *gpl_src = BKE_gpencil_layer_active_get(gpd);
-  bGPDlayer *gpl_dst = gpl_src->prev;
+  bGPDlayer *gpl_active = BKE_gpencil_layer_active_get(gpd);
+  bGPDlayer *gpl_dst = gpl_active->prev;
+  const int mode = RNA_enum_get(op->ptr, "mode");
 
-  if (ELEM(NULL, gpd, gpl_dst, gpl_src)) {
-    BKE_report(op->reports, RPT_ERROR, "No layers to merge");
+  if (mode == GP_LAYER_MERGE_ACTIVE) {
+    if (ELEM(NULL, gpd, gpl_dst, gpl_active)) {
+      BKE_report(op->reports, RPT_ERROR, "No layers to merge");
+      return OPERATOR_CANCELLED;
+    }
+  }
+  else {
+    if (ELEM(NULL, gpd, gpl_active)) {
+      BKE_report(op->reports, RPT_ERROR, "No layers to flatten");
+      return OPERATOR_CANCELLED;
+    }
+  }
+
+  if (mode == GP_LAYER_MERGE_ACTIVE) {
+    /* Apply destination layer attributes. */
+    apply_layer_settings(gpl_active);
+    ED_gpencil_layer_merge(gpd, gpl_active, gpl_dst, false);
+  }
+  else if (mode == GP_LAYER_MERGE_ALL) {
+    /* Apply layer attributes to all layers. */
+    LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
+      apply_layer_settings(gpl);
+    }
+    gpl_dst = gpl_active;
+    /* Merge layers on top of active layer. */
+    if (gpd->layers.last != gpl_dst) {
+      LISTBASE_FOREACH_BACKWARD_MUTABLE (bGPDlayer *, gpl, &gpd->layers) {
+        if (gpl == gpl_dst) {
+          break;
+        }
+        ED_gpencil_layer_merge(gpd, gpl, gpl->prev, false);
+      }
+    }
+    /* Merge layers below active layer. */
+    LISTBASE_FOREACH_BACKWARD_MUTABLE (bGPDlayer *, gpl, &gpd->layers) {
+      if (gpl == gpl_dst) {
+        continue;
+      }
+      ED_gpencil_layer_merge(gpd, gpl, gpl_dst, true);
+    }
+    /* Set general layers settings to default values. */
+    gpl_active->blend_mode = eGplBlendMode_Regular;
+    gpl_active->flag &= ~GP_LAYER_LOCKED;
+    gpl_active->flag &= ~GP_LAYER_HIDE;
+    gpl_active->flag |= GP_LAYER_USE_LIGHTS;
+    gpl_active->onion_flag |= GP_LAYER_ONIONSKIN;
+  }
+  else {
     return OPERATOR_CANCELLED;
   }
 
-  ED_gpencil_layer_merge(gpd, gpl_src, gpl_dst);
+  /* Clear any invalid mask. Some other layer could be using the merged layer. */
+  LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
+    BKE_gpencil_layer_mask_cleanup(gpd, gpl);
+  }
 
   /* notifiers */
   DEG_id_tag_update(&gpd->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY);
@@ -1345,10 +1428,16 @@ static int gpencil_merge_layer_exec(bContext *C, wmOperator *op)
 
 void GPENCIL_OT_layer_merge(wmOperatorType *ot)
 {
+  static const EnumPropertyItem merge_modes[] = {
+      {GP_LAYER_MERGE_ACTIVE, "ACTIVE", 0, "Active", "Combine active layer into the layer below"},
+      {GP_LAYER_MERGE_ALL, "ALL", 0, "All", "Combine all layers into the active layer"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
   /* identifiers */
   ot->name = "Merge Down";
   ot->idname = "GPENCIL_OT_layer_merge";
-  ot->description = "Merge the current layer with the layer below";
+  ot->description = "Combine Layers";
 
   /* callbacks */
   ot->exec = gpencil_merge_layer_exec;
@@ -1356,6 +1445,8 @@ void GPENCIL_OT_layer_merge(wmOperatorType *ot)
 
   /* flags */
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+  ot->prop = RNA_def_enum(ot->srna, "mode", merge_modes, GP_LAYER_MERGE_ACTIVE, "Mode", "");
 }
 
 /* ********************** Change Layer ***************************** */
