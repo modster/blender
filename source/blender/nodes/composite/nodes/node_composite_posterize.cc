@@ -35,12 +35,22 @@ static bNodeSocketTemplate cmp_node_posterize_out[] = {
     {-1, ""},
 };
 
+static int node_composite_gpu_posterize(GPUMaterial *mat,
+                                        bNode *node,
+                                        bNodeExecData *UNUSED(execdata),
+                                        GPUNodeStack *in,
+                                        GPUNodeStack *out)
+{
+  return GPU_stack_link(mat, node, "node_composite_posterize", in, out);
+}
+
 void register_node_type_cmp_posterize(void)
 {
   static bNodeType ntype;
 
   cmp_node_type_base(&ntype, CMP_NODE_POSTERIZE, "Posterize", NODE_CLASS_OP_COLOR, 0);
   node_type_socket_templates(&ntype, cmp_node_posterize_in, cmp_node_posterize_out);
+  node_type_gpu(&ntype, node_composite_gpu_posterize);
 
   nodeRegisterType(&ntype);
 }
