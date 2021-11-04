@@ -213,6 +213,36 @@ typedef enum eGP_AssetModes {
   GP_ASSET_MODE_SELECTED_STROKES,
 } eGP_AssetModes;
 
+/* Helper: Apply layer settings. */
+static void apply_layer_settings(bGPDlayer *gpl)
+{
+  /* Apply layer attributes. */
+  LISTBASE_FOREACH (bGPDframe *, gpf, &gpl->frames) {
+    LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
+      gps->fill_opacity_fac *= gpl->opacity;
+      gps->vert_color_fill[3] *= gpl->opacity;
+      for (int p = 0; p < gps->totpoints; p++) {
+        bGPDspoint *pt = &gps->points[p];
+        float factor = (((float)gps->thickness * pt->pressure) + (float)gpl->line_change) /
+                       ((float)gps->thickness * pt->pressure);
+        pt->pressure *= factor;
+        pt->strength *= gpl->opacity;
+
+        /* Layer transformation. */
+        mul_v3_m4v3(&pt->x, gpl->layer_mat, &pt->x);
+        zero_v3(gpl->location);
+        zero_v3(gpl->rotation);
+        copy_v3_fl(gpl->scale, 1.0f);
+      }
+    }
+  }
+
+  gpl->line_change = 0;
+  gpl->opacity = 1.0f;
+  unit_m4(gpl->layer_mat);
+  invert_m4_m4(gpl->layer_invmat, gpl->layer_mat);
+}
+
 /* Helper: Create an asset for data block.
  * return: False if there are features non supported. */
 static bool gpencil_asset_create(const bContext *C,
@@ -346,12 +376,17 @@ static bool gpencil_asset_create(const bContext *C,
 
   /* Flatten layers. */
   if ((flatten_layers) && (gpd->layers.first)) {
+    /* Apply layer attributes to all layers. */
+    LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
+      apply_layer_settings(gpl);
+    }
+
     bGPDlayer *gpl_dst = gpd->layers.first;
-    LISTBASE_FOREACH_MUTABLE (bGPDlayer *, gpl_src, &gpd->layers) {
-      if (gpl_dst == gpl_src) {
-        continue;
+    LISTBASE_FOREACH_BACKWARD_MUTABLE (bGPDlayer *, gpl, &gpd->layers) {
+      if (gpl == gpl_dst) {
+        break;
       }
-      ED_gpencil_layer_merge(gpd, gpl_src, gpl_dst);
+      ED_gpencil_layer_merge(gpd, gpl, gpl->prev, false);
     }
     strcpy(gpl_dst->info, "Asset_Layer");
   }
