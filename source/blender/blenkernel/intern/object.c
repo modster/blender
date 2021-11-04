@@ -869,6 +869,7 @@ static void object_blend_read_lib(BlendLibReader *reader, ID *id)
 {
   Object *ob = (Object *)id;
 
+  Main *bmain = BLO_read_lib_get_main(reader);
   BlendFileReadReport *reports = BLO_read_lib_reports(reader);
 
   /* XXX deprecated - old animation system <<< */
@@ -965,12 +966,7 @@ static void object_blend_read_lib(BlendLibReader *reader, ID *id)
   /* When the object is local and the data is library its possible
    * the material list size gets out of sync. T22663. */
   if (ob->data && ob->id.lib != ((ID *)ob->data)->lib) {
-    const short *totcol_data = BKE_object_material_len_p(ob);
-    /* Only expand so as not to lose any object materials that might be set. */
-    if (totcol_data && (*totcol_data > ob->totcol)) {
-      // printf("'%s' %d -> %d\n", ob->id.name, ob->totcol, *totcol_data);
-      BKE_object_material_resize(BLO_read_lib_get_main(reader), ob, *totcol_data, false);
-    }
+    BKE_object_materials_test(bmain, ob, ob->data);
   }
 
   BLO_read_id_address(reader, ob->id.lib, &ob->gpd);
@@ -2878,7 +2874,7 @@ Object *BKE_object_duplicate(Main *bmain,
 
   if (!is_subprocess) {
     /* This code will follow into all ID links using an ID tagged with LIB_TAG_NEW. */
-    BKE_libblock_relink_to_newid(bmain, &obn->id);
+    BKE_libblock_relink_to_newid(bmain, &obn->id, 0);
 
 #ifndef NDEBUG
     /* Call to `BKE_libblock_relink_to_newid` above is supposed to have cleared all those flags. */
@@ -4170,7 +4166,6 @@ void BKE_object_empty_draw_type_set(Object *ob, const int value)
   if (ob->type == OB_EMPTY && ob->empty_drawtype == OB_EMPTY_IMAGE) {
     if (!ob->iuser) {
       ob->iuser = MEM_callocN(sizeof(ImageUser), "image user");
-      ob->iuser->ok = 1;
       ob->iuser->flag |= IMA_ANIM_ALWAYS;
       ob->iuser->frames = 100;
       ob->iuser->sfra = 1;

@@ -754,13 +754,11 @@ void ntreeBlendReadData(BlendDataReader *reader, bNodeTree *ntree)
         }
         case SH_NODE_TEX_IMAGE: {
           NodeTexImage *tex = (NodeTexImage *)node->storage;
-          tex->iuser.ok = 1;
           tex->iuser.scene = nullptr;
           break;
         }
         case SH_NODE_TEX_ENVIRONMENT: {
           NodeTexEnvironment *tex = (NodeTexEnvironment *)node->storage;
-          tex->iuser.ok = 1;
           tex->iuser.scene = nullptr;
           break;
         }
@@ -769,7 +767,6 @@ void ntreeBlendReadData(BlendDataReader *reader, bNodeTree *ntree)
         case CMP_NODE_VIEWER:
         case CMP_NODE_SPLITVIEWER: {
           ImageUser *iuser = (ImageUser *)node->storage;
-          iuser->ok = 1;
           iuser->scene = nullptr;
           break;
         }
@@ -783,7 +780,6 @@ void ntreeBlendReadData(BlendDataReader *reader, bNodeTree *ntree)
         }
         case TEX_NODE_IMAGE: {
           ImageUser *iuser = (ImageUser *)node->storage;
-          iuser->ok = 1;
           iuser->scene = nullptr;
           break;
         }
@@ -2611,6 +2607,17 @@ void nodeInternalRelink(bNodeTree *ntree, bNode *node)
         bNodeLink *fromlink = link->fromsock->link->fromsock->link;
         /* skip the node */
         if (fromlink) {
+          if (link->tosock->flag & SOCK_MULTI_INPUT) {
+            /* remove the link that would be the same as the relinked one */
+            LISTBASE_FOREACH_MUTABLE (bNodeLink *, link_to_compare, &ntree->links) {
+              if (link_to_compare->fromsock == fromlink->fromsock &&
+                  link_to_compare->tosock == link->tosock) {
+                adjust_multi_input_indices_after_removed_link(
+                    ntree, link_to_compare->tosock, link_to_compare->multi_input_socket_index);
+                nodeRemLink(ntree, link_to_compare);
+              }
+            }
+          }
           link->fromnode = fromlink->fromnode;
           link->fromsock = fromlink->fromsock;
 
