@@ -47,7 +47,7 @@
 
 /* Data structure to keep track of details about the cut location */
 typedef struct CutData {
-  /* Index of the last BezTriple or BPoint before the cut. */
+  /* Index of the last #BezTriple or BPoint before the cut. */
   int bezt_index, bp_index;
   /* Nurb to which the cut belongs to. */
   Nurb *nurb;
@@ -67,7 +67,7 @@ typedef struct CutData {
 typedef struct MoveSegmentData {
   /* Nurb being altered. */
   Nurb *nu;
-  /* Index of the BezTriple before the segment. */
+  /* Index of the #BezTriple before the segment. */
   int bezt_index;
 } MoveSegmentData;
 
@@ -84,7 +84,7 @@ static void mouse_location_to_worldspace(const int mouse_loc[2],
   mul_m4_v3(imat, r_location);
 }
 
-/* Move the handle of the newly added BezTriple to mouse. */
+/* Move the handle of the newly added #BezTriple to mouse. */
 static void move_bezt_handles_to_mouse(BezTriple *bezt,
                                        const bool is_end_point,
                                        const wmEvent *event,
@@ -127,7 +127,7 @@ static void move_bezt_to_location(BezTriple *bezt, const float location[3])
   add_v3_v3(bezt->vec[2], change);
 }
 
-/* Alter handle types to allow free movement (Set handles to FREE or ALIGN). */
+/* Alter handle types to allow free movement (Set handles to #FREE or #ALIGN). */
 static void free_up_handles_for_movement(BezTriple *bezt, const bool f1, const bool f3)
 {
   if (f1) {
@@ -150,7 +150,7 @@ static void free_up_handles_for_movement(BezTriple *bezt, const bool f1, const b
   }
 }
 
-/* Move handles or entire BezTriple to mouse based on selection. */
+/* Move handles or entire #BezTriple to mouse based on selection. */
 static void move_selected_bezt_to_mouse(BezTriple *bezt,
                                         const ViewContext *vc,
                                         const wmEvent *event)
@@ -275,7 +275,7 @@ static bool get_closest_point_on_edge(float r_point[3],
   return false;
 }
 
-/* Get closest vertex in all nurbs in given ListBase to a given point. */
+/* Get closest vertex in all nurbs in given #ListBase to a given point. */
 static void get_closest_vertex_to_point_in_nurbs(ListBase *nurbs,
                                                  Nurb **r_nu,
                                                  BezTriple **r_bezt,
@@ -341,7 +341,7 @@ static void get_closest_vertex_to_point_in_nurbs(ListBase *nurbs,
   }
 }
 
-/* Assign values for several frequently changing attributes of CutData. */
+/* Assign values for several frequently changing attributes of #CutData. */
 static void assign_cut_data(CutData *data,
                             const float min_dist,
                             Nurb *nu,
@@ -358,7 +358,9 @@ static void assign_cut_data(CutData *data,
   copy_v3_v3(data->cut_loc, cut_loc);
 }
 
-/* Update CutData with location of closest BezTriple on curve. */
+/* Iterate over all the geometry between the segment formed by bezt1 and bezt2
+ * to find the closest edge to #data->mval (mouse location) and update #data->prev_loc
+ * and #data->next_loc with the vertices of the edge. */
 static void update_data_if_closest_bezt_in_segment(const BezTriple *bezt1,
                                                    const BezTriple *bezt2,
                                                    Nurb *nu,
@@ -411,7 +413,7 @@ static void update_data_if_closest_bezt_in_segment(const BezTriple *bezt1,
   MEM_freeN(points);
 }
 
-/* Interpolate along the bezier segment by a parameter (between 0 and 1) and get its location. */
+/* Interpolate along the Bezier segment by a parameter (between 0 and 1) and get its location. */
 static void get_bezier_interpolated_point(float r_point[3],
                                           const BezTriple *bezt1,
                                           const BezTriple *bezt2,
@@ -564,7 +566,7 @@ static void update_data_for_all_nurbs(const ListBase *nurbs, const ViewContext *
   }
 }
 
-/* Insert a bezt to a nurb at the location specified by op_data. */
+/* Insert a #BezTriple to a nurb at the location specified by `op_data`. */
 static void add_bezt_to_nurb(Nurb *nu, const void *op_data, Curve *cu)
 {
   EditNurb *editnurb = cu->editnurb;
@@ -619,7 +621,7 @@ static void add_bezt_to_nurb(Nurb *nu, const void *op_data, Curve *cu)
   BEZT_SEL_ALL(new_bezt);
 }
 
-/* Insert a BPoint to a nurb at the location specified by op_data. */
+/* Insert a #BPoint to a nurb at the location specified by `op_data`. */
 static void add_bp_to_nurb(Nurb *nu, const void *op_data, Curve *cu)
 {
   EditNurb *editnurb = cu->editnurb;
