@@ -25,7 +25,7 @@
 
 /* **************** Script ******************** */
 
-static void init(bNodeTree *UNUSED(ntree), bNode *node)
+static void node_shader_script_init(bNodeTree *UNUSED(ntree), bNode *node)
 {
   NodeShaderScript *nss = MEM_callocN(sizeof(NodeShaderScript), "shader script node");
   node->storage = nss;
@@ -63,7 +63,7 @@ void register_node_type_sh_script(void)
   static bNodeType ntype;
 
   sh_node_type_base(&ntype, SH_NODE_SCRIPT, "Script", NODE_CLASS_SCRIPT, 0);
-  node_type_init(&ntype, init);
+  node_type_init(&ntype, node_shader_script_init);
   node_type_storage(&ntype, "NodeShaderScript", node_free_script, node_copy_script);
 
   nodeRegisterType(&ntype);

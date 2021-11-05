@@ -43,7 +43,7 @@ extern void copy_masked_polys_to_new_mesh(const Mesh &src_mesh,
                                           blender::Span<int> masked_poly_indices,
                                           blender::Span<int> new_loop_starts);
 
-namespace blender::nodes {
+namespace blender::nodes::delete_geometry_legacy_node {
 
 static void geo_node_delete_geometry_declare(NodeDeclarationBuilder &b)
 {
@@ -662,7 +662,7 @@ static void geo_node_delete_geometry_exec(GeoNodeExecParams params)
   params.set_output("Geometry", std::move(out_set));
 }
 
-}  // namespace blender::nodes
+}  // namespace blender::nodes::delete_geometry_legacy_node
 
 void register_node_type_geo_legacy_delete_geometry()
 {
@@ -671,7 +671,8 @@ void register_node_type_geo_legacy_delete_geometry()
   geo_node_type_base(
       &ntype, GEO_NODE_LEGACY_DELETE_GEOMETRY, "Delete Geometry", NODE_CLASS_GEOMETRY, 0);
 
-  ntype.declare = blender::nodes::geo_node_delete_geometry_declare;
-  ntype.geometry_node_execute = blender::nodes::geo_node_delete_geometry_exec;
+  ntype.declare = blender::nodes::delete_geometry_legacy_node::geo_node_delete_geometry_declare;
+  ntype.geometry_node_execute =
+      blender::nodes::delete_geometry_legacy_node::geo_node_delete_geometry_exec;
   nodeRegisterType(&ntype);
 }

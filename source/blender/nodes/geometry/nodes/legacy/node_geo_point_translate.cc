@@ -19,7 +19,7 @@
 
 #include "node_geometry_util.hh"
 
-namespace blender::nodes {
+namespace blender::nodes::point_translate_node {
 
 static void geo_node_point_translate_declare(NodeDeclarationBuilder &b)
 {
@@ -89,7 +89,7 @@ static void geo_node_point_translate_update(bNodeTree *UNUSED(ntree), bNode *nod
       *node, "Translation", (GeometryNodeAttributeInputMode)node_storage.input_type);
 }
 
-}  // namespace blender::nodes
+}  // namespace blender::nodes::point_translate_node
 
 void register_node_type_geo_point_translate()
 {
@@ -97,14 +97,15 @@ void register_node_type_geo_point_translate()
 
   geo_node_type_base(
       &ntype, GEO_NODE_LEGACY_POINT_TRANSLATE, "Point Translate", NODE_CLASS_GEOMETRY, 0);
-  node_type_init(&ntype, blender::nodes::geo_node_point_translate_init);
-  node_type_update(&ntype, blender::nodes::geo_node_point_translate_update);
+  node_type_init(&ntype, blender::nodes::point_translate_node::geo_node_point_translate_init);
+  node_type_update(&ntype, blender::nodes::point_translate_node::geo_node_point_translate_update);
   node_type_storage(&ntype,
                     "NodeGeometryPointTranslate",
                     node_free_standard_storage,
                     node_copy_standard_storage);
-  ntype.declare = blender::nodes::geo_node_point_translate_declare;
-  ntype.geometry_node_execute = blender::nodes::geo_node_point_translate_exec;
-  ntype.draw_buttons = blender::nodes::geo_node_point_translate_layout;
+  ntype.declare = blender::nodes::point_translate_node::geo_node_point_translate_declare;
+  ntype.geometry_node_execute =
+      blender::nodes::point_translate_node::geo_node_point_translate_exec;
+  ntype.draw_buttons = blender::nodes::point_translate_node::geo_node_point_translate_layout;
   nodeRegisterType(&ntype);
 }

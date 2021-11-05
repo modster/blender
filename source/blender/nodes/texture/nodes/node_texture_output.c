@@ -25,19 +25,19 @@
 #include "node_texture_util.h"
 
 /* **************** COMPOSITE ******************** */
-static bNodeSocketTemplate inputs[] = {
+static bNodeSocketTemplate node_cmp_texture_out_inputs[] = {
     {SOCK_RGBA, N_("Color"), 0.0f, 0.0f, 0.0f, 1.0f},
     {SOCK_VECTOR, N_("Normal"), 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, PROP_DIRECTION},
     {-1, ""},
 };
 
 /* applies to render pipeline */
-static void exec(void *data,
-                 int UNUSED(thread),
-                 bNode *node,
-                 bNodeExecData *execdata,
-                 bNodeStack **in,
-                 bNodeStack **UNUSED(out))
+static void node_cmp_texture_out_exec(void *data,
+                                      int UNUSED(thread),
+                                      bNode *node,
+                                      bNodeExecData *execdata,
+                                      bNodeStack **in,
+                                      bNodeStack **UNUSED(out))
 {
   TexCallData *cdata = (TexCallData *)data;
   TexResult *target = cdata->target;
@@ -77,7 +77,7 @@ static void exec(void *data,
   }
 }
 
-static void unique_name(bNode *node)
+static void node_cmp_texture_out_unique_name(bNode *node)
 {
   TexNodeOutput *tno = (TexNodeOutput *)node->storage;
   char new_name[sizeof(tno->name)];
@@ -121,7 +121,7 @@ static void unique_name(bNode *node)
   }
 }
 
-static void assign_index(struct bNode *node)
+static void node_cmp_texture_out_assign_index(struct bNode *node)
 {
   bNode *tnode;
   int index = 1;
@@ -144,21 +144,23 @@ check_index:
   node->custom1 = index;
 }
 
-static void init(bNodeTree *UNUSED(ntree), bNode *node)
+static void node_cmp_texture_out_init(bNodeTree *UNUSED(ntree), bNode *node)
 {
   TexNodeOutput *tno = MEM_callocN(sizeof(TexNodeOutput), "TEX_output");
   node->storage = tno;
 
   strcpy(tno->name, "Default");
-  unique_name(node);
-  assign_index(node);
+  node_cmp_texture_out_unique_name(node);
+  node_cmp_texture_out_assign_index(node);
 }
 
-static void copy(bNodeTree *dest_ntree, bNode *dest_node, const bNode *src_node)
+static void node_cmp_texture_out_copy(bNodeTree *dest_ntree,
+                                      bNode *dest_node,
+                                      const bNode *src_node)
 {
   node_copy_standard_storage(dest_ntree, dest_node, src_node);
-  unique_name(dest_node);
-  assign_index(dest_node);
+  node_cmp_texture_out_unique_name(dest_node);
+  node_cmp_texture_out_assign_index(dest_node);
 }
 
 void register_node_type_tex_output(void)
@@ -166,11 +168,12 @@ void register_node_type_tex_output(void)
   static bNodeType ntype;
 
   tex_node_type_base(&ntype, TEX_NODE_OUTPUT, "Output", NODE_CLASS_OUTPUT, NODE_PREVIEW);
-  node_type_socket_templates(&ntype, inputs, NULL);
+  node_type_socket_templates(&ntype, node_cmp_texture_out_inputs, NULL);
   node_type_size_preset(&ntype, NODE_SIZE_MIDDLE);
-  node_type_init(&ntype, init);
-  node_type_storage(&ntype, "TexNodeOutput", node_free_standard_storage, copy);
-  node_type_exec(&ntype, NULL, NULL, exec);
+  node_type_init(&ntype, node_cmp_texture_out_init);
+  node_type_storage(
+      &ntype, "TexNodeOutput", node_free_standard_storage, node_cmp_texture_out_copy);
+  node_type_exec(&ntype, NULL, NULL, node_cmp_texture_out_exec);
 
   /* Do not allow muting output. */
   node_type_internal_links(&ntype, NULL);

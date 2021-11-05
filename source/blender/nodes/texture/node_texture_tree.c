@@ -50,114 +50,114 @@
 
 #include "RE_texture.h"
 
-static void texture_get_from_context(const bContext *C,
-                                     bNodeTreeType *UNUSED(treetype),
-                                     bNodeTree **r_ntree,
-                                     ID **r_id,
-                                     ID **r_from)
-{
-  SpaceNode *snode = CTX_wm_space_node(C);
-  Scene *scene = CTX_data_scene(C);
-  ViewLayer *view_layer = CTX_data_view_layer(C);
-  Object *ob = OBACT(view_layer);
-  Tex *tx = NULL;
+// static void texture_get_from_context(const bContext *C,
+//                                      bNodeTreeType *UNUSED(treetype),
+//                                      bNodeTree **r_ntree,
+//                                      ID **r_id,
+//                                      ID **r_from)
+// {
+//   SpaceNode *snode = CTX_wm_space_node(C);
+//   Scene *scene = CTX_data_scene(C);
+//   ViewLayer *view_layer = CTX_data_view_layer(C);
+//   Object *ob = OBACT(view_layer);
+//   Tex *tx = NULL;
 
-  if (snode->texfrom == SNODE_TEX_BRUSH) {
-    struct Brush *brush = NULL;
+//   if (snode->texfrom == SNODE_TEX_BRUSH) {
+//     struct Brush *brush = NULL;
 
-    if (ob && (ob->mode & OB_MODE_SCULPT)) {
-      brush = BKE_paint_brush(&scene->toolsettings->sculpt->paint);
-    }
-    else {
-      brush = BKE_paint_brush(&scene->toolsettings->imapaint.paint);
-    }
+//     if (ob && (ob->mode & OB_MODE_SCULPT)) {
+//       brush = BKE_paint_brush(&scene->toolsettings->sculpt->paint);
+//     }
+//     else {
+//       brush = BKE_paint_brush(&scene->toolsettings->imapaint.paint);
+//     }
 
-    if (brush) {
-      *r_from = (ID *)brush;
-      tx = give_current_brush_texture(brush);
-      if (tx) {
-        *r_id = &tx->id;
-        *r_ntree = tx->nodetree;
-      }
-    }
-  }
-  else if (snode->texfrom == SNODE_TEX_LINESTYLE) {
-    FreestyleLineStyle *linestyle = BKE_linestyle_active_from_view_layer(view_layer);
-    if (linestyle) {
-      *r_from = (ID *)linestyle;
-      tx = give_current_linestyle_texture(linestyle);
-      if (tx) {
-        *r_id = &tx->id;
-        *r_ntree = tx->nodetree;
-      }
-    }
-  }
-}
+//     if (brush) {
+//       *r_from = (ID *)brush;
+//       tx = give_current_brush_texture(brush);
+//       if (tx) {
+//         *r_id = &tx->id;
+//         *r_ntree = tx->nodetree;
+//       }
+//     }
+//   }
+//   else if (snode->texfrom == SNODE_TEX_LINESTYLE) {
+//     FreestyleLineStyle *linestyle = BKE_linestyle_active_from_view_layer(view_layer);
+//     if (linestyle) {
+//       *r_from = (ID *)linestyle;
+//       tx = give_current_linestyle_texture(linestyle);
+//       if (tx) {
+//         *r_id = &tx->id;
+//         *r_ntree = tx->nodetree;
+//       }
+//     }
+//   }
+// }
 
-static void foreach_nodeclass(Scene *UNUSED(scene), void *calldata, bNodeClassCallback func)
-{
-  func(calldata, NODE_CLASS_INPUT, N_("Input"));
-  func(calldata, NODE_CLASS_OUTPUT, N_("Output"));
-  func(calldata, NODE_CLASS_OP_COLOR, N_("Color"));
-  func(calldata, NODE_CLASS_PATTERN, N_("Patterns"));
-  func(calldata, NODE_CLASS_TEXTURE, N_("Textures"));
-  func(calldata, NODE_CLASS_CONVERTER, N_("Converter"));
-  func(calldata, NODE_CLASS_DISTORT, N_("Distort"));
-  func(calldata, NODE_CLASS_GROUP, N_("Group"));
-  func(calldata, NODE_CLASS_INTERFACE, N_("Interface"));
-  func(calldata, NODE_CLASS_LAYOUT, N_("Layout"));
-}
+// static void foreach_nodeclass(Scene *UNUSED(scene), void *calldata, bNodeClassCallback func)
+// {
+//   func(calldata, NODE_CLASS_INPUT, N_("Input"));
+//   func(calldata, NODE_CLASS_OUTPUT, N_("Output"));
+//   func(calldata, NODE_CLASS_OP_COLOR, N_("Color"));
+//   func(calldata, NODE_CLASS_PATTERN, N_("Patterns"));
+//   func(calldata, NODE_CLASS_TEXTURE, N_("Textures"));
+//   func(calldata, NODE_CLASS_CONVERTER, N_("Converter"));
+//   func(calldata, NODE_CLASS_DISTORT, N_("Distort"));
+//   func(calldata, NODE_CLASS_GROUP, N_("Group"));
+//   func(calldata, NODE_CLASS_INTERFACE, N_("Interface"));
+//   func(calldata, NODE_CLASS_LAYOUT, N_("Layout"));
+// }
 
-/* XXX muting disabled in previews because of threading issues with the main execution
- * it works here, but disabled for consistency
- */
-#if 1
-static void localize(bNodeTree *localtree, bNodeTree *UNUSED(ntree))
-{
-  bNode *node, *node_next;
+// /* XXX muting disabled in previews because of threading issues with the main execution
+//  * it works here, but disabled for consistency
+//  */
+// #if 1
+// static void localize(bNodeTree *localtree, bNodeTree *UNUSED(ntree))
+// {
+//   bNode *node, *node_next;
 
-  /* replace muted nodes and reroute nodes by internal links */
-  for (node = localtree->nodes.first; node; node = node_next) {
-    node_next = node->next;
+//   /* replace muted nodes and reroute nodes by internal links */
+//   for (node = localtree->nodes.first; node; node = node_next) {
+//     node_next = node->next;
 
-    if (node->flag & NODE_MUTED || node->type == NODE_REROUTE) {
-      nodeInternalRelink(localtree, node);
-      ntreeFreeLocalNode(localtree, node);
-    }
-  }
-}
-#else
-static void localize(bNodeTree *UNUSED(localtree), bNodeTree *UNUSED(ntree))
-{
-}
-#endif
+//     if (node->flag & NODE_MUTED || node->type == NODE_REROUTE) {
+//       nodeInternalRelink(localtree, node);
+//       ntreeFreeLocalNode(localtree, node);
+//     }
+//   }
+// }
+// #else
+// static void localize(bNodeTree *UNUSED(localtree), bNodeTree *UNUSED(ntree))
+// {
+// }
+// #endif
 
-static void local_sync(bNodeTree *localtree, bNodeTree *ntree)
-{
-  BKE_node_preview_sync_tree(ntree, localtree);
-}
+// static void local_sync(bNodeTree *localtree, bNodeTree *ntree)
+// {
+//   BKE_node_preview_sync_tree(ntree, localtree);
+// }
 
-static void local_merge(Main *UNUSED(bmain), bNodeTree *localtree, bNodeTree *ntree)
-{
-  BKE_node_preview_merge_tree(ntree, localtree, true);
-}
+// static void local_merge(Main *UNUSED(bmain), bNodeTree *localtree, bNodeTree *ntree)
+// {
+//   BKE_node_preview_merge_tree(ntree, localtree, true);
+// }
 
-static void update(bNodeTree *ntree)
-{
-  ntree_update_reroute_nodes(ntree);
+// static void update(bNodeTree *ntree)
+// {
+//   ntree_update_reroute_nodes(ntree);
 
-  if (ntree->update & NTREE_UPDATE_NODES) {
-    /* clean up preview cache, in case nodes have been removed */
-    BKE_node_preview_remove_unused(ntree);
-  }
-}
+//   if (ntree->update & NTREE_UPDATE_NODES) {
+//     /* clean up preview cache, in case nodes have been removed */
+//     BKE_node_preview_remove_unused(ntree);
+//   }
+// }
 
-static bool texture_node_tree_socket_type_valid(bNodeTreeType *UNUSED(ntreetype),
-                                                bNodeSocketType *socket_type)
-{
-  return nodeIsStaticSocketType(socket_type) &&
-         ELEM(socket_type->type, SOCK_FLOAT, SOCK_VECTOR, SOCK_RGBA);
-}
+// static bool texture_node_tree_socket_type_valid(bNodeTreeType *UNUSED(ntreetype),
+//                                                 bNodeSocketType *socket_type)
+// {
+//   return nodeIsStaticSocketType(socket_type) &&
+//          ELEM(socket_type->type, SOCK_FLOAT, SOCK_VECTOR, SOCK_RGBA);
+// }
 
 bNodeTreeType *ntreeType_Texture;
 
@@ -172,13 +172,13 @@ void register_node_tree_type_tex(void)
   tt->ui_icon = 0; /* Defined in `drawnode.c`. */
   strcpy(tt->ui_description, N_("Texture nodes"));
 
-  tt->foreach_nodeclass = foreach_nodeclass;
-  tt->update = update;
-  tt->localize = localize;
-  tt->local_sync = local_sync;
-  tt->local_merge = local_merge;
-  tt->get_from_context = texture_get_from_context;
-  tt->valid_socket_type = texture_node_tree_socket_type_valid;
+  // tt->foreach_nodeclass = foreach_nodeclass;
+  // tt->update = update;
+  // tt->localize = localize;
+  // tt->local_sync = local_sync;
+  // tt->local_merge = local_merge;
+  // tt->get_from_context = texture_get_from_context;
+  // tt->valid_socket_type = texture_node_tree_socket_type_valid;
 
   tt->rna_ext.srna = &RNA_TextureNodeTree;
 

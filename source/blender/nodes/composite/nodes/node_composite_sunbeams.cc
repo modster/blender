@@ -23,16 +23,16 @@
 
 #include "node_composite_util.hh"
 
-static bNodeSocketTemplate inputs[] = {
+static bNodeSocketTemplate node_cmp_sunbeams_inputs[] = {
     {SOCK_RGBA, N_("Image"), 1.0f, 1.0f, 1.0f, 1.0f},
     {-1, ""},
 };
-static bNodeSocketTemplate outputs[] = {
+static bNodeSocketTemplate node_cmp_sunbeams_outputs[] = {
     {SOCK_RGBA, N_("Image")},
     {-1, ""},
 };
 
-static void init(bNodeTree *UNUSED(ntree), bNode *node)
+static void node_cmp_sunbeams_init(bNodeTree *UNUSED(ntree), bNode *node)
 {
   NodeSunBeams *data = (NodeSunBeams *)MEM_callocN(sizeof(NodeSunBeams), "sun beams node");
 
@@ -46,8 +46,8 @@ void register_node_type_cmp_sunbeams(void)
   static bNodeType ntype;
 
   cmp_node_type_base(&ntype, CMP_NODE_SUNBEAMS, "Sun Beams", NODE_CLASS_OP_FILTER, 0);
-  node_type_socket_templates(&ntype, inputs, outputs);
-  node_type_init(&ntype, init);
+  node_type_socket_templates(&ntype, node_cmp_sunbeams_inputs, node_cmp_sunbeams_outputs);
+  node_type_init(&ntype, node_cmp_sunbeams_init);
   node_type_storage(
       &ntype, "NodeSunBeams", node_free_standard_storage, node_copy_standard_storage);
 

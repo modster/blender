@@ -24,12 +24,12 @@
 #include "NOD_texture.h"
 #include "node_texture_util.h"
 
-static bNodeSocketTemplate outputs[] = {
+static bNodeSocketTemplate node_sh_texture_image_outputs[] = {
     {SOCK_RGBA, N_("Image")},
     {-1, ""},
 };
 
-static void colorfn(
+static void node_sh_texture_image_colorfn(
     float *out, TexParams *p, bNode *node, bNodeStack **UNUSED(in), short UNUSED(thread))
 {
   float x = p->co[0];
@@ -86,17 +86,17 @@ static void colorfn(
   }
 }
 
-static void exec(void *data,
-                 int UNUSED(thread),
-                 bNode *node,
-                 bNodeExecData *execdata,
-                 bNodeStack **in,
-                 bNodeStack **out)
+static void node_sh_texture_image_exec(void *data,
+                                       int UNUSED(thread),
+                                       bNode *node,
+                                       bNodeExecData *execdata,
+                                       bNodeStack **in,
+                                       bNodeStack **out)
 {
-  tex_output(node, execdata, in, out[0], &colorfn, data);
+  tex_output(node, execdata, in, out[0], &node_sh_texture_image_colorfn, data);
 }
 
-static void init(bNodeTree *UNUSED(ntree), bNode *node)
+static void node_sh_texture_image_init(bNodeTree *UNUSED(ntree), bNode *node)
 {
   ImageUser *iuser = MEM_callocN(sizeof(ImageUser), "node image user");
   node->storage = iuser;
@@ -109,10 +109,10 @@ void register_node_type_tex_image(void)
   static bNodeType ntype;
 
   tex_node_type_base(&ntype, TEX_NODE_IMAGE, "Image", NODE_CLASS_INPUT, NODE_PREVIEW);
-  node_type_socket_templates(&ntype, NULL, outputs);
-  node_type_init(&ntype, init);
+  node_type_socket_templates(&ntype, NULL, node_sh_texture_image_outputs);
+  node_type_init(&ntype, node_sh_texture_image_init);
   node_type_storage(&ntype, "ImageUser", node_free_standard_storage, node_copy_standard_storage);
-  node_type_exec(&ntype, NULL, NULL, exec);
+  node_type_exec(&ntype, NULL, NULL, node_sh_texture_image_exec);
   node_type_label(&ntype, node_image_label);
 
   nodeRegisterType(&ntype);

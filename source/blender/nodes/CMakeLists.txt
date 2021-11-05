@@ -389,29 +389,29 @@ set(SRC
   shader/node_shader_tree.c
   shader/node_shader_util.c
 
-  texture/nodes/node_texture_at.c
-  texture/nodes/node_texture_bricks.c
-  texture/nodes/node_texture_checker.c
-  texture/nodes/node_texture_common.c
-  texture/nodes/node_texture_compose.c
-  texture/nodes/node_texture_coord.c
-  texture/nodes/node_texture_curves.c
-  texture/nodes/node_texture_decompose.c
-  texture/nodes/node_texture_distance.c
-  texture/nodes/node_texture_hueSatVal.c
-  texture/nodes/node_texture_image.c
-  texture/nodes/node_texture_invert.c
-  texture/nodes/node_texture_math.c
-  texture/nodes/node_texture_mixRgb.c
-  texture/nodes/node_texture_output.c
-  texture/nodes/node_texture_proc.c
-  texture/nodes/node_texture_rotate.c
-  texture/nodes/node_texture_scale.c
-  texture/nodes/node_texture_texture.c
-  texture/nodes/node_texture_translate.c
-  texture/nodes/node_texture_valToNor.c
-  texture/nodes/node_texture_valToRgb.c
-  texture/nodes/node_texture_viewer.c
+  # texture/nodes/node_texture_at.c
+  # texture/nodes/node_texture_bricks.c
+  # texture/nodes/node_texture_checker.c
+  # texture/nodes/node_texture_common.c
+  # texture/nodes/node_texture_compose.c
+  # texture/nodes/node_texture_coord.c
+  # texture/nodes/node_texture_curves.c
+  # texture/nodes/node_texture_decompose.c
+  # texture/nodes/node_texture_distance.c
+  # texture/nodes/node_texture_hueSatVal.c
+  # texture/nodes/node_texture_image.c
+  # texture/nodes/node_texture_invert.c
+  # texture/nodes/node_texture_math.c
+  # texture/nodes/node_texture_mixRgb.c
+  # texture/nodes/node_texture_output.c
+  # texture/nodes/node_texture_proc.c
+  # texture/nodes/node_texture_rotate.c
+  # texture/nodes/node_texture_scale.c
+  # texture/nodes/node_texture_texture.c
+  # texture/nodes/node_texture_translate.c
+  # texture/nodes/node_texture_valToNor.c
+  # texture/nodes/node_texture_valToRgb.c
+  # texture/nodes/node_texture_viewer.c
   texture/node_texture_tree.c
   texture/node_texture_util.c
 

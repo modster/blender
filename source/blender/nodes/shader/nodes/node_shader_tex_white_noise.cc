@@ -39,7 +39,7 @@ static void node_shader_init_tex_white_noise(bNodeTree *UNUSED(ntree), bNode *no
   node->custom1 = 3;
 }
 
-static const char *gpu_shader_get_name(const int dimensions)
+static const char *node_shader_tex_white_noise_gpu_shader_get_name(const int dimensions)
 {
   BLI_assert(dimensions >= 1 && dimensions <= 4);
   return std::array{"node_white_noise_1d",
@@ -54,7 +54,7 @@ static int gpu_shader_tex_white_noise(GPUMaterial *mat,
                                       GPUNodeStack *in,
                                       GPUNodeStack *out)
 {
-  const char *name = gpu_shader_get_name(node->custom1);
+  const char *name = node_shader_tex_white_noise_gpu_shader_get_name(node->custom1);
   return GPU_stack_link(mat, node, name, in, out);
 }
 
@@ -183,7 +183,8 @@ class WhiteNoiseFunction : public fn::MultiFunction {
   }
 };
 
-static void sh_node_noise_build_multi_function(blender::nodes::NodeMultiFunctionBuilder &builder)
+static void sh_node_white_noise_build_multi_function(
+    blender::nodes::NodeMultiFunctionBuilder &builder)
 {
   bNode &node = builder.node();
   builder.construct_and_set_matching_fn<WhiteNoiseFunction>((int)node.custom1);
@@ -201,7 +202,7 @@ void register_node_type_sh_tex_white_noise(void)
   node_type_init(&ntype, node_shader_init_tex_white_noise);
   node_type_gpu(&ntype, gpu_shader_tex_white_noise);
   node_type_update(&ntype, node_shader_update_tex_white_noise);
-  ntype.build_multi_function = blender::nodes::sh_node_noise_build_multi_function;
+  ntype.build_multi_function = blender::nodes::sh_node_white_noise_build_multi_function;
 
   nodeRegisterType(&ntype);
 }

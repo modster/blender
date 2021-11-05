@@ -53,7 +53,7 @@ static void node_shader_init_map_range(bNodeTree *UNUSED(ntree), bNode *node)
   node->custom2 = NODE_MAP_RANGE_LINEAR; /* interpolation */
 }
 
-static const char *gpu_shader_get_name(int mode)
+static const char *gpu_shader_map_range_gpu_shader_get_name(int mode)
 {
   switch (mode) {
     case NODE_MAP_RANGE_LINEAR:
@@ -75,7 +75,7 @@ static int gpu_shader_map_range(GPUMaterial *mat,
                                 GPUNodeStack *in,
                                 GPUNodeStack *out)
 {
-  const char *name = gpu_shader_get_name(node->custom2);
+  const char *name = gpu_shader_map_range_gpu_shader_get_name(node->custom2);
 
   int ret = 0;
   if (name != nullptr) {

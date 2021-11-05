@@ -46,7 +46,7 @@ static void sh_node_math_declare(NodeDeclarationBuilder &b)
 
 }  // namespace blender::nodes
 
-static const char *gpu_shader_get_name(int mode)
+static const char *sh_node_math_gpu_shader_get_name(int mode)
 {
   const blender::nodes::FloatMathOperationInfo *info =
       blender::nodes::get_float_math_operation_info(mode);
@@ -65,7 +65,7 @@ static int gpu_shader_math(GPUMaterial *mat,
                            GPUNodeStack *in,
                            GPUNodeStack *out)
 {
-  const char *name = gpu_shader_get_name(node->custom1);
+  const char *name = sh_node_math_gpu_shader_get_name(node->custom1);
   if (name != nullptr) {
     int ret = GPU_stack_link(mat, node, name, in, out);
 

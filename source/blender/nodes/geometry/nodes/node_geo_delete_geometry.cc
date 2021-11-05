@@ -46,7 +46,7 @@ extern void copy_masked_polys_to_new_mesh(const Mesh &src_mesh,
                                           blender::Span<int> masked_poly_indices,
                                           blender::Span<int> new_loop_starts);
 
-namespace blender::nodes {
+namespace blender::nodes::delete_geometry_node {
 
 static void geo_node_delete_geometry_declare(NodeDeclarationBuilder &b)
 {
@@ -1148,35 +1148,6 @@ static void separate_mesh_selection(GeometrySet &geometry_set,
   do_mesh_separation(geometry_set, src_component, selection, invert, selection_domain, mode);
 }
 
-void separate_geometry(GeometrySet &geometry_set,
-                       const AttributeDomain domain,
-                       const GeometryNodeDeleteGeometryMode mode,
-                       const Field<bool> &selection_field,
-                       const bool invert,
-                       bool &r_is_error)
-{
-  bool some_valid_domain = false;
-  if (geometry_set.has_pointcloud()) {
-    if (domain == ATTR_DOMAIN_POINT) {
-      separate_point_cloud_selection(geometry_set, selection_field, invert);
-      some_valid_domain = true;
-    }
-  }
-  if (geometry_set.has_mesh()) {
-    if (domain != ATTR_DOMAIN_CURVE) {
-      separate_mesh_selection(geometry_set, selection_field, domain, mode, invert);
-      some_valid_domain = true;
-    }
-  }
-  if (geometry_set.has_curve()) {
-    if (ELEM(domain, ATTR_DOMAIN_POINT, ATTR_DOMAIN_CURVE)) {
-      separate_curve_selection(geometry_set, selection_field, domain, invert);
-      some_valid_domain = true;
-    }
-  }
-  r_is_error = !some_valid_domain && geometry_set.has_realized_data();
-}
-
 static void geo_node_delete_geometry_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
@@ -1204,6 +1175,38 @@ static void geo_node_delete_geometry_exec(GeoNodeExecParams params)
   params.set_output("Geometry", std::move(geometry_set));
 }
 
+}  // namespace blender::nodes::delete_geometry_node
+
+namespace blender::nodes {
+void separate_geometry(GeometrySet &geometry_set,
+                       const AttributeDomain domain,
+                       const GeometryNodeDeleteGeometryMode mode,
+                       const Field<bool> &selection_field,
+                       const bool invert,
+                       bool &r_is_error)
+{
+  using namespace blender::nodes::delete_geometry_node;
+  bool some_valid_domain = false;
+  if (geometry_set.has_pointcloud()) {
+    if (domain == ATTR_DOMAIN_POINT) {
+      separate_point_cloud_selection(geometry_set, selection_field, invert);
+      some_valid_domain = true;
+    }
+  }
+  if (geometry_set.has_mesh()) {
+    if (domain != ATTR_DOMAIN_CURVE) {
+      separate_mesh_selection(geometry_set, selection_field, domain, mode, invert);
+      some_valid_domain = true;
+    }
+  }
+  if (geometry_set.has_curve()) {
+    if (ELEM(domain, ATTR_DOMAIN_POINT, ATTR_DOMAIN_CURVE)) {
+      separate_curve_selection(geometry_set, selection_field, domain, invert);
+      some_valid_domain = true;
+    }
+  }
+  r_is_error = !some_valid_domain && geometry_set.has_realized_data();
+}
 }  // namespace blender::nodes
 
 void register_node_type_geo_delete_geometry()
@@ -1217,10 +1220,11 @@ void register_node_type_geo_delete_geometry()
                     node_free_standard_storage,
                     node_copy_standard_storage);
 
-  node_type_init(&ntype, blender::nodes::geo_node_delete_geometry_init);
+  node_type_init(&ntype, blender::nodes::delete_geometry_node::geo_node_delete_geometry_init);
 
-  ntype.declare = blender::nodes::geo_node_delete_geometry_declare;
-  ntype.geometry_node_execute = blender::nodes::geo_node_delete_geometry_exec;
-  ntype.draw_buttons = blender::nodes::geo_node_delete_geometry_layout;
+  ntype.declare = blender::nodes::delete_geometry_node::geo_node_delete_geometry_declare;
+  ntype.geometry_node_execute =
+      blender::nodes::delete_geometry_node::geo_node_delete_geometry_exec;
+  ntype.draw_buttons = blender::nodes::delete_geometry_node::geo_node_delete_geometry_layout;
   nodeRegisterType(&ntype);
 }

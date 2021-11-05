@@ -21,7 +21,7 @@
 
 #include "node_geometry_util.hh"
 
-namespace blender::nodes {
+namespace blender::nodes::point_scale_node {
 
 static void geo_node_point_scale_declare(NodeDeclarationBuilder &b)
 {
@@ -120,7 +120,7 @@ static void geo_node_point_scale_exec(GeoNodeExecParams params)
   params.set_output("Geometry", std::move(geometry_set));
 }
 
-}  // namespace blender::nodes
+}  // namespace blender::nodes::point_scale_node
 
 void register_node_type_geo_point_scale()
 {
@@ -128,12 +128,12 @@ void register_node_type_geo_point_scale()
 
   geo_node_type_base(&ntype, GEO_NODE_LEGACY_POINT_SCALE, "Point Scale", NODE_CLASS_GEOMETRY, 0);
 
-  ntype.declare = blender::nodes::geo_node_point_scale_declare;
-  node_type_init(&ntype, blender::nodes::geo_node_point_scale_init);
-  node_type_update(&ntype, blender::nodes::geo_node_point_scale_update);
+  ntype.declare = blender::nodes::point_scale_node::geo_node_point_scale_declare;
+  node_type_init(&ntype, blender::nodes::point_scale_node::geo_node_point_scale_init);
+  node_type_update(&ntype, blender::nodes::point_scale_node::geo_node_point_scale_update);
   node_type_storage(
       &ntype, "NodeGeometryPointScale", node_free_standard_storage, node_copy_standard_storage);
-  ntype.geometry_node_execute = blender::nodes::geo_node_point_scale_exec;
-  ntype.draw_buttons = blender::nodes::geo_node_point_scale_layout;
+  ntype.geometry_node_execute = blender::nodes::point_scale_node::geo_node_point_scale_exec;
+  ntype.draw_buttons = blender::nodes::point_scale_node::geo_node_point_scale_layout;
   nodeRegisterType(&ntype);
 }

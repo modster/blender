@@ -61,7 +61,8 @@ static void node_shader_init_tex_voronoi(bNodeTree *UNUSED(ntree), bNode *node)
   node->storage = tex;
 }
 
-static const char *gpu_shader_get_name(const int feature, const int dimensions)
+static const char *node_shader_tex_voronoi_gpu_shader_get_name(const int feature,
+                                                               const int dimensions)
 {
   BLI_assert(feature >= 0 && feature < 5);
   BLI_assert(dimensions > 0 && dimensions < 5);
@@ -118,7 +119,7 @@ static int node_shader_gpu_tex_voronoi(GPUMaterial *mat,
   NodeTexVoronoi *tex = (NodeTexVoronoi *)node->storage;
   float metric = tex->distance;
 
-  const char *name = gpu_shader_get_name(tex->feature, tex->dimensions);
+  const char *name = node_shader_tex_voronoi_gpu_shader_get_name(tex->feature, tex->dimensions);
 
   return GPU_stack_link(mat, node, name, in, out, GPU_constant(&metric));
 }

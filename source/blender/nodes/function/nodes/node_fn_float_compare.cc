@@ -26,7 +26,7 @@
 
 #include "node_function_util.hh"
 
-namespace blender::nodes {
+namespace blender::nodes::float_compare_node {
 
 static void fn_node_float_compare_declare(NodeDeclarationBuilder &b)
 {
@@ -103,17 +103,18 @@ static void fn_node_float_compare_build_multi_function(NodeMultiFunctionBuilder 
   builder.set_matching_fn(fn);
 }
 
-}  // namespace blender::nodes
+}  // namespace blender::nodes::float_compare_node
 
 void register_node_type_fn_float_compare()
 {
   static bNodeType ntype;
 
   fn_node_type_base(&ntype, FN_NODE_COMPARE_FLOATS, "Compare Floats", NODE_CLASS_CONVERTER, 0);
-  ntype.declare = blender::nodes::fn_node_float_compare_declare;
-  node_type_label(&ntype, blender::nodes::node_float_compare_label);
-  node_type_update(&ntype, blender::nodes::node_float_compare_update);
-  ntype.build_multi_function = blender::nodes::fn_node_float_compare_build_multi_function;
-  ntype.draw_buttons = blender::nodes::geo_node_float_compare_layout;
+  ntype.declare = blender::nodes::float_compare_node::fn_node_float_compare_declare;
+  node_type_label(&ntype, blender::nodes::float_compare_node::node_float_compare_label);
+  node_type_update(&ntype, blender::nodes::float_compare_node::node_float_compare_update);
+  ntype.build_multi_function =
+      blender::nodes::float_compare_node::fn_node_float_compare_build_multi_function;
+  ntype.draw_buttons = blender::nodes::float_compare_node::geo_node_float_compare_layout;
   nodeRegisterType(&ntype);
 }

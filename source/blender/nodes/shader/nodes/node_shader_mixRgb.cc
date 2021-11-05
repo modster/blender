@@ -62,7 +62,7 @@ static void node_shader_exec_mix_rgb(void *UNUSED(data),
   copy_v3_v3(out[0]->vec, col);
 }
 
-static const char *gpu_shader_get_name(int mode)
+static const char *gpu_shader_mix_rgb_gpu_shader_get_name(int mode)
 {
   switch (mode) {
     case MA_RAMP_BLEND:
@@ -112,7 +112,7 @@ static int gpu_shader_mix_rgb(GPUMaterial *mat,
                               GPUNodeStack *in,
                               GPUNodeStack *out)
 {
-  const char *name = gpu_shader_get_name(node->custom1);
+  const char *name = gpu_shader_mix_rgb_gpu_shader_get_name(node->custom1);
 
   if (name != nullptr) {
     int ret = GPU_stack_link(mat, node, name, in, out);

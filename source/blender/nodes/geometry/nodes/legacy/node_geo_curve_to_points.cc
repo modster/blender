@@ -26,7 +26,7 @@
 
 #include "node_geometry_util.hh"
 
-namespace blender::nodes {
+namespace blender::nodes::legacy_curve_to_points_node {
 
 static void geo_node_curve_to_points_declare(NodeDeclarationBuilder &b)
 {
@@ -131,35 +131,6 @@ static MutableSpan<T> create_attribute_and_retrieve_span(PointCloudComponent &po
   GMutableSpan attribute = create_attribute_and_retrieve_span(
       points, attribute_id, bke::cpp_type_to_custom_data_type(CPPType::get<T>()));
   return attribute.typed<T>();
-}
-
-CurveToPointsResults curve_to_points_create_result_attributes(PointCloudComponent &points,
-                                                              const CurveEval &curve)
-{
-  CurveToPointsResults attributes;
-
-  attributes.result_size = points.attribute_domain_size(ATTR_DOMAIN_POINT);
-
-  attributes.positions = create_attribute_and_retrieve_span<float3>(points, "position");
-  attributes.radii = create_attribute_and_retrieve_span<float>(points, "radius");
-  attributes.tilts = create_attribute_and_retrieve_span<float>(points, "tilt");
-
-  /* Because of the invariants of the curve component, we use the attributes of the
-   * first spline as a representative for the attribute meta data all splines. */
-  curve.splines().first()->attributes.foreach_attribute(
-      [&](const AttributeIDRef &attribute_id, const AttributeMetaData &meta_data) {
-        attributes.point_attributes.add_new(
-            attribute_id,
-            create_attribute_and_retrieve_span(points, attribute_id, meta_data.data_type));
-        return true;
-      },
-      ATTR_DOMAIN_POINT);
-
-  attributes.tangents = create_attribute_and_retrieve_span<float3>(points, "tangent");
-  attributes.normals = create_attribute_and_retrieve_span<float3>(points, "normal");
-  attributes.rotations = create_attribute_and_retrieve_span<float3>(points, "rotation");
-
-  return attributes;
 }
 
 /**
@@ -340,6 +311,39 @@ static void geo_node_curve_to_points_exec(GeoNodeExecParams params)
   params.set_output("Geometry", std::move(result));
 }
 
+}  // namespace blender::nodes::legacy_curve_to_points_node
+
+namespace blender::nodes {
+CurveToPointsResults curve_to_points_create_result_attributes(PointCloudComponent &points,
+                                                              const CurveEval &curve)
+{
+  using namespace blender::nodes::legacy_curve_to_points_node;
+
+  CurveToPointsResults attributes;
+
+  attributes.result_size = points.attribute_domain_size(ATTR_DOMAIN_POINT);
+
+  attributes.positions = create_attribute_and_retrieve_span<float3>(points, "position");
+  attributes.radii = create_attribute_and_retrieve_span<float>(points, "radius");
+  attributes.tilts = create_attribute_and_retrieve_span<float>(points, "tilt");
+
+  /* Because of the invariants of the curve component, we use the attributes of the
+   * first spline as a representative for the attribute meta data all splines. */
+  curve.splines().first()->attributes.foreach_attribute(
+      [&](const AttributeIDRef &attribute_id, const AttributeMetaData &meta_data) {
+        attributes.point_attributes.add_new(
+            attribute_id,
+            create_attribute_and_retrieve_span(points, attribute_id, meta_data.data_type));
+        return true;
+      },
+      ATTR_DOMAIN_POINT);
+
+  attributes.tangents = create_attribute_and_retrieve_span<float3>(points, "tangent");
+  attributes.normals = create_attribute_and_retrieve_span<float3>(points, "normal");
+  attributes.rotations = create_attribute_and_retrieve_span<float3>(points, "rotation");
+
+  return attributes;
+}
 }  // namespace blender::nodes
 
 void register_node_type_geo_legacy_curve_to_points()
@@ -348,13 +352,17 @@ void register_node_type_geo_legacy_curve_to_points()
 
   geo_node_type_base(
       &ntype, GEO_NODE_LEGACY_CURVE_TO_POINTS, "Curve to Points", NODE_CLASS_GEOMETRY, 0);
-  ntype.declare = blender::nodes::geo_node_curve_to_points_declare;
-  ntype.geometry_node_execute = blender::nodes::geo_node_curve_to_points_exec;
-  ntype.draw_buttons = blender::nodes::geo_node_curve_to_points_layout;
+  ntype.declare = blender::nodes::legacy_curve_to_points_node::geo_node_curve_to_points_declare;
+  ntype.geometry_node_execute =
+      blender::nodes::legacy_curve_to_points_node::geo_node_curve_to_points_exec;
+  ntype.draw_buttons =
+      blender::nodes::legacy_curve_to_points_node::geo_node_curve_to_points_layout;
   node_type_storage(
       &ntype, "NodeGeometryCurveToPoints", node_free_standard_storage, node_copy_standard_storage);
-  node_type_init(&ntype, blender::nodes::geo_node_curve_to_points_init);
-  node_type_update(&ntype, blender::nodes::geo_node_curve_to_points_update);
+  node_type_init(&ntype,
+                 blender::nodes::legacy_curve_to_points_node::geo_node_curve_to_points_init);
+  node_type_update(&ntype,
+                   blender::nodes::legacy_curve_to_points_node::geo_node_curve_to_points_update);
 
   nodeRegisterType(&ntype);
 }

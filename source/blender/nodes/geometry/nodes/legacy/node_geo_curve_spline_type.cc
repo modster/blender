@@ -23,7 +23,7 @@
 
 #include "node_geometry_util.hh"
 
-namespace blender::nodes {
+namespace blender::nodes::curve_spline_type_legacy_node {
 
 static void geo_node_legacy_curve_spline_type_declare(NodeDeclarationBuilder &b)
 {
@@ -282,21 +282,26 @@ static void geo_node_legacy_curve_spline_type_exec(GeoNodeExecParams params)
   params.set_output("Curve", GeometrySet::create_with_curve(new_curve.release()));
 }
 
-}  // namespace blender::nodes
+}  // namespace blender::nodes::curve_spline_type_legacy_node
 
 void register_node_type_geo_legacy_curve_spline_type()
 {
   static bNodeType ntype;
   geo_node_type_base(
       &ntype, GEO_NODE_LEGACY_CURVE_SPLINE_TYPE, "Set Spline Type", NODE_CLASS_GEOMETRY, 0);
-  ntype.declare = blender::nodes::geo_node_legacy_curve_spline_type_declare;
-  ntype.geometry_node_execute = blender::nodes::geo_node_legacy_curve_spline_type_exec;
-  node_type_init(&ntype, blender::nodes::geo_node_legacy_curve_spline_type_init);
+  ntype.declare =
+      blender::nodes::curve_spline_type_legacy_node::geo_node_legacy_curve_spline_type_declare;
+  ntype.geometry_node_execute =
+      blender::nodes::curve_spline_type_legacy_node::geo_node_legacy_curve_spline_type_exec;
+  node_type_init(
+      &ntype,
+      blender::nodes::curve_spline_type_legacy_node::geo_node_legacy_curve_spline_type_init);
   node_type_storage(&ntype,
                     "NodeGeometryCurveSplineType",
                     node_free_standard_storage,
                     node_copy_standard_storage);
-  ntype.draw_buttons = blender::nodes::geo_node_legacy_curve_spline_type_layout;
+  ntype.draw_buttons =
+      blender::nodes::curve_spline_type_legacy_node::geo_node_legacy_curve_spline_type_layout;
 
   nodeRegisterType(&ntype);
 }

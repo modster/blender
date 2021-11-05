@@ -27,7 +27,7 @@
 
 using namespace blender::bke::mesh_surface_sample;
 
-namespace blender::nodes {
+namespace blender::nodes::raycast_node {
 
 static void geo_node_raycast_declare(NodeDeclarationBuilder &b)
 {
@@ -426,7 +426,7 @@ static void geo_node_raycast_exec(GeoNodeExecParams params)
   }
 }
 
-}  // namespace blender::nodes
+}  // namespace blender::nodes::raycast_node
 
 void register_node_type_geo_raycast()
 {
@@ -434,12 +434,12 @@ void register_node_type_geo_raycast()
 
   geo_node_type_base(&ntype, GEO_NODE_RAYCAST, "Raycast", NODE_CLASS_GEOMETRY, 0);
   node_type_size_preset(&ntype, NODE_SIZE_MIDDLE);
-  node_type_init(&ntype, blender::nodes::geo_node_raycast_init);
-  node_type_update(&ntype, blender::nodes::geo_node_raycast_update);
+  node_type_init(&ntype, blender::nodes::raycast_node::geo_node_raycast_init);
+  node_type_update(&ntype, blender::nodes::raycast_node::geo_node_raycast_update);
   node_type_storage(
       &ntype, "NodeGeometryRaycast", node_free_standard_storage, node_copy_standard_storage);
-  ntype.declare = blender::nodes::geo_node_raycast_declare;
-  ntype.geometry_node_execute = blender::nodes::geo_node_raycast_exec;
-  ntype.draw_buttons = blender::nodes::geo_node_raycast_layout;
+  ntype.declare = blender::nodes::raycast_node::geo_node_raycast_declare;
+  ntype.geometry_node_execute = blender::nodes::raycast_node::geo_node_raycast_exec;
+  ntype.draw_buttons = blender::nodes::raycast_node::geo_node_raycast_layout;
   nodeRegisterType(&ntype);
 }

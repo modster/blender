@@ -38,7 +38,7 @@
 
 using blender::bke::GeometryInstanceGroup;
 
-namespace blender::nodes {
+namespace blender::nodes::distribute_points_on_faces_node {
 
 static void geo_node_point_distribute_points_on_faces_declare(NodeDeclarationBuilder &b)
 {
@@ -573,7 +573,7 @@ static void geo_node_point_distribute_points_on_faces_exec(GeoNodeExecParams par
   }
 }
 
-}  // namespace blender::nodes
+}  // namespace blender::nodes::distribute_points_on_faces_node
 
 void register_node_type_geo_distribute_points_on_faces()
 {
@@ -584,10 +584,15 @@ void register_node_type_geo_distribute_points_on_faces()
                      "Distribute Points on Faces",
                      NODE_CLASS_GEOMETRY,
                      0);
-  node_type_update(&ntype, blender::nodes::node_point_distribute_points_on_faces_update);
+  node_type_update(&ntype,
+                   blender::nodes::distribute_points_on_faces_node::
+                       node_point_distribute_points_on_faces_update);
   node_type_size(&ntype, 170, 100, 320);
-  ntype.declare = blender::nodes::geo_node_point_distribute_points_on_faces_declare;
-  ntype.geometry_node_execute = blender::nodes::geo_node_point_distribute_points_on_faces_exec;
-  ntype.draw_buttons = blender::nodes::geo_node_point_distribute_points_on_faces_layout;
+  ntype.declare = blender::nodes::distribute_points_on_faces_node::
+      geo_node_point_distribute_points_on_faces_declare;
+  ntype.geometry_node_execute = blender::nodes::distribute_points_on_faces_node::
+      geo_node_point_distribute_points_on_faces_exec;
+  ntype.draw_buttons = blender::nodes::distribute_points_on_faces_node::
+      geo_node_point_distribute_points_on_faces_layout;
   nodeRegisterType(&ntype);
 }

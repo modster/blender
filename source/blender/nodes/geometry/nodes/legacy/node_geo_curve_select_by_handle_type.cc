@@ -23,7 +23,7 @@
 
 #include "node_geometry_util.hh"
 
-namespace blender::nodes {
+namespace blender::nodes::select_by_handle_type_node {
 
 static void geo_node_select_by_handle_type_declare(NodeDeclarationBuilder &b)
 {
@@ -121,7 +121,7 @@ static void geo_node_select_by_handle_type_exec(GeoNodeExecParams params)
   params.set_output("Geometry", std::move(geometry_set));
 }
 
-}  // namespace blender::nodes
+}  // namespace blender::nodes::select_by_handle_type_node
 
 void register_node_type_geo_legacy_select_by_handle_type()
 {
@@ -132,14 +132,19 @@ void register_node_type_geo_legacy_select_by_handle_type()
                      "Select by Handle Type",
                      NODE_CLASS_GEOMETRY,
                      0);
-  ntype.declare = blender::nodes::geo_node_select_by_handle_type_declare;
-  ntype.geometry_node_execute = blender::nodes::geo_node_select_by_handle_type_exec;
-  node_type_init(&ntype, blender::nodes::geo_node_curve_select_by_handle_type_init);
+  ntype.declare =
+      blender::nodes::select_by_handle_type_node::geo_node_select_by_handle_type_declare;
+  ntype.geometry_node_execute =
+      blender::nodes::select_by_handle_type_node::geo_node_select_by_handle_type_exec;
+  node_type_init(
+      &ntype,
+      blender::nodes::select_by_handle_type_node::geo_node_curve_select_by_handle_type_init);
   node_type_storage(&ntype,
                     "NodeGeometryCurveSelectHandles",
                     node_free_standard_storage,
                     node_copy_standard_storage);
-  ntype.draw_buttons = blender::nodes::geo_node_curve_select_by_handle_type_layout;
+  ntype.draw_buttons =
+      blender::nodes::select_by_handle_type_node::geo_node_curve_select_by_handle_type_layout;
 
   nodeRegisterType(&ntype);
 }

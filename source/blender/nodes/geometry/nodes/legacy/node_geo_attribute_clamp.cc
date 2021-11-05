@@ -20,7 +20,7 @@
 
 #include "node_geometry_util.hh"
 
-namespace blender::nodes {
+namespace blender::nodes::attribute_clamp_node {
 
 static void geo_node_attribute_clamp_declare(NodeDeclarationBuilder &b)
 {
@@ -262,7 +262,7 @@ static void geo_node_attribute_clamp_exec(GeoNodeExecParams params)
   params.set_output("Geometry", geometry_set);
 }
 
-}  // namespace blender::nodes
+}  // namespace blender::nodes::attribute_clamp_node
 
 void register_node_type_geo_attribute_clamp()
 {
@@ -270,11 +270,12 @@ void register_node_type_geo_attribute_clamp()
 
   geo_node_type_base(
       &ntype, GEO_NODE_LEGACY_ATTRIBUTE_CLAMP, "Attribute Clamp", NODE_CLASS_ATTRIBUTE, 0);
-  node_type_init(&ntype, blender::nodes::geo_node_attribute_clamp_init);
-  node_type_update(&ntype, blender::nodes::geo_node_attribute_clamp_update);
-  ntype.declare = blender::nodes::geo_node_attribute_clamp_declare;
-  ntype.geometry_node_execute = blender::nodes::geo_node_attribute_clamp_exec;
-  ntype.draw_buttons = blender::nodes::geo_node_attribute_clamp_layout;
+  node_type_init(&ntype, blender::nodes::attribute_clamp_node::geo_node_attribute_clamp_init);
+  node_type_update(&ntype, blender::nodes::attribute_clamp_node::geo_node_attribute_clamp_update);
+  ntype.declare = blender::nodes::attribute_clamp_node::geo_node_attribute_clamp_declare;
+  ntype.geometry_node_execute =
+      blender::nodes::attribute_clamp_node::geo_node_attribute_clamp_exec;
+  ntype.draw_buttons = blender::nodes::attribute_clamp_node::geo_node_attribute_clamp_layout;
   node_type_storage(
       &ntype, "NodeAttributeClamp", node_free_standard_storage, node_copy_standard_storage);
   nodeRegisterType(&ntype);

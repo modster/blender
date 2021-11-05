@@ -32,7 +32,7 @@ static bNodeSocketTemplate cmp_node_planetrackdeform_out[] = {
     {-1, ""},
 };
 
-static void init(bNodeTree *UNUSED(ntree), bNode *node)
+static void node_cmp_planetrackdeform_init(bNodeTree *UNUSED(ntree), bNode *node)
 {
   NodePlaneTrackDeformData *data = (NodePlaneTrackDeformData *)MEM_callocN(
       sizeof(NodePlaneTrackDeformData), "node plane track deform data");
@@ -48,7 +48,7 @@ void register_node_type_cmp_planetrackdeform(void)
   cmp_node_type_base(
       &ntype, CMP_NODE_PLANETRACKDEFORM, "Plane Track Deform", NODE_CLASS_DISTORT, 0);
   node_type_socket_templates(&ntype, cmp_node_planetrackdeform_in, cmp_node_planetrackdeform_out);
-  node_type_init(&ntype, init);
+  node_type_init(&ntype, node_cmp_planetrackdeform_init);
   node_type_storage(
       &ntype, "NodePlaneTrackDeformData", node_free_standard_storage, node_copy_standard_storage);
 

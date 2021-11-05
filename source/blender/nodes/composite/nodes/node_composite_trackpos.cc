@@ -34,7 +34,7 @@ static void cmp_node_trackpos_declare(NodeDeclarationBuilder &b)
 
 }  // namespace blender::nodes
 
-static void init(bNodeTree *UNUSED(ntree), bNode *node)
+static void cmp_node_trackpos_init(bNodeTree *UNUSED(ntree), bNode *node)
 {
   NodeTrackPosData *data = (NodeTrackPosData *)MEM_callocN(sizeof(NodeTrackPosData),
                                                            "node track position data");
@@ -48,7 +48,7 @@ void register_node_type_cmp_trackpos(void)
 
   cmp_node_type_base(&ntype, CMP_NODE_TRACKPOS, "Track Position", NODE_CLASS_INPUT, 0);
   ntype.declare = blender::nodes::cmp_node_trackpos_declare;
-  node_type_init(&ntype, init);
+  node_type_init(&ntype, cmp_node_trackpos_init);
   node_type_storage(
       &ntype, "NodeTrackPosData", node_free_standard_storage, node_copy_standard_storage);
 

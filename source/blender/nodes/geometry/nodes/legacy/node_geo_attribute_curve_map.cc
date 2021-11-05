@@ -24,7 +24,7 @@
 
 #include "node_geometry_util.hh"
 
-namespace blender::nodes {
+namespace blender::nodes::attribute_curve_map_node {
 
 static void geo_node_attribute_curve_map_declare(NodeDeclarationBuilder &b)
 {
@@ -204,7 +204,7 @@ static void geo_node_attribute_curve_map_exec(GeoNodeExecParams params)
   params.set_output("Geometry", std::move(geometry_set));
 }
 
-}  // namespace blender::nodes
+}  // namespace blender::nodes::attribute_curve_map_node
 
 void register_node_type_geo_attribute_curve_map()
 {
@@ -212,15 +212,20 @@ void register_node_type_geo_attribute_curve_map()
 
   geo_node_type_base(
       &ntype, GEO_NODE_LEGACY_ATTRIBUTE_CURVE_MAP, "Attribute Curve Map", NODE_CLASS_ATTRIBUTE, 0);
-  node_type_update(&ntype, blender::nodes::geo_node_attribute_curve_map_update);
-  node_type_init(&ntype, blender::nodes::geo_node_attribute_curve_map_init);
+  node_type_update(&ntype,
+                   blender::nodes::attribute_curve_map_node::geo_node_attribute_curve_map_update);
+  node_type_init(&ntype,
+                 blender::nodes::attribute_curve_map_node::geo_node_attribute_curve_map_init);
   node_type_size_preset(&ntype, NODE_SIZE_LARGE);
-  node_type_storage(&ntype,
-                    "NodeAttributeCurveMap",
-                    blender::nodes::geo_node_attribute_curve_map_free_storage,
-                    blender::nodes::geo_node_attribute_curve_map_copy_storage);
-  ntype.declare = blender::nodes::geo_node_attribute_curve_map_declare;
-  ntype.geometry_node_execute = blender::nodes::geo_node_attribute_curve_map_exec;
-  ntype.draw_buttons = blender::nodes::geo_node_attribute_curve_map_layout;
+  node_type_storage(
+      &ntype,
+      "NodeAttributeCurveMap",
+      blender::nodes::attribute_curve_map_node::geo_node_attribute_curve_map_free_storage,
+      blender::nodes::attribute_curve_map_node::geo_node_attribute_curve_map_copy_storage);
+  ntype.declare = blender::nodes::attribute_curve_map_node::geo_node_attribute_curve_map_declare;
+  ntype.geometry_node_execute =
+      blender::nodes::attribute_curve_map_node::geo_node_attribute_curve_map_exec;
+  ntype.draw_buttons =
+      blender::nodes::attribute_curve_map_node::geo_node_attribute_curve_map_layout;
   nodeRegisterType(&ntype);
 }

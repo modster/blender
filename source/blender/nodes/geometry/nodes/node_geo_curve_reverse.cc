@@ -20,7 +20,7 @@
 
 #include "node_geometry_util.hh"
 
-namespace blender::nodes {
+namespace blender::nodes::curve_reverse_node {
 
 static void geo_node_curve_reverse_declare(NodeDeclarationBuilder &b)
 {
@@ -60,13 +60,13 @@ static void geo_node_curve_reverse_exec(GeoNodeExecParams params)
   params.set_output("Curve", std::move(geometry_set));
 }
 
-}  // namespace blender::nodes
+}  // namespace blender::nodes::curve_reverse_node
 
 void register_node_type_geo_curve_reverse()
 {
   static bNodeType ntype;
   geo_node_type_base(&ntype, GEO_NODE_REVERSE_CURVE, "Reverse Curve", NODE_CLASS_GEOMETRY, 0);
-  ntype.declare = blender::nodes::geo_node_curve_reverse_declare;
-  ntype.geometry_node_execute = blender::nodes::geo_node_curve_reverse_exec;
+  ntype.declare = blender::nodes::curve_reverse_node::geo_node_curve_reverse_declare;
+  ntype.geometry_node_execute = blender::nodes::curve_reverse_node::geo_node_curve_reverse_exec;
   nodeRegisterType(&ntype);
 }

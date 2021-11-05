@@ -19,7 +19,7 @@
 
 #include "node_geometry_util.hh"
 
-namespace blender::nodes {
+namespace blender::nodes::separate_geometry_node {
 
 static void geo_node_separate_geometry_declare(NodeDeclarationBuilder &b)
 {
@@ -95,7 +95,7 @@ static void geo_node_separate_geometry_exec(GeoNodeExecParams params)
   }
 }
 
-}  // namespace blender::nodes
+}  // namespace blender::nodes::separate_geometry_node
 
 void register_node_type_geo_separate_geometry()
 {
@@ -109,10 +109,11 @@ void register_node_type_geo_separate_geometry()
                     node_free_standard_storage,
                     node_copy_standard_storage);
 
-  node_type_init(&ntype, blender::nodes::geo_node_separate_geometry_init);
+  node_type_init(&ntype, blender::nodes::separate_geometry_node::geo_node_separate_geometry_init);
 
-  ntype.declare = blender::nodes::geo_node_separate_geometry_declare;
-  ntype.geometry_node_execute = blender::nodes::geo_node_separate_geometry_exec;
-  ntype.draw_buttons = blender::nodes::geo_node_separate_geometry_layout;
+  ntype.declare = blender::nodes::separate_geometry_node::geo_node_separate_geometry_declare;
+  ntype.geometry_node_execute =
+      blender::nodes::separate_geometry_node::geo_node_separate_geometry_exec;
+  ntype.draw_buttons = blender::nodes::separate_geometry_node::geo_node_separate_geometry_layout;
   nodeRegisterType(&ntype);
 }

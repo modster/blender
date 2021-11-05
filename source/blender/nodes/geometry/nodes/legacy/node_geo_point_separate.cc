@@ -25,7 +25,7 @@
 
 namespace blender::nodes {
 
-static void geo_node_point_instance_declare(NodeDeclarationBuilder &b)
+static void geo_node_point_separate_declare(NodeDeclarationBuilder &b)
 {
   b.add_input<decl::Geometry>(N_("Geometry"));
   b.add_input<decl::String>(N_("Mask"));
@@ -166,7 +166,7 @@ void register_node_type_geo_point_separate()
 
   geo_node_type_base(
       &ntype, GEO_NODE_LEGACY_POINT_SEPARATE, "Point Separate", NODE_CLASS_GEOMETRY, 0);
-  ntype.declare = blender::nodes::geo_node_point_instance_declare;
+  ntype.declare = blender::nodes::geo_node_point_separate_declare;
   ntype.geometry_node_execute = blender::nodes::geo_node_point_separate_exec;
   ntype.geometry_node_execute_supports_laziness = true;
   nodeRegisterType(&ntype);

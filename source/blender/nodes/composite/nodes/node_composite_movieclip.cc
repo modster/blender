@@ -40,7 +40,7 @@ static void cmp_node_movieclip_declare(NodeDeclarationBuilder &b)
 
 }  // namespace blender::nodes
 
-static void init(const bContext *C, PointerRNA *ptr)
+static void cmp_node_movieclip_init(const bContext *C, PointerRNA *ptr)
 {
   bNode *node = (bNode *)ptr->data;
   Scene *scene = CTX_data_scene(C);
@@ -59,7 +59,7 @@ void register_node_type_cmp_movieclip(void)
 
   cmp_node_type_base(&ntype, CMP_NODE_MOVIECLIP, "Movie Clip", NODE_CLASS_INPUT, NODE_PREVIEW);
   ntype.declare = blender::nodes::cmp_node_movieclip_declare;
-  ntype.initfunc_api = init;
+  ntype.initfunc_api = cmp_node_movieclip_init;
   node_type_storage(
       &ntype, "MovieClipUser", node_free_standard_storage, node_copy_standard_storage);
 

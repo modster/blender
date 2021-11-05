@@ -24,7 +24,7 @@
 
 #include "node_function_util.hh"
 
-namespace blender::nodes {
+namespace blender::nodes::rotate_euler_node {
 
 static void fn_node_rotate_euler_declare(NodeDeclarationBuilder &b)
 {
@@ -125,15 +125,16 @@ static void fn_node_rotate_euler_build_multi_function(NodeMultiFunctionBuilder &
   builder.set_matching_fn(fn);
 }
 
-}  // namespace blender::nodes
+}  // namespace blender::nodes::rotate_euler_node
 
 void register_node_type_fn_rotate_euler()
 {
   static bNodeType ntype;
   fn_node_type_base(&ntype, FN_NODE_ROTATE_EULER, "Rotate Euler", NODE_CLASS_CONVERTER, 0);
-  ntype.declare = blender::nodes::fn_node_rotate_euler_declare;
-  ntype.draw_buttons = blender::nodes::fn_node_rotate_euler_layout;
-  node_type_update(&ntype, blender::nodes::fn_node_rotate_euler_update);
-  ntype.build_multi_function = blender::nodes::fn_node_rotate_euler_build_multi_function;
+  ntype.declare = blender::nodes::rotate_euler_node::fn_node_rotate_euler_declare;
+  ntype.draw_buttons = blender::nodes::rotate_euler_node::fn_node_rotate_euler_layout;
+  node_type_update(&ntype, blender::nodes::rotate_euler_node::fn_node_rotate_euler_update);
+  ntype.build_multi_function =
+      blender::nodes::rotate_euler_node::fn_node_rotate_euler_build_multi_function;
   nodeRegisterType(&ntype);
 }

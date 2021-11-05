@@ -52,7 +52,7 @@ static void node_shader_init_tex_noise(bNodeTree *UNUSED(ntree), bNode *node)
   node->storage = tex;
 }
 
-static const char *gpu_shader_get_name(const int dimensions)
+static const char *node_shader_tex_noise_gpu_shader_get_name(const int dimensions)
 {
   BLI_assert(dimensions >= 1 && dimensions <= 4);
   return std::array{"node_noise_texture_1d",
@@ -72,7 +72,7 @@ static int node_shader_gpu_tex_noise(GPUMaterial *mat,
   node_shader_gpu_tex_mapping(mat, node, in, out);
 
   NodeTexNoise *tex = (NodeTexNoise *)node->storage;
-  const char *name = gpu_shader_get_name(tex->dimensions);
+  const char *name = node_shader_tex_noise_gpu_shader_get_name(tex->dimensions);
   return GPU_stack_link(mat, node, name, in, out);
 }
 

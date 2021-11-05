@@ -26,7 +26,7 @@
 
 #include <math.h>
 
-static bNodeSocketTemplate inputs[] = {
+static bNodeSocketTemplate node_sh_texture_brick_inputs[] = {
     {SOCK_RGBA, N_("Bricks 1"), 0.596f, 0.282f, 0.0f, 1.0f},
     {SOCK_RGBA, N_("Bricks 2"), 0.632f, 0.504f, 0.05f, 1.0f},
     {SOCK_RGBA, N_("Mortar"), 0.0f, 0.0f, 0.0f, 1.0f},
@@ -36,18 +36,18 @@ static bNodeSocketTemplate inputs[] = {
     {SOCK_FLOAT, N_("Row Height"), 0.25f, 0.0f, 0.0f, 0.0f, 0.001f, 99.0f, PROP_UNSIGNED},
     {-1, ""},
 };
-static bNodeSocketTemplate outputs[] = {
+static bNodeSocketTemplate node_sh_texture_brick_outputs[] = {
     {SOCK_RGBA, N_("Color")},
     {-1, ""},
 };
 
-static void init(bNodeTree *UNUSED(ntree), bNode *node)
+static void node_sh_texture_brick_init(bNodeTree *UNUSED(ntree), bNode *node)
 {
   node->custom3 = 0.5; /* offset */
   node->custom4 = 1.0; /* squash */
 }
 
-static float noise(int n) /* fast integer noise */
+static float node_sh_texture_brick_noise(int n) /* fast integer noise */
 {
   int nn;
   n = (n >> 13) ^ n;
@@ -55,7 +55,8 @@ static float noise(int n) /* fast integer noise */
   return 0.5f * ((float)nn / 1073741824.0f);
 }
 
-static void colorfn(float *out, TexParams *p, bNode *node, bNodeStack **in, short thread)
+static void node_sh_texture_brick_colorfn(
+    float *out, TexParams *p, bNode *node, bNodeStack **in, short thread)
 {
   const float *co = p->co;
 
@@ -92,7 +93,7 @@ static void colorfn(float *out, TexParams *p, bNode *node, bNodeStack **in, shor
   ins_x = (x + offset) - brick_width * bricknum;
   ins_y = y - row_height * rownum;
 
-  tint = noise((rownum << 16) + (bricknum & 0xFFFF)) + bias;
+  tint = node_sh_texture_brick_noise((rownum << 16) + (bricknum & 0xFFFF)) + bias;
   CLAMP(tint, 0.0f, 1.0f);
 
   if (ins_x < mortar_thickness || ins_y < mortar_thickness ||
@@ -105,14 +106,14 @@ static void colorfn(float *out, TexParams *p, bNode *node, bNodeStack **in, shor
   }
 }
 
-static void exec(void *data,
-                 int UNUSED(thread),
-                 bNode *node,
-                 bNodeExecData *execdata,
-                 bNodeStack **in,
-                 bNodeStack **out)
+static void node_sh_texture_brick_exec(void *data,
+                                       int UNUSED(thread),
+                                       bNode *node,
+                                       bNodeExecData *execdata,
+                                       bNodeStack **in,
+                                       bNodeStack **out)
 {
-  tex_output(node, execdata, in, out[0], &colorfn, data);
+  tex_output(node, execdata, in, out[0], &node_sh_texture_brick_colorfn, data);
 }
 
 void register_node_type_tex_bricks(void)
@@ -120,10 +121,10 @@ void register_node_type_tex_bricks(void)
   static bNodeType ntype;
 
   tex_node_type_base(&ntype, TEX_NODE_BRICKS, "Bricks", NODE_CLASS_PATTERN, NODE_PREVIEW);
-  node_type_socket_templates(&ntype, inputs, outputs);
+  node_type_socket_templates(&ntype, node_sh_texture_brick_inputs, node_sh_texture_brick_outputs);
   node_type_size_preset(&ntype, NODE_SIZE_MIDDLE);
-  node_type_init(&ntype, init);
-  node_type_exec(&ntype, NULL, NULL, exec);
+  node_type_init(&ntype, node_sh_texture_brick_init);
+  node_type_exec(&ntype, NULL, NULL, node_sh_texture_brick_exec);
 
   nodeRegisterType(&ntype);
 }

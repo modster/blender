@@ -40,7 +40,7 @@ static void sh_node_vector_math_declare(NodeDeclarationBuilder &b)
 
 }  // namespace blender::nodes
 
-static const char *gpu_shader_get_name(int mode)
+static const char *sh_node_vector_math_gpu_shader_get_name(int mode)
 {
   switch (mode) {
     case NODE_VECTOR_MATH_ADD:
@@ -111,7 +111,7 @@ static int gpu_shader_vector_math(GPUMaterial *mat,
                                   GPUNodeStack *in,
                                   GPUNodeStack *out)
 {
-  const char *name = gpu_shader_get_name(node->custom1);
+  const char *name = sh_node_vector_math_gpu_shader_get_name(node->custom1);
   if (name != nullptr) {
     return GPU_stack_link(mat, node, name, in, out);
   }
@@ -187,7 +187,7 @@ static void node_shader_update_vector_math(bNodeTree *UNUSED(ntree), bNode *node
   }
 }
 
-static const blender::fn::MultiFunction *get_multi_function(bNode &node)
+static const blender::fn::MultiFunction *sh_node_vector_math_get_multi_function(bNode &node)
 {
   using blender::float3;
 
@@ -269,7 +269,7 @@ static const blender::fn::MultiFunction *get_multi_function(bNode &node)
 static void sh_node_vector_math_build_multi_function(
     blender::nodes::NodeMultiFunctionBuilder &builder)
 {
-  const blender::fn::MultiFunction *fn = get_multi_function(builder.node());
+  const blender::fn::MultiFunction *fn = sh_node_vector_math_get_multi_function(builder.node());
   builder.set_matching_fn(fn);
 }
 

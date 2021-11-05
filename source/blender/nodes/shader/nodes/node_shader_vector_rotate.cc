@@ -38,7 +38,7 @@ static void sh_node_vector_rotate_declare(NodeDeclarationBuilder &b)
 
 }  // namespace blender::nodes
 
-static const char *gpu_shader_get_name(int mode)
+static const char *shader_nose_vector_rotate_gpu_shader_get_name(int mode)
 {
   switch (mode) {
     case NODE_VECTOR_ROTATE_TYPE_AXIS:
@@ -62,7 +62,7 @@ static int gpu_shader_vector_rotate(GPUMaterial *mat,
                                     GPUNodeStack *in,
                                     GPUNodeStack *out)
 {
-  const char *name = gpu_shader_get_name(node->custom1);
+  const char *name = shader_nose_vector_rotate_gpu_shader_get_name(node->custom1);
 
   if (name != nullptr) {
     float invert = (node->custom2) ? -1.0 : 1.0;
@@ -101,7 +101,8 @@ static float3 sh_node_vector_rotate_euler(const float3 vector,
   return result + center;
 }
 
-static const blender::fn::MultiFunction *get_multi_function(bNode &node)
+static const blender::fn::MultiFunction *sh_node_vector_rotate_euler_get_multi_function(
+    bNode &node)
 {
   bool invert = node.custom2;
   const int mode = node.custom1;
@@ -189,7 +190,8 @@ static const blender::fn::MultiFunction *get_multi_function(bNode &node)
 static void sh_node_vector_rotate_build_multi_function(
     blender::nodes::NodeMultiFunctionBuilder &builder)
 {
-  const blender::fn::MultiFunction *fn = get_multi_function(builder.node());
+  const blender::fn::MultiFunction *fn = sh_node_vector_rotate_euler_get_multi_function(
+      builder.node());
   builder.set_matching_fn(fn);
 }
 
