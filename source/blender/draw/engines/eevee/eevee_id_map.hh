@@ -57,6 +57,7 @@ struct ObjectKey {
 #ifdef DEBUG
   char name[64];
 #endif
+  ObjectKey() : ob(nullptr), parent(nullptr){};
 
   ObjectKey(Object *ob_, Object *parent_, int id_[MAX_DUPLI_RECUR], bool use_particle_hair_)
       : ob(ob_), parent(parent_), use_particle_hair(use_particle_hair_)
@@ -256,9 +257,7 @@ struct ShaderKey {
   GPUShader *shader;
   uint64_t options;
 
-  ShaderKey(GPUMaterial *gpumat,
-            eMaterialGeometry geometry,
-            eMaterialPipeline pipeline)
+  ShaderKey(GPUMaterial *gpumat, eMaterialGeometry geometry, eMaterialPipeline pipeline)
   {
     shader = GPU_material_get_shader(gpumat);
     options = shader_uuid_from_material_type(pipeline, geometry);

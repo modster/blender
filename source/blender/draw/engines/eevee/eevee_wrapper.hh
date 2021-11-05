@@ -29,6 +29,7 @@
 #include "GPU_framebuffer.h"
 #include "GPU_texture.h"
 #include "GPU_uniform_buffer.h"
+#include "GPU_vertex_buffer.h"
 
 namespace blender::eevee {
 
@@ -42,10 +43,16 @@ class StructArrayBuffer : NonMovable, NonCopyable {
   T data_[len];
   GPUUniformBuf *ubo_;
 
+#ifdef DEBUG
+  const char *name_ = typeid(T).name();
+#else
+  constexpr static const char *name_ = "StructArrayBuffer";
+#endif
+
  public:
   StructArrayBuffer()
   {
-    ubo_ = GPU_uniformbuf_create_ex(sizeof(data_), nullptr, "StructArrayBuffer");
+    ubo_ = GPU_uniformbuf_create_ex(sizeof(data_), nullptr, name_);
   }
   ~StructArrayBuffer()
   {
@@ -112,6 +119,113 @@ class StructArrayBuffer : NonMovable, NonCopyable {
   {
     return data_ + len;
   }
+
+  operator Span<T>() const
+  {
+    return Span<T>(data_, len);
+  }
+};
+
+template<
+    /** Type of the values stored in this uniform buffer. */
+    typename T,
+    /** The number of values that can be stored in this uniform buffer. */
+    int64_t len>
+/* Same thing as StructArrayBuffer but can be arbitrary large, and are writtable on GPU. */
+class StorageArrayBuffer : NonMovable, NonCopyable {
+ private:
+  T *data_;
+  /* Use vertex buffer for now. Until there is a complete GPUStorageBuf implementation. */
+  GPUVertBuf *ssbo_;
+
+#ifdef DEBUG
+  const char *name_ = typeid(T).name();
+#else
+  constexpr static const char *name_ = "StorageArrayBuffer";
+#endif
+
+ public:
+  StorageArrayBuffer()
+  {
+    BLI_assert((sizeof(T) % 16) == 0);
+
+    GPUVertFormat format = {0};
+    GPU_vertformat_attr_add(&format, "dummy", GPU_COMP_F32, 4, GPU_FETCH_FLOAT);
+
+    ssbo_ = GPU_vertbuf_create_with_format_ex(&format, GPU_USAGE_DYNAMIC);
+    GPU_vertbuf_data_alloc(ssbo_, (sizeof(T) / 4) * len);
+    data_ = (T *)GPU_vertbuf_get_data(ssbo_);
+  }
+  ~StorageArrayBuffer()
+  {
+    GPU_vertbuf_discard(ssbo_);
+  }
+
+  void push_update(void)
+  {
+    GPU_vertbuf_use(ssbo_);
+  }
+
+  operator GPUVertBuf *() const
+  {
+    return ssbo_;
+  }
+
+  /**
+   * Get the value at the given index. This invokes undefined behavior when the index is out of
+   * bounds.
+   */
+  const T &operator[](int64_t index) const
+  {
+    BLI_assert(index >= 0);
+    BLI_assert(index < len);
+    return data_[index];
+  }
+
+  T &operator[](int64_t index)
+  {
+    BLI_assert(index >= 0);
+    BLI_assert(index < len);
+    return data_[index];
+  }
+
+  /**
+   * Get a pointer to the beginning of the array.
+   */
+  const T *data() const
+  {
+    return data_;
+  }
+  T *data()
+  {
+    return data_;
+  }
+
+  /**
+   * Iterator
+   */
+  const T *begin() const
+  {
+    return data_;
+  }
+  const T *end() const
+  {
+    return data_ + len;
+  }
+
+  T *begin()
+  {
+    return data_;
+  }
+  T *end()
+  {
+    return data_ + len;
+  }
+
+  operator Span<T>() const
+  {
+    return Span<T>(data_, len);
+  }
 };
 
 /** Simpler version where data is not an array. */
@@ -119,10 +233,16 @@ template<typename T> class StructBuffer : public T, NonMovable, NonCopyable {
  private:
   GPUUniformBuf *ubo_;
 
+#ifdef DEBUG
+  const char *name_ = typeid(T).name();
+#else
+  constexpr static const char *name_ = "StructBuffer";
+#endif
+
  public:
   StructBuffer()
   {
-    ubo_ = GPU_uniformbuf_create_ex(sizeof(T), nullptr, "StructBuffer");
+    ubo_ = GPU_uniformbuf_create_ex(sizeof(T), nullptr, name_);
   }
   ~StructBuffer()
   {

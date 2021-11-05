@@ -100,6 +100,8 @@ class CullingLightPass {
  * The light module manages light data buffers and light culling system.
  */
 class LightModule {
+  friend ShadowModule;
+
  private:
   Instance &inst_;
 
@@ -110,7 +112,7 @@ class LightModule {
   /** Batches of lights alongside their culling data. */
   struct LightBatch {
     LightDataBuf lights_data;
-    ShadowPunctualDataBuf shadows_data;
+    ShadowDataBuf shadows_data;
   };
   Culling<LightBatch, true> culling_;
   /** Active data pointers used for rendering. */
@@ -118,8 +120,7 @@ class LightModule {
   const GPUUniformBuf *active_shadows_ubo_;
   const GPUUniformBuf *active_culling_ubo_;
   GPUTexture *active_culling_tx_;
-
-  // uint64_t active_batch_count_;
+  int active_batch_ = 0;
 
   float light_threshold_;
 
@@ -149,6 +150,13 @@ class LightModule {
   const GPUUniformBuf **culling_ubo_ref_get(void)
   {
     return &active_culling_ubo_;
+  }
+  /** Returns the active Span of lights that passed the culling test. */
+  Span<LightData> lights_get(void) const
+  {
+    const auto &batch = *culling_[active_batch_];
+    Span<LightData> span = batch.item_data.lights_data;
+    return span.take_front(batch.items_count_get());
   }
   GPUTexture **culling_tx_ref_get(void)
   {

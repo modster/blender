@@ -66,9 +66,9 @@ void Instance::hair_sync(Object *ob, ObjectHandle &ob_handle, ModifierData *modi
   /* TODO(fclem) Hair velocity. */
   // shading_passes.velocity.gpencil_add(ob, ob_handle);
 
-  if (material.shadow.shgrp) {
-    shadows.sync_caster(ob, ob_handle);
-  }
+  bool is_caster = material.shadow.shgrp != nullptr;
+  bool is_alpha_blend = true; /* TODO material.is_alpha_blend. */
+  shadows.sync_object(ob, ob_handle, is_caster, is_alpha_blend);
 }
 
 }  // namespace blender::eevee

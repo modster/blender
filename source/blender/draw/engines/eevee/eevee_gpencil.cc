@@ -147,7 +147,9 @@ void Instance::gpencil_sync(Object *ob, ObjectHandle &ob_handle)
   /* TODO(fclem) Gpencil velocity. */
   // shading_passes.velocity.gpencil_add(ob, ob_handle);
 
-  shadows.sync_caster(ob, ob_handle);
+  bool is_caster = true;      /* TODO material.shadow.shgrp. */
+  bool is_alpha_blend = true; /* TODO material.is_alpha_blend. */
+  shadows.sync_object(ob, ob_handle, is_caster, is_alpha_blend);
 }
 
 }  // namespace blender::eevee

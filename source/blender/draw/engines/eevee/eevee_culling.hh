@@ -163,11 +163,15 @@ class CullingBatch {
   {
     return item_handles_.size() == CULLING_ITEM_BATCH;
   }
-  const GPUUniformBuf *culling_ubo_get(void)
+  const GPUUniformBuf *culling_ubo_get(void) const
   {
     return culling_data_.ubo_get();
   }
-  GPUTexture *culling_texture_get(void)
+  uint items_count_get(void) const
+  {
+    return culling_data_.items_count;
+  }
+  GPUTexture *culling_texture_get(void) const
   {
     return tiles_tx_;
   }
@@ -298,7 +302,7 @@ class Culling {
   /**
    * Getters
    **/
-  CullingBatchType *operator[](int64_t index)
+  const CullingBatchType *operator[](int64_t index) const
   {
     return batches_[index];
   }

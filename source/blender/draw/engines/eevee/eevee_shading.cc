@@ -101,7 +101,7 @@ DRWShadingGroup *ForwardPass::material_opaque_add(::Material *blender_mat, GPUMa
   eGPUSamplerState depth_read = GPU_SAMPLER_FILTER;
   DRWShadingGroup *grp = DRW_shgroup_material_create(gpumat, pass);
   DRW_shgroup_uniform_block_ref(grp, "lights_block", lights.lights_ubo_ref_get());
-  DRW_shgroup_uniform_block_ref(grp, "shadows_punctual_block", lights.shadows_ubo_ref_get());
+  DRW_shgroup_uniform_block_ref(grp, "shadows_block", lights.shadows_ubo_ref_get());
   DRW_shgroup_uniform_block_ref(grp, "lights_culling_block", lights.culling_ubo_ref_get());
   DRW_shgroup_uniform_block(grp, "sampling_block", inst_.sampling.ubo_get());
   DRW_shgroup_uniform_block(grp, "grids_block", lightprobes.grid_ubo_get());
@@ -149,7 +149,7 @@ DRWShadingGroup *ForwardPass::material_transparent_add(::Material *blender_mat,
   eGPUSamplerState depth_read = GPU_SAMPLER_FILTER;
   DRWShadingGroup *grp = DRW_shgroup_material_create(gpumat, transparent_ps_);
   DRW_shgroup_uniform_block_ref(grp, "lights_block", lights.lights_ubo_ref_get());
-  DRW_shgroup_uniform_block_ref(grp, "shadows_punctual_block", lights.shadows_ubo_ref_get());
+  DRW_shgroup_uniform_block_ref(grp, "shadows_block", lights.shadows_ubo_ref_get());
   DRW_shgroup_uniform_block_ref(grp, "lights_culling_block", lights.culling_ubo_ref_get());
   DRW_shgroup_uniform_block(grp, "sampling_block", inst_.sampling.ubo_get());
   DRW_shgroup_uniform_block(grp, "grids_block", lightprobes.grid_ubo_get());
@@ -308,7 +308,7 @@ void DeferredLayer::volume_add(Object *ob)
   GPUShader *sh = inst_.shaders.static_shader_get(DEFERRED_VOLUME);
   DRWShadingGroup *grp = DRW_shgroup_create(sh, volume_ps_);
   DRW_shgroup_uniform_block_ref(grp, "lights_block", lights.lights_ubo_ref_get());
-  DRW_shgroup_uniform_block_ref(grp, "shadows_punctual_block", lights.shadows_ubo_ref_get());
+  DRW_shgroup_uniform_block_ref(grp, "shadows_block", lights.shadows_ubo_ref_get());
   DRW_shgroup_uniform_block_ref(grp, "lights_culling_block", lights.culling_ubo_ref_get());
   DRW_shgroup_uniform_texture_ref(grp, "lights_culling_tx", lights.culling_tx_ref_get());
   DRW_shgroup_uniform_texture_ref(grp, "depth_max_tx", &deferred_pass.input_depth_behind_tx_);
@@ -482,7 +482,7 @@ void DeferredPass::sync(void)
     GPUShader *sh = inst_.shaders.static_shader_get(DEFERRED_EVAL_DIRECT);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, eval_direct_ps_);
     DRW_shgroup_uniform_block_ref(grp, "lights_block", lights.lights_ubo_ref_get());
-    DRW_shgroup_uniform_block_ref(grp, "shadows_punctual_block", lights.shadows_ubo_ref_get());
+    DRW_shgroup_uniform_block_ref(grp, "shadows_block", lights.shadows_ubo_ref_get());
     DRW_shgroup_uniform_block_ref(grp, "lights_culling_block", lights.culling_ubo_ref_get());
     DRW_shgroup_uniform_block(grp, "sampling_block", inst_.sampling.ubo_get());
     DRW_shgroup_uniform_block(grp, "grids_block", lightprobes.grid_ubo_get());
@@ -539,7 +539,7 @@ void DeferredPass::sync(void)
     GPUShader *sh = inst_.shaders.static_shader_get(DEFERRED_EVAL_VOLUME);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, eval_volume_homogeneous_ps_);
     DRW_shgroup_uniform_block_ref(grp, "lights_block", lights.lights_ubo_ref_get());
-    DRW_shgroup_uniform_block_ref(grp, "shadows_punctual_block", lights.shadows_ubo_ref_get());
+    DRW_shgroup_uniform_block_ref(grp, "shadows_block", lights.shadows_ubo_ref_get());
     DRW_shgroup_uniform_block_ref(grp, "lights_culling_block", lights.culling_ubo_ref_get());
     DRW_shgroup_uniform_texture_ref(grp, "lights_culling_tx", lights.culling_tx_ref_get());
     DRW_shgroup_uniform_texture(grp, "utility_tx", inst_.shading_passes.utility_tx);

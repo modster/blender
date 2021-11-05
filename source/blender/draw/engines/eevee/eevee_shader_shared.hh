@@ -54,6 +54,7 @@ typedef float mat4[4][4];
 using vec4 = blender::float4;
 using vec3 = blender::float3;
 using vec2 = blender::float2;
+typedef int ivec4[4];
 using ivec3 = blender::int3;
 using ivec2 = blender::int2;
 typedef uint uvec4[4];
@@ -421,7 +422,7 @@ struct LightData {
   float influence_radius_invsqr_volume;
   /** Maximum influence radius. Used for culling. */
   float influence_radius_max;
-  /** Offset in the shadow struct table. -1 means no shadow. */
+  /** Index of the shadow struct on CPU. -1 means no shadow. */
   int shadow_id;
   /** NOTE: It is ok to use vec3 here. A float is declared right after it.
    * vec3 is also aligned to 16 bytes. */
@@ -449,28 +450,97 @@ BLI_STATIC_ASSERT_ALIGN(LightData, 16)
  * \{ */
 
 /**
- * A point light shadow is composed of 1, 5 or 6 shadow regions.
+ * Shadow data for either a directional shadow or a punctual shadow.
+ *
+ * A punctual shadow is composed of 1, 5 or 6 shadow regions.
  * Regions are sorted in this order -Z, +X, -X, +Y, -Y, +Z.
  * Face index is computed from light's object space coordinates.
+ *
+ * A directional light shadow is composed of multiple clipmaps with each level
+ * covering twice as much area as the previous one.
  */
-struct ShadowPunctualData {
-  /** Shadow matrix to convert Local face coordinates to UV space [0..1]. */
-  mat4 shadow_mat;
+struct ShadowData {
+  /**
+   * Point : Shadow matrix to convert Local face coordinates to UV space [0..1].
+   * Directional : Rotation matrix to local light coordinate (still world scale).
+   */
+  mat4 mat;
   /** NOTE: It is ok to use vec3 here. A float is declared right after it.
    * vec3 is also aligned to 16 bytes. */
   /** Shadow offset caused by jittering projection origin (for soft shadows). */
-  vec3 shadow_offset;
+  vec3 offset;
   /** Shadow bias in world space. */
-  float shadow_bias;
-  /** Offset from the first region to the second one. All regions are stored vertically. */
-  float region_offset;
-  /** True if shadow is omnidirectional and there is 6 fullsized shadow regions.  */
-  bool is_omni;
-  /** Near and far clipping distance. */
-  float shadow_near;
-  float shadow_far;
+  float bias;
+  /** Near and far clipping distance to convert shadowmap to world space distances. */
+  float clip_near;
+  float clip_far;
+  /** Index of the first tilemap. */
+  int tilemap_index;
+  /** Index of the last tilemap. */
+  int tilemap_last;
+  /** Directional : Clipmap lod range to avoid sampling outside of valid range. */
+  int clipmap_lod_min, clipmap_lod_max;
+  int _pad1;
+  int _pad2;
 };
-BLI_STATIC_ASSERT_ALIGN(ShadowPunctualData, 16)
+BLI_STATIC_ASSERT_ALIGN(ShadowData, 16)
+
+/**
+ * IMPORTANT: Some data packing are tweaked for SHADOW_TILEMAP_RES of 16.
+ * Be sure to update them accordingly.
+ */
+#define SHADOW_TILEMAP_RES 16
+#define SHADOW_TILEMAP_PER_ROW 64
+#define MAX_SHADOW_TILEMAP 4096
+
+/**
+ * Small descriptor used for the tile update phase.
+ */
+struct ShadowTileMapData {
+  /** View Projection matrix used to render the shadow. Transforms World > NDC. */
+  mat4 persmat;
+  /** Shift to apply to the tile grid in the setup phase. */
+  ivec2 grid_shift;
+  /** True for punctual lights. */
+  bool is_cubeface;
+  /** Index inside the tilemap allocator. */
+  int index;
+};
+BLI_STATIC_ASSERT_ALIGN(ShadowTileMapData, 16)
+
+enum eShadowDebug : uint32_t {
+  SHADOW_DEBUG_NONE = 0u,
+  /**
+   * Tilemaps to screen. Is also present in other modes.
+   * - Black pixels, no pages allocated.
+   * - Green pixels, pages cached.
+   * - Red pixels, pages allocated.
+   */
+  SHADOW_DEBUG_TILEMAPS = 1u,
+  /**
+   * Random color per pages for the first light of each pixel.
+   * Validates page density allocation.
+   */
+  SHADOW_DEBUG_PAGES = 2u,
+  /**
+   * Outputs random color per tilemap (or tilemap level) for the first light of each pixel.
+   * Validates page density allocation.
+   */
+  SHADOW_DEBUG_LOD = 3u
+};
+
+/**
+ * Shadow data for debugging the active light shadow.
+ */
+struct ShadowDebugData {
+  LightData light;
+  ShadowData shadow;
+  eShadowDebug type;
+  int _pad0;
+  int _pad1;
+  int _pad2;
+};
+BLI_STATIC_ASSERT_ALIGN(ShadowDebugData, 16)
 
 /** \} */
 
@@ -758,7 +828,9 @@ using LightProbeFilterDataBuf = StructBuffer<LightProbeFilterData>;
 using LightProbeInfoDataBuf = StructBuffer<LightProbeInfoData>;
 using RaytraceBufferDataBuf = StructBuffer<RaytraceBufferData>;
 using RaytraceDataBuf = StructBuffer<RaytraceData>;
-using ShadowPunctualDataBuf = StructArrayBuffer<ShadowPunctualData, CULLING_ITEM_BATCH>;
+using ShadowDataBuf = StructArrayBuffer<ShadowData, CULLING_ITEM_BATCH>;
+using ShadowTileMapDataBuf = StorageArrayBuffer<ShadowTileMapData, MAX_SHADOW_TILEMAP>;
+using ShadowDebugDataBuf = StructBuffer<ShadowDebugData>;
 using SubsurfaceDataBuf = StructBuffer<SubsurfaceData>;
 using VelocityObjectBuf = StructBuffer<VelocityObjectData>;
 

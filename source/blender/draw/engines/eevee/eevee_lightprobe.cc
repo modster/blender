@@ -25,6 +25,7 @@
 #include "DNA_defaults.h"
 #include "DNA_lightprobe_types.h"
 
+#include "eevee_camera.hh"
 #include "eevee_instance.hh"
 
 namespace blender::eevee {
@@ -187,12 +188,6 @@ void LightProbeModule::end_sync()
   if (lightcache_->flag & LIGHTCACHE_UPDATE_WORLD) {
     cubemap_prepare(vec3(0.0f), 0.01f, 1.0f, true);
   }
-}
-
-void LightProbeModule::cubeface_winmat_get(mat4 &winmat, float near, float far)
-{
-  /* Simple 90° FOV projection. */
-  perspective_m4(winmat, -near, near, -near, near, near, far);
 }
 
 void LightProbeModule::cubemap_prepare(vec3 position, float near, float far, bool background_only)

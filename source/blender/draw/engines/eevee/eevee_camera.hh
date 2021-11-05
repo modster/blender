@@ -67,6 +67,12 @@ static const float cubeface_mat[6][4][4] = {
      {0.0f, 0.0f, 0.0f, 1.0f}},
 };
 
+inline void cubeface_winmat_get(mat4 &winmat, float near, float far)
+{
+  /* Simple 90° FOV projection. */
+  perspective_m4(winmat, -near, near, -near, near, near, far);
+}
+
 /* -------------------------------------------------------------------- */
 /** \name CameraData operators
  * \{ */
@@ -127,6 +133,14 @@ class Camera {
   bool is_panoramic(void) const
   {
     return eevee::is_panoramic(data_[data_id_].type);
+  }
+  bool is_orthographic(void) const
+  {
+    return data_[data_id_].type == CAMERA_ORTHO;
+  }
+  vec3 position(void) const
+  {
+    return vec3(data_[data_id_].viewinv[3]);
   }
 };
 

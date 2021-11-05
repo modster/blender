@@ -25,9 +25,9 @@ layout(std140) uniform lights_culling_block
   CullingData light_culling;
 };
 
-layout(std140) uniform shadows_punctual_block
+layout(std140) uniform shadows_block
 {
-  ShadowPunctualData shadows_punctual[CULLING_ITEM_BATCH];
+  ShadowData shadows[CULLING_ITEM_BATCH];
 };
 
 uniform sampler2D transparency_data_tx;
@@ -36,10 +36,9 @@ uniform usampler2D lights_culling_tx;
 uniform sampler2DArray utility_tx;
 uniform sampler2DShadow shadow_atlas_tx;
 
-utility_tx_fetch_define(utility_tx)
-utility_tx_sample_define(utility_tx)
+utility_tx_fetch_define(utility_tx) utility_tx_sample_define(utility_tx)
 
-in vec4 uvcoordsvar;
+    in vec4 uvcoordsvar;
 
 layout(location = 0) out vec4 out_combined;
 layout(location = 1) out vec3 out_volume;

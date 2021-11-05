@@ -150,8 +150,6 @@ class LightProbeModule {
   void sync_grid(const DRWView *view, const struct LightGridCache &grid_cache, int grid_index);
   void sync_cubemap(const DRWView *view, const struct LightProbeCache &cube_cache, int cube_index);
 
-  void cubeface_winmat_get(mat4 &winmat, float near, float far);
-
   LightCache *baking_cache_get(void);
 
   void cubemap_prepare(vec3 position, float near, float far, bool background_only);

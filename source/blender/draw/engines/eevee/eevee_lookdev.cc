@@ -303,7 +303,7 @@ void LookDev::sync_overlay(void)
         mat, mat->nodetree, MAT_PIPE_FORWARD, MAT_GEOM_LOOKDEV, false);
     DRWShadingGroup *grp = DRW_shgroup_material_create(gpumat, overlay_ps_);
     DRW_shgroup_uniform_block_ref(grp, "lights_block", lights.lights_ubo_ref_get());
-    DRW_shgroup_uniform_block_ref(grp, "shadows_punctual_block", lights.shadows_ubo_ref_get());
+    DRW_shgroup_uniform_block_ref(grp, "shadows_block", lights.shadows_ubo_ref_get());
     DRW_shgroup_uniform_block_ref(grp, "lights_culling_block", lights.culling_ubo_ref_get());
     DRW_shgroup_uniform_block(grp, "sampling_block", inst_.sampling.ubo_get());
     DRW_shgroup_uniform_block(grp, "grids_block", lightprobes.grid_ubo_get());

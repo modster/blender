@@ -104,12 +104,23 @@ float pow8(float x) { return sqr(sqr(sqr(x))); }
 float len_squared(vec3 a) { return dot(a, a); }
 float len_squared(vec2 a) { return dot(a, a); }
 
+bool flag_test(uint flag, uint val) { return (flag & val) != 0u; }
+bool flag_test(int flag, int val) { return (flag & val) != 0; }
+
+void set_flag_from_test(inout uint value, bool test, uint flag) { if (test) { value |= flag; } else { value &= ~flag; } }
+void set_flag_from_test(inout int value, bool test, int flag) { if (test) { value |= flag; } else { value &= ~flag; } }
+
 #define weighted_sum(val0, val1, val2, val3, weights) ((val0 * weights[0] + val1 * weights[1] + val2 * weights[2] + val3 * weights[3]) * safe_rcp(sum(weights)));
 #define weighted_sum_array(val, weights) ((val[0] * weights[0] + val[1] * weights[1] + val[2] * weights[2] + val[3] * weights[3]) * safe_rcp(sum(weights)));
 
 /* clang-format on */
 
 #define saturate(a) clamp(a, 0.0, 1.0)
+
+#define in_range_inclusive(val, min_v, max_v) \
+  (all(greaterThanEqual(val, min_v)) && all(lessThanEqual(val, max_v)))
+#define in_range_exclusive(val, min_v, max_v) \
+  (all(greaterThan(val, min_v)) && all(lessThan(val, max_v)))
 
 float distance_squared(vec2 a, vec2 b)
 {

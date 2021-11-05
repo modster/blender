@@ -134,6 +134,7 @@ void Instance::begin_sync()
   materials.begin_sync();
   velocity.begin_sync();
   lights.begin_sync();
+  shadows.begin_sync();
   lightprobes.begin_sync();
 }
 

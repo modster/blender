@@ -35,9 +35,9 @@ layout(std140) uniform lights_culling_block
   CullingData light_culling;
 };
 
-layout(std140) uniform shadows_punctual_block
+layout(std140) uniform shadows_block
 {
-  ShadowPunctualData shadows_punctual[CULLING_ITEM_BATCH];
+  ShadowData shadows[CULLING_ITEM_BATCH];
 };
 
 layout(std140) uniform grids_block

@@ -7,7 +7,7 @@
  * - light_culling
  * - lights_culling_tx
  * - lights
- * - shadows_punctual
+ * - shadows
  * - shadow_atlas_tx
  * - shadow_depth_tx
  * - sss_transmittance_tx
@@ -43,12 +43,12 @@ void light_eval(ClosureDiffuse diffuse,
 
     if ((light.shadow_id != LIGHT_NO_SHADOW) && (light.diffuse_power > 0.0 || visibility > 0.0)) {
       vec3 lL = light_world_to_local(light, -L) * dist;
-      vec3 shadow_co = shadow_punctual_coordinates_get(shadows_punctual[l_idx], lL);
+      vec3 shadow_co = shadow_punctual_coordinates_get(shadows[l_idx], lL);
 
       /* Transmittance evaluation first to use initial visibility. */
       if (diffuse.sss_id != 0u && light.diffuse_power > 0.0) {
         float sh_depth = texture(shadow_depth_tx, shadow_co.xy).r;
-        float delta = shadow_punctual_depth_delta(shadows_punctual[l_idx], lL, sh_depth);
+        float delta = shadow_punctual_depth_delta(shadows[l_idx], lL, sh_depth);
         delta = max(thickness, delta);
 
         vec3 intensity =

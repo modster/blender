@@ -1172,6 +1172,46 @@ void DRW_shgroup_call_sculpt_with_materials(DRWShadingGroup **shgroups,
 
 static GPUVertFormat inst_select_format = {0};
 
+DRWCallBuffer *DRW_call_buffer_create(struct GPUVertFormat *format)
+{
+  BLI_assert(format != NULL);
+
+  DRWCallBuffer *callbuf = BLI_memblock_alloc(DST.vmempool->callbuffers);
+  callbuf->buf = DRW_temp_buffer_request(DST.vmempool->idatalist, format, &callbuf->count);
+  callbuf->buf_select = NULL;
+  callbuf->count = 0;
+
+  if (G.f & G_FLAG_PICKSEL) {
+    /* Not actually used for rendering but alloced in one chunk. */
+    if (inst_select_format.attr_len == 0) {
+      GPU_vertformat_attr_add(&inst_select_format, "selectId", GPU_COMP_I32, 1, GPU_FETCH_INT);
+    }
+    callbuf->buf_select = DRW_temp_buffer_request(
+        DST.vmempool->idatalist, &inst_select_format, &callbuf->count);
+  }
+
+  return callbuf;
+}
+
+void DRW_shgroup_call_buffer_ex(DRWShadingGroup *shgroup,
+                                GPUPrimType prim_type,
+                                DRWCallBuffer *callbuf,
+                                int instance_count)
+{
+  if (G.f & G_FLAG_PICKSEL) {
+    drw_command_set_select_id(shgroup, callbuf->buf_select, -1);
+  }
+
+  DRWResourceHandle handle = drw_resource_handle(shgroup, NULL, NULL);
+  GPUBatch *batch = DRW_temp_batch_request(DST.vmempool->idatalist, callbuf->buf, prim_type);
+  if (instance_count > 0) {
+    drw_command_draw_instance(shgroup, batch, handle, instance_count, false);
+  }
+  else {
+    drw_command_draw(shgroup, batch, handle);
+  }
+}
+
 DRWCallBuffer *DRW_shgroup_call_buffer(DRWShadingGroup *shgroup,
                                        struct GPUVertFormat *format,
                                        GPUPrimType prim_type)

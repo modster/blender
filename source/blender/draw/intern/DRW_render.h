@@ -448,6 +448,13 @@ void DRW_shgroup_call_instances_with_attrs(DRWShadingGroup *shgroup,
 void DRW_shgroup_call_sculpt(DRWShadingGroup *sh, Object *ob, bool wire, bool mask);
 void DRW_shgroup_call_sculpt_with_materials(DRWShadingGroup **sh, int num_sh, Object *ob);
 
+/* Lower level functions. Use DRW_shgroup_call_buffer(_instance) preferably. */
+DRWCallBuffer *DRW_call_buffer_create(struct GPUVertFormat *format);
+void DRW_shgroup_call_buffer_ex(DRWShadingGroup *shgroup,
+                                GPUPrimType prim_type,
+                                DRWCallBuffer *callbuf,
+                                int instance_count);
+
 DRWCallBuffer *DRW_shgroup_call_buffer(DRWShadingGroup *shgroup,
                                        struct GPUVertFormat *format,
                                        GPUPrimType prim_type);

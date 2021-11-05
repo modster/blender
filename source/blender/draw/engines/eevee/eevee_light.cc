@@ -98,8 +98,12 @@ void Light::sync(ShadowModule &shadows, const Object *ob, float threshold)
 
   if (la->mode & LA_SHADOW) {
     if (la->type == LA_SUN) {
-      /* TODO */
-      // shadows.sync_directional_shadow()
+      if (this->shadow_id == LIGHT_NO_SHADOW) {
+        this->shadow_id = shadows.directionals.alloc();
+      }
+
+      ShadowDirectional &shadow = shadows.directionals[this->shadow_id];
+      shadow.sync(this->object_mat, la->bias * 0.05f, 1.0f);
     }
     else {
       float cone_aperture = DEG2RAD(360.0);
@@ -111,10 +115,10 @@ void Light::sync(ShadowModule &shadows, const Object *ob, float threshold)
       }
 
       if (this->shadow_id == LIGHT_NO_SHADOW) {
-        this->shadow_id = shadows.punctual_new();
+        this->shadow_id = shadows.punctuals.alloc();
       }
 
-      ShadowPunctual &shadow = shadows.punctual_get(this->shadow_id);
+      ShadowPunctual &shadow = shadows.punctuals[this->shadow_id];
       shadow.sync(this->type,
                   this->object_mat,
                   cone_aperture,
@@ -134,7 +138,10 @@ void Light::shadow_discard_safe(ShadowModule &shadows)
 {
   if (shadow_id != LIGHT_NO_SHADOW) {
     if (this->type != LIGHT_SUN) {
-      shadows.punctual_discard(shadow_id);
+      shadows.punctuals.free(shadow_id);
+    }
+    else {
+      shadows.directionals.free(shadow_id);
     }
     shadow_id = LIGHT_NO_SHADOW;
   }
@@ -348,19 +355,22 @@ void LightModule::set_view(const DRWView *view, const ivec2 extent, bool enable_
     }
 
     if (light.shadow_id != LIGHT_NO_SHADOW) {
-      ShadowPunctual &shadow = this->inst_.shadows.punctual_get(light.shadow_id);
-      shadow.is_visible = true;
-      shadow.random_position_on_shape_set(this->inst_);
-      light_batch.shadows_data[dst_index] = shadow;
+      ShadowData &shadow_dst = light_batch.shadows_data[dst_index];
+      if (light.type == LIGHT_SUN) {
+        shadow_dst = this->inst_.shadows.directionals[light.shadow_id];
+      }
+      else {
+        shadow_dst = this->inst_.shadows.punctuals[light.shadow_id];
+      }
     }
   };
 
   /* Called for each batch. Do 2D gpu culling. */
   auto culling_func = [&](LightBatch &light_batch, CullingDataBuf &culling_data) {
     LightDataBuf &lights_data = light_batch.lights_data;
-    ShadowPunctualDataBuf &shadow_data = light_batch.shadows_data;
+    ShadowDataBuf &shadows_data = light_batch.shadows_data;
     lights_data.push_update();
-    shadow_data.push_update();
+    shadows_data.push_update();
 
     this->inst_.shading_passes.light_culling.render(lights_data.ubo_get(), culling_data.ubo_get());
   };
@@ -370,12 +380,14 @@ void LightModule::set_view(const DRWView *view, const ivec2 extent, bool enable_
   inst_.shadows.update_visible(view);
 }
 
-void LightModule::bind_batch(int range_id)
+void LightModule::bind_batch(int batch_index)
 {
-  active_lights_ubo_ = culling_[range_id]->item_data.lights_data.ubo_get();
-  active_shadows_ubo_ = culling_[range_id]->item_data.shadows_data.ubo_get();
-  active_culling_ubo_ = culling_[range_id]->culling_ubo_get();
-  active_culling_tx_ = culling_[range_id]->culling_texture_get();
+  active_batch_ = batch_index;
+  auto &batch = *culling_[batch_index];
+  active_lights_ubo_ = batch.item_data.lights_data.ubo_get();
+  active_shadows_ubo_ = batch.item_data.shadows_data.ubo_get();
+  active_culling_ubo_ = batch.culling_ubo_get();
+  active_culling_tx_ = batch.culling_texture_get();
 }
 
 /** \} */
