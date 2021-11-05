@@ -214,7 +214,7 @@ static void delete_bezt_from_nurb(const BezTriple *bezt, Nurb *nu)
   BLI_assert(nu->type == CU_BEZIER);
   int index = BKE_curve_nurb_vert_index_get(nu, bezt);
   nu->pntsu -= 1;
-  memcpy(nu->bezt + index, nu->bezt + index + 1, (nu->pntsu - index) * sizeof(BezTriple));
+  memmove(nu->bezt + index, nu->bezt + index + 1, (nu->pntsu - index) * sizeof(BezTriple));
 }
 
 static void delete_bp_from_nurb(const BPoint *bp, Nurb *nu)
@@ -222,7 +222,7 @@ static void delete_bp_from_nurb(const BPoint *bp, Nurb *nu)
   BLI_assert(nu->type == CU_NURBS || nu->type == CU_POLY);
   int index = BKE_curve_nurb_vert_index_get(nu, bp);
   nu->pntsu -= 1;
-  memcpy(nu->bp + index, nu->bp + index + 1, (nu->pntsu - index) * sizeof(BPoint));
+  memmove(nu->bp + index, nu->bp + index + 1, (nu->pntsu - index) * sizeof(BPoint));
 }
 
 /* Get the closest point on an edge to a given point based on perpendicular distance. Return true
