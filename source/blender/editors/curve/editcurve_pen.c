@@ -465,26 +465,17 @@ static void update_cut_loc_in_data(void *op_data, const ViewContext *vc)
 }
 
 /* Select nearby point and get a reference to it. */
-static void select_and_get_point(ViewContext *vc,
-                                 Nurb **nu,
-                                 BezTriple **bezt,
-                                 BPoint **bp,
-                                 const int point[2],
-                                 const bool is_start)
+static void select_and_get_point(
+    ViewContext *vc, Nurb **nu, BezTriple **bezt, BPoint **bp, const int point[2])
 {
-  short hand;
   BezTriple *bezt1 = NULL;
   BPoint *bp1 = NULL;
-  Base *basact1 = NULL;
   Nurb *nu1 = NULL;
   Curve *cu = vc->obedit->data;
+
   copy_v2_v2_int(vc->mval, point);
-  if (is_start) {
-    ED_curve_pick_vert(vc, 1, &nu1, &bezt1, &bp1, &hand, &basact1);
-  }
-  else {
-    ED_curve_nurb_vert_selected_find(cu, vc->v3d, &nu1, &bezt1, &bp1);
-  }
+  ED_curve_nurb_vert_selected_find(cu, vc->v3d, &nu1, &bezt1, &bp1);
+
   *bezt = bezt1;
   *bp = bp1;
   *nu = nu1;
@@ -909,16 +900,21 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   const bool is_new_point = RNA_boolean_get(op->ptr, "new");
   /* Whether a segment is being altered by click and drag. */
   bool moving_segment = RNA_boolean_get(op->ptr, "moving_segment");
-  /* Whether a point has already been selected and added to a variable. */
-  bool picked = false;
 
   if (event->type == EVT_MODAL_MAP) {
     if (event->val == PEN_MODAL_FREE_MOVE_HANDLE) {
-      select_and_get_point(&vc, &nu, &bezt, &bp, event->mval, event->prev_val != KM_PRESS);
-      picked = true;
+      select_and_get_point(&vc, &nu, &bezt, &bp, event->mval);
 
       if (bezt) {
-        bezt->h1 = bezt->h2 = HD_FREE;
+        if (bezt->h1 != HD_FREE || bezt->h2 != HD_FREE) {
+          bezt->h1 = bezt->h2 = HD_FREE;
+        }
+        else {
+          bezt->h1 = bezt->h2 = HD_ALIGN;
+          BKE_nurb_handles_calc(nu);
+        }
+        RNA_boolean_set(op->ptr, "dragging", true);
+        dragging = true;
       }
     }
   }
@@ -937,9 +933,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
       /* If dragging a new control point, move handle point with mouse cursor. Else move entire
        * control point. */
       else if (is_new_point) {
-        if (!picked) {
-          select_and_get_point(&vc, &nu, &bezt, &bp, event->mval, event->prev_val != KM_PRESS);
-        }
+        select_and_get_point(&vc, &nu, &bezt, &bp, event->prev_xy);
         if (bezt) {
           /* Move opposite handle if last vertex. */
           const bool invert = (nu->bezt + nu->pntsu - 1 == bezt &&
@@ -949,7 +943,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
         }
       }
       else {
-        select_and_get_point(&vc, &nu, &bezt, &bp, event->mval, event->prev_val != KM_PRESS);
+        select_and_get_point(&vc, &nu, &bezt, &bp, event->prev_xy);
         if (bezt) {
           move_selected_bezt_to_mouse(bezt, &vc, event);
         }
@@ -957,7 +951,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
           move_bp_to_mouse(bp, event, &vc);
         }
       }
-      if (nu->type == CU_BEZIER) {
+      if (nu && nu->type == CU_BEZIER) {
         BKE_nurb_handles_calc(nu);
       }
     }
@@ -974,7 +968,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
 
         if (found_point) {
           ED_curve_deselect_all(cu->editnurb);
-          if (nu->type == CU_BEZIER) {
+          if (nu && nu->type == CU_BEZIER) {
             BezTriple *next_bezt = BKE_nurb_bezt_get_next(nu, bezt);
             BezTriple *prev_bezt = BKE_nurb_bezt_get_prev(nu, bezt);
             if (next_bezt && prev_bezt) {
@@ -998,7 +992,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
           make_cut(event, cu, &nu, &vc);
         }
 
-        if (nu->type == CU_BEZIER) {
+        if (nu && nu->type == CU_BEZIER) {
           BKE_nurb_handles_calc(nu);
         }
       }
