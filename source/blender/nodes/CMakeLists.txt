@@ -552,3 +552,20 @@ if(WITH_OPENVDB)
 endif()
 
 blender_add_lib(bf_nodes "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
+
+if (${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.16")
+  set_target_properties(bf_nodes PROPERTIES UNITY_BUILD ON)
+  set_target_properties(bf_nodes PROPERTIES UNITY_BUILD_BATCH_SIZE 10)
+  # target_precompile_headers(bf_nodes
+  #   PRIVATE
+  #     "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/geometry/node_geometry_util.hh>"
+  #     "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/NOD_geometry_exec.hh>"
+  #     "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/NOD_geometry_nodes_eval_log.hh>"
+  # )
+  # if(WIN32)
+  #   target_precompile_headers(bf_nodes
+  #     PRIVATE
+  #       "$<$<COMPILE_LANGUAGE:CXX>:bli_winstuff.h>"
+  # )
+  # endif()
+endif()
