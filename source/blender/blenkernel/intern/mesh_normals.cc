@@ -269,7 +269,6 @@ static void mesh_calc_normals_poly_and_vertex(MutableSpan<MVert> mverts,
  */
 const float (*BKE_mesh_ensure_vertex_normals(const Mesh *mesh))[3]
 {
-  std::cout << __func__ << " mesh: " << mesh << "\n";
   if (!(mesh->runtime.cd_dirty_vert & CD_MASK_NORMAL ||
         mesh->runtime.cd_dirty_poly & CD_MASK_NORMAL)) {
     if (!CustomData_has_layer(&mesh->vdata, CD_NORMAL)) {
@@ -316,7 +315,6 @@ const float (*BKE_mesh_ensure_vertex_normals(const Mesh *mesh))[3]
  */
 const float (*BKE_mesh_ensure_face_normals(const Mesh *mesh))[3]
 {
-  std::cout << __func__ << " mesh: " << mesh << "\n";
   if (!(mesh->runtime.cd_dirty_poly & CD_MASK_NORMAL)) {
     BLI_assert(CustomData_has_layer(&mesh->pdata, CD_NORMAL) || mesh->totpoly == 0);
     return (const float(*)[3])CustomData_get_layer(&mesh->pdata, CD_NORMAL);
