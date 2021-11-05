@@ -122,7 +122,7 @@ void Camera::sync(void)
   else {
     unit_m4(data.viewmat);
     unit_m4(data.viewinv);
-    perspective_m4(data.winmat, 0.1f, 0.1f, 0.1f, 0.1f, 0.1f, 1.0f);
+    perspective_m4(data.winmat, -0.1f, 0.1f, -0.1f, 0.1f, 0.1f, 1.0f);
     invert_m4_m4(data.wininv, data.winmat);
     mul_m4_m4m4(data.persmat, data.winmat, data.viewmat);
     invert_m4_m4(data.persinv, data.persmat);
