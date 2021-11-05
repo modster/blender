@@ -35,7 +35,7 @@
 #include "UI_interface.h"
 #include "UI_resources.h"
 
-namespace blender::nodes {
+namespace blender::nodes::volume_to_mesh_node {
 
 static void geo_node_volume_to_mesh_declare(NodeDeclarationBuilder &b)
 {
@@ -192,20 +192,20 @@ static void geo_node_volume_to_mesh_exec(GeoNodeExecParams params)
   params.set_output("Mesh", std::move(geometry_set));
 }
 
-}  // namespace blender::nodes
+}  // namespace blender::nodes::volume_to_mesh_node
 
 void register_node_type_geo_volume_to_mesh()
 {
   static bNodeType ntype;
 
   geo_node_type_base(&ntype, GEO_NODE_VOLUME_TO_MESH, "Volume to Mesh", NODE_CLASS_GEOMETRY, 0);
-  ntype.declare = blender::nodes::geo_node_volume_to_mesh_declare;
+  ntype.declare = blender::nodes::volume_to_mesh_node::geo_node_volume_to_mesh_declare;
   node_type_storage(
       &ntype, "NodeGeometryVolumeToMesh", node_free_standard_storage, node_copy_standard_storage);
   node_type_size(&ntype, 170, 120, 700);
-  node_type_init(&ntype, blender::nodes::geo_node_volume_to_mesh_init);
-  node_type_update(&ntype, blender::nodes::geo_node_volume_to_mesh_update);
-  ntype.geometry_node_execute = blender::nodes::geo_node_volume_to_mesh_exec;
-  ntype.draw_buttons = blender::nodes::geo_node_volume_to_mesh_layout;
+  node_type_init(&ntype, blender::nodes::volume_to_mesh_node::geo_node_volume_to_mesh_init);
+  node_type_update(&ntype, blender::nodes::volume_to_mesh_node::geo_node_volume_to_mesh_update);
+  ntype.geometry_node_execute = blender::nodes::volume_to_mesh_node::geo_node_volume_to_mesh_exec;
+  ntype.draw_buttons = blender::nodes::volume_to_mesh_node::geo_node_volume_to_mesh_layout;
   nodeRegisterType(&ntype);
 }

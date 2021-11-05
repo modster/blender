@@ -23,7 +23,7 @@
 
 #include "node_geometry_util.hh"
 
-namespace blender::nodes::attribute_color_ramp_node {
+namespace blender::nodes::attribute_color_ramp_legacy_node {
 
 static void geo_node_attribute_color_ramp_declare(NodeDeclarationBuilder &b)
 {
@@ -119,7 +119,7 @@ static void geo_node_attribute_color_ramp_exec(GeoNodeExecParams params)
   params.set_output("Geometry", std::move(geometry_set));
 }
 
-}  // namespace blender::nodes::attribute_color_ramp_node
+}  // namespace blender::nodes::attribute_color_ramp_legacy_node
 
 void register_node_type_geo_attribute_color_ramp()
 {
@@ -132,13 +132,15 @@ void register_node_type_geo_attribute_color_ramp()
                      0);
   node_type_storage(
       &ntype, "NodeAttributeColorRamp", node_free_standard_storage, node_copy_standard_storage);
-  node_type_init(&ntype,
-                 blender::nodes::attribute_color_ramp_node::geo_node_attribute_color_ramp_init);
+  node_type_init(
+      &ntype,
+      blender::nodes::attribute_color_ramp_legacy_node::geo_node_attribute_color_ramp_init);
   node_type_size_preset(&ntype, NODE_SIZE_LARGE);
-  ntype.declare = blender::nodes::attribute_color_ramp_node::geo_node_attribute_color_ramp_declare;
+  ntype.declare =
+      blender::nodes::attribute_color_ramp_legacy_node::geo_node_attribute_color_ramp_declare;
   ntype.geometry_node_execute =
-      blender::nodes::attribute_color_ramp_node::geo_node_attribute_color_ramp_exec;
+      blender::nodes::attribute_color_ramp_legacy_node::geo_node_attribute_color_ramp_exec;
   ntype.draw_buttons =
-      blender::nodes::attribute_color_ramp_node::geo_node_attribute_color_ramp_layout;
+      blender::nodes::attribute_color_ramp_legacy_node::geo_node_attribute_color_ramp_layout;
   nodeRegisterType(&ntype);
 }

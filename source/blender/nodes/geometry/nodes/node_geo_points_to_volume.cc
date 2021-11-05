@@ -28,7 +28,7 @@
 #include "UI_interface.h"
 #include "UI_resources.h"
 
-namespace blender::nodes {
+namespace blender::nodes::points_to_volume_node {
 
 static void geo_node_points_to_volume_declare(NodeDeclarationBuilder &b)
 {
@@ -253,7 +253,7 @@ static void geo_node_points_to_volume_exec(GeoNodeExecParams params)
 #endif
 }
 
-}  // namespace blender::nodes
+}  // namespace blender::nodes::points_to_volume_node
 
 void register_node_type_geo_points_to_volume()
 {
@@ -266,10 +266,12 @@ void register_node_type_geo_points_to_volume()
                     node_free_standard_storage,
                     node_copy_standard_storage);
   node_type_size(&ntype, 170, 120, 700);
-  node_type_init(&ntype, blender::nodes::geo_node_points_to_volume_init);
-  node_type_update(&ntype, blender::nodes::geo_node_points_to_volume_update);
-  ntype.declare = blender::nodes::geo_node_points_to_volume_declare;
-  ntype.geometry_node_execute = blender::nodes::geo_node_points_to_volume_exec;
-  ntype.draw_buttons = blender::nodes::geo_node_points_to_volume_layout;
+  node_type_init(&ntype, blender::nodes::points_to_volume_node::geo_node_points_to_volume_init);
+  node_type_update(&ntype,
+                   blender::nodes::points_to_volume_node::geo_node_points_to_volume_update);
+  ntype.declare = blender::nodes::points_to_volume_node::geo_node_points_to_volume_declare;
+  ntype.geometry_node_execute =
+      blender::nodes::points_to_volume_node::geo_node_points_to_volume_exec;
+  ntype.draw_buttons = blender::nodes::points_to_volume_node::geo_node_points_to_volume_layout;
   nodeRegisterType(&ntype);
 }

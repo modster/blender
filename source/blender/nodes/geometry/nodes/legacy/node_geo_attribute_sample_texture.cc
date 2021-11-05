@@ -28,7 +28,7 @@
 
 #include "node_geometry_util.hh"
 
-namespace blender::nodes::attribute_sample_texture_node {
+namespace blender::nodes::attribute_sample_texture_legacy_node {
 
 static void geo_node_attribute_sample_texture_declare(NodeDeclarationBuilder &b)
 {
@@ -119,7 +119,7 @@ static void geo_node_attribute_sample_texture_exec(GeoNodeExecParams params)
   params.set_output("Geometry", geometry_set);
 }
 
-}  // namespace blender::nodes::attribute_sample_texture_node
+}  // namespace blender::nodes::attribute_sample_texture_legacy_node
 
 void register_node_type_geo_sample_texture()
 {
@@ -131,9 +131,9 @@ void register_node_type_geo_sample_texture()
                      NODE_CLASS_ATTRIBUTE,
                      0);
   node_type_size_preset(&ntype, NODE_SIZE_LARGE);
-  ntype.declare =
-      blender::nodes::attribute_sample_texture_node::geo_node_attribute_sample_texture_declare;
+  ntype.declare = blender::nodes::attribute_sample_texture_legacy_node::
+      geo_node_attribute_sample_texture_declare;
   ntype.geometry_node_execute =
-      blender::nodes::attribute_sample_texture_node::geo_node_attribute_sample_texture_exec;
+      blender::nodes::attribute_sample_texture_legacy_node::geo_node_attribute_sample_texture_exec;
   nodeRegisterType(&ntype);
 }

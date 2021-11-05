@@ -25,7 +25,7 @@
 
 #include "node_geometry_util.hh"
 
-namespace blender::nodes::attribute_math_node {
+namespace blender::nodes::attribute_math_legacy_node {
 
 static void geo_node_attribute_math_declare(NodeDeclarationBuilder &b)
 {
@@ -295,7 +295,7 @@ static void geo_node_attribute_math_exec(GeoNodeExecParams params)
   params.set_output("Geometry", geometry_set);
 }
 
-}  // namespace blender::nodes::attribute_math_node
+}  // namespace blender::nodes::attribute_math_legacy_node
 
 void register_node_type_geo_attribute_math()
 {
@@ -303,12 +303,14 @@ void register_node_type_geo_attribute_math()
 
   geo_node_type_base(
       &ntype, GEO_NODE_LEGACY_ATTRIBUTE_MATH, "Attribute Math", NODE_CLASS_ATTRIBUTE, 0);
-  ntype.declare = blender::nodes::attribute_math_node::geo_node_attribute_math_declare;
-  ntype.geometry_node_execute = blender::nodes::attribute_math_node::geo_node_attribute_math_exec;
-  ntype.draw_buttons = blender::nodes::attribute_math_node::geo_node_attribute_math_layout;
-  node_type_label(&ntype, blender::nodes::attribute_math_node::geo_node_math_label);
-  node_type_update(&ntype, blender::nodes::attribute_math_node::geo_node_attribute_math_update);
-  node_type_init(&ntype, blender::nodes::attribute_math_node::geo_node_attribute_math_init);
+  ntype.declare = blender::nodes::attribute_math_legacy_node::geo_node_attribute_math_declare;
+  ntype.geometry_node_execute =
+      blender::nodes::attribute_math_legacy_node::geo_node_attribute_math_exec;
+  ntype.draw_buttons = blender::nodes::attribute_math_legacy_node::geo_node_attribute_math_layout;
+  node_type_label(&ntype, blender::nodes::attribute_math_legacy_node::geo_node_math_label);
+  node_type_update(&ntype,
+                   blender::nodes::attribute_math_legacy_node::geo_node_attribute_math_update);
+  node_type_init(&ntype, blender::nodes::attribute_math_legacy_node::geo_node_attribute_math_init);
   node_type_storage(
       &ntype, "NodeAttributeMath", node_free_standard_storage, node_copy_standard_storage);
   nodeRegisterType(&ntype);

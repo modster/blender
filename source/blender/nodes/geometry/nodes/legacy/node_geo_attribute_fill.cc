@@ -19,7 +19,7 @@
 
 #include "node_geometry_util.hh"
 
-namespace blender::nodes::attribute_fill_node {
+namespace blender::nodes::attribute_fill_legacy_node {
 
 static void geo_node_attribute_fill_declare(NodeDeclarationBuilder &b)
 {
@@ -146,7 +146,7 @@ static void geo_node_attribute_fill_exec(GeoNodeExecParams params)
   params.set_output("Geometry", geometry_set);
 }
 
-}  // namespace blender::nodes::attribute_fill_node
+}  // namespace blender::nodes::attribute_fill_legacy_node
 
 void register_node_type_geo_attribute_fill()
 {
@@ -154,10 +154,12 @@ void register_node_type_geo_attribute_fill()
 
   geo_node_type_base(
       &ntype, GEO_NODE_LEGACY_ATTRIBUTE_FILL, "Attribute Fill", NODE_CLASS_ATTRIBUTE, 0);
-  node_type_init(&ntype, blender::nodes::attribute_fill_node::geo_node_attribute_fill_init);
-  node_type_update(&ntype, blender::nodes::attribute_fill_node::geo_node_attribute_fill_update);
-  ntype.geometry_node_execute = blender::nodes::attribute_fill_node::geo_node_attribute_fill_exec;
-  ntype.draw_buttons = blender::nodes::attribute_fill_node::geo_node_attribute_fill_layout;
-  ntype.declare = blender::nodes::attribute_fill_node::geo_node_attribute_fill_declare;
+  node_type_init(&ntype, blender::nodes::attribute_fill_legacy_node::geo_node_attribute_fill_init);
+  node_type_update(&ntype,
+                   blender::nodes::attribute_fill_legacy_node::geo_node_attribute_fill_update);
+  ntype.geometry_node_execute =
+      blender::nodes::attribute_fill_legacy_node::geo_node_attribute_fill_exec;
+  ntype.draw_buttons = blender::nodes::attribute_fill_legacy_node::geo_node_attribute_fill_layout;
+  ntype.declare = blender::nodes::attribute_fill_legacy_node::geo_node_attribute_fill_declare;
   nodeRegisterType(&ntype);
 }

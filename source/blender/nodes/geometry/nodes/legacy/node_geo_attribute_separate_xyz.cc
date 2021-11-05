@@ -19,7 +19,7 @@
 
 #include "node_geometry_util.hh"
 
-namespace blender::nodes::attribute_separate_xyz_node {
+namespace blender::nodes::attribute_separate_xyz_legacy_node {
 
 static void geo_node_attribute_separate_xyz_declare(NodeDeclarationBuilder &b)
 {
@@ -151,7 +151,7 @@ static void geo_node_attribute_separate_xyz_exec(GeoNodeExecParams params)
   params.set_output("Geometry", geometry_set);
 }
 
-}  // namespace blender::nodes::attribute_separate_xyz_node
+}  // namespace blender::nodes::attribute_separate_xyz_legacy_node
 
 void register_node_type_geo_attribute_separate_xyz()
 {
@@ -163,16 +163,18 @@ void register_node_type_geo_attribute_separate_xyz()
                      NODE_CLASS_ATTRIBUTE,
                      0);
   ntype.declare =
-      blender::nodes::attribute_separate_xyz_node::geo_node_attribute_separate_xyz_declare;
+      blender::nodes::attribute_separate_xyz_legacy_node::geo_node_attribute_separate_xyz_declare;
   node_type_init(
-      &ntype, blender::nodes::attribute_separate_xyz_node::geo_node_attribute_separate_xyz_init);
+      &ntype,
+      blender::nodes::attribute_separate_xyz_legacy_node::geo_node_attribute_separate_xyz_init);
   node_type_update(
-      &ntype, blender::nodes::attribute_separate_xyz_node::geo_node_attribute_separate_xyz_update);
+      &ntype,
+      blender::nodes::attribute_separate_xyz_legacy_node::geo_node_attribute_separate_xyz_update);
   node_type_storage(
       &ntype, "NodeAttributeSeparateXYZ", node_free_standard_storage, node_copy_standard_storage);
   ntype.geometry_node_execute =
-      blender::nodes::attribute_separate_xyz_node::geo_node_attribute_separate_xyz_exec;
+      blender::nodes::attribute_separate_xyz_legacy_node::geo_node_attribute_separate_xyz_exec;
   ntype.draw_buttons =
-      blender::nodes::attribute_separate_xyz_node::geo_node_attribute_separate_xyz_layout;
+      blender::nodes::attribute_separate_xyz_legacy_node::geo_node_attribute_separate_xyz_layout;
   nodeRegisterType(&ntype);
 }

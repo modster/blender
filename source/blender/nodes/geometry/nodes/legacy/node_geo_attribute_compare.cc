@@ -21,7 +21,7 @@
 
 #include "node_geometry_util.hh"
 
-namespace blender::nodes::attribute_compare_node {
+namespace blender::nodes::attribute_compare_legacy_node {
 
 static void geo_node_attribute_compare_declare(NodeDeclarationBuilder &b)
 {
@@ -341,7 +341,7 @@ static void geo_node_attribute_compare_exec(GeoNodeExecParams params)
   params.set_output("Geometry", geometry_set);
 }
 
-}  // namespace blender::nodes::attribute_compare_node
+}  // namespace blender::nodes::attribute_compare_legacy_node
 
 void register_node_type_geo_attribute_compare()
 {
@@ -349,14 +349,17 @@ void register_node_type_geo_attribute_compare()
 
   geo_node_type_base(
       &ntype, GEO_NODE_LEGACY_ATTRIBUTE_COMPARE, "Attribute Compare", NODE_CLASS_ATTRIBUTE, 0);
-  ntype.declare = blender::nodes::attribute_compare_node::geo_node_attribute_compare_declare;
+  ntype.declare =
+      blender::nodes::attribute_compare_legacy_node::geo_node_attribute_compare_declare;
   ntype.geometry_node_execute =
-      blender::nodes::attribute_compare_node::geo_node_attribute_compare_exec;
-  ntype.draw_buttons = blender::nodes::attribute_compare_node::geo_node_attribute_compare_layout;
-  node_type_update(&ntype,
-                   blender::nodes::attribute_compare_node::geo_node_attribute_compare_update);
+      blender::nodes::attribute_compare_legacy_node::geo_node_attribute_compare_exec;
+  ntype.draw_buttons =
+      blender::nodes::attribute_compare_legacy_node::geo_node_attribute_compare_layout;
+  node_type_update(
+      &ntype, blender::nodes::attribute_compare_legacy_node::geo_node_attribute_compare_update);
   node_type_storage(
       &ntype, "NodeAttributeCompare", node_free_standard_storage, node_copy_standard_storage);
-  node_type_init(&ntype, blender::nodes::attribute_compare_node::geo_node_attribute_compare_init);
+  node_type_init(&ntype,
+                 blender::nodes::attribute_compare_legacy_node::geo_node_attribute_compare_init);
   nodeRegisterType(&ntype);
 }

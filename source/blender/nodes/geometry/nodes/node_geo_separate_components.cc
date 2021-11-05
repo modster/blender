@@ -16,9 +16,9 @@
 
 #include "node_geometry_util.hh"
 
-namespace blender::nodes {
+namespace blender::nodes::separate_components_node {
 
-static void geo_node_join_geometry_declare(NodeDeclarationBuilder &b)
+static void geo_node_separate_components_declare(NodeDeclarationBuilder &b)
 {
   b.add_input<decl::Geometry>(N_("Geometry"));
   b.add_output<decl::Geometry>(N_("Mesh"));
@@ -61,7 +61,7 @@ static void geo_node_separate_components_exec(GeoNodeExecParams params)
   params.set_output("Instances", instances);
 }
 
-}  // namespace blender::nodes
+}  // namespace blender::nodes::separate_components_node
 
 void register_node_type_geo_separate_components()
 {
@@ -69,7 +69,8 @@ void register_node_type_geo_separate_components()
 
   geo_node_type_base(
       &ntype, GEO_NODE_SEPARATE_COMPONENTS, "Separate Components", NODE_CLASS_GEOMETRY, 0);
-  ntype.declare = blender::nodes::geo_node_join_geometry_declare;
-  ntype.geometry_node_execute = blender::nodes::geo_node_separate_components_exec;
+  ntype.declare = blender::nodes::separate_components_node::geo_node_separate_components_declare;
+  ntype.geometry_node_execute =
+      blender::nodes::separate_components_node::geo_node_separate_components_exec;
   nodeRegisterType(&ntype);
 }
