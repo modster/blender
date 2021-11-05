@@ -25,7 +25,6 @@
 
 #include "BLI_utildefines.h"
 
-#include "BLI_float3.hh"
 #include "BLI_ghash.h"
 #include "BLI_listbase.h"
 #include "BLI_math.h"
@@ -65,7 +64,6 @@
 #include "BLI_vector.hh"
 
 using blender::Array;
-using blender::float3;
 using blender::IndexRange;
 using blender::ListBaseWrapper;
 using blender::MutableSpan;

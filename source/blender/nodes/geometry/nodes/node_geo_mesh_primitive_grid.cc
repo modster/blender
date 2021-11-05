@@ -105,12 +105,6 @@ Mesh *create_grid_mesh(const int verts_x,
     }
   }
 
-  {
-    /* Fill vertex normal data here since it is trivial and can avoid calculations later. */
-    MutableSpan vert_normals{(float3 *)BKE_mesh_vertex_normals_for_write(mesh), mesh->totvert};
-    vert_normals.fill(float3(0.0f, 0.0f, 1.0f));
-  }
-
   /* Build the horizontal edges in the X direction. */
   const int y_edges_start = 0;
   const short edge_flag = (edges_x == 0 || edges_y == 0) ? ME_LOOSEEDGE :

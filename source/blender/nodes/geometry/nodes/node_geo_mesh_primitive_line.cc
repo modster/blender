@@ -118,10 +118,6 @@ Mesh *create_line_mesh(const float3 start, const float3 delta, const int count)
   MutableSpan<MVert> verts{mesh->mvert, mesh->totvert};
   MutableSpan<MEdge> edges{mesh->medge, mesh->totedge};
 
-  /* Fill vertex normal data here since it is trivial and can avoid calculations later. */
-  MutableSpan vert_normals{(float3 *)BKE_mesh_vertex_normals_for_write(mesh), mesh->totvert};
-  vert_normals.fill(delta.normalized());
-
   for (const int i : verts.index_range()) {
     copy_v3_v3(verts[i].co, start + delta * i);
   }
