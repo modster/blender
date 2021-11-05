@@ -1068,7 +1068,7 @@ void CURVE_OT_pen(wmOperatorType *ot)
   /* identifiers */
   ot->name = "Curve Pen";
   ot->idname = "CURVE_OT_pen";
-  ot->description = "Edit curves with less shortcuts";
+  ot->description = "Construct and edit splines";
 
   /* api callbacks */
   ot->invoke = curve_pen_invoke;
