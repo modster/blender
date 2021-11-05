@@ -2965,9 +2965,6 @@ void pbvh_vertex_iter_init(PBVH *pbvh, PBVHNode *node, PBVHVertexIter *vi, int m
   vi->vert_indices = vert_indices;
   vi->mverts = verts;
 
-  /* Sculpt/paint code can adjust normals when restoring mesh data. */
-  vi->vert_normals = (float(*)[3])BKE_mesh_ensure_vertex_normals(pbvh->mesh);
-
   if (pbvh->type == PBVH_BMESH) {
     BLI_gsetIterator_init(&vi->bm_unique_verts, node->bm_unique_verts);
     BLI_gsetIterator_init(&vi->bm_other_verts, node->bm_other_verts);
@@ -2982,6 +2979,9 @@ void pbvh_vertex_iter_init(PBVH *pbvh, PBVHNode *node, PBVHVertexIter *vi, int m
 
   vi->mask = NULL;
   if (pbvh->type == PBVH_FACES) {
+    /* Cast awat const because sculpt/paint code can adjust normals when restoring mesh data. */
+    vi->vert_normals = (float(*)[3])BKE_mesh_ensure_vertex_normals(pbvh->mesh);
+
     vi->vmask = CustomData_get_layer(pbvh->vdata, CD_PAINT_MASK);
     vi->vcol = CustomData_get_layer(pbvh->vdata, CD_PROP_COLOR);
   }
