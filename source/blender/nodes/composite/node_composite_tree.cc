@@ -60,7 +60,9 @@ static void composite_get_from_context(const bContext *C,
   *r_ntree = scene->nodetree;
 }
 
-static void foreach_nodeclass(Scene *UNUSED(scene), void *calldata, bNodeClassCallback func)
+static void composite_foreach_nodeclass(Scene *UNUSED(scene),
+                                        void *calldata,
+                                        bNodeClassCallback func)
 {
   func(calldata, NODE_CLASS_INPUT, N_("Input"));
   func(calldata, NODE_CLASS_OUTPUT, N_("Output"));
@@ -75,7 +77,7 @@ static void foreach_nodeclass(Scene *UNUSED(scene), void *calldata, bNodeClassCa
   func(calldata, NODE_CLASS_LAYOUT, N_("Layout"));
 }
 
-static void free_node_cache(bNodeTree *UNUSED(ntree), bNode *node)
+static void composite_free_node_cache(bNodeTree *UNUSED(ntree), bNode *node)
 {
   LISTBASE_FOREACH (bNodeSocket *, sock, &node->outputs) {
     if (sock->cache) {
@@ -84,15 +86,15 @@ static void free_node_cache(bNodeTree *UNUSED(ntree), bNode *node)
   }
 }
 
-static void free_cache(bNodeTree *ntree)
+static void composite_free_cache(bNodeTree *ntree)
 {
   LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
-    free_node_cache(ntree, node);
+    composite_free_node_cache(ntree, node);
   }
 }
 
 /* local tree then owns all compbufs */
-static void localize(bNodeTree *localtree, bNodeTree *ntree)
+static void composite_localize(bNodeTree *localtree, bNodeTree *ntree)
 {
 
   bNode *node = (bNode *)ntree->nodes.first;
@@ -135,12 +137,12 @@ static void localize(bNodeTree *localtree, bNodeTree *ntree)
   }
 }
 
-static void local_sync(bNodeTree *localtree, bNodeTree *ntree)
+static void composite_local_sync(bNodeTree *localtree, bNodeTree *ntree)
 {
   BKE_node_preview_sync_tree(ntree, localtree);
 }
 
-static void local_merge(Main *bmain, bNodeTree *localtree, bNodeTree *ntree)
+static void composite_local_merge(Main *bmain, bNodeTree *localtree, bNodeTree *ntree)
 {
   bNode *lnode;
   bNodeSocket *lsock;
@@ -181,7 +183,7 @@ static void local_merge(Main *bmain, bNodeTree *localtree, bNodeTree *ntree)
   }
 }
 
-static void update(bNodeTree *ntree)
+static void composite_update(bNodeTree *ntree)
 {
   ntreeSetOutput(ntree);
 
@@ -223,13 +225,13 @@ void register_node_tree_type_cmp(void)
   tt->ui_icon = 0; /* Defined in `drawnode.c`. */
   strcpy(tt->ui_description, N_("Compositing nodes"));
 
-  tt->free_cache = free_cache;
-  tt->free_node_cache = free_node_cache;
-  tt->foreach_nodeclass = foreach_nodeclass;
-  tt->localize = localize;
-  tt->local_sync = local_sync;
-  tt->local_merge = local_merge;
-  tt->update = update;
+  tt->free_cache = composite_free_cache;
+  tt->free_node_cache = composite_free_node_cache;
+  tt->foreach_nodeclass = composite_foreach_nodeclass;
+  tt->localize = composite_localize;
+  tt->local_sync = composite_local_sync;
+  tt->local_merge = composite_local_merge;
+  tt->update = composite_update;
   tt->get_from_context = composite_get_from_context;
   tt->node_add_init = composite_node_add_init;
   tt->valid_socket_type = composite_node_tree_socket_type_valid;
