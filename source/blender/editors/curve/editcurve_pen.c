@@ -514,13 +514,11 @@ static void update_data_for_all_nurbs(const ListBase *nurbs, const ViewContext *
     if (nu->bezt) {
       float screen_co[2];
       if (data->nurb == NULL) {
-        if (ED_view3d_project_float_object(vc->region,
-                                           nu->bezt->vec[1],
-                                           screen_co,
-                                           V3D_PROJ_TEST_CLIP_BB | V3D_PROJ_TEST_CLIP_WIN) ==
-            V3D_PROJ_RET_OK) {
-          assign_cut_data(data, FLT_MAX, nu, 0, -1, 0.0f, nu->bezt->vec[1]);
-        }
+        ED_view3d_project_float_object(vc->region,
+                                       nu->bezt->vec[1],
+                                       screen_co,
+                                       V3D_PROJ_TEST_CLIP_BB | V3D_PROJ_TEST_CLIP_WIN);
+        assign_cut_data(data, FLT_MAX, nu, 0, -1, 0.0f, nu->bezt->vec[1]);
       }
 
       BezTriple *bezt = NULL;
