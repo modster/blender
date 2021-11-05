@@ -1130,6 +1130,8 @@ bool BKE_mesh_is_valid(Mesh *me)
   bool is_valid = true;
   bool changed = true;
 
+  BKE_mesh_assert_normals_dirty_or_calculated(me);
+
   is_valid &= BKE_mesh_validate_all_customdata(
       &me->vdata,
       me->totvert,

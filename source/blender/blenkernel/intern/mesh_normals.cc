@@ -376,6 +376,30 @@ void BKE_mesh_calc_normals(Mesh *mesh)
 #endif
 }
 
+void BKE_mesh_assert_normals_dirty_or_calculated(const Mesh *mesh)
+{
+  if (!(mesh->runtime.cd_dirty_vert & CD_MASK_NORMAL)) {
+    /* Meshes with non-dirty normals should always have a normal custom data layer. */
+    if (!CustomData_has_layer(&mesh->vdata, CD_NORMAL)) {
+      Mesh *me = const_cast<Mesh *>(mesh);
+      MEM_freeN(me);
+      /* Cause a use after free, to quickly tell where the offending mesh was allocated. */
+      MEM_freeN(me);
+    }
+    BLI_assert(CustomData_has_layer(&mesh->vdata, CD_NORMAL));
+  }
+  if (!(mesh->runtime.cd_dirty_poly & CD_MASK_NORMAL)) {
+    /* Meshes with non-dirty normals should always have a normal custom data layer. */
+    if (!CustomData_has_layer(&mesh->pdata, CD_NORMAL)) {
+      Mesh *me = const_cast<Mesh *>(mesh);
+      MEM_freeN(me);
+      /* Cause a use after free, to quickly tell where the offending mesh was allocated. */
+      MEM_freeN(me);
+    }
+    BLI_assert(CustomData_has_layer(&mesh->vdata, CD_NORMAL));
+  }
+}
+
 void BKE_mesh_calc_normals_looptri(MVert *mverts,
                                    int numVerts,
                                    const MLoop *mloop,
