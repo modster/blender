@@ -5713,7 +5713,7 @@ void CURVE_OT_extrude(wmOperatorType *ot)
 /** \name Make Cyclic Operator
  * \{ */
 
-bool curve_toggle_cyclic(View3D *v3d, ListBase *editnurb, int direction)
+bool ed_curve_toggle_cyclic(View3D *v3d, ListBase *editnurb, int direction)
 {
   BezTriple *bezt;
   BPoint *bp;
@@ -5810,7 +5810,7 @@ static int toggle_cyclic_exec(bContext *C, wmOperator *op)
     }
 
     ListBase *editnurb = object_editcurve_get(obedit);
-    if (curve_toggle_cyclic(v3d, editnurb, direction)) {
+    if (ed_curve_toggle_cyclic(v3d, editnurb, direction)) {
       changed_multi = true;
       WM_event_add_notifier(C, NC_GEOM | ND_DATA, obedit->data);
       DEG_id_tag_update(obedit->data, 0);
@@ -6496,12 +6496,12 @@ static bool test_bezt_is_sel_any(const void *bezt_v, void *user_data)
   return BEZT_ISSEL_ANY_HIDDENHANDLES(v3d, bezt);
 }
 
-void dissolve_bez_segment(BezTriple *bezt_prev,
-                          BezTriple *bezt_next,
-                          const Nurb *nu,
-                          const Curve *cu,
-                          const uint span_len,
-                          const uint span_step[2])
+void ed_dissolve_bez_segment(BezTriple *bezt_prev,
+                             BezTriple *bezt_next,
+                             const Nurb *nu,
+                             const Curve *cu,
+                             const uint span_len,
+                             const uint span_step[2])
 {
   int i_span_edge_len = span_len + 1;
   const uint dims = 3;
@@ -6595,7 +6595,7 @@ static int curve_dissolve_exec(bContext *C, wmOperator *UNUSED(op))
           BezTriple *bezt_prev = &nu->bezt[mod_i(span_step[0] - 1, nu->pntsu)];
           BezTriple *bezt_next = &nu->bezt[mod_i(span_step[1] + 1, nu->pntsu)];
 
-          dissolve_bez_segment(bezt_prev, bezt_next, nu, cu, span_len, span_step);
+          ed_dissolve_bez_segment(bezt_prev, bezt_next, nu, cu, span_len, span_step);
         }
       }
     }

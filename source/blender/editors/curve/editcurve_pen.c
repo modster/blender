@@ -851,7 +851,7 @@ static bool make_cyclic_if_endpoints(
          (nu->bp && bp != sel_bp && (bp == nu->bp || bp == nu->bp + nu->pntsu - 1)))) {
       View3D *v3d = CTX_wm_view3d(C);
       ListBase *editnurb = object_editcurve_get(vc->obedit);
-      curve_toggle_cyclic(v3d, editnurb, 0);
+      ed_curve_toggle_cyclic(v3d, editnurb, 0);
       return true;
     }
   }
@@ -980,7 +980,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
             if (next_bezt && prev_bezt) {
               const int bez_index = BKE_curve_nurb_vert_index_get(nu, bezt);
               uint span_step[2] = {bez_index, bez_index};
-              dissolve_bez_segment(prev_bezt, next_bezt, nu, cu, 1, span_step);
+              ed_dissolve_bez_segment(prev_bezt, next_bezt, nu, cu, 1, span_step);
             }
             delete_bezt_from_nurb(bezt, nu);
           }
