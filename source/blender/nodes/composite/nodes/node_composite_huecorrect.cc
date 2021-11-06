@@ -66,13 +66,10 @@ static int node_composite_gpu_huecorrect(GPUMaterial *mat,
   float band_layer;
   GPUNodeLink *band_texture = GPU_color_band(mat, band_size, band_values, &band_layer);
 
-  float min_hsv[3];
-  float range_hsv[3];
-  for (int i = 0; i < 3; i++) {
-    const CurveMap &curve_map = curve_mapping->cm[i];
-    min_hsv[i] = curve_map.mintable;
-    range_hsv[i] = 1.0f / max_ff(1e-8f, curve_map.maxtable - curve_map.mintable);
-  }
+  float range_minimums[CM_TOT];
+  BKE_curvemapping_get_range_minimums(curve_mapping, range_minimums);
+  float range_dividers[CM_TOT];
+  BKE_curvemapping_compute_range_dividers(curve_mapping, range_dividers);
 
   return GPU_stack_link(mat,
                         node,
@@ -81,8 +78,8 @@ static int node_composite_gpu_huecorrect(GPUMaterial *mat,
                         out,
                         band_texture,
                         GPU_constant(&band_layer),
-                        GPU_uniform(min_hsv),
-                        GPU_uniform(range_hsv));
+                        GPU_uniform(range_minimums),
+                        GPU_uniform(range_dividers));
 }
 
 void register_node_type_cmp_huecorrect(void)

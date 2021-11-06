@@ -42,6 +42,7 @@
  * dependencies, and be placed after that file in the list. */
 
 extern char datatoc_gpu_shader_common_color_util_glsl[];
+extern char datatoc_gpu_shader_common_curves_glsl[];
 extern char datatoc_gpu_shader_common_math_util_glsl[];
 extern char datatoc_gpu_shader_common_mix_rgb_glsl[];
 extern char datatoc_gpu_shader_common_hash_glsl[];
@@ -106,7 +107,6 @@ extern char datatoc_gpu_shader_material_output_world_glsl[];
 extern char datatoc_gpu_shader_material_particle_info_glsl[];
 extern char datatoc_gpu_shader_material_principled_glsl[];
 extern char datatoc_gpu_shader_material_refraction_glsl[];
-extern char datatoc_gpu_shader_material_rgb_curves_glsl[];
 extern char datatoc_gpu_shader_material_rgb_to_bw_glsl[];
 extern char datatoc_gpu_shader_material_separate_hsv_glsl[];
 extern char datatoc_gpu_shader_material_separate_rgb_glsl[];
@@ -133,7 +133,6 @@ extern char datatoc_gpu_shader_material_toon_glsl[];
 extern char datatoc_gpu_shader_material_translucent_glsl[];
 extern char datatoc_gpu_shader_material_transparent_glsl[];
 extern char datatoc_gpu_shader_material_uv_map_glsl[];
-extern char datatoc_gpu_shader_material_vector_curves_glsl[];
 extern char datatoc_gpu_shader_material_vector_displacement_glsl[];
 extern char datatoc_gpu_shader_material_vector_math_glsl[];
 extern char datatoc_gpu_shader_material_vector_rotate_glsl[];
@@ -153,6 +152,11 @@ static GPUMaterialLibrary gpu_shader_common_math_util_library = {
 
 static GPUMaterialLibrary gpu_shader_common_color_util_library = {
     .code = datatoc_gpu_shader_common_color_util_glsl,
+    .dependencies = {NULL},
+};
+
+static GPUMaterialLibrary gpu_shader_common_curves_library = {
+    .code = datatoc_gpu_shader_common_curves_glsl,
     .dependencies = {NULL},
 };
 
@@ -472,11 +476,6 @@ static GPUMaterialLibrary gpu_shader_material_refraction_library = {
     .dependencies = {NULL},
 };
 
-static GPUMaterialLibrary gpu_shader_material_rgb_curves_library = {
-    .code = datatoc_gpu_shader_material_rgb_curves_glsl,
-    .dependencies = {NULL},
-};
-
 static GPUMaterialLibrary gpu_shader_material_rgb_to_bw_library = {
     .code = datatoc_gpu_shader_material_rgb_to_bw_glsl,
     .dependencies = {NULL},
@@ -602,11 +601,6 @@ static GPUMaterialLibrary gpu_shader_material_uv_map_library = {
     .dependencies = {NULL},
 };
 
-static GPUMaterialLibrary gpu_shader_material_vector_curves_library = {
-    .code = datatoc_gpu_shader_material_vector_curves_glsl,
-    .dependencies = {NULL},
-};
-
 static GPUMaterialLibrary gpu_shader_material_vector_displacement_library = {
     .code = datatoc_gpu_shader_material_vector_displacement_glsl,
     .dependencies = {NULL},
@@ -665,6 +659,7 @@ static GPUMaterialLibrary gpu_shader_material_world_normals_library = {
 static GPUMaterialLibrary *gpu_material_libraries[] = {
     &gpu_shader_common_math_util_library,
     &gpu_shader_common_color_util_library,
+    &gpu_shader_common_curves_library,
     &gpu_shader_common_mix_rgb_library,
     &gpu_shader_common_hash_library,
     &gpu_shader_material_noise_library,
@@ -715,7 +710,6 @@ static GPUMaterialLibrary *gpu_material_libraries[] = {
     &gpu_shader_material_particle_info_library,
     &gpu_shader_material_principled_library,
     &gpu_shader_material_refraction_library,
-    &gpu_shader_material_rgb_curves_library,
     &gpu_shader_material_rgb_to_bw_library,
     &gpu_shader_material_separate_hsv_library,
     &gpu_shader_material_separate_rgb_library,
@@ -741,7 +735,6 @@ static GPUMaterialLibrary *gpu_material_libraries[] = {
     &gpu_shader_material_translucent_library,
     &gpu_shader_material_transparent_library,
     &gpu_shader_material_uv_map_library,
-    &gpu_shader_material_vector_curves_library,
     &gpu_shader_material_vector_displacement_library,
     &gpu_shader_material_vector_math_library,
     &gpu_shader_material_vector_rotate_library,

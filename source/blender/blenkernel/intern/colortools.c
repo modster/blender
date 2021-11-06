@@ -1197,6 +1197,98 @@ bool BKE_curvemapping_RGBA_does_something(const CurveMapping *cumap)
   return false;
 }
 
+/* Get the minimum x value of each curve map table. */
+void BKE_curvemapping_get_range_minimums(const CurveMapping *curve_mapping, float minimums[CM_TOT])
+{
+  for (int i = 0; i < CM_TOT; i++) {
+    minimums[i] = curve_mapping->cm[i].mintable;
+  }
+}
+
+/* Get the reciprocal of the difference between the maximum and the minimum x value of each curve
+ * map table. Evaluation parameters can be multiplied by this value to be normalized. If the
+ * difference is zero, 1^8 is returned. */
+void BKE_curvemapping_compute_range_dividers(const CurveMapping *curve_mapping,
+                                             float dividers[CM_TOT])
+{
+  for (int i = 0; i < CM_TOT; i++) {
+    const CurveMap *curve_map = &curve_mapping->cm[i];
+    dividers[i] = 1.0f / max_ff(1e-8f, curve_map->maxtable - curve_map->mintable);
+  }
+}
+
+/* Compute the slopes at the start and end points of each curve map. The slopes are multiplied by
+ * the range of the curve map to compensate for parameter normalization. If the slope is vertical,
+ * 1^8 is returned.  */
+void BKE_curvemapping_compute_slopes(const CurveMapping *curve_mapping,
+                                     float start_slopes[CM_TOT],
+                                     float end_slopes[CM_TOT])
+{
+  float range_dividers[CM_TOT];
+  BKE_curvemapping_compute_range_dividers(curve_mapping, range_dividers);
+  for (int i = 0; i < CM_TOT; i++) {
+    const CurveMap *curve_map = &curve_mapping->cm[i];
+    /* If extrapolation is not enabled, the slopes are horizontal. */
+    if (!(curve_mapping->flag & CUMA_EXTEND_EXTRAPOLATE)) {
+      start_slopes[i] = 0.0f;
+      end_slopes[i] = 0.0f;
+      continue;
+    }
+
+    if (curve_map->ext_in[0] != 0.0f) {
+      start_slopes[i] = curve_map->ext_in[1] / (curve_map->ext_in[0] * range_dividers[i]);
+    }
+    else {
+      start_slopes[i] = 1e8f;
+    }
+
+    if (curve_map->ext_out[0] != 0.0f) {
+      end_slopes[i] = curve_map->ext_out[1] / (curve_map->ext_out[0] * range_dividers[i]);
+    }
+    else {
+      end_slopes[i] = 1e8f;
+    }
+  }
+}
+
+/* Check if the curve map at the index is identity, that is, does nothing. A curve map is said to
+ * be identity if:
+ * - The curve mapping uses extrapolation.
+ * - Its range is 1.
+ * - The slope at its start point is 1.
+ * - The slope at its end point is 1.
+ * - The number of points is 2.
+ * - The start point is at (0, 0).
+ * - The end point is at (1, 1).
+ * Note that this could return false even if the curve map is identity, this happens in the case
+ * when more than 2 points exist in the curve map but all points are collinear. */
+bool BKE_curvemapping_is_map_identity(const CurveMapping *curve_mapping, int index)
+{
+  if (!(curve_mapping->flag & CUMA_EXTEND_EXTRAPOLATE)) {
+    return false;
+  }
+  const CurveMap *curve_map = &curve_mapping->cm[index];
+  if (curve_map->maxtable - curve_map->mintable != 1.0f) {
+    return false;
+  }
+  if (curve_map->ext_in[0] != curve_map->ext_in[1]) {
+    return false;
+  }
+  if (curve_map->ext_out[0] != curve_map->ext_out[1]) {
+    return false;
+  }
+  if (curve_map->totpoint != 2) {
+    return false;
+  }
+  if (curve_map->curve[0].x != 0 || curve_map->curve[0].y != 0) {
+    return false;
+  }
+  if (curve_map->curve[1].x != 0 || curve_map->curve[1].y != 0) {
+    return false;
+  }
+  return true;
+}
+
 void BKE_curvemapping_init(CurveMapping *cumap)
 {
   int a;

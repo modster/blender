@@ -98,6 +98,14 @@ void BKE_curvemapping_evaluate_premulRGBF(const struct CurveMapping *cumap,
                                           const float vecin[3]);
 bool BKE_curvemapping_RGBA_does_something(const struct CurveMapping *cumap);
 void BKE_curvemapping_table_RGBA(const struct CurveMapping *cumap, float **array, int *size);
+void BKE_curvemapping_get_range_minimums(const struct CurveMapping *curve_mapping,
+                                         float minimums[4]);
+void BKE_curvemapping_compute_range_dividers(const struct CurveMapping *curve_mapping,
+                                             float dividers[4]);
+void BKE_curvemapping_compute_slopes(const struct CurveMapping *curve_mapping,
+                                     float start_slopes[4],
+                                     float end_slopes[4]);
+bool BKE_curvemapping_is_map_identity(const struct CurveMapping *curve_mapping, int index);
 
 /* non-const, these modify the curve */
 void BKE_curvemapping_premultiply(struct CurveMapping *cumap, int restore);
