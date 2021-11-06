@@ -526,15 +526,11 @@ static void update_data_for_all_nurbs(const ListBase *nurbs, const ViewContext *
     }
     else if (nu->bp) {
       float screen_co[2];
-      if (ED_view3d_project_float_object(vc->region,
-                                         nu->bp->vec,
-                                         screen_co,
-                                         V3D_PROJ_TEST_CLIP_BB | V3D_PROJ_TEST_CLIP_WIN) ==
-          V3D_PROJ_RET_OK) {
-        if (data->nurb == NULL) {
-          assign_cut_data(
-              data, len_manhattan_v2v2(screen_co, data->mval), nu, -1, 0, 0.0f, nu->bp->vec);
-        }
+      if (data->nurb == NULL) {
+        ED_view3d_project_float_object(
+            vc->region, nu->bp->vec, screen_co, V3D_PROJ_TEST_CLIP_BB | V3D_PROJ_TEST_CLIP_WIN);
+        assign_cut_data(
+            data, len_manhattan_v2v2(screen_co, data->mval), nu, -1, 0, 0.0f, nu->bp->vec);
       }
 
       for (int i = 0; i < nu->pntsu - 1; i++) {
