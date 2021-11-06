@@ -829,7 +829,7 @@ static bool make_cyclic_if_endpoints(
 }
 
 enum {
-  PEN_MODAL_FREE_MOVE_HANDLE=1,
+  PEN_MODAL_FREE_MOVE_HANDLE = 1,
 };
 
 wmKeyMap *curve_pen_modal_keymap(wmKeyConfig *keyconf)
@@ -1038,7 +1038,7 @@ void CURVE_OT_pen(wmOperatorType *ot)
 {
   /* identifiers */
   ot->name = "Curve Pen";
-  ot->idname = "CURVE_OT_pen_add";
+  ot->idname = "CURVE_OT_pen";
   ot->description = "Construct and edit splines";
 
   /* api callbacks */
