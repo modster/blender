@@ -851,7 +851,7 @@ wmKeyMap *curve_pen_modal_keymap(wmKeyConfig *keyconf)
 
   keymap = WM_modalkeymap_ensure(keyconf, "Curve Pen Modal Map", modal_items);
 
-  WM_modalkeymap_assign(keymap, "CURVE_OT_pen_add");
+  WM_modalkeymap_assign(keymap, "CURVE_OT_pen");
 
   return keymap;
 }
