@@ -464,22 +464,6 @@ static void update_cut_loc_in_data(void *op_data, const ViewContext *vc)
   }
 }
 
-static void get_selected_vertex(
-    ViewContext *vc, Nurb **nu, BezTriple **bezt, BPoint **bp, const int point[2])
-{
-  BezTriple *bezt1 = NULL;
-  BPoint *bp1 = NULL;
-  Nurb *nu1 = NULL;
-  Curve *cu = vc->obedit->data;
-
-  copy_v2_v2_int(vc->mval, point);
-  ED_curve_nurb_vert_selected_find(cu, vc->v3d, &nu1, &bezt1, &bp1);
-
-  *bezt = bezt1;
-  *bp = bp1;
-  *nu = nu1;
-}
-
 /* Calculate handle positions of added and adjacent control points such that shape is preserved. */
 static void calculate_new_bezier_point(const float point_prev[3],
                                        float handle_prev[3],
@@ -898,7 +882,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
 
   if (event->type == EVT_MODAL_MAP) {
     if (event->val == PEN_MODAL_FREE_MOVE_HANDLE) {
-      get_selected_vertex(&vc, &nu, &bezt, &bp, event->mval);
+      ED_curve_nurb_vert_selected_find(vc.obedit->data, vc.v3d, &nu, &bezt, &bp);
 
       if (bezt) {
         if (bezt->h1 != HD_FREE || bezt->h2 != HD_FREE) {
@@ -928,7 +912,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
       /* If dragging a new control point, move handle point with mouse cursor. Else move entire
        * control point. */
       else if (is_new_point) {
-        get_selected_vertex(&vc, &nu, &bezt, &bp, event->prev_xy);
+        ED_curve_nurb_vert_selected_find(vc.obedit->data, vc.v3d, &nu, &bezt, &bp);
         if (bezt) {
           /* Move opposite handle if last vertex. */
           const bool invert = (nu->bezt + nu->pntsu - 1 == bezt &&
@@ -938,7 +922,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
         }
       }
       else {
-        get_selected_vertex(&vc, &nu, &bezt, &bp, event->prev_xy);
+        ED_curve_nurb_vert_selected_find(vc.obedit->data, vc.v3d, &nu, &bezt, &bp);
         if (bezt) {
           move_selected_bezt_to_mouse(bezt, &vc, event);
         }
