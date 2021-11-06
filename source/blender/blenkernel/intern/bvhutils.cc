@@ -1475,7 +1475,6 @@ BVHTree *BKE_bvhtree_from_mesh_get(struct BVHTreeFromMesh *data,
   BVHTree *tree = nullptr;
   BVHCache **bvh_cache_p = (BVHCache **)&mesh->runtime.bvh_cache;
   ThreadMutex *mesh_eval_mutex = (ThreadMutex *)mesh->runtime.eval_mutex;
-  data->vert_normals = BKE_mesh_ensure_vertex_normals(mesh);
 
   const bool is_cached = bvhcache_find(bvh_cache_p, bvh_cache_type, &tree, nullptr, nullptr);
 
@@ -1647,6 +1646,8 @@ BVHTree *BKE_bvhtree_from_mesh_get(struct BVHTreeFromMesh *data,
     free_bvhtree_from_mesh(data);
     memset(data, 0, sizeof(*data));
   }
+
+  data->vert_normals = BKE_mesh_ensure_vertex_normals(mesh);
 
   return tree;
 }
