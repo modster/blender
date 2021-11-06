@@ -582,6 +582,7 @@ void BKE_pbvh_build_mesh(PBVH *pbvh,
   pbvh->mloop = mloop;
   pbvh->looptri = looptri;
   pbvh->verts = verts;
+  pbvh->vert_normals = (float(*)[3])BKE_mesh_ensure_vertex_normals(mesh);
   pbvh->vert_bitmap = BLI_BITMAP_NEW(totvert, "bvh->vert_bitmap");
   pbvh->totvert = totvert;
   pbvh->leaf_limit = LEAF_LIMIT;
@@ -1099,8 +1100,6 @@ static void pbvh_faces_update_normals(PBVH *pbvh, PBVHNode **nodes, int totnode)
 {
   /* could be per node to save some memory, but also means
    * we have to store for each vertex which node it is in */
-  MEM_SAFE_FREE(pbvh->vert_normals);
-  pbvh->vert_normals = MEM_calloc_arrayN(pbvh->totvert, sizeof(float[3]), __func__);
 
   /* subtle assumptions:
    * - We know that for all edited vertices, the nodes with faces
