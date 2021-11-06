@@ -464,8 +464,7 @@ static void update_cut_loc_in_data(void *op_data, const ViewContext *vc)
   }
 }
 
-/* Select nearby point and get a reference to it. */
-static void select_and_get_point(
+static void get_selected_vertex(
     ViewContext *vc, Nurb **nu, BezTriple **bezt, BPoint **bp, const int point[2])
 {
   BezTriple *bezt1 = NULL;
@@ -899,7 +898,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
 
   if (event->type == EVT_MODAL_MAP) {
     if (event->val == PEN_MODAL_FREE_MOVE_HANDLE) {
-      select_and_get_point(&vc, &nu, &bezt, &bp, event->mval);
+      get_selected_vertex(&vc, &nu, &bezt, &bp, event->mval);
 
       if (bezt) {
         if (bezt->h1 != HD_FREE || bezt->h2 != HD_FREE) {
@@ -929,7 +928,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
       /* If dragging a new control point, move handle point with mouse cursor. Else move entire
        * control point. */
       else if (is_new_point) {
-        select_and_get_point(&vc, &nu, &bezt, &bp, event->prev_xy);
+        get_selected_vertex(&vc, &nu, &bezt, &bp, event->prev_xy);
         if (bezt) {
           /* Move opposite handle if last vertex. */
           const bool invert = (nu->bezt + nu->pntsu - 1 == bezt &&
@@ -939,7 +938,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
         }
       }
       else {
-        select_and_get_point(&vc, &nu, &bezt, &bp, event->prev_xy);
+        get_selected_vertex(&vc, &nu, &bezt, &bp, event->prev_xy);
         if (bezt) {
           move_selected_bezt_to_mouse(bezt, &vc, event);
         }
