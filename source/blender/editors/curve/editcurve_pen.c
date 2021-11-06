@@ -986,9 +986,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
             delete_nurb(cu, nu);
           }
         }
-        cu->actvert = CU_ACT_NONE;
-
-        if (!found_point) {
+        else {
           make_cut(event, cu, &nu, &vc);
         }
 
@@ -997,8 +995,8 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
         }
       }
       else {
-        /* Get currently selected point if any. Used for making spline cyclic. */
         Curve *cu = vc.obedit->data;
+        /* Get currently selected point if any. Used for making spline cyclic. */
         ED_curve_nurb_vert_selected_find(cu, vc.v3d, &nu, &bezt, &bp);
 
         const bool found_point = ED_curve_editnurb_select_pick(
