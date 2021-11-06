@@ -6084,8 +6084,6 @@ def km_curve_pen_modal_map(_params):
     )
 
     items.extend([
-        ("CANCEL", {"type": 'ESC', "value": 'PRESS', "any": True}, None),
-        ("CANCEL", {"type": 'RIGHTMOUSE', "value": 'PRESS', "any": True}, None),
         ("FREE_MOVE_HANDLE", {"type": 'LEFT_SHIFT', "value": 'PRESS', "any": True}, None),
     ])
 
@@ -6999,9 +6997,9 @@ def km_3d_view_tool_edit_curve_pen(params):
         "3D View Tool: Edit Curve, Curve Pen",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("curve.pen", {"type": params.tool_mouse, "value": 'PRESS'},
+            ("curve.pen_add", {"type": params.tool_mouse, "value": 'PRESS'},
              {"properties": [("wait_for_input", False), ("cut_or_delete", False)]}),
-            ("curve.pen", {"type": params.tool_mouse, "value": 'PRESS', "ctrl": True},
+            ("curve.pen_delete", {"type": params.tool_mouse, "value": 'PRESS', "ctrl": True},
              {"properties": [("cut_or_delete", True)]}),
         ]},
     )

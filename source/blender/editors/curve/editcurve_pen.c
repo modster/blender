@@ -829,14 +829,12 @@ static bool make_cyclic_if_endpoints(
 }
 
 enum {
-  PEN_MODAL_CANCEL = 1,
-  PEN_MODAL_FREE_MOVE_HANDLE,
+  PEN_MODAL_FREE_MOVE_HANDLE=1,
 };
 
 wmKeyMap *curve_pen_modal_keymap(wmKeyConfig *keyconf)
 {
   static const EnumPropertyItem modal_items[] = {
-      {PEN_MODAL_CANCEL, "CANCEL", 0, "Cancel", "Cancel pen"},
       {PEN_MODAL_FREE_MOVE_HANDLE,
        "FREE_MOVE_HANDLE",
        0,
@@ -853,7 +851,7 @@ wmKeyMap *curve_pen_modal_keymap(wmKeyConfig *keyconf)
 
   keymap = WM_modalkeymap_ensure(keyconf, "Curve Pen Modal Map", modal_items);
 
-  WM_modalkeymap_assign(keymap, "CURVE_OT_pen");
+  WM_modalkeymap_assign(keymap, "CURVE_OT_pen_add");
 
   return keymap;
 }
@@ -1040,7 +1038,7 @@ void CURVE_OT_pen(wmOperatorType *ot)
 {
   /* identifiers */
   ot->name = "Curve Pen";
-  ot->idname = "CURVE_OT_pen";
+  ot->idname = "CURVE_OT_pen_add";
   ot->description = "Construct and edit splines";
 
   /* api callbacks */
