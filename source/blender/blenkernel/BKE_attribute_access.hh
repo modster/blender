@@ -183,6 +183,8 @@ struct WriteAttributeLookup {
   GVMutableArrayPtr varray;
   /* Domain the attributes lives on in the geometry. */
   AttributeDomain domain;
+  /* Call this after changing the attribute to invalidate caches that depend on this attribute. */
+  std::function<void()> tag_modified_fn;
 
   /* Convenience function to check if the attribute has been found. */
   operator bool() const
@@ -369,6 +371,11 @@ class CustomDataAttributes {
                       const CustomDataType data_type,
                       void *buffer);
   bool remove(const AttributeIDRef &attribute_id);
+
+  /**
+   * Change the order of the attributes to match the order of IDs in the argument.
+   */
+  void reorder(Span<AttributeIDRef> new_order);
 
   bool foreach_attribute(const AttributeForeachCallback callback,
                          const AttributeDomain domain) const;

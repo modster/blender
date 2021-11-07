@@ -66,6 +66,7 @@
 #include "BKE_colortools.h"
 #include "BKE_cryptomatte.h"
 #include "BKE_global.h"
+#include "BKE_icons.h"
 #include "BKE_idprop.h"
 #include "BKE_idtype.h"
 #include "BKE_lib_id.h"
@@ -248,6 +249,13 @@ static void ntree_copy_data(Main *UNUSED(bmain), ID *id_dst, const ID *id_src, c
     ntree_dst->field_inferencing_interface = node_field_inferencing_interface_copy(
         *ntree_src->field_inferencing_interface);
   }
+
+  if (flag & LIB_ID_COPY_NO_PREVIEW) {
+    ntree_dst->preview = NULL;
+  }
+  else {
+    BKE_previewimg_id_copy(&ntree_dst->id, &ntree_src->id);
+  }
 }
 
 static void ntree_free_data(ID *id)
@@ -303,12 +311,16 @@ static void ntree_free_data(ID *id)
   if (ntree->id.tag & LIB_TAG_LOCALIZED) {
     BKE_libblock_free_data(&ntree->id, true);
   }
+
+  BKE_previewimg_free(&ntree->preview);
 }
 
 static void library_foreach_node_socket(LibraryForeachIDData *data, bNodeSocket *sock)
 {
-  IDP_foreach_property(
-      sock->prop, IDP_TYPE_FILTER_ID, BKE_lib_query_idpropertiesForeachIDLink_callback, data);
+  BKE_LIB_FOREACHID_PROCESS_FUNCTION_CALL(
+      data,
+      IDP_foreach_property(
+          sock->prop, IDP_TYPE_FILTER_ID, BKE_lib_query_idpropertiesForeachIDLink_callback, data));
 
   switch ((eNodeSocketDatatype)sock->type) {
     case SOCK_OBJECT: {
@@ -360,21 +372,25 @@ static void node_foreach_id(ID *id, LibraryForeachIDData *data)
   LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
     BKE_LIB_FOREACHID_PROCESS_ID(data, node->id, IDWALK_CB_USER);
 
-    IDP_foreach_property(
-        node->prop, IDP_TYPE_FILTER_ID, BKE_lib_query_idpropertiesForeachIDLink_callback, data);
+    BKE_LIB_FOREACHID_PROCESS_FUNCTION_CALL(
+        data,
+        IDP_foreach_property(node->prop,
+                             IDP_TYPE_FILTER_ID,
+                             BKE_lib_query_idpropertiesForeachIDLink_callback,
+                             data));
     LISTBASE_FOREACH (bNodeSocket *, sock, &node->inputs) {
-      library_foreach_node_socket(data, sock);
+      BKE_LIB_FOREACHID_PROCESS_FUNCTION_CALL(data, library_foreach_node_socket(data, sock));
     }
     LISTBASE_FOREACH (bNodeSocket *, sock, &node->outputs) {
-      library_foreach_node_socket(data, sock);
+      BKE_LIB_FOREACHID_PROCESS_FUNCTION_CALL(data, library_foreach_node_socket(data, sock));
     }
   }
 
   LISTBASE_FOREACH (bNodeSocket *, sock, &ntree->inputs) {
-    library_foreach_node_socket(data, sock);
+    BKE_LIB_FOREACHID_PROCESS_FUNCTION_CALL(data, library_foreach_node_socket(data, sock));
   }
   LISTBASE_FOREACH (bNodeSocket *, sock, &ntree->outputs) {
-    library_foreach_node_socket(data, sock);
+    BKE_LIB_FOREACHID_PROCESS_FUNCTION_CALL(data, library_foreach_node_socket(data, sock));
   }
 }
 
@@ -633,6 +649,8 @@ void ntreeBlendWrite(BlendWriter *writer, bNodeTree *ntree)
   LISTBASE_FOREACH (bNodeSocket *, sock, &ntree->outputs) {
     write_node_socket_interface(writer, sock);
   }
+
+  BKE_previewimg_blend_write(writer, ntree->preview);
 }
 
 static void ntree_blend_write(BlendWriter *writer, ID *id, const void *id_address)
@@ -748,13 +766,11 @@ void ntreeBlendReadData(BlendDataReader *reader, bNodeTree *ntree)
         }
         case SH_NODE_TEX_IMAGE: {
           NodeTexImage *tex = (NodeTexImage *)node->storage;
-          tex->iuser.ok = 1;
           tex->iuser.scene = nullptr;
           break;
         }
         case SH_NODE_TEX_ENVIRONMENT: {
           NodeTexEnvironment *tex = (NodeTexEnvironment *)node->storage;
-          tex->iuser.ok = 1;
           tex->iuser.scene = nullptr;
           break;
         }
@@ -763,7 +779,6 @@ void ntreeBlendReadData(BlendDataReader *reader, bNodeTree *ntree)
         case CMP_NODE_VIEWER:
         case CMP_NODE_SPLITVIEWER: {
           ImageUser *iuser = (ImageUser *)node->storage;
-          iuser->ok = 1;
           iuser->scene = nullptr;
           break;
         }
@@ -777,7 +792,6 @@ void ntreeBlendReadData(BlendDataReader *reader, bNodeTree *ntree)
         }
         case TEX_NODE_IMAGE: {
           ImageUser *iuser = (ImageUser *)node->storage;
-          iuser->ok = 1;
           iuser->scene = nullptr;
           break;
         }
@@ -829,6 +843,9 @@ void ntreeBlendReadData(BlendDataReader *reader, bNodeTree *ntree)
     /* Update field referencing for the geometry nodes modifier. */
     ntree->update |= NTREE_UPDATE_FIELD_INFERENCING;
   }
+
+  BLO_read_data_address(reader, &ntree->preview);
+  BKE_previewimg_blend_read(reader, ntree->preview);
 
   /* type verification is in lib-link */
 }
@@ -2605,6 +2622,17 @@ void nodeInternalRelink(bNodeTree *ntree, bNode *node)
         bNodeLink *fromlink = link->fromsock->link->fromsock->link;
         /* skip the node */
         if (fromlink) {
+          if (link->tosock->flag & SOCK_MULTI_INPUT) {
+            /* remove the link that would be the same as the relinked one */
+            LISTBASE_FOREACH_MUTABLE (bNodeLink *, link_to_compare, &ntree->links) {
+              if (link_to_compare->fromsock == fromlink->fromsock &&
+                  link_to_compare->tosock == link->tosock) {
+                adjust_multi_input_indices_after_removed_link(
+                    ntree, link_to_compare->tosock, link_to_compare->multi_input_socket_index);
+                nodeRemLink(ntree, link_to_compare);
+              }
+            }
+          }
           link->fromnode = fromlink->fromnode;
           link->fromsock = fromlink->fromsock;
 
@@ -4578,6 +4606,15 @@ static OutputFieldDependency get_interface_output_field_dependency(const NodeRef
   return socket_decl.output_field_dependency();
 }
 
+static FieldInferencingInterface get_dummy_field_inferencing_interface(const NodeRef &node)
+{
+  FieldInferencingInterface inferencing_interface;
+  inferencing_interface.inputs.append_n_times(InputSocketFieldType::None, node.inputs().size());
+  inferencing_interface.outputs.append_n_times(OutputFieldDependency::ForDataSource(),
+                                               node.outputs().size());
+  return inferencing_interface;
+}
+
 /**
  * Retrieves information about how the node interacts with fields.
  * In the future, this information can be stored in the node declaration. This would allow this
@@ -4590,6 +4627,10 @@ static FieldInferencingInterface get_node_field_inferencing_interface(const Node
     bNodeTree *group = (bNodeTree *)node.bnode()->id;
     if (group == nullptr) {
       return FieldInferencingInterface();
+    }
+    if (!ntreeIsRegistered(group)) {
+      /* This can happen when there is a linked node group that was not found (see T92799). */
+      return get_dummy_field_inferencing_interface(node);
     }
     if (group->field_inferencing_interface == nullptr) {
       /* Update group recursively. */

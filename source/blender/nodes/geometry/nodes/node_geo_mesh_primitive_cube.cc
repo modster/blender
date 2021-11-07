@@ -26,11 +26,27 @@ namespace blender::nodes {
 
 static void geo_node_mesh_primitive_cube_declare(NodeDeclarationBuilder &b)
 {
-  b.add_input<decl::Vector>("Size").default_value(float3(1)).min(0.0f).subtype(PROP_TRANSLATION);
-  b.add_input<decl::Int>("Vertices X").default_value(2).min(2).max(1000);
-  b.add_input<decl::Int>("Vertices Y").default_value(2).min(2).max(1000);
-  b.add_input<decl::Int>("Vertices Z").default_value(2).min(2).max(1000);
-  b.add_output<decl::Geometry>("Mesh");
+  b.add_input<decl::Vector>(N_("Size"))
+      .default_value(float3(1))
+      .min(0.0f)
+      .subtype(PROP_TRANSLATION)
+      .description(N_("Side length along each axis"));
+  b.add_input<decl::Int>(N_("Vertices X"))
+      .default_value(2)
+      .min(2)
+      .max(1000)
+      .description(N_("Number of vertices for the X side of the shape"));
+  b.add_input<decl::Int>(N_("Vertices Y"))
+      .default_value(2)
+      .min(2)
+      .max(1000)
+      .description(N_("Number of vertices for the Y side of the shape"));
+  b.add_input<decl::Int>(N_("Vertices Z"))
+      .default_value(2)
+      .min(2)
+      .max(1000)
+      .description(N_("Number of vertices for the Z side of the shape"));
+  b.add_output<decl::Geometry>(N_("Mesh"));
 }
 
 struct CuboidConfig {
