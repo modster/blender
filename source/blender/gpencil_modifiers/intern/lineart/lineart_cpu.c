@@ -609,23 +609,33 @@ static int lineart_point_on_line_segment(double v[2], double v0[2], double v1[2]
     return 0;
   }
 
-  if (v1[0] - v0[0]) {
+  if (!LRT_DOUBLE_CLOSE_ENOUGH(v1[0], v0[0])) {
     c1 = ratiod(v0[0], v1[0], v[0]);
   }
-  else if (v[0] == v1[0]) {
-    c2 = ratiod(v0[1], v1[1], v[1]);
-    return (c2 >= -DBL_TRIANGLE_LIM && c2 <= 1 + DBL_TRIANGLE_LIM);
+  else {
+    if (LRT_DOUBLE_CLOSE_ENOUGH(v[0], v1[0])) {
+      c2 = ratiod(v0[1], v1[1], v[1]);
+      return (c2 >= -DBL_TRIANGLE_LIM && c2 <= 1 + DBL_TRIANGLE_LIM);
+    }
+    else {
+      return false;
+    }
   }
 
-  if (v1[1] - v0[1]) {
+  if (!LRT_DOUBLE_CLOSE_ENOUGH(v1[1], v0[1])) {
     c2 = ratiod(v0[1], v1[1], v[1]);
   }
-  else if (v[1] == v1[1]) {
-    c1 = ratiod(v0[0], v1[0], v[0]);
-    return (c1 >= -DBL_TRIANGLE_LIM && c1 <= 1 + DBL_TRIANGLE_LIM);
+  else {
+    if (LRT_DOUBLE_CLOSE_ENOUGH(v[1], v1[1])) {
+      c1 = ratiod(v0[0], v1[0], v[0]);
+      return (c1 >= -DBL_TRIANGLE_LIM && c1 <= 1 + DBL_TRIANGLE_LIM);
+    }
+    else {
+      return false;
+    }
   }
 
-  if (LRT_DOUBLE_CLOSE_ENOUGH(c1, c2) && c1 >= -DBL_TRIANGLE_LIM && c1 <= 1 + DBL_TRIANGLE_LIM) {
+  if (LRT_DOUBLE_CLOSE_ENOUGH(c1, c2) && c1 >= 0 && c1 <= 1) {
     return 1;
   }
 
