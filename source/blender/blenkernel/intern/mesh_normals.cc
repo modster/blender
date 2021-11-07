@@ -121,9 +121,8 @@ void BKE_mesh_normals_tag_dirty(Mesh *mesh)
 }
 
 /**
- * For manual calculation of vertex normals, make sure the vertex normal data layer exists and
- * return it. Clears the dirty flag for vertex normals, since this is meant to be used when
- * manually setting normals.
+ * Make sure the vertex normal data layer exists and return it.
+ * Used for manually assigning vertex normals. Clears the dirty flag.
  */
 float (*BKE_mesh_vertex_normals_for_write(Mesh *mesh))[3]
 {
@@ -133,9 +132,8 @@ float (*BKE_mesh_vertex_normals_for_write(Mesh *mesh))[3]
 }
 
 /**
- * For manual calculation of face normals, make sure the face normal data layer exists and
- * return it. Clears the dirty flag for face normals, since this is meant to be used when
- * manually setting normals.
+ * Make sure the face normal data layer exists and return it.
+ * Used for manually assigning face normals. Clears the dirty flag.
  */
 float (*BKE_mesh_face_normals_for_write(Mesh *mesh))[3]
 {
@@ -280,6 +278,10 @@ const float (*BKE_mesh_ensure_vertex_normals(const Mesh *mesh))[3]
     return (const float(*)[3])CustomData_get_layer(&mesh->vdata, CD_NORMAL);
   }
 
+  if (mesh->totvert == 0) {
+    return nullptr;
+  }
+
   ThreadMutex *normals_mutex = (ThreadMutex *)mesh->runtime.normals_mutex;
   BLI_mutex_lock(normals_mutex);
   if (!(mesh->runtime.cd_dirty_vert & CD_MASK_NORMAL ||
@@ -293,10 +295,6 @@ const float (*BKE_mesh_ensure_vertex_normals(const Mesh *mesh))[3]
   /* Clear the dirty flags, since the normals have been calculated. */
   me.runtime.cd_dirty_vert &= ~CD_MASK_NORMAL;
   me.runtime.cd_dirty_poly &= ~CD_MASK_NORMAL;
-
-  // if (mesh->totvert == 0) {
-  //   return nullptr;
-  // }
 
   MutableSpan<float3> vert_normals{(float3 *)BKE_mesh_vertex_normals_for_write(&me), me.totvert};
   MutableSpan<float3> poly_normals{(float3 *)BKE_mesh_face_normals_for_write(&me), me.totpoly};
@@ -320,6 +318,10 @@ const float (*BKE_mesh_ensure_face_normals(const Mesh *mesh))[3]
     return (const float(*)[3])CustomData_get_layer(&mesh->pdata, CD_NORMAL);
   }
 
+  if (mesh->totpoly == 0) {
+    return nullptr;
+  }
+
   ThreadMutex *normals_mutex = (ThreadMutex *)mesh->runtime.normals_mutex;
   BLI_mutex_lock(normals_mutex);
   if (!(mesh->runtime.cd_dirty_poly & CD_MASK_NORMAL)) {
@@ -331,9 +333,6 @@ const float (*BKE_mesh_ensure_face_normals(const Mesh *mesh))[3]
   Mesh &me = *const_cast<Mesh *>(mesh);
   /* Clear the dirty flag, since the normals have been calculated. */
   me.runtime.cd_dirty_poly &= ~CD_MASK_NORMAL;
-  // if (mesh->totpoly == 0) {
-  //   return nullptr;
-  // }
 
   float(*poly_normals)[3] = BKE_mesh_face_normals_for_write(&me);
   BKE_mesh_calc_normals_poly(
@@ -383,7 +382,8 @@ void BKE_mesh_assert_normals_dirty_or_calculated(const Mesh *mesh)
     if (!CustomData_has_layer(&mesh->vdata, CD_NORMAL)) {
       Mesh *me = const_cast<Mesh *>(mesh);
       MEM_freeN(me);
-      /* Cause a use after free, to quickly tell where the offending mesh was allocated. */
+      /* Cause a use after free, to quickly tell where the offending mesh was allocated.
+       * TODO: Remove. */
       MEM_freeN(me);
     }
     BLI_assert(CustomData_has_layer(&mesh->vdata, CD_NORMAL));
@@ -393,7 +393,8 @@ void BKE_mesh_assert_normals_dirty_or_calculated(const Mesh *mesh)
     if (!CustomData_has_layer(&mesh->pdata, CD_NORMAL)) {
       Mesh *me = const_cast<Mesh *>(mesh);
       MEM_freeN(me);
-      /* Cause a use after free, to quickly tell where the offending mesh was allocated. */
+      /* Cause a use after free, to quickly tell where the offending mesh was allocated.
+       * TODO: Remove. */
       MEM_freeN(me);
     }
     BLI_assert(CustomData_has_layer(&mesh->vdata, CD_NORMAL));

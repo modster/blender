@@ -1054,7 +1054,7 @@ static void obstacles_from_mesh(Object *coll_ob,
 
     /* Transform mesh vertices to domain grid space for fast lookups */
     BKE_mesh_ensure_vertex_normals(me);
-    float(*vert_normals)[3] = (float(*)[3])CustomData_get_layer(&me->vdata, CD_NORMAL);
+    float(*vert_normals)[3] = BKE_mesh_vertex_normals_for_write(me);
     for (i = 0; i < numverts; i++) {
       float co[3];
 
@@ -2140,7 +2140,7 @@ static void emit_from_mesh(
 
     /* Transform mesh vertices to domain grid space for fast lookups */
     BKE_mesh_ensure_vertex_normals(me);
-    float(*vert_normals)[3] = (float(*)[3])CustomData_get_layer(&me->vdata, CD_NORMAL);
+    float(*vert_normals)[3] = BKE_mesh_vertex_normals_for_write(me);
     for (i = 0; i < numverts; i++) {
       /* Vertex position. */
       mul_m4_v3(flow_ob->obmat, mvert[i].co);
@@ -3408,7 +3408,6 @@ static Mesh *create_liquid_geometry(FluidDomainSettings *fds,
 #  endif
   }
 
-  BKE_mesh_normals_tag_dirty(me);
   BKE_mesh_calc_edges(me, false, false);
 
   return me;

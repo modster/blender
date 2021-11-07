@@ -1523,7 +1523,6 @@ static const LayerTypeInfo LAYERTYPEINFO[CD_NUMTYPES] = {
      NULL,
      NULL,
      NULL,
-     /* TODO: Should normal interpolation be removed? Normals are generally just recalculated. */
      layerInterp_normal,
      NULL,
      NULL,
