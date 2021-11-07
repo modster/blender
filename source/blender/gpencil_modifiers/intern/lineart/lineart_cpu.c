@@ -2426,7 +2426,7 @@ static bool lineart_edge_from_triangle(const LineartTriangle *tri,
   { \
     index = (num < is[order[0]] ? \
                  order[0] : \
-                 (num < is[order[1]] ? order[1] : (num < is[order[2]] ? order[2] : order[2]))); \
+                 (num < is[order[1]] ? order[1] : (num < is[order[2]] ? order[2] : -1))); \
   }
 
 /* `ia ib ic` are ordered. */
@@ -2434,7 +2434,7 @@ static bool lineart_edge_from_triangle(const LineartTriangle *tri,
   { \
     index = (num > is[order[2]] ? \
                  order[2] : \
-                 (num > is[order[1]] ? order[1] : (num > is[order[0]] ? order[0] : order[0]))); \
+                 (num > is[order[1]] ? order[1] : (num > is[order[0]] ? order[0] : -1))); \
   }
 
 /**
@@ -2459,7 +2459,8 @@ static bool lineart_triangle_edge_image_space_occlusion(SpinLock *UNUSED(spl),
   double is[3] = {0};
   int order[3];
   int LCross = -1, RCross = -1;
-  int a, b, c;
+  int a, b, c;     /* Crossing info. */
+  bool pa, pb, pc; /* Parallel info. */
   int st_l = 0, st_r = 0;
 
   double Lv[3];
@@ -2489,9 +2490,9 @@ static bool lineart_triangle_edge_image_space_occlusion(SpinLock *UNUSED(spl),
   }
 
   /* Check if the line visually crosses one of the edge in the triangle. */
-  a = lineart_LineIntersectTest2d(LFBC, RFBC, FBC0, FBC1, &is[0]);
-  b = lineart_LineIntersectTest2d(LFBC, RFBC, FBC1, FBC2, &is[1]);
-  c = lineart_LineIntersectTest2d(LFBC, RFBC, FBC2, FBC0, &is[2]);
+  a = lineart_LineIntersectTest2d(LFBC, RFBC, FBC0, FBC1, &is[0], &pa);
+  b = lineart_LineIntersectTest2d(LFBC, RFBC, FBC1, FBC2, &is[1], &pb);
+  c = lineart_LineIntersectTest2d(LFBC, RFBC, FBC2, FBC0, &is[2], &pc);
 
   /* Sort the intersection distance. */
   INTERSECT_SORT_MIN_TO_MAX_3(is[0], is[1], is[2], order);
@@ -2576,6 +2577,11 @@ static bool lineart_triangle_edge_image_space_occlusion(SpinLock *UNUSED(spl),
     cut = ratiod(e->v1->fbcoord[1], e->v2->fbcoord[1], trans[1]);
   }
 
+#define LRT_GUARD_NOT_FOUND \
+  if (LCross < 0 || RCross < 0) { \
+    return false; \
+  }
+
   /* Determine the pair of edges that the line has crossed. */
 
   if (st_l == 2) {
@@ -2603,12 +2609,18 @@ static bool lineart_triangle_edge_image_space_occlusion(SpinLock *UNUSED(spl),
     }
     else if (st_r == 0) {
       INTERSECT_JUST_GREATER(is, order, DBL_TRIANGLE_LIM, RCross);
-      if (LRT_ABC(RCross) && is[RCross] > (DBL_TRIANGLE_LIM)) {
+      if (RCross >= 0 && LRT_ABC(RCross) && is[RCross] > (DBL_TRIANGLE_LIM)) {
         INTERSECT_JUST_SMALLER(is, order, DBL_TRIANGLE_LIM, LCross);
       }
       else {
-        INTERSECT_JUST_SMALLER(is, order, -DBL_TRIANGLE_LIM, LCross);
-        INTERSECT_JUST_GREATER(is, order, -DBL_TRIANGLE_LIM, RCross);
+        INTERSECT_JUST_SMALLER(is, order, DBL_TRIANGLE_LIM, RCross);
+        if (RCross > 0) {
+          INTERSECT_JUST_SMALLER(is, order, is[RCross], LCross);
+        }
+      }
+      LRT_GUARD_NOT_FOUND
+      if ((LRT_PABC(LCross) && !LRT_ABC(LCross)) || (LRT_PABC(RCross) && !LRT_ABC(RCross))) {
+        return false;
       }
     }
   }
@@ -2619,17 +2631,23 @@ static bool lineart_triangle_edge_image_space_occlusion(SpinLock *UNUSED(spl),
     }
     else if (st_r == 1) {
       INTERSECT_JUST_SMALLER(is, order, 1 - DBL_TRIANGLE_LIM, LCross);
-      if (LRT_ABC(LCross) && is[LCross] < (1 - DBL_TRIANGLE_LIM)) {
+      if (LCross >= 0 && LRT_ABC(LCross) && is[LCross] < (1 - DBL_TRIANGLE_LIM)) {
         INTERSECT_JUST_GREATER(is, order, 1 - DBL_TRIANGLE_LIM, RCross);
       }
       else {
-        INTERSECT_JUST_SMALLER(is, order, 1 + DBL_TRIANGLE_LIM, LCross);
-        INTERSECT_JUST_GREATER(is, order, 1 + DBL_TRIANGLE_LIM, RCross);
+        INTERSECT_JUST_GREATER(is, order, 1 - DBL_TRIANGLE_LIM, LCross);
+        if (LCross > 0) {
+          INTERSECT_JUST_GREATER(is, order, is[LCross], RCross);
+        }
+      }
+      LRT_GUARD_NOT_FOUND
+      if ((LRT_PABC(LCross) && !LRT_ABC(LCross)) || (LRT_PABC(RCross) && !LRT_ABC(RCross))) {
+        return false;
       }
     }
     else if (st_r == 0) {
-      INTERSECT_JUST_GREATER(is, order, DBL_TRIANGLE_LIM, LCross);
-      if (LRT_ABC(LCross) && is[LCross] > DBL_TRIANGLE_LIM) {
+      INTERSECT_JUST_GREATER(is, order, -DBL_TRIANGLE_LIM, LCross);
+      if (LCross >= 0 && LRT_ABC(LCross)) {
         INTERSECT_JUST_GREATER(is, order, is[LCross], RCross);
       }
       else {
@@ -2638,6 +2656,8 @@ static bool lineart_triangle_edge_image_space_occlusion(SpinLock *UNUSED(spl),
       }
     }
   }
+
+  LRT_GUARD_NOT_FOUND
 
   double LF = dot_l * dot_f, RF = dot_r * dot_f;
 
@@ -4082,25 +4102,26 @@ static LineartBoundingArea *lineart_edge_first_bounding_area(LineartRenderBuffer
   double data[2] = {e->v1->fbcoord[0], e->v1->fbcoord[1]};
   double LU[2] = {-1, 1}, RU[2] = {1, 1}, LB[2] = {-1, -1}, RB[2] = {1, -1};
   double r = 1, sr = 1;
+  bool p_unused;
 
   if (data[0] > -1 && data[0] < 1 && data[1] > -1 && data[1] < 1) {
     return lineart_get_bounding_area(rb, data[0], data[1]);
   }
 
-  if (lineart_LineIntersectTest2d(e->v1->fbcoord, e->v2->fbcoord, LU, RU, &sr) && sr < r &&
-      sr > 0) {
+  if (lineart_LineIntersectTest2d(e->v1->fbcoord, e->v2->fbcoord, LU, RU, &sr, &p_unused) &&
+      sr < r && sr > 0) {
     r = sr;
   }
-  if (lineart_LineIntersectTest2d(e->v1->fbcoord, e->v2->fbcoord, LB, RB, &sr) && sr < r &&
-      sr > 0) {
+  if (lineart_LineIntersectTest2d(e->v1->fbcoord, e->v2->fbcoord, LB, RB, &sr, &p_unused) &&
+      sr < r && sr > 0) {
     r = sr;
   }
-  if (lineart_LineIntersectTest2d(e->v1->fbcoord, e->v2->fbcoord, LB, LU, &sr) && sr < r &&
-      sr > 0) {
+  if (lineart_LineIntersectTest2d(e->v1->fbcoord, e->v2->fbcoord, LB, LU, &sr, &p_unused) &&
+      sr < r && sr > 0) {
     r = sr;
   }
-  if (lineart_LineIntersectTest2d(e->v1->fbcoord, e->v2->fbcoord, RB, RU, &sr) && sr < r &&
-      sr > 0) {
+  if (lineart_LineIntersectTest2d(e->v1->fbcoord, e->v2->fbcoord, RB, RU, &sr, &p_unused) &&
+      sr < r && sr > 0) {
     r = sr;
   }
   interp_v2_v2v2_db(data, e->v1->fbcoord, e->v2->fbcoord, r);
