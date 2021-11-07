@@ -345,30 +345,6 @@ static void layerInterp_normal(const void **sources,
   normalize_v3_v3((float *)dest, no);
 }
 
-static bool layerValidate_normal(void *data, const uint totitems, const bool do_fixes)
-{
-  static const float no_default[3] = {0.0f, 0.0f, 1.0f}; /* Z-up default normal... */
-  float(*no)[3] = data;
-  bool has_errors = false;
-
-  for (int i = 0; i < totitems; i++, no++) {
-    if (!is_finite_v3((float *)no)) {
-      has_errors = true;
-      if (do_fixes) {
-        copy_v3_v3((float *)no, no_default);
-      }
-    }
-    else if (!compare_ff(len_squared_v3((float *)no), 1.0f, 1e-6f)) {
-      has_errors = true;
-      if (do_fixes) {
-        normalize_v3((float *)no);
-      }
-    }
-  }
-
-  return has_errors;
-}
-
 static void layerCopyValue_normal(const void *source,
                                   void *dest,
                                   const int mixmode,
@@ -1547,10 +1523,11 @@ static const LayerTypeInfo LAYERTYPEINFO[CD_NUMTYPES] = {
      NULL,
      NULL,
      NULL,
+     /* TODO: Should normal interpolation be removed? Normals are generally just recalculated. */
      layerInterp_normal,
      NULL,
      NULL,
-     layerValidate_normal,
+     NULL,
      NULL,
      NULL,
      NULL,
