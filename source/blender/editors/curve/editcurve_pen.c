@@ -851,12 +851,12 @@ wmKeyMap *curve_pen_modal_keymap(wmKeyConfig *keyconf)
 
   keymap = WM_modalkeymap_ensure(keyconf, "Curve Pen Modal Map", modal_items);
 
-  WM_modalkeymap_assign(keymap, "CURVE_OT_pen");
+  WM_modalkeymap_assign(keymap, "CURVE_OT_pen_add");
 
   return keymap;
 }
 
-static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
+static int curve_pen_add_modal(bContext *C, wmOperator *op, const wmEvent *event)
 {
   Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
   ViewContext vc;
@@ -871,8 +871,6 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   int ret = OPERATOR_RUNNING_MODAL;
   /* Whether the mouse is clicking and dragging. */
   bool dragging = RNA_boolean_get(op->ptr, "dragging");
-  /* Whether the tool should cut or delete. */
-  const bool cut_or_delete = RNA_boolean_get(op->ptr, "cut_or_delete");
   /* Whether a new point was added at the beginning of tool execution. */
   const bool is_new_point = RNA_boolean_get(op->ptr, "new");
   /* Whether a segment is being altered by click and drag. */
@@ -896,7 +894,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
     }
   }
 
-  if (ELEM(event->type, MOUSEMOVE, INBETWEEN_MOUSEMOVE) && !cut_or_delete) {
+  if (ELEM(event->type, MOUSEMOVE, INBETWEEN_MOUSEMOVE)) {
     if (!dragging && WM_event_drag_test(event, event->prev_click_xy) && event->val == KM_PRESS) {
       RNA_boolean_set(op->ptr, "dragging", true);
       dragging = true;
@@ -935,68 +933,29 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   }
   else if (ELEM(event->type, LEFTMOUSE)) {
     if (event->val == KM_PRESS) {
-      if (cut_or_delete) {
-        Curve *cu = vc.obedit->data;
-        ListBase *nurbs = BKE_curve_editNurbs_get(cu);
-        float mouse_point[2] = {(float)event->mval[0], (float)event->mval[1]};
+      Curve *cu = vc.obedit->data;
+      /* Get currently selected point if any. Used for making spline cyclic. */
+      ED_curve_nurb_vert_selected_find(cu, vc.v3d, &nu, &bezt, &bp);
 
-        get_closest_vertex_to_point_in_nurbs(nurbs, &nu, &bezt, &bp, mouse_point, &vc);
-        const bool found_point = nu != NULL;
+      const bool found_point = ED_curve_editnurb_select_pick(C, event->mval, false, false, false);
+      RNA_boolean_set(op->ptr, "new", !found_point);
 
-        if (found_point) {
-          ED_curve_deselect_all(cu->editnurb);
-          if (nu && nu->type == CU_BEZIER) {
-            BezTriple *next_bezt = BKE_nurb_bezt_get_next(nu, bezt);
-            BezTriple *prev_bezt = BKE_nurb_bezt_get_prev(nu, bezt);
-            if (next_bezt && prev_bezt) {
-              const int bez_index = BKE_curve_nurb_vert_index_get(nu, bezt);
-              uint span_step[2] = {bez_index, bez_index};
-              ed_dissolve_bez_segment(prev_bezt, next_bezt, nu, cu, 1, span_step);
-            }
-            delete_bezt_from_nurb(bezt, nu);
-          }
-          else if (nu->type == CU_NURBS || nu->type == CU_POLY) {
-            delete_bp_from_nurb(bp, nu);
-          }
+      if (found_point) {
+        copy_v2_v2_int(vc.mval, event->mval);
+        if (nu && !(nu->flagu & CU_NURB_CYCLIC)) {
+          const bool closed = nu->pntsu > 2 && make_cyclic_if_endpoints(nu, bezt, bp, &vc, C);
 
-          if (nu->pntsu == 0) {
-            delete_nurb(cu, nu);
-          }
-        }
-        else {
-          make_cut(event, cu, &nu, &vc);
-        }
-
-        if (nu && nu->type == CU_BEZIER) {
-          BKE_nurb_handles_calc(nu);
+          /* Set "new" to true to be able to click and drag to control handles when added. */
+          RNA_boolean_set(op->ptr, "new", closed);
         }
       }
       else {
-        Curve *cu = vc.obedit->data;
-        /* Get currently selected point if any. Used for making spline cyclic. */
-        ED_curve_nurb_vert_selected_find(cu, vc.v3d, &nu, &bezt, &bp);
-
-        const bool found_point = ED_curve_editnurb_select_pick(
-            C, event->mval, false, false, false);
-        RNA_boolean_set(op->ptr, "new", !found_point);
-
-        if (found_point) {
-          copy_v2_v2_int(vc.mval, event->mval);
-          if (nu && !(nu->flagu & CU_NURB_CYCLIC)) {
-            const bool closed = nu->pntsu > 2 && make_cyclic_if_endpoints(nu, bezt, bp, &vc, C);
-
-            /* Set "new" to true to be able to click and drag to control handles when added. */
-            RNA_boolean_set(op->ptr, "new", closed);
-          }
+        if (is_spline_nearby(&vc, op, event)) {
+          RNA_boolean_set(op->ptr, "moving_segment", true);
+          moving_segment = true;
         }
         else {
-          if (is_spline_nearby(&vc, op, event)) {
-            RNA_boolean_set(op->ptr, "moving_segment", true);
-            moving_segment = true;
-          }
-          else {
-            add_vertex_connected_to_selected_vertex(&vc, obedit, event);
-          }
+          add_vertex_connected_to_selected_vertex(&vc, obedit, event);
         }
       }
     }
@@ -1023,9 +982,110 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   return ret;
 }
 
-static int curve_pen_invoke(bContext *C, wmOperator *op, const wmEvent *event)
+static int curve_pen_delete_modal(bContext *C, wmOperator *op, const wmEvent *event)
 {
-  int ret = curve_pen_modal(C, op, event);
+  Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
+  ViewContext vc;
+  Object *obedit = CTX_data_edit_object(C);
+
+  ED_view3d_viewcontext_init(C, &vc, depsgraph);
+
+  BezTriple *bezt = NULL;
+  BPoint *bp = NULL;
+  Nurb *nu = NULL;
+
+  int ret = OPERATOR_RUNNING_MODAL;
+
+  if (ELEM(event->type, LEFTMOUSE)) {
+    if (event->val == KM_PRESS) {
+      Curve *cu = vc.obedit->data;
+      ListBase *nurbs = BKE_curve_editNurbs_get(cu);
+      float mouse_point[2] = {(float)event->mval[0], (float)event->mval[1]};
+
+      get_closest_vertex_to_point_in_nurbs(nurbs, &nu, &bezt, &bp, mouse_point, &vc);
+      const bool found_point = nu != NULL;
+
+      if (found_point) {
+        ED_curve_deselect_all(cu->editnurb);
+        if (nu && nu->type == CU_BEZIER) {
+          BezTriple *next_bezt = BKE_nurb_bezt_get_next(nu, bezt);
+          BezTriple *prev_bezt = BKE_nurb_bezt_get_prev(nu, bezt);
+          if (next_bezt && prev_bezt) {
+            const int bez_index = BKE_curve_nurb_vert_index_get(nu, bezt);
+            uint span_step[2] = {bez_index, bez_index};
+            ed_dissolve_bez_segment(prev_bezt, next_bezt, nu, cu, 1, span_step);
+          }
+          delete_bezt_from_nurb(bezt, nu);
+        }
+        else if (nu->type == CU_NURBS || nu->type == CU_POLY) {
+          delete_bp_from_nurb(bp, nu);
+        }
+
+        if (nu->pntsu == 0) {
+          delete_nurb(cu, nu);
+        }
+      }
+
+      if (nu && nu->type == CU_BEZIER) {
+        BKE_nurb_handles_calc(nu);
+      }
+    }
+    else if (event->val == KM_RELEASE) {
+      ret = OPERATOR_FINISHED;
+    }
+  }
+
+  WM_event_add_notifier(C, NC_GEOM | ND_DATA, obedit->data);
+  WM_event_add_notifier(C, NC_GEOM | ND_SELECT, obedit->data);
+  DEG_id_tag_update(obedit->data, 0);
+
+  return ret;
+}
+
+static int curve_pen_insert_modal(bContext *C, wmOperator *op, const wmEvent *event)
+{
+  Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
+  ViewContext vc;
+  Object *obedit = CTX_data_edit_object(C);
+
+  ED_view3d_viewcontext_init(C, &vc, depsgraph);
+
+  BezTriple *bezt = NULL;
+  BPoint *bp = NULL;
+  Nurb *nu = NULL;
+
+  int ret = OPERATOR_RUNNING_MODAL;
+
+  if (ELEM(event->type, LEFTMOUSE)) {
+    if (event->val == KM_PRESS) {
+      Curve *cu = vc.obedit->data;
+      ListBase *nurbs = BKE_curve_editNurbs_get(cu);
+      float mouse_point[2] = {(float)event->mval[0], (float)event->mval[1]};
+
+      get_closest_vertex_to_point_in_nurbs(nurbs, &nu, &bezt, &bp, mouse_point, &vc);
+      const bool no_point = nu == NULL;
+
+      make_cut(event, cu, &nu, &vc);
+
+      if (nu && nu->type == CU_BEZIER) {
+        BKE_nurb_handles_calc(nu);
+      }
+    }
+    else if (event->val == KM_RELEASE) {
+      ret = OPERATOR_FINISHED;
+    }
+  }
+
+  WM_event_add_notifier(C, NC_GEOM | ND_DATA, obedit->data);
+  WM_event_add_notifier(C, NC_GEOM | ND_SELECT, obedit->data);
+  DEG_id_tag_update(obedit->data, 0);
+
+  return ret;
+}
+
+static int curve_pen_add_invoke(bContext *C, wmOperator *op, const wmEvent *event)
+{
+  int ret = curve_pen_add_modal(C, op, event);
   BLI_assert(ret == OPERATOR_RUNNING_MODAL);
   if (ret == OPERATOR_RUNNING_MODAL) {
     WM_event_add_modal_handler(C, op);
@@ -1034,16 +1094,38 @@ static int curve_pen_invoke(bContext *C, wmOperator *op, const wmEvent *event)
   return ret;
 }
 
-void CURVE_OT_pen(wmOperatorType *ot)
+static int curve_pen_delete_invoke(bContext *C, wmOperator *op, const wmEvent *event)
+{
+  int ret = curve_pen_delete_modal(C, op, event);
+  BLI_assert(ret == OPERATOR_RUNNING_MODAL);
+  if (ret == OPERATOR_RUNNING_MODAL) {
+    WM_event_add_modal_handler(C, op);
+  }
+
+  return ret;
+}
+
+static int curve_pen_insert_invoke(bContext *C, wmOperator *op, const wmEvent *event)
+{
+  int ret = curve_pen_insert_modal(C, op, event);
+  BLI_assert(ret == OPERATOR_RUNNING_MODAL);
+  if (ret == OPERATOR_RUNNING_MODAL) {
+    WM_event_add_modal_handler(C, op);
+  }
+
+  return ret;
+}
+
+void CURVE_OT_pen_add(wmOperatorType *ot)
 {
   /* identifiers */
-  ot->name = "Curve Pen";
-  ot->idname = "CURVE_OT_pen";
+  ot->name = "Curve Pen Add";
+  ot->idname = "CURVE_OT_pen_add";
   ot->description = "Construct and edit splines";
 
   /* api callbacks */
-  ot->invoke = curve_pen_invoke;
-  ot->modal = curve_pen_modal;
+  ot->invoke = curve_pen_add_invoke;
+  ot->modal = curve_pen_add_modal;
   ot->poll = ED_operator_view3d_active;
 
   /* flags */
@@ -1060,8 +1142,42 @@ void CURVE_OT_pen(wmOperatorType *ot)
   RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
   prop = RNA_def_boolean(ot->srna, "moving_segment", 0, "Moving Segment", "");
   RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
-  prop = RNA_def_boolean(ot->srna, "wait_for_input", true, "Wait for Input", "");
-  RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
-  prop = RNA_def_boolean(ot->srna, "cut_or_delete", false, "", "");
-  RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
+}
+
+void CURVE_OT_pen_delete(wmOperatorType *ot)
+{
+  /* identifiers */
+  ot->name = "Curve Pen Delete";
+  ot->idname = "CURVE_OT_pen_delete";
+  ot->description = "Delete control points";
+
+  /* api callbacks */
+  ot->invoke = curve_pen_delete_invoke;
+  ot->modal = curve_pen_delete_modal;
+  ot->poll = ED_operator_view3d_active;
+
+  /* flags */
+  ot->flag = OPTYPE_UNDO;
+
+  /* properties */
+  WM_operator_properties_mouse_select(ot);
+}
+
+void CURVE_OT_pen_insert(wmOperatorType *ot)
+{
+  /* identifiers */
+  ot->name = "Curve Pen Insert";
+  ot->idname = "CURVE_OT_pen_insert";
+  ot->description = "Insert control points into segments";
+
+  /* api callbacks */
+  ot->invoke = curve_pen_insert_invoke;
+  ot->modal = curve_pen_insert_modal;
+  ot->poll = ED_operator_view3d_active;
+
+  /* flags */
+  ot->flag = OPTYPE_UNDO;
+
+  /* properties */
+  WM_operator_properties_mouse_select(ot);
 }

@@ -6997,10 +6997,12 @@ def km_3d_view_tool_edit_curve_pen(params):
         "3D View Tool: Edit Curve, Curve Pen",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("curve.pen", {"type": params.tool_mouse, "value": 'PRESS'},
-             {"properties": [("wait_for_input", False), ("cut_or_delete", False)]}),
-            ("curve.pen", {"type": params.tool_mouse, "value": 'PRESS', "ctrl": True},
-             {"properties": [("cut_or_delete", True)]}),
+            ("curve.pen_add", {"type": params.tool_mouse, "value": 'PRESS'},
+             {"properties": []}),
+            ("curve.pen_delete", {"type": params.tool_mouse, "value": 'PRESS', "ctrl": True},
+             {"properties": []}),
+            ("curve.pen_insert", {"type": params.tool_mouse, "value": 'PRESS', "shift": True},
+             {"properties": []}),
         ]},
     )
 
