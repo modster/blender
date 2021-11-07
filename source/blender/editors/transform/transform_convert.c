@@ -228,7 +228,7 @@ static void set_prop_dist(TransInfo *t, const bool with_dist)
    * Used to find #TransData from the index returned by #BLI_kdtree_find_nearest. */
   TransData **td_table = MEM_mallocN(sizeof(*td_table) * td_table_len, __func__);
 
-  /* Create and fill kd-tree of selected's positions - in global or proj_vec space. */
+  /* Create and fill KD-tree of selected's positions - in global or proj_vec space. */
   KDTree_3d *td_tree = BLI_kdtree_3d_new(td_table_len);
 
   int td_table_index = 0;
@@ -965,6 +965,9 @@ void special_aftertrans_update(bContext *C, TransInfo *t)
 
 int special_transform_moving(TransInfo *t)
 {
+  if (t->options & CTX_CURSOR) {
+    return G_TRANSFORM_CURSOR;
+  }
   if (t->spacetype == SPACE_SEQ) {
     return G_TRANSFORM_SEQ;
   }

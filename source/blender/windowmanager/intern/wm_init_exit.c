@@ -119,6 +119,7 @@
 #include "ED_space_api.h"
 #include "ED_undo.h"
 #include "ED_util.h"
+#include "ED_view3d.h"
 
 #include "BLF_api.h"
 #include "BLT_lang.h"

@@ -182,8 +182,8 @@ static void displacement_principled_nodes(bNode *node)
     }
   }
   else if (node->type == SH_NODE_BSDF_PRINCIPLED) {
-    if (node->custom2 != SHD_SUBSURFACE_RANDOM_WALK_FIXED_RADIUS) {
-      node->custom2 = SHD_SUBSURFACE_DIFFUSION;
+    if (node->custom2 != SHD_SUBSURFACE_RANDOM_WALK) {
+      node->custom2 = SHD_SUBSURFACE_BURLEY;
     }
   }
 }
@@ -1635,6 +1635,8 @@ void do_versions_after_linking_cycles(Main *bmain)
         flag |= OB_HIDE_CAMERA | OB_SHADOW_CATCHER;
       }
 
+      /* Clear unused bits from old version, and add new flags. */
+      object->visibility_flag &= (OB_HIDE_VIEWPORT | OB_HIDE_SELECT | OB_HIDE_RENDER);
       object->visibility_flag |= flag;
     }
   }

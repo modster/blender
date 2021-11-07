@@ -797,6 +797,25 @@ static bool transform_event_modal_constraint(TransInfo *t, short modal_type)
     if (constraint_new == CON_AXIS2) {
       return false;
     }
+
+    if (t->data_type == TC_SEQ_IMAGE_DATA) {
+      /* Setup the 2d msg string so it writes out the transform space. */
+      msg_2d = msg_3d;
+
+      short orient_index = 1;
+      if (t->orient_curr == O_DEFAULT || ELEM(constraint_curr, -1, constraint_new)) {
+        /* Successive presses on existing axis, cycle orientation modes. */
+        orient_index = (short)((t->orient_curr + 1) % (int)ARRAY_SIZE(t->orient));
+      }
+
+      transform_orientations_current_set(t, orient_index);
+      if (orient_index != 0) {
+        /* Make sure that we don't stop the constraint unless we are looped back around to
+         * "no constraint". */
+        constraint_curr = -1;
+      }
+    }
+
     if (constraint_curr == constraint_new) {
       stopConstraint(t);
     }
@@ -1006,7 +1025,7 @@ int transformEvent(TransInfo *t, const wmEvent *event)
       case TFM_MODAL_PROPSIZE:
         /* MOUSEPAN usage... */
         if (t->flag & T_PROP_EDIT) {
-          float fac = 1.0f + 0.005f * (event->y - event->prevy);
+          float fac = 1.0f + 0.005f * (event->xy[1] - event->prev_xy[1]);
           t->prop_size *= fac;
           if (t->spacetype == SPACE_VIEW3D && t->persp != RV3D_ORTHO) {
             t->prop_size = max_ff(min_ff(t->prop_size, ((View3D *)t->view)->clip_end),
@@ -1078,8 +1097,8 @@ int transformEvent(TransInfo *t, const wmEvent *event)
         break;
       case TFM_MODAL_AUTOCONSTRAINT:
       case TFM_MODAL_AUTOCONSTRAINTPLANE:
-        if ((t->flag & T_RELEASE_CONFIRM) && (event->prevval == KM_RELEASE) &&
-            event->prevtype == t->launch_event) {
+        if ((t->flag & T_RELEASE_CONFIRM) && (event->prev_val == KM_RELEASE) &&
+            event->prev_type == t->launch_event) {
           /* Confirm transform if launch key is released after mouse move. */
           t->state = TRANS_CONFIRM;
         }
@@ -1118,13 +1137,13 @@ int transformEvent(TransInfo *t, const wmEvent *event)
         }
         break;
       case TFM_MODAL_PRECISION:
-        if (event->prevval == KM_PRESS) {
+        if (event->prev_val == KM_PRESS) {
           t->modifiers |= MOD_PRECISION;
           /* Shift is modifier for higher precision transform. */
           t->mouse.precision = 1;
           t->redraw |= TREDRAW_HARD;
         }
-        else if (event->prevval == KM_RELEASE) {
+        else if (event->prev_val == KM_RELEASE) {
           t->modifiers &= ~MOD_PRECISION;
           t->mouse.precision = 0;
           t->redraw |= TREDRAW_HARD;

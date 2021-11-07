@@ -16,12 +16,12 @@
 
 #include "integrator/pass_accessor.h"
 
-#include "render/buffers.h"
-#include "util/util_logging.h"
+#include "session/buffers.h"
+#include "util/log.h"
 
 // clang-format off
 #include "kernel/device/cpu/compat.h"
-#include "kernel/kernel_types.h"
+#include "kernel/types.h"
 // clang-format on
 
 CCL_NAMESPACE_BEGIN
@@ -96,9 +96,12 @@ static void pad_pixels(const BufferParams &buffer_params,
     return;
   }
 
-  const size_t size = buffer_params.width * buffer_params.height;
+  const size_t size = static_cast<size_t>(buffer_params.width) * buffer_params.height;
   if (destination.pixels) {
-    float *pixel = destination.pixels;
+    const size_t pixel_stride = destination.pixel_stride ? destination.pixel_stride :
+                                                           destination.num_components;
+
+    float *pixel = destination.pixels + pixel_stride * destination.offset;
 
     for (size_t i = 0; i < size; i++, pixel += dest_num_components) {
       if (dest_num_components >= 3 && src_num_components == 1) {
@@ -112,8 +115,8 @@ static void pad_pixels(const BufferParams &buffer_params,
   }
 
   if (destination.pixels_half_rgba) {
-    const half one = float_to_half(1.0f);
-    half4 *pixel = destination.pixels_half_rgba;
+    const half one = float_to_half_display(1.0f);
+    half4 *pixel = destination.pixels_half_rgba + destination.offset;
 
     for (size_t i = 0; i < size; i++, pixel++) {
       if (dest_num_components >= 3 && src_num_components == 1) {
@@ -132,10 +135,6 @@ bool PassAccessor::get_render_tile_pixels(const RenderBuffers *render_buffers,
                                           const Destination &destination) const
 {
   if (render_buffers == nullptr || render_buffers->buffer.data() == nullptr) {
-    return false;
-  }
-
-  if (pass_access_info_.offset == PASS_UNUSED) {
     return false;
   }
 

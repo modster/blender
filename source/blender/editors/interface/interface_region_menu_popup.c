@@ -338,8 +338,8 @@ uiPopupBlockHandle *ui_popup_menu_create(
 
   if (!but) {
     /* no button to start from, means we are a popup */
-    pup->mx = window->eventstate->x;
-    pup->my = window->eventstate->y;
+    pup->mx = window->eventstate->xy[0];
+    pup->my = window->eventstate->xy[1];
     pup->popup = true;
     pup->block->flag |= UI_BLOCK_NO_FLIP;
   }
@@ -468,8 +468,8 @@ void UI_popup_menu_end(bContext *C, uiPopupMenu *pup)
   ARegion *butregion = NULL;
 
   pup->popup = true;
-  pup->mx = window->eventstate->x;
-  pup->my = window->eventstate->y;
+  pup->mx = window->eventstate->xy[0];
+  pup->my = window->eventstate->xy[1];
 
   if (pup->but) {
     but = pup->but;
@@ -640,7 +640,7 @@ void UI_popup_block_ex(bContext *C,
 }
 
 #if 0 /* UNUSED */
-void uiPupBlockOperator(bContext *C, uiBlockCreateFunc func, wmOperator *op, int opcontext)
+void uiPupBlockOperator(bContext *C, uiBlockCreateFunc func, wmOperator *op, wmOperatorCallContext opcontext)
 {
   wmWindow *window = CTX_wm_window(C);
   uiPopupBlockHandle *handle;

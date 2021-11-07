@@ -19,12 +19,12 @@
 #include <array>
 
 #include "device/device.h"
-#include "device/device_queue.h"
+#include "device/queue.h"
 #include "integrator/pass_accessor_cpu.h"
-#include "render/buffers.h"
-#include "util/util_array.h"
-#include "util/util_logging.h"
-#include "util/util_openimagedenoise.h"
+#include "session/buffers.h"
+#include "util/array.h"
+#include "util/log.h"
+#include "util/openimagedenoise.h"
 
 #include "kernel/device/cpu/compat.h"
 #include "kernel/device/cpu/kernel.h"
@@ -169,6 +169,7 @@ class OIDNDenoiseContext {
     OIDNPass oidn_color_access_pass = read_input_pass(oidn_color_pass, oidn_output_pass);
 
     oidn::DeviceRef oidn_device = oidn::newDevice();
+    oidn_device.set("setAffinity", false);
     oidn_device.commit();
 
     /* Create a filter for denoising a beauty (color) image using prefiltered auxiliary images too.

@@ -61,6 +61,7 @@ set(SRC
   intern/mesh_extractors/extract_mesh_ibo_lines_paint_mask.cc
   intern/mesh_extractors/extract_mesh_ibo_points.cc
   intern/mesh_extractors/extract_mesh_ibo_tris.cc
+  intern/mesh_extractors/extract_mesh_vbo_attributes.cc
   intern/mesh_extractors/extract_mesh_vbo_edge_fac.cc
   intern/mesh_extractors/extract_mesh_vbo_edit_data.cc
   intern/mesh_extractors/extract_mesh_vbo_edituv_data.cc
@@ -94,7 +95,6 @@ set(SRC
   intern/draw_color_management.cc
   intern/draw_common.c
   intern/draw_debug.c
-  intern/draw_view_data.cc
   intern/draw_fluid.c
   intern/draw_hair.c
   intern/draw_instance_data.c
@@ -106,12 +106,14 @@ set(SRC
   intern/draw_manager_text.c
   intern/draw_manager_texture.c
   intern/draw_select_buffer.c
-  intern/draw_texture_pool.cc
   intern/draw_shader.c
+  intern/draw_texture_pool.cc
   intern/draw_view.c
+  intern/draw_view_data.cc
+  intern/smaa_textures.c
   engines/basic/basic_engine.c
-  engines/image/image_engine.c
-  engines/image/image_shader.c
+  engines/image/image_engine.cc
+  engines/image/image_shader.cc
   engines/eevee/eevee_bloom.c
   engines/eevee/eevee_cryptomatte.c
   engines/eevee/eevee_data.c
@@ -199,16 +201,16 @@ set(SRC
   intern/draw_color_management.h
   intern/draw_common.h
   intern/draw_debug.h
-  intern/draw_view_data.h
   intern/draw_hair_private.h
   intern/draw_instance_data.h
   intern/draw_manager.h
   intern/draw_manager_profiling.h
   intern/draw_manager_testing.h
   intern/draw_manager_text.h
-  intern/draw_texture_pool.h
   intern/draw_shader.h
+  intern/draw_texture_pool.h
   intern/draw_view.h
+  intern/draw_view_data.h
   intern/mesh_extractors/extract_mesh.h
   intern/smaa_textures.h
   engines/basic/basic_engine.h
@@ -218,7 +220,7 @@ set(SRC
   engines/eevee/eevee_private.h
   engines/external/external_engine.h
   engines/image/image_engine.h
-  engines/image/image_private.h
+  engines/image/image_private.hh
   engines/workbench/workbench_engine.h
   engines/workbench/workbench_private.h
   engines/select/select_engine.h

@@ -1649,11 +1649,37 @@ bool PyC_RunString_AsString(const char *imports[],
 #endif
 
 /**
- * Don't use `bool` return type, so -1 can be used as an error value.
+ *
+ * Comparison with #PyObject_IsTrue
+ * ================================
+ *
+ * Even though Python provides a way to retrieve the boolean value for an object,
+ * in many cases it's far too relaxed, with the following examples coercing values.
+ *
+ * \code{.py}
+ * data.value = "Text"    # True.
+ * data.value = ""        # False.
+ * data.value = {1, 2}    # True
+ * data.value = {}        # False.
+ * data.value = None      # False.
+ * \endcode
+ *
+ * In practice this is often a mistake by the script author that doesn't behave as they expect.
+ * So it's better to be more strict for attribute assignment and function arguments,
+ * only accepting True/False 0/1.
+ *
+ * If coercing a value is desired, it can be done explicitly: `data.value = bool(value)`
+ *
+ * \see #PyC_ParseBool for use with #PyArg_ParseTuple and related functions.
+ *
+ * \note Don't use `bool` return type, so -1 can be used as an error value.
  */
 int PyC_Long_AsBool(PyObject *value)
 {
   const int test = _PyLong_AsInt(value);
+  if (UNLIKELY(test == -1 && PyErr_Occurred())) {
+    return -1;
+  }
   if (UNLIKELY((uint)test > 1)) {
     PyErr_SetString(PyExc_TypeError, "Python number not a bool (0/1)");
     return -1;
@@ -1664,6 +1690,9 @@ int PyC_Long_AsBool(PyObject *value)
 int8_t PyC_Long_AsI8(PyObject *value)
 {
   const int test = _PyLong_AsInt(value);
+  if (UNLIKELY(test == -1 && PyErr_Occurred())) {
+    return -1;
+  }
   if (UNLIKELY(test < INT8_MIN || test > INT8_MAX)) {
     PyErr_SetString(PyExc_OverflowError, "Python int too large to convert to C int8");
     return -1;
@@ -1674,6 +1703,9 @@ int8_t PyC_Long_AsI8(PyObject *value)
 int16_t PyC_Long_AsI16(PyObject *value)
 {
   const int test = _PyLong_AsInt(value);
+  if (UNLIKELY(test == -1 && PyErr_Occurred())) {
+    return -1;
+  }
   if (UNLIKELY(test < INT16_MIN || test > INT16_MAX)) {
     PyErr_SetString(PyExc_OverflowError, "Python int too large to convert to C int16");
     return -1;
@@ -1689,6 +1721,9 @@ int16_t PyC_Long_AsI16(PyObject *value)
 uint8_t PyC_Long_AsU8(PyObject *value)
 {
   const ulong test = PyLong_AsUnsignedLong(value);
+  if (UNLIKELY(test == (ulong)-1 && PyErr_Occurred())) {
+    return (uint8_t)-1;
+  }
   if (UNLIKELY(test > UINT8_MAX)) {
     PyErr_SetString(PyExc_OverflowError, "Python int too large to convert to C uint8");
     return (uint8_t)-1;
@@ -1699,6 +1734,9 @@ uint8_t PyC_Long_AsU8(PyObject *value)
 uint16_t PyC_Long_AsU16(PyObject *value)
 {
   const ulong test = PyLong_AsUnsignedLong(value);
+  if (UNLIKELY(test == (ulong)-1 && PyErr_Occurred())) {
+    return (uint16_t)-1;
+  }
   if (UNLIKELY(test > UINT16_MAX)) {
     PyErr_SetString(PyExc_OverflowError, "Python int too large to convert to C uint16");
     return (uint16_t)-1;
@@ -1709,6 +1747,9 @@ uint16_t PyC_Long_AsU16(PyObject *value)
 uint32_t PyC_Long_AsU32(PyObject *value)
 {
   const ulong test = PyLong_AsUnsignedLong(value);
+  if (UNLIKELY(test == (ulong)-1 && PyErr_Occurred())) {
+    return (uint32_t)-1;
+  }
   if (UNLIKELY(test > UINT32_MAX)) {
     PyErr_SetString(PyExc_OverflowError, "Python int too large to convert to C uint32");
     return (uint32_t)-1;

@@ -15,6 +15,7 @@
  */
 
 #include "NOD_socket_declarations.hh"
+#include "NOD_socket_declarations_geometry.hh"
 
 #include "BKE_node.h"
 
@@ -254,6 +255,7 @@ bNodeSocket &String::build(bNodeTree &ntree, bNode &node, eNodeSocketInOut in_ou
 {
   bNodeSocket &socket = *nodeAddStaticSocket(
       &ntree, &node, in_out, SOCK_STRING, PROP_NONE, identifier_.c_str(), name_.c_str());
+  STRNCPY(((bNodeSocketValueString *)socket.default_value)->value, default_value_.c_str());
   this->set_common_flags(socket);
   return socket;
 }
@@ -330,6 +332,46 @@ bool Geometry::matches(const bNodeSocket &socket) const
     return false;
   }
   return true;
+}
+
+Span<GeometryComponentType> Geometry::supported_types() const
+{
+  return supported_types_;
+}
+
+bool Geometry::only_realized_data() const
+{
+  return only_realized_data_;
+}
+
+bool Geometry::only_instances() const
+{
+  return only_instances_;
+}
+
+GeometryBuilder &GeometryBuilder::supported_type(GeometryComponentType supported_type)
+{
+  decl_->supported_types_ = {supported_type};
+  return *this;
+}
+
+GeometryBuilder &GeometryBuilder::supported_type(
+    blender::Vector<GeometryComponentType> supported_types)
+{
+  decl_->supported_types_ = std::move(supported_types);
+  return *this;
+}
+
+GeometryBuilder &GeometryBuilder::only_realized_data(bool value)
+{
+  decl_->only_realized_data_ = value;
+  return *this;
+}
+
+GeometryBuilder &GeometryBuilder::only_instances(bool value)
+{
+  decl_->only_instances_ = value;
+  return *this;
 }
 
 /** \} */

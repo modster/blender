@@ -32,7 +32,6 @@
 #include "BLI_path_util.h"
 #include "BLI_utility_mixins.hh"
 
-#include "DNA_asset_types.h"
 #include "DNA_space_types.h"
 
 #include "BKE_preferences.h"
@@ -40,7 +39,6 @@
 #include "ED_fileselect.h"
 
 #include "WM_api.h"
-#include "WM_types.h"
 
 /* XXX uses private header of file-space. */
 #include "../space_file/filelist.h"
@@ -187,7 +185,7 @@ void AssetList::fetch(const bContext &C)
 
   if (filelist_needs_force_reset(files)) {
     filelist_readjob_stop(files, CTX_wm_manager(&C));
-    filelist_clear(files);
+    filelist_clear_from_reset_tag(files);
   }
 
   if (filelist_needs_reading(files)) {
@@ -295,9 +293,7 @@ int AssetList::size() const
 void AssetList::tagMainDataDirty() const
 {
   if (filelist_needs_reset_on_main_changes(filelist_)) {
-    /* Full refresh of the file list if local asset data was changed. Refreshing this view
-     * is cheap and users expect this to be updated immediately. */
-    filelist_tag_force_reset(filelist_);
+    filelist_tag_force_reset_mainfiles(filelist_);
   }
 }
 
@@ -460,9 +456,9 @@ bool ED_assetlist_storage_has_list_for_library(const AssetLibraryReference *libr
   return AssetListStorage::lookup_list(*library_reference) != nullptr;
 }
 
-void ED_assetlist_iterate(const AssetLibraryReference *library_reference, AssetListIterFn fn)
+void ED_assetlist_iterate(const AssetLibraryReference &library_reference, AssetListIterFn fn)
 {
-  AssetList *list = AssetListStorage::lookup_list(*library_reference);
+  AssetList *list = AssetListStorage::lookup_list(library_reference);
   if (list) {
     list->iterate(fn);
   }

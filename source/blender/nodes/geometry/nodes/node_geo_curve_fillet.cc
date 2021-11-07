@@ -29,16 +29,16 @@ namespace blender::nodes {
 
 static void geo_node_curve_fillet_declare(NodeDeclarationBuilder &b)
 {
-  b.add_input<decl::Geometry>("Curve");
-  b.add_input<decl::Int>("Count").default_value(1).min(1).max(1000).supports_field();
-  b.add_input<decl::Float>("Radius")
+  b.add_input<decl::Geometry>(N_("Curve")).supported_type(GEO_COMPONENT_TYPE_CURVE);
+  b.add_input<decl::Int>(N_("Count")).default_value(1).min(1).max(1000).supports_field();
+  b.add_input<decl::Float>(N_("Radius"))
       .min(0.0f)
       .max(FLT_MAX)
       .subtype(PropertySubType::PROP_DISTANCE)
       .default_value(0.25f)
       .supports_field();
-  b.add_input<decl::Bool>("Limit Radius");
-  b.add_output<decl::Geometry>("Curve");
+  b.add_input<decl::Bool>(N_("Limit Radius"));
+  b.add_output<decl::Geometry>(N_("Curve"));
 }
 
 static void geo_node_curve_fillet_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
@@ -635,7 +635,7 @@ void register_node_type_geo_curve_fillet()
 {
   static bNodeType ntype;
 
-  geo_node_type_base(&ntype, GEO_NODE_CURVE_FILLET, "Curve Fillet", NODE_CLASS_GEOMETRY, 0);
+  geo_node_type_base(&ntype, GEO_NODE_FILLET_CURVE, "Fillet Curve", NODE_CLASS_GEOMETRY, 0);
   ntype.draw_buttons = blender::nodes::geo_node_curve_fillet_layout;
   node_type_storage(
       &ntype, "NodeGeometryCurveFillet", node_free_standard_storage, node_copy_standard_storage);

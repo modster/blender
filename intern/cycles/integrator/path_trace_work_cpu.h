@@ -16,19 +16,19 @@
 
 #pragma once
 
-#include "kernel/integrator/integrator_state.h"
+#include "kernel/integrator/state.h"
 
 #include "device/cpu/kernel_thread_globals.h"
-#include "device/device_queue.h"
+#include "device/queue.h"
 
 #include "integrator/path_trace_work.h"
 
-#include "util/util_vector.h"
+#include "util/vector.h"
 
 CCL_NAMESPACE_BEGIN
 
 struct KernelWorkTile;
-struct KernelGlobals;
+struct KernelGlobalsCPU;
 
 class CPUKernels;
 
@@ -64,7 +64,7 @@ class PathTraceWorkCPU : public PathTraceWork {
 
  protected:
   /* Core path tracing routine. Renders given work time on the given queue. */
-  void render_samples_full_pipeline(KernelGlobals *kernel_globals,
+  void render_samples_full_pipeline(KernelGlobalsCPU *kernel_globals,
                                     const KernelWorkTile &work_tile,
                                     const int samples_num);
 

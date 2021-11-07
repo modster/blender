@@ -556,14 +556,22 @@ typedef struct LineartBoundingArea {
 #define LRT_MIN3_INDEX_ABC(x, y, z) (x < y ? (x < z ? a : (y < z ? b : c)) : (y < z ? b : c))
 
 #define LRT_ABC(index) (index == 0 ? a : (index == 1 ? b : c))
+#define LRT_PABC(index) (index == 0 ? pa : (index == 1 ? pb : pc))
 
 #define LRT_DOUBLE_CLOSE_ENOUGH(a, b) (((a) + DBL_EDGE_LIM) >= (b) && ((a)-DBL_EDGE_LIM) <= (b))
 
 #define LRT_SHADOW_CLOSE_ENOUGH(a, b) \
   (((a) + DBL_SHADOW_LIM) >= (b) && ((a)-DBL_SHADOW_LIM) <= (b))
 
-BLI_INLINE int lineart_LineIntersectTest2d(
-    const double *a1, const double *a2, const double *b1, const double *b2, double *aRatio)
+#define LRT_DOUBLE_CLOSE_ENOUGH_TRI(a, b) \
+  (((a) + DBL_TRIANGLE_LIM) >= (b) && ((a)-DBL_TRIANGLE_LIM) <= (b))
+
+BLI_INLINE int lineart_LineIntersectTest2d(const double *a1,
+                                           const double *a2,
+                                           const double *b1,
+                                           const double *b2,
+                                           double *aRatio,
+                                           bool *aAligned)
 {
 /* Legacy intersection math aligns better with occlusion function quirks. */
 /* #define USE_VECTOR_LINE_INTERSECTION */
@@ -622,9 +630,20 @@ BLI_INLINE int lineart_LineIntersectTest2d(
   double x_diff = (a2[0] - a1[0]);
   double x_diff2 = (b2[0] - b1[0]);
 
+  *aAligned = false;
+
   if (LRT_DOUBLE_CLOSE_ENOUGH(x_diff, 0)) {
     if (LRT_DOUBLE_CLOSE_ENOUGH(x_diff2, 0)) {
-      *aRatio = 0;
+      if ((LRT_DOUBLE_CLOSE_ENOUGH(a2[0], b1[0]) && LRT_DOUBLE_CLOSE_ENOUGH(a2[1], b1[1])) ||
+          (LRT_DOUBLE_CLOSE_ENOUGH(a2[0], b2[0]) && LRT_DOUBLE_CLOSE_ENOUGH(a2[1], b2[1]))) {
+        *aAligned = true;
+        *aRatio = 1;
+      }
+      else if ((LRT_DOUBLE_CLOSE_ENOUGH(a1[0], b1[0]) && LRT_DOUBLE_CLOSE_ENOUGH(a1[1], b1[1])) ||
+               (LRT_DOUBLE_CLOSE_ENOUGH(a1[0], b2[0]) && LRT_DOUBLE_CLOSE_ENOUGH(a1[1], b2[1]))) {
+        *aAligned = true;
+        *aRatio = 0;
+      }
       return 0;
     }
     double r2 = ratiod(b1[0], b2[0], a1[0]);
@@ -642,8 +661,21 @@ BLI_INLINE int lineart_LineIntersectTest2d(
       k1 = (a2[1] - a1[1]) / x_diff;
       k2 = (b2[1] - b1[1]) / x_diff2;
 
-      if (k1 == k2)
+      if (LRT_DOUBLE_CLOSE_ENOUGH(k2, k1)) {
+        if ((LRT_DOUBLE_CLOSE_ENOUGH(a2[0], b1[0]) && LRT_DOUBLE_CLOSE_ENOUGH(a2[1], b1[1])) ||
+            (LRT_DOUBLE_CLOSE_ENOUGH(a2[0], b2[0]) && LRT_DOUBLE_CLOSE_ENOUGH(a2[1], b2[1]))) {
+          *aAligned = true;
+          *aRatio = 1;
+        }
+        else if ((LRT_DOUBLE_CLOSE_ENOUGH(a1[0], b1[0]) &&
+                  LRT_DOUBLE_CLOSE_ENOUGH(a1[1], b1[1])) ||
+                 (LRT_DOUBLE_CLOSE_ENOUGH(a1[0], b2[0]) &&
+                  LRT_DOUBLE_CLOSE_ENOUGH(a1[1], b2[1]))) {
+          *aAligned = true;
+          *aRatio = 0;
+        }
         return 0;
+      }
 
       x = (a1[1] - b1[1] - k1 * a1[0] + k2 * b1[0]) / (k2 - k1);
 
@@ -662,6 +694,13 @@ BLI_INLINE int lineart_LineIntersectTest2d(
            (b1[0] < b2[0] && x < b1[0]) || (b2[0] > b1[0] && x > b2[0]) ||
            (b2[0] < b1[0] && x < b2[0]))
     return 0;
+
+  if (LRT_DOUBLE_CLOSE_ENOUGH_TRI(*aRatio, 1)) {
+    *aRatio = 1;
+  }
+  else if (LRT_DOUBLE_CLOSE_ENOUGH_TRI(*aRatio, 0)) {
+    *aRatio = 0;
+  }
 
   return 1;
 #endif

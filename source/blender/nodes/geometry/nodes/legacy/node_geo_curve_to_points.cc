@@ -30,10 +30,10 @@ namespace blender::nodes {
 
 static void geo_node_curve_to_points_declare(NodeDeclarationBuilder &b)
 {
-  b.add_input<decl::Geometry>("Geometry");
-  b.add_input<decl::Int>("Count").default_value(10).min(2).max(100000);
-  b.add_input<decl::Float>("Length").default_value(0.1f).min(0.001f).subtype(PROP_DISTANCE);
-  b.add_output<decl::Geometry>("Geometry");
+  b.add_input<decl::Geometry>(N_("Geometry"));
+  b.add_input<decl::Int>(N_("Count")).default_value(10).min(2).max(100000);
+  b.add_input<decl::Float>(N_("Length")).default_value(0.1f).min(0.001f).subtype(PROP_DISTANCE);
+  b.add_output<decl::Geometry>(N_("Geometry"));
 }
 
 static void geo_node_curve_to_points_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
@@ -180,7 +180,7 @@ static void copy_evaluated_point_attributes(Span<SplinePtr> splines,
       spline.interpolate_to_evaluated(spline.radii())->materialize(data.radii.slice(offset, size));
       spline.interpolate_to_evaluated(spline.tilts())->materialize(data.tilts.slice(offset, size));
 
-      for (const Map<AttributeIDRef, GMutableSpan>::Item &item : data.point_attributes.items()) {
+      for (const Map<AttributeIDRef, GMutableSpan>::Item item : data.point_attributes.items()) {
         const AttributeIDRef attribute_id = item.key;
         GMutableSpan point_span = item.value;
 
@@ -223,7 +223,7 @@ static void copy_uniform_sample_point_attributes(Span<SplinePtr> splines,
                                               uniform_samples,
                                               data.tilts.slice(offset, size));
 
-      for (const Map<AttributeIDRef, GMutableSpan>::Item &item : data.point_attributes.items()) {
+      for (const Map<AttributeIDRef, GMutableSpan>::Item item : data.point_attributes.items()) {
         const AttributeIDRef attribute_id = item.key;
         GMutableSpan point_span = item.value;
 
@@ -286,18 +286,6 @@ static void copy_spline_domain_attributes(const CurveComponent &curve_component,
       });
 }
 
-void curve_create_default_rotation_attribute(Span<float3> tangents,
-                                             Span<float3> normals,
-                                             MutableSpan<float3> rotations)
-{
-  threading::parallel_for(IndexRange(rotations.size()), 512, [&](IndexRange range) {
-    for (const int i : range) {
-      rotations[i] =
-          float4x4::from_normalized_axis_data({0, 0, 0}, normals[i], tangents[i]).to_euler();
-    }
-  });
-}
-
 static void geo_node_curve_to_points_exec(GeoNodeExecParams params)
 {
   NodeGeometryCurveToPoints &node_storage = *(NodeGeometryCurveToPoints *)params.node().storage;
@@ -354,7 +342,7 @@ static void geo_node_curve_to_points_exec(GeoNodeExecParams params)
 
 }  // namespace blender::nodes
 
-void register_node_type_geo_curve_to_points()
+void register_node_type_geo_legacy_curve_to_points()
 {
   static bNodeType ntype;
 

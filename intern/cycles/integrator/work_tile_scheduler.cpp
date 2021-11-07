@@ -16,11 +16,11 @@
 
 #include "integrator/work_tile_scheduler.h"
 
-#include "device/device_queue.h"
+#include "device/queue.h"
 #include "integrator/tile.h"
-#include "render/buffers.h"
-#include "util/util_atomic.h"
-#include "util/util_logging.h"
+#include "session/buffers.h"
+#include "util/atomic.h"
+#include "util/log.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -33,13 +33,17 @@ void WorkTileScheduler::set_max_num_path_states(int max_num_path_states)
   max_num_path_states_ = max_num_path_states;
 }
 
-void WorkTileScheduler::reset(const BufferParams &buffer_params, int sample_start, int samples_num)
+void WorkTileScheduler::reset(const BufferParams &buffer_params,
+                              int sample_start,
+                              int samples_num,
+                              float scrambling_distance)
 {
   /* Image buffer parameters. */
   image_full_offset_px_.x = buffer_params.full_x;
   image_full_offset_px_.y = buffer_params.full_y;
 
   image_size_px_ = make_int2(buffer_params.width, buffer_params.height);
+  scrambling_distance_ = scrambling_distance;
 
   offset_ = buffer_params.offset;
   stride_ = buffer_params.stride;
@@ -54,7 +58,8 @@ void WorkTileScheduler::reset(const BufferParams &buffer_params, int sample_star
 
 void WorkTileScheduler::reset_scheduler_state()
 {
-  tile_size_ = tile_calculate_best_size(image_size_px_, samples_num_, max_num_path_states_);
+  tile_size_ = tile_calculate_best_size(
+      image_size_px_, samples_num_, max_num_path_states_, scrambling_distance_);
 
   VLOG(3) << "Will schedule tiles of size " << tile_size_;
 
@@ -88,7 +93,7 @@ bool WorkTileScheduler::get_work(KernelWorkTile *work_tile_, const int max_work_
 
   DCHECK_NE(max_num_path_states_, 0);
 
-  const int work_index = atomic_fetch_and_add_int32(&next_work_index_, 1);
+  const int work_index = next_work_index_++;
   if (work_index >= total_work_size_) {
     return false;
   }
@@ -121,12 +126,8 @@ bool WorkTileScheduler::get_work(KernelWorkTile *work_tile_, const int max_work_
 
   if (max_work_size && tile_work_size > max_work_size) {
     /* The work did not fit into the requested limit of the work size. Unschedule the tile,
-     * allowing others (or ourselves later one) to pick it up.
-     *
-     * TODO: Such temporary decrement is not ideal, since it might lead to situation when another
-     * device sees there is nothing to be done, finishing its work and leaving all work to be
-     * done by us. */
-    atomic_fetch_and_add_int32(&next_work_index_, -1);
+     * so it can be picked up again later. */
+    next_work_index_--;
     return false;
   }
 

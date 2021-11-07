@@ -139,6 +139,18 @@ GeometryComponent &GeometrySet::get_component_for_write(GeometryComponentType co
       });
 }
 
+/**
+ * Retrieve the pointer to a component without creating it if it does not exist,
+ * unlike #get_component_for_write.
+ */
+GeometryComponent *GeometrySet::get_component_ptr(GeometryComponentType type)
+{
+  if (this->has(type)) {
+    return &this->get_component_for_write(type);
+  }
+  return nullptr;
+}
+
 /* Get the component of the given type. Might return null if the component does not exist yet. */
 const GeometryComponent *GeometrySet::get_component_for_read(
     GeometryComponentType component_type) const
@@ -340,8 +352,10 @@ bool GeometrySet::is_empty() const
 GeometrySet GeometrySet::create_with_mesh(Mesh *mesh, GeometryOwnershipType ownership)
 {
   GeometrySet geometry_set;
-  MeshComponent &component = geometry_set.get_component_for_write<MeshComponent>();
-  component.replace(mesh, ownership);
+  if (mesh != nullptr) {
+    MeshComponent &component = geometry_set.get_component_for_write<MeshComponent>();
+    component.replace(mesh, ownership);
+  }
   return geometry_set;
 }
 
@@ -350,8 +364,10 @@ GeometrySet GeometrySet::create_with_pointcloud(PointCloud *pointcloud,
                                                 GeometryOwnershipType ownership)
 {
   GeometrySet geometry_set;
-  PointCloudComponent &component = geometry_set.get_component_for_write<PointCloudComponent>();
-  component.replace(pointcloud, ownership);
+  if (pointcloud != nullptr) {
+    PointCloudComponent &component = geometry_set.get_component_for_write<PointCloudComponent>();
+    component.replace(pointcloud, ownership);
+  }
   return geometry_set;
 }
 
@@ -359,65 +375,87 @@ GeometrySet GeometrySet::create_with_pointcloud(PointCloud *pointcloud,
 GeometrySet GeometrySet::create_with_curve(CurveEval *curve, GeometryOwnershipType ownership)
 {
   GeometrySet geometry_set;
-  CurveComponent &component = geometry_set.get_component_for_write<CurveComponent>();
-  component.replace(curve, ownership);
+  if (curve != nullptr) {
+    CurveComponent &component = geometry_set.get_component_for_write<CurveComponent>();
+    component.replace(curve, ownership);
+  }
   return geometry_set;
 }
 
 /* Clear the existing mesh and replace it with the given one. */
 void GeometrySet::replace_mesh(Mesh *mesh, GeometryOwnershipType ownership)
 {
-  MeshComponent &component = this->get_component_for_write<MeshComponent>();
-  component.replace(mesh, ownership);
+  if (mesh == nullptr) {
+    this->remove<MeshComponent>();
+  }
+  else {
+    MeshComponent &component = this->get_component_for_write<MeshComponent>();
+    component.replace(mesh, ownership);
+  }
 }
 
 /* Clear the existing curve and replace it with the given one. */
 void GeometrySet::replace_curve(CurveEval *curve, GeometryOwnershipType ownership)
 {
-  CurveComponent &component = this->get_component_for_write<CurveComponent>();
-  component.replace(curve, ownership);
+  if (curve == nullptr) {
+    this->remove<CurveComponent>();
+  }
+  else {
+    CurveComponent &component = this->get_component_for_write<CurveComponent>();
+    component.replace(curve, ownership);
+  }
 }
 
 /* Clear the existing point cloud and replace with the given one. */
 void GeometrySet::replace_pointcloud(PointCloud *pointcloud, GeometryOwnershipType ownership)
 {
-  PointCloudComponent &pointcloud_component = this->get_component_for_write<PointCloudComponent>();
-  pointcloud_component.replace(pointcloud, ownership);
+  if (pointcloud == nullptr) {
+    this->remove<PointCloudComponent>();
+  }
+  else {
+    PointCloudComponent &component = this->get_component_for_write<PointCloudComponent>();
+    component.replace(pointcloud, ownership);
+  }
 }
 
 /* Clear the existing volume and replace with the given one. */
 void GeometrySet::replace_volume(Volume *volume, GeometryOwnershipType ownership)
 {
-  VolumeComponent &volume_component = this->get_component_for_write<VolumeComponent>();
-  volume_component.replace(volume, ownership);
+  if (volume == nullptr) {
+    this->remove<VolumeComponent>();
+  }
+  else {
+    VolumeComponent &component = this->get_component_for_write<VolumeComponent>();
+    component.replace(volume, ownership);
+  }
 }
 
 /* Returns a mutable mesh or null. No ownership is transferred. */
 Mesh *GeometrySet::get_mesh_for_write()
 {
-  MeshComponent &component = this->get_component_for_write<MeshComponent>();
-  return component.get_for_write();
+  MeshComponent *component = this->get_component_ptr<MeshComponent>();
+  return component == nullptr ? nullptr : component->get_for_write();
 }
 
 /* Returns a mutable point cloud or null. No ownership is transferred. */
 PointCloud *GeometrySet::get_pointcloud_for_write()
 {
-  PointCloudComponent &component = this->get_component_for_write<PointCloudComponent>();
-  return component.get_for_write();
+  PointCloudComponent *component = this->get_component_ptr<PointCloudComponent>();
+  return component == nullptr ? nullptr : component->get_for_write();
 }
 
 /* Returns a mutable volume or null. No ownership is transferred. */
 Volume *GeometrySet::get_volume_for_write()
 {
-  VolumeComponent &component = this->get_component_for_write<VolumeComponent>();
-  return component.get_for_write();
+  VolumeComponent *component = this->get_component_ptr<VolumeComponent>();
+  return component == nullptr ? nullptr : component->get_for_write();
 }
 
 /* Returns a mutable curve or null. No ownership is transferred. */
 CurveEval *GeometrySet::get_curve_for_write()
 {
-  CurveComponent &component = this->get_component_for_write<CurveComponent>();
-  return component.get_for_write();
+  CurveComponent *component = this->get_component_ptr<CurveComponent>();
+  return component == nullptr ? nullptr : component->get_for_write();
 }
 
 void GeometrySet::attribute_foreach(const Span<GeometryComponentType> component_types,
@@ -469,12 +507,11 @@ void GeometrySet::gather_attributes_for_propagation(
             return;
           }
         }
-        if (attribute_id.is_anonymous()) {
-          if (!BKE_anonymous_attribute_id_has_strong_references(&attribute_id.anonymous_id())) {
-            /* Don't propagate anonymous attributes that are not used anymore. */
-            return;
-          }
+
+        if (!attribute_id.should_be_kept()) {
+          return;
         }
+
         auto add_info = [&](AttributeKind *attribute_kind) {
           attribute_kind->domain = meta_data.domain;
           attribute_kind->data_type = meta_data.data_type;
@@ -488,6 +525,40 @@ void GeometrySet::gather_attributes_for_propagation(
         r_attributes.add_or_modify(attribute_id, add_info, modify_info);
       });
   delete dummy_component;
+}
+
+static void gather_component_types_recursive(const GeometrySet &geometry_set,
+                                             const bool include_instances,
+                                             const bool ignore_empty,
+                                             Vector<GeometryComponentType> &r_types)
+{
+  for (const GeometryComponent *component : geometry_set.get_components_for_read()) {
+    if (ignore_empty) {
+      if (component->is_empty()) {
+        continue;
+      }
+    }
+    r_types.append_non_duplicates(component->type());
+  }
+  if (!include_instances) {
+    return;
+  }
+  const InstancesComponent *instances = geometry_set.get_component_for_read<InstancesComponent>();
+  if (instances == nullptr) {
+    return;
+  }
+  instances->foreach_referenced_geometry([&](const GeometrySet &instance_geometry_set) {
+    gather_component_types_recursive(
+        instance_geometry_set, include_instances, ignore_empty, r_types);
+  });
+}
+
+blender::Vector<GeometryComponentType> GeometrySet::gather_component_types(
+    const bool include_instances, bool ignore_empty) const
+{
+  Vector<GeometryComponentType> types;
+  gather_component_types_recursive(*this, include_instances, ignore_empty, types);
+  return types;
 }
 
 static void gather_mutable_geometry_sets(GeometrySet &geometry_set,
@@ -539,24 +610,32 @@ bool BKE_object_has_geometry_set_instances(const Object *ob)
   if (geometry_set == nullptr) {
     return false;
   }
-  if (geometry_set->has_instances()) {
-    return true;
-  }
-  const bool has_mesh = geometry_set->has_mesh();
-  const bool has_pointcloud = geometry_set->has_pointcloud();
-  const bool has_volume = geometry_set->has_volume();
-  const bool has_curve = geometry_set->has_curve();
-  if (ob->type == OB_MESH) {
-    return has_pointcloud || has_volume || has_curve;
-  }
-  if (ob->type == OB_POINTCLOUD) {
-    return has_mesh || has_volume || has_curve;
-  }
-  if (ob->type == OB_VOLUME) {
-    return has_mesh || has_pointcloud || has_curve;
-  }
-  if (ELEM(ob->type, OB_CURVE, OB_FONT)) {
-    return has_mesh || has_pointcloud || has_volume;
+  for (const GeometryComponent *component : geometry_set->get_components_for_read()) {
+    if (component->is_empty()) {
+      continue;
+    }
+    const GeometryComponentType type = component->type();
+    bool is_instance = false;
+    switch (type) {
+      case GEO_COMPONENT_TYPE_MESH:
+        is_instance = ob->type != OB_MESH;
+        break;
+      case GEO_COMPONENT_TYPE_POINT_CLOUD:
+        is_instance = ob->type != OB_POINTCLOUD;
+        break;
+      case GEO_COMPONENT_TYPE_INSTANCES:
+        is_instance = true;
+        break;
+      case GEO_COMPONENT_TYPE_VOLUME:
+        is_instance = ob->type != OB_VOLUME;
+        break;
+      case GEO_COMPONENT_TYPE_CURVE:
+        is_instance = !ELEM(ob->type, OB_CURVE, OB_FONT);
+        break;
+    }
+    if (is_instance) {
+      return true;
+    }
   }
   return false;
 }

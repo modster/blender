@@ -20,11 +20,11 @@
 #include "integrator/path_trace_work.h"
 #include "integrator/path_trace_work_cpu.h"
 #include "integrator/path_trace_work_gpu.h"
-#include "render/buffers.h"
-#include "render/film.h"
-#include "render/scene.h"
+#include "scene/film.h"
+#include "scene/scene.h"
+#include "session/buffers.h"
 
-#include "kernel/kernel_types.h"
+#include "kernel/types.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -182,6 +182,8 @@ PassAccessor::PassAccessInfo PathTraceWork::get_display_pass_access_info(PassMod
   pass_access_info.use_approximate_shadow_catcher = kfilm.use_approximate_shadow_catcher;
   pass_access_info.use_approximate_shadow_catcher_background =
       kfilm.use_approximate_shadow_catcher && !kbackground.transparent;
+
+  pass_access_info.show_active_pixels = film_->get_show_active_pixels();
 
   return pass_access_info;
 }

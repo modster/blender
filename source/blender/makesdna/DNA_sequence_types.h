@@ -179,7 +179,9 @@ typedef struct Sequence {
   /** Starting and ending points of the strip in the sequence. */
   int startdisp, enddisp;
   float sat;
-  float mul, handsize;
+  float mul;
+  char tmp_tag;
+  char _pad[3];
 
   short anim_preseek; /* UNUSED. */
   /** Streamindex for movie or sound files with several streams. */
@@ -250,7 +252,7 @@ typedef struct Sequence {
 
   /* Multiview */
   char views_format;
-  char _pad[3];
+  char _pad1[3];
   struct Stereo3dFormat *stereo3d_format;
 
   struct IDProperty *prop;
@@ -289,9 +291,11 @@ typedef struct Editing {
   /** 1024 = FILE_MAX. */
   char proxy_dir[1024];
 
-  int over_ofs, over_cfra;
-  int over_flag, proxy_storage;
-  rctf over_border;
+  int proxy_storage;
+
+  int overlay_frame_ofs, overlay_frame_abs;
+  int overlay_frame_flag;
+  rctf overlay_frame_rect;
 
   struct SeqCache *cache;
 
@@ -502,9 +506,9 @@ typedef struct SequencerScopes {
 
 #define SELECT 1
 
-/* Editor->over_flag */
-#define SEQ_EDIT_OVERLAY_SHOW 1
-#define SEQ_EDIT_OVERLAY_ABS 2
+/** #Editor.overlay_frame_flag */
+#define SEQ_EDIT_OVERLAY_FRAME_SHOW 1
+#define SEQ_EDIT_OVERLAY_FRAME_ABS 2
 
 #define SEQ_STRIP_OFSBOTTOM 0.05f
 #define SEQ_STRIP_OFSTOP 0.95f

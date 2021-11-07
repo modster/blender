@@ -2131,11 +2131,6 @@ bool CustomData_merge(const struct CustomData *source,
     if (flag & CD_FLAG_NOCOPY) {
       continue;
     }
-    if (layer->anonymous_id &&
-        !BKE_anonymous_attribute_id_has_strong_references(layer->anonymous_id)) {
-      /* This attribute is not referenced anymore, so it can be treated as if it didn't exist. */
-      continue;
-    }
     if (!(mask & CD_TYPE_AS_MASK(type))) {
       continue;
     }
@@ -2594,6 +2589,11 @@ static CustomDataLayer *customData_add_layer__internal(CustomData *data,
   for (; index > 0 && data->layers[index - 1].type > type; index--) {
     data->layers[index] = data->layers[index - 1];
   }
+
+  /* Clear remaining data on the layer. The original data on the layer has been moved to another
+   * index. Without this, it can happen that information from the previous layer at that index
+   * leaks into the new layer. */
+  memset(data->layers + index, 0, sizeof(CustomDataLayer));
 
   data->layers[index].type = type;
   data->layers[index].flag = flag;
