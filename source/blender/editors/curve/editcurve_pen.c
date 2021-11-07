@@ -853,12 +853,12 @@ wmKeyMap *curve_pen_modal_keymap(wmKeyConfig *keyconf)
 
   keymap = WM_modalkeymap_ensure(keyconf, "Curve Pen Modal Map", modal_items);
 
-  WM_modalkeymap_assign(keymap, "CURVE_OT_pen_add");
+  WM_modalkeymap_assign(keymap, "CURVE_OT_pen");
 
   return keymap;
 }
 
-static int curve_pen_add_modal(bContext *C, wmOperator *op, const wmEvent *event)
+static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
 {
   Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
   ViewContext vc;
@@ -1087,9 +1087,9 @@ static int curve_pen_insert_modal(bContext *C, wmOperator *op, const wmEvent *ev
   return ret;
 }
 
-static int curve_pen_add_invoke(bContext *C, wmOperator *op, const wmEvent *event)
+static int curve_pen_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
-  int ret = curve_pen_add_modal(C, op, event);
+  int ret = curve_pen_modal(C, op, event);
   BLI_assert(ret == OPERATOR_RUNNING_MODAL);
   if (ret == OPERATOR_RUNNING_MODAL) {
     WM_event_add_modal_handler(C, op);
@@ -1120,16 +1120,16 @@ static int curve_pen_insert_invoke(bContext *C, wmOperator *op, const wmEvent *e
   return ret;
 }
 
-void CURVE_OT_pen_add(wmOperatorType *ot)
+void CURVE_OT_pen(wmOperatorType *ot)
 {
   /* identifiers */
-  ot->name = "Curve Pen Add";
-  ot->idname = "CURVE_OT_pen_add";
+  ot->name = "Curve Pen";
+  ot->idname = "CURVE_OT_pen";
   ot->description = "Construct and edit splines";
 
   /* api callbacks */
-  ot->invoke = curve_pen_add_invoke;
-  ot->modal = curve_pen_add_modal;
+  ot->invoke = curve_pen_invoke;
+  ot->modal = curve_pen_modal;
   ot->poll = ED_operator_view3d_active;
 
   /* flags */
