@@ -310,7 +310,7 @@ static void get_closest_vertex_to_point_in_nurbs(ListBase *nurbs,
         }
       }
     }
-    else if (nu->type == CU_NURBS || nu->type == CU_POLY) {
+    else {
       for (int i = 0; i < nu->pntsu; i++) {
         BPoint *bp = &nu->bp[i];
         float bp_vec[2];
@@ -487,7 +487,7 @@ static void update_data_for_all_nurbs(const ListBase *nurbs, const ViewContext *
   CutData *data = op_data;
 
   LISTBASE_FOREACH (Nurb *, nu, nurbs) {
-    if (nu->bezt) {
+    if (nu->type == CU_BEZIER) {
       float screen_co[2];
       if (data->nurb == NULL) {
         ED_view3d_project_float_object(vc->region,
@@ -507,7 +507,7 @@ static void update_data_for_all_nurbs(const ListBase *nurbs, const ViewContext *
         update_data_if_closest_bezt_in_segment(bezt + 1, nu->bezt, nu, nu->pntsu - 1, vc, data);
       }
     }
-    else if (nu->bp) {
+    else {
       float screen_co[2];
       if (data->nurb == NULL) {
         ED_view3d_project_float_object(
@@ -653,14 +653,14 @@ static void make_cut(const wmEvent *event, Curve *cu, Nurb **r_nu, const ViewCon
   const float threshold_distance = ED_view3d_select_dist_px();
   Nurb *nu = data.nurb;
   if (nu) {
-    if (nu->bezt) {
+    if (nu->type == CU_BEZIER) {
       update_cut_loc_in_data(&data, vc);
       if (data.min_dist < threshold_distance) {
         add_bezt_to_nurb(nu, &data, cu);
         *r_nu = nu;
       }
     }
-    else if (nu->bp && data.min_dist < threshold_distance) {
+    else if (data.min_dist < threshold_distance) {
       add_bp_to_nurb(nu, &data, cu);
     }
   }
@@ -800,10 +800,12 @@ static bool make_cyclic_if_endpoints(
     Nurb *sel_nu, BezTriple *sel_bezt, BPoint *sel_bp, ViewContext *vc, bContext *C)
 {
   if (sel_bezt || sel_bp) {
-    const bool is_bezt_endpoint = (sel_nu->bezt && (sel_bezt == sel_nu->bezt ||
-                                                    sel_bezt == sel_nu->bezt + sel_nu->pntsu - 1));
-    const bool is_bp_endpoint = (sel_nu->bp && (sel_bp == sel_nu->bp ||
-                                                sel_bp == sel_nu->bp + sel_nu->pntsu - 1));
+    const bool is_bezt_endpoint = (sel_nu->type == CU_BEZIER &&
+                                   (sel_bezt == sel_nu->bezt ||
+                                    sel_bezt == sel_nu->bezt + sel_nu->pntsu - 1));
+    const bool is_bp_endpoint = (sel_nu->type != CU_BEZIER &&
+                                 (sel_bp == sel_nu->bp ||
+                                  sel_bp == sel_nu->bp + sel_nu->pntsu - 1));
     if (!(is_bezt_endpoint || is_bp_endpoint)) {
       return false;
     }
@@ -815,10 +817,10 @@ static bool make_cyclic_if_endpoints(
     Base *basact = NULL;
     ED_curve_pick_vert(vc, 1, &nu, &bezt, &bp, &hand, &basact);
 
-    if (nu == sel_nu &&
-        ((nu->bezt && bezt != sel_bezt &&
-          (bezt == nu->bezt || bezt == nu->bezt + nu->pntsu - 1)) ||
-         (nu->bp && bp != sel_bp && (bp == nu->bp || bp == nu->bp + nu->pntsu - 1)))) {
+    if (nu == sel_nu && ((nu->type == CU_BEZIER && bezt != sel_bezt &&
+                          (bezt == nu->bezt || bezt == nu->bezt + nu->pntsu - 1)) ||
+                         (nu->type != CU_BEZIER && bp != sel_bp &&
+                          (bp == nu->bp || bp == nu->bp + nu->pntsu - 1)))) {
       View3D *v3d = CTX_wm_view3d(C);
       ListBase *editnurb = object_editcurve_get(vc->obedit);
       ed_curve_toggle_cyclic(v3d, editnurb, 0);
@@ -1007,22 +1009,24 @@ static int curve_pen_delete_modal(bContext *C, wmOperator *op, const wmEvent *ev
 
       if (found_point) {
         ED_curve_deselect_all(cu->editnurb);
-        if (nu && nu->type == CU_BEZIER) {
-          BezTriple *next_bezt = BKE_nurb_bezt_get_next(nu, bezt);
-          BezTriple *prev_bezt = BKE_nurb_bezt_get_prev(nu, bezt);
-          if (next_bezt && prev_bezt) {
-            const int bez_index = BKE_curve_nurb_vert_index_get(nu, bezt);
-            uint span_step[2] = {bez_index, bez_index};
-            ed_dissolve_bez_segment(prev_bezt, next_bezt, nu, cu, 1, span_step);
+        if (nu) {
+          if (nu->type == CU_BEZIER) {
+            BezTriple *next_bezt = BKE_nurb_bezt_get_next(nu, bezt);
+            BezTriple *prev_bezt = BKE_nurb_bezt_get_prev(nu, bezt);
+            if (next_bezt && prev_bezt) {
+              const int bez_index = BKE_curve_nurb_vert_index_get(nu, bezt);
+              uint span_step[2] = {bez_index, bez_index};
+              ed_dissolve_bez_segment(prev_bezt, next_bezt, nu, cu, 1, span_step);
+            }
+            delete_bezt_from_nurb(bezt, nu);
           }
-          delete_bezt_from_nurb(bezt, nu);
-        }
-        else if (nu->type == CU_NURBS || nu->type == CU_POLY) {
-          delete_bp_from_nurb(bp, nu);
-        }
+          else {
+            delete_bp_from_nurb(bp, nu);
+          }
 
-        if (nu->pntsu == 0) {
-          delete_nurb(cu, nu);
+          if (nu->pntsu == 0) {
+            delete_nurb(cu, nu);
+          }
         }
       }
 
