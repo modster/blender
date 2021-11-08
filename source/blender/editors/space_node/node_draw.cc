@@ -2154,26 +2154,42 @@ static void node_draw(const bContext *C,
   }
 }
 
-static void draw_portal_link_indicators(bNodeTree *ntree)
+static void draw_portal_link_indicators(ARegion *region, bNodeTree *ntree)
 {
-  uint pos = GPU_vertformat_attr_add(immVertexFormat(), "pos", GPU_COMP_F32, 2, GPU_FETCH_FLOAT);
-  immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
-  immUniformColor3f(0.8f, 0.3f, 0.3f);
-  GPU_point_size(10);
-  immBeginAtMost(GPU_PRIM_POINTS, 1000);
+  Vector<bNodeLink *> portal_links;
   LISTBASE_FOREACH (bNodeLink *, link, &ntree->links) {
     const bool from_node_selected = link->fromnode != nullptr &&
                                     link->fromnode->flag & NODE_SELECT;
     const bool to_node_selected = link->tonode != nullptr && link->tonode->flag & NODE_SELECT;
-    if (nodeLinkIsPortal(link) && !from_node_selected && !to_node_selected) {
-      if (link->fromsock) {
-        immVertex2f(pos, link->fromsock->locx + 10, link->fromsock->locy);
-      }
-      if (link->tosock) {
-        immVertex2f(pos, link->tosock->locx - 10, link->tosock->locy);
-      }
+    if (nodeLinkIsPortal(link) && !from_node_selected && !to_node_selected &&
+        link->flag & NODE_LINK_VALID) {
+      portal_links.append(link);
     }
   }
+
+  uint pos = GPU_vertformat_attr_add(immVertexFormat(), "pos", GPU_COMP_F32, 2, GPU_FETCH_FLOAT);
+  immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
+  immUniformColor3f(0.8f, 0.3f, 0.3f);
+  immBegin(GPU_PRIM_TRIS, portal_links.size() * 2 * 12);
+
+  const float w = 12;
+  const float h = 1.5;
+  const float h2 = 3;
+  for (bNodeLink *link : portal_links) {
+    {
+      const float x = link->fromsock->locx;
+      const float y = link->fromsock->locy;
+      immRectf_fast(pos, x, y - h, x + w, y + h);
+      immRectf_fast(pos, x + w, y - h2, x + w + h * 2, y + h2);
+    }
+    {
+      const float x = link->tosock->locx;
+      const float y = link->tosock->locy;
+      immRectf_fast(pos, x, y - h, x - w, y + h);
+      immRectf_fast(pos, x - w, y - h2, x - w - h * 2, y + h2);
+    }
+  }
+
   immEnd();
   immUnbindProgram();
 }
@@ -2214,7 +2230,7 @@ void node_draw_nodetree(const bContext *C,
 
   /* Node lines. */
   GPU_blend(GPU_BLEND_ALPHA);
-  draw_portal_link_indicators(ntree);
+  draw_portal_link_indicators(region, ntree);
   nodelink_batch_start(snode);
 
   LISTBASE_FOREACH (bNodeLink *, link, &ntree->links) {
