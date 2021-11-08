@@ -70,6 +70,7 @@ typedef struct LineartIsecSingle {
   LineartTriangle *tri1, *tri2;
 } LineartIsecSingle;
 typedef struct LineartIsecThread {
+  int thread_id;
   /* Thread triangle data. */
   /* Used to roughly spread the load. */
   int count_pending;
@@ -2938,6 +2939,7 @@ static void lineart_init_isec_thread(LineartIsecData *d, LineartRenderBuffer *rb
     it->array = MEM_mallocN(sizeof(LineartIsecSingle) * 100, "LineartIsecSingle arr");
     it->max = 100;
     it->current = 0;
+    it->thread_id = i;
   }
 
 #define OBJ_PER_ISEC_THREAD 8 /* Largely arbitrary, no need to be big. */
@@ -3001,10 +3003,10 @@ static void lineart_triangle_intersect_in_bounding_area(LineartRenderBuffer *rb,
     testing_triangle = ba->linked_triangles[i];
     tt = (LineartTriangleThread *)testing_triangle;
 
-    if (testing_triangle == tri || tt->testing_e[0] == (LineartEdge *)tri) {
+    if (testing_triangle == tri || tt->testing_e[th->thread_id] == (LineartEdge *)tri) {
       continue;
     }
-    tt->testing_e[0] = (LineartEdge *)tri;
+    tt->testing_e[th->thread_id] = (LineartEdge *)tri;
 
     if ((testing_triangle->flags & LRT_TRIANGLE_NO_INTERSECTION) ||
         ((testing_triangle->flags & LRT_TRIANGLE_INTERSECTION_ONLY) &&
