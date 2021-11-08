@@ -2154,7 +2154,7 @@ static void node_draw(const bContext *C,
   }
 }
 
-static void draw_portal_link_indicators(ARegion *region, bNodeTree *ntree)
+static void draw_portal_link_indicators(bNodeTree *ntree)
 {
   Vector<bNodeLink *> portal_links;
   LISTBASE_FOREACH (bNodeLink *, link, &ntree->links) {
@@ -2234,7 +2234,7 @@ void node_draw_nodetree(const bContext *C,
 
   /* Node lines. */
   GPU_blend(GPU_BLEND_ALPHA);
-  draw_portal_link_indicators(region, ntree);
+  draw_portal_link_indicators(ntree);
   nodelink_batch_start(snode);
 
   LISTBASE_FOREACH (bNodeLink *, link, &ntree->links) {
