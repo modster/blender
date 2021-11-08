@@ -2002,6 +2002,7 @@ def km_node_editor(params):
         ("node.links_cut",
          {"type": 'EVT_TWEAK_L' if params.legacy else 'EVT_TWEAK_R', "value": 'ANY', "ctrl": True}, None),
         ("node.links_mute", {"type": 'EVT_TWEAK_R', "value": 'ANY', "ctrl": True, "alt": True}, None),
+        ("node.make_link_portals", {"type": 'RIGHTMOUSE', "value": 'PRESS', "key_modifier": 'V'}, None),
         ("node.select_link_viewer", {"type": 'LEFTMOUSE', "value": 'PRESS', "shift": True, "ctrl": True}, None),
         ("node.backimage_move", {"type": 'MIDDLEMOUSE', "value": 'PRESS', "alt": True}, None),
         ("node.backimage_zoom", {"type": 'V', "value": 'PRESS', "repeat": True},

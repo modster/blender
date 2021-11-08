@@ -345,6 +345,7 @@ class NODE_MT_node(Menu):
         layout.operator("node.links_cut")
         layout.operator("node.links_detach")
         layout.operator("node.links_mute")
+        layout.operator("node.make_link_portals")
 
         layout.separator()
 

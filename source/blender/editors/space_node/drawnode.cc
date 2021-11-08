@@ -4276,7 +4276,7 @@ void node_draw_link_bezier(const bContext *C,
                            int th_col2,
                            int th_col3)
 {
-  const float dim_factor = node_link_dim_factor(v2d, link);
+  float dim_factor = node_link_dim_factor(v2d, link);
   float thickness = 1.5f;
   float dash_factor = 1.0f;
 
@@ -4353,8 +4353,12 @@ void node_draw_link_bezier(const bContext *C,
     }
 
     if (link->flag & NODE_LINK_PORTAL) {
-      copy_v4_fl4(colors[1], 1, 1, 1, 0.3);
-      copy_v4_fl4(colors[2], 1, 1, 1, 0.3);
+      if (is_fromnode_selected || is_tonode_selected) {
+        dim_factor = 0.3f;
+      }
+      else {
+        dim_factor = 0.0f;
+      }
     }
 
     if (g_batch_link.enabled && !highlighted) {
