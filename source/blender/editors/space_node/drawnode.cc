@@ -4353,7 +4353,7 @@ void node_draw_link_bezier(const bContext *C,
     }
 
     if (link->flag & NODE_LINK_PORTAL) {
-      if (is_fromnode_selected || is_tonode_selected) {
+      if (link->flag & NODE_LINK_DRAGGED || is_fromnode_selected || is_tonode_selected) {
         dim_factor = 0.3f;
       }
       else {

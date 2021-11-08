@@ -2154,6 +2154,30 @@ static void node_draw(const bContext *C,
   }
 }
 
+static void draw_portal_link_indicators(bNodeTree *ntree)
+{
+  uint pos = GPU_vertformat_attr_add(immVertexFormat(), "pos", GPU_COMP_F32, 2, GPU_FETCH_FLOAT);
+  immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
+  immUniformColor3f(0.8f, 0.3f, 0.3f);
+  GPU_point_size(10);
+  immBeginAtMost(GPU_PRIM_POINTS, 1000);
+  LISTBASE_FOREACH (bNodeLink *, link, &ntree->links) {
+    const bool from_node_selected = link->fromnode != nullptr &&
+                                    link->fromnode->flag & NODE_SELECT;
+    const bool to_node_selected = link->tonode != nullptr && link->tonode->flag & NODE_SELECT;
+    if (nodeLinkIsPortal(link) && !from_node_selected && !to_node_selected) {
+      if (link->fromsock) {
+        immVertex2f(pos, link->fromsock->locx + 10, link->fromsock->locy);
+      }
+      if (link->tosock) {
+        immVertex2f(pos, link->tosock->locx - 10, link->tosock->locy);
+      }
+    }
+  }
+  immEnd();
+  immUnbindProgram();
+}
+
 #define USE_DRAW_TOT_UPDATE
 
 void node_draw_nodetree(const bContext *C,
@@ -2190,6 +2214,7 @@ void node_draw_nodetree(const bContext *C,
 
   /* Node lines. */
   GPU_blend(GPU_BLEND_ALPHA);
+  draw_portal_link_indicators(ntree);
   nodelink_batch_start(snode);
 
   LISTBASE_FOREACH (bNodeLink *, link, &ntree->links) {
