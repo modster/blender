@@ -100,8 +100,6 @@ void BKE_mesh_from_metaball(ListBase *lb, Mesh *me)
     allloop = mloop = (MLoop *)CustomData_add_layer(
         &me->ldata, CD_MLOOP, CD_CALLOC, nullptr, dl->parts * 4);
     mpoly = (MPoly *)CustomData_add_layer(&me->pdata, CD_MPOLY, CD_CALLOC, nullptr, dl->parts);
-    float(*vert_normals)[3] = BKE_mesh_vertex_normals_for_write(me);
-
     me->mvert = mvert;
     me->mloop = mloop;
     me->mpoly = mpoly;
@@ -110,7 +108,6 @@ void BKE_mesh_from_metaball(ListBase *lb, Mesh *me)
 
     for (const int i : IndexRange(dl->nr)) {
       copy_v3_v3(me->mvert[i].co, &dl->verts[3 * i]);
-      copy_v3_v3(vert_normals[i], &dl->nors[3 * i]);
     }
 
     a = dl->parts;
@@ -137,7 +134,7 @@ void BKE_mesh_from_metaball(ListBase *lb, Mesh *me)
 
     BKE_mesh_update_customdata_pointers(me, true);
 
-    BKE_mesh_calc_normals(me);
+    BKE_mesh_normals_tag_dirty(me);
 
     BKE_mesh_calc_edges(me, true, false);
   }

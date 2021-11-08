@@ -139,10 +139,6 @@ static Mesh *create_circle_mesh(const float radius,
     copy_v3_v3(verts.last().co, float3(0));
   }
 
-  /* Fill vertex normal data here since it is trivial and can avoid calculations later. */
-  MutableSpan vert_normals{(float3 *)BKE_mesh_vertex_normals_for_write(mesh), mesh->totvert};
-  vert_normals.fill(float3(0.0f, 0.0f, 1.0f));
-
   /* Create outer edges. */
   const short edge_flag = (fill_type == GEO_NODE_MESH_CIRCLE_FILL_NONE) ?
                               ME_LOOSEEDGE :

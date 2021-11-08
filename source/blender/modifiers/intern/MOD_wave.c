@@ -290,13 +290,13 @@ static void waveModifier_do(WaveModifierData *md,
         if (mvert) {
           /* move along normals */
           if (wmd->flag & MOD_WAVE_NORM_X) {
-            co[0] += (lifefac * amplit) * vert_normals[i][0] / 32767.0f;
+            co[0] += (lifefac * amplit) * vert_normals[i][0];
           }
           if (wmd->flag & MOD_WAVE_NORM_Y) {
-            co[1] += (lifefac * amplit) * vert_normals[i][1] / 32767.0f;
+            co[1] += (lifefac * amplit) * vert_normals[i][1];
           }
           if (wmd->flag & MOD_WAVE_NORM_Z) {
-            co[2] += (lifefac * amplit) * vert_normals[i][2] / 32767.0f;
+            co[2] += (lifefac * amplit) * vert_normals[i][2];
           }
         }
         else {
