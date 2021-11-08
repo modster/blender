@@ -1709,25 +1709,39 @@ static int make_link_portals_exec(bContext *C, wmOperator *op)
 
   ED_preview_kill_jobs(CTX_wm_manager(C), bmain);
 
-  bool changed_link = false;
+  blender::Vector<bNodeLink *> intersecting_links;
   LISTBASE_FOREACH (bNodeLink *, link, &snode->edittree->links) {
     if (node_link_is_hidden_or_dimmed(&region->v2d, link)) {
       continue;
     }
     if (node_links_intersect(link, coords, tot_coords)) {
-      if (link->flag & NODE_LINK_PORTAL) {
-        link->flag &= ~NODE_LINK_PORTAL;
-      }
-      else {
-        link->flag |= NODE_LINK_PORTAL;
-      }
-      changed_link = true;
+      intersecting_links.append(link);
     }
   }
 
-  if (!changed_link) {
+  if (intersecting_links.is_empty()) {
     return OPERATOR_CANCELLED;
   }
+
+  bool any_link_is_portal = false;
+  for (bNodeLink *link : intersecting_links) {
+    if (nodeLinkIsPortal(link)) {
+      any_link_is_portal = true;
+      break;
+    }
+  }
+
+  if (any_link_is_portal) {
+    for (bNodeLink *link : intersecting_links) {
+      link->flag &= ~NODE_LINK_PORTAL;
+    }
+  }
+  else {
+    for (bNodeLink *link : intersecting_links) {
+      link->flag |= NODE_LINK_PORTAL;
+    }
+  }
+
   snode_notify(C, snode);
   return OPERATOR_FINISHED;
 }
