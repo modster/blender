@@ -832,12 +832,12 @@ bool BKE_mesh_clear_facemap_customdata(struct Mesh *me)
 }
 
 /**
- * This ensures grouped customdata (e.g. mtexpoly and mloopuv and mtface, or
- * mloopcol and mcol) have the same relative active/render/clone/mask indices.
+ * This ensures grouped custom-data (e.g. #CD_MLOOPUV and #CD_MTFACE, or
+ * #CD_MLOOPCOL and #CD_MCOL) have the same relative active/render/clone/mask indices.
  *
- * NOTE(campbell): that for undo mesh data we want to skip 'ensure_tess_cd' call since
- * we don't want to store memory for tessface when its only used for older
- * Versions of the mesh.
+ * NOTE(@campbellbarton): that for undo mesh data we want to skip 'ensure_tess_cd' call since
+ * we don't want to store memory for #MFace data when its only used for older
+ * versions of the mesh.
  */
 static void mesh_update_linked_customdata(Mesh *me, const bool do_ensure_tess_cd)
 {
@@ -1896,8 +1896,8 @@ void BKE_mesh_calc_normals_split_ex(Mesh *mesh, MLoopNorSpaceArray *r_lnors_spac
   bool free_polynors = false;
 
   /* Note that we enforce computing clnors when the clnor space array is requested by caller here.
-   * However, we obviously only use the autosmooth angle threshold
-   * only in case autosmooth is enabled. */
+   * However, we obviously only use the auto-smooth angle threshold
+   * only in case auto-smooth is enabled. */
   const bool use_split_normals = (r_lnors_spacearr != nullptr) ||
                                  ((mesh->flag & ME_AUTOSMOOTH) != 0);
   const float split_angle = (mesh->flag & ME_AUTOSMOOTH) != 0 ? mesh->smoothresh : (float)M_PI;
