@@ -2167,6 +2167,10 @@ static void draw_portal_link_indicators(ARegion *region, bNodeTree *ntree)
     }
   }
 
+  if (portal_links.is_empty()) {
+    return;
+  }
+
   uint pos = GPU_vertformat_attr_add(immVertexFormat(), "pos", GPU_COMP_F32, 2, GPU_FETCH_FLOAT);
   immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
   immUniformColor3f(0.6f, 0.6f, 0.6f);
