@@ -1679,6 +1679,87 @@ void NODE_OT_links_mute(wmOperatorType *ot)
 /** \} */
 
 /* -------------------------------------------------------------------- */
+/** \name Make Portal Links Operator
+ * \{ */
+
+static int make_link_portals_exec(bContext *C, wmOperator *op)
+{
+  Main *bmain = CTX_data_main(C);
+  SpaceNode *snode = CTX_wm_space_node(C);
+  ARegion *region = CTX_wm_region(C);
+
+  int tot_coords = 0;
+  float coords[256][2];
+  RNA_BEGIN (op->ptr, itemptr, "path") {
+    float loc[2];
+
+    RNA_float_get_array(&itemptr, "loc", loc);
+    UI_view2d_region_to_view(
+        &region->v2d, (int)loc[0], (int)loc[1], &coords[tot_coords][0], &coords[tot_coords][1]);
+    tot_coords++;
+    if (tot_coords >= 256) {
+      break;
+    }
+  }
+  RNA_END;
+
+  if (tot_coords == 0) {
+    return OPERATOR_CANCELLED;
+  }
+
+  ED_preview_kill_jobs(CTX_wm_manager(C), bmain);
+
+  bool changed_link = false;
+  LISTBASE_FOREACH (bNodeLink *, link, &snode->edittree->links) {
+    if (node_link_is_hidden_or_dimmed(&region->v2d, link)) {
+      continue;
+    }
+    if (node_links_intersect(link, coords, tot_coords)) {
+      if (link->flag & NODE_LINK_PORTAL) {
+        link->flag &= ~NODE_LINK_PORTAL;
+      }
+      else {
+        link->flag |= NODE_LINK_PORTAL;
+      }
+      changed_link = true;
+    }
+  }
+
+  if (!changed_link) {
+    return OPERATOR_CANCELLED;
+  }
+  snode_notify(C, snode);
+  return OPERATOR_FINISHED;
+}
+
+void NODE_OT_make_link_portals(wmOperatorType *ot)
+{
+  ot->name = "Make Link Portals";
+  ot->idname = "NODE_OT_make_link_portals";
+  ot->description = "Use the mouse to create portals from existing links";
+
+  ot->invoke = WM_gesture_lines_invoke;
+  ot->modal = WM_gesture_lines_modal;
+  ot->exec = make_link_portals_exec;
+  ot->cancel = WM_gesture_lines_cancel;
+
+  ot->poll = ED_operator_node_editable;
+
+  /* flags */
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_DEPENDS_ON_CURSOR;
+
+  /* properties */
+  PropertyRNA *prop;
+  prop = RNA_def_collection_runtime(ot->srna, "path", &RNA_OperatorMousePath, "Path", "");
+  RNA_def_property_flag(prop, (PropertyFlag)(PROP_HIDDEN | PROP_SKIP_SAVE));
+
+  /* internal */
+  RNA_def_int(ot->srna, "cursor", WM_CURSOR_MUTE, 0, INT_MAX, "Cursor", "", 0, INT_MAX);
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
 /** \name Detach Links Operator
  * \{ */
 

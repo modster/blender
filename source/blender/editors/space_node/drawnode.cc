@@ -4352,6 +4352,11 @@ void node_draw_link_bezier(const bContext *C,
       }
     }
 
+    if (link->flag & NODE_LINK_PORTAL) {
+      copy_v4_fl4(colors[1], 1, 1, 1, 0.3);
+      copy_v4_fl4(colors[2], 1, 1, 1, 0.3);
+    }
+
     if (g_batch_link.enabled && !highlighted) {
       /* Add link to batch. */
       nodelink_batch_add_link(snode,

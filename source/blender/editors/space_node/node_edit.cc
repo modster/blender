@@ -1279,7 +1279,20 @@ float node_link_dim_factor(const View2D *v2d, const bNodeLink *link)
 
 bool node_link_is_hidden_or_dimmed(const View2D *v2d, const bNodeLink *link)
 {
-  return nodeLinkIsHidden(link) || node_link_dim_factor(v2d, link) < 0.5f;
+  if (nodeLinkIsHidden(link)) {
+    return true;
+  }
+  if (node_link_dim_factor(v2d, link) < 0.5f) {
+    return true;
+  }
+  if (nodeLinkIsPortal(link)) {
+    if ((link->fromnode == nullptr || (link->fromnode->flag & NODE_SELECT) == 0) &&
+        (link->tonode == nullptr || (link->tonode->flag & NODE_SELECT) == 0)) {
+      /* Portal is shown when node is selected. */
+      return true;
+    }
+  }
+  return false;
 }
 
 /* ****************** Duplicate *********************** */
