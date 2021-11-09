@@ -35,13 +35,15 @@ namespace blender::nodes {
 
 static void geo_node_curve_fill_declare(NodeDeclarationBuilder &b)
 {
-  b.add_input<decl::Geometry>(N_("Curve")).supported_type(GEO_COMPONENT_TYPE_CURVE);
-  b.add_output<decl::Geometry>(N_("Mesh"));
-}
+  static const EnumPropertyItem mode_items[] = {
+      {GEO_NODE_CURVE_FILL_MODE_TRIANGULATED, "TRIANGLES", 0, "Triangles", ""},
+      {GEO_NODE_CURVE_FILL_MODE_NGONS, "NGONS", 0, "N-gons", ""},
+      {0, NULL, 0, NULL, NULL},
+  };
 
-static void geo_node_curve_fill_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
-{
-  uiItemR(layout, ptr, "mode", UI_ITEM_R_EXPAND, nullptr, ICON_NONE);
+  b.add_input<decl::Geometry>(N_("Curve")).supported_type(GEO_COMPONENT_TYPE_CURVE);
+  b.add_input<decl::Enum>(N_("Mode")).static_items(mode_items);
+  b.add_output<decl::Geometry>(N_("Mesh"));
 }
 
 static void geo_node_curve_fill_init(bNodeTree *UNUSED(ntree), bNode *node)
@@ -151,8 +153,7 @@ static void geo_node_curve_fill_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Curve");
 
-  const NodeGeometryCurveFill &storage = *(const NodeGeometryCurveFill *)params.node().storage;
-  const GeometryNodeCurveFillMode mode = (GeometryNodeCurveFillMode)storage.mode;
+  const GeometryNodeCurveFillMode mode = params.get_input<GeometryNodeCurveFillMode>("Mode");
 
   geometry_set.modify_geometry_sets(
       [&](GeometrySet &geometry_set) { curve_fill_calculate(geometry_set, mode); });
@@ -173,6 +174,5 @@ void register_node_type_geo_curve_fill()
       &ntype, "NodeGeometryCurveFill", node_free_standard_storage, node_copy_standard_storage);
   ntype.declare = blender::nodes::geo_node_curve_fill_declare;
   ntype.geometry_node_execute = blender::nodes::geo_node_curve_fill_exec;
-  ntype.draw_buttons = blender::nodes::geo_node_curve_fill_layout;
   nodeRegisterType(&ntype);
 }

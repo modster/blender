@@ -66,6 +66,27 @@ using fn::GVMutableArray_Typed;
 using fn::GVMutableArrayPtr;
 using geometry_nodes_eval_log::NodeWarningType;
 
+/** Wrapper for an integer so that one can not perform various operations like addition on it. */
+struct EnumValue {
+  int value;
+
+  friend std::ostream &operator<<(std::ostream &stream, const EnumValue &value)
+  {
+    stream << value.value;
+    return stream;
+  }
+
+  friend bool operator==(const EnumValue &a, const EnumValue &b)
+  {
+    return a.value == b.value;
+  }
+
+  uint64_t hash() const
+  {
+    return this->value;
+  }
+};
+
 /**
  * This class exists to separate the memory management details of the geometry nodes evaluator
  * from the node execution functions and related utilities.
@@ -139,7 +160,8 @@ class GeoNodeExecParams {
                                                       std::is_same_v<T, bool> ||
                                                       std::is_same_v<T, ColorGeometry4f> ||
                                                       std::is_same_v<T, float3> ||
-                                                      std::is_same_v<T, std::string>;
+                                                      std::is_same_v<T, std::string> ||
+                                                      std::is_same_v<T, EnumValue>;
 
   /**
    * Get the input value for the input socket with the given identifier.
@@ -210,6 +232,10 @@ class GeoNodeExecParams {
     if constexpr (is_stored_as_field_v<T>) {
       const Field<T> &field = this->get_input<Field<T>>(identifier);
       return fn::evaluate_constant_field(field);
+    }
+    else if constexpr (std::is_enum_v<T>) {
+      const int value = this->get_input<EnumValue>(identifier).value;
+      return (T)this->validate_enum_value(identifier, value);
     }
     else {
 #ifdef DEBUG
@@ -354,27 +380,8 @@ class GeoNodeExecParams {
 
   /* Find the active socket with the input name (not the identifier). */
   const bNodeSocket *find_available_socket(const StringRef name) const;
-};
 
-/** Wrapper for an integer so that one can not perform various operations like addition on it. */
-struct EnumValue {
-  int value;
-
-  friend std::ostream &operator<<(std::ostream &stream, const EnumValue &value)
-  {
-    stream << value.value;
-    return stream;
-  }
-
-  friend bool operator==(const EnumValue &a, const EnumValue &b)
-  {
-    return a.value == b.value;
-  }
-
-  uint64_t hash() const
-  {
-    return this->value;
-  }
+  const int validate_enum_value(StringRef identifier, const int value) const;
 };
 
 }  // namespace blender::nodes

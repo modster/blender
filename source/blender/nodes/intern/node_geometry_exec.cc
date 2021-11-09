@@ -254,6 +254,29 @@ std::string GeoNodeExecParams::attribute_producer_name() const
   return provider_->dnode->label_or_name() + TIP_(" node");
 }
 
+const int GeoNodeExecParams::validate_enum_value(StringRef identifier, const int value) const
+{
+  const bNodeSocket &socket = *provider_->dnode->input_by_identifier(identifier).bsocket();
+  BLI_assert(socket.type == SOCK_ENUM);
+  const bNodeSocketValueEnum *socket_value = (const bNodeSocketValueEnum *)socket.default_value;
+  BLI_assert(socket_value->items != nullptr);
+  for (const EnumPropertyItem *item = socket_value->items; item->identifier != nullptr; item++) {
+    if (item->identifier[0]) {
+      if (item->value == value) {
+        return value;
+      }
+    }
+  }
+  /* Use the first value as default if the passed in value is invalid. */
+  for (const EnumPropertyItem *item = socket_value->items; item->identifier != nullptr; item++) {
+    if (item->identifier[0]) {
+      return item->value;
+    }
+  }
+  BLI_assert_unreachable();
+  return 0;
+}
+
 void GeoNodeExecParams::check_input_access(StringRef identifier,
                                            const CPPType *requested_type) const
 {
