@@ -163,6 +163,8 @@ class StorageArrayBuffer : NonMovable, NonCopyable {
 
   void push_update(void)
   {
+    /* Get the data again to tag for update. The actual pointer should not change. */
+    data_ = (T *)GPU_vertbuf_get_data(ssbo_);
     GPU_vertbuf_use(ssbo_);
   }
 

@@ -150,7 +150,7 @@ void ShadingView::render(void)
 
   inst_.shading_passes.forward.render(gbuffer_, hiz_front_, view_fb_);
 
-  inst_.shadows.debug_draw(view_fb_, depth_tx_);
+  inst_.shadows.debug_draw(view_fb_, hiz_front_);
 
   velocity_.render(depth_tx_);
 

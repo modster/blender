@@ -97,3 +97,15 @@ ShadowTileData shadow_tile_load(usampler2D tilemaps_tx, ivec2 tile_co, int tilem
   }
   return shadow_tile_data_unpack(tile_data);
 }
+
+/* Return the correct tilemap index given a world space position. */
+int shadow_directional_tilemap_index(ShadowData shadow, vec3 P)
+{
+  vec3 shadow_map_center = shadow.mat[3].xyz;
+  float dist_to_center = distance(shadow_map_center, P);
+  float clipmap_level = log2(dist_to_center);
+  /* Use floor because we can have negative numbers. */
+  int clipmap_lod = int(floor(clipmap_level));
+  clipmap_lod = clamp(clipmap_lod, shadow.clipmap_lod_min, shadow.clipmap_lod_max);
+  return shadow.tilemap_index + clipmap_lod - shadow.clipmap_lod_min;
+}

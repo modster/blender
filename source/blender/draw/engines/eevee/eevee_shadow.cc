@@ -344,9 +344,11 @@ void ShadowDirectional::end_sync(const Camera &camera, const AABB &casters_bound
     float3 local_vec = obinv.ref_3x3() * float3(bbox.vec[i]);
     local_bounds.merge(local_vec);
   }
-
+  /* Get the farthest point from camera to know what distance to cover. */
+  float3 farthest_point = float3(1.0f, 1.0f, 1.0f);
+  mul_project_m4_v3(camera.data_get().wininv, farthest_point);
   /* FIXME(fclem): This does not work in orthographic view. */
-  int max_level = ceil(log2(fabsf(camera.data_get().clip_far)));
+  int max_level = ceil(log2(farthest_point.length()));
   int min_level = floor(log2(fabsf(camera.data_get().clip_near)));
   min_level = clamp_i(user_min_level, min_level, max_level);
   int level_count = max_level - min_level + 1;
@@ -431,8 +433,13 @@ void ShadowModule::init(void)
     inst_.sampling.reset();
   }
 
-  if (G.debug_value == 4) {
-    debug_data_.type = SHADOW_DEBUG_TILEMAPS;
+  switch (G.debug_value) {
+    case 4:
+      debug_data_.type = SHADOW_DEBUG_TILEMAPS;
+      break;
+    case 5:
+      debug_data_.type = SHADOW_DEBUG_LOD;
+      break;
   }
 
   memset(views_, 0, sizeof(views_));
@@ -619,15 +626,23 @@ void ShadowModule::debug_end_sync(void)
   else {
     debug_data_.shadow = punctuals[light.shadow_id];
   }
+  /* Find index of tilemap data. */
+  for (auto index : IndexRange(tilemap_allocator.size)) {
+    if (debug_data_.shadow.tilemap_index == tilemap_allocator.tilemaps_data[index].index) {
+      debug_data_.tilemap_data_index = index;
+      break;
+    }
+  }
   debug_data_.push_update();
 
   {
-    DRWState state = DRW_STATE_WRITE_COLOR | DRW_STATE_WRITE_DEPTH | DRW_STATE_DEPTH_LESS |
+    DRWState state = DRW_STATE_WRITE_COLOR | DRW_STATE_WRITE_DEPTH | DRW_STATE_DEPTH_LESS_EQUAL |
                      DRW_STATE_BLEND_CUSTOM;
     debug_draw_ps_ = DRW_pass_create("ShadowDebugDraw", state);
 
     GPUShader *sh = inst_.shaders.static_shader_get(SHADOW_DEBUG);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, debug_draw_ps_);
+    DRW_shgroup_vertex_buffer(grp, "tilemaps_block", tilemap_allocator.tilemaps_data);
     DRW_shgroup_uniform_texture(grp, "tilemaps_tx", tilemap_allocator.tilemap_tx);
     DRW_shgroup_uniform_texture_ref(grp, "depth_tx", &input_depth_tx_);
     DRW_shgroup_uniform_block(grp, "debug_block", debug_data_.ubo_get());
@@ -714,12 +729,12 @@ void ShadowModule::update_visible(const DRWView *view)
   DRW_view_set_active(view);
 }
 
-void ShadowModule::debug_draw(GPUFrameBuffer *view_fb, GPUTexture *depth_tx)
+void ShadowModule::debug_draw(GPUFrameBuffer *view_fb, HiZBuffer &hiz)
 {
   if (debug_draw_ps_ == nullptr) {
     return;
   }
-  input_depth_tx_ = depth_tx;
+  input_depth_tx_ = hiz.texture_get();
 
   GPU_framebuffer_bind(view_fb);
   DRW_draw_pass(debug_draw_ps_);

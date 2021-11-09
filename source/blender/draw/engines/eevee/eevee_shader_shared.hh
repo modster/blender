@@ -518,13 +518,12 @@ enum eShadowDebug : uint32_t {
    */
   SHADOW_DEBUG_TILEMAPS = 1u,
   /**
-   * Random color per pages for the first light of each pixel.
-   * Validates page density allocation.
+   * Random color per pages. Validates page density allocation and sampling.
    */
   SHADOW_DEBUG_PAGES = 2u,
   /**
-   * Outputs random color per tilemap (or tilemap level) for the first light of each pixel.
-   * Validates page density allocation.
+   * Outputs random color per tilemap (or tilemap level). Validates tilemaps coverage.
+   * Black means not covered by any tilemaps LOD of the shadow.
    */
   SHADOW_DEBUG_LOD = 3u
 };
@@ -536,7 +535,7 @@ struct ShadowDebugData {
   LightData light;
   ShadowData shadow;
   eShadowDebug type;
-  int _pad0;
+  int tilemap_data_index;
   int _pad1;
   int _pad2;
 };

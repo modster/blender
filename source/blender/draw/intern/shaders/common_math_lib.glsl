@@ -227,3 +227,8 @@ vec3 heatmap_gradient(float t)
                                                    smoothstep(0.5, 1.0, t),
                                                    max(1.0 - t * 1.7, t * 7.0 - 6.0)));
 }
+vec3 hue_gradient(float t)
+{
+  vec3 p = abs(fract(t + vec3(1.0, 2.0 / 3.0, 1.0 / 3.0)) * 6.0 - 3.0);
+  return (clamp(p - 1.0, 0.0, 1.0));
+}
