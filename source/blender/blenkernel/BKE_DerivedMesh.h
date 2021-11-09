@@ -55,7 +55,7 @@
  */
 
 /*
- * Note: This structure is read-only, for all practical purposes.
+ * NOTE: This structure is read-only, for all practical purposes.
  *       At some point in the future, we may want to consider
  *       creating a replacement structure that implements a proper
  *       abstract mesh kernel interface.  Or, we can leave this
@@ -89,7 +89,7 @@ struct Object;
 struct Scene;
 
 /*
- * Note: all mface interfaces now officially operate on tessellated data.
+ * NOTE: all mface interfaces now officially operate on tessellated data.
  *       Also, the mface origindex layer indexes mpolys, not mfaces.
  */
 
@@ -156,15 +156,6 @@ struct DerivedMesh {
   int (*getNumTessFaces)(DerivedMesh *dm);
   int (*getNumLoops)(DerivedMesh *dm);
   int (*getNumPolys)(DerivedMesh *dm);
-
-  /** Copy a single vert/edge/tessellated face from the derived mesh into
-   * ``*r_{vert/edge/face}``. note that the current implementation
-   * of this function can be quite slow, iterating over all
-   * elements (editmesh)
-   */
-  void (*getVert)(DerivedMesh *dm, int index, struct MVert *r_vert);
-  void (*getEdge)(DerivedMesh *dm, int index, struct MEdge *r_edge);
-  void (*getTessFace)(DerivedMesh *dm, int index, struct MFace *r_face);
 
   /** Return a pointer to the entire array of verts/edges/face from the
    * derived mesh. if such an array does not exist yet, it will be created,

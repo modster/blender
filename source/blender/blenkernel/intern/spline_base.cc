@@ -19,6 +19,8 @@
 #include "BLI_task.hh"
 #include "BLI_timeit.hh"
 
+#include "BKE_attribute_access.hh"
+#include "BKE_attribute_math.hh"
 #include "BKE_spline.hh"
 
 #include "FN_generic_virtual_array.hh"
@@ -28,6 +30,8 @@ using blender::float3;
 using blender::IndexRange;
 using blender::MutableSpan;
 using blender::Span;
+using blender::attribute_math::convert_to_static_type;
+using blender::bke::AttributeIDRef;
 using blender::fn::GMutableSpan;
 using blender::fn::GSpan;
 using blender::fn::GVArray;
@@ -110,10 +114,36 @@ void Spline::transform(const blender::float4x4 &matrix)
   this->mark_cache_invalid();
 }
 
+void Spline::reverse()
+{
+  this->positions().reverse();
+  this->radii().reverse();
+  this->tilts().reverse();
+
+  this->attributes.foreach_attribute(
+      [&](const AttributeIDRef &id, const AttributeMetaData &meta_data) {
+        std::optional<blender::fn::GMutableSpan> attribute = this->attributes.get_for_write(id);
+        if (!attribute) {
+          BLI_assert_unreachable();
+          return false;
+        }
+        convert_to_static_type(meta_data.data_type, [&](auto dummy) {
+          using T = decltype(dummy);
+          attribute->typed<T>().reverse();
+        });
+        return true;
+      },
+      ATTR_DOMAIN_POINT);
+
+  this->reverse_impl();
+  this->mark_cache_invalid();
+}
+
 int Spline::evaluated_edges_size() const
 {
   const int eval_size = this->evaluated_points_size();
-  if (eval_size == 1) {
+  if (eval_size < 2) {
+    /* Two points are required for an edge. */
     return 0;
   }
 
@@ -123,7 +153,7 @@ int Spline::evaluated_edges_size() const
 float Spline::length() const
 {
   Span<float> lengths = this->evaluated_lengths();
-  return (lengths.size() == 0) ? 0 : this->evaluated_lengths().last();
+  return lengths.is_empty() ? 0.0f : this->evaluated_lengths().last();
 }
 
 int Spline::segments_size() const
@@ -161,7 +191,7 @@ static void accumulate_lengths(Span<float3> positions,
  * Return non-owning access to the cache of accumulated lengths along the spline. Each item is the
  * length of the subsequent segment, i.e. the first value is the length of the first segment rather
  * than 0. This calculation is rather trivial, and only depends on the evaluated positions.
- * However, the results are used often, so it makes sense to cache it.
+ * However, the results are used often, and it is necessarily single threaded, so it is cached.
  */
 Span<float> Spline::evaluated_lengths() const
 {
@@ -176,9 +206,10 @@ Span<float> Spline::evaluated_lengths() const
 
   const int total = evaluated_edges_size();
   evaluated_lengths_cache_.resize(total);
-
-  Span<float3> positions = this->evaluated_positions();
-  accumulate_lengths(positions, is_cyclic_, evaluated_lengths_cache_);
+  if (total != 0) {
+    Span<float3> positions = this->evaluated_positions();
+    accumulate_lengths(positions, is_cyclic_, evaluated_lengths_cache_);
+  }
 
   length_cache_dirty_ = false;
   return evaluated_lengths_cache_;
@@ -189,7 +220,11 @@ static float3 direction_bisect(const float3 &prev, const float3 &middle, const f
   const float3 dir_prev = (middle - prev).normalized();
   const float3 dir_next = (next - middle).normalized();
 
-  return (dir_prev + dir_next).normalized();
+  const float3 result = (dir_prev + dir_next).normalized();
+  if (UNLIKELY(result.is_zero())) {
+    return float3(0.0f, 0.0f, 1.0f);
+  }
+  return result;
 }
 
 static void calculate_tangents(Span<float3> positions,
@@ -197,6 +232,7 @@ static void calculate_tangents(Span<float3> positions,
                                MutableSpan<float3> tangents)
 {
   if (positions.size() == 1) {
+    tangents.first() = float3(0.0f, 0.0f, 1.0f);
     return;
   }
 
@@ -237,13 +273,8 @@ Span<float3> Spline::evaluated_tangents() const
 
   Span<float3> positions = this->evaluated_positions();
 
-  if (eval_size == 1) {
-    evaluated_tangents_cache_.first() = float3(1.0f, 0.0f, 0.0f);
-  }
-  else {
-    calculate_tangents(positions, is_cyclic_, evaluated_tangents_cache_);
-    this->correct_end_tangents();
-  }
+  calculate_tangents(positions, is_cyclic_, evaluated_tangents_cache_);
+  this->correct_end_tangents();
 
   tangent_cache_dirty_ = false;
   return evaluated_tangents_cache_;
@@ -410,7 +441,7 @@ Spline::LookupResult Spline::lookup_evaluated_length(const float length) const
 
   const float *offset = std::lower_bound(lengths.begin(), lengths.end(), length);
   const int index = offset - lengths.begin();
-  const int next_index = (index == this->size() - 1) ? 0 : index + 1;
+  const int next_index = (index == this->evaluated_points_size() - 1) ? 0 : index + 1;
 
   const float previous_length = (index == 0) ? 0.0f : lengths[index - 1];
   const float factor = (length - previous_length) / (lengths[index] - previous_length);
@@ -453,6 +484,12 @@ Array<float> Spline::sample_uniform_index_factors(const int samples_size) const
     }
 
     prev_length = length;
+  }
+
+  /* Zero lengths or float inaccuracies can cause invalid values, or simply
+   * skip some, so set the values that weren't completed in the main loop. */
+  for (const int i : IndexRange(i_sample, samples_size - i_sample)) {
+    samples[i] = float(samples_size);
   }
 
   if (!is_cyclic_) {
@@ -512,6 +549,10 @@ void Spline::sample_with_index_factors(const GVArray &src,
     using T = decltype(dummy);
     const GVArray_Typed<T> src_typed = src.typed<T>();
     MutableSpan<T> dst_typed = dst.typed<T>();
+    if (src.size() == 1) {
+      dst_typed.fill(src_typed[0]);
+      return;
+    }
     blender::threading::parallel_for(dst_typed.index_range(), 1024, [&](IndexRange range) {
       for (const int i : range) {
         const LookupResult interp = this->lookup_data_from_index_factor(index_factors[i]);

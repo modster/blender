@@ -233,7 +233,8 @@ static bool palette_poll(bContext *C)
 {
   Paint *paint = BKE_paint_get_active_from_context(C);
 
-  if (paint && paint->palette != NULL) {
+  if (paint && paint->palette != NULL && !ID_IS_LINKED(paint->palette) &&
+      !ID_IS_OVERRIDE_LIBRARY(paint->palette)) {
     return true;
   }
 
@@ -1307,7 +1308,7 @@ void ED_operatortypes_paint(void)
   WM_operatortype_append(BRUSH_OT_stencil_fit_image_aspect);
   WM_operatortype_append(BRUSH_OT_stencil_reset_transform);
 
-  /* note, particle uses a different system, can be added with existing operators in wm.py */
+  /* NOTE: particle uses a different system, can be added with existing operators in `wm.py`. */
   WM_operatortype_append(PAINT_OT_brush_select);
 
   /* image */

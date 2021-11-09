@@ -20,10 +20,10 @@
 /** \file
  * \ingroup modifiers
  *
- * EdgeSplit modifier
+ * Edge Split modifier
  *
  * Splits edges in the mesh according to sharpness flag
- * or edge angle (can be used to achieve autosmoothing)
+ * or edge angle (can be used to achieve auto-smoothing)
  */
 
 #include "BLI_utildefines.h"
@@ -115,7 +115,7 @@ Mesh *doEdgeSplit(const Mesh *mesh, EdgeSplitModifierData *emd)
   result = BKE_mesh_from_bmesh_for_eval_nomain(bm, NULL, mesh);
   BM_mesh_free(bm);
 
-  result->runtime.cd_dirty_vert |= CD_MASK_NORMAL;
+  BKE_mesh_normals_tag_dirty(result);
   return result;
 }
 

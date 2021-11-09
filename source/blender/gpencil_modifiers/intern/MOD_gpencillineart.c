@@ -101,8 +101,9 @@ static void generate_strokes_actual(
       lmd->use_multiple_levels ? lmd->level_end : lmd->level_start,
       lmd->target_material ? BKE_gpencil_object_material_index_get(ob, lmd->target_material) : 0,
       lmd->edge_types,
-      lmd->material_mask_flags,
+      lmd->mask_switches,
       lmd->material_mask_bits,
+      lmd->intersection_mask,
       lmd->thickness,
       lmd->opacity,
       lmd->source_vertex_group,
@@ -159,12 +160,14 @@ static void generateStrokes(GpencilModifierData *md, Depsgraph *depsgraph, Objec
 
   LineartCache *local_lc = gpd->runtime.lineart_cache;
   if (!gpd->runtime.lineart_cache) {
-    MOD_lineart_compute_feature_lines(depsgraph, lmd, &gpd->runtime.lineart_cache);
+    MOD_lineart_compute_feature_lines(
+        depsgraph, lmd, &gpd->runtime.lineart_cache, (!(ob->dtx & OB_DRAW_IN_FRONT)));
     MOD_lineart_destroy_render_data(lmd);
   }
   else {
     if (!(lmd->flags & LRT_GPENCIL_USE_CACHE)) {
-      MOD_lineart_compute_feature_lines(depsgraph, lmd, &local_lc);
+      MOD_lineart_compute_feature_lines(
+          depsgraph, lmd, &local_lc, (!(ob->dtx & OB_DRAW_IN_FRONT)));
       MOD_lineart_destroy_render_data(lmd);
     }
     MOD_lineart_chain_clear_picked_flag(local_lc);
@@ -204,11 +207,19 @@ static void bakeModifier(Main *UNUSED(bmain),
   }
 
   if (!gpd->runtime.lineart_cache) {
-    MOD_lineart_compute_feature_lines(depsgraph, lmd, &gpd->runtime.lineart_cache);
+    /* Only calculate for this modifier, thus no need to get maximum values from all line art
+     * modifiers in the stack. */
+    lmd->edge_types_override = lmd->edge_types;
+    lmd->level_end_override = lmd->level_end;
+
+    MOD_lineart_compute_feature_lines(
+        depsgraph, lmd, &gpd->runtime.lineart_cache, (!(ob->dtx & OB_DRAW_IN_FRONT)));
     MOD_lineart_destroy_render_data(lmd);
   }
 
   generate_strokes_actual(md, depsgraph, ob, gpl, gpf);
+
+  MOD_lineart_clear_cache(&gpd->runtime.lineart_cache);
 }
 
 static bool isDisabled(GpencilModifierData *md, int UNUSED(userRenderParams))
@@ -253,10 +264,18 @@ static void updateDepsgraph(GpencilModifierData *md,
   else {
     add_this_collection(ctx->scene->master_collection, ctx, mode);
   }
-  DEG_add_object_relation(
-      ctx->node, ctx->scene->camera, DEG_OB_COMP_TRANSFORM, "Line Art Modifier");
-  DEG_add_object_relation(
-      ctx->node, ctx->scene->camera, DEG_OB_COMP_PARAMETERS, "Line Art Modifier");
+  if (lmd->calculation_flags & LRT_USE_CUSTOM_CAMERA && lmd->source_camera) {
+    DEG_add_object_relation(
+        ctx->node, lmd->source_camera, DEG_OB_COMP_TRANSFORM, "Line Art Modifier");
+    DEG_add_object_relation(
+        ctx->node, lmd->source_camera, DEG_OB_COMP_PARAMETERS, "Line Art Modifier");
+  }
+  else if (ctx->scene->camera) {
+    DEG_add_object_relation(
+        ctx->node, ctx->scene->camera, DEG_OB_COMP_TRANSFORM, "Line Art Modifier");
+    DEG_add_object_relation(
+        ctx->node, ctx->scene->camera, DEG_OB_COMP_PARAMETERS, "Line Art Modifier");
+  }
 }
 
 static void foreachIDLink(GpencilModifierData *md, Object *ob, IDWalkFunc walk, void *userData)
@@ -267,6 +286,7 @@ static void foreachIDLink(GpencilModifierData *md, Object *ob, IDWalkFunc walk, 
   walk(userData, ob, (ID **)&lmd->source_collection, IDWALK_CB_NOP);
 
   walk(userData, ob, (ID **)&lmd->source_object, IDWALK_CB_NOP);
+  walk(userData, ob, (ID **)&lmd->source_camera, IDWALK_CB_NOP);
 }
 
 static void panel_draw(const bContext *UNUSED(C), Panel *panel)
@@ -280,8 +300,6 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
 
   const int source_type = RNA_enum_get(ptr, "source_type");
   const bool is_baked = RNA_boolean_get(ptr, "is_baked");
-  const bool use_cache = RNA_boolean_get(ptr, "use_cache");
-  const bool is_first = BKE_gpencil_is_first_lineart_in_stack(ob_ptr.data, ptr->data);
 
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetEnabled(layout, !is_baked);
@@ -301,8 +319,40 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
   else {
     /* Source is Scene. */
   }
+  uiItemPointerR(layout, ptr, "target_layer", &obj_data_ptr, "layers", NULL, ICON_GREASEPENCIL);
 
-  uiLayout *col = uiLayoutColumnWithHeading(layout, true, IFACE_("Edge Types"));
+  /* Material has to be used by grease pencil object already, it was possible to assign materials
+   * without this requirement in earlier versions of blender. */
+  bool material_valid = false;
+  PointerRNA material_ptr = RNA_pointer_get(ptr, "target_material");
+  if (!RNA_pointer_is_null(&material_ptr)) {
+    Material *current_material = material_ptr.data;
+    Object *ob = ob_ptr.data;
+    material_valid = BKE_gpencil_object_material_index_get(ob, current_material) != -1;
+  }
+  uiLayout *row = uiLayoutRow(layout, true);
+  uiLayoutSetRedAlert(row, !material_valid);
+  uiItemPointerR(
+      row, ptr, "target_material", &obj_data_ptr, "materials", NULL, ICON_SHADING_TEXTURE);
+
+  gpencil_modifier_panel_end(layout, ptr);
+}
+
+static void edge_types_panel_draw(const bContext *UNUSED(C), Panel *panel)
+{
+  uiLayout *layout = panel->layout;
+  PointerRNA ob_ptr;
+  PointerRNA *ptr = gpencil_modifier_panel_get_property_pointers(panel, &ob_ptr);
+
+  const bool is_baked = RNA_boolean_get(ptr, "is_baked");
+  const bool use_cache = RNA_boolean_get(ptr, "use_cache");
+  const bool is_first = BKE_gpencil_is_first_lineart_in_stack(ob_ptr.data, ptr->data);
+
+  uiLayoutSetEnabled(layout, !is_baked);
+
+  uiLayoutSetPropSep(layout, true);
+
+  uiLayout *col = uiLayoutColumn(layout, true);
 
   uiItemR(col, ptr, "use_contour", 0, IFACE_("Contour"), ICON_NONE);
   uiItemR(col, ptr, "use_loose", 0, IFACE_("Loose"), ICON_NONE);
@@ -321,28 +371,7 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
     uiItemR(entry, ptr, "crease_threshold", UI_ITEM_R_SLIDER, " ", ICON_NONE);
   }
 
-  uiItemPointerR(layout, ptr, "target_layer", &obj_data_ptr, "layers", NULL, ICON_GREASEPENCIL);
-
-  /* Material has to be used by grease pencil object already, it was possible to assign materials
-   * without this requirement in earlier versions of blender. */
-  bool material_valid = false;
-  PointerRNA material_ptr = RNA_pointer_get(ptr, "target_material");
-  if (!RNA_pointer_is_null(&material_ptr)) {
-    Material *current_material = material_ptr.data;
-    Object *ob = ob_ptr.data;
-    material_valid = BKE_gpencil_object_material_index_get(ob, current_material) != -1;
-  }
-  uiLayout *row = uiLayoutRow(layout, true);
-  uiLayoutSetRedAlert(row, !material_valid);
-  uiItemPointerR(row,
-                 ptr,
-                 "target_material",
-                 &obj_data_ptr,
-                 "materials",
-                 NULL,
-                 material_valid ? ICON_SHADING_TEXTURE : ICON_ERROR);
-
-  gpencil_modifier_panel_end(layout, ptr);
+  uiItemR(layout, ptr, "use_overlap_edge_type_support", 0, IFACE_("Allow Overlap"), ICON_NONE);
 }
 
 static void options_panel_draw(const bContext *UNUSED(C), Panel *panel)
@@ -359,9 +388,16 @@ static void options_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiLayoutSetEnabled(layout, !is_baked);
 
   if (use_cache && !is_first) {
-    uiItemL(layout, "Cached from the first line art modifier.", ICON_INFO);
+    uiItemL(layout, TIP_("Cached from the first line art modifier"), ICON_INFO);
     return;
   }
+
+  uiLayout *row = uiLayoutRowWithHeading(layout, false, IFACE_("Custom Camera"));
+  uiItemR(row, ptr, "use_custom_camera", 0, "", 0);
+  uiLayout *subrow = uiLayoutRow(row, true);
+  uiLayoutSetActive(subrow, RNA_boolean_get(ptr, "use_custom_camera"));
+  uiLayoutSetPropSep(subrow, true);
+  uiItemR(subrow, ptr, "source_camera", 0, "", ICON_OBJECT_DATA);
 
   uiLayout *col = uiLayoutColumn(layout, true);
 
@@ -369,7 +405,8 @@ static void options_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiItemR(col, ptr, "use_edge_overlap", 0, IFACE_("Overlapping Edges As Contour"), ICON_NONE);
   uiItemR(col, ptr, "use_object_instances", 0, NULL, ICON_NONE);
   uiItemR(col, ptr, "use_clip_plane_boundaries", 0, NULL, ICON_NONE);
-  uiItemR(col, ptr, "use_overlap_edge_type_support", 0, NULL, ICON_NONE);
+  uiItemR(col, ptr, "use_crease_on_smooth", 0, IFACE_("Crease On Smooth"), ICON_NONE);
+  uiItemR(col, ptr, "use_crease_on_sharp", 0, IFACE_("Crease On Sharp"), ICON_NONE);
 }
 
 static void style_panel_draw(const bContext *UNUSED(C), Panel *panel)
@@ -390,14 +427,23 @@ static void style_panel_draw(const bContext *UNUSED(C), Panel *panel)
 static void occlusion_panel_draw(const bContext *UNUSED(C), Panel *panel)
 {
   uiLayout *layout = panel->layout;
-  PointerRNA *ptr = gpencil_modifier_panel_get_property_pointers(panel, NULL);
+  PointerRNA ob_ptr;
+  PointerRNA *ptr = gpencil_modifier_panel_get_property_pointers(panel, &ob_ptr);
 
   const bool is_baked = RNA_boolean_get(ptr, "is_baked");
+
+  const bool use_multiple_levels = RNA_boolean_get(ptr, "use_multiple_levels");
+  const bool show_in_front = RNA_boolean_get(&ob_ptr, "show_in_front");
 
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetEnabled(layout, !is_baked);
 
-  const bool use_multiple_levels = RNA_boolean_get(ptr, "use_multiple_levels");
+  if (!show_in_front) {
+    uiItemL(layout, TIP_("Object is not in front"), ICON_INFO);
+  }
+
+  layout = uiLayoutColumn(layout, false);
+  uiLayoutSetActive(layout, show_in_front);
 
   uiItemR(layout, ptr, "use_multiple_levels", 0, IFACE_("Range"), ICON_NONE);
 
@@ -411,13 +457,28 @@ static void occlusion_panel_draw(const bContext *UNUSED(C), Panel *panel)
   }
 }
 
+static bool anything_showing_through(PointerRNA *ptr)
+{
+  const bool use_multiple_levels = RNA_boolean_get(ptr, "use_multiple_levels");
+  const int level_start = RNA_int_get(ptr, "level_start");
+  const int level_end = RNA_int_get(ptr, "level_end");
+  if (use_multiple_levels) {
+    return (MAX2(level_start, level_end) > 0);
+  }
+  return (level_start > 0);
+}
+
 static void material_mask_panel_draw_header(const bContext *UNUSED(C), Panel *panel)
 {
   uiLayout *layout = panel->layout;
-  PointerRNA *ptr = gpencil_modifier_panel_get_property_pointers(panel, NULL);
+  PointerRNA ob_ptr;
+  PointerRNA *ptr = gpencil_modifier_panel_get_property_pointers(panel, &ob_ptr);
 
   const bool is_baked = RNA_boolean_get(ptr, "is_baked");
+  const bool show_in_front = RNA_boolean_get(&ob_ptr, "show_in_front");
+
   uiLayoutSetEnabled(layout, !is_baked);
+  uiLayoutSetActive(layout, show_in_front && anything_showing_through(ptr));
 
   uiItemR(layout, ptr, "use_material_mask", 0, IFACE_("Material Mask"), ICON_NONE);
 }
@@ -429,26 +490,51 @@ static void material_mask_panel_draw(const bContext *UNUSED(C), Panel *panel)
 
   const bool is_baked = RNA_boolean_get(ptr, "is_baked");
   uiLayoutSetEnabled(layout, !is_baked);
+  uiLayoutSetActive(layout, anything_showing_through(ptr));
 
   uiLayoutSetPropSep(layout, true);
 
   uiLayoutSetEnabled(layout, RNA_boolean_get(ptr, "use_material_mask"));
 
-  uiLayout *row = uiLayoutRow(layout, true);
-  uiLayoutSetPropDecorate(row, false);
-  uiLayout *sub = uiLayoutRowWithHeading(row, true, IFACE_("Masks"));
-  char text[2] = "0";
+  uiLayout *col = uiLayoutColumn(layout, true);
+  uiLayout *sub = uiLayoutRowWithHeading(col, true, IFACE_("Masks"));
 
   PropertyRNA *prop = RNA_struct_find_property(ptr, "use_material_mask_bits");
-  for (int i = 0; i < 8; i++, text[0]++) {
-    uiItemFullR(sub, ptr, prop, i, 0, UI_ITEM_R_TOGGLE, text, ICON_NONE);
+  for (int i = 0; i < 8; i++) {
+    uiItemFullR(sub, ptr, prop, i, 0, UI_ITEM_R_TOGGLE, " ", ICON_NONE);
+    if (i == 3) {
+      sub = uiLayoutRow(col, true);
+    }
   }
-  uiItemL(row, "", ICON_BLANK1); /* Space for decorator. */
 
-  uiLayout *col = uiLayoutColumn(layout, true);
-  uiItemR(col, ptr, "use_material_mask_match", 0, IFACE_("Match All Masks"), ICON_NONE);
+  uiItemR(layout, ptr, "use_material_mask_match", 0, IFACE_("Exact Match"), ICON_NONE);
 }
 
+static void intersection_panel_draw(const bContext *UNUSED(C), Panel *panel)
+{
+  uiLayout *layout = panel->layout;
+  PointerRNA *ptr = gpencil_modifier_panel_get_property_pointers(panel, NULL);
+
+  const bool is_baked = RNA_boolean_get(ptr, "is_baked");
+  uiLayoutSetEnabled(layout, !is_baked);
+
+  uiLayoutSetPropSep(layout, true);
+
+  uiLayoutSetActive(layout, RNA_boolean_get(ptr, "use_intersection"));
+
+  uiLayout *col = uiLayoutColumn(layout, true);
+  uiLayout *sub = uiLayoutRowWithHeading(col, true, IFACE_("Collection Masks"));
+
+  PropertyRNA *prop = RNA_struct_find_property(ptr, "use_intersection_mask");
+  for (int i = 0; i < 8; i++) {
+    uiItemFullR(sub, ptr, prop, i, 0, UI_ITEM_R_TOGGLE, " ", ICON_NONE);
+    if (i == 3) {
+      sub = uiLayoutRow(col, true);
+    }
+  }
+
+  uiItemR(layout, ptr, "use_intersection_match", 0, IFACE_("Exact Match"), ICON_NONE);
+}
 static void face_mark_panel_draw_header(const bContext *UNUSED(C), Panel *panel)
 {
   uiLayout *layout = panel->layout;
@@ -482,7 +568,7 @@ static void face_mark_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiLayoutSetEnabled(layout, !is_baked);
 
   if (use_cache && !is_first) {
-    uiItemL(layout, "Cached from the first line art modifier.", ICON_INFO);
+    uiItemL(layout, TIP_("Cached from the first line art modifier"), ICON_INFO);
     return;
   }
 
@@ -510,7 +596,7 @@ static void chaining_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiLayoutSetEnabled(layout, !is_baked);
 
   if (use_cache && !is_first) {
-    uiItemL(layout, "Cached from the first line art modifier.", ICON_INFO);
+    uiItemL(layout, TIP_("Cached from the first line art modifier"), ICON_INFO);
     return;
   }
 
@@ -519,7 +605,7 @@ static void chaining_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiItemR(col, ptr, "use_fuzzy_all", 0, NULL, ICON_NONE);
   uiItemR(col, ptr, "use_loose_edge_chain", 0, IFACE_("Loose Edges"), ICON_NONE);
   uiItemR(col, ptr, "use_loose_as_contour", 0, NULL, ICON_NONE);
-  uiItemR(col, ptr, "use_geometry_space_chain", 0, NULL, ICON_NONE);
+  uiItemR(col, ptr, "use_geometry_space_chain", 0, IFACE_("Geometry Space"), ICON_NONE);
 
   uiItemR(layout,
           ptr,
@@ -528,6 +614,7 @@ static void chaining_panel_draw(const bContext *UNUSED(C), Panel *panel)
           is_geom ? IFACE_("Geometry Threshold") : NULL,
           ICON_NONE);
 
+  uiItemR(layout, ptr, "smooth_tolerance", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
   uiItemR(layout, ptr, "split_angle", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
 }
 
@@ -546,7 +633,7 @@ static void vgroup_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiLayoutSetEnabled(layout, !is_baked);
 
   if (use_cache && !is_first) {
-    uiItemL(layout, "Cached from the first line art modifier.", ICON_INFO);
+    uiItemL(layout, TIP_("Cached from the first line art modifier"), ICON_INFO);
     return;
   }
 
@@ -566,7 +653,7 @@ static void vgroup_panel_draw(const bContext *UNUSED(C), Panel *panel)
   }
 }
 
-static void baking_panel_draw(const bContext *UNUSED(C), Panel *panel)
+static void bake_panel_draw(const bContext *UNUSED(C), Panel *panel)
 {
   uiLayout *layout = panel->layout;
   PointerRNA ob_ptr;
@@ -579,7 +666,7 @@ static void baking_panel_draw(const bContext *UNUSED(C), Panel *panel)
   if (is_baked) {
     uiLayout *col = uiLayoutColumn(layout, false);
     uiLayoutSetPropSep(col, false);
-    uiItemL(col, IFACE_("Modifier has baked data"), ICON_NONE);
+    uiItemL(col, TIP_("Modifier has baked data"), ICON_NONE);
     uiItemR(
         col, ptr, "is_baked", UI_ITEM_R_TOGGLE, IFACE_("Continue Without Clearing"), ICON_NONE);
   }
@@ -594,11 +681,39 @@ static void baking_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiItemO(col, NULL, ICON_NONE, "OBJECT_OT_lineart_clear_all");
 }
 
+static void composition_panel_draw(const bContext *UNUSED(C), Panel *panel)
+{
+  PointerRNA ob_ptr;
+  PointerRNA *ptr = gpencil_modifier_panel_get_property_pointers(panel, &ob_ptr);
+
+  uiLayout *layout = panel->layout;
+
+  const bool show_in_front = RNA_boolean_get(&ob_ptr, "show_in_front");
+
+  uiLayoutSetPropSep(layout, true);
+
+  uiItemR(layout, ptr, "overscan", 0, NULL, ICON_NONE);
+  uiItemR(layout, ptr, "use_image_boundary_trimming", 0, NULL, ICON_NONE);
+
+  if (show_in_front) {
+    uiItemL(layout, TIP_("Object is shown in front"), ICON_ERROR);
+  }
+
+  uiLayout *col = uiLayoutColumn(layout, false);
+  uiLayoutSetActive(col, !show_in_front);
+
+  uiItemR(col, ptr, "stroke_depth_offset", UI_ITEM_R_SLIDER, IFACE_("Depth Offset"), ICON_NONE);
+  uiItemR(
+      col, ptr, "use_offset_towards_custom_camera", 0, IFACE_("Towards Custom Camera"), ICON_NONE);
+}
+
 static void panelRegister(ARegionType *region_type)
 {
   PanelType *panel_type = gpencil_modifier_panel_register(
       region_type, eGpencilModifierType_Lineart, panel_draw);
 
+  gpencil_modifier_subpanel_register(
+      region_type, "edge_types", "Edge Types", NULL, edge_types_panel_draw, panel_type);
   gpencil_modifier_subpanel_register(
       region_type, "geometry", "Geometry Processing", NULL, options_panel_draw, panel_type);
   gpencil_modifier_subpanel_register(
@@ -612,13 +727,17 @@ static void panelRegister(ARegionType *region_type)
                                      material_mask_panel_draw,
                                      occlusion_panel);
   gpencil_modifier_subpanel_register(
+      region_type, "intersection", "Intersection", NULL, intersection_panel_draw, panel_type);
+  gpencil_modifier_subpanel_register(
       region_type, "face_mark", "", face_mark_panel_draw_header, face_mark_panel_draw, panel_type);
   gpencil_modifier_subpanel_register(
       region_type, "chaining", "Chaining", NULL, chaining_panel_draw, panel_type);
   gpencil_modifier_subpanel_register(
       region_type, "vgroup", "Vertex Weight Transfer", NULL, vgroup_panel_draw, panel_type);
   gpencil_modifier_subpanel_register(
-      region_type, "baking", "Baking", NULL, baking_panel_draw, panel_type);
+      region_type, "composition", "Composition", NULL, composition_panel_draw, panel_type);
+  gpencil_modifier_subpanel_register(
+      region_type, "bake", "Bake", NULL, bake_panel_draw, panel_type);
 }
 
 GpencilModifierTypeInfo modifierType_Gpencil_Lineart = {

@@ -82,10 +82,10 @@ extern "C" {
 
 /* CRUD ------------------------------------------- */
 
-// Get main depsgraph instance from context!
+/* Get main depsgraph instance from context! */
 
 /* Create new Depsgraph instance */
-// TODO: what args are needed here? What's the building-graph entry point?
+/* TODO: what args are needed here? What's the building-graph entry point? */
 Depsgraph *DEG_graph_new(struct Main *bmain,
                          struct Scene *scene,
                          struct ViewLayer *view_layer,
@@ -159,7 +159,7 @@ void DEG_ids_restore_recalc(Depsgraph *depsgraph);
 /* Graph Evaluation  ----------------------------- */
 
 /* Frame changed recalculation entry point. */
-void DEG_evaluate_on_framechange(Depsgraph *graph, float ctime);
+void DEG_evaluate_on_framechange(Depsgraph *graph, float frame);
 
 /* Data changed recalculation entry point. */
 void DEG_evaluate_on_refresh(Depsgraph *graph);

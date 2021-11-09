@@ -133,8 +133,9 @@ static bool rna_Cache_get_valid_owner_ID(PointerRNA *ptr, Object **ob, Scene **s
       *scene = (Scene *)ptr->owner_id;
       break;
     default:
-      BLI_assert(!"Trying to get PTCacheID from an invalid ID type "
-                  "(Only scenes and objects are supported).");
+      BLI_assert_msg(0,
+                     "Trying to get PTCacheID from an invalid ID type "
+                     "(Only scenes and objects are supported).");
       break;
   }
 
@@ -984,10 +985,12 @@ static void rna_def_pointcache_common(StructRNA *srna)
   prop = RNA_def_property(srna, "is_baked", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flag", PTCACHE_BAKED);
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_ui_text(prop, "", "The cache is baked");
 
   prop = RNA_def_property(srna, "is_baking", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flag", PTCACHE_BAKING);
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_ui_text(prop, "", "The cache is being baked");
 
   prop = RNA_def_property(srna, "use_disk_cache", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flag", PTCACHE_DISK_CACHE);
@@ -998,11 +1001,13 @@ static void rna_def_pointcache_common(StructRNA *srna)
   prop = RNA_def_property(srna, "is_outdated", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flag", PTCACHE_OUTDATED);
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
-  RNA_def_property_ui_text(prop, "Cache is outdated", "");
+  RNA_def_property_ui_text(prop, "Cache Is Outdated", "");
 
   prop = RNA_def_property(srna, "is_frame_skip", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flag", PTCACHE_FRAMES_SKIPPED);
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_ui_text(
+      prop, "", "Some frames were skipped while baking/saving that cache");
 
   prop = RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
   RNA_def_property_string_sdna(prop, NULL, "name");
@@ -1055,8 +1060,8 @@ static void rna_def_ptcache_point_caches(BlenderRNA *brna, PropertyRNA *cprop)
   StructRNA *srna;
   PropertyRNA *prop;
 
-  /* FunctionRNA *func; */
-  /* PropertyRNA *parm; */
+  // FunctionRNA *func;
+  // PropertyRNA *parm;
 
   RNA_def_property_srna(cprop, "PointCaches");
   srna = RNA_def_struct(brna, "PointCaches", NULL);
@@ -1095,7 +1100,7 @@ static void rna_def_pointcache_active(BlenderRNA *brna)
    * Those caches items have exact same content as 'active' one, except for that collection,
    * to prevent ugly recursive layout pattern.
    *
-   * Note: This shall probably be redone from scratch in a proper way at some point,
+   * NOTE: This shall probably be redone from scratch in a proper way at some point,
    *       but for now that will do, and shall not break anything in the API. */
   prop = RNA_def_property(srna, "point_caches", PROP_COLLECTION, PROP_NONE);
   RNA_def_property_collection_funcs(prop,

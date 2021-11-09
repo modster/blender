@@ -28,7 +28,7 @@
  * - free can be called from any thread
  */
 
-/* TODO Create cmake option. */
+/* TODO: Create cmake option. */
 #define WITH_OPENGL_BACKEND 1
 
 #include "BLI_assert.h"
@@ -205,7 +205,7 @@ void GPU_backend_create(eGPUBackendType backend_type)
 
 void GPU_backend_exit(void)
 {
-  /* TODO assert no resource left. Currently UI textures are still not freed in their context
+  /* TODO: assert no resource left. Currently UI textures are still not freed in their context
    * correctly. */
   delete g_backend;
   g_backend = nullptr;

@@ -843,17 +843,17 @@ static float rna_GPencilStrokePoints_weight_get(bGPDstroke *stroke,
     return -1.0f;
   }
 
-  if (dvert->totweight <= vertex_group_index || vertex_group_index < 0) {
-    BKE_report(reports, RPT_ERROR, "Groups: index out of range");
-    return -1.0f;
-  }
-
   if (stroke->totpoints <= point_index || point_index < 0) {
     BKE_report(reports, RPT_ERROR, "GPencilStrokePoints: index out of range");
     return -1.0f;
   }
 
   MDeformVert *pt_dvert = stroke->dvert + point_index;
+  if ((pt_dvert) && (pt_dvert->totweight <= vertex_group_index || vertex_group_index < 0)) {
+    BKE_report(reports, RPT_ERROR, "Groups: index out of range");
+    return -1.0f;
+  }
+
   MDeformWeight *dw = BKE_defvert_find_index(pt_dvert, vertex_group_index);
   if (dw) {
     return dw->weight;
@@ -906,7 +906,8 @@ static void rna_GPencil_stroke_remove(ID *id,
     return;
   }
 
-  BLI_freelinkN(&frame->strokes, stroke);
+  BLI_remlink(&frame->strokes, stroke);
+  BKE_gpencil_free_stroke(stroke);
   RNA_POINTER_INVALIDATE(stroke_ptr);
 
   DEG_id_tag_update(&gpd->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY | ID_RECALC_COPY_ON_WRITE);
@@ -1808,7 +1809,7 @@ static void rna_def_gpencil_frame(BlenderRNA *brna)
   /* Frame Number */
   prop = RNA_def_property(srna, "frame_number", PROP_INT, PROP_NONE);
   RNA_def_property_int_sdna(prop, NULL, "framenum");
-  /* XXX note: this cannot occur on the same frame as another sketch */
+  /* XXX NOTE: this cannot occur on the same frame as another sketch. */
   RNA_def_property_range(prop, -MAXFRAME, MAXFRAME);
   RNA_def_property_ui_text(prop, "Frame Number", "The frame on which this sketch appears");
 
@@ -2005,6 +2006,14 @@ static void rna_def_gpencil_layer(BlenderRNA *brna)
       prop, "Custom Channel Color", "Custom color for animation channel in Dopesheet");
   RNA_def_property_update(prop, NC_GPENCIL | ND_DATA, "rna_GPencil_update");
 
+  /* Layer Opacity (Annotations). */
+  prop = RNA_def_property(srna, "annotation_opacity", PROP_FLOAT, PROP_NONE);
+  RNA_def_property_float_sdna(prop, NULL, "opacity");
+  RNA_def_property_range(prop, 0.0, 1.0f);
+  RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+  RNA_def_property_ui_text(prop, "Opacity", "Annotation Layer Opacity");
+  RNA_def_property_update(prop, NC_GPENCIL | ND_DATA, "rna_GPencil_update");
+
   /* Stroke Drawing Color (Annotations) */
   prop = RNA_def_property(srna, "color", PROP_FLOAT, PROP_COLOR_GAMMA);
   RNA_def_property_array(prop, 3);
@@ -2117,7 +2126,7 @@ static void rna_def_gpencil_layer(BlenderRNA *brna)
   prop = RNA_def_property(srna, "use_viewlayer_masks", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_negative_sdna(prop, NULL, "flag", GP_LAYER_DISABLE_MASKS_IN_VIEWLAYER);
   RNA_def_property_ui_text(
-      prop, "Use Masks in Render", "Include the mask layers when rendering the viewlayer");
+      prop, "Use Masks in Render", "Include the mask layers when rendering the view-layer");
   RNA_def_property_update(prop, NC_GPENCIL | ND_DATA, "rna_GPencil_update");
 
   /* blend mode */

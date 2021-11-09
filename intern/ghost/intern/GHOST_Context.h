@@ -142,7 +142,7 @@ class GHOST_Context : public GHOST_IContext {
   virtual GHOST_TSuccess getVulkanHandles(void * /*r_instance*/,
                                           void * /*r_physical_device*/,
                                           void * /*r_device*/,
-                                          GHOST_TUns32 * /*r_graphic_queue_familly*/)
+                                          uint32_t * /*r_graphic_queue_familly*/)
   {
     return GHOST_kFailure;
   };
@@ -157,7 +157,7 @@ class GHOST_Context : public GHOST_IContext {
                                              void * /*command_buffer*/,
                                              void * /*render_pass*/,
                                              void * /*extent*/,
-                                             GHOST_TUns32 * /*fb_id*/)
+                                             uint32_t * /*fb_id*/)
   {
     return GHOST_kFailure;
   }

@@ -98,7 +98,7 @@ static real angle_from_cotan(WVertex *vo, WVertex *v1, WVertex *v2)
   udotv = u * v;
   denom = sqrt(u.squareNorm() * v.squareNorm() - udotv * udotv);
 
-  /* Note: I assume this is what they mean by using atan2(). -Ray Jones */
+  /* NOTE(Ray Jones): I assume this is what they mean by using #atan2. */
 
   /* tan = denom/udotv = y/x (see man page for atan2) */
   return (fabs(atan2(denom, udotv)));
@@ -112,7 +112,7 @@ static real angle_from_cotan(WVertex *vo, WVertex *v1, WVertex *v2)
  *  Computes the Discrete Mean Curvature Normal approximation at \a v.
  *  The mean curvature at \a v is half the magnitude of the vector \a Kh.
  *
- *  Note: the normal computed is not unit length, and may point either into or out of the surface,
+ *  NOTE: the normal computed is not unit length, and may point either into or out of the surface,
  * depending on the curvature at \a v. It is the responsibility of the caller of the function to
  * use the mean curvature normal appropriately.
  *
@@ -371,29 +371,29 @@ void gts_vertex_principal_directions(WVertex *v, Vec3r Kh, real Kg, Vec3r &e1, V
     }
     e = *itE;
 
-    /* since this vertex passed the tests in gts_vertex_mean_curvature_normal(), this should be
-     * true. */
+    /* Since this vertex passed the tests in gts_vertex_mean_curvature_normal(),
+     * this should be true. */
     // g_assert(gts_edge_face_number (e, s) == 2);
 
-    /* identify the two triangles bordering e in s */
+    /* Identify the two triangles bordering e in s. */
     f1 = e->GetaFace();
     f2 = e->GetbFace();
 
     /* We are solving for the values of the curvature tensor
-     *     B = [ a b ; b c ].
-     *  The computations here are from section 5 of [Meyer et al 2002].
+     *     `B = [ a b ; b c ]`.
+     * The computations here are from section 5 of [Meyer et al 2002].
      *
-     *  The first step is to calculate the linear equations governing the values of (a,b,c). These
+     * The first step is to calculate the linear equations governing the values of (a,b,c). These
      * can be computed by setting the derivatives of the error E to zero (section 5.3).
      *
-     *  Since a + c = norm(Kh), we only compute the linear equations for dE/da and dE/db. (NB:
-     * [Meyer et al 2002] has the equation a + b = norm(Kh), but I'm almost positive this is
-     * incorrect).
+     * Since a + c = norm(Kh), we only compute the linear equations for `dE/da` and `dE/db`.
+     * (NOTE: [Meyer et al 2002] has the equation `a + b = norm(Kh)`,
+     * but I'm almost positive this is incorrect).
      *
-     *  Note that the w_ij (defined in section 5.2) are all scaled by (1/8*A_mixed). We drop this
+     * Note that the w_ij (defined in section 5.2) are all scaled by `(1/8*A_mixed)`. We drop this
      * uniform scale factor because the solution of the linear equations doesn't rely on it.
      *
-     *  The terms of the linear equations are xterm_dy with x in {a,b,c} and y in {a,b}. There are
+     * The terms of the linear equations are xterm_dy with x in {a,b,c} and y in {a,b}. There are
      * also const_dy terms that are the constant factors in the equations.
      */
 

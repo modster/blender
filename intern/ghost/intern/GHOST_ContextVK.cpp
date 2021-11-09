@@ -308,7 +308,7 @@ GHOST_TSuccess GHOST_ContextVK::getVulkanBackbuffer(void *image,
                                                     void *command_buffer,
                                                     void *render_pass,
                                                     void *extent,
-                                                    GHOST_TUns32 *fb_id)
+                                                    uint32_t *fb_id)
 {
   if (m_swapchain == VK_NULL_HANDLE) {
     return GHOST_kFailure;
@@ -326,7 +326,7 @@ GHOST_TSuccess GHOST_ContextVK::getVulkanBackbuffer(void *image,
 GHOST_TSuccess GHOST_ContextVK::getVulkanHandles(void *r_instance,
                                                  void *r_physical_device,
                                                  void *r_device,
-                                                 GHOST_TUns32 *r_graphic_queue_familly)
+                                                 uint32_t *r_graphic_queue_familly)
 {
   *((VkInstance *)r_instance) = m_instance;
   *((VkPhysicalDevice *)r_physical_device) = m_physical_device;

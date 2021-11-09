@@ -93,38 +93,39 @@ static void screen_foreach_id_dopesheet(LibraryForeachIDData *data, bDopeSheet *
 {
   if (ads != NULL) {
     BKE_LIB_FOREACHID_PROCESS_ID(data, ads->source, IDWALK_CB_NOP);
-    BKE_LIB_FOREACHID_PROCESS(data, ads->filter_grp, IDWALK_CB_NOP);
+    BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, ads->filter_grp, IDWALK_CB_NOP);
   }
 }
 
+/**
+ * Callback used by lib_query to walk over all ID usages (mimics `foreach_id` callback of
+ * `IDTypeInfo` structure).
+ */
 void BKE_screen_foreach_id_screen_area(LibraryForeachIDData *data, ScrArea *area)
 {
-  BKE_LIB_FOREACHID_PROCESS(data, area->full, IDWALK_CB_NOP);
+  BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, area->full, IDWALK_CB_NOP);
 
-  /* TODO this should be moved to a callback in `SpaceType`, defined in each editor's own code.
+  /* TODO: this should be moved to a callback in `SpaceType`, defined in each editor's own code.
    * Will be for a later round of cleanup though... */
   LISTBASE_FOREACH (SpaceLink *, sl, &area->spacedata) {
     switch (sl->spacetype) {
       case SPACE_VIEW3D: {
         View3D *v3d = (View3D *)sl;
-
-        BKE_LIB_FOREACHID_PROCESS(data, v3d->camera, IDWALK_CB_NOP);
-        BKE_LIB_FOREACHID_PROCESS(data, v3d->ob_center, IDWALK_CB_NOP);
-
+        BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, v3d->camera, IDWALK_CB_NOP);
+        BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, v3d->ob_center, IDWALK_CB_NOP);
         if (v3d->localvd) {
-          BKE_LIB_FOREACHID_PROCESS(data, v3d->localvd->camera, IDWALK_CB_NOP);
+          BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, v3d->localvd->camera, IDWALK_CB_NOP);
         }
         break;
       }
       case SPACE_GRAPH: {
         SpaceGraph *sipo = (SpaceGraph *)sl;
-
-        screen_foreach_id_dopesheet(data, sipo->ads);
+        BKE_LIB_FOREACHID_PROCESS_FUNCTION_CALL(data,
+                                                screen_foreach_id_dopesheet(data, sipo->ads));
         break;
       }
       case SPACE_PROPERTIES: {
         SpaceProperties *sbuts = (SpaceProperties *)sl;
-
         BKE_LIB_FOREACHID_PROCESS_ID(data, sbuts->pinid, IDWALK_CB_NOP);
         break;
       }
@@ -132,48 +133,41 @@ void BKE_screen_foreach_id_screen_area(LibraryForeachIDData *data, ScrArea *area
         break;
       case SPACE_ACTION: {
         SpaceAction *saction = (SpaceAction *)sl;
-
         screen_foreach_id_dopesheet(data, &saction->ads);
-        BKE_LIB_FOREACHID_PROCESS(data, saction->action, IDWALK_CB_NOP);
+        BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, saction->action, IDWALK_CB_NOP);
         break;
       }
       case SPACE_IMAGE: {
         SpaceImage *sima = (SpaceImage *)sl;
-
-        BKE_LIB_FOREACHID_PROCESS(data, sima->image, IDWALK_CB_USER_ONE);
-        BKE_LIB_FOREACHID_PROCESS(data, sima->mask_info.mask, IDWALK_CB_USER_ONE);
-        BKE_LIB_FOREACHID_PROCESS(data, sima->gpd, IDWALK_CB_USER);
+        BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, sima->image, IDWALK_CB_USER_ONE);
+        BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, sima->mask_info.mask, IDWALK_CB_USER_ONE);
+        BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, sima->gpd, IDWALK_CB_USER);
         break;
       }
       case SPACE_SEQ: {
         SpaceSeq *sseq = (SpaceSeq *)sl;
-
-        BKE_LIB_FOREACHID_PROCESS(data, sseq->gpd, IDWALK_CB_USER);
+        BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, sseq->gpd, IDWALK_CB_USER);
         break;
       }
       case SPACE_NLA: {
         SpaceNla *snla = (SpaceNla *)sl;
-
-        screen_foreach_id_dopesheet(data, snla->ads);
+        BKE_LIB_FOREACHID_PROCESS_FUNCTION_CALL(data,
+                                                screen_foreach_id_dopesheet(data, snla->ads));
         break;
       }
       case SPACE_TEXT: {
         SpaceText *st = (SpaceText *)sl;
-
-        BKE_LIB_FOREACHID_PROCESS(data, st->text, IDWALK_CB_NOP);
+        BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, st->text, IDWALK_CB_NOP);
         break;
       }
       case SPACE_SCRIPT: {
         SpaceScript *scpt = (SpaceScript *)sl;
-
-        BKE_LIB_FOREACHID_PROCESS(data, scpt->script, IDWALK_CB_NOP);
+        BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, scpt->script, IDWALK_CB_NOP);
         break;
       }
       case SPACE_OUTLINER: {
         SpaceOutliner *space_outliner = (SpaceOutliner *)sl;
-
         BKE_LIB_FOREACHID_PROCESS_ID(data, space_outliner->search_tse.id, IDWALK_CB_NOP);
-
         if (space_outliner->treestore != NULL) {
           TreeStoreElem *tselem;
           BLI_mempool_iter iter;
@@ -187,26 +181,24 @@ void BKE_screen_foreach_id_screen_area(LibraryForeachIDData *data, ScrArea *area
       }
       case SPACE_NODE: {
         SpaceNode *snode = (SpaceNode *)sl;
-
         const bool is_private_nodetree = snode->id != NULL &&
                                          ntreeFromID(snode->id) == snode->nodetree;
 
         BKE_LIB_FOREACHID_PROCESS_ID(data, snode->id, IDWALK_CB_NOP);
         BKE_LIB_FOREACHID_PROCESS_ID(data, snode->from, IDWALK_CB_NOP);
-
-        BKE_LIB_FOREACHID_PROCESS(
+        BKE_LIB_FOREACHID_PROCESS_IDSUPER(
             data, snode->nodetree, is_private_nodetree ? IDWALK_CB_EMBEDDED : IDWALK_CB_USER_ONE);
 
         LISTBASE_FOREACH (bNodeTreePath *, path, &snode->treepath) {
           if (path == snode->treepath.first) {
             /* first nodetree in path is same as snode->nodetree */
-            BKE_LIB_FOREACHID_PROCESS(data,
-                                      path->nodetree,
-                                      is_private_nodetree ? IDWALK_CB_EMBEDDED :
-                                                            IDWALK_CB_USER_ONE);
+            BKE_LIB_FOREACHID_PROCESS_IDSUPER(data,
+                                              path->nodetree,
+                                              is_private_nodetree ? IDWALK_CB_EMBEDDED :
+                                                                    IDWALK_CB_USER_ONE);
           }
           else {
-            BKE_LIB_FOREACHID_PROCESS(data, path->nodetree, IDWALK_CB_USER_ONE);
+            BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, path->nodetree, IDWALK_CB_USER_ONE);
           }
 
           if (path->nodetree == NULL) {
@@ -214,22 +206,20 @@ void BKE_screen_foreach_id_screen_area(LibraryForeachIDData *data, ScrArea *area
           }
         }
 
-        BKE_LIB_FOREACHID_PROCESS(data, snode->edittree, IDWALK_CB_NOP);
+        BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, snode->edittree, IDWALK_CB_NOP);
         break;
       }
       case SPACE_CLIP: {
         SpaceClip *sclip = (SpaceClip *)sl;
-
-        BKE_LIB_FOREACHID_PROCESS(data, sclip->clip, IDWALK_CB_USER_ONE);
-        BKE_LIB_FOREACHID_PROCESS(data, sclip->mask_info.mask, IDWALK_CB_USER_ONE);
+        BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, sclip->clip, IDWALK_CB_USER_ONE);
+        BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, sclip->mask_info.mask, IDWALK_CB_USER_ONE);
         break;
       }
       case SPACE_SPREADSHEET: {
         SpaceSpreadsheet *sspreadsheet = (SpaceSpreadsheet *)sl;
-
         LISTBASE_FOREACH (SpreadsheetContext *, context, &sspreadsheet->context_path) {
           if (context->type == SPREADSHEET_CONTEXT_OBJECT) {
-            BKE_LIB_FOREACHID_PROCESS(
+            BKE_LIB_FOREACHID_PROCESS_IDSUPER(
                 data, ((SpreadsheetContextObject *)context)->object, IDWALK_CB_NOP);
           }
         }
@@ -243,30 +233,29 @@ void BKE_screen_foreach_id_screen_area(LibraryForeachIDData *data, ScrArea *area
 
 static void screen_foreach_id(ID *id, LibraryForeachIDData *data)
 {
-  if (BKE_lib_query_foreachid_process_flags_get(data) & IDWALK_INCLUDE_UI) {
-    bScreen *screen = (bScreen *)id;
+  if ((BKE_lib_query_foreachid_process_flags_get(data) & IDWALK_INCLUDE_UI) == 0) {
+    return;
+  }
+  bScreen *screen = (bScreen *)id;
 
-    LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
-      BKE_screen_foreach_id_screen_area(data, area);
-    }
+  LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
+    BKE_LIB_FOREACHID_PROCESS_FUNCTION_CALL(data, BKE_screen_foreach_id_screen_area(data, area));
   }
 }
 
 static void screen_blend_write(BlendWriter *writer, ID *id, const void *id_address)
 {
   bScreen *screen = (bScreen *)id;
-  /* Screens are reference counted, only saved if used by a workspace. */
-  if (screen->id.us > 0 || BLO_write_is_undo(writer)) {
-    /* write LibData */
-    /* in 2.50+ files, the file identifier for screens is patched, forward compatibility */
-    BLO_write_struct_at_address_with_filecode(writer, ID_SCRN, bScreen, id_address, screen);
-    BKE_id_blend_write(writer, &screen->id);
 
-    BKE_previewimg_blend_write(writer, screen->preview);
+  /* write LibData */
+  /* in 2.50+ files, the file identifier for screens is patched, forward compatibility */
+  BLO_write_struct_at_address_with_filecode(writer, ID_SCRN, bScreen, id_address, screen);
+  BKE_id_blend_write(writer, &screen->id);
 
-    /* direct data */
-    BKE_screen_area_map_blend_write(writer, AREAMAP_FROM_SCREEN(screen));
-  }
+  BKE_previewimg_blend_write(writer, screen->preview);
+
+  /* direct data */
+  BKE_screen_area_map_blend_write(writer, AREAMAP_FROM_SCREEN(screen));
 }
 
 /* Cannot use IDTypeInfo callback yet, because of the return value. */
@@ -289,7 +278,7 @@ bool BKE_screen_blend_read_data(BlendDataReader *reader, bScreen *screen)
   return success;
 }
 
-/* note: file read without screens option G_FILE_NO_UI;
+/* NOTE: file read without screens option G_FILE_NO_UI;
  * check lib pointers in call below */
 static void screen_blend_read_lib(BlendLibReader *reader, ID *id)
 {
@@ -314,7 +303,7 @@ IDTypeInfo IDType_ID_SCR = {
     .name = "Screen",
     .name_plural = "screens",
     .translation_context = BLT_I18NCONTEXT_ID_SCREEN,
-    .flags = IDTYPE_FLAGS_NO_COPY | IDTYPE_FLAGS_NO_MAKELOCAL | IDTYPE_FLAGS_NO_ANIMDATA,
+    .flags = IDTYPE_FLAGS_NO_COPY | IDTYPE_FLAGS_ONLY_APPEND | IDTYPE_FLAGS_NO_ANIMDATA,
 
     .init_data = NULL,
     .copy_data = NULL,
@@ -682,19 +671,13 @@ void BKE_area_region_free(SpaceType *st, ARegion *region)
   BKE_area_region_panels_free(&region->panels);
 
   LISTBASE_FOREACH (uiList *, uilst, &region->ui_lists) {
-    if (uilst->dyn_data) {
-      uiListDyn *dyn_data = uilst->dyn_data;
-      if (dyn_data->items_filter_flags) {
-        MEM_freeN(dyn_data->items_filter_flags);
-      }
-      if (dyn_data->items_filter_neworder) {
-        MEM_freeN(dyn_data->items_filter_neworder);
-      }
-      MEM_freeN(dyn_data);
+    if (uilst->dyn_data && uilst->dyn_data->free_runtime_data_fn) {
+      uilst->dyn_data->free_runtime_data_fn(uilst);
     }
     if (uilst->properties) {
       IDP_FreeProperty(uilst->properties);
     }
+    MEM_SAFE_FREE(uilst->dyn_data);
   }
 
   if (region->gizmo_map != NULL) {
@@ -736,7 +719,7 @@ void BKE_screen_area_map_free(ScrAreaMap *area_map)
 }
 
 /** Free (or release) any data used by this screen (does not free the screen itself). */
-void BKE_screen_free(bScreen *screen)
+void BKE_screen_free_data(bScreen *screen)
 {
   screen_free_data(&screen->id);
 }
@@ -772,7 +755,7 @@ void BKE_screen_remove_double_scrverts(bScreen *screen)
       while (v1) {
         if (v1->newv == NULL) { /* !?! */
           if (v1->vec.x == verg->vec.x && v1->vec.y == verg->vec.y) {
-            /* printf("doublevert\n"); */
+            // printf("doublevert\n");
             v1->newv = verg;
           }
         }
@@ -1632,7 +1615,6 @@ static void direct_link_area(BlendDataReader *reader, ScrArea *area)
       SpaceImage *sima = (SpaceImage *)sl;
 
       sima->iuser.scene = NULL;
-      sima->iuser.ok = 1;
       sima->scopes.waveform_1 = NULL;
       sima->scopes.waveform_2 = NULL;
       sima->scopes.waveform_3 = NULL;
@@ -1687,6 +1669,7 @@ static void direct_link_area(BlendDataReader *reader, ScrArea *area)
       sseq->scopes.sep_waveform_ibuf = NULL;
       sseq->scopes.vector_ibuf = NULL;
       sseq->scopes.histogram_ibuf = NULL;
+      memset(&sseq->runtime, 0x0, sizeof(sseq->runtime));
     }
     else if (sl->spacetype == SPACE_PROPERTIES) {
       SpaceProperties *sbuts = (SpaceProperties *)sl;
@@ -1734,6 +1717,12 @@ static void direct_link_area(BlendDataReader *reader, ScrArea *area)
       sfile->runtime = NULL;
       BLO_read_data_address(reader, &sfile->params);
       BLO_read_data_address(reader, &sfile->asset_params);
+      if (sfile->params) {
+        sfile->params->rename_id = NULL;
+      }
+      if (sfile->asset_params) {
+        sfile->asset_params->base_params.rename_id = NULL;
+      }
     }
     else if (sl->spacetype == SPACE_ACTION) {
       SpaceAction *saction = (SpaceAction *)sl;

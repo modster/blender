@@ -65,7 +65,6 @@
 #include "BKE_displist.h"
 #include "BKE_duplilist.h"
 #include "BKE_effect.h"
-#include "BKE_font.h"
 #include "BKE_geometry_set.h"
 #include "BKE_gpencil_curve.h"
 #include "BKE_gpencil_geom.h"
@@ -75,6 +74,7 @@
 #include "BKE_lattice.h"
 #include "BKE_layer.h"
 #include "BKE_lib_id.h"
+#include "BKE_lib_override.h"
 #include "BKE_lib_query.h"
 #include "BKE_lib_remap.h"
 #include "BKE_light.h"
@@ -91,6 +91,7 @@
 #include "BKE_report.h"
 #include "BKE_scene.h"
 #include "BKE_speaker.h"
+#include "BKE_vfont.h"
 #include "BKE_volume.h"
 
 #include "DEG_depsgraph.h"
@@ -258,8 +259,8 @@ static bool object_add_drop_xy_get(bContext *C, wmOperator *op, int (*r_mval)[2]
 static int object_add_drop_xy_generic_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
   if (!object_add_drop_xy_is_set(op)) {
-    RNA_int_set(op->ptr, "drop_x", event->x);
-    RNA_int_set(op->ptr, "drop_y", event->y);
+    RNA_int_set(op->ptr, "drop_x", event->xy[0]);
+    RNA_int_set(op->ptr, "drop_y", event->xy[1]);
   }
   return op->type->exec(C, op);
 }
@@ -332,8 +333,12 @@ void ED_object_base_init_transform_on_add(Object *object, const float loc[3], co
 
 /* Uses context to figure out transform for primitive.
  * Returns standard diameter. */
-float ED_object_new_primitive_matrix(
-    bContext *C, Object *obedit, const float loc[3], const float rot[3], float r_primmat[4][4])
+float ED_object_new_primitive_matrix(bContext *C,
+                                     Object *obedit,
+                                     const float loc[3],
+                                     const float rot[3],
+                                     const float scale[3],
+                                     float r_primmat[4][4])
 {
   Scene *scene = CTX_data_scene(C);
   View3D *v3d = CTX_wm_view3d(C);
@@ -355,6 +360,10 @@ float ED_object_new_primitive_matrix(
   sub_v3_v3v3(r_primmat[3], r_primmat[3], obedit->obmat[3]);
   invert_m3_m3(imat, mat);
   mul_m3_v3(imat, r_primmat[3]);
+
+  if (scale != NULL) {
+    rescale_m4(r_primmat, scale);
+  }
 
   {
     const float dia = v3d ? ED_view3d_grid_scale(scene, v3d, NULL) :
@@ -407,7 +416,7 @@ void ED_object_add_generic_props(wmOperatorType *ot, bool do_editmode)
                            "Enter edit mode when adding this object");
     RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
   }
-  /* note: this property gets hidden for add-camera operator */
+  /* NOTE: this property gets hidden for add-camera operator. */
   prop = RNA_def_enum(
       ot->srna, "align", align_options, ALIGN_WORLD, "Align", "The alignment of the new object");
   RNA_def_property_update_runtime(prop, view_align_update);
@@ -766,8 +775,6 @@ static int lightprobe_add_exec(bContext *C, wmOperator *op)
 
   BKE_lightprobe_type_set(probe, type);
 
-  DEG_relations_tag_update(CTX_data_main(C));
-
   return OPERATOR_FINISHED;
 }
 
@@ -865,7 +872,7 @@ static int effector_add_exec(bContext *C, wmOperator *op)
     ED_object_editmode_enter_ex(bmain, scene, ob, 0);
 
     float mat[4][4];
-    ED_object_new_primitive_matrix(C, ob, loc, rot, mat);
+    ED_object_new_primitive_matrix(C, ob, loc, rot, NULL, mat);
     mul_mat3_m4_fl(mat, dia);
     BLI_addtail(&cu->editnurb->nurbs,
                 ED_curve_add_nurbs_primitive(C, ob, mat, CU_NURBS | CU_PRIM_PATH, 1));
@@ -883,8 +890,6 @@ static int effector_add_exec(bContext *C, wmOperator *op)
   }
 
   ob->pd = BKE_partdeflect_new(type);
-
-  DEG_relations_tag_update(CTX_data_main(C));
 
   return OPERATOR_FINISHED;
 }
@@ -1003,7 +1008,7 @@ static int object_metaball_add_exec(bContext *C, wmOperator *op)
   }
 
   float mat[4][4];
-  ED_object_new_primitive_matrix(C, obedit, loc, rot, mat);
+  ED_object_new_primitive_matrix(C, obedit, loc, rot, NULL, mat);
   /* Halving here is done to account for constant values from #BKE_mball_element_add.
    * While the default radius of the resulting meta element is 2,
    * we want to pass in 1 so other values such as resolution are scaled by 1.0. */
@@ -1015,8 +1020,10 @@ static int object_metaball_add_exec(bContext *C, wmOperator *op)
   if (newob && !enter_editmode) {
     ED_object_editmode_exit_ex(bmain, scene, obedit, EM_FREEDATA);
   }
-
-  WM_event_add_notifier(C, NC_OBJECT | ND_DRAW, obedit);
+  else {
+    /* Only needed in edit-mode (#ED_object_add_type normally handles this). */
+    WM_event_add_notifier(C, NC_OBJECT | ND_DRAW, obedit);
+  }
 
   return OPERATOR_FINISHED;
 }
@@ -1066,8 +1073,6 @@ static int object_add_text_exec(bContext *C, wmOperator *op)
 
   obedit = ED_object_add_type(C, OB_FONT, NULL, loc, rot, enter_editmode, local_view_bits);
   BKE_object_obdata_size_init(obedit, RNA_float_get(op->ptr, "radius"));
-
-  WM_event_add_notifier(C, NC_OBJECT | ND_DRAW, obedit);
 
   return OPERATOR_FINISHED;
 }
@@ -1137,8 +1142,6 @@ static int object_armature_add_exec(bContext *C, wmOperator *op)
   if (newob && !enter_editmode) {
     ED_object_editmode_exit_ex(bmain, scene, obedit, EM_FREEDATA);
   }
-
-  WM_event_add_notifier(C, NC_OBJECT | ND_DRAW, obedit);
 
   return OPERATOR_FINISHED;
 }
@@ -1320,12 +1323,13 @@ static int object_gpencil_add_exec(bContext *C, wmOperator *op)
   const bool use_in_front = RNA_boolean_get(op->ptr, "use_in_front");
   const bool use_lights = RNA_boolean_get(op->ptr, "use_lights");
   const int stroke_depth_order = RNA_enum_get(op->ptr, "stroke_depth_order");
+  const float stroke_depth_offset = RNA_float_get(op->ptr, "stroke_depth_offset");
 
   ushort local_view_bits;
   float loc[3], rot[3];
   bool newob = false;
 
-  /* Note: We use 'Y' here (not 'Z'), as */
+  /* NOTE: We use 'Y' here (not 'Z'), as. */
   WM_operator_view3d_unit_defaults(C, op);
   if (!ED_object_add_generic_get_opts(C, op, 'Y', loc, rot, NULL, NULL, &local_view_bits, NULL)) {
     return OPERATOR_CANCELLED;
@@ -1371,30 +1375,28 @@ static int object_gpencil_add_exec(bContext *C, wmOperator *op)
     case GP_EMPTY: {
       float mat[4][4];
 
-      ED_object_new_primitive_matrix(C, ob, loc, rot, mat);
+      ED_object_new_primitive_matrix(C, ob, loc, rot, NULL, mat);
       ED_gpencil_create_blank(C, ob, mat);
       break;
     }
     case GP_STROKE: {
       float radius = RNA_float_get(op->ptr, "radius");
+      float scale[3];
+      copy_v3_fl(scale, radius);
       float mat[4][4];
 
-      ED_object_new_primitive_matrix(C, ob, loc, rot, mat);
-      mul_v3_fl(mat[0], radius);
-      mul_v3_fl(mat[1], radius);
-      mul_v3_fl(mat[2], radius);
+      ED_object_new_primitive_matrix(C, ob, loc, rot, scale, mat);
 
       ED_gpencil_create_stroke(C, ob, mat);
       break;
     }
     case GP_MONKEY: {
       float radius = RNA_float_get(op->ptr, "radius");
+      float scale[3];
+      copy_v3_fl(scale, radius);
       float mat[4][4];
 
-      ED_object_new_primitive_matrix(C, ob, loc, rot, mat);
-      mul_v3_fl(mat[0], radius);
-      mul_v3_fl(mat[1], radius);
-      mul_v3_fl(mat[2], radius);
+      ED_object_new_primitive_matrix(C, ob, loc, rot, scale, mat);
 
       ED_gpencil_create_monkey(C, ob, mat);
       break;
@@ -1403,12 +1405,11 @@ static int object_gpencil_add_exec(bContext *C, wmOperator *op)
     case GP_LRT_COLLECTION:
     case GP_LRT_OBJECT: {
       float radius = RNA_float_get(op->ptr, "radius");
+      float scale[3];
+      copy_v3_fl(scale, radius);
       float mat[4][4];
 
-      ED_object_new_primitive_matrix(C, ob, loc, rot, mat);
-      mul_v3_fl(mat[0], radius);
-      mul_v3_fl(mat[1], radius);
-      mul_v3_fl(mat[2], radius);
+      ED_object_new_primitive_matrix(C, ob, loc, rot, scale, mat);
 
       ED_gpencil_create_lineart(C, ob);
 
@@ -1454,6 +1455,7 @@ static int object_gpencil_add_exec(bContext *C, wmOperator *op)
         if (stroke_depth_order == GP_DRAWMODE_3D) {
           gpd->draw_mode = GP_DRAWMODE_3D;
         }
+        md->stroke_depth_offset = stroke_depth_offset;
       }
 
       break;
@@ -1487,13 +1489,14 @@ static void object_add_ui(bContext *UNUSED(C), wmOperator *op)
   uiItemR(layout, op->ptr, "type", 0, NULL, ICON_NONE);
 
   int type = RNA_enum_get(op->ptr, "type");
-  if (type == GP_LRT_COLLECTION || type == GP_LRT_OBJECT || type == GP_LRT_SCENE) {
+  if (ELEM(type, GP_LRT_COLLECTION, GP_LRT_OBJECT, GP_LRT_SCENE)) {
     uiItemR(layout, op->ptr, "use_lights", 0, NULL, ICON_NONE);
     uiItemR(layout, op->ptr, "use_in_front", 0, NULL, ICON_NONE);
     bool in_front = RNA_boolean_get(op->ptr, "use_in_front");
-    uiLayout *row = uiLayoutRow(layout, false);
-    uiLayoutSetActive(row, !in_front);
-    uiItemR(row, op->ptr, "stroke_depth_order", 0, NULL, ICON_NONE);
+    uiLayout *col = uiLayoutColumn(layout, false);
+    uiLayoutSetActive(col, !in_front);
+    uiItemR(col, op->ptr, "stroke_depth_offset", 0, NULL, ICON_NONE);
+    uiItemR(col, op->ptr, "stroke_depth_order", 0, NULL, ICON_NONE);
   }
 }
 
@@ -1532,9 +1535,18 @@ void OBJECT_OT_gpencil_add(wmOperatorType *ot)
   ot->prop = RNA_def_enum(ot->srna, "type", rna_enum_object_gpencil_type_items, 0, "Type", "");
   RNA_def_boolean(ot->srna,
                   "use_in_front",
-                  false,
-                  "In Front",
+                  true,
+                  "Show In Front",
                   "Show line art grease pencil in front of everything");
+  RNA_def_float(ot->srna,
+                "stroke_depth_offset",
+                0.05f,
+                0.0f,
+                FLT_MAX,
+                "Stroke Offset",
+                "Stroke offset for the line art modifier",
+                0.0f,
+                0.5f);
   RNA_def_boolean(
       ot->srna, "use_lights", false, "Use Lights", "Use lights for this grease pencil object");
   RNA_def_enum(
@@ -1543,7 +1555,7 @@ void OBJECT_OT_gpencil_add(wmOperatorType *ot)
       rna_enum_gpencil_add_stroke_depth_order_items,
       GP_DRAWMODE_3D,
       "Stroke Depth Order",
-      "Defines how the strokes are ordered in 3D space for objects not displayed 'In Front'");
+      "Defines how the strokes are ordered in 3D space for objects not displayed 'In Front')");
 }
 
 /** \} */
@@ -1670,7 +1682,6 @@ static int collection_instance_add_exec(bContext *C, wmOperator *op)
     return OPERATOR_CANCELLED;
   }
 
-  Scene *scene = CTX_data_scene(C);
   ViewLayer *view_layer = CTX_data_view_layer(C);
 
   /* Avoid dependency cycles. */
@@ -1686,20 +1697,14 @@ static int collection_instance_add_exec(bContext *C, wmOperator *op)
   ob->transflag |= OB_DUPLICOLLECTION;
   id_us_plus(&collection->id);
 
-  /* works without this except if you try render right after, see: 22027 */
-  DEG_relations_tag_update(bmain);
-  DEG_id_tag_update(&scene->id, ID_RECALC_SELECT);
-  WM_event_add_notifier(C, NC_SCENE | ND_OB_ACTIVE, scene);
-  WM_event_add_notifier(C, NC_SCENE | ND_LAYER_CONTENT, scene);
-
   return OPERATOR_FINISHED;
 }
 
 static int object_instance_add_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
   if (!object_add_drop_xy_is_set(op)) {
-    RNA_int_set(op->ptr, "drop_x", event->x);
-    RNA_int_set(op->ptr, "drop_y", event->y);
+    RNA_int_set(op->ptr, "drop_x", event->xy[0]);
+    RNA_int_set(op->ptr, "drop_y", event->xy[1]);
   }
 
   if (!RNA_struct_property_is_set(op->ptr, "name")) {
@@ -1784,16 +1789,8 @@ static int object_data_instance_add_exec(bContext *C, wmOperator *op)
     return OPERATOR_CANCELLED;
   }
 
-  Scene *scene = CTX_data_scene(C);
-
   ED_object_add_type_with_obdata(
       C, object_type, id->name + 2, loc, rot, false, local_view_bits, id);
-
-  /* Works without this except if you try render right after, see: T22027. */
-  DEG_relations_tag_update(bmain);
-  DEG_id_tag_update(&scene->id, ID_RECALC_SELECT);
-  WM_event_add_notifier(C, NC_SCENE | ND_OB_ACTIVE, scene);
-  WM_event_add_notifier(C, NC_SCENE | ND_LAYER_CONTENT, scene);
 
   return OPERATOR_FINISHED;
 }
@@ -1845,7 +1842,7 @@ static int object_speaker_add_exec(bContext *C, wmOperator *op)
    * ready to be moved around to re-time the sound and/or make new sound clips. */
   {
     /* create new data for NLA hierarchy */
-    AnimData *adt = BKE_animdata_add_id(&ob->id);
+    AnimData *adt = BKE_animdata_ensure_id(&ob->id);
     NlaTrack *nlt = BKE_nlatrack_add(adt, NULL, is_liboverride);
     NlaStrip *strip = BKE_nla_add_soundstrip(bmain, scene, ob->data);
     strip->start = CFRA;
@@ -1977,7 +1974,7 @@ void OBJECT_OT_pointcloud_add(wmOperatorType *ot)
 /** \name Delete Object Operator
  * \{ */
 /* remove base from a specific scene */
-/* note: now unlinks constraints as well */
+/* NOTE: now unlinks constraints as well. */
 void ED_object_base_free_and_unlink(Main *bmain, Scene *scene, Object *ob)
 {
   if (ID_REAL_USERS(ob) <= 1 && ID_EXTRA_USERS(ob) == 0 &&
@@ -2012,6 +2009,7 @@ static int object_delete_exec(bContext *C, wmOperator *op)
   Scene *scene = CTX_data_scene(C);
   wmWindowManager *wm = CTX_wm_manager(C);
   const bool use_global = RNA_boolean_get(op->ptr, "use_global");
+  const bool confirm = op->flag & OP_IS_INVOKE;
   uint changed_count = 0;
   uint tagged_count = 0;
 
@@ -2027,6 +2025,15 @@ static int object_delete_exec(bContext *C, wmOperator *op)
       BKE_reportf(op->reports,
                   RPT_WARNING,
                   "Cannot delete indirectly linked object '%s'",
+                  ob->id.name + 2);
+      continue;
+    }
+
+    if (!BKE_lib_override_library_id_is_user_deletable(bmain, &ob->id)) {
+      /* Can this case ever happen? */
+      BKE_reportf(op->reports,
+                  RPT_WARNING,
+                  "Cannot delete object '%s' as it used by override collections",
                   ob->id.name + 2);
       continue;
     }
@@ -2081,7 +2088,9 @@ static int object_delete_exec(bContext *C, wmOperator *op)
     BKE_id_multi_tagged_delete(bmain);
   }
 
-  BKE_reportf(op->reports, RPT_INFO, "Deleted %u object(s)", (changed_count + tagged_count));
+  if (confirm) {
+    BKE_reportf(op->reports, RPT_INFO, "Deleted %u object(s)", (changed_count + tagged_count));
+  }
 
   /* delete has to handle all open scenes */
   BKE_main_id_tag_listbase(&bmain->scenes, LIB_TAG_DOIT, true);
@@ -2136,7 +2145,7 @@ static void copy_object_set_idnew(bContext *C)
   Main *bmain = CTX_data_main(C);
 
   CTX_DATA_BEGIN (C, Object *, ob, selected_editable_objects) {
-    BKE_libblock_relink_to_newid(&ob->id);
+    BKE_libblock_relink_to_newid(bmain, &ob->id, 0);
   }
   CTX_DATA_END;
 
@@ -2163,7 +2172,7 @@ static void copy_object_set_idnew(bContext *C)
 /** \name Make Instanced Objects Real Operator
  * \{ */
 
-/* XXX TODO That whole hierarchy handling based on persistent_id tricks is
+/* XXX TODO: That whole hierarchy handling based on persistent_id tricks is
  * very confusing and convoluted, and it will fail in many cases besides basic ones.
  * Think this should be replaced by a proper tree-like representation of the instantiations,
  * should help a lot in both readability, and precise consistent rebuilding of hierarchy.
@@ -2267,13 +2276,6 @@ static bool dupliobject_instancer_cmp(const void *a_, const void *b_)
   return false;
 }
 
-static bool object_has_geometry_set_instances(const Object *object_eval)
-{
-  struct GeometrySet *geometry_set = object_eval->runtime.geometry_set_eval;
-
-  return (geometry_set != NULL) && BKE_geometry_set_has_instances(geometry_set);
-}
-
 static void make_object_duplilist_real(bContext *C,
                                        Depsgraph *depsgraph,
                                        Scene *scene,
@@ -2287,7 +2289,8 @@ static void make_object_duplilist_real(bContext *C,
 
   Object *object_eval = DEG_get_evaluated_object(depsgraph, base->object);
 
-  if (!(base->object->transflag & OB_DUPLI) && !object_has_geometry_set_instances(object_eval)) {
+  if (!(base->object->transflag & OB_DUPLI) &&
+      !BKE_object_has_geometry_set_instances(object_eval)) {
     return;
   }
 
@@ -2375,7 +2378,7 @@ static void make_object_duplilist_real(bContext *C,
     Object *ob_dst = BLI_ghash_lookup(dupli_gh, dob);
 
     /* Remap new object to itself, and clear again newid pointer of orig object. */
-    BKE_libblock_relink_to_newid(&ob_dst->id);
+    BKE_libblock_relink_to_newid(bmain, &ob_dst->id, 0);
 
     DEG_id_tag_update(&ob_dst->id, ID_RECALC_GEOMETRY);
 
@@ -2442,7 +2445,7 @@ static void make_object_duplilist_real(bContext *C,
     }
 
     if (ob_dst->parent) {
-      /* note, this may be the parent of other objects, but it should
+      /* NOTE: this may be the parent of other objects, but it should
        * still work out ok */
       BKE_object_apply_mat4(ob_dst, dob->mat, false, true);
 
@@ -2844,13 +2847,13 @@ static int object_convert_exec(bContext *C, wmOperator *op)
                                                    matrix,
                                                    0,
                                                    use_seams,
-                                                   use_faces);
+                                                   use_faces,
+                                                   true);
 
       /* Remove unused materials. */
       int actcol = ob_gpencil->actcol;
       for (int slot = 1; slot <= ob_gpencil->totcol; slot++) {
-        while (slot <= ob_gpencil->totcol &&
-               !BKE_object_material_slot_used(ob_gpencil->data, slot)) {
+        while (slot <= ob_gpencil->totcol && !BKE_object_material_slot_used(ob_gpencil, slot)) {
           ob_gpencil->actcol = slot;
           BKE_object_material_slot_remove(CTX_data_main(C), ob_gpencil);
 
@@ -2906,7 +2909,7 @@ static int object_convert_exec(bContext *C, wmOperator *op)
       }
 
       /* make new mesh data from the original copy */
-      /* note: get the mesh from the original, not from the copy in some
+      /* NOTE: get the mesh from the original, not from the copy in some
        * cases this doesn't give correct results (when MDEF is used for eg)
        */
       Scene *scene_eval = (Scene *)DEG_get_evaluated_id(depsgraph, &scene->id);
@@ -3349,8 +3352,8 @@ static Base *object_add_duplicate_internal(Main *bmain,
 
 /* single object duplicate, if dupflag==0, fully linked, else it uses the flags given */
 /* leaves selection of base/object unaltered.
- * note: don't call this within a loop since clear_* funcs loop over the entire database.
- * note: caller must do DAG_relations_tag_update(bmain);
+ * NOTE: don't call this within a loop since clear_* funcs loop over the entire database.
+ * NOTE: caller must do DAG_relations_tag_update(bmain);
  *       this is not done automatic since we may duplicate many objects in a batch */
 Base *ED_object_add_duplicate(
     Main *bmain, Scene *scene, ViewLayer *view_layer, Base *base, const eDupli_ID_Flags dupflag)
@@ -3358,16 +3361,24 @@ Base *ED_object_add_duplicate(
   Base *basen;
   Object *ob;
 
-  basen = object_add_duplicate_internal(
-      bmain, scene, view_layer, base->object, dupflag, LIB_ID_DUPLICATE_IS_SUBPROCESS);
+  basen = object_add_duplicate_internal(bmain,
+                                        scene,
+                                        view_layer,
+                                        base->object,
+                                        dupflag,
+                                        LIB_ID_DUPLICATE_IS_SUBPROCESS |
+                                            LIB_ID_DUPLICATE_IS_ROOT_ID);
   if (basen == NULL) {
     return NULL;
   }
 
   ob = basen->object;
 
-  /* link own references to the newly duplicated data T26816. */
-  BKE_libblock_relink_to_newid(&ob->id);
+  /* Link own references to the newly duplicated data T26816.
+   * Note that this function can be called from edit-mode code, in which case we may have to
+   * enforce remapping obdata (by default this is forbidden in edit mode). */
+  const int remap_flag = BKE_object_is_in_editmode(ob) ? ID_REMAP_FORCE_OBDATA_IN_EDITMODE : 0;
+  BKE_libblock_relink_to_newid(bmain, &ob->id, remap_flag);
 
   /* DAG_relations_tag_update(bmain); */ /* caller must do */
 
@@ -3394,8 +3405,13 @@ static int duplicate_exec(bContext *C, wmOperator *op)
   BKE_main_id_newptr_and_tag_clear(bmain);
 
   CTX_DATA_BEGIN (C, Base *, base, selected_bases) {
-    Base *basen = object_add_duplicate_internal(
-        bmain, scene, view_layer, base->object, dupflag, LIB_ID_DUPLICATE_IS_SUBPROCESS);
+    Base *basen = object_add_duplicate_internal(bmain,
+                                                scene,
+                                                view_layer,
+                                                base->object,
+                                                dupflag,
+                                                LIB_ID_DUPLICATE_IS_SUBPROCESS |
+                                                    LIB_ID_DUPLICATE_IS_ROOT_ID);
 
     /* note that this is safe to do with this context iterator,
      * the list is made in advance */
@@ -3468,19 +3484,6 @@ void OBJECT_OT_duplicate(wmOperatorType *ot)
  * Use for drag & drop.
  * \{ */
 
-static Base *object_add_ensure_in_view_layer(Main *bmain, ViewLayer *view_layer, Object *ob)
-{
-  Base *base = BKE_view_layer_base_find(view_layer, ob);
-
-  if (!base) {
-    LayerCollection *layer_collection = BKE_layer_collection_get_active(view_layer);
-    BKE_collection_object_add(bmain, layer_collection->collection, ob);
-    base = BKE_view_layer_base_find(view_layer, ob);
-  }
-
-  return base;
-}
-
 static int object_add_named_exec(bContext *C, wmOperator *op)
 {
   Main *bmain = CTX_data_main(C);
@@ -3488,8 +3491,7 @@ static int object_add_named_exec(bContext *C, wmOperator *op)
   ViewLayer *view_layer = CTX_data_view_layer(C);
   Base *basen;
   Object *ob;
-  const bool duplicate = RNA_boolean_get(op->ptr, "duplicate");
-  const bool linked = duplicate && RNA_boolean_get(op->ptr, "linked");
+  const bool linked = RNA_boolean_get(op->ptr, "linked");
   const eDupli_ID_Flags dupflag = (linked) ? 0 : (eDupli_ID_Flags)U.dupflag;
   char name[MAX_ID_NAME - 2];
 
@@ -3503,40 +3505,25 @@ static int object_add_named_exec(bContext *C, wmOperator *op)
   }
 
   /* prepare dupli */
-  if (duplicate) {
-    basen = object_add_duplicate_internal(
-        bmain,
-        scene,
-        view_layer,
-        ob,
-        dupflag,
-        /* Sub-process flag because the new-ID remapping (#BKE_libblock_relink_to_newid()) in this
-         * function will only work if the object is already linked in the view layer, which is not
-         * the case here. So we have to do the new-ID relinking ourselves
-         * (#copy_object_set_idnew()).
-         */
-        LIB_ID_DUPLICATE_IS_SUBPROCESS);
-  }
-  else {
-    /* basen is actually not a new base in this case. */
-    basen = object_add_ensure_in_view_layer(bmain, view_layer, ob);
-  }
+  basen = object_add_duplicate_internal(
+      bmain,
+      scene,
+      view_layer,
+      ob,
+      dupflag,
+      /* Sub-process flag because the new-ID remapping (#BKE_libblock_relink_to_newid()) in this
+       * function will only work if the object is already linked in the view layer, which is not
+       * the case here. So we have to do the new-ID relinking ourselves
+       * (#copy_object_set_idnew()).
+       */
+      LIB_ID_DUPLICATE_IS_SUBPROCESS | LIB_ID_DUPLICATE_IS_ROOT_ID);
 
   if (basen == NULL) {
-    BKE_report(op->reports,
-               RPT_ERROR,
-               duplicate ? "Object could not be duplicated" :
-                           "Object could not be linked to the view layer");
+    BKE_report(op->reports, RPT_ERROR, "Object could not be duplicated");
     return OPERATOR_CANCELLED;
   }
 
-  basen->object->restrictflag &= ~OB_RESTRICT_VIEWPORT;
-
-  int mval[2];
-  if (object_add_drop_xy_get(C, op, &mval)) {
-    ED_object_location_from_view(C, basen->object->loc);
-    ED_view3d_cursor3d_position(C, mval, false, basen->object->loc);
-  }
+  basen->object->visibility_flag &= ~OB_HIDE_VIEWPORT;
 
   /* object_add_duplicate_internal() doesn't deselect other objects, unlike object_add_common() or
    * BKE_view_layer_base_deselect_all(). */
@@ -3555,43 +3542,163 @@ static int object_add_named_exec(bContext *C, wmOperator *op)
   WM_event_add_notifier(C, NC_SCENE | ND_LAYER_CONTENT, scene);
   ED_outliner_select_sync_from_object_tag(C);
 
+  PropertyRNA *prop_matrix = RNA_struct_find_property(op->ptr, "matrix");
+  if (RNA_property_is_set(op->ptr, prop_matrix)) {
+    Object *ob_add = basen->object;
+    RNA_property_float_get_array(op->ptr, prop_matrix, &ob_add->obmat[0][0]);
+    BKE_object_apply_mat4(ob_add, ob_add->obmat, true, true);
+
+    DEG_id_tag_update(&ob_add->id, ID_RECALC_TRANSFORM);
+  }
+  else {
+    int mval[2];
+    if (object_add_drop_xy_get(C, op, &mval)) {
+      ED_object_location_from_view(C, basen->object->loc);
+      ED_view3d_cursor3d_position(C, mval, false, basen->object->loc);
+    }
+  }
+
   return OPERATOR_FINISHED;
 }
 
 void OBJECT_OT_add_named(wmOperatorType *ot)
 {
   /* identifiers */
-  ot->name = "Add Named Object";
+  ot->name = "Add Object";
   ot->description = "Add named object";
   ot->idname = "OBJECT_OT_add_named";
 
   /* api callbacks */
   ot->invoke = object_add_drop_xy_generic_invoke;
   ot->exec = object_add_named_exec;
+  ot->poll = ED_operator_objectmode_poll_msg;
+
+  /* flags */
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+  PropertyRNA *prop;
+  RNA_def_boolean(ot->srna,
+                  "linked",
+                  false,
+                  "Linked",
+                  "Duplicate object but not object data, linking to the original data");
+
+  RNA_def_string(ot->srna, "name", NULL, MAX_ID_NAME - 2, "Name", "Object name to add");
+
+  prop = RNA_def_float_matrix(
+      ot->srna, "matrix", 4, 4, NULL, 0.0f, 0.0f, "Matrix", "", 0.0f, 0.0f);
+  RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
+
+  object_add_drop_xy_props(ot);
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Transform Object to Mouse Operator
+ * \{ */
+
+/**
+ * Alternate behavior for dropping an asset that positions the appended object(s).
+ */
+static int object_transform_to_mouse_exec(bContext *C, wmOperator *op)
+{
+  Main *bmain = CTX_data_main(C);
+  ViewLayer *view_layer = CTX_data_view_layer(C);
+  Object *ob;
+
+  if (RNA_struct_property_is_set(op->ptr, "name")) {
+    char name[MAX_ID_NAME - 2];
+    RNA_string_get(op->ptr, "name", name);
+    ob = (Object *)BKE_libblock_find_name(bmain, ID_OB, name);
+  }
+  else {
+    ob = OBACT(view_layer);
+  }
+
+  if (ob == NULL) {
+    BKE_report(op->reports, RPT_ERROR, "Object not found");
+    return OPERATOR_CANCELLED;
+  }
+
+  /* Don't transform a linked object. There's just nothing to do here in this case, so return
+   * #OPERATOR_FINISHED. */
+  if (ID_IS_LINKED(ob)) {
+    return OPERATOR_FINISHED;
+  }
+
+  /* Ensure the locations are updated so snap reads the evaluated active location. */
+  CTX_data_ensure_evaluated_depsgraph(C);
+
+  PropertyRNA *prop_matrix = RNA_struct_find_property(op->ptr, "matrix");
+  if (RNA_property_is_set(op->ptr, prop_matrix)) {
+    uint objects_len;
+    Object **objects = BKE_view_layer_array_selected_objects(view_layer, NULL, &objects_len, {0});
+
+    float matrix[4][4];
+    RNA_property_float_get_array(op->ptr, prop_matrix, &matrix[0][0]);
+
+    float mat_src_unit[4][4];
+    float mat_dst_unit[4][4];
+    float final_delta[4][4];
+
+    normalize_m4_m4(mat_src_unit, ob->obmat);
+    normalize_m4_m4(mat_dst_unit, matrix);
+    invert_m4(mat_src_unit);
+    mul_m4_m4m4(final_delta, mat_dst_unit, mat_src_unit);
+
+    ED_object_xform_array_m4(objects, objects_len, final_delta);
+
+    MEM_freeN(objects);
+  }
+  else {
+    int mval[2];
+    if (object_add_drop_xy_get(C, op, &mval)) {
+      float cursor[3];
+      ED_object_location_from_view(C, cursor);
+      ED_view3d_cursor3d_position(C, mval, false, cursor);
+
+      /* Use the active objects location since this is the ID which the user selected to drop.
+       *
+       * This transforms all selected objects, so that dropping a single object which links in
+       * other objects will have their relative transformation preserved.
+       * For example a child/parent relationship or other objects used with a boolean modifier.
+       *
+       * The caller is responsible for ensuring the selection state gives useful results.
+       * Link/append does this using #FILE_AUTOSELECT. */
+      ED_view3d_snap_selected_to_location(C, cursor, V3D_AROUND_ACTIVE);
+    }
+  }
+
+  return OPERATOR_FINISHED;
+}
+
+void OBJECT_OT_transform_to_mouse(wmOperatorType *ot)
+{
+  /* identifiers */
+  ot->name = "Place Object Under Mouse";
+  ot->description = "Snap selected item(s) to the mouse location";
+  ot->idname = "OBJECT_OT_transform_to_mouse";
+
+  /* api callbacks */
+  ot->invoke = object_add_drop_xy_generic_invoke;
+  ot->exec = object_transform_to_mouse_exec;
   ot->poll = ED_operator_objectmode;
 
   /* flags */
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 
   PropertyRNA *prop;
+  RNA_def_string(ot->srna,
+                 "name",
+                 NULL,
+                 MAX_ID_NAME - 2,
+                 "Name",
+                 "Object name to place (when unset use the active object)");
 
-  prop = RNA_def_boolean(
-      ot->srna,
-      "duplicate",
-      true,
-      "Duplicate",
-      "Create a duplicate of the object. If not set, only ensures the object is linked into the "
-      "active view layer, positions and selects/activates it (deselecting others)");
-  RNA_def_property_flag(prop, PROP_HIDDEN);
-
-  RNA_def_boolean(ot->srna,
-                  "linked",
-                  false,
-                  "Linked",
-                  "Duplicate object but not object data, linking to the original data (ignored if "
-                  "'duplicate' is false)");
-
-  RNA_def_string(ot->srna, "name", NULL, MAX_ID_NAME - 2, "Name", "Object name to add");
+  prop = RNA_def_float_matrix(
+      ot->srna, "matrix", 4, 4, NULL, 0.0f, 0.0f, "Matrix", "", 0.0f, 0.0f);
+  RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
 
   object_add_drop_xy_props(ot);
 }

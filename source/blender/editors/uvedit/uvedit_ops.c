@@ -1496,7 +1496,7 @@ static int uv_hide_exec(bContext *C, wmOperator *op)
       }
 
       if (hide) {
-        /* note, a special case for edges could be used,
+        /* NOTE: a special case for edges could be used,
          * for now edges act like verts and get flushed */
         if (use_face_center) {
           if (em->selectmode == SCE_SELECT_FACE) {
@@ -1765,11 +1765,9 @@ static int uv_set_2d_cursor_invoke(bContext *C, wmOperator *op, const wmEvent *e
   float location[2];
 
   if (region->regiontype == RGN_TYPE_WINDOW) {
-    if (event->mval[1] <= 16) {
-      SpaceImage *sima = CTX_wm_space_image(C);
-      if (sima && ED_space_image_show_cache(sima)) {
-        return OPERATOR_PASS_THROUGH;
-      }
+    SpaceImage *sima = CTX_wm_space_image(C);
+    if (sima && ED_space_image_show_cache_and_mval_over(sima, region, event->mval)) {
+      return OPERATOR_PASS_THROUGH;
     }
   }
 

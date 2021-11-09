@@ -105,6 +105,10 @@ class OUTLINER_MT_context_menu(Menu):
 
     @staticmethod
     def draw_common_operators(layout):
+        layout.menu_contents("OUTLINER_MT_asset")
+
+        layout.separator()
+
         layout.menu("OUTLINER_MT_context_menu_view")
 
         layout.separator()
@@ -306,6 +310,19 @@ class OUTLINER_MT_object(Menu):
         OUTLINER_MT_context_menu.draw_common_operators(layout)
 
 
+class OUTLINER_MT_asset(Menu):
+    bl_label = "Assets"
+
+    def draw(self, context):
+        layout = self.layout
+
+        space = context.space_data
+
+        layout.operator("asset.mark")
+        layout.operator("asset.clear", text="Clear Asset").set_fake_user = False
+        layout.operator("asset.clear", text="Clear Asset (Set Fake User)").set_fake_user = True
+
+
 class OUTLINER_PT_filter(Panel):
     bl_space_type = 'OUTLINER'
     bl_region_type = 'HEADER'
@@ -442,7 +459,6 @@ class OUTLINER_PT_filter(Panel):
             row.prop(space, "use_filter_lib_override_system", text="System Overrides")
 
 
-
 classes = (
     OUTLINER_HT_header,
     OUTLINER_MT_editor_menus,
@@ -452,6 +468,7 @@ classes = (
     OUTLINER_MT_collection_visibility,
     OUTLINER_MT_collection_view_layer,
     OUTLINER_MT_object,
+    OUTLINER_MT_asset,
     OUTLINER_MT_context_menu,
     OUTLINER_MT_context_menu_view,
     OUTLINER_PT_filter,

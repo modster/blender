@@ -27,7 +27,7 @@ if(NOT MSVC)
 endif()
 
 if(CMAKE_C_COMPILER_ID MATCHES "Clang")
-  set(MSVC_CLANG On)
+  set(MSVC_CLANG ON)
   set(VC_TOOLS_DIR $ENV{VCToolsRedistDir} CACHE STRING "Location of the msvc redistributables")
   set(MSVC_REDIST_DIR ${VC_TOOLS_DIR})
   if(DEFINED MSVC_REDIST_DIR)
@@ -53,11 +53,9 @@ if(CMAKE_C_COMPILER_ID MATCHES "Clang")
   endif()
   if(WITH_WINDOWS_STRIPPED_PDB)
     message(WARNING "stripped pdb not supported with clang, disabling..")
-    set(WITH_WINDOWS_STRIPPED_PDB Off)
+    set(WITH_WINDOWS_STRIPPED_PDB OFF)
   endif()
 endif()
-
-set_property(GLOBAL PROPERTY USE_FOLDERS ${WINDOWS_USE_VISUAL_STUDIO_PROJECT_FOLDERS})
 
 if(NOT WITH_PYTHON_MODULE)
   set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT blender)
@@ -153,15 +151,15 @@ if(MSVC_CLANG) # Clangs version of cl doesn't support all flags
   string(APPEND CMAKE_CXX_FLAGS " ${CXX_WARN_FLAGS} /nologo /J /Gd /EHsc -Wno-unused-command-line-argument -Wno-microsoft-enum-forward-reference ")
   set(CMAKE_C_FLAGS     "${CMAKE_C_FLAGS} /nologo /J /Gd -Wno-unused-command-line-argument -Wno-microsoft-enum-forward-reference")
 else()
-  string(APPEND CMAKE_CXX_FLAGS " /nologo /J /Gd /MP /EHsc /bigobj")
-  set(CMAKE_C_FLAGS     "${CMAKE_C_FLAGS} /nologo /J /Gd /MP /bigobj")
+  string(APPEND CMAKE_CXX_FLAGS " /nologo /J /Gd /MP /EHsc /bigobj /Zc:inline")
+  set(CMAKE_C_FLAGS     "${CMAKE_C_FLAGS} /nologo /J /Gd /MP /bigobj /Zc:inline")
 endif()
 
 # X64 ASAN is available and usable on MSVC 16.9 preview 4 and up)
 if(WITH_COMPILER_ASAN AND MSVC AND NOT MSVC_CLANG)
   if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 19.28.29828)
     #set a flag so we don't have to do this comparison all the time
-    SET(MSVC_ASAN On)
+    SET(MSVC_ASAN ON)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /fsanitize=address")
     set(CMAKE_C_FLAGS     "${CMAKE_C_FLAGS} /fsanitize=address")
     string(APPEND CMAKE_EXE_LINKER_FLAGS_DEBUG " /INCREMENTAL:NO")
@@ -181,22 +179,22 @@ endif()
 
 if(WITH_WINDOWS_SCCACHE AND CMAKE_VS_MSBUILD_COMMAND)
     message(WARNING "Disabling sccache, sccache is not supported with msbuild")
-    set(WITH_WINDOWS_SCCACHE Off)
+    set(WITH_WINDOWS_SCCACHE OFF)
 endif()
 
 # Debug Symbol format
 # sccache # MSVC_ASAN # format # why
-# On      # On        # Z7     # sccache will only play nice with Z7
-# On      # Off       # Z7     # sccache will only play nice with Z7
-# Off     # On        # Zi     # Asan will not play nice with Edit and Continue
-# Off     # Off       # ZI     # Neither asan nor sscache is enabled Edit and Continue is available
+# ON      # ON        # Z7     # sccache will only play nice with Z7
+# ON      # OFF       # Z7     # sccache will only play nice with Z7
+# OFF     # ON        # Zi     # Asan will not play nice with Edit and Continue
+# OFF     # OFF       # ZI     # Neither asan nor sscache is enabled Edit and Continue is available
 
 # Release Symbol format
 # sccache # MSVC_ASAN # format # why
-# On      # On        # Z7     # sccache will only play nice with Z7
-# On      # Off       # Z7     # sccache will only play nice with Z7
-# Off     # On        # Zi     # Asan will not play nice with Edit and Continue
-# Off     # Off       # Zi     # Edit and Continue disables some optimizations
+# ON      # ON        # Z7     # sccache will only play nice with Z7
+# ON      # OFF       # Z7     # sccache will only play nice with Z7
+# OFF     # ON        # Zi     # Asan will not play nice with Edit and Continue
+# OFF     # OFF       # Zi     # Edit and Continue disables some optimizations
 
 
 if(WITH_WINDOWS_SCCACHE)
@@ -217,8 +215,8 @@ else()
 endif()
 
 if(WITH_WINDOWS_PDB)
-	set(PDB_INFO_OVERRIDE_FLAGS "${SYMBOL_FORMAT_RELEASE}")
-	set(PDB_INFO_OVERRIDE_LINKER_FLAGS "/DEBUG /OPT:REF /OPT:ICF /INCREMENTAL:NO")
+  set(PDB_INFO_OVERRIDE_FLAGS "${SYMBOL_FORMAT_RELEASE}")
+  set(PDB_INFO_OVERRIDE_LINKER_FLAGS "/DEBUG /OPT:REF /OPT:ICF /INCREMENTAL:NO")
 endif()
 
 string(APPEND CMAKE_CXX_FLAGS_DEBUG " /MDd ${SYMBOL_FORMAT}")
@@ -261,7 +259,7 @@ if(NOT DEFINED LIBDIR)
   else()
     message(FATAL_ERROR "32 bit compiler detected, blender no longer provides pre-build libraries for 32 bit windows, please set the LIBDIR cmake variable to your own library folder")
   endif()
-  if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 19.29.30130)
+  if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 19.30.30423)
     message(STATUS "Visual Studio 2022 detected.")
     set(LIBDIR ${CMAKE_SOURCE_DIR}/../lib/${LIBDIR_BASE}_vc15)
   elseif(MSVC_VERSION GREATER 1919)
@@ -290,7 +288,7 @@ if(CMAKE_GENERATOR MATCHES "^Visual Studio.+" AND # Only supported in the VS IDE
     "EnableMicrosoftCodeAnalysis=false"
     "EnableClangTidyCodeAnalysis=true"
   )
-  set(VS_CLANG_TIDY On)
+  set(VS_CLANG_TIDY ON)
 endif()
 
 # Mark libdir as system headers with a lower warn level, to resolve some warnings
@@ -471,7 +469,7 @@ if(WITH_PYTHON)
 
   set(PYTHON_INCLUDE_DIR ${LIBDIR}/python/${_PYTHON_VERSION_NO_DOTS}/include)
   set(PYTHON_NUMPY_INCLUDE_DIRS ${LIBDIR}/python/${_PYTHON_VERSION_NO_DOTS}/lib/site-packages/numpy/core/include)
-  set(NUMPY_FOUND On)
+  set(NUMPY_FOUND ON)
   unset(_PYTHON_VERSION_NO_DOTS)
   # uncached vars
   set(PYTHON_INCLUDE_DIRS "${PYTHON_INCLUDE_DIR}")
@@ -855,18 +853,18 @@ if(WITH_GMP)
   set(GMP_INCLUDE_DIRS ${LIBDIR}/gmp/include)
   set(GMP_LIBRARIES ${LIBDIR}/gmp/lib/libgmp-10.lib optimized ${LIBDIR}/gmp/lib/libgmpxx.lib debug ${LIBDIR}/gmp/lib/libgmpxx_d.lib)
   set(GMP_ROOT_DIR ${LIBDIR}/gmp)
-  set(GMP_FOUND On)
+  set(GMP_FOUND ON)
 endif()
 
 if(WITH_POTRACE)
   set(POTRACE_INCLUDE_DIRS ${LIBDIR}/potrace/include)
   set(POTRACE_LIBRARIES ${LIBDIR}/potrace/lib/potrace.lib)
-  set(POTRACE_FOUND On)
+  set(POTRACE_FOUND ON)
 endif()
 
 if(WITH_HARU)
   if(EXISTS ${LIBDIR}/haru)
-    set(HARU_FOUND On)
+    set(HARU_FOUND ON)
     set(HARU_ROOT_DIR ${LIBDIR}/haru)
     set(HARU_INCLUDE_DIRS ${HARU_ROOT_DIR}/include)
     set(HARU_LIBRARIES ${HARU_ROOT_DIR}/lib/libhpdfs.lib)
@@ -902,3 +900,6 @@ if(WITH_VULKAN)
     set(WITH_VULKAN OFF)
   endif()
 endif()
+
+set(ZSTD_INCLUDE_DIRS ${LIBDIR}/zstd/include)
+set(ZSTD_LIBRARIES ${LIBDIR}/zstd/lib/zstd_static.lib)

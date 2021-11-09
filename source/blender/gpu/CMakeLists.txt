@@ -38,6 +38,7 @@ set(INC
   ../imbuf
   ../makesdna
   ../makesrna
+  ../windowmanager
 
   ../editors/include
 
@@ -83,8 +84,8 @@ set(SRC
   intern/gpu_select_sample_query.cc
   intern/gpu_shader.cc
   intern/gpu_shader_builtin.c
-  intern/gpu_shader_log.cc
   intern/gpu_shader_interface.cc
+  intern/gpu_shader_log.cc
   intern/gpu_state.cc
   intern/gpu_texture.cc
   intern/gpu_uniform_buffer.cc
@@ -104,8 +105,8 @@ set(SRC
   opengl/gl_index_buffer.cc
   opengl/gl_query.cc
   opengl/gl_shader.cc
-  opengl/gl_shader_log.cc
   opengl/gl_shader_interface.cc
+  opengl/gl_shader_log.cc
   opengl/gl_state.cc
   opengl/gl_texture.cc
   opengl/gl_uniform_buffer.cc
@@ -269,6 +270,7 @@ data_to_c_simple(shaders/gpu_shader_image_frag.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_image_desaturate_frag.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_image_overlays_merge_frag.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_image_overlays_stereo_merge_frag.glsl SRC)
+data_to_c_simple(shaders/gpu_shader_image_modulate_alpha_frag.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_image_shuffle_color_frag.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_image_color_frag.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_image_varying_color_frag.glsl SRC)
@@ -312,8 +314,8 @@ data_to_c_simple(shaders/gpu_shader_2D_edituvs_stretch_vert.glsl SRC)
 
 data_to_c_simple(shaders/gpu_shader_text_vert.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_text_frag.glsl SRC)
-data_to_c_simple(shaders/gpu_shader_keyframe_diamond_vert.glsl SRC)
-data_to_c_simple(shaders/gpu_shader_keyframe_diamond_frag.glsl SRC)
+data_to_c_simple(shaders/gpu_shader_keyframe_shape_vert.glsl SRC)
+data_to_c_simple(shaders/gpu_shader_keyframe_shape_frag.glsl SRC)
 
 data_to_c_simple(shaders/gpu_shader_codegen_lib.glsl SRC)
 
@@ -340,6 +342,7 @@ data_to_c_simple(shaders/material/gpu_shader_material_diffuse.glsl SRC)
 data_to_c_simple(shaders/material/gpu_shader_material_displacement.glsl SRC)
 data_to_c_simple(shaders/material/gpu_shader_material_eevee_specular.glsl SRC)
 data_to_c_simple(shaders/material/gpu_shader_material_emission.glsl SRC)
+data_to_c_simple(shaders/material/gpu_shader_material_float_curve.glsl SRC)
 data_to_c_simple(shaders/material/gpu_shader_material_fractal_noise.glsl SRC)
 data_to_c_simple(shaders/material/gpu_shader_material_fresnel.glsl SRC)
 data_to_c_simple(shaders/material/gpu_shader_material_gamma.glsl SRC)

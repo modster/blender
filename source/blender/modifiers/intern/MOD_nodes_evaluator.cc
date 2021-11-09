@@ -10,19 +10,24 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software  Foundation,
+ * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
 #include "MOD_nodes_evaluator.hh"
 
 #include "NOD_geometry_exec.hh"
+#include "NOD_socket_declarations.hh"
 #include "NOD_type_conversions.hh"
 
 #include "DEG_depsgraph_query.h"
 
+#include "FN_field.hh"
+#include "FN_field_cpp_type.hh"
 #include "FN_generic_value_map.hh"
 #include "FN_multi_function.hh"
+
+#include "BLT_translation.h"
 
 #include "BLI_enumerable_thread_specific.hh"
 #include "BLI_stack.hh"
@@ -33,6 +38,9 @@
 namespace blender::modifiers::geometry_nodes {
 
 using fn::CPPType;
+using fn::Field;
+using fn::FieldCPPType;
+using fn::GField;
 using fn::GValueMap;
 using nodes::GeoNodeExecParams;
 using namespace fn::multi_function_types;
@@ -118,6 +126,12 @@ struct InputState {
    * changed by others anymore.
    */
   bool was_ready_for_execution = false;
+
+  /**
+   * True when this input has to be computed for logging/debugging purposes, regardless of whether
+   * it is needed for some output.
+   */
+  bool force_compute = false;
 };
 
 struct OutputState {
@@ -294,7 +308,11 @@ class LockedNode : NonCopyable, NonMovable {
 
 static const CPPType *get_socket_cpp_type(const SocketRef &socket)
 {
-  const CPPType *type = nodes::socket_cpp_type_get(*socket.typeinfo());
+  const bNodeSocketType *typeinfo = socket.typeinfo();
+  if (typeinfo->get_geometry_nodes_cpp_type == nullptr) {
+    return nullptr;
+  }
+  const CPPType *type = typeinfo->get_geometry_nodes_cpp_type();
   if (type == nullptr) {
     return nullptr;
   }
@@ -308,6 +326,54 @@ static const CPPType *get_socket_cpp_type(const SocketRef &socket)
 static const CPPType *get_socket_cpp_type(const DSocket socket)
 {
   return get_socket_cpp_type(*socket.socket_ref());
+}
+
+/**
+ * \note This is not supposed to be a long term solution. Eventually we want that nodes can
+ * specify more complex defaults (other than just single values) in their socket declarations.
+ */
+static bool get_implicit_socket_input(const SocketRef &socket, void *r_value)
+{
+  const NodeRef &node = socket.node();
+  const nodes::NodeDeclaration *node_declaration = node.declaration();
+  if (node_declaration == nullptr) {
+    return false;
+  }
+  const nodes::SocketDeclaration &socket_declaration = *node_declaration->inputs()[socket.index()];
+  if (socket_declaration.input_field_type() == nodes::InputSocketFieldType::Implicit) {
+    const bNode &bnode = *socket.bnode();
+    if (socket.typeinfo()->type == SOCK_VECTOR) {
+      if (bnode.type == GEO_NODE_SET_CURVE_HANDLES) {
+        StringRef side = ((NodeGeometrySetCurveHandlePositions *)bnode.storage)->mode ==
+                                 GEO_NODE_CURVE_HANDLE_LEFT ?
+                             "handle_left" :
+                             "handle_right";
+        new (r_value) Field<float3>(bke::AttributeFieldInput::Create<float3>(side));
+        return true;
+      }
+      new (r_value) Field<float3>(bke::AttributeFieldInput::Create<float3>("position"));
+      return true;
+    }
+    if (socket.typeinfo()->type == SOCK_INT) {
+      if (ELEM(bnode.type, FN_NODE_RANDOM_VALUE, GEO_NODE_INSTANCE_ON_POINTS)) {
+        new (r_value) Field<int>(std::make_shared<bke::IDAttributeFieldInput>());
+        return true;
+      }
+      new (r_value) Field<int>(std::make_shared<fn::IndexFieldInput>());
+      return true;
+    }
+  }
+  return false;
+}
+
+static void get_socket_value(const SocketRef &socket, void *r_value)
+{
+  if (get_implicit_socket_input(socket, r_value)) {
+    return;
+  }
+
+  const bNodeSocketType *typeinfo = socket.typeinfo();
+  typeinfo->get_geometry_nodes_cpp_value(*socket.bsocket(), r_value);
 }
 
 static bool node_supports_laziness(const DNode node)
@@ -404,6 +470,9 @@ class GeometryNodesEvaluator {
     for (const DInputSocket &socket : params_.output_sockets) {
       nodes_to_check.push(socket.node());
     }
+    for (const DSocket &socket : params_.force_compute_sockets) {
+      nodes_to_check.push(socket.node());
+    }
     /* Use the local allocator because the states do not need to outlive the evaluator. */
     LinearAllocator<> &allocator = local_allocators_.local();
     while (!nodes_to_check.is_empty()) {
@@ -434,6 +503,14 @@ class GeometryNodesEvaluator {
             this->initialize_node_state(item.node, *item.state, allocator);
           }
         });
+
+    /* Mark input sockets that have to be computed. */
+    for (const DSocket &socket : params_.force_compute_sockets) {
+      NodeState &node_state = *node_states_.lookup_key_as(socket.node()).state;
+      if (socket->is_input()) {
+        node_state.inputs[socket->index()].force_compute = true;
+      }
+    }
   }
 
   void initialize_node_state(const DNode node, NodeState &node_state, LinearAllocator<> &allocator)
@@ -491,17 +568,18 @@ class GeometryNodesEvaluator {
       }
       /* Count the number of potential users for this socket. */
       socket.foreach_target_socket(
-          [&, this](const DInputSocket target_socket) {
+          [&, this](const DInputSocket target_socket,
+                    const DOutputSocket::TargetSocketPathInfo &UNUSED(path_info)) {
             const DNode target_node = target_socket.node();
             if (!this->node_states_.contains_as(target_node)) {
               /* The target node is not computed because it is not computed to the output. */
               return;
             }
             output_state.potential_users += 1;
-          },
-          {});
+          });
       if (output_state.potential_users == 0) {
-        /* If it does not have any potential users, it is unused. */
+        /* If it does not have any potential users, it is unused. It might become required again in
+         * `schedule_initial_nodes`. */
         output_state.output_usage = ValueUsage::Unused;
       }
     }
@@ -554,11 +632,11 @@ class GeometryNodesEvaluator {
     for (auto &&item : params_.input_values.items()) {
       const DOutputSocket socket = item.key;
       GMutablePointer value = item.value;
-      this->log_socket_value(socket, value);
 
       const DNode node = socket.node();
       if (!node_states_.contains_as(node)) {
         /* The socket is not connected to any output. */
+        this->log_socket_value({socket}, value);
         value.destruct();
         continue;
       }
@@ -574,6 +652,20 @@ class GeometryNodesEvaluator {
       this->with_locked_node(node, node_state, [&](LockedNode &locked_node) {
         /* Setting an input as required will schedule any linked node. */
         this->set_input_required(locked_node, socket);
+      });
+    }
+    for (const DSocket socket : params_.force_compute_sockets) {
+      const DNode node = socket.node();
+      NodeState &node_state = this->get_node_state(node);
+      this->with_locked_node(node, node_state, [&](LockedNode &locked_node) {
+        if (socket->is_input()) {
+          this->set_input_required(locked_node, DInputSocket(socket));
+        }
+        else {
+          OutputState &output_state = node_state.outputs[socket->index()];
+          output_state.output_usage = ValueUsage::Required;
+          this->schedule_node(locked_node);
+        }
       });
     }
   }
@@ -665,7 +757,8 @@ class GeometryNodesEvaluator {
     return do_execute_node;
   }
 
-  /* A node is finished when it has computed all outputs that may be used. */
+  /* A node is finished when it has computed all outputs that may be used have been computed and
+   * when no input is still forced to be computed. */
   bool finish_node_if_possible(LockedNode &locked_node)
   {
     if (locked_node.node_state.node_has_finished) {
@@ -674,35 +767,41 @@ class GeometryNodesEvaluator {
     }
 
     /* Check if there is any output that might be used but has not been computed yet. */
-    bool has_remaining_output = false;
     for (OutputState &output_state : locked_node.node_state.outputs) {
       if (output_state.has_been_computed) {
         continue;
       }
       if (output_state.output_usage != ValueUsage::Unused) {
-        has_remaining_output = true;
-        break;
+        return false;
       }
     }
-    if (!has_remaining_output) {
-      /* If there are no remaining outputs, all the inputs can be destructed and/or can become
-       * unused. This can also trigger a chain reaction where nodes to the left become finished
-       * too. */
-      for (const int i : locked_node.node->inputs().index_range()) {
-        const DInputSocket socket = locked_node.node.input(i);
-        InputState &input_state = locked_node.node_state.inputs[i];
-        if (input_state.usage == ValueUsage::Maybe) {
-          this->set_input_unused(locked_node, socket);
-        }
-        else if (input_state.usage == ValueUsage::Required) {
-          /* The value was required, so it cannot become unused. However, we can destruct the
-           * value. */
-          this->destruct_input_value_if_exists(locked_node, socket);
+
+    /* Check if there is an input that still has to be computed. */
+    for (InputState &input_state : locked_node.node_state.inputs) {
+      if (input_state.force_compute) {
+        if (!input_state.was_ready_for_execution) {
+          return false;
         }
       }
-      locked_node.node_state.node_has_finished = true;
     }
-    return locked_node.node_state.node_has_finished;
+
+    /* If there are no remaining outputs, all the inputs can be destructed and/or can become
+     * unused. This can also trigger a chain reaction where nodes to the left become finished
+     * too. */
+    for (const int i : locked_node.node->inputs().index_range()) {
+      const DInputSocket socket = locked_node.node.input(i);
+      InputState &input_state = locked_node.node_state.inputs[i];
+      if (input_state.usage == ValueUsage::Maybe) {
+        this->set_input_unused(locked_node, socket);
+      }
+      else if (input_state.usage == ValueUsage::Required) {
+        /* The value was required, so it cannot become unused. However, we can destruct the
+         * value. */
+        this->destruct_input_value_if_exists(locked_node, socket);
+      }
+    }
+    locked_node.node_state.node_has_finished = true;
+    return true;
   }
 
   bool prepare_node_outputs_for_execution(LockedNode &locked_node)
@@ -762,7 +861,6 @@ class GeometryNodesEvaluator {
         /* Checks if all the linked sockets have been provided already. */
         if (multi_value.items.size() == multi_value.expected_size) {
           input_state.was_ready_for_execution = true;
-          this->log_socket_value(socket, input_state, multi_value.items);
         }
         else if (is_required) {
           /* The input is required but is not fully provided yet. Therefore the node cannot be
@@ -774,7 +872,6 @@ class GeometryNodesEvaluator {
         SingleInputValue &single_value = *input_state.value.single;
         if (single_value.value != nullptr) {
           input_state.was_ready_for_execution = true;
-          this->log_socket_value(socket, GPointer{input_state.type, single_value.value});
         }
         else if (is_required) {
           /* The input is required but has not been provided yet. Therefore the node cannot be
@@ -810,9 +907,9 @@ class GeometryNodesEvaluator {
     }
 
     /* Use the multi-function implementation if it exists. */
-    const MultiFunction *multi_function = params_.mf_by_node->lookup_default(node, nullptr);
-    if (multi_function != nullptr) {
-      this->execute_multi_function_node(node, *multi_function, node_state);
+    const nodes::NodeMultiFunctions::Item &fn_item = params_.mf_by_node->try_get(node);
+    if (fn_item.fn != nullptr) {
+      this->execute_multi_function_node(node, fn_item, node_state);
       return;
     }
 
@@ -825,18 +922,29 @@ class GeometryNodesEvaluator {
 
     NodeParamsProvider params_provider{*this, node, node_state};
     GeoNodeExecParams params{params_provider};
+    if (node->idname().find("Legacy") != StringRef::not_found) {
+      params.error_message_add(geo_log::NodeWarningType::Legacy,
+                               TIP_("Legacy node will be removed before Blender 4.0"));
+    }
     bnode.typeinfo->geometry_node_execute(params);
   }
 
   void execute_multi_function_node(const DNode node,
-                                   const MultiFunction &fn,
+                                   const nodes::NodeMultiFunctions::Item &fn_item,
                                    NodeState &node_state)
   {
-    MFContextBuilder fn_context;
-    MFParamsBuilder fn_params{fn, 1};
+    if (node->idname().find("Legacy") != StringRef::not_found) {
+      /* Create geometry nodes params just for creating an error message. */
+      NodeParamsProvider params_provider{*this, node, node_state};
+      GeoNodeExecParams params{params_provider};
+      params.error_message_add(geo_log::NodeWarningType::Legacy,
+                               TIP_("Legacy node will be removed before Blender 4.0"));
+    }
+
     LinearAllocator<> &allocator = local_allocators_.local();
 
     /* Prepare the inputs for the multi function. */
+    Vector<GField> input_fields;
     for (const int i : node->inputs().index_range()) {
       const InputSocketRef &socket_ref = node->input(i);
       if (!socket_ref.is_available()) {
@@ -847,24 +955,18 @@ class GeometryNodesEvaluator {
       BLI_assert(input_state.was_ready_for_execution);
       SingleInputValue &single_value = *input_state.value.single;
       BLI_assert(single_value.value != nullptr);
-      fn_params.add_readonly_single_input(GPointer{*input_state.type, single_value.value});
-    }
-    /* Prepare the outputs for the multi function. */
-    Vector<GMutablePointer> outputs;
-    for (const int i : node->outputs().index_range()) {
-      const OutputSocketRef &socket_ref = node->output(i);
-      if (!socket_ref.is_available()) {
-        continue;
-      }
-      const CPPType &type = *get_socket_cpp_type(socket_ref);
-      void *buffer = allocator.allocate(type.size(), type.alignment());
-      fn_params.add_uninitialized_single_output(GMutableSpan{type, buffer, 1});
-      outputs.append({type, buffer});
+      input_fields.append(std::move(*(GField *)single_value.value));
     }
 
-    fn.call(IndexRange(1), fn_params, fn_context);
+    std::shared_ptr<fn::FieldOperation> operation;
+    if (fn_item.owned_fn) {
+      operation = std::make_shared<fn::FieldOperation>(fn_item.owned_fn, std::move(input_fields));
+    }
+    else {
+      operation = std::make_shared<fn::FieldOperation>(*fn_item.fn, std::move(input_fields));
+    }
 
-    /* Forward the computed outputs. */
+    /* Forward outputs. */
     int output_index = 0;
     for (const int i : node->outputs().index_range()) {
       const OutputSocketRef &socket_ref = node->output(i);
@@ -873,8 +975,11 @@ class GeometryNodesEvaluator {
       }
       OutputState &output_state = node_state.outputs[i];
       const DOutputSocket socket{node.context(), &socket_ref};
-      GMutablePointer value = outputs[output_index];
-      this->forward_output(socket, value);
+      const CPPType *cpp_type = get_socket_cpp_type(socket_ref);
+      GField new_field{operation, output_index};
+      new_field = fn::make_field_constant_if_possible(std::move(new_field));
+      GField &field_to_forward = *allocator.construct<GField>(std::move(new_field)).release();
+      this->forward_output(socket, {cpp_type, &field_to_forward});
       output_state.has_been_computed = true;
       output_index++;
     }
@@ -896,7 +1001,7 @@ class GeometryNodesEvaluator {
       OutputState &output_state = node_state.outputs[socket->index()];
       output_state.has_been_computed = true;
       void *buffer = allocator.allocate(type->size(), type->alignment());
-      type->copy_construct(type->default_value(), buffer);
+      this->construct_default_value(*type, buffer);
       this->forward_output({node.context(), socket}, {*type, buffer});
     }
   }
@@ -1042,7 +1147,7 @@ class GeometryNodesEvaluator {
       return;
     }
     bool will_be_triggered_by_other_node = false;
-    for (const DSocket origin_socket : origin_sockets) {
+    for (const DSocket &origin_socket : origin_sockets) {
       if (origin_socket->is_input()) {
         /* Load the value directly from the origin socket. In most cases this is an unlinked
          * group input. */
@@ -1124,10 +1229,14 @@ class GeometryNodesEvaluator {
     this->with_locked_node(node, node_state, [&](LockedNode &locked_node) {
       output_state.potential_users -= 1;
       if (output_state.potential_users == 0) {
-        /* The output socket has no users anymore. */
-        output_state.output_usage = ValueUsage::Unused;
-        /* Schedule the origin node in case it wants to set its inputs as unused as well. */
-        this->schedule_node(locked_node);
+        /* The socket might be required even though the output is not used by other sockets. That
+         * can happen when the socket is forced to be computed. */
+        if (output_state.output_usage != ValueUsage::Required) {
+          /* The output socket has no users anymore. */
+          output_state.output_usage = ValueUsage::Unused;
+          /* Schedule the origin node in case it wants to set its inputs as unused as well. */
+          this->schedule_node(locked_node);
+        }
       }
     });
   }
@@ -1148,35 +1257,61 @@ class GeometryNodesEvaluator {
   {
     BLI_assert(value_to_forward.get() != nullptr);
 
-    Vector<DInputSocket> to_sockets;
-    auto handle_target_socket_fn = [&, this](const DInputSocket to_socket) {
-      if (this->should_forward_to_socket(to_socket)) {
-        to_sockets.append(to_socket);
-      }
-    };
-    auto handle_skipped_socket_fn = [&, this](const DSocket socket) {
-      /* Log socket value on intermediate sockets to support e.g. attribute search or spreadsheet
-       * breadcrumbs on group nodes. */
-      this->log_socket_value(socket, value_to_forward);
-    };
-    from_socket.foreach_target_socket(handle_target_socket_fn, handle_skipped_socket_fn);
-
     LinearAllocator<> &allocator = local_allocators_.local();
 
-    const CPPType &from_type = *value_to_forward.type();
-    Vector<DInputSocket> to_sockets_same_type;
-    for (const DInputSocket &to_socket : to_sockets) {
-      const CPPType &to_type = *get_socket_cpp_type(to_socket);
-      if (from_type == to_type) {
-        /* All target sockets that do not need a conversion will be handled afterwards. */
-        to_sockets_same_type.append(to_socket);
-        continue;
-      }
-      this->forward_to_socket_with_different_type(
-          allocator, value_to_forward, from_socket, to_socket, to_type);
-    }
+    Vector<DSocket> log_original_value_sockets;
+    Vector<DInputSocket> forward_original_value_sockets;
+    log_original_value_sockets.append(from_socket);
+
+    from_socket.foreach_target_socket(
+        [&](const DInputSocket to_socket, const DOutputSocket::TargetSocketPathInfo &path_info) {
+          if (!this->should_forward_to_socket(to_socket)) {
+            return;
+          }
+          BLI_assert(to_socket == path_info.sockets.last());
+          GMutablePointer current_value = value_to_forward;
+          for (const DSocket &next_socket : path_info.sockets) {
+            const DNode next_node = next_socket.node();
+            const bool is_last_socket = to_socket == next_socket;
+            const bool do_conversion_if_necessary = is_last_socket ||
+                                                    next_node->is_group_output_node() ||
+                                                    (next_node->is_group_node() &&
+                                                     !next_node->is_muted());
+            if (do_conversion_if_necessary) {
+              const CPPType &next_type = *get_socket_cpp_type(next_socket);
+              if (*current_value.type() != next_type) {
+                void *buffer = allocator.allocate(next_type.size(), next_type.alignment());
+                this->convert_value(*current_value.type(), next_type, current_value.get(), buffer);
+                if (current_value.get() != value_to_forward.get()) {
+                  current_value.destruct();
+                }
+                current_value = {next_type, buffer};
+              }
+            }
+            if (current_value.get() == value_to_forward.get()) {
+              /* Log the original value at the current socket. */
+              log_original_value_sockets.append(next_socket);
+            }
+            else {
+              /* Multi-input sockets are logged when all values are available. */
+              if (!(next_socket->is_input() && next_socket->as_input().is_multi_input_socket())) {
+                /* Log the converted value at the socket. */
+                this->log_socket_value({next_socket}, current_value);
+              }
+            }
+          }
+          if (current_value.get() == value_to_forward.get()) {
+            /* The value has not been converted, so forward the original value. */
+            forward_original_value_sockets.append(to_socket);
+          }
+          else {
+            /* The value has been converted. */
+            this->add_value_to_input_socket(to_socket, from_socket, current_value);
+          }
+        });
+    this->log_socket_value(log_original_value_sockets, value_to_forward);
     this->forward_to_sockets_with_same_type(
-        allocator, to_sockets_same_type, value_to_forward, from_socket);
+        allocator, forward_original_value_sockets, value_to_forward, from_socket);
   }
 
   bool should_forward_to_socket(const DInputSocket socket)
@@ -1193,28 +1328,6 @@ class GeometryNodesEvaluator {
     std::lock_guard lock{target_node_state.mutex};
     /* Do not forward to an input socket whose value won't be used. */
     return target_input_state.usage != ValueUsage::Unused;
-  }
-
-  void forward_to_socket_with_different_type(LinearAllocator<> &allocator,
-                                             const GPointer value_to_forward,
-                                             const DOutputSocket from_socket,
-                                             const DInputSocket to_socket,
-                                             const CPPType &to_type)
-  {
-    const CPPType &from_type = *value_to_forward.type();
-
-    /* Allocate a buffer for the converted value. */
-    void *buffer = allocator.allocate(to_type.size(), to_type.alignment());
-
-    if (conversions_.is_convertible(from_type, to_type)) {
-      /* Do the conversion if possible. */
-      conversions_.convert_to_uninitialized(from_type, to_type, value_to_forward.get(), buffer);
-    }
-    else {
-      /* Cannot convert, use default value instead. */
-      to_type.copy_construct(to_type.default_value(), buffer);
-    }
-    this->add_value_to_input_socket(to_socket, from_socket, {to_type, buffer});
   }
 
   void forward_to_sockets_with_same_type(LinearAllocator<> &allocator,
@@ -1262,6 +1375,10 @@ class GeometryNodesEvaluator {
         /* Add a new value to the multi-input. */
         MultiInputValue &multi_value = *input_state.value.multi;
         multi_value.items.append({origin, value.get()});
+
+        if (multi_value.expected_size == multi_value.items.size()) {
+          this->log_socket_value({socket}, input_state, multi_value.items);
+        }
       }
       else {
         /* Assign the value to the input. */
@@ -1292,10 +1409,14 @@ class GeometryNodesEvaluator {
     if (input_socket->is_multi_input_socket()) {
       MultiInputValue &multi_value = *input_state.value.multi;
       multi_value.items.append({origin_socket, value.get()});
+      if (multi_value.expected_size == multi_value.items.size()) {
+        this->log_socket_value({input_socket}, input_state, multi_value.items);
+      }
     }
     else {
       SingleInputValue &single_value = *input_state.value.single;
       single_value.value = value.get();
+      this->log_socket_value({input_socket}, value);
     }
   }
 
@@ -1322,25 +1443,65 @@ class GeometryNodesEvaluator {
   {
     LinearAllocator<> &allocator = local_allocators_.local();
 
-    bNodeSocket *bsocket = socket->bsocket();
     const CPPType &type = *get_socket_cpp_type(socket);
     void *buffer = allocator.allocate(type.size(), type.alignment());
-    blender::nodes::socket_cpp_value_get(*bsocket, buffer);
+    get_socket_value(*socket.socket_ref(), buffer);
 
     if (type == required_type) {
       return {type, buffer};
     }
-    if (conversions_.is_convertible(type, required_type)) {
-      /* Convert the loaded value to the required type if possible. */
-      void *converted_buffer = allocator.allocate(required_type.size(), required_type.alignment());
-      conversions_.convert_to_uninitialized(type, required_type, buffer, converted_buffer);
-      type.destruct(buffer);
-      return {required_type, converted_buffer};
+    void *converted_buffer = allocator.allocate(required_type.size(), required_type.alignment());
+    this->convert_value(type, required_type, buffer, converted_buffer);
+    type.destruct(buffer);
+    return {required_type, converted_buffer};
+  }
+
+  void convert_value(const CPPType &from_type,
+                     const CPPType &to_type,
+                     const void *from_value,
+                     void *to_value)
+  {
+    if (from_type == to_type) {
+      from_type.copy_construct(from_value, to_value);
+      return;
     }
-    /* Use a default fallback value when the loaded type is not compatible. */
-    void *default_buffer = allocator.allocate(required_type.size(), required_type.alignment());
-    required_type.copy_construct(required_type.default_value(), default_buffer);
-    return {required_type, default_buffer};
+
+    const FieldCPPType *from_field_type = dynamic_cast<const FieldCPPType *>(&from_type);
+    const FieldCPPType *to_field_type = dynamic_cast<const FieldCPPType *>(&to_type);
+
+    if (from_field_type != nullptr && to_field_type != nullptr) {
+      const CPPType &from_base_type = from_field_type->field_type();
+      const CPPType &to_base_type = to_field_type->field_type();
+      if (conversions_.is_convertible(from_base_type, to_base_type)) {
+        const MultiFunction &fn = *conversions_.get_conversion_multi_function(
+            MFDataType::ForSingle(from_base_type), MFDataType::ForSingle(to_base_type));
+        const GField &from_field = *(const GField *)from_value;
+        auto operation = std::make_shared<fn::FieldOperation>(fn, Vector<GField>{from_field});
+        new (to_value) GField(std::move(operation), 0);
+        return;
+      }
+    }
+    if (conversions_.is_convertible(from_type, to_type)) {
+      /* Do the conversion if possible. */
+      conversions_.convert_to_uninitialized(from_type, to_type, from_value, to_value);
+    }
+    else {
+      /* Cannot convert, use default value instead. */
+      this->construct_default_value(to_type, to_value);
+    }
+  }
+
+  void construct_default_value(const CPPType &type, void *r_value)
+  {
+    if (const FieldCPPType *field_cpp_type = dynamic_cast<const FieldCPPType *>(&type)) {
+      const CPPType &base_type = field_cpp_type->field_type();
+      auto constant_fn = std::make_unique<fn::CustomMF_GenericConstant>(
+          base_type, base_type.default_value(), false);
+      auto operation = std::make_shared<fn::FieldOperation>(std::move(constant_fn));
+      new (r_value) GField(std::move(operation), 0);
+      return;
+    }
+    type.copy_construct(type.default_value(), r_value);
   }
 
   NodeState &get_node_state(const DNode node)
@@ -1348,29 +1509,27 @@ class GeometryNodesEvaluator {
     return *node_states_.lookup_key_as(node).state;
   }
 
-  void log_socket_value(const DSocket socket, Span<GPointer> values)
+  void log_socket_value(DSocket socket, InputState &input_state, Span<MultiInputValueItem> values)
   {
-    if (params_.log_socket_value_fn) {
-      params_.log_socket_value_fn(socket, values);
+    if (params_.geo_logger == nullptr) {
+      return;
     }
-  }
 
-  void log_socket_value(const DSocket socket,
-                        InputState &input_state,
-                        Span<MultiInputValueItem> values)
-  {
     Vector<GPointer, 16> value_pointers;
     value_pointers.reserve(values.size());
     const CPPType &type = *input_state.type;
     for (const MultiInputValueItem &item : values) {
       value_pointers.append({type, item.value});
     }
-    this->log_socket_value(socket, value_pointers);
+    params_.geo_logger->local().log_multi_value_socket(socket, value_pointers);
   }
 
-  void log_socket_value(const DSocket socket, GPointer value)
+  void log_socket_value(Span<DSocket> sockets, GPointer value)
   {
-    this->log_socket_value(socket, Span<GPointer>(&value, 1));
+    if (params_.geo_logger == nullptr) {
+      return;
+    }
+    params_.geo_logger->local().log_value_for_sockets(sockets, value);
   }
 
   /* In most cases when `NodeState` is accessed, the node has to be locked first to avoid race
@@ -1409,6 +1568,7 @@ NodeParamsProvider::NodeParamsProvider(GeometryNodesEvaluator &evaluator,
   this->self_object = evaluator.params_.self_object;
   this->modifier = &evaluator.params_.modifier_->modifier;
   this->depsgraph = evaluator.params_.depsgraph;
+  this->logger = evaluator.params_.geo_logger;
 }
 
 bool NodeParamsProvider::can_get_input(StringRef identifier) const
@@ -1507,8 +1667,6 @@ void NodeParamsProvider::set_output(StringRef identifier, GMutablePointer value)
 {
   const DOutputSocket socket = this->dnode.output_by_identifier(identifier);
   BLI_assert(socket);
-
-  evaluator_.log_socket_value(socket, value);
 
   OutputState &output_state = node_state_.outputs[socket->index()];
   BLI_assert(!output_state.has_been_computed);

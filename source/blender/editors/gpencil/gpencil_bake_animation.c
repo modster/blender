@@ -38,6 +38,7 @@
 #include "BKE_duplilist.h"
 #include "BKE_gpencil.h"
 #include "BKE_gpencil_geom.h"
+#include "BKE_gpencil_modifier.h"
 #include "BKE_layer.h"
 #include "BKE_main.h"
 #include "BKE_material.h"
@@ -101,7 +102,7 @@ static bool gpencil_bake_grease_pencil_animation_poll(bContext *C)
   }
 
   /* Check if grease pencil or empty for dupli groups. */
-  if ((obact == NULL) || ((obact->type != OB_GPENCIL) && (obact->type != OB_EMPTY))) {
+  if ((obact == NULL) || (!ELEM(obact->type, OB_GPENCIL, OB_EMPTY))) {
     return false;
   }
 
@@ -212,7 +213,6 @@ static int gpencil_bake_grease_pencil_animation_exec(bContext *C, wmOperator *op
   Main *bmain = CTX_data_main(C);
   Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
   Scene *scene = CTX_data_scene(C);
-  ARegion *region = CTX_wm_region(C);
   View3D *v3d = CTX_wm_view3d(C);
 
   ListBase ob_selected_list = {NULL, NULL};
@@ -255,7 +255,7 @@ static int gpencil_bake_grease_pencil_animation_exec(bContext *C, wmOperator *op
     gsc.ob = ob_gpencil;
 
     /* Init snap context for geometry projection. */
-    sctx = ED_transform_snap_object_context_create_view3d(scene, 0, region, CTX_wm_view3d(C));
+    sctx = ED_transform_snap_object_context_create(scene, 0);
   }
 
   /* Loop all frame range. */
@@ -303,8 +303,12 @@ static int gpencil_bake_grease_pencil_animation_exec(bContext *C, wmOperator *op
         float matrix[4][4];
         BKE_gpencil_layer_transform_matrix_get(depsgraph, elem->ob, gpl_src, matrix);
 
+        /* Apply time modifier. */
+        int remap_cfra = BKE_gpencil_time_modifier_cfra(
+            depsgraph, scene, elem->ob, gpl_src, CFRA, false);
         /* Duplicate frame. */
-        bGPDframe *gpf_src = BKE_gpencil_layer_frame_get(gpl_src, CFRA, GP_GETFRAME_USE_PREV);
+        bGPDframe *gpf_src = BKE_gpencil_layer_frame_get(
+            gpl_src, remap_cfra, GP_GETFRAME_USE_PREV);
         if (gpf_src == NULL) {
           continue;
         }

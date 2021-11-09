@@ -52,6 +52,14 @@ typedef enum eGPUSamplerState {
   GPU_SAMPLER_REPEAT = (GPU_SAMPLER_REPEAT_S | GPU_SAMPLER_REPEAT_T | GPU_SAMPLER_REPEAT_R),
 } eGPUSamplerState;
 
+#define GPU_TEXTURE_FREE_SAFE(texture) \
+  do { \
+    if (texture != NULL) { \
+      GPU_texture_free(texture); \
+      texture = NULL; \
+    } \
+  } while (0)
+
 /* `GPU_SAMPLER_MAX` is not a valid enum value, but only a limit.
  * It also creates a bad mask for the `NOT` operator in `ENUM_OPERATORS`.
  */
@@ -187,25 +195,30 @@ unsigned int GPU_texture_memory_usage_get(void);
  * \a mips is the number of mip level to allocate. It must be >= 1.
  */
 GPUTexture *GPU_texture_create_1d(
-    const char *name, int w, int mips, eGPUTextureFormat format, const float *data);
+    const char *name, int w, int mip_len, eGPUTextureFormat format, const float *data);
 GPUTexture *GPU_texture_create_1d_array(
-    const char *name, int w, int h, int mips, eGPUTextureFormat format, const float *data);
+    const char *name, int w, int h, int mip_len, eGPUTextureFormat format, const float *data);
 GPUTexture *GPU_texture_create_2d(
-    const char *name, int w, int h, int mips, eGPUTextureFormat format, const float *data);
-GPUTexture *GPU_texture_create_2d_array(
-    const char *name, int w, int h, int d, int mips, eGPUTextureFormat format, const float *data);
+    const char *name, int w, int h, int mip_len, eGPUTextureFormat format, const float *data);
+GPUTexture *GPU_texture_create_2d_array(const char *name,
+                                        int w,
+                                        int h,
+                                        int d,
+                                        int mip_len,
+                                        eGPUTextureFormat format,
+                                        const float *data);
 GPUTexture *GPU_texture_create_3d(const char *name,
                                   int w,
                                   int h,
                                   int d,
-                                  int mips,
+                                  int mip_len,
                                   eGPUTextureFormat texture_format,
                                   eGPUDataFormat data_format,
                                   const void *data);
 GPUTexture *GPU_texture_create_cube(
-    const char *name, int w, int mips, eGPUTextureFormat format, const float *data);
+    const char *name, int w, int mip_len, eGPUTextureFormat format, const float *data);
 GPUTexture *GPU_texture_create_cube_array(
-    const char *name, int w, int d, int mips, eGPUTextureFormat format, const float *data);
+    const char *name, int w, int d, int mip_len, eGPUTextureFormat format, const float *data);
 
 /* Special textures. */
 GPUTexture *GPU_texture_create_from_vertbuf(const char *name, struct GPUVertBuf *vert);

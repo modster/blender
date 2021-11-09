@@ -25,7 +25,7 @@
  * on a simple polygon representation where we _know_:
  *
  * - The polygon is primitive with no holes with a continuous boundary.
- * - Tris have consistent winding.
+ * - Triangles have consistent winding.
  * - 2d (saves some hassles projecting face pairs on an axis for every edge-rotation)
  *   also saves us having to store all previous edge-states (see #EdRotState in bmesh_beautify.c)
  *
@@ -175,7 +175,7 @@ float BLI_polyfill_beautify_quad_rotate_calc_ex(const float v1[2],
       len_13 = len_v2v2(v1, v3);
       len_24 = len_v2v2(v2, v4);
 
-      /* note, area is in fact (area * 2),
+      /* NOTE: area is in fact (area * 2),
        * but in this case its OK, since we're comparing ratios */
 
       /* edge (2-4), current state */

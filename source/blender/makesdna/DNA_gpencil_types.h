@@ -33,8 +33,8 @@ extern "C" {
 
 struct AnimData;
 struct Curve;
-struct MDeformVert;
 struct Curve;
+struct MDeformVert;
 
 #define GP_DEFAULT_PIX_FACTOR 1.0f
 #define GP_DEFAULT_GRID_LINES 4
@@ -48,6 +48,8 @@ struct Curve;
 
 #define GPENCIL_MIN_FILL_FAC 0.05f
 #define GPENCIL_MAX_FILL_FAC 8.0f
+
+#define GPENCIL_MAX_THICKNESS 5000
 
 /* ***************************************** */
 /* GP Stroke Points */
@@ -246,11 +248,11 @@ typedef struct bGPDstroke_Runtime {
   /** Runtime falloff factor (only for transform). */
   float multi_frame_falloff;
 
-  /** Vertex offset in the vbo where this stroke starts. */
+  /** Vertex offset in the VBO where this stroke starts. */
   int stroke_start;
   /** Triangle offset in the ibo where this fill starts. */
   int fill_start;
-  /** Curve Handles offset in the ibo where this handle starts. */
+  /** Curve Handles offset in the IBO where this handle starts. */
   int curve_start;
 
   /** Original stroke (used to dereference evaluated data) */
@@ -324,6 +326,7 @@ typedef struct bGPDstroke {
   struct bGPDcurve *editcurve;
 
   bGPDstroke_Runtime runtime;
+  void *_pad5;
 } bGPDstroke;
 
 /** #bGPDstroke.flag */
@@ -666,6 +669,9 @@ typedef struct bGPdata {
   /** List of bGPDpalette's   - Deprecated (2.78 - 2.79 only). */
   ListBase palettes DNA_DEPRECATED;
 
+  /** List of bDeformGroup names and flag only. */
+  ListBase vertex_group_names;
+
   /* 3D Viewport/Appearance Settings */
   /** Factor to define pixel size conversion. */
   float pixfactor;
@@ -715,7 +721,8 @@ typedef struct bGPdata {
 
   /** Stroke selection last index. Used to generate a unique selection index. */
   int select_last_index;
-  char _pad3[4];
+
+  int vertex_group_active_index;
 
   bGPgrid grid;
 

@@ -357,7 +357,7 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
   step_tot = ((step_tot + 1) * ltmd->iter) - (ltmd->iter - 1);
 
   /* Will the screw be closed?
-   * Note! smaller than `FLT_EPSILON * 100`
+   * NOTE: smaller than `FLT_EPSILON * 100`
    * gives problems with float precision so its never closed. */
   if (fabsf(screw_ofs) <= (FLT_EPSILON * 100.0f) &&
       fabsf(fabsf(angle) - ((float)M_PI * 2.0f)) <= (FLT_EPSILON * 100.0f) && step_tot > 3) {
@@ -1135,12 +1135,12 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
                                          ob_axis != NULL ? mtx_tx[3] : NULL,
                                          ltmd->merge_dist);
     if (result != result_prev) {
-      result->runtime.cd_dirty_vert |= CD_MASK_NORMAL;
+      BKE_mesh_normals_tag_dirty(result);
     }
   }
 
   if ((ltmd->flag & MOD_SCREW_NORMAL_CALC) == 0) {
-    result->runtime.cd_dirty_vert |= CD_MASK_NORMAL;
+    BKE_mesh_normals_tag_dirty(result);
   }
 
   return result;

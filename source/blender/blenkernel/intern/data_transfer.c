@@ -301,14 +301,12 @@ static void data_transfer_dtdata_type_preprocess(Mesh *me_src,
     }
     if (dirty_nors_dst || do_poly_nors_dst) {
       BKE_mesh_calc_normals_poly(verts_dst,
-                                 NULL,
                                  num_verts_dst,
                                  loops_dst,
-                                 polys_dst,
                                  num_loops_dst,
+                                 polys_dst,
                                  num_polys_dst,
-                                 poly_nors_dst,
-                                 true);
+                                 poly_nors_dst);
     }
     /* Cache loop nors into a temp CDLayer. */
     loop_nors_dst = CustomData_get_layer(ldata_dst, CD_NORMAL);
@@ -691,7 +689,7 @@ static bool data_transfer_layersmapping_cdlayers_multisrc_to_dst(ListBase *r_map
       }
 
       if (data_dst_to_delete) {
-        /* Note:
+        /* NOTE:
          * This won't affect newly created layers, if any, since tot_dst has not been updated!
          * Also, looping backward ensures us we do not suffer
          * from index shifting when deleting a layer. */
@@ -764,7 +762,7 @@ static bool data_transfer_layersmapping_cdlayers(ListBase *r_map,
     }
   }
   else if (fromlayers == DT_LAYERS_ACTIVE_SRC || fromlayers >= 0) {
-    /* Note: use_delete has not much meaning in this case, ignored. */
+    /* NOTE: use_delete has not much meaning in this case, ignored. */
 
     if (fromlayers >= 0) { /* Real-layer index */
       idx_src = fromlayers;
@@ -1437,7 +1435,7 @@ bool BKE_object_data_transfer_ex(struct Depsgraph *depsgraph,
   if (vgroup_name) {
     mdef = CustomData_get_layer(&me_dst->vdata, CD_MDEFORMVERT);
     if (mdef) {
-      vg_idx = BKE_object_defgroup_name_index(ob_dst, vgroup_name);
+      vg_idx = BKE_id_defgroup_name_index(&me_dst->id, vgroup_name);
     }
   }
 

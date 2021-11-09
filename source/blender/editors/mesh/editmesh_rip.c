@@ -927,10 +927,10 @@ static int edbm_rip_invoke__edge(bContext *C, const wmEvent *event, Object *obed
 
     /* single edge, extend */
     if (i == 1 && e_best->l) {
-      /* note: if the case of 3 edges has one change in loop stepping,
+      /* NOTE: if the case of 3 edges has one change in loop stepping,
        * if this becomes more involved we may be better off splitting
        * the 3 edge case into its own else-if branch */
-      if ((totedge_manifold == 4 || totedge_manifold == 3) || (all_manifold == false)) {
+      if ((ELEM(totedge_manifold, 4, 3)) || (all_manifold == false)) {
         BMLoop *l_a = e_best->l;
         BMLoop *l_b = l_a->radial_next;
 
@@ -975,7 +975,7 @@ static int edbm_rip_invoke__edge(bContext *C, const wmEvent *event, Object *obed
 
   BM_mesh_edgesplit(em->bm, true, true, true);
 
-  /* note: the output of the bmesh operator is ignored, since we built
+  /* NOTE: the output of the bmesh operator is ignored, since we built
    * the contiguous loop pairs to split already, its possible that some
    * edge did not split even though it was tagged which would not work
    * as expected (but not crash), however there are checks to ensure
@@ -1085,7 +1085,7 @@ static int edbm_rip_invoke(bContext *C, wmOperator *op, const wmEvent *event)
     EDBM_update(obedit->data,
                 &(const struct EDBMUpdate_Params){
                     .calc_looptri = true,
-                    .calc_normals = false,
+                    .calc_normals = true,
                     .is_destructive = true,
                 });
   }
@@ -1124,7 +1124,7 @@ void MESH_OT_rip(wmOperatorType *ot)
   ot->poll = EDBM_view3d_poll;
 
   /* flags */
-  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_DEPENDS_ON_CURSOR;
 
   /* to give to transform */
   Transform_Properties(ot, P_PROPORTIONAL | P_MIRROR_DUMMY);

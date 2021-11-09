@@ -70,7 +70,7 @@ typedef struct EeveeMaterialCache {
 
 /* *********** FUNCTIONS *********** */
 
-/* XXX TODO define all shared resources in a shared place without duplication */
+/* XXX TODO: define all shared resources in a shared place without duplication. */
 struct GPUTexture *EEVEE_materials_get_util_tex(void)
 {
   return e_data.util_tex;
@@ -691,7 +691,7 @@ static EeveeMaterialCache material_transparent(EEVEE_Data *vedata,
   }
   {
     /* Shading */
-    int ssr_id = -1; /* TODO transparent SSR */
+    int ssr_id = -1; /* TODO: transparent SSR. */
     int mat_options = VAR_MAT_MESH | VAR_MAT_BLEND;
     SET_FLAG_FROM_TEST(mat_options, use_ssrefract, VAR_MAT_REFRACT);
     GPUMaterial *gpumat = EEVEE_material_get(vedata, scene, ma, NULL, mat_options);
@@ -769,15 +769,16 @@ static void eevee_hair_cache_populate(EEVEE_Data *vedata,
   EeveeMaterialCache matcache = eevee_material_cache_get(vedata, sldata, ob, matnr - 1, true);
 
   if (matcache.depth_grp) {
-    *matcache.depth_grp_p = DRW_shgroup_hair_create_sub(ob, psys, md, matcache.depth_grp);
+    *matcache.depth_grp_p = DRW_shgroup_hair_create_sub(ob, psys, md, matcache.depth_grp, NULL);
     DRW_shgroup_add_material_resources(*matcache.depth_grp_p, matcache.shading_gpumat);
   }
   if (matcache.shading_grp) {
-    *matcache.shading_grp_p = DRW_shgroup_hair_create_sub(ob, psys, md, matcache.shading_grp);
+    *matcache.shading_grp_p = DRW_shgroup_hair_create_sub(
+        ob, psys, md, matcache.shading_grp, matcache.shading_gpumat);
     DRW_shgroup_add_material_resources(*matcache.shading_grp_p, matcache.shading_gpumat);
   }
   if (matcache.shadow_grp) {
-    *matcache.shadow_grp_p = DRW_shgroup_hair_create_sub(ob, psys, md, matcache.shadow_grp);
+    *matcache.shadow_grp_p = DRW_shgroup_hair_create_sub(ob, psys, md, matcache.shadow_grp, NULL);
     DRW_shgroup_add_material_resources(*matcache.shadow_grp_p, matcache.shading_gpumat);
     *cast_shadow = true;
   }
@@ -866,7 +867,7 @@ void EEVEE_materials_cache_populate(EEVEE_Data *vedata,
               continue;
             }
 
-            /* XXX TODO rewrite this to include the dupli objects.
+            /* XXX TODO: rewrite this to include the dupli objects.
              * This means we cannot exclude dupli objects from reflections!!! */
             EEVEE_ObjectEngineData *oedata = NULL;
             if ((ob->base_flag & BASE_FROM_DUPLI) == 0) {

@@ -39,6 +39,10 @@ typedef enum {
 
 #define BIFICONID_FIRST (ICON_NONE)
 
+/* Removed icon no longer used, defined so that add-ons don't have to be \
+ * updated. */
+#define ICON_SMALL_TRI_RIGHT_VEC (ICON_RIGHTARROW)
+
 /* use to denote intentionally unset theme color */
 #define TH_UNDEFINED -1
 
@@ -64,7 +68,7 @@ typedef enum ThemeColorID {
   TH_TAB_OUTLINE,
 
   TH_HEADER,
-  TH_HEADERDESEL,
+  TH_HEADER_ACTIVE,
   TH_HEADER_TEXT,
   TH_HEADER_TEXT_HI,
 
@@ -185,7 +189,7 @@ typedef enum ThemeColorID {
   TH_NODE_LAYOUT,
   TH_NODE_SHADER,
   TH_NODE_INTERFACE,
-  TH_NODE_CONVERTOR,
+  TH_NODE_CONVERTER,
   TH_NODE_GROUP,
   TH_NODE_FRAME,
   TH_NODE_MATTE,

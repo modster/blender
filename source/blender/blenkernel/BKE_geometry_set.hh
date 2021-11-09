@@ -25,22 +25,26 @@
 
 #include "BLI_float3.hh"
 #include "BLI_float4x4.hh"
+#include "BLI_function_ref.hh"
 #include "BLI_hash.hh"
 #include "BLI_map.hh"
 #include "BLI_set.hh"
 #include "BLI_user_counter.hh"
 #include "BLI_vector_set.hh"
 
+#include "BKE_anonymous_attribute.hh"
 #include "BKE_attribute_access.hh"
 #include "BKE_geometry_set.h"
 
+#include "FN_field.hh"
+
 struct Collection;
+struct Curve;
+struct CurveEval;
 struct Mesh;
 struct Object;
 struct PointCloud;
 struct Volume;
-struct Curve;
-struct CurveEval;
 
 enum class GeometryOwnershipType {
   /* The geometry is owned. This implies that it can be changed. */
@@ -88,11 +92,11 @@ class GeometryComponent {
   GeometryComponentType type() const;
 
   /* Return true when any attribute with this name exists, including built in attributes. */
-  bool attribute_exists(const blender::StringRef attribute_name) const;
+  bool attribute_exists(const blender::bke::AttributeIDRef &attribute_id) const;
 
   /* Return the data type and domain of an attribute with the given name if it exists. */
   std::optional<AttributeMetaData> attribute_get_meta_data(
-      const blender::StringRef attribute_name) const;
+      const blender::bke::AttributeIDRef &attribute_id) const;
 
   /* Returns true when the geometry component supports this attribute domain. */
   bool attribute_domain_supported(const AttributeDomain domain) const;
@@ -100,16 +104,17 @@ class GeometryComponent {
   virtual int attribute_domain_size(const AttributeDomain domain) const;
 
   bool attribute_is_builtin(const blender::StringRef attribute_name) const;
+  bool attribute_is_builtin(const blender::bke::AttributeIDRef &attribute_id) const;
 
   /* Get read-only access to the highest priority attribute with the given name.
    * Returns null if the attribute does not exist. */
   blender::bke::ReadAttributeLookup attribute_try_get_for_read(
-      const blender::StringRef attribute_name) const;
+      const blender::bke::AttributeIDRef &attribute_id) const;
 
   /* Get read and write access to the highest priority attribute with the given name.
    * Returns null if the attribute does not exist. */
   blender::bke::WriteAttributeLookup attribute_try_get_for_write(
-      const blender::StringRef attribute_name);
+      const blender::bke::AttributeIDRef &attribute_id);
 
   /* Get a read-only attribute for the domain based on the given attribute. This can be used to
    * interpolate from one domain to another.
@@ -120,10 +125,10 @@ class GeometryComponent {
       const AttributeDomain to_domain) const;
 
   /* Returns true when the attribute has been deleted. */
-  bool attribute_try_delete(const blender::StringRef attribute_name);
+  bool attribute_try_delete(const blender::bke::AttributeIDRef &attribute_id);
 
   /* Returns true when the attribute has been created. */
-  bool attribute_try_create(const blender::StringRef attribute_name,
+  bool attribute_try_create(const blender::bke::AttributeIDRef &attribute_id,
                             const AttributeDomain domain,
                             const CustomDataType data_type,
                             const AttributeInit &initializer);
@@ -133,7 +138,7 @@ class GeometryComponent {
   bool attribute_try_create_builtin(const blender::StringRef attribute_name,
                                     const AttributeInit &initializer);
 
-  blender::Set<std::string> attribute_names() const;
+  blender::Set<blender::bke::AttributeIDRef> attribute_ids() const;
   bool attribute_foreach(const AttributeForeachCallback callback) const;
 
   virtual bool is_empty() const;
@@ -142,7 +147,7 @@ class GeometryComponent {
    * Returns null when the attribute does not exist or cannot be converted to the requested domain
    * and data type. */
   std::unique_ptr<blender::fn::GVArray> attribute_try_get_for_read(
-      const blender::StringRef attribute_name,
+      const blender::bke::AttributeIDRef &attribute_id,
       const AttributeDomain domain,
       const CustomDataType data_type) const;
 
@@ -150,18 +155,18 @@ class GeometryComponent {
    * left unchanged. Returns null when the attribute does not exist or cannot be adapted to the
    * requested domain. */
   std::unique_ptr<blender::fn::GVArray> attribute_try_get_for_read(
-      const blender::StringRef attribute_name, const AttributeDomain domain) const;
+      const blender::bke::AttributeIDRef &attribute_id, const AttributeDomain domain) const;
 
   /* Get a virtual array to read data of an attribute with the given data type. The domain is
    * left unchanged. Returns null when the attribute does not exist or cannot be converted to the
    * requested data type. */
   blender::bke::ReadAttributeLookup attribute_try_get_for_read(
-      const blender::StringRef attribute_name, const CustomDataType data_type) const;
+      const blender::bke::AttributeIDRef &attribute_id, const CustomDataType data_type) const;
 
   /* Get a virtual array to read the data of an attribute. If that is not possible, the returned
    * virtual array will contain a default value. This never returns null. */
   std::unique_ptr<blender::fn::GVArray> attribute_get_for_read(
-      const blender::StringRef attribute_name,
+      const blender::bke::AttributeIDRef &attribute_id,
       const AttributeDomain domain,
       const CustomDataType data_type,
       const void *default_value = nullptr) const;
@@ -169,14 +174,15 @@ class GeometryComponent {
   /* Should be used instead of the method above when the requested data type is known at compile
    * time for better type safety. */
   template<typename T>
-  blender::fn::GVArray_Typed<T> attribute_get_for_read(const blender::StringRef attribute_name,
-                                                       const AttributeDomain domain,
-                                                       const T &default_value) const
+  blender::fn::GVArray_Typed<T> attribute_get_for_read(
+      const blender::bke::AttributeIDRef &attribute_id,
+      const AttributeDomain domain,
+      const T &default_value) const
   {
     const blender::fn::CPPType &cpp_type = blender::fn::CPPType::get<T>();
     const CustomDataType type = blender::bke::cpp_type_to_custom_data_type(cpp_type);
     std::unique_ptr varray = this->attribute_get_for_read(
-        attribute_name, domain, type, &default_value);
+        attribute_id, domain, type, &default_value);
     return blender::fn::GVArray_Typed<T>(std::move(varray));
   }
 
@@ -191,7 +197,7 @@ class GeometryComponent {
    *   is created that will overwrite the existing attribute in the end.
    */
   blender::bke::OutputAttribute attribute_try_get_for_output(
-      const blender::StringRef attribute_name,
+      const blender::bke::AttributeIDRef &attribute_id,
       const AttributeDomain domain,
       const CustomDataType data_type,
       const void *default_value = nullptr);
@@ -200,28 +206,30 @@ class GeometryComponent {
    * attributes are not read, i.e. the attribute is used only for output. Since values are not read
    * from this attribute, no default value is necessary. */
   blender::bke::OutputAttribute attribute_try_get_for_output_only(
-      const blender::StringRef attribute_name,
+      const blender::bke::AttributeIDRef &attribute_id,
       const AttributeDomain domain,
       const CustomDataType data_type);
 
   /* Statically typed method corresponding to the equally named generic one. */
   template<typename T>
   blender::bke::OutputAttribute_Typed<T> attribute_try_get_for_output(
-      const blender::StringRef attribute_name, const AttributeDomain domain, const T default_value)
+      const blender::bke::AttributeIDRef &attribute_id,
+      const AttributeDomain domain,
+      const T default_value)
   {
     const blender::fn::CPPType &cpp_type = blender::fn::CPPType::get<T>();
     const CustomDataType data_type = blender::bke::cpp_type_to_custom_data_type(cpp_type);
-    return this->attribute_try_get_for_output(attribute_name, domain, data_type, &default_value);
+    return this->attribute_try_get_for_output(attribute_id, domain, data_type, &default_value);
   }
 
   /* Statically typed method corresponding to the equally named generic one. */
   template<typename T>
   blender::bke::OutputAttribute_Typed<T> attribute_try_get_for_output_only(
-      const blender::StringRef attribute_name, const AttributeDomain domain)
+      const blender::bke::AttributeIDRef &attribute_id, const AttributeDomain domain)
   {
     const blender::fn::CPPType &cpp_type = blender::fn::CPPType::get<T>();
     const CustomDataType data_type = blender::bke::cpp_type_to_custom_data_type(cpp_type);
-    return this->attribute_try_get_for_output_only(attribute_name, domain, data_type);
+    return this->attribute_try_get_for_output_only(attribute_id, domain, data_type);
   }
 
  private:
@@ -245,6 +253,13 @@ struct GeometrySet {
   blender::Map<GeometryComponentType, GeometryComponentPtr> components_;
 
  public:
+  GeometrySet();
+  GeometrySet(const GeometrySet &other);
+  GeometrySet(GeometrySet &&other);
+  ~GeometrySet();
+  GeometrySet &operator=(const GeometrySet &other);
+  GeometrySet &operator=(GeometrySet &&other);
+
   GeometryComponent &get_component_for_write(GeometryComponentType component_type);
   template<typename Component> Component &get_component_for_write()
   {
@@ -273,6 +288,8 @@ struct GeometrySet {
     return this->remove(Component::static_type);
   }
 
+  void keep_only(const blender::Span<GeometryComponentType> component_types);
+
   void add(const GeometryComponent &component);
 
   blender::Vector<const GeometryComponent *> get_components_for_read() const;
@@ -283,7 +300,30 @@ struct GeometrySet {
 
   void clear();
 
+  bool owns_direct_data() const;
   void ensure_owns_direct_data();
+
+  using AttributeForeachCallback =
+      blender::FunctionRef<void(const blender::bke::AttributeIDRef &attribute_id,
+                                const AttributeMetaData &meta_data,
+                                const GeometryComponent &component)>;
+
+  void attribute_foreach(blender::Span<GeometryComponentType> component_types,
+                         bool include_instances,
+                         AttributeForeachCallback callback) const;
+
+  void gather_attributes_for_propagation(
+      blender::Span<GeometryComponentType> component_types,
+      GeometryComponentType dst_component_type,
+      bool include_instances,
+      blender::Map<blender::bke::AttributeIDRef, AttributeKind> &r_attributes) const;
+
+  blender::Vector<GeometryComponentType> gather_component_types(bool include_instances,
+                                                                bool ignore_empty) const;
+
+  using ForeachSubGeometryCallback = blender::FunctionRef<void(GeometrySet &geometry_set)>;
+
+  void modify_geometry_sets(ForeachSubGeometryCallback callback);
 
   /* Utility methods for creation. */
   static GeometrySet create_with_mesh(
@@ -299,6 +339,8 @@ struct GeometrySet {
   bool has_instances() const;
   bool has_volume() const;
   bool has_curve() const;
+  bool has_realized_data() const;
+  bool is_empty() const;
 
   const Mesh *get_mesh_for_read() const;
   const PointCloud *get_pointcloud_for_read() const;
@@ -318,6 +360,15 @@ struct GeometrySet {
                       GeometryOwnershipType ownership = GeometryOwnershipType::Owned);
   void replace_curve(CurveEval *curve,
                      GeometryOwnershipType ownership = GeometryOwnershipType::Owned);
+
+ private:
+  /* Utility to retrieve a mutable component without creating it. */
+  GeometryComponent *get_component_ptr(GeometryComponentType type);
+  template<typename Component> Component *get_component_ptr()
+  {
+    BLI_STATIC_ASSERT(is_geometry_component_v<Component>, "");
+    return static_cast<Component *>(get_component_ptr(Component::static_type));
+  }
 };
 
 /** A geometry component that can store a mesh. */
@@ -325,10 +376,6 @@ class MeshComponent : public GeometryComponent {
  private:
   Mesh *mesh_ = nullptr;
   GeometryOwnershipType ownership_ = GeometryOwnershipType::Owned;
-  /* Due to historical design choices, vertex group data is stored in the mesh, but the vertex
-   * group names are stored on an object. Since we don't have an object here, we copy over the
-   * names into this map. */
-  blender::Map<std::string, int> vertex_group_names_;
 
  public:
   MeshComponent();
@@ -338,13 +385,7 @@ class MeshComponent : public GeometryComponent {
   void clear();
   bool has_mesh() const;
   void replace(Mesh *mesh, GeometryOwnershipType ownership = GeometryOwnershipType::Owned);
-  void replace_mesh_but_keep_vertex_group_names(
-      Mesh *mesh, GeometryOwnershipType ownership = GeometryOwnershipType::Owned);
   Mesh *release();
-
-  void copy_vertex_group_names_from_object(const struct Object &object);
-  const blender::Map<std::string, int> &vertex_group_names() const;
-  blender::Map<std::string, int> &vertex_group_names();
 
   const Mesh *get_for_read() const;
   Mesh *get_for_write();
@@ -457,12 +498,14 @@ class InstanceReference {
     None,
     Object,
     Collection,
+    GeometrySet,
   };
 
  private:
   Type type_ = Type::None;
   /** Depending on the type this is either null, an Object or Collection pointer. */
   void *data_ = nullptr;
+  std::unique_ptr<GeometrySet> geometry_set_;
 
  public:
   InstanceReference() = default;
@@ -473,6 +516,46 @@ class InstanceReference {
 
   InstanceReference(Collection &collection) : type_(Type::Collection), data_(&collection)
   {
+  }
+
+  InstanceReference(GeometrySet geometry_set)
+      : type_(Type::GeometrySet),
+        geometry_set_(std::make_unique<GeometrySet>(std::move(geometry_set)))
+  {
+  }
+
+  InstanceReference(const InstanceReference &other) : type_(other.type_), data_(other.data_)
+  {
+    if (other.geometry_set_) {
+      geometry_set_ = std::make_unique<GeometrySet>(*other.geometry_set_);
+    }
+  }
+
+  InstanceReference(InstanceReference &&other)
+      : type_(other.type_), data_(other.data_), geometry_set_(std::move(other.geometry_set_))
+  {
+    other.type_ = Type::None;
+    other.data_ = nullptr;
+  }
+
+  InstanceReference &operator=(const InstanceReference &other)
+  {
+    if (this == &other) {
+      return *this;
+    }
+    this->~InstanceReference();
+    new (this) InstanceReference(other);
+    return *this;
+  }
+
+  InstanceReference &operator=(InstanceReference &&other)
+  {
+    if (this == &other) {
+      return *this;
+    }
+    this->~InstanceReference();
+    new (this) InstanceReference(std::move(other));
+    return *this;
   }
 
   Type type() const
@@ -492,14 +575,37 @@ class InstanceReference {
     return *(Collection *)data_;
   }
 
+  const GeometrySet &geometry_set() const
+  {
+    BLI_assert(type_ == Type::GeometrySet);
+    return *geometry_set_;
+  }
+
+  bool owns_direct_data() const
+  {
+    if (type_ != Type::GeometrySet) {
+      /* The object and collection instances are not direct data. */
+      return true;
+    }
+    return geometry_set_->owns_direct_data();
+  }
+
+  void ensure_owns_direct_data()
+  {
+    if (type_ != Type::GeometrySet) {
+      return;
+    }
+    geometry_set_->ensure_owns_direct_data();
+  }
+
   uint64_t hash() const
   {
-    return blender::get_default_hash(data_);
+    return blender::get_default_hash_2(data_, geometry_set_.get());
   }
 
   friend bool operator==(const InstanceReference &a, const InstanceReference &b)
   {
-    return a.data_ == b.data_;
+    return a.data_ == b.data_ && a.geometry_set_.get() == b.geometry_set_.get();
   }
 };
 
@@ -518,7 +624,9 @@ class InstancesComponent : public GeometryComponent {
   blender::Vector<blender::float4x4> instance_transforms_;
   /**
    * IDs of the instances. They are used for consistency over multiple frames for things like
-   * motion blur.
+   * motion blur. Proper stable ID data that actually helps when rendering can only be generated
+   * in some situations, so this vector is allowed to be empty, in which case the index of each
+   * instance will be used for the final ID.
    */
   blender::Vector<int> instance_ids_;
 
@@ -539,10 +647,14 @@ class InstancesComponent : public GeometryComponent {
   void reserve(int min_capacity);
   void resize(int capacity);
 
-  int add_reference(InstanceReference reference);
-  void add_instance(int instance_handle, const blender::float4x4 &transform, const int id = -1);
+  int add_reference(const InstanceReference &reference);
+  void add_instance(int instance_handle, const blender::float4x4 &transform);
 
   blender::Span<InstanceReference> references() const;
+  void remove_unused_references();
+
+  void ensure_geometry_instances();
+  GeometrySet &geometry_set_from_reference(const int reference_index);
 
   blender::Span<int> instance_reference_handles() const;
   blender::MutableSpan<int> instance_reference_handles();
@@ -551,9 +663,18 @@ class InstancesComponent : public GeometryComponent {
   blender::MutableSpan<int> instance_ids();
   blender::Span<int> instance_ids() const;
 
+  blender::MutableSpan<int> instance_ids_ensure();
+  void instance_ids_clear();
+
   int instances_amount() const;
+  int references_amount() const;
 
   blender::Span<int> almost_unique_ids() const;
+
+  int attribute_domain_size(const AttributeDomain domain) const final;
+
+  void foreach_referenced_geometry(
+      blender::FunctionRef<void(const GeometrySet &geometry_set)> callback) const;
 
   bool is_empty() const final;
 
@@ -561,6 +682,9 @@ class InstancesComponent : public GeometryComponent {
   void ensure_owns_direct_data() override;
 
   static constexpr inline GeometryComponentType static_type = GEO_COMPONENT_TYPE_INSTANCES;
+
+ private:
+  const blender::bke::ComponentAttributeProviders *get_attribute_providers() const final;
 };
 
 /** A geometry component that stores volume grids. */
@@ -587,3 +711,118 @@ class VolumeComponent : public GeometryComponent {
 
   static constexpr inline GeometryComponentType static_type = GEO_COMPONENT_TYPE_VOLUME;
 };
+
+namespace blender::bke {
+
+class GeometryComponentFieldContext : public fn::FieldContext {
+ private:
+  const GeometryComponent &component_;
+  const AttributeDomain domain_;
+
+ public:
+  GeometryComponentFieldContext(const GeometryComponent &component, const AttributeDomain domain)
+      : component_(component), domain_(domain)
+  {
+  }
+
+  const GeometryComponent &geometry_component() const
+  {
+    return component_;
+  }
+
+  AttributeDomain domain() const
+  {
+    return domain_;
+  }
+};
+
+class AttributeFieldInput : public fn::FieldInput {
+ private:
+  std::string name_;
+
+ public:
+  AttributeFieldInput(std::string name, const CPPType &type)
+      : fn::FieldInput(type, name), name_(std::move(name))
+  {
+    category_ = Category::NamedAttribute;
+  }
+
+  template<typename T> static fn::Field<T> Create(std::string name)
+  {
+    const CPPType &type = CPPType::get<T>();
+    auto field_input = std::make_shared<AttributeFieldInput>(std::move(name), type);
+    return fn::Field<T>{field_input};
+  }
+
+  StringRefNull attribute_name() const
+  {
+    return name_;
+  }
+
+  const GVArray *get_varray_for_context(const fn::FieldContext &context,
+                                        IndexMask mask,
+                                        ResourceScope &scope) const override;
+
+  std::string socket_inspection_name() const override;
+
+  uint64_t hash() const override;
+  bool is_equal_to(const fn::FieldNode &other) const override;
+};
+
+class IDAttributeFieldInput : public fn::FieldInput {
+ public:
+  IDAttributeFieldInput() : fn::FieldInput(CPPType::get<int>())
+  {
+    category_ = Category::Generated;
+  }
+
+  const GVArray *get_varray_for_context(const fn::FieldContext &context,
+                                        IndexMask mask,
+                                        ResourceScope &scope) const override;
+
+  std::string socket_inspection_name() const override;
+
+  uint64_t hash() const override;
+  bool is_equal_to(const fn::FieldNode &other) const override;
+};
+
+class AnonymousAttributeFieldInput : public fn::FieldInput {
+ private:
+  /**
+   * A strong reference is required to make sure that the referenced attribute is not removed
+   * automatically.
+   */
+  StrongAnonymousAttributeID anonymous_id_;
+  std::string producer_name_;
+
+ public:
+  AnonymousAttributeFieldInput(StrongAnonymousAttributeID anonymous_id,
+                               const CPPType &type,
+                               std::string producer_name)
+      : fn::FieldInput(type, anonymous_id.debug_name()),
+        anonymous_id_(std::move(anonymous_id)),
+        producer_name_(producer_name)
+  {
+    category_ = Category::AnonymousAttribute;
+  }
+
+  template<typename T>
+  static fn::Field<T> Create(StrongAnonymousAttributeID anonymous_id, std::string producer_name)
+  {
+    const CPPType &type = CPPType::get<T>();
+    auto field_input = std::make_shared<AnonymousAttributeFieldInput>(
+        std::move(anonymous_id), type, std::move(producer_name));
+    return fn::Field<T>{field_input};
+  }
+
+  const GVArray *get_varray_for_context(const fn::FieldContext &context,
+                                        IndexMask mask,
+                                        ResourceScope &scope) const override;
+
+  std::string socket_inspection_name() const override;
+
+  uint64_t hash() const override;
+  bool is_equal_to(const fn::FieldNode &other) const override;
+};
+
+}  // namespace blender::bke

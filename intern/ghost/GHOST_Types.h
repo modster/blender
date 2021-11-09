@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include <stdint.h>
+
 #ifdef WITH_CXX_GUARDEDALLOC
 #  include "MEM_guardedalloc.h"
 #endif
@@ -56,13 +58,6 @@ GHOST_DECLARE_HANDLE(GHOST_EventConsumerHandle);
 GHOST_DECLARE_HANDLE(GHOST_ContextHandle);
 GHOST_DECLARE_HANDLE(GHOST_XrContextHandle);
 
-typedef char GHOST_TInt8;
-typedef unsigned char GHOST_TUns8;
-typedef short GHOST_TInt16;
-typedef unsigned short GHOST_TUns16;
-typedef int GHOST_TInt32;
-typedef unsigned int GHOST_TUns32;
-
 typedef struct {
   int flags;
 } GHOST_GLSettings;
@@ -77,14 +72,6 @@ typedef enum GHOST_DialogOptions {
   GHOST_DialogWarning = (1 << 0),
   GHOST_DialogError = (1 << 1),
 } GHOST_DialogOptions;
-
-#ifdef _MSC_VER
-typedef __int64 GHOST_TInt64;
-typedef unsigned __int64 GHOST_TUns64;
-#else
-typedef long long GHOST_TInt64;
-typedef unsigned long long GHOST_TUns64;
-#endif
 
 typedef void *GHOST_TUserDataPtr;
 
@@ -439,9 +426,9 @@ typedef void *GHOST_TEventDataPtr;
 
 typedef struct {
   /** The x-coordinate of the cursor position. */
-  GHOST_TInt32 x;
+  int32_t x;
   /** The y-coordinate of the cursor position. */
-  GHOST_TInt32 y;
+  int32_t y;
   /** Associated tablet data. */
   GHOST_TabletData tablet;
 } GHOST_TEventCursorData;
@@ -455,7 +442,7 @@ typedef struct {
 
 typedef struct {
   /** Displacement of a mouse wheel. */
-  GHOST_TInt32 z;
+  int32_t z;
 } GHOST_TEventWheelData;
 
 typedef enum {
@@ -471,13 +458,13 @@ typedef struct {
   /** The event subtype */
   GHOST_TTrackpadEventSubTypes subtype;
   /** The x-location of the trackpad event */
-  GHOST_TInt32 x;
+  int32_t x;
   /** The y-location of the trackpad event */
-  GHOST_TInt32 y;
+  int32_t y;
   /** The x-delta or value of the trackpad event */
-  GHOST_TInt32 deltaX;
+  int32_t deltaX;
   /** The y-delta (currently only for scroll subtype) of the trackpad event */
-  GHOST_TInt32 deltaY;
+  int32_t deltaY;
   /** The delta is inverted from the device due to system preferences. */
   char isDirectionInverted;
 } GHOST_TEventTrackpadData;
@@ -491,9 +478,9 @@ typedef enum {
 
 typedef struct {
   /** The x-coordinate of the cursor position. */
-  GHOST_TInt32 x;
+  int32_t x;
   /** The y-coordinate of the cursor position. */
-  GHOST_TInt32 y;
+  int32_t y;
   /** The dropped item type */
   GHOST_TDragnDropTypes dataType;
   /** The "dropped content" */
@@ -518,7 +505,7 @@ typedef struct {
 
 typedef struct {
   int count;
-  GHOST_TUns8 **strings;
+  uint8_t **strings;
 } GHOST_TStringArray;
 
 typedef enum {
@@ -585,18 +572,19 @@ typedef enum {
   GHOST_kUserSpecialDirMusic,
   GHOST_kUserSpecialDirPictures,
   GHOST_kUserSpecialDirVideos,
+  GHOST_kUserSpecialDirCaches,
   /* Can be extended as needed. */
 } GHOST_TUserSpecialDirTypes;
 
 typedef struct {
   /** Number of pixels on a line. */
-  GHOST_TUns32 xPixels;
+  uint32_t xPixels;
   /** Number of lines. */
-  GHOST_TUns32 yPixels;
+  uint32_t yPixels;
   /** Number of bits per pixel. */
-  GHOST_TUns32 bpp;
+  uint32_t bpp;
   /** Refresh rate (in Hertz). */
-  GHOST_TUns32 frequency;
+  uint32_t frequency;
 } GHOST_DisplaySetting;
 
 #ifdef _WIN32
@@ -616,10 +604,10 @@ typedef int GHOST_TEmbedderWindowID;
  */
 #ifdef __cplusplus
 class GHOST_ITimerTask;
-typedef void (*GHOST_TimerProcPtr)(GHOST_ITimerTask *task, GHOST_TUns64 time);
+typedef void (*GHOST_TimerProcPtr)(GHOST_ITimerTask *task, uint64_t time);
 #else
 struct GHOST_TimerTaskHandle__;
-typedef void (*GHOST_TimerProcPtr)(struct GHOST_TimerTaskHandle__ *task, GHOST_TUns64 time);
+typedef void (*GHOST_TimerProcPtr)(struct GHOST_TimerTaskHandle__ *task, uint64_t time);
 #endif
 
 #ifdef WITH_XR_OPENXR
@@ -627,9 +615,9 @@ typedef void (*GHOST_TimerProcPtr)(struct GHOST_TimerTaskHandle__ *task, GHOST_T
 struct GHOST_XrDrawViewInfo;
 struct GHOST_XrError;
 /**
- * The XR view (i.e. the OpenXR runtime) may require a different graphics library than OpenGL. An
- * offscreen texture of the viewport will then be drawn into using OpenGL, but the final texture
- * draw call will happen through another lib (say DirectX).
+ * The XR view (i.e. the OpenXR runtime) may require a different graphics library than OpenGL.
+ * An off-screen texture of the viewport will then be drawn into using OpenGL,
+ * but the final texture draw call will happen through another library (say DirectX).
  *
  * This enum defines the possible graphics bindings to attempt to enable.
  */
@@ -668,6 +656,11 @@ typedef struct {
 enum {
   GHOST_kXrContextDebug = (1 << 0),
   GHOST_kXrContextDebugTime = (1 << 1),
+#  ifdef WIN32
+  /* Needed to avoid issues with the SteamVR OpenGL graphics binding (use DirectX fallback
+     instead). */
+  GHOST_kXrContextGpuNVIDIA = (1 << 2),
+#  endif
 };
 
 typedef struct {
@@ -685,6 +678,14 @@ typedef struct {
   void *exit_customdata;
 } GHOST_XrSessionBeginInfo;
 
+/** Texture format for XR swapchain. */
+typedef enum GHOST_TXrSwapchainFormat {
+  GHOST_kXrSwapchainFormatRGBA8,
+  GHOST_kXrSwapchainFormatRGBA16,
+  GHOST_kXrSwapchainFormatRGBA16F,
+  GHOST_kXrSwapchainFormatRGB10_A2,
+} GHOST_TXrSwapchainFormat;
+
 typedef struct GHOST_XrDrawViewInfo {
   int ofsx, ofsy;
   int width, height;
@@ -697,8 +698,13 @@ typedef struct GHOST_XrDrawViewInfo {
     float angle_up, angle_down;
   } fov;
 
+  GHOST_TXrSwapchainFormat swapchain_format;
   /** Set if the buffer should be submitted with a SRGB transfer applied. */
   char expects_srgb_buffer;
+
+  /** The view that this info represents. Not necessarily the "eye index" (e.g. for quad view
+   * systems, etc). */
+  char view_idx;
 } GHOST_XrDrawViewInfo;
 
 typedef struct GHOST_XrError {
@@ -727,34 +733,55 @@ typedef enum GHOST_XrActionType {
 typedef struct GHOST_XrActionInfo {
   const char *name;
   GHOST_XrActionType type;
-  GHOST_TUns32 count_subaction_paths;
+  uint32_t count_subaction_paths;
   const char **subaction_paths;
   /** States for each subaction path. */
   void *states;
+  /** Input thresholds/regions for each subaction path. */
+  float *float_thresholds;
+  int16_t *axis_flags;
 
   GHOST_XrCustomdataFreeFn customdata_free_fn;
   void *customdata; /* wmXrAction */
 } GHOST_XrActionInfo;
 
-typedef struct GHOST_XrActionSpaceInfo {
-  const char *action_name;
-  GHOST_TUns32 count_subaction_paths;
-  const char **subaction_paths;
-  /** Poses for each subaction path. */
-  const GHOST_XrPose *poses;
-} GHOST_XrActionSpaceInfo;
-
 typedef struct GHOST_XrActionBindingInfo {
-  const char *action_name;
-  GHOST_TUns32 count_interaction_paths;
-  /** Interaction path: User (sub-action) path + component path. */
-  const char **interaction_paths;
+  const char *component_path;
+  float float_threshold;
+  int16_t axis_flag;
+  GHOST_XrPose pose;
 } GHOST_XrActionBindingInfo;
 
 typedef struct GHOST_XrActionProfileInfo {
+  const char *action_name;
   const char *profile_path;
-  GHOST_TUns32 count_bindings;
+  uint32_t count_subaction_paths;
+  const char **subaction_paths;
+  /** Bindings for each subaction path. */
   const GHOST_XrActionBindingInfo *bindings;
 } GHOST_XrActionProfileInfo;
+
+typedef struct GHOST_XrControllerModelVertex {
+  float position[3];
+  float normal[3];
+} GHOST_XrControllerModelVertex;
+
+typedef struct GHOST_XrControllerModelComponent {
+  /** World space transform. */
+  float transform[4][4];
+  uint32_t vertex_offset;
+  uint32_t vertex_count;
+  uint32_t index_offset;
+  uint32_t index_count;
+} GHOST_XrControllerModelComponent;
+
+typedef struct GHOST_XrControllerModelData {
+  uint32_t count_vertices;
+  const GHOST_XrControllerModelVertex *vertices;
+  uint32_t count_indices;
+  const uint32_t *indices;
+  uint32_t count_components;
+  const GHOST_XrControllerModelComponent *components;
+} GHOST_XrControllerModelData;
 
 #endif /* WITH_XR_OPENXR */

@@ -255,7 +255,7 @@ void limit_dist_v3(float v1[3], float v2[3], const float dist);
 
 /******************************* Intersection ********************************/
 
-/* TODO int return value consistency */
+/* TODO: int return value consistency. */
 
 /* line-line */
 #define ISECT_LINE_LINE_COLINEAR -1
@@ -438,9 +438,9 @@ bool isect_tri_tri_v2(const float p1[2],
                       const float q2[2],
                       const float r2[2]);
 
-/* water-tight raycast (requires pre-calculation) */
+/* water-tight ray-cast (requires pre-calculation). */
 struct IsectRayPrecalc {
-  /* Maximal dimension kz, and orthogonal dimensions. */
+  /* Maximal dimension `kz`, and orthogonal dimensions. */
   int kx, ky, kz;
 
   /* Shear constants. */
@@ -682,14 +682,14 @@ void planes_from_projmat(const float mat[4][4],
                          float near[4],
                          float far[4]);
 
-void projmat_dimensions(const float projmat[4][4],
+void projmat_dimensions(const float winmat[4][4],
                         float *r_left,
                         float *r_right,
                         float *r_bottom,
                         float *r_top,
                         float *r_near,
                         float *r_far);
-void projmat_dimensions_db(const float projmat[4][4],
+void projmat_dimensions_db(const float winmat[4][4],
                            double *r_left,
                            double *r_right,
                            double *r_bottom,
@@ -781,7 +781,7 @@ MINLINE void add_sh_shsh(float r[9], const float a[9], const float b[9]);
 MINLINE float dot_shsh(const float a[9], const float b[9]);
 
 MINLINE float eval_shv3(float r[9], const float v[3]);
-MINLINE float diffuse_shv3(float r[9], const float v[3]);
+MINLINE float diffuse_shv3(const float r[9], const float v[3]);
 MINLINE void vec_fac_to_sh(float r[9], const float v[3], const float f);
 MINLINE void madd_sh_shfl(float r[9], const float sh[9], const float f);
 

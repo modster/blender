@@ -69,7 +69,6 @@ static const EnumPropertyItem space_items[] = {
 #  include "BKE_constraint.h"
 #  include "BKE_context.h"
 #  include "BKE_customdata.h"
-#  include "BKE_font.h"
 #  include "BKE_global.h"
 #  include "BKE_layer.h"
 #  include "BKE_main.h"
@@ -78,6 +77,7 @@ static const EnumPropertyItem space_items[] = {
 #  include "BKE_modifier.h"
 #  include "BKE_object.h"
 #  include "BKE_report.h"
+#  include "BKE_vfont.h"
 
 #  include "ED_object.h"
 #  include "ED_screen.h"
@@ -302,6 +302,9 @@ static void rna_Object_mat_convert_space(Object *ob,
                                          int to)
 {
   copy_m4_m4((float(*)[4])mat_ret, (float(*)[4])mat);
+
+  BLI_assert(!ELEM(from, CONSTRAINT_SPACE_OWNLOCAL));
+  BLI_assert(!ELEM(to, CONSTRAINT_SPACE_OWNLOCAL));
 
   /* Error in case of invalid from/to values when pchan is NULL */
   if (pchan == NULL) {

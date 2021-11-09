@@ -110,7 +110,7 @@ short euler_order_from_string(const char *str, const char *error_prefix)
   return -1;
 }
 
-/* note: BaseMath_ReadCallback must be called beforehand */
+/* NOTE: BaseMath_ReadCallback must be called beforehand. */
 static PyObject *Euler_ToTupleExt(EulerObject *self, int ndigits)
 {
   PyObject *ret;
@@ -698,6 +698,11 @@ static PyGetSetDef Euler_getseters[] = {
      (getter)BaseMathObject_is_frozen_get,
      (setter)NULL,
      BaseMathObject_is_frozen_doc,
+     NULL},
+    {"is_valid",
+     (getter)BaseMathObject_is_valid_get,
+     (setter)NULL,
+     BaseMathObject_is_valid_doc,
      NULL},
     {"owner", (getter)BaseMathObject_owner_get, (setter)NULL, BaseMathObject_owner_doc, NULL},
     {NULL, NULL, NULL, NULL, NULL} /* Sentinel */

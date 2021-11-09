@@ -338,8 +338,8 @@ uiPopupBlockHandle *ui_popup_menu_create(
 
   if (!but) {
     /* no button to start from, means we are a popup */
-    pup->mx = window->eventstate->x;
-    pup->my = window->eventstate->y;
+    pup->mx = window->eventstate->xy[0];
+    pup->my = window->eventstate->xy[1];
     pup->popup = true;
     pup->block->flag |= UI_BLOCK_NO_FLIP;
   }
@@ -403,7 +403,7 @@ uiPopupMenu *UI_popup_menu_begin_ex(bContext *C,
   pup->layout = UI_block_layout(
       pup->block, UI_LAYOUT_VERTICAL, UI_LAYOUT_MENU, 0, 0, 200, 0, UI_MENU_PADDING, style);
 
-  /* note, this intentionally differs from the menu & sub-menu default because many operators
+  /* NOTE: this intentionally differs from the menu & sub-menu default because many operators
    * use popups like this to select one of their options -
    * where having invoke doesn't make sense */
   uiLayoutSetOperatorContext(pup->layout, WM_OP_EXEC_REGION_WIN);
@@ -468,8 +468,8 @@ void UI_popup_menu_end(bContext *C, uiPopupMenu *pup)
   ARegion *butregion = NULL;
 
   pup->popup = true;
-  pup->mx = window->eventstate->x;
-  pup->my = window->eventstate->y;
+  pup->mx = window->eventstate->xy[0];
+  pup->my = window->eventstate->xy[1];
 
   if (pup->but) {
     but = pup->but;
@@ -591,7 +591,7 @@ int UI_popup_menu_invoke(bContext *C, const char *idname, ReportList *reports)
  * \{ */
 
 void UI_popup_block_invoke_ex(
-    bContext *C, uiBlockCreateFunc func, void *arg, void (*arg_free)(void *arg), bool can_refresh)
+    bContext *C, uiBlockCreateFunc func, void *arg, uiFreeArgFunc arg_free, bool can_refresh)
 {
   wmWindow *window = CTX_wm_window(C);
   uiPopupBlockHandle *handle;
@@ -608,10 +608,7 @@ void UI_popup_block_invoke_ex(
   WM_event_add_mousemove(window);
 }
 
-void UI_popup_block_invoke(bContext *C,
-                           uiBlockCreateFunc func,
-                           void *arg,
-                           void (*arg_free)(void *arg))
+void UI_popup_block_invoke(bContext *C, uiBlockCreateFunc func, void *arg, uiFreeArgFunc arg_free)
 {
   UI_popup_block_invoke_ex(C, func, arg, arg_free, true);
 }
@@ -643,7 +640,7 @@ void UI_popup_block_ex(bContext *C,
 }
 
 #if 0 /* UNUSED */
-void uiPupBlockOperator(bContext *C, uiBlockCreateFunc func, wmOperator *op, int opcontext)
+void uiPupBlockOperator(bContext *C, uiBlockCreateFunc func, wmOperator *op, wmOperatorCallContext opcontext)
 {
   wmWindow *window = CTX_wm_window(C);
   uiPopupBlockHandle *handle;

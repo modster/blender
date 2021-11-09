@@ -30,7 +30,7 @@
 
 #  include "MEM_guardedalloc.h"
 
-#  define WIN32_SKIP_HKEY_PROTECTION  // need to use HKEY
+#  define WIN32_SKIP_HKEY_PROTECTION /* Need to use HKEY. */
 #  include "BLI_path_util.h"
 #  include "BLI_string.h"
 #  include "BLI_utildefines.h"
@@ -172,12 +172,14 @@ bool BLI_windows_register_blend_extension(const bool background)
     return false;
   }
 
+#  ifdef WITH_BLENDER_THUMBNAILER
   BLI_windows_get_executable_dir(InstallDir);
   GetSystemDirectory(SysDir, FILE_MAXDIR);
   ThumbHandlerDLL = "BlendThumb.dll";
   snprintf(
       RegCmd, MAX_PATH * 2, "%s\\regsvr32 /s \"%s\\%s\"", SysDir, InstallDir, ThumbHandlerDLL);
   system(RegCmd);
+#  endif
 
   RegCloseKey(root);
   printf("success (%s)\n", usr_mode ? "user" : "system");
@@ -191,7 +193,7 @@ bool BLI_windows_register_blend_extension(const bool background)
   return true;
 }
 
-void BLI_windows_get_default_root_dir(char *root)
+void BLI_windows_get_default_root_dir(char root[4])
 {
   char str[MAX_PATH + 1];
 

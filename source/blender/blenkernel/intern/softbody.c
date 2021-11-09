@@ -891,17 +891,13 @@ static void free_softbody_baked(SoftBody *sb)
       MEM_freeN(key);
     }
   }
-  if (sb->keys) {
-    MEM_freeN(sb->keys);
-  }
-
-  sb->keys = NULL;
+  MEM_SAFE_FREE(sb->keys);
   sb->totkey = 0;
 }
 static void free_scratch(SoftBody *sb)
 {
   if (sb->scratch) {
-    /* todo make sure everything is cleaned up nicly */
+    /* TODO: make sure everything is cleaned up nicely. */
     if (sb->scratch->colliderhash) {
       BLI_ghash_free(sb->scratch->colliderhash,
                      NULL,
@@ -973,7 +969,7 @@ static void free_softbody_intern(SoftBody *sb)
  *    and need to tell their neighbors exactly what happens via spring forces
  * unless sbObjectStep( .. ) is called on sub frame timing level
  * BTW that also questions the use of a 'implicit' solvers on softbodies
- * since that would only valid for 'slow' moving collision targets and dito particles
+ * since that would only valid for 'slow' moving collision targets and ditto particles.
  */
 
 /* +++ dependency information functions. */
@@ -1907,7 +1903,7 @@ static void sb_spring_force(
 #endif
   }
   else {
-    /* TODO make this debug option */
+    /* TODO: make this debug option. */
     CLOG_WARN(&LOG, "bodypoint <bpi> is not attached to spring  <*bs>");
     return;
   }
@@ -1994,12 +1990,12 @@ static int _softbody_calc_forces_slice_in_a_thread(Scene *scene,
     return 999;
   }
 
-  /* debugerin */
+  /* Debugging. */
   if (sb->totpoint < ifirst) {
     printf("Aye 998");
     return 998;
   }
-  /* debugerin */
+  /* Debugging. */
 
   bp = &sb->bpoint[ifirst];
   for (bb = number_of_points_here; bb > 0; bb--, bp++) {
@@ -2225,7 +2221,7 @@ static void sb_cf_threads_run(Scene *scene,
     totthread--;
   }
 
-  /* printf("sb_cf_threads_run spawning %d threads\n", totthread); */
+  // printf("sb_cf_threads_run spawning %d threads\n", totthread);
 
   sb_threads = MEM_callocN(sizeof(SB_thread_context) * totthread, "SBThread");
   memset(sb_threads, 0, sizeof(SB_thread_context) * totthread);
@@ -2281,7 +2277,7 @@ static void softbody_calc_forces(
   float fieldfactor = -1.0f, windfactor = 0.25;
   int do_deflector /*, do_selfcollision */, do_springcollision, do_aero;
 
-  /* gravity = sb->grav * sb_grav_force_scale(ob); */ /* UNUSED */
+  // gravity = sb->grav * sb_grav_force_scale(ob); /* UNUSED */
 
   /* check conditions for various options */
   do_deflector = query_external_colliders(depsgraph, sb->collision_group);
@@ -2299,7 +2295,7 @@ static void softbody_calc_forces(
     sb_sfesf_threads_run(depsgraph, scene, ob, timenow, sb->totspring, NULL);
   }
 
-  /* after spring scan because it uses Effoctors too */
+  /* After spring scan because it uses effectors too. */
   ListBase *effectors = BKE_effectors_create(depsgraph, ob, NULL, sb->effector_weights, false);
 
   if (do_deflector) {
@@ -2413,9 +2409,9 @@ static void softbody_apply_forces(Object *ob, float forcetime, int mode, float *
         copy_v3_v3(dx, bp->vec);
       }
 
-      /* so here is (x)'= v(elocity) */
-      /* the euler step for location then becomes */
-      /* x(t + dt) = x(t) + v(t~) * dt */
+      /* So here is: `(x)'= v(elocity)`.
+       * The euler step for location then becomes:
+       * `x(t + dt) = x(t) + v(t~) * dt` */
       mul_v3_fl(dx, forcetime);
 
       /* the freezer coming sooner or later */
@@ -2644,7 +2640,7 @@ static void interpolate_exciter(Object *ob, int timescale, int time)
  */
 
 /* Resetting a Mesh SB object's springs */
-/* Spring length are caculted from'raw' mesh vertices that are NOT altered by modifier stack. */
+/* Spring length are calculated from 'raw' mesh vertices that are NOT altered by modifier stack. */
 static void springs_from_mesh(Object *ob)
 {
   SoftBody *sb;
@@ -2704,8 +2700,8 @@ static void mesh_to_softbody(Object *ob)
   bp = sb->bpoint;
 
   defgroup_index = me->dvert ? (sb->vertgroup - 1) : -1;
-  defgroup_index_mass = me->dvert ? BKE_object_defgroup_name_index(ob, sb->namedVG_Mass) : -1;
-  defgroup_index_spring = me->dvert ? BKE_object_defgroup_name_index(ob, sb->namedVG_Spring_K) :
+  defgroup_index_mass = me->dvert ? BKE_id_defgroup_name_index(&me->id, sb->namedVG_Mass) : -1;
+  defgroup_index_spring = me->dvert ? BKE_id_defgroup_name_index(&me->id, sb->namedVG_Spring_K) :
                                       -1;
 
   for (a = 0; a < me->totvert; a++, bp++) {
@@ -2753,7 +2749,7 @@ static void mesh_to_softbody(Object *ob)
       build_bps_springlist(ob); /* scan for springs attached to bodypoints ONCE */
       /* insert *other second order* springs if desired */
       if (sb->secondspring > 0.0000001f) {
-        /* exploits the first run of build_bps_springlist(ob); */
+        /* Exploits the first run of `build_bps_springlist(ob)`. */
         add_2nd_order_springs(ob, sb->secondspring);
         /* yes we need to do it again. */
         build_bps_springlist(ob);
@@ -2812,7 +2808,7 @@ static void reference_to_scratch(Object *ob)
   }
   mul_v3_fl(accu_pos, 1.0f / accu_mass);
   copy_v3_v3(sb->scratch->Ref.com, accu_pos);
-  /* printf("reference_to_scratch\n"); */
+  // printf("reference_to_scratch\n");
 }
 
 /*
@@ -2934,8 +2930,8 @@ static void lattice_to_softbody(Object *ob)
   bp = sb->bpoint;
 
   defgroup_index = lt->dvert ? (sb->vertgroup - 1) : -1;
-  defgroup_index_mass = lt->dvert ? BKE_object_defgroup_name_index(ob, sb->namedVG_Mass) : -1;
-  defgroup_index_spring = lt->dvert ? BKE_object_defgroup_name_index(ob, sb->namedVG_Spring_K) :
+  defgroup_index_mass = lt->dvert ? BKE_id_defgroup_name_index(&lt->id, sb->namedVG_Mass) : -1;
+  defgroup_index_spring = lt->dvert ? BKE_id_defgroup_name_index(&lt->id, sb->namedVG_Spring_K) :
                                       -1;
 
   /* same code used as for mesh vertices */
@@ -3009,7 +3005,7 @@ static void curve_surf_to_softbody(Object *ob)
 
   for (nu = cu->nurb.first; nu; nu = nu->next) {
     if (nu->bezt) {
-      /* Bezier case; this is nicly said naive; who ever wrote this part,
+      /* Bezier case; this is nicely said naive; who ever wrote this part,
        * it was not me (JOW) :).
        *
        * a: never ever make tangent handles (sub) and or (ob)ject to collision.
@@ -3086,7 +3082,7 @@ static void softbody_to_object(Object *ob, float (*vertexCos)[3], int numVerts, 
     if (sb->solverflags & SBSO_ESTIMATEIPO) {
       SB_estimate_transform(ob, sb->lcom, sb->lrot, sb->lscale);
     }
-    /* inverse matrix is not uptodate... */
+    /* Inverse matrix is not up to date. */
     invert_m4_m4(ob->imat, ob->obmat);
 
     for (a = 0; a < numVerts; a++, bp++) {
@@ -3205,7 +3201,7 @@ void sbObjectToSoftbody(Object *ob)
   free_softbody_intern(ob->soft);
 }
 
-static bool object_has_edges(Object *ob)
+static bool object_has_edges(const Object *ob)
 {
   if (ob->type == OB_MESH) {
     return ((Mesh *)ob->data)->totedge;
@@ -3447,10 +3443,10 @@ static void softbody_step(
         float newtime = forcetime * 1.1f; /* hope for 1.1 times better conditions in next step */
 
         if (sb->scratch->flag & SBF_DOFUZZY) {
-          ///* stay with this stepsize unless err really small */
+          // /* stay with this stepsize unless err really small */
           // if (err > SoftHeunTol/(2.0f*sb->fuzzyness)) {
           newtime = forcetime;
-          //}
+          // }
         }
         else {
           if (err > SoftHeunTol / 2.0f) { /* stay with this stepsize unless err really small */

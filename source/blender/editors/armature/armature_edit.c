@@ -228,7 +228,7 @@ float ED_armature_ebone_roll_to_vector(const EditBone *bone,
   return roll;
 }
 
-/* note, ranges arithmetic is used below */
+/* NOTE: ranges arithmetic is used below. */
 typedef enum eCalcRollTypes {
   /* pos */
   CALC_ROLL_POS_X = 0,
@@ -286,8 +286,9 @@ static int armature_calc_roll_exec(bContext *C, wmOperator *op)
   eCalcRollTypes type = RNA_enum_get(op->ptr, "type");
   const bool axis_only = RNA_boolean_get(op->ptr, "axis_only");
   /* axis_flip when matching the active bone never makes sense */
-  bool axis_flip = ((type >= CALC_ROLL_ACTIVE) ? RNA_boolean_get(op->ptr, "axis_flip") :
-                                                 (type >= CALC_ROLL_TAN_NEG_X) ? true : false);
+  bool axis_flip = ((type >= CALC_ROLL_ACTIVE)    ? RNA_boolean_get(op->ptr, "axis_flip") :
+                    (type >= CALC_ROLL_TAN_NEG_X) ? true :
+                                                    false);
 
   uint objects_len = 0;
   Object **objects = BKE_view_layer_array_from_objects_in_edit_mode_unique_data(
@@ -449,7 +450,7 @@ static int armature_calc_roll_exec(bContext *C, wmOperator *op)
     }
 
     if (changed) {
-      /* note, notifier might evolve */
+      /* NOTE: notifier might evolve. */
       WM_event_add_notifier(C, NC_OBJECT | ND_BONE_SELECT, ob);
       DEG_id_tag_update(&arm->id, ID_RECALC_SELECT);
     }
@@ -519,7 +520,7 @@ static int armature_roll_clear_exec(bContext *C, wmOperator *op)
     }
 
     if (changed) {
-      /* Note, notifier might evolve. */
+      /* NOTE: notifier might evolve. */
       WM_event_add_notifier(C, NC_OBJECT | ND_BONE_SELECT, ob);
       DEG_id_tag_update(&arm->id, ID_RECALC_SELECT);
     }
@@ -577,7 +578,7 @@ static void chains_find_tips(ListBase *edbo, ListBase *list)
   EditBone *curBone, *ebo;
   LinkData *ld;
 
-  /* note: this is potentially very slow ... there's got to be a better way */
+  /* NOTE: this is potentially very slow ... there's got to be a better way. */
   for (curBone = edbo->first; curBone; curBone = curBone->next) {
     short stop = 0;
 
@@ -1000,7 +1001,7 @@ static int armature_switch_direction_exec(bContext *C, wmOperator *UNUSED(op))
     armature_clear_swap_done_flags(arm);
     armature_tag_unselect(arm);
 
-    /* note, notifier might evolve */
+    /* NOTE: notifier might evolve. */
     WM_event_add_notifier(C, NC_OBJECT | ND_BONE_SELECT, ob);
     DEG_id_tag_update(&arm->id, ID_RECALC_SELECT);
   }
@@ -1151,7 +1152,7 @@ static int armature_align_bones_exec(bContext *C, wmOperator *op)
         op->reports, RPT_INFO, "%d bones aligned to bone '%s'", num_selected_bones, actbone->name);
   }
 
-  /* note, notifier might evolve */
+  /* NOTE: notifier might evolve. */
   WM_event_add_notifier(C, NC_OBJECT | ND_BONE_SELECT, ob);
   DEG_id_tag_update(&arm->id, ID_RECALC_SELECT);
 

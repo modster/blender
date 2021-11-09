@@ -155,6 +155,7 @@ def _test_import(module_name, loaded_modules):
 # This supports the case of loading a new preferences file which may reset scripts path.
 _sys_path_ensure_paths = set()
 
+
 def _sys_path_ensure_prepend(path):
     if path not in _sys.path:
         _sys.path.insert(0, path)
@@ -753,12 +754,10 @@ def register_classes_factory(classes):
     which simply registers and unregisters a sequence of classes.
     """
     def register():
-        from bpy.utils import register_class
         for cls in classes:
             register_class(cls)
 
     def unregister():
-        from bpy.utils import unregister_class
         for cls in reversed(classes):
             unregister_class(cls)
 
@@ -859,7 +858,9 @@ def register_tool(tool_cls, *, after=None, separator=False, group=False):
             "description": getattr(tool_cls, "bl_description", tool_cls.__doc__),
             "icon": getattr(tool_cls, "bl_icon", None),
             "cursor": getattr(tool_cls, "bl_cursor", None),
+            "options": getattr(tool_cls, "bl_options", None),
             "widget": getattr(tool_cls, "bl_widget", None),
+            "widget_properties": getattr(tool_cls, "bl_widget_properties", None),
             "keymap": getattr(tool_cls, "bl_keymap", None),
             "data_block": getattr(tool_cls, "bl_data_block", None),
             "operator": getattr(tool_cls, "bl_operator", None),

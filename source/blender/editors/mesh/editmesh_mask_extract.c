@@ -126,7 +126,7 @@ static int geometry_extract_apply(bContext *C,
                          .calc_face_normal = true,
                      }));
 
-  BMEditMesh *em = BKE_editmesh_create(bm, false);
+  BMEditMesh *em = BKE_editmesh_create(bm);
 
   /* Generate the tags for deleting geometry in the extracted object. */
   tag_fn(bm, params);
@@ -206,7 +206,7 @@ static int geometry_extract_apply(bContext *C,
                                         }),
                                         mesh);
 
-  BKE_editmesh_free(em);
+  BKE_editmesh_free_data(em);
   MEM_freeN(em);
 
   if (new_mesh->totvert == 0) {
@@ -389,13 +389,14 @@ static int face_set_extract_modal(bContext *C, wmOperator *op, const wmEvent *ev
          * the PBVH and update the active Face Set ID. */
         bScreen *screen = CTX_wm_screen(C);
         ARegion *region = BKE_screen_find_main_region_at_xy(
-            screen, SPACE_VIEW3D, event->x, event->y);
+            screen, SPACE_VIEW3D, event->xy[0], event->xy[1]);
 
         if (!region) {
           return OPERATOR_CANCELLED;
         }
 
-        const float mval[2] = {event->x - region->winrct.xmin, event->y - region->winrct.ymin};
+        const float mval[2] = {event->xy[0] - region->winrct.xmin,
+                               event->xy[1] - region->winrct.ymin};
 
         Object *ob = CTX_data_active_object(C);
         const int face_set_id = ED_sculpt_face_sets_active_update_and_get(C, ob, mval);

@@ -2154,7 +2154,7 @@ static void p_collapse_cost_vertex(PVert *vert, float *r_mincost, PEdge **r_mine
 
 static void p_chart_post_collapse_flush(PChart *chart, PEdge *collapsed)
 {
-  /* move to collapsed_ */
+  /* Move to `collapsed_*`. */
 
   PVert *v, *nextv = NULL, *verts = chart->verts;
   PEdge *e, *nexte = NULL, *edges = chart->edges, *laste = NULL;
@@ -2224,7 +2224,7 @@ static void p_chart_post_collapse_flush(PChart *chart, PEdge *collapsed)
 
 static void p_chart_post_split_flush(PChart *chart)
 {
-  /* move from collapsed_ */
+  /* Move from `collapsed_*`. */
 
   PVert *v, *nextv = NULL;
   PEdge *e, *nexte = NULL;
@@ -2259,7 +2259,7 @@ static void p_chart_post_split_flush(PChart *chart)
 static void p_chart_simplify_compute(PChart *chart)
 {
   /* Computes a list of edge collapses / vertex splits. The collapsed
-   * simplices go in the chart->collapsed_* lists, The original and
+   * simplices go in the `chart->collapsed_*` lists, The original and
    * collapsed may then be view as stacks, where the next collapse/split
    * is at the top of the respective lists. */
 
@@ -3399,10 +3399,7 @@ static void p_chart_lscm_end(PChart *chart)
     EIG_linear_solver_delete(chart->u.lscm.context);
   }
 
-  if (chart->u.lscm.abf_alpha) {
-    MEM_freeN(chart->u.lscm.abf_alpha);
-    chart->u.lscm.abf_alpha = NULL;
-  }
+  MEM_SAFE_FREE(chart->u.lscm.abf_alpha);
 
   chart->u.lscm.context = NULL;
   chart->u.lscm.pin1 = NULL;

@@ -263,7 +263,7 @@ Mathutils_Callback mathutils_matrix_col_cb = {
 /* ----------------------------------------------------------------------------
  * matrix row callbacks
  * this is so you can do matrix.translation = val
- * note, this is _exactly like matrix.col except the 4th component is always omitted */
+ * NOTE: this is _exactly like matrix.col except the 4th component is always omitted. */
 
 uchar mathutils_matrix_translation_cb_index = -1;
 
@@ -526,7 +526,7 @@ static PyObject *C_Matrix_Rotation(PyObject *cls, PyObject *args)
                     "cannot create a 2x2 rotation matrix around arbitrary axis");
     return NULL;
   }
-  if ((matSize == 3 || matSize == 4) && (axis == NULL) && (vec == NULL)) {
+  if ((ELEM(matSize, 3, 4)) && (axis == NULL) && (vec == NULL)) {
     PyErr_SetString(PyExc_ValueError,
                     "Matrix.Rotation(): "
                     "axis of rotation for 3d and 4d matrices is required");
@@ -1174,7 +1174,7 @@ static void matrix_invert_with_det_n_internal(float *mat_dst,
 }
 
 /**
- * \param r_mat: can be from ``self->matrix`` or not.
+ * \param r_mat: can be from `self->matrix` or not.
  */
 static bool matrix_invert_internal(const MatrixObject *self, float *r_mat)
 {
@@ -1191,8 +1191,8 @@ static bool matrix_invert_internal(const MatrixObject *self, float *r_mat)
 }
 
 /**
- * Similar to ``matrix_invert_internal`` but should never error.
- * \param r_mat: can be from ``self->matrix`` or not.
+ * Similar to `matrix_invert_internal` but should never error.
+ * \param r_mat: can be from `self->matrix` or not.
  */
 static void matrix_invert_safe_internal(const MatrixObject *self, float *r_mat)
 {
@@ -1938,7 +1938,7 @@ static PyObject *Matrix_lerp(MatrixObject *self, PyObject *args)
     return NULL;
   }
 
-  /* TODO, different sized matrix */
+  /* TODO: different sized matrix. */
   if (self->num_col == 4 && self->num_row == 4) {
 #ifdef MATH_STANDALONE
     blend_m4_m4m4((float(*)[4])mat, (float(*)[4])self->matrix, (float(*)[4])mat2->matrix, fac);
@@ -2998,7 +2998,7 @@ static int Matrix_translation_set(MatrixObject *self, PyObject *value, void *UNU
     return -1;
   }
 
-  if ((mathutils_array_parse(tvec, 3, 3, value, "Matrix.translation")) == -1) {
+  if (mathutils_array_parse(tvec, 3, 3, value, "Matrix.translation") == -1) {
     return -1;
   }
 
@@ -3147,6 +3147,11 @@ static PyGetSetDef Matrix_getseters[] = {
      (getter)BaseMathObject_is_frozen_get,
      (setter)NULL,
      BaseMathObject_is_frozen_doc,
+     NULL},
+    {"is_valid",
+     (getter)BaseMathObject_is_valid_get,
+     (setter)NULL,
+     BaseMathObject_is_valid_doc,
      NULL},
     {"owner", (getter)BaseMathObject_owner_get, (setter)NULL, BaseMathObject_owner_doc, NULL},
     {NULL, NULL, NULL, NULL, NULL} /* Sentinel */
@@ -3614,7 +3619,7 @@ static int MatrixAccess_ass_subscript(MatrixAccessObject *self, PyObject *item, 
     }
     return Matrix_ass_item_col(matrix_user, i, value);
   }
-  /* TODO, slice */
+  /* TODO: slice. */
 
   PyErr_Format(
       PyExc_TypeError, "matrix indices must be integers, not %.200s", Py_TYPE(item)->tp_name);

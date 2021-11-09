@@ -96,7 +96,7 @@ typedef struct SceneStatsFmt {
   char totgpstroke[MAX_INFO_NUM_LEN], totgppoint[MAX_INFO_NUM_LEN];
 } SceneStatsFmt;
 
-static bool stats_mesheval(Mesh *me_eval, bool is_selected, SceneStats *stats)
+static bool stats_mesheval(const Mesh *me_eval, bool is_selected, SceneStats *stats)
 {
   if (me_eval == NULL) {
     return false;
@@ -149,8 +149,8 @@ static void stats_object(Object *ob,
   switch (ob->type) {
     case OB_MESH: {
       /* we assume evaluated mesh is already built, this strictly does stats now. */
-      Mesh *me_eval = BKE_object_get_evaluated_mesh(ob);
-      if (!BLI_gset_add(objects_gset, me_eval)) {
+      const Mesh *me_eval = BKE_object_get_evaluated_mesh(ob);
+      if (!BLI_gset_add(objects_gset, (void *)me_eval)) {
         break;
       }
       stats_mesheval(me_eval, is_selected, stats);
@@ -165,8 +165,8 @@ static void stats_object(Object *ob,
     case OB_SURF:
     case OB_CURVE:
     case OB_FONT: {
-      Mesh *me_eval = BKE_object_get_evaluated_mesh(ob);
-      if ((me_eval != NULL) && !BLI_gset_add(objects_gset, me_eval)) {
+      const Mesh *me_eval = BKE_object_get_evaluated_mesh(ob);
+      if ((me_eval != NULL) && !BLI_gset_add(objects_gset, (void *)me_eval)) {
         break;
       }
 
@@ -179,7 +179,7 @@ static void stats_object(Object *ob,
       int totv = 0, totf = 0, tottri = 0;
 
       if (ob->runtime.curve_cache && ob->runtime.curve_cache->disp.first) {
-        /* Note: We only get the same curve_cache for instances of the same curve/font/...
+        /* NOTE: We only get the same curve_cache for instances of the same curve/font/...
          * For simple linked duplicated objects, each has its own dispList. */
         if (!BLI_gset_add(objects_gset, ob->runtime.curve_cache)) {
           break;
@@ -372,7 +372,7 @@ static void stats_object_sculpt(const Object *ob, SceneStats *stats)
 
   SculptSession *ss = ob->sculpt;
 
-  if (!ss) {
+  if (ss == NULL || ss->pbvh == NULL) {
     return;
   }
 
@@ -466,10 +466,7 @@ static void stats_update(Depsgraph *depsgraph,
 
 void ED_info_stats_clear(wmWindowManager *wm, ViewLayer *view_layer)
 {
-  if (view_layer->stats) {
-    MEM_freeN(view_layer->stats);
-    view_layer->stats = NULL;
-  }
+  MEM_SAFE_FREE(view_layer->stats);
 
   LISTBASE_FOREACH (wmWindow *, win, &wm->windows) {
     ViewLayer *view_layer_test = WM_window_get_active_view_layer(win);
@@ -764,6 +761,7 @@ void ED_info_draw_stats(
     FRAMES,
     STROKES,
     POINTS,
+    LIGHTS,
     MAX_LABELS_COUNT
   };
   char labels[MAX_LABELS_COUNT][64];
@@ -779,6 +777,7 @@ void ED_info_draw_stats(
   STRNCPY(labels[FRAMES], IFACE_("Frames"));
   STRNCPY(labels[STROKES], IFACE_("Strokes"));
   STRNCPY(labels[POINTS], IFACE_("Points"));
+  STRNCPY(labels[LIGHTS], IFACE_("Lights"));
 
   int longest_label = 0;
   int i;
@@ -831,6 +830,9 @@ void ED_info_draw_stats(
       stats_row(col1, labels[VERTS], col2, stats_fmt.totvertsculpt, stats_fmt.totvert, y, height);
       stats_row(col1, labels[FACES], col2, stats_fmt.totfacesculpt, stats_fmt.totface, y, height);
     }
+  }
+  else if ((ob) && (ob->type == OB_LAMP)) {
+    stats_row(col1, labels[LIGHTS], col2, stats_fmt.totlampsel, stats_fmt.totlamp, y, height);
   }
   else {
     stats_row(col1, labels[VERTS], col2, stats_fmt.totvert, NULL, y, height);

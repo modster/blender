@@ -187,7 +187,8 @@ static void ringsel_finish(bContext *C, wmOperator *op)
       const bool is_edge_wire = BM_edge_is_wire(lcd->eed);
       const bool is_single = is_edge_wire || !BM_edge_is_any_face_len_test(lcd->eed, 4);
       const int seltype = is_edge_wire ? SUBDIV_SELECT_INNER :
-                                         is_single ? SUBDIV_SELECT_NONE : SUBDIV_SELECT_LOOPCUT;
+                          is_single    ? SUBDIV_SELECT_NONE :
+                                         SUBDIV_SELECT_LOOPCUT;
 
       /* Enable grid-fill, so that intersecting loop-cut works as one would expect.
        * Note though that it will break edge-slide in this specific case.
@@ -241,7 +242,7 @@ static void ringsel_finish(bContext *C, wmOperator *op)
        *     in editmesh_select.c (around line 1000)... */
       /* sets as active, useful for other tools */
       if (em->selectmode & SCE_SELECT_VERTEX) {
-        /* low priority TODO, get vertrex close to mouse */
+        /* low priority TODO: get vertrex close to mouse. */
         BM_select_history_store(em->bm, lcd->eed->v1);
       }
       if (em->selectmode & SCE_SELECT_EDGE) {
@@ -597,13 +598,13 @@ static int loopcut_modal(bContext *C, wmOperator *op, const wmEvent *event)
         break;
       case MOUSEPAN:
         if (event->alt == 0) {
-          cuts += 0.02f * (event->y - event->prevy);
+          cuts += 0.02f * (event->xy[1] - event->prev_xy[1]);
           if (cuts < 1 && lcd->cuts >= 1) {
             cuts = 1;
           }
         }
         else {
-          smoothness += 0.002f * (event->y - event->prevy);
+          smoothness += 0.002f * (event->xy[1] - event->prev_xy[1]);
         }
         handled = true;
         break;

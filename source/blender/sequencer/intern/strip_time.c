@@ -34,6 +34,7 @@
 #include "BKE_scene.h"
 #include "BKE_sound.h"
 
+#include "DNA_sound_types.h"
 #include "IMB_imbuf.h"
 
 #include "SEQ_iterator.h"
@@ -111,8 +112,8 @@ static void seq_update_sound_bounds_recursive_impl(Scene *scene,
 {
   Sequence *seq;
 
-  /* for sound we go over full meta tree to update bounds of the sound strips,
-   * since sound is played outside of evaluating the imbufs, */
+  /* For sound we go over full meta tree to update bounds of the sound strips,
+   * since sound is played outside of evaluating the imbufs. */
   for (seq = metaseq->seqbase.first; seq; seq = seq->next) {
     if (seq->type == SEQ_TYPE_META) {
       seq_update_sound_bounds_recursive_impl(
@@ -130,11 +131,17 @@ static void seq_update_sound_bounds_recursive_impl(Scene *scene,
           endofs = seq->start + seq->len - end;
         }
 
+        double offset_time = 0.0f;
+        if (seq->sound != NULL) {
+          offset_time = seq->sound->offset_time;
+        }
+
         BKE_sound_move_scene_sound(scene,
                                    seq->scene_sound,
                                    seq->start + startofs,
                                    seq->start + seq->len - endofs,
-                                   startofs + seq->anim_startofs);
+                                   startofs + seq->anim_startofs,
+                                   offset_time);
       }
     }
   }
@@ -146,7 +153,7 @@ void seq_update_sound_bounds_recursive(Scene *scene, Sequence *metaseq)
       scene, metaseq, metaseq_start(metaseq), metaseq_end(metaseq));
 }
 
-void SEQ_time_update_sequence_bounds(Scene *scene, Sequence *seq)
+static void seq_time_update_sequence_bounds(Scene *scene, Sequence *seq)
 {
   if (seq->startofs && seq->startstill) {
     seq->startstill = 0;
@@ -193,7 +200,7 @@ void SEQ_time_update_meta_strip_range(Scene *scene, Sequence *seq_meta)
   SEQ_transform_set_right_handle_frame(seq_meta, seq_meta->enddisp);
 }
 
-void SEQ_time_update_sequence(Scene *scene, Sequence *seq)
+void SEQ_time_update_sequence(Scene *scene, ListBase *seqbase, Sequence *seq)
 {
   Sequence *seqm;
 
@@ -201,7 +208,7 @@ void SEQ_time_update_sequence(Scene *scene, Sequence *seq)
   seqm = seq->seqbase.first;
   while (seqm) {
     if (seqm->seqbase.first) {
-      SEQ_time_update_sequence(scene, seqm);
+      SEQ_time_update_sequence(scene, &seqm->seqbase, seqm);
     }
     seqm = seqm->next;
   }
@@ -239,31 +246,25 @@ void SEQ_time_update_sequence(Scene *scene, Sequence *seq)
       seq->len = seq->enddisp - seq->startdisp;
     }
     else {
-      SEQ_time_update_sequence_bounds(scene, seq);
+      seq_time_update_sequence_bounds(scene, seq);
     }
+  }
+  else if (seq->type == SEQ_TYPE_META) {
+    seq_time_update_meta_strip(scene, seq);
   }
   else {
-    if (seq->type == SEQ_TYPE_META) {
-      seq_time_update_meta_strip(scene, seq);
-    }
-
-    Editing *ed = SEQ_editing_get(scene, false);
-    MetaStack *ms = SEQ_meta_stack_active_get(ed);
-    if (ms != NULL) {
-      SEQ_time_update_meta_strip_range(scene, ms->parseq);
-    }
-
-    SEQ_time_update_sequence_bounds(scene, seq);
+    seq_time_update_sequence_bounds(scene, seq);
   }
-}
 
-/** Comparison function suitable to be used with BLI_listbase_sort()... */
-int SEQ_time_cmp_time_startdisp(const void *a, const void *b)
-{
-  const Sequence *seq_a = a;
-  const Sequence *seq_b = b;
+  Editing *ed = SEQ_editing_get(scene);
 
-  return (seq_a->startdisp > seq_b->startdisp);
+  /* Strip is inside meta strip */
+  if (seqbase != &ed->seqbase) {
+    Sequence *meta = SEQ_get_meta_by_seqbase(&ed->seqbase, seqbase);
+    SEQ_time_update_meta_strip_range(scene, meta);
+  }
+
+  seq_time_update_sequence_bounds(scene, seq);
 }
 
 int SEQ_time_find_next_prev_edit(Scene *scene,
@@ -273,7 +274,7 @@ int SEQ_time_find_next_prev_edit(Scene *scene,
                                  const bool do_center,
                                  const bool do_unselected)
 {
-  Editing *ed = SEQ_editing_get(scene, false);
+  Editing *ed = SEQ_editing_get(scene);
   Sequence *seq;
 
   int dist, best_dist, best_frame = timeline_frame;
@@ -375,19 +376,27 @@ float SEQ_time_sequence_get_fps(Scene *scene, Sequence *seq)
 }
 
 /**
- * Define boundary rectangle of sequencer timeline and fill in rect data
+ * Initialize given rectangle with the Scene's timeline boundaries.
  *
- * \param scene: Scene in which strips are located
- * \param seqbase: ListBase in which strips are located
- * \param rect: data structure describing rectangle, that will be filled in by this function
+ * \param scene: the Scene instance whose timeline boundaries are extracted from
+ * \param rect: output parameter to be filled with timeline boundaries
  */
-void SEQ_timeline_boundbox(const Scene *scene, const ListBase *seqbase, rctf *rect)
+void SEQ_timeline_init_boundbox(const Scene *scene, rctf *rect)
 {
   rect->xmin = scene->r.sfra;
   rect->xmax = scene->r.efra + 1;
   rect->ymin = 0.0f;
   rect->ymax = 8.0f;
+}
 
+/**
+ * Stretch the given rectangle to include the given strips boundaries
+ *
+ * \param seqbase: ListBase in which strips are located
+ * \param rect: output parameter to be filled with strips' boundaries
+ */
+void SEQ_timeline_expand_boundbox(const ListBase *seqbase, rctf *rect)
+{
   if (seqbase == NULL) {
     return;
   }
@@ -403,6 +412,19 @@ void SEQ_timeline_boundbox(const Scene *scene, const ListBase *seqbase, rctf *re
       rect->ymax = seq->machine + 2;
     }
   }
+}
+
+/**
+ * Define boundary rectangle of sequencer timeline and fill in rect data
+ *
+ * \param scene: Scene in which strips are located
+ * \param seqbase: ListBase in which strips are located
+ * \param rect: data structure describing rectangle, that will be filled in by this function
+ */
+void SEQ_timeline_boundbox(const Scene *scene, const ListBase *seqbase, rctf *rect)
+{
+  SEQ_timeline_init_boundbox(scene, rect);
+  SEQ_timeline_expand_boundbox(seqbase, rect);
 }
 
 static bool strip_exists_at_frame(SeqCollection *all_strips, const int timeline_frame)
@@ -471,7 +493,7 @@ void seq_time_gap_info_get(const Scene *scene,
 
 /**
  * Test if strip intersects with timeline frame.
- * Note: This checks if strip would be rendered at this frame. For rendering it is assumed, that
+ * NOTE: This checks if strip would be rendered at this frame. For rendering it is assumed, that
  * timeline frame has width of 1 frame and therefore ends at timeline_frame + 1
  *
  * \param seq: Sequence to be checked

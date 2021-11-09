@@ -90,7 +90,7 @@ bNode *node_add_node(const bContext *C, const char *idname, int type, float locx
   nodeSetSelected(node, true);
 
   ntreeUpdateTree(bmain, snode->edittree);
-  ED_node_set_active(bmain, snode->edittree, node, nullptr);
+  ED_node_set_active(bmain, snode, snode->edittree, node, nullptr);
 
   snode_update(snode, node);
 
@@ -260,7 +260,7 @@ static int add_reroute_exec(bContext *C, wmOperator *op)
     BLI_listbase_clear(&input_links);
 
     for (link = (bNodeLink *)ntree->links.first; link; link = link->next) {
-      if (nodeLinkIsHidden(link)) {
+      if (node_link_is_hidden_or_dimmed(&region->v2d, link)) {
         continue;
       }
       if (add_reroute_intersect_check(link, mcoords, i, insert_point)) {
@@ -312,7 +312,7 @@ void NODE_OT_add_reroute(wmOperatorType *ot)
   ot->poll = ED_operator_node_editable;
 
   /* flags */
-  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_DEPENDS_ON_CURSOR;
 
   /* properties */
   PropertyRNA *prop;
@@ -575,7 +575,7 @@ static int node_add_texture_exec(bContext *C, wmOperator *op)
 
   bNode *texture_node = node_add_node(C,
                                       nullptr,
-                                      GEO_NODE_ATTRIBUTE_SAMPLE_TEXTURE,
+                                      GEO_NODE_LEGACY_ATTRIBUTE_SAMPLE_TEXTURE,
                                       snode->runtime->cursor[0],
                                       snode->runtime->cursor[1]);
   if (!texture_node) {
@@ -758,7 +758,7 @@ static bool node_add_file_poll(bContext *C)
 {
   const SpaceNode *snode = CTX_wm_space_node(C);
   return ED_operator_node_editable(C) &&
-         ELEM(snode->nodetree->type, NTREE_SHADER, NTREE_TEXTURE, NTREE_COMPOSIT);
+         ELEM(snode->nodetree->type, NTREE_SHADER, NTREE_TEXTURE, NTREE_COMPOSIT, NTREE_GEOMETRY);
 }
 
 static int node_add_file_exec(bContext *C, wmOperator *op)
@@ -784,6 +784,9 @@ static int node_add_file_exec(bContext *C, wmOperator *op)
     case NTREE_COMPOSIT:
       type = CMP_NODE_IMAGE;
       break;
+    case NTREE_GEOMETRY:
+      type = GEO_NODE_IMAGE_TEXTURE;
+      break;
     default:
       return OPERATOR_CANCELLED;
   }
@@ -797,7 +800,14 @@ static int node_add_file_exec(bContext *C, wmOperator *op)
     return OPERATOR_CANCELLED;
   }
 
-  node->id = (ID *)ima;
+  if (type == GEO_NODE_IMAGE_TEXTURE) {
+    bNodeSocket *image_socket = (bNodeSocket *)node->inputs.first;
+    bNodeSocketValueImage *socket_value = (bNodeSocketValueImage *)image_socket->default_value;
+    socket_value->value = ima;
+  }
+  else {
+    node->id = (ID *)ima;
+  }
 
   /* When adding new image file via drag-drop we need to load imbuf in order
    * to get proper image source.

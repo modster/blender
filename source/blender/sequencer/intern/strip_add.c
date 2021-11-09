@@ -99,8 +99,8 @@ void SEQ_add_load_data_init(SeqLoadData *load_data,
 
 static void seq_add_generic_update(Scene *scene, ListBase *seqbase, Sequence *seq)
 {
-  SEQ_sequence_base_unique_name_recursive(scene, seqbase, seq);
-  SEQ_time_update_sequence_bounds(scene, seq);
+  SEQ_sequence_base_unique_name_recursive(scene, &scene->ed->seqbase, seq);
+  SEQ_time_update_sequence(scene, seqbase, seq);
   SEQ_sort(seqbase);
   SEQ_relations_invalidate_cache_composite(scene, seq);
 }
@@ -382,9 +382,14 @@ Sequence *SEQ_add_image_strip(Main *bmain, Scene *scene, ListBase *seqbase, SeqL
  * \return created strip
  */
 
-Sequence *SEQ_add_sound_strip(Main *bmain, Scene *scene, ListBase *seqbase, SeqLoadData *load_data)
+Sequence *SEQ_add_sound_strip(Main *bmain,
+                              Scene *scene,
+                              ListBase *seqbase,
+                              SeqLoadData *load_data,
+                              const double audio_offset)
 {
   bSound *sound = BKE_sound_new_file(bmain, load_data->path); /* Handles relative paths. */
+  sound->offset_time = audio_offset;
   SoundInfo info;
   bool sound_loaded = BKE_sound_info_get(bmain, sound, &info);
 
@@ -403,9 +408,12 @@ Sequence *SEQ_add_sound_strip(Main *bmain, Scene *scene, ListBase *seqbase, SeqL
   seq->sound = sound;
   seq->scene_sound = NULL;
 
-  /* We add a very small negative offset here, because
-   * ceil(132.0) == 133.0, not nice with videos, see T47135. */
-  seq->len = MAX2(1, (int)ceil((double)info.length * FPS - 1e-4));
+  /* We round the frame duration as the audio sample lengths usually does not
+   * line up with the video frames. Therefore we round this number to the
+   * nearest frame as the audio track usually overshoots or undershoots the
+   * end frame of the video by a little bit.
+   * See T47135 for under shoot example. */
+  seq->len = MAX2(1, round((info.length - sound->offset_time) * FPS));
 
   Strip *strip = seq->strip;
   /* We only need 1 element to store the filename. */
@@ -436,7 +444,8 @@ Sequence *SEQ_add_sound_strip(Main *bmain, Scene *scene, ListBase *seqbase, SeqL
 Sequence *SEQ_add_sound_strip(Main *UNUSED(bmain),
                               Scene *UNUSED(scene),
                               ListBase *UNUSED(seqbase),
-                              SeqLoadData *UNUSED(load_data))
+                              SeqLoadData *UNUSED(load_data),
+                              const double UNUSED(audio_offset))
 {
   return NULL;
 }
@@ -463,7 +472,7 @@ Sequence *SEQ_add_meta_strip(Scene *scene, ListBase *seqbase, SeqLoadData *load_
   /* Set frames start and length. */
   seqm->start = load_data->start_frame;
   seqm->len = 1;
-  SEQ_time_update_sequence(scene, seqm);
+  SEQ_time_update_sequence(scene, seqbase, seqm);
 
   return seqm;
 }
@@ -477,7 +486,8 @@ Sequence *SEQ_add_meta_strip(Scene *scene, ListBase *seqbase, SeqLoadData *load_
  * \param load_data: SeqLoadData with information necessary to create strip
  * \return created strip
  */
-Sequence *SEQ_add_movie_strip(Main *bmain, Scene *scene, ListBase *seqbase, SeqLoadData *load_data)
+Sequence *SEQ_add_movie_strip(
+    Main *bmain, Scene *scene, ListBase *seqbase, SeqLoadData *load_data, double *r_start_offset)
 {
   char path[sizeof(load_data->path)];
   BLI_strncpy(path, load_data->path, sizeof(path));
@@ -523,8 +533,40 @@ Sequence *SEQ_add_movie_strip(Main *bmain, Scene *scene, ListBase *seqbase, SeqL
     return NULL;
   }
 
+  int video_frame_offset = 0;
+  float video_fps = 0.0f;
+
+  if (anim_arr[0] != NULL) {
+    short fps_denom;
+    float fps_num;
+
+    IMB_anim_get_fps(anim_arr[0], &fps_denom, &fps_num, true);
+
+    video_fps = fps_denom / fps_num;
+
+    /* Adjust scene's frame rate settings to match. */
+    if (load_data->flags & SEQ_LOAD_MOVIE_SYNC_FPS) {
+      scene->r.frs_sec = fps_denom;
+      scene->r.frs_sec_base = fps_num;
+    }
+
+    double video_start_offset = IMD_anim_get_offset(anim_arr[0]);
+    int minimum_frame_offset;
+
+    if (*r_start_offset >= 0) {
+      minimum_frame_offset = MIN2(video_start_offset, *r_start_offset) * FPS;
+    }
+    else {
+      minimum_frame_offset = video_start_offset * FPS;
+    }
+
+    video_frame_offset = video_start_offset * FPS - minimum_frame_offset;
+
+    *r_start_offset = video_start_offset;
+  }
+
   Sequence *seq = SEQ_sequence_alloc(
-      seqbase, load_data->start_frame, load_data->channel, SEQ_TYPE_MOVIE);
+      seqbase, load_data->start_frame + video_frame_offset, load_data->channel, SEQ_TYPE_MOVIE);
 
   /* Multiview settings. */
   if (load_data->use_multiview) {
@@ -548,25 +590,10 @@ Sequence *SEQ_add_movie_strip(Main *bmain, Scene *scene, ListBase *seqbase, SeqL
 
   seq->blend_mode = SEQ_TYPE_CROSS; /* so alpha adjustment fade to the strip below */
 
-  float video_fps = 0.0f;
-
   if (anim_arr[0] != NULL) {
     seq->len = IMB_anim_get_duration(anim_arr[0], IMB_TC_RECORD_RUN);
 
     IMB_anim_load_metadata(anim_arr[0]);
-
-    short fps_denom;
-    float fps_num;
-
-    IMB_anim_get_fps(anim_arr[0], &fps_denom, &fps_num, true);
-
-    video_fps = fps_denom / fps_num;
-
-    /* Adjust scene's frame rate settings to match. */
-    if (load_data->flags & SEQ_LOAD_MOVIE_SYNC_FPS) {
-      scene->r.frs_sec = fps_denom;
-      scene->r.frs_sec_base = fps_num;
-    }
 
     /* Set initial scale based on load_data->fit_method. */
     orig_width = IMB_anim_get_image_width(anim_arr[0]);
@@ -597,12 +624,12 @@ Sequence *SEQ_add_movie_strip(Main *bmain, Scene *scene, ListBase *seqbase, SeqL
   return seq;
 }
 
-/* note: caller should run SEQ_time_update_sequence(scene, seq) after */
+/* NOTE: caller should run SEQ_time_update_sequence(scene, seq) after. */
 void SEQ_add_reload_new_file(Main *bmain, Scene *scene, Sequence *seq, const bool lock_range)
 {
   char path[FILE_MAX];
   int prev_startdisp = 0, prev_enddisp = 0;
-  /* note: don't rename the strip, will break animation curves */
+  /* NOTE: don't rename the strip, will break animation curves. */
 
   if (ELEM(seq->type,
            SEQ_TYPE_MOVIE,
@@ -617,7 +644,9 @@ void SEQ_add_reload_new_file(Main *bmain, Scene *scene, Sequence *seq, const boo
 
   if (lock_range) {
     /* keep so we don't have to move the actual start and end points (only the data) */
-    SEQ_time_update_sequence_bounds(scene, seq);
+    Editing *ed = SEQ_editing_get(scene);
+    ListBase *seqbase = SEQ_get_seqbase_by_seq(&ed->seqbase, seq);
+    SEQ_time_update_sequence(scene, seqbase, seq);
     prev_startdisp = seq->startdisp;
     prev_enddisp = seq->enddisp;
   }
@@ -767,7 +796,8 @@ void SEQ_add_reload_new_file(Main *bmain, Scene *scene, Sequence *seq, const boo
     SEQ_transform_fix_single_image_seq_offsets(seq);
   }
 
-  SEQ_time_update_sequence(scene, seq);
+  ListBase *seqbase = SEQ_active_seqbase_get(SEQ_editing_get(scene));
+  SEQ_time_update_sequence(scene, seqbase, seq);
 }
 
 void SEQ_add_movie_reload_if_needed(struct Main *bmain,

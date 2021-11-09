@@ -383,6 +383,7 @@ class BUILTIN_KSI_Available(KeyingSetInfo):
 
 ###############################
 
+
 class WholeCharacterMixin:
     # these prefixes should be avoided, as they are not really bones
     # that animators should be touching (or need to touch)
@@ -522,10 +523,6 @@ class WholeCharacterMixin:
 
         # go over all custom properties for bone
         for prop in bone.keys():
-            # ignore special "_RNA_UI" used for UI editing
-            if prop == "_RNA_UI":
-                continue
-
             # for now, just add all of 'em
             prop_rna = type(bone).bl_rna.properties.get(prop, None)
             if prop_rna is None:

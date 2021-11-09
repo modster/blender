@@ -130,7 +130,7 @@ static void foreach_nodeclass(Scene *UNUSED(scene), void *calldata, bNodeClassCa
   func(calldata, NODE_CLASS_TEXTURE, N_("Texture"));
   func(calldata, NODE_CLASS_OP_COLOR, N_("Color"));
   func(calldata, NODE_CLASS_OP_VECTOR, N_("Vector"));
-  func(calldata, NODE_CLASS_CONVERTOR, N_("Convertor"));
+  func(calldata, NODE_CLASS_CONVERTER, N_("Converter"));
   func(calldata, NODE_CLASS_SCRIPT, N_("Script"));
   func(calldata, NODE_CLASS_GROUP, N_("Group"));
   func(calldata, NODE_CLASS_INTERFACE, N_("Interface"));
@@ -184,10 +184,11 @@ static bool shader_validate_link(bNodeTree *UNUSED(ntree), bNodeLink *link)
   return true;
 }
 
-static bool shader_node_tree_socket_type_valid(eNodeSocketDatatype socket_type,
-                                               bNodeTreeType *UNUSED(ntreetype))
+static bool shader_node_tree_socket_type_valid(bNodeTreeType *UNUSED(ntreetype),
+                                               bNodeSocketType *socket_type)
 {
-  return ELEM(socket_type, SOCK_FLOAT, SOCK_VECTOR, SOCK_RGBA, SOCK_SHADER);
+  return nodeIsStaticSocketType(socket_type) &&
+         ELEM(socket_type->type, SOCK_FLOAT, SOCK_VECTOR, SOCK_RGBA, SOCK_SHADER);
 }
 
 bNodeTreeType *ntreeType_Shader;
@@ -200,7 +201,7 @@ void register_node_tree_type_sh(void)
   tt->type = NTREE_SHADER;
   strcpy(tt->idname, "ShaderNodeTree");
   strcpy(tt->ui_name, N_("Shader Editor"));
-  tt->ui_icon = 0; /* defined in drawnode.c */
+  tt->ui_icon = 0; /* Defined in `drawnode.c`. */
   strcpy(tt->ui_description, N_("Shader nodes"));
 
   tt->foreach_nodeclass = foreach_nodeclass;
@@ -530,6 +531,7 @@ static void ntree_shader_groups_flatten(bNodeTree *localtree)
       bNodeTree *ngroup = (bNodeTree *)node->id;
       ntreeFreeLocalNode(localtree, node);
       ntreeFreeTree(ngroup);
+      BLI_assert(!ngroup->id.py_instance); /* Or call #BKE_libblock_free_data_py. */
       MEM_freeN(ngroup);
     }
     else {
@@ -790,7 +792,7 @@ static void ntree_shader_relink_displacement(bNodeTree *ntree, bNode *output_nod
    */
   nodeAddLink(ntree, displacement_node, displacement_socket, bump_node, bump_input_socket);
 
-  /* Tag as part of the new displacmeent tree. */
+  /* Tag as part of the new displacement tree. */
   dot_node->tmp_flag = -2;
   geo_node->tmp_flag = -2;
   bump_node->tmp_flag = -2;

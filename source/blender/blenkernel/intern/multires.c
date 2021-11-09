@@ -468,15 +468,9 @@ void multires_force_sculpt_rebuild(Object *object)
     object->sculpt->pbvh = NULL;
   }
 
-  if (ss->pmap != NULL) {
-    MEM_freeN(ss->pmap);
-    ss->pmap = NULL;
-  }
+  MEM_SAFE_FREE(ss->pmap);
 
-  if (ss->pmap_mem != NULL) {
-    MEM_freeN(ss->pmap_mem);
-    ss->pmap_mem = NULL;
-  }
+  MEM_SAFE_FREE(ss->pmap_mem);
 }
 
 void multires_force_external_reload(Object *object)
@@ -1502,7 +1496,7 @@ void multires_topology_changed(Mesh *me)
     if (!mdisp->totdisp || !mdisp->disps) {
       if (grid) {
         mdisp->totdisp = grid;
-        mdisp->disps = MEM_calloc_arrayN(sizeof(float[3]), mdisp->totdisp, "mdisp topology");
+        mdisp->disps = MEM_calloc_arrayN(mdisp->totdisp, sizeof(float[3]), "mdisp topology");
       }
 
       continue;

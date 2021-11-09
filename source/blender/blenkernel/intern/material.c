@@ -46,6 +46,7 @@
 #include "DNA_meta_types.h"
 #include "DNA_node_types.h"
 #include "DNA_object_types.h"
+#include "DNA_particle_types.h"
 #include "DNA_pointcloud_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_volume_types.h"
@@ -62,7 +63,6 @@
 #include "BKE_curve.h"
 #include "BKE_displist.h"
 #include "BKE_editmesh.h"
-#include "BKE_font.h"
 #include "BKE_gpencil.h"
 #include "BKE_icons.h"
 #include "BKE_idtype.h"
@@ -73,7 +73,9 @@
 #include "BKE_material.h"
 #include "BKE_mesh.h"
 #include "BKE_node.h"
+#include "BKE_object.h"
 #include "BKE_scene.h"
+#include "BKE_vfont.h"
 
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_build.h"
@@ -135,7 +137,7 @@ static void material_copy_data(Main *bmain, ID *id_dst, const ID *id_src, const 
 
   BLI_listbase_clear(&material_dst->gpumaterial);
 
-  /* TODO Duplicate Engine Settings and set runtime to NULL */
+  /* TODO: Duplicate Engine Settings and set runtime to NULL. */
 }
 
 static void material_free_data(ID *id)
@@ -164,46 +166,44 @@ static void material_foreach_id(ID *id, LibraryForeachIDData *data)
 {
   Material *material = (Material *)id;
   /* Nodetrees **are owned by IDs**, treat them as mere sub-data and not real ID! */
-  if (!BKE_library_foreach_ID_embedded(data, (ID **)&material->nodetree)) {
-    return;
-  }
+  BKE_LIB_FOREACHID_PROCESS_FUNCTION_CALL(
+      data, BKE_library_foreach_ID_embedded(data, (ID **)&material->nodetree));
   if (material->texpaintslot != NULL) {
-    BKE_LIB_FOREACHID_PROCESS(data, material->texpaintslot->ima, IDWALK_CB_NOP);
+    BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, material->texpaintslot->ima, IDWALK_CB_NOP);
   }
   if (material->gp_style != NULL) {
-    BKE_LIB_FOREACHID_PROCESS(data, material->gp_style->sima, IDWALK_CB_USER);
-    BKE_LIB_FOREACHID_PROCESS(data, material->gp_style->ima, IDWALK_CB_USER);
+    BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, material->gp_style->sima, IDWALK_CB_USER);
+    BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, material->gp_style->ima, IDWALK_CB_USER);
   }
 }
 
 static void material_blend_write(BlendWriter *writer, ID *id, const void *id_address)
 {
   Material *ma = (Material *)id;
-  if (ma->id.us > 0 || BLO_write_is_undo(writer)) {
-    /* Clean up, important in undo case to reduce false detection of changed datablocks. */
-    ma->texpaintslot = NULL;
-    BLI_listbase_clear(&ma->gpumaterial);
 
-    /* write LibData */
-    BLO_write_id_struct(writer, Material, id_address, &ma->id);
-    BKE_id_blend_write(writer, &ma->id);
+  /* Clean up, important in undo case to reduce false detection of changed datablocks. */
+  ma->texpaintslot = NULL;
+  BLI_listbase_clear(&ma->gpumaterial);
 
-    if (ma->adt) {
-      BKE_animdata_blend_write(writer, ma->adt);
-    }
+  /* write LibData */
+  BLO_write_id_struct(writer, Material, id_address, &ma->id);
+  BKE_id_blend_write(writer, &ma->id);
 
-    /* nodetree is integral part of material, no libdata */
-    if (ma->nodetree) {
-      BLO_write_struct(writer, bNodeTree, ma->nodetree);
-      ntreeBlendWrite(writer, ma->nodetree);
-    }
+  if (ma->adt) {
+    BKE_animdata_blend_write(writer, ma->adt);
+  }
 
-    BKE_previewimg_blend_write(writer, ma->preview);
+  /* nodetree is integral part of material, no libdata */
+  if (ma->nodetree) {
+    BLO_write_struct(writer, bNodeTree, ma->nodetree);
+    ntreeBlendWrite(writer, ma->nodetree);
+  }
 
-    /* grease pencil settings */
-    if (ma->gp_style) {
-      BLO_write_struct(writer, MaterialGPencilStyle, ma->gp_style);
-    }
+  BKE_previewimg_blend_write(writer, ma->preview);
+
+  /* grease pencil settings */
+  if (ma->gp_style) {
+    BLO_write_struct(writer, MaterialGPencilStyle, ma->gp_style);
   }
 }
 
@@ -260,7 +260,7 @@ IDTypeInfo IDType_ID_MA = {
     .name = "Material",
     .name_plural = "materials",
     .translation_context = BLT_I18NCONTEXT_ID_MATERIAL,
-    .flags = 0,
+    .flags = IDTYPE_FLAGS_APPEND_IS_REUSABLE,
 
     .init_data = material_init_data,
     .copy_data = material_copy_data,
@@ -463,21 +463,33 @@ static void material_data_index_remove_id(ID *id, short index)
   }
 }
 
-bool BKE_object_material_slot_used(ID *id, short actcol)
+bool BKE_object_material_slot_used(Object *object, short actcol)
 {
-  /* ensure we don't try get materials from non-obdata */
-  BLI_assert(OB_DATA_SUPPORT_ID(GS(id->name)));
+  if (!BKE_object_supports_material_slots(object)) {
+    return false;
+  }
 
-  switch (GS(id->name)) {
+  LISTBASE_FOREACH (ParticleSystem *, psys, &object->particlesystem) {
+    if (psys->part->omat == actcol) {
+      return true;
+    }
+  }
+
+  ID *ob_data = object->data;
+  if (ob_data == NULL || !OB_DATA_SUPPORT_ID(GS(ob_data->name))) {
+    return false;
+  }
+
+  switch (GS(ob_data->name)) {
     case ID_ME:
-      return BKE_mesh_material_index_used((Mesh *)id, actcol - 1);
+      return BKE_mesh_material_index_used((Mesh *)ob_data, actcol - 1);
     case ID_CU:
-      return BKE_curve_material_index_used((Curve *)id, actcol - 1);
+      return BKE_curve_material_index_used((Curve *)ob_data, actcol - 1);
     case ID_MB:
-      /* meta-elems don't have materials atm */
+      /* Meta-elements don't support materials at the moment. */
       return false;
     case ID_GD:
-      return BKE_gpencil_material_index_used((bGPdata *)id, actcol - 1);
+      return BKE_gpencil_material_index_used((bGPdata *)ob_data, actcol - 1);
     default:
       return false;
   }
@@ -864,7 +876,7 @@ void BKE_object_material_resize(Main *bmain, Object *ob, const short totcol, boo
     ob->mat = newmatar;
     ob->matbits = newmatbits;
   }
-  /* XXX, why not realloc on shrink? - campbell */
+  /* XXX(campbell): why not realloc on shrink? */
 
   ob->totcol = totcol;
   if (ob->totcol && ob->actcol == 0) {
@@ -887,7 +899,17 @@ void BKE_object_materials_test(Main *bmain, Object *ob, ID *id)
     return;
   }
 
-  BKE_object_material_resize(bmain, ob, *totcol, false);
+  if ((ob->id.tag & LIB_TAG_MISSING) == 0 && (id->tag & LIB_TAG_MISSING) != 0) {
+    /* Exception: In case the object is a valid data, but its obdata is an empty place-holder,
+     * use object's material slots amount as reference.
+     * This avoids loosing materials in a local object when its linked obdata gets missing.
+     * See T92780. */
+    BKE_id_material_resize(bmain, id, (short)ob->totcol, false);
+  }
+  else {
+    /* Normal case: the use the obdata amount of materials slots to update the object's one. */
+    BKE_object_material_resize(bmain, ob, *totcol, false);
+  }
 }
 
 void BKE_objects_materials_test_all(Main *bmain, ID *id)
@@ -1168,7 +1190,7 @@ void BKE_object_material_from_eval_data(Main *bmain, Object *ob_orig, ID *data_e
   BKE_object_materials_test(bmain, ob_orig, data_orig);
 }
 
-/* XXX - this calls many more update calls per object then are needed, could be optimized */
+/* XXX: this calls many more update calls per object then are needed, could be optimized. */
 void BKE_object_material_array_assign(Main *bmain,
                                       struct Object *ob,
                                       struct Material ***matar,
@@ -1802,6 +1824,7 @@ void BKE_material_copybuf_free(void)
 {
   if (matcopybuf.nodetree) {
     ntreeFreeLocalTree(matcopybuf.nodetree);
+    BLI_assert(!matcopybuf.nodetree->id.py_instance); /* Or call #BKE_libblock_free_data_py. */
     MEM_freeN(matcopybuf.nodetree);
     matcopybuf.nodetree = NULL;
   }
@@ -1823,7 +1846,7 @@ void BKE_material_copybuf_copy(Main *bmain, Material *ma)
 
   matcopybuf.preview = NULL;
   BLI_listbase_clear(&matcopybuf.gpumaterial);
-  /* TODO Duplicate Engine Settings and set runtime to NULL */
+  /* TODO: Duplicate Engine Settings and set runtime to NULL. */
   matcopied = 1;
 }
 

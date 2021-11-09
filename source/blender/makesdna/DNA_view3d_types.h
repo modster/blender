@@ -69,7 +69,7 @@ typedef struct RegionView3D {
   float clip_local[6][4];
   struct BoundBox *clipbb;
 
-  /** Allocated backup of its self while in localview. */
+  /** Allocated backup of its self while in local-view. */
   struct RegionView3D *localvd;
   struct RenderEngine *render_engine;
 
@@ -204,6 +204,7 @@ typedef struct View3DOverlay {
   /** Edit mode settings. */
   int edit_flag;
   float normals_length;
+  float normals_constant_screen_size;
   float backwire_opacity;
 
   /** Paint mode settings. */
@@ -238,6 +239,8 @@ typedef struct View3DOverlay {
   float gpencil_vertex_paint_opacity;
   /** Handles display type for curves. */
   int handle_display;
+
+  char _pad[4];
 } View3DOverlay;
 
 /* View3DOverlay->handle_display */
@@ -257,7 +260,7 @@ typedef struct View3D_Runtime {
   int flag;
 
   char _pad1[4];
-  /* Only used for overlay stats while in localview. */
+  /* Only used for overlay stats while in local-view. */
   struct SceneStats *local_stats;
 } View3D_Runtime;
 
@@ -295,7 +298,7 @@ typedef struct View3D {
   struct Object *camera, *ob_center;
   rctf render_border;
 
-  /** Allocated backup of its self while in localview. */
+  /** Allocated backup of its self while in local-view. */
   struct View3D *localvd;
 
   /** Optional string for armature bone to define center, MAXBONENAME. */
@@ -370,6 +373,7 @@ typedef struct View3D {
 #define V3D_HIDE_HELPLINES (1 << 2)
 #define V3D_FLAG_UNUSED_2 (1 << 3) /* cleared */
 #define V3D_XR_SESSION_MIRROR (1 << 4)
+#define V3D_XR_SESSION_SURFACE (1 << 5)
 
 #define V3D_FLAG_UNUSED_10 (1 << 10) /* cleared */
 #define V3D_SELECT_OUTLINE (1 << 11)
@@ -462,6 +466,8 @@ enum {
 #define V3D_FLAG2_UNUSED_13 (1 << 13) /* cleared */
 #define V3D_FLAG2_UNUSED_14 (1 << 14) /* cleared */
 #define V3D_FLAG2_UNUSED_15 (1 << 15) /* cleared */
+#define V3D_XR_SHOW_CONTROLLERS (1 << 16)
+#define V3D_XR_SHOW_CUSTOM_OVERLAYS (1 << 17)
 
 /** #View3D.gp_flag (short) */
 #define V3D_GP_FADE_OBJECTS (1 << 0) /* Fade all non GP objects */
@@ -493,6 +499,16 @@ enum {
   V3D_SHADING_SCENE_WORLD_RENDER = (1 << 13),
   V3D_SHADING_STUDIOLIGHT_VIEW_ROTATION = (1 << 14),
 };
+
+#define V3D_USES_SCENE_LIGHTS(v3d) \
+  ((((v3d)->shading.type == OB_MATERIAL) && ((v3d)->shading.flag & V3D_SHADING_SCENE_LIGHTS)) || \
+   (((v3d)->shading.type == OB_RENDER) && \
+    ((v3d)->shading.flag & V3D_SHADING_SCENE_LIGHTS_RENDER)))
+
+#define V3D_USES_SCENE_WORLD(v3d) \
+  ((((v3d)->shading.type == OB_MATERIAL) && ((v3d)->shading.flag & V3D_SHADING_SCENE_WORLD)) || \
+   (((v3d)->shading.type == OB_RENDER) && \
+    ((v3d)->shading.flag & V3D_SHADING_SCENE_WORLD_RENDER)))
 
 /** #View3DShading.cavity_type */
 enum {
@@ -551,6 +567,7 @@ enum {
   // V3D_OVERLAY_EDIT_CU_HANDLES = (1 << 20),
 
   V3D_OVERLAY_EDIT_CU_NORMALS = (1 << 21),
+  V3D_OVERLAY_EDIT_CONSTANT_SCREEN_SIZE_NORMALS = (1 << 22),
 };
 
 /** #View3DOverlay.paint_flag */

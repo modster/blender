@@ -745,7 +745,7 @@ class FEdge : public Interface1D {
     _VertexB = vB;
   }
 
-  /** Sets the FEdge Id . */
+  /** Sets the FEdge Id. */
   inline void setId(const Id &id)
   {
     _Id = id;
@@ -1153,7 +1153,7 @@ class FEdgeSharp : public FEdge {
   bool _bFaceMark;
 
  public:
-  /** Returns the string "FEdgeSharp" . */
+  /** Returns the string "FEdgeSharp". */
   virtual string getExactTypeName() const
   {
     return "FEdgeSharp";
@@ -1305,7 +1305,7 @@ class FEdgeSmooth : public FEdge {
   bool _FaceMark;
 
  public:
-  /** Returns the string "FEdgeSmooth" . */
+  /** Returns the string "FEdgeSmooth". */
   virtual string getExactTypeName() const
   {
     return "FEdgeSmooth";
@@ -1916,7 +1916,7 @@ class SShape {
     return _LibraryPath;
   }
 
-  /* Modififers */
+  /* Modifiers */
   /** Sets the Id of the shape. */
   inline void setId(Id id)
   {

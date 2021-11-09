@@ -62,10 +62,10 @@ int BLI_task_scheduler_num_threads(void);
  * be launched.
  */
 
-typedef enum TaskPriority {
+typedef enum eTaskPriority {
   TASK_PRIORITY_LOW,
   TASK_PRIORITY_HIGH,
-} TaskPriority;
+} eTaskPriority;
 
 typedef struct TaskPool TaskPool;
 typedef void (*TaskRunFunction)(TaskPool *__restrict pool, void *taskdata);
@@ -73,21 +73,21 @@ typedef void (*TaskFreeFunction)(TaskPool *__restrict pool, void *taskdata);
 
 /* Regular task pool that immediately starts executing tasks as soon as they
  * are pushed, either on the current or another thread. */
-TaskPool *BLI_task_pool_create(void *userdata, TaskPriority priority);
+TaskPool *BLI_task_pool_create(void *userdata, eTaskPriority priority);
 
 /* Background: always run tasks in a background thread, never immediately
  * execute them. For running background jobs. */
-TaskPool *BLI_task_pool_create_background(void *userdata, TaskPriority priority);
+TaskPool *BLI_task_pool_create_background(void *userdata, eTaskPriority priority);
 
 /* Background Serial: run tasks one after the other in the background,
  * without parallelization between the tasks. */
-TaskPool *BLI_task_pool_create_background_serial(void *userdata, TaskPriority priority);
+TaskPool *BLI_task_pool_create_background_serial(void *userdata, eTaskPriority priority);
 
 /* Suspended: don't execute tasks until work_and_wait is called. This is slower
  * as threads can't immediately start working. But it can be used if the data
  * structures the threads operate on are not fully initialized until all tasks
  * are created. */
-TaskPool *BLI_task_pool_create_suspended(void *userdata, TaskPriority priority);
+TaskPool *BLI_task_pool_create_suspended(void *userdata, eTaskPriority priority);
 
 /* No threads: immediately executes tasks on the same thread. For debugging. */
 TaskPool *BLI_task_pool_create_no_threads(void *userdata);
@@ -129,6 +129,9 @@ typedef struct TaskParallelTLS {
 typedef void (*TaskParallelRangeFunc)(void *__restrict userdata,
                                       const int iter,
                                       const TaskParallelTLS *__restrict tls);
+
+typedef void (*TaskParallelInitFunc)(const void *__restrict userdata, void *__restrict chunk);
+
 typedef void (*TaskParallelReduceFunc)(const void *__restrict userdata,
                                        void *__restrict chunk_join,
                                        void *__restrict chunk);
@@ -151,6 +154,10 @@ typedef struct TaskParallelSettings {
   /* Function called from calling thread once whole range have been
    * processed.
    */
+  /* Function called to initialize user data chunk,
+   * typically to allocate data, freed by `func_free`.
+   */
+  TaskParallelInitFunc func_init;
   /* Function called to join user data chunk into another, to reduce
    * the result to the original userdata_chunk memory.
    * The reduce functions should have no side effects, so that they

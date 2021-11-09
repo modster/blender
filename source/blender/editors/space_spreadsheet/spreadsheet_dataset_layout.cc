@@ -38,9 +38,9 @@ namespace blender::ed::spreadsheet {
  * Definition for the component->attribute-domain hierarchy.
  * Constructed at compile time.
  *
- * \warning: Order of attribute-domains matters! It __must__ match the #AttributeDomain definition
- *           and fill gaps with unset optionals (i.e. `std::nullopt`). Would be nice to use array
- *           designators for this (which C++ doesn't support).
+ * \warning Order of attribute-domains matters! It __must__ match the #AttributeDomain
+ * definition and fill gaps with unset optionals (i.e. `std::nullopt`). Would be nice to use
+ * array designators for this (which C++ doesn't support).
  */
 constexpr DatasetComponentLayoutInfo DATASET_layout_hierarchy[] = {
     {
@@ -73,6 +73,12 @@ constexpr DatasetComponentLayoutInfo DATASET_layout_hierarchy[] = {
         {
             ATTR_INFO(ATTR_DOMAIN_POINT, N_("Point"), ICON_PARTICLE_POINT),
         },
+    },
+    {
+        GEO_COMPONENT_TYPE_VOLUME,
+        N_("Volume Grids"),
+        ICON_VOLUME_DATA,
+        {},
     },
     {
         GEO_COMPONENT_TYPE_INSTANCES,

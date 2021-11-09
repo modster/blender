@@ -46,6 +46,7 @@ const EnumPropertyItem rna_enum_region_type_items[] = {
     {RGN_TYPE_EXECUTE, "EXECUTE", 0, "Execute Buttons", ""},
     {RGN_TYPE_FOOTER, "FOOTER", 0, "Footer", ""},
     {RGN_TYPE_TOOL_HEADER, "TOOL_HEADER", 0, "Tool Header", ""},
+    {RGN_TYPE_XR, "XR", 0, "XR", ""},
     {0, NULL, 0, NULL, NULL},
 };
 
@@ -495,7 +496,7 @@ static void rna_def_view2d(BlenderRNA *brna)
   RNA_def_struct_ui_text(srna, "View2D", "Scroll and zoom for a 2D region");
   RNA_def_struct_sdna(srna, "View2D");
 
-  /* TODO more View2D properties could be exposed here (read-only) */
+  /* TODO: more View2D properties could be exposed here (read-only). */
 
   rna_def_view2d_api(srna);
 }

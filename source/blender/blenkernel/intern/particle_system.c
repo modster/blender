@@ -169,10 +169,7 @@ void psys_reset(ParticleSystem *psys, int mode)
   }
 
   /* reset children */
-  if (psys->child) {
-    MEM_freeN(psys->child);
-    psys->child = NULL;
-  }
+  MEM_SAFE_FREE(psys->child);
 
   psys->totchild = 0;
 
@@ -182,10 +179,7 @@ void psys_reset(ParticleSystem *psys, int mode)
   /* reset point cache */
   BKE_ptcache_invalidate(psys->pointcache);
 
-  if (psys->fluid_springs) {
-    MEM_freeN(psys->fluid_springs);
-    psys->fluid_springs = NULL;
-  }
+  MEM_SAFE_FREE(psys->fluid_springs);
 
   psys->tot_fluidsprings = psys->alloc_fluidsprings = 0;
 }
@@ -447,9 +441,9 @@ void psys_calc_dmcache(Object *ob, Mesh *mesh_final, Mesh *mesh_original, Partic
     MEM_freeN(nodedmelem);
   }
   else {
-    /* TODO PARTICLE, make the following line unnecessary, each function
+    /* TODO_PARTICLE: make the following line unnecessary, each function
      * should know to use the num or num_dmcache, set the num_dmcache to
-     * an invalid value, just in case */
+     * an invalid value, just in case. */
 
     LOOP_PARTICLES
     {
@@ -992,9 +986,9 @@ void psys_get_birth_coords(
           /* (part->rotmode == PART_ROT_NOR_TAN) */
           float tmat[3][3];
 
-          /* note: utan_local is not taken from 'utan', we calculate from rot_vec/vtan */
-          /* note: it looks like rotation phase may be applied twice (once with vtan, again below)
-           * however this isn't the case - campbell */
+          /* NOTE: utan_local is not taken from 'utan', we calculate from rot_vec/vtan. */
+          /* NOTE(campbell): it looks like rotation phase may be applied twice
+           * (once with vtan, again below) however this isn't the case. */
           float *rot_vec_local = tmat[0];
           float *vtan_local = tmat[1];
           float *utan_local = tmat[2];
@@ -1014,7 +1008,7 @@ void psys_get_birth_coords(
           cross_v3_v3v3(utan_local, vtan_local, rot_vec_local);
           cross_v3_v3v3(vtan_local, utan_local, rot_vec_local);
 
-          /* note: no need to normalize */
+          /* NOTE: no need to normalize. */
           mat3_to_quat(q2, tmat);
         }
 
@@ -1644,10 +1638,10 @@ static void sph_springs_modify(ParticleSystem *psys, float dtime)
     Lij = spring->rest_length;
     d = yield_ratio * timefix * Lij;
 
-    if (rij > Lij + d) {  // Stretch
+    if (rij > Lij + d) { /* Stretch */
       spring->rest_length += plasticity * (rij - Lij - d) * timefix;
     }
-    else if (rij < Lij - d) {  // Compress
+    else if (rij < Lij - d) { /* Compress */
       spring->rest_length -= plasticity * (Lij - d - rij) * timefix;
     }
 
@@ -2215,7 +2209,7 @@ static void sph_integrate(ParticleSimulationData *sim,
                           SPHData *sphdata)
 {
   ParticleSettings *part = sim->psys->part;
-  // float timestep = psys_get_timestep(sim); // UNUSED
+  // float timestep = psys_get_timestep(sim); /* UNUSED */
   float pa_mass = part->mass * ((part->flag & PART_SIZEMASS) ? pa->size : 1.0f);
   float dtime = dfra * psys_get_timestep(sim);
   // int steps = 1; // UNUSED
@@ -2224,7 +2218,7 @@ static void sph_integrate(ParticleSimulationData *sim,
   sphdata->pa = pa;
   sphdata->mass = pa_mass;
   sphdata->pass = 0;
-  // sphdata.element_size and sphdata.flow are set in the callback.
+  /* #sphdata.element_size and #sphdata.flow are set in the callback. */
 
   /* Restore previous state and treat gravity & effectors as external acceleration. */
   sub_v3_v3v3(effector_acceleration, pa->state.vel, pa->prev_state.vel);
@@ -2617,7 +2611,7 @@ static float collision_newton_rhapson(ParticleCollision *col,
      * here. */
     if (d1 == d0) {
       /* If first iteration, try from other end where the gradient may be
-       * greater. Note: code duplicated below. */
+       * greater. NOTE: code duplicated below. */
       if (iter == 0) {
         t0 = 1.0f;
         collision_interpolate_element(pce, t0, col->f, col);
@@ -2638,7 +2632,7 @@ static float collision_newton_rhapson(ParticleCollision *col,
     t1 -= d1 * dd;
 
     /* Particle moving away from plane could also mean a strangely rotating
-     * face, so check from end. Note: code duplicated above. */
+     * face, so check from end. NOTE: code duplicated above. */
     if (iter == 0 && t1 < 0.0f) {
       t0 = 1.0f;
       collision_interpolate_element(pce, t0, col->f, col);
@@ -3112,7 +3106,7 @@ static void collision_fail(ParticleData *pa, ParticleCollision *col)
   copy_v3_v3(pa->state.vel, col->pce.vel);
   mul_v3_fl(pa->state.vel, col->inv_timestep);
 
-  /* printf("max iterations\n"); */
+  // printf("max iterations\n");
 }
 
 /* Particle - Mesh collision detection and response
@@ -4516,10 +4510,7 @@ static void system_step(ParticleSimulationData *sim, float cfra, const bool use_
     reset_all_particles(sim, 0.0, cfra, oldtotpart);
     free_unexisting_particles(sim);
 
-    if (psys->fluid_springs) {
-      MEM_freeN(psys->fluid_springs);
-      psys->fluid_springs = NULL;
-    }
+    MEM_SAFE_FREE(psys->fluid_springs);
 
     psys->tot_fluidsprings = psys->alloc_fluidsprings = 0;
 
@@ -4770,6 +4761,7 @@ static void particle_settings_free_local(ParticleSettings *particle_settings)
 {
   BKE_libblock_free_datablock(&particle_settings->id, 0);
   BKE_libblock_free_data(&particle_settings->id, false);
+  BLI_assert(!particle_settings->id.py_instance); /* Or call #BKE_libblock_free_data_py. */
   MEM_freeN(particle_settings);
 }
 

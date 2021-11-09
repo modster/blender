@@ -52,6 +52,8 @@ void BKE_mesh_runtime_reset(Mesh *mesh)
   memset(&mesh->runtime, 0, sizeof(mesh->runtime));
   mesh->runtime.eval_mutex = MEM_mallocN(sizeof(ThreadMutex), "mesh runtime eval_mutex");
   BLI_mutex_init(mesh->runtime.eval_mutex);
+  mesh->runtime.render_mutex = MEM_mallocN(sizeof(ThreadMutex), "mesh runtime render_mutex");
+  BLI_mutex_init(mesh->runtime.render_mutex);
 }
 
 /* Clear all pointers which we don't want to be shared on copying the datablock.
@@ -71,6 +73,9 @@ void BKE_mesh_runtime_reset_on_copy(Mesh *mesh, const int UNUSED(flag))
 
   mesh->runtime.eval_mutex = MEM_mallocN(sizeof(ThreadMutex), "mesh runtime eval_mutex");
   BLI_mutex_init(mesh->runtime.eval_mutex);
+
+  mesh->runtime.render_mutex = MEM_mallocN(sizeof(ThreadMutex), "mesh runtime render_mutex");
+  BLI_mutex_init(mesh->runtime.render_mutex);
 }
 
 void BKE_mesh_runtime_clear_cache(Mesh *mesh)
@@ -79,6 +84,11 @@ void BKE_mesh_runtime_clear_cache(Mesh *mesh)
     BLI_mutex_end(mesh->runtime.eval_mutex);
     MEM_freeN(mesh->runtime.eval_mutex);
     mesh->runtime.eval_mutex = NULL;
+  }
+  if (mesh->runtime.render_mutex != NULL) {
+    BLI_mutex_end(mesh->runtime.render_mutex);
+    MEM_freeN(mesh->runtime.render_mutex);
+    mesh->runtime.render_mutex = NULL;
   }
   if (mesh->runtime.mesh_eval != NULL) {
     mesh->runtime.mesh_eval->edit_mesh = NULL;
@@ -158,8 +168,12 @@ static void mesh_runtime_looptri_recalc_isolated(void *userdata)
   BKE_mesh_runtime_looptri_recalc(mesh);
 }
 
-/* This is a ported copy of dm_getLoopTriArray(dm). */
-const MLoopTri *BKE_mesh_runtime_looptri_ensure(Mesh *mesh)
+/**
+ * \note This function only fills a cache, and therefore the mesh argument can
+ * be considered logically const. Concurrent access is protected by a mutex.
+ * \note This is a ported copy of dm_getLoopTriArray(dm).
+ */
+const MLoopTri *BKE_mesh_runtime_looptri_ensure(const Mesh *mesh)
 {
   ThreadMutex *mesh_eval_mutex = (ThreadMutex *)mesh->runtime.eval_mutex;
   BLI_mutex_lock(mesh_eval_mutex);
@@ -171,7 +185,7 @@ const MLoopTri *BKE_mesh_runtime_looptri_ensure(Mesh *mesh)
   }
   else {
     /* Must isolate multithreaded tasks while holding a mutex lock. */
-    BLI_task_isolate(mesh_runtime_looptri_recalc_isolated, mesh);
+    BLI_task_isolate(mesh_runtime_looptri_recalc_isolated, (void *)mesh);
     looptri = mesh->runtime.looptris.array;
   }
 
@@ -286,7 +300,7 @@ static void mesh_runtime_debug_info_layers(DynStr *dynstr, CustomData *cd)
 
   for (type = 0; type < CD_NUMTYPES; type++) {
     if (CustomData_has_layer(cd, type)) {
-      /* note: doesn't account for multiple layers */
+      /* NOTE: doesn't account for multiple layers. */
       const char *name = CustomData_layertype_name(type);
       const int size = CustomData_sizeof(type);
       const void *pt = CustomData_get_layer(cd, type);

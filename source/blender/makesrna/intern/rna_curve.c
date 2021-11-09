@@ -30,7 +30,7 @@
 
 #include "BLT_translation.h"
 
-#include "BKE_font.h"
+#include "BKE_vfont.h"
 
 #include "RNA_access.h"
 #include "RNA_define.h"
@@ -591,7 +591,7 @@ static int rna_Curve_body_length(PointerRNA *ptr)
   return cu->len;
 }
 
-/* TODO, how to handle editmode? */
+/* TODO: how to handle editmode? */
 static void rna_Curve_body_set(PointerRNA *ptr, const char *value)
 {
   size_t len_bytes;
@@ -1802,17 +1802,11 @@ static void rna_def_curve(BlenderRNA *brna)
       prop, "End Mapping Type", "Determine how the geometry end factor is mapped to a spline");
   RNA_def_property_update(prop, 0, "rna_Curve_update_data");
 
-  /* XXX - would be nice to have a better way to do this, only add for testing. */
+  /* XXX: would be nice to have a better way to do this, only add for testing. */
   prop = RNA_def_property(srna, "twist_smooth", PROP_FLOAT, PROP_NONE);
   RNA_def_property_float_sdna(prop, NULL, "twist_smooth");
   RNA_def_property_ui_range(prop, 0, 100.0, 1, 2);
   RNA_def_property_ui_text(prop, "Twist Smooth", "Smoothing iteration for tangents");
-  RNA_def_property_update(prop, 0, "rna_Curve_update_data");
-
-  prop = RNA_def_property(srna, "use_fill_deform", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_boolean_sdna(prop, NULL, "flag", CU_DEFORM_FILL);
-  RNA_def_property_ui_text(
-      prop, "Fill Deformed", "Fill curve after applying shape keys and all modifiers");
   RNA_def_property_update(prop, 0, "rna_Curve_update_data");
 
   prop = RNA_def_property(srna, "use_fill_caps", PROP_BOOLEAN, PROP_NONE);
@@ -2017,7 +2011,7 @@ static void rna_def_curve_nurb(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Cyclic V", "Make this surface a closed loop in the V direction");
   RNA_def_property_update(prop, 0, "rna_Nurb_update_cyclic_v");
 
-  /* Note, endpoint and bezier flags should never be on at the same time! */
+  /* NOTE: endpoint and bezier flags should never be on at the same time! */
   prop = RNA_def_property(srna, "use_endpoint_u", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flagu", CU_NURB_ENDPOINT);
   RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);

@@ -35,6 +35,8 @@
 #include "BLI_utildefines_stack.h"
 
 #include "BKE_context.h"
+#include "BKE_customdata.h"
+#include "BKE_deform.h"
 #include "BKE_editmesh.h"
 #include "BKE_layer.h"
 #include "BKE_report.h"
@@ -434,7 +436,7 @@ struct NearestEdgeUserData {
   struct NearestEdgeUserData_Hit hit_cycle;
 };
 
-/* note; uses v3d, so needs active 3d window */
+/* NOTE: uses v3d, so needs active 3d window. */
 static void find_nearest_edge__doClosest(
     void *userData, BMEdge *eed, const float screen_co_a[2], const float screen_co_b[2], int index)
 {
@@ -882,9 +884,8 @@ static bool unified_findnearest(ViewContext *vc,
                                 BMFace **r_efa)
 {
   BMEditMesh *em = vc->em;
-  static short mval_prev[2] = {-1, -1};
-  /* only cycle while the mouse remains still */
-  const bool use_cycle = ((mval_prev[0] == vc->mval[0]) && (mval_prev[1] == vc->mval[1]));
+
+  const bool use_cycle = !WM_cursor_test_motion_and_update(vc->mval);
   const float dist_init = ED_view3d_select_dist_px();
   /* since edges select lines, we give dots advantage of ~20 pix */
   const float dist_margin = (dist_init / 2);
@@ -964,7 +965,7 @@ static bool unified_findnearest(ViewContext *vc,
     }
   }
 
-  /* return only one of 3 pointers, for frontbuffer redraws */
+  /* Return only one of 3 pointers, for front-buffer redraws. */
   if (hit.v.ele) {
     hit.f.ele = NULL;
     hit.e.ele = NULL;
@@ -985,9 +986,6 @@ static bool unified_findnearest(ViewContext *vc,
       hit.f.ele = hit.f_zbuf.ele;
     }
   }
-
-  mval_prev[0] = vc->mval[0];
-  mval_prev[1] = vc->mval[1];
 
   /* Only one element type will be non-null. */
   BLI_assert(((hit.v.ele != NULL) + (hit.e.ele != NULL) + (hit.f.ele != NULL)) <= 1);
@@ -1858,10 +1856,16 @@ void MESH_OT_loop_select(wmOperatorType *ot)
   ot->flag = OPTYPE_UNDO;
 
   /* properties */
-  RNA_def_boolean(ot->srna, "extend", 0, "Extend Select", "Extend the selection");
-  RNA_def_boolean(ot->srna, "deselect", 0, "Deselect", "Remove from the selection");
-  RNA_def_boolean(ot->srna, "toggle", 0, "Toggle Select", "Toggle the selection");
-  RNA_def_boolean(ot->srna, "ring", 0, "Select Ring", "Select ring");
+  PropertyRNA *prop;
+
+  prop = RNA_def_boolean(ot->srna, "extend", 0, "Extend Select", "Extend the selection");
+  RNA_def_property_flag(prop, PROP_SKIP_SAVE);
+  prop = RNA_def_boolean(ot->srna, "deselect", 0, "Deselect", "Remove from the selection");
+  RNA_def_property_flag(prop, PROP_SKIP_SAVE);
+  prop = RNA_def_boolean(ot->srna, "toggle", 0, "Toggle Select", "Toggle the selection");
+  RNA_def_property_flag(prop, PROP_SKIP_SAVE);
+  prop = RNA_def_boolean(ot->srna, "ring", 0, "Select Ring", "Select ring");
+  RNA_def_property_flag(prop, PROP_SKIP_SAVE);
 }
 
 void MESH_OT_edgering_select(wmOperatorType *ot)
@@ -1878,10 +1882,16 @@ void MESH_OT_edgering_select(wmOperatorType *ot)
   /* flags */
   ot->flag = OPTYPE_UNDO;
 
-  RNA_def_boolean(ot->srna, "extend", 0, "Extend", "Extend the selection");
-  RNA_def_boolean(ot->srna, "deselect", 0, "Deselect", "Remove from the selection");
-  RNA_def_boolean(ot->srna, "toggle", 0, "Toggle Select", "Toggle the selection");
-  RNA_def_boolean(ot->srna, "ring", 1, "Select Ring", "Select ring");
+  /* Properties. */
+  PropertyRNA *prop;
+  prop = RNA_def_boolean(ot->srna, "extend", 0, "Extend", "Extend the selection");
+  RNA_def_property_flag(prop, PROP_SKIP_SAVE);
+  prop = RNA_def_boolean(ot->srna, "deselect", 0, "Deselect", "Remove from the selection");
+  RNA_def_property_flag(prop, PROP_SKIP_SAVE);
+  prop = RNA_def_boolean(ot->srna, "toggle", 0, "Toggle Select", "Toggle the selection");
+  RNA_def_property_flag(prop, PROP_SKIP_SAVE);
+  prop = RNA_def_boolean(ot->srna, "ring", 1, "Select Ring", "Select ring");
+  RNA_def_property_flag(prop, PROP_SKIP_SAVE);
 }
 
 /** \} */
@@ -3446,7 +3456,7 @@ static void edbm_select_linked_pick_ex(BMEditMesh *em, BMElem *ele, bool sel, in
     select_linked_delimit_begin(bm, delimit);
   }
 
-  /* Note: logic closely matches 'edbm_select_linked_exec', keep in sync */
+  /* NOTE: logic closely matches #edbm_select_linked_exec, keep in sync. */
 
   if (ele->head.htype == BM_VERT) {
     BMVert *eve = (BMVert *)ele;
@@ -4739,10 +4749,11 @@ static bool edbm_select_ungrouped_poll(bContext *C)
     BMEditMesh *em = BKE_editmesh_from_object(obedit);
     const int cd_dvert_offset = CustomData_get_offset(&em->bm->vdata, CD_MDEFORMVERT);
 
+    const ListBase *defbase = BKE_object_defgroup_list(obedit);
     if ((em->selectmode & SCE_SELECT_VERTEX) == 0) {
       CTX_wm_operator_poll_msg_set(C, "Must be in vertex selection mode");
     }
-    else if (BLI_listbase_is_empty(&obedit->defbase) || cd_dvert_offset == -1) {
+    else if (BLI_listbase_is_empty(defbase) || cd_dvert_offset == -1) {
       CTX_wm_operator_poll_msg_set(C, "No weights/vertex groups on object");
     }
     else {
@@ -4856,8 +4867,15 @@ static int edbm_select_axis_exec(bContext *C, wmOperator *op)
   float axis_mat[3][3];
 
   /* 3D view variables may be NULL, (no need to check in poll function). */
-  ED_transform_calc_orientation_from_type_ex(
-      C, axis_mat, scene, CTX_wm_region_view3d(C), obedit, obedit, orientation, V3D_AROUND_ACTIVE);
+  ED_transform_calc_orientation_from_type_ex(scene,
+                                             view_layer,
+                                             CTX_wm_view3d(C),
+                                             CTX_wm_region_view3d(C),
+                                             obedit,
+                                             obedit,
+                                             orientation,
+                                             V3D_AROUND_ACTIVE,
+                                             axis_mat);
 
   const float *axis_vector = axis_mat[axis];
 

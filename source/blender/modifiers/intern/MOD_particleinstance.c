@@ -182,7 +182,7 @@ static bool particle_skip(ParticleInstanceModifierData *pimd, ParticleSystem *ps
 
   totpart = psys->totpart + psys->totchild;
 
-  /* TODO make randomization optional? */
+  /* TODO: make randomization optional? */
   randp = (int)(psys_frand(psys, 3578 + p) * totpart) % totpart;
 
   minp = (int)(totpart * pimd->particle_offset) % (totpart + 1);
@@ -442,7 +442,7 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
             mul_qt_qtqt(frame, frame, rot);
           }
 
-          /* note: direction is same as normal vector currently,
+          /* NOTE: direction is same as normal vector currently,
            * but best to keep this separate so the frame can be
            * rotated later if necessary
            */
@@ -545,7 +545,7 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
   MEM_SAFE_FREE(vert_part_index);
   MEM_SAFE_FREE(vert_part_value);
 
-  result->runtime.cd_dirty_vert |= CD_MASK_NORMAL;
+  BKE_mesh_normals_tag_dirty(result);
 
   return result;
 }

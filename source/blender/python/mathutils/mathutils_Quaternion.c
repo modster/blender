@@ -42,7 +42,7 @@ static PyObject *Quaternion_deepcopy(QuaternionObject *self, PyObject *args);
 
 /* -----------------------------METHODS------------------------------ */
 
-/* note: BaseMath_ReadCallback must be called beforehand */
+/* NOTE: BaseMath_ReadCallback must be called beforehand. */
 static PyObject *Quaternion_to_tuple_ext(QuaternionObject *self, int ndigits)
 {
   PyObject *ret;
@@ -1504,6 +1504,11 @@ static PyGetSetDef Quaternion_getseters[] = {
      (getter)BaseMathObject_is_frozen_get,
      (setter)NULL,
      BaseMathObject_is_frozen_doc,
+     NULL},
+    {"is_valid",
+     (getter)BaseMathObject_is_valid_get,
+     (setter)NULL,
+     BaseMathObject_is_valid_doc,
      NULL},
     {"owner", (getter)BaseMathObject_owner_get, (setter)NULL, BaseMathObject_owner_doc, NULL},
     {NULL, NULL, NULL, NULL, NULL} /* Sentinel */

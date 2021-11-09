@@ -20,8 +20,8 @@
 /** \file
  * \ingroup gpu
  *
- * Interface for accessing gpu-related methods for selection. The semantics will be
- * similar to glRenderMode(GL_SELECT) since the goal is to maintain compatibility.
+ * Interface for accessing GPU-related methods for selection. The semantics will be
+ * similar to `glRenderMode(GL_SELECT)` since the goal is to maintain compatibility.
  */
 
 #include <cstdlib>
@@ -56,7 +56,7 @@ struct GPUSelectQueryState {
   Vector<uint> *ids;
   /* Cache on initialization. */
   uint (*buffer)[4];
-  /* Buffer size (stores number of integers, for actual size multiply by sizeof integer). */
+  /* Buffer size (stores number of integers, for actual size multiply by `sizeof(int)`). */
   uint bufsize;
   /* Mode of operation. */
   char mode;

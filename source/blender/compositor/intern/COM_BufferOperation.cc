@@ -23,21 +23,52 @@ namespace blender::compositor {
 BufferOperation::BufferOperation(MemoryBuffer *buffer, DataType data_type)
 {
   buffer_ = buffer;
-  /* TODO: Implement a MemoryBuffer get_size() method returning a Size2d type. Shorten following
-   * code to: set_resolution(buffer.get_size()) */
-  unsigned int resolution[2];
-  resolution[0] = buffer->getWidth();
-  resolution[1] = buffer->getHeight();
-  setResolution(resolution);
-  addOutputSocket(data_type);
+  inflated_buffer_ = nullptr;
+  set_canvas(buffer->get_rect());
+  add_output_socket(data_type);
+  flags_.is_constant_operation = buffer_->is_a_single_elem();
+  flags_.is_fullframe_operation = false;
 }
 
-void *BufferOperation::initializeTileData(rcti * /*rect*/)
+const float *BufferOperation::get_constant_elem()
 {
-  return buffer_;
+  BLI_assert(buffer_->is_a_single_elem());
+  return buffer_->get_buffer();
 }
 
-void BufferOperation::executePixelSampled(float output[4], float x, float y, PixelSampler sampler)
+void BufferOperation::init_execution()
+{
+  if (buffer_->is_a_single_elem()) {
+    init_mutex();
+  }
+}
+
+void *BufferOperation::initialize_tile_data(rcti * /*rect*/)
+{
+  if (buffer_->is_a_single_elem() == false) {
+    return buffer_;
+  }
+
+  lock_mutex();
+  if (!inflated_buffer_) {
+    inflated_buffer_ = buffer_->inflate();
+  }
+  unlock_mutex();
+  return inflated_buffer_;
+}
+
+void BufferOperation::deinit_execution()
+{
+  if (buffer_->is_a_single_elem()) {
+    deinit_mutex();
+  }
+  delete inflated_buffer_;
+}
+
+void BufferOperation::execute_pixel_sampled(float output[4],
+                                            float x,
+                                            float y,
+                                            PixelSampler sampler)
 {
   switch (sampler) {
     case PixelSampler::Nearest:
@@ -45,16 +76,16 @@ void BufferOperation::executePixelSampled(float output[4], float x, float y, Pix
       break;
     case PixelSampler::Bilinear:
     default:
-      buffer_->readBilinear(output, x, y);
+      buffer_->read_bilinear(output, x, y);
       break;
     case PixelSampler::Bicubic:
       /* No bicubic. Same implementation as ReadBufferOperation. */
-      buffer_->readBilinear(output, x, y);
+      buffer_->read_bilinear(output, x, y);
       break;
   }
 }
 
-void BufferOperation::executePixelFiltered(
+void BufferOperation::execute_pixel_filtered(
     float output[4], float x, float y, float dx[2], float dy[2])
 {
   const float uv[2] = {x, y};

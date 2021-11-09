@@ -134,7 +134,7 @@ class GHOST_ContextVK : public GHOST_Context {
   GHOST_TSuccess getVulkanHandles(void *r_instance,
                                   void *r_physical_device,
                                   void *r_device,
-                                  GHOST_TUns32 *r_graphic_queue_familly);
+                                  uint32_t *r_graphic_queue_familly);
   /**
    * Gets the Vulkan framebuffer related resource handles associated with the Vulkan context.
    * Needs to be called after each swap events as the framebuffer will change.
@@ -145,7 +145,7 @@ class GHOST_ContextVK : public GHOST_Context {
                                      void *command_buffer,
                                      void *render_pass,
                                      void *extent,
-                                     GHOST_TUns32 *fb_id);
+                                     uint32_t *fb_id);
 
   /**
    * Sets the swap interval for swapBuffers.
@@ -218,7 +218,7 @@ class GHOST_ContextVK : public GHOST_Context {
   /** Used to unique framebuffer ids to return when swapchain is recreated. */
   uint32_t m_swapchain_id = 0;
 
-  const char *getPlatformSpecificSurfaceExtension()const ;
+  const char *getPlatformSpecificSurfaceExtension() const;
   GHOST_TSuccess pickPhysicalDevice(std::vector<const char *> required_exts);
   GHOST_TSuccess createSwapchain(void);
   GHOST_TSuccess destroySwapchain(void);

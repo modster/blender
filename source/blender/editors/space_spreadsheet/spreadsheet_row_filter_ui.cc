@@ -105,12 +105,15 @@ static std::string value_string(const SpreadsheetRowFilter &row_filter,
         return row_filter.value_string;
       }
       return "";
-    case SPREADSHEET_VALUE_TYPE_COLOR:
+    case SPREADSHEET_VALUE_TYPE_COLOR: {
       std::ostringstream result;
       result.precision(3);
       result << std::fixed << "(" << row_filter.value_color[0] << ", " << row_filter.value_color[1]
              << ", " << row_filter.value_color[2] << ", " << row_filter.value_color[3] << ")";
       return result.str();
+    }
+    case SPREADSHEET_VALUE_TYPE_STRING:
+      return row_filter.value_string;
   }
   BLI_assert_unreachable();
   return "";
@@ -234,6 +237,8 @@ static void spreadsheet_filter_panel_draw(const bContext *C, Panel *panel)
       uiItemR(layout, filter_ptr, "value_color", 0, IFACE_("Value"), ICON_NONE);
       uiItemR(layout, filter_ptr, "threshold", 0, nullptr, ICON_NONE);
       break;
+    case SPREADSHEET_VALUE_TYPE_STRING:
+      break;
   }
 }
 
@@ -267,20 +272,20 @@ static void spreadsheet_row_filters_layout(const bContext *C, Panel *panel)
   }
   else {
     /* Assuming there's only one group of instanced panels, update the custom data pointers. */
-    Panel *panel = (Panel *)region->panels.first;
+    Panel *panel_iter = (Panel *)region->panels.first;
     LISTBASE_FOREACH (SpreadsheetRowFilter *, row_filter, row_filters) {
 
       /* Move to the next instanced panel corresponding to the next filter. */
-      while ((panel->type == nullptr) || !(panel->type->flag & PANEL_TYPE_INSTANCED)) {
-        panel = panel->next;
-        BLI_assert(panel != nullptr); /* There shouldn't be fewer panels than filters. */
+      while ((panel_iter->type == nullptr) || !(panel_iter->type->flag & PANEL_TYPE_INSTANCED)) {
+        panel_iter = panel_iter->next;
+        BLI_assert(panel_iter != nullptr); /* There shouldn't be fewer panels than filters. */
       }
 
       PointerRNA *filter_ptr = (PointerRNA *)MEM_mallocN(sizeof(PointerRNA), "panel customdata");
       RNA_pointer_create(&screen->id, &RNA_SpreadsheetRowFilter, row_filter, filter_ptr);
-      UI_panel_custom_data_set(panel, filter_ptr);
+      UI_panel_custom_data_set(panel_iter, filter_ptr);
 
-      panel = panel->next;
+      panel_iter = panel_iter->next;
     }
   }
 }
@@ -336,7 +341,7 @@ void register_row_filter_panels(ARegionType &region_type)
     strcpy(panel_type->label, "");
     strcpy(panel_type->category, "Filters");
     strcpy(panel_type->translation_context, BLT_I18NCONTEXT_DEFAULT_BPYRNA);
-    panel_type->flag = PANEL_TYPE_INSTANCED | PANEL_TYPE_DRAW_BOX | PANEL_TYPE_HEADER_EXPAND;
+    panel_type->flag = PANEL_TYPE_INSTANCED | PANEL_TYPE_HEADER_EXPAND;
     panel_type->draw_header = spreadsheet_filter_panel_draw_header;
     panel_type->draw = spreadsheet_filter_panel_draw;
     panel_type->get_list_data_expand_flag = get_filter_expand_flag;

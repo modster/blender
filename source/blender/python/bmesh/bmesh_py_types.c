@@ -553,7 +553,7 @@ static PyObject *bpy_bmloop_is_convex_get(BPy_BMLoop *self)
 /* ElemSeq
  * ^^^^^^^ */
 
-/* note: use for bmvert/edge/face/loop seq's use these, not bmelemseq directly */
+/* NOTE: use for bmvert/edge/face/loop seq's use these, not bmelemseq directly. */
 PyDoc_STRVAR(bpy_bmelemseq_layers_vert_doc,
              "custom-data layers (read-only).\n\n:type: :class:`BMLayerAccessVert`");
 PyDoc_STRVAR(bpy_bmelemseq_layers_edge_doc,
@@ -1950,7 +1950,7 @@ static PyObject *bpy_bmface_calc_tangent_edge_diagonal(BPy_BMFace *self)
 PyDoc_STRVAR(bpy_bmface_calc_tangent_vert_diagonal_doc,
              ".. method:: calc_tangent_vert_diagonal()\n"
              "\n"
-             "   Return face tangent based on the two most distent vertices.\n"
+             "   Return face tangent based on the two most distant vertices.\n"
              "\n"
              "   :return: a normalized vector.\n"
              "   :rtype: :class:`mathutils.Vector`\n");
@@ -2588,7 +2588,7 @@ PyDoc_STRVAR(
  * If a portable alternative to qsort_r becomes available, remove this static
  * var hack!
  *
- * Note: the functions below assumes the keys array has been allocated and it
+ * NOTE: the functions below assumes the keys array has been allocated and it
  * has enough elements to complete the task.
  */
 
@@ -3241,9 +3241,11 @@ static PyObject *bpy_bmelemseq_subscript(BPy_BMElemSeq *self, PyObject *key)
       const Py_ssize_t len = bpy_bmelemseq_length(self);
       if (start < 0) {
         start += len;
+        CLAMP_MIN(start, 0);
       }
       if (stop < 0) {
         stop += len;
+        CLAMP_MIN(stop, 0);
       }
     }
 
@@ -3462,7 +3464,7 @@ PyDoc_STRVAR(bpy_bmelemseq_doc,
              ":class:`BMVert`, :class:`BMEdge`, :class:`BMFace`, :class:`BMLoop`.\n"
              "\n"
              "When accessed via :class:`BMesh.verts`, :class:`BMesh.edges`, :class:`BMesh.faces`\n"
-             "there are also functions to create/remomove items.\n");
+             "there are also functions to create/remove items.\n");
 PyDoc_STRVAR(bpy_bmiter_doc,
              "Internal BMesh type for looping over verts/faces/edges,\n"
              "used for iterating over :class:`BMElemSeq` types.\n");

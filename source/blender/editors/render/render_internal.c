@@ -121,7 +121,7 @@ static bool image_buffer_calc_tile_rect(const RenderResult *rr,
 {
   int tile_y, tile_height, tile_x, tile_width;
 
-  /* if renrect argument, we only refresh scanlines */
+  /* When `renrect` argument is not NULL, we only refresh scan-lines. */
   if (renrect) {
     /* if (tile_height == recty), rendering of layer is ready,
      * we should not draw, other things happen... */
@@ -793,7 +793,7 @@ static int render_breakjob(void *rjv)
 
 /**
  * For exec() when there is no render job
- * note: this won't check for the escape key being pressed, but doing so isn't thread-safe.
+ * NOTE: this won't check for the escape key being pressed, but doing so isn't thread-safe.
  */
 static int render_break(void *UNUSED(rjv))
 {
@@ -959,7 +959,7 @@ static int screen_render_invoke(bContext *C, wmOperator *op, const wmEvent *even
    * store spare */
 
   /* ensure at least 1 area shows result */
-  area = render_view_open(C, event->x, event->y, op->reports);
+  area = render_view_open(C, event->xy[0], event->xy[1], op->reports);
 
   /* job custom data */
   rj = MEM_callocN(sizeof(RenderJob), "render job");
@@ -976,7 +976,6 @@ static int screen_render_invoke(bContext *C, wmOperator *op, const wmEvent *even
   rj->anim = is_animation;
   rj->write_still = is_write_still && !is_animation;
   rj->iuser.scene = scene;
-  rj->iuser.ok = 1;
   rj->reports = op->reports;
   rj->orig_layer = 0;
   rj->last_layer = 0;

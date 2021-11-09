@@ -29,8 +29,8 @@
 /**
  * Interface for GHOST context.
  *
- * You can create a offscreen context (windowless) with the system's
- * GHOST_ISystem::createOffscreenContext method.
+ * You can create a off-screen context (windowless) with the system's
+ * #GHOST_ISystem::createOffscreenContext method.
  * \see GHOST_ISystem#createOffscreenContext
  */
 class GHOST_IContext {
@@ -56,10 +56,10 @@ class GHOST_IContext {
 
   virtual unsigned int getDefaultFramebuffer() = 0;
 
-  virtual GHOST_TSuccess getVulkanHandles(void *, void *, void *, GHOST_TUns32 *) = 0;
+  virtual GHOST_TSuccess getVulkanHandles(void *, void *, void *, uint32_t *) = 0;
 
   virtual GHOST_TSuccess getVulkanBackbuffer(
-      void *, void *, void *, void *, void *, GHOST_TUns32 *) = 0;
+      void *, void *, void *, void *, void *, uint32_t *) = 0;
 
   virtual GHOST_TSuccess swapBuffers() = 0;
 

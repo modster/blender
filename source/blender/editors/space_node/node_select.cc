@@ -44,6 +44,7 @@
 #include "ED_node.h" /* own include */
 #include "ED_screen.h"
 #include "ED_select_utils.h"
+#include "ED_spreadsheet.h"
 #include "ED_view3d.h"
 
 #include "RNA_access.h"
@@ -330,7 +331,7 @@ static bool node_select_grouped_name(SpaceNode *snode, bNode *node_act, const bo
   pref_len_act = BLI_str_partition_ex_utf8(
       node_act->name, nullptr, delims, &sep, &suf_act, from_right);
 
-  /* Note: in case we are searching for suffix, and found none, use whole name as suffix. */
+  /* NOTE: in case we are searching for suffix, and found none, use whole name as suffix. */
   if (from_right && !(sep && suf_act)) {
     pref_len_act = 0;
     suf_act = node_act->name;
@@ -416,6 +417,7 @@ static int node_select_grouped_exec(bContext *C, wmOperator *op)
 
 void NODE_OT_select_grouped(wmOperatorType *ot)
 {
+  PropertyRNA *prop;
   static const EnumPropertyItem prop_select_grouped_types[] = {
       {NODE_SELECT_GROUPED_TYPE, "TYPE", 0, "Type", ""},
       {NODE_SELECT_GROUPED_COLOR, "COLOR", 0, "Color", ""},
@@ -438,11 +440,12 @@ void NODE_OT_select_grouped(wmOperatorType *ot)
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 
   /* properties */
-  RNA_def_boolean(ot->srna,
-                  "extend",
-                  false,
-                  "Extend",
-                  "Extend selection instead of deselecting everything first");
+  prop = RNA_def_boolean(ot->srna,
+                         "extend",
+                         false,
+                         "Extend",
+                         "Extend selection instead of deselecting everything first");
+  RNA_def_property_flag(prop, PROP_SKIP_SAVE);
   ot->prop = RNA_def_enum(ot->srna, "type", prop_select_grouped_types, 0, "Type", "");
 }
 
@@ -469,7 +472,7 @@ void node_select_single(bContext *C, bNode *node)
   }
   nodeSetSelected(node, true);
 
-  ED_node_set_active(bmain, snode->edittree, node, &active_texture_changed);
+  ED_node_set_active(bmain, snode, snode->edittree, node, &active_texture_changed);
   ED_node_set_active_viewer_key(snode);
 
   ED_node_sort(snode->edittree);
@@ -606,12 +609,18 @@ static int node_mouse_select(bContext *C,
   /* update node order */
   if (ret_value != OPERATOR_CANCELLED) {
     bool active_texture_changed = false;
+    bool viewer_node_changed = false;
     if (node != nullptr && ret_value != OPERATOR_RUNNING_MODAL) {
-      ED_node_set_active(bmain, snode->edittree, node, &active_texture_changed);
+      viewer_node_changed = (node->flag & NODE_DO_OUTPUT) == 0 && node->type == GEO_NODE_VIEWER;
+      ED_node_set_active(bmain, snode, snode->edittree, node, &active_texture_changed);
+    }
+    else if (node != nullptr && node->type == GEO_NODE_VIEWER) {
+      ED_spreadsheet_context_paths_set_geometry_node(bmain, snode, node);
     }
     ED_node_set_active_viewer_key(snode);
     ED_node_sort(snode->edittree);
-    if (active_texture_changed && has_workbench_in_texture_color(wm, scene, ob)) {
+    if ((active_texture_changed && has_workbench_in_texture_color(wm, scene, ob)) ||
+        viewer_node_changed) {
       DEG_id_tag_update(&snode->edittree->id, ID_RECALC_COPY_ON_WRITE);
     }
 
@@ -657,7 +666,8 @@ void NODE_OT_select(wmOperatorType *ot)
 
   /* properties */
   WM_operator_properties_generic_select(ot);
-  RNA_def_boolean(ot->srna, "extend", false, "Extend", "");
+  prop = RNA_def_boolean(ot->srna, "extend", false, "Extend", "");
+  RNA_def_property_flag(prop, PROP_SKIP_SAVE);
   RNA_def_boolean(ot->srna, "socket_select", false, "Socket Select", "");
   prop = RNA_def_boolean(ot->srna,
                          "deselect_all",
@@ -913,7 +923,7 @@ void NODE_OT_select_lasso(wmOperatorType *ot)
   ot->cancel = WM_gesture_lasso_cancel;
 
   /* flags */
-  ot->flag = OPTYPE_UNDO;
+  ot->flag = OPTYPE_UNDO | OPTYPE_DEPENDS_ON_CURSOR;
 
   /* properties */
   RNA_def_boolean(ot->srna,
@@ -1189,7 +1199,7 @@ static void node_find_create_label(const bNode *node, char *str, int maxlen)
   }
 }
 
-/* generic  search invoke */
+/* Generic search invoke. */
 static void node_find_update_fn(const struct bContext *C,
                                 void *UNUSED(arg),
                                 const char *str,

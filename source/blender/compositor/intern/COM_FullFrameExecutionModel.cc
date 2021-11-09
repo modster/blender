@@ -17,12 +17,12 @@
  */
 
 #include "COM_FullFrameExecutionModel.h"
-#include "COM_Debug.h"
-#include "COM_ExecutionGroup.h"
-#include "COM_ReadBufferOperation.h"
-#include "COM_WorkScheduler.h"
 
 #include "BLT_translation.h"
+
+#include "COM_Debug.h"
+#include "COM_ViewerOperation.h"
+#include "COM_WorkScheduler.h"
 
 #ifdef WITH_CXX_GUARDEDALLOC
 #  include "MEM_guardedalloc.h"
@@ -35,47 +35,36 @@ FullFrameExecutionModel::FullFrameExecutionModel(CompositorContext &context,
                                                  Span<NodeOperation *> operations)
     : ExecutionModel(context, operations),
       active_buffers_(shared_buffers),
-      num_operations_finished_(0),
-      work_mutex_(),
-      work_finished_cond_()
+      num_operations_finished_(0)
 {
   priorities_.append(eCompositorPriority::High);
-  if (!context.isFastCalculation()) {
+  if (!context.is_fast_calculation()) {
     priorities_.append(eCompositorPriority::Medium);
     priorities_.append(eCompositorPriority::Low);
   }
-
-  BLI_mutex_init(&work_mutex_);
-  BLI_condition_init(&work_finished_cond_);
-}
-
-FullFrameExecutionModel::~FullFrameExecutionModel()
-{
-  BLI_condition_end(&work_finished_cond_);
-  BLI_mutex_end(&work_mutex_);
 }
 
 void FullFrameExecutionModel::execute(ExecutionSystem &exec_system)
 {
-  const bNodeTree *node_tree = this->context_.getbNodeTree();
+  const bNodeTree *node_tree = this->context_.get_bnodetree();
   node_tree->stats_draw(node_tree->sdh, TIP_("Compositing | Initializing execution"));
 
-  DebugInfo::graphviz(&exec_system);
+  DebugInfo::graphviz(&exec_system, "compositor_prior_rendering");
 
   determine_areas_to_render_and_reads();
-  render_operations(exec_system);
+  render_operations();
 }
 
 void FullFrameExecutionModel::determine_areas_to_render_and_reads()
 {
-  const bool is_rendering = context_.isRendering();
-  const bNodeTree *node_tree = context_.getbNodeTree();
+  const bool is_rendering = context_.is_rendering();
+  const bNodeTree *node_tree = context_.get_bnodetree();
 
   rcti area;
   for (eCompositorPriority priority : priorities_) {
     for (NodeOperation *op : operations_) {
-      op->setbNodeTree(node_tree);
-      if (op->isOutputOperation(is_rendering) && op->getRenderPriority() == priority) {
+      op->set_bnodetree(node_tree);
+      if (op->is_output_operation(is_rendering) && op->get_render_priority() == priority) {
         get_output_render_area(op, area);
         determine_areas_to_render(op, area);
         determine_reads(op);
@@ -84,37 +73,65 @@ void FullFrameExecutionModel::determine_areas_to_render_and_reads()
   }
 }
 
-Vector<MemoryBuffer *> FullFrameExecutionModel::get_input_buffers(NodeOperation *op)
+/**
+ * Returns input buffers with an offset relative to given output coordinates. Returned memory
+ * buffers must be deleted.
+ */
+Vector<MemoryBuffer *> FullFrameExecutionModel::get_input_buffers(NodeOperation *op,
+                                                                  const int output_x,
+                                                                  const int output_y)
 {
-  const int num_inputs = op->getNumberOfInputSockets();
+  const int num_inputs = op->get_number_of_input_sockets();
   Vector<MemoryBuffer *> inputs_buffers(num_inputs);
   for (int i = 0; i < num_inputs; i++) {
-    NodeOperation *input_op = op->get_input_operation(i);
-    inputs_buffers[i] = active_buffers_.get_rendered_buffer(input_op);
+    NodeOperation *input = op->get_input_operation(i);
+    const int offset_x = (input->get_canvas().xmin - op->get_canvas().xmin) + output_x;
+    const int offset_y = (input->get_canvas().ymin - op->get_canvas().ymin) + output_y;
+    MemoryBuffer *buf = active_buffers_.get_rendered_buffer(input);
+
+    rcti rect = buf->get_rect();
+    BLI_rcti_translate(&rect, offset_x, offset_y);
+    inputs_buffers[i] = new MemoryBuffer(
+        buf->get_buffer(), buf->get_num_channels(), rect, buf->is_a_single_elem());
   }
   return inputs_buffers;
 }
 
-MemoryBuffer *FullFrameExecutionModel::create_operation_buffer(NodeOperation *op)
+MemoryBuffer *FullFrameExecutionModel::create_operation_buffer(NodeOperation *op,
+                                                               const int output_x,
+                                                               const int output_y)
 {
-  rcti op_rect;
-  BLI_rcti_init(&op_rect, 0, op->getWidth(), 0, op->getHeight());
+  rcti rect;
+  BLI_rcti_init(
+      &rect, output_x, output_x + op->get_width(), output_y, output_y + op->get_height());
 
-  const DataType data_type = op->getOutputSocket(0)->getDataType();
-  /* TODO: We should check if the operation is constant instead of is_set_operation. Finding a way
-   * to know if an operation is constant has to be implemented yet. */
-  const bool is_a_single_elem = op->get_flags().is_set_operation;
-  return new MemoryBuffer(data_type, op_rect, is_a_single_elem);
+  const DataType data_type = op->get_output_socket(0)->get_data_type();
+  const bool is_a_single_elem = op->get_flags().is_constant_operation;
+  return new MemoryBuffer(data_type, rect, is_a_single_elem);
 }
 
-void FullFrameExecutionModel::render_operation(NodeOperation *op, ExecutionSystem &exec_system)
+void FullFrameExecutionModel::render_operation(NodeOperation *op)
 {
-  Vector<MemoryBuffer *> input_bufs = get_input_buffers(op);
+  /* Output has no offset for easier image algorithms implementation on operations. */
+  constexpr int output_x = 0;
+  constexpr int output_y = 0;
 
-  const bool has_outputs = op->getNumberOfOutputSockets() > 0;
-  MemoryBuffer *op_buf = has_outputs ? create_operation_buffer(op) : nullptr;
-  Span<rcti> areas = active_buffers_.get_areas_to_render(op);
-  op->render(op_buf, areas, input_bufs, exec_system);
+  const bool has_outputs = op->get_number_of_output_sockets() > 0;
+  MemoryBuffer *op_buf = has_outputs ? create_operation_buffer(op, output_x, output_y) : nullptr;
+  if (op->get_width() > 0 && op->get_height() > 0) {
+    Vector<MemoryBuffer *> input_bufs = get_input_buffers(op, output_x, output_y);
+    const int op_offset_x = output_x - op->get_canvas().xmin;
+    const int op_offset_y = output_y - op->get_canvas().ymin;
+    Vector<rcti> areas = active_buffers_.get_areas_to_render(op, op_offset_x, op_offset_y);
+    op->render(op_buf, areas, input_bufs);
+    DebugInfo::operation_rendered(op, op_buf);
+
+    for (MemoryBuffer *buf : input_bufs) {
+      delete buf;
+    }
+  }
+  /* Even if operation has no resolution set the empty buffer. It will be clipped with a
+   * TranslateOperation from convert resolutions if linked to an operation with resolution. */
   active_buffers_.set_rendered_buffer(op, std::unique_ptr<MemoryBuffer>(op_buf));
 
   operation_finished(op);
@@ -123,16 +140,22 @@ void FullFrameExecutionModel::render_operation(NodeOperation *op, ExecutionSyste
 /**
  * Render output operations in order of priority.
  */
-void FullFrameExecutionModel::render_operations(ExecutionSystem &exec_system)
+void FullFrameExecutionModel::render_operations()
 {
-  const bool is_rendering = context_.isRendering();
+  const bool is_rendering = context_.is_rendering();
 
   WorkScheduler::start(this->context_);
   for (eCompositorPriority priority : priorities_) {
     for (NodeOperation *op : operations_) {
-      if (op->isOutputOperation(is_rendering) && op->getRenderPriority() == priority) {
-        render_output_dependencies(op, exec_system);
-        render_operation(op, exec_system);
+      const bool has_size = op->get_width() > 0 && op->get_height() > 0;
+      const bool is_priority_output = op->is_output_operation(is_rendering) &&
+                                      op->get_render_priority() == priority;
+      if (is_priority_output && has_size) {
+        render_output_dependencies(op);
+        render_operation(op);
+      }
+      else if (is_priority_output && !has_size && op->is_active_viewer_output()) {
+        static_cast<ViewerOperation *>(op)->clear_display_buffer();
       }
     }
   }
@@ -153,7 +176,7 @@ static Vector<NodeOperation *> get_operation_dependencies(NodeOperation *operati
     Vector<NodeOperation *> outputs(next_outputs);
     next_outputs.clear();
     for (NodeOperation *output : outputs) {
-      for (int i = 0; i < output->getNumberOfInputSockets(); i++) {
+      for (int i = 0; i < output->get_number_of_input_sockets(); i++) {
         next_outputs.append(output->get_input_operation(i));
       }
     }
@@ -166,14 +189,13 @@ static Vector<NodeOperation *> get_operation_dependencies(NodeOperation *operati
   return dependencies;
 }
 
-void FullFrameExecutionModel::render_output_dependencies(NodeOperation *output_op,
-                                                         ExecutionSystem &exec_system)
+void FullFrameExecutionModel::render_output_dependencies(NodeOperation *output_op)
 {
-  BLI_assert(output_op->isOutputOperation(context_.isRendering()));
+  BLI_assert(output_op->is_output_operation(context_.is_rendering()));
   Vector<NodeOperation *> dependencies = get_operation_dependencies(output_op);
   for (NodeOperation *op : dependencies) {
     if (!active_buffers_.is_operation_rendered(op)) {
-      render_operation(op, exec_system);
+      render_operation(op);
     }
   }
 }
@@ -184,7 +206,7 @@ void FullFrameExecutionModel::render_output_dependencies(NodeOperation *output_o
 void FullFrameExecutionModel::determine_areas_to_render(NodeOperation *output_op,
                                                         const rcti &output_area)
 {
-  BLI_assert(output_op->isOutputOperation(context_.isRendering()));
+  BLI_assert(output_op->is_output_operation(context_.is_rendering()));
 
   Vector<std::pair<NodeOperation *, const rcti>> stack;
   stack.append({output_op, output_area});
@@ -192,21 +214,21 @@ void FullFrameExecutionModel::determine_areas_to_render(NodeOperation *output_op
     std::pair<NodeOperation *, rcti> pair = stack.pop_last();
     NodeOperation *operation = pair.first;
     const rcti &render_area = pair.second;
-    if (active_buffers_.is_area_registered(operation, render_area)) {
+    if (BLI_rcti_is_empty(&render_area) ||
+        active_buffers_.is_area_registered(operation, render_area)) {
       continue;
     }
 
     active_buffers_.register_area(operation, render_area);
 
-    const int num_inputs = operation->getNumberOfInputSockets();
+    const int num_inputs = operation->get_number_of_input_sockets();
     for (int i = 0; i < num_inputs; i++) {
       NodeOperation *input_op = operation->get_input_operation(i);
-      rcti input_op_rect, input_area;
-      BLI_rcti_init(&input_op_rect, 0, input_op->getWidth(), 0, input_op->getHeight());
+      rcti input_area;
       operation->get_area_of_interest(input_op, render_area, input_area);
 
       /* Ensure area of interest is within operation bounds, cropping areas outside. */
-      BLI_rcti_isect(&input_area, &input_op_rect, &input_area);
+      BLI_rcti_isect(&input_area, &input_op->get_canvas(), &input_area);
 
       stack.append({input_op, input_area});
     }
@@ -219,13 +241,13 @@ void FullFrameExecutionModel::determine_areas_to_render(NodeOperation *output_op
  */
 void FullFrameExecutionModel::determine_reads(NodeOperation *output_op)
 {
-  BLI_assert(output_op->isOutputOperation(context_.isRendering()));
+  BLI_assert(output_op->is_output_operation(context_.is_rendering()));
 
   Vector<NodeOperation *> stack;
   stack.append(output_op);
   while (stack.size() > 0) {
     NodeOperation *operation = stack.pop_last();
-    const int num_inputs = operation->getNumberOfInputSockets();
+    const int num_inputs = operation->get_number_of_input_sockets();
     for (int i = 0; i < num_inputs; i++) {
       NodeOperation *input_op = operation->get_input_operation(i);
       if (!active_buffers_.has_registered_reads(input_op)) {
@@ -242,12 +264,11 @@ void FullFrameExecutionModel::determine_reads(NodeOperation *output_op)
  */
 void FullFrameExecutionModel::get_output_render_area(NodeOperation *output_op, rcti &r_area)
 {
-  BLI_assert(output_op->isOutputOperation(context_.isRendering()));
+  BLI_assert(output_op->is_output_operation(context_.is_rendering()));
 
   /* By default return operation bounds (no border). */
-  const int op_width = output_op->getWidth();
-  const int op_height = output_op->getHeight();
-  BLI_rcti_init(&r_area, 0, op_width, 0, op_height);
+  rcti canvas = output_op->get_canvas();
+  r_area = canvas;
 
   const bool has_viewer_border = border_.use_viewer_border &&
                                  (output_op->get_flags().is_viewer_operation ||
@@ -257,83 +278,20 @@ void FullFrameExecutionModel::get_output_render_area(NodeOperation *output_op, r
     /* Get border with normalized coordinates. */
     const rctf *norm_border = has_viewer_border ? border_.viewer_border : border_.render_border;
 
-    /* Return de-normalized border. */
-    BLI_rcti_init(&r_area,
-                  norm_border->xmin * op_width,
-                  norm_border->xmax * op_width,
-                  norm_border->ymin * op_height,
-                  norm_border->ymax * op_height);
+    /* Return de-normalized border within canvas. */
+    const int w = output_op->get_width();
+    const int h = output_op->get_height();
+    r_area.xmin = canvas.xmin + norm_border->xmin * w;
+    r_area.xmax = canvas.xmin + norm_border->xmax * w;
+    r_area.ymin = canvas.ymin + norm_border->ymin * h;
+    r_area.ymax = canvas.ymin + norm_border->ymax * h;
   }
-}
-
-/**
- * Multi-threadedly execute given work function passing work_rect splits as argument.
- */
-void FullFrameExecutionModel::execute_work(const rcti &work_rect,
-                                           std::function<void(const rcti &split_rect)> work_func)
-{
-  if (is_breaked()) {
-    return;
-  }
-
-  /* Split work vertically to maximize continuous memory. */
-  const int work_height = BLI_rcti_size_y(&work_rect);
-  const int num_sub_works = MIN2(WorkScheduler::get_num_cpu_threads(), work_height);
-  const int split_height = num_sub_works == 0 ? 0 : work_height / num_sub_works;
-  int remaining_height = work_height - split_height * num_sub_works;
-
-  Vector<WorkPackage> sub_works(num_sub_works);
-  int sub_work_y = work_rect.ymin;
-  int num_sub_works_finished = 0;
-  for (int i = 0; i < num_sub_works; i++) {
-    int sub_work_height = split_height;
-
-    /* Distribute remaining height between sub-works. */
-    if (remaining_height > 0) {
-      sub_work_height++;
-      remaining_height--;
-    }
-
-    WorkPackage &sub_work = sub_works[i];
-    sub_work.type = eWorkPackageType::CustomFunction;
-    sub_work.execute_fn = [=, &work_func, &work_rect]() {
-      if (is_breaked()) {
-        return;
-      }
-      rcti split_rect;
-      BLI_rcti_init(
-          &split_rect, work_rect.xmin, work_rect.xmax, sub_work_y, sub_work_y + sub_work_height);
-      work_func(split_rect);
-    };
-    sub_work.executed_fn = [&]() {
-      BLI_mutex_lock(&work_mutex_);
-      num_sub_works_finished++;
-      if (num_sub_works_finished == num_sub_works) {
-        BLI_condition_notify_one(&work_finished_cond_);
-      }
-      BLI_mutex_unlock(&work_mutex_);
-    };
-    WorkScheduler::schedule(&sub_work);
-    sub_work_y += sub_work_height;
-  }
-  BLI_assert(sub_work_y == work_rect.ymax);
-
-  WorkScheduler::finish();
-
-  /* Ensure all sub-works finished.
-   * TODO: This a workaround for WorkScheduler::finish() not waiting all works on queue threading
-   * model. Sync code should be removed once it's fixed. */
-  BLI_mutex_lock(&work_mutex_);
-  if (num_sub_works_finished < num_sub_works) {
-    BLI_condition_wait(&work_finished_cond_, &work_mutex_);
-  }
-  BLI_mutex_unlock(&work_mutex_);
 }
 
 void FullFrameExecutionModel::operation_finished(NodeOperation *operation)
 {
   /* Report inputs reads so that buffers may be freed/reused. */
-  const int num_inputs = operation->getNumberOfInputSockets();
+  const int num_inputs = operation->get_number_of_input_sockets();
   for (int i = 0; i < num_inputs; i++) {
     active_buffers_.read_finished(operation->get_input_operation(i));
   }
@@ -344,7 +302,7 @@ void FullFrameExecutionModel::operation_finished(NodeOperation *operation)
 
 void FullFrameExecutionModel::update_progress_bar()
 {
-  const bNodeTree *tree = context_.getbNodeTree();
+  const bNodeTree *tree = context_.get_bnodetree();
   if (tree) {
     const float progress = num_operations_finished_ / static_cast<float>(operations_.size());
     tree->progress(tree->prh, progress);

@@ -37,7 +37,7 @@ struct Ipo;
 struct Text;
 
 /* channels reside in Object or Action (ListBase) constraintChannels */
-// XXX deprecated... old AnimSys
+/* XXX: deprecated... old AnimSys. */
 typedef struct bConstraintChannel {
   struct bConstraintChannel *next, *prev;
   struct Ipo *ipo;
@@ -81,8 +81,8 @@ typedef struct bConstraint {
   /** Local influence ipo or driver */
   struct Ipo *ipo DNA_DEPRECATED;
 
-  /* below are readonly fields that are set at runtime
-   * by the solver for use in the GE (only IK atm) */
+  /* Below are read-only fields that are set at runtime
+   * by the solver for use in the GE (only IK at the moment). */
   /** Residual error on constraint expressed in blender unit. */
   float lin_error;
   /** Residual error on constraint expressed in radiant. */
@@ -316,8 +316,9 @@ typedef struct bSameVolumeConstraint {
 /* Copy Transform Constraint */
 typedef struct bTransLikeConstraint {
   struct Object *tar;
+  int flag;
   char mix_mode;
-  char _pad[7];
+  char _pad[3];
   /** MAX_ID_NAME-2. */
   char subtarget[64];
 } bTransLikeConstraint;
@@ -424,7 +425,7 @@ typedef struct bRigidBodyJointConstraint {
 typedef struct bClampToConstraint {
   /** 'target' must be a curve. */
   struct Object *tar;
-  /** Which axis/plane to compare owner's location on . */
+  /** Which axis/plane to compare owner's location on. */
   int flag;
   /** For legacy reasons, this is flag2. used for any extra settings. */
   int flag2;
@@ -473,7 +474,7 @@ typedef struct bTransformConstraint {
   float from_min[3];
   /** To map on to to_min/max range. */
   float from_max[3];
-  /** Range of motion on owner caused by target . */
+  /** Range of motion on owner caused by target. */
   float to_min[3];
   float to_max[3];
 
@@ -481,7 +482,7 @@ typedef struct bTransformConstraint {
   float from_min_rot[3];
   /** To map on to to_min/max range. */
   float from_max_rot[3];
-  /** Range of motion on owner caused by target . */
+  /** Range of motion on owner caused by target. */
   float to_min_rot[3];
   float to_max_rot[3];
 
@@ -489,7 +490,7 @@ typedef struct bTransformConstraint {
   float from_min_scale[3];
   /** To map on to to_min/max range. */
   float from_max_scale[3];
-  /** Range of motion on owner caused by target . */
+  /** Range of motion on owner caused by target. */
   float to_min_scale[3];
   float to_max_scale[3];
 } bTransformConstraint;
@@ -740,6 +741,8 @@ typedef enum eBConstraint_SpaceTypes {
   CONSTRAINT_SPACE_POSE = 2,
   /** For posechannels - local with parent. */
   CONSTRAINT_SPACE_PARLOCAL = 3,
+  /** For posechannels - local converted to the owner bone orientation. */
+  CONSTRAINT_SPACE_OWNLOCAL = 6,
   /** For files from between 2.43-2.46 (should have been parlocal). */
   CONSTRAINT_SPACE_INVALID = 4, /* do not exchange for anything! */
 } eBConstraint_SpaceTypes;
@@ -810,6 +813,12 @@ typedef enum eCopyScale_Flags {
   SIZELIKE_UNIFORM = (1 << 5),
 } eCopyScale_Flags;
 
+/* bTransLikeConstraint.flag */
+typedef enum eCopyTransforms_Flags {
+  /* Remove shear from the target matrix. */
+  TRANSLIKE_REMOVE_TARGET_SHEAR = (1 << 0),
+} eCopyTransforms_Flags;
+
 /* bTransLikeConstraint.mix_mode */
 typedef enum eCopyTransforms_MixMode {
   /* Replace rotation channel values. */
@@ -818,6 +827,14 @@ typedef enum eCopyTransforms_MixMode {
   TRANSLIKE_MIX_BEFORE = 1,
   /* Multiply the copied transformation on the right, with anti-shear scale handling. */
   TRANSLIKE_MIX_AFTER = 2,
+  /* Multiply the copied transformation on the left, handling loc/rot/scale separately. */
+  TRANSLIKE_MIX_BEFORE_SPLIT = 3,
+  /* Multiply the copied transformation on the right, handling loc/rot/scale separately. */
+  TRANSLIKE_MIX_AFTER_SPLIT = 4,
+  /* Multiply the copied transformation on the left, using simple matrix multiplication. */
+  TRANSLIKE_MIX_BEFORE_FULL = 5,
+  /* Multiply the copied transformation on the right, using simple matrix multiplication. */
+  TRANSLIKE_MIX_AFTER_FULL = 6,
 } eCopyTransforms_MixMode;
 
 /* bTransformConstraint.to/from */
@@ -884,10 +901,16 @@ typedef enum eActionConstraint_Flags {
 typedef enum eActionConstraint_MixMode {
   /* Multiply the action transformation on the right. */
   ACTCON_MIX_AFTER_FULL = 0,
+  /* Multiply the action transformation on the left. */
+  ACTCON_MIX_BEFORE_FULL = 3,
   /* Multiply the action transformation on the right, with anti-shear scale handling. */
   ACTCON_MIX_AFTER = 1,
   /* Multiply the action transformation on the left, with anti-shear scale handling. */
   ACTCON_MIX_BEFORE = 2,
+  /* Separately combine Translation, Rotation and Scale, with rotation on the right. */
+  ACTCON_MIX_AFTER_SPLIT = 4,
+  /* Separately combine Translation, Rotation and Scale, with rotation on the left. */
+  ACTCON_MIX_BEFORE_SPLIT = 5,
 } eActionConstraint_MixMode;
 
 /* Locked-Axis Values (Locked Track) */
@@ -916,7 +939,7 @@ typedef enum eTrackToAxis_Modes {
 
 /* Shrinkwrap flags */
 typedef enum eShrinkwrap_Flags {
-  /* Also raycast in the opposite direction. */
+  /* Also ray-cast in the opposite direction. */
   CON_SHRINKWRAP_PROJECT_OPPOSITE = (1 << 0),
   /* Invert the cull mode when projecting opposite. */
   CON_SHRINKWRAP_PROJECT_INVERT_CULL = (1 << 1),
@@ -1085,7 +1108,7 @@ typedef enum eRotLimit_Flags {
 /* distance limit constraint */
 /* bDistLimitConstraint->flag */
 typedef enum eDistLimit_Flag {
-  /* "soft" cushion effect when reaching the limit sphere */  // NOT IMPLEMENTED!
+  /* "soft" cushion effect when reaching the limit sphere */ /* NOT IMPLEMENTED! */
   LIMITDIST_USESOFT = (1 << 0),
   /* as for all Limit constraints - allow to be used during transform? */
   LIMITDIST_TRANSFORM = (1 << 1),
@@ -1178,13 +1201,6 @@ typedef enum eStretchTo_Flags {
   STRETCHTOCON_USE_BULGE_MIN = (1 << 0),
   STRETCHTOCON_USE_BULGE_MAX = (1 << 1),
 } eStretchTo_Flags;
-
-/* important: these defines need to match up with PHY_DynamicTypes headerfile */
-#define CONSTRAINT_RB_BALL 1
-#define CONSTRAINT_RB_HINGE 2
-#define CONSTRAINT_RB_CONETWIST 4
-#define CONSTRAINT_RB_VEHICLE 11
-#define CONSTRAINT_RB_GENERIC6DOF 12
 
 #ifdef __cplusplus
 }

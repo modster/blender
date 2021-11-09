@@ -120,7 +120,7 @@ static void action_copy_data(Main *UNUSED(bmain), ID *id_dst, const ID *id_src, 
   for (fcurve_src = action_src->curves.first; fcurve_src; fcurve_src = fcurve_src->next) {
     /* Duplicate F-Curve. */
 
-    /* XXX TODO pass subdata flag?
+    /* XXX TODO: pass subdata flag?
      * But surprisingly does not seem to be doing any ID refcounting... */
     fcurve_dst = BKE_fcurve_copy(fcurve_src);
 
@@ -175,33 +175,32 @@ static void action_foreach_id(ID *id, LibraryForeachIDData *data)
   bAction *act = (bAction *)id;
 
   LISTBASE_FOREACH (FCurve *, fcu, &act->curves) {
-    BKE_fcurve_foreach_id(fcu, data);
+    BKE_LIB_FOREACHID_PROCESS_FUNCTION_CALL(data, BKE_fcurve_foreach_id(fcu, data));
   }
 
   LISTBASE_FOREACH (TimeMarker *, marker, &act->markers) {
-    BKE_LIB_FOREACHID_PROCESS(data, marker->camera, IDWALK_CB_NOP);
+    BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, marker->camera, IDWALK_CB_NOP);
   }
 }
 
 static void action_blend_write(BlendWriter *writer, ID *id, const void *id_address)
 {
   bAction *act = (bAction *)id;
-  if (act->id.us > 0 || BLO_write_is_undo(writer)) {
-    BLO_write_id_struct(writer, bAction, id_address, &act->id);
-    BKE_id_blend_write(writer, &act->id);
 
-    BKE_fcurve_blend_write(writer, &act->curves);
+  BLO_write_id_struct(writer, bAction, id_address, &act->id);
+  BKE_id_blend_write(writer, &act->id);
 
-    LISTBASE_FOREACH (bActionGroup *, grp, &act->groups) {
-      BLO_write_struct(writer, bActionGroup, grp);
-    }
+  BKE_fcurve_blend_write(writer, &act->curves);
 
-    LISTBASE_FOREACH (TimeMarker *, marker, &act->markers) {
-      BLO_write_struct(writer, TimeMarker, marker);
-    }
-
-    BKE_previewimg_blend_write(writer, act->preview);
+  LISTBASE_FOREACH (bActionGroup *, grp, &act->groups) {
+    BLO_write_struct(writer, bActionGroup, grp);
   }
+
+  LISTBASE_FOREACH (TimeMarker *, marker, &act->markers) {
+    BLO_write_struct(writer, TimeMarker, marker);
+  }
+
+  BKE_previewimg_blend_write(writer, act->preview);
 }
 
 static void action_blend_read_data(BlendDataReader *reader, ID *id)
@@ -497,9 +496,8 @@ void action_groups_add_channel(bAction *act, bActionGroup *agrp, FCurve *fcurve)
 }
 
 /* Reconstruct group channel pointers.
- * Assumes that the channels are still in the proper order, i.e. that channels of the same group
- * are adjacent in the act->channels list. It also assumes that the groups
- * referred to by the FCurves are already in act->groups.
+ * Assumes that the groups referred to by the FCurves are already in act->groups.
+ * Reorders the main channel list to match group order.
  */
 void BKE_action_groups_reconstruct(bAction *act)
 {
@@ -514,23 +512,30 @@ void BKE_action_groups_reconstruct(bAction *act)
     BLI_listbase_clear(&group->channels);
   }
 
-  bActionGroup *grp;
-  bActionGroup *last_grp = NULL;
-  LISTBASE_FOREACH (FCurve *, fcurve, &act->curves) {
-    if (fcurve->grp == NULL) {
-      continue;
-    }
+  /* Sort the channels into the group lists, destroying the act->curves list. */
+  ListBase ungrouped = {NULL, NULL};
 
-    grp = fcurve->grp;
-    if (last_grp != grp) {
-      /* If this is the first time we see this group, this must be the first channel. */
-      grp->channels.first = fcurve;
-    }
+  LISTBASE_FOREACH_MUTABLE (FCurve *, fcurve, &act->curves) {
+    if (fcurve->grp) {
+      BLI_assert(BLI_findindex(&act->groups, fcurve->grp) >= 0);
 
-    /* This is the last channel, until it's overwritten by a later iteration. */
-    grp->channels.last = fcurve;
-    last_grp = grp;
+      BLI_addtail(&fcurve->grp->channels, fcurve);
+    }
+    else {
+      BLI_addtail(&ungrouped, fcurve);
+    }
   }
+
+  /* Recombine into the main list. */
+  BLI_listbase_clear(&act->curves);
+
+  LISTBASE_FOREACH (bActionGroup *, group, &act->groups) {
+    /* Copy the list header to preserve the pointers in the group. */
+    ListBase tmp = group->channels;
+    BLI_movelisttolist(&act->curves, &tmp);
+  }
+
+  BLI_movelisttolist(&act->curves, &ungrouped);
 }
 
 /* Remove the given channel from all groups */
@@ -1206,7 +1211,7 @@ void BKE_pose_channel_copy_data(bPoseChannel *pchan, const bPoseChannel *pchan_f
   /* copy bone group */
   pchan->agrp_index = pchan_from->agrp_index;
 
-  /* ik (dof) settings */
+  /* IK (DOF) settings. */
   pchan->ikflag = pchan_from->ikflag;
   copy_v3_v3(pchan->limitmin, pchan_from->limitmin);
   copy_v3_v3(pchan->limitmax, pchan_from->limitmax);
@@ -1986,7 +1991,7 @@ void BKE_pose_blend_read_lib(BlendLibReader *reader, Object *ob, bPose *pose)
     if (UNLIKELY(pchan->bone == NULL)) {
       rebuild = true;
     }
-    else if ((ob->id.lib == NULL) && arm->id.lib) {
+    else if (!ID_IS_LINKED(ob) && ID_IS_LINKED(arm)) {
       /* local pose selection copied to armature, bit hackish */
       pchan->bone->flag &= ~BONE_SELECTED;
       pchan->bone->flag |= pchan->selectflag;

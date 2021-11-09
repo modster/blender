@@ -190,7 +190,7 @@ GHOST_SystemX11::GHOST_SystemX11() : GHOST_System(), m_xkb_descr(NULL), m_start_
   }
 
   /* Taking care not to overflow the `tv.tv_sec * 1000`. */
-  m_start_time = GHOST_TUns64(tv.tv_sec) * 1000 + tv.tv_usec / 1000;
+  m_start_time = uint64_t(tv.tv_sec) * 1000 + tv.tv_usec / 1000;
 
   /* Use detectable auto-repeat, mac and windows also do this. */
   int use_xkb;
@@ -283,7 +283,7 @@ GHOST_TSuccess GHOST_SystemX11::init()
   return GHOST_kFailure;
 }
 
-GHOST_TUns64 GHOST_SystemX11::getMilliSeconds() const
+uint64_t GHOST_SystemX11::getMilliSeconds() const
 {
   timeval tv;
   if (gettimeofday(&tv, NULL) == -1) {
@@ -291,24 +291,24 @@ GHOST_TUns64 GHOST_SystemX11::getMilliSeconds() const
   }
 
   /* Taking care not to overflow the tv.tv_sec * 1000 */
-  return GHOST_TUns64(tv.tv_sec) * 1000 + tv.tv_usec / 1000 - m_start_time;
+  return uint64_t(tv.tv_sec) * 1000 + tv.tv_usec / 1000 - m_start_time;
 }
 
-GHOST_TUns8 GHOST_SystemX11::getNumDisplays() const
+uint8_t GHOST_SystemX11::getNumDisplays() const
 {
-  return GHOST_TUns8(1);
+  return uint8_t(1);
 }
 
 /**
  * Returns the dimensions of the main display on this system.
  * \return The dimension of the main display.
  */
-void GHOST_SystemX11::getMainDisplayDimensions(GHOST_TUns32 &width, GHOST_TUns32 &height) const
+void GHOST_SystemX11::getMainDisplayDimensions(uint32_t &width, uint32_t &height) const
 {
   if (m_display) {
-    /* note, for this to work as documented,
+    /* NOTE(campbell): for this to work as documented,
      * we would need to use Xinerama check r54370 for code that did this,
-     * we've since removed since its not worth the extra dep - campbell */
+     * we've since removed since its not worth the extra dependency. */
     getAllDisplayDimensions(width, height);
   }
 }
@@ -317,7 +317,7 @@ void GHOST_SystemX11::getMainDisplayDimensions(GHOST_TUns32 &width, GHOST_TUns32
  * Returns the dimensions of the main display on this system.
  * \return The dimension of the main display.
  */
-void GHOST_SystemX11::getAllDisplayDimensions(GHOST_TUns32 &width, GHOST_TUns32 &height) const
+void GHOST_SystemX11::getAllDisplayDimensions(uint32_t &width, uint32_t &height) const
 {
   if (m_display) {
     width = DisplayWidth(m_display, DefaultScreen(m_display));
@@ -343,10 +343,10 @@ void GHOST_SystemX11::getAllDisplayDimensions(GHOST_TUns32 &width, GHOST_TUns32 
  * \return The new window (or 0 if creation failed).
  */
 GHOST_IWindow *GHOST_SystemX11::createWindow(const char *title,
-                                             GHOST_TInt32 left,
-                                             GHOST_TInt32 top,
-                                             GHOST_TUns32 width,
-                                             GHOST_TUns32 height,
+                                             int32_t left,
+                                             int32_t top,
+                                             uint32_t width,
+                                             uint32_t height,
                                              GHOST_TWindowState state,
                                              GHOST_TDrawingContextType type,
                                              GHOST_GLSettings glSettings,
@@ -394,13 +394,23 @@ GHOST_IWindow *GHOST_SystemX11::createWindow(const char *title,
 }
 
 /**
- * Create a new offscreen context.
- * Never explicitly delete the context, use disposeContext() instead.
+ * Create a new off-screen context.
+ * Never explicitly delete the context, use #disposeContext() instead.
  * \return The new context (or 0 if creation failed).
  */
 GHOST_IContext *GHOST_SystemX11::createOffscreenContext(GHOST_TDrawingContextType type,
                                                         GHOST_GLSettings glSettings)
 {
+  /* During development:
+   *   try 4.x compatibility profile
+   *   try 3.3 compatibility profile
+   *   fall back to 3.0 if needed
+   *
+   * Final Blender 2.8:
+   *   try 4.x core profile
+   *   try 3.3 core profile
+   *   no fall-backs. */
+
   const bool debug_context = (glSettings.flags & GHOST_glDebugContext) != 0;
 
 #if defined(WITH_VULKAN)
@@ -418,10 +428,10 @@ GHOST_IContext *GHOST_SystemX11::createOffscreenContext(GHOST_TDrawingContextTyp
 #endif
 
   if (type == GHOST_kDrawingContextTypeOpenGL) {
-    // Final Blender 2.8:
-    //   try 4.x core profile
-    //   try 3.3 core profile
-    //   no fallbacks
+    /* Final Blender 2.8:
+     *   try 4.x core profile
+     *   try 3.3 core profile
+     *   no fallbacks. */
 
 #if defined(WITH_GL_PROFILE_CORE)
     {
@@ -588,7 +598,7 @@ GHOST_WindowX11 *GHOST_SystemX11::findGhostWindow(Window xwind) const
   return NULL;
 }
 
-static void SleepTillEvent(Display *display, GHOST_TInt64 maxSleep)
+static void SleepTillEvent(Display *display, int64_t maxSleep)
 {
   int fd = ConnectionNumber(display);
   fd_set fds;
@@ -667,13 +677,13 @@ bool GHOST_SystemX11::processEvents(bool waitForEvent)
     GHOST_TimerManager *timerMgr = getTimerManager();
 
     if (waitForEvent && m_dirty_windows.empty() && !XPending(m_display)) {
-      GHOST_TUns64 next = timerMgr->nextFireTime();
+      uint64_t next = timerMgr->nextFireTime();
 
       if (next == GHOST_kFireTimeNever) {
         SleepTillEvent(m_display, -1);
       }
       else {
-        GHOST_TInt64 maxSleep = next - getMilliSeconds();
+        int64_t maxSleep = next - getMilliSeconds();
 
         if (maxSleep >= 0)
           SleepTillEvent(m_display, next - getMilliSeconds());
@@ -820,8 +830,7 @@ static bool checkTabletProximity(Display *display, XDevice *device)
 
   if (state) {
     XInputClass *cls = state->data;
-    // printf("%d class%s :\n", state->num_classes,
-    //       (state->num_classes > 1) ? "es" : "");
+    // printf("%d class%s :\n", state->num_classes, (state->num_classes > 1) ? "es" : "");
     for (int loop = 0; loop < state->num_classes; loop++) {
       switch (cls->c_class) {
         case ValuatorClass:
@@ -983,17 +992,17 @@ void GHOST_SystemX11::processEvent(XEvent *xe)
       bool is_tablet = window->GetTabletData().Active != GHOST_kTabletModeNone;
 
       if (is_tablet == false && window->getCursorGrabModeIsWarp()) {
-        GHOST_TInt32 x_new = xme.x_root;
-        GHOST_TInt32 y_new = xme.y_root;
-        GHOST_TInt32 x_accum, y_accum;
+        int32_t x_new = xme.x_root;
+        int32_t y_new = xme.y_root;
+        int32_t x_accum, y_accum;
         GHOST_Rect bounds;
 
         /* fallback to window bounds */
         if (window->getCursorGrabBounds(bounds) == GHOST_kFailure)
           window->getClientBounds(bounds);
 
-        /* Could also clamp to screen bounds wrap with a window outside the view will fail atm.
-         * Use offset of 8 in case the window is at screen bounds. */
+        /* Could also clamp to screen bounds wrap with a window outside the view will
+         * fail at the moment. Use offset of 8 in case the window is at screen bounds. */
         bounds.wrapPoint(x_new, y_new, 8, window->getCursorGrabAxis());
 
         window->getCursorGrabAccum(x_accum, y_accum);
@@ -1062,33 +1071,30 @@ void GHOST_SystemX11::processEvent(XEvent *xe)
       GHOST_TKey gkey;
 
 #ifdef USE_NON_LATIN_KB_WORKAROUND
-      /* XXX Code below is kinda awfully convoluted... Issues are:
-       *
-       *     - In keyboards like latin ones, numbers need a 'Shift' to be accessed but key_sym
-       *       is unmodified (or anyone swapping the keys with xmodmap).
-       *
-       *     - XLookupKeysym seems to always use first defined keymap (see T47228), which generates
-       *       keycodes unusable by ghost_key_from_keysym for non-Latin-compatible keymaps.
+      /* XXX: Code below is kinda awfully convoluted... Issues are:
+       * - In keyboards like Latin ones, numbers need a 'Shift' to be accessed but key_sym
+       *   is unmodified (or anyone swapping the keys with `xmodmap`).
+       * - #XLookupKeysym seems to always use first defined key-map (see T47228), which generates
+       *   key-codes unusable by ghost_key_from_keysym for non-Latin-compatible key-maps.
        *
        * To address this, we:
-       *
-       *     - Try to get a 'number' key_sym using XLookupKeysym (with virtual shift modifier),
-       *       in a very restrictive set of cases.
-       *     - Fallback to XLookupString to get a key_sym from active user-defined keymap.
+       * - Try to get a 'number' key_sym using #XLookupKeysym (with virtual shift modifier),
+       *   in a very restrictive set of cases.
+       * - Fallback to #XLookupString to get a key_sym from active user-defined key-map.
        *
        * Note that:
-       *     - This effectively 'lock' main number keys to always output number events
-       *       (except when using alt-gr).
-       *     - This enforces users to use an ASCII-compatible keymap with Blender -
-       *       but at least it gives predictable and consistent results.
+       * - This effectively 'lock' main number keys to always output number events
+       *   (except when using alt-gr).
+       * - This enforces users to use an ASCII-compatible key-map with Blender -
+       *   but at least it gives predictable and consistent results.
        *
        * Also, note that nothing in XLib sources [1] makes it obvious why those two functions give
-       * different key_sym results...
+       * different key_sym results.
        *
        * [1] http://cgit.freedesktop.org/xorg/lib/libX11/tree/src/KeyBind.c
        */
       KeySym key_sym_str;
-      /* Mode_switch 'modifier' is AltGr - when this one or Shift are enabled,
+      /* Mode_switch 'modifier' is `AltGr` - when this one or Shift are enabled,
        * we do not want to apply that 'forced number' hack. */
       const unsigned int mode_switch_mask = XkbKeysymToModifiers(xke->display, XK_Mode_switch);
       const unsigned int number_hack_forbidden_kmods_mask = mode_switch_mask | ShiftMask;
@@ -1153,7 +1159,7 @@ void GHOST_SystemX11::processEvent(XEvent *xe)
         }
       }
 #else
-      /* In keyboards like latin ones,
+      /* In keyboards like Latin ones,
        * numbers needs a 'Shift' to be accessed but key_sym
        * is unmodified (or anyone swapping the keys with xmodmap).
        *
@@ -1550,13 +1556,13 @@ void GHOST_SystemX11::processEvent(XEvent *xe)
             window->GetTabletData().Pressure = axis_value / ((float)xtablet.PressureLevels);
           }
 
-          /* the (short) cast and the & 0xffff is bizarre and unexplained anywhere,
-           * but I got garbage data without it. Found it in the xidump.c source --matt
+          /* NOTE(@broken): the (short) cast and the & 0xffff is bizarre and unexplained anywhere,
+           * but I got garbage data without it. Found it in the `xidump.c` source.
            *
-           * The '& 0xffff' just truncates the value to its two lowest bytes, this probably means
-           * some drivers do not properly set the whole int value? Since we convert to float
-           * afterward, I don't think we need to cast to short here, but do not have a device to
-           * check this. --mont29
+           * NOTE(@mont29): The '& 0xffff' just truncates the value to its two lowest bytes,
+           * this probably means some drivers do not properly set the whole int value?
+           * Since we convert to float afterward,
+           * I don't think we need to cast to short here, but do not have a device to check this.
            */
           if (AXIS_VALUE_GET(3, axis_value)) {
             window->GetTabletData().Xtilt = (short)(axis_value & 0xffff) /
@@ -1659,8 +1665,8 @@ GHOST_TSuccess GHOST_SystemX11::getButtons(GHOST_Buttons &buttons) const
 }
 
 static GHOST_TSuccess getCursorPosition_impl(Display *display,
-                                             GHOST_TInt32 &x,
-                                             GHOST_TInt32 &y,
+                                             int32_t &x,
+                                             int32_t &y,
                                              Window *child_return)
 {
   int rx, ry, wx, wy;
@@ -1685,13 +1691,13 @@ static GHOST_TSuccess getCursorPosition_impl(Display *display,
   return GHOST_kSuccess;
 }
 
-GHOST_TSuccess GHOST_SystemX11::getCursorPosition(GHOST_TInt32 &x, GHOST_TInt32 &y) const
+GHOST_TSuccess GHOST_SystemX11::getCursorPosition(int32_t &x, int32_t &y) const
 {
   Window child_return;
   return getCursorPosition_impl(m_display, x, y, &child_return);
 }
 
-GHOST_TSuccess GHOST_SystemX11::setCursorPosition(GHOST_TInt32 x, GHOST_TInt32 y)
+GHOST_TSuccess GHOST_SystemX11::setCursorPosition(int32_t x, int32_t y)
 {
 
   /* This is a brute force move in screen coordinates
@@ -1944,7 +1950,7 @@ static GHOST_TKey ghost_key_from_keycode(const XkbDescPtr xkb_descr, const KeyCo
 
 #undef MAKE_ID
 
-/* from xclip.c xcout() v0.11 */
+/* From `xclip.c` #xcout() v0.11. */
 
 #define XCLIB_XCOUT_NONE 0          /* no context */
 #define XCLIB_XCOUT_SENTCONVSEL 1   /* sent a request */
@@ -2035,7 +2041,7 @@ void GHOST_SystemX11::getClipboard_xcout(const XEvent *evt,
         return;
       }
 
-      // not using INCR mechanism, just read the property
+      /* Not using INCR mechanism, just read the property. */
       XGetWindowProperty(m_display,
                          win,
                          m_atom.XCLIP_OUT,
@@ -2157,14 +2163,14 @@ void GHOST_SystemX11::getClipboard_xcout(const XEvent *evt,
   return;
 }
 
-GHOST_TUns8 *GHOST_SystemX11::getClipboard(bool selection) const
+char *GHOST_SystemX11::getClipboard(bool selection) const
 {
   Atom sseln;
   Atom target = m_atom.UTF8_STRING;
   Window owner;
 
   /* from xclip.c doOut() v0.11 */
-  unsigned char *sel_buf;
+  char *sel_buf;
   unsigned long sel_len = 0;
   XEvent evt;
   unsigned int context = XCLIB_XCOUT_NONE;
@@ -2183,13 +2189,13 @@ GHOST_TUns8 *GHOST_SystemX11::getClipboard(bool selection) const
   owner = XGetSelectionOwner(m_display, sseln);
   if (owner == win) {
     if (sseln == m_atom.CLIPBOARD) {
-      sel_buf = (unsigned char *)malloc(strlen(txt_cut_buffer) + 1);
-      strcpy((char *)sel_buf, txt_cut_buffer);
+      sel_buf = (char *)malloc(strlen(txt_cut_buffer) + 1);
+      strcpy(sel_buf, txt_cut_buffer);
       return sel_buf;
     }
     else {
-      sel_buf = (unsigned char *)malloc(strlen(txt_select_buffer) + 1);
-      strcpy((char *)sel_buf, txt_select_buffer);
+      sel_buf = (char *)malloc(strlen(txt_select_buffer) + 1);
+      strcpy(sel_buf, txt_select_buffer);
       return sel_buf;
     }
   }
@@ -2208,7 +2214,7 @@ GHOST_TUns8 *GHOST_SystemX11::getClipboard(bool selection) const
     }
 
     /* fetch the selection, or part of it */
-    getClipboard_xcout(&evt, sseln, target, &sel_buf, &sel_len, &context);
+    getClipboard_xcout(&evt, sseln, target, (unsigned char **)&sel_buf, &sel_len, &context);
 
     if (restore_this_event) {
       restore_events.push_back(evt);
@@ -2249,8 +2255,8 @@ GHOST_TUns8 *GHOST_SystemX11::getClipboard(bool selection) const
 
   if (sel_len) {
     /* Only print the buffer out, and free it, if it's not empty. */
-    unsigned char *tmp_data = (unsigned char *)malloc(sel_len + 1);
-    memcpy((char *)tmp_data, (char *)sel_buf, sel_len);
+    char *tmp_data = (char *)malloc(sel_len + 1);
+    memcpy(tmp_data, (char *)sel_buf, sel_len);
     tmp_data[sel_len] = '\0';
 
     if (sseln == m_atom.STRING)
@@ -2263,7 +2269,7 @@ GHOST_TUns8 *GHOST_SystemX11::getClipboard(bool selection) const
   return NULL;
 }
 
-void GHOST_SystemX11::putClipboard(GHOST_TInt8 *buffer, bool selection) const
+void GHOST_SystemX11::putClipboard(const char *buffer, bool selection) const
 {
   Window m_window, owner;
 

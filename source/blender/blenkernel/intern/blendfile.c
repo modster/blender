@@ -128,7 +128,7 @@ static void setup_app_userdef(BlendFileData *bfd)
 }
 
 /**
- * Context matching, handle no-ui case
+ * Context matching, handle no-UI case.
  *
  * \note this is called on Undo so any slow conversion functions here
  * should be avoided or check (mode != LOAD_UNDO).
@@ -251,7 +251,7 @@ static void setup_app_data(bContext *C,
        * replace it with 'curscene' if its needed */
     }
     /* and we enforce curscene to be in current screen */
-    else if (win) { /* can run in bgmode */
+    else if (win) { /* The window may be NULL in background-mode. */
       win->scene = curscene;
     }
 
@@ -342,6 +342,13 @@ static void setup_app_data(bContext *C,
    * but we still get too many unrelated data-corruption crashes otherwise... */
   if (bmain->versionfile < 250) {
     do_versions_ipos_to_animato(bmain);
+  }
+
+  /* FIXME: Same as above, readfile's `do_version` do not allow to create new IDs. */
+  /* TODO: Once this is definitively validated for 3.0 and option to not do it is removed, add a
+   * version bump and check here. */
+  if (mode != LOAD_UNDO && !USER_EXPERIMENTAL_TEST(&U, no_proxy_to_override_conversion)) {
+    BKE_lib_override_library_main_proxy_convert(bmain, reports);
   }
 
   bmain->recovered = 0;
@@ -622,6 +629,7 @@ UserDef *BKE_blendfile_userdef_from_defaults(void)
         "io_scene_obj",
         "io_scene_x3d",
         "cycles",
+        "pose_library",
     };
     for (int i = 0; i < ARRAY_SIZE(addons); i++) {
       bAddon *addon = BKE_addon_new();
@@ -659,10 +667,6 @@ UserDef *BKE_blendfile_userdef_from_defaults(void)
   BKE_studiolight_default(userdef->light_param, userdef->light_ambient);
 
   BKE_preferences_asset_library_default_add(userdef);
-  /* Enable asset browser features by default for alpha testing.
-   * BLO_sanitize_experimental_features_userpref_blend() will disable it again for non-alpha
-   * builds. */
-  userdef->experimental.use_asset_browser = true;
 
   return userdef;
 }
@@ -735,10 +739,12 @@ bool BKE_blendfile_userdef_write_all(ReportList *reports)
 
     if (ok_write) {
       printf("ok\n");
+      BKE_report(reports, RPT_INFO, "Preferences saved");
     }
     else {
       printf("fail\n");
       ok = false;
+      BKE_report(reports, RPT_ERROR, "Saving preferences failed");
     }
   }
   else {

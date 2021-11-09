@@ -228,7 +228,7 @@ static void set_prop_dist(TransInfo *t, const bool with_dist)
    * Used to find #TransData from the index returned by #BLI_kdtree_find_nearest. */
   TransData **td_table = MEM_mallocN(sizeof(*td_table) * td_table_len, __func__);
 
-  /* Create and fill kd-tree of selected's positions - in global or proj_vec space. */
+  /* Create and fill KD-tree of selected's positions - in global or proj_vec space. */
   KDTree_3d *td_tree = BLI_kdtree_3d_new(td_table_len);
 
   int td_table_index = 0;
@@ -849,8 +849,11 @@ bool constraints_list_needinv(TransInfo *t, ListBase *list)
           /* Copy Transforms constraint only does this in the Before mode. */
           bTransLikeConstraint *data = (bTransLikeConstraint *)con->data;
 
-          if (ELEM(data->mix_mode, TRANSLIKE_MIX_BEFORE) &&
+          if (ELEM(data->mix_mode, TRANSLIKE_MIX_BEFORE, TRANSLIKE_MIX_BEFORE_FULL) &&
               ELEM(t->mode, TFM_ROTATION, TFM_TRANSLATION)) {
+            return true;
+          }
+          if (ELEM(data->mix_mode, TRANSLIKE_MIX_BEFORE_SPLIT) && ELEM(t->mode, TFM_ROTATION)) {
             return true;
           }
         }
@@ -858,8 +861,11 @@ bool constraints_list_needinv(TransInfo *t, ListBase *list)
           /* The Action constraint only does this in the Before mode. */
           bActionConstraint *data = (bActionConstraint *)con->data;
 
-          if (ELEM(data->mix_mode, ACTCON_MIX_BEFORE) &&
+          if (ELEM(data->mix_mode, ACTCON_MIX_BEFORE, ACTCON_MIX_BEFORE_FULL) &&
               ELEM(t->mode, TFM_ROTATION, TFM_TRANSLATION)) {
+            return true;
+          }
+          if (ELEM(data->mix_mode, ACTCON_MIX_BEFORE_SPLIT) && ELEM(t->mode, TFM_ROTATION)) {
             return true;
           }
         }
@@ -939,6 +945,7 @@ void special_aftertrans_update(bContext *C, TransInfo *t)
       break;
     case TC_ARMATURE_VERTS:
     case TC_CURSOR_IMAGE:
+    case TC_CURSOR_SEQUENCER:
     case TC_CURSOR_VIEW3D:
     case TC_CURVE_VERTS:
     case TC_GPENCIL:
@@ -949,6 +956,7 @@ void special_aftertrans_update(bContext *C, TransInfo *t)
     case TC_OBJECT_TEXSPACE:
     case TC_PAINT_CURVE_VERTS:
     case TC_PARTICLE_VERTS:
+    case TC_SEQ_IMAGE_DATA:
     case TC_NONE:
     default:
       break;
@@ -957,6 +965,9 @@ void special_aftertrans_update(bContext *C, TransInfo *t)
 
 int special_transform_moving(TransInfo *t)
 {
+  if (t->options & CTX_CURSOR) {
+    return G_TRANSFORM_CURSOR;
+  }
   if (t->spacetype == SPACE_SEQ) {
     return G_TRANSFORM_SEQ;
   }
@@ -1030,12 +1041,14 @@ static void init_proportional_edit(TransInfo *t)
     case TC_POSE: /* Disable PET, its not usable in pose mode yet T32444. */
     case TC_ARMATURE_VERTS:
     case TC_CURSOR_IMAGE:
+    case TC_CURSOR_SEQUENCER:
     case TC_CURSOR_VIEW3D:
     case TC_NLA_DATA:
     case TC_OBJECT_TEXSPACE:
     case TC_PAINT_CURVE_VERTS:
     case TC_SCULPT:
     case TC_SEQ_DATA:
+    case TC_SEQ_IMAGE_DATA:
     case TC_TRACKING_DATA:
     case TC_NONE:
     default:
@@ -1066,7 +1079,8 @@ static void init_proportional_edit(TransInfo *t)
     else if (convert_type == TC_MESH_UV && t->flag & T_PROP_CONNECTED) {
       /* Already calculated by uv_set_connectivity_distance. */
     }
-    else if (convert_type == TC_CURVE_VERTS && t->obedit_type == OB_CURVE) {
+    else if (convert_type == TC_CURVE_VERTS) {
+      BLI_assert(t->obedit_type == OB_CURVE);
       set_prop_dist(t, false);
     }
     else {
@@ -1103,6 +1117,7 @@ static void init_TransDataContainers(TransInfo *t,
     case TC_ACTION_DATA:
     case TC_GRAPH_EDIT_DATA:
     case TC_CURSOR_IMAGE:
+    case TC_CURSOR_SEQUENCER:
     case TC_CURSOR_VIEW3D:
     case TC_MASKING_DATA:
     case TC_NLA_DATA:
@@ -1113,6 +1128,7 @@ static void init_TransDataContainers(TransInfo *t,
     case TC_PARTICLE_VERTS:
     case TC_SCULPT:
     case TC_SEQ_DATA:
+    case TC_SEQ_IMAGE_DATA:
     case TC_TRACKING_DATA:
     case TC_NONE:
     default:
@@ -1197,6 +1213,7 @@ static eTFlag flags_from_data_type(eTConvertType data_type)
     case TC_NODE_DATA:
     case TC_PAINT_CURVE_VERTS:
     case TC_SEQ_DATA:
+    case TC_SEQ_IMAGE_DATA:
     case TC_TRACKING_DATA:
       return T_POINTS | T_2D_EDIT;
     case TC_ARMATURE_VERTS:
@@ -1212,6 +1229,7 @@ static eTFlag flags_from_data_type(eTConvertType data_type)
     case TC_MESH_UV:
       return T_EDIT | T_POINTS | T_2D_EDIT;
     case TC_CURSOR_IMAGE:
+    case TC_CURSOR_SEQUENCER:
       return T_2D_EDIT;
     case TC_PARTICLE_VERTS:
       return T_POINTS;
@@ -1237,6 +1255,9 @@ static eTConvertType convert_type_get(const TransInfo *t, Object **r_obj_armatur
   if (t->options & CTX_CURSOR) {
     if (t->spacetype == SPACE_IMAGE) {
       convert_type = TC_CURSOR_IMAGE;
+    }
+    else if (t->spacetype == SPACE_SEQ) {
+      convert_type = TC_CURSOR_SEQUENCER;
     }
     else {
       convert_type = TC_CURSOR_VIEW3D;
@@ -1275,7 +1296,12 @@ static eTConvertType convert_type_get(const TransInfo *t, Object **r_obj_armatur
     convert_type = TC_NLA_DATA;
   }
   else if (t->spacetype == SPACE_SEQ) {
-    convert_type = TC_SEQ_DATA;
+    if (t->options & CTX_SEQUENCER_IMAGE) {
+      convert_type = TC_SEQ_IMAGE_DATA;
+    }
+    else {
+      convert_type = TC_SEQ_DATA;
+    }
   }
   else if (t->spacetype == SPACE_GRAPH) {
     convert_type = TC_GRAPH_EDIT_DATA;
@@ -1365,7 +1391,6 @@ void createTransData(bContext *C, TransInfo *t)
 
   switch (t->data_type) {
     case TC_ACTION_DATA:
-      t->obedit_type = -1;
       createTransActionData(C, t);
       break;
     case TC_POSE:
@@ -1381,6 +1406,9 @@ void createTransData(bContext *C, TransInfo *t)
     case TC_CURSOR_IMAGE:
       createTransCursor_image(t);
       break;
+    case TC_CURSOR_SEQUENCER:
+      createTransCursor_sequencer(t);
+      break;
     case TC_CURSOR_VIEW3D:
       createTransCursor_view3d(t);
       break;
@@ -1388,7 +1416,6 @@ void createTransData(bContext *C, TransInfo *t)
       createTransCurveVerts(t);
       break;
     case TC_GRAPH_EDIT_DATA:
-      t->obedit_type = -1;
       createTransGraphEditData(C, t);
       break;
     case TC_GPENCIL:
@@ -1398,9 +1425,6 @@ void createTransData(bContext *C, TransInfo *t)
       createTransLatticeVerts(t);
       break;
     case TC_MASKING_DATA:
-      if (t->spacetype == SPACE_CLIP) {
-        t->obedit_type = -1;
-      }
       createTransMaskingData(C, t);
       break;
     case TC_MBALL_VERTS:
@@ -1419,11 +1443,9 @@ void createTransData(bContext *C, TransInfo *t)
       createTransUVs(C, t);
       break;
     case TC_NLA_DATA:
-      t->obedit_type = -1;
       createTransNlaData(C, t);
       break;
     case TC_NODE_DATA:
-      t->obedit_type = -1;
       createTransNodeData(t);
       break;
     case TC_OBJECT:
@@ -1467,12 +1489,14 @@ void createTransData(bContext *C, TransInfo *t)
       createTransSculpt(C, t);
       break;
     case TC_SEQ_DATA:
-      t->obedit_type = -1;
       t->num.flag |= NUM_NO_FRACTION; /* sequencer has no use for floating point transform. */
       createTransSeqData(t);
       break;
-    case TC_TRACKING_DATA:
+    case TC_SEQ_IMAGE_DATA:
       t->obedit_type = -1;
+      createTransSeqImageData(t);
+      break;
+    case TC_TRACKING_DATA:
       createTransTrackingData(C, t);
       break;
     case TC_NONE:
@@ -1486,8 +1510,6 @@ void createTransData(bContext *C, TransInfo *t)
   countAndCleanTransDataContainer(t);
 
   init_proportional_edit(t);
-
-  BLI_assert((!(t->flag & T_EDIT)) == (!(t->obedit_type != -1)));
 }
 
 /** \} */
@@ -1666,6 +1688,26 @@ void animrecord_check_state(TransInfo *t, struct Object *ob)
   }
 }
 
+void transform_convert_flush_handle2D(TransData *td, TransData2D *td2d, const float y_fac)
+{
+  float delta_x = td->loc[0] - td->iloc[0];
+  float delta_y = (td->loc[1] - td->iloc[1]) * y_fac;
+
+  /* If the handles are to be moved too
+   * (as side-effect of keyframes moving, to keep the general effect)
+   * offset them by the same amount so that the general angles are maintained
+   * (i.e. won't change while handles are free-to-roam and keyframes are snap-locked).
+   */
+  if ((td->flag & TD_MOVEHANDLE1) && td2d->h1) {
+    td2d->h1[0] = td2d->ih1[0] + delta_x;
+    td2d->h1[1] = td2d->ih1[1] + delta_y;
+  }
+  if ((td->flag & TD_MOVEHANDLE2) && td2d->h2) {
+    td2d->h2[0] = td2d->ih2[0] + delta_x;
+    td2d->h2[1] = td2d->ih2[1] + delta_y;
+  }
+}
+
 /* called for updating while transform acts, once per redraw */
 void recalcData(TransInfo *t)
 {
@@ -1685,8 +1727,11 @@ void recalcData(TransInfo *t)
     case TC_CURSOR_IMAGE:
       recalcData_cursor_image(t);
       break;
+    case TC_CURSOR_SEQUENCER:
+      recalcData_cursor_sequencer(t);
+      break;
     case TC_CURSOR_VIEW3D:
-      recalcData_cursor(t);
+      recalcData_cursor_view3d(t);
       break;
     case TC_GRAPH_EDIT_DATA:
       recalcData_graphedit(t);
@@ -1729,6 +1774,9 @@ void recalcData(TransInfo *t)
       break;
     case TC_SEQ_DATA:
       recalcData_sequencer(t);
+      break;
+    case TC_SEQ_IMAGE_DATA:
+      recalcData_sequencer_image(t);
       break;
     case TC_TRACKING_DATA:
       recalcData_tracking(t);

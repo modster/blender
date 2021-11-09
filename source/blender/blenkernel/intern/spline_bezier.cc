@@ -166,6 +166,17 @@ MutableSpan<float3> BezierSpline::handle_positions_right()
   return handle_positions_right_;
 }
 
+void BezierSpline::reverse_impl()
+{
+  this->handle_positions_left().reverse();
+  this->handle_positions_right().reverse();
+  std::swap(this->handle_positions_left_, this->handle_positions_right_);
+
+  this->handle_types_left().reverse();
+  this->handle_types_right().reverse();
+  std::swap(this->handle_types_left_, this->handle_types_right_);
+}
+
 static float3 previous_position(Span<float3> positions, const bool cyclic, const int i)
 {
   if (i == 0) {
@@ -200,6 +211,11 @@ void BezierSpline::ensure_auto_handles() const
 
   std::lock_guard lock{auto_handle_mutex_};
   if (!auto_handles_dirty_) {
+    return;
+  }
+
+  if (this->size() == 1) {
+    auto_handles_dirty_ = false;
     return;
   }
 
@@ -273,14 +289,70 @@ void BezierSpline::transform(const blender::float4x4 &matrix)
   this->mark_cache_invalid();
 }
 
+static void set_handle_position(const float3 &position,
+                                const BezierSpline::HandleType type,
+                                const BezierSpline::HandleType type_other,
+                                const float3 &new_value,
+                                float3 &handle,
+                                float3 &handle_other)
+{
+  /* Don't bother when the handle positions are calculated automatically anyway. */
+  if (ELEM(type, BezierSpline::HandleType::Auto, BezierSpline::HandleType::Vector)) {
+    return;
+  }
+
+  handle = new_value;
+  if (type_other == BezierSpline::HandleType::Align) {
+    /* Keep track of the old length of the opposite handle. */
+    const float length = float3::distance(handle_other, position);
+    /* Set the other handle to directly opposite from the current handle. */
+    const float3 dir = (handle - position).normalized();
+    handle_other = position - dir * length;
+  }
+}
+
+/**
+ * Set positions for the right handle of the control point, ensuring that
+ * aligned handles stay aligned. Has no effect for auto and vector type handles.
+ */
+void BezierSpline::set_handle_position_right(const int index, const blender::float3 &value)
+{
+  set_handle_position(positions_[index],
+                      handle_types_right_[index],
+                      handle_types_left_[index],
+                      value,
+                      handle_positions_right_[index],
+                      handle_positions_left_[index]);
+}
+
+/**
+ * Set positions for the left handle of the control point, ensuring that
+ * aligned handles stay aligned. Has no effect for auto and vector type handles.
+ */
+void BezierSpline::set_handle_position_left(const int index, const blender::float3 &value)
+{
+  set_handle_position(positions_[index],
+                      handle_types_left_[index],
+                      handle_types_right_[index],
+                      value,
+                      handle_positions_left_[index],
+                      handle_positions_right_[index]);
+}
+
 bool BezierSpline::point_is_sharp(const int index) const
 {
   return ELEM(handle_types_left_[index], HandleType::Vector, HandleType::Free) ||
          ELEM(handle_types_right_[index], HandleType::Vector, HandleType::Free);
 }
 
+/**
+ * \warning This functional assumes that the spline has more than one point.
+ */
 bool BezierSpline::segment_is_vector(const int index) const
 {
+  /* Two control points are necessary to form a segment, that should be checked by the caller. */
+  BLI_assert(this->size() > 1);
+
   if (index == this->size() - 1) {
     if (is_cyclic_) {
       return handle_types_right_.last() == HandleType::Vector &&
@@ -331,6 +403,46 @@ void BezierSpline::correct_end_tangents() const
   if (handle_positions_left_.last() != positions_.last()) {
     tangents.last() = (positions_.last() - handle_positions_left_.last()).normalized();
   }
+}
+
+/**
+ * De Casteljau Bezier subdivision.
+ * \param index: The index of the segment's start control point.
+ * \param next_index: The index of the control point at the end of the segment. Could be 0,
+ * if the spline is cyclic.
+ * \param parameter: The factor along the segment, between 0 and 1. Note that this is used
+ * directly by the calculation, it doesn't correspond to a portion of the evaluated length.
+ *
+ * <pre>
+ *           handle_prev         handle_next
+ *                x----------------x
+ *               /                  \
+ *              /      x---O---x     \
+ *             /        result        \
+ *            /                        \
+ *           O                          O
+ *       point_prev                  point_next
+ * </pre>
+ */
+BezierSpline::InsertResult BezierSpline::calculate_segment_insertion(const int index,
+                                                                     const int next_index,
+                                                                     const float parameter)
+{
+  BLI_assert(parameter <= 1.0f && parameter >= 0.0f);
+  BLI_assert(next_index == 0 || next_index == index + 1);
+  const float3 &point_prev = positions_[index];
+  const float3 &handle_prev = handle_positions_right_[index];
+  const float3 &handle_next = handle_positions_left_[next_index];
+  const float3 &point_next = positions_[next_index];
+  const float3 center_point = float3::interpolate(handle_prev, handle_next, parameter);
+
+  BezierSpline::InsertResult result;
+  result.handle_prev = float3::interpolate(point_prev, handle_prev, parameter);
+  result.handle_next = float3::interpolate(handle_next, point_next, parameter);
+  result.left_handle = float3::interpolate(result.handle_prev, center_point, parameter);
+  result.right_handle = float3::interpolate(center_point, result.handle_next, parameter);
+  result.position = float3::interpolate(result.left_handle, result.right_handle, parameter);
+  return result;
 }
 
 static void bezier_forward_difference_3d(const float3 &point_0,
@@ -401,13 +513,18 @@ Span<int> BezierSpline::control_point_offsets() const
   offset_cache_.resize(size + 1);
 
   MutableSpan<int> offsets = offset_cache_;
-
-  int offset = 0;
-  for (const int i : IndexRange(size)) {
-    offsets[i] = offset;
-    offset += this->segment_is_vector(i) ? 1 : resolution_;
+  if (size == 1) {
+    offsets.first() = 0;
+    offsets.last() = 1;
   }
-  offsets.last() = offset;
+  else {
+    int offset = 0;
+    for (const int i : IndexRange(size)) {
+      offsets[i] = offset;
+      offset += this->segment_is_vector(i) ? 1 : resolution_;
+    }
+    offsets.last() = offset;
+  }
 
   offset_cache_dirty_ = false;
   return offsets;
@@ -494,13 +611,21 @@ Span<float3> BezierSpline::evaluated_positions() const
     return evaluated_position_cache_;
   }
 
-  this->ensure_auto_handles();
-
   const int size = this->size();
   const int eval_size = this->evaluated_points_size();
   evaluated_position_cache_.resize(eval_size);
 
   MutableSpan<float3> positions = evaluated_position_cache_;
+
+  if (size == 1) {
+    /* Use a special case for single point splines to avoid checking in #evaluate_segment. */
+    BLI_assert(eval_size == 1);
+    positions.first() = positions_.first();
+    position_cache_dirty_ = false;
+    return positions;
+  }
+
+  this->ensure_auto_handles();
 
   Span<int> offsets = this->control_point_offsets();
 

@@ -29,7 +29,7 @@
 
 #include "engines/eevee/eevee_private.h"
 #include "engines/gpencil/gpencil_engine.h"
-#include "engines/image/image_private.h"
+#include "engines/image/image_private.hh"
 #include "engines/overlay/overlay_private.h"
 #include "engines/workbench/workbench_private.h"
 
@@ -93,7 +93,7 @@ class DrawCachePerformanceTest : public DrawCacheTest {
 
   void TearDown() override
   {
-    EDBM_mesh_free(mesh.edit_mesh);
+    EDBM_mesh_free_data(mesh.edit_mesh);
     bm = nullptr;
     IDType_ID_ME.free_data(&mesh.id);
     IDType_ID_OB.free_data(&ob_mesh.id);

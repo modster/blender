@@ -52,8 +52,8 @@ typedef struct LineartTriangle {
   /* first culled in line list to use adjacent triangle info, then go through triangle list. */
   double gn[3];
 
-  /* Material flag is removed to save space. */
   unsigned char material_mask_bits;
+  unsigned char intersection_mask;
   unsigned char mat_occlusion;
   unsigned char flags; /* #eLineartTriangleFlags */
 
@@ -149,6 +149,7 @@ typedef struct LineartEdge {
 
   /** Also for line type determination on chaining. */
   unsigned char flags;
+  unsigned char intersection_mask;
 
   /**
    * Still need this entry because culled lines will not add to object
@@ -174,20 +175,22 @@ typedef struct LineartEdgeChain {
   /** Chain now only contains one type of segments */
   int type;
   unsigned char material_mask_bits;
+  unsigned char intersection_mask;
 
   struct Object *object_ref;
 } LineartEdgeChain;
 
 typedef struct LineartEdgeChainItem {
   struct LineartEdgeChainItem *next, *prev;
-  /** Need z value for fading */
-  float pos[3];
-  /** For restoring position to 3d space */
+  /** Need z value for fading, w value for image frame clipping. */
+  float pos[4];
+  /** For restoring position to 3d space. */
   float gpos[3];
   float normal[3];
   unsigned char line_type;
   char occlusion;
   unsigned char material_mask_bits;
+  unsigned char intersection_mask;
   size_t index;
 } LineartEdgeChainItem;
 
@@ -205,7 +208,7 @@ typedef struct LineartChainRegisterEntry {
 enum eLineArtTileRecursiveLimit {
   /* If tile gets this small, it's already much smaller than a pixel. No need to continue
    * splitting. */
-  LRT_TILE_RECURSIVE_PERSPECTIVE = 30,
+  LRT_TILE_RECURSIVE_PERSPECTIVE = 16,
   /* This is a tried-and-true safe value for high poly models that also needed ortho rendering. */
   LRT_TILE_RECURSIVE_ORTHO = 10,
 };
@@ -224,6 +227,8 @@ typedef struct LineartRenderBuffer {
   double width_per_tile, height_per_tile;
   double view_projection[4][4];
   double view[4][4];
+
+  float overscan;
 
   struct LineartBoundingArea *initial_bounding_areas;
   unsigned int bounding_area_count;
@@ -294,20 +299,27 @@ typedef struct LineartRenderBuffer {
   bool use_loose_as_contour;
   bool use_loose_edge_chain;
   bool use_geometry_space_chain;
+  bool use_image_boundary_trimming;
 
   bool filter_face_mark;
   bool filter_face_mark_invert;
   bool filter_face_mark_boundaries;
 
+  bool force_crease;
+  bool sharp_as_crease;
+
   /* Keep an copy of these data so when line art is running it's self-contained. */
   bool cam_is_persp;
   float cam_obmat[4][4];
   double camera_pos[3];
+  double active_camera_pos[3]; /* Stroke offset calculation may use active or selected camera. */
   double near_clip, far_clip;
   float shift_x, shift_y;
   float crease_threshold;
   float chaining_image_threshold;
   float angle_splitting_threshold;
+
+  float chain_smooth_tolerance;
 
   /* FIXME(Yiming): Temporary solution for speeding up calculation by not including lines that
    * are not in the selected source. This will not be needed after we have a proper scene-wise
@@ -377,6 +389,7 @@ typedef struct LineartObjectInfo {
   double normal[4][4];
   LineartElementLinkNode *v_eln;
   int usage;
+  uint8_t override_intersection_mask;
   int global_i_offset;
 
   bool free_use_mesh;
@@ -469,7 +482,8 @@ typedef struct LineartBoundingArea {
 BLI_INLINE int lineart_LineIntersectTest2d(
     const double *a1, const double *a2, const double *b1, const double *b2, double *aRatio)
 {
-#define USE_VECTOR_LINE_INTERSECTION
+/* Legacy intersection math aligns better with occlusion function quirks. */
+/* #define USE_VECTOR_LINE_INTERSECTION */
 #ifdef USE_VECTOR_LINE_INTERSECTION
 
   /* from isect_line_line_v2_point() */
@@ -545,7 +559,7 @@ BLI_INLINE int lineart_LineIntersectTest2d(
       k1 = (a2[1] - a1[1]) / x_diff;
       k2 = (b2[1] - b1[1]) / x_diff2;
 
-      if ((k1 == k2))
+      if (k1 == k2)
         return 0;
 
       x = (a1[1] - b1[1] - k1 * a1[0] + k2 * b1[0]) / (k2 - k1);
@@ -571,9 +585,9 @@ BLI_INLINE int lineart_LineIntersectTest2d(
 }
 
 struct Depsgraph;
-struct Scene;
-struct LineartRenderBuffer;
 struct LineartGpencilModifierData;
+struct LineartRenderBuffer;
+struct Scene;
 
 void MOD_lineart_destroy_render_data(struct LineartGpencilModifierData *lmd);
 
@@ -581,14 +595,20 @@ void MOD_lineart_chain_feature_lines(LineartRenderBuffer *rb);
 void MOD_lineart_chain_split_for_fixed_occlusion(LineartRenderBuffer *rb);
 void MOD_lineart_chain_connect(LineartRenderBuffer *rb);
 void MOD_lineart_chain_discard_short(LineartRenderBuffer *rb, const float threshold);
+void MOD_lineart_chain_clip_at_border(LineartRenderBuffer *rb);
 void MOD_lineart_chain_split_angle(LineartRenderBuffer *rb, float angle_threshold_rad);
+void MOD_lineart_smooth_chains(LineartRenderBuffer *rb, float tolerance);
+void MOD_lineart_chain_offset_towards_camera(LineartRenderBuffer *rb,
+                                             float dist,
+                                             bool use_custom_camera);
 
 int MOD_lineart_chain_count(const LineartEdgeChain *ec);
 void MOD_lineart_chain_clear_picked_flag(LineartCache *lc);
 
 bool MOD_lineart_compute_feature_lines(struct Depsgraph *depsgraph,
                                        struct LineartGpencilModifierData *lmd,
-                                       LineartCache **cached_result);
+                                       struct LineartCache **cached_result,
+                                       bool enable_stroke_offset);
 
 struct Scene;
 
@@ -598,8 +618,8 @@ LineartBoundingArea *MOD_lineart_get_parent_bounding_area(LineartRenderBuffer *r
 
 LineartBoundingArea *MOD_lineart_get_bounding_area(LineartRenderBuffer *rb, double x, double y);
 
-struct bGPDlayer;
 struct bGPDframe;
+struct bGPDlayer;
 
 void MOD_lineart_gpencil_generate(LineartCache *cache,
                                   struct Depsgraph *depsgraph,
@@ -612,8 +632,9 @@ void MOD_lineart_gpencil_generate(LineartCache *cache,
                                   int level_end,
                                   int mat_nr,
                                   short edge_types,
-                                  unsigned char material_mask_flags,
+                                  unsigned char mask_switches,
                                   unsigned char material_mask_bits,
+                                  unsigned char intersection_mask,
                                   short thickness,
                                   float opacity,
                                   const char *source_vgname,

@@ -69,8 +69,8 @@ extern "C" {
  * \attention defined in ???
  */
 struct ImBuf;
-struct rcti;
 struct rctf;
+struct rcti;
 
 /**
  *
@@ -147,6 +147,14 @@ struct ImBuf *IMB_allocImBuf(unsigned int x,
  */
 bool IMB_initImBuf(
     struct ImBuf *ibuf, unsigned int x, unsigned int y, unsigned char planes, unsigned int flags);
+
+/**
+ * Create a copy of a pixel buffer and wrap it to a new ImBuf
+ * (transferring ownership to the in imbuf).
+ * \attention Defined in allocimbuf.c
+ */
+struct ImBuf *IMB_allocFromBufferOwn(
+    unsigned int *rect, float *rectf, unsigned int w, unsigned int h, unsigned int channels);
 
 /**
  * Create a copy of a pixel buffer and wrap it to a new ImBuf
@@ -365,6 +373,11 @@ void IMB_anim_index_rebuild_finish(struct IndexBuildContext *context, short stop
  * Return the length (in frames) of the given \a anim.
  */
 int IMB_anim_get_duration(struct anim *anim, IMB_Timecode_Type tc);
+
+/**
+ * Return the encoded start offset (in seconds) of the given \a anim.
+ */
+double IMD_anim_get_offset(struct anim *anim);
 
 /**
  * Return the fps contained in movie files (function rval is false,
@@ -745,7 +758,7 @@ void IMB_processor_apply_threaded_scanlines(int total_scanlines,
 
 void IMB_transform(struct ImBuf *src,
                    struct ImBuf *dst,
-                   float transform_matrix[3][3],
+                   float transform_matrix[4][4],
                    struct rctf *src_crop,
                    const eIMBInterpolationFilterMode filter);
 

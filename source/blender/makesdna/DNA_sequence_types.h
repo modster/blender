@@ -43,9 +43,9 @@ extern "C" {
 struct Ipo;
 struct MovieClip;
 struct Scene;
+struct SequenceLookup;
 struct VFont;
 struct bSound;
-struct SequenceLookup;
 
 /* strlens; 256= FILE_MAXFILE, 768= FILE_MAXDIR */
 
@@ -74,12 +74,18 @@ typedef struct StripTransform {
   float scale_x;
   float scale_y;
   float rotation;
+  /** 0-1 range, use SEQ_image_transform_origin_offset_pixelspace_get to convert to pixel space. */
+  float origin[2];
 } StripTransform;
 
 typedef struct StripColorBalance {
+  int method;
   float lift[3];
   float gamma[3];
   float gain[3];
+  float slope[3];
+  float offset[3];
+  float power[3];
   int flag;
   char _pad[4];
   /* float exposure; */
@@ -173,7 +179,9 @@ typedef struct Sequence {
   /** Starting and ending points of the strip in the sequence. */
   int startdisp, enddisp;
   float sat;
-  float mul, handsize;
+  float mul;
+  char tmp_tag;
+  char _pad[3];
 
   short anim_preseek; /* UNUSED. */
   /** Streamindex for movie or sound files with several streams. */
@@ -201,6 +209,7 @@ typedef struct Sequence {
   ListBase anims;
 
   float effect_fader;
+  /* DEPRECATED, only used for versioning. */
   float speed_fader;
 
   /* pointers for effects: */
@@ -229,24 +238,27 @@ typedef struct Sequence {
   int blend_mode;
   float blend_opacity;
 
+  /* Tag color showed if `SEQ_TIMELINE_SHOW_STRIP_COLOR_TAG` is set. */
+  int8_t color_tag;
+
+  char alpha_mode;
+  char _pad4[2];
+
+  int cache_flag;
+
   /* is sfra needed anymore? - it looks like its only used in one place */
   /** Starting frame according to the timeline of the scene. */
   int sfra;
 
-  char alpha_mode;
-  char _pad[2];
-
   /* Multiview */
   char views_format;
+  char _pad1[3];
   struct Stereo3dFormat *stereo3d_format;
 
   struct IDProperty *prop;
 
   /* modifiers */
   ListBase modifiers;
-
-  int cache_flag;
-  int _pad2[3];
 
   SequenceRuntime runtime;
 } Sequence;
@@ -279,9 +291,11 @@ typedef struct Editing {
   /** 1024 = FILE_MAX. */
   char proxy_dir[1024];
 
-  int over_ofs, over_cfra;
-  int over_flag, proxy_storage;
-  rctf over_border;
+  int proxy_storage;
+
+  int overlay_frame_ofs, overlay_frame_abs;
+  int overlay_frame_flag;
+  rctf overlay_frame_rect;
 
   struct SeqCache *cache;
 
@@ -295,6 +309,7 @@ typedef struct Editing {
   int64_t disk_cache_timestamp;
 
   EditingRuntime runtime;
+  void *_pad1;
 } Editing;
 
 /* ************* Effect Variable Structs ********* */
@@ -335,11 +350,24 @@ typedef struct SolidColorVars {
 
 typedef struct SpeedControlVars {
   float *frameMap;
+  /* DEPRECATED, only used for versioning. */
   float globalSpeed;
   int flags;
-  int length;
-  int lastValidFrame;
+
+  int speed_control_type;
+
+  float speed_fader;
+  float speed_fader_length;
+  float speed_fader_frame_number;
 } SpeedControlVars;
+
+/* SpeedControlVars.speed_control_type */
+enum {
+  SEQ_SPEED_STRETCH = 0,
+  SEQ_SPEED_MULTIPLY = 1,
+  SEQ_SPEED_LENGTH = 2,
+  SEQ_SPEED_FRAME_NUMBER = 3,
+};
 
 typedef struct GaussianBlurVars {
   float size_x;
@@ -414,6 +442,11 @@ typedef struct ColorBalanceModifierData {
   float color_multiply;
 } ColorBalanceModifierData;
 
+enum {
+  SEQ_COLOR_BALANCE_METHOD_LIFTGAMMAGAIN = 0,
+  SEQ_COLOR_BALANCE_METHOD_SLOPEOFFSETPOWER = 1,
+};
+
 typedef struct CurvesModifierData {
   SequenceModifierData modifier;
 
@@ -469,13 +502,13 @@ typedef struct SequencerScopes {
   struct ImBuf *histogram_ibuf;
 } SequencerScopes;
 
-#define MAXSEQ 32
+#define MAXSEQ 128
 
 #define SELECT 1
 
-/* Editor->over_flag */
-#define SEQ_EDIT_OVERLAY_SHOW 1
-#define SEQ_EDIT_OVERLAY_ABS 2
+/** #Editor.overlay_frame_flag */
+#define SEQ_EDIT_OVERLAY_FRAME_SHOW 1
+#define SEQ_EDIT_OVERLAY_FRAME_ABS 2
 
 #define SEQ_STRIP_OFSBOTTOM 0.05f
 #define SEQ_STRIP_OFSTOP 0.95f
@@ -485,9 +518,9 @@ typedef struct SequencerScopes {
 #define SEQ_EDIT_PROXY_DIR_STORAGE 1
 
 /* SpeedControlVars->flags */
-#define SEQ_SPEED_INTEGRATE (1 << 0)
+#define SEQ_SPEED_UNUSED_2 (1 << 0) /* cleared */
 #define SEQ_SPEED_UNUSED_1 (1 << 1) /* cleared */
-#define SEQ_SPEED_COMPRESS_IPO_Y (1 << 2)
+#define SEQ_SPEED_UNUSED_3 (1 << 2) /* cleared */
 #define SEQ_SPEED_USE_INTERPOLATION (1 << 3)
 
 /* ***************** SEQUENCE ****************** */
@@ -501,7 +534,7 @@ enum {
   SEQ_OVERLAP = (1 << 3),
   SEQ_FILTERY = (1 << 4),
   SEQ_MUTE = (1 << 5),
-  SEQ_FLAG_UNUSED_6 = (1 << 6), /* cleared */
+  SEQ_FLAG_SKIP_THUMBNAILS = (1 << 6),
   SEQ_REVERSE_FRAMES = (1 << 7),
   SEQ_IPO_FRAME_LOCKED = (1 << 8),
   SEQ_EFFECT_NOT_LOADED = (1 << 9),
@@ -551,6 +584,9 @@ enum {
 #define SEQ_COLOR_BALANCE_INVERSE_GAIN 1
 #define SEQ_COLOR_BALANCE_INVERSE_GAMMA 2
 #define SEQ_COLOR_BALANCE_INVERSE_LIFT 4
+#define SEQ_COLOR_BALANCE_INVERSE_SLOPE 8
+#define SEQ_COLOR_BALANCE_INVERSE_OFFSET 16
+#define SEQ_COLOR_BALANCE_INVERSE_POWER 32
 
 /* !!! has to be same as IMB_imbuf.h IMB_PROXY_... and IMB_TC_... */
 
@@ -707,7 +743,24 @@ enum {
 
   SEQ_CACHE_PREFETCH_ENABLE = (1 << 10),
   SEQ_CACHE_DISK_CACHE_ENABLE = (1 << 11),
+  SEQ_CACHE_STORE_THUMBNAIL = (1 << 12),
 };
+
+/* Sequence->color_tag. */
+typedef enum SequenceColorTag {
+  SEQUENCE_COLOR_NONE = -1,
+  SEQUENCE_COLOR_01,
+  SEQUENCE_COLOR_02,
+  SEQUENCE_COLOR_03,
+  SEQUENCE_COLOR_04,
+  SEQUENCE_COLOR_05,
+  SEQUENCE_COLOR_06,
+  SEQUENCE_COLOR_07,
+  SEQUENCE_COLOR_08,
+  SEQUENCE_COLOR_09,
+
+  SEQUENCE_COLOR_TOT,
+} SequenceColorTag;
 
 #ifdef __cplusplus
 }

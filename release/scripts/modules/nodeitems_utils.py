@@ -77,7 +77,7 @@ class NodeItem:
             else:
                 return bpy.app.translations.contexts.default
 
-    # NB: is a staticmethod because called with an explicit self argument
+    # NOTE: is a staticmethod because called with an explicit self argument
     # NodeItemCustom sets this as a variable attribute in __init__
     @staticmethod
     def draw(self, layout, _context):
@@ -108,7 +108,7 @@ def register_node_categories(identifier, cat_list):
     # works as draw function for menus
     def draw_node_item(self, context):
         layout = self.layout
-        col = layout.column()
+        col = layout.column(align=True)
         for item in self.category.items(context):
             item.draw(item, col, context)
 

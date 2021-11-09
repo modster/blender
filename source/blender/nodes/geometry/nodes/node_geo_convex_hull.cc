@@ -28,17 +28,13 @@
 #  include "RBI_hull_api.h"
 #endif
 
-static bNodeSocketTemplate geo_node_convex_hull_in[] = {
-    {SOCK_GEOMETRY, N_("Geometry")},
-    {-1, ""},
-};
-
-static bNodeSocketTemplate geo_node_convex_hull_out[] = {
-    {SOCK_GEOMETRY, N_("Convex Hull")},
-    {-1, ""},
-};
-
 namespace blender::nodes {
+
+static void geo_node_convex_hull_declare(NodeDeclarationBuilder &b)
+{
+  b.add_input<decl::Geometry>(N_("Geometry"));
+  b.add_output<decl::Geometry>(N_("Convex Hull"));
+}
 
 using bke::GeometryInstanceGroup;
 
@@ -82,7 +78,7 @@ static Mesh *hull_from_bullet(const Mesh *mesh, Span<float3> coords)
       copy_v3_v3(result->mvert[i].co, co);
     }
     else {
-      BLI_assert(!"Unexpected new vertex in hull output");
+      BLI_assert_msg(0, "Unexpected new vertex in hull output");
     }
   }
 
@@ -150,7 +146,7 @@ static Mesh *hull_from_bullet(const Mesh *mesh, Span<float3> coords)
 
   plConvexHullDelete(hull);
 
-  BKE_mesh_calc_normals(result);
+  BKE_mesh_normals_tag_dirty(result);
   return result;
 }
 
@@ -231,9 +227,13 @@ static Mesh *compute_hull(const GeometrySet &geometry_set)
   return hull_from_bullet(geometry_set.get_mesh_for_read(), positions);
 }
 
+/* Since only positions are read from the instances, this can be used as an internal optimization
+ * to avoid the cost of realizing instances before the node. But disable this for now, since
+ * re-enabling that optimization will be a separate step. */
+#  if 0
 static void read_positions(const GeometryComponent &component,
-                           Span<float4x4> transforms,
-                           Vector<float3> *r_coords)
+                                           Span<float4x4> transforms,
+                                           Vector<float3> *r_coords)
 {
   GVArray_Typed<float3> positions = component.attribute_get_for_read<float3>(
       "position", ATTR_DOMAIN_POINT, {0, 0, 0});
@@ -269,6 +269,31 @@ static void read_curve_positions(const CurveEval &curve,
   }
 }
 
+static Mesh *convex_hull_from_instances(const GeometrySet &geometry_set)
+{
+  Vector<GeometryInstanceGroup> set_groups;
+  bke::geometry_set_gather_instances(geometry_set, set_groups);
+
+  Vector<float3> coords;
+
+  for (const GeometryInstanceGroup &set_group : set_groups) {
+    const GeometrySet &set = set_group.geometry_set;
+    Span<float4x4> transforms = set_group.transforms;
+
+    if (set.has_pointcloud()) {
+      read_positions(*set.get_component_for_read<PointCloudComponent>(), transforms, &coords);
+    }
+    if (set.has_mesh()) {
+      read_positions(*set.get_component_for_read<MeshComponent>(), transforms, &coords);
+    }
+    if (set.has_curve()) {
+      read_curve_positions(*set.get_curve_for_read(), transforms, &coords);
+    }
+  }
+  return hull_from_bullet(nullptr, coords);
+}
+#  endif
+
 #endif /* WITH_BULLET */
 
 static void geo_node_convex_hull_exec(GeoNodeExecParams params)
@@ -276,34 +301,17 @@ static void geo_node_convex_hull_exec(GeoNodeExecParams params)
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
 
 #ifdef WITH_BULLET
-  Mesh *mesh = nullptr;
-  if (geometry_set.has_instances()) {
-    Vector<GeometryInstanceGroup> set_groups;
-    bke::geometry_set_gather_instances(geometry_set, set_groups);
 
-    Vector<float3> coords;
+  geometry_set.modify_geometry_sets([&](GeometrySet &geometry_set) {
+    Mesh *mesh = compute_hull(geometry_set);
+    geometry_set.replace_mesh(mesh);
+    geometry_set.keep_only({GEO_COMPONENT_TYPE_MESH, GEO_COMPONENT_TYPE_INSTANCES});
+  });
 
-    for (const GeometryInstanceGroup &set_group : set_groups) {
-      const GeometrySet &set = set_group.geometry_set;
-      Span<float4x4> transforms = set_group.transforms;
-
-      if (set.has_pointcloud()) {
-        read_positions(*set.get_component_for_read<PointCloudComponent>(), transforms, &coords);
-      }
-      if (set.has_mesh()) {
-        read_positions(*set.get_component_for_read<MeshComponent>(), transforms, &coords);
-      }
-      if (set.has_curve()) {
-        read_curve_positions(*set.get_curve_for_read(), transforms, &coords);
-      }
-    }
-    mesh = hull_from_bullet(nullptr, coords);
-  }
-  else {
-    mesh = compute_hull(geometry_set);
-  }
-  params.set_output("Convex Hull", GeometrySet::create_with_mesh(mesh));
+  params.set_output("Convex Hull", std::move(geometry_set));
 #else
+  params.error_message_add(NodeWarningType::Error,
+                           TIP_("Disabled, Blender was compiled without Bullet"));
   params.set_output("Convex Hull", geometry_set);
 #endif /* WITH_BULLET */
 }
@@ -315,7 +323,7 @@ void register_node_type_geo_convex_hull()
   static bNodeType ntype;
 
   geo_node_type_base(&ntype, GEO_NODE_CONVEX_HULL, "Convex Hull", NODE_CLASS_GEOMETRY, 0);
-  node_type_socket_templates(&ntype, geo_node_convex_hull_in, geo_node_convex_hull_out);
+  ntype.declare = blender::nodes::geo_node_convex_hull_declare;
   ntype.geometry_node_execute = blender::nodes::geo_node_convex_hull_exec;
   nodeRegisterType(&ntype);
 }

@@ -688,6 +688,39 @@ class VIEW3D_PT_tools_brush_stroke_smooth_stroke(Panel, View3DPaintPanel, Smooth
     bl_options = {'DEFAULT_CLOSED'}
 
 
+class VIEW3D_PT_tools_weight_gradient(Panel, View3DPaintPanel):
+    bl_context = ".weightpaint" # dot on purpose (access from topbar)
+    bl_label = "Falloff"
+    bl_options = {'DEFAULT_CLOSED'}
+
+    @classmethod
+    def poll(cls, context):
+        settings = context.tool_settings.weight_paint
+        brush = settings.brush
+        return brush is not None
+
+    def draw(self, context):
+        layout = self.layout
+        settings = context.tool_settings.weight_paint
+        brush = settings.brush
+
+        col = layout.column(align=True)
+        row = col.row(align=True)
+        row.prop(brush, "curve_preset", text="")
+
+        if brush.curve_preset == 'CUSTOM':
+            layout.template_curve_mapping(brush, "curve", brush=True)
+
+            col = layout.column(align=True)
+            row = col.row(align=True)
+            row.operator("brush.curve_preset", icon='SMOOTHCURVE', text="").shape = 'SMOOTH'
+            row.operator("brush.curve_preset", icon='SPHERECURVE', text="").shape = 'ROUND'
+            row.operator("brush.curve_preset", icon='ROOTCURVE', text="").shape = 'ROOT'
+            row.operator("brush.curve_preset", icon='SHARPCURVE', text="").shape = 'SHARP'
+            row.operator("brush.curve_preset", icon='LINCURVE', text="").shape = 'LINE'
+            row.operator("brush.curve_preset", icon='NOCURVE', text="").shape = 'MAX'
+
+
 # TODO, move to space_view3d.py
 class VIEW3D_PT_tools_brush_falloff(Panel, View3DPaintPanel, FalloffPanel):
     bl_context = ".paint_common"  # dot on purpose (access from topbar)
@@ -1029,7 +1062,7 @@ class VIEW3D_PT_tools_vertexpaint_options(Panel, View3DPaintPanel):
     bl_options = {'DEFAULT_CLOSED'}
 
     @classmethod
-    def poll(self, _context):
+    def poll(cls, _context):
         # This is currently unused, since there aren't any Vertex Paint mode specific options.
         return False
 
@@ -1731,7 +1764,7 @@ class VIEW3D_PT_tools_grease_pencil_brush_paint_falloff(GreasePencilBrushFalloff
 
         from bl_ui.space_toolsystem_common import ToolSelectPanelHelper
         tool = ToolSelectPanelHelper.tool_active_from_context(context)
-        if tool and tool.idname  != 'builtin_brush.Tint':
+        if tool and tool.idname != 'builtin_brush.Tint':
             return False
 
         gptool = brush.gpencil_tool
@@ -2057,7 +2090,7 @@ class VIEW3D_PT_tools_grease_pencil_brush_mixcolor(View3DPanel, Panel):
 
         from bl_ui.space_toolsystem_common import ToolSelectPanelHelper
         tool = ToolSelectPanelHelper.tool_active_from_context(context)
-        if tool and tool.idname in('builtin.cutter', 'builtin.eyedropper', 'builtin.interpolate'):
+        if tool and tool.idname in {'builtin.cutter', 'builtin.eyedropper', 'builtin.interpolate'}:
             return False
 
         if brush.gpencil_tool == 'TINT':
@@ -2118,7 +2151,7 @@ class VIEW3D_PT_tools_grease_pencil_brush_mix_palette(View3DPanel, Panel):
 
         from bl_ui.space_toolsystem_common import ToolSelectPanelHelper
         tool = ToolSelectPanelHelper.tool_active_from_context(context)
-        if tool and tool.idname in('builtin.cutter', 'builtin.eyedropper', 'builtin.interpolate'):
+        if tool and tool.idname in {'builtin.cutter', 'builtin.eyedropper', 'builtin.interpolate'}:
             return False
 
         if brush.gpencil_tool == 'TINT':
@@ -2219,6 +2252,7 @@ classes = (
     VIEW3D_PT_tools_brush_falloff_frontface,
     VIEW3D_PT_tools_brush_falloff_normal,
     VIEW3D_PT_tools_brush_display,
+    VIEW3D_PT_tools_weight_gradient,
 
     VIEW3D_PT_sculpt_dyntopo,
     VIEW3D_PT_sculpt_voxel_remesh,

@@ -56,7 +56,7 @@ static void OVERLAY_engine_init(void *vedata)
   OVERLAY_shader_library_ensure();
 
   if (!stl->pd) {
-    /* Alloc transient pointers */
+    /* Allocate transient pointers. */
     stl->pd = MEM_callocN(sizeof(*stl->pd), __func__);
   }
 
@@ -200,7 +200,7 @@ static void OVERLAY_cache_init(void *vedata)
     case CTX_MODE_OBJECT:
       break;
     default:
-      BLI_assert(!"Draw mode invalid");
+      BLI_assert_msg(0, "Draw mode invalid");
       break;
   }
   OVERLAY_antialiasing_cache_init(vedata);
@@ -235,7 +235,7 @@ BLI_INLINE OVERLAY_DupliData *OVERLAY_duplidata_get(Object *ob, void *vedata, bo
       *do_init = true;
     }
     else if ((*dupli_data)->base_flag != ob->base_flag) {
-      /* Select state might have change, reinit. */
+      /* Select state might have change, reinitialize. */
       *do_init = true;
     }
     return *dupli_data;
@@ -463,9 +463,14 @@ static void OVERLAY_cache_populate(void *vedata, Object *ob)
       case OB_LIGHTPROBE:
         OVERLAY_lightprobe_cache_populate(vedata, ob);
         break;
-      case OB_LATTICE:
-        OVERLAY_lattice_cache_populate(vedata, ob);
+      case OB_LATTICE: {
+        /* Unlike the other types above, lattices actually have a bounding box defined, so hide the
+         * lattice wires if only the bounding-box is requested. */
+        if (ob->dt > OB_BOUNDBOX) {
+          OVERLAY_lattice_cache_populate(vedata, ob);
+        }
         break;
+      }
     }
   }
 
@@ -473,7 +478,7 @@ static void OVERLAY_cache_populate(void *vedata, Object *ob)
     OVERLAY_particle_cache_populate(vedata, ob);
   }
 
-  /* Relationship, object center, bounbox ... */
+  /* Relationship, object center, bounding-box... etc. */
   if (!pd->hide_overlays) {
     OVERLAY_extra_cache_populate(vedata, ob);
   }
@@ -576,9 +581,20 @@ static void OVERLAY_draw_scene(void *vedata)
   OVERLAY_extra_blend_draw(vedata);
   OVERLAY_volume_draw(vedata);
 
-  if (pd->ctx_mode == CTX_MODE_SCULPT) {
-    /* Sculpt overlays are drawn here to avoid artifacts with wireframe opacity. */
-    OVERLAY_sculpt_draw(vedata);
+  /* These overlays are drawn here to avoid artifacts with wire-frame opacity. */
+  switch (pd->ctx_mode) {
+    case CTX_MODE_SCULPT:
+      OVERLAY_sculpt_draw(vedata);
+      break;
+    case CTX_MODE_EDIT_MESH:
+    case CTX_MODE_POSE:
+    case CTX_MODE_PAINT_WEIGHT:
+    case CTX_MODE_PAINT_VERTEX:
+    case CTX_MODE_PAINT_TEXTURE:
+      OVERLAY_paint_draw(vedata);
+      break;
+    default:
+      break;
   }
 
   if (DRW_state_is_fbo()) {
@@ -600,11 +616,6 @@ static void OVERLAY_draw_scene(void *vedata)
   OVERLAY_grid_draw(vedata);
 
   OVERLAY_xray_depth_infront_copy(vedata);
-
-  if (pd->ctx_mode == CTX_MODE_PAINT_WEIGHT) {
-    /* Fix weird case where weightpaint mode needs to draw before xray bones. */
-    OVERLAY_paint_draw(vedata);
-  }
 
   if (DRW_state_is_fbo()) {
     GPU_framebuffer_bind(fbl->overlay_in_front_fb);
@@ -640,7 +651,6 @@ static void OVERLAY_draw_scene(void *vedata)
 
   switch (pd->ctx_mode) {
     case CTX_MODE_EDIT_MESH:
-      OVERLAY_paint_draw(vedata);
       OVERLAY_edit_mesh_draw(vedata);
       break;
     case CTX_MODE_EDIT_SURFACE:
@@ -654,12 +664,7 @@ static void OVERLAY_draw_scene(void *vedata)
       OVERLAY_edit_lattice_draw(vedata);
       break;
     case CTX_MODE_POSE:
-      OVERLAY_paint_draw(vedata);
       OVERLAY_pose_draw(vedata);
-      break;
-    case CTX_MODE_PAINT_VERTEX:
-    case CTX_MODE_PAINT_TEXTURE:
-      OVERLAY_paint_draw(vedata);
       break;
     case CTX_MODE_PARTICLE:
       OVERLAY_edit_particle_draw(vedata);

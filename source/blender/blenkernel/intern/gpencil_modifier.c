@@ -65,7 +65,7 @@
 static CLG_LogRef LOG = {"bke.gpencil_modifier"};
 static GpencilModifierTypeInfo *modifier_gpencil_types[NUM_GREASEPENCIL_MODIFIER_TYPES] = {NULL};
 #if 0
-/* Note that GPencil actually does not support these atm, but might do in the future. */
+/* Note that GPencil actually does not support these at the moment, but might do in the future. */
 static GpencilVirtualModifierData virtualModifierCommonData;
 #endif
 
@@ -129,7 +129,8 @@ GpencilModifierData *BKE_gpencil_modifiers_get_virtual_modifierlist(
   GpencilModifierData *md = ob->greasepencil_modifiers.first;
 
 #if 0
-  /* Note that GPencil actually does not support these atm, but might do in the future. */
+  /* Note that GPencil actually does not support these at the moment,
+   * but might do in the future. */
   *virtualModifierData = virtualModifierCommonData;
   if (ob->parent) {
     if (ob->parent->type == OB_ARMATURE && ob->partype == PARSKEL) {
@@ -257,9 +258,13 @@ bool BKE_gpencil_is_first_lineart_in_stack(const Object *ob, const GpencilModifi
   return false;
 }
 
-/* apply time modifiers */
-static int gpencil_time_modifier(
-    Depsgraph *depsgraph, Scene *scene, Object *ob, bGPDlayer *gpl, int cfra, bool is_render)
+/* Get Time modifier frame number. */
+int BKE_gpencil_time_modifier_cfra(Depsgraph *depsgraph,
+                                   Scene *scene,
+                                   Object *ob,
+                                   bGPDlayer *gpl,
+                                   const int cfra,
+                                   const bool is_render)
 {
   bGPdata *gpd = ob->data;
   const bool is_edit = GPENCIL_ANY_EDIT_MODE(gpd);
@@ -269,7 +274,7 @@ static int gpencil_time_modifier(
     if (GPENCIL_MODIFIER_ACTIVE(md, is_render)) {
       const GpencilModifierTypeInfo *mti = BKE_gpencil_modifier_get_info(md->type);
 
-      if ((GPENCIL_MODIFIER_EDIT(md, is_edit)) && (!is_render)) {
+      if (GPENCIL_MODIFIER_EDIT(md, is_edit) && (!is_render)) {
         continue;
       }
 
@@ -324,8 +329,9 @@ void BKE_gpencil_modifier_init(void)
   gpencil_modifier_type_init(modifier_gpencil_types); /* MOD_gpencil_util.c */
 
 #if 0
-  /* Note that GPencil actually does not support these atm, but might do in the future. */
-  /* Initialize global cmmon storage used for virtual modifier list */
+  /* Note that GPencil actually does not support these at the moment,
+   * but might do in the future. */
+  /* Initialize global common storage used for virtual modifier list. */
   GpencilModifierData *md;
   md = BKE_gpencil_modifier_new(eGpencilModifierType_Armature);
   virtualModifierCommonData.amd = *((ArmatureGpencilModifierData *)md);
@@ -350,7 +356,7 @@ GpencilModifierData *BKE_gpencil_modifier_new(int type)
   const GpencilModifierTypeInfo *mti = BKE_gpencil_modifier_get_info(type);
   GpencilModifierData *md = MEM_callocN(mti->struct_size, mti->struct_name);
 
-  /* note, this name must be made unique later */
+  /* NOTE: this name must be made unique later. */
   BLI_strncpy(md->name, DATA_(mti->name), sizeof(md->name));
 
   md->type = type;
@@ -514,7 +520,7 @@ static void gpencil_modifier_copy_data_id_us_cb(void *UNUSED(userData),
  * Copy grease pencil modifier data.
  * \param md: Source modifier data
  * \param target: Target modifier data
- * \parm flag: Flags
+ * \param flag: Flags
  */
 void BKE_gpencil_modifier_copydata_ex(GpencilModifierData *md,
                                       GpencilModifierData *target,
@@ -665,7 +671,7 @@ static int gpencil_remap_time_get(Depsgraph *depsgraph, Scene *scene, Object *ob
 
   int remap_cfra = cfra_eval;
   if (time_remap) {
-    remap_cfra = gpencil_time_modifier(depsgraph, scene, ob, gpl, cfra_eval, is_render);
+    remap_cfra = BKE_gpencil_time_modifier_cfra(depsgraph, scene, ob, gpl, cfra_eval, is_render);
   }
 
   return remap_cfra;
@@ -715,7 +721,7 @@ static void gpencil_copy_activeframe_to_eval(
       bGPDframe *gpf_orig = gpl_orig->actframe;
 
       int remap_cfra = gpencil_remap_time_get(depsgraph, scene, ob, gpl_orig);
-      if (gpf_orig && gpf_orig->framenum != remap_cfra) {
+      if ((gpf_orig == NULL) || (gpf_orig && gpf_orig->framenum != remap_cfra)) {
         gpf_orig = BKE_gpencil_layer_frame_get(gpl_orig, remap_cfra, GP_GETFRAME_USE_PREV);
       }
 
@@ -834,7 +840,7 @@ void BKE_gpencil_modifiers_calc(Depsgraph *depsgraph, Scene *scene, Object *ob)
     if (GPENCIL_MODIFIER_ACTIVE(md, is_render)) {
       const GpencilModifierTypeInfo *mti = BKE_gpencil_modifier_get_info(md->type);
 
-      if ((GPENCIL_MODIFIER_EDIT(md, is_edit)) && (!is_render)) {
+      if (GPENCIL_MODIFIER_EDIT(md, is_edit) && (!is_render)) {
         continue;
       }
 
@@ -934,6 +940,11 @@ void BKE_gpencil_modifier_blend_write(BlendWriter *writer, ListBase *modbase)
         BKE_curvemapping_blend_write(writer, gpmd->curve_intensity);
       }
     }
+    else if (md->type == eGpencilModifierType_Dash) {
+      DashGpencilModifierData *gpmd = (DashGpencilModifierData *)md;
+      BLO_write_struct_array(
+          writer, DashGpencilModifierSegment, gpmd->segments_len, gpmd->segments);
+    }
   }
 }
 
@@ -1013,6 +1024,13 @@ void BKE_gpencil_modifier_blend_read_data(BlendDataReader *reader, ListBase *lb)
         BKE_curvemapping_init(gpmd->curve_intensity);
       }
     }
+    else if (md->type == eGpencilModifierType_Dash) {
+      DashGpencilModifierData *gpmd = (DashGpencilModifierData *)md;
+      BLO_read_data_address(reader, &gpmd->segments);
+      for (int i = 0; i < gpmd->segments_len; i++) {
+        gpmd->segments[i].dmd = gpmd;
+      }
+    }
   }
 }
 
@@ -1021,7 +1039,7 @@ void BKE_gpencil_modifier_blend_read_lib(BlendLibReader *reader, Object *ob)
   BKE_gpencil_modifiers_foreach_ID_link(ob, BKE_object_modifiers_lib_link_common, reader);
 
   /* If linking from a library, clear 'local' library override flag. */
-  if (ob->id.lib != NULL) {
+  if (ID_IS_LINKED(ob)) {
     LISTBASE_FOREACH (GpencilModifierData *, mod, &ob->greasepencil_modifiers) {
       mod->flag &= ~eGpencilModifierFlag_OverrideLibrary_Local;
     }

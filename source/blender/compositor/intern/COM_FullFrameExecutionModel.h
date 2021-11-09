@@ -18,6 +18,9 @@
 
 #pragma once
 
+#include "BLI_vector.hh"
+
+#include "COM_Enums.h"
 #include "COM_ExecutionModel.h"
 
 #ifdef WITH_CXX_GUARDEDALLOC
@@ -27,7 +30,11 @@
 namespace blender::compositor {
 
 /* Forward declarations. */
-class ExecutionGroup;
+class CompositorContext;
+class ExecutionSystem;
+class MemoryBuffer;
+class NodeOperation;
+class SharedOperationBuffers;
 
 /**
  * Fully renders operations in order from inputs to outputs.
@@ -50,27 +57,22 @@ class FullFrameExecutionModel : public ExecutionModel {
    */
   Vector<eCompositorPriority> priorities_;
 
-  ThreadMutex work_mutex_;
-  ThreadCondition work_finished_cond_;
-
  public:
   FullFrameExecutionModel(CompositorContext &context,
                           SharedOperationBuffers &shared_buffers,
                           Span<NodeOperation *> operations);
-  ~FullFrameExecutionModel();
 
   void execute(ExecutionSystem &exec_system) override;
 
-  void execute_work(const rcti &work_rect,
-                    std::function<void(const rcti &split_rect)> work_func) override;
-
  private:
   void determine_areas_to_render_and_reads();
-  void render_operations(ExecutionSystem &exec_system);
-  void render_output_dependencies(NodeOperation *output_op, ExecutionSystem &exec_system);
-  Vector<MemoryBuffer *> get_input_buffers(NodeOperation *op);
-  MemoryBuffer *create_operation_buffer(NodeOperation *op);
-  void render_operation(NodeOperation *op, ExecutionSystem &exec_system);
+  void render_operations();
+  void render_output_dependencies(NodeOperation *output_op);
+  Vector<MemoryBuffer *> get_input_buffers(NodeOperation *op,
+                                           const int output_x,
+                                           const int output_y);
+  MemoryBuffer *create_operation_buffer(NodeOperation *op, const int output_x, const int output_y);
+  void render_operation(NodeOperation *op);
 
   void operation_finished(NodeOperation *operation);
 

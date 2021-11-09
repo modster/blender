@@ -16,31 +16,90 @@
 
 #include "DNA_modifier_types.h"
 
-#include "BKE_node_ui_storage.hh"
-
 #include "DEG_depsgraph_query.h"
 
 #include "NOD_geometry_exec.hh"
-#include "NOD_type_callbacks.hh"
 #include "NOD_type_conversions.hh"
 
 #include "node_geometry_util.hh"
+
+using blender::nodes::geometry_nodes_eval_log::LocalGeoLogger;
 
 namespace blender::nodes {
 
 void GeoNodeExecParams::error_message_add(const NodeWarningType type, std::string message) const
 {
-  bNodeTree *btree_cow = provider_->dnode->btree();
-  BLI_assert(btree_cow != nullptr);
-  if (btree_cow == nullptr) {
+  if (provider_->logger == nullptr) {
     return;
   }
-  bNodeTree *btree_original = (bNodeTree *)DEG_get_original_id((ID *)btree_cow);
+  LocalGeoLogger &local_logger = provider_->logger->local();
+  local_logger.log_node_warning(provider_->dnode, type, std::move(message));
+}
 
-  const NodeTreeEvaluationContext context(*provider_->self_object, *provider_->modifier);
+void GeoNodeExecParams::check_input_geometry_set(StringRef identifier,
+                                                 const GeometrySet &geometry_set) const
+{
+  const SocketDeclaration &decl =
+      *provider_->dnode->input_by_identifier(identifier).bsocket()->declaration;
+  const decl::Geometry *geo_decl = dynamic_cast<const decl::Geometry *>(&decl);
+  if (geo_decl == nullptr) {
+    return;
+  }
 
-  BKE_nodetree_error_message_add(
-      *btree_original, context, *provider_->dnode->bnode(), type, std::move(message));
+  const bool only_realized_data = geo_decl->only_realized_data();
+  const bool only_instances = geo_decl->only_instances();
+  const Span<GeometryComponentType> supported_types = geo_decl->supported_types();
+
+  if (only_realized_data) {
+    if (geometry_set.has_instances()) {
+      this->error_message_add(NodeWarningType::Info,
+                              TIP_("Instances in input geometry are ignored"));
+    }
+  }
+  if (only_instances) {
+    if (geometry_set.has_realized_data()) {
+      this->error_message_add(NodeWarningType::Info,
+                              TIP_("Realized data in input geometry is ignored"));
+    }
+  }
+  if (supported_types.is_empty()) {
+    /* Assume all types are supported. */
+    return;
+  }
+  const Vector<GeometryComponentType> types_in_geometry = geometry_set.gather_component_types(
+      true, true);
+  for (const GeometryComponentType type : types_in_geometry) {
+    if (type == GEO_COMPONENT_TYPE_INSTANCES) {
+      continue;
+    }
+    if (supported_types.contains(type)) {
+      continue;
+    }
+    std::string message = TIP_("Input geometry has unsupported type: ");
+    switch (type) {
+      case GEO_COMPONENT_TYPE_MESH: {
+        message += TIP_("Mesh");
+        break;
+      }
+      case GEO_COMPONENT_TYPE_POINT_CLOUD: {
+        message += TIP_("Point Cloud");
+        break;
+      }
+      case GEO_COMPONENT_TYPE_INSTANCES: {
+        BLI_assert_unreachable();
+        break;
+      }
+      case GEO_COMPONENT_TYPE_VOLUME: {
+        message += TIP_("Volume");
+        break;
+      }
+      case GEO_COMPONENT_TYPE_CURVE: {
+        message += TIP_("Curve");
+        break;
+      }
+    }
+    this->error_message_add(NodeWarningType::Info, std::move(message));
+  }
 }
 
 const bNodeSocket *GeoNodeExecParams::find_available_socket(const StringRef name) const
@@ -190,6 +249,11 @@ AttributeDomain GeoNodeExecParams::get_highest_priority_input_domain(
   return default_domain;
 }
 
+std::string GeoNodeExecParams::attribute_producer_name() const
+{
+  return provider_->dnode->label_or_name() + TIP_(" node");
+}
+
 void GeoNodeExecParams::check_input_access(StringRef identifier,
                                            const CPPType *requested_type) const
 {
@@ -224,7 +288,7 @@ void GeoNodeExecParams::check_input_access(StringRef identifier,
     BLI_assert_unreachable();
   }
   else if (requested_type != nullptr) {
-    const CPPType &expected_type = *socket_cpp_type_get(*found_socket->typeinfo);
+    const CPPType &expected_type = *found_socket->typeinfo->get_geometry_nodes_cpp_type();
     if (*requested_type != expected_type) {
       std::cout << "The requested type '" << requested_type->name() << "' is incorrect. Expected '"
                 << expected_type.name() << "'.\n";
@@ -264,7 +328,7 @@ void GeoNodeExecParams::check_output_access(StringRef identifier, const CPPType 
     BLI_assert_unreachable();
   }
   else {
-    const CPPType &expected_type = *socket_cpp_type_get(*found_socket->typeinfo);
+    const CPPType &expected_type = *found_socket->typeinfo->get_geometry_nodes_cpp_type();
     if (value_type != expected_type) {
       std::cout << "The value type '" << value_type.name() << "' is incorrect. Expected '"
                 << expected_type.name() << "'.\n";

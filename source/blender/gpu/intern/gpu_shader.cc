@@ -35,7 +35,6 @@
 
 extern "C" char datatoc_gpu_shader_colorspace_lib_glsl[];
 
-
 using namespace blender;
 using namespace blender::gpu;
 
@@ -230,7 +229,8 @@ GPUShader *GPU_shader_create_from_python(const char *vertcode,
                                          const char *fragcode,
                                          const char *geomcode,
                                          const char *libcode,
-                                         const char *defines)
+                                         const char *defines,
+                                         const char *name)
 {
   char *libcodecat = nullptr;
 
@@ -241,6 +241,9 @@ GPUShader *GPU_shader_create_from_python(const char *vertcode,
     libcode = libcodecat = BLI_strdupcat(libcode, datatoc_gpu_shader_colorspace_lib_glsl);
   }
 
+  /* Use pyGPUShader as default name for shader. */
+  const char *shname = name != nullptr ? name : "pyGPUShader";
+
   GPUShader *sh = GPU_shader_create_ex(vertcode,
                                        fragcode,
                                        geomcode,
@@ -250,7 +253,7 @@ GPUShader *GPU_shader_create_from_python(const char *vertcode,
                                        GPU_SHADER_TFB_NONE,
                                        nullptr,
                                        0,
-                                       "pyGPUShader");
+                                       shname);
 
   MEM_SAFE_FREE(libcodecat);
   return sh;
@@ -365,6 +368,17 @@ void GPU_shader_unbind(void)
   }
   ctx->shader = nullptr;
 #endif
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Shader name
+ * \{ */
+
+const char *GPU_shader_get_name(GPUShader *shader)
+{
+  return unwrap(shader)->name_get();
 }
 
 /** \} */

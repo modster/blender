@@ -269,7 +269,7 @@ void BKE_nla_tracks_copy(Main *bmain, ListBase *dst, const ListBase *src, const 
   /* copy each NLA-track, one at a time */
   for (nlt = src->first; nlt; nlt = nlt->next) {
     /* make a copy, and add the copy to the destination list */
-    // XXX: we need to fix this sometime
+    /* XXX: we need to fix this sometime. */
     nlt_d = BKE_nlatrack_copy(bmain, nlt, true, flag);
     BLI_addtail(dst, nlt_d);
   }
@@ -488,14 +488,14 @@ NlaStrip *BKE_nla_add_soundstrip(Main *bmain, Scene *scene, Speaker *speaker)
  */
 void BKE_nla_strip_foreach_id(NlaStrip *strip, LibraryForeachIDData *data)
 {
-  BKE_LIB_FOREACHID_PROCESS(data, strip->act, IDWALK_CB_USER);
+  BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, strip->act, IDWALK_CB_USER);
 
   LISTBASE_FOREACH (FCurve *, fcu, &strip->fcurves) {
-    BKE_fcurve_foreach_id(fcu, data);
+    BKE_LIB_FOREACHID_PROCESS_FUNCTION_CALL(data, BKE_fcurve_foreach_id(fcu, data));
   }
 
   LISTBASE_FOREACH (NlaStrip *, substrip, &strip->strips) {
-    BKE_nla_strip_foreach_id(substrip, data);
+    BKE_LIB_FOREACHID_PROCESS_FUNCTION_CALL(data, BKE_nla_strip_foreach_id(substrip, data));
   }
 }
 
@@ -516,7 +516,7 @@ static float nlastrip_get_frame_actionclip(NlaStrip *strip, float cframe, short 
   if (IS_EQF(strip->repeat, 0.0f)) {
     strip->repeat = 1.0f;
   }
-  // repeat = strip->repeat; // UNUSED
+  // repeat = strip->repeat; /* UNUSED */
 
   /* scaling */
   if (IS_EQF(strip->scale, 0.0f)) {
@@ -631,10 +631,10 @@ float BKE_nla_tweakedit_remap(AnimData *adt, float cframe, short mode)
 {
   NlaStrip *strip;
 
-  /* sanity checks
-   * - obviously we've got to have some starting data
-   * - when not in tweakmode, the active Action does not have any scaling applied :)
-   * - when in tweakmode, if the no-mapping flag is set, do not map
+  /* Sanity checks:
+   * - Obviously we've got to have some starting data.
+   * - When not in tweak-mode, the active Action does not have any scaling applied :)
+   * - When in tweak-mode, if the no-mapping flag is set, do not map.
    */
   if ((adt == NULL) || (adt->flag & ADT_NLA_EDIT_ON) == 0 || (adt->flag & ADT_NLA_EDIT_NOMAP)) {
     return cframe;
@@ -1484,7 +1484,7 @@ void BKE_nlastrip_recalculate_bounds(NlaStrip *strip)
 }
 
 /* Is the given NLA-strip the first one to occur for the given AnimData block */
-// TODO: make this an api method if necessary, but need to add prefix first
+/* TODO: make this an api method if necessary, but need to add prefix first */
 static bool nlastrip_is_first(AnimData *adt, NlaStrip *strip)
 {
   NlaTrack *nlt;
@@ -2089,9 +2089,8 @@ bool BKE_nla_tweakmode_enter(AnimData *adt)
     return false;
   }
 
-  /* if block is already in tweakmode, just leave, but we should report
-   * that this block is in tweakmode (as our returncode)
-   */
+  /* If block is already in tweak-mode, just leave, but we should report
+   * that this block is in tweak-mode (as our returncode). */
   if (adt->flag & ADT_NLA_EDIT_ON) {
     return true;
   }
@@ -2111,8 +2110,8 @@ bool BKE_nla_tweakmode_enter(AnimData *adt)
     }
   }
 
-  /* There are situations where we may have multiple strips selected and we want to enter tweakmode
-   * on all of those at once. Usually in those cases,
+  /* There are situations where we may have multiple strips selected and we want to enter
+   * tweak-mode on all of those at once. Usually in those cases,
    * it will usually just be a single strip per AnimData.
    * In such cases, compromise and take the last selected track and/or last selected strip, T28468.
    */
@@ -2142,7 +2141,7 @@ bool BKE_nla_tweakmode_enter(AnimData *adt)
 
   if (ELEM(NULL, activeTrack, activeStrip, activeStrip->act)) {
     if (G.debug & G_DEBUG) {
-      printf("NLA tweakmode enter - neither active requirement found\n");
+      printf("NLA tweak-mode enter - neither active requirement found\n");
       printf("\tactiveTrack = %p, activeStrip = %p\n", (void *)activeTrack, (void *)activeStrip);
     }
     return false;
@@ -2192,7 +2191,7 @@ bool BKE_nla_tweakmode_enter(AnimData *adt)
   return true;
 }
 
-/* Exit tweakmode for this AnimData block */
+/* Exit tweak-mode for this AnimData block. */
 void BKE_nla_tweakmode_exit(AnimData *adt)
 {
   NlaStrip *strip;
@@ -2345,7 +2344,7 @@ void BKE_nla_blend_read_lib(BlendLibReader *reader, ID *id, ListBase *tracks)
   /* we only care about the NLA strips inside the tracks */
   LISTBASE_FOREACH (NlaTrack *, nlt, tracks) {
     /* If linking from a library, clear 'local' library override flag. */
-    if (id->lib != NULL) {
+    if (ID_IS_LINKED(id)) {
       nlt->flag &= ~NLATRACK_OVERRIDELIBRARY_LOCAL;
     }
 

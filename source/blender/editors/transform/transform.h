@@ -87,13 +87,16 @@ typedef enum {
   CTX_PAINT_CURVE = (1 << 7),
   CTX_POSE_BONE = (1 << 8),
   CTX_TEXTURE_SPACE = (1 << 9),
+  CTX_SEQUENCER_IMAGE = (1 << 10),
 
-  CTX_NO_PET = (1 << 10),
-  CTX_AUTOCONFIRM = (1 << 11),
+  CTX_NO_PET = (1 << 11),
+  CTX_AUTOCONFIRM = (1 << 12),
   /** When transforming object's, adjust the object data so it stays in the same place. */
-  CTX_OBMODE_XFORM_OBDATA = (1 << 12),
+  CTX_OBMODE_XFORM_OBDATA = (1 << 13),
   /** Transform object parents without moving their children. */
-  CTX_OBMODE_XFORM_SKIP_CHILDREN = (1 << 13),
+  CTX_OBMODE_XFORM_SKIP_CHILDREN = (1 << 14),
+  /** Enable edge scrolling in 2D views */
+  CTX_VIEW2D_EDGE_PAN = (1 << 15),
 } eTContext;
 
 /** #TransInfo.flag */
@@ -219,6 +222,7 @@ typedef enum {
   TC_POSE,
   TC_ARMATURE_VERTS,
   TC_CURSOR_IMAGE,
+  TC_CURSOR_SEQUENCER,
   TC_CURSOR_VIEW3D,
   TC_CURVE_VERTS,
   TC_GRAPH_EDIT_DATA,
@@ -238,6 +242,7 @@ typedef enum {
   TC_PARTICLE_VERTS,
   TC_SCULPT,
   TC_SEQ_DATA,
+  TC_SEQ_IMAGE_DATA,
   TC_TRACKING_DATA,
 } eTConvertType;
 
@@ -335,7 +340,10 @@ typedef struct TransSnap {
   /**
    * Re-usable snap context data.
    */
-  struct SnapObjectContext *object_context;
+  union {
+    struct SnapObjectContext *object_context;
+    struct TransSeqSnapData *seq_context;
+  };
 } TransSnap;
 
 typedef struct TransCon {
@@ -350,28 +358,28 @@ typedef struct TransCon {
   eTConstraint mode;
   void (*drawExtra)(struct TransInfo *t);
 
-  /* Note: if 'tc' is NULL, 'td' must also be NULL.
+  /* NOTE: if 'tc' is NULL, 'td' must also be NULL.
    * For constraints that needs to draw differently from the other
    * uses this instead of the generic draw function. */
 
   /** Apply function pointer for linear vectorial transformation
    * The last three parameters are pointers to the in/out/printable vectors. */
-  void (*applyVec)(struct TransInfo *t,
-                   struct TransDataContainer *tc,
-                   struct TransData *td,
+  void (*applyVec)(const struct TransInfo *t,
+                   const struct TransDataContainer *tc,
+                   const struct TransData *td,
                    const float in[3],
-                   float out[3]);
+                   float r_out[3]);
   /** Apply function pointer for size transformation. */
-  void (*applySize)(struct TransInfo *t,
-                    struct TransDataContainer *tc,
-                    struct TransData *td,
-                    float smat[3][3]);
+  void (*applySize)(const struct TransInfo *t,
+                    const struct TransDataContainer *tc,
+                    const struct TransData *td,
+                    float r_smat[3][3]);
   /** Apply function pointer for rotation transformation */
-  void (*applyRot)(struct TransInfo *t,
-                   struct TransDataContainer *tc,
-                   struct TransData *td,
-                   float vec[3],
-                   float *angle);
+  void (*applyRot)(const struct TransInfo *t,
+                   const struct TransDataContainer *tc,
+                   const struct TransData *td,
+                   float r_axis[3],
+                   float *r_angle);
 } TransCon;
 
 typedef struct MouseInput {
@@ -579,7 +587,7 @@ typedef struct TransInfo {
   short around;
   /** space-type where transforming is. */
   char spacetype;
-  /** Avoid looking inside #TransDataContainer.obedit. */
+  /** Type of active object being edited. */
   short obedit_type;
 
   /** translation, to show for widget. */
@@ -612,9 +620,6 @@ typedef struct TransInfo {
     O_SCENE,
     O_SET,
   } orient_curr;
-
-  /** backup from view3d, to restore on end. */
-  short gizmo_flag;
 
   short prop_mode;
 
@@ -776,7 +781,6 @@ void drawLine(TransInfo *t, const float center[3], const float dir[3], char axis
 
 void applyTransObjects(TransInfo *t);
 void restoreTransObjects(TransInfo *t);
-void recalcData(TransInfo *t);
 
 void calculateCenter2D(TransInfo *t);
 void calculateCenterLocal(TransInfo *t, const float center_global[3]);
@@ -799,7 +803,7 @@ struct Object *transform_object_deform_pose_armature_get(const TransInfo *t, str
 
 void freeCustomNormalArray(TransInfo *t, TransDataContainer *tc, TransCustomData *custom_data);
 
-/* TODO. transform_query.c */
+/* TODO: `transform_query.c`. */
 bool checkUseAxisMatrix(TransInfo *t);
 
 #define TRANSFORM_SNAP_MAX_PX 100.0f
