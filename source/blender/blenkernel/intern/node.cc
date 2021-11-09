@@ -5172,8 +5172,10 @@ static bool update_enum_inferencing(const NodeTreeRef &tree)
       /* TODO: Handle case when connected to incompatible enums. */
       EnumState enum_state;
       for (const InputSocketRef *target_socket : socket->directly_linked_sockets()) {
-        enum_state = state_by_socket.lookup(target_socket);
-        break;
+        if (target_socket->is_available()) {
+          enum_state = state_by_socket.lookup_default(target_socket, {});
+          break;
+        }
       }
       state_by_socket.add_new(socket, enum_state);
     }

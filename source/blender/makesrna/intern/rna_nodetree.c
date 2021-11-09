@@ -12102,7 +12102,8 @@ static void rna_def_node_socket_enum(BlenderRNA *brna,
 
   prop = RNA_def_property(srna, "default_value", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_sdna(prop, NULL, "value");
-  RNA_def_property_enum_items(prop, node_socket_data_type_items); /* TODO */
+  RNA_def_property_enum_funcs(prop, NULL, "rna_NodeSocketEnum_set", "rna_NodeSocketEnum_items");
+  RNA_def_property_enum_items(prop, DummyRNA_DEFAULT_items);
   RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
   RNA_def_property_ui_text(prop, "Default Value", "Input value used for unconnected socket");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_NodeSocketInterface_update");
