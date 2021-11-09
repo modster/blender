@@ -5239,6 +5239,12 @@ static bool update_enum_inferencing(const NodeTreeRef &tree)
       else {
         group_input_info.items = std::make_shared<EnumItems>();
       }
+      bNodeSocket *interface_socket = (bNodeSocket *)BLI_findlink(&btree.inputs,
+                                                                  output_socket->index());
+      BLI_assert(interface_socket->type == SOCK_ENUM);
+      bNodeSocketValueEnum *interface_value = (bNodeSocketValueEnum *)
+                                                  interface_socket->default_value;
+      interface_value->items = group_input_info.items ? group_input_info.items->items() : nullptr;
     }
   }
 
