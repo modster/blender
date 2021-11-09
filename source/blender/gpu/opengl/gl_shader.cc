@@ -84,7 +84,7 @@ static char *glsl_patch_default_get()
 
   size_t slen = 0;
   /* Version need to go first. */
-  STR_CONCAT(patch, slen, "#version 330\n");
+  STR_CONCAT(patch, slen, "#version 430\n");
 
   /* Enable extensions for features that are not part of our base GLSL version
    * don't use an extension for something already available! */
@@ -103,6 +103,10 @@ static char *glsl_patch_default_get()
   if (GLContext::texture_cube_map_array_support) {
     STR_CONCAT(patch, slen, "#extension GL_ARB_texture_cube_map_array : enable\n");
     STR_CONCAT(patch, slen, "#define GPU_ARB_texture_cube_map_array\n");
+  }
+  if (GPU_shader_image_load_store_support()) {
+    STR_CONCAT(patch, slen, "#extension GL_ARB_shader_image_load_store : enable\n");
+    STR_CONCAT(patch, slen, "#define GPU_ARB_shader_image_load_store\n");
   }
 
   /* Derivative sign can change depending on implementation. */

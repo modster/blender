@@ -115,7 +115,13 @@ static inline int image_binding(int32_t program,
   switch (type) {
     case GL_IMAGE_1D:
     case GL_IMAGE_2D:
-    case GL_IMAGE_3D: {
+    case GL_IMAGE_3D:
+    case GL_INT_IMAGE_1D:
+    case GL_INT_IMAGE_2D:
+    case GL_INT_IMAGE_3D:
+    case GL_UNSIGNED_INT_IMAGE_1D:
+    case GL_UNSIGNED_INT_IMAGE_2D:
+    case GL_UNSIGNED_INT_IMAGE_3D: {
       /* For now just assign a consecutive index. In the future, we should set it in
        * the shader using layout(binding = i) and query its value. */
       int binding = *image_len;
