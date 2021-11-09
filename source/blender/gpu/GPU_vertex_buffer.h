@@ -140,7 +140,7 @@ void GPU_vertbuf_attr_get_raw_data(GPUVertBuf *, uint a_idx, GPUVertBufRaw *acce
 
 void *GPU_vertbuf_steal_data(GPUVertBuf *verts);
 
-void *GPU_vertbuf_get_data(const GPUVertBuf *verts);
+void *GPU_vertbuf_get_data(GPUVertBuf *verts);
 const GPUVertFormat *GPU_vertbuf_get_format(const GPUVertBuf *verts);
 uint GPU_vertbuf_get_vertex_alloc(const GPUVertBuf *verts);
 uint GPU_vertbuf_get_vertex_len(const GPUVertBuf *verts);

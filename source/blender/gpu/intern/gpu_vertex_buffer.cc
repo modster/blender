@@ -285,10 +285,12 @@ void GPU_vertbuf_attr_get_raw_data(GPUVertBuf *verts_, uint a_idx, GPUVertBufRaw
 /* -------- Getters -------- */
 
 /* NOTE: Be careful when using this. The data needs to match the expected format. */
-void *GPU_vertbuf_get_data(const GPUVertBuf *verts)
+void *GPU_vertbuf_get_data(GPUVertBuf *verts_)
 {
   /* TODO: Assert that the format has no padding. */
-  return unwrap(verts)->data;
+  VertBuf *verts = unwrap(verts_);
+  verts->flag |= GPU_VERTBUF_DATA_DIRTY;
+  return verts->data;
 }
 
 /* Returns the data buffer and set it to null internally to avoid freeing.
