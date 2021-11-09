@@ -139,7 +139,8 @@ uint8_t GHOST_SystemSDL::getNumDisplays() const
   return SDL_GetNumVideoDisplays();
 }
 
-GHOST_IContext *GHOST_SystemSDL::createOffscreenContext(GHOST_GLSettings glSettings)
+GHOST_IContext *GHOST_SystemSDL::createOffscreenContext(GHOST_TDrawingContextType /* type */,
+                                                        GHOST_GLSettings glSettings)
 {
   GHOST_Context *context = new GHOST_ContextSDL(0,
                                                 NULL,

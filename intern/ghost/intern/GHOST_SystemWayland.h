@@ -73,7 +73,8 @@ class GHOST_SystemWayland : public GHOST_System {
 
   void getAllDisplayDimensions(uint32_t &width, uint32_t &height) const override;
 
-  GHOST_IContext *createOffscreenContext(GHOST_GLSettings glSettings) override;
+  GHOST_IContext *createOffscreenContext(GHOST_TDrawingContextType type,
+                                         GHOST_GLSettings glSettings) override;
 
   GHOST_TSuccess disposeContext(GHOST_IContext *context) override;
 

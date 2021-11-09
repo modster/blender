@@ -265,7 +265,8 @@ class GHOST_ISystem {
    * Never explicitly delete the context, use #disposeContext() instead.
    * \return The new context (or 0 if creation failed).
    */
-  virtual GHOST_IContext *createOffscreenContext(GHOST_GLSettings glSettings) = 0;
+  virtual GHOST_IContext *createOffscreenContext(GHOST_TDrawingContextType type,
+                                                 GHOST_GLSettings glSettings) = 0;
 
   /**
    * Dispose of a context.

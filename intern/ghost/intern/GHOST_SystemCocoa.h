@@ -116,7 +116,8 @@ class GHOST_SystemCocoa : public GHOST_System {
    * Never explicitly delete the context, use #disposeContext() instead.
    * \return The new context (or 0 if creation failed).
    */
-  GHOST_IContext *createOffscreenContext(GHOST_GLSettings glSettings);
+  GHOST_IContext *createOffscreenContext(GHOST_TDrawingContextType type,
+                                         GHOST_GLSettings glSettings);
 
   /**
    * Dispose of a context.

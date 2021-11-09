@@ -72,7 +72,8 @@ class GHOST_SystemSDL : public GHOST_System {
 
   void getMainDisplayDimensions(uint32_t &width, uint32_t &height) const;
 
-  GHOST_IContext *createOffscreenContext(GHOST_GLSettings glSettings);
+  GHOST_IContext *createOffscreenContext(GHOST_TDrawingContextType type,
+                                         GHOST_GLSettings glSettings);
 
   GHOST_TSuccess disposeContext(GHOST_IContext *context);
 

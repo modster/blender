@@ -30,6 +30,10 @@
 
 #include "GHOST_ContextEGL.h"
 
+#if defined(WITH_VULKAN)
+#  include "GHOST_ContextVK.h"
+#endif
+
 #include <EGL/egl.h>
 #include <wayland-egl.h>
 
@@ -1588,55 +1592,75 @@ void GHOST_SystemWayland::getAllDisplayDimensions(uint32_t &width, uint32_t &hei
   getMainDisplayDimensions(width, height);
 }
 
-GHOST_IContext *GHOST_SystemWayland::createOffscreenContext(GHOST_GLSettings /*glSettings*/)
+GHOST_IContext *GHOST_SystemWayland::createOffscreenContext(GHOST_TDrawingContextType type,
+                                                            GHOST_GLSettings glSettings)
 {
-  /* Create new off-screen window. */
-  wl_surface *os_surface = wl_compositor_create_surface(compositor());
-  wl_egl_window *os_egl_window = wl_egl_window_create(os_surface, int(1), int(1));
+#if defined(WITH_VULKAN)
+  const bool debug_context = (glSettings.flags & GHOST_glDebugContext) != 0;
 
-  d->os_surfaces.push_back(os_surface);
-  d->os_egl_windows.push_back(os_egl_window);
+  if (type == GHOST_kDrawingContextTypeVulkan) {
+    GHOST_Context *context = new GHOST_ContextVK(
+        false, GHOST_kVulkanPlatformWayland, 0, NULL, NULL, d->display, 1, 0, debug_context);
 
-  GHOST_Context *context;
+    if (context->initializeDrawingContext()) {
+      return context;
+    }
+    else {
+      delete context;
+    }
+  }
+#else
+  (void)glSettings;
+#endif
 
-  for (int minor = 6; minor >= 0; --minor) {
+  if (type == GHOST_kDrawingContextTypeOpenGL) {
+    /* Create new off-screen window. */
+    wl_surface *os_surface = wl_compositor_create_surface(compositor());
+    wl_egl_window *os_egl_window = wl_egl_window_create(os_surface, int(1), int(1));
+
+    d->os_surfaces.push_back(os_surface);
+    d->os_egl_windows.push_back(os_egl_window);
+
+    GHOST_Context *context;
+
+    for (int minor = 6; minor >= 0; --minor) {
+      context = new GHOST_ContextEGL(this,
+                                     false,
+                                     EGLNativeWindowType(os_egl_window),
+                                     EGLNativeDisplayType(d->display),
+                                     EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT,
+                                     4,
+                                     minor,
+                                     GHOST_OPENGL_EGL_CONTEXT_FLAGS,
+                                     GHOST_OPENGL_EGL_RESET_NOTIFICATION_STRATEGY,
+                                     EGL_OPENGL_API);
+
+      if (context->initializeDrawingContext())
+        return context;
+      else
+        delete context;
+    }
+
     context = new GHOST_ContextEGL(this,
                                    false,
                                    EGLNativeWindowType(os_egl_window),
                                    EGLNativeDisplayType(d->display),
                                    EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT,
-                                   4,
-                                   minor,
+                                   3,
+                                   3,
                                    GHOST_OPENGL_EGL_CONTEXT_FLAGS,
                                    GHOST_OPENGL_EGL_RESET_NOTIFICATION_STRATEGY,
                                    EGL_OPENGL_API);
 
-    if (context->initializeDrawingContext())
+    if (context->initializeDrawingContext()) {
       return context;
-    else
+    }
+    else {
       delete context;
+    }
+
+    GHOST_PRINT("Cannot create off-screen EGL context" << std::endl);
   }
-
-  context = new GHOST_ContextEGL(this,
-                                 false,
-                                 EGLNativeWindowType(os_egl_window),
-                                 EGLNativeDisplayType(d->display),
-                                 EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT,
-                                 3,
-                                 3,
-                                 GHOST_OPENGL_EGL_CONTEXT_FLAGS,
-                                 GHOST_OPENGL_EGL_RESET_NOTIFICATION_STRATEGY,
-                                 EGL_OPENGL_API);
-
-  if (context->initializeDrawingContext()) {
-    return context;
-  }
-  else {
-    delete context;
-  }
-
-  GHOST_PRINT("Cannot create off-screen EGL context" << std::endl);
-
   return nullptr;
 }
 

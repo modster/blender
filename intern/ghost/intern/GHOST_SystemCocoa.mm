@@ -34,6 +34,10 @@
 
 #include "GHOST_ContextCGL.h"
 
+#if defined(WITH_VULKAN)
+#  include "GHOST_ContextVK.h"
+#endif
+
 #ifdef WITH_INPUT_NDOF
 #  include "GHOST_NDOFManagerCocoa.h"
 #endif
@@ -764,8 +768,21 @@ GHOST_IWindow *GHOST_SystemCocoa::createWindow(const char *title,
  * Never explicitly delete the context, use #disposeContext() instead.
  * \return The new context (or 0 if creation failed).
  */
-GHOST_IContext *GHOST_SystemCocoa::createOffscreenContext(GHOST_GLSettings glSettings)
+GHOST_IContext *GHOST_SystemCocoa::createOffscreenContext(GHOST_TDrawingContextType type,
+                                                          GHOST_GLSettings glSettings)
 {
+#ifdef WITH_VULKAN
+  if (type == GHOST_kDrawingContextTypeVulkan) {
+    const bool debug_context = (glSettings.flags & GHOST_glDebugContext) != 0;
+    GHOST_Context *context = new GHOST_ContextVK(false, NULL, 1, 0, debug_context);
+    if (context->initializeDrawingContext()) {
+      return context;
+    }
+    delete context;
+    type = GHOST_kDrawingContextTypeOpenGL;
+  }
+#endif
+
   GHOST_Context *context = new GHOST_ContextCGL(false, NULL, NULL, NULL);
   if (context->initializeDrawingContext())
     return context;

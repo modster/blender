@@ -26,7 +26,7 @@
 
 #include "GHOST_IWindow.h"
 
-class GHOST_Context;
+#include "GHOST_Context.h"
 
 /**
  * Platform independent implementation of GHOST_IWindow.
@@ -93,6 +93,22 @@ class GHOST_Window : public GHOST_IWindow {
   {
     return m_context != NULL;
   }
+
+  /**
+   * Gets the Vulkan framebuffer related resource handles associated with the Vulkan context.
+   * Needs to be called after each swap events as the framebuffer will change.
+   * \return  A boolean success indicator.
+   */
+  GHOST_TSuccess getVulkanBackbuffer(void *image,
+                                     void *framebuffer,
+                                     void *command_buffer,
+                                     void *render_pass,
+                                     void *extent,
+                                     uint32_t *fb_id)
+  {
+    return m_context->getVulkanBackbuffer(
+        image, framebuffer, command_buffer, render_pass, extent, fb_id);
+  };
 
   /**
    * Returns the associated OS object/handle
@@ -228,6 +244,12 @@ class GHOST_Window : public GHOST_IWindow {
    * \return The current type of drawing context.
    */
   inline GHOST_TDrawingContextType getDrawingContextType();
+
+  /**
+   * Returns the drawing context used in this window.
+   * \return The drawing context.
+   */
+  inline GHOST_IContext *getDrawingContext();
 
   /**
    * Tries to install a rendering context in this window.
@@ -409,6 +431,11 @@ class GHOST_Window : public GHOST_IWindow {
 inline GHOST_TDrawingContextType GHOST_Window::getDrawingContextType()
 {
   return m_drawingContextType;
+}
+
+inline GHOST_IContext *GHOST_Window::getDrawingContext()
+{
+  return m_context;
 }
 
 inline bool GHOST_Window::getCursorVisibility() const

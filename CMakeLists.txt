@@ -513,9 +513,12 @@ if(UNIX AND NOT APPLE)
 endif()
 
 
+# Vulkan
+option(WITH_VULKAN              "Enable Vulkan GHOST backend (for development purposes)" OFF)
+
 # OpenGL
 
-option(WITH_OPENGL              "When off limits visibility of the opengl headers to just bf_gpu and gawain (temporary option for development purposes)" ON)
+option(WITH_OPENGL              "When off limits visibility of the opengl headers to just bf_gpu (temporary option for development purposes)" ON)
 option(WITH_GLEW_ES             "Switches to experimental copy of GLEW that has support for OpenGL ES. (temporary option for development purposes)" OFF)
 option(WITH_GL_EGL              "Use the EGL OpenGL system library instead of the platform specific OpenGL system library (CGL, glX, or WGL)"       OFF)
 option(WITH_GL_PROFILE_ES20     "Support using OpenGL ES 2.0. (through either EGL or the AGL/WGL/XGL 'es20' profile)"                               OFF)
@@ -525,6 +528,7 @@ mark_as_advanced(
   WITH_GLEW_ES
   WITH_GL_EGL
   WITH_GL_PROFILE_ES20
+  WITH_VULKAN
 )
 
 if(WIN32)
@@ -1123,6 +1127,15 @@ if(WITH_OPENVDB)
   endif()
 
   list(APPEND OPENVDB_LIBRARIES ${BOOST_LIBRARIES} ${TBB_LIBRARIES})
+endif()
+
+#-----------------------------------------------------------------------------
+# Configure Vulkan.
+
+if(WITH_VULKAN)
+  list(APPEND BLENDER_GL_LIBRARIES ${Vulkan_LIBRARY})
+
+  add_definitions(-DWITH_VULKAN)
 endif()
 
 #-----------------------------------------------------------------------------

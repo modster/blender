@@ -2450,7 +2450,7 @@ void *WM_opengl_context_create(void)
   if (G.debug & G_DEBUG_GPU) {
     glSettings.flags |= GHOST_glDebugContext;
   }
-  return GHOST_CreateOpenGLContext(g_system, glSettings);
+  return GHOST_CreateOpenGLContext(g_system, GHOST_kDrawingContextTypeOpenGL, glSettings);
 }
 
 void WM_opengl_context_dispose(void *context)

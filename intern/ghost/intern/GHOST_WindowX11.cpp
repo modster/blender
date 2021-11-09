@@ -38,6 +38,10 @@
 #  include "GHOST_DropTargetX11.h"
 #endif
 
+#if defined(WITH_VULKAN)
+#  include "GHOST_ContextVK.h"
+#endif
+
 #ifdef WITH_GL_EGL
 #  include "GHOST_ContextEGL.h"
 #  include <EGL/eglext.h>
@@ -1273,8 +1277,38 @@ GHOST_WindowX11::~GHOST_WindowX11()
 
 GHOST_Context *GHOST_WindowX11::newDrawingContext(GHOST_TDrawingContextType type)
 {
-  if (type == GHOST_kDrawingContextTypeOpenGL) {
+#if defined(WITH_VULKAN)
+  if (type == GHOST_kDrawingContextTypeVulkan) {
+    /* Vulkan port
+     *   try vulkan
+     *   fallback to OGL */
+    GHOST_Context *context = new GHOST_ContextVK(m_wantStereoVisual,
+                                                 GHOST_kVulkanPlatformX11,
+                                                 m_window,
+                                                 m_display,
+                                                 NULL,
+                                                 NULL,
+                                                 1,
+                                                 0,
+                                                 m_is_debug_context);
 
+    if (context->initializeDrawingContext()) {
+      return context;
+    }
+    else {
+      delete context;
+    }
+
+    fprintf(stderr, "Error! Unsupported graphics card or driver.\n");
+    fprintf(stderr, "A graphics card and driver with support for Vulkan 1.0.\n");
+    fprintf(stderr, "You can try the `--debug-gpu' option to have more information.\n");
+    fprintf(stderr, "The program will now close.\n");
+    fflush(stderr);
+    exit(1);
+  }
+#endif
+
+  if (type == GHOST_kDrawingContextTypeOpenGL) {
     /* During development:
      * - Try 4.x compatibility profile.
      * - Try 3.3 compatibility profile.

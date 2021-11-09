@@ -195,6 +195,7 @@ extern GHOST_WindowHandle GHOST_CreateWindow(GHOST_SystemHandle systemhandle,
  * \return A handle to the new context ( == NULL if creation failed).
  */
 extern GHOST_ContextHandle GHOST_CreateOpenGLContext(GHOST_SystemHandle systemhandle,
+                                                     GHOST_TDrawingContextType type,
                                                      GHOST_GLSettings glSettings);
 
 /**
@@ -541,6 +542,13 @@ extern int GHOST_GetValid(GHOST_WindowHandle windowhandle);
  * \return The current type of drawing context.
  */
 extern GHOST_TDrawingContextType GHOST_GetDrawingContextType(GHOST_WindowHandle windowhandle);
+
+/**
+ * Returns the drawing context used in this window.
+ * \param windowhandle: The handle to the window.
+ * \return The window drawing context.
+ */
+extern GHOST_ContextHandle GHOST_GetDrawingContext(GHOST_WindowHandle windowhandle);
 
 /**
  * Tries to install a rendering context in this window.
@@ -1165,6 +1173,30 @@ int GHOST_XrGetControllerModelData(GHOST_XrContextHandle xr_context,
                                    GHOST_XrControllerModelData *r_data);
 
 #endif /* WITH_XR_OPENXR */
+
+#ifdef WITH_VULKAN
+
+/**
+ * Return vulkan handles for the given context.
+ */
+void GHOST_GetVulkanHandles(GHOST_ContextHandle context,
+                            void *r_instance,
+                            void *r_physical_device,
+                            void *r_device,
+                            uint32_t *r_graphic_queue_familly);
+
+/**
+ * Return vulkan backbuffer resources handles for the given window.
+ */
+void GHOST_GetVulkanBackbuffer(GHOST_WindowHandle windowhandle,
+                               void *image,
+                               void *framebuffer,
+                               void *command_buffer,
+                               void *render_pass,
+                               void *extent,
+                               uint32_t *fb_id);
+
+#endif
 
 #ifdef __cplusplus
 }

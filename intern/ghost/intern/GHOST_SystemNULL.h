@@ -81,7 +81,8 @@ class GHOST_SystemNULL : public GHOST_System {
   void getAllDisplayDimensions(uint32_t &width, uint32_t &height) const
   { /* nop */
   }
-  GHOST_IContext *createOffscreenContext(GHOST_GLSettings glSettings)
+  GHOST_IContext *createOffscreenContext(GHOST_TDrawingContextType /* type */,
+                                         GHOST_GLSettings glSettings)
   {
     return NULL;
   }

@@ -30,6 +30,8 @@
 #include <stdlib.h>
 #include <string>
 
+class GHOST_IContext;
+
 /**
  * Interface for GHOST windows.
  *
@@ -70,6 +72,12 @@ class GHOST_IWindow {
    * \return The current type of drawing context.
    */
   virtual GHOST_TDrawingContextType getDrawingContextType() = 0;
+
+  /**
+   * Returns the type of drawing context used in this window.
+   * \return The current type of drawing context.
+   */
+  virtual GHOST_IContext *getDrawingContext() = 0;
 
   /**
    * Tries to install a rendering context in this window.
@@ -217,6 +225,18 @@ class GHOST_IWindow {
    * \return The name of an OpenGL frame-buffer object.
    */
   virtual unsigned int getDefaultFramebuffer() = 0;
+
+  /**
+   * Gets the Vulkan framebuffer related resource handles associated with the Vulkan context.
+   * Needs to be called after each swap events as the framebuffer will change.
+   * \return  A boolean success indicator.
+   */
+  virtual GHOST_TSuccess getVulkanBackbuffer(void * /*image*/,
+                                             void * /*framebuffer*/,
+                                             void * /*command_buffer*/,
+                                             void * /*render_pass*/,
+                                             void * /*extent*/,
+                                             uint32_t * /*fb_id*/) = 0;
 
   /**
    * Invalidates the contents of this window.

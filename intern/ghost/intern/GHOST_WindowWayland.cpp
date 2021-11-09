@@ -26,6 +26,9 @@
 
 #include "GHOST_ContextEGL.h"
 #include "GHOST_ContextNone.h"
+#if defined(WITH_VULKAN)
+#  include "GHOST_ContextVK.h"
+#endif
 
 #include <wayland-egl.h>
 
@@ -554,6 +557,21 @@ GHOST_Context *GHOST_WindowWayland::newDrawingContext(GHOST_TDrawingContextType 
                                      GHOST_OPENGL_EGL_CONTEXT_FLAGS,
                                      GHOST_OPENGL_EGL_RESET_NOTIFICATION_STRATEGY,
                                      EGL_OPENGL_API);
+      break;
+#if defined(WITH_VULKAN)
+    case GHOST_kDrawingContextTypeVulkan:
+      context = new GHOST_ContextVK(m_wantStereoVisual,
+                                    GHOST_kVulkanPlatformWayland,
+                                    0,
+                                    NULL,
+                                    w->surface,
+                                    m_system->display(),
+                                    1,
+                                    0,
+                                    false);
+      break;
+
+#endif
   }
 
   return (context->initializeDrawingContext() == GHOST_kSuccess) ? context : nullptr;
