@@ -20,13 +20,15 @@
  * \ingroup draw_engine
  */
 
-#pragma once
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-extern DrawEngineType draw_engine_image_type;
+GPUShader *BASIC_shaders_depth_sh_get(eGPUShaderConfig config);
+GPUShader *BASIC_shaders_pointcloud_depth_sh_get(eGPUShaderConfig config);
+GPUShader *BASIC_shaders_depth_conservative_sh_get(eGPUShaderConfig config);
+GPUShader *BASIC_shaders_pointcloud_depth_conservative_sh_get(eGPUShaderConfig config);
+void BASIC_shaders_free(void);
 
 #ifdef __cplusplus
 }
