@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <functional>
+
 #include "NOD_node_declaration.hh"
 
 #include "RNA_types.h"

@@ -687,7 +687,8 @@ typedef struct bNodeSocketValueMaterial {
 /* TODO: Add something to help with versioning for built-in enums. */
 typedef struct bNodeSocketValueEnum {
   int value;
-  char _pad[4];
+  char targets_are_invalid;
+  char _pad[3];
   /**
    * Possible items for the enum. This is only runtime data and is not owned by the socket.
    */

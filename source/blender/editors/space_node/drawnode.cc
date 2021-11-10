@@ -4450,6 +4450,12 @@ void node_draw_link(const bContext *C, View2D *v2d, SpaceNode *snode, bNodeLink 
       th_col1 = th_col2 = th_col3 = TH_REDALERT;
     }
   }
+  if (link->fromsock && link->fromsock->type == SOCK_ENUM) {
+    bNodeSocketValueEnum *socket_value = (bNodeSocketValueEnum *)link->fromsock->default_value;
+    if (socket_value->targets_are_invalid) {
+      th_col1 = th_col2 = th_col3 = TH_REDALERT;
+    }
+  }
 
   node_draw_link_bezier(C, v2d, snode, link, th_col1, th_col2, th_col3);
 }

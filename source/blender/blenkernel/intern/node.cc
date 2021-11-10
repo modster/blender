@@ -5138,7 +5138,22 @@ static EnumInputInferencingInfo get_input_enum_socket_inferencing_info(
 struct EnumState {
   std::shared_ptr<EnumItems> items;
   int group_output_index = -1;
+  bool targets_are_invalid = false;
 };
+
+static bool enum_states_are_compatible(const EnumState &a, const EnumState &b)
+{
+  if (a.items && b.items) {
+    return a.items->items() == b.items->items();
+  }
+  if (a.group_output_index == -1 || b.group_output_index == -1) {
+    return true;
+  }
+  if (a.group_output_index == b.group_output_index) {
+    return true;
+  }
+  return false;
+}
 
 static bool update_enum_inferencing(const NodeTreeRef &tree)
 {
@@ -5169,12 +5184,19 @@ static bool update_enum_inferencing(const NodeTreeRef &tree)
       if (socket->typeinfo()->type != SOCK_ENUM) {
         continue;
       }
-      /* TODO: Handle case when connected to incompatible enums. */
       EnumState enum_state;
       for (const InputSocketRef *target_socket : socket->directly_linked_sockets()) {
         if (target_socket->is_available()) {
-          enum_state = state_by_socket.lookup_default(target_socket, {});
-          break;
+          EnumState new_state = state_by_socket.lookup_default(target_socket, {});
+          if (enum_states_are_compatible(enum_state, new_state)) {
+            enum_state = new_state;
+            enum_state.targets_are_invalid = false;
+          }
+          else {
+            enum_state = {};
+            enum_state.targets_are_invalid = true;
+            break;
+          }
         }
       }
       state_by_socket.add_new(socket, enum_state);
@@ -5202,6 +5224,7 @@ static bool update_enum_inferencing(const NodeTreeRef &tree)
         BLI_assert(inference_index >= 0);
         const OutputSocketRef &output_socket = node->output(inference_index);
         input_state = state_by_socket.lookup(&output_socket);
+        input_state.targets_are_invalid = false;
       }
       state_by_socket.add_new(socket, input_state);
     }
@@ -5217,6 +5240,7 @@ static bool update_enum_inferencing(const NodeTreeRef &tree)
     else {
       socket_value->items = nullptr;
     }
+    socket_value->targets_are_invalid = state.targets_are_invalid;
   }
 
   EnumInferencingInterface *new_inferencing_interface = new EnumInferencingInterface();
