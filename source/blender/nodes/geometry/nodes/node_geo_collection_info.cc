@@ -31,7 +31,25 @@ namespace blender::nodes {
 
 static void geo_node_collection_info_declare(NodeDeclarationBuilder &b)
 {
+  static const EnumPropertyItem rna_node_geometry_collection_info_transform_space_items[] = {
+      {GEO_NODE_TRANSFORM_SPACE_ORIGINAL,
+       "ORIGINAL",
+       0,
+       "Original",
+       "Output the geometry relative to the collection offset"},
+      {GEO_NODE_TRANSFORM_SPACE_RELATIVE,
+       "RELATIVE",
+       0,
+       "Relative",
+       "Bring the input collection geometry into the modified object, maintaining the relative "
+       "position between the objects in the scene"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
   b.add_input<decl::Collection>(N_("Collection")).hide_label();
+  b.add_input<decl::Enum>(N_("Transform Space"))
+      .static_items(rna_node_geometry_collection_info_transform_space_items)
+      .hide_label();
   b.add_input<decl::Bool>(N_("Separate Children"))
       .description(
           N_("Output each child of the collection as a separate instance, sorted alphabetically"));
@@ -40,11 +58,6 @@ static void geo_node_collection_info_declare(NodeDeclarationBuilder &b)
           N_("Reset the transforms of every child instance in the output. Only used when Separate "
              "Children is enabled"));
   b.add_output<decl::Geometry>(N_("Geometry"));
-}
-
-static void geo_node_collection_info_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
-{
-  uiItemR(layout, ptr, "transform_space", UI_ITEM_R_EXPAND, nullptr, ICON_NONE);
 }
 
 static void geo_node_collection_info_node_init(bNodeTree *UNUSED(tree), bNode *node)
@@ -80,10 +93,8 @@ static void geo_node_collection_info_exec(GeoNodeExecParams params)
     return;
   }
 
-  const bNode &bnode = params.node();
-  NodeGeometryCollectionInfo *node_storage = (NodeGeometryCollectionInfo *)bnode.storage;
-  const bool use_relative_transform = (node_storage->transform_space ==
-                                       GEO_NODE_TRANSFORM_SPACE_RELATIVE);
+  const bool use_relative_transform = params.get_input<GeometryNodeTransformSpace>(
+                                          "Transform Space") == GEO_NODE_TRANSFORM_SPACE_RELATIVE;
 
   InstancesComponent &instances = geometry_set_out.get_component_for_write<InstancesComponent>();
 
@@ -169,6 +180,5 @@ void register_node_type_geo_collection_info()
                     node_free_standard_storage,
                     node_copy_standard_storage);
   ntype.geometry_node_execute = blender::nodes::geo_node_collection_info_exec;
-  ntype.draw_buttons = blender::nodes::geo_node_collection_info_layout;
   nodeRegisterType(&ntype);
 }
