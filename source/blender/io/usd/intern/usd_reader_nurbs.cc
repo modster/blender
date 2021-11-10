@@ -183,6 +183,29 @@ void USDNurbsReader::read_curve_sample(Curve *cu, const double motionSampleTime)
   }
 }
 
+static bool topology_changed(CurveEval *curve_eval, const pxr::VtIntArray &usdCounts)
+{
+  if (!curve_eval) {
+    return true;
+  }
+
+  if (curve_eval->splines().size() != usdCounts.size()) {
+    return true;
+  }
+
+  int curve_idx = 0;
+  for (const SplinePtr &spline : curve_eval->splines()) {
+    const int num_in_usd = usdCounts[curve_idx++];
+    const int num_in_blender = spline->positions().size();
+
+    if (num_in_usd != num_in_blender) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 void USDNurbsReader::read_geometry(GeometrySet &geometry_set,
                                    double motionSampleTime,
                                    int /* read_flag */,
@@ -197,7 +220,6 @@ void USDNurbsReader::read_geometry(GeometrySet &geometry_set,
   pxr::VtIntArray usdCounts;
 
   vertexAttr.Get(&usdCounts, motionSampleTime);
-  int num_subcurves = usdCounts.size();
 
   pxr::VtVec3fArray usdPoints;
   pointsAttr.Get(&usdPoints, motionSampleTime);
@@ -206,22 +228,7 @@ void USDNurbsReader::read_geometry(GeometrySet &geometry_set,
   int curve_idx;
   CurveEval *curve_eval = geometry_set.get_curve_for_write();
 
-  const int curve_count = curve_eval->splines().size();
-  bool same_topology = curve_count == num_subcurves;
-
-  if (same_topology) {
-    for (const SplinePtr &spline : curve_eval->splines()) {
-      const int num_in_usd = usdCounts[curve_idx++];
-      const int num_in_blender = spline->positions().size();
-
-      if (num_in_usd != num_in_blender) {
-        same_topology = false;
-        break;
-      }
-    }
-  }
-
-  if (!same_topology) {
+  if (blender::io::usd::topology_changed(curve_eval, usdCounts)) {
     Curve *curve = static_cast<Curve *>(object_->data);
     BKE_nurbList_free(&curve->nurb);
     read_curve_sample(curve, motionSampleTime);
@@ -230,6 +237,8 @@ void USDNurbsReader::read_geometry(GeometrySet &geometry_set,
     geometry_set.replace_curve(new_curve_eval.release(), GeometryOwnershipType::Editable);
   }
   else {
+    BLI_assert_msg(curve_eval, "curve_eval is null although the topology is the same !");
+    const int curve_count = curve_eval->splines().size();
     for (curve_idx = 0; curve_idx < curve_count; curve_idx++) {
       Spline *spline = curve_eval->splines()[curve_idx].get();
 

@@ -300,6 +300,10 @@ void AbcCurveReader::read_curve_sample(Curve *cu,
 
 static bool topology_changed(CurveEval *curve_eval, const Int32ArraySamplePtr &num_vertices)
 {
+  if (!curve_eval) {
+    return true;
+  }
+
   const size_t num_curves = num_vertices->size();
   if (num_curves != curve_eval->splines().size()) {
     return true;
@@ -334,8 +338,6 @@ void AbcCurveReader::read_geometry(GeometrySet &geometry_set,
                                    const float /*velocity_scale*/,
                                    const char **err_str)
 {
-  assert(geometry_set.has_curve());
-
   ICurvesSchema::Sample sample;
 
   try {
