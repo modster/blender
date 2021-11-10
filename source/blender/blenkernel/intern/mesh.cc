@@ -88,7 +88,7 @@ static void mesh_init_data(ID *id)
   CustomData_reset(&mesh->pdata);
   CustomData_reset(&mesh->ldata);
 
-  BKE_mesh_runtime_reset(mesh);
+  BKE_mesh_runtime_init_data(mesh);
 
   /* A newly created mesh does not have normals, so tag them dirty. This will be cleared by
    * retrieving the normal layer for manually writing to it, or calling functions like
@@ -180,7 +180,7 @@ static void mesh_free_data(ID *id)
     mesh->edit_mesh = nullptr;
   }
 
-  BKE_mesh_runtime_clear_cache(mesh);
+  BKE_mesh_runtime_free_data(mesh);
   mesh_clear_geometry(mesh);
   MEM_SAFE_FREE(mesh->mat);
 }
@@ -320,7 +320,9 @@ static void mesh_blend_read_data(BlendDataReader *reader, ID *id)
 
   mesh->texflag &= ~ME_AUTOSPACE_EVALUATED;
   mesh->edit_mesh = nullptr;
-  BKE_mesh_runtime_reset(mesh);
+
+  memset(&mesh->runtime, 0, sizeof(mesh->runtime));
+  BKE_mesh_runtime_init_data(mesh);
 
   /* happens with old files */
   if (mesh->mselect == nullptr) {
@@ -853,12 +855,12 @@ bool BKE_mesh_clear_facemap_customdata(struct Mesh *me)
 }
 
 /**
- * This ensures grouped customdata (e.g. mtexpoly and mloopuv and mtface, or
- * mloopcol and mcol) have the same relative active/render/clone/mask indices.
+ * This ensures grouped custom-data (e.g. #CD_MLOOPUV and #CD_MTFACE, or
+ * #CD_MLOOPCOL and #CD_MCOL) have the same relative active/render/clone/mask indices.
  *
- * NOTE(campbell): that for undo mesh data we want to skip 'ensure_tess_cd' call since
- * we don't want to store memory for tessface when its only used for older
- * Versions of the mesh.
+ * NOTE(@campbellbarton): that for undo mesh data we want to skip 'ensure_tess_cd' call since
+ * we don't want to store memory for #MFace data when its only used for older
+ * versions of the mesh.
  */
 static void mesh_update_linked_customdata(Mesh *me, const bool do_ensure_tess_cd)
 {
@@ -1166,8 +1168,12 @@ BMesh *BKE_mesh_to_bmesh(Mesh *me,
                          const bool add_key_index,
                          const struct BMeshCreateParams *params)
 {
-  struct BMeshFromMeshParams bmfmp = {false, add_key_index, true, ob->shapenr};
-  return BKE_mesh_to_bmesh_ex(me, params, &bmfmp);
+  BMeshFromMeshParams bmesh_from_mesh_params{};
+  bmesh_from_mesh_params.calc_face_normal = false;
+  bmesh_from_mesh_params.add_key_index = add_key_index;
+  bmesh_from_mesh_params.use_shapekey = true;
+  bmesh_from_mesh_params.active_shapekey = ob->shapenr;
+  return BKE_mesh_to_bmesh_ex(me, params, &bmesh_from_mesh_params);
 }
 
 Mesh *BKE_mesh_from_bmesh_nomain(BMesh *bm,
@@ -1910,8 +1916,8 @@ void BKE_mesh_calc_normals_split_ex(Mesh *mesh, MLoopNorSpaceArray *r_lnors_spac
   short(*clnors)[2] = NULL;
 
   /* Note that we enforce computing clnors when the clnor space array is requested by caller here.
-   * However, we obviously only use the autosmooth angle threshold
-   * only in case autosmooth is enabled. */
+   * However, we obviously only use the auto-smooth angle threshold
+   * only in case auto-smooth is enabled. */
   const bool use_split_normals = (r_lnors_spacearr != nullptr) ||
                                  ((mesh->flag & ME_AUTOSMOOTH) != 0);
   const float split_angle = (mesh->flag & ME_AUTOSMOOTH) != 0 ? mesh->smoothresh : (float)M_PI;
