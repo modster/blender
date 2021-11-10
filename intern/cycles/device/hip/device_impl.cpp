@@ -154,7 +154,7 @@ bool HIPDevice::support_device(const uint /*kernel_features*/)
     hipDeviceProp_t props;
     hipGetDeviceProperties(&props, hipDevId);
 
-    set_error(string_printf("HIP backend requires AMD RDNA2 graphics card or up, but found %s.",
+    set_error(string_printf("HIP backend requires AMD RDNA graphics card or up, but found %s.",
                             props.name));
     return false;
   }
@@ -1160,6 +1160,8 @@ bool HIPDevice::should_use_graphics_interop()
    * possible, but from the empiric measurements it can be considerably slower than using naive
    * pixels copy. */
 
+  /* Disable graphics interop for now, because of driver bug in 21.40. See T92972 */
+#  if 0
   HIPContextScope scope(this);
 
   int num_all_devices = 0;
@@ -1178,6 +1180,7 @@ bool HIPDevice::should_use_graphics_interop()
       return true;
     }
   }
+#  endif
 
   return false;
 }
