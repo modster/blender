@@ -769,18 +769,6 @@ static void wm_file_read_post(bContext *C, const struct wmFileReadPost_Params *p
       WM_toolsystem_init(C);
     }
   }
-
-  /* Keep last. */
-  if (use_data) {
-    if (!G.background) {
-      /* Special case, when calling indirectly (from a Python script for example),
-       * the event loop wont run again to set the active window.
-       * Set the window here to allow scripts to continue running other operations, see: T92464. */
-      if (wm->op_undo_depth > 0) {
-        CTX_wm_window_set(C, wm->windows.first);
-      }
-    }
-  }
 }
 
 /** \} */
@@ -1805,8 +1793,9 @@ static bool wm_file_write(bContext *C,
   /* Enforce full override check/generation on file save. */
   BKE_lib_override_library_main_operations_create(bmain, true);
 
-  if (!G.background) {
-    /* Redraw to remove menus that might be open. */
+  if (!G.background && BLI_thread_is_main()) {
+    /* Redraw to remove menus that might be open.
+     * But only in the main thread otherwise this can crash, see T92704. */
     WM_redraw_windows(C);
   }
 
