@@ -101,7 +101,7 @@ ccl_device_forceinline void integrate_surface_emission(KernelGlobals kg,
   }
 
   const float3 throughput = INTEGRATOR_STATE(state, path, throughput);
-  kernel_accum_emission(kg, state, throughput, L, render_buffer);
+  kernel_accum_emission(kg, state, throughput * L, render_buffer);
 }
 #endif /* __EMISSION__ */
 
@@ -490,10 +490,6 @@ ccl_device bool integrate_surface(KernelGlobals kg,
 
 #ifdef __DENOISING_FEATURES__
     kernel_write_denoising_features_surface(kg, state, &sd, render_buffer);
-#endif
-
-#ifdef __SHADOW_CATCHER__
-    kernel_write_shadow_catcher_bounce_data(kg, state, &sd, render_buffer);
 #endif
 
     /* Direct light. */

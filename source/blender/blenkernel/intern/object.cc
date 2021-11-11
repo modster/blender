@@ -96,6 +96,7 @@
 #include "BKE_fcurve.h"
 #include "BKE_fcurve_driver.h"
 #include "BKE_geometry_set.h"
+#include "BKE_geometry_set.hh"
 #include "BKE_global.h"
 #include "BKE_gpencil.h"
 #include "BKE_gpencil_geom.h"
@@ -1222,7 +1223,7 @@ static IDProperty *object_asset_dimensions_property(Object *ob)
     return nullptr;
   }
 
-  IDPropertyTemplate idprop = {0};
+  IDPropertyTemplate idprop{};
   idprop.array.len = ARRAY_SIZE(dimensions);
   idprop.array.type = IDP_FLOAT;
 
@@ -2634,7 +2635,7 @@ Object **BKE_object_pose_array_get_ex(ViewLayer *view_layer,
   Object *ob_pose = BKE_object_pose_armature_get(ob_active);
   Object **objects = nullptr;
   if (ob_pose == ob_active) {
-    ObjectsInModeParams ob_params = {0};
+    ObjectsInModeParams ob_params{};
     ob_params.object_mode = OB_MODE_POSE;
     ob_params.no_dup_data = unique;
 
@@ -2681,7 +2682,7 @@ Base **BKE_object_pose_base_array_get_ex(ViewLayer *view_layer,
   }
 
   if (base_active && (base_pose == base_active)) {
-    ObjectsInModeParams ob_params = {0};
+    ObjectsInModeParams ob_params{};
     ob_params.object_mode = OB_MODE_POSE;
     ob_params.no_dup_data = unique;
 
@@ -4303,7 +4304,7 @@ void BKE_object_foreach_display_point(Object *ob,
     }
   }
   else if (ob->type == OB_GPENCIL) {
-    GPencilStrokePointIterData iter_data = {nullptr};
+    GPencilStrokePointIterData iter_data{};
     iter_data.obmat = obmat;
     iter_data.point_func_cb = func_cb;
     iter_data.user_data = user_data;
@@ -4341,28 +4342,18 @@ void BKE_scene_foreach_display_point(Depsgraph *depsgraph,
 }
 
 /**
- * Struct members from DNA_object_types.h
+ * See struct members from #Object in DNA_object_types.h
  */
 struct ObTfmBack {
   float loc[3], dloc[3];
-  /** scale and delta scale. */
   float scale[3], dscale[3];
-  /** euler rotation. */
   float rot[3], drot[3];
-  /** quaternion rotation. */
   float quat[4], dquat[4];
-  /** axis angle rotation - axis part. */
   float rotAxis[3], drotAxis[3];
-  /** axis angle rotation - angle part. */
   float rotAngle, drotAngle;
-  /** final worldspace matrix with constraints & animsys applied. */
   float obmat[4][4];
-  /** inverse result of parent, so that object doesn't 'stick' to parent. */
   float parentinv[4][4];
-  /** inverse result of constraints. doesn't include effect of parent or object local transform.
-   */
   float constinv[4][4];
-  /** inverse matrix of 'obmat' for during render, temporally: ipokeys of transform. */
   float imat[4][4];
 };
 
@@ -4578,8 +4569,28 @@ bool BKE_object_obdata_texspace_get(Object *ob, short **r_texflag, float **r_loc
 /** Get evaluated mesh for given object. */
 Mesh *BKE_object_get_evaluated_mesh(const Object *object)
 {
+  /* First attempt to retrieve the evaluated mesh from the evaluated geometry set. Most
+   * object types either store it there or add a reference to it if it's owned elsewhere. */
+  GeometrySet *geometry_set_eval = object->runtime.geometry_set_eval;
+  if (geometry_set_eval) {
+    /* Some areas expect to be able to modify the evaluated mesh. Theoretically this should be
+     * avoided, or at least protected with a lock, so a const mesh could be returned from this
+     * function. */
+    Mesh *mesh = geometry_set_eval->get_mesh_for_write();
+    if (mesh) {
+      return mesh;
+    }
+  }
+
+  /* Some object types do not yet add the evaluated mesh to an evaluated geometry set, if they do
+   * not support evaluating to multiple data types. Eventually this should be removed, when all
+   * object types use #geometry_set_eval. */
   ID *data_eval = object->runtime.data_eval;
-  return (data_eval && GS(data_eval->name) == ID_ME) ? (Mesh *)data_eval : nullptr;
+  if (data_eval && GS(data_eval->name) == ID_ME) {
+    return reinterpret_cast<Mesh *>(data_eval);
+  }
+
+  return nullptr;
 }
 
 /**
@@ -5424,7 +5435,7 @@ KDTree_3d *BKE_object_as_kdtree(Object *ob, int *r_tot)
         MVert *mvert = me_eval->mvert;
         uint totvert = me_eval->totvert;
 
-        /* tree over-allocs in case where some verts have ORIGINDEX_NONE */
+        /* Tree over-allocates in case where some verts have #ORIGINDEX_NONE. */
         tot = 0;
         tree = BLI_kdtree_3d_new(totvert);
 
@@ -5848,7 +5859,7 @@ void BKE_object_replace_data_on_shallow_copy(Object *ob, ID *new_data)
   ob->type = BKE_object_obdata_to_type(new_data);
   ob->data = (void *)new_data;
   ob->runtime.geometry_set_eval = nullptr;
-  ob->runtime.data_eval = nullptr;
+  ob->runtime.data_eval = new_data;
   if (ob->runtime.bb != nullptr) {
     ob->runtime.bb->flag |= BOUNDBOX_DIRTY;
   }
