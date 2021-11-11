@@ -146,12 +146,18 @@ HIPDevice::~HIPDevice()
 
 bool HIPDevice::support_device(const uint /*kernel_features*/)
 {
-  int major, minor;
-  hipDeviceGetAttribute(&major, hipDeviceAttributeComputeCapabilityMajor, hipDevId);
-  hipDeviceGetAttribute(&minor, hipDeviceAttributeComputeCapabilityMinor, hipDevId);
+  if (hipSupportsDevice(hipDevId)) {
+    return true;
+  }
+  else {
+    /* We only support Navi and above. */
+    hipDeviceProp_t props;
+    hipGetDeviceProperties(&props, hipDevId);
 
-  // TODO : (Arya) What versions do we plan to support?
-  return true;
+    set_error(string_printf("HIP backend requires AMD RDNA graphics card or up, but found %s.",
+                            props.name));
+    return false;
+  }
 }
 
 bool HIPDevice::check_peer_access(Device *peer_device)
@@ -216,7 +222,6 @@ string HIPDevice::compile_kernel_get_common_cflags(const uint kernel_features)
   const string include_path = source_path;
   string cflags = string_printf(
       "-m%d "
-      "--ptxas-options=\"-v\" "
       "--use_fast_math "
       "-DHIPCC "
       "-I\"%s\"",
@@ -230,8 +235,7 @@ string HIPDevice::compile_kernel_get_common_cflags(const uint kernel_features)
 
 string HIPDevice::compile_kernel(const uint kernel_features,
                                  const char *name,
-                                 const char *base,
-                                 bool force_ptx)
+                                 const char *base)
 {
   /* Compute kernel name. */
   int major, minor;
@@ -240,35 +244,20 @@ string HIPDevice::compile_kernel(const uint kernel_features,
   hipDeviceProp_t props;
   hipGetDeviceProperties(&props, hipDevId);
 
+  /* gcnArchName can contain tokens after the arch name with features, ie.
+    "gfx1010:sramecc-:xnack-" so we tokenize it to get the first part. */
+  char *arch = strtok(props.gcnArchName, ":");
+  if (arch == NULL) {
+    arch = props.gcnArchName;
+  }
+
   /* Attempt to use kernel provided with Blender. */
   if (!use_adaptive_compilation()) {
-    if (!force_ptx) {
-      const string fatbin = path_get(string_printf("lib/%s_%s.fatbin", name, props.gcnArchName));
-      VLOG(1) << "Testing for pre-compiled kernel " << fatbin << ".";
-      if (path_exists(fatbin)) {
-        VLOG(1) << "Using precompiled kernel.";
-        return fatbin;
-      }
-    }
-
-    /* The driver can JIT-compile PTX generated for older generations, so find the closest one. */
-    int ptx_major = major, ptx_minor = minor;
-    while (ptx_major >= 3) {
-      const string ptx = path_get(
-          string_printf("lib/%s_compute_%d%d.ptx", name, ptx_major, ptx_minor));
-      VLOG(1) << "Testing for pre-compiled kernel " << ptx << ".";
-      if (path_exists(ptx)) {
-        VLOG(1) << "Using precompiled kernel.";
-        return ptx;
-      }
-
-      if (ptx_minor > 0) {
-        ptx_minor--;
-      }
-      else {
-        ptx_major--;
-        ptx_minor = 9;
-      }
+    const string fatbin = path_get(string_printf("lib/%s_%s.fatbin", name, arch));
+    VLOG(1) << "Testing for pre-compiled kernel " << fatbin << ".";
+    if (path_exists(fatbin)) {
+      VLOG(1) << "Using precompiled kernel.";
+      return fatbin;
     }
   }
 
@@ -292,12 +281,10 @@ string HIPDevice::compile_kernel(const uint kernel_features,
 #  ifdef _DEBUG
   options.append(" -save-temps");
 #  endif
-  options.append(" --amdgpu-target=").append(props.gcnArchName);
+  options.append(" --amdgpu-target=").append(arch);
 
   const string include_path = source_path;
-  const char *const kernel_arch = props.gcnArchName;
-  const string fatbin_file = string_printf(
-      "cycles_%s_%s_%s", name, kernel_arch, kernel_md5.c_str());
+  const string fatbin_file = string_printf("cycles_%s_%s_%s", name, arch, kernel_md5.c_str());
   const string fatbin = path_cache_get(path_join("kernels", fatbin_file));
   VLOG(1) << "Testing for locally compiled kernel " << fatbin << ".";
   if (path_exists(fatbin)) {
@@ -307,9 +294,9 @@ string HIPDevice::compile_kernel(const uint kernel_features,
 
 #  ifdef _WIN32
   if (!use_adaptive_compilation() && have_precompiled_kernels()) {
-    if (major < 3) {
+    if (!hipSupportsDevice(hipDevId)) {
       set_error(
-          string_printf("HIP backend requires compute capability 3.0 or up, but found %d.%d. "
+          string_printf("HIP backend requires compute capability 10.1 or up, but found %d.%d. "
                         "Your GPU is not supported.",
                         major,
                         minor));
@@ -389,10 +376,9 @@ string HIPDevice::compile_kernel(const uint kernel_features,
 
 bool HIPDevice::load_kernels(const uint kernel_features)
 {
-  /* TODO(sergey): Support kernels re-load for CUDA devices adaptive compile.
+  /* TODO(sergey): Support kernels re-load for HIP devices adaptive compile.
    *
-   * Currently re-loading kernel will invalidate memory pointers,
-   * causing problems in cuCtxSynchronize.
+   * Currently re-loading kernels will invalidate memory pointers.
    */
   if (hipModule) {
     if (use_adaptive_compilation()) {
@@ -406,8 +392,9 @@ bool HIPDevice::load_kernels(const uint kernel_features)
     return false;
 
   /* check if GPU is supported */
-  if (!support_device(kernel_features))
+  if (!support_device(kernel_features)) {
     return false;
+  }
 
   /* get kernel */
   const char *kernel_name = "kernel";
@@ -912,7 +899,6 @@ void HIPDevice::tex_alloc(device_texture &mem)
 {
   HIPContextScope scope(this);
 
-  /* General variables for both architectures */
   string bind_name = mem.name;
   size_t dsize = datatype_size(mem.data_type);
   size_t size = mem.memory_size();
@@ -1077,7 +1063,6 @@ void HIPDevice::tex_alloc(device_texture &mem)
 
   if (mem.info.data_type != IMAGE_DATA_TYPE_NANOVDB_FLOAT &&
       mem.info.data_type != IMAGE_DATA_TYPE_NANOVDB_FLOAT3) {
-    /* Kepler+, bindless textures. */
     hipResourceDesc resDesc;
     memset(&resDesc, 0, sizeof(resDesc));
 
@@ -1168,6 +1153,8 @@ bool HIPDevice::should_use_graphics_interop()
    * possible, but from the empiric measurements it can be considerably slower than using naive
    * pixels copy. */
 
+  /* Disable graphics interop for now, because of driver bug in 21.40. See T92972 */
+#  if 0
   HIPContextScope scope(this);
 
   int num_all_devices = 0;
@@ -1186,6 +1173,7 @@ bool HIPDevice::should_use_graphics_interop()
       return true;
     }
   }
+#  endif
 
   return false;
 }

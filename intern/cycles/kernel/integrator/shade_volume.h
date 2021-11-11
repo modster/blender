@@ -608,7 +608,7 @@ ccl_device_forceinline void volume_integrate_heterogeneous(
         if (!result.indirect_scatter) {
           const float3 emission = volume_emission_integrate(
               &coeff, closure_flag, transmittance, dt);
-          accum_emission += emission;
+          accum_emission += result.indirect_throughput * emission;
         }
       }
 
@@ -661,7 +661,7 @@ ccl_device_forceinline void volume_integrate_heterogeneous(
 
   /* Write accumulated emission. */
   if (!is_zero(accum_emission)) {
-    kernel_accum_emission(kg, state, result.indirect_throughput, accum_emission, render_buffer);
+    kernel_accum_emission(kg, state, accum_emission, render_buffer);
   }
 
 #  ifdef __DENOISING_FEATURES__
@@ -1023,25 +1023,9 @@ ccl_device void integrator_shade_volume(KernelGlobals kg,
   }
   else {
     /* Continue to background, light or surface. */
-    if (isect.prim == PRIM_NONE) {
-      INTEGRATOR_PATH_NEXT(DEVICE_KERNEL_INTEGRATOR_SHADE_VOLUME,
-                           DEVICE_KERNEL_INTEGRATOR_SHADE_BACKGROUND);
-      return;
-    }
-    else if (isect.type & PRIMITIVE_LAMP) {
-      INTEGRATOR_PATH_NEXT(DEVICE_KERNEL_INTEGRATOR_SHADE_VOLUME,
-                           DEVICE_KERNEL_INTEGRATOR_SHADE_LIGHT);
-      return;
-    }
-    else {
-      /* Hit a surface, continue with surface kernel unless terminated. */
-      const int shader = intersection_get_shader(kg, &isect);
-      const int flags = kernel_tex_fetch(__shaders, shader).flags;
-
-      integrator_intersect_shader_next_kernel<DEVICE_KERNEL_INTEGRATOR_SHADE_VOLUME>(
-          kg, state, &isect, shader, flags);
-      return;
-    }
+    integrator_intersect_next_kernel_after_volume<DEVICE_KERNEL_INTEGRATOR_SHADE_VOLUME>(
+        kg, state, &isect, render_buffer);
+    return;
   }
 #endif /* __VOLUME__ */
 }
