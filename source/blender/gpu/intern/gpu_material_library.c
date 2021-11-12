@@ -41,6 +41,7 @@
  * If a file uses functions from another file, it must be added to the list of
  * dependencies, and be placed after that file in the list. */
 
+extern char datatoc_gpu_shader_common_color_ramp_glsl[];
 extern char datatoc_gpu_shader_common_color_util_glsl[];
 extern char datatoc_gpu_shader_common_curves_glsl[];
 extern char datatoc_gpu_shader_common_math_util_glsl[];
@@ -72,7 +73,6 @@ extern char datatoc_gpu_shader_material_bright_contrast_glsl[];
 extern char datatoc_gpu_shader_material_bump_glsl[];
 extern char datatoc_gpu_shader_material_camera_glsl[];
 extern char datatoc_gpu_shader_material_clamp_glsl[];
-extern char datatoc_gpu_shader_material_color_ramp_glsl[];
 extern char datatoc_gpu_shader_material_combine_hsv_glsl[];
 extern char datatoc_gpu_shader_material_combine_rgb_glsl[];
 extern char datatoc_gpu_shader_material_combine_xyz_glsl[];
@@ -152,6 +152,11 @@ static GPUMaterialLibrary gpu_shader_common_math_util_library = {
 
 static GPUMaterialLibrary gpu_shader_common_color_util_library = {
     .code = datatoc_gpu_shader_common_color_util_glsl,
+    .dependencies = {NULL},
+};
+
+static GPUMaterialLibrary gpu_shader_common_color_ramp_library = {
+    .code = datatoc_gpu_shader_common_color_ramp_glsl,
     .dependencies = {NULL},
 };
 
@@ -308,11 +313,6 @@ static GPUMaterialLibrary gpu_shader_material_camera_library = {
 
 static GPUMaterialLibrary gpu_shader_material_clamp_library = {
     .code = datatoc_gpu_shader_material_clamp_glsl,
-    .dependencies = {NULL},
-};
-
-static GPUMaterialLibrary gpu_shader_material_color_ramp_library = {
-    .code = datatoc_gpu_shader_material_color_ramp_glsl,
     .dependencies = {NULL},
 };
 
@@ -657,6 +657,7 @@ static GPUMaterialLibrary gpu_shader_material_world_normals_library = {
 };
 
 static GPUMaterialLibrary *gpu_material_libraries[] = {
+    &gpu_shader_common_color_ramp_library,
     &gpu_shader_common_math_util_library,
     &gpu_shader_common_color_util_library,
     &gpu_shader_common_curves_library,
@@ -677,7 +678,6 @@ static GPUMaterialLibrary *gpu_material_libraries[] = {
     &gpu_shader_material_bump_library,
     &gpu_shader_material_camera_library,
     &gpu_shader_material_clamp_library,
-    &gpu_shader_material_color_ramp_library,
     &gpu_shader_material_combine_hsv_library,
     &gpu_shader_material_combine_rgb_library,
     &gpu_shader_material_combine_xyz_library,

@@ -39,6 +39,67 @@ static void node_composit_init_valtorgb(bNodeTree *UNUSED(ntree), bNode *node)
   node->storage = BKE_colorband_add(true);
 }
 
+static int node_composite_gpu_valtorgb(GPUMaterial *mat,
+                                       bNode *node,
+                                       bNodeExecData *UNUSED(execdata),
+                                       GPUNodeStack *in,
+                                       GPUNodeStack *out)
+{
+  struct ColorBand *coba = (ColorBand *)node->storage;
+  float *array, layer;
+  int size;
+
+  /* Common / easy case optimization. */
+  if ((coba->tot <= 2) && (coba->color_mode == COLBAND_BLEND_RGB)) {
+    float mul_bias[2];
+    switch (coba->ipotype) {
+      case COLBAND_INTERP_LINEAR:
+        mul_bias[0] = 1.0f / (coba->data[1].pos - coba->data[0].pos);
+        mul_bias[1] = -mul_bias[0] * coba->data[0].pos;
+        return GPU_stack_link(mat,
+                              node,
+                              "valtorgb_opti_linear",
+                              in,
+                              out,
+                              GPU_uniform(mul_bias),
+                              GPU_uniform(&coba->data[0].r),
+                              GPU_uniform(&coba->data[1].r));
+      case COLBAND_INTERP_CONSTANT:
+        mul_bias[1] = max_ff(coba->data[0].pos, coba->data[1].pos);
+        return GPU_stack_link(mat,
+                              node,
+                              "valtorgb_opti_constant",
+                              in,
+                              out,
+                              GPU_uniform(&mul_bias[1]),
+                              GPU_uniform(&coba->data[0].r),
+                              GPU_uniform(&coba->data[1].r));
+      case COLBAND_INTERP_EASE:
+        mul_bias[0] = 1.0f / (coba->data[1].pos - coba->data[0].pos);
+        mul_bias[1] = -mul_bias[0] * coba->data[0].pos;
+        return GPU_stack_link(mat,
+                              node,
+                              "valtorgb_opti_ease",
+                              in,
+                              out,
+                              GPU_uniform(mul_bias),
+                              GPU_uniform(&coba->data[0].r),
+                              GPU_uniform(&coba->data[1].r));
+      default:
+        break;
+    }
+  }
+
+  BKE_colorband_evaluate_table_rgba(coba, &array, &size);
+  GPUNodeLink *tex = GPU_color_band(mat, size, array, &layer);
+
+  if (coba->ipotype == COLBAND_INTERP_CONSTANT) {
+    return GPU_stack_link(mat, node, "valtorgb_nearest", in, out, tex, GPU_constant(&layer));
+  }
+
+  return GPU_stack_link(mat, node, "valtorgb", in, out, tex, GPU_constant(&layer));
+}
+
 void register_node_type_cmp_valtorgb(void)
 {
   static bNodeType ntype;
@@ -48,6 +109,7 @@ void register_node_type_cmp_valtorgb(void)
   node_type_size(&ntype, 240, 200, 320);
   node_type_init(&ntype, node_composit_init_valtorgb);
   node_type_storage(&ntype, "ColorBand", node_free_standard_storage, node_copy_standard_storage);
+  node_type_gpu(&ntype, node_composite_gpu_valtorgb);
 
   nodeRegisterType(&ntype);
 }
