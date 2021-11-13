@@ -41,6 +41,21 @@ static void node_composit_init_setalpha(bNodeTree *UNUSED(ntree), bNode *node)
   settings->mode = CMP_NODE_SETALPHA_MODE_APPLY;
 }
 
+static int node_composite_gpu_set_alpha(GPUMaterial *mat,
+                                        bNode *node,
+                                        bNodeExecData *UNUSED(execdata),
+                                        GPUNodeStack *in,
+                                        GPUNodeStack *out)
+{
+  const NodeSetAlpha *settings = (NodeSetAlpha *)node->storage;
+
+  if (settings->mode == CMP_NODE_SETALPHA_MODE_APPLY) {
+    return GPU_stack_link(mat, node, "node_composite_set_alpha_apply", in, out);
+  }
+
+  return GPU_stack_link(mat, node, "node_composite_set_alpha_replace", in, out);
+}
+
 void register_node_type_cmp_setalpha(void)
 {
   static bNodeType ntype;
@@ -50,6 +65,7 @@ void register_node_type_cmp_setalpha(void)
   node_type_init(&ntype, node_composit_init_setalpha);
   node_type_storage(
       &ntype, "NodeSetAlpha", node_free_standard_storage, node_copy_standard_storage);
+  node_type_gpu(&ntype, node_composite_gpu_set_alpha);
 
   nodeRegisterType(&ntype);
 }
