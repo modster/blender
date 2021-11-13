@@ -37,12 +37,25 @@ static bNodeSocketTemplate cmp_node_map_range_out[] = {
     {-1, ""},
 };
 
+static int node_composite_gpu_map_range(GPUMaterial *mat,
+                                        bNode *node,
+                                        bNodeExecData *UNUSED(execdata),
+                                        GPUNodeStack *in,
+                                        GPUNodeStack *out)
+{
+  const float should_clamp = node->custom1 ? 1.0f : 0.0f;
+
+  return GPU_stack_link(
+      mat, node, "node_composite_map_range", in, out, GPU_constant(&should_clamp));
+}
+
 void register_node_type_cmp_map_range(void)
 {
   static bNodeType ntype;
 
   cmp_node_type_base(&ntype, CMP_NODE_MAP_RANGE, "Map Range", NODE_CLASS_OP_VECTOR, 0);
   node_type_socket_templates(&ntype, cmp_node_map_range_in, cmp_node_map_range_out);
+  node_type_gpu(&ntype, node_composite_gpu_map_range);
 
   nodeRegisterType(&ntype);
 }

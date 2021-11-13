@@ -61,6 +61,7 @@ extern char datatoc_gpu_shader_composite_hue_correct_glsl[];
 extern char datatoc_gpu_shader_composite_hue_saturation_value_glsl[];
 extern char datatoc_gpu_shader_composite_image_glsl[];
 extern char datatoc_gpu_shader_composite_invert_glsl[];
+extern char datatoc_gpu_shader_composite_map_value_glsl[];
 extern char datatoc_gpu_shader_composite_posterize_glsl[];
 extern char datatoc_gpu_shader_composite_separate_combine_glsl[];
 extern char datatoc_gpu_shader_composite_set_alpha_glsl[];
@@ -246,6 +247,11 @@ static GPUMaterialLibrary gpu_shader_composite_image_library = {
 
 static GPUMaterialLibrary gpu_shader_composite_invert_library = {
     .code = datatoc_gpu_shader_composite_invert_glsl,
+    .dependencies = {NULL},
+};
+
+static GPUMaterialLibrary gpu_shader_composite_map_value_library = {
+    .code = datatoc_gpu_shader_composite_map_value_glsl,
     .dependencies = {NULL},
 };
 
@@ -776,6 +782,7 @@ static GPUMaterialLibrary *gpu_material_libraries[] = {
     &gpu_shader_composite_hue_saturation_value_library,
     &gpu_shader_composite_image_library,
     &gpu_shader_composite_invert_library,
+    &gpu_shader_composite_map_value_library,
     &gpu_shader_composite_posterize_library,
     &gpu_shader_composite_separate_combined_library,
     &gpu_shader_composite_set_alpha_library,
