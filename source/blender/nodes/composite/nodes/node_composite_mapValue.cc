@@ -38,6 +38,30 @@ static void node_composit_init_map_value(bNodeTree *UNUSED(ntree), bNode *node)
   node->storage = BKE_texture_mapping_add(TEXMAP_TYPE_POINT);
 }
 
+static int node_composite_gpu_map_value(GPUMaterial *mat,
+                                        bNode *node,
+                                        bNodeExecData *UNUSED(execdata),
+                                        GPUNodeStack *in,
+                                        GPUNodeStack *out)
+{
+  const TexMapping *texture_mapping = (TexMapping *)node->storage;
+
+  const float use_min = texture_mapping->flag & TEXMAP_CLIP_MIN ? 1.0f : 0.0f;
+  const float use_max = texture_mapping->flag & TEXMAP_CLIP_MAX ? 1.0f : 0.0f;
+
+  return GPU_stack_link(mat,
+                        node,
+                        "node_composite_map_value",
+                        in,
+                        out,
+                        GPU_uniform(texture_mapping->loc),
+                        GPU_uniform(texture_mapping->size),
+                        GPU_constant(&use_min),
+                        GPU_uniform(texture_mapping->min),
+                        GPU_constant(&use_max),
+                        GPU_uniform(texture_mapping->max));
+}
+
 void register_node_type_cmp_map_value(void)
 {
   static bNodeType ntype;
@@ -46,6 +70,7 @@ void register_node_type_cmp_map_value(void)
   node_type_socket_templates(&ntype, cmp_node_map_value_in, cmp_node_map_value_out);
   node_type_init(&ntype, node_composit_init_map_value);
   node_type_storage(&ntype, "TexMapping", node_free_standard_storage, node_copy_standard_storage);
+  node_type_gpu(&ntype, node_composite_gpu_map_value);
 
   nodeRegisterType(&ntype);
 }

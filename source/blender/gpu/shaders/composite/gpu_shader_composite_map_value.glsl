@@ -33,3 +33,23 @@ void node_composite_map_range(float value,
     }
   }
 }
+
+void node_composite_map_value(float value,
+                              float offset,
+                              float size,
+                              const float use_min,
+                              float min,
+                              const float use_max,
+                              float max,
+                              out float result)
+{
+  result = (value + offset) * size;
+
+  if (use_min != 0.0 && result < min) {
+    result = min;
+  }
+
+  if (use_max != 0.0 && result > max) {
+    result = max;
+  }
+}
