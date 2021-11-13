@@ -35,12 +35,22 @@ static bNodeSocketTemplate cmp_node_normal_out[] = {
     {-1, ""},
 };
 
+static int node_composite_gpu_normal(GPUMaterial *mat,
+                                     bNode *node,
+                                     bNodeExecData *UNUSED(execdata),
+                                     GPUNodeStack *in,
+                                     GPUNodeStack *out)
+{
+  return GPU_stack_link(mat, node, "node_composite_normal", in, out, GPU_uniform(out[0].vec));
+}
+
 void register_node_type_cmp_normal(void)
 {
   static bNodeType ntype;
 
   cmp_node_type_base(&ntype, CMP_NODE_NORMAL, "Normal", NODE_CLASS_OP_VECTOR, 0);
   node_type_socket_templates(&ntype, cmp_node_normal_in, cmp_node_normal_out);
+  node_type_gpu(&ntype, node_composite_gpu_normal);
 
   nodeRegisterType(&ntype);
 }
