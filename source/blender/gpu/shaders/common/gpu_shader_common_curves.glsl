@@ -170,24 +170,36 @@ void curves_film_like(float factor,
   result = mix(color, result, factor);
 }
 
-void curves_vector(float factor,
-                   vec3 vector,
+void curves_vector(vec3 vector,
                    sampler1DArray curve_map,
                    const float layer,
-                   vec4 range_minimums,
-                   vec4 range_dividers,
-                   vec4 start_slopes,
-                   vec4 end_slopes,
+                   vec3 range_minimums,
+                   vec3 range_dividers,
+                   vec3 start_slopes,
+                   vec3 end_slopes,
                    out vec3 result)
 {
   /* Evaluate each component on its curve map. */
-  vec3 parameters = NORMALIZE_PARAMETER(vector.xyz, range_minimums.xyz, range_dividers.xyz);
+  vec3 parameters = NORMALIZE_PARAMETER(vector, range_minimums, range_dividers);
   result.x = texture(curve_map, vec2(parameters.x, layer)).x;
   result.y = texture(curve_map, vec2(parameters.y, layer)).y;
   result.z = texture(curve_map, vec2(parameters.z, layer)).z;
 
   /* Then, extrapolate if needed. */
-  result = extrapolate_if_needed(parameters, result, start_slopes.xyz, end_slopes.xyz);
+  result = extrapolate_if_needed(parameters, result, start_slopes, end_slopes);
+}
 
+void curves_vector_mixed(float factor,
+                         vec3 vector,
+                         sampler1DArray curve_map,
+                         const float layer,
+                         vec3 range_minimums,
+                         vec3 range_dividers,
+                         vec3 start_slopes,
+                         vec3 end_slopes,
+                         out vec3 result)
+{
+  curves_vector(
+      vector, curve_map, layer, range_minimums, range_dividers, start_slopes, end_slopes, result);
   result = mix(vector, result, factor);
 }

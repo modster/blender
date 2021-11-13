@@ -80,7 +80,7 @@ static int gpu_shader_curve_vec(GPUMaterial *mat,
 
   return GPU_stack_link(mat,
                         node,
-                        "curves_vector",
+                        "curves_vector_mixed",
                         in,
                         out,
                         band_texture,
