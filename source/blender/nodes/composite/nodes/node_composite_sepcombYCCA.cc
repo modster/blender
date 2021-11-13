@@ -39,6 +39,21 @@ static void node_composit_init_mode_sepycca(bNodeTree *UNUSED(ntree), bNode *nod
   node->custom1 = 1; /* BLI_YCC_ITU_BT709 */
 }
 
+static const char *separate_ycca_gpu_names[] = {
+    "node_composite_separate_ycca_itu_601",
+    "node_composite_separate_ycca_itu_709",
+    "node_composite_separate_ycca_jpeg",
+};
+
+static int node_composite_gpu_sepycca(GPUMaterial *mat,
+                                      bNode *node,
+                                      bNodeExecData *UNUSED(execdata),
+                                      GPUNodeStack *in,
+                                      GPUNodeStack *out)
+{
+  return GPU_stack_link(mat, node, separate_ycca_gpu_names[node->custom1], in, out);
+}
+
 void register_node_type_cmp_sepycca(void)
 {
   static bNodeType ntype;
@@ -46,6 +61,7 @@ void register_node_type_cmp_sepycca(void)
   cmp_node_type_base(&ntype, CMP_NODE_SEPYCCA, "Separate YCbCrA", NODE_CLASS_CONVERTER, 0);
   node_type_socket_templates(&ntype, cmp_node_sepycca_in, cmp_node_sepycca_out);
   node_type_init(&ntype, node_composit_init_mode_sepycca);
+  node_type_gpu(&ntype, node_composite_gpu_sepycca);
 
   nodeRegisterType(&ntype);
 }
@@ -68,6 +84,21 @@ static void node_composit_init_mode_combycca(bNodeTree *UNUSED(ntree), bNode *no
   node->custom1 = 1; /* BLI_YCC_ITU_BT709 */
 }
 
+static const char *combine_ycca_gpu_names[] = {
+    "node_composite_combine_ycca_itu_601",
+    "node_composite_combine_ycca_itu_709",
+    "node_composite_combine_ycca_jpeg",
+};
+
+static int node_composite_gpu_combycca(GPUMaterial *mat,
+                                       bNode *node,
+                                       bNodeExecData *UNUSED(execdata),
+                                       GPUNodeStack *in,
+                                       GPUNodeStack *out)
+{
+  return GPU_stack_link(mat, node, combine_ycca_gpu_names[node->custom1], in, out);
+}
+
 void register_node_type_cmp_combycca(void)
 {
   static bNodeType ntype;
@@ -75,6 +106,7 @@ void register_node_type_cmp_combycca(void)
   cmp_node_type_base(&ntype, CMP_NODE_COMBYCCA, "Combine YCbCrA", NODE_CLASS_CONVERTER, 0);
   node_type_socket_templates(&ntype, cmp_node_combycca_in, cmp_node_combycca_out);
   node_type_init(&ntype, node_composit_init_mode_combycca);
+  node_type_gpu(&ntype, node_composite_gpu_combycca);
 
   nodeRegisterType(&ntype);
 }

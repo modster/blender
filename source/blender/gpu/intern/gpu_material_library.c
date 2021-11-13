@@ -60,6 +60,7 @@ extern char datatoc_gpu_shader_composite_hue_saturation_value_glsl[];
 extern char datatoc_gpu_shader_composite_image_glsl[];
 extern char datatoc_gpu_shader_composite_invert_glsl[];
 extern char datatoc_gpu_shader_composite_posterize_glsl[];
+extern char datatoc_gpu_shader_composite_separate_combine_glsl[];
 
 extern char datatoc_gpu_shader_material_add_shader_glsl[];
 extern char datatoc_gpu_shader_material_ambient_occlusion_glsl[];
@@ -239,6 +240,11 @@ static GPUMaterialLibrary gpu_shader_composite_invert_library = {
 static GPUMaterialLibrary gpu_shader_composite_posterize_library = {
     .code = datatoc_gpu_shader_composite_posterize_glsl,
     .dependencies = {NULL},
+};
+
+static GPUMaterialLibrary gpu_shader_composite_separate_combined_library = {
+    .code = datatoc_gpu_shader_composite_separate_combine_glsl,
+    .dependencies = {&gpu_shader_common_color_util_library, NULL},
 };
 
 static GPUMaterialLibrary gpu_shader_material_noise_library = {
@@ -758,6 +764,7 @@ static GPUMaterialLibrary *gpu_material_libraries[] = {
     &gpu_shader_composite_image_library,
     &gpu_shader_composite_invert_library,
     &gpu_shader_composite_posterize_library,
+    &gpu_shader_composite_separate_combined_library,
     NULL};
 
 /* GLSL code parsing for finding function definitions.

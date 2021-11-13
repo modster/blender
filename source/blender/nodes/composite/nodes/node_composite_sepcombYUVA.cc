@@ -34,12 +34,22 @@ static bNodeSocketTemplate cmp_node_sepyuva_out[] = {
     {-1, ""},
 };
 
+static int node_composite_gpu_sepyuva(GPUMaterial *mat,
+                                      bNode *node,
+                                      bNodeExecData *UNUSED(execdata),
+                                      GPUNodeStack *in,
+                                      GPUNodeStack *out)
+{
+  return GPU_stack_link(mat, node, "node_composite_separate_yuva_itu_709", in, out);
+}
+
 void register_node_type_cmp_sepyuva(void)
 {
   static bNodeType ntype;
 
   cmp_node_type_base(&ntype, CMP_NODE_SEPYUVA, "Separate YUVA", NODE_CLASS_CONVERTER, 0);
   node_type_socket_templates(&ntype, cmp_node_sepyuva_in, cmp_node_sepyuva_out);
+  node_type_gpu(&ntype, node_composite_gpu_sepyuva);
 
   nodeRegisterType(&ntype);
 }
@@ -57,12 +67,22 @@ static bNodeSocketTemplate cmp_node_combyuva_out[] = {
     {-1, ""},
 };
 
+static int node_composite_gpu_combyuva(GPUMaterial *mat,
+                                       bNode *node,
+                                       bNodeExecData *UNUSED(execdata),
+                                       GPUNodeStack *in,
+                                       GPUNodeStack *out)
+{
+  return GPU_stack_link(mat, node, "node_composite_combine_yuva_itu_709", in, out);
+}
+
 void register_node_type_cmp_combyuva(void)
 {
   static bNodeType ntype;
 
   cmp_node_type_base(&ntype, CMP_NODE_COMBYUVA, "Combine YUVA", NODE_CLASS_CONVERTER, 0);
   node_type_socket_templates(&ntype, cmp_node_combyuva_in, cmp_node_combyuva_out);
+  node_type_gpu(&ntype, node_composite_gpu_combyuva);
 
   nodeRegisterType(&ntype);
 }

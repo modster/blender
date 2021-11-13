@@ -36,12 +36,22 @@ static bNodeSocketTemplate cmp_node_sephsva_out[] = {
     {-1, ""},
 };
 
+static int node_composite_gpu_sephsva(GPUMaterial *mat,
+                                      bNode *node,
+                                      bNodeExecData *UNUSED(execdata),
+                                      GPUNodeStack *in,
+                                      GPUNodeStack *out)
+{
+  return GPU_stack_link(mat, node, "node_composite_separate_hsva", in, out);
+}
+
 void register_node_type_cmp_sephsva(void)
 {
   static bNodeType ntype;
 
   cmp_node_type_base(&ntype, CMP_NODE_SEPHSVA, "Separate HSVA", NODE_CLASS_CONVERTER, 0);
   node_type_socket_templates(&ntype, cmp_node_sephsva_in, cmp_node_sephsva_out);
+  node_type_gpu(&ntype, node_composite_gpu_sephsva);
 
   nodeRegisterType(&ntype);
 }
@@ -59,12 +69,22 @@ static bNodeSocketTemplate cmp_node_combhsva_out[] = {
     {-1, ""},
 };
 
+static int node_composite_gpu_combhsva(GPUMaterial *mat,
+                                       bNode *node,
+                                       bNodeExecData *UNUSED(execdata),
+                                       GPUNodeStack *in,
+                                       GPUNodeStack *out)
+{
+  return GPU_stack_link(mat, node, "node_composite_combine_hsva", in, out);
+}
+
 void register_node_type_cmp_combhsva(void)
 {
   static bNodeType ntype;
 
   cmp_node_type_base(&ntype, CMP_NODE_COMBHSVA, "Combine HSVA", NODE_CLASS_CONVERTER, 0);
   node_type_socket_templates(&ntype, cmp_node_combhsva_in, cmp_node_combhsva_out);
+  node_type_gpu(&ntype, node_composite_gpu_combhsva);
 
   nodeRegisterType(&ntype);
 }

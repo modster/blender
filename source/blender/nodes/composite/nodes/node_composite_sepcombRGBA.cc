@@ -36,12 +36,22 @@ static bNodeSocketTemplate cmp_node_seprgba_out[] = {
     {-1, ""},
 };
 
+static int node_composite_gpu_seprgba(GPUMaterial *mat,
+                                      bNode *node,
+                                      bNodeExecData *UNUSED(execdata),
+                                      GPUNodeStack *in,
+                                      GPUNodeStack *out)
+{
+  return GPU_stack_link(mat, node, "node_composite_separate_rgba", in, out);
+}
+
 void register_node_type_cmp_seprgba(void)
 {
   static bNodeType ntype;
 
   cmp_node_type_base(&ntype, CMP_NODE_SEPRGBA, "Separate RGBA", NODE_CLASS_CONVERTER, 0);
   node_type_socket_templates(&ntype, cmp_node_seprgba_in, cmp_node_seprgba_out);
+  node_type_gpu(&ntype, node_composite_gpu_seprgba);
 
   nodeRegisterType(&ntype);
 }
@@ -59,12 +69,22 @@ static bNodeSocketTemplate cmp_node_combrgba_out[] = {
     {-1, ""},
 };
 
+static int node_composite_gpu_combrgba(GPUMaterial *mat,
+                                       bNode *node,
+                                       bNodeExecData *UNUSED(execdata),
+                                       GPUNodeStack *in,
+                                       GPUNodeStack *out)
+{
+  return GPU_stack_link(mat, node, "node_composite_combine_rgba", in, out);
+}
+
 void register_node_type_cmp_combrgba(void)
 {
   static bNodeType ntype;
 
   cmp_node_type_base(&ntype, CMP_NODE_COMBRGBA, "Combine RGBA", NODE_CLASS_CONVERTER, 0);
   node_type_socket_templates(&ntype, cmp_node_combrgba_in, cmp_node_combrgba_out);
+  node_type_gpu(&ntype, node_composite_gpu_combrgba);
 
   nodeRegisterType(&ntype);
 }

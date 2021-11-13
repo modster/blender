@@ -294,6 +294,7 @@ data_to_c_simple(shaders/composite/gpu_shader_composite_hue_saturation_value.gls
 data_to_c_simple(shaders/composite/gpu_shader_composite_image.glsl SRC)
 data_to_c_simple(shaders/composite/gpu_shader_composite_invert.glsl SRC)
 data_to_c_simple(shaders/composite/gpu_shader_composite_posterize.glsl SRC)
+data_to_c_simple(shaders/composite/gpu_shader_composite_separate_combine.glsl SRC)
 
 data_to_c_simple(shaders/material/gpu_shader_material_add_shader.glsl SRC)
 data_to_c_simple(shaders/material/gpu_shader_material_ambient_occlusion.glsl SRC)
