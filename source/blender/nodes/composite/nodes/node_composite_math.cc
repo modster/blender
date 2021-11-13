@@ -23,6 +23,8 @@
 
 #include "node_composite_util.hh"
 
+#include "NOD_math_functions.hh"
+
 /* **************** SCALAR MATH ******************** */
 static bNodeSocketTemplate cmp_node_math_in[] = {
     {SOCK_FLOAT, N_("Value"), 0.5f, 0.5f, 0.5f, 1.0f, -10000.0f, 10000.0f, PROP_NONE},
@@ -32,6 +34,45 @@ static bNodeSocketTemplate cmp_node_math_in[] = {
 
 static bNodeSocketTemplate cmp_node_math_out[] = {{SOCK_FLOAT, N_("Value")}, {-1, ""}};
 
+static const char *gpu_shader_get_name(int mode)
+{
+  const blender::nodes::FloatMathOperationInfo *info =
+      blender::nodes::get_float_math_operation_info(mode);
+  if (!info) {
+    return nullptr;
+  }
+  if (info->shader_name.is_empty()) {
+    return nullptr;
+  }
+  return info->shader_name.c_str();
+}
+
+static int node_composite_gpu_math(GPUMaterial *mat,
+                                   bNode *node,
+                                   bNodeExecData *UNUSED(execdata),
+                                   GPUNodeStack *in,
+                                   GPUNodeStack *out)
+{
+  const char *name = gpu_shader_get_name(node->custom1);
+  if (name == nullptr) {
+    return 0;
+  }
+
+  int valid = GPU_stack_link(mat, node, name, in, out);
+  if (!valid) {
+    return 0;
+  }
+
+  if (node->custom2 & SHD_MATH_CLAMP) {
+    const float min = 0.0f;
+    const float max = 1.0f;
+    return GPU_link(
+        mat, "clamp_value", out[0].link, GPU_constant(&min), GPU_constant(&max), &out[0].link);
+  }
+
+  return 1;
+}
+
 void register_node_type_cmp_math(void)
 {
   static bNodeType ntype;
@@ -40,6 +81,7 @@ void register_node_type_cmp_math(void)
   node_type_socket_templates(&ntype, cmp_node_math_in, cmp_node_math_out);
   node_type_label(&ntype, node_math_label);
   node_type_update(&ntype, node_math_update);
+  node_type_gpu(&ntype, node_composite_gpu_math);
 
   nodeRegisterType(&ntype);
 }

@@ -1,4 +1,4 @@
-void clamp_value(float value, float min, float max, out float result)
+void clamp_value(float value, const float min, const float max, out float result)
 {
   result = clamp(value, min, max);
 }
