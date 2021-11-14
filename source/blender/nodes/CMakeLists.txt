@@ -268,6 +268,7 @@ set(SRC
   geometry/nodes/node_geo_raycast.cc
   geometry/nodes/node_geo_realize_instances.cc
   geometry/nodes/node_geo_rotate_instances.cc
+  geometry/nodes/node_geo_sample_sound.cc
   geometry/nodes/node_geo_scale_instances.cc
   geometry/nodes/node_geo_separate_components.cc
   geometry/nodes/node_geo_separate_geometry.cc

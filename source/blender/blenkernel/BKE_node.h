@@ -1553,6 +1553,7 @@ int ntreeTexExecTree(struct bNodeTree *ntree,
 #define GEO_NODE_VOLUME_TO_MESH 1133
 #define GEO_NODE_INPUT_ID 1134
 #define GEO_NODE_SET_ID 1135
+#define GEO_NODE_SAMPLE_SOUND 1136
 
 /** \} */
 
