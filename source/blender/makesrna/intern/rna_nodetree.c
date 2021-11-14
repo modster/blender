@@ -11091,6 +11091,18 @@ static void def_geo_viewer(StructRNA *srna)
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_GeometryNode_socket_update");
 }
 
+static void def_geo_sample_sound(StructRNA *srna)
+{
+  PropertyRNA *prop;
+
+  prop = RNA_def_property(srna, "sound", PROP_POINTER, PROP_NONE);
+  RNA_def_property_pointer_sdna(prop, NULL, "id");
+  RNA_def_property_struct_type(prop, "Sound");
+  RNA_def_property_flag(prop, PROP_EDITABLE);
+  RNA_def_property_ui_text(prop, "Sound", "");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+}
+
 /* -------------------------------------------------------------------------- */
 
 static void rna_def_shader_node(BlenderRNA *brna)

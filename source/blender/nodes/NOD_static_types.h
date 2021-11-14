@@ -418,7 +418,7 @@ DefNode(GeometryNode, GEO_NODE_TRIANGULATE, def_geo_triangulate, "TRIANGULATE", 
 DefNode(GeometryNode, GEO_NODE_TRIM_CURVE, def_geo_curve_trim, "TRIM_CURVE", TrimCurve, "Trim Curve", "")
 DefNode(GeometryNode, GEO_NODE_VIEWER, def_geo_viewer, "VIEWER", Viewer, "Viewer", "")
 DefNode(GeometryNode, GEO_NODE_VOLUME_TO_MESH, def_geo_volume_to_mesh, "VOLUME_TO_MESH", VolumeToMesh, "Volume to Mesh", "")
-DefNode(GeometryNode, GEO_NODE_SAMPLE_SOUND, 0, "SAMPLE_SOUND", SampleSound, "Sample Sound", "")
+DefNode(GeometryNode, GEO_NODE_SAMPLE_SOUND, def_geo_sample_sound, "SAMPLE_SOUND", SampleSound, "Sample Sound", "")
 
 /* undefine macros */
 #undef DefNode

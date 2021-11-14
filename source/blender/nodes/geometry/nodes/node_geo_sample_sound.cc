@@ -14,6 +14,9 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
+#include "UI_interface.h"
+#include "UI_resources.h"
+
 #include "node_geometry_util.hh"
 
 namespace blender::nodes {
@@ -24,6 +27,11 @@ static void geo_node_sample_sound_declare(NodeDeclarationBuilder &b)
   b.add_input<decl::Float>(N_("Min Frequency")).supports_field().default_value(0.0f);
   b.add_input<decl::Float>(N_("Max Frequency")).supports_field().default_value(20000.0f);
   b.add_output<decl::Float>(N_("Volume")).dependent_field();
+}
+
+static void geo_node_sample_sound_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
+{
+  uiItemR(layout, ptr, "sound", 0, "", ICON_NONE);
 }
 
 static void geo_node_sample_sound_exec(GeoNodeExecParams params)
@@ -41,5 +49,6 @@ void register_node_type_geo_sample_sound()
   node_type_size(&ntype, 200, 40, 1000);
   ntype.declare = blender::nodes::geo_node_sample_sound_declare;
   ntype.geometry_node_execute = blender::nodes::geo_node_sample_sound_exec;
+  ntype.draw_buttons = blender::nodes::geo_node_sample_sound_layout;
   nodeRegisterType(&ntype);
 }
