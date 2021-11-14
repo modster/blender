@@ -1369,6 +1369,15 @@ static void drw_shgroup_init(DRWShadingGroup *shgroup, GPUShader *shader)
     }
   }
 
+#ifdef DEBUG
+  int debugbuf_location = GPU_shader_get_builtin_ssbo(shader, GPU_BUFFER_BLOCK_DEBUG);
+  if (debugbuf_location != -1) {
+    GPUVertBuf *vertbuf = drw_debug_line_buffer_get();
+    drw_shgroup_uniform_create_ex(
+        shgroup, debugbuf_location, DRW_UNIFORM_VERTEX_BUFFER_AS_STORAGE, vertbuf, 0, 0, 1);
+  }
+#endif
+
   if (info_ubo_location != -1) {
     drw_shgroup_uniform_create_ex(
         shgroup, info_ubo_location, DRW_UNIFORM_BLOCK_OBINFOS, NULL, 0, 0, 1);

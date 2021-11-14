@@ -137,11 +137,18 @@ typedef enum {
   GPU_NUM_UNIFORM_BLOCKS, /* Special value, denotes number of builtin uniforms block. */
 } GPUUniformBlockBuiltin;
 
+typedef enum {
+  GPU_BUFFER_BLOCK_DEBUG = 0, /* debugBuf */
+
+  GPU_NUM_BUFFER_BLOCKS, /* Special value, denotes number of builtin buffer blocks. */
+} GPUBufferBlockBuiltin;
+
 void GPU_shader_set_srgb_uniform(GPUShader *shader);
 
 int GPU_shader_get_uniform(GPUShader *shader, const char *name);
 int GPU_shader_get_builtin_uniform(GPUShader *shader, int builtin);
 int GPU_shader_get_builtin_block(GPUShader *shader, int builtin);
+int GPU_shader_get_builtin_ssbo(GPUShader *shader, int builtin);
 int GPU_shader_get_uniform_block(GPUShader *shader, const char *name);
 int GPU_shader_get_ssbo(GPUShader *shader, const char *name);
 

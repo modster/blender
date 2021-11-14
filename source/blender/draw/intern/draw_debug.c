@@ -148,6 +148,44 @@ void DRW_debug_sphere(const float center[3], const float radius, const float col
   BLI_LINKS_PREPEND(DST.debug.spheres, sphere);
 }
 
+/* --------- Indirect Rendering --------- */
+
+/* Keep in sync with shader. */
+#define DEBUG_VERT_MAX 16 * 4096
+
+static GPUVertFormat *debug_buf_format(void)
+{
+  static GPUVertFormat format = {0};
+  if (format.attr_len == 0) {
+    GPU_vertformat_attr_add(&format, "pos", GPU_COMP_F32, 3, GPU_FETCH_FLOAT);
+    GPU_vertformat_attr_add(&format, "color", GPU_COMP_U8, 4, GPU_FETCH_INT_TO_FLOAT_UNIT);
+  }
+  return &format;
+}
+
+GPUVertBuf *drw_debug_line_buffer_get()
+{
+  DRWDebugBuffer *buf = MEM_mallocN(sizeof(DRWDebugBuffer), "DRWDebugBuffer");
+
+  buf->verts = GPU_vertbuf_create_with_format(debug_buf_format());
+  GPU_vertbuf_data_alloc(buf->verts, DEBUG_VERT_MAX);
+  uint(*data)[4] = GPU_vertbuf_get_data(buf->verts);
+  /* Set vertex count to 1 to skip the first 2 degenerate verts.
+   * This is because the first one is already being aliased in the shader definition. */
+  data[0][3] = 1;
+  /* Fill positions to NaN to avoid rendering unused verts. */
+  /* TODO(fclem): This could be done on GPU if that becomes a bottleneck. */
+  float(*fdata)[4] = (float(*)[4])data;
+  for (int v = 0; v < DEBUG_VERT_MAX; v++) {
+    for (int i = 0; i < 3; i++) {
+      fdata[v][i] = 0.0f / 0.0f;
+    }
+  }
+  BLI_LINKS_PREPEND(DST.debug.line_buffers, buf);
+
+  return buf->verts;
+}
+
 /* --------- Render --------- */
 
 static void drw_debug_draw_lines(void)
@@ -229,10 +267,38 @@ static void drw_debug_draw_spheres(void)
   GPU_batch_discard(draw_batch);
 }
 
+static void drw_debug_draw_buffers(void)
+{
+  int count = BLI_linklist_count((LinkNode *)DST.debug.line_buffers);
+
+  if (count == 0) {
+    return;
+  }
+
+  while (DST.debug.line_buffers) {
+    void *next = DST.debug.line_buffers->next;
+
+    GPUBatch *batch = GPU_batch_create_ex(
+        GPU_PRIM_LINES, DST.debug.line_buffers->verts, NULL, GPU_BATCH_OWNS_VBO);
+    GPU_batch_program_set_builtin(batch, GPU_SHADER_3D_FLAT_COLOR);
+
+    float persmat[4][4];
+    DRW_view_persmat_get(NULL, persmat, false);
+    GPU_batch_uniform_mat4(batch, "ViewProjectionMatrix", persmat);
+
+    GPU_batch_draw(batch);
+    GPU_batch_discard(batch);
+
+    MEM_freeN(DST.debug.line_buffers);
+    DST.debug.line_buffers = next;
+  }
+}
+
 void drw_debug_draw(void)
 {
   drw_debug_draw_lines();
   drw_debug_draw_spheres();
+  drw_debug_draw_buffers();
 }
 
 void drw_debug_init(void)

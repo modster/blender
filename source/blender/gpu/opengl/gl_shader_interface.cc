@@ -317,6 +317,12 @@ GLShaderInterface::GLShaderInterface(GLuint program)
     builtin_blocks_[u] = (block != nullptr) ? block->binding : -1;
   }
 
+  for (int32_t u_int = 0; u_int < GPU_NUM_BUFFER_BLOCKS; u_int++) {
+    GPUBufferBlockBuiltin u = static_cast<GPUBufferBlockBuiltin>(u_int);
+    const ShaderInput *buffer = this->ssbo_get(builtin_buffer_block_name(u));
+    builtin_buffers_[u] = (buffer != nullptr) ? buffer->binding : -1;
+  }
+
   MEM_freeN(uniforms_from_blocks);
 
   /* Resize name buffer to save some memory. */

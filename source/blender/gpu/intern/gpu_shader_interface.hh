@@ -69,6 +69,7 @@ class ShaderInterface {
   /** Location of builtin uniforms. Fast access, no lookup needed. */
   int32_t builtins_[GPU_NUM_UNIFORMS];
   int32_t builtin_blocks_[GPU_NUM_UNIFORM_BLOCKS];
+  int32_t builtin_buffers_[GPU_NUM_BUFFER_BLOCKS];
 
  public:
   ShaderInterface();
@@ -123,10 +124,17 @@ class ShaderInterface {
     BLI_assert(builtin >= 0 && builtin < GPU_NUM_UNIFORM_BLOCKS);
     return builtin_blocks_[builtin];
   }
+  /* Returns binding position. */
+  inline int32_t buffer_builtin(const GPUBufferBlockBuiltin builtin) const
+  {
+    BLI_assert(builtin >= 0 && builtin < GPU_NUM_BUFFER_BLOCKS);
+    return builtin_buffers_[builtin];
+  }
 
  protected:
   static inline const char *builtin_uniform_name(GPUUniformBuiltin u);
   static inline const char *builtin_uniform_block_name(GPUUniformBlockBuiltin u);
+  static inline const char *builtin_buffer_block_name(GPUBufferBlockBuiltin u);
 
   inline uint32_t set_input_name(ShaderInput *input, char *name, uint32_t name_len) const;
 
@@ -202,6 +210,16 @@ inline const char *ShaderInterface::builtin_uniform_block_name(GPUUniformBlockBu
       return "modelBlock";
     case GPU_UNIFORM_BLOCK_INFO:
       return "infoBlock";
+    default:
+      return NULL;
+  }
+}
+
+inline const char *ShaderInterface::builtin_buffer_block_name(GPUBufferBlockBuiltin u)
+{
+  switch (u) {
+    case GPU_BUFFER_BLOCK_DEBUG:
+      return "debugBuf";
     default:
       return NULL;
   }

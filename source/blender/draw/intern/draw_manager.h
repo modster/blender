@@ -509,6 +509,11 @@ typedef struct DRWDebugSphere {
   float color[4];
 } DRWDebugSphere;
 
+typedef struct DRWDebugBuffer {
+  struct DRWDebugBuffer *next; /* linked list */
+  struct GPUVertBuf *verts;
+} DRWDebugBuffer;
+
 /* ------------- Memory Pools ------------ */
 
 /* Contains memory pools information */
@@ -646,6 +651,7 @@ typedef struct DRWManager {
     /* TODO(fclem): optimize: use chunks. */
     DRWDebugLine *lines;
     DRWDebugSphere *spheres;
+    DRWDebugBuffer *line_buffers;
   } debug;
 } DRWManager;
 
@@ -659,6 +665,7 @@ void *drw_viewport_engine_data_ensure(void *engine_type);
 
 void drw_state_set(DRWState state);
 
+GPUVertBuf *drw_debug_line_buffer_get(void);
 void drw_debug_draw(void);
 void drw_debug_init(void);
 

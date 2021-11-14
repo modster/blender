@@ -394,6 +394,7 @@ data_to_c_simple(engines/workbench/shaders/workbench_world_light_lib.glsl SRC)
 
 data_to_c_simple(intern/shaders/common_attribute_lib.glsl SRC)
 data_to_c_simple(intern/shaders/common_colormanagement_lib.glsl SRC)
+data_to_c_simple(intern/shaders/common_debug_lib.glsl SRC)
 data_to_c_simple(intern/shaders/common_globals_lib.glsl SRC)
 data_to_c_simple(intern/shaders/common_gpencil_lib.glsl SRC)
 data_to_c_simple(intern/shaders/common_pointcloud_lib.glsl SRC)
