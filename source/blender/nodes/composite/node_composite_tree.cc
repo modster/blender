@@ -421,7 +421,7 @@ static bNode *ntreeCompositeViewportOutputNode(bNodeTree *ntree)
   bNode *output_node = NULL;
 
   LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
-    if (!ELEM(node->type, CMP_NODE_VIEWER, CMP_NODE_COMPOSITE)) {
+    if (!ELEM(node->type, CMP_NODE_VIEWER, CMP_NODE_SPLITVIEWER, CMP_NODE_COMPOSITE)) {
       continue;
     }
 

@@ -49,6 +49,22 @@ static void node_composit_init_splitviewer(bNodeTree *UNUSED(ntree), bNode *node
   node->id = (ID *)BKE_image_ensure_viewer(G.main, IMA_TYPE_COMPOSITE, "Viewer Node");
 }
 
+static int node_composit_gpu_splitviewer(GPUMaterial *mat,
+                                         bNode *node,
+                                         bNodeExecData *UNUSED(execdata),
+                                         GPUNodeStack *in,
+                                         GPUNodeStack *out)
+{
+  const float split_factor = node->custom1 / 100.0f;
+  const char *function_name = node->custom2 ? "node_composite_split_viewer_y" :
+                                              "node_composite_split_viewer_x";
+  GPUNodeLink *out_link;
+  GPU_stack_link(mat, node, function_name, in, out, GPU_uniform(&split_factor), &out_link);
+  GPU_material_output_surface(mat, out_link);
+
+  return true;
+}
+
 void register_node_type_cmp_splitviewer(void)
 {
   static bNodeType ntype;
@@ -58,6 +74,7 @@ void register_node_type_cmp_splitviewer(void)
   ntype.declare = blender::nodes::cmp_node_splitviewer_declare;
   node_type_init(&ntype, node_composit_init_splitviewer);
   node_type_storage(&ntype, "ImageUser", node_free_standard_storage, node_copy_standard_storage);
+  node_type_gpu(&ntype, node_composit_gpu_splitviewer);
 
   /* Do not allow muting for this node. */
   node_type_internal_links(&ntype, nullptr);

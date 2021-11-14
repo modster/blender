@@ -300,6 +300,7 @@ data_to_c_simple(shaders/composite/gpu_shader_composite_normal.glsl SRC)
 data_to_c_simple(shaders/composite/gpu_shader_composite_posterize.glsl SRC)
 data_to_c_simple(shaders/composite/gpu_shader_composite_separate_combine.glsl SRC)
 data_to_c_simple(shaders/composite/gpu_shader_composite_set_alpha.glsl SRC)
+data_to_c_simple(shaders/composite/gpu_shader_composite_split_viewer.glsl SRC)
 
 data_to_c_simple(shaders/material/gpu_shader_material_add_shader.glsl SRC)
 data_to_c_simple(shaders/material/gpu_shader_material_ambient_occlusion.glsl SRC)
