@@ -425,6 +425,11 @@ typedef struct DRWViewUboStorage {
   float viewcamtexcofac[4];
   float viewport_size[2];
   float viewport_size_inv[2];
+
+  /** Frustum culling data. */
+  /** NOTE: vec3 arrays are paded to vec4. */
+  float frustum_corners[8][4];
+  float frustum_planes[6][4];
 } DRWViewUboStorage;
 
 BLI_STATIC_ASSERT_ALIGN(DRWViewUboStorage, 16)

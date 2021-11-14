@@ -22,6 +22,9 @@ layout(std140) uniform viewBlock
   vec4 CameraTexCoFactors;
   vec2 ViewportSize;
   vec2 ViewportSizeInverse;
+
+  vec3 frustum_corners[8];
+  vec4 frustum_planes[6];
 };
 
 #define ViewNear (ViewVecs[0].w)
