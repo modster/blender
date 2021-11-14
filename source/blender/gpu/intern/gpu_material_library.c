@@ -56,6 +56,7 @@ extern char datatoc_gpu_shader_composite_color_balance_glsl[];
 extern char datatoc_gpu_shader_composite_color_correction_glsl[];
 extern char datatoc_gpu_shader_composite_color_to_luminance_glsl[];
 extern char datatoc_gpu_shader_composite_composite_glsl[];
+extern char datatoc_gpu_shader_composite_ellipse_mask_glsl[];
 extern char datatoc_gpu_shader_composite_exposure_glsl[];
 extern char datatoc_gpu_shader_composite_gamma_glsl[];
 extern char datatoc_gpu_shader_composite_hue_correct_glsl[];
@@ -225,6 +226,11 @@ static GPUMaterialLibrary gpu_shader_composite_color_to_luminance_library = {
 
 static GPUMaterialLibrary gpu_shader_composite_composite_library = {
     .code = datatoc_gpu_shader_composite_composite_glsl,
+    .dependencies = {NULL},
+};
+
+static GPUMaterialLibrary gpu_shader_composite_ellipse_mask_library = {
+    .code = datatoc_gpu_shader_composite_ellipse_mask_glsl,
     .dependencies = {NULL},
 };
 
@@ -795,6 +801,7 @@ static GPUMaterialLibrary *gpu_material_libraries[] = {
     &gpu_shader_composite_color_correction_library,
     &gpu_shader_composite_color_to_luminance_library,
     &gpu_shader_composite_composite_library,
+    &gpu_shader_composite_ellipse_mask_library,
     &gpu_shader_composite_exposure_library,
     &gpu_shader_composite_gamma_library,
     &gpu_shader_composite_hue_correct_library,
