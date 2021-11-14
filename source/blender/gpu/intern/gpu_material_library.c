@@ -50,6 +50,7 @@ extern char datatoc_gpu_shader_common_mix_rgb_glsl[];
 extern char datatoc_gpu_shader_common_hash_glsl[];
 
 extern char datatoc_gpu_shader_composite_alpha_over_glsl[];
+extern char datatoc_gpu_shader_composite_box_mask_glsl[];
 extern char datatoc_gpu_shader_composite_bright_contrast_glsl[];
 extern char datatoc_gpu_shader_composite_color_balance_glsl[];
 extern char datatoc_gpu_shader_composite_color_correction_glsl[];
@@ -188,6 +189,11 @@ static GPUMaterialLibrary gpu_shader_common_hash_library = {
 
 static GPUMaterialLibrary gpu_shader_composite_alpha_over_library = {
     .code = datatoc_gpu_shader_composite_alpha_over_glsl,
+    .dependencies = {NULL},
+};
+
+static GPUMaterialLibrary gpu_shader_composite_box_mask_library = {
+    .code = datatoc_gpu_shader_composite_box_mask_glsl,
     .dependencies = {NULL},
 };
 
@@ -783,6 +789,7 @@ static GPUMaterialLibrary *gpu_material_libraries[] = {
     &gpu_shader_material_wireframe_library,
     &gpu_shader_material_world_normals_library,
     &gpu_shader_composite_alpha_over_library,
+    &gpu_shader_composite_box_mask_library,
     &gpu_shader_composite_bright_contrast_library,
     &gpu_shader_composite_color_balance_library,
     &gpu_shader_composite_color_correction_library,
