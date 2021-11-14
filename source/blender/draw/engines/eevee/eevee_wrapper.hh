@@ -130,11 +130,13 @@ template<
     /** Type of the values stored in this uniform buffer. */
     typename T,
     /** The number of values that can be stored in this uniform buffer. */
-    int64_t len>
+    int64_t len,
+    /** True if created on device and no memory host memory is allocated. */
+    bool device_only = false>
 /* Same thing as StructArrayBuffer but can be arbitrary large, and are writtable on GPU. */
 class StorageArrayBuffer : NonMovable, NonCopyable {
  private:
-  T *data_;
+  T *data_ = nullptr;
   /* Use vertex buffer for now. Until there is a complete GPUStorageBuf implementation. */
   GPUVertBuf *ssbo_;
 
@@ -147,14 +149,18 @@ class StorageArrayBuffer : NonMovable, NonCopyable {
  public:
   StorageArrayBuffer()
   {
-    BLI_assert((sizeof(T) % 16) == 0);
+    BLI_assert(((sizeof(T) * len) % 16) == 0);
 
     GPUVertFormat format = {0};
-    GPU_vertformat_attr_add(&format, "dummy", GPU_COMP_F32, 4, GPU_FETCH_FLOAT);
+    GPU_vertformat_attr_add(&format, "dummy", GPU_COMP_F32, 1, GPU_FETCH_FLOAT);
 
-    ssbo_ = GPU_vertbuf_create_with_format_ex(&format, GPU_USAGE_DYNAMIC);
+    GPUUsageType usage = device_only ? GPU_USAGE_DEVICE_ONLY : GPU_USAGE_DYNAMIC;
+    ssbo_ = GPU_vertbuf_create_with_format_ex(&format, usage);
     GPU_vertbuf_data_alloc(ssbo_, (sizeof(T) / 4) * len);
-    data_ = (T *)GPU_vertbuf_get_data(ssbo_);
+    if (!device_only) {
+      data_ = (T *)GPU_vertbuf_get_data(ssbo_);
+      GPU_vertbuf_use(ssbo_);
+    }
   }
   ~StorageArrayBuffer()
   {
@@ -163,6 +169,7 @@ class StorageArrayBuffer : NonMovable, NonCopyable {
 
   void push_update(void)
   {
+    BLI_assert(!device_only);
     /* Get the data again to tag for update. The actual pointer should not change. */
     data_ = (T *)GPU_vertbuf_get_data(ssbo_);
     GPU_vertbuf_use(ssbo_);
@@ -179,6 +186,7 @@ class StorageArrayBuffer : NonMovable, NonCopyable {
    */
   const T &operator[](int64_t index) const
   {
+    BLI_assert(!device_only);
     BLI_assert(index >= 0);
     BLI_assert(index < len);
     return data_[index];
@@ -186,6 +194,7 @@ class StorageArrayBuffer : NonMovable, NonCopyable {
 
   T &operator[](int64_t index)
   {
+    BLI_assert(!device_only);
     BLI_assert(index >= 0);
     BLI_assert(index < len);
     return data_[index];
@@ -196,10 +205,12 @@ class StorageArrayBuffer : NonMovable, NonCopyable {
    */
   const T *data() const
   {
+    BLI_assert(!device_only);
     return data_;
   }
   T *data()
   {
+    BLI_assert(!device_only);
     return data_;
   }
 
@@ -208,24 +219,29 @@ class StorageArrayBuffer : NonMovable, NonCopyable {
    */
   const T *begin() const
   {
+    BLI_assert(!device_only);
     return data_;
   }
   const T *end() const
   {
+    BLI_assert(!device_only);
     return data_ + len;
   }
 
   T *begin()
   {
+    BLI_assert(!device_only);
     return data_;
   }
   T *end()
   {
+    BLI_assert(!device_only);
     return data_ + len;
   }
 
   operator Span<T>() const
   {
+    BLI_assert(!device_only);
     return Span<T>(data_, len);
   }
 };
@@ -391,7 +407,7 @@ class Texture {
     return false;
   }
 
-  /* Return true is a texture has been created. */
+  /* Return true if a texture has been created. */
   bool ensure(int w, int h, int mips, eGPUTextureFormat format)
   {
     return ensure(name_, w, h, mips, format);
@@ -401,10 +417,36 @@ class Texture {
   {
     GPU_texture_clear(tx_, GPU_DATA_FLOAT, &color[0]);
   }
+  void clear(float val)
+  {
+    float color[4] = {val, val, val, val};
+    GPU_texture_clear(tx_, GPU_DATA_FLOAT, &color[0]);
+  }
+  void clear(uint val)
+  {
+    uint color[4] = {val, val, val, val};
+    GPU_texture_clear(tx_, GPU_DATA_UINT, &color[0]);
+  }
+  void clear(uchar val)
+  {
+    uchar color[4] = {val, val, val, val};
+    GPU_texture_clear(tx_, GPU_DATA_UBYTE, &color[0]);
+  }
+  void clear(int val)
+  {
+    int color[4] = {val, val, val, val};
+    GPU_texture_clear(tx_, GPU_DATA_INT, &color[0]);
+  }
 
   void release()
   {
     GPU_TEXTURE_FREE_SAFE(tx_);
+  }
+
+  /* Returns a memory block that needs to be manually freed by MEM_freeN(). */
+  template<typename T> T *read(eGPUDataFormat format, int miplvl = 0)
+  {
+    return reinterpret_cast<T *>(GPU_texture_read(tx_, format, miplvl));
   }
 
   Texture &operator=(Texture &a)

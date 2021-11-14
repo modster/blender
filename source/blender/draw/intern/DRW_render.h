@@ -450,10 +450,8 @@ void DRW_shgroup_call_sculpt_with_materials(DRWShadingGroup **sh, int num_sh, Ob
 
 /* Lower level functions. Use DRW_shgroup_call_buffer(_instance) preferably. */
 DRWCallBuffer *DRW_call_buffer_create(struct GPUVertFormat *format);
-void DRW_shgroup_call_buffer_ex(DRWShadingGroup *shgroup,
-                                GPUPrimType prim_type,
-                                DRWCallBuffer *callbuf,
-                                int instance_count);
+
+struct GPUVertBuf *DRW_call_buffer_as_vertbuf(DRWCallBuffer *callbuf);
 
 DRWCallBuffer *DRW_shgroup_call_buffer(DRWShadingGroup *shgroup,
                                        struct GPUVertFormat *format,

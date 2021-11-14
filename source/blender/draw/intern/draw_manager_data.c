@@ -1193,23 +1193,9 @@ DRWCallBuffer *DRW_call_buffer_create(struct GPUVertFormat *format)
   return callbuf;
 }
 
-void DRW_shgroup_call_buffer_ex(DRWShadingGroup *shgroup,
-                                GPUPrimType prim_type,
-                                DRWCallBuffer *callbuf,
-                                int instance_count)
+GPUVertBuf *DRW_call_buffer_as_vertbuf(DRWCallBuffer *callbuf)
 {
-  if (G.f & G_FLAG_PICKSEL) {
-    drw_command_set_select_id(shgroup, callbuf->buf_select, -1);
-  }
-
-  DRWResourceHandle handle = drw_resource_handle(shgroup, NULL, NULL);
-  GPUBatch *batch = DRW_temp_batch_request(DST.vmempool->idatalist, callbuf->buf, prim_type);
-  if (instance_count > 0) {
-    drw_command_draw_instance(shgroup, batch, handle, instance_count, false);
-  }
-  else {
-    drw_command_draw(shgroup, batch, handle);
-  }
+  return callbuf->buf;
 }
 
 DRWCallBuffer *DRW_shgroup_call_buffer(DRWShadingGroup *shgroup,

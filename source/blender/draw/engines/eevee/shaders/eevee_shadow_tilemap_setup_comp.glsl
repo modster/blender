@@ -11,7 +11,7 @@
 
 layout(local_size_x = SHADOW_TILEMAP_RES, local_size_y = SHADOW_TILEMAP_RES) in;
 
-layout(std430, binding = 0) readonly buffer tilemaps_block
+layout(std430, binding = 0) readonly buffer tilemaps_buf
 {
   ShadowTileMapData tilemaps[];
 };
@@ -24,11 +24,25 @@ void main()
 
   ivec2 tile_co = ivec2(gl_GlobalInvocationID.xy);
   ivec2 tile_shifted = tile_co + tilemap.grid_shift;
+  /* Still load a valid tile after the shifting in order to not loose any page reference.
+   * This way the tile can even be reused if it is needed. Also avoid negative modulo. */
+  ivec2 tile_wrapped = (tile_shifted + SHADOW_TILEMAP_RES) % SHADOW_TILEMAP_RES;
 
-  ShadowTileData tile_data = shadow_tile_load(tilemaps_img, tile_shifted, tilemap.index);
+  ShadowTileData tile_data = shadow_tile_load(tilemaps_img, tile_wrapped, tilemap.index);
+  /* Reset all flags but keep the allocated page. */
   tile_data.is_visible = false;
   tile_data.is_used = false;
   tile_data.do_update = false;
+#ifdef SHADOW_NO_CACHING
+  tile_data.page = uvec2(0);
+  tile_data.is_allocated = false;
+#endif
+
+  if (!in_range_inclusive(tile_shifted, ivec2(0), ivec2(SHADOW_TILEMAP_RES - 1))) {
+    /* This tile was shifted in. */
+    tile_data.do_update = true;
+  }
+
   shadow_tile_store(tilemaps_img, tile_co, tilemap.index, tile_data);
 
   if (tilemap.is_cubeface) {

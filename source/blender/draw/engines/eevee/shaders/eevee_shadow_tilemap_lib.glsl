@@ -6,17 +6,20 @@
 struct ShadowTileData {
   /** Page inside the virtual shadow map atlas. */
   uvec2 page;
-  /** If not 0, offset to the tilemap that has a valid page for this position. */
+  /** If not 0, offset to the tilemap that has a valid page for this position. (cubemap only) */
   uint lod_tilemap_offset;
   /** Set to true during the setup phase if the tile is inside the view frustum. */
   bool is_visible;
   /** If the tile is needed for rendering. */
   bool is_used;
+  /** True if the page points to a valid page. */
+  bool is_allocated;
   /** True if an update is needed. */
   bool do_update;
 };
 
 #define SHADOW_TILE_NO_DATA 0u
+#define SHADOW_TILE_IS_ALLOCATED (1u << 28u)
 #define SHADOW_TILE_DO_UPDATE (1u << 29u)
 #define SHADOW_TILE_IS_VISIBLE (1u << 30u)
 #define SHADOW_TILE_IS_USED (1u << 31u)
@@ -24,11 +27,12 @@ struct ShadowTileData {
 ShadowTileData shadow_tile_data_unpack(uint data)
 {
   ShadowTileData tile;
-  tile.page.x = data & 0xFu;
-  tile.page.y = (data >> 4u) & 0xFu;
-  tile.lod_tilemap_offset = (data >> 8u) & 0xFu;
+  tile.page.x = data & 0xFFu;
+  tile.page.y = (data >> 8u) & 0xFFu;
+  tile.lod_tilemap_offset = (data >> 12u) & 0xFu;
   tile.is_visible = flag_test(data, SHADOW_TILE_IS_VISIBLE);
   tile.is_used = flag_test(data, SHADOW_TILE_IS_USED);
+  tile.is_allocated = flag_test(data, SHADOW_TILE_IS_ALLOCATED);
   tile.do_update = flag_test(data, SHADOW_TILE_DO_UPDATE);
   return tile;
 }
@@ -37,10 +41,11 @@ uint shadow_tile_data_pack(ShadowTileData tile)
 {
   uint data;
   data = tile.page.x;
-  data |= tile.page.y << 4u;
-  data |= tile.lod_tilemap_offset << 8u;
+  data |= tile.page.y << 8u;
+  data |= tile.lod_tilemap_offset << 12u;
   set_flag_from_test(data, tile.is_visible, SHADOW_TILE_IS_VISIBLE);
   set_flag_from_test(data, tile.is_used, SHADOW_TILE_IS_USED);
+  set_flag_from_test(data, tile.is_allocated, SHADOW_TILE_IS_ALLOCATED);
   set_flag_from_test(data, tile.do_update, SHADOW_TILE_DO_UPDATE);
   return data;
 }

@@ -28,9 +28,11 @@
 
 extern "C" {
 extern char datatoc_common_attribute_lib_glsl[];
+extern char datatoc_common_debug_lib_glsl[];
 extern char datatoc_common_fullscreen_vert_glsl[];
 extern char datatoc_common_gpencil_lib_glsl[];
 extern char datatoc_common_hair_lib_glsl[];
+extern char datatoc_common_intersection_lib_glsl[];
 extern char datatoc_common_math_geom_lib_glsl[];
 extern char datatoc_common_math_lib_glsl[];
 extern char datatoc_common_obinfos_lib_glsl[];
@@ -110,13 +112,16 @@ extern char datatoc_eevee_raytrace_resolve_lib_glsl[];
 extern char datatoc_eevee_raytrace_trace_lib_glsl[];
 extern char datatoc_eevee_sampling_lib_glsl[];
 extern char datatoc_eevee_shadow_debug_frag_glsl[];
-extern char datatoc_eevee_shadow_aabb_vert_glsl[];
-extern char datatoc_eevee_shadow_aabb_interface_lib_glsl[];
 extern char datatoc_eevee_shadow_lib_glsl[];
+extern char datatoc_eevee_shadow_page_alloc_comp_glsl[];
+extern char datatoc_eevee_shadow_page_copy_comp_glsl[];
+extern char datatoc_eevee_shadow_page_free_comp_glsl[];
+extern char datatoc_eevee_shadow_page_init_comp_glsl[];
+extern char datatoc_eevee_shadow_page_lib_glsl[];
+extern char datatoc_eevee_shadow_page_mark_vert_glsl[];
 extern char datatoc_eevee_shadow_tilemap_lib_glsl[];
 extern char datatoc_eevee_shadow_tilemap_setup_comp_glsl[];
-extern char datatoc_eevee_shadow_tilemap_update_frag_glsl[];
-extern char datatoc_eevee_shadow_tilemap_usage_frag_glsl[];
+extern char datatoc_eevee_shadow_tilemap_tag_comp_glsl[];
 extern char datatoc_eevee_shadow_tilemap_visibility_comp_glsl[];
 extern char datatoc_eevee_subsurface_eval_frag_glsl[];
 extern char datatoc_eevee_surface_background_frag_glsl[];
@@ -164,11 +169,13 @@ ShaderModule::ShaderModule()
 
   shader_lib_ = DRW_shader_library_create();
   /* NOTE: These need to be ordered by dependencies. */
+  DRW_SHADER_LIB_ADD(shader_lib_, common_debug_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, common_math_lib);
   DRW_shader_library_add_file(shader_lib_, shared_lib_.c_str(), "eevee_shader_shared.hh");
   DRW_SHADER_LIB_ADD(shader_lib_, common_math_geom_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, common_hair_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, common_view_lib);
+  DRW_SHADER_LIB_ADD(shader_lib_, common_intersection_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, common_attribute_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, common_obinfos_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, common_gpencil_lib);
@@ -184,7 +191,7 @@ ShaderModule::ShaderModule()
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_nodetree_eval_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_sampling_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_ltc_lib);
-  DRW_SHADER_LIB_ADD(shader_lib_, eevee_shadow_aabb_interface_lib);
+  DRW_SHADER_LIB_ADD(shader_lib_, eevee_shadow_page_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_shadow_tilemap_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_shadow_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_camera_lib);
@@ -382,20 +389,17 @@ ShaderModule::ShaderModule()
   SHADER_FULLSCREEN_DEFINES(
       RAYTRACE_RESOLVE_REFRACTION, eevee_raytrace_resolve_frag, "#define REFRACTION\n");
 
-  SHADER_FULLSCREEN(SHADOW_CLEAR, eevee_depth_clear_frag);
   SHADER_FULLSCREEN(SHADOW_DEBUG, eevee_shadow_debug_frag);
+  SHADER_COMPUTE(SHADOW_PAGE_ALLOC, eevee_shadow_page_alloc_comp, nullptr);
+  SHADER_COMPUTE(SHADOW_PAGE_COPY, eevee_shadow_page_copy_comp, nullptr);
+  SHADER_COMPUTE(SHADOW_PAGE_FREE, eevee_shadow_page_free_comp, nullptr);
+  SHADER_COMPUTE(SHADOW_PAGE_INIT, eevee_shadow_page_init_comp, nullptr);
+  SHADER(SHADOW_PAGE_MARK, eevee_shadow_page_mark_vert, nullptr, eevee_depth_clear_frag, nullptr);
   SHADER_COMPUTE(SHADOW_TILE_SETUP, eevee_shadow_tilemap_setup_comp, nullptr);
-  SHADER(SHADOW_TILE_TAG_UPDATE,
-         eevee_shadow_aabb_vert,
-         nullptr,
-         eevee_shadow_tilemap_update_frag,
-         nullptr);
-  SHADER(SHADOW_TILE_TAG_USAGE,
-         eevee_shadow_aabb_vert,
-         nullptr,
-         eevee_shadow_tilemap_usage_frag,
-         nullptr);
+  SHADER_COMPUTE(SHADOW_TILE_TAG_UPDATE, eevee_shadow_tilemap_tag_comp, "#define TAG_UPDATE\n");
+  SHADER_COMPUTE(SHADOW_TILE_TAG_USAGE, eevee_shadow_tilemap_tag_comp, "#define TAG_USAGE\n");
   SHADER_COMPUTE(SHADOW_TILE_TAG_VISIBILITY, eevee_shadow_tilemap_visibility_comp, nullptr);
+
   SHADER_FULLSCREEN(SUBSURFACE_EVAL, eevee_subsurface_eval_frag);
 
   SHADER(VELOCITY_MESH,
@@ -413,7 +417,7 @@ ShaderModule::ShaderModule()
 #ifdef DEBUG
   /* Ensure all shader are described. */
   for (ShaderDescription &desc : shader_descriptions_) {
-    BLI_assert(desc.name != nullptr);
+    BLI_assert_msg(desc.name != nullptr, "EEVEE: Mising shader definition.");
     if (desc.compute_shader_code == nullptr) {
       BLI_assert(desc.vertex_shader_code != nullptr);
       BLI_assert(desc.fragment_shader_code != nullptr);

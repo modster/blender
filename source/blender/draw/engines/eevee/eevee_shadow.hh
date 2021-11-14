@@ -53,7 +53,14 @@ class ShadowModule;
 
 /** World space axis aligned bounding box. */
 struct AABB {
-  float3 min, max;
+  /**
+   * TODO(fclem) There is padding to match the std430 layout requirement inside shaders storage.
+   * The goal would be to send the Oriented Bound Box for better culling.
+   */
+  float3 min;
+  float _pad0;
+  float3 max;
+  float _pad1;
 
   AABB() = default;
   AABB(float val) : min(-val), max(val){};
@@ -153,6 +160,11 @@ enum eCubeFace {
 struct ShadowTileMap : public ShadowTileMapData {
   static constexpr int64_t tile_map_resolution = SHADOW_TILEMAP_RES;
   static constexpr int64_t tiles_count = tile_map_resolution * tile_map_resolution;
+  /**
+   * Maximum "bounding" angle of a tile inside a cubemap.
+   * Half the diagonal of tile since we test using the tile center.
+   */
+  static constexpr float tile_cone_half_angle = atan(0.5 * M_SQRT2 / (SHADOW_TILEMAP_RES / 2));
 
   /** Level of detail for clipmap. */
   int level = INT_MAX;
@@ -160,8 +172,10 @@ struct ShadowTileMap : public ShadowTileMapData {
   int2 grid_offset = int2(16);
   /** Cube face index. */
   eCubeFace cubeface = Z_NEG;
-  /** Copy of the light object matrix. */
-  float4x4 object_mat;
+  /** Cached, used for rendering. */
+  float4x4 viewmat, winmat;
+  /** Cached, used for detecting updates. */
+  float4x4 obmat;
   /** Near and far clip distances. For clipmap they are updated after sync. */
   float near, far;
 
@@ -171,12 +185,13 @@ struct ShadowTileMap : public ShadowTileMapData {
     index = _index;
   };
 
-  void sync_clipmap(const Camera &camera,
+  void sync_clipmap(const float3 &camera_position,
                     const float4x4 &object_mat_,
-                    const AABB &casters_bounds,
+                    float near_,
+                    float far_,
                     int clipmap_level);
   void sync_cubeface(
-      const float4x4 &object_mat, const float4x4 &winmat, float near, float far, eCubeFace face);
+      const float4x4 &object_mat, float near, float far, float cone_aperture, eCubeFace face);
 
   float tilemap_coverage_get(void) const
   {
@@ -184,6 +199,8 @@ struct ShadowTileMap : public ShadowTileMapData {
     return powf(2.0f, level);
   }
 
+  float4x4 winmat_get(const rcti *tile_minmax) const;
+  void setup_view(const rcti &rect, DRWView *&view) const;
   void debug_draw(void) const;
 
   void set_dirty()
@@ -210,8 +227,6 @@ struct ShadowCommon {
 
 class ShadowPunctual : public ShadowCommon {
  private:
-  /** Cone angle to cover. Used to reject tiles not present in the lit part. */
-  float cone_aperture_;
   /** Area light size. */
   float size_x_, size_y_;
   /** Shape type. */
@@ -253,7 +268,10 @@ class ShadowDirectional : public ShadowCommon {
   ShadowDirectional(ShadowModule *shadows) : ShadowCommon(shadows){};
 
   void sync(const mat4 &object_mat, float bias, float min_resolution);
-  void end_sync(const Camera &camera, const AABB &casters_bounds);
+  void end_sync(int min_level,
+                int max_level,
+                const float3 &camera_position,
+                const AABB &casters_bounds);
 
   operator ShadowData();
 };
@@ -298,7 +316,7 @@ struct ShadowObject {
  * In the future we could resize and copy old tilemap infos. But for now we KISS.
  */
 struct ShadowTileAllocator {
-  static constexpr int64_t size = MAX_SHADOW_TILEMAP;
+  static constexpr int64_t size = SHADOW_MAX_TILEMAP;
   /** Limit the with of the texture. */
   static constexpr int64_t maps_per_row = SHADOW_TILEMAP_PER_ROW;
   /* TODO(fclem): Do it for real... Use real bitmap. */
@@ -317,13 +335,13 @@ struct ShadowTileAllocator {
   Texture tilemap_tx = Texture("tilemap_tx");
   /** Very small texture containing the result of the update pass. */
   /** FIXME(fclem): It would be nice to avoid GPU > CPU readback. */
-  Texture tilemap_update_result_tx = Texture("tilemap_update_result_tx");
+  Texture tilemap_rects_tx = Texture("tilemap_rects_tx");
   /** UBO containing the description for every allocated tilemap. */
   ShadowTileMapDataBuf tilemaps_data;
   /** Number of maps inside the tilemaps_data. */
-  int64_t updated_maps_count = 0;
+  int64_t active_maps_len = 0;
   /** Number of maps at the end of tilemaps_data that are being deleted and need clear. */
-  int64_t deleted_maps_count = 0;
+  int64_t deleted_maps_len = 0;
 
   ShadowTileAllocator();
   ~ShadowTileAllocator();
@@ -332,6 +350,16 @@ struct ShadowTileAllocator {
   Span<ShadowTileMap *> alloc(int64_t count);
 
   void free(Vector<ShadowTileMap *> &free_list);
+
+  void end_sync();
+};
+
+/**
+ * Simple struct here to group all things page related.
+ */
+struct ShadowVirtualPageManager {
+  ShadowVirtualPageManager();
+  ~ShadowVirtualPageManager();
 
   void end_sync();
 };
@@ -377,56 +405,82 @@ class ShadowModule {
   DRWView *views_[6] = {nullptr};
 
   /**
-   * Contains pages of shadow_page_size_. Tilemaps reference these pages.
-   * Managed using compute shaders.
-   */
-  eevee::Texture atlas_tx_ = Texture("atlas_tx");
-  /**
-   * Atlas map used from bookeeping of rendered page on the GPU.
-   * Contains mapping from pages to pixel inside the tilemap.
-   */
-  eevee::Texture atlas_info_tx_ = Texture("atlas_info_tx");
-  /**
    * Separate render buffer. This is meant to be replace by directly rendering inside the atlas.
    */
   eevee::Texture render_tx_ = Texture("shadow_target_tx_");
   eevee::Framebuffer render_fb_ = Framebuffer("shadow_fb");
-  /**
-   * For rendering occluders & non-opaque. Small 16x16 framebuffer.
-   */
-  eevee::Texture tagging_tx_ = Texture("tagging_tx");
-  eevee::Framebuffer tagging_fb_ = Framebuffer("tagging_fb");
+
+  /* -------------------------------------------------------------------- */
+  /** \name Tilemap Management
+   * \{ */
 
   /**
    * Clear the visibility, usage and request bits.
    * Also shifts the whole tilemap for directional shadow clipmaps.
    */
   DRWPass *tilemap_setup_ps_;
-  bool tilemap_setup_has_run_ = false;
   /** Update passes that will mark all shadow pages from a light to update or as unused. */
   DRWPass *tilemap_visibility_ps_;
-  /**
-   * Update passes that will mark all shadow pages touching an updated shadow caster.
-   * This uses point sprite rendering to render only compute intersection and update the
-   * intersecting tiles. This reduces atomic contention.
-   */
+  /** Update passes that will mark all shadow pages touching an updated shadow caster. */
   DRWPass *tilemap_update_tag_ps_;
-  DRWCallBuffer *casters_updated_;
-  /**
-   * Draw one point for each receiver that may not appear in the depth buffer.
-   * This is to support forward shaded geometry.
-   */
+  /** Tag each tile intersecting with a shadow receiver. */
   /* NOTE(fclem): Until we implement depth buffer scanning, we rely solely on this to tag
    * needed tiles. */
   DRWPass *tilemap_usage_tag_ps_;
+  /** Propagate LOD pages to higher level to avoid multiple fetches. */
+  DRWPass *tilemap_propagate_lod_ps_;
+
+  /** List of AABBs for tagging passes. */
+  DRWCallBuffer *casters_updated_;
   DRWCallBuffer *receivers_non_opaque_;
-  int updating_map_index_;
+
+  bool do_tilemap_setup_ = true;
+
+  /** \} */
+
+  /* -------------------------------------------------------------------- */
+  /** \name Page Management
+   * \{ */
+
+  eevee::Texture atlas_tx_ = Texture("shadow_atlas_tx_");
+
+  /** Contains mapping from pages to pixel inside the tilemap. As well a some some other flags. */
+  ShadowPageHeapBuf pages_data_;
+  /** Pool of unallocated pages waiting to be assigned to specific tiles in the tilemap atlas. */
+  ShadowPageHeapBuf pages_free_data_;
+
+  /** Page buffer clear. This is only done if shadow atlas is reallocated. */
+  DRWPass *page_init_ps_;
+  /** Free pages of deleted tiles. You can think of a garbage collection. */
+  DRWPass *page_free_ps_;
+  /** Allocate pages for new tiles. */
+  DRWPass *page_alloc_ps_;
+  /** Clear depth of tiles to render to 1.0 and 0.0 for others. */
+  DRWPass *page_mark_ps_;
+  /** Copy pages in the copy list. */
+  DRWPass *page_copy_ps_;
+
+  bool do_page_init_ = true;
+  int rendering_tilemap_;
+
+  /** \} */
+
+  /* -------------------------------------------------------------------- */
+  /** \name Debugging
+   * \{ */
 
   /** Display informations about the virtual shadows. */
   DRWPass *debug_draw_ps_;
   /** Depth input for debug drawing. Reference only. */
   GPUTexture *input_depth_tx_;
+  /** Object key used to retreive last active light. The debug info shown are from this light. */
   ObjectKey debug_light_key;
+  /** View used for the whole virtual shadow mapping setup. Used to debug culling. */
+  DRWView *debug_view_;
+  /** Debug data sent to GPU. */
+  ShadowDebugDataBuf debug_data_;
+
+  /** \} */
 
   /** Scene immutable parameter. */
   int shadow_page_size_ = 256;
@@ -441,16 +495,14 @@ class ShadowModule {
   /** Global bounds that contains all shadow casters. Used by directionnal for best fit. */
   AABB casters_bounds_;
 
-  ShadowDebugDataBuf debug_data_;
-
  public:
   ShadowModule(Instance &inst) : punctuals(*this), directionals(*this), inst_(inst)
   {
     GPU_vertformat_clear(&aabb_format_);
     /* Must match the C++ AABB layout. */
-    BLI_assert(sizeof(AABB) == sizeof(float) * 6);
-    GPU_vertformat_attr_add(&aabb_format_, "aabb_min", GPU_COMP_F32, 3, GPU_FETCH_FLOAT);
-    GPU_vertformat_attr_add(&aabb_format_, "aabb_max", GPU_COMP_F32, 3, GPU_FETCH_FLOAT);
+    BLI_assert(sizeof(AABB) == sizeof(float) * 8);
+    GPU_vertformat_attr_add(&aabb_format_, "aabb_min", GPU_COMP_F32, 4, GPU_FETCH_FLOAT);
+    GPU_vertformat_attr_add(&aabb_format_, "aabb_max", GPU_COMP_F32, 4, GPU_FETCH_FLOAT);
   }
   ~ShadowModule(){};
 
@@ -489,7 +541,6 @@ class ShadowPass {
  private:
   Instance &inst_;
 
-  DRWPass *clear_ps_ = nullptr;
   DRWPass *surface_ps_ = nullptr;
 
  public:

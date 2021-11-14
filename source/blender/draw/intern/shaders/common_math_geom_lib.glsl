@@ -134,3 +134,103 @@ vec3 world_to_tangent(vec3 vector, vec3 N, vec3 T, vec3 B)
 }
 
 /** \} */
+
+/* ---------------------------------------------------------------------- */
+/** \name Shapes
+ * \{ */
+
+struct Box {
+  vec3 corners[8];
+};
+
+struct Pyramid {
+  /* Apex is the first. Base vertices are in clockwise order from front view. */
+  vec3 corners[5];
+};
+
+#if defined(DEBUG_DRAW)
+
+void drw_debug(Box shape, vec4 color)
+{
+  drw_debug_quad(shape.corners[0], shape.corners[1], shape.corners[2], shape.corners[3], color);
+  drw_debug_line(shape.corners[0], shape.corners[4], color);
+  drw_debug_line(shape.corners[1], shape.corners[5], color);
+  drw_debug_line(shape.corners[2], shape.corners[6], color);
+  drw_debug_line(shape.corners[3], shape.corners[7], color);
+  drw_debug_quad(shape.corners[4], shape.corners[5], shape.corners[6], shape.corners[7], color);
+}
+
+void drw_debug(Pyramid shape, vec4 color)
+{
+  drw_debug_line(shape.corners[0], shape.corners[1], color);
+  drw_debug_line(shape.corners[0], shape.corners[2], color);
+  drw_debug_line(shape.corners[0], shape.corners[3], color);
+  drw_debug_line(shape.corners[0], shape.corners[4], color);
+  drw_debug_quad(shape.corners[1], shape.corners[2], shape.corners[3], shape.corners[4], color);
+}
+
+#endif
+
+/** \} */
+
+/* ---------------------------------------------------------------------- */
+/** \name Axis Aligned Bound Box
+ * \{ */
+
+struct AABB {
+  vec3 min, max;
+};
+
+AABB init_min_max()
+{
+  AABB aabb;
+  aabb.min = vec3(1.0e30);
+  aabb.max = vec3(-1.0e30);
+  return aabb;
+}
+
+void merge(inout AABB aabb, vec3 v)
+{
+  /* Fix for perspective where  */
+  aabb.min = min(aabb.min, v);
+  aabb.max = max(aabb.max, v);
+}
+
+bool intersect(AABB a, AABB b)
+{
+  return all(greaterThanEqual(min(a.max, b.max), max(a.min, b.min)));
+}
+
+bool intersect(AABB a, AABB b, out AABB c)
+{
+  bool isect = intersect(a, b);
+  c.min = max(a.min, b.min);
+  c.max = min(a.max, b.max);
+  return isect;
+}
+
+Box to_box(AABB aabb)
+{
+  Box box;
+  box.corners[0] = aabb.min;
+  box.corners[1] = vec3(aabb.max.x, aabb.min.y, aabb.min.z);
+  box.corners[2] = vec3(aabb.max.x, aabb.max.y, aabb.min.z);
+  box.corners[3] = vec3(aabb.min.x, aabb.max.y, aabb.min.z);
+  box.corners[4] = vec3(aabb.min.x, aabb.min.y, aabb.max.z);
+  box.corners[5] = vec3(aabb.max.x, aabb.min.y, aabb.max.z);
+  box.corners[6] = aabb.max;
+  box.corners[7] = vec3(aabb.min.x, aabb.max.y, aabb.max.z);
+  return box;
+}
+
+#if defined(DEBUG_DRAW)
+
+void drw_debug(AABB shape, vec4 color)
+{
+  Box box = to_box(shape);
+  drw_debug(box, color);
+}
+
+#endif
+
+/** \} */

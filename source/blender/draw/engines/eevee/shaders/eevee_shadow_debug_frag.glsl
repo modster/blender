@@ -10,22 +10,29 @@
 #pragma BLENDER_REQUIRE(eevee_shadow_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_sampling_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_shadow_tilemap_lib.glsl)
+#pragma BLENDER_REQUIRE(eevee_shadow_page_lib.glsl)
 
 /** Control the scaling of the tilemap splat. */
-const float pixel_scale = 5.0;
+const float pixel_scale = 8.0;
 
 layout(std140) uniform debug_block
 {
   ShadowDebugData debug;
 };
 
-layout(std430, binding = 0) readonly buffer tilemaps_block
+layout(std430, binding = 0) readonly buffer tilemaps_buf
 {
   ShadowTileMapData tilemaps[];
 };
 
+layout(std430, binding = 1) readonly buffer pages_buf
+{
+  ShadowPagePacked pages[];
+};
+
 uniform usampler2D tilemaps_tx;
 uniform sampler2D depth_tx;
+uniform sampler2D atlas_tx;
 
 in vec4 uvcoordsvar;
 
@@ -60,8 +67,8 @@ vec3 debug_tile_state_color(ShadowTileData tile)
 bool debug_tilemap()
 {
   ivec2 tile = ivec2(gl_FragCoord.xy / pixel_scale);
-  int tilemap_lod = tile.x / (SHADOW_TILEMAP_RES + 2);
-  int tilemap_index = tile.y / (SHADOW_TILEMAP_RES + 2);
+  int tilemap_lod = tile.y / (SHADOW_TILEMAP_RES + 2);
+  int tilemap_index = tile.x / (SHADOW_TILEMAP_RES + 2);
   tile = (tile % (SHADOW_TILEMAP_RES + 2)) - 1;
   tilemap_index += debug.shadow.tilemap_index;
 
@@ -121,11 +128,11 @@ void debug_lod(vec3 P)
   if (tilemap_index != -1) {
     vec3 color = debug_random_color(tilemap_index);
     out_color_add = vec4(color * 0.5, 0.0);
-    out_color_mul = out_color_add;
+    out_color_mul = out_color_add * 0.5 + 0.5;
   }
   else {
     out_color_add = vec4(0.0);
-    out_color_mul = vec4(0.0);
+    out_color_mul = vec4(0.5);
   }
 }
 
@@ -140,11 +147,43 @@ void debug_tile_state(vec3 P)
     ShadowTileData tile_data = shadow_tile_load(tilemaps_tx, tile, tilemap_index);
     vec3 color = debug_tile_state_color(tile_data);
     out_color_add = vec4(color * 0.5, 0);
-    out_color_mul = out_color_add;
+    out_color_mul = out_color_add * 0.5 + 0.5;
   }
   else {
     out_color_add = vec4(0.0);
-    out_color_mul = vec4(0.0);
+    out_color_mul = vec4(0.5);
+  }
+}
+
+void debug_page_allocation(void)
+{
+  ivec2 page = ivec2(gl_FragCoord.xy / pixel_scale);
+
+  if (in_range_inclusive(page, ivec2(0), ivec2(SHADOW_PAGE_PER_ROW - 1))) {
+    uint page_index = shadow_page_to_index(page);
+    if (pages[page_index] != SHADOW_PAGE_NO_DATA) {
+      out_color_add = vec4(1, 1, 1, 0);
+    }
+    else {
+      out_color_add = vec4(0, 0, 0, 0);
+    }
+    out_color_mul = vec4(0);
+    /* Write depth to overlap overlays. */
+    gl_FragDepth = 0.0;
+  }
+}
+
+void debug_tile_allocation(void)
+{
+  ivec2 tile_co = ivec2(gl_FragCoord.xy);
+  /* Assumes tilemap buffer is squared. */
+  if (in_range_inclusive(
+          tile_co, ivec2(0), ivec2(SHADOW_TILEMAP_PER_ROW * SHADOW_TILEMAP_RES - 1))) {
+    ShadowTileData tile = shadow_tile_data_unpack(texelFetch(tilemaps_tx, tile_co, 0).x);
+    out_color_add = vec4(debug_tile_state_color(tile), 0);
+    out_color_mul = vec4(0);
+    /* Write depth to overlap overlays. */
+    gl_FragDepth = 0.0;
   }
 }
 
@@ -154,6 +193,16 @@ void main()
   gl_FragDepth = 1.0;
   out_color_add = vec4(0.0);
   out_color_mul = vec4(1.0);
+
+  if (debug.type == SHADOW_DEBUG_PAGE_ALLOCATION) {
+    debug_page_allocation();
+    return;
+  }
+
+  if (debug.type == SHADOW_DEBUG_TILE_ALLOCATION) {
+    debug_tile_allocation();
+    return;
+  }
 
   if (debug_tilemap()) {
     return;

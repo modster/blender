@@ -486,12 +486,30 @@ struct ShadowData {
 BLI_STATIC_ASSERT_ALIGN(ShadowData, 16)
 
 /**
- * IMPORTANT: Some data packing are tweaked for SHADOW_TILEMAP_RES of 16.
+ * IMPORTANT: Some data packing are tweaked for these values.
  * Be sure to update them accordingly.
  */
 #define SHADOW_TILEMAP_RES 16
 #define SHADOW_TILEMAP_PER_ROW 64
-#define MAX_SHADOW_TILEMAP 4096
+#define SHADOW_PAGE_COPY_GROUP_SIZE 32
+#define SHADOW_AABB_TAG_GROUP_SIZE 64
+#define SHADOW_MAX_TILEMAP 4096
+#define SHADOW_MAX_PAGE 4096
+#define SHADOW_PAGE_PER_ROW 64
+/** Debug shadow tile allocation. */
+// #define SHADOW_NO_CACHING
+// #define SHADOW_DEBUG_PAGE_ALLOCATION_ENABLED
+// #define SHADOW_DEBUG_TILE_ALLOCATION_ENABLED
+
+/* Given an input tile coordinate [0..SHADOW_TILEMAP_RES] returns the coordinate in NDC [-1..1]. */
+static inline vec2 shadow_tile_coord_to_ndc(ivec2 tile)
+{
+  vec2 co = vec2(tile.x, tile.y) / float(SHADOW_TILEMAP_RES);
+  return co * 2.0f - 1.0f;
+}
+
+/** Expands to ShadowPageData. */
+#define ShadowPagePacked int
 
 /**
  * Small descriptor used for the tile update phase.
@@ -499,12 +517,18 @@ BLI_STATIC_ASSERT_ALIGN(ShadowData, 16)
 struct ShadowTileMapData {
   /** View Projection matrix used to render the shadow. Transforms World > NDC. */
   mat4 persmat;
+  /** Corners of the frustum. */
+  vec4 corners[4];
   /** Shift to apply to the tile grid in the setup phase. */
   ivec2 grid_shift;
   /** True for punctual lights. */
   bool is_cubeface;
   /** Index inside the tilemap allocator. */
   int index;
+  /** Cone direction for punctual shadows. */
+  vec3 cone_direction;
+  /** Cosine of the max angle. Offset to take into acount the max tile angle. */
+  float cone_angle_cos;
 };
 BLI_STATIC_ASSERT_ALIGN(ShadowTileMapData, 16)
 
@@ -525,7 +549,17 @@ enum eShadowDebug : uint32_t {
    * Outputs random color per tilemap (or tilemap level). Validates tilemaps coverage.
    * Black means not covered by any tilemaps LOD of the shadow.
    */
-  SHADOW_DEBUG_LOD = 3u
+  SHADOW_DEBUG_LOD = 3u,
+  /**
+   * Outputs white pixels for pages allocated and black pixels for unused pages.
+   * This needs SHADOW_DEBUG_PAGE_ALLOCATION_ENABLED defined in order to work.
+   */
+  SHADOW_DEBUG_PAGE_ALLOCATION = 4u,
+  /**
+   * Outputs the tilemap atlas. Default tilemap is too big for the usual screen resolution.
+   * Try lowering SHADOW_TILEMAP_PER_ROW and SHADOW_MAX_TILEMAP before using this option.
+   */
+  SHADOW_DEBUG_TILE_ALLOCATION = 5u
 };
 
 /**
@@ -828,7 +862,8 @@ using LightProbeInfoDataBuf = StructBuffer<LightProbeInfoData>;
 using RaytraceBufferDataBuf = StructBuffer<RaytraceBufferData>;
 using RaytraceDataBuf = StructBuffer<RaytraceData>;
 using ShadowDataBuf = StructArrayBuffer<ShadowData, CULLING_ITEM_BATCH>;
-using ShadowTileMapDataBuf = StorageArrayBuffer<ShadowTileMapData, MAX_SHADOW_TILEMAP>;
+using ShadowTileMapDataBuf = StorageArrayBuffer<ShadowTileMapData, SHADOW_MAX_TILEMAP>;
+using ShadowPageHeapBuf = StorageArrayBuffer<ShadowPagePacked, SHADOW_MAX_PAGE, true>;
 using ShadowDebugDataBuf = StructBuffer<ShadowDebugData>;
 using SubsurfaceDataBuf = StructBuffer<SubsurfaceData>;
 using VelocityObjectBuf = StructBuffer<VelocityObjectData>;
