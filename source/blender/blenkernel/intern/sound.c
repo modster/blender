@@ -86,6 +86,8 @@ static void sound_copy_data(Main *UNUSED(bmain),
   sound_dst->playback_handle = NULL;
   sound_dst->spinlock = MEM_mallocN(sizeof(SpinLock), "sound_spinlock");
   BLI_spin_init(sound_dst->spinlock);
+  sound_dst->tot_samples = 0;
+  sound_dst->samples = NULL;
 
   /* Just to be sure, should not have any value actually after reading time. */
   sound_dst->ipo = NULL;
@@ -116,6 +118,9 @@ static void sound_free_data(ID *id)
     BLI_spin_end(sound->spinlock);
     MEM_freeN(sound->spinlock);
     sound->spinlock = NULL;
+  }
+  if (sound->samples) {
+    AUD_Sound_freeData(sound->samples);
   }
 }
 
@@ -162,6 +167,8 @@ static void sound_blend_read_data(BlendDataReader *reader, ID *id)
   sound->tags = 0;
   sound->handle = NULL;
   sound->playback_handle = NULL;
+  sound->samples = NULL;
+  sound->tot_samples = 0;
 
   /* versioning stuff, if there was a cache, then we enable caching: */
   if (sound->cache) {

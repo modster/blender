@@ -93,6 +93,11 @@ typedef struct bSound {
   void *spinlock;
   /* XXX unused currently (SOUND_TYPE_LIMITER) */
   /* float start, end; */
+
+  float *samples;
+  int tot_samples;
+  char _pad2[4];
+  void *_pad3;
 } bSound;
 
 /* XXX unused currently */

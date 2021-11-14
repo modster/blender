@@ -17,6 +17,14 @@
 #include "UI_interface.h"
 #include "UI_resources.h"
 
+#include "DNA_sound_types.h"
+
+#include "AUD_Sound.h"
+
+#include "BKE_sound.h"
+
+#include "DEG_depsgraph_query.h"
+
 #include "node_geometry_util.hh"
 
 namespace blender::nodes {
@@ -36,6 +44,37 @@ static void geo_node_sample_sound_layout(uiLayout *layout, bContext *UNUSED(C), 
 
 static void geo_node_sample_sound_exec(GeoNodeExecParams params)
 {
+  bSound *sound_id = (bSound *)params.node().id;
+  Scene *scene = DEG_get_input_scene(params.depsgraph());
+  const float fps = FPS;
+  if (sound_id != nullptr) {
+    AUD_Sound *sound = (AUD_Sound *)sound_id->handle;
+    if (sound != NULL) {
+      if (sound_id->samples == NULL) {
+        AUD_Specs specs;
+        sound_id->samples = AUD_Sound_data(sound, &sound_id->tot_samples, &specs);
+      }
+      AUD_Specs specs = AUD_Sound_getSpecs(sound);
+      const float *samples = sound_id->samples;
+      const int tot_samples = sound_id->tot_samples;
+      const float sample_rate = specs.rate;
+
+      const float frame = params.get_input<float>("Frame");
+      const float time = (frame - 1) / fps;
+      const int end_sample = std::max(
+          0, std::min<int>(time * sample_rate * specs.channels, tot_samples));
+      const int sample_duration = 1000;
+      const int start_sample = std::max(0,
+                                        std::min<int>(end_sample - sample_duration, tot_samples));
+      float sum = 0.0f;
+      for (int i = start_sample; i < end_sample; i++) {
+        sum += fabsf(samples[i]);
+      }
+      const float average = sum / (end_sample - start_sample);
+      params.set_output("Volume", average);
+      return;
+    }
+  }
   params.set_output("Volume", 0.0f);
 }
 

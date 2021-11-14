@@ -553,4 +553,12 @@ if(WITH_OPENVDB)
   add_definitions(-DWITH_OPENVDB ${OPENVDB_DEFINITIONS})
 endif()
 
+if(WITH_AUDASPACE)
+  add_definitions(-DWITH_AUDASPACE)
+
+  list(APPEND INC_SYS
+    ${AUDASPACE_C_INCLUDE_DIRS}
+  )
+endif()
+
 blender_add_lib(bf_nodes "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
