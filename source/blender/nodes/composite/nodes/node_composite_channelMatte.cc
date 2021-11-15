@@ -50,6 +50,41 @@ static void node_composit_init_channel_matte(bNodeTree *UNUSED(ntree), bNode *no
   node->custom2 = 2; /* Green Channel. */
 }
 
+static int node_composite_gpu_channel_matte(GPUMaterial *mat,
+                                            bNode *node,
+                                            bNodeExecData *UNUSED(execdata),
+                                            GPUNodeStack *in,
+                                            GPUNodeStack *out)
+{
+  const NodeChroma *data = (NodeChroma *)node->storage;
+
+  const float color_space = (float)node->custom1;
+  const float matte_channel = (float)(node->custom2 - 1);
+
+  /* Always assume the limit algorithm is Max, if it is a single limit channel, store it in both
+   * limit channels. */
+  float limit_channels[2];
+  if (data->algorithm == 1) {
+    limit_channels[0] = (float)(node->custom2 % 3);
+    limit_channels[1] = (float)((node->custom2 + 1) % 3);
+  }
+  else {
+    limit_channels[0] = (float)(data->channel - 1);
+    limit_channels[1] = (float)(data->channel - 1);
+  }
+
+  return GPU_stack_link(mat,
+                        node,
+                        "node_composite_channel_matte",
+                        in,
+                        out,
+                        GPU_constant(&color_space),
+                        GPU_constant(&matte_channel),
+                        GPU_constant(limit_channels),
+                        GPU_uniform(&data->t1),
+                        GPU_uniform(&data->t2));
+}
+
 void register_node_type_cmp_channel_matte(void)
 {
   static bNodeType ntype;
@@ -59,6 +94,7 @@ void register_node_type_cmp_channel_matte(void)
   node_type_socket_templates(&ntype, cmp_node_channel_matte_in, cmp_node_channel_matte_out);
   node_type_init(&ntype, node_composit_init_channel_matte);
   node_type_storage(&ntype, "NodeChroma", node_free_standard_storage, node_copy_standard_storage);
+  node_type_gpu(&ntype, node_composite_gpu_channel_matte);
 
   nodeRegisterType(&ntype);
 }
