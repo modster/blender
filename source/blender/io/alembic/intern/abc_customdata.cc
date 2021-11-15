@@ -1567,9 +1567,10 @@ void read_arbitrary_attributes(const CDStreamConfig &config,
   /* Manually extract the arbitrary geometry parameters. We do it this way to avoid complicating
    * the code when dealing with schemas and default velocities which are not accessible via an
    * IGeomParam as we would like for the sake of genericity, but as an IArrayProperty. */
-  const ICompoundProperty &arb_geom_params = ICompoundProperty(schema, ".arbGeomParams");
-  if (!arb_geom_params.valid()) {
-    return;
+  const PropertyHeader *arb_geom_prop_header = schema.getPropertyHeader(".arbGeomParams");
+  ICompoundProperty arb_geom_params;
+  if (arb_geom_prop_header) {
+    arb_geom_params = ICompoundProperty(schema, ".arbGeomParams");
   }
 
   const AttributeSelector &attr_sel = *config.attr_selector;
