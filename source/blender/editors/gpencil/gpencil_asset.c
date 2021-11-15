@@ -54,6 +54,7 @@
 
 #include "ED_asset.h"
 #include "ED_gpencil.h"
+#include "ED_keyframing.h"
 #include "ED_screen.h"
 #include "ED_space_api.h"
 
@@ -1019,6 +1020,12 @@ static bool gpencil_asset_append_strokes(tGPDasset *tgpa)
       }
 
       bool is_new_gpf = false;
+      /* Check Rec button. If button is disabled, try to use active frame.
+       * If no active keyframe, must create a new frame. */
+      if ((gpf_target == NULL) && (!IS_AUTOKEY_ON(tgpa->scene))) {
+        gpf_target = BKE_gpencil_layer_frame_get(gpl_target, fra, GP_GETFRAME_USE_PREV);
+      }
+
       if (gpf_target == NULL) {
         gpf_target = BKE_gpencil_frame_addnew(gpl_target, fra);
         gpl_target->actframe = gpf_target;
