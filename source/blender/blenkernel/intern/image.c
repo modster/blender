@@ -130,6 +130,8 @@ static void image_runtime_reset_on_copy(struct Image *image)
 {
   image->runtime.cache_mutex = MEM_mallocN(sizeof(ThreadMutex), "image runtime cache_mutex");
   BLI_mutex_init(image->runtime.cache_mutex);
+
+  image->runtime.partial_update_register = NULL;
 }
 
 static void image_init_data(ID *id)

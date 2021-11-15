@@ -142,10 +142,17 @@ typedef enum eImageTextureResolution {
   IMA_TEXTURE_RESOLUTION_LEN
 } eImageTextureResolution;
 
+/* Defined in BKE_image.h. */
+struct PartialUpdateRegister;
+
 typedef struct Image_Runtime {
   /* Mutex used to guarantee thread-safe access to the cached ImBuf of the corresponding image ID.
    */
   void *cache_mutex;
+
+  /** \brief Register containing partial updates. */
+  struct PartialUpdateRegister *partial_update_register;
+
 } Image_Runtime;
 
 typedef struct Image {
