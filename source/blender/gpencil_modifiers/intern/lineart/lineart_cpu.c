@@ -2453,12 +2453,12 @@ static bool lineart_edge_from_triangle(const LineartTriangle *tri,
  *
  * 2) Currently using discrete a/b/c/pa/pb/pc/is[3] values for storing
  * intersection/edge_aligned/intersection_order info, which isn't optimal, needs a better
- * representation (likely a struct) for redability and clarity of code path.
+ * representation (likely a struct) for readability and clarity of code path.
  *
  * I keep this function as-is because it's still fast, and more importantly the output value
  * threshold is already in tune with the cutting function in the next stage.
  * While current "edge aligned" fix isn't ideal, it does solve most of the precision issue
- * expecially in ortho camera mode.
+ * especially in ortho camera mode.
  */
 static bool lineart_triangle_edge_image_space_occlusion(SpinLock *UNUSED(spl),
                                                         const LineartTriangle *tri,
