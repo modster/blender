@@ -541,8 +541,8 @@ static void lineart_main_occlusion_begin(LineartRenderBuffer *rb)
   rb->floating.last = rb->floating.first;
   rb->light_contour.last = rb->light_contour.first;
 
-  /* This is needed because the occlusion function needs camera vector to be in the direction of
-   * point to camera. */
+  /* This is needed because the occlusion function expects the camera vector to point towards the
+   * camera. */
   negate_v3_db(rb->view_vector);
 
   TaskPool *tp = BLI_task_pool_create(NULL, TASK_PRIORITY_HIGH);
@@ -2443,6 +2443,22 @@ static bool lineart_edge_from_triangle(const LineartTriangle *tri,
  * the occlusion status between 1(one) triangle and 1(one) line.
  * if returns true, then from/to will carry the occluded segments
  * in ratio from `e->v1` to `e->v2`. The line is later cut with these two values.
+ *
+ * TODO: (Yiming) This function uses a convoluted method that needs to be redesigned.
+ *
+ * 1) The lineart_intersect_seg_seg() and lineart_point_triangle_relation() are separate calls,
+ * which would potentially return results that doesn't agree, especially when it's an edge
+ * extruding from one of the triangle's point. To get the information using one math process can
+ * solve this problem.
+ *
+ * 2) Currently using discrete a/b/c/pa/pb/pc/is[3] values for storing
+ * intersection/edge_aligned/intersection_order info, which isn't optimal, needs a better
+ * representation (likely a struct) for redability and clarity of code path.
+ *
+ * I keep this function as-is because it's still fast, and more importantly the output value
+ * threshold is already in tune with the cutting function in the next stage.
+ * While current "edge aligned" fix isn't ideal, it does solve most of the precision issue
+ * expecially in ortho camera mode.
  */
 static bool lineart_triangle_edge_image_space_occlusion(SpinLock *UNUSED(spl),
                                                         const LineartTriangle *tri,
@@ -2491,9 +2507,9 @@ static bool lineart_triangle_edge_image_space_occlusion(SpinLock *UNUSED(spl),
   }
 
   /* Check if the line visually crosses one of the edge in the triangle. */
-  a = lineart_LineIntersectTest2d(LFBC, RFBC, FBC0, FBC1, &is[0], &pa);
-  b = lineart_LineIntersectTest2d(LFBC, RFBC, FBC1, FBC2, &is[1], &pb);
-  c = lineart_LineIntersectTest2d(LFBC, RFBC, FBC2, FBC0, &is[2], &pc);
+  a = lineart_intersect_seg_seg(LFBC, RFBC, FBC0, FBC1, &is[0], &pa);
+  b = lineart_intersect_seg_seg(LFBC, RFBC, FBC1, FBC2, &is[1], &pb);
+  c = lineart_intersect_seg_seg(LFBC, RFBC, FBC2, FBC0, &is[2], &pc);
 
   /* Sort the intersection distance. */
   INTERSECT_SORT_MIN_TO_MAX_3(is[0], is[1], is[2], order);
@@ -2525,13 +2541,16 @@ static bool lineart_triangle_edge_image_space_occlusion(SpinLock *UNUSED(spl),
     return false;
   }
 
+  /* If the edge doesn't visually cross any edge of the triangle... */
   if (!a && !b && !c) {
+    /* And if both end point from the edge is outside of the triangle... */
     if (!(st_l = lineart_point_triangle_relation(LFBC, FBC0, FBC1, FBC2)) &&
         !(st_r = lineart_point_triangle_relation(RFBC, FBC0, FBC1, FBC2))) {
-      return 0; /* Intersection point is not inside triangle. */
+      return 0; /* We don't have any occlusion. */
     }
   }
 
+  /* Whether two end points are inside/on_the_edge/outside of the triangle. */
   st_l = lineart_point_triangle_relation(LFBC, FBC0, FBC1, FBC2);
   st_r = lineart_point_triangle_relation(RFBC, FBC0, FBC1, FBC2);
 
@@ -2583,32 +2602,42 @@ static bool lineart_triangle_edge_image_space_occlusion(SpinLock *UNUSED(spl),
     return false; \
   }
 
-  /* Determine the pair of edges that the line has crossed. */
+  /* Determine the pair of edges that the line has crossed. The "|" symbol in the comment indicates
+   * triangle boundary. DBL_TRIANGLE_LIM is needed to for floating point precision tolerance. */
 
   if (st_l == 2) {
+    /* Left side is in the triangle. */
     if (st_r == 2) {
+      /* |   l---r   | */
       INTERSECT_JUST_SMALLER(is, order, DBL_TRIANGLE_LIM, LCross);
       INTERSECT_JUST_GREATER(is, order, 1 - DBL_TRIANGLE_LIM, RCross);
     }
     else if (st_r == 1) {
+      /* |   l------r| */
       INTERSECT_JUST_SMALLER(is, order, DBL_TRIANGLE_LIM, LCross);
       INTERSECT_JUST_GREATER(is, order, 1 - DBL_TRIANGLE_LIM, RCross);
     }
     else if (st_r == 0) {
+      /* |   l-------|------r */
       INTERSECT_JUST_SMALLER(is, order, DBL_TRIANGLE_LIM, LCross);
       INTERSECT_JUST_GREATER(is, order, 0, RCross);
     }
   }
   else if (st_l == 1) {
+    /* Left side is on some edge of the triangle. */
     if (st_r == 2) {
+      /* |l------r   | */
       INTERSECT_JUST_SMALLER(is, order, DBL_TRIANGLE_LIM, LCross);
       INTERSECT_JUST_GREATER(is, order, 1 - DBL_TRIANGLE_LIM, RCross);
     }
     else if (st_r == 1) {
+      /* |l---------r| */
       INTERSECT_JUST_SMALLER(is, order, DBL_TRIANGLE_LIM, LCross);
       INTERSECT_JUST_GREATER(is, order, 1 - DBL_TRIANGLE_LIM, RCross);
     }
     else if (st_r == 0) {
+      /*           |l----------|-------r (crossing the triangle) [OR]
+       * r---------|l          |         (not crossing the triangle) */
       INTERSECT_JUST_GREATER(is, order, DBL_TRIANGLE_LIM, RCross);
       if (RCross >= 0 && LRT_ABC(RCross) && is[RCross] > (DBL_TRIANGLE_LIM)) {
         INTERSECT_JUST_SMALLER(is, order, DBL_TRIANGLE_LIM, LCross);
@@ -2620,17 +2649,23 @@ static bool lineart_triangle_edge_image_space_occlusion(SpinLock *UNUSED(spl),
         }
       }
       LRT_GUARD_NOT_FOUND
+      /* We could have the edge being completely parallel to the triangle where there isn't a
+       * viable occlusion result. */
       if ((LRT_PABC(LCross) && !LRT_ABC(LCross)) || (LRT_PABC(RCross) && !LRT_ABC(RCross))) {
         return false;
       }
     }
   }
   else if (st_l == 0) {
+    /* Left side is outside of the triangle. */
     if (st_r == 2) {
+      /* l---|---r   | */
       INTERSECT_JUST_SMALLER(is, order, 1 - DBL_TRIANGLE_LIM, LCross);
       INTERSECT_JUST_GREATER(is, order, 1 - DBL_TRIANGLE_LIM, RCross);
     }
     else if (st_r == 1) {
+      /*           |r----------|-------l (crossing the triangle) [OR]
+       * l---------|r          |         (not crossing the triangle) */
       INTERSECT_JUST_SMALLER(is, order, 1 - DBL_TRIANGLE_LIM, LCross);
       if (LCross >= 0 && LRT_ABC(LCross) && is[LCross] < (1 - DBL_TRIANGLE_LIM)) {
         INTERSECT_JUST_GREATER(is, order, 1 - DBL_TRIANGLE_LIM, RCross);
@@ -2642,11 +2677,14 @@ static bool lineart_triangle_edge_image_space_occlusion(SpinLock *UNUSED(spl),
         }
       }
       LRT_GUARD_NOT_FOUND
+      /* The same logic applies as above case. */
       if ((LRT_PABC(LCross) && !LRT_ABC(LCross)) || (LRT_PABC(RCross) && !LRT_ABC(RCross))) {
         return false;
       }
     }
     else if (st_r == 0) {
+      /*      l---|----|----r (crossing the triangle) [OR]
+       * l----r   |    |      (not crossing the triangle) */
       INTERSECT_JUST_GREATER(is, order, -DBL_TRIANGLE_LIM, LCross);
       if (LCross >= 0 && LRT_ABC(LCross)) {
         INTERSECT_JUST_GREATER(is, order, is[LCross], RCross);
@@ -4110,19 +4148,19 @@ static LineartBoundingArea *lineart_edge_first_bounding_area(LineartRenderBuffer
     return lineart_get_bounding_area(rb, data[0], data[1]);
   }
 
-  if (lineart_LineIntersectTest2d(e->v1->fbcoord, e->v2->fbcoord, LU, RU, &sr, &p_unused) &&
+  if (lineart_intersect_seg_seg(e->v1->fbcoord, e->v2->fbcoord, LU, RU, &sr, &p_unused) &&
       sr < r && sr > 0) {
     r = sr;
   }
-  if (lineart_LineIntersectTest2d(e->v1->fbcoord, e->v2->fbcoord, LB, RB, &sr, &p_unused) &&
+  if (lineart_intersect_seg_seg(e->v1->fbcoord, e->v2->fbcoord, LB, RB, &sr, &p_unused) &&
       sr < r && sr > 0) {
     r = sr;
   }
-  if (lineart_LineIntersectTest2d(e->v1->fbcoord, e->v2->fbcoord, LB, LU, &sr, &p_unused) &&
+  if (lineart_intersect_seg_seg(e->v1->fbcoord, e->v2->fbcoord, LB, LU, &sr, &p_unused) &&
       sr < r && sr > 0) {
     r = sr;
   }
-  if (lineart_LineIntersectTest2d(e->v1->fbcoord, e->v2->fbcoord, RB, RU, &sr, &p_unused) &&
+  if (lineart_intersect_seg_seg(e->v1->fbcoord, e->v2->fbcoord, RB, RU, &sr, &p_unused) &&
       sr < r && sr > 0) {
     r = sr;
   }
