@@ -2,31 +2,44 @@
 /**
  * \file image_gpu_partial_update.cc
  *
- * To reduce the overhead of uploading images to GPU only changed areas will be uploaded.
- * The areas are organized in tiles. Changed tiles over time are organized in changesets.
+ * To reduce the overhead of image processing this file contains a mechanism to detect areas of the
+ * image that are changed. These areas are organized in tiles. Changes that happen over time are
+ * organized in changesets.
  *
- * Requirements:
- * - Independent how the actual GPU textures look like. The uploading, transforming are
- *   responsibility of the user of this API.
- *
+ * A common usecase is to update GPUTexture for drawing where only that part is uploaded that only
+ * changed.
  *
  * Usage:
  *
  * ```
- * Image *image = space_data->image;
- * PartialUpdateUser* partial_update_user = BKE_image_partial_update_create(image);
+ * Image *image = ...;
+ * ImBuf *image_buffer = ...;
  *
- * if (BKE_image_partial_update_collect_tiles(image, partial_update_user) == DO_FULL_UPDATE {
- *   // Recreate full GPU texture.
- *   ...
- * } else {
- *   PartialUpdateTile tile;
- *   while(BKE_image_partial_update_get_tile(partial_update_user, index++, &tile) == TILE_VALID) {
- *     // Do something with the tile.
- *     ...
- *   }
+ * // partial_update_user should be kept for the whole session where the changes needs to be
+ * // tracked. Keep this instance alive as long as you need to track image changes.
+ *
+ * PartialUpdateUser *partial_update_user = BKE_image_partial_update_create(image);
+ *
+ * ...
+ *
+ * switch (BKE_image_partial_update_collect_tiles(image, image_buffer))
+ * {
+ * case PARTIAL_UPDATE_NEED_FULL_UPDATE:
+ *  // Unable to do partial updates. Perform a full update.
+ *  break;
+ * case PARTIAL_UPDATE_CHANGES_AVAILABLE:
+ *  PartialUpdateTile tile;
+ *  while (BKE_image_partial_update_next_tile(partial_update_user, &tile) ==
+ *         PARTIAL_UPDATE_ITER_TILE_LOADED){
+ *  // Do something with the tile.
+ *  }
+ *  case PARTIAL_UPDATE_NO_CHANGES:
+ *    break;
  * }
  *
+ * ...
+ *
+ * // Free partial_update_user.
  * BKE_image_partial_update_free(partial_update_user);
  *
  * ```
@@ -47,20 +60,32 @@ struct PartialUpdateUserImpl;
 struct PartialUpdateRegisterImpl;
 
 /**
- * Wrap the CPP implementation (PartialUpdateUserImpl) to a C struct.
+ * Wrap PartialUpdateUserImpl to its C-struct (PartialUpdateUser).
  */
 static struct PartialUpdateUser *wrap(PartialUpdateUserImpl *user)
 {
   return static_cast<struct PartialUpdateUser *>(static_cast<void *>(user));
 }
+
+/**
+ * Unwrap the PartialUpdateUser C-struct to its CPP counterpart (PartialUpdateUserImpl).
+ */
 static PartialUpdateUserImpl *unwrap(struct PartialUpdateUser *user)
 {
   return static_cast<PartialUpdateUserImpl *>(static_cast<void *>(user));
 }
+
+/**
+ * Wrap PartialUpdateRegisterImpl to its C-struct (PartialUpdateRegister).
+ */
 static struct PartialUpdateRegister *wrap(PartialUpdateRegisterImpl *partial_update_register)
 {
   return static_cast<struct PartialUpdateRegister *>(static_cast<void *>(partial_update_register));
 }
+
+/**
+ * Unwrap the PartialUpdateRegister C-struct to its CPP counterpart (PartialUpdateRegisterImpl).
+ */
 static PartialUpdateRegisterImpl *unwrap(struct PartialUpdateRegister *partial_update_register)
 {
   return static_cast<PartialUpdateRegisterImpl *>(static_cast<void *>(partial_update_register));
@@ -79,7 +104,8 @@ struct PartialUpdateUserImpl {
   /**
    * \brief Clear the updated tiles.
    *
-   * Updated tiles should be cleared at the start of #BKE_image_partial_update_collect_tiles so the
+   * Updated tiles should be cleared at the start of #BKE_image_partial_update_collect_tiles so
+   * the
    */
   void clear_updated_tiles()
   {
@@ -90,8 +116,8 @@ struct PartialUpdateUserImpl {
 /**
  * \brief Dirty tiles.
  *
- * Internally dirty tiles are grouped together in change sets to make sure that the correct answer
- * can be built for different users reducing the amount of merges.
+ * Internally dirty tiles are grouped together in change sets to make sure that the correct
+ * answer can be built for different users reducing the amount of merges.
  */
 struct TileChangeset {
  private:
@@ -134,7 +160,7 @@ struct TileChangeset {
     init_tiles(tile_x_len_, tile_y_len_);
   }
 
-  void add_region(int start_x_tile, int start_y_tile, int end_x_tile, int end_y_tile)
+  void mark_tiles_dirty(int start_x_tile, int start_y_tile, int end_x_tile, int end_y_tile)
   {
     for (int tile_y = start_y_tile; tile_y <= end_y_tile; tile_y++) {
       for (int tile_x = start_x_tile; tile_x <= end_x_tile; tile_x++) {
@@ -253,7 +279,7 @@ struct PartialUpdateRegisterImpl {
       return;
     }
 
-    current_changeset.add_region(start_x_tile, start_y_tile, end_x_tile, end_y_tile);
+    current_changeset.mark_tiles_dirty(start_x_tile, start_y_tile, end_x_tile, end_y_tile);
   }
 
   void ensure_empty_changeset()
@@ -266,6 +292,7 @@ struct PartialUpdateRegisterImpl {
     commit_current_changeset();
   }
 
+  /** Move the current changeset to the history and resets the current changeset. */
   void commit_current_changeset()
   {
     history.append_as(std::move(current_changeset));
@@ -284,6 +311,9 @@ struct PartialUpdateRegisterImpl {
     return changeset_id >= first_changeset_id;
   }
 
+  /**
+   * \brief collect all historic changes since a given changeset.
+   */
   std::unique_ptr<TileChangeset> changed_tiles_since(const ChangesetID from_changeset)
   {
     std::unique_ptr<TileChangeset> changed_tiles = std::make_unique<TileChangeset>();
@@ -304,6 +334,7 @@ extern "C" {
 
 using namespace blender::bke::image::partial_update;
 
+// TODO(jbakker): cleanup parameter.
 struct PartialUpdateUser *BKE_image_partial_update_create(struct Image *image)
 {
   BLI_assert(image);

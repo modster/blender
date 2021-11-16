@@ -144,6 +144,7 @@ typedef enum eImageTextureResolution {
 
 /* Defined in BKE_image.h. */
 struct PartialUpdateRegister;
+struct PartialUpdateUser;
 
 typedef struct Image_Runtime {
   /* Mutex used to guarantee thread-safe access to the cached ImBuf of the corresponding image ID.
@@ -152,6 +153,8 @@ typedef struct Image_Runtime {
 
   /** \brief Register containing partial updates. */
   struct PartialUpdateRegister *partial_update_register;
+  /** \brief Partial update user for GPUTextures stored inside the Image. */
+  struct PartialUpdateUser *partial_update_user;
 
 } Image_Runtime;
 
@@ -178,8 +181,6 @@ typedef struct Image {
   int lastframe;
 
   /* GPU texture flag. */
-  /* Contains `ImagePartialRefresh`. */
-  ListBase gpu_refresh_areas;
   int gpuframenr;
   short gpuflag;
   short gpu_pass;
