@@ -107,9 +107,19 @@ struct PartialUpdateTransaction {
     tile_y_len_ = tile_y_len;
     const int tile_len = tile_x_len * tile_y_len;
     tile_validity.resize(tile_len);
+    /* Fast exit. When the transaction was already empty no need to re-init the tile_validity. */
+    if (is_empty()) {
+      return;
+    }
     for (int index = 0; index < tile_len; index++) {
       tile_validity[index] = false;
     }
+    is_empty_ = true;
+  }
+
+  void reset()
+  {
+    init_tiles(tile_x_len_, tile_y_len_);
   }
 
   void add_region(int start_x_tile, int start_y_tile, int end_x_tile, int end_y_tile)
@@ -121,6 +131,28 @@ struct PartialUpdateTransaction {
       }
     }
     is_empty_ = false;
+  }
+
+  /** \brief Merge the given transaction into the receiver. */
+  void merge(PartialUpdateTransaction &other)
+  {
+    BLI_assert(tile_x_len_ == other.tile_x_len_);
+    BLI_assert(tile_y_len_ == other.tile_y_len_);
+    const int tile_len = tile_x_len_ * tile_y_len_;
+
+    for (int tile_index = 0; tile_index < tile_len; tile_index++) {
+      tile_validity[tile_index] |= other.tile_validity[tile_index];
+    }
+    if (!other.is_empty()) {
+      is_empty_ = false;
+    }
+  }
+
+  /** \brief has a tile changed inside this transaction. */
+  bool tile_changed(int tile_x, int tile_y)
+  {
+    int tile_index = tile_y * tile_x_len_ + tile_x;
+    return tile_validity[tile_index];
   }
 };
 
@@ -138,15 +170,17 @@ struct PartialUpdateRegisterImpl {
   int image_width;
   int image_height;
 
-  void set_resolution(Image *image, ImBuf *image_buffer)
+  void set_resolution(ImBuf *image_buffer)
   {
     if (image_width != image_buffer->x || image_height != image_buffer->y) {
-      mark_full_update();
+      image_width = image_buffer->x;
+      image_height = image_buffer->y;
+
       int tile_x_len = image_width / TILE_SIZE;
       int tile_y_len = image_height / TILE_SIZE;
       current_transaction.init_tiles(tile_x_len, tile_y_len);
-      image_width = image_buffer->x;
-      image_height = image_buffer->y;
+
+      mark_full_update();
     }
   }
 
@@ -154,6 +188,7 @@ struct PartialUpdateRegisterImpl {
   {
     history.clear();
     current_transaction_id++;
+    current_transaction.reset();
     first_transaction_id = current_transaction_id;
   }
 
@@ -200,6 +235,7 @@ struct PartialUpdateRegisterImpl {
   void commit_current_transaction()
   {
     history.append_as(std::move(current_transaction));
+    current_transaction.reset();
     current_transaction_id++;
   }
 
@@ -212,6 +248,21 @@ struct PartialUpdateRegisterImpl {
   bool can_construct(TransactionID transaction_id)
   {
     return transaction_id >= first_transaction_id;
+  }
+
+  std::unique_ptr<PartialUpdateTransaction> changed_tiles_since(
+      const TransactionID from_transaction)
+  {
+    std::unique_ptr<PartialUpdateTransaction> changed_tiles =
+        std::make_unique<PartialUpdateTransaction>();
+    int tile_x_len = image_width / TILE_SIZE;
+    int tile_y_len = image_height / TILE_SIZE;
+    changed_tiles->init_tiles(tile_x_len, tile_y_len);
+
+    for (int index = from_transaction - first_transaction_id; index < history.size(); index++) {
+      changed_tiles->merge(history[index]);
+    }
+    return changed_tiles;
   }
 };
 
@@ -235,17 +286,14 @@ void BKE_image_partial_update_free(PartialUpdateUser *user)
 }
 
 ePartialUpdateCollectResult BKE_image_partial_update_collect_tiles(Image *image,
+                                                                   ImBuf *image_buffer,
                                                                    PartialUpdateUser *user)
 {
   PartialUpdateUserImpl *user_impl = unwrap(user);
   user_impl->clear_updated_tiles();
 
   PartialUpdateRegisterImpl *partial_updater = unwrap(
-      BKE_image_partial_update_register_ensure(image));
-
-  if (partial_updater == nullptr) {
-    return PARTIAL_UPDATE_NEED_FULL_UPDATE;
-  }
+      BKE_image_partial_update_register_ensure(image, image_buffer));
   partial_updater->ensure_empty_transaction();
 
   if (!partial_updater->can_construct(user_impl->last_transaction_id)) {
@@ -259,6 +307,22 @@ ePartialUpdateCollectResult BKE_image_partial_update_collect_tiles(Image *image,
   }
 
   // TODO: Collect changes between last_transaction_id and current_transaction_id.
+  std::unique_ptr<PartialUpdateTransaction> changed_tiles = partial_updater->changed_tiles_since(
+      user_impl->last_transaction_id);
+  for (int tile_y = 0; tile_y < changed_tiles->tile_y_len_; tile_y++) {
+    for (int tile_x = 0; tile_x < changed_tiles->tile_x_len_; tile_x++) {
+      if (changed_tiles->tile_changed(tile_x, tile_y)) {
+        PartialUpdateTile tile;
+        BLI_rcti_init(&tile.region,
+                      tile_x * PartialUpdateRegisterImpl::TILE_SIZE,
+                      (tile_x + 1) * PartialUpdateRegisterImpl::TILE_SIZE,
+                      tile_y * PartialUpdateRegisterImpl::TILE_SIZE,
+                      (tile_y + 1) * PartialUpdateRegisterImpl::TILE_SIZE);
+        user_impl->updated_tiles.append_as(tile);
+      }
+    }
+  }
+
   // TODO: compress neighboring tiles and store in user.
 
   user_impl->last_transaction_id = partial_updater->current_transaction_id;
@@ -268,7 +332,13 @@ ePartialUpdateCollectResult BKE_image_partial_update_collect_tiles(Image *image,
 ePartialUpdateIterResult BKE_image_partial_update_next_tile(PartialUpdateUser *user,
                                                             PartialUpdateTile *r_tile)
 {
-  return PARTIAL_UPDATE_ITER_NO_TILES_LEFT;
+  PartialUpdateUserImpl *user_impl = unwrap(user);
+  if (user_impl->updated_tiles.is_empty()) {
+    return PARTIAL_UPDATE_ITER_NO_TILES_LEFT;
+  }
+  PartialUpdateTile tile = user_impl->updated_tiles.pop_last();
+  *r_tile = tile;
+  return PARTIAL_UPDATE_ITER_TILE_LOADED;
 }
 
 /* --- Image side --- */
@@ -279,7 +349,7 @@ struct PartialUpdateRegister *BKE_image_partial_update_register_ensure(Image *im
   if (image->runtime.partial_update_register == nullptr) {
     PartialUpdateRegisterImpl *partial_update_register = OBJECT_GUARDED_NEW(
         PartialUpdateRegisterImpl);
-    partial_update_register->set_resolution(image, image_buffer);
+    partial_update_register->set_resolution(image_buffer);
     image->runtime.partial_update_register = wrap(partial_update_register);
   }
   return image->runtime.partial_update_register;
@@ -295,18 +365,19 @@ void BKE_image_partial_update_register_free(Image *image)
   image->runtime.partial_update_register = nullptr;
 }
 
-void BKE_image_partial_update_register_mark_region(struct Image *image, rcti *updated_region)
+void BKE_image_partial_update_register_mark_region(Image *image,
+                                                   ImBuf *image_buffer,
+                                                   rcti *updated_region)
 {
   PartialUpdateRegisterImpl *partial_updater = unwrap(
-      BKE_image_partial_update_register_ensure(image));
+      BKE_image_partial_update_register_ensure(image, image_buffer));
   partial_updater->mark_region(updated_region);
 }
 
-void BKE_image_partial_update_register_mark_full_update(struct Image *image,
-                                                        struct ImBuf *image_buffer)
+void BKE_image_partial_update_register_mark_full_update(Image *image, ImBuf *image_buffer)
 {
   PartialUpdateRegisterImpl *partial_updater = unwrap(
-      BKE_image_partial_update_register_ensure(image));
+      BKE_image_partial_update_register_ensure(image, image_buffer));
   partial_updater->mark_full_update();
   partial_updater->set_resolution(image_buffer);
 }

@@ -417,8 +417,9 @@ typedef enum ePartialUpdateCollectResult {
  * tiles are requested they are merged with neighboring tiles.
  */
 typedef struct PartialUpdateTile {
-  /** \brief area of the image that has been updated. */
-  struct rcti update_area;
+  /** \brief region of the image that has been updated. Region can be bigger than actual changes.
+   */
+  struct rcti region;
 } PartialUpdateTile;
 
 /**
@@ -429,7 +430,7 @@ typedef enum ePartialUpdateIterResult {
   PARTIAL_UPDATE_ITER_NO_TILES_LEFT = 0,
 
   /** \brief a tile was available and has been loaded. */
-  PARTIAL_UPDATE_ITER_NEW_TILE_LOADED = 1,
+  PARTIAL_UPDATE_ITER_TILE_LOADED = 1,
 } ePartialUpdateIterResult;
 
 /**
@@ -458,6 +459,7 @@ void BKE_image_partial_update_free(struct PartialUpdateUser *user);
  *              using #BKE_image_partial_update_next_tile.
  */
 ePartialUpdateCollectResult BKE_image_partial_update_collect_tiles(struct Image *image,
+                                                                   struct ImBuf *image_buffer,
                                                                    struct PartialUpdateUser *user);
 
 ePartialUpdateIterResult BKE_image_partial_update_next_tile(struct PartialUpdateUser *user,
@@ -470,7 +472,9 @@ struct PartialUpdateRegister *BKE_image_partial_update_register_ensure(struct Im
                                                                        struct ImBuf *image_buffer);
 void BKE_image_partial_update_register_free(struct Image *image);
 /** \brief Mark a region of the image to update. */
-void BKE_image_partial_update_register_mark_region(struct Image *image, rcti *updated_region);
+void BKE_image_partial_update_register_mark_region(struct Image *image,
+                                                   struct ImBuf *image_buffer,
+                                                   rcti *updated_region);
 /** \brief Mark the whole image to be updated. */
 void BKE_image_partial_update_register_mark_full_update(struct Image *image,
                                                         struct ImBuf *image_buffer);

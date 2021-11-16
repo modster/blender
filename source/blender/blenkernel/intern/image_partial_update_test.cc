@@ -33,69 +33,107 @@
 namespace blender::bke::image {
 
 constexpr float black_color[4] = {0.0f, 0.0f, 0.0f, 1.0f};
-static Image *create_test_image(Main *bmain, int width, int height)
+
+class ImagePartialUpdateTest : public testing::Test {
+ protected:
+  Main *bmain;
+  Image *image;
+  ImBuf *image_buffer;
+  PartialUpdateUser *partial_update_user;
+
+ private:
+  Image *create_test_image(int width, int height)
+  {
+    return BKE_image_add_generated(bmain,
+                                   width,
+                                   height,
+                                   "Test Image",
+                                   32,
+                                   true,
+                                   IMA_GENTYPE_BLANK,
+                                   black_color,
+                                   false,
+                                   false,
+                                   false);
+  }
+
+ protected:
+  void SetUp() override
+  {
+    CLG_init();
+    BKE_idtype_init();
+    BKE_appdir_init();
+    IMB_init();
+
+    bmain = BKE_main_new();
+    image = create_test_image(1024, 1024);
+    image_buffer = BKE_image_acquire_ibuf(image, nullptr, nullptr);
+
+    partial_update_user = BKE_image_partial_update_create(image);
+  }
+
+  void TearDown() override
+  {
+    BKE_image_release_ibuf(image, image_buffer, nullptr);
+    BKE_image_partial_update_free(partial_update_user);
+    BKE_main_free(bmain);
+
+    IMB_exit();
+    BKE_appdir_exit();
+    CLG_exit();
+  }
+};
+
+TEST_F(ImagePartialUpdateTest, mark_full_update)
 {
-  return BKE_image_add_generated(bmain,
-                                 width,
-                                 height,
-                                 "Test Image",
-                                 32,
-                                 true,
-                                 IMA_GENTYPE_BLANK,
-                                 black_color,
-                                 false,
-                                 false,
-                                 false);
-}
-
-static void init()
-{
-  CLG_init();
-  BKE_idtype_init();
-  BKE_appdir_init();
-  IMB_init();
-}
-
-static void deinit()
-{
-  IMB_exit();
-  BKE_appdir_exit();
-  CLG_exit();
-}
-
-TEST(image_partial_update, mark_full_update)
-{
-  init();
-  Main *bmain = BKE_main_new();
-  Image *image = create_test_image(bmain, 1024, 1024);
-  ImBuf *image_buffer = BKE_image_acquire_ibuf(image, nullptr, nullptr);
-
-  struct PartialUpdateUser *partial_update_user = BKE_image_partial_update_create(image);
-  EXPECT_NE(partial_update_user, nullptr);
-
   ePartialUpdateCollectResult result;
   /* First tile should always return a full update. */
-  result = BKE_image_partial_update_collect_tiles(image, partial_update_user);
+  result = BKE_image_partial_update_collect_tiles(image, image_buffer, partial_update_user);
   EXPECT_EQ(result, PARTIAL_UPDATE_NEED_FULL_UPDATE);
   /* Second invoke should now detect no changes. */
-  result = BKE_image_partial_update_collect_tiles(image, partial_update_user);
+  result = BKE_image_partial_update_collect_tiles(image, image_buffer, partial_update_user);
   EXPECT_EQ(result, PARTIAL_UPDATE_NO_CHANGES);
 
   /* Mark full update */
   BKE_image_partial_update_register_mark_full_update(image, image_buffer);
 
   /* Validate need full update followed by no changes. */
-  result = BKE_image_partial_update_collect_tiles(image, partial_update_user);
+  result = BKE_image_partial_update_collect_tiles(image, image_buffer, partial_update_user);
   EXPECT_EQ(result, PARTIAL_UPDATE_NEED_FULL_UPDATE);
-  result = BKE_image_partial_update_collect_tiles(image, partial_update_user);
+  result = BKE_image_partial_update_collect_tiles(image, image_buffer, partial_update_user);
+  EXPECT_EQ(result, PARTIAL_UPDATE_NO_CHANGES);
+}
+
+TEST_F(ImagePartialUpdateTest, mark_single_tile)
+{
+  ePartialUpdateCollectResult result;
+  /* First tile should always return a full update. */
+  result = BKE_image_partial_update_collect_tiles(image, image_buffer, partial_update_user);
+  EXPECT_EQ(result, PARTIAL_UPDATE_NEED_FULL_UPDATE);
+  /* Second invoke should now detect no changes. */
+  result = BKE_image_partial_update_collect_tiles(image, image_buffer, partial_update_user);
   EXPECT_EQ(result, PARTIAL_UPDATE_NO_CHANGES);
 
-  BKE_image_release_ibuf(image, image_buffer, nullptr);
+  /* Mark full update */
+  rcti region;
+  BLI_rcti_init(&region, 10, 20, 40, 50);
+  BKE_image_partial_update_register_mark_region(image, image_buffer, &region);
 
-  BKE_image_partial_update_free(partial_update_user);
+  /* Partial Update should be available. */
+  result = BKE_image_partial_update_collect_tiles(image, image_buffer, partial_update_user);
+  EXPECT_EQ(result, PARTIAL_UPDATE_CHANGES_AVAILABLE);
 
-  BKE_main_free(bmain);
-  deinit();
+  /* Check tiles. */
+  PartialUpdateTile changed_tile;
+  ePartialUpdateIterResult iter_result;
+  iter_result = BKE_image_partial_update_next_tile(partial_update_user, &changed_tile);
+  EXPECT_EQ(iter_result, PARTIAL_UPDATE_ITER_TILE_LOADED);
+  EXPECT_EQ(BLI_rcti_inside_rcti(&changed_tile.region, &region), true);
+  iter_result = BKE_image_partial_update_next_tile(partial_update_user, &changed_tile);
+  EXPECT_EQ(iter_result, PARTIAL_UPDATE_ITER_NO_TILES_LEFT);
+
+  result = BKE_image_partial_update_collect_tiles(image, image_buffer, partial_update_user);
+  EXPECT_EQ(result, PARTIAL_UPDATE_NO_CHANGES);
 }
 
 }  // namespace blender::bke::image

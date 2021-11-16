@@ -134,6 +134,15 @@ static void image_runtime_reset_on_copy(struct Image *image)
   image->runtime.partial_update_register = NULL;
 }
 
+static void image_runtime_free_data(struct Image *image)
+{
+  BLI_mutex_end(image->runtime.cache_mutex);
+  MEM_freeN(image->runtime.cache_mutex);
+  image->runtime.cache_mutex = NULL;
+
+  BKE_image_partial_update_register_free(image);
+}
+
 static void image_init_data(ID *id)
 {
   Image *image = (Image *)id;
@@ -213,8 +222,7 @@ static void image_free_data(ID *id)
   BLI_freelistN(&image->tiles);
   BLI_freelistN(&image->gpu_refresh_areas);
 
-  BLI_mutex_end(image->runtime.cache_mutex);
-  MEM_freeN(image->runtime.cache_mutex);
+  image_runtime_free_data(image);
 }
 
 static void image_foreach_cache(ID *id,
