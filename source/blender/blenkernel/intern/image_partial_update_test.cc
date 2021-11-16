@@ -326,4 +326,34 @@ TEST_F(ImagePartialUpdateTest, sequential_mark_region)
   }
 }
 
+TEST_F(ImagePartialUpdateTest, mark_multiple_tiles)
+{
+  ePartialUpdateCollectResult result;
+  /* First tile should always return a full update. */
+  result = BKE_image_partial_update_collect_tiles(image, image_buffer, partial_update_user);
+  EXPECT_EQ(result, PARTIAL_UPDATE_NEED_FULL_UPDATE);
+  /* Second invoke should now detect no changes. */
+  result = BKE_image_partial_update_collect_tiles(image, image_buffer, partial_update_user);
+  EXPECT_EQ(result, PARTIAL_UPDATE_NO_CHANGES);
+
+  /* Mark region. */
+  rcti region;
+  BLI_rcti_init(&region, 300, 700, 300, 700);
+  BKE_image_partial_update_register_mark_region(image, image_buffer, &region);
+
+  /* Partial Update should be available. */
+  result = BKE_image_partial_update_collect_tiles(image, image_buffer, partial_update_user);
+  EXPECT_EQ(result, PARTIAL_UPDATE_CHANGES_AVAILABLE);
+
+  /* Check tiles. */
+  PartialUpdateTile changed_tile;
+  int num_tiles_found = 0;
+  while (BKE_image_partial_update_next_tile(partial_update_user, &changed_tile) ==
+         PARTIAL_UPDATE_ITER_TILE_LOADED) {
+    BLI_rcti_isect(&changed_tile.region, &region, nullptr);
+    num_tiles_found++;
+  }
+  EXPECT_EQ(num_tiles_found, 4);
+}
+
 }  // namespace blender::bke::image

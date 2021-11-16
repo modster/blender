@@ -108,7 +108,7 @@ struct TileChangeset {
 
   bool has_dirty_tiles() const
   {
-    return has_dirty_tiles();
+    return has_dirty_tiles_;
   }
 
   void init_tiles(int tile_x_len, int tile_y_len)
@@ -167,15 +167,24 @@ struct TileChangeset {
   }
 };
 
-/** \brief Partial update data that is stored inside the image. */
+/**
+ * \brief Partial update changes stored inside the image runtime.
+ *
+ * The PartialUpdateRegisterImpl will keep track of changes over time. Changes are groups inside
+ * TileChangesets.
+ */
 struct PartialUpdateRegisterImpl {
   /* Changes are tracked in tiles. */
   static constexpr int TILE_SIZE = 256;
 
+  /** \brief changeset id of the first changeset kept in #history. */
   ChangesetID first_changeset_id;
-  ChangesetID current_changeset_id;
-  Vector<TileChangeset> history;
+  /** \brief changeset id of the top changeset kept in #history. */
+  ChangesetID last_changeset_id;
 
+  /** \brief history of changesets. */
+  Vector<TileChangeset> history;
+  /** \brief The current changeset. New changes will be added to this changeset only. */
   TileChangeset current_changeset;
 
   int image_width;
@@ -198,9 +207,9 @@ struct PartialUpdateRegisterImpl {
   void mark_full_update()
   {
     history.clear();
-    current_changeset_id++;
+    last_changeset_id++;
     current_changeset.reset();
-    first_changeset_id = current_changeset_id;
+    first_changeset_id = last_changeset_id;
   }
 
   /**
@@ -261,7 +270,7 @@ struct PartialUpdateRegisterImpl {
   {
     history.append_as(std::move(current_changeset));
     current_changeset.reset();
-    current_changeset_id++;
+    last_changeset_id++;
   }
 
   /**
@@ -320,12 +329,12 @@ ePartialUpdateCollectResult BKE_image_partial_update_collect_tiles(Image *image,
   partial_updater->ensure_empty_changeset();
 
   if (!partial_updater->can_construct(user_impl->last_changeset_id)) {
-    user_impl->last_changeset_id = partial_updater->current_changeset_id;
+    user_impl->last_changeset_id = partial_updater->last_changeset_id;
     return PARTIAL_UPDATE_NEED_FULL_UPDATE;
   }
 
   /* Check if there are changes since last invocation for the user. */
-  if (user_impl->last_changeset_id == partial_updater->current_changeset_id) {
+  if (user_impl->last_changeset_id == partial_updater->last_changeset_id) {
     return PARTIAL_UPDATE_NO_CHANGES;
   }
 
@@ -336,19 +345,21 @@ ePartialUpdateCollectResult BKE_image_partial_update_collect_tiles(Image *image,
   /* Convert tiles in the changeset to rectangles that are dirty. */
   for (int tile_y = 0; tile_y < changed_tiles->tile_y_len_; tile_y++) {
     for (int tile_x = 0; tile_x < changed_tiles->tile_x_len_; tile_x++) {
-      if (changed_tiles->is_tile_dirty(tile_x, tile_y)) {
-        PartialUpdateTile tile;
-        BLI_rcti_init(&tile.region,
-                      tile_x * PartialUpdateRegisterImpl::TILE_SIZE,
-                      (tile_x + 1) * PartialUpdateRegisterImpl::TILE_SIZE,
-                      tile_y * PartialUpdateRegisterImpl::TILE_SIZE,
-                      (tile_y + 1) * PartialUpdateRegisterImpl::TILE_SIZE);
-        user_impl->updated_tiles.append_as(tile);
+      if (!changed_tiles->is_tile_dirty(tile_x, tile_y)) {
+        continue;
       }
+
+      PartialUpdateTile tile;
+      BLI_rcti_init(&tile.region,
+                    tile_x * PartialUpdateRegisterImpl::TILE_SIZE,
+                    (tile_x + 1) * PartialUpdateRegisterImpl::TILE_SIZE,
+                    tile_y * PartialUpdateRegisterImpl::TILE_SIZE,
+                    (tile_y + 1) * PartialUpdateRegisterImpl::TILE_SIZE);
+      user_impl->updated_tiles.append_as(tile);
     }
   }
 
-  user_impl->last_changeset_id = partial_updater->current_changeset_id;
+  user_impl->last_changeset_id = partial_updater->last_changeset_id;
   return PARTIAL_UPDATE_CHANGES_AVAILABLE;
 }
 
