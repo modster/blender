@@ -53,6 +53,7 @@ extern char datatoc_gpu_shader_composite_alpha_over_glsl[];
 extern char datatoc_gpu_shader_composite_box_mask_glsl[];
 extern char datatoc_gpu_shader_composite_bright_contrast_glsl[];
 extern char datatoc_gpu_shader_composite_channel_matte_glsl[];
+extern char datatoc_gpu_shader_composite_chroma_matte_glsl[];
 extern char datatoc_gpu_shader_composite_color_balance_glsl[];
 extern char datatoc_gpu_shader_composite_color_correction_glsl[];
 extern char datatoc_gpu_shader_composite_color_to_luminance_glsl[];
@@ -209,6 +210,13 @@ static GPUMaterialLibrary gpu_shader_composite_bright_contrast_library = {
 static GPUMaterialLibrary gpu_shader_composite_channel_matte_library = {
     .code = datatoc_gpu_shader_composite_channel_matte_glsl,
     .dependencies = {&gpu_shader_common_color_util_library, NULL},
+};
+
+static GPUMaterialLibrary gpu_shader_composite_chroma_matte_library = {
+    .code = datatoc_gpu_shader_composite_chroma_matte_glsl,
+    .dependencies = {&gpu_shader_common_math_util_library,
+                     &gpu_shader_common_color_util_library,
+                     NULL},
 };
 
 static GPUMaterialLibrary gpu_shader_composite_color_balance_library = {
@@ -804,6 +812,7 @@ static GPUMaterialLibrary *gpu_material_libraries[] = {
     &gpu_shader_composite_box_mask_library,
     &gpu_shader_composite_bright_contrast_library,
     &gpu_shader_composite_channel_matte_library,
+    &gpu_shader_composite_chroma_matte_library,
     &gpu_shader_composite_color_balance_library,
     &gpu_shader_composite_color_correction_library,
     &gpu_shader_composite_color_to_luminance_library,

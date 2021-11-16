@@ -21,6 +21,8 @@
  * \ingroup cmpnodes
  */
 
+#include <cmath>
+
 #include "node_composite_util.hh"
 
 /* ******************* Chroma Key ********************************************************** */
@@ -47,6 +49,26 @@ static void node_composit_init_chroma_matte(bNodeTree *UNUSED(ntree), bNode *nod
   c->fstrength = 1.0f;
 }
 
+static int node_composite_gpu_chroma_matte(GPUMaterial *mat,
+                                           bNode *node,
+                                           bNodeExecData *UNUSED(execdata),
+                                           GPUNodeStack *in,
+                                           GPUNodeStack *out)
+{
+  const NodeChroma *data = (NodeChroma *)node->storage;
+
+  const float acceptance = std::tan(data->t1) / 2.0f;
+
+  return GPU_stack_link(mat,
+                        node,
+                        "node_composite_chroma_matte",
+                        in,
+                        out,
+                        GPU_uniform(&acceptance),
+                        GPU_uniform(&data->t2),
+                        GPU_uniform(&data->fstrength));
+}
+
 void register_node_type_cmp_chroma_matte(void)
 {
   static bNodeType ntype;
@@ -55,6 +77,7 @@ void register_node_type_cmp_chroma_matte(void)
   node_type_socket_templates(&ntype, cmp_node_chroma_in, cmp_node_chroma_out);
   node_type_init(&ntype, node_composit_init_chroma_matte);
   node_type_storage(&ntype, "NodeChroma", node_free_standard_storage, node_copy_standard_storage);
+  node_type_gpu(&ntype, node_composite_gpu_chroma_matte);
 
   nodeRegisterType(&ntype);
 }
