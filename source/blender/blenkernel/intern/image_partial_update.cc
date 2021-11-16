@@ -3,7 +3,7 @@
  * \file image_gpu_partial_update.cc
  *
  * To reduce the overhead of uploading images to GPU only changed areas will be uploaded.
- * The areas are organized in tiles.
+ * The areas are organized in tiles. Changed tiles over time are organized in changesets.
  *
  * Requirements:
  * - Independent how the actual GPU textures look like. The uploading, transforming are
@@ -21,7 +21,6 @@
  *   ...
  * } else {
  *   PartialUpdateTile tile;
- *  int index = 0;
  *   while(BKE_image_partial_update_get_tile(partial_update_user, index++, &tile) == TILE_VALID) {
  *     // Do something with the tile.
  *     ...
@@ -67,12 +66,12 @@ static PartialUpdateRegisterImpl *unwrap(struct PartialUpdateRegister *partial_u
   return static_cast<PartialUpdateRegisterImpl *>(static_cast<void *>(partial_update_register));
 }
 
-using TransactionID = int64_t;
-constexpr TransactionID UnknownTransactionID = -1;
+using ChangesetID = int64_t;
+constexpr ChangesetID UnknownChangesetID = -1;
 
 struct PartialUpdateUserImpl {
-  /** \brief last transaction id that was seen by this user. */
-  TransactionID last_transaction_id = UnknownTransactionID;
+  /** \brief last changeset id that was seen by this user. */
+  ChangesetID last_changeset_id = UnknownChangesetID;
 
   /** \brief tiles that have been updated. */
   Vector<PartialUpdateTile> updated_tiles;
@@ -88,17 +87,28 @@ struct PartialUpdateUserImpl {
   }
 };
 
-struct PartialUpdateTransaction {
-  /* bitvec for each tile in the transaction. True means that this tile was changed during during
-   * this transaction. */
-  Vector<bool> tile_validity;
-  int tile_x_len_;
-  int tile_y_len_;
-  bool is_empty_ = true;
+/**
+ * \brief Dirty tiles.
+ *
+ * Internally dirty tiles are grouped together in change sets to make sure that the correct answer
+ * can be built for different users reducing the amount of merges.
+ */
+struct TileChangeset {
+ private:
+  /** \brief Dirty flag for each tile. */
+  std::vector<bool> tile_dirty_flags_;
+  /** \brief are there dirty/ */
+  bool has_dirty_tiles_ = false;
 
-  bool is_empty()
+ public:
+  /** \brief Number of tiles along the x-axis. */
+  int tile_x_len_;
+  /** \brief Number of tiles along the y-axis. */
+  int tile_y_len_;
+
+  bool has_dirty_tiles() const
   {
-    return is_empty_;
+    return has_dirty_tiles();
   }
 
   void init_tiles(int tile_x_len, int tile_y_len)
@@ -106,15 +116,17 @@ struct PartialUpdateTransaction {
     tile_x_len_ = tile_x_len;
     tile_y_len_ = tile_y_len;
     const int tile_len = tile_x_len * tile_y_len;
-    tile_validity.resize(tile_len);
-    /* Fast exit. When the transaction was already empty no need to re-init the tile_validity. */
-    if (is_empty()) {
+    const int previous_tile_len = tile_dirty_flags_.size();
+
+    tile_dirty_flags_.resize(tile_len);
+    /* Fast exit. When the changeset was already empty no need to re-init the tile_validity. */
+    if (!has_dirty_tiles()) {
       return;
     }
-    for (int index = 0; index < tile_len; index++) {
-      tile_validity[index] = false;
+    for (int index = 0; index < min_ii(tile_len, previous_tile_len); index++) {
+      tile_dirty_flags_[index] = false;
     }
-    is_empty_ = true;
+    has_dirty_tiles_ = false;
   }
 
   void reset()
@@ -127,32 +139,31 @@ struct PartialUpdateTransaction {
     for (int tile_y = start_y_tile; tile_y <= end_y_tile; tile_y++) {
       for (int tile_x = start_x_tile; tile_x <= end_x_tile; tile_x++) {
         int tile_index = tile_y * tile_x_len_ + tile_x;
-        tile_validity[tile_index] = true;
+        tile_dirty_flags_[tile_index] = true;
       }
     }
-    is_empty_ = false;
+    has_dirty_tiles_ = true;
   }
 
-  /** \brief Merge the given transaction into the receiver. */
-  void merge(PartialUpdateTransaction &other)
+  /** \brief Merge the given changeset into the receiver. */
+  void merge(const TileChangeset &other)
   {
     BLI_assert(tile_x_len_ == other.tile_x_len_);
     BLI_assert(tile_y_len_ == other.tile_y_len_);
     const int tile_len = tile_x_len_ * tile_y_len_;
 
     for (int tile_index = 0; tile_index < tile_len; tile_index++) {
-      tile_validity[tile_index] |= other.tile_validity[tile_index];
+      tile_dirty_flags_[tile_index] = tile_dirty_flags_[tile_index] |
+                                      other.tile_dirty_flags_[tile_index];
     }
-    if (!other.is_empty()) {
-      is_empty_ = false;
-    }
+    has_dirty_tiles_ |= other.has_dirty_tiles_;
   }
 
-  /** \brief has a tile changed inside this transaction. */
-  bool tile_changed(int tile_x, int tile_y)
+  /** \brief has a tile changed inside this changeset. */
+  bool is_tile_dirty(int tile_x, int tile_y) const
   {
-    int tile_index = tile_y * tile_x_len_ + tile_x;
-    return tile_validity[tile_index];
+    const int tile_index = tile_y * tile_x_len_ + tile_x;
+    return tile_dirty_flags_[tile_index];
   }
 };
 
@@ -161,11 +172,11 @@ struct PartialUpdateRegisterImpl {
   /* Changes are tracked in tiles. */
   static constexpr int TILE_SIZE = 256;
 
-  TransactionID first_transaction_id;
-  TransactionID current_transaction_id;
-  Vector<PartialUpdateTransaction> history;
+  ChangesetID first_changeset_id;
+  ChangesetID current_changeset_id;
+  Vector<TileChangeset> history;
 
-  PartialUpdateTransaction current_transaction;
+  TileChangeset current_changeset;
 
   int image_width;
   int image_height;
@@ -178,7 +189,7 @@ struct PartialUpdateRegisterImpl {
 
       int tile_x_len = image_width / TILE_SIZE;
       int tile_y_len = image_height / TILE_SIZE;
-      current_transaction.init_tiles(tile_x_len, tile_y_len);
+      current_changeset.init_tiles(tile_x_len, tile_y_len);
 
       mark_full_update();
     }
@@ -187,29 +198,43 @@ struct PartialUpdateRegisterImpl {
   void mark_full_update()
   {
     history.clear();
-    current_transaction_id++;
-    current_transaction.reset();
-    first_transaction_id = current_transaction_id;
+    current_changeset_id++;
+    current_changeset.reset();
+    first_changeset_id = current_changeset_id;
+  }
+
+  /**
+   * \brief get the tile number for the give pixel coordinate.
+   *
+   * As tiles are squares the this member can be used for both x and y axis.
+   */
+  static int tile_number_for_pixel(int pixel_offset)
+  {
+    int tile_offset = pixel_offset / TILE_SIZE;
+    if (pixel_offset < 0) {
+      tile_offset -= 1;
+    }
+    return tile_offset;
   }
 
   void mark_region(rcti *updated_region)
   {
-    int start_x_tile = updated_region->xmin / TILE_SIZE;
-    int end_x_tile = updated_region->xmax / TILE_SIZE;
-    int start_y_tile = updated_region->ymin / TILE_SIZE;
-    int end_y_tile = updated_region->ymax / TILE_SIZE;
+    int start_x_tile = tile_number_for_pixel(updated_region->xmin);
+    int end_x_tile = tile_number_for_pixel(updated_region->xmax - 1);
+    int start_y_tile = tile_number_for_pixel(updated_region->ymin);
+    int end_y_tile = tile_number_for_pixel(updated_region->ymax - 1);
 
     /* Clamp tiles to tiles in image. */
     start_x_tile = max_ii(0, start_x_tile);
     start_y_tile = max_ii(0, start_y_tile);
-    end_x_tile = min_ii(current_transaction.tile_x_len_ - 1, end_x_tile);
-    end_y_tile = min_ii(current_transaction.tile_y_len_ - 1, end_y_tile);
+    end_x_tile = min_ii(current_changeset.tile_x_len_ - 1, end_x_tile);
+    end_y_tile = min_ii(current_changeset.tile_y_len_ - 1, end_y_tile);
 
     /* Early exit when no tiles need to be updated. */
-    if (start_x_tile >= current_transaction.tile_x_len_) {
+    if (start_x_tile >= current_changeset.tile_x_len_) {
       return;
     }
-    if (start_y_tile >= current_transaction.tile_y_len_) {
+    if (start_y_tile >= current_changeset.tile_y_len_) {
       return;
     }
     if (end_x_tile < 0) {
@@ -219,47 +244,45 @@ struct PartialUpdateRegisterImpl {
       return;
     }
 
-    current_transaction.add_region(start_x_tile, start_y_tile, end_x_tile, end_y_tile);
+    current_changeset.add_region(start_x_tile, start_y_tile, end_x_tile, end_y_tile);
   }
 
-  void ensure_empty_transaction()
+  void ensure_empty_changeset()
   {
-    if (current_transaction.is_empty()) {
-      /* No need to create a new transaction when previous transaction does not contain any data.
-       */
+    if (!current_changeset.has_dirty_tiles()) {
+      /* No need to create a new changeset when previous changeset does not contain any dirty
+       * tiles. */
       return;
     }
-    commit_current_transaction();
+    commit_current_changeset();
   }
 
-  void commit_current_transaction()
+  void commit_current_changeset()
   {
-    history.append_as(std::move(current_transaction));
-    current_transaction.reset();
-    current_transaction_id++;
+    history.append_as(std::move(current_changeset));
+    current_changeset.reset();
+    current_changeset_id++;
   }
 
   /**
    * /brief Check if data is available to construct the update tiles for the given
-   * transaction_id.
+   * changeset_id.
    *
-   * The update tiles can be created when transaction id is between
+   * The update tiles can be created when changeset id is between
    */
-  bool can_construct(TransactionID transaction_id)
+  bool can_construct(ChangesetID changeset_id)
   {
-    return transaction_id >= first_transaction_id;
+    return changeset_id >= first_changeset_id;
   }
 
-  std::unique_ptr<PartialUpdateTransaction> changed_tiles_since(
-      const TransactionID from_transaction)
+  std::unique_ptr<TileChangeset> changed_tiles_since(const ChangesetID from_changeset)
   {
-    std::unique_ptr<PartialUpdateTransaction> changed_tiles =
-        std::make_unique<PartialUpdateTransaction>();
+    std::unique_ptr<TileChangeset> changed_tiles = std::make_unique<TileChangeset>();
     int tile_x_len = image_width / TILE_SIZE;
     int tile_y_len = image_height / TILE_SIZE;
     changed_tiles->init_tiles(tile_x_len, tile_y_len);
 
-    for (int index = from_transaction - first_transaction_id; index < history.size(); index++) {
+    for (int index = from_changeset - first_changeset_id; index < history.size(); index++) {
       changed_tiles->merge(history[index]);
     }
     return changed_tiles;
@@ -294,24 +317,26 @@ ePartialUpdateCollectResult BKE_image_partial_update_collect_tiles(Image *image,
 
   PartialUpdateRegisterImpl *partial_updater = unwrap(
       BKE_image_partial_update_register_ensure(image, image_buffer));
-  partial_updater->ensure_empty_transaction();
+  partial_updater->ensure_empty_changeset();
 
-  if (!partial_updater->can_construct(user_impl->last_transaction_id)) {
-    user_impl->last_transaction_id = partial_updater->current_transaction_id;
+  if (!partial_updater->can_construct(user_impl->last_changeset_id)) {
+    user_impl->last_changeset_id = partial_updater->current_changeset_id;
     return PARTIAL_UPDATE_NEED_FULL_UPDATE;
   }
 
-  if (user_impl->last_transaction_id == partial_updater->current_transaction_id) {
-    // No changes since last time.
+  /* Check if there are changes since last invocation for the user. */
+  if (user_impl->last_changeset_id == partial_updater->current_changeset_id) {
     return PARTIAL_UPDATE_NO_CHANGES;
   }
 
-  // TODO: Collect changes between last_transaction_id and current_transaction_id.
-  std::unique_ptr<PartialUpdateTransaction> changed_tiles = partial_updater->changed_tiles_since(
-      user_impl->last_transaction_id);
+  /* Collect changed tiles. */
+  std::unique_ptr<TileChangeset> changed_tiles = partial_updater->changed_tiles_since(
+      user_impl->last_changeset_id);
+
+  /* Convert tiles in the changeset to rectangles that are dirty. */
   for (int tile_y = 0; tile_y < changed_tiles->tile_y_len_; tile_y++) {
     for (int tile_x = 0; tile_x < changed_tiles->tile_x_len_; tile_x++) {
-      if (changed_tiles->tile_changed(tile_x, tile_y)) {
+      if (changed_tiles->is_tile_dirty(tile_x, tile_y)) {
         PartialUpdateTile tile;
         BLI_rcti_init(&tile.region,
                       tile_x * PartialUpdateRegisterImpl::TILE_SIZE,
@@ -323,9 +348,7 @@ ePartialUpdateCollectResult BKE_image_partial_update_collect_tiles(Image *image,
     }
   }
 
-  // TODO: compress neighboring tiles and store in user.
-
-  user_impl->last_transaction_id = partial_updater->current_transaction_id;
+  user_impl->last_changeset_id = partial_updater->current_changeset_id;
   return PARTIAL_UPDATE_CHANGES_AVAILABLE;
 }
 
