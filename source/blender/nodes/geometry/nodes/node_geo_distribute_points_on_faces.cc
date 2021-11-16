@@ -42,22 +42,22 @@ namespace blender::nodes {
 
 static void geo_node_point_distribute_points_on_faces_declare(NodeDeclarationBuilder &b)
 {
-  b.add_input<decl::Geometry>("Geometry").supported_type(GEO_COMPONENT_TYPE_MESH);
-  b.add_input<decl::Bool>("Selection").default_value(true).hide_value().supports_field();
-  b.add_input<decl::Float>("Distance Min").min(0.0f).subtype(PROP_DISTANCE);
-  b.add_input<decl::Float>("Density Max").default_value(10.0f).min(0.0f);
-  b.add_input<decl::Float>("Density").default_value(10.0f).supports_field();
-  b.add_input<decl::Float>("Density Factor")
+  b.add_input<decl::Geometry>(N_("Mesh")).supported_type(GEO_COMPONENT_TYPE_MESH);
+  b.add_input<decl::Bool>(N_("Selection")).default_value(true).hide_value().supports_field();
+  b.add_input<decl::Float>(N_("Distance Min")).min(0.0f).subtype(PROP_DISTANCE);
+  b.add_input<decl::Float>(N_("Density Max")).default_value(10.0f).min(0.0f);
+  b.add_input<decl::Float>(N_("Density")).default_value(10.0f).supports_field();
+  b.add_input<decl::Float>(N_("Density Factor"))
       .default_value(1.0f)
       .min(0.0f)
       .max(1.0f)
       .subtype(PROP_FACTOR)
       .supports_field();
-  b.add_input<decl::Int>("Seed");
+  b.add_input<decl::Int>(N_("Seed"));
 
-  b.add_output<decl::Geometry>("Points");
-  b.add_output<decl::Vector>("Normal").field_source();
-  b.add_output<decl::Vector>("Rotation").subtype(PROP_EULER).field_source();
+  b.add_output<decl::Geometry>(N_("Points"));
+  b.add_output<decl::Vector>(N_("Normal")).field_source();
+  b.add_output<decl::Vector>(N_("Rotation")).subtype(PROP_EULER).field_source();
 }
 
 static void geo_node_point_distribute_points_on_faces_layout(uiLayout *layout,
@@ -295,6 +295,12 @@ BLI_NOINLINE static void propagate_existing_attributes(
   for (Map<AttributeIDRef, AttributeKind>::Item entry : attributes.items()) {
     const AttributeIDRef attribute_id = entry.key;
     const CustomDataType output_data_type = entry.value.data_type;
+
+    ReadAttributeLookup source_attribute = mesh_component.attribute_try_get_for_read(attribute_id);
+    if (!source_attribute) {
+      continue;
+    }
+
     /* The output domain is always #ATTR_DOMAIN_POINT, since we are creating a point cloud. */
     OutputAttribute attribute_out = point_component.attribute_try_get_for_output_only(
         attribute_id, ATTR_DOMAIN_POINT, output_data_type);
@@ -303,23 +309,12 @@ BLI_NOINLINE static void propagate_existing_attributes(
     }
 
     GMutableSpan out_span = attribute_out.as_span();
-
-    std::optional<AttributeMetaData> attribute_info = point_component.attribute_get_meta_data(
-        attribute_id);
-    if (!attribute_info) {
-      continue;
-    }
-
-    const AttributeDomain source_domain = attribute_info->domain;
-    GVArrayPtr source_attribute = mesh_component.attribute_get_for_read(
-        attribute_id, source_domain, output_data_type, nullptr);
-    if (!source_attribute) {
-      continue;
-    }
-
-    interpolate_attribute(
-        mesh, bary_coords, looptri_indices, source_domain, *source_attribute, out_span);
-
+    interpolate_attribute(mesh,
+                          bary_coords,
+                          looptri_indices,
+                          source_attribute.domain,
+                          source_attribute.varray,
+                          out_span);
     attribute_out.save();
   }
 }
@@ -533,7 +528,7 @@ static void point_distribution_calculate(GeometrySet &geometry_set,
 
 static void geo_node_point_distribute_points_on_faces_exec(GeoNodeExecParams params)
 {
-  GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
+  GeometrySet geometry_set = params.extract_input<GeometrySet>("Mesh");
 
   const GeometryNodeDistributePointsOnFacesMode method =
       static_cast<GeometryNodeDistributePointsOnFacesMode>(params.node().custom1);

@@ -853,7 +853,6 @@ static void view3d_dropboxes(void)
   drop->draw = WM_drag_draw_item_name_fn;
   drop->draw_activate = view3d_ob_drop_draw_activate;
   drop->draw_deactivate = view3d_ob_drop_draw_deactivate;
-  drop->opcontext = WM_OP_EXEC_DEFAULT; /* Not really needed. */
 
   drop = WM_dropbox_add(lb,
                         "OBJECT_OT_transform_to_mouse",
@@ -865,7 +864,6 @@ static void view3d_dropboxes(void)
   drop->draw = WM_drag_draw_item_name_fn;
   drop->draw_activate = view3d_ob_drop_draw_activate;
   drop->draw_deactivate = view3d_ob_drop_draw_deactivate;
-  drop->opcontext = WM_OP_INVOKE_DEFAULT;
 
   WM_dropbox_add(lb,
                  "OBJECT_OT_drop_named_material",
@@ -1821,8 +1819,8 @@ static int view3d_context(const bContext *C, const char *member, bContextDataRes
   if (CTX_data_equals(member, "selected_ids")) {
     ListBase selected_objects;
     CTX_data_selected_objects(C, &selected_objects);
-    LISTBASE_FOREACH (PointerRNA *, object_ptr, &selected_objects) {
-      ID *selected_id = object_ptr->data;
+    LISTBASE_FOREACH (CollectionPointerLink *, object_ptr_link, &selected_objects) {
+      ID *selected_id = object_ptr_link->ptr.owner_id;
       CTX_data_id_list_add(result, selected_id);
     }
     BLI_freelistN(&selected_objects);

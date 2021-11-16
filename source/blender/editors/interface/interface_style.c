@@ -419,7 +419,7 @@ int UI_fontstyle_height_max(const uiFontStyle *fs)
 /* reading without uifont will create one */
 void uiStyleInit(void)
 {
-  uiStyle *style = U.uistyles.first;
+  const uiStyle *style = U.uistyles.first;
 
   /* recover from uninitialized dpi */
   if (U.dpi == 0) {
@@ -483,15 +483,19 @@ void uiStyleInit(void)
        * Yes, this build the glyph cache and create
        * the texture.
        */
-      BLF_size(font->blf_id, 11 * U.pixelsize, U.dpi);
-      BLF_size(font->blf_id, 12 * U.pixelsize, U.dpi);
-      BLF_size(font->blf_id, 14 * U.pixelsize, U.dpi);
+      BLF_size(font->blf_id, 11.0f * U.pixelsize, U.dpi);
+      BLF_size(font->blf_id, 12.0f * U.pixelsize, U.dpi);
+      BLF_size(font->blf_id, 14.0f * U.pixelsize, U.dpi);
     }
   }
 
   if (style == NULL) {
-    ui_style_new(&U.uistyles, "Default Style", UIFONT_DEFAULT);
+    style = ui_style_new(&U.uistyles, "Default Style", UIFONT_DEFAULT);
   }
+
+  BLF_cache_flush_set_fn(UI_widgetbase_draw_cache_flush);
+
+  BLF_default_size(style->widgetlabel.points);
 
   /* XXX, this should be moved into a style,
    * but for now best only load the monospaced font once. */
@@ -506,7 +510,7 @@ void uiStyleInit(void)
     blf_mono_font = BLF_load_mono_default(unique);
   }
 
-  BLF_size(blf_mono_font, 12 * U.pixelsize, 72);
+  BLF_size(blf_mono_font, 12.0f * U.pixelsize, 72);
 
   /* Set default flags based on UI preferences (not render fonts) */
   {
@@ -551,7 +555,7 @@ void uiStyleInit(void)
     blf_mono_font_render = BLF_load_mono_default(unique);
   }
 
-  BLF_size(blf_mono_font_render, 12 * U.pixelsize, 72);
+  BLF_size(blf_mono_font_render, 12.0f * U.pixelsize, 72);
 }
 
 void UI_fontstyle_set(const uiFontStyle *fs)

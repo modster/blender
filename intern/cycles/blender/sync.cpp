@@ -162,19 +162,19 @@ void BlenderSync::sync_recalc(BL::Depsgraph &b_depsgraph, BL::SpaceView3D &b_v3d
     /* Object */
     else if (b_id.is_a(&RNA_Object)) {
       BL::Object b_ob(b_id);
-      const bool is_geometry = object_is_geometry(b_ob);
-      const bool is_light = !is_geometry && object_is_light(b_ob);
+      const bool can_have_geometry = object_can_have_geometry(b_ob);
+      const bool is_light = !can_have_geometry && object_is_light(b_ob);
 
       if (b_ob.is_instancer() && b_update.is_updated_shading()) {
         /* Needed for e.g. object color updates on instancer. */
         object_map.set_recalc(b_ob);
       }
 
-      if (is_geometry || is_light) {
+      if (can_have_geometry || is_light) {
         const bool updated_geometry = b_update.is_updated_geometry();
 
         /* Geometry (mesh, hair, volume). */
-        if (is_geometry) {
+        if (can_have_geometry) {
           if (b_update.is_updated_transform() || b_update.is_updated_shading()) {
             object_map.set_recalc(b_ob);
           }
@@ -183,6 +183,15 @@ void BlenderSync::sync_recalc(BL::Depsgraph &b_depsgraph, BL::SpaceView3D &b_v3d
               (object_subdivision_type(b_ob, preview, experimental) != Mesh::SUBDIVISION_NONE)) {
             BL::ID key = BKE_object_is_modified(b_ob) ? b_ob : b_ob.data();
             geometry_map.set_recalc(key);
+
+            /* Sync all contained geometry instances as well when the object changed.. */
+            map<void *, set<BL::ID>>::const_iterator instance_geometries =
+                instance_geometries_by_object.find(b_ob.ptr.data);
+            if (instance_geometries != instance_geometries_by_object.end()) {
+              for (BL::ID geometry : instance_geometries->second) {
+                geometry_map.set_recalc(geometry);
+              }
+            }
           }
 
           if (updated_geometry) {
@@ -340,14 +349,16 @@ void BlenderSync::sync_integrator(BL::ViewLayer &b_view_layer, bool background)
       cscene, "sampling_pattern", SAMPLING_NUM_PATTERNS, SAMPLING_PATTERN_SOBOL);
   integrator->set_sampling_pattern(sampling_pattern);
 
+  bool use_adaptive_sampling = false;
   if (preview) {
-    integrator->set_use_adaptive_sampling(
-        RNA_boolean_get(&cscene, "use_preview_adaptive_sampling"));
+    use_adaptive_sampling = RNA_boolean_get(&cscene, "use_preview_adaptive_sampling");
+    integrator->set_use_adaptive_sampling(use_adaptive_sampling);
     integrator->set_adaptive_threshold(get_float(cscene, "preview_adaptive_threshold"));
     integrator->set_adaptive_min_samples(get_int(cscene, "preview_adaptive_min_samples"));
   }
   else {
-    integrator->set_use_adaptive_sampling(RNA_boolean_get(&cscene, "use_adaptive_sampling"));
+    use_adaptive_sampling = RNA_boolean_get(&cscene, "use_adaptive_sampling");
+    integrator->set_use_adaptive_sampling(use_adaptive_sampling);
     integrator->set_adaptive_threshold(get_float(cscene, "adaptive_threshold"));
     integrator->set_adaptive_min_samples(get_int(cscene, "adaptive_min_samples"));
   }
@@ -361,10 +372,12 @@ void BlenderSync::sync_integrator(BL::ViewLayer &b_view_layer, bool background)
 
   /* only use scrambling distance in the viewport if user wants to and disable with AS */
   bool preview_scrambling_distance = get_boolean(cscene, "preview_scrambling_distance");
-  if ((preview && !preview_scrambling_distance) || sampling_pattern != SAMPLING_PATTERN_SOBOL)
+  if ((preview && !preview_scrambling_distance) || use_adaptive_sampling)
     scrambling_distance = 1.0f;
 
-  VLOG(1) << "Used Scrambling Distance: " << scrambling_distance;
+  if (scrambling_distance != 1.0f) {
+    VLOG(3) << "Using scrambling distance: " << scrambling_distance;
+  }
   integrator->set_scrambling_distance(scrambling_distance);
 
   if (get_boolean(cscene, "use_fast_gi")) {
@@ -822,18 +835,25 @@ SessionParams BlenderSync::get_session_params(BL::RenderEngine &b_engine,
   /* samples */
   int samples = get_int(cscene, "samples");
   int preview_samples = get_int(cscene, "preview_samples");
+  int sample_offset = get_int(cscene, "sample_offset");
 
   if (background) {
     params.samples = samples;
+    params.sample_offset = sample_offset;
   }
   else {
     params.samples = preview_samples;
-    if (params.samples == 0)
+    if (params.samples == 0) {
       params.samples = INT_MAX;
+    }
+    params.sample_offset = 0;
   }
 
+  /* Clamp sample offset. */
+  params.sample_offset = clamp(params.sample_offset, 0, Integrator::MAX_SAMPLES);
+
   /* Clamp samples. */
-  params.samples = min(params.samples, Integrator::MAX_SAMPLES);
+  params.samples = clamp(params.samples, 0, Integrator::MAX_SAMPLES - params.sample_offset);
 
   /* Viewport Performance */
   params.pixel_size = b_engine.get_preview_pixel_size(b_scene);

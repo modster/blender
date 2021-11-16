@@ -43,7 +43,7 @@ bool ConstantFolder::all_inputs_constant() const
 
 void ConstantFolder::make_constant(float value) const
 {
-  VLOG(1) << "Folding " << node->name << "::" << output->name() << " to constant (" << value
+  VLOG(3) << "Folding " << node->name << "::" << output->name() << " to constant (" << value
           << ").";
 
   foreach (ShaderInput *sock, output->links) {
@@ -56,7 +56,7 @@ void ConstantFolder::make_constant(float value) const
 
 void ConstantFolder::make_constant(float3 value) const
 {
-  VLOG(1) << "Folding " << node->name << "::" << output->name() << " to constant " << value << ".";
+  VLOG(3) << "Folding " << node->name << "::" << output->name() << " to constant " << value << ".";
 
   foreach (ShaderInput *sock, output->links) {
     sock->set(value);
@@ -68,15 +68,15 @@ void ConstantFolder::make_constant(float3 value) const
 
 void ConstantFolder::make_constant_clamp(float value, bool clamp) const
 {
-  make_constant(clamp ? saturate(value) : value);
+  make_constant(clamp ? saturatef(value) : value);
 }
 
 void ConstantFolder::make_constant_clamp(float3 value, bool clamp) const
 {
   if (clamp) {
-    value.x = saturate(value.x);
-    value.y = saturate(value.y);
-    value.z = saturate(value.z);
+    value.x = saturatef(value.x);
+    value.y = saturatef(value.y);
+    value.z = saturatef(value.z);
   }
 
   make_constant(value);
@@ -112,7 +112,7 @@ void ConstantFolder::bypass(ShaderOutput *new_output) const
 {
   assert(new_output);
 
-  VLOG(1) << "Folding " << node->name << "::" << output->name() << " to socket "
+  VLOG(3) << "Folding " << node->name << "::" << output->name() << " to socket "
           << new_output->parent->name << "::" << new_output->name() << ".";
 
   /* Remove all outgoing links from socket and connect them to new_output instead.
@@ -131,7 +131,7 @@ void ConstantFolder::discard() const
 {
   assert(output->type() == SocketType::CLOSURE);
 
-  VLOG(1) << "Discarding closure " << node->name << ".";
+  VLOG(3) << "Discarding closure " << node->name << ".";
 
   graph->disconnect(output);
 }
@@ -215,7 +215,7 @@ void ConstantFolder::fold_mix(NodeMix type, bool clamp) const
   ShaderInput *color1_in = node->input("Color1");
   ShaderInput *color2_in = node->input("Color2");
 
-  float fac = saturate(node->get_float(fac_in->socket_type));
+  float fac = saturatef(node->get_float(fac_in->socket_type));
   bool fac_is_zero = !fac_in->link && fac == 0.0f;
   bool fac_is_one = !fac_in->link && fac == 1.0f;
 

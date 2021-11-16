@@ -24,45 +24,11 @@
 extern "C" {
 #endif
 
-/* Forward declarations */
-struct GPUTexture;
-struct ImBuf;
-struct Image;
-
-/* *********** LISTS *********** */
-
-/* GPUViewport.storage
- * Is freed every time the viewport engine changes. */
-typedef struct IMAGE_PassList {
-  DRWPass *image_pass;
-} IMAGE_PassList;
-
-typedef struct IMAGE_PrivateData {
-  void *lock;
-  struct ImBuf *ibuf;
-  struct Image *image;
-  struct DRWView *view;
-
-  struct GPUTexture *texture;
-  bool owns_texture;
-} IMAGE_PrivateData;
-
-typedef struct IMAGE_StorageList {
-  IMAGE_PrivateData *pd;
-} IMAGE_StorageList;
-
-typedef struct IMAGE_Data {
-  void *engine_type;
-  DRWViewportEmptyList *fbl;
-  DRWViewportEmptyList *txl;
-  IMAGE_PassList *psl;
-  IMAGE_StorageList *stl;
-} IMAGE_Data;
-
-/* image_shader.c */
-GPUShader *IMAGE_shader_image_get(bool is_tiled_image);
-void IMAGE_shader_library_ensure(void);
-void IMAGE_shader_free(void);
+GPUShader *BASIC_shaders_depth_sh_get(eGPUShaderConfig config);
+GPUShader *BASIC_shaders_pointcloud_depth_sh_get(eGPUShaderConfig config);
+GPUShader *BASIC_shaders_depth_conservative_sh_get(eGPUShaderConfig config);
+GPUShader *BASIC_shaders_pointcloud_depth_conservative_sh_get(eGPUShaderConfig config);
+void BASIC_shaders_free(void);
 
 #ifdef __cplusplus
 }

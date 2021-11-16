@@ -287,15 +287,21 @@ class CYCLES_RENDER_PT_sampling_advanced(CyclesButtonsPanel, Panel):
         row.prop(cscene, "use_animated_seed", text="", icon='TIME')
 
         col = layout.column(align=True)
-        col.active = not(cscene.use_adaptive_sampling)
+        col.active = not (cscene.use_adaptive_sampling and cscene.use_preview_adaptive_sampling)
         col.prop(cscene, "sampling_pattern", text="Pattern")
+
         col = layout.column(align=True)
-        col.active = cscene.sampling_pattern == 'SOBOL' and not cscene.use_adaptive_sampling
-        col.prop(cscene, "scrambling_distance", text="Scrambling Distance Strength")
-        col.prop(cscene, "adaptive_scrambling_distance", text="Adaptive Scrambling Distance")
+        col.prop(cscene, "sample_offset")
+
+        layout.separator()
+
         col = layout.column(align=True)
-        col.active = ((cscene.scrambling_distance < 1.0) or cscene.adaptive_scrambling_distance) and cscene.sampling_pattern == 'SOBOL' and not cscene.use_adaptive_sampling
-        col.prop(cscene, "preview_scrambling_distance", text="Viewport Scrambling Distance")
+        col.active = not (cscene.use_adaptive_sampling and cscene.use_preview_adaptive_sampling)
+        col.prop(cscene, "scrambling_distance", text="Scrambling Distance")
+        col.prop(cscene, "adaptive_scrambling_distance", text="Adaptive")
+        sub = col.row(align=True)
+        sub.active = not cscene.use_preview_adaptive_sampling
+        sub.prop(cscene, "preview_scrambling_distance", text="Viewport")
 
         layout.separator()
 
@@ -1048,7 +1054,7 @@ class CYCLES_OBJECT_PT_motion_blur(CyclesButtonsPanel, Panel):
 
 
 def has_geometry_visibility(ob):
-    return ob and ((ob.type in {'MESH', 'CURVE', 'SURFACE', 'FONT', 'META', 'LIGHT'}) or
+    return ob and ((ob.type in {'MESH', 'CURVE', 'SURFACE', 'FONT', 'META', 'LIGHT', 'VOLUME', 'POINTCLOUD', 'HAIR'}) or
                    (ob.instance_type == 'COLLECTION' and ob.instance_collection))
 
 

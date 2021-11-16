@@ -46,6 +46,7 @@
  */
 
 #include "BLI_compiler_attrs.h"
+#include "BLI_utildefines.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -133,8 +134,10 @@ enum {
   LIB_ID_COPY_SHAPEKEY = 1 << 26,
   /** EXCEPTION! Specific deep-copy of node trees used e.g. for rendering purposes. */
   LIB_ID_COPY_NODETREE_LOCALIZE = 1 << 27,
-  /** EXCEPTION! Specific handling of RB objects regarding collections differs depending whether we
-     duplicate scene/collections, or objects. */
+  /**
+   * EXCEPTION! Specific handling of RB objects regarding collections differs depending whether we
+   * duplicate scene/collections, or objects.
+   */
   LIB_ID_COPY_RIGID_BODY_NO_COLLECTION_HANDLING = 1 << 28,
 
   /* *** Helper 'defines' gathering most common flag sets. *** */
@@ -162,7 +165,7 @@ void BLI_libblock_ensure_unique_name(struct Main *bmain, const char *name) ATTR_
 struct ID *BKE_libblock_find_name(struct Main *bmain,
                                   const short type,
                                   const char *name) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL();
-
+struct ID *BKE_libblock_find_session_uuid(struct Main *bmain, short type, uint32_t session_uuid);
 /**
  * Duplicate (a.k.a. deep copy) common processing options.
  * See also eDupli_ID_Flags for options controlling what kind of IDs to duplicate.
@@ -178,6 +181,8 @@ typedef enum eLibIDDuplicateFlags {
    * sub-IDs (dependencies), check for linked vs. locale data, etc. */
   LIB_ID_DUPLICATE_IS_ROOT_ID = 1 << 1,
 } eLibIDDuplicateFlags;
+
+ENUM_OPERATORS(eLibIDDuplicateFlags, LIB_ID_DUPLICATE_IS_ROOT_ID)
 
 /* lib_remap.c (keep here since they're general functions) */
 /**

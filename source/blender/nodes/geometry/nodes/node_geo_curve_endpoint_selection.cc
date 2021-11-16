@@ -25,19 +25,20 @@ namespace blender::nodes {
 
 static void geo_node_curve_endpoint_selection_declare(NodeDeclarationBuilder &b)
 {
-  b.add_input<decl::Int>("Start Size")
+  b.add_input<decl::Int>(N_("Start Size"))
       .min(0)
       .default_value(1)
       .supports_field()
-      .description("The amount of points to select from the start of each spline");
-  b.add_input<decl::Int>("End Size")
+      .description(N_("The amount of points to select from the start of each spline"));
+  b.add_input<decl::Int>(N_("End Size"))
       .min(0)
       .default_value(1)
       .supports_field()
-      .description("The amount of points to select from the end of each spline");
-  b.add_output<decl::Bool>("Selection")
+      .description(N_("The amount of points to select from the end of each spline"));
+  b.add_output<decl::Bool>(N_("Selection"))
       .field_source()
-      .description("The selection from the start and end of the splines based on the input sizes");
+      .description(
+          N_("The selection from the start and end of the splines based on the input sizes"));
 }
 
 static void select_by_spline(const int start, const int end, MutableSpan<bool> r_selection)
@@ -63,9 +64,9 @@ class EndpointFieldInput final : public fn::FieldInput {
     category_ = Category::Generated;
   }
 
-  const GVArray *get_varray_for_context(const fn::FieldContext &context,
-                                        IndexMask UNUSED(mask),
-                                        ResourceScope &scope) const final
+  GVArray get_varray_for_context(const fn::FieldContext &context,
+                                 IndexMask UNUSED(mask),
+                                 ResourceScope &UNUSED(scope)) const final
   {
     if (const GeometryComponentFieldContext *geometry_context =
             dynamic_cast<const GeometryComponentFieldContext *>(&context)) {
@@ -110,9 +111,9 @@ class EndpointFieldInput final : public fn::FieldInput {
         }
         current_point += spline->size();
       }
-      return &scope.construct<fn::GVArray_For_ArrayContainer<Array<bool>>>(std::move(selection));
+      return VArray<bool>::ForContainer(std::move(selection));
     }
-    return nullptr;
+    return {};
   };
 
   uint64_t hash() const override

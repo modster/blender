@@ -108,7 +108,7 @@ static int wm_operator_call_internal(bContext *C,
                                      wmOperatorType *ot,
                                      PointerRNA *properties,
                                      ReportList *reports,
-                                     const short context,
+                                     const wmOperatorCallContext context,
                                      const bool poll_only,
                                      wmEvent *event);
 
@@ -1460,7 +1460,7 @@ static int wm_operator_call_internal(bContext *C,
                                      wmOperatorType *ot,
                                      PointerRNA *properties,
                                      ReportList *reports,
-                                     const short context,
+                                     const wmOperatorCallContext context,
                                      const bool poll_only,
                                      wmEvent *event)
 {
@@ -1595,13 +1595,16 @@ static int wm_operator_call_internal(bContext *C,
 /* Invokes operator in context. */
 int WM_operator_name_call_ptr(bContext *C,
                               wmOperatorType *ot,
-                              short context,
+                              wmOperatorCallContext context,
                               PointerRNA *properties)
 {
   BLI_assert(ot == WM_operatortype_find(ot->idname, true));
   return wm_operator_call_internal(C, ot, properties, NULL, context, false, NULL);
 }
-int WM_operator_name_call(bContext *C, const char *opstring, short context, PointerRNA *properties)
+int WM_operator_name_call(bContext *C,
+                          const char *opstring,
+                          wmOperatorCallContext context,
+                          PointerRNA *properties)
 {
   wmOperatorType *ot = WM_operatortype_find(opstring, 0);
   if (ot) {
@@ -1613,7 +1616,7 @@ int WM_operator_name_call(bContext *C, const char *opstring, short context, Poin
 
 int WM_operator_name_call_with_properties(struct bContext *C,
                                           const char *opstring,
-                                          short context,
+                                          wmOperatorCallContext context,
                                           struct IDProperty *properties)
 {
   PointerRNA props_ptr;
@@ -1644,7 +1647,7 @@ void WM_menu_name_call(bContext *C, const char *menu_name, short context)
  */
 int WM_operator_call_py(bContext *C,
                         wmOperatorType *ot,
-                        short context,
+                        wmOperatorCallContext context,
                         PointerRNA *properties,
                         ReportList *reports,
                         const bool is_undo)
@@ -1768,8 +1771,11 @@ static int ui_handler_wait_for_input(bContext *C, const wmEvent *event, void *us
   return WM_UI_HANDLER_CONTINUE;
 }
 
-void WM_operator_name_call_ptr_with_depends_on_cursor(
-    bContext *C, wmOperatorType *ot, short opcontext, PointerRNA *properties, const char *drawstr)
+void WM_operator_name_call_ptr_with_depends_on_cursor(bContext *C,
+                                                      wmOperatorType *ot,
+                                                      wmOperatorCallContext opcontext,
+                                                      PointerRNA *properties,
+                                                      const char *drawstr)
 {
   int flag = ot->flag;
 
@@ -3063,8 +3069,9 @@ static int wm_handlers_do_intern(bContext *C, wmWindow *win, wmEvent *event, Lis
                   BLI_addtail(&single_lb, drag);
                   event->customdata = &single_lb;
 
+                  const wmOperatorCallContext opcontext = wm_drop_operator_context_get(drop);
                   int op_retval = wm_operator_call_internal(
-                      C, drop->ot, drop->ptr, NULL, drop->opcontext, false, event);
+                      C, drop->ot, drop->ptr, NULL, opcontext, false, event);
                   OPERATOR_RETVAL_CHECK(op_retval);
 
                   if ((op_retval & OPERATOR_CANCELLED) && drop->cancel) {
@@ -3628,7 +3635,8 @@ void wm_event_do_handlers(bContext *C)
       /* Clear tool-tip on mouse move. */
       if (screen->tool_tip && screen->tool_tip->exit_on_event) {
         if (ELEM(event->type, MOUSEMOVE, INBETWEEN_MOUSEMOVE)) {
-          if (len_manhattan_v2v2_int(screen->tool_tip->event_xy, event->xy) > U.move_threshold) {
+          if (len_manhattan_v2v2_int(screen->tool_tip->event_xy, event->xy) >
+              WM_EVENT_CURSOR_MOTION_THRESHOLD) {
             WM_tooltip_clear(C, win);
           }
         }
@@ -4008,10 +4016,12 @@ wmEventHandler_Keymap *WM_event_add_keymap_handler(ListBase *handlers, wmKeyMap 
  *
  * Follow #wmEventHandler_KeymapDynamicFn signature.
  */
-void WM_event_get_keymap_from_toolsystem_fallback(wmWindowManager *wm,
-                                                  wmWindow *win,
-                                                  wmEventHandler_Keymap *handler,
-                                                  wmEventHandler_KeymapResult *km_result)
+static void wm_event_get_keymap_from_toolsystem_ex(wmWindowManager *wm,
+                                                   wmWindow *win,
+                                                   wmEventHandler_Keymap *handler,
+                                                   wmEventHandler_KeymapResult *km_result,
+                                                   /* Extra arguments. */
+                                                   const bool with_gizmos)
 {
   memset(km_result, 0x0, sizeof(*km_result));
 
@@ -4044,7 +4054,8 @@ void WM_event_get_keymap_from_toolsystem_fallback(wmWindowManager *wm,
     if (tref_rt->flag & TOOLREF_FLAG_FALLBACK_KEYMAP) {
       add_keymap = true;
     }
-    if (tref_rt->gizmo_group[0] != '\0') {
+
+    if (with_gizmos && (tref_rt->gizmo_group[0] != '\0')) {
       wmGizmoMap *gzmap = NULL;
       wmGizmoGroup *gzgroup = NULL;
       LISTBASE_FOREACH (ARegion *, region, &area->regionbase) {
@@ -4068,6 +4079,7 @@ void WM_event_get_keymap_from_toolsystem_fallback(wmWindowManager *wm,
         }
       }
     }
+
     if (add_keymap) {
       keymap_id_list[keymap_id_list_len++] = tref_rt->keymap_fallback;
     }
@@ -4095,32 +4107,20 @@ void WM_event_get_keymap_from_toolsystem_fallback(wmWindowManager *wm,
   }
 }
 
+void WM_event_get_keymap_from_toolsystem_with_gizmos(wmWindowManager *wm,
+                                                     wmWindow *win,
+                                                     wmEventHandler_Keymap *handler,
+                                                     wmEventHandler_KeymapResult *km_result)
+{
+  wm_event_get_keymap_from_toolsystem_ex(wm, win, handler, km_result, true);
+}
+
 void WM_event_get_keymap_from_toolsystem(wmWindowManager *wm,
-                                         wmWindow *UNUSED(win),
+                                         wmWindow *win,
                                          wmEventHandler_Keymap *handler,
                                          wmEventHandler_KeymapResult *km_result)
 {
-  memset(km_result, 0x0, sizeof(*km_result));
-
-  ScrArea *area = handler->dynamic.user_data;
-  handler->keymap_tool = NULL;
-  bToolRef_Runtime *tref_rt = area->runtime.tool ? area->runtime.tool->runtime : NULL;
-  if (tref_rt && tref_rt->keymap[0]) {
-    const char *keymap_id = tref_rt->keymap;
-    {
-      wmKeyMap *km = WM_keymap_list_find_spaceid_or_empty(
-          &wm->userconf->keymaps, keymap_id, area->spacetype, RGN_TYPE_WINDOW);
-      /* We shouldn't use keymaps from unrelated spaces. */
-      if (km != NULL) {
-        handler->keymap_tool = area->runtime.tool;
-        km_result->keymaps[km_result->keymaps_len++] = km;
-      }
-      else {
-        printf(
-            "Keymap: '%s' not found for tool '%s'\n", tref_rt->keymap, area->runtime.tool->idname);
-      }
-    }
-  }
+  wm_event_get_keymap_from_toolsystem_ex(wm, win, handler, km_result, false);
 }
 
 struct wmEventHandler_Keymap *WM_event_add_keymap_handler_dynamic(

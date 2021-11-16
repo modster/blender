@@ -255,7 +255,7 @@ struct uiBut {
   /* Operator data */
   struct wmOperatorType *optype;
   struct PointerRNA *opptr;
-  short opcontext;
+  wmOperatorCallContext opcontext;
 
   /** When non-zero, this is the key used to activate a menu items (`a-z` always lower case). */
   uchar menu_key;
@@ -609,7 +609,7 @@ typedef struct uiSafetyRct {
 
 /* interface.c */
 
-void ui_fontscale(short *points, float aspect);
+void ui_fontscale(float *points, float aspect);
 
 extern void ui_block_to_region_fl(const struct ARegion *region,
                                   uiBlock *block,
@@ -680,6 +680,7 @@ extern bool ui_but_string_eval_number(struct bContext *C,
 extern int ui_but_string_get_max_length(uiBut *but);
 /* Clear & exit the active button's string. */
 extern void ui_but_active_string_clear_and_exit(struct bContext *C, uiBut *but) ATTR_NONNULL();
+extern void ui_but_set_string_interactive(struct bContext *C, uiBut *but, const char *value);
 extern uiBut *ui_but_drag_multi_edit_get(uiBut *but);
 
 void ui_def_but_icon(uiBut *but, const int icon, const int flag);
@@ -881,7 +882,7 @@ void ui_pie_menu_level_create(uiBlock *block,
                               struct IDProperty *properties,
                               const EnumPropertyItem *items,
                               int totitem,
-                              int context,
+                              wmOperatorCallContext context,
                               int flag);
 
 /* interface_region_popup.c */
@@ -959,7 +960,8 @@ const char *ui_textedit_undo(struct uiUndoStack_Text *undo_stack,
                              int *r_cursor_index);
 
 /* interface_handlers.c */
-extern void ui_handle_afterfunc_add_operator(struct wmOperatorType *ot, int opcontext);
+extern void ui_handle_afterfunc_add_operator(struct wmOperatorType *ot,
+                                             wmOperatorCallContext opcontext);
 extern void ui_pan_to_scroll(const struct wmEvent *event, int *type, int *val);
 extern void ui_but_activate_event(struct bContext *C, struct ARegion *region, uiBut *but);
 extern void ui_but_activate_over(struct bContext *C, struct ARegion *region, uiBut *but);

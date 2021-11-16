@@ -57,9 +57,10 @@
 
 #include "BLT_translation.h"
 
+#include "NOD_node_declaration.hh"
 #include "NOD_node_tree_ref.hh"
 
-#include "node_intern.h" /* own include */
+#include "node_intern.hh" /* own include */
 
 using namespace blender::nodes::node_tree_ref_types;
 
@@ -2182,9 +2183,32 @@ static int get_main_socket_priority(const bNodeSocket *socket)
   return -1;
 }
 
-/** Get the "main" socket of a socket list using a heuristic based on socket types. */
-static bNodeSocket *get_main_socket(ListBase *sockets)
+/** Get the "main" socket based on the node declaration or an heuristic. */
+static bNodeSocket *get_main_socket(bNodeTree &ntree, bNode &node, eNodeSocketInOut in_out)
 {
+  using namespace blender;
+  using namespace blender::nodes;
+
+  ListBase *sockets = (in_out == SOCK_IN) ? &node.inputs : &node.outputs;
+
+  /* Try to get the main socket based on the socket declaration. */
+  nodeDeclarationEnsure(&ntree, &node);
+  const NodeDeclaration *node_decl = node.declaration;
+  if (node_decl != nullptr) {
+    Span<SocketDeclarationPtr> socket_decls = (in_out == SOCK_IN) ? node_decl->inputs() :
+                                                                    node_decl->outputs();
+    int index;
+    LISTBASE_FOREACH_INDEX (bNodeSocket *, socket, sockets, index) {
+      const SocketDeclaration &socket_decl = *socket_decls[index];
+      if (nodeSocketIsHidden(socket)) {
+        continue;
+      }
+      if (socket_decl.is_default_link_socket()) {
+        return socket;
+      }
+    }
+  }
+
   /* find priority range */
   int maxpriority = -1;
   LISTBASE_FOREACH (bNodeSocket *, sock, sockets) {
@@ -2345,8 +2369,8 @@ static void node_link_insert_offset_ntree(NodeInsertOfsData *iofsd,
   /* NODE_TEST will be used later, so disable for all nodes */
   ntreeNodeFlagSet(ntree, NODE_TEST, false);
 
-  /* insert->totr isn't updated yet,
-   * so totr_insert is used to get the correct worldspace coords */
+  /* `insert->totr` isn't updated yet,
+   * so `totr_insert` is used to get the correct world-space coords. */
   rctf totr_insert;
   node_to_updated_rect(insert, &totr_insert);
 
@@ -2561,8 +2585,8 @@ void ED_node_link_insert(Main *bmain, ScrArea *area)
   }
 
   if (link) {
-    bNodeSocket *best_input = get_main_socket(&select->inputs);
-    bNodeSocket *best_output = get_main_socket(&select->outputs);
+    bNodeSocket *best_input = get_main_socket(*snode->edittree, *select, SOCK_IN);
+    bNodeSocket *best_output = get_main_socket(*snode->edittree, *select, SOCK_OUT);
 
     if (best_input && best_output) {
       bNode *node = link->tonode;

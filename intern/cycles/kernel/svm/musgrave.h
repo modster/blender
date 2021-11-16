@@ -180,7 +180,7 @@ ccl_device_noinline_cpu float noise_musgrave_ridged_multi_fractal_1d(
 
   for (int i = 1; i < float_to_int(octaves); i++) {
     p *= lacunarity;
-    weight = saturate(signal * gain);
+    weight = saturatef(signal * gain);
     signal = offset - fabsf(snoise_1d(p));
     signal *= signal;
     signal *= weight;
@@ -351,7 +351,7 @@ ccl_device_noinline_cpu float noise_musgrave_ridged_multi_fractal_2d(
 
   for (int i = 1; i < float_to_int(octaves); i++) {
     p *= lacunarity;
-    weight = saturate(signal * gain);
+    weight = saturatef(signal * gain);
     signal = offset - fabsf(snoise_2d(p));
     signal *= signal;
     signal *= weight;
@@ -522,7 +522,7 @@ ccl_device_noinline_cpu float noise_musgrave_ridged_multi_fractal_3d(
 
   for (int i = 1; i < float_to_int(octaves); i++) {
     p *= lacunarity;
-    weight = saturate(signal * gain);
+    weight = saturatef(signal * gain);
     signal = offset - fabsf(snoise_3d(p));
     signal *= signal;
     signal *= weight;
@@ -693,7 +693,7 @@ ccl_device_noinline_cpu float noise_musgrave_ridged_multi_fractal_4d(
 
   for (int i = 1; i < float_to_int(octaves); i++) {
     p *= lacunarity;
-    weight = saturate(signal * gain);
+    weight = saturatef(signal * gain);
     signal = offset - fabsf(snoise_4d(p));
     signal *= signal;
     signal *= weight;
@@ -737,7 +737,7 @@ ccl_device_noinline int svm_node_tex_musgrave(KernelGlobals kg,
   float gain = stack_load_float_default(stack, gain_stack_offset, defaults2.z);
 
   dimension = fmaxf(dimension, 1e-5f);
-  detail = clamp(detail, 0.0f, 16.0f);
+  detail = clamp(detail, 0.0f, 15.0f);
   lacunarity = fmaxf(lacunarity, 1e-5f);
 
   float fac;

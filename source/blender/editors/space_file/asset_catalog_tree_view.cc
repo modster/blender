@@ -95,26 +95,45 @@ class AssetCatalogTreeViewItem : public ui::BasicTreeViewItem {
   bool can_rename() const override;
   bool rename(StringRefNull new_name) override;
 
+  /** Add drag support for catalog items. */
+  std::unique_ptr<ui::AbstractTreeViewItemDragController> create_drag_controller() const override;
   /** Add dropping support for catalog items. */
   std::unique_ptr<ui::AbstractTreeViewItemDropController> create_drop_controller() const override;
+};
+
+class AssetCatalogDragController : public ui::AbstractTreeViewItemDragController {
+  AssetCatalogTreeItem &catalog_item_;
+
+ public:
+  explicit AssetCatalogDragController(AssetCatalogTreeItem &catalog_item);
+
+  int get_drag_type() const override;
+  void *create_drag_data() const override;
 };
 
 class AssetCatalogDropController : public ui::AbstractTreeViewItemDropController {
   AssetCatalogTreeItem &catalog_item_;
 
  public:
-  explicit AssetCatalogDropController(AssetCatalogTreeView &tree_view,
-                                      AssetCatalogTreeItem &catalog_item);
+  AssetCatalogDropController(AssetCatalogTreeView &tree_view, AssetCatalogTreeItem &catalog_item);
 
   bool can_drop(const wmDrag &drag, const char **r_disabled_hint) const override;
   std::string drop_tooltip(const wmDrag &drag) const override;
   bool on_drop(const wmDrag &drag) override;
 
-  static bool has_droppable_item(const wmDrag &drag, const char **r_disabled_hint);
-  static bool drop_into_catalog(const AssetCatalogTreeView &tree_view,
-                                const wmDrag &drag,
-                                CatalogID catalog_id,
-                                StringRefNull simple_name = "");
+  ::AssetLibrary &get_asset_library() const;
+  AssetCatalog *get_drag_catalog(const wmDrag &drag) const;
+
+  static bool has_droppable_asset(const wmDrag &drag, const char **r_disabled_hint);
+  static bool drop_assets_into_catalog(const AssetCatalogTreeView &tree_view,
+                                       const wmDrag &drag,
+                                       CatalogID catalog_id,
+                                       StringRefNull simple_name = "");
+
+ private:
+  bool drop_asset_catalog_into_catalog(const wmDrag &drag);
+  std::string drop_tooltip_asset_list(const wmDrag &drag) const;
+  std::string drop_tooltip_asset_catalog(const wmDrag &drag) const;
 };
 
 /** Only reason this isn't just `BasicTreeViewItem` is to add a '+' icon for adding a root level
@@ -308,6 +327,12 @@ std::unique_ptr<ui::AbstractTreeViewItemDropController> AssetCatalogTreeViewItem
       static_cast<AssetCatalogTreeView &>(get_tree_view()), catalog_item_);
 }
 
+std::unique_ptr<ui::AbstractTreeViewItemDragController> AssetCatalogTreeViewItem::
+    create_drag_controller() const
+{
+  return std::make_unique<AssetCatalogDragController>(catalog_item_);
+}
+
 /* ---------------------------------------------------------------------- */
 
 AssetCatalogDropController::AssetCatalogDropController(AssetCatalogTreeView &tree_view,
@@ -318,14 +343,44 @@ AssetCatalogDropController::AssetCatalogDropController(AssetCatalogTreeView &tre
 
 bool AssetCatalogDropController::can_drop(const wmDrag &drag, const char **r_disabled_hint) const
 {
-  if (drag.type != WM_DRAG_ASSET_LIST) {
-    return false;
+  if (drag.type == WM_DRAG_ASSET_CATALOG) {
+    const AssetCatalog *drag_catalog = get_drag_catalog(drag);
+    /* Note: Technically it's not an issue to allow this (the catalog will just receive a new
+     * path and the catalog system will generate missing parents from the path). But it does
+     * appear broken to users, so disabling entirely. */
+    if (catalog_item_.catalog_path().is_contained_in(drag_catalog->path)) {
+      *r_disabled_hint = "Catalog cannot be dropped into itself";
+      return false;
+    }
+    return true;
   }
-  return has_droppable_item(drag, r_disabled_hint);
+  if (drag.type == WM_DRAG_ASSET_LIST) {
+    return has_droppable_asset(drag, r_disabled_hint);
+  }
+  return false;
 }
 
 std::string AssetCatalogDropController::drop_tooltip(const wmDrag &drag) const
 {
+  if (drag.type == WM_DRAG_ASSET_CATALOG) {
+    return drop_tooltip_asset_catalog(drag);
+  }
+  return drop_tooltip_asset_list(drag);
+}
+
+std::string AssetCatalogDropController::drop_tooltip_asset_catalog(const wmDrag &drag) const
+{
+  BLI_assert(drag.type == WM_DRAG_ASSET_CATALOG);
+  const AssetCatalog *src_catalog = get_drag_catalog(drag);
+
+  return std::string(TIP_("Move Catalog")) + " '" + src_catalog->path.name() + "' " +
+         TIP_("into") + " '" + catalog_item_.get_name() + "'";
+}
+
+std::string AssetCatalogDropController::drop_tooltip_asset_list(const wmDrag &drag) const
+{
+  BLI_assert(drag.type == WM_DRAG_ASSET_LIST);
+
   const ListBase *asset_drags = WM_drag_asset_list_get(&drag);
   const bool is_multiple_assets = !BLI_listbase_is_single(asset_drags);
 
@@ -340,17 +395,32 @@ std::string AssetCatalogDropController::drop_tooltip(const wmDrag &drag) const
 
 bool AssetCatalogDropController::on_drop(const wmDrag &drag)
 {
-  return drop_into_catalog(tree_view<AssetCatalogTreeView>(),
-                           drag,
-                           catalog_item_.get_catalog_id(),
-                           catalog_item_.get_simple_name());
+  if (drag.type == WM_DRAG_ASSET_CATALOG) {
+    return drop_asset_catalog_into_catalog(drag);
+  }
+  return drop_assets_into_catalog(tree_view<AssetCatalogTreeView>(),
+                                  drag,
+                                  catalog_item_.get_catalog_id(),
+                                  catalog_item_.get_simple_name());
 }
 
-bool AssetCatalogDropController::drop_into_catalog(const AssetCatalogTreeView &tree_view,
-                                                   const wmDrag &drag,
-                                                   CatalogID catalog_id,
-                                                   StringRefNull simple_name)
+bool AssetCatalogDropController::drop_asset_catalog_into_catalog(const wmDrag &drag)
 {
+  BLI_assert(drag.type == WM_DRAG_ASSET_CATALOG);
+  wmDragAssetCatalog *catalog_drag = WM_drag_get_asset_catalog_data(&drag);
+  ED_asset_catalog_move(
+      &get_asset_library(), catalog_drag->drag_catalog_id, catalog_item_.get_catalog_id());
+
+  WM_main_add_notifier(NC_ASSET | ND_ASSET_CATALOGS, nullptr);
+  return true;
+}
+
+bool AssetCatalogDropController::drop_assets_into_catalog(const AssetCatalogTreeView &tree_view,
+                                                          const wmDrag &drag,
+                                                          CatalogID catalog_id,
+                                                          StringRefNull simple_name)
+{
+  BLI_assert(drag.type == WM_DRAG_ASSET_LIST);
   const ListBase *asset_drags = WM_drag_asset_list_get(&drag);
   if (!asset_drags) {
     return false;
@@ -373,8 +443,20 @@ bool AssetCatalogDropController::drop_into_catalog(const AssetCatalogTreeView &t
   return true;
 }
 
-bool AssetCatalogDropController::has_droppable_item(const wmDrag &drag,
-                                                    const char **r_disabled_hint)
+AssetCatalog *AssetCatalogDropController::get_drag_catalog(const wmDrag &drag) const
+{
+  if (drag.type != WM_DRAG_ASSET_CATALOG) {
+    return nullptr;
+  }
+  const bke::AssetCatalogService *catalog_service = BKE_asset_library_get_catalog_service(
+      &get_asset_library());
+  const wmDragAssetCatalog *catalog_drag = WM_drag_get_asset_catalog_data(&drag);
+
+  return catalog_service->find_catalog(catalog_drag->drag_catalog_id);
+}
+
+bool AssetCatalogDropController::has_droppable_asset(const wmDrag &drag,
+                                                     const char **r_disabled_hint)
 {
   const ListBase *asset_drags = WM_drag_asset_list_get(&drag);
 
@@ -388,6 +470,31 @@ bool AssetCatalogDropController::has_droppable_item(const wmDrag &drag,
 
   *r_disabled_hint = "Only assets from this current file can be moved between catalogs";
   return false;
+}
+
+::AssetLibrary &AssetCatalogDropController::get_asset_library() const
+{
+  return *tree_view<AssetCatalogTreeView>().asset_library_;
+}
+
+/* ---------------------------------------------------------------------- */
+
+AssetCatalogDragController::AssetCatalogDragController(AssetCatalogTreeItem &catalog_item)
+    : catalog_item_(catalog_item)
+{
+}
+
+int AssetCatalogDragController::get_drag_type() const
+{
+  return WM_DRAG_ASSET_CATALOG;
+}
+
+void *AssetCatalogDragController::create_drag_data() const
+{
+  wmDragAssetCatalog *drag_catalog = (wmDragAssetCatalog *)MEM_callocN(sizeof(*drag_catalog),
+                                                                       __func__);
+  drag_catalog->drag_catalog_id = catalog_item_.get_catalog_id();
+  return drag_catalog;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -427,7 +534,7 @@ bool AssetCatalogTreeViewUnassignedItem::DropController::can_drop(
   if (drag.type != WM_DRAG_ASSET_LIST) {
     return false;
   }
-  return AssetCatalogDropController::has_droppable_item(drag, r_disabled_hint);
+  return AssetCatalogDropController::has_droppable_asset(drag, r_disabled_hint);
 }
 
 std::string AssetCatalogTreeViewUnassignedItem::DropController::drop_tooltip(
@@ -443,7 +550,7 @@ std::string AssetCatalogTreeViewUnassignedItem::DropController::drop_tooltip(
 bool AssetCatalogTreeViewUnassignedItem::DropController::on_drop(const wmDrag &drag)
 {
   /* Assign to nil catalog ID. */
-  return AssetCatalogDropController::drop_into_catalog(
+  return AssetCatalogDropController::drop_assets_into_catalog(
       tree_view<AssetCatalogTreeView>(), drag, CatalogID{});
 }
 

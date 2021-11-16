@@ -274,19 +274,26 @@ void OSLShaderManager::shading_system_init()
 
         "diffuse_ancestor", /* PATH_RAY_DIFFUSE_ANCESTOR */
 
-        "__unused__", /* PATH_RAY_SINGLE_PASS_DONE */
-        "__unused__", /* PATH_RAY_TRANSPARENT_BACKGROUND */
-        "__unused__", /* PATH_RAY_TERMINATE_IMMEDIATE */
-        "__unused__", /* PATH_RAY_TERMINATE_AFTER_TRANSPARENT */
-        "__unused__", /* PATH_RAY_EMISSION */
-        "__unused__", /* PATH_RAY_SUBSURFACE */
-        "__unused__", /* PATH_RAY_DENOISING_FEATURES */
-        "__unused__", /* PATH_RAY_REFLECT_PASS */
-        "__unused__", /* PATH_RAY_TRANSMISSION_PASS */
-        "__unused__", /* PATH_RAY_VOLUME_PASS */
-        "__unused__", /* PATH_RAY_SHADOW_FOR_LIGHT */
-        "__unused__", /* PATH_RAY_SHADOW_CATCHER_HIT */
-        "__unused__", /* PATH_RAY_SHADOW_CATCHER_PASS */
+        /* Remaining irrelevant bits up to 32. */
+        "__unused__",
+        "__unused__",
+        "__unused__",
+        "__unused__",
+        "__unused__",
+        "__unused__",
+        "__unused__",
+        "__unused__",
+        "__unused__",
+        "__unused__",
+        "__unused__",
+        "__unused__",
+        "__unused__",
+        "__unused__",
+        "__unused__",
+        "__unused__",
+        "__unused__",
+        "__unused__",
+        "__unused__",
     };
 
     const int nraytypes = sizeof(raytypes) / sizeof(raytypes[0]);
@@ -326,17 +333,22 @@ bool OSLShaderManager::osl_compile(const string &inputfile, const string &output
   string stdosl_path;
   string shader_path = path_get("shader");
 
-  /* specify output file name */
+  /* Specify output file name. */
   options.push_back("-o");
   options.push_back(outputfile);
 
-  /* specify standard include path */
+  /* Specify standard include path. */
   string include_path_arg = string("-I") + shader_path;
   options.push_back(include_path_arg);
 
   stdosl_path = path_join(shader_path, "stdcycles.h");
 
-  /* compile */
+  /* Compile.
+   *
+   * Mutex protected because the OSL compiler does not appear to be thread safe, see T92503. */
+  static thread_mutex osl_compiler_mutex;
+  thread_scoped_lock lock(osl_compiler_mutex);
+
   OSL::OSLCompiler *compiler = new OSL::OSLCompiler(&OSL::ErrorHandler::default_handler());
   bool ok = compiler->compile(string_view(inputfile), options, string_view(stdosl_path));
   delete compiler;

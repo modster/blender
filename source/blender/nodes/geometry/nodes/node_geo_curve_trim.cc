@@ -28,21 +28,24 @@ namespace blender::nodes {
 
 static void geo_node_curve_trim_declare(NodeDeclarationBuilder &b)
 {
-  b.add_input<decl::Geometry>("Curve").supported_type(GEO_COMPONENT_TYPE_CURVE);
-  b.add_input<decl::Float>("Start").min(0.0f).max(1.0f).subtype(PROP_FACTOR).supports_field();
-  b.add_input<decl::Float>("End")
+  b.add_input<decl::Geometry>(N_("Curve")).supported_type(GEO_COMPONENT_TYPE_CURVE);
+  b.add_input<decl::Float>(N_("Start")).min(0.0f).max(1.0f).subtype(PROP_FACTOR).supports_field();
+  b.add_input<decl::Float>(N_("End"))
       .min(0.0f)
       .max(1.0f)
       .default_value(1.0f)
       .subtype(PROP_FACTOR)
       .supports_field();
-  b.add_input<decl::Float>("Start", "Start_001").min(0.0f).subtype(PROP_DISTANCE).supports_field();
-  b.add_input<decl::Float>("End", "End_001")
+  b.add_input<decl::Float>(N_("Start"), "Start_001")
+      .min(0.0f)
+      .subtype(PROP_DISTANCE)
+      .supports_field();
+  b.add_input<decl::Float>(N_("End"), "End_001")
       .min(0.0f)
       .default_value(1.0f)
       .subtype(PROP_DISTANCE)
       .supports_field();
-  b.add_output<decl::Geometry>("Curve");
+  b.add_output<decl::Geometry>(N_("Curve"));
 }
 
 static void geo_node_curve_trim_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
@@ -213,9 +216,9 @@ static PolySpline trim_nurbs_spline(const Spline &spline,
 
         attribute_math::convert_to_static_type(src->type(), [&](auto dummy) {
           using T = decltype(dummy);
-          GVArray_Typed<T> eval_data = spline.interpolate_to_evaluated<T>(src->typed<T>());
+          VArray<T> eval_data = spline.interpolate_to_evaluated<T>(src->typed<T>());
           linear_trim_to_output_data<T>(
-              start, end, eval_data->get_internal_span(), dst->typed<T>());
+              start, end, eval_data.get_internal_span(), dst->typed<T>());
         });
         return true;
       },
@@ -224,13 +227,13 @@ static PolySpline trim_nurbs_spline(const Spline &spline,
   linear_trim_to_output_data<float3>(
       start, end, spline.evaluated_positions(), new_spline.positions());
 
-  GVArray_Typed<float> evaluated_radii = spline.interpolate_to_evaluated(spline.radii());
+  VArray<float> evaluated_radii = spline.interpolate_to_evaluated(spline.radii());
   linear_trim_to_output_data<float>(
-      start, end, evaluated_radii->get_internal_span(), new_spline.radii());
+      start, end, evaluated_radii.get_internal_span(), new_spline.radii());
 
-  GVArray_Typed<float> evaluated_tilts = spline.interpolate_to_evaluated(spline.tilts());
+  VArray<float> evaluated_tilts = spline.interpolate_to_evaluated(spline.tilts());
   linear_trim_to_output_data<float>(
-      start, end, evaluated_tilts->get_internal_span(), new_spline.tilts());
+      start, end, evaluated_tilts.get_internal_span(), new_spline.tilts());
 
   return new_spline;
 }
@@ -424,8 +427,8 @@ static PolySpline to_single_point_nurbs(const Spline &spline, const Spline::Look
         std::optional<GMutableSpan> dst = new_spline.attributes.get_for_write(attribute_id);
         attribute_math::convert_to_static_type(src->type(), [&](auto dummy) {
           using T = decltype(dummy);
-          GVArray_Typed<T> eval_data = spline.interpolate_to_evaluated<T>(src->typed<T>());
-          to_single_point_data<T>(trim, eval_data->get_internal_span(), dst->typed<T>());
+          VArray<T> eval_data = spline.interpolate_to_evaluated<T>(src->typed<T>());
+          to_single_point_data<T>(trim, eval_data.get_internal_span(), dst->typed<T>());
         });
         return true;
       },
@@ -433,11 +436,11 @@ static PolySpline to_single_point_nurbs(const Spline &spline, const Spline::Look
 
   to_single_point_data<float3>(trim, spline.evaluated_positions(), new_spline.positions());
 
-  GVArray_Typed<float> evaluated_radii = spline.interpolate_to_evaluated(spline.radii());
-  to_single_point_data<float>(trim, evaluated_radii->get_internal_span(), new_spline.radii());
+  VArray<float> evaluated_radii = spline.interpolate_to_evaluated(spline.radii());
+  to_single_point_data<float>(trim, evaluated_radii.get_internal_span(), new_spline.radii());
 
-  GVArray_Typed<float> evaluated_tilts = spline.interpolate_to_evaluated(spline.tilts());
-  to_single_point_data<float>(trim, evaluated_tilts->get_internal_span(), new_spline.tilts());
+  VArray<float> evaluated_tilts = spline.interpolate_to_evaluated(spline.tilts());
+  to_single_point_data<float>(trim, evaluated_tilts.get_internal_span(), new_spline.tilts());
 
   return new_spline;
 }

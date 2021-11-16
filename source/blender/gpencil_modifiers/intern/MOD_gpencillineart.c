@@ -264,13 +264,13 @@ static void updateDepsgraph(GpencilModifierData *md,
   else {
     add_this_collection(ctx->scene->master_collection, ctx, mode);
   }
-  if (lmd->calculation_flags & LRT_USE_CUSTOM_CAMERA) {
+  if (lmd->calculation_flags & LRT_USE_CUSTOM_CAMERA && lmd->source_camera) {
     DEG_add_object_relation(
         ctx->node, lmd->source_camera, DEG_OB_COMP_TRANSFORM, "Line Art Modifier");
     DEG_add_object_relation(
         ctx->node, lmd->source_camera, DEG_OB_COMP_PARAMETERS, "Line Art Modifier");
   }
-  if (ctx->scene->camera) {
+  else if (ctx->scene->camera) {
     DEG_add_object_relation(
         ctx->node, ctx->scene->camera, DEG_OB_COMP_TRANSFORM, "Line Art Modifier");
     DEG_add_object_relation(
@@ -388,7 +388,7 @@ static void options_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiLayoutSetEnabled(layout, !is_baked);
 
   if (use_cache && !is_first) {
-    uiItemL(layout, "Cached from the first line art modifier.", ICON_INFO);
+    uiItemL(layout, TIP_("Cached from the first line art modifier"), ICON_INFO);
     return;
   }
 
@@ -439,7 +439,7 @@ static void occlusion_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiLayoutSetEnabled(layout, !is_baked);
 
   if (!show_in_front) {
-    uiItemL(layout, IFACE_("Object is not in front"), ICON_INFO);
+    uiItemL(layout, TIP_("Object is not in front"), ICON_INFO);
   }
 
   layout = uiLayoutColumn(layout, false);
@@ -478,7 +478,7 @@ static void material_mask_panel_draw_header(const bContext *UNUSED(C), Panel *pa
   const bool show_in_front = RNA_boolean_get(&ob_ptr, "show_in_front");
 
   uiLayoutSetEnabled(layout, !is_baked);
-  uiLayoutSetActive(layout, (!show_in_front) && anything_showing_through(ptr));
+  uiLayoutSetActive(layout, show_in_front && anything_showing_through(ptr));
 
   uiItemR(layout, ptr, "use_material_mask", 0, IFACE_("Material Mask"), ICON_NONE);
 }
@@ -568,7 +568,7 @@ static void face_mark_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiLayoutSetEnabled(layout, !is_baked);
 
   if (use_cache && !is_first) {
-    uiItemL(layout, "Cached from the first line art modifier.", ICON_INFO);
+    uiItemL(layout, TIP_("Cached from the first line art modifier"), ICON_INFO);
     return;
   }
 
@@ -596,7 +596,7 @@ static void chaining_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiLayoutSetEnabled(layout, !is_baked);
 
   if (use_cache && !is_first) {
-    uiItemL(layout, "Cached from the first line art modifier.", ICON_INFO);
+    uiItemL(layout, TIP_("Cached from the first line art modifier"), ICON_INFO);
     return;
   }
 
@@ -633,7 +633,7 @@ static void vgroup_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiLayoutSetEnabled(layout, !is_baked);
 
   if (use_cache && !is_first) {
-    uiItemL(layout, "Cached from the first line art modifier.", ICON_INFO);
+    uiItemL(layout, TIP_("Cached from the first line art modifier"), ICON_INFO);
     return;
   }
 
@@ -666,7 +666,7 @@ static void bake_panel_draw(const bContext *UNUSED(C), Panel *panel)
   if (is_baked) {
     uiLayout *col = uiLayoutColumn(layout, false);
     uiLayoutSetPropSep(col, false);
-    uiItemL(col, IFACE_("Modifier has baked data"), ICON_NONE);
+    uiItemL(col, TIP_("Modifier has baked data"), ICON_NONE);
     uiItemR(
         col, ptr, "is_baked", UI_ITEM_R_TOGGLE, IFACE_("Continue Without Clearing"), ICON_NONE);
   }
@@ -696,7 +696,7 @@ static void composition_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiItemR(layout, ptr, "use_image_boundary_trimming", 0, NULL, ICON_NONE);
 
   if (show_in_front) {
-    uiItemL(layout, IFACE_("Object is shown in front"), ICON_ERROR);
+    uiItemL(layout, TIP_("Object is shown in front"), ICON_ERROR);
   }
 
   uiLayout *col = uiLayoutColumn(layout, false);

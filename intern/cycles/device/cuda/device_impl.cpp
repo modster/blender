@@ -378,7 +378,9 @@ string CUDADevice::compile_kernel(const uint kernel_features,
       cubin.c_str(),
       common_cflags.c_str());
 
-  printf("Compiling CUDA kernel ...\n%s\n", command.c_str());
+  printf("Compiling %sCUDA kernel ...\n%s\n",
+         (use_adaptive_compilation()) ? "adaptive " : "",
+         command.c_str());
 
 #  ifdef _WIN32
   command = "call " + command;
@@ -405,13 +407,15 @@ string CUDADevice::compile_kernel(const uint kernel_features,
 
 bool CUDADevice::load_kernels(const uint kernel_features)
 {
-  /* TODO(sergey): Support kernels re-load for CUDA devices.
+  /* TODO(sergey): Support kernels re-load for CUDA devices adaptive compile.
    *
    * Currently re-loading kernel will invalidate memory pointers,
    * causing problems in cuCtxSynchronize.
    */
   if (cuModule) {
-    VLOG(1) << "Skipping kernel reload, not currently supported.";
+    if (use_adaptive_compilation()) {
+      VLOG(1) << "Skipping CUDA kernel reload for adaptive compilation, not currently supported.";
+    }
     return true;
   }
 
@@ -927,7 +931,6 @@ void CUDADevice::tex_alloc(device_texture &mem)
 {
   CUDAContextScope scope(this);
 
-  /* General variables for both architectures */
   string bind_name = mem.name;
   size_t dsize = datatype_size(mem.data_type);
   size_t size = mem.memory_size();
@@ -1090,7 +1093,6 @@ void CUDADevice::tex_alloc(device_texture &mem)
 
   if (mem.info.data_type != IMAGE_DATA_TYPE_NANOVDB_FLOAT &&
       mem.info.data_type != IMAGE_DATA_TYPE_NANOVDB_FLOAT3) {
-    /* Kepler+, bindless textures. */
     CUDA_RESOURCE_DESC resDesc;
     memset(&resDesc, 0, sizeof(resDesc));
 

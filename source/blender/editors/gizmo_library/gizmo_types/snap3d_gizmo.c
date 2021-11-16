@@ -226,6 +226,7 @@ static void snap_gizmo_setup(wmGizmo *gz)
   SnapGizmo3D *snap_gizmo = (SnapGizmo3D *)gz;
   snap_gizmo->snap_state = ED_view3d_cursor_snap_active();
   if (snap_gizmo->snap_state) {
+    snap_gizmo->snap_state->gzgrp_type = gz->parent_gzgroup->type;
     snap_gizmo->snap_state->draw_point = true;
     snap_gizmo->snap_state->draw_plane = false;
   }

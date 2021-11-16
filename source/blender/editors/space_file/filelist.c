@@ -914,6 +914,9 @@ static void prepare_filter_asset_library(const FileList *filelist, FileListFilte
   if (!filter->asset_catalog_filter) {
     return;
   }
+  BLI_assert_msg(filelist->asset_library,
+                 "prepare_filter_asset_library() should only be called when the file browser is "
+                 "in asset browser mode");
 
   file_ensure_updated_catalog_filter_data(filter->asset_catalog_filter, filelist->asset_library);
 }
@@ -1876,11 +1879,13 @@ void filelist_settype(FileList *filelist, short type)
     case FILE_MAIN:
       filelist->check_dir_fn = filelist_checkdir_main;
       filelist->read_job_fn = filelist_readjob_main;
+      filelist->prepare_filter_fn = NULL;
       filelist->filter_fn = is_filtered_main;
       break;
     case FILE_LOADLIB:
       filelist->check_dir_fn = filelist_checkdir_lib;
       filelist->read_job_fn = filelist_readjob_lib;
+      filelist->prepare_filter_fn = NULL;
       filelist->filter_fn = is_filtered_lib;
       break;
     case FILE_ASSET_LIBRARY:
@@ -1900,6 +1905,7 @@ void filelist_settype(FileList *filelist, short type)
     default:
       filelist->check_dir_fn = filelist_checkdir_dir;
       filelist->read_job_fn = filelist_readjob_dir;
+      filelist->prepare_filter_fn = NULL;
       filelist->filter_fn = is_filtered_file;
       break;
   }
@@ -1911,6 +1917,7 @@ static void filelist_clear_asset_library(FileList *filelist)
 {
   /* The AssetLibraryService owns the AssetLibrary pointer, so no need for us to free it. */
   filelist->asset_library = NULL;
+  file_delete_asset_catalog_filter_settings(&filelist->filter_data.asset_catalog_filter);
 }
 
 void filelist_clear_ex(struct FileList *filelist,
@@ -2010,7 +2017,6 @@ void filelist_free(struct FileList *filelist)
     filelist->selection_state = NULL;
   }
 
-  file_delete_asset_catalog_filter_settings(&filelist->filter_data.asset_catalog_filter);
   MEM_SAFE_FREE(filelist->asset_library_ref);
 
   memset(&filelist->filter_data, 0, sizeof(filelist->filter_data));

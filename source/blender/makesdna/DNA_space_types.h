@@ -64,7 +64,7 @@ struct wmTimer;
 /* Defined in `buttons_intern.h`. */
 typedef struct SpaceProperties_Runtime SpaceProperties_Runtime;
 
-/* Defined in `node_intern.h`. */
+/* Defined in `node_intern.hh`. */
 typedef struct SpaceNode_Runtime SpaceNode_Runtime;
 
 /* Defined in `file_intern.h`. */
@@ -2006,6 +2006,7 @@ typedef enum eSpreadsheetColumnValueType {
   SPREADSHEET_VALUE_TYPE_FLOAT3 = 4,
   SPREADSHEET_VALUE_TYPE_COLOR = 5,
   SPREADSHEET_VALUE_TYPE_INSTANCES = 6,
+  SPREADSHEET_VALUE_TYPE_STRING = 7,
 } eSpreadsheetColumnValueType;
 
 /**

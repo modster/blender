@@ -276,10 +276,10 @@ typedef void(wmEventHandler_KeymapDynamicFn)(wmWindowManager *wm,
                                              struct wmEventHandler_Keymap *handler,
                                              struct wmEventHandler_KeymapResult *km_result);
 
-void WM_event_get_keymap_from_toolsystem_fallback(struct wmWindowManager *wm,
-                                                  struct wmWindow *win,
-                                                  struct wmEventHandler_Keymap *handler,
-                                                  wmEventHandler_KeymapResult *km_result);
+void WM_event_get_keymap_from_toolsystem_with_gizmos(struct wmWindowManager *wm,
+                                                     struct wmWindow *win,
+                                                     struct wmEventHandler_Keymap *handler,
+                                                     wmEventHandler_KeymapResult *km_result);
 void WM_event_get_keymap_from_toolsystem(struct wmWindowManager *wm,
                                          struct wmWindow *win,
                                          struct wmEventHandler_Keymap *handler,
@@ -413,7 +413,7 @@ int WM_generic_select_invoke(struct bContext *C,
                              const struct wmEvent *event);
 void WM_operator_view3d_unit_defaults(struct bContext *C, struct wmOperator *op);
 int WM_operator_smooth_viewtx_get(const struct wmOperator *op);
-int WM_menu_invoke_ex(struct bContext *C, struct wmOperator *op, int opcontext);
+int WM_menu_invoke_ex(struct bContext *C, struct wmOperator *op, wmOperatorCallContext opcontext);
 int WM_menu_invoke(struct bContext *C, struct wmOperator *op, const struct wmEvent *event);
 void WM_menu_name_call(struct bContext *C, const char *menu_name, short context);
 int WM_enum_search_invoke_previews(struct bContext *C,
@@ -451,7 +451,7 @@ int WM_operator_confirm_message_ex(struct bContext *C,
                                    const char *title,
                                    const int icon,
                                    const char *message,
-                                   const short opcontext);
+                                   const wmOperatorCallContext opcontext);
 int WM_operator_confirm_message(struct bContext *C, struct wmOperator *op, const char *message);
 
 /* operator api */
@@ -472,26 +472,26 @@ bool WM_operator_repeat_check(const struct bContext *C, struct wmOperator *op);
 bool WM_operator_is_repeat(const struct bContext *C, const struct wmOperator *op);
 int WM_operator_name_call_ptr(struct bContext *C,
                               struct wmOperatorType *ot,
-                              short context,
+                              wmOperatorCallContext context,
                               struct PointerRNA *properties);
 int WM_operator_name_call(struct bContext *C,
                           const char *opstring,
-                          short context,
+                          wmOperatorCallContext context,
                           struct PointerRNA *properties);
 int WM_operator_name_call_with_properties(struct bContext *C,
                                           const char *opstring,
-                                          short context,
+                                          wmOperatorCallContext context,
                                           struct IDProperty *properties);
 int WM_operator_call_py(struct bContext *C,
                         struct wmOperatorType *ot,
-                        short context,
+                        wmOperatorCallContext context,
                         struct PointerRNA *properties,
                         struct ReportList *reports,
                         const bool is_undo);
 
 void WM_operator_name_call_ptr_with_depends_on_cursor(struct bContext *C,
                                                       wmOperatorType *ot,
-                                                      short opcontext,
+                                                      wmOperatorCallContext opcontext,
                                                       PointerRNA *properties,
                                                       const char *drawstr);
 
@@ -770,6 +770,8 @@ void WM_drag_free_imported_drag_ID(struct Main *bmain,
                                    struct wmDrag *drag,
                                    struct wmDropBox *drop);
 
+struct wmDragAssetCatalog *WM_drag_get_asset_catalog_data(const struct wmDrag *drag);
+
 void WM_drag_add_asset_list_item(wmDrag *drag,
                                  const struct bContext *C,
                                  const struct AssetLibraryReference *asset_library_ref,
@@ -935,6 +937,7 @@ bool WM_event_is_modal_tweak_exit(const struct wmEvent *event, int tweak_event);
 bool WM_event_is_last_mousemove(const struct wmEvent *event);
 bool WM_event_is_mouse_drag(const struct wmEvent *event);
 bool WM_event_is_mouse_drag_or_press(const wmEvent *event);
+bool WM_cursor_test_motion_and_update(const int mval[2]) ATTR_NONNULL(1) ATTR_WARN_UNUSED_RESULT;
 
 int WM_event_drag_threshold(const struct wmEvent *event);
 bool WM_event_drag_test(const struct wmEvent *event, const int prev_xy[2]);
