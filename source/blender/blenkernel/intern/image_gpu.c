@@ -378,7 +378,7 @@ static GPUTexture *image_get_gpu_texture(Image *ima,
   /* TODO(jbakker): bad call. Or we should do this everywhere where image is changed, or we should
    * make it possible to initialize an empty register. */
   if ((ima->gpuflag & IMA_GPU_REFRESH) != 0) {
-    BKE_image_partial_update_register_mark_full_update(ima, ibuf_intern);
+    BKE_image_partial_update_mark_full_update(ima, ibuf_intern);
     ima->gpuflag &= ~IMA_GPU_REFRESH;
   }
 
@@ -386,8 +386,8 @@ static GPUTexture *image_get_gpu_texture(Image *ima,
     ima->runtime.partial_update_user = BKE_image_partial_update_create(ima);
   }
 
-  switch (
-      BKE_image_partial_update_collect_tiles(ima, ibuf_intern, ima->runtime.partial_update_user)) {
+  switch (BKE_image_partial_update_collect_changes(
+      ima, ibuf_intern, ima->runtime.partial_update_user)) {
     case PARTIAL_UPDATE_NEED_FULL_UPDATE: {
       image_free_gpu(ima, true);
       break;
@@ -396,10 +396,10 @@ static GPUTexture *image_get_gpu_texture(Image *ima,
     case PARTIAL_UPDATE_CHANGES_AVAILABLE: {
       BLI_assert(ibuf_intern);
       BLI_assert(tile);
-      PartialUpdateTile changed_region;
-      while (
-          BKE_image_partial_update_next_tile(ima->runtime.partial_update_user, &changed_region) ==
-          PARTIAL_UPDATE_ITER_TILE_LOADED) {
+      PartialUpdateRegion changed_region;
+      while (BKE_image_partial_update_get_next_change(ima->runtime.partial_update_user,
+                                                      &changed_region) ==
+             PARTIAL_UPDATE_ITER_CHANGE_AVAILABLE) {
         const int tile_offset_x = changed_region.region.xmin;
         const int tile_offset_y = changed_region.region.ymin;
         const int tile_width = BLI_rcti_size_x(&changed_region.region);
@@ -941,12 +941,12 @@ void BKE_image_update_gputexture_delayed(
 {
   /* Check for full refresh. */
   if (ibuf && x == 0 && y == 0 && w == ibuf->x && h == ibuf->y) {
-    BKE_image_partial_update_register_mark_full_update(ima, ibuf);
+    BKE_image_partial_update_mark_full_update(ima, ibuf);
   }
   else {
     rcti dirty_region;
     BLI_rcti_init(&dirty_region, x, x + w, y, y + h);
-    BKE_image_partial_update_register_mark_region(ima, ibuf, &dirty_region);
+    BKE_image_partial_update_mark_region(ima, ibuf, &dirty_region);
   }
 }
 

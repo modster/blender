@@ -397,7 +397,7 @@ bool BKE_image_clear_renderslot(struct Image *ima, struct ImageUser *iuser, int 
 struct PartialUpdateUser;
 
 /**
- * \brief Result codes of #BKE_image_partial_update_collect_tiles.
+ * \brief Result codes of #BKE_image_partial_update_collect_changes.
  */
 typedef enum ePartialUpdateCollectResult {
   /** \brief Unable to construct partial updates. Caller should perform a full update. */
@@ -406,31 +406,31 @@ typedef enum ePartialUpdateCollectResult {
   /** \brief No changes detected since the last time requested. */
   PARTIAL_UPDATE_NO_CHANGES,
 
-  /** \brief Changes detected sinve the last time requested. */
+  /** \brief Changes detected since the last time requested. */
   PARTIAL_UPDATE_CHANGES_AVAILABLE,
 } ePartialUpdateCollectResult;
 
 /**
- * \brief A single tile to update.
+ * \brief A region to update.
  *
  * Data is organized in tiles. These tiles are in texel space (1 unit is a single texel). When
  * tiles are requested they are merged with neighboring tiles.
  */
-typedef struct PartialUpdateTile {
+typedef struct PartialUpdateRegion {
   /** \brief region of the image that has been updated. Region can be bigger than actual changes.
    */
   struct rcti region;
-} PartialUpdateTile;
+} PartialUpdateRegion;
 
 /**
- * \brief Return codes of #BKE_image_partial_update_next_tile.
+ * \brief Return codes of #BKE_image_partial_update_get_next_change.
  */
 typedef enum ePartialUpdateIterResult {
   /** \brief no tiles left when iterating over tiles. */
-  PARTIAL_UPDATE_ITER_NO_TILES_LEFT = 0,
+  PARTIAL_UPDATE_ITER_FINISHED = 0,
 
   /** \brief a tile was available and has been loaded. */
-  PARTIAL_UPDATE_ITER_TILE_LOADED = 1,
+  PARTIAL_UPDATE_ITER_CHANGE_AVAILABLE = 1,
 } ePartialUpdateIterResult;
 
 /**
@@ -446,7 +446,7 @@ void BKE_image_partial_update_free(struct PartialUpdateUser *user);
 /**
  * \brief collect the partial update since the last request.
  *
- * Invoke #BKE_image_partial_update_next_tile to iterate over the collected tiles.
+ * Invoke #BKE_image_partial_update_get_next_change to iterate over the collected tiles.
  *
  * \returns PARTIAL_UPDATE_NEED_FULL_UPDATE: called should not use partial updates but
  *              recalculate the full image. This result can be expected when called
@@ -456,14 +456,13 @@ void BKE_image_partial_update_free(struct PartialUpdateUser *user);
  *              invoke for the same user.
  *          PARTIAL_UPDATE_CHANGES_AVAILABLE: Parts of the image has been updated
  *              since last invoke for the same user. The changes can be read by
- *              using #BKE_image_partial_update_next_tile.
+ *              using #BKE_image_partial_update_get_next_change.
  */
-ePartialUpdateCollectResult BKE_image_partial_update_collect_tiles(struct Image *image,
-                                                                   struct ImBuf *image_buffer,
-                                                                   struct PartialUpdateUser *user);
+ePartialUpdateCollectResult BKE_image_partial_update_collect_changes(
+    struct Image *image, struct ImBuf *image_buffer, struct PartialUpdateUser *user);
 
-ePartialUpdateIterResult BKE_image_partial_update_next_tile(struct PartialUpdateUser *user,
-                                                            struct PartialUpdateTile *r_tile);
+ePartialUpdateIterResult BKE_image_partial_update_get_next_change(
+    struct PartialUpdateUser *user, struct PartialUpdateRegion *r_tile);
 
 /* --- partial updater (image side) --- */
 struct PartialUpdateRegister;
@@ -472,12 +471,11 @@ struct PartialUpdateRegister *BKE_image_partial_update_register_ensure(struct Im
                                                                        struct ImBuf *image_buffer);
 void BKE_image_partial_update_register_free(struct Image *image);
 /** \brief Mark a region of the image to update. */
-void BKE_image_partial_update_register_mark_region(struct Image *image,
-                                                   struct ImBuf *image_buffer,
-                                                   rcti *updated_region);
+void BKE_image_partial_update_mark_region(struct Image *image,
+                                          struct ImBuf *image_buffer,
+                                          rcti *updated_region);
 /** \brief Mark the whole image to be updated. */
-void BKE_image_partial_update_register_mark_full_update(struct Image *image,
-                                                        struct ImBuf *image_buffer);
+void BKE_image_partial_update_mark_full_update(struct Image *image, struct ImBuf *image_buffer);
 
 #ifdef __cplusplus
 }

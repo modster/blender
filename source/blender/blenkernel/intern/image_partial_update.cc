@@ -1,4 +1,3 @@
-
 /**
  * \file image_gpu_partial_update.cc
  *
@@ -22,16 +21,16 @@
  *
  * ...
  *
- * switch (BKE_image_partial_update_collect_tiles(image, image_buffer))
+ * switch (BKE_image_partial_update_collect_changes(image, image_buffer))
  * {
  * case PARTIAL_UPDATE_NEED_FULL_UPDATE:
  *  // Unable to do partial updates. Perform a full update.
  *  break;
  * case PARTIAL_UPDATE_CHANGES_AVAILABLE:
- *  PartialUpdateTile tile;
- *  while (BKE_image_partial_update_next_tile(partial_update_user, &tile) ==
- *         PARTIAL_UPDATE_ITER_TILE_LOADED){
- *  // Do something with the tile.
+ *  PartialUpdateRegion change;
+ *  while (BKE_image_partial_update_get_next_change(partial_update_user, &change) ==
+ *         PARTIAL_UPDATE_ITER_CHANGE_AVAILABLE){
+ *  // Do something with the change.
  *  }
  *  case PARTIAL_UPDATE_NO_CHANGES:
  *    break;
@@ -98,18 +97,18 @@ struct PartialUpdateUserImpl {
   /** \brief last changeset id that was seen by this user. */
   ChangesetID last_changeset_id = UnknownChangesetID;
 
-  /** \brief tiles that have been updated. */
-  Vector<PartialUpdateTile> updated_tiles;
+  /** \brief regions that have been updated. */
+  Vector<PartialUpdateRegion> updated_regions;
 
   /**
-   * \brief Clear the updated tiles.
+   * \brief Clear the list of updated regions.
    *
-   * Updated tiles should be cleared at the start of #BKE_image_partial_update_collect_tiles so
+   * Updated tiles should be cleared at the start of #BKE_image_partial_update_collect_changes so
    * the
    */
-  void clear_updated_tiles()
+  void clear_updated_regions()
   {
-    updated_tiles.clear();
+    updated_regions.clear();
   }
 };
 
@@ -119,7 +118,7 @@ struct PartialUpdateUserImpl {
  * Internally dirty tiles are grouped together in change sets to make sure that the correct
  * answer can be built for different users reducing the amount of merges.
  */
-struct TileChangeset {
+struct Changeset {
  private:
   /** \brief Dirty flag for each tile. */
   std::vector<bool> tile_dirty_flags_;
@@ -172,7 +171,7 @@ struct TileChangeset {
   }
 
   /** \brief Merge the given changeset into the receiver. */
-  void merge(const TileChangeset &other)
+  void merge(const Changeset &other)
   {
     BLI_assert(tile_x_len_ == other.tile_x_len_);
     BLI_assert(tile_y_len_ == other.tile_y_len_);
@@ -209,9 +208,9 @@ struct PartialUpdateRegisterImpl {
   ChangesetID last_changeset_id;
 
   /** \brief history of changesets. */
-  Vector<TileChangeset> history;
+  Vector<Changeset> history;
   /** \brief The current changeset. New changes will be added to this changeset only. */
-  TileChangeset current_changeset;
+  Changeset current_changeset;
 
   int image_width;
   int image_height;
@@ -314,9 +313,9 @@ struct PartialUpdateRegisterImpl {
   /**
    * \brief collect all historic changes since a given changeset.
    */
-  std::unique_ptr<TileChangeset> changed_tiles_since(const ChangesetID from_changeset)
+  std::unique_ptr<Changeset> changed_tiles_since(const ChangesetID from_changeset)
   {
-    std::unique_ptr<TileChangeset> changed_tiles = std::make_unique<TileChangeset>();
+    std::unique_ptr<Changeset> changed_tiles = std::make_unique<Changeset>();
     int tile_x_len = image_width / TILE_SIZE;
     int tile_y_len = image_height / TILE_SIZE;
     changed_tiles->init_tiles(tile_x_len, tile_y_len);
@@ -348,12 +347,12 @@ void BKE_image_partial_update_free(PartialUpdateUser *user)
   OBJECT_GUARDED_DELETE(user_impl, PartialUpdateUserImpl);
 }
 
-ePartialUpdateCollectResult BKE_image_partial_update_collect_tiles(Image *image,
-                                                                   ImBuf *image_buffer,
-                                                                   PartialUpdateUser *user)
+ePartialUpdateCollectResult BKE_image_partial_update_collect_changes(Image *image,
+                                                                     ImBuf *image_buffer,
+                                                                     PartialUpdateUser *user)
 {
   PartialUpdateUserImpl *user_impl = unwrap(user);
-  user_impl->clear_updated_tiles();
+  user_impl->clear_updated_regions();
 
   PartialUpdateRegisterImpl *partial_updater = unwrap(
       BKE_image_partial_update_register_ensure(image, image_buffer));
@@ -370,7 +369,7 @@ ePartialUpdateCollectResult BKE_image_partial_update_collect_tiles(Image *image,
   }
 
   /* Collect changed tiles. */
-  std::unique_ptr<TileChangeset> changed_tiles = partial_updater->changed_tiles_since(
+  std::unique_ptr<Changeset> changed_tiles = partial_updater->changed_tiles_since(
       user_impl->last_changeset_id);
 
   /* Convert tiles in the changeset to rectangles that are dirty. */
@@ -380,13 +379,13 @@ ePartialUpdateCollectResult BKE_image_partial_update_collect_tiles(Image *image,
         continue;
       }
 
-      PartialUpdateTile tile;
-      BLI_rcti_init(&tile.region,
+      PartialUpdateRegion region;
+      BLI_rcti_init(&region.region,
                     tile_x * PartialUpdateRegisterImpl::TILE_SIZE,
                     (tile_x + 1) * PartialUpdateRegisterImpl::TILE_SIZE,
                     tile_y * PartialUpdateRegisterImpl::TILE_SIZE,
                     (tile_y + 1) * PartialUpdateRegisterImpl::TILE_SIZE);
-      user_impl->updated_tiles.append_as(tile);
+      user_impl->updated_regions.append_as(region);
     }
   }
 
@@ -394,16 +393,16 @@ ePartialUpdateCollectResult BKE_image_partial_update_collect_tiles(Image *image,
   return PARTIAL_UPDATE_CHANGES_AVAILABLE;
 }
 
-ePartialUpdateIterResult BKE_image_partial_update_next_tile(PartialUpdateUser *user,
-                                                            PartialUpdateTile *r_tile)
+ePartialUpdateIterResult BKE_image_partial_update_get_next_change(PartialUpdateUser *user,
+                                                                  PartialUpdateRegion *r_region)
 {
   PartialUpdateUserImpl *user_impl = unwrap(user);
-  if (user_impl->updated_tiles.is_empty()) {
-    return PARTIAL_UPDATE_ITER_NO_TILES_LEFT;
+  if (user_impl->updated_regions.is_empty()) {
+    return PARTIAL_UPDATE_ITER_FINISHED;
   }
-  PartialUpdateTile tile = user_impl->updated_tiles.pop_last();
-  *r_tile = tile;
-  return PARTIAL_UPDATE_ITER_TILE_LOADED;
+  PartialUpdateRegion region = user_impl->updated_regions.pop_last();
+  *r_region = region;
+  return PARTIAL_UPDATE_ITER_CHANGE_AVAILABLE;
 }
 
 /* --- Image side --- */
@@ -430,16 +429,14 @@ void BKE_image_partial_update_register_free(Image *image)
   image->runtime.partial_update_register = nullptr;
 }
 
-void BKE_image_partial_update_register_mark_region(Image *image,
-                                                   ImBuf *image_buffer,
-                                                   rcti *updated_region)
+void BKE_image_partial_update_mark_region(Image *image, ImBuf *image_buffer, rcti *updated_region)
 {
   PartialUpdateRegisterImpl *partial_updater = unwrap(
       BKE_image_partial_update_register_ensure(image, image_buffer));
   partial_updater->mark_region(updated_region);
 }
 
-void BKE_image_partial_update_register_mark_full_update(Image *image, ImBuf *image_buffer)
+void BKE_image_partial_update_mark_full_update(Image *image, ImBuf *image_buffer)
 {
   PartialUpdateRegisterImpl *partial_updater = unwrap(
       BKE_image_partial_update_register_ensure(image, image_buffer));
