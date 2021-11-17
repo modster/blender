@@ -21,6 +21,7 @@
  * \ingroup cmpnodes
  */
 
+#include "IMB_colormanagement.h"
 #include "node_composite_util.hh"
 
 /* ******************* Luma Matte Node ********************************* */
@@ -43,6 +44,27 @@ static void node_composit_init_luma_matte(bNodeTree *UNUSED(ntree), bNode *node)
   c->t2 = 0.0f;
 }
 
+static int node_composite_gpu_luma_matte(GPUMaterial *mat,
+                                         bNode *node,
+                                         bNodeExecData *UNUSED(execdata),
+                                         GPUNodeStack *in,
+                                         GPUNodeStack *out)
+{
+  const NodeChroma *data = (NodeChroma *)node->storage;
+
+  float luminance_coefficients[3];
+  IMB_colormanagement_get_luminance_coefficients(luminance_coefficients);
+
+  return GPU_stack_link(mat,
+                        node,
+                        "node_composite_luminance_matte",
+                        in,
+                        out,
+                        GPU_constant(luminance_coefficients),
+                        GPU_uniform(&data->t1),
+                        GPU_uniform(&data->t2));
+}
+
 void register_node_type_cmp_luma_matte(void)
 {
   static bNodeType ntype;
@@ -51,6 +73,7 @@ void register_node_type_cmp_luma_matte(void)
   node_type_socket_templates(&ntype, cmp_node_luma_matte_in, cmp_node_luma_matte_out);
   node_type_init(&ntype, node_composit_init_luma_matte);
   node_type_storage(&ntype, "NodeChroma", node_free_standard_storage, node_copy_standard_storage);
+  node_type_gpu(&ntype, node_composite_gpu_luma_matte);
 
   nodeRegisterType(&ntype);
 }
