@@ -2941,20 +2941,11 @@ class VIEW3D_PT_tools_active(ToolSelectPanelHelper, Panel):
                 _defs_sculpt.trim_lasso,
             ),
             _defs_sculpt.project_line,
+            _defs_sculpt.mask_by_color,
             None,
             _defs_sculpt.mesh_filter,
             _defs_sculpt.cloth_filter,
-            lambda context: (
-                (_defs_sculpt.color_filter,)
-                if context is None
-                else ()
-            ),
-            None,
-            lambda context: (
-                (_defs_sculpt.mask_by_color,)
-                if context is None
-                else ()
-            ),
+            _defs_sculpt.color_filter,
             None,
             _defs_sculpt.face_set_edit,
             None,

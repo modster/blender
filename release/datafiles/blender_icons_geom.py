@@ -118,7 +118,7 @@ def object_child_map(objects):
 
 def mesh_data_lists_from_mesh(me, material_colors):
     me_loops = me.loops[:]
-    me_loops_color = me.vertex_colors.active.data[:]
+    me_loops_color = me.vertex_colors.active.data[:] if me.vertex_colors.active else None
     me_verts = me.vertices[:]
     me_polys = me.polygons[:]
 
@@ -135,7 +135,12 @@ def mesh_data_lists_from_mesh(me, material_colors):
         l_sta = p.loop_start
         l_len = p.loop_total
         loops_poly = me_loops[l_sta:l_sta + l_len]
-        color_poly = me_loops_color[l_sta:l_sta + l_len]
+
+        if me_loops_color is not None:
+            color_poly = me_loops_color[l_sta:l_sta + l_len]
+        else:
+            color_poly = (1.0, 1.0, 1.0, 1.0)
+
         i0 = 0
         i1 = 1
 

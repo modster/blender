@@ -150,7 +150,6 @@ bool BKE_id_attribute_rename(ID *id,
   return true;
 }
 
-
 typedef struct AttrUniqueData {
   ID *id;
   CustomDataMask mask;
@@ -662,15 +661,15 @@ bool BKE_id_attribute_ref_from_index(ID *id,
     for (int i = 0; i < data->totlayer; i++) {
       CustomDataLayer *layer = data->layers + i;
 
-      if (index == attr_index) {
-        r_ref->domain = domain;
-        r_ref->type = layer->type;
-        BLI_strncpy_utf8(r_ref->name, layer->name, MAX_CUSTOMDATA_LAYER_NAME);
-
-        return true;
-      }
-
       if (CD_TYPE_AS_MASK(layer->type) & type_filter) {
+        if (index == attr_index) {
+          r_ref->domain = domain;
+          r_ref->type = layer->type;
+          BLI_strncpy_utf8(r_ref->name, layer->name, MAX_CUSTOMDATA_LAYER_NAME);
+
+          return true;
+        }
+
         index++;
       }
     }
