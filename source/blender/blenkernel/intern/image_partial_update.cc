@@ -123,7 +123,8 @@ struct PartialUpdateUserImpl {
  * Internally dirty tiles are grouped together in change sets to make sure that the correct
  * answer can be built for different users reducing the amount of merges.
  */
-struct Changeset {
+// TODO(jbakker): TileChangeset is per UDIM tile. There should be an
+struct TileChangeset {
  private:
   /** \brief Dirty flag for each tile. */
   std::vector<bool> tile_dirty_flags_;
@@ -176,7 +177,7 @@ struct Changeset {
   }
 
   /** \brief Merge the given changeset into the receiver. */
-  void merge(const Changeset &other)
+  void merge(const TileChangeset &other)
   {
     BLI_assert(tile_x_len_ == other.tile_x_len_);
     BLI_assert(tile_y_len_ == other.tile_y_len_);
@@ -195,6 +196,10 @@ struct Changeset {
     const int tile_index = tile_y * tile_x_len_ + tile_x;
     return tile_dirty_flags_[tile_index];
   }
+};
+
+struct Changeset {
+  TileChangeset tile_changeset;
 };
 
 /**
@@ -228,10 +233,10 @@ struct PartialUpdateRegisterImpl {
 
       int tile_x_len = image_width / TILE_SIZE;
       int tile_y_len = image_height / TILE_SIZE;
-      current_changeset.init_tiles(tile_x_len, tile_y_len);
+      current_changeset.tile_changeset.init_tiles(tile_x_len, tile_y_len);
 
       /* Only perform a full update when the cache contains data. */
-      if (current_changeset.has_dirty_tiles() || !history.is_empty()) {
+      if (current_changeset.tile_changeset.has_dirty_tiles() || !history.is_empty()) {
         mark_full_update();
       }
     }
@@ -241,7 +246,7 @@ struct PartialUpdateRegisterImpl {
   {
     history.clear();
     last_changeset_id++;
-    current_changeset.reset();
+    current_changeset.tile_changeset.reset();
     first_changeset_id = last_changeset_id;
   }
 
@@ -269,14 +274,14 @@ struct PartialUpdateRegisterImpl {
     /* Clamp tiles to tiles in image. */
     start_x_tile = max_ii(0, start_x_tile);
     start_y_tile = max_ii(0, start_y_tile);
-    end_x_tile = min_ii(current_changeset.tile_x_len_ - 1, end_x_tile);
-    end_y_tile = min_ii(current_changeset.tile_y_len_ - 1, end_y_tile);
+    end_x_tile = min_ii(current_changeset.tile_changeset.tile_x_len_ - 1, end_x_tile);
+    end_y_tile = min_ii(current_changeset.tile_changeset.tile_y_len_ - 1, end_y_tile);
 
     /* Early exit when no tiles need to be updated. */
-    if (start_x_tile >= current_changeset.tile_x_len_) {
+    if (start_x_tile >= current_changeset.tile_changeset.tile_x_len_) {
       return;
     }
-    if (start_y_tile >= current_changeset.tile_y_len_) {
+    if (start_y_tile >= current_changeset.tile_changeset.tile_y_len_) {
       return;
     }
     if (end_x_tile < 0) {
@@ -286,12 +291,13 @@ struct PartialUpdateRegisterImpl {
       return;
     }
 
-    current_changeset.mark_tiles_dirty(start_x_tile, start_y_tile, end_x_tile, end_y_tile);
+    current_changeset.tile_changeset.mark_tiles_dirty(
+        start_x_tile, start_y_tile, end_x_tile, end_y_tile);
   }
 
   void ensure_empty_changeset()
   {
-    if (!current_changeset.has_dirty_tiles()) {
+    if (!current_changeset.tile_changeset.has_dirty_tiles()) {
       /* No need to create a new changeset when previous changeset does not contain any dirty
        * tiles. */
       return;
@@ -303,7 +309,7 @@ struct PartialUpdateRegisterImpl {
   void commit_current_changeset()
   {
     history.append_as(std::move(current_changeset));
-    current_changeset.reset();
+    current_changeset.tile_changeset.reset();
     last_changeset_id++;
   }
 
@@ -326,10 +332,10 @@ struct PartialUpdateRegisterImpl {
     std::unique_ptr<Changeset> changed_tiles = std::make_unique<Changeset>();
     int tile_x_len = image_width / TILE_SIZE;
     int tile_y_len = image_height / TILE_SIZE;
-    changed_tiles->init_tiles(tile_x_len, tile_y_len);
+    changed_tiles->tile_changeset.init_tiles(tile_x_len, tile_y_len);
 
     for (int index = from_changeset - first_changeset_id; index < history.size(); index++) {
-      changed_tiles->merge(history[index]);
+      changed_tiles->tile_changeset.merge(history[index].tile_changeset);
     }
     return changed_tiles;
   }
@@ -399,9 +405,9 @@ ePartialUpdateCollectResult BKE_image_partial_update_collect_changes(Image *imag
       user_impl->last_changeset_id);
 
   /* Convert tiles in the changeset to rectangles that are dirty. */
-  for (int tile_y = 0; tile_y < changed_tiles->tile_y_len_; tile_y++) {
-    for (int tile_x = 0; tile_x < changed_tiles->tile_x_len_; tile_x++) {
-      if (!changed_tiles->is_tile_dirty(tile_x, tile_y)) {
+  for (int tile_y = 0; tile_y < changed_tiles->tile_changeset.tile_y_len_; tile_y++) {
+    for (int tile_x = 0; tile_x < changed_tiles->tile_changeset.tile_x_len_; tile_x++) {
+      if (!changed_tiles->tile_changeset.is_tile_dirty(tile_x, tile_y)) {
         continue;
       }
 
