@@ -438,6 +438,11 @@ class Texture {
     GPU_texture_clear(tx_, GPU_DATA_INT, &color[0]);
   }
 
+  void filter_mode(bool do_filter)
+  {
+    GPU_texture_filter_mode(tx_, do_filter);
+  }
+
   void release()
   {
     GPU_TEXTURE_FREE_SAFE(tx_);

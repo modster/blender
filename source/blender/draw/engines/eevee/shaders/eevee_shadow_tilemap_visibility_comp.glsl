@@ -20,18 +20,6 @@ layout(std430, binding = 0) readonly buffer tilemaps_buf
 
 layout(r32ui) restrict uniform uimage2D tilemaps_img;
 
-vec3 tile_corner_ortho(ShadowTileMapData tilemap, ivec2 tile, const bool far)
-{
-  return tilemap.corners[0].xyz + tilemap.corners[1].xyz * float(tile.x) +
-         tilemap.corners[2].xyz * float(tile.y) + tilemap.corners[3].xyz * float(far);
-}
-
-vec3 tile_corner_persp(ShadowTileMapData tilemap, ivec2 tile)
-{
-  return tilemap.corners[1].xyz + tilemap.corners[2].xyz * float(tile.x) +
-         tilemap.corners[3].xyz * float(tile.y);
-}
-
 void main()
 {
   ShadowTileMapData tilemap = tilemaps[gl_GlobalInvocationID.z];
@@ -40,12 +28,7 @@ void main()
   bool is_intersecting;
 
   if (tilemap.is_cubeface) {
-    Pyramid shape;
-    shape.corners[0] = tilemap.corners[0].xyz;
-    shape.corners[1] = tile_corner_persp(tilemap, tile_co + ivec2(0, 0));
-    shape.corners[2] = tile_corner_persp(tilemap, tile_co + ivec2(1, 0));
-    shape.corners[3] = tile_corner_persp(tilemap, tile_co + ivec2(1, 1));
-    shape.corners[4] = tile_corner_persp(tilemap, tile_co + ivec2(0, 1));
+    Pyramid shape = shadow_tilemap_cubeface_bounds(tilemap, tile_co, ivec2(1));
 
     is_intersecting = intersect_view(shape);
 
@@ -60,17 +43,19 @@ void main()
     }
   }
   else {
-    Box shape;
-    shape.corners[0] = tile_corner_ortho(tilemap, tile_co + ivec2(0, 0), false);
-    shape.corners[1] = tile_corner_ortho(tilemap, tile_co + ivec2(1, 0), false);
-    shape.corners[2] = tile_corner_ortho(tilemap, tile_co + ivec2(1, 1), false);
-    shape.corners[3] = tile_corner_ortho(tilemap, tile_co + ivec2(0, 1), false);
-    shape.corners[4] = tile_corner_ortho(tilemap, tile_co + ivec2(0, 0), true);
-    shape.corners[5] = tile_corner_ortho(tilemap, tile_co + ivec2(1, 0), true);
-    shape.corners[6] = tile_corner_ortho(tilemap, tile_co + ivec2(1, 1), true);
-    shape.corners[7] = tile_corner_ortho(tilemap, tile_co + ivec2(0, 1), true);
+    /* TODO(fclem): We can save a few tile more by shaping the BBoxes in depth based on their
+     * distance to the center. */
+    Box shape = shadow_tilemap_clipmap_bounds(tilemap, tile_co, ivec2(1));
 
     is_intersecting = intersect_view(shape);
+
+    if (is_intersecting) {
+      /* Reject tiles not in view distance. */
+      float tile_dist = length(vec2(tile_co - (SHADOW_TILEMAP_RES / 2)) + 0.5);
+      if (tile_dist > (SHADOW_TILEMAP_RES / 2) + M_SQRT2 * 0.5) {
+        is_intersecting = false;
+      }
+    }
   }
 
   if (is_intersecting) {

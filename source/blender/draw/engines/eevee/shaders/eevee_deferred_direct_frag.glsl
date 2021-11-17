@@ -5,6 +5,7 @@
 
 #pragma BLENDER_REQUIRE(common_view_lib.glsl)
 #pragma BLENDER_REQUIRE(common_math_lib.glsl)
+#pragma BLENDER_REQUIRE(common_debug_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_culling_iter_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_gbuffer_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_sampling_lib.glsl)
@@ -56,8 +57,8 @@ uniform sampler2D reflect_normal_tx;
 uniform sampler1D sss_transmittance_tx;
 uniform usampler2D lights_culling_tx;
 uniform sampler2DArray utility_tx;
-uniform sampler2DShadow shadow_atlas_tx;
-uniform sampler2D shadow_depth_tx;
+uniform sampler2D shadow_atlas_tx;
+uniform usampler2D shadow_tilemaps_tx;
 uniform sampler2DArray lightprobe_grid_tx;
 uniform samplerCubeArray lightprobe_cube_tx;
 

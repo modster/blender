@@ -142,6 +142,18 @@ constexpr static const float shadow_face_mat[6][4][4] = {
     {{1, 0, 0, 0}, {0, -1, 0, 0}, {0, 0, -1, 0}, {0, 0, 0, 1}}, /* Z_POS */
 };
 
+/* Converts to [-SHADOW_TILEMAP_RES / 2..SHADOW_TILEMAP_RES / 2] for XY and [0..1] for Z. */
+constexpr static const float shadow_clipmap_scale_mat[4][4] = {{SHADOW_TILEMAP_RES / 2, 0, 0, 0},
+                                                               {0, SHADOW_TILEMAP_RES / 2, 0, 0},
+                                                               {0, 0, 0.5, 0},
+                                                               {0, 0, 0.5, 1}};
+
+constexpr static const float tilemat_scale_bias_mat[4][4] = {
+    {SHADOW_TILEMAP_RES / 2, 0, 0, 0},
+    {0, SHADOW_TILEMAP_RES / 2, 0, 0},
+    {0, 0, 1, 0},
+    {SHADOW_TILEMAP_RES / 2, SHADOW_TILEMAP_RES / 2, 0, 1}};
+
 enum eCubeFace {
   /* Ordering by culling order. If cone aperture is shallow, we cull the later view. */
   Z_NEG = 0,
@@ -175,7 +187,7 @@ struct ShadowTileMap : public ShadowTileMapData {
   /** Cached, used for rendering. */
   float4x4 viewmat, winmat;
   /** Cached, used for detecting updates. */
-  float4x4 obmat;
+  float4x4 object_mat;
   /** Near and far clip distances. For clipmap they are updated after sync. */
   float near, far;
 
@@ -189,19 +201,43 @@ struct ShadowTileMap : public ShadowTileMapData {
                     const float4x4 &object_mat_,
                     float near_,
                     float far_,
+                    int2 origin_offset,
                     int clipmap_level);
   void sync_cubeface(
       const float4x4 &object_mat, float near, float far, float cone_aperture, eCubeFace face);
 
   float tilemap_coverage_get(void) const
   {
+    /* This function should be kept in sync with shadow_directional_clipmap_level(). */
+    /* NOTE(fclem): If we would to introduce a global scaling option it would be here. */
     BLI_assert(!is_cubeface);
     return powf(2.0f, level);
+  }
+
+  float tile_size_get(void) const
+  {
+    return tilemap_coverage_get() / tile_map_resolution;
   }
 
   float4x4 winmat_get(const rcti *tile_minmax) const;
   void setup_view(const rcti &rect, DRWView *&view) const;
   void debug_draw(void) const;
+
+  /* For external callers. Use this in order to not miss an update. */
+  void set_level(int clipmap_level)
+  {
+    if (level != clipmap_level) {
+      level = clipmap_level;
+      set_dirty();
+    }
+  }
+  void set_is_cubemap(bool is_cubemap_)
+  {
+    if (is_cubeface != is_cubemap_) {
+      is_cubeface = is_cubemap_;
+      set_dirty();
+    }
+  }
 
   void set_dirty()
   {
@@ -235,7 +271,7 @@ class ShadowPunctual : public ShadowCommon {
   vec3 random_offset_;
   /** Light position. */
   float3 position_;
-  /** Near and far clip distances. For clipmap they are updated after sync. */
+  /** Near and far clip distances. */
   float far_, near_;
   /** View space offset to apply to the shadow. */
   float bias_;
@@ -259,8 +295,10 @@ class ShadowDirectional : public ShadowCommon {
   float min_resolution_;
   /** View space offset to apply to the shadow. */
   float bias_;
-  /** Near and far clip distances. For clipmap they are updated after sync. */
+  /** Near and far clip distances. For clipmap, when they are updated after sync. */
   float near_, far_;
+  /** Offset of the lowest clipmap relative to the highest one. */
+  ivec2 base_offset_;
   /** Copy of object matrix. */
   float4x4 object_mat_;
 
@@ -488,8 +526,6 @@ class ShadowModule {
   /** Default to invalid texture type. */
   eGPUTextureFormat shadow_format_ = GPU_RGBA8;
 
-  GPUTexture *atlas_tx_ptr_;
-
   /** Used for caster & receiver AABB lists. */
   GPUVertFormat aabb_format_;
   /** Global bounds that contains all shadow casters. Used by directionnal for best fit. */
@@ -520,9 +556,13 @@ class ShadowModule {
   void debug_end_sync(void);
   void debug_draw(GPUFrameBuffer *view_fb, HiZBuffer &hiz);
 
-  GPUTexture **atlas_ref_get(void)
+  GPUTexture *atlas_tx_get(void)
   {
-    return &atlas_tx_ptr_;
+    return atlas_tx_;
+  }
+  GPUTexture *tilemap_tx_get(void)
+  {
+    return tilemap_allocator.tilemap_tx;
   }
 
  private:

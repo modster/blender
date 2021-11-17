@@ -23,14 +23,14 @@ uvec2 shadow_page_from_index(ShadowPagePacked index)
 
 uint shadow_page_to_index(uvec2 page)
 {
-  return page.y * SHADOW_PAGE_PER_ROW + page.x;
+  return page.y * uint(SHADOW_PAGE_PER_ROW) + page.x;
 }
 
 ShadowPageData shadow_page_data_unpack(ShadowPagePacked data)
 {
   ShadowPageData page;
   page.tile.x = data & 0xFFF;
-  page.tile.y = (data >> 12) & 0xFFF;
+  page.tile.y = (data >> 16) & 0xFFF;
   return page;
 }
 
@@ -40,4 +40,13 @@ ShadowPagePacked shadow_page_data_pack(ShadowPageData page)
   data = page.tile.x;
   data |= page.tile.y << 12;
   return data;
+}
+
+/** \a unormalized_uv is the uv coordinates for the whole tilemap [0..SHADOW_TILEMAP_RES]. */
+vec2 shadow_page_uv_transform(uvec2 page, uint lod, vec2 unormalized_uv)
+{
+  vec2 page_texel = fract(unormalized_uv / float(1 << lod)) / vec2(SHADOW_PAGE_PER_ROW);
+  /* Assumes atlas is squared. */
+  vec2 page_offset = vec2(page) / vec2(SHADOW_PAGE_PER_ROW);
+  return page_offset + page_texel;
 }

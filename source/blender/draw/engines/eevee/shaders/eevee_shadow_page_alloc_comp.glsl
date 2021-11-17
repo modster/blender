@@ -29,7 +29,7 @@ layout(std430, binding = 0) restrict readonly buffer tilemaps_buf
 
 layout(std430, binding = 1) restrict buffer pages_free_buf
 {
-  ShadowPagePacked pages_free[];
+  int pages_free[];
 };
 
 layout(std430, binding = 2) restrict buffer pages_buf
@@ -55,7 +55,7 @@ void main()
       ShadowPageData page;
       page.tile = tile_co;
 
-      ShadowPagePacked page_index = pages_free[free_index];
+      int page_index = pages_free[free_index];
       pages[page_index] = shadow_page_data_pack(page);
 
       tile.page = shadow_page_from_index(page_index);
@@ -93,6 +93,7 @@ void main()
     barrier();
 
     if (gl_GlobalInvocationID.xy == uvec2(0)) {
+      max_tile += 1;
       /* Must match the rcti structure. */
       ivec4 out_data = ivec4(min_tile.x, max_tile.x, min_tile.y, max_tile.y);
       imageStore(tilemap_rects_img, ivec2(gl_GlobalInvocationID.z, 0), out_data);

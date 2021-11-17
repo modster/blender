@@ -19,7 +19,7 @@ layout(std430, binding = 0) restrict readonly buffer tilemaps_buf
 
 layout(std430, binding = 1) restrict buffer pages_free_buf
 {
-  ShadowPagePacked pages_free[];
+  int pages_free[];
 };
 
 layout(std430, binding = 2) restrict writeonly buffer pages_buf
@@ -46,7 +46,7 @@ void main()
 
     int free_index = atomicAdd(SHADOW_PAGE_HEAP_LAST_USED(pages_free), 1) + 1;
     if (free_index < SHADOW_MAX_PAGE - 1) {
-      pages_free[free_index] = ShadowPagePacked(page_index);
+      pages_free[free_index] = int(page_index);
     }
     else {
       /* Well, this should never happen. This would mean some pages were marked

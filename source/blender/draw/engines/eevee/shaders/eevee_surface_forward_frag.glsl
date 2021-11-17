@@ -77,8 +77,8 @@ layout(std140) uniform hiz_block
 
 uniform usampler2D lights_culling_tx;
 uniform sampler2DArray utility_tx;
-uniform sampler2DShadow shadow_atlas_tx;
-uniform sampler2D shadow_depth_tx;
+uniform sampler2D shadow_atlas_tx;
+uniform usampler2D shadow_tilemaps_tx;
 uniform sampler1D sss_transmittance_tx;
 uniform sampler2DArray lightprobe_grid_tx;
 uniform samplerCubeArray lightprobe_cube_tx;

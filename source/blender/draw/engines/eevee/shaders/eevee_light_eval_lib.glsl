@@ -9,7 +9,7 @@
  * - lights
  * - shadows
  * - shadow_atlas_tx
- * - shadow_depth_tx
+ * - shadow_tilemaps_tx
  * - sss_transmittance_tx
  * - utility_tx
  *
@@ -41,15 +41,15 @@ void light_eval(ClosureDiffuse diffuse,
 
     float visibility = light_attenuation(light, L, dist);
 
-    if ((light.shadow_id != LIGHT_NO_SHADOW) && (light.diffuse_power > 0.0 || visibility > 0.0)) {
+    if ((light.shadow_id != LIGHT_NO_SHADOW) && (visibility > 0.0)) {
       vec3 lL = light_world_to_local(light, -L) * dist;
-      vec3 shadow_co = shadow_punctual_coordinates_get(shadows[l_idx], lL);
+
+      float shadow_delta = shadow_delta_get(
+          shadow_atlas_tx, shadow_tilemaps_tx, light, shadows[l_idx], lL, dist, P);
 
       /* Transmittance evaluation first to use initial visibility. */
       if (diffuse.sss_id != 0u && light.diffuse_power > 0.0) {
-        float sh_depth = texture(shadow_depth_tx, shadow_co.xy).r;
-        float delta = shadow_punctual_depth_delta(shadows[l_idx], lL, sh_depth);
-        delta = max(thickness, delta);
+        float delta = max(thickness, shadow_delta);
 
         vec3 intensity =
             visibility * light.transmit_power *
@@ -58,7 +58,7 @@ void light_eval(ClosureDiffuse diffuse,
         out_diffuse += light.color * intensity;
       }
 
-      visibility *= texture(shadow_atlas_tx, shadow_co);
+      visibility *= float(shadow_delta - shadows[l_idx].bias <= 0.0);
     }
 
     if (visibility < 1e-6) {

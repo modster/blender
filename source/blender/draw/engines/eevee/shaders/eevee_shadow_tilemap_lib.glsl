@@ -1,6 +1,11 @@
 
 #pragma BLENDER_REQUIRE(common_math_lib.glsl)
+#pragma BLENDER_REQUIRE(common_math_geom_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
+
+/* ---------------------------------------------------------------------- */
+/** \name Tilemap data
+ * \{ */
 
 /** Decoded tile data structure. */
 struct ShadowTileData {
@@ -29,7 +34,7 @@ ShadowTileData shadow_tile_data_unpack(uint data)
   ShadowTileData tile;
   tile.page.x = data & 0xFFu;
   tile.page.y = (data >> 8u) & 0xFFu;
-  tile.lod_tilemap_offset = (data >> 12u) & 0xFu;
+  tile.lod_tilemap_offset = (data >> 16u) & 0xFu;
   tile.is_visible = flag_test(data, SHADOW_TILE_IS_VISIBLE);
   tile.is_used = flag_test(data, SHADOW_TILE_IS_USED);
   tile.is_allocated = flag_test(data, SHADOW_TILE_IS_ALLOCATED);
@@ -42,7 +47,7 @@ uint shadow_tile_data_pack(ShadowTileData tile)
   uint data;
   data = tile.page.x;
   data |= tile.page.y << 8u;
-  data |= tile.lod_tilemap_offset << 12u;
+  data |= tile.lod_tilemap_offset << 16u;
   set_flag_from_test(data, tile.is_visible, SHADOW_TILE_IS_VISIBLE);
   set_flag_from_test(data, tile.is_used, SHADOW_TILE_IS_USED);
   set_flag_from_test(data, tile.is_allocated, SHADOW_TILE_IS_ALLOCATED);
@@ -71,6 +76,12 @@ ivec2 shadow_tile_coord_in_atlas(ivec2 tile, int tilemap_index)
 {
   return shadow_tilemap_start(tilemap_index) + tile;
 }
+
+/** \} */
+
+/* ---------------------------------------------------------------------- */
+/** \name Load / Store functions.
+ * \{ */
 
 void shadow_tile_store(restrict uimage2D tilemaps_img,
                        ivec2 tile_co,
@@ -103,14 +114,57 @@ ShadowTileData shadow_tile_load(usampler2D tilemaps_tx, ivec2 tile_co, int tilem
   return shadow_tile_data_unpack(tile_data);
 }
 
-/* Return the correct tilemap index given a world space position. */
-int shadow_directional_tilemap_index(ShadowData shadow, vec3 P)
+/* This function should be the inverse of ShadowTileMap::tilemap_coverage_get. */
+int shadow_directional_clipmap_level(ShadowData shadow, float distance_to_camera)
 {
-  vec3 shadow_map_center = shadow.mat[3].xyz;
-  float dist_to_center = distance(shadow_map_center, P);
-  float clipmap_level = log2(dist_to_center);
-  /* Use floor because we can have negative numbers. */
-  int clipmap_lod = int(floor(clipmap_level));
-  clipmap_lod = clamp(clipmap_lod, shadow.clipmap_lod_min, shadow.clipmap_lod_max);
-  return shadow.tilemap_index + clipmap_lod - shadow.clipmap_lod_min;
+  /* Why do we need to bias by 2 here? I don't know... */
+  int clipmap_lod = int(ceil(log2(distance_to_camera))) + 2;
+  return clamp(clipmap_lod, shadow.clipmap_lod_min, shadow.clipmap_lod_max);
 }
+
+/** \} */
+
+/* ---------------------------------------------------------------------- */
+/** \name Frustum shapes.
+ * \{ */
+
+vec3 shadow_tile_corner_persp(ShadowTileMapData tilemap, ivec2 tile)
+{
+  return tilemap.corners[1].xyz + tilemap.corners[2].xyz * float(tile.x) +
+         tilemap.corners[3].xyz * float(tile.y);
+}
+
+Pyramid shadow_tilemap_cubeface_bounds(ShadowTileMapData tilemap,
+                                       ivec2 tile_start,
+                                       const ivec2 extent)
+{
+  Pyramid shape;
+  shape.corners[0] = tilemap.corners[0].xyz;
+  shape.corners[1] = shadow_tile_corner_persp(tilemap, tile_start + ivec2(0, 0));
+  shape.corners[2] = shadow_tile_corner_persp(tilemap, tile_start + ivec2(extent.x, 0));
+  shape.corners[3] = shadow_tile_corner_persp(tilemap, tile_start + extent);
+  shape.corners[4] = shadow_tile_corner_persp(tilemap, tile_start + ivec2(0, extent.y));
+  return shape;
+}
+
+vec3 shadow_tile_corner_ortho(ShadowTileMapData tilemap, ivec2 tile, const bool far)
+{
+  return tilemap.corners[0].xyz + tilemap.corners[1].xyz * float(tile.x) +
+         tilemap.corners[2].xyz * float(tile.y) + tilemap.corners[3].xyz * float(far);
+}
+
+Box shadow_tilemap_clipmap_bounds(ShadowTileMapData tilemap, ivec2 tile_start, const ivec2 extent)
+{
+  Box shape;
+  shape.corners[0] = shadow_tile_corner_ortho(tilemap, tile_start + ivec2(0, 0), false);
+  shape.corners[1] = shadow_tile_corner_ortho(tilemap, tile_start + ivec2(extent.x, 0), false);
+  shape.corners[2] = shadow_tile_corner_ortho(tilemap, tile_start + extent, false);
+  shape.corners[3] = shadow_tile_corner_ortho(tilemap, tile_start + ivec2(0, extent.y), false);
+  shape.corners[4] = shadow_tile_corner_ortho(tilemap, tile_start + ivec2(0, 0), true);
+  shape.corners[5] = shadow_tile_corner_ortho(tilemap, tile_start + ivec2(extent.x, 0), true);
+  shape.corners[6] = shadow_tile_corner_ortho(tilemap, tile_start + extent, true);
+  shape.corners[7] = shadow_tile_corner_ortho(tilemap, tile_start + ivec2(0, extent.y), true);
+  return shape;
+}
+
+/** \} */

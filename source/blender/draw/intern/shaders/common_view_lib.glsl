@@ -221,23 +221,25 @@ uniform mat4 ModelMatrixInverse;
 
 /* ---- Opengl Depth conversion ---- */
 
+/* Expects positive near/far values. Returns positive value. */
 float linear_depth(bool is_persp, float z, float zf, float zn)
 {
   if (is_persp) {
     return (zn * zf) / (z * (zn - zf) + zf);
   }
   else {
-    return (z * 2.0 - 1.0) * zf;
+    return z * (zf - zn) + zn;
   }
 }
 
+/* Expects positive near/far values. Returns positive value. */
 float buffer_depth(bool is_persp, float z, float zf, float zn)
 {
   if (is_persp) {
     return (zf * (zn - z)) / (z * (zn - zf));
   }
   else {
-    return (z / (zf * 2.0)) + 0.5;
+    return (z - zn) / (zf - zn);
   }
 }
 

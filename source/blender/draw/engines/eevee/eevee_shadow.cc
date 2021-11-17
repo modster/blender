@@ -42,6 +42,7 @@ void ShadowTileMap::sync_clipmap(const float3 &camera_position,
                                  const float4x4 &object_mat_,
                                  float near_,
                                  float far_,
+                                 int2 new_offset,
                                  int clipmap_level)
 {
 #ifdef SHADOW_NO_CACHING
@@ -57,59 +58,49 @@ void ShadowTileMap::sync_clipmap(const float3 &camera_position,
   cone_direction = float3(1.0f);
   cone_angle_cos = -2.0f;
 
-  float4x4 object_mat = object_mat_;
-  /* Clear embedded custom data. */
-  object_mat.values[0][3] = object_mat.values[1][3] = object_mat.values[2][3] = 0.0f;
-  object_mat.values[3][3] = 1.0f;
-  /* Remove translation. */
-  zero_v3(object_mat.values[3]);
-
-  if (!equals_m4m4(obmat.values, object_mat.values)) {
-    obmat = object_mat;
-    set_dirty();
-  }
-
-  /* Same as object_mat.inverted() because object_mat it is orthogonal. */
-  float3 tilemap_center = object_mat.transposed() * camera_position;
-
-  /* In world units. */
-  /* NOTE(fclem): If we would to introduce a global scaling option it would be here. */
-  float map_size = tilemap_coverage_get();
-  float tile_size = map_size / tile_map_resolution;
-  /* TODO(fclem): Add hysteresis in viewport to avoid too much invalidation. */
-  /* Snap to tile of the grid above. This avoid half visible tiles and too much update. */
-  float upper_tile_size = tile_size * 2.0f;
-  /* Snap to a position on tile sized grid. */
-  int2 new_offset;
-  new_offset.x = roundf(tilemap_center.x / upper_tile_size) * upper_tile_size;
-  new_offset.y = roundf(tilemap_center.y / upper_tile_size) * upper_tile_size;
   if (grid_shift == int2(0)) {
     /* Only replace shift if it is not already dirty. */
     grid_shift = new_offset - grid_offset;
   }
   grid_offset = new_offset;
 
-  tilemap_center = object_mat * float3(grid_offset.x, grid_offset.y, 0.0f);
-
-  copy_v3_v3(object_mat.values[3], tilemap_center);
+  if (!equals_m4m4(object_mat.ptr(), object_mat_.ptr())) {
+    object_mat = object_mat_;
+    set_dirty();
+  }
 
   float half_size = tilemap_coverage_get() / 2.0f;
-  orthographic_m4(winmat.values, -half_size, half_size, -half_size, half_size, near, far);
-  winmat = winmat_get(nullptr);
-  viewmat = object_mat.inverted_affine();
+  float tile_size = tile_size_get();
+  float3 tilemap_center = object_mat *
+                          float3(grid_offset.x * tile_size, grid_offset.y * tile_size, 0.0f);
 
-  mul_m4_m4m4(persmat, winmat.values, viewmat.values);
+  float4x4 viewinv = object_mat;
+  copy_v3_v3(viewinv.values[3], tilemap_center);
 
-  /* Update corners. */
-  float4x4 viewinv = viewmat.inverted();
-  *reinterpret_cast<float3 *>(&corners[0]) = viewinv * float3(-half_size, -half_size, near);
-  *reinterpret_cast<float3 *>(&corners[1]) = viewinv * float3(half_size, -half_size, near);
-  *reinterpret_cast<float3 *>(&corners[2]) = viewinv * float3(-half_size, half_size, near);
-  *reinterpret_cast<float3 *>(&corners[3]) = viewinv * float3(-half_size, -half_size, far);
+  float camera_distance_to_plane = float3::dot(float3(object_mat.values[2]), camera_position);
+  float visible_near = camera_distance_to_plane - half_size;
+  float visible_far = camera_distance_to_plane + half_size;
+
+  /* Update corners. Used for visibility test of each tile. */
+  *(float3 *)(&corners[0]) = viewinv * float3(-half_size, -half_size, visible_near);
+  *(float3 *)(&corners[1]) = viewinv * float3(half_size, -half_size, visible_near);
+  *(float3 *)(&corners[2]) = viewinv * float3(-half_size, half_size, visible_near);
+  *(float3 *)(&corners[3]) = viewinv * float3(-half_size, -half_size, visible_far);
   /* Store deltas. */
   corners[1] = (corners[1] - corners[0]) / float(SHADOW_TILEMAP_RES);
   corners[2] = (corners[2] - corners[0]) / float(SHADOW_TILEMAP_RES);
   corners[3] -= corners[0];
+
+  /* Usage depth range. Used for usage tagging. */
+  float range = (far - near);
+  /* Need to be after the corners arithmetic because they are stored inside the last component. */
+  _min_usage_depth = clamp_f((2.0f * (-visible_far - near) / range) - 1.0f, -1.0f, 1.0f);
+  _max_usage_depth = clamp_f((2.0f * (-visible_near - near) / range) - 1.0f, -1.0f, 1.0f);
+
+  viewmat = viewinv.inverted_affine();
+  winmat = winmat_get(nullptr);
+  mul_m4_m4m4(tilemat, tilemat_scale_bias_mat, winmat.ptr());
+  mul_m4_m4m4(tilemat, tilemat, viewmat.ptr());
 }
 
 void ShadowTileMap::sync_cubeface(
@@ -134,20 +125,15 @@ void ShadowTileMap::sync_cubeface(
   }
   cone_direction = -float3(object_mat_.values[2]);
 
-  float4x4 object_mat = object_mat_;
-  /* Clear embedded custom data. */
-  object_mat.values[0][3] = object_mat.values[1][3] = object_mat.values[2][3] = 0.0f;
-  object_mat.values[3][3] = 1.0f;
-
-  if (obmat != object_mat) {
-    obmat = object_mat;
+  if (!equals_m4m4(object_mat.ptr(), object_mat_.ptr())) {
+    object_mat = object_mat_;
     set_dirty();
   }
 
   viewmat = float4x4(shadow_face_mat[cubeface]) * object_mat.inverted_affine();
   winmat = winmat_get(nullptr);
-
-  mul_m4_m4m4(persmat, winmat.values, viewmat.values);
+  mul_m4_m4m4(tilemat, tilemat_scale_bias_mat, winmat.ptr());
+  mul_m4_m4m4(tilemat, tilemat, viewmat.ptr());
 
   /* Update corners. */
   float4x4 viewinv = viewmat.inverted();
@@ -158,6 +144,10 @@ void ShadowTileMap::sync_cubeface(
   /* Store deltas. */
   corners[2] = (corners[2] - corners[1]) / float(SHADOW_TILEMAP_RES);
   corners[3] = (corners[3] - corners[1]) / float(SHADOW_TILEMAP_RES);
+  /* Need to be after the corners arithmetic because they are stored inside the last component. */
+  _min_usage_depth = -1.0f;
+  _max_usage_depth = 1.0f;
+  _punctual_distance = far_;
 }
 
 float4x4 ShadowTileMap::winmat_get(const rcti *tile_minmax) const
@@ -166,18 +156,18 @@ float4x4 ShadowTileMap::winmat_get(const rcti *tile_minmax) const
   float2 max = float2(1.0f);
 
   if (tile_minmax != nullptr) {
-    min = shadow_tile_coord_to_ndc(int2(tile_minmax->xmin + 0, tile_minmax->ymin + 0));
-    max = shadow_tile_coord_to_ndc(int2(tile_minmax->xmax + 1, tile_minmax->ymax + 1));
+    min = shadow_tile_coord_to_ndc(int2(tile_minmax->xmin, tile_minmax->ymin));
+    max = shadow_tile_coord_to_ndc(int2(tile_minmax->xmax, tile_minmax->ymax));
   }
 
   float4x4 winmat;
   if (is_cubeface) {
     perspective_m4(
-        winmat.values, near * min.x, near * max.x, near * min.y, near * max.y, near, far);
+        winmat.ptr(), near * min.x, near * max.x, near * min.y, near * max.y, near, far);
   }
   else {
     float half_size = tilemap_coverage_get() / 2.0f;
-    orthographic_m4(winmat.values,
+    orthographic_m4(winmat.ptr(),
                     half_size * min.x,
                     half_size * max.x,
                     half_size * min.y,
@@ -193,10 +183,10 @@ void ShadowTileMap::setup_view(const rcti &rect, DRWView *&view) const
   float4x4 culling_mat = winmat_get(&rect);
 
   if (view == nullptr) {
-    view = DRW_view_create(viewmat.values, winmat.values, nullptr, culling_mat.values, nullptr);
+    view = DRW_view_create(viewmat.ptr(), winmat.ptr(), nullptr, culling_mat.ptr(), nullptr);
   }
   else {
-    DRW_view_update(view, viewmat.values, winmat.values, nullptr, culling_mat.values);
+    DRW_view_update(view, viewmat.ptr(), winmat.ptr(), nullptr, culling_mat.ptr());
   }
 
 #if 0 /* Debug. */
@@ -215,8 +205,10 @@ void ShadowTileMap::debug_draw(void) const
       {1, .1, .1, 1}, {.1, 1, .1, 1}, {0, .2, 1, 1}, {1, 1, .3, 1}, {.1, .1, .1, 1}, {1, 1, 1, 1}};
   float4 color = debug_color[((is_cubeface ? cubeface : level) + 9999) % 6];
 
+  float4x4 winmat = winmat_get(nullptr);
   float persinv[4][4];
-  invert_m4_m4(persinv, persmat);
+  mul_m4_m4m4(persinv, winmat.ptr(), viewmat.ptr());
+  invert_m4(persinv);
   DRW_debug_m4_as_bbox(persinv, color, false);
 
   int64_t div = ShadowTileAllocator::maps_per_row;
@@ -227,8 +219,8 @@ void ShadowTileMap::debug_draw(void) const
   float3 pos = float3(0.0f, 0.0f, (is_cubeface) ? 1.0f : 0.0f);
   mul_project_m4_v3(persinv, pos);
 
-  uchar ucolor[4] = {
-      uchar(255 * color.x), uchar(255 * color.y), uchar(255 * color.z), uchar(255 * color.w)};
+  uchar ucolor[4];
+  rgba_float_to_uchar(ucolor, color);
   struct DRWTextStore *dt = DRW_text_cache_ensure();
   DRW_text_cache_add(dt, pos, text.c_str(), text.size(), 0, 0, DRW_TEXT_CACHE_GLOBALSPACE, ucolor);
 }
@@ -382,15 +374,20 @@ void ShadowPunctual::sync(eLightType light_type,
     tilemaps = shadows_->tilemap_allocator.alloc(face_needed);
   }
 
-  tilemaps[Z_NEG]->sync_cubeface(object_mat, near_, far_, cone_aperture, Z_NEG);
+  /* Clear embedded custom data. */
+  float4x4 obmat_tmp = float4x4(object_mat);
+  obmat_tmp.values[0][3] = obmat_tmp.values[1][3] = obmat_tmp.values[2][3] = 0.0f;
+  obmat_tmp.values[3][3] = 1.0f;
+
+  tilemaps[Z_NEG]->sync_cubeface(obmat_tmp, near_, far_, cone_aperture, Z_NEG);
   if (is_wide_cone) {
-    tilemaps[X_POS]->sync_cubeface(object_mat, near_, far_, cone_aperture, X_POS);
-    tilemaps[X_NEG]->sync_cubeface(object_mat, near_, far_, cone_aperture, X_NEG);
-    tilemaps[Y_POS]->sync_cubeface(object_mat, near_, far_, cone_aperture, Y_POS);
-    tilemaps[Y_NEG]->sync_cubeface(object_mat, near_, far_, cone_aperture, Y_NEG);
+    tilemaps[X_POS]->sync_cubeface(obmat_tmp, near_, far_, cone_aperture, X_POS);
+    tilemaps[X_NEG]->sync_cubeface(obmat_tmp, near_, far_, cone_aperture, X_NEG);
+    tilemaps[Y_POS]->sync_cubeface(obmat_tmp, near_, far_, cone_aperture, Y_POS);
+    tilemaps[Y_NEG]->sync_cubeface(obmat_tmp, near_, far_, cone_aperture, Y_NEG);
   }
   if (is_omni) {
-    tilemaps[Z_POS]->sync_cubeface(object_mat, near_, far_, cone_aperture, Z_POS);
+    tilemaps[Z_POS]->sync_cubeface(obmat_tmp, near_, far_, cone_aperture, Z_POS);
   }
 }
 
@@ -418,6 +415,12 @@ ShadowPunctual::operator ShadowData()
 void ShadowDirectional::sync(const mat4 &object_mat, float bias, float min_resolution)
 {
   object_mat_ = float4x4(object_mat);
+  /* Clear embedded custom data. */
+  object_mat_.values[0][3] = object_mat_.values[1][3] = object_mat_.values[2][3] = 0.0f;
+  object_mat_.values[3][3] = 1.0f;
+  /* Remove translation. */
+  zero_v3(object_mat_.values[3]);
+
   min_resolution_ = min_resolution;
   bias_ = bias;
 }
@@ -433,46 +436,64 @@ void ShadowDirectional::end_sync(int min_level,
    * can affect lightprobe shadowing quality. To fix, just change camera position during bake and
    * profit!!! */
 
-  /* Transpose is inverse if using only the 3x3 portion and the basis is orthogonal. */
-  float4x4 obinv = object_mat_.transposed();
-
-  AABB local_bounds;
-  local_bounds.init_min_max();
+  float3 z_axis = float3(object_mat_.values[2]);
+  /* Near & far values used for rendering. Bounds the shadow casters. */
+  near_ = 1.0e30f;
+  far_ = -1.0e30f;
   BoundBox bbox = casters_bounds;
   for (auto i : IndexRange(8)) {
-    float3 local_vec = obinv.ref_3x3() * float3(bbox.vec[i]);
-    local_bounds.merge(local_vec);
+    float dist = -float3::dot(z_axis, float3(bbox.vec[i]));
+    near_ = min_ff(near_, dist);
+    far_ = max_ff(far_, dist);
   }
+  near_ -= 1e-8f;
+  far_ += 1e-8f;
 
   min_level = clamp_i(user_min_level, min_level, max_level);
   int level_count = max_level - min_level + 1;
+  /* The maximum level count is bounded by the mantissa of a 32bit float. */
+  if (level_count > 23) {
+    level_count = 23;
+    min_level = max_level - level_count + 1;
+  }
 
   if (tilemaps.size() != level_count) {
     shadows_->tilemap_allocator.free(tilemaps);
     tilemaps = shadows_->tilemap_allocator.alloc(level_count);
   }
+  ShadowTileMap &first_clipmap = *tilemaps.first();
+  /* Meh... in order to make tile_size_get() work properly. */
+  first_clipmap.set_level(min_level);
+  first_clipmap.set_is_cubemap(false);
 
-  /* Choose clipmap configuration. */
-  /* TODO(fclem): We might want to improve / simplify the orthographic projection case since
-   * all tiles would need the same resolution. The current clipmap distribution makes farthest
-   * tiles less granular and potentially wasteful. */
-
-  float near = -local_bounds.max.z + 1e-8f;
-  float far = -local_bounds.min.z - 1e-8f;
+  /* Compute full offset from origin to the smallest clipmap tile size. */
+  float tile_size = first_clipmap.tile_size_get();
+  base_offset_ = int2(
+      roundf(float3::dot(float3(object_mat_.values[0]), camera_position) / tile_size),
+      roundf(float3::dot(float3(object_mat_.values[1]), camera_position) / tile_size));
 
   int level = min_level;
+  int divisor = 1;
   for (ShadowTileMap *tilemap : tilemaps) {
-    tilemap->sync_clipmap(camera_position, object_mat_, near, far, level++);
+    tilemap->sync_clipmap(
+        camera_position, object_mat_, near_, far_, base_offset_ / divisor, level++);
+    divisor <<= 1;
   }
+  divisor >>= 1;
+  /* Save only the offset from the first clipmap level to the last. */
+  base_offset_ = base_offset_ - (base_offset_ / divisor) * divisor;
 }
 
 ShadowDirectional::operator ShadowData()
 {
   ShadowData data;
-  invert_m4_m4(data.mat, object_mat_.values);
+  ShadowTileMap &last_level = *tilemaps.last();
+  mul_m4_m4m4(data.mat, shadow_clipmap_scale_mat, last_level.winmat.ptr());
+  mul_m4_m4m4(data.mat, data.mat, last_level.viewmat.ptr());
   data.bias = bias_;
   data.clip_near = near_;
   data.clip_far = far_;
+  data.base_offset = base_offset_;
   data.tilemap_index = tilemaps.first()->index;
   data.tilemap_last = data.tilemap_index + tilemaps.size() - 1;
   data.clipmap_lod_min = min_resolution_;
@@ -518,7 +539,7 @@ void ShadowModule::init(void)
     /* TODO(fclem) GPU_DEPTH_COMPONENT16 support in copy shader? */
     /* TODO(fclem) Make allocation safe. */
     atlas_tx_.ensure(UNPACK2(atlas_extent), 1, GPU_R32F);
-    atlas_tx_ptr_ = atlas_tx_;
+    atlas_tx_.filter_mode(false);
 #if DEBUG
     atlas_tx_.clear(0.0f);
 #endif
@@ -551,6 +572,12 @@ void ShadowModule::init(void)
       break;
     case 7:
       debug_data_.type = SHADOW_DEBUG_TILE_ALLOCATION;
+      break;
+    case 8:
+      debug_data_.type = SHADOW_DEBUG_SHADOW_DEPTH;
+      break;
+    default:
+      debug_data_.type = SHADOW_DEBUG_NONE;
       break;
   }
 
@@ -646,16 +673,26 @@ void ShadowModule::end_sync(void)
       far_dist_freezed = far_dist;
       near_dist_freezed = near_dist;
       cam_position_freezed = cam_position;
+      debug_data_.camera_position = cam_position;
     }
     else {
       far_dist = far_dist_freezed;
       near_dist = near_dist_freezed;
       cam_position = cam_position_freezed;
+      debug_data_.camera_position = cam_position_freezed;
     }
 #endif
-    /* FIXME(fclem): This does not work in orthographic view. */
-    int max_level = ceil(log2(far_dist));
-    int min_level = floor(log2(near_dist));
+
+    int min_level, max_level;
+    if (false /* is_ortho_camera */) {
+      /* TODO(fclem): To have the best resolution we need to find the smallest
+       * Clipmap that covers the intersection of the Camera Frustum with casters_bounds_.
+       * cam_position should be the center of this intersection. */
+    }
+    else {
+      max_level = ceil(log2(far_dist));
+      min_level = floor(log2(near_dist));
+    }
 
     for (ShadowDirectional &directional : directionals) {
       directional.end_sync(min_level, max_level, cam_position, casters_bounds_);
@@ -764,8 +801,7 @@ void ShadowModule::end_sync(void)
     int64_t tilemaps_updated_len = tilemaps_len + tilemap_allocator.deleted_maps_len;
     if (tilemaps_updated_len > 0) {
       DRW_shgroup_call_compute(grp, 1, 1, tilemaps_updated_len);
-      DRW_shgroup_barrier(grp, GPU_BARRIER_SHADER_IMAGE_ACCESS);
-      DRW_shgroup_barrier(grp, GPU_BARRIER_SHADER_STORAGE);
+      DRW_shgroup_barrier(grp, GPU_BARRIER_SHADER_IMAGE_ACCESS | GPU_BARRIER_SHADER_STORAGE);
     }
   }
   {
@@ -780,8 +816,10 @@ void ShadowModule::end_sync(void)
     DRW_shgroup_uniform_image(grp, "tilemap_rects_img", tilemap_allocator.tilemap_rects_tx);
     if (tilemaps_len > 0) {
       DRW_shgroup_call_compute(grp, 1, 1, tilemaps_len);
-      DRW_shgroup_barrier(grp, GPU_BARRIER_SHADER_IMAGE_ACCESS);
-      DRW_shgroup_barrier(grp, GPU_BARRIER_SHADER_STORAGE);
+      eGPUBarrier barrier = GPU_BARRIER_SHADER_IMAGE_ACCESS | GPU_BARRIER_SHADER_STORAGE;
+      barrier |= GPU_BARRIER_TEXTURE_FETCH;  /* Needed for ShadowPageMark / ShadowPageCopy. */
+      barrier |= GPU_BARRIER_TEXTURE_UPDATE; /* Needed for readback. */
+      DRW_shgroup_barrier(grp, barrier);
     }
   }
   {
@@ -803,9 +841,10 @@ void ShadowModule::end_sync(void)
     DRW_shgroup_uniform_texture(grp, "tilemaps_tx", tilemap_allocator.tilemap_tx);
     DRW_shgroup_uniform_texture(grp, "render_tx", render_tx_);
     DRW_shgroup_uniform_image(grp, "out_atlas_img", atlas_tx_);
+    DRW_shgroup_uniform_int(grp, "tilemap_index", &rendering_tilemap_, 1);
     int dispatch_size = shadow_page_size_ / SHADOW_PAGE_COPY_GROUP_SIZE;
     DRW_shgroup_call_compute(grp, dispatch_size, dispatch_size, 1);
-    DRW_shgroup_barrier(grp, GPU_BARRIER_SHADER_IMAGE_ACCESS);
+    DRW_shgroup_barrier(grp, GPU_BARRIER_TEXTURE_FETCH);
   }
 
   debug_end_sync();
@@ -871,6 +910,7 @@ void ShadowModule::debug_end_sync(void)
     DRW_shgroup_vertex_buffer(grp, "pages_buf", pages_data_);
     DRW_shgroup_uniform_texture(grp, "tilemaps_tx", tilemap_allocator.tilemap_tx);
     DRW_shgroup_uniform_texture_ref(grp, "depth_tx", &input_depth_tx_);
+    DRW_shgroup_uniform_texture(grp, "atlas_tx", atlas_tx_);
     DRW_shgroup_uniform_block(grp, "debug_block", debug_data_.ubo_get());
     DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
   }
@@ -945,18 +985,23 @@ void ShadowModule::update_visible(const DRWView *view)
     Span<ShadowTileMap *> tilemaps = tilemap_allocator.maps.as_span();
 
     while (!regions.is_empty()) {
-      int region_len = 0;
+      Vector<int, 6> regions_index;
+
       /* Group updates by pack of 6. This is to workaround the current DRWView limitation.
        * Future goal is to have GPU culling and create the views on GPU. */
-      while (!regions.is_empty() && region_len < 6) {
+      while (!regions.is_empty() && regions_index.size() < 6) {
         if (!BLI_rcti_is_empty(&regions.first())) {
-          tilemaps.first()->setup_view(regions.first(), views_[region_len++]);
+          ShadowTileMap &tilemap = *tilemaps.first();
+          tilemap.setup_view(regions.first(), views_[regions_index.size()]);
+          regions_index.append(tilemap.index);
         }
         regions = regions.drop_front(1);
         tilemaps = tilemaps.drop_front(1);
       }
 
-      for (auto i : IndexRange(region_len)) {
+      for (auto i : regions_index.index_range()) {
+        rendering_tilemap_ = regions_index[i];
+
         DRW_view_set_active(views_[i]);
         GPU_framebuffer_bind(render_fb_);
         DRW_draw_pass(page_mark_ps_);

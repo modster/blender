@@ -1,5 +1,7 @@
 
 #pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
+#pragma BLENDER_REQUIRE(eevee_shadow_tilemap_lib.glsl)
+#pragma BLENDER_REQUIRE(eevee_shadow_page_lib.glsl)
 
 /* ---------------------------------------------------------------------- */
 /** \name Shadow Sampling Functions
@@ -39,31 +41,80 @@ vec3 shadow_punctual_local_position_to_face_local(int face_id, vec3 lL)
   }
 }
 
-vec3 shadow_punctual_coordinates_get(ShadowData shadow, vec3 lL)
+float shadow_punctual_depth_get(
+    sampler2D atlas_tx, usampler2D tilemaps_tx, LightData light, ShadowData shadow, vec3 lL)
 {
   lL -= shadow.offset;
   int face_id = shadow_punctual_face_index_get(lL);
   lL = shadow_punctual_local_position_to_face_local(face_id, lL);
-  lL *= min(0.0, lL.z + shadow.bias) / lL.z;
+  /* UVs in [0..SHADOW_TILEMAP_RES] range. */
+  vec2 uv = (lL.xy / abs(lL.z)) * vec2(SHADOW_TILEMAP_RES / 2) + float(SHADOW_TILEMAP_RES / 2);
+  ivec2 tile_co = ivec2(floor(uv));
+  int tilemap_index = shadow.tilemap_index + face_id;
+  ShadowTileData tile = shadow_tile_load(tilemaps_tx, tile_co, tilemap_index);
 
-  vec3 shadow_co = project_point(shadow.mat, lL);
-
-  /* TODO */
-  // shadow_co = shadow_tilemap_coordinate(shadow.tilemap_id + face_id, shadow_co);
-
-  return shadow_co;
+  float depth = 1.0;
+  if (/* tile.is_valid && */ tilemap_index <= shadow.tilemap_last) {
+    vec2 shadow_uv = shadow_page_uv_transform(tile.page, 0, uv);
+    depth = texture(atlas_tx, shadow_uv).r;
+  }
+  return depth;
 }
 
-/* Returns world distance delta from light between shading point (lL) and shadow depth. */
-float shadow_punctual_depth_delta(ShadowData shadow, vec3 lL, float depth)
+float shadow_directional_depth_get(sampler2D atlas_tx,
+                                   usampler2D tilemaps_tx,
+                                   LightData light,
+                                   ShadowData shadow,
+                                   vec3 camera_P,
+                                   vec3 lP,
+                                   vec3 P)
 {
-  lL -= shadow.offset;
-  /* Revert the constant bias from shadow rendering. (Tweaked for 16bit shadowmaps) */
-  const float depth_bias = 3.1e-5;
-  depth = saturate(depth - depth_bias);
-  depth = linear_depth(true, depth, shadow.clip_far, shadow.clip_near);
-  depth *= length(lL / max_v3(abs(lL)));
-  return length(lL) - depth;
+  int clipmap_lod = shadow_directional_clipmap_level(shadow, distance(P, camera_P));
+  int clipmap_lod_relative = clipmap_lod - shadow.clipmap_lod_min;
+  int tilemap_index = clamp(
+      shadow.tilemap_index + clipmap_lod_relative, shadow.tilemap_index, shadow.tilemap_last);
+  /* Compute how many time we need to subdivide. */
+  float clipmap_res_mul = float(1 << (shadow.clipmap_lod_max - clipmap_lod));
+  /* Compute offset of the clipmap from the largest LOD. */
+  vec2 clipmap_offset = vec2(abs(shadow.base_offset) >> clipmap_lod_relative) *
+                        sign(shadow.base_offset);
+
+  vec2 uv = (lP.xy * clipmap_res_mul - clipmap_offset) + float(SHADOW_TILEMAP_RES / 2);
+  ivec2 tile_co = ivec2(floor(uv));
+  ShadowTileData tile = shadow_tile_load(tilemaps_tx, tile_co, tilemap_index);
+
+  float depth = 1.0;
+  if (tile.is_allocated) {
+    vec2 shadow_uv = shadow_page_uv_transform(tile.page, 0, uv);
+    depth = texture(atlas_tx, shadow_uv).r;
+  }
+  return depth;
+}
+
+/* Returns world distance delta from light between shading point and first occluder. */
+float shadow_delta_get(sampler2D atlas_tx,
+                       usampler2D tilemaps_tx,
+                       LightData light,
+                       ShadowData shadow,
+                       vec3 lL,
+                       float receiver_dist,
+                       vec3 P)
+{
+  if (light.type == LIGHT_SUN) {
+    /* [-SHADOW_TILEMAP_RES/2..SHADOW_TILEMAP_RES/2] range for highest LOD. */
+    vec3 lP = transform_point(shadow.mat, P);
+    float occluder_z = shadow_directional_depth_get(
+        atlas_tx, tilemaps_tx, light, shadow, cameraPos, lP, P);
+    /* Transform to world space distance. */
+    return (lP.z - occluder_z) * abs(shadow.clip_far - shadow.clip_near);
+  }
+  else {
+    float occluder_z = shadow_punctual_depth_get(atlas_tx, tilemaps_tx, light, shadow, lL);
+    occluder_z = linear_depth(true, occluder_z, shadow.clip_far, shadow.clip_near);
+    /* Take into account the cubemap projection. We want the radial distance. */
+    float occluder_dist = receiver_dist * occluder_z / max_v3(abs(lL));
+    return receiver_dist - occluder_dist;
+  }
 }
 
 /** \} */

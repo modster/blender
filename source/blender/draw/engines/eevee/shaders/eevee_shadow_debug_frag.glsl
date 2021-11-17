@@ -88,8 +88,8 @@ bool debug_tilemap()
 bool debug_tilemap_point_is_inside(vec3 P, int tilemap_index)
 {
   int tilemap_data_index = debug.tilemap_data_index + tilemap_index - debug.shadow.tilemap_index;
-  vec3 clipP = project_point(tilemaps[tilemap_data_index].persmat, P);
-  return in_range_inclusive(clipP, vec3(-1.0), vec3(1.0));
+  vec3 clipP = project_point(tilemaps[tilemap_data_index].tilemat, P);
+  return in_range_inclusive(clipP, vec3(0.0), vec3(16.0));
 }
 
 /** Unlike shadow_directional_tilemap_index, returns the first tilemap overlapping the position. */
@@ -142,8 +142,8 @@ void debug_tile_state(vec3 P)
                                                         debug_punctual_tilemap_index(P);
   if (tilemap_index != -1) {
     int tilemap_data_index = debug.tilemap_data_index + tilemap_index - debug.shadow.tilemap_index;
-    vec3 clipP = project_point(tilemaps[tilemap_data_index].persmat, P);
-    ivec2 tile = ivec2((clipP * 0.5 + 0.5) * SHADOW_TILEMAP_RES);
+    vec3 clipP = project_point(tilemaps[tilemap_data_index].tilemat, P);
+    ivec2 tile = ivec2(clipP.xy);
     ShadowTileData tile_data = shadow_tile_load(tilemaps_tx, tile, tilemap_index);
     vec3 color = debug_tile_state_color(tile_data);
     out_color_add = vec4(color * 0.5, 0);
@@ -187,6 +187,26 @@ void debug_tile_allocation(void)
   }
 }
 
+void debug_shadow_depth(vec3 P)
+{
+  vec3 L;
+  float dist;
+  light_vector_get(debug.light, P, L, dist);
+  vec3 lL = light_world_to_local(debug.light, -L) * dist;
+  lL -= debug.shadow.offset;
+  vec3 lP = transform_point(debug.shadow.mat, P);
+  float depth;
+  if (debug.light.type == LIGHT_SUN) {
+    shadow_directional_depth_get(
+        atlas_tx, tilemaps_tx, debug.light, debug.shadow, debug.camera_position, lP, P);
+  }
+  else {
+    shadow_punctual_depth_get(atlas_tx, tilemaps_tx, debug.light, debug.shadow, lL);
+  }
+  out_color_add = vec4(vec3(depth), 0);
+  out_color_mul = vec4(0);
+}
+
 void main()
 {
   /* Default to no output. */
@@ -220,6 +240,9 @@ void main()
         break;
       case SHADOW_DEBUG_LOD:
         debug_lod(P);
+        break;
+      case SHADOW_DEBUG_SHADOW_DEPTH:
+        debug_shadow_depth(P);
         break;
       default:
         discard;

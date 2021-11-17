@@ -33,6 +33,7 @@ void main()
   tile_data.is_visible = false;
   tile_data.is_used = false;
   tile_data.do_update = false;
+  tile_data.lod_tilemap_offset = 0;
 #ifdef SHADOW_NO_CACHING
   tile_data.page = uvec2(0);
   tile_data.is_allocated = false;

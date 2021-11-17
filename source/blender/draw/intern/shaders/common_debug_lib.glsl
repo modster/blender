@@ -26,6 +26,8 @@ layout(std430, binding = 7) restrict buffer debugBuf
 }
 drw_debug_verts;
 
+bool drw_debug_draw_enable = true;
+
 uint drw_debug_color_pack(vec4 color)
 {
   color = clamp(color, 0.0, 1.0);
@@ -37,27 +39,70 @@ uint drw_debug_color_pack(vec4 color)
   return result;
 }
 
+void drw_debug_line_do(inout uint vertid, vec3 v1, vec3 v2, uint color)
+{
+  drw_debug_verts.verts[vertid++] = DebugVert(v1, color);
+  drw_debug_verts.verts[vertid++] = DebugVert(v2, color);
+}
+
 void drw_debug_line(vec3 v1, vec3 v2, vec4 color)
 {
-  uint vertid = atomicAdd(drw_debug_verts.v_count, 2);
-  if (vertid + 1 < DEBUG_VERT_MAX) {
-    drw_debug_verts.verts[vertid + 0] = DebugVert(v1, drw_debug_color_pack(color));
-    drw_debug_verts.verts[vertid + 1] = DebugVert(v2, drw_debug_color_pack(color));
+  if (!drw_debug_draw_enable) {
+    return;
+  }
+  const uint vneeded = 2;
+  uint vertid = atomicAdd(drw_debug_verts.v_count, vneeded);
+  if (vertid + vneeded < DEBUG_VERT_MAX + 1) {
+    drw_debug_line_do(vertid, v1, v2, drw_debug_color_pack(color));
   }
 }
 
 void drw_debug_quad(vec3 v1, vec3 v2, vec3 v3, vec3 v4, vec4 color)
 {
-  uint vertid = atomicAdd(drw_debug_verts.v_count, 8);
-  if (vertid + 7 < DEBUG_VERT_MAX) {
-    drw_debug_verts.verts[vertid + 0] = DebugVert(v1, drw_debug_color_pack(color));
-    drw_debug_verts.verts[vertid + 1] = DebugVert(v2, drw_debug_color_pack(color));
-    drw_debug_verts.verts[vertid + 2] = DebugVert(v2, drw_debug_color_pack(color));
-    drw_debug_verts.verts[vertid + 3] = DebugVert(v3, drw_debug_color_pack(color));
-    drw_debug_verts.verts[vertid + 4] = DebugVert(v3, drw_debug_color_pack(color));
-    drw_debug_verts.verts[vertid + 5] = DebugVert(v4, drw_debug_color_pack(color));
-    drw_debug_verts.verts[vertid + 6] = DebugVert(v4, drw_debug_color_pack(color));
-    drw_debug_verts.verts[vertid + 7] = DebugVert(v1, drw_debug_color_pack(color));
+  if (!drw_debug_draw_enable) {
+    return;
+  }
+  const uint vneeded = 8;
+  uint vertid = atomicAdd(drw_debug_verts.v_count, vneeded);
+  if (vertid + vneeded < DEBUG_VERT_MAX + 1) {
+    uint pcolor = drw_debug_color_pack(color);
+    drw_debug_line_do(vertid, v1, v2, pcolor);
+    drw_debug_line_do(vertid, v2, v3, pcolor);
+    drw_debug_line_do(vertid, v3, v4, pcolor);
+    drw_debug_line_do(vertid, v4, v1, pcolor);
+  }
+}
+
+/* Draw an octahedron. */
+void drw_debug_point(vec3 p, float radius, vec4 color)
+{
+  if (!drw_debug_draw_enable) {
+    return;
+  }
+  vec3 c = vec3(radius, -radius, 0);
+  vec3 v1 = p + c.xzz;
+  vec3 v2 = p + c.zxz;
+  vec3 v3 = p + c.yzz;
+  vec3 v4 = p + c.zyz;
+  vec3 v5 = p + c.zzx;
+  vec3 v6 = p + c.zzy;
+
+  const uint vneeded = 12 * 2;
+  uint vertid = atomicAdd(drw_debug_verts.v_count, vneeded);
+  if (vertid + vneeded < DEBUG_VERT_MAX + 1) {
+    uint pcolor = drw_debug_color_pack(color);
+    drw_debug_line_do(vertid, v1, v2, pcolor);
+    drw_debug_line_do(vertid, v2, v3, pcolor);
+    drw_debug_line_do(vertid, v3, v4, pcolor);
+    drw_debug_line_do(vertid, v4, v1, pcolor);
+    drw_debug_line_do(vertid, v1, v5, pcolor);
+    drw_debug_line_do(vertid, v2, v5, pcolor);
+    drw_debug_line_do(vertid, v3, v5, pcolor);
+    drw_debug_line_do(vertid, v4, v5, pcolor);
+    drw_debug_line_do(vertid, v1, v6, pcolor);
+    drw_debug_line_do(vertid, v2, v6, pcolor);
+    drw_debug_line_do(vertid, v3, v6, pcolor);
+    drw_debug_line_do(vertid, v4, v6, pcolor);
   }
 }
 

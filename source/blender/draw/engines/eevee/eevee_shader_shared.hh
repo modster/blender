@@ -461,9 +461,15 @@ BLI_STATIC_ASSERT_ALIGN(LightData, 16)
  */
 struct ShadowData {
   /**
-   * Point : Shadow matrix to convert Local face coordinates to UV space [0..1].
-   * Directional : Rotation matrix to local light coordinate (still world scale).
+   * Point : Unused.
+   * Directional : Rotation matrix to local light coordinate.
+   * The scale is uniform for the Z axis.
+   * For the X & Y axes, it is scaled to be the size of a tile.
+   * Origin is the one of the largest clipmap.
+   * So after transformation, you are in the tilemap space [0..SHADOW_TILEMAP_RES]
+   * of the largest clipmap.
    */
+  /** TODO(fclem) Could be move to light matrix. */
   mat4 mat;
   /** NOTE: It is ok to use vec3 here. A float is declared right after it.
    * vec3 is also aligned to 16 bytes. */
@@ -480,8 +486,8 @@ struct ShadowData {
   int tilemap_last;
   /** Directional : Clipmap lod range to avoid sampling outside of valid range. */
   int clipmap_lod_min, clipmap_lod_max;
-  int _pad1;
-  int _pad2;
+  /** Directional : Offset of the lod min in base units. */
+  ivec2 base_offset;
 };
 BLI_STATIC_ASSERT_ALIGN(ShadowData, 16)
 
@@ -498,8 +504,8 @@ BLI_STATIC_ASSERT_ALIGN(ShadowData, 16)
 #define SHADOW_PAGE_PER_ROW 64
 /** Debug shadow tile allocation. */
 // #define SHADOW_NO_CACHING
-// #define SHADOW_DEBUG_PAGE_ALLOCATION_ENABLED
-// #define SHADOW_DEBUG_TILE_ALLOCATION_ENABLED
+#define SHADOW_DEBUG_PAGE_ALLOCATION_ENABLED
+#define SHADOW_DEBUG_TILE_ALLOCATION_ENABLED
 
 /* Given an input tile coordinate [0..SHADOW_TILEMAP_RES] returns the coordinate in NDC [-1..1]. */
 static inline vec2 shadow_tile_coord_to_ndc(ivec2 tile)
@@ -515,10 +521,14 @@ static inline vec2 shadow_tile_coord_to_ndc(ivec2 tile)
  * Small descriptor used for the tile update phase.
  */
 struct ShadowTileMapData {
-  /** View Projection matrix used to render the shadow. Transforms World > NDC. */
-  mat4 persmat;
+  /** View Projection matrix used to tag tiles (World > UV Tile [0..SHADOW_TILEMAP_RES]). */
+  mat4 tilemat;
   /** Corners of the frustum. */
   vec4 corners[4];
+  /** NDC depths to clip usage bbox. */
+#define _max_usage_depth corners[0].w
+#define _min_usage_depth corners[1].w
+#define _punctual_distance corners[2].w
   /** Shift to apply to the tile grid in the setup phase. */
   ivec2 grid_shift;
   /** True for punctual lights. */
@@ -559,7 +569,12 @@ enum eShadowDebug : uint32_t {
    * Outputs the tilemap atlas. Default tilemap is too big for the usual screen resolution.
    * Try lowering SHADOW_TILEMAP_PER_ROW and SHADOW_MAX_TILEMAP before using this option.
    */
-  SHADOW_DEBUG_TILE_ALLOCATION = 5u
+  SHADOW_DEBUG_TILE_ALLOCATION = 5u,
+  /**
+   * Visualize linear depth stored in the atlas regions of the active light.
+   * This way, one can check if the rendering, the copying and the shadow sampling functions works.
+   */
+  SHADOW_DEBUG_SHADOW_DEPTH = 6u
 };
 
 /**
@@ -568,10 +583,12 @@ enum eShadowDebug : uint32_t {
 struct ShadowDebugData {
   LightData light;
   ShadowData shadow;
+  vec3 camera_position;
   eShadowDebug type;
   int tilemap_data_index;
   int _pad1;
   int _pad2;
+  int _pad3;
 };
 BLI_STATIC_ASSERT_ALIGN(ShadowDebugData, 16)
 
