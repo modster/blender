@@ -3451,6 +3451,14 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
       "Trim all edges right at the boundary of image(including overscan region)");
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
 
+  prop = RNA_def_property(srna, "use_ortho_tolerance", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "calculation_flags", LRT_USE_ORTHO_TOLERANCE);
+  RNA_def_property_ui_text(
+      prop,
+      "Use Ortho Tolerance",
+      "Internally rotate the camera slightly to comphensate for the precision of the algorithm");
+  RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
+
   RNA_define_lib_overridable(false);
 }
 

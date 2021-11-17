@@ -53,6 +53,7 @@ typedef enum eLineartMainFlags {
   LRT_FILTER_FACE_MARK_KEEP_CONTOUR = (1 << 18),
   LRT_USE_BACK_FACE_CULLING = (1 << 19),
   LRT_USE_IMAGE_BOUNDARY_TRIMMING = (1 << 20),
+  LRT_USE_ORTHO_TOLERANCE = (1 << 21),
 } eLineartMainFlags;
 
 typedef enum eLineartEdgeFlag {

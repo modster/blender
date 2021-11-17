@@ -3190,6 +3190,13 @@ static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
     copy_v3db_v3fl(rb->active_camera_pos, active_camera->obmat[3]);
   }
   copy_m4_m4(rb->cam_obmat, camera->obmat);
+
+  if (c->type == CAM_ORTHO && lmd->calculation_flags & LRT_USE_ORTHO_TOLERANCE) {
+    rotate_m4(rb->cam_obmat, 'X', DEG2RAD(0.1f));
+    rotate_m4(rb->cam_obmat, 'Y', DEG2RAD(0.1f));
+    rotate_m4(rb->cam_obmat, 'Z', DEG2RAD(0.1f));
+  }
+
   rb->cam_is_persp = (c->type == CAM_PERSP);
   rb->near_clip = c->clip_start + clipping_offset;
   rb->far_clip = c->clip_end - clipping_offset;
