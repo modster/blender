@@ -494,6 +494,8 @@ typedef struct LineartBoundingArea {
 #define LRT_ABC(index) (index == 0 ? a : (index == 1 ? b : c))
 #define LRT_PABC(index) (index == 0 ? pa : (index == 1 ? pb : pc))
 
+#define DBL_LOOSER 1e-5
+#define LRT_DOUBLE_CLOSE_LOOSER(a, b) (((a) + DBL_LOOSER) >= (b) && ((a)-DBL_LOOSER) <= (b))
 #define LRT_DOUBLE_CLOSE_ENOUGH(a, b) (((a) + DBL_EDGE_LIM) >= (b) && ((a)-DBL_EDGE_LIM) <= (b))
 #define LRT_DOUBLE_CLOSE_ENOUGH_TRI(a, b) \
   (((a) + DBL_TRIANGLE_LIM) >= (b) && ((a)-DBL_TRIANGLE_LIM) <= (b))
@@ -603,10 +605,11 @@ BLI_INLINE int lineart_intersect_seg_seg(const double *a1,
       *r_ratio = ratio;
     }
     else {
-      k1 = (a2[1] - a1[1]) / x_diff;
-      k2 = (b2[1] - b1[1]) / x_diff2;
+      double y_diff = a2[1] - a1[1], y_diff2 = b2[1] - b1[1];
+      k1 = y_diff / x_diff;
+      k2 = y_diff2 / x_diff2;
 
-      if (LRT_DOUBLE_CLOSE_ENOUGH(k2, k1)) {
+      if (LRT_DOUBLE_CLOSE_ENOUGH_TRI(k2, k1)) {
         /* This means two segments are parallel. This also handles k==0 (both completely
          * horizontal) cases. */
         if ((LRT_DOUBLE_CLOSE_ENOUGH(a2[0], b1[0]) && LRT_DOUBLE_CLOSE_ENOUGH(a2[1], b1[1])) ||

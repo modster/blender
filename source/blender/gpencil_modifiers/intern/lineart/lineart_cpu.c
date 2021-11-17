@@ -1612,7 +1612,7 @@ static uint16_t lineart_identify_feature_line(LineartRenderBuffer *rb,
     dot_1 = dot_v3v3_db(view_vector, tri1->gn);
     dot_2 = dot_v3v3_db(view_vector, tri2->gn);
 
-    if (rb->use_contour && (result = dot_1 * dot_2) <= 0 && (dot_1 + dot_2)) {
+    if (rb->use_contour && (result = dot_1 * dot_2) <= 0 && (fabs(dot_1) + fabs(dot_2))) {
       edge_flag_result |= LRT_EDGE_FLAG_CONTOUR;
     }
 
