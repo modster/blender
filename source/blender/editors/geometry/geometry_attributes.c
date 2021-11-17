@@ -88,7 +88,8 @@ static int geometry_attribute_add_exec(bContext *C, wmOperator *op)
   RNA_string_get(op->ptr, "name", name);
   CustomDataType type = (CustomDataType)RNA_enum_get(op->ptr, "data_type");
   AttributeDomain domain = (AttributeDomain)RNA_enum_get(op->ptr, "domain");
-  CustomDataLayer *layer = BKE_id_attribute_new(id, name, type, domain, op->reports);
+  CustomDataLayer *layer = BKE_id_attribute_new(
+      id, name, type, domain, CD_MASK_PROP_ALL, op->reports);
 
   if (layer == NULL) {
     return OPERATOR_CANCELLED;
@@ -176,6 +177,131 @@ void GEOMETRY_OT_attribute_remove(wmOperatorType *ot)
   /* api callbacks */
   ot->exec = geometry_attribute_remove_exec;
   ot->poll = geometry_attributes_remove_poll;
+
+  /* flags */
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+}
+
+static int geometry_color_attribute_add_exec(bContext *C, wmOperator *op)
+{
+  Object *ob = ED_object_context(C);
+  ID *id = ob->data;
+
+  char name[MAX_NAME];
+  RNA_string_get(op->ptr, "name", name);
+  CustomDataType type = (CustomDataType)RNA_enum_get(op->ptr, "data_type");
+  AttributeDomain domain = (AttributeDomain)RNA_enum_get(op->ptr, "domain");
+  CustomDataLayer *layer = BKE_id_attribute_new(
+      id, name, type, domain, CD_MASK_PROP_ALL, op->reports);
+
+  if (layer == NULL) {
+    return OPERATOR_CANCELLED;
+  }
+
+  BKE_id_attributes_active_color_set(id, layer);
+
+  DEG_id_tag_update(id, ID_RECALC_GEOMETRY);
+  WM_main_add_notifier(NC_GEOM | ND_DATA, id);
+
+  return OPERATOR_FINISHED;
+}
+
+void GEOMETRY_OT_color_attribute_add(wmOperatorType *ot)
+{
+  /* identifiers */
+  ot->name = "Add Geometry Attribute";
+  ot->description = "Add attribute to geometry";
+  ot->idname = "GEOMETRY_OT_color_attribute_add";
+
+  /* api callbacks */
+  ot->poll = geometry_attributes_poll;
+  ot->exec = geometry_color_attribute_add_exec;
+  ot->invoke = WM_operator_props_popup_confirm;
+
+  /* flags */
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+  /* properties */
+  PropertyRNA *prop;
+
+  prop = RNA_def_string(ot->srna, "name", "Color", MAX_NAME, "Name", "Name of color attribute");
+  RNA_def_property_flag(prop, PROP_SKIP_SAVE);
+
+  static EnumPropertyItem domains[3] = {{ATTR_DOMAIN_POINT, "POINT", -1, "Point", ""},
+                                        {ATTR_DOMAIN_CORNER, "CORNER", -1, "Face Corner", ""},
+                                        {0, NULL, 0, NULL, NULL}};
+
+  static EnumPropertyItem types[3] = {{CD_PROP_COLOR, "COLOR", -1, "Color", ""},
+                                      {CD_MLOOPCOL, "BYTE_COLOR", -1, "Byte Color", ""},
+                                      {0, NULL, 0, NULL, NULL}};
+
+  prop = RNA_def_enum(ot->srna,
+                      "domain",
+                      domains,
+                      ATTR_DOMAIN_POINT,
+                      "Domain",
+                      "Type of element that attribute is stored on");
+
+  RNA_def_property_flag(prop, PROP_SKIP_SAVE);
+
+  prop = RNA_def_enum(ot->srna,
+                      "data_type",
+                      types,
+                      CD_PROP_COLOR,
+                      "Data Type",
+                      "Type of data stored in attribute");
+  RNA_def_property_flag(prop, PROP_SKIP_SAVE);
+}
+
+static int geometry_color_attribute_remove_exec(bContext *C, wmOperator *op)
+{
+  Object *ob = ED_object_context(C);
+  ID *id = ob->data;
+  CustomDataLayer *layer = BKE_id_attributes_active_color_get(id);
+
+  if (layer == NULL) {
+    return OPERATOR_CANCELLED;
+  }
+
+  if (!BKE_id_attribute_remove(id, layer, op->reports)) {
+    return OPERATOR_CANCELLED;
+  }
+
+  int *active_index = BKE_id_attributes_active_index_p(id);
+  if (*active_index > 0) {
+    *active_index -= 1;
+  }
+
+  DEG_id_tag_update(id, ID_RECALC_GEOMETRY);
+  WM_main_add_notifier(NC_GEOM | ND_DATA, id);
+
+  return OPERATOR_FINISHED;
+}
+
+static bool geometry_color_attributes_remove_poll(bContext *C)
+{
+  if (!geometry_attributes_poll(C)) {
+    return false;
+  }
+
+  Object *ob = ED_object_context(C);
+  ID *data = (ob) ? ob->data : NULL;
+  if (BKE_id_attributes_active_color_get(data) != NULL) {
+    return true;
+  }
+
+  return false;
+}
+void GEOMETRY_OT_color_attribute_remove(wmOperatorType *ot)
+{
+  /* identifiers */
+  ot->name = "Remove Color Attribute";
+  ot->description = "Remove color attribute from geometry";
+  ot->idname = "GEOMETRY_OT_color_attribute_remove";
+
+  /* api callbacks */
+  ot->exec = geometry_color_attribute_remove_exec;
+  ot->poll = geometry_color_attributes_remove_poll;
 
   /* flags */
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;

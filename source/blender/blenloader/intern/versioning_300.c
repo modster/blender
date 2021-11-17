@@ -41,6 +41,7 @@
 #include "DNA_lineart_types.h"
 #include "DNA_listBase.h"
 #include "DNA_material_types.h"
+#include "DNA_mesh_types.h"
 #include "DNA_modifier_types.h"
 #include "DNA_text_types.h"
 #include "DNA_workspace_types.h"
@@ -49,6 +50,7 @@
 #include "BKE_animsys.h"
 #include "BKE_armature.h"
 #include "BKE_asset.h"
+#include "BKE_attribute.h"
 #include "BKE_collection.h"
 #include "BKE_deform.h"
 #include "BKE_fcurve.h"
@@ -2170,6 +2172,41 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
         version_node_output_socket_name(
             ntree, GEO_NODE_MESH_PRIMITIVE_UV_SPHERE, "Geometry", "Mesh");
         version_node_socket_name(ntree, GEO_NODE_SET_POINT_RADIUS, "Geometry", "Points");
+      }
+    }
+  }
+
+  if (!MAIN_VERSION_ATLEAST(bmain, 301, 3)) {
+    LISTBASE_FOREACH (Mesh *, me, &bmain->meshes) {
+      for (int step = 0; step < 2; step++) {
+        CustomDataLayer *actlayer = NULL;
+
+        int vact1, vact2;
+
+        if (step) {
+          vact1 = CustomData_get_render_layer_index(&me->vdata, CD_PROP_COLOR);
+          vact2 = CustomData_get_render_layer_index(&me->ldata, CD_MLOOPCOL);
+        }
+        else {
+          vact1 = CustomData_get_active_layer_index(&me->vdata, CD_PROP_COLOR);
+          vact2 = CustomData_get_active_layer_index(&me->ldata, CD_MLOOPCOL);
+        }
+
+        if (vact1 != -1) {
+          actlayer = me->vdata.layers + vact1;
+        }
+        else if (vact2 != -1) {
+          actlayer = me->ldata.layers + vact2;
+        }
+
+        if (actlayer) {
+          if (step) {
+            BKE_id_attributes_render_color_set(&me->id, actlayer);
+          }
+          else {
+            BKE_id_attributes_active_color_set(&me->id, actlayer);
+          }
+        }
       }
     }
   }

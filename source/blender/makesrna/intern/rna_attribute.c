@@ -291,7 +291,7 @@ static void rna_ByteColorAttributeValue_color_set(PointerRNA *ptr, const float *
 static PointerRNA rna_AttributeGroup_new(
     ID *id, ReportList *reports, const char *name, const int type, const int domain)
 {
-  CustomDataLayer *layer = BKE_id_attribute_new(id, name, type, domain, reports);
+  CustomDataLayer *layer = BKE_id_attribute_new(id, name, type, domain, CD_MASK_PROP_ALL, reports);
   DEG_id_tag_update(id, ID_RECALC_GEOMETRY);
   WM_main_add_notifier(NC_GEOM | ND_DATA, id);
 
@@ -365,7 +365,7 @@ PointerRNA rna_AttributeGroup_iterator_get(CollectionPropertyIterator *iter)
 
 int rna_AttributeGroup_length(PointerRNA *ptr)
 {
-  return BKE_id_attributes_length(ptr->owner_id, CD_MASK_PROP_ALL);
+  return BKE_id_attributes_length(ptr->owner_id, ATTR_DOMAIN_MASK_ALL, CD_MASK_PROP_ALL);
 }
 
 static int rna_AttributeGroup_active_index_get(PointerRNA *ptr)
@@ -401,7 +401,7 @@ static void rna_AttributeGroup_active_index_range(
     PointerRNA *ptr, int *min, int *max, int *softmin, int *softmax)
 {
   *min = 0;
-  *max = BKE_id_attributes_length(ptr->owner_id, CD_MASK_PROP_ALL);
+  *max = BKE_id_attributes_length(ptr->owner_id, ATTR_DOMAIN_MASK_ALL, CD_MASK_PROP_ALL);
 
   *softmin = *min;
   *softmax = *max;
@@ -412,6 +412,172 @@ static void rna_AttributeGroup_update_active(Main *bmain, Scene *scene, PointerR
   rna_Attribute_update_data(bmain, scene, ptr);
 }
 
+static PointerRNA rna_AttributeGroup_active_color_get(PointerRNA *ptr)
+{
+  ID *id = ptr->owner_id;
+  CustomDataLayer *layer = BKE_id_attributes_active_color_get(id);
+
+  PointerRNA attribute_ptr;
+  RNA_pointer_create(id, &RNA_Attribute, layer, &attribute_ptr);
+  return attribute_ptr;
+}
+
+static void rna_AttributeGroup_active_color_set(PointerRNA *ptr,
+                                                PointerRNA attribute_ptr,
+                                                ReportList *UNUSED(reports))
+{
+  ID *id = ptr->owner_id;
+  CustomDataLayer *layer = attribute_ptr.data;
+
+  BKE_id_attributes_active_color_set(id, layer);
+}
+
+static int rna_AttributeGroup_active_color_index_get(PointerRNA *ptr)
+{
+  AttributeRef *ref = BKE_id_attributes_active_color_ref_p(ptr->owner_id);
+
+  return ref ? BKE_id_attribute_index_from_ref(
+                   ptr->owner_id, ref, ATTR_DOMAIN_MASK_ALL, CD_MASK_PROP_ALL) :
+               0;
+}
+
+static void rna_AttributeGroup_active_color_index_set(PointerRNA *ptr, int value)
+{
+  ID *id = ptr->owner_id;
+  AttributeRef *ref = BKE_id_attributes_active_color_ref_p(ptr->owner_id);
+
+  if (!ref ||
+      !BKE_id_attribute_ref_from_index(id, value, ATTR_DOMAIN_MASK_ALL, CD_MASK_PROP_ALL, ref)) {
+    fprintf(stderr, "%s: error setting active color index to %d\n", __func__, value);
+  }
+}
+
+static void rna_AttributeGroup_active_color_index_range(
+    PointerRNA *ptr, int *min, int *max, int *softmin, int *softmax)
+{
+  *min = 0;
+  *max = BKE_id_attributes_length(ptr->owner_id,
+                                  ATTR_DOMAIN_MASK_POINT | ATTR_DOMAIN_MASK_CORNER,
+                                  CD_MASK_PROP_COLOR | CD_MASK_MLOOPCOL);
+
+  *softmin = *min;
+  *softmax = *max;
+}
+
+static void rna_AttributeGroup_update_active_color(Main *bmain, Scene *scene, PointerRNA *ptr)
+{
+  ID *id = ptr->owner_id;
+
+  /* cheating way for importers to avoid slow updates */
+  if (id->us > 0) {
+    DEG_id_tag_update(id, 0);
+    WM_main_add_notifier(NC_GEOM | ND_DATA, id);
+  }
+}
+
+static bool rna_Attribute_active_render_get(PointerRNA *ptr)
+{
+  ID *id = ptr->owner_id;
+  CustomDataLayer *layer = ptr->data;
+
+  if (!BKE_id_attributes_supported(id)) {
+    return false;
+  }
+
+  if (ELEM(layer->type, CD_PROP_COLOR, CD_MLOOPCOL)) {
+    return layer == BKE_id_attributes_render_color_get(id);
+  }
+
+  if (GS(id->name) != ID_ME) {
+    /* only meshes for now */
+    return false;
+  }
+
+  Mesh *me = (Mesh *)id;
+  AttributeDomain domain = BKE_id_attribute_domain(id, layer);
+  CustomData *cdata = NULL;
+
+  switch (domain) {
+    case ATTR_DOMAIN_POINT:
+      cdata = &me->vdata;
+      break;
+    case ATTR_DOMAIN_EDGE:
+      cdata = &me->edata;
+      break;
+    case ATTR_DOMAIN_CORNER:
+      cdata = &me->ldata;
+      break;
+    case ATTR_DOMAIN_FACE:
+      cdata = &me->pdata;
+      break;
+    default:
+      return false;
+  }
+
+  int idx = CustomData_get_layer_index(cdata, layer->type);
+
+  if (idx == -1) {
+    return false;
+  }
+
+  CustomDataLayer *base = cdata->layers + idx;
+
+  return layer == base + base->active_rnd;
+}
+
+static void rna_Attribute_active_render_set(PointerRNA *ptr, bool value)
+{
+  ID *id = ptr->owner_id;
+  CustomDataLayer *layer = ptr->data;
+
+  if (!value) {
+    return;  // do nothing;
+  }
+
+  if (!BKE_id_attributes_supported(id)) {
+    return;
+  }
+
+  if (GS(id->name) != ID_ME) {
+    /* only meshes for now */
+    return;
+  }
+
+  Mesh *me = (Mesh *)id;
+  AttributeDomain domain = BKE_id_attribute_domain(id, layer);
+  CustomData *cdata;
+
+  switch (domain) {
+    case ATTR_DOMAIN_POINT:
+      cdata = &me->vdata;
+      break;
+    case ATTR_DOMAIN_EDGE:
+      cdata = &me->edata;
+      break;
+    case ATTR_DOMAIN_CORNER:
+      cdata = &me->ldata;
+      break;
+    case ATTR_DOMAIN_FACE:
+      cdata = &me->pdata;
+      break;
+    default:
+      return;
+  }
+
+  if (ELEM(layer->type, CD_PROP_COLOR, CD_MLOOPCOL)) {
+    BKE_id_attributes_render_color_set(id, layer);
+  }
+  else {
+    int idx = CustomData_get_layer_index(cdata, layer->type);
+
+    if (idx != -1) {
+      CustomDataLayer *base = cdata->layers + idx;
+      int newrender = layer - base;
+
+      CustomData_set_layer_render(cdata, layer->type, newrender);
+    }
+  }
+}
 #else
 
 static void rna_def_attribute_float(BlenderRNA *brna)
@@ -699,6 +865,16 @@ static void rna_def_attribute(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Data Type", "Type of data stored in attribute");
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
 
+  prop = RNA_def_property(srna, "temporary", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "flag", CD_FLAG_TEMPORARY);
+  RNA_def_property_ui_text(prop, "Temporary", "Layer is temporary");
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+
+  prop = RNA_def_property(srna, "active_render", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_funcs(
+      prop, "rna_Attribute_active_render_get", "rna_Attribute_active_render_set");
+  RNA_def_property_ui_text(prop, "Active Render", "Active for render");
+
   prop = RNA_def_property(srna, "domain", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, rna_enum_attribute_domain_items);
   RNA_def_property_enum_funcs(
@@ -772,6 +948,25 @@ static void rna_def_attribute_group(BlenderRNA *brna)
                              "rna_AttributeGroup_active_index_set",
                              "rna_AttributeGroup_active_index_range");
   RNA_def_property_update(prop, 0, "rna_AttributeGroup_update_active");
+
+  prop = RNA_def_property(srna, "active_color", PROP_POINTER, PROP_NONE);
+  RNA_def_property_struct_type(prop, "Attribute");
+  RNA_def_property_pointer_funcs(prop,
+                                 "rna_AttributeGroup_active_color_get",
+                                 "rna_AttributeGroup_active_color_set",
+                                 NULL,
+                                 NULL);
+  RNA_def_property_flag(prop, PROP_EDITABLE | PROP_NEVER_UNLINK);
+  RNA_def_property_ui_text(prop, "Active Color", "Active color attribute");
+  RNA_def_property_update(prop, 0, "rna_AttributeGroup_update_active_color");
+
+  prop = RNA_def_property(srna, "active_color_index", PROP_INT, PROP_NONE);
+  RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+  RNA_def_property_int_funcs(prop,
+                             "rna_AttributeGroup_active_color_index_get",
+                             "rna_AttributeGroup_active_color_index_set",
+                             "rna_AttributeGroup_active_color_index_range");
+  RNA_def_property_update(prop, 0, "rna_AttributeGroup_update_active_color");
 }
 
 void rna_def_attributes_common(StructRNA *srna)

@@ -1261,7 +1261,7 @@ static int pbvh_get_buffers_update_flags(PBVH *UNUSED(pbvh))
 
 bool BKE_pbvh_get_color_layer(const Mesh *me, CustomDataLayer **r_cl, AttributeDomain *r_attr)
 {
-  CustomDataLayer *cl = BKE_id_attributes_active_get((ID *)me);
+  CustomDataLayer *cl = BKE_id_attributes_active_color_get((ID *)me);
   AttributeDomain domain;
 
   if (!cl || !ELEM(cl->type, CD_PROP_COLOR, CD_MLOOPCOL)) {
