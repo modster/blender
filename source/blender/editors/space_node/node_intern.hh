@@ -26,6 +26,10 @@
 #include "BKE_node.h"
 #include "UI_interface.h"
 #include "UI_view2d.h"
+
+#include "BLI_vector.hh"
+#include "UI_interface.hh"
+
 #include <stddef.h> /* for size_t */
 
 /* internal exports only */
@@ -42,10 +46,6 @@ struct bNodeSocket;
 struct wmGizmoGroupType;
 struct wmKeyConfig;
 struct wmWindow;
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 /* temp data to pass on to modal */
 typedef struct bNodeLinkDrag {
@@ -265,11 +265,11 @@ bool composite_node_editable(struct bContext *C);
 bool node_has_hidden_sockets(struct bNode *node);
 void node_set_hidden_sockets(struct SpaceNode *snode, bNode *node, int set);
 int node_render_changed_exec(bContext *, struct wmOperator *);
-int node_find_indicated_socket(struct SpaceNode *snode,
-                               struct bNode **nodep,
-                               struct bNodeSocket **sockp,
-                               const float cursor[2],
-                               int in_out);
+bool node_find_indicated_socket(struct SpaceNode *snode,
+                                struct bNode **nodep,
+                                struct bNodeSocket **sockp,
+                                const float cursor[2],
+                                int in_out);
 float node_link_dim_factor(const struct View2D *v2d, const struct bNodeLink *link);
 bool node_link_is_hidden_or_dimmed(const struct View2D *v2d, const struct bNodeLink *link);
 
@@ -342,14 +342,6 @@ extern const char *node_context_dir[];
 #define NODE_RESIZE_MARGIN (0.20f * U.widget_unit)
 #define NODE_LINK_RESOL 12
 
-#ifdef __cplusplus
-}
-#endif
-
-#ifdef __cplusplus
-#  include "BLI_vector.hh"
-#  include "UI_interface.hh"
 namespace blender::ed::space_node {
 Vector<ui::ContextPathItem> context_path_for_space_node(const bContext &C);
 }
-#endif

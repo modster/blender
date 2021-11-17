@@ -914,6 +914,9 @@ static void prepare_filter_asset_library(const FileList *filelist, FileListFilte
   if (!filter->asset_catalog_filter) {
     return;
   }
+  BLI_assert_msg(filelist->asset_library,
+                 "prepare_filter_asset_library() should only be called when the file browser is "
+                 "in asset browser mode");
 
   file_ensure_updated_catalog_filter_data(filter->asset_catalog_filter, filelist->asset_library);
 }
@@ -1728,7 +1731,7 @@ static void filelist_cache_previews_push(FileList *filelist, FileDirEntry *entry
     return;
   }
 
-  if (entry->flags & FILE_ENTRY_INVALID_PREVIEW) {
+  if (entry->flags & (FILE_ENTRY_INVALID_PREVIEW | FILE_ENTRY_PREVIEW_LOADING)) {
     return;
   }
 
@@ -1759,6 +1762,7 @@ static void filelist_cache_previews_push(FileList *filelist, FileDirEntry *entry
   FileListEntryPreviewTaskData *preview_taskdata = MEM_mallocN(sizeof(*preview_taskdata),
                                                                __func__);
   preview_taskdata->preview = preview;
+  entry->flags |= FILE_ENTRY_PREVIEW_LOADING;
   BLI_task_pool_push(cache->previews_pool,
                      filelist_cache_preview_runf,
                      preview_taskdata,
@@ -1876,11 +1880,13 @@ void filelist_settype(FileList *filelist, short type)
     case FILE_MAIN:
       filelist->check_dir_fn = filelist_checkdir_main;
       filelist->read_job_fn = filelist_readjob_main;
+      filelist->prepare_filter_fn = NULL;
       filelist->filter_fn = is_filtered_main;
       break;
     case FILE_LOADLIB:
       filelist->check_dir_fn = filelist_checkdir_lib;
       filelist->read_job_fn = filelist_readjob_lib;
+      filelist->prepare_filter_fn = NULL;
       filelist->filter_fn = is_filtered_lib;
       break;
     case FILE_ASSET_LIBRARY:
@@ -1900,6 +1906,7 @@ void filelist_settype(FileList *filelist, short type)
     default:
       filelist->check_dir_fn = filelist_checkdir_dir;
       filelist->read_job_fn = filelist_readjob_dir;
+      filelist->prepare_filter_fn = NULL;
       filelist->filter_fn = is_filtered_file;
       break;
   }
@@ -2674,24 +2681,27 @@ bool filelist_cache_previews_update(FileList *filelist)
 
     //      printf("%s: %d - %s - %p\n", __func__, preview->index, preview->path, preview->img);
 
-    if (preview->icon_id) {
-      /* Due to asynchronous process, a preview for a given image may be generated several times,
-       * i.e. entry->image may already be set at this point. */
-      if (entry && !entry->preview_icon_id) {
+    if (entry) {
+      entry->flags &= ~FILE_ENTRY_PREVIEW_LOADING;
+      if (preview->icon_id) {
+        /* The FILE_ENTRY_PREVIEW_LOADING flag should have prevented any other asynchronous
+         * process from trying to generate the same preview icon. */
+        BLI_assert_msg(!entry->preview_icon_id, "Preview icon should not have been generated yet");
+
         /* Move ownership over icon. */
         entry->preview_icon_id = preview->icon_id;
         preview->icon_id = 0;
         changed = true;
       }
       else {
-        BKE_icon_delete(preview->icon_id);
+        /* We want to avoid re-processing this entry continuously!
+         * Note that, since entries only live in cache,
+         * preview will be retried quite often anyway. */
+        entry->flags |= FILE_ENTRY_INVALID_PREVIEW;
       }
     }
-    else if (entry) {
-      /* We want to avoid re-processing this entry continuously!
-       * Note that, since entries only live in cache,
-       * preview will be retried quite often anyway. */
-      entry->flags |= FILE_ENTRY_INVALID_PREVIEW;
+    else {
+      BKE_icon_delete(preview->icon_id);
     }
 
     MEM_freeN(preview);

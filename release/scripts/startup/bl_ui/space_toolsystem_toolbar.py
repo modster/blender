@@ -2995,7 +2995,11 @@ class VIEW3D_PT_tools_active(ToolSelectPanelHelper, Panel):
             ),
             None,
             lambda context: (
-                (_defs_view3d_generic.cursor,)
+                (
+                    _defs_view3d_generic.cursor,
+                    None,
+                    *VIEW3D_PT_tools_active._tools_transform,
+                )
                 if context is None or context.pose_object
                 else ()
             ),

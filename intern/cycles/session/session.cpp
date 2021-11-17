@@ -262,6 +262,7 @@ RenderWork Session::run_update_for_next_iteration()
   }
 
   render_scheduler_.set_num_samples(params.samples);
+  render_scheduler_.set_start_sample(params.sample_offset);
   render_scheduler_.set_time_limit(params.time_limit);
 
   while (have_tiles) {
@@ -397,7 +398,7 @@ void Session::do_delayed_reset()
 
   /* Tile and work scheduling. */
   tile_manager_.reset_scheduling(buffer_params_, get_effective_tile_size());
-  render_scheduler_.reset(buffer_params_, params.samples);
+  render_scheduler_.reset(buffer_params_, params.samples, params.sample_offset);
 
   /* Passes. */
   /* When multiple tiles are used SAMPLE_COUNT pass is used to keep track of possible partial
@@ -504,8 +505,8 @@ void Session::set_display_driver(unique_ptr<DisplayDriver> driver)
 
 double Session::get_estimated_remaining_time() const
 {
-  const float completed = progress.get_progress();
-  if (completed == 0.0f) {
+  const double completed = progress.get_progress();
+  if (completed == 0.0) {
     return 0.0;
   }
 
@@ -573,7 +574,7 @@ void Session::update_status_time(bool show_pause, bool show_done)
   }
 
   /* Sample. */
-  if (num_samples == Integrator::MAX_SAMPLES) {
+  if (!params.background && num_samples == Integrator::MAX_SAMPLES) {
     substatus = status_append(substatus, string_printf("Sample %d", current_sample));
   }
   else {

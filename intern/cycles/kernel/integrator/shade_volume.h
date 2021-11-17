@@ -78,9 +78,8 @@ ccl_device_inline bool shadow_volume_shader_sample(KernelGlobals kg,
                                                    ccl_private ShaderData *ccl_restrict sd,
                                                    ccl_private float3 *ccl_restrict extinction)
 {
-  shader_eval_volume<true>(kg, state, sd, PATH_RAY_SHADOW, [=](const int i) {
-    return integrator_state_read_shadow_volume_stack(state, i);
-  });
+  VOLUME_READ_LAMBDA(integrator_state_read_shadow_volume_stack(state, i))
+  shader_eval_volume<true>(kg, state, sd, PATH_RAY_SHADOW, volume_read_lambda_pass);
 
   if (!(sd->flag & SD_EXTINCTION)) {
     return false;
@@ -98,9 +97,8 @@ ccl_device_inline bool volume_shader_sample(KernelGlobals kg,
                                             ccl_private VolumeShaderCoefficients *coeff)
 {
   const uint32_t path_flag = INTEGRATOR_STATE(state, path, flag);
-  shader_eval_volume<false>(kg, state, sd, path_flag, [=](const int i) {
-    return integrator_state_read_volume_stack(state, i);
-  });
+  VOLUME_READ_LAMBDA(integrator_state_read_volume_stack(state, i))
+  shader_eval_volume<false>(kg, state, sd, path_flag, volume_read_lambda_pass);
 
   if (!(sd->flag & (SD_EXTINCTION | SD_SCATTER | SD_EMISSION))) {
     return false;
@@ -608,7 +606,7 @@ ccl_device_forceinline void volume_integrate_heterogeneous(
         if (!result.indirect_scatter) {
           const float3 emission = volume_emission_integrate(
               &coeff, closure_flag, transmittance, dt);
-          accum_emission += emission;
+          accum_emission += result.indirect_throughput * emission;
         }
       }
 
@@ -661,7 +659,7 @@ ccl_device_forceinline void volume_integrate_heterogeneous(
 
   /* Write accumulated emission. */
   if (!is_zero(accum_emission)) {
-    kernel_accum_emission(kg, state, result.indirect_throughput, accum_emission, render_buffer);
+    kernel_accum_emission(kg, state, accum_emission, render_buffer);
   }
 
 #  ifdef __DENOISING_FEATURES__
@@ -794,10 +792,11 @@ ccl_device_forceinline void integrate_volume_direct_light(
   const float3 throughput_phase = throughput * bsdf_eval_sum(&phase_eval);
 
   if (kernel_data.kernel_features & KERNEL_FEATURE_LIGHT_PASSES) {
-    const float3 diffuse_glossy_ratio = (bounce == 0) ?
-                                            one_float3() :
-                                            INTEGRATOR_STATE(state, path, diffuse_glossy_ratio);
-    INTEGRATOR_STATE_WRITE(shadow_state, shadow_path, diffuse_glossy_ratio) = diffuse_glossy_ratio;
+    const float3 pass_diffuse_weight = (bounce == 0) ?
+                                           one_float3() :
+                                           INTEGRATOR_STATE(state, path, pass_diffuse_weight);
+    INTEGRATOR_STATE_WRITE(shadow_state, shadow_path, pass_diffuse_weight) = pass_diffuse_weight;
+    INTEGRATOR_STATE_WRITE(shadow_state, shadow_path, pass_glossy_weight) = zero_float3();
   }
 
   INTEGRATOR_STATE_WRITE(shadow_state, shadow_path, render_pixel_index) = INTEGRATOR_STATE(
@@ -876,7 +875,8 @@ ccl_device_forceinline bool integrate_volume_phase_scatter(
   INTEGRATOR_STATE_WRITE(state, path, throughput) = throughput_phase;
 
   if (kernel_data.kernel_features & KERNEL_FEATURE_LIGHT_PASSES) {
-    INTEGRATOR_STATE_WRITE(state, path, diffuse_glossy_ratio) = one_float3();
+    INTEGRATOR_STATE_WRITE(state, path, pass_diffuse_weight) = one_float3();
+    INTEGRATOR_STATE_WRITE(state, path, pass_glossy_weight) = zero_float3();
   }
 
   /* Update path state */
@@ -919,8 +919,8 @@ ccl_device VolumeIntegrateEvent volume_integrate(KernelGlobals kg,
                                                 VOLUME_SAMPLE_DISTANCE;
 
   /* Step through volume. */
-  const float step_size = volume_stack_step_size(
-      kg, [=](const int i) { return integrator_state_read_volume_stack(state, i); });
+  VOLUME_READ_LAMBDA(integrator_state_read_volume_stack(state, i))
+  const float step_size = volume_stack_step_size(kg, volume_read_lambda_pass);
 
   /* TODO: expensive to zero closures? */
   VolumeIntegrateResult result = {};
@@ -1024,7 +1024,7 @@ ccl_device void integrator_shade_volume(KernelGlobals kg,
   else {
     /* Continue to background, light or surface. */
     integrator_intersect_next_kernel_after_volume<DEVICE_KERNEL_INTEGRATOR_SHADE_VOLUME>(
-        kg, state, &isect);
+        kg, state, &isect, render_buffer);
     return;
   }
 #endif /* __VOLUME__ */
