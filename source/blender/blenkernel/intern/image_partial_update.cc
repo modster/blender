@@ -100,6 +100,11 @@ struct PartialUpdateUserImpl {
   /** \brief regions that have been updated. */
   Vector<PartialUpdateRegion> updated_regions;
 
+#ifdef NDEBUG
+  /** \brief reference to image to validate correct API usage. */
+  void *debug_image_;
+#endif
+
   /**
    * \brief Clear the list of updated regions.
    *
@@ -349,8 +354,14 @@ static struct PartialUpdateRegister *image_partial_update_register_ensure(Image 
 // TODO(jbakker): cleanup parameter.
 struct PartialUpdateUser *BKE_image_partial_update_create(struct Image *image)
 {
-  BLI_assert(image);
   PartialUpdateUserImpl *user_impl = OBJECT_GUARDED_NEW(PartialUpdateUserImpl);
+
+#ifdef NDEBUG
+  user_impl->debug_image_ = image;
+#else
+  UNUSED_VARS(image);
+#endif
+
   return wrap(user_impl);
 }
 
@@ -364,6 +375,10 @@ ePartialUpdateCollectResult BKE_image_partial_update_collect_changes(Image *imag
                                                                      PartialUpdateUser *user)
 {
   PartialUpdateUserImpl *user_impl = unwrap(user);
+#ifdef NDEBUG
+  BLI_assert(image == user_impl->debug_image_);
+#endif
+
   user_impl->clear_updated_regions();
 
   PartialUpdateRegisterImpl *partial_updater = unwrap(image_partial_update_register_ensure(image));
