@@ -378,7 +378,7 @@ static GPUTexture *image_get_gpu_texture(Image *ima,
   /* TODO(jbakker): bad call. Or we should do this everywhere where image is changed, or we should
    * make it possible to initialize an empty register. */
   if ((ima->gpuflag & IMA_GPU_REFRESH) != 0) {
-    BKE_image_partial_update_mark_full_update(ima, ibuf_intern);
+    BKE_image_partial_update_mark_full_update(ima);
     ima->gpuflag &= ~IMA_GPU_REFRESH;
   }
 
@@ -386,8 +386,7 @@ static GPUTexture *image_get_gpu_texture(Image *ima,
     ima->runtime.partial_update_user = BKE_image_partial_update_create(ima);
   }
 
-  switch (BKE_image_partial_update_collect_changes(
-      ima, ibuf_intern, ima->runtime.partial_update_user)) {
+  switch (BKE_image_partial_update_collect_changes(ima, ima->runtime.partial_update_user)) {
     case PARTIAL_UPDATE_NEED_FULL_UPDATE: {
       image_free_gpu(ima, true);
       break;
@@ -941,7 +940,7 @@ void BKE_image_update_gputexture_delayed(
 {
   /* Check for full refresh. */
   if (ibuf && x == 0 && y == 0 && w == ibuf->x && h == ibuf->y) {
-    BKE_image_partial_update_mark_full_update(ima, ibuf);
+    BKE_image_partial_update_mark_full_update(ima);
   }
   else {
     rcti dirty_region;

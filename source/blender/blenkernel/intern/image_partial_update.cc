@@ -215,7 +215,7 @@ struct PartialUpdateRegisterImpl {
   int image_width;
   int image_height;
 
-  void set_resolution(ImBuf *image_buffer)
+  void update_resolution(ImBuf *image_buffer)
   {
     if (image_width != image_buffer->x || image_height != image_buffer->y) {
       image_width = image_buffer->x;
@@ -225,7 +225,10 @@ struct PartialUpdateRegisterImpl {
       int tile_y_len = image_height / TILE_SIZE;
       current_changeset.init_tiles(tile_x_len, tile_y_len);
 
-      mark_full_update();
+      /* Only perform a full update when the cache contains data. */
+      if (current_changeset.has_dirty_tiles() || !history.is_empty()) {
+        mark_full_update();
+      }
     }
   }
 
@@ -333,6 +336,16 @@ extern "C" {
 
 using namespace blender::bke::image::partial_update;
 
+static struct PartialUpdateRegister *image_partial_update_register_ensure(Image *image)
+{
+  if (image->runtime.partial_update_register == nullptr) {
+    PartialUpdateRegisterImpl *partial_update_register = OBJECT_GUARDED_NEW(
+        PartialUpdateRegisterImpl);
+    image->runtime.partial_update_register = wrap(partial_update_register);
+  }
+  return image->runtime.partial_update_register;
+}
+
 // TODO(jbakker): cleanup parameter.
 struct PartialUpdateUser *BKE_image_partial_update_create(struct Image *image)
 {
@@ -348,14 +361,12 @@ void BKE_image_partial_update_free(PartialUpdateUser *user)
 }
 
 ePartialUpdateCollectResult BKE_image_partial_update_collect_changes(Image *image,
-                                                                     ImBuf *image_buffer,
                                                                      PartialUpdateUser *user)
 {
   PartialUpdateUserImpl *user_impl = unwrap(user);
   user_impl->clear_updated_regions();
 
-  PartialUpdateRegisterImpl *partial_updater = unwrap(
-      BKE_image_partial_update_register_ensure(image, image_buffer));
+  PartialUpdateRegisterImpl *partial_updater = unwrap(image_partial_update_register_ensure(image));
   partial_updater->ensure_empty_changeset();
 
   if (!partial_updater->can_construct(user_impl->last_changeset_id)) {
@@ -407,18 +418,6 @@ ePartialUpdateIterResult BKE_image_partial_update_get_next_change(PartialUpdateU
 
 /* --- Image side --- */
 
-struct PartialUpdateRegister *BKE_image_partial_update_register_ensure(Image *image,
-                                                                       ImBuf *image_buffer)
-{
-  if (image->runtime.partial_update_register == nullptr) {
-    PartialUpdateRegisterImpl *partial_update_register = OBJECT_GUARDED_NEW(
-        PartialUpdateRegisterImpl);
-    partial_update_register->set_resolution(image_buffer);
-    image->runtime.partial_update_register = wrap(partial_update_register);
-  }
-  return image->runtime.partial_update_register;
-}
-
 void BKE_image_partial_update_register_free(Image *image)
 {
   PartialUpdateRegisterImpl *partial_update_register = unwrap(
@@ -431,16 +430,14 @@ void BKE_image_partial_update_register_free(Image *image)
 
 void BKE_image_partial_update_mark_region(Image *image, ImBuf *image_buffer, rcti *updated_region)
 {
-  PartialUpdateRegisterImpl *partial_updater = unwrap(
-      BKE_image_partial_update_register_ensure(image, image_buffer));
+  PartialUpdateRegisterImpl *partial_updater = unwrap(image_partial_update_register_ensure(image));
+  partial_updater->update_resolution(image_buffer);
   partial_updater->mark_region(updated_region);
 }
 
-void BKE_image_partial_update_mark_full_update(Image *image, ImBuf *image_buffer)
+void BKE_image_partial_update_mark_full_update(Image *image)
 {
-  PartialUpdateRegisterImpl *partial_updater = unwrap(
-      BKE_image_partial_update_register_ensure(image, image_buffer));
+  PartialUpdateRegisterImpl *partial_updater = unwrap(image_partial_update_register_ensure(image));
   partial_updater->mark_full_update();
-  partial_updater->set_resolution(image_buffer);
 }
 }

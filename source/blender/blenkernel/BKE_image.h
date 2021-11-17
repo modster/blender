@@ -459,7 +459,7 @@ void BKE_image_partial_update_free(struct PartialUpdateUser *user);
  *              using #BKE_image_partial_update_get_next_change.
  */
 ePartialUpdateCollectResult BKE_image_partial_update_collect_changes(
-    struct Image *image, struct ImBuf *image_buffer, struct PartialUpdateUser *user);
+    struct Image *image, struct PartialUpdateUser *user);
 
 ePartialUpdateIterResult BKE_image_partial_update_get_next_change(
     struct PartialUpdateUser *user, struct PartialUpdateRegion *r_tile);
@@ -467,15 +467,13 @@ ePartialUpdateIterResult BKE_image_partial_update_get_next_change(
 /* --- partial updater (image side) --- */
 struct PartialUpdateRegister;
 
-struct PartialUpdateRegister *BKE_image_partial_update_register_ensure(struct Image *image,
-                                                                       struct ImBuf *image_buffer);
 void BKE_image_partial_update_register_free(struct Image *image);
 /** \brief Mark a region of the image to update. */
 void BKE_image_partial_update_mark_region(struct Image *image,
                                           struct ImBuf *image_buffer,
                                           rcti *updated_region);
 /** \brief Mark the whole image to be updated. */
-void BKE_image_partial_update_mark_full_update(struct Image *image, struct ImBuf *image_buffer);
+void BKE_image_partial_update_mark_full_update(struct Image *image);
 
 #ifdef __cplusplus
 }
