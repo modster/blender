@@ -420,6 +420,14 @@ typedef struct PartialUpdateRegion {
   /** \brief region of the image that has been updated. Region can be bigger than actual changes.
    */
   struct rcti region;
+
+  /**
+   * \brief Tile number that this region belongs to.
+   * 
+   * For tiled images it contains the UDIM tile number (1001, 1010).
+   * For non tiled images this is set to 0.
+   */
+  int tile_number;
 } PartialUpdateRegion;
 
 /**

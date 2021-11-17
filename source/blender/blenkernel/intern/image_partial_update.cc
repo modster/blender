@@ -90,6 +90,7 @@ static PartialUpdateRegisterImpl *unwrap(struct PartialUpdateRegister *partial_u
   return static_cast<PartialUpdateRegisterImpl *>(static_cast<void *>(partial_update_register));
 }
 
+using TileNumber = int32_t;
 using ChangesetID = int64_t;
 constexpr ChangesetID UnknownChangesetID = -1;
 
@@ -209,7 +210,7 @@ struct Changeset {
  * TileChangesets.
  */
 struct PartialUpdateRegisterImpl {
-  /* Changes are tracked in tiles. */
+  /* Changes are tracked in chunks. */
   static constexpr int CHUNK_SIZE = 256;
 
   /** \brief changeset id of the first changeset kept in #history. */
@@ -231,9 +232,9 @@ struct PartialUpdateRegisterImpl {
       image_width = image_buffer->x;
       image_height = image_buffer->y;
 
-      int tile_x_len = image_width / CHUNK_SIZE;
-      int tile_y_len = image_height / CHUNK_SIZE;
-      current_changeset.tile_changeset.init_chunks(tile_x_len, tile_y_len);
+      int chunk_x_len = image_width / CHUNK_SIZE;
+      int chunk_y_len = image_height / CHUNK_SIZE;
+      current_changeset.tile_changeset.init_chunks(chunk_x_len, chunk_y_len);
 
       /* Only perform a full update when the cache contains data. */
       if (current_changeset.tile_changeset.has_dirty_chunks() || !history.is_empty()) {
@@ -251,48 +252,48 @@ struct PartialUpdateRegisterImpl {
   }
 
   /**
-   * \brief get the tile number for the give pixel coordinate.
+   * \brief get the chunk number for the give pixel coordinate.
    *
-   * As tiles are squares the this member can be used for both x and y axis.
+   * As chunks are squares the this member can be used for both x and y axis.
    */
-  static int tile_number_for_pixel(int pixel_offset)
+  static int chunk_number_for_pixel(int pixel_offset)
   {
-    int tile_offset = pixel_offset / CHUNK_SIZE;
+    int chunk_offset = pixel_offset / CHUNK_SIZE;
     if (pixel_offset < 0) {
-      tile_offset -= 1;
+      chunk_offset -= 1;
     }
-    return tile_offset;
+    return chunk_offset;
   }
 
   void mark_region(rcti *updated_region)
   {
-    int start_x_tile = tile_number_for_pixel(updated_region->xmin);
-    int end_x_tile = tile_number_for_pixel(updated_region->xmax - 1);
-    int start_y_tile = tile_number_for_pixel(updated_region->ymin);
-    int end_y_tile = tile_number_for_pixel(updated_region->ymax - 1);
+    int start_x_chunk = chunk_number_for_pixel(updated_region->xmin);
+    int end_x_chunk = chunk_number_for_pixel(updated_region->xmax - 1);
+    int start_y_chunk = chunk_number_for_pixel(updated_region->ymin);
+    int end_y_chunk = chunk_number_for_pixel(updated_region->ymax - 1);
 
     /* Clamp tiles to tiles in image. */
-    start_x_tile = max_ii(0, start_x_tile);
-    start_y_tile = max_ii(0, start_y_tile);
-    end_x_tile = min_ii(current_changeset.tile_changeset.chunk_x_len_ - 1, end_x_tile);
-    end_y_tile = min_ii(current_changeset.tile_changeset.chunk_y_len_ - 1, end_y_tile);
+    start_x_chunk = max_ii(0, start_x_chunk);
+    start_y_chunk = max_ii(0, start_y_chunk);
+    end_x_chunk = min_ii(current_changeset.tile_changeset.chunk_x_len_ - 1, end_x_chunk);
+    end_y_chunk = min_ii(current_changeset.tile_changeset.chunk_y_len_ - 1, end_y_chunk);
 
     /* Early exit when no tiles need to be updated. */
-    if (start_x_tile >= current_changeset.tile_changeset.chunk_x_len_) {
+    if (start_x_chunk >= current_changeset.tile_changeset.chunk_x_len_) {
       return;
     }
-    if (start_y_tile >= current_changeset.tile_changeset.chunk_y_len_) {
+    if (start_y_chunk >= current_changeset.tile_changeset.chunk_y_len_) {
       return;
     }
-    if (end_x_tile < 0) {
+    if (end_x_chunk < 0) {
       return;
     }
-    if (end_y_tile < 0) {
+    if (end_y_chunk < 0) {
       return;
     }
 
     current_changeset.tile_changeset.mark_chunks_dirty(
-        start_x_tile, start_y_tile, end_x_tile, end_y_tile);
+        start_x_chunk, start_y_chunk, end_x_chunk, end_y_chunk);
   }
 
   void ensure_empty_changeset()
@@ -327,12 +328,13 @@ struct PartialUpdateRegisterImpl {
   /**
    * \brief collect all historic changes since a given changeset.
    */
-  std::unique_ptr<TileChangeset> changed_chunks_since(const ChangesetID from_changeset)
+  // TODO(jbakker): add tile_number as parameter.
+  std::unique_ptr<TileChangeset> changed_tile_chunks_since(const TileNumber UNUSED(tile_number), const ChangesetID from_changeset)
   {
     std::unique_ptr<TileChangeset> changed_tiles = std::make_unique<TileChangeset>();
-    int tile_x_len = image_width / CHUNK_SIZE;
-    int tile_y_len = image_height / CHUNK_SIZE;
-    changed_tiles->init_chunks(tile_x_len, tile_y_len);
+    int chunk_x_len = image_width / CHUNK_SIZE;
+    int chunk_y_len = image_height / CHUNK_SIZE;
+    changed_tiles->init_chunks(chunk_x_len, chunk_y_len);
 
     for (int index = from_changeset - first_changeset_id; index < history.size(); index++) {
       changed_tiles->merge(history[index].tile_changeset);
@@ -401,9 +403,8 @@ ePartialUpdateCollectResult BKE_image_partial_update_collect_changes(Image *imag
   }
 
   /* Collect changed tiles. */
-  // TODO: for each tile in image.
   LISTBASE_FOREACH (ImageTile *, tile, &image->tiles) {
-    std::unique_ptr<TileChangeset> changed_chunks = partial_updater->changed_chunks_since(
+    std::unique_ptr<TileChangeset> changed_chunks = partial_updater->changed_tile_chunks_since(tile->tile_number,
         user_impl->last_changeset_id);
     /* Check if chunks of this tile are dirty. */
     if (!changed_chunks->has_dirty_chunks()) {
@@ -418,6 +419,7 @@ ePartialUpdateCollectResult BKE_image_partial_update_collect_changes(Image *imag
         }
 
         PartialUpdateRegion region;
+        region.tile_number = tile->tile_number;
         BLI_rcti_init(&region.region,
                       chunk_x * PartialUpdateRegisterImpl::CHUNK_SIZE,
                       (chunk_x + 1) * PartialUpdateRegisterImpl::CHUNK_SIZE,
@@ -427,7 +429,6 @@ ePartialUpdateCollectResult BKE_image_partial_update_collect_changes(Image *imag
       }
     }
   }
-  // TODO end for each tile in image.
 
   user_impl->last_changeset_id = partial_updater->last_changeset_id;
   return PARTIAL_UPDATE_CHANGES_AVAILABLE;
