@@ -42,6 +42,47 @@ static void node_composit_init_curves_time(bNodeTree *UNUSED(ntree), bNode *node
   node->storage = BKE_curvemapping_add(1, 0.0f, 0.0f, 1.0f, 1.0f);
 }
 
+static int node_composite_gpu_curve_time(GPUMaterial *mat,
+                                         bNode *node,
+                                         bNodeExecData *UNUSED(execdata),
+                                         GPUNodeStack *in,
+                                         GPUNodeStack *out)
+{
+  CurveMapping *curve_mapping = (CurveMapping *)node->storage;
+
+  BKE_curvemapping_init(curve_mapping);
+  float *band_values;
+  int band_size;
+  BKE_curvemapping_table_RGBA(curve_mapping, &band_values, &band_size);
+  float band_layer;
+  GPUNodeLink *band_texture = GPU_color_band(mat, band_size, band_values, &band_layer);
+
+  float start_slopes[CM_TOT];
+  float end_slopes[CM_TOT];
+  BKE_curvemapping_compute_slopes(curve_mapping, start_slopes, end_slopes);
+  float range_minimums[CM_TOT];
+  BKE_curvemapping_get_range_minimums(curve_mapping, range_minimums);
+  float range_dividers[CM_TOT];
+  BKE_curvemapping_compute_range_dividers(curve_mapping, range_dividers);
+
+  const float start_frame = (float)node->custom1;
+  const float end_frame = (float)node->custom2;
+
+  return GPU_stack_link(mat,
+                        node,
+                        "curves_time",
+                        in,
+                        out,
+                        band_texture,
+                        GPU_constant(&band_layer),
+                        GPU_uniform(range_minimums),
+                        GPU_uniform(range_dividers),
+                        GPU_uniform(start_slopes),
+                        GPU_uniform(end_slopes),
+                        GPU_uniform(&start_frame),
+                        GPU_uniform(&end_frame));
+}
+
 void register_node_type_cmp_curve_time(void)
 {
   static bNodeType ntype;
@@ -51,6 +92,7 @@ void register_node_type_cmp_curve_time(void)
   node_type_size(&ntype, 140, 100, 320);
   node_type_init(&ntype, node_composit_init_curves_time);
   node_type_storage(&ntype, "CurveMapping", node_free_curves, node_copy_curves);
+  node_type_gpu(&ntype, node_composite_gpu_curve_time);
 
   nodeRegisterType(&ntype);
 }
