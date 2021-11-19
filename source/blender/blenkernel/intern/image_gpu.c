@@ -371,7 +371,7 @@ static GPUTexture *image_get_gpu_texture(Image *ima,
   }
 
   ImageTile *tile = BKE_image_get_tile(ima, 0);
-  if (tile == NULL || ibuf == NULL) {
+  if (tile == NULL || ibuf_intern == NULL) {
     ima->gpuflag |= IMA_GPU_REFRESH;
   }
 
@@ -433,7 +433,7 @@ static GPUTexture *image_get_gpu_texture(Image *ima,
                                                          IMA_TEXTURE_RESOLUTION_FULL;
   GPUTexture **tex = get_image_gpu_texture_ptr(ima, textarget, current_view, texture_resolution);
   if (*tex) {
-    if (ibuf == NULL) {
+    if (ibuf != ibuf_intern) {
       BKE_image_release_ibuf(ima, ibuf_intern, NULL);
     }
     return *tex;
@@ -443,7 +443,7 @@ static GPUTexture *image_get_gpu_texture(Image *ima,
    * texture with zero bind-code so we don't keep trying. */
   if (tile == NULL) {
     *tex = image_gpu_texture_error_create(textarget);
-    if (ibuf == NULL) {
+    if (ibuf != ibuf_intern) {
       BKE_image_release_ibuf(ima, ibuf_intern, NULL);
     }
     return *tex;
@@ -496,13 +496,12 @@ static GPUTexture *image_get_gpu_texture(Image *ima,
       break;
   }
 
-  /* if `ibuf` was given, we don't own the `ibuf_intern` */
-  if (ibuf == NULL) {
-    BKE_image_release_ibuf(ima, ibuf_intern, NULL);
-  }
-
   if (*tex) {
     GPU_texture_orig_size_set(*tex, ibuf_intern->x, ibuf_intern->y);
+  }
+
+  if (ibuf != ibuf_intern) {
+    BKE_image_release_ibuf(ima, ibuf_intern, NULL);
   }
 
   return *tex;

@@ -406,6 +406,7 @@ struct PartialUpdateRegisterImpl {
       return;
     }
     history.remove(0, num_items_to_remove);
+    first_changeset_id += num_items_to_remove;
   }
 
   /**
