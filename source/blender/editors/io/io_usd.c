@@ -539,12 +539,13 @@ void WM_OT_usd_import(struct wmOperatorType *ot)
                 0.0001f,
                 1000.0f);
 
-  RNA_def_enum(ot->srna,
-               "mtl_name_collision_mode",
-               rna_enum_usd_mtl_name_collision_mode_items,
-               USD_MTL_NAME_COLLISION_MODIFY,
-               "Material Name Collision",
-               "Behavior when the name of an imported material conflicts with an existing material");
+  RNA_def_enum(
+      ot->srna,
+      "mtl_name_collision_mode",
+      rna_enum_usd_mtl_name_collision_mode_items,
+      USD_MTL_NAME_COLLISION_MODIFY,
+      "Material Name Collision",
+      "Behavior when the name of an imported material conflicts with an existing material");
 }
 
 #endif /* WITH_USD */
