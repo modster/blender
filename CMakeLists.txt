@@ -411,6 +411,7 @@ option(WITH_CYCLES                   "Enable Cycles Render Engine" ON)
 option(WITH_CYCLES_OSL               "Build Cycles with OpenShadingLanguage support" ON)
 option(WITH_CYCLES_EMBREE            "Build Cycles with Embree support" ON)
 option(WITH_CYCLES_LOGGING           "Build Cycles with logging support" ON)
+option(WITH_CYCLES_DEBUG             "Build Cycles with options useful for debugging (e.g., MIS)" OFF)
 
 option(WITH_CYCLES_STANDALONE        "Build Cycles standalone application" OFF)
 option(WITH_CYCLES_STANDALONE_GUI    "Build Cycles standalone with GUI" OFF)
@@ -440,7 +441,11 @@ mark_as_advanced(WITH_CYCLES_CUDA_BUILD_SERIAL)
 mark_as_advanced(WITH_CUDA_DYNLOAD)
 
 # AMD HIP
-option(WITH_CYCLES_DEVICE_HIP        "Enable Cycles AMD HIP support" OFF)
+if(WIN32)
+  option(WITH_CYCLES_DEVICE_HIP        "Enable Cycles AMD HIP support" ON)
+else()
+  option(WITH_CYCLES_DEVICE_HIP        "Enable Cycles AMD HIP support" OFF)
+endif()
 option(WITH_CYCLES_HIP_BINARIES      "Build Cycles AMD HIP binaries" OFF)
 set(CYCLES_HIP_BINARIES_ARCH gfx1010 gfx1011 gfx1012 gfx1030 gfx1031 gfx1032 gfx1034 CACHE STRING "AMD HIP architectures to build binaries for")
 mark_as_advanced(WITH_CYCLES_DEVICE_HIP)
@@ -642,7 +647,7 @@ if(WIN32)
   option(WITH_WINDOWS_PDB "Generate a pdb file for client side stacktraces" ON)
   mark_as_advanced(WITH_WINDOWS_PDB)
 
-  option(WITH_WINDOWS_STRIPPED_PDB "Use a stripped PDB file" On)
+  option(WITH_WINDOWS_STRIPPED_PDB "Use a stripped PDB file" ON)
   mark_as_advanced(WITH_WINDOWS_STRIPPED_PDB)
 
 endif()
@@ -1065,7 +1070,7 @@ if(MSVC)
   add_definitions(-D__LITTLE_ENDIAN__)
 
   # OSX-Note: as we do cross-compiling with specific set architecture,
-  # endianess-detection and auto-setting is counterproductive
+  # endianness-detection and auto-setting is counterproductive
   # so we just set endianness according CMAKE_OSX_ARCHITECTURES
 
 elseif(CMAKE_OSX_ARCHITECTURES MATCHES i386 OR CMAKE_OSX_ARCHITECTURES MATCHES x86_64 OR CMAKE_OSX_ARCHITECTURES MATCHES arm64)
@@ -1755,7 +1760,7 @@ endif()
 set(CMAKE_CXX_STANDARD 17)
 # If C++17 is not available, downgrading to an earlier standard is NOT OK.
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-# Do not enable compiler specific language extentions.
+# Do not enable compiler specific language extensions.
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Make MSVC properly report the value of the __cplusplus preprocessor macro

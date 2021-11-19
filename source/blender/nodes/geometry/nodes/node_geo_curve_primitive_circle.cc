@@ -25,17 +25,34 @@ namespace blender::nodes {
 
 static void geo_node_curve_primitive_circle_declare(NodeDeclarationBuilder &b)
 {
-  b.add_input<decl::Int>(N_("Resolution")).default_value(32).min(3).max(512);
+  b.add_input<decl::Int>(N_("Resolution"))
+      .default_value(32)
+      .min(3)
+      .max(512)
+      .description(N_("Number of points on the circle"));
   b.add_input<decl::Vector>(N_("Point 1"))
       .default_value({-1.0f, 0.0f, 0.0f})
-      .subtype(PROP_TRANSLATION);
+      .subtype(PROP_TRANSLATION)
+      .description(
+          N_("One of the three points on the circle. The point order determines the circle's "
+             "direction"));
   b.add_input<decl::Vector>(N_("Point 2"))
       .default_value({0.0f, 1.0f, 0.0f})
-      .subtype(PROP_TRANSLATION);
+      .subtype(PROP_TRANSLATION)
+      .description(
+          N_("One of the three points on the circle. The point order determines the circle's "
+             "direction"));
   b.add_input<decl::Vector>(N_("Point 3"))
       .default_value({1.0f, 0.0f, 0.0f})
-      .subtype(PROP_TRANSLATION);
-  b.add_input<decl::Float>(N_("Radius")).default_value(1.0f).min(0.0f).subtype(PROP_DISTANCE);
+      .subtype(PROP_TRANSLATION)
+      .description(
+          N_("One of the three points on the circle. The point order determines the circle's "
+             "direction"));
+  b.add_input<decl::Float>(N_("Radius"))
+      .default_value(1.0f)
+      .min(0.0f)
+      .subtype(PROP_DISTANCE)
+      .description(N_("Distance of the points from the origin"));
   b.add_output<decl::Geometry>(N_("Curve"));
   b.add_output<decl::Vector>(N_("Center"));
 }
@@ -56,7 +73,7 @@ static void geo_node_curve_primitive_circle_init(bNodeTree *UNUSED(tree), bNode 
   node->storage = data;
 }
 
-static void geo_node_curve_primitive_circle_update(bNodeTree *UNUSED(ntree), bNode *node)
+static void geo_node_curve_primitive_circle_update(bNodeTree *ntree, bNode *node)
 {
   const NodeGeometryCurvePrimitiveCircle *node_storage = (NodeGeometryCurvePrimitiveCircle *)
                                                              node->storage;
@@ -70,11 +87,16 @@ static void geo_node_curve_primitive_circle_update(bNodeTree *UNUSED(ntree), bNo
 
   bNodeSocket *center_socket = ((bNodeSocket *)node->outputs.first)->next;
 
-  nodeSetSocketAvailability(start_socket, mode == GEO_NODE_CURVE_PRIMITIVE_CIRCLE_TYPE_POINTS);
-  nodeSetSocketAvailability(middle_socket, mode == GEO_NODE_CURVE_PRIMITIVE_CIRCLE_TYPE_POINTS);
-  nodeSetSocketAvailability(end_socket, mode == GEO_NODE_CURVE_PRIMITIVE_CIRCLE_TYPE_POINTS);
-  nodeSetSocketAvailability(center_socket, mode == GEO_NODE_CURVE_PRIMITIVE_CIRCLE_TYPE_POINTS);
-  nodeSetSocketAvailability(radius_socket, mode == GEO_NODE_CURVE_PRIMITIVE_CIRCLE_TYPE_RADIUS);
+  nodeSetSocketAvailability(
+      ntree, start_socket, mode == GEO_NODE_CURVE_PRIMITIVE_CIRCLE_TYPE_POINTS);
+  nodeSetSocketAvailability(
+      ntree, middle_socket, mode == GEO_NODE_CURVE_PRIMITIVE_CIRCLE_TYPE_POINTS);
+  nodeSetSocketAvailability(
+      ntree, end_socket, mode == GEO_NODE_CURVE_PRIMITIVE_CIRCLE_TYPE_POINTS);
+  nodeSetSocketAvailability(
+      ntree, center_socket, mode == GEO_NODE_CURVE_PRIMITIVE_CIRCLE_TYPE_POINTS);
+  nodeSetSocketAvailability(
+      ntree, radius_socket, mode == GEO_NODE_CURVE_PRIMITIVE_CIRCLE_TYPE_RADIUS);
 }
 
 static bool colinear_f3_f3_f3(const float3 p1, const float3 p2, const float3 p3)

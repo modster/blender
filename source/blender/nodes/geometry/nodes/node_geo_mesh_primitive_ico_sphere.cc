@@ -28,8 +28,16 @@ namespace blender::nodes {
 
 static void geo_node_mesh_primitive_ico_sphere_declare(NodeDeclarationBuilder &b)
 {
-  b.add_input<decl::Float>(N_("Radius")).default_value(1.0f).min(0.0f).subtype(PROP_DISTANCE);
-  b.add_input<decl::Int>(N_("Subdivisions")).default_value(1).min(1).max(7);
+  b.add_input<decl::Float>(N_("Radius"))
+      .default_value(1.0f)
+      .min(0.0f)
+      .subtype(PROP_DISTANCE)
+      .description(N_("Distance from the generated points to the origin"));
+  b.add_input<decl::Int>(N_("Subdivisions"))
+      .default_value(1)
+      .min(1)
+      .max(7)
+      .description(N_("Number of subdivisions on top of the basic icosahedron"));
   b.add_output<decl::Geometry>(N_("Mesh"));
 }
 
@@ -37,9 +45,10 @@ static Mesh *create_ico_sphere_mesh(const int subdivisions, const float radius)
 {
   const float4x4 transform = float4x4::identity();
 
-  const BMeshCreateParams bmcp = {true};
+  BMeshCreateParams bmesh_create_params{};
+  bmesh_create_params.use_toolflags = true;
   const BMAllocTemplate allocsize = {0, 0, 0, 0};
-  BMesh *bm = BM_mesh_create(&allocsize, &bmcp);
+  BMesh *bm = BM_mesh_create(&allocsize, &bmesh_create_params);
   BM_data_layer_add_named(bm, &bm->ldata, CD_MLOOPUV, nullptr);
 
   BMO_op_callf(bm,

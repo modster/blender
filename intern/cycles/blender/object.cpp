@@ -62,31 +62,46 @@ bool BlenderSync::BKE_object_is_modified(BL::Object &b_ob)
   return false;
 }
 
-bool BlenderSync::object_is_geometry(BL::Object &b_ob)
+bool BlenderSync::object_is_geometry(BObjectInfo &b_ob_info)
 {
-  BL::ID b_ob_data = b_ob.data();
+  BL::ID b_ob_data = b_ob_info.object_data;
 
   if (!b_ob_data) {
     return false;
   }
 
-  BL::Object::type_enum type = b_ob.type();
+  BL::Object::type_enum type = b_ob_info.iter_object.type();
 
   if (type == BL::Object::type_VOLUME || type == BL::Object::type_HAIR) {
     /* Will be exported attached to mesh. */
     return true;
   }
-  else if (type == BL::Object::type_CURVE) {
-    /* Skip exporting curves without faces, overhead can be
-     * significant if there are many for path animation. */
-    BL::Curve b_curve(b_ob_data);
 
-    return (b_curve.bevel_object() || b_curve.extrude() != 0.0f || b_curve.bevel_depth() != 0.0f ||
-            b_curve.dimensions() == BL::Curve::dimensions_2D || b_ob.modifiers.length());
+  /* Other object types that are not meshes but evaluate to meshes are presented to render engines
+   * as separate instance objects. Metaballs and surface objects have not been affected by that
+   * change yet. */
+  if (type == BL::Object::type_SURFACE || type == BL::Object::type_META) {
+    return true;
   }
-  else {
-    return (b_ob_data.is_a(&RNA_Mesh) || b_ob_data.is_a(&RNA_Curve) ||
-            b_ob_data.is_a(&RNA_MetaBall));
+
+  return b_ob_data.is_a(&RNA_Mesh);
+}
+
+bool BlenderSync::object_can_have_geometry(BL::Object &b_ob)
+{
+  BL::Object::type_enum type = b_ob.type();
+  switch (type) {
+    case BL::Object::type_MESH:
+    case BL::Object::type_CURVE:
+    case BL::Object::type_SURFACE:
+    case BL::Object::type_META:
+    case BL::Object::type_FONT:
+    case BL::Object::type_HAIR:
+    case BL::Object::type_POINTCLOUD:
+    case BL::Object::type_VOLUME:
+      return true;
+    default:
+      return false;
   }
 }
 
@@ -161,6 +176,11 @@ Object *BlenderSync::sync_object(BL::Depsgraph &b_depsgraph,
   if (is_instance) {
     persistent_id_array = b_instance.persistent_id();
     persistent_id = persistent_id_array.data;
+    if (!b_ob_info.is_real_object_data()) {
+      /* Remember which object data the geometry is coming from, so that we can sync it when the
+       * object has changed. */
+      instance_geometries_by_object[b_ob_info.real_object.ptr.data].insert(b_ob_info.object_data);
+    }
   }
 
   /* light is handled separately */
@@ -187,7 +207,7 @@ Object *BlenderSync::sync_object(BL::Depsgraph &b_depsgraph,
   }
 
   /* only interested in object that we can create meshes from */
-  if (!object_is_geometry(b_ob)) {
+  if (!object_is_geometry(b_ob_info)) {
     return NULL;
   }
 
@@ -274,7 +294,7 @@ Object *BlenderSync::sync_object(BL::Depsgraph &b_depsgraph,
 
   object->set_visibility(visibility);
 
-  object->set_is_shadow_catcher(b_ob.is_shadow_catcher());
+  object->set_is_shadow_catcher(b_ob.is_shadow_catcher() || b_parent.is_shadow_catcher());
 
   float shadow_terminator_shading_offset = get_float(cobject, "shadow_terminator_offset");
   object->set_shadow_terminator_shading_offset(shadow_terminator_shading_offset);
@@ -560,6 +580,7 @@ void BlenderSync::sync_objects(BL::Depsgraph &b_depsgraph,
   else {
     geometry_motion_synced.clear();
   }
+  instance_geometries_by_object.clear();
 
   /* initialize culling */
   BlenderObjectCulling culling(scene, b_scene);

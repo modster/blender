@@ -784,7 +784,7 @@ static void view3d_collection_drop_copy(wmDrag *drag, wmDropBox *drop)
 {
   ID *id = WM_drag_get_local_ID_or_import_from_asset(drag, ID_GR);
 
-  RNA_string_set(drop->ptr, "name", id->name + 2);
+  RNA_int_set(drop->ptr, "session_uuid", (int)id->session_uuid);
 }
 
 static void view3d_id_drop_copy(wmDrag *drag, wmDropBox *drop)
@@ -853,7 +853,6 @@ static void view3d_dropboxes(void)
   drop->draw = WM_drag_draw_item_name_fn;
   drop->draw_activate = view3d_ob_drop_draw_activate;
   drop->draw_deactivate = view3d_ob_drop_draw_deactivate;
-  drop->opcontext = WM_OP_EXEC_DEFAULT; /* Not really needed. */
 
   drop = WM_dropbox_add(lb,
                         "OBJECT_OT_transform_to_mouse",
@@ -865,7 +864,6 @@ static void view3d_dropboxes(void)
   drop->draw = WM_drag_draw_item_name_fn;
   drop->draw_activate = view3d_ob_drop_draw_activate;
   drop->draw_deactivate = view3d_ob_drop_draw_deactivate;
-  drop->opcontext = WM_OP_INVOKE_DEFAULT;
 
   WM_dropbox_add(lb,
                  "OBJECT_OT_drop_named_material",

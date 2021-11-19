@@ -50,8 +50,6 @@
 
 #include "BLF_api.h"
 
-#include "UI_interface.h"
-
 #include "GPU_batch.h"
 #include "GPU_matrix.h"
 
@@ -71,6 +69,9 @@ BatchBLF g_batch;
 static FT_Library ft_lib;
 static SpinLock ft_lib_mutex;
 static SpinLock blf_glyph_cache_mutex;
+
+/* May be set to #UI_widgetbase_draw_cache_flush. */
+static void (*blf_draw_cache_flush)(void) = NULL;
 
 /* -------------------------------------------------------------------- */
 /** \name FreeType Utilities (Internal)
@@ -255,10 +256,10 @@ void blf_batch_draw(void)
 
   GPU_blend(GPU_BLEND_ALPHA);
 
-#ifndef BLF_STANDALONE
   /* We need to flush widget base first to ensure correct ordering. */
-  UI_widgetbase_draw_cache_flush();
-#endif
+  if (blf_draw_cache_flush != NULL) {
+    blf_draw_cache_flush();
+  }
 
   GPUTexture *texture = blf_batch_cache_texture_load();
   GPU_vertbuf_data_len_set(g_batch.verts, g_batch.glyph_len);
@@ -581,7 +582,7 @@ void blf_font_draw_buffer(FontBLF *font,
 /** \} */
 
 /* -------------------------------------------------------------------- */
-/** \name Text Evaluation: Width to Sting Length
+/** \name Text Evaluation: Width to String Length
  *
  * Use to implement exported functions:
  * - #BLF_width_to_strlen
@@ -1167,6 +1168,14 @@ void blf_font_exit(void)
   blf_batch_draw_exit();
 }
 
+/**
+ * Optional cache flushing function, called before #blf_batch_draw.
+ */
+void BLF_cache_flush_set_fn(void (*cache_flush_fn)(void))
+{
+  blf_draw_cache_flush = cache_flush_fn;
+}
+
 /** \} */
 
 /* -------------------------------------------------------------------- */
@@ -1341,19 +1350,24 @@ void blf_font_free(FontBLF *font)
 /** \name Font Configure
  * \{ */
 
-void blf_font_size(FontBLF *font, unsigned int size, unsigned int dpi)
+void blf_font_size(FontBLF *font, float size, unsigned int dpi)
 {
   blf_glyph_cache_acquire(font);
+
+  /* FreeType uses fixed-point integers in 64ths. */
+  FT_F26Dot6 ft_size = lroundf(size * 64.0f);
+  /* Adjust our size to be on even 64ths. */
+  size = (float)ft_size / 64.0f;
 
   GlyphCacheBLF *gc = blf_glyph_cache_find(font, size, dpi);
   if (gc && (font->size == size && font->dpi == dpi)) {
     /* Optimization: do not call FT_Set_Char_Size if size did not change. */
   }
   else {
-    const FT_Error err = FT_Set_Char_Size(font->face, 0, ((FT_F26Dot6)(size)) * 64, dpi, dpi);
+    const FT_Error err = FT_Set_Char_Size(font->face, 0, ft_size, dpi, dpi);
     if (err) {
       /* FIXME: here we can go through the fixed size and choice a close one */
-      printf("The current font don't support the size, %u and dpi, %u\n", size, dpi);
+      printf("The current font don't support the size, %f and dpi, %u\n", size, dpi);
     }
     else {
       font->size = size;

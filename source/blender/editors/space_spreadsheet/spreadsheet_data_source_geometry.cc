@@ -20,6 +20,7 @@
 #include "BKE_mesh.h"
 #include "BKE_mesh_wrapper.h"
 #include "BKE_modifier.h"
+#include "BKE_volume.h"
 
 #include "DNA_ID.h"
 #include "DNA_mesh_types.h"
@@ -32,6 +33,11 @@
 #include "ED_spreadsheet.h"
 
 #include "NOD_geometry_nodes_eval_log.hh"
+
+#include "BLT_translation.h"
+
+#include "RNA_access.h"
+#include "RNA_enum_types.h"
 
 #include "FN_field_cpp_type.hh"
 
@@ -72,7 +78,7 @@ static std::optional<eSpreadsheetColumnValueType> cpp_type_to_column_value_type(
 void ExtraColumns::foreach_default_column_ids(
     FunctionRef<void(const SpreadsheetColumnID &, bool is_extra)> fn) const
 {
-  for (const auto &item : columns_.items()) {
+  for (const auto item : columns_.items()) {
     SpreadsheetColumnID column_id;
     column_id.name = (char *)item.key.c_str();
     fn(column_id, true);
@@ -111,6 +117,9 @@ std::unique_ptr<ColumnValues> ExtraColumns::get_column_values(
                                          case SPREADSHEET_VALUE_TYPE_COLOR:
                                            r_cell_value.value_color = *(
                                                const ColorGeometry4f *)value;
+                                           break;
+                                         case SPREADSHEET_VALUE_TYPE_STRING:
+                                           r_cell_value.value_string = *(const std::string *)value;
                                            break;
                                          case SPREADSHEET_VALUE_TYPE_INSTANCES:
                                            break;
@@ -159,12 +168,12 @@ std::unique_ptr<ColumnValues> GeometryDataSource::get_column_values(
   if (!attribute) {
     return {};
   }
-  const fn::GVArray *varray = scope_.add(std::move(attribute.varray));
+  fn::GVArray varray = std::move(attribute.varray);
   if (attribute.domain != domain_) {
     return {};
   }
-  int domain_size = varray->size();
-  const CustomDataType type = bke::cpp_type_to_custom_data_type(varray->type());
+  int domain_size = varray.size();
+  const CustomDataType type = bke::cpp_type_to_custom_data_type(varray.type());
   switch (type) {
     case CD_PROP_FLOAT:
       return column_values_from_function(SPREADSHEET_VALUE_TYPE_FLOAT,
@@ -172,7 +181,7 @@ std::unique_ptr<ColumnValues> GeometryDataSource::get_column_values(
                                          domain_size,
                                          [varray](int index, CellValue &r_cell_value) {
                                            float value;
-                                           varray->get(index, &value);
+                                           varray.get(index, &value);
                                            r_cell_value.value_float = value;
                                          });
     case CD_PROP_INT32:
@@ -182,7 +191,7 @@ std::unique_ptr<ColumnValues> GeometryDataSource::get_column_values(
           domain_size,
           [varray](int index, CellValue &r_cell_value) {
             int value;
-            varray->get(index, &value);
+            varray.get(index, &value);
             r_cell_value.value_int = value;
           },
           STREQ(column_id.name, "id") ? 5.5f : 0.0f);
@@ -192,7 +201,7 @@ std::unique_ptr<ColumnValues> GeometryDataSource::get_column_values(
                                          domain_size,
                                          [varray](int index, CellValue &r_cell_value) {
                                            bool value;
-                                           varray->get(index, &value);
+                                           varray.get(index, &value);
                                            r_cell_value.value_bool = value;
                                          });
     case CD_PROP_FLOAT2: {
@@ -201,7 +210,7 @@ std::unique_ptr<ColumnValues> GeometryDataSource::get_column_values(
                                          domain_size,
                                          [varray](int index, CellValue &r_cell_value) {
                                            float2 value;
-                                           varray->get(index, &value);
+                                           varray.get(index, &value);
                                            r_cell_value.value_float2 = value;
                                          });
     }
@@ -211,7 +220,7 @@ std::unique_ptr<ColumnValues> GeometryDataSource::get_column_values(
                                          domain_size,
                                          [varray](int index, CellValue &r_cell_value) {
                                            float3 value;
-                                           varray->get(index, &value);
+                                           varray.get(index, &value);
                                            r_cell_value.value_float3 = value;
                                          });
     }
@@ -221,7 +230,7 @@ std::unique_ptr<ColumnValues> GeometryDataSource::get_column_values(
                                          domain_size,
                                          [varray](int index, CellValue &r_cell_value) {
                                            ColorGeometry4f value;
-                                           varray->get(index, &value);
+                                           varray.get(index, &value);
                                            r_cell_value.value_color = value;
                                          });
     }
@@ -487,6 +496,91 @@ int InstancesDataSource::tot_rows() const
   return component_->instances_amount();
 }
 
+void VolumeDataSource::foreach_default_column_ids(
+    FunctionRef<void(const SpreadsheetColumnID &, bool is_extra)> fn) const
+{
+  if (component_->is_empty()) {
+    return;
+  }
+
+  for (const char *name : {"Grid Name", "Data Type", "Class"}) {
+    SpreadsheetColumnID column_id{(char *)name};
+    fn(column_id, false);
+  }
+}
+
+std::unique_ptr<ColumnValues> VolumeDataSource::get_column_values(
+    const SpreadsheetColumnID &column_id) const
+{
+  const Volume *volume = component_->get_for_read();
+  if (volume == nullptr) {
+    return {};
+  }
+
+#ifdef WITH_OPENVDB
+  const int size = this->tot_rows();
+  if (STREQ(column_id.name, "Grid Name")) {
+    return column_values_from_function(
+        SPREADSHEET_VALUE_TYPE_STRING,
+        IFACE_("Grid Name"),
+        size,
+        [volume](int index, CellValue &r_cell_value) {
+          const VolumeGrid *volume_grid = BKE_volume_grid_get_for_read(volume, index);
+          r_cell_value.value_string = BKE_volume_grid_name(volume_grid);
+        },
+        6.0f);
+  }
+  if (STREQ(column_id.name, "Data Type")) {
+    return column_values_from_function(
+        SPREADSHEET_VALUE_TYPE_STRING,
+        IFACE_("Type"),
+        size,
+        [volume](int index, CellValue &r_cell_value) {
+          const VolumeGrid *volume_grid = BKE_volume_grid_get_for_read(volume, index);
+          const VolumeGridType type = BKE_volume_grid_type(volume_grid);
+          const char *name = nullptr;
+          RNA_enum_name_from_value(rna_enum_volume_grid_data_type_items, type, &name);
+          r_cell_value.value_string = IFACE_(name);
+        },
+        5.0f);
+  }
+  if (STREQ(column_id.name, "Class")) {
+    return column_values_from_function(
+        SPREADSHEET_VALUE_TYPE_STRING,
+        IFACE_("Class"),
+        size,
+        [volume](int index, CellValue &r_cell_value) {
+          const VolumeGrid *volume_grid = BKE_volume_grid_get_for_read(volume, index);
+          openvdb::GridBase::ConstPtr grid = BKE_volume_grid_openvdb_for_read(volume, volume_grid);
+          openvdb::GridClass grid_class = grid->getGridClass();
+          if (grid_class == openvdb::GridClass::GRID_FOG_VOLUME) {
+            r_cell_value.value_string = IFACE_("Fog Volume");
+          }
+          else if (grid_class == openvdb::GridClass::GRID_LEVEL_SET) {
+            r_cell_value.value_string = IFACE_("Level Set");
+          }
+          else {
+            r_cell_value.value_string = IFACE_("Unkown");
+          }
+        },
+        5.0f);
+  }
+#else
+  UNUSED_VARS(column_id);
+#endif
+
+  return {};
+}
+
+int VolumeDataSource::tot_rows() const
+{
+  const Volume *volume = component_->get_for_read();
+  if (volume == nullptr) {
+    return 0;
+  }
+  return BKE_volume_num_grids(volume);
+}
+
 GeometrySet spreadsheet_get_display_geometry_set(const SpaceSpreadsheet *sspreadsheet,
                                                  Object *object_eval,
                                                  const GeometryComponentType used_component_type)
@@ -644,7 +738,7 @@ static void add_fields_as_extra_columns(SpaceSpreadsheet *sspreadsheet,
 
   const AttributeDomain domain = (AttributeDomain)sspreadsheet->attribute_domain;
   const int domain_size = component.attribute_domain_size(domain);
-  for (const auto &item : fields_to_show.items()) {
+  for (const auto item : fields_to_show.items()) {
     StringRef name = item.key;
     const GField &field = item.value;
 
@@ -681,6 +775,9 @@ std::unique_ptr<DataSource> data_source_from_geometry(const bContext *C, Object 
 
   if (component_type == GEO_COMPONENT_TYPE_INSTANCES) {
     return std::make_unique<InstancesDataSource>(geometry_set, std::move(extra_columns));
+  }
+  if (component_type == GEO_COMPONENT_TYPE_VOLUME) {
+    return std::make_unique<VolumeDataSource>(geometry_set);
   }
   return std::make_unique<GeometryDataSource>(
       object_eval, geometry_set, component_type, domain, std::move(extra_columns));

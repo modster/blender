@@ -23,31 +23,57 @@ namespace blender::nodes {
 
 static void geo_node_curve_primitive_quadrilateral_declare(NodeDeclarationBuilder &b)
 {
-  b.add_input<decl::Float>(N_("Width")).default_value(2.0f).min(0.0f).subtype(PROP_DISTANCE);
-  b.add_input<decl::Float>(N_("Height")).default_value(2.0f).min(0.0f).subtype(PROP_DISTANCE);
+  b.add_input<decl::Float>(N_("Width"))
+      .default_value(2.0f)
+      .min(0.0f)
+      .subtype(PROP_DISTANCE)
+      .description(N_("The X axis size of the shape"));
+  b.add_input<decl::Float>(N_("Height"))
+      .default_value(2.0f)
+      .min(0.0f)
+      .subtype(PROP_DISTANCE)
+      .description(N_("The Y axis size of the shape"));
   b.add_input<decl::Float>(N_("Bottom Width"))
       .default_value(4.0f)
       .min(0.0f)
-      .subtype(PROP_DISTANCE);
-  b.add_input<decl::Float>(N_("Top Width")).default_value(2.0f).min(0.0f).subtype(PROP_DISTANCE);
-  b.add_input<decl::Float>(N_("Offset")).default_value(1.0f).subtype(PROP_DISTANCE);
+      .subtype(PROP_DISTANCE)
+      .description(N_("The X axis size of the shape"));
+  b.add_input<decl::Float>(N_("Top Width"))
+      .default_value(2.0f)
+      .min(0.0f)
+      .subtype(PROP_DISTANCE)
+      .description(N_("The X axis size of the shape"));
+  b.add_input<decl::Float>(N_("Offset"))
+      .default_value(1.0f)
+      .subtype(PROP_DISTANCE)
+      .description(
+          N_("For Parallelogram, the relative X difference between the top and bottom edges. For "
+             "Trapezoid, the amount to move the top edge in the positive X axis"));
   b.add_input<decl::Float>(N_("Bottom Height"))
       .default_value(3.0f)
       .min(0.0f)
-      .subtype(PROP_DISTANCE);
-  b.add_input<decl::Float>(N_("Top Height")).default_value(1.0f).subtype(PROP_DISTANCE);
+      .subtype(PROP_DISTANCE)
+      .description(N_("The distance between the bottom point and the X axis"));
+  b.add_input<decl::Float>(N_("Top Height"))
+      .default_value(1.0f)
+      .subtype(PROP_DISTANCE)
+      .description(N_("The distance between the top point and the X axis"));
   b.add_input<decl::Vector>(N_("Point 1"))
       .default_value({-1.0f, -1.0f, 0.0f})
-      .subtype(PROP_DISTANCE);
+      .subtype(PROP_DISTANCE)
+      .description(N_("The exact location of the point to use"));
   b.add_input<decl::Vector>(N_("Point 2"))
       .default_value({1.0f, -1.0f, 0.0f})
-      .subtype(PROP_DISTANCE);
+      .subtype(PROP_DISTANCE)
+      .description(N_("The exact location of the point to use"));
   b.add_input<decl::Vector>(N_("Point 3"))
       .default_value({1.0f, 1.0f, 0.0f})
-      .subtype(PROP_DISTANCE);
+      .subtype(PROP_DISTANCE)
+      .description(N_("The exact location of the point to use"));
   b.add_input<decl::Vector>(N_("Point 4"))
       .default_value({-1.0f, 1.0f, 0.0f})
-      .subtype(PROP_DISTANCE);
+      .subtype(PROP_DISTANCE)
+      .description(N_("The exact location of the point to use"));
   b.add_output<decl::Geometry>(N_("Curve"));
 }
 
@@ -66,7 +92,7 @@ static void geo_node_curve_primitive_quadrilateral_init(bNodeTree *UNUSED(tree),
   node->storage = data;
 }
 
-static void geo_node_curve_primitive_quadrilateral_update(bNodeTree *UNUSED(ntree), bNode *node)
+static void geo_node_curve_primitive_quadrilateral_update(bNodeTree *ntree, bNode *node)
 {
   NodeGeometryCurvePrimitiveQuad &node_storage = *(NodeGeometryCurvePrimitiveQuad *)node->storage;
   GeometryNodeCurvePrimitiveQuadMode mode = static_cast<GeometryNodeCurvePrimitiveQuadMode>(
@@ -85,34 +111,34 @@ static void geo_node_curve_primitive_quadrilateral_update(bNodeTree *UNUSED(ntre
   bNodeSocket *p4 = p3->next;
 
   LISTBASE_FOREACH (bNodeSocket *, sock, &node->inputs) {
-    nodeSetSocketAvailability(sock, false);
+    nodeSetSocketAvailability(ntree, sock, false);
   }
 
   if (mode == GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_RECTANGLE) {
-    nodeSetSocketAvailability(width, true);
-    nodeSetSocketAvailability(height, true);
+    nodeSetSocketAvailability(ntree, width, true);
+    nodeSetSocketAvailability(ntree, height, true);
   }
   else if (mode == GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_PARALLELOGRAM) {
-    nodeSetSocketAvailability(width, true);
-    nodeSetSocketAvailability(height, true);
-    nodeSetSocketAvailability(offset, true);
+    nodeSetSocketAvailability(ntree, width, true);
+    nodeSetSocketAvailability(ntree, height, true);
+    nodeSetSocketAvailability(ntree, offset, true);
   }
   else if (mode == GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_TRAPEZOID) {
-    nodeSetSocketAvailability(bottom, true);
-    nodeSetSocketAvailability(top, true);
-    nodeSetSocketAvailability(offset, true);
-    nodeSetSocketAvailability(height, true);
+    nodeSetSocketAvailability(ntree, bottom, true);
+    nodeSetSocketAvailability(ntree, top, true);
+    nodeSetSocketAvailability(ntree, offset, true);
+    nodeSetSocketAvailability(ntree, height, true);
   }
   else if (mode == GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_KITE) {
-    nodeSetSocketAvailability(width, true);
-    nodeSetSocketAvailability(bottom_height, true);
-    nodeSetSocketAvailability(top_height, true);
+    nodeSetSocketAvailability(ntree, width, true);
+    nodeSetSocketAvailability(ntree, bottom_height, true);
+    nodeSetSocketAvailability(ntree, top_height, true);
   }
   else if (mode == GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_POINTS) {
-    nodeSetSocketAvailability(p1, true);
-    nodeSetSocketAvailability(p2, true);
-    nodeSetSocketAvailability(p3, true);
-    nodeSetSocketAvailability(p4, true);
+    nodeSetSocketAvailability(ntree, p1, true);
+    nodeSetSocketAvailability(ntree, p2, true);
+    nodeSetSocketAvailability(ntree, p3, true);
+    nodeSetSocketAvailability(ntree, p4, true);
   }
 }
 
