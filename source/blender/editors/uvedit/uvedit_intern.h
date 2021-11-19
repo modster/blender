@@ -127,13 +127,13 @@ BMLoop *uv_find_nearest_loop_from_edge(struct Scene *scene,
 
 /* flush uv selection */
 void uv_flush_vert_to_edge(struct Scene *scene,
-                           struct Object *obedit,
+                           struct BMEditMesh *em,
                            const int cd_loop_uv_offset);
 void uv_flush_edge_to_vert(struct Scene *scene,
-                           struct Object *obedit,
+                           struct BMEditMesh *em,
                            const int cd_loop_uv_offset);
-void uv_flush_edge_to_vert_with_sticky_loc(Scene *scene,
-                                           Object *obedit,
+void uv_flush_edge_to_vert_with_sticky_loc(struct Scene *scene,
+                                           struct BMEditMesh *em,
                                            const int cd_loop_uv_offset);
 
 /* utility tool functions */
