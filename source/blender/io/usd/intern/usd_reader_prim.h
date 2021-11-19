@@ -24,6 +24,9 @@
 
 #include <pxr/usd/usd/prim.h>
 
+#include <map>
+#include <string>
+
 struct Main;
 struct Object;
 
@@ -49,6 +52,10 @@ struct ImportSettings {
   bool validate_meshes;
 
   CacheFile *cache_file;
+
+  /* Map a USD matrial prim path to a Blender material name.
+   * This map might be updated by readers during stage traversal. */
+  mutable std::map<std::string, std::string> usd_path_to_mat_name;
 
   ImportSettings()
       : do_convert_mat(false),

@@ -31,6 +31,11 @@ struct CacheReader;
 struct Object;
 struct bContext;
 
+typedef enum eUSDMtlNameCollisionMode {
+  USD_MTL_NAME_COLLISION_MODIFY = 0,
+  USD_MTL_NAME_COLLISION_SKIP = 1,
+} eUSDMtlNameCollisionMode;
+
 struct USDExportParams {
   bool export_animation;
   bool export_hair;
@@ -69,6 +74,7 @@ struct USDImportParams {
   bool import_usd_preview;
   bool set_material_blend;
   float light_intensity_scale;
+  eUSDMtlNameCollisionMode mtl_name_collision_mode;
 };
 
 /* The USD_export takes a as_background_job parameter, and returns a boolean.
