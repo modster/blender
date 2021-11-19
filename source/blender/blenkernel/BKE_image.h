@@ -472,7 +472,7 @@ ePartialUpdateCollectResult BKE_image_partial_update_collect_changes(
     struct Image *image, struct PartialUpdateUser *user);
 
 ePartialUpdateIterResult BKE_image_partial_update_get_next_change(
-    struct PartialUpdateUser *user, struct PartialUpdateRegion *r_tile);
+    struct PartialUpdateUser *user, struct PartialUpdateRegion *r_region);
 
 /* --- partial updater (image side) --- */
 struct PartialUpdateRegister;

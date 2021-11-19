@@ -295,7 +295,6 @@ struct Changeset {
   /** \brief Keep track if any of the tiles have dirty chunks. */
   bool has_dirty_chunks;
 
- public:
   /**
    * \brief Retrieve the TileChangeset for the given ImageTile.
    *
