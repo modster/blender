@@ -329,7 +329,7 @@ static void image_update_reusable_textures(Image *ima,
   }
 }
 
-static void image_gpu_texture_update_partial(Image *image, ImageUser *iuser)
+static void image_gpu_texture_partial_update_changes_available(Image *image, ImageUser *iuser)
 {
   PartialUpdateRegion changed_region;
   int last_tile_number = -1;
@@ -367,6 +367,27 @@ static void image_gpu_texture_update_partial(Image *image, ImageUser *iuser)
   }
 }
 
+static void image_gpu_texture_try_partial_update(Image *image, ImageUser *iuser)
+{
+
+  switch (BKE_image_partial_update_collect_changes(image, image->runtime.partial_update_user)) {
+    case PARTIAL_UPDATE_NEED_FULL_UPDATE: {
+      image_free_gpu(image, true);
+      break;
+    }
+
+    case PARTIAL_UPDATE_CHANGES_AVAILABLE: {
+      image_gpu_texture_partial_update_changes_available(image, iuser);
+      break;
+    }
+
+    case PARTIAL_UPDATE_NO_CHANGES: {
+      /* GPUTextures are up to date. */
+      break;
+    }
+  }
+}
+
 static GPUTexture *image_get_gpu_texture(Image *ima,
                                          ImageUser *iuser,
                                          ImBuf *ibuf,
@@ -400,21 +421,9 @@ static GPUTexture *image_get_gpu_texture(Image *ima,
   }
 #undef GPU_FLAGS_TO_CHECK
 
-  ImBuf *ibuf_intern = ibuf;
-  if (ibuf_intern == NULL) {
-    ibuf_intern = BKE_image_acquire_ibuf(ima, iuser, NULL);
-    if (ibuf_intern == NULL) {
-      return image_gpu_texture_error_create(textarget);
-    }
-  }
-
-  ImageTile *tile = BKE_image_get_tile(ima, 0);
-  if (tile == NULL || ibuf_intern == NULL) {
-    ima->gpuflag |= IMA_GPU_REFRESH;
-  }
-
-  /* TODO(jbakker): bad call. Or we should do this everywhere where image is changed, or we should
-   * make it possible to initialize an empty register. */
+  /* TODO(jbakker): We should replace the IMA_GPU_REFRESH flag with a call to
+   * BKE_image-partial_update_mark_full_update. Although the flag is quicker it leads to double
+   * administration. */
   if ((ima->gpuflag & IMA_GPU_REFRESH) != 0) {
     BKE_image_partial_update_mark_full_update(ima);
     ima->gpuflag &= ~IMA_GPU_REFRESH;
@@ -424,22 +433,7 @@ static GPUTexture *image_get_gpu_texture(Image *ima,
     ima->runtime.partial_update_user = BKE_image_partial_update_create(ima);
   }
 
-  switch (BKE_image_partial_update_collect_changes(ima, ima->runtime.partial_update_user)) {
-    case PARTIAL_UPDATE_NEED_FULL_UPDATE: {
-      image_free_gpu(ima, true);
-      break;
-    }
-
-    case PARTIAL_UPDATE_CHANGES_AVAILABLE: {
-      image_gpu_texture_update_partial(ima, iuser);
-      break;
-    }
-
-    case PARTIAL_UPDATE_NO_CHANGES: {
-      /* GPUTextures are up to date. */
-      break;
-    }
-  }
+  image_gpu_texture_try_partial_update(ima, iuser);
 
   /* Tag as in active use for garbage collector. */
   BKE_image_tag_time(ima);
@@ -458,23 +452,25 @@ static GPUTexture *image_get_gpu_texture(Image *ima,
                                                          IMA_TEXTURE_RESOLUTION_FULL;
   GPUTexture **tex = get_image_gpu_texture_ptr(ima, textarget, current_view, texture_resolution);
   if (*tex) {
-    if (ibuf != ibuf_intern) {
-      BKE_image_release_ibuf(ima, ibuf_intern, NULL);
-    }
     return *tex;
   }
 
   /* Check if we have a valid image. If not, we return a dummy
    * texture with zero bind-code so we don't keep trying. */
+  ImageTile *tile = BKE_image_get_tile(ima, 0);
   if (tile == NULL) {
     *tex = image_gpu_texture_error_create(textarget);
-    if (ibuf != ibuf_intern) {
-      BKE_image_release_ibuf(ima, ibuf_intern, NULL);
-    }
     return *tex;
   }
 
   /* check if we have a valid image buffer */
+  ImBuf *ibuf_intern = ibuf;
+  if (ibuf_intern == NULL) {
+    ibuf_intern = BKE_image_acquire_ibuf(ima, iuser, NULL);
+    if (ibuf_intern == NULL) {
+      return image_gpu_texture_error_create(textarget);
+    }
+  }
 
   if (textarget == TEXTARGET_2D_ARRAY) {
     *tex = gpu_texture_create_tile_array(ima, ibuf_intern, texture_resolution);
@@ -946,8 +942,6 @@ static void image_update_gputexture_ex(
 
 /* Partial update of texture for texture painting. This is often much
  * quicker than fully updating the texture for high resolution images. */
-/* TODO(jbakker): remove this function. It is only allowed to perform delayed updates as the
- * texture user is decentralized. */
 void BKE_image_update_gputexture(Image *ima, ImageUser *iuser, int x, int y, int w, int h)
 {
   ImageTile *image_tile = BKE_image_get_tile_from_iuser(ima, iuser);
