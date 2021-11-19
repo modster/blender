@@ -431,7 +431,8 @@ typedef enum FilterClosures {
   FILTER_CLOSURE_DIFFUSE = (1 << 1),
   FILTER_CLOSURE_GLOSSY = (1 << 2),
   FILTER_CLOSURE_TRANSMISSION = (1 << 3),
-  FILTER_CLOSURE_DIRECT_LIGHT = (1 << 4),
+  FILTER_CLOSURE_TRANSPARENT = (1 << 4),
+  FILTER_CLOSURE_DIRECT_LIGHT = (1 << 5),
 } FilterClosures;
 
 /* Shader Flag */
@@ -479,6 +480,16 @@ enum PanoramaType {
   PANORAMA_MIRRORBALL = 3,
 
   PANORAMA_NUM_TYPES,
+};
+
+/* Direct Light Sampling */
+
+enum DirectLightSamplingType {
+  DIRECT_LIGHT_SAMPLING_MIS = 0,
+  DIRECT_LIGHT_SAMPLING_FORWARD = 1,
+  DIRECT_LIGHT_SAMPLING_NEE = 2,
+
+  DIRECT_LIGHT_SAMPLING_NUM,
 };
 
 /* Differential */
@@ -1193,8 +1204,11 @@ typedef struct KernelIntegrator {
   /* Closure filter. */
   int filter_closures;
 
+  /* MIS debuging */
+  int direct_light_sampling_type;
+
   /* padding */
-  int pad1, pad2, pad3;
+  int pad1, pad2;
 } KernelIntegrator;
 static_assert_align(KernelIntegrator, 16);
 

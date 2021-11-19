@@ -68,6 +68,7 @@
 
 #include "SEQ_iterator.h"
 #include "SEQ_sequencer.h"
+#include "SEQ_time.h"
 
 #include "RNA_access.h"
 
@@ -1284,6 +1285,15 @@ static void version_node_tree_socket_id_delim(bNodeTree *ntree)
   }
 }
 
+static bool version_fix_seq_meta_range(Sequence *seq, void *user_data)
+{
+  Scene *scene = (Scene *)user_data;
+  if (seq->type == SEQ_TYPE_META) {
+    SEQ_time_update_meta_strip_range(scene, seq);
+  }
+  return true;
+}
+
 /* NOLINTNEXTLINE: readability-function-size */
 void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
 {
@@ -2193,6 +2203,34 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
           }
         }
       }
+    }
+
+    /* Change minimum zoom to 0.05f in the node editor. */
+    LISTBASE_FOREACH (bScreen *, screen, &bmain->screens) {
+      LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
+        LISTBASE_FOREACH (SpaceLink *, sl, &area->spacedata) {
+          if (sl->spacetype == SPACE_NODE) {
+            ListBase *regionbase = (sl == area->spacedata.first) ? &area->regionbase :
+                                                                   &sl->regionbase;
+            LISTBASE_FOREACH (ARegion *, region, regionbase) {
+              if (region->regiontype == RGN_TYPE_WINDOW) {
+                if (region->v2d.minzoom > 0.05f) {
+                  region->v2d.minzoom = 0.05f;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
+      Editing *ed = SEQ_editing_get(scene);
+      /* Make sure range of meta strips is correct.
+       * It was possible to save .blend file with incorrect state of meta strip
+       * range. The root cause is expected to be fixed, but need to ensure files
+       * with invalid meta strip range are corrected. */
+      SEQ_for_each_callback(&ed->seqbase, version_fix_seq_meta_range, scene);
     }
   }
 }
