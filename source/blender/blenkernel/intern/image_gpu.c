@@ -329,6 +329,44 @@ static void image_update_reusable_textures(Image *ima,
   }
 }
 
+static void image_gpu_texture_update_partial(Image *image, ImageUser *iuser)
+{
+  PartialUpdateRegion changed_region;
+  int last_tile_number = -1;
+  ImBuf *tile_buffer = NULL;
+  ImageTile *tile = NULL;
+  ImageUser tile_user = {0};
+  if (iuser) {
+    tile_user = *iuser;
+  }
+
+  while (BKE_image_partial_update_get_next_change(image->runtime.partial_update_user,
+                                                  &changed_region) ==
+         PARTIAL_UPDATE_ITER_CHANGE_AVAILABLE) {
+    if (last_tile_number != changed_region.tile_number) {
+      if (tile_buffer) {
+        BKE_image_release_ibuf(image, tile_buffer, NULL);
+        tile_buffer = NULL;
+      }
+      tile_user.tile = changed_region.tile_number;
+      tile = BKE_image_get_tile(image, changed_region.tile_number);
+      tile_buffer = BKE_image_acquire_ibuf(image, &tile_user, NULL);
+      last_tile_number = changed_region.tile_number;
+    }
+
+    const int tile_offset_x = changed_region.region.xmin;
+    const int tile_offset_y = changed_region.region.ymin;
+    const int tile_width = min_ii(tile_buffer->x, BLI_rcti_size_x(&changed_region.region));
+    const int tile_height = min_ii(tile_buffer->y, BLI_rcti_size_y(&changed_region.region));
+    image_update_gputexture_ex(
+        image, tile, tile_buffer, tile_offset_x, tile_offset_y, tile_width, tile_height);
+  }
+
+  if (tile_buffer) {
+    BKE_image_release_ibuf(image, tile_buffer, NULL);
+  }
+}
+
 static GPUTexture *image_get_gpu_texture(Image *ima,
                                          ImageUser *iuser,
                                          ImBuf *ibuf,
@@ -393,20 +431,7 @@ static GPUTexture *image_get_gpu_texture(Image *ima,
     }
 
     case PARTIAL_UPDATE_CHANGES_AVAILABLE: {
-      BLI_assert(ibuf_intern);
-      BLI_assert(tile);
-      PartialUpdateRegion changed_region;
-      while (BKE_image_partial_update_get_next_change(ima->runtime.partial_update_user,
-                                                      &changed_region) ==
-             PARTIAL_UPDATE_ITER_CHANGE_AVAILABLE) {
-        const int tile_offset_x = changed_region.region.xmin;
-        const int tile_offset_y = changed_region.region.ymin;
-        const int tile_width = BLI_rcti_size_x(&changed_region.region);
-        const int tile_height = BLI_rcti_size_y(&changed_region.region);
-        // TODO(jbakker): rect may not exceed image resolution.
-        image_update_gputexture_ex(
-            ima, tile, ibuf_intern, tile_offset_x, tile_offset_y, tile_width, tile_height);
-      }
+      image_gpu_texture_update_partial(ima, iuser);
       break;
     }
 
