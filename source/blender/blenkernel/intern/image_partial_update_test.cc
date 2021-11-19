@@ -38,6 +38,7 @@ class ImagePartialUpdateTest : public testing::Test {
  protected:
   Main *bmain;
   Image *image;
+  ImageTile *image_tile;
   ImBuf *image_buffer;
   PartialUpdateUser *partial_update_user;
 
@@ -68,6 +69,7 @@ class ImagePartialUpdateTest : public testing::Test {
     bmain = BKE_main_new();
     /* Creating an image generates a mem-leak during tests. */
     image = create_test_image(1024, 1024);
+    image_tile = BKE_image_get_tile(image, 0);
     image_buffer = BKE_image_acquire_ibuf(image, nullptr, nullptr);
 
     partial_update_user = BKE_image_partial_update_create(image);
@@ -118,7 +120,7 @@ TEST_F(ImagePartialUpdateTest, mark_single_tile)
   /* Mark region. */
   rcti region;
   BLI_rcti_init(&region, 10, 20, 40, 50);
-  BKE_image_partial_update_mark_region(image, image_buffer, &region);
+  BKE_image_partial_update_mark_region(image, image_tile, image_buffer, &region);
 
   /* Partial Update should be available. */
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
@@ -150,10 +152,10 @@ TEST_F(ImagePartialUpdateTest, mark_unconnected_tiles)
   /* Mark region. */
   rcti region_a;
   BLI_rcti_init(&region_a, 10, 20, 40, 50);
-  BKE_image_partial_update_mark_region(image, image_buffer, &region_a);
+  BKE_image_partial_update_mark_region(image, image_tile, image_buffer, &region_a);
   rcti region_b;
   BLI_rcti_init(&region_b, 710, 720, 740, 750);
-  BKE_image_partial_update_mark_region(image, image_buffer, &region_b);
+  BKE_image_partial_update_mark_region(image, image_tile, image_buffer, &region_b);
 
   /* Partial Update should be available. */
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
@@ -189,43 +191,43 @@ TEST_F(ImagePartialUpdateTest, donot_mark_outside_image)
   rcti region;
   /* Axis. */
   BLI_rcti_init(&region, -100, 0, 50, 100);
-  BKE_image_partial_update_mark_region(image, image_buffer, &region);
+  BKE_image_partial_update_mark_region(image, image_tile, image_buffer, &region);
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
   EXPECT_EQ(result, PARTIAL_UPDATE_NO_CHANGES);
 
   BLI_rcti_init(&region, 1024, 1100, 50, 100);
-  BKE_image_partial_update_mark_region(image, image_buffer, &region);
+  BKE_image_partial_update_mark_region(image, image_tile, image_buffer, &region);
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
   EXPECT_EQ(result, PARTIAL_UPDATE_NO_CHANGES);
 
   BLI_rcti_init(&region, 50, 100, -100, 0);
-  BKE_image_partial_update_mark_region(image, image_buffer, &region);
+  BKE_image_partial_update_mark_region(image, image_tile, image_buffer, &region);
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
   EXPECT_EQ(result, PARTIAL_UPDATE_NO_CHANGES);
 
   BLI_rcti_init(&region, 50, 100, 1024, 1100);
-  BKE_image_partial_update_mark_region(image, image_buffer, &region);
+  BKE_image_partial_update_mark_region(image, image_tile, image_buffer, &region);
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
   EXPECT_EQ(result, PARTIAL_UPDATE_NO_CHANGES);
 
   /* Diagonals. */
   BLI_rcti_init(&region, -100, 0, -100, 0);
-  BKE_image_partial_update_mark_region(image, image_buffer, &region);
+  BKE_image_partial_update_mark_region(image, image_tile, image_buffer, &region);
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
   EXPECT_EQ(result, PARTIAL_UPDATE_NO_CHANGES);
 
   BLI_rcti_init(&region, -100, 0, 1024, 1100);
-  BKE_image_partial_update_mark_region(image, image_buffer, &region);
+  BKE_image_partial_update_mark_region(image, image_tile, image_buffer, &region);
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
   EXPECT_EQ(result, PARTIAL_UPDATE_NO_CHANGES);
 
   BLI_rcti_init(&region, 1024, 1100, -100, 0);
-  BKE_image_partial_update_mark_region(image, image_buffer, &region);
+  BKE_image_partial_update_mark_region(image, image_tile, image_buffer, &region);
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
   EXPECT_EQ(result, PARTIAL_UPDATE_NO_CHANGES);
 
   BLI_rcti_init(&region, 1024, 1100, 1024, 1100);
-  BKE_image_partial_update_mark_region(image, image_buffer, &region);
+  BKE_image_partial_update_mark_region(image, image_tile, image_buffer, &region);
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
   EXPECT_EQ(result, PARTIAL_UPDATE_NO_CHANGES);
 }
@@ -243,28 +245,28 @@ TEST_F(ImagePartialUpdateTest, mark_inside_image)
   /* Mark region. */
   rcti region;
   BLI_rcti_init(&region, 0, 1, 0, 1);
-  BKE_image_partial_update_mark_region(image, image_buffer, &region);
+  BKE_image_partial_update_mark_region(image, image_tile, image_buffer, &region);
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
   EXPECT_EQ(result, PARTIAL_UPDATE_CHANGES_AVAILABLE);
 
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
   EXPECT_EQ(result, PARTIAL_UPDATE_NO_CHANGES);
   BLI_rcti_init(&region, 1023, 1024, 0, 1);
-  BKE_image_partial_update_mark_region(image, image_buffer, &region);
+  BKE_image_partial_update_mark_region(image, image_tile, image_buffer, &region);
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
   EXPECT_EQ(result, PARTIAL_UPDATE_CHANGES_AVAILABLE);
 
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
   EXPECT_EQ(result, PARTIAL_UPDATE_NO_CHANGES);
   BLI_rcti_init(&region, 1023, 1024, 1023, 1024);
-  BKE_image_partial_update_mark_region(image, image_buffer, &region);
+  BKE_image_partial_update_mark_region(image, image_tile, image_buffer, &region);
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
   EXPECT_EQ(result, PARTIAL_UPDATE_CHANGES_AVAILABLE);
 
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
   EXPECT_EQ(result, PARTIAL_UPDATE_NO_CHANGES);
   BLI_rcti_init(&region, 1023, 1024, 0, 1);
-  BKE_image_partial_update_mark_region(image, image_buffer, &region);
+  BKE_image_partial_update_mark_region(image, image_tile, image_buffer, &region);
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
   EXPECT_EQ(result, PARTIAL_UPDATE_CHANGES_AVAILABLE);
 }
@@ -283,7 +285,7 @@ TEST_F(ImagePartialUpdateTest, sequential_mark_region)
     /* Mark region. */
     rcti region;
     BLI_rcti_init(&region, 10, 20, 40, 50);
-    BKE_image_partial_update_mark_region(image, image_buffer, &region);
+    BKE_image_partial_update_mark_region(image, image_tile, image_buffer, &region);
 
     /* Partial Update should be available. */
     result = BKE_image_partial_update_collect_changes(image, partial_update_user);
@@ -306,7 +308,7 @@ TEST_F(ImagePartialUpdateTest, sequential_mark_region)
     /* Mark different region. */
     rcti region;
     BLI_rcti_init(&region, 710, 720, 740, 750);
-    BKE_image_partial_update_mark_region(image, image_buffer, &region);
+    BKE_image_partial_update_mark_region(image, image_tile, image_buffer, &region);
 
     /* Partial Update should be available. */
     result = BKE_image_partial_update_collect_changes(image, partial_update_user);
@@ -339,7 +341,7 @@ TEST_F(ImagePartialUpdateTest, mark_multiple_tiles)
   /* Mark region. */
   rcti region;
   BLI_rcti_init(&region, 300, 700, 300, 700);
-  BKE_image_partial_update_mark_region(image, image_buffer, &region);
+  BKE_image_partial_update_mark_region(image, image_tile, image_buffer, &region);
 
   /* Partial Update should be available. */
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);

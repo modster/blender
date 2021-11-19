@@ -14,7 +14,7 @@
  * Image *image = ...;
  * ImBuf *image_buffer = ...;
  *
- * // partial_update_user should be kept for the whole session where the changes needs to be
+ * // Partial_update_user should be kept for the whole session where the changes needs to be
  * // tracked. Keep this instance alive as long as you need to track image changes.
  *
  * PartialUpdateUser *partial_update_user = BKE_image_partial_update_create(image);
@@ -44,6 +44,8 @@
  * ```
  */
 
+#include <optional>
+
 #include "BKE_image.h"
 
 #include "DNA_image_types.h"
@@ -54,6 +56,23 @@
 #include "BLI_vector.hh"
 
 namespace blender::bke::image::partial_update {
+
+/** \brief Size of chunks to track changes. */
+constexpr int CHUNK_SIZE = 256;
+
+/**
+ * \brief get the chunk number for the give pixel coordinate.
+ *
+ * As chunks are squares the this member can be used for both x and y axis.
+ */
+static int chunk_number_for_pixel(int pixel_offset)
+{
+  int chunk_offset = pixel_offset / CHUNK_SIZE;
+  if (pixel_offset < 0) {
+    chunk_offset -= 1;
+  }
+  return chunk_offset;
+}
 
 struct PartialUpdateUserImpl;
 struct PartialUpdateRegisterImpl;
@@ -133,10 +152,81 @@ struct TileChangeset {
   bool has_dirty_chunks_ = false;
 
  public:
+  /** \brief Width of the tile in pixels. */
+  int tile_width;
+  /** \brief Hieght of the tile in pixels. */
+  int tile_height;
   /** \brief Number of chunks along the x-axis. */
   int chunk_x_len_;
   /** \brief Number of chunks along the y-axis. */
   int chunk_y_len_;
+
+  void clear()
+  {
+    init_chunks(chunk_x_len_, chunk_y_len_);
+  }
+
+  /**
+   * \brief Update the resolution of the tile.
+   *
+   * \returns true: resolution has been updated.
+   *          false: resolution was unchanged.
+   */
+  bool update_resolution(ImBuf *image_buffer)
+  {
+    if (tile_width == image_buffer->x && tile_height == image_buffer->y) {
+      return false;
+    }
+
+    tile_width = image_buffer->x;
+    tile_height = image_buffer->y;
+
+    int chunk_x_len = tile_width / CHUNK_SIZE;
+    int chunk_y_len = tile_height / CHUNK_SIZE;
+    init_chunks(chunk_x_len, chunk_y_len);
+    return true;
+  }
+
+  void mark_region(rcti *updated_region)
+  {
+    int start_x_chunk = chunk_number_for_pixel(updated_region->xmin);
+    int end_x_chunk = chunk_number_for_pixel(updated_region->xmax - 1);
+    int start_y_chunk = chunk_number_for_pixel(updated_region->ymin);
+    int end_y_chunk = chunk_number_for_pixel(updated_region->ymax - 1);
+
+    /* Clamp tiles to tiles in image. */
+    start_x_chunk = max_ii(0, start_x_chunk);
+    start_y_chunk = max_ii(0, start_y_chunk);
+    end_x_chunk = min_ii(chunk_x_len_ - 1, end_x_chunk);
+    end_y_chunk = min_ii(chunk_y_len_ - 1, end_y_chunk);
+
+    /* Early exit when no tiles need to be updated. */
+    if (start_x_chunk >= chunk_x_len_) {
+      return;
+    }
+    if (start_y_chunk >= chunk_y_len_) {
+      return;
+    }
+    if (end_x_chunk < 0) {
+      return;
+    }
+    if (end_y_chunk < 0) {
+      return;
+    }
+
+    mark_chunks_dirty(start_x_chunk, start_y_chunk, end_x_chunk, end_y_chunk);
+  }
+
+  void mark_chunks_dirty(int start_x_chunk, int start_y_chunk, int end_x_chunk, int end_y_chunk)
+  {
+    for (int chunk_y = start_y_chunk; chunk_y <= end_y_chunk; chunk_y++) {
+      for (int chunk_x = start_x_chunk; chunk_x <= end_x_chunk; chunk_x++) {
+        int chunk_index = chunk_y * chunk_x_len_ + chunk_x;
+        chunk_dirty_flags_[chunk_index] = true;
+      }
+    }
+    has_dirty_chunks_ = true;
+  }
 
   bool has_dirty_chunks() const
   {
@@ -159,22 +249,6 @@ struct TileChangeset {
       chunk_dirty_flags_[index] = false;
     }
     has_dirty_chunks_ = false;
-  }
-
-  void reset()
-  {
-    init_chunks(chunk_x_len_, chunk_y_len_);
-  }
-
-  void mark_chunks_dirty(int start_x_chunk, int start_y_chunk, int end_x_chunk, int end_y_chunk)
-  {
-    for (int chunk_y = start_y_chunk; chunk_y <= end_y_chunk; chunk_y++) {
-      for (int chunk_x = start_x_chunk; chunk_x <= end_x_chunk; chunk_x++) {
-        int chunk_index = chunk_y * chunk_x_len_ + chunk_x;
-        chunk_dirty_flags_[chunk_index] = true;
-      }
-    }
-    has_dirty_chunks_ = true;
   }
 
   /** \brief Merge the given changeset into the receiver. */
@@ -200,7 +274,23 @@ struct TileChangeset {
 };
 
 struct Changeset {
+ private:
   TileChangeset tile_changeset;
+
+ public:
+  bool has_dirty_chunks;
+
+ public:
+  TileChangeset &operator[](ImageTile *UNUSED(image_tile))
+  {
+    return tile_changeset;
+  }
+
+  void clear()
+  {
+    tile_changeset.clear();
+    has_dirty_chunks = false;
+  }
 };
 
 /**
@@ -210,9 +300,6 @@ struct Changeset {
  * TileChangesets.
  */
 struct PartialUpdateRegisterImpl {
-  /* Changes are tracked in chunks. */
-  static constexpr int CHUNK_SIZE = 256;
-
   /** \brief changeset id of the first changeset kept in #history. */
   ChangesetID first_changeset_id;
   /** \brief changeset id of the top changeset kept in #history. */
@@ -223,23 +310,14 @@ struct PartialUpdateRegisterImpl {
   /** \brief The current changeset. New changes will be added to this changeset only. */
   Changeset current_changeset;
 
-  int image_width;
-  int image_height;
-
-  void update_resolution(ImBuf *image_buffer)
+  void update_resolution(ImageTile *image_tile, ImBuf *image_buffer)
   {
-    if (image_width != image_buffer->x || image_height != image_buffer->y) {
-      image_width = image_buffer->x;
-      image_height = image_buffer->y;
+    TileChangeset &tile_changeset = current_changeset[image_tile];
+    const bool has_dirty_chunks = tile_changeset.has_dirty_chunks();
+    const bool resolution_changed = tile_changeset.update_resolution(image_buffer);
 
-      int chunk_x_len = image_width / CHUNK_SIZE;
-      int chunk_y_len = image_height / CHUNK_SIZE;
-      current_changeset.tile_changeset.init_chunks(chunk_x_len, chunk_y_len);
-
-      /* Only perform a full update when the cache contains data. */
-      if (current_changeset.tile_changeset.has_dirty_chunks() || !history.is_empty()) {
-        mark_full_update();
-      }
+    if (has_dirty_chunks && resolution_changed && !history.is_empty()) {
+      mark_full_update();
     }
   }
 
@@ -247,58 +325,20 @@ struct PartialUpdateRegisterImpl {
   {
     history.clear();
     last_changeset_id++;
-    current_changeset.tile_changeset.reset();
+    current_changeset.clear();
     first_changeset_id = last_changeset_id;
   }
 
-  /**
-   * \brief get the chunk number for the give pixel coordinate.
-   *
-   * As chunks are squares the this member can be used for both x and y axis.
-   */
-  static int chunk_number_for_pixel(int pixel_offset)
+  void mark_region(ImageTile *image_tile, rcti *updated_region)
   {
-    int chunk_offset = pixel_offset / CHUNK_SIZE;
-    if (pixel_offset < 0) {
-      chunk_offset -= 1;
-    }
-    return chunk_offset;
-  }
-
-  void mark_region(rcti *updated_region)
-  {
-    int start_x_chunk = chunk_number_for_pixel(updated_region->xmin);
-    int end_x_chunk = chunk_number_for_pixel(updated_region->xmax - 1);
-    int start_y_chunk = chunk_number_for_pixel(updated_region->ymin);
-    int end_y_chunk = chunk_number_for_pixel(updated_region->ymax - 1);
-
-    /* Clamp tiles to tiles in image. */
-    start_x_chunk = max_ii(0, start_x_chunk);
-    start_y_chunk = max_ii(0, start_y_chunk);
-    end_x_chunk = min_ii(current_changeset.tile_changeset.chunk_x_len_ - 1, end_x_chunk);
-    end_y_chunk = min_ii(current_changeset.tile_changeset.chunk_y_len_ - 1, end_y_chunk);
-
-    /* Early exit when no tiles need to be updated. */
-    if (start_x_chunk >= current_changeset.tile_changeset.chunk_x_len_) {
-      return;
-    }
-    if (start_y_chunk >= current_changeset.tile_changeset.chunk_y_len_) {
-      return;
-    }
-    if (end_x_chunk < 0) {
-      return;
-    }
-    if (end_y_chunk < 0) {
-      return;
-    }
-
-    current_changeset.tile_changeset.mark_chunks_dirty(
-        start_x_chunk, start_y_chunk, end_x_chunk, end_y_chunk);
+    TileChangeset &tile_changeset = current_changeset[image_tile];
+    tile_changeset.mark_region(updated_region);
+    current_changeset.has_dirty_chunks |= tile_changeset.has_dirty_chunks();
   }
 
   void ensure_empty_changeset()
   {
-    if (!current_changeset.tile_changeset.has_dirty_chunks()) {
+    if (!current_changeset.has_dirty_chunks) {
       /* No need to create a new changeset when previous changeset does not contain any dirty
        * tiles. */
       return;
@@ -310,7 +350,7 @@ struct PartialUpdateRegisterImpl {
   void commit_current_changeset()
   {
     history.append_as(std::move(current_changeset));
-    current_changeset.tile_changeset.reset();
+    current_changeset.clear();
     last_changeset_id++;
   }
 
@@ -329,17 +369,28 @@ struct PartialUpdateRegisterImpl {
    * \brief collect all historic changes since a given changeset.
    */
   // TODO(jbakker): add tile_number as parameter.
-  std::unique_ptr<TileChangeset> changed_tile_chunks_since(const TileNumber UNUSED(tile_number), const ChangesetID from_changeset)
+  std::optional<TileChangeset> changed_tile_chunks_since(const TileNumber UNUSED(tile_number),
+                                                         const ChangesetID from_changeset)
   {
     std::unique_ptr<TileChangeset> changed_tiles = std::make_unique<TileChangeset>();
     int chunk_x_len = image_width / CHUNK_SIZE;
     int chunk_y_len = image_height / CHUNK_SIZE;
     changed_tiles->init_chunks(chunk_x_len, chunk_y_len);
 
+    std::optional<TileChangeset> changed_chunks = std::nullopt;
     for (int index = from_changeset - first_changeset_id; index < history.size(); index++) {
-      changed_tiles->merge(history[index].tile_changeset);
+      if (!history[index].has_tile(image_tile)) {
+        continue;
+      }
+
+      TileChangeset &tile_changeset = history[index][image_tile];
+      if (!changed_chunks.has_value()) {
+        changed_chunks = std::make_optional<TileChangeset>();
+      }
+
+      changed_tiles->merge(tile_changeset);
     }
-    return changed_tiles;
+    return changed_chunks;
   }
 };
 
@@ -404,8 +455,8 @@ ePartialUpdateCollectResult BKE_image_partial_update_collect_changes(Image *imag
 
   /* Collect changed tiles. */
   LISTBASE_FOREACH (ImageTile *, tile, &image->tiles) {
-    std::unique_ptr<TileChangeset> changed_chunks = partial_updater->changed_tile_chunks_since(tile->tile_number,
-        user_impl->last_changeset_id);
+    std::unique_ptr<TileChangeset> changed_chunks = partial_updater->changed_tile_chunks_since(
+        tile->tile_number, user_impl->last_changeset_id);
     /* Check if chunks of this tile are dirty. */
     if (!changed_chunks->has_dirty_chunks()) {
       continue;
@@ -421,10 +472,10 @@ ePartialUpdateCollectResult BKE_image_partial_update_collect_changes(Image *imag
         PartialUpdateRegion region;
         region.tile_number = tile->tile_number;
         BLI_rcti_init(&region.region,
-                      chunk_x * PartialUpdateRegisterImpl::CHUNK_SIZE,
-                      (chunk_x + 1) * PartialUpdateRegisterImpl::CHUNK_SIZE,
-                      chunk_y * PartialUpdateRegisterImpl::CHUNK_SIZE,
-                      (chunk_y + 1) * PartialUpdateRegisterImpl::CHUNK_SIZE);
+                      chunk_x * CHUNK_SIZE,
+                      (chunk_x + 1) * CHUNK_SIZE,
+                      chunk_y * CHUNK_SIZE,
+                      (chunk_y + 1) * CHUNK_SIZE);
         user_impl->updated_regions.append_as(region);
       }
     }
@@ -458,11 +509,14 @@ void BKE_image_partial_update_register_free(Image *image)
   image->runtime.partial_update_register = nullptr;
 }
 
-void BKE_image_partial_update_mark_region(Image *image, ImBuf *image_buffer, rcti *updated_region)
+void BKE_image_partial_update_mark_region(Image *image,
+                                          ImageTile *image_tile,
+                                          ImBuf *image_buffer,
+                                          rcti *updated_region)
 {
   PartialUpdateRegisterImpl *partial_updater = unwrap(image_partial_update_register_ensure(image));
-  partial_updater->update_resolution(image_buffer);
-  partial_updater->mark_region(updated_region);
+  partial_updater->update_resolution(image_tile, image_buffer);
+  partial_updater->mark_region(image_tile, updated_region);
 }
 
 void BKE_image_partial_update_mark_full_update(Image *image)

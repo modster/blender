@@ -926,8 +926,9 @@ static void image_update_gputexture_ex(
  * texture user is decentralized. */
 void BKE_image_update_gputexture(Image *ima, ImageUser *iuser, int x, int y, int w, int h)
 {
+  ImageTile *image_tile = BKE_image_get_tile_from_iuser(ima, iuser);
   ImBuf *ibuf = BKE_image_acquire_ibuf(ima, iuser, NULL);
-  BKE_image_update_gputexture_delayed(ima, ibuf, x, y, w, h);
+  BKE_image_update_gputexture_delayed(ima, image_tile, ibuf, x, y, w, h);
   BKE_image_release_ibuf(ima, ibuf, NULL);
 }
 
@@ -935,17 +936,22 @@ void BKE_image_update_gputexture(Image *ima, ImageUser *iuser, int x, int y, int
  * The next time the GPUTexture is used these tiles will be refreshes. This saves time
  * when writing to the same place multiple times This happens for during foreground
  * rendering. */
-void BKE_image_update_gputexture_delayed(
-    struct Image *ima, struct ImBuf *ibuf, int x, int y, int w, int h)
+void BKE_image_update_gputexture_delayed(struct Image *ima,
+                                         struct ImageTile *image_tile,
+                                         struct ImBuf *ibuf,
+                                         int x,
+                                         int y,
+                                         int w,
+                                         int h)
 {
   /* Check for full refresh. */
-  if (ibuf && x == 0 && y == 0 && w == ibuf->x && h == ibuf->y) {
+  if (ibuf && image_tile->tile_number == 0 && x == 0 && y == 0 && w == ibuf->x && h == ibuf->y) {
     BKE_image_partial_update_mark_full_update(ima);
   }
   else {
     rcti dirty_region;
     BLI_rcti_init(&dirty_region, x, x + w, y, y + h);
-    BKE_image_partial_update_mark_region(ima, ibuf, &dirty_region);
+    BKE_image_partial_update_mark_region(ima, image_tile, ibuf, &dirty_region);
   }
 }
 
