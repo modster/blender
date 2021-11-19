@@ -197,7 +197,7 @@ static bool get_udim_tiles(const std::string &file_path,
     int id = BLI_path_sequence_decode(dir[i].relname, head, tail, &digits);
 
     if (digits == 0 || digits > 4 || !(STREQLEN(base_head, head, FILE_MAX)) ||
-      !(STREQLEN(base_tail, tail, FILE_MAX))) {
+        !(STREQLEN(base_tail, tail, FILE_MAX))) {
       continue;
     }
 
