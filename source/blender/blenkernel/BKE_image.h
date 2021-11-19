@@ -427,10 +427,7 @@ typedef struct PartialUpdateRegion {
   struct rcti region;
 
   /**
-   * \brief Tile number that this region belongs to.
-   *
-   * For tiled images it contains the UDIM tile number (1001, 1010).
-   * For non tiled images this is set to 0.
+   * \brief Tile number (UDIM) that this region belongs to.
    */
   int tile_number;
 } PartialUpdateRegion;
@@ -442,7 +439,7 @@ typedef enum ePartialUpdateIterResult {
   /** \brief no tiles left when iterating over tiles. */
   PARTIAL_UPDATE_ITER_FINISHED = 0,
 
-  /** \brief a tile was available and has been loaded. */
+  /** \brief a chunk was available and has been loaded. */
   PARTIAL_UPDATE_ITER_CHANGE_AVAILABLE = 1,
 } ePartialUpdateIterResult;
 
