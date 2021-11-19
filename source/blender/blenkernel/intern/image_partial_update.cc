@@ -155,7 +155,6 @@ struct PartialUpdateUserImpl {
  * Internally dirty tiles are grouped together in change sets to make sure that the correct
  * answer can be built for different users reducing the amount of merges.
  */
-// TODO(jbakker): TileChangeset is per UDIM tile. There should be an
 struct TileChangeset {
  private:
   /** \brief Dirty flag for each chunk. */
