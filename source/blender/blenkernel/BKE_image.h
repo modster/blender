@@ -483,9 +483,9 @@ struct PartialUpdateRegister;
 void BKE_image_partial_update_register_free(struct Image *image);
 /** \brief Mark a region of the image to update. */
 void BKE_image_partial_update_mark_region(struct Image *image,
-                                          struct ImageTile *image_tile,
-                                          struct ImBuf *image_buffer,
-                                          rcti *updated_region);
+                                          const struct ImageTile *image_tile,
+                                          const struct ImBuf *image_buffer,
+                                          const rcti *updated_region);
 /** \brief Mark the whole image to be updated. */
 void BKE_image_partial_update_mark_full_update(struct Image *image);
 

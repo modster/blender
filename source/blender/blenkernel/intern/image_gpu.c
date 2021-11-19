@@ -945,7 +945,8 @@ void BKE_image_update_gputexture_delayed(struct Image *ima,
                                          int h)
 {
   /* Check for full refresh. */
-  if (ibuf && image_tile->tile_number == 0 && x == 0 && y == 0 && w == ibuf->x && h == ibuf->y) {
+  if (ibuf != NULL && ima->source != IMA_SRC_TILED && x == 0 && y == 0 && w == ibuf->x &&
+      h == ibuf->y) {
     BKE_image_partial_update_mark_full_update(ima);
   }
   else {
