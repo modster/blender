@@ -34,6 +34,7 @@ using namespace metal;
 
 #pragma clang diagnostic ignored "-Wunused-variable"
 #pragma clang diagnostic ignored "-Wsign-compare"
+#pragma clang diagnostic ignored "-Wuninitialized"
 
 /* Qualifiers */
 
@@ -42,8 +43,9 @@ using namespace metal;
 #define ccl_device_forceinline ccl_device
 #define ccl_device_noinline ccl_device __attribute__((noinline))
 #define ccl_device_noinline_cpu ccl_device
+#define ccl_device_inline_method ccl_device
 #define ccl_global device
-#define ccl_static_constant static constant constexpr
+#define ccl_inline_constant static constant constexpr
 #define ccl_device_constant constant
 #define ccl_constant const device
 #define ccl_gpu_shared threadgroup
@@ -64,7 +66,7 @@ using namespace metal;
 #define ccl_gpu_thread_mask(thread_warp) uint64_t((1ull << thread_warp) - 1)
 
 #define ccl_gpu_ballot(predicate) ((uint64_t)((simd_vote::vote_t)simd_ballot(predicate)))
-#define ccl_gpu_popc(x) popcount(x)
+#define ccl_gpu_syncthreads() threadgroup_barrier(mem_flags::mem_threadgroup);
 
 // clang-format off
 
@@ -73,7 +75,8 @@ using namespace metal;
 #define ccl_gpu_kernel(block_num_threads, thread_num_registers)
 #define ccl_gpu_kernel_threads(block_num_threads)
 
-/* convert a comma-separated list into a semicolon-separated list (so that we can generate a struct based on kernel entrypoint parameters) */
+/* Convert a comma-separated list into a semicolon-separated list
+ * (so that we can generate a struct based on kernel entry-point parameters). */
 #define FN0()
 #define FN1(p1) p1;
 #define FN2(p1, p2) p1; p2;
@@ -94,7 +97,8 @@ using namespace metal;
 #define GET_LAST_ARG(p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, ...) p16
 #define PARAMS_MAKER(...) GET_LAST_ARG(__VA_ARGS__, FN16, FN15, FN14, FN13, FN12, FN11, FN10, FN9, FN8, FN7, FN6, FN5, FN4, FN3, FN2, FN1, FN0)
 
-/* generate a struct containing the entrypoint parameters and a "run" method which can access them implicitly via this-> */
+/* Generate a struct containing the entry-point parameters and a "run"
+ * method which can access them implicitly via this-> */
 #define ccl_gpu_kernel_signature(name, ...) \
 struct kernel_gpu_##name \
 { \
@@ -121,7 +125,6 @@ kernel void kernel_metal_##name(device const kernel_gpu_##name *params_struct, \
                                 uint simd_group_index [[simdgroup_index_in_threadgroup]], \
                                 uint num_simd_groups [[simdgroups_per_threadgroup]]) { \
   MetalKernelContext context(_launch_params_metal, _metal_ancillaries); \
-  INIT_DEBUG_BUFFER \
   params_struct->run(context, simdgroup_offset, metal_global_id, metal_local_id, metal_local_size, simdgroup_size, simd_lane_index, simd_group_index, num_simd_groups); \
 } \
 void kernel_gpu_##name::run(thread MetalKernelContext& context, \
@@ -147,6 +150,31 @@ void kernel_gpu_##name::run(thread MetalKernelContext& context, \
   } ccl_gpu_kernel_lambda_pass(context)
 
 // clang-format on
+
+/* volumetric lambda functions - use function objects for lambda-like functionality */
+#define VOLUME_READ_LAMBDA(function_call) \
+  struct FnObjectRead { \
+    KernelGlobals kg; \
+    ccl_private MetalKernelContext *context; \
+    int state; \
+\
+    VolumeStack operator()(const int i) const \
+    { \
+      return context->function_call; \
+    } \
+  } volume_read_lambda_pass{kg, this, state};
+
+#define VOLUME_WRITE_LAMBDA(function_call) \
+  struct FnObjectWrite { \
+    KernelGlobals kg; \
+    ccl_private MetalKernelContext *context; \
+    int state; \
+\
+    void operator()(const int i, VolumeStack entry) const \
+    { \
+      context->function_call; \
+    } \
+  } volume_write_lambda_pass{kg, this, state};
 
 /* make_type definitions with Metal style element initializers */
 #ifdef make_float2
@@ -202,6 +230,7 @@ void kernel_gpu_##name::run(thread MetalKernelContext& context, \
 #define sinhf(x) sinh(float(x))
 #define coshf(x) cosh(float(x))
 #define tanhf(x) tanh(float(x))
+#define saturatef(x) saturate(float(x))
 
 /* Use native functions with possibly lower precision for performance,
  * no issues found so far. */
@@ -214,6 +243,8 @@ void kernel_gpu_##name::run(thread MetalKernelContext& context, \
 #define logf(x) trigmode::log(float(x))
 
 #define NULL 0
+
+#define __device__
 
 /* texture bindings and sampler setup */
 
@@ -228,6 +259,9 @@ struct MetalAncillaries {
   device Texture2DParamsMetal *textures_2d;
   device Texture3DParamsMetal *textures_3d;
 };
+
+#include "util/half.h"
+#include "util/types.h"
 
 enum SamplerType {
   SamplerFilterNearest_AddressRepeat,

@@ -75,8 +75,6 @@ class HIPDevice : public Device {
 
   static bool have_precompiled_kernels();
 
-  virtual bool show_samples() const override;
-
   virtual BVHLayoutMask get_bvh_layout_mask() const override;
 
   void set_error(const string &error) override;
@@ -93,9 +91,7 @@ class HIPDevice : public Device {
 
   virtual string compile_kernel_get_common_cflags(const uint kernel_features);
 
-  string compile_kernel(const uint kernel_features,
-                        const char *name,
-                        const char *base = "hip");
+  string compile_kernel(const uint kernel_features, const char *name, const char *base = "hip");
 
   virtual bool load_kernels(const uint kernel_features) override;
   void reserve_local_memory(const uint kernel_features);
