@@ -519,11 +519,10 @@ static MenuSearch_Data *menu_items_from_ui_create(
     PropertyRNA *prop_ui_type = nullptr;
     {
       /* This must be a valid pointer, with only it's type checked. */
-      ScrArea area_dummy = {
-          /* Anything besides #SPACE_EMPTY is fine,
-           * as this value is only included in the enum when set. */
-          .spacetype = SPACE_TOPBAR,
-      };
+      ScrArea area_dummy = {nullptr};
+      /* Anything besides #SPACE_EMPTY is fine,
+       * as this value is only included in the enum when set. */
+      area_dummy.spacetype = SPACE_TOPBAR;
       PointerRNA ptr;
       RNA_pointer_create(&screen->id, &RNA_Area, &area_dummy, &ptr);
       prop_ui_type = RNA_struct_find_property(&ptr, "ui_type");
