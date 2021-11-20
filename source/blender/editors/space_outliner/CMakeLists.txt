@@ -42,7 +42,7 @@ set(SRC
   outliner_ops.c
   outliner_select.c
   outliner_sync.c
-  outliner_tools.c
+  outliner_tools.cc
   outliner_tree.c
   outliner_utils.c
   space_outliner.c
