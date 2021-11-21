@@ -1913,7 +1913,7 @@ void BKE_mesh_vert_coords_apply_with_mat4(Mesh *mesh,
 void BKE_mesh_calc_normals_split_ex(Mesh *mesh, MLoopNorSpaceArray *r_lnors_spacearr)
 {
   float(*r_loopnors)[3];
-  short(*clnors)[2] = NULL;
+  short(*clnors)[2] = nullptr;
 
   /* Note that we enforce computing clnors when the clnor space array is requested by caller here.
    * However, we obviously only use the auto-smooth angle threshold
