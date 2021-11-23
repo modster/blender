@@ -1188,7 +1188,27 @@ void GHOST_GetVulkanBackbuffer(GHOST_WindowHandle windowhandle,
                                void *render_pass,
                                void *extent,
                                uint32_t *fb_id);
+/**
+ * \brief Query vulkan devices.
+ *
+ * \returns a device list handle or NULL when there is no vulkan available.
+ */
+GHOST_VulkanDeviceListHandle GHOST_QueryVulkanDevices(GHOST_ContextHandle system);
 
+/**
+ * \brief Destroy the given device list.
+ */
+GHOST_TSuccess GHOST_DestroyVulkanDeviceList(GHOST_VulkanDeviceListHandle device_list_handle);
+
+/**
+ * \brief Get an item from the given device list.
+ *
+ * \returns GHOST_kSuccess when device is loaded. GHOST_kFailure when the given device_list_handle
+ * is incorrect or the given index is out of range.
+ */
+GHOST_TSuccess GHOST_GetVulkanDeviceListItem(GHOST_VulkanDeviceListHandle device_list_handle,
+                                             int64_t index,
+                                             GHOST_VulkanPhysicalDevice *r_device);
 #endif
 
 #ifdef __cplusplus

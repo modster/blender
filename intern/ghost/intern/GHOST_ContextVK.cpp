@@ -1028,3 +1028,17 @@ GHOST_TSuccess GHOST_ContextVK::releaseNativeHandles()
 {
   return GHOST_kSuccess;
 }
+
+GHOST_VulkanDeviceList *GHOST_ContextVK::queryDevices()
+{
+  if (m_instance == nullptr) {
+    // TODO(jbakker): initializeVkInstance();
+  }
+  GHOST_VulkanDeviceList *device_list = new GHOST_VulkanDeviceList();
+  return device_list;
+}
+
+void GHOST_ContextVK::destroyDeviceList(GHOST_VulkanDeviceList *device_list)
+{
+  delete device_list;
+}

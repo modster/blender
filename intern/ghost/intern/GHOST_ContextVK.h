@@ -64,6 +64,10 @@ typedef enum {
 #endif
 } GHOST_TVulkanPlatformType;
 
+struct GHOST_VulkanDeviceList {
+  std::vector<GHOST_VulkanPhysicalDevice> m_devices;
+};
+
 class GHOST_ContextVK : public GHOST_Context {
   /* XR code needs low level graphics data to send to OpenXR. */
   // friend class GHOST_XrGraphicsBindingOpenGL;
@@ -166,6 +170,9 @@ class GHOST_ContextVK : public GHOST_Context {
   {
     return GHOST_kFailure;
   };
+
+  GHOST_VulkanDeviceList *queryDevices();
+  static void destroyDeviceList(GHOST_VulkanDeviceList *device_list);
 
  private:
 #ifdef _WIN32
