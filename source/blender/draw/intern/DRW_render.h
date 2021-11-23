@@ -578,6 +578,9 @@ void DRW_shgroup_uniform_vec4_array_copy(DRWShadingGroup *shgroup,
 void DRW_shgroup_vertex_buffer(DRWShadingGroup *shgroup,
                                const char *name,
                                struct GPUVertBuf *vertex_buffer);
+void DRW_shgroup_vertex_buffer_ref(DRWShadingGroup *shgroup,
+                                   const char *name,
+                                   struct GPUVertBuf **vertex_buffer);
 
 bool DRW_shgroup_is_empty(DRWShadingGroup *shgroup);
 

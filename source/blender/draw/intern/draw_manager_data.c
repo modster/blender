@@ -463,6 +463,19 @@ void DRW_shgroup_vertex_buffer(DRWShadingGroup *shgroup,
       shgroup, location, DRW_UNIFORM_VERTEX_BUFFER_AS_STORAGE, vertex_buffer, 0, 0, 1);
 }
 
+void DRW_shgroup_vertex_buffer_ref(DRWShadingGroup *shgroup,
+                                   const char *name,
+                                   GPUVertBuf **vertex_buffer)
+{
+  int location = GPU_shader_get_ssbo(shgroup->shader, name);
+  if (location == -1) {
+    BLI_assert_msg(0, "Unable to locate binding of shader storage buffer objects.");
+    return;
+  }
+  drw_shgroup_uniform_create_ex(
+      shgroup, location, DRW_UNIFORM_VERTEX_BUFFER_AS_STORAGE_REF, vertex_buffer, 0, 0, 1);
+}
+
 /** \} */
 
 /* -------------------------------------------------------------------- */

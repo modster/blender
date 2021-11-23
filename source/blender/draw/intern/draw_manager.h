@@ -315,6 +315,7 @@ typedef enum {
   DRW_UNIFORM_BLOCK_REF,
   DRW_UNIFORM_TFEEDBACK_TARGET,
   DRW_UNIFORM_VERTEX_BUFFER_AS_STORAGE,
+  DRW_UNIFORM_VERTEX_BUFFER_AS_STORAGE_REF,
   /** Per drawcall uniforms/UBO */
   DRW_UNIFORM_BLOCK_OBMATS,
   DRW_UNIFORM_BLOCK_OBINFOS,
@@ -345,6 +346,11 @@ struct DRWUniform {
     union {
       GPUUniformBuf *block;
       GPUUniformBuf **block_ref;
+    };
+    /* DRW_UNIFORM_VERTEX_BUFFER_AS_STORAGE */
+    union {
+      GPUVertBuf *vertbuf;
+      GPUVertBuf **vertbuf_ref;
     };
     /* DRW_UNIFORM_FLOAT_COPY */
     float fvalue[4];
