@@ -554,32 +554,16 @@ void ShadowModule::init(void)
     inst_.sampling.reset();
   }
 
-  switch (G.debug_value) {
-    case 4:
-      debug_data_.type = SHADOW_DEBUG_TILEMAPS;
-      break;
-    case 5:
-      debug_data_.type = SHADOW_DEBUG_LOD;
-      break;
-    case 6:
-      debug_data_.type = SHADOW_DEBUG_PAGE_ALLOCATION;
 #ifndef SHADOW_DEBUG_PAGE_ALLOCATION_ENABLED
-      BLI_assert_msg(0,
-                     "Error: EEVEE: SHADOW_DEBUG_PAGE_ALLOCATION used but "
-                     "SHADOW_DEBUG_PAGE_ALLOCATION_ENABLED "
-                     "is not defined");
-#endif
-      break;
-    case 7:
-      debug_data_.type = SHADOW_DEBUG_TILE_ALLOCATION;
-      break;
-    case 8:
-      debug_data_.type = SHADOW_DEBUG_SHADOW_DEPTH;
-      break;
-    default:
-      debug_data_.type = SHADOW_DEBUG_NONE;
-      break;
+  if (inst_.debug_mode == SHADOW_DEBUG_PAGE_ALLOCATION) {
+    BLI_assert_msg(0,
+                   "Error: EEVEE: SHADOW_DEBUG_PAGE_ALLOCATION used but "
+                   "SHADOW_DEBUG_PAGE_ALLOCATION_ENABLED "
+                   "is not defined");
   }
+#endif
+
+  debug_data_.type = inst_.debug_mode;
 
   memset(views_, 0, sizeof(views_));
 }

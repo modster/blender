@@ -29,7 +29,6 @@
 #include "DNA_light_types.h"
 
 #include "eevee_camera.hh"
-#include "eevee_culling.hh"
 #include "eevee_id_map.hh"
 #include "eevee_sampling.hh"
 #include "eevee_shader.hh"
@@ -72,27 +71,6 @@ struct Light : public LightData {
 /** \} */
 
 /* -------------------------------------------------------------------- */
-/** \name CullingPass
- * \{ */
-
-class CullingLightPass {
- private:
-  Instance &inst_;
-
-  DRWPass *culling_ps_ = nullptr;
-  const GPUUniformBuf *lights_ubo_ = nullptr;
-  const GPUUniformBuf *culling_ubo_ = nullptr;
-
- public:
-  CullingLightPass(Instance &inst) : inst_(inst){};
-
-  void sync(void);
-  void render(const GPUUniformBuf *lights_ubo, const GPUUniformBuf *culling_ubo);
-};
-
-/** \} */
-
-/* -------------------------------------------------------------------- */
 /** \name LightModule
  * \{ */
 
@@ -102,30 +80,47 @@ class CullingLightPass {
 class LightModule {
   friend ShadowModule;
 
+ public:
+  /** Scene lights data. */
+  LightDataBuf lights_data;
+  /** Shadow data. TODO(fclem): merge with lights_data. */
+  ShadowDataBuf shadows_data;
+  /** Culling infos. */
+  CullingDataBuf culling_data;
+  /** Key buffer containing only visible lights indices. */
+  CullingKeyBuf culling_key_buf;
+  /** LightData buffer used for rendering. Ordered by the culling phase. */
+  CullingLightBuf culling_light_buf;
+  /** Zbins containing min and max light index for each Z bin. */
+  CullingZbinBuf culling_zbin_buf;
+  /** Bitmap of lights touching each tiles. Using one layer for each culling batch. */
+  CullingTileBuf culling_tile_buf;
+
  private:
   Instance &inst_;
 
   /** Map of light objects. This is used to track light deletion. */
   Map<ObjectKey, Light> lights_;
-  /** References to data in lights_ for easy indexing. */
-  Vector<Light *> lights_refs_;
-  /** Batches of lights alongside their culling data. */
-  struct LightBatch {
-    LightDataBuf lights_data;
-    ShadowDataBuf shadows_data;
-  };
-  Culling<LightBatch, true> culling_;
-  /** Active data pointers used for rendering. */
-  const GPUUniformBuf *active_lights_ubo_;
-  const GPUUniformBuf *active_shadows_ubo_;
-  const GPUUniformBuf *active_culling_ubo_;
-  GPUTexture *active_culling_tx_;
-  int active_batch_ = 0;
+
+  Vector<Light *> light_refs_;
+
+  /** Follows the principles of Tiled Culling + Z binning from:
+   * "Improved Culling for Tiled and Clustered Rendering"
+   * by Michal Drobot
+   * http://advances.realtimerendering.com/s2017/2017_Sig_Improved_Culling_final.pdf */
+  DRWPass *culling_ps_ = nullptr;
+  int3 culling_tile_dispatch_size_ = int3(1);
+  /* Number of batches of lights that are separately processed. */
+  int batch_len_ = 1;
 
   float light_threshold_;
 
+  /** Debug Culling visualization. */
+  DRWPass *debug_draw_ps_ = nullptr;
+  GPUTexture *input_depth_tx_ = nullptr;
+
  public:
-  LightModule(Instance &inst) : inst_(inst), culling_(){};
+  LightModule(Instance &inst) : inst_(inst){};
   ~LightModule(){};
 
   void begin_sync(void);
@@ -134,40 +129,10 @@ class LightModule {
 
   void set_view(const DRWView *view, const ivec2 extent, bool enable_specular = true);
 
-  void bind_batch(int range_id);
+  void shgroup_resources(DRWShadingGroup *grp);
 
-  /**
-   * Getters
-   **/
-  const GPUUniformBuf **lights_ubo_ref_get(void)
-  {
-    return &active_lights_ubo_;
-  }
-  const GPUUniformBuf **shadows_ubo_ref_get(void)
-  {
-    return &active_shadows_ubo_;
-  }
-  const GPUUniformBuf **culling_ubo_ref_get(void)
-  {
-    return &active_culling_ubo_;
-  }
-  /** Returns the active Span of lights that passed the culling test. */
-  Span<LightData> lights_get(void) const
-  {
-    const auto &batch = *culling_[active_batch_];
-    Span<LightData> span = batch.item_data.lights_data;
-    return span.take_front(batch.items_count_get());
-  }
-  GPUTexture **culling_tx_ref_get(void)
-  {
-    return &active_culling_tx_;
-  }
-  /* Return a range iterator to loop over all lights.
-   * In practice, we render with light in waves of LIGHT_MAX lights at a time. */
-  IndexRange index_range(void) const
-  {
-    return culling_.index_range();
-  }
+  void debug_end_sync(void);
+  void debug_draw(GPUFrameBuffer *view_fb, HiZBuffer &hiz);
 };
 
 /** \} */

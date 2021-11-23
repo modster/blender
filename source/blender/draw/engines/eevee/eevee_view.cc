@@ -109,9 +109,6 @@ void ShadingView::sync(ivec2 render_extent_)
 
     view_fb_.ensure(GPU_ATTACHMENT_TEXTURE(depth_tx_), GPU_ATTACHMENT_TEXTURE(combined_tx_));
 
-    /* Reuse postfx_tx_. */
-    debug_fb_.ensure(GPU_ATTACHMENT_NONE, GPU_ATTACHMENT_TEXTURE(postfx_tx_));
-
     gbuffer_.sync(depth_tx_, combined_tx_, owner);
   }
 }
@@ -150,6 +147,7 @@ void ShadingView::render(void)
 
   inst_.shading_passes.forward.render(gbuffer_, hiz_front_, view_fb_);
 
+  inst_.lights.debug_draw(view_fb_, hiz_front_);
   inst_.shadows.debug_draw(view_fb_, hiz_front_);
 
   velocity_.render(depth_tx_);
@@ -160,15 +158,7 @@ void ShadingView::render(void)
 
   GPUTexture *final_radiance_tx = render_post(combined_tx_);
 
-  /* TODO(fclem) Have a special renderpass for this. */
-  if (G.debug_value == 3) {
-    GPU_framebuffer_bind(debug_fb_);
-    inst_.shading_passes.debug_culling.render(depth_tx_);
-
-    // inst_.render_passes.debug_culling->accumulate(debug_tx_, sub_view_);
-    inst_.render_passes.combined->accumulate(postfx_tx_, sub_view_);
-  }
-  else if (inst_.render_passes.combined) {
+  if (inst_.render_passes.combined) {
     inst_.render_passes.combined->accumulate(final_radiance_tx, sub_view_);
   }
 

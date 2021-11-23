@@ -17,19 +17,29 @@ layout(std140) uniform sampling_block
   SamplingData sampling;
 };
 
-layout(std140) uniform lights_block
+layout(std430, binding = 0) readonly restrict buffer lights_buf
 {
-  LightData lights[CULLING_ITEM_BATCH];
+  LightData lights[];
 };
 
-layout(std140) uniform lights_culling_block
+layout(std430, binding = 1) readonly restrict buffer lights_zbins_buf
+{
+  CullingZBin lights_zbins[];
+};
+
+layout(std430, binding = 2) readonly restrict buffer lights_culling_buf
 {
   CullingData light_culling;
 };
 
-layout(std140) uniform shadows_block
+layout(std430, binding = 3) readonly restrict buffer lights_tile_buf
 {
-  ShadowData shadows[CULLING_ITEM_BATCH];
+  CullingWord lights_culling_words[];
+};
+
+layout(std430, binding = 4) readonly restrict buffer shadows_buf
+{
+  ShadowData shadows[];
 };
 
 layout(std140) uniform grids_block
@@ -55,7 +65,6 @@ uniform sampler2D transmit_data_tx;
 uniform sampler2D reflect_color_tx;
 uniform sampler2D reflect_normal_tx;
 uniform sampler1D sss_transmittance_tx;
-uniform usampler2D lights_culling_tx;
 uniform sampler2DArray utility_tx;
 uniform sampler2D shadow_atlas_tx;
 uniform usampler2D shadow_tilemaps_tx;

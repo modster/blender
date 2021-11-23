@@ -50,7 +50,9 @@ extern char datatoc_eevee_cubemap_lib_glsl[];
 extern char datatoc_eevee_culling_debug_frag_glsl[];
 extern char datatoc_eevee_culling_iter_lib_glsl[];
 extern char datatoc_eevee_culling_lib_glsl[];
-extern char datatoc_eevee_culling_light_frag_glsl[];
+extern char datatoc_eevee_culling_select_comp_glsl[];
+extern char datatoc_eevee_culling_sort_comp_glsl[];
+extern char datatoc_eevee_culling_tile_comp_glsl[];
 extern char datatoc_eevee_deferred_direct_frag_glsl[];
 extern char datatoc_eevee_deferred_holdout_frag_glsl[];
 extern char datatoc_eevee_deferred_transparent_frag_glsl[];
@@ -236,7 +238,9 @@ ShaderModule::ShaderModule()
 #define SHADER_FULLSCREEN(enum_, frag_) SHADER_FULLSCREEN_DEFINES(enum_, frag_, nullptr)
 
   SHADER_FULLSCREEN(CULLING_DEBUG, eevee_culling_debug_frag);
-  SHADER_FULLSCREEN(CULLING_LIGHT, eevee_culling_light_frag);
+  SHADER_COMPUTE(CULLING_SELECT, eevee_culling_select_comp, nullptr);
+  SHADER_COMPUTE(CULLING_SORT, eevee_culling_sort_comp, nullptr);
+  SHADER_COMPUTE(CULLING_TILE, eevee_culling_tile_comp, nullptr);
   SHADER_FULLSCREEN(FILM_FILTER, eevee_film_filter_frag);
   SHADER_FULLSCREEN(FILM_RESOLVE, eevee_film_resolve_frag);
   SHADER_FULLSCREEN(FILM_RESOLVE_DEPTH, eevee_film_resolve_depth_frag);

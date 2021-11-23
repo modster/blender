@@ -284,9 +284,9 @@ void LightModule::sync_light(const Object *ob, ObjectHandle &handle)
 
 void LightModule::end_sync(void)
 {
-  lights_refs_.clear();
-
   Vector<ObjectKey, 0> deleted_keys;
+
+  light_refs_.clear();
 
   /* Detect light deletion. */
   for (auto item : lights_.items()) {
@@ -297,7 +297,7 @@ void LightModule::end_sync(void)
     }
     else {
       light.used = false;
-      lights_refs_.append(&light);
+      light_refs_.append(&light);
     }
   }
 
@@ -308,110 +308,171 @@ void LightModule::end_sync(void)
     lights_.remove(key);
   }
 
+  if (light_refs_.size() > CULLING_MAX_ITEM) {
+    /* TODO(fclem) Print error to user. */
+    light_refs_.resize(CULLING_MAX_ITEM);
+  }
+
+  batch_len_ = divide_ceil_u(max_ii(light_refs_.size(), 1), CULLING_BATCH_SIZE);
+  lights_data.resize(batch_len_ * CULLING_BATCH_SIZE);
+  shadows_data.resize(batch_len_ * CULLING_BATCH_SIZE);
+  culling_key_buf.resize(batch_len_ * CULLING_BATCH_SIZE);
+  culling_light_buf.resize(batch_len_ * CULLING_BATCH_SIZE);
+  culling_zbin_buf.resize(batch_len_ * CULLING_ZBIN_COUNT);
+  culling_data.items_count = light_refs_.size();
+  culling_data.tile_word_len = divide_ceil_u(max_ii(culling_data.items_count, 1), 32);
+
   /* Call shadows.end_sync after light pruning to avoid packing deleted shadows. */
   inst_.shadows.end_sync();
+
+  for (auto l_idx : light_refs_.index_range()) {
+    Light &light = *light_refs_[l_idx];
+    lights_data[l_idx] = light;
+    lights_data[l_idx].shadow_id = LIGHT_NO_SHADOW;
+
+    if (light.shadow_id != LIGHT_NO_SHADOW) {
+      if (light.type == LIGHT_SUN) {
+        shadows_data[l_idx] = this->inst_.shadows.directionals[light.shadow_id];
+      }
+      else {
+        shadows_data[l_idx] = this->inst_.shadows.punctuals[light.shadow_id];
+      }
+    }
+  }
+
+  lights_data.push_update();
+  shadows_data.push_update();
+
+  {
+    culling_ps_ = DRW_pass_create("CullingLight", (DRWState)0);
+
+    uint lights_len = light_refs_.size();
+    uint batch_len = divide_ceil_u(lights_len, CULLING_BATCH_SIZE);
+
+    if (batch_len > 0) {
+      /* NOTE: We reference the buffers that may be resized or updated later. */
+      {
+        GPUShader *sh = inst_.shaders.static_shader_get(CULLING_SELECT);
+        DRWShadingGroup *grp = DRW_shgroup_create(sh, culling_ps_);
+        DRW_shgroup_vertex_buffer(grp, "lights_buf", lights_data);
+        DRW_shgroup_vertex_buffer_ref(grp, "culling_buf", &culling_data);
+        DRW_shgroup_vertex_buffer(grp, "key_buf", culling_key_buf);
+        DRW_shgroup_call_compute(grp, batch_len, 1, 1);
+        DRW_shgroup_barrier(grp, GPU_BARRIER_SHADER_STORAGE);
+      }
+      {
+        GPUShader *sh = inst_.shaders.static_shader_get(CULLING_SORT);
+        DRWShadingGroup *grp = DRW_shgroup_create(sh, culling_ps_);
+        DRW_shgroup_vertex_buffer(grp, "lights_buf", lights_data);
+        DRW_shgroup_vertex_buffer_ref(grp, "culling_buf", &culling_data);
+        DRW_shgroup_vertex_buffer(grp, "key_buf", culling_key_buf);
+        DRW_shgroup_vertex_buffer_ref(grp, "out_zbins_buf", &culling_zbin_buf);
+        DRW_shgroup_vertex_buffer_ref(grp, "out_items_buf", &culling_light_buf);
+        DRW_shgroup_call_compute(grp, batch_len, 1, 1);
+        DRW_shgroup_barrier(grp, GPU_BARRIER_SHADER_STORAGE);
+      }
+      {
+        GPUShader *sh = inst_.shaders.static_shader_get(CULLING_TILE);
+        DRWShadingGroup *grp = DRW_shgroup_create(sh, culling_ps_);
+        DRW_shgroup_vertex_buffer(grp, "lights_buf", culling_light_buf);
+        DRW_shgroup_vertex_buffer_ref(grp, "culling_buf", &culling_data);
+        DRW_shgroup_vertex_buffer_ref(grp, "culling_tile_buf", &culling_tile_buf);
+        DRW_shgroup_call_compute_ref(grp, culling_tile_dispatch_size_);
+        DRW_shgroup_barrier(grp, GPU_BARRIER_TEXTURE_FETCH);
+      }
+    }
+  }
+
+  debug_end_sync();
+}
+
+void LightModule::debug_end_sync(void)
+{
+  if (inst_.debug_mode != eDebugMode::DEBUG_LIGHT_CULLING) {
+    debug_draw_ps_ = nullptr;
+    return;
+  }
+
+  debug_draw_ps_ = DRW_pass_create("CullingDebug", DRW_STATE_WRITE_COLOR);
+
+  GPUShader *sh = inst_.shaders.static_shader_get(CULLING_DEBUG);
+  DRWShadingGroup *grp = DRW_shgroup_create(sh, debug_draw_ps_);
+  DRW_shgroup_vertex_buffer_ref(grp, "lights_buf", &culling_light_buf);
+  DRW_shgroup_vertex_buffer_ref(grp, "lights_culling_buf", &culling_data);
+  DRW_shgroup_vertex_buffer_ref(grp, "lights_zbins_buf", &culling_zbin_buf);
+  DRW_shgroup_vertex_buffer_ref(grp, "lights_tile_buf", &culling_tile_buf);
+  DRW_shgroup_uniform_texture_ref(grp, "depth_tx", &input_depth_tx_);
+  DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
 }
 
 /* Compute acceleration structure for the given view. If extent is 0, bind no lights. */
 void LightModule::set_view(const DRWView *view, const ivec2 extent, bool enable_specular)
 {
-  if (extent.x == 0) {
-    culling_.set_empty();
+  const bool no_lights = (extent.x == 0);
+
+  /* Target 1bit per pixel. */
+  uint tile_size = 1u << log2_ceil_u(ceil(sqrtf(culling_data.tile_word_len * 32)));
+
+  int3 tiles_extent;
+  tiles_extent.x = divide_ceil_u(extent.x, tile_size);
+  tiles_extent.y = divide_ceil_u(extent.y, tile_size);
+  tiles_extent.z = batch_len_;
+
+  float far_z = DRW_view_far_distance_get(view);
+  float near_z = DRW_view_near_distance_get(view);
+
+  culling_data.zbin_scale = -CULLING_ZBIN_COUNT / fabsf(far_z - near_z);
+  culling_data.zbin_bias = -near_z * culling_data.zbin_scale;
+  culling_data.tile_size = tile_size;
+  culling_data.tile_x_len = tiles_extent.x;
+  culling_data.tile_y_len = tiles_extent.y;
+  culling_data.tile_to_uv_fac = tile_size / float2(UNPACK2(extent));
+
+  culling_data.enable_specular = enable_specular;
+  culling_data.items_count = no_lights ? 0 : light_refs_.size();
+  culling_data.visible_count = 0;
+  culling_data.push_update();
+
+  if (no_lights) {
     return;
   }
 
-  culling_.set_view(view, extent);
+  uint word_count = tiles_extent.x * tiles_extent.y * tiles_extent.z * culling_data.tile_word_len;
 
-  for (auto light_id : lights_refs_.index_range()) {
-    Light &light = *lights_refs_[light_id];
+  /* TODO(fclem) Only resize once per redraw. */
+  culling_tile_buf.resize(word_count);
 
-    BoundSphere bsphere;
-    if (light.type == LIGHT_SUN) {
-      /* Make sun lights cover the whole frustum. */
-      float viewinv[4][4];
-      DRW_view_viewmat_get(view, viewinv, true);
-      copy_v3_v3(bsphere.center, viewinv[3]);
-      bsphere.radius = fabsf(DRW_view_far_distance_get(view));
-    }
-    else {
-      /* TODO(fclem) fit cones better. */
-      copy_v3_v3(bsphere.center, light._position);
-      bsphere.radius = light.influence_radius_max;
-    }
-
-    culling_.insert(light_id, bsphere);
-  }
+  culling_tile_dispatch_size_.x = divide_ceil_u(word_count, 1024);
+  culling_tile_dispatch_size_.y = 1;
+  culling_tile_dispatch_size_.z = 1;
 
   DRW_view_set_active(view);
-
-  /* This is only called if the light is visible under this view. */
-  auto data_copy = [&](LightBatch &light_batch, uint32_t dst_index, uint32_t src_index) {
-    Light &light = *this->lights_refs_[src_index];
-    LightData &dst = light_batch.lights_data[dst_index];
-
-    dst = light;
-    if (!enable_specular) {
-      dst.specular_power = 0.0f;
-    }
-
-    if (light.shadow_id != LIGHT_NO_SHADOW) {
-      ShadowData &shadow_dst = light_batch.shadows_data[dst_index];
-      if (light.type == LIGHT_SUN) {
-        shadow_dst = this->inst_.shadows.directionals[light.shadow_id];
-      }
-      else {
-        shadow_dst = this->inst_.shadows.punctuals[light.shadow_id];
-      }
-    }
-  };
-
-  /* Called for each batch. Do 2D gpu culling. */
-  auto culling_func = [&](LightBatch &light_batch, CullingDataBuf &culling_data) {
-    LightDataBuf &lights_data = light_batch.lights_data;
-    ShadowDataBuf &shadows_data = light_batch.shadows_data;
-    lights_data.push_update();
-    shadows_data.push_update();
-
-    this->inst_.shading_passes.light_culling.render(lights_data.ubo_get(), culling_data.ubo_get());
-  };
-
-  culling_.finalize(data_copy, culling_func);
+  DRW_draw_pass(culling_ps_);
 
   inst_.shadows.update_visible(view);
 }
 
-void LightModule::bind_batch(int batch_index)
+void LightModule::debug_draw(GPUFrameBuffer *view_fb, HiZBuffer &hiz)
 {
-  active_batch_ = batch_index;
-  auto &batch = *culling_[batch_index];
-  active_lights_ubo_ = batch.item_data.lights_data.ubo_get();
-  active_shadows_ubo_ = batch.item_data.shadows_data.ubo_get();
-  active_culling_ubo_ = batch.culling_ubo_get();
-  active_culling_tx_ = batch.culling_texture_get();
+  if (debug_draw_ps_ == nullptr) {
+    return;
+  }
+  input_depth_tx_ = hiz.texture_get();
+
+  GPU_framebuffer_bind(view_fb);
+  DRW_draw_pass(debug_draw_ps_);
 }
 
-/** \} */
-
-/* -------------------------------------------------------------------- */
-/** \name CullingPass
- * \{ */
-
-void CullingLightPass::sync(void)
+void LightModule::shgroup_resources(DRWShadingGroup *grp)
 {
-  culling_ps_ = DRW_pass_create("CullingLight", DRW_STATE_WRITE_COLOR);
+  DRW_shgroup_vertex_buffer_ref(grp, "lights_buf", &culling_light_buf);
+  DRW_shgroup_vertex_buffer_ref(grp, "lights_culling_buf", &culling_data);
+  DRW_shgroup_vertex_buffer_ref(grp, "lights_zbins_buf", &culling_zbin_buf);
+  DRW_shgroup_vertex_buffer_ref(grp, "lights_tile_buf", &culling_tile_buf);
 
-  GPUShader *sh = inst_.shaders.static_shader_get(CULLING_LIGHT);
-  DRWShadingGroup *grp = DRW_shgroup_create(sh, culling_ps_);
-  DRW_shgroup_uniform_block_ref(grp, "lights_block", &lights_ubo_);
-  DRW_shgroup_uniform_block_ref(grp, "lights_culling_block", &culling_ubo_);
-  DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
-}
-
-void CullingLightPass::render(const GPUUniformBuf *lights_ubo, const GPUUniformBuf *culling_ubo)
-{
-  lights_ubo_ = lights_ubo;
-  culling_ubo_ = culling_ubo;
-  DRW_draw_pass(culling_ps_);
+  DRW_shgroup_vertex_buffer_ref(grp, "shadows_buf", &shadows_data);
+  DRW_shgroup_uniform_texture(grp, "shadow_atlas_tx", inst_.shadows.atlas_tx_get());
+  DRW_shgroup_uniform_texture(grp, "shadow_tilemaps_tx", inst_.shadows.tilemap_tx_get());
 }
 
 /** \} */

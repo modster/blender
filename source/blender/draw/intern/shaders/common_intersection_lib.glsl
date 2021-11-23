@@ -66,7 +66,6 @@ bool intersect_view(Pyramid pyramid)
    */
   bool intersects = true;
 
-#if TEST_ENABLED
   /* Do Pyramid vertices vs Frustum planes. */
   for (int p = 0; p < 6 && intersects; ++p) {
     bool is_any_vertex_on_positive_side = false;
@@ -79,9 +78,7 @@ bool intersect_view(Pyramid pyramid)
       intersects = false;
     }
   }
-#endif
 
-#if TEST_ENABLED && FALSE_POSITIVE_REJECTION
   if (intersects) {
     vec4 pyramid_planes[5];
     planes_setup(pyramid, pyramid_planes);
@@ -98,7 +95,6 @@ bool intersect_view(Pyramid pyramid)
       }
     }
   }
-#endif
 
 #if defined(DEBUG_DRAW) && defined(DEBUG_DRAW_ISECT)
   drw_debug(pyramid, intersects ? vec4(0, 1, 0, 1) : vec4(1, 0, 0, 1));
@@ -110,7 +106,6 @@ bool intersect_view(Box box)
 {
   bool intersects = true;
 
-#if TEST_ENABLED
   /* Do Box vertices vs Frustum planes. */
   for (int p = 0; p < 6 && intersects; ++p) {
     bool is_any_vertex_on_positive_side = false;
@@ -123,9 +118,7 @@ bool intersect_view(Box box)
       intersects = false;
     }
   }
-#endif
 
-#if TEST_ENABLED && FALSE_POSITIVE_REJECTION
   if (intersects) {
     vec4 box_planes[6];
     planes_setup(box, box_planes);
@@ -142,11 +135,31 @@ bool intersect_view(Box box)
       }
     }
   }
-#endif
 
 #if defined(DEBUG_DRAW) && defined(DEBUG_DRAW_ISECT)
   if (intersects) {
-    drw_debug(box, vec4(0, 1, 0, 1));
+    drw_debug(box, intersects ? vec4(0, 1, 0, 1) : vec4(1, 0, 0, 1));
+  }
+#endif
+  return intersects;
+}
+
+bool intersect_view(Sphere sph)
+{
+  bool intersects = true;
+
+  for (int p = 0; p < 6 && intersects; ++p) {
+    float dist_to_plane = dot(frustum_planes[p], vec4(sph.center, 1.0));
+    if (dist_to_plane < -sph.radius) {
+      intersects = false;
+    }
+  }
+
+  /* TODO reject false positive. */
+
+#if defined(DEBUG_DRAW) && defined(DEBUG_DRAW_ISECT)
+  if (intersects) {
+    drw_debug(sph, intersects ? vec4(0, 1, 0, 1) : vec4(1, 0, 0, 1));
   }
 #endif
   return intersects;

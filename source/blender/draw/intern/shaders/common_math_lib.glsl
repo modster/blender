@@ -122,6 +122,11 @@ void set_flag_from_test(inout int value, bool test, int flag) { if (test) { valu
 #define in_range_exclusive(val, min_v, max_v) \
   (all(greaterThan(val, min_v)) && all(lessThan(val, max_v)))
 
+uint divide_ceil_u(uint visible_count, uint divisor)
+{
+  return (visible_count + (divisor - 1)) / divisor;
+}
+
 float distance_squared(vec2 a, vec2 b)
 {
   a -= b;

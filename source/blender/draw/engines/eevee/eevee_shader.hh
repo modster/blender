@@ -40,7 +40,9 @@ namespace blender::eevee {
 /* Keep alphabetical order and clean prefix. */
 enum eShaderType {
   CULLING_DEBUG = 0,
-  CULLING_LIGHT,
+  CULLING_SELECT,
+  CULLING_SORT,
+  CULLING_TILE,
 
   DEFERRED_EVAL_DIRECT,
   DEFERRED_EVAL_HOLDOUT,

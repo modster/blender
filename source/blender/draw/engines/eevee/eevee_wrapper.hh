@@ -139,6 +139,8 @@ class StorageArrayBuffer : NonMovable, NonCopyable {
   T *data_ = nullptr;
   /* Use vertex buffer for now. Until there is a complete GPUStorageBuf implementation. */
   GPUVertBuf *ssbo_;
+  /* Currently allocated size. */
+  int64_t size;
 
 #ifdef DEBUG
   const char *name_ = typeid(T).name();
@@ -149,22 +151,36 @@ class StorageArrayBuffer : NonMovable, NonCopyable {
  public:
   StorageArrayBuffer()
   {
-    BLI_assert(((sizeof(T) * len) % 16) == 0);
+    init(len);
+  }
+  ~StorageArrayBuffer()
+  {
+    GPU_vertbuf_discard(ssbo_);
+  }
+
+  void init(int64_t new_size)
+  {
+    size = new_size;
 
     GPUVertFormat format = {0};
     GPU_vertformat_attr_add(&format, "dummy", GPU_COMP_F32, 1, GPU_FETCH_FLOAT);
 
     GPUUsageType usage = device_only ? GPU_USAGE_DEVICE_ONLY : GPU_USAGE_DYNAMIC;
     ssbo_ = GPU_vertbuf_create_with_format_ex(&format, usage);
-    GPU_vertbuf_data_alloc(ssbo_, (sizeof(T) / 4) * len);
+    GPU_vertbuf_data_alloc(ssbo_, divide_ceil_u(sizeof(T) * size, 4));
     if (!device_only) {
       data_ = (T *)GPU_vertbuf_get_data(ssbo_);
       GPU_vertbuf_use(ssbo_);
     }
   }
-  ~StorageArrayBuffer()
+
+  void resize(int64_t new_size)
   {
-    GPU_vertbuf_discard(ssbo_);
+    BLI_assert(new_size > 0);
+    if (new_size != size) {
+      GPU_vertbuf_discard(ssbo_);
+      this->init(new_size);
+    }
   }
 
   void push_update(void)
@@ -179,6 +195,11 @@ class StorageArrayBuffer : NonMovable, NonCopyable {
   {
     return ssbo_;
   }
+  /* To be able to use it with DRW_shgroup_*_ref(). */
+  GPUVertBuf **operator&()
+  {
+    return &ssbo_;
+  }
 
   /**
    * Get the value at the given index. This invokes undefined behavior when the index is out of
@@ -188,7 +209,7 @@ class StorageArrayBuffer : NonMovable, NonCopyable {
   {
     BLI_assert(!device_only);
     BLI_assert(index >= 0);
-    BLI_assert(index < len);
+    BLI_assert(index < size);
     return data_[index];
   }
 
@@ -196,7 +217,7 @@ class StorageArrayBuffer : NonMovable, NonCopyable {
   {
     BLI_assert(!device_only);
     BLI_assert(index >= 0);
-    BLI_assert(index < len);
+    BLI_assert(index < size);
     return data_[index];
   }
 
@@ -243,6 +264,68 @@ class StorageArrayBuffer : NonMovable, NonCopyable {
   {
     BLI_assert(!device_only);
     return Span<T>(data_, len);
+  }
+};
+
+/** Simpler version where data is not an array. */
+template<
+    /** Type of the values stored in this uniform buffer. */
+    typename T,
+    /** True if created on device and no memory host memory is allocated. */
+    bool device_only = false>
+class StorageBuffer : public T, NonMovable, NonCopyable {
+ private:
+  /* Use vertex buffer for now. Until there is a complete GPUStorageBuf implementation. */
+  GPUVertBuf *ssbo_;
+
+#ifdef DEBUG
+  const char *name_ = typeid(T).name();
+#else
+  constexpr static const char *name_ = "StorageBuffer";
+#endif
+
+ public:
+  StorageBuffer()
+  {
+    GPUVertFormat format = {0};
+    GPU_vertformat_attr_add(&format, "dummy", GPU_COMP_F32, 1, GPU_FETCH_FLOAT);
+
+    GPUUsageType usage = device_only ? GPU_USAGE_DEVICE_ONLY : GPU_USAGE_DYNAMIC;
+    ssbo_ = GPU_vertbuf_create_with_format_ex(&format, usage);
+    GPU_vertbuf_data_alloc(ssbo_, divide_ceil_u(sizeof(T), 4));
+    if (!device_only) {
+      GPU_vertbuf_use(ssbo_);
+    }
+  }
+  ~StorageBuffer()
+  {
+    GPU_vertbuf_discard(ssbo_);
+  }
+
+  void push_update(void)
+  {
+    BLI_assert(!device_only);
+    /* TODO(fclem): Avoid a full copy. */
+    T *data = (T *)GPU_vertbuf_get_data(ssbo_);
+    *data = *this;
+
+    GPU_vertbuf_use(ssbo_);
+  }
+
+  operator GPUVertBuf *() const
+  {
+    return ssbo_;
+  }
+  /* To be able to use it with DRW_shgroup_*_ref(). */
+  GPUVertBuf **operator&()
+  {
+    return &ssbo_;
+  }
+
+  StorageBuffer<T> &operator=(const T &other)
+  {
+    *static_cast<T *>(this) = other;
+    return *this;
   }
 };
 
@@ -366,6 +449,42 @@ class Texture {
   }
 
   /* Return true is a texture has been created. */
+  bool ensure(const char *name,
+              int w,
+              int h,
+              int d,
+              int mips,
+              eGPUTextureFormat format,
+              bool layered = false)
+  {
+
+    /* TODO(fclem) In the future, we need to check if mip_count did not change.
+     * For now it's ok as we always define all mip level.*/
+    if (tx_) {
+      int3 size = this->size();
+      BLI_assert(GPU_texture_array(tx_) == layered);
+      if (size != int3(w, h, d) || GPU_texture_format(tx_) != format) {
+        GPU_TEXTURE_FREE_SAFE(tx_);
+      }
+    }
+    if (tx_ == nullptr) {
+      if (layered) {
+        tx_ = GPU_texture_create_2d_array(name, w, h, d, mips, format, nullptr);
+      }
+      else {
+        tx_ = GPU_texture_create_3d(name, w, h, d, mips, format, GPU_DATA_FLOAT, nullptr);
+      }
+      if (mips > 1) {
+        /* TODO(fclem) Remove once we have immutable storage or when mips are
+         * generated on creation. */
+        GPU_texture_generate_mipmap(tx_);
+      }
+      return true;
+    }
+    return false;
+  }
+
+  /* Return true is a texture has been created. */
   bool ensure(const char *name, int w, int h, int mips, eGPUTextureFormat format)
   {
     /* TODO(fclem) In the future, we need to check if mip_count did not change.
@@ -474,6 +593,10 @@ class Texture {
     return &tx_;
   }
 
+  bool is_valid(void) const
+  {
+    return !!tx_;
+  }
   int width(void) const
   {
     return GPU_texture_width(tx_);
@@ -481,6 +604,12 @@ class Texture {
   int height(void) const
   {
     return GPU_texture_height(tx_);
+  }
+  int3 size(void) const
+  {
+    int3 size;
+    GPU_texture_get_mipmap_size(tx_, 0, size);
+    return size;
   }
 };
 

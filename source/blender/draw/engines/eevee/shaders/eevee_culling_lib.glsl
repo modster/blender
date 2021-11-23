@@ -7,11 +7,6 @@
 /** \name Intersection Tests
  * \{ */
 
-struct Sphere {
-  vec3 position;
-  float radius;
-};
-
 struct Cone {
   vec3 direction;
   float angle_cos;
@@ -39,12 +34,12 @@ bool culling_sphere_cone_isect(Sphere sphere, Cone cone)
    * by Eric Zhang
    * https://lxjk.github.io/2018/03/25/Improve-Tile-based-Light-Culling-with-Spherical-sliced-Cone.html
    */
-  float sphere_distance = length(sphere.position);
+  float sphere_distance = length(sphere.center);
   float sphere_sin = saturate(sphere.radius / sphere_distance);
   float sphere_cos = sqrt(1.0 - sphere_sin * sphere_sin);
   float cone_aperture_sin = sqrt(1.0 - cone.angle_cos * cone.angle_cos);
 
-  float cone_sphere_center_cos = dot(sphere.position / sphere_distance, cone.direction);
+  float cone_sphere_center_cos = dot(sphere.center / sphere_distance, cone.direction);
   /* cos(A+B) = cos(A) * cos(B) - sin(A) * sin(B). */
   float cone_sphere_angle_sum_cos = (sphere.radius > sphere_distance) ?
                                         -1.0 :
@@ -58,22 +53,22 @@ bool culling_sphere_cone_isect(Sphere sphere, Cone cone)
 
 bool culling_sphere_cylinder_isect(Sphere sphere, Cylinder cylinder)
 {
-  float distance_squared = len_squared(sphere.position.xy - cylinder.center.xy);
+  float distance_squared = len_squared(sphere.center.xy - cylinder.center.xy);
   return (distance_squared < sqr(cylinder.radius + sphere.radius));
 }
 
 bool culling_sphere_frustum_isect(Sphere sphere, Frustum frustum)
 {
-  if (dot(vec4(sphere.position, 1.0), frustum.planes[0]) > sphere.radius) {
+  if (dot(vec4(sphere.center, 1.0), frustum.planes[0]) > sphere.radius) {
     return false;
   }
-  if (dot(vec4(sphere.position, 1.0), frustum.planes[1]) > sphere.radius) {
+  if (dot(vec4(sphere.center, 1.0), frustum.planes[1]) > sphere.radius) {
     return false;
   }
-  if (dot(vec4(sphere.position, 1.0), frustum.planes[2]) > sphere.radius) {
+  if (dot(vec4(sphere.center, 1.0), frustum.planes[2]) > sphere.radius) {
     return false;
   }
-  if (dot(vec4(sphere.position, 1.0), frustum.planes[3]) > sphere.radius) {
+  if (dot(vec4(sphere.center, 1.0), frustum.planes[3]) > sphere.radius) {
     return false;
   }
   return true;
@@ -82,7 +77,7 @@ bool culling_sphere_frustum_isect(Sphere sphere, Frustum frustum)
 bool culling_sphere_tile_isect(Sphere sphere, CullingTile tile)
 {
   /* Culling in view space for precision and simplicity. */
-  sphere.position = transform_point(ViewMatrix, sphere.position);
+  sphere.center = transform_point(ViewMatrix, sphere.center);
   bool isect;
   /* Test tile intersection using bounding cone or bounding cylinder.
    * This has less false positive cases when the sphere is large. */
@@ -148,14 +143,15 @@ vec2 tile_to_ndc(CullingData culling, vec2 tile_co, vec2 offset)
   return tile_co * culling.tile_to_uv_fac * 2.0 - 1.0;
 }
 
-CullingTile culling_tile_get(CullingData culling)
+CullingTile culling_tile_get(CullingData culling, uvec2 tile_co)
 {
+  vec2 ftile = vec2(tile_co);
   /* Culling frustum corners for this tile. */
   vec3 corners[8];
-  corners[0].xy = corners[4].xy = tile_to_ndc(culling, gl_FragCoord.xy, vec2(0.5, 0.5));
-  corners[1].xy = corners[5].xy = tile_to_ndc(culling, gl_FragCoord.xy, vec2(0.5, -0.5));
-  corners[2].xy = corners[6].xy = tile_to_ndc(culling, gl_FragCoord.xy, vec2(-0.5, -0.5));
-  corners[3].xy = corners[7].xy = tile_to_ndc(culling, gl_FragCoord.xy, vec2(-0.5, 0.5));
+  corners[0].xy = corners[4].xy = tile_to_ndc(culling, ftile, vec2(1, 1));
+  corners[1].xy = corners[5].xy = tile_to_ndc(culling, ftile, vec2(1, 0));
+  corners[2].xy = corners[6].xy = tile_to_ndc(culling, ftile, vec2(0, 0));
+  corners[3].xy = corners[7].xy = tile_to_ndc(culling, ftile, vec2(0, 1));
   /* The corners depth only matter for precision. Use a mix of not so close to clip plane to
    * avoid small float imprecision if near clip is low. */
   corners[0].z = corners[1].z = corners[2].z = corners[3].z = -0.5;

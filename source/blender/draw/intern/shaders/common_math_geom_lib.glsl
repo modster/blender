@@ -139,6 +139,11 @@ vec3 world_to_tangent(vec3 vector, vec3 N, vec3 T, vec3 B)
 /** \name Shapes
  * \{ */
 
+struct Sphere {
+  vec3 center;
+  float radius;
+};
+
 struct Box {
   vec3 corners[8];
 };
@@ -167,6 +172,12 @@ void drw_debug(Pyramid shape, vec4 color)
   drw_debug_line(shape.corners[0], shape.corners[3], color);
   drw_debug_line(shape.corners[0], shape.corners[4], color);
   drw_debug_quad(shape.corners[1], shape.corners[2], shape.corners[3], shape.corners[4], color);
+}
+
+void drw_debug(Sphere shape, vec4 color)
+{
+  /* TODO(fclem): Counld be better. */
+  drw_debug_point(shape.center, shape.radius, color);
 }
 
 #endif

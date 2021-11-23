@@ -22,6 +22,7 @@
  * An instance contains all structures needed to do a complete render.
  */
 
+#include "BKE_global.h"
 #include "BKE_object.h"
 #include "BLI_rect.h"
 #include "DEG_depsgraph_query.h"
@@ -62,6 +63,8 @@ void Instance::init(const ivec2 &output_res,
   v3d = v3d_;
   rv3d = rv3d_;
   baking_probe = light_probe_;
+
+  debug_mode = (eDebugMode)G.debug_value;
 
   update_eval_members();
 

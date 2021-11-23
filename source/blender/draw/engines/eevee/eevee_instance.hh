@@ -99,6 +99,8 @@ class Instance {
   /** Can be null. Used to exclude objects during baking. */
   const struct LightProbe *baking_probe = nullptr;
 
+  eDebugMode debug_mode = SHADOW_DEBUG_NONE;
+
   /* Info string displayed at the top of the render / viewport. */
   char info[64];
 

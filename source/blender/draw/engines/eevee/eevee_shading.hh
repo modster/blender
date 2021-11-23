@@ -30,7 +30,6 @@
 
 #include "eevee_lut.h"
 
-#include "eevee_culling.hh"
 #include "eevee_gbuffer.hh"
 #include "eevee_raytracing.hh"
 #include "eevee_shadow.hh"
@@ -280,38 +279,24 @@ class UtilityTexture : public Texture {
  */
 class ShadingPasses {
  public:
-  CullingLightPass light_culling;
-
   BackgroundPass background;
   DeferredPass deferred;
   ForwardPass forward;
   ShadowPass shadow;
   VelocityPass velocity;
 
-  CullingDebugPass debug_culling;
-
   UtilityTexture utility_tx;
 
  public:
   ShadingPasses(Instance &inst)
-      : light_culling(inst),
-        background(inst),
-        deferred(inst),
-        forward(inst),
-        shadow(inst),
-        velocity(inst),
-        debug_culling(inst){};
+      : background(inst), deferred(inst), forward(inst), shadow(inst), velocity(inst){};
 
   void sync()
   {
-    light_culling.sync();
-
     deferred.sync();
     forward.sync();
     shadow.sync();
     velocity.sync();
-
-    debug_culling.sync();
   }
 
   DRWShadingGroup *material_add(::Material *blender_mat,

@@ -178,6 +178,52 @@ BLI_STATIC_ASSERT_ALIGN(CameraData, 16)
 /** \name Film
  * \{ */
 
+enum eDebugMode : uint32_t {
+  /* TODO(fclem) Rename shadow cases. */
+  SHADOW_DEBUG_NONE = 0u,
+  /**
+   * Gradient showing light evaluation hotspots.
+   */
+  DEBUG_LIGHT_CULLING = 4u,
+  /**
+   * Tilemaps to screen. Is also present in other modes.
+   * - Black pixels, no pages allocated.
+   * - Green pixels, pages cached.
+   * - Red pixels, pages allocated.
+   */
+  SHADOW_DEBUG_TILEMAPS = 5u,
+  /**
+   * Random color per pages. Validates page density allocation and sampling.
+   */
+  SHADOW_DEBUG_PAGES = 6u,
+  /**
+   * Outputs random color per tilemap (or tilemap level). Validates tilemaps coverage.
+   * Black means not covered by any tilemaps LOD of the shadow.
+   */
+  SHADOW_DEBUG_LOD = 7u,
+  /**
+   * Outputs white pixels for pages allocated and black pixels for unused pages.
+   * This needs SHADOW_DEBUG_PAGE_ALLOCATION_ENABLED defined in order to work.
+   */
+  SHADOW_DEBUG_PAGE_ALLOCATION = 8u,
+  /**
+   * Outputs the tilemap atlas. Default tilemap is too big for the usual screen resolution.
+   * Try lowering SHADOW_TILEMAP_PER_ROW and SHADOW_MAX_TILEMAP before using this option.
+   */
+  SHADOW_DEBUG_TILE_ALLOCATION = 9u,
+  /**
+   * Visualize linear depth stored in the atlas regions of the active light.
+   * This way, one can check if the rendering, the copying and the shadow sampling functions works.
+   */
+  SHADOW_DEBUG_SHADOW_DEPTH = 10u
+};
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Film
+ * \{ */
+
 enum eFilmDataType : uint32_t {
   /** Color is accumulated using the pixel filter. No negative values. */
   FILM_DATA_COLOR = 0u,
@@ -341,34 +387,44 @@ BLI_STATIC_ASSERT_ALIGN(MotionBlurData, 16)
 /** \name Cullings
  * \{ */
 
-/* Number of items in a culling batch. Needs to be Power of 2. */
+/* TODO(fclem) Rename this. Only used by probes now. */
 #define CULLING_ITEM_BATCH 128
+/* Number of items we can cull. Limited by how we store CullingZBin. */
+#define CULLING_MAX_ITEM 65536
+/* Number of items in a culling batch. Needs to be Power of 2. Must be <= to 65536. */
+/* Current limiting factor is the sorting phase which is single pass and only sort within a
+ * threadgroup which maximum size is 1024. */
+#define CULLING_BATCH_SIZE 1024
 /* Maximum number of 32 bit uint stored per tile. */
-#define CULLING_MAX_WORD ((CULLING_ITEM_BATCH + 1) / 32)
-/* TODO(fclem) Support more than 4 words using layered texture for culling result. */
-#if CULLING_MAX_WORD > 4
-#  error "CULLING_MAX_WORD is greater than supported maximum."
-#endif
-/* Fine grained subdivision in the Z direction. */
-#define CULLING_ZBIN_COUNT 4088
+#define CULLING_MAX_WORD (CULLING_BATCH_SIZE / 32)
+/* Fine grained subdivision in the Z direction (Must be multiple of CULLING_BATCH_SIZE). */
+#define CULLING_ZBIN_COUNT 4096
 
 struct CullingData {
-  /* Linearly distributed z-bins with encoded uint16_t min and max index. */
-  /* NOTE: due to alignment restrictions of uint arrays, use uvec4. */
-  uvec4 zbins[CULLING_ZBIN_COUNT / 4];
-  /* Extent of one square tile in pixels. */
-  int tile_size;
-  /* Valid item count in the data array. */
-  uint items_count;
-  /* Scale and bias applied to linear Z to get zbin. */
+  /** Scale applied to tile pixel coordinates to get target UV coordinate. */
+  vec2 tile_to_uv_fac;
+  /** Scale and bias applied to linear Z to get zbin. */
   float zbin_scale;
   float zbin_bias;
-  /* Scale applied to tile pixel coordinates to get target UV coordinate. */
-  vec2 tile_to_uv_fac;
-  vec2 _pad0;
+  /** Valid item count in the source data array. */
+  uint items_count;
+  /** Number of items that passes the first culling test. */
+  uint visible_count;
+  /** Will disable specular during light data copy.. */
+  bool enable_specular;
+  /** Extent of one square tile in pixels. */
+  uint tile_size;
+  /** Number of tiles on the X/Y axis. */
+  uint tile_x_len;
+  uint tile_y_len;
+  /** Number of word per tile. Depends on the maximum number of lights. */
+  uint tile_word_len;
+  int _pad0;
 };
 BLI_STATIC_ASSERT_ALIGN(CullingData, 16)
-BLI_STATIC_ASSERT_SIZE(CullingData, UBO_MIN_MAX_SUPPORTED_SIZE)
+
+#define CullingZBin uint
+#define CullingWord uint
 
 static inline int culling_z_to_zbin(CullingData data, float z)
 {
@@ -542,41 +598,6 @@ struct ShadowTileMapData {
 };
 BLI_STATIC_ASSERT_ALIGN(ShadowTileMapData, 16)
 
-enum eShadowDebug : uint32_t {
-  SHADOW_DEBUG_NONE = 0u,
-  /**
-   * Tilemaps to screen. Is also present in other modes.
-   * - Black pixels, no pages allocated.
-   * - Green pixels, pages cached.
-   * - Red pixels, pages allocated.
-   */
-  SHADOW_DEBUG_TILEMAPS = 1u,
-  /**
-   * Random color per pages. Validates page density allocation and sampling.
-   */
-  SHADOW_DEBUG_PAGES = 2u,
-  /**
-   * Outputs random color per tilemap (or tilemap level). Validates tilemaps coverage.
-   * Black means not covered by any tilemaps LOD of the shadow.
-   */
-  SHADOW_DEBUG_LOD = 3u,
-  /**
-   * Outputs white pixels for pages allocated and black pixels for unused pages.
-   * This needs SHADOW_DEBUG_PAGE_ALLOCATION_ENABLED defined in order to work.
-   */
-  SHADOW_DEBUG_PAGE_ALLOCATION = 4u,
-  /**
-   * Outputs the tilemap atlas. Default tilemap is too big for the usual screen resolution.
-   * Try lowering SHADOW_TILEMAP_PER_ROW and SHADOW_MAX_TILEMAP before using this option.
-   */
-  SHADOW_DEBUG_TILE_ALLOCATION = 5u,
-  /**
-   * Visualize linear depth stored in the atlas regions of the active light.
-   * This way, one can check if the rendering, the copying and the shadow sampling functions works.
-   */
-  SHADOW_DEBUG_SHADOW_DEPTH = 6u
-};
-
 /**
  * Shadow data for debugging the active light shadow.
  */
@@ -584,7 +605,7 @@ struct ShadowDebugData {
   LightData light;
   ShadowData shadow;
   vec3 camera_position;
-  eShadowDebug type;
+  eDebugMode type;
   int tilemap_data_index;
   int _pad1;
   int _pad2;
@@ -869,19 +890,23 @@ vec4 utility_tx_sample(vec2 uv, float layer);
 #ifdef __cplusplus
 using CameraDataBuf = StructBuffer<CameraData>;
 using CubemapDataBuf = StructArrayBuffer<CubemapData, CULLING_ITEM_BATCH>;
-using CullingDataBuf = StructBuffer<CullingData>;
+using CullingDataBuf = StorageBuffer<CullingData>;
+using CullingKeyBuf = StorageArrayBuffer<uint, CULLING_BATCH_SIZE, true>;
+using CullingLightBuf = StorageArrayBuffer<LightData, CULLING_BATCH_SIZE, true>;
+using CullingTileBuf = StorageArrayBuffer<uint, 16 * 16 * CULLING_MAX_WORD, true>;
+using CullingZbinBuf = StorageArrayBuffer<uint, CULLING_ZBIN_COUNT, true>;
 using DepthOfFieldDataBuf = StructBuffer<DepthOfFieldData>;
 using GridDataBuf = StructArrayBuffer<GridData, GRID_MAX>;
 using HiZDataBuf = StructBuffer<HiZData>;
-using LightDataBuf = StructArrayBuffer<LightData, CULLING_ITEM_BATCH>;
+using LightDataBuf = StorageArrayBuffer<LightData, CULLING_BATCH_SIZE>;
 using LightProbeFilterDataBuf = StructBuffer<LightProbeFilterData>;
 using LightProbeInfoDataBuf = StructBuffer<LightProbeInfoData>;
 using RaytraceBufferDataBuf = StructBuffer<RaytraceBufferData>;
 using RaytraceDataBuf = StructBuffer<RaytraceData>;
-using ShadowDataBuf = StructArrayBuffer<ShadowData, CULLING_ITEM_BATCH>;
-using ShadowTileMapDataBuf = StorageArrayBuffer<ShadowTileMapData, SHADOW_MAX_TILEMAP>;
-using ShadowPageHeapBuf = StorageArrayBuffer<ShadowPagePacked, SHADOW_MAX_PAGE, true>;
+using ShadowDataBuf = StorageArrayBuffer<ShadowData, CULLING_BATCH_SIZE>;
 using ShadowDebugDataBuf = StructBuffer<ShadowDebugData>;
+using ShadowPageHeapBuf = StorageArrayBuffer<ShadowPagePacked, SHADOW_MAX_PAGE, true>;
+using ShadowTileMapDataBuf = StorageArrayBuffer<ShadowTileMapData, SHADOW_MAX_TILEMAP>;
 using SubsurfaceDataBuf = StructBuffer<SubsurfaceData>;
 using VelocityObjectBuf = StructBuffer<VelocityObjectData>;
 

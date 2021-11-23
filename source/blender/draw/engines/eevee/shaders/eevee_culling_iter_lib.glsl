@@ -8,11 +8,14 @@ uint bit_field_mask(uint bit_width, uint bit_min)
   return ~mask << bit_min;
 }
 
-uint zbin_mask(int word_index, int zbin_min, int zbin_max)
+uint zbin_mask(uint word_index, uint zbin_min, uint zbin_max)
 {
-  int local_min = clamp(zbin_min - word_index * 32, 0, 31);
-  int mask_width = clamp(zbin_max - zbin_min + 1, 0, 32);
-  return bit_field_mask(uint(mask_width), uint(local_min));
+  uint word_start = word_index * 32u;
+  uint word_end = word_start + 31u;
+  uint local_min = max(zbin_min, word_start);
+  uint local_max = min(zbin_max, word_end);
+  uint mask_width = local_max - local_min + 1;
+  return bit_field_mask(mask_width, local_min);
 }
 
 /* Waiting to implement extensions support. We need:
@@ -28,39 +31,39 @@ uint zbin_mask(int word_index, int zbin_min, int zbin_max)
 #  define subgroupBroadcastFirst(a) a
 #endif
 
-#define ITEM_FOREACH_BEGIN(_culling, _tiles_tx, _linearz, _item_index) \
+#define ITEM_FOREACH_BEGIN(_culling, _zbins, _words, _linearz, _item_index) \
   { \
-    int zbin_index = culling_z_to_zbin(_culling, _linearz); \
-    zbin_index = min(max(zbin_index, 0), int(CULLING_ZBIN_COUNT - 1)); \
-    uint zbin_data = _culling.zbins[zbin_index / 4][zbin_index % 4]; \
-    int min_index = int(zbin_data & uint(CULLING_ITEM_BATCH - 1)); \
-    int max_index = int((zbin_data >> 16u) & uint(CULLING_ITEM_BATCH - 1)); \
-    /* Ensure all threads inside a subgroup get the same value to reduce VGPR usage. */ \
-    min_index = subgroupBroadcastFirst(subgroupMin(min_index)); \
-    max_index = subgroupBroadcastFirst(subgroupMax(max_index)); \
-    int word_min = 0; \
-    int word_max = max(0, CULLING_MAX_WORD - 1); \
-    word_min = max(min_index / 32, word_min); \
-    word_max = min(max_index / 32, word_max); \
-    for (int word_index = word_min; word_index <= word_max; word_index++) { \
-      /* TODO(fclem) Support bigger max_word with larger texture. */ \
-      ivec2 texel = ivec2(gl_FragCoord.xy) / _culling.tile_size; \
-      uint word = texelFetch(_tiles_tx, texel, 0)[word_index]; \
-      uint mask = zbin_mask(word_index, min_index, max_index); \
-      word &= mask; \
+    uint batch_count = divide_ceil_u(_culling.visible_count, CULLING_BATCH_SIZE); \
+    uvec2 tile_co = uvec2(gl_FragCoord.xy) / _culling.tile_size; \
+    uint tile_word_offset = (tile_co.x + tile_co.y * _culling.tile_x_len) * \
+                            _culling.tile_word_len; \
+    for (uint batch = 0; batch < batch_count; batch++) { \
+      int zbin_index = culling_z_to_zbin(_culling, _linearz); \
+      zbin_index = clamp(zbin_index, 0, CULLING_ZBIN_COUNT - 1); \
+      uint zbin_data = _zbins[zbin_index + batch * CULLING_ZBIN_COUNT]; \
+      uint min_index = zbin_data & 0xFFFFu; \
+      uint max_index = zbin_data >> 16u; \
       /* Ensure all threads inside a subgroup get the same value to reduce VGPR usage. */ \
-      word = subgroupBroadcastFirst(subgroupOr(word)); \
-      /* TODO(fclem) Replace by findLSB on supported hardware. */ \
-      for (uint i = 0u; word != 0u; word = word >> 1u, i++) { \
-        if ((word & 1u) != 0u) { \
-          int _item_index = word_index * 32 + int(i);
+      min_index = subgroupBroadcastFirst(subgroupMin(min_index)); \
+      max_index = subgroupBroadcastFirst(subgroupMax(max_index)); \
+      uint word_min = min_index / 32u; \
+      uint word_max = max_index / 32u; \
+      for (uint word_idx = word_min; word_idx <= word_max; word_idx++) { \
+        uint word = _words[tile_word_offset + word_idx]; \
+        word &= zbin_mask(word_idx, min_index, max_index); \
+        /* Ensure all threads inside a subgroup get the same value to reduce VGPR usage. */ \
+        word = subgroupBroadcastFirst(subgroupOr(word)); \
+        while (word != 0u) { \
+          uint bit_index = uint(findLSB(word)); \
+          word &= ~1u << bit_index; \
+          uint _item_index = word_idx * 32u + bit_index;
 
 /* No culling. Iterate over all items. */
 #define ITEM_FOREACH_BEGIN_NO_CULL(_culling, _item_index) \
   { \
     { \
       { \
-        for (uint _item_index = 0u; _item_index < _culling.items_count; _item_index++) {
+        for (uint _item_index = 0u; _item_index < _culling.visible_count; _item_index++) {
 
 #define ITEM_FOREACH_END \
   } \

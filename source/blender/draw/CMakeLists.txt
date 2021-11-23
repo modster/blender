@@ -132,7 +132,6 @@ set(SRC
   engines/image/image_engine.c
   engines/image/image_shader.c
   engines/eevee/eevee_camera.cc
-  engines/eevee/eevee_culling.cc
   engines/eevee/eevee_depth_of_field.cc
   engines/eevee/eevee_engine.c
   engines/eevee/eevee_engine.cc
@@ -270,7 +269,9 @@ data_to_c_simple(engines/eevee/shaders/eevee_cubemap_lib.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_culling_debug_frag.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_culling_iter_lib.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_culling_lib.glsl SRC)
-data_to_c_simple(engines/eevee/shaders/eevee_culling_light_frag.glsl SRC)
+data_to_c_simple(engines/eevee/shaders/eevee_culling_select_comp.glsl SRC)
+data_to_c_simple(engines/eevee/shaders/eevee_culling_sort_comp.glsl SRC)
+data_to_c_simple(engines/eevee/shaders/eevee_culling_tile_comp.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_deferred_direct_frag.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_deferred_holdout_frag.glsl SRC)
 data_to_c_simple(engines/eevee/shaders/eevee_deferred_transparent_frag.glsl SRC)

@@ -302,18 +302,13 @@ void LookDev::sync_overlay(void)
     GPUMaterial *gpumat = inst_.shaders.material_shader_get(
         mat, mat->nodetree, MAT_PIPE_FORWARD, MAT_GEOM_LOOKDEV, false);
     DRWShadingGroup *grp = DRW_shgroup_material_create(gpumat, overlay_ps_);
-    DRW_shgroup_uniform_block_ref(grp, "lights_block", lights.lights_ubo_ref_get());
-    DRW_shgroup_uniform_block_ref(grp, "shadows_block", lights.shadows_ubo_ref_get());
-    DRW_shgroup_uniform_block_ref(grp, "lights_culling_block", lights.culling_ubo_ref_get());
+    lights.shgroup_resources(grp);
     DRW_shgroup_uniform_block(grp, "sampling_block", inst_.sampling.ubo_get());
     DRW_shgroup_uniform_block(grp, "grids_block", lightprobes.grid_ubo_get());
     DRW_shgroup_uniform_block(grp, "cubes_block", lightprobes.cube_ubo_get());
     DRW_shgroup_uniform_block(grp, "lightprobes_info_block", lightprobes.info_ubo_get());
     DRW_shgroup_uniform_texture_ref(grp, "lightprobe_grid_tx", lightprobes.grid_tx_ref_get());
     DRW_shgroup_uniform_texture_ref(grp, "lightprobe_cube_tx", lightprobes.cube_tx_ref_get());
-    DRW_shgroup_uniform_texture_ref(grp, "lights_culling_tx", lights.culling_tx_ref_get());
-    DRW_shgroup_uniform_texture(grp, "utility_tx", inst_.shading_passes.utility_tx);
-    DRW_shgroup_uniform_texture(grp, "shadow_atlas_tx", inst_.shadows.atlas_tx_get());
 
     offset.x -= sphere_size_ + sphere_margin;
 
@@ -340,7 +335,6 @@ void LookDev::render_overlay(GPUFrameBuffer *fb)
 
   inst_.lightprobes.set_view(active_view, ivec2(0));
   inst_.lights.set_view(active_view, ivec2(0));
-  inst_.lights.bind_batch(0);
 
   /* Create subview for correct shading. Sub because we don not care about culling. */
   const CameraData &cam = inst_.camera.data_get();
