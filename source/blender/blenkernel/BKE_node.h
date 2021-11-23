@@ -121,12 +121,11 @@ class MFDataType;
 }  // namespace fn
 }  // namespace blender
 
+using CPPTypeHandle = blender::fn::CPPType;
 using NodeMultiFunctionBuildFunction = void (*)(blender::nodes::NodeMultiFunctionBuilder &builder);
 using NodeGeometryExecFunction = void (*)(blender::nodes::GeoNodeExecParams params);
 using NodeDeclareFunction = void (*)(blender::nodes::NodeDeclarationBuilder &builder);
-using SocketGetCPPTypeFunction = const blender::fn::CPPType *(*)();
 using SocketGetCPPValueFunction = void (*)(const struct bNodeSocket &socket, void *r_value);
-using SocketGetGeometryNodesCPPTypeFunction = const blender::fn::CPPType *(*)();
 using SocketGetGeometryNodesCPPValueFunction = void (*)(const struct bNodeSocket &socket,
                                                         void *r_value);
 
@@ -138,6 +137,7 @@ typedef void *SocketGetCPPTypeFunction;
 typedef void *SocketGetGeometryNodesCPPTypeFunction;
 typedef void *SocketGetGeometryNodesCPPValueFunction;
 typedef void *SocketGetCPPValueFunction;
+typedef struct CPPTypeHandle CPPTypeHandle;
 #endif
 
 /**
@@ -197,11 +197,11 @@ typedef struct bNodeSocketType {
   void (*free_self)(struct bNodeSocketType *stype);
 
   /* Return the CPPType of this socket. */
-  SocketGetCPPTypeFunction get_base_cpp_type;
+  const CPPTypeHandle *base_cpp_type;
   /* Get the value of this socket in a generic way. */
   SocketGetCPPValueFunction get_base_cpp_value;
   /* Get geometry nodes cpp type. */
-  SocketGetGeometryNodesCPPTypeFunction get_geometry_nodes_cpp_type;
+  const CPPTypeHandle *geometry_nodes_cpp_type;
   /* Get geometry nodes cpp value. */
   SocketGetGeometryNodesCPPValueFunction get_geometry_nodes_cpp_value;
 } bNodeSocketType;
@@ -318,8 +318,6 @@ typedef struct bNodeType {
 
   /* optional handling of link insertion */
   void (*insert_link)(struct bNodeTree *ntree, struct bNode *node, struct bNodeLink *link);
-  /* Update the internal links list, for muting and disconnect operators. */
-  void (*update_internal_links)(struct bNodeTree *, struct bNode *node);
 
   void (*free_self)(struct bNodeType *ntype);
 
@@ -343,6 +341,9 @@ typedef struct bNodeType {
   bool declaration_is_dynamic;
   /* Declaration to be used when it is not dynamic. */
   NodeDeclarationHandle *fixed_declaration;
+
+  /** True when the node cannot be muted. */
+  bool no_muting;
 
   /* RNA integration */
   ExtensionRNA rna_ext;
@@ -731,7 +732,9 @@ void nodeUpdateInternalLinks(struct bNodeTree *ntree, struct bNode *node);
 
 int nodeSocketIsHidden(const struct bNodeSocket *sock);
 void ntreeTagUsedSockets(struct bNodeTree *ntree);
-void nodeSetSocketAvailability(struct bNodeSocket *sock, bool is_available);
+void nodeSetSocketAvailability(struct bNodeTree *ntree,
+                               struct bNodeSocket *sock,
+                               bool is_available);
 
 int nodeSocketLinkLimit(const struct bNodeSocket *sock);
 
@@ -889,8 +892,6 @@ void node_type_exec(struct bNodeType *ntype,
                     NodeFreeExecFunction free_exec_fn,
                     NodeExecFunction exec_fn);
 void node_type_gpu(struct bNodeType *ntype, NodeGPUExecFunction gpu_fn);
-void node_type_internal_links(struct bNodeType *ntype,
-                              void (*update_internal_links)(struct bNodeTree *, struct bNode *));
 
 /** \} */
 

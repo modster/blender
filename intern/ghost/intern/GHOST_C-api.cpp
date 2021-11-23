@@ -1117,7 +1117,7 @@ int GHOST_XrGetControllerModelData(GHOST_XrContextHandle xr_contexthandle,
 #ifdef WITH_VULKAN
 
 /**
- * Return vulkan handles for the given contest.
+ * Return vulkan handles for the given context.
  */
 void GHOST_GetVulkanHandles(GHOST_ContextHandle contexthandle,
                             void *r_instance,

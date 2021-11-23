@@ -397,8 +397,8 @@ typedef struct uiHandleButtonData {
   float vec[3], origvec[3];
   ColorBand *coba;
 
-  /* Tool-tip. */
-  uint tooltip_force : 1;
+  /* True when alt is held and the preference for displaying tooltips should be ignored. */
+  bool tooltip_force;
 
   /* auto open */
   bool used_mouse;
@@ -2333,9 +2333,6 @@ static void ui_apply_but(
       break;
     case UI_BTYPE_LISTROW:
       ui_apply_but_LISTROW(C, block, but, data);
-      break;
-    case UI_BTYPE_DATASETROW:
-      ui_apply_but_ROW(C, block, but, data);
       break;
     case UI_BTYPE_TAB:
       ui_apply_but_TAB(C, but, data);
@@ -8012,7 +8009,6 @@ static int ui_do_button(bContext *C, uiBlock *block, uiBut *but, const wmEvent *
     case UI_BTYPE_CHECKBOX:
     case UI_BTYPE_CHECKBOX_N:
     case UI_BTYPE_ROW:
-    case UI_BTYPE_DATASETROW:
       retval = ui_do_but_TOG(C, but, data, event);
       break;
     case UI_BTYPE_TREEROW:
@@ -10312,7 +10308,7 @@ static int ui_handle_menu_event(bContext *C,
           retval = WM_UI_HANDLER_BREAK;
           break;
 
-        /* Smooth scrolling for pocopy_v2_v2_int(&povers. */
+        /* Smooth scrolling for popovers. */
         case MOUSEPAN: {
           if (IS_EVENT_MOD(event, shift, ctrl, alt, oskey)) {
             /* pass */
@@ -11344,8 +11340,7 @@ static void ui_region_handler_remove(bContext *C, void *UNUSED(userdata))
     return;
   }
 
-  UI_blocklist_free(C, &region->uiblocks);
-
+  UI_blocklist_free(C, region);
   bScreen *screen = CTX_wm_screen(C);
   if (screen == NULL) {
     return;

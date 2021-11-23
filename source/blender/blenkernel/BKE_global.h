@@ -45,7 +45,6 @@ typedef struct Global {
 
   /** When set: `G_MAIN->name` contains valid relative base path. */
   bool relbase_valid;
-  bool file_loaded;
   bool save_over;
 
   /** Strings of recent opened files. */
@@ -215,7 +214,7 @@ enum {
   /**
    * Set when transforming the cursor itself.
    * Used as a hint to draw the cursor (even when hidden).
-   * Otherwise it's not possible to see whats being transformed.
+   * Otherwise it's not possible to see what's being transformed.
    */
   G_TRANSFORM_CURSOR = (1 << 5),
 };

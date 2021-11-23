@@ -109,6 +109,24 @@ void CurveEval::bounds_min_max(float3 &min, float3 &max, const bool use_evaluate
   }
 }
 
+float CurveEval::total_length() const
+{
+  float length = 0.0f;
+  for (const SplinePtr &spline : this->splines()) {
+    length += spline->length();
+  }
+  return length;
+}
+
+int CurveEval::total_control_point_size() const
+{
+  int count = 0;
+  for (const SplinePtr &spline : this->splines()) {
+    count += spline->size();
+  }
+  return count;
+}
+
 /**
  * Return the start indices for each of the curve spline's control points, if they were part
  * of a flattened array. This can be used to facilitate parallelism by avoiding the need to
@@ -225,8 +243,8 @@ static SplinePtr spline_from_dna_bezier(const Nurb &nurb)
   Span<const BezTriple> src_points{nurb.bezt, nurb.pntsu};
   spline->resize(src_points.size());
   MutableSpan<float3> positions = spline->positions();
-  MutableSpan<float3> handle_positions_left = spline->handle_positions_left();
-  MutableSpan<float3> handle_positions_right = spline->handle_positions_right();
+  MutableSpan<float3> handle_positions_left = spline->handle_positions_left(true);
+  MutableSpan<float3> handle_positions_right = spline->handle_positions_right(true);
   MutableSpan<BezierSpline::HandleType> handle_types_left = spline->handle_types_left();
   MutableSpan<BezierSpline::HandleType> handle_types_right = spline->handle_types_right();
   MutableSpan<float> radii = spline->radii();

@@ -48,14 +48,6 @@ OptiXDevice::Denoiser::Denoiser(OptiXDevice *device)
 {
 }
 
-OptiXDevice::Denoiser::~Denoiser()
-{
-  const CUDAContextScope scope(device);
-  if (optix_denoiser != nullptr) {
-    optixDenoiserDestroy(optix_denoiser);
-  }
-}
-
 OptiXDevice::OptiXDevice(const DeviceInfo &info, Stats &stats, Profiler &profiler)
     : CUDADevice(info, stats, profiler),
       sbt_data(this, "__sbt", MEM_READ_ONLY),
@@ -131,6 +123,11 @@ OptiXDevice::~OptiXDevice()
     if (pipelines[i] != NULL) {
       optixPipelineDestroy(pipelines[i]);
     }
+  }
+
+  /* Make sure denoiser is destroyed before device context! */
+  if (denoiser_.optix_denoiser != nullptr) {
+    optixDenoiserDestroy(denoiser_.optix_denoiser);
   }
 
   optixDeviceContextDestroy(context);
@@ -884,26 +881,30 @@ bool OptiXDevice::denoise_configure_if_needed(DenoiseContext &context)
   optix_assert(optixDenoiserComputeMemoryResources(
       denoiser_.optix_denoiser, buffer_params.width, buffer_params.height, &sizes));
 
-  denoiser_.scratch_size = sizes.withOverlapScratchSizeInBytes;
+  /* Denoiser is invoked on whole images only, so no overlap needed (would be used for tiling). */
+  denoiser_.scratch_size = sizes.withoutOverlapScratchSizeInBytes;
   denoiser_.scratch_offset = sizes.stateSizeInBytes;
 
   /* Allocate denoiser state if tile size has changed since last setup. */
   denoiser_.state.alloc_to_device(denoiser_.scratch_offset + denoiser_.scratch_size);
 
   /* Initialize denoiser state for the current tile size. */
-  const OptixResult result = optixDenoiserSetup(denoiser_.optix_denoiser,
-                                                denoiser_.queue.stream(),
-                                                buffer_params.width,
-                                                buffer_params.height,
-                                                denoiser_.state.device_pointer,
-                                                denoiser_.scratch_offset,
-                                                denoiser_.state.device_pointer +
-                                                    denoiser_.scratch_offset,
-                                                denoiser_.scratch_size);
+  const OptixResult result = optixDenoiserSetup(
+      denoiser_.optix_denoiser,
+      0, /* Work around bug in r495 drivers that causes artifacts when denoiser setup is called
+            on a stream that is not the default stream */
+      buffer_params.width,
+      buffer_params.height,
+      denoiser_.state.device_pointer,
+      denoiser_.scratch_offset,
+      denoiser_.state.device_pointer + denoiser_.scratch_offset,
+      denoiser_.scratch_size);
   if (result != OPTIX_SUCCESS) {
     set_error("Failed to set up OptiX denoiser");
     return false;
   }
+
+  cuda_assert(cuCtxSynchronize());
 
   denoiser_.is_configured = true;
   denoiser_.configured_size.x = buffer_params.width;
@@ -939,8 +940,6 @@ bool OptiXDevice::denoise_run(DenoiseContext &context, const DenoisePass &pass)
     color_layer.format = OPTIX_PIXEL_FORMAT_FLOAT3;
   }
 
-  device_vector<float> fake_albedo(this, "fake_albedo", MEM_READ_WRITE);
-
   /* Optional albedo and color passes. */
   if (context.num_input_passes > 1) {
     const device_ptr d_guiding_buffer = context.guiding_params.device_pointer;
@@ -971,6 +970,7 @@ bool OptiXDevice::denoise_run(DenoiseContext &context, const DenoisePass &pass)
 
   /* Finally run denoising. */
   OptixDenoiserParams params = {}; /* All parameters are disabled/zero. */
+
   OptixDenoiserLayer image_layers = {};
   image_layers.input = color_layer;
   image_layers.output = output_layer;
@@ -1032,7 +1032,7 @@ bool OptiXDevice::build_optix_bvh(BVHOptiX *bvh,
     return false;
   }
 
-  device_only_memory<char> &out_data = bvh->as_data;
+  device_only_memory<char> &out_data = *bvh->as_data;
   if (operation == OPTIX_BUILD_OPERATION_BUILD) {
     assert(out_data.device == this);
     out_data.alloc_to_device(sizes.outputSizeInBytes);
@@ -1123,7 +1123,7 @@ void OptiXDevice::build_bvh(BVH *bvh, Progress &progress, bool refit)
       operation = OPTIX_BUILD_OPERATION_UPDATE;
     }
     else {
-      bvh_optix->as_data.free();
+      bvh_optix->as_data->free();
       bvh_optix->traversable_handle = 0;
     }
 
@@ -1344,9 +1344,9 @@ void OptiXDevice::build_bvh(BVH *bvh, Progress &progress, bool refit)
     unsigned int num_instances = 0;
     unsigned int max_num_instances = 0xFFFFFFFF;
 
-    bvh_optix->as_data.free();
+    bvh_optix->as_data->free();
     bvh_optix->traversable_handle = 0;
-    bvh_optix->motion_transform_data.free();
+    bvh_optix->motion_transform_data->free();
 
     optixDeviceContextGetProperty(context,
                                   OPTIX_DEVICE_PROPERTY_LIMIT_MAX_INSTANCE_ID,
@@ -1379,8 +1379,8 @@ void OptiXDevice::build_bvh(BVH *bvh, Progress &progress, bool refit)
         }
       }
 
-      assert(bvh_optix->motion_transform_data.device == this);
-      bvh_optix->motion_transform_data.alloc_to_device(total_motion_transform_size);
+      assert(bvh_optix->motion_transform_data->device == this);
+      bvh_optix->motion_transform_data->alloc_to_device(total_motion_transform_size);
     }
 
     for (Object *ob : bvh->objects) {
@@ -1441,7 +1441,7 @@ void OptiXDevice::build_bvh(BVH *bvh, Progress &progress, bool refit)
 
         motion_transform_offset = align_up(motion_transform_offset,
                                            OPTIX_TRANSFORM_BYTE_ALIGNMENT);
-        CUdeviceptr motion_transform_gpu = bvh_optix->motion_transform_data.device_pointer +
+        CUdeviceptr motion_transform_gpu = bvh_optix->motion_transform_data->device_pointer +
                                            motion_transform_offset;
         motion_transform_offset += motion_transform_size;
 

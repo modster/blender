@@ -309,10 +309,10 @@ class LockedNode : NonCopyable, NonMovable {
 static const CPPType *get_socket_cpp_type(const SocketRef &socket)
 {
   const bNodeSocketType *typeinfo = socket.typeinfo();
-  if (typeinfo->get_geometry_nodes_cpp_type == nullptr) {
+  if (typeinfo->geometry_nodes_cpp_type == nullptr) {
     return nullptr;
   }
-  const CPPType *type = typeinfo->get_geometry_nodes_cpp_type();
+  const CPPType *type = typeinfo->geometry_nodes_cpp_type;
   if (type == nullptr) {
     return nullptr;
   }
@@ -723,7 +723,7 @@ class GeometryNodesEvaluator {
       this->execute_node(node, node_state);
     }
 
-    this->node_task_postprocessing(node, node_state);
+    this->node_task_postprocessing(node, node_state, do_execute_node);
   }
 
   bool node_task_preprocessing(const DNode node, NodeState &node_state)
@@ -1006,7 +1006,7 @@ class GeometryNodesEvaluator {
     }
   }
 
-  void node_task_postprocessing(const DNode node, NodeState &node_state)
+  void node_task_postprocessing(const DNode node, NodeState &node_state, bool was_executed)
   {
     this->with_locked_node(node, node_state, [&](LockedNode &locked_node) {
       const bool node_has_finished = this->finish_node_if_possible(locked_node);
@@ -1017,8 +1017,9 @@ class GeometryNodesEvaluator {
         /* Either the node rescheduled itself or another node tried to schedule it while it ran. */
         this->schedule_node(locked_node);
       }
-
-      this->assert_expected_outputs_have_been_computed(locked_node);
+      if (was_executed) {
+        this->assert_expected_outputs_have_been_computed(locked_node);
+      }
     });
   }
 
@@ -1465,13 +1466,12 @@ class GeometryNodesEvaluator {
       from_type.copy_construct(from_value, to_value);
       return;
     }
-
     const FieldCPPType *from_field_type = dynamic_cast<const FieldCPPType *>(&from_type);
     const FieldCPPType *to_field_type = dynamic_cast<const FieldCPPType *>(&to_type);
 
     if (from_field_type != nullptr && to_field_type != nullptr) {
-      const CPPType &from_base_type = from_field_type->field_type();
-      const CPPType &to_base_type = to_field_type->field_type();
+      const CPPType &from_base_type = from_field_type->base_type();
+      const CPPType &to_base_type = to_field_type->base_type();
       if (conversions_.is_convertible(from_base_type, to_base_type)) {
         const MultiFunction &fn = *conversions_.get_conversion_multi_function(
             MFDataType::ForSingle(from_base_type), MFDataType::ForSingle(to_base_type));
@@ -1494,7 +1494,7 @@ class GeometryNodesEvaluator {
   void construct_default_value(const CPPType &type, void *r_value)
   {
     if (const FieldCPPType *field_cpp_type = dynamic_cast<const FieldCPPType *>(&type)) {
-      const CPPType &base_type = field_cpp_type->field_type();
+      const CPPType &base_type = field_cpp_type->base_type();
       auto constant_fn = std::make_unique<fn::CustomMF_GenericConstant>(
           base_type, base_type.default_value(), false);
       auto operation = std::make_shared<fn::FieldOperation>(std::move(constant_fn));

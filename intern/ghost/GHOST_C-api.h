@@ -737,13 +737,6 @@ extern GHOST_TSuccess GHOST_ReleaseOpenGLContext(GHOST_ContextHandle contexthand
 extern unsigned int GHOST_GetContextDefaultOpenGLFramebuffer(GHOST_ContextHandle contexthandle);
 
 /**
- * Returns whether a context is rendered upside down compared to OpenGL. This only needs to be
- * called if there's a non-OpenGL context, which is really the exception.
- * So generally, this does not need to be called.
- */
-extern int GHOST_isUpsideDownContext(GHOST_ContextHandle contexthandle);
-
-/**
  * Get the OpenGL frame-buffer handle that serves as a default frame-buffer.
  */
 extern unsigned int GHOST_GetDefaultOpenGLFramebuffer(GHOST_WindowHandle windwHandle);
@@ -1177,7 +1170,7 @@ int GHOST_XrGetControllerModelData(GHOST_XrContextHandle xr_context,
 #ifdef WITH_VULKAN
 
 /**
- * Return vulkan handles for the given contest.
+ * Return vulkan handles for the given context.
  */
 void GHOST_GetVulkanHandles(GHOST_ContextHandle context,
                             void *r_instance,
