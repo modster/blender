@@ -41,6 +41,10 @@ class Integrator : public Node {
   NODE_SOCKET_API(int, max_transmission_bounce)
   NODE_SOCKET_API(int, max_volume_bounce)
 
+#ifdef WITH_CYCLES_DEBUG
+  NODE_SOCKET_API(DirectLightSamplingType, direct_light_sampling_type)
+#endif
+
   NODE_SOCKET_API(int, transparent_min_bounce)
   NODE_SOCKET_API(int, transparent_max_bounce)
 
@@ -55,6 +59,13 @@ class Integrator : public Node {
   NODE_SOCKET_API(bool, caustics_reflective)
   NODE_SOCKET_API(bool, caustics_refractive)
   NODE_SOCKET_API(float, filter_glossy)
+
+  NODE_SOCKET_API(bool, use_direct_light);
+  NODE_SOCKET_API(bool, use_indirect_light);
+  NODE_SOCKET_API(bool, use_diffuse);
+  NODE_SOCKET_API(bool, use_glossy);
+  NODE_SOCKET_API(bool, use_transmission);
+  NODE_SOCKET_API(bool, use_emission);
 
   NODE_SOCKET_API(int, seed)
 

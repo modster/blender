@@ -64,7 +64,7 @@ struct wmTimer;
 /* Defined in `buttons_intern.h`. */
 typedef struct SpaceProperties_Runtime SpaceProperties_Runtime;
 
-/* Defined in `node_intern.h`. */
+/* Defined in `node_intern.hh`. */
 typedef struct SpaceNode_Runtime SpaceNode_Runtime;
 
 /* Defined in `file_intern.h`. */
@@ -1158,8 +1158,12 @@ typedef struct FileDirEntryArr {
 
 /* FileDirEntry.flags */
 enum {
-  FILE_ENTRY_INVALID_PREVIEW = 1 << 0, /* The preview for this entry could not be generated. */
+  /* The preview for this entry could not be generated. */
+  FILE_ENTRY_INVALID_PREVIEW = 1 << 0,
+  /* The entry name needs to be freed when clearing file list. */
   FILE_ENTRY_NAME_FREE = 1 << 1,
+  /* The preview for this entry is being loaded on another thread. */
+  FILE_ENTRY_PREVIEW_LOADING = 1 << 2,
 };
 
 /** \} */

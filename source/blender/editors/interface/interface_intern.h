@@ -351,14 +351,6 @@ typedef struct uiButProgressbar {
   float progress;
 } uiButProgressbar;
 
-/** Derived struct for #UI_BTYPE_DATASETROW. */
-typedef struct uiButDatasetRow {
-  uiBut but;
-
-  uint8_t geometry_component_type;
-  uint8_t attribute_domain;
-  int indentation;
-} uiButDatasetRow;
 
 /** Derived struct for #UI_BTYPE_TREEROW. */
 typedef struct uiButTreeRow {
@@ -609,7 +601,7 @@ typedef struct uiSafetyRct {
 
 /* interface.c */
 
-void ui_fontscale(short *points, float aspect);
+void ui_fontscale(float *points, float aspect);
 
 extern void ui_block_to_region_fl(const struct ARegion *region,
                                   uiBlock *block,

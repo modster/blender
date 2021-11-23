@@ -123,6 +123,9 @@ enum {
   LIB_ID_COPY_CD_REFERENCE = 1 << 20,
   /** Do not copy id->override_library, used by ID datablock override routines. */
   LIB_ID_COPY_NO_LIB_OVERRIDE = 1 << 21,
+  /** When copying local sub-data (like constraints or modifiers), do not set their "library
+   * override local data" flag. */
+  LIB_ID_COPY_NO_LIB_OVERRIDE_LOCAL_DATA_FLAG = 1 << 22,
 
   /* *** XXX Hackish/not-so-nice specific behaviors needed for some corner cases. *** */
   /* *** Ideally we should not have those, but we need them for now... *** */
@@ -134,8 +137,10 @@ enum {
   LIB_ID_COPY_SHAPEKEY = 1 << 26,
   /** EXCEPTION! Specific deep-copy of node trees used e.g. for rendering purposes. */
   LIB_ID_COPY_NODETREE_LOCALIZE = 1 << 27,
-  /** EXCEPTION! Specific handling of RB objects regarding collections differs depending whether we
-     duplicate scene/collections, or objects. */
+  /**
+   * EXCEPTION! Specific handling of RB objects regarding collections differs depending whether we
+   * duplicate scene/collections, or objects.
+   */
   LIB_ID_COPY_RIGID_BODY_NO_COLLECTION_HANDLING = 1 << 28,
 
   /* *** Helper 'defines' gathering most common flag sets. *** */
