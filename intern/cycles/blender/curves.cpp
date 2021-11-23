@@ -199,7 +199,7 @@ static bool ObtainCacheParticleUV(Hair *hair,
           b_mesh->uv_layers.begin(l);
 
           float2 uv = zero_float2();
-          if (b_mesh->uv_layers.length())
+          if (!b_mesh->uv_layers.empty())
             b_psys.uv_on_emitter(psmd, *b_pa, pa_no, uv_num, &uv.x);
           CData->curve_uv.push_back_slow(uv);
 
@@ -261,7 +261,7 @@ static bool ObtainCacheParticleVcol(Hair *hair,
           b_mesh->vertex_colors.begin(l);
 
           float4 vcol = make_float4(0.0f, 0.0f, 0.0f, 1.0f);
-          if (b_mesh->vertex_colors.length())
+          if (!b_mesh->vertex_colors.empty())
             b_psys.mcol_on_emitter(psmd, *b_pa, pa_no, vcol_num, &vcol.x);
           CData->curve_vcol.push_back_slow(vcol);
 
@@ -302,10 +302,6 @@ static void ExportCurveSegments(Scene *scene, Hair *hair, ParticleCurveData *CDa
       num_keys += CData->curve_keynum[curve];
       num_curves++;
     }
-  }
-
-  if (num_curves > 0) {
-    VLOG(1) << "Exporting curve segments for mesh " << hair->name;
   }
 
   hair->reserve_curves(hair->num_curves() + num_curves, hair->get_curve_keys().size() + num_keys);
@@ -356,7 +352,7 @@ static void ExportCurveSegments(Scene *scene, Hair *hair, ParticleCurveData *CDa
 
   /* check allocation */
   if ((hair->get_curve_keys().size() != num_keys) || (hair->num_curves() != num_curves)) {
-    VLOG(1) << "Allocation failed, clearing data";
+    VLOG(1) << "Hair memory allocation failed, clearing data.";
     hair->clear(true);
   }
 }
@@ -412,16 +408,11 @@ static void export_hair_motion_validate_attribute(Hair *hair,
   if (num_motion_keys != num_keys || !have_motion) {
     /* No motion or hair "topology" changed, remove attributes again. */
     if (num_motion_keys != num_keys) {
-      VLOG(1) << "Hair topology changed, removing attribute.";
-    }
-    else {
-      VLOG(1) << "No motion, removing attribute.";
+      VLOG(1) << "Hair topology changed, removing motion attribute.";
     }
     hair->attributes.remove(ATTR_STD_MOTION_VERTEX_POSITION);
   }
   else if (motion_step > 0) {
-    VLOG(1) << "Filling in new motion vertex position for motion_step " << motion_step;
-
     /* Motion, fill up previous steps that we might have skipped because
      * they had no motion, but we need them anyway now. */
     for (int step = 0; step < motion_step; step++) {
@@ -437,16 +428,12 @@ static void export_hair_motion_validate_attribute(Hair *hair,
 
 static void ExportCurveSegmentsMotion(Hair *hair, ParticleCurveData *CData, int motion_step)
 {
-  VLOG(1) << "Exporting curve motion segments for hair " << hair->name << ", motion step "
-          << motion_step;
-
   /* find attribute */
   Attribute *attr_mP = hair->attributes.find(ATTR_STD_MOTION_VERTEX_POSITION);
   bool new_attribute = false;
 
   /* add new attribute if it doesn't exist already */
   if (!attr_mP) {
-    VLOG(1) << "Creating new motion vertex position attribute";
     attr_mP = hair->attributes.add(ATTR_STD_MOTION_VERTEX_POSITION);
     new_attribute = true;
   }
@@ -682,10 +669,6 @@ static void export_hair_curves(Scene *scene, Hair *hair, BL::Hair b_hair)
   const int num_keys = b_hair.points.length();
   const int num_curves = b_hair.curves.length();
 
-  if (num_curves > 0) {
-    VLOG(1) << "Exporting curve segments for hair " << hair->name;
-  }
-
   hair->reserve_curves(num_curves, num_keys);
 
   /* Export curves and points. */
@@ -743,15 +726,11 @@ static void export_hair_curves(Scene *scene, Hair *hair, BL::Hair b_hair)
 
 static void export_hair_curves_motion(Hair *hair, BL::Hair b_hair, int motion_step)
 {
-  VLOG(1) << "Exporting curve motion segments for hair " << hair->name << ", motion step "
-          << motion_step;
-
   /* Find or add attribute. */
   Attribute *attr_mP = hair->attributes.find(ATTR_STD_MOTION_VERTEX_POSITION);
   bool new_attribute = false;
 
   if (!attr_mP) {
-    VLOG(1) << "Creating new motion vertex position attribute";
     attr_mP = hair->attributes.add(ATTR_STD_MOTION_VERTEX_POSITION);
     new_attribute = true;
   }

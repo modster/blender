@@ -41,6 +41,8 @@
 #include "WM_api.h"
 #include "WM_types.h"
 
+#include "BLT_translation.h"
+
 #include "BLF_api.h"
 
 #include "spreadsheet_intern.hh"
@@ -137,7 +139,12 @@ static SpaceLink *spreadsheet_duplicate(SpaceLink *sl)
 {
   const SpaceSpreadsheet *sspreadsheet_old = (SpaceSpreadsheet *)sl;
   SpaceSpreadsheet *sspreadsheet_new = (SpaceSpreadsheet *)MEM_dupallocN(sspreadsheet_old);
-  sspreadsheet_new->runtime = new SpaceSpreadsheet_Runtime(*sspreadsheet_old->runtime);
+  if (sspreadsheet_old->runtime) {
+    sspreadsheet_new->runtime = new SpaceSpreadsheet_Runtime(*sspreadsheet_old->runtime);
+  }
+  else {
+    sspreadsheet_new->runtime = new SpaceSpreadsheet_Runtime();
+  }
 
   BLI_listbase_clear(&sspreadsheet_new->row_filters);
   LISTBASE_FOREACH (const SpreadsheetRowFilter *, src_filter, &sspreadsheet_old->row_filters) {
@@ -314,6 +321,8 @@ static float get_default_column_width(const ColumnValues &values)
       return 4.0f * float_width;
     case SPREADSHEET_VALUE_TYPE_INSTANCES:
       return 8.0f;
+    case SPREADSHEET_VALUE_TYPE_STRING:
+      return 5.0f;
   }
   return float_width;
 }
@@ -584,35 +593,10 @@ static void spreadsheet_dataset_region_listener(const wmRegionListenerParams *pa
   spreadsheet_header_region_listener(params);
 }
 
-static void spreadsheet_dataset_region_init(wmWindowManager *wm, ARegion *region)
-{
-  region->v2d.scroll |= V2D_SCROLL_RIGHT;
-  region->v2d.scroll &= ~(V2D_SCROLL_LEFT | V2D_SCROLL_TOP | V2D_SCROLL_BOTTOM);
-  region->v2d.scroll |= V2D_SCROLL_HORIZONTAL_HIDE;
-  region->v2d.scroll |= V2D_SCROLL_VERTICAL_HIDE;
-
-  UI_view2d_region_reinit(&region->v2d, V2D_COMMONVIEW_LIST, region->winx, region->winy);
-
-  wmKeyMap *keymap = WM_keymap_ensure(
-      wm->defaultconf, "Spreadsheet Generic", SPACE_SPREADSHEET, 0);
-  WM_event_add_keymap_handler(&region->handlers, keymap);
-}
-
 static void spreadsheet_dataset_region_draw(const bContext *C, ARegion *region)
 {
   spreadsheet_update_context_path(C);
-
-  View2D *v2d = &region->v2d;
-  UI_view2d_view_ortho(v2d);
-  UI_ThemeClearColor(TH_BACK);
-
-  draw_dataset_in_region(C, region);
-
-  /* reset view matrix */
-  UI_view2d_view_restore(C);
-
-  /* scrollers */
-  UI_view2d_scrollers_draw(v2d, nullptr);
+  ED_region_panels(C, region);
 }
 
 static void spreadsheet_sidebar_init(wmWindowManager *wm, ARegion *region)
@@ -703,11 +687,12 @@ void ED_spacetype_spreadsheet(void)
   /* regions: channels */
   art = (ARegionType *)MEM_callocN(sizeof(ARegionType), "spreadsheet dataset region");
   art->regionid = RGN_TYPE_CHANNELS;
-  art->prefsizex = 200 + V2D_SCROLL_WIDTH;
+  art->prefsizex = 150 + V2D_SCROLL_WIDTH;
   art->keymapflag = ED_KEYMAP_UI | ED_KEYMAP_VIEW2D;
-  art->init = spreadsheet_dataset_region_init;
+  art->init = ED_region_panels_init;
   art->draw = spreadsheet_dataset_region_draw;
   art->listener = spreadsheet_dataset_region_listener;
+  blender::ed::spreadsheet::spreadsheet_data_set_region_panels_register(*art);
   BLI_addhead(&st->regiontypes, art);
 
   BKE_spacetype_register(st);

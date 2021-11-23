@@ -114,7 +114,6 @@ typedef enum {
   UI_WTYPE_LISTITEM,
   UI_WTYPE_PROGRESSBAR,
   UI_WTYPE_NODESOCKET,
-  UI_WTYPE_DATASETROW,
   UI_WTYPE_TREEROW,
 } uiWidgetTypeEnum;
 
@@ -1407,8 +1406,8 @@ static void widget_draw_icon(
 
     /* force positions to integers, for zoom levels near 1. draws icons crisp. */
     if (aspect > 0.95f && aspect < 1.05f) {
-      xs = (int)(xs + 0.1f);
-      ys = (int)(ys + 0.1f);
+      xs = roundf(xs);
+      ys = roundf(ys);
     }
 
     /* Get theme color. */
@@ -2526,7 +2525,7 @@ static void widget_state(uiWidgetType *wt, int state, int drawflag, eUIEmbossTyp
 {
   uiWidgetStateColors *wcol_state = wt->wcol_state;
 
-  if ((state & UI_BUT_LIST_ITEM) && !(state & UI_STATE_TEXT_INPUT)) {
+  if (state & UI_BUT_LIST_ITEM) {
     /* Override default widget's colors. */
     bTheme *btheme = UI_GetTheme();
     wt->wcol_theme = &btheme->tui.wcol_list_item;
@@ -3675,13 +3674,7 @@ static void widget_treerow(
   widget_treerow_exec(wcol, rect, state, roundboxalign, tree_row->indentation);
 }
 
-static void widget_datasetrow(
-    uiBut *but, uiWidgetColors *wcol, rcti *rect, int state, int roundboxalign)
-{
-  uiButDatasetRow *dataset_row = (uiButDatasetRow *)but;
-  BLI_assert(but->type == UI_BTYPE_DATASETROW);
-  widget_treerow_exec(wcol, rect, state, roundboxalign, dataset_row->indentation);
-}
+
 
 static void widget_nodesocket(
     uiBut *but, uiWidgetColors *wcol, rcti *rect, int UNUSED(state), int UNUSED(roundboxalign))
@@ -4476,9 +4469,6 @@ static uiWidgetType *widget_type(uiWidgetTypeEnum type)
       wt.custom = widget_progressbar;
       break;
 
-    case UI_WTYPE_DATASETROW:
-      wt.custom = widget_datasetrow;
-      break;
 
     case UI_WTYPE_TREEROW:
       wt.custom = widget_treerow;
@@ -4808,11 +4798,6 @@ void ui_draw_but(const bContext *C, struct ARegion *region, uiStyle *style, uiBu
 
       case UI_BTYPE_PROGRESS_BAR:
         wt = widget_type(UI_WTYPE_PROGRESSBAR);
-        fstyle = &style->widgetlabel;
-        break;
-
-      case UI_BTYPE_DATASETROW:
-        wt = widget_type(UI_WTYPE_DATASETROW);
         fstyle = &style->widgetlabel;
         break;
 

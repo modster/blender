@@ -458,6 +458,9 @@ typedef struct ARegion_Runtime {
 
   /* The offset needed to not overlap with window scrollbars. Only used by HUD regions for now. */
   int offset_x, offset_y;
+
+  /* Maps uiBlock->name to uiBlock for faster lookups. */
+  struct GHash *block_name_map;
 } ARegion_Runtime;
 
 typedef struct ARegion {
@@ -667,7 +670,7 @@ typedef enum eRegion_Type {
   RGN_TYPE_FOOTER = 11,
   RGN_TYPE_TOOL_HEADER = 12,
   /* Region type used exclusively by internal code and add-ons to register draw callbacks to the XR
-     context (surface, mirror view). Does not represent any real region. */
+   * context (surface, mirror view). Does not represent any real region. */
   RGN_TYPE_XR = 13,
 
 #define RGN_TYPE_LEN (RGN_TYPE_XR + 1)

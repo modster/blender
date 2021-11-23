@@ -290,15 +290,18 @@ class CYCLES_RENDER_PT_sampling_advanced(CyclesButtonsPanel, Panel):
         col.active = not (cscene.use_adaptive_sampling and cscene.use_preview_adaptive_sampling)
         col.prop(cscene, "sampling_pattern", text="Pattern")
 
+        col = layout.column(align=True)
+        col.prop(cscene, "sample_offset")
+
         layout.separator()
 
-        col = layout.column(align=True)
-        col.active = not (cscene.use_adaptive_sampling and cscene.use_preview_adaptive_sampling)
-        col.prop(cscene, "scrambling_distance", text="Scrambling Distance")
-        col.prop(cscene, "adaptive_scrambling_distance", text="Adaptive")
-        sub = col.row(align=True)
+        heading = layout.column(align=True, heading="Scrambling Distance")
+        heading.active = not (cscene.use_adaptive_sampling and cscene.use_preview_adaptive_sampling)
+        heading.prop(cscene, "auto_scrambling_distance", text="Automatic")
+        sub = heading.row()
         sub.active = not cscene.use_preview_adaptive_sampling
         sub.prop(cscene, "preview_scrambling_distance", text="Viewport")
+        heading.prop(cscene, "scrambling_distance", text="Multiplier")
 
         layout.separator()
 
@@ -1051,7 +1054,7 @@ class CYCLES_OBJECT_PT_motion_blur(CyclesButtonsPanel, Panel):
 
 
 def has_geometry_visibility(ob):
-    return ob and ((ob.type in {'MESH', 'CURVE', 'SURFACE', 'FONT', 'META', 'LIGHT'}) or
+    return ob and ((ob.type in {'MESH', 'CURVE', 'SURFACE', 'FONT', 'META', 'LIGHT', 'VOLUME', 'POINTCLOUD', 'HAIR'}) or
                    (ob.instance_type == 'COLLECTION' and ob.instance_collection))
 
 

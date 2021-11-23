@@ -208,7 +208,8 @@ class BlenderSync {
   /* util */
   void find_shader(BL::ID &id, array<Node *> &used_shaders, Shader *default_shader);
   bool BKE_object_is_modified(BL::Object &b_ob);
-  bool object_is_geometry(BL::Object &b_ob);
+  bool object_is_geometry(BObjectInfo &b_ob_info);
+  bool object_can_have_geometry(BL::Object &b_ob);
   bool object_is_light(BL::Object &b_ob);
 
   /* variables */
@@ -225,6 +226,8 @@ class BlenderSync {
   set<Geometry *> geometry_synced;
   set<Geometry *> geometry_motion_synced;
   set<Geometry *> geometry_motion_attribute_synced;
+  /** Remember which geometries come from which objects to be able to sync them after changes. */
+  map<void *, set<BL::ID>> instance_geometries_by_object;
   set<float> motion_times;
   void *world_map;
   bool world_recalc;

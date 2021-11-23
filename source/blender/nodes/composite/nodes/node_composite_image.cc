@@ -141,7 +141,6 @@ static void cmp_node_image_create_outputs(bNodeTree *ntree,
      * So we manually construct image user to be sure first
      * image from sequence (that one which is set as filename
      * for image data-block) is used for sockets detection. */
-    load_iuser.ok = 1;
     load_iuser.framenr = offset;
 
     /* make sure ima->type is correct */
@@ -373,7 +372,8 @@ static void cmp_node_image_verify_outputs(bNodeTree *ntree, bNode *node, bool rl
   for (sock = (bNodeSocket *)node->outputs.first; sock; sock = sock_next, sock_index++) {
     sock_next = sock->next;
     if (BLI_linklist_index(available_sockets.list, sock) >= 0) {
-      sock->flag &= ~(SOCK_UNAVAIL | SOCK_HIDDEN);
+      sock->flag &= ~SOCK_HIDDEN;
+      nodeSetSocketAvailability(ntree, sock, true);
     }
     else {
       bNodeLink *link;
@@ -387,7 +387,7 @@ static void cmp_node_image_verify_outputs(bNodeTree *ntree, bNode *node, bool rl
         nodeRemoveSocket(ntree, node, sock);
       }
       else {
-        sock->flag |= SOCK_UNAVAIL;
+        nodeSetSocketAvailability(ntree, sock, false);
       }
     }
   }
@@ -411,7 +411,6 @@ static void node_composit_init_image(bNodeTree *ntree, bNode *node)
   node->storage = iuser;
   iuser->frames = 1;
   iuser->sfra = 1;
-  iuser->ok = 1;
   iuser->flag |= IMA_ANIM_ALWAYS;
 
   /* setup initial outputs */

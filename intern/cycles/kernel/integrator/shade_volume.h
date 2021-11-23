@@ -27,8 +27,6 @@
 #include "kernel/light/light.h"
 #include "kernel/light/sample.h"
 
-#include "kernel/sample/mis.h"
-
 CCL_NAMESPACE_BEGIN
 
 #ifdef __VOLUME__
@@ -78,9 +76,8 @@ ccl_device_inline bool shadow_volume_shader_sample(KernelGlobals kg,
                                                    ccl_private ShaderData *ccl_restrict sd,
                                                    ccl_private float3 *ccl_restrict extinction)
 {
-  shader_eval_volume<true>(kg, state, sd, PATH_RAY_SHADOW, [=](const int i) {
-    return integrator_state_read_shadow_volume_stack(state, i);
-  });
+  VOLUME_READ_LAMBDA(integrator_state_read_shadow_volume_stack(state, i))
+  shader_eval_volume<true>(kg, state, sd, PATH_RAY_SHADOW, volume_read_lambda_pass);
 
   if (!(sd->flag & SD_EXTINCTION)) {
     return false;
@@ -98,9 +95,8 @@ ccl_device_inline bool volume_shader_sample(KernelGlobals kg,
                                             ccl_private VolumeShaderCoefficients *coeff)
 {
   const uint32_t path_flag = INTEGRATOR_STATE(state, path, flag);
-  shader_eval_volume<false>(kg, state, sd, path_flag, [=](const int i) {
-    return integrator_state_read_volume_stack(state, i);
-  });
+  VOLUME_READ_LAMBDA(integrator_state_read_volume_stack(state, i))
+  shader_eval_volume<false>(kg, state, sd, path_flag, volume_read_lambda_pass);
 
   if (!(sd->flag & (SD_EXTINCTION | SD_SCATTER | SD_EMISSION))) {
     return false;
@@ -262,6 +258,12 @@ ccl_device void volume_shadow_heterogeneous(KernelGlobals kg,
 
 /* Equi-angular sampling as in:
  * "Importance Sampling Techniques for Path Tracing in Participating Media" */
+
+/* Below this pdf we ignore samples, as they tend to lead to very long distances.
+ * This can cause performance issues with BVH traversal in OptiX, leading it to
+ * traverse many nodes. Since these contribute very little to the image, just ignore
+ * those samples. */
+#  define VOLUME_SAMPLE_PDF_CUTOFF 1e-8f
 
 ccl_device float volume_equiangular_sample(ccl_private const Ray *ccl_restrict ray,
                                            const float3 light_P,
@@ -437,7 +439,8 @@ ccl_device_forceinline void volume_integrate_step_scattering(
 
   /* Equiangular sampling for direct lighting. */
   if (vstate.direct_sample_method == VOLUME_SAMPLE_EQUIANGULAR && !result.direct_scatter) {
-    if (result.direct_t >= vstate.start_t && result.direct_t <= vstate.end_t) {
+    if (result.direct_t >= vstate.start_t && result.direct_t <= vstate.end_t &&
+        vstate.equiangular_pdf > VOLUME_SAMPLE_PDF_CUTOFF) {
       const float new_dt = result.direct_t - vstate.start_t;
       const float3 new_transmittance = volume_color_transmittance(coeff.sigma_t, new_dt);
 
@@ -474,26 +477,28 @@ ccl_device_forceinline void volume_integrate_step_scattering(
       const float3 new_transmittance = volume_color_transmittance(coeff.sigma_t, new_dt);
       const float distance_pdf = dot(channel_pdf, coeff.sigma_t * new_transmittance);
 
-      /* throughput */
-      result.indirect_scatter = true;
-      result.indirect_t = new_t;
-      result.indirect_throughput *= coeff.sigma_s * new_transmittance / distance_pdf;
-      shader_copy_volume_phases(&result.indirect_phases, sd);
+      if (vstate.distance_pdf * distance_pdf > VOLUME_SAMPLE_PDF_CUTOFF) {
+        /* throughput */
+        result.indirect_scatter = true;
+        result.indirect_t = new_t;
+        result.indirect_throughput *= coeff.sigma_s * new_transmittance / distance_pdf;
+        shader_copy_volume_phases(&result.indirect_phases, sd);
 
-      if (vstate.direct_sample_method != VOLUME_SAMPLE_EQUIANGULAR) {
-        /* If using distance sampling for direct light, just copy parameters
-         * of indirect light since we scatter at the same point then. */
-        result.direct_scatter = true;
-        result.direct_t = result.indirect_t;
-        result.direct_throughput = result.indirect_throughput;
-        shader_copy_volume_phases(&result.direct_phases, sd);
+        if (vstate.direct_sample_method != VOLUME_SAMPLE_EQUIANGULAR) {
+          /* If using distance sampling for direct light, just copy parameters
+           * of indirect light since we scatter at the same point then. */
+          result.direct_scatter = true;
+          result.direct_t = result.indirect_t;
+          result.direct_throughput = result.indirect_throughput;
+          shader_copy_volume_phases(&result.direct_phases, sd);
 
-        /* Multiple importance sampling. */
-        if (vstate.use_mis) {
-          const float equiangular_pdf = volume_equiangular_pdf(ray, equiangular_light_P, new_t);
-          const float mis_weight = power_heuristic(vstate.distance_pdf * distance_pdf,
-                                                   equiangular_pdf);
-          result.direct_throughput *= 2.0f * mis_weight;
+          /* Multiple importance sampling. */
+          if (vstate.use_mis) {
+            const float equiangular_pdf = volume_equiangular_pdf(ray, equiangular_light_P, new_t);
+            const float mis_weight = power_heuristic(vstate.distance_pdf * distance_pdf,
+                                                     equiangular_pdf);
+            result.direct_throughput *= 2.0f * mis_weight;
+          }
         }
       }
     }
@@ -608,7 +613,7 @@ ccl_device_forceinline void volume_integrate_heterogeneous(
         if (!result.indirect_scatter) {
           const float3 emission = volume_emission_integrate(
               &coeff, closure_flag, transmittance, dt);
-          accum_emission += emission;
+          accum_emission += result.indirect_throughput * emission;
         }
       }
 
@@ -661,7 +666,7 @@ ccl_device_forceinline void volume_integrate_heterogeneous(
 
   /* Write accumulated emission. */
   if (!is_zero(accum_emission)) {
-    kernel_accum_emission(kg, state, result.indirect_throughput, accum_emission, render_buffer);
+    kernel_accum_emission(kg, state, accum_emission, render_buffer);
   }
 
 #  ifdef __DENOISING_FEATURES__
@@ -694,8 +699,10 @@ ccl_device_forceinline bool integrate_volume_sample_light(
   float light_u, light_v;
   path_state_rng_2D(kg, rng_state, PRNG_LIGHT_U, &light_u, &light_v);
 
-  light_distribution_sample_from_volume_segment(
-      kg, light_u, light_v, sd->time, sd->P, bounce, path_flag, ls);
+  if (!light_distribution_sample_from_volume_segment(
+          kg, light_u, light_v, sd->time, sd->P, bounce, path_flag, ls)) {
+    return false;
+  }
 
   if (ls->shader & SHADER_EXCLUDE_SCATTER) {
     return false;
@@ -761,7 +768,7 @@ ccl_device_forceinline void integrate_volume_direct_light(
   const float phase_pdf = shader_volume_phase_eval(kg, sd, phases, ls->D, &phase_eval);
 
   if (ls->shader & SHADER_USE_MIS) {
-    float mis_weight = power_heuristic(ls->pdf, phase_pdf);
+    float mis_weight = light_sample_mis_weight_nee(kg, ls->pdf, phase_pdf);
     bsdf_eval_mul(&phase_eval, mis_weight);
   }
 
@@ -794,10 +801,12 @@ ccl_device_forceinline void integrate_volume_direct_light(
   const float3 throughput_phase = throughput * bsdf_eval_sum(&phase_eval);
 
   if (kernel_data.kernel_features & KERNEL_FEATURE_LIGHT_PASSES) {
-    const float3 diffuse_glossy_ratio = (bounce == 0) ?
-                                            one_float3() :
-                                            INTEGRATOR_STATE(state, path, diffuse_glossy_ratio);
-    INTEGRATOR_STATE_WRITE(shadow_state, shadow_path, diffuse_glossy_ratio) = diffuse_glossy_ratio;
+    const packed_float3 pass_diffuse_weight = (bounce == 0) ?
+                                                  packed_float3(one_float3()) :
+                                                  INTEGRATOR_STATE(
+                                                      state, path, pass_diffuse_weight);
+    INTEGRATOR_STATE_WRITE(shadow_state, shadow_path, pass_diffuse_weight) = pass_diffuse_weight;
+    INTEGRATOR_STATE_WRITE(shadow_state, shadow_path, pass_glossy_weight) = zero_float3();
   }
 
   INTEGRATOR_STATE_WRITE(shadow_state, shadow_path, render_pixel_index) = INTEGRATOR_STATE(
@@ -876,7 +885,8 @@ ccl_device_forceinline bool integrate_volume_phase_scatter(
   INTEGRATOR_STATE_WRITE(state, path, throughput) = throughput_phase;
 
   if (kernel_data.kernel_features & KERNEL_FEATURE_LIGHT_PASSES) {
-    INTEGRATOR_STATE_WRITE(state, path, diffuse_glossy_ratio) = one_float3();
+    INTEGRATOR_STATE_WRITE(state, path, pass_diffuse_weight) = one_float3();
+    INTEGRATOR_STATE_WRITE(state, path, pass_glossy_weight) = zero_float3();
   }
 
   /* Update path state */
@@ -919,8 +929,8 @@ ccl_device VolumeIntegrateEvent volume_integrate(KernelGlobals kg,
                                                 VOLUME_SAMPLE_DISTANCE;
 
   /* Step through volume. */
-  const float step_size = volume_stack_step_size(
-      kg, [=](const int i) { return integrator_state_read_volume_stack(state, i); });
+  VOLUME_READ_LAMBDA(integrator_state_read_volume_stack(state, i))
+  const float step_size = volume_stack_step_size(kg, volume_read_lambda_pass);
 
   /* TODO: expensive to zero closures? */
   VolumeIntegrateResult result = {};
@@ -941,7 +951,7 @@ ccl_device VolumeIntegrateEvent volume_integrate(KernelGlobals kg,
   const uint32_t path_flag = INTEGRATOR_STATE(state, path, flag);
   const float probability = (path_flag & PATH_RAY_TERMINATE_IN_NEXT_VOLUME) ?
                                 0.0f :
-                                path_state_continuation_probability(kg, state, path_flag);
+                                INTEGRATOR_STATE(state, path, continuation_probability);
   if (probability == 0.0f) {
     return VOLUME_PATH_MISSED;
   }
@@ -1023,25 +1033,9 @@ ccl_device void integrator_shade_volume(KernelGlobals kg,
   }
   else {
     /* Continue to background, light or surface. */
-    if (isect.prim == PRIM_NONE) {
-      INTEGRATOR_PATH_NEXT(DEVICE_KERNEL_INTEGRATOR_SHADE_VOLUME,
-                           DEVICE_KERNEL_INTEGRATOR_SHADE_BACKGROUND);
-      return;
-    }
-    else if (isect.type & PRIMITIVE_LAMP) {
-      INTEGRATOR_PATH_NEXT(DEVICE_KERNEL_INTEGRATOR_SHADE_VOLUME,
-                           DEVICE_KERNEL_INTEGRATOR_SHADE_LIGHT);
-      return;
-    }
-    else {
-      /* Hit a surface, continue with surface kernel unless terminated. */
-      const int shader = intersection_get_shader(kg, &isect);
-      const int flags = kernel_tex_fetch(__shaders, shader).flags;
-
-      integrator_intersect_shader_next_kernel<DEVICE_KERNEL_INTEGRATOR_SHADE_VOLUME>(
-          kg, state, &isect, shader, flags);
-      return;
-    }
+    integrator_intersect_next_kernel_after_volume<DEVICE_KERNEL_INTEGRATOR_SHADE_VOLUME>(
+        kg, state, &isect, render_buffer);
+    return;
   }
 #endif /* __VOLUME__ */
 }

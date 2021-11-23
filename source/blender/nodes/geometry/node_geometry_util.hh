@@ -43,7 +43,8 @@ bool geo_node_poll_default(struct bNodeType *ntype,
                            const char **r_disabled_hint);
 
 namespace blender::nodes {
-void update_attribute_input_socket_availabilities(bNode &node,
+void update_attribute_input_socket_availabilities(bNodeTree &ntree,
+                                                  bNode &node,
                                                   const StringRef name,
                                                   const GeometryNodeAttributeInputMode mode,
                                                   const bool name_is_available = true);
@@ -67,13 +68,20 @@ Mesh *create_grid_mesh(const int verts_x,
                        const float size_x,
                        const float size_y);
 
+struct ConeAttributeOutputs {
+  StrongAnonymousAttributeID top_id;
+  StrongAnonymousAttributeID bottom_id;
+  StrongAnonymousAttributeID side_id;
+};
+
 Mesh *create_cylinder_or_cone_mesh(const float radius_top,
                                    const float radius_bottom,
                                    const float depth,
                                    const int circle_segments,
                                    const int side_segments,
                                    const int fill_segments,
-                                   const GeometryNodeMeshCircleFillType fill_type);
+                                   const GeometryNodeMeshCircleFillType fill_type,
+                                   ConeAttributeOutputs &attribute_outputs);
 
 Mesh *create_cuboid_mesh(float3 size, int verts_x, int verts_y, int verts_z);
 

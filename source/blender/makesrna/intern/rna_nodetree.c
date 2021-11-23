@@ -2805,6 +2805,7 @@ static StructRNA *rna_NodeSocket_register(Main *UNUSED(bmain),
 
   /* setup dummy socket & socket type to store static properties in */
   memset(&dummyst, 0, sizeof(bNodeSocketType));
+  dummyst.type = SOCK_CUSTOM;
 
   memset(&dummysock, 0, sizeof(bNodeSocket));
   dummysock.typeinfo = &dummyst;
@@ -12787,6 +12788,11 @@ static void rna_def_nodetree(BlenderRNA *brna)
   PropertyRNA *parm;
 
   static const EnumPropertyItem static_type_items[] = {
+      {NTREE_UNDEFINED,
+       "UNDEFINED",
+       ICON_QUESTION,
+       "Undefined",
+       "Undefined type of nodes (can happen e.g. when a linked node tree goes missing)"},
       {NTREE_SHADER, "SHADER", ICON_MATERIAL, "Shader", "Shader nodes"},
       {NTREE_TEXTURE, "TEXTURE", ICON_TEXTURE, "Texture", "Texture nodes"},
       {NTREE_COMPOSIT, "COMPOSITING", ICON_RENDERLAYERS, "Compositing", "Compositing nodes"},
@@ -12807,6 +12813,8 @@ static void rna_def_nodetree(BlenderRNA *brna)
   prop = RNA_def_property(srna, "view_center", PROP_FLOAT, PROP_XYZ);
   RNA_def_property_array(prop, 2);
   RNA_def_property_float_sdna(prop, NULL, "view_center");
+  RNA_def_property_ui_text(
+      prop, "", "The current location (offset) of the view for this Node Tree");
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
 
   /* AnimData */

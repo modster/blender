@@ -116,6 +116,17 @@ class DebugFlags {
     bool use_debug;
   };
 
+  /* Descriptor of Metal feature-set to be used. */
+  struct Metal {
+    Metal();
+
+    /* Reset flags to their defaults. */
+    void reset();
+
+    /* Whether adaptive feature based runtime compile is enabled or not.*/
+    bool adaptive_compile;
+  };
+
   /* Get instance of debug flags registry. */
   static DebugFlags &get()
   {
@@ -138,6 +149,9 @@ class DebugFlags {
   /* Requested HIP flags. */
   HIP hip;
 
+  /* Requested Metal flags. */
+  Metal metal;
+
  private:
   DebugFlags();
 
@@ -159,8 +173,6 @@ inline DebugFlags &DebugFlags()
 {
   return DebugFlags::get();
 }
-
-std::ostream &operator<<(std::ostream &os, DebugFlagsConstRef debug_flags);
 
 CCL_NAMESPACE_END
 

@@ -673,7 +673,6 @@ static void viewrotate_apply_snap(ViewOpsData *vod)
   float zaxis_best[3];
   int x, y, z;
   bool found = false;
-  bool is_axis_aligned = false;
 
   invert_qt_qt_normalized(viewquat_inv, vod->curr.viewquat);
 
@@ -691,10 +690,6 @@ static void viewrotate_apply_snap(ViewOpsData *vod)
           if (angle_normalized_v3v3(zaxis_test, zaxis) < axis_limit) {
             copy_v3_v3(zaxis_best, zaxis_test);
             found = true;
-
-            if (abs(x) + abs(y) + abs(z) == 1) {
-              is_axis_aligned = true;
-            }
           }
         }
       }
@@ -767,7 +762,7 @@ static void viewrotate_apply_snap(ViewOpsData *vod)
     viewrotate_apply_dyn_ofs(vod, rv3d->viewquat);
 
     if (U.uiflag & USER_AUTOPERSP) {
-      if (is_axis_aligned) {
+      if (RV3D_VIEW_IS_AXIS(rv3d->view)) {
         if (rv3d->persp == RV3D_PERSP) {
           rv3d->persp = RV3D_ORTHO;
         }
@@ -3063,6 +3058,23 @@ static int viewselected_exec(bContext *C, wmOperator *op)
       /* we're only interested in selected points here... */
       if ((gps->flag & GP_STROKE_SELECT) && (gps->flag & GP_STROKE_3DSPACE)) {
         ok |= BKE_gpencil_stroke_minmax(gps, true, min, max);
+      }
+      if (gps->editcurve != NULL) {
+        for (int i = 0; i < gps->editcurve->tot_curve_points; i++) {
+          BezTriple *bezt = &gps->editcurve->curve_points[i].bezt;
+          if ((bezt->f1 & SELECT)) {
+            minmax_v3v3_v3(min, max, bezt->vec[0]);
+            ok = true;
+          }
+          if ((bezt->f2 & SELECT)) {
+            minmax_v3v3_v3(min, max, bezt->vec[1]);
+            ok = true;
+          }
+          if ((bezt->f3 & SELECT)) {
+            minmax_v3v3_v3(min, max, bezt->vec[2]);
+            ok = true;
+          }
+        }
       }
     }
     CTX_DATA_END;

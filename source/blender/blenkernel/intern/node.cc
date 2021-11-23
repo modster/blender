@@ -66,6 +66,7 @@
 #include "BKE_colortools.h"
 #include "BKE_cryptomatte.h"
 #include "BKE_global.h"
+#include "BKE_icons.h"
 #include "BKE_idprop.h"
 #include "BKE_idtype.h"
 #include "BKE_lib_id.h"
@@ -129,10 +130,6 @@ static void node_socket_interface_free(bNodeTree *UNUSED(ntree),
 static void nodeMuteRerouteOutputLinks(struct bNodeTree *ntree,
                                        struct bNode *node,
                                        const bool mute);
-static FieldInferencingInterface *node_field_inferencing_interface_copy(
-    const FieldInferencingInterface &field_inferencing_interface);
-static void node_field_inferencing_interface_free(
-    const FieldInferencingInterface *field_inferencing_interface);
 
 static void ntree_init_data(ID *id)
 {
@@ -245,8 +242,15 @@ static void ntree_copy_data(Main *UNUSED(bmain), ID *id_dst, const ID *id_src, c
   ntree_dst->interface_type = nullptr;
 
   if (ntree_src->field_inferencing_interface) {
-    ntree_dst->field_inferencing_interface = node_field_inferencing_interface_copy(
+    ntree_dst->field_inferencing_interface = new FieldInferencingInterface(
         *ntree_src->field_inferencing_interface);
+  }
+
+  if (flag & LIB_ID_COPY_NO_PREVIEW) {
+    ntree_dst->preview = nullptr;
+  }
+  else {
+    BKE_previewimg_id_copy(&ntree_dst->id, &ntree_src->id);
   }
 }
 
@@ -293,7 +297,7 @@ static void ntree_free_data(ID *id)
     MEM_freeN(sock);
   }
 
-  node_field_inferencing_interface_free(ntree->field_inferencing_interface);
+  delete ntree->field_inferencing_interface;
 
   /* free preview hash */
   if (ntree->previews) {
@@ -303,6 +307,8 @@ static void ntree_free_data(ID *id)
   if (ntree->id.tag & LIB_TAG_LOCALIZED) {
     BKE_libblock_free_data(&ntree->id, true);
   }
+
+  BKE_previewimg_free(&ntree->preview);
 }
 
 static void library_foreach_node_socket(LibraryForeachIDData *data, bNodeSocket *sock)
@@ -480,8 +486,10 @@ static void write_node_socket_default_value(BlendWriter *writer, bNodeSocket *so
     case SOCK_MATERIAL:
       BLO_write_struct(writer, bNodeSocketValueMaterial, sock->default_value);
       break;
-    case __SOCK_MESH:
     case SOCK_CUSTOM:
+      /* Custom node sockets where default_value is defined uses custom properties for storage. */
+      break;
+    case __SOCK_MESH:
     case SOCK_SHADER:
     case SOCK_GEOMETRY:
       BLI_assert_unreachable();
@@ -639,6 +647,8 @@ void ntreeBlendWrite(BlendWriter *writer, bNodeTree *ntree)
   LISTBASE_FOREACH (bNodeSocket *, sock, &ntree->outputs) {
     write_node_socket_interface(writer, sock);
   }
+
+  BKE_previewimg_blend_write(writer, ntree->preview);
 }
 
 static void ntree_blend_write(BlendWriter *writer, ID *id, const void *id_address)
@@ -669,6 +679,7 @@ static void direct_link_node_socket(BlendDataReader *reader, bNodeSocket *sock)
   BLO_read_data_address(reader, &sock->default_value);
   sock->total_inputs = 0; /* Clear runtime data set before drawing. */
   sock->cache = nullptr;
+  sock->declaration = nullptr;
 }
 
 /* ntree itself has been read! */
@@ -754,13 +765,11 @@ void ntreeBlendReadData(BlendDataReader *reader, bNodeTree *ntree)
         }
         case SH_NODE_TEX_IMAGE: {
           NodeTexImage *tex = (NodeTexImage *)node->storage;
-          tex->iuser.ok = 1;
           tex->iuser.scene = nullptr;
           break;
         }
         case SH_NODE_TEX_ENVIRONMENT: {
           NodeTexEnvironment *tex = (NodeTexEnvironment *)node->storage;
-          tex->iuser.ok = 1;
           tex->iuser.scene = nullptr;
           break;
         }
@@ -769,7 +778,6 @@ void ntreeBlendReadData(BlendDataReader *reader, bNodeTree *ntree)
         case CMP_NODE_VIEWER:
         case CMP_NODE_SPLITVIEWER: {
           ImageUser *iuser = (ImageUser *)node->storage;
-          iuser->ok = 1;
           iuser->scene = nullptr;
           break;
         }
@@ -783,7 +791,6 @@ void ntreeBlendReadData(BlendDataReader *reader, bNodeTree *ntree)
         }
         case TEX_NODE_IMAGE: {
           ImageUser *iuser = (ImageUser *)node->storage;
-          iuser->ok = 1;
           iuser->scene = nullptr;
           break;
         }
@@ -835,6 +842,9 @@ void ntreeBlendReadData(BlendDataReader *reader, bNodeTree *ntree)
     /* Update field referencing for the geometry nodes modifier. */
     ntree->update |= NTREE_UPDATE_FIELD_INFERENCING;
   }
+
+  BLO_read_data_address(reader, &ntree->preview);
+  BKE_previewimg_blend_read(reader, ntree->preview);
 
   /* type verification is in lib-link */
 }
@@ -1059,8 +1069,7 @@ IDTypeInfo IDType_ID_NT = {
 static void node_add_sockets_from_type(bNodeTree *ntree, bNode *node, bNodeType *ntype)
 {
   if (ntype->declare != nullptr) {
-    nodeDeclarationEnsure(ntree, node);
-    node->declaration->build(*ntree, *node);
+    node_verify_sockets(ntree, node, true);
     return;
   }
   bNodeSocketTemplate *sockdef;
@@ -1149,15 +1158,15 @@ static void ntree_set_typeinfo(bNodeTree *ntree, bNodeTreeType *typeinfo)
 {
   if (typeinfo) {
     ntree->typeinfo = typeinfo;
-
-    /* deprecated integer type */
-    ntree->type = typeinfo->type;
   }
   else {
     ntree->typeinfo = &NodeTreeTypeUndefined;
 
     ntree->init &= ~NTREE_TYPE_INIT;
   }
+
+  /* Deprecated integer type. */
+  ntree->type = ntree->typeinfo->type;
 }
 
 static void node_set_typeinfo(const struct bContext *C,
@@ -1531,7 +1540,7 @@ static bNodeSocket *make_socket(bNodeTree *ntree,
   }
   /* make the identifier unique */
   BLI_uniquename_cb(
-      unique_identifier_check, lb, "socket", '.', auto_identifier, sizeof(auto_identifier));
+      unique_identifier_check, lb, "socket", '_', auto_identifier, sizeof(auto_identifier));
 
   bNodeSocket *sock = (bNodeSocket *)MEM_callocN(sizeof(bNodeSocket), "sock");
   sock->in_out = in_out;
@@ -2611,6 +2620,17 @@ void nodeInternalRelink(bNodeTree *ntree, bNode *node)
         bNodeLink *fromlink = link->fromsock->link->fromsock->link;
         /* skip the node */
         if (fromlink) {
+          if (link->tosock->flag & SOCK_MULTI_INPUT) {
+            /* remove the link that would be the same as the relinked one */
+            LISTBASE_FOREACH_MUTABLE (bNodeLink *, link_to_compare, &ntree->links) {
+              if (link_to_compare->fromsock == fromlink->fromsock &&
+                  link_to_compare->tosock == link->tosock) {
+                adjust_multi_input_indices_after_removed_link(
+                    ntree, link_to_compare->tosock, link_to_compare->multi_input_socket_index);
+                nodeRemLink(ntree, link_to_compare);
+              }
+            }
+          }
           link->fromnode = fromlink->fromnode;
           link->fromsock = fromlink->fromsock;
 
@@ -3972,8 +3992,10 @@ int nodeSocketIsHidden(const bNodeSocket *sock)
   return ((sock->flag & (SOCK_HIDDEN | SOCK_UNAVAIL)) != 0);
 }
 
-void nodeSetSocketAvailability(bNodeSocket *sock, bool is_available)
+void nodeSetSocketAvailability(bNodeTree *UNUSED(ntree), bNodeSocket *sock, bool is_available)
 {
+  /* #ntree is not needed right now, but it's generally necessary when changing the tree because we
+   * want to tag it as changed in the future. */
   if (is_available) {
     sock->flag &= ~SOCK_UNAVAIL;
   }
@@ -3996,17 +4018,38 @@ int nodeSocketLinkLimit(const bNodeSocket *sock)
   return sock->limit;
 }
 
+static void update_socket_declarations(ListBase *sockets,
+                                       Span<blender::nodes::SocketDeclarationPtr> declarations)
+{
+  int index;
+  LISTBASE_FOREACH_INDEX (bNodeSocket *, socket, sockets, index) {
+    const SocketDeclaration &socket_decl = *declarations[index];
+    socket->declaration = &socket_decl;
+  }
+}
+
 /**
- * If the node implements a `declare` function, this function makes sure that `node->declaration`
- * is up to date.
+ * Update `socket->declaration` for all sockets in the node. This assumes that the node declaration
+ * and sockets are up to date already.
  */
-void nodeDeclarationEnsure(bNodeTree *UNUSED(ntree), bNode *node)
+void nodeSocketDeclarationsUpdate(bNode *node)
+{
+  BLI_assert(node->declaration != nullptr);
+  update_socket_declarations(&node->inputs, node->declaration->inputs());
+  update_socket_declarations(&node->outputs, node->declaration->outputs());
+}
+
+/**
+ * Just update `node->declaration` if necessary. This can also be called on nodes that may not be
+ * up to date (e.g. because the need versioning or are dynamic).
+ */
+bool nodeDeclarationEnsureOnOutdatedNode(bNodeTree *UNUSED(ntree), bNode *node)
 {
   if (node->declaration != nullptr) {
-    return;
+    return false;
   }
   if (node->typeinfo->declare == nullptr) {
-    return;
+    return false;
   }
   if (node->typeinfo->declaration_is_dynamic) {
     node->declaration = new blender::nodes::NodeDeclaration();
@@ -4018,6 +4061,20 @@ void nodeDeclarationEnsure(bNodeTree *UNUSED(ntree), bNode *node)
     BLI_assert(node->typeinfo->fixed_declaration != nullptr);
     node->declaration = node->typeinfo->fixed_declaration;
   }
+  return true;
+}
+
+/**
+ * If the node implements a `declare` function, this function makes sure that `node->declaration`
+ * is up to date. It is expected that the sockets of the node are up to date already.
+ */
+bool nodeDeclarationEnsure(bNodeTree *ntree, bNode *node)
+{
+  if (nodeDeclarationEnsureOnOutdatedNode(ntree, node)) {
+    nodeSocketDeclarationsUpdate(node);
+    return true;
+  }
+  return false;
 }
 
 /* ************** Node Clipboard *********** */
@@ -4489,18 +4546,6 @@ void ntreeUpdateAllNew(Main *main)
   FOREACH_NODETREE_END;
 }
 
-static FieldInferencingInterface *node_field_inferencing_interface_copy(
-    const FieldInferencingInterface &field_inferencing_interface)
-{
-  return new FieldInferencingInterface(field_inferencing_interface);
-}
-
-static void node_field_inferencing_interface_free(
-    const FieldInferencingInterface *field_inferencing_interface)
-{
-  delete field_inferencing_interface;
-}
-
 namespace blender::bke::node_field_inferencing {
 
 static bool is_field_socket_type(eNodeSocketDatatype type)
@@ -4584,6 +4629,15 @@ static OutputFieldDependency get_interface_output_field_dependency(const NodeRef
   return socket_decl.output_field_dependency();
 }
 
+static FieldInferencingInterface get_dummy_field_inferencing_interface(const NodeRef &node)
+{
+  FieldInferencingInterface inferencing_interface;
+  inferencing_interface.inputs.append_n_times(InputSocketFieldType::None, node.inputs().size());
+  inferencing_interface.outputs.append_n_times(OutputFieldDependency::ForDataSource(),
+                                               node.outputs().size());
+  return inferencing_interface;
+}
+
 /**
  * Retrieves information about how the node interacts with fields.
  * In the future, this information can be stored in the node declaration. This would allow this
@@ -4596,6 +4650,10 @@ static FieldInferencingInterface get_node_field_inferencing_interface(const Node
     bNodeTree *group = (bNodeTree *)node.bnode()->id;
     if (group == nullptr) {
       return FieldInferencingInterface();
+    }
+    if (!ntreeIsRegistered(group)) {
+      /* This can happen when there is a linked node group that was not found (see T92799). */
+      return get_dummy_field_inferencing_interface(node);
     }
     if (group->field_inferencing_interface == nullptr) {
       /* Update group recursively. */
@@ -4708,6 +4766,9 @@ static OutputFieldDependency find_group_output_dependencies(
         /* Propagate search further to the left. */
         for (const InputSocketRef *origin_input_socket :
              gather_input_socket_dependencies(field_dependency, origin_node)) {
+          if (!origin_input_socket->is_available()) {
+            continue;
+          }
           if (!field_state_by_socket_id[origin_input_socket->id()].is_single) {
             if (handled_sockets.add(origin_input_socket)) {
               sockets_to_check.push(origin_input_socket);
@@ -4756,6 +4817,9 @@ static void propagate_data_requirements_from_right_to_left(
         const Vector<const InputSocketRef *> connected_inputs = gather_input_socket_dependencies(
             field_dependency, *node);
         for (const InputSocketRef *input_socket : connected_inputs) {
+          if (!input_socket->is_available()) {
+            continue;
+          }
           if (inferencing_interface.inputs[input_socket->index()] ==
               InputSocketFieldType::Implicit) {
             if (!input_socket->is_logically_linked()) {
@@ -5173,9 +5237,8 @@ bool nodeUpdateID(bNodeTree *ntree, ID *id)
 void nodeUpdateInternalLinks(bNodeTree *ntree, bNode *node)
 {
   BLI_freelistN(&node->internal_links);
-
-  if (node->typeinfo && node->typeinfo->update_internal_links) {
-    node->typeinfo->update_internal_links(ntree, node);
+  if (!node->typeinfo->no_muting) {
+    node_internal_links_create(ntree, node);
   }
 }
 
@@ -5440,12 +5503,6 @@ void node_type_gpu(struct bNodeType *ntype, NodeGPUExecFunction gpu_fn)
   ntype->gpu_fn = gpu_fn;
 }
 
-void node_type_internal_links(bNodeType *ntype,
-                              void (*update_internal_links)(bNodeTree *, bNode *))
-{
-  ntype->update_internal_links = update_internal_links;
-}
-
 /* callbacks for undefined types */
 
 static bool node_undefined_poll(bNodeType *UNUSED(ntype),
@@ -5463,6 +5520,7 @@ static void register_undefined_types()
    * they are just used as placeholders in case the actual types are not registered.
    */
 
+  NodeTreeTypeUndefined.type = NTREE_UNDEFINED;
   strcpy(NodeTreeTypeUndefined.idname, "NodeTreeUndefined");
   strcpy(NodeTreeTypeUndefined.ui_name, N_("Undefined"));
   strcpy(NodeTreeTypeUndefined.ui_description, N_("Undefined Node Tree Type"));

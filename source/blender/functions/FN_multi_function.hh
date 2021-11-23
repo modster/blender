@@ -97,6 +97,8 @@ class MultiFunction {
     return signature_ref_->function_name;
   }
 
+  virtual std::string debug_name() const;
+
   bool depends_on_context() const
   {
     return signature_ref_->depends_on_context;
@@ -130,8 +132,6 @@ inline MFParamsBuilder::MFParamsBuilder(const MultiFunction &fn, const IndexMask
     : MFParamsBuilder(fn.signature(), *mask)
 {
 }
-
-extern const MultiFunction &dummy_multi_function;
 
 namespace multi_function_types {
 using fn::CPPType;

@@ -594,7 +594,7 @@ void ED_region_do_draw(bContext *C, ARegion *region)
 
   memset(&region->drawrct, 0, sizeof(region->drawrct));
 
-  UI_blocklist_free_inactive(C, &region->uiblocks);
+  UI_blocklist_free_inactive(C, region);
 
   if (area) {
     const bScreen *screen = WM_window_get_active_screen(win);
@@ -1377,7 +1377,7 @@ static void region_rect_recursive(
   else if (alignment == RGN_ALIGN_FLOAT) {
     /**
      * \note Currently this window type is only used for #RGN_TYPE_HUD,
-     * We expect the panel to resize it's self to be larger.
+     * We expect the panel to resize itself to be larger.
      *
      * This aligns to the lower left of the area.
      */
@@ -1985,7 +1985,7 @@ void ED_area_init(wmWindowManager *wm, wmWindow *win, ScrArea *area)
     }
     else {
       /* prevent uiblocks to run */
-      UI_blocklist_free(NULL, &region->uiblocks);
+      UI_blocklist_free(NULL, region);
     }
 
     /* Some AZones use View2D data which is only updated in region init, so call that first! */
@@ -3323,7 +3323,7 @@ bool ED_region_property_search(const bContext *C,
   }
 
   /* Free the panels and blocks, as they are only used for search. */
-  UI_blocklist_free(C, &region->uiblocks);
+  UI_blocklist_free(C, region);
   UI_panels_free_instanced(C, region);
   BKE_area_region_panels_free(&region->panels);
 

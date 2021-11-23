@@ -2227,7 +2227,7 @@ static int image_save_sequence_exec(bContext *C, wmOperator *op)
     iter = IMB_moviecacheIter_new(image->cache);
     while (!IMB_moviecacheIter_done(iter)) {
       ibuf = IMB_moviecacheIter_getImBuf(iter);
-      if (ibuf->userflags & IB_BITMAPDIRTY) {
+      if (ibuf != NULL && ibuf->userflags & IB_BITMAPDIRTY) {
         if (first_ibuf == NULL) {
           first_ibuf = ibuf;
         }
@@ -2251,7 +2251,7 @@ static int image_save_sequence_exec(bContext *C, wmOperator *op)
   while (!IMB_moviecacheIter_done(iter)) {
     ibuf = IMB_moviecacheIter_getImBuf(iter);
 
-    if (ibuf->userflags & IB_BITMAPDIRTY) {
+    if (ibuf != NULL && ibuf->userflags & IB_BITMAPDIRTY) {
       char name[FILE_MAX];
       BLI_strncpy(name, ibuf->name, sizeof(name));
 
@@ -3191,7 +3191,10 @@ void IMAGE_OT_unpack(wmOperatorType *ot)
  * \{ */
 
 /* Returns mouse position in image space. */
-bool ED_space_image_get_position(SpaceImage *sima, struct ARegion *ar, int mval[2], float fpos[2])
+bool ED_space_image_get_position(SpaceImage *sima,
+                                 struct ARegion *region,
+                                 int mval[2],
+                                 float fpos[2])
 {
   void *lock;
   ImBuf *ibuf = ED_space_image_acquire_buffer(sima, &lock, 0);
@@ -3201,7 +3204,7 @@ bool ED_space_image_get_position(SpaceImage *sima, struct ARegion *ar, int mval[
     return false;
   }
 
-  UI_view2d_region_to_view(&ar->v2d, mval[0], mval[1], &fpos[0], &fpos[1]);
+  UI_view2d_region_to_view(&region->v2d, mval[0], mval[1], &fpos[0], &fpos[1]);
 
   ED_space_image_release_buffer(sima, ibuf, lock);
   return true;

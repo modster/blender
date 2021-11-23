@@ -20,7 +20,6 @@
 #include "kernel/integrator/shader_eval.h"
 #include "kernel/light/light.h"
 #include "kernel/light/sample.h"
-#include "kernel/sample/mis.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -81,8 +80,7 @@ ccl_device float3 integrator_eval_background_shader(KernelGlobals kg,
     /* multiple importance sampling, get background light pdf for ray
      * direction, and compute weight with respect to BSDF pdf */
     const float pdf = background_light_pdf(kg, ray_P - ray_D * mis_ray_t, ray_D);
-    const float mis_weight = power_heuristic(mis_ray_pdf, pdf);
-
+    const float mis_weight = light_sample_mis_weight_forward(kg, mis_ray_pdf, pdf);
     L *= mis_weight;
   }
 #  endif
@@ -169,13 +167,13 @@ ccl_device_inline void integrate_distant_lights(KernelGlobals kg,
         /* multiple importance sampling, get regular light pdf,
          * and compute weight with respect to BSDF pdf */
         const float mis_ray_pdf = INTEGRATOR_STATE(state, path, mis_ray_pdf);
-        const float mis_weight = power_heuristic(mis_ray_pdf, ls.pdf);
+        const float mis_weight = light_sample_mis_weight_forward(kg, mis_ray_pdf, ls.pdf);
         light_eval *= mis_weight;
       }
 
       /* Write to render buffer. */
       const float3 throughput = INTEGRATOR_STATE(state, path, throughput);
-      kernel_accum_emission(kg, state, throughput, light_eval, render_buffer);
+      kernel_accum_emission(kg, state, throughput * light_eval, render_buffer);
     }
   }
 }
@@ -192,23 +190,11 @@ ccl_device void integrator_shade_background(KernelGlobals kg,
 
 #ifdef __SHADOW_CATCHER__
   if (INTEGRATOR_STATE(state, path, flag) & PATH_RAY_SHADOW_CATCHER_BACKGROUND) {
+    /* Special case for shadow catcher where we want to fill the background pass
+     * behind the shadow catcher but also continue tracing the path. */
     INTEGRATOR_STATE_WRITE(state, path, flag) &= ~PATH_RAY_SHADOW_CATCHER_BACKGROUND;
-
-    const int isect_prim = INTEGRATOR_STATE(state, isect, prim);
-    const int isect_type = INTEGRATOR_STATE(state, isect, type);
-    const int shader = intersection_get_shader_from_isect_prim(kg, isect_prim, isect_type);
-    const int shader_flags = kernel_tex_fetch(__shaders, shader).flags;
-
-    if (shader_flags & SD_HAS_RAYTRACE) {
-      INTEGRATOR_PATH_NEXT_SORTED(DEVICE_KERNEL_INTEGRATOR_SHADE_BACKGROUND,
-                                  DEVICE_KERNEL_INTEGRATOR_SHADE_SURFACE_RAYTRACE,
-                                  shader);
-    }
-    else {
-      INTEGRATOR_PATH_NEXT_SORTED(DEVICE_KERNEL_INTEGRATOR_SHADE_BACKGROUND,
-                                  DEVICE_KERNEL_INTEGRATOR_SHADE_SURFACE,
-                                  shader);
-    }
+    integrator_intersect_next_kernel_after_shadow_catcher_background<
+        DEVICE_KERNEL_INTEGRATOR_SHADE_BACKGROUND>(kg, state);
     return;
   }
 #endif

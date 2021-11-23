@@ -38,7 +38,6 @@ static void node_composit_init_splitviewer(bNodeTree *UNUSED(ntree), bNode *node
   ImageUser *iuser = (ImageUser *)MEM_callocN(sizeof(ImageUser), "node image user");
   node->storage = iuser;
   iuser->sfra = 1;
-  iuser->ok = 1;
   node->custom1 = 50; /* default 50% split */
 
   node->id = (ID *)BKE_image_ensure_viewer(G.main, IMA_TYPE_COMPOSITE, "Viewer Node");
@@ -54,8 +53,7 @@ void register_node_type_cmp_splitviewer(void)
   node_type_init(&ntype, node_composit_init_splitviewer);
   node_type_storage(&ntype, "ImageUser", node_free_standard_storage, node_copy_standard_storage);
 
-  /* Do not allow muting for this node. */
-  node_type_internal_links(&ntype, nullptr);
+  ntype.no_muting = true;
 
   nodeRegisterType(&ntype);
 }
