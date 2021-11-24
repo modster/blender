@@ -23,6 +23,7 @@
  * Compile time automation of shader compilation and validation.
  */
 
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -248,7 +249,8 @@ static void write_inout(FILE *fp,
   (void)indent;
   (void)desc;
   (void)iface_type;
-  fprintf(fp, "{%s, \"%s\", %u}", inout_type_to_str(inout->type), inout->name, (uint)inout->qual);
+  fprintf(
+      fp, "{%s, \"%s\", %u}", inout_type_to_str(inout->type), inout->name, (uint32_t)inout->qual);
 }
 
 static void write_interface_declaration(FILE *fp,
@@ -319,10 +321,10 @@ static void write_resource_bind(FILE *fp,
   (void)iface_type;
   fprintf(fp,
           "{%u, %u, %u, %u, \"%s\", \"%s\"}",
-          (uint)bind->bind_type,
-          (uint)bind->type,
-          (uint)bind->qual,
-          (uint)bind->sampler,
+          (uint32_t)bind->bind_type,
+          (uint32_t)bind->type,
+          (uint32_t)bind->qual,
+          (uint32_t)bind->sampler,
           bind->type_name ? bind->type_name : "",
           bind->name);
 }
@@ -365,15 +367,27 @@ static void write_descriptor(FILE *fp, const GPUShaderDescriptor *desc)
     int used_slots_1 = 0;
     for (int i = 0; i < ARRAY_SIZE(desc->resources); i++) {
       for (int j = 0; j < ARRAY_SIZE(desc->resources[i]); j++) {
-        used_slots_1 += (desc->resources[i][j].type != UNUSED);
+        used_slots_1 += (desc->resources[i][j].bind_type != UNUSED);
       }
     }
     if (used_slots_1) {
       fprintf(fp, "  .resources = {\n");
-      write_array(
-          fp, desc, desc->resources[0], [DESCRIPTOR_SET_0], .type, write_resource_bind, "", "  ");
-      write_array(
-          fp, desc, desc->resources[1], [DESCRIPTOR_SET_1], .type, write_resource_bind, "", "  ");
+      write_array(fp,
+                  desc,
+                  desc->resources[0],
+                  [DESCRIPTOR_SET_0],
+                  .bind_type,
+                  write_resource_bind,
+                  "",
+                  "  ");
+      write_array(fp,
+                  desc,
+                  desc->resources[1],
+                  [DESCRIPTOR_SET_1],
+                  .bind_type,
+                  write_resource_bind,
+                  "",
+                  "  ");
       fprintf(fp, "  },\n");
     }
   }

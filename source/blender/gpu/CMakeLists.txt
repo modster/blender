@@ -421,13 +421,11 @@ file(GENERATE OUTPUT ${shader_descriptor_list_file} CONTENT "${SHADER_DESCRIPTOR
 
 add_executable(shader_builder
   intern/gpu_shader_builder.c
-  # intern/gpu_shader_dependency.cc
-  # ../blenlib/intern/BLI_assert.c
-  # ../../../intern/guardedalloc/intern/mallocn.c
-  # ../../../intern/guardedalloc/intern/mallocn_lockfree_impl.c
-  # ${GLSL_C}
+  intern/gpu_shader_dependency.cc
+  ${GLSL_C}
   ${shader_descriptor_list_file}
 )
+target_link_libraries(shader_builder PRIVATE bf_intern_guardedalloc bf_blenlib ${PLATFORM_LINKLIBS})
 target_include_directories(shader_builder PRIVATE ${INC} ${CMAKE_CURRENT_BINARY_DIR})
 
 set(BAKED_DESCRIPTORS_FILE ${CMAKE_CURRENT_BINARY_DIR}/shader_descriptors_baked.c)

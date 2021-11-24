@@ -30,6 +30,7 @@ GPU_SHADER_DESCRIPTOR(workbench_hair,
                               },
                           .additional_descriptors =
                               {
+                                  0,
                                   /* TODO */
                                   // &draw_hair,
                               },
@@ -47,6 +48,7 @@ GPU_SHADER_DESCRIPTOR(workbench_pointcloud,
                           .vertex_source = "workbench_prepass_pointcloud_vert.glsl",
                           .additional_descriptors =
                               {
+                                  0,
                                   /* TODO */
                                   // &draw_pointcloud,
                               },
