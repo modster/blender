@@ -34,8 +34,23 @@
 #undef GPU_STAGE_INTERFACE_CREATE
 #undef GPU_SHADER_DESCRIPTOR
 
+static const GPUShaderDescriptor *find_descriptor_by_name(const GPUShaderDescriptor **descriptors,
+                                                          const char *name)
+{
+  const GPUShaderDescriptor **result = descriptors;
+  while (*result) {
+    if (strcmp((*result)->name, name) == 0) {
+      return *result;
+    }
+    result++;
+  }
+  return NULL;
+}
+
 /* Return 0 on success. (Recursive). */
-static bool descriptor_flatten(const GPUShaderDescriptor *input, GPUShaderDescriptor *output)
+static bool descriptor_flatten(const GPUShaderDescriptor **descriptors,
+                               const GPUShaderDescriptor *input,
+                               GPUShaderDescriptor *output)
 {
   int errors = 0;
 
@@ -192,7 +207,17 @@ static bool descriptor_flatten(const GPUShaderDescriptor *input, GPUShaderDescri
 
   for (int i = 0; i < ARRAY_SIZE(input->additional_descriptors); i++) {
     if (input->additional_descriptors[i]) {
-      errors += descriptor_flatten(input->additional_descriptors[i], output);
+      const GPUShaderDescriptor *deps = find_descriptor_by_name(descriptors,
+                                                                input->additional_descriptors[i]);
+      if (deps) {
+        errors += descriptor_flatten(descriptors, deps, output);
+      }
+      else {
+        printf("Error: %s : Could not find dependency %s.\n",
+               input->name,
+               input->additional_descriptors[i]);
+        errors++;
+      }
     }
   }
   return errors;
@@ -418,32 +443,39 @@ int main(int argc, char const *argv[])
   }
 
   size_t descriptors_len = 0;
-/* Count number of descriptors. */
-#define GPU_STAGE_INTERFACE_CREATE(_interface, ...)
-#define GPU_SHADER_DESCRIPTOR(_descriptor, ...) descriptors_len++;
+/* Count number of descriptors. Define interfaces. */
+#define GPU_STAGE_INTERFACE_CREATE(_interface) GPUInOut _interface[] =
+#define GPU_SHADER_DESCRIPTOR(_descriptor) \
+  descriptors_len++; \
+  (void)(GPUShaderDescriptor)
 #include "gpu_shader_descriptor_list.h"
 #undef GPU_STAGE_INTERFACE_CREATE
 #undef GPU_SHADER_DESCRIPTOR
+/* Discard interfaces then. */
+#define GPU_STAGE_INTERFACE_CREATE(_interface) (void)(GPUInOut[])
 
-  GPUShaderDescriptor **descriptors = calloc(descriptors_len, sizeof(void *));
+  /* Null ended array. */
+  GPUShaderDescriptor **descriptors = calloc(descriptors_len + 1, sizeof(void *));
 
   size_t index = 0;
 /* Declare everything first to be able to avoid dependency for references. */
-#define GPU_STAGE_INTERFACE_CREATE(_interface, ...) GPUInOut _interface[] = __VA_ARGS__;
-#define GPU_SHADER_DESCRIPTOR(_descriptor, ...) \
+#define GPU_SHADER_DESCRIPTOR(_descriptor) \
   GPUShaderDescriptor _descriptor; \
-  descriptors[index++] = &_descriptor;
+  descriptors[index++] = &_descriptor; \
+  (void)(GPUShaderDescriptor)
 #include "gpu_shader_descriptor_list.h"
-#undef GPU_STAGE_INTERFACE_CREATE
 #undef GPU_SHADER_DESCRIPTOR
 
 /* Set values. */
-#define GPU_STAGE_INTERFACE_CREATE(_interface, ...)
-#define GPU_SHADER_DESCRIPTOR(_descriptor, ...) \
-  _descriptor = (GPUShaderDescriptor)__VA_ARGS__; \
-  _descriptor.name = #_descriptor;
+#define GPU_SHADER_DESCRIPTOR(_descriptor) _descriptor = (GPUShaderDescriptor)
 #include "gpu_shader_descriptor_list.h"
-#undef GPU_STAGE_INTERFACE_CREATE
+#undef GPU_SHADER_DESCRIPTOR
+
+/* Set name. */
+#define GPU_SHADER_DESCRIPTOR(_descriptor) \
+  _descriptor.name = #_descriptor; \
+  (void)(GPUShaderDescriptor)
+#include "gpu_shader_descriptor_list.h"
 #undef GPU_SHADER_DESCRIPTOR
 
   FILE *fp = fopen(argv[1], "w");
@@ -460,7 +492,7 @@ int main(int argc, char const *argv[])
 
     GPUShaderDescriptor flattened_descriptor = {0};
 
-    int errors = descriptor_flatten(descriptor, &flattened_descriptor);
+    int errors = descriptor_flatten(descriptors, descriptor, &flattened_descriptor);
     if (errors != 0) {
       result = 1;
       continue;
