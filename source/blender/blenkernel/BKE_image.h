@@ -446,7 +446,7 @@ typedef enum ePartialUpdateIterResult {
 /**
  * \brief Create a new PartialUpdateUser. An Object that contains data to use partial updates.
  */
-struct PartialUpdateUser *BKE_image_partial_update_create(struct Image *image);
+struct PartialUpdateUser *BKE_image_partial_update_create(const struct Image *image);
 
 /**
  * \brief free a partial update user.

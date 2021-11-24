@@ -24,6 +24,15 @@
 
 #include <optional>
 
+#include "BKE_image.h"
+
+/**
+ * \brief max allowed textures to use by the ScreenSpaceDrawingMode.
+ *
+ * Technically between 4 and 16 textures could be in use.
+ */
+constexpr int SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN = 16;
+
 /* Forward declarations */
 extern "C" {
 struct GPUTexture;
@@ -41,6 +50,25 @@ struct IMAGE_PassList {
   DRWPass *image_pass;
 };
 
+struct IMAGE_ScreenSpaceTextureInfo {
+  /**
+   * \brief Is the texture clipped.
+   *
+   * Resources of clipped textures are freed and ignored when performing partial updates.
+   */
+  bool visible : 1;
+
+  /**
+   * \brief does this texture need a full update.
+   *
+   * When set to false the texture can be updated using a partial update.
+   */
+  bool dirty : 1;
+
+  /** \brief area of the texture in screen space. */
+  rctf clipping_bounds;
+};
+
 struct IMAGE_PrivateData {
   void *lock;
   struct ImBuf *ibuf;
@@ -49,6 +77,20 @@ struct IMAGE_PrivateData {
 
   struct GPUTexture *texture;
   bool owns_texture;
+
+  /* Data used in screen space drawing mode. */
+  struct {
+    /* TODO: partial_update_user isn't freed with the space leading to a memory leak. */
+    struct PartialUpdateUser *partial_update_user;
+    const struct Image *partial_update_image;
+    IMAGE_ScreenSpaceTextureInfo texture_infos[SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN];
+  } screen_space;
+};
+
+struct IMAGE_TextureList {
+  struct {
+    GPUTexture *textures[SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN];
+  } screen_space;
 };
 
 struct IMAGE_StorageList {
@@ -58,7 +100,7 @@ struct IMAGE_StorageList {
 struct IMAGE_Data {
   void *engine_type;
   DRWViewportEmptyList *fbl;
-  DRWViewportEmptyList *txl;
+  IMAGE_TextureList *txl;
   IMAGE_PassList *psl;
   IMAGE_StorageList *stl;
 };

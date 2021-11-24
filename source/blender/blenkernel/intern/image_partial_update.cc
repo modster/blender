@@ -134,7 +134,7 @@ struct PartialUpdateUserImpl {
 
 #ifdef NDEBUG
   /** \brief reference to image to validate correct API usage. */
-  void *debug_image_;
+  const void *debug_image_;
 #endif
 
   /**
@@ -460,7 +460,7 @@ static struct PartialUpdateRegister *image_partial_update_register_ensure(Image 
 }
 
 // TODO(jbakker): cleanup parameter.
-struct PartialUpdateUser *BKE_image_partial_update_create(struct Image *image)
+struct PartialUpdateUser *BKE_image_partial_update_create(const struct Image *image)
 {
   PartialUpdateUserImpl *user_impl = OBJECT_GUARDED_NEW(PartialUpdateUserImpl);
 
