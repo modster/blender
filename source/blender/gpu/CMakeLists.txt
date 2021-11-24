@@ -378,6 +378,47 @@ data_to_c_simple(shaders/gpu_shader_colorspace_lib.glsl SRC)
 
 data_to_c_simple(shaders/gpu_shader_common_obinfos_lib.glsl SRC)
 
+set(SHADER_DESCRIPTORS
+  ../draw/engines/workbench/shaders/workbench_effect_cavity.desc.h
+  ../draw/engines/workbench/shaders/workbench_prepass.desc.h
+  ../draw/intern/shaders/draw_fullscreen.desc.h
+  ../draw/intern/shaders/draw_view.desc.h
+  ../draw/intern/shaders/draw_object_infos.desc.h
+  shaders/gpu_shader_3D_flat_color.desc.h
+  shaders/gpu_clip_planes.desc.h
+)
+
+set(SHADER_DESCRIPTORS_CONTENT "")
+foreach(DESCRIPTOR_FILE ${SHADER_DESCRIPTORS})
+  string(APPEND SHADER_DESCRIPTORS_CONTENT "#include \"${DESCRIPTOR_FILE}\"\n")
+endforeach()
+
+set(shader_descriptor_list_file "${CMAKE_CURRENT_BINARY_DIR}/gpu_shader_descriptor_list.h")
+file(GENERATE OUTPUT ${shader_descriptor_list_file} CONTENT "${SHADER_DESCRIPTORS_CONTENT}")
+
+add_executable(shader_builder
+  intern/gpu_shader_builder.c
+  # intern/gpu_shader_dependency.cc
+  # ../blenlib/intern/BLI_assert.c
+  # ../../../intern/guardedalloc/intern/mallocn.c
+  # ../../../intern/guardedalloc/intern/mallocn_lockfree_impl.c
+  # ${GLSL_C}
+  ${shader_descriptor_list_file}
+)
+target_include_directories(shader_builder PRIVATE ${INC} ${CMAKE_CURRENT_BINARY_DIR})
+
+set(BAKED_DESCRIPTORS_FILE ${CMAKE_CURRENT_BINARY_DIR}/shader_descriptors_baked.c)
+
+add_custom_command(
+  OUTPUT
+    ${BAKED_DESCRIPTORS_FILE}
+  COMMAND
+    "$<TARGET_FILE:shader_builder>" ${BAKED_DESCRIPTORS_FILE}
+  DEPENDS shader_builder
+)
+
+list(APPEND SRC ${BAKED_DESCRIPTORS_FILE})
+
 
 if(WITH_MOD_FLUID)
   add_definitions(-DWITH_FLUID)
