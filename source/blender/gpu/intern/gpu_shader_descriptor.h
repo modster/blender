@@ -24,18 +24,16 @@
  *
  * Some rule of thumb:
  * - Do not include anything else than this file in each descriptor file.
- * - You can assume all descriptors will be defined and you can reference any of them in
- *   additional_descriptors.
  */
 
 #pragma once
 
 #include <stdbool.h>
 
-/* For helping code suggestion. */
+/* For helping intellisense. */
 #ifndef GPU_SHADER_DESCRIPTOR
-#  define GPU_STAGE_INTERFACE_CREATE(_interface, ...) GPUInOut _interface[] = __VA_ARGS__;
-#  define GPU_SHADER_DESCRIPTOR(_descriptor, ...) GPUShaderDescriptor _descriptor = __VA_ARGS__;
+#  define GPU_STAGE_INTERFACE_CREATE(_interface) GPUInOut _interface[] =
+#  define GPU_SHADER_DESCRIPTOR(_descriptor) GPUShaderDescriptor _descriptor =
 #endif
 
 #ifndef ARRAY_SIZE
@@ -238,8 +236,8 @@ typedef struct GPUShaderDescriptor {
   const char *defines[8];
 
   /**
-   * Link to other descriptors to recursively merge with this one.
+   * Name of other descriptors to recursively merge with this one.
    * No data slot must overlap otherwise we throw an error.
    */
-  struct GPUShaderDescriptor *additional_descriptors[4];
+  const char *additional_descriptors[4];
 } GPUShaderDescriptor;
