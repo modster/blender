@@ -351,7 +351,7 @@ static void create_attributes(GeoNodeExecParams &params,
 
   if (line_id) {
     line_attribute = instances.attribute_try_get_for_output_only<int>(line_id.get(),
-                                                                      ATTR_DOMAIN_POINT);
+                                                                      ATTR_DOMAIN_INSTANCE);
     lines = line_attribute.as_span();
   }
 
@@ -363,7 +363,7 @@ static void create_attributes(GeoNodeExecParams &params,
 
   if (pivot_id) {
     pivot_attribute = instances.attribute_try_get_for_output_only<float3>(pivot_id.get(),
-                                                                          ATTR_DOMAIN_POINT);
+                                                                          ATTR_DOMAIN_INSTANCE);
     pivots = pivot_attribute.as_span();
   }
 
@@ -394,7 +394,7 @@ static void create_attributes(GeoNodeExecParams &params,
   }
 }
 
-static void geo_node_string_to_curves_exec(GeoNodeExecParams params)
+static void node_geo_exec(GeoNodeExecParams params)
 {
   TextLayout layout = get_text_layout(params);
 

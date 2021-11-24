@@ -654,7 +654,6 @@ class InstancesComponent : public GeometryComponent {
   blender::bke::CustomDataAttributes attributes_;
 
  public:
-  blender::bke::CustomDataAttributes attributes;
   InstancesComponent();
   ~InstancesComponent() = default;
   GeometryComponent *copy() const override;
