@@ -21,13 +21,6 @@ GPU_SHADER_DESCRIPTOR(gpu_shader_3D_flat_color,
                               {
                                   [0] = FRAGMENT_OUTPUT(VEC4, "fragColor"),
                               },
-                          .resources =
-                              {
-                                  [DESCRIPTOR_SET_0] =
-                                      {
-                                          // [0] = common->matrix_stack_block,
-                                      },
-                              },
                           .push_constants =
                               {
                                   [1] = PUSH_CONSTANT(BOOL, "srgbTarget"),

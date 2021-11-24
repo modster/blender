@@ -82,9 +82,10 @@ struct GPUSource {
       /* Recursive. */
       source->init_dependencies(dict);
 
-      std::cout << "Add: " << dependency_name << "  to " << filename << "." << std::endl;
+      for (auto dep : source->dependencies) {
+        dependencies.add(dep);
+      }
       dependencies.add(source);
-
       pos++;
     };
   }
