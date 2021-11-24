@@ -386,7 +386,11 @@ foreach(GLSL_FILE ${GLSL_SRC})
   data_to_c_simple(${GLSL_FILE} GLSL_C)
 endforeach()
 
-list(APPEND SRC ${GLSL_C})
+blender_add_lib(bf_gpu_shaders "${GLSL_C}" "" "" "")
+
+list(APPEND LIB
+  bf_gpu_shaders
+)
 
 set(GLSL_SOURCE_CONTENT "")
 foreach(GLSL_FILE ${GLSL_SRC})
@@ -395,11 +399,10 @@ foreach(GLSL_FILE ${GLSL_SRC})
   string(APPEND GLSL_SOURCE_CONTENT "SHADER_SOURCE\(datatoc_${GLSL_FILE_NAME_UNDERSCORES}, \"${GLSL_FILE_NAME}\"\)\n")
 endforeach()
 
-set(glsl_source_list_file "${CMAKE_CURRENT_BINARY_DIR}/glsl_source_list.h")
+set(glsl_source_list_file "${CMAKE_CURRENT_BINARY_DIR}/glsl_gpu_source_list.h")
 file(GENERATE OUTPUT ${glsl_source_list_file} CONTENT "${GLSL_SOURCE_CONTENT}")
 list(APPEND SRC ${glsl_source_list_file})
 list(APPEND INC ${CMAKE_CURRENT_BINARY_DIR})
-
 
 set(SHADER_DESCRIPTORS
   ../draw/engines/workbench/shaders/workbench_effect_cavity.desc.h
@@ -422,10 +425,14 @@ file(GENERATE OUTPUT ${shader_descriptor_list_file} CONTENT "${SHADER_DESCRIPTOR
 add_executable(shader_builder
   intern/gpu_shader_builder.c
   intern/gpu_shader_dependency.cc
-  ${GLSL_C}
   ${shader_descriptor_list_file}
 )
-target_link_libraries(shader_builder PRIVATE bf_intern_guardedalloc bf_blenlib ${PLATFORM_LINKLIBS})
+target_link_libraries(shader_builder PRIVATE
+  bf_intern_guardedalloc
+  bf_blenlib
+  bf_gpu_shaders
+  bf_draw_shaders
+  ${PLATFORM_LINKLIBS})
 target_include_directories(shader_builder PRIVATE ${INC} ${CMAKE_CURRENT_BINARY_DIR})
 
 set(BAKED_DESCRIPTORS_FILE ${CMAKE_CURRENT_BINARY_DIR}/shader_descriptors_baked.c)

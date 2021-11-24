@@ -27,14 +27,15 @@
 #include <iostream>
 
 #include "BLI_map.hh"
+#include "BLI_set.hh"
 #include "BLI_string_ref.hh"
-#include "BLI_vector.hh"
 
 #include "gpu_shader_dependency_private.h"
 
 extern "C" {
 #define SHADER_SOURCE(datatoc, filename) extern char datatoc[];
-#include "glsl_source_list.h"
+#include "glsl_draw_source_list.h"
+#include "glsl_gpu_source_list.h"
 #undef SHADER_SOURCE
 }
 
@@ -45,10 +46,8 @@ using GPUSourceDictionnary = Map<StringRef, struct GPUSource *>;
 struct GPUSource {
   StringRefNull filename;
   StringRefNull source;
-  Vector<GPUSource *> dependencies;
+  Set<GPUSource *> dependencies;
   bool dependencies_init = false;
-  /* Tag when pragma once has been set. */
-  bool visited = false;
 
   GPUSource(const char *file, const char *datatoc) : filename(file), source(datatoc){};
 
@@ -82,38 +81,21 @@ struct GPUSource {
       }
       /* Recursive. */
       source->init_dependencies(dict);
-      dependencies.append(source);
+
+      std::cout << "Add: " << dependency_name << "  to " << filename << "." << std::endl;
+      dependencies.add(source);
+
+      pos++;
     };
   }
 
-  void reset_recursive()
-  {
-    visited = false;
-    for (auto dep : dependencies) {
-      dep->reset_recursive();
-    }
-  }
-
-  void build_recursive(std::string &str)
-  {
-    if (visited) {
-      return;
-    }
-    visited = true;
-    /* Recursive. */
-    for (auto dep : dependencies) {
-      dep->build_recursive(str);
-    }
-    str += source;
-  }
-
-  /* Returns the final string with all inlcudes done.
-   * IMPORTANT: Not threadsafe because of visited flag! Could be easily fixed by gathering all
-   * deps in the dependencies vector. */
+  /* Returns the final string with all inlcudes done. */
   void build(std::string &str)
   {
-    reset_recursive();
-    build_recursive(str);
+    for (auto dep : dependencies) {
+      str += dep->source;
+    }
+    str += source;
   }
 };
 
@@ -129,6 +111,7 @@ void gpu_shader_dependency_init()
 
 #define SHADER_SOURCE(datatoc, filename) \
   g_sources->add_new(filename, new GPUSource(filename, datatoc));
+#include "glsl_draw_source_list.h"
 #include "glsl_source_list.h"
 #undef SHADER_SOURCE
 

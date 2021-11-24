@@ -450,7 +450,7 @@ int main(int argc, char const *argv[])
 
   fprintf(fp, "#include \"gpu_shader_descriptor.h\"\n");
 
-#if 0 /* TEST */
+#if 1 /* TEST */
   gpu_shader_dependency_init();
 #endif
 
@@ -482,7 +482,7 @@ int main(int argc, char const *argv[])
         result = 1;
       }
 #endif
-#if 0 /* TEST */
+#if 1 /* TEST */
       if (descriptor->vertex_source) {
         char *src = gpu_shader_dependency_get_resolved_source(descriptor->vertex_source);
 
@@ -497,7 +497,7 @@ int main(int argc, char const *argv[])
     write_descriptor(fp, descriptor);
   }
 
-#if 0 /* TEST */
+#if 1 /* TEST */
   gpu_shader_dependency_exit();
 #endif
 
