@@ -337,6 +337,57 @@ class GVArrayImpl_For_SingleValue : public GVArrayImpl_For_SingleValueRef,
 /** \} */
 
 /* -------------------------------------------------------------------- */
+/** \name #GVArrayImpl_For_SmallTrivialSingleValue
+ * \{ */
+
+/**
+ * Contains an inline buffer that can store a single value of a trivial type.
+ * This avoids the allocation that would be done by #GVArrayImpl_For_SingleValue.
+ */
+template<int BufferSize> class GVArrayImpl_For_SmallTrivialSingleValue : public GVArrayImpl {
+ private:
+  AlignedBuffer<BufferSize, 8> buffer_;
+
+ public:
+  GVArrayImpl_For_SmallTrivialSingleValue(const CPPType &type,
+                                          const int64_t size,
+                                          const void *value)
+      : GVArrayImpl(type, size)
+  {
+    BLI_assert(type.is_trivial());
+    BLI_assert(type.alignment() <= 8);
+    BLI_assert(type.size() <= BufferSize);
+    type.copy_construct(value, &buffer_);
+  }
+
+ private:
+  void get(const int64_t UNUSED(index), void *r_value) const override
+  {
+    this->copy_value_to(r_value);
+  }
+  void get_to_uninitialized(const int64_t UNUSED(index), void *r_value) const override
+  {
+    this->copy_value_to(r_value);
+  }
+
+  bool is_single() const override
+  {
+    return true;
+  }
+  void get_internal_single(void *r_value) const override
+  {
+    this->copy_value_to(r_value);
+  }
+
+  void copy_value_to(void *dst) const
+  {
+    memcpy(dst, &buffer_, type_->size());
+  }
+};
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
 /** \name #GVArray_GSpan
  * \{ */
 
@@ -426,12 +477,14 @@ class GVArrayImpl_For_SlicedGVArray : public GVArrayImpl {
  protected:
   GVArray varray_;
   int64_t offset_;
+  IndexRange slice_;
 
  public:
   GVArrayImpl_For_SlicedGVArray(GVArray varray, const IndexRange slice)
       : GVArrayImpl(varray.type(), slice.size()),
         varray_(std::move(varray)),
-        offset_(slice.start())
+        offset_(slice.start()),
+        slice_(slice)
   {
     BLI_assert(slice.one_after_last() <= varray_.size());
   }
@@ -444,6 +497,24 @@ class GVArrayImpl_For_SlicedGVArray : public GVArrayImpl {
   void get_to_uninitialized(const int64_t index, void *r_value) const override
   {
     varray_.get_to_uninitialized(index + offset_, r_value);
+  }
+
+  bool is_span() const override
+  {
+    return varray_.is_span();
+  }
+  GSpan get_internal_span() const override
+  {
+    return varray_.get_internal_span().slice(slice_);
+  }
+
+  bool is_single() const override
+  {
+    return varray_.is_single();
+  }
+  void get_internal_single(void *r_value) const override
+  {
+    varray_.get_internal_single(r_value);
   }
 };
 
@@ -530,9 +601,6 @@ void GVArrayCommon::move_from(GVArrayCommon &&other) noexcept
 /* Returns true when the virtual array is stored as a span internally. */
 bool GVArrayCommon::is_span() const
 {
-  if (this->is_empty()) {
-    return true;
-  }
   return impl_->is_span();
 }
 
@@ -541,18 +609,12 @@ bool GVArrayCommon::is_span() const
 GSpan GVArrayCommon::get_internal_span() const
 {
   BLI_assert(this->is_span());
-  if (this->is_empty()) {
-    return GSpan(impl_->type());
-  }
   return impl_->get_internal_span();
 }
 
 /* Returns true when the virtual array returns the same value for every index. */
 bool GVArrayCommon::is_single() const
 {
-  if (impl_->size() == 1) {
-    return true;
-  }
   return impl_->is_single();
 }
 
@@ -562,10 +624,6 @@ bool GVArrayCommon::is_single() const
 void GVArrayCommon::get_internal_single(void *r_value) const
 {
   BLI_assert(this->is_single());
-  if (impl_->size() == 1) {
-    impl_->get(0, r_value);
-    return;
-  }
   impl_->get_internal_single(r_value);
 }
 
@@ -606,6 +664,9 @@ GVArray::GVArray(std::shared_ptr<const GVArrayImpl> impl) : GVArrayCommon(std::m
 
 GVArray GVArray::ForSingle(const CPPType &type, const int64_t size, const void *value)
 {
+  if (type.is_trivial() && type.size() <= 16 && type.alignment() <= 8) {
+    return GVArray::For<GVArrayImpl_For_SmallTrivialSingleValue<16>>(type, size, value);
+  }
   return GVArray::For<GVArrayImpl_For_SingleValue>(type, size, value);
 }
 
