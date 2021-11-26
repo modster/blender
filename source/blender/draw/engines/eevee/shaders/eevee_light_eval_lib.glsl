@@ -8,7 +8,6 @@
  * - lights_zbins
  * - light_culling
  * - lights_culling_words
- * - shadows
  * - shadow_atlas_tx
  * - shadow_tilemaps_tx
  * - sss_transmittance_tx
@@ -46,7 +45,7 @@ void light_eval(ClosureDiffuse diffuse,
       vec3 lL = light_world_to_local(light, -L) * dist;
 
       float shadow_delta = shadow_delta_get(
-          shadow_atlas_tx, shadow_tilemaps_tx, light, shadows[l_idx], lL, dist, P);
+          shadow_atlas_tx, shadow_tilemaps_tx, light, light.shadow_data, lL, dist, P);
 
       /* Transmittance evaluation first to use initial visibility. */
       if (diffuse.sss_id != 0u && light.diffuse_power > 0.0) {
@@ -59,7 +58,7 @@ void light_eval(ClosureDiffuse diffuse,
         out_diffuse += light.color * intensity;
       }
 
-      visibility *= float(shadow_delta - shadows[l_idx].bias <= 0.0);
+      visibility *= float(shadow_delta - light.shadow_data.bias <= 0.0);
     }
 
     if (visibility < 1e-6) {

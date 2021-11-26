@@ -434,74 +434,6 @@ static inline int culling_z_to_zbin(CullingData data, float z)
 /** \} */
 
 /* -------------------------------------------------------------------- */
-/** \name Lights
- * \{ */
-
-#define LIGHT_NO_SHADOW -1
-
-enum eLightType : uint32_t {
-  LIGHT_SUN = 0u,
-  LIGHT_POINT = 1u,
-  LIGHT_SPOT = 2u,
-  LIGHT_RECT = 3u,
-  LIGHT_ELLIPSE = 4u
-};
-
-static inline bool is_area_light(eLightType type)
-{
-  return type >= LIGHT_RECT;
-}
-
-struct LightData {
-  /** Normalized obmat. Last column contains data accessible using the following macros. */
-  mat4 object_mat;
-  /** Packed data in the last column of the object_mat. */
-#define _area_size_x object_mat[0][3]
-#define _area_size_y object_mat[1][3]
-#define _radius _area_size_x
-#define _spot_mul object_mat[2][3]
-#define _spot_bias object_mat[3][3]
-  /** Aliases for axes. */
-#ifdef __cplusplus
-#  define _right object_mat[0]
-#  define _up object_mat[1]
-#  define _back object_mat[2]
-#  define _position object_mat[3]
-#else
-#  define _right object_mat[0].xyz
-#  define _up object_mat[1].xyz
-#  define _back object_mat[2].xyz
-#  define _position object_mat[3].xyz
-#endif
-  /** Influence radius (inversed and squared) adjusted for Surface / Volume power. */
-  float influence_radius_invsqr_surface;
-  float influence_radius_invsqr_volume;
-  /** Maximum influence radius. Used for culling. */
-  float influence_radius_max;
-  /** Index of the shadow struct on CPU. -1 means no shadow. */
-  int shadow_id;
-  /** NOTE: It is ok to use vec3 here. A float is declared right after it.
-   * vec3 is also aligned to 16 bytes. */
-  vec3 color;
-  /** Power depending on shader type. */
-  float diffuse_power;
-  float specular_power;
-  float volume_power;
-  float transmit_power;
-  /** Special radius factor for point lighting. */
-  float radius_squared;
-  /** Light Type. */
-  eLightType type;
-  /** Padding to sizeof(vec2). */
-  float _pad1;
-  /** Spot size. Aligned to size of vec2. */
-  vec2 spot_size_inv;
-};
-BLI_STATIC_ASSERT_ALIGN(LightData, 16)
-
-/** \} */
-
-/* -------------------------------------------------------------------- */
 /** \name Shadows
  * \{ */
 
@@ -525,7 +457,6 @@ struct ShadowData {
    * So after transformation, you are in the tilemap space [0..SHADOW_TILEMAP_RES]
    * of the largest clipmap.
    */
-  /** TODO(fclem) Could be move to light matrix. */
   mat4 mat;
   /** NOTE: It is ok to use vec3 here. A float is declared right after it.
    * vec3 is also aligned to 16 bytes. */
@@ -597,6 +528,76 @@ struct ShadowTileMapData {
   float cone_angle_cos;
 };
 BLI_STATIC_ASSERT_ALIGN(ShadowTileMapData, 16)
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Lights
+ * \{ */
+
+#define LIGHT_NO_SHADOW -1
+
+enum eLightType : uint32_t {
+  LIGHT_SUN = 0u,
+  LIGHT_POINT = 1u,
+  LIGHT_SPOT = 2u,
+  LIGHT_RECT = 3u,
+  LIGHT_ELLIPSE = 4u
+};
+
+static inline bool is_area_light(eLightType type)
+{
+  return type >= LIGHT_RECT;
+}
+
+struct LightData {
+  /** Normalized obmat. Last column contains data accessible using the following macros. */
+  mat4 object_mat;
+  /** Packed data in the last column of the object_mat. */
+#define _area_size_x object_mat[0][3]
+#define _area_size_y object_mat[1][3]
+#define _radius _area_size_x
+#define _spot_mul object_mat[2][3]
+#define _spot_bias object_mat[3][3]
+  /** Aliases for axes. */
+#ifdef __cplusplus
+#  define _right object_mat[0]
+#  define _up object_mat[1]
+#  define _back object_mat[2]
+#  define _position object_mat[3]
+#else
+#  define _right object_mat[0].xyz
+#  define _up object_mat[1].xyz
+#  define _back object_mat[2].xyz
+#  define _position object_mat[3].xyz
+#endif
+  /** Influence radius (inversed and squared) adjusted for Surface / Volume power. */
+  float influence_radius_invsqr_surface;
+  float influence_radius_invsqr_volume;
+  /** Maximum influence radius. Used for culling. */
+  float influence_radius_max;
+  /** Index of the shadow struct on CPU. -1 means no shadow. */
+  int shadow_id;
+  /** NOTE: It is ok to use vec3 here. A float is declared right after it.
+   * vec3 is also aligned to 16 bytes. */
+  vec3 color;
+  /** Power depending on shader type. */
+  float diffuse_power;
+  float specular_power;
+  float volume_power;
+  float transmit_power;
+  /** Special radius factor for point lighting. */
+  float radius_squared;
+  /** Light Type. */
+  eLightType type;
+  /** Padding to sizeof(vec2). */
+  float _pad1;
+  /** Spot size. Aligned to size of vec2. */
+  vec2 spot_size_inv;
+  /** Associated shadow data. Only valid if shadow_id is not LIGHT_NO_SHADOW. */
+  ShadowData shadow_data;
+};
+BLI_STATIC_ASSERT_ALIGN(LightData, 16)
 
 /**
  * Shadow data for debugging the active light shadow.

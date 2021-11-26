@@ -35,11 +35,6 @@ layout(std430, binding = 3) readonly restrict buffer lights_tile_buf
   CullingWord lights_culling_words[];
 };
 
-layout(std430, binding = 4) readonly restrict buffer shadows_buf
-{
-  ShadowData shadows[];
-};
-
 uniform sampler2D transparency_data_tx;
 uniform usampler2D volume_data_tx;
 uniform sampler2DArray utility_tx;

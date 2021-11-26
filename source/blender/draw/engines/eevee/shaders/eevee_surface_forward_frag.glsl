@@ -45,11 +45,6 @@ layout(std430, binding = 3) readonly restrict buffer lights_tile_buf
   CullingWord lights_culling_words[];
 };
 
-layout(std430, binding = 4) readonly restrict buffer shadows_buf
-{
-  ShadowData shadows[];
-};
-
 layout(std140) uniform grids_block
 {
   GridData grids[GRID_MAX];

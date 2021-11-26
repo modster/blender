@@ -315,7 +315,6 @@ void LightModule::end_sync(void)
 
   batch_len_ = divide_ceil_u(max_ii(light_refs_.size(), 1), CULLING_BATCH_SIZE);
   lights_data.resize(batch_len_ * CULLING_BATCH_SIZE);
-  shadows_data.resize(batch_len_ * CULLING_BATCH_SIZE);
   culling_key_buf.resize(batch_len_ * CULLING_BATCH_SIZE);
   culling_light_buf.resize(batch_len_ * CULLING_BATCH_SIZE);
   culling_zbin_buf.resize(batch_len_ * CULLING_ZBIN_COUNT);
@@ -328,20 +327,18 @@ void LightModule::end_sync(void)
   for (auto l_idx : light_refs_.index_range()) {
     Light &light = *light_refs_[l_idx];
     lights_data[l_idx] = light;
-    lights_data[l_idx].shadow_id = LIGHT_NO_SHADOW;
 
     if (light.shadow_id != LIGHT_NO_SHADOW) {
       if (light.type == LIGHT_SUN) {
-        shadows_data[l_idx] = this->inst_.shadows.directionals[light.shadow_id];
+        lights_data[l_idx].shadow_data = this->inst_.shadows.directionals[light.shadow_id];
       }
       else {
-        shadows_data[l_idx] = this->inst_.shadows.punctuals[light.shadow_id];
+        lights_data[l_idx].shadow_data = this->inst_.shadows.punctuals[light.shadow_id];
       }
     }
   }
 
   lights_data.push_update();
-  shadows_data.push_update();
 
   {
     culling_ps_ = DRW_pass_create("CullingLight", (DRWState)0);
@@ -470,7 +467,6 @@ void LightModule::shgroup_resources(DRWShadingGroup *grp)
   DRW_shgroup_vertex_buffer_ref(grp, "lights_zbins_buf", &culling_zbin_buf);
   DRW_shgroup_vertex_buffer_ref(grp, "lights_tile_buf", &culling_tile_buf);
 
-  DRW_shgroup_vertex_buffer_ref(grp, "shadows_buf", &shadows_data);
   DRW_shgroup_uniform_texture(grp, "shadow_atlas_tx", inst_.shadows.atlas_tx_get());
   DRW_shgroup_uniform_texture(grp, "shadow_tilemaps_tx", inst_.shadows.tilemap_tx_get());
 }
