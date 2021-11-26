@@ -32,6 +32,8 @@ using namespace blender::bke::image::partial_update;
 
 /* TODO: Should we use static class functions in stead of a namespace. */
 namespace clipping {
+
+/** \brief Update the texture slot uv and screen space bounds. */
 static void update_texture_slots_bounds(const AbstractSpaceAccessor *space, IMAGE_PrivateData *pd)
 {
   // each texture

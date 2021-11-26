@@ -67,6 +67,8 @@ struct IMAGE_ScreenSpaceTextureInfo {
 
   /** \brief area of the texture in screen space. */
   rctf clipping_bounds;
+  /** \brief uv area of the texture. */
+  rctf uv_bounds;
 };
 
 struct IMAGE_PrivateData {
@@ -80,7 +82,8 @@ struct IMAGE_PrivateData {
 
   /* Data used in screen space drawing mode. */
   struct {
-    /* TODO: partial_update_user isn't freed with the space leading to a memory leak. */
+    /* TODO: partial_update_user isn't freed with the space leading to a memory leak.
+     * port mechanism from tmp-eevee-rewrite to master.*/
     struct PartialUpdateUser *partial_update_user;
     const struct Image *partial_update_image;
     IMAGE_ScreenSpaceTextureInfo texture_infos[SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN];

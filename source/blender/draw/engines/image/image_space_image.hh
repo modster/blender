@@ -106,9 +106,14 @@ class SpaceImageAccessor : public AbstractSpaceAccessor {
   {
     return false;
   }
-  DRWView *create_view_override(const ARegion *UNUSED(region)) override
+
+  DRWView *create_view_override(const ARegion *region) override
   {
-    return nullptr;
+    /* Setup a screen pixel view. The backdrop of the node editor doesn't follow the region. */
+    float winmat[4][4], viewmat[4][4];
+    orthographic_m4(viewmat, 0.0, region->winx, 0.0, region->winy, 0.0, 1.0);
+    unit_m4(winmat);
+    return DRW_view_create(viewmat, winmat, nullptr, nullptr, nullptr);
   }
 
   void get_gpu_textures(Image *image,
