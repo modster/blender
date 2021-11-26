@@ -284,6 +284,10 @@ void BKE_mesh_calc_normals_poly(const struct MVert *mvert,
                                 int mpoly_len,
                                 float (*r_poly_normals)[3]);
 void BKE_mesh_calc_normals(struct Mesh *me);
+
+/**
+ * Check that a mesh with non-dirty normals has vertex and face custom data layers.
+ */
 void BKE_mesh_assert_normals_dirty_or_calculated(const struct Mesh *mesh);
 float (*BKE_mesh_vertex_normals_for_write(struct Mesh *mesh))[3];
 float (*BKE_mesh_face_normals_for_write(struct Mesh *mesh))[3];
