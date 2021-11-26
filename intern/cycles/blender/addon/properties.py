@@ -429,7 +429,7 @@ class CyclesRenderSettings(bpy.types.PropertyGroup):
     )
 
     direct_light_sampling_type: EnumProperty(
-        name="Direct Light Sampling Type",
+        name="Direct Light Sampling",
         description="The type of strategy used for sampling direct light contributions",
         items=enum_direct_light_sampling_type,
         default='MULTIPLE_IMPORTANCE_SAMPLING',
@@ -790,7 +790,7 @@ class CyclesRenderSettings(bpy.types.PropertyGroup):
     )
 
     use_auto_tile: BoolProperty(
-        name="Using Tiling",
+        name="Use Tiling",
         description="Render high resolution images in tiles to reduce memory usage, using the specified tile size. Tiles are cached to disk while rendering to save memory",
         default=True,
     )

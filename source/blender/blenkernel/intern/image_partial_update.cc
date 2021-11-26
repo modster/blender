@@ -1,5 +1,23 @@
+/*
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ *
+ * Copyright 2021, Blender Foundation.
+ */
 /**
  * \file image_gpu_partial_update.cc
+ * \ingroup bke
  *
  * To reduce the overhead of image processing this file contains a mechanism to detect areas of the
  * image that are changed. These areas are organized in chunks. Changes that happen over time are
@@ -23,16 +41,16 @@
  *
  * switch (BKE_image_partial_update_collect_changes(image, image_buffer))
  * {
- * case PARTIAL_UPDATE_NEED_FULL_UPDATE:
+ * case ePartialUpdateCollectResult::FullUpdateNeeded:
  *  // Unable to do partial updates. Perform a full update.
  *  break;
- * case PARTIAL_UPDATE_CHANGES_AVAILABLE:
+ * case ePartialUpdateCollectResult::PartialChangesDetected:
  *  PartialUpdateRegion change;
  *  while (BKE_image_partial_update_get_next_change(partial_update_user, &change) ==
- *         PARTIAL_UPDATE_ITER_CHANGE_AVAILABLE){
+ *         ePartialUpdateIterResult::ChangeAvailable){
  *  // Do something with the change.
  *  }
- *  case PARTIAL_UPDATE_NO_CHANGES:
+ *  case ePartialUpdateCollectResult::NoChangesDetected:
  *    break;
  * }
  *
@@ -47,6 +65,7 @@
 #include <optional>
 
 #include "BKE_image.h"
+#include "BKE_image_partial_update.hh"
 
 #include "DNA_image_types.h"
 
@@ -443,13 +462,7 @@ struct PartialUpdateRegisterImpl {
   }
 };
 
-}  // namespace blender::bke::image::partial_update
-
-extern "C" {
-
-using namespace blender::bke::image::partial_update;
-
-static struct PartialUpdateRegister *image_partial_update_register_ensure(Image *image)
+static PartialUpdateRegister *image_partial_update_register_ensure(Image *image)
 {
   if (image->runtime.partial_update_register == nullptr) {
     PartialUpdateRegisterImpl *partial_update_register = OBJECT_GUARDED_NEW(
@@ -457,26 +470,6 @@ static struct PartialUpdateRegister *image_partial_update_register_ensure(Image 
     image->runtime.partial_update_register = wrap(partial_update_register);
   }
   return image->runtime.partial_update_register;
-}
-
-// TODO(jbakker): cleanup parameter.
-struct PartialUpdateUser *BKE_image_partial_update_create(const struct Image *image)
-{
-  PartialUpdateUserImpl *user_impl = OBJECT_GUARDED_NEW(PartialUpdateUserImpl);
-
-#ifdef NDEBUG
-  user_impl->debug_image_ = image;
-#else
-  UNUSED_VARS(image);
-#endif
-
-  return wrap(user_impl);
-}
-
-void BKE_image_partial_update_free(PartialUpdateUser *user)
-{
-  PartialUpdateUserImpl *user_impl = unwrap(user);
-  OBJECT_GUARDED_DELETE(user_impl, PartialUpdateUserImpl);
 }
 
 ePartialUpdateCollectResult BKE_image_partial_update_collect_changes(Image *image,
@@ -494,12 +487,12 @@ ePartialUpdateCollectResult BKE_image_partial_update_collect_changes(Image *imag
 
   if (!partial_updater->can_construct(user_impl->last_changeset_id)) {
     user_impl->last_changeset_id = partial_updater->last_changeset_id;
-    return PARTIAL_UPDATE_NEED_FULL_UPDATE;
+    return ePartialUpdateCollectResult::FullUpdateNeeded;
   }
 
   /* Check if there are changes since last invocation for the user. */
   if (user_impl->last_changeset_id == partial_updater->last_changeset_id) {
-    return PARTIAL_UPDATE_NO_CHANGES;
+    return ePartialUpdateCollectResult::NoChangesDetected;
   }
 
   /* Collect changed tiles. */
@@ -534,7 +527,7 @@ ePartialUpdateCollectResult BKE_image_partial_update_collect_changes(Image *imag
   }
 
   user_impl->last_changeset_id = partial_updater->last_changeset_id;
-  return PARTIAL_UPDATE_CHANGES_AVAILABLE;
+  return ePartialUpdateCollectResult::PartialChangesDetected;
 }
 
 ePartialUpdateIterResult BKE_image_partial_update_get_next_change(PartialUpdateUser *user,
@@ -542,11 +535,37 @@ ePartialUpdateIterResult BKE_image_partial_update_get_next_change(PartialUpdateU
 {
   PartialUpdateUserImpl *user_impl = unwrap(user);
   if (user_impl->updated_regions.is_empty()) {
-    return PARTIAL_UPDATE_ITER_FINISHED;
+    return ePartialUpdateIterResult::Finished;
   }
   PartialUpdateRegion region = user_impl->updated_regions.pop_last();
   *r_region = region;
-  return PARTIAL_UPDATE_ITER_CHANGE_AVAILABLE;
+  return ePartialUpdateIterResult::ChangeAvailable;
+}
+
+}  // namespace blender::bke::image::partial_update
+
+extern "C" {
+
+using namespace blender::bke::image::partial_update;
+
+// TODO(jbakker): cleanup parameter.
+struct PartialUpdateUser *BKE_image_partial_update_create(const struct Image *image)
+{
+  PartialUpdateUserImpl *user_impl = OBJECT_GUARDED_NEW(PartialUpdateUserImpl);
+
+#ifdef NDEBUG
+  user_impl->debug_image_ = image;
+#else
+  UNUSED_VARS(image);
+#endif
+
+  return wrap(user_impl);
+}
+
+void BKE_image_partial_update_free(PartialUpdateUser *user)
+{
+  PartialUpdateUserImpl *user_impl = unwrap(user);
+  OBJECT_GUARDED_DELETE(user_impl, PartialUpdateUserImpl);
 }
 
 /* --- Image side --- */

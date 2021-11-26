@@ -28,7 +28,7 @@
 
 namespace blender::draw::image_engine {
 
-using namespace blender::bke::image;
+using namespace blender::bke::image::partial_update;
 
 /* TODO: Should we use static class functions in stead of a namespace. */
 namespace clipping {
@@ -136,29 +136,34 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
     }
   }
 
-  void update_textures(IMAGE_TextureList *txl, IMAGE_PrivateData *pd, Image *image) const
+  void update_textures(IMAGE_TextureList *txl,
+                       IMAGE_PrivateData *pd,
+                       Image *image,
+                       ImageUser *image_user) const
   {
-    PartialUpdateIterator iterator(image, pd->screen_space.partial_update_user);
+    PartialUpdateChecker<ImageTileData> checker(
+        image, image_user, pd->screen_space.partial_update_user);
+    PartialUpdateChecker<ImageTileData>::CollectResult changes = checker.collect_changes();
 
-    switch (iterator.collect_changes()) {
-      case PARTIAL_UPDATE_NEED_FULL_UPDATE:
+    switch (changes.get_result_code()) {
+      case ePartialUpdateCollectResult::FullUpdateNeeded:
         mark_all_texture_slots_dirty(pd);
         break;
-      case PARTIAL_UPDATE_NO_CHANGES:
+      case ePartialUpdateCollectResult::NoChangesDetected:
         break;
-      case PARTIAL_UPDATE_CHANGES_AVAILABLE:
-        do_partial_update(iterator, txl, pd, image);
+      case ePartialUpdateCollectResult::PartialChangesDetected:
+        do_partial_update(changes, txl, pd, image);
         break;
     }
     update_dirty_textures();
   }
 
-  void do_partial_update(PartialUpdateIterator &iterator,
+  void do_partial_update(PartialUpdateChecker<ImageTileData>::CollectResult &iterator,
                          IMAGE_TextureList *txl,
                          IMAGE_PrivateData *pd,
                          Image *image) const
   {
-    while (iterator.get_next_change() != PARTIAL_UPDATE_ITER_FINISHED) {
+    while (iterator.get_next_change() == ePartialUpdateIterResult::ChangeAvailable) {
       for (int i = 0; i < SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN; i++) {
         /* Dirty images will receive a full update. No need to do a partial one now. */
         if (pd->screen_space.texture_infos[i].dirty) {
@@ -204,7 +209,7 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
     update_texture_slot_allocation(txl, pd);
 
     // Step: Update the GPU textures based on the changes in the image.
-    update_textures(txl, pd, image);
+    update_textures(txl, pd, image, iuser);
 
     // Step: Add the GPU textures to the shgroup.
 
