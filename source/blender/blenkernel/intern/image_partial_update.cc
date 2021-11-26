@@ -47,6 +47,7 @@
 #include <optional>
 
 #include "BKE_image.h"
+#include "BKE_image_partial_update.hh"
 
 #include "DNA_image_types.h"
 
@@ -134,7 +135,7 @@ struct PartialUpdateUserImpl {
 
 #ifdef NDEBUG
   /** \brief reference to image to validate correct API usage. */
-  void *debug_image_;
+  const void *debug_image_;
 #endif
 
   /**
@@ -443,13 +444,7 @@ struct PartialUpdateRegisterImpl {
   }
 };
 
-}  // namespace blender::bke::image::partial_update
-
-extern "C" {
-
-using namespace blender::bke::image::partial_update;
-
-static struct PartialUpdateRegister *image_partial_update_register_ensure(Image *image)
+static PartialUpdateRegister *image_partial_update_register_ensure(Image *image)
 {
   if (image->runtime.partial_update_register == nullptr) {
     PartialUpdateRegisterImpl *partial_update_register = OBJECT_GUARDED_NEW(
@@ -457,26 +452,6 @@ static struct PartialUpdateRegister *image_partial_update_register_ensure(Image 
     image->runtime.partial_update_register = wrap(partial_update_register);
   }
   return image->runtime.partial_update_register;
-}
-
-// TODO(jbakker): cleanup parameter.
-struct PartialUpdateUser *BKE_image_partial_update_create(struct Image *image)
-{
-  PartialUpdateUserImpl *user_impl = OBJECT_GUARDED_NEW(PartialUpdateUserImpl);
-
-#ifdef NDEBUG
-  user_impl->debug_image_ = image;
-#else
-  UNUSED_VARS(image);
-#endif
-
-  return wrap(user_impl);
-}
-
-void BKE_image_partial_update_free(PartialUpdateUser *user)
-{
-  PartialUpdateUserImpl *user_impl = unwrap(user);
-  OBJECT_GUARDED_DELETE(user_impl, PartialUpdateUserImpl);
 }
 
 ePartialUpdateCollectResult BKE_image_partial_update_collect_changes(Image *image,
@@ -547,6 +522,32 @@ ePartialUpdateIterResult BKE_image_partial_update_get_next_change(PartialUpdateU
   PartialUpdateRegion region = user_impl->updated_regions.pop_last();
   *r_region = region;
   return PARTIAL_UPDATE_ITER_CHANGE_AVAILABLE;
+}
+
+}  // namespace blender::bke::image::partial_update
+
+extern "C" {
+
+using namespace blender::bke::image::partial_update;
+
+// TODO(jbakker): cleanup parameter.
+struct PartialUpdateUser *BKE_image_partial_update_create(const struct Image *image)
+{
+  PartialUpdateUserImpl *user_impl = OBJECT_GUARDED_NEW(PartialUpdateUserImpl);
+
+#ifdef NDEBUG
+  user_impl->debug_image_ = image;
+#else
+  UNUSED_VARS(image);
+#endif
+
+  return wrap(user_impl);
+}
+
+void BKE_image_partial_update_free(PartialUpdateUser *user)
+{
+  PartialUpdateUserImpl *user_impl = unwrap(user);
+  OBJECT_GUARDED_DELETE(user_impl, PartialUpdateUserImpl);
 }
 
 /* --- Image side --- */

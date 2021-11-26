@@ -22,6 +22,7 @@
 #include "BKE_appdir.h"
 #include "BKE_idtype.h"
 #include "BKE_image.h"
+#include "BKE_image_partial_update.hh"
 #include "BKE_main.h"
 
 #include "IMB_imbuf.h"
@@ -31,7 +32,7 @@
 
 #include "MEM_guardedalloc.h"
 
-namespace blender::bke::image {
+namespace blender::bke::image::partial_update {
 
 constexpr float black_color[4] = {0.0f, 0.0f, 0.0f, 1.0f};
 
@@ -40,6 +41,7 @@ class ImagePartialUpdateTest : public testing::Test {
   Main *bmain;
   Image *image;
   ImageTile *image_tile;
+  ImageUser image_user = {nullptr};
   ImBuf *image_buffer;
   PartialUpdateUser *partial_update_user;
 
@@ -330,7 +332,7 @@ TEST_F(ImagePartialUpdateTest, sequential_mark_region)
   }
 }
 
-TEST_F(ImagePartialUpdateTest, mark_multiple_tiles)
+TEST_F(ImagePartialUpdateTest, mark_multiple_chunks)
 {
   ePartialUpdateCollectResult result;
   /* First tile should always return a full update. */
@@ -351,13 +353,41 @@ TEST_F(ImagePartialUpdateTest, mark_multiple_tiles)
 
   /* Check tiles. */
   PartialUpdateRegion changed_region;
-  int num_tiles_found = 0;
+  int num_chunks_found = 0;
   while (BKE_image_partial_update_get_next_change(partial_update_user, &changed_region) ==
          PARTIAL_UPDATE_ITER_CHANGE_AVAILABLE) {
     BLI_rcti_isect(&changed_region.region, &region, nullptr);
+    num_chunks_found++;
+  }
+  EXPECT_EQ(num_chunks_found, 4);
+}
+
+TEST_F(ImagePartialUpdateTest, iterator)
+{
+  PartialUpdateChecker<NoTileData> checker(image, &image_user, partial_update_user);
+  /* First tile should always return a full update. */
+  PartialUpdateCollectResult<NoTileData> changes = checker.collect_changes();
+  EXPECT_EQ(changes.get_collect_result(), PARTIAL_UPDATE_NEED_FULL_UPDATE);
+  /* Second invoke should now detect no changes. */
+  changes = checker.collect_changes();
+  EXPECT_EQ(changes.get_collect_result(), PARTIAL_UPDATE_NO_CHANGES);
+
+  /* Mark region. */
+  rcti region;
+  BLI_rcti_init(&region, 300, 700, 300, 700);
+  BKE_image_partial_update_mark_region(image, image_tile, image_buffer, &region);
+
+  /* Partial Update should be available. */
+  changes = checker.collect_changes();
+  EXPECT_EQ(changes.get_collect_result(), PARTIAL_UPDATE_CHANGES_AVAILABLE);
+
+  /* Check tiles. */
+  int num_tiles_found = 0;
+  while (changes.get_next_change() == PARTIAL_UPDATE_ITER_CHANGE_AVAILABLE) {
+    BLI_rcti_isect(&changes.changed_region.region, &region, nullptr);
     num_tiles_found++;
   }
   EXPECT_EQ(num_tiles_found, 4);
 }
 
-}  // namespace blender::bke::image
+}  // namespace blender::bke::image::partial_update

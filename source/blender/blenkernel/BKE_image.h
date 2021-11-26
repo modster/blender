@@ -402,77 +402,14 @@ bool BKE_image_clear_renderslot(struct Image *ima, struct ImageUser *iuser, int 
 struct PartialUpdateUser;
 
 /**
- * \brief Result codes of #BKE_image_partial_update_collect_changes.
- */
-typedef enum ePartialUpdateCollectResult {
-  /** \brief Unable to construct partial updates. Caller should perform a full update. */
-  PARTIAL_UPDATE_NEED_FULL_UPDATE,
-
-  /** \brief No changes detected since the last time requested. */
-  PARTIAL_UPDATE_NO_CHANGES,
-
-  /** \brief Changes detected since the last time requested. */
-  PARTIAL_UPDATE_CHANGES_AVAILABLE,
-} ePartialUpdateCollectResult;
-
-/**
- * \brief A region to update.
- *
- * Data is organized in tiles. These tiles are in texel space (1 unit is a single texel). When
- * tiles are requested they are merged with neighboring tiles.
- */
-typedef struct PartialUpdateRegion {
-  /** \brief region of the image that has been updated. Region can be bigger than actual changes.
-   */
-  struct rcti region;
-
-  /**
-   * \brief Tile number (UDIM) that this region belongs to.
-   */
-  int tile_number;
-} PartialUpdateRegion;
-
-/**
- * \brief Return codes of #BKE_image_partial_update_get_next_change.
- */
-typedef enum ePartialUpdateIterResult {
-  /** \brief no tiles left when iterating over tiles. */
-  PARTIAL_UPDATE_ITER_FINISHED = 0,
-
-  /** \brief a chunk was available and has been loaded. */
-  PARTIAL_UPDATE_ITER_CHANGE_AVAILABLE = 1,
-} ePartialUpdateIterResult;
-
-/**
  * \brief Create a new PartialUpdateUser. An Object that contains data to use partial updates.
  */
-struct PartialUpdateUser *BKE_image_partial_update_create(struct Image *image);
+struct PartialUpdateUser *BKE_image_partial_update_create(const struct Image *image);
 
 /**
  * \brief free a partial update user.
  */
 void BKE_image_partial_update_free(struct PartialUpdateUser *user);
-
-/**
- * \brief collect the partial update since the last request.
- *
- * Invoke #BKE_image_partial_update_get_next_change to iterate over the collected tiles.
- *
- * \returns PARTIAL_UPDATE_NEED_FULL_UPDATE: called should not use partial updates but
- *              recalculate the full image. This result can be expected when called
- *              for the first time for a user and when it isn't possible to reconstruct
- *              the changes as the internal state doesn't have enough data stored.
- *          PARTIAL_UPDATE_NO_CHANGES: The have been no changes detected since last
- *              invoke for the same user.
- *          PARTIAL_UPDATE_CHANGES_AVAILABLE: Parts of the image has been updated
- *              since last invoke for the same user. The changes can be read by
- *              using #BKE_image_partial_update_get_next_change.
- */
-ePartialUpdateCollectResult BKE_image_partial_update_collect_changes(
-    struct Image *image, struct PartialUpdateUser *user);
-
-ePartialUpdateIterResult BKE_image_partial_update_get_next_change(
-    struct PartialUpdateUser *user, struct PartialUpdateRegion *r_region);
 
 /* --- partial updater (image side) --- */
 struct PartialUpdateRegister;

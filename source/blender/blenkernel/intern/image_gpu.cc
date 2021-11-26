@@ -38,6 +38,7 @@
 
 #include "BKE_global.h"
 #include "BKE_image.h"
+#include "BKE_image_partial_update.hh"
 #include "BKE_main.h"
 
 #include "GPU_capabilities.h"
@@ -45,6 +46,10 @@
 #include "GPU_texture.h"
 
 #include "PIL_time.h"
+
+using namespace blender::bke::image::partial_update;
+
+extern "C" {
 
 /* Prototypes. */
 static void gpu_free_unused_buffers();
@@ -329,55 +334,38 @@ static void image_update_reusable_textures(Image *ima,
   }
 }
 
-static void image_gpu_texture_partial_update_changes_available(Image *image, ImageUser *iuser)
+static void image_gpu_texture_partial_update_changes_available(
+    PartialUpdateCollectResult<ImageTileData> &changes)
 {
-  PartialUpdateRegion changed_region;
-  int last_tile_number = -1;
-  ImBuf *tile_buffer = nullptr;
-  ImageTile *tile = nullptr;
-  ImageUser tile_user = {nullptr};
-  if (iuser) {
-    tile_user = *iuser;
-  }
-
-  while (BKE_image_partial_update_get_next_change(image->runtime.partial_update_user,
-                                                  &changed_region) ==
-         PARTIAL_UPDATE_ITER_CHANGE_AVAILABLE) {
-    if (last_tile_number != changed_region.tile_number) {
-      if (tile_buffer) {
-        BKE_image_release_ibuf(image, tile_buffer, nullptr);
-        tile_buffer = nullptr;
-      }
-      tile_user.tile = changed_region.tile_number;
-      tile = BKE_image_get_tile(image, changed_region.tile_number);
-      tile_buffer = BKE_image_acquire_ibuf(image, &tile_user, nullptr);
-      last_tile_number = changed_region.tile_number;
-    }
-
-    const int tile_offset_x = changed_region.region.xmin;
-    const int tile_offset_y = changed_region.region.ymin;
-    const int tile_width = min_ii(tile_buffer->x, BLI_rcti_size_x(&changed_region.region));
-    const int tile_height = min_ii(tile_buffer->y, BLI_rcti_size_y(&changed_region.region));
-    image_update_gputexture_ex(
-        image, tile, tile_buffer, tile_offset_x, tile_offset_y, tile_width, tile_height);
-  }
-
-  if (tile_buffer) {
-    BKE_image_release_ibuf(image, tile_buffer, nullptr);
+  while (changes.get_next_change() == PARTIAL_UPDATE_ITER_CHANGE_AVAILABLE) {
+    const int tile_offset_x = changes.changed_region.region.xmin;
+    const int tile_offset_y = changes.changed_region.region.ymin;
+    const int tile_width = min_ii(changes.tile_data.tile_buffer->x,
+                                  BLI_rcti_size_x(&changes.changed_region.region));
+    const int tile_height = min_ii(changes.tile_data.tile_buffer->y,
+                                   BLI_rcti_size_y(&changes.changed_region.region));
+    image_update_gputexture_ex(changes.image,
+                               changes.tile_data.tile,
+                               changes.tile_data.tile_buffer,
+                               tile_offset_x,
+                               tile_offset_y,
+                               tile_width,
+                               tile_height);
   }
 }
 
 static void image_gpu_texture_try_partial_update(Image *image, ImageUser *iuser)
 {
-
-  switch (BKE_image_partial_update_collect_changes(image, image->runtime.partial_update_user)) {
+  PartialUpdateChecker<ImageTileData> checker(image, iuser, image->runtime.partial_update_user);
+  PartialUpdateCollectResult<ImageTileData> changes = checker.collect_changes();
+  switch (changes.get_collect_result()) {
     case PARTIAL_UPDATE_NEED_FULL_UPDATE: {
       image_free_gpu(image, true);
       break;
     }
 
     case PARTIAL_UPDATE_CHANGES_AVAILABLE: {
-      image_gpu_texture_partial_update_changes_available(image, iuser);
+      image_gpu_texture_partial_update_changes_available(changes);
       break;
     }
 
@@ -1007,3 +995,4 @@ void BKE_image_paint_set_mipmap(Main *bmain, bool mipmap)
 }
 
 /** \} */
+}
