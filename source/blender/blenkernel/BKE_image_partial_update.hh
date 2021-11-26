@@ -137,7 +137,7 @@ class AbstractTileData {
  */
 class NoTileData : AbstractTileData {
  public:
-  NoTileData(Image *UNUSED(image), ImageUser &UNUSED(image_user))
+  NoTileData(Image *UNUSED(image), ImageUser *UNUSED(image_user))
   {
   }
 
@@ -166,7 +166,7 @@ class ImageTileData : AbstractTileData {
    * The local copy is required so we don't change the image user of the caller.
    * We need to change it in order to request data for a specific tile.
    */
-  ImageUser image_user;
+  ImageUser image_user = {0};
 
   /**
    * \brief ImageTile associated with the loaded tile.
@@ -181,8 +181,11 @@ class ImageTileData : AbstractTileData {
    */
   ImBuf *tile_buffer = nullptr;
 
-  ImageTileData(Image *image, ImageUser image_user) : image(image), image_user(image_user)
+  ImageTileData(Image *image, ImageUser *image_user) : image(image)
   {
+    if (image_user != nullptr) {
+      this->image_user = *image_user;
+    }
   }
 
   void init_data(TileNumber new_tile_number) override
@@ -229,7 +232,7 @@ template<typename TileData = NoTileData> struct PartialUpdateChecker {
    public:
     CollectResult(PartialUpdateChecker<TileData> *checker, ePartialUpdateCollectResult result_code)
         : checker(checker),
-          tile_data(checker->image, *checker->image_user),
+          tile_data(checker->image, checker->image_user),
           result_code(result_code)
     {
     }
