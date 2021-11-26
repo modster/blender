@@ -335,7 +335,7 @@ static void image_update_reusable_textures(Image *ima,
 }
 
 static void image_gpu_texture_partial_update_changes_available(
-    PartialUpdateCollectResult<ImageTileData> &changes)
+    Image *image, PartialUpdateChecker<ImageTileData>::CollectResult &changes)
 {
   while (changes.get_next_change() == ePartialUpdateIterResult::ChangeAvailable) {
     const int tile_offset_x = changes.changed_region.region.xmin;
@@ -344,7 +344,7 @@ static void image_gpu_texture_partial_update_changes_available(
                                   BLI_rcti_size_x(&changes.changed_region.region));
     const int tile_height = min_ii(changes.tile_data.tile_buffer->y,
                                    BLI_rcti_size_y(&changes.changed_region.region));
-    image_update_gputexture_ex(changes.image,
+    image_update_gputexture_ex(image,
                                changes.tile_data.tile,
                                changes.tile_data.tile_buffer,
                                tile_offset_x,
@@ -357,15 +357,15 @@ static void image_gpu_texture_partial_update_changes_available(
 static void image_gpu_texture_try_partial_update(Image *image, ImageUser *iuser)
 {
   PartialUpdateChecker<ImageTileData> checker(image, iuser, image->runtime.partial_update_user);
-  PartialUpdateCollectResult<ImageTileData> changes = checker.collect_changes();
-  switch (changes.get_collect_result()) {
+  PartialUpdateChecker<ImageTileData>::CollectResult changes = checker.collect_changes();
+  switch (changes.get_result_code()) {
     case ePartialUpdateCollectResult::FullUpdateNeeded: {
       image_free_gpu(image, true);
       break;
     }
 
     case ePartialUpdateCollectResult::PartialChangesDetected: {
-      image_gpu_texture_partial_update_changes_available(changes);
+      image_gpu_texture_partial_update_changes_available(image, changes);
       break;
     }
 

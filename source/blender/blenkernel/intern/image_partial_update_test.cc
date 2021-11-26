@@ -366,11 +366,11 @@ TEST_F(ImagePartialUpdateTest, iterator)
 {
   PartialUpdateChecker<NoTileData> checker(image, &image_user, partial_update_user);
   /* First tile should always return a full update. */
-  PartialUpdateCollectResult<NoTileData> changes = checker.collect_changes();
-  EXPECT_EQ(changes.get_collect_result(), ePartialUpdateCollectResult::FullUpdateNeeded);
+  PartialUpdateChecker<NoTileData>::CollectResult changes = checker.collect_changes();
+  EXPECT_EQ(changes.get_result_code(), ePartialUpdateCollectResult::FullUpdateNeeded);
   /* Second invoke should now detect no changes. */
   changes = checker.collect_changes();
-  EXPECT_EQ(changes.get_collect_result(), ePartialUpdateCollectResult::NoChangesDetected);
+  EXPECT_EQ(changes.get_result_code(), ePartialUpdateCollectResult::NoChangesDetected);
 
   /* Mark region. */
   rcti region;
@@ -379,7 +379,7 @@ TEST_F(ImagePartialUpdateTest, iterator)
 
   /* Partial Update should be available. */
   changes = checker.collect_changes();
-  EXPECT_EQ(changes.get_collect_result(), ePartialUpdateCollectResult::PartialChangesDetected);
+  EXPECT_EQ(changes.get_result_code(), ePartialUpdateCollectResult::PartialChangesDetected);
 
   /* Check tiles. */
   int num_tiles_found = 0;
