@@ -29,29 +29,26 @@
 
 #include "node_geometry_util.hh"
 
-/* Code from the mask modifier in MOD_mask.cc. */
-void copy_masked_vertices_to_new_mesh(const Mesh &src_mesh,
-                                      Mesh &dst_mesh,
-                                      blender::Span<int> vertex_map);
-void copy_masked_edges_to_new_mesh(const Mesh &src_mesh,
-                                   Mesh &dst_mesh,
-                                   blender::Span<int> vertex_map,
-                                   blender::Span<int> edge_map);
-void copy_masked_polys_to_new_mesh(const Mesh &src_mesh,
-                                   Mesh &dst_mesh,
-                                   blender::Span<int> vertex_map,
-                                   blender::Span<int> edge_map,
-                                   blender::Span<int> masked_poly_indices,
-                                   blender::Span<int> new_loop_starts);
-
 namespace blender::nodes {
 
 using blender::bke::CustomDataAttributes;
 
-template<typename T> static void copy_data(Span<T> data, MutableSpan<T> r_data, IndexMask mask)
+template<typename T>
+static void copy_data_based_on_mask(Span<T> data, MutableSpan<T> r_data, IndexMask mask)
 {
   for (const int i_out : mask.index_range()) {
     r_data[i_out] = data[mask[i_out]];
+  }
+}
+
+template<typename T>
+static void copy_data_based_on_map(Span<T> src, MutableSpan<T> dst, Span<int> index_map)
+{
+  for (const int i_src : index_map.index_range()) {
+    const int i_dst = index_map[i_src];
+    if (i_dst != -1) {
+      dst[i_dst] = src[i_src];
+    }
   }
 }
 
@@ -63,23 +60,6 @@ static IndexMask index_mask_indices(Span<bool> mask, const bool invert, Vector<i
   for (const int i : mask.index_range()) {
     if (mask[i] != invert) {
       indices.append(i);
-    }
-  }
-  return IndexMask(indices);
-}
-
-/** Utility function for making an IndexMask from an array of integers, where the negative integers
- * are seen as false. The indices vector should live at least as long as the returned IndexMask.
- */
-static IndexMask index_mask_indices(Span<int> mask,
-                                    const int num_indices,
-                                    Vector<int64_t> &indices)
-{
-  indices.clear();
-  indices.reserve(num_indices);
-  for (const int i : mask.index_range()) {
-    if (mask[i] >= 0) {
-      indices.append_unchecked(i);
     }
   }
   return IndexMask(indices);
@@ -157,7 +137,43 @@ static void copy_attributes_based_on_mask(const Map<AttributeIDRef, AttributeKin
       using T = decltype(dummy);
       VArray_Span<T> span{attribute.varray.typed<T>()};
       MutableSpan<T> out_span = result_attribute.as_span<T>();
-      copy_data(span, out_span, mask);
+      copy_data_based_on_mask(span, out_span, mask);
+    });
+    result_attribute.save();
+  }
+}
+
+static void copy_attributes_based_on_map(const Map<AttributeIDRef, AttributeKind> &attributes,
+                                         const GeometryComponent &in_component,
+                                         GeometryComponent &result_component,
+                                         const AttributeDomain domain,
+                                         const Span<int> index_map)
+{
+  for (Map<AttributeIDRef, AttributeKind>::Item entry : attributes.items()) {
+    const AttributeIDRef attribute_id = entry.key;
+    ReadAttributeLookup attribute = in_component.attribute_try_get_for_read(attribute_id);
+    if (!attribute) {
+      continue;
+    }
+
+    /* Only copy if it is on a domain we want. */
+    if (domain != attribute.domain) {
+      continue;
+    }
+    const CustomDataType data_type = bke::cpp_type_to_custom_data_type(attribute.varray.type());
+
+    OutputAttribute result_attribute = result_component.attribute_try_get_for_output_only(
+        attribute_id, attribute.domain, data_type);
+
+    if (!result_attribute) {
+      continue;
+    }
+
+    attribute_math::convert_to_static_type(data_type, [&](auto dummy) {
+      using T = decltype(dummy);
+      VArray_Span<T> span{attribute.varray.typed<T>()};
+      MutableSpan<T> out_span = result_attribute.as_span<T>();
+      copy_data_based_on_map(span, out_span, index_map);
     });
     result_attribute.save();
   }
@@ -184,6 +200,24 @@ static void copy_face_corner_attributes(const Map<AttributeIDRef, AttributeKind>
       attributes, in_component, out_component, ATTR_DOMAIN_CORNER, IndexMask(indices));
 }
 
+static void copy_masked_vertices_to_new_mesh(const Mesh &src_mesh,
+                                             Mesh &dst_mesh,
+                                             Span<int> vertex_map)
+{
+  BLI_assert(src_mesh.totvert == vertex_map.size());
+  for (const int i_src : vertex_map.index_range()) {
+    const int i_dst = vertex_map[i_src];
+    if (i_dst == -1) {
+      continue;
+    }
+
+    const MVert &v_src = src_mesh.mvert[i_src];
+    MVert &v_dst = dst_mesh.mvert[i_dst];
+
+    v_dst = v_src;
+  }
+}
+
 static void copy_masked_edges_to_new_mesh(const Mesh &src_mesh, Mesh &dst_mesh, Span<int> edge_map)
 {
   BLI_assert(src_mesh.totedge == edge_map.size());
@@ -199,6 +233,28 @@ static void copy_masked_edges_to_new_mesh(const Mesh &src_mesh, Mesh &dst_mesh, 
     e_dst = e_src;
     e_dst.v1 = e_src.v1;
     e_dst.v2 = e_src.v2;
+  }
+}
+
+static void copy_masked_edges_to_new_mesh(const Mesh &src_mesh,
+                                          Mesh &dst_mesh,
+                                          Span<int> vertex_map,
+                                          Span<int> edge_map)
+{
+  BLI_assert(src_mesh.totvert == vertex_map.size());
+  BLI_assert(src_mesh.totedge == edge_map.size());
+  for (const int i_src : IndexRange(src_mesh.totedge)) {
+    const int i_dst = edge_map[i_src];
+    if (i_dst == -1) {
+      continue;
+    }
+
+    const MEdge &e_src = src_mesh.medge[i_src];
+    MEdge &e_dst = dst_mesh.medge[i_dst];
+
+    e_dst = e_src;
+    e_dst.v1 = vertex_map[e_src.v1];
+    e_dst.v2 = vertex_map[e_src.v2];
   }
 }
 
@@ -255,29 +311,56 @@ static void copy_masked_polys_to_new_mesh(const Mesh &src_mesh,
   }
 }
 
+static void copy_masked_polys_to_new_mesh(const Mesh &src_mesh,
+                                          Mesh &dst_mesh,
+                                          Span<int> vertex_map,
+                                          Span<int> edge_map,
+                                          Span<int> masked_poly_indices,
+                                          Span<int> new_loop_starts)
+{
+  for (const int i_dst : masked_poly_indices.index_range()) {
+    const int i_src = masked_poly_indices[i_dst];
+
+    const MPoly &mp_src = src_mesh.mpoly[i_src];
+    MPoly &mp_dst = dst_mesh.mpoly[i_dst];
+    const int i_ml_src = mp_src.loopstart;
+    const int i_ml_dst = new_loop_starts[i_dst];
+
+    const MLoop *ml_src = src_mesh.mloop + i_ml_src;
+    MLoop *ml_dst = dst_mesh.mloop + i_ml_dst;
+
+    mp_dst = mp_src;
+    mp_dst.loopstart = i_ml_dst;
+    for (int i : IndexRange(mp_src.totloop)) {
+      ml_dst[i].v = vertex_map[ml_src[i].v];
+      ml_dst[i].e = edge_map[ml_src[i].e];
+    }
+  }
+}
+
 static void spline_copy_builtin_attributes(const Spline &spline,
                                            Spline &r_spline,
                                            const IndexMask mask)
 {
-  copy_data(spline.positions(), r_spline.positions(), mask);
-  copy_data(spline.radii(), r_spline.radii(), mask);
-  copy_data(spline.tilts(), r_spline.tilts(), mask);
+  copy_data_based_on_mask(spline.positions(), r_spline.positions(), mask);
+  copy_data_based_on_mask(spline.radii(), r_spline.radii(), mask);
+  copy_data_based_on_mask(spline.tilts(), r_spline.tilts(), mask);
   switch (spline.type()) {
     case Spline::Type::Poly:
       break;
     case Spline::Type::Bezier: {
       const BezierSpline &src = static_cast<const BezierSpline &>(spline);
       BezierSpline &dst = static_cast<BezierSpline &>(r_spline);
-      copy_data(src.handle_positions_left(), dst.handle_positions_left(), mask);
-      copy_data(src.handle_positions_right(), dst.handle_positions_right(), mask);
-      copy_data(src.handle_types_left(), dst.handle_types_left(), mask);
-      copy_data(src.handle_types_right(), dst.handle_types_right(), mask);
+      copy_data_based_on_mask(src.handle_positions_left(), dst.handle_positions_left(), mask);
+      copy_data_based_on_mask(src.handle_positions_right(), dst.handle_positions_right(), mask);
+      copy_data_based_on_mask(src.handle_types_left(), dst.handle_types_left(), mask);
+      copy_data_based_on_mask(src.handle_types_right(), dst.handle_types_right(), mask);
       break;
     }
     case Spline::Type::NURBS: {
       const NURBSpline &src = static_cast<const NURBSpline &>(spline);
       NURBSpline &dst = static_cast<NURBSpline &>(r_spline);
-      copy_data(src.weights(), dst.weights(), mask);
+      copy_data_based_on_mask(src.weights(), dst.weights(), mask);
       break;
     }
   }
@@ -303,7 +386,7 @@ static void copy_dynamic_attributes(const CustomDataAttributes &src,
 
         attribute_math::convert_to_static_type(new_attribute->type(), [&](auto dummy) {
           using T = decltype(dummy);
-          copy_data(src_attribute->typed<T>(), new_attribute->typed<T>(), mask);
+          copy_data_based_on_mask(src_attribute->typed<T>(), new_attribute->typed<T>(), mask);
         });
         return true;
       },
@@ -973,6 +1056,23 @@ static void do_mesh_separation(GeometrySet &geometry_set,
       copy_masked_edges_to_new_mesh(mesh_in, *mesh_out, vertex_map, edge_map);
       copy_masked_polys_to_new_mesh(
           mesh_in, *mesh_out, vertex_map, edge_map, selected_poly_indices, new_loop_starts);
+
+      /* Copy attributes. */
+      copy_attributes_based_on_map(
+          attributes, in_component, out_component, ATTR_DOMAIN_POINT, vertex_map);
+      copy_attributes_based_on_map(
+          attributes, in_component, out_component, ATTR_DOMAIN_EDGE, edge_map);
+      copy_attributes_based_on_mask(attributes,
+                                    in_component,
+                                    out_component,
+                                    ATTR_DOMAIN_FACE,
+                                    IndexMask(Vector<int64_t>(selected_poly_indices.as_span())));
+      copy_face_corner_attributes(attributes,
+                                  in_component,
+                                  out_component,
+                                  num_selected_loops,
+                                  selected_poly_indices,
+                                  mesh_in);
       break;
     }
     case GEO_NODE_DELETE_GEOMETRY_MODE_EDGE_FACE: {
@@ -1028,16 +1128,14 @@ static void do_mesh_separation(GeometrySet &geometry_set,
 
       /* Copy the selected parts of the mesh over to the new mesh. */
       memcpy(mesh_out->mvert, mesh_in.mvert, mesh_in.totvert * sizeof(MVert));
-      copy_attributes(attributes, in_component, out_component, {ATTR_DOMAIN_POINT});
       copy_masked_edges_to_new_mesh(mesh_in, *mesh_out, edge_map);
       copy_masked_polys_to_new_mesh(
           mesh_in, *mesh_out, edge_map, selected_poly_indices, new_loop_starts);
-      Vector<int64_t> indices;
-      copy_attributes_based_on_mask(attributes,
-                                    in_component,
-                                    out_component,
-                                    ATTR_DOMAIN_EDGE,
-                                    index_mask_indices(edge_map, num_selected_edges, indices));
+
+      /* Copy attributes. */
+      copy_attributes(attributes, in_component, out_component, {ATTR_DOMAIN_POINT});
+      copy_attributes_based_on_map(
+          attributes, in_component, out_component, ATTR_DOMAIN_EDGE, edge_map);
       copy_attributes_based_on_mask(attributes,
                                     in_component,
                                     out_component,
@@ -1092,9 +1190,11 @@ static void do_mesh_separation(GeometrySet &geometry_set,
       /* Copy the selected parts of the mesh over to the new mesh. */
       memcpy(mesh_out->mvert, mesh_in.mvert, mesh_in.totvert * sizeof(MVert));
       memcpy(mesh_out->medge, mesh_in.medge, mesh_in.totedge * sizeof(MEdge));
+      copy_masked_polys_to_new_mesh(mesh_in, *mesh_out, selected_poly_indices, new_loop_starts);
+
+      /* Copy attributes. */
       copy_attributes(
           attributes, in_component, out_component, {ATTR_DOMAIN_POINT, ATTR_DOMAIN_EDGE});
-      copy_masked_polys_to_new_mesh(mesh_in, *mesh_out, selected_poly_indices, new_loop_starts);
       copy_attributes_based_on_mask(attributes,
                                     in_component,
                                     out_component,
