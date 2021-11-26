@@ -96,19 +96,19 @@ TEST_F(ImagePartialUpdateTest, mark_full_update)
   ePartialUpdateCollectResult result;
   /* First tile should always return a full update. */
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
-  EXPECT_EQ(result, PARTIAL_UPDATE_NEED_FULL_UPDATE);
+  EXPECT_EQ(result, ePartialUpdateCollectResult::FullUpdateNeeded);
   /* Second invoke should now detect no changes. */
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
-  EXPECT_EQ(result, PARTIAL_UPDATE_NO_CHANGES);
+  EXPECT_EQ(result, ePartialUpdateCollectResult::NoChangesDetected);
 
   /* Mark full update */
   BKE_image_partial_update_mark_full_update(image);
 
   /* Validate need full update followed by no changes. */
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
-  EXPECT_EQ(result, PARTIAL_UPDATE_NEED_FULL_UPDATE);
+  EXPECT_EQ(result, ePartialUpdateCollectResult::FullUpdateNeeded);
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
-  EXPECT_EQ(result, PARTIAL_UPDATE_NO_CHANGES);
+  EXPECT_EQ(result, ePartialUpdateCollectResult::NoChangesDetected);
 }
 
 TEST_F(ImagePartialUpdateTest, mark_single_tile)
@@ -116,10 +116,10 @@ TEST_F(ImagePartialUpdateTest, mark_single_tile)
   ePartialUpdateCollectResult result;
   /* First tile should always return a full update. */
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
-  EXPECT_EQ(result, PARTIAL_UPDATE_NEED_FULL_UPDATE);
+  EXPECT_EQ(result, ePartialUpdateCollectResult::FullUpdateNeeded);
   /* Second invoke should now detect no changes. */
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
-  EXPECT_EQ(result, PARTIAL_UPDATE_NO_CHANGES);
+  EXPECT_EQ(result, ePartialUpdateCollectResult::NoChangesDetected);
 
   /* Mark region. */
   rcti region;
@@ -128,7 +128,7 @@ TEST_F(ImagePartialUpdateTest, mark_single_tile)
 
   /* Partial Update should be available. */
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
-  EXPECT_EQ(result, PARTIAL_UPDATE_CHANGES_AVAILABLE);
+  EXPECT_EQ(result, ePartialUpdateCollectResult::PartialChangesDetected);
 
   /* Check tiles. */
   PartialUpdateRegion changed_region;
@@ -140,7 +140,7 @@ TEST_F(ImagePartialUpdateTest, mark_single_tile)
   EXPECT_EQ(iter_result, PARTIAL_UPDATE_ITER_FINISHED);
 
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
-  EXPECT_EQ(result, PARTIAL_UPDATE_NO_CHANGES);
+  EXPECT_EQ(result, ePartialUpdateCollectResult::NoChangesDetected);
 }
 
 TEST_F(ImagePartialUpdateTest, mark_unconnected_tiles)
@@ -148,10 +148,10 @@ TEST_F(ImagePartialUpdateTest, mark_unconnected_tiles)
   ePartialUpdateCollectResult result;
   /* First tile should always return a full update. */
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
-  EXPECT_EQ(result, PARTIAL_UPDATE_NEED_FULL_UPDATE);
+  EXPECT_EQ(result, ePartialUpdateCollectResult::FullUpdateNeeded);
   /* Second invoke should now detect no changes. */
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
-  EXPECT_EQ(result, PARTIAL_UPDATE_NO_CHANGES);
+  EXPECT_EQ(result, ePartialUpdateCollectResult::NoChangesDetected);
 
   /* Mark region. */
   rcti region_a;
@@ -163,7 +163,7 @@ TEST_F(ImagePartialUpdateTest, mark_unconnected_tiles)
 
   /* Partial Update should be available. */
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
-  EXPECT_EQ(result, PARTIAL_UPDATE_CHANGES_AVAILABLE);
+  EXPECT_EQ(result, ePartialUpdateCollectResult::PartialChangesDetected);
 
   /* Check tiles. */
   PartialUpdateRegion changed_region;
@@ -178,7 +178,7 @@ TEST_F(ImagePartialUpdateTest, mark_unconnected_tiles)
   EXPECT_EQ(iter_result, PARTIAL_UPDATE_ITER_FINISHED);
 
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
-  EXPECT_EQ(result, PARTIAL_UPDATE_NO_CHANGES);
+  EXPECT_EQ(result, ePartialUpdateCollectResult::NoChangesDetected);
 }
 
 TEST_F(ImagePartialUpdateTest, donot_mark_outside_image)
@@ -186,10 +186,10 @@ TEST_F(ImagePartialUpdateTest, donot_mark_outside_image)
   ePartialUpdateCollectResult result;
   /* First tile should always return a full update. */
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
-  EXPECT_EQ(result, PARTIAL_UPDATE_NEED_FULL_UPDATE);
+  EXPECT_EQ(result, ePartialUpdateCollectResult::FullUpdateNeeded);
   /* Second invoke should now detect no changes. */
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
-  EXPECT_EQ(result, PARTIAL_UPDATE_NO_CHANGES);
+  EXPECT_EQ(result, ePartialUpdateCollectResult::NoChangesDetected);
 
   /* Mark region. */
   rcti region;
@@ -197,43 +197,43 @@ TEST_F(ImagePartialUpdateTest, donot_mark_outside_image)
   BLI_rcti_init(&region, -100, 0, 50, 100);
   BKE_image_partial_update_mark_region(image, image_tile, image_buffer, &region);
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
-  EXPECT_EQ(result, PARTIAL_UPDATE_NO_CHANGES);
+  EXPECT_EQ(result, ePartialUpdateCollectResult::NoChangesDetected);
 
   BLI_rcti_init(&region, 1024, 1100, 50, 100);
   BKE_image_partial_update_mark_region(image, image_tile, image_buffer, &region);
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
-  EXPECT_EQ(result, PARTIAL_UPDATE_NO_CHANGES);
+  EXPECT_EQ(result, ePartialUpdateCollectResult::NoChangesDetected);
 
   BLI_rcti_init(&region, 50, 100, -100, 0);
   BKE_image_partial_update_mark_region(image, image_tile, image_buffer, &region);
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
-  EXPECT_EQ(result, PARTIAL_UPDATE_NO_CHANGES);
+  EXPECT_EQ(result, ePartialUpdateCollectResult::NoChangesDetected);
 
   BLI_rcti_init(&region, 50, 100, 1024, 1100);
   BKE_image_partial_update_mark_region(image, image_tile, image_buffer, &region);
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
-  EXPECT_EQ(result, PARTIAL_UPDATE_NO_CHANGES);
+  EXPECT_EQ(result, ePartialUpdateCollectResult::NoChangesDetected);
 
   /* Diagonals. */
   BLI_rcti_init(&region, -100, 0, -100, 0);
   BKE_image_partial_update_mark_region(image, image_tile, image_buffer, &region);
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
-  EXPECT_EQ(result, PARTIAL_UPDATE_NO_CHANGES);
+  EXPECT_EQ(result, ePartialUpdateCollectResult::NoChangesDetected);
 
   BLI_rcti_init(&region, -100, 0, 1024, 1100);
   BKE_image_partial_update_mark_region(image, image_tile, image_buffer, &region);
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
-  EXPECT_EQ(result, PARTIAL_UPDATE_NO_CHANGES);
+  EXPECT_EQ(result, ePartialUpdateCollectResult::NoChangesDetected);
 
   BLI_rcti_init(&region, 1024, 1100, -100, 0);
   BKE_image_partial_update_mark_region(image, image_tile, image_buffer, &region);
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
-  EXPECT_EQ(result, PARTIAL_UPDATE_NO_CHANGES);
+  EXPECT_EQ(result, ePartialUpdateCollectResult::NoChangesDetected);
 
   BLI_rcti_init(&region, 1024, 1100, 1024, 1100);
   BKE_image_partial_update_mark_region(image, image_tile, image_buffer, &region);
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
-  EXPECT_EQ(result, PARTIAL_UPDATE_NO_CHANGES);
+  EXPECT_EQ(result, ePartialUpdateCollectResult::NoChangesDetected);
 }
 
 TEST_F(ImagePartialUpdateTest, mark_inside_image)
@@ -241,38 +241,38 @@ TEST_F(ImagePartialUpdateTest, mark_inside_image)
   ePartialUpdateCollectResult result;
   /* First tile should always return a full update. */
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
-  EXPECT_EQ(result, PARTIAL_UPDATE_NEED_FULL_UPDATE);
+  EXPECT_EQ(result, ePartialUpdateCollectResult::FullUpdateNeeded);
   /* Second invoke should now detect no changes. */
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
-  EXPECT_EQ(result, PARTIAL_UPDATE_NO_CHANGES);
+  EXPECT_EQ(result, ePartialUpdateCollectResult::NoChangesDetected);
 
   /* Mark region. */
   rcti region;
   BLI_rcti_init(&region, 0, 1, 0, 1);
   BKE_image_partial_update_mark_region(image, image_tile, image_buffer, &region);
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
-  EXPECT_EQ(result, PARTIAL_UPDATE_CHANGES_AVAILABLE);
+  EXPECT_EQ(result, ePartialUpdateCollectResult::PartialChangesDetected);
 
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
-  EXPECT_EQ(result, PARTIAL_UPDATE_NO_CHANGES);
+  EXPECT_EQ(result, ePartialUpdateCollectResult::NoChangesDetected);
   BLI_rcti_init(&region, 1023, 1024, 0, 1);
   BKE_image_partial_update_mark_region(image, image_tile, image_buffer, &region);
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
-  EXPECT_EQ(result, PARTIAL_UPDATE_CHANGES_AVAILABLE);
+  EXPECT_EQ(result, ePartialUpdateCollectResult::PartialChangesDetected);
 
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
-  EXPECT_EQ(result, PARTIAL_UPDATE_NO_CHANGES);
+  EXPECT_EQ(result, ePartialUpdateCollectResult::NoChangesDetected);
   BLI_rcti_init(&region, 1023, 1024, 1023, 1024);
   BKE_image_partial_update_mark_region(image, image_tile, image_buffer, &region);
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
-  EXPECT_EQ(result, PARTIAL_UPDATE_CHANGES_AVAILABLE);
+  EXPECT_EQ(result, ePartialUpdateCollectResult::PartialChangesDetected);
 
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
-  EXPECT_EQ(result, PARTIAL_UPDATE_NO_CHANGES);
+  EXPECT_EQ(result, ePartialUpdateCollectResult::NoChangesDetected);
   BLI_rcti_init(&region, 1023, 1024, 0, 1);
   BKE_image_partial_update_mark_region(image, image_tile, image_buffer, &region);
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
-  EXPECT_EQ(result, PARTIAL_UPDATE_CHANGES_AVAILABLE);
+  EXPECT_EQ(result, ePartialUpdateCollectResult::PartialChangesDetected);
 }
 
 TEST_F(ImagePartialUpdateTest, sequential_mark_region)
@@ -280,10 +280,10 @@ TEST_F(ImagePartialUpdateTest, sequential_mark_region)
   ePartialUpdateCollectResult result;
   /* First tile should always return a full update. */
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
-  EXPECT_EQ(result, PARTIAL_UPDATE_NEED_FULL_UPDATE);
+  EXPECT_EQ(result, ePartialUpdateCollectResult::FullUpdateNeeded);
   /* Second invoke should now detect no changes. */
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
-  EXPECT_EQ(result, PARTIAL_UPDATE_NO_CHANGES);
+  EXPECT_EQ(result, ePartialUpdateCollectResult::NoChangesDetected);
 
   {
     /* Mark region. */
@@ -293,7 +293,7 @@ TEST_F(ImagePartialUpdateTest, sequential_mark_region)
 
     /* Partial Update should be available. */
     result = BKE_image_partial_update_collect_changes(image, partial_update_user);
-    EXPECT_EQ(result, PARTIAL_UPDATE_CHANGES_AVAILABLE);
+    EXPECT_EQ(result, ePartialUpdateCollectResult::PartialChangesDetected);
 
     /* Check tiles. */
     PartialUpdateRegion changed_region;
@@ -305,7 +305,7 @@ TEST_F(ImagePartialUpdateTest, sequential_mark_region)
     EXPECT_EQ(iter_result, PARTIAL_UPDATE_ITER_FINISHED);
 
     result = BKE_image_partial_update_collect_changes(image, partial_update_user);
-    EXPECT_EQ(result, PARTIAL_UPDATE_NO_CHANGES);
+    EXPECT_EQ(result, ePartialUpdateCollectResult::NoChangesDetected);
   }
 
   {
@@ -316,7 +316,7 @@ TEST_F(ImagePartialUpdateTest, sequential_mark_region)
 
     /* Partial Update should be available. */
     result = BKE_image_partial_update_collect_changes(image, partial_update_user);
-    EXPECT_EQ(result, PARTIAL_UPDATE_CHANGES_AVAILABLE);
+    EXPECT_EQ(result, ePartialUpdateCollectResult::PartialChangesDetected);
 
     /* Check tiles. */
     PartialUpdateRegion changed_region;
@@ -328,7 +328,7 @@ TEST_F(ImagePartialUpdateTest, sequential_mark_region)
     EXPECT_EQ(iter_result, PARTIAL_UPDATE_ITER_FINISHED);
 
     result = BKE_image_partial_update_collect_changes(image, partial_update_user);
-    EXPECT_EQ(result, PARTIAL_UPDATE_NO_CHANGES);
+    EXPECT_EQ(result, ePartialUpdateCollectResult::NoChangesDetected);
   }
 }
 
@@ -337,10 +337,10 @@ TEST_F(ImagePartialUpdateTest, mark_multiple_chunks)
   ePartialUpdateCollectResult result;
   /* First tile should always return a full update. */
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
-  EXPECT_EQ(result, PARTIAL_UPDATE_NEED_FULL_UPDATE);
+  EXPECT_EQ(result, ePartialUpdateCollectResult::FullUpdateNeeded);
   /* Second invoke should now detect no changes. */
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
-  EXPECT_EQ(result, PARTIAL_UPDATE_NO_CHANGES);
+  EXPECT_EQ(result, ePartialUpdateCollectResult::NoChangesDetected);
 
   /* Mark region. */
   rcti region;
@@ -349,7 +349,7 @@ TEST_F(ImagePartialUpdateTest, mark_multiple_chunks)
 
   /* Partial Update should be available. */
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
-  EXPECT_EQ(result, PARTIAL_UPDATE_CHANGES_AVAILABLE);
+  EXPECT_EQ(result, ePartialUpdateCollectResult::PartialChangesDetected);
 
   /* Check tiles. */
   PartialUpdateRegion changed_region;
@@ -367,10 +367,10 @@ TEST_F(ImagePartialUpdateTest, iterator)
   PartialUpdateChecker<NoTileData> checker(image, &image_user, partial_update_user);
   /* First tile should always return a full update. */
   PartialUpdateCollectResult<NoTileData> changes = checker.collect_changes();
-  EXPECT_EQ(changes.get_collect_result(), PARTIAL_UPDATE_NEED_FULL_UPDATE);
+  EXPECT_EQ(changes.get_collect_result(), ePartialUpdateCollectResult::FullUpdateNeeded);
   /* Second invoke should now detect no changes. */
   changes = checker.collect_changes();
-  EXPECT_EQ(changes.get_collect_result(), PARTIAL_UPDATE_NO_CHANGES);
+  EXPECT_EQ(changes.get_collect_result(), ePartialUpdateCollectResult::NoChangesDetected);
 
   /* Mark region. */
   rcti region;
@@ -379,7 +379,7 @@ TEST_F(ImagePartialUpdateTest, iterator)
 
   /* Partial Update should be available. */
   changes = checker.collect_changes();
-  EXPECT_EQ(changes.get_collect_result(), PARTIAL_UPDATE_CHANGES_AVAILABLE);
+  EXPECT_EQ(changes.get_collect_result(), ePartialUpdateCollectResult::PartialChangesDetected);
 
   /* Check tiles. */
   int num_tiles_found = 0;

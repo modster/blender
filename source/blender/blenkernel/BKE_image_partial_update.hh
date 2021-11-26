@@ -34,7 +34,7 @@ struct PartialUpdateRegister;
 }
 
 namespace blender::bke::image {
-  
+
 using TileNumber = int;
 
 namespace partial_update {
@@ -45,16 +45,16 @@ namespace partial_update {
 /**
  * \brief Result codes of #BKE_image_partial_update_collect_changes.
  */
-typedef enum ePartialUpdateCollectResult {
+enum class ePartialUpdateCollectResult {
   /** \brief Unable to construct partial updates. Caller should perform a full update. */
-  PARTIAL_UPDATE_NEED_FULL_UPDATE,
+  FullUpdateNeeded,
 
   /** \brief No changes detected since the last time requested. */
-  PARTIAL_UPDATE_NO_CHANGES,
+  NoChangesDetected,
 
   /** \brief Changes detected since the last time requested. */
-  PARTIAL_UPDATE_CHANGES_AVAILABLE,
-} ePartialUpdateCollectResult;
+  PartialChangesDetected,
+};
 
 /**
  * \brief A region to update.
@@ -89,15 +89,14 @@ typedef enum ePartialUpdateIterResult {
  *
  * Invoke #BKE_image_partial_update_get_next_change to iterate over the collected tiles.
  *
- * \returns PARTIAL_UPDATE_NEED_FULL_UPDATE: called should not use partial updates but
- *              recalculate the full image. This result can be expected when called
- *              for the first time for a user and when it isn't possible to reconstruct
- *              the changes as the internal state doesn't have enough data stored.
- *          PARTIAL_UPDATE_NO_CHANGES: The have been no changes detected since last
- *              invoke for the same user.
- *          PARTIAL_UPDATE_CHANGES_AVAILABLE: Parts of the image has been updated
- *              since last invoke for the same user. The changes can be read by
- *              using #BKE_image_partial_update_get_next_change.
+ * \returns ePartialUpdateCollectResult::FullUpdateNeeded: called should not use partial updates
+ * but recalculate the full image. This result can be expected when called for the first time for a
+ * user and when it isn't possible to reconstruct the changes as the internal state doesn't have
+ * enough data stored. ePartialUpdateCollectResult::NoChangesDetected: The have been no changes
+ * detected since last invoke for the same user.
+ * ePartialUpdateCollectResult::PartialChangesDetected: Parts of the image has been updated since
+ * last invoke for the same user. The changes can be read by using
+ * #BKE_image_partial_update_get_next_change.
  */
 ePartialUpdateCollectResult BKE_image_partial_update_collect_changes(
     struct Image *image, struct PartialUpdateUser *user);
@@ -183,7 +182,7 @@ template<typename TileData = NoTileData> struct PartialUpdateCollectResult {
 
   ePartialUpdateIterResult get_next_change()
   {
-    BLI_assert(collect_result == PARTIAL_UPDATE_CHANGES_AVAILABLE);
+    BLI_assert(collect_result == ePartialUpdateCollectResult::PartialChangesDetected);
     ePartialUpdateIterResult result = BKE_image_partial_update_get_next_change(user,
                                                                                &changed_region);
     switch (result) {

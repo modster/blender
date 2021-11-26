@@ -359,17 +359,17 @@ static void image_gpu_texture_try_partial_update(Image *image, ImageUser *iuser)
   PartialUpdateChecker<ImageTileData> checker(image, iuser, image->runtime.partial_update_user);
   PartialUpdateCollectResult<ImageTileData> changes = checker.collect_changes();
   switch (changes.get_collect_result()) {
-    case PARTIAL_UPDATE_NEED_FULL_UPDATE: {
+    case ePartialUpdateCollectResult::FullUpdateNeeded: {
       image_free_gpu(image, true);
       break;
     }
 
-    case PARTIAL_UPDATE_CHANGES_AVAILABLE: {
+    case ePartialUpdateCollectResult::PartialChangesDetected: {
       image_gpu_texture_partial_update_changes_available(changes);
       break;
     }
 
-    case PARTIAL_UPDATE_NO_CHANGES: {
+    case ePartialUpdateCollectResult::NoChangesDetected: {
       /* GPUTextures are up to date. */
       break;
     }

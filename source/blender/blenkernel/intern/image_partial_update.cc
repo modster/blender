@@ -23,16 +23,16 @@
  *
  * switch (BKE_image_partial_update_collect_changes(image, image_buffer))
  * {
- * case PARTIAL_UPDATE_NEED_FULL_UPDATE:
+ * case ePartialUpdateCollectResult::FullUpdateNeeded:
  *  // Unable to do partial updates. Perform a full update.
  *  break;
- * case PARTIAL_UPDATE_CHANGES_AVAILABLE:
+ * case ePartialUpdateCollectResult::PartialChangesDetected:
  *  PartialUpdateRegion change;
  *  while (BKE_image_partial_update_get_next_change(partial_update_user, &change) ==
  *         PARTIAL_UPDATE_ITER_CHANGE_AVAILABLE){
  *  // Do something with the change.
  *  }
- *  case PARTIAL_UPDATE_NO_CHANGES:
+ *  case ePartialUpdateCollectResult::NoChangesDetected:
  *    break;
  * }
  *
@@ -469,12 +469,12 @@ ePartialUpdateCollectResult BKE_image_partial_update_collect_changes(Image *imag
 
   if (!partial_updater->can_construct(user_impl->last_changeset_id)) {
     user_impl->last_changeset_id = partial_updater->last_changeset_id;
-    return PARTIAL_UPDATE_NEED_FULL_UPDATE;
+    return ePartialUpdateCollectResult::FullUpdateNeeded;
   }
 
   /* Check if there are changes since last invocation for the user. */
   if (user_impl->last_changeset_id == partial_updater->last_changeset_id) {
-    return PARTIAL_UPDATE_NO_CHANGES;
+    return ePartialUpdateCollectResult::NoChangesDetected;
   }
 
   /* Collect changed tiles. */
@@ -509,7 +509,7 @@ ePartialUpdateCollectResult BKE_image_partial_update_collect_changes(Image *imag
   }
 
   user_impl->last_changeset_id = partial_updater->last_changeset_id;
-  return PARTIAL_UPDATE_CHANGES_AVAILABLE;
+  return ePartialUpdateCollectResult::PartialChangesDetected;
 }
 
 ePartialUpdateIterResult BKE_image_partial_update_get_next_change(PartialUpdateUser *user,
