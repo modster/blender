@@ -34,14 +34,30 @@ using namespace blender::bke::image::partial_update;
 namespace clipping {
 
 /** \brief Update the texture slot uv and screen space bounds. */
-static void update_texture_slots_bounds(const AbstractSpaceAccessor *space, IMAGE_PrivateData *pd)
+static void update_texture_slots_bounds(const ARegion *region,
+                                        const AbstractSpaceAccessor *space,
+                                        IMAGE_PrivateData *pd)
 {
   // each texture
+  BLI_rctf_init(
+      &pd->screen_space.texture_infos[0].clipping_bounds, 0, region->winx, 0, region->winy);
+  // TODO: calculate the correct visible uv bounds.
+  BLI_rctf_init(&pd->screen_space.texture_infos[0].uv_bounds, 0.0, 1.0, 0.0, 1.0);
+
+  /* Mark the other textures as invalid. */
+  for (int i = 1; i < SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN; i++) {
+    BLI_rctf_init_minmax(&pd->screen_space.texture_infos[i].clipping_bounds);
+    BLI_rctf_init_minmax(&pd->screen_space.texture_infos[i].uv_bounds);
+  }
 }
 
 static void update_texture_slots_visibility(const AbstractSpaceAccessor *space,
                                             IMAGE_PrivateData *pd)
 {
+  pd->screen_space.texture_infos[0].visible = true;
+  for (int i = 1; i < SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN; i++) {
+    pd->screen_space.texture_infos[i].visible = false;
+  }
 }
 
 }  // namespace clipping
@@ -57,27 +73,35 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
     return DRW_pass_create("Image", state);
   }
 
-  void add_to_shgroup(AbstractSpaceAccessor *space,
-                      DRWShadingGroup *grp,
-                      const Image *image,
-                      const ImBuf *image_buffer) const
+  void add_shgroups(IMAGE_PassList *psl,
+                    IMAGE_TextureList *txl,
+                    IMAGE_PrivateData *pd,
+                    const ShaderParameters &sh_params) const
   {
-    float image_mat[4][4];
-
-    const DRWContextState *draw_ctx = DRW_context_state_get();
-    const ARegion *region = draw_ctx->region;
-    space->get_image_mat(image_buffer, region, image_mat);
-
     GPUBatch *geom = DRW_cache_quad_get();
+    GPUShader *shader = IMAGE_shader_image_get(false);
 
-    const float translate_x = image_mat[3][0];
-    const float translate_y = image_mat[3][1];
-    LISTBASE_FOREACH (ImageTile *, tile, &image->tiles) {
-      const int tile_x = ((tile->tile_number - 1001) % 10);
-      const int tile_y = ((tile->tile_number - 1001) / 10);
-      image_mat[3][0] = (float)tile_x + translate_x;
-      image_mat[3][1] = (float)tile_y + translate_y;
-      DRW_shgroup_call_obmat(grp, geom, image_mat);
+    float image_mat[4][4];
+    unit_m4(image_mat);
+    for (int i = 0; i < SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN; i++) {
+      if (!pd->screen_space.texture_infos[i].visible) {
+        continue;
+      }
+
+      image_mat[0][0] = pd->screen_space.texture_infos[i].clipping_bounds.xmax;
+      image_mat[1][1] = pd->screen_space.texture_infos[i].clipping_bounds.ymax;
+
+      // TODO: use subgroup.
+      DRWShadingGroup *shgrp = DRW_shgroup_create(shader, psl->image_pass);
+      DRW_shgroup_uniform_texture_ex(
+          shgrp, "imageTexture", txl->screen_space.textures[i], GPU_SAMPLER_DEFAULT);
+      DRW_shgroup_uniform_vec2_copy(shgrp, "farNearDistances", sh_params.far_near);
+      DRW_shgroup_uniform_vec4_copy(shgrp, "color", ShaderParameters::color);
+      DRW_shgroup_uniform_vec4_copy(shgrp, "shuffle", sh_params.shuffle);
+      DRW_shgroup_uniform_int_copy(shgrp, "drawFlags", sh_params.flags);
+      DRW_shgroup_uniform_bool_copy(shgrp, "imgPremultiplied", sh_params.use_premul_alpha);
+
+      DRW_shgroup_call_obmat(shgrp, geom, image_mat);
     }
   }
 
@@ -157,7 +181,7 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
         do_partial_update(changes, txl, pd, image);
         break;
     }
-    update_dirty_textures();
+    update_dirty_textures(txl, pd);
   }
 
   void do_partial_update(PartialUpdateChecker<ImageTileData>::CollectResult &iterator,
@@ -176,8 +200,41 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
     }
   }
 
-  void update_dirty_textures() const
+  void update_dirty_textures(IMAGE_TextureList *txl, IMAGE_PrivateData *pd) const
   {
+    for (int i = 0; i < SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN; i++) {
+      if (!pd->screen_space.texture_infos[i].dirty) {
+        continue;
+      }
+      if (!pd->screen_space.texture_infos[i].visible) {
+        continue;
+      }
+
+      rctf *uv_bounds = &pd->screen_space.texture_infos[i].uv_bounds;
+
+      GPUTexture *gpu_texture = txl->screen_space.textures[i];
+      int texture_width = GPU_texture_width(gpu_texture);
+      int texture_height = GPU_texture_height(gpu_texture);
+      int texture_size = texture_width * texture_height;
+
+      float *data = static_cast<float *>(MEM_mallocN(sizeof(float) * 4 * texture_size, __func__));
+      int offset = 0;
+      for (int y = 0; y < texture_height; y++) {
+        float v = y / (float)texture_height;
+        for (int x = 0; x < texture_width; x++) {
+          float u = x / (float)texture_width;
+          copy_v4_fl4(&data[offset * 4],
+                      uv_bounds->xmin * u + uv_bounds->xmax * (1.0 - u),
+                      uv_bounds->ymin * v + uv_bounds->ymax * (1.0 - v),
+                      0.0,
+                      1.0);
+          offset++;
+        }
+      }
+      GPU_texture_update(gpu_texture, GPU_DATA_FLOAT, data);
+
+      MEM_freeN(data);
+    }
   }
 
  public:
@@ -194,6 +251,7 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
                    ImageUser *iuser,
                    ImBuf *image_buffer) const override
   {
+    const DRWContextState *draw_ctx = DRW_context_state_get();
     IMAGE_PassList *psl = vedata->psl;
     IMAGE_TextureList *txl = vedata->txl;
     IMAGE_StorageList *stl = vedata->stl;
@@ -206,7 +264,8 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
 
     // Step: Find out which screen space textures are needed to draw on the screen. Remove the
     // screen space textures that aren't needed.
-    clipping::update_texture_slots_bounds(space, pd);
+    const ARegion *region = draw_ctx->region;
+    clipping::update_texture_slots_bounds(region, space, pd);
     clipping::update_texture_slots_visibility(space, pd);
     update_texture_slot_allocation(txl, pd);
 
@@ -226,7 +285,7 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
     ShaderParameters sh_params;
     sh_params.use_premul_alpha = BKE_image_has_gpu_texture_premultiplied_alpha(image,
                                                                                image_buffer);
-    const DRWContextState *draw_ctx = DRW_context_state_get();
+
     const Scene *scene = draw_ctx->scene;
     if (scene->camera && scene->camera->type == OB_CAMERA) {
       Camera *camera = static_cast<Camera *>(scene->camera->data);
@@ -234,22 +293,7 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
     }
     space->get_shader_parameters(sh_params, image_buffer, is_tiled_texture);
 
-    GPUShader *shader = IMAGE_shader_image_get(is_tiled_texture);
-    DRWShadingGroup *shgrp = DRW_shgroup_create(shader, psl->image_pass);
-    if (is_tiled_texture) {
-      DRW_shgroup_uniform_texture_ex(shgrp, "imageTileArray", pd->texture, GPU_SAMPLER_DEFAULT);
-      DRW_shgroup_uniform_texture(shgrp, "imageTileData", tex_tile_data);
-    }
-    else {
-      DRW_shgroup_uniform_texture_ex(shgrp, "imageTexture", pd->texture, GPU_SAMPLER_DEFAULT);
-    }
-    DRW_shgroup_uniform_vec2_copy(shgrp, "farNearDistances", sh_params.far_near);
-    DRW_shgroup_uniform_vec4_copy(shgrp, "color", ShaderParameters::color);
-    DRW_shgroup_uniform_vec4_copy(shgrp, "shuffle", sh_params.shuffle);
-    DRW_shgroup_uniform_int_copy(shgrp, "drawFlags", sh_params.flags);
-    DRW_shgroup_uniform_bool_copy(shgrp, "imgPremultiplied", sh_params.use_premul_alpha);
-
-    add_to_shgroup(space, shgrp, image, image_buffer);
+    add_shgroups(psl, txl, pd, sh_params);
   }
 
   void draw_finish(IMAGE_Data *vedata) const override
@@ -278,6 +322,6 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
     DRW_draw_pass(psl->image_pass);
     DRW_view_set_active(nullptr);
   }
-};
+};  // namespace clipping
 
 }  // namespace blender::draw::image_engine

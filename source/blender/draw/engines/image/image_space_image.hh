@@ -104,7 +104,7 @@ class SpaceImageAccessor : public AbstractSpaceAccessor {
 
   bool has_view_override() const override
   {
-    return false;
+    return true;
   }
 
   DRWView *create_view_override(const ARegion *region) override
