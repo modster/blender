@@ -76,13 +76,13 @@ struct PartialUpdateRegion {
 /**
  * \brief Return codes of #BKE_image_partial_update_get_next_change.
  */
-typedef enum ePartialUpdateIterResult {
+enum class ePartialUpdateIterResult {
   /** \brief no tiles left when iterating over tiles. */
-  PARTIAL_UPDATE_ITER_FINISHED = 0,
+  Finished = 0,
 
   /** \brief a chunk was available and has been loaded. */
-  PARTIAL_UPDATE_ITER_CHANGE_AVAILABLE = 1,
-} ePartialUpdateIterResult;
+  ChangeAvailable = 1,
+};
 
 /**
  * \brief collect the partial update since the last request.
@@ -186,11 +186,11 @@ template<typename TileData = NoTileData> struct PartialUpdateCollectResult {
     ePartialUpdateIterResult result = BKE_image_partial_update_get_next_change(user,
                                                                                &changed_region);
     switch (result) {
-      case PARTIAL_UPDATE_ITER_FINISHED:
+      case ePartialUpdateIterResult::Finished:
         tile_data.free_data();
         return result;
 
-      case PARTIAL_UPDATE_ITER_CHANGE_AVAILABLE:
+      case ePartialUpdateIterResult::ChangeAvailable:
         if (last_tile_number == changed_region.tile_number) {
           return result;
         }

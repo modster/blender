@@ -337,7 +337,7 @@ static void image_update_reusable_textures(Image *ima,
 static void image_gpu_texture_partial_update_changes_available(
     PartialUpdateCollectResult<ImageTileData> &changes)
 {
-  while (changes.get_next_change() == PARTIAL_UPDATE_ITER_CHANGE_AVAILABLE) {
+  while (changes.get_next_change() == ePartialUpdateIterResult::ChangeAvailable) {
     const int tile_offset_x = changes.changed_region.region.xmin;
     const int tile_offset_y = changes.changed_region.region.ymin;
     const int tile_width = min_ii(changes.tile_data.tile_buffer->x,

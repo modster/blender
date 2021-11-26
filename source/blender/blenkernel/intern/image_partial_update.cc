@@ -29,7 +29,7 @@
  * case ePartialUpdateCollectResult::PartialChangesDetected:
  *  PartialUpdateRegion change;
  *  while (BKE_image_partial_update_get_next_change(partial_update_user, &change) ==
- *         PARTIAL_UPDATE_ITER_CHANGE_AVAILABLE){
+ *         ePartialUpdateIterResult::ChangeAvailable){
  *  // Do something with the change.
  *  }
  *  case ePartialUpdateCollectResult::NoChangesDetected:
@@ -517,11 +517,11 @@ ePartialUpdateIterResult BKE_image_partial_update_get_next_change(PartialUpdateU
 {
   PartialUpdateUserImpl *user_impl = unwrap(user);
   if (user_impl->updated_regions.is_empty()) {
-    return PARTIAL_UPDATE_ITER_FINISHED;
+    return ePartialUpdateIterResult::Finished;
   }
   PartialUpdateRegion region = user_impl->updated_regions.pop_last();
   *r_region = region;
-  return PARTIAL_UPDATE_ITER_CHANGE_AVAILABLE;
+  return ePartialUpdateIterResult::ChangeAvailable;
 }
 
 }  // namespace blender::bke::image::partial_update

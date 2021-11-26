@@ -134,10 +134,10 @@ TEST_F(ImagePartialUpdateTest, mark_single_tile)
   PartialUpdateRegion changed_region;
   ePartialUpdateIterResult iter_result;
   iter_result = BKE_image_partial_update_get_next_change(partial_update_user, &changed_region);
-  EXPECT_EQ(iter_result, PARTIAL_UPDATE_ITER_CHANGE_AVAILABLE);
+  EXPECT_EQ(iter_result, ePartialUpdateIterResult::ChangeAvailable);
   EXPECT_EQ(BLI_rcti_inside_rcti(&changed_region.region, &region), true);
   iter_result = BKE_image_partial_update_get_next_change(partial_update_user, &changed_region);
-  EXPECT_EQ(iter_result, PARTIAL_UPDATE_ITER_FINISHED);
+  EXPECT_EQ(iter_result, ePartialUpdateIterResult::Finished);
 
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
   EXPECT_EQ(result, ePartialUpdateCollectResult::NoChangesDetected);
@@ -169,13 +169,13 @@ TEST_F(ImagePartialUpdateTest, mark_unconnected_tiles)
   PartialUpdateRegion changed_region;
   ePartialUpdateIterResult iter_result;
   iter_result = BKE_image_partial_update_get_next_change(partial_update_user, &changed_region);
-  EXPECT_EQ(iter_result, PARTIAL_UPDATE_ITER_CHANGE_AVAILABLE);
+  EXPECT_EQ(iter_result, ePartialUpdateIterResult::ChangeAvailable);
   EXPECT_EQ(BLI_rcti_inside_rcti(&changed_region.region, &region_b), true);
   iter_result = BKE_image_partial_update_get_next_change(partial_update_user, &changed_region);
-  EXPECT_EQ(iter_result, PARTIAL_UPDATE_ITER_CHANGE_AVAILABLE);
+  EXPECT_EQ(iter_result, ePartialUpdateIterResult::ChangeAvailable);
   EXPECT_EQ(BLI_rcti_inside_rcti(&changed_region.region, &region_a), true);
   iter_result = BKE_image_partial_update_get_next_change(partial_update_user, &changed_region);
-  EXPECT_EQ(iter_result, PARTIAL_UPDATE_ITER_FINISHED);
+  EXPECT_EQ(iter_result, ePartialUpdateIterResult::Finished);
 
   result = BKE_image_partial_update_collect_changes(image, partial_update_user);
   EXPECT_EQ(result, ePartialUpdateCollectResult::NoChangesDetected);
@@ -299,10 +299,10 @@ TEST_F(ImagePartialUpdateTest, sequential_mark_region)
     PartialUpdateRegion changed_region;
     ePartialUpdateIterResult iter_result;
     iter_result = BKE_image_partial_update_get_next_change(partial_update_user, &changed_region);
-    EXPECT_EQ(iter_result, PARTIAL_UPDATE_ITER_CHANGE_AVAILABLE);
+    EXPECT_EQ(iter_result, ePartialUpdateIterResult::ChangeAvailable);
     EXPECT_EQ(BLI_rcti_inside_rcti(&changed_region.region, &region), true);
     iter_result = BKE_image_partial_update_get_next_change(partial_update_user, &changed_region);
-    EXPECT_EQ(iter_result, PARTIAL_UPDATE_ITER_FINISHED);
+    EXPECT_EQ(iter_result, ePartialUpdateIterResult::Finished);
 
     result = BKE_image_partial_update_collect_changes(image, partial_update_user);
     EXPECT_EQ(result, ePartialUpdateCollectResult::NoChangesDetected);
@@ -322,10 +322,10 @@ TEST_F(ImagePartialUpdateTest, sequential_mark_region)
     PartialUpdateRegion changed_region;
     ePartialUpdateIterResult iter_result;
     iter_result = BKE_image_partial_update_get_next_change(partial_update_user, &changed_region);
-    EXPECT_EQ(iter_result, PARTIAL_UPDATE_ITER_CHANGE_AVAILABLE);
+    EXPECT_EQ(iter_result, ePartialUpdateIterResult::ChangeAvailable);
     EXPECT_EQ(BLI_rcti_inside_rcti(&changed_region.region, &region), true);
     iter_result = BKE_image_partial_update_get_next_change(partial_update_user, &changed_region);
-    EXPECT_EQ(iter_result, PARTIAL_UPDATE_ITER_FINISHED);
+    EXPECT_EQ(iter_result, ePartialUpdateIterResult::Finished);
 
     result = BKE_image_partial_update_collect_changes(image, partial_update_user);
     EXPECT_EQ(result, ePartialUpdateCollectResult::NoChangesDetected);
@@ -355,7 +355,7 @@ TEST_F(ImagePartialUpdateTest, mark_multiple_chunks)
   PartialUpdateRegion changed_region;
   int num_chunks_found = 0;
   while (BKE_image_partial_update_get_next_change(partial_update_user, &changed_region) ==
-         PARTIAL_UPDATE_ITER_CHANGE_AVAILABLE) {
+         ePartialUpdateIterResult::ChangeAvailable) {
     BLI_rcti_isect(&changed_region.region, &region, nullptr);
     num_chunks_found++;
   }
@@ -383,7 +383,7 @@ TEST_F(ImagePartialUpdateTest, iterator)
 
   /* Check tiles. */
   int num_tiles_found = 0;
-  while (changes.get_next_change() == PARTIAL_UPDATE_ITER_CHANGE_AVAILABLE) {
+  while (changes.get_next_change() == ePartialUpdateIterResult::ChangeAvailable) {
     BLI_rcti_isect(&changes.changed_region.region, &region, nullptr);
     num_tiles_found++;
   }
