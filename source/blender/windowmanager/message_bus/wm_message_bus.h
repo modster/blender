@@ -234,17 +234,33 @@ void WM_msg_subscribe_ID(struct wmMsgBus *mbus,
                          const char *id_repr);
 void WM_msg_publish_ID(struct wmMsgBus *mbus, struct ID *id);
 
-#define WM_msg_publish_rna_prop(mbus, id_, data_, type_, prop_) \
-  { \
-    wmMsgParams_RNA msg_key_params_ = {{0}}; \
-    _WM_MESSAGE_EXTERN_BEGIN; \
-    extern PropertyRNA rna_##type_##_##prop_; \
-    _WM_MESSAGE_EXTERN_END; \
-    RNA_pointer_create(id_, &RNA_##type_, data_, &msg_key_params_.ptr); \
-    msg_key_params_.prop = &rna_##type_##_##prop_; \
-    WM_msg_publish_rna_params(mbus, &msg_key_params_); \
-  } \
-  ((void)0)
+#ifdef __cplusplus
+#  define WM_msg_publish_rna_prop(mbus, id_, data_, type_, prop_) \
+    { \
+      wmMsgParams_RNA msg_key_params_ = {{0}}; \
+      _WM_MESSAGE_EXTERN_BEGIN; \
+      extern "C" { \
+      PropertyRNA rna_##type_##_##prop_; \
+      } \
+      _WM_MESSAGE_EXTERN_END; \
+      RNA_pointer_create(id_, &RNA_##type_, data_, &msg_key_params_.ptr); \
+      msg_key_params_.prop = &rna_##type_##_##prop_; \
+      WM_msg_publish_rna_params(mbus, &msg_key_params_); \
+    } \
+    ((void)0)
+#else
+#  define WM_msg_publish_rna_prop(mbus, id_, data_, type_, prop_) \
+    { \
+      wmMsgParams_RNA msg_key_params_ = {{0}}; \
+      _WM_MESSAGE_EXTERN_BEGIN; \
+      extern PropertyRNA rna_##type_##_##prop_; \
+      _WM_MESSAGE_EXTERN_END; \
+      RNA_pointer_create(id_, &RNA_##type_, data_, &msg_key_params_.ptr); \
+      msg_key_params_.prop = &rna_##type_##_##prop_; \
+      WM_msg_publish_rna_params(mbus, &msg_key_params_); \
+    } \
+    ((void)0)
+#endif
 #define WM_msg_subscribe_rna_prop(mbus, id_, data_, type_, prop_, value) \
   { \
     wmMsgParams_RNA msg_key_params_ = {{0}}; \
