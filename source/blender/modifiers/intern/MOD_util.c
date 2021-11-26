@@ -237,6 +237,8 @@ Mesh *MOD_deform_mesh_eval_get(Object *ob,
     }
   }
 
+  /* TODO: Remove this "use_normals" argument, since the caller should retrieve normals afterwards
+   * if necessary. */
   if (use_normals) {
     if (LIKELY(mesh)) {
       BKE_mesh_ensure_vertex_normals(mesh);

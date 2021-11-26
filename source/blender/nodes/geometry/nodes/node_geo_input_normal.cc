@@ -31,16 +31,6 @@ static void node_declare(NodeDeclarationBuilder &b)
   b.add_output<decl::Vector>(N_("Normal")).field_source();
 }
 
-static GVArray mesh_face_normals_gvarray(const Mesh &mesh)
-{
-  return VArray<float3>::ForSpan({(float3 *)BKE_mesh_ensure_face_normals(&mesh), mesh.totpoly});
-}
-
-static GVArray mesh_vert_normals_gvarray(const Mesh &mesh)
-{
-  return VArray<float3>::ForSpan({(float3 *)BKE_mesh_ensure_vertex_normals(&mesh), mesh.totvert});
-}
-
 static VArray<float3> construct_mesh_normals_gvarray(const MeshComponent &mesh_component,
                                                      const Mesh &mesh,
                                                      const IndexMask mask,
@@ -60,7 +50,7 @@ static VArray<float3> construct_mesh_normals_gvarray(const MeshComponent &mesh_c
       /* In this case, start with vertex normals and convert to the edge domain, since the
        * conversion from edges to vertices is very simple. Use "manual" domain interpolation
        * instead of the GeometryComponent API to avoid calculating unnecessary values and to
-       * allow normalizing the result much more simply. */
+       * allow normalizing the result more simply. */
       Span<float3> vert_normals{(float3 *)BKE_mesh_ensure_vertex_normals(&mesh), mesh.totvert};
       Array<float3> edge_normals(mask.min_array_size());
       Span<MEdge> edges{mesh.medge, mesh.totedge};

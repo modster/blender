@@ -120,10 +120,6 @@ void BKE_mesh_normals_tag_dirty(Mesh *mesh)
   mesh->runtime.cd_dirty_poly |= CD_MASK_NORMAL;
 }
 
-/**
- * Make sure the vertex normal data layer exists and return it.
- * Used for manually assigning vertex normals. Clears the dirty flag.
- */
 float (*BKE_mesh_vertex_normals_for_write(Mesh *mesh))[3]
 {
   mesh->runtime.cd_dirty_vert &= ~CD_MASK_NORMAL;
@@ -131,10 +127,6 @@ float (*BKE_mesh_vertex_normals_for_write(Mesh *mesh))[3]
       &mesh->vdata, CD_NORMAL, CD_CALLOC, nullptr, mesh->totvert);
 }
 
-/**
- * Make sure the face normal data layer exists and return it.
- * Used for manually assigning face normals. Clears the dirty flag.
- */
 float (*BKE_mesh_face_normals_for_write(Mesh *mesh))[3]
 {
   mesh->runtime.cd_dirty_poly &= ~CD_MASK_NORMAL;
@@ -189,8 +181,7 @@ static void mesh_calc_normals_poly_and_vertex(MutableSpan<MVert> mverts,
       const MPoly &poly = polys[i];
       Span<MLoop> ml = loops.slice(poly.loopstart, poly.totloop);
 
-      float3 pnor_temp;
-      float3 &pnor = poly_normals.is_empty() ? pnor_temp : poly_normals[i];
+      float3 &pnor = poly_normals[i];
 
       const int i_end = poly.totloop - 1;
 
@@ -262,18 +253,10 @@ static void mesh_calc_normals_poly_and_vertex(MutableSpan<MVert> mverts,
 /** \name Mesh Normal Calculation
  * \{ */
 
-/**
- * \warning May still return null if the mesh is empty.
- */
 const float (*BKE_mesh_ensure_vertex_normals(const Mesh *mesh))[3]
 {
   if (!(mesh->runtime.cd_dirty_vert & CD_MASK_NORMAL ||
         mesh->runtime.cd_dirty_poly & CD_MASK_NORMAL)) {
-    if (!CustomData_has_layer(&mesh->vdata, CD_NORMAL)) {
-      Mesh *me = const_cast<Mesh *>(mesh);
-      MEM_freeN(me);
-      MEM_freeN(me);
-    }
     BLI_assert(CustomData_has_layer(&mesh->vdata, CD_NORMAL) || mesh->totvert == 0);
     return (const float(*)[3])CustomData_get_layer(&mesh->vdata, CD_NORMAL);
   }
@@ -378,25 +361,9 @@ void BKE_mesh_calc_normals(Mesh *mesh)
 void BKE_mesh_assert_normals_dirty_or_calculated(const Mesh *mesh)
 {
   if (!(mesh->runtime.cd_dirty_vert & CD_MASK_NORMAL)) {
-    /* Meshes with non-dirty normals should always have a normal custom data layer. */
-    if (!CustomData_has_layer(&mesh->vdata, CD_NORMAL)) {
-      Mesh *me = const_cast<Mesh *>(mesh);
-      MEM_freeN(me);
-      /* Cause a use after free, to quickly tell where the offending mesh was allocated.
-       * TODO: Remove. */
-      MEM_freeN(me);
-    }
     BLI_assert(CustomData_has_layer(&mesh->vdata, CD_NORMAL));
   }
   if (!(mesh->runtime.cd_dirty_poly & CD_MASK_NORMAL)) {
-    /* Meshes with non-dirty normals should always have a normal custom data layer. */
-    if (!CustomData_has_layer(&mesh->pdata, CD_NORMAL)) {
-      Mesh *me = const_cast<Mesh *>(mesh);
-      MEM_freeN(me);
-      /* Cause a use after free, to quickly tell where the offending mesh was allocated.
-       * TODO: Remove. */
-      MEM_freeN(me);
-    }
     BLI_assert(CustomData_has_layer(&mesh->vdata, CD_NORMAL));
   }
 }

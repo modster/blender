@@ -184,7 +184,7 @@ void BKE_object_handle_data_update(Depsgraph *depsgraph, Scene *scene, Object *o
       cddata_masks.pmask |= CD_MASK_PROP_ALL;
       cddata_masks.lmask |= CD_MASK_PROP_ALL;
 
-      /* Also carry over normal layers to avoid recomputation. */
+      /* Also copy over normal layers to avoid recomputation. */
       cddata_masks.pmask |= CD_MASK_NORMAL;
       cddata_masks.vmask |= CD_MASK_NORMAL;
 

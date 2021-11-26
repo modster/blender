@@ -74,7 +74,7 @@ typedef struct ShrinkwrapCalcData {
 
   struct Object *ob; /* object we are applying shrinkwrap to */
 
-  struct MVert *vert; /* Array of verts being projected (to fetch other data) */
+  struct MVert *vert; /* Array of verts being projected. */
   const float (*vert_normals)[3];
   float (*vertexCos)[3]; /* vertexs being shrinkwraped */
   int numVerts;

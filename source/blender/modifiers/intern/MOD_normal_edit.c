@@ -338,7 +338,7 @@ static void normalEditModifier_do_radial(NormalEditModifierData *enmd,
     /* XXX TODO: is this still needed? */
     // mesh->dirty |= DM_DIRTY_TESS_CDLAYERS;
     /* We need to recompute vertex normals! */
-    BKE_mesh_calc_normals(mesh);
+    BKE_mesh_normals_tag_dirty(mesh);
   }
 
   BKE_mesh_normals_loop_custom_set(mvert,

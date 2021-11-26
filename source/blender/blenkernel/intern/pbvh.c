@@ -1098,9 +1098,6 @@ static void pbvh_update_normals_store_task_cb(void *__restrict userdata,
 
 static void pbvh_faces_update_normals(PBVH *pbvh, PBVHNode **nodes, int totnode)
 {
-  /* could be per node to save some memory, but also means
-   * we have to store for each vertex which node it is in */
-
   /* subtle assumptions:
    * - We know that for all edited vertices, the nodes with faces
    *   adjacent to these vertices have been marked with PBVH_UpdateNormals.
@@ -2978,7 +2975,7 @@ void pbvh_vertex_iter_init(PBVH *pbvh, PBVHNode *node, PBVHVertexIter *vi, int m
 
   vi->mask = NULL;
   if (pbvh->type == PBVH_FACES) {
-    /* Cast awat const because sculpt/paint code can adjust normals when restoring mesh data. */
+    /* Cast away const because sculpt/paint code can adjust normals when restoring mesh data. */
     vi->vert_normals = (float(*)[3])BKE_mesh_ensure_vertex_normals(pbvh->mesh);
 
     vi->vmask = CustomData_get_layer(pbvh->vdata, CD_PAINT_MASK);

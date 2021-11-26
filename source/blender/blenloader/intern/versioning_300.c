@@ -43,7 +43,6 @@
 #include "DNA_lineart_types.h"
 #include "DNA_listBase.h"
 #include "DNA_material_types.h"
-#include "DNA_mesh_types.h"
 #include "DNA_modifier_types.h"
 #include "DNA_text_types.h"
 #include "DNA_workspace_types.h"
@@ -61,7 +60,6 @@
 #include "BKE_lib_id.h"
 #include "BKE_lib_override.h"
 #include "BKE_main.h"
-#include "BKE_mesh.h"
 #include "BKE_modifier.h"
 #include "BKE_node.h"
 
@@ -2407,17 +2405,5 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
    */
   {
     /* Keep this block, even when empty. */
-    if (!DNA_struct_elem_find(fd->filesdna, "MVert", "short *", "no")) {
-      LISTBASE_FOREACH (Mesh *, mesh, &bmain->meshes) {
-        BKE_mesh_normals_tag_dirty(mesh);
-      }
-    }
-
-    FOREACH_NODETREE_BEGIN (bmain, ntree, id) {
-      if (ntree->type != NTREE_CUSTOM) {
-        version_node_tree_socket_id_delim(ntree);
-      }
-    }
-    FOREACH_NODETREE_END;
   }
 }

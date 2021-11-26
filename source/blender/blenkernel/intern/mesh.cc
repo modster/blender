@@ -336,8 +336,7 @@ static void mesh_blend_read_data(BlendDataReader *reader, ID *id)
     }
   }
 
-  /* TODO: Decide whether to store normal layers in files. If we decide not to,
-   * we should always tag normals dirty when reading mesh data. */
+  /* Note: Theoretically we could avoid storing normal layers in files. */
   if (!CustomData_has_layer(&mesh->vdata, CD_NORMAL) ||
       !CustomData_has_layer(&mesh->pdata, CD_NORMAL)) {
     BKE_mesh_normals_tag_dirty(mesh);

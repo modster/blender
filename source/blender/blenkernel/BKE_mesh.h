@@ -275,7 +275,20 @@ void BKE_mesh_recalc_looptri_with_normals(const struct MLoop *mloop,
 
 /* *** mesh_normals.cc *** */
 
+/**
+ * Tag mesh vertex and face normals to be recalculated when/if they are needed later.
+ *
+ * \note Dirty tagged normals are the default state of a new mesh, so tagging them
+ * dirty explicitly is not always necessary if the mesh is created locally.
+ */
 void BKE_mesh_normals_tag_dirty(struct Mesh *mesh);
+
+/**
+ * Calculate face normals directly into a result array.
+ *
+ * \note Usually #BKE_mesh_ensure_face_normals is the preferred way to access face normals,
+ * since they may already be calculated and cached on the mesh.
+ */
 void BKE_mesh_calc_normals_poly(const struct MVert *mvert,
                                 int mvert_len,
                                 const struct MLoop *mloop,
@@ -283,15 +296,41 @@ void BKE_mesh_calc_normals_poly(const struct MVert *mvert,
                                 const struct MPoly *mpoly,
                                 int mpoly_len,
                                 float (*r_poly_normals)[3]);
+
+/**
+ * Calculate vertex and face normals, storing the result in custom data layers on the mesh.
+ *
+ * \note It is usually preferrable to calculate normals lazily with
+ * #BKE_mesh_ensure_vertex_normals, but some areas (perhaps unnecessarily)
+ * can also calculate them eagerly.
+ */
 void BKE_mesh_calc_normals(struct Mesh *me);
 
 /**
  * Check that a mesh with non-dirty normals has vertex and face custom data layers.
  */
 void BKE_mesh_assert_normals_dirty_or_calculated(const struct Mesh *mesh);
+
+/**
+ * Make sure the vertex normal data layer exists and return it.
+ * Used for manually assigning vertex normals. Clears the dirty flag.
+ */
 float (*BKE_mesh_vertex_normals_for_write(struct Mesh *mesh))[3];
+
+/**
+ * Make sure the face normal data layer exists and return it.
+ * Used for manually assigning face normals. Clears the dirty flag.
+ */
 float (*BKE_mesh_face_normals_for_write(struct Mesh *mesh))[3];
+
+/**
+ * \warning May still return null if the mesh is empty.
+ */
 const float (*BKE_mesh_ensure_vertex_normals(const struct Mesh *mesh))[3];
+
+/**
+ * \warning May still return null if the mesh is empty.
+ */
 const float (*BKE_mesh_ensure_face_normals(const struct Mesh *mesh))[3];
 void BKE_mesh_ensure_normals_for_display(struct Mesh *mesh);
 void BKE_mesh_calc_normals_looptri(struct MVert *mverts,

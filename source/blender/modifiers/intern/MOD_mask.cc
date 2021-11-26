@@ -395,6 +395,7 @@ static void add_interp_verts_copy_edges_to_new_mesh(const Mesh &src_mesh,
 {
   BLI_assert(src_mesh.totvert == vertex_mask.size());
   BLI_assert(src_mesh.totedge == r_edge_map.size());
+
   uint vert_index = dst_mesh.totvert - num_add_verts;
   uint edge_index = num_masked_edges - num_add_verts;
   for (int i_src : IndexRange(src_mesh.totedge)) {
