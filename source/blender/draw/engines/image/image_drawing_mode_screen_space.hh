@@ -28,28 +28,76 @@
 
 namespace blender::draw::image_engine {
 
+constexpr float EPSILON_UV_BOUNDS = 0.00001f;
+
+/**
+ * \brief Accessor to texture slots.
+ *
+ * Texture slots info is stored in IMAGE_PrivateData. The GPUTextures are stored in
+ * IMAGE_TextureList. This class simplifies accessing texture slots by providing
+ */
+struct PrivateDataAccessor {
+  IMAGE_PrivateData *pd;
+  IMAGE_TextureList *txl;
+  PrivateDataAccessor(IMAGE_PrivateData *pd, IMAGE_TextureList *txl) : pd(pd)
+  {
+  }
+
+  /** \brief Clear dirty flag from all texture slots. */
+  void clear_dirty_flag()
+  {
+    for (int i = 0; i < SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN; i++) {
+      pd->screen_space.texture_infos[i].dirty = false;
+    }
+  }
+
+  /** \brief Update the texture slot uv and screen space bounds. */
+  void update_screen_space_bounds(const ARegion *region)
+  {
+    /* Create a single texture that covers the visible screen space. */
+    BLI_rctf_init(
+        &pd->screen_space.texture_infos[0].clipping_bounds, 0, region->winx, 0, region->winy);
+
+    /* Mark the other textures as invalid. */
+    for (int i = 1; i < SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN; i++) {
+      BLI_rctf_init_minmax(&pd->screen_space.texture_infos[i].clipping_bounds);
+    }
+  }
+
+  void update_uv_bounds()
+  {
+
+    /* Calculate the uv coordinates of the screen space visible corners. */
+    float inverse_mat[4][4];
+    DRW_view_viewmat_get(NULL, inverse_mat, true);
+
+    rctf new_uv_bounds;
+    float uv_min[3];
+    static const float screen_space_co1[3] = {0.0, 0.0, 0.0};
+    mul_v3_m4v3(uv_min, inverse_mat, screen_space_co1);
+
+    static const float screen_space_co2[3] = {1.0, 1.0, 0.0};
+    float uv_max[3];
+    mul_v3_m4v3(uv_max, inverse_mat, screen_space_co2);
+    BLI_rctf_init(&new_uv_bounds, uv_min[0], uv_max[0], uv_min[1], uv_max[1]);
+
+    if (!BLI_rctf_compare(
+            &pd->screen_space.texture_infos[0].uv_bounds, &new_uv_bounds, EPSILON_UV_BOUNDS)) {
+      pd->screen_space.texture_infos[0].uv_bounds = new_uv_bounds;
+      pd->screen_space.texture_infos[0].dirty = true;
+    }
+
+    /* Mark the other textures as invalid. */
+    for (int i = 1; i < SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN; i++) {
+      BLI_rctf_init_minmax(&pd->screen_space.texture_infos[i].clipping_bounds);
+    }
+  }
+};
+
 using namespace blender::bke::image::partial_update;
 
 /* TODO: Should we use static class functions in stead of a namespace. */
 namespace clipping {
-
-/** \brief Update the texture slot uv and screen space bounds. */
-static void update_texture_slots_bounds(const ARegion *region,
-                                        const AbstractSpaceAccessor *space,
-                                        IMAGE_PrivateData *pd)
-{
-  // each texture
-  BLI_rctf_init(
-      &pd->screen_space.texture_infos[0].clipping_bounds, 0, region->winx, 0, region->winy);
-  // TODO: calculate the correct visible uv bounds.
-  BLI_rctf_init(&pd->screen_space.texture_infos[0].uv_bounds, 0.0, 1.0, 0.0, 1.0);
-
-  /* Mark the other textures as invalid. */
-  for (int i = 1; i < SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN; i++) {
-    BLI_rctf_init_minmax(&pd->screen_space.texture_infos[i].clipping_bounds);
-    BLI_rctf_init_minmax(&pd->screen_space.texture_infos[i].uv_bounds);
-  }
-}
 
 static void update_texture_slots_visibility(const AbstractSpaceAccessor *space,
                                             IMAGE_PrivateData *pd)
@@ -151,7 +199,7 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
         DRW_texture_ensure_fullscreen_2d(
             &txl->screen_space.textures[i], GPU_RGBA16F, static_cast<DRWTextureFlag>(0));
       }
-      pd->screen_space.texture_infos[i].dirty = should_be_created;
+      pd->screen_space.texture_infos[i].dirty |= should_be_created;
     }
   }
 
@@ -218,19 +266,39 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
       int texture_size = texture_width * texture_height;
 
       float *data = static_cast<float *>(MEM_mallocN(sizeof(float) * 4 * texture_size, __func__));
-      int offset = 0;
-      for (int y = 0; y < texture_height; y++) {
-        float v = y / (float)texture_height;
-        for (int x = 0; x < texture_width; x++) {
-          float u = x / (float)texture_width;
-          copy_v4_fl4(&data[offset * 4],
-                      uv_bounds->xmin * u + uv_bounds->xmax * (1.0 - u),
-                      uv_bounds->ymin * v + uv_bounds->ymax * (1.0 - v),
-                      0.0,
-                      1.0);
-          offset++;
+
+      LISTBASE_FOREACH (ImageTile *, image_tile, &pd->image->tiles) {
+
+        ImBuf *image_buffer = pd->ibuf;
+        if (image_buffer == nullptr) {
+          memset(data, 0, texture_size * 4 * sizeof(float));
+          /* TODO: remove break when tiles are supported. */
+          break;
         }
+        if (image_buffer->rect_float == nullptr) {
+          break;
+        }
+
+        int offset = 0;
+        for (int y = 0; y < texture_height; y++) {
+          float yf = y / (float)texture_height;
+          float v = uv_bounds->ymax * yf + uv_bounds->ymin * (1.0 - yf);
+          for (int x = 0; x < texture_width; x++) {
+            float xf = x / (float)texture_width;
+            float u = uv_bounds->xmax * xf + uv_bounds->xmin * (1.0 - xf);
+            nearest_interpolation_color(image_buffer,
+                                        nullptr,
+                                        &data[offset * 4],
+                                        u * image_buffer->x,
+                                        v * image_buffer->y);
+            offset++;
+          }
+        }
+        /* TODO: render other tiles as well. But we should do that with a scale copy algo in stead
+         * of the pixel sampling we do currently. */
+        break;
       }
+
       GPU_texture_update(gpu_texture, GPU_DATA_FLOAT, data);
 
       MEM_freeN(data);
@@ -256,6 +324,7 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
     IMAGE_TextureList *txl = vedata->txl;
     IMAGE_StorageList *stl = vedata->stl;
     IMAGE_PrivateData *pd = stl->pd;
+    PrivateDataAccessor pda(pd, txl);
 
     if (!partial_update_is_valid(pd, image)) {
       partial_update_free(pd);
@@ -265,7 +334,9 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
     // Step: Find out which screen space textures are needed to draw on the screen. Remove the
     // screen space textures that aren't needed.
     const ARegion *region = draw_ctx->region;
-    clipping::update_texture_slots_bounds(region, space, pd);
+    pda.clear_dirty_flag();
+    pda.update_screen_space_bounds(region);
+    pda.update_uv_bounds();
     clipping::update_texture_slots_visibility(space, pd);
     update_texture_slot_allocation(txl, pd);
 
