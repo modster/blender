@@ -48,6 +48,7 @@
 #include "BLT_translation.h"
 
 #include "BKE_anim_data.h"
+#include "BKE_bpath.h"
 #include "BKE_deform.h"
 #include "BKE_editmesh.h"
 #include "BKE_global.h"
@@ -88,7 +89,7 @@ static void mesh_init_data(ID *id)
   CustomData_reset(&mesh->pdata);
   CustomData_reset(&mesh->ldata);
 
-  BKE_mesh_runtime_reset(mesh);
+  BKE_mesh_runtime_init_data(mesh);
 
   mesh->face_sets_color_seed = BLI_hash_int(PIL_check_seconds_timer_i() & UINT_MAX);
 }
@@ -168,7 +169,7 @@ static void mesh_free_data(ID *id)
     mesh->edit_mesh = nullptr;
   }
 
-  BKE_mesh_runtime_clear_cache(mesh);
+  BKE_mesh_runtime_free_data(mesh);
   mesh_clear_geometry(mesh);
   MEM_SAFE_FREE(mesh->mat);
 }
@@ -180,6 +181,14 @@ static void mesh_foreach_id(ID *id, LibraryForeachIDData *data)
   BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, mesh->key, IDWALK_CB_USER);
   for (int i = 0; i < mesh->totcol; i++) {
     BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, mesh->mat[i], IDWALK_CB_USER);
+  }
+}
+
+static void mesh_foreach_path(ID *id, BPathForeachPathData *bpath_data)
+{
+  Mesh *me = (Mesh *)id;
+  if (me->ldata.external) {
+    BKE_bpath_foreach_path_fixed_process(bpath_data, me->ldata.external->filename);
   }
 }
 
@@ -308,7 +317,9 @@ static void mesh_blend_read_data(BlendDataReader *reader, ID *id)
 
   mesh->texflag &= ~ME_AUTOSPACE_EVALUATED;
   mesh->edit_mesh = nullptr;
-  BKE_mesh_runtime_reset(mesh);
+
+  memset(&mesh->runtime, 0, sizeof(mesh->runtime));
+  BKE_mesh_runtime_init_data(mesh);
 
   /* happens with old files */
   if (mesh->mselect == nullptr) {
@@ -353,28 +364,33 @@ static void mesh_read_expand(BlendExpander *expander, ID *id)
 }
 
 IDTypeInfo IDType_ID_ME = {
-    ID_ME,
-    FILTER_ID_ME,
-    INDEX_ID_ME,
-    sizeof(Mesh),
-    "Mesh",
-    "meshes",
-    BLT_I18NCONTEXT_ID_MESH,
-    IDTYPE_FLAGS_APPEND_IS_REUSABLE,
+    /* id_code */ ID_ME,
+    /* id_filter */ FILTER_ID_ME,
+    /* main_listbase_index */ INDEX_ID_ME,
+    /* struct_size */ sizeof(Mesh),
+    /* name */ "Mesh",
+    /* name_plural */ "meshes",
+    /* translation_context */ BLT_I18NCONTEXT_ID_MESH,
+    /* flags */ IDTYPE_FLAGS_APPEND_IS_REUSABLE,
+    /* asset_type_info */ nullptr,
 
-    mesh_init_data,
-    mesh_copy_data,
-    mesh_free_data,
-    nullptr,
-    mesh_foreach_id,
-    nullptr,
-    nullptr,
-    mesh_blend_write,
-    mesh_blend_read_data,
-    mesh_blend_read_lib,
-    mesh_read_expand,
-    nullptr,
-    nullptr,
+    /* init_data */ mesh_init_data,
+    /* copy_data */ mesh_copy_data,
+    /* free_data */ mesh_free_data,
+    /* make_local */ nullptr,
+    /* foreach_id */ mesh_foreach_id,
+    /* foreach_cache */ nullptr,
+    /* foreach_path */ mesh_foreach_path,
+    /* owner_get */ nullptr,
+
+    /* blend_write */ mesh_blend_write,
+    /* blend_read_data */ mesh_blend_read_data,
+    /* blend_read_lib */ mesh_blend_read_lib,
+    /* blend_read_expand */ mesh_read_expand,
+
+    /* blend_read_undo_preserve */ nullptr,
+
+    /* lib_override_apply_post */ nullptr,
 };
 
 enum {
@@ -436,13 +452,15 @@ static int customdata_compare(
   const uint64_t cd_mask_all_attr = CD_MASK_PROP_ALL | cd_mask_non_generic;
 
   for (int i = 0; i < c1->totlayer; i++) {
-    if (CD_TYPE_AS_MASK(c1->layers[i].type) & cd_mask_all_attr) {
+    l1 = &c1->layers[i];
+    if (CD_TYPE_AS_MASK(l1->type) & cd_mask_all_attr && l1->anonymous_id != nullptr) {
       layer_count1++;
     }
   }
 
   for (int i = 0; i < c2->totlayer; i++) {
-    if (CD_TYPE_AS_MASK(c2->layers[i].type) & cd_mask_all_attr) {
+    l2 = &c2->layers[i];
+    if (CD_TYPE_AS_MASK(l1->type) & cd_mask_all_attr && l2->anonymous_id != nullptr) {
       layer_count2++;
     }
   }
@@ -458,7 +476,8 @@ static int customdata_compare(
     l1 = c1->layers + i1;
     for (int i2 = 0; i2 < c2->totlayer; i2++) {
       l2 = c2->layers + i2;
-      if (l1->type != l2->type || !STREQ(l1->name, l2->name)) {
+      if (l1->type != l2->type || !STREQ(l1->name, l2->name) || l1->anonymous_id != nullptr ||
+          l2->anonymous_id != nullptr) {
         continue;
       }
       /* At this point `l1` and `l2` have the same name and type, so they should be compared. */
@@ -832,12 +851,12 @@ bool BKE_mesh_clear_facemap_customdata(struct Mesh *me)
 }
 
 /**
- * This ensures grouped customdata (e.g. mtexpoly and mloopuv and mtface, or
- * mloopcol and mcol) have the same relative active/render/clone/mask indices.
+ * This ensures grouped custom-data (e.g. #CD_MLOOPUV and #CD_MTFACE, or
+ * #CD_MLOOPCOL and #CD_MCOL) have the same relative active/render/clone/mask indices.
  *
- * NOTE(campbell): that for undo mesh data we want to skip 'ensure_tess_cd' call since
- * we don't want to store memory for tessface when its only used for older
- * Versions of the mesh.
+ * NOTE(@campbellbarton): that for undo mesh data we want to skip 'ensure_tess_cd' call since
+ * we don't want to store memory for #MFace data when its only used for older
+ * versions of the mesh.
  */
 static void mesh_update_linked_customdata(Mesh *me, const bool do_ensure_tess_cd)
 {
@@ -1138,8 +1157,12 @@ BMesh *BKE_mesh_to_bmesh(Mesh *me,
                          const bool add_key_index,
                          const struct BMeshCreateParams *params)
 {
-  struct BMeshFromMeshParams bmfmp = {false, add_key_index, true, ob->shapenr};
-  return BKE_mesh_to_bmesh_ex(me, params, &bmfmp);
+  BMeshFromMeshParams bmesh_from_mesh_params{};
+  bmesh_from_mesh_params.calc_face_normal = false;
+  bmesh_from_mesh_params.add_key_index = add_key_index;
+  bmesh_from_mesh_params.use_shapekey = true;
+  bmesh_from_mesh_params.active_shapekey = ob->shapenr;
+  return BKE_mesh_to_bmesh_ex(me, params, &bmesh_from_mesh_params);
 }
 
 Mesh *BKE_mesh_from_bmesh_nomain(BMesh *bm,
@@ -1896,8 +1919,8 @@ void BKE_mesh_calc_normals_split_ex(Mesh *mesh, MLoopNorSpaceArray *r_lnors_spac
   bool free_polynors = false;
 
   /* Note that we enforce computing clnors when the clnor space array is requested by caller here.
-   * However, we obviously only use the autosmooth angle threshold
-   * only in case autosmooth is enabled. */
+   * However, we obviously only use the auto-smooth angle threshold
+   * only in case auto-smooth is enabled. */
   const bool use_split_normals = (r_lnors_spacearr != nullptr) ||
                                  ((mesh->flag & ME_AUTOSMOOTH) != 0);
   const float split_angle = (mesh->flag & ME_AUTOSMOOTH) != 0 ? mesh->smoothresh : (float)M_PI;

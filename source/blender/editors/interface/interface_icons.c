@@ -253,12 +253,6 @@ static void def_internal_vicon(int icon_id, VectorDrawFunc drawFunc)
 
 /* Utilities */
 
-static void viconutil_set_point(int pt[2], int x, int y)
-{
-  pt[0] = x;
-  pt[1] = y;
-}
-
 static void vicon_keytype_draw_wrapper(
     int x, int y, int w, int h, float alpha, short key_type, short handle_type)
 {
@@ -1276,7 +1270,7 @@ static void icon_create_rect(struct PreviewImage *prv_img, enum eIconSizes size)
   else if (!prv_img->rect[size]) {
     prv_img->w[size] = render_size;
     prv_img->h[size] = render_size;
-    prv_img->flag[size] |= (PRV_CHANGED | PRV_UNFINISHED);
+    prv_img->flag[size] |= PRV_CHANGED;
     prv_img->changed_timestamp[size] = 0;
     prv_img->rect[size] = MEM_callocN(render_size * render_size * sizeof(uint), "prv_rect");
   }
@@ -1425,6 +1419,7 @@ static void icon_set_image(const bContext *C,
 
   const bool delay = prv_img->rect[size] != NULL;
   icon_create_rect(prv_img, size);
+  prv_img->flag[size] |= PRV_RENDERING;
 
   if (use_job && (!id || BKE_previewimg_id_supports_jobs(id))) {
     /* Job (background) version */
@@ -1486,6 +1481,78 @@ PreviewImage *UI_icon_to_preview(int icon_id)
   }
 
   return NULL;
+}
+
+/**
+ * Version of #icon_draw_rect() that uses the GPU for scaling. This is only used for
+ * #ICON_TYPE_IMBUF because it's a back-ported fix for performance issues, see T92922. Only
+ * File/Asset Browser use #ICON_TYPE_IMBUF right now, which makes implications more predictable.
+ *
+ * TODO(Julian): This code is mostly duplicated. #icon_draw_rect() should be ported to use the GPU
+ *               instead (D13144).
+ */
+static void icon_draw_rect_fast(float x,
+                                float y,
+                                int w,
+                                int h,
+                                float UNUSED(aspect),
+                                int rw,
+                                int rh,
+                                uint *rect,
+                                float alpha,
+                                const float desaturate)
+{
+  int draw_w = w;
+  int draw_h = h;
+  int draw_x = x;
+  /* We need to round y, to avoid the icon jittering in some cases. */
+  int draw_y = round_fl_to_int(y);
+
+  /* sanity check */
+  if (w <= 0 || h <= 0 || w > 2000 || h > 2000) {
+    printf("%s: icons are %i x %i pixels?\n", __func__, w, h);
+    BLI_assert_msg(0, "invalid icon size");
+    return;
+  }
+  /* modulate color */
+  const float col[4] = {alpha, alpha, alpha, alpha};
+
+  float scale_x = 1.0f;
+  float scale_y = 1.0f;
+  /* rect contains image in 'rendersize', we only scale if needed */
+  if (rw != w || rh != h) {
+    /* preserve aspect ratio and center */
+    if (rw > rh) {
+      draw_w = w;
+      draw_h = (int)(((float)rh / (float)rw) * (float)w);
+      draw_y += (h - draw_h) / 2;
+    }
+    else if (rw < rh) {
+      draw_w = (int)(((float)rw / (float)rh) * (float)h);
+      draw_h = h;
+      draw_x += (w - draw_w) / 2;
+    }
+    scale_x = draw_w / (float)rw;
+    scale_y = draw_h / (float)rh;
+    /* If the image is squared, the `draw_*` initialization values are good. */
+  }
+
+  /* draw */
+  eGPUBuiltinShader shader;
+  if (desaturate != 0.0f) {
+    shader = GPU_SHADER_2D_IMAGE_DESATURATE_COLOR;
+  }
+  else {
+    shader = GPU_SHADER_2D_IMAGE_COLOR;
+  }
+  IMMDrawPixelsTexState state = immDrawPixelsTexSetup(shader);
+
+  if (shader == GPU_SHADER_2D_IMAGE_DESATURATE_COLOR) {
+    immUniform1f("factor", desaturate);
+  }
+
+  immDrawPixelsTexScaled(
+      &state, draw_x, draw_y, rw, rh, GPU_RGBA8, true, rect, scale_x, scale_y, 1.0f, 1.0f, col);
 }
 
 static void icon_draw_rect(float x,
@@ -1812,7 +1879,9 @@ static void icon_draw_size(float x,
     ImBuf *ibuf = icon->obj;
 
     GPU_blend(GPU_BLEND_ALPHA_PREMULT);
-    icon_draw_rect(x, y, w, h, aspect, ibuf->x, ibuf->y, ibuf->rect, alpha, desaturate);
+    /* These icons are only used by the File/Asset Browser currently. Without this `_fast()`
+     * version, there may be performance issues, see T92922. */
+    icon_draw_rect_fast(x, y, w, h, aspect, ibuf->x, ibuf->y, ibuf->rect, alpha, desaturate);
     GPU_blend(GPU_BLEND_ALPHA);
   }
   else if (di->type == ICON_TYPE_VECTOR) {
@@ -1969,8 +2038,19 @@ void UI_icon_render_id(
     const bContext *C, Scene *scene, ID *id, const enum eIconSizes size, const bool use_job)
 {
   PreviewImage *pi = BKE_previewimg_id_ensure(id);
-
   if (pi == NULL) {
+    return;
+  }
+
+  /* For objects, first try if a preview can created via the object data. */
+  if (GS(id->name) == ID_OB) {
+    Object *ob = (Object *)id;
+    if (ED_preview_id_is_supported(ob->data)) {
+      id = ob->data;
+    }
+  }
+
+  if (!ED_preview_id_is_supported(id)) {
     return;
   }
 

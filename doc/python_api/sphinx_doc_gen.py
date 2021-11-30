@@ -1103,6 +1103,7 @@ context_type_map = {
     "selectable_objects": ("Object", True),
     "selected_asset_files": ("FileSelectEntry", True),
     "selected_bones": ("EditBone", True),
+    "selected_editable_actions": ("Action", True),
     "selected_editable_bones": ("EditBone", True),
     "selected_editable_fcurves": ("FCurve", True),
     "selected_editable_keyframes": ("Keyframe", True),
@@ -1118,6 +1119,7 @@ context_type_map = {
     "selected_pose_bones": ("PoseBone", True),
     "selected_pose_bones_from_active_object": ("PoseBone", True),
     "selected_sequences": ("Sequence", True),
+    "selected_visible_actions": ("Action", True),
     "selected_visible_fcurves": ("FCurve", True),
     "sequences": ("Sequence", True),
     "soft_body": ("SoftBodyModifier", False),
@@ -2254,7 +2256,7 @@ def main():
     # First monkey patch to load in fake members.
     setup_monkey_patch()
 
-    # Perform changes to Blender it's self.
+    # Perform changes to Blender itself.
     setup_data = setup_blender()
 
     # eventually, create the dirs

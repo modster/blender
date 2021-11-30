@@ -27,6 +27,7 @@
 
 #include "BLI_listbase.h"
 #include "BLI_string.h"
+#include "BLI_string_ref.hh"
 
 #include "BKE_animsys.h"
 #include "BKE_lib_id.h"
@@ -36,6 +37,8 @@
 #include "MEM_guardedalloc.h"
 
 #include "versioning_common.h"
+
+using blender::StringRef;
 
 ARegion *do_versions_add_region_if_not_found(ListBase *regionbase,
                                              int region_type,
@@ -101,6 +104,30 @@ static void change_node_socket_name(ListBase *sockets, const char *old_name, con
   }
 }
 
+/**
+ * Convert `SocketName.001` unique name format to `SocketName_001`. Previously both were used.
+ */
+void version_node_socket_id_delim(bNodeSocket *socket)
+{
+  StringRef name = socket->name;
+  StringRef id = socket->identifier;
+
+  if (!id.startswith(name)) {
+    /* We only need to affect the case where the identifier starts with the name. */
+    return;
+  }
+
+  StringRef id_number = id.drop_known_prefix(name);
+  if (id_number.is_empty()) {
+    /* The name was already unique, and didn't need numbers at the end for the id. */
+    return;
+  }
+
+  if (id_number.startswith(".")) {
+    socket->identifier[name.size()] = '_';
+  }
+}
+
 void version_node_socket_name(bNodeTree *ntree,
                               const int node_type,
                               const char *old_name,
@@ -127,9 +154,9 @@ void version_node_input_socket_name(bNodeTree *ntree,
 }
 
 void version_node_output_socket_name(bNodeTree *ntree,
-                                    const int node_type,
-                                    const char *old_name,
-                                    const char *new_name)
+                                     const int node_type,
+                                     const char *old_name,
+                                     const char *new_name)
 {
   LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
     if (node->type == node_type) {
@@ -161,13 +188,13 @@ void version_node_id(bNodeTree *ntree, const int node_type, const char *new_name
  *
  * Since this is about animation data, it only concerns input sockets.
  *
- * \param node_tree_type node tree type that has these nodes, for example NTREE_SHADER.
- * \param node_type node type to adjust, for example SH_NODE_BSDF_PRINCIPLED.
- * \param socket_index_orig the original index of the moved socket; when socket 4 moved to 6,
+ * \param node_tree_type: Node tree type that has these nodes, for example #NTREE_SHADER.
+ * \param node_type: Node type to adjust, for example #SH_NODE_BSDF_PRINCIPLED.
+ * \param socket_index_orig: The original index of the moved socket; when socket 4 moved to 6,
  * pass 4 here.
- * \param socket_index_offset the offset of the nodes, so when socket 4 moved to 6,
+ * \param socket_index_offset: The offset of the nodes, so when socket 4 moved to 6,
  * pass 2 here.
- * \param total_number_of_sockets the total number of sockets in the node.
+ * \param total_number_of_sockets: The total number of sockets in the node.
  */
 void version_node_socket_index_animdata(Main *bmain,
                                         const int node_tree_type,

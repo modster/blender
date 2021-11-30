@@ -154,6 +154,9 @@ typedef struct Panel_Runtime {
   /* Pointer to the panel's block. Useful when changes to panel #uiBlocks
    * need some context from traversal of the panel "tree". */
   struct uiBlock *block;
+
+  /* Non-owning pointer. The context is stored in the block. */
+  struct bContextStore *context;
 } Panel_Runtime;
 
 /** The part from uiBlock that needs saved in file. */
@@ -458,6 +461,9 @@ typedef struct ARegion_Runtime {
 
   /* The offset needed to not overlap with window scrollbars. Only used by HUD regions for now. */
   int offset_x, offset_y;
+
+  /* Maps uiBlock->name to uiBlock for faster lookups. */
+  struct GHash *block_name_map;
 } ARegion_Runtime;
 
 typedef struct ARegion {
@@ -667,7 +673,7 @@ typedef enum eRegion_Type {
   RGN_TYPE_FOOTER = 11,
   RGN_TYPE_TOOL_HEADER = 12,
   /* Region type used exclusively by internal code and add-ons to register draw callbacks to the XR
-     context (surface, mirror view). Does not represent any real region. */
+   * context (surface, mirror view). Does not represent any real region. */
   RGN_TYPE_XR = 13,
 
 #define RGN_TYPE_LEN (RGN_TYPE_XR + 1)

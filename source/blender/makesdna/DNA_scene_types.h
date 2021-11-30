@@ -720,6 +720,7 @@ typedef struct RenderData {
 
   /* path to render output */
   /** 1024 = FILE_MAX. */
+  /* NOTE: Excluded from `BKE_bpath_foreach_path_` / `scene_foreach_path` code. */
   char pic[1024];
 
   /* stamps flags. */
@@ -2066,6 +2067,9 @@ enum {
 #define SCE_SNAP_MODE_VOLUME (1 << 3)
 #define SCE_SNAP_MODE_EDGE_MIDPOINT (1 << 4)
 #define SCE_SNAP_MODE_EDGE_PERPENDICULAR (1 << 5)
+#define SCE_SNAP_MODE_GEOM \
+  (SCE_SNAP_MODE_VERTEX | SCE_SNAP_MODE_EDGE | SCE_SNAP_MODE_FACE | \
+   SCE_SNAP_MODE_EDGE_PERPENDICULAR | SCE_SNAP_MODE_EDGE_MIDPOINT)
 
 /** #SequencerToolSettings.snap_mode */
 #define SEQ_SNAP_TO_STRIPS (1 << 0)

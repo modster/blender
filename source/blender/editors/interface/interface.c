@@ -25,7 +25,7 @@
 #include <float.h>
 #include <limits.h>
 #include <math.h>
-#include <stddef.h> /* offsetof() */
+#include <stddef.h> /* `offsetof()` */
 #include <string.h>
 
 #include "MEM_guardedalloc.h"
@@ -37,6 +37,7 @@
 #include "DNA_workspace_types.h"
 
 #include "BLI_alloca.h"
+#include "BLI_ghash.h"
 #include "BLI_listbase.h"
 #include "BLI_math.h"
 #include "BLI_rect.h"
@@ -1993,23 +1994,9 @@ void UI_block_end(const bContext *C, uiBlock *block)
 
 /* ************** BLOCK DRAWING FUNCTION ************* */
 
-void ui_fontscale(short *points, float aspect)
+void ui_fontscale(float *points, float aspect)
 {
-  if (aspect < 0.9f || aspect > 1.1f) {
-    float pointsf = *points;
-
-    /* For some reason scaling fonts goes too fast compared to widget size. */
-    /* XXX(ton): not true anymore? */
-    // aspect = sqrt(aspect);
-    pointsf /= aspect;
-
-    if (aspect > 1.0f) {
-      *points = ceilf(pointsf);
-    }
-    else {
-      *points = floorf(pointsf);
-    }
-  }
+  *points /= aspect;
 }
 
 /* Project button or block (but==NULL) to pixels in region-space. */
@@ -2020,6 +2007,13 @@ static void ui_but_to_pixelrect(rcti *rect, const ARegion *region, uiBlock *bloc
   ui_block_to_window_rctf(region, block, &rectf, (but) ? &but->rect : &block->rect);
   BLI_rcti_rctf_copy_round(rect, &rectf);
   BLI_rcti_translate(rect, -region->winrct.xmin, -region->winrct.ymin);
+}
+
+static bool ui_but_pixelrect_in_view(const ARegion *region, const rcti *rect)
+{
+  rcti rect_winspace = *rect;
+  BLI_rcti_translate(&rect_winspace, region->winrct.xmin, region->winrct.ymin);
+  return BLI_rcti_isect(&region->winrct, &rect_winspace, NULL);
 }
 
 /* uses local copy of style, to scale things down, and allow widgets to change stuff */
@@ -2068,24 +2062,11 @@ void UI_block_draw(const bContext *C, uiBlock *block)
     ui_draw_menu_back(&style, block, &rect);
   }
   else if (block->panel) {
-    bool show_background = region->alignment != RGN_ALIGN_FLOAT;
-    if (show_background) {
-      if (block->panel->type && (block->panel->type->flag & PANEL_TYPE_NO_HEADER)) {
-        if (region->regiontype == RGN_TYPE_TOOLS) {
-          /* We never want a background around active tools. */
-          show_background = false;
-        }
-        else {
-          /* Without a header there is no background except for region overlap. */
-          show_background = region->overlap != 0;
-        }
-      }
-    }
     ui_draw_aligned_panel(&style,
                           block,
                           &rect,
                           UI_panel_category_is_visible(region),
-                          show_background,
+                          UI_panel_should_show_background(region, block->panel->type),
                           region->flag & RGN_FLAG_SEARCH_FILTER_ACTIVE);
   }
 
@@ -2095,14 +2076,20 @@ void UI_block_draw(const bContext *C, uiBlock *block)
 
   /* widgets */
   LISTBASE_FOREACH (uiBut *, but, &block->buttons) {
-    if (!(but->flag & (UI_HIDDEN | UI_SCROLLED))) {
-      ui_but_to_pixelrect(&rect, region, block, but);
+    if (but->flag & (UI_HIDDEN | UI_SCROLLED)) {
+      continue;
+    }
 
-      /* XXX: figure out why invalid coordinates happen when closing render window */
-      /* and material preview is redrawn in main window (temp fix for bug T23848) */
-      if (rect.xmin < rect.xmax && rect.ymin < rect.ymax) {
-        ui_draw_but(C, region, &style, but, &rect);
-      }
+    ui_but_to_pixelrect(&rect, region, block, but);
+    /* Optimization: Don't draw buttons that are not visible (outside view bounds). */
+    if (!ui_but_pixelrect_in_view(region, &rect)) {
+      continue;
+    }
+
+    /* XXX: figure out why invalid coordinates happen when closing render window */
+    /* and material preview is redrawn in main window (temp fix for bug T23848) */
+    if (rect.xmin < rect.xmax && rect.ymin < rect.ymax) {
+      ui_draw_but(C, region, &style, but, &rect);
     }
   }
 
@@ -3522,22 +3509,35 @@ void UI_blocklist_draw(const bContext *C, const ListBase *lb)
 }
 
 /* can be called with C==NULL */
-void UI_blocklist_free(const bContext *C, ListBase *lb)
+void UI_blocklist_free(const bContext *C, ARegion *region)
 {
+  ListBase *lb = &region->uiblocks;
   uiBlock *block;
   while ((block = BLI_pophead(lb))) {
     UI_block_free(C, block);
   }
+  if (region->runtime.block_name_map != NULL) {
+    BLI_ghash_free(region->runtime.block_name_map, NULL, NULL);
+    region->runtime.block_name_map = NULL;
+  }
 }
 
-void UI_blocklist_free_inactive(const bContext *C, ListBase *lb)
+void UI_blocklist_free_inactive(const bContext *C, ARegion *region)
 {
+  ListBase *lb = &region->uiblocks;
+
   LISTBASE_FOREACH_MUTABLE (uiBlock *, block, lb) {
     if (!block->handle) {
       if (block->active) {
         block->active = false;
       }
       else {
+        if (region->runtime.block_name_map != NULL) {
+          uiBlock *b = BLI_ghash_lookup(region->runtime.block_name_map, block->name);
+          if (b == block) {
+            BLI_ghash_remove(region->runtime.block_name_map, b->name, NULL, NULL);
+          }
+        }
         BLI_remlink(lb, block);
         UI_block_free(C, block);
       }
@@ -3553,7 +3553,10 @@ void UI_block_region_set(uiBlock *block, ARegion *region)
   /* each listbase only has one block with this name, free block
    * if is already there so it can be rebuilt from scratch */
   if (lb) {
-    oldblock = BLI_findstring(lb, block->name, offsetof(uiBlock, name));
+    if (region->runtime.block_name_map == NULL) {
+      region->runtime.block_name_map = BLI_ghash_str_new(__func__);
+    }
+    oldblock = (uiBlock *)BLI_ghash_lookup(region->runtime.block_name_map, block->name);
 
     if (oldblock) {
       oldblock->active = false;
@@ -3563,6 +3566,7 @@ void UI_block_region_set(uiBlock *block, ARegion *region)
 
     /* at the beginning of the list! for dynamical menus/blocks */
     BLI_addhead(lb, block);
+    BLI_ghash_reinsert(region->runtime.block_name_map, block->name, block, NULL, NULL);
   }
 
   block->oldblock = oldblock;
@@ -3978,10 +3982,6 @@ static void ui_but_alloc_info(const eButType type,
       alloc_size = sizeof(uiButCurveProfile);
       alloc_str = "uiButCurveProfile";
       break;
-    case UI_BTYPE_DATASETROW:
-      alloc_size = sizeof(uiButDatasetRow);
-      alloc_str = "uiButDatasetRow";
-      break;
     case UI_BTYPE_TREEROW:
       alloc_size = sizeof(uiButTreeRow);
       alloc_str = "uiButTreeRow";
@@ -4184,7 +4184,6 @@ static uiBut *ui_def_but(uiBlock *block,
                 UI_BTYPE_BLOCK,
                 UI_BTYPE_BUT_MENU,
                 UI_BTYPE_SEARCH_MENU,
-                UI_BTYPE_DATASETROW,
                 UI_BTYPE_TREEROW,
                 UI_BTYPE_POPOVER)) {
     but->drawflag |= (UI_BUT_TEXT_LEFT | UI_BUT_ICON_LEFT);
@@ -6226,6 +6225,16 @@ void UI_but_drag_set_id(uiBut *but, ID *id)
 }
 
 /**
+ * Set an image to display while dragging. This works for any drag type (`WM_DRAG_XXX`).
+ * Not to be confused with #UI_but_drag_set_image(), which sets up dragging of an image.
+ */
+void UI_but_drag_attach_image(uiBut *but, struct ImBuf *imb, const float scale)
+{
+  but->imb = imb;
+  but->imb_scale = scale;
+}
+
+/**
  * \param asset: May be passed from a temporary variable, drag data only stores a copy of this.
  */
 void UI_but_drag_set_asset(uiBut *but,
@@ -6253,8 +6262,7 @@ void UI_but_drag_set_asset(uiBut *but,
   }
   but->dragpoin = asset_drag;
   but->dragflag |= UI_BUT_DRAGPOIN_FREE;
-  but->imb = imb;
-  but->imb_scale = scale;
+  UI_but_drag_attach_image(but, imb, scale);
 }
 
 void UI_but_drag_set_rna(uiBut *but, PointerRNA *ptr)
@@ -6309,8 +6317,7 @@ void UI_but_drag_set_image(
   if (use_free) {
     but->dragflag |= UI_BUT_DRAGPOIN_FREE;
   }
-  but->imb = imb;
-  but->imb_scale = scale;
+  UI_but_drag_attach_image(but, imb, scale);
 }
 
 PointerRNA *UI_but_operator_ptr_get(uiBut *but)
@@ -6917,15 +6924,6 @@ uiBut *uiDefSearchButO_ptr(uiBlock *block,
   return but;
 }
 
-void UI_but_datasetrow_indentation_set(uiBut *but, int indentation)
-{
-  uiButDatasetRow *but_dataset = (uiButDatasetRow *)but;
-  BLI_assert(but->type == UI_BTYPE_DATASETROW);
-
-  but_dataset->indentation = indentation;
-  BLI_assert(indentation >= 0);
-}
-
 void UI_but_treerow_indentation_set(uiBut *but, int indentation)
 {
   uiButTreeRow *but_row = (uiButTreeRow *)but;
@@ -6941,38 +6939,6 @@ void UI_but_treerow_indentation_set(uiBut *but, int indentation)
 void UI_but_hint_drawstr_set(uiBut *but, const char *string)
 {
   ui_but_add_shortcut(but, string, false);
-}
-
-void UI_but_datasetrow_component_set(uiBut *but, uint8_t geometry_component_type)
-{
-  uiButDatasetRow *but_dataset_row = (uiButDatasetRow *)but;
-  BLI_assert(but->type == UI_BTYPE_DATASETROW);
-
-  but_dataset_row->geometry_component_type = geometry_component_type;
-}
-
-void UI_but_datasetrow_domain_set(uiBut *but, uint8_t attribute_domain)
-{
-  uiButDatasetRow *but_dataset_row = (uiButDatasetRow *)but;
-  BLI_assert(but->type == UI_BTYPE_DATASETROW);
-
-  but_dataset_row->attribute_domain = attribute_domain;
-}
-
-uint8_t UI_but_datasetrow_component_get(uiBut *but)
-{
-  uiButDatasetRow *but_dataset_row = (uiButDatasetRow *)but;
-  BLI_assert(but->type == UI_BTYPE_DATASETROW);
-
-  return but_dataset_row->geometry_component_type;
-}
-
-uint8_t UI_but_datasetrow_domain_get(uiBut *but)
-{
-  uiButDatasetRow *but_dataset_row = (uiButDatasetRow *)but;
-  BLI_assert(but->type == UI_BTYPE_DATASETROW);
-
-  return but_dataset_row->attribute_domain;
 }
 
 void UI_but_node_link_set(uiBut *but, bNodeSocket *socket, const float draw_color[4])

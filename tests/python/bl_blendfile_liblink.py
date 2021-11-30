@@ -109,7 +109,7 @@ class TestBlendLibLinkSaveLoadBasic(TestBlendLibLinkHelper):
         assert(len(bpy.data.meshes) == 0)
         assert(orig_data != read_data)
 
-        # Simple link of a single ObData with obdata instanciation.
+        # Simple link of a single ObData with obdata instantiation.
         self.reset_blender()
 
         link_dir = os.path.join(output_lib_path, "Mesh")
@@ -147,7 +147,7 @@ class TestBlendLibLinkSaveLoadBasic(TestBlendLibLinkHelper):
 
         assert(orig_data == read_data)
 
-        # Simple link of a single Collection, with Empty-instanciation.
+        # Simple link of a single Collection, with Empty-instantiation.
         self.reset_blender()
 
         link_dir = os.path.join(output_lib_path, "Collection")
@@ -166,7 +166,7 @@ class TestBlendLibLinkSaveLoadBasic(TestBlendLibLinkHelper):
 
         assert(orig_data == read_data)
 
-        # Simple link of a single Collection, with ViewLayer-instanciation.
+        # Simple link of a single Collection, with ViewLayer-instantiation.
         self.reset_blender()
 
         link_dir = os.path.join(output_lib_path, "Collection")
@@ -216,7 +216,7 @@ class TestBlendLibAppendBasic(TestBlendLibLinkHelper):
         assert(len(bpy.data.objects) == 0)
         assert(len(bpy.data.collections) == 0)  # Scene's master collection is not listed here
 
-        # Simple append of a single ObData with obdata instanciation.
+        # Simple append of a single ObData with obdata instantiation.
         self.reset_blender()
 
         link_dir = os.path.join(output_lib_path, "Mesh")
@@ -435,12 +435,45 @@ class TestBlendLibLibraryRelocate(TestBlendLibLinkHelper):
         assert(orig_data == relocate_data)
 
 
+class TestBlendLibDataLibrariesLoad(TestBlendLibLinkHelper):
+
+    def __init__(self, args):
+        self.args = args
+
+    def test_link_relocate(self):
+        output_dir = self.args.output_dir
+        output_lib_path = self.init_lib_data_basic()
+
+        # Simple link of a single Object, and reload.
+        self.reset_blender()
+
+        with bpy.data.libraries.load(filepath=output_lib_path) as lib_ctx:
+            lib_src, lib_link = lib_ctx
+
+            assert(len(lib_src.meshes) == 1)
+            assert(len(lib_src.objects) == 1)
+            assert(len(lib_src.collections) == 1)
+
+            assert(len(lib_link.meshes) == 0)
+            assert(len(lib_link.objects) == 0)
+            assert(len(lib_link.collections) == 0)
+
+            lib_link.collections.append(lib_src.collections[0])
+
+        # Linking happens when living the context manager.
+
+        assert(len(bpy.data.meshes) == 1)
+        assert(len(bpy.data.objects) == 1)  # This code does no instantiation.
+        assert(len(bpy.data.collections) == 1)
+
+
 TESTS = (
     TestBlendLibLinkSaveLoadBasic,
     TestBlendLibAppendBasic,
     TestBlendLibAppendReuseID,
     TestBlendLibLibraryReload,
     TestBlendLibLibraryRelocate,
+    TestBlendLibDataLibrariesLoad,
 )
 
 

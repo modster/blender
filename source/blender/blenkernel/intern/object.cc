@@ -83,6 +83,7 @@
 #include "BKE_animsys.h"
 #include "BKE_armature.h"
 #include "BKE_asset.h"
+#include "BKE_bpath.h"
 #include "BKE_camera.h"
 #include "BKE_collection.h"
 #include "BKE_constraint.h"
@@ -545,6 +546,67 @@ static void object_foreach_id(ID *id, LibraryForeachIDData *data)
       BKE_LIB_FOREACHID_PROCESS_IDSUPER(
           data, object->soft->effector_weights->group, IDWALK_CB_NOP);
     }
+  }
+}
+
+static void object_foreach_path_pointcache(ListBase *ptcache_list,
+                                           BPathForeachPathData *bpath_data)
+{
+  for (PointCache *cache = (PointCache *)ptcache_list->first; cache != nullptr;
+       cache = cache->next) {
+    if (cache->flag & PTCACHE_DISK_CACHE) {
+      BKE_bpath_foreach_path_fixed_process(bpath_data, cache->path);
+    }
+  }
+}
+
+static void object_foreach_path(ID *id, BPathForeachPathData *bpath_data)
+{
+  Object *ob = reinterpret_cast<Object *>(id);
+
+  LISTBASE_FOREACH (ModifierData *, md, &ob->modifiers) {
+    /* TODO: Move that to #ModifierTypeInfo. */
+    switch (md->type) {
+      case eModifierType_Fluidsim: {
+        FluidsimModifierData *fluidmd = reinterpret_cast<FluidsimModifierData *>(md);
+        if (fluidmd->fss) {
+          BKE_bpath_foreach_path_fixed_process(bpath_data, fluidmd->fss->surfdataPath);
+        }
+        break;
+      }
+      case eModifierType_Fluid: {
+        FluidModifierData *fmd = reinterpret_cast<FluidModifierData *>(md);
+        if (fmd->type & MOD_FLUID_TYPE_DOMAIN && fmd->domain) {
+          BKE_bpath_foreach_path_fixed_process(bpath_data, fmd->domain->cache_directory);
+        }
+        break;
+      }
+      case eModifierType_Cloth: {
+        ClothModifierData *clmd = reinterpret_cast<ClothModifierData *>(md);
+        object_foreach_path_pointcache(&clmd->ptcaches, bpath_data);
+        break;
+      }
+      case eModifierType_Ocean: {
+        OceanModifierData *omd = reinterpret_cast<OceanModifierData *>(md);
+        BKE_bpath_foreach_path_fixed_process(bpath_data, omd->cachepath);
+        break;
+      }
+      case eModifierType_MeshCache: {
+        MeshCacheModifierData *mcmd = reinterpret_cast<MeshCacheModifierData *>(md);
+        BKE_bpath_foreach_path_fixed_process(bpath_data, mcmd->filepath);
+        break;
+      }
+      default:
+        break;
+    }
+  }
+
+  if (ob->soft != nullptr) {
+    object_foreach_path_pointcache(&ob->soft->shared->ptcaches, bpath_data);
+  }
+
+  LISTBASE_FOREACH (ParticleSystem *, psys, &ob->particlesystem) {
+    object_foreach_path_pointcache(&psys->ptcaches, bpath_data);
   }
 }
 
@@ -1223,7 +1285,7 @@ static IDProperty *object_asset_dimensions_property(Object *ob)
     return nullptr;
   }
 
-  IDPropertyTemplate idprop = {0};
+  IDPropertyTemplate idprop{};
   idprop.array.len = ARRAY_SIZE(dimensions);
   idprop.array.type = IDP_FLOAT;
 
@@ -1258,6 +1320,7 @@ IDTypeInfo IDType_ID_OB = {
     /* name_plural */ "objects",
     /* translation_context */ BLT_I18NCONTEXT_ID_OBJECT,
     /* flags */ 0,
+    /* asset_type_info */ &AssetType_OB,
 
     /* init_data */ object_init_data,
     /* copy_data */ object_copy_data,
@@ -1265,6 +1328,7 @@ IDTypeInfo IDType_ID_OB = {
     /* make_local */ object_make_local,
     /* foreach_id */ object_foreach_id,
     /* foreach_cache */ nullptr,
+    /* foreach_path */ object_foreach_path,
     /* owner_get */ nullptr,
 
     /* blend_write */ object_blend_write,
@@ -1275,8 +1339,6 @@ IDTypeInfo IDType_ID_OB = {
     /* blend_read_undo_preserve */ nullptr,
 
     /* lib_override_apply_post */ object_lib_override_apply_post,
-
-    /* asset_type_info */ &AssetType_OB,
 };
 
 void BKE_object_workob_clear(Object *workob)
@@ -2635,7 +2697,7 @@ Object **BKE_object_pose_array_get_ex(ViewLayer *view_layer,
   Object *ob_pose = BKE_object_pose_armature_get(ob_active);
   Object **objects = nullptr;
   if (ob_pose == ob_active) {
-    ObjectsInModeParams ob_params = {0};
+    ObjectsInModeParams ob_params{};
     ob_params.object_mode = OB_MODE_POSE;
     ob_params.no_dup_data = unique;
 
@@ -2682,7 +2744,7 @@ Base **BKE_object_pose_base_array_get_ex(ViewLayer *view_layer,
   }
 
   if (base_active && (base_pose == base_active)) {
-    ObjectsInModeParams ob_params = {0};
+    ObjectsInModeParams ob_params{};
     ob_params.object_mode = OB_MODE_POSE;
     ob_params.no_dup_data = unique;
 
@@ -3984,6 +4046,37 @@ void BKE_object_boundbox_calc_from_mesh(Object *ob, const Mesh *me_eval)
   ob->runtime.bb->flag &= ~BOUNDBOX_DIRTY;
 }
 
+bool BKE_object_boundbox_calc_from_evaluated_geometry(Object *ob)
+{
+  blender::float3 min, max;
+  INIT_MINMAX(min, max);
+
+  if (ob->runtime.geometry_set_eval) {
+    ob->runtime.geometry_set_eval->compute_boundbox_without_instances(&min, &max);
+  }
+  else if (const Mesh *mesh_eval = BKE_object_get_evaluated_mesh(ob)) {
+    if (!BKE_mesh_wrapper_minmax(mesh_eval, min, max)) {
+      return false;
+    }
+  }
+  else if (ob->runtime.curve_cache) {
+    BKE_displist_minmax(&ob->runtime.curve_cache->disp, min, max);
+  }
+  else {
+    return false;
+  }
+
+  if (ob->runtime.bb == nullptr) {
+    ob->runtime.bb = (BoundBox *)MEM_callocN(sizeof(BoundBox), __func__);
+  }
+
+  BKE_boundbox_init_from_minmax(ob->runtime.bb, min, max);
+
+  ob->runtime.bb->flag &= ~BOUNDBOX_DIRTY;
+
+  return true;
+}
+
 /** \} */
 
 /* -------------------------------------------------------------------- */
@@ -4304,7 +4397,7 @@ void BKE_object_foreach_display_point(Object *ob,
     }
   }
   else if (ob->type == OB_GPENCIL) {
-    GPencilStrokePointIterData iter_data = {nullptr};
+    GPencilStrokePointIterData iter_data{};
     iter_data.obmat = obmat;
     iter_data.point_func_cb = func_cb;
     iter_data.user_data = user_data;
@@ -4342,28 +4435,18 @@ void BKE_scene_foreach_display_point(Depsgraph *depsgraph,
 }
 
 /**
- * Struct members from DNA_object_types.h
+ * See struct members from #Object in DNA_object_types.h
  */
 struct ObTfmBack {
   float loc[3], dloc[3];
-  /** scale and delta scale. */
   float scale[3], dscale[3];
-  /** euler rotation. */
   float rot[3], drot[3];
-  /** quaternion rotation. */
   float quat[4], dquat[4];
-  /** axis angle rotation - axis part. */
   float rotAxis[3], drotAxis[3];
-  /** axis angle rotation - angle part. */
   float rotAngle, drotAngle;
-  /** final worldspace matrix with constraints & animsys applied. */
   float obmat[4][4];
-  /** inverse result of parent, so that object doesn't 'stick' to parent. */
   float parentinv[4][4];
-  /** inverse result of constraints. doesn't include effect of parent or object local transform.
-   */
   float constinv[4][4];
-  /** inverse matrix of 'obmat' for during render, temporally: ipokeys of transform. */
   float imat[4][4];
 };
 
@@ -4583,10 +4666,11 @@ Mesh *BKE_object_get_evaluated_mesh(const Object *object)
    * object types either store it there or add a reference to it if it's owned elsewhere. */
   GeometrySet *geometry_set_eval = object->runtime.geometry_set_eval;
   if (geometry_set_eval) {
-    /* Some areas expect to be able to modify the evaluated mesh. Theoretically this should be
-     * avoided, or at least protected with a lock, so a const mesh could be returned from this
-     * function. */
-    Mesh *mesh = geometry_set_eval->get_mesh_for_write();
+    /* Some areas expect to be able to modify the evaluated mesh in limited ways. Theoretically
+     * this should be avoided, or at least protected with a lock, so a const mesh could be returned
+     * from this function. We use a const_cast instead of #get_mesh_for_write, because that might
+     * result in a copy of the mesh when it is shared. */
+    Mesh *mesh = const_cast<Mesh *>(geometry_set_eval->get_mesh_for_read());
     if (mesh) {
       return mesh;
     }
@@ -5445,7 +5529,7 @@ KDTree_3d *BKE_object_as_kdtree(Object *ob, int *r_tot)
         MVert *mvert = me_eval->mvert;
         uint totvert = me_eval->totvert;
 
-        /* tree over-allocs in case where some verts have ORIGINDEX_NONE */
+        /* Tree over-allocates in case where some verts have #ORIGINDEX_NONE. */
         tot = 0;
         tree = BLI_kdtree_3d_new(totvert);
 

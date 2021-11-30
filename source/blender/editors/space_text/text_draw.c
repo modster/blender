@@ -70,7 +70,7 @@ static void text_draw_context_init(const SpaceText *st, TextDrawContext *tdc)
 
 static void text_font_begin(const TextDrawContext *tdc)
 {
-  BLF_size(tdc->font_id, tdc->lheight_px, 72);
+  BLF_size(tdc->font_id, (float)tdc->lheight_px, 72);
 }
 
 static void text_font_end(const TextDrawContext *UNUSED(tdc))
@@ -1671,7 +1671,7 @@ void draw_text_main(SpaceText *st, ARegion *region)
 
     if (st->showlinenrs && !wrap_skip) {
       /* Draw line number. */
-      UI_FontThemeColor(tdc.font_id, (tmp == text->curl) ? TH_HILITE : TH_LINENUMBERS);
+      UI_FontThemeColor(tdc.font_id, (tmp == text->sell) ? TH_HILITE : TH_LINENUMBERS);
       BLI_snprintf(linenr,
                    sizeof(linenr),
                    "%*d",

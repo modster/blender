@@ -98,6 +98,15 @@ class AssetCatalogService {
   bool write_to_disk(const CatalogFilePath &blend_file_path);
 
   /**
+   * Ensure that the next call to #on_blend_save_post() will choose a new location for the CDF
+   * suitable for the location of the blend file (regardless of where the current catalogs come
+   * from), and that catalogs will be merged with already-existing ones in that location.
+   *
+   * Use this for a "Save as..." that has to write the catalogs to the new blend file location,
+   * instead of updating the previously read CDF. */
+  void prepare_to_merge_on_write();
+
+  /**
    * Merge on-disk changes into the in-memory asset catalogs.
    * This should be called before writing the asset catalogs to disk.
    *
@@ -237,6 +246,11 @@ class AssetCatalogService {
    * For every catalog, ensure that its parent path also has a known catalog.
    */
   void create_missing_catalogs();
+
+  /**
+   * For every catalog, mark it as "dirty".
+   */
+  void tag_all_catalogs_as_unsaved_changes();
 
   /* For access by subclasses, as those will not be marked as friend by #AssetCatalogCollection. */
   AssetCatalogDefinitionFile *get_catalog_definition_file();
@@ -429,7 +443,9 @@ class AssetCatalog {
    * Simple, human-readable name for the asset catalog. This is stored on assets alongside the
    * catalog ID; the catalog ID is a UUID that is not human-readable,
    * so to avoid complete data-loss when the catalog definition file gets lost,
-   * we also store a human-readable simple name for the catalog. */
+   * we also store a human-readable simple name for the catalog.
+   *
+   * It should fit in sizeof(AssetMetaData::catalog_simple_name) bytes. */
   std::string simple_name;
 
   struct Flags {
