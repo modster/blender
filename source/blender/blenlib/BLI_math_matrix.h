@@ -312,6 +312,7 @@ void invert_m4_m4_safe_ortho(float Ainv[4][4], const float A[4][4]);
 
 void scale_m3_fl(float R[3][3], float scale);
 void scale_m4_fl(float R[4][4], float scale);
+void scale_m4_v2(float R[4][4], const float scale[2]);
 
 float mat3_to_volume_scale(const float M[3][3]);
 float mat4_to_volume_scale(const float M[4][4]);

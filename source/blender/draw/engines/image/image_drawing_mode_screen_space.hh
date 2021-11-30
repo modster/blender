@@ -66,7 +66,6 @@ struct PrivateDataAccessor {
 
   void update_uv_bounds()
   {
-
     /* Calculate the uv coordinates of the screen space visible corners. */
     float inverse_mat[4][4];
     DRW_view_viewmat_get(NULL, inverse_mat, true);
@@ -85,12 +84,47 @@ struct PrivateDataAccessor {
             &pd->screen_space.texture_infos[0].uv_bounds, &new_uv_bounds, EPSILON_UV_BOUNDS)) {
       pd->screen_space.texture_infos[0].uv_bounds = new_uv_bounds;
       pd->screen_space.texture_infos[0].dirty = true;
+      update_uv_to_texture_matrix(&pd->screen_space.texture_infos[0]);
     }
 
     /* Mark the other textures as invalid. */
     for (int i = 1; i < SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN; i++) {
       BLI_rctf_init_minmax(&pd->screen_space.texture_infos[i].clipping_bounds);
     }
+  }
+
+  void update_uv_to_texture_matrix(IMAGE_ScreenSpaceTextureInfo *info)
+  {
+    // TODO: I remember that there was a function for this somewhere.
+    unit_m4(info->uv_to_texture);
+    float scale_x = 1.0 / BLI_rctf_size_x(&info->uv_bounds);
+    float scale_y = 1.0 / BLI_rctf_size_y(&info->uv_bounds);
+    float translate_x = scale_x * -info->uv_bounds.xmin;
+    float translate_y = scale_y * -info->uv_bounds.ymin;
+
+    info->uv_to_texture[0][0] = scale_x;
+    info->uv_to_texture[1][1] = scale_y;
+    info->uv_to_texture[3][0] = translate_x;
+    info->uv_to_texture[3][1] = translate_y;
+  }
+};
+
+struct ImageTileAccessor {
+  ImageTile *image_tile;
+  ImageTileAccessor(ImageTile *image_tile) : image_tile(image_tile)
+  {
+  }
+
+  int get_tile_x_offset()
+  {
+    int tile_number = image_tile->tile_number;
+    return (tile_number - 1001) % 10;
+  }
+
+  int get_tile_y_offset()
+  {
+    int tile_number = image_tile->tile_number;
+    return (tile_number - 1001) / 10;
   }
 };
 
@@ -229,7 +263,7 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
         do_partial_update(changes, txl, pd, image);
         break;
     }
-    update_dirty_textures(txl, pd);
+    do_full_update_for_dirty_textures(txl, pd);
   }
 
   void do_partial_update(PartialUpdateChecker<ImageTileData>::CollectResult &iterator,
@@ -238,70 +272,171 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
                          Image *image) const
   {
     while (iterator.get_next_change() == ePartialUpdateIterResult::ChangeAvailable) {
+      const float tile_width = static_cast<float>(iterator.tile_data.tile_buffer->x);
+      const float tile_height = static_cast<float>(iterator.tile_data.tile_buffer->y);
+
       for (int i = 0; i < SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN; i++) {
+        const IMAGE_ScreenSpaceTextureInfo *info = &pd->screen_space.texture_infos[i];
         /* Dirty images will receive a full update. No need to do a partial one now. */
-        if (pd->screen_space.texture_infos[i].dirty) {
+        if (info->dirty) {
           continue;
         }
+        if (!info->visible) {
+          continue;
+        }
+        GPUTexture *texture = txl->screen_space.textures[i];
+        const float texture_width = GPU_texture_width(texture);
+        const float texture_height = GPU_texture_height(texture);
         // TODO
+        // early bound check.
+        ImageTileAccessor tile_accessor(iterator.tile_data.tile);
+        float tile_offset_x = static_cast<float>(tile_accessor.get_tile_x_offset());
+        float tile_offset_y = static_cast<float>(tile_accessor.get_tile_y_offset());
+        rcti *changed_region_in_texel_space = &iterator.changed_region.region;
+        rctf changed_region_in_uv_space;
+        BLI_rctf_init(&changed_region_in_uv_space,
+                      static_cast<float>(changed_region_in_texel_space->xmin) /
+                              static_cast<float>(iterator.tile_data.tile_buffer->x) +
+                          tile_offset_x,
+                      static_cast<float>(changed_region_in_texel_space->xmax) /
+                              static_cast<float>(iterator.tile_data.tile_buffer->x) +
+                          tile_offset_x,
+                      static_cast<float>(changed_region_in_texel_space->ymin) /
+                              static_cast<float>(iterator.tile_data.tile_buffer->y) +
+                          tile_offset_y,
+                      static_cast<float>(changed_region_in_texel_space->ymax) /
+                              static_cast<float>(iterator.tile_data.tile_buffer->y) +
+                          tile_offset_y);
+        rctf changed_overlapping_region_in_uv_space;
+        const bool region_overlap = BLI_rctf_isect(&info->uv_bounds,
+                                                   &changed_region_in_uv_space,
+                                                   &changed_overlapping_region_in_uv_space);
+        if (!region_overlap) {
+          continue;
+        }
+        // convert the overlapping region to texel space and to ss_pixel space...
+        // TODO: first convert to ss_pixel space as integer based. and from there go back to texel
+        // space. But perhaps this isn't needed and we could use an extraction offset somehow.
+        rcti gpu_texture_region_to_update;
+        BLI_rcti_init(&gpu_texture_region_to_update,
+                      floor((changed_overlapping_region_in_uv_space.xmin - info->uv_bounds.xmin) *
+                            texture_width / BLI_rctf_size_x(&info->uv_bounds)),
+                      floor((changed_overlapping_region_in_uv_space.xmax - info->uv_bounds.xmin) *
+                            texture_width / BLI_rctf_size_x(&info->uv_bounds)),
+                      ceil((changed_overlapping_region_in_uv_space.ymin - info->uv_bounds.ymin) *
+                           texture_height / BLI_rctf_size_y(&info->uv_bounds)),
+                      ceil((changed_overlapping_region_in_uv_space.ymax - info->uv_bounds.ymin) *
+                           texture_height / BLI_rctf_size_y(&info->uv_bounds)));
+
+        rcti tile_region_to_extract;
+        BLI_rcti_init(
+            &tile_region_to_extract,
+            floor((changed_overlapping_region_in_uv_space.xmin - tile_offset_x) * tile_width),
+            floor((changed_overlapping_region_in_uv_space.xmax - tile_offset_x) * tile_width),
+            ceil((changed_overlapping_region_in_uv_space.ymin - tile_offset_y) * tile_height),
+            ceil((changed_overlapping_region_in_uv_space.ymax - tile_offset_y) * tile_height));
+
+        // Create an image buffer with a size
+        // extract and scale into an imbuf
+        const int texture_region_width = BLI_rcti_size_x(&gpu_texture_region_to_update);
+        const int texture_region_height = BLI_rcti_size_y(&gpu_texture_region_to_update);
+
+        ImBuf extracted_buffer;
+        IMB_initImBuf(
+            &extracted_buffer, texture_region_width, texture_region_height, 32, IB_rectfloat);
+
+        int offset = 0;
+        ImBuf *tile_buffer = iterator.tile_data.tile_buffer;
+        for (int y = gpu_texture_region_to_update.ymin; y < gpu_texture_region_to_update.ymax;
+             y++) {
+          float yf = y / (float)texture_height;
+          float v = info->uv_bounds.ymax * yf + info->uv_bounds.ymin * (1.0 - yf);
+          for (int x = gpu_texture_region_to_update.xmin; x < gpu_texture_region_to_update.xmax;
+               x++) {
+            float xf = x / (float)texture_width;
+            float u = info->uv_bounds.xmax * xf + info->uv_bounds.xmin * (1.0 - xf);
+            nearest_interpolation_color(tile_buffer,
+                                        nullptr,
+                                        &extracted_buffer.rect_float[offset * 4],
+                                        u * tile_buffer->x,
+                                        v * tile_buffer->y);
+            offset++;
+          }
+        }
+
+        GPU_texture_update_sub(texture,
+                               GPU_DATA_FLOAT,
+                               extracted_buffer.rect_float,
+                               gpu_texture_region_to_update.xmin,
+                               gpu_texture_region_to_update.ymin,
+                               0,
+                               extracted_buffer.x,
+                               extracted_buffer.y,
+                               0);
+        imb_freerectImbuf_all(&extracted_buffer);
       }
     }
   }
 
-  void update_dirty_textures(IMAGE_TextureList *txl, IMAGE_PrivateData *pd) const
+  void do_partial_update()
+  {
+  }
+
+  void do_full_update_for_dirty_textures(IMAGE_TextureList *txl, IMAGE_PrivateData *pd) const
   {
     for (int i = 0; i < SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN; i++) {
-      if (!pd->screen_space.texture_infos[i].dirty) {
+      IMAGE_ScreenSpaceTextureInfo *info = &pd->screen_space.texture_infos[i];
+      if (!info->dirty) {
         continue;
       }
-      if (!pd->screen_space.texture_infos[i].visible) {
+      if (!info->visible) {
         continue;
       }
-
-      rctf *uv_bounds = &pd->screen_space.texture_infos[i].uv_bounds;
 
       GPUTexture *gpu_texture = txl->screen_space.textures[i];
-      int texture_width = GPU_texture_width(gpu_texture);
-      int texture_height = GPU_texture_height(gpu_texture);
-      int texture_size = texture_width * texture_height;
+      const int texture_width = GPU_texture_width(gpu_texture);
+      const int texture_height = GPU_texture_height(gpu_texture);
 
-      float *data = static_cast<float *>(MEM_mallocN(sizeof(float) * 4 * texture_size, __func__));
+      ImBuf tmp;
+      IMB_initImBuf(&tmp, texture_width, texture_height, 0, IB_rectfloat);
 
-      LISTBASE_FOREACH (ImageTile *, image_tile, &pd->image->tiles) {
+      LISTBASE_FOREACH (ImageTile *, image_tile_ptr, &pd->image->tiles) {
+        ImageTileAccessor image_tile(image_tile_ptr);
 
         ImBuf *image_buffer = pd->ibuf;
         if (image_buffer == nullptr) {
-          memset(data, 0, texture_size * 4 * sizeof(float));
           /* TODO: remove break when tiles are supported. */
           break;
         }
         if (image_buffer->rect_float == nullptr) {
-          break;
+          IMB_float_from_rect(image_buffer);
         }
+        /* TODO(jbakker): add IMB_transform without cropping. */
+        /* TODO(jbakker): add IMB_transform with repeat. */
+        rctf crop;
+        BLI_rctf_init(&crop, 0.0, image_buffer->x, 0.0, image_buffer->y);
+        float uv_to_texel[4][4];
 
-        int offset = 0;
-        for (int y = 0; y < texture_height; y++) {
-          float yf = y / (float)texture_height;
-          float v = uv_bounds->ymax * yf + uv_bounds->ymin * (1.0 - yf);
-          for (int x = 0; x < texture_width; x++) {
-            float xf = x / (float)texture_width;
-            float u = uv_bounds->xmax * xf + uv_bounds->xmin * (1.0 - xf);
-            nearest_interpolation_color(image_buffer,
-                                        nullptr,
-                                        &data[offset * 4],
-                                        u * image_buffer->x,
-                                        v * image_buffer->y);
-            offset++;
-          }
-        }
+        /* IMB_transform works in a non-consistent space. This should be documented or fixed!.
+         * Construct a variant of the info_uv_to_texture that adds the texel space
+         * transformation.*/
+        copy_m4_m4(uv_to_texel, info->uv_to_texture);
+        float scale[3] = {static_cast<float>(texture_width) / static_cast<float>(image_buffer->x),
+                          static_cast<float>(texture_height) / static_cast<float>(image_buffer->y),
+                          1.0f};
+        rescale_m4(uv_to_texel, scale);
+        uv_to_texel[3][0] *= texture_width;
+        uv_to_texel[3][1] *= texture_height;
+        invert_m4(uv_to_texel);
+        IMB_transform(image_buffer, &tmp, uv_to_texel, &crop, IMB_FILTER_NEAREST);
+
         /* TODO: render other tiles as well. But we should do that with a scale copy algo in stead
          * of the pixel sampling we do currently. */
         break;
       }
 
-      GPU_texture_update(gpu_texture, GPU_DATA_FLOAT, data);
-
-      MEM_freeN(data);
+      GPU_texture_update(gpu_texture, GPU_DATA_FLOAT, tmp.rect_float);
+      imb_freerectImbuf_all(&tmp);
     }
   }
 
@@ -344,15 +479,6 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
     update_textures(txl, pd, image, iuser);
 
     // Step: Add the GPU textures to the shgroup.
-
-    GPUTexture *tex_tile_data = nullptr;
-    space->get_gpu_textures(
-        image, iuser, image_buffer, &pd->texture, &pd->owns_texture, &tex_tile_data);
-    if (pd->texture == nullptr) {
-      return;
-    }
-    const bool is_tiled_texture = tex_tile_data != nullptr;
-
     ShaderParameters sh_params;
     sh_params.use_premul_alpha = BKE_image_has_gpu_texture_premultiplied_alpha(image,
                                                                                image_buffer);
@@ -362,21 +488,14 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
       Camera *camera = static_cast<Camera *>(scene->camera->data);
       copy_v2_fl2(sh_params.far_near, camera->clip_end, camera->clip_start);
     }
-    space->get_shader_parameters(sh_params, image_buffer, is_tiled_texture);
+    const bool is_tiled_image = (image->source == IMA_SRC_TILED);
+    space->get_shader_parameters(sh_params, image_buffer, is_tiled_image);
 
     add_shgroups(psl, txl, pd, sh_params);
   }
 
-  void draw_finish(IMAGE_Data *vedata) const override
+  void draw_finish(IMAGE_Data *UNUSED(vedata)) const override
   {
-    IMAGE_StorageList *stl = vedata->stl;
-    IMAGE_PrivateData *pd = stl->pd;
-
-    if (pd->texture && pd->owns_texture) {
-      GPU_texture_free(pd->texture);
-      pd->owns_texture = false;
-    }
-    pd->texture = nullptr;
   }
 
   void draw_scene(IMAGE_Data *vedata) const override
