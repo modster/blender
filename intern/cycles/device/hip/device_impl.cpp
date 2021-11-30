@@ -47,12 +47,6 @@ bool HIPDevice::have_precompiled_kernels()
   return path_exists(fatbins_path);
 }
 
-bool HIPDevice::show_samples() const
-{
-  /* The HIPDevice only processes one tile at a time, so showing samples is fine. */
-  return true;
-}
-
 BVHLayoutMask HIPDevice::get_bvh_layout_mask() const
 {
   return BVH_LAYOUT_BVH2;
@@ -99,7 +93,7 @@ HIPDevice::HIPDevice(const DeviceInfo &info, Stats &stats, Profiler &profiler)
   }
 
   /* Setup device and context. */
-  result = hipGetDevice(&hipDevice, hipDevId);
+  result = hipDeviceGet(&hipDevice, hipDevId);
   if (result != hipSuccess) {
     set_error(string_printf("Failed to get HIP device handle from ordinal (%s)",
                             hipewErrorString(result)));
@@ -154,7 +148,7 @@ bool HIPDevice::support_device(const uint /*kernel_features*/)
     hipDeviceProp_t props;
     hipGetDeviceProperties(&props, hipDevId);
 
-    set_error(string_printf("HIP backend requires AMD RDNA2 graphics card or up, but found %s.",
+    set_error(string_printf("HIP backend requires AMD RDNA graphics card or up, but found %s.",
                             props.name));
     return false;
   }
@@ -222,7 +216,6 @@ string HIPDevice::compile_kernel_get_common_cflags(const uint kernel_features)
   const string include_path = source_path;
   string cflags = string_printf(
       "-m%d "
-      "--ptxas-options=\"-v\" "
       "--use_fast_math "
       "-DHIPCC "
       "-I\"%s\"",
@@ -234,10 +227,7 @@ string HIPDevice::compile_kernel_get_common_cflags(const uint kernel_features)
   return cflags;
 }
 
-string HIPDevice::compile_kernel(const uint kernel_features,
-                                 const char *name,
-                                 const char *base,
-                                 bool force_ptx)
+string HIPDevice::compile_kernel(const uint kernel_features, const char *name, const char *base)
 {
   /* Compute kernel name. */
   int major, minor;
@@ -247,7 +237,7 @@ string HIPDevice::compile_kernel(const uint kernel_features,
   hipGetDeviceProperties(&props, hipDevId);
 
   /* gcnArchName can contain tokens after the arch name with features, ie.
-    "gfx1010:sramecc-:xnack-" so we tokenize it to get the first part. */
+   * `gfx1010:sramecc-:xnack-` so we tokenize it to get the first part. */
   char *arch = strtok(props.gcnArchName, ":");
   if (arch == NULL) {
     arch = props.gcnArchName;
@@ -255,13 +245,11 @@ string HIPDevice::compile_kernel(const uint kernel_features,
 
   /* Attempt to use kernel provided with Blender. */
   if (!use_adaptive_compilation()) {
-    if (!force_ptx) {
-      const string fatbin = path_get(string_printf("lib/%s_%s.fatbin", name, arch));
-      VLOG(1) << "Testing for pre-compiled kernel " << fatbin << ".";
-      if (path_exists(fatbin)) {
-        VLOG(1) << "Using precompiled kernel.";
-        return fatbin;
-      }
+    const string fatbin = path_get(string_printf("lib/%s_%s.fatbin", name, arch));
+    VLOG(1) << "Testing for pre-compiled kernel " << fatbin << ".";
+    if (path_exists(fatbin)) {
+      VLOG(1) << "Using precompiled kernel.";
+      return fatbin;
     }
   }
 
@@ -298,9 +286,9 @@ string HIPDevice::compile_kernel(const uint kernel_features,
 
 #  ifdef _WIN32
   if (!use_adaptive_compilation() && have_precompiled_kernels()) {
-    if (major < 3) {
+    if (!hipSupportsDevice(hipDevId)) {
       set_error(
-          string_printf("HIP backend requires compute capability 3.0 or up, but found %d.%d. "
+          string_printf("HIP backend requires compute capability 10.1 or up, but found %d.%d. "
                         "Your GPU is not supported.",
                         major,
                         minor));
@@ -380,10 +368,9 @@ string HIPDevice::compile_kernel(const uint kernel_features,
 
 bool HIPDevice::load_kernels(const uint kernel_features)
 {
-  /* TODO(sergey): Support kernels re-load for CUDA devices adaptive compile.
+  /* TODO(sergey): Support kernels re-load for HIP devices adaptive compile.
    *
-   * Currently re-loading kernel will invalidate memory pointers,
-   * causing problems in cuCtxSynchronize.
+   * Currently re-loading kernels will invalidate memory pointers.
    */
   if (hipModule) {
     if (use_adaptive_compilation()) {
@@ -453,10 +440,10 @@ void HIPDevice::reserve_local_memory(const uint kernel_features)
      * still to make it faster. */
     HIPDeviceQueue queue(this);
 
-    void *d_path_index = nullptr;
-    void *d_render_buffer = nullptr;
+    device_ptr d_path_index = 0;
+    device_ptr d_render_buffer = 0;
     int d_work_size = 0;
-    void *args[] = {&d_path_index, &d_render_buffer, &d_work_size};
+    DeviceKernelArguments args(&d_path_index, &d_render_buffer, &d_work_size);
 
     queue.init_execution();
     queue.enqueue(test_kernel, 1, args);
@@ -751,6 +738,7 @@ void HIPDevice::generic_free(device_memory &mem)
   if (mem.device_pointer) {
     HIPContextScope scope(this);
     thread_scoped_lock lock(hip_mem_map_mutex);
+    DCHECK(hip_mem_map.find(&mem) != hip_mem_map.end());
     const HIPMem &cmem = hip_mem_map[&mem];
 
     /* If cmem.use_mapped_host is true, reference counting is used
@@ -904,7 +892,6 @@ void HIPDevice::tex_alloc(device_texture &mem)
 {
   HIPContextScope scope(this);
 
-  /* General variables for both architectures */
   string bind_name = mem.name;
   size_t dsize = datatype_size(mem.data_type);
   size_t size = mem.memory_size();
@@ -994,16 +981,16 @@ void HIPDevice::tex_alloc(device_texture &mem)
             << string_human_readable_number(mem.memory_size()) << " bytes. ("
             << string_human_readable_size(mem.memory_size()) << ")";
 
-    hip_assert(hipArray3DCreate(&array_3d, &desc));
+    hip_assert(hipArray3DCreate((hArray *)&array_3d, &desc));
 
     if (!array_3d) {
       return;
     }
 
     HIP_MEMCPY3D param;
-    memset(&param, 0, sizeof(param));
+    memset(&param, 0, sizeof(HIP_MEMCPY3D));
     param.dstMemoryType = hipMemoryTypeArray;
-    param.dstArray = &array_3d;
+    param.dstArray = array_3d;
     param.srcMemoryType = hipMemoryTypeHost;
     param.srcHost = mem.host_pointer;
     param.srcPitch = src_pitch;
@@ -1069,13 +1056,13 @@ void HIPDevice::tex_alloc(device_texture &mem)
 
   if (mem.info.data_type != IMAGE_DATA_TYPE_NANOVDB_FLOAT &&
       mem.info.data_type != IMAGE_DATA_TYPE_NANOVDB_FLOAT3) {
-    /* Kepler+, bindless textures. */
+    /* Bindless textures. */
     hipResourceDesc resDesc;
     memset(&resDesc, 0, sizeof(resDesc));
 
     if (array_3d) {
       resDesc.resType = hipResourceTypeArray;
-      resDesc.res.array.h_Array = &array_3d;
+      resDesc.res.array.h_Array = array_3d;
       resDesc.flags = 0;
     }
     else if (mem.data_height > 0) {
@@ -1120,6 +1107,7 @@ void HIPDevice::tex_free(device_texture &mem)
   if (mem.device_pointer) {
     HIPContextScope scope(this);
     thread_scoped_lock lock(hip_mem_map_mutex);
+    DCHECK(hip_mem_map.find(&mem) != hip_mem_map.end());
     const HIPMem &cmem = hip_mem_map[&mem];
 
     if (cmem.texobject) {
@@ -1160,6 +1148,8 @@ bool HIPDevice::should_use_graphics_interop()
    * possible, but from the empiric measurements it can be considerably slower than using naive
    * pixels copy. */
 
+  /* Disable graphics interop for now, because of driver bug in 21.40. See T92972 */
+#  if 0
   HIPContextScope scope(this);
 
   int num_all_devices = 0;
@@ -1178,6 +1168,7 @@ bool HIPDevice::should_use_graphics_interop()
       return true;
     }
   }
+#  endif
 
   return false;
 }

@@ -36,13 +36,6 @@
 #  define __KERNEL_CPU__
 #endif
 
-/* TODO(sergey): This is only to make it possible to include this header
- * from outside of the kernel. but this could be done somewhat cleaner?
- */
-#ifndef ccl_addr_space
-#  define ccl_addr_space
-#endif
-
 CCL_NAMESPACE_BEGIN
 
 /* Constants */
@@ -117,9 +110,9 @@ CCL_NAMESPACE_BEGIN
 #  define __VOLUME_RECORD_ALL__
 #endif /* __KERNEL_CPU__ */
 
-#ifdef __KERNEL_OPTIX__
+#ifdef __KERNEL_GPU_RAYTRACING__
 #  undef __BAKING__
-#endif /* __KERNEL_OPTIX__ */
+#endif /* __KERNEL_GPU_RAYTRACING__ */
 
 /* Scene-based selective features compilation. */
 #ifdef __KERNEL_FEATURES__
@@ -279,17 +272,17 @@ enum PathRayFlag {
   PATH_RAY_SUBSURFACE_RANDOM_WALK = (1U << 20U),
   PATH_RAY_SUBSURFACE_DISK = (1U << 21U),
   PATH_RAY_SUBSURFACE_USE_FRESNEL = (1U << 22U),
+  PATH_RAY_SUBSURFACE_BACKFACING = (1U << 23U),
   PATH_RAY_SUBSURFACE = (PATH_RAY_SUBSURFACE_RANDOM_WALK | PATH_RAY_SUBSURFACE_DISK |
-                         PATH_RAY_SUBSURFACE_USE_FRESNEL),
+                         PATH_RAY_SUBSURFACE_USE_FRESNEL | PATH_RAY_SUBSURFACE_BACKFACING),
 
   /* Contribute to denoising features. */
-  PATH_RAY_DENOISING_FEATURES = (1U << 23U),
+  PATH_RAY_DENOISING_FEATURES = (1U << 24U),
 
   /* Render pass categories. */
-  PATH_RAY_REFLECT_PASS = (1U << 24U),
-  PATH_RAY_TRANSMISSION_PASS = (1U << 25U),
+  PATH_RAY_SURFACE_PASS = (1U << 25U),
   PATH_RAY_VOLUME_PASS = (1U << 26U),
-  PATH_RAY_ANY_PASS = (PATH_RAY_REFLECT_PASS | PATH_RAY_TRANSMISSION_PASS | PATH_RAY_VOLUME_PASS),
+  PATH_RAY_ANY_PASS = (PATH_RAY_SURFACE_PASS | PATH_RAY_VOLUME_PASS),
 
   /* Shadow ray is for a light or surface, or AO. */
   PATH_RAY_SHADOW_FOR_LIGHT = (1U << 27U),
@@ -428,7 +421,19 @@ typedef enum CryptomatteType {
 typedef struct BsdfEval {
   float3 diffuse;
   float3 glossy;
+  float3 sum;
 } BsdfEval;
+
+/* Closure Filter */
+
+typedef enum FilterClosures {
+  FILTER_CLOSURE_EMISSION = (1 << 0),
+  FILTER_CLOSURE_DIFFUSE = (1 << 1),
+  FILTER_CLOSURE_GLOSSY = (1 << 2),
+  FILTER_CLOSURE_TRANSMISSION = (1 << 3),
+  FILTER_CLOSURE_TRANSPARENT = (1 << 4),
+  FILTER_CLOSURE_DIRECT_LIGHT = (1 << 5),
+} FilterClosures;
 
 /* Shader Flag */
 
@@ -475,6 +480,16 @@ enum PanoramaType {
   PANORAMA_MIRRORBALL = 3,
 
   PANORAMA_NUM_TYPES,
+};
+
+/* Direct Light Sampling */
+
+enum DirectLightSamplingType {
+  DIRECT_LIGHT_SAMPLING_MIS = 0,
+  DIRECT_LIGHT_SAMPLING_FORWARD = 1,
+  DIRECT_LIGHT_SAMPLING_NEE = 2,
+
+  DIRECT_LIGHT_SAMPLING_NUM,
 };
 
 /* Differential */
@@ -1186,7 +1201,14 @@ typedef struct KernelIntegrator {
   int has_shadow_catcher;
   float scrambling_distance;
 
+  /* Closure filter. */
+  int filter_closures;
+
+  /* MIS debugging. */
+  int direct_light_sampling_type;
+
   /* padding */
+  int pad1, pad2;
 } KernelIntegrator;
 static_assert_align(KernelIntegrator, 16);
 
@@ -1198,10 +1220,12 @@ typedef enum KernelBVHLayout {
   BVH_LAYOUT_OPTIX = (1 << 2),
   BVH_LAYOUT_MULTI_OPTIX = (1 << 3),
   BVH_LAYOUT_MULTI_OPTIX_EMBREE = (1 << 4),
+  BVH_LAYOUT_METAL = (1 << 5),
+  BVH_LAYOUT_MULTI_METAL_EMBREE = (1 << 6),
 
   /* Default BVH layout to use for CPU. */
   BVH_LAYOUT_AUTO = BVH_LAYOUT_EMBREE,
-  BVH_LAYOUT_ALL = BVH_LAYOUT_BVH2 | BVH_LAYOUT_EMBREE | BVH_LAYOUT_OPTIX,
+  BVH_LAYOUT_ALL = BVH_LAYOUT_BVH2 | BVH_LAYOUT_EMBREE | BVH_LAYOUT_OPTIX | BVH_LAYOUT_METAL,
 } KernelBVHLayout;
 
 typedef struct KernelBVH {
@@ -1216,6 +1240,8 @@ typedef struct KernelBVH {
   /* Custom BVH */
 #ifdef __KERNEL_OPTIX__
   OptixTraversableHandle scene;
+#elif defined __METALRT__
+  metalrt_as_type scene;
 #else
 #  ifdef __EMBREE__
   RTCScene scene;
@@ -1410,6 +1436,7 @@ typedef struct KernelWorkTile {
 
   uint start_sample;
   uint num_samples;
+  uint sample_offset;
 
   int offset;
   uint stride;

@@ -39,6 +39,7 @@
 #include "BKE_animsys.h"
 #include "BKE_attribute.h"
 #include "BKE_cryptomatte.h"
+#include "BKE_geometry_set.h"
 #include "BKE_image.h"
 #include "BKE_node.h"
 #include "BKE_texture.h"
@@ -2805,6 +2806,7 @@ static StructRNA *rna_NodeSocket_register(Main *UNUSED(bmain),
 
   /* setup dummy socket & socket type to store static properties in */
   memset(&dummyst, 0, sizeof(bNodeSocketType));
+  dummyst.type = SOCK_CUSTOM;
 
   memset(&dummysock, 0, sizeof(bNodeSocket));
   dummysock.typeinfo = &dummyst;
@@ -9165,6 +9167,16 @@ static void def_geo_boolean(StructRNA *srna)
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
 }
 
+static void def_geo_attribute_domain_size(StructRNA *srna)
+{
+  PropertyRNA *prop = RNA_def_property(srna, "component", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_sdna(prop, NULL, "custom1");
+  RNA_def_property_enum_items(prop, rna_enum_geometry_component_type_items);
+  RNA_def_property_enum_default(prop, GEO_COMPONENT_TYPE_MESH);
+  RNA_def_property_ui_text(prop, "Component", "");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
+}
+
 static void def_geo_curve_primitive_bezier_segment(StructRNA *srna)
 {
   static const EnumPropertyItem mode_items[] = {
@@ -12753,6 +12765,11 @@ static void rna_def_nodetree(BlenderRNA *brna)
   PropertyRNA *parm;
 
   static const EnumPropertyItem static_type_items[] = {
+      {NTREE_UNDEFINED,
+       "UNDEFINED",
+       ICON_QUESTION,
+       "Undefined",
+       "Undefined type of nodes (can happen e.g. when a linked node tree goes missing)"},
       {NTREE_SHADER, "SHADER", ICON_MATERIAL, "Shader", "Shader nodes"},
       {NTREE_TEXTURE, "TEXTURE", ICON_TEXTURE, "Texture", "Texture nodes"},
       {NTREE_COMPOSIT, "COMPOSITING", ICON_RENDERLAYERS, "Compositing", "Compositing nodes"},

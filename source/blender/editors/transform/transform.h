@@ -317,9 +317,9 @@ typedef struct TransSnap {
   /* Snapped Element Type (currently for objects only). */
   char snapElem;
   /** snapping from this point (in global-space). */
-  float snapPoint[3];
-  /** to this point (in global-space). */
   float snapTarget[3];
+  /** to this point (in global-space). */
+  float snapPoint[3];
   float snapTargetGrid[3];
   float snapNormal[3];
   char snapNodeBorder;
@@ -608,7 +608,7 @@ typedef struct TransInfo {
    * mouse button then.) */
   bool is_launch_event_tweak;
 
-  bool is_orient_set;
+  bool is_orient_default_overwrite;
 
   struct {
     short type;
@@ -620,6 +620,12 @@ typedef struct TransInfo {
     O_SCENE,
     O_SET,
   } orient_curr;
+
+  /**
+   * All values from `TransInfo.orient[].type` converted into a flag
+   * to allow quickly checking which orientation types are used.
+   */
+  int orient_type_mask;
 
   short prop_mode;
 
@@ -713,7 +719,8 @@ struct wmKeyMap *transform_modal_keymap(struct wmKeyConfig *keyconf);
 /* transform_gizmo.c */
 #define GIZMO_AXIS_LINE_WIDTH 2.0f
 
-bool gimbal_axis(struct Object *ob, float gmat[3][3]);
+bool gimbal_axis_pose(struct Object *ob, const struct bPoseChannel *pchan, float gmat[3][3]);
+bool gimbal_axis_object(struct Object *ob, float gmat[3][3]);
 void drawDial3d(const TransInfo *t);
 
 /** \} */

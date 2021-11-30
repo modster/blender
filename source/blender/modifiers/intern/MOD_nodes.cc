@@ -88,6 +88,7 @@
 #include "MOD_ui_common.h"
 
 #include "ED_object.h"
+#include "ED_screen.h"
 #include "ED_spreadsheet.h"
 #include "ED_undo.h"
 
@@ -97,6 +98,7 @@
 #include "NOD_node_declaration.hh"
 
 #include "FN_field.hh"
+#include "FN_field_cpp_type.hh"
 #include "FN_multi_function.hh"
 
 using blender::Array;
@@ -112,9 +114,11 @@ using blender::StringRef;
 using blender::StringRefNull;
 using blender::Vector;
 using blender::bke::OutputAttribute;
+using blender::fn::Field;
 using blender::fn::GField;
 using blender::fn::GMutablePointer;
 using blender::fn::GPointer;
+using blender::fn::ValueOrField;
 using blender::nodes::FieldInferencingInterface;
 using blender::nodes::GeoNodeExecParams;
 using blender::nodes::InputSocketFieldType;
@@ -490,35 +494,34 @@ static void init_socket_cpp_value_from_property(const IDProperty &property,
       else if (property.type == IDP_DOUBLE) {
         value = (float)IDP_Double(&property);
       }
-      new (r_value) blender::fn::Field<float>(blender::fn::make_constant_field(value));
+      new (r_value) ValueOrField<float>(value);
       break;
     }
     case SOCK_INT: {
       int value = IDP_Int(&property);
-      new (r_value) blender::fn::Field<int>(blender::fn::make_constant_field(value));
+      new (r_value) ValueOrField<int>(value);
       break;
     }
     case SOCK_VECTOR: {
       float3 value;
       copy_v3_v3(value, (const float *)IDP_Array(&property));
-      new (r_value) blender::fn::Field<float3>(blender::fn::make_constant_field(value));
+      new (r_value) ValueOrField<float3>(value);
       break;
     }
     case SOCK_RGBA: {
       blender::ColorGeometry4f value;
       copy_v4_v4((float *)value, (const float *)IDP_Array(&property));
-      new (r_value) blender::fn::Field<ColorGeometry4f>(blender::fn::make_constant_field(value));
+      new (r_value) ValueOrField<ColorGeometry4f>(value);
       break;
     }
     case SOCK_BOOLEAN: {
       bool value = IDP_Int(&property) != 0;
-      new (r_value) blender::fn::Field<bool>(blender::fn::make_constant_field(value));
+      new (r_value) ValueOrField<bool>(value);
       break;
     }
     case SOCK_STRING: {
       std::string value = IDP_String(&property);
-      new (r_value)
-          blender::fn::Field<std::string>(blender::fn::make_constant_field(std::move(value)));
+      new (r_value) ValueOrField<std::string>(std::move(value));
       break;
     }
     case SOCK_OBJECT: {
@@ -738,8 +741,13 @@ static void initialize_group_input(NodesModifierData &nmd,
   if (use_attribute) {
     const StringRef attribute_name{IDP_String(property_attribute_name)};
     auto attribute_input = std::make_shared<blender::bke::AttributeFieldInput>(
-        attribute_name, *socket_type.get_base_cpp_type());
-    new (r_value) blender::fn::GField(std::move(attribute_input), 0);
+        attribute_name, *socket_type.base_cpp_type);
+    GField attribute_field{std::move(attribute_input), 0};
+    const blender::fn::ValueOrFieldCPPType *cpp_type =
+        dynamic_cast<const blender::fn::ValueOrFieldCPPType *>(
+            socket_type.geometry_nodes_cpp_type);
+    BLI_assert(cpp_type != nullptr);
+    cpp_type->construct_from_field(r_value, std::move(attribute_field));
   }
   else {
     init_socket_cpp_value_from_property(
@@ -903,7 +911,11 @@ static void store_output_value_in_geometry(GeometrySet &geometry_set,
   if (attribute_name.is_empty()) {
     return;
   }
-  const GField &field = *(const GField *)value.get();
+  const blender::fn::ValueOrFieldCPPType *cpp_type =
+      dynamic_cast<const blender::fn::ValueOrFieldCPPType *>(value.type());
+  BLI_assert(cpp_type != nullptr);
+
+  const GField field = cpp_type->as_field(value.get());
   const bNodeSocket *interface_socket = (bNodeSocket *)BLI_findlink(&nmd->node_group->outputs,
                                                                     socket.index());
   const AttributeDomain domain = (AttributeDomain)interface_socket->attribute_domain;
@@ -962,7 +974,7 @@ static GeometrySet compute_geometry(const DerivedNodeTree &tree,
 
     /* Initialize remaining group inputs. */
     for (const OutputSocketRef *socket : remaining_input_sockets) {
-      const CPPType &cpp_type = *socket->typeinfo()->get_geometry_nodes_cpp_type();
+      const CPPType &cpp_type = *socket->typeinfo()->geometry_nodes_cpp_type;
       void *value_in = allocator.allocate(cpp_type.size(), cpp_type.alignment());
       initialize_group_input(*nmd, *socket, value_in);
       group_inputs.add_new({root_context, socket}, {cpp_type, value_in});
@@ -1025,17 +1037,20 @@ static void check_property_socket_sync(const Object *ob, ModifierData *md)
 {
   NodesModifierData *nmd = reinterpret_cast<NodesModifierData *>(md);
 
-  int i = 0;
+  int geometry_socket_count = 0;
+
+  int i;
   LISTBASE_FOREACH_INDEX (const bNodeSocket *, socket, &nmd->node_group->inputs, i) {
     /* The first socket is the special geometry socket for the modifier object. */
     if (i == 0 && socket->type == SOCK_GEOMETRY) {
+      geometry_socket_count++;
       continue;
     }
 
     IDProperty *property = IDP_GetPropertyFromGroup(nmd->settings.properties, socket->identifier);
     if (property == nullptr) {
       if (socket->type == SOCK_GEOMETRY) {
-        BKE_modifier_set_error(ob, md, "Node group can only have one geometry input");
+        geometry_socket_count++;
       }
       else {
         BKE_modifier_set_error(ob, md, "Missing property for input socket \"%s\"", socket->name);
@@ -1050,15 +1065,13 @@ static void check_property_socket_sync(const Object *ob, ModifierData *md)
     }
   }
 
-  bool has_geometry_output = false;
-  LISTBASE_FOREACH (const bNodeSocket *, socket, &nmd->node_group->outputs) {
-    if (socket->type == SOCK_GEOMETRY) {
-      has_geometry_output = true;
+  if (geometry_socket_count == 1) {
+    if (((bNodeSocket *)nmd->node_group->inputs.first)->type != SOCK_GEOMETRY) {
+      BKE_modifier_set_error(ob, md, "Node group's geometry input must be the first");
     }
   }
-
-  if (!has_geometry_output) {
-    BKE_modifier_set_error(ob, md, "Node group must have a geometry output");
+  else if (geometry_socket_count > 1) {
+    BKE_modifier_set_error(ob, md, "Node group can only have one geometry input");
   }
 }
 
@@ -1078,6 +1091,7 @@ static void modifyGeometry(ModifierData *md,
 
   if (tree.has_link_cycles()) {
     BKE_modifier_set_error(ctx->object, md, "Node group has cycles");
+    geometry_set.clear();
     return;
   }
 
@@ -1085,17 +1099,23 @@ static void modifyGeometry(ModifierData *md,
   Span<const NodeRef *> input_nodes = root_tree_ref.nodes_by_type("NodeGroupInput");
   Span<const NodeRef *> output_nodes = root_tree_ref.nodes_by_type("NodeGroupOutput");
   if (output_nodes.size() != 1) {
+    BKE_modifier_set_error(ctx->object, md, "Node group must have a single output node");
+    geometry_set.clear();
     return;
   }
 
   const NodeRef &output_node = *output_nodes[0];
   Span<const InputSocketRef *> group_outputs = output_node.inputs().drop_back(1);
   if (group_outputs.is_empty()) {
+    BKE_modifier_set_error(ctx->object, md, "Node group must have an output socket");
+    geometry_set.clear();
     return;
   }
 
   const InputSocketRef *first_output_socket = group_outputs[0];
   if (first_output_socket->idname() != "NodeSocketGeometry") {
+    BKE_modifier_set_error(ctx->object, md, "Node group's first output must be a geometry");
+    geometry_set.clear();
     return;
   }
 
@@ -1132,8 +1152,17 @@ struct AttributeSearchData {
 /* This class must not have a destructor, since it is used by buttons and freed with #MEM_freeN. */
 BLI_STATIC_ASSERT(std::is_trivially_destructible_v<AttributeSearchData>, "");
 
-static NodesModifierData *get_modifier_data(Main &bmain, const AttributeSearchData &data)
+static NodesModifierData *get_modifier_data(Main &bmain,
+                                            const wmWindowManager &wm,
+                                            const AttributeSearchData &data)
 {
+  if (ED_screen_animation_playing(&wm)) {
+    /* Work around an issue where the attribute search exec function has stale pointers when data
+     * is reallocated when evaluating the node tree, causing a crash. This would be solved by
+     * allowing the UI search data to own arbitrary memory rather than just referencing it. */
+    return nullptr;
+  }
+
   const Object *object = (Object *)BKE_libblock_find_session_uuid(
       &bmain, ID_OB, data.object_session_uid);
   if (object == nullptr) {
@@ -1151,7 +1180,7 @@ static void attribute_search_update_fn(
     const bContext *C, void *arg, const char *str, uiSearchItems *items, const bool is_first)
 {
   AttributeSearchData &data = *static_cast<AttributeSearchData *>(arg);
-  const NodesModifierData *nmd = get_modifier_data(*CTX_data_main(C), data);
+  const NodesModifierData *nmd = get_modifier_data(*CTX_data_main(C), *CTX_wm_manager(C), data);
   if (nmd == nullptr) {
     return;
   }
@@ -1185,7 +1214,7 @@ static void attribute_search_exec_fn(bContext *C, void *data_v, void *item_v)
   }
   AttributeSearchData &data = *static_cast<AttributeSearchData *>(data_v);
   const GeometryAttributeInfo &item = *static_cast<const GeometryAttributeInfo *>(item_v);
-  const NodesModifierData *nmd = get_modifier_data(*CTX_data_main(C), data);
+  const NodesModifierData *nmd = get_modifier_data(*CTX_data_main(C), *CTX_wm_manager(C), data);
   if (nmd == nullptr) {
     return;
   }
@@ -1362,8 +1391,8 @@ static void draw_property_for_socket(const bContext &C,
       }
       else {
         uiLayout *row = uiLayoutRow(layout, false);
+        uiLayoutSetPropDecorate(row, true);
         uiItemR(row, md_ptr, rna_path, 0, socket.name, ICON_NONE);
-        uiItemDecoratorR(row, md_ptr, rna_path, 0);
       }
     }
   }

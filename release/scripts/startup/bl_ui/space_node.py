@@ -367,6 +367,17 @@ class NODE_MT_node(Menu):
         layout.operator("node.read_viewlayers")
 
 
+class NODE_MT_view_pie(Menu):
+    bl_label = "View"
+
+    def draw(self, context):
+        layout = self.layout
+
+        pie = layout.menu_pie()
+        pie.operator("node.view_all")
+        pie.operator("node.view_selected", icon='ZOOM_SELECTED')
+
+
 class NODE_PT_active_tool(ToolActivePanelHelper, Panel):
     bl_space_type = 'NODE_EDITOR'
     bl_region_type = 'UI'
@@ -710,6 +721,10 @@ class NODE_PT_overlay(Panel):
 
         col.prop(snode, "show_annotation", text="Annotations")
 
+        if snode.tree_type == 'GeometryNodeTree':
+            col.separator()
+            col.prop(overlay, "show_timing", text="Timings")
+
 
 class NODE_UL_interface_sockets(bpy.types.UIList):
     def draw_item(self, context, layout, _data, item, icon, _active_data, _active_propname, _index):
@@ -877,6 +892,7 @@ classes = (
     NODE_MT_node,
     NODE_MT_node_color_context_menu,
     NODE_MT_context_menu,
+    NODE_MT_view_pie,
     NODE_PT_material_slots,
     NODE_PT_node_color_presets,
     NODE_PT_active_node_generic,

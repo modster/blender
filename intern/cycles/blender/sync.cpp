@@ -162,19 +162,19 @@ void BlenderSync::sync_recalc(BL::Depsgraph &b_depsgraph, BL::SpaceView3D &b_v3d
     /* Object */
     else if (b_id.is_a(&RNA_Object)) {
       BL::Object b_ob(b_id);
-      const bool is_geometry = object_is_geometry(b_ob);
-      const bool is_light = !is_geometry && object_is_light(b_ob);
+      const bool can_have_geometry = object_can_have_geometry(b_ob);
+      const bool is_light = !can_have_geometry && object_is_light(b_ob);
 
       if (b_ob.is_instancer() && b_update.is_updated_shading()) {
         /* Needed for e.g. object color updates on instancer. */
         object_map.set_recalc(b_ob);
       }
 
-      if (is_geometry || is_light) {
+      if (can_have_geometry || is_light) {
         const bool updated_geometry = b_update.is_updated_geometry();
 
         /* Geometry (mesh, hair, volume). */
-        if (is_geometry) {
+        if (can_have_geometry) {
           if (b_update.is_updated_transform() || b_update.is_updated_shading()) {
             object_map.set_recalc(b_ob);
           }
@@ -365,8 +365,8 @@ void BlenderSync::sync_integrator(BL::ViewLayer &b_view_layer, bool background)
 
   int samples = get_int(cscene, "samples");
   float scrambling_distance = get_float(cscene, "scrambling_distance");
-  bool adaptive_scrambling_distance = get_boolean(cscene, "adaptive_scrambling_distance");
-  if (adaptive_scrambling_distance) {
+  bool auto_scrambling_distance = get_boolean(cscene, "auto_scrambling_distance");
+  if (auto_scrambling_distance) {
     scrambling_distance *= 4.0f / sqrtf(samples);
   }
 
@@ -391,6 +391,12 @@ void BlenderSync::sync_integrator(BL::ViewLayer &b_view_layer, bool background)
   else {
     integrator->set_ao_bounces(0);
   }
+
+#ifdef WITH_CYCLES_DEBUG
+  DirectLightSamplingType direct_light_sampling_type = (DirectLightSamplingType)get_enum(
+      cscene, "direct_light_sampling_type", DIRECT_LIGHT_SAMPLING_NUM, DIRECT_LIGHT_SAMPLING_MIS);
+  integrator->set_direct_light_sampling_type(direct_light_sampling_type);
+#endif
 
   const DenoiseParams denoise_params = get_denoise_params(b_scene, b_view_layer, background);
   integrator->set_use_denoise(denoise_params.use);
@@ -835,18 +841,25 @@ SessionParams BlenderSync::get_session_params(BL::RenderEngine &b_engine,
   /* samples */
   int samples = get_int(cscene, "samples");
   int preview_samples = get_int(cscene, "preview_samples");
+  int sample_offset = get_int(cscene, "sample_offset");
 
   if (background) {
     params.samples = samples;
+    params.sample_offset = sample_offset;
   }
   else {
     params.samples = preview_samples;
-    if (params.samples == 0)
+    if (params.samples == 0) {
       params.samples = INT_MAX;
+    }
+    params.sample_offset = 0;
   }
 
+  /* Clamp sample offset. */
+  params.sample_offset = clamp(params.sample_offset, 0, Integrator::MAX_SAMPLES);
+
   /* Clamp samples. */
-  params.samples = min(params.samples, Integrator::MAX_SAMPLES);
+  params.samples = clamp(params.samples, 0, Integrator::MAX_SAMPLES - params.sample_offset);
 
   /* Viewport Performance */
   params.pixel_size = b_engine.get_preview_pixel_size(b_scene);
@@ -865,7 +878,7 @@ SessionParams BlenderSync::get_session_params(BL::RenderEngine &b_engine,
 
   /* Time limit. */
   if (background) {
-    params.time_limit = get_float(cscene, "time_limit");
+    params.time_limit = (double)get_float(cscene, "time_limit");
   }
   else {
     /* For the viewport it kind of makes more sense to think in terms of the noise floor, which is

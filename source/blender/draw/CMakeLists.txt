@@ -112,6 +112,7 @@ set(SRC
   intern/draw_view_data.cc
   intern/smaa_textures.c
   engines/basic/basic_engine.c
+  engines/basic/basic_shader.c
   engines/image/image_engine.cc
   engines/image/image_shader.cc
   engines/eevee/eevee_bloom.c
@@ -214,6 +215,7 @@ set(SRC
   intern/mesh_extractors/extract_mesh.h
   intern/smaa_textures.h
   engines/basic/basic_engine.h
+  engines/basic/basic_private.h
   engines/eevee/eevee_engine.h
   engines/eevee/eevee_lightcache.h
   engines/eevee/eevee_lut.h
@@ -221,6 +223,9 @@ set(SRC
   engines/external/external_engine.h
   engines/image/image_engine.h
   engines/image/image_private.hh
+  engines/image/image_drawing_mode_image_space.hh
+  engines/image/image_space_image.hh
+  engines/image/image_space_node.hh
   engines/workbench/workbench_engine.h
   engines/workbench/workbench_private.h
   engines/select/select_engine.h
