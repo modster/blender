@@ -45,7 +45,6 @@ typedef struct Global {
 
   /** When set: `G_MAIN->name` contains valid relative base path. */
   bool relbase_valid;
-  bool file_loaded;
   bool save_over;
 
   /** Strings of recent opened files. */
@@ -124,7 +123,10 @@ enum {
 /** Don't overwrite these flags when reading a file. */
 #define G_FLAG_ALL_RUNTIME \
   (G_FLAG_SCRIPT_AUTOEXEC | G_FLAG_SCRIPT_OVERRIDE_PREF | G_FLAG_EVENT_SIMULATE | \
-   G_FLAG_USERPREF_NO_SAVE_ON_EXIT)
+   G_FLAG_USERPREF_NO_SAVE_ON_EXIT | \
+\
+   /* #BPY_python_reset is responsible for resetting these flags on file load. */ \
+   G_FLAG_SCRIPT_AUTOEXEC_FAIL | G_FLAG_SCRIPT_AUTOEXEC_FAIL_QUIET)
 
 /** Flags to read from blend file. */
 #define G_FLAG_ALL_READFILE 0
@@ -208,6 +210,12 @@ enum {
   G_TRANSFORM_SEQ = (1 << 2),
   G_TRANSFORM_FCURVES = (1 << 3),
   G_TRANSFORM_WM = (1 << 4),
+  /**
+   * Set when transforming the cursor itself.
+   * Used as a hint to draw the cursor (even when hidden).
+   * Otherwise it's not possible to see what's being transformed.
+   */
+  G_TRANSFORM_CURSOR = (1 << 5),
 };
 
 /** Defined in blender.c */

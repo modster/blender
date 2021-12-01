@@ -35,9 +35,9 @@ const UserDef U_default = {
     .subversionfile = BLENDER_FILE_SUBVERSION,
     .flag = (USER_AUTOSAVE | USER_TOOLTIPS | USER_RELPATHS | USER_RELEASECONFIRM |
              USER_SCRIPT_AUTOEXEC_DISABLE | USER_NONEGFRAMES),
-    .dupflag = USER_DUP_MESH | USER_DUP_CURVE | USER_DUP_SURF | USER_DUP_FONT | USER_DUP_MBALL |
-               USER_DUP_LAMP | USER_DUP_ARM | USER_DUP_ACT | USER_DUP_LIGHTPROBE |
-               USER_DUP_GPENCIL,
+    .dupflag = USER_DUP_MESH | USER_DUP_CURVE | USER_DUP_SURF | USER_DUP_LATTICE | USER_DUP_FONT |
+               USER_DUP_MBALL | USER_DUP_LAMP | USER_DUP_ARM | USER_DUP_CAMERA | USER_DUP_SPEAKER |
+               USER_DUP_ACT | USER_DUP_LIGHTPROBE | USER_DUP_GPENCIL,
     .pref_flag = USER_PREF_FLAG_SAVE,
     .savetime = 2,
     .tempdir = "",
@@ -231,7 +231,7 @@ const UserDef U_default = {
     .collection_instance_empty_size = 1.0f,
 
     .statusbar_flag = STATUSBAR_SHOW_VERSION,
-    .file_preview_type = USER_FILE_PREVIEW_CAMERA,
+    .file_preview_type = USER_FILE_PREVIEW_AUTO,
 
     .runtime =
         {

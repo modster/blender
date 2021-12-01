@@ -1094,17 +1094,10 @@ bool ED_view3d_autodist_simple(ARegion *region,
   return ED_view3d_unproject_v3(region, centx, centy, depth, mouse_worldloc);
 }
 
-bool ED_view3d_autodist_depth(ARegion *region, const int mval[2], int margin, float *depth)
-{
-  *depth = view_autodist_depth_margin(region, mval, margin);
-
-  return (*depth != FLT_MAX);
-}
-
 static bool depth_segment_cb(int x, int y, void *userData)
 {
   struct {
-    ARegion *region;
+    const ViewDepths *vd;
     int margin;
     float depth;
   } *data = userData;
@@ -1114,29 +1107,27 @@ static bool depth_segment_cb(int x, int y, void *userData)
   mval[0] = x;
   mval[1] = y;
 
-  depth = view_autodist_depth_margin(data->region, mval, data->margin);
-
-  if (depth != FLT_MAX) {
+  if (ED_view3d_depth_read_cached(data->vd, mval, data->margin, &depth)) {
     data->depth = depth;
     return false;
   }
   return true;
 }
 
-bool ED_view3d_autodist_depth_seg(
-    ARegion *region, const int mval_sta[2], const int mval_end[2], int margin, float *depth)
+bool ED_view3d_depth_read_cached_seg(
+    const ViewDepths *vd, const int mval_sta[2], const int mval_end[2], int margin, float *depth)
 {
   struct {
-    ARegion *region;
+    const ViewDepths *vd;
     int margin;
     float depth;
   } data = {NULL};
   int p1[2];
   int p2[2];
 
-  data.region = region;
+  data.vd = vd;
   data.margin = margin;
-  data.depth = FLT_MAX;
+  data.depth = 1.0f;
 
   copy_v2_v2_int(p1, mval_sta);
   copy_v2_v2_int(p2, mval_end);
@@ -1145,7 +1136,7 @@ bool ED_view3d_autodist_depth_seg(
 
   *depth = data.depth;
 
-  return (*depth != FLT_MAX);
+  return (*depth != 1.0f);
 }
 
 /** \} */
@@ -1656,6 +1647,9 @@ bool ED_view3d_depth_read_cached(const ViewDepths *vd,
                                  int margin,
                                  float *r_depth)
 {
+  BLI_assert(1.0 <= vd->depth_range[1]);
+  *r_depth = 1.0f;
+
   if (!vd || !vd->depths) {
     return false;
   }
@@ -1685,7 +1679,6 @@ bool ED_view3d_depth_read_cached(const ViewDepths *vd,
     depth = vd->depths[y * vd->w + x];
   }
 
-  BLI_assert(1.0 <= vd->depth_range[1]);
   if (depth != 1.0f) {
     *r_depth = depth;
     return true;

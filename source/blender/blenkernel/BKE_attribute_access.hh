@@ -42,65 +42,23 @@ class AttributeIDRef {
   const AnonymousAttributeID *anonymous_id_ = nullptr;
 
  public:
-  AttributeIDRef() = default;
+  AttributeIDRef();
+  AttributeIDRef(StringRef name);
+  AttributeIDRef(StringRefNull name);
+  AttributeIDRef(const char *name);
+  AttributeIDRef(const std::string &name);
+  AttributeIDRef(const AnonymousAttributeID *anonymous_id);
 
-  AttributeIDRef(StringRef name) : name_(name)
-  {
-  }
+  operator bool() const;
+  uint64_t hash() const;
+  bool is_named() const;
+  bool is_anonymous() const;
+  StringRef name() const;
+  const AnonymousAttributeID &anonymous_id() const;
+  bool should_be_kept() const;
 
-  AttributeIDRef(StringRefNull name) : name_(name)
-  {
-  }
-
-  AttributeIDRef(const char *name) : name_(name)
-  {
-  }
-
-  AttributeIDRef(const std::string &name) : name_(name)
-  {
-  }
-
-  /* The anonymous id is only borrowed, the caller has to keep a reference to it. */
-  AttributeIDRef(const AnonymousAttributeID *anonymous_id) : anonymous_id_(anonymous_id)
-  {
-  }
-
-  operator bool() const
-  {
-    return this->is_named() || this->is_anonymous();
-  }
-
-  friend bool operator==(const AttributeIDRef &a, const AttributeIDRef &b)
-  {
-    return a.anonymous_id_ == b.anonymous_id_ && a.name_ == b.name_;
-  }
-
-  uint64_t hash() const
-  {
-    return get_default_hash_2(name_, anonymous_id_);
-  }
-
-  bool is_named() const
-  {
-    return !name_.is_empty();
-  }
-
-  bool is_anonymous() const
-  {
-    return anonymous_id_ != nullptr;
-  }
-
-  StringRef name() const
-  {
-    BLI_assert(this->is_named());
-    return name_;
-  }
-
-  const AnonymousAttributeID &anonymous_id() const
-  {
-    BLI_assert(this->is_anonymous());
-    return *anonymous_id_;
-  }
+  friend bool operator==(const AttributeIDRef &a, const AttributeIDRef &b);
+  friend std::ostream &operator<<(std::ostream &stream, const AttributeIDRef &attribute_id);
 };
 
 }  // namespace blender::bke
@@ -118,6 +76,11 @@ struct AttributeMetaData {
   {
     return (a.domain == b.domain) && (a.data_type == b.data_type);
   }
+};
+
+struct AttributeKind {
+  AttributeDomain domain;
+  CustomDataType data_type;
 };
 
 /**
@@ -152,10 +115,10 @@ struct AttributeInitDefault : public AttributeInit {
  * Note that this can be used to fill the new attribute with the default
  */
 struct AttributeInitVArray : public AttributeInit {
-  const blender::fn::GVArray *varray;
+  blender::fn::GVArray varray;
 
-  AttributeInitVArray(const blender::fn::GVArray *varray)
-      : AttributeInit(Type::VArray), varray(varray)
+  AttributeInitVArray(blender::fn::GVArray varray)
+      : AttributeInit(Type::VArray), varray(std::move(varray))
   {
   }
 };
@@ -187,9 +150,7 @@ namespace blender::bke {
 
 using fn::CPPType;
 using fn::GVArray;
-using fn::GVArrayPtr;
 using fn::GVMutableArray;
-using fn::GVMutableArrayPtr;
 
 const CPPType *custom_data_type_to_cpp_type(const CustomDataType type);
 CustomDataType cpp_type_to_custom_data_type(const CPPType &type);
@@ -201,14 +162,14 @@ AttributeDomain attribute_domain_highest_priority(Span<AttributeDomain> domains)
  */
 struct ReadAttributeLookup {
   /* The virtual array that is used to read from this attribute. */
-  GVArrayPtr varray;
+  GVArray varray;
   /* Domain the attribute lives on in the geometry. */
   AttributeDomain domain;
 
   /* Convenience function to check if the attribute has been found. */
   operator bool() const
   {
-    return this->varray.get() != nullptr;
+    return this->varray;
   }
 };
 
@@ -217,14 +178,16 @@ struct ReadAttributeLookup {
  */
 struct WriteAttributeLookup {
   /* The virtual array that is used to read from and write to the attribute. */
-  GVMutableArrayPtr varray;
+  GVMutableArray varray;
   /* Domain the attributes lives on in the geometry. */
   AttributeDomain domain;
+  /* Call this after changing the attribute to invalidate caches that depend on this attribute. */
+  std::function<void()> tag_modified_fn;
 
   /* Convenience function to check if the attribute has been found. */
   operator bool() const
   {
-    return this->varray.get() != nullptr;
+    return this->varray;
   }
 };
 
@@ -244,80 +207,34 @@ class OutputAttribute {
   using SaveFn = std::function<void(OutputAttribute &)>;
 
  private:
-  GVMutableArrayPtr varray_;
-  AttributeDomain domain_;
+  GVMutableArray varray_;
+  AttributeDomain domain_ = ATTR_DOMAIN_AUTO;
   SaveFn save_;
-  std::optional<fn::GVMutableArray_GSpan> optional_span_varray_;
+  std::unique_ptr<fn::GVMutableArray_GSpan> optional_span_varray_;
   bool ignore_old_values_ = false;
   bool save_has_been_called_ = false;
 
  public:
-  OutputAttribute() = default;
-
-  OutputAttribute(GVMutableArrayPtr varray,
+  OutputAttribute();
+  OutputAttribute(OutputAttribute &&other);
+  OutputAttribute(GVMutableArray varray,
                   AttributeDomain domain,
                   SaveFn save,
-                  const bool ignore_old_values)
-      : varray_(std::move(varray)),
-        domain_(domain),
-        save_(std::move(save)),
-        ignore_old_values_(ignore_old_values)
-  {
-  }
-
-  OutputAttribute(OutputAttribute &&other) = default;
+                  const bool ignore_old_values);
 
   ~OutputAttribute();
 
-  operator bool() const
-  {
-    return varray_.get() != nullptr;
-  }
+  operator bool() const;
 
-  GVMutableArray &operator*()
-  {
-    return *varray_;
-  }
+  GVMutableArray &operator*();
+  fn::GVMutableArray *operator->();
+  GVMutableArray &varray();
+  AttributeDomain domain() const;
+  const CPPType &cpp_type() const;
+  CustomDataType custom_data_type() const;
 
-  GVMutableArray *operator->()
-  {
-    return varray_.get();
-  }
-
-  GVMutableArray &varray()
-  {
-    return *varray_;
-  }
-
-  AttributeDomain domain() const
-  {
-    return domain_;
-  }
-
-  const CPPType &cpp_type() const
-  {
-    return varray_->type();
-  }
-
-  CustomDataType custom_data_type() const
-  {
-    return cpp_type_to_custom_data_type(this->cpp_type());
-  }
-
-  fn::GMutableSpan as_span()
-  {
-    if (!optional_span_varray_.has_value()) {
-      const bool materialize_old_values = !ignore_old_values_;
-      optional_span_varray_.emplace(*varray_, materialize_old_values);
-    }
-    fn::GVMutableArray_GSpan &span_varray = *optional_span_varray_;
-    return span_varray;
-  }
-
-  template<typename T> MutableSpan<T> as_span()
-  {
-    return this->as_span().typed<T>();
-  }
+  fn::GMutableSpan as_span();
+  template<typename T> MutableSpan<T> as_span();
 
   void save();
 };
@@ -328,36 +245,48 @@ class OutputAttribute {
 template<typename T> class OutputAttribute_Typed {
  private:
   OutputAttribute attribute_;
-  std::optional<fn::GVMutableArray_Typed<T>> optional_varray_;
-  VMutableArray<T> *varray_ = nullptr;
+  VMutableArray<T> varray_;
 
  public:
+  OutputAttribute_Typed();
   OutputAttribute_Typed(OutputAttribute attribute) : attribute_(std::move(attribute))
   {
     if (attribute_) {
-      optional_varray_.emplace(attribute_.varray());
-      varray_ = &**optional_varray_;
+      varray_ = attribute_.varray().template typed<T>();
     }
+  }
+
+  OutputAttribute_Typed(OutputAttribute_Typed &&other);
+  ~OutputAttribute_Typed();
+
+  OutputAttribute_Typed &operator=(OutputAttribute_Typed &&other)
+  {
+    if (this == &other) {
+      return *this;
+    }
+    this->~OutputAttribute_Typed();
+    new (this) OutputAttribute_Typed(std::move(other));
+    return *this;
   }
 
   operator bool() const
   {
-    return varray_ != nullptr;
+    return varray_;
   }
 
   VMutableArray<T> &operator*()
   {
-    return *varray_;
+    return varray_;
   }
 
   VMutableArray<T> *operator->()
   {
-    return varray_;
+    return &varray_;
   }
 
   VMutableArray<T> &varray()
   {
-    return *varray_;
+    return varray_;
   }
 
   AttributeDomain domain() const
@@ -386,6 +315,13 @@ template<typename T> class OutputAttribute_Typed {
   }
 };
 
+/* These are not defined in the class directly, because when defining them there, the external
+ * template instantiation does not work, resulting in longer compile times. */
+template<typename T> inline OutputAttribute_Typed<T>::OutputAttribute_Typed() = default;
+template<typename T>
+inline OutputAttribute_Typed<T>::OutputAttribute_Typed(OutputAttribute_Typed &&other) = default;
+template<typename T> inline OutputAttribute_Typed<T>::~OutputAttribute_Typed() = default;
+
 /**
  * A basic container around DNA CustomData so that its users
  * don't have to implement special copy and move constructors.
@@ -409,20 +345,21 @@ class CustomDataAttributes {
 
   void reallocate(const int size);
 
+  void clear();
+
   std::optional<blender::fn::GSpan> get_for_read(const AttributeIDRef &attribute_id) const;
 
-  blender::fn::GVArrayPtr get_for_read(const AttributeIDRef &attribute_id,
-                                       const CustomDataType data_type,
-                                       const void *default_value) const;
+  blender::fn::GVArray get_for_read(const AttributeIDRef &attribute_id,
+                                    const CustomDataType data_type,
+                                    const void *default_value) const;
 
   template<typename T>
-  blender::fn::GVArray_Typed<T> get_for_read(const AttributeIDRef &attribute_id,
-                                             const T &default_value) const
+  blender::VArray<T> get_for_read(const AttributeIDRef &attribute_id, const T &default_value) const
   {
     const blender::fn::CPPType &cpp_type = blender::fn::CPPType::get<T>();
     const CustomDataType type = blender::bke::cpp_type_to_custom_data_type(cpp_type);
-    GVArrayPtr varray = this->get_for_read(attribute_id, type, &default_value);
-    return blender::fn::GVArray_Typed<T>(std::move(varray));
+    GVArray varray = this->get_for_read(attribute_id, type, &default_value);
+    return varray.typed<T>();
   }
 
   std::optional<blender::fn::GMutableSpan> get_for_write(const AttributeIDRef &attribute_id);
@@ -432,8 +369,166 @@ class CustomDataAttributes {
                       void *buffer);
   bool remove(const AttributeIDRef &attribute_id);
 
+  /**
+   * Change the order of the attributes to match the order of IDs in the argument.
+   */
+  void reorder(Span<AttributeIDRef> new_order);
+
   bool foreach_attribute(const AttributeForeachCallback callback,
                          const AttributeDomain domain) const;
 };
 
+/* -------------------------------------------------------------------- */
+/** \name #AttributeIDRef Inline Methods
+ * \{ */
+
+inline AttributeIDRef::AttributeIDRef() = default;
+
+inline AttributeIDRef::AttributeIDRef(StringRef name) : name_(name)
+{
+}
+
+inline AttributeIDRef::AttributeIDRef(StringRefNull name) : name_(name)
+{
+}
+
+inline AttributeIDRef::AttributeIDRef(const char *name) : name_(name)
+{
+}
+
+inline AttributeIDRef::AttributeIDRef(const std::string &name) : name_(name)
+{
+}
+
+/* The anonymous id is only borrowed, the caller has to keep a reference to it. */
+inline AttributeIDRef::AttributeIDRef(const AnonymousAttributeID *anonymous_id)
+    : anonymous_id_(anonymous_id)
+{
+}
+
+inline bool operator==(const AttributeIDRef &a, const AttributeIDRef &b)
+{
+  return a.anonymous_id_ == b.anonymous_id_ && a.name_ == b.name_;
+}
+
+inline AttributeIDRef::operator bool() const
+{
+  return this->is_named() || this->is_anonymous();
+}
+
+inline uint64_t AttributeIDRef::hash() const
+{
+  return get_default_hash_2(name_, anonymous_id_);
+}
+
+inline bool AttributeIDRef::is_named() const
+{
+  return !name_.is_empty();
+}
+
+inline bool AttributeIDRef::is_anonymous() const
+{
+  return anonymous_id_ != nullptr;
+}
+
+inline StringRef AttributeIDRef::name() const
+{
+  BLI_assert(this->is_named());
+  return name_;
+}
+
+inline const AnonymousAttributeID &AttributeIDRef::anonymous_id() const
+{
+  BLI_assert(this->is_anonymous());
+  return *anonymous_id_;
+}
+
+/**
+ * \return True if the attribute should not be removed automatically as an optimization during
+ * processing or copying. Anonymous attributes can be removed when they no longer have any
+ * references.
+ */
+inline bool AttributeIDRef::should_be_kept() const
+{
+  return this->is_named() || BKE_anonymous_attribute_id_has_strong_references(anonymous_id_);
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name #OutputAttribute Inline Methods
+ * \{ */
+
+inline OutputAttribute::OutputAttribute() = default;
+inline OutputAttribute::OutputAttribute(OutputAttribute &&other) = default;
+
+inline OutputAttribute::OutputAttribute(GVMutableArray varray,
+                                        AttributeDomain domain,
+                                        SaveFn save,
+                                        const bool ignore_old_values)
+    : varray_(std::move(varray)),
+      domain_(domain),
+      save_(std::move(save)),
+      ignore_old_values_(ignore_old_values)
+{
+}
+
+inline OutputAttribute::operator bool() const
+{
+  return varray_;
+}
+
+inline GVMutableArray &OutputAttribute::operator*()
+{
+  return varray_;
+}
+
+inline fn::GVMutableArray *OutputAttribute::operator->()
+{
+  return &varray_;
+}
+
+inline GVMutableArray &OutputAttribute::varray()
+{
+  return varray_;
+}
+
+inline AttributeDomain OutputAttribute::domain() const
+{
+  return domain_;
+}
+
+inline const CPPType &OutputAttribute::cpp_type() const
+{
+  return varray_.type();
+}
+
+inline CustomDataType OutputAttribute::custom_data_type() const
+{
+  return cpp_type_to_custom_data_type(this->cpp_type());
+}
+
+template<typename T> inline MutableSpan<T> OutputAttribute::as_span()
+{
+  return this->as_span().typed<T>();
+}
+
+/** \} */
+
 }  // namespace blender::bke
+
+/* -------------------------------------------------------------------- */
+/** \name External Template Instantiations
+ *
+ * Defined in `intern/extern_implementations.cc`.
+ * \{ */
+
+namespace blender::bke {
+extern template class OutputAttribute_Typed<float>;
+extern template class OutputAttribute_Typed<int>;
+extern template class OutputAttribute_Typed<float3>;
+extern template class OutputAttribute_Typed<bool>;
+extern template class OutputAttribute_Typed<ColorGeometry4f>;
+}  // namespace blender::bke
+
+/** \} */

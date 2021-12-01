@@ -212,7 +212,8 @@ IDTypeInfo IDType_ID_KE = {
     .name = "Key",
     .name_plural = "shape_keys",
     .translation_context = BLT_I18NCONTEXT_ID_SHAPEKEY,
-    .flags = IDTYPE_FLAGS_NO_LIBLINKING | IDTYPE_FLAGS_NO_MAKELOCAL,
+    .flags = IDTYPE_FLAGS_NO_LIBLINKING,
+    .asset_type_info = NULL,
 
     .init_data = NULL,
     .copy_data = shapekey_copy_data,
@@ -220,6 +221,7 @@ IDTypeInfo IDType_ID_KE = {
     .make_local = NULL,
     .foreach_id = shapekey_foreach_id,
     .foreach_cache = NULL,
+    .foreach_path = NULL,
     /* A bit weird, due to shapekeys not being strictly speaking embedded data... But they also
      * share a lot with those (non linkable, only ever used by one owner ID, etc.). */
     .owner_get = shapekey_owner_get,
@@ -1904,7 +1906,7 @@ KeyBlock *BKE_keyblock_add_ctime(Key *key, const char *name, const bool do_force
   return kb;
 }
 
-/* only the active keyblock */
+/* Only the active key-block. */
 KeyBlock *BKE_keyblock_from_object(Object *ob)
 {
   Key *key = BKE_key_from_object(ob);
@@ -2247,7 +2249,7 @@ void BKE_keyblock_convert_to_mesh(KeyBlock *kb, Mesh *me)
  * Computes normals (vertices, polygons and/or loops ones) of given mesh for given shape key.
  *
  * \param kb: the KeyBlock to use to compute normals.
- * \param mesh: the Mesh to apply keyblock to.
+ * \param mesh: the Mesh to apply key-block to.
  * \param r_vertnors: if non-NULL, an array of vectors, same length as number of vertices.
  * \param r_polynors: if non-NULL, an array of vectors, same length as number of polygons.
  * \param r_loopnors: if non-NULL, an array of vectors, same length as number of loops.
@@ -2345,7 +2347,7 @@ void BKE_keyblock_update_from_vertcos(Object *ob, KeyBlock *kb, const float (*ve
     return;
   }
 
-  /* Copy coords to keyblock */
+  /* Copy coords to key-block. */
   if (ELEM(ob->type, OB_MESH, OB_LATTICE)) {
     for (a = 0; a < tot; a++, fp += 3, co++) {
       copy_v3_v3(fp, *co);
@@ -2405,7 +2407,7 @@ void BKE_keyblock_convert_from_vertcos(Object *ob, KeyBlock *kb, const float (*v
 
   kb->data = MEM_mallocN(tot * elemsize, __func__);
 
-  /* Copy coords to keyblock */
+  /* Copy coords to key-block. */
   BKE_keyblock_update_from_vertcos(ob, kb, vertCos);
 }
 
@@ -2594,7 +2596,7 @@ bool BKE_keyblock_move(Object *ob, int org_index, int new_index)
 }
 
 /**
- * Check if given keyblock (as index) is used as basis by others in given key.
+ * Check if given key-block (as index) is used as basis by others in given key.
  */
 bool BKE_keyblock_is_basis(Key *key, const int index)
 {

@@ -821,8 +821,8 @@ static int edbm_dupli_extrude_cursor_invoke(bContext *C, wmOperator *op, const w
         float view_vec[3], cross[3];
 
         /* convert the 2D normal into 3D */
-        mul_mat3_m4_v3(vc.rv3d->viewinv, nor); /* worldspace */
-        mul_mat3_m4_v3(vc.obedit->imat, nor);  /* local space */
+        mul_mat3_m4_v3(vc.rv3d->viewinv, nor); /* World-space. */
+        mul_mat3_m4_v3(vc.obedit->imat, nor);  /* Local-space. */
 
         /* correct the normal to be aligned on the view plane */
         mul_v3_mat3_m4v3(view_vec, vc.obedit->imat, vc.rv3d->viewinv[2]);
@@ -925,7 +925,7 @@ static int edbm_dupli_extrude_cursor_invoke(bContext *C, wmOperator *op, const w
 void MESH_OT_dupli_extrude_cursor(wmOperatorType *ot)
 {
   /* identifiers */
-  ot->name = "Duplicate or Extrude to Cursor";
+  ot->name = "Extrude to Cursor or Add";
   ot->idname = "MESH_OT_dupli_extrude_cursor";
   ot->description =
       "Duplicate and extrude selected vertices, edges or faces towards the mouse cursor";
@@ -935,7 +935,7 @@ void MESH_OT_dupli_extrude_cursor(wmOperatorType *ot)
   ot->poll = ED_operator_editmesh_region_view3d;
 
   /* flags */
-  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_DEPENDS_ON_CURSOR;
 
   RNA_def_boolean(ot->srna,
                   "rotate_source",

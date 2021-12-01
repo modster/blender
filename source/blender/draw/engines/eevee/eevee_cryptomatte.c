@@ -166,12 +166,12 @@ void EEVEE_cryptomatte_output_init(EEVEE_ViewLayerData *UNUSED(sldata),
 
   if (g_data->cryptomatte_accum_buffer == NULL) {
     g_data->cryptomatte_accum_buffer = MEM_calloc_arrayN(
-        sizeof(EEVEE_CryptomatteSample),
         buffer_size * eevee_cryptomatte_pixel_stride(view_layer),
+        sizeof(EEVEE_CryptomatteSample),
         __func__);
     /* Download buffer should store a float per active cryptomatte layer. */
     g_data->cryptomatte_download_buffer = MEM_malloc_arrayN(
-        sizeof(float), buffer_size * num_cryptomatte_layers, __func__);
+        buffer_size * num_cryptomatte_layers, sizeof(float), __func__);
   }
   else {
     /* During multiview rendering the `cryptomatte_accum_buffer` is deallocated after all views
@@ -257,7 +257,7 @@ static void eevee_cryptomatte_hair_cache_populate(EEVEE_Data *vedata,
 {
   DRWShadingGroup *grp = eevee_cryptomatte_shading_group_create(
       vedata, sldata, ob, material, true);
-  DRW_shgroup_hair_create_sub(ob, psys, md, grp);
+  DRW_shgroup_hair_create_sub(ob, psys, md, grp, NULL);
 }
 
 void EEVEE_cryptomatte_object_hair_cache_populate(EEVEE_Data *vedata,

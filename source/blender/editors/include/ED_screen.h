@@ -31,6 +31,8 @@
 
 #include "DNA_object_enums.h"
 
+#include "WM_types.h"
+
 #include "BLI_compiler_attrs.h"
 
 #ifdef __cplusplus
@@ -68,7 +70,7 @@ void ED_region_do_layout(struct bContext *C, struct ARegion *region);
 void ED_region_do_draw(struct bContext *C, struct ARegion *region);
 void ED_region_exit(struct bContext *C, struct ARegion *region);
 void ED_region_remove(struct bContext *C, struct ScrArea *area, struct ARegion *region);
-void ED_region_pixelspace(struct ARegion *region);
+void ED_region_pixelspace(const struct ARegion *region);
 void ED_region_update_rect(struct ARegion *region);
 void ED_region_floating_init(struct ARegion *region);
 void ED_region_tag_redraw(struct ARegion *region);
@@ -178,6 +180,10 @@ void ED_area_update_region_sizes(struct wmWindowManager *wm,
                                  struct wmWindow *win,
                                  struct ScrArea *area);
 bool ED_area_has_shared_border(struct ScrArea *a, struct ScrArea *b);
+ScrArea *ED_area_offscreen_create(struct wmWindow *win, eSpace_Type space_type);
+void ED_area_offscreen_free(struct wmWindowManager *wm,
+                            struct wmWindow *win,
+                            struct ScrArea *area);
 
 ScrArea *ED_screen_areas_iter_first(const struct wmWindow *win, const bScreen *screen);
 ScrArea *ED_screen_areas_iter_next(const bScreen *screen, const ScrArea *area);
@@ -206,7 +212,10 @@ void ED_screen_ensure_updated(struct wmWindowManager *wm,
                               struct bScreen *screen);
 void ED_screen_do_listen(struct bContext *C, struct wmNotifier *note);
 bool ED_screen_change(struct bContext *C, struct bScreen *screen);
-void ED_screen_scene_change(struct bContext *C, struct wmWindow *win, struct Scene *scene);
+void ED_screen_scene_change(struct bContext *C,
+                            struct wmWindow *win,
+                            struct Scene *scene,
+                            const bool refresh_toolsystem);
 void ED_screen_set_active_region(struct bContext *C, struct wmWindow *win, const int xy[2]);
 void ED_screen_exit(struct bContext *C, struct wmWindow *window, struct bScreen *screen);
 void ED_screen_animation_timer(struct bContext *C, int redraws, int sync, int enable);
@@ -310,6 +319,7 @@ bool ED_operator_regionactive(struct bContext *C);
 bool ED_operator_scene(struct bContext *C);
 bool ED_operator_scene_editable(struct bContext *C);
 bool ED_operator_objectmode(struct bContext *C);
+bool ED_operator_objectmode_poll_msg(struct bContext *C);
 
 bool ED_operator_view3d_active(struct bContext *C);
 bool ED_operator_region_view3d_active(struct bContext *C);
@@ -372,7 +382,7 @@ struct bUserMenu *ED_screen_user_menu_ensure(struct bContext *C);
 struct bUserMenuItem_Op *ED_screen_user_menu_item_find_operator(struct ListBase *lb,
                                                                 const struct wmOperatorType *ot,
                                                                 struct IDProperty *prop,
-                                                                short opcontext);
+                                                                wmOperatorCallContext opcontext);
 struct bUserMenuItem_Menu *ED_screen_user_menu_item_find_menu(struct ListBase *lb,
                                                               const struct MenuType *mt);
 struct bUserMenuItem_Prop *ED_screen_user_menu_item_find_prop(struct ListBase *lb,
@@ -384,7 +394,7 @@ void ED_screen_user_menu_item_add_operator(struct ListBase *lb,
                                            const char *ui_name,
                                            const struct wmOperatorType *ot,
                                            const struct IDProperty *prop,
-                                           short opcontext);
+                                           wmOperatorCallContext opcontext);
 void ED_screen_user_menu_item_add_menu(struct ListBase *lb,
                                        const char *ui_name,
                                        const struct MenuType *mt);
@@ -431,6 +441,7 @@ bool ED_region_panel_category_gutter_calc_rect(const ARegion *region, rcti *r_re
 bool ED_region_panel_category_gutter_isect_xy(const ARegion *region, const int event_xy[2]);
 
 bool ED_region_contains_xy(const struct ARegion *region, const int event_xy[2]);
+ARegion *ED_area_find_region_xy_visual(const ScrArea *area, int regiontype, const int event_xy[2]);
 
 /* interface_region_hud.c */
 struct ARegionType *ED_area_type_hud(int space_type);

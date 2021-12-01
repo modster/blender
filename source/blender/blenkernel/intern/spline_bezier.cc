@@ -25,9 +25,8 @@ using blender::float3;
 using blender::IndexRange;
 using blender::MutableSpan;
 using blender::Span;
+using blender::VArray;
 using blender::fn::GVArray;
-using blender::fn::GVArray_For_ArrayContainer;
-using blender::fn::GVArrayPtr;
 
 void BezierSpline::copy_settings(Spline &dst) const
 {
@@ -142,11 +141,14 @@ Span<float3> BezierSpline::handle_positions_left() const
   this->ensure_auto_handles();
   return handle_positions_left_;
 }
-MutableSpan<float3> BezierSpline::handle_positions_left()
+MutableSpan<float3> BezierSpline::handle_positions_left(const bool write_only)
 {
-  this->ensure_auto_handles();
+  if (!write_only) {
+    this->ensure_auto_handles();
+  }
   return handle_positions_left_;
 }
+
 Span<BezierSpline::HandleType> BezierSpline::handle_types_right() const
 {
   return handle_types_right_;
@@ -160,10 +162,23 @@ Span<float3> BezierSpline::handle_positions_right() const
   this->ensure_auto_handles();
   return handle_positions_right_;
 }
-MutableSpan<float3> BezierSpline::handle_positions_right()
+MutableSpan<float3> BezierSpline::handle_positions_right(const bool write_only)
 {
-  this->ensure_auto_handles();
+  if (!write_only) {
+    this->ensure_auto_handles();
+  }
   return handle_positions_right_;
+}
+
+void BezierSpline::reverse_impl()
+{
+  this->handle_positions_left().reverse();
+  this->handle_positions_right().reverse();
+  std::swap(this->handle_positions_left_, this->handle_positions_right_);
+
+  this->handle_types_left().reverse();
+  this->handle_types_right().reverse();
+  std::swap(this->handle_types_left_, this->handle_types_right_);
 }
 
 static float3 previous_position(Span<float3> positions, const bool cyclic, const int i)
@@ -200,6 +215,11 @@ void BezierSpline::ensure_auto_handles() const
 
   std::lock_guard lock{auto_handle_mutex_};
   if (!auto_handles_dirty_) {
+    return;
+  }
+
+  if (this->size() == 1) {
+    auto_handles_dirty_ = false;
     return;
   }
 
@@ -273,14 +293,70 @@ void BezierSpline::transform(const blender::float4x4 &matrix)
   this->mark_cache_invalid();
 }
 
+static void set_handle_position(const float3 &position,
+                                const BezierSpline::HandleType type,
+                                const BezierSpline::HandleType type_other,
+                                const float3 &new_value,
+                                float3 &handle,
+                                float3 &handle_other)
+{
+  /* Don't bother when the handle positions are calculated automatically anyway. */
+  if (ELEM(type, BezierSpline::HandleType::Auto, BezierSpline::HandleType::Vector)) {
+    return;
+  }
+
+  handle = new_value;
+  if (type_other == BezierSpline::HandleType::Align) {
+    /* Keep track of the old length of the opposite handle. */
+    const float length = float3::distance(handle_other, position);
+    /* Set the other handle to directly opposite from the current handle. */
+    const float3 dir = (handle - position).normalized();
+    handle_other = position - dir * length;
+  }
+}
+
+/**
+ * Set positions for the right handle of the control point, ensuring that
+ * aligned handles stay aligned. Has no effect for auto and vector type handles.
+ */
+void BezierSpline::set_handle_position_right(const int index, const blender::float3 &value)
+{
+  set_handle_position(positions_[index],
+                      handle_types_right_[index],
+                      handle_types_left_[index],
+                      value,
+                      handle_positions_right_[index],
+                      handle_positions_left_[index]);
+}
+
+/**
+ * Set positions for the left handle of the control point, ensuring that
+ * aligned handles stay aligned. Has no effect for auto and vector type handles.
+ */
+void BezierSpline::set_handle_position_left(const int index, const blender::float3 &value)
+{
+  set_handle_position(positions_[index],
+                      handle_types_left_[index],
+                      handle_types_right_[index],
+                      value,
+                      handle_positions_left_[index],
+                      handle_positions_right_[index]);
+}
+
 bool BezierSpline::point_is_sharp(const int index) const
 {
   return ELEM(handle_types_left_[index], HandleType::Vector, HandleType::Free) ||
          ELEM(handle_types_right_[index], HandleType::Vector, HandleType::Free);
 }
 
+/**
+ * \warning This functional assumes that the spline has more than one point.
+ */
 bool BezierSpline::segment_is_vector(const int index) const
 {
+  /* Two control points are necessary to form a segment, that should be checked by the caller. */
+  BLI_assert(this->size() > 1);
+
   if (index == this->size() - 1) {
     if (is_cyclic_) {
       return handle_types_right_.last() == HandleType::Vector &&
@@ -441,13 +517,18 @@ Span<int> BezierSpline::control_point_offsets() const
   offset_cache_.resize(size + 1);
 
   MutableSpan<int> offsets = offset_cache_;
-
-  int offset = 0;
-  for (const int i : IndexRange(size)) {
-    offsets[i] = offset;
-    offset += this->segment_is_vector(i) ? 1 : resolution_;
+  if (size == 1) {
+    offsets.first() = 0;
+    offsets.last() = 1;
   }
-  offsets.last() = offset;
+  else {
+    int offset = 0;
+    for (const int i : IndexRange(size)) {
+      offsets[i] = offset;
+      offset += this->segment_is_vector(i) ? 1 : resolution_;
+    }
+    offsets.last() = offset;
+  }
 
   offset_cache_dirty_ = false;
   return offsets;
@@ -517,7 +598,10 @@ Span<float> BezierSpline::evaluated_mappings() const
 
   Span<int> offsets = this->control_point_offsets();
 
-  calculate_mappings_linear_resolution(offsets, size, resolution_, is_cyclic_, mappings);
+  blender::threading::isolate_task([&]() {
+    /* Isolate the task, since this is function is multi-threaded and holds a lock. */
+    calculate_mappings_linear_resolution(offsets, size, resolution_, is_cyclic_, mappings);
+  });
 
   mapping_cache_dirty_ = false;
   return mappings;
@@ -534,21 +618,32 @@ Span<float3> BezierSpline::evaluated_positions() const
     return evaluated_position_cache_;
   }
 
-  this->ensure_auto_handles();
-
   const int size = this->size();
   const int eval_size = this->evaluated_points_size();
   evaluated_position_cache_.resize(eval_size);
 
   MutableSpan<float3> positions = evaluated_position_cache_;
 
+  if (size == 1) {
+    /* Use a special case for single point splines to avoid checking in #evaluate_segment. */
+    BLI_assert(eval_size == 1);
+    positions.first() = positions_.first();
+    position_cache_dirty_ = false;
+    return positions;
+  }
+
+  this->ensure_auto_handles();
+
   Span<int> offsets = this->control_point_offsets();
 
   const int grain_size = std::max(512 / resolution_, 1);
-  blender::threading::parallel_for(IndexRange(size - 1), grain_size, [&](IndexRange range) {
-    for (const int i : range) {
-      this->evaluate_segment(i, i + 1, positions.slice(offsets[i], offsets[i + 1] - offsets[i]));
-    }
+  blender::threading::isolate_task([&]() {
+    /* Isolate the task, since this is function is multi-threaded and holds a lock. */
+    blender::threading::parallel_for(IndexRange(size - 1), grain_size, [&](IndexRange range) {
+      for (const int i : range) {
+        this->evaluate_segment(i, i + 1, positions.slice(offsets[i], offsets[i + 1] - offsets[i]));
+      }
+    });
   });
   if (is_cyclic_) {
     this->evaluate_segment(
@@ -612,26 +707,26 @@ static void interpolate_to_evaluated_impl(const BezierSpline &spline,
   }
 }
 
-GVArrayPtr BezierSpline::interpolate_to_evaluated(const GVArray &src) const
+GVArray BezierSpline::interpolate_to_evaluated(const GVArray &src) const
 {
   BLI_assert(src.size() == this->size());
 
   if (src.is_single()) {
-    return src.shallow_copy();
+    return src;
   }
 
   const int eval_size = this->evaluated_points_size();
   if (eval_size == 1) {
-    return src.shallow_copy();
+    return src;
   }
 
-  GVArrayPtr new_varray;
+  GVArray new_varray;
   blender::attribute_math::convert_to_static_type(src.type(), [&](auto dummy) {
     using T = decltype(dummy);
     if constexpr (!std::is_void_v<blender::attribute_math::DefaultMixer<T>>) {
       Array<T> values(eval_size);
       interpolate_to_evaluated_impl<T>(*this, src.typed<T>(), values);
-      new_varray = std::make_unique<GVArray_For_ArrayContainer<Array<T>>>(std::move(values));
+      new_varray = VArray<T>::ForContainer(std::move(values));
     }
   });
 

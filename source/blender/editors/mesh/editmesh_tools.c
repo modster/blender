@@ -3706,10 +3706,7 @@ static int edbm_shape_propagate_to_all_exec(bContext *C, wmOperator *op)
     return OPERATOR_CANCELLED;
   }
   if (tot_shapekeys == 0) {
-    BKE_report(op->reports,
-               RPT_ERROR,
-               objects_len > 1 ? "Meshes do not have shape keys" :
-                                 "Mesh does not have shape keys");
+    BKE_report(op->reports, RPT_ERROR, "Mesh(es) do not have shape keys");
     return OPERATOR_CANCELLED;
   }
 
@@ -4323,7 +4320,7 @@ void MESH_OT_knife_cut(wmOperatorType *ot)
   ot->poll = EDBM_view3d_poll;
 
   /* flags */
-  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_DEPENDS_ON_CURSOR;
 
   /* properties */
   PropertyRNA *prop;

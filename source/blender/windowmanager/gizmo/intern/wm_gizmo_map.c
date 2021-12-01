@@ -381,29 +381,29 @@ static void gizmomap_prepare_drawing(wmGizmoMap *gzmap,
 
   wmGizmo *gz_modal = gzmap->gzmap_context.modal;
 
-  /* only active gizmo needs updating */
-  if (gz_modal) {
-    if ((gz_modal->parent_gzgroup->type->flag & WM_GIZMOGROUPTYPE_DRAW_MODAL_ALL) == 0) {
-      if ((gz_modal->parent_gzgroup->hide.any == 0) &&
-          wm_gizmogroup_is_visible_in_drawstep(gz_modal->parent_gzgroup, drawstep)) {
-        if (gizmo_prepare_drawing(gzmap, gz_modal, C, draw_gizmos, drawstep)) {
-          gzmap->update_flag[drawstep] &= ~GIZMOMAP_IS_PREPARE_DRAW;
-        }
-      }
-      /* don't draw any other gizmos */
-      return;
-    }
-  }
-
   /* Allow refresh functions to ask to be refreshed again, clear before the loop below. */
   const bool do_refresh = gzmap->update_flag[drawstep] & GIZMOMAP_IS_REFRESH_CALLBACK;
   gzmap->update_flag[drawstep] &= ~GIZMOMAP_IS_REFRESH_CALLBACK;
 
   LISTBASE_FOREACH (wmGizmoGroup *, gzgroup, &gzmap->groups) {
     /* check group visibility - drawstep first to avoid unnecessary call of group poll callback */
-    if (!wm_gizmogroup_is_visible_in_drawstep(gzgroup, drawstep) ||
-        !WM_gizmo_group_type_poll(C, gzgroup->type)) {
+    if (!wm_gizmogroup_is_visible_in_drawstep(gzgroup, drawstep)) {
       continue;
+    }
+
+    if (gz_modal && (gzgroup == gz_modal->parent_gzgroup)) {
+      if (gzgroup->type->flag & WM_GIZMOGROUPTYPE_DRAW_MODAL_EXCLUDE) {
+        continue;
+      }
+    }
+    else { /* Don't poll modal gizmo since some poll functions unlink. */
+      if (!WM_gizmo_group_type_poll(C, gzgroup->type)) {
+        continue;
+      }
+      /* When modal only show other gizmo groups tagged with #WM_GIZMOGROUPTYPE_DRAW_MODAL_ALL. */
+      if (gz_modal && ((gzgroup->type->flag & WM_GIZMOGROUPTYPE_DRAW_MODAL_ALL) == 0)) {
+        continue;
+      }
     }
 
     /* Needs to be initialized on first draw. */
@@ -743,14 +743,7 @@ wmGizmo *wm_gizmomap_highlight_find(wmGizmoMap *gzmap,
     }
 
     if (WM_gizmo_group_type_poll(C, gzgroup->type)) {
-      eWM_GizmoFlagMapDrawStep step;
-      if (gzgroup->type->flag & WM_GIZMOGROUPTYPE_3D) {
-        step = WM_GIZMOMAP_DRAWSTEP_3D;
-      }
-      else {
-        step = WM_GIZMOMAP_DRAWSTEP_2D;
-      }
-
+      const eWM_GizmoFlagMapDrawStep step = WM_gizmomap_drawstep_from_gizmo_group(gzgroup);
       if (do_step[step]) {
         if (gzmap->update_flag[step] & GIZMOMAP_IS_REFRESH_CALLBACK) {
           WM_gizmo_group_refresh(C, gzgroup);
@@ -1050,6 +1043,8 @@ wmGizmo *wm_gizmomap_highlight_get(wmGizmoMap *gzmap)
 void wm_gizmomap_modal_set(
     wmGizmoMap *gzmap, bContext *C, wmGizmo *gz, const wmEvent *event, bool enable)
 {
+  bool do_refresh = false;
+
   if (enable) {
     BLI_assert(gzmap->gzmap_context.modal == NULL);
     wmWindow *win = CTX_wm_window(C);
@@ -1068,12 +1063,15 @@ void wm_gizmomap_modal_set(
       }
     }
 
+    if (gzmap->gzmap_context.modal != gz) {
+      do_refresh = true;
+    }
     gz->state |= WM_GIZMO_STATE_MODAL;
     gzmap->gzmap_context.modal = gz;
 
     if ((gz->flag & WM_GIZMO_MOVE_CURSOR) && (event->tablet.is_motion_absolute == false)) {
       WM_cursor_grab_enable(win, WM_CURSOR_WRAP_XY, true, NULL);
-      copy_v2_v2_int(gzmap->gzmap_context.event_xy, &event->x);
+      copy_v2_v2_int(gzmap->gzmap_context.event_xy, event->xy);
       gzmap->gzmap_context.event_grabcursor = win->grabcursor;
     }
     else {
@@ -1092,7 +1090,6 @@ void wm_gizmomap_modal_set(
         gz->state &= ~WM_GIZMO_STATE_MODAL;
         MEM_SAFE_FREE(gz->interaction_data);
       }
-      return;
     }
   }
   else {
@@ -1102,6 +1099,10 @@ void wm_gizmomap_modal_set(
     if (gz) {
       gz->state &= ~WM_GIZMO_STATE_MODAL;
       MEM_SAFE_FREE(gz->interaction_data);
+    }
+
+    if (gzmap->gzmap_context.modal != NULL) {
+      do_refresh = true;
     }
     gzmap->gzmap_context.modal = NULL;
 
@@ -1123,6 +1124,12 @@ void wm_gizmomap_modal_set(
     }
 
     gzmap->gzmap_context.event_xy[0] = INT_MAX;
+  }
+
+  if (do_refresh) {
+    const eWM_GizmoFlagMapDrawStep step = WM_gizmomap_drawstep_from_gizmo_group(
+        gz->parent_gzgroup);
+    gzmap->update_flag[step] |= GIZMOMAP_IS_REFRESH_CALLBACK;
   }
 }
 

@@ -27,15 +27,6 @@
 
 namespace blender::nodes {
 
-static void geo_node_mesh_primitive_grid_declare(NodeDeclarationBuilder &b)
-{
-  b.add_input<decl::Float>("Size X").default_value(1.0f).min(0.0f).subtype(PROP_DISTANCE);
-  b.add_input<decl::Float>("Size Y").default_value(1.0f).min(0.0f).subtype(PROP_DISTANCE);
-  b.add_input<decl::Int>("Vertices X").default_value(3).min(2).max(1000);
-  b.add_input<decl::Int>("Vertices Y").default_value(3).min(2).max(1000);
-  b.add_output<decl::Geometry>("Geometry");
-}
-
 static void calculate_uvs(
     Mesh *mesh, Span<MVert> verts, Span<MLoop> loops, const float size_x, const float size_y)
 {
@@ -153,14 +144,43 @@ Mesh *create_grid_mesh(const int verts_x,
   return mesh;
 }
 
-static void geo_node_mesh_primitive_grid_exec(GeoNodeExecParams params)
+}  // namespace blender::nodes
+
+namespace blender::nodes::node_geo_mesh_primitive_grid_cc {
+
+static void node_declare(NodeDeclarationBuilder &b)
+{
+  b.add_input<decl::Float>(N_("Size X"))
+      .default_value(1.0f)
+      .min(0.0f)
+      .subtype(PROP_DISTANCE)
+      .description(N_("Side length of the plane in the X direction"));
+  b.add_input<decl::Float>(N_("Size Y"))
+      .default_value(1.0f)
+      .min(0.0f)
+      .subtype(PROP_DISTANCE)
+      .description(N_("Side length of the plane in the Y direction"));
+  b.add_input<decl::Int>(N_("Vertices X"))
+      .default_value(3)
+      .min(2)
+      .max(1000)
+      .description(N_("Number of vertices in the X direction"));
+  b.add_input<decl::Int>(N_("Vertices Y"))
+      .default_value(3)
+      .min(2)
+      .max(1000)
+      .description(N_("Number of vertices in the Y direction"));
+  b.add_output<decl::Geometry>(N_("Mesh"));
+}
+
+static void node_geo_exec(GeoNodeExecParams params)
 {
   const float size_x = params.extract_input<float>("Size X");
   const float size_y = params.extract_input<float>("Size Y");
   const int verts_x = params.extract_input<int>("Vertices X");
   const int verts_y = params.extract_input<int>("Vertices Y");
   if (verts_x < 1 || verts_y < 1) {
-    params.set_output("Geometry", GeometrySet());
+    params.set_default_remaining_outputs();
     return;
   }
 
@@ -168,17 +188,19 @@ static void geo_node_mesh_primitive_grid_exec(GeoNodeExecParams params)
   BLI_assert(BKE_mesh_is_valid(mesh));
   BKE_id_material_eval_ensure_default_slot(&mesh->id);
 
-  params.set_output("Geometry", GeometrySet::create_with_mesh(mesh));
+  params.set_output("Mesh", GeometrySet::create_with_mesh(mesh));
 }
 
-}  // namespace blender::nodes
+}  // namespace blender::nodes::node_geo_mesh_primitive_grid_cc
 
 void register_node_type_geo_mesh_primitive_grid()
 {
+  namespace file_ns = blender::nodes::node_geo_mesh_primitive_grid_cc;
+
   static bNodeType ntype;
 
   geo_node_type_base(&ntype, GEO_NODE_MESH_PRIMITIVE_GRID, "Grid", NODE_CLASS_GEOMETRY, 0);
-  ntype.declare = blender::nodes::geo_node_mesh_primitive_grid_declare;
-  ntype.geometry_node_execute = blender::nodes::geo_node_mesh_primitive_grid_exec;
+  ntype.declare = file_ns::node_declare;
+  ntype.geometry_node_execute = file_ns::node_geo_exec;
   nodeRegisterType(&ntype);
 }

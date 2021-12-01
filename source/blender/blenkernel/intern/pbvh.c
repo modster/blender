@@ -15,7 +15,7 @@
  */
 
 /** \file
- * \ingroup bli
+ * \ingroup bke
  */
 
 #include "MEM_guardedalloc.h"
@@ -1379,7 +1379,7 @@ static int pbvh_flush_bb(PBVH *pbvh, PBVHNode *node, int flag)
 {
   int update = 0;
 
-  /* difficult to multithread well, we just do single threaded recursive */
+  /* Difficult to multi-thread well, we just do single threaded recursive. */
   if (node->flag & PBVH_Leaf) {
     if (flag & PBVH_UpdateBB) {
       update |= (node->flag & PBVH_UpdateBB);
@@ -1977,7 +1977,7 @@ bool BKE_pbvh_node_vert_update_check_any(PBVH *pbvh, PBVHNode *node)
   return false;
 }
 
-/********************************* Raycast ***********************************/
+/********************************* Ray-cast ***********************************/
 
 typedef struct {
   struct IsectRayAABB_Precalc ray;
@@ -2798,7 +2798,7 @@ float (*BKE_pbvh_vert_coords_alloc(PBVH *pbvh))[3]
 void BKE_pbvh_vert_coords_apply(PBVH *pbvh, const float (*vertCos)[3], const int totvert)
 {
   if (totvert != pbvh->totvert) {
-    BLI_assert_msg(0, "PBVH: Given deforming vcos number does not natch PBVH vertex number!");
+    BLI_assert_msg(0, "PBVH: Given deforming vcos number does not match PBVH vertex number!");
     return;
   }
 

@@ -708,9 +708,16 @@ static bool mesh_is_manifold_consistent(Mesh *mesh)
   }
 
   if (is_manifold_consistent) {
-    /* check for wire edges */
     for (uint i = 0; i < mesh->totedge; i++) {
+      /* Check for wire edges. */
       if (edge_faces[i] == 0) {
+        is_manifold_consistent = false;
+        break;
+      }
+      /* Check for zero length edges */
+      MVert *v1 = &mesh->mvert[mesh->medge[i].v1];
+      MVert *v2 = &mesh->mvert[mesh->medge[i].v2];
+      if (compare_v3v3(v1->co, v2->co, 1e-4f)) {
         is_manifold_consistent = false;
         break;
       }
@@ -814,7 +821,8 @@ static Mesh *remesh_symmetry_mirror(Object *ob, Mesh *mesh, eSymmetryAxes symmet
       mmd.flag = 0;
       mmd.flag &= MOD_MIR_AXIS_X << i;
       mesh_mirror_temp = mesh_mirror;
-      mesh_mirror = BKE_mesh_mirror_apply_mirror_on_axis_for_modifier(&mmd, ob, mesh_mirror, axis);
+      mesh_mirror = BKE_mesh_mirror_apply_mirror_on_axis_for_modifier(
+          &mmd, ob, mesh_mirror, axis, true);
       if (mesh_mirror_temp != mesh_mirror) {
         BKE_id_free(nullptr, mesh_mirror_temp);
       }

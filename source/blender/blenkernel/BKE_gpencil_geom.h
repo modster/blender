@@ -114,7 +114,12 @@ void BKE_gpencil_dissolve_points(struct bGPdata *gpd,
 bool BKE_gpencil_stroke_stretch(struct bGPDstroke *gps,
                                 const float dist,
                                 const float overshoot_fac,
-                                const short mode);
+                                const short mode,
+                                const bool follow_curvature,
+                                const int extra_point_count,
+                                const float segment_influence,
+                                const float max_angle,
+                                const bool invert_curvature);
 bool BKE_gpencil_stroke_trim_points(struct bGPDstroke *gps,
                                     const int index_from,
                                     const int index_to);
@@ -123,8 +128,9 @@ struct bGPDstroke *BKE_gpencil_stroke_delete_tagged_points(struct bGPdata *gpd,
                                                            struct bGPDstroke *gps,
                                                            struct bGPDstroke *next_stroke,
                                                            int tag_flags,
-                                                           bool select,
-                                                           int limit);
+                                                           const bool select,
+                                                           const bool flat_cap,
+                                                           const int limit);
 void BKE_gpencil_curve_delete_tagged_points(struct bGPdata *gpd,
                                             struct bGPDframe *gpf,
                                             struct bGPDstroke *gps,

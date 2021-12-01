@@ -29,6 +29,7 @@ struct Object;
 struct ParticleSystem;
 struct RegionView3D;
 struct ViewLayer;
+struct GPUMaterial;
 
 #define UBO_FIRST_COLOR colorWire
 #define UBO_LAST_COLOR colorUVShadow
@@ -42,8 +43,6 @@ typedef struct GlobalsUboStorage {
   float colorWireEdit[4];
   float colorActive[4];
   float colorSelect[4];
-  float colorDupliSelect[4];
-  float colorDupli[4];
   float colorLibrarySelect[4];
   float colorLibrary[4];
   float colorTransform[4];
@@ -175,7 +174,8 @@ bool DRW_object_axis_orthogonal_to_view(struct Object *ob, int axis);
 struct DRWShadingGroup *DRW_shgroup_hair_create_sub(struct Object *object,
                                                     struct ParticleSystem *psys,
                                                     struct ModifierData *md,
-                                                    struct DRWShadingGroup *shgrp);
+                                                    struct DRWShadingGroup *shgrp,
+                                                    struct GPUMaterial *gpu_material);
 struct GPUVertBuf *DRW_hair_pos_buffer_get(struct Object *object,
                                            struct ParticleSystem *psys,
                                            struct ModifierData *md);

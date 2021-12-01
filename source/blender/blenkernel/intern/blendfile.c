@@ -78,7 +78,9 @@
 /** \name High Level `.blend` file read/write.
  * \{ */
 
-static bool clean_paths_visit_cb(void *UNUSED(userdata), char *path_dst, const char *path_src)
+static bool foreach_path_clean_cb(BPathForeachPathData *UNUSED(bpath_data),
+                                  char *path_dst,
+                                  const char *path_src)
 {
   strcpy(path_dst, path_src);
   BLI_path_slash_native(path_dst);
@@ -86,13 +88,16 @@ static bool clean_paths_visit_cb(void *UNUSED(userdata), char *path_dst, const c
 }
 
 /* make sure path names are correct for OS */
-static void clean_paths(Main *main)
+static void clean_paths(Main *bmain)
 {
-  Scene *scene;
+  BKE_bpath_foreach_path_main(&(BPathForeachPathData){
+      .bmain = bmain,
+      .callback_function = foreach_path_clean_cb,
+      .flag = BKE_BPATH_FOREACH_PATH_SKIP_MULTIFILE,
+      .user_data = NULL,
+  });
 
-  BKE_bpath_traverse_main(main, clean_paths_visit_cb, BKE_BPATH_TRAVERSE_SKIP_MULTIFILE, NULL);
-
-  for (scene = main->scenes.first; scene; scene = scene->id.next) {
+  LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
     BLI_path_slash_native(scene->r.pic);
   }
 }
@@ -251,7 +256,7 @@ static void setup_app_data(bContext *C,
        * replace it with 'curscene' if its needed */
     }
     /* and we enforce curscene to be in current screen */
-    else if (win) { /* can run in bgmode */
+    else if (win) { /* The window may be NULL in background-mode. */
       win->scene = curscene;
     }
 
@@ -342,6 +347,13 @@ static void setup_app_data(bContext *C,
    * but we still get too many unrelated data-corruption crashes otherwise... */
   if (bmain->versionfile < 250) {
     do_versions_ipos_to_animato(bmain);
+  }
+
+  /* FIXME: Same as above, readfile's `do_version` do not allow to create new IDs. */
+  /* TODO: Once this is definitively validated for 3.0 and option to not do it is removed, add a
+   * version bump and check here. */
+  if (mode != LOAD_UNDO && !USER_EXPERIMENTAL_TEST(&U, no_proxy_to_override_conversion)) {
+    BKE_lib_override_library_main_proxy_convert(bmain, reports);
   }
 
   bmain->recovered = 0;
@@ -880,7 +892,8 @@ bool BKE_blendfile_write_partial(Main *bmain_src,
   int a, retval;
 
   void *path_list_backup = NULL;
-  const int path_list_flag = (BKE_BPATH_TRAVERSE_SKIP_LIBRARY | BKE_BPATH_TRAVERSE_SKIP_MULTIFILE);
+  const eBPathForeachFlag path_list_flag = (BKE_BPATH_FOREACH_PATH_SKIP_LINKED |
+                                            BKE_BPATH_FOREACH_PATH_SKIP_MULTIFILE);
 
   /* This is needed to be able to load that file as a real one later
    * (otherwise main->name will not be set at read time). */

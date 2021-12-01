@@ -141,16 +141,15 @@ int PointCloudComponent::attribute_domain_size(const AttributeDomain domain) con
 namespace blender::bke {
 
 template<typename T>
-static GVArrayPtr make_array_read_attribute(const void *data, const int domain_size)
+static GVArray make_array_read_attribute(const void *data, const int domain_size)
 {
-  return std::make_unique<fn::GVArray_For_Span<T>>(Span<T>((const T *)data, domain_size));
+  return VArray<T>::ForSpan(Span<T>((const T *)data, domain_size));
 }
 
 template<typename T>
-static GVMutableArrayPtr make_array_write_attribute(void *data, const int domain_size)
+static GVMutableArray make_array_write_attribute(void *data, const int domain_size)
 {
-  return std::make_unique<fn::GVMutableArray_For_MutableSpan<T>>(
-      MutableSpan<T>((T *)data, domain_size));
+  return VMutableArray<T>::ForSpan(MutableSpan<T>((T *)data, domain_size));
 }
 
 /**
@@ -202,8 +201,19 @@ static ComponentAttributeProviders create_attribute_providers_for_point_cloud()
                                                make_array_read_attribute<float>,
                                                make_array_write_attribute<float>,
                                                nullptr);
+  static BuiltinCustomDataLayerProvider id("id",
+                                           ATTR_DOMAIN_POINT,
+                                           CD_PROP_INT32,
+                                           CD_PROP_INT32,
+                                           BuiltinAttributeProvider::Creatable,
+                                           BuiltinAttributeProvider::Writable,
+                                           BuiltinAttributeProvider::Deletable,
+                                           point_access,
+                                           make_array_read_attribute<int>,
+                                           make_array_write_attribute<int>,
+                                           nullptr);
   static CustomDataAttributeProvider point_custom_data(ATTR_DOMAIN_POINT, point_access);
-  return ComponentAttributeProviders({&position, &radius}, {&point_custom_data});
+  return ComponentAttributeProviders({&position, &radius, &id}, {&point_custom_data});
 }
 
 }  // namespace blender::bke

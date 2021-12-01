@@ -94,8 +94,6 @@ const char *nodeTypeAsString(NodeType type)
       return "PARTICLE_SETTINGS";
     case NodeType::SHADING:
       return "SHADING";
-    case NodeType::SHADING_PARAMETERS:
-      return "SHADING_PARAMETERS";
     case NodeType::CACHE:
       return "CACHE";
     case NodeType::POINT_CACHE:
@@ -114,6 +112,8 @@ const char *nodeTypeAsString(NodeType type)
       return "ARMATURE";
     case NodeType::GENERIC_DATABLOCK:
       return "GENERIC_DATABLOCK";
+    case NodeType::VISIBILITY:
+      return "VISIBILITY";
     case NodeType::SIMULATION:
       return "SIMULATION";
 
@@ -159,7 +159,6 @@ eDepsSceneComponentType nodeTypeToSceneComponent(NodeType type)
     case NodeType::GENERIC_DATABLOCK:
     case NodeType::PARTICLE_SYSTEM:
     case NodeType::PARTICLE_SETTINGS:
-    case NodeType::SHADING_PARAMETERS:
     case NodeType::POINT_CACHE:
     case NodeType::IMAGE_ANIMATION:
     case NodeType::BATCH_CACHE:
@@ -176,8 +175,12 @@ eDepsSceneComponentType nodeTypeToSceneComponent(NodeType type)
     case NodeType::PROXY:
     case NodeType::SIMULATION:
       return DEG_SCENE_COMP_PARAMETERS;
+
+    case NodeType::VISIBILITY:
+      BLI_assert_msg(0, "Visibility component is supposed to be only used internally.");
+      return DEG_SCENE_COMP_PARAMETERS;
   }
-  BLI_assert_msg(0, "Unhandled node type, not suppsed to happen.");
+  BLI_assert_msg(0, "Unhandled node type, not supposed to happen.");
   return DEG_SCENE_COMP_PARAMETERS;
 }
 
@@ -242,7 +245,6 @@ eDepsObjectComponentType nodeTypeToObjectComponent(NodeType type)
     case NodeType::GENERIC_DATABLOCK:
     case NodeType::PARTICLE_SYSTEM:
     case NodeType::PARTICLE_SETTINGS:
-    case NodeType::SHADING_PARAMETERS:
     case NodeType::POINT_CACHE:
     case NodeType::IMAGE_ANIMATION:
     case NodeType::BATCH_CACHE:
@@ -251,6 +253,10 @@ eDepsObjectComponentType nodeTypeToObjectComponent(NodeType type)
     case NodeType::SIMULATION:
     case NodeType::UNDEFINED:
     case NodeType::NUM_TYPES:
+      return DEG_OB_COMP_PARAMETERS;
+
+    case NodeType::VISIBILITY:
+      BLI_assert_msg(0, "Visibility component is supposed to be only used internally.");
       return DEG_OB_COMP_PARAMETERS;
   }
   BLI_assert_msg(0, "Unhandled node type, not suppsed to happen.");

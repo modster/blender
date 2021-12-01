@@ -666,12 +666,13 @@ bool ED_object_modifier_convert(ReportList *UNUSED(reports),
 static Mesh *modifier_apply_create_mesh_for_modifier(Depsgraph *depsgraph,
                                                      Object *object,
                                                      ModifierData *md_eval,
+                                                     bool use_virtual_modifiers,
                                                      bool build_shapekey_layers)
 {
   Scene *scene_eval = DEG_get_evaluated_scene(depsgraph);
   Object *object_eval = DEG_get_evaluated_object(depsgraph, object);
   Mesh *mesh_applied = BKE_mesh_create_derived_for_modifier(
-      depsgraph, scene_eval, object_eval, md_eval, build_shapekey_layers);
+      depsgraph, scene_eval, object_eval, md_eval, use_virtual_modifiers, build_shapekey_layers);
   return mesh_applied;
 }
 
@@ -708,7 +709,8 @@ static bool modifier_apply_shape(Main *bmain,
       return false;
     }
 
-    Mesh *mesh_applied = modifier_apply_create_mesh_for_modifier(depsgraph, ob, md_eval, false);
+    Mesh *mesh_applied = modifier_apply_create_mesh_for_modifier(
+        depsgraph, ob, md_eval, true, false);
     if (!mesh_applied) {
       BKE_report(reports, RPT_ERROR, "Modifier is disabled or returned error, skipping apply");
       return false;
@@ -767,7 +769,8 @@ static bool modifier_apply_obdata(
       }
     }
     else {
-      Mesh *mesh_applied = modifier_apply_create_mesh_for_modifier(depsgraph, ob, md_eval, true);
+      Mesh *mesh_applied = modifier_apply_create_mesh_for_modifier(
+          depsgraph, ob, md_eval, true, true);
       if (!mesh_applied) {
         BKE_report(reports, RPT_ERROR, "Modifier returned error, skipping apply");
         return false;
@@ -1043,6 +1046,10 @@ bool edit_modifier_poll_generic(bContext *C,
   PointerRNA ptr = CTX_data_pointer_get_type(C, "modifier", rna_type);
   Object *ob = (ptr.owner_id) ? (Object *)ptr.owner_id : ED_object_active_context(C);
   ModifierData *mod = ptr.data; /* May be NULL. */
+
+  if (mod == NULL && ob != NULL) {
+    mod = BKE_object_active_modifier(ob);
+  }
 
   if (!ob || ID_IS_LINKED(ob)) {
     return false;
@@ -3239,6 +3246,57 @@ void OBJECT_OT_surfacedeform_bind(wmOperatorType *ot)
   /* flags */
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_INTERNAL;
   edit_modifier_properties(ot);
+}
+
+/** \} */
+
+/* ------------------------------------------------------------------- */
+/** \name Toggle Value or Attribute Operator
+ *
+ * \note This operator basically only exists to provide a better tooltip for the toggle button,
+ * since it is stored as an IDProperty. It also stops the button from being highlighted when
+ * "use_attribute" is on, which isn't expected.
+ * \{ */
+
+static int geometry_nodes_input_attribute_toggle_exec(bContext *C, wmOperator *op)
+{
+  Object *ob = ED_object_active_context(C);
+
+  char modifier_name[MAX_NAME];
+  RNA_string_get(op->ptr, "modifier_name", modifier_name);
+  NodesModifierData *nmd = (NodesModifierData *)BKE_modifiers_findby_name(ob, modifier_name);
+  if (nmd == NULL) {
+    return OPERATOR_CANCELLED;
+  }
+
+  char prop_path[MAX_NAME];
+  RNA_string_get(op->ptr, "prop_path", prop_path);
+
+  PointerRNA mod_ptr;
+  RNA_pointer_create(&ob->id, &RNA_Modifier, nmd, &mod_ptr);
+
+  const int old_value = RNA_int_get(&mod_ptr, prop_path);
+  const int new_value = !old_value;
+  RNA_int_set(&mod_ptr, prop_path, new_value);
+
+  DEG_id_tag_update(&ob->id, ID_RECALC_GEOMETRY);
+  WM_event_add_notifier(C, NC_OBJECT | ND_MODIFIER, ob);
+  return OPERATOR_FINISHED;
+}
+
+void OBJECT_OT_geometry_nodes_input_attribute_toggle(wmOperatorType *ot)
+{
+  ot->name = "Input Attribute Toggle";
+  ot->description =
+      "Switch between an attribute and a single value to define the data for every element";
+  ot->idname = "OBJECT_OT_geometry_nodes_input_attribute_toggle";
+
+  ot->exec = geometry_nodes_input_attribute_toggle_exec;
+
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_INTERNAL;
+
+  RNA_def_string(ot->srna, "prop_path", NULL, 0, "Prop Path", "");
+  RNA_def_string(ot->srna, "modifier_name", NULL, MAX_NAME, "Modifier Name", "");
 }
 
 /** \} */

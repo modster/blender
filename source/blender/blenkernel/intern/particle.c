@@ -173,28 +173,29 @@ static void particle_settings_free_data(ID *id)
 static void particle_settings_foreach_id(ID *id, LibraryForeachIDData *data)
 {
   ParticleSettings *psett = (ParticleSettings *)id;
-  BKE_LIB_FOREACHID_PROCESS(data, psett->instance_collection, IDWALK_CB_USER);
-  BKE_LIB_FOREACHID_PROCESS(data, psett->instance_object, IDWALK_CB_NOP);
-  BKE_LIB_FOREACHID_PROCESS(data, psett->bb_ob, IDWALK_CB_NOP);
-  BKE_LIB_FOREACHID_PROCESS(data, psett->collision_group, IDWALK_CB_NOP);
+  BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, psett->instance_collection, IDWALK_CB_USER);
+  BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, psett->instance_object, IDWALK_CB_NOP);
+  BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, psett->bb_ob, IDWALK_CB_NOP);
+  BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, psett->collision_group, IDWALK_CB_NOP);
 
   for (int i = 0; i < MAX_MTEX; i++) {
     if (psett->mtex[i]) {
-      BKE_texture_mtex_foreach_id(data, psett->mtex[i]);
+      BKE_LIB_FOREACHID_PROCESS_FUNCTION_CALL(data,
+                                              BKE_texture_mtex_foreach_id(data, psett->mtex[i]));
     }
   }
 
   if (psett->effector_weights) {
-    BKE_LIB_FOREACHID_PROCESS(data, psett->effector_weights->group, IDWALK_CB_NOP);
+    BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, psett->effector_weights->group, IDWALK_CB_NOP);
   }
 
   if (psett->pd) {
-    BKE_LIB_FOREACHID_PROCESS(data, psett->pd->tex, IDWALK_CB_USER);
-    BKE_LIB_FOREACHID_PROCESS(data, psett->pd->f_source, IDWALK_CB_NOP);
+    BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, psett->pd->tex, IDWALK_CB_USER);
+    BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, psett->pd->f_source, IDWALK_CB_NOP);
   }
   if (psett->pd2) {
-    BKE_LIB_FOREACHID_PROCESS(data, psett->pd2->tex, IDWALK_CB_USER);
-    BKE_LIB_FOREACHID_PROCESS(data, psett->pd2->f_source, IDWALK_CB_NOP);
+    BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, psett->pd2->tex, IDWALK_CB_USER);
+    BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, psett->pd2->f_source, IDWALK_CB_NOP);
   }
 
   if (psett->boids) {
@@ -202,18 +203,18 @@ static void particle_settings_foreach_id(ID *id, LibraryForeachIDData *data)
       LISTBASE_FOREACH (BoidRule *, rule, &state->rules) {
         if (rule->type == eBoidRuleType_Avoid) {
           BoidRuleGoalAvoid *gabr = (BoidRuleGoalAvoid *)rule;
-          BKE_LIB_FOREACHID_PROCESS(data, gabr->ob, IDWALK_CB_NOP);
+          BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, gabr->ob, IDWALK_CB_NOP);
         }
         else if (rule->type == eBoidRuleType_FollowLeader) {
           BoidRuleFollowLeader *flbr = (BoidRuleFollowLeader *)rule;
-          BKE_LIB_FOREACHID_PROCESS(data, flbr->ob, IDWALK_CB_NOP);
+          BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, flbr->ob, IDWALK_CB_NOP);
         }
       }
     }
   }
 
   LISTBASE_FOREACH (ParticleDupliWeight *, dw, &psett->instance_weights) {
-    BKE_LIB_FOREACHID_PROCESS(data, dw->ob, IDWALK_CB_NOP);
+    BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, dw->ob, IDWALK_CB_NOP);
   }
 }
 
@@ -499,6 +500,7 @@ IDTypeInfo IDType_ID_PA = {
     .name_plural = "particles",
     .translation_context = BLT_I18NCONTEXT_ID_PARTICLESETTINGS,
     .flags = 0,
+    .asset_type_info = NULL,
 
     .init_data = particle_settings_init,
     .copy_data = particle_settings_copy_data,
@@ -506,6 +508,7 @@ IDTypeInfo IDType_ID_PA = {
     .make_local = NULL,
     .foreach_id = particle_settings_foreach_id,
     .foreach_cache = NULL,
+    .foreach_path = NULL,
     .owner_get = NULL,
 
     .blend_write = particle_settings_blend_write,
@@ -1148,7 +1151,27 @@ void psys_copy_particles(ParticleSystem *psys_dst, ParticleSystem *psys_src)
   /* Copy particles and children. */
   psys_dst->particles = MEM_dupallocN(psys_src->particles);
   psys_dst->child = MEM_dupallocN(psys_src->child);
-  if (psys_dst->part->type == PART_HAIR) {
+
+  /* Ideally this should only be performed if `(psys_dst->part->type == PART_HAIR)`.
+   *
+   * But #ParticleData (`psys_dst`) is some sub-data of the #Object ID, while #ParticleSettings
+   * (`psys_dst->part`) is another ID. In case the particle settings is a linked ID that gets
+   * missing, it will be replaced (in readfile code) by a place-holder, which defaults to a
+   * `PART_EMITTER` type of particle settings.
+   *
+   * This leads to a situation where each particle of `psys_dst` still has a valid allocated `hair`
+   * data, which should still be preserved in case the missing particle settings ID becomes valid
+   * again.
+   *
+   * Furthermore, #free_hair() always frees `pa->hair` if it's not NULL, regardless of the
+   * particle type. So *not* copying here would cause a double free (or more), e.g. freeing the
+   * copy-on-write copy and the original data will crash Blender.
+   * In any case, sharing pointers between `psys_src` and `psys_dst` should be forbidden.
+   *
+   * So while we could in theory 'sanitize' the situation by setting `pa->hair` to NULL in the new
+   * copy (in case of non-`PART_HAIR` type), it is probably safer for now to systematically
+   * duplicate the `hair` data if available. */
+  {
     ParticleData *pa;
     int p;
     for (p = 0, pa = psys_dst->particles; p < psys_dst->totpart; p++, pa++) {
@@ -4620,11 +4643,11 @@ void psys_get_particle_on_path(ParticleSimulationData *sim,
       pind.cache = cached ? psys->pointcache : NULL;
       pind.epoint = NULL;
       pind.bspline = (psys->part->flag & PART_HAIR_BSPLINE);
-      /* pind.dm disabled in editmode means we don't get effectors taken into
-       * account when subdividing for instance */
+      /* `pind.dm` disabled in edit-mode means we don't get effectors taken into
+       * account when subdividing for instance. */
       pind.mesh = psys_in_edit_mode(sim->depsgraph, psys) ?
                       NULL :
-                      psys->hair_out_mesh; /* XXX Sybren EEK */
+                      psys->hair_out_mesh; /* XXX(@sybren) EEK. */
       init_particle_interpolation(sim->ob, psys, pa, &pind);
       do_particle_interpolation(psys, p, pa, t, &pind, state);
 

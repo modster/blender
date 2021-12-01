@@ -219,7 +219,7 @@ def enable_addons(addons=None, support=None, disable=False, check_only=False):
     try:
         import bpy
     except ModuleNotFoundError:
-        print("Could not import bpy, enable_addons must be run from whithin Blender.")
+        print("Could not import bpy, enable_addons must be run from within Blender.")
         return
 
     if addons is None:
@@ -778,7 +778,7 @@ class I18nMessages:
         try:
             import bpy
         except ModuleNotFoundError:
-            print("Could not import bpy, find_best_messages_matches must be run from whithin Blender.")
+            print("Could not import bpy, find_best_messages_matches must be run from within Blender.")
             return
 
         # Build helper mappings.

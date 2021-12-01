@@ -51,6 +51,7 @@
 #include "BKE_anim_visualization.h"
 #include "BKE_animsys.h"
 #include "BKE_armature.h"
+#include "BKE_asset.h"
 #include "BKE_constraint.h"
 #include "BKE_deform.h"
 #include "BKE_fcurve.h"
@@ -175,11 +176,11 @@ static void action_foreach_id(ID *id, LibraryForeachIDData *data)
   bAction *act = (bAction *)id;
 
   LISTBASE_FOREACH (FCurve *, fcu, &act->curves) {
-    BKE_fcurve_foreach_id(fcu, data);
+    BKE_LIB_FOREACHID_PROCESS_FUNCTION_CALL(data, BKE_fcurve_foreach_id(fcu, data));
   }
 
   LISTBASE_FOREACH (TimeMarker *, marker, &act->markers) {
-    BKE_LIB_FOREACHID_PROCESS(data, marker->camera, IDWALK_CB_NOP);
+    BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, marker->camera, IDWALK_CB_NOP);
   }
 }
 
@@ -286,6 +287,30 @@ static void action_blend_read_expand(BlendExpander *expander, ID *id)
   }
 }
 
+static IDProperty *action_asset_type_property(const bAction *action)
+{
+  const bool is_single_frame = !BKE_action_has_single_frame(action);
+
+  IDPropertyTemplate idprop = {0};
+  idprop.i = is_single_frame;
+
+  IDProperty *property = IDP_New(IDP_INT, &idprop, "is_single_frame");
+  return property;
+}
+
+static void action_asset_pre_save(void *asset_ptr, struct AssetMetaData *asset_data)
+{
+  bAction *action = (bAction *)asset_ptr;
+  BLI_assert(GS(action->id.name) == ID_AC);
+
+  IDProperty *action_type = action_asset_type_property(action);
+  BKE_asset_metadata_idprop_ensure(asset_data, action_type);
+}
+
+AssetTypeInfo AssetType_AC = {
+    /* pre_save_fn */ action_asset_pre_save,
+};
+
 IDTypeInfo IDType_ID_AC = {
     .id_code = ID_AC,
     .id_filter = FILTER_ID_AC,
@@ -295,6 +320,7 @@ IDTypeInfo IDType_ID_AC = {
     .name_plural = "actions",
     .translation_context = BLT_I18NCONTEXT_ID_ACTION,
     .flags = IDTYPE_FLAGS_NO_ANIMDATA,
+    .asset_type_info = &AssetType_AC,
 
     .init_data = NULL,
     .copy_data = action_copy_data,
@@ -302,6 +328,7 @@ IDTypeInfo IDType_ID_AC = {
     .make_local = NULL,
     .foreach_id = action_foreach_id,
     .foreach_cache = NULL,
+    .foreach_path = NULL,
     .owner_get = NULL,
 
     .blend_write = action_blend_write,
@@ -1211,7 +1238,7 @@ void BKE_pose_channel_copy_data(bPoseChannel *pchan, const bPoseChannel *pchan_f
   /* copy bone group */
   pchan->agrp_index = pchan_from->agrp_index;
 
-  /* ik (dof) settings */
+  /* IK (DOF) settings. */
   pchan->ikflag = pchan_from->ikflag;
   copy_v3_v3(pchan->limitmin, pchan_from->limitmin);
   copy_v3_v3(pchan->limitmax, pchan_from->limitmax);
@@ -1418,6 +1445,47 @@ bool action_has_motion(const bAction *act)
   return false;
 }
 
+bool BKE_action_has_single_frame(const struct bAction *act)
+{
+  if (act == NULL || BLI_listbase_is_empty(&act->curves)) {
+    return false;
+  }
+
+  bool found_key = false;
+  float found_key_frame = 0.0f;
+
+  LISTBASE_FOREACH (FCurve *, fcu, &act->curves) {
+    switch (fcu->totvert) {
+      case 0:
+        /* No keys, so impossible to come to a conclusion on this curve alone. */
+        continue;
+      case 1:
+        /* Single key, which is the complex case, so handle below. */
+        break;
+      default:
+        /* Multiple keys, so there is animation. */
+        return false;
+    }
+
+    const float this_key_frame = fcu->bezt != NULL ? fcu->bezt[0].vec[1][0] : fcu->fpt[0].vec[0];
+    if (!found_key) {
+      found_key = true;
+      found_key_frame = this_key_frame;
+      continue;
+    }
+
+    /* The graph editor rounds to 1/1000th of a frame, so it's not necessary to be really precise
+     * with these comparisons. */
+    if (!compare_ff(found_key_frame, this_key_frame, 0.001f)) {
+      /* This key differs from the already-found key, so this Action represents animation. */
+      return false;
+    }
+  }
+
+  /* There is only a single frame if we found at least one key. */
+  return found_key;
+}
+
 /* Calculate the extents of given action */
 void calc_action_range(const bAction *act, float *start, float *end, short incl_modifiers)
 {
@@ -1504,6 +1572,30 @@ void calc_action_range(const bAction *act, float *start, float *end, short incl_
     *start = 0.0f;
     *end = 1.0f;
   }
+}
+
+/* Retrieve the intended playback frame range, using the manually set range if available,
+ * or falling back to scanning F-Curves for their first & last frames otherwise. */
+void BKE_action_get_frame_range(const struct bAction *act, float *r_start, float *r_end)
+{
+  if (act && (act->flag & ACT_FRAME_RANGE)) {
+    *r_start = act->frame_start;
+    *r_end = act->frame_end;
+  }
+  else {
+    calc_action_range(act, r_start, r_end, false);
+  }
+
+  /* Ensure that action is at least 1 frame long (for NLA strips to have a valid length). */
+  if (*r_start >= *r_end) {
+    *r_end = *r_start + 1.0f;
+  }
+}
+
+/* Is the action configured as cyclic. */
+bool BKE_action_is_cyclic(const struct bAction *act)
+{
+  return act && (act->flag & ACT_FRAME_RANGE) && (act->flag & ACT_CYCLIC);
 }
 
 /* Return flags indicating which transforms the given object/posechannel has

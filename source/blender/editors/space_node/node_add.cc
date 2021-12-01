@@ -56,7 +56,7 @@
 
 #include "UI_view2d.h"
 
-#include "node_intern.h" /* own include */
+#include "node_intern.hh" /* own include */
 
 /* -------------------------------------------------------------------- */
 /** \name Utilities
@@ -312,7 +312,7 @@ void NODE_OT_add_reroute(wmOperatorType *ot)
   ot->poll = ED_operator_node_editable;
 
   /* flags */
-  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_DEPENDS_ON_CURSOR;
 
   /* properties */
   PropertyRNA *prop;
@@ -445,15 +445,14 @@ void NODE_OT_add_group(wmOperatorType *ot)
 
 static Object *node_add_object_get_and_poll_object_node_tree(Main *bmain, wmOperator *op)
 {
-  char name[MAX_ID_NAME - 2];
-  RNA_string_get(op->ptr, "name", name);
-
-  Object *object = (Object *)BKE_libblock_find_name(bmain, ID_OB, name);
-  if (!object) {
-    return nullptr;
+  if (RNA_struct_property_is_set(op->ptr, "session_uuid")) {
+    const uint32_t session_uuid = (uint32_t)RNA_int_get(op->ptr, "session_uuid");
+    return (Object *)BKE_libblock_find_session_uuid(bmain, ID_OB, session_uuid);
   }
 
-  return object;
+  char name[MAX_ID_NAME - 2];
+  RNA_string_get(op->ptr, "name", name);
+  return (Object *)BKE_libblock_find_name(bmain, ID_OB, name);
 }
 
 static int node_add_object_exec(bContext *C, wmOperator *op)
@@ -539,6 +538,15 @@ void NODE_OT_add_object(wmOperatorType *ot)
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_INTERNAL;
 
   RNA_def_string(ot->srna, "name", "Object", MAX_ID_NAME - 2, "Name", "Data-block name to assign");
+  RNA_def_int(ot->srna,
+              "session_uuid",
+              0,
+              INT32_MIN,
+              INT32_MAX,
+              "Session UUID",
+              "Session UUID of the data-block to assign",
+              INT32_MIN,
+              INT32_MAX);
 }
 
 /** \} */
@@ -549,15 +557,14 @@ void NODE_OT_add_object(wmOperatorType *ot)
 
 static Tex *node_add_texture_get_and_poll_texture_node_tree(Main *bmain, wmOperator *op)
 {
-  char name[MAX_ID_NAME - 2];
-  RNA_string_get(op->ptr, "name", name);
-
-  Tex *texture = (Tex *)BKE_libblock_find_name(bmain, ID_TE, name);
-  if (!texture) {
-    return nullptr;
+  if (RNA_struct_property_is_set(op->ptr, "session_uuid")) {
+    const uint32_t session_uuid = (uint32_t)RNA_int_get(op->ptr, "session_uuid");
+    return (Tex *)BKE_libblock_find_session_uuid(bmain, ID_TE, session_uuid);
   }
 
-  return texture;
+  char name[MAX_ID_NAME - 2];
+  RNA_string_get(op->ptr, "name", name);
+  return (Tex *)BKE_libblock_find_name(bmain, ID_TE, name);
 }
 
 static int node_add_texture_exec(bContext *C, wmOperator *op)
@@ -640,6 +647,15 @@ void NODE_OT_add_texture(wmOperatorType *ot)
 
   RNA_def_string(
       ot->srna, "name", "Texture", MAX_ID_NAME - 2, "Name", "Data-block name to assign");
+  RNA_def_int(ot->srna,
+              "session_uuid",
+              0,
+              INT32_MIN,
+              INT32_MAX,
+              "Session UUID",
+              "Session UUID of the data-block to assign",
+              INT32_MIN,
+              INT32_MAX);
 }
 
 /** \} */
@@ -651,15 +667,14 @@ void NODE_OT_add_texture(wmOperatorType *ot)
 static Collection *node_add_collection_get_and_poll_collection_node_tree(Main *bmain,
                                                                          wmOperator *op)
 {
-  char name[MAX_ID_NAME - 2];
-  RNA_string_get(op->ptr, "name", name);
-
-  Collection *collection = (Collection *)BKE_libblock_find_name(bmain, ID_GR, name);
-  if (!collection) {
-    return nullptr;
+  if (RNA_struct_property_is_set(op->ptr, "session_uuid")) {
+    const uint32_t session_uuid = (uint32_t)RNA_int_get(op->ptr, "session_uuid");
+    return (Collection *)BKE_libblock_find_session_uuid(bmain, ID_GR, session_uuid);
   }
 
-  return collection;
+  char name[MAX_ID_NAME - 2];
+  RNA_string_get(op->ptr, "name", name);
+  return (Collection *)BKE_libblock_find_name(bmain, ID_GR, name);
 }
 
 static int node_add_collection_exec(bContext *C, wmOperator *op)
@@ -746,6 +761,15 @@ void NODE_OT_add_collection(wmOperatorType *ot)
 
   RNA_def_string(
       ot->srna, "name", "Collection", MAX_ID_NAME - 2, "Name", "Data-block name to assign");
+  RNA_def_int(ot->srna,
+              "session_uuid",
+              0,
+              INT32_MIN,
+              INT32_MAX,
+              "Session UUID",
+              "Session UUID of the data-block to assign",
+              INT32_MIN,
+              INT32_MAX);
 }
 
 /** \} */
@@ -758,7 +782,7 @@ static bool node_add_file_poll(bContext *C)
 {
   const SpaceNode *snode = CTX_wm_space_node(C);
   return ED_operator_node_editable(C) &&
-         ELEM(snode->nodetree->type, NTREE_SHADER, NTREE_TEXTURE, NTREE_COMPOSIT);
+         ELEM(snode->nodetree->type, NTREE_SHADER, NTREE_TEXTURE, NTREE_COMPOSIT, NTREE_GEOMETRY);
 }
 
 static int node_add_file_exec(bContext *C, wmOperator *op)
@@ -784,6 +808,9 @@ static int node_add_file_exec(bContext *C, wmOperator *op)
     case NTREE_COMPOSIT:
       type = CMP_NODE_IMAGE;
       break;
+    case NTREE_GEOMETRY:
+      type = GEO_NODE_IMAGE_TEXTURE;
+      break;
     default:
       return OPERATOR_CANCELLED;
   }
@@ -797,7 +824,14 @@ static int node_add_file_exec(bContext *C, wmOperator *op)
     return OPERATOR_CANCELLED;
   }
 
-  node->id = (ID *)ima;
+  if (type == GEO_NODE_IMAGE_TEXTURE) {
+    bNodeSocket *image_socket = (bNodeSocket *)node->inputs.first;
+    bNodeSocketValueImage *socket_value = (bNodeSocketValueImage *)image_socket->default_value;
+    socket_value->value = ima;
+  }
+  else {
+    node->id = (ID *)ima;
+  }
 
   /* When adding new image file via drag-drop we need to load imbuf in order
    * to get proper image source.
@@ -867,6 +901,18 @@ void NODE_OT_add_file(wmOperatorType *ot)
 /** \name Add Mask Node Operator
  * \{ */
 
+static ID *node_add_mask_get_and_poll_mask(Main *bmain, wmOperator *op)
+{
+  if (RNA_struct_property_is_set(op->ptr, "session_uuid")) {
+    const uint32_t session_uuid = (uint32_t)RNA_int_get(op->ptr, "session_uuid");
+    return BKE_libblock_find_session_uuid(bmain, ID_MSK, session_uuid);
+  }
+
+  char name[MAX_ID_NAME - 2];
+  RNA_string_get(op->ptr, "name", name);
+  return BKE_libblock_find_name(bmain, ID_MSK, name);
+}
+
 static bool node_add_mask_poll(bContext *C)
 {
   SpaceNode *snode = CTX_wm_space_node(C);
@@ -879,14 +925,9 @@ static int node_add_mask_exec(bContext *C, wmOperator *op)
   Main *bmain = CTX_data_main(C);
   SpaceNode *snode = CTX_wm_space_node(C);
   bNode *node;
-  ID *mask = nullptr;
 
-  /* check input variables */
-  char name[MAX_ID_NAME - 2];
-  RNA_string_get(op->ptr, "name", name);
-  mask = BKE_libblock_find_name(bmain, ID_MSK, name);
+  ID *mask = node_add_mask_get_and_poll_mask(bmain, op);
   if (!mask) {
-    BKE_reportf(op->reports, RPT_ERROR, "Mask '%s' not found", name);
     return OPERATOR_CANCELLED;
   }
 
@@ -925,6 +966,15 @@ void NODE_OT_add_mask(wmOperatorType *ot)
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_INTERNAL;
 
   RNA_def_string(ot->srna, "name", "Mask", MAX_ID_NAME - 2, "Name", "Data-block name to assign");
+  RNA_def_int(ot->srna,
+              "session_uuid",
+              0,
+              INT32_MIN,
+              INT32_MAX,
+              "Session UUID",
+              "Session UUID of the data-block to assign",
+              INT32_MIN,
+              INT32_MAX);
 }
 
 /** \} */

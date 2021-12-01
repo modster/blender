@@ -769,15 +769,16 @@ static void eevee_hair_cache_populate(EEVEE_Data *vedata,
   EeveeMaterialCache matcache = eevee_material_cache_get(vedata, sldata, ob, matnr - 1, true);
 
   if (matcache.depth_grp) {
-    *matcache.depth_grp_p = DRW_shgroup_hair_create_sub(ob, psys, md, matcache.depth_grp);
+    *matcache.depth_grp_p = DRW_shgroup_hair_create_sub(ob, psys, md, matcache.depth_grp, NULL);
     DRW_shgroup_add_material_resources(*matcache.depth_grp_p, matcache.shading_gpumat);
   }
   if (matcache.shading_grp) {
-    *matcache.shading_grp_p = DRW_shgroup_hair_create_sub(ob, psys, md, matcache.shading_grp);
+    *matcache.shading_grp_p = DRW_shgroup_hair_create_sub(
+        ob, psys, md, matcache.shading_grp, matcache.shading_gpumat);
     DRW_shgroup_add_material_resources(*matcache.shading_grp_p, matcache.shading_gpumat);
   }
   if (matcache.shadow_grp) {
-    *matcache.shadow_grp_p = DRW_shgroup_hair_create_sub(ob, psys, md, matcache.shadow_grp);
+    *matcache.shadow_grp_p = DRW_shgroup_hair_create_sub(ob, psys, md, matcache.shadow_grp, NULL);
     DRW_shgroup_add_material_resources(*matcache.shadow_grp_p, matcache.shading_gpumat);
     *cast_shadow = true;
   }
@@ -819,7 +820,7 @@ void EEVEE_materials_cache_populate(EEVEE_Data *vedata,
                          !DRW_state_is_image_render();
 
   /* First get materials for this mesh. */
-  if (ELEM(ob->type, OB_MESH, OB_CURVE, OB_SURF, OB_FONT, OB_MBALL)) {
+  if (ELEM(ob->type, OB_MESH, OB_SURF, OB_MBALL)) {
     const int materials_len = DRW_cache_object_material_count_get(ob);
 
     EeveeMaterialCache *matcache = BLI_array_alloca(matcache, materials_len);

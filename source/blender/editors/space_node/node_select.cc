@@ -61,7 +61,7 @@
 
 #include "MEM_guardedalloc.h"
 
-#include "node_intern.h" /* own include */
+#include "node_intern.hh" /* own include */
 
 /**
  * Function to detect if there is a visible view3d that uses workbench in texture mode.
@@ -923,7 +923,7 @@ void NODE_OT_select_lasso(wmOperatorType *ot)
   ot->cancel = WM_gesture_lasso_cancel;
 
   /* flags */
-  ot->flag = OPTYPE_UNDO;
+  ot->flag = OPTYPE_UNDO | OPTYPE_DEPENDS_ON_CURSOR;
 
   /* properties */
   RNA_def_boolean(ot->srna,

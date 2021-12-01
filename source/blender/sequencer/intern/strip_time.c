@@ -131,12 +131,17 @@ static void seq_update_sound_bounds_recursive_impl(Scene *scene,
           endofs = seq->start + seq->len - end;
         }
 
+        double offset_time = 0.0f;
+        if (seq->sound != NULL) {
+          offset_time = seq->sound->offset_time;
+        }
+
         BKE_sound_move_scene_sound(scene,
                                    seq->scene_sound,
                                    seq->start + startofs,
                                    seq->start + seq->len - endofs,
                                    startofs + seq->anim_startofs,
-                                   seq->sound->offset_time);
+                                   offset_time);
       }
     }
   }
@@ -148,7 +153,7 @@ void seq_update_sound_bounds_recursive(Scene *scene, Sequence *metaseq)
       scene, metaseq, metaseq_start(metaseq), metaseq_end(metaseq));
 }
 
-void SEQ_time_update_sequence_bounds(Scene *scene, Sequence *seq)
+static void seq_time_update_sequence_bounds(Scene *scene, Sequence *seq)
 {
   if (seq->startofs && seq->startstill) {
     seq->startstill = 0;
@@ -195,7 +200,7 @@ void SEQ_time_update_meta_strip_range(Scene *scene, Sequence *seq_meta)
   SEQ_transform_set_right_handle_frame(seq_meta, seq_meta->enddisp);
 }
 
-void SEQ_time_update_sequence(Scene *scene, Sequence *seq)
+void SEQ_time_update_sequence(Scene *scene, ListBase *seqbase, Sequence *seq)
 {
   Sequence *seqm;
 
@@ -203,7 +208,7 @@ void SEQ_time_update_sequence(Scene *scene, Sequence *seq)
   seqm = seq->seqbase.first;
   while (seqm) {
     if (seqm->seqbase.first) {
-      SEQ_time_update_sequence(scene, seqm);
+      SEQ_time_update_sequence(scene, &seqm->seqbase, seqm);
     }
     seqm = seqm->next;
   }
@@ -241,21 +246,83 @@ void SEQ_time_update_sequence(Scene *scene, Sequence *seq)
       seq->len = seq->enddisp - seq->startdisp;
     }
     else {
-      SEQ_time_update_sequence_bounds(scene, seq);
+      seq_time_update_sequence_bounds(scene, seq);
     }
   }
+  else if (seq->type == SEQ_TYPE_META) {
+    seq_time_update_meta_strip(scene, seq);
+  }
   else {
-    if (seq->type == SEQ_TYPE_META) {
-      seq_time_update_meta_strip(scene, seq);
-    }
+    seq_time_update_sequence_bounds(scene, seq);
+  }
 
-    Editing *ed = SEQ_editing_get(scene);
-    MetaStack *ms = SEQ_meta_stack_active_get(ed);
-    if (ms != NULL) {
-      SEQ_time_update_meta_strip_range(scene, ms->parseq);
-    }
+  Editing *ed = SEQ_editing_get(scene);
 
-    SEQ_time_update_sequence_bounds(scene, seq);
+  /* Strip is inside meta strip */
+  if (seqbase != &ed->seqbase) {
+    Sequence *meta = SEQ_get_meta_by_seqbase(&ed->seqbase, seqbase);
+    SEQ_time_update_meta_strip_range(scene, meta);
+  }
+
+  seq_time_update_sequence_bounds(scene, seq);
+}
+
+static bool update_changed_seq_recurs(Scene *scene, Sequence *seq, Sequence *changed_seq)
+{
+  Sequence *subseq;
+  bool do_update = false;
+
+  /* recurse downwards to see if this seq depends on the changed seq */
+
+  if (seq == NULL) {
+    return false;
+  }
+
+  if (seq == changed_seq) {
+    do_update = true;
+  }
+
+  for (subseq = seq->seqbase.first; subseq; subseq = subseq->next) {
+    if (update_changed_seq_recurs(scene, subseq, changed_seq)) {
+      do_update = true;
+    }
+  }
+
+  if (seq->seq1) {
+    if (update_changed_seq_recurs(scene, seq->seq1, changed_seq)) {
+      do_update = true;
+    }
+  }
+  if (seq->seq2 && (seq->seq2 != seq->seq1)) {
+    if (update_changed_seq_recurs(scene, seq->seq2, changed_seq)) {
+      do_update = true;
+    }
+  }
+  if (seq->seq3 && (seq->seq3 != seq->seq1) && (seq->seq3 != seq->seq2)) {
+    if (update_changed_seq_recurs(scene, seq->seq3, changed_seq)) {
+      do_update = true;
+    }
+  }
+
+  if (do_update) {
+    ListBase *seqbase = SEQ_active_seqbase_get(SEQ_editing_get(scene));
+    SEQ_time_update_sequence(scene, seqbase, seq);
+  }
+
+  return do_update;
+}
+
+void SEQ_time_update_recursive(Scene *scene, Sequence *changed_seq)
+{
+  Editing *ed = SEQ_editing_get(scene);
+  Sequence *seq;
+
+  if (ed == NULL) {
+    return;
+  }
+
+  for (seq = ed->seqbase.first; seq; seq = seq->next) {
+    update_changed_seq_recurs(scene, seq, changed_seq);
   }
 }
 
@@ -368,19 +435,27 @@ float SEQ_time_sequence_get_fps(Scene *scene, Sequence *seq)
 }
 
 /**
- * Define boundary rectangle of sequencer timeline and fill in rect data
+ * Initialize given rectangle with the Scene's timeline boundaries.
  *
- * \param scene: Scene in which strips are located
- * \param seqbase: ListBase in which strips are located
- * \param rect: data structure describing rectangle, that will be filled in by this function
+ * \param scene: the Scene instance whose timeline boundaries are extracted from
+ * \param rect: output parameter to be filled with timeline boundaries
  */
-void SEQ_timeline_boundbox(const Scene *scene, const ListBase *seqbase, rctf *rect)
+void SEQ_timeline_init_boundbox(const Scene *scene, rctf *rect)
 {
   rect->xmin = scene->r.sfra;
   rect->xmax = scene->r.efra + 1;
   rect->ymin = 0.0f;
   rect->ymax = 8.0f;
+}
 
+/**
+ * Stretch the given rectangle to include the given strips boundaries
+ *
+ * \param seqbase: ListBase in which strips are located
+ * \param rect: output parameter to be filled with strips' boundaries
+ */
+void SEQ_timeline_expand_boundbox(const ListBase *seqbase, rctf *rect)
+{
   if (seqbase == NULL) {
     return;
   }
@@ -396,6 +471,19 @@ void SEQ_timeline_boundbox(const Scene *scene, const ListBase *seqbase, rctf *re
       rect->ymax = seq->machine + 2;
     }
   }
+}
+
+/**
+ * Define boundary rectangle of sequencer timeline and fill in rect data
+ *
+ * \param scene: Scene in which strips are located
+ * \param seqbase: ListBase in which strips are located
+ * \param rect: data structure describing rectangle, that will be filled in by this function
+ */
+void SEQ_timeline_boundbox(const Scene *scene, const ListBase *seqbase, rctf *rect)
+{
+  SEQ_timeline_init_boundbox(scene, rect);
+  SEQ_timeline_expand_boundbox(seqbase, rect);
 }
 
 static bool strip_exists_at_frame(SeqCollection *all_strips, const int timeline_frame)

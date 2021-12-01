@@ -123,7 +123,7 @@ void BKE_mesh_eval_delete(struct Mesh *mesh_eval);
 
 /* Performs copy for use during evaluation,
  * optional referencing original arrays to reduce memory. */
-struct Mesh *BKE_mesh_copy_for_eval(struct Mesh *source, bool reference);
+struct Mesh *BKE_mesh_copy_for_eval(const struct Mesh *source, bool reference);
 
 /* These functions construct a new Mesh,
  * contrary to BKE_mesh_to_curve_nurblist which modifies ob itself. */
@@ -209,6 +209,7 @@ struct Mesh *BKE_mesh_create_derived_for_modifier(struct Depsgraph *depsgraph,
                                                   struct Scene *scene,
                                                   struct Object *ob_eval,
                                                   struct ModifierData *md_eval,
+                                                  const bool use_virtual_modifiers,
                                                   const bool build_shapekey_layers);
 
 /* Copies a nomain-Mesh into an existing Mesh. */
@@ -651,9 +652,8 @@ extern void (*BKE_mesh_batch_cache_free_cb)(struct Mesh *me);
 
 /* Inlines */
 
-/* Instead of -1 that function uses ORIGINDEX_NONE as defined in BKE_customdata.h,
- * but I don't want to force every user of BKE_mesh.h to also include that file.
- * ~~ Sybren */
+/* NOTE(@sybren): Instead of -1 that function uses ORIGINDEX_NONE as defined in BKE_customdata.h,
+ * but I don't want to force every user of BKE_mesh.h to also include that file. */
 BLI_INLINE int BKE_mesh_origindex_mface_mpoly(const int *index_mf_to_mpoly,
                                               const int *index_mp_to_orig,
                                               const int i)

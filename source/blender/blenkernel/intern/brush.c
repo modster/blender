@@ -33,6 +33,7 @@
 
 #include "BLT_translation.h"
 
+#include "BKE_bpath.h"
 #include "BKE_brush.h"
 #include "BKE_colortools.h"
 #include "BKE_context.h"
@@ -161,7 +162,13 @@ static void brush_make_local(Main *bmain, ID *id, const int flags)
 
   if (brush->clone.image) {
     /* Special case: ima always local immediately. Clone image should only have one user anyway. */
-    BKE_lib_id_make_local(bmain, &brush->clone.image->id, false, 0);
+    /* FIXME: Recursive calls affecting other non-embedded IDs are really bad and should be avoided
+     * in IDType callbacks. Higher-level ID management code usually does not expect such things and
+     * does not deal properly with it. */
+    /* NOTE: assert below ensures that the comment above is valid, and that that exception is
+     * acceptable for the time being. */
+    BKE_lib_id_make_local(bmain, &brush->clone.image->id, 0);
+    BLI_assert(brush->clone.image->id.lib == NULL && brush->clone.image->id.newid == NULL);
   }
 
   if (!force_local && !force_copy) {
@@ -177,8 +184,8 @@ static void brush_make_local(Main *bmain, ID *id, const int flags)
   }
 
   if (force_local) {
-    BKE_lib_id_clear_library_data(bmain, &brush->id);
-    BKE_lib_id_expand_local(bmain, &brush->id);
+    BKE_lib_id_clear_library_data(bmain, &brush->id, flags);
+    BKE_lib_id_expand_local(bmain, &brush->id, flags);
 
     /* enable fake user by default */
     id_fake_user_set(&brush->id);
@@ -201,14 +208,23 @@ static void brush_foreach_id(ID *id, LibraryForeachIDData *data)
 {
   Brush *brush = (Brush *)id;
 
-  BKE_LIB_FOREACHID_PROCESS(data, brush->toggle_brush, IDWALK_CB_NOP);
-  BKE_LIB_FOREACHID_PROCESS(data, brush->clone.image, IDWALK_CB_NOP);
-  BKE_LIB_FOREACHID_PROCESS(data, brush->paint_curve, IDWALK_CB_USER);
+  BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, brush->toggle_brush, IDWALK_CB_NOP);
+  BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, brush->clone.image, IDWALK_CB_NOP);
+  BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, brush->paint_curve, IDWALK_CB_USER);
   if (brush->gpencil_settings) {
-    BKE_LIB_FOREACHID_PROCESS(data, brush->gpencil_settings->material, IDWALK_CB_USER);
+    BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, brush->gpencil_settings->material, IDWALK_CB_USER);
   }
-  BKE_texture_mtex_foreach_id(data, &brush->mtex);
-  BKE_texture_mtex_foreach_id(data, &brush->mask_mtex);
+  BKE_LIB_FOREACHID_PROCESS_FUNCTION_CALL(data, BKE_texture_mtex_foreach_id(data, &brush->mtex));
+  BKE_LIB_FOREACHID_PROCESS_FUNCTION_CALL(data,
+                                          BKE_texture_mtex_foreach_id(data, &brush->mask_mtex));
+}
+
+static void brush_foreach_path(ID *id, BPathForeachPathData *bpath_data)
+{
+  Brush *brush = (Brush *)id;
+  if (brush->icon_filepath[0] != '\0') {
+    BKE_bpath_foreach_path_fixed_process(bpath_data, brush->icon_filepath);
+  }
 }
 
 static void brush_blend_write(BlendWriter *writer, ID *id, const void *id_address)
@@ -407,6 +423,7 @@ IDTypeInfo IDType_ID_BR = {
     .name_plural = "brushes",
     .translation_context = BLT_I18NCONTEXT_ID_BRUSH,
     .flags = IDTYPE_FLAGS_NO_ANIMDATA,
+    .asset_type_info = NULL,
 
     .init_data = brush_init_data,
     .copy_data = brush_copy_data,
@@ -414,6 +431,7 @@ IDTypeInfo IDType_ID_BR = {
     .make_local = brush_make_local,
     .foreach_id = brush_foreach_id,
     .foreach_cache = NULL,
+    .foreach_path = brush_foreach_path,
     .owner_get = NULL,
 
     .blend_write = brush_blend_write,
@@ -2468,7 +2486,7 @@ float BKE_brush_curve_strength(const Brush *br, float p, const float len)
 }
 
 /* Uses the brush curve control to find a strength value between 0 and 1 */
-float BKE_brush_curve_strength_clamped(Brush *br, float p, const float len)
+float BKE_brush_curve_strength_clamped(const Brush *br, float p, const float len)
 {
   float strength = BKE_brush_curve_strength(br, p, len);
 

@@ -40,7 +40,7 @@ static bool sh_fn_poll_default(bNodeType *UNUSED(ntype),
                                bNodeTree *ntree,
                                const char **r_disabled_hint)
 {
-  if (!STREQ(ntree->idname, "ShaderNodeTree") && !STREQ(ntree->idname, "GeometryNodeTree")) {
+  if (!STR_ELEM(ntree->idname, "ShaderNodeTree", "GeometryNodeTree")) {
     *r_disabled_hint = "Not a shader or geometry node tree";
     return false;
   }
@@ -54,7 +54,6 @@ void sh_node_type_base(
 
   ntype->poll = sh_node_poll_default;
   ntype->insert_link = node_insert_link_default;
-  ntype->update_internal_links = node_update_internal_links_default;
 }
 
 void sh_fn_node_type_base(bNodeType *ntype, int type, const char *name, short nclass, short flag)

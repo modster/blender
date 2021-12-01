@@ -84,7 +84,7 @@ Depsgraph *animviz_depsgraph_build(Main *bmain,
 
   /* Make a flat array of IDs for the DEG API. */
   const int num_ids = BLI_listbase_count(targets);
-  ID **ids = MEM_malloc_arrayN(sizeof(ID *), num_ids, "animviz IDS");
+  ID **ids = MEM_malloc_arrayN(num_ids, sizeof(ID *), "animviz IDS");
   int current_id_index = 0;
   for (MPathTarget *mpt = targets->first; mpt != NULL; mpt = mpt->next) {
     ids[current_id_index++] = &mpt->ob->id;
@@ -176,11 +176,11 @@ static void motionpaths_calc_bake_targets(ListBase *targets, int cframe)
         copy_v3_v3(mpv->co, pchan_eval->pose_tail);
       }
 
-      /* result must be in worldspace */
+      /* Result must be in world-space. */
       mul_m4_v3(ob_eval->obmat, mpv->co);
     }
     else {
-      /* worldspace object location */
+      /* World-space object location. */
       copy_v3_v3(mpv->co, ob_eval->obmat[3]);
     }
 

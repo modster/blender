@@ -795,15 +795,16 @@ static void gpencil_primitive_update_strokes(bContext *C, tGPDprimitive *tgpi)
                              (ts->gpencil_v3d_align & GP_PROJECT_DEPTH_STROKE) ?
                                  V3D_DEPTH_GPENCIL_ONLY :
                                  V3D_DEPTH_NO_GPENCIL,
-                             NULL);
+                             &tgpi->depths);
 
     depth_arr = MEM_mallocN(sizeof(float) * gps->totpoints, "depth_points");
+    const ViewDepths *depths = tgpi->depths;
     tGPspoint *ptc = &points2D[0];
     for (int i = 0; i < gps->totpoints; i++, ptc++) {
       round_v2i_v2fl(mval_i, &ptc->x);
-      if ((ED_view3d_autodist_depth(tgpi->region, mval_i, depth_margin, depth_arr + i) == 0) &&
-          (i && (ED_view3d_autodist_depth_seg(
-                     tgpi->region, mval_i, mval_prev, depth_margin + 1, depth_arr + i) == 0))) {
+      if ((ED_view3d_depth_read_cached(depths, mval_i, depth_margin, depth_arr + i) == 0) &&
+          (i && (ED_view3d_depth_read_cached_seg(
+                     depths, mval_i, mval_prev, depth_margin + 1, depth_arr + i) == 0))) {
         interp_depth = true;
       }
       else {
@@ -840,7 +841,7 @@ static void gpencil_primitive_update_strokes(bContext *C, tGPDprimitive *tgpi)
           /* find first valid contact point */
           int i;
           for (i = 0; i < gps->totpoints; i++) {
-            if (depth_arr[i] != FLT_MAX) {
+            if (depth_arr[i] != DEPTH_INVALID) {
               break;
             }
           }
@@ -852,7 +853,7 @@ static void gpencil_primitive_update_strokes(bContext *C, tGPDprimitive *tgpi)
           }
           else {
             for (i = gps->totpoints - 1; i >= 0; i--) {
-              if (depth_arr[i] != FLT_MAX) {
+              if (depth_arr[i] != DEPTH_INVALID) {
                 break;
               }
             }
@@ -863,14 +864,14 @@ static void gpencil_primitive_update_strokes(bContext *C, tGPDprimitive *tgpi)
            * first and last contact in an imaginary line between them */
           for (i = 0; i < gps->totpoints; i++) {
             if (!ELEM(i, first_valid, last_valid)) {
-              depth_arr[i] = FLT_MAX;
+              depth_arr[i] = DEPTH_INVALID;
             }
           }
           interp_depth = true;
         }
 
         if (interp_depth) {
-          interp_sparse_array(depth_arr, gps->totpoints, FLT_MAX);
+          interp_sparse_array(depth_arr, gps->totpoints, DEPTH_INVALID);
         }
       }
     }
@@ -1040,7 +1041,7 @@ static void gpencil_primitive_update_strokes(bContext *C, tGPDprimitive *tgpi)
         gpd->runtime.sbuffer, &gpd->runtime.sbuffer_size, &gpd->runtime.sbuffer_used, false);
 
     /* add small offset to keep stroke over the surface */
-    if ((depth_arr) && (gpd->zdepth_offset > 0.0f)) {
+    if ((depth_arr) && (gpd->zdepth_offset > 0.0f) && (depth_arr[i] != DEPTH_INVALID)) {
       depth_arr[i] *= (1.0f - (gpd->zdepth_offset / 1000.0f));
     }
 
@@ -1152,6 +1153,11 @@ static void gpencil_primitive_exit(bContext *C, wmOperator *op)
     /* free random seed */
     if (tgpi->rng != NULL) {
       BLI_rng_free(tgpi->rng);
+    }
+
+    /* Remove depth buffer in cache. */
+    if (tgpi->depths) {
+      ED_view3d_depths_free(tgpi->depths);
     }
 
     MEM_freeN(tgpi);

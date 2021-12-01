@@ -47,7 +47,6 @@
 #include "BKE_anim_path.h"
 #include "BKE_curve.h"
 #include "BKE_displist.h"
-#include "BKE_font.h"
 #include "BKE_geometry_set.hh"
 #include "BKE_key.h"
 #include "BKE_lattice.h"
@@ -58,6 +57,7 @@
 #include "BKE_modifier.h"
 #include "BKE_object.h"
 #include "BKE_spline.hh"
+#include "BKE_vfont.h"
 
 #include "BLI_sys_types.h" /* For #intptr_t support. */
 
@@ -65,8 +65,6 @@
 #include "DEG_depsgraph_query.h"
 
 using blender::IndexRange;
-
-static void boundbox_displist_object(Object *ob);
 
 static void displist_elem_free(DispList *dl)
 {
@@ -261,7 +259,7 @@ bool BKE_displist_surfindex_get(
   return true;
 }
 
-/* ****************** make displists ********************* */
+/* ****************** Make #DispList ********************* */
 #ifdef __INTEL_COMPILER
 /* ICC with the optimization -02 causes crashes. */
 #  pragma intel optimization_level 1
@@ -1504,7 +1502,7 @@ void BKE_displist_make_curveTypes(Depsgraph *depsgraph,
   cow_curve.curve_eval = nullptr;
 
   ob->runtime.curve_cache = (CurveCache *)MEM_callocN(sizeof(CurveCache), __func__);
-  ListBase *dispbase = &(ob->runtime.curve_cache->disp);
+  ListBase *dispbase = &ob->runtime.curve_cache->disp;
 
   if (ob->type == OB_SURF) {
     Mesh *mesh_eval;
@@ -1524,37 +1522,11 @@ void BKE_displist_make_curveTypes(Depsgraph *depsgraph,
       cow_curve.curve_eval = curve_component.get_for_write();
       BKE_object_eval_assign_data(ob, &cow_curve.id, false);
     }
-    else if (geometry.has_mesh()) {
-      /* Most areas of Blender don't yet know how to look in #geometry_set_eval for evaluated mesh
-       * data, and look in #data_eval instead. When the object evaluates to a curve, that field
-       * must be used for the evaluated curve data, but otherwise we can use the field to store a
-       * pointer to the mesh, so more areas can retrieve the mesh. */
-      MeshComponent &mesh_component = geometry.get_component_for_write<MeshComponent>();
-      Mesh *mesh_eval = mesh_component.get_for_write();
-      BKE_object_eval_assign_data(ob, &mesh_eval->id, false);
-    }
 
     ob->runtime.geometry_set_eval = new GeometrySet(std::move(geometry));
   }
 
-  boundbox_displist_object(ob);
-}
-
-void BKE_displist_make_curveTypes_forRender(
-    Depsgraph *depsgraph, const Scene *scene, Object *ob, ListBase *r_dispbase, Mesh **r_final)
-{
-  if (ob->runtime.curve_cache == nullptr) {
-    ob->runtime.curve_cache = (CurveCache *)MEM_callocN(sizeof(CurveCache), __func__);
-  }
-
-  if (ob->type == OB_SURF) {
-    evaluate_surface_object(depsgraph, scene, ob, true, r_dispbase, r_final);
-  }
-  else {
-    GeometrySet geometry_set = evaluate_curve_type_object(depsgraph, scene, ob, true, r_dispbase);
-    MeshComponent &mesh_component = geometry_set.get_component_for_write<MeshComponent>();
-    *r_final = mesh_component.release();
-  }
+  BKE_object_boundbox_calc_from_evaluated_geometry(ob);
 }
 
 void BKE_displist_minmax(const ListBase *dispbase, float min[3], float max[3])
@@ -1575,32 +1547,5 @@ void BKE_displist_minmax(const ListBase *dispbase, float min[3], float max[3])
     /* there's no geometry in displist, use zero-sized boundbox */
     zero_v3(min);
     zero_v3(max);
-  }
-}
-
-/* this is confusing, there's also min_max_object, applying the obmat... */
-static void boundbox_displist_object(Object *ob)
-{
-  BLI_assert(ELEM(ob->type, OB_CURVE, OB_SURF, OB_FONT));
-  /* Curve's BB is already calculated as a part of modifier stack,
-   * here we only calculate object BB based on final display list. */
-
-  /* object's BB is calculated from final displist */
-  if (ob->runtime.bb == nullptr) {
-    ob->runtime.bb = (BoundBox *)MEM_callocN(sizeof(BoundBox), __func__);
-  }
-
-  const Mesh *mesh_eval = BKE_object_get_evaluated_mesh(ob);
-  if (mesh_eval) {
-    BKE_object_boundbox_calc_from_mesh(ob, mesh_eval);
-  }
-  else {
-    float min[3], max[3];
-
-    INIT_MINMAX(min, max);
-    BKE_displist_minmax(&ob->runtime.curve_cache->disp, min, max);
-    BKE_boundbox_init_from_minmax(ob->runtime.bb, min, max);
-
-    ob->runtime.bb->flag &= ~BOUNDBOX_DIRTY;
   }
 }

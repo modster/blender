@@ -20,13 +20,12 @@
 
 namespace blender::fn {
 
-MFProcedureExecutor::MFProcedureExecutor(std::string name, const MFProcedure &procedure)
-    : procedure_(procedure)
+MFProcedureExecutor::MFProcedureExecutor(const MFProcedure &procedure) : procedure_(procedure)
 {
-  MFSignatureBuilder signature(std::move(name));
+  MFSignatureBuilder signature("Procedure Executor");
 
   for (const ConstMFParameter &param : procedure.params()) {
-    signature.add(param.variable->name(), MFParamType(param.type, param.variable->data_type()));
+    signature.add("Parameter", MFParamType(param.type, param.variable->data_type()));
   }
 
   signature_ = signature.build();
@@ -66,6 +65,7 @@ struct VariableValue_GVArray : public VariableValue {
 
   VariableValue_GVArray(const GVArray &data) : VariableValue(static_type), data(data)
   {
+    BLI_assert(data);
   }
 };
 
@@ -756,7 +756,7 @@ class VariableState : NonCopyable, NonMovable {
 
     switch (value_->type) {
       case ValueType::GVArray: {
-        const GVArray_Typed<bool> varray{this->value_as<VariableValue_GVArray>()->data};
+        const VArray<bool> varray = this->value_as<VariableValue_GVArray>()->data.typed<bool>();
         for (const int i : mask) {
           r_indices[varray[i]].append(i);
         }
@@ -978,7 +978,7 @@ static bool evaluate_as_one(const MultiFunction &fn,
     return false;
   }
   for (VariableState *state : param_variable_states) {
-    if (!state->is_one()) {
+    if (state != nullptr && !state->is_one()) {
       return false;
     }
   }
@@ -997,8 +997,13 @@ static void execute_call_instruction(const MFCallInstruction &instruction,
 
   for (const int param_index : fn.param_indices()) {
     const MFVariable *variable = instruction.params()[param_index];
-    VariableState &variable_state = variable_states.get_variable_state(*variable);
-    param_variable_states[param_index] = &variable_state;
+    if (variable == nullptr) {
+      param_variable_states[param_index] = nullptr;
+    }
+    else {
+      VariableState &variable_state = variable_states.get_variable_state(*variable);
+      param_variable_states[param_index] = &variable_state;
+    }
   }
 
   /* If all inputs to the function are constant, it's enough to call the function only once instead
@@ -1008,22 +1013,44 @@ static void execute_call_instruction(const MFCallInstruction &instruction,
 
     for (const int param_index : fn.param_indices()) {
       const MFParamType param_type = fn.param_type(param_index);
-      VariableState &variable_state = *param_variable_states[param_index];
-      variable_states.add_as_param__one(variable_state, params, param_type, mask);
+      VariableState *variable_state = param_variable_states[param_index];
+      if (variable_state == nullptr) {
+        params.add_ignored_single_output();
+      }
+      else {
+        variable_states.add_as_param__one(*variable_state, params, param_type, mask);
+      }
     }
 
-    fn.call(IndexRange(1), params, context);
+    try {
+      fn.call(IndexRange(1), params, context);
+    }
+    catch (...) {
+      /* Multi-functions must not throw exceptions. */
+      BLI_assert_unreachable();
+    }
   }
   else {
-    MFParamsBuilder params(fn, mask.min_array_size());
+    MFParamsBuilder params(fn, &mask);
 
     for (const int param_index : fn.param_indices()) {
       const MFParamType param_type = fn.param_type(param_index);
-      VariableState &variable_state = *param_variable_states[param_index];
-      variable_states.add_as_param(variable_state, params, param_type, mask);
+      VariableState *variable_state = param_variable_states[param_index];
+      if (variable_state == nullptr) {
+        params.add_ignored_single_output();
+      }
+      else {
+        variable_states.add_as_param(*variable_state, params, param_type, mask);
+      }
     }
 
-    fn.call(mask, params, context);
+    try {
+      fn.call_auto(mask, params, context);
+    }
+    catch (...) {
+      /* Multi-functions must not throw exceptions. */
+      BLI_assert_unreachable();
+    }
   }
 }
 
@@ -1207,6 +1234,14 @@ void MFProcedureExecutor::call(IndexMask full_mask, MFParams params, MFContext c
       }
     }
   }
+}
+
+MultiFunction::ExecutionHints MFProcedureExecutor::get_execution_hints() const
+{
+  ExecutionHints hints;
+  hints.allocates_array = true;
+  hints.min_grain_size = 10000;
+  return hints;
 }
 
 }  // namespace blender::fn

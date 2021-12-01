@@ -35,6 +35,7 @@ struct BlendDataReader;
 struct BlendExpander;
 struct BlendLibReader;
 struct BlendWriter;
+struct BPathForeachPathData;
 struct ID;
 struct LibraryForeachIDData;
 struct Main;
@@ -45,10 +46,15 @@ enum {
   IDTYPE_FLAGS_NO_COPY = 1 << 0,
   /** Indicates that the given IDType does not support linking/appending from a library file. */
   IDTYPE_FLAGS_NO_LIBLINKING = 1 << 1,
-  /** Indicates that the given IDType does not support making a library-linked ID local. */
-  IDTYPE_FLAGS_NO_MAKELOCAL = 1 << 2,
+  /** Indicates that the given IDType should not be directly linked from a library file, but may be
+   * appended.
+   * NOTE: Mutually exclusive with `IDTYPE_FLAGS_NO_LIBLINKING`. */
+  IDTYPE_FLAGS_ONLY_APPEND = 1 << 2,
+  /** Allow to re-use an existing local ID with matching weak library reference instead of creating
+   * a new copy of it, when appending. See also #LibraryWeakReference in `DNA_ID.h`. */
+  IDTYPE_FLAGS_APPEND_IS_REUSABLE = 1 << 3,
   /** Indicates that the given IDType does not have animation data. */
-  IDTYPE_FLAGS_NO_ANIMDATA = 1 << 3,
+  IDTYPE_FLAGS_NO_ANIMDATA = 1 << 4,
 };
 
 typedef struct IDCacheKey {
@@ -94,6 +100,8 @@ typedef void (*IDTypeForeachCacheFunctionCallback)(struct ID *id,
 typedef void (*IDTypeForeachCacheFunction)(struct ID *id,
                                            IDTypeForeachCacheFunctionCallback function_callback,
                                            void *user_data);
+
+typedef void (*IDTypeForeachPathFunction)(struct ID *id, struct BPathForeachPathData *bpath_data);
 
 typedef struct ID *(*IDTypeEmbeddedOwnerGetFunction)(struct Main *bmain, struct ID *id);
 
@@ -144,11 +152,12 @@ typedef struct IDTypeInfo {
   /** Generic info flags about that data-block type. */
   uint32_t flags;
 
-  /* ********** ID management callbacks ********** */
+  /**
+   * Information and callbacks for assets, based on the type of asset.
+   */
+  struct AssetTypeInfo *asset_type_info;
 
-  /* TODO: Note about callbacks: Ideally we could also handle here `BKE_lib_query`'s behavior, as
-   * well as read/write of files. However, this is a bit more involved than basic ID management
-   * callbacks, so we'll check on this later. */
+  /* ********** ID management callbacks ********** */
 
   /**
    * Initialize a new, empty calloc'ed data-block. May be NULL if there is nothing to do.
@@ -182,6 +191,11 @@ typedef struct IDTypeInfo {
    * Iterator over all cache pointers of given ID.
    */
   IDTypeForeachCacheFunction foreach_cache;
+
+  /**
+   * Iterator over all file paths of given ID.
+   */
+  IDTypeForeachPathFunction foreach_path;
 
   /**
    * For embedded IDs, return their owner ID.
@@ -283,8 +297,14 @@ const struct IDTypeInfo *BKE_idtype_get_info_from_id(const struct ID *id);
 const char *BKE_idtype_idcode_to_name(const short idcode);
 const char *BKE_idtype_idcode_to_name_plural(const short idcode);
 const char *BKE_idtype_idcode_to_translation_context(const short idcode);
-bool BKE_idtype_idcode_is_linkable(const short idcode);
+
 bool BKE_idtype_idcode_is_valid(const short idcode);
+
+bool BKE_idtype_idcode_is_linkable(const short idcode);
+bool BKE_idtype_idcode_is_only_appendable(const short idcode);
+bool BKE_idtype_idcode_append_is_reusable(const short idcode);
+/* Macro currently, since any linkable IDtype should be localizable. */
+#define BKE_idtype_idcode_is_localizable BKE_idtype_idcode_is_linkable
 
 short BKE_idtype_idcode_from_name(const char *idtype_name);
 

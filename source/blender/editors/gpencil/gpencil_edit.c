@@ -2635,7 +2635,7 @@ static int gpencil_delete_selected_points(bContext *C)
             else {
               /* delete unwanted points by splitting stroke into several smaller ones */
               BKE_gpencil_stroke_delete_tagged_points(
-                  gpd, gpf, gps, gps->next, GP_SPOINT_SELECT, false, 0);
+                  gpd, gpf, gps, gps->next, GP_SPOINT_SELECT, false, false, 0);
             }
 
             changed = true;
@@ -3556,7 +3556,7 @@ static int gpencil_stroke_join_exec(bContext *C, wmOperator *op)
 
   int tot_strokes = 0;
   /** Alloc memory. */
-  tJoinStrokes *strokes_list = MEM_malloc_arrayN(sizeof(tJoinStrokes), max_join_strokes, __func__);
+  tJoinStrokes *strokes_list = MEM_malloc_arrayN(max_join_strokes, sizeof(tJoinStrokes), __func__);
   tJoinStrokes *elem = NULL;
   /* Read all selected strokes to create a list. */
   CTX_DATA_BEGIN (C, bGPDlayer *, gpl, editable_gpencil_layers) {
@@ -3758,7 +3758,6 @@ static int gpencil_strokes_reproject_exec(bContext *C, wmOperator *op)
   bGPdata *gpd = ED_gpencil_data_get_active(C);
   Scene *scene = CTX_data_scene(C);
   Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
-  ARegion *region = CTX_wm_region(C);
   int oldframe = (int)DEG_get_ctime(depsgraph);
   const eGP_ReprojectModes mode = RNA_enum_get(op->ptr, "type");
   const bool keep_original = RNA_boolean_get(op->ptr, "keep_original");
@@ -3767,7 +3766,7 @@ static int gpencil_strokes_reproject_exec(bContext *C, wmOperator *op)
 
   /* Init snap context for geometry projection. */
   SnapObjectContext *sctx = NULL;
-  sctx = ED_transform_snap_object_context_create_view3d(scene, 0, region, CTX_wm_view3d(C));
+  sctx = ED_transform_snap_object_context_create(scene, 0);
 
   bool changed = false;
   /* Init space conversion stuff. */
@@ -4657,11 +4656,11 @@ static int gpencil_stroke_separate_exec(bContext *C, wmOperator *op)
 
                   /* delete selected points from destination stroke */
                   BKE_gpencil_stroke_delete_tagged_points(
-                      gpd_dst, gpf_dst, gps_dst, NULL, GP_SPOINT_SELECT, false, 0);
+                      gpd_dst, gpf_dst, gps_dst, NULL, GP_SPOINT_SELECT, false, false, 0);
 
                   /* delete selected points from origin stroke */
                   BKE_gpencil_stroke_delete_tagged_points(
-                      gpd_src, gpf, gps, gps->next, GP_SPOINT_SELECT, false, 0);
+                      gpd_src, gpf, gps, gps->next, GP_SPOINT_SELECT, false, false, 0);
                 }
               }
               /* selected strokes mode */
@@ -4729,7 +4728,7 @@ static int gpencil_stroke_separate_exec(bContext *C, wmOperator *op)
   /* Remove unused slots. */
   int actcol = ob_dst->actcol;
   for (int slot = 1; slot <= ob_dst->totcol; slot++) {
-    while (slot <= ob_dst->totcol && !BKE_object_material_slot_used(ob_dst->data, slot)) {
+    while (slot <= ob_dst->totcol && !BKE_object_material_slot_used(ob_dst, slot)) {
       ob_dst->actcol = slot;
       BKE_object_material_slot_remove(bmain, ob_dst);
       if (actcol >= slot) {
@@ -4840,11 +4839,11 @@ static int gpencil_stroke_split_exec(bContext *C, wmOperator *op)
 
               /* delete selected points from destination stroke */
               BKE_gpencil_stroke_delete_tagged_points(
-                  gpd, gpf, gps_dst, NULL, GP_SPOINT_SELECT, true, 0);
+                  gpd, gpf, gps_dst, NULL, GP_SPOINT_SELECT, true, false, 0);
 
               /* delete selected points from origin stroke */
               BKE_gpencil_stroke_delete_tagged_points(
-                  gpd, gpf, gps, gps->next, GP_SPOINT_SELECT, false, 0);
+                  gpd, gpf, gps, gps->next, GP_SPOINT_SELECT, false, false, 0);
             }
           }
         }
@@ -5040,7 +5039,7 @@ static void gpencil_cutter_dissolve(bGPdata *gpd,
     }
 
     BKE_gpencil_stroke_delete_tagged_points(
-        gpd, hit_layer->actframe, hit_stroke, gpsn, GP_SPOINT_TAG, false, 1);
+        gpd, hit_layer->actframe, hit_stroke, gpsn, GP_SPOINT_TAG, false, flat_caps, 1);
   }
 }
 
@@ -5243,7 +5242,7 @@ void GPENCIL_OT_stroke_cutter(wmOperatorType *ot)
   ot->cancel = WM_gesture_lasso_cancel;
 
   /* flag */
-  ot->flag = OPTYPE_UNDO;
+  ot->flag = OPTYPE_UNDO | OPTYPE_DEPENDS_ON_CURSOR;
 
   /* properties */
   WM_operator_properties_gesture_lasso(ot);

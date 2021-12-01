@@ -268,28 +268,28 @@ static bool eyedropper_cryptomatte_sample_fl(
     return false;
   }
 
-  ARegion *ar = BKE_area_find_region_xy(sa, RGN_TYPE_WINDOW, mx, my);
-  if (!ar) {
+  ARegion *region = BKE_area_find_region_xy(sa, RGN_TYPE_WINDOW, mx, my);
+  if (!region) {
     return false;
   }
 
-  int mval[2] = {mx - ar->winrct.xmin, my - ar->winrct.ymin};
+  int mval[2] = {mx - region->winrct.xmin, my - region->winrct.ymin};
   float fpos[2] = {-1.0f, -1.0};
   switch (sa->spacetype) {
     case SPACE_IMAGE: {
       SpaceImage *sima = sa->spacedata.first;
-      ED_space_image_get_position(sima, ar, mval, fpos);
+      ED_space_image_get_position(sima, region, mval, fpos);
       break;
     }
     case SPACE_NODE: {
       Main *bmain = CTX_data_main(C);
       SpaceNode *snode = sa->spacedata.first;
-      ED_space_node_get_position(bmain, snode, ar, mval, fpos);
+      ED_space_node_get_position(bmain, snode, region, mval, fpos);
       break;
     }
     case SPACE_CLIP: {
       SpaceClip *sc = sa->spacedata.first;
-      ED_space_clip_get_position(sc, ar, mval, fpos);
+      ED_space_clip_get_position(sc, region, mval, fpos);
       break;
     }
     default: {
@@ -481,7 +481,7 @@ static int eyedropper_modal(bContext *C, wmOperator *op, const wmEvent *event)
       case EYE_MODAL_SAMPLE_CONFIRM: {
         const bool is_undo = eye->is_undo;
         if (eye->accum_tot == 0) {
-          eyedropper_color_sample(C, eye, event->x, event->y);
+          eyedropper_color_sample(C, eye, event->xy[0], event->xy[1]);
         }
         eyedropper_exit(C, op);
         /* Could support finished & undo-skip. */
@@ -490,23 +490,23 @@ static int eyedropper_modal(bContext *C, wmOperator *op, const wmEvent *event)
       case EYE_MODAL_SAMPLE_BEGIN:
         /* enable accum and make first sample */
         eye->accum_start = true;
-        eyedropper_color_sample(C, eye, event->x, event->y);
+        eyedropper_color_sample(C, eye, event->xy[0], event->xy[1]);
         break;
       case EYE_MODAL_SAMPLE_RESET:
         eye->accum_tot = 0;
         zero_v3(eye->accum_col);
-        eyedropper_color_sample(C, eye, event->x, event->y);
+        eyedropper_color_sample(C, eye, event->xy[0], event->xy[1]);
         break;
     }
   }
   else if (ELEM(event->type, MOUSEMOVE, INBETWEEN_MOUSEMOVE)) {
     if (eye->accum_start) {
       /* button is pressed so keep sampling */
-      eyedropper_color_sample(C, eye, event->x, event->y);
+      eyedropper_color_sample(C, eye, event->xy[0], event->xy[1]);
     }
 
     if (eye->draw_handle_sample_text) {
-      eyedropper_color_sample_text_update(C, eye, event->x, event->y);
+      eyedropper_color_sample_text_update(C, eye, event->xy[0], event->xy[1]);
       ED_region_tag_redraw(CTX_wm_region(C));
     }
   }

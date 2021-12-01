@@ -27,6 +27,8 @@
 
 #include "ED_numinput.h"
 
+#define DEPTH_INVALID 1.0f
+
 /* internal exports only */
 struct Material;
 struct bGPDspoint;
@@ -155,6 +157,8 @@ typedef struct tGPDprimitive {
   struct Material *material;
   /** current brush */
   struct Brush *brush;
+  /** For operations that require occlusion testing. */
+  struct ViewDepths *depths;
 
   /** Settings to pass to gp_points_to_xy(). */
   GP_SpaceConversion gsc;

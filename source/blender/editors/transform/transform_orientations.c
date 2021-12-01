@@ -30,6 +30,7 @@
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_screen_types.h"
+#include "DNA_sequence_types.h"
 #include "DNA_space_types.h"
 #include "DNA_view3d_types.h"
 
@@ -51,6 +52,8 @@
 #include "BLT_translation.h"
 
 #include "ED_armature.h"
+
+#include "SEQ_select.h"
 
 #include "transform.h"
 #include "transform_orientations.h"
@@ -521,8 +524,19 @@ short ED_transform_calc_orientation_from_type_ex(const Scene *scene,
 {
   switch (orientation_index) {
     case V3D_ORIENT_GIMBAL: {
-      if (ob && gimbal_axis(ob, r_mat)) {
-        break;
+
+      if (ob) {
+        if (ob->mode & OB_MODE_POSE) {
+          const bPoseChannel *pchan = BKE_pose_channel_active(ob);
+          if (pchan && gimbal_axis_pose(ob, pchan, r_mat)) {
+            break;
+          }
+        }
+        else {
+          if (gimbal_axis_object(ob, r_mat)) {
+            break;
+          }
+        }
       }
       /* If not gimbal, fall through to normal. */
       ATTR_FALLTHROUGH;
@@ -600,6 +614,15 @@ short transform_orientation_matrix_get(bContext *C,
   if (orient_index == V3D_ORIENT_CUSTOM_MATRIX) {
     copy_m3_m3(r_spacemtx, custom);
     return V3D_ORIENT_CUSTOM_MATRIX;
+  }
+
+  if (t->spacetype == SPACE_SEQ && t->options & CTX_SEQUENCER_IMAGE) {
+    Scene *scene = t->scene;
+    Sequence *seq = SEQ_select_active_get(scene);
+    if (seq && seq->strip->transform && orient_index == V3D_ORIENT_LOCAL) {
+      axis_angle_to_mat3_single(r_spacemtx, 'Z', seq->strip->transform->rotation);
+      return orient_index;
+    }
   }
 
   Object *ob = CTX_data_active_object(C);

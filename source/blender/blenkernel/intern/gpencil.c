@@ -139,11 +139,11 @@ static void greasepencil_foreach_id(ID *id, LibraryForeachIDData *data)
   bGPdata *gpencil = (bGPdata *)id;
   /* materials */
   for (int i = 0; i < gpencil->totcol; i++) {
-    BKE_LIB_FOREACHID_PROCESS(data, gpencil->mat[i], IDWALK_CB_USER);
+    BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, gpencil->mat[i], IDWALK_CB_USER);
   }
 
   LISTBASE_FOREACH (bGPDlayer *, gplayer, &gpencil->layers) {
-    BKE_LIB_FOREACHID_PROCESS(data, gplayer->parent, IDWALK_CB_NOP);
+    BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, gplayer->parent, IDWALK_CB_NOP);
   }
 }
 
@@ -319,7 +319,8 @@ IDTypeInfo IDType_ID_GD = {
     .name = "GPencil",
     .name_plural = "grease_pencils",
     .translation_context = BLT_I18NCONTEXT_ID_GPENCIL,
-    .flags = 0,
+    .flags = IDTYPE_FLAGS_APPEND_IS_REUSABLE,
+    .asset_type_info = NULL,
 
     .init_data = NULL,
     .copy_data = greasepencil_copy_data,
@@ -327,6 +328,7 @@ IDTypeInfo IDType_ID_GD = {
     .make_local = NULL,
     .foreach_id = greasepencil_foreach_id,
     .foreach_cache = NULL,
+    .foreach_path = NULL,
     .owner_get = NULL,
 
     .blend_write = greasepencil_blend_write,
@@ -1044,7 +1046,6 @@ bGPDlayer *BKE_gpencil_layer_duplicate(const bGPDlayer *gpl_src,
                                        const bool dup_frames,
                                        const bool dup_strokes)
 {
-  const bGPDframe *gpf_src;
   bGPDframe *gpf_dst;
   bGPDlayer *gpl_dst;
 
@@ -1063,7 +1064,7 @@ bGPDlayer *BKE_gpencil_layer_duplicate(const bGPDlayer *gpl_src,
   /* copy frames */
   BLI_listbase_clear(&gpl_dst->frames);
   if (dup_frames) {
-    for (gpf_src = gpl_src->frames.first; gpf_src; gpf_src = gpf_src->next) {
+    LISTBASE_FOREACH (bGPDframe *, gpf_src, &gpl_src->frames) {
       /* make a copy of source frame */
       gpf_dst = BKE_gpencil_frame_duplicate(gpf_src, dup_strokes);
       BLI_addtail(&gpl_dst->frames, gpf_dst);
@@ -3063,13 +3064,12 @@ void BKE_gpencil_update_layer_transforms(const Depsgraph *depsgraph, Object *ob)
         Object *ob_parent = DEG_get_evaluated_object(depsgraph, gpl->parent);
         /* calculate new matrix */
         if (ELEM(gpl->partype, PAROBJECT, PARSKEL)) {
-          copy_m4_m4(cur_mat, ob_parent->obmat);
+          mul_m4_m4m4(cur_mat, ob->imat, ob_parent->obmat);
         }
         else if (gpl->partype == PARBONE) {
           bPoseChannel *pchan = BKE_pose_channel_find_name(ob_parent->pose, gpl->parsubstr);
           if (pchan != NULL) {
-            copy_m4_m4(cur_mat, ob->imat);
-            mul_m4_m4m4(cur_mat, ob_parent->obmat, pchan->pose_mat);
+            mul_m4_series(cur_mat, ob->imat, ob_parent->obmat, pchan->pose_mat);
           }
           else {
             unit_m4(cur_mat);

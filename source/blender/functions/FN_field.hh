@@ -77,29 +77,15 @@ class FieldNode {
   bool depends_on_input_;
 
  public:
-  FieldNode(bool is_input, bool depends_on_input)
-      : is_input_(is_input), depends_on_input_(depends_on_input)
-  {
-  }
+  FieldNode(bool is_input, bool depends_on_input);
 
   virtual ~FieldNode() = default;
 
   virtual const CPPType &output_cpp_type(int output_index) const = 0;
 
-  bool is_input() const
-  {
-    return is_input_;
-  }
-
-  bool is_operation() const
-  {
-    return !is_input_;
-  }
-
-  bool depends_on_input() const
-  {
-    return depends_on_input_;
-  }
+  bool is_input() const;
+  bool is_operation() const;
+  bool depends_on_input() const;
 
   /**
    * Invoke callback for every field input. It might be called multiple times for the same input.
@@ -107,25 +93,8 @@ class FieldNode {
    */
   virtual void foreach_field_input(FunctionRef<void(const FieldInput &)> foreach_fn) const = 0;
 
-  virtual uint64_t hash() const
-  {
-    return get_default_hash(this);
-  }
-
-  friend bool operator==(const FieldNode &a, const FieldNode &b)
-  {
-    return a.is_equal_to(b);
-  }
-
-  friend bool operator!=(const FieldNode &a, const FieldNode &b)
-  {
-    return !(a == b);
-  }
-
-  virtual bool is_equal_to(const FieldNode &other) const
-  {
-    return this == &other;
-  }
+  virtual uint64_t hash() const;
+  virtual bool is_equal_to(const FieldNode &other) const;
 };
 
 /**
@@ -209,11 +178,19 @@ class GFieldRef : public GFieldBase<const FieldNode *> {
   }
 };
 
+namespace detail {
+/* Utility class to make #is_field_v work. */
+struct TypedFieldBase {
+};
+}  // namespace detail
+
 /**
  * A typed version of #GField. It has the same memory layout as #GField.
  */
-template<typename T> class Field : public GField {
+template<typename T> class Field : public GField, detail::TypedFieldBase {
  public:
+  using base_type = T;
+
   Field() = default;
 
   Field(GField field) : GField(std::move(field))
@@ -227,6 +204,11 @@ template<typename T> class Field : public GField {
   }
 };
 
+/** True when T is any Field<...> type. */
+template<typename T>
+static constexpr bool is_field_v = std::is_base_of_v<detail::TypedFieldBase, T> &&
+                                   !std::is_same_v<detail::TypedFieldBase, T>;
+
 /**
  * A #FieldNode that allows composing existing fields into new fields.
  */
@@ -235,42 +217,20 @@ class FieldOperation : public FieldNode {
    * The multi-function used by this node. It is optionally owned.
    * Multi-functions with mutable or vector parameters are not supported currently.
    */
-  std::unique_ptr<const MultiFunction> owned_function_;
+  std::shared_ptr<const MultiFunction> owned_function_;
   const MultiFunction *function_;
 
   /** Inputs to the operation. */
   blender::Vector<GField> inputs_;
 
  public:
-  FieldOperation(std::unique_ptr<const MultiFunction> function, Vector<GField> inputs = {});
+  FieldOperation(std::shared_ptr<const MultiFunction> function, Vector<GField> inputs = {});
   FieldOperation(const MultiFunction &function, Vector<GField> inputs = {});
 
-  Span<GField> inputs() const
-  {
-    return inputs_;
-  }
+  Span<GField> inputs() const;
+  const MultiFunction &multi_function() const;
 
-  const MultiFunction &multi_function() const
-  {
-    return *function_;
-  }
-
-  const CPPType &output_cpp_type(int output_index) const override
-  {
-    int output_counter = 0;
-    for (const int param_index : function_->param_indices()) {
-      MFParamType param_type = function_->param_type(param_index);
-      if (param_type.is_output()) {
-        if (output_counter == output_index) {
-          return param_type.data_type().single_type();
-        }
-        output_counter++;
-      }
-    }
-    BLI_assert_unreachable();
-    return CPPType::get<float>();
-  }
-
+  const CPPType &output_cpp_type(int output_index) const override;
   void foreach_field_input(FunctionRef<void(const FieldInput &)> foreach_fn) const override;
 };
 
@@ -280,9 +240,19 @@ class FieldContext;
  * A #FieldNode that represents an input to the entire field-tree.
  */
 class FieldInput : public FieldNode {
+ public:
+  /* The order is also used for sorting in socket inspection. */
+  enum class Category {
+    NamedAttribute = 0,
+    Generated = 1,
+    AnonymousAttribute = 2,
+    Unknown,
+  };
+
  protected:
   const CPPType *type_;
   std::string debug_name_;
+  Category category_ = Category::Unknown;
 
  public:
   FieldInput(const CPPType &type, std::string debug_name = "");
@@ -291,32 +261,16 @@ class FieldInput : public FieldNode {
    * Get the value of this specific input based on the given context. The returned virtual array,
    * should live at least as long as the passed in #scope. May return null.
    */
-  virtual const GVArray *get_varray_for_context(const FieldContext &context,
-                                                IndexMask mask,
-                                                ResourceScope &scope) const = 0;
+  virtual GVArray get_varray_for_context(const FieldContext &context,
+                                         IndexMask mask,
+                                         ResourceScope &scope) const = 0;
 
-  virtual std::string socket_inspection_name() const
-  {
-    return debug_name_;
-  }
+  virtual std::string socket_inspection_name() const;
+  blender::StringRef debug_name() const;
+  const CPPType &cpp_type() const;
+  Category category() const;
 
-  blender::StringRef debug_name() const
-  {
-    return debug_name_;
-  }
-
-  const CPPType &cpp_type() const
-  {
-    return *type_;
-  }
-
-  const CPPType &output_cpp_type(int output_index) const override
-  {
-    BLI_assert(output_index == 0);
-    UNUSED_VARS_NDEBUG(output_index);
-    return *type_;
-  }
-
+  const CPPType &output_cpp_type(int output_index) const override;
   void foreach_field_input(FunctionRef<void(const FieldInput &)> foreach_fn) const override;
 };
 
@@ -327,9 +281,9 @@ class FieldContext {
  public:
   ~FieldContext() = default;
 
-  virtual const GVArray *get_varray_for_input(const FieldInput &field_input,
-                                              IndexMask mask,
-                                              ResourceScope &scope) const;
+  virtual GVArray get_varray_for_input(const FieldInput &field_input,
+                                       IndexMask mask,
+                                       ResourceScope &scope) const;
 };
 
 /**
@@ -348,8 +302,8 @@ class FieldEvaluator : NonMovable, NonCopyable {
   const FieldContext &context_;
   const IndexMask mask_;
   Vector<GField> fields_to_evaluate_;
-  Vector<GVMutableArray *> dst_varrays_;
-  Vector<const GVArray *> evaluated_varrays_;
+  Vector<GVMutableArray> dst_varrays_;
+  Vector<GVArray> evaluated_varrays_;
   Vector<OutputPointerInfo> output_pointer_infos_;
   bool is_evaluated_ = false;
 
@@ -376,13 +330,12 @@ class FieldEvaluator : NonMovable, NonCopyable {
    * \param field: Field to add to the evaluator.
    * \param dst: Mutable virtual array that the evaluated result for this field is be written into.
    */
-  int add_with_destination(GField field, GVMutableArray &dst);
+  int add_with_destination(GField field, GVMutableArray dst);
 
   /** Same as #add_with_destination but typed. */
-  template<typename T> int add_with_destination(Field<T> field, VMutableArray<T> &dst)
+  template<typename T> int add_with_destination(Field<T> field, VMutableArray<T> dst)
   {
-    GVMutableArray &varray = scope_.construct<GVMutableArray_For_VMutableArray<T>>(__func__, dst);
-    return this->add_with_destination(GField(std::move(field)), varray);
+    return this->add_with_destination(GField(std::move(field)), GVMutableArray(std::move(dst)));
   }
 
   /**
@@ -401,11 +354,10 @@ class FieldEvaluator : NonMovable, NonCopyable {
    */
   template<typename T> int add_with_destination(Field<T> field, MutableSpan<T> dst)
   {
-    GVMutableArray &varray = scope_.construct<GVMutableArray_For_MutableSpan<T>>(__func__, dst);
-    return this->add_with_destination(std::move(field), varray);
+    return this->add_with_destination(std::move(field), VMutableArray<T>::ForSpan(dst));
   }
 
-  int add(GField field, const GVArray **varray_ptr);
+  int add(GField field, GVArray *varray_ptr);
 
   /**
    * \param field: Field to add to the evaluator.
@@ -413,13 +365,13 @@ class FieldEvaluator : NonMovable, NonCopyable {
    *   assigned to the given position.
    * \return Index of the field in the evaluator which can be used in the #get_evaluated methods.
    */
-  template<typename T> int add(Field<T> field, const VArray<T> **varray_ptr)
+  template<typename T> int add(Field<T> field, VArray<T> *varray_ptr)
   {
     const int field_index = fields_to_evaluate_.append_and_get_index(std::move(field));
-    dst_varrays_.append(nullptr);
+    dst_varrays_.append({});
     output_pointer_infos_.append(OutputPointerInfo{
-        varray_ptr, [](void *dst, const GVArray &varray, ResourceScope &scope) {
-          *(const VArray<T> **)dst = &*scope.construct<GVArray_Typed<T>>(__func__, varray);
+        varray_ptr, [](void *dst, const GVArray &varray, ResourceScope &UNUSED(scope)) {
+          *(VArray<T> *)dst = varray.typed<T>();
         }});
     return field_index;
   }
@@ -437,14 +389,12 @@ class FieldEvaluator : NonMovable, NonCopyable {
   const GVArray &get_evaluated(const int field_index) const
   {
     BLI_assert(is_evaluated_);
-    return *evaluated_varrays_[field_index];
+    return evaluated_varrays_[field_index];
   }
 
-  template<typename T> const VArray<T> &get_evaluated(const int field_index)
+  template<typename T> VArray<T> get_evaluated(const int field_index)
   {
-    const GVArray &varray = this->get_evaluated(field_index);
-    GVArray_Typed<T> &typed_varray = scope_.construct<GVArray_Typed<T>>(__func__, varray);
-    return *typed_varray;
+    return this->get_evaluated(field_index).typed<T>();
   }
 
   /**
@@ -455,15 +405,15 @@ class FieldEvaluator : NonMovable, NonCopyable {
   IndexMask get_evaluated_as_mask(const int field_index);
 };
 
-Vector<const GVArray *> evaluate_fields(ResourceScope &scope,
-                                        Span<GFieldRef> fields_to_evaluate,
-                                        IndexMask mask,
-                                        const FieldContext &context,
-                                        Span<GVMutableArray *> dst_varrays = {});
+Vector<GVArray> evaluate_fields(ResourceScope &scope,
+                                Span<GFieldRef> fields_to_evaluate,
+                                IndexMask mask,
+                                const FieldContext &context,
+                                Span<GVMutableArray> dst_varrays = {});
 
-/* --------------------------------------------------------------------
- * Utility functions for simple field creation and evaluation.
- */
+/* -------------------------------------------------------------------- */
+/** \name Utility functions for simple field creation and evaluation
+ * \{ */
 
 void evaluate_constant_field(const GField &field, void *r_value);
 
@@ -482,6 +432,181 @@ template<typename T> Field<T> make_constant_field(T value)
   return Field<T>{GField{std::move(operation), 0}};
 }
 
+GField make_constant_field(const CPPType &type, const void *value);
+
 GField make_field_constant_if_possible(GField field);
+
+class IndexFieldInput final : public FieldInput {
+ public:
+  IndexFieldInput();
+
+  static GVArray get_index_varray(IndexMask mask, ResourceScope &scope);
+
+  GVArray get_varray_for_context(const FieldContext &context,
+                                 IndexMask mask,
+                                 ResourceScope &scope) const final;
+
+  uint64_t hash() const override;
+  bool is_equal_to(const fn::FieldNode &other) const override;
+};
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Value or Field Class
+ *
+ * Utility class that wraps a single value and a field, to simplify accessing both of the types.
+ * \{ */
+
+template<typename T> struct ValueOrField {
+  /** Value that is used when the field is empty. */
+  T value{};
+  Field<T> field;
+
+  ValueOrField() = default;
+
+  ValueOrField(T value) : value(std::move(value))
+  {
+  }
+
+  ValueOrField(Field<T> field) : field(std::move(field))
+  {
+  }
+
+  bool is_field() const
+  {
+    return (bool)this->field;
+  }
+
+  Field<T> as_field() const
+  {
+    if (this->field) {
+      return this->field;
+    }
+    return make_constant_field(this->value);
+  }
+
+  T as_value() const
+  {
+    if (this->field) {
+      /* This returns a default value when the field is not constant. */
+      return evaluate_constant_field(this->field);
+    }
+    return this->value;
+  }
+};
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name #FieldNode Inline Methods
+ * \{ */
+
+inline FieldNode::FieldNode(bool is_input, bool depends_on_input)
+    : is_input_(is_input), depends_on_input_(depends_on_input)
+{
+}
+
+inline bool FieldNode::is_input() const
+{
+  return is_input_;
+}
+
+inline bool FieldNode::is_operation() const
+{
+  return !is_input_;
+}
+
+inline bool FieldNode::depends_on_input() const
+{
+  return depends_on_input_;
+}
+
+inline uint64_t FieldNode::hash() const
+{
+  return get_default_hash(this);
+}
+
+inline bool FieldNode::is_equal_to(const FieldNode &other) const
+{
+  return this == &other;
+}
+
+inline bool operator==(const FieldNode &a, const FieldNode &b)
+{
+  return a.is_equal_to(b);
+}
+
+inline bool operator!=(const FieldNode &a, const FieldNode &b)
+{
+  return !(a == b);
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name #FieldOperation Inline Methods
+ * \{ */
+
+inline Span<GField> FieldOperation::inputs() const
+{
+  return inputs_;
+}
+
+inline const MultiFunction &FieldOperation::multi_function() const
+{
+  return *function_;
+}
+
+inline const CPPType &FieldOperation::output_cpp_type(int output_index) const
+{
+  int output_counter = 0;
+  for (const int param_index : function_->param_indices()) {
+    MFParamType param_type = function_->param_type(param_index);
+    if (param_type.is_output()) {
+      if (output_counter == output_index) {
+        return param_type.data_type().single_type();
+      }
+      output_counter++;
+    }
+  }
+  BLI_assert_unreachable();
+  return CPPType::get<float>();
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name #FieldInput Inline Methods
+ * \{ */
+
+inline std::string FieldInput::socket_inspection_name() const
+{
+  return debug_name_;
+}
+
+inline StringRef FieldInput::debug_name() const
+{
+  return debug_name_;
+}
+
+inline const CPPType &FieldInput::cpp_type() const
+{
+  return *type_;
+}
+
+inline FieldInput::Category FieldInput::category() const
+{
+  return category_;
+}
+
+inline const CPPType &FieldInput::output_cpp_type(int output_index) const
+{
+  BLI_assert(output_index == 0);
+  UNUSED_VARS_NDEBUG(output_index);
+  return *type_;
+}
+
+/** \} */
 
 }  // namespace blender::fn

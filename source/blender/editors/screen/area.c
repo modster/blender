@@ -134,7 +134,7 @@ static void region_draw_emboss(const ARegion *region, const rcti *scirct, int si
   GPU_blend(GPU_BLEND_NONE);
 }
 
-void ED_region_pixelspace(ARegion *region)
+void ED_region_pixelspace(const ARegion *region)
 {
   wmOrtho2_region_pixelspace(region);
   GPU_matrix_identity_set();
@@ -594,7 +594,7 @@ void ED_region_do_draw(bContext *C, ARegion *region)
 
   memset(&region->drawrct, 0, sizeof(region->drawrct));
 
-  UI_blocklist_free_inactive(C, &region->uiblocks);
+  UI_blocklist_free_inactive(C, region);
 
   if (area) {
     const bScreen *screen = WM_window_get_active_screen(win);
@@ -882,7 +882,7 @@ static void area_azone_init(wmWindow *win, const bScreen *screen, ScrArea *area)
     return;
   }
 
-  if (U.app_flag & USER_APP_LOCK_UI_LAYOUT) {
+  if (U.app_flag & USER_APP_LOCK_CORNER_SPLIT) {
     return;
   }
 
@@ -972,29 +972,33 @@ static void fullscreen_azone_init(ScrArea *area, ARegion *region)
 #define AZONEPAD_ICON (0.45f * U.widget_unit)
 static void region_azone_edge(AZone *az, ARegion *region)
 {
+  /* If region is overlapped (transparent background), move #AZone to content.
+   * Note this is an arbitrary amount that matches nicely with numbers elsewhere. */
+  int overlap_padding = (region->overlap) ? (int)(0.4f * U.widget_unit) : 0;
+
   switch (az->edge) {
     case AE_TOP_TO_BOTTOMRIGHT:
       az->x1 = region->winrct.xmin;
-      az->y1 = region->winrct.ymax - AZONEPAD_EDGE;
+      az->y1 = region->winrct.ymax - AZONEPAD_EDGE - overlap_padding;
       az->x2 = region->winrct.xmax;
-      az->y2 = region->winrct.ymax + AZONEPAD_EDGE;
+      az->y2 = region->winrct.ymax + AZONEPAD_EDGE - overlap_padding;
       break;
     case AE_BOTTOM_TO_TOPLEFT:
       az->x1 = region->winrct.xmin;
-      az->y1 = region->winrct.ymin + AZONEPAD_EDGE;
+      az->y1 = region->winrct.ymin + AZONEPAD_EDGE + overlap_padding;
       az->x2 = region->winrct.xmax;
-      az->y2 = region->winrct.ymin - AZONEPAD_EDGE;
+      az->y2 = region->winrct.ymin - AZONEPAD_EDGE + overlap_padding;
       break;
     case AE_LEFT_TO_TOPRIGHT:
-      az->x1 = region->winrct.xmin - AZONEPAD_EDGE;
+      az->x1 = region->winrct.xmin - AZONEPAD_EDGE + overlap_padding;
       az->y1 = region->winrct.ymin;
-      az->x2 = region->winrct.xmin + AZONEPAD_EDGE;
+      az->x2 = region->winrct.xmin + AZONEPAD_EDGE + overlap_padding;
       az->y2 = region->winrct.ymax;
       break;
     case AE_RIGHT_TO_TOPLEFT:
-      az->x1 = region->winrct.xmax + AZONEPAD_EDGE;
+      az->x1 = region->winrct.xmax + AZONEPAD_EDGE - overlap_padding;
       az->y1 = region->winrct.ymin;
-      az->x2 = region->winrct.xmax - AZONEPAD_EDGE;
+      az->x2 = region->winrct.xmax - AZONEPAD_EDGE - overlap_padding;
       az->y2 = region->winrct.ymax;
       break;
   }
@@ -1055,6 +1059,14 @@ static bool region_azone_edge_poll(const ARegion *region, const bool is_fullscre
     return false;
   }
   if (!is_hidden && ELEM(region->regiontype, RGN_TYPE_HEADER, RGN_TYPE_TOOL_HEADER)) {
+    return false;
+  }
+
+  if (is_hidden && (U.app_flag & USER_APP_HIDE_REGION_TOGGLE)) {
+    return false;
+  }
+
+  if (!is_hidden && (U.app_flag & USER_APP_LOCK_EDGE_RESIZE)) {
     return false;
   }
 
@@ -1276,8 +1288,8 @@ bool ED_region_is_overlap(int spacetype, int regiontype)
                RGN_TYPE_TOOLS,
                RGN_TYPE_UI,
                RGN_TYPE_TOOL_PROPS,
-               RGN_TYPE_HEADER,
-               RGN_TYPE_FOOTER)) {
+               RGN_TYPE_FOOTER,
+               RGN_TYPE_TOOL_HEADER)) {
         return true;
       }
     }
@@ -1365,7 +1377,7 @@ static void region_rect_recursive(
   else if (alignment == RGN_ALIGN_FLOAT) {
     /**
      * \note Currently this window type is only used for #RGN_TYPE_HUD,
-     * We expect the panel to resize it's self to be larger.
+     * We expect the panel to resize itself to be larger.
      *
      * This aligns to the lower left of the area.
      */
@@ -1673,7 +1685,7 @@ static bool event_in_markers_region(const ARegion *region, const wmEvent *event)
 {
   rcti rect = region->winrct;
   rect.ymax = rect.ymin + UI_MARKER_MARGIN_Y;
-  return BLI_rcti_isect_pt(&rect, event->x, event->y);
+  return BLI_rcti_isect_pt(&rect, event->xy[0], event->xy[1]);
 }
 
 /**
@@ -1690,6 +1702,9 @@ static void ed_default_handlers(
   if (flag & ED_KEYMAP_UI) {
     wmKeyMap *keymap = WM_keymap_ensure(wm->defaultconf, "User Interface", 0, 0);
     WM_event_add_keymap_handler(handlers, keymap);
+
+    ListBase *dropboxes = WM_dropboxmap_find("User Interface", 0, 0);
+    WM_event_add_dropbox_handler(handlers, dropboxes);
 
     /* user interface widgets */
     UI_region_handlers_add(handlers);
@@ -1727,10 +1742,14 @@ static void ed_default_handlers(
     WM_event_add_keymap_handler(handlers, keymap);
   }
   if (flag & ED_KEYMAP_TOOL) {
-    WM_event_add_keymap_handler_dynamic(
-        &region->handlers, WM_event_get_keymap_from_toolsystem_fallback, area);
-    WM_event_add_keymap_handler_dynamic(
-        &region->handlers, WM_event_get_keymap_from_toolsystem, area);
+    if (flag & ED_KEYMAP_GIZMO) {
+      WM_event_add_keymap_handler_dynamic(
+          &region->handlers, WM_event_get_keymap_from_toolsystem_with_gizmos, area);
+    }
+    else {
+      WM_event_add_keymap_handler_dynamic(
+          &region->handlers, WM_event_get_keymap_from_toolsystem, area);
+    }
   }
   if (flag & ED_KEYMAP_FRAMES) {
     /* frame changing/jumping (for all spaces) */
@@ -1897,7 +1916,7 @@ void ED_area_update_region_sizes(wmWindowManager *wm, wmWindow *win, ScrArea *ar
     /* Some AZones use View2D data which is only updated in region init, so call that first! */
     region_azones_add(screen, area, region);
   }
-  ED_area_azones_update(area, &win->eventstate->x);
+  ED_area_azones_update(area, win->eventstate->xy);
 
   area->flag &= ~AREA_FLAG_REGION_SIZE_UPDATE;
 }
@@ -1921,7 +1940,7 @@ void ED_area_init(wmWindowManager *wm, wmWindow *win, ScrArea *area)
   rcti window_rect;
   WM_window_rect_calc(win, &window_rect);
 
-  /* set typedefinitions */
+  /* Set type-definitions. */
   area->type = BKE_spacetype_from_id(area->spacetype);
 
   if (area->type == NULL) {
@@ -1966,7 +1985,7 @@ void ED_area_init(wmWindowManager *wm, wmWindow *win, ScrArea *area)
     }
     else {
       /* prevent uiblocks to run */
-      UI_blocklist_free(NULL, &region->uiblocks);
+      UI_blocklist_free(NULL, region);
     }
 
     /* Some AZones use View2D data which is only updated in region init, so call that first! */
@@ -1984,6 +2003,68 @@ void ED_area_init(wmWindowManager *wm, wmWindow *win, ScrArea *area)
       area->runtime.is_tool_set = true;
     }
   }
+}
+
+static void area_offscreen_init(ScrArea *area)
+{
+  area->type = BKE_spacetype_from_id(area->spacetype);
+
+  if (area->type == NULL) {
+    area->spacetype = SPACE_VIEW3D;
+    area->type = BKE_spacetype_from_id(area->spacetype);
+  }
+
+  LISTBASE_FOREACH (ARegion *, region, &area->regionbase) {
+    region->type = BKE_regiontype_from_id_or_first(area->type, region->regiontype);
+  }
+}
+
+ScrArea *ED_area_offscreen_create(wmWindow *win, eSpace_Type space_type)
+{
+  ScrArea *area = MEM_callocN(sizeof(*area), __func__);
+  area->spacetype = space_type;
+
+  screen_area_spacelink_add(WM_window_get_active_scene(win), area, space_type);
+  area_offscreen_init(area);
+
+  return area;
+}
+
+static void area_offscreen_exit(wmWindowManager *wm, wmWindow *win, ScrArea *area)
+{
+  if (area->type && area->type->exit) {
+    area->type->exit(wm, area);
+  }
+
+  LISTBASE_FOREACH (ARegion *, region, &area->regionbase) {
+    if (region->type && region->type->exit) {
+      region->type->exit(wm, region);
+    }
+
+    WM_event_modal_handler_region_replace(win, region, NULL);
+    WM_draw_region_free(region, true);
+
+    MEM_SAFE_FREE(region->headerstr);
+
+    if (region->regiontimer) {
+      WM_event_remove_timer(wm, win, region->regiontimer);
+      region->regiontimer = NULL;
+    }
+
+    if (wm->message_bus) {
+      WM_msgbus_clear_by_owner(wm->message_bus, region);
+    }
+  }
+
+  WM_event_modal_handler_area_replace(win, area, NULL);
+}
+
+void ED_area_offscreen_free(wmWindowManager *wm, wmWindow *win, ScrArea *area)
+{
+  area_offscreen_exit(wm, win, area);
+
+  BKE_screen_area_free(area);
+  MEM_freeN(area);
 }
 
 static void region_update_rect(ARegion *region)
@@ -2581,10 +2662,10 @@ static ThemeColorID region_background_color_id(const bContext *C, const ARegion 
     case RGN_TYPE_HEADER:
     case RGN_TYPE_TOOL_HEADER:
       if (ED_screen_area_active(C) || ED_area_is_global(area)) {
-        return TH_HEADER;
+        return TH_HEADER_ACTIVE;
       }
       else {
-        return TH_HEADERDESEL;
+        return TH_HEADER;
       }
     case RGN_TYPE_PREVIEW:
       return TH_PREVIEW_BACK;
@@ -2853,6 +2934,16 @@ static const char *region_panels_collect_categories(ARegion *region,
   return NULL;
 }
 
+static int panel_draw_width_from_max_width_get(const ARegion *region,
+                                               const PanelType *panel_type,
+                                               const int max_width)
+{
+  /* With a background, we want some extra padding. */
+  return UI_panel_should_show_background(region, panel_type) ?
+             max_width - UI_PANEL_MARGIN_X * 2.0f :
+             max_width;
+}
+
 /**
  * \param contexts: A NULL terminated array of context strings to match against.
  * Matching against any of these strings will draw the panel.
@@ -2900,11 +2991,9 @@ void ED_region_panels_layout_ex(const bContext *C,
     margin_x = category_tabs_width;
   }
 
-  const int w = BLI_rctf_size_x(&v2d->cur) - margin_x;
+  const int width_no_header = BLI_rctf_size_x(&v2d->cur) - margin_x;
   /* Works out to 10 * UI_UNIT_X or 20 * UI_UNIT_X. */
   const int em = (region->type->prefsizex) ? 10 : 20;
-
-  const int w_box_panel = w - UI_PANEL_BOX_STYLE_MARGIN * 2.0f;
 
   /* create panels */
   UI_panels_begin(C, region);
@@ -2930,6 +3019,7 @@ void ED_region_panels_layout_ex(const bContext *C,
         continue;
       }
     }
+    const int width = panel_draw_width_from_max_width_get(region, pt, width_no_header);
 
     if (panel && UI_panel_is_dragging(panel)) {
       /* Prevent View2d.tot rectangle size changes while dragging panels. */
@@ -2941,13 +3031,13 @@ void ED_region_panels_layout_ex(const bContext *C,
                   &region->panels,
                   pt,
                   panel,
-                  (pt->flag & PANEL_TYPE_DRAW_BOX) ? w_box_panel : w,
+                  (pt->flag & PANEL_TYPE_NO_HEADER) ? width_no_header : width,
                   em,
                   NULL,
                   search_filter);
   }
 
-  /* Draw "polyinstantaited" panels that don't have a 1 to 1 correspondence with their types. */
+  /* Draw "poly-instantiated" panels that don't have a 1 to 1 correspondence with their types. */
   if (has_instanced_panel) {
     LISTBASE_FOREACH (Panel *, panel, &region->panels) {
       if (panel->type == NULL) {
@@ -2960,6 +3050,7 @@ void ED_region_panels_layout_ex(const bContext *C,
           !STREQ(category, panel->type->category)) {
         continue;
       }
+      const int width = panel_draw_width_from_max_width_get(region, panel->type, width_no_header);
 
       if (panel && UI_panel_is_dragging(panel)) {
         /* Prevent View2d.tot rectangle size changes while dragging panels. */
@@ -2975,7 +3066,7 @@ void ED_region_panels_layout_ex(const bContext *C,
                     &region->panels,
                     panel->type,
                     panel,
-                    (panel->type->flag & PANEL_TYPE_DRAW_BOX) ? w_box_panel : w,
+                    (panel->type->flag & PANEL_TYPE_NO_HEADER) ? width_no_header : width,
                     em,
                     unique_panel_str,
                     search_filter);
@@ -2988,7 +3079,7 @@ void ED_region_panels_layout_ex(const bContext *C,
 
   /* before setting the view */
   if (region_layout_based) {
-    /* XXX, only single panel support atm.
+    /* XXX, only single panel support at the moment.
      * Can't use x/y values calculated above because they're not using the real height of panels,
      * instead they calculate offsets for the next panel to start drawing. */
     Panel *panel = region->panels.last;
@@ -3243,7 +3334,7 @@ bool ED_region_property_search(const bContext *C,
   }
 
   /* Free the panels and blocks, as they are only used for search. */
-  UI_blocklist_free(C, &region->uiblocks);
+  UI_blocklist_free(C, region);
   UI_panels_free_instanced(C, region);
   BKE_area_region_panels_free(&region->panels);
 

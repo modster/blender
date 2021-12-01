@@ -54,6 +54,7 @@
 #  include <AUD_Special.h>
 #endif
 
+#include "BKE_bpath.h"
 #include "BKE_global.h"
 #include "BKE_idtype.h"
 #include "BKE_lib_id.h"
@@ -133,6 +134,17 @@ static void sound_foreach_cache(ID *id,
   function_callback(id, &key, &sound->waveform, 0, user_data);
 }
 
+static void sound_foreach_path(ID *id, BPathForeachPathData *bpath_data)
+{
+  bSound *sound = (bSound *)id;
+  if (sound->packedfile != NULL && (bpath_data->flag & BKE_BPATH_FOREACH_PATH_SKIP_PACKED) != 0) {
+    return;
+  }
+
+  /* FIXME: This does not check for empty path... */
+  BKE_bpath_foreach_path_fixed_process(bpath_data, sound->filepath);
+}
+
 static void sound_blend_write(BlendWriter *writer, ID *id, const void *id_address)
 {
   bSound *sound = (bSound *)id;
@@ -204,7 +216,8 @@ IDTypeInfo IDType_ID_SO = {
     .name = "Sound",
     .name_plural = "sounds",
     .translation_context = BLT_I18NCONTEXT_ID_SOUND,
-    .flags = IDTYPE_FLAGS_NO_ANIMDATA,
+    .flags = IDTYPE_FLAGS_NO_ANIMDATA | IDTYPE_FLAGS_APPEND_IS_REUSABLE,
+    .asset_type_info = NULL,
 
     /* A fuzzy case, think NULLified content is OK here... */
     .init_data = NULL,
@@ -213,6 +226,7 @@ IDTypeInfo IDType_ID_SO = {
     .make_local = NULL,
     .foreach_id = NULL,
     .foreach_cache = sound_foreach_cache,
+    .foreach_path = sound_foreach_path,
     .owner_get = NULL,
 
     .blend_write = sound_blend_write,
@@ -702,13 +716,13 @@ void *BKE_sound_scene_add_scene_sound(
     Scene *scene, Sequence *sequence, int startframe, int endframe, int frameskip)
 {
   sound_verify_evaluated_id(&scene->id);
-  if (sequence->scene && scene != sequence->scene && sequence->sound) {
+  if (sequence->scene && scene != sequence->scene) {
     const double fps = FPS;
     return AUD_Sequence_add(scene->sound_scene,
                             sequence->scene->sound_scene,
                             startframe / fps,
                             endframe / fps,
-                            frameskip / fps + sequence->sound->offset_time);
+                            frameskip / fps);
   }
   return NULL;
 }
@@ -774,13 +788,13 @@ void BKE_sound_move_scene_sound(
 void BKE_sound_move_scene_sound_defaults(Scene *scene, Sequence *sequence)
 {
   sound_verify_evaluated_id(&scene->id);
-  if (sequence->scene_sound && sequence->sound) {
+  if (sequence->scene_sound) {
     BKE_sound_move_scene_sound(scene,
                                sequence->scene_sound,
                                sequence->startdisp,
                                sequence->enddisp,
                                sequence->startofs + sequence->anim_startofs,
-                               sequence->sound->offset_time);
+                               0.0);
   }
 }
 
@@ -1213,7 +1227,6 @@ static bool sound_info_from_playback_handle(void *playback_handle, SoundInfo *so
   AUD_SoundInfo info = AUD_getInfo(playback_handle);
   sound_info->specs.channels = (eSoundChannels)info.specs.channels;
   sound_info->length = info.length;
-  sound_info->start_offset = info.start_offset;
   return true;
 }
 
@@ -1229,6 +1242,47 @@ bool BKE_sound_info_get(struct Main *main, struct bSound *sound, SoundInfo *soun
   const bool result = sound_info_from_playback_handle(sound->playback_handle, sound_info);
   sound_free_audio(sound);
   return result;
+}
+
+bool BKE_sound_stream_info_get(struct Main *main,
+                               const char *filepath,
+                               int stream,
+                               SoundStreamInfo *sound_info)
+{
+  const char *path;
+  char str[FILE_MAX];
+  AUD_Sound *sound;
+  AUD_StreamInfo *stream_infos;
+  int stream_count;
+
+  BLI_strncpy(str, filepath, sizeof(str));
+  path = BKE_main_blendfile_path(main);
+  BLI_path_abs(str, path);
+
+  sound = AUD_Sound_file(str);
+  if (!sound) {
+    return false;
+  }
+
+  stream_count = AUD_Sound_getFileStreams(sound, &stream_infos);
+
+  AUD_Sound_free(sound);
+
+  if (!stream_infos) {
+    return false;
+  }
+
+  if ((stream < 0) || (stream >= stream_count)) {
+    free(stream_infos);
+    return false;
+  }
+
+  sound_info->start = stream_infos[stream].start;
+  sound_info->duration = stream_infos[stream].duration;
+
+  free(stream_infos);
+
+  return true;
 }
 
 #else /* WITH_AUDASPACE */
@@ -1396,6 +1450,14 @@ void BKE_sound_free_waveform(bSound *UNUSED(sound))
 bool BKE_sound_info_get(struct Main *UNUSED(main),
                         struct bSound *UNUSED(sound),
                         SoundInfo *UNUSED(sound_info))
+{
+  return false;
+}
+
+bool BKE_sound_stream_info_get(struct Main *UNUSED(main),
+                               const char *UNUSED(filepath),
+                               int UNUSED(stream),
+                               SoundStreamInfo *UNUSED(sound_info))
 {
   return false;
 }

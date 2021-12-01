@@ -2296,7 +2296,7 @@ static void softbody_calc_forces(
     sb_sfesf_threads_run(depsgraph, scene, ob, timenow, sb->totspring, NULL);
   }
 
-  /* after spring scan because it uses Effoctors too */
+  /* After spring scan because it uses effectors too. */
   ListBase *effectors = BKE_effectors_create(depsgraph, ob, NULL, sb->effector_weights, false);
 
   if (do_deflector) {
@@ -2634,7 +2634,7 @@ static void interpolate_exciter(Object *ob, int timescale, int time)
   }
 }
 
-/* ************ convertors ********** */
+/* ************ converters ********** */
 
 /* for each object type we need;
  * - xxxx_to_softbody(Object *ob)      : a full (new) copy, creates SB geometry

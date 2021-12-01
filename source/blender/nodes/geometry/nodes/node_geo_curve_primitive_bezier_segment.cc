@@ -21,28 +21,44 @@
 
 #include "node_geometry_util.hh"
 
-namespace blender::nodes {
+namespace blender::nodes::node_geo_curve_primitive_bezier_segment_cc {
 
-static void geo_node_curve_primitive_bezier_segment_declare(NodeDeclarationBuilder &b)
+static void node_declare(NodeDeclarationBuilder &b)
 {
-  b.add_input<decl::Int>("Resolution").default_value(16).min(1).max(256).subtype(PROP_UNSIGNED);
-  b.add_input<decl::Vector>("Start").default_value({-1.0f, 0.0f, 0.0f}).subtype(PROP_TRANSLATION);
-  b.add_input<decl::Vector>("Start Handle")
+  b.add_input<decl::Int>(N_("Resolution"))
+      .default_value(16)
+      .min(1)
+      .max(256)
+      .subtype(PROP_UNSIGNED)
+      .description(N_("The number of evaluated points on the curve"));
+  b.add_input<decl::Vector>(N_("Start"))
+      .default_value({-1.0f, 0.0f, 0.0f})
+      .subtype(PROP_TRANSLATION)
+      .description(N_("Position of the start control point of the curve"));
+  b.add_input<decl::Vector>(N_("Start Handle"))
       .default_value({-0.5f, 0.5f, 0.0f})
-      .subtype(PROP_TRANSLATION);
-  b.add_input<decl::Vector>("End Handle").subtype(PROP_TRANSLATION);
-  b.add_input<decl::Vector>("End").default_value({1.0f, 0.0f, 0.0f}).subtype(PROP_TRANSLATION);
-  b.add_output<decl::Geometry>("Curve");
+      .subtype(PROP_TRANSLATION)
+      .description(
+          N_("Position of the start handle used to define the shape of the curve. In Offset mode, "
+             "relative to Start point"));
+  b.add_input<decl::Vector>(N_("End Handle"))
+      .subtype(PROP_TRANSLATION)
+      .description(
+          N_("Position of the end handle used to define the shape of the curve. In Offset mode, "
+             "relative to End point"));
+  b.add_input<decl::Vector>(N_("End"))
+      .default_value({1.0f, 0.0f, 0.0f})
+      .subtype(PROP_TRANSLATION)
+      .description(N_("Position of the end control point of the curve"));
+  b.add_output<decl::Geometry>(N_("Curve"));
 }
 
-static void geo_node_curve_primitive_bezier_segment_layout(uiLayout *layout,
-                                                           bContext *UNUSED(C),
-                                                           PointerRNA *ptr)
+static void node_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 {
   uiItemR(layout, ptr, "mode", UI_ITEM_R_EXPAND, nullptr, ICON_NONE);
 }
 
-static void geo_node_curve_primitive_bezier_segment_init(bNodeTree *UNUSED(tree), bNode *node)
+static void node_init(bNodeTree *UNUSED(tree), bNode *node)
 {
   NodeGeometryCurvePrimitiveBezierSegment *data = (NodeGeometryCurvePrimitiveBezierSegment *)
       MEM_callocN(sizeof(NodeGeometryCurvePrimitiveBezierSegment), __func__);
@@ -102,7 +118,7 @@ static std::unique_ptr<CurveEval> create_bezier_segment_curve(
   return curve;
 }
 
-static void geo_node_curve_primitive_bezier_segment_exec(GeoNodeExecParams params)
+static void node_geo_exec(GeoNodeExecParams params)
 {
   const NodeGeometryCurvePrimitiveBezierSegment *node_storage =
       (NodeGeometryCurvePrimitiveBezierSegment *)params.node().storage;
@@ -119,20 +135,22 @@ static void geo_node_curve_primitive_bezier_segment_exec(GeoNodeExecParams param
   params.set_output("Curve", GeometrySet::create_with_curve(curve.release()));
 }
 
-}  // namespace blender::nodes
+}  // namespace blender::nodes::node_geo_curve_primitive_bezier_segment_cc
 
 void register_node_type_geo_curve_primitive_bezier_segment()
 {
+  namespace file_ns = blender::nodes::node_geo_curve_primitive_bezier_segment_cc;
+
   static bNodeType ntype;
   geo_node_type_base(
       &ntype, GEO_NODE_CURVE_PRIMITIVE_BEZIER_SEGMENT, "Bezier Segment", NODE_CLASS_GEOMETRY, 0);
-  node_type_init(&ntype, blender::nodes::geo_node_curve_primitive_bezier_segment_init);
+  node_type_init(&ntype, file_ns::node_init);
   node_type_storage(&ntype,
                     "NodeGeometryCurvePrimitiveBezierSegment",
                     node_free_standard_storage,
                     node_copy_standard_storage);
-  ntype.declare = blender::nodes::geo_node_curve_primitive_bezier_segment_declare;
-  ntype.draw_buttons = blender::nodes::geo_node_curve_primitive_bezier_segment_layout;
-  ntype.geometry_node_execute = blender::nodes::geo_node_curve_primitive_bezier_segment_exec;
+  ntype.declare = file_ns::node_declare;
+  ntype.draw_buttons = file_ns::node_layout;
+  ntype.geometry_node_execute = file_ns::node_geo_exec;
   nodeRegisterType(&ntype);
 }

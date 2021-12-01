@@ -65,6 +65,7 @@
 #include "DNA_sound_types.h"
 #include "DNA_speaker_types.h"
 #include "DNA_texture_types.h"
+#include "DNA_vfont_types.h"
 #include "DNA_volume_types.h"
 #include "DNA_world_types.h"
 
@@ -365,6 +366,13 @@ Relation *DepsgraphRelationBuilder::add_time_relation(TimeSourceNode *timesrc,
                    description);
 
   return nullptr;
+}
+
+void DepsgraphRelationBuilder::add_visibility_relation(ID *id_from, ID *id_to)
+{
+  ComponentKey from_key(id_from, NodeType::VISIBILITY);
+  ComponentKey to_key(id_to, NodeType::VISIBILITY);
+  add_relation(from_key, to_key, "visibility");
 }
 
 Relation *DepsgraphRelationBuilder::add_operation_relation(OperationNode *node_from,
@@ -2496,6 +2504,11 @@ void DepsgraphRelationBuilder::build_nodetree(bNodeTree *ntree)
       OperationKey clip_key(id, NodeType::PARAMETERS, OperationCode::MOVIECLIP_EVAL);
       add_relation(clip_key, shading_key, "Clip -> Node");
     }
+    else if (id_type == ID_VF) {
+      build_vfont((VFont *)id);
+      ComponentKey vfont_key(id, NodeType::GENERIC_DATABLOCK);
+      add_relation(vfont_key, shading_key, "VFont -> Node");
+    }
     else if (ELEM(bnode->type, NODE_GROUP, NODE_CUSTOM_GROUP)) {
       bNodeTree *group_ntree = (bNodeTree *)id;
       build_nodetree(group_ntree);
@@ -2515,16 +2528,13 @@ void DepsgraphRelationBuilder::build_nodetree(bNodeTree *ntree)
   }
 
   OperationKey shading_update_key(&ntree->id, NodeType::SHADING, OperationCode::MATERIAL_UPDATE);
-  OperationKey shading_parameters_key(
-      &ntree->id, NodeType::SHADING_PARAMETERS, OperationCode::MATERIAL_UPDATE);
-  add_relation(shading_parameters_key, shading_update_key, "NTree Shading Parameters");
 
   if (check_id_has_anim_component(&ntree->id)) {
     ComponentKey animation_key(&ntree->id, NodeType::ANIMATION);
-    add_relation(animation_key, shading_parameters_key, "NTree Shading Parameters");
+    add_relation(animation_key, shading_update_key, "NTree Shading Parameters");
   }
   ComponentKey parameters_key(&ntree->id, NodeType::PARAMETERS);
-  add_relation(parameters_key, shading_parameters_key, "NTree Shading Parameters");
+  add_relation(parameters_key, shading_update_key, "NTree Shading Parameters");
 }
 
 /* Recursively build graph for material */
@@ -2840,6 +2850,15 @@ void DepsgraphRelationBuilder::build_scene_speakers(Scene * /*scene*/, ViewLayer
     }
     build_object(base->object);
   }
+}
+
+void DepsgraphRelationBuilder::build_vfont(VFont *vfont)
+{
+  if (built_map_.checkIsBuiltAndTag(vfont)) {
+    return;
+  }
+  build_parameters(&vfont->id);
+  build_idproperties(vfont->id.properties);
 }
 
 void DepsgraphRelationBuilder::build_copy_on_write_relations()

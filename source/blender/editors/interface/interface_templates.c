@@ -673,8 +673,8 @@ static void template_id_cb(bContext *C, void *arg_litem, void *arg_event)
           }
         }
         else {
-          if (BKE_lib_id_make_local(bmain, id, false, 0)) {
-            BKE_main_id_newptr_and_tag_clear(bmain);
+          if (BKE_lib_id_make_local(bmain, id, 0)) {
+            BKE_id_newptr_and_tag_clear(id);
 
             /* Reassign to get proper updates/notifiers. */
             idptr = RNA_property_pointer_get(&template_ui->ptr, template_ui->prop);
@@ -1031,7 +1031,7 @@ static void template_ID(const bContext *C,
         UI_but_flag_enable(but, UI_BUT_DISABLED);
       }
       else {
-        const bool disabled = (!BKE_lib_id_make_local(CTX_data_main(C), id, true /* test */, 0) ||
+        const bool disabled = (!BKE_idtype_idcode_is_localizable(GS(id->name)) ||
                                (idfrom && idfrom->lib));
         but = uiDefIconBut(block,
                            UI_BTYPE_BUT,
@@ -1112,24 +1112,41 @@ static void template_ID(const bContext *C,
       UI_but_flag_enable(but, UI_BUT_REDALERT);
     }
 
-    if (!ID_IS_LINKED(id) && !(ELEM(GS(id->name), ID_GR, ID_SCE, ID_SCR, ID_OB, ID_WS)) &&
-        (hide_buttons == false)) {
-      uiDefIconButR(block,
-                    UI_BTYPE_ICON_TOGGLE,
-                    0,
-                    ICON_FAKE_USER_OFF,
-                    0,
-                    0,
-                    UI_UNIT_X,
-                    UI_UNIT_Y,
-                    &idptr,
-                    "use_fake_user",
-                    -1,
-                    0,
-                    0,
-                    -1,
-                    -1,
-                    NULL);
+    if (!ID_IS_LINKED(id)) {
+      if (ID_IS_ASSET(id)) {
+        uiDefIconButO(block,
+                      /* Using `_N` version allows us to get the 'active' state by default. */
+                      UI_BTYPE_ICON_TOGGLE_N,
+                      "ASSET_OT_clear",
+                      WM_OP_INVOKE_DEFAULT,
+                      /* 'active' state of a toggle button uses icon + 1, so to get proper asset
+                       * icon we need to pass its value - 1 here. */
+                      ICON_ASSET_MANAGER - 1,
+                      0,
+                      0,
+                      UI_UNIT_X,
+                      UI_UNIT_Y,
+                      NULL);
+      }
+      else if (!(ELEM(GS(id->name), ID_GR, ID_SCE, ID_SCR, ID_OB, ID_WS)) &&
+               (hide_buttons == false)) {
+        uiDefIconButR(block,
+                      UI_BTYPE_ICON_TOGGLE,
+                      0,
+                      ICON_FAKE_USER_OFF,
+                      0,
+                      0,
+                      UI_UNIT_X,
+                      UI_UNIT_Y,
+                      &idptr,
+                      "use_fake_user",
+                      -1,
+                      0,
+                      0,
+                      -1,
+                      -1,
+                      NULL);
+      }
     }
   }
 
@@ -1724,7 +1741,7 @@ static void template_search_add_button_name(uiBlock *block,
 
 static void template_search_add_button_operator(uiBlock *block,
                                                 const char *const operator_name,
-                                                const int opcontext,
+                                                const wmOperatorCallContext opcontext,
                                                 const int icon,
                                                 const bool editable)
 {
@@ -2364,7 +2381,7 @@ static eAutoPropButsReturn template_operator_property_buts_draw_single(
   /* poll() on this operator may still fail,
    * at the moment there is no nice feedback when this happens just fails silently. */
   if (!WM_operator_repeat_check(C, op)) {
-    UI_block_lock_set(block, true, "Operator can't' redo");
+    UI_block_lock_set(block, true, "Operator can't redo");
     return return_info;
   }
 
@@ -2710,7 +2727,12 @@ static void draw_constraint_header(uiLayout *layout, Object *ob, bConstraint *co
   PointerRNA ptr;
   RNA_pointer_create(&ob->id, &RNA_Constraint, con, &ptr);
 
-  uiLayoutSetContextPointer(layout, "constraint", &ptr);
+  if (block->panel) {
+    UI_panel_context_pointer_set(block->panel, "constraint", &ptr);
+  }
+  else {
+    uiLayoutSetContextPointer(layout, "constraint", &ptr);
+  }
 
   /* Constraint type icon. */
   uiLayout *sub = uiLayoutRow(layout, false);
@@ -2726,7 +2748,7 @@ static void draw_constraint_header(uiLayout *layout, Object *ob, bConstraint *co
     uiItemR(row, &ptr, "name", 0, "", ICON_NONE);
   }
   else {
-    uiItemL(row, con->name, ICON_NONE);
+    uiItemL(row, IFACE_(con->name), ICON_NONE);
   }
 
   /* proxy-protected constraints cannot be edited, so hide up/down + close buttons */
@@ -5823,6 +5845,11 @@ void uiTemplateRunningJobs(uiLayout *layout, bContext *C)
       icon = ICON_SEQUENCE;
       break;
     }
+    if (WM_jobs_test(wm, scene, WM_JOB_TYPE_SEQ_DRAW_THUMBNAIL)) {
+      handle_event = B_STOPSEQ;
+      icon = ICON_SEQUENCE;
+      break;
+    }
     if (WM_jobs_test(wm, scene, WM_JOB_TYPE_CLIP_BUILD_PROXY)) {
       handle_event = B_STOPCLIP;
       icon = ICON_TRACKER;
@@ -6120,8 +6147,8 @@ void uiTemplateInputStatus(uiLayout *layout, struct bContext *C)
     uiLayout *row = uiLayoutRow(col, true);
     uiLayoutSetAlignment(row, UI_LAYOUT_ALIGN_LEFT);
 
-    const char *msg = WM_window_cursor_keymap_status_get(win, i, 0);
-    const char *msg_drag = WM_window_cursor_keymap_status_get(win, i, 1);
+    const char *msg = TIP_(WM_window_cursor_keymap_status_get(win, i, 0));
+    const char *msg_drag = TIP_(WM_window_cursor_keymap_status_get(win, i, 1));
 
     if (msg || (msg_drag == NULL)) {
       uiItemL(row, msg ? msg : "", (ICON_MOUSE_LMB + i));
@@ -6476,12 +6503,15 @@ void uiTemplateCacheFile(uiLayout *layout,
     row = uiLayoutRow(layout, false);
     /* For Cycles, verify that experimental features are enabled. */
     if (BKE_scene_uses_cycles(scene) && !BKE_scene_uses_cycles_experimental_features(scene)) {
-      uiItemL(row,
-              "The Cycles Alembic Procedural is only available with the experimental feature set",
-              ICON_INFO);
+      uiItemL(
+          row,
+          TIP_(
+              "The Cycles Alembic Procedural is only available with the experimental feature set"),
+          ICON_INFO);
     }
     else {
-      uiItemL(row, "The active render engine does not have an Alembic Procedural", ICON_INFO);
+      uiItemL(
+          row, TIP_("The active render engine does not have an Alembic Procedural"), ICON_INFO);
     }
   }
 

@@ -107,7 +107,7 @@ static void hair_foreach_id(ID *id, LibraryForeachIDData *data)
 {
   Hair *hair = (Hair *)id;
   for (int i = 0; i < hair->totcol; i++) {
-    BKE_LIB_FOREACHID_PROCESS(data, hair->mat[i], IDWALK_CB_USER);
+    BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, hair->mat[i], IDWALK_CB_USER);
   }
 }
 
@@ -181,7 +181,8 @@ IDTypeInfo IDType_ID_HA = {
     .name = "Hair",
     .name_plural = "hairs",
     .translation_context = BLT_I18NCONTEXT_ID_HAIR,
-    .flags = 0,
+    .flags = IDTYPE_FLAGS_APPEND_IS_REUSABLE,
+    .asset_type_info = NULL,
 
     .init_data = hair_init_data,
     .copy_data = hair_copy_data,
@@ -189,6 +190,7 @@ IDTypeInfo IDType_ID_HA = {
     .make_local = NULL,
     .foreach_id = hair_foreach_id,
     .foreach_cache = NULL,
+    .foreach_path = NULL,
     .owner_get = NULL,
 
     .blend_write = hair_blend_write,

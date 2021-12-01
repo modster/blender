@@ -103,6 +103,8 @@
 #include "ED_view3d.h"
 #include "ED_view3d_offscreen.h"
 
+#include "UI_interface_icons.h"
+
 #ifndef NDEBUG
 /* Used for database init assert(). */
 #  include "BLI_threads.h"
@@ -479,15 +481,6 @@ static Scene *preview_prepare_scene(
     BKE_color_managed_view_settings_free(&sce->view_settings);
     BKE_color_managed_view_settings_copy(&sce->view_settings, &scene->view_settings);
 
-    /* prevent overhead for small renders and icons (32) */
-    if (id && sp->sizex < 40) {
-      sce->r.tilex = sce->r.tiley = 64;
-    }
-    else {
-      sce->r.tilex = sce->r.xsch / 4;
-      sce->r.tiley = sce->r.ysch / 4;
-    }
-
     if ((id && sp->pr_method == PR_ICON_RENDER) && id_type != ID_WO) {
       sce->r.alphamode = R_ALPHAPREMUL;
     }
@@ -794,6 +787,11 @@ struct ObjectPreviewData {
   int sizex;
   int sizey;
 };
+
+static bool object_preview_is_type_supported(const Object *ob)
+{
+  return OB_TYPE_IS_GEOMETRY(ob->type);
+}
 
 static Object *object_preview_camera_create(Main *preview_main,
                                             ViewLayer *view_layer,
@@ -1352,7 +1350,7 @@ static ImBuf *icon_preview_imbuf_from_brush(Brush *brush)
         BLI_strncpy(path, brush->icon_filepath, sizeof(brush->icon_filepath));
         BLI_path_abs(path, ID_BLEND_PATH_FROM_GLOBAL(&brush->id));
 
-        /* use default colorspaces for brushes */
+        /* Use default color-spaces for brushes. */
         brush->icon_imbuf = IMB_loadiffname(path, flags, NULL);
 
         /* otherwise lets try to find it in other directories */
@@ -1485,14 +1483,8 @@ static void icon_preview_startjob(void *customdata, short *stop, short *do_updat
         return;
       }
 
-      ImageTile *tile = BKE_image_get_tile(ima, 0);
-      /* tile->ok is zero when Image cannot load */
-      if (tile->ok == 0) {
-        return;
-      }
-
       /* setup dummy image user */
-      iuser.ok = iuser.framenr = 1;
+      iuser.framenr = 1;
       iuser.scene = sp->scene;
 
       /* elubie: this needs to be changed: here image is always loaded if not
@@ -1673,9 +1665,12 @@ static void icon_preview_startjob_all_sizes(void *customdata,
     if (ip->id != NULL) {
       switch (GS(ip->id->name)) {
         case ID_OB:
-          /* Much simpler than the ShaderPreview mess used for other ID types. */
-          object_preview_render(ip, cur_size);
-          continue;
+          if (object_preview_is_type_supported((Object *)ip->id)) {
+            /* Much simpler than the ShaderPreview mess used for other ID types. */
+            object_preview_render(ip, cur_size);
+            continue;
+          }
+          break;
         case ID_AC:
           action_preview_render(ip, cur_size);
           continue;
@@ -1762,6 +1757,21 @@ static void icon_preview_free(void *customdata)
 
   BLI_freelistN(&ip->sizes);
   MEM_freeN(ip);
+}
+
+/**
+ * Check if \a id is supported by the automatic preview render.
+ */
+bool ED_preview_id_is_supported(const ID *id)
+{
+  if (id == NULL) {
+    return false;
+  }
+
+  if (GS(id->name) == ID_OB) {
+    return object_preview_is_type_supported((const Object *)id);
+  }
+  return BKE_previewimg_id_get_p(id) != NULL;
 }
 
 void ED_preview_icon_render(
@@ -1941,6 +1951,47 @@ void ED_preview_kill_jobs(wmWindowManager *wm, Main *UNUSED(bmain))
      * avoid invalid memory access. */
     WM_jobs_kill(wm, NULL, common_preview_startjob);
     WM_jobs_kill(wm, NULL, icon_preview_startjob_all_sizes);
+  }
+}
+
+typedef struct PreviewRestartQueueEntry {
+  struct PreviewRestartQueueEntry *next, *prev;
+
+  enum eIconSizes size;
+  ID *id;
+} PreviewRestartQueueEntry;
+
+static ListBase /* #PreviewRestartQueueEntry */ G_restart_previews_queue;
+
+void ED_preview_restart_queue_free(void)
+{
+  BLI_freelistN(&G_restart_previews_queue);
+}
+
+void ED_preview_restart_queue_add(ID *id, enum eIconSizes size)
+{
+  PreviewRestartQueueEntry *queue_entry = MEM_mallocN(sizeof(*queue_entry), __func__);
+  queue_entry->size = size;
+  queue_entry->id = id;
+  BLI_addtail(&G_restart_previews_queue, queue_entry);
+}
+
+void ED_preview_restart_queue_work(const bContext *C)
+{
+  LISTBASE_FOREACH_MUTABLE (PreviewRestartQueueEntry *, queue_entry, &G_restart_previews_queue) {
+    PreviewImage *preview = BKE_previewimg_id_get(queue_entry->id);
+    if (!preview) {
+      continue;
+    }
+    if (preview->flag[queue_entry->size] & PRV_USER_EDITED) {
+      /* Don't touch custom previews. */
+      continue;
+    }
+
+    BKE_previewimg_clear_single(preview, queue_entry->size);
+    UI_icon_render_id(C, NULL, queue_entry->id, queue_entry->size, true);
+
+    BLI_freelinkN(&G_restart_previews_queue, queue_entry);
   }
 }
 

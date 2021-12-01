@@ -26,6 +26,7 @@ not associated with blenders internal data.
 __all__ = (
     "blend_paths",
     "escape_identifier",
+    "flip_name",
     "unescape_identifier",
     "keyconfig_init",
     "keyconfig_set",
@@ -61,6 +62,7 @@ from _bpy import (
     _utils_units as units,
     blend_paths,
     escape_identifier,
+    flip_name,
     unescape_identifier,
     register_class,
     resource_path,
@@ -106,7 +108,7 @@ def execfile(filepath, *, mod=None):
     mod_orig = modules.get(mod_name, None)
     modules[mod_name] = mod
 
-    # No error supression, just ensure `sys.modules[mod_name]` is properly restored in the case of an error.
+    # No error suppression, just ensure `sys.modules[mod_name]` is properly restored in the case of an error.
     try:
         mod_spec.loader.exec_module(mod)
     finally:
@@ -858,6 +860,7 @@ def register_tool(tool_cls, *, after=None, separator=False, group=False):
             "description": getattr(tool_cls, "bl_description", tool_cls.__doc__),
             "icon": getattr(tool_cls, "bl_icon", None),
             "cursor": getattr(tool_cls, "bl_cursor", None),
+            "options": getattr(tool_cls, "bl_options", None),
             "widget": getattr(tool_cls, "bl_widget", None),
             "widget_properties": getattr(tool_cls, "bl_widget_properties", None),
             "keymap": getattr(tool_cls, "bl_keymap", None),

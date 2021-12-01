@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include "DNA_uuid_types.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -107,6 +109,7 @@ struct FileSelectParams *ED_fileselect_ensure_active_params(struct SpaceFile *sf
 struct FileSelectParams *ED_fileselect_get_active_params(const struct SpaceFile *sfile);
 struct FileSelectParams *ED_fileselect_get_file_params(const struct SpaceFile *sfile);
 struct FileAssetSelectParams *ED_fileselect_get_asset_params(const struct SpaceFile *sfile);
+bool ED_fileselect_is_local_asset_library(const struct SpaceFile *sfile);
 
 void ED_fileselect_set_params_from_userdef(struct SpaceFile *sfile);
 void ED_fileselect_params_to_userdef(struct SpaceFile *sfile,
@@ -142,13 +145,19 @@ void ED_fileselect_exit(struct wmWindowManager *wm, struct SpaceFile *sfile);
 
 bool ED_fileselect_is_file_browser(const struct SpaceFile *sfile);
 bool ED_fileselect_is_asset_browser(const struct SpaceFile *sfile);
+struct AssetLibrary *ED_fileselect_active_asset_library_get(const struct SpaceFile *sfile);
 struct ID *ED_fileselect_active_asset_get(const struct SpaceFile *sfile);
 
-/* Activate the file that corresponds to the given ID.
+void ED_fileselect_activate_asset_catalog(const struct SpaceFile *sfile, bUUID catalog_id);
+
+/* Activate and select the file that corresponds to the given ID.
  * Pass deferred=true to wait for the next refresh before activating. */
 void ED_fileselect_activate_by_id(struct SpaceFile *sfile,
                                   struct ID *asset_id,
                                   const bool deferred);
+
+void ED_fileselect_deselect_all(struct SpaceFile *sfile);
+void ED_fileselect_activate_by_relpath(struct SpaceFile *sfile, const char *relative_path);
 
 void ED_fileselect_window_params_get(const struct wmWindow *win,
                                      int win_size[2],
