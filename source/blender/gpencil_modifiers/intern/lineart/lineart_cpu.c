@@ -550,10 +550,6 @@ static void lineart_main_occlusion_begin(LineartRenderBuffer *rb)
   rb->light_contour.last = rb->light_contour.first;
   rb->shadow.last = rb->shadow.first;
 
-  /* This is needed because the occlusion function expects the camera vector to point towards the
-   * camera. */
-  negate_v3_db(rb->view_vector);
-
   TaskPool *tp = BLI_task_pool_create(NULL, TASK_PRIORITY_HIGH);
 
   for (i = 0; i < thread_count; i++) {
@@ -1615,7 +1611,7 @@ static uint16_t lineart_identify_feature_line(LineartRenderBuffer *rb,
   if (rb->use_contour || rb->use_back_face_culling) {
 
     if (rb->cam_is_persp) {
-      sub_v3_v3v3_db(view_vector, l->gloc, rb->camera_pos);
+      sub_v3_v3v3_db(view_vector, rb->camera_pos, l->gloc);
     }
     else {
       view_vector = rb->view_vector;
@@ -1628,12 +1624,12 @@ static uint16_t lineart_identify_feature_line(LineartRenderBuffer *rb,
       edge_flag_result |= LRT_EDGE_FLAG_CONTOUR;
     }
 
-    /* Because the camera ray starts from camera, so backface is when dot value being positive. */
+    /* Because the ray points towards the camera, so backface is when dot value being negative.*/
     if (rb->use_back_face_culling) {
-      if (dot_1 > 0) {
+      if (dot_1 < 0) {
         tri1->flags |= LRT_CULL_DISCARD;
       }
-      if (dot_2 > 0) {
+      if (dot_2 < 0) {
         tri2->flags |= LRT_CULL_DISCARD;
       }
     }
