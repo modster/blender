@@ -1603,7 +1603,7 @@ static uint16_t lineart_identify_feature_line(LineartRenderBuffer *rb,
   if (rb->use_contour || rb->use_back_face_culling) {
 
     if (rb->cam_is_persp) {
-      sub_v3_v3v3_db(view_vector, l->gloc, rb->camera_pos);
+      sub_v3_v3v3_db(view_vector, rb->camera_pos, l->gloc);
     }
     else {
       view_vector = rb->view_vector;
@@ -1616,12 +1616,12 @@ static uint16_t lineart_identify_feature_line(LineartRenderBuffer *rb,
       edge_flag_result |= LRT_EDGE_FLAG_CONTOUR;
     }
 
-    /* Because the camera ray starts from camera, so backface is when dot value being positive. */
+    /* Because the ray points towards the camera, so backface is when dot value being negative.*/
     if (rb->use_back_face_culling) {
-      if (dot_1 > 0) {
+      if (dot_1 < 0) {
         tri1->flags |= LRT_CULL_DISCARD;
       }
-      if (dot_2 > 0) {
+      if (dot_2 < 0) {
         tri2->flags |= LRT_CULL_DISCARD;
       }
     }
