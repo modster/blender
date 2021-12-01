@@ -163,6 +163,12 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
     GPUBatch *geom = DRW_cache_quad_get();
     GPUShader *shader = IMAGE_shader_image_get(false);
 
+    DRWShadingGroup *shgrp = DRW_shgroup_create(shader, psl->image_pass);
+    DRW_shgroup_uniform_vec2_copy(shgrp, "farNearDistances", sh_params.far_near);
+    DRW_shgroup_uniform_vec4_copy(shgrp, "color", ShaderParameters::color);
+    DRW_shgroup_uniform_vec4_copy(shgrp, "shuffle", sh_params.shuffle);
+    DRW_shgroup_uniform_int_copy(shgrp, "drawFlags", sh_params.flags);
+    DRW_shgroup_uniform_bool_copy(shgrp, "imgPremultiplied", sh_params.use_premul_alpha);
     float image_mat[4][4];
     unit_m4(image_mat);
     for (int i = 0; i < SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN; i++) {
@@ -173,17 +179,10 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
       image_mat[0][0] = pd->screen_space.texture_infos[i].clipping_bounds.xmax;
       image_mat[1][1] = pd->screen_space.texture_infos[i].clipping_bounds.ymax;
 
-      // TODO: use subgroup.
-      DRWShadingGroup *shgrp = DRW_shgroup_create(shader, psl->image_pass);
+      DRWShadingGroup *shgrp_sub = DRW_shgroup_create_sub(shgrp);
       DRW_shgroup_uniform_texture_ex(
-          shgrp, "imageTexture", txl->screen_space.textures[i], GPU_SAMPLER_DEFAULT);
-      DRW_shgroup_uniform_vec2_copy(shgrp, "farNearDistances", sh_params.far_near);
-      DRW_shgroup_uniform_vec4_copy(shgrp, "color", ShaderParameters::color);
-      DRW_shgroup_uniform_vec4_copy(shgrp, "shuffle", sh_params.shuffle);
-      DRW_shgroup_uniform_int_copy(shgrp, "drawFlags", sh_params.flags);
-      DRW_shgroup_uniform_bool_copy(shgrp, "imgPremultiplied", sh_params.use_premul_alpha);
-
-      DRW_shgroup_call_obmat(shgrp, geom, image_mat);
+          shgrp_sub, "imageTexture", txl->screen_space.textures[i], GPU_SAMPLER_DEFAULT);
+      DRW_shgroup_call_obmat(shgrp_sub, geom, image_mat);
     }
   }
 
