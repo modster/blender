@@ -115,15 +115,20 @@ struct ImageTileAccessor {
   {
   }
 
+  int get_tile_number()
+  {
+    return image_tile->tile_number;
+  }
+
   int get_tile_x_offset()
   {
-    int tile_number = image_tile->tile_number;
+    int tile_number = get_tile_number();
     return (tile_number - 1001) % 10;
   }
 
   int get_tile_y_offset()
   {
-    int tile_number = image_tile->tile_number;
+    int tile_number = get_tile_number();
     return (tile_number - 1001) / 10;
   }
 };
@@ -243,6 +248,12 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
     }
   }
 
+  /**
+   * \brief Update GPUTextures for drawing the image.
+   *
+   * GPUTextures that are marked dirty are rebuild. GPUTextures that aren't marked dirty are
+   * updated with changed region of the image.
+   */
   void update_textures(IMAGE_TextureList *txl,
                        IMAGE_PrivateData *pd,
                        Image *image,
@@ -262,7 +273,7 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
         do_partial_update(changes, txl, pd, image);
         break;
     }
-    do_full_update_for_dirty_textures(txl, pd);
+    do_full_update_for_dirty_textures(txl, pd, image_user);
   }
 
   void do_partial_update(PartialUpdateChecker<ImageTileData>::CollectResult &iterator,
@@ -381,7 +392,9 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
   {
   }
 
-  void do_full_update_for_dirty_textures(IMAGE_TextureList *txl, IMAGE_PrivateData *pd) const
+  void do_full_update_for_dirty_textures(IMAGE_TextureList *txl,
+                                         IMAGE_PrivateData *pd,
+                                         const ImageUser *image_user) const
   {
     for (int i = 0; i < SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN; i++) {
       IMAGE_ScreenSpaceTextureInfo *info = &pd->screen_space.texture_infos[i];
@@ -398,40 +411,40 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
 
       ImBuf tmp;
       IMB_initImBuf(&tmp, texture_width, texture_height, 0, IB_rectfloat);
+      ImageUser tile_user = *image_user;
 
       LISTBASE_FOREACH (ImageTile *, image_tile_ptr, &pd->image->tiles) {
         ImageTileAccessor image_tile(image_tile_ptr);
+        tile_user.tile = image_tile.get_tile_number();
+        ImBuf *tile_buffer = BKE_image_acquire_ibuf(pd->image, &tile_user, NULL);
 
-        ImBuf *image_buffer = pd->ibuf;
-        if (image_buffer == nullptr) {
-          /* TODO: remove break when tiles are supported. */
-          break;
+        if (tile_buffer == nullptr) {
+          /* Couldn't load the image buffer of the tile. So continue to the next change. */
+          continue;
         }
-        if (image_buffer->rect_float == nullptr) {
-          IMB_float_from_rect(image_buffer);
+        if (tile_buffer->rect_float == nullptr) {
+          IMB_float_from_rect(tile_buffer);
         }
         /* TODO(jbakker): add IMB_transform without cropping. */
         /* TODO(jbakker): add IMB_transform with repeat. */
         rctf crop;
-        BLI_rctf_init(&crop, 0.0, image_buffer->x, 0.0, image_buffer->y);
+        BLI_rctf_init(&crop, 0.0, tile_buffer->x, 0.0, tile_buffer->y);
         float uv_to_texel[4][4];
 
         /* IMB_transform works in a non-consistent space. This should be documented or fixed!.
          * Construct a variant of the info_uv_to_texture that adds the texel space
          * transformation.*/
         copy_m4_m4(uv_to_texel, info->uv_to_texture);
-        float scale[3] = {static_cast<float>(texture_width) / static_cast<float>(image_buffer->x),
-                          static_cast<float>(texture_height) / static_cast<float>(image_buffer->y),
+        float scale[3] = {static_cast<float>(texture_width) / static_cast<float>(tile_buffer->x),
+                          static_cast<float>(texture_height) / static_cast<float>(tile_buffer->y),
                           1.0f};
         rescale_m4(uv_to_texel, scale);
         uv_to_texel[3][0] *= texture_width;
         uv_to_texel[3][1] *= texture_height;
         invert_m4(uv_to_texel);
-        IMB_transform(image_buffer, &tmp, uv_to_texel, &crop, IMB_FILTER_NEAREST);
+        IMB_transform(tile_buffer, &tmp, uv_to_texel, &crop, IMB_FILTER_NEAREST);
 
-        /* TODO: render other tiles as well. But we should do that with a scale copy algo in stead
-         * of the pixel sampling we do currently. */
-        break;
+        BKE_image_release_ibuf(pd->image, tile_buffer, nullptr);
       }
 
       GPU_texture_update(gpu_texture, GPU_DATA_FLOAT, tmp.rect_float);
