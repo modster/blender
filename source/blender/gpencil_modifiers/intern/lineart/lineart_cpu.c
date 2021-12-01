@@ -545,10 +545,6 @@ static void lineart_main_occlusion_begin(LineartRenderBuffer *rb)
    * camera. */
   negate_v3_db(rb->view_vector);
 
-  /* This is needed because the occlusion function expects the camera vector to point towards the
-   * camera. */
-  negate_v3_db(rb->view_vector);
-
   TaskPool *tp = BLI_task_pool_create(NULL, TASK_PRIORITY_HIGH);
 
   for (i = 0; i < thread_count; i++) {
@@ -3085,7 +3081,7 @@ static void lineart_triangle_intersect_in_bounding_area(LineartRenderBuffer *rb,
  */
 static void lineart_main_get_view_vector(LineartRenderBuffer *rb)
 {
-  float direction[3] = {0, 0, -1};
+  float direction[3] = {0, 0, 1};
   float trans[3];
   float inv[4][4];
   float obmat_no_scale[4][4];
