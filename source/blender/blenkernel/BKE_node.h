@@ -121,12 +121,11 @@ class MFDataType;
 }  // namespace fn
 }  // namespace blender
 
+using CPPTypeHandle = blender::fn::CPPType;
 using NodeMultiFunctionBuildFunction = void (*)(blender::nodes::NodeMultiFunctionBuilder &builder);
 using NodeGeometryExecFunction = void (*)(blender::nodes::GeoNodeExecParams params);
 using NodeDeclareFunction = void (*)(blender::nodes::NodeDeclarationBuilder &builder);
-using SocketGetCPPTypeFunction = const blender::fn::CPPType *(*)();
 using SocketGetCPPValueFunction = void (*)(const struct bNodeSocket &socket, void *r_value);
-using SocketGetGeometryNodesCPPTypeFunction = const blender::fn::CPPType *(*)();
 using SocketGetGeometryNodesCPPValueFunction = void (*)(const struct bNodeSocket &socket,
                                                         void *r_value);
 
@@ -138,6 +137,7 @@ typedef void *SocketGetCPPTypeFunction;
 typedef void *SocketGetGeometryNodesCPPTypeFunction;
 typedef void *SocketGetGeometryNodesCPPValueFunction;
 typedef void *SocketGetCPPValueFunction;
+typedef struct CPPTypeHandle CPPTypeHandle;
 #endif
 
 /**
@@ -197,11 +197,11 @@ typedef struct bNodeSocketType {
   void (*free_self)(struct bNodeSocketType *stype);
 
   /* Return the CPPType of this socket. */
-  SocketGetCPPTypeFunction get_base_cpp_type;
+  const CPPTypeHandle *base_cpp_type;
   /* Get the value of this socket in a generic way. */
   SocketGetCPPValueFunction get_base_cpp_value;
   /* Get geometry nodes cpp type. */
-  SocketGetGeometryNodesCPPTypeFunction get_geometry_nodes_cpp_type;
+  const CPPTypeHandle *geometry_nodes_cpp_type;
   /* Get geometry nodes cpp value. */
   SocketGetGeometryNodesCPPValueFunction get_geometry_nodes_cpp_value;
 } bNodeSocketType;
@@ -1507,7 +1507,7 @@ int ntreeTexExecTree(struct bNodeTree *ntree,
 #define GEO_NODE_SAMPLE_CURVE 1085
 #define GEO_NODE_INPUT_TANGENT 1086
 #define GEO_NODE_STRING_JOIN 1087
-#define GEO_NODE_CURVE_PARAMETER 1088
+#define GEO_NODE_CURVE_SPLINE_PARAMETER 1088
 #define GEO_NODE_FILLET_CURVE 1089
 #define GEO_NODE_DISTRIBUTE_POINTS_ON_FACES 1090
 #define GEO_NODE_STRING_TO_CURVES 1091
@@ -1554,6 +1554,8 @@ int ntreeTexExecTree(struct bNodeTree *ntree,
 #define GEO_NODE_VOLUME_TO_MESH 1133
 #define GEO_NODE_INPUT_ID 1134
 #define GEO_NODE_SET_ID 1135
+#define GEO_NODE_ATTRIBUTE_DOMAIN_SIZE 1136
+#define GEO_NODE_DUAL_MESH 1137
 
 /** \} */
 
@@ -1562,7 +1564,7 @@ int ntreeTexExecTree(struct bNodeTree *ntree,
  * \{ */
 
 #define FN_NODE_BOOLEAN_MATH 1200
-#define FN_NODE_COMPARE_FLOATS 1202
+#define FN_NODE_COMPARE 1202
 #define FN_NODE_LEGACY_RANDOM_FLOAT 1206
 #define FN_NODE_INPUT_VECTOR 1207
 #define FN_NODE_INPUT_STRING 1208

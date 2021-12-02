@@ -266,11 +266,16 @@ class device_memory {
 
   /* Only create through subclasses. */
   device_memory(Device *device, const char *name, MemoryType type);
-  device_memory(device_memory &&other) noexcept;
 
-  /* No copying allowed. */
+  /* No copying and allowed.
+   *
+   * This is because device implementation might need to register device memory in an allocation
+   * map of some sort and use pointer as a key to identify blocks. Moving data from one place to
+   * another bypassing device allocation routines will make those maps hard to maintain. */
   device_memory(const device_memory &) = delete;
+  device_memory(device_memory &&other) noexcept = delete;
   device_memory &operator=(const device_memory &) = delete;
+  device_memory &operator=(device_memory &&) = delete;
 
   /* Host allocation on the device. All host_pointer memory should be
    * allocated with these functions, for devices that support using
@@ -576,7 +581,7 @@ template<typename T> class device_vector : public device_memory {
  * from an already allocated base memory. It is freed automatically when it
  * goes out of scope, which should happen before base memory is freed.
  *
- * Note: some devices require offset and size of the sub_ptr to be properly
+ * NOTE: some devices require offset and size of the sub_ptr to be properly
  * aligned to device->mem_address_alingment(). */
 
 class device_sub_ptr {

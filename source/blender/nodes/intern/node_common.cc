@@ -107,7 +107,7 @@ bool nodeGroupPoll(bNodeTree *nodetree, bNodeTree *grouptree, const char **r_dis
   }
 
   if (nodetree == grouptree) {
-    *r_disabled_hint = "Nesting a node group inside of itself is not allowed";
+    *r_disabled_hint = TIP_("Nesting a node group inside of itself is not allowed");
     return false;
   }
 
@@ -612,6 +612,8 @@ void register_node_type_group_output(void)
   node_type_size(ntype, 140, 80, 400);
   node_type_init(ntype, node_group_output_init);
   node_type_update(ntype, node_group_output_update);
+
+  ntype->no_muting = true;
 
   nodeRegisterType(ntype);
 }
