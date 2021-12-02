@@ -50,7 +50,7 @@ using blender::bke::AttributeIDRef;
 using blender::bke::OutputAttribute;
 using blender::fn::GMutableSpan;
 using blender::fn::GSpan;
-using blender::fn::GVMutableArrayImpl_For_GMutableSpan;
+using blender::fn::GVArrayImpl_For_GSpan;
 
 namespace blender::bke {
 
@@ -400,7 +400,9 @@ WriteAttributeLookup BuiltinCustomDataLayerProvider::try_get_for_write(
   }
 
   if (data != new_data) {
-    custom_data_access_.update_custom_data_pointers(component);
+    if (custom_data_access_.update_custom_data_pointers) {
+      custom_data_access_.update_custom_data_pointers(component);
+    }
     data = new_data;
   }
 
@@ -441,7 +443,9 @@ bool BuiltinCustomDataLayerProvider::try_delete(GeometryComponent &component) co
   const bool delete_success = CustomData_free_layer(
       custom_data, stored_type_, domain_size, layer_index);
   if (delete_success) {
-    custom_data_access_.update_custom_data_pointers(component);
+    if (custom_data_access_.update_custom_data_pointers) {
+      custom_data_access_.update_custom_data_pointers(component);
+    }
   }
   return delete_success;
 }
@@ -476,7 +480,9 @@ bool BuiltinCustomDataLayerProvider::try_create(GeometryComponent &component,
         *custom_data, stored_type_, domain_size, initializer);
   }
   if (success) {
-    custom_data_access_.update_custom_data_pointers(component);
+    if (custom_data_access_.update_custom_data_pointers) {
+      custom_data_access_.update_custom_data_pointers(component);
+    }
   }
   return success;
 }
@@ -644,7 +650,9 @@ WriteAttributeLookup NamedLegacyCustomDataProvider::try_get_for_write(
         void *data_new = CustomData_duplicate_referenced_layer_named(
             custom_data, stored_type_, layer.name, domain_size);
         if (data_old != data_new) {
-          custom_data_access_.update_custom_data_pointers(component);
+          if (custom_data_access_.update_custom_data_pointers) {
+            custom_data_access_.update_custom_data_pointers(component);
+          }
         }
         return {as_write_attribute_(layer.data, domain_size), domain_};
       }
@@ -666,7 +674,9 @@ bool NamedLegacyCustomDataProvider::try_delete(GeometryComponent &component,
       if (custom_data_layer_matches_attribute_id(layer, attribute_id)) {
         const int domain_size = component.attribute_domain_size(domain_);
         CustomData_free_layer(custom_data, stored_type_, domain_size, i);
-        custom_data_access_.update_custom_data_pointers(component);
+        if (custom_data_access_.update_custom_data_pointers) {
+          custom_data_access_.update_custom_data_pointers(component);
+        }
         return true;
       }
     }
@@ -734,7 +744,6 @@ CustomDataAttributes &CustomDataAttributes::operator=(const CustomDataAttributes
 
 std::optional<GSpan> CustomDataAttributes::get_for_read(const AttributeIDRef &attribute_id) const
 {
-  BLI_assert(size_ != 0);
   for (const CustomDataLayer &layer : Span(data.layers, data.totlayer)) {
     if (custom_data_layer_matches_attribute_id(layer, attribute_id)) {
       const CPPType *cpp_type = custom_data_type_to_cpp_type((CustomDataType)layer.type);
@@ -773,8 +782,6 @@ GVArray CustomDataAttributes::get_for_read(const AttributeIDRef &attribute_id,
 
 std::optional<GMutableSpan> CustomDataAttributes::get_for_write(const AttributeIDRef &attribute_id)
 {
-  /* If this assert hits, it most likely means that #reallocate was not called at some point. */
-  BLI_assert(size_ != 0);
   for (CustomDataLayer &layer : MutableSpan(data.layers, data.totlayer)) {
     if (custom_data_layer_matches_attribute_id(layer, attribute_id)) {
       const CPPType *cpp_type = custom_data_type_to_cpp_type((CustomDataType)layer.type);
@@ -819,6 +826,12 @@ void CustomDataAttributes::reallocate(const int size)
 {
   size_ = size;
   CustomData_realloc(&data, size);
+}
+
+void CustomDataAttributes::clear()
+{
+  CustomData_free(&data, size_);
+  size_ = 0;
 }
 
 bool CustomDataAttributes::foreach_attribute(const AttributeForeachCallback callback,
@@ -1200,8 +1213,7 @@ blender::fn::GVArray GeometryComponent::attribute_get_for_read(const AttributeID
   return blender::fn::GVArray::ForSingle(*type, domain_size, default_value);
 }
 
-class GVMutableAttribute_For_OutputAttribute
-    : public blender::fn::GVMutableArrayImpl_For_GMutableSpan {
+class GVMutableAttribute_For_OutputAttribute : public blender::fn::GVArrayImpl_For_GSpan {
  public:
   GeometryComponent *component;
   std::string attribute_name;
@@ -1210,7 +1222,7 @@ class GVMutableAttribute_For_OutputAttribute
   GVMutableAttribute_For_OutputAttribute(GMutableSpan data,
                                          GeometryComponent &component,
                                          const AttributeIDRef &attribute_id)
-      : blender::fn::GVMutableArrayImpl_For_GMutableSpan(data), component(&component)
+      : blender::fn::GVArrayImpl_For_GSpan(data), component(&component)
   {
     if (attribute_id.is_named()) {
       this->attribute_name = attribute_id.name();
