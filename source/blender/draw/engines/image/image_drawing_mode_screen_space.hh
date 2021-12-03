@@ -259,7 +259,7 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
         break;
       case ePartialUpdateCollectResult::PartialChangesDetected:
         /* Partial update when wrap repeat is enabled is not supported. */
-        if (pd->flags.do_wrap_repeat) {
+        if (pd->flags.do_tile_drawing) {
           mark_all_texture_slots_dirty(pd);
         }
         else {
@@ -471,7 +471,7 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
     invert_m4(uv_to_texel);
     IMB_transform(&tile_buffer,
                   &texture_buffer,
-                  pd.flags.do_wrap_repeat ? IMB_TRANSFORM_MODE_WRAP_REPEAT :
+                  pd.flags.do_tile_drawing ? IMB_TRANSFORM_MODE_WRAP_REPEAT :
                                             IMB_TRANSFORM_MODE_REGULAR,
                   IMB_FILTER_NEAREST,
                   uv_to_texel,

@@ -134,7 +134,7 @@ class SpaceNodeAccessor : public AbstractSpaceAccessor {
     r_mat[3][1] = (region->winy - snode->zoom * ibuf_height) / 2 + snode->yof;
   }
 
-  bool use_wrap_repeat() const
+  bool use_tile_drawing() const
   {
     return false;
   }

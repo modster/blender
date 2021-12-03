@@ -181,7 +181,7 @@ class SpaceImageAccessor : public AbstractSpaceAccessor {
     unit_m4(r_mat);
   }
 
-  bool use_wrap_repeat() const
+  bool use_tile_drawing() const
   {
     return (sima->flag & SI_DRAW_TILE) != 0;
   }

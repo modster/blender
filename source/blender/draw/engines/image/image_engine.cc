@@ -107,7 +107,7 @@ class ImageEngine {
       /* Early exit, nothing to draw. */
       return;
     }
-    pd->flags.do_wrap_repeat = pd->image->source != IMA_SRC_TILED && space->use_wrap_repeat();
+    pd->flags.do_tile_drawing = pd->image->source != IMA_SRC_TILED && space->use_tile_drawing();
     pd->ibuf = space->acquire_image_buffer(pd->image, &pd->lock);
     ImageUser *iuser = space->get_image_user();
     drawing_mode.cache_image(space.get(), vedata, pd->image, iuser, pd->ibuf);

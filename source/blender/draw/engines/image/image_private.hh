@@ -80,7 +80,13 @@ struct IMAGE_PrivateData {
   struct DRWView *view;
 
   struct {
-    bool do_wrap_repeat : 1;
+    /**
+     * \brief should we perform tile drawing (wrap repeat).
+     *
+     * Option is true when image is capable of tile drawing (image is not tiled) and the option is
+     * set in the space.
+     */
+    bool do_tile_drawing : 1;
   } flags;
 
   /* Data used in screen space drawing mode. */
@@ -216,7 +222,7 @@ class AbstractSpaceAccessor {
                              float r_mat[4][4]) const = 0;
 
   /** \brief Is (wrap) repeat option enabled in the space. */
-  virtual bool use_wrap_repeat() const = 0;
+  virtual bool use_tile_drawing() const = 0;
 };  // namespace blender::draw::image_engine
 
 /**
