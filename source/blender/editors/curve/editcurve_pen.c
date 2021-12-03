@@ -877,10 +877,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
         if (bezt->h1 != HD_FREE || bezt->h2 != HD_FREE) {
           bezt->h1 = bezt->h2 = HD_FREE;
         }
-        else {
-          bezt->h1 = bezt->h2 = HD_ALIGN;
-          BKE_nurb_handles_calc(nu);
-        }
+
         RNA_boolean_set(op->ptr, "dragging", true);
         dragging = true;
       }
