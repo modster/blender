@@ -448,15 +448,10 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
     const int texture_height = texture_buffer.y;
     ensure_float_buffer(tile_buffer);
 
-    /* TODO(jbakker): add IMB_transform without cropping. */
-    /* TODO(jbakker): add IMB_transform with repeat. */
-    rctf crop;
-    BLI_rctf_init(&crop, 0.0, tile_buffer.x, 0.0, tile_buffer.y);
-    float uv_to_texel[4][4];
-
     /* IMB_transform works in a non-consistent space. This should be documented or fixed!.
      * Construct a variant of the info_uv_to_texture that adds the texel space
      * transformation.*/
+    float uv_to_texel[4][4];
     copy_m4_m4(uv_to_texel, texture_info.uv_to_texture);
     float scale[3] = {static_cast<float>(texture_width) / static_cast<float>(tile_buffer.x),
                       static_cast<float>(texture_height) / static_cast<float>(tile_buffer.y),
@@ -467,7 +462,12 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
     uv_to_texel[3][0] *= texture_width;
     uv_to_texel[3][1] *= texture_height;
     invert_m4(uv_to_texel);
-    IMB_transform(&tile_buffer, &texture_buffer, uv_to_texel, &crop, IMB_FILTER_NEAREST);
+    IMB_transform(&tile_buffer,
+                  &texture_buffer,
+                  IMB_TRANSFORM_MODE_REGULAR,
+                  IMB_FILTER_NEAREST,
+                  uv_to_texel,
+                  nullptr);
   }
 
  public:
