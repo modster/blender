@@ -1471,7 +1471,7 @@ static bool kmi_cmp(const wmKeyMapItem *kmi_a, const wmKeyMapItem *kmi_b)
 
 static const wmKeyMapItem *modalmap_is_conflicting(wmKeyMapItem **km_items,
                                                    const int km_items_len,
-                                                   wmKeyMapItem *kmi_modal)
+                                                   const wmKeyMapItem *kmi_modal)
 {
   for (int i = 0; i < km_items_len; i++) {
     const wmKeyMapItem *kmi = km_items[i];
