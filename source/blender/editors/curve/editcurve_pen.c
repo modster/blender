@@ -366,13 +366,10 @@ static void update_data_if_closest_bezt_in_segment(const BezTriple *bezt1,
                                                    Nurb *nu,
                                                    const int index,
                                                    const ViewContext *vc,
-                                                   void *op_data)
+                                                   CutData *data)
 {
-
-  CutData *data = op_data;
-
   const float resolu = nu->resolu;
-  float *points = MEM_mallocN(sizeof(float[3]) * (resolu + 1), "makeCut_bezier");
+  float *points = MEM_mallocN(sizeof(float[3]) * (resolu + 1), __func__);
 
   /* Calculate all points on curve. */
   for (int j = 0; j < 3; j++) {
@@ -429,9 +426,8 @@ static void get_bezier_interpolated_point(float r_point[3],
 }
 
 /* Update the closest location as cut location in data. */
-static void update_cut_loc_in_data(void *op_data, const ViewContext *vc)
+static void update_cut_loc_in_data(CutData *data, const ViewContext *vc)
 {
-  CutData *data = op_data;
   bool found_min = false;
   float point[3];
   float factor;
@@ -482,10 +478,8 @@ static void calculate_new_bezier_point(const float point_prev[3],
 }
 
 /* Update the nearest point data for all nurbs. */
-static void update_data_for_all_nurbs(const ListBase *nurbs, const ViewContext *vc, void *op_data)
+static void update_data_for_all_nurbs(const ListBase *nurbs, const ViewContext *vc, CutData *data)
 {
-  CutData *data = op_data;
-
   LISTBASE_FOREACH (Nurb *, nu, nurbs) {
     if (nu->type == CU_BEZIER) {
       float screen_co[2];
@@ -537,13 +531,11 @@ static void update_data_for_all_nurbs(const ListBase *nurbs, const ViewContext *
 }
 
 /* Insert a #BezTriple to a nurb at the location specified by `op_data`. */
-static void add_bezt_to_nurb(Nurb *nu, const void *op_data, Curve *cu)
+static void add_bezt_to_nurb(Nurb *nu, const CutData *data, Curve *cu)
 {
   EditNurb *editnurb = cu->editnurb;
-  const CutData *data = op_data;
 
-  BezTriple *bezt1 = (BezTriple *)MEM_mallocN((nu->pntsu + 1) * sizeof(BezTriple),
-                                              "new_bezt_nurb");
+  BezTriple *bezt1 = (BezTriple *)MEM_mallocN((nu->pntsu + 1) * sizeof(BezTriple), __func__);
   const int index = data->bezt_index + 1;
   /* Copy all control points before the cut to the new memory. */
   memcpy(bezt1, nu->bezt, index * sizeof(BezTriple));
@@ -592,12 +584,11 @@ static void add_bezt_to_nurb(Nurb *nu, const void *op_data, Curve *cu)
 }
 
 /* Insert a #BPoint to a nurb at the location specified by `op_data`. */
-static void add_bp_to_nurb(Nurb *nu, const void *op_data, Curve *cu)
+static void add_bp_to_nurb(Nurb *nu, const CutData *data, Curve *cu)
 {
   EditNurb *editnurb = cu->editnurb;
-  const CutData *data = op_data;
 
-  BPoint *bp1 = (BPoint *)MEM_mallocN((nu->pntsu + 1) * sizeof(BPoint), "new_bp_nurb");
+  BPoint *bp1 = (BPoint *)MEM_mallocN((nu->pntsu + 1) * sizeof(BPoint), __func__);
   const int index = data->bp_index + 1;
   /* Copy all control points before the cut to the new memory. */
   memcpy(bp1, nu->bp, index * sizeof(BPoint));
@@ -732,7 +723,7 @@ static bool is_spline_nearby(ViewContext *vc, wmOperator *op, const wmEvent *eve
   const float threshold_distance = ED_view3d_select_dist_px();
   if (data.nurb && !data.nurb->bp && data.min_dist < threshold_distance) {
     MoveSegmentData *seg_data;
-    op->customdata = seg_data = MEM_callocN(sizeof(MoveSegmentData), "MoveSegmentData");
+    op->customdata = seg_data = MEM_callocN(sizeof(MoveSegmentData), __func__);
     seg_data->bezt_index = data.bezt_index;
     seg_data->nu = data.nurb;
     return true;
