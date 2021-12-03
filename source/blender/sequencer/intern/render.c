@@ -459,11 +459,7 @@ static void sequencer_thumbnail_transform(ImBuf *in, ImBuf *out)
   transform_pivot_set_m4(transform_matrix, pivot);
   invert_m4(transform_matrix);
 
-  /* No crop. */
-  rctf source_crop;
-  BLI_rctf_init(&source_crop, 0, in->x, 0, in->y);
-
-  IMB_transform(in, out, transform_matrix, &source_crop, IMB_FILTER_NEAREST);
+  IMB_transform(in, out, IMB_TRANSFORM_MODE_REGULAR, IMB_FILTER_NEAREST, transform_matrix, NULL);
 }
 
 /* Check whether transform introduces transparent ares in the result (happens when the transformed
@@ -528,7 +524,7 @@ static void sequencer_preprocess_transform_crop(
 
   const eIMBInterpolationFilterMode filter = context->for_render ? IMB_FILTER_BILINEAR :
                                                                    IMB_FILTER_NEAREST;
-  IMB_transform(in, out, transform_matrix, &source_crop, filter);
+  IMB_transform(in, out, IMB_TRANSFORM_MODE_CROP_SRC, filter, transform_matrix, &source_crop);
 
   if (!seq_image_transform_transparency_gained(context, seq)) {
     out->planes = in->planes;
@@ -2112,7 +2108,7 @@ int SEQ_render_thumbnails_guaranteed_set_frame_step_get(const Sequence *seq)
   /* Arbitrary, but due to performance reasons should be as low as possible. */
   const int thumbnails_base_set_count = min_ii(content_len / 100, 30);
   if (thumbnails_base_set_count <= 0) {
-    return 0;
+    return content_len;
   }
   return content_len / thumbnails_base_set_count;
 }
