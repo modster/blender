@@ -28,12 +28,12 @@ void main()
    * This way the tile can even be reused if it is needed. Also avoid negative modulo. */
   ivec2 tile_wrapped = (tile_shifted + SHADOW_TILEMAP_RES) % SHADOW_TILEMAP_RES;
 
-  ShadowTileData tile_data = shadow_tile_load(tilemaps_img, tile_wrapped, tilemap.index);
+  ShadowTileData tile_data = shadow_tile_load(tilemaps_img, tile_wrapped, 0, tilemap.index);
   /* Reset all flags but keep the allocated page. */
   tile_data.is_visible = false;
   tile_data.is_used = false;
   tile_data.do_update = false;
-  tile_data.lod_tilemap_offset = 0;
+  tile_data.lod = 0;
 #ifdef SHADOW_NO_CACHING
   tile_data.page = uvec2(0);
   tile_data.is_allocated = false;
@@ -47,6 +47,31 @@ void main()
   shadow_tile_store(tilemaps_img, tile_co, tilemap.index, tile_data);
 
   if (tilemap.is_cubeface) {
-    /* TODO(fclem) Need array of image. Do recursive downsample using groupshared. */
+    /* Cubemap shift update is always all or nothing. */
+    bool do_update = (tilemap.grid_shift.x != 0);
+
+    /* Number of lod0 tiles covered by the current lod level (in one dimension). */
+    uint lod_stride = 1u;
+    uint lod_size = uint(SHADOW_TILEMAP_RES);
+    for (int lod = 1; lod <= SHADOW_TILEMAP_LOD; lod++) {
+      lod_size >>= 1;
+      lod_stride <<= 1;
+
+      if (all(lessThan(tile_co, ivec2(lod_size)))) {
+        ivec2 texel = shadow_tile_coord_in_atlas(tile_co, tilemap.index, lod);
+
+        ShadowTileData tile_data = shadow_tile_data_unpack(imageLoad(tilemaps_img, texel).x);
+        /* Reset all flags but keep the allocated page. */
+        tile_data.is_visible = false;
+        tile_data.is_used = false;
+        tile_data.do_update = do_update;
+        tile_data.lod = 0;
+#ifdef SHADOW_NO_CACHING
+        tile_data.page = uvec2(0);
+        tile_data.is_allocated = false;
+#endif
+        imageStore(tilemaps_img, texel, uvec4(shadow_tile_data_pack(tile_data)));
+      }
+    }
   }
 }

@@ -481,8 +481,10 @@ BLI_STATIC_ASSERT_ALIGN(ShadowData, 16)
 /**
  * IMPORTANT: Some data packing are tweaked for these values.
  * Be sure to update them accordingly.
+ * SHADOW_TILEMAP_RES max is 32 because of the shared bitmaps used for LOD tagging.
  */
 #define SHADOW_TILEMAP_RES 16
+#define SHADOW_TILEMAP_LOD 4 /* LOG2(SHADOW_TILEMAP_RES) */
 #define SHADOW_TILEMAP_PER_ROW 64
 #define SHADOW_PAGE_COPY_GROUP_SIZE 32
 #define SHADOW_AABB_TAG_GROUP_SIZE 64

@@ -20,16 +20,17 @@ uniform sampler2D render_tx;
 layout(r32f) writeonly restrict uniform image2D out_atlas_img;
 
 uniform int tilemap_index;
+uniform int tilemap_lod;
 
 void main()
 {
   int page_size = textureSize(render_tx, 0).x / SHADOW_TILEMAP_RES;
-
+  int lod_size = SHADOW_TILEMAP_RES >> tilemap_lod;
   /* TODO(fclem) Experiment with biggest dispatch instead of iterating. Or a list. */
-  for (int y = 0; y < SHADOW_TILEMAP_RES; y++) {
-    for (int x = 0; x < SHADOW_TILEMAP_RES; x++) {
+  for (int y = 0; y < lod_size; y++) {
+    for (int x = 0; x < lod_size; x++) {
       ivec2 tile_co = ivec2(x, y);
-      ShadowTileData tile = shadow_tile_load(tilemaps_tx, tile_co, tilemap_index);
+      ShadowTileData tile = shadow_tile_load(tilemaps_tx, tile_co, tilemap_lod, tilemap_index);
       if (tile.do_update && tile.is_used && tile.is_visible) {
         /* We dispatch enough group to cover one page. */
         ivec2 page_texel = ivec2(gl_GlobalInvocationID.xy);

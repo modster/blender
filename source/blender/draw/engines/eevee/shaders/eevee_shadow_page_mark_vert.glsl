@@ -12,13 +12,15 @@
 uniform usampler2D tilemaps_tx;
 
 uniform int tilemap_index;
+uniform int tilemap_lod;
 
 void main()
 {
   int tile_index = gl_VertexID / 6;
   ivec2 tile_co = ivec2(tile_index % SHADOW_TILEMAP_RES, tile_index / SHADOW_TILEMAP_RES);
+  tile_co >>= tilemap_lod;
 
-  ShadowTileData tile = shadow_tile_load(tilemaps_tx, tile_co, tilemap_index);
+  ShadowTileData tile = shadow_tile_load(tilemaps_tx, tile_co, tilemap_lod, tilemap_index);
 
   if (!tile.is_visible || !tile.is_used || !tile.do_update) {
     /* Don't draw anything as we already cleared the render target for these areas. */
@@ -32,7 +34,7 @@ void main()
   /* NOTE: this only renders if backface cull is off. */
   pos = ((gl_VertexID % 6) > 2) ? -pos : pos;
 
-  pos = ((pos * 0.5 + 0.5) + vec2(tile_co)) / float(SHADOW_TILEMAP_RES);
+  pos = ((pos * 0.5 + 0.5) + vec2(tile_co)) / float(SHADOW_TILEMAP_RES >> tilemap_lod);
 
   gl_Position = vec4(pos * 2.0 - 1.0, 1.0, 1.0);
 }

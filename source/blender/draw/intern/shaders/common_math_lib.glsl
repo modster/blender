@@ -124,7 +124,19 @@ void set_flag_from_test(inout int value, bool test, int flag) { if (test) { valu
 
 uint divide_ceil_u(uint visible_count, uint divisor)
 {
+  return (visible_count + (divisor - 1u)) / divisor;
+}
+
+int divide_ceil_i(int visible_count, int divisor)
+{
   return (visible_count + (divisor - 1)) / divisor;
+}
+
+uint bit_field_mask(uint bit_width, uint bit_min)
+{
+  /* Cannot bit shift more than 31 positions. */
+  uint mask = (bit_width > 31u) ? 0x0u : (0xFFFFFFFFu << bit_width);
+  return ~mask << bit_min;
 }
 
 float distance_squared(vec2 a, vec2 b)

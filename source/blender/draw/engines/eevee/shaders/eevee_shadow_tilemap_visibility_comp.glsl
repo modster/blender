@@ -26,6 +26,8 @@ void main()
   ivec2 tile_co = ivec2(gl_GlobalInvocationID.xy);
 
   bool is_intersecting;
+  int lod_visible_min = 0;
+  int lod_visible_max = 0;
 
   if (tilemap.is_cubeface) {
     Pyramid shape = shadow_tilemap_cubeface_bounds(tilemap, tile_co, ivec2(1));
@@ -36,9 +38,59 @@ void main()
       /* Reject tile not in spot light cone angle. */
       vec3 tile_dir = normalize((shape.corners[3] - shape.corners[1]) * 0.5 +
                                 (shape.corners[1] - shape.corners[0]));
-      /* cone_angle_cos is already bias to include the maximum tile cone half angle. */
+      /* cone_angle_cos is already biased to include the maximum tile cone half angle. */
       if (dot(tilemap.cone_direction, tile_dir) < tilemap.cone_angle_cos) {
         is_intersecting = false;
+      }
+    }
+
+    if (is_intersecting) {
+      /* Test minimum receiver distance and compute min and max visible LOD.  */
+      float len;
+      vec3 tile_center = shape.corners[1] + shape.corners[3] * 0.5;
+      vec3 corner_vec = normalize_len(tile_center - shape.corners[0], len);
+      float projection_len = dot(corner_vec, cameraPos - shape.corners[0]);
+      vec3 nearest_receiver = corner_vec * min(len, projection_len);
+
+      lod_visible_min = shadow_punctual_lod_level(distance(nearest_receiver, cameraPos));
+      /* FIXME(fclem): This should be computed using the farthest intersection with the view.  */
+      lod_visible_max = SHADOW_TILEMAP_LOD;
+
+      lod_visible_max = clamp(lod_visible_max, 0, SHADOW_TILEMAP_LOD);
+      lod_visible_min = clamp(lod_visible_min, 0, SHADOW_TILEMAP_LOD);
+    }
+
+    /* Bitmap of intersection tests. Use one uint per row. */
+    shared uint intersect_map[SHADOW_TILEMAP_RES];
+
+    /* Number of lod0 tiles covered by the current lod level (in one dimension). */
+    uint lod_stride = 1u;
+    uint lod_size = uint(SHADOW_TILEMAP_RES);
+    for (int lod = 1; lod <= SHADOW_TILEMAP_LOD; lod++) {
+      lod_size >>= 1;
+      lod_stride <<= 1;
+
+      barrier();
+      if (is_intersecting && lod >= lod_visible_min && lod <= lod_visible_max) {
+        atomicOr(intersect_map[tile_co.y], (1u << tile_co.x));
+      }
+      else {
+        atomicAnd(intersect_map[tile_co.y], ~(1u << tile_co.x));
+      }
+      /* Control flow is uniform inside a workgroup. */
+      barrier();
+
+      if (all(lessThan(tile_co, ivec2(lod_size)))) {
+        uint col_mask = bit_field_mask(lod_stride, lod_stride * tile_co.x);
+        bool visible = false;
+        uint row = lod_stride * tile_co.y;
+        uint row_max = lod_stride + row;
+        for (; row < row_max && !visible; row++) {
+          visible = (intersect_map[row] & col_mask) != 0;
+        }
+        if (visible) {
+          shadow_tile_set_flag(tilemaps_img, tile_co, lod, tilemap.index, SHADOW_TILE_IS_VISIBLE);
+        }
       }
     }
   }
@@ -58,8 +110,7 @@ void main()
     }
   }
 
-  if (is_intersecting) {
-    shadow_tile_set_flag(tilemaps_img, tile_co, tilemap.index, SHADOW_TILE_IS_VISIBLE);
+  if (is_intersecting && lod_visible_min == 0) {
+    shadow_tile_set_flag(tilemaps_img, tile_co, 0, tilemap.index, SHADOW_TILE_IS_VISIBLE);
   }
-  /* TODO Do Mips for cubemaps. Could do recursive downsampling using groupshared memory. */
 }

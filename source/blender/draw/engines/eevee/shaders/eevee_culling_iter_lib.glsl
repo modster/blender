@@ -1,13 +1,6 @@
 
 #pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 
-uint bit_field_mask(uint bit_width, uint bit_min)
-{
-  /* Cannot bit shift more than 31 positions. */
-  uint mask = (bit_width > 31u) ? 0x0u : (0xFFFFFFFFu << bit_width);
-  return ~mask << bit_min;
-}
-
 uint zbin_mask(uint word_index, uint zbin_min, uint zbin_max)
 {
   uint word_start = word_index * 32u;

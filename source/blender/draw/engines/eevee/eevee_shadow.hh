@@ -465,8 +465,6 @@ class ShadowModule {
   /* NOTE(fclem): Until we implement depth buffer scanning, we rely solely on this to tag
    * needed tiles. */
   DRWPass *tilemap_usage_tag_ps_;
-  /** Propagate LOD pages to higher level to avoid multiple fetches. */
-  DRWPass *tilemap_propagate_lod_ps_;
 
   /** List of AABBs for tagging passes. */
   DRWCallBuffer *casters_updated_;
@@ -499,7 +497,9 @@ class ShadowModule {
   DRWPass *page_copy_ps_;
 
   bool do_page_init_ = true;
+  int3 copy_dispatch_size_;
   int rendering_tilemap_;
+  int rendering_lod_;
 
   /** \} */
 

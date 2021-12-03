@@ -68,11 +68,6 @@ void main()
   int z_min = clamp(culling_z_to_zbin(culling, z_dist + radius), 0, CULLING_ZBIN_COUNT - 1);
   int z_max = clamp(culling_z_to_zbin(culling, z_dist - radius), 0, CULLING_ZBIN_COUNT - 1);
 
-  if (!valid_thread) {
-    /* Do not register invalid threads. */
-    z_max = z_min - 1;
-  }
-
   /* Fits the limit of 32KB. */
   shared int zbin_max[CULLING_ZBIN_COUNT];
   shared int zbin_min[CULLING_ZBIN_COUNT];
@@ -88,9 +83,9 @@ void main()
   z_dists[gl_LocalInvocationID.x] = floatBitsToInt(z_dist);
   barrier();
 
-  const uint i_start = gl_WorkGroupID.x * CULLING_BATCH_SIZE;
-  uint i_max = min(CULLING_BATCH_SIZE, culling.visible_count - i_start);
-  for (uint i = 0; i < i_max; i++) {
+  const int i_start = int(gl_WorkGroupID.x) * CULLING_BATCH_SIZE;
+  int i_max = min(CULLING_BATCH_SIZE, int(culling.visible_count) - i_start);
+  for (int i = 0; i < i_max; i++) {
     float ref = intBitsToFloat(z_dists[i]);
     if (ref > z_dist) {
       index++;
@@ -109,9 +104,10 @@ void main()
      * we use an atomic counter to know how much to offset from the disputed index.
      */
     index += atomicAdd(contender_table[index], -1) - 1;
-    index += int(i_start);
+    index += i_start;
     out_lights[index] = light;
   }
+  barrier();
 
   const uint iter = uint(CULLING_ZBIN_COUNT / CULLING_BATCH_SIZE);
   const uint zbin_local = gl_LocalInvocationID.x * iter;
@@ -124,9 +120,11 @@ void main()
   barrier();
 
   /* Register to Z bins. */
-  for (int z = z_min; z <= z_max; z++) {
-    atomicMin(zbin_min[z], index);
-    atomicMax(zbin_max[z], index);
+  if (valid_thread) {
+    for (int z = z_min; z <= z_max; z++) {
+      atomicMin(zbin_min[z], index);
+      atomicMax(zbin_max[z], index);
+    }
   }
   barrier();
 

@@ -45,8 +45,7 @@ ShadowPagePacked shadow_page_data_pack(ShadowPageData page)
 /** \a unormalized_uv is the uv coordinates for the whole tilemap [0..SHADOW_TILEMAP_RES]. */
 vec2 shadow_page_uv_transform(uvec2 page, uint lod, vec2 unormalized_uv)
 {
-  vec2 page_texel = fract(unormalized_uv / float(1 << lod)) / vec2(SHADOW_PAGE_PER_ROW);
+  vec2 page_texel = fract(unormalized_uv / float(1u << lod));
   /* Assumes atlas is squared. */
-  vec2 page_offset = vec2(page) / vec2(SHADOW_PAGE_PER_ROW);
-  return page_offset + page_texel;
+  return (vec2(page) + page_texel) / vec2(SHADOW_PAGE_PER_ROW);
 }

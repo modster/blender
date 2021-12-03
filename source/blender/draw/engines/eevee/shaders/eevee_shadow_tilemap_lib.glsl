@@ -11,13 +11,13 @@
 struct ShadowTileData {
   /** Page inside the virtual shadow map atlas. */
   uvec2 page;
-  /** If not 0, offset to the tilemap that has a valid page for this position. (cubemap only) */
-  uint lod_tilemap_offset;
+  /** Lod pointed to by LOD 0 tile page. (cubemap only) */
+  uint lod;
   /** Set to true during the setup phase if the tile is inside the view frustum. */
   bool is_visible;
   /** If the tile is needed for rendering. */
   bool is_used;
-  /** True if the page points to a valid page. */
+  /** True if this tile owns the page and if it points to a valid page. */
   bool is_allocated;
   /** True if an update is needed. */
   bool do_update;
@@ -34,7 +34,7 @@ ShadowTileData shadow_tile_data_unpack(uint data)
   ShadowTileData tile;
   tile.page.x = data & 0xFFu;
   tile.page.y = (data >> 8u) & 0xFFu;
-  tile.lod_tilemap_offset = (data >> 16u) & 0xFu;
+  tile.lod = (data >> 16u) & 0xFu;
   tile.is_visible = flag_test(data, SHADOW_TILE_IS_VISIBLE);
   tile.is_used = flag_test(data, SHADOW_TILE_IS_USED);
   tile.is_allocated = flag_test(data, SHADOW_TILE_IS_ALLOCATED);
@@ -47,7 +47,7 @@ uint shadow_tile_data_pack(ShadowTileData tile)
   uint data;
   data = tile.page.x;
   data |= tile.page.y << 8u;
-  data |= tile.lod_tilemap_offset << 16u;
+  data |= tile.lod << 16u;
   set_flag_from_test(data, tile.is_visible, SHADOW_TILE_IS_VISIBLE);
   set_flag_from_test(data, tile.is_used, SHADOW_TILE_IS_USED);
   set_flag_from_test(data, tile.is_allocated, SHADOW_TILE_IS_ALLOCATED);
@@ -68,13 +68,33 @@ ivec2 shadow_tile_coord(int tile_index)
 /* Return bottom left pixel position of the tilemap inside the tilemap atlas. */
 ivec2 shadow_tilemap_start(int tilemap_index)
 {
-  return SHADOW_TILEMAP_RES *
-         ivec2(tilemap_index % SHADOW_TILEMAP_PER_ROW, tilemap_index / SHADOW_TILEMAP_PER_ROW);
+  /* Assumes base map is squared. */
+  ivec2 start = SHADOW_TILEMAP_RES * ivec2(tilemap_index % SHADOW_TILEMAP_PER_ROW,
+                                           tilemap_index / SHADOW_TILEMAP_PER_ROW);
+  return start;
+}
+
+/* Return bottom left pixel position of the tilemap inside the tilemap atlas. */
+ivec2 shadow_tilemap_start(int tilemap_index, int lod)
+{
+  /* Assumes base map is squared. */
+  ivec2 start = shadow_tilemap_start(tilemap_index) >> lod;
+  if (lod > 0) {
+    const int lod0_res = SHADOW_TILEMAP_RES * SHADOW_TILEMAP_PER_ROW;
+    start.y += lod0_res;
+    start.x += lod0_res - (lod0_res >> (lod - 1));
+  }
+  return start;
 }
 
 ivec2 shadow_tile_coord_in_atlas(ivec2 tile, int tilemap_index)
 {
   return shadow_tilemap_start(tilemap_index) + tile;
+}
+
+ivec2 shadow_tile_coord_in_atlas(ivec2 tile, int tilemap_index, int lod)
+{
+  return shadow_tilemap_start(tilemap_index, lod) + tile;
 }
 
 /** \} */
@@ -91,25 +111,37 @@ void shadow_tile_store(restrict uimage2D tilemaps_img,
   uint tile_data = shadow_tile_data_pack(data);
   imageStore(tilemaps_img, shadow_tile_coord_in_atlas(tile_co, tilemap_index), uvec4(tile_data));
 }
+
+void shadow_tile_store(
+    restrict uimage2D tilemaps_img, ivec2 tile_co, int lod, int tilemap_index, ShadowTileData data)
+{
+  uint tile_data = shadow_tile_data_pack(data);
+  imageStore(
+      tilemaps_img, shadow_tile_coord_in_atlas(tile_co, tilemap_index, lod), uvec4(tile_data));
+}
 /* Ugly define because some compilers seems to not like the fact the imageAtomicOr is inside
  * a function. */
-#define shadow_tile_set_flag(tilemaps_img, tile_co, tilemap_index, flag) \
-  imageAtomicOr(tilemaps_img, shadow_tile_coord_in_atlas(tile_co, tilemap_index), flag)
+#define shadow_tile_set_flag(tilemaps_img, tile_co, lod, tilemap_index, flag) \
+  imageAtomicOr(tilemaps_img, shadow_tile_coord_in_atlas(tile_co, tilemap_index, lod), flag)
 
-ShadowTileData shadow_tile_load(restrict uimage2D tilemaps_img, ivec2 tile_co, int tilemap_index)
+ShadowTileData shadow_tile_load(restrict uimage2D tilemaps_img,
+                                ivec2 tile_co,
+                                int lod,
+                                int tilemap_index)
 {
   uint tile_data = SHADOW_TILE_NO_DATA;
   if (in_range_inclusive(tile_co, ivec2(0), ivec2(SHADOW_TILEMAP_RES - 1))) {
-    tile_data = imageLoad(tilemaps_img, shadow_tile_coord_in_atlas(tile_co, tilemap_index)).x;
+    tile_data = imageLoad(tilemaps_img, shadow_tile_coord_in_atlas(tile_co, tilemap_index, lod)).x;
   }
   return shadow_tile_data_unpack(tile_data);
 }
 
-ShadowTileData shadow_tile_load(usampler2D tilemaps_tx, ivec2 tile_co, int tilemap_index)
+ShadowTileData shadow_tile_load(usampler2D tilemaps_tx, ivec2 tile_co, int lod, int tilemap_index)
 {
   uint tile_data = SHADOW_TILE_NO_DATA;
   if (in_range_inclusive(tile_co, ivec2(0), ivec2(SHADOW_TILEMAP_RES - 1))) {
-    tile_data = texelFetch(tilemaps_tx, shadow_tile_coord_in_atlas(tile_co, tilemap_index), 0).x;
+    tile_data =
+        texelFetch(tilemaps_tx, shadow_tile_coord_in_atlas(tile_co, tilemap_index, lod), 0).x;
   }
   return shadow_tile_data_unpack(tile_data);
 }
@@ -120,6 +152,13 @@ int shadow_directional_clipmap_level(ShadowData shadow, float distance_to_camera
   /* Why do we need to bias by 2 here? I don't know... */
   int clipmap_lod = int(ceil(log2(distance_to_camera))) + 2;
   return clamp(clipmap_lod, shadow.clipmap_lod_min, shadow.clipmap_lod_max);
+}
+
+int shadow_punctual_lod_level(float distance_to_camera)
+{
+  /* FIXME(fclem): Does not work great with orthographic projection. */
+  /* TODO use pixel density. */
+  return int(log2(distance_to_camera));
 }
 
 /** \} */

@@ -244,12 +244,14 @@ ShadowTileAllocator::ShadowTileAllocator()
   int2 extent;
   extent.x = min_ii(size, maps_per_row) * tilemap_res;
   extent.y = (size / maps_per_row) * tilemap_res;
-  int mips = log2_ceil_u(tilemap_res);
-  tilemap_tx.ensure(UNPACK2(extent), mips, GPU_R32UI);
+  /* Add half the height for LODs. */
+  extent.y += extent.y / 2;
+
+  tilemap_tx.ensure(UNPACK2(extent), 1, GPU_R32UI);
   tilemap_tx.clear((uint)0);
 
-  /* Allocate one pixel for each tilemap. */
-  tilemap_rects_tx.ensure(size, 1, 1, GPU_RGBA32I);
+  /* Allocate one pixel for each tilemap and each lod. */
+  tilemap_rects_tx.ensure(SHADOW_TILEMAP_LOD + 1, size, 1, GPU_RGBA32I);
   tilemap_rects_tx.clear((int)0);
 }
 
@@ -564,8 +566,6 @@ void ShadowModule::init(void)
 #endif
 
   debug_data_.type = inst_.debug_mode;
-
-  memset(views_, 0, sizeof(views_));
 }
 
 void ShadowModule::begin_sync(void)
@@ -573,6 +573,8 @@ void ShadowModule::begin_sync(void)
   casters_bounds_.init_min_max();
   receivers_non_opaque_ = DRW_call_buffer_create(&aabb_format_);
   casters_updated_ = DRW_call_buffer_create(&aabb_format_);
+
+  memset(views_, 0, sizeof(views_));
 }
 
 void ShadowModule::sync_object(Object *ob,
@@ -754,10 +756,6 @@ void ShadowModule::end_sync(void)
       DRW_shgroup_barrier(grp, GPU_BARRIER_SHADER_IMAGE_ACCESS);
     }
   }
-  {
-    tilemap_propagate_lod_ps_ = DRW_pass_create("ShadowLodPropagate", (DRWState)0);
-    /* TODO */
-  }
 
   /**
    * Page Management
@@ -813,6 +811,7 @@ void ShadowModule::end_sync(void)
     GPUShader *sh = inst_.shaders.static_shader_get(SHADOW_PAGE_MARK);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, page_mark_ps_);
     DRW_shgroup_uniform_texture(grp, "tilemaps_tx", tilemap_allocator.tilemap_tx);
+    DRW_shgroup_uniform_int(grp, "tilemap_lod", &rendering_lod_, 1);
     DRW_shgroup_uniform_int(grp, "tilemap_index", &rendering_tilemap_, 1);
     DRW_shgroup_clear_framebuffer(grp, GPU_DEPTH_BIT, 0, 0, 0, 0, 0.0f, 0x0);
     DRW_shgroup_call_procedural_triangles(grp, nullptr, square_i(SHADOW_TILEMAP_RES) * 2);
@@ -825,9 +824,9 @@ void ShadowModule::end_sync(void)
     DRW_shgroup_uniform_texture(grp, "tilemaps_tx", tilemap_allocator.tilemap_tx);
     DRW_shgroup_uniform_texture(grp, "render_tx", render_tx_);
     DRW_shgroup_uniform_image(grp, "out_atlas_img", atlas_tx_);
+    DRW_shgroup_uniform_int(grp, "tilemap_lod", &rendering_lod_, 1);
     DRW_shgroup_uniform_int(grp, "tilemap_index", &rendering_tilemap_, 1);
-    int dispatch_size = shadow_page_size_ / SHADOW_PAGE_COPY_GROUP_SIZE;
-    DRW_shgroup_call_compute(grp, dispatch_size, dispatch_size, 1);
+    DRW_shgroup_call_compute_ref(grp, copy_dispatch_size_);
     DRW_shgroup_barrier(grp, GPU_BARRIER_TEXTURE_FETCH);
   }
 
@@ -955,8 +954,6 @@ void ShadowModule::update_visible(const DRWView *view)
     }
     DRW_draw_pass(page_free_ps_);
     DRW_draw_pass(page_alloc_ps_);
-
-    DRW_draw_pass(tilemap_propagate_lod_ps_);
   }
   DRW_stats_group_end();
 
@@ -965,29 +962,48 @@ void ShadowModule::update_visible(const DRWView *view)
     /* Readback update list. Ugly sync point. */
     rcti *rect = tilemap_allocator.tilemap_rects_tx.read<rcti>(GPU_DATA_INT);
 
-    Span<rcti> regions(rect, tilemap_allocator.maps.size());
+    Span<rcti> regions(rect, tilemap_allocator.maps.size() * (SHADOW_TILEMAP_LOD + 1));
     Span<ShadowTileMap *> tilemaps = tilemap_allocator.maps.as_span();
 
+    int rect_idx = 0;
     while (!regions.is_empty()) {
       Vector<int, 6> regions_index;
+      Vector<int, 6> regions_lod;
 
       /* Group updates by pack of 6. This is to workaround the current DRWView limitation.
        * Future goal is to have GPU culling and create the views on GPU. */
       while (!regions.is_empty() && regions_index.size() < 6) {
-        if (!BLI_rcti_is_empty(&regions.first())) {
-          ShadowTileMap &tilemap = *tilemaps.first();
+        int lod = rect_idx % (SHADOW_TILEMAP_LOD + 1);
+        ShadowTileMap &tilemap = *tilemaps.first();
+        if (!tilemap.is_cubeface && lod > 0) {
+          /* Do not process lod for clipmaps as they are undefined. */
+        }
+        else if (!BLI_rcti_is_empty(&regions.first())) {
           tilemap.setup_view(regions.first(), views_[regions_index.size()]);
           regions_index.append(tilemap.index);
+          regions_lod.append(lod);
         }
+        rect_idx++;
         regions = regions.drop_front(1);
-        tilemaps = tilemaps.drop_front(1);
+        if (lod == SHADOW_TILEMAP_LOD) {
+          tilemaps = tilemaps.drop_front(1);
+        }
       }
 
       for (auto i : regions_index.index_range()) {
         rendering_tilemap_ = regions_index[i];
+        rendering_lod_ = regions_lod[i];
 
         DRW_view_set_active(views_[i]);
         GPU_framebuffer_bind(render_fb_);
+
+        copy_dispatch_size_.x = shadow_page_size_ / SHADOW_PAGE_COPY_GROUP_SIZE;
+        copy_dispatch_size_.y = copy_dispatch_size_.x;
+        copy_dispatch_size_.z = 1;
+
+        int viewport_size = render_tx_.width() >> rendering_lod_;
+        GPU_framebuffer_viewport_set(render_fb_, 0, 0, viewport_size, viewport_size);
+
         DRW_draw_pass(page_mark_ps_);
         inst_.shading_passes.shadow.render();
         DRW_draw_pass(page_copy_ps_);

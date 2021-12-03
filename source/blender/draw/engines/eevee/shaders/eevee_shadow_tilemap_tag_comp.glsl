@@ -48,12 +48,21 @@ void main()
 {
   ShadowTileMapData tilemap = tilemaps[gl_GlobalInvocationID.z];
 
+  /* Bitmap of tile intersection tests. Use one uint per row for each LOD. */
+  shared uint flag_map[SHADOW_TILEMAP_RES * 2];
+  if (gl_LocalInvocationID.x == 0u) {
+    for (int i = 0; i < SHADOW_TILEMAP_RES * 2; i++) {
+      flag_map[i] = 0u;
+    }
+  }
+  barrier();
+
   Pyramid frustum;
   if (tilemap.is_cubeface) {
     frustum = shadow_tilemap_cubeface_bounds(tilemap, ivec2(0), ivec2(SHADOW_TILEMAP_RES));
   }
 
-  int iter = (aabb_len + (int(gl_WorkGroupSize.x) - 1)) / int(gl_WorkGroupSize.x);
+  int iter = divide_ceil_i(aabb_len, int(gl_WorkGroupSize.x));
   for (int i = 0; i < iter; i++) {
     int aabb_index = i * int(gl_WorkGroupSize.x) + int(gl_GlobalInvocationID.x);
     if (aabb_index >= aabb_len) {
@@ -79,13 +88,32 @@ void main()
     // drw_debug(aabb, vec4(1, 1, 0, 1));
 #endif
 
+    int lod_min = tilemap.is_cubeface ? SHADOW_TILEMAP_LOD : 0;
+    int lod_max = 0;
     int clipped = 0;
     /* TODO(fclem) project bbox instead of AABB. */
     /* NDC space post projection [-1..1] (unclamped). */
     AABB aabb_ndc = init_min_max();
     for (int v = 0; v < 8; v++) {
       merge(aabb_ndc, safe_project(tilemap, clipped, box.corners[v]));
+
+#ifdef TAG_USAGE
+      if (tilemap.is_cubeface) {
+        /* FIXME(fclem) this will fail if camera is inside the box.  */
+        int lod_visible = shadow_punctual_lod_level(distance(cameraPos, box.corners[v]));
+        lod_min = min(lod_min, lod_visible);
+        lod_max = max(lod_max, lod_visible);
+      }
+#endif
     }
+    lod_max = clamp(lod_max, 0, SHADOW_TILEMAP_LOD);
+    lod_min = clamp(lod_min, 0, SHADOW_TILEMAP_LOD);
+
+#ifdef TAG_UPDATE
+    /* Update tag all LODs. */
+    lod_max = SHADOW_TILEMAP_LOD;
+    lod_min = 0;
+#endif
 
     if (tilemap.is_cubeface) {
       if (clipped == 8) {
@@ -96,11 +124,11 @@ void main()
         /* Not all verts are behind the near clip plane. */
         if (intersect(frustum, box)) {
           /* We cannot correctly handle this case so we fallback by covering the whole view. */
-          aabb_ndc.max = vec3(16.0, 16.0, 1.0);
+          aabb_ndc.max = vec3(vec2(SHADOW_TILEMAP_RES), 1.0);
           aabb_ndc.min = vec3(0.0, 0.0, -1.0);
         }
         else {
-          /* Still out of the frutum. Ignore. */
+          /* Still out of the frustum. Ignore. */
           continue;
         }
       }
@@ -117,29 +145,55 @@ void main()
 
     /* Discard if the bbox does not touch the rendering frustum. */
 #ifdef TAG_UPDATE
-    const uint flag = SHADOW_TILE_DO_UPDATE;
     const float min_depth = -1.0;
     const float max_depth = 1.0;
 #else /* TAG_USAGE */
-    const uint flag = SHADOW_TILE_IS_USED;
     float max_depth = tilemap._max_usage_depth;
     float min_depth = tilemap._min_usage_depth;
 #endif
     AABB aabb_tag;
-    AABB aabb_map = AABB(vec3(0.0, 0.0, min_depth), vec3(15.99999, 15.99999, max_depth));
+    const AABB aabb_map = AABB(vec3(0.0, 0.0, min_depth),
+                               vec3(vec2(SHADOW_TILEMAP_RES) - 1e-6, max_depth));
     if (!intersect(aabb_map, aabb_ndc, aabb_tag)) {
       continue;
     }
 
     /* Raster the Box. */
-    ivec2 range_min = ivec2(aabb_tag.min.xy);
-    ivec2 range_max = ivec2(aabb_tag.max.xy);
+    ivec2 range_min = ivec2(aabb_tag.min.xy) >> lod_min;
+    ivec2 range_max = ivec2(aabb_tag.max.xy) >> lod_min;
 
-    /* OPTI(fclem): Could only test tiles not already tagged. */
-    for (int y = range_min.y; y <= range_max.y; y++) {
-      for (int x = range_min.x; x <= range_max.x; x++) {
-        /* TODO(fclem) Reduce atomic contention. */
-        shadow_tile_set_flag(tilemaps_img, ivec2(x, y), tilemap.index, flag);
+    for (int lod = lod_min; lod <= lod_max; lod++) {
+      for (int y = range_min.y; y <= range_max.y; y++) {
+        int flag_idx = (SHADOW_TILEMAP_RES >> lod) + y;
+        uint row_bits = bit_field_mask(range_max.x - range_min.x + 1, range_min.x);
+        atomicOr(flag_map[flag_idx], row_bits);
+      }
+      range_min >>= 1;
+      range_max >>= 1;
+    }
+  }
+
+  barrier();
+
+  if (gl_LocalInvocationID.x == 0u) {
+#ifdef TAG_UPDATE
+    const uint flag = SHADOW_TILE_DO_UPDATE;
+#else /* TAG_USAGE */
+    const uint flag = SHADOW_TILE_IS_USED;
+#endif
+    int lod_max = tilemap.is_cubeface ? SHADOW_TILEMAP_LOD : 0;
+    /* Number of lod0 tiles covered by the current lod level (in one dimension). */
+    uint lod_size = uint(SHADOW_TILEMAP_RES);
+    /* TODO(fclem): Could use multiple thread to set flag. */
+    for (int lod = 0; lod <= lod_max; lod++, lod_size >>= 1) {
+      for (int y = 0; y < lod_size; y++) {
+        int flag_idx = (SHADOW_TILEMAP_RES >> lod) + y;
+        uint row_bits = flag_map[flag_idx];
+        while (row_bits != 0u) {
+          int x = findLSB(row_bits);
+          row_bits &= ~1u << uint(x);
+          shadow_tile_set_flag(tilemaps_img, ivec2(x, y), lod, tilemap.index, flag);
+        }
       }
     }
   }

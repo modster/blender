@@ -51,11 +51,11 @@ float shadow_punctual_depth_get(
   vec2 uv = (lL.xy / abs(lL.z)) * vec2(SHADOW_TILEMAP_RES / 2) + float(SHADOW_TILEMAP_RES / 2);
   ivec2 tile_co = ivec2(floor(uv));
   int tilemap_index = shadow.tilemap_index + face_id;
-  ShadowTileData tile = shadow_tile_load(tilemaps_tx, tile_co, tilemap_index);
+  ShadowTileData tile = shadow_tile_load(tilemaps_tx, tile_co, 0, tilemap_index);
 
   float depth = 1.0;
   if (/* tile.is_valid && */ tilemap_index <= shadow.tilemap_last) {
-    vec2 shadow_uv = shadow_page_uv_transform(tile.page, 0, uv);
+    vec2 shadow_uv = shadow_page_uv_transform(tile.page, tile.lod, uv);
     depth = texture(atlas_tx, shadow_uv).r;
   }
   return depth;
@@ -81,7 +81,7 @@ float shadow_directional_depth_get(sampler2D atlas_tx,
 
   vec2 uv = (lP.xy * clipmap_res_mul - clipmap_offset) + float(SHADOW_TILEMAP_RES / 2);
   ivec2 tile_co = ivec2(floor(uv));
-  ShadowTileData tile = shadow_tile_load(tilemaps_tx, tile_co, tilemap_index);
+  ShadowTileData tile = shadow_tile_load(tilemaps_tx, tile_co, 0, tilemap_index);
 
   float depth = 1.0;
   if (tile.is_allocated) {

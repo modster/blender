@@ -52,6 +52,9 @@ vec3 debug_random_color(int v)
 
 vec3 debug_tile_state_color(ShadowTileData tile)
 {
+  if (tile.is_used && tile.is_visible && tile.lod > 0) {
+    return vec3(1, 1, 0);
+  }
   if (tile.do_update && tile.is_used && tile.is_visible) {
     return vec3(1, 0, 0);
   }
@@ -71,11 +74,14 @@ bool debug_tilemap()
   int tilemap_index = tile.x / (SHADOW_TILEMAP_RES + 2);
   tile = (tile % (SHADOW_TILEMAP_RES + 2)) - 1;
   tilemap_index += debug.shadow.tilemap_index;
+  int tilemap_lod_max = (debug.light.type != LIGHT_SUN) ? SHADOW_TILEMAP_LOD : 0;
 
   if ((tilemap_index >= debug.shadow.tilemap_index) &&
-      (tilemap_index <= debug.shadow.tilemap_last) && (tilemap_lod == 0) &&
+      (tilemap_index <= debug.shadow.tilemap_last) && (tilemap_lod >= 0) &&
+      (tilemap_lod <= tilemap_lod_max) &&
       in_range_inclusive(tile, ivec2(0), ivec2(SHADOW_TILEMAP_RES - 1))) {
-    ShadowTileData tile_data = shadow_tile_load(tilemaps_tx, tile, tilemap_index);
+    tile >>= tilemap_lod;
+    ShadowTileData tile_data = shadow_tile_load(tilemaps_tx, tile, tilemap_lod, tilemap_index);
     /* Write depth to overlap overlays. */
     gl_FragDepth = 0.0;
     out_color_add = vec4(debug_tile_state_color(tile_data), 0);
@@ -144,7 +150,7 @@ void debug_tile_state(vec3 P)
     int tilemap_data_index = debug.tilemap_data_index + tilemap_index - debug.shadow.tilemap_index;
     vec3 clipP = project_point(tilemaps[tilemap_data_index].tilemat, P);
     ivec2 tile = ivec2(clipP.xy);
-    ShadowTileData tile_data = shadow_tile_load(tilemaps_tx, tile, tilemap_index);
+    ShadowTileData tile_data = shadow_tile_load(tilemaps_tx, tile, 0, tilemap_index);
     vec3 color = debug_tile_state_color(tile_data);
     out_color_add = vec4(color * 0.5, 0);
     out_color_mul = out_color_add * 0.5 + 0.5;
@@ -175,10 +181,9 @@ void debug_page_allocation(void)
 
 void debug_tile_allocation(void)
 {
-  ivec2 tile_co = ivec2(gl_FragCoord.xy);
+  ivec2 tile_co = ivec2(gl_FragCoord.xy) - 32;
   /* Assumes tilemap buffer is squared. */
-  if (in_range_inclusive(
-          tile_co, ivec2(0), ivec2(SHADOW_TILEMAP_PER_ROW * SHADOW_TILEMAP_RES - 1))) {
+  if (in_range_inclusive(tile_co, ivec2(0), textureSize(tilemaps_tx, 0).xy - 1)) {
     ShadowTileData tile = shadow_tile_data_unpack(texelFetch(tilemaps_tx, tile_co, 0).x);
     out_color_add = vec4(debug_tile_state_color(tile), 0);
     out_color_mul = vec4(0);
