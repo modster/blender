@@ -57,10 +57,12 @@ struct PrivateDataAccessor {
     /* Create a single texture that covers the visible screen space. */
     BLI_rctf_init(
         &pd->screen_space.texture_infos[0].clipping_bounds, 0, region->winx, 0, region->winy);
+    pd->screen_space.texture_infos[0].visible = true;
 
     /* Mark the other textures as invalid. */
     for (int i = 1; i < SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN; i++) {
       BLI_rctf_init_minmax(&pd->screen_space.texture_infos[i].clipping_bounds);
+      pd->screen_space.texture_infos[i].visible = false;
     }
   }
 
@@ -134,20 +136,6 @@ struct ImageTileAccessor {
 };
 
 using namespace blender::bke::image::partial_update;
-
-/* TODO: Should we use static class functions in stead of a namespace. */
-namespace clipping {
-
-static void update_texture_slots_visibility(const AbstractSpaceAccessor *UNUSED(space),
-                                            IMAGE_PrivateData *pd)
-{
-  pd->screen_space.texture_infos[0].visible = true;
-  for (int i = 1; i < SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN; i++) {
-    pd->screen_space.texture_infos[i].visible = false;
-  }
-}
-
-}  // namespace clipping
 
 class ScreenSpaceDrawingMode : public AbstractDrawingMode {
  private:
@@ -282,6 +270,7 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
                          Image *image) const
   {
     while (iterator.get_next_change() == ePartialUpdateIterResult::ChangeAvailable) {
+      /* Quick exit when tile_buffer isn't availble. */
       if (iterator.tile_data.tile_buffer == nullptr) {
         continue;
       }
@@ -513,7 +502,6 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
     pda.clear_dirty_flag();
     pda.update_screen_space_bounds(region);
     pda.update_uv_bounds();
-    clipping::update_texture_slots_visibility(space, pd);
     update_texture_slot_allocation(txl, pd);
 
     // Step: Update the GPU textures based on the changes in the image.

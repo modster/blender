@@ -116,7 +116,6 @@ struct IMAGE_Data {
 #define IMAGE_DRAW_FLAG_SHUFFLING (1 << 2)
 #define IMAGE_DRAW_FLAG_DEPTH (1 << 3)
 #define IMAGE_DRAW_FLAG_DO_REPEAT (1 << 4)
-#define IMAGE_DRAW_FLAG_USE_WORLD_POS (1 << 5)
 
 struct ShaderParameters {
   constexpr static float color[4] = {1.0f, 1.0f, 1.0f, 1.0f};

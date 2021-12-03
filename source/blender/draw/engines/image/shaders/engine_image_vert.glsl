@@ -1,7 +1,6 @@
 #pragma BLENDER_REQUIRE(common_view_lib.glsl)
 
 #define IMAGE_DRAW_FLAG_DO_REPEAT (1 << 4)
-#define IMAGE_DRAW_FLAG_USE_WORLD_POS (1 << 5)
 #define IMAGE_Z_DEPTH 0.75
 
 uniform int drawFlags;
@@ -29,7 +28,6 @@ void main()
     position.z = IMAGE_Z_DEPTH;
     gl_Position = position;
     /* UDIM texture uses the world position for tile selection. */
-    uvs = image_pos.xy;  //((drawFlags & IMAGE_DRAW_FLAG_USE_WORLD_POS) != 0) ? world_pos.xy :
-                         //image_pos.xy;
+    uvs = image_pos.xy; 
   }
 }
