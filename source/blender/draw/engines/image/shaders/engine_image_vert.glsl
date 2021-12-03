@@ -29,6 +29,7 @@ void main()
     position.z = IMAGE_Z_DEPTH;
     gl_Position = position;
     /* UDIM texture uses the world position for tile selection. */
-    uvs = ((drawFlags & IMAGE_DRAW_FLAG_USE_WORLD_POS) != 0) ? world_pos.xy : image_pos.xy;
+    uvs = image_pos.xy;  //((drawFlags & IMAGE_DRAW_FLAG_USE_WORLD_POS) != 0) ? world_pos.xy :
+                         //image_pos.xy;
   }
 }

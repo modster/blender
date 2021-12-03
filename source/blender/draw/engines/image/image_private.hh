@@ -29,9 +29,9 @@
 /**
  * \brief max allowed textures to use by the ScreenSpaceDrawingMode.
  *
- * Technically between 4 and 16 textures could be in use.
+ * 4 textures are used to reduce uploading screen space textures when translating the image.
  */
-constexpr int SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN = 16;
+constexpr int SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN = 4;
 
 /* Forward declarations */
 extern "C" {

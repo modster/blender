@@ -39,7 +39,7 @@ constexpr float EPSILON_UV_BOUNDS = 0.00001f;
 struct PrivateDataAccessor {
   IMAGE_PrivateData *pd;
   IMAGE_TextureList *txl;
-  PrivateDataAccessor(IMAGE_PrivateData *pd, IMAGE_TextureList *txl) : pd(pd)
+  PrivateDataAccessor(IMAGE_PrivateData *pd, IMAGE_TextureList *txl) : pd(pd), txl(txl)
   {
   }
 
@@ -115,18 +115,18 @@ struct ImageTileAccessor {
   {
   }
 
-  int get_tile_number()
+  int get_tile_number() const
   {
     return image_tile->tile_number;
   }
 
-  int get_tile_x_offset()
+  int get_tile_x_offset() const
   {
     int tile_number = get_tile_number();
     return (tile_number - 1001) % 10;
   }
 
-  int get_tile_y_offset()
+  int get_tile_y_offset() const
   {
     int tile_number = get_tile_number();
     return (tile_number - 1001) / 10;
@@ -138,7 +138,7 @@ using namespace blender::bke::image::partial_update;
 /* TODO: Should we use static class functions in stead of a namespace. */
 namespace clipping {
 
-static void update_texture_slots_visibility(const AbstractSpaceAccessor *space,
+static void update_texture_slots_visibility(const AbstractSpaceAccessor *UNUSED(space),
                                             IMAGE_PrivateData *pd)
 {
   pd->screen_space.texture_infos[0].visible = true;
@@ -282,6 +282,10 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
                          Image *image) const
   {
     while (iterator.get_next_change() == ePartialUpdateIterResult::ChangeAvailable) {
+      if (iterator.tile_data.tile_buffer == nullptr) {
+        continue;
+      }
+      ensure_float_buffer(*iterator.tile_data.tile_buffer);
       const float tile_width = static_cast<float>(iterator.tile_data.tile_buffer->x);
       const float tile_height = static_cast<float>(iterator.tile_data.tile_buffer->y);
 
@@ -360,11 +364,12 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
         for (int y = gpu_texture_region_to_update.ymin; y < gpu_texture_region_to_update.ymax;
              y++) {
           float yf = y / (float)texture_height;
-          float v = info->uv_bounds.ymax * yf + info->uv_bounds.ymin * (1.0 - yf);
+          float v = info->uv_bounds.ymax * yf + info->uv_bounds.ymin * (1.0 - yf) - tile_offset_y;
           for (int x = gpu_texture_region_to_update.xmin; x < gpu_texture_region_to_update.xmax;
                x++) {
             float xf = x / (float)texture_width;
-            float u = info->uv_bounds.xmax * xf + info->uv_bounds.xmin * (1.0 - xf);
+            float u = info->uv_bounds.xmax * xf + info->uv_bounds.xmin * (1.0 - xf) -
+                      tile_offset_x;
             nearest_interpolation_color(tile_buffer,
                                         nullptr,
                                         &extracted_buffer.rect_float[offset * 4],
@@ -388,10 +393,6 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
     }
   }
 
-  void do_partial_update()
-  {
-  }
-
   void do_full_update_for_dirty_textures(IMAGE_TextureList *txl,
                                          IMAGE_PrivateData *pd,
                                          const ImageUser *image_user) const
@@ -404,52 +405,80 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
       if (!info->visible) {
         continue;
       }
-
       GPUTexture *gpu_texture = txl->screen_space.textures[i];
-      const int texture_width = GPU_texture_width(gpu_texture);
-      const int texture_height = GPU_texture_height(gpu_texture);
-
-      ImBuf tmp;
-      IMB_initImBuf(&tmp, texture_width, texture_height, 0, IB_rectfloat);
-      ImageUser tile_user = *image_user;
-
-      LISTBASE_FOREACH (ImageTile *, image_tile_ptr, &pd->image->tiles) {
-        ImageTileAccessor image_tile(image_tile_ptr);
-        tile_user.tile = image_tile.get_tile_number();
-        ImBuf *tile_buffer = BKE_image_acquire_ibuf(pd->image, &tile_user, NULL);
-
-        if (tile_buffer == nullptr) {
-          /* Couldn't load the image buffer of the tile. So continue to the next change. */
-          continue;
-        }
-        if (tile_buffer->rect_float == nullptr) {
-          IMB_float_from_rect(tile_buffer);
-        }
-        /* TODO(jbakker): add IMB_transform without cropping. */
-        /* TODO(jbakker): add IMB_transform with repeat. */
-        rctf crop;
-        BLI_rctf_init(&crop, 0.0, tile_buffer->x, 0.0, tile_buffer->y);
-        float uv_to_texel[4][4];
-
-        /* IMB_transform works in a non-consistent space. This should be documented or fixed!.
-         * Construct a variant of the info_uv_to_texture that adds the texel space
-         * transformation.*/
-        copy_m4_m4(uv_to_texel, info->uv_to_texture);
-        float scale[3] = {static_cast<float>(texture_width) / static_cast<float>(tile_buffer->x),
-                          static_cast<float>(texture_height) / static_cast<float>(tile_buffer->y),
-                          1.0f};
-        rescale_m4(uv_to_texel, scale);
-        uv_to_texel[3][0] *= texture_width;
-        uv_to_texel[3][1] *= texture_height;
-        invert_m4(uv_to_texel);
-        IMB_transform(tile_buffer, &tmp, uv_to_texel, &crop, IMB_FILTER_NEAREST);
-
-        BKE_image_release_ibuf(pd->image, tile_buffer, nullptr);
-      }
-
-      GPU_texture_update(gpu_texture, GPU_DATA_FLOAT, tmp.rect_float);
-      imb_freerectImbuf_all(&tmp);
+      do_full_update_gpu_texture(*info, gpu_texture, pd, image_user);
     }
+  }
+
+  void do_full_update_gpu_texture(const IMAGE_ScreenSpaceTextureInfo &texture_info,
+                                  GPUTexture *gpu_texture,
+                                  IMAGE_PrivateData *pd,
+                                  const ImageUser *image_user) const
+  {
+
+    ImBuf texture_buffer;
+    const int texture_width = GPU_texture_width(gpu_texture);
+    const int texture_height = GPU_texture_height(gpu_texture);
+    IMB_initImBuf(&texture_buffer, texture_width, texture_height, 0, IB_rectfloat);
+    ImageUser tile_user = *image_user;
+
+    LISTBASE_FOREACH (ImageTile *, image_tile_ptr, &pd->image->tiles) {
+      const ImageTileAccessor image_tile(image_tile_ptr);
+      tile_user.tile = image_tile.get_tile_number();
+      ImBuf *tile_buffer = BKE_image_acquire_ibuf(pd->image, &tile_user, NULL);
+      if (tile_buffer == nullptr) {
+        /* Couldn't load the image buffer of the tile. */
+        continue;
+      }
+      do_full_update_texture_slot(texture_info, texture_buffer, *tile_buffer, image_tile);
+      BKE_image_release_ibuf(pd->image, tile_buffer, nullptr);
+    }
+    GPU_texture_update(gpu_texture, GPU_DATA_FLOAT, texture_buffer.rect_float);
+    imb_freerectImbuf_all(&texture_buffer);
+  }
+
+  /**
+   * \brief Ensure that the float buffer of the given image buffer is available.
+   *
+   * TODO: Should we add a ImageBufferAccessor for cleaner access.
+   * (`image_buffer.ensure_float_buffer()`)
+   */
+  void ensure_float_buffer(ImBuf &image_buffer) const
+  {
+    if (image_buffer.rect_float == nullptr) {
+      IMB_float_from_rect(&image_buffer);
+    }
+  }
+
+  void do_full_update_texture_slot(const IMAGE_ScreenSpaceTextureInfo &texture_info,
+                                   ImBuf &texture_buffer,
+                                   ImBuf &tile_buffer,
+                                   const ImageTileAccessor &image_tile) const
+  {
+    const int texture_width = texture_buffer.x;
+    const int texture_height = texture_buffer.y;
+    ensure_float_buffer(tile_buffer);
+
+    /* TODO(jbakker): add IMB_transform without cropping. */
+    /* TODO(jbakker): add IMB_transform with repeat. */
+    rctf crop;
+    BLI_rctf_init(&crop, 0.0, tile_buffer.x, 0.0, tile_buffer.y);
+    float uv_to_texel[4][4];
+
+    /* IMB_transform works in a non-consistent space. This should be documented or fixed!.
+     * Construct a variant of the info_uv_to_texture that adds the texel space
+     * transformation.*/
+    copy_m4_m4(uv_to_texel, texture_info.uv_to_texture);
+    float scale[3] = {static_cast<float>(texture_width) / static_cast<float>(tile_buffer.x),
+                      static_cast<float>(texture_height) / static_cast<float>(tile_buffer.y),
+                      1.0f};
+    rescale_m4(uv_to_texel, scale);
+    uv_to_texel[3][0] += image_tile.get_tile_x_offset() / BLI_rctf_size_x(&texture_info.uv_bounds);
+    uv_to_texel[3][1] += image_tile.get_tile_y_offset() / BLI_rctf_size_y(&texture_info.uv_bounds);
+    uv_to_texel[3][0] *= texture_width;
+    uv_to_texel[3][1] *= texture_height;
+    invert_m4(uv_to_texel);
+    IMB_transform(&tile_buffer, &texture_buffer, uv_to_texel, &crop, IMB_FILTER_NEAREST);
   }
 
  public:
