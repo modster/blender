@@ -258,7 +258,13 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
       case ePartialUpdateCollectResult::NoChangesDetected:
         break;
       case ePartialUpdateCollectResult::PartialChangesDetected:
-        do_partial_update(changes, txl, pd, image);
+        /* Partial update when wrap repeat is enabled is not supported. */
+        if (pd->flags.do_wrap_repeat) {
+          mark_all_texture_slots_dirty(pd);
+        }
+        else {
+          do_partial_update(changes, txl, pd, image);
+        }
         break;
     }
     do_full_update_for_dirty_textures(txl, pd, image_user);
@@ -419,7 +425,7 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
         /* Couldn't load the image buffer of the tile. */
         continue;
       }
-      do_full_update_texture_slot(texture_info, texture_buffer, *tile_buffer, image_tile);
+      do_full_update_texture_slot(*pd, texture_info, texture_buffer, *tile_buffer, image_tile);
       BKE_image_release_ibuf(pd->image, tile_buffer, nullptr);
     }
     GPU_texture_update(gpu_texture, GPU_DATA_FLOAT, texture_buffer.rect_float);
@@ -439,7 +445,8 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
     }
   }
 
-  void do_full_update_texture_slot(const IMAGE_ScreenSpaceTextureInfo &texture_info,
+  void do_full_update_texture_slot(const IMAGE_PrivateData &pd,
+                                   const IMAGE_ScreenSpaceTextureInfo &texture_info,
                                    ImBuf &texture_buffer,
                                    ImBuf &tile_buffer,
                                    const ImageTileAccessor &image_tile) const
@@ -464,7 +471,8 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
     invert_m4(uv_to_texel);
     IMB_transform(&tile_buffer,
                   &texture_buffer,
-                  IMB_TRANSFORM_MODE_REGULAR,
+                  pd.flags.do_wrap_repeat ? IMB_TRANSFORM_MODE_WRAP_REPEAT :
+                                            IMB_TRANSFORM_MODE_REGULAR,
                   IMB_FILTER_NEAREST,
                   uv_to_texel,
                   nullptr);

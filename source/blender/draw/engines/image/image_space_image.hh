@@ -174,12 +174,16 @@ class SpaceImageAccessor : public AbstractSpaceAccessor {
       *r_owns_texture = false;
     }
   }
-
   void get_image_mat(const ImBuf *UNUSED(image_buffer),
                      const ARegion *UNUSED(region),
                      float r_mat[4][4]) const override
   {
     unit_m4(r_mat);
+  }
+
+  bool use_wrap_repeat() const
+  {
+    return (sima->flag & SI_DRAW_TILE) != 0;
   }
 };
 

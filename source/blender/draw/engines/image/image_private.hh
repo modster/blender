@@ -79,8 +79,9 @@ struct IMAGE_PrivateData {
   struct Image *image;
   struct DRWView *view;
 
-  struct GPUTexture *texture;
-  bool owns_texture;
+  struct {
+    bool do_wrap_repeat : 1;
+  } flags;
 
   /* Data used in screen space drawing mode. */
   struct {
@@ -213,6 +214,9 @@ class AbstractSpaceAccessor {
   virtual void get_image_mat(const ImBuf *image_buffer,
                              const ARegion *region,
                              float r_mat[4][4]) const = 0;
+
+  /** \brief Is (wrap) repeat option enabled in the space. */
+  virtual bool use_wrap_repeat() const = 0;
 };  // namespace blender::draw::image_engine
 
 /**

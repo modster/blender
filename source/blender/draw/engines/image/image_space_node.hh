@@ -133,6 +133,11 @@ class SpaceNodeAccessor : public AbstractSpaceAccessor {
     r_mat[3][0] = (region->winx - snode->zoom * ibuf_width) / 2 + snode->xof;
     r_mat[3][1] = (region->winy - snode->zoom * ibuf_height) / 2 + snode->yof;
   }
+
+  bool use_wrap_repeat() const
+  {
+    return false;
+  }
 };
 
 }  // namespace blender::draw::image_engine

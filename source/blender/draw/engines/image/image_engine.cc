@@ -41,7 +41,6 @@
 
 #include "GPU_batch.h"
 
-#include "image_drawing_mode_image_space.hh"
 #include "image_drawing_mode_screen_space.hh"
 #include "image_engine.h"
 #include "image_private.hh"
@@ -108,6 +107,7 @@ class ImageEngine {
       /* Early exit, nothing to draw. */
       return;
     }
+    pd->flags.do_wrap_repeat = pd->image->source != IMA_SRC_TILED && space->use_wrap_repeat();
     pd->ibuf = space->acquire_image_buffer(pd->image, &pd->lock);
     ImageUser *iuser = space->get_image_user();
     drawing_mode.cache_image(space.get(), vedata, pd->image, iuser, pd->ibuf);
@@ -146,7 +146,6 @@ static void IMAGE_engine_init(void *ved)
 
   pd->ibuf = nullptr;
   pd->lock = nullptr;
-  pd->texture = nullptr;
 }
 
 static void IMAGE_cache_init(void *vedata)
