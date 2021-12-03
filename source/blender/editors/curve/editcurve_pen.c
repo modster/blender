@@ -361,12 +361,12 @@ static void assign_cut_data(CutData *data,
 /* Iterate over all the geometry between the segment formed by bezt1 and bezt2
  * to find the closest edge to #data->mval (mouse location) and update #data->prev_loc
  * and #data->next_loc with the vertices of the edge. */
-static void update_data_if_closest_bezt_in_segment(const BezTriple *bezt1,
-                                                   const BezTriple *bezt2,
-                                                   Nurb *nu,
-                                                   const int index,
-                                                   const ViewContext *vc,
-                                                   CutData *data)
+static void update_data_if_closest_point_in_segment(const BezTriple *bezt1,
+                                                    const BezTriple *bezt2,
+                                                    Nurb *nu,
+                                                    const int index,
+                                                    const ViewContext *vc,
+                                                    CutData *data)
 {
   const float resolu = nu->resolu;
   float *points = MEM_mallocN(sizeof(float[3]) * (resolu + 1), __func__);
@@ -494,12 +494,27 @@ static void update_data_for_all_nurbs(const ListBase *nurbs, const ViewContext *
       BezTriple *bezt = NULL;
       for (int i = 0; i < nu->pntsu - 1; i++) {
         bezt = &nu->bezt[i];
-        update_data_if_closest_bezt_in_segment(bezt, bezt + 1, nu, i, vc, data);
+        update_data_if_closest_point_in_segment(bezt, bezt + 1, nu, i, vc, data);
       }
 
       if (nu->flagu & CU_NURB_CYCLIC && bezt) {
-        update_data_if_closest_bezt_in_segment(bezt + 1, nu->bezt, nu, nu->pntsu - 1, vc, data);
+        update_data_if_closest_point_in_segment(bezt + 1, nu->bezt, nu, nu->pntsu - 1, vc, data);
       }
+
+      float point[3], factor;
+      bool found_min = get_closest_point_on_edge(
+          point, data->mval, data->cut_loc, data->next_loc, vc, &factor);
+      bool check = ED_view3d_project_float_object(
+          vc->region, point, screen_co, V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN);
+      const float dist1 = len_manhattan_v3v3(screen_co, data->mval);
+
+      found_min = get_closest_point_on_edge(
+          point, data->mval, data->cut_loc, data->prev_loc, vc, &factor);
+      check = ED_view3d_project_float_object(
+          vc->region, point, screen_co, V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN);
+      const float dist2 = len_manhattan_v3v3(screen_co, data->mval);
+
+      data->min_dist = min_fff(dist1, dist2, data->min_dist);
     }
     else {
       float screen_co[2];
@@ -720,7 +735,7 @@ static bool is_spline_nearby(ViewContext *vc, wmOperator *op, const wmEvent *eve
 
   update_data_for_all_nurbs(nurbs, vc, &data);
 
-  const float threshold_distance = ED_view3d_select_dist_px();
+  const float threshold_distance = ED_view3d_select_dist_px() * 0.3f;
   if (data.nurb && !data.nurb->bp && data.min_dist < threshold_distance) {
     MoveSegmentData *seg_data;
     op->customdata = seg_data = MEM_callocN(sizeof(MoveSegmentData), __func__);
