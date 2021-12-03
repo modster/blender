@@ -1607,6 +1607,7 @@ LRESULT WINAPI GHOST_SystemWin32::s_wndProc(HWND hwnd, UINT msg, WPARAM wParam, 
             if (inRange) {
               /* Some devices don't emit WT_CSRCHANGE events, so update cursor info here. */
               wt->updateCursorInfo();
+              wt->enterRange();
             }
             else {
               wt->leaveRange();

@@ -247,6 +247,12 @@ void GHOST_Wintab::leaveRange()
   m_fpPacketsGet(m_context.get(), m_pkts.size(), m_pkts.data());
 }
 
+void GHOST_Wintab::enterRange()
+{
+  /* Placeholder to signal tablet in range, necessary to disable mouse input handling. */
+  m_lastTabletData.Active = GHOST_kTabletModeStylus;
+}
+
 void GHOST_Wintab::remapCoordinates()
 {
   LOGCONTEXT lc = {0};

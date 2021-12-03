@@ -92,6 +92,11 @@ class GHOST_Wintab {
   void loseFocus();
 
   /**
+   * Updates tablet state to indicate tablet is in range.
+   */
+  void enterRange();
+
+  /**
    * Clean up when Wintab leaves tracking range.
    */
   void leaveRange();
