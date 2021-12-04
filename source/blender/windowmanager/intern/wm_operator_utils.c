@@ -375,6 +375,8 @@ bool WM_operator_do_navigation(bContext *C, wmOperator *op, const wmEvent *event
       "VIEW3D_OT_move",
       "VIEW3D_OT_view_pan",
       "VIEW3D_OT_dolly",
+      "VIEW3D_OT_view_center_pick",
+      "VIEW3D_OT_zoom_border",
       // "VIEW3D_OT_view_orbit",
       "VIEW3D_OT_view_roll",
 #ifdef WITH_INPUT_NDOF
@@ -394,6 +396,7 @@ bool WM_operator_do_navigation(bContext *C, wmOperator *op, const wmEvent *event
       "VIEW2D_OT_pan",
       "VIEW2D_OT_zoom_in",
       "VIEW2D_OT_zoom_out",
+      "VIEW2D_OT_zoom_border",
 #ifdef WITH_INPUT_NDOF
       "VIEW2D_OT_ndof",
 #endif
@@ -402,7 +405,7 @@ bool WM_operator_do_navigation(bContext *C, wmOperator *op, const wmEvent *event
   static struct {
     wmKeyMapItem *kmi;
     wmOperatorType *ot;
-  } kmi_ot[70];
+  } kmi_ot[80];
   static int kmi_ot_len;
 
   /* Lazy initialization (avoids having to allocating a context). */

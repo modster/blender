@@ -425,20 +425,43 @@ static int transform_modal(bContext *C, wmOperator *op, const wmEvent *event)
   }
 #endif
 
+  if (event->type == MOUSEMOVE) {
+    /* Call before #tranformViewUpdate. */
+    copy_v2_v2_int(t->mval, event->mval);
+  }
+
+  if (t->flag & T_VIEW_DIRTY) {
+    if (t->spacetype == SPACE_VIEW3D) {
+      RegionView3D *rv3d = t->region->regiondata;
+      if (rv3d->sms) {
+        /* Smooth View in progress. */
+        return OPERATOR_RUNNING_MODAL;
+      }
+    }
+    /* Call before #applyMouseInput. */
+    tranformViewUpdate(t);
+
+    if (t->mouse.precision) {
+      /* WOKARROUND: Navigation operators like #VIEW3D_OT_zoom_border can make some modal events go
+       * unnoticed. */
+      short event_val = event->type == EVT_MODAL_MAP ? event->prev_val : event->val;
+      if (event_val == KM_RELEASE) {
+        t->modifiers &= ~MOD_PRECISION;
+        t->mouse.precision = 0;
+      }
+    }
+  }
+
   /* XXX insert keys are called here, and require context */
   t->context = C;
   exit_code = transformEvent(t, event);
   t->context = NULL;
 
-  if (!(t->flag & T_RELEASE_CONFIRM)) {
+  if ((exit_code == OPERATOR_PASS_THROUGH) && !(t->flag & T_RELEASE_CONFIRM) &&
+      WM_operator_do_navigation(C, op, event)) {
     /* Allow navigation while transforming */
-    if ((exit_code == OPERATOR_PASS_THROUGH) && WM_operator_do_navigation(C, op, event)) {
-      t->flag |= T_VIEW_DIRTY;
-      return OPERATOR_RUNNING_MODAL;
-    }
-    else if (t->flag & T_VIEW_DIRTY) {
-      tranformViewUpdate(t);
-    }
+    t->flag |= T_VIEW_DIRTY;
+    return OPERATOR_RUNNING_MODAL;
   }
 
   /* XXX, workaround: active needs to be calculated before transforming,
@@ -1368,7 +1391,7 @@ static void TRANSFORM_OT_from_gizmo(struct wmOperatorType *ot)
 
 static wmKeyMapItem **navigation_keymaps(bContext *C, int *r_kmi_len)
 {
-  wmKeyMapItem *km_items[70];
+  wmKeyMapItem *km_items[80];
   int kmi_len = 0;
 
   const char *op_names[] = {
@@ -1378,6 +1401,8 @@ static wmKeyMapItem **navigation_keymaps(bContext *C, int *r_kmi_len)
       "VIEW3D_OT_move",
       "VIEW3D_OT_view_pan",
       "VIEW3D_OT_dolly",
+      "VIEW3D_OT_view_center_pick",
+      "VIEW3D_OT_zoom_border",
       //"VIEW3D_OT_view_orbit",
       "VIEW3D_OT_view_roll",
 #ifdef WITH_INPUT_NDOF
@@ -1397,6 +1422,7 @@ static wmKeyMapItem **navigation_keymaps(bContext *C, int *r_kmi_len)
       "VIEW2D_OT_pan",
       "VIEW2D_OT_zoom_in",
       "VIEW2D_OT_zoom_out",
+      "VIEW2D_OT_zoom_border",
 #ifdef WITH_INPUT_NDOF
       "VIEW2D_OT_ndof",
 #endif
@@ -1510,20 +1536,24 @@ static int modalkeymap_update_invoke(bContext *C, wmOperator *op, const wmEvent 
   int kmi_navigate_len, kmi_modals_len, kmi_modals_new_len;
   wmKeyMapItem **kmi_navigate, **kmi_modals, **kmi_modals_new;
   kmi_navigate = navigation_keymaps(C, &kmi_navigate_len);
-  kmi_modals_len = BLI_listbase_count(&modalmap->items);
+  kmi_modals_len = BLI_listbase_count(&modalmap->items) - 3;
   kmi_modals = BLI_array_alloca(kmi_modals, kmi_modals_len);
   kmi_modals_new = BLI_array_alloca(kmi_modals_new, kmi_modals_len);
   kmi_modals_new_len = 0;
 
-  int i;
-  LISTBASE_FOREACH_INDEX (wmKeyMapItem *, kmi_modal, &modalmap->items, i) {
-    kmi_modals[i] = kmi_modal;
+  kmi_modals_len = 0;
+  LISTBASE_FOREACH (wmKeyMapItem *, kmi_modal, &modalmap->items) {
+    if (ELEM(kmi_modal->propvalue, TFM_MODAL_AXIS_X, TFM_MODAL_AXIS_Y, TFM_MODAL_AXIS_Z)) {
+      /* Do not change these keyitems. */
+      continue;
+    }
+    kmi_modals[kmi_modals_len++] = kmi_modal;
   }
 
   struct KMConflict conflicts[CONFLICT_MAX_LEN];
   int conflicts_len = 0;
 
-  for (i = 0; i < kmi_modals_len; i++) {
+  for (int i = 0; i < kmi_modals_len; i++) {
     wmKeyMapItem *kmi_modal = kmi_modals[i];
     if (kmi_modal->flag & KMI_INACTIVE) {
       continue;
@@ -1564,12 +1594,15 @@ static int modalkeymap_update_invoke(bContext *C, wmOperator *op, const wmEvent 
       BLI_snprintf(conflict->descr,
                    LABEL_LINE_SIZE,
                    "\"%s\" will change from '%s' to '%s' (as it conflicts with \"%s\")",
-                   TIP_(name),
+                   IFACE_(name),
                    descriptor,
                    descriptor_new,
                    kmi->idname);
 
+#if DEBUG
       printf("%s\n", conflict->descr);
+#endif
+
       if (conflicts_len == CONFLICT_MAX_LEN) {
         BLI_assert(false);
         break;
@@ -1672,7 +1705,7 @@ static int modalkeymap_restore_invoke(bContext *C, wmOperator *op, const wmEvent
       BLI_snprintf(conflict->descr,
                    LABEL_LINE_SIZE,
                    "\"%s\" will be restored from '%s' to '%s'",
-                   TIP_(name),
+                   IFACE_(name),
                    descriptor,
                    descriptor_new);
 

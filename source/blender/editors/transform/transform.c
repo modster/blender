@@ -899,8 +899,6 @@ int transformEvent(TransInfo *t, const wmEvent *event)
       t->con.mode |= CON_SELECT;
     }
 
-    copy_v2_v2_int(t->mval, event->mval);
-
     /* Use this for soft redraw. Might cause flicker in object mode */
     // t->redraw |= TREDRAW_SOFT;
     t->redraw |= TREDRAW_HARD;
