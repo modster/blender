@@ -1062,6 +1062,27 @@ static int curve_pen_insert_modal(bContext *C, wmOperator *op, const wmEvent *ev
   Nurb *nu = NULL;
 
   int ret = OPERATOR_RUNNING_MODAL;
+  /* Whether the mouse is clicking and dragging. */
+  bool dragging = RNA_boolean_get(op->ptr, "dragging");
+
+  if (ELEM(event->type, MOUSEMOVE, INBETWEEN_MOUSEMOVE)) {
+    if (!dragging && WM_event_drag_test(event, event->prev_click_xy) && event->val == KM_PRESS) {
+      RNA_boolean_set(op->ptr, "dragging", true);
+      dragging = true;
+    }
+    if (dragging) {
+      ED_curve_nurb_vert_selected_find(vc.obedit->data, vc.v3d, &nu, &bezt, &bp);
+      if (bezt) {
+        move_selected_bezt_to_mouse(bezt, &vc, event);
+      }
+      else if (bp) {
+        move_bp_to_mouse(bp, event, &vc);
+      }
+      if (nu && nu->type == CU_BEZIER) {
+        BKE_nurb_handles_calc(nu);
+      }
+    }
+  }
 
   if (ELEM(event->type, LEFTMOUSE)) {
     if (event->val == KM_PRESS) {
@@ -1079,6 +1100,7 @@ static int curve_pen_insert_modal(bContext *C, wmOperator *op, const wmEvent *ev
       }
     }
     else if (event->val == KM_RELEASE) {
+      RNA_boolean_set(op->ptr, "dragging", false);
       ret = OPERATOR_FINISHED;
     }
   }
