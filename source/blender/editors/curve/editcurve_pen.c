@@ -69,6 +69,8 @@ typedef struct MoveSegmentData {
   Nurb *nu;
   /* Index of the #BezTriple before the segment. */
   int bezt_index;
+  /* Fraction along the segment at which mouse was pressed. */
+  float t;
 } MoveSegmentData;
 
 static void mouse_location_to_worldspace(const int mouse_loc[2],
@@ -232,7 +234,7 @@ static bool get_closest_point_on_edge(float r_point[3],
                                       const float pos1[3],
                                       const float pos2[3],
                                       const ViewContext *vc,
-                                      float *r_factor)
+                                      float *r_fraction)
 {
   float pos1_2d[2], pos2_2d[2], vec1[2], vec2[2], vec3[2];
 
@@ -259,19 +261,21 @@ static bool get_closest_point_on_edge(float r_point[3],
   perpendicular line from the mouse to the line.*/
   if ((dot1 > 0) == (dot2 > 0)) {
     float len_vec3_sq = len_squared_v2(vec3);
-    *r_factor = 1 - dot2 / len_vec3_sq;
+    *r_fraction = 1 - dot2 / len_vec3_sq;
 
     float pos_dif[3];
     sub_v3_v3v3(pos_dif, pos2, pos1);
-    madd_v3_v3v3fl(r_point, pos1, pos_dif, *r_factor);
+    madd_v3_v3v3fl(r_point, pos1, pos_dif, *r_fraction);
     return true;
   }
 
   if (len_manhattan_v2(vec1) < len_manhattan_v2(vec2)) {
     copy_v3_v3(r_point, pos1);
+    *r_fraction = 0.0f;
     return false;
   }
   copy_v3_v3(r_point, pos2);
+  *r_fraction = 1.0f;
   return false;
 }
 
@@ -501,20 +505,28 @@ static void update_data_for_all_nurbs(const ListBase *nurbs, const ViewContext *
         update_data_if_closest_point_in_segment(bezt + 1, nu->bezt, nu, nu->pntsu - 1, vc, data);
       }
 
-      float point[3], factor;
+      float point[3], fraction;
       bool found_min = get_closest_point_on_edge(
-          point, data->mval, data->cut_loc, data->next_loc, vc, &factor);
+          point, data->mval, data->cut_loc, data->next_loc, vc, &fraction);
       bool check = ED_view3d_project_float_object(
           vc->region, point, screen_co, V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN);
       const float dist1 = len_manhattan_v3v3(screen_co, data->mval);
 
+      data->min_dist = dist1;
+
       found_min = get_closest_point_on_edge(
-          point, data->mval, data->cut_loc, data->prev_loc, vc, &factor);
+          point, data->mval, data->cut_loc, data->prev_loc, vc, &fraction);
       check = ED_view3d_project_float_object(
           vc->region, point, screen_co, V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN);
       const float dist2 = len_manhattan_v3v3(screen_co, data->mval);
 
-      data->min_dist = min_fff(dist1, dist2, data->min_dist);
+      if (dist2 < dist1) {
+        data->parameter -= fraction / nu->resolu;
+        data->min_dist = dist2;
+      }
+      else {
+        data->parameter += fraction / nu->resolu;
+      }
     }
     else {
       float screen_co[2];
@@ -741,6 +753,7 @@ static bool is_spline_nearby(ViewContext *vc, wmOperator *op, const wmEvent *eve
     op->customdata = seg_data = MEM_callocN(sizeof(MoveSegmentData), __func__);
     seg_data->bezt_index = data.bezt_index;
     seg_data->nu = data.nurb;
+    seg_data->t = data.parameter;
     return true;
   }
   return false;
@@ -752,6 +765,13 @@ static void move_segment(MoveSegmentData *seg_data, const wmEvent *event, ViewCo
   Nurb *nu = seg_data->nu;
   BezTriple *bezt1 = nu->bezt + seg_data->bezt_index;
   BezTriple *bezt2 = BKE_nurb_bezt_get_next(nu, bezt1);
+
+  const float t = seg_data->t;
+  const float t_sq = t * t;
+  const float t_cu = t_sq * t;
+  const float one_minus_t = 1 - t;
+  const float one_minus_t_sq = one_minus_t * one_minus_t;
+  const float one_minus_t_cu = one_minus_t_sq * one_minus_t;
 
   float mouse_3d[3];
   float depth[3];
@@ -771,17 +791,18 @@ static void move_segment(MoveSegmentData *seg_data, const wmEvent *event, ViewCo
    * The minima can be found by differentiating the total distance.
    */
 
-  float p1_plus_p2_div_2[3];
-  p1_plus_p2_div_2[0] = (8.0f * mouse_3d[0] - bezt1->vec[1][0] - bezt2->vec[1][0]) / 6.0f;
-  p1_plus_p2_div_2[1] = (8.0f * mouse_3d[1] - bezt1->vec[1][1] - bezt2->vec[1][1]) / 6.0f;
-  p1_plus_p2_div_2[2] = (8.0f * mouse_3d[2] - bezt1->vec[1][2] - bezt2->vec[1][2]) / 6.0f;
+  float k1[3];
+  sub_v3_v3v3(k1, bezt1->vec[2], bezt2->vec[0]);
 
-  float p1_minus_p2_div_2[3];
-  sub_v3_v3v3(p1_minus_p2_div_2, bezt1->vec[2], bezt2->vec[0]);
-  mul_v3_fl(p1_minus_p2_div_2, 0.5f);
+  float k2[3];
+  const float denom = (3.0f * one_minus_t * t_sq);
+  k2[0] = (mouse_3d[0] - one_minus_t_cu * bezt1->vec[1][0] - t_cu * bezt2->vec[1][0]) / denom;
+  k2[1] = (mouse_3d[1] - one_minus_t_cu * bezt1->vec[1][1] - t_cu * bezt2->vec[1][1]) / denom;
+  k2[2] = (mouse_3d[2] - one_minus_t_cu * bezt1->vec[1][2] - t_cu * bezt2->vec[1][2]) / denom;
 
-  add_v3_v3v3(bezt1->vec[2], p1_plus_p2_div_2, p1_minus_p2_div_2);
-  sub_v3_v3v3(bezt2->vec[0], p1_plus_p2_div_2, p1_minus_p2_div_2);
+  add_v3_v3v3(bezt1->vec[2], k1, k2);
+  mul_v3_fl(bezt1->vec[2], t);
+  sub_v3_v3v3(bezt2->vec[0], bezt1->vec[2], k1);
 
   free_up_handles_for_movement(bezt1, true, true);
   free_up_handles_for_movement(bezt2, true, true);
