@@ -130,7 +130,7 @@ static void move_bezt_to_location(BezTriple *bezt, const float location[3])
 }
 
 /* Alter handle types to allow free movement (Set handles to #FREE or #ALIGN). */
-static void free_up_handles_for_movement(BezTriple *bezt, const bool f1, const bool f3)
+static void remove_handle_movement_constraints(BezTriple *bezt, const bool f1, const bool f3)
 {
   if (f1) {
     if (bezt->h1 == HD_VECT) {
@@ -163,7 +163,7 @@ static void move_selected_bezt_to_mouse(BezTriple *bezt,
     move_bezt_to_location(bezt, location);
   }
   else {
-    free_up_handles_for_movement(bezt, bezt->f1, bezt->f3);
+    remove_handle_movement_constraints(bezt, bezt->f1, bezt->f3);
     if (BEZT_ISSEL_IDX(bezt, 0)) {
       mouse_location_to_worldspace(event->mval, bezt->vec[0], vc, location);
       copy_v3_v3(bezt->vec[0], location);
@@ -782,30 +782,35 @@ static void move_segment(MoveSegmentData *seg_data, const wmEvent *event, ViewCo
   /*
    * Equation of Bezier Curve
    *      => B(t) = (1-t)^3 * P0 + 3(1-t)^2 * t * P1 + 3(1-t) * t^2 * P2 + t^3 * P3
+   *
    * Mouse location (Say Pm) should satisfy this equation.
-   * Substituting t = 0.5 => Pm = 0.5^3 * (P0 + 3P1 + 3P2 + P3)
-   * Therefore => P1 + P2 = (8 * Pm - P0 - P3) / 3
+   * Therefore => (1/t - 1) * P1 + P2 = (Pm - (1 - t)^3 * P0 - t^3 * P3) / [3 * (1 - t) * t^2] = k1
+   * (in code)
    *
    * Another constraint is required to identify P1 and P2.
-   * The constraint is to minimize the distance between new points and initial points.
-   * The minima can be found by differentiating the total distance.
+   * The constraint used is that the vector between P1 and P2 doesn't change.
+   * Therefore => P1 - P2 = k2
+   *
+   * From the two equations => P1 = t(k1 + k2) and P2 = P1 - K2
    */
 
   float k1[3];
-  sub_v3_v3v3(k1, bezt1->vec[2], bezt2->vec[0]);
+  const float denom = (3.0f * one_minus_t * t_sq);
+  k1[0] = (mouse_3d[0] - one_minus_t_cu * bezt1->vec[1][0] - t_cu * bezt2->vec[1][0]) / denom;
+  k1[1] = (mouse_3d[1] - one_minus_t_cu * bezt1->vec[1][1] - t_cu * bezt2->vec[1][1]) / denom;
+  k1[2] = (mouse_3d[2] - one_minus_t_cu * bezt1->vec[1][2] - t_cu * bezt2->vec[1][2]) / denom;
 
   float k2[3];
-  const float denom = (3.0f * one_minus_t * t_sq);
-  k2[0] = (mouse_3d[0] - one_minus_t_cu * bezt1->vec[1][0] - t_cu * bezt2->vec[1][0]) / denom;
-  k2[1] = (mouse_3d[1] - one_minus_t_cu * bezt1->vec[1][1] - t_cu * bezt2->vec[1][1]) / denom;
-  k2[2] = (mouse_3d[2] - one_minus_t_cu * bezt1->vec[1][2] - t_cu * bezt2->vec[1][2]) / denom;
+  sub_v3_v3v3(k2, bezt1->vec[2], bezt2->vec[0]);
 
+  /* P1 = t(k1 + k2) */
   add_v3_v3v3(bezt1->vec[2], k1, k2);
   mul_v3_fl(bezt1->vec[2], t);
-  sub_v3_v3v3(bezt2->vec[0], bezt1->vec[2], k1);
+  /* P2 = P1 - K2 */
+  sub_v3_v3v3(bezt2->vec[0], bezt1->vec[2], k2);
 
-  free_up_handles_for_movement(bezt1, true, true);
-  free_up_handles_for_movement(bezt2, true, true);
+  remove_handle_movement_constraints(bezt1, true, true);
+  remove_handle_movement_constraints(bezt2, true, true);
 
   /* Move opposite handle as well if type is align. */
   if (bezt1->h1 == HD_ALIGN) {
@@ -1230,4 +1235,8 @@ void CURVE_OT_pen_insert(wmOperatorType *ot)
 
   /* properties */
   WM_operator_properties_mouse_select(ot);
+
+  PropertyRNA *prop;
+  prop = RNA_def_boolean(ot->srna, "dragging", 0, "Dragging", "Check if click and drag");
+  RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
 }
