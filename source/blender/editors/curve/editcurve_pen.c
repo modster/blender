@@ -332,7 +332,7 @@ static void get_closest_vertex_to_point_in_nurbs(ListBase *nurbs,
     }
   }
 
-  const float threshold_distance = ED_view3d_select_dist_px();
+  const float threshold_distance = ED_view3d_select_dist_px() * 0.4;
   if (min_distance_bezt < threshold_distance || min_distance_bp < threshold_distance) {
     if (min_distance_bp < min_distance_bezt) {
       *r_bp = closest_bp;
@@ -747,7 +747,7 @@ static bool is_spline_nearby(ViewContext *vc, wmOperator *op, const wmEvent *eve
 
   update_data_for_all_nurbs(nurbs, vc, &data);
 
-  const float threshold_distance = ED_view3d_select_dist_px() * 0.3f;
+  const float threshold_distance = ED_view3d_select_dist_px() * 0.4f;
   if (data.nurb && !data.nurb->bp && data.min_dist < threshold_distance) {
     MoveSegmentData *seg_data;
     op->customdata = seg_data = MEM_callocN(sizeof(MoveSegmentData), __func__);
@@ -825,6 +825,34 @@ static void move_segment(MoveSegmentData *seg_data, const wmEvent *event, ViewCo
     normalize_v3_length(handle_vec, len_v3v3(bezt2->vec[1], bezt2->vec[2]));
     add_v3_v3v3(bezt2->vec[2], bezt2->vec[1], handle_vec);
   }
+}
+
+static bool check_selected_threshold(BezTriple *prev_bezt,
+                                     BPoint *prev_bp,
+                                     ViewContext *vc,
+                                     EditNurb *editnurb,
+                                     const float mval[2])
+{
+  Nurb *nu = NULL;
+  BezTriple *bezt = NULL;
+  BPoint *bp = NULL;
+  ED_curve_nurb_vert_selected_find(vc->obedit->data, vc->v3d, &nu, &bezt, &bp);
+  float screen_co[2];
+
+  if (bezt)
+    ED_view3d_project_float_object(
+        vc->region, bezt->vec[1], screen_co, V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN);
+  if (len_manhattan_v2v2(screen_co, mval) >= ED_view3d_select_dist_px() * 0.4f) {
+    ED_curve_deselect_all(editnurb);
+    if (prev_bezt) {
+      select_beztriple(prev_bezt, SELECT, SELECT, HIDDEN);
+    }
+    else if (prev_bp) {
+      select_bpoint(prev_bp, SELECT, SELECT, HIDDEN);
+    }
+    return false;
+  }
+  return true;
 }
 
 /* Close the spline if endpoints are selected consecutively. Return true if cycle was created. */
@@ -968,7 +996,11 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
       /* Get currently selected point if any. Used for making spline cyclic. */
       ED_curve_nurb_vert_selected_find(cu, vc.v3d, &nu, &bezt, &bp);
 
-      const bool found_point = ED_curve_editnurb_select_pick(C, event->mval, false, false, false);
+      bool found_point = ED_curve_editnurb_select_pick(C, event->mval, false, false, false);
+      if (found_point) {
+        const float mval[2] = {(float)event->mval[0], (float)event->mval[1]};
+        found_point = check_selected_threshold(bezt, bp, &vc, cu->editnurb, mval);
+      }
       RNA_boolean_set(op->ptr, "new", !found_point);
 
       if (found_point) {
