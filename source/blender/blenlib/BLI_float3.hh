@@ -75,6 +75,11 @@ struct float3 {
     return {a.x - b.x, a.y - b.y, a.z - b.z};
   }
 
+  friend float3 operator-(const float3 &a, float b)
+  {
+    return {a.x - b, a.y - b, a.z - b};
+  }
+
   friend float3 operator-(const float3 &a)
   {
     return {-a.x, -a.y, -a.z};

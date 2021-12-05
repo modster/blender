@@ -565,6 +565,8 @@ void ShadowModule::init(void)
   }
 #endif
 
+  tilemap_pixel_radius_ = M_SQRT2 * 2.0f / (SHADOW_TILEMAP_RES * shadow_page_size_);
+
   debug_data_.type = inst_.debug_mode;
 }
 
@@ -713,6 +715,8 @@ void ShadowModule::end_sync(void)
     DRWShadingGroup *grp = DRW_shgroup_create(sh, tilemap_visibility_ps_);
     DRW_shgroup_vertex_buffer(grp, "tilemaps_buf", tilemap_allocator.tilemaps_data);
     DRW_shgroup_uniform_image(grp, "tilemaps_img", tilemap_allocator.tilemap_tx);
+    DRW_shgroup_uniform_float(grp, "tilemap_pixel_radius", &tilemap_pixel_radius_, 1);
+    DRW_shgroup_uniform_float(grp, "screen_pixel_radius_inv", &screen_pixel_radius_inv_, 1);
     if (tilemaps_len > 0) {
       DRW_shgroup_call_compute(grp, 1, 1, tilemaps_len);
       DRW_shgroup_barrier(grp, GPU_BARRIER_SHADER_IMAGE_ACCESS);
@@ -729,6 +733,8 @@ void ShadowModule::end_sync(void)
     DRW_shgroup_vertex_buffer(grp, "aabb_buf", receivers_aabbs);
     DRW_shgroup_vertex_buffer(grp, "tilemaps_buf", tilemap_allocator.tilemaps_data);
     DRW_shgroup_uniform_image(grp, "tilemaps_img", tilemap_allocator.tilemap_tx);
+    DRW_shgroup_uniform_float(grp, "tilemap_pixel_radius", &tilemap_pixel_radius_, 1);
+    DRW_shgroup_uniform_float(grp, "screen_pixel_radius_inv", &screen_pixel_radius_inv_, 1);
     DRW_shgroup_uniform_int_copy(grp, "aabb_len", aabb_len);
     if (tilemaps_len > 0 && aabb_len > 0) {
       uint group_len = divide_ceil_u(aabb_len, SHADOW_AABB_TAG_GROUP_SIZE);
@@ -900,7 +906,7 @@ void ShadowModule::debug_end_sync(void)
 }
 
 /* Update all shadow regions visible inside the view. */
-void ShadowModule::update_visible(const DRWView *view)
+void ShadowModule::update_visible(const DRWView *view, const ivec2 extent)
 {
 #if 0 /* TODO */
   bool force_update = false;
@@ -914,6 +920,21 @@ void ShadowModule::update_visible(const DRWView *view)
 #endif
 
   DRW_view_set_active(view);
+
+  float4x4 wininv;
+  DRW_view_winmat_get(view, wininv.values, true);
+
+  float min_dim = float(min_ii(extent.x, extent.y));
+  float3 p0 = float3(-1.0f, -1.0f, 0.0f);
+  float3 p1 = float3(min_dim / extent.x, min_dim / extent.y, 0.0f) * 2.0f - 1.0f;
+  mul_project_m4_v3(wininv.values, p0);
+  mul_project_m4_v3(wininv.values, p1);
+  /* Compute radius at unit plane from the camera. */
+  if (DRW_view_is_persp_get(view)) {
+    p0 = p0 / p0.z;
+    p1 = p1 / p1.z;
+  }
+  screen_pixel_radius_inv_ = min_dim / float3::distance(p0, p1);
 
 #ifdef DEBUG
   static bool valid = false;

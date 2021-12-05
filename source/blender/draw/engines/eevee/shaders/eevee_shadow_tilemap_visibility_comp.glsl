@@ -18,6 +18,9 @@ layout(std430, binding = 0) readonly buffer tilemaps_buf
   ShadowTileMapData tilemaps[];
 };
 
+uniform float tilemap_pixel_radius;
+uniform float screen_pixel_radius_inv;
+
 layout(r32ui) restrict uniform uimage2D tilemaps_img;
 
 void main()
@@ -47,12 +50,42 @@ void main()
     if (is_intersecting) {
       /* Test minimum receiver distance and compute min and max visible LOD.  */
       float len;
-      vec3 tile_center = shape.corners[1] + shape.corners[3] * 0.5;
-      vec3 corner_vec = normalize_len(tile_center - shape.corners[0], len);
-      float projection_len = dot(corner_vec, cameraPos - shape.corners[0]);
-      vec3 nearest_receiver = corner_vec * min(len, projection_len);
+      vec3 tile_center = (shape.corners[1] + shape.corners[3]) * 0.5;
+      vec3 tile_center_dir = normalize_len(tile_center - shape.corners[0], len);
+      /* Project the tile center to the frustum and compare the shadow texel density at this
+       * position since this is where the density ratio will be the lowest (meanning the highest
+       * LOD). NOTE: There is some inacuracy because we only project one point instead of
+       * projecting each individual pixels.  */
+      for (int p = 0; p < 6; p++) {
+        float facing = dot(tile_center_dir, -frustum_planes[p].xyz);
+        float d = line_plane_intersect_dist(shape.corners[0], tile_center_dir, frustum_planes[p]);
+        if (d > 0.0 && facing > 0.0) {
+          len = min(d, len);
+        }
+      }
+      vec3 nearest_receiver = shape.corners[0] + tile_center_dir * len;
+      /* How much a shadow map pixel covers a final image pixel. */
+      float footprint_ratio = len * (tilemap_pixel_radius * screen_pixel_radius_inv);
+      /* Project the radius to the screen. 1 unit away from the camera the same way
+       * pixel_world_radius_inv was computed. Not needed in orthographic mode. */
+      bool is_persp = (ProjectionMatrix[3][3] == 0.0);
+      if (is_persp) {
+        footprint_ratio /= distance(nearest_receiver, cameraPos);
+      }
 
-      lod_visible_min = shadow_punctual_lod_level(distance(nearest_receiver, cameraPos));
+#if 0 /* DEBUG */
+      if (gl_GlobalInvocationID.z == 0u) {
+        vec4 green = vec4(0, 1, 0, 1);
+        vec4 yellow = vec4(1, 1, 0, 1);
+        vec4 red = vec4(1, 0, 0, 1);
+        float dist_fac = (is_persp) ? distance(nearest_receiver, cameraPos) : 1.0;
+        drw_debug_point(nearest_receiver, 128.0 * dist_fac / screen_pixel_radius_inv, green);
+        drw_debug_point(shape.corners[0] + tile_center_dir, tilemap_pixel_radius * 128.0, red);
+        drw_debug_point(nearest_receiver, len * tilemap_pixel_radius * 128.0, yellow);
+      }
+#endif
+
+      lod_visible_min = int(ceil(-log2(footprint_ratio)));
       /* FIXME(fclem): This should be computed using the farthest intersection with the view.  */
       lod_visible_max = SHADOW_TILEMAP_LOD;
 

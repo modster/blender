@@ -471,6 +471,8 @@ class ShadowModule {
   DRWCallBuffer *receivers_non_opaque_;
 
   bool do_tilemap_setup_ = true;
+  float tilemap_pixel_radius_;
+  float screen_pixel_radius_inv_;
 
   /** \} */
 
@@ -551,7 +553,7 @@ class ShadowModule {
                    bool is_alpha_blend);
   void end_sync(void);
 
-  void update_visible(const DRWView *view);
+  void update_visible(const DRWView *view, const ivec2 extent);
 
   void debug_end_sync(void);
   void debug_draw(GPUFrameBuffer *view_fb, HiZBuffer &hiz);

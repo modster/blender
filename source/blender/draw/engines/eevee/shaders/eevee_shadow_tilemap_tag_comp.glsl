@@ -35,6 +35,8 @@ layout(std430, binding = 1) readonly buffer aabb_buf
 layout(r32ui) restrict uniform uimage2D tilemaps_img;
 
 uniform int aabb_len;
+uniform float tilemap_pixel_radius;
+uniform float screen_pixel_radius_inv;
 
 vec3 safe_project(ShadowTileMapData tilemap, inout int clipped, vec3 v)
 {
@@ -82,32 +84,51 @@ void main()
     }
 #endif
 
+    int lod_min = 0;
+    int lod_max = 0;
+#ifdef TAG_USAGE
+    if (tilemap.is_cubeface) {
+      /* TODO(fclem): This is imprecise as we only evaluate one point.
+       * Evaluate more point to get a range? but which ones? */
+      vec3 nearest_receiver = (aabb.min + aabb.max) * 0.5;
+      float len = distance(nearest_receiver, frustum.corners[0]);
+      /* How much a shadow map pixel covers a final image pixel. */
+      float footprint_ratio = len * (tilemap_pixel_radius * screen_pixel_radius_inv);
+      /* Project the radius to the screen. 1 unit away from the camera the same way
+       * pixel_world_radius_inv was computed. Not needed in orthographic mode. */
+      bool is_persp = (ProjectionMatrix[3][3] == 0.0);
+      if (is_persp) {
+        footprint_ratio /= distance(nearest_receiver, cameraPos);
+      }
+
+      lod_min = lod_max = int(ceil(-log2(footprint_ratio)));
+
+#  if 0 /* DEBUG */
+      vec4 green = vec4(0, 1, 0, 1);
+      vec4 yellow = vec4(1, 1, 0, 1);
+      vec4 red = vec4(1, 0, 0, 1);
+      float dist_fac = (is_persp) ? distance(nearest_receiver, cameraPos) : 1.0;
+      drw_debug_point(nearest_receiver, 128.0 * dist_fac / screen_pixel_radius_inv, green);
+      drw_debug_point(nearest_receiver, len * tilemap_pixel_radius * 128.0, yellow);
+#  endif
+    }
+    lod_max = clamp(lod_max, 0, SHADOW_TILEMAP_LOD);
+    lod_min = clamp(lod_min, 0, SHADOW_TILEMAP_LOD);
+#endif
+
 #ifdef TAG_UPDATE
     // drw_debug(aabb, vec4(0, 1, 0, 1));
 #else /* TAG_USAGE */
     // drw_debug(aabb, vec4(1, 1, 0, 1));
 #endif
 
-    int lod_min = tilemap.is_cubeface ? SHADOW_TILEMAP_LOD : 0;
-    int lod_max = 0;
     int clipped = 0;
     /* TODO(fclem) project bbox instead of AABB. */
     /* NDC space post projection [-1..1] (unclamped). */
     AABB aabb_ndc = init_min_max();
     for (int v = 0; v < 8; v++) {
       merge(aabb_ndc, safe_project(tilemap, clipped, box.corners[v]));
-
-#ifdef TAG_USAGE
-      if (tilemap.is_cubeface) {
-        /* FIXME(fclem) this will fail if camera is inside the box.  */
-        int lod_visible = shadow_punctual_lod_level(distance(cameraPos, box.corners[v]));
-        lod_min = min(lod_min, lod_visible);
-        lod_max = max(lod_max, lod_visible);
-      }
-#endif
     }
-    lod_max = clamp(lod_max, 0, SHADOW_TILEMAP_LOD);
-    lod_min = clamp(lod_min, 0, SHADOW_TILEMAP_LOD);
 
 #ifdef TAG_UPDATE
     /* Update tag all LODs. */

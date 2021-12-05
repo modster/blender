@@ -154,13 +154,6 @@ int shadow_directional_clipmap_level(ShadowData shadow, float distance_to_camera
   return clamp(clipmap_lod, shadow.clipmap_lod_min, shadow.clipmap_lod_max);
 }
 
-int shadow_punctual_lod_level(float distance_to_camera)
-{
-  /* FIXME(fclem): Does not work great with orthographic projection. */
-  /* TODO use pixel density. */
-  return int(log2(distance_to_camera));
-}
-
 /** \} */
 
 /* ---------------------------------------------------------------------- */
