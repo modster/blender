@@ -776,7 +776,7 @@ static void move_segment(MoveSegmentData *seg_data, const wmEvent *event, ViewCo
   float mouse_3d[3];
   float depth[3];
   /* Use the center of the spline segment as depth. */
-  get_bezier_interpolated_point(depth, bezt1, bezt2, 0.5f);
+  get_bezier_interpolated_point(depth, bezt1, bezt2, t);
   mouse_location_to_worldspace(event->mval, depth, vc, mouse_3d);
 
   /*
