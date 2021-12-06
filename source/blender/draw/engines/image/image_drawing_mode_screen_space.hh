@@ -564,13 +564,26 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
     uv_to_texel[3][0] *= texture_width;
     uv_to_texel[3][1] *= texture_height;
     invert_m4(uv_to_texel);
+
+    rctf crop_rect;
+    rctf *crop_rect_ptr = nullptr;
+    /* TODO: use regular when drawing none repeating single tile buffers. */
+    eIMBTransformMode transform_mode;  // = IMB_TRANSFORM_MODE_REGULAR;
+    if (pd.flags.do_tile_drawing) {
+      transform_mode = IMB_TRANSFORM_MODE_WRAP_REPEAT;
+    }
+    else {
+      BLI_rctf_init(&crop_rect, 0.0, tile_buffer.x, 0.0, tile_buffer.y);
+      crop_rect_ptr = &crop_rect;
+      transform_mode = IMB_TRANSFORM_MODE_CROP_SRC;
+    }
+
     IMB_transform(&tile_buffer,
                   &texture_buffer,
-                  pd.flags.do_tile_drawing ? IMB_TRANSFORM_MODE_WRAP_REPEAT :
-                                             IMB_TRANSFORM_MODE_REGULAR,
+                  transform_mode,
                   IMB_FILTER_NEAREST,
                   uv_to_texel,
-                  nullptr);
+                  crop_rect_ptr);
   }
 
  public:
