@@ -95,6 +95,7 @@ struct IMAGE_PrivateData {
      * set in the space.
      */
     bool do_tile_drawing : 1;
+
   } flags;
 
   /* Data used in screen space drawing mode. */
@@ -104,6 +105,12 @@ struct IMAGE_PrivateData {
     struct PartialUpdateUser *partial_update_user;
     const struct Image *partial_update_image;
     IMAGE_ScreenSpaceTextureInfo texture_infos[SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN];
+
+    /**
+     * \brief Maximum uv's that are on the border of the image.
+     *
+     * Larger UV coordinates would be drawn as a border. */
+    float max_uv[2];
   } screen_space;
 };
 

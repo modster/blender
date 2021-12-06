@@ -255,6 +255,7 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
     DRW_shgroup_uniform_vec4_copy(shgrp, "shuffle", sh_params.shuffle);
     DRW_shgroup_uniform_int_copy(shgrp, "drawFlags", sh_params.flags);
     DRW_shgroup_uniform_bool_copy(shgrp, "imgPremultiplied", sh_params.use_premul_alpha);
+    DRW_shgroup_uniform_vec2_copy(shgrp, "maxUv", pd->screen_space.max_uv);
     float image_mat[4][4];
     unit_m4(image_mat);
     for (int i = 0; i < SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN; i++) {
@@ -610,6 +611,15 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
     if (!partial_update_is_valid(pd, image)) {
       partial_update_free(pd);
       partial_update_allocate(pd, image);
+    }
+
+    copy_v2_fl2(pd->screen_space.max_uv, 1.0f, 1.0);
+    LISTBASE_FOREACH (ImageTile *, image_tile, &image->tiles) {
+      ImageTileAccessor image_tile_accessor(image_tile);
+      pd->screen_space.max_uv[0] = max_ii(pd->screen_space.max_uv[0],
+                                          image_tile_accessor.get_tile_x_offset() + 1);
+      pd->screen_space.max_uv[1] = max_ii(pd->screen_space.max_uv[1],
+                                          image_tile_accessor.get_tile_y_offset() + 1);
     }
 
     // Step: Find out which screen space textures are needed to draw on the screen. Remove the

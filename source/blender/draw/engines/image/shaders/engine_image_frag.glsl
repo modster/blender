@@ -15,6 +15,9 @@ uniform vec2 farNearDistances;
 uniform vec4 color;
 uniform vec4 shuffle;
 
+/* Maximum UV range. UV coordinates beyond would draw a border. */
+uniform vec2 maxUv;
+
 #define FAR_DISTANCE farNearDistances.x
 #define NEAR_DISTANCE farNearDistances.y
 
@@ -28,7 +31,8 @@ out vec4 fragColor;
 
 bool is_border(vec2 uv)
 {
-  return (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0);
+  // TODO: should use bvec to reduce branching?
+  return (uv.x < 0.0 || uv.y < 0.0 || uv.x > maxUv.x || uv.y > maxUv.y);
 }
 
 void main()
