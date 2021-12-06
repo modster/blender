@@ -71,6 +71,14 @@ struct IMAGE_ScreenSpaceTextureInfo {
   rctf uv_bounds;
   /** \brief Transform matrix to convert a normalized uv coordinate to texture space. */
   float uv_to_texture[4][4];
+  /**
+   * \brief Batch to draw the associated texton the screen.
+   *
+   * contans a VBO with `pos` and 'uv'.
+   * `pos` (2xF32) is relative to the origin of the space.
+   * `uv` (2xF32) reflect the uv bounds.
+   */
+  GPUBatch *batch;
 };
 
 struct IMAGE_PrivateData {

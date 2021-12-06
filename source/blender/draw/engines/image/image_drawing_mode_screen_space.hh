@@ -30,6 +30,87 @@ namespace blender::draw::image_engine {
 
 constexpr float EPSILON_UV_BOUNDS = 0.00001f;
 
+/** \brief Create GPUBatch for a IMAGE_ScreenSpaceTextureInfo. */
+class BatchUpdater {
+  IMAGE_ScreenSpaceTextureInfo &info;
+
+  GPUVertFormat format = {0};
+  int pos_id;
+  int uv_id;
+
+ public:
+  BatchUpdater(IMAGE_ScreenSpaceTextureInfo &info) : info(info)
+  {
+  }
+
+  void update_batch()
+  {
+    ensure_clear_batch();
+    ensure_format();
+    init_batch();
+  }
+
+  void discard_batch()
+  {
+    GPU_BATCH_DISCARD_SAFE(info.batch);
+  }
+
+ private:
+  void ensure_clear_batch()
+  {
+    GPU_BATCH_CLEAR_SAFE(info.batch);
+    if (info.batch == nullptr) {
+      info.batch = GPU_batch_calloc();
+    }
+  }
+
+  void init_batch()
+  {
+    GPUVertBuf *vbo = create_vbo();
+    GPU_batch_init_ex(info.batch, GPU_PRIM_TRI_FAN, vbo, nullptr, GPU_BATCH_OWNS_VBO);
+  }
+
+  GPUVertBuf *create_vbo()
+  {
+    GPUVertBuf *vbo = GPU_vertbuf_create_with_format(&format);
+    GPU_vertbuf_data_alloc(vbo, 4);
+    float pos[4][2];
+    fill_tri_fan_from_rctf(pos, info.clipping_bounds);
+    float uv[4][2];
+    fill_tri_fan_from_rctf(uv, info.uv_bounds);
+
+    for (int i = 0; i < 4; i++) {
+      GPU_vertbuf_attr_set(vbo, pos_id, i, pos[i]);
+      GPU_vertbuf_attr_set(vbo, uv_id, i, uv[i]);
+    }
+
+    return vbo;
+  }
+
+  static void fill_tri_fan_from_rctf(float result[4][2], rctf &rect)
+  {
+    result[0][0] = rect.xmin;
+    result[0][1] = rect.ymin;
+    result[1][0] = rect.xmax;
+    result[1][1] = rect.ymin;
+    result[2][0] = rect.xmax;
+    result[2][1] = rect.ymax;
+    result[3][0] = rect.xmin;
+    result[3][1] = rect.ymax;
+  }
+
+  void ensure_format()
+  {
+    if (format.attr_len == 0) {
+      GPU_vertformat_attr_add(&format, "pos", GPU_COMP_F32, 2, GPU_FETCH_FLOAT);
+      GPU_vertformat_attr_add(&format, "uv", GPU_COMP_F32, 2, GPU_FETCH_FLOAT);
+
+      pos_id = GPU_vertformat_attr_id_get(&format, "pos");
+      uv_id = GPU_vertformat_attr_id_get(&format, "uv");
+    }
+  }
+};
+
 /**
  * \brief Accessor to texture slots.
  *
@@ -39,6 +120,7 @@ constexpr float EPSILON_UV_BOUNDS = 0.00001f;
 struct PrivateDataAccessor {
   IMAGE_PrivateData *pd;
   IMAGE_TextureList *txl;
+
   PrivateDataAccessor(IMAGE_PrivateData *pd, IMAGE_TextureList *txl) : pd(pd), txl(txl)
   {
   }
@@ -109,6 +191,18 @@ struct PrivateDataAccessor {
     info->uv_to_texture[3][0] = translate_x;
     info->uv_to_texture[3][1] = translate_y;
   }
+
+  void update_batches()
+  {
+    for (int i = 0; i < SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN; i++) {
+      IMAGE_ScreenSpaceTextureInfo &info = pd->screen_space.texture_infos[i];
+      if (!info.dirty) {
+        continue;
+      }
+      BatchUpdater batch_updater(info);
+      batch_updater.update_batch();
+    }
+  }
 };
 
 struct ImageTileAccessor {
@@ -153,7 +247,6 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
                     IMAGE_PrivateData *pd,
                     const ShaderParameters &sh_params) const
   {
-    GPUBatch *geom = DRW_cache_quad_get();
     GPUShader *shader = IMAGE_shader_image_get(false);
 
     DRWShadingGroup *shgrp = DRW_shgroup_create(shader, psl->image_pass);
@@ -165,17 +258,20 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
     float image_mat[4][4];
     unit_m4(image_mat);
     for (int i = 0; i < SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN; i++) {
-      if (!pd->screen_space.texture_infos[i].visible) {
+      IMAGE_ScreenSpaceTextureInfo &info = pd->screen_space.texture_infos[i];
+      if (!info.visible) {
         continue;
       }
-
-      image_mat[0][0] = pd->screen_space.texture_infos[i].clipping_bounds.xmax;
-      image_mat[1][1] = pd->screen_space.texture_infos[i].clipping_bounds.ymax;
+      /*
+        Should be space relative translation.
+        image_mat[0][0] = info.clipping_bounds.xmax;
+        image_mat[1][1] = info.clipping_bounds.ymax;
+      */
 
       DRWShadingGroup *shgrp_sub = DRW_shgroup_create_sub(shgrp);
       DRW_shgroup_uniform_texture_ex(
           shgrp_sub, "imageTexture", txl->screen_space.textures[i], GPU_SAMPLER_DEFAULT);
-      DRW_shgroup_call_obmat(shgrp_sub, geom, image_mat);
+      DRW_shgroup_call_obmat(shgrp_sub, info.batch, image_mat);
     }
   }
 
@@ -263,7 +359,7 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
           mark_all_texture_slots_dirty(pd);
         }
         else {
-          do_partial_update(changes, txl, pd, image);
+          do_partial_update(changes, txl, pd);
         }
         break;
     }
@@ -272,8 +368,7 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
 
   void do_partial_update(PartialUpdateChecker<ImageTileData>::CollectResult &iterator,
                          IMAGE_TextureList *txl,
-                         IMAGE_PrivateData *pd,
-                         Image *image) const
+                         IMAGE_PrivateData *pd) const
   {
     while (iterator.get_next_change() == ePartialUpdateIterResult::ChangeAvailable) {
       /* Quick exit when tile_buffer isn't availble. */
@@ -472,7 +567,7 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
     IMB_transform(&tile_buffer,
                   &texture_buffer,
                   pd.flags.do_tile_drawing ? IMB_TRANSFORM_MODE_WRAP_REPEAT :
-                                            IMB_TRANSFORM_MODE_REGULAR,
+                                             IMB_TRANSFORM_MODE_REGULAR,
                   IMB_FILTER_NEAREST,
                   uv_to_texel,
                   nullptr);
@@ -510,6 +605,7 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
     pda.clear_dirty_flag();
     pda.update_screen_space_bounds(region);
     pda.update_uv_bounds();
+    pda.update_batches();
     update_texture_slot_allocation(txl, pd);
 
     // Step: Update the GPU textures based on the changes in the image.

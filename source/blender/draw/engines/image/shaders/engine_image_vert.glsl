@@ -5,24 +5,20 @@
 
 uniform int drawFlags;
 
-in vec3 pos;
+in vec2 pos;
+in vec2 uv;
 
 /* Normalized screen space uv coordinates. */
-out vec2 uvs;
+out vec2 uv_screen;
+out vec2 uv_image;
 
 void main()
 {
-  /* `pos` contains the coordinates of a quad (-1..1). but we need the coordinates of an image
-   * plane (0..1) */
-  vec3 image_pos = pos * 0.5 + 0.5;
-  uvs = image_pos.xy;
+  vec3 image_pos = vec3(pos, 0.0);
+  uv_screen = image_pos.xy;
+  uv_image = uv;
 
   vec3 world_pos = point_object_to_world(image_pos);
   vec4 position = point_world_to_ndc(world_pos);
-  /* Move drawn pixels to the front. In the overlay engine the depth is used
-   * to detect if a transparency texture or the background color should be drawn.
-   * Vertices are between 0.0 and 0.2, Edges between 0.2 and 0.4
-   * actual pixels are at 0.75, 1.0 is used for the background. */
-  position.z = IMAGE_Z_DEPTH;
   gl_Position = position;
 }
