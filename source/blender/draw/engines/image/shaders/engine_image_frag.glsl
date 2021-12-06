@@ -15,7 +15,8 @@ uniform vec2 farNearDistances;
 uniform vec4 color;
 uniform vec4 shuffle;
 
-/* Maximum UV range. UV coordinates beyond would draw a border. */
+/* Maximum UV range.
+ * Negative UV coordinates and UV coordinates beyond maxUV would draw a border. */
 uniform vec2 maxUv;
 
 #define FAR_DISTANCE farNearDistances.x
