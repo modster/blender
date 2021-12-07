@@ -101,13 +101,15 @@ class ImageEngine {
   {
     IMAGE_StorageList *stl = vedata->stl;
     IMAGE_PrivateData *pd = stl->pd;
+    IMAGE_InstanceData *instance_data = vedata->instance_data;
     Main *bmain = CTX_data_main(draw_ctx->evil_C);
     pd->image = space->get_image(bmain);
     if (pd->image == nullptr) {
       /* Early exit, nothing to draw. */
       return;
     }
-    pd->flags.do_tile_drawing = pd->image->source != IMA_SRC_TILED && space->use_tile_drawing();
+    instance_data->flags.do_tile_drawing = pd->image->source != IMA_SRC_TILED &&
+                                           space->use_tile_drawing();
     pd->ibuf = space->acquire_image_buffer(pd->image, &pd->lock);
     ImageUser *iuser = space->get_image_user();
     drawing_mode.cache_image(space.get(), vedata, pd->image, iuser, pd->ibuf);
@@ -142,6 +144,9 @@ static void IMAGE_engine_init(void *ved)
   if (!stl->pd) {
     stl->pd = static_cast<IMAGE_PrivateData *>(MEM_callocN(sizeof(IMAGE_PrivateData), __func__));
   }
+  if (vedata->instance_data == nullptr) {
+    vedata->instance_data = OBJECT_GUARDED_NEW(IMAGE_InstanceData);
+  }
   IMAGE_PrivateData *pd = stl->pd;
 
   pd->ibuf = nullptr;
@@ -174,6 +179,11 @@ static void IMAGE_engine_free()
   IMAGE_shader_free();
 }
 
+static void IMAGE_instance_free(void *instance_data)
+{
+  OBJECT_GUARDED_DELETE(instance_data, IMAGE_InstanceData);
+}
+
 /** \} */
 
 static const DrawEngineDataSize IMAGE_data_size = DRW_VIEWPORT_DATA_SIZE(IMAGE_Data);
@@ -191,7 +201,7 @@ DrawEngineType draw_engine_image_type = {
     &IMAGE_data_size,      /* vedata_size */
     &IMAGE_engine_init,    /* engine_init */
     &IMAGE_engine_free,    /* engine_free */
-    nullptr,               /* instance_free */
+    &IMAGE_instance_free,  /* instance_free */
     &IMAGE_cache_init,     /* cache_init */
     &IMAGE_cache_populate, /* cache_populate */
     nullptr,               /* cache_finish */

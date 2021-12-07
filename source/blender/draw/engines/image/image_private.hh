@@ -50,6 +50,19 @@ struct IMAGE_PassList {
   DRWPass *image_pass;
 };
 
+struct IMAGE_PrivateData {
+  void *lock;
+  struct ImBuf *ibuf;
+  struct Image *image;
+  struct DRWView *view;
+
+  /* Data used in screen space drawing mode. */
+};
+
+struct IMAGE_StorageList {
+  IMAGE_PrivateData *pd;
+};
+
 struct IMAGE_ScreenSpaceTextureInfo {
   /**
    * \brief Is the texture clipped.
@@ -79,13 +92,16 @@ struct IMAGE_ScreenSpaceTextureInfo {
    * `uv` (2xF32) reflect the uv bounds.
    */
   GPUBatch *batch;
+
+  /**
+   * \brief GPU Texture for a partial region of the image editor.
+   */
+  GPUTexture *texture;
 };
 
-struct IMAGE_PrivateData {
-  void *lock;
-  struct ImBuf *ibuf;
-  struct Image *image;
-  struct DRWView *view;
+struct IMAGE_InstanceData {
+  struct PartialUpdateUser *partial_update_user;
+  const struct Image *partial_update_image;
 
   struct {
     /**
@@ -95,41 +111,24 @@ struct IMAGE_PrivateData {
      * set in the space.
      */
     bool do_tile_drawing : 1;
-
   } flags;
 
-  /* Data used in screen space drawing mode. */
-  struct {
-    /* TODO: partial_update_user isn't freed with the space leading to a memory leak.
-     * port mechanism from tmp-eevee-rewrite to master.*/
-    struct PartialUpdateUser *partial_update_user;
-    const struct Image *partial_update_image;
-    IMAGE_ScreenSpaceTextureInfo texture_infos[SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN];
+  IMAGE_ScreenSpaceTextureInfo texture_infos[SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN];
 
-    /**
-     * \brief Maximum uv's that are on the border of the image.
-     *
-     * Larger UV coordinates would be drawn as a border. */
-    float max_uv[2];
-  } screen_space;
-};
-
-struct IMAGE_TextureList {
-  struct {
-    GPUTexture *textures[SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN];
-  } screen_space;
-};
-
-struct IMAGE_StorageList {
-  IMAGE_PrivateData *pd;
+  /**
+   * \brief Maximum uv's that are on the border of the image.
+   *
+   * Larger UV coordinates would be drawn as a border. */
+  float max_uv[2];
 };
 
 struct IMAGE_Data {
   void *engine_type;
   DRWViewportEmptyList *fbl;
-  IMAGE_TextureList *txl;
+  DRWViewportEmptyList *txl;
   IMAGE_PassList *psl;
   IMAGE_StorageList *stl;
+  IMAGE_InstanceData *instance_data;
 };
 
 /* Shader parameters. */
