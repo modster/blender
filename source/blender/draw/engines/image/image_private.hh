@@ -44,25 +44,6 @@ struct Image;
 
 namespace blender::draw::image_engine {
 
-/* GPUViewport.storage
- * Is freed every time the viewport engine changes. */
-struct IMAGE_PassList {
-  DRWPass *image_pass;
-};
-
-struct IMAGE_PrivateData {
-  void *lock;
-  struct ImBuf *ibuf;
-  struct Image *image;
-  struct DRWView *view;
-
-  /* Data used in screen space drawing mode. */
-};
-
-struct IMAGE_StorageList {
-  IMAGE_PrivateData *pd;
-};
-
 struct IMAGE_ScreenSpaceTextureInfo {
   /**
    * \brief Is the texture clipped.
@@ -84,6 +65,7 @@ struct IMAGE_ScreenSpaceTextureInfo {
   rctf uv_bounds;
   /** \brief Transform matrix to convert a normalized uv coordinate to texture space. */
   float uv_to_texture[4][4];
+
   /**
    * \brief Batch to draw the associated texton the screen.
    *
@@ -97,11 +79,33 @@ struct IMAGE_ScreenSpaceTextureInfo {
    * \brief GPU Texture for a partial region of the image editor.
    */
   GPUTexture *texture;
+
+  ~IMAGE_ScreenSpaceTextureInfo()
+  {
+    if (batch != nullptr) {
+      GPU_batch_discard(batch);
+      batch = nullptr;
+    }
+
+    if (texture != nullptr) {
+      GPU_texture_free(texture);
+      texture = nullptr;
+    }
+  }
 };
 
 struct IMAGE_InstanceData {
   struct PartialUpdateUser *partial_update_user;
   const struct Image *partial_update_image;
+
+  void *lock;
+  struct ImBuf *ibuf;
+  struct Image *image;
+  struct DRWView *view;
+
+  struct {
+    DRWPass *image_pass;
+  } passes;
 
   struct {
     /**
@@ -120,14 +124,22 @@ struct IMAGE_InstanceData {
    *
    * Larger UV coordinates would be drawn as a border. */
   float max_uv[2];
+
+  ~IMAGE_InstanceData()
+  {
+    if (partial_update_user) {
+      BKE_image_partial_update_free(partial_update_user);
+      partial_update_user = nullptr;
+    }
+  }
 };
 
 struct IMAGE_Data {
   void *engine_type;
   DRWViewportEmptyList *fbl;
   DRWViewportEmptyList *txl;
-  IMAGE_PassList *psl;
-  IMAGE_StorageList *stl;
+  DRWViewportEmptyList *psl;
+  DRWViewportEmptyList *stl;
   IMAGE_InstanceData *instance_data;
 };
 

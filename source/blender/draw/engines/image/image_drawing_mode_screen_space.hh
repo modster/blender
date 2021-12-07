@@ -241,13 +241,12 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
     return DRW_pass_create("Image", state);
   }
 
-  void add_shgroups(IMAGE_PassList *psl,
-                    const IMAGE_InstanceData *instance_data,
+  void add_shgroups(const IMAGE_InstanceData *instance_data,
                     const ShaderParameters &sh_params) const
   {
     GPUShader *shader = IMAGE_shader_image_get(false);
 
-    DRWShadingGroup *shgrp = DRW_shgroup_create(shader, psl->image_pass);
+    DRWShadingGroup *shgrp = DRW_shgroup_create(shader, instance_data->passes.image_pass);
     DRW_shgroup_uniform_vec2_copy(shgrp, "farNearDistances", sh_params.far_near);
     DRW_shgroup_uniform_vec4_copy(shgrp, "color", ShaderParameters::color);
     DRW_shgroup_uniform_vec4_copy(shgrp, "shuffle", sh_params.shuffle);
@@ -583,9 +582,8 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
  public:
   void cache_init(IMAGE_Data *vedata) const override
   {
-    IMAGE_PassList *psl = vedata->psl;
-
-    psl->image_pass = create_image_pass();
+    IMAGE_InstanceData *instance_data = vedata->instance_data;
+    instance_data->passes.image_pass = create_image_pass();
   }
 
   void cache_image(AbstractSpaceAccessor *space,
@@ -595,7 +593,6 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
                    ImBuf *image_buffer) const override
   {
     const DRWContextState *draw_ctx = DRW_context_state_get();
-    IMAGE_PassList *psl = vedata->psl;
     IMAGE_InstanceData *instance_data = vedata->instance_data;
     InstanceDataAccessor pda(instance_data);
 
@@ -638,7 +635,7 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
     const bool is_tiled_image = (image->source == IMA_SRC_TILED);
     space->get_shader_parameters(sh_params, image_buffer, is_tiled_image);
 
-    add_shgroups(psl, instance_data, sh_params);
+    add_shgroups(instance_data, sh_params);
   }
 
   void draw_finish(IMAGE_Data *UNUSED(vedata)) const override
@@ -647,16 +644,15 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
 
   void draw_scene(IMAGE_Data *vedata) const override
   {
-    IMAGE_PassList *psl = vedata->psl;
-    IMAGE_PrivateData *pd = vedata->stl->pd;
+    IMAGE_InstanceData *instance_data = vedata->instance_data;
 
     DefaultFramebufferList *dfbl = DRW_viewport_framebuffer_list_get();
     GPU_framebuffer_bind(dfbl->default_fb);
     static float clear_col[4] = {0.0f, 0.0f, 0.0f, 0.0f};
     GPU_framebuffer_clear_color_depth(dfbl->default_fb, clear_col, 1.0);
 
-    DRW_view_set_active(pd->view);
-    DRW_draw_pass(psl->image_pass);
+    DRW_view_set_active(instance_data->view);
+    DRW_draw_pass(instance_data->passes.image_pass);
     DRW_view_set_active(nullptr);
   }
 };  // namespace clipping

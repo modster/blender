@@ -86,44 +86,40 @@ class ImageEngine {
 
   void cache_init()
   {
-    IMAGE_StorageList *stl = vedata->stl;
-    IMAGE_PrivateData *pd = stl->pd;
-
+    IMAGE_InstanceData *instance_data = vedata->instance_data;
     drawing_mode.cache_init(vedata);
-    pd->view = nullptr;
+    instance_data->view = nullptr;
     if (space->has_view_override()) {
       const ARegion *region = draw_ctx->region;
-      pd->view = space->create_view_override(region);
+      instance_data->view = space->create_view_override(region);
     }
   }
 
   void cache_populate()
   {
-    IMAGE_StorageList *stl = vedata->stl;
-    IMAGE_PrivateData *pd = stl->pd;
     IMAGE_InstanceData *instance_data = vedata->instance_data;
     Main *bmain = CTX_data_main(draw_ctx->evil_C);
-    pd->image = space->get_image(bmain);
-    if (pd->image == nullptr) {
+    instance_data->image = space->get_image(bmain);
+    if (instance_data->image == nullptr) {
       /* Early exit, nothing to draw. */
       return;
     }
-    instance_data->flags.do_tile_drawing = pd->image->source != IMA_SRC_TILED &&
+    instance_data->flags.do_tile_drawing = instance_data->image->source != IMA_SRC_TILED &&
                                            space->use_tile_drawing();
-    pd->ibuf = space->acquire_image_buffer(pd->image, &pd->lock);
+    instance_data->ibuf = space->acquire_image_buffer(instance_data->image, &instance_data->lock);
     ImageUser *iuser = space->get_image_user();
-    drawing_mode.cache_image(space.get(), vedata, pd->image, iuser, pd->ibuf);
+    drawing_mode.cache_image(
+        space.get(), vedata, instance_data->image, iuser, instance_data->ibuf);
   }
 
   void draw_finish()
   {
     drawing_mode.draw_finish(vedata);
 
-    IMAGE_StorageList *stl = vedata->stl;
-    IMAGE_PrivateData *pd = stl->pd;
-    space->release_buffer(pd->image, pd->ibuf, pd->lock);
-    pd->image = nullptr;
-    pd->ibuf = nullptr;
+    IMAGE_InstanceData *instance_data = vedata->instance_data;
+    space->release_buffer(instance_data->image, instance_data->ibuf, instance_data->lock);
+    instance_data->image = nullptr;
+    instance_data->ibuf = nullptr;
   }
 
   void draw_scene()
@@ -140,17 +136,9 @@ static void IMAGE_engine_init(void *ved)
 {
   IMAGE_shader_library_ensure();
   IMAGE_Data *vedata = (IMAGE_Data *)ved;
-  IMAGE_StorageList *stl = vedata->stl;
-  if (!stl->pd) {
-    stl->pd = static_cast<IMAGE_PrivateData *>(MEM_callocN(sizeof(IMAGE_PrivateData), __func__));
-  }
   if (vedata->instance_data == nullptr) {
     vedata->instance_data = OBJECT_GUARDED_NEW(IMAGE_InstanceData);
   }
-  IMAGE_PrivateData *pd = stl->pd;
-
-  pd->ibuf = nullptr;
-  pd->lock = nullptr;
 }
 
 static void IMAGE_cache_init(void *vedata)
