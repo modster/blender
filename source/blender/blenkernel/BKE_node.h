@@ -1715,6 +1715,7 @@ int ntreeTexExecTree(struct bNodeTree *ntree,
 #define GEO_NODE_INPUT_MESH_FACE_AREA 1139
 #define GEO_NODE_INPUT_MESH_FACE_NEIGHBORS 1140
 #define GEO_NODE_INPUT_MESH_VERTEX_NEIGHBORS 1141
+#define GEO_NODE_GEOMETRY_TO_INSTANCE 1142
 /** \} */
 
 /* -------------------------------------------------------------------- */
@@ -1759,3 +1760,13 @@ extern struct bNodeSocketType NodeSocketTypeUndefined;
 #ifdef __cplusplus
 }
 #endif
+
+#define NODE_STORAGE_FUNCS(StorageT) \
+  [[maybe_unused]] static StorageT &node_storage(bNode &node) \
+  { \
+    return *static_cast<StorageT *>(node.storage); \
+  } \
+  [[maybe_unused]] static const StorageT &node_storage(const bNode &node) \
+  { \
+    return *static_cast<const StorageT *>(node.storage); \
+  }
