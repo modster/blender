@@ -58,7 +58,6 @@ static void image_free_gpu_limited_scale(Image *ima);
 static void image_update_gputexture_ex(
     Image *ima, ImageTile *tile, ImBuf *ibuf, int x, int y, int w, int h);
 
-/* Is the alpha of the `GPUTexture` for a given image/ibuf premultiplied. */
 bool BKE_image_has_gpu_texture_premultiplied_alpha(Image *image, ImBuf *ibuf)
 {
   if (image) {
@@ -625,7 +624,6 @@ void BKE_image_free_all_gputextures(Main *bmain)
   }
 }
 
-/* same as above but only free animated images */
 void BKE_image_free_anim_gputextures(Main *bmain)
 {
   if (bmain) {
@@ -928,8 +926,6 @@ static void image_update_gputexture_ex(
   }
 }
 
-/* Partial update of texture for texture painting. This is often much
- * quicker than fully updating the texture for high resolution images. */
 void BKE_image_update_gputexture(Image *ima, ImageUser *iuser, int x, int y, int w, int h)
 {
   ImageTile *image_tile = BKE_image_get_tile_from_iuser(ima, iuser);
@@ -962,10 +958,6 @@ void BKE_image_update_gputexture_delayed(struct Image *ima,
   }
 }
 
-/* these two functions are called on entering and exiting texture paint mode,
- * temporary disabling/enabling mipmapping on all images for quick texture
- * updates with glTexSubImage2D. images that didn't change don't have to be
- * re-uploaded to OpenGL */
 void BKE_image_paint_set_mipmap(Main *bmain, bool mipmap)
 {
   LISTBASE_FOREACH (Image *, ima, &bmain->images) {

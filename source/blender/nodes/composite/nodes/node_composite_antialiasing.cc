@@ -27,10 +27,15 @@
 
 /* **************** Anti-Aliasing (SMAA 1x) ******************** */
 
-static bNodeSocketTemplate cmp_node_antialiasing_in[] = {
-    {SOCK_RGBA, N_("Image"), 1.0f, 1.0f, 1.0f, 1.0f}, {-1, ""}};
+namespace blender::nodes {
 
-static bNodeSocketTemplate cmp_node_antialiasing_out[] = {{SOCK_RGBA, N_("Image")}, {-1, ""}};
+static void cmp_node_antialiasing_declare(NodeDeclarationBuilder &b)
+{
+  b.add_input<decl::Color>(N_("Image")).default_value({1.0f, 1.0f, 1.0f, 1.0f});
+  b.add_output<decl::Color>(N_("Image"));
+}
+
+}  // namespace blender::nodes
 
 static void node_composit_init_antialiasing(bNodeTree *UNUSED(ntree), bNode *node)
 {
@@ -44,13 +49,13 @@ static void node_composit_init_antialiasing(bNodeTree *UNUSED(ntree), bNode *nod
   node->storage = data;
 }
 
-void register_node_type_cmp_antialiasing(void)
+void register_node_type_cmp_antialiasing()
 {
   static bNodeType ntype;
 
   cmp_node_type_base(
       &ntype, CMP_NODE_ANTIALIASING, "Anti-Aliasing", NODE_CLASS_OP_FILTER, NODE_PREVIEW);
-  node_type_socket_templates(&ntype, cmp_node_antialiasing_in, cmp_node_antialiasing_out);
+  ntype.declare = blender::nodes::cmp_node_antialiasing_declare;
   node_type_size(&ntype, 170, 140, 200);
   node_type_init(&ntype, node_composit_init_antialiasing);
   node_type_storage(

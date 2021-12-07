@@ -563,10 +563,6 @@ static void image_free_anims(Image *ima)
   }
 }
 
-/**
- * Simply free the image data from memory,
- * on display the image can load again (except for render buffers).
- */
 void BKE_image_free_buffers_ex(Image *ima, bool do_lock)
 {
   if (do_lock) {
@@ -593,7 +589,6 @@ void BKE_image_free_buffers(Image *ima)
   BKE_image_free_buffers_ex(ima, false);
 }
 
-/** Free (or release) any data used by this image (does not free the image itself). */
 void BKE_image_free_data(Image *ima)
 {
   image_free_data(&ima->id);
@@ -720,9 +715,11 @@ void BKE_image_merge(Main *bmain, Image *dest, Image *source)
   }
 }
 
-/* NOTE: We could be clever and scale all imbuf's but since some are mipmaps its not so simple. */
 bool BKE_image_scale(Image *image, int width, int height)
 {
+  /* NOTE: We could be clever and scale all imbuf's
+   * but since some are mipmaps its not so simple. */
+
   ImBuf *ibuf;
   void *lock;
 
@@ -821,9 +818,6 @@ int BKE_image_get_tile_from_pos(struct Image *ima,
   return tile_number;
 }
 
-/**
- * Return the tile_number for the closest UDIM tile.
- */
 int BKE_image_find_nearest_tile(const Image *image, const float co[2])
 {
   const float co_floor[2] = {floorf(co[0]), floorf(co[1])};
@@ -922,10 +916,6 @@ Image *BKE_image_load(Main *bmain, const char *filepath)
   return ima;
 }
 
-/* checks if image was already loaded, then returns same image */
-/* otherwise creates new. */
-/* does not load ibuf itself */
-/* pass on optional frame for #name images */
 Image *BKE_image_load_exists_ex(Main *bmain, const char *filepath, bool *r_exists)
 {
   Image *ima;
@@ -1072,7 +1062,6 @@ static ImBuf *add_ibuf_size(unsigned int width,
   return ibuf;
 }
 
-/* adds new image block, creates ImBuf and initializes color */
 Image *BKE_image_add_generated(Main *bmain,
                                unsigned int width,
                                unsigned int height,
@@ -1133,11 +1122,6 @@ Image *BKE_image_add_generated(Main *bmain,
   return ima;
 }
 
-/**
- * Create an image from ibuf. The refcount of ibuf is increased,
- * caller should take care to drop its reference by calling
- * #IMB_freeImBuf if needed.
- */
 Image *BKE_image_add_from_imbuf(Main *bmain, ImBuf *ibuf, const char *name)
 {
   /* on save, type is changed to FILE in editsima.c */
@@ -1189,7 +1173,6 @@ static bool image_memorypack_imbuf(Image *ima, ImBuf *ibuf, const char *filepath
   return true;
 }
 
-/* Pack image to memory. */
 bool BKE_image_memorypack(Image *ima)
 {
   bool ok = true;
@@ -1422,7 +1405,6 @@ static bool imagecache_check_free_anim(ImBuf *ibuf, void *UNUSED(userkey), void 
          (except_frame != IMA_INDEX_ENTRY(ibuf->index));
 }
 
-/* except_frame is weak, only works for seqs without offset... */
 void BKE_image_free_anim_ibufs(Image *ima, int except_frame)
 {
   BLI_mutex_lock(ima->runtime.cache_mutex);
@@ -1684,8 +1666,6 @@ char BKE_imtype_valid_depths(const char imtype)
   }
 }
 
-/* string is from command line --render-format arg, keep in sync with
- * creator_args.c help info */
 char BKE_imtype_from_arg(const char *imtype_arg)
 {
   if (STREQ(imtype_arg, "TGA")) {
@@ -2789,8 +2769,6 @@ static const char *stamp_metadata_fields[] = {
     NULL,
 };
 
-/* Check whether the given metadata field name translates to a known field of
- * a stamp. */
 bool BKE_stamp_is_known_field(const char *field_name)
 {
   int i = 0;
@@ -2952,8 +2930,6 @@ bool BKE_imbuf_alpha_test(ImBuf *ibuf)
   return false;
 }
 
-/* NOTE: imf->planes is ignored here, its assumed the image channels
- * are already set */
 void BKE_imbuf_write_prepare(ImBuf *ibuf, const ImageFormatData *imf)
 {
   char imtype = imf->imtype;
@@ -3130,8 +3106,6 @@ int BKE_imbuf_write(ImBuf *ibuf, const char *name, const ImageFormatData *imf)
   return ok;
 }
 
-/* same as BKE_imbuf_write() but crappy workaround not to permanently modify
- * _some_, values in the imbuf */
 int BKE_imbuf_write_as(ImBuf *ibuf, const char *name, ImageFormatData *imf, const bool save_copy)
 {
   ImBuf ibuf_back = *ibuf;
@@ -3230,7 +3204,6 @@ struct anim *openanim_noload(const char *name,
   return anim;
 }
 
-/* used by sequencer too */
 struct anim *openanim(const char *name, int flags, int streamindex, char colorspace[IMA_MAX_SPACE])
 {
   struct anim *anim;
@@ -3276,8 +3249,6 @@ struct anim *openanim(const char *name, int flags, int streamindex, char colorsp
  *   -> comes from packedfile or filename or generated
  */
 
-/* forces existence of 1 Image for renderout or nodes, returns Image */
-/* name is only for default, when making new one */
 Image *BKE_image_ensure_viewer(Main *bmain, int type, const char *name)
 {
   Image *ima;
@@ -3318,7 +3289,6 @@ static void image_viewer_create_views(const RenderData *rd, Image *ima)
   }
 }
 
-/* Reset the image cache and views when the Viewer Nodes views don't match the scene views */
 void BKE_image_ensure_viewer_views(const RenderData *rd, Image *ima, ImageUser *iuser)
 {
   bool do_reset;
@@ -3973,7 +3943,6 @@ bool BKE_image_fill_tile(struct Image *ima,
 
 /* if layer or pass changes, we need an index for the imbufs list */
 /* note it is called for rendered results, but it doesn't use the index! */
-/* and because rendered results use fake layer/passes, don't correct for wrong indices here */
 RenderPass *BKE_image_multilayer_index(RenderResult *rr, ImageUser *iuser)
 {
   RenderLayer *rl;
@@ -4028,7 +3997,6 @@ void BKE_image_multiview_index(Image *ima, ImageUser *iuser)
 
 /* if layer or pass changes, we need an index for the imbufs list */
 /* note it is called for rendered results, but it doesn't use the index! */
-/* and because rendered results use fake layer/passes, don't correct for wrong indices here */
 bool BKE_image_is_multilayer(Image *ima)
 {
   if (ELEM(ima->source, IMA_SRC_FILE, IMA_SRC_SEQUENCE, IMA_SRC_TILED)) {
@@ -5060,9 +5028,10 @@ BLI_INLINE bool image_quick_test(Image *ima, const ImageUser *iuser)
   return true;
 }
 
-/* Checks optional ImageUser and verifies/creates ImBuf.
+/**
+ * Checks optional #ImageUser and verifies/creates #ImBuf.
  *
- * not thread-safe, so callee should worry about thread locks
+ * \warning Not thread-safe, so callee should worry about thread locks.
  */
 static ImBuf *image_acquire_ibuf(Image *ima, ImageUser *iuser, void **r_lock)
 {
@@ -5183,15 +5152,11 @@ static ImBuf *image_acquire_ibuf(Image *ima, ImageUser *iuser, void **r_lock)
   return ibuf;
 }
 
-/* return image buffer for given image and user
- *
- * - will lock render result if image type is render result and lock is not NULL
- * - will return NULL if image is NULL or image type is render or composite result and lock is NULL
- *
- * references the result, BKE_image_release_ibuf should be used to de-reference
- */
 ImBuf *BKE_image_acquire_ibuf(Image *ima, ImageUser *iuser, void **r_lock)
 {
+  /* NOTE: same as #image_acquire_ibuf, but can be used to retrieve images being rendered in
+   * a thread safe way, always call both acquire and release. */
+
   if (ima == NULL) {
     return NULL;
   }
@@ -5227,7 +5192,6 @@ void BKE_image_release_ibuf(Image *ima, ImBuf *ibuf, void *lock)
   }
 }
 
-/* checks whether there's an image buffer for given image and user */
 bool BKE_image_has_ibuf(Image *ima, ImageUser *iuser)
 {
   ImBuf *ibuf;
@@ -5735,19 +5699,16 @@ bool BKE_image_has_filepath(Image *ima)
   return ima->filepath[0] != '\0';
 }
 
-/* Checks the image buffer changes with time (not keyframed values). */
 bool BKE_image_is_animated(Image *image)
 {
   return ELEM(image->source, IMA_SRC_MOVIE, IMA_SRC_SEQUENCE);
 }
 
-/* Checks whether the image consists of multiple buffers. */
 bool BKE_image_has_multiple_ibufs(Image *image)
 {
   return ELEM(image->source, IMA_SRC_MOVIE, IMA_SRC_SEQUENCE, IMA_SRC_TILED);
 }
 
-/* Image modifications */
 bool BKE_image_is_dirty_writable(Image *image, bool *r_is_writable)
 {
   bool is_dirty = false;
@@ -5833,10 +5794,6 @@ bool BKE_image_has_loaded_ibuf(Image *image)
   return has_loaded_ibuf;
 }
 
-/**
- * References the result, #BKE_image_release_ibuf is to be called to de-reference.
- * Use lock=NULL when calling #BKE_image_release_ibuf().
- */
 ImBuf *BKE_image_get_ibuf_with_name(Image *image, const char *name)
 {
   ImBuf *ibuf = NULL;
@@ -5861,15 +5818,6 @@ ImBuf *BKE_image_get_ibuf_with_name(Image *image, const char *name)
   return ibuf;
 }
 
-/**
- * References the result, #BKE_image_release_ibuf is to be called to de-reference.
- * Use lock=NULL when calling #BKE_image_release_ibuf().
- *
- * TODO(sergey): This is actually "get first item from the cache", which is
- *               not so much predictable. But using first loaded image buffer
- *               was also malicious logic and all the areas which uses this
- *               function are to be re-considered.
- */
 ImBuf *BKE_image_get_first_ibuf(Image *image)
 {
   ImBuf *ibuf = NULL;
