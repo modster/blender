@@ -141,6 +141,7 @@ def mesh_node_items(context):
         yield NodeItem("GeometryNodeLegacySubdivisionSurface", poll=geometry_nodes_legacy_poll)
         yield NodeItemCustom(draw=lambda self, layout, context: layout.separator())
 
+    yield NodeItem("GeometryNodeDualMesh")
     yield NodeItem("GeometryNodeMeshBoolean")
     yield NodeItem("GeometryNodeMeshToCurve")
     yield NodeItem("GeometryNodeMeshToPoints")
@@ -149,7 +150,12 @@ def mesh_node_items(context):
     yield NodeItem("GeometryNodeSubdivisionSurface")
     yield NodeItem("GeometryNodeTriangulate")
     yield NodeItemCustom(draw=lambda self, layout, context: layout.separator())
+    yield NodeItem("GeometryNodeInputMeshEdgeNeighbors")
+    yield NodeItem("GeometryNodeInputMeshEdgeVertices")
+    yield NodeItem("GeometryNodeInputMeshFaceArea")
+    yield NodeItem("GeometryNodeInputMeshFaceNeighbors")
     yield NodeItem("GeometryNodeInputShadeSmooth")
+    yield NodeItem("GeometryNodeInputMeshVertexNeighbors")
     yield NodeItemCustom(draw=lambda self, layout, context: layout.separator())
     yield NodeItem("GeometryNodeSetShadeSmooth")
 
@@ -169,6 +175,7 @@ def geometry_node_items(context):
     yield NodeItem("GeometryNodeBoundBox")
     yield NodeItem("GeometryNodeConvexHull")
     yield NodeItem("GeometryNodeDeleteGeometry")
+    yield NodeItem("GeometryNodeGeometryToInstance")
     yield NodeItem("GeometryNodeProximity")
     yield NodeItem("GeometryNodeJoinGeometry")
     yield NodeItem("GeometryNodeRaycast")
@@ -750,7 +757,7 @@ geometry_node_categories = [
         NodeItem("ShaderNodeMath"),
         NodeItem("FunctionNodeBooleanMath"),
         NodeItem("FunctionNodeRotateEuler"),
-        NodeItem("FunctionNodeCompareFloats"),
+        NodeItem("FunctionNodeCompare"),
         NodeItem("FunctionNodeFloatToInt"),
         NodeItem("GeometryNodeSwitch"),
         NodeItem("FunctionNodeRandomValue"),

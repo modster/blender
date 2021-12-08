@@ -2204,7 +2204,7 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
       if (ntree->type != NTREE_GEOMETRY) {
         continue;
       }
-      version_node_id(ntree, FN_NODE_COMPARE_FLOATS, "FunctionNodeCompareFloats");
+      version_node_id(ntree, FN_NODE_COMPARE, "FunctionNodeCompareFloats");
       version_node_id(ntree, GEO_NODE_CAPTURE_ATTRIBUTE, "GeometryNodeCaptureAttribute");
       version_node_id(ntree, GEO_NODE_MESH_BOOLEAN, "GeometryNodeMeshBoolean");
       version_node_id(ntree, GEO_NODE_FILL_CURVE, "GeometryNodeFillCurve");
@@ -2407,16 +2407,7 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
     FOREACH_MAIN_ID_END;
   }
 
-  /**
-   * Versioning code until next subversion bump goes here.
-   *
-   * \note Be sure to check when bumping the version:
-   * - "versioning_userdef.c", #blo_do_versions_userdef
-   * - "versioning_userdef.c", #do_versions_theme
-   *
-   * \note Keep this message at the bottom of the function.
-   */
-  {
+  if (!MAIN_VERSION_ATLEAST(bmain, 301, 4)) {
     LISTBASE_FOREACH (bNodeTree *, ntree, &bmain->nodetrees) {
       if (ntree->type != NTREE_GEOMETRY) {
         continue;
@@ -2427,9 +2418,45 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
           version_node_add_socket_if_not_exist(
               ntree, node, SOCK_OUT, SOCK_INT, PROP_NONE, "Index", "Index");
         }
+
+        /* Convert float compare into a more general compare node. */
+        if (node->type == FN_NODE_COMPARE) {
+          if (node->storage == NULL) {
+            NodeFunctionCompare *data = (NodeFunctionCompare *)MEM_callocN(
+                sizeof(NodeFunctionCompare), __func__);
+            data->data_type = SOCK_FLOAT;
+            data->operation = node->custom1;
+            strcpy(node->idname, "FunctionNodeCompare");
+            node->update = NODE_UPDATE;
+            node->storage = data;
+          }
+        }
       }
     }
 
+    /* Add a toggle for the breadcrumbs overlay in the node editor. */
+    LISTBASE_FOREACH (bScreen *, screen, &bmain->screens) {
+      LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
+        LISTBASE_FOREACH (SpaceLink *, space, &area->spacedata) {
+          if (space->spacetype == SPACE_NODE) {
+            SpaceNode *snode = (SpaceNode *)space;
+            snode->overlay.flag |= SN_OVERLAY_SHOW_PATH;
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Versioning code until next subversion bump goes here.
+   *
+   * \note Be sure to check when bumping the version:
+   * - "versioning_userdef.c", #blo_do_versions_userdef
+   * - "versioning_userdef.c", #do_versions_theme
+   *
+   * \note Keep this message at the bottom of the function.
+   */
+  {
     /* Keep this block, even when empty. */
   }
 }

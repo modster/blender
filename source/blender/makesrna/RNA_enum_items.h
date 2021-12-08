@@ -172,6 +172,7 @@ DEF_ENUM(rna_enum_mapping_type_items)
 DEF_ENUM(rna_enum_node_vec_math_items)
 DEF_ENUM(rna_enum_node_boolean_math_items)
 DEF_ENUM(rna_enum_node_float_compare_items)
+DEF_ENUM(rna_enum_node_compare_operation_items)
 DEF_ENUM(rna_enum_node_filter_items)
 DEF_ENUM(rna_enum_node_float_to_int_items)
 DEF_ENUM(rna_enum_node_map_range_items)
@@ -222,7 +223,7 @@ DEF_ENUM(rna_enum_subdivision_boundary_smooth_items)
 
 DEF_ENUM(rna_enum_transform_orientation_items)
 
-/* Not available to RNA pre-processing (`makrsrna`).
+/* Not available to RNA pre-processing (`makesrna`).
  * Defined in editors for example. */
 #ifndef RNA_MAKESRNA
 

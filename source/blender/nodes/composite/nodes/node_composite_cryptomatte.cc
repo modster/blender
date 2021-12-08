@@ -297,16 +297,16 @@ static bool node_poll_cryptomatte(bNodeType *UNUSED(ntype),
     }
 
     if (scene == nullptr) {
-      *r_disabled_hint =
-          "The node tree must be the compositing node tree of any scene in the file";
+      *r_disabled_hint = TIP_(
+          "The node tree must be the compositing node tree of any scene in the file");
     }
     return scene != nullptr;
   }
-  *r_disabled_hint = "Not a compositor node tree";
+  *r_disabled_hint = TIP_("Not a compositor node tree");
   return false;
 }
 
-void register_node_type_cmp_cryptomatte(void)
+void register_node_type_cmp_cryptomatte()
 {
   static bNodeType ntype;
 
@@ -361,7 +361,7 @@ int ntreeCompositCryptomatteRemoveSocket(bNodeTree *ntree, bNode *node)
   return 1;
 }
 
-void register_node_type_cmp_cryptomatte_legacy(void)
+void register_node_type_cmp_cryptomatte_legacy()
 {
   static bNodeType ntype;
 

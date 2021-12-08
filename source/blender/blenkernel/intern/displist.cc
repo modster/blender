@@ -402,12 +402,6 @@ static void curve_to_displist(const Curve *cu,
   }
 }
 
-/**
- * \param normal_proj: Optional normal that's used to project the scanfill verts into 2d coords.
- * Pass this along if known since it saves time calculating the normal.
- * This is also used to initialize #DispList.nors (one normal per display list).
- * \param flipnormal: Flip the normal (same as passing \a normal_proj negated)
- */
 void BKE_displist_fill(const ListBase *dispbase,
                        ListBase *to,
                        const float normal_proj[3],
@@ -830,7 +824,7 @@ static bool do_curve_implicit_mesh_conversion(const Curve *curve,
   }
 
   /* Curve objects with implicit "tube" meshes should convert implicitly to a mesh. */
-  if (curve->ext1 != 0.0f || curve->ext2 != 0.0f) {
+  if (curve->extrude != 0.0f || curve->bevel_radius != 0.0f) {
     return true;
   }
 
@@ -1310,11 +1304,11 @@ static GeometrySet evaluate_curve_type_object(Depsgraph *depsgraph,
   ListBase dlbev = BKE_curve_bevel_make(cu);
 
   /* no bevel or extrude, and no width correction? */
-  if (BLI_listbase_is_empty(&dlbev) && cu->width == 1.0f) {
+  if (BLI_listbase_is_empty(&dlbev) && cu->offset == 1.0f) {
     curve_to_displist(cu, deformed_nurbs, for_render, r_dispbase);
   }
   else {
-    const float widfac = cu->width - 1.0f;
+    const float widfac = cu->offset - 1.0f;
 
     const BevList *bl = (BevList *)ob->runtime.curve_cache->bev.first;
     const Nurb *nu = (Nurb *)deformed_nurbs->first;
