@@ -541,10 +541,6 @@ static void lineart_main_occlusion_begin(LineartRenderBuffer *rb)
   rb->floating.last = rb->floating.first;
   rb->light_contour.last = rb->light_contour.first;
 
-  /* This is needed because the occlusion function expects the camera vector to point towards the
-   * camera. */
-  negate_v3_db(rb->view_vector);
-
   TaskPool *tp = BLI_task_pool_create(NULL, TASK_PRIORITY_HIGH);
 
   for (i = 0; i < thread_count; i++) {
