@@ -106,10 +106,14 @@ class ImageEngine {
     }
     instance_data->flags.do_tile_drawing = instance_data->image->source != IMA_SRC_TILED &&
                                            space->use_tile_drawing();
-    instance_data->ibuf = space->acquire_image_buffer(instance_data->image, &instance_data->lock);
+    void *lock;
+    ImBuf *image_buffer = space->acquire_image_buffer(instance_data->image, &lock);
+    const Scene *scene = DRW_context_state_get()->scene;
+    instance_data->sh_params.update(space.get(), scene, instance_data->image, image_buffer);
+    space->release_buffer(instance_data->image, image_buffer, lock);
+
     ImageUser *iuser = space->get_image_user();
-    drawing_mode.cache_image(
-        space.get(), vedata, instance_data->image, iuser, instance_data->ibuf);
+    drawing_mode.cache_image(vedata, instance_data->image, iuser);
   }
 
   void draw_finish()
@@ -117,9 +121,7 @@ class ImageEngine {
     drawing_mode.draw_finish(vedata);
 
     IMAGE_InstanceData *instance_data = vedata->instance_data;
-    space->release_buffer(instance_data->image, instance_data->ibuf, instance_data->lock);
     instance_data->image = nullptr;
-    instance_data->ibuf = nullptr;
   }
 
   void draw_scene()

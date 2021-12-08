@@ -117,9 +117,9 @@ template<typename TextureMethod> class ScreenSpaceDrawingMode : public AbstractD
     return DRW_pass_create("Image", state);
   }
 
-  void add_shgroups(const IMAGE_InstanceData *instance_data,
-                    const ShaderParameters &sh_params) const
+  void add_shgroups(const IMAGE_InstanceData *instance_data) const
   {
+    const ShaderParameters &sh_params = instance_data->sh_params;
     GPUShader *shader = IMAGE_shader_image_get(false);
 
     DRWShadingGroup *shgrp = DRW_shgroup_create(shader, instance_data->passes.image_pass);
@@ -321,17 +321,20 @@ template<typename TextureMethod> class ScreenSpaceDrawingMode : public AbstractD
     IMB_initImBuf(&texture_buffer, texture_width, texture_height, 0, IB_rectfloat);
     ImageUser tile_user = *image_user;
 
+    void *lock;
+
     Image *image = instance_data.image;
     LISTBASE_FOREACH (ImageTile *, image_tile_ptr, &image->tiles) {
       const ImageTileWrapper image_tile(image_tile_ptr);
       tile_user.tile = image_tile.get_tile_number();
-      ImBuf *tile_buffer = BKE_image_acquire_ibuf(image, &tile_user, NULL);
+
+      ImBuf *tile_buffer = BKE_image_acquire_ibuf(image, &tile_user, &lock);
       if (tile_buffer == nullptr) {
         /* Couldn't load the image buffer of the tile. */
         continue;
       }
       do_full_update_texture_slot(instance_data, info, texture_buffer, *tile_buffer, image_tile);
-      BKE_image_release_ibuf(image, tile_buffer, nullptr);
+      BKE_image_release_ibuf(image, tile_buffer, lock);
     }
     GPU_texture_update(info.texture, GPU_DATA_FLOAT, texture_buffer.rect_float);
     imb_freerectImbuf_all(&texture_buffer);
@@ -400,15 +403,11 @@ template<typename TextureMethod> class ScreenSpaceDrawingMode : public AbstractD
     instance_data->passes.image_pass = create_image_pass();
   }
 
-  void cache_image(AbstractSpaceAccessor *space,
-                   IMAGE_Data *vedata,
-                   Image *image,
-                   ImageUser *iuser,
-                   ImBuf *image_buffer) const override
+  void cache_image(IMAGE_Data *vedata, Image *image, ImageUser *iuser) const override
   {
     const DRWContextState *draw_ctx = DRW_context_state_get();
     IMAGE_InstanceData *instance_data = vedata->instance_data;
-    TextureMethod pda(instance_data);
+    TextureMethod method(instance_data);
 
     instance_data->partial_update.ensure_image(image);
     instance_data->max_uv_update();
@@ -417,28 +416,16 @@ template<typename TextureMethod> class ScreenSpaceDrawingMode : public AbstractD
     // Step: Find out which screen space textures are needed to draw on the screen. Remove the
     // screen space textures that aren't needed.
     const ARegion *region = draw_ctx->region;
-    pda.update_screen_space_bounds(region);
-    pda.update_uv_bounds();
+    method.update_screen_space_bounds(region);
+    method.update_uv_bounds();
 
     // Step: Update the GPU textures based on the changes in the image.
     instance_data->update_gpu_texture_allocations();
     update_textures(*instance_data, image, iuser);
 
     // Step: Add the GPU textures to the shgroup.
-    ShaderParameters sh_params;
-    sh_params.use_premul_alpha = BKE_image_has_gpu_texture_premultiplied_alpha(image,
-                                                                               image_buffer);
-
-    const Scene *scene = draw_ctx->scene;
-    if (scene->camera && scene->camera->type == OB_CAMERA) {
-      Camera *camera = static_cast<Camera *>(scene->camera->data);
-      copy_v2_fl2(sh_params.far_near, camera->clip_end, camera->clip_start);
-    }
-    const bool is_tiled_image = (image->source == IMA_SRC_TILED);
-    space->get_shader_parameters(sh_params, image_buffer, is_tiled_image);
-
     instance_data->update_batches();
-    add_shgroups(instance_data, sh_params);
+    add_shgroups(instance_data);
   }
 
   void draw_finish(IMAGE_Data *UNUSED(vedata)) const override

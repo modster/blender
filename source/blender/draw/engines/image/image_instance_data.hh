@@ -25,6 +25,7 @@
 #include "image_batches.hh"
 #include "image_partial_updater.hh"
 #include "image_private.hh"
+#include "image_shader_params.hh"
 #include "image_texture_info.hh"
 #include "image_wrappers.hh"
 
@@ -38,17 +39,12 @@
 constexpr int SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN = 4;
 
 struct IMAGE_InstanceData {
+  struct Image *image;
+
   PartialImageUpdater partial_update;
 
-  void *lock;
-  struct ImBuf *ibuf;
-  struct Image *image;
   struct DRWView *view;
-
-  struct {
-    DRWPass *image_pass;
-  } passes;
-
+  ShaderParameters sh_params;
   struct {
     /**
      * \brief should we perform tile drawing (wrap repeat).
@@ -58,6 +54,10 @@ struct IMAGE_InstanceData {
      */
     bool do_tile_drawing : 1;
   } flags;
+
+  struct {
+    DRWPass *image_pass;
+  } passes;
 
   TextureInfo texture_infos[SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN];
 
