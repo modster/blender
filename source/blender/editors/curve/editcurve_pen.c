@@ -506,19 +506,17 @@ static void update_data_for_all_nurbs(const ListBase *nurbs, const ViewContext *
       }
 
       float point[3], fraction;
-      bool found_min = get_closest_point_on_edge(
-          point, data->mval, data->cut_loc, data->next_loc, vc, &fraction);
-      bool check = ED_view3d_project_float_object(
+      get_closest_point_on_edge(point, data->mval, data->cut_loc, data->next_loc, vc, &fraction);
+      ED_view3d_project_float_object(
           vc->region, point, screen_co, V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN);
-      const float dist1 = len_manhattan_v3v3(screen_co, data->mval);
+      const float dist1 = len_manhattan_v2v2(screen_co, data->mval);
 
       data->min_dist = dist1;
 
-      found_min = get_closest_point_on_edge(
-          point, data->mval, data->cut_loc, data->prev_loc, vc, &fraction);
-      check = ED_view3d_project_float_object(
+      get_closest_point_on_edge(point, data->mval, data->cut_loc, data->prev_loc, vc, &fraction);
+      ED_view3d_project_float_object(
           vc->region, point, screen_co, V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN);
-      const float dist2 = len_manhattan_v3v3(screen_co, data->mval);
+      const float dist2 = len_manhattan_v2v2(screen_co, data->mval);
 
       if (dist2 < dist1) {
         data->parameter -= fraction / nu->resolu;
@@ -1117,7 +1115,6 @@ static int curve_pen_insert_modal(bContext *C, wmOperator *op, const wmEvent *ev
       float mouse_point[2] = {(float)event->mval[0], (float)event->mval[1]};
 
       get_closest_vertex_to_point_in_nurbs(nurbs, &nu, &bezt, &bp, mouse_point, &vc);
-      const bool no_point = nu == NULL;
 
       make_cut(event, cu, &nu, &vc);
 
