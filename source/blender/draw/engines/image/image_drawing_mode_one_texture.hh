@@ -22,94 +22,15 @@
 
 #pragma once
 
+#include "image_batches.hh"
 #include "image_private.hh"
+#include "image_wrappers.hh"
 
 #include "BKE_image_partial_update.hh"
 
 namespace blender::draw::image_engine {
 
 constexpr float EPSILON_UV_BOUNDS = 0.00001f;
-
-/** \brief Create GPUBatch for a IMAGE_ScreenSpaceTextureInfo. */
-class BatchUpdater {
-  IMAGE_ScreenSpaceTextureInfo &info;
-
-  GPUVertFormat format = {0};
-  int pos_id;
-  int uv_id;
-
- public:
-  BatchUpdater(IMAGE_ScreenSpaceTextureInfo &info) : info(info)
-  {
-  }
-
-  void update_batch()
-  {
-    ensure_clear_batch();
-    ensure_format();
-    init_batch();
-  }
-
-  void discard_batch()
-  {
-    GPU_BATCH_DISCARD_SAFE(info.batch);
-  }
-
- private:
-  void ensure_clear_batch()
-  {
-    GPU_BATCH_CLEAR_SAFE(info.batch);
-    if (info.batch == nullptr) {
-      info.batch = GPU_batch_calloc();
-    }
-  }
-
-  void init_batch()
-  {
-    GPUVertBuf *vbo = create_vbo();
-    GPU_batch_init_ex(info.batch, GPU_PRIM_TRI_FAN, vbo, nullptr, GPU_BATCH_OWNS_VBO);
-  }
-
-  GPUVertBuf *create_vbo()
-  {
-    GPUVertBuf *vbo = GPU_vertbuf_create_with_format(&format);
-    GPU_vertbuf_data_alloc(vbo, 4);
-    float pos[4][2];
-    fill_tri_fan_from_rctf(pos, info.clipping_bounds);
-    float uv[4][2];
-    fill_tri_fan_from_rctf(uv, info.uv_bounds);
-
-    for (int i = 0; i < 4; i++) {
-      GPU_vertbuf_attr_set(vbo, pos_id, i, pos[i]);
-      GPU_vertbuf_attr_set(vbo, uv_id, i, uv[i]);
-    }
-
-    return vbo;
-  }
-
-  static void fill_tri_fan_from_rctf(float result[4][2], rctf &rect)
-  {
-    result[0][0] = rect.xmin;
-    result[0][1] = rect.ymin;
-    result[1][0] = rect.xmax;
-    result[1][1] = rect.ymin;
-    result[2][0] = rect.xmax;
-    result[2][1] = rect.ymax;
-    result[3][0] = rect.xmin;
-    result[3][1] = rect.ymax;
-  }
-
-  void ensure_format()
-  {
-    if (format.attr_len == 0) {
-      GPU_vertformat_attr_add(&format, "pos", GPU_COMP_F32, 2, GPU_FETCH_FLOAT);
-      GPU_vertformat_attr_add(&format, "uv", GPU_COMP_F32, 2, GPU_FETCH_FLOAT);
-
-      pos_id = GPU_vertformat_attr_id_get(&format, "pos");
-      uv_id = GPU_vertformat_attr_id_get(&format, "uv");
-    }
-  }
-};
 
 /**
  * \brief Accessor to texture slots.
@@ -122,14 +43,6 @@ struct InstanceDataAccessor {
 
   InstanceDataAccessor(IMAGE_InstanceData *instance_data) : instance_data(instance_data)
   {
-  }
-
-  /** \brief Clear dirty flag from all texture slots. */
-  void clear_dirty_flag()
-  {
-    for (int i = 0; i < SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN; i++) {
-      instance_data->texture_infos[i].dirty = false;
-    }
   }
 
   /** \brief Update the texture slot uv and screen space bounds. */
@@ -176,7 +89,7 @@ struct InstanceDataAccessor {
     }
   }
 
-  void update_uv_to_texture_matrix(IMAGE_ScreenSpaceTextureInfo *info)
+  void update_uv_to_texture_matrix(IMAGE_TextureInfo *info)
   {
     // TODO: I remember that there was a function for this somewhere.
     unit_m4(info->uv_to_texture);
@@ -189,42 +102,6 @@ struct InstanceDataAccessor {
     info->uv_to_texture[1][1] = scale_y;
     info->uv_to_texture[3][0] = translate_x;
     info->uv_to_texture[3][1] = translate_y;
-  }
-
-  void update_batches()
-  {
-    for (int i = 0; i < SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN; i++) {
-      IMAGE_ScreenSpaceTextureInfo &info = instance_data->texture_infos[i];
-      if (!info.dirty) {
-        continue;
-      }
-      BatchUpdater batch_updater(info);
-      batch_updater.update_batch();
-    }
-  }
-};
-
-struct ImageTileAccessor {
-  ImageTile *image_tile;
-  ImageTileAccessor(ImageTile *image_tile) : image_tile(image_tile)
-  {
-  }
-
-  int get_tile_number() const
-  {
-    return image_tile->tile_number;
-  }
-
-  int get_tile_x_offset() const
-  {
-    int tile_number = get_tile_number();
-    return (tile_number - 1001) % 10;
-  }
-
-  int get_tile_y_offset() const
-  {
-    int tile_number = get_tile_number();
-    return (tile_number - 1001) / 10;
   }
 };
 
@@ -256,7 +133,7 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
     float image_mat[4][4];
     unit_m4(image_mat);
     for (int i = 0; i < SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN; i++) {
-      const IMAGE_ScreenSpaceTextureInfo &info = instance_data->texture_infos[i];
+      const IMAGE_TextureInfo &info = instance_data->texture_infos[i];
       if (!info.visible) {
         continue;
       }
@@ -273,64 +150,6 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
   }
 
   /**
-   * \brief check if the partial update user in the private data can still be used.
-   *
-   * When switching to a different image the partial update user should be recreated.
-   */
-  bool partial_update_is_valid(const IMAGE_InstanceData *instance_data, const Image *image) const
-  {
-    if (instance_data->partial_update_image != image) {
-      return false;
-    }
-
-    return instance_data->partial_update_user != nullptr;
-  }
-
-  void partial_update_allocate(IMAGE_InstanceData *instance_data, const Image *image) const
-  {
-    BLI_assert(instance_data->partial_update_user == nullptr);
-    instance_data->partial_update_user = BKE_image_partial_update_create(image);
-    instance_data->partial_update_image = image;
-  }
-
-  void partial_update_free(IMAGE_InstanceData *instance_data) const
-  {
-    if (instance_data->partial_update_user != nullptr) {
-      BKE_image_partial_update_free(instance_data->partial_update_user);
-      instance_data->partial_update_user = nullptr;
-    }
-  }
-
-  void update_texture_slot_allocation(IMAGE_InstanceData *instance_data) const
-  {
-    for (int i = 0; i < SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN; i++) {
-      IMAGE_ScreenSpaceTextureInfo &info = instance_data->texture_infos[i];
-      const bool is_allocated = info.texture != nullptr;
-      const bool is_visible = info.visible;
-      const bool should_be_freed = !is_visible && is_allocated;
-      const bool should_be_created = is_visible && !is_allocated;
-
-      if (should_be_freed) {
-        GPU_texture_free(info.texture);
-        info.texture = nullptr;
-      }
-
-      if (should_be_created) {
-        DRW_texture_ensure_fullscreen_2d(
-            &info.texture, GPU_RGBA16F, static_cast<DRWTextureFlag>(0));
-      }
-      info.dirty |= should_be_created;
-    }
-  }
-
-  void mark_all_texture_slots_dirty(IMAGE_InstanceData &instance_data) const
-  {
-    for (int i = 0; i < SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN; i++) {
-      instance_data.texture_infos[i].dirty = true;
-    }
-  }
-
-  /**
    * \brief Update GPUTextures for drawing the image.
    *
    * GPUTextures that are marked dirty are rebuild. GPUTextures that aren't marked dirty are
@@ -341,19 +160,19 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
                        ImageUser *image_user) const
   {
     PartialUpdateChecker<ImageTileData> checker(
-        image, image_user, instance_data.partial_update_user);
+        image, image_user, instance_data.partial_update.user);
     PartialUpdateChecker<ImageTileData>::CollectResult changes = checker.collect_changes();
 
     switch (changes.get_result_code()) {
       case ePartialUpdateCollectResult::FullUpdateNeeded:
-        mark_all_texture_slots_dirty(instance_data);
+        instance_data.mark_all_texture_slots_dirty();
         break;
       case ePartialUpdateCollectResult::NoChangesDetected:
         break;
       case ePartialUpdateCollectResult::PartialChangesDetected:
         /* Partial update when wrap repeat is enabled is not supported. */
         if (instance_data.flags.do_tile_drawing) {
-          mark_all_texture_slots_dirty(instance_data);
+          instance_data.mark_all_texture_slots_dirty();
         }
         else {
           do_partial_update(changes, instance_data);
@@ -376,7 +195,7 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
       const float tile_height = static_cast<float>(iterator.tile_data.tile_buffer->y);
 
       for (int i = 0; i < SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN; i++) {
-        const IMAGE_ScreenSpaceTextureInfo &info = instance_data.texture_infos[i];
+        const IMAGE_TextureInfo &info = instance_data.texture_infos[i];
         /* Dirty images will receive a full update. No need to do a partial one now. */
         if (info.dirty) {
           continue;
@@ -389,7 +208,7 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
         const float texture_height = GPU_texture_height(texture);
         // TODO
         // early bound check.
-        ImageTileAccessor tile_accessor(iterator.tile_data.tile);
+        ImageTileWrapper tile_accessor(iterator.tile_data.tile);
         float tile_offset_x = static_cast<float>(tile_accessor.get_tile_x_offset());
         float tile_offset_y = static_cast<float>(tile_accessor.get_tile_y_offset());
         rcti *changed_region_in_texel_space = &iterator.changed_region.region;
@@ -481,7 +300,7 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
                                          const ImageUser *image_user) const
   {
     for (int i = 0; i < SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN; i++) {
-      IMAGE_ScreenSpaceTextureInfo &info = instance_data.texture_infos[i];
+      IMAGE_TextureInfo &info = instance_data.texture_infos[i];
       if (!info.dirty) {
         continue;
       }
@@ -492,7 +311,7 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
     }
   }
 
-  void do_full_update_gpu_texture(IMAGE_ScreenSpaceTextureInfo &info,
+  void do_full_update_gpu_texture(IMAGE_TextureInfo &info,
                                   IMAGE_InstanceData &instance_data,
                                   const ImageUser *image_user) const
   {
@@ -503,10 +322,9 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
     IMB_initImBuf(&texture_buffer, texture_width, texture_height, 0, IB_rectfloat);
     ImageUser tile_user = *image_user;
 
-    /* TODO don't access partial update image directly. */
-    Image *image = const_cast<Image *>(instance_data.partial_update_image);
+    Image *image = instance_data.image;
     LISTBASE_FOREACH (ImageTile *, image_tile_ptr, &image->tiles) {
-      const ImageTileAccessor image_tile(image_tile_ptr);
+      const ImageTileWrapper image_tile(image_tile_ptr);
       tile_user.tile = image_tile.get_tile_number();
       ImBuf *tile_buffer = BKE_image_acquire_ibuf(image, &tile_user, NULL);
       if (tile_buffer == nullptr) {
@@ -534,10 +352,10 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
   }
 
   void do_full_update_texture_slot(const IMAGE_InstanceData &instance_data,
-                                   const IMAGE_ScreenSpaceTextureInfo &texture_info,
+                                   const IMAGE_TextureInfo &texture_info,
                                    ImBuf &texture_buffer,
                                    ImBuf &tile_buffer,
-                                   const ImageTileAccessor &image_tile) const
+                                   const ImageTileWrapper &image_tile) const
   {
     const int texture_width = texture_buffer.x;
     const int texture_height = texture_buffer.y;
@@ -596,30 +414,18 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
     IMAGE_InstanceData *instance_data = vedata->instance_data;
     InstanceDataAccessor pda(instance_data);
 
-    if (!partial_update_is_valid(instance_data, image)) {
-      partial_update_free(instance_data);
-      partial_update_allocate(instance_data, image);
-    }
-
-    copy_v2_fl2(instance_data->max_uv, 1.0f, 1.0);
-    LISTBASE_FOREACH (ImageTile *, image_tile, &image->tiles) {
-      ImageTileAccessor image_tile_accessor(image_tile);
-      instance_data->max_uv[0] = max_ii(instance_data->max_uv[0],
-                                        image_tile_accessor.get_tile_x_offset() + 1);
-      instance_data->max_uv[1] = max_ii(instance_data->max_uv[1],
-                                        image_tile_accessor.get_tile_y_offset() + 1);
-    }
+    instance_data->partial_update.ensure_image(image);
+    instance_data->max_uv_update();
+    instance_data->clear_dirty_flag();
 
     // Step: Find out which screen space textures are needed to draw on the screen. Remove the
     // screen space textures that aren't needed.
     const ARegion *region = draw_ctx->region;
-    pda.clear_dirty_flag();
     pda.update_screen_space_bounds(region);
     pda.update_uv_bounds();
-    pda.update_batches();
-    update_texture_slot_allocation(instance_data);
 
     // Step: Update the GPU textures based on the changes in the image.
+    instance_data->update_gpu_texture_allocations();
     update_textures(*instance_data, image, iuser);
 
     // Step: Add the GPU textures to the shgroup.
@@ -635,6 +441,7 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
     const bool is_tiled_image = (image->source == IMA_SRC_TILED);
     space->get_shader_parameters(sh_params, image_buffer, is_tiled_image);
 
+    instance_data->update_batches();
     add_shgroups(instance_data, sh_params);
   }
 

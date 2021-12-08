@@ -41,7 +41,7 @@
 
 #include "GPU_batch.h"
 
-#include "image_drawing_mode_screen_space.hh"
+#include "image_drawing_mode_one_texture.hh"
 #include "image_engine.h"
 #include "image_private.hh"
 #include "image_space_image.hh"

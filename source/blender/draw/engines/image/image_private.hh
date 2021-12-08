@@ -26,12 +26,9 @@
 
 #include "BKE_image.h"
 
-/**
- * \brief max allowed textures to use by the ScreenSpaceDrawingMode.
- *
- * 4 textures are used to reduce uploading screen space textures when translating the image.
- */
-constexpr int SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN = 4;
+#include "image_instance_data.hh"
+#include "image_texture_info.hh"
+
 
 /* Forward declarations */
 extern "C" {
@@ -43,96 +40,6 @@ struct Image;
 /* *********** LISTS *********** */
 
 namespace blender::draw::image_engine {
-
-struct IMAGE_ScreenSpaceTextureInfo {
-  /**
-   * \brief Is the texture clipped.
-   *
-   * Resources of clipped textures are freed and ignored when performing partial updates.
-   */
-  bool visible : 1;
-
-  /**
-   * \brief does this texture need a full update.
-   *
-   * When set to false the texture can be updated using a partial update.
-   */
-  bool dirty : 1;
-
-  /** \brief area of the texture in screen space. */
-  rctf clipping_bounds;
-  /** \brief uv area of the texture. */
-  rctf uv_bounds;
-  /** \brief Transform matrix to convert a normalized uv coordinate to texture space. */
-  float uv_to_texture[4][4];
-
-  /**
-   * \brief Batch to draw the associated texton the screen.
-   *
-   * contans a VBO with `pos` and 'uv'.
-   * `pos` (2xF32) is relative to the origin of the space.
-   * `uv` (2xF32) reflect the uv bounds.
-   */
-  GPUBatch *batch;
-
-  /**
-   * \brief GPU Texture for a partial region of the image editor.
-   */
-  GPUTexture *texture;
-
-  ~IMAGE_ScreenSpaceTextureInfo()
-  {
-    if (batch != nullptr) {
-      GPU_batch_discard(batch);
-      batch = nullptr;
-    }
-
-    if (texture != nullptr) {
-      GPU_texture_free(texture);
-      texture = nullptr;
-    }
-  }
-};
-
-struct IMAGE_InstanceData {
-  struct PartialUpdateUser *partial_update_user;
-  const struct Image *partial_update_image;
-
-  void *lock;
-  struct ImBuf *ibuf;
-  struct Image *image;
-  struct DRWView *view;
-
-  struct {
-    DRWPass *image_pass;
-  } passes;
-
-  struct {
-    /**
-     * \brief should we perform tile drawing (wrap repeat).
-     *
-     * Option is true when image is capable of tile drawing (image is not tiled) and the option is
-     * set in the space.
-     */
-    bool do_tile_drawing : 1;
-  } flags;
-
-  IMAGE_ScreenSpaceTextureInfo texture_infos[SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN];
-
-  /**
-   * \brief Maximum uv's that are on the border of the image.
-   *
-   * Larger UV coordinates would be drawn as a border. */
-  float max_uv[2];
-
-  ~IMAGE_InstanceData()
-  {
-    if (partial_update_user) {
-      BKE_image_partial_update_free(partial_update_user);
-      partial_update_user = nullptr;
-    }
-  }
-};
 
 struct IMAGE_Data {
   void *engine_type;
