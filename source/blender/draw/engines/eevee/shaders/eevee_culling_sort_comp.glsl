@@ -43,15 +43,21 @@ void main()
   uint src_index = gl_GlobalInvocationID.x;
   bool valid_thread = true;
 
-  if (src_index >= culling.visible_count) {
+  uint items_count_total = culling.items_no_cull_count + culling.visible_count;
+
+  if (src_index >= items_count_total) {
     /* Do not return because we use barriers later on (which need uniform control flow).
      * Just process the same last item but avoid insertion. */
-    src_index = culling.visible_count - 1;
+    src_index = items_count_total - 1;
     valid_thread = false;
   }
 
   uint key = keys[src_index];
   LightData light = lights[key];
+
+  if (light.type == LIGHT_SUN) {
+    valid_thread = false;
+  }
 
   if (!culling.enable_specular) {
     light.specular_power = 0.0;
@@ -60,9 +66,8 @@ void main()
   int index = 0;
   int contenders = 0;
 
-  /* TODO(fclem): Sun lights are polutting the zbins with no reasons. Better bypass culling. */
-  vec3 lP = (light.type == LIGHT_SUN) ? cameraPos : light._position;
-  float radius = (light.type == LIGHT_SUN) ? ViewFar * 2.0 : light.influence_radius_max;
+  vec3 lP = light._position;
+  float radius = light.influence_radius_max;
   float z_dist = dot(cameraForward, lP) - dot(cameraForward, cameraPos);
 
   int z_min = clamp(culling_z_to_zbin(culling, z_dist + radius), 0, CULLING_ZBIN_COUNT - 1);
@@ -83,9 +88,10 @@ void main()
   z_dists[gl_LocalInvocationID.x] = floatBitsToInt(z_dist);
   barrier();
 
-  const int i_start = int(gl_WorkGroupID.x) * CULLING_BATCH_SIZE;
-  int i_max = min(CULLING_BATCH_SIZE, int(culling.visible_count) - i_start);
-  for (int i = 0; i < i_max; i++) {
+  int batch_start = int(gl_WorkGroupID.x) * CULLING_BATCH_SIZE;
+  int i_start = max(batch_start, int(culling.items_no_cull_count));
+  int i_max = min(CULLING_BATCH_SIZE, int(items_count_total) - batch_start);
+  for (int i = i_start; i < i_max; i++) {
     float ref = intBitsToFloat(z_dists[i]);
     if (ref > z_dist) {
       index++;
@@ -95,7 +101,9 @@ void main()
     }
   }
 
-  atomicExchange(contender_table[index], contenders);
+  if (valid_thread) {
+    atomicExchange(contender_table[index], contenders);
+  }
   barrier();
 
   if (valid_thread) {
@@ -106,6 +114,10 @@ void main()
     index += atomicAdd(contender_table[index], -1) - 1;
     index += i_start;
     out_lights[index] = light;
+  }
+  else if (light.type == LIGHT_SUN) {
+    /* Directional lights are just copied to the same index. */
+    out_lights[key] = light;
   }
   barrier();
 

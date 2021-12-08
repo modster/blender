@@ -408,6 +408,8 @@ struct CullingData {
   float zbin_bias;
   /** Valid item count in the source data array. */
   uint items_count;
+  /** Items to skip that are not processed by the 2.5D culling. */
+  uint items_no_cull_count;
   /** Number of items that passes the first culling test. */
   uint visible_count;
   /** Will disable specular during light data copy.. */
@@ -419,7 +421,6 @@ struct CullingData {
   uint tile_y_len;
   /** Number of word per tile. Depends on the maximum number of lights. */
   uint tile_word_len;
-  int _pad0;
 };
 BLI_STATIC_ASSERT_ALIGN(CullingData, 16)
 

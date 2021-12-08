@@ -36,11 +36,14 @@ void main()
 
   LightData light = lights[l_idx];
 
+  /* Sun lights are packed at the start of the array. */
+  if (light.type == LIGHT_SUN) {
+    keys[l_idx] = l_idx;
+    return;
+  }
+
   Sphere sphere;
   switch (light.type) {
-    case LIGHT_SUN:
-      sphere = Sphere(cameraPos, ViewFar * 2.0);
-      break;
     case LIGHT_SPOT:
       /* TODO cone culling. */
     case LIGHT_RECT:
@@ -51,7 +54,7 @@ void main()
   }
 
   if (intersect_view(sphere)) {
-    uint index = atomicAdd(culling.visible_count, 1);
+    uint index = culling.items_no_cull_count + atomicAdd(culling.visible_count, 1u);
     keys[index] = l_idx;
   }
 }

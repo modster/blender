@@ -42,8 +42,8 @@ void main(void)
   /* TODO(fclem): We could stop the tile at the HiZ depth. */
   CullingTile tile = culling_tile_get(culling, tile_co);
 
-  uint l_idx = word_idx * 32u;
-  uint l_end = min(l_idx + 32u, culling.visible_count);
+  uint l_idx = max(word_idx * 32u, culling.items_no_cull_count);
+  uint l_end = min(l_idx + 32u, culling.visible_count + culling.items_no_cull_count);
   uint word = 0u;
 
   for (; l_idx < l_end; l_idx++) {
@@ -51,9 +51,6 @@ void main(void)
 
     bool intersect_tile;
     switch (light.type) {
-      case LIGHT_SUN:
-        intersect_tile = true;
-        break;
       case LIGHT_SPOT:
         /* TODO cone culling. */
       case LIGHT_RECT:

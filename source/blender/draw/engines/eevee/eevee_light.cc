@@ -289,6 +289,7 @@ void LightModule::end_sync(void)
   light_refs_.clear();
 
   /* Detect light deletion. */
+  culling_data.items_no_cull_count = 0;
   for (auto item : lights_.items()) {
     Light &light = item.value;
     if (!light.used) {
@@ -298,6 +299,10 @@ void LightModule::end_sync(void)
     else {
       light.used = false;
       light_refs_.append(&light);
+
+      if (light.type == LIGHT_SUN) {
+        culling_data.items_no_cull_count++;
+      }
     }
   }
 
@@ -324,16 +329,19 @@ void LightModule::end_sync(void)
   /* Call shadows.end_sync after light pruning to avoid packing deleted shadows. */
   inst_.shadows.end_sync();
 
+  int direc_idx = 0;
+  int punct_idx = culling_data.items_no_cull_count;
   for (auto l_idx : light_refs_.index_range()) {
     Light &light = *light_refs_[l_idx];
-    lights_data[l_idx] = light;
+    int dst_idx = (light.type == LIGHT_SUN) ? direc_idx++ : punct_idx++;
+    lights_data[dst_idx] = light;
 
     if (light.shadow_id != LIGHT_NO_SHADOW) {
       if (light.type == LIGHT_SUN) {
-        lights_data[l_idx].shadow_data = this->inst_.shadows.directionals[light.shadow_id];
+        lights_data[dst_idx].shadow_data = this->inst_.shadows.directionals[light.shadow_id];
       }
       else {
-        lights_data[l_idx].shadow_data = this->inst_.shadows.punctuals[light.shadow_id];
+        lights_data[dst_idx].shadow_data = this->inst_.shadows.punctuals[light.shadow_id];
       }
     }
   }

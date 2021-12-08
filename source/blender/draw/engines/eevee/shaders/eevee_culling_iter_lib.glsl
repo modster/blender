@@ -24,7 +24,13 @@ uint zbin_mask(uint word_index, uint zbin_min, uint zbin_max)
 #  define subgroupBroadcastFirst(a) a
 #endif
 
-#define ITEM_FOREACH_BEGIN(_culling, _zbins, _words, _pixel, _linearz, _item_index) \
+#define LIGHT_FOREACH_BEGIN_DIRECTIONAL(_culling, _item_index) \
+  { \
+    { \
+      { \
+        for (uint _item_index = 0u; _item_index < _culling.items_no_cull_count; _item_index++) {
+
+#define LIGHT_FOREACH_BEGIN_LOCAL(_culling, _zbins, _words, _pixel, _linearz, _item_index) \
   { \
     uint batch_count = divide_ceil_u(_culling.visible_count, CULLING_BATCH_SIZE); \
     uvec2 tile_co = uvec2(_pixel) / _culling.tile_size; \
@@ -52,13 +58,15 @@ uint zbin_mask(uint word_index, uint zbin_min, uint zbin_max)
           uint _item_index = word_idx * 32u + bit_index;
 
 /* No culling. Iterate over all items. */
-#define ITEM_FOREACH_BEGIN_NO_CULL(_culling, _item_index) \
+#define LIGHT_FOREACH_BEGIN_LOCAL_NO_CULL(_culling, _item_index) \
   { \
     { \
       { \
-        for (uint _item_index = 0u; _item_index < _culling.visible_count; _item_index++) {
+        for (uint _item_index = _culling.items_no_cull_count; \
+             _item_index < _culling.visible_count; \
+             _item_index++) {
 
-#define ITEM_FOREACH_END \
+#define LIGHT_FOREACH_END \
   } \
   } \
   } \
