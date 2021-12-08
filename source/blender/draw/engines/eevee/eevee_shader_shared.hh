@@ -482,19 +482,30 @@ BLI_STATIC_ASSERT_ALIGN(ShadowData, 16)
  * IMPORTANT: Some data packing are tweaked for these values.
  * Be sure to update them accordingly.
  * SHADOW_TILEMAP_RES max is 32 because of the shared bitmaps used for LOD tagging.
+ * It is also limited by the maximum thread group size (1024)
  */
-#define SHADOW_TILEMAP_RES 16
-#define SHADOW_TILEMAP_LOD 4 /* LOG2(SHADOW_TILEMAP_RES) */
+#define SHADOW_TILEMAP_RES 32
+#define SHADOW_TILEMAP_LOD 5 /* LOG2(SHADOW_TILEMAP_RES) */
 #define SHADOW_TILEMAP_PER_ROW 64
 #define SHADOW_PAGE_COPY_GROUP_SIZE 32
+#define SHADOW_DEPTH_SCAN_GROUP_SIZE 32
 #define SHADOW_AABB_TAG_GROUP_SIZE 64
 #define SHADOW_MAX_TILEMAP 4096
 #define SHADOW_MAX_PAGE 4096
 #define SHADOW_PAGE_PER_ROW 64
-/** Debug shadow tile allocation. */
-// #define SHADOW_NO_CACHING
+
 #define SHADOW_DEBUG_PAGE_ALLOCATION_ENABLED
 #define SHADOW_DEBUG_TILE_ALLOCATION_ENABLED
+/** Debug shadow tile allocation. */
+// #define SHADOW_DEBUG_NO_CACHING
+/* Debug: Comment to only use BBox tagging instead of depth scanning. */
+// #define SHADOW_DEBUG_NO_DEPTH_SCAN
+/* Debug: Will freeze the camera used for shadow tagging if G.debug_value is >= 4. */
+// #define SHADOW_DEBUG_FREEZE_CAMERA
+
+#if defined(SHADOW_DEBUG_FREEZE_CAMERA) && defined(SHADOW_DEBUG_NO_DEPTH_SCAN)
+#  error Freeze camera debug option is incompatible with depth scanning.
+#endif
 
 /* Given an input tile coordinate [0..SHADOW_TILEMAP_RES] returns the coordinate in NDC [-1..1]. */
 static inline vec2 shadow_tile_coord_to_ndc(ivec2 tile)
@@ -530,6 +541,17 @@ struct ShadowTileMapData {
   float cone_angle_cos;
 };
 BLI_STATIC_ASSERT_ALIGN(ShadowTileMapData, 16)
+
+struct ShadowPagesInfoData {
+  /** Index of the next free pages in the free page heap. */
+  int page_free_next;
+  /** Last number of free pages at the begining of the redraw. */
+  int page_free_next_prev;
+  /** Number of pages that needs to be rendered. */
+  int page_updated_count;
+  int _pad0;
+};
+BLI_STATIC_ASSERT_ALIGN(ShadowPagesInfoData, 16)
 
 /** \} */
 
@@ -908,6 +930,7 @@ using RaytraceBufferDataBuf = StructBuffer<RaytraceBufferData>;
 using RaytraceDataBuf = StructBuffer<RaytraceData>;
 using ShadowDataBuf = StorageArrayBuffer<ShadowData, CULLING_BATCH_SIZE>;
 using ShadowDebugDataBuf = StructBuffer<ShadowDebugData>;
+using ShadowPagesInfoDataBuf = StorageBuffer<ShadowPagesInfoData, true>;
 using ShadowPageHeapBuf = StorageArrayBuffer<ShadowPagePacked, SHADOW_MAX_PAGE, true>;
 using ShadowTileMapDataBuf = StorageArrayBuffer<ShadowTileMapData, SHADOW_MAX_TILEMAP>;
 using SubsurfaceDataBuf = StructBuffer<SubsurfaceData>;

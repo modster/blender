@@ -145,7 +145,7 @@ void ShadingView::render(void)
 
   inst_.lookdev.render_overlay(view_fb_);
 
-  inst_.shading_passes.forward.render(gbuffer_, hiz_front_, view_fb_);
+  inst_.shading_passes.forward.render(render_view_, gbuffer_, hiz_front_, view_fb_);
 
   inst_.lights.debug_draw(view_fb_, hiz_front_);
   inst_.shadows.debug_draw(view_fb_, hiz_front_);
@@ -252,7 +252,7 @@ void LightProbeView::render(void)
 
     inst_.shading_passes.deferred.render(
         view_, gbuffer_, hiz_front_, hiz_back_, rt_buffer_opaque_, rt_buffer_refract_, view_fb_);
-    inst_.shading_passes.forward.render(gbuffer_, hiz_front_, view_fb_);
+    inst_.shading_passes.forward.render(view_, gbuffer_, hiz_front_, view_fb_);
   }
   DRW_stats_group_end();
 }

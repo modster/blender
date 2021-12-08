@@ -13,7 +13,7 @@
 #pragma BLENDER_REQUIRE(eevee_shadow_page_lib.glsl)
 
 /** Control the scaling of the tilemap splat. */
-const float pixel_scale = 8.0;
+const float pixel_scale = 4.0;
 
 layout(std140) uniform debug_block
 {
@@ -52,8 +52,8 @@ vec3 debug_random_color(int v)
 
 vec3 debug_tile_state_color(ShadowTileData tile)
 {
-  if (tile.is_used && tile.is_visible && tile.lod > 0) {
-    return vec3(1, 1, 0);
+  if (tile.lod > 0) {
+    return vec3(1, 0.5, 0) * float(tile.lod) / float(SHADOW_TILEMAP_LOD);
   }
   if (tile.do_update && tile.is_used && tile.is_visible) {
     return vec3(1, 0, 0);
@@ -95,7 +95,7 @@ bool debug_tilemap_point_is_inside(vec3 P, int tilemap_index)
 {
   int tilemap_data_index = debug.tilemap_data_index + tilemap_index - debug.shadow.tilemap_index;
   vec3 clipP = project_point(tilemaps[tilemap_data_index].tilemat, P);
-  return in_range_inclusive(clipP, vec3(0.0), vec3(16.0));
+  return in_range_inclusive(clipP, vec3(0.0), vec3(SHADOW_TILEMAP_RES));
 }
 
 /** Unlike shadow_directional_tilemap_index, returns the first tilemap overlapping the position. */
@@ -125,6 +125,25 @@ int debug_punctual_tilemap_index(vec3 P)
     return tilemap_index;
   }
   return -1;
+}
+
+void debug_pages(vec3 P)
+{
+  int tilemap_index = (debug.light.type == LIGHT_SUN) ? debug_directional_tilemap_index(P) :
+                                                        debug_punctual_tilemap_index(P);
+  if (tilemap_index != -1) {
+    int tilemap_data_index = debug.tilemap_data_index + tilemap_index - debug.shadow.tilemap_index;
+    vec3 clipP = project_point(tilemaps[tilemap_data_index].tilemat, P);
+    ivec2 tile = ivec2(clipP.xy);
+    ShadowTileData tile_data = shadow_tile_load(tilemaps_tx, tile, 0, tilemap_index);
+    vec3 color = debug_random_color(ivec2(tile_data.page));
+    out_color_add = vec4(color * 0.5, 0);
+    out_color_mul = out_color_add * 0.5 + 0.5;
+  }
+  else {
+    out_color_add = vec4(0.0);
+    out_color_mul = vec4(0.5);
+  }
 }
 
 void debug_lod(vec3 P)
@@ -242,6 +261,9 @@ void main()
     switch (debug.type) {
       case SHADOW_DEBUG_TILEMAPS:
         debug_tile_state(P);
+        break;
+      case SHADOW_DEBUG_PAGES:
+        debug_pages(P);
         break;
       case SHADOW_DEBUG_LOD:
         debug_lod(P);

@@ -55,7 +55,8 @@ namespace blender::eevee {
 
 void DepthOfField::init(void)
 {
-  const SceneEEVEE &sce_eevee = inst_.scene->eevee;
+  const Instance &inst = inst_;
+  const SceneEEVEE &sce_eevee = inst.scene->eevee;
   do_hq_slight_focus_ = (sce_eevee.flag & SCE_EEVEE_DOF_HQ_SLIGHT_FOCUS) != 0;
   do_jitter_ = (sce_eevee.flag & SCE_EEVEE_DOF_JITTER) != 0;
   user_overblur_ = sce_eevee.bokeh_overblur / 100.0f;

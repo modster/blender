@@ -48,13 +48,14 @@ float shadow_punctual_depth_get(
   int face_id = shadow_punctual_face_index_get(lL);
   lL = shadow_punctual_local_position_to_face_local(face_id, lL);
   /* UVs in [0..SHADOW_TILEMAP_RES] range. */
-  vec2 uv = (lL.xy / abs(lL.z)) * vec2(SHADOW_TILEMAP_RES / 2) + float(SHADOW_TILEMAP_RES / 2);
+  const float lod0_res = float(SHADOW_TILEMAP_RES / 2);
+  vec2 uv = (lL.xy / abs(lL.z)) * lod0_res + lod0_res;
   ivec2 tile_co = ivec2(floor(uv));
   int tilemap_index = shadow.tilemap_index + face_id;
   ShadowTileData tile = shadow_tile_load(tilemaps_tx, tile_co, 0, tilemap_index);
 
   float depth = 1.0;
-  if (/* tile.is_valid && */ tilemap_index <= shadow.tilemap_last) {
+  if ((tilemap_index <= shadow.tilemap_last) && (tile.is_allocated || tile.lod > 0)) {
     vec2 shadow_uv = shadow_page_uv_transform(tile.page, tile.lod, uv);
     depth = texture(atlas_tx, shadow_uv).r;
   }

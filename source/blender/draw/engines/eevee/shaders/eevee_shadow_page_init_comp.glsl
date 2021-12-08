@@ -19,12 +19,19 @@ layout(std430, binding = 2) restrict writeonly buffer pages_buf
   ShadowPagePacked pages[];
 };
 
+layout(std430, binding = 3) restrict writeonly buffer pages_infos_buf
+{
+  ShadowPagesInfoData infos;
+};
+
 void main()
 {
-  /* Note this also kindly sets SHADOW_PAGE_HEAP_LAST to the right amount (SHADOW_MAX_PAGE - 2). */
-  uint free_page_index = min(gl_GlobalInvocationID.x, SHADOW_MAX_PAGE - 2);
+  infos.page_free_next = SHADOW_MAX_PAGE - 1;
+  infos.page_free_next_prev = 0;
+  infos.page_updated_count = 0;
 
-  pages_free[gl_GlobalInvocationID.x] = int(free_page_index);
+  pages_free[gl_GlobalInvocationID.x] = ShadowPagePacked(gl_GlobalInvocationID.x);
+
 #ifdef SHADOW_DEBUG_PAGE_ALLOCATION_ENABLED
   pages[gl_GlobalInvocationID.x] = SHADOW_PAGE_NO_DATA;
 #endif

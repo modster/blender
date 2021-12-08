@@ -24,10 +24,10 @@ uint zbin_mask(uint word_index, uint zbin_min, uint zbin_max)
 #  define subgroupBroadcastFirst(a) a
 #endif
 
-#define ITEM_FOREACH_BEGIN(_culling, _zbins, _words, _linearz, _item_index) \
+#define ITEM_FOREACH_BEGIN(_culling, _zbins, _words, _pixel, _linearz, _item_index) \
   { \
     uint batch_count = divide_ceil_u(_culling.visible_count, CULLING_BATCH_SIZE); \
-    uvec2 tile_co = uvec2(gl_FragCoord.xy) / _culling.tile_size; \
+    uvec2 tile_co = uvec2(_pixel) / _culling.tile_size; \
     uint tile_word_offset = (tile_co.x + tile_co.y * _culling.tile_x_len) * \
                             _culling.tile_word_len; \
     for (uint batch = 0; batch < batch_count; batch++) { \

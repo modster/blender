@@ -132,7 +132,7 @@ class DepthOfField {
   /** Reduce pass info. */
   int reduce_steps_;
 
-  /** Static srting pointer. Used as debug name and as UUID for texture pool. */
+  /** Static string pointer. Used as debug name and as UUID for texture pool. */
   StringRefNull view_name_;
 
  public:

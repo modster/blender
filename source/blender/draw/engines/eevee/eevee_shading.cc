@@ -192,7 +192,10 @@ DRWShadingGroup *ForwardPass::prepass_transparent_add(::Material *blender_mat, G
   return grp;
 }
 
-void ForwardPass::render(GBuffer &gbuffer, HiZBuffer &hiz, GPUFrameBuffer *view_fb)
+void ForwardPass::render(const DRWView *view,
+                         GBuffer &gbuffer,
+                         HiZBuffer &hiz,
+                         GPUFrameBuffer *view_fb)
 {
   if (inst_.raytracing.enabled()) {
     ivec2 extent = {GPU_texture_width(gbuffer.depth_tx), GPU_texture_height(gbuffer.depth_tx)};
@@ -212,14 +215,19 @@ void ForwardPass::render(GBuffer &gbuffer, HiZBuffer &hiz, GPUFrameBuffer *view_
     GPU_framebuffer_bind(view_fb);
   }
 
+  DRW_stats_group_start("ForwardOpaque");
   DRW_draw_pass(prepass_ps_);
+  inst_.shadows.set_view(view, gbuffer.depth_tx);
   DRW_draw_pass(opaque_ps_);
+  DRW_stats_group_end();
 
+  DRW_stats_group_start("ForwardTransparent");
   /* TODO(fclem) This is suboptimal. We could sort during sync. */
   /* FIXME(fclem) This wont work for panoramic, where we need
    * to sort by distance to camera, not by z. */
   DRW_pass_sort_shgroup_z(transparent_ps_);
   DRW_draw_pass(transparent_ps_);
+  DRW_stats_group_end();
 
   if (inst_.raytracing.enabled()) {
     gbuffer.ray_radiance_tx.release_tmp();
@@ -297,7 +305,8 @@ void DeferredLayer::volume_add(Object *ob)
   DRW_shgroup_call(grp, DRW_cache_cube_get(), ob);
 }
 
-void DeferredLayer::render(GBuffer &gbuffer,
+void DeferredLayer::render(const DRWView *view,
+                           GBuffer &gbuffer,
                            HiZBuffer &hiz_front,
                            HiZBuffer &hiz_back,
                            RaytraceBuffer &rt_buffer,
@@ -348,6 +357,8 @@ void DeferredLayer::render(GBuffer &gbuffer,
 
     DRW_draw_pass(gbuffer_ps_);
   }
+
+  inst_.shadows.set_view(view, gbuffer.depth_tx);
 
   if (!no_volumes) {
     // gbuffer.copy_depth_behind();
@@ -566,16 +577,16 @@ void DeferredPass::render(const DRWView *drw_view,
                           GPUFrameBuffer *view_fb)
 {
   DRW_stats_group_start("OpaqueLayer");
-  opaque_layer_.render(gbuffer, hiz_front, hiz_back, rt_buffer_opaque_, view_fb);
+  opaque_layer_.render(drw_view, gbuffer, hiz_front, hiz_back, rt_buffer_opaque_, view_fb);
   DRW_stats_group_end();
 
   DRW_stats_group_start("RefractionLayer");
-  refraction_layer_.render(gbuffer, hiz_front, hiz_back, rt_buffer_refract_, view_fb);
+  refraction_layer_.render(drw_view, gbuffer, hiz_front, hiz_back, rt_buffer_refract_, view_fb);
   DRW_stats_group_end();
 
   /* NOTE(fclem): Reuse the same rtbuffer as refraction but should not use it. */
   DRW_stats_group_start("VolumetricLayer");
-  volumetric_layer_.render(gbuffer, hiz_front, hiz_back, rt_buffer_refract_, view_fb);
+  volumetric_layer_.render(drw_view, gbuffer, hiz_front, hiz_back, rt_buffer_refract_, view_fb);
   DRW_stats_group_end();
 
   gbuffer.render_end();

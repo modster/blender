@@ -2,12 +2,6 @@
 #pragma BLENDER_REQUIRE(common_math_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
 
-/**
- * HACK: Use last member to store the heap usage to avoid alignment.
- * Note that this stores the index to the last element.
- */
-#define SHADOW_PAGE_HEAP_LAST_USED(heap) heap[SHADOW_MAX_PAGE - 1]
-
 /** Decoded page data structure. */
 struct ShadowPageData {
   /** Tile inside the tilemap atlas. */

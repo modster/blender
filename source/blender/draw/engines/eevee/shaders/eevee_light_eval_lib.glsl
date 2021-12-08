@@ -33,7 +33,8 @@ void light_eval(ClosureDiffuse diffuse,
   vec4 ltc_mat = utility_tx_sample(uv, UTIL_LTC_MAT_LAYER);
   float ltc_mag = utility_tx_sample(uv, UTIL_LTC_MAG_LAYER).x;
 
-  ITEM_FOREACH_BEGIN (light_culling, lights_zbins, lights_culling_words, vP_z, l_idx) {
+  ITEM_FOREACH_BEGIN (
+      light_culling, lights_zbins, lights_culling_words, gl_FragCoord.xy, vP_z, l_idx) {
     LightData light = lights[l_idx];
     vec3 L;
     float dist;

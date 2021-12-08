@@ -103,7 +103,7 @@ class ForwardPass {
   DRWShadingGroup *material_transparent_add(::Material *blender_mat, GPUMaterial *gpumat);
   DRWShadingGroup *prepass_transparent_add(::Material *blender_mat, GPUMaterial *gpumat);
 
-  void render(GBuffer &gbuffer, HiZBuffer &hiz, GPUFrameBuffer *view_fb);
+  void render(const DRWView *view, GBuffer &gbuffer, HiZBuffer &hiz, GPUFrameBuffer *view_fb);
 };
 
 /** \} */
@@ -134,7 +134,8 @@ class DeferredLayer {
   DRWShadingGroup *material_add(::Material *blender_mat, GPUMaterial *gpumat);
   DRWShadingGroup *prepass_add(::Material *blender_mat, GPUMaterial *gpumat);
   void volume_add(Object *ob);
-  void render(GBuffer &gbuffer,
+  void render(const DRWView *view,
+              GBuffer &gbuffer,
               HiZBuffer &hiz_front,
               HiZBuffer &hiz_back,
               RaytraceBuffer &rtbuffer,

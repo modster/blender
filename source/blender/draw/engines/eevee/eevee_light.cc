@@ -445,8 +445,6 @@ void LightModule::set_view(const DRWView *view, const ivec2 extent, bool enable_
 
   DRW_view_set_active(view);
   DRW_draw_pass(culling_ps_);
-
-  inst_.shadows.update_visible(view, extent);
 }
 
 void LightModule::debug_draw(GPUFrameBuffer *view_fb, HiZBuffer &hiz)

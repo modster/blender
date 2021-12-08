@@ -31,7 +31,7 @@ void main()
     for (int x = 0; x < lod_size; x++) {
       ivec2 tile_co = ivec2(x, y);
       ShadowTileData tile = shadow_tile_load(tilemaps_tx, tile_co, tilemap_lod, tilemap_index);
-      if (tile.do_update && tile.is_used && tile.is_visible) {
+      if (tile.do_update && tile.is_used && tile.is_visible && tile.is_allocated) {
         /* We dispatch enough group to cover one page. */
         ivec2 page_texel = ivec2(gl_GlobalInvocationID.xy);
         ivec2 in_texel = page_texel + tile_co * page_size;

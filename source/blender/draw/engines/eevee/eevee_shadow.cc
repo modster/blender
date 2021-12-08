@@ -45,7 +45,7 @@ void ShadowTileMap::sync_clipmap(const float3 &camera_position,
                                  int2 new_offset,
                                  int clipmap_level)
 {
-#ifdef SHADOW_NO_CACHING
+#ifdef SHADOW_DEBUG_NO_CACHING
   set_dirty();
 #endif
   if (is_cubeface || (level != clipmap_level) || (near != near_) || (far != far_)) {
@@ -106,7 +106,7 @@ void ShadowTileMap::sync_clipmap(const float3 &camera_position,
 void ShadowTileMap::sync_cubeface(
     const float4x4 &object_mat_, float near_, float far_, float cone_aperture, eCubeFace face)
 {
-#ifdef SHADOW_NO_CACHING
+#ifdef SHADOW_DEBUG_NO_CACHING
   set_dirty();
 #endif
   if (!is_cubeface || (cubeface != face) || (near != near_) || (far != far_)) {
@@ -576,7 +576,9 @@ void ShadowModule::begin_sync(void)
   receivers_non_opaque_ = DRW_call_buffer_create(&aabb_format_);
   casters_updated_ = DRW_call_buffer_create(&aabb_format_);
 
-  memset(views_, 0, sizeof(views_));
+  for (int i = 0; i < ARRAY_SIZE(views_); i++) {
+    views_[i] = nullptr;
+  }
 }
 
 void ShadowModule::sync_object(Object *ob,
@@ -584,6 +586,9 @@ void ShadowModule::sync_object(Object *ob,
                                bool is_shadow_caster,
                                bool is_alpha_blend)
 {
+#ifdef SHADOW_DEBUG_NO_DEPTH_SCAN
+  is_alpha_blend = true;
+#endif
   if (!is_shadow_caster && !is_alpha_blend) {
     return;
   }
@@ -651,7 +656,7 @@ void ShadowModule::end_sync(void)
     float near_dist = fabsf(inst_.camera.data_get().clip_near);
     float3 cam_position = inst_.camera.position();
 
-#ifdef DEBUG
+#ifdef SHADOW_DEBUG_FREEZE_CAMERA
     static bool valid = false;
     static float far_dist_freezed;
     static float near_dist_freezed;
@@ -689,6 +694,8 @@ void ShadowModule::end_sync(void)
 
   tilemap_allocator.end_sync();
 
+  last_processed_view = nullptr;
+
   /**
    * Tilemap Management
    */
@@ -699,6 +706,7 @@ void ShadowModule::end_sync(void)
 
     GPUShader *sh = inst_.shaders.static_shader_get(SHADOW_TILE_SETUP);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, tilemap_setup_ps_);
+    DRW_shgroup_vertex_buffer(grp, "pages_infos_buf", pages_infos_data_);
     DRW_shgroup_vertex_buffer(grp, "tilemaps_buf", tilemap_allocator.tilemaps_data);
     DRW_shgroup_uniform_image(grp, "tilemaps_img", tilemap_allocator.tilemap_tx);
     int64_t tilemaps_updated_len = tilemaps_len + tilemap_allocator.deleted_maps_len;
@@ -741,8 +749,22 @@ void ShadowModule::end_sync(void)
       DRW_shgroup_call_compute(grp, group_len, 1, tilemaps_len);
       DRW_shgroup_barrier(grp, GPU_BARRIER_SHADER_IMAGE_ACCESS);
     }
+  }
+  {
+    tilemap_depth_scan_ps_ = DRW_pass_create("ShadowDepthScan", (DRWState)0);
 
-    /* TODO(fclem): Add depth buffer scanning here. */
+    GPUShader *sh = inst_.shaders.static_shader_get(SHADOW_TILE_DEPTH_SCAN);
+    DRWShadingGroup *grp = DRW_shgroup_create(sh, tilemap_depth_scan_ps_);
+    DRW_shgroup_uniform_texture_ref(grp, "depth_tx", &input_depth_tx_);
+    DRW_shgroup_vertex_buffer_ref(grp, "lights_buf", &inst_.lights.culling_light_buf);
+    DRW_shgroup_vertex_buffer_ref(grp, "lights_culling_buf", &inst_.lights.culling_data);
+    DRW_shgroup_vertex_buffer_ref(grp, "lights_zbins_buf", &inst_.lights.culling_zbin_buf);
+    DRW_shgroup_vertex_buffer_ref(grp, "lights_tile_buf", &inst_.lights.culling_tile_buf);
+    DRW_shgroup_uniform_image(grp, "tilemaps_img", tilemap_allocator.tilemap_tx);
+    DRW_shgroup_uniform_float(grp, "tilemap_pixel_radius", &tilemap_pixel_radius_, 1);
+    DRW_shgroup_uniform_float(grp, "screen_pixel_radius_inv", &screen_pixel_radius_inv_, 1);
+    DRW_shgroup_call_compute_ref(grp, scan_dispatch_size_);
+    DRW_shgroup_barrier(grp, GPU_BARRIER_SHADER_IMAGE_ACCESS);
   }
   {
     tilemap_update_tag_ps_ = DRW_pass_create("ShadowUpdateTag", (DRWState)0);
@@ -772,6 +794,7 @@ void ShadowModule::end_sync(void)
 
     GPUShader *sh = inst_.shaders.static_shader_get(SHADOW_PAGE_INIT);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, page_init_ps_);
+    DRW_shgroup_vertex_buffer(grp, "pages_infos_buf", pages_infos_data_);
     DRW_shgroup_vertex_buffer(grp, "pages_free_buf", pages_free_data_);
     DRW_shgroup_vertex_buffer(grp, "pages_buf", pages_data_);
     DRW_shgroup_call_compute(grp, SHADOW_MAX_PAGE / SHADOW_PAGE_PER_ROW, 1, 1);
@@ -782,6 +805,7 @@ void ShadowModule::end_sync(void)
 
     GPUShader *sh = inst_.shaders.static_shader_get(SHADOW_PAGE_FREE);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, page_free_ps_);
+    DRW_shgroup_vertex_buffer(grp, "pages_infos_buf", pages_infos_data_);
     DRW_shgroup_vertex_buffer(grp, "pages_free_buf", pages_free_data_);
     DRW_shgroup_vertex_buffer(grp, "pages_buf", pages_data_);
     DRW_shgroup_vertex_buffer(grp, "tilemaps_buf", tilemap_allocator.tilemaps_data);
@@ -797,6 +821,7 @@ void ShadowModule::end_sync(void)
 
     GPUShader *sh = inst_.shaders.static_shader_get(SHADOW_PAGE_ALLOC);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, page_alloc_ps_);
+    DRW_shgroup_vertex_buffer(grp, "pages_infos_buf", pages_infos_data_);
     DRW_shgroup_vertex_buffer(grp, "pages_free_buf", pages_free_data_);
     DRW_shgroup_vertex_buffer(grp, "pages_buf", pages_data_);
     DRW_shgroup_vertex_buffer(grp, "tilemaps_buf", tilemap_allocator.tilemaps_data);
@@ -905,9 +930,16 @@ void ShadowModule::debug_end_sync(void)
   }
 }
 
-/* Update all shadow regions visible inside the view. */
-void ShadowModule::update_visible(const DRWView *view, const ivec2 extent)
+/* Update all shadow regions visible inside the view.
+ * If called multiple time for the same view, it will only do the depth buffer scanning
+ * to check any new opaque surfaces.
+ * Needs to be called after LightModule::set_view(); */
+void ShadowModule::set_view(const DRWView *view, GPUTexture *depth_tx)
 {
+  /* Only process each view once. */
+  bool do_process_view = (view != last_processed_view);
+  last_processed_view = view;
+
 #if 0 /* TODO */
   bool force_update = false;
   if (soft_shadows_enabled_ && (inst_.sampling.sample_get() != last_sample_)) {
@@ -919,24 +951,35 @@ void ShadowModule::update_visible(const DRWView *view, const ivec2 extent)
   }
 #endif
 
+  ivec2 extent(GPU_texture_width(depth_tx), GPU_texture_height(depth_tx));
+  input_depth_tx_ = depth_tx;
+
+  scan_dispatch_size_.x = divide_ceil_u(extent.x, SHADOW_DEPTH_SCAN_GROUP_SIZE);
+  scan_dispatch_size_.y = divide_ceil_u(extent.y, SHADOW_DEPTH_SCAN_GROUP_SIZE);
+  scan_dispatch_size_.z = 1;
+
   DRW_view_set_active(view);
 
   float4x4 wininv;
   DRW_view_winmat_get(view, wininv.values, true);
 
-  float min_dim = float(min_ii(extent.x, extent.y));
-  float3 p0 = float3(-1.0f, -1.0f, 0.0f);
-  float3 p1 = float3(min_dim / extent.x, min_dim / extent.y, 0.0f) * 2.0f - 1.0f;
-  mul_project_m4_v3(wininv.values, p0);
-  mul_project_m4_v3(wininv.values, p1);
-  /* Compute radius at unit plane from the camera. */
-  if (DRW_view_is_persp_get(view)) {
-    p0 = p0 / p0.z;
-    p1 = p1 / p1.z;
+  {
+    /* Compute approximate screen pixel density (as world space radius). */
+    float min_dim = float(min_ii(extent.x, extent.y));
+    float3 p0 = float3(-1.0f, -1.0f, 0.0f);
+    float3 p1 = float3(
+        (min_dim / extent.x) * 2.0f - 1.0f, (min_dim / extent.y) * 2.0f - 1.0f, 0.0f);
+    mul_project_m4_v3(wininv.values, p0);
+    mul_project_m4_v3(wininv.values, p1);
+    /* Compute radius at unit plane from the camera. */
+    if (DRW_view_is_persp_get(view)) {
+      p0 = p0 / p0.z;
+      p1 = p1 / p1.z;
+    }
+    screen_pixel_radius_inv_ = min_dim / float3::distance(p0, p1);
   }
-  screen_pixel_radius_inv_ = min_dim / float3::distance(p0, p1);
 
-#ifdef DEBUG
+#ifdef SHADOW_DEBUG_FREEZE_CAMERA
   static bool valid = false;
   static float4x4 viewmat_freezed;
   if (G.debug_value < 4 || !valid) {
@@ -959,21 +1002,28 @@ void ShadowModule::update_visible(const DRWView *view, const ivec2 extent)
 
   DRW_stats_group_start("ShadowUpdate");
   {
-    if (do_tilemap_setup_) {
-      do_tilemap_setup_ = false;
-      DRW_draw_pass(tilemap_setup_ps_);
-    }
-    DRW_draw_pass(tilemap_visibility_ps_);
-    DRW_draw_pass(tilemap_usage_tag_ps_);
-    DRW_draw_pass(tilemap_update_tag_ps_);
-
     if (do_page_init_) {
-#ifndef SHADOW_NO_CACHING
+#ifndef SHADOW_DEBUG_NO_CACHING
       do_page_init_ = false;
 #endif
       DRW_draw_pass(page_init_ps_);
     }
-    DRW_draw_pass(page_free_ps_);
+    if (do_tilemap_setup_) {
+      do_tilemap_setup_ = false;
+      /* Free pages not used in the previous frame. */
+      DRW_draw_pass(page_free_ps_);
+      DRW_draw_pass(tilemap_setup_ps_);
+      DRW_draw_pass(tilemap_update_tag_ps_);
+    }
+    if (do_process_view) {
+      DRW_draw_pass(tilemap_visibility_ps_);
+      DRW_draw_pass(tilemap_usage_tag_ps_);
+    }
+#ifndef SHADOW_DEBUG_NO_DEPTH_SCAN
+    if (input_depth_tx_ != nullptr) {
+      DRW_draw_pass(tilemap_depth_scan_ps_);
+    }
+#endif
     DRW_draw_pass(page_alloc_ps_);
   }
   DRW_stats_group_end();

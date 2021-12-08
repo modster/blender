@@ -67,7 +67,7 @@ void Instance::hair_sync(Object *ob, ObjectHandle &ob_handle, ModifierData *modi
   // shading_passes.velocity.gpencil_add(ob, ob_handle);
 
   bool is_caster = material.shadow.shgrp != nullptr;
-  bool is_alpha_blend = true; /* TODO material.is_alpha_blend. */
+  bool is_alpha_blend = material.is_alpha_blend_transparent;
   shadows.sync_object(ob, ob_handle, is_caster, is_alpha_blend);
 }
 

@@ -123,6 +123,8 @@ void shadow_tile_store(
  * a function. */
 #define shadow_tile_set_flag(tilemaps_img, tile_co, lod, tilemap_index, flag) \
   imageAtomicOr(tilemaps_img, shadow_tile_coord_in_atlas(tile_co, tilemap_index, lod), flag)
+#define shadow_tile_unset_flag(tilemaps_img, tile_co, lod, tilemap_index, flag) \
+  imageAtomicAnd(tilemaps_img, shadow_tile_coord_in_atlas(tile_co, tilemap_index, lod), ~(flag))
 
 ShadowTileData shadow_tile_load(restrict uimage2D tilemaps_img,
                                 ivec2 tile_co,

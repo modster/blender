@@ -465,12 +465,15 @@ class ShadowModule {
   /* NOTE(fclem): Until we implement depth buffer scanning, we rely solely on this to tag
    * needed tiles. */
   DRWPass *tilemap_usage_tag_ps_;
+  /** Use depth buffer to tag needed shadow pages. */
+  DRWPass *tilemap_depth_scan_ps_;
 
   /** List of AABBs for tagging passes. */
   DRWCallBuffer *casters_updated_;
   DRWCallBuffer *receivers_non_opaque_;
 
   bool do_tilemap_setup_ = true;
+  const DRWView *last_processed_view = nullptr;
   float tilemap_pixel_radius_;
   float screen_pixel_radius_inv_;
 
@@ -482,10 +485,12 @@ class ShadowModule {
 
   eevee::Texture atlas_tx_ = Texture("shadow_atlas_tx_");
 
-  /** Contains mapping from pages to pixel inside the tilemap. As well a some some other flags. */
+  /** Contains mapping from pages to pixel inside the tilemap. */
   ShadowPageHeapBuf pages_data_;
   /** Pool of unallocated pages waiting to be assigned to specific tiles in the tilemap atlas. */
   ShadowPageHeapBuf pages_free_data_;
+  /** Infos for book keeping and debug. */
+  ShadowPagesInfoDataBuf pages_infos_data_;
 
   /** Page buffer clear. This is only done if shadow atlas is reallocated. */
   DRWPass *page_init_ps_;
@@ -500,6 +505,7 @@ class ShadowModule {
 
   bool do_page_init_ = true;
   int3 copy_dispatch_size_;
+  int3 scan_dispatch_size_;
   int rendering_tilemap_;
   int rendering_lod_;
 
@@ -553,7 +559,7 @@ class ShadowModule {
                    bool is_alpha_blend);
   void end_sync(void);
 
-  void update_visible(const DRWView *view, const ivec2 extent);
+  void set_view(const DRWView *view, GPUTexture *depth_tx);
 
   void debug_end_sync(void);
   void debug_draw(GPUFrameBuffer *view_fb, HiZBuffer &hiz);

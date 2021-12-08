@@ -277,6 +277,10 @@ Material &MaterialModule::material_sync(::Material *blender_mat, eMaterialGeomet
     mat.prepass = material_pass_get(blender_mat, prepass_pipe, geometry_type);
     mat.shading = material_pass_get(blender_mat, surface_pipe, geometry_type);
     mat.shadow = material_pass_get(blender_mat, MAT_PIPE_SHADOW, geometry_type);
+
+    mat.is_alpha_blend_transparent = (blender_mat->blend_method == MA_BM_BLEND) &&
+                                     GPU_material_flag_get(mat.prepass.gpumat,
+                                                           GPU_MATFLAG_TRANSPARENT);
   }
   return mat;
 }

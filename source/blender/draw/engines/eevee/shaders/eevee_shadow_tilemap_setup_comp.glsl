@@ -16,6 +16,11 @@ layout(std430, binding = 0) readonly buffer tilemaps_buf
   ShadowTileMapData tilemaps[];
 };
 
+layout(std430, binding = 3) restrict buffer pages_infos_buf
+{
+  ShadowPagesInfoData infos;
+};
+
 layout(r32ui) restrict uniform uimage2D tilemaps_img;
 
 void main()
@@ -34,7 +39,7 @@ void main()
   tile_data.is_used = false;
   tile_data.do_update = false;
   tile_data.lod = 0;
-#ifdef SHADOW_NO_CACHING
+#ifdef SHADOW_DEBUG_NO_CACHING
   tile_data.page = uvec2(0);
   tile_data.is_allocated = false;
 #endif
@@ -66,12 +71,18 @@ void main()
         tile_data.is_used = false;
         tile_data.do_update = do_update;
         tile_data.lod = 0;
-#ifdef SHADOW_NO_CACHING
+#ifdef SHADOW_DEBUG_NO_CACHING
         tile_data.page = uvec2(0);
         tile_data.is_allocated = false;
 #endif
         imageStore(tilemaps_img, texel, uvec4(shadow_tile_data_pack(tile_data)));
       }
     }
+  }
+
+  if (gl_GlobalInvocationID == uvec3(0)) {
+    infos.page_free_next = max(-1, infos.page_free_next);
+    infos.page_free_next_prev = infos.page_free_next;
+    infos.page_updated_count = 0;
   }
 }

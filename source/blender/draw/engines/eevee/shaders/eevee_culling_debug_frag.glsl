@@ -45,7 +45,8 @@ void main(void)
 
   float lights_count = 0.0;
   uint lights_cull = 0u;
-  ITEM_FOREACH_BEGIN (light_culling, lights_zbins, lights_culling_words, vP_z, l_idx) {
+  ITEM_FOREACH_BEGIN (
+      light_culling, lights_zbins, lights_culling_words, gl_FragCoord.xy, vP_z, l_idx) {
     LightData light = lights[l_idx];
     lights_cull |= 1u << l_idx;
     lights_count += 1.0;
