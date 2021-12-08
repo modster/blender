@@ -45,6 +45,7 @@ struct PartialImageUpdater {
     free();
   }
 
+ private:
   /**
    * \brief check if the partial update user can still be used for the given image.
    *

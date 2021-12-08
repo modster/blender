@@ -59,7 +59,7 @@ struct IMAGE_InstanceData {
     bool do_tile_drawing : 1;
   } flags;
 
-  IMAGE_TextureInfo texture_infos[SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN];
+  TextureInfo texture_infos[SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN];
 
   /**
    * \brief Maximum uv's that are on the border of the image.
@@ -90,7 +90,7 @@ struct IMAGE_InstanceData {
   void update_gpu_texture_allocations()
   {
     for (int i = 0; i < SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN; i++) {
-      IMAGE_TextureInfo &info = texture_infos[i];
+      TextureInfo &info = texture_infos[i];
       const bool is_allocated = info.texture != nullptr;
       const bool is_visible = info.visible;
       const bool should_be_freed = !is_visible && is_allocated;
@@ -112,7 +112,7 @@ struct IMAGE_InstanceData {
   void update_batches()
   {
     for (int i = 0; i < SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN; i++) {
-      IMAGE_TextureInfo &info = texture_infos[i];
+      TextureInfo &info = texture_infos[i];
       if (!info.dirty) {
         continue;
       }

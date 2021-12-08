@@ -22,26 +22,25 @@
 
 #pragma once
 
+#include "BKE_image_partial_update.hh"
+
+#include "IMB_imbuf_types.h"
+
 #include "image_batches.hh"
 #include "image_private.hh"
 #include "image_wrappers.hh"
-
-#include "BKE_image_partial_update.hh"
 
 namespace blender::draw::image_engine {
 
 constexpr float EPSILON_UV_BOUNDS = 0.00001f;
 
 /**
- * \brief Accessor to texture slots.
- *
- * Texture slots info is stored in IMAGE_PrivateData. The GPUTextures are stored in
- * IMAGE_TextureList. This class simplifies accessing texture slots by providing
+ * \brief Screen space method using a single texture spawning the whole screen.
  */
-struct InstanceDataAccessor {
+struct OneTextureMethod {
   IMAGE_InstanceData *instance_data;
 
-  InstanceDataAccessor(IMAGE_InstanceData *instance_data) : instance_data(instance_data)
+  OneTextureMethod(IMAGE_InstanceData *instance_data) : instance_data(instance_data)
   {
   }
 
@@ -89,7 +88,7 @@ struct InstanceDataAccessor {
     }
   }
 
-  void update_uv_to_texture_matrix(IMAGE_TextureInfo *info)
+  void update_uv_to_texture_matrix(TextureInfo *info)
   {
     // TODO: I remember that there was a function for this somewhere.
     unit_m4(info->uv_to_texture);
@@ -107,7 +106,7 @@ struct InstanceDataAccessor {
 
 using namespace blender::bke::image::partial_update;
 
-class ScreenSpaceDrawingMode : public AbstractDrawingMode {
+template<typename TextureMethod> class ScreenSpaceDrawingMode : public AbstractDrawingMode {
  private:
   DRWPass *create_image_pass() const
   {
@@ -133,7 +132,7 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
     float image_mat[4][4];
     unit_m4(image_mat);
     for (int i = 0; i < SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN; i++) {
-      const IMAGE_TextureInfo &info = instance_data->texture_infos[i];
+      const TextureInfo &info = instance_data->texture_infos[i];
       if (!info.visible) {
         continue;
       }
@@ -195,7 +194,7 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
       const float tile_height = static_cast<float>(iterator.tile_data.tile_buffer->y);
 
       for (int i = 0; i < SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN; i++) {
-        const IMAGE_TextureInfo &info = instance_data.texture_infos[i];
+        const TextureInfo &info = instance_data.texture_infos[i];
         /* Dirty images will receive a full update. No need to do a partial one now. */
         if (info.dirty) {
           continue;
@@ -300,7 +299,7 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
                                          const ImageUser *image_user) const
   {
     for (int i = 0; i < SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN; i++) {
-      IMAGE_TextureInfo &info = instance_data.texture_infos[i];
+      TextureInfo &info = instance_data.texture_infos[i];
       if (!info.dirty) {
         continue;
       }
@@ -311,7 +310,7 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
     }
   }
 
-  void do_full_update_gpu_texture(IMAGE_TextureInfo &info,
+  void do_full_update_gpu_texture(TextureInfo &info,
                                   IMAGE_InstanceData &instance_data,
                                   const ImageUser *image_user) const
   {
@@ -340,9 +339,6 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
 
   /**
    * \brief Ensure that the float buffer of the given image buffer is available.
-   *
-   * TODO: Should we add a ImageBufferAccessor for cleaner access.
-   * (`image_buffer.ensure_float_buffer()`)
    */
   void ensure_float_buffer(ImBuf &image_buffer) const
   {
@@ -352,7 +348,7 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
   }
 
   void do_full_update_texture_slot(const IMAGE_InstanceData &instance_data,
-                                   const IMAGE_TextureInfo &texture_info,
+                                   const TextureInfo &texture_info,
                                    ImBuf &texture_buffer,
                                    ImBuf &tile_buffer,
                                    const ImageTileWrapper &image_tile) const
@@ -412,7 +408,7 @@ class ScreenSpaceDrawingMode : public AbstractDrawingMode {
   {
     const DRWContextState *draw_ctx = DRW_context_state_get();
     IMAGE_InstanceData *instance_data = vedata->instance_data;
-    InstanceDataAccessor pda(instance_data);
+    TextureMethod pda(instance_data);
 
     instance_data->partial_update.ensure_image(image);
     instance_data->max_uv_update();

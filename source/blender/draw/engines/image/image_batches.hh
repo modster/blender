@@ -26,14 +26,14 @@
 
 /** \brief Create GPUBatch for a IMAGE_ScreenSpaceTextureInfo. */
 class BatchUpdater {
-  IMAGE_TextureInfo &info;
+  TextureInfo &info;
 
   GPUVertFormat format = {0};
   int pos_id;
   int uv_id;
 
  public:
-  BatchUpdater(IMAGE_TextureInfo &info) : info(info)
+  BatchUpdater(TextureInfo &info) : info(info)
   {
   }
 

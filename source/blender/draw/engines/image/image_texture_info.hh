@@ -27,7 +27,7 @@
 #include "GPU_batch.h"
 #include "GPU_texture.h"
 
-struct IMAGE_TextureInfo {
+struct TextureInfo {
   /**
    * \brief Is the texture clipped.
    *
@@ -63,7 +63,7 @@ struct IMAGE_TextureInfo {
    */
   GPUTexture *texture;
 
-  ~IMAGE_TextureInfo()
+  ~TextureInfo()
   {
     if (batch != nullptr) {
       GPU_batch_discard(batch);

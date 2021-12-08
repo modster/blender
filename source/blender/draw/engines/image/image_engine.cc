@@ -41,7 +41,7 @@
 
 #include "GPU_batch.h"
 
-#include "image_drawing_mode_one_texture.hh"
+#include "image_drawing_mode.hh"
 #include "image_engine.h"
 #include "image_private.hh"
 #include "image_space_image.hh"
@@ -68,7 +68,7 @@ template<
      *
      * Useful during development to switch between drawing implementations.
      */
-    typename DrawingMode = ScreenSpaceDrawingMode>
+    typename DrawingMode = ScreenSpaceDrawingMode<OneTextureMethod>>
 class ImageEngine {
  private:
   const DRWContextState *draw_ctx;
