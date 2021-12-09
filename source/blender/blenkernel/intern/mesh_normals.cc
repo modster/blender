@@ -361,7 +361,7 @@ void BKE_mesh_assert_normals_dirty_or_calculated(const Mesh *mesh)
     BLI_assert(CustomData_has_layer(&mesh->vdata, CD_NORMAL));
   }
   if (!(mesh->runtime.cd_dirty_poly & CD_MASK_NORMAL)) {
-    BLI_assert(CustomData_has_layer(&mesh->vdata, CD_NORMAL));
+    BLI_assert(CustomData_has_layer(&mesh->pdata, CD_NORMAL));
   }
 }
 
