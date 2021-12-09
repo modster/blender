@@ -52,6 +52,9 @@ vec3 debug_random_color(int v)
 
 vec3 debug_tile_state_color(ShadowTileData tile)
 {
+  if (tile.is_error) {
+    return vec3(1, 0, 1);
+  }
   if (tile.lod > 0) {
     return vec3(1, 0.5, 0) * float(tile.lod) / float(SHADOW_TILEMAP_LOD);
   }
@@ -187,7 +190,15 @@ void debug_page_allocation(void)
   if (in_range_inclusive(page, ivec2(0), ivec2(SHADOW_PAGE_PER_ROW - 1))) {
     uint page_index = shadow_page_to_index(page);
     if (pages[page_index] != SHADOW_PAGE_NO_DATA) {
-      out_color_add = vec4(1, 1, 1, 0);
+      ShadowPageData page = shadow_page_data_unpack(pages[page_index]);
+      ShadowTileData tile = shadow_tile_data_unpack(texelFetch(tilemaps_tx, page.tile, 0).x);
+      if (tile.is_allocated) {
+        out_color_add = vec4(1, 1, 1, 0);
+      }
+      else {
+        /* There is an error. Page points to a tile that isn't its owner. */
+        out_color_add = vec4(1, 0, 0, 0);
+      }
     }
     else {
       out_color_add = vec4(0, 0, 0, 0);

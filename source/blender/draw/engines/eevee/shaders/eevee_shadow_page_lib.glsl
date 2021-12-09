@@ -24,7 +24,7 @@ ShadowPageData shadow_page_data_unpack(ShadowPagePacked data)
 {
   ShadowPageData page;
   page.tile.x = data & 0xFFF;
-  page.tile.y = (data >> 16) & 0xFFF;
+  page.tile.y = (data >> 12) & 0xFFF;
   return page;
 }
 

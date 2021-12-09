@@ -122,6 +122,7 @@ extern char datatoc_eevee_shadow_page_init_comp_glsl[];
 extern char datatoc_eevee_shadow_page_lib_glsl[];
 extern char datatoc_eevee_shadow_page_mark_vert_glsl[];
 extern char datatoc_eevee_shadow_tilemap_depth_scan_comp_glsl[];
+extern char datatoc_eevee_shadow_tilemap_lod_mask_comp_glsl[];
 extern char datatoc_eevee_shadow_tilemap_lib_glsl[];
 extern char datatoc_eevee_shadow_tilemap_setup_comp_glsl[];
 extern char datatoc_eevee_shadow_tilemap_tag_comp_glsl[];
@@ -401,6 +402,7 @@ ShaderModule::ShaderModule()
   SHADER_COMPUTE(SHADOW_PAGE_INIT, eevee_shadow_page_init_comp, nullptr);
   SHADER(SHADOW_PAGE_MARK, eevee_shadow_page_mark_vert, nullptr, eevee_depth_clear_frag, nullptr);
   SHADER_COMPUTE(SHADOW_TILE_DEPTH_SCAN, eevee_shadow_tilemap_depth_scan_comp, nullptr);
+  SHADER_COMPUTE(SHADOW_TILE_LOD_MASK, eevee_shadow_tilemap_lod_mask_comp, nullptr);
   SHADER_COMPUTE(SHADOW_TILE_SETUP, eevee_shadow_tilemap_setup_comp, nullptr);
   SHADER_COMPUTE(SHADOW_TILE_TAG_UPDATE, eevee_shadow_tilemap_tag_comp, "#define TAG_UPDATE\n");
   SHADER_COMPUTE(SHADOW_TILE_TAG_USAGE, eevee_shadow_tilemap_tag_comp, "#define TAG_USAGE\n");

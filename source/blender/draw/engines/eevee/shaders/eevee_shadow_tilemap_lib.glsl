@@ -21,9 +21,11 @@ struct ShadowTileData {
   bool is_allocated;
   /** True if an update is needed. */
   bool do_update;
+  bool is_error;
 };
 
 #define SHADOW_TILE_NO_DATA 0u
+#define SHADOW_TILE_IS_ERROR (1u << 27u)
 #define SHADOW_TILE_IS_ALLOCATED (1u << 28u)
 #define SHADOW_TILE_DO_UPDATE (1u << 29u)
 #define SHADOW_TILE_IS_VISIBLE (1u << 30u)
@@ -38,6 +40,7 @@ ShadowTileData shadow_tile_data_unpack(uint data)
   tile.is_visible = flag_test(data, SHADOW_TILE_IS_VISIBLE);
   tile.is_used = flag_test(data, SHADOW_TILE_IS_USED);
   tile.is_allocated = flag_test(data, SHADOW_TILE_IS_ALLOCATED);
+  tile.is_error = flag_test(data, SHADOW_TILE_IS_ERROR);
   tile.do_update = flag_test(data, SHADOW_TILE_DO_UPDATE);
   return tile;
 }
@@ -51,6 +54,7 @@ uint shadow_tile_data_pack(ShadowTileData tile)
   set_flag_from_test(data, tile.is_visible, SHADOW_TILE_IS_VISIBLE);
   set_flag_from_test(data, tile.is_used, SHADOW_TILE_IS_USED);
   set_flag_from_test(data, tile.is_allocated, SHADOW_TILE_IS_ALLOCATED);
+  set_flag_from_test(data, tile.is_error, SHADOW_TILE_IS_ERROR);
   set_flag_from_test(data, tile.do_update, SHADOW_TILE_DO_UPDATE);
   return data;
 }

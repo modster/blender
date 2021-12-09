@@ -467,6 +467,8 @@ class ShadowModule {
   DRWPass *tilemap_usage_tag_ps_;
   /** Use depth buffer to tag needed shadow pages. */
   DRWPass *tilemap_depth_scan_ps_;
+  /** Discard pages that are redundant in the mipmap chain. */
+  DRWPass *tilemap_lod_mask_ps_;
 
   /** List of AABBs for tagging passes. */
   DRWCallBuffer *casters_updated_;

@@ -707,6 +707,7 @@ void ShadowModule::end_sync(void)
     GPUShader *sh = inst_.shaders.static_shader_get(SHADOW_TILE_SETUP);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, tilemap_setup_ps_);
     DRW_shgroup_vertex_buffer(grp, "pages_infos_buf", pages_infos_data_);
+    DRW_shgroup_vertex_buffer(grp, "pages_buf", pages_data_);
     DRW_shgroup_vertex_buffer(grp, "tilemaps_buf", tilemap_allocator.tilemaps_data);
     DRW_shgroup_uniform_image(grp, "tilemaps_img", tilemap_allocator.tilemap_tx);
     int64_t tilemaps_updated_len = tilemaps_len + tilemap_allocator.deleted_maps_len;
@@ -781,6 +782,18 @@ void ShadowModule::end_sync(void)
     if (tilemaps_len > 0 && aabb_len > 0) {
       uint group_len = divide_ceil_u(aabb_len, SHADOW_AABB_TAG_GROUP_SIZE);
       DRW_shgroup_call_compute(grp, group_len, 1, tilemaps_len);
+      DRW_shgroup_barrier(grp, GPU_BARRIER_SHADER_IMAGE_ACCESS);
+    }
+  }
+  {
+    tilemap_lod_mask_ps_ = DRW_pass_create("ShadowLodMaskTag", (DRWState)0);
+
+    GPUShader *sh = inst_.shaders.static_shader_get(SHADOW_TILE_LOD_MASK);
+    DRWShadingGroup *grp = DRW_shgroup_create(sh, tilemap_lod_mask_ps_);
+    DRW_shgroup_vertex_buffer(grp, "tilemaps_buf", tilemap_allocator.tilemaps_data);
+    DRW_shgroup_uniform_image(grp, "tilemaps_img", tilemap_allocator.tilemap_tx);
+    if (tilemaps_len > 0) {
+      DRW_shgroup_call_compute(grp, 1, 1, tilemaps_len);
       DRW_shgroup_barrier(grp, GPU_BARRIER_SHADER_IMAGE_ACCESS);
     }
   }
@@ -1002,16 +1015,14 @@ void ShadowModule::set_view(const DRWView *view, GPUTexture *depth_tx)
 
   DRW_stats_group_start("ShadowUpdate");
   {
-    if (do_page_init_) {
-#ifndef SHADOW_DEBUG_NO_CACHING
-      do_page_init_ = false;
-#endif
-      DRW_draw_pass(page_init_ps_);
-    }
     if (do_tilemap_setup_) {
+      if (do_page_init_) {
+#ifndef SHADOW_DEBUG_NO_CACHING
+        do_page_init_ = false;
+#endif
+        DRW_draw_pass(page_init_ps_);
+      }
       do_tilemap_setup_ = false;
-      /* Free pages not used in the previous frame. */
-      DRW_draw_pass(page_free_ps_);
       DRW_draw_pass(tilemap_setup_ps_);
       DRW_draw_pass(tilemap_update_tag_ps_);
     }
@@ -1024,6 +1035,8 @@ void ShadowModule::set_view(const DRWView *view, GPUTexture *depth_tx)
       DRW_draw_pass(tilemap_depth_scan_ps_);
     }
 #endif
+    DRW_draw_pass(tilemap_lod_mask_ps_);
+    DRW_draw_pass(page_free_ps_);
     DRW_draw_pass(page_alloc_ps_);
   }
   DRW_stats_group_end();

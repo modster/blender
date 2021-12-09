@@ -7,6 +7,7 @@
 
 #pragma BLENDER_REQUIRE(common_math_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_shader_shared.hh)
+#pragma BLENDER_REQUIRE(eevee_shadow_page_lib.glsl)
 #pragma BLENDER_REQUIRE(eevee_shadow_tilemap_lib.glsl)
 
 layout(local_size_x = SHADOW_TILEMAP_RES, local_size_y = SHADOW_TILEMAP_RES) in;
@@ -14,6 +15,11 @@ layout(local_size_x = SHADOW_TILEMAP_RES, local_size_y = SHADOW_TILEMAP_RES) in;
 layout(std430, binding = 0) readonly buffer tilemaps_buf
 {
   ShadowTileMapData tilemaps[];
+};
+
+layout(std430, binding = 2) restrict writeonly buffer pages_buf
+{
+  ShadowPagePacked pages[];
 };
 
 layout(std430, binding = 3) restrict buffer pages_infos_buf
@@ -33,7 +39,8 @@ void main()
    * This way the tile can even be reused if it is needed. Also avoid negative modulo. */
   ivec2 tile_wrapped = (tile_shifted + SHADOW_TILEMAP_RES) % SHADOW_TILEMAP_RES;
 
-  ShadowTileData tile_data = shadow_tile_load(tilemaps_img, tile_wrapped, 0, tilemap.index);
+  ivec2 texel = shadow_tile_coord_in_atlas(tile_wrapped, tilemap.index, 0);
+  ShadowTileData tile_data = shadow_tile_data_unpack(imageLoad(tilemaps_img, texel).x);
   /* Reset all flags but keep the allocated page. */
   tile_data.is_visible = false;
   tile_data.is_used = false;
@@ -47,6 +54,13 @@ void main()
   if (!in_range_inclusive(tile_shifted, ivec2(0), ivec2(SHADOW_TILEMAP_RES - 1))) {
     /* This tile was shifted in. */
     tile_data.do_update = true;
+  }
+
+  if (tilemap.grid_shift.x != 0) {
+    /* Update page location after shift. */
+    ShadowPageData page;
+    page.tile = texel;
+    pages[shadow_page_to_index(tile_data.page)] = shadow_page_data_pack(page);
   }
 
   shadow_tile_store(tilemaps_img, tile_co, tilemap.index, tile_data);

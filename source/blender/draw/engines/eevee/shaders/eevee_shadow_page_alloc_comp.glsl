@@ -51,58 +51,14 @@ void main()
   int tilemap_idx = tilemap_data.index;
   int lod_max = tilemap_data.is_cubeface ? SHADOW_TILEMAP_LOD : 0;
 
-  /* Bitmap of usage tests. Use one uint per tile. One bit per lod level. */
-  shared uint lod_map[SHADOW_TILEMAP_RES * SHADOW_TILEMAP_RES];
-
-  /* For now there is nothing to do for directional shadows. */
-  if (tilemap_data.is_cubeface) {
-    ivec2 tile_co = ivec2(gl_GlobalInvocationID.xy);
-
-    lod_map[SHADOW_TILEMAP_RES * tile_co.y + tile_co.x] = 0u;
-
-    int map_index = tile_co.y * SHADOW_TILEMAP_RES + tile_co.x;
-    for (int lod = 0; lod <= lod_max; lod++) {
-      ivec2 tile_co_lod = ivec2(gl_GlobalInvocationID.xy) >> lod;
-      ShadowTileData tile = shadow_tile_load(tilemaps_img, tile_co_lod, lod, tilemap_idx);
-
-      if (tile.is_used && tile.is_visible) {
-        lod_map[map_index] |= 1u << uint(lod);
-      }
-    }
-
-    barrier();
-
-    /* We mask tiles from lower LOD that are completely covered by the lods above it. */
-    for (int lod = 1; lod <= SHADOW_TILEMAP_LOD; lod++) {
-      uint stride = 1u << uint(lod);
-      if ((gl_GlobalInvocationID.xy % stride) != uvec2(0)) {
-        continue;
-      }
-      uint lod_mask = ~(~0x0u << uint(lod));
-      bool tiles_covered = true;
-      for (int x = 0; x < stride && tiles_covered; x++) {
-        for (int y = 0; y < stride && tiles_covered; y++) {
-          ivec2 tile_co = ivec2(gl_GlobalInvocationID.xy) + ivec2(x, y);
-          uint lod_bits = lod_map[tile_co.y * SHADOW_TILEMAP_RES + tile_co.x];
-          if ((lod_bits & lod_mask) == 0u) {
-            tiles_covered = false;
-          }
-        }
-      }
-      if (tiles_covered) {
-        ivec2 tile_co = ivec2(gl_GlobalInvocationID.xy >> uint(lod));
-        shadow_tile_unset_flag(tilemaps_img, tile_co, lod, tilemap_idx, SHADOW_TILE_IS_USED);
-      }
-    }
-
-    barrier();
-  }
+  /* Used to broadcast the first valid page to all LOD 0 tiles covered by a LOD > 0 page. */
+  shared uint page_map[(SHADOW_TILEMAP_RES / 2) * (SHADOW_TILEMAP_RES / 2)];
 
   int lod_valid = -1;
   uvec2 page_valid;
   for (int lod = lod_max; lod >= 0; lod--) {
     ivec2 tile_co = ivec2(gl_GlobalInvocationID.xy) >> lod;
-    int tile_index = SHADOW_TILEMAP_RES * tile_co.y + tile_co.x;
+    int tile_index = (SHADOW_TILEMAP_RES / 2) * tile_co.y + tile_co.x;
     uint stride = 1u << lod;
     /* We load the same data for each thread covering the same LOD tile, but we avoid
      * allocating the same tile twice. This is because we need uniform control flow for the
@@ -123,9 +79,16 @@ void main()
           int page_index = pages_free[free_index];
           pages[page_index] = shadow_page_data_pack(page);
 
+          pages_free[free_index] = -1;
+
           tile.page = shadow_page_from_index(page_index);
           tile.do_update = true;
           tile.is_allocated = true;
+
+          if (page_index == -1) {
+            tile.is_error = true;
+            tile.is_allocated = false;
+          }
 
           imageStore(tilemaps_img, texel, uvec4(shadow_tile_data_pack(tile)));
         }
@@ -133,12 +96,15 @@ void main()
           /* Well, hum ... you blew up your budget! */
         }
       }
-      /* Use shared variable to broadcast the page. */
-      if (tile.is_allocated) {
-        lod_map[tile_index] = shadow_page_to_index(tile.page);
-      }
-      else {
-        lod_map[tile_index] = uint(-1);
+
+      if (lod > 0) {
+        /* Use shared variable to broadcast the page. */
+        if (tile.is_allocated) {
+          page_map[tile_index] = shadow_page_to_index(tile.page);
+        }
+        else {
+          page_map[tile_index] = uint(-1);
+        }
       }
     }
 
@@ -146,9 +112,9 @@ void main()
 
     if (lod > 0) {
       /* Save highest quality valid lod for this thread. */
-      if (lod_map[tile_index] != uint(-1)) {
+      if (page_map[tile_index] != uint(-1)) {
         lod_valid = lod;
-        page_valid = shadow_page_from_index(int(lod_map[tile_index]));
+        page_valid = shadow_page_from_index(int(page_map[tile_index]));
       }
     }
     else if (tile.is_allocated == false && lod_valid != -1) {
