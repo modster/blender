@@ -710,12 +710,6 @@ static int customdata_compare(
   return 0;
 }
 
-/**
- * Used for unit testing; compares two meshes, checking only
- * differences we care about.  should be usable with leaf's
- * testing framework I get RNA work done, will use hackish
- * testing code for now.
- */
 const char *BKE_mesh_cmp(Mesh *me1, Mesh *me2, float thresh)
 {
   int c;
@@ -916,10 +910,6 @@ bool BKE_mesh_has_custom_loop_normals(Mesh *me)
   return CustomData_has_layer(&me->ldata, CD_CUSTOMLOOPNORMAL);
 }
 
-/**
- * Free (or release) any data used by this mesh (does not free the mesh itself).
- * Only use for undo, in most cases `BKE_id_free(nullptr, me)` should be used.
- */
 void BKE_mesh_free_data_for_undo(Mesh *me)
 {
   mesh_free_data(&me->id);
@@ -1034,10 +1024,6 @@ Mesh *BKE_mesh_new_nomain(
   return mesh;
 }
 
-/**
- * Copy user editable settings that we want to preserve
- * when a new mesh is based on an existing mesh.
- */
 void BKE_mesh_copy_parameters(Mesh *me_dst, const Mesh *me_src)
 {
   /* Copy general settings. */
@@ -1060,12 +1046,6 @@ void BKE_mesh_copy_parameters(Mesh *me_dst, const Mesh *me_src)
   me_dst->vertex_group_active_index = me_src->vertex_group_active_index;
 }
 
-/**
- * A version of #BKE_mesh_copy_parameters that is intended for evaluated output
- * (the modifier stack for example).
- *
- * \warning User counts are not handled for ID's.
- */
 void BKE_mesh_copy_parameters_for_eval(Mesh *me_dst, const Mesh *me_src)
 {
   /* User counts aren't handled, don't copy into a mesh from #G_MAIN. */
@@ -1371,10 +1351,6 @@ void BKE_mesh_orco_ensure(Object *ob, Mesh *mesh)
   CustomData_add_layer(&mesh->vdata, CD_ORCO, CD_ASSIGN, orcodata, mesh->totvert);
 }
 
-/**
- * Rotates the vertices of a face in case v[2] or v[3] (vertex index) is = 0.
- * this is necessary to make the if #MFace.v4 check for quads work.
- */
 int BKE_mesh_mface_index_validate(MFace *mface, CustomData *fdata, int mfindex, int nr)
 {
   /* first test if the face is legal */
@@ -1578,10 +1554,6 @@ void BKE_mesh_smooth_flag_set(Mesh *me, const bool use_smooth)
   }
 }
 
-/**
- * Find the index of the loop in 'poly' which references vertex,
- * returns -1 if not found
- */
 int poly_find_loop_from_vert(const MPoly *poly, const MLoop *loopstart, uint vert)
 {
   for (int j = 0; j < poly->totloop; j++, loopstart++) {
@@ -1593,11 +1565,6 @@ int poly_find_loop_from_vert(const MPoly *poly, const MLoop *loopstart, uint ver
   return -1;
 }
 
-/**
- * Fill \a r_adj with the loop indices in \a poly adjacent to the
- * vertex. Returns the index of the loop matching vertex, or -1 if the
- * vertex is not in \a poly
- */
 int poly_get_adj_loops_from_vert(const MPoly *poly, const MLoop *mloop, uint vert, uint r_adj[2])
 {
   int corner = poly_find_loop_from_vert(poly, &mloop[poly->loopstart], vert);
@@ -1611,10 +1578,6 @@ int poly_get_adj_loops_from_vert(const MPoly *poly, const MLoop *mloop, uint ver
   return corner;
 }
 
-/**
- * Return the index of the edge vert that is not equal to \a v. If
- * neither edge vertex is equal to \a v, returns -1.
- */
 int BKE_mesh_edge_other_vert(const MEdge *e, int v)
 {
   if (e->v1 == v) {
@@ -1627,9 +1590,6 @@ int BKE_mesh_edge_other_vert(const MEdge *e, int v)
   return -1;
 }
 
-/**
- * Sets each output array element to the edge index if it is a real edge, or -1.
- */
 void BKE_mesh_looptri_get_real_edges(const Mesh *mesh, const MLoopTri *looptri, int r_edges[3])
 {
   for (int i = 2, i_next = 0; i_next < 3; i = i_next++) {
@@ -1642,7 +1602,6 @@ void BKE_mesh_looptri_get_real_edges(const Mesh *mesh, const MLoopTri *looptri, 
   }
 }
 
-/* basic vertex data functions */
 bool BKE_mesh_minmax(const Mesh *me, float r_min[3], float r_max[3])
 {
   int i = me->totvert;
@@ -1824,9 +1783,6 @@ void BKE_mesh_mselect_validate(Mesh *me)
   me->mselect = mselect_dst;
 }
 
-/**
- * Return the index within me->mselect, or -1
- */
 int BKE_mesh_mselect_find(Mesh *me, int index, int type)
 {
   BLI_assert(ELEM(type, ME_VSEL, ME_ESEL, ME_FSEL));
@@ -1840,9 +1796,6 @@ int BKE_mesh_mselect_find(Mesh *me, int index, int type)
   return -1;
 }
 
-/**
- * Return The index of the active element.
- */
 int BKE_mesh_mselect_active_get(Mesh *me, int type)
 {
   BLI_assert(ELEM(type, ME_VSEL, ME_ESEL, ME_FSEL));
@@ -1931,13 +1884,6 @@ void BKE_mesh_vert_coords_apply_with_mat4(Mesh *mesh,
   BKE_mesh_normals_tag_dirty(mesh);
 }
 
-/**
- * Compute 'split' (aka loop, or per face corner's) normals.
- *
- * \param r_lnors_spacearr: Allows to get computed loop normal space array.
- * That data, among other things, contains 'smooth fan' info, useful e.g.
- * to split geometry along sharp edges...
- */
 void BKE_mesh_calc_normals_split_ex(Mesh *mesh, MLoopNorSpaceArray *r_lnors_spacearr)
 {
   float(*r_loopnors)[3];
@@ -2188,12 +2134,6 @@ static void split_faces_split_new_edges(Mesh *mesh,
   }
 }
 
-/* Split faces based on the edge angle and loop normals.
- * Matches behavior of face splitting in render engines.
- *
- * NOTE: Will leave CD_NORMAL loop data layer which is
- * used by render engines to set shading up.
- */
 void BKE_mesh_split_faces(Mesh *mesh, bool free_loop_normals)
 {
   const int num_polys = mesh->totpoly;
