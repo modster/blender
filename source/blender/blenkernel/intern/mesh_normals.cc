@@ -275,9 +275,6 @@ const float (*BKE_mesh_ensure_vertex_normals(const Mesh *mesh))[3]
   }
 
   Mesh &me = *const_cast<Mesh *>(mesh);
-  /* Clear the dirty flags, since the normals have been calculated. */
-  me.runtime.cd_dirty_vert &= ~CD_MASK_NORMAL;
-  me.runtime.cd_dirty_poly &= ~CD_MASK_NORMAL;
 
   MutableSpan<float3> vert_normals{(float3 *)BKE_mesh_vertex_normals_for_write(&me), me.totvert};
   MutableSpan<float3> poly_normals{(float3 *)BKE_mesh_face_normals_for_write(&me), me.totpoly};
@@ -314,8 +311,6 @@ const float (*BKE_mesh_ensure_face_normals(const Mesh *mesh))[3]
   }
 
   Mesh &me = *const_cast<Mesh *>(mesh);
-  /* Clear the dirty flag, since the normals have been calculated. */
-  me.runtime.cd_dirty_poly &= ~CD_MASK_NORMAL;
 
   float(*poly_normals)[3] = BKE_mesh_face_normals_for_write(&me);
   BKE_mesh_calc_normals_poly(
