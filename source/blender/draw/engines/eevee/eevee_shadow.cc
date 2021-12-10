@@ -711,6 +711,7 @@ void ShadowModule::end_sync(void)
     DRW_shgroup_vertex_buffer(grp, "pages_free_buf", pages_free_data_);
     DRW_shgroup_vertex_buffer(grp, "tilemaps_buf", tilemap_allocator.tilemaps_data);
     DRW_shgroup_uniform_image(grp, "tilemaps_img", tilemap_allocator.tilemap_tx);
+    DRW_shgroup_uniform_bool(grp, "do_tilemap_setup", &do_tilemap_setup_, 1);
     int64_t tilemaps_updated_len = tilemaps_len + tilemap_allocator.deleted_maps_len;
     if (tilemaps_updated_len > 0) {
       DRW_shgroup_call_compute(grp, 1, 1, tilemaps_updated_len);
@@ -1074,9 +1075,12 @@ void ShadowModule::set_view(const DRWView *view, GPUTexture *depth_tx)
         tilemap_allocator.tilemap_tx.clear((uint)0);
         DRW_draw_pass(page_init_ps_);
       }
-      do_tilemap_setup_ = false;
-      DRW_draw_pass(tilemap_setup_ps_);
+    }
+    /* Run every every time but only process tilemap update once. */
+    DRW_draw_pass(tilemap_setup_ps_);
+    if (do_tilemap_setup_) {
       DRW_draw_pass(tilemap_update_tag_ps_);
+      do_tilemap_setup_ = false;
     }
     if (do_process_view) {
       DRW_draw_pass(tilemap_visibility_ps_);

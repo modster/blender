@@ -29,12 +29,14 @@ layout(std430, binding = 3) restrict buffer pages_infos_buf
 
 layout(r32ui) restrict uniform uimage2D tilemaps_img;
 
+uniform bool do_tilemap_setup;
+
 void main()
 {
   ShadowTileMapData tilemap = tilemaps[gl_GlobalInvocationID.z];
-
+  ivec2 grid_shift = (do_tilemap_setup) ? tilemap.grid_shift : ivec2(0);
   ivec2 tile_co = ivec2(gl_GlobalInvocationID.xy);
-  ivec2 tile_shifted = tile_co + tilemap.grid_shift;
+  ivec2 tile_shifted = tile_co + grid_shift;
   /* Still load a valid tile after the shifting in order to not loose any page reference.
    * This way the tile can even be reused if it is needed. Also avoid negative modulo. */
   ivec2 tile_wrapped = (tile_shifted + SHADOW_TILEMAP_RES) % SHADOW_TILEMAP_RES;
@@ -52,7 +54,7 @@ void main()
     tile_data.do_update = true;
   }
 
-  if (tilemap.grid_shift != ivec2(0) && tile_data.is_cached) {
+  if (grid_shift != ivec2(0) && tile_data.is_cached) {
     /* Update page location after shift. */
     free_page_owners[tile_data.free_page_owner_index] = packUvec2x16(uvec2(texel_out));
   }
@@ -61,7 +63,7 @@ void main()
 
   if (tilemap.is_cubeface) {
     /* Cubemap shift update is always all or nothing. */
-    bool do_update = (tilemap.grid_shift.x != 0);
+    bool do_update = (grid_shift.x != 0);
 
     /* Number of lod0 tiles covered by the current lod level (in one dimension). */
     uint lod_stride = 1u << 1u;

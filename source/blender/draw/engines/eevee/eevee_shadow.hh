@@ -474,7 +474,7 @@ class ShadowModule {
   DRWCallBuffer *casters_updated_;
   DRWCallBuffer *receivers_non_opaque_;
 
-  bool do_tilemap_setup_ = true;
+  int do_tilemap_setup_ = true;
   const DRWView *last_processed_view = nullptr;
   float tilemap_pixel_radius_;
   float screen_pixel_radius_inv_;
