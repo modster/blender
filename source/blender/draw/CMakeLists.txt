@@ -220,7 +220,7 @@ set(SRC
   engines/eevee/eevee_lightcache.h
   engines/eevee/eevee_lut.h
   engines/eevee/eevee_private.h
-  engines/external/external_engine.hb
+  engines/external/external_engine.h
   engines/image/image_batches.hh
   engines/image/image_drawing_mode.hh
   engines/image/image_engine.h
