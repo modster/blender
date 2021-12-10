@@ -1273,7 +1273,7 @@ void BKE_mesh_texspace_get(Mesh *me, float r_loc[3], float r_size[3])
   }
 }
 
-void BKE_mesh_texspace_get_reference(Mesh *me, short **r_texflag, float **r_loc, float **r_size)
+void BKE_mesh_texspace_get_reference(Mesh *me, char **r_texflag, float **r_loc, float **r_size)
 {
   BKE_mesh_texspace_ensure(me);
 
@@ -1291,7 +1291,7 @@ void BKE_mesh_texspace_get_reference(Mesh *me, short **r_texflag, float **r_loc,
 void BKE_mesh_texspace_copy_from_object(Mesh *me, Object *ob)
 {
   float *texloc, *texsize;
-  short *texflag;
+  char *texflag;
 
   if (BKE_object_obdata_texspace_get(ob, &texflag, &texloc, &texsize)) {
     me->texflag = *texflag;
