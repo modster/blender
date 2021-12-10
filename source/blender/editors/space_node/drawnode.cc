@@ -2454,11 +2454,6 @@ static void node_composit_buts_planetrackdeform(uiLayout *layout, bContext *C, P
   }
 }
 
-static void node_composit_buts_cornerpin(uiLayout *UNUSED(layout),
-                                         bContext *UNUSED(C),
-                                         PointerRNA *UNUSED(ptr))
-{
-}
 
 static void node_composit_buts_sunbeams(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 {
@@ -2792,9 +2787,6 @@ static void node_composit_set_butfunc(bNodeType *ntype)
       break;
     case CMP_NODE_PLANETRACKDEFORM:
       ntype->draw_buttons = node_composit_buts_planetrackdeform;
-      break;
-    case CMP_NODE_CORNERPIN:
-      ntype->draw_buttons = node_composit_buts_cornerpin;
       break;
     case CMP_NODE_SUNBEAMS:
       ntype->draw_buttons = node_composit_buts_sunbeams;
@@ -3508,7 +3500,6 @@ void draw_nodespace_back_pix(const bContext &C,
   GPU_matrix_pop();
 }
 
-/* return quadratic beziers points for a given nodelink and clip if v2d is not nullptr. */
 bool node_link_bezier_handles(const View2D *v2d,
                               const SpaceNode *snode,
                               const bNodeLink &link,
@@ -3617,7 +3608,6 @@ bool node_link_bezier_handles(const View2D *v2d,
   return true;
 }
 
-/* if v2d not nullptr, it clips and returns 0 if not visible */
 bool node_link_bezier_points(const View2D *v2d,
                              const SpaceNode *snode,
                              const bNodeLink &link,
@@ -3934,7 +3924,6 @@ static void nodelink_batch_add_link(const SpaceNode &snode,
   }
 }
 
-/* don't do shadows if th_col3 is -1. */
 void node_draw_link_bezier(const bContext &C,
                            const View2D &v2d,
                            const SpaceNode &snode,
@@ -4060,7 +4049,6 @@ void node_draw_link_bezier(const bContext &C,
   }
 }
 
-/* NOTE: this is used for fake links in groups too. */
 void node_draw_link(const bContext &C,
                     const View2D &v2d,
                     const SpaceNode &snode,
