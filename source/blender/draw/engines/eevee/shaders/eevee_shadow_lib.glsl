@@ -54,6 +54,13 @@ float shadow_punctual_depth_get(
   int tilemap_index = shadow.tilemap_index + face_id;
   ShadowTileData tile = shadow_tile_load(tilemaps_tx, tile_co, 0, tilemap_index);
 
+  /* TODO(fclem): Remove this indirection. But this means having to store another indirection
+   * table for the pages. */
+  if (tile.lod > 0u) {
+    tile_co >>= int(tile.lod);
+    tile.page = shadow_tile_load(tilemaps_tx, tile_co, int(tile.lod), tilemap_index).page;
+  }
+
   float depth = 1.0;
   if ((tilemap_index <= shadow.tilemap_last) && (tile.is_allocated || tile.lod > 0)) {
     vec2 shadow_uv = shadow_page_uv_transform(tile.page, tile.lod, uv);

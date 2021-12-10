@@ -29,12 +29,7 @@ layout(std430, binding = 0) restrict readonly buffer tilemaps_buf
 
 layout(std430, binding = 1) restrict buffer pages_free_buf
 {
-  int pages_free[];
-};
-
-layout(std430, binding = 2) restrict buffer pages_buf
-{
-  ShadowPagePacked pages[];
+  uint free_page_owners[];
 };
 
 layout(std430, binding = 3) restrict buffer pages_infos_buf
@@ -51,11 +46,7 @@ void main()
   int tilemap_idx = tilemap_data.index;
   int lod_max = tilemap_data.is_cubeface ? SHADOW_TILEMAP_LOD : 0;
 
-  /* Used to broadcast the first valid page to all LOD 0 tiles covered by a LOD > 0 page. */
-  shared uint page_map[(SHADOW_TILEMAP_RES / 2) * (SHADOW_TILEMAP_RES / 2)];
-
-  int lod_valid = -1;
-  uvec2 page_valid;
+  int lod_valid = 0;
   for (int lod = lod_max; lod >= 0; lod--) {
     ivec2 tile_co = ivec2(gl_GlobalInvocationID.xy) >> lod;
     int tile_index = (SHADOW_TILEMAP_RES / 2) * tile_co.y + tile_co.x;
@@ -73,56 +64,38 @@ void main()
         /** Tile allocation. */
         int free_index = atomicAdd(infos.page_free_next, -1);
         if (free_index >= 0) {
-          ShadowPageData page;
-          page.tile = texel;
+          ivec2 owner_texel = ivec2(unpackUvec2x16(free_page_owners[free_index]));
+          free_page_owners[free_index] = uint(-1);
 
-          int page_index = pages_free[free_index];
-          pages[page_index] = shadow_page_data_pack(page);
-
-          pages_free[free_index] = -1;
-
-          tile.page = shadow_page_from_index(page_index);
+          tile.page = shadow_tile_data_unpack(imageLoad(tilemaps_img, owner_texel).x).page;
           tile.do_update = true;
           tile.is_allocated = true;
-
-          if (page_index == -1) {
-            tile.is_error = true;
-            tile.is_allocated = false;
-          }
-
+          tile.is_cached = false;
           imageStore(tilemaps_img, texel, uvec4(shadow_tile_data_pack(tile)));
+
+          const uint flag = SHADOW_TILE_IS_ALLOCATED | SHADOW_TILE_IS_CACHED;
+          imageAtomicAnd(tilemaps_img, owner_texel, ~flag);
         }
         else {
           /* Well, hum ... you blew up your budget! */
-        }
-      }
-
-      if (lod > 0) {
-        /* Use shared variable to broadcast the page. */
-        if (tile.is_allocated) {
-          page_map[tile_index] = shadow_page_to_index(tile.page);
-        }
-        else {
-          page_map[tile_index] = uint(-1);
         }
       }
     }
 
     barrier();
 
-    if (lod > 0) {
-      /* Save highest quality valid lod for this thread. */
-      if (page_map[tile_index] != uint(-1)) {
-        lod_valid = lod;
-        page_valid = shadow_page_from_index(int(page_map[tile_index]));
-      }
+    /* Save highest quality valid lod for this thread. */
+    if (tile.is_visible && tile.is_used) {
+      lod_valid = lod;
     }
-    else if (tile.is_allocated == false && lod_valid != -1) {
-      /* If the LOD 0 tile is not allocated and one of the lower level is,
-       * we save a reference to it to avoid 2 load at shading time. */
-      tile.lod = uint(lod_valid);
-      tile.page = page_valid;
-      imageStore(tilemaps_img, texel, uvec4(shadow_tile_data_pack(tile)));
+    else if (lod == 0) {
+      /* If the tile is not used, store the valid LOD level. */
+      /* This is tricky because the tile might be processed by another thread doing an allocation.
+       * So we need to set the LOD using atomics. */
+      uint lod_mask = 7u << 12u;
+      uint lod_store = uint(lod_valid) << 12u;
+      imageAtomicAnd(tilemaps_img, texel, ~lod_mask);
+      imageAtomicOr(tilemaps_img, texel, lod_store);
     }
 
     /** Compute area to render and write to buffer for CPU to read. */

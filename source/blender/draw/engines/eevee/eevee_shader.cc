@@ -117,6 +117,8 @@ extern char datatoc_eevee_shadow_debug_frag_glsl[];
 extern char datatoc_eevee_shadow_lib_glsl[];
 extern char datatoc_eevee_shadow_page_alloc_comp_glsl[];
 extern char datatoc_eevee_shadow_page_copy_comp_glsl[];
+extern char datatoc_eevee_shadow_page_debug_comp_glsl[];
+extern char datatoc_eevee_shadow_page_defrag_comp_glsl[];
 extern char datatoc_eevee_shadow_page_free_comp_glsl[];
 extern char datatoc_eevee_shadow_page_init_comp_glsl[];
 extern char datatoc_eevee_shadow_page_lib_glsl[];
@@ -398,6 +400,8 @@ ShaderModule::ShaderModule()
   SHADER_FULLSCREEN(SHADOW_DEBUG, eevee_shadow_debug_frag);
   SHADER_COMPUTE(SHADOW_PAGE_ALLOC, eevee_shadow_page_alloc_comp, nullptr);
   SHADER_COMPUTE(SHADOW_PAGE_COPY, eevee_shadow_page_copy_comp, nullptr);
+  SHADER_COMPUTE(SHADOW_PAGE_DEBUG, eevee_shadow_page_debug_comp, nullptr);
+  SHADER_COMPUTE(SHADOW_PAGE_DEFRAG, eevee_shadow_page_defrag_comp, nullptr);
   SHADER_COMPUTE(SHADOW_PAGE_FREE, eevee_shadow_page_free_comp, nullptr);
   SHADER_COMPUTE(SHADOW_PAGE_INIT, eevee_shadow_page_init_comp, nullptr);
   SHADER(SHADOW_PAGE_MARK, eevee_shadow_page_mark_vert, nullptr, eevee_depth_clear_frag, nullptr);

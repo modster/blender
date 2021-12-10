@@ -19,12 +19,7 @@ layout(std430, binding = 0) restrict readonly buffer tilemaps_buf
 
 layout(std430, binding = 1) restrict buffer pages_free_buf
 {
-  int pages_free[];
-};
-
-layout(std430, binding = 2) restrict writeonly buffer pages_buf
-{
-  ShadowPagePacked pages[];
+  uint free_page_owners[];
 };
 
 layout(std430, binding = 3) restrict buffer pages_infos_buf
@@ -51,31 +46,28 @@ void main()
     ivec2 texel = shadow_tile_coord_in_atlas(tile_co, tilemap_idx, lod);
     ShadowTileData tile = shadow_tile_data_unpack(imageLoad(tilemaps_img, texel).x);
 
-    if (tile.is_allocated && (!tile.is_visible || !tile.is_used)) {
-      /* Push page to the free page heap. */
-      uint page_index = shadow_page_to_index(tile.page);
-#ifdef SHADOW_DEBUG_PAGE_ALLOCATION_ENABLED
-      pages[page_index] = SHADOW_PAGE_NO_DATA;
-#endif
-
-      int free_index = atomicAdd(infos.page_free_next, 1) + 1;
-      if (free_index < SHADOW_MAX_PAGE) {
-        pages_free[free_index] = int(page_index);
+    if (tile.is_allocated) {
+      if (tile.is_visible && tile.is_used && tile.is_cached) {
+        /* Try to recover cached tiles. Update flag is kept untouched as content might be valid. */
+        free_page_owners[tile.free_page_owner_index] = uint(-1);
+        tile.is_cached = false;
+        tile.free_page_owner_index = uint(-1);
+        imageStore(tilemaps_img, texel, uvec4(shadow_tile_data_pack(tile)));
       }
-      else {
-        /* Well, this should never happen. This would mean some pages were marked
-         * for deletion multiple times. */
-        infos.page_free_next = SHADOW_MAX_PAGE - 1;
+      else if ((!tile.is_visible || !tile.is_used) && !tile.is_cached) {
+        /* Push page to the free page heap. */
+        int free_index = atomicAdd(infos.page_free_next, 1) + 1;
+        if (free_index < SHADOW_MAX_PAGE) {
+          free_page_owners[free_index] = packUvec2x16(uvec2(texel));
+          tile.is_cached = true;
+          tile.free_page_owner_index = uint(free_index);
+          imageStore(tilemaps_img, texel, uvec4(shadow_tile_data_pack(tile)));
+        }
+        else {
+          /* Well, this should never happen. This would mean some pages were marked
+           * for deletion multiple times. */
+        }
       }
-
-      tile.is_allocated = false;
-#ifdef SHADOW_DEBUG_TILE_ALLOCATION_ENABLED
-      tile.page = uvec2(0);
-      tile.is_visible = false;
-      tile.do_update = false;
-      tile.is_used = false;
-#endif
-      imageStore(tilemaps_img, texel, uvec4(shadow_tile_data_pack(tile)));
     }
   }
 }

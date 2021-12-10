@@ -139,6 +139,16 @@ uint bit_field_mask(uint bit_width, uint bit_min)
   return ~mask << bit_min;
 }
 
+uvec2 unpackUvec2x16(uint data)
+{
+  return uvec2(data >> 16u, data & 0xFFFFu);
+}
+
+uint packUvec2x16(uvec2 data)
+{
+  return (data.x << 16u) | (data.y & 0xFFFFu);
+}
+
 float distance_squared(vec2 a, vec2 b)
 {
   a -= b;

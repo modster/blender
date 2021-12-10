@@ -17,9 +17,9 @@ layout(std430, binding = 0) readonly buffer tilemaps_buf
   ShadowTileMapData tilemaps[];
 };
 
-layout(std430, binding = 2) restrict writeonly buffer pages_buf
+layout(std430, binding = 1) restrict buffer pages_free_buf
 {
-  ShadowPagePacked pages[];
+  uint free_page_owners[];
 };
 
 layout(std430, binding = 3) restrict buffer pages_infos_buf
@@ -39,56 +39,42 @@ void main()
    * This way the tile can even be reused if it is needed. Also avoid negative modulo. */
   ivec2 tile_wrapped = (tile_shifted + SHADOW_TILEMAP_RES) % SHADOW_TILEMAP_RES;
 
-  ivec2 texel = shadow_tile_coord_in_atlas(tile_wrapped, tilemap.index, 0);
-  ShadowTileData tile_data = shadow_tile_data_unpack(imageLoad(tilemaps_img, texel).x);
-  /* Reset all flags but keep the allocated page. */
+  ivec2 texel_out = shadow_tile_coord_in_atlas(tile_co, tilemap.index, 0);
+  ivec2 texel_in = shadow_tile_coord_in_atlas(tile_wrapped, tilemap.index, 0);
+
+  ShadowTileData tile_data = shadow_tile_data_unpack(imageLoad(tilemaps_img, texel_in).x);
   tile_data.is_visible = false;
   tile_data.is_used = false;
-  tile_data.do_update = false;
   tile_data.lod = 0;
-#ifdef SHADOW_DEBUG_NO_CACHING
-  tile_data.page = uvec2(0);
-  tile_data.is_allocated = false;
-#endif
 
   if (!in_range_inclusive(tile_shifted, ivec2(0), ivec2(SHADOW_TILEMAP_RES - 1))) {
     /* This tile was shifted in. */
     tile_data.do_update = true;
   }
 
-  if (tilemap.grid_shift.x != 0) {
+  if (tilemap.grid_shift != ivec2(0) && tile_data.is_cached) {
     /* Update page location after shift. */
-    ShadowPageData page;
-    page.tile = texel;
-    pages[shadow_page_to_index(tile_data.page)] = shadow_page_data_pack(page);
+    free_page_owners[tile_data.free_page_owner_index] = packUvec2x16(uvec2(texel_out));
   }
 
-  shadow_tile_store(tilemaps_img, tile_co, tilemap.index, tile_data);
+  imageStore(tilemaps_img, texel_out, uvec4(shadow_tile_data_pack(tile_data)));
 
   if (tilemap.is_cubeface) {
     /* Cubemap shift update is always all or nothing. */
     bool do_update = (tilemap.grid_shift.x != 0);
 
     /* Number of lod0 tiles covered by the current lod level (in one dimension). */
-    uint lod_stride = 1u;
-    uint lod_size = uint(SHADOW_TILEMAP_RES);
-    for (int lod = 1; lod <= SHADOW_TILEMAP_LOD; lod++) {
-      lod_size >>= 1;
-      lod_stride <<= 1;
-
+    uint lod_stride = 1u << 1u;
+    uint lod_size = uint(SHADOW_TILEMAP_RES) >> 1u;
+    for (int lod = 1; lod <= SHADOW_TILEMAP_LOD; lod++, lod_size >>= 1u, lod_stride <<= 1u) {
       if (all(lessThan(tile_co, ivec2(lod_size)))) {
         ivec2 texel = shadow_tile_coord_in_atlas(tile_co, tilemap.index, lod);
 
         ShadowTileData tile_data = shadow_tile_data_unpack(imageLoad(tilemaps_img, texel).x);
-        /* Reset all flags but keep the allocated page. */
         tile_data.is_visible = false;
         tile_data.is_used = false;
         tile_data.do_update = do_update;
         tile_data.lod = 0;
-#ifdef SHADOW_DEBUG_NO_CACHING
-        tile_data.page = uvec2(0);
-        tile_data.is_allocated = false;
-#endif
         imageStore(tilemaps_img, texel, uvec4(shadow_tile_data_pack(tile_data)));
       }
     }

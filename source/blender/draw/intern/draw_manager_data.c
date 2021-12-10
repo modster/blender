@@ -1208,6 +1208,7 @@ DRWCallBuffer *DRW_call_buffer_create(struct GPUVertFormat *format)
 
 GPUVertBuf *DRW_call_buffer_as_vertbuf(DRWCallBuffer *callbuf)
 {
+  GPU_vertbuf_data_len_set(callbuf->buf, callbuf->count);
   return callbuf->buf;
 }
 

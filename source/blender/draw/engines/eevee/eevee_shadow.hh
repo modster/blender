@@ -241,7 +241,7 @@ struct ShadowTileMap : public ShadowTileMapData {
 
   void set_dirty()
   {
-    grid_shift = int2(16);
+    grid_shift = int2(SHADOW_TILEMAP_RES);
   }
 
   void set_updated()
@@ -487,8 +487,6 @@ class ShadowModule {
 
   eevee::Texture atlas_tx_ = Texture("shadow_atlas_tx_");
 
-  /** Contains mapping from pages to pixel inside the tilemap. */
-  ShadowPageHeapBuf pages_data_;
   /** Pool of unallocated pages waiting to be assigned to specific tiles in the tilemap atlas. */
   ShadowPageHeapBuf pages_free_data_;
   /** Infos for book keeping and debug. */
@@ -496,6 +494,8 @@ class ShadowModule {
 
   /** Page buffer clear. This is only done if shadow atlas is reallocated. */
   DRWPass *page_init_ps_;
+  /** Defragment the page free array. */
+  DRWPass *page_defrag_ps_;
   /** Free pages of deleted tiles. You can think of a garbage collection. */
   DRWPass *page_free_ps_;
   /** Allocate pages for new tiles. */
@@ -527,6 +527,8 @@ class ShadowModule {
   DRWView *debug_view_;
   /** Debug data sent to GPU. */
   ShadowDebugDataBuf debug_data_;
+  /** Debug texture to check page status. */
+  Texture debug_page_tx_ = Texture("debug_page_tx_");
 
   /** \} */
 
@@ -577,6 +579,7 @@ class ShadowModule {
 
  private:
   void remove_unused(void);
+  void debug_page_map_call(DRWPass *pass);
 };
 
 /** \} */

@@ -11,6 +11,8 @@
 struct ShadowTileData {
   /** Page inside the virtual shadow map atlas. */
   uvec2 page;
+  /** Page owner index inside free_page_owners heap. Only valid if is_cached is true. */
+  uint free_page_owner_index;
   /** Lod pointed to by LOD 0 tile page. (cubemap only) */
   uint lod;
   /** Set to true during the setup phase if the tile is inside the view frustum. */
@@ -21,11 +23,12 @@ struct ShadowTileData {
   bool is_allocated;
   /** True if an update is needed. */
   bool do_update;
-  bool is_error;
+  /** True if the tile is indexed inside the free_page_owners heap. */
+  bool is_cached;
 };
 
 #define SHADOW_TILE_NO_DATA 0u
-#define SHADOW_TILE_IS_ERROR (1u << 27u)
+#define SHADOW_TILE_IS_CACHED (1u << 27u)
 #define SHADOW_TILE_IS_ALLOCATED (1u << 28u)
 #define SHADOW_TILE_DO_UPDATE (1u << 29u)
 #define SHADOW_TILE_IS_VISIBLE (1u << 30u)
@@ -34,13 +37,17 @@ struct ShadowTileData {
 ShadowTileData shadow_tile_data_unpack(uint data)
 {
   ShadowTileData tile;
-  tile.page.x = data & 0xFFu;
-  tile.page.y = (data >> 8u) & 0xFFu;
-  tile.lod = (data >> 16u) & 0xFu;
+  /* Tweaked for SHADOW_PAGE_PER_ROW = 64. */
+  tile.page.x = data & 63u;
+  tile.page.y = (data >> 6u) & 63u;
+  /* Tweaked for SHADOW_TILEMAP_LOD < 8. */
+  tile.lod = (data >> 12u) & 7u;
+  /* Tweaked for SHADOW_MAX_TILEMAP = 4096. */
+  tile.free_page_owner_index = (data >> 15u) & 4095u;
   tile.is_visible = flag_test(data, SHADOW_TILE_IS_VISIBLE);
   tile.is_used = flag_test(data, SHADOW_TILE_IS_USED);
+  tile.is_cached = flag_test(data, SHADOW_TILE_IS_CACHED);
   tile.is_allocated = flag_test(data, SHADOW_TILE_IS_ALLOCATED);
-  tile.is_error = flag_test(data, SHADOW_TILE_IS_ERROR);
   tile.do_update = flag_test(data, SHADOW_TILE_DO_UPDATE);
   return tile;
 }
@@ -49,12 +56,13 @@ uint shadow_tile_data_pack(ShadowTileData tile)
 {
   uint data;
   data = tile.page.x;
-  data |= tile.page.y << 8u;
-  data |= tile.lod << 16u;
+  data |= tile.page.y << 6u;
+  data |= tile.lod << 12u;
+  data |= tile.free_page_owner_index << 15u;
   set_flag_from_test(data, tile.is_visible, SHADOW_TILE_IS_VISIBLE);
   set_flag_from_test(data, tile.is_used, SHADOW_TILE_IS_USED);
   set_flag_from_test(data, tile.is_allocated, SHADOW_TILE_IS_ALLOCATED);
-  set_flag_from_test(data, tile.is_error, SHADOW_TILE_IS_ERROR);
+  set_flag_from_test(data, tile.is_cached, SHADOW_TILE_IS_CACHED);
   set_flag_from_test(data, tile.do_update, SHADOW_TILE_DO_UPDATE);
   return data;
 }

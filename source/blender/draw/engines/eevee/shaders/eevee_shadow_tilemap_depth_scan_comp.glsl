@@ -97,7 +97,7 @@ void tag_tilemap(uint l_idx, vec3 P, float dist_to_cam, const bool is_directiona
     tilemap_index += face_id;
   }
 
-  const uint flag = SHADOW_TILE_IS_VISIBLE | SHADOW_TILE_IS_USED;
+  const uint flag = SHADOW_TILE_IS_USED;
   shadow_tile_set_flag(tilemaps_img, tile_co, lod, tilemap_index, flag);
 }
 

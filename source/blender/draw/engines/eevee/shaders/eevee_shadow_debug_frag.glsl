@@ -25,11 +25,7 @@ layout(std430, binding = 0) readonly buffer tilemaps_buf
   ShadowTileMapData tilemaps[];
 };
 
-layout(std430, binding = 1) readonly buffer pages_buf
-{
-  ShadowPagePacked pages[];
-};
-
+uniform usampler2D debug_page_tx;
 uniform usampler2D tilemaps_tx;
 uniform sampler2D depth_tx;
 uniform sampler2D atlas_tx;
@@ -52,9 +48,6 @@ vec3 debug_random_color(int v)
 
 vec3 debug_tile_state_color(ShadowTileData tile)
 {
-  if (tile.is_error) {
-    return vec3(1, 0, 1);
-  }
   if (tile.lod > 0) {
     return vec3(1, 0.5, 0) * float(tile.lod) / float(SHADOW_TILEMAP_LOD);
   }
@@ -185,24 +178,21 @@ void debug_tile_state(vec3 P)
 
 void debug_page_allocation(void)
 {
-  ivec2 page = ivec2(gl_FragCoord.xy / pixel_scale);
+  ivec2 page = ivec2(gl_FragCoord.xy / pixel_scale) - 1;
 
-  if (in_range_inclusive(page, ivec2(0), ivec2(SHADOW_PAGE_PER_ROW - 1))) {
-    uint page_index = shadow_page_to_index(page);
-    if (pages[page_index] != SHADOW_PAGE_NO_DATA) {
-      ShadowPageData page = shadow_page_data_unpack(pages[page_index]);
-      ShadowTileData tile = shadow_tile_data_unpack(texelFetch(tilemaps_tx, page.tile, 0).x);
-      if (tile.is_allocated) {
-        out_color_add = vec4(1, 1, 1, 0);
-      }
-      else {
-        /* There is an error. Page points to a tile that isn't its owner. */
-        out_color_add = vec4(1, 0, 0, 0);
-      }
-    }
-    else {
-      out_color_add = vec4(0, 0, 0, 0);
-    }
+  if (in_range_inclusive(page, ivec2(0), textureSize(debug_page_tx, 0).xy - 1)) {
+    uint page = texelFetch(debug_page_tx, page, 0).x;
+
+    bool error = (page & 0xFFFFu) != 1u;
+    bool is_cached = (page & SHADOW_PAGE_IS_CACHED) != 0u;
+    bool is_needed = (page & SHADOW_PAGE_IS_NEEDED) != 0u;
+    bool in_heap = (page & SHADOW_PAGE_IN_FREE_HEAP) != 0u;
+    error = error || (is_cached && !in_heap);
+    error = error || (is_needed && is_cached);
+
+    vec3 col = vec3(error, is_cached, is_needed);
+
+    out_color_add = vec4(col, 0);
     out_color_mul = vec4(0);
     /* Write depth to overlap overlays. */
     gl_FragDepth = 0.0;

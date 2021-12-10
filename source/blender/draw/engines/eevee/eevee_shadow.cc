@@ -610,6 +610,7 @@ void ShadowModule::sync_object(Object *ob,
   }
 
   if (is_alpha_blend) {
+    printf("receivers_non_opaque_\n");
     DRW_buffer_add_entry_struct(receivers_non_opaque_, &shadow_ob.aabb);
   }
 }
@@ -707,15 +708,19 @@ void ShadowModule::end_sync(void)
     GPUShader *sh = inst_.shaders.static_shader_get(SHADOW_TILE_SETUP);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, tilemap_setup_ps_);
     DRW_shgroup_vertex_buffer(grp, "pages_infos_buf", pages_infos_data_);
-    DRW_shgroup_vertex_buffer(grp, "pages_buf", pages_data_);
+    DRW_shgroup_vertex_buffer(grp, "pages_free_buf", pages_free_data_);
     DRW_shgroup_vertex_buffer(grp, "tilemaps_buf", tilemap_allocator.tilemaps_data);
     DRW_shgroup_uniform_image(grp, "tilemaps_img", tilemap_allocator.tilemap_tx);
     int64_t tilemaps_updated_len = tilemaps_len + tilemap_allocator.deleted_maps_len;
     if (tilemaps_updated_len > 0) {
       DRW_shgroup_call_compute(grp, 1, 1, tilemaps_updated_len);
-      DRW_shgroup_barrier(grp, GPU_BARRIER_SHADER_IMAGE_ACCESS);
+      DRW_shgroup_barrier(grp, GPU_BARRIER_SHADER_IMAGE_ACCESS | GPU_BARRIER_SHADER_STORAGE);
     }
     do_tilemap_setup_ = true;
+
+    if (G.debug & G_DEBUG_GPU) {
+      debug_page_map_call(tilemap_setup_ps_);
+    }
   }
   {
     tilemap_visibility_ps_ = DRW_pass_create("ShadowVisibilityTag", (DRWState)0);
@@ -809,9 +814,13 @@ void ShadowModule::end_sync(void)
     DRWShadingGroup *grp = DRW_shgroup_create(sh, page_init_ps_);
     DRW_shgroup_vertex_buffer(grp, "pages_infos_buf", pages_infos_data_);
     DRW_shgroup_vertex_buffer(grp, "pages_free_buf", pages_free_data_);
-    DRW_shgroup_vertex_buffer(grp, "pages_buf", pages_data_);
+    DRW_shgroup_uniform_image(grp, "tilemaps_img", tilemap_allocator.tilemap_tx);
     DRW_shgroup_call_compute(grp, SHADOW_MAX_PAGE / SHADOW_PAGE_PER_ROW, 1, 1);
-    DRW_shgroup_barrier(grp, GPU_BARRIER_SHADER_STORAGE);
+    DRW_shgroup_barrier(grp, GPU_BARRIER_SHADER_IMAGE_ACCESS | GPU_BARRIER_SHADER_STORAGE);
+
+    if (G.debug & G_DEBUG_GPU) {
+      debug_page_map_call(page_init_ps_);
+    }
   }
   {
     page_free_ps_ = DRW_pass_create("ShadowPageFree", (DRWState)0);
@@ -820,7 +829,6 @@ void ShadowModule::end_sync(void)
     DRWShadingGroup *grp = DRW_shgroup_create(sh, page_free_ps_);
     DRW_shgroup_vertex_buffer(grp, "pages_infos_buf", pages_infos_data_);
     DRW_shgroup_vertex_buffer(grp, "pages_free_buf", pages_free_data_);
-    DRW_shgroup_vertex_buffer(grp, "pages_buf", pages_data_);
     DRW_shgroup_vertex_buffer(grp, "tilemaps_buf", tilemap_allocator.tilemaps_data);
     DRW_shgroup_uniform_image(grp, "tilemaps_img", tilemap_allocator.tilemap_tx);
     int64_t tilemaps_updated_len = tilemaps_len + tilemap_allocator.deleted_maps_len;
@@ -828,6 +836,21 @@ void ShadowModule::end_sync(void)
       DRW_shgroup_call_compute(grp, 1, 1, tilemaps_updated_len);
       DRW_shgroup_barrier(grp, GPU_BARRIER_SHADER_IMAGE_ACCESS | GPU_BARRIER_SHADER_STORAGE);
     }
+
+    if (G.debug & G_DEBUG_GPU) {
+      debug_page_map_call(page_free_ps_);
+    }
+  }
+  {
+    page_defrag_ps_ = DRW_pass_create("ShadowPageDefrag", (DRWState)0);
+
+    GPUShader *sh = inst_.shaders.static_shader_get(SHADOW_PAGE_DEFRAG);
+    DRWShadingGroup *grp = DRW_shgroup_create(sh, page_defrag_ps_);
+    DRW_shgroup_vertex_buffer(grp, "pages_free_buf", pages_free_data_);
+    DRW_shgroup_vertex_buffer(grp, "pages_infos_buf", pages_infos_data_);
+    DRW_shgroup_uniform_image(grp, "tilemaps_img", tilemap_allocator.tilemap_tx);
+    DRW_shgroup_call_compute(grp, 1, 1, 1);
+    DRW_shgroup_barrier(grp, GPU_BARRIER_SHADER_IMAGE_ACCESS | GPU_BARRIER_SHADER_STORAGE);
   }
   {
     page_alloc_ps_ = DRW_pass_create("ShadowPageAllocate", (DRWState)0);
@@ -836,7 +859,6 @@ void ShadowModule::end_sync(void)
     DRWShadingGroup *grp = DRW_shgroup_create(sh, page_alloc_ps_);
     DRW_shgroup_vertex_buffer(grp, "pages_infos_buf", pages_infos_data_);
     DRW_shgroup_vertex_buffer(grp, "pages_free_buf", pages_free_data_);
-    DRW_shgroup_vertex_buffer(grp, "pages_buf", pages_data_);
     DRW_shgroup_vertex_buffer(grp, "tilemaps_buf", tilemap_allocator.tilemaps_data);
     DRW_shgroup_uniform_image(grp, "tilemaps_img", tilemap_allocator.tilemap_tx);
     DRW_shgroup_uniform_image(grp, "tilemap_rects_img", tilemap_allocator.tilemap_rects_tx);
@@ -846,6 +868,10 @@ void ShadowModule::end_sync(void)
       barrier |= GPU_BARRIER_TEXTURE_FETCH;  /* Needed for ShadowPageMark / ShadowPageCopy. */
       barrier |= GPU_BARRIER_TEXTURE_UPDATE; /* Needed for readback. */
       DRW_shgroup_barrier(grp, barrier);
+    }
+
+    if (G.debug & G_DEBUG_GPU) {
+      debug_page_map_call(page_alloc_ps_);
     }
   }
   {
@@ -875,6 +901,22 @@ void ShadowModule::end_sync(void)
   }
 
   debug_end_sync();
+}
+
+void ShadowModule::debug_page_map_call(DRWPass *pass)
+{
+  if (debug_data_.type == SHADOW_DEBUG_NONE) {
+    return;
+  }
+  debug_page_tx_.ensure(SHADOW_PAGE_PER_ROW, SHADOW_PAGE_PER_ROW, 0, GPU_R32UI);
+
+  GPUShader *sh = inst_.shaders.static_shader_get(SHADOW_PAGE_DEBUG);
+  DRWShadingGroup *grp = DRW_shgroup_create(sh, pass);
+  DRW_shgroup_vertex_buffer(grp, "pages_free_buf", pages_free_data_);
+  DRW_shgroup_uniform_image(grp, "tilemaps_img", tilemap_allocator.tilemap_tx);
+  DRW_shgroup_uniform_image(grp, "debug_img", debug_page_tx_);
+  DRW_shgroup_call_compute(grp, 1, 1, 1);
+  DRW_shgroup_barrier(grp, GPU_BARRIER_SHADER_IMAGE_ACCESS | GPU_BARRIER_TEXTURE_FETCH);
 }
 
 void ShadowModule::debug_end_sync(void)
@@ -931,14 +973,23 @@ void ShadowModule::debug_end_sync(void)
                      DRW_STATE_BLEND_CUSTOM;
     debug_draw_ps_ = DRW_pass_create("ShadowDebugDraw", state);
 
+    if (debug_data_.type == SHADOW_DEBUG_PAGE_ALLOCATION) {
+      debug_page_map_call(debug_draw_ps_);
+    }
+
     GPUShader *sh = inst_.shaders.static_shader_get(SHADOW_DEBUG);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, debug_draw_ps_);
     DRW_shgroup_vertex_buffer(grp, "tilemaps_buf", tilemap_allocator.tilemaps_data);
-    DRW_shgroup_vertex_buffer(grp, "pages_buf", pages_data_);
     DRW_shgroup_uniform_texture(grp, "tilemaps_tx", tilemap_allocator.tilemap_tx);
     DRW_shgroup_uniform_texture_ref(grp, "depth_tx", &input_depth_tx_);
     DRW_shgroup_uniform_texture(grp, "atlas_tx", atlas_tx_);
     DRW_shgroup_uniform_block(grp, "debug_block", debug_data_.ubo_get());
+    if (debug_data_.type == SHADOW_DEBUG_PAGE_ALLOCATION) {
+      DRW_shgroup_uniform_texture(grp, "debug_page_tx", debug_page_tx_);
+    }
+    else {
+      DRW_shgroup_uniform_texture(grp, "debug_page_tx", tilemap_allocator.tilemap_tx);
+    }
     DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
   }
 }
@@ -1020,6 +1071,7 @@ void ShadowModule::set_view(const DRWView *view, GPUTexture *depth_tx)
 #ifndef SHADOW_DEBUG_NO_CACHING
         do_page_init_ = false;
 #endif
+        tilemap_allocator.tilemap_tx.clear((uint)0);
         DRW_draw_pass(page_init_ps_);
       }
       do_tilemap_setup_ = false;
@@ -1037,6 +1089,7 @@ void ShadowModule::set_view(const DRWView *view, GPUTexture *depth_tx)
 #endif
     DRW_draw_pass(tilemap_lod_mask_ps_);
     DRW_draw_pass(page_free_ps_);
+    DRW_draw_pass(page_defrag_ps_);
     DRW_draw_pass(page_alloc_ps_);
   }
   DRW_stats_group_end();
