@@ -104,13 +104,14 @@ static void ED_curve_pick_vert__do_closest(void *userData,
   UNUSED_VARS_NDEBUG(handles_visible);
 }
 
-bool ED_curve_pick_vert(ViewContext *vc,
-                        short sel,
-                        Nurb **r_nurb,
-                        BezTriple **r_bezt,
-                        BPoint **r_bp,
-                        short *r_handle,
-                        Base **r_base)
+bool ED_curve_pick_vert_thresholded(ViewContext *vc,
+                                    short sel,
+                                    const float sel_dist_mul,
+                                    Nurb **r_nurb,
+                                    BezTriple **r_bezt,
+                                    BPoint **r_bp,
+                                    short *r_handle,
+                                    Base **r_base)
 {
   /* (sel == 1): selected gets a disadvantage */
   /* in nurb and bezt or bp the nearest is written */
@@ -125,7 +126,7 @@ bool ED_curve_pick_vert(ViewContext *vc,
     bool is_changed;
   } data = {NULL};
 
-  data.dist = ED_view3d_select_dist_px();
+  data.dist = ED_view3d_select_dist_px() * sel_dist_mul;
   data.hpoint = 0;
   data.select = sel;
   data.mval_fl[0] = vc->mval[0];
@@ -157,6 +158,17 @@ bool ED_curve_pick_vert(ViewContext *vc,
   }
 
   return (data.bezt || data.bp);
+}
+
+bool ED_curve_pick_vert(ViewContext *vc,
+                        short sel,
+                        Nurb **r_nurb,
+                        BezTriple **r_bezt,
+                        BPoint **r_bp,
+                        short *r_handle,
+                        Base **r_base)
+{
+  return ED_curve_pick_vert_thresholded(vc, 1, 1.0f, r_nurb, r_bezt, r_bp, r_handle, r_base);
 }
 
 /** \} */

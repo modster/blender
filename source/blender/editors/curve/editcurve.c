@@ -4744,9 +4744,18 @@ void CURVE_OT_make_segment(wmOperatorType *ot)
 /* -------------------------------------------------------------------- */
 /** \name Pick Select from 3D View
  * \{ */
-
 bool ED_curve_editnurb_select_pick(
     bContext *C, const int mval[2], bool extend, bool deselect, bool toggle)
+{
+  return ED_curve_editnurb_select_pick_thresholded(C, mval, 1.0f, extend, deselect, toggle);
+}
+
+bool ED_curve_editnurb_select_pick_thresholded(bContext *C,
+                                               const int mval[2],
+                                               const float sel_dist_mul,
+                                               bool extend,
+                                               bool deselect,
+                                               bool toggle)
 {
   Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
   ViewContext vc;
@@ -4760,7 +4769,7 @@ bool ED_curve_editnurb_select_pick(
   ED_view3d_viewcontext_init(C, &vc, depsgraph);
   copy_v2_v2_int(vc.mval, mval);
 
-  if (ED_curve_pick_vert(&vc, 1, &nu, &bezt, &bp, &hand, &basact)) {
+  if (ED_curve_pick_vert_thresholded(&vc, 1, sel_dist_mul, &nu, &bezt, &bp, &hand, &basact)) {
     Object *obedit = basact->object;
     Curve *cu = obedit->data;
     ListBase *editnurb = object_editcurve_get(obedit);

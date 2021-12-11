@@ -45,6 +45,8 @@
 
 #include "float.h"
 
+#define SEL_DIST_MUL 0.4f
+
 /* Data structure to keep track of details about the cut location */
 typedef struct CutData {
   /* Index of the last #BezTriple or BPoint before the cut. */
@@ -745,7 +747,7 @@ static bool is_spline_nearby(ViewContext *vc, wmOperator *op, const wmEvent *eve
 
   update_data_for_all_nurbs(nurbs, vc, &data);
 
-  const float threshold_distance = ED_view3d_select_dist_px() * 0.3f;
+  const float threshold_distance = ED_view3d_select_dist_px() * SEL_DIST_MUL;
   if (data.nurb && !data.nurb->bp && data.min_dist < threshold_distance) {
     MoveSegmentData *seg_data;
     op->customdata = seg_data = MEM_callocN(sizeof(MoveSegmentData), __func__);
@@ -966,7 +968,8 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
       /* Get currently selected point if any. Used for making spline cyclic. */
       ED_curve_nurb_vert_selected_find(cu, vc.v3d, &nu, &bezt, &bp);
 
-      const bool found_point = ED_curve_editnurb_select_pick(C, event->mval, false, false, false);
+      const bool found_point = ED_curve_editnurb_select_pick_thresholded(
+          C, event->mval, SEL_DIST_MUL, false, false, false);
       RNA_boolean_set(op->ptr, "new", !found_point);
 
       if (found_point) {

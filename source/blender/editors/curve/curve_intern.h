@@ -215,6 +215,14 @@ bool ED_curve_pick_vert(struct ViewContext *vc,
                         struct BPoint **r_bp,
                         short *r_handle,
                         struct Base **r_base);
+bool ED_curve_pick_vert_thresholded(struct ViewContext *vc,
+                                    short sel,
+                                    const float sel_dist_mul,
+                                    struct Nurb **r_nurb,
+                                    struct BezTriple **r_bezt,
+                                    struct BPoint **r_bp,
+                                    short *r_handle,
+                                    struct Base **r_base);
 void ED_curve_nurb_vert_selected_find(
     Curve *cu, View3D *v3d, Nurb **r_nu, BezTriple **r_bezt, BPoint **r_bp);
 
