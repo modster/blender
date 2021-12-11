@@ -318,7 +318,7 @@ static void rna_Mesh_update_facemask(Main *bmain, Scene *scene, PointerRNA *ptr)
 static void rna_MeshVertex_normal_get(PointerRNA *ptr, float *value)
 {
   Mesh *mesh = rna_mesh(ptr);
-  const float(*vert_normals)[3] = BKE_mesh_ensure_vertex_normals(mesh);
+  const float(*vert_normals)[3] = BKE_mesh_vertex_normals_ensure(mesh);
 
   const int index = (MVert *)ptr->data - mesh->mvert;
   BLI_assert(index >= 0);

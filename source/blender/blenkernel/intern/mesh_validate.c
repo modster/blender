@@ -302,7 +302,7 @@ bool BKE_mesh_validate_arrays(Mesh *mesh,
     recalc_flag.edges = do_fixes;
   }
 
-  const float(*vert_normals)[3] = BKE_mesh_ensure_vertex_normals(mesh);
+  const float(*vert_normals)[3] = BKE_mesh_vertex_normals_ensure(mesh);
 
   for (i = 0; i < totvert; i++, mv++) {
     bool fix_normal = true;

@@ -2125,7 +2125,7 @@ void psys_particle_on_dm(Mesh *mesh_final,
   }
 
   orcodata = CustomData_get_layer(&mesh_final->vdata, CD_ORCO);
-  const float(*vert_normals)[3] = BKE_mesh_ensure_vertex_normals(mesh_final);
+  const float(*vert_normals)[3] = BKE_mesh_vertex_normals_ensure(mesh_final);
 
   if (from == PART_FROM_VERT) {
     copy_v3_v3(vec, mesh_final->mvert[mapindex].co);

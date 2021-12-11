@@ -384,7 +384,7 @@ void BKE_mesh_normals_tag_dirty(struct Mesh *mesh);
 /**
  * Calculate face normals directly into a result array.
  *
- * \note Usually #BKE_mesh_ensure_face_normals is the preferred way to access face normals,
+ * \note Usually #BKE_mesh_poly_normals_ensure is the preferred way to access face normals,
  * since they may already be calculated and cached on the mesh.
  */
 void BKE_mesh_calc_normals_poly(const struct MVert *mvert,
@@ -399,7 +399,7 @@ void BKE_mesh_calc_normals_poly(const struct MVert *mvert,
  * Calculate vertex and face normals, storing the result in custom data layers on the mesh.
  *
  * \note It is usually preferrable to calculate normals lazily with
- * #BKE_mesh_ensure_vertex_normals, but some areas (perhaps unnecessarily)
+ * #BKE_mesh_vertex_normals_ensure, but some areas (perhaps unnecessarily)
  * can also calculate them eagerly.
  */
 void BKE_mesh_calc_normals(struct Mesh *me);
@@ -424,12 +424,12 @@ float (*BKE_mesh_face_normals_for_write(struct Mesh *mesh))[3];
 /**
  * \warning May still return null if the mesh is empty.
  */
-const float (*BKE_mesh_ensure_vertex_normals(const struct Mesh *mesh))[3];
+const float (*BKE_mesh_vertex_normals_ensure(const struct Mesh *mesh))[3];
 
 /**
  * \warning May still return null if the mesh is empty.
  */
-const float (*BKE_mesh_ensure_face_normals(const struct Mesh *mesh))[3];
+const float (*BKE_mesh_poly_normals_ensure(const struct Mesh *mesh))[3];
 
 /**
  * Called after calculating all modifiers.
@@ -581,6 +581,7 @@ void BKE_lnor_space_custom_normal_to_data(MLoopNorSpace *lnor_space,
  * (splitting edges).
  */
 void BKE_mesh_normals_loop_split(const struct MVert *mverts,
+                                 const float (*vert_normals)[3],
                                  const int numVerts,
                                  struct MEdge *medges,
                                  const int numEdges,
@@ -589,7 +590,6 @@ void BKE_mesh_normals_loop_split(const struct MVert *mverts,
                                  const int numLoops,
                                  struct MPoly *mpolys,
                                  const float (*polynors)[3],
-                                 const float (*vert_normals)[3],
                                  const int numPolys,
                                  const bool use_split_normals,
                                  const float split_angle,

@@ -4062,7 +4062,7 @@ static bool proj_paint_state_mesh_eval_init(const bContext *C, ProjPaintState *p
   ps->mat_array[totmat - 1] = NULL;
 
   ps->mvert_eval = ps->me_eval->mvert;
-  ps->vert_normals = BKE_mesh_ensure_vertex_normals(ps->me_eval);
+  ps->vert_normals = BKE_mesh_vertex_normals_ensure(ps->me_eval);
   if (ps->do_mask_cavity) {
     ps->medge_eval = ps->me_eval->medge;
   }

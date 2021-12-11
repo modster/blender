@@ -594,7 +594,7 @@ void BKE_mesh_remap_calc_verts_from_mesh(const int mode,
       MPoly *polys_src = me_src->mpoly;
       MLoop *loops_src = me_src->mloop;
       float(*vcos_src)[3] = BKE_mesh_vert_coords_alloc(me_src, NULL);
-      const float(*vert_normals_src)[3] = BKE_mesh_ensure_vertex_normals(me_src);
+      const float(*vert_normals_src)[3] = BKE_mesh_vertex_normals_ensure(me_src);
 
       size_t tmp_buff_size = MREMAP_DEFAULT_BUFSIZE;
       float(*vcos)[3] = MEM_mallocN(sizeof(*vcos) * tmp_buff_size, __func__);
@@ -952,7 +952,7 @@ void BKE_mesh_remap_calc_edges_from_mesh(const int mode,
 
       BKE_bvhtree_from_mesh_get(&treedata, me_src, BVHTREE_FROM_EDGES, 2);
 
-      const float(*vert_normals_dst)[3] = BKE_mesh_ensure_vertex_normals(me_src);
+      const float(*vert_normals_dst)[3] = BKE_mesh_vertex_normals_ensure(me_src);
 
       for (i = 0; i < numedges_dst; i++) {
         /* For each dst edge, we sample some rays from it (interpolated from its vertices)
@@ -1245,8 +1245,8 @@ void BKE_mesh_remap_calc_loops_from_mesh(const int mode,
                                          const SpaceTransform *space_transform,
                                          const float max_dist,
                                          const float ray_radius,
+                                         Mesh *mesh_dst,
                                          MVert *verts_dst,
-                                         const float (*vert_normals_dst)[3],
                                          const int numverts_dst,
                                          MEdge *edges_dst,
                                          const int numedges_dst,
@@ -1301,8 +1301,8 @@ void BKE_mesh_remap_calc_loops_from_mesh(const int mode,
                                            1) :
                                     0);
 
-    float(*poly_nors_src)[3] = NULL;
-    float(*loop_nors_src)[3] = NULL;
+    const float(*poly_nors_src)[3] = NULL;
+    const float(*loop_nors_src)[3] = NULL;
     float(*poly_nors_dst)[3] = NULL;
     float(*loop_nors_dst)[3] = NULL;
 
@@ -1360,23 +1360,7 @@ void BKE_mesh_remap_calc_loops_from_mesh(const int mode,
       const bool need_pnors_dst = need_lnors_dst || need_pnors_src;
 
       if (need_pnors_dst) {
-        /* Cache poly nors into a temp CDLayer. */
-        poly_nors_dst = CustomData_get_layer(pdata_dst, CD_NORMAL);
-        const bool do_poly_nors_dst = (poly_nors_dst == NULL);
-        if (!poly_nors_dst) {
-          poly_nors_dst = CustomData_add_layer(
-              pdata_dst, CD_NORMAL, CD_CALLOC, NULL, numpolys_dst);
-          CustomData_set_layer_flag(pdata_dst, CD_NORMAL, CD_FLAG_TEMPORARY);
-        }
-        if (dirty_nors_dst || do_poly_nors_dst) {
-          BKE_mesh_calc_normals_poly(verts_dst,
-                                     numverts_dst,
-                                     loops_dst,
-                                     numloops_dst,
-                                     polys_dst,
-                                     numpolys_dst,
-                                     poly_nors_dst);
-        }
+        poly_nors_dst = BKE_mesh_poly_normals_ensure(mesh_dst);
       }
       if (need_lnors_dst) {
         short(*custom_nors_dst)[2] = CustomData_get_layer(ldata_dst, CD_CUSTOMLOOPNORMAL);
@@ -1391,6 +1375,7 @@ void BKE_mesh_remap_calc_loops_from_mesh(const int mode,
         }
         if (dirty_nors_dst || do_loop_nors_dst) {
           BKE_mesh_normals_loop_split(verts_dst,
+                                      BKE_mesh_vertex_normals_ensure(mesh_dst),
                                       numverts_dst,
                                       edges_dst,
                                       numedges_dst,
@@ -1398,8 +1383,7 @@ void BKE_mesh_remap_calc_loops_from_mesh(const int mode,
                                       loop_nors_dst,
                                       numloops_dst,
                                       polys_dst,
-                                      (const float(*)[3])poly_nors_dst,
-                                      vert_normals_dst,
+                                      poly_nors_dst,
                                       numpolys_dst,
                                       use_split_nors_dst,
                                       split_angle_dst,
@@ -1410,8 +1394,7 @@ void BKE_mesh_remap_calc_loops_from_mesh(const int mode,
       }
       if (need_pnors_src || need_lnors_src) {
         if (need_pnors_src) {
-          poly_nors_src = CustomData_get_layer(&me_src->pdata, CD_NORMAL);
-          BLI_assert(poly_nors_src != NULL);
+          poly_nors_src = BKE_mesh_poly_normals_ensure(me_src);
         }
         if (need_lnors_src) {
           loop_nors_src = CustomData_get_layer(&me_src->ldata, CD_NORMAL);
@@ -1653,7 +1636,7 @@ void BKE_mesh_remap_calc_loops_from_mesh(const int mode,
             if (mesh_remap_bvhtree_query_nearest(
                     tdata, &nearest, tmp_co, max_dist_sq, &hit_dist)) {
               float(*nor_dst)[3];
-              float(*nors_src)[3];
+              const float(*nors_src)[3];
               float best_nor_dot = -2.0f;
               float best_sqdist_fallback = FLT_MAX;
               int best_index_src = -1;
@@ -2193,6 +2176,7 @@ void BKE_mesh_remap_calc_polys_from_mesh(const int mode,
                                          const SpaceTransform *space_transform,
                                          const float max_dist,
                                          const float ray_radius,
+                                         Mesh *mesh_dst,
                                          MVert *verts_dst,
                                          const int numverts_dst,
                                          MLoop *loops_dst,
@@ -2213,21 +2197,7 @@ void BKE_mesh_remap_calc_polys_from_mesh(const int mode,
   BLI_assert(mode & MREMAP_MODE_POLY);
 
   if (mode & (MREMAP_USE_NORMAL | MREMAP_USE_NORPROJ)) {
-    /* Cache poly nors into a temp CDLayer. */
-    poly_nors_dst = CustomData_get_layer(pdata_dst, CD_NORMAL);
-    if (!poly_nors_dst) {
-      poly_nors_dst = CustomData_add_layer(pdata_dst, CD_NORMAL, CD_CALLOC, NULL, numpolys_dst);
-      CustomData_set_layer_flag(pdata_dst, CD_NORMAL, CD_FLAG_TEMPORARY);
-    }
-    if (dirty_nors_dst) {
-      BKE_mesh_calc_normals_poly(verts_dst,
-                                 numverts_dst,
-                                 loops_dst,
-                                 numloops_dst,
-                                 polys_dst,
-                                 numpolys_dst,
-                                 poly_nors_dst);
-    }
+    poly_nors_dst = BKE_mesh_poly_normals_ensure(mesh_dst);
   }
 
   BKE_mesh_remap_init(r_map, numpolys_dst);

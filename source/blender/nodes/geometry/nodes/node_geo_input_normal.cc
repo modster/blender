@@ -39,18 +39,18 @@ static VArray<float3> construct_mesh_normals_gvarray(const MeshComponent &mesh_c
   switch (domain) {
     case ATTR_DOMAIN_FACE: {
       return VArray<float3>::ForSpan(
-          {(float3 *)BKE_mesh_ensure_face_normals(&mesh), mesh.totpoly});
+          {(float3 *)BKE_mesh_ensure_poly_normals(&mesh), mesh.totpoly});
     }
     case ATTR_DOMAIN_POINT: {
       return VArray<float3>::ForSpan(
-          {(float3 *)BKE_mesh_ensure_vertex_normals(&mesh), mesh.totvert});
+          {(float3 *)BKE_mesh_vertex_normals_ensure(&mesh), mesh.totvert});
     }
     case ATTR_DOMAIN_EDGE: {
       /* In this case, start with vertex normals and convert to the edge domain, since the
        * conversion from edges to vertices is very simple. Use "manual" domain interpolation
        * instead of the GeometryComponent API to avoid calculating unnecessary values and to
        * allow normalizing the result more simply. */
-      Span<float3> vert_normals{(float3 *)BKE_mesh_ensure_vertex_normals(&mesh), mesh.totvert};
+      Span<float3> vert_normals{(float3 *)BKE_mesh_vertex_normals_ensure(&mesh), mesh.totvert};
       Array<float3> edge_normals(mask.min_array_size());
       Span<MEdge> edges{mesh.medge, mesh.totedge};
       for (const int i : mask) {
@@ -67,7 +67,7 @@ static VArray<float3> construct_mesh_normals_gvarray(const MeshComponent &mesh_c
        * component's generic domain interpolation is fine, the data will still be normalized,
        * since the face normal is just copied to every corner. */
       return mesh_component.attribute_try_adapt_domain(
-          VArray<float3>::ForSpan({(float3 *)BKE_mesh_ensure_face_normals(&mesh), mesh.totpoly}),
+          VArray<float3>::ForSpan({(float3 *)BKE_mesh_ensure_poly_normals(&mesh), mesh.totpoly}),
           ATTR_DOMAIN_FACE,
           ATTR_DOMAIN_CORNER);
     }

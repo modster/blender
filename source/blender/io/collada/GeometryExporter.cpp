@@ -631,7 +631,7 @@ void GeometryExporter::create_normals(std::vector<Normal> &normals,
   int last_normal_index = -1;
 
   MVert *verts = me->mvert;
-  const float(*vert_normals)[3] = BKE_mesh_ensure_vertex_normals(me);
+  const float(*vert_normals)[3] = BKE_mesh_vertex_normals_ensure(me);
   MLoop *mloops = me->mloop;
   float(*lnors)[3] = nullptr;
   bool use_custom_normals = false;

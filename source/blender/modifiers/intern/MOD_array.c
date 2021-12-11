@@ -575,7 +575,7 @@ static Mesh *arrayModifier_doArray(ArrayModifierData *amd,
   const float(*src_vert_normals)[3] = NULL;
   float(*dst_vert_normals)[3] = NULL;
   if (!use_recalc_normals) {
-    src_vert_normals = BKE_mesh_ensure_vertex_normals(mesh);
+    src_vert_normals = BKE_mesh_vertex_normals_ensure(mesh);
     dst_vert_normals = BKE_mesh_vertex_normals_for_write(result);
   }
 

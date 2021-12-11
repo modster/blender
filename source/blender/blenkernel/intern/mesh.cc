@@ -93,7 +93,7 @@ static void mesh_init_data(ID *id)
 
   /* A newly created mesh does not have normals, so tag them dirty. This will be cleared by
    * retrieving the normal layer for manually writing to it, or calling functions like
-   * #BKE_mesh_ensure_face_normals. */
+   * #BKE_mesh_ensure_poly_normals. */
   BKE_mesh_normals_tag_dirty(mesh);
 
   mesh->face_sets_color_seed = BLI_hash_int(PIL_check_seconds_timer_i() & UINT_MAX);
@@ -1910,6 +1910,7 @@ void BKE_mesh_calc_normals_split_ex(Mesh *mesh, MLoopNorSpaceArray *r_lnors_spac
   clnors = (short(*)[2])CustomData_get_layer(&mesh->ldata, CD_CUSTOMLOOPNORMAL);
 
   BKE_mesh_normals_loop_split(mesh->mvert,
+                              BKE_mesh_vertex_normals_ensure(mesh),
                               mesh->totvert,
                               mesh->medge,
                               mesh->totedge,
@@ -1917,8 +1918,7 @@ void BKE_mesh_calc_normals_split_ex(Mesh *mesh, MLoopNorSpaceArray *r_lnors_spac
                               r_loopnors,
                               mesh->totloop,
                               mesh->mpoly,
-                              BKE_mesh_ensure_face_normals(mesh),
-                              BKE_mesh_ensure_vertex_normals(mesh),
+                              BKE_mesh_ensure_poly_normals(mesh),
                               mesh->totpoly,
                               use_split_normals,
                               split_angle,
@@ -1966,7 +1966,7 @@ static int split_faces_prepare_new_verts(const Mesh *mesh,
   const int loops_len = mesh->totloop;
   int verts_len = mesh->totvert;
   MLoop *mloop = mesh->mloop;
-  float(*vert_normals)[3] = (float(*)[3])BKE_mesh_ensure_vertex_normals(mesh);
+  float(*vert_normals)[3] = (float(*)[3])BKE_mesh_vertex_normals_ensure(mesh);
 
   BLI_bitmap *verts_used = BLI_BITMAP_NEW(verts_len, __func__);
   BLI_bitmap *done_loops = BLI_BITMAP_NEW(loops_len, __func__);

@@ -253,7 +253,7 @@ static void mesh_calc_normals_poly_and_vertex(MutableSpan<MVert> mverts,
 /** \name Mesh Normal Calculation
  * \{ */
 
-const float (*BKE_mesh_ensure_vertex_normals(const Mesh *mesh))[3]
+const float (*BKE_mesh_vertex_normals_ensure(const Mesh *mesh))[3]
 {
   if (!(mesh->runtime.cd_dirty_vert & CD_MASK_NORMAL ||
         mesh->runtime.cd_dirty_poly & CD_MASK_NORMAL)) {
@@ -296,7 +296,7 @@ const float (*BKE_mesh_ensure_vertex_normals(const Mesh *mesh))[3]
   return (const float(*)[3])vert_normals.data();
 }
 
-const float (*BKE_mesh_ensure_face_normals(const Mesh *mesh))[3]
+const float (*BKE_mesh_poly_normals_ensure(const Mesh *mesh))[3]
 {
   if (!(mesh->runtime.cd_dirty_poly & CD_MASK_NORMAL)) {
     BLI_assert(CustomData_has_layer(&mesh->pdata, CD_NORMAL) || mesh->totpoly == 0);
@@ -332,8 +332,8 @@ void BKE_mesh_ensure_normals_for_display(Mesh *mesh)
 {
   switch ((eMeshWrapperType)mesh->runtime.wrapper_type) {
     case ME_WRAPPER_TYPE_MDATA:
-      BKE_mesh_ensure_vertex_normals(mesh);
-      BKE_mesh_ensure_face_normals(mesh);
+      BKE_mesh_vertex_normals_ensure(mesh);
+      BKE_mesh_poly_normals_ensure(mesh);
       break;
     case ME_WRAPPER_TYPE_BMESH: {
       struct BMEditMesh *em = mesh->edit_mesh;
@@ -352,7 +352,7 @@ void BKE_mesh_calc_normals(Mesh *mesh)
 #ifdef DEBUG_TIME
   TIMEIT_START_AVERAGED(BKE_mesh_calc_normals);
 #endif
-  BKE_mesh_ensure_vertex_normals(mesh);
+  BKE_mesh_vertex_normals_ensure(mesh);
 #ifdef DEBUG_TIME
   TIMEIT_END_AVERAGED(BKE_mesh_calc_normals);
 #endif
@@ -1504,6 +1504,7 @@ static void loop_split_generator(TaskPool *pool, LoopSplitTaskDataCommon *common
 }
 
 void BKE_mesh_normals_loop_split(const MVert *mverts,
+                                 const float (*vert_normals)[3],
                                  const int UNUSED(numVerts),
                                  MEdge *medges,
                                  const int numEdges,
@@ -1512,7 +1513,6 @@ void BKE_mesh_normals_loop_split(const MVert *mverts,
                                  const int numLoops,
                                  MPoly *mpolys,
                                  const float (*polynors)[3],
-                                 const float (*vert_normals)[3],
                                  const int numPolys,
                                  const bool use_split_normals,
                                  const float split_angle,
@@ -1689,6 +1689,7 @@ static void mesh_normals_loop_custom_set(const MVert *mverts,
 
   /* Compute current lnor spacearr. */
   BKE_mesh_normals_loop_split(mverts,
+                              vert_normals,
                               numVerts,
                               medges,
                               numEdges,
@@ -1697,7 +1698,6 @@ static void mesh_normals_loop_custom_set(const MVert *mverts,
                               numLoops,
                               mpolys,
                               polynors,
-                              vert_normals,
                               numPolys,
                               use_split_normals,
                               split_angle,
@@ -1812,6 +1812,7 @@ static void mesh_normals_loop_custom_set(const MVert *mverts,
     /* And now, recompute our new auto lnors and lnor spacearr! */
     BKE_lnor_spacearr_clear(&lnors_spacearr);
     BKE_mesh_normals_loop_split(mverts,
+                                vert_normals,
                                 numVerts,
                                 medges,
                                 numEdges,
@@ -1820,7 +1821,6 @@ static void mesh_normals_loop_custom_set(const MVert *mverts,
                                 numLoops,
                                 mpolys,
                                 polynors,
-                                vert_normals,
                                 numPolys,
                                 use_split_normals,
                                 split_angle,
@@ -1964,7 +1964,7 @@ static void mesh_set_custom_normals(Mesh *mesh, float (*r_custom_nors)[3], const
   }
 
   mesh_normals_loop_custom_set(mesh->mvert,
-                               BKE_mesh_ensure_vertex_normals(mesh),
+                               BKE_mesh_vertex_normals_ensure(mesh),
                                mesh->totvert,
                                mesh->medge,
                                mesh->totedge,
@@ -1972,7 +1972,7 @@ static void mesh_set_custom_normals(Mesh *mesh, float (*r_custom_nors)[3], const
                                r_custom_nors,
                                mesh->totloop,
                                mesh->mpoly,
-                               BKE_mesh_ensure_face_normals(mesh),
+                               BKE_mesh_poly_normals_ensure(mesh),
                                mesh->totpoly,
                                clnors,
                                use_vertices);

@@ -1830,7 +1830,7 @@ static void dynamicPaint_applySurfaceDisplace(DynamicPaintSurface *surface, Mesh
     DynamicPaintModifierApplyData data = {
         .surface = surface,
         .mvert = mvert,
-        .vert_normals = BKE_mesh_ensure_vertex_normals(result),
+        .vert_normals = BKE_mesh_vertex_normals_ensure(result),
     };
     TaskParallelSettings settings;
     BLI_parallel_range_settings_defaults(&settings);
@@ -2027,7 +2027,7 @@ static Mesh *dynamicPaint_Modifier_apply(DynamicPaintModifierData *pmd, Object *
             DynamicPaintModifierApplyData data = {
                 .surface = surface,
                 .mvert = mvert,
-                .vert_normals = BKE_mesh_ensure_vertex_normals(result),
+                .vert_normals = BKE_mesh_vertex_normals_ensure(result),
             };
             TaskParallelSettings settings;
             BLI_parallel_range_settings_defaults(&settings);
@@ -4285,7 +4285,7 @@ static bool dynamicPaint_paintMesh(Depsgraph *depsgraph,
 
     mesh = BKE_mesh_copy_for_eval(brush_mesh, false);
     mvert = mesh->mvert;
-    const float(*vert_normals)[3] = BKE_mesh_ensure_vertex_normals(mesh);
+    const float(*vert_normals)[3] = BKE_mesh_vertex_normals_ensure(mesh);
     mlooptri = BKE_mesh_runtime_looptri_ensure(mesh);
     mloop = mesh->mloop;
     numOfVerts = mesh->totvert;
@@ -6144,7 +6144,7 @@ static bool dynamicPaint_generateBakeData(DynamicPaintSurface *surface,
       .surface = surface,
       .ob = ob,
       .mvert = mvert,
-      .vert_normals = BKE_mesh_ensure_vertex_normals(mesh),
+      .vert_normals = BKE_mesh_vertex_normals_ensure(mesh),
       .canvas_verts = canvas_verts,
       .do_velocity_data = do_velocity_data,
       .new_bdata = new_bdata,

@@ -238,7 +238,7 @@ Mesh *MOD_deform_mesh_eval_get(Object *ob,
    * if necessary. */
   if (use_normals) {
     if (LIKELY(mesh)) {
-      BKE_mesh_ensure_vertex_normals(mesh);
+      BKE_mesh_vertex_normals_ensure(mesh);
     }
   }
 

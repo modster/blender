@@ -235,6 +235,7 @@ static void apply_weights_vertex_normal(WeightedNormalModifierData *wnmd,
      * we do not actually care about computed loop_normals for now... */
     loop_normals = MEM_calloc_arrayN((size_t)numLoops, sizeof(*loop_normals), __func__);
     BKE_mesh_normals_loop_split(mvert,
+                                wn_data->vert_normals,
                                 numVerts,
                                 medge,
                                 numEdges,
@@ -243,7 +244,6 @@ static void apply_weights_vertex_normal(WeightedNormalModifierData *wnmd,
                                 numLoops,
                                 mpoly,
                                 polynors,
-                                wn_data->vert_normals,
                                 numPolys,
                                 true,
                                 split_angle,
@@ -411,6 +411,7 @@ static void apply_weights_vertex_normal(WeightedNormalModifierData *wnmd,
       loop_normals = MEM_calloc_arrayN((size_t)numLoops, sizeof(*loop_normals), __func__);
 
       BKE_mesh_normals_loop_split(mvert,
+                                  wn_data->vert_normals,
                                   numVerts,
                                   medge,
                                   numEdges,
@@ -419,7 +420,6 @@ static void apply_weights_vertex_normal(WeightedNormalModifierData *wnmd,
                                   numLoops,
                                   mpoly,
                                   polynors,
-                                  wn_data->vert_normals,
                                   numPolys,
                                   true,
                                   split_angle,
@@ -638,7 +638,7 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
       .numPolys = numPolys,
 
       .mvert = mvert,
-      .vert_normals = BKE_mesh_ensure_vertex_normals(result),
+      .vert_normals = BKE_mesh_vertex_normals_ensure(result),
       .medge = medge,
 
       .mloop = mloop,
@@ -647,7 +647,7 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
       .split_angle = split_angle,
 
       .mpoly = mpoly,
-      .polynors = BKE_mesh_ensure_face_normals(mesh),
+      .polynors = BKE_mesh_ensure_poly_normals(mesh),
       .poly_strength = CustomData_get_layer_named(
           &result->pdata, CD_PROP_INT32, MOD_WEIGHTEDNORMALS_FACEWEIGHT_CDLAYER_ID),
 

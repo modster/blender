@@ -2231,18 +2231,19 @@ void BKE_keyblock_mesh_calc_normals(struct KeyBlock *kb,
     free_polynors = true;
   }
 
-  const float(*vert_normals)[3] = BKE_mesh_ensure_vertex_normals(mesh);
+  const float(*vert_normals)[3] = BKE_mesh_vertex_normals_ensure(mesh);
   if (r_vertnors) {
     memcpy(r_vertnors, vert_normals, sizeof(float[3]) * me.totvert);
   }
 
-  const float(*face_normals)[3] = BKE_mesh_ensure_face_normals(mesh);
+  const float(*face_normals)[3] = BKE_mesh_poly_normals_ensure(mesh);
   memcpy(r_polynors, face_normals, sizeof(float[3]) * me.totpoly);
 
   if (r_loopnors) {
     short(*clnors)[2] = CustomData_get_layer(&mesh->ldata, CD_CUSTOMLOOPNORMAL); /* May be NULL. */
 
     BKE_mesh_normals_loop_split(me.mvert,
+                                vert_normals,
                                 me.totvert,
                                 me.medge,
                                 me.totedge,
@@ -2251,7 +2252,6 @@ void BKE_keyblock_mesh_calc_normals(struct KeyBlock *kb,
                                 me.totloop,
                                 me.mpoly,
                                 face_normals,
-                                vert_normals,
                                 me.totpoly,
                                 (me.flag & ME_AUTOSMOOTH) != 0,
                                 me.smoothresh,

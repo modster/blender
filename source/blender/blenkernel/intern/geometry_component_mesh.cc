@@ -1158,7 +1158,7 @@ class NormalAttributeProvider final : public BuiltinAttributeProvider {
     if (mesh == nullptr || mesh->totpoly == 0) {
       return {};
     }
-    return VArray<float3>::ForSpan({(float3 *)BKE_mesh_ensure_face_normals(mesh), mesh->totpoly});
+    return VArray<float3>::ForSpan({(float3 *)BKE_mesh_poly_normals_ensure(mesh), mesh->totpoly});
   }
 
   WriteAttributeLookup try_get_for_write(GeometryComponent &UNUSED(component)) const final

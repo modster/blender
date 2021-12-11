@@ -342,7 +342,7 @@ static void normalEditModifier_do_radial(NormalEditModifierData *enmd,
   }
 
   BKE_mesh_normals_loop_custom_set(mvert,
-                                   BKE_mesh_ensure_vertex_normals(mesh),
+                                   BKE_mesh_vertex_normals_ensure(mesh),
                                    num_verts,
                                    medge,
                                    num_edges,
@@ -455,7 +455,7 @@ static void normalEditModifier_do_directional(NormalEditModifierData *enmd,
   }
 
   BKE_mesh_normals_loop_custom_set(mvert,
-                                   BKE_mesh_ensure_vertex_normals(mesh),
+                                   BKE_mesh_vertex_normals_ensure(mesh),
                                    num_verts,
                                    medge,
                                    num_edges,
@@ -550,8 +550,8 @@ static Mesh *normalEditModifier_do(NormalEditModifierData *enmd,
   CustomData *ldata = &result->ldata;
 
   /* Compute poly (always needed) and vert normals. */
-  const float(*vert_normals)[3] = BKE_mesh_ensure_vertex_normals(mesh);
-  const float(*poly_normals)[3] = BKE_mesh_ensure_face_normals(mesh);
+  const float(*vert_normals)[3] = BKE_mesh_vertex_normals_ensure(mesh);
+  const float(*poly_normals)[3] = BKE_mesh_ensure_poly_normals(mesh);
 
   clnors = CustomData_get_layer(ldata, CD_CUSTOMLOOPNORMAL);
   if (use_current_clnors) {
@@ -559,6 +559,7 @@ static Mesh *normalEditModifier_do(NormalEditModifierData *enmd,
     loopnors = MEM_malloc_arrayN((size_t)num_loops, sizeof(*loopnors), __func__);
 
     BKE_mesh_normals_loop_split(mvert,
+                                vert_normals,
                                 num_verts,
                                 medge,
                                 num_edges,
@@ -567,7 +568,6 @@ static Mesh *normalEditModifier_do(NormalEditModifierData *enmd,
                                 num_loops,
                                 mpoly,
                                 poly_normals,
-                                vert_normals,
                                 num_polys,
                                 true,
                                 result->smoothresh,

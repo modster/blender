@@ -1456,7 +1456,7 @@ void BKE_mesh_nomain_to_mesh(Mesh *mesh_src,
   CustomData_reset(&tmp.ldata);
   CustomData_reset(&tmp.pdata);
 
-  BKE_mesh_ensure_vertex_normals(mesh_src);
+  BKE_mesh_vertex_normals_ensure(mesh_src);
 
   totvert = tmp.totvert = mesh_src->totvert;
   totedge = tmp.totedge = mesh_src->totedge;

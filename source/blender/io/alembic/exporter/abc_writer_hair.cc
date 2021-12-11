@@ -136,7 +136,7 @@ void ABCHairWriter::write_hair_sample(const HierarchyContext &context,
   MTFace *mtface = mesh->mtface;
   MFace *mface = mesh->mface;
   MVert *mverts = mesh->mvert;
-  const float(*vert_normals)[3] = BKE_mesh_ensure_vertex_normals(mesh);
+  const float(*vert_normals)[3] = BKE_mesh_vertex_normals_ensure(mesh);
 
   if ((!mtface || !mface) && !uv_warning_shown_) {
     std::fprintf(stderr,
@@ -257,7 +257,7 @@ void ABCHairWriter::write_hair_child_sample(const HierarchyContext &context,
 
   MTFace *mtface = mesh->mtface;
   MVert *mverts = mesh->mvert;
-  const float(*vert_normals)[3] = BKE_mesh_ensure_vertex_normals(mesh);
+  const float(*vert_normals)[3] = BKE_mesh_vertex_normals_ensure(mesh);
 
   ParticleSystem *psys = context.particle_system;
   ParticleSettings *part = psys->part;

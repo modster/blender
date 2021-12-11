@@ -192,7 +192,7 @@ void BM_mesh_bm_from_me(BMesh *bm, const Mesh *me, const struct BMeshFromMeshPar
   int totloops, i;
   CustomData_MeshMasks mask = CD_MASK_BMESH;
   CustomData_MeshMasks_update(&mask, &params->cd_mask_extra);
-  const float(*vert_normals)[3] = BKE_mesh_ensure_vertex_normals(me);
+  const float(*vert_normals)[3] = BKE_mesh_vertex_normals_ensure(me);
 
   if (!me || !me->totvert) {
     if (me && is_new) { /* No verts? still copy custom-data layout. */

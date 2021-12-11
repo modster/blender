@@ -378,8 +378,8 @@ void USDGenericMeshWriter::write_normals(const Mesh *mesh, pxr::UsdGeomMesh usd_
   }
   else {
     /* Compute the loop normals based on the 'smooth' flag. */
-    const float(*vert_normals)[3] = BKE_mesh_ensure_vertex_normals(mesh);
-    const float(*face_normals)[3] = BKE_mesh_ensure_face_normals(mesh);
+    const float(*vert_normals)[3] = BKE_mesh_vertex_normals_ensure(mesh);
+    const float(*face_normals)[3] = BKE_mesh_poly_normals_ensure(mesh);
     MPoly *mpoly = mesh->mpoly;
     for (int poly_idx = 0, totpoly = mesh->totpoly; poly_idx < totpoly; ++poly_idx, ++mpoly) {
       MLoop *mloop = mesh->mloop + mpoly->loopstart;

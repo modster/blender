@@ -146,7 +146,7 @@ bool BKE_shrinkwrap_init_tree(
   }
 
   if (force_normals || BKE_shrinkwrap_needs_normals(shrinkType, shrinkMode)) {
-    data->pnors = BKE_mesh_ensure_face_normals(mesh);
+    data->pnors = BKE_mesh_ensure_poly_normals(mesh);
     if ((mesh->flag & ME_AUTOSMOOTH) != 0) {
       data->clnors = CustomData_get_layer(&mesh->ldata, CD_NORMAL);
     }
@@ -313,7 +313,7 @@ static ShrinkwrapBoundaryData *shrinkwrap_build_boundary_data(struct Mesh *mesh)
   MEM_freeN(vert_status);
 
   /* Finalize average direction and compute normal. */
-  const float(*vert_normals)[3] = BKE_mesh_ensure_vertex_normals(mesh);
+  const float(*vert_normals)[3] = BKE_mesh_vertex_normals_ensure(mesh);
   for (int i = 0; i < mesh->totvert; i++) {
     int bidx = vert_boundary_id[i];
 
@@ -1427,7 +1427,7 @@ void shrinkwrapModifier_deform(ShrinkwrapModifierData *smd,
   if (mesh != NULL && smd->shrinkType == MOD_SHRINKWRAP_PROJECT) {
     /* Setup arrays to get vertexs positions, normals and deform weights */
     calc.vert = mesh->mvert;
-    calc.vert_normals = BKE_mesh_ensure_vertex_normals(mesh);
+    calc.vert_normals = BKE_mesh_vertex_normals_ensure(mesh);
 
     /* Using vertexs positions/normals as if a subsurface was applied */
     if (smd->subsurfLevels) {
@@ -1536,7 +1536,7 @@ void BKE_shrinkwrap_remesh_target_project(Mesh *src_me, Mesh *target_me, Object 
   calc.smd = &ssmd;
   calc.numVerts = src_me->totvert;
   calc.vertexCos = vertexCos;
-  calc.vert_normals = BKE_mesh_ensure_vertex_normals(src_me);
+  calc.vert_normals = BKE_mesh_vertex_normals_ensure(src_me);
   calc.vgroup = -1;
   calc.target = target_me;
   calc.keepDist = ssmd.keepDist;

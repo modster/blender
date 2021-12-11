@@ -72,7 +72,7 @@ void BKE_mesh_foreach_mapped_vert(
     const MVert *mv = mesh->mvert;
     const int *index = CustomData_get_layer(&mesh->vdata, CD_ORIGINDEX);
     const float(*vert_normals)[3] = (flag & MESH_FOREACH_USE_NORMAL) ?
-                                        BKE_mesh_ensure_vertex_normals(mesh) :
+                                        BKE_mesh_vertex_normals_ensure(mesh) :
                                         NULL;
 
     if (index) {
@@ -311,7 +311,7 @@ void BKE_mesh_foreach_mapped_subdiv_face_center(
   const MLoop *ml;
   const MVert *mv;
   const float(*vert_normals)[3] = (flag & MESH_FOREACH_USE_NORMAL) ?
-                                      BKE_mesh_ensure_vertex_normals(mesh) :
+                                      BKE_mesh_vertex_normals_ensure(mesh) :
                                       NULL;
   const int *index = CustomData_get_layer(&mesh->pdata, CD_ORIGINDEX);
 
