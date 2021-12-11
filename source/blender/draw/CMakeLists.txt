@@ -408,6 +408,7 @@ set(GLSL_SRC
   engines/overlay/shaders/common_overlay_lib.glsl
   engines/overlay/shaders/antialiasing_frag.glsl
   engines/overlay/shaders/antialiasing_vert.glsl
+  engines/overlay/shaders/armature_alpha_lib.glsl
   engines/overlay/shaders/armature_dof_vert.glsl
   engines/overlay/shaders/armature_dof_solid_frag.glsl
   engines/overlay/shaders/armature_envelope_outline_vert.glsl
