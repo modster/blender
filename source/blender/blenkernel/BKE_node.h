@@ -164,20 +164,20 @@ typedef struct bNodeSocketType {
   void (*interface_draw)(struct bContext *C, struct uiLayout *layout, struct PointerRNA *ptr);
   void (*interface_draw_color)(struct bContext *C, struct PointerRNA *ptr, float *r_color);
   void (*interface_register_properties)(struct bNodeTree *ntree,
-                                        struct bNodeSocket *stemp,
+                                        struct bNodeSocket *interface_socket,
                                         struct StructRNA *data_srna);
   void (*interface_init_socket)(struct bNodeTree *ntree,
-                                struct bNodeSocket *stemp,
+                                const struct bNodeSocket *interface_socket,
                                 struct bNode *node,
                                 struct bNodeSocket *sock,
                                 const char *data_path);
   void (*interface_verify_socket)(struct bNodeTree *ntree,
-                                  struct bNodeSocket *stemp,
+                                  const struct bNodeSocket *interface_socket,
                                   struct bNode *node,
                                   struct bNodeSocket *sock,
                                   const char *data_path);
   void (*interface_from_socket)(struct bNodeTree *ntree,
-                                struct bNodeSocket *stemp,
+                                struct bNodeSocket *interface_socket,
                                 struct bNode *node,
                                 struct bNodeSocket *sock);
 
@@ -1256,7 +1256,7 @@ struct bNode *ntreeShaderOutputNode(struct bNodeTree *ntree, int target);
  * This one needs to work on a local tree.
  *
  * TODO: This is *not* part of `blenkernel`, it's defined under "source/blender/nodes/".
- * This declaration should be be moved out of BKE.
+ * This declaration should be moved out of BKE.
  */
 void ntreeGPUMaterialNodes(struct bNodeTree *localtree,
                            struct GPUMaterial *mat,
@@ -1466,7 +1466,7 @@ void ntreeCompositTagRender(struct Scene *scene);
  *   which calls #node_cmp_rlayers_register_pass for every render layer node.
  *
  * TODO: This is *not* part of `blenkernel`, it's defined under "source/blender/nodes/".
- * This declaration should be be moved out of BKE.
+ * This declaration should be moved out of BKE.
  */
 void ntreeCompositUpdateRLayers(struct bNodeTree *ntree);
 void ntreeCompositRegisterPass(struct bNodeTree *ntree,
@@ -1718,6 +1718,7 @@ int ntreeTexExecTree(struct bNodeTree *ntree,
 #define GEO_NODE_GEOMETRY_TO_INSTANCE 1142
 #define GEO_NODE_INPUT_MESH_EDGE_NEIGHBORS 1143
 #define GEO_NODE_INPUT_MESH_ISLAND 1144
+#define GEO_NODE_INPUT_SCENE_TIME 1145
 /** \} */
 
 /* -------------------------------------------------------------------- */

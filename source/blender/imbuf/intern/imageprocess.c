@@ -40,7 +40,6 @@
 #include "IMB_imbuf_types.h"
 #include <math.h>
 
-/* Only this one is used liberally here, and in imbuf */
 void IMB_convert_rgba_to_abgr(struct ImBuf *ibuf)
 {
   size_t size;
@@ -157,10 +156,6 @@ void bilinear_interpolation_color(
 /* function assumes out to be zero'ed, only does RGBA */
 /* BILINEAR INTERPOLATION */
 
-/* Note about wrapping, the u/v still needs to be within the image bounds,
- * just the interpolation is wrapped.
- * This the same as bilinear_interpolation_color except it wraps
- * rather than using empty and emptyI. */
 void bilinear_interpolation_color_wrap(
     const struct ImBuf *in, unsigned char outI[4], float outF[4], float u, float v)
 {
@@ -254,7 +249,6 @@ void bilinear_interpolation(const ImBuf *in, ImBuf *out, float u, float v, int x
 /** \name Nearest Interpolation
  * \{ */
 
-/* functions assumes out to be zero'ed, only does RGBA */
 void nearest_interpolation_color_char(
     const struct ImBuf *in, unsigned char outI[4], float UNUSED(outF[4]), float u, float v)
 {
@@ -270,7 +264,7 @@ void nearest_interpolation_color_char(
     return;
   }
 
-  const size_t offset = (in->x * y1 + x1) * 4;
+  const size_t offset = ((size_t)in->x * y1 + x1) * 4;
   const unsigned char *dataI = (unsigned char *)in->rect + offset;
   outI[0] = dataI[0];
   outI[1] = dataI[1];
@@ -293,7 +287,7 @@ void nearest_interpolation_color_fl(
     return;
   }
 
-  const size_t offset = (in->x * y1 + x1) * 4;
+  const size_t offset = ((size_t)in->x * y1 + x1) * 4;
   const float *dataF = in->rect_float + offset;
   copy_v4_v4(outF, dataF);
 }
@@ -502,7 +496,6 @@ void IMB_alpha_under_color_byte(unsigned char *rect, int x, int y, const float b
 /** \name Sample Pixel
  * \{ */
 
-/* Sample pixel of image using NEAREST method. */
 void IMB_sampleImageAtLocation(ImBuf *ibuf, float x, float y, bool make_linear_rgb, float color[4])
 {
   if (ibuf->rect_float) {
