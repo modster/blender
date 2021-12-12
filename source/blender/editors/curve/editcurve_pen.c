@@ -1078,25 +1078,31 @@ static int curve_pen_insert_modal(bContext *C, wmOperator *op, const wmEvent *ev
     }
     if (dragging) {
       ED_curve_nurb_vert_selected_find(vc.obedit->data, vc.v3d, &nu, &bezt, &bp);
-      if (move_adjacent) {
+      if (move_adjacent && nu && bezt) {
         int displacement[2], screen_co_int[2];
         float screen_co_fl[2];
 
-        BezTriple *prev_bezt = BKE_nurb_bezt_get_prev(nu, bezt);
+        BezTriple *adj_bezt = BKE_nurb_bezt_get_prev(nu, bezt);
         int cp_index = 2;
-        if (!prev_bezt) {
-          prev_bezt = BKE_nurb_bezt_get_next(nu, bezt);
+        if (!adj_bezt) {
+          adj_bezt = BKE_nurb_bezt_get_next(nu, bezt);
           cp_index = 0;
+
+          if (!adj_bezt) {
+            return OPERATOR_FINISHED;
+          }
         }
+        remove_handle_movement_constraints(adj_bezt, true, true);
+
         ED_view3d_project_float_object(vc.region,
-                                       prev_bezt->vec[cp_index],
+                                       adj_bezt->vec[cp_index],
                                        screen_co_fl,
                                        V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN);
         sub_v2_v2v2_int(displacement, event->xy, event->prev_xy);
         screen_co_int[0] = (int)screen_co_fl[0];
         screen_co_int[1] = (int)screen_co_fl[1];
         add_v2_v2v2_int(screen_co_int, screen_co_int, displacement);
-        move_bezt_handle_or_vertex_to_location(prev_bezt, screen_co_int, cp_index, &vc);
+        move_bezt_handle_or_vertex_to_location(adj_bezt, screen_co_int, cp_index, &vc);
       }
       else {
         if (bezt) {
@@ -1107,7 +1113,7 @@ static int curve_pen_insert_modal(bContext *C, wmOperator *op, const wmEvent *ev
         }
       }
       if (nu && nu->type == CU_BEZIER) {
-        // BKE_nurb_handles_calc(nu);
+        BKE_nurb_handles_calc(nu);
       }
     }
   }
