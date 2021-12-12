@@ -154,25 +154,43 @@ static void remove_handle_movement_constraints(BezTriple *bezt, const bool f1, c
   }
 }
 
-/* Move handles or entire #BezTriple to mouse based on selection. */
-static void move_selected_bezt_to_mouse(BezTriple *bezt,
-                                        const ViewContext *vc,
-                                        const wmEvent *event)
+static void move_bezt_handle_or_vertex_to_location(BezTriple *bezt,
+                                                   const int mval[2],
+                                                   const short cp_index,
+                                                   const ViewContext *vc)
 {
   float location[3];
-  if (BEZT_ISSEL_IDX(bezt, 1)) {
-    mouse_location_to_worldspace(event->mval, bezt->vec[1], vc, location);
+  mouse_location_to_worldspace(mval, bezt->vec[cp_index], vc, location);
+  if (cp_index == 1) {
     move_bezt_to_location(bezt, location);
+  }
+  else {
+    copy_v3_v3(bezt->vec[cp_index], location);
+    if (bezt->h1 == HD_ALIGN && bezt->h2 == HD_ALIGN) {
+      float handle_vec[3];
+      sub_v3_v3v3(handle_vec, bezt->vec[1], location);
+      const short other_handle = cp_index == 2 ? 0 : 2;
+      normalize_v3_length(handle_vec, len_v3v3(bezt->vec[1], bezt->vec[other_handle]));
+      add_v3_v3v3(bezt->vec[other_handle], bezt->vec[1], handle_vec);
+    }
+  }
+}
+
+/* Move handles or entire #BezTriple to mouse based on selection. */
+static void move_selected_bezt_to_location(BezTriple *bezt,
+                                           const ViewContext *vc,
+                                           const int mval[2])
+{
+  if (BEZT_ISSEL_IDX(bezt, 1)) {
+    move_bezt_handle_or_vertex_to_location(bezt, mval, 1, vc);
   }
   else {
     remove_handle_movement_constraints(bezt, bezt->f1, bezt->f3);
     if (BEZT_ISSEL_IDX(bezt, 0)) {
-      mouse_location_to_worldspace(event->mval, bezt->vec[0], vc, location);
-      copy_v3_v3(bezt->vec[0], location);
+      move_bezt_handle_or_vertex_to_location(bezt, mval, 0, vc);
     }
     else {
-      mouse_location_to_worldspace(event->mval, bezt->vec[2], vc, location);
-      copy_v3_v3(bezt->vec[2], location);
+      move_bezt_handle_or_vertex_to_location(bezt, mval, 2, vc);
     }
   }
 }
@@ -652,8 +670,8 @@ static void add_bp_to_nurb(Nurb *nu, const CutData *data, Curve *cu)
   BKE_nurb_knot_calc_u(nu);
 }
 
-/* Make a cut on the nearest nurb at the closest point. */
-static void make_cut(const wmEvent *event, Curve *cu, Nurb **r_nu, const ViewContext *vc)
+/* Make a cut on the nearest nurb at the closest point. Return true if spline is nearby. */
+static bool make_cut(const wmEvent *event, Curve *cu, Nurb **r_nu, const ViewContext *vc)
 {
   CutData data = {.bezt_index = 0,
                   .bp_index = 0,
@@ -676,12 +694,15 @@ static void make_cut(const wmEvent *event, Curve *cu, Nurb **r_nu, const ViewCon
       if (data.min_dist < threshold_distance) {
         add_bezt_to_nurb(nu, &data, cu);
         *r_nu = nu;
+        return true;
       }
     }
     else if (data.min_dist < threshold_distance) {
       add_bp_to_nurb(nu, &data, cu);
+      return true;
     }
   }
+  return false;
 }
 
 /* Add a new vertex connected to the selected vertex. */
@@ -916,7 +937,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
       else {
         ED_curve_nurb_vert_selected_find(vc.obedit->data, vc.v3d, &nu, &bezt, &bp);
         if (bezt) {
-          move_selected_bezt_to_mouse(bezt, &vc, event);
+          move_selected_bezt_to_location(bezt, &vc, event->mval);
         }
         else if (bp) {
           move_bp_to_mouse(bp, event, &vc);
@@ -1047,6 +1068,8 @@ static int curve_pen_insert_modal(bContext *C, wmOperator *op, const wmEvent *ev
   int ret = OPERATOR_RUNNING_MODAL;
   /* Whether the mouse is clicking and dragging. */
   bool dragging = RNA_boolean_get(op->ptr, "dragging");
+  /* Whether the previous vertex is to be moved. */
+  bool move_adjacent = RNA_boolean_get(op->ptr, "move_adjacent");
 
   if (ELEM(event->type, MOUSEMOVE, INBETWEEN_MOUSEMOVE)) {
     if (!dragging && WM_event_drag_test(event, event->prev_click_xy) && event->val == KM_PRESS) {
@@ -1055,14 +1078,36 @@ static int curve_pen_insert_modal(bContext *C, wmOperator *op, const wmEvent *ev
     }
     if (dragging) {
       ED_curve_nurb_vert_selected_find(vc.obedit->data, vc.v3d, &nu, &bezt, &bp);
-      if (bezt) {
-        move_selected_bezt_to_mouse(bezt, &vc, event);
+      if (move_adjacent) {
+        int displacement[2], screen_co_int[2];
+        float screen_co_fl[2];
+
+        BezTriple *prev_bezt = BKE_nurb_bezt_get_prev(nu, bezt);
+        int cp_index = 2;
+        if (!prev_bezt) {
+          prev_bezt = BKE_nurb_bezt_get_next(nu, bezt);
+          cp_index = 0;
+        }
+        ED_view3d_project_float_object(vc.region,
+                                       prev_bezt->vec[cp_index],
+                                       screen_co_fl,
+                                       V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN);
+        sub_v2_v2v2_int(displacement, event->xy, event->prev_xy);
+        screen_co_int[0] = (int)screen_co_fl[0];
+        screen_co_int[1] = (int)screen_co_fl[1];
+        add_v2_v2v2_int(screen_co_int, screen_co_int, displacement);
+        move_bezt_handle_or_vertex_to_location(prev_bezt, screen_co_int, cp_index, &vc);
       }
-      else if (bp) {
-        move_bp_to_mouse(bp, event, &vc);
+      else {
+        if (bezt) {
+          move_selected_bezt_to_location(bezt, &vc, event->mval);
+        }
+        else if (bp) {
+          move_bp_to_mouse(bp, event, &vc);
+        }
       }
       if (nu && nu->type == CU_BEZIER) {
-        BKE_nurb_handles_calc(nu);
+        // BKE_nurb_handles_calc(nu);
       }
     }
   }
@@ -1075,7 +1120,11 @@ static int curve_pen_insert_modal(bContext *C, wmOperator *op, const wmEvent *ev
 
       get_closest_vertex_to_point_in_nurbs(nurbs, &nu, &bezt, &bp, mouse_point, &vc);
 
-      make_cut(event, cu, &nu, &vc);
+      bool no_spline = !make_cut(event, cu, &nu, &vc);
+
+      if (no_spline) {
+        RNA_boolean_set(op->ptr, "move_adjacent", true);
+      }
 
       if (nu && nu->type == CU_BEZIER) {
         BKE_nurb_handles_calc(nu);
@@ -1083,6 +1132,7 @@ static int curve_pen_insert_modal(bContext *C, wmOperator *op, const wmEvent *ev
     }
     else if (event->val == KM_RELEASE) {
       RNA_boolean_set(op->ptr, "dragging", false);
+      RNA_boolean_set(op->ptr, "move_adjacent", false);
       ret = OPERATOR_FINISHED;
     }
   }
@@ -1194,5 +1244,7 @@ void CURVE_OT_pen_insert(wmOperatorType *ot)
 
   PropertyRNA *prop;
   prop = RNA_def_boolean(ot->srna, "dragging", 0, "Dragging", "Check if click and drag");
+  prop = RNA_def_boolean(
+      ot->srna, "move_adjacent", 0, "Move Adjacent", "Whether the adjacent vertex is to be moved");
   RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
 }
