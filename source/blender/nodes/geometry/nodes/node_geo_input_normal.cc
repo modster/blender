@@ -39,7 +39,7 @@ static VArray<float3> construct_mesh_normals_gvarray(const MeshComponent &mesh_c
   switch (domain) {
     case ATTR_DOMAIN_FACE: {
       return VArray<float3>::ForSpan(
-          {(float3 *)BKE_mesh_ensure_poly_normals(&mesh), mesh.totpoly});
+          {(float3 *)BKE_mesh_poly_normals_ensure(&mesh), mesh.totpoly});
     }
     case ATTR_DOMAIN_POINT: {
       return VArray<float3>::ForSpan(
@@ -67,7 +67,7 @@ static VArray<float3> construct_mesh_normals_gvarray(const MeshComponent &mesh_c
        * component's generic domain interpolation is fine, the data will still be normalized,
        * since the face normal is just copied to every corner. */
       return mesh_component.attribute_try_adapt_domain(
-          VArray<float3>::ForSpan({(float3 *)BKE_mesh_ensure_poly_normals(&mesh), mesh.totpoly}),
+          VArray<float3>::ForSpan({(float3 *)BKE_mesh_poly_normals_ensure(&mesh), mesh.totpoly}),
           ATTR_DOMAIN_FACE,
           ATTR_DOMAIN_CORNER);
     }

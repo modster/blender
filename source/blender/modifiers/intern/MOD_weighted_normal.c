@@ -647,7 +647,7 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
       .split_angle = split_angle,
 
       .mpoly = mpoly,
-      .polynors = BKE_mesh_ensure_poly_normals(mesh),
+      .polynors = BKE_mesh_poly_normals_ensure(mesh),
       .poly_strength = CustomData_get_layer_named(
           &result->pdata, CD_PROP_INT32, MOD_WEIGHTEDNORMALS_FACEWEIGHT_CDLAYER_ID),
 

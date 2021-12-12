@@ -1619,7 +1619,7 @@ static void harmonic_coordinates_bind(MeshDeformModifierData *mmd, MeshDeformBin
     mdb->cagemesh_cache.mloop = me->mloop;
     mdb->cagemesh_cache.looptri = BKE_mesh_runtime_looptri_ensure(me);
     /* can be NULL */
-    mdb->cagemesh_cache.poly_nors = BKE_mesh_ensure_poly_normals(me);
+    mdb->cagemesh_cache.poly_nors = BKE_mesh_poly_normals_ensure(me);
   }
 
   /* make bounding box equal size in all directions, add padding, and compute

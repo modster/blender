@@ -146,7 +146,7 @@ bool BKE_shrinkwrap_init_tree(
   }
 
   if (force_normals || BKE_shrinkwrap_needs_normals(shrinkType, shrinkMode)) {
-    data->pnors = BKE_mesh_ensure_poly_normals(mesh);
+    data->pnors = BKE_mesh_poly_normals_ensure(mesh);
     if ((mesh->flag & ME_AUTOSMOOTH) != 0) {
       data->clnors = CustomData_get_layer(&mesh->ldata, CD_NORMAL);
     }

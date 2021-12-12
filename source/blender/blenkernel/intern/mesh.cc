@@ -93,7 +93,7 @@ static void mesh_init_data(ID *id)
 
   /* A newly created mesh does not have normals, so tag them dirty. This will be cleared by
    * retrieving the normal layer for manually writing to it, or calling functions like
-   * #BKE_mesh_ensure_poly_normals. */
+   * #BKE_mesh_poly_normals_ensure. */
   BKE_mesh_normals_tag_dirty(mesh);
 
   mesh->face_sets_color_seed = BLI_hash_int(PIL_check_seconds_timer_i() & UINT_MAX);
@@ -1918,7 +1918,7 @@ void BKE_mesh_calc_normals_split_ex(Mesh *mesh, MLoopNorSpaceArray *r_lnors_spac
                               r_loopnors,
                               mesh->totloop,
                               mesh->mpoly,
-                              BKE_mesh_ensure_poly_normals(mesh),
+                              BKE_mesh_poly_normals_ensure(mesh),
                               mesh->totpoly,
                               use_split_normals,
                               split_angle,

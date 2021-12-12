@@ -381,7 +381,7 @@ void mesh_render_data_update_normals(MeshRenderData *mr, const eMRDataType data_
     /* Mesh */
     mr->vert_normals = BKE_mesh_vertex_normals_ensure(mr->me);
     if (data_flag & (MR_DATA_POLY_NOR | MR_DATA_LOOP_NOR | MR_DATA_TAN_LOOP_NOR)) {
-      mr->poly_normals = BKE_mesh_ensure_poly_normals(mr->me);
+      mr->poly_normals = BKE_mesh_poly_normals_ensure(mr->me);
     }
     if (((data_flag & MR_DATA_LOOP_NOR) && is_auto_smooth) || (data_flag & MR_DATA_TAN_LOOP_NOR)) {
       mr->loop_normals = MEM_mallocN(sizeof(*mr->loop_normals) * mr->loop_len, __func__);
