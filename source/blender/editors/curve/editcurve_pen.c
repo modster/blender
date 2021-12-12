@@ -827,41 +827,6 @@ static void move_segment(MoveSegmentData *seg_data, const wmEvent *event, ViewCo
   }
 }
 
-/* Close the spline if endpoints are selected consecutively. Return true if cycle was created. */
-static bool make_cyclic_if_endpoints(
-    Nurb *sel_nu, BezTriple *sel_bezt, BPoint *sel_bp, ViewContext *vc, bContext *C)
-{
-  if (sel_bezt || sel_bp) {
-    const bool is_bezt_endpoint = (sel_nu->type == CU_BEZIER &&
-                                   (sel_bezt == sel_nu->bezt ||
-                                    sel_bezt == sel_nu->bezt + sel_nu->pntsu - 1));
-    const bool is_bp_endpoint = (sel_nu->type != CU_BEZIER &&
-                                 (sel_bp == sel_nu->bp ||
-                                  sel_bp == sel_nu->bp + sel_nu->pntsu - 1));
-    if (!(is_bezt_endpoint || is_bp_endpoint)) {
-      return false;
-    }
-
-    short hand;
-    Nurb *nu = NULL;
-    BezTriple *bezt = NULL;
-    BPoint *bp = NULL;
-    Base *basact = NULL;
-    ED_curve_pick_vert(vc, 1, &nu, &bezt, &bp, &hand, &basact);
-
-    if (nu == sel_nu && ((nu->type == CU_BEZIER && bezt != sel_bezt &&
-                          (bezt == nu->bezt || bezt == nu->bezt + nu->pntsu - 1)) ||
-                         (nu->type != CU_BEZIER && bp != sel_bp &&
-                          (bp == nu->bp || bp == nu->bp + nu->pntsu - 1)))) {
-      View3D *v3d = CTX_wm_view3d(C);
-      ListBase *editnurb = object_editcurve_get(vc->obedit);
-      ed_curve_toggle_cyclic(v3d, editnurb, 0);
-      return true;
-    }
-  }
-  return false;
-}
-
 enum {
   PEN_MODAL_FREE_MOVE_HANDLE = 1,
 };
@@ -972,16 +937,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
           C, event->mval, SEL_DIST_MUL, false, false, false);
       RNA_boolean_set(op->ptr, "new", !found_point);
 
-      if (found_point) {
-        copy_v2_v2_int(vc.mval, event->mval);
-        if (nu && !(nu->flagu & CU_NURB_CYCLIC)) {
-          const bool closed = nu->pntsu > 2 && make_cyclic_if_endpoints(nu, bezt, bp, &vc, C);
-
-          /* Set "new" to true to be able to click and drag to control handles when added. */
-          RNA_boolean_set(op->ptr, "new", closed);
-        }
-      }
-      else {
+      if (!found_point) {
         if (is_spline_nearby(&vc, op, event)) {
           RNA_boolean_set(op->ptr, "moving_segment", true);
           moving_segment = true;
