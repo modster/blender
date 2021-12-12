@@ -152,10 +152,11 @@ static void mesh_copy_data(Main *bmain, ID *id_dst, const ID *id_src, const int 
 
   mesh_dst->mselect = (MSelect *)MEM_dupallocN(mesh_dst->mselect);
 
-  /* Copy dirty flags, essential for normal layers to avoid recomputation and
-   * to ensure that when no normal layers exist, they are marked as dirty. */
-  mesh_dst->runtime.cd_dirty_poly = mesh_src->runtime.cd_dirty_poly;
-  mesh_dst->runtime.cd_dirty_vert = mesh_src->runtime.cd_dirty_vert;
+  /* Set normal layers dirty, since they aren't included in CD_MASK_MESH and are therefore not
+   * copied to the destination mesh. Alternatively normal layers could be copied if they aren't
+   * dirty, avoiding recomputation in some cases. However, a copied mesh is often changed anyway,
+   * so that idea is not clearly better. */
+  BKE_mesh_normals_tag_dirty(mesh_dst);
 
   /* TODO: Do we want to add flag to prevent this? */
   if (mesh_src->key && (flag & LIB_ID_COPY_SHAPEKEY)) {
