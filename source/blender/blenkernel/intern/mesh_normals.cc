@@ -140,6 +140,24 @@ float (*BKE_mesh_face_normals_for_write(Mesh *mesh))[3]
 /** \name Mesh Normal Calculation (Polygons)
  * \{ */
 
+struct MeshCalcNormalsData_Poly {
+  const MVert *mvert;
+  const MLoop *mloop;
+  const MPoly *mpoly;
+
+  /** Polygon normal output. */
+  float (*pnors)[3];
+};
+
+static void mesh_calc_normals_poly_fn(void *__restrict userdata,
+                                      const int pidx,
+                                      const TaskParallelTLS *__restrict UNUSED(tls))
+{
+  const MeshCalcNormalsData_Poly *data = (MeshCalcNormalsData_Poly *)userdata;
+  const MPoly *mp = &data->mpoly[pidx];
+  BKE_mesh_calc_poly_normal(mp, data->mloop + mp->loopstart, data->mvert, data->pnors[pidx]);
+}
+
 void BKE_mesh_calc_normals_poly(const MVert *mvert,
                                 int UNUSED(mvert_len),
                                 const MLoop *mloop,
@@ -148,14 +166,19 @@ void BKE_mesh_calc_normals_poly(const MVert *mvert,
                                 int mpoly_len,
                                 float (*r_poly_normals)[3])
 {
+  TaskParallelSettings settings;
+  BLI_parallel_range_settings_defaults(&settings);
+  settings.min_iter_per_thread = 1024;
+
   BLI_assert((r_poly_normals != nullptr) || (mpoly_len == 0));
 
-  blender::threading::parallel_for(IndexRange(mpoly_len), 1024, [&](IndexRange range) {
-    for (const int i : range) {
-      const MPoly &poly = mpoly[i];
-      BKE_mesh_calc_poly_normal(&poly, &mloop[poly.loopstart], mvert, r_poly_normals[i]);
-    }
-  });
+  MeshCalcNormalsData_Poly data = {};
+  data.mpoly = mpoly;
+  data.mloop = mloop;
+  data.mvert = mvert;
+  data.pnors = r_poly_normals;
+
+  BLI_task_parallel_range(0, mpoly_len, &data, mesh_calc_normals_poly_fn, &settings);
 }
 
 /** \} */
@@ -167,84 +190,137 @@ void BKE_mesh_calc_normals_poly(const MVert *mvert,
  * meshes can slow down high-poly meshes. For details on performance, see D11993.
  * \{ */
 
-static void mesh_calc_normals_poly_and_vertex(MutableSpan<MVert> mverts,
-                                              Span<MLoop> loops,
-                                              Span<MPoly> polys,
-                                              MutableSpan<float3> poly_normals,
-                                              MutableSpan<float3> vert_normals)
+struct MeshCalcNormalsData_PolyAndVertex {
+  /** Write into vertex normals #MVert.no. */
+  MVert *mvert;
+  const MLoop *mloop;
+  const MPoly *mpoly;
+
+  /** Polygon normal output. */
+  float (*pnors)[3];
+  /** Vertex normal output (may be freed, copied into #MVert.no). */
+  float (*vnors)[3];
+};
+
+static void mesh_calc_normals_poly_and_vertex_accum_fn(
+    void *__restrict userdata, const int pidx, const TaskParallelTLS *__restrict UNUSED(tls))
 {
-  vert_normals.fill(float3(0));
+  const MeshCalcNormalsData_PolyAndVertex *data = (MeshCalcNormalsData_PolyAndVertex *)userdata;
+  const MPoly *mp = &data->mpoly[pidx];
+  const MLoop *ml = &data->mloop[mp->loopstart];
+  const MVert *mverts = data->mvert;
+  float(*vnors)[3] = data->vnors;
 
-  /* Compute poly normals, accumulating them into vertex normals. */
-  blender::threading::parallel_for(polys.index_range(), 1024, [&](IndexRange range) {
-    for (const int i : range) {
-      const MPoly &poly = polys[i];
-      Span<MLoop> ml = loops.slice(poly.loopstart, poly.totloop);
+  float pnor_temp[3];
+  float *pnor = data->pnors ? data->pnors[pidx] : pnor_temp;
 
-      float3 &pnor = poly_normals[i];
+  const int i_end = mp->totloop - 1;
 
-      const int i_end = poly.totloop - 1;
-
-      /* Polygon Normal and edge-vector. */
-      /* Inline version of #BKE_mesh_calc_poly_normal, also does edge-vectors. */
-      {
-        zero_v3(pnor);
-        /* Newell's Method */
-        const float *v_curr = mverts[ml[i_end].v].co;
-        for (int i_next = 0; i_next <= i_end; i_next++) {
-          const float *v_next = mverts[ml[i_next].v].co;
-          add_newell_cross_v3_v3v3(pnor, v_curr, v_next);
-          v_curr = v_next;
-        }
-        if (UNLIKELY(normalize_v3(pnor) == 0.0f)) {
-          pnor[2] = 1.0f; /* Other axes set to zero. */
-        }
-      }
-
-      /* Accumulate angle weighted face normal into the vertex normal. */
-      /* Inline version of #accumulate_vertex_normals_poly_v3. */
-      {
-        float edvec_prev[3], edvec_next[3], edvec_end[3];
-        const float *v_curr = mverts[ml[i_end].v].co;
-        sub_v3_v3v3(edvec_prev, mverts[ml[i_end - 1].v].co, v_curr);
-        normalize_v3(edvec_prev);
-        copy_v3_v3(edvec_end, edvec_prev);
-
-        for (int i_next = 0, i_curr = i_end; i_next <= i_end; i_curr = i_next++) {
-          const float *v_next = mverts[ml[i_next].v].co;
-
-          /* Skip an extra normalization by reusing the first calculated edge. */
-          if (i_next != i_end) {
-            sub_v3_v3v3(edvec_next, v_curr, v_next);
-            normalize_v3(edvec_next);
-          }
-          else {
-            copy_v3_v3(edvec_next, edvec_end);
-          }
-
-          /* Calculate angle between the two poly edges incident on this vertex. */
-          const float fac = saacos(-dot_v3v3(edvec_prev, edvec_next));
-          const float vnor_add[3] = {pnor[0] * fac, pnor[1] * fac, pnor[2] * fac};
-
-          add_v3_v3_atomic(vert_normals[ml[i_curr].v], vnor_add);
-          v_curr = v_next;
-          copy_v3_v3(edvec_prev, edvec_next);
-        }
-      }
+  /* Polygon Normal and edge-vector. */
+  /* Inline version of #BKE_mesh_calc_poly_normal, also does edge-vectors. */
+  {
+    zero_v3(pnor);
+    /* Newell's Method */
+    const float *v_curr = mverts[ml[i_end].v].co;
+    for (int i_next = 0; i_next <= i_end; i_next++) {
+      const float *v_next = mverts[ml[i_next].v].co;
+      add_newell_cross_v3_v3v3(pnor, v_curr, v_next);
+      v_curr = v_next;
     }
-  });
-
-  /* Normalize and validate computed vertex normals. */
-  blender::threading::parallel_for(mverts.index_range(), 1024, [&](IndexRange range) {
-    for (const int i : range) {
-      MVert &vert = mverts[i];
-      float3 &no = vert_normals[i];
-      if (UNLIKELY(normalize_v3(no) == 0.0f)) {
-        /* Following Mesh convention; we use vertex coordinate itself for normal in this case. */
-        normalize_v3_v3(no, vert.co);
-      }
+    if (UNLIKELY(normalize_v3(pnor) == 0.0f)) {
+      pnor[2] = 1.0f; /* Other axes set to zero. */
     }
-  });
+  }
+
+  /* Accumulate angle weighted face normal into the vertex normal. */
+  /* Inline version of #accumulate_vertex_normals_poly_v3. */
+  {
+    float edvec_prev[3], edvec_next[3], edvec_end[3];
+    const float *v_curr = mverts[ml[i_end].v].co;
+    sub_v3_v3v3(edvec_prev, mverts[ml[i_end - 1].v].co, v_curr);
+    normalize_v3(edvec_prev);
+    copy_v3_v3(edvec_end, edvec_prev);
+
+    for (int i_next = 0, i_curr = i_end; i_next <= i_end; i_curr = i_next++) {
+      const float *v_next = mverts[ml[i_next].v].co;
+
+      /* Skip an extra normalization by reusing the first calculated edge. */
+      if (i_next != i_end) {
+        sub_v3_v3v3(edvec_next, v_curr, v_next);
+        normalize_v3(edvec_next);
+      }
+      else {
+        copy_v3_v3(edvec_next, edvec_end);
+      }
+
+      /* Calculate angle between the two poly edges incident on this vertex. */
+      const float fac = saacos(-dot_v3v3(edvec_prev, edvec_next));
+      const float vnor_add[3] = {pnor[0] * fac, pnor[1] * fac, pnor[2] * fac};
+
+      add_v3_v3_atomic(vnors[ml[i_curr].v], vnor_add);
+      v_curr = v_next;
+      copy_v3_v3(edvec_prev, edvec_next);
+    }
+  }
+}
+
+static void mesh_calc_normals_poly_and_vertex_finalize_fn(
+    void *__restrict userdata, const int vidx, const TaskParallelTLS *__restrict UNUSED(tls))
+{
+  MeshCalcNormalsData_PolyAndVertex *data = (MeshCalcNormalsData_PolyAndVertex *)userdata;
+
+  MVert *mv = &data->mvert[vidx];
+  float *no = data->vnors[vidx];
+
+  if (UNLIKELY(normalize_v3(no) == 0.0f)) {
+    /* Following Mesh convention; we use vertex coordinate itself for normal in this case. */
+    normalize_v3_v3(no, mv->co);
+  }
+}
+
+static void mesh_calc_normals_poly_and_vertex(MVert *mvert,
+                                              const int mvert_len,
+                                              const MLoop *mloop,
+                                              const int UNUSED(mloop_len),
+                                              const MPoly *mpoly,
+                                              const int mpoly_len,
+                                              float (*r_poly_normals)[3],
+                                              float (*r_vert_normals)[3])
+{
+  TaskParallelSettings settings;
+  BLI_parallel_range_settings_defaults(&settings);
+  settings.min_iter_per_thread = 1024;
+
+  float(*vnors)[3] = r_vert_normals;
+  bool free_vnors = false;
+
+  /* First go through and calculate normals for all the polys. */
+  if (vnors == nullptr) {
+    vnors = (float(*)[3])MEM_calloc_arrayN((size_t)mvert_len, sizeof(*vnors), __func__);
+    free_vnors = true;
+  }
+  else {
+    memset(vnors, 0, sizeof(*vnors) * (size_t)mvert_len);
+  }
+
+  MeshCalcNormalsData_PolyAndVertex data = {};
+  data.mpoly = mpoly;
+  data.mloop = mloop;
+  data.mvert = mvert;
+  data.pnors = r_poly_normals;
+  data.vnors = vnors;
+
+  /* Compute poly normals (`pnors`), accumulating them into vertex normals (`vnors`). */
+  BLI_task_parallel_range(
+      0, mpoly_len, &data, mesh_calc_normals_poly_and_vertex_accum_fn, &settings);
+
+  /* Normalize and validate computed vertex normals (`vnors`). */
+  BLI_task_parallel_range(
+      0, mvert_len, &data, mesh_calc_normals_poly_and_vertex_finalize_fn, &settings);
+
+  if (free_vnors) {
+    MEM_freeN(vnors);
+  }
 }
 
 /** \} */
@@ -276,16 +352,17 @@ const float (*BKE_mesh_vertex_normals_ensure(const Mesh *mesh))[3]
 
   Mesh &me = *const_cast<Mesh *>(mesh);
 
-  MutableSpan<float3> vert_normals{
-      (float3 *)CustomData_add_layer(&me.vdata, CD_NORMAL, CD_CALLOC, nullptr, me.totvert),
-      me.totvert};
-  MutableSpan<float3> poly_normals{
-      (float3 *)CustomData_add_layer(&me.pdata, CD_NORMAL, CD_CALLOC, nullptr, me.totpoly),
-      me.totpoly};
+  float(*vert_normals)[3] = (float(*)[3])CustomData_add_layer(
+      &me.vdata, CD_NORMAL, CD_CALLOC, nullptr, me.totvert);
+  float(*poly_normals)[3] = (float(*)[3])CustomData_add_layer(
+      &me.pdata, CD_NORMAL, CD_CALLOC, nullptr, me.totpoly);
 
-  mesh_calc_normals_poly_and_vertex({me.mvert, me.totvert},
-                                    {me.mloop, me.totloop},
-                                    {me.mpoly, me.totpoly},
+  mesh_calc_normals_poly_and_vertex(me.mvert,
+                                    me.totvert,
+                                    me.mloop,
+                                    me.totloop,
+                                    me.mpoly,
+                                    me.totpoly,
                                     poly_normals,
                                     vert_normals);
 
@@ -293,7 +370,7 @@ const float (*BKE_mesh_vertex_normals_ensure(const Mesh *mesh))[3]
   me.runtime.cd_dirty_poly &= ~CD_MASK_NORMAL;
 
   BLI_mutex_unlock(normals_mutex);
-  return (const float(*)[3])vert_normals.data();
+  return vert_normals;
 }
 
 const float (*BKE_mesh_poly_normals_ensure(const Mesh *mesh))[3]
