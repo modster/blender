@@ -144,24 +144,24 @@ template<
      * \brief Kind of buffer.
      * Possible options: float, unsigned char.
      */
-    typename ImBufStorageType = float,
+    typename StorageType = float,
 
     /**
      * \brief Number of channels of a single pixel.
      */
     int NumChannels = 4>
 class TexelPointer {
-  ImBufStorageType *pointer;
+  StorageType *pointer;
 
  public:
   void init_pixel_pointer(const ImBuf *image_buffer, int x, int y)
   {
     const size_t offset = (y * (size_t)image_buffer->x + x) * NumChannels;
 
-    if constexpr (std::is_same_v<ImBufStorageType, float>) {
+    if constexpr (std::is_same_v<StorageType, float>) {
       pointer = image_buffer->rect_float + offset;
     }
-    else if constexpr (std::is_same_v<ImBufStorageType, unsigned char>) {
+    else if constexpr (std::is_same_v<StorageType, unsigned char>) {
       pointer = const_cast<unsigned char *>(
           static_cast<const unsigned char *>(static_cast<const void *>(image_buffer->rect)) +
           offset);
@@ -170,29 +170,68 @@ class TexelPointer {
       pointer = nullptr;
     }
   }
+  /*
+    float *get_float_pointer()
+    {
+      if constexpr (std::is_same_v<StorageType, float>) {
+        return pointer;
+      }
+      else {
+        return nullptr;
+      }
+    }
+    unsigned char *get_uchar_pointer()
+    {
+      if constexpr (std::is_same_v<StorageType, unsigned char>) {
+        return pointer;
+      }
+      else {
+        return nullptr;
+      }
+    }
+    */
 
-  float *get_float_pointer()
+  /**
+   * \brief Get pointer to the current texel to write to.
+   */
+  StorageType *get_pointer()
   {
-    if constexpr (std::is_same_v<ImBufStorageType, float>) {
-      return pointer;
-    }
-    else {
-      return nullptr;
-    }
-  }
-  unsigned char *get_uchar_pointer()
-  {
-    if constexpr (std::is_same_v<ImBufStorageType, unsigned char>) {
-      return pointer;
-    }
-    else {
-      return nullptr;
-    }
+    return pointer;
   }
 
   void increase_pixel_pointer()
   {
     pointer += NumChannels;
+  }
+};
+
+template<eIMBInterpolationFilterMode Filter, typename StorageType, int NumChannels> class Sampler {
+ public:
+  virtual void sample(const ImBuf *source,
+                      const float u,
+                      const float v,
+                      StorageType r_sample[NumChannels])
+  {
+    if constexpr (Filter == IMB_FILTER_NEAREST && std::is_same_v<StorageType, float> &&
+                  NumChannels == 4) {
+      nearest_interpolation_color_fl(source, nullptr, r_sample, u, v);
+    }
+    else if constexpr (Filter == IMB_FILTER_BILINEAR && std::is_same_v<StorageType, float> &&
+                       NumChannels == 4) {
+      bilinear_interpolation_color_fl(source, nullptr, r_sample, u, v);
+    }
+    else if constexpr (Filter == IMB_FILTER_NEAREST &&
+                       std::is_same_v<StorageType, unsigned char> && NumChannels == 4) {
+      nearest_interpolation_color_char(source, r_sample, nullptr, u, v);
+    }
+    else if constexpr (Filter == IMB_FILTER_BILINEAR &&
+                       std::is_same_v<StorageType, unsigned char> && NumChannels == 4) {
+      bilinear_interpolation_color_char(source, r_sample, nullptr, u, v);
+    }
+    else {
+      /* Unsupported sampler. */
+      BLI_assert_unreachable();
+    }
   }
 };
 
@@ -269,7 +308,7 @@ template<
     /**
      * \brief Color interpolation function to read from the source buffer.
      */
-    InterpolationColorFunction ColorInterpolation,
+    typename Sampler,
 
     /**
      * \brief Kernel to store to the destination buffer.
@@ -286,6 +325,7 @@ class ScanlineProcessor {
   Discard discarder;
   UVWrapping uv_wrapping;
   OutputTexelPointer output;
+  Sampler sampler;
 
  public:
   void process(const TransformUserData *user_data, int scanline)
@@ -298,11 +338,11 @@ class ScanlineProcessor {
     output.init_pixel_pointer(user_data->dst, 0, scanline);
     for (int xi = 0; xi < width; xi++) {
       if (!discarder.should_discard(*user_data, uv)) {
-        ColorInterpolation(user_data->src,
-                           output.get_uchar_pointer(),
-                           output.get_float_pointer(),
-                           uv_wrapping.modify_u(*user_data, uv[0]),
-                           uv_wrapping.modify_v(*user_data, uv[1]));
+
+        sampler.sample(user_data->src,
+                       uv_wrapping.modify_u(*user_data, uv[0]),
+                       uv_wrapping.modify_v(*user_data, uv[1]),
+                       output.get_pointer());
       }
 
       add_v2_v2(uv, user_data->add_x);
@@ -318,26 +358,29 @@ template<typename Processor> void transform_scanline_function(void *custom_data,
   processor.process(user_data, scanline);
 }
 
-template<InterpolationColorFunction InterpolationFunction, typename StorageType>
+template<eIMBInterpolationFilterMode Filter, typename StorageType, int NumChannels>
 ScanlineThreadFunc get_scanline_function(const eIMBTransformMode mode)
 
 {
   switch (mode) {
     case IMB_TRANSFORM_MODE_REGULAR:
-      return transform_scanline_function<ScanlineProcessor<NoDiscard,
-                                                           InterpolationFunction,
-                                                           TexelPointer<StorageType, 4>,
-                                                           PassThroughUV>>;
+      return transform_scanline_function<
+          ScanlineProcessor<NoDiscard,
+                            Sampler<Filter, StorageType, NumChannels>,
+                            TexelPointer<StorageType, NumChannels>,
+                            PassThroughUV>>;
     case IMB_TRANSFORM_MODE_CROP_SRC:
-      return transform_scanline_function<ScanlineProcessor<CropSource,
-                                                           InterpolationFunction,
-                                                           TexelPointer<StorageType, 4>,
-                                                           PassThroughUV>>;
+      return transform_scanline_function<
+          ScanlineProcessor<CropSource,
+                            Sampler<Filter, StorageType, NumChannels>,
+                            TexelPointer<StorageType, NumChannels>,
+                            PassThroughUV>>;
     case IMB_TRANSFORM_MODE_WRAP_REPEAT:
-      return transform_scanline_function<ScanlineProcessor<NoDiscard,
-                                                           InterpolationFunction,
-                                                           TexelPointer<StorageType, 4>,
-                                                           WrapRepeatUV>>;
+      return transform_scanline_function<
+          ScanlineProcessor<NoDiscard,
+                            Sampler<Filter, StorageType, NumChannels>,
+                            TexelPointer<StorageType, NumChannels>,
+                            WrapRepeatUV>>;
   }
 
   BLI_assert_unreachable();
@@ -350,16 +393,10 @@ static void transform(TransformUserData *user_data, const eIMBTransformMode mode
   ScanlineThreadFunc scanline_func = nullptr;
 
   if (user_data->dst->rect_float) {
-    constexpr InterpolationColorFunction interpolation_function =
-        Filter == IMB_FILTER_NEAREST ? nearest_interpolation_color_fl :
-                                       bilinear_interpolation_color_fl;
-    scanline_func = get_scanline_function<interpolation_function, float>(mode);
+    scanline_func = get_scanline_function<Filter, float, 4>(mode);
   }
   else if (user_data->dst->rect) {
-    constexpr InterpolationColorFunction interpolation_function =
-        Filter == IMB_FILTER_NEAREST ? nearest_interpolation_color_char :
-                                       bilinear_interpolation_color_char;
-    scanline_func = get_scanline_function<interpolation_function, unsigned char>(mode);
+    scanline_func = get_scanline_function<Filter, unsigned char, 4>(mode);
   }
 
   if (scanline_func != nullptr) {
