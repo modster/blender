@@ -387,7 +387,7 @@ class ChannelConverter {
     }
     else if constexpr (std::is_same_v<StorageType, float> && SourceNumChannels == 1 &&
                        DestinationNumChannels == 4) {
-      copy_v4_fl4(texel_pointer.get_pointer(), sample[0], 0.0f, 0.0f, 1.0f);
+      copy_v4_fl4(texel_pointer.get_pointer(), sample[0], sample[0], sample[0], 1.0f);
     }
     else {
       BLI_assert_unreachable();
