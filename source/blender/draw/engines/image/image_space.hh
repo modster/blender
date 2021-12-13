@@ -86,15 +86,7 @@ class AbstractSpaceAccessor {
                                 GPUTexture **r_tex_tile_data) = 0;
 
   /**
-   * Does this space override the view.
-   * When so this member should return true and the create_view_override must return the view to
-   * use during drawing.
-   */
-  virtual bool has_view_override() const = 0;
-
-  /**
    * Override the view for drawing.
-   * Should match #has_view_override.
    */
   virtual DRWView *create_view_override(const ARegion *UNUSED(region)) = 0;
 

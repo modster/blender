@@ -101,11 +101,6 @@ class SpaceImageAccessor : public AbstractSpaceAccessor {
     }
   }
 
-  bool has_view_override() const override
-  {
-    return true;
-  }
-
   DRWView *create_view_override(const ARegion *region) override
   {
     /* Setup a screen pixel view. The backdrop of the node editor doesn't follow the region. */

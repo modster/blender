@@ -88,11 +88,8 @@ class ImageEngine {
   {
     IMAGE_InstanceData *instance_data = vedata->instance_data;
     drawing_mode.cache_init(vedata);
-    instance_data->view = nullptr;
-    if (space->has_view_override()) {
-      const ARegion *region = draw_ctx->region;
-      instance_data->view = space->create_view_override(region);
-    }
+    const ARegion *region = draw_ctx->region;
+    instance_data->view = space->create_view_override(region);
   }
 
   void cache_populate()
