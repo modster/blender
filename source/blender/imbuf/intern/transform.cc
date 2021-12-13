@@ -21,6 +21,7 @@
  * \ingroup imbuf
  */
 
+#include <array>
 #include <type_traits>
 
 #include "BLI_math.h"
@@ -151,6 +152,10 @@ template<
      */
     int NumChannels = 4>
 class TexelPointer {
+ public:
+  static const int ChannelLen = NumChannels;
+
+ private:
   StorageType *pointer;
 
  public:
@@ -170,26 +175,6 @@ class TexelPointer {
       pointer = nullptr;
     }
   }
-  /*
-    float *get_float_pointer()
-    {
-      if constexpr (std::is_same_v<StorageType, float>) {
-        return pointer;
-      }
-      else {
-        return nullptr;
-      }
-    }
-    unsigned char *get_uchar_pointer()
-    {
-      if constexpr (std::is_same_v<StorageType, unsigned char>) {
-        return pointer;
-      }
-      else {
-        return nullptr;
-      }
-    }
-    */
 
   /**
    * \brief Get pointer to the current texel to write to.
@@ -207,6 +192,10 @@ class TexelPointer {
 
 template<eIMBInterpolationFilterMode Filter, typename StorageType, int NumChannels> class Sampler {
  public:
+  using ChannelType = StorageType;
+  static const int ChannelLen = NumChannels;
+  using SampleType = std::array<StorageType, NumChannels>;
+
   virtual void sample(const ImBuf *source,
                       const float u,
                       const float v,
@@ -231,6 +220,44 @@ template<eIMBInterpolationFilterMode Filter, typename StorageType, int NumChanne
     else {
       /* Unsupported sampler. */
       BLI_assert_unreachable();
+    }
+  }
+};
+
+/**
+ * \brief Change the number of channels and store it.
+ *
+ * Template class to convert and store a sample in a TexelPointer.
+ * It supports:
+ * - 4 channel unsigned char -> 4 channel unsigned char.
+ * - 4 channel float -> 4 channel float.
+ * - 3 channel float -> 4 channel float.
+ */
+template<typename StorageType, int SourceNumChannels, int DestinationNumChannels>
+class ChannelConverter {
+ public:
+  using SampleType = std::array<StorageType, SourceNumChannels>;
+  using TexelType = TexelPointer<StorageType, DestinationNumChannels>;
+
+  /**
+   * \brief Convert the number of channels of the given sample to match the texel pointer and store
+   * it at the location the texel_pointer points at.
+   */
+  void convert_and_store(const SampleType &sample, TexelType &texel_pointer)
+  {
+    if constexpr (std::is_same_v<StorageType, unsigned char>) {
+      BLI_STATIC_ASSERT(SourceNumChannels == 4, "Unsigned chars always have 4 channels.");
+      BLI_STATIC_ASSERT(DestinationNumChannels == 4, "Unsigned chars always have 4 channels.");
+
+      copy_v4_v4_uchar(texel_pointer.get_pointer(), sample.begin());
+    }
+    else if constexpr (std::is_same_v<StorageType, float> && SourceNumChannels == 4 &&
+                       DestinationNumChannels == 4) {
+      copy_v4_v4(texel_pointer.get_pointer(), sample.begin());
+    }
+    else if constexpr (std::is_same_v<StorageType, float> && SourceNumChannels == 3 &&
+                       DestinationNumChannels == 4) {
+      copy_v4_fl4(texel_pointer.get_pointer(), sample[0], sample[1], sample[2], 1.0f);
     }
   }
 };
@@ -326,6 +353,10 @@ class ScanlineProcessor {
   UVWrapping uv_wrapping;
   OutputTexelPointer output;
   Sampler sampler;
+  ChannelConverter<typename Sampler::ChannelType,
+                   Sampler::ChannelLen,
+                   OutputTexelPointer::ChannelLen>
+      channel_converter;
 
  public:
   void process(const TransformUserData *user_data, int scanline)
@@ -338,11 +369,12 @@ class ScanlineProcessor {
     output.init_pixel_pointer(user_data->dst, 0, scanline);
     for (int xi = 0; xi < width; xi++) {
       if (!discarder.should_discard(*user_data, uv)) {
-
+        typename Sampler::SampleType sample;
         sampler.sample(user_data->src,
                        uv_wrapping.modify_u(*user_data, uv[0]),
                        uv_wrapping.modify_v(*user_data, uv[1]),
-                       output.get_pointer());
+                       &sample[0]);
+        channel_converter.convert_and_store(sample, output);
       }
 
       add_v2_v2(uv, user_data->add_x);
@@ -358,7 +390,10 @@ template<typename Processor> void transform_scanline_function(void *custom_data,
   processor.process(user_data, scanline);
 }
 
-template<eIMBInterpolationFilterMode Filter, typename StorageType, int NumChannels>
+template<eIMBInterpolationFilterMode Filter,
+         typename StorageType,
+         int SourceNumChannels,
+         int DestinationNumChannels>
 ScanlineThreadFunc get_scanline_function(const eIMBTransformMode mode)
 
 {
@@ -366,24 +401,43 @@ ScanlineThreadFunc get_scanline_function(const eIMBTransformMode mode)
     case IMB_TRANSFORM_MODE_REGULAR:
       return transform_scanline_function<
           ScanlineProcessor<NoDiscard,
-                            Sampler<Filter, StorageType, NumChannels>,
-                            TexelPointer<StorageType, NumChannels>,
+                            Sampler<Filter, StorageType, SourceNumChannels>,
+                            TexelPointer<StorageType, DestinationNumChannels>,
                             PassThroughUV>>;
     case IMB_TRANSFORM_MODE_CROP_SRC:
       return transform_scanline_function<
           ScanlineProcessor<CropSource,
-                            Sampler<Filter, StorageType, NumChannels>,
-                            TexelPointer<StorageType, NumChannels>,
+                            Sampler<Filter, StorageType, SourceNumChannels>,
+                            TexelPointer<StorageType, DestinationNumChannels>,
                             PassThroughUV>>;
     case IMB_TRANSFORM_MODE_WRAP_REPEAT:
       return transform_scanline_function<
           ScanlineProcessor<NoDiscard,
-                            Sampler<Filter, StorageType, NumChannels>,
-                            TexelPointer<StorageType, NumChannels>,
+                            Sampler<Filter, StorageType, SourceNumChannels>,
+                            TexelPointer<StorageType, DestinationNumChannels>,
                             WrapRepeatUV>>;
   }
 
   BLI_assert_unreachable();
+  return nullptr;
+}
+
+template<eIMBInterpolationFilterMode Filter>
+ScanlineThreadFunc get_scanline_function(const TransformUserData *user_data,
+                                         const eIMBTransformMode mode)
+{
+  const ImBuf *src = user_data->src;
+  const ImBuf *dst = user_data->dst;
+
+  if (src->channels == 4 && dst->channels == 4) {
+    return get_scanline_function<Filter, float, 4, 4>(mode);
+  }
+  if (src->channels == 3 && dst->channels == 4) {
+    return get_scanline_function<Filter, float, 3, 4>(mode);
+  }
+  if (src->channels == 3 && dst->channels == 4) {
+    return get_scanline_function<Filter, float, 3, 4>(mode);
+  }
   return nullptr;
 }
 
@@ -393,10 +447,11 @@ static void transform(TransformUserData *user_data, const eIMBTransformMode mode
   ScanlineThreadFunc scanline_func = nullptr;
 
   if (user_data->dst->rect_float) {
-    scanline_func = get_scanline_function<Filter, float, 4>(mode);
+    scanline_func = get_scanline_function<Filter>(user_data, mode);
   }
   else if (user_data->dst->rect) {
-    scanline_func = get_scanline_function<Filter, unsigned char, 4>(mode);
+    /* Number of channels is always 4 when using unsigned char buffers (sRGB + straight alpha). */
+    scanline_func = get_scanline_function<Filter, unsigned char, 4, 4>(mode);
   }
 
   if (scanline_func != nullptr) {
