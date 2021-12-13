@@ -443,7 +443,7 @@ static void node_composit_copy_image(bNodeTree *UNUSED(dest_ntree),
   }
 }
 
-void register_node_type_cmp_image(void)
+void register_node_type_cmp_image()
 {
   static bNodeType ntype;
 
@@ -451,7 +451,7 @@ void register_node_type_cmp_image(void)
   node_type_init(&ntype, node_composit_init_image);
   node_type_storage(&ntype, "ImageUser", node_composit_free_image, node_composit_copy_image);
   node_type_update(&ntype, cmp_node_image_update);
-  node_type_label(&ntype, node_image_label);
+  ntype.labelfunc = node_image_label;
 
   nodeRegisterType(&ntype);
 }
@@ -499,7 +499,7 @@ static bool node_composit_poll_rlayers(bNodeType *UNUSED(ntype),
                                        const char **r_disabled_hint)
 {
   if (!STREQ(ntree->idname, "CompositorNodeTree")) {
-    *r_disabled_hint = "Not a compositor node tree";
+    *r_disabled_hint = TIP_("Not a compositor node tree");
     return false;
   }
 
@@ -516,7 +516,8 @@ static bool node_composit_poll_rlayers(bNodeType *UNUSED(ntype),
   }
 
   if (scene == nullptr) {
-    *r_disabled_hint = "The node tree must be the compositing node tree of any scene in the file";
+    *r_disabled_hint = TIP_(
+        "The node tree must be the compositing node tree of any scene in the file");
     return false;
   }
   return true;
@@ -554,7 +555,7 @@ static void cmp_node_rlayers_update(bNodeTree *ntree, bNode *node)
   cmp_node_update_default(ntree, node);
 }
 
-void register_node_type_cmp_rlayers(void)
+void register_node_type_cmp_rlayers()
 {
   static bNodeType ntype;
 

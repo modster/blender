@@ -103,6 +103,8 @@
 #include "ED_view3d.h"
 #include "ED_view3d_offscreen.h"
 
+#include "UI_interface_icons.h"
+
 #ifndef NDEBUG
 /* Used for database init assert(). */
 #  include "BLI_threads.h"
@@ -459,7 +461,7 @@ static Scene *preview_prepare_scene(
   Scene *sce;
   Main *pr_main = sp->pr_main;
 
-  memcpy(pr_main->name, BKE_main_blendfile_path(bmain), sizeof(pr_main->name));
+  memcpy(pr_main->filepath, BKE_main_blendfile_path(bmain), sizeof(pr_main->filepath));
 
   sce = preview_get_scene(pr_main);
   if (sce) {
@@ -994,7 +996,7 @@ static void action_preview_render(IconPreview *preview, IconPreviewSize *preview
                                                       preview_sized->sizey,
                                                       IB_rect,
                                                       V3D_OFSDRAW_NONE,
-                                                      R_ALPHAPREMUL,
+                                                      R_ADDSKY,
                                                       NULL,
                                                       NULL,
                                                       err_out);
@@ -1757,11 +1759,12 @@ static void icon_preview_free(void *customdata)
   MEM_freeN(ip);
 }
 
-/**
- * Check if \a id is supported by the automatic preview render.
- */
 bool ED_preview_id_is_supported(const ID *id)
 {
+  if (id == NULL) {
+    return false;
+  }
+
   if (GS(id->name) == ID_OB) {
     return object_preview_is_type_supported((const Object *)id);
   }
@@ -1945,6 +1948,47 @@ void ED_preview_kill_jobs(wmWindowManager *wm, Main *UNUSED(bmain))
      * avoid invalid memory access. */
     WM_jobs_kill(wm, NULL, common_preview_startjob);
     WM_jobs_kill(wm, NULL, icon_preview_startjob_all_sizes);
+  }
+}
+
+typedef struct PreviewRestartQueueEntry {
+  struct PreviewRestartQueueEntry *next, *prev;
+
+  enum eIconSizes size;
+  ID *id;
+} PreviewRestartQueueEntry;
+
+static ListBase /* #PreviewRestartQueueEntry */ G_restart_previews_queue;
+
+void ED_preview_restart_queue_free(void)
+{
+  BLI_freelistN(&G_restart_previews_queue);
+}
+
+void ED_preview_restart_queue_add(ID *id, enum eIconSizes size)
+{
+  PreviewRestartQueueEntry *queue_entry = MEM_mallocN(sizeof(*queue_entry), __func__);
+  queue_entry->size = size;
+  queue_entry->id = id;
+  BLI_addtail(&G_restart_previews_queue, queue_entry);
+}
+
+void ED_preview_restart_queue_work(const bContext *C)
+{
+  LISTBASE_FOREACH_MUTABLE (PreviewRestartQueueEntry *, queue_entry, &G_restart_previews_queue) {
+    PreviewImage *preview = BKE_previewimg_id_get(queue_entry->id);
+    if (!preview) {
+      continue;
+    }
+    if (preview->flag[queue_entry->size] & PRV_USER_EDITED) {
+      /* Don't touch custom previews. */
+      continue;
+    }
+
+    BKE_previewimg_clear_single(preview, queue_entry->size);
+    UI_icon_render_id(C, NULL, queue_entry->id, queue_entry->size, true);
+
+    BLI_freelinkN(&G_restart_previews_queue, queue_entry);
   }
 }
 

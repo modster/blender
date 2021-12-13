@@ -27,6 +27,8 @@
 
 namespace blender::nodes::node_geo_curve_fillet_cc {
 
+NODE_STORAGE_FUNCS(NodeGeometryCurveFillet)
+
 static void node_declare(NodeDeclarationBuilder &b)
 {
   b.add_input<decl::Geometry>(N_("Curve")).supported_type(GEO_COMPONENT_TYPE_CURVE);
@@ -78,8 +80,8 @@ struct FilletData {
 
 static void node_update(bNodeTree *ntree, bNode *node)
 {
-  NodeGeometryCurveFillet &node_storage = *(NodeGeometryCurveFillet *)node->storage;
-  const GeometryNodeCurveFilletMode mode = (GeometryNodeCurveFilletMode)node_storage.mode;
+  const NodeGeometryCurveFillet &storage = node_storage(*node);
+  const GeometryNodeCurveFilletMode mode = (GeometryNodeCurveFilletMode)storage.mode;
 
   bNodeSocket *poly_socket = ((bNodeSocket *)node->inputs.first)->next;
 
@@ -332,14 +334,17 @@ static void copy_common_attributes_by_mapping(const Spline &src,
   copy_attribute_by_mapping(src.radii(), dst.radii(), mapping);
   copy_attribute_by_mapping(src.tilts(), dst.tilts(), mapping);
 
-  dst.attributes.reallocate(1);
   src.attributes.foreach_attribute(
       [&](const AttributeIDRef &attribute_id, const AttributeMetaData &meta_data) {
         std::optional<GSpan> src_attribute = src.attributes.get_for_read(attribute_id);
         if (dst.attributes.create(attribute_id, meta_data.data_type)) {
           std::optional<GMutableSpan> dst_attribute = dst.attributes.get_for_write(attribute_id);
           if (dst_attribute) {
-            src_attribute->type().copy_assign(src_attribute->data(), dst_attribute->data());
+            attribute_math::convert_to_static_type(dst_attribute->type(), [&](auto dummy) {
+              using T = decltype(dummy);
+              copy_attribute_by_mapping(
+                  src_attribute->typed<T>(), dst_attribute->typed<T>(), mapping);
+            });
             return true;
           }
         }
@@ -611,8 +616,8 @@ static void node_geo_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Curve");
 
-  NodeGeometryCurveFillet &node_storage = *(NodeGeometryCurveFillet *)params.node().storage;
-  const GeometryNodeCurveFilletMode mode = (GeometryNodeCurveFilletMode)node_storage.mode;
+  const NodeGeometryCurveFillet &storage = node_storage(params.node());
+  const GeometryNodeCurveFilletMode mode = (GeometryNodeCurveFilletMode)storage.mode;
 
   Field<float> radius_field = params.extract_input<Field<float>>("Radius");
   const bool limit_radius = params.extract_input<bool>("Limit Radius");

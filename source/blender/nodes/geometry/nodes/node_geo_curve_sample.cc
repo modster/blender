@@ -25,6 +25,8 @@
 
 namespace blender::nodes::node_geo_curve_sample_cc {
 
+NODE_STORAGE_FUNCS(NodeGeometryCurveSample)
+
 static void node_declare(NodeDeclarationBuilder &b)
 {
   b.add_input<decl::Geometry>(N_("Curve"))
@@ -53,8 +55,8 @@ static void node_type_init(bNodeTree *UNUSED(tree), bNode *node)
 
 static void node_update(bNodeTree *ntree, bNode *node)
 {
-  const NodeGeometryCurveSample &node_storage = *(NodeGeometryCurveSample *)node->storage;
-  const GeometryNodeCurveSampleMode mode = (GeometryNodeCurveSampleMode)node_storage.mode;
+  const NodeGeometryCurveSample &storage = node_storage(*node);
+  const GeometryNodeCurveSampleMode mode = (GeometryNodeCurveSampleMode)storage.mode;
 
   bNodeSocket *factor = ((bNodeSocket *)node->inputs.first)->next;
   bNodeSocket *length = factor->next;
@@ -200,8 +202,8 @@ class SampleCurveFunction : public fn::MultiFunction {
 static Field<float> get_length_input_field(const GeoNodeExecParams &params,
                                            const float curve_total_length)
 {
-  const NodeGeometryCurveSample &node_storage = *(NodeGeometryCurveSample *)params.node().storage;
-  const GeometryNodeCurveSampleMode mode = (GeometryNodeCurveSampleMode)node_storage.mode;
+  const NodeGeometryCurveSample &storage = node_storage(params.node());
+  const GeometryNodeCurveSampleMode mode = (GeometryNodeCurveSampleMode)storage.mode;
 
   if (mode == GEO_NODE_CURVE_SAMPLE_LENGTH) {
     /* Just make sure the length is in bounds of the curve. */
@@ -233,30 +235,28 @@ static void node_geo_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Curve");
 
-  auto return_default = [&]() {
-    params.set_output("Position", fn::make_constant_field<float3>({0.0f, 0.0f, 0.0f}));
-    params.set_output("Tangent", fn::make_constant_field<float3>({0.0f, 0.0f, 0.0f}));
-    params.set_output("Normal", fn::make_constant_field<float3>({0.0f, 0.0f, 0.0f}));
-  };
-
   const CurveComponent *component = geometry_set.get_component_for_read<CurveComponent>();
   if (component == nullptr) {
-    return return_default();
+    params.set_default_remaining_outputs();
+    return;
   }
 
   const CurveEval *curve = component->get_for_read();
   if (curve == nullptr) {
-    return return_default();
+    params.set_default_remaining_outputs();
+    return;
   }
 
   if (curve->splines().is_empty()) {
-    return return_default();
+    params.set_default_remaining_outputs();
+    return;
   }
 
   Array<float> spline_lengths = curve->accumulated_spline_lengths();
   const float total_length = spline_lengths.last();
   if (total_length == 0.0f) {
-    return return_default();
+    params.set_default_remaining_outputs();
+    return;
   }
 
   Field<float> length_field = get_length_input_field(params, total_length);

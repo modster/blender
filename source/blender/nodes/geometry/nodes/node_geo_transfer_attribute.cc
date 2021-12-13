@@ -38,6 +38,8 @@ namespace blender::nodes::node_geo_transfer_attribute_cc {
 using namespace blender::bke::mesh_surface_sample;
 using blender::fn::GArray;
 
+NODE_STORAGE_FUNCS(NodeGeometryTransferAttribute)
+
 static void node_declare(NodeDeclarationBuilder &b)
 {
   b.add_input<decl::Geometry>(N_("Target"))
@@ -65,9 +67,9 @@ static void node_declare(NodeDeclarationBuilder &b)
 static void node_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 {
   const bNode &node = *static_cast<const bNode *>(ptr->data);
-  const NodeGeometryTransferAttribute &data = *static_cast<const NodeGeometryTransferAttribute *>(
-      node.storage);
-  const GeometryNodeAttributeTransferMode mapping = (GeometryNodeAttributeTransferMode)data.mode;
+  const NodeGeometryTransferAttribute &storage = node_storage(node);
+  const GeometryNodeAttributeTransferMode mapping = (GeometryNodeAttributeTransferMode)
+                                                        storage.mode;
 
   uiItemR(layout, ptr, "data_type", 0, "", ICON_NONE);
   uiItemR(layout, ptr, "mapping", 0, "", ICON_NONE);
@@ -87,10 +89,10 @@ static void node_init(bNodeTree *UNUSED(tree), bNode *node)
 
 static void node_update(bNodeTree *ntree, bNode *node)
 {
-  const NodeGeometryTransferAttribute &data = *(const NodeGeometryTransferAttribute *)
-                                                   node->storage;
-  const CustomDataType data_type = static_cast<CustomDataType>(data.data_type);
-  const GeometryNodeAttributeTransferMode mapping = (GeometryNodeAttributeTransferMode)data.mode;
+  const NodeGeometryTransferAttribute &storage = node_storage(*node);
+  const CustomDataType data_type = static_cast<CustomDataType>(storage.data_type);
+  const GeometryNodeAttributeTransferMode mapping = (GeometryNodeAttributeTransferMode)
+                                                        storage.mode;
 
   bNodeSocket *socket_geometry = (bNodeSocket *)node->inputs.first;
   bNodeSocket *socket_vector = socket_geometry->next;
@@ -131,9 +133,9 @@ static void get_closest_in_bvhtree(BVHTreeFromMesh &tree_data,
                                    const MutableSpan<float> r_distances_sq,
                                    const MutableSpan<float3> r_positions)
 {
-  BLI_assert(positions.size() == r_indices.size() || r_indices.is_empty());
-  BLI_assert(positions.size() == r_distances_sq.size() || r_distances_sq.is_empty());
-  BLI_assert(positions.size() == r_positions.size() || r_positions.is_empty());
+  BLI_assert(positions.size() >= r_indices.size());
+  BLI_assert(positions.size() >= r_distances_sq.size());
+  BLI_assert(positions.size() >= r_positions.size());
 
   for (const int i : mask) {
     BVHTreeNearest nearest;
@@ -159,7 +161,7 @@ static void get_closest_pointcloud_points(const PointCloud &pointcloud,
                                           const MutableSpan<int> r_indices,
                                           const MutableSpan<float> r_distances_sq)
 {
-  BLI_assert(positions.size() == r_indices.size());
+  BLI_assert(positions.size() >= r_indices.size());
   BLI_assert(pointcloud.totpoint > 0);
 
   BVHTreeFromPointCloud tree_data;
@@ -499,7 +501,7 @@ class NearestTransferFunction : public fn::MultiFunction {
     Array<int> mesh_indices;
     Array<float> mesh_distances;
 
-    /* If there is a point-cloud, find the closest points. */
+    /* If there is a point cloud, find the closest points. */
     if (use_points_) {
       point_indices.reinitialize(tot_samples);
       if (use_mesh_) {
@@ -723,11 +725,11 @@ static void output_attribute_field(GeoNodeExecParams &params, GField field)
 static void node_geo_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry = params.extract_input<GeometrySet>("Target");
-  const bNode &node = params.node();
-  const NodeGeometryTransferAttribute &data = *(const NodeGeometryTransferAttribute *)node.storage;
-  const GeometryNodeAttributeTransferMode mapping = (GeometryNodeAttributeTransferMode)data.mode;
-  const CustomDataType data_type = static_cast<CustomDataType>(data.data_type);
-  const AttributeDomain domain = static_cast<AttributeDomain>(data.domain);
+  const NodeGeometryTransferAttribute &storage = node_storage(params.node());
+  const GeometryNodeAttributeTransferMode mapping = (GeometryNodeAttributeTransferMode)
+                                                        storage.mode;
+  const CustomDataType data_type = static_cast<CustomDataType>(storage.data_type);
+  const AttributeDomain domain = static_cast<AttributeDomain>(storage.domain);
 
   GField field = get_input_attribute_field(params, data_type);
 

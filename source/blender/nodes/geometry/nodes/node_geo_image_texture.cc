@@ -34,6 +34,8 @@
 
 namespace blender::nodes::node_geo_image_texture_cc {
 
+NODE_STORAGE_FUNCS(NodeGeometryImageTexture)
+
 static void node_declare(NodeDeclarationBuilder &b)
 {
   b.add_input<decl::Image>(N_("Image")).hide_label();
@@ -372,18 +374,13 @@ class ImageFieldsFunction : public fn::MultiFunction {
 
 static void node_geo_exec(GeoNodeExecParams params)
 {
-  auto return_default = [&]() {
-    params.set_output("Color", ColorGeometry4f(0.0f, 0.0f, 0.0f, 1.0f));
-    params.set_output("Alpha", 1.0f);
-  };
-
   Image *image = params.get_input<Image *>("Image");
   if (image == nullptr) {
-    return return_default();
+    params.set_default_remaining_outputs();
+    return;
   }
 
-  const bNode &node = params.node();
-  NodeGeometryImageTexture *data = (NodeGeometryImageTexture *)node.storage;
+  const NodeGeometryImageTexture &storage = node_storage(params.node());
 
   ImageUser image_user;
   BKE_imageuser_default(&image_user);
@@ -395,10 +392,11 @@ static void node_geo_exec(GeoNodeExecParams params)
   std::unique_ptr<ImageFieldsFunction> image_fn;
   try {
     image_fn = std::make_unique<ImageFieldsFunction>(
-        data->interpolation, data->extension, *image, image_user);
+        storage.interpolation, storage.extension, *image, image_user);
   }
   catch (const std::runtime_error &) {
-    return return_default();
+    params.set_default_remaining_outputs();
+    return;
   }
 
   Field<float3> vector_field = params.extract_input<Field<float3>>("Vector");
@@ -412,7 +410,7 @@ static void node_geo_exec(GeoNodeExecParams params)
 
 }  // namespace blender::nodes::node_geo_image_texture_cc
 
-void register_node_type_geo_image_texture(void)
+void register_node_type_geo_image_texture()
 {
   namespace file_ns = blender::nodes::node_geo_image_texture_cc;
 

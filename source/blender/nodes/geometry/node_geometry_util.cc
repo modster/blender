@@ -28,13 +28,6 @@ namespace blender::nodes {
 
 using bke::GeometryInstanceGroup;
 
-/**
- * Update the availability of a group of input sockets with the same name,
- * used for switching between attribute inputs or single values.
- *
- * \param mode: Controls which socket of the group to make available.
- * \param name_is_available: If false, make all sockets with this name unavailable.
- */
 void update_attribute_input_socket_availabilities(bNodeTree &ntree,
                                                   bNode &node,
                                                   const StringRef name,
@@ -63,7 +56,7 @@ bool geo_node_poll_default(bNodeType *UNUSED(ntype),
                            const char **r_disabled_hint)
 {
   if (!STREQ(ntree->idname, "GeometryNodeTree")) {
-    *r_disabled_hint = "Not a geometry node tree";
+    *r_disabled_hint = TIP_("Not a geometry node tree");
     return false;
   }
   return true;

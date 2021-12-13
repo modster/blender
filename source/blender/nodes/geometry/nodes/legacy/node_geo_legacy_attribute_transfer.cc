@@ -403,7 +403,7 @@ static void transfer_attribute_nearest(const GeometrySet &src_geometry,
                                                                                         data_type);
     for (const int i : IndexRange(tot_samples)) {
       if (pointcloud_distances_sq[i] < mesh_distances_sq[i]) {
-        /* Point-cloud point is closer. */
+        /* Point cloud point is closer. */
         const int index = pointcloud_indices[i];
         pointcloud_src_attribute.varray.get(index, buffer);
         dst_attribute->set_by_relocate(i, buffer);
@@ -483,7 +483,7 @@ static void node_geo_exec(GeoNodeExecParams params)
   const std::string dst_attribute_name = params.extract_input<std::string>("Destination");
 
   if (src_attribute_name.empty() || dst_attribute_name.empty()) {
-    params.set_output("Geometry", dst_geometry_set);
+    params.set_default_remaining_outputs();
     return;
   }
 

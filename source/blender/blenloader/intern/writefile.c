@@ -50,7 +50,7 @@
  * Almost all data in Blender are structures. Each struct saved
  * gets a BHead header.  With BHead the struct can be linked again
  * and compared with #StructDNA.
-
+ *
  * WRITE
  * =====
  *
@@ -1028,7 +1028,7 @@ static void write_global(WriteData *wd, int fileflags, Main *mainvar)
 
   /* prevent mem checkers from complaining */
   memset(fg._pad, 0, sizeof(fg._pad));
-  memset(fg.filename, 0, sizeof(fg.filename));
+  memset(fg.filepath, 0, sizeof(fg.filepath));
   memset(fg.build_hash, 0, sizeof(fg.build_hash));
   fg._pad1 = NULL;
 
@@ -1045,7 +1045,7 @@ static void write_global(WriteData *wd, int fileflags, Main *mainvar)
   fg.globalf = G.f;
   /* Write information needed for recovery. */
   if (fileflags & G_FILE_RECOVER_WRITE) {
-    BLI_strncpy(fg.filename, mainvar->name, sizeof(fg.filename));
+    STRNCPY(fg.filepath, mainvar->filepath);
   }
   sprintf(subvstr, "%4d", BLENDER_FILE_SUBVERSION);
   memcpy(fg.subvstr, subvstr, 4);
@@ -1312,9 +1312,6 @@ static bool do_history(const char *name, ReportList *reports)
 /** \name File Writing (Public)
  * \{ */
 
-/**
- * \return Success.
- */
 bool BLO_write_file(Main *mainvar,
                     const char *filepath,
                     const int write_flags,
@@ -1332,7 +1329,8 @@ bool BLO_write_file(Main *mainvar,
 
   /* path backup/restore */
   void *path_list_backup = NULL;
-  const int path_list_flag = (BKE_BPATH_TRAVERSE_SKIP_LIBRARY | BKE_BPATH_TRAVERSE_SKIP_MULTIFILE);
+  const eBPathForeachFlag path_list_flag = (BKE_BPATH_FOREACH_PATH_SKIP_LINKED |
+                                            BKE_BPATH_FOREACH_PATH_SKIP_MULTIFILE);
 
   if (G.debug & G_DEBUG_IO && mainvar->lock != NULL) {
     BKE_report(reports, RPT_INFO, "Checking sanity of current .blend file *BEFORE* save to disk");
@@ -1364,12 +1362,12 @@ bool BLO_write_file(Main *mainvar,
 
     char dir_src[FILE_MAX];
     char dir_dst[FILE_MAX];
-    BLI_split_dir_part(mainvar->name, dir_src, sizeof(dir_src));
+    BLI_split_dir_part(mainvar->filepath, dir_src, sizeof(dir_src));
     BLI_split_dir_part(filepath, dir_dst, sizeof(dir_dst));
 
     /* Just in case there is some subtle difference. */
-    BLI_path_normalize(mainvar->name, dir_dst);
-    BLI_path_normalize(mainvar->name, dir_src);
+    BLI_path_normalize(mainvar->filepath, dir_dst);
+    BLI_path_normalize(mainvar->filepath, dir_src);
 
     /* Only for relative, not relative-all, as this means making existing paths relative. */
     if (remap_mode == BLO_WRITE_PATH_REMAP_RELATIVE) {
@@ -1452,9 +1450,6 @@ bool BLO_write_file(Main *mainvar,
   return 1;
 }
 
-/**
- * \return Success.
- */
 bool BLO_write_file_mem(Main *mainvar, MemFile *compare, MemFile *current, int write_flags)
 {
   bool use_userdef = false;
@@ -1577,9 +1572,6 @@ void BLO_write_float3_array(BlendWriter *writer, uint num, const float *data_ptr
   BLO_write_raw(writer, sizeof(float[3]) * (size_t)num, data_ptr);
 }
 
-/**
- * Write a null terminated string.
- */
 void BLO_write_string(BlendWriter *writer, const char *data_ptr)
 {
   if (data_ptr != NULL) {
@@ -1587,10 +1579,6 @@ void BLO_write_string(BlendWriter *writer, const char *data_ptr)
   }
 }
 
-/**
- * Sometimes different data is written depending on whether the file is saved to disk or used for
- * undo. This function returns true when the current file-writing is done for undo.
- */
 bool BLO_write_is_undo(BlendWriter *writer)
 {
   return writer->wd->use_memfile;

@@ -30,6 +30,7 @@
 #include "BLI_fileops.h"
 #include "BLI_fnmatch.h"
 #include "BLI_path_util.h"
+#include "BLI_set.hh"
 
 #include "ED_asset.h"
 #include "ED_asset_catalog.hh"
@@ -413,7 +414,7 @@ static int asset_library_refresh_exec(bContext *C, wmOperator *UNUSED(unused))
   if (ED_operator_asset_browsing_active(C)) {
     SpaceFile *sfile = CTX_wm_space_file(C);
     ED_fileselect_clear(CTX_wm_manager(C), sfile);
-    WM_event_add_notifier(C, NC_SPACE | ND_SPACE_FILE_LIST, NULL);
+    WM_event_add_notifier(C, NC_SPACE | ND_SPACE_FILE_LIST, nullptr);
   }
   else {
     /* Execution mode #2: Outside the Asset Browser, use the asset list. */
@@ -636,7 +637,7 @@ static bool asset_catalogs_save_poll(bContext *C)
   }
 
   const Main *bmain = CTX_data_main(C);
-  if (!bmain->name[0]) {
+  if (!bmain->filepath[0]) {
     CTX_wm_operator_poll_msg_set(C, "Cannot save asset catalogs before the Blender file is saved");
     return false;
   }
@@ -688,6 +689,9 @@ static bool asset_bundle_install_poll(bContext *C)
 {
   /* This operator only works when the asset browser is set to Current File. */
   const SpaceFile *sfile = CTX_wm_space_file(C);
+  if (sfile == nullptr) {
+    return false;
+  }
   if (!ED_fileselect_is_local_asset_library(sfile)) {
     return false;
   }
@@ -699,7 +703,7 @@ static bool asset_bundle_install_poll(bContext *C)
 
   /* Check whether this file is already located inside any asset library. */
   const struct bUserAssetLibrary *asset_lib = BKE_preferences_asset_library_containing_path(
-      &U, bmain->name);
+      &U, bmain->filepath);
   if (asset_lib) {
     return false;
   }
@@ -775,7 +779,7 @@ static int asset_bundle_install_exec(bContext *C, wmOperator *op)
   BKE_reportf(op->reports,
               RPT_INFO,
               R"(Saved "%s" to asset library "%s")",
-              BLI_path_basename(bmain->name),
+              BLI_path_basename(bmain->filepath),
               lib->name);
   return OPERATOR_FINISHED;
 }
@@ -826,7 +830,7 @@ static void ASSET_OT_bundle_install(struct wmOperatorType *ot)
  * referenced. */
 static bool could_be_asset_bundle(const Main *bmain)
 {
-  return fnmatch("*_bundle.blend", bmain->name, FNM_CASEFOLD) == 0;
+  return fnmatch("*_bundle.blend", bmain->filepath, FNM_CASEFOLD) == 0;
 }
 
 static const bUserAssetLibrary *selected_asset_library(struct wmOperator *op)
@@ -860,7 +864,7 @@ static bool set_filepath_for_asset_lib(const Main *bmain, struct wmOperator *op)
   }
 
   /* Concatenate the filename of the current blend file. */
-  const char *blend_filename = BLI_path_basename(bmain->name);
+  const char *blend_filename = BLI_path_basename(bmain->filepath);
   if (blend_filename == nullptr || blend_filename[0] == '\0') {
     return false;
   }
@@ -874,45 +878,75 @@ static bool set_filepath_for_asset_lib(const Main *bmain, struct wmOperator *op)
 
 struct FileCheckCallbackInfo {
   struct ReportList *reports;
-  bool external_file_found;
+  Set<std::string> external_files;
 };
 
-static bool external_file_check_callback(void *callback_info_ptr,
+static bool external_file_check_callback(BPathForeachPathData *bpath_data,
                                          char * /*path_dst*/,
                                          const char *path_src)
 {
-  FileCheckCallbackInfo *callback_info = static_cast<FileCheckCallbackInfo *>(callback_info_ptr);
-  BKE_reportf(callback_info->reports,
-              RPT_ERROR,
-              "Unable to install asset bundle, has external dependency \"%s\"",
-              path_src);
-  callback_info->external_file_found = true;
+  FileCheckCallbackInfo *callback_info = static_cast<FileCheckCallbackInfo *>(
+      bpath_data->user_data);
+  callback_info->external_files.add(std::string(path_src));
   return false;
 }
 
 /**
  * Do a check on any external files (.blend, textures, etc.) being used.
- * The "Install asset bundle" operator only works on standalone .blend files
+ * The ASSET_OT_bundle_install operator only works on standalone .blend files
  * (catalog definition files are fine, though).
  *
  * \return true when there are external files, false otherwise.
  */
 static bool has_external_files(Main *bmain, struct ReportList *reports)
 {
-  struct FileCheckCallbackInfo callback_info = {reports, false};
+  struct FileCheckCallbackInfo callback_info = {reports, Set<std::string>()};
 
-  BKE_bpath_traverse_main(
-      bmain,
-      &external_file_check_callback,
-      BKE_BPATH_TRAVERSE_SKIP_PACKED /* Packed files are fine. */
-          | BKE_BPATH_TRAVERSE_SKIP_MULTIFILE /* Only report multifiles once, it's enough. */,
-      &callback_info);
-  return callback_info.external_file_found;
+  eBPathForeachFlag flag = static_cast<eBPathForeachFlag>(
+      BKE_BPATH_FOREACH_PATH_SKIP_PACKED          /* Packed files are fine. */
+      | BKE_BPATH_FOREACH_PATH_SKIP_MULTIFILE     /* Only report multi-files once, it's enough. */
+      | BKE_BPATH_TRAVERSE_SKIP_WEAK_REFERENCES); /* Only care about actually used files. */
+
+  BPathForeachPathData bpath_data = {
+      /* bmain */ bmain,
+      /* callback_function */ &external_file_check_callback,
+      /* flag */ flag,
+      /* user_data */ &callback_info,
+      /* absolute_base_path */ nullptr,
+  };
+  BKE_bpath_foreach_path_main(&bpath_data);
+
+  if (callback_info.external_files.is_empty()) {
+    /* No external dependencies. */
+    return false;
+  }
+
+  if (callback_info.external_files.size() == 1) {
+    /* Only one external dependency, report it directly. */
+    BKE_reportf(callback_info.reports,
+                RPT_ERROR,
+                "Unable to copy bundle due to external dependency: \"%s\"",
+                callback_info.external_files.begin()->c_str());
+    return true;
+  }
+
+  /* Multiple external dependencies, report the aggregate and put details on console. */
+  BKE_reportf(
+      callback_info.reports,
+      RPT_ERROR,
+      "Unable to copy bundle due to %ld external dependencies; more details on the console",
+      callback_info.external_files.size());
+  printf("Unable to copy bundle due to %ld external dependencies:\n",
+         callback_info.external_files.size());
+  for (const std::string &path : callback_info.external_files) {
+    printf("   \"%s\"\n", path.c_str());
+  }
+  return true;
 }
 
 /* -------------------------------------------------------------------- */
 
-void ED_operatortypes_asset(void)
+void ED_operatortypes_asset()
 {
   WM_operatortype_append(ASSET_OT_mark);
   WM_operatortype_append(ASSET_OT_clear);

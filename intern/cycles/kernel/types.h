@@ -110,9 +110,9 @@ CCL_NAMESPACE_BEGIN
 #  define __VOLUME_RECORD_ALL__
 #endif /* __KERNEL_CPU__ */
 
-#ifdef __KERNEL_OPTIX__
+#ifdef __KERNEL_GPU_RAYTRACING__
 #  undef __BAKING__
-#endif /* __KERNEL_OPTIX__ */
+#endif /* __KERNEL_GPU_RAYTRACING__ */
 
 /* Scene-based selective features compilation. */
 #ifdef __KERNEL_FEATURES__
@@ -478,6 +478,7 @@ enum PanoramaType {
   PANORAMA_FISHEYE_EQUIDISTANT = 1,
   PANORAMA_FISHEYE_EQUISOLID = 2,
   PANORAMA_MIRRORBALL = 3,
+  PANORAMA_FISHEYE_LENS_POLYNOMIAL = 4,
 
   PANORAMA_NUM_TYPES,
 };
@@ -922,6 +923,8 @@ typedef struct KernelCamera {
   float fisheye_fov;
   float fisheye_lens;
   float4 equirectangular_range;
+  float fisheye_lens_polynomial_bias;
+  float4 fisheye_lens_polynomial_coefficients;
 
   /* stereo */
   float interocular_offset;
@@ -1204,7 +1207,7 @@ typedef struct KernelIntegrator {
   /* Closure filter. */
   int filter_closures;
 
-  /* MIS debuging */
+  /* MIS debugging. */
   int direct_light_sampling_type;
 
   /* padding */
@@ -1220,10 +1223,12 @@ typedef enum KernelBVHLayout {
   BVH_LAYOUT_OPTIX = (1 << 2),
   BVH_LAYOUT_MULTI_OPTIX = (1 << 3),
   BVH_LAYOUT_MULTI_OPTIX_EMBREE = (1 << 4),
+  BVH_LAYOUT_METAL = (1 << 5),
+  BVH_LAYOUT_MULTI_METAL_EMBREE = (1 << 6),
 
   /* Default BVH layout to use for CPU. */
   BVH_LAYOUT_AUTO = BVH_LAYOUT_EMBREE,
-  BVH_LAYOUT_ALL = BVH_LAYOUT_BVH2 | BVH_LAYOUT_EMBREE | BVH_LAYOUT_OPTIX,
+  BVH_LAYOUT_ALL = BVH_LAYOUT_BVH2 | BVH_LAYOUT_EMBREE | BVH_LAYOUT_OPTIX | BVH_LAYOUT_METAL,
 } KernelBVHLayout;
 
 typedef struct KernelBVH {
@@ -1238,6 +1243,8 @@ typedef struct KernelBVH {
   /* Custom BVH */
 #ifdef __KERNEL_OPTIX__
   OptixTraversableHandle scene;
+#elif defined __METALRT__
+  metalrt_as_type scene;
 #else
 #  ifdef __EMBREE__
   RTCScene scene;

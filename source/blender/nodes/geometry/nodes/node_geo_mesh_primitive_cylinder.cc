@@ -27,6 +27,8 @@
 
 namespace blender::nodes::node_geo_mesh_primitive_cylinder_cc {
 
+NODE_STORAGE_FUNCS(NodeGeometryMeshCylinder)
+
 static void node_declare(NodeDeclarationBuilder &b)
 {
   b.add_input<decl::Int>(N_("Vertices"))
@@ -83,47 +85,39 @@ static void node_update(bNodeTree *ntree, bNode *node)
   bNodeSocket *rings_socket = vertices_socket->next;
   bNodeSocket *fill_subdiv_socket = rings_socket->next;
 
-  const NodeGeometryMeshCone &storage = *(const NodeGeometryMeshCone *)node->storage;
-  const GeometryNodeMeshCircleFillType fill_type =
-      static_cast<const GeometryNodeMeshCircleFillType>(storage.fill_type);
-  const bool has_fill = fill_type != GEO_NODE_MESH_CIRCLE_FILL_NONE;
+  const NodeGeometryMeshCylinder &storage = node_storage(*node);
+  const GeometryNodeMeshCircleFillType fill = (GeometryNodeMeshCircleFillType)storage.fill_type;
+  const bool has_fill = fill != GEO_NODE_MESH_CIRCLE_FILL_NONE;
   nodeSetSocketAvailability(ntree, fill_subdiv_socket, has_fill);
 }
 
 static void node_geo_exec(GeoNodeExecParams params)
 {
-  const bNode &node = params.node();
-  const NodeGeometryMeshCylinder &storage = *(const NodeGeometryMeshCylinder *)node.storage;
-
-  const GeometryNodeMeshCircleFillType fill_type = (const GeometryNodeMeshCircleFillType)
-                                                       storage.fill_type;
-
-  auto return_default = [&]() {
-    params.set_output("Top", fn::make_constant_field<bool>(false));
-    params.set_output("Bottom", fn::make_constant_field<bool>(false));
-    params.set_output("Side", fn::make_constant_field<bool>(false));
-    params.set_output("Mesh", GeometrySet());
-  };
+  const NodeGeometryMeshCylinder &storage = node_storage(params.node());
+  const GeometryNodeMeshCircleFillType fill = (GeometryNodeMeshCircleFillType)storage.fill_type;
 
   const float radius = params.extract_input<float>("Radius");
   const float depth = params.extract_input<float>("Depth");
   const int circle_segments = params.extract_input<int>("Vertices");
   if (circle_segments < 3) {
     params.error_message_add(NodeWarningType::Info, TIP_("Vertices must be at least 3"));
-    return return_default();
+    params.set_default_remaining_outputs();
+    return;
   }
 
   const int side_segments = params.extract_input<int>("Side Segments");
   if (side_segments < 1) {
     params.error_message_add(NodeWarningType::Info, TIP_("Side Segments must be at least 1"));
-    return return_default();
+    params.set_default_remaining_outputs();
+    return;
   }
 
-  const bool no_fill = fill_type == GEO_NODE_MESH_CIRCLE_FILL_NONE;
+  const bool no_fill = fill == GEO_NODE_MESH_CIRCLE_FILL_NONE;
   const int fill_segments = no_fill ? 1 : params.extract_input<int>("Fill Segments");
   if (fill_segments < 1) {
     params.error_message_add(NodeWarningType::Info, TIP_("Fill Segments must be at least 1"));
-    return return_default();
+    params.set_default_remaining_outputs();
+    return;
   }
 
   ConeAttributeOutputs attribute_outputs;
@@ -144,7 +138,7 @@ static void node_geo_exec(GeoNodeExecParams params)
                                             circle_segments,
                                             side_segments,
                                             fill_segments,
-                                            fill_type,
+                                            fill,
                                             attribute_outputs);
 
   if (attribute_outputs.top_id) {

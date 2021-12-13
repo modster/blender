@@ -228,16 +228,15 @@ typedef struct Curve {
   /** Creation-time type of curve datablock. */
   short type;
 
-  /** Keep a short because of BKE_object_obdata_texspace_get(). */
-  short texflag;
-  char _pad0[6];
+  char texflag;
+  char _pad0[7];
   short twist_mode;
   float twist_smooth, smallcaps_scale;
 
   int pathlen;
   short bevresol, totcol;
   int flag;
-  float width, ext1, ext2;
+  float offset, extrude, bevel_radius;
 
   /* default */
   short resolu, resolv;
@@ -457,6 +456,8 @@ enum {
 typedef enum eBezTriple_Flag {
   /* SELECT */
   BEZT_FLAG_TEMP_TAG = (1 << 1), /* always clear. */
+  /* Can be used to ignore keyframe points for certain operations. */
+  BEZT_FLAG_IGNORE_TAG = (1 << 2),
 } eBezTriple_Flag;
 
 /* h1 h2 (beztriple) */

@@ -368,6 +368,13 @@ Relation *DepsgraphRelationBuilder::add_time_relation(TimeSourceNode *timesrc,
   return nullptr;
 }
 
+void DepsgraphRelationBuilder::add_visibility_relation(ID *id_from, ID *id_to)
+{
+  ComponentKey from_key(id_from, NodeType::VISIBILITY);
+  ComponentKey to_key(id_to, NodeType::VISIBILITY);
+  add_relation(from_key, to_key, "visibility");
+}
+
 Relation *DepsgraphRelationBuilder::add_operation_relation(OperationNode *node_from,
                                                            OperationNode *node_to,
                                                            const char *description,
@@ -2066,7 +2073,8 @@ void DepsgraphRelationBuilder::build_shapekeys(Key *key)
  *        and also for the links coming from the shapekey data-blocks
  * - Animation/Drivers affecting the parameters of the geometry are made to
  *   trigger updates on the obdata geometry component, which then trigger
- *   downstream re-evaluation of the individual instances of this geometry. */
+ *   downstream re-evaluation of the individual instances of this geometry.
+ */
 void DepsgraphRelationBuilder::build_object_data_geometry(Object *object)
 {
   ID *obdata = (ID *)object->data;
@@ -2521,16 +2529,13 @@ void DepsgraphRelationBuilder::build_nodetree(bNodeTree *ntree)
   }
 
   OperationKey shading_update_key(&ntree->id, NodeType::SHADING, OperationCode::MATERIAL_UPDATE);
-  OperationKey shading_parameters_key(
-      &ntree->id, NodeType::SHADING_PARAMETERS, OperationCode::MATERIAL_UPDATE);
-  add_relation(shading_parameters_key, shading_update_key, "NTree Shading Parameters");
 
   if (check_id_has_anim_component(&ntree->id)) {
     ComponentKey animation_key(&ntree->id, NodeType::ANIMATION);
-    add_relation(animation_key, shading_parameters_key, "NTree Shading Parameters");
+    add_relation(animation_key, shading_update_key, "NTree Shading Parameters");
   }
   ComponentKey parameters_key(&ntree->id, NodeType::PARAMETERS);
-  add_relation(parameters_key, shading_parameters_key, "NTree Shading Parameters");
+  add_relation(parameters_key, shading_update_key, "NTree Shading Parameters");
 }
 
 /* Recursively build graph for material */
@@ -2864,7 +2869,8 @@ void DepsgraphRelationBuilder::build_copy_on_write_relations()
   }
 }
 
-/* Nested datablocks (node trees, shape keys) requires special relation to
+/**
+ * Nested datablocks (node trees, shape keys) requires special relation to
  * ensure owner's datablock remapping happens after node tree itself is ready.
  *
  * This is similar to what happens in ntree_hack_remap_pointers().

@@ -23,6 +23,8 @@
 
 namespace blender::nodes::node_geo_object_info_cc {
 
+NODE_STORAGE_FUNCS(NodeGeometryObjectInfo)
+
 static void node_declare(NodeDeclarationBuilder &b)
 {
   b.add_input<decl::Object>(N_("Object")).hide_label();
@@ -42,24 +44,15 @@ static void node_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 
 static void node_geo_exec(GeoNodeExecParams params)
 {
-  const bNode &bnode = params.node();
-  NodeGeometryObjectInfo *node_storage = (NodeGeometryObjectInfo *)bnode.storage;
-  const bool transform_space_relative = (node_storage->transform_space ==
+  const NodeGeometryObjectInfo &storage = node_storage(params.node());
+  const bool transform_space_relative = (storage.transform_space ==
                                          GEO_NODE_TRANSFORM_SPACE_RELATIVE);
-
-  auto default_transform = [&]() {
-    params.set_output("Location", float3(0));
-    params.set_output("Rotation", float3(0));
-    params.set_output("Scale", float3(0));
-  };
-  auto default_geometry = [&]() { params.set_output("Geometry", GeometrySet()); };
 
   Object *object = params.get_input<Object *>("Object");
 
   const Object *self_object = params.self_object();
   if (object == nullptr) {
-    default_transform();
-    default_geometry();
+    params.set_default_remaining_outputs();
     return;
   }
 
@@ -81,7 +74,7 @@ static void node_geo_exec(GeoNodeExecParams params)
     if (object == self_object) {
       params.error_message_add(NodeWarningType::Error,
                                TIP_("Geometry cannot be retrieved from the modifier object"));
-      default_geometry();
+      params.set_default_remaining_outputs();
       return;
     }
 

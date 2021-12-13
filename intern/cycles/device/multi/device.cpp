@@ -129,6 +129,10 @@ class MultiDevice : public Device {
     if ((bvh_layout_mask_all & BVH_LAYOUT_OPTIX_EMBREE) == BVH_LAYOUT_OPTIX_EMBREE) {
       return BVH_LAYOUT_MULTI_OPTIX_EMBREE;
     }
+    const BVHLayoutMask BVH_LAYOUT_METAL_EMBREE = (BVH_LAYOUT_METAL | BVH_LAYOUT_EMBREE);
+    if ((bvh_layout_mask_all & BVH_LAYOUT_METAL_EMBREE) == BVH_LAYOUT_METAL_EMBREE) {
+      return BVH_LAYOUT_MULTI_METAL_EMBREE;
+    }
 
     return bvh_layout_mask;
   }
@@ -151,7 +155,8 @@ class MultiDevice : public Device {
     }
 
     assert(bvh->params.bvh_layout == BVH_LAYOUT_MULTI_OPTIX ||
-           bvh->params.bvh_layout == BVH_LAYOUT_MULTI_OPTIX_EMBREE);
+           bvh->params.bvh_layout == BVH_LAYOUT_MULTI_OPTIX_EMBREE ||
+           bvh->params.bvh_layout == BVH_LAYOUT_MULTI_METAL_EMBREE);
 
     BVHMulti *const bvh_multi = static_cast<BVHMulti *>(bvh);
     bvh_multi->sub_bvhs.resize(devices.size());
@@ -176,6 +181,9 @@ class MultiDevice : public Device {
           params.bvh_layout = BVH_LAYOUT_OPTIX;
         else if (bvh->params.bvh_layout == BVH_LAYOUT_MULTI_OPTIX_EMBREE)
           params.bvh_layout = sub.device->info.type == DEVICE_OPTIX ? BVH_LAYOUT_OPTIX :
+                                                                      BVH_LAYOUT_EMBREE;
+        else if (bvh->params.bvh_layout == BVH_LAYOUT_MULTI_METAL_EMBREE)
+          params.bvh_layout = sub.device->info.type == DEVICE_METAL ? BVH_LAYOUT_METAL :
                                                                       BVH_LAYOUT_EMBREE;
 
         /* Skip building a bottom level acceleration structure for non-instanced geometry on Embree

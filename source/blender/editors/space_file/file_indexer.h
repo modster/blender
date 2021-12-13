@@ -14,14 +14,23 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-#include "BKE_attribute_access.hh"
+/** \file
+ * \ingroup edfile
+ */
+#pragma once
 
-namespace blender::bke {
+#include "ED_file_indexer.h"
 
-template class OutputAttribute_Typed<float>;
-template class OutputAttribute_Typed<int>;
-template class OutputAttribute_Typed<float3>;
-template class OutputAttribute_Typed<bool>;
-template class OutputAttribute_Typed<ColorGeometry4f>;
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-}  // namespace blender::bke
+/**
+ * Default indexer to use when listing files. The implementation is a no-operation indexing. When
+ * set it won't use indexing. It is added to increase the code clarity.
+ */
+extern const FileIndexerType file_indexer_noop;
+
+#ifdef __cplusplus
+}
+#endif

@@ -29,6 +29,8 @@
 
 namespace blender::nodes::node_geo_proximity_cc {
 
+NODE_STORAGE_FUNCS(NodeGeometryProximity)
+
 static void node_declare(NodeDeclarationBuilder &b)
 {
   b.add_input<decl::Geometry>(N_("Target"))
@@ -211,16 +213,12 @@ static void node_geo_exec(GeoNodeExecParams params)
   GeometrySet geometry_set_target = params.extract_input<GeometrySet>("Target");
   geometry_set_target.ensure_owns_direct_data();
 
-  auto return_default = [&]() {
-    params.set_output("Position", fn::make_constant_field<float3>({0.0f, 0.0f, 0.0f}));
-    params.set_output("Distance", fn::make_constant_field<float>(0.0f));
-  };
-
   if (!geometry_set_target.has_mesh() && !geometry_set_target.has_pointcloud()) {
-    return return_default();
+    params.set_default_remaining_outputs();
+    return;
   }
 
-  const NodeGeometryProximity &storage = *(const NodeGeometryProximity *)params.node().storage;
+  const NodeGeometryProximity &storage = node_storage(params.node());
   Field<float3> position_field = params.extract_input<Field<float3>>("Source Position");
 
   auto proximity_fn = std::make_unique<ProximityFunction>(

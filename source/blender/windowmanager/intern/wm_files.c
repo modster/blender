@@ -111,6 +111,7 @@
 #include "ED_fileselect.h"
 #include "ED_image.h"
 #include "ED_outliner.h"
+#include "ED_render.h"
 #include "ED_screen.h"
 #include "ED_undo.h"
 #include "ED_util.h"
@@ -170,9 +171,6 @@ void WM_file_tag_modified(void)
   }
 }
 
-/**
- * Check if there is data that would be lost when closing the current file without saving.
- */
 bool wm_file_or_session_data_has_unsaved_changes(const Main *bmain, const wmWindowManager *wm)
 {
   return !wm->file_saved || ED_image_should_save_modified(bmain) ||
@@ -620,6 +618,8 @@ static void wm_file_read_pre(bContext *C, bool use_data, bool UNUSED(use_userdef
   /* Always do this as both startup and preferences may have loaded in many font's
    * at a different zoom level to the file being loaded. */
   UI_view2d_zoom_cache_reset();
+
+  ED_preview_restart_queue_free();
 }
 
 /**
@@ -1032,12 +1032,6 @@ static struct {
   bool override;
 } wm_init_state_app_template = {{0}};
 
-/**
- * Used for setting app-template from the command line:
- * - non-empty string: overrides.
- * - empty string: override, using no app template.
- * - NULL: clears override.
- */
 void WM_init_state_app_template_set(const char *app_template)
 {
   if (app_template) {
@@ -1061,16 +1055,6 @@ const char *WM_init_state_app_template_get(void)
 /** \name Read Startup & Preferences Blend-File API
  * \{ */
 
-/**
- * Called on startup, (context entirely filled with NULLs)
- * or called for 'New File' both `startup.blend` and `userpref.blend` are checked.
- *
- * \param r_params_file_read_post: Support postponed initialization,
- * needed for initial startup when only some sub-systems have been initialized.
- * When non-null, #wm_file_read_post doesn't run, instead it's arguments are stored
- * in this return argument.
- * The caller is responsible for calling #wm_homefile_read_post with this return argument.
- */
 void wm_homefile_read_ex(bContext *C,
                          const struct wmHomeFileRead_Params *params_homefile,
                          ReportList *reports,
@@ -1372,7 +1356,7 @@ void wm_homefile_read_ex(bContext *C,
   if (use_data) {
     WM_check(C); /* opens window(s), checks keymaps */
 
-    bmain->name[0] = '\0';
+    bmain->filepath[0] = '\0';
 
     /* start with save preference untitled.blend */
     G.save_over = 0;
@@ -1406,10 +1390,6 @@ void wm_homefile_read(bContext *C,
   wm_homefile_read_ex(C, params_homefile, reports, NULL);
 }
 
-/**
- * Special case, support deferred execution of #wm_file_read_post,
- * Needed when loading for the first time to workaround order of initialization bug, see T89046.
- */
 void wm_homefile_read_post(struct bContext *C,
                            const struct wmFileReadPost_Params *params_file_read_post)
 {
@@ -1721,7 +1701,6 @@ static ImBuf *blend_file_thumb_from_camera(const bContext *C,
   return ibuf;
 }
 
-/* easy access from gdb */
 bool write_crash_blend(void)
 {
   char path[FILE_MAX];
@@ -1849,7 +1828,7 @@ static bool wm_file_write(bContext *C,
   /* First time saving. */
   /* XXX(ton): temp solution to solve bug, real fix coming. */
   if ((BKE_main_blendfile_path(bmain)[0] == '\0') && (use_save_as_copy == false)) {
-    BLI_strncpy(bmain->name, filepath, sizeof(bmain->name));
+    STRNCPY(bmain->filepath, filepath);
   }
 
   /* XXX(ton): temp solution to solve bug, real fix coming. */
@@ -1870,7 +1849,7 @@ static bool wm_file_write(bContext *C,
 
     if (use_save_as_copy == false) {
       G.relbase_valid = 1;
-      BLI_strncpy(bmain->name, filepath, sizeof(bmain->name)); /* is guaranteed current file */
+      STRNCPY(bmain->filepath, filepath); /* is guaranteed current file */
 
       G.save_over = 1; /* disable untitled.blend convention */
     }
@@ -2006,9 +1985,6 @@ void WM_autosave_init(wmWindowManager *wm)
   wm_autosave_timer_begin(wm);
 }
 
-/**
- * Run the auto-save timer action.
- */
 void wm_autosave_timer(Main *bmain, wmWindowManager *wm, wmTimer *UNUSED(wt))
 {
   wm_autosave_timer_end(wm);
@@ -3059,21 +3035,21 @@ static void save_set_filepath(bContext *C, wmOperator *op)
 {
   Main *bmain = CTX_data_main(C);
   PropertyRNA *prop;
-  char name[FILE_MAX];
+  char filepath[FILE_MAX];
 
   prop = RNA_struct_find_property(op->ptr, "filepath");
   if (!RNA_property_is_set(op->ptr, prop)) {
     /* if not saved before, get the name of the most recently used .blend file */
     if (BKE_main_blendfile_path(bmain)[0] == '\0' && G.recent_files.first) {
       struct RecentFile *recent = G.recent_files.first;
-      BLI_strncpy(name, recent->filepath, FILE_MAX);
+      STRNCPY(filepath, recent->filepath);
     }
     else {
-      BLI_strncpy(name, bmain->name, FILE_MAX);
+      STRNCPY(filepath, bmain->filepath);
     }
 
-    wm_filepath_default(name);
-    RNA_property_string_set(op->ptr, prop, name);
+    wm_filepath_default(filepath);
+    RNA_property_string_set(op->ptr, prop, filepath);
   }
 }
 
@@ -3810,10 +3786,6 @@ static void wm_free_operator_properties_callback(void *user_data)
   IDP_FreeProperty(properties);
 }
 
-/**
- * \return True if the dialog was created, the calling operator should return #OPERATOR_INTERFACE
- *         then.
- */
 bool wm_operator_close_file_dialog_if_needed(bContext *C,
                                              wmOperator *op,
                                              wmGenericCallbackFn post_action_fn)

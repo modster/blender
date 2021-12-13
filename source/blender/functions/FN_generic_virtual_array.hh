@@ -148,11 +148,29 @@ class GVArrayCommon {
   void materialize_to_uninitialized(void *dst) const;
   void materialize_to_uninitialized(const IndexMask mask, void *dst) const;
 
+  /**
+   * Returns true when the virtual array is stored as a span internally.
+   */
   bool is_span() const;
+  /**
+   * Returns the internally used span of the virtual array. This invokes undefined behavior is the
+   * virtual array is not stored as a span internally.
+   */
   GSpan get_internal_span() const;
 
+  /**
+   * Returns true when the virtual array returns the same value for every index.
+   */
   bool is_single() const;
+  /**
+   * Copies the value that is used for every element into `r_value`, which is expected to point to
+   * initialized memory. This invokes undefined behavior if the virtual array would not return the
+   * same value for every index.
+   */
   void get_internal_single(void *r_value) const;
+  /**
+   * Same as `get_internal_single`, but `r_value` points to initialized memory.
+   */
   void get_internal_single_to_uninitialized(void *r_value) const;
 
   void get(const int64_t index, void *r_value) const;
@@ -226,6 +244,9 @@ class GVMutableArray : public GVArrayCommon {
   void set_by_relocate(const int64_t index, void *value);
 
   void fill(const void *value);
+  /**
+   * Copy the values from the source buffer to all elements in the virtual array.
+   */
   void set_all(const void *src);
 
   GVMutableArrayImpl *get_implementation() const;
@@ -555,37 +576,19 @@ template<typename T> class VMutableArrayImpl_For_GVMutableArray : public VMutabl
 /** \} */
 
 /* -------------------------------------------------------------------- */
-/** \name #GVArrayImpl_For_GSpan and #GVMutableArrayImpl_For_GMutableSpan.
+/** \name #GVArrayImpl_For_GSpan.
  * \{ */
 
-class GVArrayImpl_For_GSpan : public GVArrayImpl {
- protected:
-  const void *data_ = nullptr;
-  const int64_t element_size_;
-
- public:
-  GVArrayImpl_For_GSpan(const GSpan span);
-
- protected:
-  GVArrayImpl_For_GSpan(const CPPType &type, const int64_t size);
-
-  void get(const int64_t index, void *r_value) const override;
-  void get_to_uninitialized(const int64_t index, void *r_value) const override;
-
-  bool is_span() const override;
-  GSpan get_internal_span() const override;
-};
-
-class GVMutableArrayImpl_For_GMutableSpan : public GVMutableArrayImpl {
+class GVArrayImpl_For_GSpan : public GVMutableArrayImpl {
  protected:
   void *data_ = nullptr;
   const int64_t element_size_;
 
  public:
-  GVMutableArrayImpl_For_GMutableSpan(const GMutableSpan span);
+  GVArrayImpl_For_GSpan(const GMutableSpan span);
 
  protected:
-  GVMutableArrayImpl_For_GMutableSpan(const CPPType &type, const int64_t size);
+  GVArrayImpl_For_GSpan(const CPPType &type, const int64_t size);
 
  public:
   void get(const int64_t index, void *r_value) const override;
