@@ -377,8 +377,7 @@ template<typename TextureMethod> class ScreenSpaceDrawingMode : public AbstractD
 
     rctf crop_rect;
     rctf *crop_rect_ptr = nullptr;
-    /* TODO: use regular when drawing none repeating single tile buffers. */
-    eIMBTransformMode transform_mode;  // = IMB_TRANSFORM_MODE_REGULAR;
+    eIMBTransformMode transform_mode;
     if (instance_data.flags.do_tile_drawing) {
       transform_mode = IMB_TRANSFORM_MODE_WRAP_REPEAT;
     }

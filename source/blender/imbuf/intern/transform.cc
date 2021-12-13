@@ -115,8 +115,8 @@ class CropSource : public BaseDiscard {
    */
   virtual bool should_discard(const TransformUserData &user_data, const float uv[2])
   {
-    return uv[0] < user_data.src_crop.xmin && uv[0] >= user_data.src_crop.xmax &&
-           uv[1] < user_data.src_crop.ymin && uv[1] >= user_data.src_crop.ymax;
+    return uv[0] < user_data.src_crop.xmin || uv[0] >= user_data.src_crop.xmax ||
+           uv[1] < user_data.src_crop.ymin || uv[1] >= user_data.src_crop.ymax;
   }
 };
 
@@ -196,30 +196,53 @@ template<eIMBInterpolationFilterMode Filter, typename StorageType, int NumChanne
   static const int ChannelLen = NumChannels;
   using SampleType = std::array<StorageType, NumChannels>;
 
-  virtual void sample(const ImBuf *source,
-                      const float u,
-                      const float v,
-                      StorageType r_sample[NumChannels])
+  void sample(const ImBuf *source, const float u, const float v, SampleType &r_sample)
   {
-    if constexpr (Filter == IMB_FILTER_NEAREST && std::is_same_v<StorageType, float> &&
+    if constexpr (Filter == IMB_FILTER_BILINEAR && std::is_same_v<StorageType, float> &&
                   NumChannels == 4) {
-      nearest_interpolation_color_fl(source, nullptr, r_sample, u, v);
-    }
-    else if constexpr (Filter == IMB_FILTER_BILINEAR && std::is_same_v<StorageType, float> &&
-                       NumChannels == 4) {
-      bilinear_interpolation_color_fl(source, nullptr, r_sample, u, v);
+      bilinear_interpolation_color_fl(source, nullptr, r_sample.begin(), u, v);
     }
     else if constexpr (Filter == IMB_FILTER_NEAREST &&
                        std::is_same_v<StorageType, unsigned char> && NumChannels == 4) {
-      nearest_interpolation_color_char(source, r_sample, nullptr, u, v);
+      nearest_interpolation_color_char(source, r_sample.begin(), nullptr, u, v);
     }
     else if constexpr (Filter == IMB_FILTER_BILINEAR &&
                        std::is_same_v<StorageType, unsigned char> && NumChannels == 4) {
-      bilinear_interpolation_color_char(source, r_sample, nullptr, u, v);
+      bilinear_interpolation_color_char(source, r_sample.begin(), nullptr, u, v);
+    }
+    else if constexpr (Filter == IMB_FILTER_NEAREST && std::is_same_v<StorageType, float>) {
+      sample_nearest_float(source, u, v, r_sample);
     }
     else {
       /* Unsupported sampler. */
       BLI_assert_unreachable();
+    }
+  }
+
+ private:
+  void sample_nearest_float(const ImBuf *source,
+                            const float u,
+                            const float v,
+                            SampleType &r_sample)
+  {
+    BLI_STATIC_ASSERT(std::is_same_v<StorageType, float>);
+
+    /* ImBuf in must have a valid rect or rect_float, assume this is already checked */
+    int x1 = (int)(u);
+    int y1 = (int)(v);
+
+    /* Break when sample outside image is requested. */
+    if (x1 < 0 || x1 >= source->x || y1 < 0 || y1 >= source->y) {
+      for (int i = 0; i < NumChannels; i++) {
+        r_sample[i] = 0.0f;
+      }
+      return;
+    }
+
+    const size_t offset = ((size_t)source->x * y1 + x1) * NumChannels;
+    const float *dataF = source->rect_float + offset;
+    for (int i = 0; i < NumChannels; i++) {
+      r_sample[i] = dataF[i];
     }
   }
 };
@@ -232,6 +255,8 @@ template<eIMBInterpolationFilterMode Filter, typename StorageType, int NumChanne
  * - 4 channel unsigned char -> 4 channel unsigned char.
  * - 4 channel float -> 4 channel float.
  * - 3 channel float -> 4 channel float.
+ * - 2 channel float -> 4 channel float.
+ * - 1 channel float -> 4 channel float.
  */
 template<typename StorageType, int SourceNumChannels, int DestinationNumChannels>
 class ChannelConverter {
@@ -258,6 +283,17 @@ class ChannelConverter {
     else if constexpr (std::is_same_v<StorageType, float> && SourceNumChannels == 3 &&
                        DestinationNumChannels == 4) {
       copy_v4_fl4(texel_pointer.get_pointer(), sample[0], sample[1], sample[2], 1.0f);
+    }
+    else if constexpr (std::is_same_v<StorageType, float> && SourceNumChannels == 2 &&
+                       DestinationNumChannels == 4) {
+      copy_v4_fl4(texel_pointer.get_pointer(), sample[0], sample[1], 0.0f, 1.0f);
+    }
+    else if constexpr (std::is_same_v<StorageType, float> && SourceNumChannels == 1 &&
+                       DestinationNumChannels == 4) {
+      copy_v4_fl4(texel_pointer.get_pointer(), sample[0], 0.0f, 0.0f, 1.0f);
+    }
+    else {
+      BLI_assert_unreachable();
     }
   }
 };
@@ -373,7 +409,7 @@ class ScanlineProcessor {
         sampler.sample(user_data->src,
                        uv_wrapping.modify_u(*user_data, uv[0]),
                        uv_wrapping.modify_v(*user_data, uv[1]),
-                       &sample[0]);
+                       sample);
         channel_converter.convert_and_store(sample, output);
       }
 
@@ -435,8 +471,11 @@ ScanlineThreadFunc get_scanline_function(const TransformUserData *user_data,
   if (src->channels == 3 && dst->channels == 4) {
     return get_scanline_function<Filter, float, 3, 4>(mode);
   }
-  if (src->channels == 3 && dst->channels == 4) {
-    return get_scanline_function<Filter, float, 3, 4>(mode);
+  if (src->channels == 2 && dst->channels == 4) {
+    return get_scanline_function<Filter, float, 2, 4>(mode);
+  }
+  if (src->channels == 1 && dst->channels == 4) {
+    return get_scanline_function<Filter, float, 1, 4>(mode);
   }
   return nullptr;
 }
@@ -446,10 +485,10 @@ static void transform(TransformUserData *user_data, const eIMBTransformMode mode
 {
   ScanlineThreadFunc scanline_func = nullptr;
 
-  if (user_data->dst->rect_float) {
+  if (user_data->dst->rect_float && user_data->src->rect_float) {
     scanline_func = get_scanline_function<Filter>(user_data, mode);
   }
-  else if (user_data->dst->rect) {
+  else if (user_data->dst->rect && user_data->src->rect) {
     /* Number of channels is always 4 when using unsigned char buffers (sRGB + straight alpha). */
     scanline_func = get_scanline_function<Filter, unsigned char, 4, 4>(mode);
   }
