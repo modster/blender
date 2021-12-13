@@ -46,8 +46,6 @@ struct TextureInfo {
   rctf clipping_bounds;
   /** \brief uv area of the texture. */
   rctf uv_bounds;
-  /** \brief Transform matrix to convert a normalized uv coordinate to texture space. */
-  float uv_to_texture[4][4];
 
   /**
    * \brief Batch to draw the associated texton the screen.

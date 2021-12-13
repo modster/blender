@@ -44,6 +44,21 @@ struct OneTextureMethod {
   {
   }
 
+  void update_uv_to_texture_matrix(const ARegion *region)
+  {
+    // TODO: I remember that there was a function for this somewhere.
+    unit_m4(instance_data->uv_to_texture);
+    float scale_x = 1.0 / BLI_rctf_size_x(&region->v2d.cur);
+    float scale_y = 1.0 / BLI_rctf_size_y(&region->v2d.cur);
+    float translate_x = scale_x * -region->v2d.cur.xmin;
+    float translate_y = scale_y * -region->v2d.cur.ymin;
+
+    instance_data->uv_to_texture[0][0] = scale_x;
+    instance_data->uv_to_texture[1][1] = scale_y;
+    instance_data->uv_to_texture[3][0] = translate_x;
+    instance_data->uv_to_texture[3][1] = translate_y;
+  }
+
   /** \brief Update the texture slot uv and screen space bounds. */
   void update_screen_space_bounds(const ARegion *region)
   {
@@ -59,48 +74,18 @@ struct OneTextureMethod {
     }
   }
 
-  void update_uv_bounds()
+  void update_uv_bounds(const ARegion *region)
   {
-    /* Calculate the uv coordinates of the screen space visible corners. */
-    float inverse_mat[4][4];
-    DRW_view_viewmat_get(NULL, inverse_mat, true);
-
-    rctf new_uv_bounds;
-    float uv_min[3];
-    static const float screen_space_co1[3] = {0.0, 0.0, 0.0};
-    mul_v3_m4v3(uv_min, inverse_mat, screen_space_co1);
-
-    static const float screen_space_co2[3] = {1.0, 1.0, 0.0};
-    float uv_max[3];
-    mul_v3_m4v3(uv_max, inverse_mat, screen_space_co2);
-    BLI_rctf_init(&new_uv_bounds, uv_min[0], uv_max[0], uv_min[1], uv_max[1]);
-
-    if (!BLI_rctf_compare(
-            &instance_data->texture_infos[0].uv_bounds, &new_uv_bounds, EPSILON_UV_BOUNDS)) {
-      instance_data->texture_infos[0].uv_bounds = new_uv_bounds;
-      instance_data->texture_infos[0].dirty = true;
-      update_uv_to_texture_matrix(&instance_data->texture_infos[0]);
+    TextureInfo &info = instance_data->texture_infos[0];
+    if (!BLI_rctf_compare(&info.uv_bounds, &region->v2d.cur, EPSILON_UV_BOUNDS)) {
+      info.uv_bounds = region->v2d.cur;
+      info.dirty = true;
     }
 
     /* Mark the other textures as invalid. */
     for (int i = 1; i < SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN; i++) {
       BLI_rctf_init_minmax(&instance_data->texture_infos[i].clipping_bounds);
     }
-  }
-
-  void update_uv_to_texture_matrix(TextureInfo *info)
-  {
-    // TODO: I remember that there was a function for this somewhere.
-    unit_m4(info->uv_to_texture);
-    float scale_x = 1.0 / BLI_rctf_size_x(&info->uv_bounds);
-    float scale_y = 1.0 / BLI_rctf_size_y(&info->uv_bounds);
-    float translate_x = scale_x * -info->uv_bounds.xmin;
-    float translate_y = scale_y * -info->uv_bounds.ymin;
-
-    info->uv_to_texture[0][0] = scale_x;
-    info->uv_to_texture[1][1] = scale_y;
-    info->uv_to_texture[3][0] = translate_x;
-    info->uv_to_texture[3][1] = translate_y;
   }
 };
 
@@ -367,7 +352,7 @@ template<typename TextureMethod> class ScreenSpaceDrawingMode : public AbstractD
      * Construct a variant of the info_uv_to_texture that adds the texel space
      * transformation.*/
     float uv_to_texel[4][4];
-    copy_m4_m4(uv_to_texel, texture_info.uv_to_texture);
+    copy_m4_m4(uv_to_texel, instance_data.uv_to_texture);
     float scale[3] = {static_cast<float>(texture_width) / static_cast<float>(tile_buffer.x),
                       static_cast<float>(texture_height) / static_cast<float>(tile_buffer.y),
                       1.0f};
@@ -418,8 +403,9 @@ template<typename TextureMethod> class ScreenSpaceDrawingMode : public AbstractD
     // Step: Find out which screen space textures are needed to draw on the screen. Remove the
     // screen space textures that aren't needed.
     const ARegion *region = draw_ctx->region;
+    method.update_uv_to_texture_matrix(region);
     method.update_screen_space_bounds(region);
-    method.update_uv_bounds();
+    method.update_uv_bounds(region);
 
     // Step: Update the GPU textures based on the changes in the image.
     instance_data->update_gpu_texture_allocations();

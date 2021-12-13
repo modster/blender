@@ -85,10 +85,6 @@ class AbstractSpaceAccessor {
                                 bool *r_owns_texture,
                                 GPUTexture **r_tex_tile_data) = 0;
 
-  /**
-   * Override the view for drawing.
-   */
-  virtual DRWView *create_view_override(const ARegion *UNUSED(region)) = 0;
 
   /**
    * Initialize the matrix that will be used to draw the image. The matrix will be send as object

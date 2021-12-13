@@ -89,7 +89,20 @@ class ImageEngine {
     IMAGE_InstanceData *instance_data = vedata->instance_data;
     drawing_mode.cache_init(vedata);
     const ARegion *region = draw_ctx->region;
-    instance_data->view = space->create_view_override(region);
+
+    /* Setup full screen view matrix. */
+    float winmat[4][4], viewmat[4][4];
+    orthographic_m4(viewmat, 0.0, region->winx, 0.0, region->winy, 0.0, 1.0);
+    unit_m4(winmat);
+    instance_data->view = DRW_view_create(viewmat, winmat, nullptr, nullptr, nullptr);
+
+    /*
+     * TODO: space can override the uv bounds of the visible region.
+     * for image space it would use the region->v2d.cur.
+     * for node space it would use the zoom and scaling of the backdrop.
+     *
+     * This should be stored in the root of the instance data.
+     */
   }
 
   void cache_populate()

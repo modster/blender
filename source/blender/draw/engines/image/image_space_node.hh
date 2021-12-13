@@ -54,14 +54,6 @@ class SpaceNodeAccessor : public AbstractSpaceAccessor {
     BKE_image_release_ibuf(image, ibuf, lock);
   }
 
-  DRWView *create_view_override(const ARegion *region) override
-  {
-    /* Setup a screen pixel view. The backdrop of the node editor doesn't follow the region. */
-    float winmat[4][4], viewmat[4][4];
-    orthographic_m4(viewmat, 0.0, region->winx, 0.0, region->winy, 0.0, 1.0);
-    unit_m4(winmat);
-    return DRW_view_create(viewmat, winmat, nullptr, nullptr, nullptr);
-  }
 
   void get_shader_parameters(ShaderParameters &r_shader_parameters,
                              ImBuf *ibuf,
