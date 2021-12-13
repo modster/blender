@@ -319,7 +319,10 @@ template<typename TextureMethod> class ScreenSpaceDrawingMode : public AbstractD
     const int texture_width = GPU_texture_width(info.texture);
     const int texture_height = GPU_texture_height(info.texture);
     IMB_initImBuf(&texture_buffer, texture_width, texture_height, 0, IB_rectfloat);
-    ImageUser tile_user = *image_user;
+    ImageUser tile_user = {0};
+    if (image_user) {
+      tile_user = *image_user;
+    }
 
     void *lock;
 
