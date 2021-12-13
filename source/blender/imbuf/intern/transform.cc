@@ -162,7 +162,9 @@ class TexelPointer {
       pointer = image_buffer->rect_float + offset;
     }
     else if constexpr (std::is_same_v<ImBufStorageType, unsigned char>) {
-      pointer = image_buffer->rect + offset;
+      pointer = const_cast<unsigned char *>(
+          static_cast<const unsigned char *>(static_cast<const void *>(image_buffer->rect)) +
+          offset);
     }
     else {
       pointer = nullptr;
@@ -316,7 +318,7 @@ template<typename Processor> void transform_scanline_function(void *custom_data,
   processor.process(user_data, scanline);
 }
 
-template<InterpolationColorFunction InterpolationFunction>
+template<InterpolationColorFunction InterpolationFunction, typename StorageType>
 ScanlineThreadFunc get_scanline_function(const eIMBTransformMode mode)
 
 {
@@ -324,17 +326,17 @@ ScanlineThreadFunc get_scanline_function(const eIMBTransformMode mode)
     case IMB_TRANSFORM_MODE_REGULAR:
       return transform_scanline_function<ScanlineProcessor<NoDiscard,
                                                            InterpolationFunction,
-                                                           TexelPointer<float, 4>,
+                                                           TexelPointer<StorageType, 4>,
                                                            PassThroughUV>>;
     case IMB_TRANSFORM_MODE_CROP_SRC:
       return transform_scanline_function<ScanlineProcessor<CropSource,
                                                            InterpolationFunction,
-                                                           TexelPointer<float, 4>,
+                                                           TexelPointer<StorageType, 4>,
                                                            PassThroughUV>>;
     case IMB_TRANSFORM_MODE_WRAP_REPEAT:
       return transform_scanline_function<ScanlineProcessor<NoDiscard,
                                                            InterpolationFunction,
-                                                           TexelPointer<float, 4>,
+                                                           TexelPointer<StorageType, 4>,
                                                            WrapRepeatUV>>;
   }
 
@@ -351,13 +353,13 @@ static void transform(TransformUserData *user_data, const eIMBTransformMode mode
     constexpr InterpolationColorFunction interpolation_function =
         Filter == IMB_FILTER_NEAREST ? nearest_interpolation_color_fl :
                                        bilinear_interpolation_color_fl;
-    scanline_func = get_scanline_function<interpolation_function>(mode);
+    scanline_func = get_scanline_function<interpolation_function, float>(mode);
   }
   else if (user_data->dst->rect) {
     constexpr InterpolationColorFunction interpolation_function =
         Filter == IMB_FILTER_NEAREST ? nearest_interpolation_color_char :
                                        bilinear_interpolation_color_char;
-    scanline_func = get_scanline_function<interpolation_function>(mode);
+    scanline_func = get_scanline_function<interpolation_function, unsigned char>(mode);
   }
 
   if (scanline_func != nullptr) {
