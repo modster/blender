@@ -138,7 +138,7 @@ class NoDiscard : public BaseDiscard {
 };
 
 /**
- * \brief pointer to a texel to write or read serial.
+ * \brief Pointer to a texel to write or read serial.
  */
 template<
     /**
@@ -190,7 +190,79 @@ class TexelPointer {
   }
 };
 
-template<eIMBInterpolationFilterMode Filter, typename StorageType, int NumChannels> class Sampler {
+/**
+ * \brief Wrapping mode for the uv coordinates.
+ *
+ * Subclasses have the ability to change the UV coordinates before the source buffer will be
+ * sampled.
+ */
+class BaseUVWrapping {
+ public:
+  /**
+   * \brief modify the given u coordinate.
+   */
+  virtual float modify_u(const ImBuf *source_buffer, float u) = 0;
+
+  /**
+   * \brief modify the given v coordinate.
+   */
+  virtual float modify_v(const ImBuf *source_buffer, float v) = 0;
+};
+
+/**
+ * \brief UVWrapping method that does not modify the UV coordinates.
+ */
+class PassThroughUV : public BaseUVWrapping {
+ public:
+  float modify_u(const ImBuf *UNUSED(source_buffer), float u) override
+  {
+    return u;
+  }
+
+  float modify_v(const ImBuf *UNUSED(source_buffer), float v) override
+  {
+    return v;
+  }
+};
+
+/**
+ * \brief UVWrapping method that wrap repeats the UV coordinates.
+ */
+class WrapRepeatUV : public BaseUVWrapping {
+ public:
+  float modify_u(const ImBuf *source_buffer, float u) override
+
+  {
+    int x = (int)floor(u);
+    x = x % source_buffer->x;
+    if (x < 0) {
+      x += source_buffer->x;
+    }
+    return x;
+  }
+
+  float modify_v(const ImBuf *source_buffer, float v) override
+  {
+    int y = (int)floor(v);
+    y = y % source_buffer->y;
+    if (y < 0) {
+      y += source_buffer->y;
+    }
+    return y;
+  }
+};
+
+template<eIMBInterpolationFilterMode Filter,
+         typename StorageType,
+         int NumChannels,
+         /**
+          * \brief Wrapping method to perform
+          * Should be a subclass of BaseUVWrapper
+          */
+         typename UVWrapping>
+class Sampler {
+  UVWrapping uv_wrapper;
+
  public:
   using ChannelType = StorageType;
   static const int ChannelLen = NumChannels;
@@ -198,20 +270,45 @@ template<eIMBInterpolationFilterMode Filter, typename StorageType, int NumChanne
 
   void sample(const ImBuf *source, const float u, const float v, SampleType &r_sample)
   {
+    const float wrapped_u = uv_wrapper.modify_u(source, u);
+    const float wrapped_v = uv_wrapper.modify_v(source, v);
+
     if constexpr (Filter == IMB_FILTER_BILINEAR && std::is_same_v<StorageType, float> &&
                   NumChannels == 4) {
-      bilinear_interpolation_color_fl(source, nullptr, r_sample.begin(), u, v);
+      bilinear_interpolation_color_fl(source, nullptr, r_sample.begin(), wrapped_u, wrapped_v);
     }
     else if constexpr (Filter == IMB_FILTER_NEAREST &&
                        std::is_same_v<StorageType, unsigned char> && NumChannels == 4) {
-      nearest_interpolation_color_char(source, r_sample.begin(), nullptr, u, v);
+      nearest_interpolation_color_char(source, r_sample.begin(), nullptr, wrapped_u, wrapped_v);
     }
     else if constexpr (Filter == IMB_FILTER_BILINEAR &&
                        std::is_same_v<StorageType, unsigned char> && NumChannels == 4) {
-      bilinear_interpolation_color_char(source, r_sample.begin(), nullptr, u, v);
+      bilinear_interpolation_color_char(source, r_sample.begin(), nullptr, wrapped_u, wrapped_v);
+    }
+    else if constexpr (Filter == IMB_FILTER_BILINEAR && std::is_same_v<StorageType, float>) {
+      if constexpr (std::is_same_v<UVWrapping, WrapRepeatUV>) {
+        BLI_bilinear_interpolation_wrap_fl(source->rect_float,
+                                           r_sample.begin(),
+                                           source->x,
+                                           source->y,
+                                           NumChannels,
+                                           u,
+                                           v,
+                                           true,
+                                           true);
+      }
+      else {
+        BLI_bilinear_interpolation_fl(source->rect_float,
+                                      r_sample.begin(),
+                                      source->x,
+                                      source->y,
+                                      NumChannels,
+                                      wrapped_u,
+                                      wrapped_v);
+      }
     }
     else if constexpr (Filter == IMB_FILTER_NEAREST && std::is_same_v<StorageType, float>) {
-      sample_nearest_float(source, u, v, r_sample);
+      sample_nearest_float(source, wrapped_u, wrapped_v, r_sample);
     }
     else {
       /* Unsupported sampler. */
@@ -298,68 +395,6 @@ class ChannelConverter {
   }
 };
 
-/**
- * \brief Wrapping mode for the uv coordinates.
- *
- * Subclasses have the ability to change the UV coordinates before the source buffer will be
- * sampled.
- */
-class BaseUVWrapping {
- public:
-  /**
-   * \brief modify the given u coordinate.
-   */
-  virtual float modify_u(const TransformUserData &user_data, float u) = 0;
-
-  /**
-   * \brief modify the given v coordinate.
-   */
-  virtual float modify_v(const TransformUserData &user_data, float v) = 0;
-};
-
-/**
- * \brief UVWrapping method that does not modify the UV coordinates.
- */
-class PassThroughUV : public BaseUVWrapping {
- public:
-  float modify_u(const TransformUserData &UNUSED(user_data), float u) override
-  {
-    return u;
-  }
-
-  float modify_v(const TransformUserData &UNUSED(user_data), float v) override
-  {
-    return v;
-  }
-};
-
-/**
- * \brief UVWrapping method that wrap repeats the UV coordinates.
- */
-class WrapRepeatUV : public BaseUVWrapping {
- public:
-  float modify_u(const TransformUserData &user_data, float u) override
-
-  {
-    int x = (int)floor(u);
-    x = x % user_data.src->x;
-    if (x < 0) {
-      x += user_data.src->x;
-    }
-    return x;
-  }
-
-  float modify_v(const TransformUserData &user_data, float v) override
-  {
-    int y = (int)floor(v);
-    y = y % user_data.src->y;
-    if (y < 0) {
-      y += user_data.src->y;
-    }
-    return y;
-  }
-};
-
 template<
     /**
      * \brief Discard function to use.
@@ -377,16 +412,9 @@ template<
      * \brief Kernel to store to the destination buffer.
      * Should be an TexelPointer
      */
-    typename OutputTexelPointer,
-
-    /**
-     * \brief Wrapping method to perform
-     * Should be a subclass of BaseUVWrapper
-     */
-    typename UVWrapping>
+    typename OutputTexelPointer>
 class ScanlineProcessor {
   Discard discarder;
-  UVWrapping uv_wrapping;
   OutputTexelPointer output;
   Sampler sampler;
   ChannelConverter<typename Sampler::ChannelType,
@@ -406,10 +434,7 @@ class ScanlineProcessor {
     for (int xi = 0; xi < width; xi++) {
       if (!discarder.should_discard(*user_data, uv)) {
         typename Sampler::SampleType sample;
-        sampler.sample(user_data->src,
-                       uv_wrapping.modify_u(*user_data, uv[0]),
-                       uv_wrapping.modify_v(*user_data, uv[1]),
-                       sample);
+        sampler.sample(user_data->src, uv[0], uv[1], sample);
         channel_converter.convert_and_store(sample, output);
       }
 
@@ -437,21 +462,18 @@ ScanlineThreadFunc get_scanline_function(const eIMBTransformMode mode)
     case IMB_TRANSFORM_MODE_REGULAR:
       return transform_scanline_function<
           ScanlineProcessor<NoDiscard,
-                            Sampler<Filter, StorageType, SourceNumChannels>,
-                            TexelPointer<StorageType, DestinationNumChannels>,
-                            PassThroughUV>>;
+                            Sampler<Filter, StorageType, SourceNumChannels, PassThroughUV>,
+                            TexelPointer<StorageType, DestinationNumChannels>>>;
     case IMB_TRANSFORM_MODE_CROP_SRC:
       return transform_scanline_function<
           ScanlineProcessor<CropSource,
-                            Sampler<Filter, StorageType, SourceNumChannels>,
-                            TexelPointer<StorageType, DestinationNumChannels>,
-                            PassThroughUV>>;
+                            Sampler<Filter, StorageType, SourceNumChannels, PassThroughUV>,
+                            TexelPointer<StorageType, DestinationNumChannels>>>;
     case IMB_TRANSFORM_MODE_WRAP_REPEAT:
       return transform_scanline_function<
           ScanlineProcessor<NoDiscard,
-                            Sampler<Filter, StorageType, SourceNumChannels>,
-                            TexelPointer<StorageType, DestinationNumChannels>,
-                            WrapRepeatUV>>;
+                            Sampler<Filter, StorageType, SourceNumChannels, WrapRepeatUV>,
+                            TexelPointer<StorageType, DestinationNumChannels>>>;
   }
 
   BLI_assert_unreachable();
