@@ -54,7 +54,6 @@ class SpaceNodeAccessor : public AbstractSpaceAccessor {
     BKE_image_release_ibuf(image, ibuf, lock);
   }
 
-
   void get_shader_parameters(ShaderParameters &r_shader_parameters,
                              ImBuf *ibuf,
                              bool UNUSED(is_tiled)) override
@@ -107,23 +106,31 @@ class SpaceNodeAccessor : public AbstractSpaceAccessor {
     *r_tex_tile_data = nullptr;
   }
 
-  void get_image_mat(const ImBuf *image_buffer,
-                     const ARegion *region,
-                     float r_mat[4][4]) const override
-  {
-    unit_m4(r_mat);
-    const float ibuf_width = image_buffer->x;
-    const float ibuf_height = image_buffer->y;
-
-    r_mat[0][0] = ibuf_width * snode->zoom;
-    r_mat[1][1] = ibuf_height * snode->zoom;
-    r_mat[3][0] = (region->winx - snode->zoom * ibuf_width) / 2 + snode->xof;
-    r_mat[3][1] = (region->winy - snode->zoom * ibuf_height) / 2 + snode->yof;
-  }
-
-  bool use_tile_drawing() const
+  bool use_tile_drawing() const override
   {
     return false;
+  }
+
+  /**
+   * The backdrop of the node editor isn't drawn in screen space UV space. But is locked with the
+   * screen.
+   */
+  void init_ss_to_texture_matrix(const ARegion *region,
+                                 const float image_resolution[2],
+                                 float r_uv_to_texture[4][4]) const override
+  {
+    unit_m4(r_uv_to_texture);
+    float display_resolution[2];
+    mul_v2_v2fl(display_resolution, image_resolution, snode->zoom);
+    const float scale_x = display_resolution[0] / region->winx;
+    const float scale_y = display_resolution[1] / region->winy;
+    const float translate_x = 0.5f - 0.5f * scale_x + snode->xof / image_resolution[0];
+    const float translate_y = 0.5 - 0.5f * scale_y + snode->yof / image_resolution[1];
+
+    r_uv_to_texture[0][0] = scale_x;
+    r_uv_to_texture[1][1] = scale_y;
+    r_uv_to_texture[3][0] = translate_x;
+    r_uv_to_texture[3][1] = translate_y;
   }
 };
 

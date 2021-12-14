@@ -160,16 +160,27 @@ class SpaceImageAccessor : public AbstractSpaceAccessor {
       *r_owns_texture = false;
     }
   }
-  void get_image_mat(const ImBuf *UNUSED(image_buffer),
-                     const ARegion *UNUSED(region),
-                     float r_mat[4][4]) const override
-  {
-    unit_m4(r_mat);
-  }
 
   bool use_tile_drawing() const
   {
     return (sima->flag & SI_DRAW_TILE) != 0;
+  }
+
+  void init_ss_to_texture_matrix(const ARegion *region,
+                                 const float UNUSED(image_resolution[2]),
+                                 float r_uv_to_texture[4][4]) const override
+  {
+    // TODO: I remember that there was a function for this somewhere.
+    unit_m4(r_uv_to_texture);
+    float scale_x = 1.0 / BLI_rctf_size_x(&region->v2d.cur);
+    float scale_y = 1.0 / BLI_rctf_size_y(&region->v2d.cur);
+    float translate_x = scale_x * -region->v2d.cur.xmin;
+    float translate_y = scale_y * -region->v2d.cur.ymin;
+
+    r_uv_to_texture[0][0] = scale_x;
+    r_uv_to_texture[1][1] = scale_y;
+    r_uv_to_texture[3][0] = translate_x;
+    r_uv_to_texture[3][1] = translate_y;
   }
 };
 

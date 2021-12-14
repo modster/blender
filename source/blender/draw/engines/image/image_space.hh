@@ -85,15 +85,15 @@ class AbstractSpaceAccessor {
                                 bool *r_owns_texture,
                                 GPUTexture **r_tex_tile_data) = 0;
 
-
-  /**
-   * Initialize the matrix that will be used to draw the image. The matrix will be send as object
-   * matrix to the drawing pipeline.
-   */
-  virtual void get_image_mat(const ImBuf *image_buffer,
-                             const ARegion *region,
-                             float r_mat[4][4]) const = 0;
-
   /** \brief Is (wrap) repeat option enabled in the space. */
   virtual bool use_tile_drawing() const = 0;
+
+  /**
+   * \brief Initialize r_uv_to_texture matrix to transform from normalized screen space coordinates
+   * (0..1) to texture space UV coordinates.
+   */
+  virtual void init_ss_to_texture_matrix(const ARegion *region,
+                                         const float image_resolution[2],
+                                         float r_uv_to_texture[4][4]) const = 0;
+
 };  // namespace blender::draw::image_engine

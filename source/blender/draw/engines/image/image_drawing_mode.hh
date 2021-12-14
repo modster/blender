@@ -44,21 +44,6 @@ struct OneTextureMethod {
   {
   }
 
-  void update_uv_to_texture_matrix(const ARegion *region)
-  {
-    // TODO: I remember that there was a function for this somewhere.
-    unit_m4(instance_data->uv_to_texture);
-    float scale_x = 1.0 / BLI_rctf_size_x(&region->v2d.cur);
-    float scale_y = 1.0 / BLI_rctf_size_y(&region->v2d.cur);
-    float translate_x = scale_x * -region->v2d.cur.xmin;
-    float translate_y = scale_y * -region->v2d.cur.ymin;
-
-    instance_data->uv_to_texture[0][0] = scale_x;
-    instance_data->uv_to_texture[1][1] = scale_y;
-    instance_data->uv_to_texture[3][0] = translate_x;
-    instance_data->uv_to_texture[3][1] = translate_y;
-  }
-
   /** \brief Update the texture slot uv and screen space bounds. */
   void update_screen_space_bounds(const ARegion *region)
   {
@@ -352,7 +337,7 @@ template<typename TextureMethod> class ScreenSpaceDrawingMode : public AbstractD
      * Construct a variant of the info_uv_to_texture that adds the texel space
      * transformation.*/
     float uv_to_texel[4][4];
-    copy_m4_m4(uv_to_texel, instance_data.uv_to_texture);
+    copy_m4_m4(uv_to_texel, instance_data.ss_to_texture);
     float scale[3] = {static_cast<float>(texture_width) / static_cast<float>(tile_buffer.x),
                       static_cast<float>(texture_height) / static_cast<float>(tile_buffer.y),
                       1.0f};
@@ -403,7 +388,6 @@ template<typename TextureMethod> class ScreenSpaceDrawingMode : public AbstractD
     // Step: Find out which screen space textures are needed to draw on the screen. Remove the
     // screen space textures that aren't needed.
     const ARegion *region = draw_ctx->region;
-    method.update_uv_to_texture_matrix(region);
     method.update_screen_space_bounds(region);
     method.update_uv_bounds(region);
 

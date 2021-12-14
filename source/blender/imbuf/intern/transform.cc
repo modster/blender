@@ -33,13 +33,33 @@
 namespace blender::imbuf::transform {
 
 struct TransformUserData {
+  /** \brief Source image buffer to read from. */
   const ImBuf *src;
+  /** \brief Destination image buffer to write to. */
   ImBuf *dst;
+  /** \brief UV coordinates at the origin (0,0) in source image space. */
   float start_uv[2];
+
+  /**
+   * \brief delta UV coordinates along the source image buffer, when moving a single texel in the X
+   * axis of the dst image buffer.
+   */
   float add_x[2];
+
+  /**
+   * \brief delta UV coordinate along the source image buffer, when moving a single texel in the Y
+   * axes of the dst image buffer.
+   */
   float add_y[2];
+
+  /**
+   * \brief Cropping region in source image texel space.
+   */
   rctf src_crop;
 
+  /**
+   * \brief Initialize the start_uv, add_x and add_y fields based on the given transform matrix.
+   */
   void init(const float transform_matrix[4][4])
   {
     init_start_uv(transform_matrix);

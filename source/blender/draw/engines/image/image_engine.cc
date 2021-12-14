@@ -88,21 +88,13 @@ class ImageEngine {
   {
     IMAGE_InstanceData *instance_data = vedata->instance_data;
     drawing_mode.cache_init(vedata);
-    const ARegion *region = draw_ctx->region;
 
     /* Setup full screen view matrix. */
+    const ARegion *region = draw_ctx->region;
     float winmat[4][4], viewmat[4][4];
     orthographic_m4(viewmat, 0.0, region->winx, 0.0, region->winy, 0.0, 1.0);
     unit_m4(winmat);
     instance_data->view = DRW_view_create(viewmat, winmat, nullptr, nullptr, nullptr);
-
-    /*
-     * TODO: space can override the uv bounds of the visible region.
-     * for image space it would use the region->v2d.cur.
-     * for node space it would use the zoom and scaling of the backdrop.
-     *
-     * This should be stored in the root of the instance data.
-     */
   }
 
   void cache_populate()
@@ -118,6 +110,13 @@ class ImageEngine {
                                            space->use_tile_drawing();
     void *lock;
     ImBuf *image_buffer = space->acquire_image_buffer(instance_data->image, &lock);
+
+    /* Setup the matrix to go from screen UV coordinates to UV texture space coordinates. */
+    float image_resolution[2] = {image_buffer ? image_buffer->x : 1024.0f,
+                                 image_buffer ? image_buffer->y : 1024.0f};
+    space->init_ss_to_texture_matrix(
+        draw_ctx->region, image_resolution, instance_data->ss_to_texture);
+
     const Scene *scene = DRW_context_state_get()->scene;
     instance_data->sh_params.update(space.get(), scene, instance_data->image, image_buffer);
     space->release_buffer(instance_data->image, image_buffer, lock);
@@ -138,7 +137,7 @@ class ImageEngine {
   {
     drawing_mode.draw_scene(vedata);
   }
-};
+};  // namespace blender::draw::image_engine
 
 /* -------------------------------------------------------------------- */
 /** \name Engine Callbacks

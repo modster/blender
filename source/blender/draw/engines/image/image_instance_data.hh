@@ -59,8 +59,8 @@ struct IMAGE_InstanceData {
     DRWPass *image_pass;
   } passes;
 
-  /** \brief Transform matrix to convert a normalized uv coordinate to texture space. */
-  float uv_to_texture[4][4];
+  /** \brief Transform matrix to convert a normalized screen space coordinates to texture space. */
+  float ss_to_texture[4][4];
   TextureInfo texture_infos[SCREEN_SPACE_DRAWING_MODE_TEXTURE_LEN];
 
   /**
