@@ -269,9 +269,5 @@ StatementMacros:
   - PyObject_HEAD
   - PyObject_VAR_HEAD
 
-StatementMacros:
-  - GPU_STAGE_INTERFACE_CREATE
-  - GPU_SHADER_DESCRIPTOR
-
 MacroBlockBegin: "^BSDF_CLOSURE_CLASS_BEGIN$"
 MacroBlockEnd: "^BSDF_CLOSURE_CLASS_END$"

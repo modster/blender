@@ -83,6 +83,7 @@ set(SRC
   intern/gpu_select_sample_query.cc
   intern/gpu_shader.cc
   intern/gpu_shader_builtin.c
+  intern/gpu_shader_create_info.cc
   intern/gpu_shader_dependency.cc
   intern/gpu_shader_interface.cc
   intern/gpu_shader_log.cc
@@ -160,6 +161,8 @@ set(SRC
   intern/gpu_private.h
   intern/gpu_query.hh
   intern/gpu_select_private.h
+  intern/gpu_shader_create_info.hh
+  intern/gpu_shader_create_info_private.hh
   intern/gpu_shader_interface.hh
   intern/gpu_shader_private.hh
   intern/gpu_state_private.hh
@@ -405,13 +408,13 @@ list(APPEND SRC ${glsl_source_list_file})
 list(APPEND INC ${CMAKE_CURRENT_BINARY_DIR})
 
 set(SHADER_DESCRIPTORS
-  ../draw/engines/workbench/shaders/workbench_effect_cavity.desc.h
-  ../draw/engines/workbench/shaders/workbench_prepass.desc.h
-  ../draw/intern/shaders/draw_fullscreen.desc.h
-  ../draw/intern/shaders/draw_view.desc.h
-  ../draw/intern/shaders/draw_object_infos.desc.h
-  shaders/gpu_shader_3D_flat_color.desc.h
-  shaders/gpu_clip_planes.desc.h
+  ../draw/engines/workbench/shaders/workbench_effect_cavity_info.hh
+  ../draw/engines/workbench/shaders/workbench_prepass_info.hh
+  ../draw/intern/shaders/draw_fullscreen_info.hh
+  ../draw/intern/shaders/draw_view_info.hh
+  ../draw/intern/shaders/draw_object_infos_info.hh
+  shaders/gpu_shader_3D_flat_color_info.hh
+  shaders/gpu_clip_planes_info.hh
 )
 
 set(SHADER_DESCRIPTORS_CONTENT "")
@@ -419,13 +422,14 @@ foreach(DESCRIPTOR_FILE ${SHADER_DESCRIPTORS})
   string(APPEND SHADER_DESCRIPTORS_CONTENT "#include \"${DESCRIPTOR_FILE}\"\n")
 endforeach()
 
-set(shader_descriptor_list_file "${CMAKE_CURRENT_BINARY_DIR}/gpu_shader_descriptor_list.h")
-file(GENERATE OUTPUT ${shader_descriptor_list_file} CONTENT "${SHADER_DESCRIPTORS_CONTENT}")
+set(shader_create_info_list_file "${CMAKE_CURRENT_BINARY_DIR}/gpu_shader_create_info_list.hh")
+file(GENERATE OUTPUT ${shader_create_info_list_file} CONTENT "${SHADER_DESCRIPTORS_CONTENT}")
 
 add_executable(shader_builder
-  intern/gpu_shader_builder.c
+  intern/gpu_shader_builder.cc
+  intern/gpu_shader_create_info.cc
   intern/gpu_shader_dependency.cc
-  ${shader_descriptor_list_file}
+  ${shader_create_info_list_file}
 )
 target_link_libraries(shader_builder PRIVATE
   bf_intern_guardedalloc
@@ -435,7 +439,7 @@ target_link_libraries(shader_builder PRIVATE
   ${PLATFORM_LINKLIBS})
 target_include_directories(shader_builder PRIVATE ${INC} ${CMAKE_CURRENT_BINARY_DIR})
 
-set(BAKED_DESCRIPTORS_FILE ${CMAKE_CURRENT_BINARY_DIR}/shader_descriptors_baked.c)
+set(BAKED_DESCRIPTORS_FILE ${CMAKE_CURRENT_BINARY_DIR}/shader_baked.hh)
 
 add_custom_command(
   OUTPUT

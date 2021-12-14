@@ -20,8 +20,10 @@
 /** \file
  * \ingroup gpu
  *
- * Shader source dependency builder that make possible to support #include directive inside the
- * shader files.
+ * Descriptior type used to define shader structure, resources and interfaces.
+ *
+ * Some rule of thumb:
+ * - Do not include anything else than this file in each descriptor file.
  */
 
 #pragma once
@@ -30,12 +32,13 @@
 extern "C" {
 #endif
 
-void gpu_shader_dependency_init(void);
+typedef struct GPUShaderCreateInfo GPUShaderCreateInfo;
 
-void gpu_shader_dependency_exit(void);
+void gpu_shader_create_info_init(void);
 
-/* User must free the resulting string using MEM_freeN. */
-char *gpu_shader_dependency_get_resolved_source(const char *shader_source_name);
+void gpu_shader_create_info_exit(void);
+
+const GPUShaderCreateInfo *gpu_shader_create_info_get(const char *info_name);
 
 #ifdef __cplusplus
 }

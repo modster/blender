@@ -20,23 +20,31 @@
 /** \file
  * \ingroup gpu
  *
- * Shader source dependency builder that make possible to support #include directive inside the
- * shader files.
+ * Compile time automation of shader compilation and validation.
  */
 
-#pragma once
+#include <iostream>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include "gpu_shader_create_info.hh"
+#include "gpu_shader_create_info_private.hh"
+#include "gpu_shader_dependency_private.h"
 
-void gpu_shader_dependency_init(void);
+int main(int argc, char const *argv[])
+{
+  if (argc < 1) {
+    printf("Usage: shader_builder <data_file_to>\n");
+    exit(1);
+  }
 
-void gpu_shader_dependency_exit(void);
+  gpu_shader_dependency_init();
+  gpu_shader_create_info_init();
 
-/* User must free the resulting string using MEM_freeN. */
-char *gpu_shader_dependency_get_resolved_source(const char *shader_source_name);
+  FILE *fp = fopen(argv[1], "w");
 
-#ifdef __cplusplus
+  fclose(fp);
+
+  gpu_shader_dependency_exit();
+  gpu_shader_create_info_exit();
+
+  return 0;
 }
-#endif
