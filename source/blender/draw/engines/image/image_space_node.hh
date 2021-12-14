@@ -124,8 +124,10 @@ class SpaceNodeAccessor : public AbstractSpaceAccessor {
     mul_v2_v2fl(display_resolution, image_resolution, snode->zoom);
     const float scale_x = display_resolution[0] / region->winx;
     const float scale_y = display_resolution[1] / region->winy;
-    const float translate_x = 0.5f - 0.5f * scale_x + snode->xof / image_resolution[0];
-    const float translate_y = 0.5 - 0.5f * scale_y + snode->yof / image_resolution[1];
+    const float translate_x = (region->winx * 0.5f - display_resolution[0] * 0.5f + snode->xof) /
+                              region->winx;
+    const float translate_y = (region->winy * 0.5f - display_resolution[1] * 0.5f + snode->yof) /
+                              region->winy;
 
     r_uv_to_texture[0][0] = scale_x;
     r_uv_to_texture[1][1] = scale_y;
