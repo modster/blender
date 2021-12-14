@@ -113,7 +113,7 @@ class CropSource : public BaseDiscard {
    *
    * Uses user_data.src_crop to determine if the uv coordinate should be skipped.
    */
-  virtual bool should_discard(const TransformUserData &user_data, const float uv[2])
+  bool should_discard(const TransformUserData &user_data, const float uv[2]) override
   {
     return uv[0] < user_data.src_crop.xmin || uv[0] >= user_data.src_crop.xmax ||
            uv[1] < user_data.src_crop.ymin || uv[1] >= user_data.src_crop.ymax;
@@ -130,8 +130,8 @@ class NoDiscard : public BaseDiscard {
    *
    * Will never discard any pixels.
    */
-  virtual bool should_discard(const TransformUserData &UNUSED(user_data),
-                              const float UNUSED(uv[2]))
+  bool should_discard(const TransformUserData &UNUSED(user_data),
+                      const float UNUSED(uv[2])) override
   {
     return false;
   }
