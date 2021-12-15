@@ -47,10 +47,10 @@ struct IMAGE_InstanceData {
   ShaderParameters sh_params;
   struct {
     /**
-     * \brief should we perform tile drawing (wrap repeat).
+     * \brief should we perform tiled drawing (wrap repeat).
      *
-     * Option is true when image is capable of tile drawing (image is not tiled) and the option is
-     * set in the space.
+     * Option is true when image is capable of tile drawing (image is not tile) and the tiled
+     * option is set in the space.
      */
     bool do_tile_drawing : 1;
   } flags;

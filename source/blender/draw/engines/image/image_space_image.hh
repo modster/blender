@@ -161,7 +161,7 @@ class SpaceImageAccessor : public AbstractSpaceAccessor {
     }
   }
 
-  bool use_tile_drawing() const
+  bool use_tile_drawing() const override
   {
     return (sima->flag & SI_DRAW_TILE) != 0;
   }
