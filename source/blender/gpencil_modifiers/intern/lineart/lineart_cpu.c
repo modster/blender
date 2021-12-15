@@ -3187,7 +3187,7 @@ static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
   }
   copy_m4_m4(rb->cam_obmat, camera->obmat);
 
-  if (c->type == CAM_ORTHO && lmd->calculation_flags & LRT_USE_ORTHO_TOLERANCE) {
+  if (lmd->calculation_flags & LRT_USE_ORTHO_TOLERANCE) {
     rotate_m4(rb->cam_obmat, 'X', DEG2RAD(0.1f));
     rotate_m4(rb->cam_obmat, 'Y', DEG2RAD(0.1f));
     rotate_m4(rb->cam_obmat, 'Z', DEG2RAD(0.1f));
