@@ -283,6 +283,11 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
   std::string defines = shader->defines_declare(info);
   std::string resources = shader->resources_declare(info);
 
+  Vector<std::string> typedefs;
+  for (auto filename : info.typedef_sources_) {
+    typedefs.append(gpu_shader_dependency_get_resolved_source(filename.c_str()));
+  }
+
   if (!info.vertex_source_.is_empty()) {
     std::string interface = shader->vertex_interface_declare(info);
     std::string code = gpu_shader_dependency_get_resolved_source(info.vertex_source_.c_str());
@@ -294,11 +299,14 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
       sources.append("#define USE_GEOMETRY_SHADER\n");
     }
     sources.append(defines.c_str());
+    for (auto &typedef : typedefs) {
+      sources.append(typedef.c_str());
+    }
     sources.append(resources.c_str());
     sources.append(interface.c_str());
     sources.append(code.c_str());
 
-    // shader->vertex_shader_from_glsl(sources);
+    shader->vertex_shader_from_glsl(sources);
   }
 
   if (!info.fragment_source_.is_empty()) {
@@ -312,11 +320,14 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
       sources.append("#define USE_GEOMETRY_SHADER\n");
     }
     sources.append(defines.c_str());
+    for (auto &typedef : typedefs) {
+      sources.append(typedef.c_str());
+    }
     sources.append(resources.c_str());
     sources.append(interface.c_str());
     sources.append(code.c_str());
 
-    // shader->fragment_shader_from_glsl(sources);
+    shader->fragment_shader_from_glsl(sources);
   }
 
   if (!info.geometry_source_.is_empty()) {
@@ -327,11 +338,14 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
     standard_defines(sources);
     sources.append("#define GPU_GEOMETRY_SHADER\n");
     sources.append(defines.c_str());
+    for (auto &typedef : typedefs) {
+      sources.append(typedef.c_str());
+    }
     sources.append(resources.c_str());
     sources.append(interface.c_str());
     sources.append(code.c_str());
 
-    // shader->geometry_shader_from_glsl(sources);
+    shader->geometry_shader_from_glsl(sources);
   }
 
   if (!info.compute_source_.is_empty()) {
@@ -341,11 +355,16 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
     standard_defines(sources);
     sources.append("#define GPU_COMPUTE_SHADER\n");
     sources.append(defines.c_str());
+    for (auto &typedef : typedefs) {
+      sources.append(typedef.c_str());
+    }
     sources.append(resources.c_str());
     sources.append(code.c_str());
 
-    // shader->compute_shader_from_glsl(sources);
+    shader->compute_shader_from_glsl(sources);
   }
+
+  shader->finalize(&info);
 
   delete shader;
   return nullptr;

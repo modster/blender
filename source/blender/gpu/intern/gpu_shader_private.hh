@@ -56,7 +56,7 @@ class Shader {
   virtual void geometry_shader_from_glsl(MutableSpan<const char *> sources) = 0;
   virtual void fragment_shader_from_glsl(MutableSpan<const char *> sources) = 0;
   virtual void compute_shader_from_glsl(MutableSpan<const char *> sources) = 0;
-  virtual bool finalize(void) = 0;
+  virtual bool finalize(const shader::ShaderCreateInfo *info = nullptr) = 0;
 
   virtual void transform_feedback_names_set(Span<const char *> name_list,
                                             const eGPUShaderTFBType geom_type) = 0;

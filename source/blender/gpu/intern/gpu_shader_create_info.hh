@@ -44,7 +44,7 @@ namespace blender::gpu::shader {
     _info
 #endif
 
-enum Type {
+enum class Type {
   FLOAT = 0,
   VEC2,
   VEC3,
@@ -62,7 +62,7 @@ enum Type {
 };
 
 /* Samplers & images. */
-enum ImageType {
+enum class ImageType {
   FLOAT_BUFFER = 0,
   FLOAT_1D,
   FLOAT_1D_ARRAY,
@@ -94,28 +94,28 @@ enum ImageType {
 };
 
 /* Storage qualifiers. */
-enum Qualifier {
+enum class Qualifier {
   RESTRICT = (1 << 0),
   READ_ONLY = (1 << 1),
   WRITE_ONLY = (1 << 2),
   QUALIFIER_MAX = (WRITE_ONLY << 1) - 1,
 };
-ENUM_OPERATORS(Qualifier, QUALIFIER_MAX);
+ENUM_OPERATORS(Qualifier, Qualifier::QUALIFIER_MAX);
 
-enum Frequency {
+enum class Frequency {
   BATCH = 0,
   PASS,
 };
 
 /* Dual Source Blending Index. */
-enum DualBlend {
+enum class DualBlend {
   NONE = 0,
   SRC_0,
   SRC_1,
 };
 
 /* Interpolation qualifiers. */
-enum Interpolation {
+enum class Interpolation {
   SMOOTH = 0,
   FLAT,
   NO_PERSPECTIVE,
@@ -129,7 +129,8 @@ struct StageInterfaceInfo {
   };
 
   StringRefNull name;
-  /** Name of the instance of the block (used to access). Can be empty "". */
+  /** Name of the instance of the block (used to access).
+   *  Can be empty string (i.e: "") only if not using geometry shader. */
   StringRefNull instance_name;
   /** List of all members of the interface. */
   Vector<InOut> inouts;
@@ -174,6 +175,11 @@ struct ShaderCreateInfo {
   bool do_static_compilation_ = false;
   /** If true, all additionaly linked create info will be merged into this one. */
   bool finalized_ = false;
+  /**
+   * Minimum length of all the resource names including each null terminator.
+   * Only for names used by gpu::ShaderInterface.
+   */
+  size_t interface_names_size_ = 0;
   /** Only for compute shaders. */
   int local_group_size_[3] = {0, 0, 0};
 
@@ -251,6 +257,9 @@ struct ShaderCreateInfo {
 
   Vector<PushConst> push_constants_;
 
+  /* Sources for resources type definitions. */
+  Vector<StringRefNull> typedef_sources_;
+
   StringRefNull vertex_source_, geometry_source_, fragment_source_, compute_source_;
 
   Vector<std::array<StringRefNull, 2>> defines_;
@@ -273,6 +282,7 @@ struct ShaderCreateInfo {
   Self &vertex_in(int slot, Type type, StringRefNull name)
   {
     vertex_inputs_.append({slot, type, name});
+    interface_names_size_ += name.size() + 1;
     return *(Self *)this;
   }
 
@@ -289,7 +299,7 @@ struct ShaderCreateInfo {
     return *(Self *)this;
   }
 
-  Self &fragment_out(int slot, Type type, StringRefNull name, DualBlend blend = NONE)
+  Self &fragment_out(int slot, Type type, StringRefNull name, DualBlend blend = DualBlend::NONE)
   {
     fragment_outputs_.append({slot, type, blend, name});
     return *(Self *)this;
@@ -301,12 +311,16 @@ struct ShaderCreateInfo {
   /** \name Resources bindings points
    * \{ */
 
-  Self &uniform_buf(int slot, StringRefNull type_name, StringRefNull name, Frequency freq = PASS)
+  Self &uniform_buf(int slot,
+                    StringRefNull type_name,
+                    StringRefNull name,
+                    Frequency freq = Frequency::PASS)
   {
     Resource res(Resource::BindType::UNIFORM_BUFFER, slot);
     res.uniformbuf.name = name;
     res.uniformbuf.type_name = type_name;
-    ((freq == PASS) ? pass_resources_ : batch_resources_).append(res);
+    ((freq == Frequency::PASS) ? pass_resources_ : batch_resources_).append(res);
+    interface_names_size_ += name.size() + 1;
     return *(Self *)this;
   }
 
@@ -314,13 +328,14 @@ struct ShaderCreateInfo {
                     Qualifier qualifiers,
                     StringRefNull type_name,
                     StringRefNull name,
-                    Frequency freq = PASS)
+                    Frequency freq = Frequency::PASS)
   {
     Resource res(Resource::BindType::STORAGE_BUFFER, slot);
     res.storagebuf.qualifiers = qualifiers;
     res.storagebuf.type_name = type_name;
     res.storagebuf.name = name;
-    ((freq == PASS) ? pass_resources_ : batch_resources_).append(res);
+    ((freq == Frequency::PASS) ? pass_resources_ : batch_resources_).append(res);
+    interface_names_size_ += name.size() + 1;
     return *(Self *)this;
   }
 
@@ -329,28 +344,30 @@ struct ShaderCreateInfo {
               Qualifier qualifiers,
               ImageType type,
               StringRefNull name,
-              Frequency freq = PASS)
+              Frequency freq = Frequency::PASS)
   {
     Resource res(Resource::BindType::IMAGE, slot);
     res.image.format = format;
     res.image.qualifiers = qualifiers;
     res.image.type = type;
     res.image.name = name;
-    ((freq == PASS) ? pass_resources_ : batch_resources_).append(res);
+    ((freq == Frequency::PASS) ? pass_resources_ : batch_resources_).append(res);
+    interface_names_size_ += name.size() + 1;
     return *(Self *)this;
   }
 
   Self &sampler(int slot,
                 ImageType type,
                 StringRefNull name,
-                Frequency freq = PASS,
+                Frequency freq = Frequency::PASS,
                 eGPUSamplerState sampler = (eGPUSamplerState)-1)
   {
     Resource res(Resource::BindType::SAMPLER, slot);
     res.sampler.type = type;
     res.sampler.name = name;
     res.sampler.sampler = sampler;
-    ((freq == PASS) ? pass_resources_ : batch_resources_).append(res);
+    ((freq == Frequency::PASS) ? pass_resources_ : batch_resources_).append(res);
+    interface_names_size_ += name.size() + 1;
     return *(Self *)this;
   }
 
@@ -402,6 +419,7 @@ struct ShaderCreateInfo {
   Self &push_constant(int slot, Type type, StringRefNull name)
   {
     push_constants_.append({slot, type, name});
+    interface_names_size_ += name.size() + 1;
     return *(Self *)this;
   }
 
@@ -470,6 +488,22 @@ struct ShaderCreateInfo {
     if (!info_name4.is_empty()) {
       additional_infos_.append(info_name4);
     }
+    return *(Self *)this;
+  }
+
+  /** \} */
+
+  /* -------------------------------------------------------------------- */
+  /** \name Typedef Sources
+   *
+   * Some resource declarations might need some special structure defined.
+   * Adding a file using typedef_source will include it before the resource
+   * and interface definitions.
+   * \{ */
+
+  Self &typedef_source(StringRefNull filename)
+  {
+    typedef_sources_.append(filename);
     return *(Self *)this;
   }
 

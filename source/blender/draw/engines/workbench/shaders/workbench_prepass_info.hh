@@ -15,15 +15,15 @@ GPU_SHADER_CREATE_INFO(workbench_mesh)
 GPU_SHADER_CREATE_INFO(workbench_hair)
     .sampler(0, ImageType::FLOAT_BUFFER, "ac", Frequency::BATCH)
     .sampler(1, ImageType::FLOAT_BUFFER, "au", Frequency::BATCH)
-    .vertex_source("workbench_prepass_hair_vert.glsl")
-    .additional_info("draw_hair");
+    .vertex_source("workbench_prepass_hair_vert.glsl");
+// .additional_info("draw_hair");
 
 GPU_SHADER_CREATE_INFO(workbench_pointcloud)
     .vertex_in(0, Type::VEC4, "pos")
     .vertex_in(1, Type::VEC3, "pos_inst")
     .vertex_in(2, Type::VEC3, "nor")
-    .vertex_source("workbench_prepass_pointcloud_vert.glsl")
-    .additional_info("draw_pointcloud");
+    .vertex_source("workbench_prepass_pointcloud_vert.glsl");
+// .additional_info("draw_pointcloud");
 
 /** \} */
 

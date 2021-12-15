@@ -113,7 +113,7 @@ void gpu_shader_dependency_init()
 #define SHADER_SOURCE(datatoc, filename) \
   g_sources->add_new(filename, new GPUSource(filename, datatoc));
 #include "glsl_draw_source_list.h"
-#include "glsl_source_list.h"
+#include "glsl_gpu_source_list.h"
 #undef SHADER_SOURCE
 
   for (auto value : g_sources->values()) {
