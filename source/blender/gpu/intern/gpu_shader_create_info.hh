@@ -23,7 +23,7 @@
  * Descriptior type used to define shader structure, resources and interfaces.
  *
  * Some rule of thumb:
- * - Do not include anything else than this file in each descriptor file.
+ * - Do not include anything else than this file in each info file.
  */
 
 #pragma once
@@ -39,9 +39,9 @@ namespace blender::gpu::shader {
 #  define GPU_SHADER_INTERFACE_INFO(_interface, _inst_name) \
     StageInterfaceInfo _interface(#_interface, _inst_name); \
     _interface
-#  define GPU_SHADER_CREATE_INFO(_descriptor) \
-    ShaderCreateInfo _descriptor(#_descriptor); \
-    _descriptor
+#  define GPU_SHADER_CREATE_INFO(_info) \
+    ShaderCreateInfo _info(#_info); \
+    _info
 #endif
 
 enum Type {
@@ -69,20 +69,28 @@ enum ImageType {
   FLOAT_2D,
   FLOAT_2D_ARRAY,
   FLOAT_3D,
+  FLOAT_CUBE,
+  FLOAT_CUBE_ARRAY,
   INT_BUFFER,
   INT_1D,
   INT_1D_ARRAY,
   INT_2D,
   INT_2D_ARRAY,
   INT_3D,
+  INT_CUBE,
+  INT_CUBE_ARRAY,
   UINT_BUFFER,
   UINT_1D,
   UINT_1D_ARRAY,
   UINT_2D,
   UINT_2D_ARRAY,
   UINT_3D,
+  UINT_CUBE,
+  UINT_CUBE_ARRAY,
   SHADOW_2D,
   SHADOW_2D_ARRAY,
+  SHADOW_CUBE,
+  SHADOW_CUBE_ARRAY,
 };
 
 /* Storage qualifiers. */
@@ -90,7 +98,9 @@ enum Qualifier {
   RESTRICT = (1 << 0),
   READ_ONLY = (1 << 1),
   WRITE_ONLY = (1 << 2),
+  QUALIFIER_MAX = (WRITE_ONLY << 1) - 1,
 };
+ENUM_OPERATORS(Qualifier, QUALIFIER_MAX);
 
 enum Frequency {
   BATCH = 0,
@@ -112,22 +122,20 @@ enum Interpolation {
 };
 
 struct StageInterfaceInfo {
- private:
   struct InOut {
     Interpolation interp;
     Type type;
     StringRefNull name;
   };
 
-  StringRefNull name_;
+  StringRefNull name;
   /** Name of the instance of the block (used to access). Can be empty "". */
-  StringRefNull instance_name_;
+  StringRefNull instance_name;
   /** List of all members of the interface. */
   Vector<InOut> inouts;
 
- public:
-  StageInterfaceInfo(const char *name, const char *instance_name)
-      : name_(name), instance_name_(instance_name){};
+  StageInterfaceInfo(const char *name_, const char *instance_name_)
+      : name(name_), instance_name(instance_name_){};
   ~StageInterfaceInfo(){};
 
   using Self = StageInterfaceInfo;
@@ -160,11 +168,12 @@ struct StageInterfaceInfo {
  *            ShaderCreateInfo are not freed until it is consumed or deleted.
  */
 struct ShaderCreateInfo {
- private:
   /** Shader name for debugging. */
   StringRefNull name_;
   /** True if the shader is static and can be precompiled at compile time. */
   bool do_static_compilation_ = false;
+  /** If true, all additionaly linked create info will be merged into this one. */
+  bool finalized_ = false;
   /** Only for compute shaders. */
   int local_group_size_[3] = {0, 0, 0};
 
@@ -197,13 +206,13 @@ struct ShaderCreateInfo {
   };
 
   struct UniformBuf {
-    StringRefNull struct_name;
+    StringRefNull type_name;
     StringRefNull name;
   };
 
   struct StorageBuf {
     Qualifier qualifiers;
-    StringRefNull struct_name;
+    StringRefNull type_name;
     StringRefNull name;
   };
 
@@ -246,7 +255,7 @@ struct ShaderCreateInfo {
 
   Vector<std::array<StringRefNull, 2>> defines_;
   /**
-   * Name of other descriptors to recursively merge with this one.
+   * Name of other infos to recursively merge with this one.
    * No data slot must overlap otherwise we throw an error.
    */
   Vector<StringRefNull> additional_infos_;
@@ -292,24 +301,24 @@ struct ShaderCreateInfo {
   /** \name Resources bindings points
    * \{ */
 
-  Self &uniform_buf(int slot, StringRefNull struct_name, StringRefNull name, Frequency freq = PASS)
+  Self &uniform_buf(int slot, StringRefNull type_name, StringRefNull name, Frequency freq = PASS)
   {
     Resource res(Resource::BindType::UNIFORM_BUFFER, slot);
     res.uniformbuf.name = name;
-    res.uniformbuf.struct_name = struct_name;
+    res.uniformbuf.type_name = type_name;
     ((freq == PASS) ? pass_resources_ : batch_resources_).append(res);
     return *(Self *)this;
   }
 
   Self &storage_buf(int slot,
                     Qualifier qualifiers,
-                    StringRefNull struct_name,
+                    StringRefNull type_name,
                     StringRefNull name,
                     Frequency freq = PASS)
   {
     Resource res(Resource::BindType::STORAGE_BUFFER, slot);
     res.storagebuf.qualifiers = qualifiers;
-    res.storagebuf.struct_name = struct_name;
+    res.storagebuf.type_name = type_name;
     res.storagebuf.name = name;
     ((freq == PASS) ? pass_resources_ : batch_resources_).append(res);
     return *(Self *)this;
@@ -442,27 +451,39 @@ struct ShaderCreateInfo {
    * Used to share parts of the infos that are common to many shaders.
    * \{ */
 
-  Self &additional_info(StringRefNull descriptor_name0,
-                        StringRefNull descriptor_name1 = "",
-                        StringRefNull descriptor_name2 = "",
-                        StringRefNull descriptor_name3 = "",
-                        StringRefNull descriptor_name4 = "")
+  Self &additional_info(StringRefNull info_name0,
+                        StringRefNull info_name1 = "",
+                        StringRefNull info_name2 = "",
+                        StringRefNull info_name3 = "",
+                        StringRefNull info_name4 = "")
   {
-    additional_infos_.append(descriptor_name0);
-    if (!descriptor_name1.is_empty()) {
-      additional_infos_.append(descriptor_name1);
+    additional_infos_.append(info_name0);
+    if (!info_name1.is_empty()) {
+      additional_infos_.append(info_name1);
     }
-    if (!descriptor_name2.is_empty()) {
-      additional_infos_.append(descriptor_name2);
+    if (!info_name2.is_empty()) {
+      additional_infos_.append(info_name2);
     }
-    if (!descriptor_name3.is_empty()) {
-      additional_infos_.append(descriptor_name3);
+    if (!info_name3.is_empty()) {
+      additional_infos_.append(info_name3);
     }
-    if (!descriptor_name4.is_empty()) {
-      additional_infos_.append(descriptor_name4);
+    if (!info_name4.is_empty()) {
+      additional_infos_.append(info_name4);
     }
     return *(Self *)this;
   }
+
+  /** \} */
+
+  /* -------------------------------------------------------------------- */
+  /** \name Recursive evaluation.
+   *
+   * Flatten all dependency so that this descriptor contains all the data from the additional
+   * descriptors. This avoids tedious traversal in shader source creation.
+   * \{ */
+
+  /* WARNING: Recursive. */
+  void finalize();
 
   /** \} */
 };

@@ -38,6 +38,7 @@
 
 using namespace blender;
 using namespace blender::gpu;
+using namespace blender::gpu::shader;
 
 /* -------------------------------------------------------------------- */
 /** \name Creation / Destruction
@@ -66,6 +67,356 @@ GLShader::~GLShader()
   glDeleteShader(frag_shader_);
   glDeleteShader(compute_shader_);
   glDeleteProgram(shader_program_);
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Create Info
+ * \{ */
+
+static inline std::ostream &operator<<(std::ostream &stream, const Interpolation &interp)
+{
+  switch (interp) {
+    case SMOOTH:
+      stream << "smooth";
+      break;
+    case FLAT:
+      stream << "flat";
+      break;
+    case NO_PERSPECTIVE:
+      stream << "no_perspective";
+      break;
+  }
+  return stream;
+}
+
+static inline std::ostream &operator<<(std::ostream &stream, const Type &type)
+{
+  switch (type) {
+    case FLOAT:
+      stream << "float";
+      break;
+    case VEC2:
+      stream << "vec2";
+      break;
+    case VEC3:
+      stream << "vec3";
+      break;
+    case VEC4:
+      stream << "vec4";
+      break;
+    case MAT4:
+      stream << "mat4";
+      break;
+    case UINT:
+      stream << "uint";
+      break;
+    case UVEC2:
+      stream << "uvec2";
+      break;
+    case UVEC3:
+      stream << "uvec3";
+      break;
+    case UVEC4:
+      stream << "uvec4";
+      break;
+    case INT:
+      stream << "int";
+      break;
+    case IVEC2:
+      stream << "ivec2";
+      break;
+    case IVEC3:
+      stream << "ivec3";
+      break;
+    case IVEC4:
+      stream << "ivec4";
+      break;
+    case BOOL:
+      stream << "bool";
+      break;
+  }
+  return stream;
+}
+
+static inline void print_image_type(std::ostream &stream,
+                                    const ImageType &type,
+                                    const bool is_image)
+{
+  switch (type) {
+    case INT_BUFFER:
+    case INT_1D:
+    case INT_1D_ARRAY:
+    case INT_2D:
+    case INT_2D_ARRAY:
+    case INT_3D:
+    case INT_CUBE:
+    case INT_CUBE_ARRAY:
+      stream << "i";
+      break;
+    case UINT_BUFFER:
+    case UINT_1D:
+    case UINT_1D_ARRAY:
+    case UINT_2D:
+    case UINT_2D_ARRAY:
+    case UINT_3D:
+    case UINT_CUBE:
+    case UINT_CUBE_ARRAY:
+      stream << "u";
+      break;
+    default:
+      break;
+  }
+
+  if (is_image) {
+    stream << "image";
+  }
+  else {
+    stream << "sampler";
+  }
+
+  switch (type) {
+    case FLOAT_BUFFER:
+    case INT_BUFFER:
+    case UINT_BUFFER:
+      stream << "Buffer";
+      break;
+    case FLOAT_1D:
+    case FLOAT_1D_ARRAY:
+    case INT_1D:
+    case INT_1D_ARRAY:
+    case UINT_1D:
+    case UINT_1D_ARRAY:
+      stream << "1D";
+      break;
+    case FLOAT_2D:
+    case FLOAT_2D_ARRAY:
+    case INT_2D:
+    case INT_2D_ARRAY:
+    case UINT_2D:
+    case UINT_2D_ARRAY:
+    case SHADOW_2D:
+    case SHADOW_2D_ARRAY:
+      stream << "2D";
+      break;
+    case FLOAT_3D:
+    case INT_3D:
+    case UINT_3D:
+      stream << "3D";
+      break;
+    case FLOAT_CUBE:
+    case FLOAT_CUBE_ARRAY:
+    case INT_CUBE:
+    case INT_CUBE_ARRAY:
+    case UINT_CUBE:
+    case UINT_CUBE_ARRAY:
+    case SHADOW_CUBE:
+    case SHADOW_CUBE_ARRAY:
+      stream << "Cube";
+      break;
+    default:
+      break;
+  }
+
+  switch (type) {
+    case FLOAT_1D_ARRAY:
+    case FLOAT_2D_ARRAY:
+    case FLOAT_CUBE_ARRAY:
+    case INT_1D_ARRAY:
+    case INT_2D_ARRAY:
+    case INT_CUBE_ARRAY:
+    case UINT_1D_ARRAY:
+    case UINT_2D_ARRAY:
+    case UINT_CUBE_ARRAY:
+    case SHADOW_2D_ARRAY:
+    case SHADOW_CUBE_ARRAY:
+      stream << "Array";
+      break;
+    default:
+      break;
+  }
+
+  switch (type) {
+    case SHADOW_2D:
+    case SHADOW_2D_ARRAY:
+    case SHADOW_CUBE:
+    case SHADOW_CUBE_ARRAY:
+      stream << "Shadow";
+      break;
+    default:
+      break;
+  }
+}
+
+enum SamplerType {
+  DUMMY_IMAGE_TYPE = 0,
+};
+
+static inline std::ostream &operator<<(std::ostream &stream, const ImageType &type)
+{
+  print_image_type(stream, type, true);
+  return stream;
+}
+
+static inline std::ostream &operator<<(std::ostream &stream, const SamplerType &type)
+{
+  print_image_type(stream, *(const ImageType *)&type, false);
+  return stream;
+}
+
+static inline std::ostream &operator<<(std::ostream &stream, const Qualifier &qualifiers)
+{
+  if (qualifiers & RESTRICT) {
+    stream << "restrict";
+  }
+  if (qualifiers & READ_ONLY) {
+    stream << "readonly";
+  }
+  if (qualifiers & WRITE_ONLY) {
+    stream << "writeonly";
+  }
+  return stream;
+}
+
+static inline void print_resource(std::ostream &stream, const ShaderCreateInfo::Resource &res)
+{
+  stream << "layout(";
+
+  switch (res.bind_type) {
+    case ShaderCreateInfo::Resource::BindType::IMAGE:
+      stream << res.image.format << ", ";
+      break;
+    case ShaderCreateInfo::Resource::BindType::UNIFORM_BUFFER:
+      stream << "std140, ";
+      break;
+    case ShaderCreateInfo::Resource::BindType::STORAGE_BUFFER:
+      stream << "std430, ";
+      break;
+    default:
+      break;
+  }
+
+  stream << "binding = " << res.slot << ") ";
+
+  switch (res.bind_type) {
+    case ShaderCreateInfo::Resource::BindType::SAMPLER:
+      stream << "uniform " << res.sampler.type << " " << res.sampler.name << ";\n";
+      break;
+    case ShaderCreateInfo::Resource::BindType::IMAGE:
+      stream << "uniform " << res.image.qualifiers << " " << res.image.type << " "
+             << res.image.name << ";\n";
+      break;
+    case ShaderCreateInfo::Resource::BindType::UNIFORM_BUFFER:
+      stream << "uniform " << res.uniformbuf.name << "{ " << res.uniformbuf.type_name << " "
+             << res.uniformbuf.name << "; };\n";
+      break;
+    case ShaderCreateInfo::Resource::BindType::STORAGE_BUFFER:
+      stream << "buffer " << res.storagebuf.qualifiers << " " << res.storagebuf.name << "{ "
+             << res.storagebuf.type_name << " " << res.storagebuf.name << "; };\n";
+      break;
+  }
+}
+
+std::string GLShader::resources_declare(const ShaderCreateInfo &info) const
+{
+  std::stringstream ss;
+
+  for (const ShaderCreateInfo::Resource &res : info.batch_resources_) {
+    print_resource(ss, res);
+  }
+  for (const ShaderCreateInfo::Resource &res : info.pass_resources_) {
+    print_resource(ss, res);
+  }
+  for (const ShaderCreateInfo::PushConst &uniform : info.push_constants_) {
+    ss << "uniform " << uniform.type << " " << uniform.name << ";\n";
+  }
+  std::cout << ss.str();
+  return ss.str();
+}
+
+std::string GLShader::vertex_interface_declare(const ShaderCreateInfo &info) const
+{
+  std::stringstream ss;
+  for (const ShaderCreateInfo::VertIn &attr : info.vertex_inputs_) {
+#if 1 /* If using layout. */
+    ss << "layout(location = " << attr.index << ") ";
+#endif
+    ss << "in " << attr.type << " " << attr.name << ";\n";
+  }
+
+  for (const StageInterfaceInfo *iface : info.vertex_out_interfaces_) {
+    ss << "out " << iface->name << "{" << std::endl;
+    for (const StageInterfaceInfo::InOut &inout : iface->inouts) {
+      ss << "  " << inout.interp << " " << inout.type << " " << inout.name << ";\n";
+    }
+    ss << "} " << iface->instance_name << ";" << std::endl;
+  }
+  std::cout << ss.str();
+  return ss.str();
+}
+
+std::string GLShader::fragment_interface_declare(const ShaderCreateInfo &info) const
+{
+  std::stringstream ss;
+
+  const Vector<StageInterfaceInfo *> &in_interfaces = (info.geometry_source_.is_empty()) ?
+                                                          info.vertex_out_interfaces_ :
+                                                          info.geometry_out_interfaces_;
+
+  for (const StageInterfaceInfo *iface : in_interfaces) {
+    ss << "in " << iface->name << "{" << std::endl;
+    for (const StageInterfaceInfo::InOut &inout : iface->inouts) {
+      ss << "  " << inout.interp << " " << inout.type << " " << inout.name << ";\n";
+    }
+    ss << "} " << iface->instance_name << ";" << std::endl;
+  }
+
+  for (const ShaderCreateInfo::VertIn &attr : info.vertex_inputs_) {
+#if 1 /* If using layout. */
+    ss << "layout(location = " << attr.index << ") ";
+#endif
+    ss << "in " << attr.type << " " << attr.name << ";\n";
+  }
+  std::cout << ss.str();
+  return ss.str();
+}
+
+std::string GLShader::geometry_interface_declare(const ShaderCreateInfo &info) const
+{
+  std::stringstream ss;
+  for (const ShaderCreateInfo::FragOut &output : info.fragment_outputs_) {
+    ss << "layout(location = " << output.index;
+    switch (output.blend) {
+      case SRC_0:
+        ss << ", index = 0";
+        break;
+      case SRC_1:
+        ss << ", index = 1";
+        break;
+      default:
+        break;
+    }
+    ss << ") ";
+    ss << "out " << output.type << " " << output.name << ";\n";
+  }
+
+  for (const StageInterfaceInfo *iface : info.vertex_out_interfaces_) {
+    ss << "in " << iface->name << "{" << std::endl;
+    for (const StageInterfaceInfo::InOut &inout : iface->inouts) {
+      ss << "  " << inout.interp << " " << inout.type << " " << inout.name << ";\n";
+    }
+    ss << "} " << iface->instance_name << "[];" << std::endl;
+  }
+
+  for (const StageInterfaceInfo *iface : info.geometry_out_interfaces_) {
+    ss << "out " << iface->name << "{" << std::endl;
+    for (const StageInterfaceInfo::InOut &inout : iface->inouts) {
+      ss << "  " << inout.interp << " " << inout.type << " " << inout.name << ";\n";
+    }
+    ss << "} " << iface->instance_name << ";" << std::endl;
+  }
+  return ss.str();
 }
 
 /** \} */

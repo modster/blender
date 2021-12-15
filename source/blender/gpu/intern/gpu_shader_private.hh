@@ -24,8 +24,11 @@
 #include "BLI_string_ref.hh"
 
 #include "GPU_shader.h"
+#include "gpu_shader_create_info.hh"
 #include "gpu_shader_interface.hh"
 #include "gpu_vertex_buffer_private.hh"
+
+#include <string>
 
 namespace blender {
 namespace gpu {
@@ -67,6 +70,12 @@ class Shader {
   virtual void uniform_int(int location, int comp_len, int array_size, const int *data) = 0;
 
   virtual void vertformat_from_shader(GPUVertFormat *) const = 0;
+
+  std::string defines_declare(const shader::ShaderCreateInfo &info) const;
+  virtual std::string resources_declare(const shader::ShaderCreateInfo &info) const = 0;
+  virtual std::string vertex_interface_declare(const shader::ShaderCreateInfo &info) const = 0;
+  virtual std::string fragment_interface_declare(const shader::ShaderCreateInfo &info) const = 0;
+  virtual std::string geometry_interface_declare(const shader::ShaderCreateInfo &info) const = 0;
 
   /* DEPRECATED: Kept only because of BGL API. */
   virtual int program_handle_get(void) const = 0;

@@ -28,15 +28,16 @@
 
 #pragma once
 
+#include "GPU_shader.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-typedef struct GPUShaderCreateInfo GPUShaderCreateInfo;
-
 void gpu_shader_create_info_init(void);
-
 void gpu_shader_create_info_exit(void);
+
+void gpu_shader_create_info_compile_all(void);
 
 const GPUShaderCreateInfo *gpu_shader_create_info_get(const char *info_name);
 

@@ -31,9 +31,31 @@
 
 #include "gpu_backend.hh"
 #include "gpu_context_private.hh"
+#include "gpu_shader_create_info.hh"
+#include "gpu_shader_create_info_private.hh"
+#include "gpu_shader_dependency_private.h"
 #include "gpu_shader_private.hh"
 
+#include <string>
+
 extern "C" char datatoc_gpu_shader_colorspace_lib_glsl[];
+
+namespace blender::gpu {
+
+std::string Shader::defines_declare(const shader::ShaderCreateInfo &info) const
+{
+  std::string defines("");
+  for (const auto &def : info.defines_) {
+    defines += "#define ";
+    defines += def[0];
+    defines += " ";
+    defines += def[1];
+    defines += "\n";
+  }
+  return defines;
+}
+
+}  // namespace blender::gpu
 
 using namespace blender;
 using namespace blender::gpu;
@@ -223,6 +245,116 @@ GPUShader *GPU_shader_create_compute(const char *computecode,
                               nullptr,
                               0,
                               shname);
+}
+
+GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
+{
+  using namespace blender::gpu::shader;
+  const ShaderCreateInfo &info = *reinterpret_cast<const ShaderCreateInfo *>(_info);
+
+  const_cast<ShaderCreateInfo &>(info).finalize();
+
+  /* At least a vertex shader and a fragment shader are required, or only a compute shader. */
+  if (info.compute_source_.is_empty()) {
+    if (info.vertex_source_.is_empty()) {
+      printf("Missing vertex shader in %s.\n", info.name_.c_str());
+    }
+    if (info.fragment_source_.is_empty()) {
+      printf("Missing fragment shader in %s.\n", info.name_.c_str());
+    }
+    BLI_assert(!info.vertex_source_.is_empty() && !info.fragment_source_.is_empty());
+  }
+  else {
+    if (!info.vertex_source_.is_empty()) {
+      printf("Compute shader has vertex_source_ shader attached in %s.\n", info.name_.c_str());
+    }
+    if (!info.geometry_source_.is_empty()) {
+      printf("Compute shader has geometry_source_ shader attached in %s.\n", info.name_.c_str());
+    }
+    if (!info.fragment_source_.is_empty()) {
+      printf("Compute shader has fragment_source_ shader attached in %s.\n", info.name_.c_str());
+    }
+    BLI_assert(info.vertex_source_.is_empty() && info.geometry_source_.is_empty() &&
+               info.fragment_source_.is_empty());
+  }
+
+  Shader *shader = GPUBackend::get()->shader_alloc(info.name_.c_str());
+
+  std::string defines = shader->defines_declare(info);
+  std::string resources = shader->resources_declare(info);
+
+  if (!info.vertex_source_.is_empty()) {
+    std::string interface = shader->vertex_interface_declare(info);
+    std::string code = gpu_shader_dependency_get_resolved_source(info.vertex_source_.c_str());
+
+    Vector<const char *> sources;
+    standard_defines(sources);
+    sources.append("#define GPU_VERTEX_SHADER\n");
+    if (!info.geometry_source_.is_empty()) {
+      sources.append("#define USE_GEOMETRY_SHADER\n");
+    }
+    sources.append(defines.c_str());
+    sources.append(resources.c_str());
+    sources.append(interface.c_str());
+    sources.append(code.c_str());
+
+    // shader->vertex_shader_from_glsl(sources);
+  }
+
+  if (!info.fragment_source_.is_empty()) {
+    std::string interface = shader->fragment_interface_declare(info);
+    std::string code = gpu_shader_dependency_get_resolved_source(info.fragment_source_.c_str());
+
+    Vector<const char *> sources;
+    standard_defines(sources);
+    sources.append("#define GPU_FRAGMENT_SHADER\n");
+    if (!info.geometry_source_.is_empty()) {
+      sources.append("#define USE_GEOMETRY_SHADER\n");
+    }
+    sources.append(defines.c_str());
+    sources.append(resources.c_str());
+    sources.append(interface.c_str());
+    sources.append(code.c_str());
+
+    // shader->fragment_shader_from_glsl(sources);
+  }
+
+  if (!info.geometry_source_.is_empty()) {
+    std::string interface = shader->geometry_interface_declare(info);
+    std::string code = gpu_shader_dependency_get_resolved_source(info.geometry_source_.c_str());
+
+    Vector<const char *> sources;
+    standard_defines(sources);
+    sources.append("#define GPU_GEOMETRY_SHADER\n");
+    sources.append(defines.c_str());
+    sources.append(resources.c_str());
+    sources.append(interface.c_str());
+    sources.append(code.c_str());
+
+    // shader->geometry_shader_from_glsl(sources);
+  }
+
+  if (!info.compute_source_.is_empty()) {
+    std::string code = gpu_shader_dependency_get_resolved_source(info.compute_source_.c_str());
+
+    Vector<const char *> sources;
+    standard_defines(sources);
+    sources.append("#define GPU_COMPUTE_SHADER\n");
+    sources.append(defines.c_str());
+    sources.append(resources.c_str());
+    sources.append(code.c_str());
+
+    // shader->compute_shader_from_glsl(sources);
+  }
+
+  delete shader;
+  return nullptr;
+  // if (!shader->finalize()) {
+  //   delete shader;
+  //   return nullptr;
+  // }
+
+  return wrap(shader);
 }
 
 GPUShader *GPU_shader_create_from_python(const char *vertcode,

@@ -9,7 +9,8 @@ GPU_SHADER_CREATE_INFO(workbench_mesh)
     .vertex_in(0, Type::VEC3, "pos")
     .vertex_in(1, Type::VEC3, "nor")
     .vertex_in(2, Type::VEC4, "ac")
-    .vertex_in(3, Type::VEC2, "au");
+    .vertex_in(3, Type::VEC2, "au")
+    .vertex_source("workbench_prepass_vert.glsl");
 
 GPU_SHADER_CREATE_INFO(workbench_hair)
     .sampler(0, ImageType::FLOAT_BUFFER, "ac", Frequency::BATCH)

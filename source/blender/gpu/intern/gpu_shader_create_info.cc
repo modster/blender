@@ -27,6 +27,7 @@
 #include "BLI_set.hh"
 #include "BLI_string_ref.hh"
 
+#include "GPU_shader.h"
 #include "GPU_texture.h"
 
 #include "gpu_shader_create_info.hh"
@@ -41,6 +42,52 @@ using InterfaceDictionnary = Map<StringRef, StageInterfaceInfo *>;
 
 static CreateInfoDictionnary *g_create_infos = nullptr;
 static InterfaceDictionnary *g_interfaces = nullptr;
+
+void ShaderCreateInfo::finalize()
+{
+  if (finalized_) {
+    return;
+  }
+  finalized_ = true;
+
+  for (auto &info_name : additional_infos_) {
+    const ShaderCreateInfo &info = *reinterpret_cast<const ShaderCreateInfo *>(
+        gpu_shader_create_info_get(info_name.c_str()));
+
+    /* Recursive. */
+    const_cast<ShaderCreateInfo &>(info).finalize();
+
+    vertex_inputs_.extend(info.vertex_inputs_);
+    fragment_outputs_.extend(info.fragment_outputs_);
+    vertex_out_interfaces_.extend(info.vertex_out_interfaces_);
+    geometry_out_interfaces_.extend(info.geometry_out_interfaces_);
+
+    push_constants_.extend(info.push_constants_);
+    defines_.extend(info.defines_);
+
+    batch_resources_.extend(info.batch_resources_);
+    pass_resources_.extend(info.pass_resources_);
+
+    if (!info.vertex_source_.is_empty()) {
+      BLI_assert(vertex_source_.is_empty());
+      vertex_source_ = info.vertex_source_;
+    }
+    if (!info.geometry_source_.is_empty()) {
+      BLI_assert(geometry_source_.is_empty());
+      geometry_source_ = info.geometry_source_;
+    }
+    if (!info.fragment_source_.is_empty()) {
+      BLI_assert(fragment_source_.is_empty());
+      fragment_source_ = info.fragment_source_;
+    }
+    if (!info.compute_source_.is_empty()) {
+      BLI_assert(compute_source_.is_empty());
+      compute_source_ = info.compute_source_;
+    }
+
+    do_static_compilation_ = do_static_compilation_ || info.do_static_compilation_;
+  }
+}
 
 }  // namespace blender::gpu::shader
 
@@ -57,11 +104,11 @@ void gpu_shader_create_info_init()
   g_interfaces->add_new(#_interface, ptr_##_interface); \
   _interface
 
-#define GPU_SHADER_CREATE_INFO(_descriptor) \
-  auto *ptr_##_descriptor = new ShaderCreateInfo(#_descriptor); \
-  auto &_descriptor = *ptr_##_descriptor; \
-  g_create_infos->add_new(#_descriptor, ptr_##_descriptor); \
-  _descriptor
+#define GPU_SHADER_CREATE_INFO(_info) \
+  auto *ptr_##_info = new ShaderCreateInfo(#_info); \
+  auto &_info = *ptr_##_info; \
+  g_create_infos->add_new(#_info, ptr_##_info); \
+  _info
 
 /* Declare, register and construct the infos. */
 #include "gpu_shader_create_info_list.hh"
@@ -70,6 +117,9 @@ void gpu_shader_create_info_init()
 #ifdef GPU_RUNTIME
 #  include "gpu_shader_baked.hh"
 #endif
+
+  /* TEST */
+  gpu_shader_create_info_compile_all();
 }
 
 void gpu_shader_create_info_exit()
@@ -85,9 +135,20 @@ void gpu_shader_create_info_exit()
   delete g_interfaces;
 }
 
-/* Runtime descriptors are not registered in the descriptor dictionnary and cannot be searched. */
+void gpu_shader_create_info_compile_all()
+{
+  for (ShaderCreateInfo *info : g_create_infos->values()) {
+    if (info->do_static_compilation_) {
+      printf("Compiling %s: ... ", info->name_.c_str());
+      GPU_shader_create_from_info(reinterpret_cast<const GPUShaderCreateInfo *>(info));
+      printf("Success\n");
+    }
+  }
+}
+
+/* Runtime create infos are not registered in the dictionnary and cannot be searched. */
 const GPUShaderCreateInfo *gpu_shader_create_info_get(const char *info_name)
 {
-  blender::gpu::shader::ShaderCreateInfo *info = g_create_infos->lookup(info_name);
+  ShaderCreateInfo *info = g_create_infos->lookup(info_name);
   return reinterpret_cast<const GPUShaderCreateInfo *>(info);
 }

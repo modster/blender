@@ -407,7 +407,7 @@ file(GENERATE OUTPUT ${glsl_source_list_file} CONTENT "${GLSL_SOURCE_CONTENT}")
 list(APPEND SRC ${glsl_source_list_file})
 list(APPEND INC ${CMAKE_CURRENT_BINARY_DIR})
 
-set(SHADER_DESCRIPTORS
+set(SHADER_CREATE_INFOS
   ../draw/engines/workbench/shaders/workbench_effect_cavity_info.hh
   ../draw/engines/workbench/shaders/workbench_prepass_info.hh
   ../draw/intern/shaders/draw_fullscreen_info.hh
@@ -417,39 +417,39 @@ set(SHADER_DESCRIPTORS
   shaders/gpu_clip_planes_info.hh
 )
 
-set(SHADER_DESCRIPTORS_CONTENT "")
-foreach(DESCRIPTOR_FILE ${SHADER_DESCRIPTORS})
-  string(APPEND SHADER_DESCRIPTORS_CONTENT "#include \"${DESCRIPTOR_FILE}\"\n")
+set(SHADER_CREATE_INFOS_CONTENT "")
+foreach(DESCRIPTOR_FILE ${SHADER_CREATE_INFOS})
+  string(APPEND SHADER_CREATE_INFOS_CONTENT "#include \"${DESCRIPTOR_FILE}\"\n")
 endforeach()
 
 set(shader_create_info_list_file "${CMAKE_CURRENT_BINARY_DIR}/gpu_shader_create_info_list.hh")
-file(GENERATE OUTPUT ${shader_create_info_list_file} CONTENT "${SHADER_DESCRIPTORS_CONTENT}")
+file(GENERATE OUTPUT ${shader_create_info_list_file} CONTENT "${SHADER_CREATE_INFOS_CONTENT}")
 
-add_executable(shader_builder
-  intern/gpu_shader_builder.cc
-  intern/gpu_shader_create_info.cc
-  intern/gpu_shader_dependency.cc
-  ${shader_create_info_list_file}
-)
-target_link_libraries(shader_builder PRIVATE
-  bf_intern_guardedalloc
-  bf_blenlib
-  bf_gpu_shaders
-  bf_draw_shaders
-  ${PLATFORM_LINKLIBS})
-target_include_directories(shader_builder PRIVATE ${INC} ${CMAKE_CURRENT_BINARY_DIR})
+# add_executable(shader_builder
+#   intern/gpu_shader_builder.cc
+#   intern/gpu_shader_create_info.cc
+#   intern/gpu_shader_dependency.cc
+#   ${shader_create_info_list_file}
+# )
+# target_link_libraries(shader_builder PRIVATE
+#   bf_intern_guardedalloc
+#   bf_blenlib
+#   bf_gpu_shaders
+#   bf_draw_shaders
+#   ${PLATFORM_LINKLIBS})
+# target_include_directories(shader_builder PRIVATE ${INC} ${CMAKE_CURRENT_BINARY_DIR})
 
-set(BAKED_DESCRIPTORS_FILE ${CMAKE_CURRENT_BINARY_DIR}/shader_baked.hh)
+# set(BAKED_CREATE_INFOS_FILE ${CMAKE_CURRENT_BINARY_DIR}/shader_baked.hh)
 
-add_custom_command(
-  OUTPUT
-    ${BAKED_DESCRIPTORS_FILE}
-  COMMAND
-    "$<TARGET_FILE:shader_builder>" ${BAKED_DESCRIPTORS_FILE}
-  DEPENDS shader_builder
-)
+# add_custom_command(
+#   OUTPUT
+#     ${BAKED_CREATE_INFOS_FILE}
+#   COMMAND
+#     "$<TARGET_FILE:shader_builder>" ${BAKED_CREATE_INFOS_FILE}
+#   DEPENDS shader_builder
+# )
 
-list(APPEND SRC ${BAKED_DESCRIPTORS_FILE})
+# list(APPEND SRC ${BAKED_CREATE_INFOS_FILE})
 
 
 if(WITH_MOD_FLUID)

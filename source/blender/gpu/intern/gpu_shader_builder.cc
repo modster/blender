@@ -29,6 +29,12 @@
 #include "gpu_shader_create_info_private.hh"
 #include "gpu_shader_dependency_private.h"
 
+#include "CLG_log.h"
+#include "GPU_context.h"
+#include "GPU_init_exit.h"
+
+#include "GHOST_C-api.h"
+
 int main(int argc, char const *argv[])
 {
   if (argc < 1) {
@@ -36,15 +42,24 @@ int main(int argc, char const *argv[])
     exit(1);
   }
 
-  gpu_shader_dependency_init();
-  gpu_shader_create_info_init();
+  (void)argv;
 
-  FILE *fp = fopen(argv[1], "w");
+#if 0 /* Make it compile. Somehow... (dependency with GPU module is hard). */
+  GHOST_GLSettings glSettings = {0};
+  GHOST_SystemHandle ghost_system = GHOST_CreateSystem();
+  GHOST_ContextHandle ghost_context = GHOST_CreateOpenGLContext(ghost_system, glSettings);
+  GHOST_ActivateOpenGLContext(ghost_context);
+  struct GPUContext *context = GPU_context_create(nullptr);
+  GPU_init();
 
-  fclose(fp);
+  gpu_shader_create_info_compile_all();
 
-  gpu_shader_dependency_exit();
-  gpu_shader_create_info_exit();
+  GPU_exit();
+  GPU_backend_exit();
+  GPU_context_discard(context);
+  GHOST_DisposeOpenGLContext(ghost_system, ghost_context);
+  GHOST_DisposeSystem(ghost_system);
+#endif
 
   return 0;
 }
