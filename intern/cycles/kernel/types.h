@@ -110,9 +110,9 @@ CCL_NAMESPACE_BEGIN
 #  define __VOLUME_RECORD_ALL__
 #endif /* __KERNEL_CPU__ */
 
-#ifdef __KERNEL_OPTIX__
+#ifdef __KERNEL_GPU_RAYTRACING__
 #  undef __BAKING__
-#endif /* __KERNEL_OPTIX__ */
+#endif /* __KERNEL_GPU_RAYTRACING__ */
 
 /* Scene-based selective features compilation. */
 #ifdef __KERNEL_FEATURES__
@@ -272,33 +272,34 @@ enum PathRayFlag {
   PATH_RAY_SUBSURFACE_RANDOM_WALK = (1U << 20U),
   PATH_RAY_SUBSURFACE_DISK = (1U << 21U),
   PATH_RAY_SUBSURFACE_USE_FRESNEL = (1U << 22U),
+  PATH_RAY_SUBSURFACE_BACKFACING = (1U << 23U),
   PATH_RAY_SUBSURFACE = (PATH_RAY_SUBSURFACE_RANDOM_WALK | PATH_RAY_SUBSURFACE_DISK |
-                         PATH_RAY_SUBSURFACE_USE_FRESNEL),
+                         PATH_RAY_SUBSURFACE_USE_FRESNEL | PATH_RAY_SUBSURFACE_BACKFACING),
 
   /* Contribute to denoising features. */
-  PATH_RAY_DENOISING_FEATURES = (1U << 23U),
+  PATH_RAY_DENOISING_FEATURES = (1U << 24U),
 
   /* Render pass categories. */
-  PATH_RAY_SURFACE_PASS = (1U << 24U),
-  PATH_RAY_VOLUME_PASS = (1U << 25U),
+  PATH_RAY_SURFACE_PASS = (1U << 25U),
+  PATH_RAY_VOLUME_PASS = (1U << 26U),
   PATH_RAY_ANY_PASS = (PATH_RAY_SURFACE_PASS | PATH_RAY_VOLUME_PASS),
 
   /* Shadow ray is for a light or surface, or AO. */
-  PATH_RAY_SHADOW_FOR_LIGHT = (1U << 26U),
-  PATH_RAY_SHADOW_FOR_AO = (1U << 27U),
+  PATH_RAY_SHADOW_FOR_LIGHT = (1U << 27U),
+  PATH_RAY_SHADOW_FOR_AO = (1U << 28U),
 
   /* A shadow catcher object was hit and the path was split into two. */
-  PATH_RAY_SHADOW_CATCHER_HIT = (1U << 28U),
+  PATH_RAY_SHADOW_CATCHER_HIT = (1U << 29U),
 
   /* A shadow catcher object was hit and this path traces only shadow catchers, writing them into
    * their dedicated pass for later division.
    *
    * NOTE: Is not covered with `PATH_RAY_ANY_PASS` because shadow catcher does special handling
    * which is separate from the light passes. */
-  PATH_RAY_SHADOW_CATCHER_PASS = (1U << 29U),
+  PATH_RAY_SHADOW_CATCHER_PASS = (1U << 30U),
 
   /* Path is evaluating background for an approximate shadow catcher with non-transparent film. */
-  PATH_RAY_SHADOW_CATCHER_BACKGROUND = (1U << 30U),
+  PATH_RAY_SHADOW_CATCHER_BACKGROUND = (1U << 31U),
 };
 
 /* Configure ray visibility bits for rays and objects respectively,
@@ -430,7 +431,8 @@ typedef enum FilterClosures {
   FILTER_CLOSURE_DIFFUSE = (1 << 1),
   FILTER_CLOSURE_GLOSSY = (1 << 2),
   FILTER_CLOSURE_TRANSMISSION = (1 << 3),
-  FILTER_CLOSURE_DIRECT_LIGHT = (1 << 4),
+  FILTER_CLOSURE_TRANSPARENT = (1 << 4),
+  FILTER_CLOSURE_DIRECT_LIGHT = (1 << 5),
 } FilterClosures;
 
 /* Shader Flag */
@@ -476,8 +478,19 @@ enum PanoramaType {
   PANORAMA_FISHEYE_EQUIDISTANT = 1,
   PANORAMA_FISHEYE_EQUISOLID = 2,
   PANORAMA_MIRRORBALL = 3,
+  PANORAMA_FISHEYE_LENS_POLYNOMIAL = 4,
 
   PANORAMA_NUM_TYPES,
+};
+
+/* Direct Light Sampling */
+
+enum DirectLightSamplingType {
+  DIRECT_LIGHT_SAMPLING_MIS = 0,
+  DIRECT_LIGHT_SAMPLING_FORWARD = 1,
+  DIRECT_LIGHT_SAMPLING_NEE = 2,
+
+  DIRECT_LIGHT_SAMPLING_NUM,
 };
 
 /* Differential */
@@ -910,6 +923,8 @@ typedef struct KernelCamera {
   float fisheye_fov;
   float fisheye_lens;
   float4 equirectangular_range;
+  float fisheye_lens_polynomial_bias;
+  float4 fisheye_lens_polynomial_coefficients;
 
   /* stereo */
   float interocular_offset;
@@ -1192,8 +1207,11 @@ typedef struct KernelIntegrator {
   /* Closure filter. */
   int filter_closures;
 
+  /* MIS debugging. */
+  int direct_light_sampling_type;
+
   /* padding */
-  int pad1, pad2, pad3;
+  int pad1, pad2;
 } KernelIntegrator;
 static_assert_align(KernelIntegrator, 16);
 
@@ -1205,10 +1223,13 @@ typedef enum KernelBVHLayout {
   BVH_LAYOUT_OPTIX = (1 << 2),
   BVH_LAYOUT_MULTI_OPTIX = (1 << 3),
   BVH_LAYOUT_MULTI_OPTIX_EMBREE = (1 << 4),
+  BVH_LAYOUT_METAL = (1 << 5),
+  BVH_LAYOUT_MULTI_METAL = (1 << 6),
+  BVH_LAYOUT_MULTI_METAL_EMBREE = (1 << 7),
 
   /* Default BVH layout to use for CPU. */
   BVH_LAYOUT_AUTO = BVH_LAYOUT_EMBREE,
-  BVH_LAYOUT_ALL = BVH_LAYOUT_BVH2 | BVH_LAYOUT_EMBREE | BVH_LAYOUT_OPTIX,
+  BVH_LAYOUT_ALL = BVH_LAYOUT_BVH2 | BVH_LAYOUT_EMBREE | BVH_LAYOUT_OPTIX | BVH_LAYOUT_METAL,
 } KernelBVHLayout;
 
 typedef struct KernelBVH {
@@ -1223,6 +1244,8 @@ typedef struct KernelBVH {
   /* Custom BVH */
 #ifdef __KERNEL_OPTIX__
   OptixTraversableHandle scene;
+#elif defined __METALRT__
+  metalrt_as_type scene;
 #else
 #  ifdef __EMBREE__
   RTCScene scene;

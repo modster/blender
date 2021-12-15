@@ -38,8 +38,10 @@
 
 #include <optional>
 
+/* -------------------------------------------------------------------- */
 /** \name Cryptomatte
  * \{ */
+
 static blender::bke::cryptomatte::CryptomatteSessionPtr cryptomatte_init_from_node_render(
     const bNode &node, const bool use_meta_data)
 {
@@ -297,16 +299,16 @@ static bool node_poll_cryptomatte(bNodeType *UNUSED(ntype),
     }
 
     if (scene == nullptr) {
-      *r_disabled_hint =
-          "The node tree must be the compositing node tree of any scene in the file";
+      *r_disabled_hint = TIP_(
+          "The node tree must be the compositing node tree of any scene in the file");
     }
     return scene != nullptr;
   }
-  *r_disabled_hint = "Not a compositor node tree";
+  *r_disabled_hint = TIP_("Not a compositor node tree");
   return false;
 }
 
-void register_node_type_cmp_cryptomatte(void)
+void register_node_type_cmp_cryptomatte()
 {
   static bNodeType ntype;
 
@@ -322,8 +324,10 @@ void register_node_type_cmp_cryptomatte(void)
 
 /** \} */
 
+/* -------------------------------------------------------------------- */
 /** \name Cryptomatte Legacy
  * \{ */
+
 static void node_init_cryptomatte_legacy(bNodeTree *ntree, bNode *node)
 {
   node_init_cryptomatte(ntree, node);
@@ -361,7 +365,7 @@ int ntreeCompositCryptomatteRemoveSocket(bNodeTree *ntree, bNode *node)
   return 1;
 }
 
-void register_node_type_cmp_cryptomatte_legacy(void)
+void register_node_type_cmp_cryptomatte_legacy()
 {
   static bNodeType ntype;
 

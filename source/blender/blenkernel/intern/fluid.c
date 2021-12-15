@@ -4437,8 +4437,6 @@ static void manta_smoke_calc_transparency(FluidDomainSettings *fds, ViewLayer *v
   }
 }
 
-/* Get fluid velocity and density at given coordinates
- * Returns fluid density or -1.0f if outside domain. */
 float BKE_fluid_get_velocity_at(struct Object *ob, float position[3], float velocity[3])
 {
   FluidModifierData *fmd = (FluidModifierData *)BKE_modifiers_findby_type(ob, eModifierType_Fluid);
@@ -4575,9 +4573,9 @@ void BKE_fluid_particle_system_destroy(struct Object *ob, const int particle_typ
   }
 }
 
-#endif /* WITH_FLUID */
-
 /** \} */
+
+#endif /* WITH_FLUID */
 
 /* -------------------------------------------------------------------- */
 /** \name Public Data Access API
@@ -5090,7 +5088,7 @@ void BKE_fluid_modifier_copy(const struct FluidModifierData *fmd,
     copy_v4_v4(tfds->gridlines_range_color, fds->gridlines_range_color);
     tfds->gridlines_cell_filter = fds->gridlines_cell_filter;
 
-    /* -- Deprecated / unsed options (below)-- */
+    /* -- Deprecated / unused options (below)-- */
 
     /* pointcache options */
     BKE_ptcache_free_list(&(tfds->ptcaches[0]));

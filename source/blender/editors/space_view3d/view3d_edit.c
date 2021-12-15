@@ -618,7 +618,6 @@ enum {
   VIEWROT_MODAL_SWITCH_ROTATE = 6,
 };
 
-/* Called in transform_ops.c, on each regeneration of key-maps. */
 void viewrotate_modal_keymap(wmKeyConfig *keyconf)
 {
   static const EnumPropertyItem modal_items[] = {
@@ -1250,9 +1249,6 @@ static void view3d_ndof_orbit(const struct wmNDOFMotionData *ndof,
   }
 }
 
-/**
- * Called from both fly mode and walk mode,
- */
 void view3d_ndof_fly(const wmNDOFMotionData *ndof,
                      View3D *v3d,
                      RegionView3D *rv3d,
@@ -1685,7 +1681,6 @@ void VIEW3D_OT_ndof_all(struct wmOperatorType *ot)
 
 /* NOTE: these defines are saved in keymap files, do not change values but just add new ones */
 
-/* Called in transform_ops.c, on each regeneration of key-maps. */
 void viewmove_modal_keymap(wmKeyConfig *keyconf)
 {
   static const EnumPropertyItem modal_items[] = {
@@ -1882,7 +1877,6 @@ void VIEW3D_OT_move(wmOperatorType *ot)
  * \{ */
 
 /* #viewdolly_modal_keymap has an exact copy of this, apply fixes to both. */
-/* Called in transform_ops.c, on each regeneration of key-maps. */
 void viewzoom_modal_keymap(wmKeyConfig *keyconf)
 {
   static const EnumPropertyItem modal_items[] = {
@@ -2446,7 +2440,6 @@ void VIEW3D_OT_zoom(wmOperatorType *ot)
  * \{ */
 
 /* This is an exact copy of #viewzoom_modal_keymap. */
-/* Called in transform_ops.c, on each regeneration of key-maps. */
 void viewdolly_modal_keymap(wmKeyConfig *keyconf)
 {
   static const EnumPropertyItem modal_items[] = {
@@ -3058,6 +3051,23 @@ static int viewselected_exec(bContext *C, wmOperator *op)
       /* we're only interested in selected points here... */
       if ((gps->flag & GP_STROKE_SELECT) && (gps->flag & GP_STROKE_3DSPACE)) {
         ok |= BKE_gpencil_stroke_minmax(gps, true, min, max);
+      }
+      if (gps->editcurve != NULL) {
+        for (int i = 0; i < gps->editcurve->tot_curve_points; i++) {
+          BezTriple *bezt = &gps->editcurve->curve_points[i].bezt;
+          if ((bezt->f1 & SELECT)) {
+            minmax_v3v3_v3(min, max, bezt->vec[0]);
+            ok = true;
+          }
+          if ((bezt->f2 & SELECT)) {
+            minmax_v3v3_v3(min, max, bezt->vec[1]);
+            ok = true;
+          }
+          if ((bezt->f3 & SELECT)) {
+            minmax_v3v3_v3(min, max, bezt->vec[2]);
+            ok = true;
+          }
+        }
       }
     }
     CTX_DATA_END;
@@ -5010,7 +5020,6 @@ void VIEW3D_OT_clip_border(wmOperatorType *ot)
  * \{ */
 
 /* cursor position in vec, result in vec, mval in region coords */
-/* NOTE: cannot use `event->mval` here, called by #object_add(). */
 void ED_view3d_cursor3d_position(bContext *C,
                                  const int mval[2],
                                  const bool use_depth,

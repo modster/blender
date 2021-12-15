@@ -75,12 +75,15 @@ typedef struct tGraphSliderOp {
   ARegion *region;
 
   /** A 0-1 value for determining how much we should decimate. */
-  PropertyRNA *percentage_prop;
+  PropertyRNA *factor_prop;
 
   /** The original bezt curve data (used for restoring fcurves). */
   ListBase bezt_arr_list;
 
   struct tSlider *slider;
+
+  /* Each operator has a specific update function. */
+  void (*modal_update)(struct bContext *, struct wmOperator *);
 
   NumInput num;
 } tGraphSliderOp;
@@ -177,37 +180,10 @@ static void reset_bezts(tGraphSliderOp *gso)
 /** \} */
 
 /* -------------------------------------------------------------------- */
-/** \name Decimate Keyframes Operator
+/** \name Common Modal Functions
  * \{ */
 
-typedef enum tDecimModes {
-  DECIM_RATIO = 1,
-  DECIM_ERROR,
-} tDecimModes;
-
-static void decimate_graph_keys(bAnimContext *ac, float remove_ratio, float error_sq_max)
-{
-  ListBase anim_data = {NULL, NULL};
-  bAnimListElem *ale;
-
-  /* Filter data. */
-  ANIM_animdata_filter(ac, &anim_data, OPERATOR_DATA_FILTER, ac->data, ac->datatype);
-
-  /* Loop through filtered data and clean curves. */
-  for (ale = anim_data.first; ale; ale = ale->next) {
-    if (!decimate_fcurve(ale, remove_ratio, error_sq_max)) {
-      /* The selection contains unsupported keyframe types! */
-      WM_report(RPT_WARNING, "Decimate: Skipping non linear/bezier keyframes!");
-    }
-
-    ale->update |= ANIM_UPDATE_DEFAULT;
-  }
-
-  ANIM_animdata_update(ac, &anim_data);
-  ANIM_animdata_freelist(&anim_data);
-}
-
-static void decimate_exit(bContext *C, wmOperator *op)
+static void graph_slider_exit(bContext *C, wmOperator *op)
 {
   tGraphSliderOp *gso = op->customdata;
   wmWindow *win = CTX_wm_window(C);
@@ -235,8 +211,149 @@ static void decimate_exit(bContext *C, wmOperator *op)
   WM_cursor_modal_restore(win);
   ED_area_status_text(area, NULL);
 
-  /* Cleanup. */
+  /* cleanup */
   op->customdata = NULL;
+}
+
+static int graph_slider_modal(bContext *C, wmOperator *op, const wmEvent *event)
+{
+  tGraphSliderOp *gso = op->customdata;
+
+  const bool has_numinput = hasNumInput(&gso->num);
+
+  ED_slider_modal(gso->slider, event);
+
+  switch (event->type) {
+    /* Confirm */
+    case LEFTMOUSE:
+    case EVT_RETKEY:
+    case EVT_PADENTER: {
+      if (event->val == KM_PRESS) {
+        graph_slider_exit(C, op);
+
+        return OPERATOR_FINISHED;
+      }
+      break;
+    }
+
+    /* Cancel */
+    case EVT_ESCKEY:
+    case RIGHTMOUSE: {
+      if (event->val == KM_PRESS) {
+        reset_bezts(gso);
+
+        WM_event_add_notifier(C, NC_ANIMATION | ND_KEYFRAME | NA_EDITED, NULL);
+
+        graph_slider_exit(C, op);
+
+        return OPERATOR_CANCELLED;
+      }
+      break;
+    }
+
+    /* When the mouse is moved, the percentage and the keyframes update. */
+    case MOUSEMOVE: {
+      if (has_numinput == false) {
+        /* Do the update as specified by the operator. */
+        gso->modal_update(C, op);
+      }
+      break;
+    }
+    default: {
+      if ((event->val == KM_PRESS) && handleNumInput(C, &gso->num, event)) {
+        float value;
+        float percentage = RNA_property_float_get(op->ptr, gso->factor_prop);
+
+        /* Grab percentage from numeric input, and store this new value for redo
+         * NOTE: users see ints, while internally we use a 0-1 float.
+         */
+        value = percentage * 100.0f;
+        applyNumInput(&gso->num, &value);
+
+        percentage = value / 100.0f;
+        ED_slider_factor_set(gso->slider, percentage);
+        RNA_property_float_set(op->ptr, gso->factor_prop, percentage);
+
+        gso->modal_update(C, op);
+        break;
+      }
+
+      /* Unhandled event - maybe it was some view manipulation? */
+      /* Allow to pass through. */
+      return OPERATOR_RUNNING_MODAL | OPERATOR_PASS_THROUGH;
+    }
+  }
+
+  return OPERATOR_RUNNING_MODAL;
+}
+
+/* Allocate tGraphSliderOp and assign to op->customdata. */
+static int graph_slider_invoke(bContext *C, wmOperator *op, const wmEvent *event)
+{
+  tGraphSliderOp *gso;
+
+  WM_cursor_modal_set(CTX_wm_window(C), WM_CURSOR_EW_SCROLL);
+
+  /* Init slide-op data. */
+  gso = op->customdata = MEM_callocN(sizeof(tGraphSliderOp), "tGraphSliderOp");
+
+  /* Get editor data. */
+  if (ANIM_animdata_get_context(C, &gso->ac) == 0) {
+    graph_slider_exit(C, op);
+    return OPERATOR_CANCELLED;
+  }
+
+  gso->scene = CTX_data_scene(C);
+  gso->area = CTX_wm_area(C);
+  gso->region = CTX_wm_region(C);
+
+  store_original_bezt_arrays(gso);
+
+  gso->slider = ED_slider_create(C);
+  ED_slider_init(gso->slider, event);
+
+  if (gso->bezt_arr_list.first == NULL) {
+    WM_report(RPT_WARNING,
+              "Fcurve Slider: Can't work on baked channels. Unbake them and try again.");
+    graph_slider_exit(C, op);
+    return OPERATOR_CANCELLED;
+  }
+
+  WM_event_add_modal_handler(C, op);
+  return OPERATOR_RUNNING_MODAL;
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Decimate Keyframes Operator
+ * \{ */
+
+typedef enum tDecimModes {
+  DECIM_RATIO = 1,
+  DECIM_ERROR,
+} tDecimModes;
+
+static void decimate_graph_keys(bAnimContext *ac, float factor, float error_sq_max)
+{
+  ListBase anim_data = {NULL, NULL};
+  bAnimListElem *ale;
+
+  /* Filter data. */
+  ANIM_animdata_filter(ac, &anim_data, OPERATOR_DATA_FILTER, ac->data, ac->datatype);
+
+  /* Loop through filtered data and clean curves. */
+  for (ale = anim_data.first; ale; ale = ale->next) {
+    if (!decimate_fcurve(ale, factor, error_sq_max)) {
+      /* The selection contains unsupported keyframe types! */
+      WM_report(RPT_WARNING, "Decimate: Skipping non linear/bezier keyframes!");
+    }
+
+    ale->update |= ANIM_UPDATE_DEFAULT;
+  }
+
+  ANIM_animdata_update(ac, &anim_data);
+  ANIM_animdata_freelist(&anim_data);
 }
 
 /* Draw a percentage indicator in workspace footer. */
@@ -264,47 +381,7 @@ static void decimate_draw_status(bContext *C, tGraphSliderOp *gso)
   ED_workspace_status_text(C, status_str);
 }
 
-static int graphkeys_decimate_invoke(bContext *C, wmOperator *op, const wmEvent *event)
-{
-  tGraphSliderOp *gso;
-
-  WM_cursor_modal_set(CTX_wm_window(C), WM_CURSOR_EW_SCROLL);
-
-  /* Init slide-op data. */
-  gso = op->customdata = MEM_callocN(sizeof(tGraphSliderOp), "tGraphSliderOp");
-
-  /* Get editor data. */
-  if (ANIM_animdata_get_context(C, &gso->ac) == 0) {
-    decimate_exit(C, op);
-    return OPERATOR_CANCELLED;
-  }
-
-  gso->percentage_prop = RNA_struct_find_property(op->ptr, "remove_ratio");
-
-  gso->scene = CTX_data_scene(C);
-  gso->area = CTX_wm_area(C);
-  gso->region = CTX_wm_region(C);
-
-  store_original_bezt_arrays(gso);
-
-  gso->slider = ED_slider_create(C);
-  ED_slider_init(gso->slider, event);
-  ED_slider_allow_overshoot_set(gso->slider, false);
-
-  decimate_draw_status(C, gso);
-
-  if (gso->bezt_arr_list.first == NULL) {
-    WM_report(RPT_WARNING,
-              "Fcurve Decimate: Can't decimate baked channels. Unbake them and try again.");
-    decimate_exit(C, op);
-    return OPERATOR_CANCELLED;
-  }
-
-  WM_event_add_modal_handler(C, op);
-  return OPERATOR_RUNNING_MODAL;
-}
-
-static void graphkeys_decimate_modal_update(bContext *C, wmOperator *op)
+static void decimate_modal_update(bContext *C, wmOperator *op)
 {
   /* Perform decimate updates - in response to some user action
    * (e.g. pressing a key or moving the mouse). */
@@ -316,90 +393,31 @@ static void graphkeys_decimate_modal_update(bContext *C, wmOperator *op)
   reset_bezts(gso);
 
   /* Apply... */
-  float remove_ratio = ED_slider_factor_get(gso->slider);
-  RNA_property_float_set(op->ptr, gso->percentage_prop, remove_ratio);
+  float factor = ED_slider_factor_get(gso->slider);
+  RNA_property_float_set(op->ptr, gso->factor_prop, factor);
   /* We don't want to limit the decimation to a certain error margin. */
   const float error_sq_max = FLT_MAX;
-  decimate_graph_keys(&gso->ac, remove_ratio, error_sq_max);
+  decimate_graph_keys(&gso->ac, factor, error_sq_max);
   WM_event_add_notifier(C, NC_ANIMATION | ND_KEYFRAME | NA_EDITED, NULL);
 }
 
-static int graphkeys_decimate_modal(bContext *C, wmOperator *op, const wmEvent *event)
+static int decimate_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
-  /* This assumes that we are in "DECIM_RATIO" mode. This is because the error margin is very hard
-   * and finicky to control with this modal mouse grab method. Therefore, it is expected that the
-   * error margin mode is not adjusted by the modal operator but instead tweaked via the redo
-   * panel. */
-  tGraphSliderOp *gso = op->customdata;
+  const int invoke_result = graph_slider_invoke(C, op, event);
 
-  const bool has_numinput = hasNumInput(&gso->num);
-
-  ED_slider_modal(gso->slider, event);
-
-  switch (event->type) {
-    case LEFTMOUSE: /* Confirm */
-    case EVT_RETKEY:
-    case EVT_PADENTER: {
-      if (event->val == KM_PRESS) {
-        decimate_exit(C, op);
-
-        return OPERATOR_FINISHED;
-      }
-      break;
-    }
-
-    case EVT_ESCKEY: /* Cancel */
-    case RIGHTMOUSE: {
-      if (event->val == KM_PRESS) {
-        reset_bezts(gso);
-
-        WM_event_add_notifier(C, NC_ANIMATION | ND_KEYFRAME | NA_EDITED, NULL);
-
-        decimate_exit(C, op);
-
-        return OPERATOR_CANCELLED;
-      }
-      break;
-    }
-
-    /* Percentage Change... */
-    case MOUSEMOVE: /* Calculate new position. */
-    {
-      if (has_numinput == false) {
-        /* Update pose to reflect the new values. */
-        graphkeys_decimate_modal_update(C, op);
-      }
-      break;
-    }
-    default: {
-      if ((event->val == KM_PRESS) && handleNumInput(C, &gso->num, event)) {
-        float value;
-        float percentage = RNA_property_float_get(op->ptr, gso->percentage_prop);
-
-        /* Grab percentage from numeric input, and store this new value for redo
-         * NOTE: users see ints, while internally we use a 0-1 float.
-         */
-        value = percentage * 100.0f;
-        applyNumInput(&gso->num, &value);
-
-        percentage = value / 100.0f;
-        RNA_property_float_set(op->ptr, gso->percentage_prop, percentage);
-
-        /* Update decimate output to reflect the new values. */
-        graphkeys_decimate_modal_update(C, op);
-        break;
-      }
-
-      /* Unhandled event - maybe it was some view manipulation? */
-      /* Allow to pass through. */
-      return OPERATOR_RUNNING_MODAL | OPERATOR_PASS_THROUGH;
-    }
+  if (invoke_result == OPERATOR_CANCELLED) {
+    return OPERATOR_CANCELLED;
   }
 
-  return OPERATOR_RUNNING_MODAL;
+  tGraphSliderOp *gso = op->customdata;
+  gso->factor_prop = RNA_struct_find_property(op->ptr, "factor");
+  gso->modal_update = decimate_modal_update;
+  ED_slider_allow_overshoot_set(gso->slider, false);
+
+  return invoke_result;
 }
 
-static int graphkeys_decimate_exec(bContext *C, wmOperator *op)
+static int decimate_exec(bContext *C, wmOperator *op)
 {
   bAnimContext ac;
 
@@ -410,13 +428,13 @@ static int graphkeys_decimate_exec(bContext *C, wmOperator *op)
 
   tDecimModes mode = RNA_enum_get(op->ptr, "mode");
   /* We want to be able to work on all available keyframes. */
-  float remove_ratio = 1.0f;
+  float factor = 1.0f;
   /* We don't want to limit the decimation to a certain error margin. */
   float error_sq_max = FLT_MAX;
 
   switch (mode) {
     case DECIM_RATIO:
-      remove_ratio = RNA_float_get(op->ptr, "remove_ratio");
+      factor = RNA_float_get(op->ptr, "factor");
       break;
     case DECIM_ERROR:
       error_sq_max = RNA_float_get(op->ptr, "remove_error_margin");
@@ -426,12 +444,12 @@ static int graphkeys_decimate_exec(bContext *C, wmOperator *op)
       break;
   }
 
-  if (remove_ratio == 0.0f || error_sq_max == 0.0f) {
+  if (factor == 0.0f || error_sq_max == 0.0f) {
     /* Nothing to remove. */
     return OPERATOR_FINISHED;
   }
 
-  decimate_graph_keys(&ac, remove_ratio, error_sq_max);
+  decimate_graph_keys(&ac, factor, error_sq_max);
 
   /* Set notifier that keyframes have changed. */
   WM_event_add_notifier(C, NC_ANIMATION | ND_KEYFRAME | NA_EDITED, NULL);
@@ -439,16 +457,16 @@ static int graphkeys_decimate_exec(bContext *C, wmOperator *op)
   return OPERATOR_FINISHED;
 }
 
-static bool graphkeys_decimate_poll_property(const bContext *UNUSED(C),
-                                             wmOperator *op,
-                                             const PropertyRNA *prop)
+static bool decimate_poll_property(const bContext *UNUSED(C),
+                                   wmOperator *op,
+                                   const PropertyRNA *prop)
 {
   const char *prop_id = RNA_property_identifier(prop);
 
   if (STRPREFIX(prop_id, "remove")) {
     int mode = RNA_enum_get(op->ptr, "mode");
 
-    if (STREQ(prop_id, "remove_ratio") && mode != DECIM_RATIO) {
+    if (STREQ(prop_id, "factor") && mode != DECIM_RATIO) {
       return false;
     }
     if (STREQ(prop_id, "remove_error_margin") && mode != DECIM_ERROR) {
@@ -459,9 +477,7 @@ static bool graphkeys_decimate_poll_property(const bContext *UNUSED(C),
   return true;
 }
 
-static char *graphkeys_decimate_desc(bContext *UNUSED(C),
-                                     wmOperatorType *UNUSED(op),
-                                     PointerRNA *ptr)
+static char *decimate_desc(bContext *UNUSED(C), wmOperatorType *UNUSED(op), PointerRNA *ptr)
 {
 
   if (RNA_enum_get(ptr, "mode") == DECIM_ERROR) {
@@ -497,11 +513,11 @@ void GRAPH_OT_decimate(wmOperatorType *ot)
       "Decimate F-Curves by removing keyframes that influence the curve shape the least";
 
   /* API callbacks */
-  ot->poll_property = graphkeys_decimate_poll_property;
-  ot->get_description = graphkeys_decimate_desc;
-  ot->invoke = graphkeys_decimate_invoke;
-  ot->modal = graphkeys_decimate_modal;
-  ot->exec = graphkeys_decimate_exec;
+  ot->poll_property = decimate_poll_property;
+  ot->get_description = decimate_desc;
+  ot->invoke = decimate_invoke;
+  ot->modal = graph_slider_modal;
+  ot->exec = decimate_exec;
   ot->poll = graphop_editable_keyframes_poll;
 
   /* Flags */
@@ -516,7 +532,7 @@ void GRAPH_OT_decimate(wmOperatorType *ot)
                "Which mode to use for decimation");
 
   RNA_def_float_factor(ot->srna,
-                       "remove_ratio",
+                       "factor",
                        1.0f / 3.0f,
                        0.0f,
                        1.0f,

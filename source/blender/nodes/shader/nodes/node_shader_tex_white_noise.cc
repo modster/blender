@@ -27,7 +27,10 @@ static void sh_node_tex_white_noise_declare(NodeDeclarationBuilder &b)
 {
   b.is_function_node();
   b.add_input<decl::Vector>(N_("Vector")).min(-10000.0f).max(10000.0f).implicit_field();
-  b.add_input<decl::Float>(N_("W")).min(-10000.0f).max(10000.0f);
+  b.add_input<decl::Float>(N_("W")).min(-10000.0f).max(10000.0f).make_available([](bNode &node) {
+    /* Default to 1 instead of 4, because it is faster. */
+    node.custom1 = 1;
+  });
   b.add_output<decl::Float>(N_("Value"));
   b.add_output<decl::Color>(N_("Color"));
 };
@@ -58,13 +61,13 @@ static int gpu_shader_tex_white_noise(GPUMaterial *mat,
   return GPU_stack_link(mat, node, name, in, out);
 }
 
-static void node_shader_update_tex_white_noise(bNodeTree *UNUSED(ntree), bNode *node)
+static void node_shader_update_tex_white_noise(bNodeTree *ntree, bNode *node)
 {
   bNodeSocket *sockVector = nodeFindSocket(node, SOCK_IN, "Vector");
   bNodeSocket *sockW = nodeFindSocket(node, SOCK_IN, "W");
 
-  nodeSetSocketAvailability(sockVector, node->custom1 != 1);
-  nodeSetSocketAvailability(sockW, node->custom1 == 1 || node->custom1 == 4);
+  nodeSetSocketAvailability(ntree, sockVector, node->custom1 != 1);
+  nodeSetSocketAvailability(ntree, sockW, node->custom1 == 1 || node->custom1 == 4);
 }
 
 namespace blender::nodes {
@@ -191,7 +194,7 @@ static void sh_node_noise_build_multi_function(blender::nodes::NodeMultiFunction
 
 }  // namespace blender::nodes
 
-void register_node_type_sh_tex_white_noise(void)
+void register_node_type_sh_tex_white_noise()
 {
   static bNodeType ntype;
 

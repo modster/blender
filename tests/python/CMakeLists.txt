@@ -639,6 +639,7 @@ if(WITH_CYCLES OR WITH_OPENGL_RENDER_TESTS)
     MESSAGE(STATUS "Disabling Cycles tests because WITH_OPENCOLORIO is disabled")
   else()
     set(render_tests
+      camera
       bsdf
       hair
       image_colorspace
@@ -651,7 +652,6 @@ if(WITH_CYCLES OR WITH_OPENGL_RENDER_TESTS)
       shader
       shadow_catcher
       sss
-      volume
     )
 
     if(WITH_OPENSUBDIV)
@@ -663,7 +663,7 @@ if(WITH_CYCLES OR WITH_OPENGL_RENDER_TESTS)
     endif()
 
     if(WITH_MOD_FLUID)
-      list(APPEND render_tests motion_blur reports)
+      list(APPEND render_tests motion_blur reports volume)
     endif()
 
     if(WITH_OPENVDB)

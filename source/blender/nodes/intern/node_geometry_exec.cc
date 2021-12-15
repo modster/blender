@@ -18,8 +18,9 @@
 
 #include "DEG_depsgraph_query.h"
 
+#include "BKE_type_conversions.hh"
+
 #include "NOD_geometry_exec.hh"
-#include "NOD_type_conversions.hh"
 
 #include "node_geometry_util.hh"
 
@@ -149,7 +150,7 @@ GVArray GeoNodeExecParams::get_input_attribute(const StringRef name,
     }
     return GVArray::ForSingle(*cpp_type, domain_size, default_value);
   }
-  const DataTypeConversions &conversions = get_implicit_type_conversions();
+  const bke::DataTypeConversions &conversions = bke::get_implicit_type_conversions();
   if (found_socket->type == SOCK_FLOAT) {
     const float value = this->get_input<float>(found_socket->identifier);
     BUFFER_FOR_CPP_TYPE_VALUE(*cpp_type, buffer);
@@ -215,11 +216,6 @@ CustomDataType GeoNodeExecParams::get_input_attribute_data_type(
   return default_type;
 }
 
-/**
- * If any of the corresponding input sockets are attributes instead of single values,
- * use the highest priority attribute domain from among them.
- * Otherwise return the default domain.
- */
 AttributeDomain GeoNodeExecParams::get_highest_priority_input_domain(
     Span<std::string> names,
     const GeometryComponent &component,
@@ -252,6 +248,11 @@ AttributeDomain GeoNodeExecParams::get_highest_priority_input_domain(
 std::string GeoNodeExecParams::attribute_producer_name() const
 {
   return provider_->dnode->label_or_name() + TIP_(" node");
+}
+
+void GeoNodeExecParams::set_default_remaining_outputs()
+{
+  provider_->set_default_remaining_outputs();
 }
 
 void GeoNodeExecParams::check_input_access(StringRef identifier,
@@ -288,7 +289,7 @@ void GeoNodeExecParams::check_input_access(StringRef identifier,
     BLI_assert_unreachable();
   }
   else if (requested_type != nullptr) {
-    const CPPType &expected_type = *found_socket->typeinfo->get_geometry_nodes_cpp_type();
+    const CPPType &expected_type = *found_socket->typeinfo->geometry_nodes_cpp_type;
     if (*requested_type != expected_type) {
       std::cout << "The requested type '" << requested_type->name() << "' is incorrect. Expected '"
                 << expected_type.name() << "'.\n";
@@ -328,7 +329,7 @@ void GeoNodeExecParams::check_output_access(StringRef identifier, const CPPType 
     BLI_assert_unreachable();
   }
   else {
-    const CPPType &expected_type = *found_socket->typeinfo->get_geometry_nodes_cpp_type();
+    const CPPType &expected_type = *found_socket->typeinfo->geometry_nodes_cpp_type;
     if (value_type != expected_type) {
       std::cout << "The value type '" << value_type.name() << "' is incorrect. Expected '"
                 << expected_type.name() << "'.\n";

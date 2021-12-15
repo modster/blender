@@ -447,7 +447,9 @@ static void ui_node_link(bContext *C, void *arg_p, void *event_p)
   ED_undo_push(C, "Node input modify");
 }
 
-static void ui_node_sock_name(bNodeTree *ntree, bNodeSocket *sock, char name[UI_MAX_NAME_STR])
+static void ui_node_sock_name(const bNodeTree *ntree,
+                              bNodeSocket *sock,
+                              char name[UI_MAX_NAME_STR])
 {
   if (sock->link && sock->link->fromnode) {
     bNode *node = sock->link->fromnode;
@@ -709,7 +711,7 @@ void uiTemplateNodeLink(
 
   PointerRNA node_ptr;
   RNA_pointer_create((ID *)ntree, &RNA_Node, node, &node_ptr);
-  node_socket_color_get(C, ntree, &node_ptr, input, socket_col);
+  node_socket_color_get(*C, *ntree, node_ptr, *input, socket_col);
 
   UI_block_layout_set_current(block, layout);
 
@@ -769,7 +771,6 @@ static void ui_node_draw_input(
   PointerRNA inputptr, nodeptr;
   uiBlock *block = uiLayoutGetBlock(layout);
   uiLayout *row = nullptr;
-  bNode *lnode;
   bool dependency_loop;
 
   if (input->flag & SOCK_UNAVAIL) {
@@ -778,7 +779,7 @@ static void ui_node_draw_input(
 
   /* to avoid eternal loops on cyclic dependencies */
   node->flag |= NODE_TEST;
-  lnode = (input->link) ? input->link->fromnode : nullptr;
+  bNode *lnode = (input->link) ? input->link->fromnode : nullptr;
 
   dependency_loop = (lnode && (lnode->flag & NODE_TEST));
   if (dependency_loop) {
@@ -868,7 +869,7 @@ static void ui_node_draw_input(
           if (node_tree->type == NTREE_GEOMETRY && snode != nullptr) {
             /* Only add the attribute search in the node editor, in other places there is not
              * enough context. */
-            node_geometry_add_attribute_search_button(C, node_tree, node, &inputptr, row);
+            node_geometry_add_attribute_search_button(*C, *node_tree, *node, inputptr, *row);
           }
           else {
             uiItemR(sub, &inputptr, "default_value", 0, "", ICON_NONE);
