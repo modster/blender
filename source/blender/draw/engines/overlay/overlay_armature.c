@@ -104,9 +104,6 @@ typedef struct ArmatureDrawContext {
   const ThemeWireColor *bcolor; /* pchan color */
 } ArmatureDrawContext;
 
-/**
- * Return true if armature should be handled by the pose mode engine.
- */
 bool OVERLAY_armature_is_pose_mode(Object *ob, const DRWContextState *draw_ctx)
 {
   Object *active_ob = draw_ctx->obact;
@@ -1923,6 +1920,7 @@ static void draw_bone_name(ArmatureDrawContext *ctx,
                      DRW_TEXT_CACHE_GLOBALSPACE | DRW_TEXT_CACHE_STRING_PTR,
                      color);
 }
+
 /** \} */
 
 /* -------------------------------------------------------------------- */
@@ -2331,3 +2329,5 @@ void OVERLAY_pose_draw(OVERLAY_Data *vedata)
     DRW_draw_pass(psl->armature_ps[1]);
   }
 }
+
+/** \} */

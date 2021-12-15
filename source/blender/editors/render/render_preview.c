@@ -461,7 +461,7 @@ static Scene *preview_prepare_scene(
   Scene *sce;
   Main *pr_main = sp->pr_main;
 
-  memcpy(pr_main->name, BKE_main_blendfile_path(bmain), sizeof(pr_main->name));
+  memcpy(pr_main->filepath, BKE_main_blendfile_path(bmain), sizeof(pr_main->filepath));
 
   sce = preview_get_scene(pr_main);
   if (sce) {
@@ -1759,9 +1759,6 @@ static void icon_preview_free(void *customdata)
   MEM_freeN(ip);
 }
 
-/**
- * Check if \a id is supported by the automatic preview render.
- */
 bool ED_preview_id_is_supported(const ID *id)
 {
   if (id == NULL) {

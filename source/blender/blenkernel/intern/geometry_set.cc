@@ -351,44 +351,56 @@ void GeometrySet::replace_mesh(Mesh *mesh, GeometryOwnershipType ownership)
 {
   if (mesh == nullptr) {
     this->remove<MeshComponent>();
+    return;
   }
-  else {
-    MeshComponent &component = this->get_component_for_write<MeshComponent>();
-    component.replace(mesh, ownership);
+  if (mesh == this->get_mesh_for_read()) {
+    return;
   }
+  this->remove<MeshComponent>();
+  MeshComponent &component = this->get_component_for_write<MeshComponent>();
+  component.replace(mesh, ownership);
 }
 
 void GeometrySet::replace_curve(CurveEval *curve, GeometryOwnershipType ownership)
 {
   if (curve == nullptr) {
     this->remove<CurveComponent>();
+    return;
   }
-  else {
-    CurveComponent &component = this->get_component_for_write<CurveComponent>();
-    component.replace(curve, ownership);
+  if (curve == this->get_curve_for_read()) {
+    return;
   }
+  this->remove<CurveComponent>();
+  CurveComponent &component = this->get_component_for_write<CurveComponent>();
+  component.replace(curve, ownership);
 }
 
 void GeometrySet::replace_pointcloud(PointCloud *pointcloud, GeometryOwnershipType ownership)
 {
   if (pointcloud == nullptr) {
     this->remove<PointCloudComponent>();
+    return;
   }
-  else {
-    PointCloudComponent &component = this->get_component_for_write<PointCloudComponent>();
-    component.replace(pointcloud, ownership);
+  if (pointcloud == this->get_pointcloud_for_read()) {
+    return;
   }
+  this->remove<PointCloudComponent>();
+  PointCloudComponent &component = this->get_component_for_write<PointCloudComponent>();
+  component.replace(pointcloud, ownership);
 }
 
 void GeometrySet::replace_volume(Volume *volume, GeometryOwnershipType ownership)
 {
   if (volume == nullptr) {
     this->remove<VolumeComponent>();
+    return;
   }
-  else {
-    VolumeComponent &component = this->get_component_for_write<VolumeComponent>();
-    component.replace(volume, ownership);
+  if (volume == this->get_volume_for_read()) {
+    return;
   }
+  this->remove<VolumeComponent>();
+  VolumeComponent &component = this->get_component_for_write<VolumeComponent>();
+  component.replace(volume, ownership);
 }
 
 Mesh *GeometrySet::get_mesh_for_write()
@@ -469,13 +481,18 @@ void GeometrySet::gather_attributes_for_propagation(
           return;
         }
 
+        AttributeDomain domain = meta_data.domain;
+        if (dst_component_type != GEO_COMPONENT_TYPE_INSTANCES && domain == ATTR_DOMAIN_INSTANCE) {
+          domain = ATTR_DOMAIN_POINT;
+        }
+
         auto add_info = [&](AttributeKind *attribute_kind) {
-          attribute_kind->domain = meta_data.domain;
+          attribute_kind->domain = domain;
           attribute_kind->data_type = meta_data.data_type;
         };
         auto modify_info = [&](AttributeKind *attribute_kind) {
           attribute_kind->domain = bke::attribute_domain_highest_priority(
-              {attribute_kind->domain, meta_data.domain});
+              {attribute_kind->domain, domain});
           attribute_kind->data_type = bke::attribute_data_type_highest_complexity(
               {attribute_kind->data_type, meta_data.data_type});
         };

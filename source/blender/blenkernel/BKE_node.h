@@ -164,20 +164,20 @@ typedef struct bNodeSocketType {
   void (*interface_draw)(struct bContext *C, struct uiLayout *layout, struct PointerRNA *ptr);
   void (*interface_draw_color)(struct bContext *C, struct PointerRNA *ptr, float *r_color);
   void (*interface_register_properties)(struct bNodeTree *ntree,
-                                        struct bNodeSocket *stemp,
+                                        struct bNodeSocket *interface_socket,
                                         struct StructRNA *data_srna);
   void (*interface_init_socket)(struct bNodeTree *ntree,
-                                struct bNodeSocket *stemp,
+                                const struct bNodeSocket *interface_socket,
                                 struct bNode *node,
                                 struct bNodeSocket *sock,
                                 const char *data_path);
   void (*interface_verify_socket)(struct bNodeTree *ntree,
-                                  struct bNodeSocket *stemp,
+                                  const struct bNodeSocket *interface_socket,
                                   struct bNode *node,
                                   struct bNodeSocket *sock,
                                   const char *data_path);
   void (*interface_from_socket)(struct bNodeTree *ntree,
-                                struct bNodeSocket *stemp,
+                                struct bNodeSocket *interface_socket,
                                 struct bNode *node,
                                 struct bNodeSocket *sock);
 
@@ -258,7 +258,10 @@ typedef struct bNodeType {
    * Optional custom label function for the node header.
    * \note Used as a fallback when #bNode.label isn't set.
    */
-  void (*labelfunc)(struct bNodeTree *ntree, struct bNode *node, char *label, int maxlen);
+  void (*labelfunc)(const struct bNodeTree *ntree,
+                    const struct bNode *node,
+                    char *label,
+                    int maxlen);
 
   /** Called when the node is updated in the editor. */
   void (*updatefunc)(struct bNodeTree *ntree, struct bNode *node);
@@ -538,6 +541,7 @@ void ntreeBlendReadExpand(struct BlendExpander *expander, struct bNodeTree *ntre
 /* -------------------------------------------------------------------- */
 /** \name Node Tree Interface
  * \{ */
+
 struct bNodeSocket *ntreeFindSocketInterface(struct bNodeTree *ntree,
                                              eNodeSocketInOut in_out,
                                              const char *identifier);
@@ -967,7 +971,7 @@ void BKE_node_preview_set_pixel(
 /** \name Node Type Access
  * \{ */
 
-void nodeLabel(struct bNodeTree *ntree, struct bNode *node, char *label, int maxlen);
+void nodeLabel(const struct bNodeTree *ntree, const struct bNode *node, char *label, int maxlen);
 /**
  * Get node socket label if it is set.
  */
@@ -1000,9 +1004,6 @@ void node_type_storage(struct bNodeType *ntype,
                        void (*copyfunc)(struct bNodeTree *dest_ntree,
                                         struct bNode *dest_node,
                                         const struct bNode *src_node));
-void node_type_label(
-    struct bNodeType *ntype,
-    void (*labelfunc)(struct bNodeTree *ntree, struct bNode *, char *label, int maxlen));
 void node_type_update(struct bNodeType *ntype,
                       void (*updatefunc)(struct bNodeTree *ntree, struct bNode *node));
 void node_type_group_update(struct bNodeType *ntype,
@@ -1108,6 +1109,7 @@ bool BKE_node_tree_iter_step(struct NodeTreeIterStore *ntreeiter,
   } \
   } \
   ((void)0)
+
 /** \} */
 
 /* -------------------------------------------------------------------- */
@@ -1256,7 +1258,7 @@ struct bNode *ntreeShaderOutputNode(struct bNodeTree *ntree, int target);
  * This one needs to work on a local tree.
  *
  * TODO: This is *not* part of `blenkernel`, it's defined under "source/blender/nodes/".
- * This declaration should be be moved out of BKE.
+ * This declaration should be moved out of BKE.
  */
 void ntreeGPUMaterialNodes(struct bNodeTree *localtree,
                            struct GPUMaterial *mat,
@@ -1466,7 +1468,7 @@ void ntreeCompositTagRender(struct Scene *scene);
  *   which calls #node_cmp_rlayers_register_pass for every render layer node.
  *
  * TODO: This is *not* part of `blenkernel`, it's defined under "source/blender/nodes/".
- * This declaration should be be moved out of BKE.
+ * This declaration should be moved out of BKE.
  */
 void ntreeCompositUpdateRLayers(struct bNodeTree *ntree);
 void ntreeCompositRegisterPass(struct bNodeTree *ntree,
@@ -1568,6 +1570,7 @@ int ntreeTexExecTree(struct bNodeTree *ntree,
                      int cfra,
                      int preview,
                      struct MTex *mtex);
+
 /** \} */
 
 /* -------------------------------------------------------------------- */
@@ -1717,6 +1720,9 @@ int ntreeTexExecTree(struct bNodeTree *ntree,
 #define GEO_NODE_INPUT_MESH_VERTEX_NEIGHBORS 1141
 #define GEO_NODE_GEOMETRY_TO_INSTANCE 1142
 #define GEO_NODE_INPUT_MESH_EDGE_NEIGHBORS 1143
+#define GEO_NODE_INPUT_MESH_ISLAND 1144
+#define GEO_NODE_INPUT_SCENE_TIME 1145
+
 /** \} */
 
 /* -------------------------------------------------------------------- */

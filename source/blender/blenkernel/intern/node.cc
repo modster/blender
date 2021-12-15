@@ -1365,7 +1365,7 @@ bool ntreeIsRegistered(bNodeTree *ntree)
   return (ntree->typeinfo != &NodeTreeTypeUndefined);
 }
 
-GHashIterator *ntreeTypeGetIterator(void)
+GHashIterator *ntreeTypeGetIterator()
 {
   return BLI_ghashIterator_new(nodetreetypes_hash);
 }
@@ -1450,7 +1450,7 @@ bool nodeTypeUndefined(const bNode *node)
           ID_IS_LINKED(node->id) && (node->id->tag & LIB_TAG_MISSING));
 }
 
-GHashIterator *nodeTypeGetIterator(void)
+GHashIterator *nodeTypeGetIterator()
 {
   return BLI_ghashIterator_new(nodetypes_hash);
 }
@@ -1498,7 +1498,7 @@ bool nodeSocketIsRegistered(bNodeSocket *sock)
   return (sock->typeinfo != &NodeSocketTypeUndefined);
 }
 
-GHashIterator *nodeSocketTypeGetIterator(void)
+GHashIterator *nodeSocketTypeGetIterator()
 {
   return BLI_ghashIterator_new(nodesockettypes_hash);
 }
@@ -3418,40 +3418,39 @@ void ntreeNodeFlagSet(const bNodeTree *ntree, const int flag, const bool enable)
 
 bNodeTree *ntreeLocalize(bNodeTree *ntree)
 {
-  if (ntree) {
-    /* Make full copy outside of Main database.
-     * NOTE: previews are not copied here.
-     */
-    bNodeTree *ltree = (bNodeTree *)BKE_id_copy_ex(
-        nullptr, &ntree->id, nullptr, (LIB_ID_COPY_LOCALIZE | LIB_ID_COPY_NO_ANIMDATA));
-
-    ltree->id.tag |= LIB_TAG_LOCALIZED;
-
-    LISTBASE_FOREACH (bNode *, node, &ltree->nodes) {
-      if (ELEM(node->type, NODE_GROUP, NODE_CUSTOM_GROUP) && node->id) {
-        node->id = (ID *)ntreeLocalize((bNodeTree *)node->id);
-      }
-    }
-
-    /* ensures only a single output node is enabled */
-    ntreeSetOutput(ntree);
-
-    bNode *node_src = (bNode *)ntree->nodes.first;
-    bNode *node_local = (bNode *)ltree->nodes.first;
-    while (node_src != nullptr) {
-      node_local->original = node_src;
-      node_src = node_src->next;
-      node_local = node_local->next;
-    }
-
-    if (ntree->typeinfo->localize) {
-      ntree->typeinfo->localize(ltree, ntree);
-    }
-
-    return ltree;
+  if (ntree == nullptr) {
+    return nullptr;
   }
 
-  return nullptr;
+  /* Make full copy outside of Main database.
+   * NOTE: previews are not copied here. */
+  bNodeTree *ltree = (bNodeTree *)BKE_id_copy_ex(
+      nullptr, &ntree->id, nullptr, (LIB_ID_COPY_LOCALIZE | LIB_ID_COPY_NO_ANIMDATA));
+
+  ltree->id.tag |= LIB_TAG_LOCALIZED;
+
+  LISTBASE_FOREACH (bNode *, node, &ltree->nodes) {
+    if (ELEM(node->type, NODE_GROUP, NODE_CUSTOM_GROUP) && node->id) {
+      node->id = (ID *)ntreeLocalize((bNodeTree *)node->id);
+    }
+  }
+
+  /* ensures only a single output node is enabled */
+  ntreeSetOutput(ntree);
+
+  bNode *node_src = (bNode *)ntree->nodes.first;
+  bNode *node_local = (bNode *)ltree->nodes.first;
+  while (node_src != nullptr) {
+    node_local->original = node_src;
+    node_src = node_src->next;
+    node_local = node_local->next;
+  }
+
+  if (ntree->typeinfo->localize) {
+    ntree->typeinfo->localize(ltree, ntree);
+  }
+
+  return ltree;
 }
 
 void ntreeLocalSync(bNodeTree *localtree, bNodeTree *ntree)
@@ -4057,7 +4056,7 @@ void BKE_node_clipboard_init(const struct bNodeTree *ntree)
   node_clipboard.type = ntree->type;
 }
 
-void BKE_node_clipboard_clear(void)
+void BKE_node_clipboard_clear()
 {
   LISTBASE_FOREACH_MUTABLE (bNodeLink *, link, &node_clipboard.links) {
     nodeRemLink(nullptr, link);
@@ -4074,7 +4073,7 @@ void BKE_node_clipboard_clear(void)
 #endif
 }
 
-bool BKE_node_clipboard_validate(void)
+bool BKE_node_clipboard_validate()
 {
   bool ok = true;
 
@@ -4152,22 +4151,22 @@ void BKE_node_clipboard_add_link(bNodeLink *link)
   BLI_addtail(&node_clipboard.links, link);
 }
 
-const ListBase *BKE_node_clipboard_get_nodes(void)
+const ListBase *BKE_node_clipboard_get_nodes()
 {
   return &node_clipboard.nodes;
 }
 
-const ListBase *BKE_node_clipboard_get_links(void)
+const ListBase *BKE_node_clipboard_get_links()
 {
   return &node_clipboard.links;
 }
 
-int BKE_node_clipboard_get_type(void)
+int BKE_node_clipboard_get_type()
 {
   return node_clipboard.type;
 }
 
-void BKE_node_clipboard_free(void)
+void BKE_node_clipboard_free()
 {
   BKE_node_clipboard_validate();
   BKE_node_clipboard_clear();
@@ -4749,7 +4748,9 @@ static void propagate_data_requirements_from_right_to_left(
       /* The output is required to be a single value when it is connected to any input that does
        * not support fields. */
       for (const InputSocketRef *target_socket : output_socket->directly_linked_sockets()) {
-        state.requires_single |= field_state_by_socket_id[target_socket->id()].requires_single;
+        if (target_socket->is_available()) {
+          state.requires_single |= field_state_by_socket_id[target_socket->id()].requires_single;
+        }
       }
 
       if (state.requires_single) {
@@ -5181,7 +5182,7 @@ void nodeUpdateInternalLinks(bNodeTree *ntree, bNode *node)
 
 /* ************* node type access ********** */
 
-void nodeLabel(bNodeTree *ntree, bNode *node, char *label, int maxlen)
+void nodeLabel(const bNodeTree *ntree, const bNode *node, char *label, int maxlen)
 {
   label[0] = '\0';
 
@@ -5399,13 +5400,6 @@ void node_type_storage(bNodeType *ntype,
   }
   ntype->copyfunc = copyfunc;
   ntype->freefunc = freefunc;
-}
-
-void node_type_label(
-    struct bNodeType *ntype,
-    void (*labelfunc)(struct bNodeTree *ntree, struct bNode *node, char *label, int maxlen))
-{
-  ntype->labelfunc = labelfunc;
 }
 
 void node_type_update(struct bNodeType *ntype,
@@ -5811,10 +5805,12 @@ static void registerGeometryNodes()
   register_node_type_geo_input_mesh_edge_vertices();
   register_node_type_geo_input_mesh_face_area();
   register_node_type_geo_input_mesh_face_neighbors();
+  register_node_type_geo_input_mesh_island();
   register_node_type_geo_input_mesh_vertex_neighbors();
   register_node_type_geo_input_normal();
   register_node_type_geo_input_position();
   register_node_type_geo_input_radius();
+  register_node_type_geo_input_scene_time();
   register_node_type_geo_input_shade_smooth();
   register_node_type_geo_input_spline_cyclic();
   register_node_type_geo_input_spline_length();
@@ -5899,7 +5895,7 @@ static void registerFunctionNodes()
   register_node_type_fn_value_to_string();
 }
 
-void BKE_node_system_init(void)
+void BKE_node_system_init()
 {
   nodetreetypes_hash = BLI_ghash_str_new("nodetreetypes_hash gh");
   nodetypes_hash = BLI_ghash_str_new("nodetypes_hash gh");
@@ -5926,7 +5922,7 @@ void BKE_node_system_init(void)
   registerFunctionNodes();
 }
 
-void BKE_node_system_exit(void)
+void BKE_node_system_exit()
 {
   if (nodetypes_hash) {
     NODE_TYPES_BEGIN (nt) {

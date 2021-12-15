@@ -908,7 +908,7 @@ Image *BKE_image_load_exists_ex(Main *bmain, const char *filepath, bool *r_exist
   char str[FILE_MAX], strtest[FILE_MAX];
 
   STRNCPY(str, filepath);
-  BLI_path_abs(str, bmain->name);
+  BLI_path_abs(str, bmain->filepath);
 
   /* first search an identical filepath */
   for (ima = bmain->images.first; ima; ima = ima->id.next) {
@@ -5770,8 +5770,12 @@ bool BKE_image_has_loaded_ibuf(Image *image)
     struct MovieCacheIter *iter = IMB_moviecacheIter_new(image->cache);
 
     while (!IMB_moviecacheIter_done(iter)) {
-      has_loaded_ibuf = true;
-      break;
+      ImBuf *ibuf = IMB_moviecacheIter_getImBuf(iter);
+      if (ibuf != NULL) {
+        has_loaded_ibuf = true;
+        break;
+      }
+      IMB_moviecacheIter_step(iter);
     }
     IMB_moviecacheIter_free(iter);
   }

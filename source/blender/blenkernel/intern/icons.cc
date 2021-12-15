@@ -210,7 +210,7 @@ void BKE_icons_init(int first_dyn_id)
   }
 }
 
-void BKE_icons_free(void)
+void BKE_icons_free()
 {
   BLI_assert(BLI_thread_is_main());
 
@@ -227,7 +227,7 @@ void BKE_icons_free(void)
   BLI_linklist_lockfree_free(&g_icon_delete_queue, MEM_freeN);
 }
 
-void BKE_icons_deferred_free(void)
+void BKE_icons_deferred_free()
 {
   std::scoped_lock lock(gIconMutex);
 
@@ -271,7 +271,7 @@ static PreviewImage *previewimg_deferred_create(const char *path, int source)
   return prv;
 }
 
-PreviewImage *BKE_previewimg_create(void)
+PreviewImage *BKE_previewimg_create()
 {
   return previewimg_create_ex(0);
 }
@@ -1022,4 +1022,5 @@ int BKE_icon_ensure_studio_light(struct StudioLight *sl, int id_type)
   icon->id_type = id_type;
   return icon_id;
 }
+
 /** \} */
