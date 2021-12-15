@@ -158,7 +158,7 @@ class NoDiscard : public BaseDiscard {
 };
 
 /**
- * \brief Pointer to a texel to write or read serial.
+ * \brief Pointer to a texel to write to in serial.
  */
 template<
     /**
@@ -213,8 +213,7 @@ class TexelPointer {
 /**
  * \brief Wrapping mode for the uv coordinates.
  *
- * Subclasses have the ability to change the UV coordinates before the source buffer will be
- * sampled.
+ * Subclasses have the ability to change the UV coordinates when sampling the source buffer.
  */
 class BaseUVWrapping {
  public:
@@ -272,14 +271,30 @@ class WrapRepeatUV : public BaseUVWrapping {
   }
 };
 
-template<eIMBInterpolationFilterMode Filter,
-         typename StorageType,
-         int NumChannels,
-         /**
-          * \brief Wrapping method to perform
-          * Should be a subclass of BaseUVWrapper
-          */
-         typename UVWrapping>
+/**
+ * \brief Read a sample from an image buffer.
+ *
+ * A sampler can read from an image buffer.
+ *
+ */
+template<
+    /** \brief Interpolation mode to use when sampling. */
+    eIMBInterpolationFilterMode Filter,
+
+    /** \brief storage type of a single texel channel (unsigned char or float). */
+    typename StorageType,
+    /**
+     * \brief number of channels if the image to read.
+     *
+     * Must match the actual channels of the image buffer that is sampled.
+     */
+    int NumChannels,
+    /**
+     * \brief Wrapping method to perform
+     *
+     * Should be a subclass of BaseUVWrapper
+     */
+    typename UVWrapping>
 class Sampler {
   UVWrapping uv_wrapper;
 
@@ -415,6 +430,9 @@ class ChannelConverter {
   }
 };
 
+/**
+ * \brief Processor for a scanline.
+ */
 template<
     /**
      * \brief Discard function to use.
@@ -437,12 +455,20 @@ class ScanlineProcessor {
   Discard discarder;
   OutputTexelPointer output;
   Sampler sampler;
+
+  /**
+   * \brief Channels sizzling logic to convert between the input image buffer and the output image
+   * buffer.
+   */
   ChannelConverter<typename Sampler::ChannelType,
                    Sampler::ChannelLen,
                    OutputTexelPointer::ChannelLen>
       channel_converter;
 
  public:
+  /**
+   * \brief Inner loop of the transformations, processing a full scanline.
+   */
   void process(const TransformUserData *user_data, int scanline)
   {
     const int width = user_data->dst->x;
@@ -464,6 +490,9 @@ class ScanlineProcessor {
   }
 };
 
+/**
+ * \brief callback function for threaded transformation.
+ */
 template<typename Processor> void transform_scanline_function(void *custom_data, int scanline)
 {
   const TransformUserData *user_data = static_cast<const TransformUserData *>(custom_data);
@@ -523,7 +552,7 @@ ScanlineThreadFunc get_scanline_function(const TransformUserData *user_data,
 }
 
 template<eIMBInterpolationFilterMode Filter>
-static void transform(TransformUserData *user_data, const eIMBTransformMode mode)
+static void transform_threaded(TransformUserData *user_data, const eIMBTransformMode mode)
 {
   ScanlineThreadFunc scanline_func = nullptr;
 
@@ -566,10 +595,10 @@ void IMB_transform(const struct ImBuf *src,
   user_data.init(transform_matrix);
 
   if (filter == IMB_FILTER_NEAREST) {
-    transform<IMB_FILTER_NEAREST>(&user_data, mode);
+    transform_threaded<IMB_FILTER_NEAREST>(&user_data, mode);
   }
   else {
-    transform<IMB_FILTER_BILINEAR>(&user_data, mode);
+    transform_threaded<IMB_FILTER_BILINEAR>(&user_data, mode);
   }
 }
 }
