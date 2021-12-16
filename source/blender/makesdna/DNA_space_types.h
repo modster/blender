@@ -281,7 +281,7 @@ typedef struct SpaceOutliner {
    * Note that treestore may contain duplicate elements if element
    * is used multiple times in outliner tree (e. g. linked objects)
    * Also note that BLI_mempool can not be read/written in DNA directly,
-   * therefore readfile.c/writefile.c linearize treestore into TreeStore structure
+   * therefore `readfile.c/writefile.c` linearize treestore into TreeStore structure
    */
   struct BLI_mempool *treestore;
 
@@ -1514,12 +1514,15 @@ typedef struct bNodeTreePath {
 } bNodeTreePath;
 
 typedef struct SpaceNodeOverlay {
+  /* eSpaceNodeOverlay_Flag */
   int flag;
 } SpaceNodeOverlay;
 
 typedef enum eSpaceNodeOverlay_Flag {
   SN_OVERLAY_SHOW_OVERLAYS = (1 << 1),
   SN_OVERLAY_SHOW_WIRE_COLORS = (1 << 2),
+  SN_OVERLAY_SHOW_TIMINGS = (1 << 3),
+  SN_OVERLAY_SHOW_PATH = (1 << 4),
 } eSpaceNodeOverlay_Flag;
 
 typedef struct SpaceNode {
@@ -2003,6 +2006,7 @@ typedef enum eSpaceSpreadsheet_ContextType {
 } eSpaceSpreadsheet_ContextType;
 
 typedef enum eSpreadsheetColumnValueType {
+  SPREADSHEET_VALUE_TYPE_UNKNOWN = -1,
   SPREADSHEET_VALUE_TYPE_BOOL = 0,
   SPREADSHEET_VALUE_TYPE_INT32 = 1,
   SPREADSHEET_VALUE_TYPE_FLOAT = 2,

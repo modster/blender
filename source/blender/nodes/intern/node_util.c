@@ -190,7 +190,7 @@ void node_math_update(bNodeTree *ntree, bNode *node)
 /** \name Labels
  * \{ */
 
-void node_blend_label(bNodeTree *UNUSED(ntree), bNode *node, char *label, int maxlen)
+void node_blend_label(const bNodeTree *UNUSED(ntree), const bNode *node, char *label, int maxlen)
 {
   const char *name;
   bool enum_label = RNA_enum_name(rna_enum_ramp_blend_items, node->custom1, &name);
@@ -200,14 +200,14 @@ void node_blend_label(bNodeTree *UNUSED(ntree), bNode *node, char *label, int ma
   BLI_strncpy(label, IFACE_(name), maxlen);
 }
 
-void node_image_label(bNodeTree *UNUSED(ntree), bNode *node, char *label, int maxlen)
+void node_image_label(const bNodeTree *UNUSED(ntree), const bNode *node, char *label, int maxlen)
 {
   /* If there is no loaded image, return an empty string,
    * and let nodeLabel() fill in the proper type translation. */
   BLI_strncpy(label, (node->id) ? node->id->name + 2 : "", maxlen);
 }
 
-void node_math_label(bNodeTree *UNUSED(ntree), bNode *node, char *label, int maxlen)
+void node_math_label(const bNodeTree *UNUSED(ntree), const bNode *node, char *label, int maxlen)
 {
   const char *name;
   bool enum_label = RNA_enum_name(rna_enum_node_math_items, node->custom1, &name);
@@ -217,7 +217,10 @@ void node_math_label(bNodeTree *UNUSED(ntree), bNode *node, char *label, int max
   BLI_strncpy(label, IFACE_(name), maxlen);
 }
 
-void node_vector_math_label(bNodeTree *UNUSED(ntree), bNode *node, char *label, int maxlen)
+void node_vector_math_label(const bNodeTree *UNUSED(ntree),
+                            const bNode *node,
+                            char *label,
+                            int maxlen)
 {
   const char *name;
   bool enum_label = RNA_enum_name(rna_enum_node_vec_math_items, node->custom1, &name);
@@ -227,7 +230,7 @@ void node_vector_math_label(bNodeTree *UNUSED(ntree), bNode *node, char *label, 
   BLI_strncpy(label, IFACE_(name), maxlen);
 }
 
-void node_filter_label(bNodeTree *UNUSED(ntree), bNode *node, char *label, int maxlen)
+void node_filter_label(const bNodeTree *UNUSED(ntree), const bNode *node, char *label, int maxlen)
 {
   const char *name;
   bool enum_label = RNA_enum_name(rna_enum_node_filter_items, node->custom1, &name);
@@ -301,11 +304,6 @@ static bNodeSocket *node_find_linkable_socket(bNodeTree *ntree,
   return NULL;
 }
 
-/**
- * The idea behind this is: When a user connects an input to a socket that is
- * already linked (and if its not an Multi Input Socket), we try to find a replacement socket for
- * the link that we try to overwrite and connect that previous link to the new socket.
- */
 void node_insert_link_default(bNodeTree *ntree, bNode *node, bNodeLink *link)
 {
   bNodeSocket *socket = link->tosock;
@@ -351,11 +349,11 @@ void node_insert_link_default(bNodeTree *ntree, bNode *node, bNodeLink *link)
  * `<  0`: never connect these types.
  * `>= 0`: priority of connection (higher values chosen first).
  */
-static int node_datatype_priority(eNodeSocketDatatype from, eNodeSocketDatatype to)
+static int node_datatype_priority(const bNodeSocketType *from, const bNodeSocketType *to)
 {
-  switch (to) {
+  switch (to->type) {
     case SOCK_RGBA:
-      switch (from) {
+      switch (from->type) {
         case SOCK_RGBA:
           return 4;
         case SOCK_FLOAT:
@@ -364,11 +362,10 @@ static int node_datatype_priority(eNodeSocketDatatype from, eNodeSocketDatatype 
           return 2;
         case SOCK_BOOLEAN:
           return 1;
-        default:
-          return -1;
       }
+      return -1;
     case SOCK_VECTOR:
-      switch (from) {
+      switch (from->type) {
         case SOCK_VECTOR:
           return 4;
         case SOCK_FLOAT:
@@ -377,11 +374,10 @@ static int node_datatype_priority(eNodeSocketDatatype from, eNodeSocketDatatype 
           return 2;
         case SOCK_BOOLEAN:
           return 1;
-        default:
-          return -1;
       }
+      return -1;
     case SOCK_FLOAT:
-      switch (from) {
+      switch (from->type) {
         case SOCK_FLOAT:
           return 5;
         case SOCK_INT:
@@ -392,11 +388,10 @@ static int node_datatype_priority(eNodeSocketDatatype from, eNodeSocketDatatype 
           return 2;
         case SOCK_VECTOR:
           return 1;
-        default:
-          return -1;
       }
+      return -1;
     case SOCK_INT:
-      switch (from) {
+      switch (from->type) {
         case SOCK_INT:
           return 5;
         case SOCK_FLOAT:
@@ -407,11 +402,10 @@ static int node_datatype_priority(eNodeSocketDatatype from, eNodeSocketDatatype 
           return 2;
         case SOCK_VECTOR:
           return 1;
-        default:
-          return -1;
       }
+      return -1;
     case SOCK_BOOLEAN:
-      switch (from) {
+      switch (from->type) {
         case SOCK_BOOLEAN:
           return 5;
         case SOCK_INT:
@@ -422,74 +416,17 @@ static int node_datatype_priority(eNodeSocketDatatype from, eNodeSocketDatatype 
           return 2;
         case SOCK_VECTOR:
           return 1;
-        default:
-          return -1;
       }
-    case SOCK_SHADER:
-      switch (from) {
-        case SOCK_SHADER:
-          return 1;
-        default:
-          return -1;
-      }
-    case SOCK_STRING:
-      switch (from) {
-        case SOCK_STRING:
-          return 1;
-        default:
-          return -1;
-      }
-    case SOCK_OBJECT: {
-      switch (from) {
-        case SOCK_OBJECT:
-          return 1;
-        default:
-          return -1;
-      }
-    }
-    case SOCK_GEOMETRY: {
-      switch (from) {
-        case SOCK_GEOMETRY:
-          return 1;
-        default:
-          return -1;
-      }
-    }
-    case SOCK_COLLECTION: {
-      switch (from) {
-        case SOCK_COLLECTION:
-          return 1;
-        default:
-          return -1;
-      }
-    }
-    case SOCK_TEXTURE: {
-      switch (from) {
-        case SOCK_TEXTURE:
-          return 1;
-        default:
-          return -1;
-      }
-    }
-    case SOCK_IMAGE: {
-      switch (from) {
-        case SOCK_IMAGE:
-          return 1;
-        default:
-          return -1;
-      }
-    }
-    case SOCK_MATERIAL: {
-      switch (from) {
-        case SOCK_MATERIAL:
-          return 1;
-        default:
-          return -1;
-      }
-    }
-    default:
       return -1;
   }
+
+  /* The rest of the socket types only allow an internal link if both the input and output socket
+   * have the same type. If the sockets are custom, we check the idname instead. */
+  if (to->type == from->type && (to->type != SOCK_CUSTOM || STREQ(to->idname, from->idname))) {
+    return 1;
+  }
+
+  return -1;
 }
 
 /* select a suitable input socket for an output */
@@ -505,7 +442,7 @@ static bNodeSocket *select_internal_link_input(bNode *node, bNodeSocket *output)
   bool sel_is_linked = false;
 
   for (input = node->inputs.first, i = 0; input; input = input->next, i++) {
-    int priority = node_datatype_priority(input->type, output->type);
+    int priority = node_datatype_priority(input->typeinfo, output->typeinfo);
     bool is_linked = (input->link != NULL);
     bool preferred;
 

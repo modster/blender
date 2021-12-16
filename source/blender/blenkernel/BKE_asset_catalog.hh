@@ -98,6 +98,15 @@ class AssetCatalogService {
   bool write_to_disk(const CatalogFilePath &blend_file_path);
 
   /**
+   * Ensure that the next call to #on_blend_save_post() will choose a new location for the CDF
+   * suitable for the location of the blend file (regardless of where the current catalogs come
+   * from), and that catalogs will be merged with already-existing ones in that location.
+   *
+   * Use this for a "Save as..." that has to write the catalogs to the new blend file location,
+   * instead of updating the previously read CDF. */
+  void prepare_to_merge_on_write();
+
+  /**
    * Merge on-disk changes into the in-memory asset catalogs.
    * This should be called before writing the asset catalogs to disk.
    *
@@ -238,6 +247,11 @@ class AssetCatalogService {
    */
   void create_missing_catalogs();
 
+  /**
+   * For every catalog, mark it as "dirty".
+   */
+  void tag_all_catalogs_as_unsaved_changes();
+
   /* For access by subclasses, as those will not be marked as friend by #AssetCatalogCollection. */
   AssetCatalogDefinitionFile *get_catalog_definition_file();
   OwningAssetCatalogMap &get_catalogs();
@@ -363,6 +377,9 @@ class AssetCatalogDefinitionFile {
   /* For now this is the only version of the catalog definition files that is supported.
    * Later versioning code may be added to handle older files. */
   const static int SUPPORTED_VERSION;
+  /* String that's matched in the catalog definition file to know that the line is the version
+   * declaration. It has to start with a space to ensure it won't match any hypothetical future
+   * field that starts with "VERSION". */
   const static std::string VERSION_MARKER;
   const static std::string HEADER;
 

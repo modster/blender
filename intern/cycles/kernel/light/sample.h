@@ -22,6 +22,7 @@
 #include "kernel/light/light.h"
 
 #include "kernel/sample/mapping.h"
+#include "kernel/sample/mis.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -199,6 +200,9 @@ ccl_device_inline float3 shadow_ray_offset(KernelGlobals kg,
     if (offset_cutoff > 0.0f) {
       float NgL = dot(Ng, L);
       float offset_amount = 0.0f;
+      if (NL < 0) {
+        NL = -NL;
+      }
       if (NL < offset_cutoff) {
         offset_amount = clamp(2.0f - (NgL + NL) / offset_cutoff, 0.0f, 1.0f);
       }
@@ -266,6 +270,38 @@ ccl_device_inline void light_sample_to_volume_shadow_ray(
     ccl_private Ray *ray)
 {
   shadow_ray_setup(sd, ls, P, ray);
+}
+
+ccl_device_inline float light_sample_mis_weight_forward(KernelGlobals kg,
+                                                        const float forward_pdf,
+                                                        const float nee_pdf)
+{
+#ifdef WITH_CYCLES_DEBUG
+  if (kernel_data.integrator.direct_light_sampling_type == DIRECT_LIGHT_SAMPLING_FORWARD) {
+    return 1.0f;
+  }
+  else if (kernel_data.integrator.direct_light_sampling_type == DIRECT_LIGHT_SAMPLING_NEE) {
+    return 0.0f;
+  }
+  else
+#endif
+    return power_heuristic(forward_pdf, nee_pdf);
+}
+
+ccl_device_inline float light_sample_mis_weight_nee(KernelGlobals kg,
+                                                    const float nee_pdf,
+                                                    const float forward_pdf)
+{
+#ifdef WITH_CYCLES_DEBUG
+  if (kernel_data.integrator.direct_light_sampling_type == DIRECT_LIGHT_SAMPLING_FORWARD) {
+    return 0.0f;
+  }
+  else if (kernel_data.integrator.direct_light_sampling_type == DIRECT_LIGHT_SAMPLING_NEE) {
+    return 1.0f;
+  }
+  else
+#endif
+    return power_heuristic(nee_pdf, forward_pdf);
 }
 
 CCL_NAMESPACE_END

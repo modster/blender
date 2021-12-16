@@ -19,11 +19,15 @@
 
 #include "BKE_attribute_math.hh"
 
+#include "NOD_socket_search_link.hh"
+
 #include "node_geometry_util.hh"
 
-namespace blender::nodes {
+namespace blender::nodes::node_geo_attribute_capture_cc {
 
-static void geo_node_attribute_capture_declare(NodeDeclarationBuilder &b)
+NODE_STORAGE_FUNCS(NodeGeometryAttributeCapture)
+
+static void node_declare(NodeDeclarationBuilder &b)
 {
   b.add_input<decl::Geometry>(N_("Geometry"));
   b.add_input<decl::Vector>(N_("Value")).supports_field();
@@ -40,9 +44,7 @@ static void geo_node_attribute_capture_declare(NodeDeclarationBuilder &b)
   b.add_output<decl::Int>(N_("Attribute"), "Attribute_004").field_source();
 }
 
-static void geo_node_attribute_capture_layout(uiLayout *layout,
-                                              bContext *UNUSED(C),
-                                              PointerRNA *ptr)
+static void node_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 {
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetPropDecorate(layout, false);
@@ -50,7 +52,7 @@ static void geo_node_attribute_capture_layout(uiLayout *layout,
   uiItemR(layout, ptr, "data_type", 0, "", ICON_NONE);
 }
 
-static void geo_node_attribute_capture_init(bNodeTree *UNUSED(tree), bNode *node)
+static void node_init(bNodeTree *UNUSED(tree), bNode *node)
 {
   NodeGeometryAttributeCapture *data = (NodeGeometryAttributeCapture *)MEM_callocN(
       sizeof(NodeGeometryAttributeCapture), __func__);
@@ -60,10 +62,9 @@ static void geo_node_attribute_capture_init(bNodeTree *UNUSED(tree), bNode *node
   node->storage = data;
 }
 
-static void geo_node_attribute_capture_update(bNodeTree *ntree, bNode *node)
+static void node_update(bNodeTree *ntree, bNode *node)
 {
-  const NodeGeometryAttributeCapture &storage = *(const NodeGeometryAttributeCapture *)
-                                                     node->storage;
+  const NodeGeometryAttributeCapture &storage = node_storage(*node);
   const CustomDataType data_type = static_cast<CustomDataType>(storage.data_type);
 
   bNodeSocket *socket_value_geometry = (bNodeSocket *)node->inputs.first;
@@ -93,6 +94,33 @@ static void geo_node_attribute_capture_update(bNodeTree *ntree, bNode *node)
   nodeSetSocketAvailability(ntree, out_socket_value_int32, data_type == CD_PROP_INT32);
 }
 
+static void node_gather_link_searches(GatherLinkSearchOpParams &params)
+{
+  const NodeDeclaration &declaration = *params.node_type().fixed_declaration;
+  search_link_ops_for_declarations(params, declaration.inputs().take_front(1));
+  search_link_ops_for_declarations(params, declaration.outputs().take_front(1));
+
+  const bNodeType &node_type = params.node_type();
+  const std::optional<CustomDataType> type = node_data_type_to_custom_data_type(
+      (eNodeSocketDatatype)params.other_socket().type);
+  if (type && *type != CD_PROP_STRING) {
+    if (params.in_out() == SOCK_OUT) {
+      params.add_item(IFACE_("Attribute"), [node_type, type](LinkSearchOpParams &params) {
+        bNode &node = params.add_node(node_type);
+        node_storage(node).data_type = *type;
+        params.update_and_connect_available_socket(node, "Attribute");
+      });
+    }
+    else {
+      params.add_item(IFACE_("Value"), [node_type, type](LinkSearchOpParams &params) {
+        bNode &node = params.add_node(node_type);
+        node_storage(node).data_type = *type;
+        params.update_and_connect_available_socket(node, "Value");
+      });
+    }
+  }
+}
+
 static void try_capture_field_on_geometry(GeometryComponent &component,
                                           const AttributeIDRef &attribute_id,
                                           const AttributeDomain domain,
@@ -113,13 +141,11 @@ static void try_capture_field_on_geometry(GeometryComponent &component,
   output_attribute.save();
 }
 
-static void geo_node_attribute_capture_exec(GeoNodeExecParams params)
+static void node_geo_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
 
-  const bNode &node = params.node();
-  const NodeGeometryAttributeCapture &storage = *(const NodeGeometryAttributeCapture *)
-                                                     node.storage;
+  const NodeGeometryAttributeCapture &storage = node_storage(params.node());
   const CustomDataType data_type = static_cast<CustomDataType>(storage.data_type);
   const AttributeDomain domain = static_cast<AttributeDomain>(storage.domain);
 
@@ -147,16 +173,27 @@ static void geo_node_attribute_capture_exec(GeoNodeExecParams params)
   WeakAnonymousAttributeID anonymous_id{"Attribute"};
   const CPPType &type = field.cpp_type();
 
-  static const Array<GeometryComponentType> types = {
-      GEO_COMPONENT_TYPE_MESH, GEO_COMPONENT_TYPE_POINT_CLOUD, GEO_COMPONENT_TYPE_CURVE};
-  geometry_set.modify_geometry_sets([&](GeometrySet &geometry_set) {
-    for (const GeometryComponentType type : types) {
-      if (geometry_set.has(type)) {
-        GeometryComponent &component = geometry_set.get_component_for_write(type);
-        try_capture_field_on_geometry(component, anonymous_id.get(), domain, field);
-      }
+  /* Run on the instances component separately to only affect the top level of instances. */
+  if (domain == ATTR_DOMAIN_INSTANCE) {
+    if (geometry_set.has_instances()) {
+      GeometryComponent &component = geometry_set.get_component_for_write(
+          GEO_COMPONENT_TYPE_INSTANCES);
+      try_capture_field_on_geometry(component, anonymous_id.get(), domain, field);
     }
-  });
+  }
+  else {
+    static const Array<GeometryComponentType> types = {
+        GEO_COMPONENT_TYPE_MESH, GEO_COMPONENT_TYPE_POINT_CLOUD, GEO_COMPONENT_TYPE_CURVE};
+
+    geometry_set.modify_geometry_sets([&](GeometrySet &geometry_set) {
+      for (const GeometryComponentType type : types) {
+        if (geometry_set.has(type)) {
+          GeometryComponent &component = geometry_set.get_component_for_write(type);
+          try_capture_field_on_geometry(component, anonymous_id.get(), domain, field);
+        }
+      }
+    });
+  }
 
   GField output_field{std::make_shared<bke::AnonymousAttributeFieldInput>(
       std::move(anonymous_id), type, params.attribute_producer_name())};
@@ -189,10 +226,12 @@ static void geo_node_attribute_capture_exec(GeoNodeExecParams params)
   params.set_output("Geometry", geometry_set);
 }
 
-}  // namespace blender::nodes
+}  // namespace blender::nodes::node_geo_attribute_capture_cc
 
 void register_node_type_geo_attribute_capture()
 {
+  namespace file_ns = blender::nodes::node_geo_attribute_capture_cc;
+
   static bNodeType ntype;
 
   geo_node_type_base(
@@ -201,10 +240,11 @@ void register_node_type_geo_attribute_capture()
                     "NodeGeometryAttributeCapture",
                     node_free_standard_storage,
                     node_copy_standard_storage);
-  node_type_init(&ntype, blender::nodes::geo_node_attribute_capture_init);
-  node_type_update(&ntype, blender::nodes::geo_node_attribute_capture_update);
-  ntype.declare = blender::nodes::geo_node_attribute_capture_declare;
-  ntype.geometry_node_execute = blender::nodes::geo_node_attribute_capture_exec;
-  ntype.draw_buttons = blender::nodes::geo_node_attribute_capture_layout;
+  node_type_init(&ntype, file_ns::node_init);
+  node_type_update(&ntype, file_ns::node_update);
+  ntype.declare = file_ns::node_declare;
+  ntype.geometry_node_execute = file_ns::node_geo_exec;
+  ntype.draw_buttons = file_ns::node_layout;
+  ntype.gather_link_search_ops = file_ns::node_gather_link_searches;
   nodeRegisterType(&ntype);
 }

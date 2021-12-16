@@ -36,12 +36,7 @@ namespace blender::bke {
 
 const CatalogFilePath AssetCatalogService::DEFAULT_CATALOG_FILENAME = "blender_assets.cats.txt";
 
-/* For now this is the only version of the catalog definition files that is supported.
- * Later versioning code may be added to handle older files. */
 const int AssetCatalogDefinitionFile::SUPPORTED_VERSION = 1;
-/* String that's matched in the catalog definition file to know that the line is the version
- * declaration. It has to start with a space to ensure it won't match any hypothetical future field
- * that starts with "VERSION". */
 const std::string AssetCatalogDefinitionFile::VERSION_MARKER = "VERSION ";
 
 const std::string AssetCatalogDefinitionFile::HEADER =
@@ -96,6 +91,14 @@ bool AssetCatalogService::has_unsaved_changes() const
 {
   BLI_assert(catalog_collection_);
   return catalog_collection_->has_unsaved_changes_;
+}
+
+void AssetCatalogService::tag_all_catalogs_as_unsaved_changes()
+{
+  for (auto &catalog : catalog_collection_->catalogs_.values()) {
+    catalog->flags.has_unsaved_changes = true;
+  }
+  catalog_collection_->has_unsaved_changes_ = true;
 }
 
 bool AssetCatalogService::is_empty() const
@@ -484,6 +487,24 @@ bool AssetCatalogService::write_to_disk_ex(const CatalogFilePath &blend_file_pat
   catalog_collection_->catalog_definition_file_ = construct_cdf_in_memory(cdf_path_to_write);
   reload_catalogs();
   return catalog_collection_->catalog_definition_file_->write_to_disk();
+}
+
+void AssetCatalogService::prepare_to_merge_on_write()
+{
+  /* TODO(Sybren): expand to support multiple CDFs. */
+
+  if (!catalog_collection_->catalog_definition_file_) {
+    /* There is no CDF connected, so it's a no-op. */
+    return;
+  }
+
+  /* Remove any association with the CDF, so that a new location will be chosen
+   * when the blend file is saved. */
+  catalog_collection_->catalog_definition_file_.reset();
+
+  /* Mark all in-memory catalogs as "dirty", to force them to be kept around on
+   * the next "load-merge-write" cycle. */
+  tag_all_catalogs_as_unsaved_changes();
 }
 
 CatalogFilePath AssetCatalogService::find_suitable_cdf_path_for_writing(

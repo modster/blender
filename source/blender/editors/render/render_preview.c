@@ -103,6 +103,8 @@
 #include "ED_view3d.h"
 #include "ED_view3d_offscreen.h"
 
+#include "UI_interface_icons.h"
+
 #ifndef NDEBUG
 /* Used for database init assert(). */
 #  include "BLI_threads.h"
@@ -212,7 +214,7 @@ static bool check_engine_supports_preview(Scene *scene)
 
 static bool preview_method_is_render(int pr_method)
 {
-  return ELEM(pr_method, PR_ICON_RENDER, PR_BUTS_RENDER, PR_NODE_RENDER);
+  return ELEM(pr_method, PR_ICON_RENDER, PR_BUTS_RENDER);
 }
 
 void ED_preview_free_dbase(void)
@@ -459,7 +461,7 @@ static Scene *preview_prepare_scene(
   Scene *sce;
   Main *pr_main = sp->pr_main;
 
-  memcpy(pr_main->name, BKE_main_blendfile_path(bmain), sizeof(pr_main->name));
+  memcpy(pr_main->filepath, BKE_main_blendfile_path(bmain), sizeof(pr_main->filepath));
 
   sce = preview_get_scene(pr_main);
   if (sce) {
@@ -526,15 +528,6 @@ static Scene *preview_prepare_scene(
                                               MA_SPHERE_A :
                                               mat->pr_type;
         set_preview_visibility(pr_main, sce, view_layer, preview_type, sp->pr_method);
-
-        if (sp->pr_method != PR_ICON_RENDER) {
-          if (mat->nodetree && sp->pr_method == PR_NODE_RENDER) {
-            /* two previews, they get copied by wmJob */
-            BKE_node_preview_init_tree(mat->nodetree, sp->sizex, sp->sizey, true);
-            /* WATCH: Accessing origmat is not safe! */
-            BKE_node_preview_init_tree(origmat->nodetree, sp->sizex, sp->sizey, true);
-          }
-        }
       }
       else {
         sce->display.render_aa = SCE_DISPLAY_AA_OFF;
@@ -570,13 +563,6 @@ static Scene *preview_prepare_scene(
         sp->id_copy = NULL;
         BLI_addtail(&pr_main->textures, tex);
       }
-
-      if (tex && tex->nodetree && sp->pr_method == PR_NODE_RENDER) {
-        /* two previews, they get copied by wmJob */
-        BKE_node_preview_init_tree(tex->nodetree, sp->sizex, sp->sizey, true);
-        /* WATCH: Accessing origtex is not safe! */
-        BKE_node_preview_init_tree(origtex->nodetree, sp->sizex, sp->sizey, true);
-      }
     }
     else if (id_type == ID_LA) {
       Light *la = NULL, *origla = (Light *)id;
@@ -606,13 +592,6 @@ static Scene *preview_prepare_scene(
           }
         }
       }
-
-      if (la && la->nodetree && sp->pr_method == PR_NODE_RENDER) {
-        /* two previews, they get copied by wmJob */
-        BKE_node_preview_init_tree(la->nodetree, sp->sizex, sp->sizey, true);
-        /* WATCH: Accessing origla is not safe! */
-        BKE_node_preview_init_tree(origla->nodetree, sp->sizex, sp->sizey, true);
-      }
     }
     else if (id_type == ID_WO) {
       World *wrld = NULL, *origwrld = (World *)id;
@@ -626,13 +605,6 @@ static Scene *preview_prepare_scene(
 
       set_preview_visibility(pr_main, sce, view_layer, MA_SKY, sp->pr_method);
       sce->world = wrld;
-
-      if (wrld && wrld->nodetree && sp->pr_method == PR_NODE_RENDER) {
-        /* two previews, they get copied by wmJob */
-        BKE_node_preview_init_tree(wrld->nodetree, sp->sizex, sp->sizey, true);
-        /* WATCH: Accessing origwrld is not safe! */
-        BKE_node_preview_init_tree(origwrld->nodetree, sp->sizex, sp->sizey, true);
-      }
     }
 
     return sce;
@@ -785,6 +757,11 @@ struct ObjectPreviewData {
   int sizex;
   int sizey;
 };
+
+static bool object_preview_is_type_supported(const Object *ob)
+{
+  return OB_TYPE_IS_GEOMETRY(ob->type);
+}
 
 static Object *object_preview_camera_create(Main *preview_main,
                                             ViewLayer *view_layer,
@@ -989,7 +966,7 @@ static void action_preview_render(IconPreview *preview, IconPreviewSize *preview
                                                       preview_sized->sizey,
                                                       IB_rect,
                                                       V3D_OFSDRAW_NONE,
-                                                      R_ALPHAPREMUL,
+                                                      R_ADDSKY,
                                                       NULL,
                                                       NULL,
                                                       err_out);
@@ -1030,41 +1007,8 @@ static int shader_preview_break(void *spv)
   return *(sp->stop);
 }
 
-/* outside thread, called before redraw notifiers, it moves finished preview over */
-static void shader_preview_updatejob(void *spv)
+static void shader_preview_updatejob(void *UNUSED(spv))
 {
-  ShaderPreview *sp = spv;
-
-  if (sp->pr_method == PR_NODE_RENDER) {
-    if (GS(sp->id->name) == ID_MA) {
-      Material *mat = (Material *)sp->id;
-
-      if (sp->matcopy && mat->nodetree && sp->matcopy->nodetree) {
-        ntreeLocalSync(sp->matcopy->nodetree, mat->nodetree);
-      }
-    }
-    else if (GS(sp->id->name) == ID_TE) {
-      Tex *tex = (Tex *)sp->id;
-
-      if (sp->texcopy && tex->nodetree && sp->texcopy->nodetree) {
-        ntreeLocalSync(sp->texcopy->nodetree, tex->nodetree);
-      }
-    }
-    else if (GS(sp->id->name) == ID_WO) {
-      World *wrld = (World *)sp->id;
-
-      if (sp->worldcopy && wrld->nodetree && sp->worldcopy->nodetree) {
-        ntreeLocalSync(sp->worldcopy->nodetree, wrld->nodetree);
-      }
-    }
-    else if (GS(sp->id->name) == ID_LA) {
-      Light *la = (Light *)sp->id;
-
-      if (sp->lampcopy && la->nodetree && sp->lampcopy->nodetree) {
-        ntreeLocalSync(sp->lampcopy->nodetree, la->nodetree);
-      }
-    }
-  }
 }
 
 /* Renders texture directly to render buffer. */
@@ -1180,21 +1124,12 @@ static void shader_preview_render(ShaderPreview *sp, ID *id, int split, int firs
     sce->r.scemode |= R_NO_IMAGE_LOAD;
     sce->display.render_aa = SCE_DISPLAY_AA_SAMPLES_8;
   }
-  else if (sp->pr_method == PR_NODE_RENDER) {
-    if (idtype == ID_MA) {
-      sce->r.scemode |= R_MATNODE_PREVIEW;
-    }
-    else if (idtype == ID_TE) {
-      sce->r.scemode |= R_TEXNODE_PREVIEW;
-    }
-    sce->display.render_aa = SCE_DISPLAY_AA_OFF;
-  }
   else { /* PR_BUTS_RENDER */
     sce->display.render_aa = SCE_DISPLAY_AA_SAMPLES_8;
   }
 
   /* Callbacks are cleared on GetRender(). */
-  if (ELEM(sp->pr_method, PR_BUTS_RENDER, PR_NODE_RENDER)) {
+  if (sp->pr_method == PR_BUTS_RENDER) {
     RE_display_update_cb(re, sp, shader_preview_update);
   }
   /* set this for all previews, default is react to G.is_break still */
@@ -1301,10 +1236,6 @@ static void shader_preview_free(void *customdata)
     BLI_assert(main_id_copy == NULL);
     main_id_copy = (ID *)sp->lampcopy;
     BLI_remlink(&pr_main->lights, sp->lampcopy);
-  }
-  if (main_id_copy || sp->id_copy) {
-    /* node previews */
-    shader_preview_updatejob(sp);
   }
   if (sp->own_id_copy) {
     if (sp->id_copy) {
@@ -1658,9 +1589,12 @@ static void icon_preview_startjob_all_sizes(void *customdata,
     if (ip->id != NULL) {
       switch (GS(ip->id->name)) {
         case ID_OB:
-          /* Much simpler than the ShaderPreview mess used for other ID types. */
-          object_preview_render(ip, cur_size);
-          continue;
+          if (object_preview_is_type_supported((Object *)ip->id)) {
+            /* Much simpler than the ShaderPreview mess used for other ID types. */
+            object_preview_render(ip, cur_size);
+            continue;
+          }
+          break;
         case ID_AC:
           action_preview_render(ip, cur_size);
           continue;
@@ -1747,6 +1681,18 @@ static void icon_preview_free(void *customdata)
 
   BLI_freelistN(&ip->sizes);
   MEM_freeN(ip);
+}
+
+bool ED_preview_id_is_supported(const ID *id)
+{
+  if (id == NULL) {
+    return false;
+  }
+
+  if (GS(id->name) == ID_OB) {
+    return object_preview_is_type_supported((const Object *)id);
+  }
+  return BKE_previewimg_id_get_p(id) != NULL;
 }
 
 void ED_preview_icon_render(
@@ -1849,7 +1795,7 @@ void ED_preview_shader_job(const bContext *C,
   wmJob *wm_job;
   ShaderPreview *sp;
   Scene *scene = CTX_data_scene(C);
-  short id_type = GS(id->name);
+  const ID_Type id_type = GS(id->name);
 
   BLI_assert(BKE_previewimg_id_supports_jobs(id));
 
@@ -1857,11 +1803,6 @@ void ED_preview_shader_job(const bContext *C,
    * since the other previews are related to the datablock. */
 
   if (preview_method_is_render(method) && !check_engine_supports_preview(scene)) {
-    return;
-  }
-
-  /* Only texture node preview is supported with Cycles. */
-  if (method == PR_NODE_RENDER && id_type != ID_TE) {
     return;
   }
 
@@ -1893,7 +1834,7 @@ void ED_preview_shader_job(const bContext *C,
    * once with custom preview .blend path for external engines */
 
   /* grease pencil use its own preview file */
-  if (GS(id->name) == ID_MA) {
+  if (id_type == ID_MA) {
     ma = (Material *)id;
   }
 
@@ -1926,6 +1867,47 @@ void ED_preview_kill_jobs(wmWindowManager *wm, Main *UNUSED(bmain))
      * avoid invalid memory access. */
     WM_jobs_kill(wm, NULL, common_preview_startjob);
     WM_jobs_kill(wm, NULL, icon_preview_startjob_all_sizes);
+  }
+}
+
+typedef struct PreviewRestartQueueEntry {
+  struct PreviewRestartQueueEntry *next, *prev;
+
+  enum eIconSizes size;
+  ID *id;
+} PreviewRestartQueueEntry;
+
+static ListBase /* #PreviewRestartQueueEntry */ G_restart_previews_queue;
+
+void ED_preview_restart_queue_free(void)
+{
+  BLI_freelistN(&G_restart_previews_queue);
+}
+
+void ED_preview_restart_queue_add(ID *id, enum eIconSizes size)
+{
+  PreviewRestartQueueEntry *queue_entry = MEM_mallocN(sizeof(*queue_entry), __func__);
+  queue_entry->size = size;
+  queue_entry->id = id;
+  BLI_addtail(&G_restart_previews_queue, queue_entry);
+}
+
+void ED_preview_restart_queue_work(const bContext *C)
+{
+  LISTBASE_FOREACH_MUTABLE (PreviewRestartQueueEntry *, queue_entry, &G_restart_previews_queue) {
+    PreviewImage *preview = BKE_previewimg_id_get(queue_entry->id);
+    if (!preview) {
+      continue;
+    }
+    if (preview->flag[queue_entry->size] & PRV_USER_EDITED) {
+      /* Don't touch custom previews. */
+      continue;
+    }
+
+    BKE_previewimg_clear_single(preview, queue_entry->size);
+    UI_icon_render_id(C, NULL, queue_entry->id, queue_entry->size, true);
+
+    BLI_freelinkN(&G_restart_previews_queue, queue_entry);
   }
 }
 

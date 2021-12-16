@@ -182,6 +182,4 @@ void read_arbitrary_attributes(const CDStreamConfig &config,
                                const Alembic::Abc::ISampleSelector &sample_sel,
                                float velocity_scale);
 
-bool has_animated_attributes(const ICompoundProperty &arb_geom_params);
-
 }  // namespace blender::io::alembic

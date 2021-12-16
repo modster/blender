@@ -28,14 +28,27 @@
 #include "UI_interface.h"
 #include "UI_resources.h"
 
-namespace blender::nodes {
+namespace blender::nodes::node_geo_points_to_volume_cc {
 
-static void geo_node_points_to_volume_declare(NodeDeclarationBuilder &b)
+NODE_STORAGE_FUNCS(NodeGeometryPointsToVolume)
+
+static void node_declare(NodeDeclarationBuilder &b)
 {
   b.add_input<decl::Geometry>(N_("Points"));
   b.add_input<decl::Float>(N_("Density")).default_value(1.0f).min(0.0f);
-  b.add_input<decl::Float>(N_("Voxel Size")).default_value(0.3f).min(0.01f).subtype(PROP_DISTANCE);
-  b.add_input<decl::Float>(N_("Voxel Amount")).default_value(64.0f).min(0.0f);
+  b.add_input<decl::Float>(N_("Voxel Size"))
+      .default_value(0.3f)
+      .min(0.01f)
+      .subtype(PROP_DISTANCE)
+      .make_available([](bNode &node) {
+        node_storage(node).resolution_mode = GEO_NODE_POINTS_TO_VOLUME_RESOLUTION_MODE_SIZE;
+      });
+  b.add_input<decl::Float>(N_("Voxel Amount"))
+      .default_value(64.0f)
+      .min(0.0f)
+      .make_available([](bNode &node) {
+        node_storage(node).resolution_mode = GEO_NODE_POINTS_TO_VOLUME_RESOLUTION_MODE_AMOUNT;
+      });
   b.add_input<decl::Float>(N_("Radius"))
       .default_value(0.5f)
       .min(0.0f)
@@ -44,16 +57,14 @@ static void geo_node_points_to_volume_declare(NodeDeclarationBuilder &b)
   b.add_output<decl::Geometry>(N_("Volume"));
 }
 
-static void geo_node_points_to_volume_layout(uiLayout *layout,
-                                             bContext *UNUSED(C),
-                                             PointerRNA *ptr)
+static void node_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 {
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetPropDecorate(layout, false);
   uiItemR(layout, ptr, "resolution_mode", 0, IFACE_("Resolution"), ICON_NONE);
 }
 
-static void geo_node_points_to_volume_init(bNodeTree *UNUSED(ntree), bNode *node)
+static void node_init(bNodeTree *UNUSED(ntree), bNode *node)
 {
   NodeGeometryPointsToVolume *data = (NodeGeometryPointsToVolume *)MEM_callocN(
       sizeof(NodeGeometryPointsToVolume), __func__);
@@ -61,18 +72,18 @@ static void geo_node_points_to_volume_init(bNodeTree *UNUSED(ntree), bNode *node
   node->storage = data;
 }
 
-static void geo_node_points_to_volume_update(bNodeTree *ntree, bNode *node)
+static void node_update(bNodeTree *ntree, bNode *node)
 {
-  NodeGeometryPointsToVolume *data = (NodeGeometryPointsToVolume *)node->storage;
+  const NodeGeometryPointsToVolume &storage = node_storage(*node);
   bNodeSocket *voxel_size_socket = nodeFindSocket(node, SOCK_IN, "Voxel Size");
   bNodeSocket *voxel_amount_socket = nodeFindSocket(node, SOCK_IN, "Voxel Amount");
   nodeSetSocketAvailability(ntree,
                             voxel_amount_socket,
-                            data->resolution_mode ==
+                            storage.resolution_mode ==
                                 GEO_NODE_POINTS_TO_VOLUME_RESOLUTION_MODE_AMOUNT);
   nodeSetSocketAvailability(ntree,
                             voxel_size_socket,
-                            data->resolution_mode ==
+                            storage.resolution_mode ==
                                 GEO_NODE_POINTS_TO_VOLUME_RESOLUTION_MODE_SIZE);
 }
 
@@ -136,8 +147,7 @@ static float compute_voxel_size(const GeoNodeExecParams &params,
                                 Span<float3> positions,
                                 const float radius)
 {
-  const NodeGeometryPointsToVolume &storage =
-      *(const NodeGeometryPointsToVolume *)params.node().storage;
+  const NodeGeometryPointsToVolume &storage = node_storage(params.node());
 
   if (storage.resolution_mode == GEO_NODE_POINTS_TO_VOLUME_RESOLUTION_MODE_SIZE) {
     return params.get_input<float>("Voxel Size");
@@ -236,7 +246,7 @@ static void initialize_volume_component_from_points(GeoNodeExecParams &params,
 }
 #endif
 
-static void geo_node_points_to_volume_exec(GeoNodeExecParams params)
+static void node_geo_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Points");
 
@@ -248,14 +258,16 @@ static void geo_node_points_to_volume_exec(GeoNodeExecParams params)
 #else
   params.error_message_add(NodeWarningType::Error,
                            TIP_("Disabled, Blender was compiled without OpenVDB"));
-  params.set_output("Volume", GeometrySet());
+  params.set_default_remaining_outputs();
 #endif
 }
 
-}  // namespace blender::nodes
+}  // namespace blender::nodes::node_geo_points_to_volume_cc
 
 void register_node_type_geo_points_to_volume()
 {
+  namespace file_ns = blender::nodes::node_geo_points_to_volume_cc;
+
   static bNodeType ntype;
 
   geo_node_type_base(
@@ -265,10 +277,10 @@ void register_node_type_geo_points_to_volume()
                     node_free_standard_storage,
                     node_copy_standard_storage);
   node_type_size(&ntype, 170, 120, 700);
-  node_type_init(&ntype, blender::nodes::geo_node_points_to_volume_init);
-  node_type_update(&ntype, blender::nodes::geo_node_points_to_volume_update);
-  ntype.declare = blender::nodes::geo_node_points_to_volume_declare;
-  ntype.geometry_node_execute = blender::nodes::geo_node_points_to_volume_exec;
-  ntype.draw_buttons = blender::nodes::geo_node_points_to_volume_layout;
+  node_type_init(&ntype, file_ns::node_init);
+  node_type_update(&ntype, file_ns::node_update);
+  ntype.declare = file_ns::node_declare;
+  ntype.geometry_node_execute = file_ns::node_geo_exec;
+  ntype.draw_buttons = file_ns::node_layout;
   nodeRegisterType(&ntype);
 }

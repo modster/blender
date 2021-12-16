@@ -325,12 +325,6 @@ static bool topology_changed(CurveEval *curve_eval, const Int32ArraySamplePtr &n
   return false;
 }
 
-/* NOTE: Alembic only stores data about control points, but the CurveEval
- * passed from the cache modifier contains the displist, which has more data
- * than the control points, so to avoid corrupting the displist we modify the
- * object directly and create a new CurveEval from that. Also we might need to
- * create new or delete existing NURBS in the curve.
- */
 void AbcCurveReader::read_geometry(GeometrySet &geometry_set,
                                    const Alembic::Abc::ISampleSelector &sample_sel,
                                    const AttributeSelector * /*attribute_selector*/,
