@@ -102,13 +102,15 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Sculpt PBVH abstraction API
+/* -------------------------------------------------------------------- */
+/** \name Sculpt PBVH Abstraction API
  *
  * This is read-only, for writing use PBVH vertex iterators. There vd.index matches
  * the indices used here.
  *
  * For multi-resolution, the same vertex in multiple grids is counted multiple times, with
- * different index for each grid. */
+ * different index for each grid.
+ * \{ */
 
 void SCULPT_vertex_random_access_ensure(SculptSession *ss)
 {
@@ -911,32 +913,18 @@ bool SCULPT_vertex_is_boundary(const SculptSession *ss, const int index)
 
 /* Utilities */
 
-/**
- * Returns true when the step belongs to the stroke that is directly performed by the brush and
- * not by one of the symmetry passes.
- */
 bool SCULPT_stroke_is_main_symmetry_pass(StrokeCache *cache)
 {
   return cache->mirror_symmetry_pass == 0 && cache->radial_symmetry_pass == 0 &&
          cache->tile_pass == 0;
 }
 
-/**
- * Return true only once per stroke on the first symmetry pass, regardless of the symmetry passes
- * enabled.
- *
- * This should be used for functionality that needs to be computed once per stroke of a particular
- * tool (allocating memory, updating random seeds...).
- */
 bool SCULPT_stroke_is_first_brush_step(StrokeCache *cache)
 {
   return cache->first_time && cache->mirror_symmetry_pass == 0 &&
          cache->radial_symmetry_pass == 0 && cache->tile_pass == 0;
 }
 
-/**
- * Returns true on the first brush step of each symmetry pass.
- */
 bool SCULPT_stroke_is_first_brush_step_of_symmetry_pass(StrokeCache *cache)
 {
   return cache->first_time;
@@ -1049,7 +1037,6 @@ bool SCULPT_is_symmetry_iteration_valid(char i, char symm)
   return i == 0 || (symm & i && (symm != 5 || i != 3) && (symm != 6 || (!ELEM(i, 3, 5))));
 }
 
-/* Checks if a vertex is inside the brush radius from any of its mirrored axis. */
 bool SCULPT_is_vertex_inside_brush_radius_symm(const float vertex[3],
                                                const float br_co[3],
                                                float radius,
@@ -1083,9 +1070,13 @@ void SCULPT_tag_update_overlays(bContext *C)
   }
 }
 
-/* Sculpt Flood Fill API
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Sculpt Flood Fill API
  *
- * Iterate over connected vertices, starting from one or more initial vertices. */
+ * Iterate over connected vertices, starting from one or more initial vertices.
+ * \{ */
 
 void SCULPT_floodfill_init(SculptSession *ss, SculptFloodFill *flood)
 {
@@ -1196,12 +1187,13 @@ void SCULPT_floodfill_free(SculptFloodFill *flood)
   flood->queue = NULL;
 }
 
+/** \} */
+
 /* -------------------------------------------------------------------- */
 /** \name Tool Capabilities
  *
  * Avoid duplicate checks, internal logic only,
  * share logic with #rna_def_sculpt_capabilities where possible.
- *
  * \{ */
 
 static bool sculpt_tool_needs_original(const char sculpt_tool)
@@ -1261,12 +1253,17 @@ static int sculpt_brush_needs_normal(const SculptSession *ss, const Brush *brush
           (brush->mtex.brush_map_mode == MTEX_MAP_MODE_AREA)) ||
          sculpt_brush_use_topology_rake(ss, brush);
 }
-/** \} */
 
 static bool sculpt_brush_needs_rake_rotation(const Brush *brush)
 {
   return SCULPT_TOOL_HAS_RAKE(brush->sculpt_tool) && (brush->rake_factor != 0.0f);
 }
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Sculpt Init/Update
+ * \{ */
 
 typedef enum StrokeFlags {
   CLIP_X = 1,
@@ -1274,10 +1271,6 @@ typedef enum StrokeFlags {
   CLIP_Z = 4,
 } StrokeFlags;
 
-/**
- * Initialize a #SculptOrigVertData for accessing original vertex data;
- * handles #BMesh, #Mesh, and multi-resolution.
- */
 void SCULPT_orig_vert_data_unode_init(SculptOrigVertData *data, Object *ob, SculptUndoNode *unode)
 {
   SculptSession *ss = ob->sculpt;
@@ -1297,10 +1290,6 @@ void SCULPT_orig_vert_data_unode_init(SculptOrigVertData *data, Object *ob, Scul
   }
 }
 
-/**
- * Initialize a #SculptOrigVertData for accessing original vertex data;
- * handles #BMesh, #Mesh, and multi-resolution.
- */
 void SCULPT_orig_vert_data_init(SculptOrigVertData *data, Object *ob, PBVHNode *node)
 {
   SculptUndoNode *unode;
@@ -1308,9 +1297,6 @@ void SCULPT_orig_vert_data_init(SculptOrigVertData *data, Object *ob, PBVHNode *
   SCULPT_orig_vert_data_unode_init(data, ob, unode);
 }
 
-/**
- * Update a #SculptOrigVertData for a particular vertex from the PBVH iterator.
- */
 void SCULPT_orig_vert_data_update(SculptOrigVertData *orig_data, PBVHVertexIter *iter)
 {
   if (orig_data->unode->type == SCULPT_UNDO_COORDS) {
@@ -1400,11 +1386,12 @@ static void sculpt_project_v3_normal_align(SculptSession *ss,
       grab_delta, ss->cache->sculpt_normal_symm, (len_signed * normal_weight) * len_view_scale);
 }
 
+/** \} */
+
 /* -------------------------------------------------------------------- */
 /** \name SculptProjectVector
  *
  * Fast-path for #project_plane_v3_v3v3
- *
  * \{ */
 
 typedef struct SculptProjectVector {
@@ -1441,14 +1428,10 @@ static void sculpt_project_v3(const SculptProjectVector *spvc, const float vec[3
 
 /** \} */
 
-/**********************************************************************/
+/* -------------------------------------------------------------------- */
+/** \name Sculpt Dynamic Topology
+ * \{ */
 
-/* Returns true if the stroke will use dynamic topology, false
- * otherwise.
- *
- * Factors: some brushes like grab cannot do dynamic topology.
- * Others, like smooth, are better without.
- * Same goes for alt-key smoothing. */
 bool SCULPT_stroke_is_dynamic_topology(const SculptSession *ss, const Brush *brush)
 {
   return ((BKE_pbvh_type(ss->pbvh) == PBVH_BMESH) &&
@@ -1462,7 +1445,11 @@ bool SCULPT_stroke_is_dynamic_topology(const SculptSession *ss, const Brush *bru
           SCULPT_TOOL_HAS_DYNTOPO(brush->sculpt_tool));
 }
 
-/*** paint mesh ***/
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Sculpt Paint Mesh
+ * \{ */
 
 static void paint_mesh_restore_co_task_cb(void *__restrict userdata,
                                           const int n,
@@ -1573,7 +1560,6 @@ static void sculpt_extend_redraw_rect_previous(Object *ob, rcti *rect)
   BLI_rcti_union(rect, &ss->cache->previous_r);
 }
 
-/* Get a screen-space rectangle of the modified area. */
 bool SCULPT_get_redraw_rect(ARegion *region, RegionView3D *rv3d, Object *ob, rcti *rect)
 {
   PBVH *pbvh = ob->sculpt->pbvh;
@@ -1918,6 +1904,8 @@ static float calc_symmetry_feather(Sculpt *sd, StrokeCache *cache)
   return 1.0f / overlap;
 }
 
+/** \} */
+
 /* -------------------------------------------------------------------- */
 /** \name Calculate Normal and Center
  *
@@ -2205,7 +2193,6 @@ void SCULPT_calc_area_normal(
   SCULPT_pbvh_calc_area_normal(brush, ob, nodes, totnode, true, r_area_no);
 }
 
-/* Expose 'calc_area_normal' externally. */
 bool SCULPT_pbvh_calc_area_normal(const Brush *brush,
                                   Object *ob,
                                   PBVHNode **nodes,
@@ -2247,8 +2234,10 @@ bool SCULPT_pbvh_calc_area_normal(const Brush *brush,
   return data.any_vertex_sampled;
 }
 
-/* This calculates flatten center and area normal together,
- * amortizing the memory bandwidth and loop overhead to calculate both at the same time. */
+/**
+ * This calculates flatten center and area normal together,
+ * amortizing the memory bandwidth and loop overhead to calculate both at the same time.
+ */
 static void calc_area_normal_and_center(
     Sculpt *sd, Object *ob, PBVHNode **nodes, int totnode, float r_area_no[3], float r_area_co[3])
 {
@@ -2307,6 +2296,10 @@ static void calc_area_normal_and_center(
 }
 
 /** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Generic Brush Utilities
+ * \{ */
 
 /**
  * Return modified brush strength. Includes the direction of the brush, positive
@@ -2463,7 +2456,6 @@ static float brush_strength(const Sculpt *sd,
   }
 }
 
-/* Return a multiplier for brush strength on a particular vertex. */
 float SCULPT_brush_strength_factor(SculptSession *ss,
                                    const Brush *br,
                                    const float brush_point[3],
@@ -2561,7 +2553,6 @@ float SCULPT_brush_strength_factor(SculptSession *ss,
   return avg;
 }
 
-/* Test AABB against sphere. */
 bool SCULPT_search_sphere_cb(PBVHNode *node, void *data_v)
 {
   SculptSearchSphereData *data = data_v;
@@ -2608,7 +2599,6 @@ bool SCULPT_search_sphere_cb(PBVHNode *node, void *data_v)
   return len_squared_v3(t) < data->radius_squared;
 }
 
-/* 2D projection (distance to line). */
 bool SCULPT_search_circle_cb(PBVHNode *node, void *data_v)
 {
   SculptSearchCircleData *data = data_v;
@@ -2636,9 +2626,6 @@ bool SCULPT_search_circle_cb(PBVHNode *node, void *data_v)
   return dist_sq < data->radius_squared || true;
 }
 
-/**
- * Handles clipping against a mirror modifier and #SCULPT_LOCK_X/Y/Z axis flags.
- */
 void SCULPT_clip(Sculpt *sd, SculptSession *ss, float co[3], const float val[3])
 {
   for (int i = 0; i < 3; i++) {
@@ -2867,6 +2854,12 @@ static void update_brush_local_mat(Sculpt *sd, Object *ob)
   }
 }
 
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Sculpt Topology Rake (Shared Utility)
+ * \{ */
+
 typedef struct {
   SculptSession *ss;
   const float *ray_start;
@@ -2979,6 +2972,12 @@ static void bmesh_topology_rake(
   }
 }
 
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Sculpt Mask Brush
+ * \{ */
+
 static void do_mask_brush_draw_task_cb_ex(void *__restrict userdata,
                                           const int n,
                                           const TaskParallelTLS *__restrict tls)
@@ -3050,6 +3049,8 @@ static void do_mask_brush(Sculpt *sd, Object *ob, PBVHNode **nodes, int totnode)
   }
 }
 
+/** \} */
+
 /* -------------------------------------------------------------------- */
 /** \name Sculpt Multires Displacement Eraser Brush
  * \{ */
@@ -3118,6 +3119,7 @@ static void do_displacement_eraser_brush(Sculpt *sd, Object *ob, PBVHNode **node
 
 /** \} */
 
+/* -------------------------------------------------------------------- */
 /** \name Sculpt Multires Displacement Smear Brush
  * \{ */
 
@@ -3259,6 +3261,10 @@ static void do_displacement_smear_brush(Sculpt *sd, Object *ob, PBVHNode **nodes
 }
 
 /** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Sculpt Draw Brush
+ * \{ */
 
 static void do_draw_brush_task_cb_ex(void *__restrict userdata,
                                      const int n,
@@ -3413,6 +3419,8 @@ static void do_draw_sharp_brush(Sculpt *sd, Object *ob, PBVHNode **nodes, int to
   BKE_pbvh_parallel_range_settings(&settings, true, totnode);
   BLI_task_parallel_range(0, totnode, &data, do_draw_sharp_brush_task_cb_ex, &settings);
 }
+
+/** \} */
 
 /* -------------------------------------------------------------------- */
 /** \name Sculpt Topology Brush
@@ -3737,6 +3745,10 @@ static void calc_sculpt_plane(
 }
 
 /** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Sculpt Crease & Blob Brush
+ * \{ */
 
 /**
  * Used for 'SCULPT_TOOL_CREASE' and 'SCULPT_TOOL_BLOB'
@@ -4974,6 +4986,8 @@ static void do_flatten_brush(Sculpt *sd, Object *ob, PBVHNode **nodes, int totno
   BLI_task_parallel_range(0, totnode, &data, do_flatten_brush_task_cb_ex, &settings);
 }
 
+/** \} */
+
 /* -------------------------------------------------------------------- */
 /** \name Sculpt Clay Brush
  * \{ */
@@ -5506,6 +5520,8 @@ static void do_scrape_brush(Sculpt *sd, Object *ob, PBVHNode **nodes, int totnod
   BLI_task_parallel_range(0, totnode, &data, do_scrape_brush_task_cb_ex, &settings);
 }
 
+/** \} */
+
 /* -------------------------------------------------------------------- */
 /** \name Sculpt Clay Thumb Brush
  * \{ */
@@ -5680,6 +5696,10 @@ static void do_clay_thumb_brush(Sculpt *sd, Object *ob, PBVHNode **nodes, int to
 
 /** \} */
 
+/* -------------------------------------------------------------------- */
+/** \name Sculpt Gravity Brush
+ * \{ */
+
 static void do_gravity_task_cb_ex(void *__restrict userdata,
                                   const int n,
                                   const TaskParallelTLS *__restrict tls)
@@ -5749,6 +5769,12 @@ static void do_gravity(Sculpt *sd, Object *ob, PBVHNode **nodes, int totnode, fl
   BKE_pbvh_parallel_range_settings(&settings, true, totnode);
   BLI_task_parallel_range(0, totnode, &data, do_gravity_task_cb_ex, &settings);
 }
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Sculpt Brush Utilities
+ * \{ */
 
 void SCULPT_vertcos_to_key(Object *ob, KeyBlock *kb, const float (*vertCos)[3])
 {
@@ -5954,8 +5980,8 @@ static void do_brush_action(Sculpt *sd, Object *ob, Brush *brush, UnifiedPaintSe
     }
   }
 
-  /* Initialize automasking cache. For anchored brushes with spherical falloff, we start off with
-   * zero radius, thus we have no pbvh nodes on the first brush step. */
+  /* Initialize auto-masking cache. For anchored brushes with spherical falloff,
+   * we start off with zero radius, thus we have no PBVH nodes on the first brush step. */
   if (totnode ||
       ((brush->falloff_shape == PAINT_FALLOFF_SHAPE_SPHERE) && (brush->flag & BRUSH_ANCHORED))) {
     if (SCULPT_stroke_is_first_brush_step(ss->cache)) {
@@ -6318,7 +6344,6 @@ static void SCULPT_flush_stroke_deform_task_cb(void *__restrict userdata,
   BKE_pbvh_vertex_iter_end;
 }
 
-/* Flush displacement from deformed PBVH to original layer. */
 void SCULPT_flush_stroke_deform(Sculpt *sd, Object *ob, bool is_proxy_used)
 {
   SculptSession *ss = ob->sculpt;
@@ -6372,10 +6397,6 @@ void SCULPT_flush_stroke_deform(Sculpt *sd, Object *ob, bool is_proxy_used)
   }
 }
 
-/**
- * Flip all the edit-data across the axis/axes specified by \a symm.
- * Used to calculate multiple modifications to the mesh when symmetry is enabled.
- */
 void SCULPT_cache_calc_brushdata_symm(StrokeCache *cache,
                                       const char symm,
                                       const char axis,
@@ -7416,9 +7437,6 @@ float SCULPT_raycast_init(ViewContext *vc,
   return dist;
 }
 
-/* Gets the normal, location and active vertex location of the geometry under the cursor. This also
- * updates the active vertex and cursor related data of the SculptSession using the mouse position
- */
 bool SCULPT_cursor_geometry_info_update(bContext *C,
                                         SculptCursorGeometryInfo *out,
                                         const float mouse[2],
@@ -7548,9 +7566,6 @@ bool SCULPT_cursor_geometry_info_update(bContext *C,
   return true;
 }
 
-/* Do a raycast in the tree to find the 3d brush location
- * (This allows us to ignore the GL depth buffer)
- * Returns 0 if the ray doesn't hit the mesh, non-zero otherwise. */
 bool SCULPT_stroke_get_location(bContext *C, float out[3], const float mouse[2])
 {
   Depsgraph *depsgraph = CTX_data_depsgraph_pointer(C);
@@ -7714,7 +7729,6 @@ static void sculpt_restore_mesh(Sculpt *sd, Object *ob)
   }
 }
 
-/* Copy the PBVH bounding box into the object's bounding box. */
 void SCULPT_update_object_bounding_box(Object *ob)
 {
   if (ob->runtime.bb) {
@@ -9398,6 +9412,12 @@ static void SCULPT_OT_mask_by_color(wmOperatorType *ot)
                 1.0f);
 }
 
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Operator Registration
+ * \{ */
+
 void ED_operatortypes_sculpt(void)
 {
   WM_operatortype_append(SCULPT_OT_brush_stroke);
@@ -9436,3 +9456,5 @@ void ED_operatortypes_sculpt(void)
 
   WM_operatortype_append(SCULPT_OT_expand);
 }
+
+/** \} */

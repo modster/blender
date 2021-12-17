@@ -24,6 +24,7 @@
 #include "node_shader_util.h"
 
 #include "NOD_math_functions.hh"
+#include "NOD_socket_search_link.hh"
 
 /* **************** SCALAR MATH ******************** */
 
@@ -43,6 +44,18 @@ static void sh_node_math_declare(NodeDeclarationBuilder &b)
       .max(10000.0f);
   b.add_output<decl::Float>(N_("Value"));
 };
+
+static void sh_node_math_gather_link_searches(GatherLinkSearchOpParams &params)
+{
+  /* For now, do something very basic (only exposing "Add", and a single "Value" socket). */
+  if (params.node_tree().typeinfo->validate_link(
+          static_cast<eNodeSocketDatatype>(params.other_socket().type), SOCK_FLOAT)) {
+    params.add_item(IFACE_("Value"), [](LinkSearchOpParams &params) {
+      bNode &node = params.add_node("ShaderNodeMath");
+      params.update_and_connect_available_socket(node, "Value");
+    });
+  }
+}
 
 }  // namespace blender::nodes
 
@@ -88,7 +101,8 @@ static const blender::fn::MultiFunction *get_base_multi_function(bNode &node)
 
   blender::nodes::try_dispatch_float_math_fl_to_fl(
       mode, [&](auto function, const blender::nodes::FloatMathOperationInfo &info) {
-        static blender::fn::CustomMF_SI_SO<float, float> fn{info.title_case_name, function};
+        static blender::fn::CustomMF_SI_SO<float, float> fn{info.title_case_name.c_str(),
+                                                            function};
         base_fn = &fn;
       });
   if (base_fn != nullptr) {
@@ -97,7 +111,7 @@ static const blender::fn::MultiFunction *get_base_multi_function(bNode &node)
 
   blender::nodes::try_dispatch_float_math_fl_fl_to_fl(
       mode, [&](auto function, const blender::nodes::FloatMathOperationInfo &info) {
-        static blender::fn::CustomMF_SI_SI_SO<float, float, float> fn{info.title_case_name,
+        static blender::fn::CustomMF_SI_SI_SO<float, float, float> fn{info.title_case_name.c_str(),
                                                                       function};
         base_fn = &fn;
       });
@@ -108,7 +122,7 @@ static const blender::fn::MultiFunction *get_base_multi_function(bNode &node)
   blender::nodes::try_dispatch_float_math_fl_fl_fl_to_fl(
       mode, [&](auto function, const blender::nodes::FloatMathOperationInfo &info) {
         static blender::fn::CustomMF_SI_SI_SI_SO<float, float, float, float> fn{
-            info.title_case_name, function};
+            info.title_case_name.c_str(), function};
         base_fn = &fn;
       });
   if (base_fn != nullptr) {
@@ -160,16 +174,17 @@ static void sh_node_math_build_multi_function(blender::nodes::NodeMultiFunctionB
   }
 }
 
-void register_node_type_sh_math(void)
+void register_node_type_sh_math()
 {
   static bNodeType ntype;
 
   sh_fn_node_type_base(&ntype, SH_NODE_MATH, "Math", NODE_CLASS_CONVERTER, 0);
   ntype.declare = blender::nodes::sh_node_math_declare;
-  node_type_label(&ntype, node_math_label);
+  ntype.labelfunc = node_math_label;
   node_type_gpu(&ntype, gpu_shader_math);
   node_type_update(&ntype, node_math_update);
   ntype.build_multi_function = sh_node_math_build_multi_function;
+  ntype.gather_link_search_ops = blender::nodes::sh_node_math_gather_link_searches;
 
   nodeRegisterType(&ntype);
 }

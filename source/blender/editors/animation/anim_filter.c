@@ -362,11 +362,6 @@ static bool nlaedit_get_context(bAnimContext *ac, SpaceNla *snla)
 
 /* ----------- Public API --------------- */
 
-/* Obtain current anim-data context,
- * given that context info from Blender context has already been set:
- * - AnimContext to write to is provided as pointer to var on stack so that we don't have
- *   allocation/freeing costs (which are not that avoidable with channels).
- */
 bool ANIM_animdata_context_getdata(bAnimContext *ac)
 {
   SpaceLink *sl = ac->sl;
@@ -397,11 +392,6 @@ bool ANIM_animdata_context_getdata(bAnimContext *ac)
   return (ok && ac->data);
 }
 
-/* Obtain current anim-data context from Blender Context info
- * - AnimContext to write to is provided as pointer to var on stack so that we don't have
- *   allocation/freeing costs (which are not that avoidable with channels).
- * - Clears data and sets the information from Blender Context which is useful
- */
 bool ANIM_animdata_get_context(const bContext *C, bAnimContext *ac)
 {
   Main *bmain = CTX_data_main(C);
@@ -1900,7 +1890,8 @@ static size_t animdata_filter_gpencil(bAnimContext *ac,
       if ((filter_mode & ANIMFILTER_DATA_VISIBLE) && !(ads->filterflag & ADS_FILTER_INCL_HIDDEN)) {
         /* Layer visibility - we check both object and base,
          * since these may not be in sync yet. */
-        if ((base->flag & BASE_VISIBLE_DEPSGRAPH) == 0) {
+        if ((base->flag & BASE_VISIBLE_DEPSGRAPH) == 0 ||
+            (base->flag & BASE_VISIBLE_VIEWLAYER) == 0) {
           continue;
         }
 
@@ -3459,14 +3450,6 @@ static size_t animdata_filter_remove_duplis(ListBase *anim_data)
 
 /* ----------- Public API --------------- */
 
-/**
- * This function filters the active data source to leave only animation channels suitable for
- * usage by the caller. It will return the length of the list
- *
- * \param anim_data: Is a pointer to a #ListBase,
- * to which the filtered animation channels will be placed for use.
- * \param filter_mode: how should the data be filtered - bit-mapping accessed flags.
- */
 size_t ANIM_animdata_filter(bAnimContext *ac,
                             ListBase *anim_data,
                             eAnimFilter_Flags filter_mode,

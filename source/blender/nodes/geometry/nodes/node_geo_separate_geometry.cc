@@ -19,9 +19,11 @@
 
 #include "node_geometry_util.hh"
 
-namespace blender::nodes {
+namespace blender::nodes::node_geo_separate_geometry_cc {
 
-static void geo_node_separate_geometry_declare(NodeDeclarationBuilder &b)
+NODE_STORAGE_FUNCS(NodeGeometrySeparateGeometry)
+
+static void node_declare(NodeDeclarationBuilder &b)
 {
   b.add_input<decl::Geometry>(N_("Geometry"));
   b.add_input<decl::Bool>(N_("Selection"))
@@ -35,14 +37,12 @@ static void geo_node_separate_geometry_declare(NodeDeclarationBuilder &b)
       .description(N_("The parts of the geometry not in the selection"));
 }
 
-static void geo_node_separate_geometry_layout(uiLayout *layout,
-                                              bContext *UNUSED(C),
-                                              PointerRNA *ptr)
+static void node_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 {
   uiItemR(layout, ptr, "domain", 0, "", ICON_NONE);
 }
 
-static void geo_node_separate_geometry_init(bNodeTree *UNUSED(tree), bNode *node)
+static void node_init(bNodeTree *UNUSED(tree), bNode *node)
 {
   NodeGeometrySeparateGeometry *data = (NodeGeometrySeparateGeometry *)MEM_callocN(
       sizeof(NodeGeometrySeparateGeometry), __func__);
@@ -51,14 +51,13 @@ static void geo_node_separate_geometry_init(bNodeTree *UNUSED(tree), bNode *node
   node->storage = data;
 }
 
-static void geo_node_separate_geometry_exec(GeoNodeExecParams params)
+static void node_geo_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
 
   const Field<bool> selection_field = params.extract_input<Field<bool>>("Selection");
 
-  const bNode &node = params.node();
-  const NodeGeometryDeleteGeometry &storage = *(const NodeGeometryDeleteGeometry *)node.storage;
+  const NodeGeometrySeparateGeometry &storage = node_storage(params.node());
   const AttributeDomain domain = static_cast<AttributeDomain>(storage.domain);
 
   bool all_is_error = false;
@@ -95,10 +94,12 @@ static void geo_node_separate_geometry_exec(GeoNodeExecParams params)
   }
 }
 
-}  // namespace blender::nodes
+}  // namespace blender::nodes::node_geo_separate_geometry_cc
 
 void register_node_type_geo_separate_geometry()
 {
+  namespace file_ns = blender::nodes::node_geo_separate_geometry_cc;
+
   static bNodeType ntype;
 
   geo_node_type_base(
@@ -109,10 +110,10 @@ void register_node_type_geo_separate_geometry()
                     node_free_standard_storage,
                     node_copy_standard_storage);
 
-  node_type_init(&ntype, blender::nodes::geo_node_separate_geometry_init);
+  node_type_init(&ntype, file_ns::node_init);
 
-  ntype.declare = blender::nodes::geo_node_separate_geometry_declare;
-  ntype.geometry_node_execute = blender::nodes::geo_node_separate_geometry_exec;
-  ntype.draw_buttons = blender::nodes::geo_node_separate_geometry_layout;
+  ntype.declare = file_ns::node_declare;
+  ntype.geometry_node_execute = file_ns::node_geo_exec;
+  ntype.draw_buttons = file_ns::node_layout;
   nodeRegisterType(&ntype);
 }

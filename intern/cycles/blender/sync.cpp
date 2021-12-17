@@ -95,6 +95,11 @@ void BlenderSync::reset(BL::BlendData &b_data, BL::Scene &b_scene)
   this->b_scene = b_scene;
 }
 
+void BlenderSync::tag_update()
+{
+  has_updates_ = true;
+}
+
 /* Sync */
 
 void BlenderSync::sync_recalc(BL::Depsgraph &b_depsgraph, BL::SpaceView3D &b_v3d)
@@ -365,8 +370,8 @@ void BlenderSync::sync_integrator(BL::ViewLayer &b_view_layer, bool background)
 
   int samples = get_int(cscene, "samples");
   float scrambling_distance = get_float(cscene, "scrambling_distance");
-  bool adaptive_scrambling_distance = get_boolean(cscene, "adaptive_scrambling_distance");
-  if (adaptive_scrambling_distance) {
+  bool auto_scrambling_distance = get_boolean(cscene, "auto_scrambling_distance");
+  if (auto_scrambling_distance) {
     scrambling_distance *= 4.0f / sqrtf(samples);
   }
 

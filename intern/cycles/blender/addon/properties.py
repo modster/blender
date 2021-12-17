@@ -33,6 +33,7 @@ from math import pi
 # enums
 
 from . import engine
+from . import camera
 
 enum_devices = (
     ('CPU', "CPU", "Use CPU for rendering"),
@@ -72,6 +73,8 @@ enum_panorama_types = (
     ('FISHEYE_EQUISOLID', "Fisheye Equisolid",
                           "Similar to most fisheye modern lens, takes sensor dimensions into consideration"),
     ('MIRRORBALL', "Mirror Ball", "Uses the mirror ball mapping"),
+    ('FISHEYE_LENS_POLYNOMIAL', "Fisheye Lens Polynomial",
+     "Defines the lens projection as polynomial to allow real world camera lenses to be mimicked."),
 )
 
 enum_curve_shape = (
@@ -111,7 +114,8 @@ enum_device_type = (
     ('CPU', "CPU", "CPU", 0),
     ('CUDA', "CUDA", "CUDA", 1),
     ('OPTIX', "OptiX", "OptiX", 3),
-    ("HIP", "HIP", "HIP", 4)
+    ('HIP', "HIP", "HIP", 4),
+    ('METAL', "Metal", "Metal", 5)
 )
 
 enum_texture_limit = (
@@ -359,7 +363,7 @@ class CyclesRenderSettings(bpy.types.PropertyGroup):
         name="Scrambling Distance",
         default=1.0,
         min=0.0, max=1.0,
-        description="Lower values give faster rendering with GPU rendering and less noise with all devices at the cost of possible artifacts if set too low. Only works when not using adaptive sampling",
+        description="Reduce randomization between pixels to improve GPU rendering performance, at the cost of possible rendering artifacts if set too low. Only works when not using adaptive sampling",
     )
     preview_scrambling_distance: BoolProperty(
         name="Scrambling Distance viewport",
@@ -367,10 +371,10 @@ class CyclesRenderSettings(bpy.types.PropertyGroup):
         description="Uses the Scrambling Distance value for the viewport. Faster but may flicker",
     )
 
-    adaptive_scrambling_distance: BoolProperty(
-        name="Adaptive Scrambling Distance",
+    auto_scrambling_distance: BoolProperty(
+        name="Automatic Scrambling Distance",
         default=False,
-        description="Uses a formula to adapt the scrambling distance strength based on the sample count",
+        description="Automatically reduce the randomization between pixels to improve GPU rendering performance, at the cost of possible rendering artifacts. Only works when not using adaptive sampling",
     )
 
     use_layer_samples: EnumProperty(
@@ -429,7 +433,7 @@ class CyclesRenderSettings(bpy.types.PropertyGroup):
     )
 
     direct_light_sampling_type: EnumProperty(
-        name="Direct Light Sampling Type",
+        name="Direct Light Sampling",
         description="The type of strategy used for sampling direct light contributions",
         items=enum_direct_light_sampling_type,
         default='MULTIPLE_IMPORTANCE_SAMPLING',
@@ -790,8 +794,8 @@ class CyclesRenderSettings(bpy.types.PropertyGroup):
     )
 
     use_auto_tile: BoolProperty(
-        name="Auto Tiles",
-        description="Automatically render high resolution images in tiles to reduce memory usage, using the specified tile size. Tiles are cached to disk while rendering to save memory",
+        name="Use Tiling",
+        description="Render high resolution images in tiles to reduce memory usage, using the specified tile size. Tiles are cached to disk while rendering to save memory",
         default=True,
     )
     tile_size: IntProperty(
@@ -888,6 +892,32 @@ class CyclesCameraSettings(bpy.types.PropertyGroup):
         min=-pi, max=pi,
         subtype='ANGLE',
         default=pi,
+    )
+
+    fisheye_polynomial_k0: FloatProperty(
+        name="Fisheye Polynomial K0",
+        description="Coefficient K0 of the lens polinomial",
+        default=camera.default_fisheye_polynomial[0], precision=6, step=0.1, subtype='ANGLE',
+    )
+    fisheye_polynomial_k1: FloatProperty(
+        name="Fisheye Polynomial K1",
+        description="Coefficient K1 of the lens polinomial",
+        default=camera.default_fisheye_polynomial[1], precision=6, step=0.1, subtype='ANGLE',
+    )
+    fisheye_polynomial_k2: FloatProperty(
+        name="Fisheye Polynomial K2",
+        description="Coefficient K2 of the lens polinomial",
+        default=camera.default_fisheye_polynomial[2], precision=6, step=0.1, subtype='ANGLE',
+    )
+    fisheye_polynomial_k3: FloatProperty(
+        name="Fisheye Polynomial K3",
+        description="Coefficient K3 of the lens polinomial",
+        default=camera.default_fisheye_polynomial[3], precision=6, step=0.1, subtype='ANGLE',
+    )
+    fisheye_polynomial_k4: FloatProperty(
+        name="Fisheye Polynomial K4",
+        description="Coefficient K4 of the lens polinomial",
+        default=camera.default_fisheye_polynomial[4], precision=6, step=0.1, subtype='ANGLE',
     )
 
     @classmethod
@@ -1312,8 +1342,7 @@ class CyclesPreferences(bpy.types.AddonPreferences):
 
     def get_device_types(self, context):
         import _cycles
-        has_cuda, has_optix, has_hip = _cycles.get_device_types()
-
+        has_cuda, has_optix, has_hip, has_metal = _cycles.get_device_types()
         list = [('NONE', "None", "Don't use compute device", 0)]
         if has_cuda:
             list.append(('CUDA', "CUDA", "Use CUDA for GPU acceleration", 1))
@@ -1321,6 +1350,8 @@ class CyclesPreferences(bpy.types.AddonPreferences):
             list.append(('OPTIX', "OptiX", "Use OptiX for GPU acceleration", 3))
         if has_hip:
             list.append(('HIP', "HIP", "Use HIP for GPU acceleration", 4))
+        if has_metal:
+            list.append(('METAL', "Metal", "Use Metal for GPU acceleration", 5))
 
         return list
 
@@ -1346,7 +1377,7 @@ class CyclesPreferences(bpy.types.AddonPreferences):
 
     def update_device_entries(self, device_list):
         for device in device_list:
-            if not device[1] in {'CUDA', 'OPTIX', 'CPU', 'HIP'}:
+            if not device[1] in {'CUDA', 'OPTIX', 'CPU', 'HIP', 'METAL'}:
                 continue
             # Try to find existing Device entry
             entry = self.find_existing_device_entry(device)
@@ -1390,7 +1421,7 @@ class CyclesPreferences(bpy.types.AddonPreferences):
         import _cycles
         # Ensure `self.devices` is not re-allocated when the second call to
         # get_devices_for_type is made, freeing items from the first list.
-        for device_type in ('CUDA', 'OPTIX', 'HIP'):
+        for device_type in ('CUDA', 'OPTIX', 'HIP', 'METAL'):
             self.update_device_entries(_cycles.available_devices(device_type))
 
     # Deprecated: use refresh_devices instead.
@@ -1442,6 +1473,8 @@ class CyclesPreferences(bpy.types.AddonPreferences):
                 col.label(text="Requires discrete AMD GPU with RDNA architecture", icon='BLANK1')
                 if sys.platform[:3] == "win":
                     col.label(text="and AMD Radeon Pro 21.Q4 driver or newer", icon='BLANK1')
+            elif device_type == 'METAL':
+                col.label(text="Requires Apple Silicon and macOS 12.0 or newer", icon='BLANK1')
             return
 
         for device in devices:

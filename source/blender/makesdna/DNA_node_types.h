@@ -304,8 +304,6 @@ typedef struct bNode {
 
   /** Entire boundbox (world-space). */
   rctf totr;
-  /** Optional buttons area. */
-  rctf butr;
   /** Optional preview area. */
   rctf prvr;
   /**
@@ -325,8 +323,6 @@ typedef struct bNode {
   char branch_tag;
   /** Used at runtime when iterating over node branches. */
   char iter_flag;
-  /** Runtime during drawing. */
-  struct uiBlock *block;
 
   /**
    * XXX: eevee only, id of screen space reflection layer,
@@ -375,8 +371,7 @@ typedef struct bNode {
 /* node is disabled */
 #define NODE_MUTED 512
 // #define NODE_CUSTOM_NAME 1024    /* deprecated! */
-/* group node types: use const outputs by default */
-#define NODE_CONST_OUTPUT (1 << 11)
+// #define NODE_CONST_OUTPUT (1 << 11) /* deprecated */
 /* node is always behind others */
 #define NODE_BACKGROUND (1 << 12)
 /* automatic flag for nodes included in transforms */
@@ -1209,6 +1204,16 @@ typedef struct NodeDenoise {
   char prefilter;
 } NodeDenoise;
 
+typedef struct NodeMapRange {
+  /* CustomDataType */
+  uint8_t data_type;
+
+  /* NodeMapRangeType. */
+  uint8_t interpolation_type;
+  uint8_t clamp;
+  char _pad[5];
+} NodeMapRange;
+
 typedef struct NodeAttributeClamp {
   /* CustomDataType. */
   uint8_t data_type;
@@ -1606,6 +1611,16 @@ typedef struct NodeGeometryViewer {
   int8_t data_type;
 } NodeGeometryViewer;
 
+typedef struct NodeFunctionCompare {
+  /* NodeCompareOperation */
+  int8_t operation;
+  /* eNodeSocketDatatype */
+  int8_t data_type;
+  /* NodeCompareMode */
+  int8_t mode;
+  char _pad[1];
+} NodeFunctionCompare;
+
 /* script node mode */
 #define NODE_SCRIPT_INTERNAL 0
 #define NODE_SCRIPT_EXTERNAL 1
@@ -1886,14 +1901,25 @@ enum {
 };
 
 /* Float compare node operations. */
-typedef enum FloatCompareOperation {
-  NODE_FLOAT_COMPARE_LESS_THAN = 0,
-  NODE_FLOAT_COMPARE_LESS_EQUAL = 1,
-  NODE_FLOAT_COMPARE_GREATER_THAN = 2,
-  NODE_FLOAT_COMPARE_GREATER_EQUAL = 3,
-  NODE_FLOAT_COMPARE_EQUAL = 4,
-  NODE_FLOAT_COMPARE_NOT_EQUAL = 5,
-} FloatCompareOperation;
+typedef enum NodeCompareMode {
+  NODE_COMPARE_MODE_ELEMENT = 0,
+  NODE_COMPARE_MODE_LENGTH = 1,
+  NODE_COMPARE_MODE_AVERAGE = 2,
+  NODE_COMPARE_MODE_DOT_PRODUCT = 3,
+  NODE_COMPARE_MODE_DIRECTION = 4
+} NodeCompareMode;
+
+typedef enum NodeCompareOperation {
+  NODE_COMPARE_LESS_THAN = 0,
+  NODE_COMPARE_LESS_EQUAL = 1,
+  NODE_COMPARE_GREATER_THAN = 2,
+  NODE_COMPARE_GREATER_EQUAL = 3,
+  NODE_COMPARE_EQUAL = 4,
+  NODE_COMPARE_NOT_EQUAL = 5,
+  NODE_COMPARE_COLOR_BRIGHTER = 6,
+  NODE_COMPARE_COLOR_DARKER = 7,
+
+} NodeCompareOperation;
 
 /* Float to Int node operations. */
 typedef enum FloatToIntRoundingMode {
@@ -2271,6 +2297,10 @@ typedef enum GeometryNodeDeleteGeometryMode {
   GEO_NODE_DELETE_GEOMETRY_MODE_EDGE_FACE = 1,
   GEO_NODE_DELETE_GEOMETRY_MODE_ONLY_FACE = 2,
 } GeometryNodeDeleteGeometryMode;
+
+typedef enum GeometryNodeRealizeInstancesFlag {
+  GEO_NODE_REALIZE_INSTANCES_LEGACY_BEHAVIOR = (1 << 0),
+} GeometryNodeRealizeInstancesFlag;
 
 #ifdef __cplusplus
 }

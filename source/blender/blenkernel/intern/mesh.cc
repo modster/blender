@@ -48,6 +48,7 @@
 #include "BLT_translation.h"
 
 #include "BKE_anim_data.h"
+#include "BKE_bpath.h"
 #include "BKE_deform.h"
 #include "BKE_editmesh.h"
 #include "BKE_global.h"
@@ -180,6 +181,14 @@ static void mesh_foreach_id(ID *id, LibraryForeachIDData *data)
   BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, mesh->key, IDWALK_CB_USER);
   for (int i = 0; i < mesh->totcol; i++) {
     BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, mesh->mat[i], IDWALK_CB_USER);
+  }
+}
+
+static void mesh_foreach_path(ID *id, BPathForeachPathData *bpath_data)
+{
+  Mesh *me = (Mesh *)id;
+  if (me->ldata.external) {
+    BKE_bpath_foreach_path_fixed_process(bpath_data, me->ldata.external->filename);
   }
 }
 
@@ -355,28 +364,33 @@ static void mesh_read_expand(BlendExpander *expander, ID *id)
 }
 
 IDTypeInfo IDType_ID_ME = {
-    ID_ME,
-    FILTER_ID_ME,
-    INDEX_ID_ME,
-    sizeof(Mesh),
-    "Mesh",
-    "meshes",
-    BLT_I18NCONTEXT_ID_MESH,
-    IDTYPE_FLAGS_APPEND_IS_REUSABLE,
+    /* id_code */ ID_ME,
+    /* id_filter */ FILTER_ID_ME,
+    /* main_listbase_index */ INDEX_ID_ME,
+    /* struct_size */ sizeof(Mesh),
+    /* name */ "Mesh",
+    /* name_plural */ "meshes",
+    /* translation_context */ BLT_I18NCONTEXT_ID_MESH,
+    /* flags */ IDTYPE_FLAGS_APPEND_IS_REUSABLE,
+    /* asset_type_info */ nullptr,
 
-    mesh_init_data,
-    mesh_copy_data,
-    mesh_free_data,
-    nullptr,
-    mesh_foreach_id,
-    nullptr,
-    nullptr,
-    mesh_blend_write,
-    mesh_blend_read_data,
-    mesh_blend_read_lib,
-    mesh_read_expand,
-    nullptr,
-    nullptr,
+    /* init_data */ mesh_init_data,
+    /* copy_data */ mesh_copy_data,
+    /* free_data */ mesh_free_data,
+    /* make_local */ nullptr,
+    /* foreach_id */ mesh_foreach_id,
+    /* foreach_cache */ nullptr,
+    /* foreach_path */ mesh_foreach_path,
+    /* owner_get */ nullptr,
+
+    /* blend_write */ mesh_blend_write,
+    /* blend_read_data */ mesh_blend_read_data,
+    /* blend_read_lib */ mesh_blend_read_lib,
+    /* blend_read_expand */ mesh_read_expand,
+
+    /* blend_read_undo_preserve */ nullptr,
+
+    /* lib_override_apply_post */ nullptr,
 };
 
 enum {
@@ -438,13 +452,15 @@ static int customdata_compare(
   const uint64_t cd_mask_all_attr = CD_MASK_PROP_ALL | cd_mask_non_generic;
 
   for (int i = 0; i < c1->totlayer; i++) {
-    if (CD_TYPE_AS_MASK(c1->layers[i].type) & cd_mask_all_attr) {
+    l1 = &c1->layers[i];
+    if (CD_TYPE_AS_MASK(l1->type) & cd_mask_all_attr && l1->anonymous_id != nullptr) {
       layer_count1++;
     }
   }
 
   for (int i = 0; i < c2->totlayer; i++) {
-    if (CD_TYPE_AS_MASK(c2->layers[i].type) & cd_mask_all_attr) {
+    l2 = &c2->layers[i];
+    if (CD_TYPE_AS_MASK(l1->type) & cd_mask_all_attr && l2->anonymous_id != nullptr) {
       layer_count2++;
     }
   }
@@ -460,7 +476,8 @@ static int customdata_compare(
     l1 = c1->layers + i1;
     for (int i2 = 0; i2 < c2->totlayer; i2++) {
       l2 = c2->layers + i2;
-      if (l1->type != l2->type || !STREQ(l1->name, l2->name)) {
+      if (l1->type != l2->type || !STREQ(l1->name, l2->name) || l1->anonymous_id != nullptr ||
+          l2->anonymous_id != nullptr) {
         continue;
       }
       /* At this point `l1` and `l2` have the same name and type, so they should be compared. */
@@ -673,12 +690,6 @@ static int customdata_compare(
   return 0;
 }
 
-/**
- * Used for unit testing; compares two meshes, checking only
- * differences we care about.  should be usable with leaf's
- * testing framework I get RNA work done, will use hackish
- * testing code for now.
- */
 const char *BKE_mesh_cmp(Mesh *me1, Mesh *me2, float thresh)
 {
   int c;
@@ -879,10 +890,6 @@ bool BKE_mesh_has_custom_loop_normals(Mesh *me)
   return CustomData_has_layer(&me->ldata, CD_CUSTOMLOOPNORMAL);
 }
 
-/**
- * Free (or release) any data used by this mesh (does not free the mesh itself).
- * Only use for undo, in most cases `BKE_id_free(nullptr, me)` should be used.
- */
 void BKE_mesh_free_data_for_undo(Mesh *me)
 {
   mesh_free_data(&me->id);
@@ -997,10 +1004,6 @@ Mesh *BKE_mesh_new_nomain(
   return mesh;
 }
 
-/**
- * Copy user editable settings that we want to preserve
- * when a new mesh is based on an existing mesh.
- */
 void BKE_mesh_copy_parameters(Mesh *me_dst, const Mesh *me_src)
 {
   /* Copy general settings. */
@@ -1023,12 +1026,6 @@ void BKE_mesh_copy_parameters(Mesh *me_dst, const Mesh *me_src)
   me_dst->vertex_group_active_index = me_src->vertex_group_active_index;
 }
 
-/**
- * A version of #BKE_mesh_copy_parameters that is intended for evaluated output
- * (the modifier stack for example).
- *
- * \warning User counts are not handled for ID's.
- */
 void BKE_mesh_copy_parameters_for_eval(Mesh *me_dst, const Mesh *me_src)
 {
   /* User counts aren't handled, don't copy into a mesh from #G_MAIN. */
@@ -1249,7 +1246,7 @@ void BKE_mesh_texspace_get(Mesh *me, float r_loc[3], float r_size[3])
   }
 }
 
-void BKE_mesh_texspace_get_reference(Mesh *me, short **r_texflag, float **r_loc, float **r_size)
+void BKE_mesh_texspace_get_reference(Mesh *me, char **r_texflag, float **r_loc, float **r_size)
 {
   BKE_mesh_texspace_ensure(me);
 
@@ -1267,7 +1264,7 @@ void BKE_mesh_texspace_get_reference(Mesh *me, short **r_texflag, float **r_loc,
 void BKE_mesh_texspace_copy_from_object(Mesh *me, Object *ob)
 {
   float *texloc, *texsize;
-  short *texflag;
+  char *texflag;
 
   if (BKE_object_obdata_texspace_get(ob, &texflag, &texloc, &texsize)) {
     me->texflag = *texflag;
@@ -1315,10 +1312,18 @@ void BKE_mesh_orco_verts_transform(Mesh *me, float (*orco)[3], int totvert, int 
   }
 }
 
-/**
- * Rotates the vertices of a face in case v[2] or v[3] (vertex index) is = 0.
- * this is necessary to make the if #MFace.v4 check for quads work.
- */
+void BKE_mesh_orco_ensure(Object *ob, Mesh *mesh)
+{
+  if (CustomData_has_layer(&mesh->vdata, CD_ORCO)) {
+    return;
+  }
+
+  /* Orcos are stored in normalized 0..1 range by convention. */
+  float(*orcodata)[3] = BKE_mesh_orco_verts_get(ob);
+  BKE_mesh_orco_verts_transform(mesh, orcodata, mesh->totvert, false);
+  CustomData_add_layer(&mesh->vdata, CD_ORCO, CD_ASSIGN, orcodata, mesh->totvert);
+}
+
 int BKE_mesh_mface_index_validate(MFace *mface, CustomData *fdata, int mfindex, int nr)
 {
   /* first test if the face is legal */
@@ -1522,10 +1527,6 @@ void BKE_mesh_smooth_flag_set(Mesh *me, const bool use_smooth)
   }
 }
 
-/**
- * Find the index of the loop in 'poly' which references vertex,
- * returns -1 if not found
- */
 int poly_find_loop_from_vert(const MPoly *poly, const MLoop *loopstart, uint vert)
 {
   for (int j = 0; j < poly->totloop; j++, loopstart++) {
@@ -1537,11 +1538,6 @@ int poly_find_loop_from_vert(const MPoly *poly, const MLoop *loopstart, uint ver
   return -1;
 }
 
-/**
- * Fill \a r_adj with the loop indices in \a poly adjacent to the
- * vertex. Returns the index of the loop matching vertex, or -1 if the
- * vertex is not in \a poly
- */
 int poly_get_adj_loops_from_vert(const MPoly *poly, const MLoop *mloop, uint vert, uint r_adj[2])
 {
   int corner = poly_find_loop_from_vert(poly, &mloop[poly->loopstart], vert);
@@ -1555,10 +1551,6 @@ int poly_get_adj_loops_from_vert(const MPoly *poly, const MLoop *mloop, uint ver
   return corner;
 }
 
-/**
- * Return the index of the edge vert that is not equal to \a v. If
- * neither edge vertex is equal to \a v, returns -1.
- */
 int BKE_mesh_edge_other_vert(const MEdge *e, int v)
 {
   if (e->v1 == v) {
@@ -1571,9 +1563,6 @@ int BKE_mesh_edge_other_vert(const MEdge *e, int v)
   return -1;
 }
 
-/**
- * Sets each output array element to the edge index if it is a real edge, or -1.
- */
 void BKE_mesh_looptri_get_real_edges(const Mesh *mesh, const MLoopTri *looptri, int r_edges[3])
 {
   for (int i = 2, i_next = 0; i_next < 3; i = i_next++) {
@@ -1586,7 +1575,6 @@ void BKE_mesh_looptri_get_real_edges(const Mesh *mesh, const MLoopTri *looptri, 
   }
 }
 
-/* basic vertex data functions */
 bool BKE_mesh_minmax(const Mesh *me, float r_min[3], float r_max[3])
 {
   int i = me->totvert;
@@ -1768,9 +1756,6 @@ void BKE_mesh_mselect_validate(Mesh *me)
   me->mselect = mselect_dst;
 }
 
-/**
- * Return the index within me->mselect, or -1
- */
 int BKE_mesh_mselect_find(Mesh *me, int index, int type)
 {
   BLI_assert(ELEM(type, ME_VSEL, ME_ESEL, ME_FSEL));
@@ -1784,9 +1769,6 @@ int BKE_mesh_mselect_find(Mesh *me, int index, int type)
   return -1;
 }
 
-/**
- * Return The index of the active element.
- */
 int BKE_mesh_mselect_active_get(Mesh *me, int type)
 {
   BLI_assert(ELEM(type, ME_VSEL, ME_ESEL, ME_FSEL));
@@ -1887,13 +1869,6 @@ void BKE_mesh_vert_normals_apply(Mesh *mesh, const short (*vert_normals)[3])
   mesh->runtime.cd_dirty_vert &= ~CD_MASK_NORMAL;
 }
 
-/**
- * Compute 'split' (aka loop, or per face corner's) normals.
- *
- * \param r_lnors_spacearr: Allows to get computed loop normal space array.
- * That data, among other things, contains 'smooth fan' info, useful e.g.
- * to split geometry along sharp edges...
- */
 void BKE_mesh_calc_normals_split_ex(Mesh *mesh, MLoopNorSpaceArray *r_lnors_spacearr)
 {
   float(*r_loopnors)[3];
@@ -2169,12 +2144,6 @@ static void split_faces_split_new_edges(Mesh *mesh,
   }
 }
 
-/* Split faces based on the edge angle and loop normals.
- * Matches behavior of face splitting in render engines.
- *
- * NOTE: Will leave CD_NORMAL loop data layer which is
- * used by render engines to set shading up.
- */
 void BKE_mesh_split_faces(Mesh *mesh, bool free_loop_normals)
 {
   const int num_polys = mesh->totpoly;

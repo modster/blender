@@ -429,6 +429,9 @@ static void gpencil_stroke_convertcoords(tGPsdata *p,
                                          float *depth)
 {
   bGPdata *gpd = p->gpd;
+  if (depth && (*depth == DEPTH_INVALID)) {
+    depth = NULL;
+  }
 
   /* in 3d-space - pt->x/y/z are 3 side-by-side floats */
   if (gpd->runtime.sbuffer_sflag & GP_STROKE_3DSPACE) {
@@ -1126,7 +1129,7 @@ static void gpencil_stroke_newfrombuffer(tGPsdata *p)
 
           /* find first valid contact point */
           for (i = 0; i < gpd->runtime.sbuffer_used; i++) {
-            if (depth_arr[i] != FLT_MAX) {
+            if (depth_arr[i] != DEPTH_INVALID) {
               break;
             }
           }
@@ -1138,7 +1141,7 @@ static void gpencil_stroke_newfrombuffer(tGPsdata *p)
           }
           else {
             for (i = gpd->runtime.sbuffer_used - 1; i >= 0; i--) {
-              if (depth_arr[i] != FLT_MAX) {
+              if (depth_arr[i] != DEPTH_INVALID) {
                 break;
               }
             }
@@ -1148,14 +1151,14 @@ static void gpencil_stroke_newfrombuffer(tGPsdata *p)
            * first and last contact in an imaginary line between them */
           for (i = 0; i < gpd->runtime.sbuffer_used; i++) {
             if (!ELEM(i, first_valid, last_valid)) {
-              depth_arr[i] = FLT_MAX;
+              depth_arr[i] = DEPTH_INVALID;
             }
           }
           interp_depth = true;
         }
 
         if (interp_depth) {
-          interp_sparse_array(depth_arr, gpd->runtime.sbuffer_used, FLT_MAX);
+          interp_sparse_array(depth_arr, gpd->runtime.sbuffer_used, DEPTH_INVALID);
         }
       }
     }
@@ -1202,7 +1205,7 @@ static void gpencil_stroke_newfrombuffer(tGPsdata *p)
       for (int r = 0; r < brush->gpencil_settings->draw_smoothlvl; r++) {
         for (i = 0; i < gps->totpoints - 1; i++) {
           BKE_gpencil_stroke_smooth_point(
-              gps, i, brush->gpencil_settings->draw_smoothfac - reduce);
+              gps, i, brush->gpencil_settings->draw_smoothfac - reduce, false);
           BKE_gpencil_stroke_smooth_strength(gps, i, brush->gpencil_settings->draw_smoothfac);
         }
         reduce += 0.25f; /* reduce the factor */
@@ -1214,7 +1217,7 @@ static void gpencil_stroke_newfrombuffer(tGPsdata *p)
       float ifac = (float)brush->gpencil_settings->input_samples / 10.0f;
       float sfac = interpf(1.0f, 0.2f, ifac);
       for (i = 0; i < gps->totpoints - 1; i++) {
-        BKE_gpencil_stroke_smooth_point(gps, i, sfac);
+        BKE_gpencil_stroke_smooth_point(gps, i, sfac, false);
         BKE_gpencil_stroke_smooth_strength(gps, i, sfac);
       }
     }

@@ -3425,7 +3425,8 @@ static void rna_def_tool_settings(BlenderRNA *brna)
       prop,
       "Cycle-Aware Keying",
       "For channels with cyclic extrapolation, keyframe insertion is automatically "
-      "remapped inside the cycle time range, and keeps ends in sync");
+      "remapped inside the cycle time range, and keeps ends in sync. Curves newly added to "
+      "actions with a Manual Frame Range and Cyclic Animation are automatically made cyclic");
 
   /* Keyframing */
   prop = RNA_def_property(srna, "keyframe_type", PROP_ENUM, PROP_NONE);
@@ -5582,7 +5583,7 @@ static void rna_def_scene_ffmpeg_settings(BlenderRNA *brna)
       {FFMPEG_MPEG2, "MPEG2", 0, "MPEG-2", ""},
       {FFMPEG_MPEG4, "MPEG4", 0, "MPEG-4", ""},
       {FFMPEG_AVI, "AVI", 0, "AVI", ""},
-      {FFMPEG_MOV, "QUICKTIME", 0, "Quicktime", ""},
+      {FFMPEG_MOV, "QUICKTIME", 0, "QuickTime", ""},
       {FFMPEG_DV, "DV", 0, "DV", ""},
       {FFMPEG_OGG, "OGG", 0, "Ogg", ""},
       {FFMPEG_MKV, "MKV", 0, "Matroska", ""},
