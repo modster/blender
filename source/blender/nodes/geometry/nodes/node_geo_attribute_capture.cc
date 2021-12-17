@@ -54,8 +54,7 @@ static void node_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 
 static void node_init(bNodeTree *UNUSED(tree), bNode *node)
 {
-  NodeGeometryAttributeCapture *data = (NodeGeometryAttributeCapture *)MEM_callocN(
-      sizeof(NodeGeometryAttributeCapture), __func__);
+  NodeGeometryAttributeCapture *data = MEM_cnew<NodeGeometryAttributeCapture>(__func__);
   data->data_type = CD_PROP_FLOAT;
   data->domain = ATTR_DOMAIN_POINT;
 
@@ -96,17 +95,14 @@ static void node_update(bNodeTree *ntree, bNode *node)
 
 static void node_gather_link_searches(GatherLinkSearchOpParams &params)
 {
-  const bNodeType &node_type = params.node_type();
-  if (params.other_socket().type == SOCK_GEOMETRY) {
-    params.add_item(IFACE_("Geometry"), [node_type](LinkSearchOpParams &params) {
-      bNode &node = params.add_node(node_type);
-      params.connect_available_socket(node, "Geometry");
-    });
-  }
+  const NodeDeclaration &declaration = *params.node_type().fixed_declaration;
+  search_link_ops_for_declarations(params, declaration.inputs().take_front(1));
+  search_link_ops_for_declarations(params, declaration.outputs().take_front(1));
 
+  const bNodeType &node_type = params.node_type();
   const std::optional<CustomDataType> type = node_data_type_to_custom_data_type(
       (eNodeSocketDatatype)params.other_socket().type);
-  if (type) {
+  if (type && *type != CD_PROP_STRING) {
     if (params.in_out() == SOCK_OUT) {
       params.add_item(IFACE_("Attribute"), [node_type, type](LinkSearchOpParams &params) {
         bNode &node = params.add_node(node_type);

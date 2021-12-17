@@ -75,8 +75,7 @@ static void node_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 
 static void node_init(bNodeTree *UNUSED(tree), bNode *node)
 {
-  NodeGeometryRaycast *data = (NodeGeometryRaycast *)MEM_callocN(sizeof(NodeGeometryRaycast),
-                                                                 __func__);
+  NodeGeometryRaycast *data = MEM_cnew<NodeGeometryRaycast>(__func__);
   data->mapping = GEO_NODE_RAYCAST_INTERPOLATED;
   data->data_type = CD_PROP_FLOAT;
   node->storage = data;
@@ -121,7 +120,7 @@ static void node_gather_link_searches(GatherLinkSearchOpParams &params)
 
   const std::optional<CustomDataType> type = node_data_type_to_custom_data_type(
       (eNodeSocketDatatype)params.other_socket().type);
-  if (type) {
+  if (type && *type != CD_PROP_STRING) {
     /* The input and output sockets have the same name. */
     params.add_item(IFACE_("Attribute"), [type](LinkSearchOpParams &params) {
       bNode &node = params.add_node("GeometryNodeRaycast");
