@@ -154,6 +154,32 @@ void BKE_library_callback_free_notifier_reference_set(BKE_library_free_notifier_
 void BKE_library_callback_remap_editor_id_reference_set(
     BKE_library_remap_editor_id_reference_cb func);
 
+/* IDRemapper */
+struct IDRemapper;
+
+/**
+ * \brief Create a new ID Remapper.
+ *
+ * An ID remapper stores multiple remapping rules.
+ */
+struct IDRemapper *BKE_id_remapper_create(void);
+
+/** \brief Free the given ID Remapper. */
+void BKE_id_remapper_free(struct IDRemapper *id_remapper);
+/** \brief Add a new remapping. */
+void BKE_id_remapper_add(struct IDRemapper *id_remapper, struct ID *old_id, struct ID *new_id);
+/**
+ * \brief Apply a remapping.
+ *
+ * Update the id pointer stored in the given id_ptr_ptr id a remapping rule exists.
+ *
+ * \returns
+ * false id pointer stored at the given id_ptr_ptr doesn't have a remap rule and isn't
+ *       modified.
+ * true  id pointer stored at the given id_ptr_ptr has a remap rule that is applied.
+ */
+bool BKE_id_remapper_apply(const struct IDRemapper *id_remapper, struct ID **id_ptr_ptr);
+
 #ifdef __cplusplus
 }
 #endif

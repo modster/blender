@@ -177,6 +177,7 @@ set(SRC
   intern/lib_id.c
   intern/lib_id_delete.c
   intern/lib_id_eval.c
+  intern/lib_id_remapper.cc
   intern/lib_override.c
   intern/lib_query.c
   intern/lib_remap.c
