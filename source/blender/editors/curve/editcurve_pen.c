@@ -73,6 +73,27 @@ typedef struct MoveSegmentData {
   float t;
 } MoveSegmentData;
 
+/* Enum to choose between the extra functionalities. */
+typedef enum eExtra_func { FREE_TOGGLE = 0, ADJ_HANDLE = 1 } eExtra_func;
+static const EnumPropertyItem prop_extra_func_types[] = {
+    {FREE_TOGGLE, "free_toggle", 0, "Free-Align Toggle", "Toggle between free and align handles."},
+    {ADJ_HANDLE,
+     "adj_handle",
+     0,
+     "Move Adjacent Handle",
+     "Move the closer handle of the adjacent vertex."},
+    {0, NULL, 0, NULL, NULL},
+};
+
+/* Enum to choose between shortcuts for the extra functionality. */
+typedef enum eExtra_key { SHIFT = 0, CTRL = 1, ALT = 2 } eExtra_key;
+static const EnumPropertyItem prop_extra_key_types[] = {
+    {SHIFT, "Shift", 0, "Shift", ""},
+    {CTRL, "Ctrl", 0, "Ctrl", ""},
+    {ALT, "Alt", 0, "Alt", ""},
+    {0, NULL, 0, NULL, NULL},
+};
+
 static void mouse_location_to_worldspace(const int mouse_loc[2],
                                          const float depth[3],
                                          const ViewContext *vc,
@@ -778,6 +799,12 @@ static bool is_spline_nearby(ViewContext *vc, wmOperator *op, const wmEvent *eve
   return false;
 }
 
+static bool is_extra_key_pressed(const wmEvent *event, int key)
+{
+  return (key == SHIFT && event->shift) || (key == CTRL && event->ctrl) ||
+         (key == ALT && event->alt);
+}
+
 /* Move segment to mouse pointer. */
 static void move_segment(MoveSegmentData *seg_data, const wmEvent *event, ViewContext *vc)
 {
@@ -847,6 +874,17 @@ static void move_segment(MoveSegmentData *seg_data, const wmEvent *event, ViewCo
   }
 }
 
+/* Toggle between `free` and `align` handles of the given `BezTriple` */
+static void toggle_bezt_free_align_handles(BezTriple *bezt)
+{
+  if (bezt->h1 != HD_FREE || bezt->h2 != HD_FREE) {
+    bezt->h1 = bezt->h2 = HD_FREE;
+  }
+  else {
+    bezt->h1 = bezt->h2 = HD_ALIGN;
+  }
+}
+
 enum {
   PEN_MODAL_FREE_MOVE_HANDLE = 1,
 };
@@ -894,21 +932,35 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   const bool is_new_point = RNA_boolean_get(op->ptr, "new");
   /* Whether a segment is being altered by click and drag. */
   bool moving_segment = RNA_boolean_get(op->ptr, "moving_segment");
+  /* Key binding set for the extra functionality. */
+  int extra_key = RNA_enum_get(op->ptr, "extra_key");
+  /* The chosen extra functionality. */
+  int extra_func = RNA_enum_get(op->ptr, "extra_func");
+  /* Whether the extra key was pressed before. */
+  bool extra_pressed_before = RNA_boolean_get(op->ptr, "extra_pressed");
 
-  if (event->type == EVT_MODAL_MAP) {
-    if (event->val == PEN_MODAL_FREE_MOVE_HANDLE) {
-      ED_curve_nurb_vert_selected_find(vc.obedit->data, vc.v3d, &nu, &bezt, &bp);
-
-      if (bezt) {
-        if (bezt->h1 != HD_FREE || bezt->h2 != HD_FREE) {
-          bezt->h1 = bezt->h2 = HD_FREE;
-        }
-
+  if (!extra_pressed_before && is_extra_key_pressed(event, extra_key)) {
+    ED_curve_nurb_vert_selected_find(vc.obedit->data, vc.v3d, &nu, &bezt, &bp);
+    if (bezt) {
+      if (extra_func == FREE_TOGGLE) {
+        toggle_bezt_free_align_handles(bezt);
+        BKE_nurb_handles_calc(nu);
         RNA_boolean_set(op->ptr, "dragging", true);
         dragging = true;
       }
+      else {
+        BezTriple *adj_bezt = BKE_nurb_bezt_get_prev(nu, bezt);
+        if (!adj_bezt) {
+          adj_bezt = BKE_nurb_bezt_get_next(nu, bezt);
+        }
+        if (adj_bezt) {
+          adj_bezt->h1 = adj_bezt->h2 = HD_FREE;
+        }
+      }
     }
   }
+  extra_pressed_before = is_extra_key_pressed(event, extra_key);
+  RNA_boolean_set(op->ptr, "extra_pressed", extra_pressed_before);
 
   if (ELEM(event->type, MOUSEMOVE, INBETWEEN_MOUSEMOVE)) {
     if (!dragging && WM_event_drag_test(event, event->prev_click_xy) && event->val == KM_PRESS) {
@@ -920,6 +972,33 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
         MoveSegmentData *seg_data = op->customdata;
         nu = seg_data->nu;
         move_segment(seg_data, event, &vc);
+      }
+      else if (extra_pressed_before && extra_func == ADJ_HANDLE) {
+        ED_curve_nurb_vert_selected_find(vc.obedit->data, vc.v3d, &nu, &bezt, &bp);
+        
+        /* Get the adjacent `BezTriple` */
+        BezTriple *adj_bezt = BKE_nurb_bezt_get_prev(nu, bezt);
+        int cp_index = 2;
+        if (!adj_bezt) {
+          adj_bezt = BKE_nurb_bezt_get_next(nu, bezt);
+          cp_index = 0;
+        }
+
+        float screen_co_fl[2];
+        int displacement[2], screen_co_int[2];
+        /* Get the screen space coordinates of moved handle. */
+        ED_view3d_project_float_object(vc.region,
+                                       adj_bezt->vec[cp_index],
+                                       screen_co_fl,
+                                       V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN);
+        sub_v2_v2v2_int(displacement, event->xy, event->prev_xy);
+        screen_co_int[0] = (int)screen_co_fl[0];
+        screen_co_int[1] = (int)screen_co_fl[1];
+
+        /* Add the displacement of the mouse to the handle position. */
+        add_v2_v2v2_int(screen_co_int, screen_co_int, displacement);
+        move_bezt_handle_or_vertex_to_location(adj_bezt, screen_co_int, cp_index, &vc);
+        BKE_nurb_handles_calc(nu);
       }
       /* If dragging a new control point, move handle point with mouse cursor. Else move entire
        * control point. */
@@ -980,6 +1059,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
       RNA_boolean_set(op->ptr, "dragging", false);
       RNA_boolean_set(op->ptr, "new", false);
       RNA_boolean_set(op->ptr, "moving_segment", false);
+      RNA_boolean_set(op->ptr, "extra_pressed", false);
       ret = OPERATOR_FINISHED;
     }
   }
@@ -1068,8 +1148,6 @@ static int curve_pen_insert_modal(bContext *C, wmOperator *op, const wmEvent *ev
   int ret = OPERATOR_RUNNING_MODAL;
   /* Whether the mouse is clicking and dragging. */
   bool dragging = RNA_boolean_get(op->ptr, "dragging");
-  /* Whether the previous vertex is to be moved. */
-  bool move_adjacent = RNA_boolean_get(op->ptr, "move_adjacent");
 
   if (ELEM(event->type, MOUSEMOVE, INBETWEEN_MOUSEMOVE)) {
     if (!dragging && WM_event_drag_test(event, event->prev_click_xy) && event->val == KM_PRESS) {
@@ -1078,39 +1156,11 @@ static int curve_pen_insert_modal(bContext *C, wmOperator *op, const wmEvent *ev
     }
     if (dragging) {
       ED_curve_nurb_vert_selected_find(vc.obedit->data, vc.v3d, &nu, &bezt, &bp);
-      if (move_adjacent && nu && bezt) {
-        int displacement[2], screen_co_int[2];
-        float screen_co_fl[2];
-
-        BezTriple *adj_bezt = BKE_nurb_bezt_get_prev(nu, bezt);
-        int cp_index = 2;
-        if (!adj_bezt) {
-          adj_bezt = BKE_nurb_bezt_get_next(nu, bezt);
-          cp_index = 0;
-
-          if (!adj_bezt) {
-            return OPERATOR_FINISHED;
-          }
-        }
-        remove_handle_movement_constraints(adj_bezt, true, true);
-
-        ED_view3d_project_float_object(vc.region,
-                                       adj_bezt->vec[cp_index],
-                                       screen_co_fl,
-                                       V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN);
-        sub_v2_v2v2_int(displacement, event->xy, event->prev_xy);
-        screen_co_int[0] = (int)screen_co_fl[0];
-        screen_co_int[1] = (int)screen_co_fl[1];
-        add_v2_v2v2_int(screen_co_int, screen_co_int, displacement);
-        move_bezt_handle_or_vertex_to_location(adj_bezt, screen_co_int, cp_index, &vc);
+      if (bezt) {
+        move_selected_bezt_to_location(bezt, &vc, event->mval);
       }
-      else {
-        if (bezt) {
-          move_selected_bezt_to_location(bezt, &vc, event->mval);
-        }
-        else if (bp) {
-          move_bp_to_mouse(bp, event, &vc);
-        }
+      else if (bp) {
+        move_bp_to_mouse(bp, event, &vc);
       }
       if (nu && nu->type == CU_BEZIER) {
         BKE_nurb_handles_calc(nu);
@@ -1138,7 +1188,6 @@ static int curve_pen_insert_modal(bContext *C, wmOperator *op, const wmEvent *ev
     }
     else if (event->val == KM_RELEASE) {
       RNA_boolean_set(op->ptr, "dragging", false);
-      RNA_boolean_set(op->ptr, "move_adjacent", false);
       ret = OPERATOR_FINISHED;
     }
   }
@@ -1218,6 +1267,20 @@ void CURVE_OT_pen(wmOperatorType *ot)
                        "A multiplier on the default click distance",
                        0.2f,
                        1.5f);
+  prop = RNA_def_enum(ot->srna,
+                      "extra_func",
+                      prop_extra_func_types,
+                      FREE_TOGGLE,
+                      "Extra Functionality",
+                      "Additional functionality assignable to a specified key");
+  prop = RNA_def_enum(ot->srna,
+                      "extra_key",
+                      prop_extra_key_types,
+                      SHIFT,
+                      "Extra Key",
+                      "Key used by the extra functionality");
+  prop = RNA_def_boolean(ot->srna, "extra_pressed", false, "Extra Pressed", "");
+  RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
 }
 
 void CURVE_OT_pen_delete(wmOperatorType *ot)
@@ -1270,9 +1333,6 @@ void CURVE_OT_pen_insert(wmOperatorType *ot)
 
   PropertyRNA *prop;
   prop = RNA_def_boolean(ot->srna, "dragging", 0, "Dragging", "Check if click and drag");
-  RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
-  prop = RNA_def_boolean(
-      ot->srna, "move_adjacent", 0, "Move Adjacent", "Whether the adjacent vertex is to be moved");
   RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
   prop = RNA_def_float(ot->srna,
                        "sel_dist_mul",
