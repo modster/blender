@@ -34,6 +34,10 @@
 #include "RNA_types.h"
 
 #ifdef __cplusplus
+#  include "BLI_string_ref.hh"
+#endif
+
+#ifdef __cplusplus
 extern "C" {
 #endif
 
@@ -114,6 +118,7 @@ namespace nodes {
 class NodeMultiFunctionBuilder;
 class GeoNodeExecParams;
 class NodeDeclarationBuilder;
+class GatherLinkSearchOpParams;
 }  // namespace nodes
 namespace fn {
 class CPPType;
@@ -129,10 +134,15 @@ using SocketGetCPPValueFunction = void (*)(const struct bNodeSocket &socket, voi
 using SocketGetGeometryNodesCPPValueFunction = void (*)(const struct bNodeSocket &socket,
                                                         void *r_value);
 
+/* Adds socket link operations that are specific to this node type. */
+using NodeGatherSocketLinkOperationsFunction =
+    void (*)(blender::nodes::GatherLinkSearchOpParams &params);
+
 #else
 typedef void *NodeMultiFunctionBuildFunction;
 typedef void *NodeGeometryExecFunction;
 typedef void *NodeDeclareFunction;
+typedef void *NodeGatherSocketLinkOperationsFunction;
 typedef void *SocketGetCPPTypeFunction;
 typedef void *SocketGetGeometryNodesCPPTypeFunction;
 typedef void *SocketGetGeometryNodesCPPValueFunction;
@@ -258,7 +268,10 @@ typedef struct bNodeType {
    * Optional custom label function for the node header.
    * \note Used as a fallback when #bNode.label isn't set.
    */
-  void (*labelfunc)(struct bNodeTree *ntree, struct bNode *node, char *label, int maxlen);
+  void (*labelfunc)(const struct bNodeTree *ntree,
+                    const struct bNode *node,
+                    char *label,
+                    int maxlen);
 
   /** Called when the node is updated in the editor. */
   void (*updatefunc)(struct bNodeTree *ntree, struct bNode *node);
@@ -281,7 +294,7 @@ typedef struct bNodeType {
 
   /**
    * Can this node type be added to a node tree?
-   * \param r_disabled_hint: Optional hint to display in the UI when the poll fails.
+   * \param r_disabled_hint: Hint to display in the UI when the poll fails.
    *                         The callback can set this to a static string without having to
    *                         null-check it (or without setting it to null if it's not used).
    *                         The caller must pass a valid `const char **` and null-initialize it
@@ -321,6 +334,13 @@ typedef struct bNodeType {
   bool declaration_is_dynamic;
   /* Declaration to be used when it is not dynamic. */
   NodeDeclarationHandle *fixed_declaration;
+
+  /**
+   * Add to the list of search names and operations gathered by node link drag searching.
+   * Usually it isn't necessary to override the default behavior here, but a node type can have
+   * custom behavior here like adding custom search items.
+   */
+  NodeGatherSocketLinkOperationsFunction gather_link_search_ops;
 
   /** True when the node cannot be muted. */
   bool no_muting;
@@ -399,7 +419,7 @@ typedef struct bNodeTreeType {
   /* Tree update. Overrides `nodetype->updatetreefunc` ! */
   void (*update)(struct bNodeTree *ntree);
 
-  bool (*validate_link)(struct bNodeTree *ntree, struct bNodeLink *link);
+  bool (*validate_link)(eNodeSocketDatatype from, eNodeSocketDatatype to);
 
   void (*node_add_init)(struct bNodeTree *ntree, struct bNode *bnode);
 
@@ -538,6 +558,7 @@ void ntreeBlendReadExpand(struct BlendExpander *expander, struct bNodeTree *ntre
 /* -------------------------------------------------------------------- */
 /** \name Node Tree Interface
  * \{ */
+
 struct bNodeSocket *ntreeFindSocketInterface(struct bNodeTree *ntree,
                                              eNodeSocketInOut in_out,
                                              const char *identifier);
@@ -967,7 +988,7 @@ void BKE_node_preview_set_pixel(
 /** \name Node Type Access
  * \{ */
 
-void nodeLabel(struct bNodeTree *ntree, struct bNode *node, char *label, int maxlen);
+void nodeLabel(const struct bNodeTree *ntree, const struct bNode *node, char *label, int maxlen);
 /**
  * Get node socket label if it is set.
  */
@@ -1000,9 +1021,6 @@ void node_type_storage(struct bNodeType *ntype,
                        void (*copyfunc)(struct bNodeTree *dest_ntree,
                                         struct bNode *dest_node,
                                         const struct bNode *src_node));
-void node_type_label(
-    struct bNodeType *ntype,
-    void (*labelfunc)(struct bNodeTree *ntree, struct bNode *, char *label, int maxlen));
 void node_type_update(struct bNodeType *ntype,
                       void (*updatefunc)(struct bNodeTree *ntree, struct bNode *node));
 void node_type_group_update(struct bNodeType *ntype,
@@ -1108,6 +1126,7 @@ bool BKE_node_tree_iter_step(struct NodeTreeIterStore *ntreeiter,
   } \
   } \
   ((void)0)
+
 /** \} */
 
 /* -------------------------------------------------------------------- */
@@ -1568,6 +1587,7 @@ int ntreeTexExecTree(struct bNodeTree *ntree,
                      int cfra,
                      int preview,
                      struct MTex *mtex);
+
 /** \} */
 
 /* -------------------------------------------------------------------- */
@@ -1719,6 +1739,7 @@ int ntreeTexExecTree(struct bNodeTree *ntree,
 #define GEO_NODE_INPUT_MESH_EDGE_NEIGHBORS 1143
 #define GEO_NODE_INPUT_MESH_ISLAND 1144
 #define GEO_NODE_INPUT_SCENE_TIME 1145
+
 /** \} */
 
 /* -------------------------------------------------------------------- */
@@ -1762,6 +1783,18 @@ extern struct bNodeSocketType NodeSocketTypeUndefined;
 
 #ifdef __cplusplus
 }
+#endif
+
+#ifdef __cplusplus
+
+namespace blender::bke {
+
+bNodeSocket *node_find_enabled_socket(bNode &node, eNodeSocketInOut in_out, StringRef name);
+bNodeSocket *node_find_enabled_input_socket(bNode &node, StringRef name);
+bNodeSocket *node_find_enabled_output_socket(bNode &node, StringRef name);
+
+}  // namespace blender::bke
+
 #endif
 
 #define NODE_STORAGE_FUNCS(StorageT) \

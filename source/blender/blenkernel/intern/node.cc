@@ -102,6 +102,7 @@ using blender::MutableSpan;
 using blender::Set;
 using blender::Span;
 using blender::Stack;
+using blender::StringRef;
 using blender::Vector;
 using blender::VectorSet;
 using blender::nodes::FieldInferencingInterface;
@@ -1521,6 +1522,33 @@ struct bNodeSocket *nodeFindSocket(const bNode *node,
   }
   return nullptr;
 }
+
+namespace blender::bke {
+
+bNodeSocket *node_find_enabled_socket(bNode &node,
+                                      const eNodeSocketInOut in_out,
+                                      const StringRef name)
+{
+  ListBase *sockets = (in_out == SOCK_IN) ? &node.inputs : &node.outputs;
+  LISTBASE_FOREACH (bNodeSocket *, socket, sockets) {
+    if (!(socket->flag & SOCK_UNAVAIL) && socket->name == name) {
+      return socket;
+    }
+  }
+  return nullptr;
+}
+
+bNodeSocket *node_find_enabled_input_socket(bNode &node, StringRef name)
+{
+  return node_find_enabled_socket(node, SOCK_IN, name);
+}
+
+bNodeSocket *node_find_enabled_output_socket(bNode &node, StringRef name)
+{
+  return node_find_enabled_socket(node, SOCK_OUT, name);
+}
+
+}  // namespace blender::bke
 
 /* find unique socket identifier */
 static bool unique_identifier_check(void *arg, const char *identifier)
@@ -4459,7 +4487,8 @@ static void ntree_validate_links(bNodeTree *ntree)
       link->flag &= ~NODE_LINK_VALID;
     }
     else if (ntree->typeinfo->validate_link) {
-      if (!ntree->typeinfo->validate_link(ntree, link)) {
+      if (!ntree->typeinfo->validate_link((eNodeSocketDatatype)link->fromsock->type,
+                                          (eNodeSocketDatatype)link->tosock->type)) {
         link->flag &= ~NODE_LINK_VALID;
       }
     }
@@ -4748,7 +4777,9 @@ static void propagate_data_requirements_from_right_to_left(
       /* The output is required to be a single value when it is connected to any input that does
        * not support fields. */
       for (const InputSocketRef *target_socket : output_socket->directly_linked_sockets()) {
-        state.requires_single |= field_state_by_socket_id[target_socket->id()].requires_single;
+        if (target_socket->is_available()) {
+          state.requires_single |= field_state_by_socket_id[target_socket->id()].requires_single;
+        }
       }
 
       if (state.requires_single) {
@@ -5180,7 +5211,7 @@ void nodeUpdateInternalLinks(bNodeTree *ntree, bNode *node)
 
 /* ************* node type access ********** */
 
-void nodeLabel(bNodeTree *ntree, bNode *node, char *label, int maxlen)
+void nodeLabel(const bNodeTree *ntree, const bNode *node, char *label, int maxlen)
 {
   label[0] = '\0';
 
@@ -5398,13 +5429,6 @@ void node_type_storage(bNodeType *ntype,
   }
   ntype->copyfunc = copyfunc;
   ntype->freefunc = freefunc;
-}
-
-void node_type_label(
-    struct bNodeType *ntype,
-    void (*labelfunc)(struct bNodeTree *ntree, struct bNode *node, char *label, int maxlen))
-{
-  ntype->labelfunc = labelfunc;
 }
 
 void node_type_update(struct bNodeType *ntype,
