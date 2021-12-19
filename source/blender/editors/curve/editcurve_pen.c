@@ -787,11 +787,7 @@ static void move_segment(MoveSegmentData *seg_data, const wmEvent *event, ViewCo
   BezTriple *bezt1 = nu->bezt + seg_data->bezt_index;
   BezTriple *bezt2 = BKE_nurb_bezt_get_next(nu, bezt1);
 
-  const float t = seg_data->t;
-
-  if (min_ff(t, 1.0f - t) < 0.1f) {
-    return;
-  }
+  const float t = max_ff(min_ff(seg_data->t, 0.9f), 0.1f);
 
   const float t_sq = t * t;
   const float t_cu = t_sq * t;
