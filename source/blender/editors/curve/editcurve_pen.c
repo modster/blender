@@ -45,8 +45,6 @@
 
 #include "float.h"
 
-#define SEL_DIST_MUL 0.4f
-
 /* Data structure to keep track of details about the cut location */
 typedef struct CutData {
   /* Index of the last #BezTriple or BPoint before the cut. */
@@ -767,8 +765,8 @@ static bool is_spline_nearby(ViewContext *vc, wmOperator *op, const wmEvent *eve
                   .mval[1] = event->mval[1]};
 
   update_data_for_all_nurbs(nurbs, vc, &data);
-
-  const float threshold_distance = ED_view3d_select_dist_px() * SEL_DIST_MUL;
+  const float sel_dist_mul = RNA_float_get(op->ptr, "sel_dist_mul");
+  const float threshold_distance = ED_view3d_select_dist_px() * sel_dist_mul;
   if (data.nurb && !data.nurb->bp && data.min_dist < threshold_distance) {
     MoveSegmentData *seg_data;
     op->customdata = seg_data = MEM_callocN(sizeof(MoveSegmentData), __func__);
@@ -955,8 +953,9 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
       /* Get currently selected point if any. Used for making spline cyclic. */
       ED_curve_nurb_vert_selected_find(cu, vc.v3d, &nu, &bezt, &bp);
 
+      const float sel_dist_mul = RNA_float_get(op->ptr, "sel_dist_mul");
       const bool found_point = ED_curve_editnurb_select_pick_thresholded(
-          C, event->mval, SEL_DIST_MUL, false, false, false);
+          C, event->mval, sel_dist_mul, false, false, false);
       RNA_boolean_set(op->ptr, "new", !found_point);
 
       if (!found_point) {
@@ -1210,6 +1209,15 @@ void CURVE_OT_pen(wmOperatorType *ot)
   RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
   prop = RNA_def_boolean(ot->srna, "moving_segment", 0, "Moving Segment", "");
   RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
+  prop = RNA_def_float(ot->srna,
+                       "sel_dist_mul",
+                       0.4f,
+                       0.0f,
+                       2.0f,
+                       "Select Distance",
+                       "A multiplier on the default click distance",
+                       0.2f,
+                       1.5f);
 }
 
 void CURVE_OT_pen_delete(wmOperatorType *ot)
@@ -1229,6 +1237,17 @@ void CURVE_OT_pen_delete(wmOperatorType *ot)
 
   /* properties */
   WM_operator_properties_mouse_select(ot);
+
+  PropertyRNA *prop;
+  prop = RNA_def_float(ot->srna,
+                       "sel_dist_mul",
+                       0.4f,
+                       0.0f,
+                       2.0f,
+                       "Select Distance",
+                       "A multiplier on the default click distance",
+                       0.2f,
+                       1.5f);
 }
 
 void CURVE_OT_pen_insert(wmOperatorType *ot)
@@ -1251,7 +1270,17 @@ void CURVE_OT_pen_insert(wmOperatorType *ot)
 
   PropertyRNA *prop;
   prop = RNA_def_boolean(ot->srna, "dragging", 0, "Dragging", "Check if click and drag");
+  RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
   prop = RNA_def_boolean(
       ot->srna, "move_adjacent", 0, "Move Adjacent", "Whether the adjacent vertex is to be moved");
   RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
+  prop = RNA_def_float(ot->srna,
+                       "sel_dist_mul",
+                       0.4f,
+                       0.0f,
+                       2.0f,
+                       "Select Distance",
+                       "A multiplier on the default click distance",
+                       0.2f,
+                       1.5f);
 }
