@@ -17,19 +17,19 @@ struct IDRemapper {
     mappings.add_as(old_id, new_id);
   }
 
-  bool apply(ID **id_ptr_ptr) const
+  IDRemapperApplyResult apply(ID **id_ptr_ptr) const
   {
     BLI_assert(id_ptr_ptr != nullptr);
     if (*id_ptr_ptr == nullptr) {
-      return false;
+      return ID_REMAP_SOURCE_NOT_MAPPABLE;
     }
 
     if (!mappings.contains(*id_ptr_ptr)) {
-      return false;
+      return ID_REMAP_SOURCE_UNAVAILABLE;
     }
 
     *id_ptr_ptr = mappings.lookup(*id_ptr_ptr);
-    return true;
+    return ID_REMAP_SOURCE_REMAPPED;
   }
 };
 
@@ -74,7 +74,7 @@ void BKE_id_remapper_add(IDRemapper *id_remapper, ID *old_id, ID *new_id)
   remapper->add(old_id, new_id);
 }
 
-bool BKE_id_remapper_apply(const IDRemapper *id_remapper, ID **id_ptr_ptr)
+IDRemapperApplyResult BKE_id_remapper_apply(const IDRemapper *id_remapper, ID **id_ptr_ptr)
 {
   const blender::bke::id::remapper::IDRemapper *remapper = unwrap_const(id_remapper);
   return remapper->apply(id_ptr_ptr);

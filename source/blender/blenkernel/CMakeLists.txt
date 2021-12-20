@@ -815,6 +815,7 @@ if(WITH_GTESTS)
     intern/fcurve_test.cc
     intern/lattice_deform_test.cc
     intern/layer_test.cc
+    intern/lib_id_remapper_test.cc
     intern/lib_id_test.cc
     intern/tracking_test.cc
   )

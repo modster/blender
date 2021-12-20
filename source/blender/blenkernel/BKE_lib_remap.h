@@ -156,6 +156,14 @@ void BKE_library_callback_remap_editor_id_reference_set(
 
 /* IDRemapper */
 struct IDRemapper;
+typedef enum IDRemapperApplyResult {
+  /** No remapping rules available for the source. */
+  ID_REMAP_SOURCE_UNAVAILABLE,
+  /** Source isn't mappable (fe NULL). */
+  ID_REMAP_SOURCE_NOT_MAPPABLE,
+  /** Source has been remapped to a new pointer. */
+  ID_REMAP_SOURCE_REMAPPED,
+} IDRemapperApplyResult;
 
 /**
  * \brief Create a new ID Remapper.
@@ -172,13 +180,9 @@ void BKE_id_remapper_add(struct IDRemapper *id_remapper, struct ID *old_id, stru
  * \brief Apply a remapping.
  *
  * Update the id pointer stored in the given id_ptr_ptr id a remapping rule exists.
- *
- * \returns
- * false id pointer stored at the given id_ptr_ptr doesn't have a remap rule and isn't
- *       modified.
- * true  id pointer stored at the given id_ptr_ptr has a remap rule that is applied.
  */
-bool BKE_id_remapper_apply(const struct IDRemapper *id_remapper, struct ID **id_ptr_ptr);
+IDRemapperApplyResult BKE_id_remapper_apply(const struct IDRemapper *id_remapper,
+                                            struct ID **id_ptr_ptr);
 
 #ifdef __cplusplus
 }
