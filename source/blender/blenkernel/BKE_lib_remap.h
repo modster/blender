@@ -38,6 +38,8 @@
 extern "C" {
 #endif
 
+struct ID;
+
 /* BKE_libblock_free, delete are declared in BKE_lib_id.h for convenience. */
 
 /* Also IDRemap->flag. */
@@ -163,7 +165,15 @@ typedef enum IDRemapperApplyResult {
   ID_REMAP_SOURCE_NOT_MAPPABLE,
   /** Source has been remapped to a new pointer. */
   ID_REMAP_SOURCE_REMAPPED,
+  /** Source has been set to NULL. */
+  ID_REMAP_SOURCE_UNASSIGNED,
 } IDRemapperApplyResult;
+
+typedef enum IDRemapperApplyOptions {
+  ID_REMAP_APPLY_DEFAULT = 0,
+  ID_REMAP_APPLY_UPDATE_REFCOUNT = (1 << 0),
+  ID_REMAP_APPLY_ENSURE_REAL = (1 << 1),
+} IDRemapperApplyOptions;
 
 /**
  * \brief Create a new ID Remapper.
@@ -182,7 +192,9 @@ void BKE_id_remapper_add(struct IDRemapper *id_remapper, struct ID *old_id, stru
  * Update the id pointer stored in the given id_ptr_ptr id a remapping rule exists.
  */
 IDRemapperApplyResult BKE_id_remapper_apply(const struct IDRemapper *id_remapper,
-                                            struct ID **id_ptr_ptr);
+                                            struct ID **id_ptr_ptr,
+                                            IDRemapperApplyOptions options);
+bool BKE_id_remapper_has_mapping_for(const struct IDRemapper *id_remapper, uint64_t type_filter);
 
 #ifdef __cplusplus
 }
