@@ -59,6 +59,13 @@ struct IDRemapper {
     }
     return ID_REMAP_SOURCE_REMAPPED;
   }
+
+  void iter(IDRemapperIterFunction func, void *user_data) const
+  {
+    for (auto item : mappings.items()) {
+      func(item.key, item.value, user_data);
+    }
+  }
 };
 
 }  // namespace blender::bke::id::remapper
@@ -114,5 +121,13 @@ IDRemapperApplyResult BKE_id_remapper_apply(const IDRemapper *id_remapper,
 {
   const blender::bke::id::remapper::IDRemapper *remapper = unwrap_const(id_remapper);
   return remapper->apply(id_ptr_ptr, options);
+}
+
+void BKE_id_remapper_iter(const struct IDRemapper *id_remapper,
+                          IDRemapperIterFunction func,
+                          void *user_data)
+{
+  const blender::bke::id::remapper::IDRemapper *remapper = unwrap_const(id_remapper);
+  remapper->iter(func, user_data);
 }
 }

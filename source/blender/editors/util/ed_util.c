@@ -435,8 +435,19 @@ void unpack_menu(bContext *C,
   UI_popup_menu_end(C, pup);
 }
 
-void ED_spacedata_id_remap(struct ScrArea *area, struct SpaceLink *sl, ID *old_id, ID *new_id)
+void ED_spacedata_id_remap(struct ScrArea *area,
+                           struct SpaceLink *sl,
+                           const struct IDRemapper *mappings)
 {
+  SpaceType *st = BKE_spacetype_from_id(sl->spacetype);
+  if (st && st->id_remap) {
+    st->id_remap(area, sl, mappings);
+  }
+}
+
+void ED_spacedata_id_remap_old(struct ScrArea *area, struct SpaceLink *sl, ID *old_id, ID *new_id)
+{
+  printf("%s is deprecated use ED_spacedata_id_remap_ex\n", __func__);
   SpaceType *st = BKE_spacetype_from_id(sl->spacetype);
 
   if (st && st->id_remap) {

@@ -175,6 +175,8 @@ typedef enum IDRemapperApplyOptions {
   ID_REMAP_APPLY_ENSURE_REAL = (1 << 1),
 } IDRemapperApplyOptions;
 
+typedef void (*IDRemapperIterFunction)(struct ID *old_id, struct ID *new_id, void *user_data);
+
 /**
  * \brief Create a new ID Remapper.
  *
@@ -195,6 +197,9 @@ IDRemapperApplyResult BKE_id_remapper_apply(const struct IDRemapper *id_remapper
                                             struct ID **id_ptr_ptr,
                                             IDRemapperApplyOptions options);
 bool BKE_id_remapper_has_mapping_for(const struct IDRemapper *id_remapper, uint64_t type_filter);
+void BKE_id_remapper_iter(const struct IDRemapper *id_remapper,
+                          IDRemapperIterFunction func,
+                          void *user_data);
 
 #ifdef __cplusplus
 }
