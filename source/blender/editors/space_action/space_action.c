@@ -821,8 +821,8 @@ static void action_id_remap(ScrArea *UNUSED(area),
 {
   SpaceAction *sact = (SpaceAction *)slink;
 
-  BKE_id_remapper_apply(mappings, &sact->action, ID_REMAP_APPLY_DEFAULT);
-  BKE_id_remapper_apply(mappings, &sact->ads.filter_grp, ID_REMAP_APPLY_DEFAULT);
+  BKE_id_remapper_apply(mappings, (ID **)&sact->action, ID_REMAP_APPLY_DEFAULT);
+  BKE_id_remapper_apply(mappings, (ID **)&sact->ads.filter_grp, ID_REMAP_APPLY_DEFAULT);
   BKE_id_remapper_apply(mappings, &sact->ads.source, ID_REMAP_APPLY_DEFAULT);
 }
 

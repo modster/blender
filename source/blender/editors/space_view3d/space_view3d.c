@@ -1816,7 +1816,7 @@ static int view3d_context(const bContext *C, const char *member, bContextDataRes
 
 static void view3d_id_remap_v3d_ob_centers(View3D *v3d, const struct IDRemapper *mappings)
 {
-  if (BKE_id_remapper_apply(mappings, (ID **)v3d->ob_center, ID_REMAP_APPLY_DEFAULT) ==
+  if (BKE_id_remapper_apply(mappings, (ID **)&v3d->ob_center, ID_REMAP_APPLY_DEFAULT) ==
       ID_REMAP_SOURCE_UNASSIGNED) {
     /* Otherwise, bonename may remain valid...
      * We could be smart and check this, too? */
@@ -1831,7 +1831,7 @@ static void view3d_id_remap_v3d(ScrArea *area,
                                 const bool is_local)
 {
   ARegion *region;
-  if (BKE_id_remapper_apply(mappings, (ID **)v3d->camera, ID_REMAP_APPLY_DEFAULT) ==
+  if (BKE_id_remapper_apply(mappings, (ID **)&v3d->camera, ID_REMAP_APPLY_DEFAULT) ==
       ID_REMAP_SOURCE_UNASSIGNED) {
     /* 3D view might be inactive, in that case needs to use slink->regionbase */
     ListBase *regionbase = (slink == area->spacedata.first) ? &area->regionbase :

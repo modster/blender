@@ -991,7 +991,7 @@ static void sequencer_buttons_region_listener(const wmRegionListenerParams *para
 
 static void sequencer_id_remap(ScrArea *UNUSED(area),
                                SpaceLink *slink,
-                               const struct IDMappings *mappings)
+                               const struct IDRemapper *mappings)
 {
   SpaceSeq *sseq = (SpaceSeq *)slink;
   BKE_id_remapper_apply(mappings, (ID **)&sseq->gpd, ID_REMAP_APPLY_DEFAULT);
