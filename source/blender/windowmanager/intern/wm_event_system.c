@@ -328,29 +328,24 @@ static void wm_main_remap_msgbus_notify(ID *old_id, ID *new_id, void *user_data)
   }
 }
 
-void WM_main_remap_editor_id_reference(ID *old_id, ID *new_id)
+void WM_main_remap_editor_id_reference(const struct IDRemapper *mappings)
 {
   Main *bmain = G_MAIN;
-
-  struct IDRemapper *remapper = BKE_id_remapper_create();
-  BKE_id_remapper_add(remapper, old_id, new_id);
 
   LISTBASE_FOREACH (bScreen *, screen, &bmain->screens) {
     LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
       LISTBASE_FOREACH (SpaceLink *, sl, &area->spacedata) {
-        ED_spacedata_id_remap(area, sl, remapper);
+        ED_spacedata_id_remap(area, sl, mappings);
       }
     }
   }
 
-  BKE_id_remapper_iter(remapper, wm_main_remap_assetlist, NULL);
+  BKE_id_remapper_iter(mappings, wm_main_remap_assetlist, NULL);
 
   wmWindowManager *wm = bmain->wm.first;
   if (wm && wm->message_bus) {
-    BKE_id_remapper_iter(remapper, wm_main_remap_msgbus_notify, wm->message_bus);
+    BKE_id_remapper_iter(mappings, wm_main_remap_msgbus_notify, wm->message_bus);
   }
-
-  BKE_id_remapper_free(remapper);
 }
 
 static void wm_notifier_clear(wmNotifier *note)

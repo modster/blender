@@ -456,11 +456,17 @@ static void libblock_remap_data(
 #endif
 }
 
-void BKE_libblock_remap_locked(Main *bmain, void *old_idv, void *new_idv, const short remap_flags)
+typedef struct LibblockRemapMultipleUserData {
+  Main *bmain;
+  short remap_flags;
+} LibBlockRemapMultipleUserData;
+static void libblock_remap_locked_ex(ID *old_id, ID *new_id, void *user_data)
 {
+  LibBlockRemapMultipleUserData *data = user_data;
+  Main *bmain = data->bmain;
+  const short remap_flags = data->remap_flags;
+
   IDRemap id_remap_data;
-  ID *old_id = old_idv;
-  ID *new_id = new_idv;
   int skipped_direct, skipped_refcounted;
 
   BLI_assert(old_id != NULL);
@@ -471,13 +477,6 @@ void BKE_libblock_remap_locked(Main *bmain, void *old_idv, void *new_idv, const 
 
   if (free_notifier_reference_cb) {
     free_notifier_reference_cb(old_id);
-  }
-
-  /* We assume editors do not hold references to their IDs... This is false in some cases
-   * (Image is especially tricky here),
-   * editors' code is to handle refcount (id->us) itself then. */
-  if (remap_editor_id_reference_cb) {
-    remap_editor_id_reference_cb(old_id, new_id);
   }
 
   skipped_direct = id_remap_data.skipped_direct;
@@ -547,9 +546,36 @@ void BKE_libblock_remap_locked(Main *bmain, void *old_idv, void *new_idv, const 
   BKE_main_unlock(bmain);
   libblock_remap_data_postprocess_nodetree_update(bmain, new_id);
   BKE_main_lock(bmain);
+}
+
+void BKE_libblock_remap_multiple_locked(Main *bmain,
+                                        const struct IDRemapper *mappings,
+                                        const short remap_flags)
+{
+  LibBlockRemapMultipleUserData user_data;
+  user_data.bmain = bmain;
+  user_data.remap_flags = remap_flags;
+  BKE_id_remapper_iter(mappings, libblock_remap_locked_ex, &user_data);
+
+  /* We assume editors do not hold references to their IDs... This is false in some cases
+   * (Image is especially tricky here),
+   * editors' code is to handle refcount (id->us) itself then. */
+  if (remap_editor_id_reference_cb) {
+    remap_editor_id_reference_cb(mappings);
+  }
 
   /* Full rebuild of DEG! */
   DEG_relations_tag_update(bmain);
+}
+
+void BKE_libblock_remap_locked(Main *bmain, void *old_idv, void *new_idv, const short remap_flags)
+{
+  struct IDRemapper *remapper = BKE_id_remapper_create();
+  ID *old_id = old_idv;
+  ID *new_id = new_idv;
+  BKE_id_remapper_add(remapper, old_id, new_id);
+  BKE_libblock_remap_multiple_locked(bmain, remapper, remap_flags);
+  BKE_id_remapper_free(remapper);
 }
 
 void BKE_libblock_remap(Main *bmain, void *old_idv, void *new_idv, const short remap_flags)

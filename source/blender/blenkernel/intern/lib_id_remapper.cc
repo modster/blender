@@ -18,6 +18,17 @@ struct IDRemapper {
   IDTypeFilter source_types = 0;
 
  public:
+  void clear()
+  {
+    mappings.clear();
+    source_types = 0;
+  }
+
+  bool is_empty() const
+  {
+    return mappings.is_empty();
+  }
+
   void add(ID *old_id, ID *new_id)
   {
     BLI_assert(old_id != nullptr);
@@ -101,6 +112,18 @@ void BKE_id_remapper_free(IDRemapper *id_remapper)
 {
   blender::bke::id::remapper::IDRemapper *remapper = unwrap(id_remapper);
   MEM_delete<blender::bke::id::remapper::IDRemapper>(remapper);
+}
+
+void BKE_id_remapper_clear(struct IDRemapper *id_remapper)
+{
+  blender::bke::id::remapper::IDRemapper *remapper = unwrap(id_remapper);
+  remapper->clear();
+}
+
+bool BKE_id_remapper_is_empty(const struct IDRemapper *id_remapper)
+{
+  const blender::bke::id::remapper::IDRemapper *remapper = unwrap_const(id_remapper);
+  return remapper->is_empty();
 }
 
 void BKE_id_remapper_add(IDRemapper *id_remapper, ID *old_id, ID *new_id)

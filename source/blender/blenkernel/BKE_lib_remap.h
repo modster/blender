@@ -39,6 +39,7 @@ extern "C" {
 #endif
 
 struct ID;
+struct IDRemapper;
 
 /* BKE_libblock_free, delete are declared in BKE_lib_id.h for convenience. */
 
@@ -100,6 +101,15 @@ enum {
 };
 
 /**
+ * Replace all references in given Main using the given \a mappings
+ *
+ * \note Is preferred over BKE_libblock_remap_locked due to performance.
+ */
+void BKE_libblock_remap_multiple_locked(struct Main *bmain,
+                                        const struct IDRemapper *mappings,
+                                        const short remap_flags) ATTR_NONNULL(1, 2);
+
+/**
  * Replace all references in given Main to \a old_id by \a new_id
  * (if \a new_id is NULL, it unlinks \a old_id).
  *
@@ -150,7 +160,7 @@ void BKE_libblock_relink_to_newid(struct Main *bmain, struct ID *id, const int r
     ATTR_NONNULL();
 
 typedef void (*BKE_library_free_notifier_reference_cb)(const void *);
-typedef void (*BKE_library_remap_editor_id_reference_cb)(struct ID *, struct ID *);
+typedef void (*BKE_library_remap_editor_id_reference_cb)(const struct IDRemapper *mappings);
 
 void BKE_library_callback_free_notifier_reference_set(BKE_library_free_notifier_reference_cb func);
 void BKE_library_callback_remap_editor_id_reference_set(
@@ -184,6 +194,8 @@ typedef void (*IDRemapperIterFunction)(struct ID *old_id, struct ID *new_id, voi
  */
 struct IDRemapper *BKE_id_remapper_create(void);
 
+void BKE_id_remapper_clear(struct IDRemapper *id_remapper);
+bool BKE_id_remapper_is_empty(const struct IDRemapper *id_remapper);
 /** \brief Free the given ID Remapper. */
 void BKE_id_remapper_free(struct IDRemapper *id_remapper);
 /** \brief Add a new remapping. */
