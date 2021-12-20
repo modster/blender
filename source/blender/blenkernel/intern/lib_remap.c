@@ -587,6 +587,17 @@ void BKE_libblock_remap(Main *bmain, void *old_idv, void *new_idv, const short r
   BKE_main_unlock(bmain);
 }
 
+void BKE_libblock_remap_multiple(Main *bmain,
+                                 const struct IDRemapper *mappings,
+                                 const short remap_flags)
+{
+  BKE_main_lock(bmain);
+
+  BKE_libblock_remap_multiple_locked(bmain, mappings, remap_flags);
+
+  BKE_main_unlock(bmain);
+}
+
 void BKE_libblock_unlink(Main *bmain,
                          void *idv,
                          const bool do_flag_never_null,

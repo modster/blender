@@ -107,8 +107,11 @@ enum {
  */
 void BKE_libblock_remap_multiple_locked(struct Main *bmain,
                                         const struct IDRemapper *mappings,
-                                        const short remap_flags) ATTR_NONNULL(1, 2);
+                                        const short remap_flags);
 
+void BKE_libblock_remap_multiple(struct Main *bmain,
+                                 const struct IDRemapper *mappings,
+                                 const short remap_flags);
 /**
  * Replace all references in given Main to \a old_id by \a new_id
  * (if \a new_id is NULL, it unlinks \a old_id).
