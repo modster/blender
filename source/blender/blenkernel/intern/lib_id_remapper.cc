@@ -32,7 +32,7 @@ struct IDRemapper {
   void add(ID *old_id, ID *new_id)
   {
     BLI_assert(old_id != nullptr);
-    mappings.add_as(old_id, new_id);
+    mappings.add(old_id, new_id);
     source_types |= BKE_idtype_idcode_to_idfilter(GS(old_id->name));
   }
 
@@ -81,7 +81,6 @@ struct IDRemapper {
 
 }  // namespace blender::bke::id::remapper
 
-extern "C" {
 /** \brief wrap CPP IDRemapper to a C handle. */
 static IDRemapper *wrap(blender::bke::id::remapper::IDRemapper *remapper)
 {
@@ -95,11 +94,13 @@ static blender::bke::id::remapper::IDRemapper *unwrap(IDRemapper *remapper)
 }
 
 /** \brief wrap C handle to a CPP IDRemapper. */
-static const blender::bke::id::remapper::IDRemapper *unwrap_const(const IDRemapper *remapper)
+static const blender::bke::id::remapper::IDRemapper *unwrap(const IDRemapper *remapper)
 {
   return static_cast<const blender::bke::id::remapper::IDRemapper *>(
       static_cast<const void *>(remapper));
 }
+
+extern "C" {
 
 IDRemapper *BKE_id_remapper_create(void)
 {
@@ -122,7 +123,7 @@ void BKE_id_remapper_clear(struct IDRemapper *id_remapper)
 
 bool BKE_id_remapper_is_empty(const struct IDRemapper *id_remapper)
 {
-  const blender::bke::id::remapper::IDRemapper *remapper = unwrap_const(id_remapper);
+  const blender::bke::id::remapper::IDRemapper *remapper = unwrap(id_remapper);
   return remapper->is_empty();
 }
 
@@ -134,7 +135,7 @@ void BKE_id_remapper_add(IDRemapper *id_remapper, ID *old_id, ID *new_id)
 
 bool BKE_id_remapper_has_mapping_for(const struct IDRemapper *id_remapper, uint64_t type_filter)
 {
-  const blender::bke::id::remapper::IDRemapper *remapper = unwrap_const(id_remapper);
+  const blender::bke::id::remapper::IDRemapper *remapper = unwrap(id_remapper);
   return remapper->contains_mappings_for_any(type_filter);
 }
 
@@ -142,7 +143,7 @@ IDRemapperApplyResult BKE_id_remapper_apply(const IDRemapper *id_remapper,
                                             ID **id_ptr_ptr,
                                             const IDRemapperApplyOptions options)
 {
-  const blender::bke::id::remapper::IDRemapper *remapper = unwrap_const(id_remapper);
+  const blender::bke::id::remapper::IDRemapper *remapper = unwrap(id_remapper);
   return remapper->apply(id_ptr_ptr, options);
 }
 
@@ -150,7 +151,7 @@ void BKE_id_remapper_iter(const struct IDRemapper *id_remapper,
                           IDRemapperIterFunction func,
                           void *user_data)
 {
-  const blender::bke::id::remapper::IDRemapper *remapper = unwrap_const(id_remapper);
+  const blender::bke::id::remapper::IDRemapper *remapper = unwrap(id_remapper);
   remapper->iter(func, user_data);
 }
 }
