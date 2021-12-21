@@ -1301,9 +1301,11 @@ bool BKE_lib_override_library_resync(Main *bmain,
         }
       }
     }
+    FOREACH_MAIN_ID_END;
+
     /* Remap all IDs to use the new override. */
     BKE_libblock_remap_multiple(bmain, remapper, 0);
-    FOREACH_MAIN_ID_END;
+    BKE_id_remapper_free(remapper);
   }
 
   BKE_main_collection_sync(bmain);
