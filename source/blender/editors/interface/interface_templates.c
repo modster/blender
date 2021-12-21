@@ -435,7 +435,7 @@ static void id_search_cb(const bContext *C,
   /* ID listbase */
   LISTBASE_FOREACH (ID *, id, lb) {
     if (id_search_allows_id(template_ui, flag, id, str)) {
-      BLI_string_search_add(search, id->name + 2, id);
+      BLI_string_search_add(search, id->name + 2, id, 0);
     }
   }
 
@@ -470,7 +470,7 @@ static void id_search_cb_tagged(const bContext *C,
   LISTBASE_FOREACH (ID *, id, lb) {
     if (id->tag & LIB_TAG_DOIT) {
       if (id_search_allows_id(template_ui, flag, id, str)) {
-        BLI_string_search_add(search, id->name + 2, id);
+        BLI_string_search_add(search, id->name + 2, id, 0);
       }
       id->tag &= ~LIB_TAG_DOIT;
     }
@@ -2234,8 +2234,6 @@ void uiTemplateGpencilModifiers(uiLayout *UNUSED(layout), bContext *C)
 
 /** \} */
 
-/** \} */
-
 #define ERROR_LIBDATA_MESSAGE TIP_("Can't edit external library data")
 
 /* -------------------------------------------------------------------- */
@@ -2674,7 +2672,7 @@ static void constraint_ops_extra_draw(bContext *C, uiLayout *layout, void *con_v
 
 static void draw_constraint_header(uiLayout *layout, Object *ob, bConstraint *con)
 {
-  bPoseChannel *pchan = BKE_pose_channel_active(ob);
+  bPoseChannel *pchan = BKE_pose_channel_active_if_layer_visible(ob);
   short proxy_protected, xco = 0, yco = 0;
   // int rb_col; // UNUSED
 

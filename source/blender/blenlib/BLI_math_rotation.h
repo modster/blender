@@ -32,6 +32,10 @@
 extern "C" {
 #endif
 
+/* -------------------------------------------------------------------- */
+/** \name Conversion Defines
+ * \{ */
+
 #define RAD2DEG(_rad) ((_rad) * (180.0 / M_PI))
 #define DEG2RAD(_deg) ((_deg) * (M_PI / 180.0))
 
@@ -53,7 +57,8 @@ void unit_axis_angle(float axis[3], float *angle);
 void unit_qt(float q[4]);
 void copy_qt_qt(float q[4], const float a[4]);
 
-/* arithmetic */
+/* Arithmetic. */
+
 void mul_qt_qtqt(float q[4], const float a[4], const float b[4]);
 /**
  * \note
@@ -102,7 +107,8 @@ float dot_qtqt(const float a[4], const float b[4]);
 float normalize_qt(float q[4]);
 float normalize_qt_qt(float r[4], const float q[4]);
 
-/* comparison */
+/* Comparison. */
+
 bool is_zero_qt(const float q[4]);
 
 /* interpolation */
@@ -114,11 +120,12 @@ bool is_zero_qt(const float q[4]);
  * \param cosom: dot product from normalized vectors/quats.
  * \param r_w: calculated weights.
  */
-void interp_dot_slerp(const float t, const float cosom, float w[2]);
+void interp_dot_slerp(const float t, const float cosom, float r_w[2]);
 void interp_qt_qtqt(float q[4], const float a[4], const float b[4], const float t);
 void add_qt_qtqt(float q[4], const float a[4], const float b[4], const float t);
 
-/* conversion */
+/* Conversion. */
+
 void quat_to_mat3(float mat[3][3], const float q[4]);
 void quat_to_mat4(float mat[4][4], const float q[4]);
 
@@ -184,7 +191,8 @@ float angle_signed_qtqt(const float q1[4], const float q2[4]);
  */
 void mat3_to_quat_is_ok(float q[4], const float mat[3][3]);
 
-/* other */
+/* Other. */
+
 void print_qt(const char *str, const float q[4]);
 
 #define print_qt_id(q) print_qt(STRINGIFY(q), q)
@@ -195,7 +203,8 @@ void print_qt(const char *str, const float q[4]);
 /** \name Axis Angle
  * \{ */
 
-/* conversion */
+/* Conversion. */
+
 void axis_angle_normalized_to_quat(float r[4], const float axis[3], const float angle);
 void axis_angle_to_quat(float r[4], const float axis[3], const float angle);
 /**
@@ -267,31 +276,24 @@ void expmap_to_quat(float r[4], const float expmap[3]);
 /** \name XYZ Eulers
  * \{ */
 
-/* XYZ order. */
 void eul_to_quat(float quat[4], const float eul[3]);
-/* XYZ order */
 void eul_to_mat3(float mat[3][3], const float eul[3]);
-/* XYZ order */
 void eul_to_mat4(float mat[4][4], const float eul[3]);
 
-/* XYZ order */
 void mat3_normalized_to_eul(float eul[3], const float mat[3][3]);
-/* XYZ order */
 void mat4_normalized_to_eul(float eul[3], const float mat[4][4]);
 void mat3_to_eul(float eul[3], const float mat[3][3]);
 void mat4_to_eul(float eul[3], const float mat[4][4]);
-/* XYZ order */
 void quat_to_eul(float eul[3], const float quat[4]);
 
-/* XYZ order */
 void mat3_normalized_to_compatible_eul(float eul[3], const float old[3], float mat[3][3]);
 void mat3_to_compatible_eul(float eul[3], const float old[3], float mat[3][3]);
 void quat_to_compatible_eul(float eul[3], const float oldrot[3], const float quat[4]);
-/* order independent! */
-void compatible_eul(float eul[3], const float old[3]);
-
-/* XYZ order */
 void rotate_eul(float eul[3], const char axis, const float angle);
+
+/* Order independent. */
+
+void compatible_eul(float eul[3], const float old[3]);
 
 void add_eul_euleul(float r_eul[3], float a[3], float b[3], const short order);
 void sub_eul_euleul(float r_eul[3], float a[3], float b[3], const short order);

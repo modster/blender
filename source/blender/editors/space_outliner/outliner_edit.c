@@ -38,6 +38,7 @@
 
 #include "BLT_translation.h"
 
+#include "BKE_action.h"
 #include "BKE_animsys.h"
 #include "BKE_appdir.h"
 #include "BKE_armature.h"
@@ -48,6 +49,7 @@
 #include "BKE_lib_query.h"
 #include "BKE_lib_remap.h"
 #include "BKE_main.h"
+#include "BKE_object.h"
 #include "BKE_report.h"
 #include "BKE_workspace.h"
 
@@ -77,8 +79,6 @@ static void outliner_show_active(SpaceOutliner *space_outliner,
                                  ARegion *region,
                                  TreeElement *te,
                                  ID *id);
-
-/** \} */
 
 /* -------------------------------------------------------------------- */
 /** \name Highlight on Cursor Motion Operator
@@ -656,7 +656,7 @@ static int outliner_id_remap_invoke(bContext *C, wmOperator *op, const wmEvent *
     outliner_id_remap_find_tree_element(C, op, &space_outliner->tree, fmval[1]);
   }
 
-  return WM_operator_props_dialog_popup(C, op, 200);
+  return WM_operator_props_dialog_popup(C, op, 400);
 }
 
 static const EnumPropertyItem *outliner_id_itemf(bContext *C,
@@ -705,6 +705,9 @@ void OUTLINER_OT_id_remap(wmOperatorType *ot)
 
   prop = RNA_def_enum(ot->srna, "id_type", rna_enum_id_type_items, ID_OB, "ID Type", "");
   RNA_def_property_translation_context(prop, BLT_I18NCONTEXT_ID_ID);
+  /* Changing ID type wont make sense, would return early with "Invalid old/new ID pair" anyways.
+   */
+  RNA_def_property_flag(prop, PROP_HIDDEN);
 
   prop = RNA_def_enum(ot->srna, "old_id", DummyRNA_NULL_items, 0, "Old ID", "Old ID to replace");
   RNA_def_property_enum_funcs_runtime(prop, NULL, NULL, outliner_id_itemf);
@@ -1264,7 +1267,8 @@ static TreeElement *outliner_show_active_get_element(bContext *C,
     TreeElement *te_obact = te;
 
     if (obact->mode & OB_MODE_POSE) {
-      bPoseChannel *pchan = CTX_data_active_pose_bone(C);
+      Object *obpose = BKE_object_pose_armature_get(obact);
+      bPoseChannel *pchan = BKE_pose_channel_active(obpose, false);
       if (pchan) {
         te = outliner_find_posechannel(&te_obact->subtree, pchan);
       }
@@ -2226,8 +2230,6 @@ static bool ed_operator_outliner_id_orphans_active(bContext *C)
   }
   return true;
 }
-
-/** \} */
 
 static int outliner_orphans_purge_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
 {

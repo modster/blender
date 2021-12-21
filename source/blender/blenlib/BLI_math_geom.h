@@ -37,8 +37,6 @@
 extern "C" {
 #endif
 
-/** \} */
-
 /* -------------------------------------------------------------------- */
 /** \name Polygons
  * \{ */
@@ -333,8 +331,8 @@ double closest_to_line_v2_db(double r_close[2],
                              const double l1[2],
                              const double l2[2]);
 /**
- * Find closest point to p on line through (l1, l2) and return lambda,
- * where (0 <= lambda <= 1) when cp is in the line segment (l1, l2).
+ * Find closest point to p on line through (`l1`, `l2`) and return lambda,
+ * where (0 <= lambda <= 1) when `p` is in the line segment (`l1`, `l2`).
  */
 float closest_to_line_v3(float r_close[3], const float p[3], const float l1[3], const float l2[3]);
 /**
@@ -443,7 +441,9 @@ void isect_seg_seg_v3(const float a0[3],
                       float r_a[3],
                       float r_b[3]);
 
-/* intersect Line-Line, shorts */
+/**
+ * Intersect Line-Line, integer.
+ */
 int isect_seg_seg_v2_int(const int v1[2], const int v2[2], const int v3[2], const int v4[2]);
 /**
  * Get intersection point of two 2D segments.
@@ -931,7 +931,7 @@ void interp_weights_quad_v3(float w[4],
 void interp_weights_poly_v3(float w[], float v[][3], const int n, const float co[3]);
 void interp_weights_poly_v2(float w[], float v[][2], const int n, const float co[2]);
 
-/* (x1, v1)(t1=0)------(x2, v2)(t2=1), 0<t<1 --> (x, v)(t) */
+/** `(x1, v1)(t1=0)------(x2, v2)(t2=1), 0<t<1 --> (x, v)(t)`. */
 void interp_cubic_v3(float x[3],
                      float v[3],
                      const float x1[3],

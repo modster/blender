@@ -43,6 +43,9 @@ struct bNodeLink;
 struct bNodeSocket;
 struct wmGizmoGroupType;
 struct wmKeyConfig;
+namespace blender {
+struct float2;
+}
 struct wmWindow;
 
 /** Temporary data used in node link drag modal operator. */
@@ -50,14 +53,29 @@ struct bNodeLinkDrag {
   /** Links dragged by the operator. */
   blender::Vector<bNodeLink *> links;
   bool from_multi_input_socket;
-  int in_out;
+  eNodeSocketInOut in_out;
+
+  /** Draw handler for the "+" icon when dragging a link in empty space. */
+  void *draw_handle;
 
   /** Temporarily stores the last picked link from multi-input socket operator. */
-  struct bNodeLink *last_picked_multi_input_socket_link;
+  bNodeLink *last_picked_multi_input_socket_link;
 
-  /** Temporarily stores the last hovered socket for multi-input socket operator.
-   *  Store it to recalculate sorting after it is no longer hovered. */
-  struct bNode *last_node_hovered_while_dragging_a_link;
+  /**
+   * Temporarily stores the last hovered socket for multi-input socket operator.
+   * Store it to recalculate sorting after it is no longer hovered.
+   */
+  bNode *last_node_hovered_while_dragging_a_link;
+
+  /* The cursor position, used for drawing a + icon when dragging a node link. */
+  std::array<int, 2> cursor;
+
+  /** The node the drag started at. */
+  bNode *start_node;
+  /** The socket the drag started at. */
+  bNodeSocket *start_socket;
+  /** The number of links connected to the #start_socket when the drag started. */
+  int start_link_count;
 
   /* Data for edge panning */
   View2DEdgePanData pan_data;
@@ -110,7 +128,6 @@ void node_socket_color_get(const bContext &C,
                            PointerRNA &node_ptr,
                            const bNodeSocket &sock,
                            float r_color[4]);
-void node_update_nodetree(const bContext &C, bNodeTree &ntree);
 void node_draw_space(const bContext &C, ARegion &region);
 
 void node_set_cursor(wmWindow &win, SpaceNode &snode, const blender::float2 &cursor);
@@ -218,7 +235,6 @@ void sort_multi_input_socket_links(SpaceNode &snode,
                                    bNode &node,
                                    bNodeLink *drag_link,
                                    const blender::float2 *cursor);
-bool node_connected_to_output(Main &bmain, bNodeTree &ntree, bNode &node);
 
 void NODE_OT_link(wmOperatorType *ot);
 void NODE_OT_link_make(wmOperatorType *ot);
@@ -235,12 +251,8 @@ void NODE_OT_link_viewer(wmOperatorType *ot);
 
 void NODE_OT_insert_offset(wmOperatorType *ot);
 
-void snode_notify(bContext &C, SpaceNode &snode);
-void snode_dag_update(bContext &C, SpaceNode &snode);
 void snode_set_context(const bContext &C);
 
-void snode_update(SpaceNode &snode, bNode *node);
-/** Operator poll callback. */
 bool composite_node_active(bContext *C);
 /** Operator poll callback. */
 bool composite_node_editable(bContext *C);
@@ -328,4 +340,9 @@ namespace blender::ed::space_node {
 
 Vector<ui::ContextPathItem> context_path_for_space_node(const bContext &C);
 
-}
+void invoke_node_link_drag_add_menu(bContext &C,
+                                    bNode &node,
+                                    bNodeSocket &socket,
+                                    const float2 &cursor);
+
+}  // namespace blender::ed::space_node

@@ -91,7 +91,7 @@ typedef struct UndoStep {
   /** When this is true, undo/memfile read code is allowed to re-use old data-blocks for unchanged
    * IDs, and existing depsgraphes. This has to be forbidden in some cases (like renamed IDs). */
   bool use_old_bmain_data;
-  /** For use by undo systems that accumulate changes (text editor, painting). */
+  /** For use by undo systems that accumulate changes (mesh-sculpt & image-painting). */
   bool is_applied;
   /* Over alloc 'type->struct_size'. */
 } UndoStep;
@@ -171,17 +171,20 @@ typedef enum eUndoTypeFlags {
   UNDOTYPE_FLAG_DECODE_ACTIVE_STEP = 1 << 1,
 } eUndoTypeFlags;
 
-/* Expose since we need to perform operations on specific undo types (rarely). */
+/* -------------------------------------------------------------------- */
 /** \name Public Undo Types
  *
- * Unfortunately we need this for a handful of places.
+ * Expose since we need to perform operations on specific undo types (rarely).
  * \{ */
+
 extern const UndoType *BKE_UNDOSYS_TYPE_IMAGE;
 extern const UndoType *BKE_UNDOSYS_TYPE_MEMFILE;
 extern const UndoType *BKE_UNDOSYS_TYPE_PAINTCURVE;
 extern const UndoType *BKE_UNDOSYS_TYPE_PARTICLE;
 extern const UndoType *BKE_UNDOSYS_TYPE_SCULPT;
 extern const UndoType *BKE_UNDOSYS_TYPE_TEXT;
+
+/** \} */
 
 #define BKE_UNDOSYS_TYPE_IS_MEMFILE_SKIP(ty) ELEM(ty, BKE_UNDOSYS_TYPE_IMAGE)
 
