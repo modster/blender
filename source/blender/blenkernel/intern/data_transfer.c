@@ -1635,7 +1635,6 @@ bool BKE_object_data_transfer_ex(struct Depsgraph *depsgraph,
       const int num_polys_dst = me_dst->totpoly;
       MLoop *loops_dst = me_dst->mloop;
       const int num_loops_dst = me_dst->totloop;
-      CustomData *pdata_dst = &me_dst->pdata;
       CustomData *ldata_dst = &me_dst->ldata;
 
       MeshRemapIslandsCalc island_callback = data_transfer_get_loop_islands_generator(cddata_type);
@@ -1679,7 +1678,6 @@ bool BKE_object_data_transfer_ex(struct Depsgraph *depsgraph,
                                             polys_dst,
                                             num_polys_dst,
                                             ldata_dst,
-                                            pdata_dst,
                                             (me_dst->flag & ME_AUTOSMOOTH) != 0,
                                             me_dst->smoothresh,
                                             dirty_nors_dst,
@@ -1730,7 +1728,6 @@ bool BKE_object_data_transfer_ex(struct Depsgraph *depsgraph,
       const int num_polys_dst = me_dst->totpoly;
       MLoop *loops_dst = me_dst->mloop;
       const int num_loops_dst = me_dst->totloop;
-      CustomData *pdata_dst = &me_dst->pdata;
 
       if (!geom_map_init[PDATA]) {
         const int num_polys_src = me_src->totpoly;
@@ -1763,13 +1760,9 @@ bool BKE_object_data_transfer_ex(struct Depsgraph *depsgraph,
                                             ray_radius,
                                             me_dst,
                                             verts_dst,
-                                            num_verts_dst,
                                             loops_dst,
-                                            num_loops_dst,
                                             polys_dst,
                                             num_polys_dst,
-                                            pdata_dst,
-                                            dirty_nors_dst,
                                             me_src,
                                             &geom_map[PDATA]);
         geom_map_init[PDATA] = true;

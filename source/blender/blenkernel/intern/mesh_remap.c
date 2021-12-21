@@ -1255,7 +1255,6 @@ void BKE_mesh_remap_calc_loops_from_mesh(const int mode,
                                          MPoly *polys_dst,
                                          const int numpolys_dst,
                                          CustomData *ldata_dst,
-                                         CustomData *pdata_dst,
                                          const bool use_split_nors_dst,
                                          const float split_angle_dst,
                                          const bool dirty_nors_dst,
@@ -1303,7 +1302,7 @@ void BKE_mesh_remap_calc_loops_from_mesh(const int mode,
 
     const float(*poly_nors_src)[3] = NULL;
     const float(*loop_nors_src)[3] = NULL;
-    float(*poly_nors_dst)[3] = NULL;
+    const float(*poly_nors_dst)[3] = NULL;
     float(*loop_nors_dst)[3] = NULL;
 
     float(*poly_cents_src)[3] = NULL;
@@ -2178,19 +2177,15 @@ void BKE_mesh_remap_calc_polys_from_mesh(const int mode,
                                          const float ray_radius,
                                          Mesh *mesh_dst,
                                          MVert *verts_dst,
-                                         const int numverts_dst,
                                          MLoop *loops_dst,
-                                         const int numloops_dst,
                                          MPoly *polys_dst,
                                          const int numpolys_dst,
-                                         CustomData *pdata_dst,
-                                         const bool dirty_nors_dst,
                                          Mesh *me_src,
                                          MeshPairRemap *r_map)
 {
   const float full_weight = 1.0f;
   const float max_dist_sq = max_dist * max_dist;
-  float(*poly_nors_dst)[3] = NULL;
+  const float(*poly_nors_dst)[3] = NULL;
   float tmp_co[3], tmp_no[3];
   int i;
 
