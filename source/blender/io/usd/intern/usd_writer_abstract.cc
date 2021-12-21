@@ -18,10 +18,14 @@
  */
 #include "usd_writer_abstract.h"
 #include "usd_hierarchy_iterator.h"
+#include "usd_writer_material.h"
 
 #include <pxr/base/tf/stringUtils.h>
 
+#include "BKE_customdata.h"
 #include "BLI_assert.h"
+
+#include "DNA_mesh_types.h"
 
 /* TfToken objects are not cheap to construct, so we do it once. */
 namespace usdtokens {
@@ -35,6 +39,47 @@ static const pxr::TfToken surface("surface", pxr::TfToken::Immortal);
 }  // namespace usdtokens
 
 namespace blender::io::usd {
+
+/* The following three utility function for getting active layers
+ * were coppied from the collada utils. */
+
+/* Returns name of the active layer of the given type or null
+ * if no such active layer is defined. */
+static const char *customData_get_active_layer_name(const CustomData *data, int type)
+{
+  /* get the layer index of the active layer of type */
+  int layer_index = CustomData_get_active_layer_index(data, type);
+  if (layer_index < 0) {
+    return nullptr;
+  }
+
+  return data->layers[layer_index].name;
+}
+
+/* Returns name of the active UV layer or the empty string if no active
+ * UV Layer defined. */
+static std::string get_active_uvlayer_name(Mesh *me)
+{
+  int num_layers = CustomData_number_of_layers(&me->ldata, CD_MLOOPUV);
+  if (num_layers) {
+    const char *layer_name = customData_get_active_layer_name(&me->ldata, CD_MLOOPUV);
+    if (layer_name) {
+      return std::string(layer_name);
+    }
+  }
+  return "";
+}
+
+/* Returns name of the acive Layer or empty String if no active UV Layer defined,
+ * assuming the Object is of type MESH. */
+static std::string get_active_uvlayer_name(Object *ob)
+{
+  if (!ob || !ob->type == OB_MESH) {
+    return "";
+  }
+  Mesh *me = static_cast<Mesh *>(ob->data);
+  return get_active_uvlayer_name(me);
+}
 
 USDAbstractWriter::USDAbstractWriter(const USDExporterContext &usd_export_context)
     : usd_export_context_(usd_export_context), frame_has_been_written_(false), is_animated_(false)
@@ -78,7 +123,8 @@ const pxr::SdfPath &USDAbstractWriter::usd_path() const
   return usd_export_context_.usd_path;
 }
 
-pxr::UsdShadeMaterial USDAbstractWriter::ensure_usd_material(Material *material)
+pxr::UsdShadeMaterial USDAbstractWriter::ensure_usd_material(Material *material,
+                                                             const HierarchyContext &context)
 {
   static pxr::SdfPath material_library_path("/_materials");
   pxr::UsdStageRefPtr stage = usd_export_context_.stage;
@@ -92,17 +138,14 @@ pxr::UsdShadeMaterial USDAbstractWriter::ensure_usd_material(Material *material)
   }
   usd_material = pxr::UsdShadeMaterial::Define(stage, usd_path);
 
-  /* Construct the shader. */
-  pxr::SdfPath shader_path = usd_path.AppendChild(usdtokens::preview_shader);
-  pxr::UsdShadeShader shader = pxr::UsdShadeShader::Define(stage, shader_path);
-  shader.CreateIdAttr(pxr::VtValue(usdtokens::preview_surface));
-  shader.CreateInput(usdtokens::diffuse_color, pxr::SdfValueTypeNames->Color3f)
-      .Set(pxr::GfVec3f(material->r, material->g, material->b));
-  shader.CreateInput(usdtokens::roughness, pxr::SdfValueTypeNames->Float).Set(material->roughness);
-  shader.CreateInput(usdtokens::metallic, pxr::SdfValueTypeNames->Float).Set(material->metallic);
-
-  /* Connect the shader and the material together. */
-  usd_material.CreateSurfaceOutput().ConnectToSource(shader, usdtokens::surface);
+  if (material->use_nodes && this->usd_export_context_.export_params.generate_preview_surface) {
+    std::string active_uv_name = get_active_uvlayer_name(context.object);
+    create_usd_preview_surface_material(
+      this->usd_export_context_, material, usd_material, active_uv_name);
+  }
+  else {
+    create_usd_viewport_material(this->usd_export_context_, material, usd_material);
+  }
 
   return usd_material;
 }
