@@ -74,7 +74,7 @@ static std::string get_active_uvlayer_name(Mesh *me)
  * assuming the Object is of type MESH. */
 static std::string get_active_uvlayer_name(Object *ob)
 {
-  if (!ob || !ob->type == OB_MESH) {
+  if (!ob || ob->type != OB_MESH) {
     return "";
   }
   Mesh *me = static_cast<Mesh *>(ob->data);
