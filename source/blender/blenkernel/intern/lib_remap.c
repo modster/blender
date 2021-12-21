@@ -552,6 +552,11 @@ void BKE_libblock_remap_multiple_locked(Main *bmain,
                                         const struct IDRemapper *mappings,
                                         const short remap_flags)
 {
+  if (BKE_id_remapper_is_empty(mappings)) {
+    /* Early exit nothing to do. */
+    return;
+  }
+
   LibBlockRemapMultipleUserData user_data;
   user_data.bmain = bmain;
   user_data.remap_flags = remap_flags;
