@@ -176,7 +176,9 @@ static std::string get_in_memory_texture_filename(bNode *node)
   return file_name;
 }
 
-static void export_in_memory_texture(Image *ima, const std::string &export_dir, const bool allow_overwrite)
+static void export_in_memory_texture(Image *ima,
+                                     const std::string &export_dir,
+                                     const bool allow_overwrite)
 {
   if (!ima) {
     return;
@@ -249,7 +251,9 @@ static void get_absolute_path(Image *ima, size_t path_len, char *r_path)
 
 /* If the given image is tiled, copy the image tiles to the given
  * destination directory. */
-static void copy_tiled_textures(Image *ima, const std::string &in_dest_dir, const bool allow_overwrite)
+static void copy_tiled_textures(Image *ima,
+                                const std::string &in_dest_dir,
+                                const bool allow_overwrite)
 {
   if (!ima || in_dest_dir.empty()) {
     return;
@@ -345,7 +349,6 @@ static void copy_single_file(Image *ima, const std::string &dest_dir, const bool
               << std::endl;
   }
 }
-
 
 /* Gets a NodeTexImage's filepath */
 static std::string get_node_tex_image_filepath(bNode *node)
@@ -535,9 +538,11 @@ void create_usd_preview_surface_material(const USDExporterContext &usd_export_co
                                          const std::string &default_uv)
 {
   /* Define a 'preview' scope beneath the material which will contain the preview shaders. */
-  pxr::UsdGeomScope::Define(usd_export_context.stage, usd_material.GetPath().AppendChild(usdtokens::preview));
+  pxr::UsdGeomScope::Define(usd_export_context.stage,
+                            usd_material.GetPath().AppendChild(usdtokens::preview));
 
-  pxr::TfToken default_uv_sampler = default_uv.empty() ? cyclestokens::UVMap : pxr::TfToken(default_uv);
+  pxr::TfToken default_uv_sampler = default_uv.empty() ? cyclestokens::UVMap :
+                                                         pxr::TfToken(default_uv);
 
   /* We only handle the first instance of either principled or
    * diffuse bsdf nodes in the material's node tree, because
@@ -701,7 +706,9 @@ void create_usd_preview_surface_material(const USDExporterContext &usd_export_co
     if (created_shader && input_node && input_node->type == SH_NODE_TEX_IMAGE) {
 
       if (usd_export_context.export_params.export_textures) {
-        export_texture(input_node, usd_export_context.stage, usd_export_context.export_params.overwrite_textures);
+        export_texture(input_node,
+                       usd_export_context.stage,
+                       usd_export_context.export_params.overwrite_textures);
       }
 
       bool found_uv_node = false;

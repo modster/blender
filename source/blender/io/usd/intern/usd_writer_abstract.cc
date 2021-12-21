@@ -141,7 +141,7 @@ pxr::UsdShadeMaterial USDAbstractWriter::ensure_usd_material(Material *material,
   if (material->use_nodes && this->usd_export_context_.export_params.generate_preview_surface) {
     std::string active_uv_name = get_active_uvlayer_name(context.object);
     create_usd_preview_surface_material(
-      this->usd_export_context_, material, usd_material, active_uv_name);
+        this->usd_export_context_, material, usd_material, active_uv_name);
   }
   else {
     create_usd_viewport_material(this->usd_export_context_, material, usd_material);
