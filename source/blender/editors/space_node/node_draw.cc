@@ -176,35 +176,6 @@ void ED_node_tag_update_id(ID *id)
   }
 }
 
-void ED_node_tag_update_nodetree(Main *bmain, bNodeTree *ntree, bNode *node)
-{
-  if (!ntree) {
-    return;
-  }
-
-  bool do_tag_update = true;
-  if (node != nullptr) {
-    if (!node_connected_to_output(*bmain, *ntree, *node)) {
-      do_tag_update = false;
-    }
-  }
-
-  /* Look through all datablocks to support groups. */
-  if (do_tag_update) {
-    FOREACH_NODETREE_BEGIN (bmain, tntree, id) {
-      /* Check if nodetree uses the group. */
-      if (ntreeHasTree(tntree, ntree)) {
-        ED_node_tag_update_id(id);
-      }
-    }
-    FOREACH_NODETREE_END;
-  }
-
-  if (ntree->type == NTREE_TEXTURE) {
-    ntreeTexCheckCyclics(ntree);
-  }
-}
-
 static bool compare_nodes(const bNode *a, const bNode *b)
 {
   /* These tell if either the node or any of the parent nodes is selected.
@@ -2418,9 +2389,11 @@ static void node_update_nodetree(const bContext &C,
     bNode &node = *nodes[i];
     uiBlock &block = *blocks[i];
     if (node.type == NODE_FRAME) {
-      frame_node_prepare_for_draw(node, nodes);
+      /* Frame sizes are calculated after all other nodes have calculating their #totr. */
+      continue;
     }
-    else if (node.type == NODE_REROUTE) {
+
+    if (node.type == NODE_REROUTE) {
       reroute_node_prepare_for_draw(node);
     }
     else {
@@ -2430,6 +2403,13 @@ static void node_update_nodetree(const bContext &C,
       else {
         node_update_basis(C, ntree, node, block);
       }
+    }
+  }
+
+  /* Now calculate the size of frame nodes, which can depend on the size of other nodes. */
+  for (const int i : nodes.index_range()) {
+    if (nodes[i]->type == NODE_FRAME) {
+      frame_node_prepare_for_draw(*nodes[i], nodes);
     }
   }
 }
