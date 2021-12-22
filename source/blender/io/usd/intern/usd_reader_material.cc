@@ -129,7 +129,7 @@ static pxr::SdfLayerHandle get_layer_handle(const pxr::UsdAttribute &Attribute)
  * on disk to determine the indices of the UDIM tiles that are available
  * to load.  Returns the path to the file corresponding to the lowest tile
  * index and an array containing valid tile indices in 'r_first_tile_path'
- * and 'r_tile_indices', respctively.  The function returns true if the
+ * and 'r_tile_indices', respectively.  The function returns true if the
  * given arguments are valid, if 'file_path' is a UDIM path and
  * if any tiles were found on disk; it returns false otherwise. */
 static bool get_udim_tiles(const std::string &file_path,
@@ -155,7 +155,7 @@ static bool get_udim_tiles(const std::string &file_path,
   /* Create a dummy UDIM path by replacing the '<UDIM>' token
    * with an arbitrary index, since this is the format expected
    * as input to the call BLI_path_sequence_decode().  We use the
-   * index 1001, but this will be rplaced by the actual index
+   * index 1001, but this will be replaced by the actual index
    * of the first tile found on disk. */
   std::string base_udim_path(file_path);
   base_udim_path.replace(udim_token_offset, 6, "1001");
