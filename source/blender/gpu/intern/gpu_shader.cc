@@ -284,13 +284,16 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
   std::string resources = shader->resources_declare(info);
 
   Vector<std::string> typedefs;
+  uint32_t builtins = 0;
   for (auto filename : info.typedef_sources_) {
-    typedefs.append(gpu_shader_dependency_get_resolved_source(filename.c_str()));
+    typedefs.append(gpu_shader_dependency_get_resolved_source(filename.c_str(), &builtins));
   }
 
   if (!info.vertex_source_.is_empty()) {
+    uint32_t vertex_builtins = builtins;
     std::string interface = shader->vertex_interface_declare(info);
-    std::string code = gpu_shader_dependency_get_resolved_source(info.vertex_source_.c_str());
+    std::string code = gpu_shader_dependency_get_resolved_source(info.vertex_source_.c_str(),
+                                                                 &vertex_builtins);
 
     Vector<const char *> sources;
     standard_defines(sources);
@@ -299,8 +302,8 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
       sources.append("#define USE_GEOMETRY_SHADER\n");
     }
     sources.append(defines.c_str());
-    for (auto &typedef : typedefs) {
-      sources.append(typedef.c_str());
+    for (auto &types : typedefs) {
+      sources.append(types.c_str());
     }
     sources.append(resources.c_str());
     sources.append(interface.c_str());
@@ -310,8 +313,10 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
   }
 
   if (!info.fragment_source_.is_empty()) {
+    uint32_t fragment_builtins = builtins;
     std::string interface = shader->fragment_interface_declare(info);
-    std::string code = gpu_shader_dependency_get_resolved_source(info.fragment_source_.c_str());
+    std::string code = gpu_shader_dependency_get_resolved_source(info.fragment_source_.c_str(),
+                                                                 &fragment_builtins);
 
     Vector<const char *> sources;
     standard_defines(sources);
@@ -320,8 +325,8 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
       sources.append("#define USE_GEOMETRY_SHADER\n");
     }
     sources.append(defines.c_str());
-    for (auto &typedef : typedefs) {
-      sources.append(typedef.c_str());
+    for (auto &types : typedefs) {
+      sources.append(types.c_str());
     }
     sources.append(resources.c_str());
     sources.append(interface.c_str());
@@ -331,15 +336,17 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
   }
 
   if (!info.geometry_source_.is_empty()) {
+    uint32_t geometry_builtins = builtins;
     std::string interface = shader->geometry_interface_declare(info);
-    std::string code = gpu_shader_dependency_get_resolved_source(info.geometry_source_.c_str());
+    std::string code = gpu_shader_dependency_get_resolved_source(info.geometry_source_.c_str(),
+                                                                 &geometry_builtins);
 
     Vector<const char *> sources;
     standard_defines(sources);
     sources.append("#define GPU_GEOMETRY_SHADER\n");
     sources.append(defines.c_str());
-    for (auto &typedef : typedefs) {
-      sources.append(typedef.c_str());
+    for (auto &types : typedefs) {
+      sources.append(types.c_str());
     }
     sources.append(resources.c_str());
     sources.append(interface.c_str());
@@ -349,14 +356,16 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
   }
 
   if (!info.compute_source_.is_empty()) {
-    std::string code = gpu_shader_dependency_get_resolved_source(info.compute_source_.c_str());
+    uint32_t compute_builtins = builtins;
+    std::string code = gpu_shader_dependency_get_resolved_source(info.compute_source_.c_str(),
+                                                                 &compute_builtins);
 
     Vector<const char *> sources;
     standard_defines(sources);
     sources.append("#define GPU_COMPUTE_SHADER\n");
     sources.append(defines.c_str());
-    for (auto &typedef : typedefs) {
-      sources.append(typedef.c_str());
+    for (auto &types : typedefs) {
+      sources.append(types.c_str());
     }
     sources.append(resources.c_str());
     sources.append(code.c_str());

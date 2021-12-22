@@ -61,8 +61,29 @@ enum class Type {
   BOOL,
 };
 
+enum class BuiltinBits {
+  /** Allow getting barycentic coordinates inside the fragment shader. NOTE: emulated on OpenGL. */
+  BARYCENTRIC_COORD = (1 << 0),
+  FRAG_COORD = (1 << 2),
+  FRONT_FACING = (1 << 4),
+  GLOBAL_INVOCATION_ID = (1 << 5),
+  INSTANCE_ID = (1 << 6),
+  LAYER = (1 << 7),
+  LOCAL_INVOCATION_ID = (1 << 8),
+  LOCAL_INVOCATION_INDEX = (1 << 9),
+  NUM_WORK_GROUP = (1 << 10),
+  POINT_COORD = (1 << 11),
+  POINT_SIZE = (1 << 12),
+  PRIMITIVE_ID = (1 << 13),
+  VERTEX_ID = (1 << 14),
+  WORK_GROUP_ID = (1 << 15),
+  WORK_GROUP_SIZE = (1 << 16),
+};
+ENUM_OPERATORS(BuiltinBits, BuiltinBits::WORK_GROUP_SIZE);
+
 /* Samplers & images. */
 enum class ImageType {
+  /** Color samplers/image. */
   FLOAT_BUFFER = 0,
   FLOAT_1D,
   FLOAT_1D_ARRAY,
@@ -87,10 +108,15 @@ enum class ImageType {
   UINT_3D,
   UINT_CUBE,
   UINT_CUBE_ARRAY,
+  /** Depth samplers (not supported as image). */
   SHADOW_2D,
   SHADOW_2D_ARRAY,
   SHADOW_CUBE,
   SHADOW_CUBE_ARRAY,
+  DEPTH_2D,
+  DEPTH_2D_ARRAY,
+  DEPTH_CUBE,
+  DEPTH_CUBE_ARRAY,
 };
 
 /* Storage qualifiers. */
@@ -176,7 +202,7 @@ struct ShaderCreateInfo {
   /** If true, all additionaly linked create info will be merged into this one. */
   bool finalized_ = false;
   /**
-   * Minimum length of all the resource names including each null terminator.
+   * Maximum length of all the resource names including each null terminator.
    * Only for names used by gpu::ShaderInterface.
    */
   size_t interface_names_size_ = 0;

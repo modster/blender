@@ -30,6 +30,7 @@
 #include "BLI_set.hh"
 #include "BLI_string_ref.hh"
 
+#include "gpu_shader_create_info.hh"
 #include "gpu_shader_dependency_private.h"
 
 extern "C" {
@@ -48,8 +49,57 @@ struct GPUSource {
   StringRefNull source;
   Set<GPUSource *> dependencies;
   bool dependencies_init = false;
+  shader::BuiltinBits builtins = (shader::BuiltinBits)0;
 
-  GPUSource(const char *file, const char *datatoc) : filename(file), source(datatoc){};
+  GPUSource(const char *file, const char *datatoc) : filename(file), source(datatoc)
+  {
+    /* Scan for builtins. */
+    /* FIXME: This can trigger false positive caused by disabled #if blocks. */
+    /* TODO(fclem): Could be made faster by scanning once. */
+    /* TODO(fclem): BARYCENTRIC_COORD. */
+    if (source.find("gl_FragCoord", 0)) {
+      builtins |= shader::BuiltinBits::FRAG_COORD;
+    }
+    if (source.find("gl_FrontFacing", 0)) {
+      builtins |= shader::BuiltinBits::FRONT_FACING;
+    }
+    if (source.find("gl_GlobalInvocationID", 0)) {
+      builtins |= shader::BuiltinBits::GLOBAL_INVOCATION_ID;
+    }
+    if (source.find("gl_InstanceID", 0)) {
+      builtins |= shader::BuiltinBits::INSTANCE_ID;
+    }
+    if (source.find("gl_Layer", 0)) {
+      builtins |= shader::BuiltinBits::LAYER;
+    }
+    if (source.find("gl_LocalInvocationID", 0)) {
+      builtins |= shader::BuiltinBits::LOCAL_INVOCATION_ID;
+    }
+    if (source.find("gl_LocalInvocationIndex", 0)) {
+      builtins |= shader::BuiltinBits::LOCAL_INVOCATION_INDEX;
+    }
+    if (source.find("gl_NumWorkGroup", 0)) {
+      builtins |= shader::BuiltinBits::NUM_WORK_GROUP;
+    }
+    if (source.find("gl_PointCoord", 0)) {
+      builtins |= shader::BuiltinBits::POINT_COORD;
+    }
+    if (source.find("gl_PointSize", 0)) {
+      builtins |= shader::BuiltinBits::POINT_SIZE;
+    }
+    if (source.find("gl_PrimitiveID", 0)) {
+      builtins |= shader::BuiltinBits::PRIMITIVE_ID;
+    }
+    if (source.find("gl_VertexID", 0)) {
+      builtins |= shader::BuiltinBits::VERTEX_ID;
+    }
+    if (source.find("gl_WorkGroupID", 0)) {
+      builtins |= shader::BuiltinBits::WORK_GROUP_ID;
+    }
+    if (source.find("gl_WorkGroupSize", 0)) {
+      builtins |= shader::BuiltinBits::WORK_GROUP_SIZE;
+    }
+  };
 
   void init_dependencies(const GPUSourceDictionnary &dict)
   {
@@ -91,9 +141,10 @@ struct GPUSource {
   }
 
   /* Returns the final string with all inlcudes done. */
-  void build(std::string &str)
+  void build(std::string &str, shader::BuiltinBits &out_builtins)
   {
     for (auto dep : dependencies) {
+      out_builtins |= builtins;
       str += dep->source;
     }
     str += source;
@@ -129,10 +180,12 @@ void gpu_shader_dependency_exit()
   delete g_sources;
 }
 
-char *gpu_shader_dependency_get_resolved_source(const char *shader_source_name)
+char *gpu_shader_dependency_get_resolved_source(const char *shader_source_name, uint32_t *builtins)
 {
   GPUSource *source = g_sources->lookup(shader_source_name);
   std::string str;
-  source->build(str);
+  shader::BuiltinBits out_builtins;
+  source->build(str, out_builtins);
+  *builtins |= (uint32_t)out_builtins;
   return strdup(str.c_str());
 }
