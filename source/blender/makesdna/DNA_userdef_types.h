@@ -30,7 +30,8 @@
 extern "C" {
 #endif
 
-/* themes; defines in BIF_resource.h */
+/* Themes; defines in `BIF_resource.h`. */
+
 struct ColorBand;
 
 /* ************************ style definitions ******************** */
@@ -50,8 +51,10 @@ typedef enum eUIFont_ID {
   /* UIFONT_CUSTOM2 = 3, */ /* UNUSED */
 } eUIFont_ID;
 
-/* default fonts to load/initialize */
-/* first font is the default (index 0), others optional */
+/**
+ * Default fonts to load/initialize.
+ * First font is the default (index 0), others optional.
+ */
 typedef struct uiFont {
   struct uiFont *next, *prev;
   /** 1024 = FILE_MAX. */
@@ -445,7 +448,7 @@ typedef enum eBackgroundGradientTypes {
   TH_BACKGROUND_GRADIENT_RADIAL = 2,
 } eBackgroundGradientTypes;
 
-/* set of colors for use as a custom color set for Objects/Bones wire drawing */
+/** Set of colors for use as a custom color set for Objects/Bones wire drawing. */
 typedef struct ThemeWireColor {
   unsigned char solid[4];
   unsigned char select[4];
@@ -652,6 +655,7 @@ typedef struct UserDef_Experimental {
   char no_proxy_to_override_conversion;
   char use_cycles_debug;
   char use_geometry_nodes_legacy;
+  char show_asset_debug_info;
   char SANITIZE_AFTER_HERE;
   /* The following options are automatically sanitized (set to 0)
    * when the release cycle is not alpha. */
@@ -662,7 +666,7 @@ typedef struct UserDef_Experimental {
   char use_sculpt_tools_tilt;
   char use_extended_asset_browser;
   char use_override_templates;
-  char _pad[3];
+  char _pad[2];
   /** `makesdna` does not allow empty structs. */
 } UserDef_Experimental;
 
@@ -958,7 +962,7 @@ typedef struct UserDef {
   UserDef_Runtime runtime;
 } UserDef;
 
-/* from blenkernel blender.c */
+/** From blenkernel `blender.c`. */
 extern UserDef U;
 
 /* ***************** USERDEF ****************** */

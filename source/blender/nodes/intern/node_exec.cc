@@ -28,20 +28,19 @@
 
 #include "BKE_global.h"
 #include "BKE_node.h"
+#include "BKE_node_tree_update.h"
 
 #include "MEM_guardedalloc.h"
 
 #include "node_exec.h"
 #include "node_util.h"
 
-/* supported socket types in old nodes */
 int node_exec_socket_use_stack(bNodeSocket *sock)
 {
   /* NOTE: INT supported as FLOAT. Only for EEVEE. */
   return ELEM(sock->type, SOCK_INT, SOCK_FLOAT, SOCK_VECTOR, SOCK_RGBA, SOCK_SHADER);
 }
 
-/* for a given socket, find the actual stack entry */
 bNodeStack *node_get_socket_stack(bNodeStack *stack, bNodeSocket *sock)
 {
   if (stack && sock && sock->stack_index >= 0) {
@@ -172,7 +171,7 @@ bNodeTreeExec *ntree_exec_begin(bNodeExecContext *context,
   /* Using global main here is likely totally wrong, not sure what to do about that one though...
    * We cannot even check ntree is in global main,
    * since most of the time it won't be (thanks to ntree design)!!! */
-  ntreeUpdateTree(G.main, ntree);
+  BKE_ntree_update_main_tree(G.main, ntree, nullptr);
 
   /* get a dependency-sorted list of nodes */
   ntreeGetDependencyList(ntree, &nodelist, &totnodes);

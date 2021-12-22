@@ -129,7 +129,7 @@ void BlenderSession::create_session()
   /* reset status/progress */
   last_status = "";
   last_error = "";
-  last_progress = -1.0f;
+  last_progress = -1.0;
   start_resize_time = 0.0;
 
   /* create session */
@@ -396,6 +396,13 @@ void BlenderSession::render(BL::Depsgraph &b_depsgraph_)
     /* set the current view */
     b_engine.active_view_set(b_rview_name.c_str());
 
+    /* Force update in this case, since the camera transform on each frame changes
+     * in different views. This could be optimized by somehow storing the animated
+     * camera transforms separate from the fixed stereo transform. */
+    if ((scene->need_motion() != Scene::MOTION_NONE) && view_index > 0) {
+      sync->tag_update();
+    }
+
     /* update scene */
     BL::Object b_camera_override(b_engine.camera_override());
     sync->sync_camera(b_render, b_camera_override, width, height, b_rview_name.c_str());
@@ -606,19 +613,6 @@ void BlenderSession::bake(BL::Depsgraph &b_depsgraph_,
   pass->set_type(bake_type_to_pass(bake_type, bake_filter));
   pass->set_include_albedo((bake_filter & BL::BakeSettings::pass_filter_COLOR));
 
-  if (pass->get_type() == PASS_COMBINED) {
-    /* Filtering settings for combined pass. */
-    Integrator *integrator = scene->integrator;
-    integrator->set_use_direct_light((bake_filter & BL::BakeSettings::pass_filter_DIRECT) != 0);
-    integrator->set_use_indirect_light((bake_filter & BL::BakeSettings::pass_filter_INDIRECT) !=
-                                       0);
-    integrator->set_use_diffuse((bake_filter & BL::BakeSettings::pass_filter_DIFFUSE) != 0);
-    integrator->set_use_glossy((bake_filter & BL::BakeSettings::pass_filter_GLOSSY) != 0);
-    integrator->set_use_transmission((bake_filter & BL::BakeSettings::pass_filter_TRANSMISSION) !=
-                                     0);
-    integrator->set_use_emission((bake_filter & BL::BakeSettings::pass_filter_EMIT) != 0);
-  }
-
   session->set_display_driver(nullptr);
   session->set_output_driver(make_unique<BlenderOutputDriver>(b_engine));
 
@@ -628,6 +622,24 @@ void BlenderSession::bake(BL::Depsgraph &b_depsgraph_,
     sync->sync_camera(b_render, b_camera_override, width, height, "");
     sync->sync_data(
         b_render, b_depsgraph, b_v3d, b_camera_override, width, height, &python_thread_state);
+
+    /* Filtering settings for combined pass. */
+    if (pass->get_type() == PASS_COMBINED) {
+      Integrator *integrator = scene->integrator;
+      integrator->set_use_direct_light((bake_filter & BL::BakeSettings::pass_filter_DIRECT) != 0);
+      integrator->set_use_indirect_light((bake_filter & BL::BakeSettings::pass_filter_INDIRECT) !=
+                                         0);
+      integrator->set_use_diffuse((bake_filter & BL::BakeSettings::pass_filter_DIFFUSE) != 0);
+      integrator->set_use_glossy((bake_filter & BL::BakeSettings::pass_filter_GLOSSY) != 0);
+      integrator->set_use_transmission(
+          (bake_filter & BL::BakeSettings::pass_filter_TRANSMISSION) != 0);
+      integrator->set_use_emission((bake_filter & BL::BakeSettings::pass_filter_EMIT) != 0);
+    }
+
+    /* Always use transparent background for baking. */
+    scene->background->set_transparent(true);
+
+    /* Load built-in images from Blender. */
     builtin_images_load();
   }
 
@@ -854,7 +866,7 @@ void BlenderSession::get_status(string &status, string &substatus)
   session->progress.get_status(status, substatus);
 }
 
-void BlenderSession::get_progress(float &progress, double &total_time, double &render_time)
+void BlenderSession::get_progress(double &progress, double &total_time, double &render_time)
 {
   session->progress.get_time(total_time, render_time);
   progress = session->progress.get_progress();
@@ -862,10 +874,10 @@ void BlenderSession::get_progress(float &progress, double &total_time, double &r
 
 void BlenderSession::update_bake_progress()
 {
-  float progress = session->progress.get_progress();
+  double progress = session->progress.get_progress();
 
   if (progress != last_progress) {
-    b_engine.update_progress(progress);
+    b_engine.update_progress((float)progress);
     last_progress = progress;
   }
 }
@@ -874,7 +886,7 @@ void BlenderSession::update_status_progress()
 {
   string timestatus, status, substatus;
   string scene_status = "";
-  float progress;
+  double progress;
   double total_time, remaining_time = 0, render_time;
   float mem_used = (float)session->stats.mem_used / 1024.0f / 1024.0f;
   float mem_peak = (float)session->stats.mem_peak / 1024.0f / 1024.0f;
@@ -918,7 +930,7 @@ void BlenderSession::update_status_progress()
     last_status_time = current_time;
   }
   if (progress != last_progress) {
-    b_engine.update_progress(progress);
+    b_engine.update_progress((float)progress);
     last_progress = progress;
   }
 

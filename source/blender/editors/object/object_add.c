@@ -130,7 +130,7 @@
 /** \name Local Enum Declarations
  * \{ */
 
-/* this is an exact copy of the define in rna_light.c
+/* This is an exact copy of the define in `rna_light.c`
  * kept here because of linking order.
  * Icons are only defined here */
 const EnumPropertyItem rna_enum_light_type_items[] = {
@@ -331,8 +331,6 @@ void ED_object_base_init_transform_on_add(Object *object, const float loc[3], co
   BKE_object_to_mat4(object, object->obmat);
 }
 
-/* Uses context to figure out transform for primitive.
- * Returns standard diameter. */
 float ED_object_new_primitive_matrix(bContext *C,
                                      Object *obedit,
                                      const float loc[3],
@@ -603,12 +601,6 @@ bool ED_object_add_generic_get_opts(bContext *C,
   return true;
 }
 
-/**
- * For object add primitive operators, or for object creation when `obdata != NULL`.
- * \param obdata: Assigned to #Object.data, with increased user count.
- *
- * \note Do not call undo push in this function (users of this function have to).
- */
 Object *ED_object_add_type_with_obdata(bContext *C,
                                        const int type,
                                        const char *name,
@@ -1657,21 +1649,31 @@ static int collection_instance_add_exec(bContext *C, wmOperator *op)
 
   PropertyRNA *prop_name = RNA_struct_find_property(op->ptr, "name");
   PropertyRNA *prop_location = RNA_struct_find_property(op->ptr, "location");
+  PropertyRNA *prop_session_uuid = RNA_struct_find_property(op->ptr, "session_uuid");
 
+  bool update_location_if_necessary = false;
   if (RNA_property_is_set(op->ptr, prop_name)) {
     char name[MAX_ID_NAME - 2];
     RNA_property_string_get(op->ptr, prop_name, name);
     collection = (Collection *)BKE_libblock_find_name(bmain, ID_GR, name);
+    update_location_if_necessary = true;
+  }
+  else if (RNA_property_is_set(op->ptr, prop_session_uuid)) {
+    const uint32_t session_uuid = (uint32_t)RNA_property_int_get(op->ptr, prop_session_uuid);
+    collection = (Collection *)BKE_libblock_find_session_uuid(bmain, ID_GR, session_uuid);
+    update_location_if_necessary = true;
+  }
+  else {
+    collection = BLI_findlink(&bmain->collections, RNA_enum_get(op->ptr, "collection"));
+  }
 
+  if (update_location_if_necessary) {
     int mval[2];
     if (!RNA_property_is_set(op->ptr, prop_location) && object_add_drop_xy_get(C, op, &mval)) {
       ED_object_location_from_view(C, loc);
       ED_view3d_cursor3d_position(C, mval, false, loc);
       RNA_property_float_set_array(op->ptr, prop_location, loc);
     }
-  }
-  else {
-    collection = BLI_findlink(&bmain->collections, RNA_enum_get(op->ptr, "collection"));
   }
 
   if (collection == NULL) {
@@ -1707,13 +1709,13 @@ static int object_instance_add_invoke(bContext *C, wmOperator *op, const wmEvent
     RNA_int_set(op->ptr, "drop_y", event->xy[1]);
   }
 
-  if (!RNA_struct_property_is_set(op->ptr, "name")) {
+  if (!RNA_struct_property_is_set(op->ptr, "name") &&
+      !RNA_struct_property_is_set(op->ptr, "session_uuid")) {
     return WM_enum_search_invoke(C, op, event);
   }
   return op->type->exec(C, op);
 }
 
-/* only used as menu */
 void OBJECT_OT_collection_instance_add(wmOperatorType *ot)
 {
   PropertyRNA *prop;
@@ -1739,6 +1741,16 @@ void OBJECT_OT_collection_instance_add(wmOperatorType *ot)
   RNA_def_property_flag(prop, PROP_ENUM_NO_TRANSLATE);
   ot->prop = prop;
   ED_object_add_generic_props(ot, false);
+
+  RNA_def_int(ot->srna,
+              "session_uuid",
+              0,
+              INT32_MIN,
+              INT32_MAX,
+              "Session UUID",
+              "Session UUID of the collection to add",
+              INT32_MIN,
+              INT32_MAX);
 
   object_add_drop_xy_props(ot);
 }
@@ -1973,8 +1985,7 @@ void OBJECT_OT_pointcloud_add(wmOperatorType *ot)
 /* -------------------------------------------------------------------- */
 /** \name Delete Object Operator
  * \{ */
-/* remove base from a specific scene */
-/* NOTE: now unlinks constraints as well. */
+
 void ED_object_base_free_and_unlink(Main *bmain, Scene *scene, Object *ob)
 {
   if (ID_REAL_USERS(ob) <= 1 && ID_EXTRA_USERS(ob) == 0 &&
@@ -1992,10 +2003,6 @@ void ED_object_base_free_and_unlink(Main *bmain, Scene *scene, Object *ob)
   BKE_scene_collections_object_remove(bmain, scene, ob, true);
 }
 
-/**
- * Remove base from a specific scene.
- * `ob` must not be indirectly used.
- */
 void ED_object_base_free_and_unlink_no_indirect_check(Main *bmain, Scene *scene, Object *ob)
 {
   BLI_assert(!BKE_library_ID_is_indirectly_used(bmain, ob));
@@ -3094,11 +3101,11 @@ static int object_convert_exec(bContext *C, wmOperator *op)
         basen = duplibase_for_convert(bmain, depsgraph, scene, view_layer, base, NULL);
         newob = basen->object;
 
-        /* Decrement original point-cloud's usage count. */
+        /* Decrement original point cloud's usage count. */
         PointCloud *pointcloud = newob->data;
         id_us_min(&pointcloud->id);
 
-        /* Make a new copy of the point-cloud. */
+        /* Make a new copy of the point cloud. */
         newob->data = BKE_id_copy(bmain, &pointcloud->id);
       }
       else {
@@ -3350,11 +3357,6 @@ static Base *object_add_duplicate_internal(Main *bmain,
   return basen;
 }
 
-/* single object duplicate, if dupflag==0, fully linked, else it uses the flags given */
-/* leaves selection of base/object unaltered.
- * NOTE: don't call this within a loop since clear_* funcs loop over the entire database.
- * NOTE: caller must do DAG_relations_tag_update(bmain);
- *       this is not done automatic since we may duplicate many objects in a batch */
 Base *ED_object_add_duplicate(
     Main *bmain, Scene *scene, ViewLayer *view_layer, Base *base, const eDupli_ID_Flags dupflag)
 {

@@ -70,6 +70,8 @@ NodeTreeRef::NodeTreeRef(bNodeTree *btree) : btree_(btree)
           break;
         }
       }
+      BLI_assert(internal_link.from_ != nullptr);
+      BLI_assert(internal_link.to_ != nullptr);
       node.internal_links_.append(&internal_link);
     }
 
@@ -262,7 +264,6 @@ void InputSocketRef::foreach_logical_origin(
           skipped_fn.call_safe(origin);
           skipped_fn.call_safe(mute_input);
           mute_input.foreach_logical_origin(origin_fn, skipped_fn, true, seen_sockets_stack);
-          break;
         }
       }
     }
@@ -442,9 +443,6 @@ static bool has_link_cycles_recursive(const NodeRef &node,
   return false;
 }
 
-/**
- * \return True when there is a link cycle. Unavailable sockets are ignored.
- */
 bool NodeTreeRef::has_link_cycles() const
 {
   const int node_amount = nodes_by_id_.size();
@@ -571,10 +569,6 @@ static void toposort_from_start_node(const NodeTreeRef::ToposortDirection direct
   }
 }
 
-/**
- * Sort nodes topologically from left to right or right to left.
- * In the future the result if this could be cached on #NodeTreeRef.
- */
 NodeTreeRef::ToposortResult NodeTreeRef::toposort(const ToposortDirection direction) const
 {
   ToposortResult result;

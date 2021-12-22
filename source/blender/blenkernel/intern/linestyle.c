@@ -50,6 +50,7 @@
 #include "BKE_linestyle.h"
 #include "BKE_main.h"
 #include "BKE_node.h"
+#include "BKE_node_tree_update.h"
 #include "BKE_texture.h"
 
 #include "BLO_read_write.h"
@@ -754,6 +755,7 @@ IDTypeInfo IDType_ID_LS = {
     .name_plural = "linestyles",
     .translation_context = BLT_I18NCONTEXT_ID_FREESTYLELINESTYLE,
     .flags = IDTYPE_FLAGS_APPEND_IS_REUSABLE,
+    .asset_type_info = NULL,
 
     .init_data = linestyle_init_data,
     .copy_data = linestyle_copy_data,
@@ -761,6 +763,7 @@ IDTypeInfo IDType_ID_LS = {
     .make_local = NULL,
     .foreach_id = linestyle_foreach_id,
     .foreach_cache = NULL,
+    .foreach_path = NULL,
     .owner_get = NULL,
 
     .blend_write = linestyle_blend_write,
@@ -1910,10 +1913,6 @@ int BKE_linestyle_geometry_modifier_remove(FreestyleLineStyle *linestyle, LineSt
   return 0;
 }
 
-/**
- * Reinsert \a modifier in modifier list with an offset of \a direction.
- * \return if position of \a modifier has changed.
- */
 bool BKE_linestyle_color_modifier_move(FreestyleLineStyle *linestyle,
                                        LineStyleModifier *modifier,
                                        int direction)
@@ -2087,5 +2086,5 @@ void BKE_linestyle_default_shader(const bContext *C, FreestyleLineStyle *linesty
   tosock = BLI_findlink(&output_linestyle->inputs, 0); /* Color */
   nodeAddLink(ntree, input_texure, fromsock, output_linestyle, tosock);
 
-  ntreeUpdateTree(CTX_data_main(C), ntree);
+  BKE_ntree_update_main_tree(CTX_data_main(C), ntree, NULL);
 }
