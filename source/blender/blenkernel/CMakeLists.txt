@@ -156,7 +156,7 @@ set(SRC
   intern/gpencil_curve.c
   intern/gpencil_geom.cc
   intern/gpencil_modifier.c
-  intern/hair.c
+  intern/hair.cc
   intern/icons.cc
   intern/icons_rasterize.c
   intern/idprop.c
@@ -226,6 +226,7 @@ set(SRC
   intern/multires_versioning.c
   intern/nla.c
   intern/node.cc
+  intern/node_tree_update.cc
   intern/type_conversions.cc
   intern/object.cc
   intern/object_deform.c
@@ -420,6 +421,7 @@ set(SRC
   BKE_multires.h
   BKE_nla.h
   BKE_node.h
+  BKE_node_tree_update.h
   BKE_object.h
   BKE_object_deform.h
   BKE_object_facemap.h
