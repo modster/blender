@@ -1248,7 +1248,7 @@ void CURVE_OT_pen(wmOperatorType *ot)
                       "extra_func",
                       prop_extra_func_types,
                       FREE_TOGGLE,
-                      "Extra Functionality",
+                      "Extra",
                       "Additional functionality assignable to a specified key");
   prop = RNA_def_enum(ot->srna,
                       "extra_key",
