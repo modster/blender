@@ -1273,7 +1273,7 @@ void CURVE_OT_pen(wmOperatorType *ot)
       ot->srna, "move_point", false, "Move Point", "Move a point or its handles");
   prop = RNA_def_boolean(ot->srna,
                          "close_spline",
-                         true,
+                         false,
                          "Close Spline",
                          "Make a spline cyclic by clicking endpoints");
 }
