@@ -1184,7 +1184,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
     else if (event->val == KM_RELEASE) {
       bool deleted = false;
 
-      if (!select_point && delete_point && !cpd->new_point && !cpd->dragging) {
+      if (delete_point && !cpd->new_point && !cpd->dragging) {
         if (ED_curve_editnurb_select_pick_thresholded(
                 C, event->mval, sel_dist_mul, false, false, false)) {
           deleted = delete_point_under_mouse(&vc, event);
