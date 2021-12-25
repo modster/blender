@@ -74,6 +74,20 @@ typedef struct MoveSegmentData {
   float t;
 } MoveSegmentData;
 
+typedef struct CurvePenData {
+  MoveSegmentData *msd;
+  /* Whether the mouse is clicking and dragging. */
+  bool dragging;
+  /* Whether a new point was added at the beginning of tool execution. */
+  bool new_point;
+  /* Whether a segment is being altered by click and drag. */
+  bool spline_nearby;
+  /* Whether the extra key was pressed before. */
+  bool extra_pressed;
+  /* Whether a point was found underneath the mouse. */
+  bool found_point;
+} CurvePenData;
+
 /* Enum to choose between the extra functionalities. */
 typedef enum eExtra_func { FREE_TOGGLE = 0, ADJ_HANDLE = 1 } eExtra_func;
 static const EnumPropertyItem prop_extra_func_types[] = {
@@ -796,7 +810,8 @@ static bool is_spline_nearby(ViewContext *vc, struct wmOperator *op, const wmEve
   if (data.min_dist < threshold_distance) {
     if (data.nurb && !data.nurb->bp && RNA_boolean_get(op->ptr, "move_segment")) {
       MoveSegmentData *seg_data;
-      op->customdata = seg_data = MEM_callocN(sizeof(MoveSegmentData), __func__);
+      CurvePenData *cpd = (CurvePenData *)(op->customdata);
+      cpd->msd = seg_data = MEM_callocN(sizeof(MoveSegmentData), __func__);
       seg_data->bezt_index = data.bezt_index;
       seg_data->nu = data.nurb;
       seg_data->t = data.parameter;
@@ -1030,20 +1045,20 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   Nurb *nu = NULL;
 
   int ret = OPERATOR_RUNNING_MODAL;
-  /* Whether the mouse is clicking and dragging. */
-  bool dragging = RNA_boolean_get(op->ptr, "dragging");
-  /* Whether a new point was added at the beginning of tool execution. */
-  const bool is_new_point = RNA_boolean_get(op->ptr, "new_point");
-  /* Whether a segment is being altered by click and drag. */
-  bool spline_nearby = RNA_boolean_get(op->ptr, "spline_nearby");
   /* Key binding set for the extra functionality. */
   const int extra_key = RNA_enum_get(op->ptr, "extra_key");
   /* The chosen extra functionality. */
   const int extra_func = RNA_enum_get(op->ptr, "extra_func");
-  /* Whether the extra key was pressed before. */
-  bool extra_pressed_before = RNA_boolean_get(op->ptr, "extra_pressed");
   /* Distance threshold for mouse clicks to affect the spline or its points */
   const float sel_dist_mul = RNA_float_get(op->ptr, "sel_dist_mul");
+
+  CurvePenData *cpd;
+  if (op->customdata == NULL) {
+    op->customdata = cpd = MEM_callocN(sizeof(CurvePenData), __func__);
+  }
+  else {
+    cpd = (CurvePenData *)(op->customdata);
+  }
 
   /* Main functionalities */
   const bool add_point = RNA_boolean_get(op->ptr, "add_point");
@@ -1054,14 +1069,13 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   const bool move_point = RNA_boolean_get(op->ptr, "move_point");
   const bool close_spline = RNA_boolean_get(op->ptr, "close_spline");
 
-  if (!extra_pressed_before && is_event_key_equal_to_extra_key(event->type, extra_key)) {
+  if (!cpd->extra_pressed && is_event_key_equal_to_extra_key(event->type, extra_key)) {
     ED_curve_nurb_vert_selected_find(vc.obedit->data, vc.v3d, &nu, &bezt, &bp);
     if (bezt) {
       if (extra_func == FREE_TOGGLE) {
         toggle_bezt_free_align_handles(bezt);
         BKE_nurb_handles_calc(nu);
-        RNA_boolean_set(op->ptr, "dragging", true);
-        dragging = true;
+        cpd->dragging = true;
       }
       else {
         BezTriple *adj_bezt = BKE_nurb_bezt_get_prev(nu, bezt);
@@ -1074,26 +1088,25 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
       }
     }
   }
-  extra_pressed_before = is_extra_key_pressed(event, extra_key);
-  RNA_boolean_set(op->ptr, "extra_pressed", extra_pressed_before);
+  cpd->extra_pressed = is_extra_key_pressed(event, extra_key);
 
   if (ELEM(event->type, MOUSEMOVE, INBETWEEN_MOUSEMOVE)) {
-    if (!dragging && WM_event_drag_test(event, event->prev_click_xy) && event->val == KM_PRESS) {
-      RNA_boolean_set(op->ptr, "dragging", true);
-      dragging = true;
+    if (!cpd->dragging && WM_event_drag_test(event, event->prev_click_xy) &&
+        event->val == KM_PRESS) {
+      cpd->dragging = true;
     }
-    if (dragging) {
-      if (spline_nearby && move_seg) {
-        MoveSegmentData *seg_data = op->customdata;
+    if (cpd->dragging) {
+      if (cpd->spline_nearby && move_seg) {
+        MoveSegmentData *seg_data = ((CurvePenData *)op->customdata)->msd;
         nu = seg_data->nu;
         move_segment(seg_data, event, &vc);
       }
-      else if (extra_pressed_before && extra_func == ADJ_HANDLE) {
+      else if (cpd->extra_pressed && extra_func == ADJ_HANDLE) {
         move_adjacent_handle(&vc, event);
       }
       /* If dragging a new control point, move handle point with mouse cursor. Else move entire
        * control point. */
-      else if (is_new_point) {
+      else if (cpd->new_point) {
         ED_curve_nurb_vert_selected_find(vc.obedit->data, vc.v3d, &nu, &bezt, &bp);
         if (bezt) {
           /* Move opposite handle if last vertex. */
@@ -1103,9 +1116,8 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
           move_bezt_handles_to_mouse(bezt, invert, event, &vc);
         }
       }
-      else if ((select_point || move_point) && !spline_nearby) {
-        if (ED_curve_editnurb_select_pick_thresholded(
-                C, event->mval, sel_dist_mul, false, false, false)) {
+      else if ((select_point || move_point) && !cpd->spline_nearby) {
+        if (cpd->found_point) {
           ED_curve_nurb_vert_selected_find(vc.obedit->data, vc.v3d, &nu, &bezt, &bp);
           if (move_point) {
             if (bezt) {
@@ -1135,42 +1147,42 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
                               make_cyclic_if_endpoints(nu, bezt, bp, &vc, C, sel_dist_mul);
 
           /* Set "new_point" to true to be able to click and drag to control handles when added. */
-          RNA_boolean_set(op->ptr, "new_point", closed);
+          cpd->new_point = closed;
         }
+        cpd->found_point = true;
       }
       else {
         if (is_spline_nearby(&vc, op, event)) {
-          RNA_boolean_set(op->ptr, "spline_nearby", true);
-          spline_nearby = true;
+          cpd->spline_nearby = true;
 
           /* If move segment is disabled,then insert point on key press and set
           "new_point" to true so that the new point's handles can be controlled. */
           if (insert_point && !move_seg) {
             insert_point_to_segment(event, vc.obedit->data, &nu, &vc);
-            RNA_boolean_set(op->ptr, "new_point", true);
+            cpd->new_point = true;
           }
         }
         else if (add_point) {
           add_vertex_connected_to_selected_vertex(&vc, obedit, event);
-          RNA_boolean_set(op->ptr, "new_point", true);
+          cpd->new_point = true;
         }
       }
     }
     else if (event->val == KM_RELEASE) {
       bool deleted = false;
 
-      if (!select_point && delete_point && !is_new_point && !dragging) {
+      if (!select_point && delete_point && !cpd->new_point && !cpd->dragging) {
         if (ED_curve_editnurb_select_pick_thresholded(
                 C, event->mval, sel_dist_mul, false, false, false)) {
           deleted = delete_point_under_mouse(&vc, event);
         }
       }
 
-      if (insert_point && spline_nearby) {
-        if (!dragging && !deleted) {
+      if ((insert_point || add_point) && cpd->spline_nearby) {
+        if (!cpd->dragging && !deleted) {
           if (insert_point && move_seg) {
             insert_point_to_segment(event, vc.obedit->data, &nu, &vc);
-            RNA_boolean_set(op->ptr, "new_point", true);
+            cpd->new_point = true;
           }
           else if (add_point) {
             add_vertex_connected_to_selected_vertex(&vc, obedit, event);
@@ -1178,14 +1190,10 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
         }
       }
 
-      if (op->customdata != NULL) {
-        MEM_freeN(op->customdata);
+      if (cpd->msd != NULL) {
+        MEM_freeN(cpd->msd);
       }
-
-      RNA_boolean_set(op->ptr, "dragging", false);
-      RNA_boolean_set(op->ptr, "new_point", false);
-      RNA_boolean_set(op->ptr, "spline_nearby", false);
-      RNA_boolean_set(op->ptr, "extra_pressed", false);
+      MEM_freeN(cpd);
       ret = OPERATOR_FINISHED;
     }
   }
@@ -1227,12 +1235,6 @@ void CURVE_OT_pen(wmOperatorType *ot)
   WM_operator_properties_mouse_select(ot);
 
   PropertyRNA *prop;
-  prop = RNA_def_boolean(ot->srna, "dragging", 0, "", "");
-  RNA_def_property_flag(prop, PROP_HIDDEN);
-  prop = RNA_def_boolean(ot->srna, "new_point", 0, "", "");
-  RNA_def_property_flag(prop, PROP_HIDDEN);
-  prop = RNA_def_boolean(ot->srna, "spline_nearby", 0, "", "");
-  RNA_def_property_flag(prop, PROP_HIDDEN);
   prop = RNA_def_float(ot->srna,
                        "sel_dist_mul",
                        0.4f,
@@ -1254,8 +1256,6 @@ void CURVE_OT_pen(wmOperatorType *ot)
                       SHIFT,
                       "Extra Key",
                       "Key used by the extra functionality");
-  prop = RNA_def_boolean(ot->srna, "extra_pressed", false, "", "");
-  RNA_def_property_flag(prop, PROP_HIDDEN);
   prop = RNA_def_boolean(ot->srna,
                          "add_point",
                          false,
