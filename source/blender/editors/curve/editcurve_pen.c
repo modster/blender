@@ -754,15 +754,20 @@ static void extrude_point_from_selected_vertex(const ViewContext *vc,
   BPoint *bp = NULL;
   Curve *cu = vc->obedit->data;
 
-  float location[3];
-
   ED_curve_nurb_vert_selected_find(cu, vc->v3d, &nu, &bezt, &bp);
 
   if (nu && !extrude_center && nu->pntsu > 2) {
     for (int i = 1; i < nu->pntsu - 1; i++) {
-      BEZT_DESEL_ALL(nu->bezt + i);
+      if (nu->type == CU_BEZIER) {
+        BEZT_DESEL_ALL(nu->bezt + i);
+      }
+      else {
+        (nu->bp + i)->f1 = ~SELECT;
+      }
     }
   }
+
+  float location[3];
 
   if (bezt) {
     mul_v3_m4v3(location, vc->obedit->obmat, bezt->vec[1]);
