@@ -1075,6 +1075,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
 
   const bool extrude_point = RNA_boolean_get(op->ptr, "extrude_point");
   const bool extrude_center = RNA_boolean_get(op->ptr, "extrude_center");
+  const bool new_spline = RNA_boolean_get(op->ptr, "new_spline");
   const bool delete_point = RNA_boolean_get(op->ptr, "delete_point");
   const bool insert_point = RNA_boolean_get(op->ptr, "insert_point");
   const bool move_seg = RNA_boolean_get(op->ptr, "move_segment");
@@ -1174,6 +1175,11 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
             insert_point_to_segment(event, vc.obedit->data, &nu, &vc);
             cpd->new_point = true;
           }
+        }
+        else if (new_spline) {
+          ED_curve_deselect_all(((Curve *)(vc.obedit->data))->editnurb);
+          extrude_point_from_selected_vertex(&vc, obedit, event, extrude_center);
+          cpd->new_point = true;
         }
         else if (extrude_point) {
           extrude_point_from_selected_vertex(&vc, obedit, event, extrude_center);
@@ -1279,6 +1285,7 @@ void CURVE_OT_pen(wmOperatorType *ot)
                          false,
                          "Extrude Internal",
                          "Allow extruding points from internal points");
+  prop = RNA_def_boolean(ot->srna, "new_spline", false, "New Spline", "Create a new spline");
   prop = RNA_def_boolean(
       ot->srna, "delete_point", false, "Delete Point", "Delete an existing point");
   prop = RNA_def_boolean(
