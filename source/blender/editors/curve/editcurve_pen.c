@@ -89,14 +89,15 @@ typedef struct CurvePenData {
 } CurvePenData;
 
 /* Enum to choose between the extra functionalities. */
-typedef enum eExtra_func { FREE_TOGGLE = 0, ADJ_HANDLE = 1 } eExtra_func;
+typedef enum eExtra_func { FREE_TOGGLE = 0, ADJ_HANDLE = 1, NO_EXTRA = 2 } eExtra_func;
 static const EnumPropertyItem prop_extra_func_types[] = {
-    {FREE_TOGGLE, "free_toggle", 0, "Free-Align Toggle", "Toggle between free and align handles."},
+    {FREE_TOGGLE, "FREE_TOGGLE", 0, "Free-Align Toggle", "Toggle between free and align handles."},
     {ADJ_HANDLE,
-     "adj_handle",
+     "ADJ_HANDLE",
      0,
      "Move Adjacent Handle",
      "Move the closer handle of the adjacent vertex."},
+    {NO_EXTRA, "NO_EXTRA", 0, "None", "No extra functionality."},
     {0, NULL, 0, NULL, NULL},
 };
 
@@ -743,9 +744,10 @@ static bool insert_point_to_segment(const wmEvent *event,
 }
 
 /* Add a new vertex connected to the selected vertex. */
-static void add_vertex_connected_to_selected_vertex(const ViewContext *vc,
-                                                    Object *obedit,
-                                                    const wmEvent *event)
+static void extrude_point_from_selected_vertex(const ViewContext *vc,
+                                               Object *obedit,
+                                               const wmEvent *event,
+                                               const bool extrude_center)
 {
   Nurb *nu = NULL;
   BezTriple *bezt = NULL;
@@ -755,6 +757,12 @@ static void add_vertex_connected_to_selected_vertex(const ViewContext *vc,
   float location[3];
 
   ED_curve_nurb_vert_selected_find(cu, vc->v3d, &nu, &bezt, &bp);
+
+  if (nu && !extrude_center && nu->pntsu > 2) {
+    for (int i = 1; i < nu->pntsu - 1; i++) {
+      BEZT_DESEL_ALL(nu->bezt + i);
+    }
+  }
 
   if (bezt) {
     mul_v3_m4v3(location, vc->obedit->obmat, bezt->vec[1]);
@@ -1060,8 +1068,8 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
     cpd = (CurvePenData *)(op->customdata);
   }
 
-  /* Main functionalities */
-  const bool add_point = RNA_boolean_get(op->ptr, "add_point");
+  const bool extrude_point = RNA_boolean_get(op->ptr, "extrude_point");
+  const bool extrude_center = RNA_boolean_get(op->ptr, "extrude_center");
   const bool delete_point = RNA_boolean_get(op->ptr, "delete_point");
   const bool insert_point = RNA_boolean_get(op->ptr, "insert_point");
   const bool move_seg = RNA_boolean_get(op->ptr, "move_segment");
@@ -1077,7 +1085,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
         BKE_nurb_handles_calc(nu);
         cpd->dragging = true;
       }
-      else {
+      else if (extra_func == ADJ_HANDLE) {
         BezTriple *adj_bezt = BKE_nurb_bezt_get_prev(nu, bezt);
         if (!adj_bezt) {
           adj_bezt = BKE_nurb_bezt_get_next(nu, bezt);
@@ -1162,8 +1170,8 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
             cpd->new_point = true;
           }
         }
-        else if (add_point) {
-          add_vertex_connected_to_selected_vertex(&vc, obedit, event);
+        else if (extrude_point) {
+          extrude_point_from_selected_vertex(&vc, obedit, event, extrude_center);
           cpd->new_point = true;
         }
       }
@@ -1178,14 +1186,14 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
         }
       }
 
-      if ((insert_point || add_point) && cpd->spline_nearby) {
+      if ((insert_point || extrude_point) && cpd->spline_nearby) {
         if (!cpd->dragging && !deleted) {
           if (insert_point && move_seg) {
             insert_point_to_segment(event, vc.obedit->data, &nu, &vc);
             cpd->new_point = true;
           }
-          else if (add_point) {
-            add_vertex_connected_to_selected_vertex(&vc, obedit, event);
+          else if (extrude_point) {
+            extrude_point_from_selected_vertex(&vc, obedit, event, extrude_center);
           }
         }
       }
@@ -1247,7 +1255,7 @@ void CURVE_OT_pen(wmOperatorType *ot)
   prop = RNA_def_enum(ot->srna,
                       "extra_func",
                       prop_extra_func_types,
-                      FREE_TOGGLE,
+                      NO_EXTRA,
                       "Extra",
                       "Additional functionality assignable to a specified key");
   prop = RNA_def_enum(ot->srna,
@@ -1257,10 +1265,15 @@ void CURVE_OT_pen(wmOperatorType *ot)
                       "Extra Key",
                       "Key used by the extra functionality");
   prop = RNA_def_boolean(ot->srna,
-                         "add_point",
+                         "extrude_point",
                          false,
-                         "Add Point",
+                         "Extrude Point",
                          "Add a point connected to the last selected point");
+  prop = RNA_def_boolean(ot->srna,
+                         "extrude_center",
+                         false,
+                         "Extrude Internal",
+                         "Allow extruding points from internal points");
   prop = RNA_def_boolean(
       ot->srna, "delete_point", false, "Delete Point", "Delete an existing point");
   prop = RNA_def_boolean(
