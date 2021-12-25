@@ -4584,7 +4584,6 @@ def km_curve(params):
         ("curve.dissolve_verts", {"type": 'X', "value": 'PRESS', "ctrl": True}, None),
         ("curve.dissolve_verts", {"type": 'DEL', "value": 'PRESS', "ctrl": True}, None),
         ("curve.tilt_clear", {"type": 'T', "value": 'PRESS', "alt": True}, None),
-        ("curve.pen", {"type": 'X', "value": 'PRESS', "alt": True}, None),
         op_tool_optional(
             ("transform.tilt", {"type": 'T', "value": 'PRESS', "ctrl": True}, None),
             (op_tool_cycle, "builtin.tilt"), params),
@@ -6084,20 +6083,6 @@ def km_sculpt_expand_modal(_params):
     ])
     return keymap
 
-def km_curve_pen_modal_map(_params):
-    items = []
-    keymap = (
-        "Curve Pen Modal Map",
-        {"space_type": 'EMPTY', "region_type": 'WINDOW', "modal": True},
-        {"items": items},
-    )
-
-    items.extend([
-        ("FREE_MOVE_HANDLE", {"type": 'LEFT_SHIFT', "value": 'PRESS', "any": True}, None),
-    ])
-
-    return keymap
-
 
 # Fallback for gizmos that don't have custom a custom key-map.
 def km_generic_gizmo(_params):
@@ -7007,11 +6992,16 @@ def km_3d_view_tool_edit_curve_pen(params):
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
             ("curve.pen", {"type": params.tool_mouse, "value": 'PRESS'},
-             {"properties": []}),
-            ("curve.pen_delete", {"type": params.tool_mouse, "value": 'PRESS', "ctrl": True},
-             {"properties": []}),
-            ("curve.pen_insert", {"type": params.tool_mouse, "value": 'PRESS', "shift": True},
-             {"properties": []}),
+             {"properties": [
+                 ("add_point", True),
+                 ("move_segment", True),
+                 ("select_point", True),
+                 ("move_point", True)
+                ]}),
+            ("curve.pen", {"type": params.tool_mouse, "value": 'PRESS', "ctrl": True},
+             {"properties": [("delete_point", True),]}),
+            ("curve.pen", {"type": params.tool_mouse, "value": 'PRESS', "shift": True},
+             {"properties": [("insert_point", True),]}),
         ]},
     )
 
@@ -7816,7 +7806,6 @@ def generate_keymaps(params=None):
         km_view3d_dolly_modal(params),
         km_paint_stroke_modal(params),
         km_sculpt_expand_modal(params),
-        km_curve_pen_modal_map(params),
 
         # Gizmos.
         km_generic_gizmo(params),

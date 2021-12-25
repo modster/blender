@@ -231,6 +231,3 @@ void CURVE_OT_draw(struct wmOperatorType *ot);
 
 /* editcurve_pen.c */
 void CURVE_OT_pen(struct wmOperatorType *ot);
-void CURVE_OT_pen_delete(struct wmOperatorType *ot);
-void CURVE_OT_pen_insert(struct wmOperatorType *ot);
-struct wmKeyMap *curve_pen_modal_keymap(struct wmKeyConfig *keyconf);
