@@ -738,3 +738,8 @@ if(WITH_COMPILER_CCACHE)
     set(WITH_COMPILER_CCACHE OFF)
   endif()
 endif()
+
+if(WITH_OPENCASCADE)
+  find_package_wrapper(OpenCascade REQUIRED)
+endif()
+

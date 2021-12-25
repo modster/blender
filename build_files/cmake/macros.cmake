@@ -596,6 +596,10 @@ function(SETUP_LIBDIRS)
       link_directories(${GMP_LIBPATH})
     endif()
 
+    if(WITH_OPENCASCADE)
+      link_directories(${OpenCASCADE_LIBRARY_DIR})
+    endif()
+
     if(WIN32 AND NOT UNIX)
       link_directories(${PTHREADS_LIBPATH})
     endif()

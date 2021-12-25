@@ -699,6 +699,8 @@ if(UNIX AND NOT APPLE)
   mark_as_advanced(WITH_CXX11_ABI)
 endif()
 
+option(WITH_OPENCASCADE         "Enable opencascade for curve" ON)
+
 # Installation process.
 option(POSTINSTALL_SCRIPT "Run given CMake script after installation process" OFF)
 mark_as_advanced(POSTINSTALL_SCRIPT)

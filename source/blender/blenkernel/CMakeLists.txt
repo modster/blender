@@ -791,6 +791,24 @@ if(WITH_GMP)
   )
 endif()
 
+if(WITH_OPENCASCADE)
+  add_definitions(-DWITH_OPENCASCADE)
+
+  list(APPEND INC_SYS
+    ${OpenCASCADE_INCLUDE_DIR}
+  )
+  SET(OpenCASCADE_LIBS 
+    TKTObjDRAW.a TKQADraw.a TKXDEDRAW.a TKDCAF.a TKDCAF.a TKXSDRAW.a
+    TKViewerTest.a TKTopTest.a TKDraw.a TKXDESTEP.a TKBinXCAF.a TKXmlXCAF.a TKXDEIGES.a TKXCAF.a TKIGES.a TKSTEP.a TKSTEP209.a TKSTEPAttr.a
+    TKSTEPBase.a TKXSBase.a TKStd.a TKStdL.a TKSTL.a TKXml.a TKBin.a TKXmlL.a TKBinL.a TKCAF.a TKXCAF.a TKLCAF.a TKCDF.a TKMeshVS.a TKOpenGl.a TKV3d.a TKService.a
+    TKXMesh.a TKMesh.a TKOffset.a TKFeat.a TKFillet.a TKHLR.a TKBool.a TKBO.a TKShHealing.a TKPrim.a TKTopAlgo.a TKGeomAlgo.a TKBRep.a
+    TKGeomBase.a TKG3d.a TKG2d.a TKMath.a TKernel.a
+    )
+  list(APPEND LIB
+    ${OpenCASCADE_LIBS}
+  )
+endif()
+
 # # Warnings as errors, this is too strict!
 # if(MSVC)
 #    string(APPEND CMAKE_C_FLAGS " /WX")

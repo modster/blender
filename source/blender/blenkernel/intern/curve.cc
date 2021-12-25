@@ -67,6 +67,35 @@
 
 #include "BLO_read_write.h"
 
+/* opencascade includes */
+
+#include <IGESCAFControl_Reader.hxx>
+#include <STEPCAFControl_Reader.hxx>
+#include <Standard_Stream.hxx>
+#include <Standard_TypeDef.hxx>
+#include <StlAPI_Writer.hxx>
+#include <iostream>
+
+#include <IMeshData_Status.hxx>
+#include <IMeshTools_Parameters.hxx>
+
+#include <BRepBuilderAPI.hxx>
+#include <BRepTools.hxx>
+#include <BRep_Tool.hxx>
+#include <Geom_BSplineSurface.hxx>
+#include <TColStd_Array1OfInteger.hxx>
+#include <TColStd_Array1OfReal.hxx>
+#include <TColgp_Array2OfPnt.hxx>
+#include <TopoDS.hxx>
+#include <TopoDS_Iterator.hxx>
+#include <TopoDS_Vertex.hxx>
+
+#include <BRepMesh_IncrementalMesh.hxx>
+#include <Geom_BSplineCurve.hxx>
+#include <Geom_Curve.hxx>
+#include <Geom_TrimmedCurve.hxx>
+#include <NCollection_Array1.hxx>
+
 /* globals */
 
 /* local */
@@ -1390,6 +1419,209 @@ void BKE_nurb_makeFaces(const Nurb *nu, float *coord_array, int rowstride, int r
   if (coord_array == nullptr) {
     return;
   }
+
+  /* An example code I got somewhere on the Internet, this works... */
+
+  TColgp_Array2OfPnt poles(0, 7, 0, 5);  // ucol,vrow
+  TColStd_Array1OfReal UKnots(0, 12);
+  TColStd_Array1OfReal VKnots(0, 10);
+
+  TColStd_Array1OfReal UKnots1(0, 5);
+  TColStd_Array1OfReal VKnots1(0, 3);
+  UKnots1.SetValue(0, 0);
+  UKnots1.SetValue(1, 1);
+  UKnots1.SetValue(2, 2);
+  UKnots1.SetValue(3, 3);
+  UKnots1.SetValue(4, 4);
+  UKnots1.SetValue(5, 5);
+  VKnots1.SetValue(0, 0);
+  VKnots1.SetValue(1, 1);
+  VKnots1.SetValue(2, 2);
+  VKnots1.SetValue(3, 3);
+  TColStd_Array1OfInteger UMults(0, 5);
+  UMults.SetValue(0, 4);
+  UMults.SetValue(1, 1);
+  UMults.SetValue(2, 1);
+  UMults.SetValue(3, 1);
+  UMults.SetValue(4, 1);
+  UMults.SetValue(5, 4);
+  TColStd_Array1OfInteger VMults(0, 3);
+  VMults.SetValue(0, 4);
+  VMults.SetValue(1, 1);
+  VMults.SetValue(2, 1);
+  VMults.SetValue(3, 4);
+  int n = 7;  //(ctr pnts-1)
+  int k = 4;  // degree+1
+  int n1 = 5;
+  int k1 = 4;
+  int t = 0;
+  int a = 0;
+  int b = 0;
+
+  for (int j = 0; j <= n + k; j++) {
+    if (j < k) {
+      t = 0;
+      a++;
+      UKnots.SetValue(a, t);
+    }
+
+    if (k <= j && j <= n) {
+      t = j - k + 1;
+      a++;
+      UKnots.SetValue(a, t);
+    }
+
+    if (j > n) {
+      t = n - k + 2;
+      a++;
+      UKnots.SetValue(a, t);
+    }
+  }
+  UKnots.SetValue(a, t);
+
+  for (int s = 0; s <= n1 + k1; s++) {
+    if (s < k1) {
+      t = 0;
+      b++;
+      VKnots.SetValue(b, t);
+    }
+
+    if (k1 <= s && s <= n1) {
+      t = s - k1 + 1;
+      b++;
+      VKnots.SetValue(b, t);
+    }
+
+    if (s > n1) {
+      t = n1 - k1 + 2;
+      b++;
+      VKnots.SetValue(b, t);
+    }
+  }
+  /*
+ knots = [knots ; t];
+ end
+
+ knots_matrix = knots;
+ */
+  // gp_Pnt P;
+  // poles.SetValue(1,1,P);
+  // poles.SetValue(1,1,P);
+  poles.SetValue(0, 0, gp_Pnt(0, 0, 0));
+  poles.SetValue(1, 0, gp_Pnt(0.4, 0, 0));
+  poles.SetValue(2, 0, gp_Pnt(0.8, 0, 0));
+  poles.SetValue(3, 0, gp_Pnt(1.2, 0, 0));
+  poles.SetValue(4, 0, gp_Pnt(1.6, 0, 0));
+  poles.SetValue(5, 0, gp_Pnt(2.0, 0, 0));
+  poles.SetValue(6, 0, gp_Pnt(2.5, 0, 0));
+  poles.SetValue(7, 0, gp_Pnt(3, 0, 0));
+
+  poles.SetValue(0, 1, gp_Pnt(0, 0.4, 0));
+  poles.SetValue(1, 1, gp_Pnt(0.4, 0.4, 0.2));
+  poles.SetValue(2, 1, gp_Pnt(0.8, 0.4, 0.3));
+  poles.SetValue(3, 1, gp_Pnt(1.2, 0.4, 0.1));
+  poles.SetValue(4, 1, gp_Pnt(1.6, 0.4, 0));
+  poles.SetValue(5, 1, gp_Pnt(2.0, 0.4, 0.2));
+  poles.SetValue(6, 1, gp_Pnt(2.5, 0.4, 0.1));
+  poles.SetValue(7, 1, gp_Pnt(3, 0.4, 0));
+
+  poles.SetValue(0, 2, gp_Pnt(0, 0.8, 0));
+  poles.SetValue(1, 2, gp_Pnt(0.4, 0.8, 0.5));
+  poles.SetValue(2, 2, gp_Pnt(0.8, 0.8, 0.6));
+  poles.SetValue(3, 2, gp_Pnt(1.2, 0.8, 0.2));
+  poles.SetValue(4, 2, gp_Pnt(1.6, 0.8, 0.0));
+  poles.SetValue(5, 2, gp_Pnt(2.0, 0.8, 0));
+  poles.SetValue(6, 2, gp_Pnt(2.5, 0.8, 0.3));
+  poles.SetValue(7, 2, gp_Pnt(3, 0.8, 0));
+
+  poles.SetValue(0, 3, gp_Pnt(0, 1.2, 0));
+  poles.SetValue(1, 3, gp_Pnt(0.4, 1.2, 0.4));
+  poles.SetValue(2, 3, gp_Pnt(0.8, 1.2, 0.4));
+  poles.SetValue(3, 3, gp_Pnt(1.2, 1.2, 0.2));
+  poles.SetValue(4, 3, gp_Pnt(1.6, 1.2, 0.0));
+  poles.SetValue(5, 3, gp_Pnt(2.0, 1.2, 0.0));
+  poles.SetValue(6, 3, gp_Pnt(2.5, 1.2, 0.5));
+  poles.SetValue(7, 3, gp_Pnt(3, 1.2, 0));
+
+  poles.SetValue(0, 4, gp_Pnt(0, 1.6, 0));
+  poles.SetValue(1, 4, gp_Pnt(0.4, 1.6, 0.3));
+  poles.SetValue(2, 4, gp_Pnt(0.8, 1.6, 0.2));
+  poles.SetValue(3, 4, gp_Pnt(1.2, 1.6, 0.1));
+  poles.SetValue(4, 4, gp_Pnt(1.6, 1.6, 0.3));
+  poles.SetValue(5, 4, gp_Pnt(2.0, 1.6, 0.2));
+  poles.SetValue(6, 4, gp_Pnt(2.5, 1.6, 0.1));
+  poles.SetValue(7, 4, gp_Pnt(3, 1.6, 0));
+
+  poles.SetValue(0, 5, gp_Pnt(0, 2.0, 0));
+  poles.SetValue(1, 5, gp_Pnt(0.4, 2.0, 0));
+  poles.SetValue(2, 5, gp_Pnt(0.8, 2.0, 0));
+  poles.SetValue(3, 5, gp_Pnt(1.2, 2.0, 0));
+  poles.SetValue(4, 5, gp_Pnt(1.6, 2.0, 0));
+  poles.SetValue(5, 5, gp_Pnt(2.0, 2.0, 0));
+  poles.SetValue(6, 5, gp_Pnt(2.5, 2.0, 0));
+  poles.SetValue(7, 5, gp_Pnt(3, 2.0, 0));
+
+  Geom_BSplineSurface Surf(poles,
+                           UKnots1,
+                           VKnots1,
+                           UMults,
+                           VMults,
+                           3,
+                           3,
+                           Standard_False,
+                           Standard_False);  // = new Geom_BSplineSurface();
+                                             // TopoDS_Shape sh=Surf;
+                                             // Handle(Geom_Surf) plz= new Geom_Surf(Surf);
+                                             // Handle (AIS_Shape) ais= new AIS_Shape(sh);
+                                             // Surf.Bounds(0,2,0,1);
+  // myAISContext->DisplayAll(1,1);//>Display(Surf);
+
+  /* XXXXX: My code does not work........ */
+  /* try to get cascade surface construction to work... not yet working it will crash. */
+
+  TColgp_Array2OfPnt poles = TColgp_Array2OfPnt(0, nu->pntsu, 0, nu->pntsv);
+  TColStd_Array1OfReal uknots = TColStd_Array1OfReal(0, nu->orderu + nu->pntsu);
+  TColStd_Array1OfReal vknots = TColStd_Array1OfReal(0, nu->orderv + nu->pntsv);
+  TColStd_Array1OfInteger umults = TColStd_Array1OfInteger(0, nu->orderu + nu->pntsu);
+  TColStd_Array1OfInteger vmults = TColStd_Array1OfInteger(0, nu->orderv + nu->pntsv);
+  for (int u = 0; u < nu->pntsu; u++) {
+    for (int v = 0; v < nu->pntsv; v++) {
+      BPoint *bp = &nu->bp[u * nu->pntsu + v];
+      poles.SetValue(u, v, gp_Pnt(bp->vec[0], bp->vec[1], bp->vec[2]));
+      printf("pt uv %d %d %f %f %f\n ", u, v, bp->vec[0], bp->vec[1], bp->vec[2]);
+    }
+  }
+  printf("pts uv %d %d\n ", nu->pntsu, nu->pntsv);
+  printf("order uv %d %d\n ", nu->orderu, nu->orderv);
+  for (int u = 0; u < nu->orderu + nu->pntsu; u++) {
+    uknots.SetValue(u, nu->knotsu[u]);
+    printf("%f ", nu->knotsu[u]);
+  }
+  printf("\n");
+  for (int v = 0; v < nu->orderv + nu->pntsv; v++) {
+    vknots.SetValue(v, nu->knotsv[v]);
+    printf("%f ", nu->knotsv[v]);
+  }
+  printf("\n");
+  for (int u = 0; u < nu->orderu + nu->pntsu; u++) {
+    umults.SetValue(u, 0);
+  }
+  umults.SetValue(0, 4);
+  umults.SetValue(nu->orderu + nu->pntsu - 1, 4);
+  for (int v = 0; v < nu->orderv + nu->pntsv; v++) {
+    vmults.SetValue(v, 0);
+  }
+  vmults.SetValue(0, 4);
+  vmults.SetValue(nu->orderv + nu->pntsv - 1, 4);
+  Geom_BSplineSurface surface = Geom_BSplineSurface(poles,
+                                                    uknots,
+                                                    vknots,
+                                                    umults,
+                                                    vmults,
+                                                    nu->orderu - 1,
+                                                    nu->orderv - 1,
+                                                    Standard_False,
+                                                    Standard_False);
 
   /* allocate and initialize */
   len = totu * totv;
