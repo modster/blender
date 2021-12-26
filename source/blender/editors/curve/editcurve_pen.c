@@ -821,7 +821,7 @@ static bool is_spline_nearby(ViewContext *vc, struct wmOperator *op, const wmEve
   const float threshold_distance = ED_view3d_select_dist_px() * sel_dist_mul;
 
   if (data.min_dist < threshold_distance) {
-    if (data.nurb && !data.nurb->bp && RNA_boolean_get(op->ptr, "move_segment")) {
+    if (data.nurb && (data.nurb->type == CU_BEZIER) && RNA_boolean_get(op->ptr, "move_segment")) {
       MoveSegmentData *seg_data;
       CurvePenData *cpd = (CurvePenData *)(op->customdata);
       cpd->msd = seg_data = MEM_callocN(sizeof(MoveSegmentData), __func__);
@@ -1110,8 +1110,8 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
       cpd->dragging = true;
     }
     if (cpd->dragging) {
-      if (cpd->spline_nearby && move_seg) {
-        MoveSegmentData *seg_data = ((CurvePenData *)op->customdata)->msd;
+      if (cpd->spline_nearby && move_seg && cpd->msd != NULL) {
+        MoveSegmentData *seg_data = cpd->msd;
         nu = seg_data->nu;
         move_segment(seg_data, event, &vc);
       }
