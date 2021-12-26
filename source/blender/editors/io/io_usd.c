@@ -184,23 +184,22 @@ static void wm_usd_export_draw(bContext *UNUSED(C), wmOperator *op)
   box = uiLayoutBox(layout);
   col = uiLayoutColumnWithHeading(box, true, IFACE_("Materials"));
   uiItemR(col, ptr, "generate_preview_surface", 0, NULL, ICON_NONE);
-  bool export_mtl = RNA_boolean_get(ptr, "export_materials");
-
-  uiLayoutSetEnabled(col, export_mtl);
+  const bool export_mtl = RNA_boolean_get(ptr, "export_materials");
+  uiLayoutSetActive(col, export_mtl);
 
   uiLayout *row = uiLayoutRow(col, true);
   uiItemR(row, ptr, "export_textures", 0, NULL, ICON_NONE);
-  bool preview = RNA_boolean_get(ptr, "generate_preview_surface");
-  uiLayoutSetEnabled(row, export_mtl && preview);
+  const bool preview = RNA_boolean_get(ptr, "generate_preview_surface");
+  uiLayoutSetActive(row, export_mtl && preview);
 
   row = uiLayoutRow(col, true);
   uiItemR(row, ptr, "overwrite_textures", 0, NULL, ICON_NONE);
-  bool export_tex = RNA_boolean_get(ptr, "export_textures");
-  uiLayoutSetEnabled(row, export_mtl && preview && export_tex);
+  const bool export_tex = RNA_boolean_get(ptr, "export_textures");
+  uiLayoutSetActive(row, export_mtl && preview && export_tex);
 
   row = uiLayoutRow(col, true);
   uiItemR(row, ptr, "relative_texture_paths", 0, NULL, ICON_NONE);
-  uiLayoutSetEnabled(row, export_mtl && preview);
+  uiLayoutSetActive(row, export_mtl && preview);
 
   box = uiLayoutBox(layout);
   uiItemL(box, IFACE_("Experimental"), ICON_NONE);
@@ -283,16 +282,16 @@ void WM_OT_usd_export(struct wmOperatorType *ot)
   RNA_def_boolean(ot->srna,
                   "generate_preview_surface",
                   true,
-                  "USD Preview Surface From Nodes",
+                  "To USD Preview Surface",
                   "Generate an approximate USD Preview Surface shader "
-                  "representation of a Principled BSDF node network ");
+                  "representation of a Principled BSDF node network");
 
   RNA_def_boolean(ot->srna,
                   "export_textures",
                   true,
                   "Export Textures",
                   "If exporting materials, export textures referenced by material nodes "
-                  "to a 'textures' directory in the same directory as the USD");
+                  "to a 'textures' directory in the same directory as the USD file");
 
   RNA_def_boolean(ot->srna,
                   "overwrite_textures",
@@ -305,7 +304,7 @@ void WM_OT_usd_export(struct wmOperatorType *ot)
       "relative_texture_paths",
       true,
       "Relative Texture Paths",
-      "When checked, material texture asset paths will be saved as relative paths in the USD");
+      "Make texture asset paths relative to the USD file");
 }
 
 /* ====== USD Import ====== */
