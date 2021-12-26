@@ -123,8 +123,8 @@ const pxr::SdfPath &USDAbstractWriter::usd_path() const
   return usd_export_context_.usd_path;
 }
 
-pxr::UsdShadeMaterial USDAbstractWriter::ensure_usd_material(Material *material,
-                                                             const HierarchyContext &context)
+pxr::UsdShadeMaterial USDAbstractWriter::ensure_usd_material(const HierarchyContext &context,
+                                                             Material *material)
 {
   static pxr::SdfPath material_library_path("/_materials");
   pxr::UsdStageRefPtr stage = usd_export_context_.stage;
