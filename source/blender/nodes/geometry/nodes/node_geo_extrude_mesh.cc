@@ -86,10 +86,11 @@ static void extrude_mesh_vertices(MeshComponent &component,
   MutableSpan<MVert> new_verts = verts.take_back(selection.size());
   MutableSpan<MEdge> new_edges = edges.take_back(selection.size());
 
-  for (const int i : selection.index_range()) {
-    new_edges[i].v1 = selection[i];
-    new_edges[i].v2 = orig_vert_size + i;
-    new_edges[i].flag |= ME_LOOSEEDGE;
+  for (const int i_selection : selection.index_range()) {
+    MEdge &edge = new_edges[i_selection];
+    edge.v1 = selection[i_selection];
+    edge.v2 = orig_vert_size + i_selection;
+    edge.flag |= ME_LOOSEEDGE;
   }
 
   component.attribute_foreach([&](const AttributeIDRef &id, const AttributeMetaData meta_data) {
@@ -125,6 +126,90 @@ static void extrude_mesh_vertices(MeshComponent &component,
   BKE_mesh_normals_tag_dirty(&mesh);
 }
 
+// Array<Vector<int>> selected_edges_of_verts(mesh.totvert);
+// for (const int i : selection) {
+//   const MEdge &edge = mesh.medge[i];
+//   selected_edges_of_verts[edge.v1].append(i);
+//   selected_edges_of_verts[edge.v2].append(i);
+// }
+
+struct CopiedVert {
+  int orig_index;
+  // int new_index;
+};
+
+static void extrude_mesh_edges(MeshComponent &component,
+                               const Field<bool> &selection_field,
+                               const Field<float3> &offset_field)
+{
+  Mesh &mesh = *component.get_for_write();
+  const int orig_vert_size = mesh.totvert;
+  const int orig_edge_size = mesh.totedge;
+  const int orig_loop_size = mesh.totloop;
+
+  GeometryComponentFieldContext context{component, ATTR_DOMAIN_EDGE};
+  FieldEvaluator evaluator{context, mesh.totvert};
+  evaluator.add(offset_field);
+  evaluator.set_selection(selection_field);
+  evaluator.evaluate();
+  const IndexMask selection = evaluator.get_evaluated_selection_as_mask();
+  const VArray<float3> offsets = evaluator.get_evaluated<float3>(0);
+
+  Array<int> extrude_vert_indices(mesh.totvert, -1);
+  Vector<CopiedVert> extrude_vert_orig_indices;
+  extrude_vert_orig_indices.reserve(selection.size());
+  for (const int i_edge : selection) {
+    const MEdge &edge = mesh.medge[i_edge];
+
+    if (extrude_vert_indices[edge.v1] == -1) {
+      extrude_vert_indices[edge.v1] = orig_vert_size + extrude_vert_orig_indices.size();
+      extrude_vert_orig_indices.append({int(edge.v1)});
+    }
+
+    if (extrude_vert_indices[edge.v2] == -1) {
+      extrude_vert_indices[edge.v2] = orig_vert_size + extrude_vert_orig_indices.size();
+      extrude_vert_orig_indices.append({int(edge.v2)});
+    }
+  }
+
+  const int extrude_vert_size = extrude_vert_orig_indices.size();
+  const int extrude_edge_size = extrude_vert_size;
+  const int duplicate_edge_size = selection.size();
+  const int new_edge_size = extrude_edge_size + duplicate_edge_size;
+
+  mesh.totvert += extrude_vert_size;
+  mesh.totedge += new_edge_size;
+  // mesh.totpoly += selection.size();
+  // mesh.totloop += selection.size() * 4;
+  CustomData_realloc(&mesh.vdata, mesh.totvert);
+  CustomData_realloc(&mesh.edata, mesh.totedge);
+  // CustomData_realloc(&mesh.pdata, mesh.totpoly);
+  // CustomData_realloc(&mesh.ldata, mesh.totloop);
+
+  MutableSpan<MEdge> edges{mesh.medge, mesh.totedge};
+  MutableSpan<MEdge> new_edges = edges.take_back(new_edge_size);
+  MutableSpan<MEdge> extrude_edges = new_edges.take_front(extrude_edge_size);
+  MutableSpan<MEdge> duplicate_edges = new_edges.take_back(duplicate_edge_size);
+
+  for (const int i : extrude_edges.index_range()) {
+    MEdge &edge = extrude_edges[i];
+    edge.v1 = extrude_vert_orig_indices[i].orig_index;
+    edge.v2 = orig_vert_size + i;
+    edge.flag |= (ME_EDGEDRAW | ME_EDGERENDER);
+  }
+
+  for (const int i : duplicate_edges.index_range()) {
+    const MEdge &orig_edge = mesh.medge[selection[i]];
+    MEdge &edge = extrude_edges[i];
+    edge.v1 = extrude_vert_indices[orig_edge.v1];
+    edge.v2 = extrude_vert_indices[orig_edge.v2];
+    edge.flag |= (ME_EDGEDRAW | ME_EDGERENDER);
+  }
+
+  BKE_mesh_runtime_clear_cache(&mesh);
+  BKE_mesh_normals_tag_dirty(&mesh);
+}
+
 static void extrude_mesh(MeshComponent &component,
                          GeometryNodeExtrudeMeshMode mode,
                          const Field<bool> &selection,
@@ -135,10 +220,12 @@ static void extrude_mesh(MeshComponent &component,
       extrude_mesh_vertices(component, selection, offset);
       break;
     case GEO_NODE_EXTRUDE_MESH_EDGES:
+      extrude_mesh_edges(component, selection, offset);
       break;
     case GEO_NODE_EXTRUDE_MESH_FACES:
       break;
   }
+  BLI_assert(BKE_mesh_is_valid(component.get_for_write()));
 }
 
 static void node_geo_exec(GeoNodeExecParams params)
