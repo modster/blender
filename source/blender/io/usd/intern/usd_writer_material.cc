@@ -129,7 +129,6 @@ static std::string get_in_memory_texture_filename(bNode *node)
   }
 
   Image *ima = reinterpret_cast<Image *>(node->id);
-
   if (!ima) {
     return "";
   }
@@ -143,7 +142,6 @@ static std::string get_in_memory_texture_filename(bNode *node)
   bool is_dirty = BKE_image_is_dirty(ima);
   bool is_generated = ima->source == IMA_SRC_GENERATED;
   bool is_packed = BKE_image_has_packedfile(ima);
-
   if (!(is_generated || is_dirty || is_packed)) {
     return "";
   }
@@ -163,7 +161,6 @@ static std::string get_in_memory_texture_filename(bNode *node)
   /* Determine the correct file extension from the image format. */
 
   ImBuf *imbuf = BKE_image_acquire_ibuf(ima, nullptr, nullptr);
-
   if (!imbuf) {
     return "";
   }
@@ -356,7 +353,6 @@ static std::string get_node_tex_image_filepath(bNode *node)
   NodeTexImage *tex_original = (NodeTexImage *)node->storage;
 
   Image *ima = (Image *)node->id;
-
   if (!ima)
     return "";
   if (sizeof(ima->filepath) == 0)
@@ -415,7 +411,6 @@ static bNode *traverse_channel(bNodeSocket *input, short target_type = SH_NODE_T
 {
   if (input->link) {
     bNode *linked_node = input->link->fromnode;
-
     if (linked_node->type == target_type) {
       /* Return match. */
       return linked_node;
@@ -548,7 +543,6 @@ void create_usd_preview_surface_material(const USDExporterContext &usd_export_co
    * diffuse bsdf nodes in the material's node tree, because
    * USD Preview Surface has no concept of layering materials. */
   bNode *node = get_bsdf_node(material);
-
   if (!node) {
     return;
   }
@@ -796,7 +790,6 @@ std::string get_node_tex_image_filepath(bNode *node,
                                         const USDExportParams &export_params)
 {
   std::string image_path = get_node_tex_image_filepath(node);
-
   if (image_path.empty() && export_params.export_textures) {
     /* The path may be empty because this is an in-memory texture.
      * Since we are exporting textures, check if this is an
@@ -820,7 +813,6 @@ void export_texture(bNode *node, const pxr::UsdStageRefPtr stage, const bool all
   // Get the path relative to the USD.
   // TODO(makowalski): avoid recomputing the USD path, if possible.
   pxr::SdfLayerHandle layer = stage->GetRootLayer();
-
   std::string stage_path = layer->GetRealPath();
 
   if (stage_path.empty()) {
@@ -828,7 +820,6 @@ void export_texture(bNode *node, const pxr::UsdStageRefPtr stage, const bool all
   }
 
   Image *ima = reinterpret_cast<Image *>(node->id);
-
   if (!ima) {
     return;
   }
