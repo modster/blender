@@ -487,7 +487,7 @@ static void copy_tiled_textures(Image *ima,
 
     std::string src_tile_path = std::string(src_dir) + std::string(tile_file);
 
-    if (allow_overwrite && paths_equal(src_tile_path.c_str(), dest_tile_path.c_str())) {
+    if (paths_equal(src_tile_path.c_str(), dest_tile_path.c_str())) {
       /* Source and destination paths are the same, don't copy. */
       continue;
     }
@@ -530,7 +530,7 @@ static void copy_single_file(Image *ima, const std::string &dest_dir, const bool
     return;
   }
 
-  if (allow_overwrite && paths_equal(source_path, dest_path.c_str())) {
+  if (paths_equal(source_path, dest_path.c_str())) {
     /* Source and destination paths are the same, don't copy. */
     return;
   }
