@@ -64,7 +64,6 @@ static const pxr::TfToken b("b", pxr::TfToken::Immortal);
 static const pxr::TfToken st("st", pxr::TfToken::Immortal);
 static const pxr::TfToken result("result", pxr::TfToken::Immortal);
 static const pxr::TfToken varname("varname", pxr::TfToken::Immortal);
-static const pxr::TfToken mdl("mdl", pxr::TfToken::Immortal);
 static const pxr::TfToken out("out", pxr::TfToken::Immortal);
 static const pxr::TfToken normal("normal", pxr::TfToken::Immortal);
 static const pxr::TfToken ior("ior", pxr::TfToken::Immortal);
@@ -76,19 +75,9 @@ static const pxr::TfToken sourceColorSpace("sourceColorSpace", pxr::TfToken::Imm
 static const pxr::TfToken Shader("Shader", pxr::TfToken::Immortal);
 }  // namespace usdtokens
 
-/* Cycles specific tokens (Blender Importer and HdCycles) */
+/* Cycles specific tokens. */
 namespace cyclestokens {
-static const pxr::TfToken cycles("cycles", pxr::TfToken::Immortal);
 static const pxr::TfToken UVMap("UVMap", pxr::TfToken::Immortal);
-static const pxr::TfToken filename("filename", pxr::TfToken::Immortal);
-static const pxr::TfToken interpolation("interpolation", pxr::TfToken::Immortal);
-static const pxr::TfToken projection("projection", pxr::TfToken::Immortal);
-static const pxr::TfToken extension("extension", pxr::TfToken::Immortal);
-static const pxr::TfToken colorspace("colorspace", pxr::TfToken::Immortal);
-static const pxr::TfToken attribute("attribute", pxr::TfToken::Immortal);
-static const pxr::TfToken bsdf("bsdf", pxr::TfToken::Immortal);
-static const pxr::TfToken closure("closure", pxr::TfToken::Immortal);
-static const pxr::TfToken vector("vector", pxr::TfToken::Immortal);
 }  // namespace cyclestokens
 
 namespace blender::io::usd {
