@@ -47,19 +47,9 @@ void create_usd_preview_surface_material(const USDExporterContext &usd_export_co
                                          pxr::UsdShadeMaterial &usd_material,
                                          const std::string &default_uv = "");
 
-/* Entry point to create USD Shade Material network from Blender "Viewport Display". */
+/* Entry point to create USD Shade Material network from Blender viewport display settings. */
 void create_usd_viewport_material(const USDExporterContext &usd_export_context,
                                   Material *material,
                                   pxr::UsdShadeMaterial &usd_material);
 
-void export_texture(bNode *node, const pxr::UsdStageRefPtr stage, bool allow_overwrite = false);
-
-std::string get_node_tex_image_filepath(bNode *node,
-                                        const pxr::UsdStageRefPtr stage,
-                                        const USDExportParams &export_params);
-
-std::string get_texture_filepath(const std::string &tex_filepath,
-                                 const pxr::UsdStageRefPtr stage,
-                                 const USDExportParams &export_params);
-
-}  // Namespace blender::io::usd
+}  // namespace blender::io::usd
