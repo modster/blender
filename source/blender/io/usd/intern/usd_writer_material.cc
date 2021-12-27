@@ -107,6 +107,10 @@ void create_usd_preview_surface_material(const USDExporterContext &usd_export_co
                                          pxr::UsdShadeMaterial &usd_material,
                                          const std::string &default_uv)
 {
+  if (!material) {
+    return;
+  }
+
   /* Define a 'preview' scope beneath the material which will contain the preview shaders. */
   pxr::UsdGeomScope::Define(usd_export_context.stage,
     usd_material.GetPath().AppendChild(usdtokens::preview));
@@ -298,8 +302,10 @@ void create_usd_preview_surface_material(const USDExporterContext &usd_export_co
 
         pxr::UsdShadeShader uv_shader = create_usd_preview_shader(
           usd_export_context, usd_material, uv_node);
-        if (!uv_shader.GetPrim().IsValid())
+
+        if (!uv_shader.GetPrim().IsValid()) {
           continue;
+        }
 
         found_uv_node = true;
 
@@ -382,10 +388,6 @@ static bool paths_equal(const char *p1, const char *p2)
  * filepath already defined. */
 static std::string get_in_memory_texture_filename(bNode *node)
 {
-  if (!node) {
-    return "";
-  }
-
   Image *ima = reinterpret_cast<Image *>(node->id);
   if (!ima) {
     return "";
@@ -426,12 +428,7 @@ static void export_in_memory_texture(Image *ima,
                                      const std::string &export_dir,
                                      const bool allow_overwrite)
 {
-  if (!ima) {
-    return;
-  }
-
-  char file_name[FILE_MAX] = {0};
-
+  char file_name[FILE_MAX];
   if (strlen(ima->filepath) > 0) {
     BLI_split_file_part(ima->filepath, file_name, FILE_MAX);
   }
@@ -481,14 +478,6 @@ static void export_in_memory_texture(Image *ima,
 /* Get the absolute filepath of the given image. */
 static void get_absolute_path(Image *ima, size_t path_len, char *r_path)
 {
-  if (!r_path || path_len == 0) {
-    return;
-  }
-
-  if (!ima) {
-    r_path[0] = '\0';
-    return;
-  }
   /* make absolute source path */
   BLI_strncpy(r_path, ima->filepath, path_len);
   BLI_path_abs(r_path, ID_BLEND_PATH_FROM_GLOBAL(&ima->id));
@@ -501,7 +490,7 @@ static void copy_tiled_textures(Image *ima,
                                 const std::string &in_dest_dir,
                                 const bool allow_overwrite)
 {
-  if (!ima || in_dest_dir.empty()) {
+  if (in_dest_dir.empty()) {
     return;
   }
 
@@ -560,7 +549,7 @@ static void copy_tiled_textures(Image *ima,
 /* Copy the given image to the destination directory. */
 static void copy_single_file(Image *ima, const std::string &dest_dir, const bool allow_overwrite)
 {
-  if (!ima || dest_dir.empty()) {
+  if (dest_dir.empty()) {
     return;
   }
 
@@ -681,10 +670,6 @@ static bNode *traverse_channel(bNodeSocket *input, short target_type)
  * material's node tree.  Returns null if no instance of either type was found.*/
 static bNode *find_bsdf_node(Material *material)
 {
-  if (!material) {
-    return nullptr;
-  }
-
   LISTBASE_FOREACH (bNode *, node, &material->nodetree->nodes) {
     if (node->type == SH_NODE_BSDF_PRINCIPLED || node->type == SH_NODE_BSDF_DIFFUSE) {
       return node;
@@ -700,10 +685,6 @@ static pxr::UsdShadeShader create_usd_preview_shader(const USDExporterContext &u
                                                      const char *name,
                                                      int type)
 {
-  if (!name || !material) {
-    return pxr::UsdShadeShader();
-  }
-
   pxr::SdfPath shader_path = material.GetPath()
                                  .AppendChild(usdtokens::preview)
                                  .AppendChild(pxr::TfToken(pxr::TfMakeValidIdentifier(name)));
@@ -738,10 +719,6 @@ static pxr::UsdShadeShader create_usd_preview_shader(const USDExporterContext &u
                                                      pxr::UsdShadeMaterial &material,
                                                      bNode *node)
 {
-  if (!node) {
-    return pxr::UsdShadeShader();
-  }
-
   pxr::UsdShadeShader shader = create_usd_preview_shader(
       usd_export_context, material, node->name, node->type);
 
@@ -788,22 +765,19 @@ static std::string get_node_tex_image_filepath(bNode *node,
  * Based on ImagesExporter::export_UV_Image() */
 static void export_texture(bNode *node, const pxr::UsdStageRefPtr stage, const bool allow_overwrite)
 {
-  if (!stage || !node ||
-      (node->type != SH_NODE_TEX_IMAGE && node->type != SH_NODE_TEX_ENVIRONMENT)) {
-    return;
-  }
-
-  // Get the path relative to the USD.
-  // TODO(makowalski): avoid recomputing the USD path, if possible.
-  pxr::SdfLayerHandle layer = stage->GetRootLayer();
-  std::string stage_path = layer->GetRealPath();
-
-  if (stage_path.empty()) {
+  if (node->type != SH_NODE_TEX_IMAGE && node->type != SH_NODE_TEX_ENVIRONMENT) {
     return;
   }
 
   Image *ima = reinterpret_cast<Image *>(node->id);
   if (!ima) {
+    return;
+  }
+
+  pxr::SdfLayerHandle layer = stage->GetRootLayer();
+  std::string stage_path = layer->GetRealPath();
+
+  if (stage_path.empty()) {
     return;
   }
 
@@ -844,7 +818,7 @@ static std::string get_texture_filepath(const std::string &in_path,
     return in_path;
   }
 
-  if (in_path.empty() || !stage) {
+  if (in_path.empty()) {
     return in_path;
   }
 
