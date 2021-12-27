@@ -149,13 +149,6 @@ static void extrude_mesh_vertices(MeshComponent &component,
   BKE_mesh_normals_tag_dirty(&mesh);
 }
 
-// Array<Vector<int>> selected_edges_of_verts(mesh.totvert);
-// for (const int i : selection) {
-//   const MEdge &edge = mesh.medge[i];
-//   selected_edges_of_verts[edge.v1].append(i);
-//   selected_edges_of_verts[edge.v2].append(i);
-// }
-
 static void extrude_mesh_edges(MeshComponent &component,
                                const Field<bool> &selection_field,
                                const Field<float3> &offset_field)
@@ -216,6 +209,10 @@ static void extrude_mesh_edges(MeshComponent &component,
   MutableSpan<MPoly> new_polys = polys.take_back(selection.size());
   MutableSpan<MLoop> loops{mesh.mloop, mesh.totloop};
   MutableSpan<MLoop> new_loops = loops.take_back(new_loop_size);
+
+  for (MVert &vert : new_verts) {
+    vert.flag = 0;
+  }
 
   for (const int i : extrude_edges.index_range()) {
     MEdge &edge = extrude_edges[i];
@@ -322,6 +319,35 @@ static void extrude_mesh_edges(MeshComponent &component,
   BKE_mesh_normals_tag_dirty(&mesh);
 }
 
+static IndexMask index_mask_from_selection(const VArray<bool> &selection,
+                                           Vector<int64_t> &r_indices)
+{
+  if (selection.is_single()) {
+    if (selection.get_internal_single()) {
+      return IndexMask(selection.size());
+    }
+    return IndexMask(0);
+  }
+
+  if (selection.is_span()) {
+    Span<bool> span = selection.get_internal_span();
+    for (const int i : span.index_range()) {
+      if (span[i]) {
+        r_indices.append(i);
+      }
+    }
+  }
+  else {
+    for (const int i : selection.index_range()) {
+      if (selection[i]) {
+        r_indices.append(i);
+      }
+    }
+  }
+
+  return IndexMask(r_indices);
+}
+
 static void extrude_mesh_faces(MeshComponent &component,
                                const Field<bool> &selection_field,
                                const Field<float3> &offset_field)
@@ -332,34 +358,24 @@ static void extrude_mesh_faces(MeshComponent &component,
   Span<MPoly> orig_polys{mesh.mpoly, mesh.totpoly};
   Span<MLoop> orig_loops{mesh.mloop, mesh.totloop};
 
-  GeometryComponentFieldContext edge_context{component, ATTR_DOMAIN_FACE};
-  FieldEvaluator edge_evaluator{edge_context, mesh.totpoly};
-  edge_evaluator.add(selection_field);
-  edge_evaluator.evaluate();
-  const IndexMask poly_selection = edge_evaluator.get_evaluated_as_mask(0);
+  GeometryComponentFieldContext poly_context{component, ATTR_DOMAIN_FACE};
+  FieldEvaluator poly_evaluator{poly_context, mesh.totpoly};
+  poly_evaluator.add(selection_field);
+  poly_evaluator.evaluate();
+  const VArray<bool> &poly_selection_varray = poly_evaluator.get_evaluated<bool>(0);
+  const IndexMask poly_selection = poly_evaluator.get_evaluated_as_mask(0);
+
+  Vector<int64_t> int_selection_indices;
+  const VArray<bool> point_selection_varray = component.attribute_try_adapt_domain(
+      poly_selection_varray, ATTR_DOMAIN_FACE, ATTR_DOMAIN_POINT);
+  const IndexMask point_selection = index_mask_from_selection(point_selection_varray,
+                                                              int_selection_indices);
 
   Array<float3> offsets(orig_vert_size);
   GeometryComponentFieldContext point_context{component, ATTR_DOMAIN_POINT};
-  FieldEvaluator point_evaluator{point_context, orig_vert_size}; /* TODO: Better poly_selection. */
+  FieldEvaluator point_evaluator{point_context, &point_selection};
   point_evaluator.add_with_destination(offset_field, offsets.as_mutable_span());
   point_evaluator.evaluate();
-
-  // Array<Vector<int>> edge_to_poly_map(orig_edge_size);
-  // for (const int i : IndexRange(orig_poly_size)) {
-  //   const MPoly &poly = orig_polys[i];
-  //   for (const MLoop &loop : Span{mesh.mloop + poly.loopstart, poly.totloop}) {
-  //     edge_to_poly_map[loop.e].append(i);
-  //   }
-  // }
-
-  /* Counts the number of selected faces connected to each edge. */
-  // Array<int> edges_to_split(orig_edge_size, 0);
-  // for (const int i : poly_selection) {
-  //   const MPoly &poly = orig_polys[i];
-  //   for (const MLoop &loop : orig_loops.slice(poly.loopstart, poly.totloop)) {
-  //     edges_to_split[loop.e]++;
-  //   }
-  // }
 
   Array<int> edge_neighbor_count(orig_edge_size, 0);
   for (const int i : poly_selection) {
@@ -427,6 +443,10 @@ static void extrude_mesh_faces(MeshComponent &component,
   MutableSpan<MPoly> new_polys = polys.take_back(new_poly_size);
   MutableSpan<MLoop> loops{mesh.mloop, mesh.totloop};
   MutableSpan<MLoop> new_loops = loops.take_back(new_loop_size);
+
+  for (MVert &vert : new_verts) {
+    vert.flag = 0;
+  }
 
   for (const int i : connect_edges.index_range()) {
     MEdge &edge = connect_edges[i];
@@ -565,10 +585,15 @@ static void extrude_mesh_faces(MeshComponent &component,
     return true;
   });
 
-  threading::parallel_for(new_verts.index_range(), 1024, [&](const IndexRange range) {
+  threading::parallel_for(point_selection.index_range(), 1024, [&](const IndexRange range) {
     for (const int i : range) {
-      const float3 offset = offsets[new_vert_orig_indices[i]];
-      add_v3_v3(new_verts[i].co, offset);
+      const int orig_vert_index = point_selection[i];
+      const int new_vert_index = new_vert_indices[orig_vert_index];
+      const float3 offset = offsets[orig_vert_index];
+      /* If the vertex is used by a selected edge, it will have been duplicated and only the new
+       * vertex should use the offset. Otherwise the vertex might still need an offset, but it was
+       * reused on the inside of a set of extruded faces. */
+      add_v3_v3(verts[(new_vert_index != -1) ? new_vert_index : orig_vert_index].co, offset);
     }
   });
 
@@ -592,6 +617,7 @@ static void extrude_mesh(MeshComponent &component,
       extrude_mesh_faces(component, selection, offset);
       break;
   }
+  BKE_mesh_calc_normals(component.get_for_write());
   BLI_assert(BKE_mesh_is_valid(component.get_for_write()));
 }
 
