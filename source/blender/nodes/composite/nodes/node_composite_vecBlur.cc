@@ -21,6 +21,9 @@
  * \ingroup cmpnodes
  */
 
+#include "UI_interface.h"
+#include "UI_resources.h"
+
 #include "node_composite_util.hh"
 
 /* **************** VECTOR BLUR ******************** */
@@ -43,10 +46,26 @@ static void cmp_node_vec_blur_declare(NodeDeclarationBuilder &b)
 
 static void node_composit_init_vecblur(bNodeTree *UNUSED(ntree), bNode *node)
 {
-  NodeBlurData *nbd = (NodeBlurData *)MEM_callocN(sizeof(NodeBlurData), "node blur data");
+  NodeBlurData *nbd = MEM_cnew<NodeBlurData>(__func__);
   node->storage = nbd;
   nbd->samples = 32;
   nbd->fac = 1.0f;
+}
+
+static void node_composit_buts_vecblur(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
+{
+  uiLayout *col;
+
+  col = uiLayoutColumn(layout, false);
+  uiItemR(col, ptr, "samples", UI_ITEM_R_SPLIT_EMPTY_NAME, nullptr, ICON_NONE);
+  uiItemR(col, ptr, "factor", UI_ITEM_R_SPLIT_EMPTY_NAME, IFACE_("Blur"), ICON_NONE);
+
+  col = uiLayoutColumn(layout, true);
+  uiItemL(col, IFACE_("Speed:"), ICON_NONE);
+  uiItemR(col, ptr, "speed_min", UI_ITEM_R_SPLIT_EMPTY_NAME, IFACE_("Min"), ICON_NONE);
+  uiItemR(col, ptr, "speed_max", UI_ITEM_R_SPLIT_EMPTY_NAME, IFACE_("Max"), ICON_NONE);
+
+  uiItemR(layout, ptr, "use_curved", UI_ITEM_R_SPLIT_EMPTY_NAME, nullptr, ICON_NONE);
 }
 
 /* custom1: iterations, custom2: max_speed (0 = no_limit). */
@@ -56,6 +75,7 @@ void register_node_type_cmp_vecblur()
 
   cmp_node_type_base(&ntype, CMP_NODE_VECBLUR, "Vector Blur", NODE_CLASS_OP_FILTER, 0);
   ntype.declare = blender::nodes::cmp_node_vec_blur_declare;
+  ntype.draw_buttons = node_composit_buts_vecblur;
   node_type_init(&ntype, node_composit_init_vecblur);
   node_type_storage(
       &ntype, "NodeBlurData", node_free_standard_storage, node_copy_standard_storage);

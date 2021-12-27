@@ -1567,6 +1567,12 @@ static void gpencil_stroke_eraser_dostroke(tGPsdata *p,
       }
 
       bGPDspoint npt;
+      gpencil_point_to_parent_space(pt1, p->diff_mat, &npt);
+      gpencil_point_to_xy(&p->gsc, gps, &npt, &pc1[0], &pc1[1]);
+
+      gpencil_point_to_parent_space(pt2, p->diff_mat, &npt);
+      gpencil_point_to_xy(&p->gsc, gps, &npt, &pc2[0], &pc2[1]);
+
       if (pt0) {
         gpencil_point_to_parent_space(pt0, p->diff_mat, &npt);
         gpencil_point_to_xy(&p->gsc, gps, &npt, &pc0[0], &pc0[1]);
@@ -1575,12 +1581,6 @@ static void gpencil_stroke_eraser_dostroke(tGPsdata *p,
         /* avoid null values */
         copy_v2_v2_int(pc0, pc1);
       }
-
-      gpencil_point_to_parent_space(pt1, p->diff_mat, &npt);
-      gpencil_point_to_xy(&p->gsc, gps, &npt, &pc1[0], &pc1[1]);
-
-      gpencil_point_to_parent_space(pt2, p->diff_mat, &npt);
-      gpencil_point_to_xy(&p->gsc, gps, &npt, &pc2[0], &pc2[1]);
 
       /* Check that point segment of the boundbox of the eraser stroke */
       if (((!ELEM(V2D_IS_CLIPPED, pc0[0], pc0[1])) && BLI_rcti_isect_pt(rect, pc0[0], pc0[1])) ||
@@ -3681,8 +3681,7 @@ static int gpencil_draw_modal(bContext *C, wmOperator *op, const wmEvent *event)
        */
       if ((p->region) && (p->region->regiontype == RGN_TYPE_TOOLS)) {
         /* Change to whatever region is now under the mouse */
-        ARegion *current_region = BKE_area_find_region_xy(
-            p->area, RGN_TYPE_ANY, event->xy[0], event->xy[1]);
+        ARegion *current_region = BKE_area_find_region_xy(p->area, RGN_TYPE_ANY, event->xy);
 
         if (current_region) {
           /* Assume that since we found the cursor in here, it is in bounds

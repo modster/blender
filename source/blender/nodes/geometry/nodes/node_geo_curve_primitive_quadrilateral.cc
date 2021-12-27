@@ -17,6 +17,9 @@
 #include "BKE_spline.hh"
 #include "UI_interface.h"
 #include "UI_resources.h"
+
+#include "NOD_socket_search_link.hh"
+
 #include "node_geometry_util.hh"
 
 namespace blender::nodes::node_geo_curve_primitive_quadrilaterial_cc {
@@ -86,8 +89,7 @@ static void node_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 
 static void node_init(bNodeTree *UNUSED(tree), bNode *node)
 {
-  NodeGeometryCurvePrimitiveQuad *data = (NodeGeometryCurvePrimitiveQuad *)MEM_callocN(
-      sizeof(NodeGeometryCurvePrimitiveQuad), __func__);
+  NodeGeometryCurvePrimitiveQuad *data = MEM_cnew<NodeGeometryCurvePrimitiveQuad>(__func__);
   data->mode = GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_RECTANGLE;
   node->storage = data;
 }
@@ -110,35 +112,61 @@ static void node_update(bNodeTree *ntree, bNode *node)
   bNodeSocket *p3 = p2->next;
   bNodeSocket *p4 = p3->next;
 
-  LISTBASE_FOREACH (bNodeSocket *, sock, &node->inputs) {
-    nodeSetSocketAvailability(ntree, sock, false);
-  }
+  Vector<bNodeSocket *> available_sockets;
 
   if (mode == GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_RECTANGLE) {
-    nodeSetSocketAvailability(ntree, width, true);
-    nodeSetSocketAvailability(ntree, height, true);
+    available_sockets.extend({width, height});
   }
   else if (mode == GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_PARALLELOGRAM) {
-    nodeSetSocketAvailability(ntree, width, true);
-    nodeSetSocketAvailability(ntree, height, true);
-    nodeSetSocketAvailability(ntree, offset, true);
+    available_sockets.extend({width, height, offset});
   }
   else if (mode == GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_TRAPEZOID) {
-    nodeSetSocketAvailability(ntree, bottom, true);
-    nodeSetSocketAvailability(ntree, top, true);
-    nodeSetSocketAvailability(ntree, offset, true);
-    nodeSetSocketAvailability(ntree, height, true);
+    available_sockets.extend({bottom, top, offset, height});
   }
   else if (mode == GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_KITE) {
-    nodeSetSocketAvailability(ntree, width, true);
-    nodeSetSocketAvailability(ntree, bottom_height, true);
-    nodeSetSocketAvailability(ntree, top_height, true);
+    available_sockets.extend({width, bottom_height, top_height});
   }
   else if (mode == GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_POINTS) {
-    nodeSetSocketAvailability(ntree, p1, true);
-    nodeSetSocketAvailability(ntree, p2, true);
-    nodeSetSocketAvailability(ntree, p3, true);
-    nodeSetSocketAvailability(ntree, p4, true);
+    available_sockets.extend({p1, p2, p3, p4});
+  }
+
+  LISTBASE_FOREACH (bNodeSocket *, sock, &node->inputs) {
+    nodeSetSocketAvailability(ntree, sock, available_sockets.contains(sock));
+  }
+}
+
+class SocketSearchOp {
+ public:
+  std::string socket_name;
+  GeometryNodeCurvePrimitiveQuadMode quad_mode;
+  void operator()(LinkSearchOpParams &params)
+  {
+    bNode &node = params.add_node("GeometryNodeCurvePrimitiveQuadrilateral");
+    node_storage(node).mode = quad_mode;
+    params.update_and_connect_available_socket(node, socket_name);
+  }
+};
+
+static void node_gather_link_searches(GatherLinkSearchOpParams &params)
+{
+  const NodeDeclaration &declaration = *params.node_type().fixed_declaration;
+  if (params.in_out() == SOCK_OUT) {
+    search_link_ops_for_declarations(params, declaration.outputs());
+  }
+  else if (params.node_tree().typeinfo->validate_link(
+               static_cast<eNodeSocketDatatype>(params.other_socket().type), SOCK_FLOAT)) {
+    params.add_item(IFACE_("Width"),
+                    SocketSearchOp{"Width", GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_RECTANGLE});
+    params.add_item(IFACE_("Height"),
+                    SocketSearchOp{"Height", GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_RECTANGLE});
+    params.add_item(IFACE_("Bottom Width"),
+                    SocketSearchOp{"Bottom Width", GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_TRAPEZOID});
+    params.add_item(IFACE_("Top Width"),
+                    SocketSearchOp{"Top Width", GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_TRAPEZOID});
+    params.add_item(IFACE_("Offset"),
+                    SocketSearchOp{"Offset", GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_PARALLELOGRAM});
+    params.add_item(IFACE_("Point 1"),
+                    SocketSearchOp{"Point 1", GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_POINTS});
   }
 }
 
@@ -271,5 +299,6 @@ void register_node_type_geo_curve_primitive_quadrilateral()
                     "NodeGeometryCurvePrimitiveQuad",
                     node_free_standard_storage,
                     node_copy_standard_storage);
+  ntype.gather_link_search_ops = file_ns::node_gather_link_searches;
   nodeRegisterType(&ntype);
 }

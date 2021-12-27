@@ -84,6 +84,7 @@
 #include "BKE_lib_id.h"
 #include "BKE_main.h"
 #include "BKE_node.h"
+#include "BKE_node_tree_update.h"
 #include "BKE_packedFile.h"
 #include "BKE_report.h"
 #include "BKE_scene.h"
@@ -2062,9 +2063,10 @@ static void stampdata(
   time_t t;
 
   if (scene->r.stamp & R_STAMP_FILENAME) {
+    const char *blendfile_path = BKE_main_blendfile_path_from_global();
     SNPRINTF(stamp_data->file,
              do_prefix ? "File %s" : "%s",
-             G.relbase_valid ? BKE_main_blendfile_path_from_global() : "<untitled>");
+             (blendfile_path[0] != '\0') ? blendfile_path : "<untitled>");
   }
   else {
     stamp_data->file[0] = '\0';
@@ -3698,16 +3700,8 @@ void BKE_image_signal(Main *bmain, Image *ima, ImageUser *iuser, int signal)
 
   BLI_mutex_unlock(ima->runtime.cache_mutex);
 
-  /* don't use notifiers because they are not 100% sure to succeeded
-   * this also makes sure all scenes are accounted for. */
-  {
-    Scene *scene;
-    for (scene = bmain->scenes.first; scene; scene = scene->id.next) {
-      if (scene->nodetree) {
-        nodeUpdateID(scene->nodetree, &ima->id);
-      }
-    }
-  }
+  BKE_ntree_update_tag_id_changed(bmain, &ima->id);
+  BKE_ntree_update_main(bmain, NULL);
 }
 
 /* return renderpass for a given pass index and active view */
