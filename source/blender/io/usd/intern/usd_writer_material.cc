@@ -546,38 +546,6 @@ static void copy_single_file(Image *ima, const std::string &dest_dir, const bool
   }
 }
 
-/* Gets a NodeTexImage's filepath */
-static std::string get_node_tex_image_filepath(bNode *node)
-{
-  NodeTexImage *tex_original = (NodeTexImage *)node->storage;
-
-  Image *ima = (Image *)node->id;
-  if (!ima) {
-    return "";
-  }
-
-  if (strlen(ima->filepath) == 0) {
-    return "";
-  }
-
-  char filepath[1024];
-  strncpy(filepath, ima->filepath, sizeof(ima->filepath));
-
-  BKE_image_user_file_path(&tex_original->iuser, ima, filepath);
-
-  BLI_str_replace_char(filepath, '\\', '/');
-
-  if (ima->source == IMA_SRC_TILED) {
-    char head[FILE_MAX], tail[FILE_MAX];
-    unsigned short numlen;
-
-    BLI_path_sequence_decode(filepath, head, tail, &numlen);
-    return (std::string(head) + "<UDIM>" + std::string(tail));
-  }
-
-  return std::string(filepath);
-}
-
 static pxr::TfToken get_node_tex_image_color_space(bNode *node)
 {
   if (node->type != SH_NODE_TEX_IMAGE) {
@@ -701,6 +669,38 @@ static pxr::UsdShadeShader create_usd_preview_shader(const USDExporterContext &u
   }
 
   return shader;
+}
+
+/* Gets a NodeTexImage's filepath */
+static std::string get_node_tex_image_filepath(bNode *node)
+{
+  NodeTexImage *tex_original = (NodeTexImage *)node->storage;
+
+  Image *ima = (Image *)node->id;
+  if (!ima) {
+    return "";
+  }
+
+  if (strlen(ima->filepath) == 0) {
+    return "";
+  }
+
+  char filepath[1024];
+  strncpy(filepath, ima->filepath, sizeof(ima->filepath));
+
+  BKE_image_user_file_path(&tex_original->iuser, ima, filepath);
+
+  BLI_str_replace_char(filepath, '\\', '/');
+
+  if (ima->source == IMA_SRC_TILED) {
+    char head[FILE_MAX], tail[FILE_MAX];
+    unsigned short numlen;
+
+    BLI_path_sequence_decode(filepath, head, tail, &numlen);
+    return (std::string(head) + "<UDIM>" + std::string(tail));
+  }
+
+  return std::string(filepath);
 }
 
 /* Gets a NodeTexImage's filepath, returning a path in the texture export directory or a relative
