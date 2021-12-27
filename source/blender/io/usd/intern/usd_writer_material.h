@@ -41,7 +41,7 @@ struct USDExporterContext;
  * More may be added in the future.
  *
  * The 'default_uv' paramter is used as the default UV set name sampled by the primvar
- * reader shaders generated for image texture nodes shat don't have an attached UVMAp node. */
+ * reader shaders generated for image texture nodes that don't have an attached UVMAp node. */
 void create_usd_preview_surface_material(const USDExporterContext &usd_export_context,
                                          Material *material,
                                          pxr::UsdShadeMaterial &usd_material,
