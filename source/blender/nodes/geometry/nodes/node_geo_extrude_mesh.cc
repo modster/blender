@@ -221,7 +221,7 @@ static void extrude_mesh_edges(MeshComponent &component,
     MEdge &edge = extrude_edges[i];
     edge.v1 = extrude_vert_orig_indices[i];
     edge.v2 = orig_vert_size + i;
-    edge.flag |= (ME_EDGEDRAW | ME_EDGERENDER | ME_LOOSEEDGE);
+    edge.flag = (ME_EDGEDRAW | ME_EDGERENDER);
   }
 
   for (const int i : duplicate_edges.index_range()) {
@@ -229,7 +229,7 @@ static void extrude_mesh_edges(MeshComponent &component,
     MEdge &edge = duplicate_edges[i];
     edge.v1 = extrude_vert_indices[orig_edge.v1];
     edge.v2 = extrude_vert_indices[orig_edge.v2];
-    edge.flag |= (ME_EDGEDRAW | ME_EDGERENDER | ME_LOOSEEDGE);
+    edge.flag = (ME_EDGEDRAW | ME_EDGERENDER);
   }
 
   for (const int i : new_polys.index_range()) {
@@ -237,6 +237,7 @@ static void extrude_mesh_edges(MeshComponent &component,
     poly.loopstart = orig_loop_size + i * 4;
     poly.totloop = 4;
     poly.mat_nr = 0;
+    poly.flag = 0;
   }
 
   /* Maps new vertices to the extruded edges connecting them to the original edges. The values are
@@ -265,13 +266,13 @@ static void extrude_mesh_edges(MeshComponent &component,
     poly_loops[0].v = orig_edge.v1;
     poly_loops[0].e = orig_edge_index;
     poly_loops[1].v = orig_edge.v2;
-    poly_loops[1].e = extrude_edge_offset + extrude_edge_index_1;
+    poly_loops[1].e = extrude_edge_offset + extrude_edge_index_2;
     /* The first vertex of the duplicate edge is the extrude edge that isn't used yet. */
-    poly_loops[2].v = extrude_edge_1.v1 == orig_edge.v2 ? extrude_edge_1.v1 : extrude_edge_1.v2;
+    poly_loops[2].v = extrude_edge_1.v1 == orig_edge.v2 ? extrude_edge_2.v1 : extrude_edge_2.v2;
     poly_loops[2].e = duplicate_edge_offset + i;
 
-    poly_loops[3].v = extrude_edge_2.v1 == orig_edge.v1 ? extrude_edge_2.v2 : extrude_edge_2.v1;
-    poly_loops[3].e = extrude_edge_offset + extrude_edge_index_2;
+    poly_loops[3].v = extrude_edge_2.v1 == orig_edge.v1 ? extrude_edge_1.v1 : extrude_edge_1.v2;
+    poly_loops[3].e = extrude_edge_offset + extrude_edge_index_1;
   }
 
   component.attribute_foreach([&](const AttributeIDRef &id, const AttributeMetaData meta_data) {
