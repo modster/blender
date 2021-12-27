@@ -32,6 +32,9 @@ namespace blender::nodes::node_geo_extrude_mesh_cc {
 
 NODE_STORAGE_FUNCS(NodeGeometryExtrudeMesh)
 
+/* TODO: Decide whether to transfer attributes by topology proximity to new faces, corners, and
+ * edges. */
+
 static void node_declare(NodeDeclarationBuilder &b)
 {
   b.add_input<decl::Geometry>("Mesh").supported_type(GEO_COMPONENT_TYPE_MESH);
@@ -153,7 +156,9 @@ static void extrude_mesh_edges(MeshComponent &component,
   edge_evaluator.evaluate();
   const IndexMask selection = edge_evaluator.get_evaluated_as_mask(0);
 
+  /* Maps vertex indices in the original mesh to the corresponding extruded vertices. */
   Array<int> extrude_vert_indices(mesh.totvert, -1);
+  /* Maps from the index in the added vertices to the original vertex they were extruded from. */
   Vector<int> extrude_vert_orig_indices;
   extrude_vert_orig_indices.reserve(selection.size());
   for (const int i_edge : selection) {
@@ -177,9 +182,13 @@ static void extrude_mesh_edges(MeshComponent &component,
   const VArray<float3> offsets = point_evaluator.get_evaluated<float3>(0);
 
   const int extrude_vert_size = extrude_vert_orig_indices.size();
+  const int extrude_edge_offset = orig_edge_size;
   const int extrude_edge_size = extrude_vert_size;
+  const int duplicate_edge_offset = orig_edge_size + extrude_vert_size;
   const int duplicate_edge_size = selection.size();
   const int new_edge_size = extrude_edge_size + duplicate_edge_size;
+  const int new_poly_size = selection.size();
+  const int new_loop_size = new_poly_size * 4;
 
   /* TODO: This is a stupid way to work around an issue with #CustomData_realloc,
    * which doesn't reallocate a referenced layer apparently. */
@@ -190,20 +199,23 @@ static void extrude_mesh_edges(MeshComponent &component,
 
   mesh.totvert += extrude_vert_size;
   mesh.totedge += new_edge_size;
-  // mesh.totpoly += selection.size();
-  // mesh.totloop += selection.size() * 4;
+  mesh.totpoly += selection.size();
+  mesh.totloop += selection.size() * 4;
   CustomData_realloc(&mesh.vdata, mesh.totvert);
   CustomData_realloc(&mesh.edata, mesh.totedge);
-  // CustomData_realloc(&mesh.pdata, mesh.totpoly);
-  // CustomData_realloc(&mesh.ldata, mesh.totloop);
+  CustomData_realloc(&mesh.pdata, mesh.totpoly);
+  CustomData_realloc(&mesh.ldata, mesh.totloop);
   BKE_mesh_update_customdata_pointers(&mesh, false);
 
   MutableSpan<MVert> verts{mesh.mvert, mesh.totvert};
   MutableSpan<MVert> new_verts = verts.take_back(extrude_vert_size);
   MutableSpan<MEdge> edges{mesh.medge, mesh.totedge};
-  MutableSpan<MEdge> new_edges = edges.take_back(new_edge_size);
-  MutableSpan<MEdge> extrude_edges = new_edges.take_front(extrude_edge_size);
-  MutableSpan<MEdge> duplicate_edges = new_edges.take_back(duplicate_edge_size);
+  MutableSpan<MEdge> extrude_edges = edges.slice(extrude_edge_offset, extrude_edge_size);
+  MutableSpan<MEdge> duplicate_edges = edges.slice(duplicate_edge_offset, duplicate_edge_size);
+  MutableSpan<MPoly> polys{mesh.mpoly, mesh.totpoly};
+  MutableSpan<MPoly> new_polys = polys.take_back(selection.size());
+  MutableSpan<MLoop> loops{mesh.mloop, mesh.totloop};
+  MutableSpan<MLoop> new_loops = loops.take_back(new_loop_size);
 
   for (const int i : extrude_edges.index_range()) {
     MEdge &edge = extrude_edges[i];
@@ -218,6 +230,48 @@ static void extrude_mesh_edges(MeshComponent &component,
     edge.v1 = extrude_vert_indices[orig_edge.v1];
     edge.v2 = extrude_vert_indices[orig_edge.v2];
     edge.flag |= (ME_EDGEDRAW | ME_EDGERENDER | ME_LOOSEEDGE);
+  }
+
+  for (const int i : new_polys.index_range()) {
+    MPoly &poly = new_polys[i];
+    poly.loopstart = orig_loop_size + i * 4;
+    poly.totloop = 4;
+    poly.mat_nr = 0;
+  }
+
+  /* Maps new vertices to the extruded edges connecting them to the original edges. The values are
+   * indices into the `extrude_edges` array, and the element index corresponds to the vert in
+   * `new_verts` of the same index. */
+  Array<int> new_vert_to_extrude_edge(extrude_vert_size);
+  for (const int i : extrude_edges.index_range()) {
+    const MEdge &extrude_edge = extrude_edges[i];
+    BLI_assert(extrude_edge.v1 >= orig_vert_size || extrude_edge.v2 >= orig_vert_size);
+    const int vert_index = extrude_edge.v1 > orig_vert_size ? extrude_edge.v1 : extrude_edge.v2;
+    new_vert_to_extrude_edge[vert_index - orig_vert_size] = i;
+  }
+
+  /* TODO: Figure out winding order for new faces. */
+  for (const int i : selection.index_range()) {
+    MutableSpan<MLoop> poly_loops = new_loops.slice(4 * i, 4);
+    const int orig_edge_index = selection[i];
+    const MEdge &orig_edge = edges[orig_edge_index];
+    const MEdge &duplicate_edge = duplicate_edges[i];
+    const int new_vert_index_1 = duplicate_edge.v1 - orig_vert_size;
+    const int new_vert_index_2 = duplicate_edge.v2 - orig_vert_size;
+    const int extrude_edge_index_1 = new_vert_to_extrude_edge[new_vert_index_1];
+    const int extrude_edge_index_2 = new_vert_to_extrude_edge[new_vert_index_2];
+    const MEdge &extrude_edge_1 = extrude_edges[new_vert_to_extrude_edge[new_vert_index_1]];
+    const MEdge &extrude_edge_2 = extrude_edges[new_vert_to_extrude_edge[new_vert_index_2]];
+    poly_loops[0].v = orig_edge.v1;
+    poly_loops[0].e = orig_edge_index;
+    poly_loops[1].v = orig_edge.v2;
+    poly_loops[1].e = extrude_edge_offset + extrude_edge_index_1;
+    /* The first vertex of the duplicate edge is the extrude edge that isn't used yet. */
+    poly_loops[2].v = extrude_edge_1.v1 == orig_edge.v2 ? extrude_edge_1.v1 : extrude_edge_1.v2;
+    poly_loops[2].e = duplicate_edge_offset + i;
+
+    poly_loops[3].v = extrude_edge_2.v1 == orig_edge.v1 ? extrude_edge_2.v2 : extrude_edge_2.v1;
+    poly_loops[3].e = extrude_edge_offset + extrude_edge_index_2;
   }
 
   component.attribute_foreach([&](const AttributeIDRef &id, const AttributeMetaData meta_data) {
@@ -244,9 +298,7 @@ static void extrude_mesh_edges(MeshComponent &component,
       attribute_math::convert_to_static_type(meta_data.data_type, [&](auto dummy) {
         using T = decltype(dummy);
         MutableSpan<T> data = attribute.as_span().typed<T>();
-        MutableSpan<T> new_data = data.take_back(new_edge_size);
-        MutableSpan<T> extrude_data = new_data.take_front(extrude_edge_size);
-        MutableSpan<T> duplicate_data = new_data.take_back(duplicate_edge_size);
+        MutableSpan<T> duplicate_data = data.slice(duplicate_edge_offset, duplicate_edge_size);
 
         for (const int i : selection.index_range()) {
           duplicate_data[i] = data[selection[i]];
