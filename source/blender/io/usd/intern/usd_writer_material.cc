@@ -91,7 +91,7 @@ static pxr::UsdShadeShader create_usd_preview_shader(const USDExporterContext &u
                                                      pxr::UsdShadeMaterial &material,
                                                      bNode *node);
 static void export_texture(bNode *node, const pxr::UsdStageRefPtr stage, const bool allow_overwrite=false);
-static bNode *get_bsdf_node(Material *material);
+static bNode *find_bsdf_node(Material *material);
 static std::string get_node_tex_image_filepath(bNode *node);
 static std::string get_node_tex_image_filepath(bNode *node,
                                                const pxr::UsdStageRefPtr stage,
@@ -117,7 +117,7 @@ void create_usd_preview_surface_material(const USDExporterContext &usd_export_co
   /* We only handle the first instance of either principled or
     * diffuse bsdf nodes in the material's node tree, because
     * USD Preview Surface has no concept of layering materials. */
-  bNode *node = get_bsdf_node(material);
+  bNode *node = find_bsdf_node(material);
   if (!node) {
     return;
   }
@@ -404,20 +404,7 @@ static std::string get_in_memory_texture_filename(bNode *node)
     return "";
   }
 
-  char file_name[FILE_MAX];
-  file_name[0] = '\0';
-
-  /* Try using the iamge name for the file name. */
-
-  /* Sanity check that the id name isn't empty. */
-  if (strlen(ima->id.name) < 3) {
-    return "";
-  }
-
-  strcpy(file_name, ima->id.name + 2);
-
   /* Determine the correct file extension from the image format. */
-
   ImBuf *imbuf = BKE_image_acquire_ibuf(ima, nullptr, nullptr);
   if (!imbuf) {
     return "";
@@ -425,6 +412,10 @@ static std::string get_in_memory_texture_filename(bNode *node)
 
   ImageFormatData imageFormat;
   BKE_imbuf_to_image_format(&imageFormat, imbuf);
+
+  char file_name[FILE_MAX];
+  /* Use the image name for the file name. */
+  strcpy(file_name, ima->id.name + 2);
 
   BKE_image_path_ensure_ext_from_imformat(file_name, &imageFormat);
 
@@ -611,13 +602,15 @@ static std::string get_node_tex_image_filepath(bNode *node)
   NodeTexImage *tex_original = (NodeTexImage *)node->storage;
 
   Image *ima = (Image *)node->id;
-  if (!ima)
+  if (!ima) {
     return "";
-  if (sizeof(ima->filepath) == 0)
+  }
+
+  if (strlen(ima->filepath) == 0) {
     return "";
+  }
 
-  char filepath[1024] = "\0";
-
+  char filepath[1024];
   strncpy(filepath, ima->filepath, sizeof(ima->filepath));
 
   BKE_image_user_file_path(&tex_original->iuser, ima, filepath);
@@ -638,7 +631,6 @@ static std::string get_node_tex_image_filepath(bNode *node)
 static pxr::TfToken get_node_tex_image_color_space(bNode *node)
 {
   if (node->type != SH_NODE_TEX_IMAGE) {
-    std::cout << "get_node_tex_image_color_space() called with unexpected type.\n";
     return pxr::TfToken();
   }
 
@@ -648,38 +640,37 @@ static pxr::TfToken get_node_tex_image_color_space(bNode *node)
 
   Image *ima = reinterpret_cast<Image *>(node->id);
 
-  pxr::TfToken color_space;
-
   if (strcmp(ima->colorspace_settings.name, "Raw") == 0) {
-    color_space = usdtokens::raw;
+    return usdtokens::raw;
   }
-  else if (strcmp(ima->colorspace_settings.name, "Non-Color") == 0) {
-    color_space = usdtokens::raw;
+  if (strcmp(ima->colorspace_settings.name, "Non-Color") == 0) {
+    return usdtokens::raw;
   }
-  else if (strcmp(ima->colorspace_settings.name, "sRGB") == 0) {
-    color_space = usdtokens::sRGB;
+  if (strcmp(ima->colorspace_settings.name, "sRGB") == 0) {
+    return usdtokens::sRGB;
   }
 
-  return color_space;
+  return  pxr::TfToken();
 }
 
 /* Search the upstream nodes connected to the given socket and return the first occurrance
  * of the node of the given type. Return null if no node of this type was found. */
 static bNode *traverse_channel(bNodeSocket *input, short target_type)
 {
-  if (input->link) {
-    bNode *linked_node = input->link->fromnode;
-    if (linked_node->type == target_type) {
-      /* Return match. */
-      return linked_node;
-    }
+  if (!input->link) {
+    return nullptr;
+  }
 
-    /* Recursively traverse the linked node's sockets. */
-    for (bNodeSocket *sock = static_cast<bNodeSocket *>(linked_node->inputs.first); sock;
-         sock = sock->next) {
-      if (bNode *found_node = traverse_channel(sock)) {
-        return found_node;
-      }
+  bNode *linked_node = input->link->fromnode;
+  if (linked_node->type == target_type) {
+    /* Return match. */
+    return linked_node;
+  }
+
+  /* Recursively traverse the linked node's sockets. */
+  LISTBASE_FOREACH(bNodeSocket *, sock, &linked_node->inputs) {
+    if (bNode *found_node = traverse_channel(sock, target_type)) {
+      return found_node;
     }
   }
 
@@ -688,7 +679,7 @@ static bNode *traverse_channel(bNodeSocket *input, short target_type)
 
 /* Returns the first occurence of a principled bsdf or a diffuse bsdf node found in the given
  * material's node tree.  Returns null if no instance of either type was found.*/
-static bNode *get_bsdf_node(Material *material)
+static bNode *find_bsdf_node(Material *material)
 {
   if (!material) {
     return nullptr;
@@ -754,21 +745,22 @@ static pxr::UsdShadeShader create_usd_preview_shader(const USDExporterContext &u
   pxr::UsdShadeShader shader = create_usd_preview_shader(
       usd_export_context, material, node->name, node->type);
 
-  if (node->type == SH_NODE_TEX_IMAGE) {
+  if (node->type != SH_NODE_TEX_IMAGE) {
+    return shader;
+  }
 
-    /* For texture image nodes we set the image path and color space. */
-    std::string imagePath = get_node_tex_image_filepath(
-        node, usd_export_context.stage, usd_export_context.export_params);
-    if (!imagePath.empty()) {
-      shader.CreateInput(usdtokens::file, pxr::SdfValueTypeNames->Asset)
-          .Set(pxr::SdfAssetPath(imagePath));
-    }
+  /* For texture image nodes we set the image path and color space. */
+  std::string imagePath = get_node_tex_image_filepath(
+      node, usd_export_context.stage, usd_export_context.export_params);
+  if (!imagePath.empty()) {
+    shader.CreateInput(usdtokens::file, pxr::SdfValueTypeNames->Asset)
+        .Set(pxr::SdfAssetPath(imagePath));
+  }
 
-    pxr::TfToken colorSpace = get_node_tex_image_color_space(node);
-    if (!colorSpace.IsEmpty()) {
-      shader.CreateInput(usdtokens::sourceColorSpace, pxr::SdfValueTypeNames->Token)
-          .Set(colorSpace);
-    }
+  pxr::TfToken colorSpace = get_node_tex_image_color_space(node);
+  if (!colorSpace.IsEmpty()) {
+    shader.CreateInput(usdtokens::sourceColorSpace, pxr::SdfValueTypeNames->Token)
+        .Set(colorSpace);
   }
 
   return shader;
