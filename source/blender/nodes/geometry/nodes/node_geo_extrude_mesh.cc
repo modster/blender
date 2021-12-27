@@ -42,6 +42,8 @@ static void node_declare(NodeDeclarationBuilder &b)
   b.add_input<decl::Bool>(N_("Selection")).default_value(true).supports_field().hide_value();
   b.add_input<decl::Vector>(N_("Offset")).supports_field().subtype(PROP_TRANSLATION);
   b.add_output<decl::Geometry>("Mesh");
+  b.add_output<decl::Bool>(N_("Side Faces")).field_source();
+  b.add_output<decl::Bool>(N_("Top Faces")).field_source();
 }
 
 static void node_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
@@ -58,6 +60,19 @@ static void node_init(bNodeTree *UNUSED(tree), bNode *node)
   node->storage = data;
 }
 
+static void node_update(bNodeTree *tree, bNode *node)
+{
+  const NodeGeometryExtrudeMesh &storage = node_storage(*node);
+  const GeometryNodeExtrudeMeshMode mode = static_cast<GeometryNodeExtrudeMeshMode>(storage.mode);
+
+  bNodeSocket *mesh = (bNodeSocket *)node->outputs.first;
+  bNodeSocket *side_faces = mesh->next;
+  bNodeSocket *top_faces = side_faces->next;
+
+  nodeSetSocketAvailability(tree, side_faces, mode == GEO_NODE_EXTRUDE_MESH_FACES);
+  nodeSetSocketAvailability(tree, top_faces, mode == GEO_NODE_EXTRUDE_MESH_FACES);
+}
+
 static void expand_mesh_size(Mesh &mesh,
                              const int vert_expand,
                              const int edge_expand,
@@ -68,6 +83,10 @@ static void expand_mesh_size(Mesh &mesh,
     mesh.totvert += vert_expand;
     CustomData_duplicate_referenced_layers(&mesh.vdata, mesh.totvert);
     CustomData_realloc(&mesh.vdata, mesh.totvert);
+  }
+  else {
+    /* Even when the number of vertices is not changed, the mesh can still be deformed. */
+    CustomData_duplicate_referenced_layer(&mesh.vdata, CD_MVERT, mesh.totvert);
   }
   if (edge_expand != 0) {
     mesh.totedge += edge_expand;
@@ -147,6 +166,9 @@ static void extrude_mesh_vertices(MeshComponent &component,
 
   BKE_mesh_runtime_clear_cache(&mesh);
   BKE_mesh_normals_tag_dirty(&mesh);
+
+  BKE_mesh_calc_normals(component.get_for_write());
+  BLI_assert(BKE_mesh_is_valid(component.get_for_write()));
 }
 
 static void extrude_mesh_edges(MeshComponent &component,
@@ -317,6 +339,9 @@ static void extrude_mesh_edges(MeshComponent &component,
 
   BKE_mesh_runtime_clear_cache(&mesh);
   BKE_mesh_normals_tag_dirty(&mesh);
+
+  BKE_mesh_calc_normals(component.get_for_write());
+  BLI_assert(BKE_mesh_is_valid(component.get_for_write()));
 }
 
 static IndexMask index_mask_from_selection(const VArray<bool> &selection,
@@ -348,9 +373,15 @@ static IndexMask index_mask_from_selection(const VArray<bool> &selection,
   return IndexMask(r_indices);
 }
 
+struct FaceExtrudeAttributeOutputs {
+  StrongAnonymousAttributeID top_faces_id;
+  StrongAnonymousAttributeID side_faces_id;
+};
+
 static void extrude_mesh_faces(MeshComponent &component,
                                const Field<bool> &selection_field,
-                               const Field<float3> &offset_field)
+                               const Field<float3> &offset_field,
+                               FaceExtrudeAttributeOutputs &attribute_outputs)
 {
   Mesh &mesh = *component.get_for_write();
   const int orig_vert_size = mesh.totvert;
@@ -612,24 +643,20 @@ static void extrude_mesh_faces(MeshComponent &component,
 
   BKE_mesh_runtime_clear_cache(&mesh);
   BKE_mesh_normals_tag_dirty(&mesh);
-}
 
-static void extrude_mesh(MeshComponent &component,
-                         GeometryNodeExtrudeMeshMode mode,
-                         const Field<bool> &selection,
-                         const Field<float3> &offset)
-{
-  switch (mode) {
-    case GEO_NODE_EXTRUDE_MESH_VERTICES:
-      extrude_mesh_vertices(component, selection, offset);
-      break;
-    case GEO_NODE_EXTRUDE_MESH_EDGES:
-      extrude_mesh_edges(component, selection, offset);
-      break;
-    case GEO_NODE_EXTRUDE_MESH_FACES:
-      extrude_mesh_faces(component, selection, offset);
-      break;
+  if (attribute_outputs.top_faces_id) {
+    OutputAttribute_Typed<bool> top_faces = component.attribute_try_get_for_output_only<bool>(
+        attribute_outputs.top_faces_id.get(), ATTR_DOMAIN_FACE);
+    top_faces.as_span().fill_indices(poly_selection, true);
+    top_faces.save();
   }
+  if (attribute_outputs.side_faces_id) {
+    OutputAttribute_Typed<bool> side_faces = component.attribute_try_get_for_output_only<bool>(
+        attribute_outputs.side_faces_id.get(), ATTR_DOMAIN_FACE);
+    side_faces.as_span().slice(orig_polys.size(), new_poly_size).fill(true);
+    side_faces.save();
+  }
+
   BKE_mesh_calc_normals(component.get_for_write());
   BLI_assert(BKE_mesh_is_valid(component.get_for_write()));
 }
@@ -641,13 +668,59 @@ static void node_geo_exec(GeoNodeExecParams params)
   Field<float3> offset = params.extract_input<Field<float3>>("Offset");
   const NodeGeometryExtrudeMesh &storage = node_storage(params.node());
   GeometryNodeExtrudeMeshMode mode = static_cast<GeometryNodeExtrudeMeshMode>(storage.mode);
-  geometry_set.modify_geometry_sets([&](GeometrySet &geometry_set) {
-    if (geometry_set.has_mesh()) {
-      MeshComponent &component = geometry_set.get_component_for_write<MeshComponent>();
-      extrude_mesh(component, mode, selection, offset);
+
+  FaceExtrudeAttributeOutputs attribute_outputs;
+  if (mode == GEO_NODE_EXTRUDE_MESH_FACES) {
+    if (params.output_is_required("Top Faces")) {
+      attribute_outputs.top_faces_id = StrongAnonymousAttributeID("Top Faces");
     }
-  });
+    if (params.output_is_required("Side Faces")) {
+      attribute_outputs.side_faces_id = StrongAnonymousAttributeID("Side Faces");
+    }
+  }
+
+  switch (mode) {
+    case GEO_NODE_EXTRUDE_MESH_VERTICES:
+      geometry_set.modify_geometry_sets([&](GeometrySet &geometry_set) {
+        if (geometry_set.has_mesh()) {
+          MeshComponent &component = geometry_set.get_component_for_write<MeshComponent>();
+          extrude_mesh_vertices(component, selection, offset);
+        }
+      });
+      break;
+    case GEO_NODE_EXTRUDE_MESH_EDGES:
+      geometry_set.modify_geometry_sets([&](GeometrySet &geometry_set) {
+        if (geometry_set.has_mesh()) {
+          MeshComponent &component = geometry_set.get_component_for_write<MeshComponent>();
+          extrude_mesh_edges(component, selection, offset);
+        }
+      });
+      break;
+    case GEO_NODE_EXTRUDE_MESH_FACES: {
+
+      geometry_set.modify_geometry_sets([&](GeometrySet &geometry_set) {
+        if (geometry_set.has_mesh()) {
+          MeshComponent &component = geometry_set.get_component_for_write<MeshComponent>();
+          extrude_mesh_faces(component, selection, offset, attribute_outputs);
+        }
+      });
+      break;
+    }
+  }
+
   params.set_output("Mesh", std::move(geometry_set));
+  if (attribute_outputs.top_faces_id) {
+    params.set_output(
+        "Top Faces",
+        AnonymousAttributeFieldInput::Create<bool>(std::move(attribute_outputs.top_faces_id),
+                                                   params.attribute_producer_name()));
+  }
+  if (attribute_outputs.side_faces_id) {
+    params.set_output(
+        "Side Faces",
+        AnonymousAttributeFieldInput::Create<bool>(std::move(attribute_outputs.side_faces_id),
+                                                   params.attribute_producer_name()));
+  }
 }
 
 }  // namespace blender::nodes::node_geo_extrude_mesh_cc
@@ -659,6 +732,7 @@ void register_node_type_geo_extrude_mesh()
   static bNodeType ntype;
   geo_node_type_base(&ntype, GEO_NODE_EXTRUDE_MESH, "Extrude Mesh", NODE_CLASS_GEOMETRY, 0);
   node_type_init(&ntype, file_ns::node_init);
+  node_type_update(&ntype, file_ns::node_update);
   ntype.declare = file_ns::node_declare;
   ntype.geometry_node_execute = file_ns::node_geo_exec;
   node_type_storage(
