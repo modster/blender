@@ -299,12 +299,11 @@ void WM_OT_usd_export(struct wmOperatorType *ot)
                   "Overwrite Textures",
                   "Allow overwriting existing texture files when exporting textures");
 
-  RNA_def_boolean(
-      ot->srna,
-      "relative_texture_paths",
-      true,
-      "Relative Texture Paths",
-      "Make texture asset paths relative to the USD file");
+  RNA_def_boolean(ot->srna,
+                  "relative_texture_paths",
+                  true,
+                  "Relative Texture Paths",
+                  "Make texture asset paths relative to the USD file");
 }
 
 /* ====== USD Import ====== */

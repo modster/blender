@@ -44,7 +44,7 @@ static std::string get_mesh_active_uvlayer_name(const Object *ob)
     return "";
   }
 
-  const Mesh *me =static_cast<Mesh *>(ob->data);
+  const Mesh *me = static_cast<Mesh *>(ob->data);
 
   const char *name = CustomData_get_active_layer_name(&me->ldata, CD_MLOOPUV);
 
