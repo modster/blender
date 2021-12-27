@@ -82,6 +82,20 @@ static const pxr::TfToken UVMap("UVMap", pxr::TfToken::Immortal);
 
 namespace blender::io::usd {
 
+/* Preview surface input specification. */
+struct InputSpec {
+  pxr::TfToken input_name;
+  pxr::SdfValueTypeName input_type;
+  pxr::TfToken source_name;
+  /* Whether a default value should be set
+   * if the node socket has not input. Usually
+   * false for the Normal input. */
+  bool set_default_value;
+};
+
+/* Map Blender socket names to USD Preview Surface InputSpec structs. */
+typedef std::map<std::string, InputSpec> InputSpecMap;
+
 /* Static function forward declarations. */
 static pxr::UsdShadeShader create_usd_preview_shader(const USDExporterContext &usd_export_context,
                                                      pxr::UsdShadeMaterial &material,
@@ -99,7 +113,13 @@ static std::string get_node_tex_image_filepath(bNode *node,
 static std::string get_texture_filepath(const std::string &in_path,
                                         const pxr::UsdStageRefPtr stage,
                                         const USDExportParams &export_params);
-static bNode *traverse_channel(bNodeSocket *input, short target_type = SH_NODE_TEX_IMAGE);
+static bNode *traverse_channel(bNodeSocket *input, short target_type);
+static InputSpecMap &preview_surface_input_map();
+static void create_uvmap_shader(const USDExporterContext &usd_export_context,
+                                bNode *tex_node,
+                                pxr::UsdShadeMaterial &usd_material,
+                                pxr::UsdShadeShader &usd_tex_shader,
+                                const pxr::TfToken &default_uv);
 
 
 void create_usd_preview_surface_material(const USDExporterContext &usd_export_context,
@@ -115,6 +135,7 @@ void create_usd_preview_surface_material(const USDExporterContext &usd_export_co
   pxr::UsdGeomScope::Define(usd_export_context.stage,
     usd_material.GetPath().AppendChild(usdtokens::preview));
 
+  /* Default map when creating UV primvar reader shaders. */
   pxr::TfToken default_uv_sampler = default_uv.empty() ? cyclestokens::UVMap :
     pxr::TfToken(default_uv);
 
@@ -129,153 +150,52 @@ void create_usd_preview_surface_material(const USDExporterContext &usd_export_co
   pxr::UsdShadeShader preview_surface = create_usd_preview_shader(
     usd_export_context, usd_material, node);
 
+  const InputSpecMap &input_map = preview_surface_input_map();
+
   /* Set the preview surface inputs. */
   LISTBASE_FOREACH(bNodeSocket *, sock, &node->inputs) {
-    bNode *input_node = nullptr;
+
+    /* Check if this socket is mapped to a USD preview shader input. */
+    const InputSpecMap::const_iterator it = input_map.find(sock->name);
+
+    if (it == input_map.end()) {
+      continue;
+    }
+
     pxr::UsdShadeShader created_shader;
 
-    if (STREQ(sock->name, "Base Color") || STREQ(sock->name, "Color")) {
+    bNode *input_node = traverse_channel(sock, SH_NODE_TEX_IMAGE);
 
-      input_node = traverse_channel(sock);
-      if (input_node) {
-        /* Create connection. */
-        created_shader = create_usd_preview_shader(usd_export_context, usd_material, input_node);
-        preview_surface.CreateInput(usdtokens::diffuse_color, pxr::SdfValueTypeNames->Float3)
-          .ConnectToSource(created_shader, usdtokens::rgb);
+    if (input_node) {
+      /* Create connection. */
+      created_shader = create_usd_preview_shader(usd_export_context, usd_material, input_node);
+
+      preview_surface.CreateInput(it->second.input_name, it->second.input_type)
+        .ConnectToSource(created_shader, it->second.source_name);
+    }
+    else if (it->second.set_default_value) {
+      /* Set hardcoded value. */
+      if (sock->type == SOCK_FLOAT) {
+            bNodeSocketValueFloat *float_value = static_cast<bNodeSocketValueFloat *>(sock->default_value);
+               preview_surface.CreateInput(it->second.input_name, it->second.input_type)
+                 .Set(pxr::VtValue(float_value->value));
       }
-      else {
-        /* Set hardcoded value. */
-        bNodeSocketValueRGBA *socket_data = (bNodeSocketValueRGBA *)sock->default_value;
-        preview_surface.CreateInput(usdtokens::diffuse_color, pxr::SdfValueTypeNames->Float3)
+      else if (sock->type == SOCK_VECTOR) {
+        bNodeSocketValueVector *vec_data = static_cast<bNodeSocketValueVector *>(sock->default_value);
+        preview_surface.CreateInput(it->second.input_name, it->second.input_type)
           .Set(pxr::VtValue(pxr::GfVec3f(
-            socket_data->value[0], socket_data->value[1], socket_data->value[2])));
+            vec_data->value[0], vec_data->value[1], vec_data->value[2])));
       }
-    }
-    else if (STREQ(sock->name, "Roughness")) {
-
-      input_node = traverse_channel(sock);
-      if (input_node) {
-        /* Create connection. */
-        created_shader = create_usd_preview_shader(usd_export_context, usd_material, input_node);
-        preview_surface.CreateInput(usdtokens::roughness, pxr::SdfValueTypeNames->Float)
-          .ConnectToSource(created_shader, usdtokens::r);
-      }
-      else {
-        /* Set hardcoded value. */
-        bNodeSocketValueFloat *socket_data = (bNodeSocketValueFloat *)sock->default_value;
-        preview_surface.CreateInput(usdtokens::roughness, pxr::SdfValueTypeNames->Float)
-          .Set(pxr::VtValue(socket_data->value));
-      }
-    }
-    else if (STREQ(sock->name, "Metallic")) {
-
-      input_node = traverse_channel(sock);
-      if (input_node) {
-        /* Create connection. */
-        created_shader = create_usd_preview_shader(usd_export_context, usd_material, input_node);
-        preview_surface.CreateInput(usdtokens::metallic, pxr::SdfValueTypeNames->Float)
-          .ConnectToSource(created_shader, usdtokens::r);
-      }
-      else {
-        /* Set hardcoded value. */
-        bNodeSocketValueFloat *socket_data = (bNodeSocketValueFloat *)sock->default_value;
-        preview_surface.CreateInput(usdtokens::metallic, pxr::SdfValueTypeNames->Float)
-          .Set(pxr::VtValue(socket_data->value));
-      }
-    }
-    else if (STREQ(sock->name, "Specular")) {
-
-      input_node = traverse_channel(sock);
-      if (input_node) {
-        /* Create connection. */
-        created_shader = create_usd_preview_shader(usd_export_context, usd_material, input_node);
-        preview_surface.CreateInput(usdtokens::specular, pxr::SdfValueTypeNames->Float)
-          .ConnectToSource(created_shader, usdtokens::r);
-      }
-      else {
-        /* Set hardcoded value. */
-        bNodeSocketValueFloat *socket_data = (bNodeSocketValueFloat *)sock->default_value;
-        preview_surface.CreateInput(usdtokens::specular, pxr::SdfValueTypeNames->Float)
-          .Set(pxr::VtValue(socket_data->value));
-      }
-    }
-    else if (STREQ(sock->name, "Alpha")) {
-
-      input_node = traverse_channel(sock);
-      if (input_node) {
-        /* Create connection. */
-        created_shader = create_usd_preview_shader(usd_export_context, usd_material, input_node);
-        preview_surface.CreateInput(usdtokens::opacity, pxr::SdfValueTypeNames->Float)
-          .ConnectToSource(created_shader, usdtokens::r);
-      }
-      else {
-        /* Set hardcoded value. */
-        bNodeSocketValueFloat *socket_data = (bNodeSocketValueFloat *)sock->default_value;
-        preview_surface.CreateInput(usdtokens::opacity, pxr::SdfValueTypeNames->Float)
-          .Set(pxr::VtValue(socket_data->value));
-      }
-    }
-    else if (STREQ(sock->name, "IOR")) {
-
-      input_node = traverse_channel(sock);
-      if (input_node) {
-        /* Create connection. */
-        created_shader = create_usd_preview_shader(usd_export_context, usd_material, input_node);
-        preview_surface.CreateInput(usdtokens::ior, pxr::SdfValueTypeNames->Float)
-          .ConnectToSource(created_shader, usdtokens::r);
-      }
-      else {
-        /* Set hardcoded value. */
-        bNodeSocketValueFloat *socket_data = (bNodeSocketValueFloat *)sock->default_value;
-        preview_surface.CreateInput(usdtokens::ior, pxr::SdfValueTypeNames->Float)
-          .Set(pxr::VtValue(socket_data->value));
-      }
-    }
-    else if (STREQ(sock->name, "Normal")) {
-
-      input_node = traverse_channel(sock);
-      if (input_node) {
-        created_shader = create_usd_preview_shader(usd_export_context, usd_material, input_node);
-        preview_surface.CreateInput(usdtokens::normal, pxr::SdfValueTypeNames->Float3)
-          .ConnectToSource(created_shader, usdtokens::rgb);
-      }
-      /* We don't handle hardcoded value. */
-    }
-    else if (STREQ(sock->name, "Clearcoat")) {
-
-      input_node = traverse_channel(sock);
-      if (input_node) {
-        /* Create connection. */
-        created_shader = create_usd_preview_shader(usd_export_context, usd_material, input_node);
-        preview_surface.CreateInput(usdtokens::clearcoat, pxr::SdfValueTypeNames->Float)
-          .ConnectToSource(created_shader, usdtokens::r);
-      }
-      else {
-        /* Set hardcoded value. */
-        bNodeSocketValueFloat *socket_data = (bNodeSocketValueFloat *)sock->default_value;
-        preview_surface.CreateInput(usdtokens::clearcoat, pxr::SdfValueTypeNames->Float)
-          .Set(pxr::VtValue(socket_data->value));
-      }
-    }
-    else if (STREQ(sock->name, "Clearcoat Roughness")) {
-
-      input_node = traverse_channel(sock);
-      if (input_node) {
-        /* Create connection. */
-        created_shader = create_usd_preview_shader(usd_export_context, usd_material, input_node);
-        preview_surface.CreateInput(usdtokens::clearcoatRoughness, pxr::SdfValueTypeNames->Float)
-          .ConnectToSource(created_shader, usdtokens::r);
-      }
-      else {
-        /* Set hardcoded value. */
-        bNodeSocketValueFloat *socket_data = (bNodeSocketValueFloat *)sock->default_value;
-        preview_surface.CreateInput(usdtokens::clearcoatRoughness, pxr::SdfValueTypeNames->Float)
-          .Set(pxr::VtValue(socket_data->value));
+      else if (sock->type == SOCK_RGBA) {
+        bNodeSocketValueRGBA *rgba_data = static_cast<bNodeSocketValueRGBA *>(sock->default_value);
+        preview_surface.CreateInput(it->second.input_name, it->second.input_type)
+          .Set(pxr::VtValue(pxr::GfVec3f(
+            rgba_data->value[0], rgba_data->value[1], rgba_data->value[2])));
       }
     }
 
     /* If any input texture node has been found, export the texture, if necessary,
-      * and look for a connected uv node. */
+     * and look for a connected uv node. */
     if (created_shader && input_node && input_node->type == SH_NODE_TEX_IMAGE) {
 
       if (usd_export_context.export_params.export_textures) {
@@ -284,63 +204,7 @@ void create_usd_preview_surface_material(const USDExporterContext &usd_export_co
           usd_export_context.export_params.overwrite_textures);
       }
 
-      bool found_uv_node = false;
-
-      /* Find UV input to the texture node. */
-      LISTBASE_FOREACH(bNodeSocket *, input_node_sock, &input_node->inputs) {
-
-        if (!input_node_sock || !input_node_sock->link ||
-          !STREQ(input_node_sock->name, "Vector")) {
-          continue;
-        }
-
-        bNode *uv_node = traverse_channel(input_node_sock, SH_NODE_UVMAP);
-
-        if (uv_node == NULL) {
-          continue;
-        }
-
-        pxr::UsdShadeShader uv_shader = create_usd_preview_shader(
-          usd_export_context, usd_material, uv_node);
-
-        if (!uv_shader.GetPrim().IsValid()) {
-          continue;
-        }
-
-        found_uv_node = true;
-
-        if (NodeShaderUVMap *shader_uv_map = static_cast<NodeShaderUVMap *>(uv_node->storage)) {
-          /* We need to make valid here because actual uv primvar has been. */
-          std::string uv_set = pxr::TfMakeValidIdentifier(shader_uv_map->uv_map);
-
-          uv_shader.CreateInput(usdtokens::varname, pxr::SdfValueTypeNames->Token)
-            .Set(pxr::TfToken(uv_set));
-          created_shader.CreateInput(usdtokens::st, pxr::SdfValueTypeNames->Float2)
-            .ConnectToSource(uv_shader, usdtokens::result);
-        }
-        else {
-          uv_shader.CreateInput(usdtokens::varname, pxr::SdfValueTypeNames->Token)
-            .Set(default_uv_sampler);
-          created_shader.CreateInput(usdtokens::st, pxr::SdfValueTypeNames->Float2)
-            .ConnectToSource(uv_shader, usdtokens::result);
-        }
-      }
-
-      if (!found_uv_node) {
-        /* No UVMAP node was linked to the texture node. However, we generate
-          * a primvar reader node that specifies the UV set to sample, as some
-          * DCCs require this. */
-
-        pxr::UsdShadeShader uv_shader = create_usd_preview_shader(
-          usd_export_context, usd_material, "uvmap", SH_NODE_TEX_COORD);
-
-        if (uv_shader.GetPrim().IsValid()) {
-          uv_shader.CreateInput(usdtokens::varname, pxr::SdfValueTypeNames->Token)
-            .Set(default_uv_sampler);
-          created_shader.CreateInput(usdtokens::st, pxr::SdfValueTypeNames->Float2)
-            .ConnectToSource(uv_shader, usdtokens::result);
-        }
-      }
+      create_uvmap_shader(usd_export_context, input_node, usd_material, created_shader, default_uv_sampler);
     }
   }
 }
@@ -363,6 +227,93 @@ void create_usd_viewport_material(const USDExporterContext &usd_export_context,
   usd_material.CreateSurfaceOutput().ConnectToSource(shader, usdtokens::surface);
 }
 
+/* Return USD Preview Surface input map singleton. */
+static InputSpecMap &preview_surface_input_map()
+{
+  static InputSpecMap input_map = {
+    { "Base Color", { usdtokens::diffuse_color, pxr::SdfValueTypeNames->Float3, usdtokens::rgb, true } },
+    { "Color", { usdtokens::diffuse_color, pxr::SdfValueTypeNames->Float3, usdtokens::rgb, true } },
+    { "Roughness", { usdtokens::roughness, pxr::SdfValueTypeNames->Float, usdtokens::r, true } },
+    { "Metallic", { usdtokens::metallic, pxr::SdfValueTypeNames->Float, usdtokens::r, true } },
+    { "Specular", { usdtokens::specular, pxr::SdfValueTypeNames->Float, usdtokens::r, true } },
+    { "Alpha", { usdtokens::opacity, pxr::SdfValueTypeNames->Float, usdtokens::r, true } },
+    { "IOR", { usdtokens::ior, pxr::SdfValueTypeNames->Float, usdtokens::r, true } },
+    /* Note that for the Normal input set_default_value is false. */
+    { "Normal", { usdtokens::normal, pxr::SdfValueTypeNames->Float3, usdtokens::rgb, false} },
+    { "Clearcoat", { usdtokens::clearcoat, pxr::SdfValueTypeNames->Float, usdtokens::r, true } },
+    { "Clearcoat Roughness", { usdtokens::clearcoatRoughness, pxr::SdfValueTypeNames->Float, usdtokens::r, true } },
+  };
+
+  return input_map;
+}
+
+/* Find the UVMAP node input to the given texture image node and convert it
+ * to a USD primvar reader shader. If no UVMAP node is found, create a primvar
+ * reader for the given default uv set.  The primvar reader will be attached to
+ * the 'st' input of the given USD texture shader.  */
+static void create_uvmap_shader(const USDExporterContext &usd_export_context,
+                                bNode *tex_node,
+                                pxr::UsdShadeMaterial &usd_material,
+                                pxr::UsdShadeShader &usd_tex_shader,
+                                const pxr::TfToken &default_uv)
+{
+  bool found_uv_node = false;
+
+  /* Find UV input to the texture node. */
+  LISTBASE_FOREACH(bNodeSocket *, tex_node_sock, &tex_node->inputs) {
+
+    if (!tex_node_sock || !tex_node_sock->link ||
+      !STREQ(tex_node_sock->name, "Vector")) {
+      continue;
+    }
+
+    bNode *uv_node = traverse_channel(tex_node_sock, SH_NODE_UVMAP);
+    if (uv_node == NULL) {
+      continue;
+    }
+
+    pxr::UsdShadeShader uv_shader = create_usd_preview_shader(
+      usd_export_context, usd_material, uv_node);
+
+    if (!uv_shader.GetPrim().IsValid()) {
+      continue;
+    }
+
+    found_uv_node = true;
+
+    if (NodeShaderUVMap *shader_uv_map = static_cast<NodeShaderUVMap *>(uv_node->storage)) {
+      /* We need to make valid here because actual uv primvar has been. */
+      std::string uv_set = pxr::TfMakeValidIdentifier(shader_uv_map->uv_map);
+
+      uv_shader.CreateInput(usdtokens::varname, pxr::SdfValueTypeNames->Token)
+        .Set(pxr::TfToken(uv_set));
+      usd_tex_shader.CreateInput(usdtokens::st, pxr::SdfValueTypeNames->Float2)
+        .ConnectToSource(uv_shader, usdtokens::result);
+    }
+    else {
+      uv_shader.CreateInput(usdtokens::varname, pxr::SdfValueTypeNames->Token)
+        .Set(default_uv);
+      usd_tex_shader.CreateInput(usdtokens::st, pxr::SdfValueTypeNames->Float2)
+        .ConnectToSource(uv_shader, usdtokens::result);
+    }
+  }
+
+  if (!found_uv_node) {
+    /* No UVMAP node was linked to the texture node. However, we generate
+     * a primvar reader node that specifies the UV set to sample, as some
+     * DCCs require this. */
+
+    pxr::UsdShadeShader uv_shader = create_usd_preview_shader(
+      usd_export_context, usd_material, "uvmap", SH_NODE_TEX_COORD);
+
+    if (uv_shader.GetPrim().IsValid()) {
+      uv_shader.CreateInput(usdtokens::varname, pxr::SdfValueTypeNames->Token)
+        .Set(default_uv);
+      usd_tex_shader.CreateInput(usdtokens::st, pxr::SdfValueTypeNames->Float2)
+        .ConnectToSource(uv_shader, usdtokens::result);
+    }
+  }
+}
 
 /* Returns true if the given paths are equal,
  * returns false otherwise. */
