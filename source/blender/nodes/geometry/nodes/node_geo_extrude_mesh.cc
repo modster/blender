@@ -147,35 +147,46 @@ static void extrude_mesh_edges(MeshComponent &component,
   const int orig_edge_size = mesh.totedge;
   const int orig_loop_size = mesh.totloop;
 
-  GeometryComponentFieldContext context{component, ATTR_DOMAIN_EDGE};
-  FieldEvaluator evaluator{context, mesh.totvert};
-  evaluator.add(offset_field);
-  evaluator.set_selection(selection_field);
-  evaluator.evaluate();
-  const IndexMask selection = evaluator.get_evaluated_selection_as_mask();
-  const VArray<float3> offsets = evaluator.get_evaluated<float3>(0);
+  GeometryComponentFieldContext edge_context{component, ATTR_DOMAIN_EDGE};
+  FieldEvaluator edge_evaluator{edge_context, mesh.totedge};
+  edge_evaluator.add(selection_field);
+  edge_evaluator.evaluate();
+  const IndexMask selection = edge_evaluator.get_evaluated_as_mask(0);
 
   Array<int> extrude_vert_indices(mesh.totvert, -1);
-  Vector<CopiedVert> extrude_vert_orig_indices;
+  Vector<int> extrude_vert_orig_indices;
   extrude_vert_orig_indices.reserve(selection.size());
   for (const int i_edge : selection) {
     const MEdge &edge = mesh.medge[i_edge];
 
     if (extrude_vert_indices[edge.v1] == -1) {
       extrude_vert_indices[edge.v1] = orig_vert_size + extrude_vert_orig_indices.size();
-      extrude_vert_orig_indices.append({int(edge.v1)});
+      extrude_vert_orig_indices.append(edge.v1);
     }
 
     if (extrude_vert_indices[edge.v2] == -1) {
       extrude_vert_indices[edge.v2] = orig_vert_size + extrude_vert_orig_indices.size();
-      extrude_vert_orig_indices.append({int(edge.v2)});
+      extrude_vert_orig_indices.append(edge.v2);
     }
   }
+
+  GeometryComponentFieldContext point_context{component, ATTR_DOMAIN_POINT};
+  FieldEvaluator point_evaluator{point_context, mesh.totvert}; /* TODO: Better selection. */
+  point_evaluator.add(offset_field);
+  point_evaluator.evaluate();
+  const VArray<float3> offsets = point_evaluator.get_evaluated<float3>(0);
 
   const int extrude_vert_size = extrude_vert_orig_indices.size();
   const int extrude_edge_size = extrude_vert_size;
   const int duplicate_edge_size = selection.size();
   const int new_edge_size = extrude_edge_size + duplicate_edge_size;
+
+  /* TODO: This is a stupid way to work around an issue with #CustomData_realloc,
+   * which doesn't reallocate a referenced layer apparently. */
+  CustomData_duplicate_referenced_layers(&mesh.vdata, mesh.totvert);
+  CustomData_duplicate_referenced_layers(&mesh.edata, mesh.totedge);
+  CustomData_duplicate_referenced_layers(&mesh.pdata, mesh.totpoly);
+  CustomData_duplicate_referenced_layers(&mesh.ldata, mesh.totloop);
 
   mesh.totvert += extrude_vert_size;
   mesh.totedge += new_edge_size;
@@ -185,7 +196,10 @@ static void extrude_mesh_edges(MeshComponent &component,
   CustomData_realloc(&mesh.edata, mesh.totedge);
   // CustomData_realloc(&mesh.pdata, mesh.totpoly);
   // CustomData_realloc(&mesh.ldata, mesh.totloop);
+  BKE_mesh_update_customdata_pointers(&mesh, false);
 
+  MutableSpan<MVert> verts{mesh.mvert, mesh.totvert};
+  MutableSpan<MVert> new_verts = verts.take_back(extrude_vert_size);
   MutableSpan<MEdge> edges{mesh.medge, mesh.totedge};
   MutableSpan<MEdge> new_edges = edges.take_back(new_edge_size);
   MutableSpan<MEdge> extrude_edges = new_edges.take_front(extrude_edge_size);
@@ -193,18 +207,65 @@ static void extrude_mesh_edges(MeshComponent &component,
 
   for (const int i : extrude_edges.index_range()) {
     MEdge &edge = extrude_edges[i];
-    edge.v1 = extrude_vert_orig_indices[i].orig_index;
+    edge.v1 = extrude_vert_orig_indices[i];
     edge.v2 = orig_vert_size + i;
-    edge.flag |= (ME_EDGEDRAW | ME_EDGERENDER);
+    edge.flag |= (ME_EDGEDRAW | ME_EDGERENDER | ME_LOOSEEDGE);
   }
 
   for (const int i : duplicate_edges.index_range()) {
     const MEdge &orig_edge = mesh.medge[selection[i]];
-    MEdge &edge = extrude_edges[i];
+    MEdge &edge = duplicate_edges[i];
     edge.v1 = extrude_vert_indices[orig_edge.v1];
     edge.v2 = extrude_vert_indices[orig_edge.v2];
-    edge.flag |= (ME_EDGEDRAW | ME_EDGERENDER);
+    edge.flag |= (ME_EDGEDRAW | ME_EDGERENDER | ME_LOOSEEDGE);
   }
+
+  component.attribute_foreach([&](const AttributeIDRef &id, const AttributeMetaData meta_data) {
+    if (meta_data.domain == ATTR_DOMAIN_POINT) {
+      OutputAttribute attribute = component.attribute_try_get_for_output(
+          id, ATTR_DOMAIN_POINT, meta_data.data_type);
+
+      attribute_math::convert_to_static_type(meta_data.data_type, [&](auto dummy) {
+        using T = decltype(dummy);
+        MutableSpan<T> data = attribute.as_span().typed<T>();
+        MutableSpan<T> new_data = data.take_back(extrude_vert_size);
+
+        for (const int i : extrude_vert_orig_indices.index_range()) {
+          new_data[i] = data[extrude_vert_orig_indices[i]];
+        }
+      });
+
+      attribute.save();
+    }
+    else if (meta_data.domain == ATTR_DOMAIN_EDGE) {
+      OutputAttribute attribute = component.attribute_try_get_for_output(
+          id, ATTR_DOMAIN_EDGE, meta_data.data_type);
+
+      attribute_math::convert_to_static_type(meta_data.data_type, [&](auto dummy) {
+        using T = decltype(dummy);
+        MutableSpan<T> data = attribute.as_span().typed<T>();
+        MutableSpan<T> new_data = data.take_back(new_edge_size);
+        MutableSpan<T> extrude_data = new_data.take_front(extrude_edge_size);
+        MutableSpan<T> duplicate_data = new_data.take_back(duplicate_edge_size);
+
+        for (const int i : selection.index_range()) {
+          duplicate_data[i] = data[selection[i]];
+        }
+      });
+
+      attribute.save();
+    }
+    return true;
+  });
+
+  devirtualize_varray(offsets, [&](const auto offsets) {
+    threading::parallel_for(new_verts.index_range(), 1024, [&](const IndexRange range) {
+      for (const int i : range) {
+        const float3 offset = offsets[extrude_vert_orig_indices[i]];
+        add_v3_v3(new_verts[i].co, offset);
+      }
+    });
+  });
 
   BKE_mesh_runtime_clear_cache(&mesh);
   BKE_mesh_normals_tag_dirty(&mesh);

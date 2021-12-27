@@ -103,6 +103,20 @@ void GeometryDataSource::foreach_default_column_ids(
     fn({(char *)"Rotation"}, false);
     fn({(char *)"Scale"}, false);
   }
+  else if (component_->type() == GEO_COMPONENT_TYPE_MESH) {
+    if (domain_ == ATTR_DOMAIN_EDGE) {
+      fn({(char *)"v1"}, false);
+      fn({(char *)"v2"}, false);
+    }
+    else if (domain_ == ATTR_DOMAIN_FACE) {
+      fn({(char *)"loopstart"}, false);
+      fn({(char *)"totloop"}, false);
+    }
+    else if (domain_ == ATTR_DOMAIN_CORNER) {
+      fn({(char *)"v"}, false);
+      fn({(char *)"e"}, false);
+    }
+  }
 }
 
 std::unique_ptr<ColumnValues> GeometryDataSource::get_column_values(
@@ -144,6 +158,53 @@ std::unique_ptr<ColumnValues> GeometryDataSource::get_column_values(
           column_id.name, VArray<float3>::ForFunc(domain_size, [transforms](int64_t index) {
             return transforms[index].scale();
           }));
+    }
+  }
+  else if (component_->type() == GEO_COMPONENT_TYPE_MESH) {
+    const MeshComponent &component = static_cast<const MeshComponent &>(*component_);
+    if (const Mesh *mesh = component.get_for_read()) {
+      if (domain_ == ATTR_DOMAIN_EDGE) {
+        if (STREQ(column_id.name, "v1")) {
+          return std::make_unique<ColumnValues>(
+              column_id.name, VArray<int>::ForFunc(mesh->totedge, [mesh](int64_t index) {
+                return mesh->medge[index].v1;
+              }));
+        }
+        if (STREQ(column_id.name, "v2")) {
+          return std::make_unique<ColumnValues>(
+              column_id.name, VArray<int>::ForFunc(mesh->totedge, [mesh](int64_t index) {
+                return mesh->medge[index].v2;
+              }));
+        }
+      }
+      else if (domain_ == ATTR_DOMAIN_FACE) {
+        if (STREQ(column_id.name, "loopstart")) {
+          return std::make_unique<ColumnValues>(
+              column_id.name, VArray<int>::ForFunc(mesh->totpoly, [mesh](int64_t index) {
+                return mesh->mpoly[index].loopstart;
+              }));
+        }
+        if (STREQ(column_id.name, "totloop")) {
+          return std::make_unique<ColumnValues>(
+              column_id.name, VArray<int>::ForFunc(mesh->totpoly, [mesh](int64_t index) {
+                return mesh->mpoly[index].totloop;
+              }));
+        }
+      }
+      else if (domain_ == ATTR_DOMAIN_CORNER) {
+        if (STREQ(column_id.name, "v")) {
+          return std::make_unique<ColumnValues>(
+              column_id.name, VArray<int>::ForFunc(mesh->totloop, [mesh](int64_t index) {
+                return mesh->mloop[index].v;
+              }));
+        }
+        if (STREQ(column_id.name, "e")) {
+          return std::make_unique<ColumnValues>(
+              column_id.name, VArray<int>::ForFunc(mesh->totloop, [mesh](int64_t index) {
+                return mesh->mloop[index].e;
+              }));
+        }
+      }
     }
   }
 
