@@ -377,22 +377,34 @@ static void extrude_mesh_faces(MeshComponent &component,
   point_evaluator.add_with_destination(offset_field, offsets.as_mutable_span());
   point_evaluator.evaluate();
 
+  /* TODO: See if this section can be simplified by having a precalculated topology map method for
+   * retrieving the faces connected to each edge. */
+
+  /* Keep track of the selected face that each edge corresponds to. Only edges with one selected
+   * face will have a single associated face. However, we need to keep track of a value for every
+   * face in the mesh at this point, because we don't know how many edges will be selected for
+   * extrusion in the end. */
+  Array<int> edge_face_indices(orig_edge_size, -1);
   Array<int> edge_neighbor_count(orig_edge_size, 0);
-  for (const int i : poly_selection) {
-    const MPoly &poly = orig_polys[i];
+  for (const int i_poly : poly_selection) {
+    const MPoly &poly = orig_polys[i_poly];
     for (const MLoop &loop : orig_loops.slice(poly.loopstart, poly.totloop)) {
       edge_neighbor_count[loop.e]++;
+      edge_face_indices[loop.e] = i_poly;
     }
   }
 
   Vector<int> in_between_edges;
+  /* The extruded face corresponding to each extruded edge. */
+  Vector<int> edge_orig_face_indices;
   Vector<int64_t> selected_edges_orig_indices;
-  for (const int i : IndexRange(orig_edge_size)) {
-    if (edge_neighbor_count[i] == 1) {
-      selected_edges_orig_indices.append(i);
+  for (const int i_edge : IndexRange(orig_edge_size)) {
+    if (edge_neighbor_count[i_edge] == 1) {
+      selected_edges_orig_indices.append(i_edge);
+      edge_orig_face_indices.append(edge_face_indices[i_edge]);
     }
-    else if (edge_neighbor_count[i] > 1) {
-      in_between_edges.append(i);
+    else if (edge_neighbor_count[i_edge] > 1) {
+      in_between_edges.append(i_edge);
     }
   }
   const IndexMask edge_selection{selected_edges_orig_indices}; /* TODO: Remove. */
@@ -565,22 +577,23 @@ static void extrude_mesh_faces(MeshComponent &component,
       attribute.save();
     }
     else if (meta_data.domain == ATTR_DOMAIN_FACE) {
-      /* TODO: Keep track of the original face that corresponds to all of the new faces. */
-      // OutputAttribute attribute = component.attribute_try_get_for_output(
-      //     id, ATTR_DOMAIN_EDGE, meta_data.data_type);
+      OutputAttribute attribute = component.attribute_try_get_for_output(
+          id, ATTR_DOMAIN_FACE, meta_data.data_type);
+      if (!attribute) {
+        return true; /* Impossible to write the "normal" attribute. */
+      }
 
-      // attribute_math::convert_to_static_type(meta_data.data_type, [&](auto dummy) {
-      //   using T = decltype(dummy);
-      //   MutableSpan<T> data = attribute.as_span().typed<T>();
-      //   MutableSpan<T> duplicate_data = data.slice(duplicate_edge_offset,
-      //   duplicate_edge_size);
+      attribute_math::convert_to_static_type(meta_data.data_type, [&](auto dummy) {
+        using T = decltype(dummy);
+        MutableSpan<T> data = attribute.as_span().typed<T>();
+        MutableSpan<T> new_data = data.take_back(new_poly_size);
 
-      //   for (const int i : edge_selection.index_range()) {
-      //     duplicate_data[i] = data[edge_selection[i]];
-      //   }
-      // });
+        for (const int i : new_data.index_range()) {
+          new_data[i] = data[edge_orig_face_indices[i]];
+        }
+      });
 
-      // attribute.save();
+      attribute.save();
     }
     return true;
   });
