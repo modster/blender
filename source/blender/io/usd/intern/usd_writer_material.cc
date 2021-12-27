@@ -369,15 +369,8 @@ static bool paths_equal(const char *p1, const char *p2)
   BLI_strncpy(norm_p1, p1, sizeof(norm_p1));
   BLI_strncpy(norm_p2, p2, sizeof(norm_p2));
 
-#ifdef WIN32
-  /* On Windows, BLI_path_normalize() expects
-   * backslash separators, so we caonvert all
-   * forward slashes to backslashes.
-   * TODO(makowalski): consider alternatives to
-   * avoid this. */
-  BLI_str_replace_char(norm_p1, '/', '\\');
-  BLI_str_replace_char(norm_p2, '/', '\\');
-#endif
+  BLI_path_slash_native(norm_p1);
+  BLI_path_slash_native(norm_p2);
 
   BLI_path_normalize(nullptr, norm_p1);
   BLI_path_normalize(nullptr, norm_p2);
