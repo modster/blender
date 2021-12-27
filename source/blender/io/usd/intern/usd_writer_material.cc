@@ -34,6 +34,8 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "WM_api.h"
+
 #include <pxr/base/tf/stringUtils.h>
 #include <pxr/pxr.h>
 #include <pxr/usd/usdGeom/scope.h>
@@ -425,7 +427,8 @@ static void export_in_memory_texture(Image *ima,
   std::cout << "Exporting in-memory texture to " << export_path << std::endl;
 
   if (BKE_imbuf_write_as(imbuf, export_path.c_str(), &imageFormat, true) == 0) {
-    std::cout << "WARNING: couldn't export in-memory texture to " << export_path << std::endl;
+    WM_reportf(
+        RPT_WARNING, "USD export: couldn't export in-memory texture to %s", export_path.c_str());
   }
 }
 
@@ -494,8 +497,10 @@ static void copy_tiled_textures(Image *ima,
 
     /* Copy the file. */
     if (BLI_copy(src_tile_path.c_str(), dest_tile_path.c_str()) != 0) {
-      std::cout << "WARNING: couldn't copy texture tile from " << src_tile_path << " to "
-                << dest_tile_path << std::endl;
+      WM_reportf(RPT_WARNING,
+                 "USD export:  couldn't copy texture tile from %s to %s",
+                 src_tile_path.c_str(),
+                 dest_tile_path.c_str());
     }
   }
 }
@@ -534,8 +539,10 @@ static void copy_single_file(Image *ima, const std::string &dest_dir, const bool
 
   /* Copy the file. */
   if (BLI_copy(source_path, dest_path.c_str()) != 0) {
-    std::cout << "WARNING: couldn't copy texture from " << source_path << " to " << dest_path
-              << std::endl;
+    WM_reportf(RPT_WARNING,
+               "USD export:  couldn't copy texture from %s to %s",
+               source_path,
+               dest_path.c_str());
   }
 }
 
