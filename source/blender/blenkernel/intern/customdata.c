@@ -2405,10 +2405,10 @@ int CustomData_get_stencil_layer(const CustomData *data, int type)
   return (layer_index != -1) ? data->layers[layer_index].active_mask : -1;
 }
 
-const char *CustomData_get_active_layer_name(const struct CustomData *data, int type)
+const char *CustomData_get_active_layer_name(const struct CustomData *data, const int type)
 {
   /* Get the layer index of the active layer of this type. */
-  int layer_index = CustomData_get_active_layer_index(data, type);
+  const int layer_index = CustomData_get_active_layer_index(data, type);
   return layer_index < 0 ? NULL : data->layers[layer_index].name;
 }
 

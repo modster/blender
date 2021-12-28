@@ -550,7 +550,7 @@ static pxr::TfToken get_node_tex_image_color_space(bNode *node)
 
 /* Search the upstream nodes connected to the given socket and return the first occurrance
  * of the node of the given type. Return null if no node of this type was found. */
-static bNode *traverse_channel(bNodeSocket *input, short target_type)
+static bNode *traverse_channel(bNodeSocket *input, const short target_type)
 {
   if (!input->link) {
     return nullptr;
@@ -589,7 +589,7 @@ static bNode *find_bsdf_node(Material *material)
 static pxr::UsdShadeShader create_usd_preview_shader(const USDExporterContext &usd_export_context,
                                                      pxr::UsdShadeMaterial &material,
                                                      const char *name,
-                                                     int type)
+                                                     const int type)
 {
   pxr::SdfPath shader_path = material.GetPath()
                                  .AppendChild(usdtokens::preview)
@@ -725,8 +725,7 @@ static std::string get_tex_image_asset_path(bNode *node,
     }
     return exp_path;
   }
-
-  if (export_params.relative_texture_paths) {
+  else if (export_params.relative_texture_paths) {
     /* Get the path relative to the USD. */
     pxr::SdfLayerHandle layer = stage->GetRootLayer();
     std::string stage_path = layer->GetRealPath();
