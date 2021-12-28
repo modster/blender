@@ -32,6 +32,7 @@
 #include "BLI_linklist.h"
 #include "BLI_listbase.h"
 #include "BLI_string.h"
+#include "BLI_vector.hh"
 
 #include "BLT_translation.h"
 
@@ -62,6 +63,8 @@
 #include "node_intern.hh" /* own include */
 
 using blender::float2;
+using blender::Map;
+using blender::Vector;
 
 /* -------------------------------------------------------------------- */
 /** \name Local Utilities
@@ -217,24 +220,21 @@ static void animation_basepath_change_free(AnimationBasePathChange *basepath_cha
   MEM_freeN(basepath_change);
 }
 
-/* returns 1 if its OK */
-static int node_group_ungroup(Main *bmain, bNodeTree *ntree, bNode *gnode)
+/**
+ * \return True if successful.
+ */
+static bool node_group_ungroup(Main *bmain, bNodeTree *ntree, bNode *gnode)
 {
-  /* Clear new pointers, set in #ntreeCopyTree_ex_new_pointers. */
-  LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
-    node->new_node = nullptr;
-  }
-
   ListBase anim_basepaths = {nullptr, nullptr};
-  LinkNode *nodes_delayed_free = nullptr;
-  bNodeTree *ngroup = (bNodeTree *)gnode->id;
+  Vector<bNode *> nodes_delayed_free;
+  const bNodeTree *ngroup = reinterpret_cast<const bNodeTree *>(gnode->id);
 
   /* wgroup is a temporary copy of the NodeTree we're merging in
    * - all of wgroup's nodes are copied across to their new home
    * - ngroup (i.e. the source NodeTree) is left unscathed
    * - temp copy. do change ID usercount for the copies
    */
-  bNodeTree *wgroup = ntreeCopyTree_ex_new_pointers(ngroup, bmain, true);
+  bNodeTree *wgroup = ntreeCopyTree(bmain, ngroup);
 
   /* Add the nodes into the ntree */
   LISTBASE_FOREACH_MUTABLE (bNode *, node, &wgroup->nodes) {
@@ -243,7 +243,7 @@ static int node_group_ungroup(Main *bmain, bNodeTree *ntree, bNode *gnode)
      */
     if (ELEM(node->type, NODE_GROUP_INPUT, NODE_GROUP_OUTPUT)) {
       /* We must delay removal since sockets will reference this node. see: T52092 */
-      BLI_linklist_prepend(&nodes_delayed_free, node);
+      nodes_delayed_free.append(node);
     }
 
     /* keep track of this node's RNA "base" path (the part of the path identifying the node)
@@ -388,15 +388,14 @@ static int node_group_ungroup(Main *bmain, bNodeTree *ntree, bNode *gnode)
     }
   }
 
-  while (nodes_delayed_free) {
-    bNode *node = (bNode *)BLI_linklist_pop(&nodes_delayed_free);
+  for (bNode *node : nodes_delayed_free) {
     nodeRemoveNode(bmain, ntree, node, false);
   }
 
   /* delete the group instance and dereference group tree */
   nodeRemoveNode(bmain, ntree, gnode, true);
 
-  return 1;
+  return true;
 }
 
 static int node_group_ungroup_exec(bContext *C, wmOperator *op)
@@ -455,12 +454,10 @@ static bool node_group_separate_selected(
     nodeSetSelected(node, false);
   }
 
-  /* clear new pointers, set in BKE_node_copy_ex(). */
-  LISTBASE_FOREACH (bNode *, node, &ngroup.nodes) {
-    node->new_node = nullptr;
-  }
-
   ListBase anim_basepaths = {nullptr, nullptr};
+
+  Map<const bNode *, bNode *> node_map;
+  Map<const bNodeSocket *, bNodeSocket *> socket_map;
 
   /* add selected nodes into the ntree */
   LISTBASE_FOREACH_MUTABLE (bNode *, node, &ngroup.nodes) {
@@ -477,7 +474,9 @@ static bool node_group_separate_selected(
     bNode *newnode;
     if (make_copy) {
       /* make a copy */
-      newnode = BKE_node_copy_store_new_pointers(&ngroup, node, LIB_ID_COPY_DEFAULT);
+      newnode = blender::bke::node_copy_with_mapping(
+          &ngroup, *node, LIB_ID_COPY_DEFAULT, true, socket_map);
+      node_map.add_new(node, newnode);
     }
     else {
       /* use the existing node */
@@ -526,10 +525,10 @@ static bool node_group_separate_selected(
       /* make a copy of internal links */
       if (fromselect && toselect) {
         nodeAddLink(&ntree,
-                    link->fromnode->new_node,
-                    link->fromsock->new_sock,
-                    link->tonode->new_node,
-                    link->tosock->new_sock);
+                    node_map.lookup(link->fromnode),
+                    socket_map.lookup(link->fromsock),
+                    node_map.lookup(link->tonode),
+                    socket_map.lookup(link->tosock));
       }
     }
     else {

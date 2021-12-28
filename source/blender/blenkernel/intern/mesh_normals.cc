@@ -408,6 +408,7 @@ const float (*BKE_mesh_poly_normals_ensure(const Mesh *mesh))[3]
 void BKE_mesh_ensure_normals_for_display(Mesh *mesh)
 {
   switch ((eMeshWrapperType)mesh->runtime.wrapper_type) {
+    case ME_WRAPPER_TYPE_SUBD:
     case ME_WRAPPER_TYPE_MDATA:
       BKE_mesh_vertex_normals_ensure(mesh);
       BKE_mesh_poly_normals_ensure(mesh);
