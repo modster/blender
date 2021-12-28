@@ -122,7 +122,6 @@ static std::string get_tex_image_asset_path(bNode *node,
 static InputSpecMap &preview_surface_input_map();
 static bNode *traverse_channel(bNodeSocket *input, short target_type);
 
-
 void create_usd_preview_surface_material(const USDExporterContext &usd_export_context,
                                          Material *material,
                                          pxr::UsdShadeMaterial &usd_material,
@@ -416,8 +415,7 @@ static void export_in_memory_texture(Image *ima,
   std::cout << "Exporting in-memory texture to " << export_path << std::endl;
 
   if (BKE_imbuf_write_as(imbuf, export_path, &imageFormat, true) == 0) {
-    WM_reportf(
-        RPT_WARNING, "USD export: couldn't export in-memory texture to %s", export_path);
+    WM_reportf(RPT_WARNING, "USD export: couldn't export in-memory texture to %s", export_path);
   }
 }
 
@@ -520,10 +518,8 @@ static void copy_single_file(Image *ima, const std::string &dest_dir, const bool
 
   /* Copy the file. */
   if (BLI_copy(source_path, dest_path) != 0) {
-    WM_reportf(RPT_WARNING,
-               "USD export:  couldn't copy texture from %s to %s",
-               source_path,
-               dest_path);
+    WM_reportf(
+        RPT_WARNING, "USD export:  couldn't copy texture from %s to %s", source_path, dest_path);
   }
 }
 
