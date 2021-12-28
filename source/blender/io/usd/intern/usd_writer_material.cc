@@ -106,20 +106,22 @@ static pxr::UsdShadeShader create_usd_preview_shader(const USDExporterContext &u
 static pxr::UsdShadeShader create_usd_preview_shader(const USDExporterContext &usd_export_context,
                                                      pxr::UsdShadeMaterial &material,
                                                      bNode *node);
-static void export_texture(bNode *node,
-                           const pxr::UsdStageRefPtr stage,
-                           const bool allow_overwrite = false);
-static bNode *find_bsdf_node(Material *material);
-static std::string get_tex_image_asset_path(bNode *node,
-                                            const pxr::UsdStageRefPtr stage,
-                                            const USDExportParams &export_params);
-static bNode *traverse_channel(bNodeSocket *input, short target_type);
-static InputSpecMap &preview_surface_input_map();
 static void create_uvmap_shader(const USDExporterContext &usd_export_context,
                                 bNode *tex_node,
                                 pxr::UsdShadeMaterial &usd_material,
                                 pxr::UsdShadeShader &usd_tex_shader,
                                 const pxr::TfToken &default_uv);
+static void export_texture(bNode *node,
+                           const pxr::UsdStageRefPtr stage,
+                           const bool allow_overwrite = false);
+static bNode *find_bsdf_node(Material *material);
+static void get_absolute_path(Image *ima, char *r_path);
+static std::string get_tex_image_asset_path(bNode *node,
+                                            const pxr::UsdStageRefPtr stage,
+                                            const USDExportParams &export_params);
+static InputSpecMap &preview_surface_input_map();
+static bNode *traverse_channel(bNodeSocket *input, short target_type);
+
 
 void create_usd_preview_surface_material(const USDExporterContext &usd_export_context,
                                          Material *material,
@@ -369,18 +371,20 @@ static void export_in_memory_texture(Image *ima,
                                      const std::string &export_dir,
                                      const bool allow_overwrite)
 {
-  char file_name[FILE_MAX];
-  if (strlen(ima->filepath) > 0) {
-    BLI_split_file_part(ima->filepath, file_name, FILE_MAX);
-  }
-  else {
-    /* Try using the image name for the file name.  */
-    strcpy(file_name, ima->id.name + 2);
+  if (export_dir.empty()) {
+    return;
   }
 
-  if (strlen(file_name) == 0) {
-    printf("WARNING:  Couldn't retrieve in memory texture file name.\n");
-    return;
+  char image_abs_path[FILE_MAX];
+
+  char file_name[FILE_MAX];
+  if (strlen(ima->filepath) > 0) {
+    get_absolute_path(ima, image_abs_path);
+    BLI_split_file_part(image_abs_path, file_name, FILE_MAX);
+  }
+  else {
+    /* Use the image name for the file name.  */
+    strcpy(file_name, ima->id.name + 2);
   }
 
   ImBuf *imbuf = BKE_image_acquire_ibuf(ima, nullptr, nullptr);
@@ -397,23 +401,23 @@ static void export_in_memory_texture(Image *ima,
 
   BKE_image_path_ensure_ext_from_imformat(file_name, &imageFormat);
 
-  std::string export_path = export_dir;
+  char export_path[FILE_MAX];
+  BLI_path_join(export_path, FILE_MAX, export_dir.c_str(), file_name, NULL);
 
-  if (export_path.back() != '/' && export_path.back() != '\\') {
-    export_path += "/";
+  if (!allow_overwrite && BLI_exists(export_path)) {
+    return;
   }
 
-  export_path += std::string(file_name);
-
-  if (!allow_overwrite && BLI_exists(export_path.c_str())) {
+  if (BLI_exists(image_abs_path) && paths_equal(export_path, image_abs_path)) {
+    /* As a precaution, don't overwrite the original path. */
     return;
   }
 
   std::cout << "Exporting in-memory texture to " << export_path << std::endl;
 
-  if (BKE_imbuf_write_as(imbuf, export_path.c_str(), &imageFormat, true) == 0) {
+  if (BKE_imbuf_write_as(imbuf, export_path, &imageFormat, true) == 0) {
     WM_reportf(
-        RPT_WARNING, "USD export: couldn't export in-memory texture to %s", export_path.c_str());
+        RPT_WARNING, "USD export: couldn't export in-memory texture to %s", export_path);
   }
 }
 
@@ -430,21 +434,15 @@ static void get_absolute_path(Image *ima, char *r_path)
 /* If the given image is tiled, copy the image tiles to the given
  * destination directory. */
 static void copy_tiled_textures(Image *ima,
-                                const std::string &in_dest_dir,
+                                const std::string &dest_dir,
                                 const bool allow_overwrite)
 {
-  if (in_dest_dir.empty()) {
+  if (dest_dir.empty()) {
     return;
   }
 
   if (ima->source != IMA_SRC_TILED) {
     return;
-  }
-
-  std::string dest_dir = in_dest_dir;
-
-  if (dest_dir.back() != '/' && dest_dir.back() != '\\') {
-    dest_dir += "/";
   }
 
   char src_path[FILE_MAX];
@@ -465,15 +463,17 @@ static void copy_tiled_textures(Image *ima,
     /* Build filepath of the tile. */
     BLI_path_sequence_encode(tile_file, head, tail, numlen, tile->tile_number);
 
-    std::string dest_tile_path = dest_dir + std::string(tile_file);
+    char dest_tile_path[FILE_MAX];
+    BLI_path_join(dest_tile_path, FILE_MAX, dest_dir.c_str(), tile_file, NULL);
 
-    if (!allow_overwrite && BLI_exists(dest_tile_path.c_str())) {
+    if (!allow_overwrite && BLI_exists(dest_tile_path)) {
       continue;
     }
 
-    std::string src_tile_path = std::string(src_dir) + std::string(tile_file);
+    char src_tile_path[FILE_MAX];
+    BLI_path_join(src_tile_path, FILE_MAX, src_dir, tile_file, NULL);
 
-    if (paths_equal(src_tile_path.c_str(), dest_tile_path.c_str())) {
+    if (paths_equal(src_tile_path, dest_tile_path)) {
       /* Source and destination paths are the same, don't copy. */
       continue;
     }
@@ -482,11 +482,11 @@ static void copy_tiled_textures(Image *ima,
               << std::endl;
 
     /* Copy the file. */
-    if (BLI_copy(src_tile_path.c_str(), dest_tile_path.c_str()) != 0) {
+    if (BLI_copy(src_tile_path, dest_tile_path) != 0) {
       WM_reportf(RPT_WARNING,
                  "USD export:  couldn't copy texture tile from %s to %s",
-                 src_tile_path.c_str(),
-                 dest_tile_path.c_str());
+                 src_tile_path,
+                 dest_tile_path);
     }
   }
 }
@@ -504,19 +504,14 @@ static void copy_single_file(Image *ima, const std::string &dest_dir, const bool
   char file_name[FILE_MAX];
   BLI_split_file_part(source_path, file_name, FILE_MAX);
 
-  std::string dest_path = dest_dir;
+  char dest_path[FILE_MAX];
+  BLI_path_join(dest_path, FILE_MAX, dest_dir.c_str(), file_name, NULL);
 
-  if (dest_path.back() != '/' && dest_path.back() != '\\') {
-    dest_path += "/";
-  }
-
-  dest_path += std::string(file_name);
-
-  if (!allow_overwrite && BLI_exists(dest_path.c_str())) {
+  if (!allow_overwrite && BLI_exists(dest_path)) {
     return;
   }
 
-  if (paths_equal(source_path, dest_path.c_str())) {
+  if (paths_equal(source_path, dest_path)) {
     /* Source and destination paths are the same, don't copy. */
     return;
   }
@@ -524,11 +519,11 @@ static void copy_single_file(Image *ima, const std::string &dest_dir, const bool
   std::cout << "Copying texture from " << source_path << " to " << dest_path << std::endl;
 
   /* Copy the file. */
-  if (BLI_copy(source_path, dest_path.c_str()) != 0) {
+  if (BLI_copy(source_path, dest_path) != 0) {
     WM_reportf(RPT_WARNING,
                "USD export:  couldn't copy texture from %s to %s",
                source_path,
-               dest_path.c_str());
+               dest_path);
   }
 }
 
@@ -779,7 +774,6 @@ static void export_texture(bNode *node,
 
   pxr::SdfLayerHandle layer = stage->GetRootLayer();
   std::string stage_path = layer->GetRealPath();
-
   if (stage_path.empty()) {
     return;
   }
@@ -787,16 +781,16 @@ static void export_texture(bNode *node,
   char usd_dir_path[FILE_MAX];
   BLI_split_dir_part(stage_path.c_str(), usd_dir_path, FILE_MAX);
 
-  std::string dest_dir(usd_dir_path);
-  dest_dir += "textures";
+  char tex_dir_path[FILE_MAX];
+  BLI_path_join(tex_dir_path, FILE_MAX, usd_dir_path, "textures", SEP_STR, NULL);
 
-  BLI_dir_create_recursive(dest_dir.c_str());
-
-  dest_dir += "/";
+  BLI_dir_create_recursive(tex_dir_path);
 
   bool is_dirty = BKE_image_is_dirty(ima);
   bool is_generated = ima->source == IMA_SRC_GENERATED;
   bool is_packed = BKE_image_has_packedfile(ima);
+
+  std::string dest_dir(tex_dir_path);
 
   if (is_generated || is_dirty || is_packed) {
     export_in_memory_texture(ima, dest_dir, allow_overwrite);
