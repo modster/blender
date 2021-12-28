@@ -132,7 +132,16 @@ typedef struct Mesh_Runtime {
    */
   char wrapper_type_finalize;
 
-  void *_pad;
+  /**
+   * Settings for lazily evaluating the subdivision on the CPU if needed. These are
+   * set in the modifier when GPU subdivision can be performed.
+   */
+  char subsurf_apply_render;
+  char subsurf_use_optimal_display;
+  char _pad[2];
+  int subsurf_resolution;
+
+  void *_pad2;
 
   /**
    * Used to mark when derived data needs to be recalculated for a certain layer.
@@ -143,15 +152,6 @@ typedef struct Mesh_Runtime {
   int64_t cd_dirty_edge;
   int64_t cd_dirty_loop;
   int64_t cd_dirty_poly;
-
-  /**
-   * Settings for lazily evaluating the subdivision on the CPU if needed. These are
-   * set in the modifier when GPU subdivision can be performed.
-   */
-  char subsurf_apply_render;
-  char subsurf_use_optimal_display;
-  char _pad[2];
-  int subsurf_resolution;
 
 } Mesh_Runtime;
 
@@ -346,7 +346,7 @@ typedef struct Mesh {
 
   char _pad1[4];
 
-  void *_pad;
+  void *_pad2;
 
   Mesh_Runtime runtime;
 } Mesh;
