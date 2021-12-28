@@ -110,13 +110,9 @@ static void export_texture(bNode *node,
                            const pxr::UsdStageRefPtr stage,
                            const bool allow_overwrite = false);
 static bNode *find_bsdf_node(Material *material);
-static std::string get_node_tex_image_filepath(bNode *node);
-static std::string get_node_tex_image_filepath(bNode *node,
-                                               const pxr::UsdStageRefPtr stage,
-                                               const USDExportParams &export_params);
-static std::string get_texture_filepath(const std::string &in_path,
-                                        const pxr::UsdStageRefPtr stage,
-                                        const USDExportParams &export_params);
+static std::string get_tex_image_asset_path(bNode *node,
+                                            const pxr::UsdStageRefPtr stage,
+                                            const USDExportParams &export_params);
 static bNode *traverse_channel(bNodeSocket *input, short target_type);
 static InputSpecMap &preview_surface_input_map();
 static void create_uvmap_shader(const USDExporterContext &usd_export_context,
@@ -342,19 +338,8 @@ static bool paths_equal(const char *p1, const char *p2)
 
 /* Generate a file name for an in-memory image that doesn't have a
  * filepath already defined. */
-static std::string get_in_memory_texture_filename(bNode *node)
+static std::string get_in_memory_texture_filename(Image *ima)
 {
-  Image *ima = reinterpret_cast<Image *>(node->id);
-  if (!ima) {
-    return "";
-  }
-
-  if (strlen(ima->filepath) > 0) {
-    /* We only generate a filename if the image
-     * doesn't already have one. */
-    return "";
-  }
-
   bool is_dirty = BKE_image_is_dirty(ima);
   bool is_generated = ima->source == IMA_SRC_GENERATED;
   bool is_packed = BKE_image_has_packedfile(ima);
@@ -432,11 +417,12 @@ static void export_in_memory_texture(Image *ima,
   }
 }
 
-/* Get the absolute filepath of the given image. */
-static void get_absolute_path(Image *ima, size_t path_len, char *r_path)
+/* Get the absolute filepath of the given image.  Assumes
+ * r_path result array is of length FILE_MAX. */
+static void get_absolute_path(Image *ima, char *r_path)
 {
-  /* make absolute source path */
-  BLI_strncpy(r_path, ima->filepath, path_len);
+  /* Make absolute source path. */
+  BLI_strncpy(r_path, ima->filepath, FILE_MAX);
   BLI_path_abs(r_path, ID_BLEND_PATH_FROM_GLOBAL(&ima->id));
   BLI_path_normalize(nullptr, r_path);
 }
@@ -462,7 +448,7 @@ static void copy_tiled_textures(Image *ima,
   }
 
   char src_path[FILE_MAX];
-  get_absolute_path(ima, sizeof(src_path), src_path);
+  get_absolute_path(ima, src_path);
 
   char src_dir[FILE_MAX];
   char src_file[FILE_MAX];
@@ -513,7 +499,7 @@ static void copy_single_file(Image *ima, const std::string &dest_dir, const bool
   }
 
   char source_path[FILE_MAX];
-  get_absolute_path(ima, sizeof(source_path), source_path);
+  get_absolute_path(ima, source_path);
 
   char file_name[FILE_MAX];
   BLI_split_file_part(source_path, file_name, FILE_MAX);
@@ -656,7 +642,7 @@ static pxr::UsdShadeShader create_usd_preview_shader(const USDExporterContext &u
   }
 
   /* For texture image nodes we set the image path and color space. */
-  std::string imagePath = get_node_tex_image_filepath(
+  std::string imagePath = get_tex_image_asset_path(
       node, usd_export_context.stage, usd_export_context.export_params);
   if (!imagePath.empty()) {
     shader.CreateInput(usdtokens::file, pxr::SdfValueTypeNames->Asset)
@@ -671,26 +657,14 @@ static pxr::UsdShadeShader create_usd_preview_shader(const USDExporterContext &u
   return shader;
 }
 
-/* Gets a NodeTexImage's filepath */
-static std::string get_node_tex_image_filepath(bNode *node)
+static std::string get_tex_image_asset_path(Image *ima)
 {
-  NodeTexImage *tex_original = (NodeTexImage *)node->storage;
-
-  Image *ima = (Image *)node->id;
-  if (!ima) {
-    return "";
-  }
-
   if (strlen(ima->filepath) == 0) {
     return "";
   }
 
-  char filepath[1024];
-  strncpy(filepath, ima->filepath, sizeof(ima->filepath));
-
-  BKE_image_user_file_path(&tex_original->iuser, ima, filepath);
-
-  BLI_str_replace_char(filepath, '\\', '/');
+  char filepath[FILE_MAX];
+  get_absolute_path(ima, filepath);
 
   if (ima->source == IMA_SRC_TILED) {
     char head[FILE_MAX], tail[FILE_MAX];
@@ -703,21 +677,88 @@ static std::string get_node_tex_image_filepath(bNode *node)
   return std::string(filepath);
 }
 
-/* Gets a NodeTexImage's filepath, returning a path in the texture export directory or a relative
- * path, if the export parameters require it. */
-static std::string get_node_tex_image_filepath(bNode *node,
-                                               const pxr::UsdStageRefPtr stage,
-                                               const USDExportParams &export_params)
+/* Gets an asset path for the given texture image node. The resulting path
+ * may be absolute, relative to the USD file, or in a 'textures' directory
+ * in the same directory as the USD file, depending on the export parameters.
+ * The filename is typically the image filepath but might also be automatically
+ * generated based on the image name for in-memory textures when exporting textures.
+ * This function may return an empty string if no asset path could be determined. */
+static std::string get_tex_image_asset_path(bNode *node,
+                                            const pxr::UsdStageRefPtr stage,
+                                            const USDExportParams &export_params)
 {
-  std::string image_path = get_node_tex_image_filepath(node);
-  if (image_path.empty() && export_params.export_textures) {
-    /* The path may be empty because this is an in-memory texture.
-     * Since we are exporting textures, check if this is an
-     * in-memory texture for which we can generate a file name. */
-    image_path = get_in_memory_texture_filename(node);
+  Image *ima = reinterpret_cast<Image *>(node->id);
+  if (!ima) {
+    return "";
   }
 
-  return get_texture_filepath(image_path, stage, export_params);
+  std::string path;
+
+  if (strlen(ima->filepath) > 0) {
+    /* Get absolute path. */
+    path = get_tex_image_asset_path(ima);
+  }
+  else if (export_params.export_textures) {
+    /* Image has no filepath, but since we are exporting textures,
+     * check if this is an in-memory texture for which we can
+     * generate a file name. */
+    path = get_in_memory_texture_filename(ima);
+  }
+
+  if (path.empty()) {
+    return path;
+  }
+
+  if (export_params.export_textures) {
+    /* The texture is exported to a 'textures' directory next to the
+     * USD root layer. */
+
+    char exp_path[FILE_MAX];
+    char file_path[FILE_MAX];
+    BLI_split_file_part(path.c_str(), file_path, FILE_MAX);
+
+    if (export_params.relative_texture_paths) {
+      BLI_path_join(exp_path, FILE_MAX, ".", "textures", file_path, NULL);
+    }
+    else {
+      /* Create absolute path in the textures directory. */
+      pxr::SdfLayerHandle layer = stage->GetRootLayer();
+      std::string stage_path = layer->GetRealPath();
+      if (stage_path.empty()) {
+        return path;
+      }
+
+      char dir_path[FILE_MAX];
+      BLI_split_dir_part(stage_path.c_str(), dir_path, FILE_MAX);
+      BLI_path_join(exp_path, FILE_MAX, dir_path, "textures", file_path, NULL);
+    }
+    return exp_path;
+  }
+
+  if (export_params.relative_texture_paths) {
+    /* Get the path relative to the USD. */
+    pxr::SdfLayerHandle layer = stage->GetRootLayer();
+    std::string stage_path = layer->GetRealPath();
+    if (stage_path.empty()) {
+      return path;
+    }
+
+    char rel_path[FILE_MAX];
+    strcpy(rel_path, path.c_str());
+
+    BLI_path_rel(rel_path, stage_path.c_str());
+
+    /* BLI_path_rel adds '//' as a prefix to the path, if
+     * generating the relative path was successful. */
+    if (rel_path[0] != '/' || rel_path[1] != '/') {
+      /* No relative path generated. */
+      return path;
+    }
+
+    return rel_path + 2;
+  }
+
+  return path;
 }
 
 /* Export the given texture node's image to a 'textures' directory
@@ -766,86 +807,6 @@ static void export_texture(bNode *node,
   else {
     copy_single_file(ima, dest_dir, allow_overwrite);
   }
-}
-
-/* Process the given file path 'in_path' to convert it to an export path
- * for textures or to make the path relative to the given stage's root USD
- * layer. */
-static std::string get_texture_filepath(const std::string &in_path,
-                                        const pxr::UsdStageRefPtr stage,
-                                        const USDExportParams &export_params)
-{
-  /* Do nothing if we are not exporting textures or using relative texture paths. */
-  if (!(export_params.relative_texture_paths || export_params.export_textures)) {
-    return in_path;
-  }
-
-  if (in_path.empty()) {
-    return in_path;
-  }
-
-  pxr::SdfLayerHandle layer = stage->GetRootLayer();
-  std::string stage_path = layer->GetRealPath();
-
-  if (stage_path.empty()) {
-    return in_path;
-  }
-
-  /* If we are exporting textures, set the textures directory in the path. */
-  if (export_params.export_textures) {
-    /* The texture is exported to a 'textures' directory next to the
-     * USD root layer. */
-
-    char dir_path[FILE_MAX];
-    char file_path[FILE_MAX];
-    BLI_split_dir_part(stage_path.c_str(), dir_path, FILE_MAX);
-    BLI_split_file_part(in_path.c_str(), file_path, FILE_MAX);
-
-    BLI_str_replace_char(dir_path, '\\', '/');
-
-    std::string result;
-
-    if (export_params.relative_texture_paths) {
-      result = "./textures/";
-    }
-    else {
-      result = std::string(dir_path);
-      if (result.back() != '/' && result.back() != '\\') {
-        result += "/";
-      }
-      result += "textures/";
-    }
-
-    result += std::string(file_path);
-    return result;
-  }
-
-  // Get the path relative to the USD.
-  char rel_path[FILE_MAX];
-
-  strcpy(rel_path, in_path.c_str());
-
-  BLI_path_rel(rel_path, stage_path.c_str());
-
-  /* BLI_path_rel adds '//' as a prefix to the path, if
-   * generating the relative path was successful. */
-  if (rel_path[0] != '/' || rel_path[1] != '/') {
-    /* No relative path generated. */
-    return in_path;
-  }
-
-  int offset = 0;
-
-  if (rel_path[2] != '.') {
-    rel_path[0] = '.';
-  }
-  else {
-    offset = 2;
-  }
-
-  BLI_str_replace_char(rel_path, '\\', '/');
-
-  return std::string(rel_path + offset);
 }
 
 }  // namespace blender::io::usd
