@@ -113,9 +113,9 @@ static void link_nodes(
 
 /* Returns a layer handle retrieved from the given attribute's property specs.
  * Note that the returned handle may be invalid if no layer could be found. */
-static pxr::SdfLayerHandle get_layer_handle(const pxr::UsdAttribute &Attribute)
+static pxr::SdfLayerHandle get_layer_handle(const pxr::UsdAttribute &attribute)
 {
-  for (auto PropertySpec : Attribute.GetPropertyStack(pxr::UsdTimeCode::EarliestTime())) {
+  for (auto PropertySpec : attribute.GetPropertyStack(pxr::UsdTimeCode::EarliestTime())) {
     if (PropertySpec->HasDefaultValue() ||
         PropertySpec->GetLayer()->GetNumTimeSamplesForPath(PropertySpec->GetPath()) > 0) {
       return PropertySpec->GetLayer();
@@ -136,14 +136,6 @@ static bool get_udim_tiles(const std::string &file_path,
                            std::string *r_first_tile_path,
                            std::vector<int> *r_tile_indices)
 {
-  if (file_path.empty()) {
-    return false;
-  }
-
-  if (!(r_first_tile_path && r_tile_indices)) {
-    return false;
-  }
-
   /* Check if we have a UDIM path. */
   std::size_t udim_token_offset = file_path.find("<UDIM>");
 
@@ -160,21 +152,14 @@ static bool get_udim_tiles(const std::string &file_path,
   std::string base_udim_path(file_path);
   base_udim_path.replace(udim_token_offset, 6, "1001");
 
-  /* Exctract the file and directory names from the path. */
+  /* Extract the file and directory names from the path. */
   char filename[FILE_MAX], dirname[FILE_MAXDIR];
   BLI_split_dirfile(base_udim_path.c_str(), dirname, filename, sizeof(dirname), sizeof(filename));
 
   /* Split the base and head portions of the file name. */
   ushort digits = 0;
   char base_head[FILE_MAX], base_tail[FILE_MAX];
-  base_head[0] = '\0';
-  base_tail[0] = '\0';
-  int id = BLI_path_sequence_decode(filename, base_head, base_tail, &digits);
-
-  /* As a sanity check, confirm that we got our original index. */
-  if (id != 1001) {
-    return false;
-  }
+  BLI_path_sequence_decode(filename, base_head, base_tail, &digits);
 
   /* Iterate over the directory contents to find files
    * with matching names and with the expected index format
@@ -192,8 +177,6 @@ static bool get_udim_tiles(const std::string &file_path,
     }
 
     char head[FILE_MAX], tail[FILE_MAX];
-    head[0] = '\0';
-    tail[0] = '\0';
     int id = BLI_path_sequence_decode(dir[i].relname, head, tail, &digits);
 
     if (digits == 0 || digits > 4 || !(STREQLEN(base_head, head, FILE_MAX)) ||
@@ -226,14 +209,10 @@ static bool get_udim_tiles(const std::string &file_path,
 /* Add tiles with the given indices to the given image. */
 static void add_udim_tiles(Image *image, const std::vector<int> &indices)
 {
-  if (!image || indices.empty()) {
-    return;
-  }
-
   image->source = IMA_SRC_TILED;
 
-  for (int i = 0; i < indices.size(); ++i) {
-    BKE_image_add_tile(image, indices[i], nullptr);
+  for (int tile_number : indices) {
+    BKE_image_add_tile(image, tile_number, nullptr);
   }
 }
 

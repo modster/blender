@@ -76,6 +76,19 @@ static void build_mat_map(const Main *bmain, std::map<std::string, Material *> *
   }
 }
 
+static pxr::UsdShadeMaterial compute_bound_material(const pxr::UsdPrim &prim)
+{
+  pxr::UsdShadeMaterialBindingAPI api = pxr::UsdShadeMaterialBindingAPI(prim);
+  pxr::UsdShadeMaterial mtl = api.ComputeBoundMaterial();
+
+  if (!mtl) {
+    /* Check for a preview material as fallback. */
+    mtl = api.ComputeBoundMaterial(pxr::UsdShadeTokens->preview);
+  }
+
+  return mtl;
+}
+
 static void assign_materials(Main *bmain,
                              Object *ob,
                              const std::map<pxr::SdfPath, int> &mat_index_map,
@@ -107,7 +120,7 @@ static void assign_materials(Main *bmain,
 
     Material *assigned_mat = nullptr;
 
-    if (params.mtl_name_collision_mode == USD_MTL_NAME_COLLISION_MODIFY) {
+    if (params.mtl_name_collision_mode == USD_MTL_NAME_COLLISION_UNIQUE_NAME) {
       /* Check if we've already created the Blender material with a modified name. */
       std::map<std::string, std::string>::const_iterator path_to_name_iter =
           usd_path_to_mat_name.find(it->first.GetAsString());
@@ -159,7 +172,7 @@ static void assign_materials(Main *bmain,
       std::string mat_name = pxr::TfMakeValidIdentifier(assigned_mat->id.name + 2);
       mat_map[mat_name] = assigned_mat;
 
-      if (params.mtl_name_collision_mode == USD_MTL_NAME_COLLISION_MODIFY) {
+      if (params.mtl_name_collision_mode == USD_MTL_NAME_COLLISION_UNIQUE_NAME) {
         /* Record the name of the Blender material we created for the USD material
          * with the given path. */
         usd_path_to_mat_name[it->first.GetAsString()] = mat_name;
@@ -719,16 +732,8 @@ void USDMeshReader::assign_facesets_to_mpoly(double motionSampleTime,
   int current_mat = 0;
   if (!subsets.empty()) {
     for (const pxr::UsdGeomSubset &subset : subsets) {
-      pxr::UsdShadeMaterialBindingAPI subset_api = pxr::UsdShadeMaterialBindingAPI(
-          subset.GetPrim());
 
-      pxr::UsdShadeMaterial subset_mtl = subset_api.ComputeBoundMaterial();
-
-      if (!subset_mtl) {
-        /* Check for a preview material as fallback. */
-        subset_mtl = subset_api.ComputeBoundMaterial(pxr::UsdShadeTokens->preview);
-      }
-
+      pxr::UsdShadeMaterial subset_mtl = utils::compute_bound_material(subset.GetPrim());
       if (!subset_mtl) {
         continue;
       }
@@ -757,17 +762,9 @@ void USDMeshReader::assign_facesets_to_mpoly(double motionSampleTime,
   }
 
   if (r_mat_map->empty()) {
-    pxr::UsdShadeMaterialBindingAPI api = pxr::UsdShadeMaterialBindingAPI(prim_);
 
-    pxr::UsdShadeMaterial mtl = api.ComputeBoundMaterial();
-
-    if (!mtl) {
-      /* Check for a preview material as fallback. */
-      mtl = api.ComputeBoundMaterial(pxr::UsdShadeTokens->preview);
-    }
-
+    pxr::UsdShadeMaterial mtl = utils::compute_bound_material(prim_);
     if (mtl) {
-
       pxr::SdfPath mtl_path = mtl.GetPath();
 
       if (!mtl_path.IsEmpty()) {

@@ -74,16 +74,16 @@ const EnumPropertyItem rna_enum_usd_export_evaluation_mode_items[] = {
 };
 
 const EnumPropertyItem rna_enum_usd_mtl_name_collision_mode_items[] = {
-    {USD_MTL_NAME_COLLISION_MODIFY,
-     "MODIFY",
+    {USD_MTL_NAME_COLLISION_UNIQUE_NAME,
+     "UNIQUE_NAME",
      0,
-     "Modify",
+     "Unique Name",
      "Create a unique name for the imported material"},
-    {USD_MTL_NAME_COLLISION_SKIP,
-     "SKIP",
+    {USD_MTL_NAME_COLLISION_REFERENCE_EXISTING,
+     "REFERENCE_EXISTING",
      0,
-     "Skip",
-     "Keep the existing material and discard the imported material"},
+     "Reference Existing",
+     "If a material with the same name already exists, reference that instead of importing"},
     {0, NULL, 0, NULL, NULL},
 };
 
@@ -543,7 +543,7 @@ void WM_OT_usd_import(struct wmOperatorType *ot)
       ot->srna,
       "mtl_name_collision_mode",
       rna_enum_usd_mtl_name_collision_mode_items,
-      USD_MTL_NAME_COLLISION_MODIFY,
+      USD_MTL_NAME_COLLISION_UNIQUE_NAME,
       "Material Name Collision",
       "Behavior when the name of an imported material conflicts with an existing material");
 }

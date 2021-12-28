@@ -32,8 +32,8 @@ struct Object;
 struct bContext;
 
 typedef enum eUSDMtlNameCollisionMode {
-  USD_MTL_NAME_COLLISION_MODIFY = 0,
-  USD_MTL_NAME_COLLISION_SKIP = 1,
+  USD_MTL_NAME_COLLISION_UNIQUE_NAME = 0,
+  USD_MTL_NAME_COLLISION_REFERENCE_EXISTING = 1,
 } eUSDMtlNameCollisionMode;
 
 struct USDExportParams {

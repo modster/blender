@@ -54,7 +54,7 @@ struct ImportSettings {
   CacheFile *cache_file;
 
   /* Map a USD matrial prim path to a Blender material name.
-   * This map might be updated by readers during stage traversal. */
+   * This map is updated by readers during stage traversal. */
   mutable std::map<std::string, std::string> usd_path_to_mat_name;
 
   ImportSettings()
