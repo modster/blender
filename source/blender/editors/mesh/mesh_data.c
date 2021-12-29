@@ -1026,7 +1026,7 @@ static int mesh_customdata_custom_splitnormals_add_exec(bContext *C, wmOperator 
                                        me->mloop,
                                        me->totloop,
                                        me->mpoly,
-                                       BKE_mesh_face_normals_for_write(me),
+                                       BKE_mesh_poly_normals_for_write(me),
                                        me->totpoly,
                                        me->smoothresh);
       }

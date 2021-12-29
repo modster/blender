@@ -419,7 +419,7 @@ float (*BKE_mesh_vertex_normals_for_write(struct Mesh *mesh))[3];
  * Make sure the face normal data layer exists and return it.
  * Used for manually assigning face normals. Clears the dirty flag.
  */
-float (*BKE_mesh_face_normals_for_write(struct Mesh *mesh))[3];
+float (*BKE_mesh_poly_normals_for_write(struct Mesh *mesh))[3];
 
 /**
  * \warning May still return null if the mesh is empty.

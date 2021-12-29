@@ -127,7 +127,7 @@ float (*BKE_mesh_vertex_normals_for_write(Mesh *mesh))[3]
       &mesh->vdata, CD_NORMAL, CD_CALLOC, nullptr, mesh->totvert);
 }
 
-float (*BKE_mesh_face_normals_for_write(Mesh *mesh))[3]
+float (*BKE_mesh_poly_normals_for_write(Mesh *mesh))[3]
 {
   mesh->runtime.cd_dirty_poly &= ~CD_MASK_NORMAL;
   return (float(*)[3])CustomData_add_layer(

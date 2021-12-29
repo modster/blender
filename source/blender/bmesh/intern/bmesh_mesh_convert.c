@@ -639,7 +639,7 @@ void BM_mesh_bm_to_me(Main *bmain, BMesh *bm, Mesh *me, const struct BMeshToMesh
   CustomData_add_layer(&me->edata, CD_MEDGE, CD_ASSIGN, medge, me->totedge);
   CustomData_add_layer(&me->ldata, CD_MLOOP, CD_ASSIGN, mloop, me->totloop);
   CustomData_add_layer(&me->pdata, CD_MPOLY, CD_ASSIGN, mpoly, me->totpoly);
-  float(*face_normals)[3] = BKE_mesh_face_normals_for_write(me);
+  float(*face_normals)[3] = BKE_mesh_poly_normals_for_write(me);
   float(*vert_normals)[3] = BKE_mesh_vertex_normals_for_write(me);
 
   me->cd_flag = BM_mesh_cd_flag_from_bmesh(bm);
