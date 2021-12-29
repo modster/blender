@@ -158,7 +158,8 @@ static void mesh_copy_data(Main *bmain, ID *id_dst, const ID *id_src, const int 
   /* Set normal layers dirty, since they aren't included in CD_MASK_MESH and are therefore not
    * copied to the destination mesh. Alternatively normal layers could be copied if they aren't
    * dirty, avoiding recomputation in some cases. However, a copied mesh is often changed anyway,
-   * so that idea is not clearly better. */
+   * so that idea is not clearly better. With proper reference counting of custom data layers could
+   * be copied as the cost would be much lower. */
   BKE_mesh_normals_tag_dirty(mesh_dst);
 
   /* TODO: Do we want to add flag to prevent this? */
