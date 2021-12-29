@@ -19,6 +19,8 @@
 
 #include "../node_shader_util.h"
 
+namespace blender::nodes::node_shader_bsdf_hair_cc {
+
 /* **************** OUTPUT ******************** */
 
 static bNodeSocketTemplate sh_node_bsdf_hair_in[] = {
@@ -44,17 +46,20 @@ static int node_shader_gpu_bsdf_hair(GPUMaterial *mat,
   return GPU_stack_link(mat, node, "node_bsdf_hair", in, out);
 }
 
+}  // namespace blender::nodes::node_shader_bsdf_hair_cc
+
 /* node type definition */
-void register_node_type_sh_bsdf_hair(void)
+void register_node_type_sh_bsdf_hair()
 {
+  namespace file_ns = blender::nodes::node_shader_bsdf_hair_cc;
+
   static bNodeType ntype;
 
   sh_node_type_base(&ntype, SH_NODE_BSDF_HAIR, "Hair BSDF", NODE_CLASS_SHADER, 0);
-  node_type_socket_templates(&ntype, sh_node_bsdf_hair_in, sh_node_bsdf_hair_out);
+  node_type_socket_templates(
+      &ntype, file_ns::sh_node_bsdf_hair_in, file_ns::sh_node_bsdf_hair_out);
   node_type_size(&ntype, 150, 60, 200);
-  node_type_init(&ntype, NULL);
-  node_type_storage(&ntype, "", NULL, NULL);
-  node_type_gpu(&ntype, node_shader_gpu_bsdf_hair);
+  node_type_gpu(&ntype, file_ns::node_shader_gpu_bsdf_hair);
 
   nodeRegisterType(&ntype);
 }

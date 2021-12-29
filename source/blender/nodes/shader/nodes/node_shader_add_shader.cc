@@ -19,39 +19,43 @@
 
 #include "../node_shader_util.h"
 
+namespace blender::nodes::node_shader_add_shader_cc {
+
 /* **************** OUTPUT ******************** */
 
-static bNodeSocketTemplate sh_node_mix_shader_in[] = {
-    {SOCK_FLOAT, N_("Fac"), 0.5f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, PROP_FACTOR},
+static bNodeSocketTemplate sh_node_add_shader_in[] = {
     {SOCK_SHADER, N_("Shader")},
     {SOCK_SHADER, N_("Shader")},
     {-1, ""},
 };
 
-static bNodeSocketTemplate sh_node_mix_shader_out[] = {
+static bNodeSocketTemplate sh_node_add_shader_out[] = {
     {SOCK_SHADER, N_("Shader")},
     {-1, ""},
 };
 
-static int node_shader_gpu_mix_shader(GPUMaterial *mat,
+static int node_shader_gpu_add_shader(GPUMaterial *mat,
                                       bNode *node,
                                       bNodeExecData *UNUSED(execdata),
                                       GPUNodeStack *in,
                                       GPUNodeStack *out)
 {
-  return GPU_stack_link(mat, node, "node_mix_shader", in, out);
+  return GPU_stack_link(mat, node, "node_add_shader", in, out);
 }
 
+}  // namespace blender::nodes::node_shader_add_shader_cc
+
 /* node type definition */
-void register_node_type_sh_mix_shader(void)
+void register_node_type_sh_add_shader()
 {
+  namespace file_ns = blender::nodes::node_shader_add_shader_cc;
+
   static bNodeType ntype;
 
-  sh_node_type_base(&ntype, SH_NODE_MIX_SHADER, "Mix Shader", NODE_CLASS_SHADER, 0);
-  node_type_socket_templates(&ntype, sh_node_mix_shader_in, sh_node_mix_shader_out);
-  node_type_init(&ntype, NULL);
-  node_type_storage(&ntype, "", NULL, NULL);
-  node_type_gpu(&ntype, node_shader_gpu_mix_shader);
+  sh_node_type_base(&ntype, SH_NODE_ADD_SHADER, "Add Shader", NODE_CLASS_SHADER, 0);
+  node_type_socket_templates(
+      &ntype, file_ns::sh_node_add_shader_in, file_ns::sh_node_add_shader_out);
+  node_type_gpu(&ntype, file_ns::node_shader_gpu_add_shader);
 
   nodeRegisterType(&ntype);
 }
