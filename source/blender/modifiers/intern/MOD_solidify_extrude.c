@@ -244,14 +244,7 @@ Mesh *MOD_solidify_extrude_modifyMesh(ModifierData *md, const ModifierEvalContex
 
   if (need_poly_normals) {
     /* calculate only face normals */
-    poly_nors = MEM_malloc_arrayN(numPolys, sizeof(*poly_nors), __func__);
-    BKE_mesh_calc_normals_poly(orig_mvert,
-                               (int)numVerts,
-                               orig_mloop,
-                               (int)numLoops,
-                               orig_mpoly,
-                               (int)numPolys,
-                               poly_nors);
+    poly_nors = BKE_mesh_poly_normals_ensure(mesh);
   }
 
   STACK_INIT(new_vert_arr, numVerts * 2);
@@ -1214,10 +1207,6 @@ Mesh *MOD_solidify_extrude_modifyMesh(ModifierData *md, const ModifierEvalContex
 
   if (old_vert_arr) {
     MEM_freeN(old_vert_arr);
-  }
-
-  if (poly_nors) {
-    MEM_freeN(poly_nors);
   }
 
   return result;
