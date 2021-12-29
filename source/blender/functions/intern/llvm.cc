@@ -23,9 +23,9 @@
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Verifier.h>
+#include <llvm/Object/ObjectFile.h>
 #include <llvm/Support/CommandLine.h>
 #include <llvm/Support/TargetRegistry.h>
-#include <llvm/Object/ObjectFile.h>
 #include <llvm/Support/TargetSelect.h>
 
 #include "FN_llvm.hh"
@@ -34,7 +34,7 @@
 
 namespace blender::fn {
 
-  const std::string object_file_path = "C:\\Users\\jacques\\Documents\\my_object.o";
+const std::string object_file_path = "C:\\Users\\jacques\\Documents\\my_object.o";
 
 class MyObjectCache : public llvm::ObjectCache {
   void notifyObjectCompiled(const llvm::Module *module, llvm::MemoryBufferRef obj) override
@@ -43,7 +43,7 @@ class MyObjectCache : public llvm::ObjectCache {
               << module->getModuleIdentifier() << "\n";
     std::cout << "Size: " << obj.getBufferSize() << "\n";
 
-    std::ofstream f;    
+    std::ofstream f;
     f.open(object_file_path, std::ofstream::out | std::ofstream::binary);
     f.write(obj.getBufferStart(), obj.getBufferSize());
     f.close();
@@ -51,10 +51,11 @@ class MyObjectCache : public llvm::ObjectCache {
 
   std::unique_ptr<llvm::MemoryBuffer> getObject(const llvm::Module *module) override
   {
-    //return {};
+    // return {};
     std::cout << "Request Cache: " << module->getName().str() << "   -    "
               << module->getModuleIdentifier() << "\n";
-    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> buffer_err = llvm::MemoryBuffer::getFile(object_file_path);
+    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> buffer_err = llvm::MemoryBuffer::getFile(
+        object_file_path);
     std::unique_ptr<llvm::MemoryBuffer> buffer = std::move(*buffer_err);
     return buffer;
   }
@@ -91,7 +92,8 @@ void playground()
 
   MyObjectCache object_cache;
 
-  llvm::Expected<llvm::object::OwningBinary<llvm::object::ObjectFile>> object_file_ex = llvm::object::ObjectFile::createObjectFile(object_file_path);
+  llvm::Expected<llvm::object::OwningBinary<llvm::object::ObjectFile>> object_file_ex =
+      llvm::object::ObjectFile::createObjectFile(object_file_path);
   if (!object_file_ex) {
     return;
   }
@@ -99,7 +101,7 @@ void playground()
   llvm::Module *module_ptr = &*module;
   std::unique_ptr<llvm::ExecutionEngine> ee{llvm::EngineBuilder(std::move(module)).create()};
   ee->addObjectFile(std::move(*object_file_ex));
-  //ee->setObjectCache(&object_cache);
+  ee->setObjectCache(&object_cache);
   ee->finalizeObject();
 
   const uint64_t function_ptr = ee->getFunctionAddress(function->getName().str());
