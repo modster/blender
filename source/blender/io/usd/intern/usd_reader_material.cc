@@ -28,6 +28,7 @@
 #include "BLI_math_vector.h"
 #include "BLI_path_util.h"
 #include "BLI_string.h"
+#include "BLI_vector.hh"
 
 #include "DNA_material_types.h"
 
@@ -36,7 +37,12 @@
 #include <pxr/usd/usdShade/shader.h>
 
 #include <iostream>
+#include <optional>
 #include <vector>
+
+/* The result of querying UDIM information for a texture,
+ * the path to the first tile and a list of tile indices. */
+typedef std::pair<std::string, blender::Vector<int>> UDIMQueryResult;
 
 namespace usdtokens {
 
@@ -125,24 +131,22 @@ static pxr::SdfLayerHandle get_layer_handle(const pxr::UsdAttribute &attribute)
   return pxr::SdfLayerHandle();
 }
 
-/* If the given file path contains a UDIM token, examine files
+static bool is_udim_path(const std::string &path)
+{
+  return path.find("<UDIM>") != std::string::npos;
+}
+
+/* For the given UDIM path (assumed to contain the UDIM token), examine files
  * on disk to determine the indices of the UDIM tiles that are available
- * to load.  Returns the path to the file corresponding to the lowest tile
- * index and an array containing valid tile indices in 'r_first_tile_path'
- * and 'r_tile_indices', respectively.  The function returns true if the
- * given arguments are valid, if 'file_path' is a UDIM path and
- * if any tiles were found on disk; it returns false otherwise. */
-static bool get_udim_tiles(const std::string &file_path,
-                           std::string *r_first_tile_path,
-                           std::vector<int> *r_tile_indices)
+ * to load.  Returns a pair representing the path to the file corresponding
+ * to the lowest tile index and an array containing valid tile indices.
+ * Returns std::nullopt if no tiles were found. */
+static std::optional<UDIMQueryResult> get_udim_tiles(const std::string &file_path)
 {
   /* Check if we have a UDIM path. */
   std::size_t udim_token_offset = file_path.find("<UDIM>");
 
-  if (udim_token_offset == std::string::npos) {
-    /* No UDIM token. */
-    return false;
-  }
+  BLI_assert(udim_token_offset != std::string::npos);
 
   /* Create a dummy UDIM path by replacing the '<UDIM>' token
    * with an arbitrary index, since this is the format expected
@@ -168,8 +172,12 @@ static bool get_udim_tiles(const std::string &file_path,
   uint totfile = BLI_filelist_dir_contents(dirname, &dir);
 
   if (!dir) {
-    return false;
+    return std::nullopt;
   }
+
+  /* Keep track of the lowest tile index. */
+  int min_id = IMA_UDIM_MAX;
+  std::pair<std::string, blender::Vector<int>> result;
 
   for (int i = 0; i < totfile; ++i) {
     if (!(dir[i].type & S_IFREG)) {
@@ -188,26 +196,27 @@ static bool get_udim_tiles(const std::string &file_path,
       continue;
     }
 
-    r_tile_indices->push_back(id);
+    if (id < min_id) {
+      min_id = id;
+    }
+    result.second.append(id);
   }
 
   BLI_filelist_free(dir, totfile);
 
-  if (r_tile_indices->empty()) {
-    return false;
+  if (result.second.is_empty()) {
+    return std::nullopt;
   }
 
-  std::sort(r_tile_indices->begin(), r_tile_indices->end());
-
   /* Finally, use the lowest index we found to create the first tile path. */
-  (*r_first_tile_path) = file_path;
-  r_first_tile_path->replace(udim_token_offset, 6, std::to_string(r_tile_indices->front()));
+  result.first = file_path;
+  result.first.replace(udim_token_offset, 6, std::to_string(min_id));
 
-  return true;
+  return result;
 }
 
 /* Add tiles with the given indices to the given image. */
-static void add_udim_tiles(Image *image, const std::vector<int> &indices)
+static void add_udim_tiles(Image *image, const blender::Vector<int> &indices)
 {
   image->source = IMA_SRC_TILED;
 
@@ -740,10 +749,17 @@ void USDMaterialReader::load_tex_image(const pxr::UsdShadeShader &usd_shader,
     }
   }
 
-  /* If this is a UDIM texture, this array will store the
+  /* If this is a UDIM texture, this will store the
    * UDIM tile indices. */
-  std::vector<int> udim_tile_indices;
-  get_udim_tiles(file_path, &file_path, &udim_tile_indices);
+  std::optional<UDIMQueryResult> udim_result;
+
+  if (is_udim_path(file_path)) {
+    udim_result = get_udim_tiles(file_path);
+
+    if (udim_result) {
+      file_path = udim_result->first;
+    }
+  }
 
   if (file_path.empty()) {
     std::cerr << "WARNING: Couldn't resolve image asset '" << asset_path
@@ -759,8 +775,8 @@ void USDMaterialReader::load_tex_image(const pxr::UsdShadeShader &usd_shader,
     return;
   }
 
-  if (!udim_tile_indices.empty()) {
-    add_udim_tiles(image, udim_tile_indices);
+  if (udim_result) {
+    add_udim_tiles(image, udim_result->second);
   }
 
   tex_image->id = &image->id;
