@@ -89,6 +89,44 @@ static pxr::UsdShadeMaterial compute_bound_material(const pxr::UsdPrim &prim)
   return mtl;
 }
 
+/* Returns an existing Blender material that corresponds to the USD
+ * material with with the given path.  Returns null if no such material
+ * exists. */
+static Material *find_existing_material(const pxr::SdfPath &usd_mat_path,
+                                        const USDImportParams &params,
+                                        const std::map<std::string, Material *> &mat_map,
+                                        const std::map<std::string, std::string> &usd_path_to_mat_name)
+{
+  if (params.mtl_name_collision_mode == USD_MTL_NAME_COLLISION_UNIQUE_NAME) {
+    /* Check if we've already created the Blender material with a modified name. */
+    std::map<std::string, std::string>::const_iterator path_to_name_iter =
+      usd_path_to_mat_name.find(usd_mat_path.GetAsString());
+
+    if (path_to_name_iter != usd_path_to_mat_name.end()) {
+      std::string mat_name = path_to_name_iter->second;
+      std::map<std::string, Material *>::const_iterator mat_iter = mat_map.find(mat_name);
+      if (mat_iter != mat_map.end()) {
+        return mat_iter->second;
+      }
+      else {
+        std::cout
+          << "WARNING: Couldn't find previously assigned Blender material for USD material "
+          << usd_mat_path << std::endl;
+      }
+    }
+  }
+  else {
+    std::string mat_name = usd_mat_path.GetName();
+    std::map<std::string, Material *>::const_iterator mat_iter = mat_map.find(mat_name);
+
+    if (mat_iter != mat_map.end()) {
+      return mat_iter->second;
+    }
+  }
+
+  return nullptr;
+}
+
 static void assign_materials(Main *bmain,
                              Object *ob,
                              const std::map<pxr::SdfPath, int> &mat_index_map,
@@ -118,35 +156,10 @@ static void assign_materials(Main *bmain,
 
   for (it = mat_index_map.begin(); it != mat_index_map.end(); ++it) {
 
-    Material *assigned_mat = nullptr;
-
-    if (params.mtl_name_collision_mode == USD_MTL_NAME_COLLISION_UNIQUE_NAME) {
-      /* Check if we've already created the Blender material with a modified name. */
-      std::map<std::string, std::string>::const_iterator path_to_name_iter =
-          usd_path_to_mat_name.find(it->first.GetAsString());
-
-      if (path_to_name_iter != usd_path_to_mat_name.end()) {
-        std::string mat_name = path_to_name_iter->second;
-        std::map<std::string, Material *>::iterator mat_iter = mat_map.find(mat_name);
-        if (mat_iter != mat_map.end()) {
-          assigned_mat = mat_iter->second;
-        }
-        else {
-          std::cout
-              << "WARNING: Couldn't find previously assigned Blender material for USD material "
-              << it->first << std::endl;
-        }
-      }
-    }
-    else {
-      std::string mat_name = it->first.GetName();
-      std::map<std::string, Material *>::iterator mat_iter = mat_map.find(mat_name);
-
-      if (mat_iter != mat_map.end()) {
-        assigned_mat = mat_iter->second;
-      }
-    }
-
+    Material *assigned_mat = find_existing_material(it->first,
+                                                    params,
+                                                    mat_map,
+                                                    usd_path_to_mat_name);
     if (!assigned_mat) {
       /* Blender material doesn't exist, so create it now. */
 

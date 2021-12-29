@@ -31,6 +31,8 @@ struct CacheReader;
 struct Object;
 struct bContext;
 
+/* Behavior when the name of an imported material
+ * conflicts with an existing material. */
 typedef enum eUSDMtlNameCollisionMode {
   USD_MTL_NAME_COLLISION_UNIQUE_NAME = 0,
   USD_MTL_NAME_COLLISION_REFERENCE_EXISTING = 1,
