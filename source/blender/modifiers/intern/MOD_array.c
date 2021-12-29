@@ -306,14 +306,14 @@ static void mesh_merge_transform(Mesh *result,
     mul_m4_v3(cap_offset, mv->co);
     /* Reset MVert flags for caps */
     mv->flag = mv->bweight = 0;
+  }
 
-    /* We have to correct normals too, if we do not tag them as dirty later! */
-    if (!recalc_normals_later) {
-      float no[3];
-      normal_short_to_float_v3(no, mv->no);
-      mul_mat3_m4_v3(cap_offset, no);
-      normalize_v3(no);
-      normal_float_to_short_v3(mv->no, no);
+  /* We have to correct normals too, if we do not tag them as dirty later! */
+  if (!recalc_normals_later) {
+    float(*dst_vert_normals)[3] = BKE_mesh_vertex_normals_for_write(result);
+    for (i = 0; i < cap_nverts; i++) {
+      mul_mat3_m4_v3(cap_offset, dst_vert_normals[cap_verts_index + i]);
+      normalize_v3(dst_vert_normals[cap_verts_index + i]);
     }
   }
 
