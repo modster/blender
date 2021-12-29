@@ -1107,10 +1107,17 @@ Mesh *BKE_mesh_new_nomain_from_template_ex(const Mesh *me_src,
     mesh_tessface_clear_intern(me_dst, false);
   }
 
-  /* Copy dirty flags, essential for normal layers to avoid recomputation and
-   * to ensure that when no normal layers exist, they are marked as dirty. */
   me_dst->runtime.cd_dirty_poly = me_src->runtime.cd_dirty_poly;
   me_dst->runtime.cd_dirty_vert = me_src->runtime.cd_dirty_vert;
+
+  /* Ensure that when no normal layers exist, they are marked dirty,
+   * because normals might not have been included in the mask. */
+  if (!CustomData_has_layer(&me_dst->vdata, CD_NORMAL)) {
+    me_dst->runtime.cd_dirty_vert |= CD_MASK_NORMAL;
+  }
+  if (!CustomData_has_layer(&me_dst->pdata, CD_NORMAL)) {
+    me_dst->runtime.cd_dirty_poly |= CD_MASK_NORMAL;
+  }
 
   /* The destination mesh should at least have valid primary CD layers,
    * even in cases where the source mesh does not. */
