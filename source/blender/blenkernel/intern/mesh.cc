@@ -2147,6 +2147,7 @@ static void split_faces_split_new_verts(Mesh *mesh,
       copy_v3_v3(vert_normals[i], new_verts->vnor);
     }
   }
+  BKE_mesh_vertex_normals_clear_dirty(mesh);
 }
 
 /* Perform actual split of edges. */

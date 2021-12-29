@@ -382,6 +382,41 @@ void BKE_mesh_recalc_looptri_with_normals(const struct MLoop *mloop,
 void BKE_mesh_normals_tag_dirty(struct Mesh *mesh);
 
 /**
+ * Check that a mesh with non-dirty normals has vertex and face custom data layers.
+ */
+void BKE_mesh_assert_normals_dirty_or_calculated(const struct Mesh *mesh);
+
+/**
+ * Retrieve write access to the vertex normal layer, ensuring that it exists and that it is not
+ * shared. The provided vertex normals should be the same as if they were calculated automatically.
+ *
+ * \note In order to clear the dirty flag, this function should be followed by a call to
+ * #BKE_mesh_vertex_normals_clear_dirty. This is separate so that normals are still tagged dirty
+ * while they are being assigned.
+ */
+float (*BKE_mesh_vertex_normals_for_write(struct Mesh *mesh))[3];
+
+/**
+ * Retrieve write access to the poly normal layer, ensuring that it exists and that it is not
+ * shared. The provided poly normals should be the same as if they were calculated automatically.
+ *
+ * \note In order to clear the dirty flag, this function should be followed by a call to
+ * #BKE_mesh_poly_normals_clear_dirty. This is separate so that normals are still tagged dirty
+ * while they are being assigned.
+ */
+float (*BKE_mesh_poly_normals_for_write(struct Mesh *mesh))[3];
+
+/**
+ * Mark the mesh's vertex normals non-dirty, for when they are calculated or assigned manually.
+ */
+void BKE_mesh_vertex_normals_clear_dirty(struct Mesh *mesh);
+
+/**
+ * Mark the mesh's poly normals non-dirty, for when they are calculated or assigned manually.
+ */
+void BKE_mesh_poly_normals_clear_dirty(struct Mesh *mesh);
+
+/**
  * Calculate face normals directly into a result array.
  *
  * \note Usually #BKE_mesh_poly_normals_ensure is the preferred way to access face normals,
@@ -405,29 +440,16 @@ void BKE_mesh_calc_normals_poly(const struct MVert *mvert,
 void BKE_mesh_calc_normals(struct Mesh *me);
 
 /**
- * Check that a mesh with non-dirty normals has vertex and face custom data layers.
- */
-void BKE_mesh_assert_normals_dirty_or_calculated(const struct Mesh *mesh);
-
-/**
- * Make sure the vertex normal data layer exists and return it.
- * Used for manually assigning vertex normals. Clears the dirty flag.
- */
-float (*BKE_mesh_vertex_normals_for_write(struct Mesh *mesh))[3];
-
-/**
- * Make sure the face normal data layer exists and return it.
- * Used for manually assigning face normals. Clears the dirty flag.
- */
-float (*BKE_mesh_poly_normals_for_write(struct Mesh *mesh))[3];
-
-/**
+ * Returns the normals for each vertex, which is defined as the weighted average of the normals
+ * from a vertices surrounding faces, or the normalized position of vertices connected to no faces.
  * \warning May still return null if the mesh is empty.
  */
 const float (*BKE_mesh_vertex_normals_ensure(const struct Mesh *mesh))[3];
 
 /**
- * \warning May still return null if the mesh is empty.
+ * Return the normal direction of every polygon, which is defined by the winding direction of its
+ * corners.
+ * \warning May still return null if the mesh is empty or has no polygons.
  */
 const float (*BKE_mesh_poly_normals_ensure(const struct Mesh *mesh))[3];
 

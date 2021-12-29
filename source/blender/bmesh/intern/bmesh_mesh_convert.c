@@ -639,8 +639,8 @@ void BM_mesh_bm_to_me(Main *bmain, BMesh *bm, Mesh *me, const struct BMeshToMesh
   CustomData_add_layer(&me->edata, CD_MEDGE, CD_ASSIGN, medge, me->totedge);
   CustomData_add_layer(&me->ldata, CD_MLOOP, CD_ASSIGN, mloop, me->totloop);
   CustomData_add_layer(&me->pdata, CD_MPOLY, CD_ASSIGN, mpoly, me->totpoly);
-  float(*face_normals)[3] = BKE_mesh_poly_normals_for_write(me);
-  float(*vert_normals)[3] = BKE_mesh_vertex_normals_for_write(me);
+
+  BKE_mesh_normals_tag_dirty(me);
 
   me->cd_flag = BM_mesh_cd_flag_from_bmesh(bm);
 
@@ -650,7 +650,6 @@ void BM_mesh_bm_to_me(Main *bmain, BMesh *bm, Mesh *me, const struct BMeshToMesh
   i = 0;
   BM_ITER_MESH (v, &iter, bm, BM_VERTS_OF_MESH) {
     copy_v3_v3(mvert->co, v->co);
-    copy_v3_v3(vert_normals[i], v->no);
 
     mvert->flag = BM_vert_flag_to_mflag(v);
 
@@ -706,7 +705,6 @@ void BM_mesh_bm_to_me(Main *bmain, BMesh *bm, Mesh *me, const struct BMeshToMesh
     mpoly->totloop = f->len;
     mpoly->mat_nr = f->mat_nr;
     mpoly->flag = BM_face_flag_to_mflag(f);
-    copy_v3_v3(face_normals[i], f->no);
 
     l_iter = l_first = BM_FACE_FIRST_LOOP(f);
     do {

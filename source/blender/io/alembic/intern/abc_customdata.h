@@ -51,7 +51,6 @@ struct CDStreamConfig {
   int totpoly;
 
   MVert *mvert;
-  float (*vert_normals)[3];
   int totvert;
 
   MLoopUV *mloopuv;

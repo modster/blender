@@ -396,6 +396,7 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
 
   mvert_new = result->mvert;
   float(*vert_normals_new)[3] = BKE_mesh_vertex_normals_for_write(result);
+  BKE_mesh_vertex_normals_clear_dirty(result);
   mpoly_new = result->mpoly;
   mloop_new = result->mloop;
   medge_new = result->medge;

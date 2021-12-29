@@ -101,9 +101,10 @@ static void subdiv_mesh_ctx_cache_custom_data_layers(SubdivMeshContext *ctx)
 
 static void subdiv_mesh_prepare_accumulator(SubdivMeshContext *ctx, int num_vertices)
 {
-  /* TODO: Even though #can_evaluated_normals is false, a buffer for the normals is necessary,
-   * since previously the code was evaluating into Mert.no directly. */
+  /* Even though #can_evaluated_normals is false, a buffer for the normals is necessary,
+   * since previously the code was evaluating into #Mert.no directly. */
   ctx->accumulated_normals = BKE_mesh_vertex_normals_for_write(ctx->subdiv_mesh);
+  BKE_mesh_vertex_normals_clear_dirty(ctx->subdiv_mesh);
   /* TODO(sergey): Technically, this is overallocating, we don't need memory
    * for an inner subdivision vertices. */
   memset(ctx->accumulated_normals, 0, sizeof(float[3]) * num_vertices);
