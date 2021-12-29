@@ -372,24 +372,22 @@ const float (*BKE_mesh_vertex_normals_ensure(const Mesh *mesh))[3]
     return (const float(*)[3])CustomData_get_layer(&mesh->vdata, CD_NORMAL);
   }
 
-  Mesh &me = *const_cast<Mesh *>(mesh);
+  Mesh &mesh_mutable = *const_cast<Mesh *>(mesh);
 
-  float(*vert_normals)[3] = (float(*)[3])CustomData_add_layer(
-      &me.vdata, CD_NORMAL, CD_CALLOC, nullptr, me.totvert);
-  float(*poly_normals)[3] = (float(*)[3])CustomData_add_layer(
-      &me.pdata, CD_NORMAL, CD_CALLOC, nullptr, me.totpoly);
+  float(*vert_normals)[3] = BKE_mesh_vertex_normals_for_write(&mesh_mutable);
+  float(*poly_normals)[3] = BKE_mesh_poly_normals_for_write(&mesh_mutable);
 
-  mesh_calc_normals_poly_and_vertex(me.mvert,
-                                    me.totvert,
-                                    me.mloop,
-                                    me.totloop,
-                                    me.mpoly,
-                                    me.totpoly,
+  mesh_calc_normals_poly_and_vertex(mesh_mutable.mvert,
+                                    mesh_mutable.totvert,
+                                    mesh_mutable.mloop,
+                                    mesh_mutable.totloop,
+                                    mesh_mutable.mpoly,
+                                    mesh_mutable.totpoly,
                                     poly_normals,
                                     vert_normals);
 
-  me.runtime.cd_dirty_vert &= ~CD_MASK_NORMAL;
-  me.runtime.cd_dirty_poly &= ~CD_MASK_NORMAL;
+  BKE_mesh_vertex_normals_clear_dirty(&mesh_mutable);
+  BKE_mesh_poly_normals_clear_dirty(&mesh_mutable);
 
   BLI_mutex_unlock(normals_mutex);
   return vert_normals;
@@ -414,14 +412,19 @@ const float (*BKE_mesh_poly_normals_ensure(const Mesh *mesh))[3]
     return (const float(*)[3])CustomData_get_layer(&mesh->pdata, CD_NORMAL);
   }
 
-  Mesh &me = *const_cast<Mesh *>(mesh);
+  Mesh &mesh_mutable = *const_cast<Mesh *>(mesh);
 
-  float(*poly_normals)[3] = (float(*)[3])CustomData_add_layer(
-      &me.pdata, CD_NORMAL, CD_DEFAULT, nullptr, me.totpoly);
-  BKE_mesh_calc_normals_poly(
-      me.mvert, me.totvert, me.mloop, me.totloop, me.mpoly, me.totpoly, poly_normals);
+  float(*poly_normals)[3] = BKE_mesh_poly_normals_for_write(&mesh_mutable);
 
-  me.runtime.cd_dirty_poly &= ~CD_MASK_NORMAL;
+  BKE_mesh_calc_normals_poly(mesh_mutable.mvert,
+                             mesh_mutable.totvert,
+                             mesh_mutable.mloop,
+                             mesh_mutable.totloop,
+                             mesh_mutable.mpoly,
+                             mesh_mutable.totpoly,
+                             poly_normals);
+
+  BKE_mesh_poly_normals_clear_dirty(&mesh_mutable);
 
   BLI_mutex_unlock(normals_mutex);
   return poly_normals;
