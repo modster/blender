@@ -313,38 +313,48 @@ static void extrude_mesh_edges(MeshComponent &component,
   }
 
   component.attribute_foreach([&](const AttributeIDRef &id, const AttributeMetaData meta_data) {
-    if (meta_data.domain == ATTR_DOMAIN_POINT) {
-      OutputAttribute attribute = component.attribute_try_get_for_output(
-          id, ATTR_DOMAIN_POINT, meta_data.data_type);
-
-      attribute_math::convert_to_static_type(meta_data.data_type, [&](auto dummy) {
-        using T = decltype(dummy);
-        MutableSpan<T> data = attribute.as_span().typed<T>();
-        MutableSpan<T> new_data = data.slice(extrude_vert_range);
-
-        for (const int i : extrude_vert_orig_indices.index_range()) {
-          new_data[i] = data[extrude_vert_orig_indices[i]];
-        }
-      });
-
-      attribute.save();
+    OutputAttribute attribute = component.attribute_try_get_for_output(
+        id, meta_data.domain, meta_data.data_type);
+    if (!attribute) {
+      return true; /* Impossible to write the "normal" attribute. */
     }
-    else if (meta_data.domain == ATTR_DOMAIN_EDGE) {
-      OutputAttribute attribute = component.attribute_try_get_for_output(
-          id, ATTR_DOMAIN_EDGE, meta_data.data_type);
 
-      attribute_math::convert_to_static_type(meta_data.data_type, [&](auto dummy) {
-        using T = decltype(dummy);
-        MutableSpan<T> data = attribute.as_span().typed<T>();
-        MutableSpan<T> duplicate_data = data.slice(duplicate_edge_range);
-
-        for (const int i : selection.index_range()) {
-          duplicate_data[i] = data[selection[i]];
+    attribute_math::convert_to_static_type(meta_data.data_type, [&](auto dummy) {
+      using T = decltype(dummy);
+      MutableSpan<T> data = attribute.as_span().typed<T>();
+      switch (attribute.domain()) {
+        case ATTR_DOMAIN_POINT: {
+          MutableSpan<T> new_data = data.slice(extrude_vert_range);
+          for (const int i : new_vert_orig_indices.index_range()) {
+            new_data[i] = data[extrude_vert_orig_indices[i]];
+          }
+          break;
         }
-      });
+        case ATTR_DOMAIN_EDGE: {
+          MutableSpan<T> duplicate_data = data.slice(duplicate_edge_range);
+          MutableSpan<T> connect_data = data.slice(extrude_edge_range);
+          connect_data.fill(T());
+          for (const int i : selection.index_range()) {
+            duplicate_data[i] = data[selection[i]];
+          }
+          break;
+        }
+        case ATTR_DOMAIN_FACE: {
+          MutableSpan<T> new_data = data.take_back(selection.size());
+          new_data.fill(T());
+          break;
+        }
+        case ATTR_DOMAIN_CORNER: {
+          MutableSpan<T> new_data = data.take_back(new_loop_size);
+          new_data.fill(T());
+          break;
+        }
+        default:
+          BLI_assert_unreachable();
+      }
+    });
 
-      attribute.save();
-    }
+    attribute.save();
     return true;
   });
 
