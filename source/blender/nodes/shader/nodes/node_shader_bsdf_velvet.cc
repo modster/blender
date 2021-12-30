@@ -19,42 +19,50 @@
 
 #include "../node_shader_util.h"
 
+namespace blender::nodes::node_shader_bsdf_velvet_cc {
+
 /* **************** OUTPUT ******************** */
 
-static bNodeSocketTemplate sh_node_shadertorgb_in[] = {
-    {SOCK_SHADER, N_("Shader")},
+static bNodeSocketTemplate sh_node_bsdf_velvet_in[] = {
+    {SOCK_RGBA, N_("Color"), 0.8f, 0.8f, 0.8f, 1.0f, 0.0f, 1.0f},
+    {SOCK_FLOAT, N_("Sigma"), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, PROP_FACTOR},
+    {SOCK_VECTOR, N_("Normal"), 0.0f, 0.0f, 0.0f, 1.0f, -1.0f, 1.0f, PROP_NONE, SOCK_HIDE_VALUE},
     {-1, ""},
 };
 
-static bNodeSocketTemplate sh_node_shadertorgb_out[] = {
-    {SOCK_RGBA, N_("Color")},
-    {SOCK_FLOAT, N_("Alpha")},
+static bNodeSocketTemplate sh_node_bsdf_velvet_out[] = {
+    {SOCK_SHADER, N_("BSDF")},
     {-1, ""},
 };
 
-static int node_shader_gpu_shadertorgb(GPUMaterial *mat,
+static int node_shader_gpu_bsdf_velvet(GPUMaterial *mat,
                                        bNode *node,
                                        bNodeExecData *UNUSED(execdata),
                                        GPUNodeStack *in,
                                        GPUNodeStack *out)
 {
-  /* Because node_shader_to_rgba is using fallback_cubemap()
-   * we need to tag material as glossy. */
-  GPU_material_flag_set(mat, GPU_MATFLAG_GLOSSY);
+  if (!in[2].link) {
+    GPU_link(mat, "world_normals_get", &in[2].link);
+  }
 
-  return GPU_stack_link(mat, node, "node_shader_to_rgba", in, out);
+  GPU_material_flag_set(mat, GPU_MATFLAG_DIFFUSE);
+
+  return GPU_stack_link(mat, node, "node_bsdf_velvet", in, out);
 }
 
+}  // namespace blender::nodes::node_shader_bsdf_velvet_cc
+
 /* node type definition */
-void register_node_type_sh_shadertorgb(void)
+void register_node_type_sh_bsdf_velvet()
 {
+  namespace file_ns = blender::nodes::node_shader_bsdf_velvet_cc;
+
   static bNodeType ntype;
 
-  sh_node_type_base(&ntype, SH_NODE_SHADERTORGB, "Shader to RGB", NODE_CLASS_CONVERTER, 0);
-  node_type_socket_templates(&ntype, sh_node_shadertorgb_in, sh_node_shadertorgb_out);
-  node_type_init(&ntype, NULL);
-  node_type_storage(&ntype, "", NULL, NULL);
-  node_type_gpu(&ntype, node_shader_gpu_shadertorgb);
+  sh_node_type_base(&ntype, SH_NODE_BSDF_VELVET, "Velvet BSDF", NODE_CLASS_SHADER, 0);
+  node_type_socket_templates(
+      &ntype, file_ns::sh_node_bsdf_velvet_in, file_ns::sh_node_bsdf_velvet_out);
+  node_type_gpu(&ntype, file_ns::node_shader_gpu_bsdf_velvet);
 
   nodeRegisterType(&ntype);
 }
