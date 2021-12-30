@@ -150,23 +150,33 @@ static void extrude_mesh_vertices(MeshComponent &component,
   }
 
   component.attribute_foreach([&](const AttributeIDRef &id, const AttributeMetaData meta_data) {
-    if (meta_data.domain == ATTR_DOMAIN_POINT) {
-      OutputAttribute attribute = component.attribute_try_get_for_output(
-          id, ATTR_DOMAIN_POINT, meta_data.data_type);
-
-      attribute_math::convert_to_static_type(meta_data.data_type, [&](auto dummy) {
-        using T = decltype(dummy);
-        MutableSpan<T> data = attribute.as_span().typed<T>();
-        MutableSpan<T> new_data = data.take_back(selection.size());
-
-        for (const int i : selection.index_range()) {
-          new_data[i] = data[selection[i]];
-        }
-      });
-
-      attribute.save();
+    if (!ELEM(meta_data.domain, ATTR_DOMAIN_POINT, ATTR_DOMAIN_EDGE)) {
+      return true;
     }
-    return true;
+    OutputAttribute attribute = component.attribute_try_get_for_output(
+        id, meta_data.domain, meta_data.data_type);
+    attribute_math::convert_to_static_type(meta_data.data_type, [&](auto dummy) {
+      using T = decltype(dummy);
+      MutableSpan<T> data = attribute.as_span().typed<T>();
+      switch (attribute.domain()) {
+        case ATTR_DOMAIN_POINT: {
+          MutableSpan<T> new_data = data.slice(new_vert_range);
+          for (const int i : selection.index_range()) {
+            new_data[i] = data[selection[i]];
+          }
+          break;
+        }
+        case ATTR_DOMAIN_EDGE: {
+          MutableSpan<T> new_edges = data.slice(new_edge_range);
+          new_edges.fill(T());
+          break;
+        }
+        default:
+          BLI_assert_unreachable();
+      }
+    });
+
+    attribute.save();
   });
 
   devirtualize_varray(offsets, [&](const auto offsets) {
@@ -434,17 +444,17 @@ static void extrude_mesh_faces(MeshComponent &component,
   const VArray<bool> &poly_selection_varray = poly_evaluator.get_evaluated<bool>(0);
   const IndexMask poly_selection = poly_evaluator.get_evaluated_as_mask(0);
 
-  Vector<int64_t> int_selection_indices;
-  const VArray<bool> point_selection_varray = component.attribute_try_adapt_domain(
+  Vector<int64_t> vert_selection_indices;
+  const VArray<bool> vert_selection_varray = component.attribute_try_adapt_domain(
       poly_selection_varray, ATTR_DOMAIN_FACE, ATTR_DOMAIN_POINT);
-  const IndexMask point_selection = index_mask_from_selection(point_selection_varray,
-                                                              int_selection_indices);
+  const IndexMask vert_selection = index_mask_from_selection(vert_selection_varray,
+                                                             vert_selection_indices);
 
   Array<float3> offsets(orig_vert_size);
-  GeometryComponentFieldContext point_context{component, ATTR_DOMAIN_POINT};
-  FieldEvaluator point_evaluator{point_context, &point_selection};
-  point_evaluator.add_with_destination(offset_field, offsets.as_mutable_span());
-  point_evaluator.evaluate();
+  GeometryComponentFieldContext vert_context{component, ATTR_DOMAIN_POINT};
+  FieldEvaluator vert_evaluator{vert_context, &vert_selection};
+  vert_evaluator.add_with_destination(offset_field, offsets.as_mutable_span());
+  vert_evaluator.evaluate();
 
   /* TODO: See if this section can be simplified by having a precalculated topology map method for
    * retrieving the faces connected to each edge. */
@@ -656,14 +666,14 @@ static void extrude_mesh_faces(MeshComponent &component,
     return true;
   });
 
-  threading::parallel_for(point_selection.index_range(), 1024, [&](const IndexRange range) {
+  threading::parallel_for(vert_selection.index_range(), 1024, [&](const IndexRange range) {
     for (const int i : range) {
-      const int orig_vert_index = point_selection[i];
+      const int orig_vert_index = vert_selection[i];
       const int new_vert_index = new_vert_indices[orig_vert_index];
       const float3 offset = offsets[orig_vert_index];
       /* If the vertex is used by a selected edge, it will have been duplicated and only the new
        * vertex should use the offset. Otherwise the vertex might still need an offset, but it was
-       * reused on the inside of a set of extruded faces. */
+       * reused on the inside of a group of extruded faces. */
       add_v3_v3(verts[(new_vert_index != -1) ? new_vert_index : orig_vert_index].co, offset);
     }
   });
