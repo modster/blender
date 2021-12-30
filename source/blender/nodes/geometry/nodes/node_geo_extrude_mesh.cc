@@ -325,7 +325,7 @@ static void extrude_mesh_edges(MeshComponent &component,
       switch (attribute.domain()) {
         case ATTR_DOMAIN_POINT: {
           MutableSpan<T> new_data = data.slice(extrude_vert_range);
-          for (const int i : new_vert_orig_indices.index_range()) {
+          for (const int i : extrude_vert_orig_indices.index_range()) {
             new_data[i] = data[extrude_vert_orig_indices[i]];
           }
           break;
