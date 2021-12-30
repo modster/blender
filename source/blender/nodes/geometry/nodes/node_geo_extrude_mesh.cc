@@ -239,24 +239,25 @@ static void extrude_mesh_edges(MeshComponent &component,
   const IndexRange extrude_vert_range{orig_vert_size, extrude_vert_orig_indices.size()};
   const IndexRange extrude_edge_range{orig_edges.size(), extrude_vert_range.size()};
   const IndexRange duplicate_edge_range{extrude_edge_range.one_after_last(), selection.size()};
-  const int new_poly_size = selection.size();
-  const int new_loop_size = new_poly_size * 4;
+  /* There is a new polygon for every selected edge. */
+  const IndexRange new_poly_range{orig_polys.size(), selection.size()};
+  /* Every new polygon is a quad with four corners. */
+  const IndexRange new_loop_range{orig_loop_size, new_poly_range.size() * 4};
 
   expand_mesh_size(mesh,
                    extrude_vert_range.size(),
                    extrude_edge_range.size() + duplicate_edge_range.size(),
-                   new_poly_size,
-                   new_loop_size);
+                   new_poly_range.size(),
+                   new_loop_range.size());
 
-  MutableSpan<MVert> verts{mesh.mvert, mesh.totvert};
-  MutableSpan<MVert> new_verts = verts.slice(extrude_vert_range);
+  MutableSpan<MVert> new_verts = bke::mesh_verts(mesh).slice(extrude_vert_range);
   MutableSpan<MEdge> edges{mesh.medge, mesh.totedge};
   MutableSpan<MEdge> extrude_edges = edges.slice(extrude_edge_range);
   MutableSpan<MEdge> duplicate_edges = edges.slice(duplicate_edge_range);
   MutableSpan<MPoly> polys{mesh.mpoly, mesh.totpoly};
-  MutableSpan<MPoly> new_polys = polys.take_back(selection.size());
+  MutableSpan<MPoly> new_polys = polys.slice(new_poly_range);
   MutableSpan<MLoop> loops{mesh.mloop, mesh.totloop};
-  MutableSpan<MLoop> new_loops = loops.take_back(new_loop_size);
+  MutableSpan<MLoop> new_loops = loops.slice(new_loop_range);
 
   for (MVert &vert : new_verts) {
     vert.flag = 0;
@@ -303,13 +304,13 @@ static void extrude_mesh_edges(MeshComponent &component,
     poly_loops[0].e = orig_edge_index;
     /* Add the other vertex of the original edge and the first extrusion edge. */
     poly_loops[1].v = orig_edge.v2;
-    poly_loops[1].e = extrude_edge_range.start() + new_vert_index_2;
+    poly_loops[1].e = extrude_edge_range[new_vert_index_2];
     /* The first vertex of the duplicate edge is the extrude edge vertex that isn't used yet. */
     poly_loops[2].v = extrude_edge_1.v1 == orig_edge.v2 ? extrude_edge_2.v1 : extrude_edge_2.v2;
-    poly_loops[2].e = duplicate_edge_range.start() + i;
+    poly_loops[2].e = duplicate_edge_range[i];
     /* The second vertex of the duplicate edge and the extruded edge on other side. */
     poly_loops[3].v = extrude_edge_2.v1 == orig_edge.v1 ? extrude_edge_1.v1 : extrude_edge_1.v2;
-    poly_loops[3].e = extrude_edge_range.start() + new_vert_index_1;
+    poly_loops[3].e = extrude_edge_range[new_vert_index_1];
   }
 
   component.attribute_foreach([&](const AttributeIDRef &id, const AttributeMetaData meta_data) {
@@ -340,12 +341,12 @@ static void extrude_mesh_edges(MeshComponent &component,
           break;
         }
         case ATTR_DOMAIN_FACE: {
-          MutableSpan<T> new_data = data.take_back(selection.size());
+          MutableSpan<T> new_data = data.slice(new_poly_range);
           new_data.fill(T());
           break;
         }
         case ATTR_DOMAIN_CORNER: {
-          MutableSpan<T> new_data = data.take_back(new_loop_size);
+          MutableSpan<T> new_data = data.slice(new_loop_range);
           new_data.fill(T());
           break;
         }
@@ -370,10 +371,8 @@ static void extrude_mesh_edges(MeshComponent &component,
         component, attribute_outputs.top_id.get(), ATTR_DOMAIN_EDGE, duplicate_edge_range);
   }
   if (attribute_outputs.side_id) {
-    save_selection_as_attribute(component,
-                                attribute_outputs.side_id.get(),
-                                ATTR_DOMAIN_FACE,
-                                IndexRange(orig_polys.size(), new_poly_size));
+    save_selection_as_attribute(
+        component, attribute_outputs.side_id.get(), ATTR_DOMAIN_FACE, new_poly_range);
   }
 
   BKE_mesh_runtime_clear_cache(&mesh);
