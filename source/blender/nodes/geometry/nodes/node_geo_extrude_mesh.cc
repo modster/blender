@@ -556,39 +556,31 @@ static void extrude_mesh_faces(MeshComponent &component,
     poly.flag = 0;
   }
 
-  /* Maps new vertices to the extruded edges connecting them to the original edges. The values are
-   * indices into the `connect_edges` array, and the element index corresponds to the vert in
-   * `new_verts` of the same index. */
-  Array<int> new_vert_to_connect_edge(new_vert_range.size());
-  for (const int i : connect_edges.index_range()) {
-    const MEdge &connect_edge = connect_edges[i];
-    BLI_assert(connect_edge.v1 >= orig_vert_size || connect_edge.v2 >= orig_vert_size);
-    const int vert_index = connect_edge.v1 > orig_vert_size ? connect_edge.v1 : connect_edge.v2;
-    new_vert_to_connect_edge[vert_index - orig_vert_size] = i;
-  }
-
   /* TODO: Figure out winding order for new faces. */
   for (const int i : edge_selection.index_range()) {
     MutableSpan<MLoop> poly_loops = new_loops.slice(4 * i, 4);
     const int orig_edge_index = edge_selection[i];
-    const MEdge &orig_edge = edges[orig_edge_index];
     const MEdge &duplicate_edge = duplicate_edges[i];
-    const int new_vert_index_1 = duplicate_edge.v1 - orig_vert_size;
-    const int new_vert_index_2 = duplicate_edge.v2 - orig_vert_size;
-    const int connect_edge_index_1 = new_vert_to_connect_edge[new_vert_index_1];
-    const int connect_edge_index_2 = new_vert_to_connect_edge[new_vert_index_2];
-    const MEdge &connect_edge_1 = connect_edges[new_vert_to_connect_edge[new_vert_index_1]];
-    const MEdge &connect_edge_2 = connect_edges[new_vert_to_connect_edge[new_vert_index_2]];
-    poly_loops[0].v = orig_edge.v1;
-    poly_loops[0].e = orig_edge_index;
-    poly_loops[1].v = orig_edge.v2;
-    poly_loops[1].e = connect_edge_range.start() + connect_edge_index_2;
-    /* The first vertex of the duplicate edge is the connect edge that isn't used yet. */
-    poly_loops[2].v = connect_edge_1.v1 == orig_edge.v2 ? connect_edge_2.v1 : connect_edge_2.v2;
-    poly_loops[2].e = duplicate_edge_range.start() + i;
 
-    poly_loops[3].v = connect_edge_2.v1 == orig_edge.v1 ? connect_edge_1.v1 : connect_edge_1.v2;
-    poly_loops[3].e = connect_edge_range.start() + connect_edge_index_1;
+    const int new_vert_1 = duplicate_edge.v1;
+    const int new_vert_2 = duplicate_edge.v2;
+    const int extrude_index_1 = new_vert_1 - orig_vert_size;
+    const int extrude_index_2 = new_vert_2 - orig_vert_size;
+    const int orig_vert_index_1 = new_vert_orig_indices[extrude_index_1];
+    const int orig_vert_index_2 = new_vert_orig_indices[extrude_index_2];
+
+    /* Add the start vertex and edge along the original edge. */
+    poly_loops[0].v = orig_vert_index_1;
+    poly_loops[0].e = orig_edge_index;
+    /* Add the other vertex of the original edge and the first extrusion edge. */
+    poly_loops[1].v = orig_vert_index_2;
+    poly_loops[1].e = connect_edge_range[extrude_index_2];
+    /* Add the first new vertex and the duplicated edge. */
+    poly_loops[2].v = new_vert_2;
+    poly_loops[2].e = duplicate_edge_range[i];
+    /* Add the second duplicate edge vertex, and the second extruded edge to complete the face. */
+    poly_loops[3].v = new_vert_1;
+    poly_loops[3].e = connect_edge_range[extrude_index_1];
   }
 
   /* Connect original edges that are in between two selected faces to the new vertices.
