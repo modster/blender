@@ -270,6 +270,7 @@ static void extrude_mesh_edges(MeshComponent &component,
     edge.flag = (ME_EDGEDRAW | ME_EDGERENDER);
   }
 
+  /* TODO: Combine with poly loop? */
   for (const int i : duplicate_edges.index_range()) {
     const MEdge &orig_edge = mesh.medge[selection[i]];
     MEdge &edge = duplicate_edges[i];
@@ -290,27 +291,27 @@ static void extrude_mesh_edges(MeshComponent &component,
   for (const int i : selection.index_range()) {
     MutableSpan<MLoop> poly_loops = new_loops.slice(4 * i, 4);
     const int orig_edge_index = selection[i];
-    const MEdge &orig_edge = edges[orig_edge_index];
     const MEdge &duplicate_edge = duplicate_edges[i];
-    const int new_vert_index_1 = duplicate_edge.v1 - orig_vert_size;
-    const int new_vert_index_2 = duplicate_edge.v2 - orig_vert_size;
-    const int orig_vert_index_1 = extrude_vert_orig_indices[new_vert_index_1];
-    const int orig_vert_index_2 = extrude_vert_orig_indices[new_vert_index_2];
-    const MEdge &extrude_edge_1 = extrude_edges[new_vert_index_1];
-    const MEdge &extrude_edge_2 = extrude_edges[new_vert_index_2];
+
+    const int new_vert_1 = duplicate_edge.v1;
+    const int new_vert_2 = duplicate_edge.v2;
+    const int extrude_index_1 = new_vert_1 - orig_vert_size;
+    const int extrude_index_2 = new_vert_2 - orig_vert_size;
+    const int orig_vert_index_1 = extrude_vert_orig_indices[extrude_index_1];
+    const int orig_vert_index_2 = extrude_vert_orig_indices[extrude_index_2];
 
     /* Add the start vertex and edge along the original edge. */
-    poly_loops[0].v = orig_edge.v1;
+    poly_loops[0].v = orig_vert_index_1;
     poly_loops[0].e = orig_edge_index;
     /* Add the other vertex of the original edge and the first extrusion edge. */
-    poly_loops[1].v = orig_edge.v2;
-    poly_loops[1].e = extrude_edge_range[new_vert_index_2];
-    /* The first vertex of the duplicate edge is the extrude edge vertex that isn't used yet. */
-    poly_loops[2].v = extrude_edge_1.v1 == orig_edge.v2 ? extrude_edge_2.v1 : extrude_edge_2.v2;
+    poly_loops[1].v = orig_vert_index_2;
+    poly_loops[1].e = extrude_edge_range[extrude_index_2];
+    /* Add the first new vertex and the duplicated edge. */
+    poly_loops[2].v = new_vert_2;
     poly_loops[2].e = duplicate_edge_range[i];
-    /* The second vertex of the duplicate edge and the extruded edge on other side. */
-    poly_loops[3].v = extrude_edge_2.v1 == orig_edge.v1 ? extrude_edge_1.v1 : extrude_edge_1.v2;
-    poly_loops[3].e = extrude_edge_range[new_vert_index_1];
+    /* Add the second duplicate edge vertex, and the second extruded edge to complete the face. */
+    poly_loops[3].v = new_vert_1;
+    poly_loops[3].e = extrude_edge_range[extrude_index_1];
   }
 
   component.attribute_foreach([&](const AttributeIDRef &id, const AttributeMetaData meta_data) {
