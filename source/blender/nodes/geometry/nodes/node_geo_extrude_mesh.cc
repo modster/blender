@@ -285,17 +285,6 @@ static void extrude_mesh_edges(MeshComponent &component,
     poly.flag = 0;
   }
 
-  /* Maps new vertices to the extruded edges connecting them to the original edges. The values are
-   * indices into the `extrude_edges` array, and the element index corresponds to the vert in
-   * `new_verts` of the same index. */
-  Array<int> new_vert_to_extrude_edge(extrude_vert_range.size());
-  for (const int i : extrude_edges.index_range()) {
-    const MEdge &extrude_edge = extrude_edges[i];
-    BLI_assert(extrude_edge.v1 >= orig_vert_size || extrude_edge.v2 >= orig_vert_size);
-    const int vert_index = extrude_edge.v1 > orig_vert_size ? extrude_edge.v1 : extrude_edge.v2;
-    new_vert_to_extrude_edge[vert_index - orig_vert_size] = i;
-  }
-
   /* TODO: Figure out winding order for new faces. */
   for (const int i : selection.index_range()) {
     MutableSpan<MLoop> poly_loops = new_loops.slice(4 * i, 4);
@@ -304,20 +293,23 @@ static void extrude_mesh_edges(MeshComponent &component,
     const MEdge &duplicate_edge = duplicate_edges[i];
     const int new_vert_index_1 = duplicate_edge.v1 - orig_vert_size;
     const int new_vert_index_2 = duplicate_edge.v2 - orig_vert_size;
-    const int extrude_edge_index_1 = new_vert_to_extrude_edge[new_vert_index_1];
-    const int extrude_edge_index_2 = new_vert_to_extrude_edge[new_vert_index_2];
-    const MEdge &extrude_edge_1 = extrude_edges[new_vert_to_extrude_edge[new_vert_index_1]];
-    const MEdge &extrude_edge_2 = extrude_edges[new_vert_to_extrude_edge[new_vert_index_2]];
+    const int orig_vert_index_1 = extrude_vert_orig_indices[new_vert_index_1];
+    const int orig_vert_index_2 = extrude_vert_orig_indices[new_vert_index_2];
+    const MEdge &extrude_edge_1 = extrude_edges[new_vert_index_1];
+    const MEdge &extrude_edge_2 = extrude_edges[new_vert_index_2];
+
+    /* Add the start vertex and edge along the original edge. */
     poly_loops[0].v = orig_edge.v1;
     poly_loops[0].e = orig_edge_index;
+    /* Add the other vertex of the original edge and the first extrusion edge. */
     poly_loops[1].v = orig_edge.v2;
-    poly_loops[1].e = extrude_edge_range.start() + extrude_edge_index_2;
-    /* The first vertex of the duplicate edge is the extrude edge that isn't used yet. */
+    poly_loops[1].e = extrude_edge_range.start() + new_vert_index_2;
+    /* The first vertex of the duplicate edge is the extrude edge vertex that isn't used yet. */
     poly_loops[2].v = extrude_edge_1.v1 == orig_edge.v2 ? extrude_edge_2.v1 : extrude_edge_2.v2;
     poly_loops[2].e = duplicate_edge_range.start() + i;
-
+    /* The second vertex of the duplicate edge and the extruded edge on other side. */
     poly_loops[3].v = extrude_edge_2.v1 == orig_edge.v1 ? extrude_edge_1.v1 : extrude_edge_1.v2;
-    poly_loops[3].e = extrude_edge_range.start() + extrude_edge_index_1;
+    poly_loops[3].e = extrude_edge_range.start() + new_vert_index_1;
   }
 
   component.attribute_foreach([&](const AttributeIDRef &id, const AttributeMetaData meta_data) {
@@ -409,6 +401,10 @@ static IndexMask index_mask_from_selection(const VArray<bool> &selection,
 
   return IndexMask(r_indices);
 }
+
+// static Array<Vector<int>> polys_of_vert_map()
+// {
+// }
 
 static void extrude_mesh_faces(MeshComponent &component,
                                const Field<bool> &selection_field,
