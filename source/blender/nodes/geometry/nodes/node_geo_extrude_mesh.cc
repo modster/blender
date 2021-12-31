@@ -613,7 +613,7 @@ static void extrude_mesh_faces(MeshComponent &component,
         loop.v = new_vert_indices[loop.v];
       }
       if (duplicate_edge_indices[loop.e] != -1) {
-        loop.e = duplicate_edge_range.start() + duplicate_edge_indices[loop.e];
+        loop.e = duplicate_edge_range[duplicate_edge_indices[loop.e]];
       }
     }
   }
