@@ -579,7 +579,7 @@ static void extrude_mesh_faces(MeshComponent &component,
   for (const int i : connect_edges.index_range()) {
     MEdge &edge = connect_edges[i];
     edge.v1 = new_vert_orig_indices[i];
-    edge.v2 = orig_vert_size + i;
+    edge.v2 = new_vert_range[i];
     edge.flag = (ME_EDGEDRAW | ME_EDGERENDER);
   }
 
@@ -593,9 +593,8 @@ static void extrude_mesh_faces(MeshComponent &component,
 
   for (const int i : new_polys.index_range()) {
     MPoly &poly = new_polys[i];
-    poly.loopstart = side_loop_range.start() + i * 4;
+    poly.loopstart = side_loop_range[i * 4];
     poly.totloop = 4;
-    poly.mat_nr = 0;
     poly.flag = 0;
   }
 
@@ -660,7 +659,7 @@ static void extrude_mesh_faces(MeshComponent &component,
       poly_loops[0].v = new_vert_1;
       poly_loops[0].e = duplicate_edge_index;
       poly_loops[1].v = new_vert_2;
-      poly_loops[1].e = connect_edge_range[extrude_index_1];
+      poly_loops[1].e = connect_edge_range[extrude_index_2];
       poly_loops[2].v = orig_vert_index_2;
       poly_loops[2].e = orig_edge_index;
       poly_loops[3].v = orig_vert_index_1;
