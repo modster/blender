@@ -86,6 +86,10 @@ typedef struct CurvePenData {
   bool extra_pressed;
   /* Whether a point was found underneath the mouse. */
   bool found_point;
+
+  Nurb *nu;
+  BezTriple *bezt;
+  BPoint *bp;
 } CurvePenData;
 
 /* Enum to choose between the extra functionalities. */
@@ -1052,6 +1056,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   Object *obedit = CTX_data_edit_object(C);
 
   ED_view3d_viewcontext_init(C, &vc, depsgraph);
+  Curve *cu = vc.obedit->data;
 
   BezTriple *bezt = NULL;
   BPoint *bp = NULL;
@@ -1150,20 +1155,14 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   }
   else if (ELEM(event->type, LEFTMOUSE)) {
     if (event->val == KM_PRESS) {
-      Curve *cu = vc.obedit->data;
       /* Get currently selected point if any. Used for making spline cyclic. */
       ED_curve_nurb_vert_selected_find(cu, vc.v3d, &nu, &bezt, &bp);
       if (ED_curve_editnurb_select_pick_thresholded(
               C, event->mval, sel_dist_mul, false, false, false)) {
-        if (close_spline && nu && !(nu->flagu & CU_NURB_CYCLIC)) {
-          copy_v2_v2_int(vc.mval, event->mval);
-          const bool closed = nu->pntsu > 2 &&
-                              make_cyclic_if_endpoints(nu, bezt, bp, &vc, C, sel_dist_mul);
-
-          /* Set "new_point" to true to be able to click and drag to control handles when added. */
-          cpd->new_point = closed;
-        }
         cpd->found_point = true;
+        cpd->nu = nu;
+        cpd->bezt = bezt;
+        cpd->bp = bp;
       }
       else {
         if (is_spline_nearby(&vc, op, event)) {
@@ -1188,7 +1187,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
       }
     }
     else if (event->val == KM_RELEASE) {
-      bool deleted = false;
+      bool deleted = false, closed = false;
 
       if (delete_point && !cpd->new_point && !cpd->dragging) {
         if (ED_curve_editnurb_select_pick_thresholded(
@@ -1197,8 +1196,16 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
         }
       }
 
-      if ((insert_point || extrude_point) && cpd->spline_nearby) {
-        if (!cpd->dragging && !deleted) {
+      if (!deleted && close_spline && cpd->found_point && !cpd->dragging) {
+        if (cpd->nu && !(cpd->nu->flagu & CU_NURB_CYCLIC)) {
+          copy_v2_v2_int(vc.mval, event->mval);
+          closed = cpd->nu->pntsu > 2 &&
+                   make_cyclic_if_endpoints(cpd->nu, cpd->bezt, cpd->bp, &vc, C, sel_dist_mul);
+        }
+      }
+
+      if (!deleted && !closed && (insert_point || extrude_point) && cpd->spline_nearby) {
+        if (!cpd->dragging) {
           if (insert_point && move_seg) {
             insert_point_to_segment(event, vc.obedit->data, &nu, &vc);
             cpd->new_point = true;
