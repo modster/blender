@@ -7004,6 +7004,8 @@ def km_3d_view_tool_edit_curve_pen(params):
              {"properties": [("delete_point", True),]}),
             ("curve.pen", {"type": params.tool_mouse, "value": 'PRESS', "shift": True},
              {"properties": [("insert_point", True),]}),
+            ("curve.pen", {"type": params.tool_mouse, "value": 'DOUBLE_CLICK'},
+             {"properties": [("make_vector", True),]}),
         ]},
     )
 

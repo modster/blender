@@ -1160,6 +1160,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   const bool select_point = RNA_boolean_get(op->ptr, "select_point");
   const bool move_point = RNA_boolean_get(op->ptr, "move_point");
   const bool close_spline = RNA_boolean_get(op->ptr, "close_spline");
+  const bool make_vector = RNA_boolean_get(op->ptr, "make_vector");
 
   if (!cpd->extra_pressed && is_event_key_equal_to_extra_key(event->type, extra_key)) {
     ED_curve_nurb_vert_selected_find(vc.obedit->data, vc.v3d, &nu, &bezt, &bp);
@@ -1310,9 +1311,30 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
           if (insert_point && move_seg) {
             insert_point_to_segment(event, vc.obedit->data, &nu, sel_dist_mul, &vc);
             cpd->new_point = true;
+            cpd->acted = true;
           }
           else if (extrude_point) {
             extrude_point_from_selected_vertex(&vc, obedit, event, extrude_center);
+            cpd->acted = true;
+          }
+        }
+      }
+
+      if (!cpd->acted && make_vector) {
+        short bezt_idx;
+        float mval_fl[2] = {(float)event->mval[0], (float)event->mval[1]};
+        get_closest_vertex_to_point_in_nurbs(
+            &(cu->editnurb->nurbs), &nu, &bezt, &bp, &bezt_idx, mval_fl, sel_dist_mul, &vc);
+        if (bezt) {
+          if (bezt_idx == 0) {
+            bezt->h1 = HD_VECT;
+          }
+          else if (bezt_idx == 2) {
+            bezt->h2 = HD_VECT;
+          }
+
+          if (nu && nu->type == CU_BEZIER) {
+            BKE_nurb_handles_calc(nu);
           }
         }
       }
@@ -1414,4 +1436,6 @@ void CURVE_OT_pen(wmOperatorType *ot)
                          false,
                          "Close Spline",
                          "Make a spline cyclic by clicking endpoints");
+  prop = RNA_def_boolean(
+      ot->srna, "make_vector", false, "Make Vector", "Click handle to convert to vector handle");
 }
