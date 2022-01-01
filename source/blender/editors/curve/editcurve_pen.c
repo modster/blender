@@ -148,6 +148,8 @@ static bool worldspace_to_screenspace_int(const float pos_3d[3],
   const bool check = worldspace_to_screenspace(pos_3d, vc, pos_2d_fl);
   r_pos_2d[0] = (int)pos_2d_fl[0];
   r_pos_2d[1] = (int)pos_2d_fl[1];
+
+  return check;
 }
 
 /* Move the handle of the newly added #BezTriple to mouse. */
@@ -265,7 +267,9 @@ static void move_bp_to_location(BPoint *bp, const int mval[2], const ViewContext
   copy_v3_v3(bp->vec, location);
 }
 
-static void move_all_selected_points(ListBase *editnurb, wmEvent *event, const ViewContext *vc)
+static void move_all_selected_points(ListBase *editnurb,
+                                     const wmEvent *event,
+                                     const ViewContext *vc)
 {
   int change[2];
   sub_v2_v2v2_int(change, event->xy, event->prev_xy);
