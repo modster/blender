@@ -84,8 +84,12 @@ typedef struct CurvePenData {
   bool spline_nearby;
   /* Whether the extra key was pressed before. */
   bool extra_pressed;
+  /* Whether some action was done. Used for select. */
+  bool acted;
   /* Whether a point was found underneath the mouse. */
   bool found_point;
+  /* Whether multiple selected points should be moved. */
+  bool multi_point;
 
   Nurb *nu;
   BezTriple *bezt;
@@ -114,17 +118,36 @@ static const EnumPropertyItem prop_extra_key_types[] = {
     {0, NULL, 0, NULL, NULL},
 };
 
-static void mouse_location_to_worldspace(const int mouse_loc[2],
-                                         const float depth[3],
-                                         const ViewContext *vc,
-                                         float r_location[3])
+static void screenspace_to_worldspace(const int pos_2d[2],
+                                      const float depth[3],
+                                      const ViewContext *vc,
+                                      float r_pos_3d[3])
 {
-  mul_v3_m4v3(r_location, vc->obedit->obmat, depth);
-  ED_view3d_win_to_3d_int(vc->v3d, vc->region, r_location, mouse_loc, r_location);
+  mul_v3_m4v3(r_pos_3d, vc->obedit->obmat, depth);
+  ED_view3d_win_to_3d_int(vc->v3d, vc->region, r_pos_3d, pos_2d, r_pos_3d);
 
   float imat[4][4];
   invert_m4_m4(imat, vc->obedit->obmat);
-  mul_m4_v3(imat, r_location);
+  mul_m4_v3(imat, r_pos_3d);
+}
+
+static bool worldspace_to_screenspace(const float pos_3d[3],
+                                      const ViewContext *vc,
+                                      float r_pos_2d[2])
+{
+  return ED_view3d_project_float_object(
+             vc->region, pos_3d, r_pos_2d, V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN) ==
+         V3D_PROJ_RET_OK;
+}
+
+static bool worldspace_to_screenspace_int(const float pos_3d[3],
+                                          const ViewContext *vc,
+                                          int r_pos_2d[2])
+{
+  float pos_2d_fl[2];
+  const bool check = worldspace_to_screenspace(pos_3d, vc, pos_2d_fl);
+  r_pos_2d[0] = (int)pos_2d_fl[0];
+  r_pos_2d[1] = (int)pos_2d_fl[1];
 }
 
 /* Move the handle of the newly added #BezTriple to mouse. */
@@ -139,7 +162,7 @@ static void move_bezt_handles_to_mouse(BezTriple *bezt,
   }
 
   float location[3];
-  mouse_location_to_worldspace(event->mval, bezt->vec[1], vc, location);
+  screenspace_to_worldspace(event->mval, bezt->vec[1], vc, location);
 
   /* If the new point is the last point of the curve, move the second handle to the mouse. */
   if (is_end_point) {
@@ -199,7 +222,7 @@ static void move_bezt_handle_or_vertex_to_location(BezTriple *bezt,
                                                    const ViewContext *vc)
 {
   float location[3];
-  mouse_location_to_worldspace(mval, bezt->vec[cp_index], vc, location);
+  screenspace_to_worldspace(mval, bezt->vec[cp_index], vc, location);
   if (cp_index == 1) {
     move_bezt_to_location(bezt, location);
   }
@@ -234,12 +257,67 @@ static void move_selected_bezt_to_location(BezTriple *bezt,
   }
 }
 
-static void move_bp_to_mouse(BPoint *bp, const wmEvent *event, const ViewContext *vc)
+static void move_bp_to_location(BPoint *bp, const int mval[2], const ViewContext *vc)
 {
   float location[3];
-  mouse_location_to_worldspace(event->mval, bp->vec, vc, location);
+  screenspace_to_worldspace(mval, bp->vec, vc, location);
 
   copy_v3_v3(bp->vec, location);
+}
+
+static void move_all_selected_points(ListBase *editnurb, wmEvent *event, const ViewContext *vc)
+{
+  int change[2];
+  sub_v2_v2v2_int(change, event->xy, event->prev_xy);
+  LISTBASE_FOREACH (Nurb *, nu, editnurb) {
+    if (nu->type == CU_BEZIER) {
+      for (int i = 0; i < nu->pntsu; i++) {
+        BezTriple *bezt = nu->bezt + i;
+        if (BEZT_ISSEL_IDX(bezt, 1)) {
+          int pos[2], dst[2];
+          worldspace_to_screenspace_int(bezt->vec[1], vc, pos);
+          add_v2_v2v2_int(dst, pos, change);
+          move_bezt_handle_or_vertex_to_location(bezt, dst, 1, vc);
+        }
+        else {
+          remove_handle_movement_constraints(bezt, bezt->f1, bezt->f3);
+          if (BEZT_ISSEL_IDX(bezt, 0)) {
+            int pos[2], dst[2];
+            worldspace_to_screenspace_int(bezt->vec[0], vc, pos);
+            add_v2_v2v2_int(dst, pos, change);
+            move_bezt_handle_or_vertex_to_location(bezt, dst, 0, vc);
+          }
+          else if (BEZT_ISSEL_IDX(bezt, 2)) {
+            int pos[2], dst[2];
+            worldspace_to_screenspace_int(bezt->vec[2], vc, pos);
+            add_v2_v2v2_int(dst, pos, change);
+            move_bezt_handle_or_vertex_to_location(bezt, dst, 2, vc);
+          }
+        }
+      }
+    }
+    else {
+      for (int i = 0; i < nu->pntsu; i++) {
+        BPoint *bp = nu->bp + i;
+        if (bp->f1) {
+          int pos[2], dst[2];
+          worldspace_to_screenspace_int(bp->vec, vc, pos);
+          add_v2_v2v2_int(dst, pos, change);
+          move_bp_to_location(bp, dst, vc);
+        }
+      }
+    }
+  }
+}
+
+static bool world_point_near_screen_point(const float world_pos[3],
+                                          const int screen_pos[2],
+                                          const float sel_dist_mul,
+                                          const ViewContext *vc)
+{
+  int pos_2d[2];
+  worldspace_to_screenspace_int(world_pos, vc, pos_2d);
+  return len_v2v2_int(pos_2d, screen_pos) < ED_view3d_select_dist_px() * sel_dist_mul;
 }
 
 static int get_nurb_index(const ListBase *nurbs, const Nurb *nurb)
@@ -298,12 +376,8 @@ static bool get_closest_point_on_edge(float r_point[3],
   float pos1_2d[2], pos2_2d[2], vec1[2], vec2[2], vec3[2];
 
   /* Get screen space coordinates of points. */
-  if (!(ED_view3d_project_float_object(
-            vc->region, pos1, pos1_2d, V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN) ==
-            V3D_PROJ_RET_OK &&
-        ED_view3d_project_float_object(
-            vc->region, pos2, pos2_2d, V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN) ==
-            V3D_PROJ_RET_OK)) {
+  if (!(worldspace_to_screenspace(pos1, vc, pos1_2d) &&
+        worldspace_to_screenspace(pos2, vc, pos2_2d))) {
     return false;
   }
 
@@ -339,17 +413,20 @@ static bool get_closest_point_on_edge(float r_point[3],
 }
 
 /* Get closest vertex in all nurbs in given #ListBase to a given point. */
-static void get_closest_vertex_to_point_in_nurbs(ListBase *nurbs,
+static bool get_closest_vertex_to_point_in_nurbs(ListBase *nurbs,
                                                  Nurb **r_nu,
                                                  BezTriple **r_bezt,
                                                  BPoint **r_bp,
+                                                 short *r_bezt_idx,
                                                  const float point[2],
+                                                 const float sel_dist_mul,
                                                  const ViewContext *vc)
 {
   float min_distance_bezt = FLT_MAX;
   float min_distance_bp = FLT_MAX;
 
   BezTriple *closest_bezt = NULL;
+  short closest_handle = 0;
   BPoint *closest_bp = NULL;
   Nurb *closest_bezt_nu = NULL;
   Nurb *closest_bp_nu = NULL;
@@ -359,16 +436,15 @@ static void get_closest_vertex_to_point_in_nurbs(ListBase *nurbs,
       for (int i = 0; i < nu->pntsu; i++) {
         BezTriple *bezt = &nu->bezt[i];
         float bezt_vec[2];
-        if (ED_view3d_project_float_object(vc->region,
-                                           bezt->vec[1],
-                                           bezt_vec,
-                                           V3D_PROJ_TEST_CLIP_BB | V3D_PROJ_TEST_CLIP_WIN) ==
-            V3D_PROJ_RET_OK) {
-          const float distance = len_manhattan_v2v2(bezt_vec, point);
-          if (distance < min_distance_bezt) {
-            min_distance_bezt = distance;
-            closest_bezt = bezt;
-            closest_bezt_nu = nu;
+        for (short j = 0; j < 3; j++) {
+          if (worldspace_to_screenspace(bezt->vec[j], vc, bezt_vec)) {
+            const float distance = len_manhattan_v2v2(bezt_vec, point);
+            if (distance < min_distance_bezt) {
+              min_distance_bezt = distance;
+              closest_bezt = bezt;
+              closest_bezt_nu = nu;
+              closest_handle = j;
+            }
           }
         }
       }
@@ -377,9 +453,7 @@ static void get_closest_vertex_to_point_in_nurbs(ListBase *nurbs,
       for (int i = 0; i < nu->pntsu; i++) {
         BPoint *bp = &nu->bp[i];
         float bp_vec[2];
-        if (ED_view3d_project_float_object(
-                vc->region, bp->vec, bp_vec, V3D_PROJ_TEST_CLIP_BB | V3D_PROJ_TEST_CLIP_WIN) ==
-            V3D_PROJ_RET_OK) {
+        if (worldspace_to_screenspace(bp->vec, vc, bp_vec)) {
           const float distance = len_manhattan_v2v2(bp_vec, point);
           if (distance < min_distance_bp) {
             min_distance_bp = distance;
@@ -391,7 +465,7 @@ static void get_closest_vertex_to_point_in_nurbs(ListBase *nurbs,
     }
   }
 
-  const float threshold_distance = ED_view3d_select_dist_px();
+  const float threshold_distance = ED_view3d_select_dist_px() * sel_dist_mul;
   if (min_distance_bezt < threshold_distance || min_distance_bp < threshold_distance) {
     if (min_distance_bp < min_distance_bezt) {
       *r_bp = closest_bp;
@@ -399,9 +473,12 @@ static void get_closest_vertex_to_point_in_nurbs(ListBase *nurbs,
     }
     else {
       *r_bezt = closest_bezt;
+      *r_bezt_idx = closest_handle;
       *r_nu = closest_bezt_nu;
     }
+    return true;
   }
+  return false;
 }
 
 /* Assign values for several frequently changing attributes of #CutData. */
@@ -447,12 +524,7 @@ static void update_data_if_closest_point_in_segment(const BezTriple *bezt1,
 
   for (int k = 0; k <= resolu; k++) {
     float screen_co[2];
-
-    bool check = ED_view3d_project_float_object(vc->region,
-                                                points + 3 * k,
-                                                screen_co,
-                                                V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN) ==
-                 V3D_PROJ_RET_OK;
+    bool check = worldspace_to_screenspace(points + 3 * k, vc, screen_co);
 
     if (check) {
       const float distance = len_manhattan_v2v2(screen_co, data->mval);
@@ -506,9 +578,7 @@ static void update_cut_loc_in_data(CutData *data, const ViewContext *vc)
   }
   if (found_min) {
     float point_2d[2];
-    if (ED_view3d_project_float_object(
-            vc->region, point, point_2d, V3D_PROJ_TEST_CLIP_BB | V3D_PROJ_TEST_CLIP_WIN) !=
-        V3D_PROJ_RET_OK) {
+    if (worldspace_to_screenspace(point, vc, point_2d)) {
       return;
     }
     const float dist = len_manhattan_v2v2(point_2d, data->mval);
@@ -547,10 +617,7 @@ static void update_data_for_all_nurbs(const ListBase *nurbs, const ViewContext *
     if (nu->type == CU_BEZIER) {
       float screen_co[2];
       if (data->nurb == NULL) {
-        ED_view3d_project_float_object(vc->region,
-                                       nu->bezt->vec[1],
-                                       screen_co,
-                                       V3D_PROJ_TEST_CLIP_BB | V3D_PROJ_TEST_CLIP_WIN);
+        worldspace_to_screenspace(nu->bezt->vec[1], vc, screen_co);
         assign_cut_data(data, FLT_MAX, nu, 0, -1, 0.0f, nu->bezt->vec[1]);
       }
 
@@ -566,15 +633,13 @@ static void update_data_for_all_nurbs(const ListBase *nurbs, const ViewContext *
 
       float point[3], fraction;
       get_closest_point_on_edge(point, data->mval, data->cut_loc, data->next_loc, vc, &fraction);
-      ED_view3d_project_float_object(
-          vc->region, point, screen_co, V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN);
+      worldspace_to_screenspace(point, vc, screen_co);
       const float dist1 = len_manhattan_v2v2(screen_co, data->mval);
 
       data->min_dist = dist1;
 
       get_closest_point_on_edge(point, data->mval, data->cut_loc, data->prev_loc, vc, &fraction);
-      ED_view3d_project_float_object(
-          vc->region, point, screen_co, V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN);
+      worldspace_to_screenspace(point, vc, screen_co);
       const float dist2 = len_manhattan_v2v2(screen_co, data->mval);
 
       if (dist2 < dist1) {
@@ -588,8 +653,7 @@ static void update_data_for_all_nurbs(const ListBase *nurbs, const ViewContext *
     else {
       float screen_co[2];
       if (data->nurb == NULL) {
-        ED_view3d_project_float_object(
-            vc->region, nu->bp->vec, screen_co, V3D_PROJ_TEST_CLIP_BB | V3D_PROJ_TEST_CLIP_WIN);
+        worldspace_to_screenspace(nu->bp->vec, vc, screen_co);
         assign_cut_data(
             data, len_manhattan_v2v2(screen_co, data->mval), nu, -1, 0, 0.0f, nu->bp->vec);
       }
@@ -600,9 +664,7 @@ static void update_data_for_all_nurbs(const ListBase *nurbs, const ViewContext *
             point, data->mval, (nu->bp + i)->vec, (nu->bp + i + 1)->vec, vc, &factor);
         if (found_min) {
           float point_2d[2];
-          if (ED_view3d_project_float_object(
-                  vc->region, point, point_2d, V3D_PROJ_TEST_CLIP_BB | V3D_PROJ_TEST_CLIP_WIN) ==
-              V3D_PROJ_RET_OK) {
+          if (worldspace_to_screenspace(point, vc, point_2d)) {
             const float dist = len_manhattan_v2v2(point_2d, data->mval);
             if (dist < data->min_dist) {
               assign_cut_data(data, dist, nu, -1, i, 0.0f, point);
@@ -710,10 +772,8 @@ static void add_bp_to_nurb(Nurb *nu, const CutData *data, Curve *cu)
 }
 
 /* Make a cut on the nearest nurb at the closest point. Return true if spline is nearby. */
-static bool insert_point_to_segment(const wmEvent *event,
-                                    Curve *cu,
-                                    Nurb **r_nu,
-                                    const ViewContext *vc)
+static bool insert_point_to_segment(
+    const wmEvent *event, Curve *cu, Nurb **r_nu, const float sel_dist_mul, const ViewContext *vc)
 {
   CutData data = {.bezt_index = 0,
                   .bp_index = 0,
@@ -728,7 +788,7 @@ static bool insert_point_to_segment(const wmEvent *event,
 
   update_data_for_all_nurbs(nurbs, vc, &data);
 
-  const float threshold_distance = ED_view3d_select_dist_px();
+  const float threshold_distance = ED_view3d_select_dist_px() * sel_dist_mul;
   Nurb *nu = data.nurb;
   if (nu) {
     if (nu->type == CU_BEZIER) {
@@ -863,7 +923,7 @@ static void move_segment(MoveSegmentData *seg_data, const wmEvent *event, ViewCo
   float depth[3];
   /* Use the center of the spline segment as depth. */
   get_bezier_interpolated_point(depth, bezt1, bezt2, t);
-  mouse_location_to_worldspace(event->mval, depth, vc, mouse_3d);
+  screenspace_to_worldspace(event->mval, depth, vc, mouse_3d);
 
   /*
    * Equation of Bezier Curve
@@ -925,16 +985,20 @@ static void toggle_bezt_free_align_handles(BezTriple *bezt)
 }
 
 /* Returns true if point was found under mouse. */
-static bool delete_point_under_mouse(ViewContext *vc, const wmEvent *event)
+static bool delete_point_under_mouse(ViewContext *vc,
+                                     const wmEvent *event,
+                                     const float sel_dist_mul)
 {
   BezTriple *bezt = NULL;
   BPoint *bp = NULL;
   Nurb *nu = NULL;
+  short temp = 0;
   Curve *cu = vc->obedit->data;
   ListBase *nurbs = BKE_curve_editNurbs_get(cu);
   float mouse_point[2] = {(float)event->mval[0], (float)event->mval[1]};
 
-  get_closest_vertex_to_point_in_nurbs(nurbs, &nu, &bezt, &bp, mouse_point, vc);
+  get_closest_vertex_to_point_in_nurbs(
+      nurbs, &nu, &bezt, &bp, &temp, mouse_point, sel_dist_mul, vc);
   const bool found_point = nu != NULL;
 
   bool deleted = false;
@@ -1137,14 +1201,22 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
       }
       else if ((select_point || move_point) && !cpd->spline_nearby) {
         if (cpd->found_point) {
-          ED_curve_nurb_vert_selected_find(vc.obedit->data, vc.v3d, &nu, &bezt, &bp);
           if (move_point) {
-            if (bezt) {
-              move_selected_bezt_to_location(bezt, &vc, event->mval);
+            if (cpd->multi_point) {
+              move_all_selected_points(&cu->editnurb->nurbs, event, &vc);
             }
-            else if (bp) {
-              move_bp_to_mouse(bp, event, &vc);
+            else {
+              ED_curve_editnurb_select_pick_thresholded(
+                  C, event->mval, sel_dist_mul, false, false, false);
+              ED_curve_nurb_vert_selected_find(vc.obedit->data, vc.v3d, &nu, &bezt, &bp);
+              if (bezt) {
+                move_selected_bezt_to_location(bezt, &vc, event->mval);
+              }
+              else if (bp) {
+                move_bp_to_location(bp, event->mval, &vc);
+              }
             }
+            cpd->acted = true;
           }
         }
       }
@@ -1155,65 +1227,90 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   }
   else if (ELEM(event->type, LEFTMOUSE)) {
     if (event->val == KM_PRESS) {
-      /* Get currently selected point if any. Used for making spline cyclic. */
       ED_curve_nurb_vert_selected_find(cu, vc.v3d, &nu, &bezt, &bp);
-      if (ED_curve_editnurb_select_pick_thresholded(
-              C, event->mval, sel_dist_mul, false, false, false)) {
-        cpd->found_point = true;
-        cpd->nu = nu;
-        cpd->bezt = bezt;
-        cpd->bp = bp;
+      if (select_point || move_point) {
+        float mval_fl[2] = {(float)event->mval[0], (float)event->mval[1]};
+        short bezt_idx = 0;
+        if ((!nu || bezt || bp) && ED_curve_editnurb_select_pick_thresholded(
+                                       C, event->mval, sel_dist_mul, false, false, false)) {
+          cpd->found_point = true;
+          cpd->nu = nu;
+          cpd->bezt = bezt;
+          cpd->bp = bp;
+        }
+        else if (!(bezt || bp) && get_closest_vertex_to_point_in_nurbs(&(cu->editnurb->nurbs),
+                                                                       &nu,
+                                                                       &bezt,
+                                                                       &bp,
+                                                                       &bezt_idx,
+                                                                       mval_fl,
+                                                                       sel_dist_mul,
+                                                                       &vc)) {
+          cpd->found_point = true;
+          cpd->nu = nu;
+          cpd->bezt = bezt;
+          cpd->bp = bp;
+          if ((bezt && BEZT_ISSEL_IDX(bezt, bezt_idx)) || bp) {
+            cpd->multi_point = true;
+          }
+        }
       }
-      else {
+      if (!cpd->found_point) {
         if (is_spline_nearby(&vc, op, event)) {
           cpd->spline_nearby = true;
 
           /* If move segment is disabled,then insert point on key press and set
           "new_point" to true so that the new point's handles can be controlled. */
           if (insert_point && !move_seg) {
-            insert_point_to_segment(event, vc.obedit->data, &nu, &vc);
+            insert_point_to_segment(event, vc.obedit->data, &nu, sel_dist_mul, &vc);
             cpd->new_point = true;
+            cpd->acted = true;
           }
         }
         else if (new_spline) {
           ED_curve_deselect_all(((Curve *)(vc.obedit->data))->editnurb);
           extrude_point_from_selected_vertex(&vc, obedit, event, extrude_center);
           cpd->new_point = true;
+          cpd->acted = true;
         }
         else if (extrude_point) {
           extrude_point_from_selected_vertex(&vc, obedit, event, extrude_center);
           cpd->new_point = true;
+          cpd->acted = true;
         }
       }
     }
     else if (event->val == KM_RELEASE) {
-      bool deleted = false, closed = false;
-
       if (delete_point && !cpd->new_point && !cpd->dragging) {
         if (ED_curve_editnurb_select_pick_thresholded(
                 C, event->mval, sel_dist_mul, false, false, false)) {
-          deleted = delete_point_under_mouse(&vc, event);
+          cpd->acted = delete_point_under_mouse(&vc, event, sel_dist_mul);
         }
       }
 
-      if (!deleted && close_spline && cpd->found_point && !cpd->dragging) {
+      if (!cpd->acted && close_spline && cpd->found_point && !cpd->dragging) {
         if (cpd->nu && !(cpd->nu->flagu & CU_NURB_CYCLIC)) {
           copy_v2_v2_int(vc.mval, event->mval);
-          closed = cpd->nu->pntsu > 2 &&
-                   make_cyclic_if_endpoints(cpd->nu, cpd->bezt, cpd->bp, &vc, C, sel_dist_mul);
+          cpd->acted = cpd->nu->pntsu > 2 &&
+                       make_cyclic_if_endpoints(cpd->nu, cpd->bezt, cpd->bp, &vc, C, sel_dist_mul);
         }
       }
 
-      if (!deleted && !closed && (insert_point || extrude_point) && cpd->spline_nearby) {
+      if (!cpd->acted && (insert_point || extrude_point) && cpd->spline_nearby) {
         if (!cpd->dragging) {
           if (insert_point && move_seg) {
-            insert_point_to_segment(event, vc.obedit->data, &nu, &vc);
+            insert_point_to_segment(event, vc.obedit->data, &nu, sel_dist_mul, &vc);
             cpd->new_point = true;
           }
           else if (extrude_point) {
             extrude_point_from_selected_vertex(&vc, obedit, event, extrude_center);
           }
         }
+      }
+
+      if (!cpd->acted && select_point) {
+        ED_curve_editnurb_select_pick_thresholded(
+            C, event->mval, sel_dist_mul, false, false, false);
       }
 
       if (cpd->msd != NULL) {
