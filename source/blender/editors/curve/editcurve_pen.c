@@ -821,7 +821,16 @@ static void extrude_point_from_selected_vertex(const ViewContext *vc,
   ED_curve_nurb_vert_selected_find(cu, vc->v3d, &nu, &bezt, &bp);
 
   if (nu && !extrude_center && nu->pntsu > 2) {
-    for (int i = 1; i < nu->pntsu - 1; i++) {
+    int start, end;
+    if (nu->flagu & CU_NURB_CYCLIC) {
+      start = 0;
+      end = nu->pntsu;
+    }
+    else {
+      start = 1;
+      end = nu->pntsu - 1;
+    }
+    for (int i = start; i < end; i++) {
       if (nu->type == CU_BEZIER) {
         BEZT_DESEL_ALL(nu->bezt + i);
       }
