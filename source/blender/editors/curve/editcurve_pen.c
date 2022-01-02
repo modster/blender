@@ -809,6 +809,56 @@ static bool insert_point_to_segment(
   return false;
 }
 
+static void get_selected_points(
+    Curve *cu, View3D *v3d, Nurb **r_nu, BezTriple **r_bezt, BPoint **r_bp)
+{
+  /* In nu and (bezt or bp) selected are written if there's 1 sel. */
+  /* If more points selected in 1 spline: return only nu, bezt and bp are 0. */
+  ListBase *editnurb = &cu->editnurb->nurbs;
+  BezTriple *bezt1;
+  BPoint *bp1;
+  int a;
+
+  *r_nu = NULL;
+  *r_bezt = NULL;
+  *r_bp = NULL;
+
+  LISTBASE_FOREACH (Nurb *, nu1, editnurb) {
+    if (nu1->type == CU_BEZIER) {
+      bezt1 = nu1->bezt;
+      a = nu1->pntsu;
+      while (a--) {
+        if (BEZT_ISSEL_ANY_HIDDENHANDLES(v3d, bezt1)) {
+          if (*r_bezt || *r_bp) {
+            *r_bp = NULL;
+            *r_bezt = NULL;
+            return;
+          }
+          *r_bezt = bezt1;
+          *r_nu = nu1;
+        }
+        bezt1++;
+      }
+    }
+    else {
+      bp1 = nu1->bp;
+      a = nu1->pntsu * nu1->pntsv;
+      while (a--) {
+        if (bp1->f1 & SELECT) {
+          if (*r_bezt || *r_bp) {
+            *r_bp = NULL;
+            *r_bezt = NULL;
+            return;
+          }
+          *r_bp = bp1;
+          *r_nu = nu1;
+        }
+        bp1++;
+      }
+    }
+  }
+}
+
 /* Add a new vertex connected to the selected vertex. */
 static void extrude_point_from_selected_vertex(const ViewContext *vc,
                                                Object *obedit,
@@ -820,7 +870,7 @@ static void extrude_point_from_selected_vertex(const ViewContext *vc,
   BPoint *bp = NULL;
   Curve *cu = vc->obedit->data;
 
-  ED_curve_nurb_vert_selected_find(cu, vc->v3d, &nu, &bezt, &bp);
+  get_selected_points(cu, vc->v3d, &nu, &bezt, &bp);
 
   if (nu && !extrude_center && nu->pntsu > 2) {
     int start, end;
@@ -899,7 +949,7 @@ static void extrude_point_from_selected_vertex(const ViewContext *vc,
     new_last_nu->flagu = ~CU_NURB_CYCLIC;
   }
 
-  ED_curve_nurb_vert_selected_find(cu, vc->v3d, &nu, &bezt, &bp);
+  get_selected_points(cu, vc->v3d, &nu, &bezt, &bp);
   if (bezt) {
     bezt->h1 = HD_VECT;
     bezt->h2 = HD_VECT;
@@ -1080,7 +1130,7 @@ static void move_adjacent_handle(ViewContext *vc, const wmEvent *event)
   Nurb *nu;
   BezTriple *bezt;
   BPoint *bp;
-  ED_curve_nurb_vert_selected_find(vc->obedit->data, vc->v3d, &nu, &bezt, &bp);
+  get_selected_points(vc->obedit->data, vc->v3d, &nu, &bezt, &bp);
 
   /* Get the adjacent `BezTriple` */
   BezTriple *adj_bezt = BKE_nurb_bezt_get_prev(nu, bezt);
@@ -1259,7 +1309,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   const bool toggle_vector = RNA_boolean_get(op->ptr, "toggle_vector");
 
   if (!cpd->extra_pressed && is_event_key_equal_to_extra_key(event->type, extra_key)) {
-    ED_curve_nurb_vert_selected_find(vc.obedit->data, vc.v3d, &nu, &bezt, &bp);
+    get_selected_points(vc.obedit->data, vc.v3d, &nu, &bezt, &bp);
     if (bezt) {
       if (extra_func == FREE_TOGGLE) {
         toggle_bezt_free_align_handles(bezt);
@@ -1296,7 +1346,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
       /* If dragging a new control point, move handle point with mouse cursor. Else move entire
        * control point. */
       else if (cpd->new_point) {
-        ED_curve_nurb_vert_selected_find(vc.obedit->data, vc.v3d, &nu, &bezt, &bp);
+        get_selected_points(vc.obedit->data, vc.v3d, &nu, &bezt, &bp);
         if (bezt) {
           /* Move opposite handle if last vertex. */
           const bool invert = (nu->bezt + nu->pntsu - 1 == bezt &&
@@ -1312,7 +1362,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
               move_all_selected_points(&cu->editnurb->nurbs, event, &vc);
             }
             else {
-              ED_curve_nurb_vert_selected_find(vc.obedit->data, vc.v3d, &nu, &bezt, &bp);
+              get_selected_points(vc.obedit->data, vc.v3d, &nu, &bezt, &bp);
               if (bezt) {
                 move_selected_bezt_to_location(bezt, &vc, event->mval);
               }
@@ -1331,7 +1381,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   }
   else if (ELEM(event->type, LEFTMOUSE)) {
     if (event->val == KM_PRESS) {
-      ED_curve_nurb_vert_selected_find(cu, vc.v3d, &nu, &bezt, &bp);
+      get_selected_points(cu, vc.v3d, &nu, &bezt, &bp);
       cpd->nu = nu;
       cpd->bezt = bezt;
       cpd->bp = bp;
@@ -1386,7 +1436,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
       }
 
       if (!cpd->acted && close_spline && cpd->found_point && !cpd->dragging) {
-        ED_curve_nurb_vert_selected_find(cu, vc.v3d, &nu, &bezt, &bp);
+        get_selected_points(cu, vc.v3d, &nu, &bezt, &bp);
         if (cpd->nu && !(cpd->nu->flagu & CU_NURB_CYCLIC)) {
           copy_v2_v2_int(vc.mval, event->mval);
           cpd->acted = cpd->nu->pntsu > 2 &&

@@ -197,13 +197,21 @@ void ED_curve_nurb_vert_selected_find(
       a = nu1->pntsu;
       while (a--) {
         if (BEZT_ISSEL_ANY_HIDDENHANDLES(v3d, bezt1)) {
-          if (*r_bezt || *r_bp) {
+          if (!ELEM(*r_nu, NULL, nu1)) {
+            *r_nu = NULL;
             *r_bp = NULL;
             *r_bezt = NULL;
             return;
           }
-          *r_bezt = bezt1;
-          *r_nu = nu1;
+
+          if (*r_bezt || *r_bp) {
+            *r_bp = NULL;
+            *r_bezt = NULL;
+          }
+          else {
+            *r_bezt = bezt1;
+            *r_nu = nu1;
+          }
         }
         bezt1++;
       }
@@ -213,13 +221,21 @@ void ED_curve_nurb_vert_selected_find(
       a = nu1->pntsu * nu1->pntsv;
       while (a--) {
         if (bp1->f1 & SELECT) {
+          if (!ELEM(*r_nu, NULL, nu1)) {
+            *r_bp = NULL;
+            *r_bezt = NULL;
+            *r_nu = NULL;
+            return;
+          }
+
           if (*r_bezt || *r_bp) {
             *r_bp = NULL;
             *r_bezt = NULL;
-            return;
           }
-          *r_bp = bp1;
-          *r_nu = nu1;
+          else {
+            *r_bp = bp1;
+            *r_nu = nu1;
+          }
         }
         bp1++;
       }
