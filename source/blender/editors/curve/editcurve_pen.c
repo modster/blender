@@ -1106,13 +1106,19 @@ static bool make_cyclic_if_endpoints(Nurb *sel_nu,
     Nurb *nu = NULL;
     BezTriple *bezt = NULL;
     BPoint *bp = NULL;
-    Base *basact = NULL;
-    ED_curve_pick_vert_thresholded(vc, 1, sel_dist_mul, &nu, &bezt, &bp, &hand, &basact);
+    // Base *basact = NULL;
+    Curve *cu = vc->obedit->data;
+    short bezt_idx;
+    const float mval_fl[2] = {(float)vc->mval[0], (float)vc->mval[1]};
+    // ED_curve_pick_vert_thresholded(vc, 1, sel_dist_mul, &nu, &bezt, &bp, &hand, &basact);
+    get_closest_vertex_to_point_in_nurbs(
+        &(cu->editnurb->nurbs), &nu, &bezt, &bp, &bezt_idx, mval_fl, sel_dist_mul, vc);
 
-    if (nu == sel_nu && ((nu->type == CU_BEZIER && bezt != sel_bezt &&
-                          (bezt == nu->bezt || bezt == nu->bezt + nu->pntsu - 1)) ||
-                         (nu->type != CU_BEZIER && bp != sel_bp &&
-                          (bp == nu->bp || bp == nu->bp + nu->pntsu - 1)))) {
+    if (nu == sel_nu &&
+        ((nu->type == CU_BEZIER && bezt != sel_bezt &&
+          (bezt == nu->bezt || bezt == nu->bezt + nu->pntsu - 1) && bezt_idx == 1) ||
+         (nu->type != CU_BEZIER && bp != sel_bp &&
+          (bp == nu->bp || bp == nu->bp + nu->pntsu - 1)))) {
       View3D *v3d = CTX_wm_view3d(C);
       ListBase *editnurb = object_editcurve_get(vc->obedit);
       ed_curve_toggle_cyclic(v3d, editnurb, 0);
