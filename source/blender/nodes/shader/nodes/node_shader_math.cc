@@ -26,6 +26,8 @@
 #include "NOD_math_functions.hh"
 #include "NOD_socket_search_link.hh"
 
+#include "FN_llvm.hh"
+
 /* **************** SCALAR MATH ******************** */
 
 namespace blender::nodes::node_shader_math_cc {
@@ -92,9 +94,67 @@ static int gpu_shader_math(GPUMaterial *mat,
   return 0;
 }
 
+class AddMultiFunction : public MultiFunction {
+  bool use_compiled_;
+
+ public:
+  AddMultiFunction(bool use_compiled) : use_compiled_(use_compiled)
+  {
+    static fn::MFSignature signature = create_signature();
+    this->set_signature(&signature);
+  }
+
+  static fn::MFSignature create_signature()
+  {
+    fn::MFSignatureBuilder signature{"Add"};
+    signature.single_input<float>("A");
+    signature.single_input<float>("B");
+    signature.single_output<float>("Result");
+    return signature.build();
+  }
+
+  void call(IndexMask mask, fn::MFParams params, fn::MFContext UNUSED(context)) const override
+  {
+    const VArray<float> a = params.readonly_single_input<float>(0, "A");
+    const VArray<float> b = params.readonly_single_input<float>(1, "B");
+    MutableSpan<float> result = params.uninitialized_single_output<float>(2, "Result");
+
+    if (a.is_span() && b.is_single() && mask.is_range() && mask.as_range().start() == 0) {
+      const float *a_data = a.get_internal_span().data();
+      float b_data = b.get_internal_single();
+      float *result_data = result.data();
+      int64_t size = mask.size();
+      if (use_compiled_) {
+        fn::AddFuncType func = fn::get_compiled_add_function();
+        func(a_data, b_data, result_data, size);
+      }
+      else {
+        for (const int64_t i : IndexRange(size)) {
+          result_data[i] = a_data[i] + b_data;
+        }
+      }
+    }
+    else {
+      for (const int i : mask) {
+        result[i] = a[i] + b[i];
+      }
+    }
+  }
+};
+
 static const blender::fn::MultiFunction *get_base_multi_function(bNode &node)
 {
   const int mode = node.custom1;
+
+  if (mode == NODE_MATH_ADD) {
+    static AddMultiFunction fn{false};
+    return &fn;
+  }
+  if (mode == NODE_MATH_MULTIPLY) {
+    static AddMultiFunction fn{true};
+    return &fn;
+  }
+
   const blender::fn::MultiFunction *base_fn = nullptr;
 
   blender::nodes::try_dispatch_float_math_fl_to_fl(

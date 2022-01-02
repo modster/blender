@@ -99,98 +99,113 @@ static llvm::Function &create_add_loop_function(llvm::Module &module)
   return function;
 }
 
-void playground()
-{
-  std::cout << "Start\n";
+class FunctionOptimizer {
+ private:
+  llvm::LLVMContext context_;
+  std::unique_ptr<llvm::ExecutionEngine> execution_engine_;
 
-  static bool initialized = []() {
-    /* Set assembly syntax flavour. */
+ public:
+  AddFuncType generated_function;
+
+ public:
+  void initialize()
+  {
     char const *args[] = {"some-random-name-for-the-parser", "--x86-asm-syntax=intel"};
     llvm::cl::ParseCommandLineOptions(std::size(args), args);
 
     llvm::InitializeNativeTarget();
     llvm::InitializeNativeTargetAsmPrinter();
     llvm::InitializeNativeTargetAsmParser();
-    return true;
-  }();
-  UNUSED_VARS(initialized);
-
-  llvm::LLVMContext context;
-
-  std::unique_ptr<llvm::Module> module = std::make_unique<llvm::Module>("My Module", context);
-  llvm::Module *module_ptr = &*module;
-  std::string error;
-  const llvm::Target *target = llvm::TargetRegistry::lookupTarget(
-      llvm::sys::getDefaultTargetTriple(), error);
-  llvm::TargetOptions target_options;
-  llvm::StringMap<bool> cpu_feature_map;
-  llvm::sys::getHostCPUFeatures(cpu_feature_map);
-  llvm::SubtargetFeatures subtarget_features;
-  for (const auto &item : cpu_feature_map) {
-    subtarget_features.AddFeature(item.getKey(), item.getValue());
   }
-  llvm::TargetMachine *target_machine = target->createTargetMachine(
-      llvm::sys::getDefaultTargetTriple(),
-      llvm::sys::getHostCPUName().str(),
-      subtarget_features.getString(),
-      target_options,
-      {},
-      {},
-      llvm::CodeGenOpt::Aggressive);
 
-  module->setDataLayout(target_machine->createDataLayout());
-  module->setTargetTriple(target_machine->getTargetTriple().normalize());
-  std::cout << "Target Feature: " << target_machine->getTargetFeatureString().str() << "\n";
-  std::cout << "CPU: " << target_machine->getTargetCPU().str() << "\n";
+  void generate_function()
+  {
+    std::unique_ptr<llvm::Module> module_owned = std::make_unique<llvm::Module>("My Module",
+                                                                                context_);
+    llvm::Module &ir_module = *module_owned;
+    std::string error;
+    const llvm::Target *target = llvm::TargetRegistry::lookupTarget(
+        llvm::sys::getDefaultTargetTriple(), error);
+    llvm::TargetOptions target_options;
+    llvm::StringMap<bool> cpu_feature_map;
+    llvm::sys::getHostCPUFeatures(cpu_feature_map);
+    llvm::SubtargetFeatures subtarget_features;
+    for (const auto &item : cpu_feature_map) {
+      subtarget_features.AddFeature(item.getKey(), item.getValue());
+    }
+    llvm::TargetMachine *target_machine = target->createTargetMachine(
+        llvm::sys::getDefaultTargetTriple(),
+        llvm::sys::getHostCPUName().str(),
+        subtarget_features.getString(),
+        target_options,
+        {},
+        {},
+        llvm::CodeGenOpt::Aggressive);
 
-  std::cout << module->getTargetTriple() << "\n";
-  std::cout << module->getDataLayout().getStringRepresentation() << "\n";
+    ir_module.setDataLayout(target_machine->createDataLayout());
+    ir_module.setTargetTriple(target_machine->getTargetTriple().normalize());
 
-  llvm::Function &add_function = create_add_loop_function(*module);
+    std::cout << ir_module.getTargetTriple() << "\n";
+    std::cout << ir_module.getDataLayout().getStringRepresentation() << "\n";
 
-  BLI_assert(!llvm::verifyModule(*module, &llvm::outs()));
-  add_function.print(llvm::outs());
+    llvm::Function &add_function = create_add_loop_function(ir_module);
 
-  llvm::LoopAnalysisManager loop_analysis_manager;
-  llvm::FunctionAnalysisManager function_analysis_manager;
-  llvm::CGSCCAnalysisManager cgscc_anaylysis_manager;
-  llvm::ModuleAnalysisManager module_analysis_manager;
+    BLI_assert(!llvm::verifyModule(ir_module, &llvm::outs()));
+    add_function.print(llvm::outs());
 
-  llvm::PassBuilder pass_builder{false, target_machine};
+    llvm::LoopAnalysisManager loop_analysis_manager;
+    llvm::FunctionAnalysisManager function_analysis_manager;
+    llvm::CGSCCAnalysisManager cgscc_anaylysis_manager;
+    llvm::ModuleAnalysisManager module_analysis_manager;
 
-  function_analysis_manager.registerPass([&] { return pass_builder.buildDefaultAAPipeline(); });
+    llvm::PassBuilder pass_builder{false, target_machine};
 
-  pass_builder.registerModuleAnalyses(module_analysis_manager);
-  pass_builder.registerCGSCCAnalyses(cgscc_anaylysis_manager);
-  pass_builder.registerFunctionAnalyses(function_analysis_manager);
-  pass_builder.registerLoopAnalyses(loop_analysis_manager);
-  pass_builder.crossRegisterProxies(loop_analysis_manager,
-                                    function_analysis_manager,
-                                    cgscc_anaylysis_manager,
-                                    module_analysis_manager);
+    function_analysis_manager.registerPass([&] { return pass_builder.buildDefaultAAPipeline(); });
 
-  llvm::ModulePassManager module_pass_manager = pass_builder.buildPerModuleDefaultPipeline(
-      llvm::PassBuilder::OptimizationLevel::O3);
+    pass_builder.registerModuleAnalyses(module_analysis_manager);
+    pass_builder.registerCGSCCAnalyses(cgscc_anaylysis_manager);
+    pass_builder.registerFunctionAnalyses(function_analysis_manager);
+    pass_builder.registerLoopAnalyses(loop_analysis_manager);
+    pass_builder.crossRegisterProxies(loop_analysis_manager,
+                                      function_analysis_manager,
+                                      cgscc_anaylysis_manager,
+                                      module_analysis_manager);
 
-  module_pass_manager.run(*module, module_analysis_manager);
+    llvm::ModulePassManager module_pass_manager = pass_builder.buildPerModuleDefaultPipeline(
+        llvm::PassBuilder::OptimizationLevel::O3);
 
-  add_function.print(llvm::outs());
+    module_pass_manager.run(ir_module, module_analysis_manager);
 
-  llvm::EngineBuilder engine_builder{std::move(module)};
-  engine_builder.setOptLevel(llvm::CodeGenOpt::Aggressive);
-  std::unique_ptr<llvm::ExecutionEngine> ee{engine_builder.create(target_machine)};
-  ee->finalizeObject();
+    add_function.print(llvm::outs());
 
-  const uint64_t function_ptr = ee->getFunctionAddress(add_function.getName().str());
-  using FuncType = void (*)(const float *, float, float *, int);
-  const FuncType generated_function = (FuncType)function_ptr;
-  UNUSED_VARS(generated_function, module_ptr);
+    llvm::EngineBuilder engine_builder{std::move(module_owned)};
+    engine_builder.setOptLevel(llvm::CodeGenOpt::Aggressive);
+    execution_engine_ = std::unique_ptr<llvm::ExecutionEngine>(
+        engine_builder.create(target_machine));
+    execution_engine_->finalizeObject();
 
-  LLVMTargetMachineEmitToFile((LLVMTargetMachineRef)ee->getTargetMachine(),
-                              llvm::wrap(module_ptr),
-                              (char *)"C:\\Users\\jacques\\Documents\\machine_code.txt",
-                              LLVMAssemblyFile,
-                              nullptr);
+    const uint64_t function_ptr = execution_engine_->getFunctionAddress(
+        add_function.getName().str());
+
+    this->generated_function = (AddFuncType)function_ptr;
+
+    LLVMTargetMachineEmitToFile((LLVMTargetMachineRef)target_machine,
+                                llvm::wrap(&ir_module),
+                                (char *)"C:\\Users\\jacques\\Documents\\machine_code.txt",
+                                LLVMAssemblyFile,
+                                nullptr);
+  }
+};
+
+AddFuncType get_compiled_add_function()
+{
+  static FunctionOptimizer *optimizer = []() {
+    static FunctionOptimizer optimizer;
+    optimizer.initialize();
+    optimizer.generate_function();
+    return &optimizer;
+  }();
+  return optimizer->generated_function;
 }
 
 }  // namespace blender::fn

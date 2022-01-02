@@ -18,6 +18,8 @@
 
 namespace blender::fn {
 
-void playground();
+using AddFuncType = void (*)(const float *, float, float *, int);
 
-}
+AddFuncType get_compiled_add_function();
+
+}  // namespace blender::fn
