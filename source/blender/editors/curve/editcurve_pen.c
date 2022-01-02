@@ -90,6 +90,8 @@ typedef struct CurvePenData {
   bool found_point;
   /* Whether multiple selected points should be moved. */
   bool multi_point;
+  /* Whether a point has already been selected. */
+  bool selection_made;
 
   Nurb *nu;
   BezTriple *bezt;
@@ -1282,27 +1284,21 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   else if (ELEM(event->type, LEFTMOUSE)) {
     if (event->val == KM_PRESS) {
       ED_curve_nurb_vert_selected_find(cu, vc.v3d, &nu, &bezt, &bp);
-      if (select_point || move_point) {
-        short bezt_idx = 0;
-        if ((!nu || bezt || bp) && ED_curve_editnurb_select_pick_thresholded(
-                                       C, event->mval, sel_dist_mul, false, false, false)) {
-          cpd->found_point = true;
-          cpd->nu = nu;
-          cpd->bezt = bezt;
-          cpd->bp = bp;
+      cpd->nu = nu;
+      cpd->bezt = bezt;
+      cpd->bp = bp;
+
+      if (select_point || move_point || select_multi) {
+        if (move_point && (!nu || bezt || bp)) {
+          cpd->found_point = ED_curve_editnurb_select_pick_thresholded(
+              C, event->mval, sel_dist_mul, false, false, false);
+          cpd->selection_made = true;
         }
-        else if (!(bezt || bp) && get_closest_vertex_to_point_in_nurbs(&(cu->editnurb->nurbs),
-                                                                       &nu,
-                                                                       &bezt,
-                                                                       &bp,
-                                                                       &bezt_idx,
-                                                                       mval_fl,
-                                                                       sel_dist_mul,
-                                                                       &vc)) {
-          cpd->found_point = true;
-          cpd->nu = nu;
-          cpd->bezt = bezt;
-          cpd->bp = bp;
+        else {
+          short bezt_idx = 0;
+          cpd->found_point = get_closest_vertex_to_point_in_nurbs(
+              &(cu->editnurb->nurbs), &nu, &bezt, &bp, &bezt_idx, mval_fl, sel_dist_mul, &vc);
+          /* If point under mouse is selected, set cpd->multi_point to true. */
           if ((bezt && BEZT_ISSEL_IDX(bezt, bezt_idx)) || bp) {
             cpd->multi_point = true;
           }
@@ -1342,6 +1338,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
       }
 
       if (!cpd->acted && close_spline && cpd->found_point && !cpd->dragging) {
+        ED_curve_nurb_vert_selected_find(cu, vc.v3d, &nu, &bezt, &bp);
         if (cpd->nu && !(cpd->nu->flagu & CU_NURB_CYCLIC)) {
           copy_v2_v2_int(vc.mval, event->mval);
           cpd->acted = cpd->nu->pntsu > 2 &&
@@ -1385,23 +1382,25 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
         }
       }
 
-      if (!cpd->acted && select_multi) {
-        short bezt_idx;
-        get_closest_vertex_to_point_in_nurbs(
-            &(cu->editnurb->nurbs), &nu, &bezt, &bp, &bezt_idx, mval_fl, sel_dist_mul, &vc);
-        if (bezt) {
-          select_deselect_bezt(bezt, bezt_idx);
+      if (!cpd->selection_made) {
+        if (!cpd->acted && select_multi) {
+          short bezt_idx;
+          get_closest_vertex_to_point_in_nurbs(
+              &(cu->editnurb->nurbs), &nu, &bezt, &bp, &bezt_idx, mval_fl, sel_dist_mul, &vc);
+          if (bezt) {
+            select_deselect_bezt(bezt, bezt_idx);
+          }
+          else if (bp) {
+            select_deselect_bp(bp);
+          }
+          else {
+            ED_curve_deselect_all(cu->editnurb);
+          }
         }
-        else if (bp) {
-          select_deselect_bp(bp);
+        else if (!cpd->acted && select_point) {
+          ED_curve_editnurb_select_pick_thresholded(
+              C, event->mval, sel_dist_mul, false, false, false);
         }
-        else {
-          ED_curve_deselect_all(cu->editnurb);
-        }
-      }
-      else if (!cpd->acted && select_point) {
-        ED_curve_editnurb_select_pick_thresholded(
-            C, event->mval, sel_dist_mul, false, false, false);
       }
 
       if (cpd->msd != NULL) {
