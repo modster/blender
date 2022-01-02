@@ -17,6 +17,10 @@
 #include <fstream>
 #include <iostream>
 
+#include "llvm/IR/LegacyPassManager.h"
+#include "llvm/Transforms/InstCombine/InstCombine.h"
+#include "llvm/Transforms/Scalar.h"
+#include "llvm/Transforms/Scalar/GVN.h"
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
 #include <llvm/ExecutionEngine/ObjectCache.h>
 #include <llvm/IR/IRBuilder.h>
@@ -34,7 +38,7 @@
 
 namespace blender::fn {
 
-const std::string object_file_path = "C:\\Users\\jacques\\Documents\\my_object.o";
+const std::string object_file_path = "/home/jacques/Documents/my_object.o";
 
 class MyObjectCache : public llvm::ObjectCache {
   void notifyObjectCompiled(const llvm::Module *module, llvm::MemoryBufferRef obj) override
@@ -63,6 +67,8 @@ class MyObjectCache : public llvm::ObjectCache {
 
 void playground()
 {
+  std::cout << "Start\n";
+
   static bool initialized = []() {
     /* Set assembly syntax flavour. */
     char const *args[] = {"some-random-name-for-the-parser", "--x86-asm-syntax=intel"};
@@ -77,6 +83,9 @@ void playground()
   llvm::LLVMContext context;
   std::unique_ptr<llvm::Module> module = std::make_unique<llvm::Module>("My Module", context);
 
+  llvm::legacy::FunctionPassManager function_pass_manager{module.get()};
+  function_pass_manager.add(llvm::createInstructionCombiningPass());
+
   llvm::Type *int32_type = llvm::Type::getInt32Ty(context);
   llvm::FunctionType *function_type = llvm::FunctionType::get(
       int32_type, {int32_type, int32_type}, false);
@@ -85,23 +94,27 @@ void playground()
   llvm::BasicBlock *bb = llvm::BasicBlock::Create(context, "entry", function);
   llvm::IRBuilder<> builder{bb};
   llvm::Value *sum_value = builder.CreateAdd(function->getArg(0), function->getArg(1));
+  sum_value = builder.CreateAdd(sum_value, builder.getInt32(5));
+  sum_value = builder.CreateAdd(sum_value, builder.getInt32(10));
   llvm::Value *product_value = builder.CreateMul(function->getArg(0), sum_value);
   builder.CreateRet(product_value);
 
   BLI_assert(!llvm::verifyModule(*module, &llvm::outs()));
 
-  MyObjectCache object_cache;
+  function_pass_manager.run(*function);
 
-  llvm::Expected<llvm::object::OwningBinary<llvm::object::ObjectFile>> object_file_ex =
-      llvm::object::ObjectFile::createObjectFile(object_file_path);
-  if (!object_file_ex) {
-    return;
-  }
+  // MyObjectCache object_cache;
+
+  // llvm::Expected<llvm::object::OwningBinary<llvm::object::ObjectFile>> object_file_ex =
+  //     llvm::object::ObjectFile::createObjectFile(object_file_path);
+  // if (!object_file_ex) {
+  //   return;
+  // }
 
   llvm::Module *module_ptr = &*module;
   std::unique_ptr<llvm::ExecutionEngine> ee{llvm::EngineBuilder(std::move(module)).create()};
-  ee->addObjectFile(std::move(*object_file_ex));
-  ee->setObjectCache(&object_cache);
+  // ee->addObjectFile(std::move(*object_file_ex));
+  // ee->setObjectCache(&object_cache);
   ee->finalizeObject();
 
   const uint64_t function_ptr = ee->getFunctionAddress(function->getName().str());
