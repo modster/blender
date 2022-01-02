@@ -1180,6 +1180,34 @@ static void toggle_select_bp(BPoint *bp)
   }
 }
 
+static void toggle_vector_auto(BezTriple *bezt, short bezt_idx, CurvePenData *cpd)
+{
+  if (bezt_idx == 0) {
+    if (bezt->h1 == HD_VECT) {
+      bezt->h1 = bezt->h2 = HD_AUTO;
+    }
+    else {
+      bezt->h1 = HD_VECT;
+      if (bezt->h2 != HD_VECT) {
+        bezt->h2 = HD_FREE;
+      }
+    }
+    cpd->acted = true;
+  }
+  else if (bezt_idx == 2) {
+    if (bezt->h2 == HD_VECT) {
+      bezt->h1 = bezt->h2 = HD_AUTO;
+    }
+    else {
+      bezt->h2 = HD_VECT;
+      if (bezt->h1 != HD_VECT) {
+        bezt->h1 = HD_FREE;
+      }
+    }
+    cpd->acted = true;
+  }
+}
+
 static bool is_event_key_equal_to_extra_key(const int event_key, const int extra_key)
 {
   return ((event_key == EVT_LEFTSHIFTKEY || event_key == EVT_RIGHTSHIFTKEY) &&
@@ -1228,7 +1256,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   const bool select_multi = RNA_boolean_get(op->ptr, "select_multi");
   const bool move_point = RNA_boolean_get(op->ptr, "move_point");
   const bool close_spline = RNA_boolean_get(op->ptr, "close_spline");
-  const bool make_vector = RNA_boolean_get(op->ptr, "make_vector");
+  const bool toggle_vector = RNA_boolean_get(op->ptr, "toggle_vector");
 
   if (!cpd->extra_pressed && is_event_key_equal_to_extra_key(event->type, extra_key)) {
     ED_curve_nurb_vert_selected_find(vc.obedit->data, vc.v3d, &nu, &bezt, &bp);
@@ -1380,21 +1408,12 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
         }
       }
 
-      if (!cpd->acted && make_vector) {
+      if (!cpd->acted && toggle_vector) {
         short bezt_idx;
         get_closest_vertex_to_point_in_nurbs(
             &(cu->editnurb->nurbs), &nu, &bezt, &bp, &bezt_idx, mval_fl, sel_dist_mul, &vc);
         if (bezt) {
-          if (bezt_idx == 0) {
-            bezt->h1 = HD_VECT;
-            bezt->h2 = HD_FREE;
-            cpd->acted = true;
-          }
-          else if (bezt_idx == 2) {
-            bezt->h1 = HD_FREE;
-            bezt->h2 = HD_VECT;
-            cpd->acted = true;
-          }
+          toggle_vector_auto(bezt, bezt_idx, cpd);
 
           if (nu && nu->type == CU_BEZIER) {
             BKE_nurb_handles_calc(nu);
@@ -1518,5 +1537,5 @@ void CURVE_OT_pen(wmOperatorType *ot)
                          "Close Spline",
                          "Make a spline cyclic by clicking endpoints");
   prop = RNA_def_boolean(
-      ot->srna, "make_vector", false, "Make Vector", "Click handle to convert to vector handle");
+      ot->srna, "toggle_vector", false, "Toggle Vector", "Toggle between Vector and Auto handles");
 }
