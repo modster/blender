@@ -92,7 +92,7 @@ typedef struct CurvePenData {
   bool multi_point;
   /* Whether a point has already been selected. */
   bool selection_made;
-
+  /* Data about found point. Used for closing splines. */
   Nurb *nu;
   BezTriple *bezt;
   BPoint *bp;
@@ -269,6 +269,7 @@ static void move_bp_to_location(BPoint *bp, const int mval[2], const ViewContext
   copy_v3_v3(bp->vec, location);
 }
 
+/* Move all selected points by an amount equivalent to the distance moved by mouse. */
 static void move_all_selected_points(ListBase *editnurb,
                                      const wmEvent *event,
                                      const ViewContext *vc)
@@ -314,16 +315,6 @@ static void move_all_selected_points(ListBase *editnurb,
       }
     }
   }
-}
-
-static bool world_point_near_screen_point(const float world_pos[3],
-                                          const int screen_pos[2],
-                                          const float sel_dist_mul,
-                                          const ViewContext *vc)
-{
-  int pos_2d[2];
-  worldspace_to_screenspace_int(world_pos, vc, pos_2d);
-  return len_v2v2_int(pos_2d, screen_pos) < ED_view3d_select_dist_px() * sel_dist_mul;
 }
 
 static int get_nurb_index(const ListBase *nurbs, const Nurb *nurb)
@@ -418,7 +409,8 @@ static bool get_closest_point_on_edge(float r_point[3],
   return false;
 }
 
-/* Get closest vertex in all nurbs in given #ListBase to a given point. */
+/* Get closest vertex in all nurbs in given #ListBase to a given point.
+ * Returns true if point is found. */
 static bool get_closest_vertex_to_point_in_nurbs(const ListBase *nurbs,
                                                  Nurb **r_nu,
                                                  BezTriple **r_bezt,
@@ -1134,15 +1126,13 @@ static bool make_cyclic_if_endpoints(Nurb *sel_nu,
       return false;
     }
 
-    short hand;
     Nurb *nu = NULL;
     BezTriple *bezt = NULL;
     BPoint *bp = NULL;
-    // Base *basact = NULL;
     Curve *cu = vc->obedit->data;
     short bezt_idx;
     const float mval_fl[2] = {(float)vc->mval[0], (float)vc->mval[1]};
-    // ED_curve_pick_vert_thresholded(vc, 1, sel_dist_mul, &nu, &bezt, &bp, &hand, &basact);
+
     get_closest_vertex_to_point_in_nurbs(
         &(cu->editnurb->nurbs), &nu, &bezt, &bp, &bezt_idx, mval_fl, sel_dist_mul, vc);
 
@@ -1160,7 +1150,7 @@ static bool make_cyclic_if_endpoints(Nurb *sel_nu,
   return false;
 }
 
-static void select_deselect_bezt(BezTriple *bezt, const short bezt_idx)
+static void toggle_select_bezt(BezTriple *bezt, const short bezt_idx)
 {
   if (bezt_idx == 1) {
     if (BEZT_ISSEL_IDX(bezt, 1)) {
@@ -1180,7 +1170,7 @@ static void select_deselect_bezt(BezTriple *bezt, const short bezt_idx)
   }
 }
 
-static void select_deselect_bp(BPoint *bp)
+static void toggle_select_bp(BPoint *bp)
 {
   if (bp->f1 == SELECT) {
     bp->f1 = ~SELECT;
@@ -1418,10 +1408,10 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
           get_closest_vertex_to_point_in_nurbs(
               &(cu->editnurb->nurbs), &nu, &bezt, &bp, &bezt_idx, mval_fl, sel_dist_mul, &vc);
           if (bezt) {
-            select_deselect_bezt(bezt, bezt_idx);
+            toggle_select_bezt(bezt, bezt_idx);
           }
           else if (bp) {
-            select_deselect_bp(bp);
+            toggle_select_bp(bp);
           }
           else {
             ED_curve_deselect_all(cu->editnurb);
