@@ -65,6 +65,7 @@
 #include "BKE_animsys.h"
 #include "BKE_bpath.h"
 #include "BKE_colortools.h"
+#include "BKE_context.h"
 #include "BKE_cryptomatte.h"
 #include "BKE_global.h"
 #include "BKE_icons.h"
@@ -1529,7 +1530,7 @@ static bNodeSocket *make_socket(bNodeTree *ntree,
   BLI_uniquename_cb(
       unique_identifier_check, lb, "socket", '_', auto_identifier, sizeof(auto_identifier));
 
-  bNodeSocket *sock = (bNodeSocket *)MEM_callocN(sizeof(bNodeSocket), "sock");
+  bNodeSocket *sock = MEM_cnew<bNodeSocket>("sock");
   sock->in_out = in_out;
 
   BLI_strncpy(sock->identifier, auto_identifier, NODE_MAXSTR);
@@ -2160,13 +2161,17 @@ void nodeUniqueName(bNodeTree *ntree, bNode *node)
 
 bNode *nodeAddNode(const struct bContext *C, bNodeTree *ntree, const char *idname)
 {
-  bNode *node = (bNode *)MEM_callocN(sizeof(bNode), "new node");
+  bNode *node = MEM_cnew<bNode>("new node");
   BLI_addtail(&ntree->nodes, node);
 
   BLI_strncpy(node->idname, idname, sizeof(node->idname));
   node_set_typeinfo(C, ntree, node, nodeTypeFind(idname));
 
   BKE_ntree_update_tag_node_new(ntree, node);
+
+  if (node->type == GEO_NODE_INPUT_SCENE_TIME) {
+    DEG_relations_tag_update(CTX_data_main(C));
+  }
 
   return node;
 }
@@ -2329,7 +2334,7 @@ bNodeLink *nodeAddLink(
   BLI_assert(tonode);
 
   if (fromsock->in_out == SOCK_OUT && tosock->in_out == SOCK_IN) {
-    link = (bNodeLink *)MEM_callocN(sizeof(bNodeLink), "link");
+    link = MEM_cnew<bNodeLink>("link");
     if (ntree) {
       BLI_addtail(&ntree->links, link);
     }
@@ -2340,7 +2345,7 @@ bNodeLink *nodeAddLink(
   }
   else if (fromsock->in_out == SOCK_IN && tosock->in_out == SOCK_OUT) {
     /* OK but flip */
-    link = (bNodeLink *)MEM_callocN(sizeof(bNodeLink), "link");
+    link = MEM_cnew<bNodeLink>("link");
     if (ntree) {
       BLI_addtail(&ntree->links, link);
     }
@@ -2752,7 +2757,7 @@ bNodePreview *BKE_node_preview_verify(bNodeInstanceHash *previews,
   bNodePreview *preview = (bNodePreview *)BKE_node_instance_hash_lookup(previews, key);
   if (!preview) {
     if (create) {
-      preview = (bNodePreview *)MEM_callocN(sizeof(bNodePreview), "node preview");
+      preview = MEM_cnew<bNodePreview>("node preview");
       BKE_node_instance_hash_insert(previews, key, preview);
     }
     else {
@@ -2896,40 +2901,6 @@ void BKE_node_preview_clear_tree(bNodeTree *ntree)
   NODE_INSTANCE_HASH_ITER (iter, ntree->previews) {
     bNodePreview *preview = (bNodePreview *)BKE_node_instance_hash_iterator_get_value(&iter);
     BKE_node_preview_clear(preview);
-  }
-}
-
-static void node_preview_sync(bNodePreview *to, bNodePreview *from)
-{
-  /* sizes should have been initialized by BKE_node_preview_init_tree */
-  BLI_assert(to->xsize == from->xsize && to->ysize == from->ysize);
-
-  /* copy over contents of previews */
-  if (to->rect && from->rect) {
-    int xsize = to->xsize;
-    int ysize = to->ysize;
-    memcpy(to->rect, from->rect, xsize * ysize * sizeof(char[4]));
-  }
-}
-
-void BKE_node_preview_sync_tree(bNodeTree *to_ntree, bNodeTree *from_ntree)
-{
-  bNodeInstanceHash *from_previews = from_ntree->previews;
-  bNodeInstanceHash *to_previews = to_ntree->previews;
-
-  if (!from_previews || !to_previews) {
-    return;
-  }
-
-  bNodeInstanceHashIterator iter;
-  NODE_INSTANCE_HASH_ITER (iter, from_previews) {
-    bNodeInstanceKey key = BKE_node_instance_hash_iterator_get_key(&iter);
-    bNodePreview *from = (bNodePreview *)BKE_node_instance_hash_iterator_get_value(&iter);
-    bNodePreview *to = (bNodePreview *)BKE_node_instance_hash_lookup(to_previews, key);
-
-    if (from && to) {
-      node_preview_sync(to, from);
-    }
   }
 }
 
@@ -3341,15 +3312,6 @@ bNodeTree *ntreeLocalize(bNodeTree *ntree)
   return ltree;
 }
 
-void ntreeLocalSync(bNodeTree *localtree, bNodeTree *ntree)
-{
-  if (localtree && ntree) {
-    if (ntree->typeinfo->local_sync) {
-      ntree->typeinfo->local_sync(localtree, ntree);
-    }
-  }
-}
-
 void ntreeLocalMerge(Main *bmain, bNodeTree *localtree, bNodeTree *ntree)
 {
   if (ntree && localtree) {
@@ -3374,7 +3336,7 @@ static bNodeSocket *make_socket_interface(bNodeTree *ntree,
     return nullptr;
   }
 
-  bNodeSocket *sock = (bNodeSocket *)MEM_callocN(sizeof(bNodeSocket), "socket template");
+  bNodeSocket *sock = MEM_cnew<bNodeSocket>("socket template");
   BLI_strncpy(sock->idname, stype->idname, sizeof(sock->idname));
   node_socket_set_typeinfo(ntree, sock, stype);
   sock->in_out = in_out;
@@ -4908,6 +4870,7 @@ static void registerGeometryNodes()
   register_node_type_geo_legacy_subdivision_surface();
   register_node_type_geo_legacy_volume_to_mesh();
 
+  register_node_type_geo_accumulate_field();
   register_node_type_geo_align_rotation_to_vector();
   register_node_type_geo_attribute_capture();
   register_node_type_geo_attribute_clamp();

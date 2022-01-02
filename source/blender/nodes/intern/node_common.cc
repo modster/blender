@@ -224,7 +224,7 @@ void node_group_update(struct bNodeTree *ntree, struct bNode *node)
 
 static void node_frame_init(bNodeTree *UNUSED(ntree), bNode *node)
 {
-  NodeFrame *data = (NodeFrame *)MEM_callocN(sizeof(NodeFrame), "frame node storage");
+  NodeFrame *data = MEM_cnew<NodeFrame>("frame node storage");
   node->storage = data;
 
   data->flag |= NODE_FRAME_SHRINK;
@@ -232,10 +232,10 @@ static void node_frame_init(bNodeTree *UNUSED(ntree), bNode *node)
   data->label_size = 20;
 }
 
-void register_node_type_frame(void)
+void register_node_type_frame()
 {
   /* frame type is used for all tree types, needs dynamic allocation */
-  bNodeType *ntype = (bNodeType *)MEM_callocN(sizeof(bNodeType), "frame node type");
+  bNodeType *ntype = MEM_cnew<bNodeType>("frame node type");
   ntype->free_self = (void (*)(bNodeType *))MEM_freeN;
 
   node_type_base(ntype, NODE_FRAME, "Frame", NODE_CLASS_LAYOUT, NODE_BACKGROUND);
@@ -261,10 +261,10 @@ static void node_reroute_init(bNodeTree *ntree, bNode *node)
   nodeAddStaticSocket(ntree, node, SOCK_OUT, SOCK_RGBA, PROP_NONE, "Output", "Output");
 }
 
-void register_node_type_reroute(void)
+void register_node_type_reroute()
 {
   /* frame type is used for all tree types, needs dynamic allocation */
-  bNodeType *ntype = (bNodeType *)MEM_callocN(sizeof(bNodeType), "frame node type");
+  bNodeType *ntype = MEM_cnew<bNodeType>("frame node type");
   ntype->free_self = (void (*)(bNodeType *))MEM_freeN;
 
   node_type_base(ntype, NODE_REROUTE, "Reroute", NODE_CLASS_LAYOUT, 0);
@@ -454,7 +454,7 @@ void node_group_input_update(bNodeTree *ntree, bNode *node)
     }
 
     if (link->fromsock == extsock) {
-      bNodeLink *tlink = (bNodeLink *)MEM_callocN(sizeof(bNodeLink), "temporary link");
+      bNodeLink *tlink = MEM_cnew<bNodeLink>("temporary link");
       *tlink = *link;
       BLI_addtail(&tmplinks, tlink);
 
@@ -502,10 +502,10 @@ void node_group_input_update(bNodeTree *ntree, bNode *node)
   }
 }
 
-void register_node_type_group_input(void)
+void register_node_type_group_input()
 {
   /* used for all tree types, needs dynamic allocation */
-  bNodeType *ntype = (bNodeType *)MEM_callocN(sizeof(bNodeType), "node type");
+  bNodeType *ntype = MEM_cnew<bNodeType>("node type");
   ntype->free_self = (void (*)(bNodeType *))MEM_freeN;
 
   node_type_base(ntype, NODE_GROUP_INPUT, "Group Input", NODE_CLASS_INTERFACE, 0);
@@ -551,7 +551,7 @@ void node_group_output_update(bNodeTree *ntree, bNode *node)
     }
 
     if (link->tosock == extsock) {
-      bNodeLink *tlink = (bNodeLink *)MEM_callocN(sizeof(bNodeLink), "temporary link");
+      bNodeLink *tlink = MEM_cnew<bNodeLink>("temporary link");
       *tlink = *link;
       BLI_addtail(&tmplinks, tlink);
 
@@ -600,10 +600,10 @@ void node_group_output_update(bNodeTree *ntree, bNode *node)
   }
 }
 
-void register_node_type_group_output(void)
+void register_node_type_group_output()
 {
   /* used for all tree types, needs dynamic allocation */
-  bNodeType *ntype = (bNodeType *)MEM_callocN(sizeof(bNodeType), "node type");
+  bNodeType *ntype = MEM_cnew<bNodeType>("node type");
   ntype->free_self = (void (*)(bNodeType *))MEM_freeN;
 
   node_type_base(ntype, NODE_GROUP_OUTPUT, "Group Output", NODE_CLASS_INTERFACE, 0);
