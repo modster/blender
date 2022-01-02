@@ -61,9 +61,9 @@ static llvm::Function &create_add_loop_function(llvm::Module &module)
   llvm::Value *array_size_v = function.getArg(3);
 
   llvm::BasicBlock *entry_bb = llvm::BasicBlock::Create(context, "entry", &function);
-  llvm::BasicBlock *loop_entry_bb = llvm::BasicBlock::Create(context, "loop_entry");
-  llvm::BasicBlock *loop_body_bb = llvm::BasicBlock::Create(context, "loop_body");
-  llvm::BasicBlock *loop_end_bb = llvm::BasicBlock::Create(context, "loop_end");
+  llvm::BasicBlock *loop_entry_bb = llvm::BasicBlock::Create(context, "loop_entry", &function);
+  llvm::BasicBlock *loop_body_bb = llvm::BasicBlock::Create(context, "loop_body", &function);
+  llvm::BasicBlock *loop_end_bb = llvm::BasicBlock::Create(context, "loop_end", &function);
 
   builder.SetInsertPoint(entry_bb);
   builder.CreateBr(loop_entry_bb);
@@ -74,22 +74,19 @@ static llvm::Function &create_add_loop_function(llvm::Module &module)
   llvm::Value *is_less_than_v = builder.CreateICmpSLT(index_v, array_size_v);
   builder.CreateCondBr(is_less_than_v, loop_body_bb, loop_end_bb);
 
-  std::cout << "1\n";
   builder.SetInsertPoint(loop_body_bb);
-  std::cout << "2\n";
   llvm::Value *load_ptr_v = builder.CreateGEP(src_array_ptr_v, index_v);
-  std::cout << "3\n";
   llvm::Value *store_ptr_v = builder.CreateGEP(dst_array_ptr_v, index_v);
-  std::cout << "4\n";
   llvm::Value *value_from_array_v = builder.CreateLoad(builder.getFloatTy(), load_ptr_v);
-  std::cout << "5\n";
-  llvm::Value *new_value_v = builder.CreateAdd(value_from_array_v, src_value_v);
+  llvm::Value *new_value_v = builder.CreateFAdd(value_from_array_v, src_value_v);
   builder.CreateStore(new_value_v, store_ptr_v);
   llvm::Value *next_index_v = builder.CreateAdd(index_v, builder.getInt64(1));
   index_v->addIncoming(next_index_v, loop_body_bb);
+  builder.CreateBr(loop_entry_bb);
 
   builder.SetInsertPoint(loop_end_bb);
   builder.CreateRetVoid();
+
   return function;
 }
 
