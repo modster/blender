@@ -17,20 +17,29 @@
 #include <fstream>
 #include <iostream>
 
-#include "llvm/IR/LegacyPassManager.h"
-#include "llvm/Transforms/InstCombine/InstCombine.h"
-#include "llvm/Transforms/Scalar.h"
-#include "llvm/Transforms/Scalar/GVN.h"
+#include <llvm/Analysis/AliasAnalysis.h>
+#include <llvm/Analysis/LoopAccessAnalysis.h>
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
 #include <llvm/ExecutionEngine/ObjectCache.h>
+#include <llvm/ExecutionEngine/Orc/Core.h>
+#include <llvm/ExecutionEngine/Orc/JITTargetMachineBuilder.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Verifier.h>
 #include <llvm/Object/ObjectFile.h>
+#include <llvm/Passes/PassBuilder.h>
 #include <llvm/Support/CommandLine.h>
+#include <llvm/Support/Host.h>
 #include <llvm/Support/TargetRegistry.h>
 #include <llvm/Support/TargetSelect.h>
+#include <llvm/Transforms/IPO/PassManagerBuilder.h>
+#include <llvm/Transforms/InstCombine/InstCombine.h>
+#include <llvm/Transforms/Scalar.h>
+#include <llvm/Transforms/Scalar/GVN.h>
+#include <llvm/Transforms/Vectorize.h>
+#include <llvm/Transforms/Vectorize/LoopVectorize.h>
 
 #include "FN_llvm.hh"
 
@@ -107,18 +116,69 @@ void playground()
   UNUSED_VARS(initialized);
 
   llvm::LLVMContext context;
-  std::unique_ptr<llvm::Module> module = std::make_unique<llvm::Module>("My Module", context);
 
-  llvm::legacy::FunctionPassManager function_pass_manager{module.get()};
-  function_pass_manager.add(llvm::createInstructionCombiningPass());
-  std::cout << "A\n";
+  std::unique_ptr<llvm::Module> module = std::make_unique<llvm::Module>("My Module", context);
+  llvm::Module *module_ptr = &*module;
+  std::string error;
+  const llvm::Target *target = llvm::TargetRegistry::lookupTarget(
+      llvm::sys::getDefaultTargetTriple(), error);
+  llvm::TargetOptions target_options;
+  llvm::StringMap<bool> cpu_feature_map;
+  llvm::sys::getHostCPUFeatures(cpu_feature_map);
+  llvm::SubtargetFeatures subtarget_features;
+  for (const auto &item : cpu_feature_map) {
+    subtarget_features.AddFeature(item.getKey(), item.getValue());
+  }
+  llvm::TargetMachine *target_machine = target->createTargetMachine(
+      llvm::sys::getDefaultTargetTriple(),
+      llvm::sys::getHostCPUName().str(),
+      subtarget_features.getString(),
+      target_options,
+      {},
+      {},
+      llvm::CodeGenOpt::Aggressive);
+
+  module->setDataLayout(target_machine->createDataLayout());
+  module->setTargetTriple(target_machine->getTargetTriple().normalize());
+  std::cout << "Target Feature: " << target_machine->getTargetFeatureString().str() << "\n";
+  std::cout << "CPU: " << target_machine->getTargetCPU().str() << "\n";
+
+  std::cout << module->getTargetTriple() << "\n";
+  std::cout << module->getDataLayout().getStringRepresentation() << "\n";
 
   llvm::Function &add_function = create_add_loop_function(*module);
 
   BLI_assert(!llvm::verifyModule(*module, &llvm::outs()));
+  add_function.print(llvm::outs());
 
-  llvm::Module *module_ptr = &*module;
-  std::unique_ptr<llvm::ExecutionEngine> ee{llvm::EngineBuilder(std::move(module)).create()};
+  llvm::LoopAnalysisManager loop_analysis_manager;
+  llvm::FunctionAnalysisManager function_analysis_manager;
+  llvm::CGSCCAnalysisManager cgscc_anaylysis_manager;
+  llvm::ModuleAnalysisManager module_analysis_manager;
+
+  llvm::PassBuilder pass_builder{false, target_machine};
+
+  function_analysis_manager.registerPass([&] { return pass_builder.buildDefaultAAPipeline(); });
+
+  pass_builder.registerModuleAnalyses(module_analysis_manager);
+  pass_builder.registerCGSCCAnalyses(cgscc_anaylysis_manager);
+  pass_builder.registerFunctionAnalyses(function_analysis_manager);
+  pass_builder.registerLoopAnalyses(loop_analysis_manager);
+  pass_builder.crossRegisterProxies(loop_analysis_manager,
+                                    function_analysis_manager,
+                                    cgscc_anaylysis_manager,
+                                    module_analysis_manager);
+
+  llvm::ModulePassManager module_pass_manager = pass_builder.buildPerModuleDefaultPipeline(
+      llvm::PassBuilder::OptimizationLevel::O3);
+
+  module_pass_manager.run(*module, module_analysis_manager);
+
+  add_function.print(llvm::outs());
+
+  llvm::EngineBuilder engine_builder{std::move(module)};
+  engine_builder.setOptLevel(llvm::CodeGenOpt::Aggressive);
+  std::unique_ptr<llvm::ExecutionEngine> ee{engine_builder.create(target_machine)};
   ee->finalizeObject();
 
   const uint64_t function_ptr = ee->getFunctionAddress(add_function.getName().str());
@@ -126,14 +186,11 @@ void playground()
   const FuncType generated_function = (FuncType)function_ptr;
   UNUSED_VARS(generated_function, module_ptr);
 
-  /*
   LLVMTargetMachineEmitToFile((LLVMTargetMachineRef)ee->getTargetMachine(),
                               llvm::wrap(module_ptr),
                               (char *)"C:\\Users\\jacques\\Documents\\machine_code.txt",
                               LLVMAssemblyFile,
                               nullptr);
-  */
-  add_function.print(llvm::outs());
 }
 
 }  // namespace blender::fn
