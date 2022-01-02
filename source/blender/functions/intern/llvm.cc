@@ -38,32 +38,60 @@
 
 namespace blender::fn {
 
-const std::string object_file_path = "/home/jacques/Documents/my_object.o";
+static llvm::Function &create_add_loop_function(llvm::Module &module)
+{
+  llvm::LLVMContext &context = module.getContext();
+  llvm::IRBuilder<> builder{context};
+  llvm::FunctionType &function_type = *llvm::FunctionType::get(
+      builder.getVoidTy(),
+      {builder.getFloatTy()->getPointerTo(),
+       builder.getFloatTy(),
+       builder.getFloatTy()->getPointerTo(),
+       builder.getInt64Ty()},
+      false);
+  llvm::Function &function = *llvm::Function::Create(
+      &function_type,
+      llvm::GlobalValue::LinkageTypes::ExternalLinkage,
+      "Add Span and Single",
+      &module);
 
-class MyObjectCache : public llvm::ObjectCache {
-  void notifyObjectCompiled(const llvm::Module *module, llvm::MemoryBufferRef obj) override
-  {
-    std::cout << "Compiled Module: " << module->getName().str() << "   -    "
-              << module->getModuleIdentifier() << "\n";
-    std::cout << "Size: " << obj.getBufferSize() << "\n";
+  llvm::Value *src_array_ptr_v = function.getArg(0);
+  llvm::Value *src_value_v = function.getArg(1);
+  llvm::Value *dst_array_ptr_v = function.getArg(2);
+  llvm::Value *array_size_v = function.getArg(3);
 
-    std::ofstream f;
-    f.open(object_file_path, std::ofstream::out | std::ofstream::binary);
-    f.write(obj.getBufferStart(), obj.getBufferSize());
-    f.close();
-  }
+  llvm::BasicBlock *entry_bb = llvm::BasicBlock::Create(context, "entry", &function);
+  llvm::BasicBlock *loop_entry_bb = llvm::BasicBlock::Create(context, "loop_entry");
+  llvm::BasicBlock *loop_body_bb = llvm::BasicBlock::Create(context, "loop_body");
+  llvm::BasicBlock *loop_end_bb = llvm::BasicBlock::Create(context, "loop_end");
 
-  std::unique_ptr<llvm::MemoryBuffer> getObject(const llvm::Module *module) override
-  {
-    // return {};
-    std::cout << "Request Cache: " << module->getName().str() << "   -    "
-              << module->getModuleIdentifier() << "\n";
-    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> buffer_err = llvm::MemoryBuffer::getFile(
-        object_file_path);
-    std::unique_ptr<llvm::MemoryBuffer> buffer = std::move(*buffer_err);
-    return buffer;
-  }
-};
+  builder.SetInsertPoint(entry_bb);
+  builder.CreateBr(loop_entry_bb);
+
+  builder.SetInsertPoint(loop_entry_bb);
+  llvm::PHINode *index_v = builder.CreatePHI(builder.getInt64Ty(), 2);
+  index_v->addIncoming(builder.getInt64(0), entry_bb);
+  llvm::Value *is_less_than_v = builder.CreateICmpSLT(index_v, array_size_v);
+  builder.CreateCondBr(is_less_than_v, loop_body_bb, loop_end_bb);
+
+  std::cout << "1\n";
+  builder.SetInsertPoint(loop_body_bb);
+  std::cout << "2\n";
+  llvm::Value *load_ptr_v = builder.CreateGEP(src_array_ptr_v, index_v);
+  std::cout << "3\n";
+  llvm::Value *store_ptr_v = builder.CreateGEP(dst_array_ptr_v, index_v);
+  std::cout << "4\n";
+  llvm::Value *value_from_array_v = builder.CreateLoad(builder.getFloatTy(), load_ptr_v);
+  std::cout << "5\n";
+  llvm::Value *new_value_v = builder.CreateAdd(value_from_array_v, src_value_v);
+  builder.CreateStore(new_value_v, store_ptr_v);
+  llvm::Value *next_index_v = builder.CreateAdd(index_v, builder.getInt64(1));
+  index_v->addIncoming(next_index_v, loop_body_bb);
+
+  builder.SetInsertPoint(loop_end_bb);
+  builder.CreateRetVoid();
+  return function;
+}
 
 void playground()
 {
@@ -79,49 +107,27 @@ void playground()
     llvm::InitializeNativeTargetAsmParser();
     return true;
   }();
+  UNUSED_VARS(initialized);
 
   llvm::LLVMContext context;
   std::unique_ptr<llvm::Module> module = std::make_unique<llvm::Module>("My Module", context);
 
   llvm::legacy::FunctionPassManager function_pass_manager{module.get()};
   function_pass_manager.add(llvm::createInstructionCombiningPass());
+  std::cout << "A\n";
 
-  llvm::Type *int32_type = llvm::Type::getInt32Ty(context);
-  llvm::FunctionType *function_type = llvm::FunctionType::get(
-      int32_type, {int32_type, int32_type}, false);
-  llvm::Function *function = llvm::Function::Create(
-      function_type, llvm::GlobalValue::LinkageTypes::ExternalLinkage, "My Func", *module);
-  llvm::BasicBlock *bb = llvm::BasicBlock::Create(context, "entry", function);
-  llvm::IRBuilder<> builder{bb};
-  llvm::Value *sum_value = builder.CreateAdd(function->getArg(0), function->getArg(1));
-  sum_value = builder.CreateAdd(sum_value, builder.getInt32(5));
-  sum_value = builder.CreateAdd(sum_value, builder.getInt32(10));
-  llvm::Value *product_value = builder.CreateMul(function->getArg(0), sum_value);
-  builder.CreateRet(product_value);
+  llvm::Function &add_function = create_add_loop_function(*module);
 
   BLI_assert(!llvm::verifyModule(*module, &llvm::outs()));
 
-  function_pass_manager.run(*function);
-
-  // MyObjectCache object_cache;
-
-  // llvm::Expected<llvm::object::OwningBinary<llvm::object::ObjectFile>> object_file_ex =
-  //     llvm::object::ObjectFile::createObjectFile(object_file_path);
-  // if (!object_file_ex) {
-  //   return;
-  // }
-
   llvm::Module *module_ptr = &*module;
   std::unique_ptr<llvm::ExecutionEngine> ee{llvm::EngineBuilder(std::move(module)).create()};
-  // ee->addObjectFile(std::move(*object_file_ex));
-  // ee->setObjectCache(&object_cache);
   ee->finalizeObject();
 
-  const uint64_t function_ptr = ee->getFunctionAddress(function->getName().str());
-  using FuncType = int (*)(int, int);
+  const uint64_t function_ptr = ee->getFunctionAddress(add_function.getName().str());
+  using FuncType = void (*)(const float *, float, float *, int);
   const FuncType generated_function = (FuncType)function_ptr;
-  const int result = generated_function(3, 5);
-  std::cout << result << "\n";
+  UNUSED_VARS(generated_function, module_ptr);
 
   /*
   LLVMTargetMachineEmitToFile((LLVMTargetMachineRef)ee->getTargetMachine(),
@@ -130,8 +136,7 @@ void playground()
                               LLVMAssemblyFile,
                               nullptr);
   */
-  // function->dump();
-  function->print(llvm::outs());
+  add_function.print(llvm::outs());
 }
 
 }  // namespace blender::fn
