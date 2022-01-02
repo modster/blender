@@ -61,6 +61,16 @@ static void node_init(bNodeTree *UNUSED(tree), bNode *node)
   node->storage = data;
 }
 
+static void node_update(bNodeTree *ntree, bNode *node)
+{
+  const NodeGeometryExtrudeMesh &storage = node_storage(*node);
+  const GeometryNodeExtrudeMeshMode mode = static_cast<GeometryNodeExtrudeMeshMode>(storage.mode);
+
+  bNodeSocket *individual_socket = (bNodeSocket *)node->inputs.last;
+
+  nodeSetSocketAvailability(ntree, individual_socket, mode == GEO_NODE_EXTRUDE_MESH_FACES);
+}
+
 struct AttributeOutputs {
   StrongAnonymousAttributeID top_id;
   StrongAnonymousAttributeID side_id;
@@ -295,7 +305,6 @@ static void extrude_mesh_edges(MeshComponent &component,
     MPoly &poly = new_polys[i];
     poly.loopstart = orig_loop_size + i * 4;
     poly.totloop = 4;
-    poly.mat_nr = 0;
     poly.flag = 0;
   }
 
@@ -1024,7 +1033,8 @@ static void node_geo_exec(GeoNodeExecParams params)
     attribute_outputs.side_id = StrongAnonymousAttributeID("Side");
   }
 
-  const bool extrude_individual = params.extract_input<bool>("Individual");
+  const bool extrude_individual = mode == GEO_NODE_EXTRUDE_MESH_FACES &&
+                                  params.extract_input<bool>("Individual");
 
   geometry_set.modify_geometry_sets([&](GeometrySet &geometry_set) {
     if (geometry_set.has_mesh()) {
@@ -1072,6 +1082,7 @@ void register_node_type_geo_extrude_mesh()
   geo_node_type_base(&ntype, GEO_NODE_EXTRUDE_MESH, "Extrude Mesh", NODE_CLASS_GEOMETRY, 0);
   ntype.declare = file_ns::node_declare;
   node_type_init(&ntype, file_ns::node_init);
+  node_type_update(&ntype, file_ns::node_update);
   ntype.geometry_node_execute = file_ns::node_geo_exec;
   node_type_storage(
       &ntype, "NodeGeometryExtrudeMesh", node_free_standard_storage, node_copy_standard_storage);
