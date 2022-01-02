@@ -417,7 +417,7 @@ static bool get_closest_point_on_edge(float r_point[3],
 }
 
 /* Get closest vertex in all nurbs in given #ListBase to a given point. */
-static bool get_closest_vertex_to_point_in_nurbs(ListBase *nurbs,
+static bool get_closest_vertex_to_point_in_nurbs(const ListBase *nurbs,
                                                  Nurb **r_nu,
                                                  BezTriple **r_bezt,
                                                  BPoint **r_bp,
@@ -426,6 +426,10 @@ static bool get_closest_vertex_to_point_in_nurbs(ListBase *nurbs,
                                                  const float sel_dist_mul,
                                                  const ViewContext *vc)
 {
+  *r_nu = NULL;
+  *r_bezt = NULL;
+  *r_bp = NULL;
+
   float min_distance_bezt = FLT_MAX;
   float min_distance_bp = FLT_MAX;
 
@@ -1184,6 +1188,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   else {
     cpd = (CurvePenData *)(op->customdata);
   }
+  const float mval_fl[2] = {(float)event->mval[0], (float)event->mval[1]};
 
   const bool extrude_point = RNA_boolean_get(op->ptr, "extrude_point");
   const bool extrude_center = RNA_boolean_get(op->ptr, "extrude_center");
@@ -1251,8 +1256,6 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
               move_all_selected_points(&cu->editnurb->nurbs, event, &vc);
             }
             else {
-              ED_curve_editnurb_select_pick_thresholded(
-                  C, event->mval, sel_dist_mul, false, false, false);
               ED_curve_nurb_vert_selected_find(vc.obedit->data, vc.v3d, &nu, &bezt, &bp);
               if (bezt) {
                 move_selected_bezt_to_location(bezt, &vc, event->mval);
@@ -1274,7 +1277,6 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
     if (event->val == KM_PRESS) {
       ED_curve_nurb_vert_selected_find(cu, vc.v3d, &nu, &bezt, &bp);
       if (select_point || move_point) {
-        float mval_fl[2] = {(float)event->mval[0], (float)event->mval[1]};
         short bezt_idx = 0;
         if ((!nu || bezt || bp) && ED_curve_editnurb_select_pick_thresholded(
                                        C, event->mval, sel_dist_mul, false, false, false)) {
@@ -1357,7 +1359,6 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
 
       if (!cpd->acted && make_vector) {
         short bezt_idx;
-        float mval_fl[2] = {(float)event->mval[0], (float)event->mval[1]};
         get_closest_vertex_to_point_in_nurbs(
             &(cu->editnurb->nurbs), &nu, &bezt, &bp, &bezt_idx, mval_fl, sel_dist_mul, &vc);
         if (bezt) {
@@ -1380,7 +1381,6 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
 
       if (!cpd->acted && select_multi) {
         short bezt_idx;
-        const float mval_fl[2] = {(float)event->mval[0], (float)event->mval[1]};
         get_closest_vertex_to_point_in_nurbs(
             &(cu->editnurb->nurbs), &nu, &bezt, &bp, &bezt_idx, mval_fl, sel_dist_mul, &vc);
         if (bezt) {
