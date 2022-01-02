@@ -41,6 +41,7 @@ static void node_declare(NodeDeclarationBuilder &b)
   b.add_input<decl::Geometry>("Mesh").supported_type(GEO_COMPONENT_TYPE_MESH);
   b.add_input<decl::Bool>(N_("Selection")).default_value(true).supports_field().hide_value();
   b.add_input<decl::Vector>(N_("Offset")).supports_field().subtype(PROP_TRANSLATION);
+  b.add_input<decl::Bool>(N_("Individual"));
   b.add_output<decl::Geometry>("Mesh");
   b.add_output<decl::Bool>(N_("Top")).field_source();
   b.add_output<decl::Bool>(N_("Side")).field_source();
@@ -743,6 +744,270 @@ static void extrude_mesh_faces(MeshComponent &component,
   BLI_assert(BKE_mesh_is_valid(component.get_for_write()));
 }
 
+static void extrude_individual_mesh_faces(MeshComponent &component,
+                                          const Field<bool> &selection_field,
+                                          const Field<float3> &offset_field,
+                                          const AttributeOutputs &attribute_outputs)
+{
+  Mesh &mesh = *component.get_for_write();
+  const int orig_vert_size = mesh.totvert;
+  const int orig_edge_size = mesh.totedge;
+  Span<MPoly> orig_polys{mesh.mpoly, mesh.totpoly};
+  Span<MLoop> orig_loops{mesh.mloop, mesh.totloop};
+
+  Array<float3> poly_offset(orig_polys.size());
+  GeometryComponentFieldContext poly_context{component, ATTR_DOMAIN_FACE};
+  FieldEvaluator poly_evaluator{poly_context, mesh.totpoly};
+  poly_evaluator.set_selection(selection_field);
+  poly_evaluator.add_with_destination(offset_field, poly_offset.as_mutable_span());
+  poly_evaluator.evaluate();
+  const IndexMask poly_selection = poly_evaluator.get_evaluated_selection_as_mask();
+
+  int extrude_corner_size = 0;
+  Array<int> index_offsets(poly_selection.size() + 1);
+  for (const int i_selection : poly_selection.index_range()) {
+    const MPoly &poly = orig_polys[poly_selection[i_selection]];
+    index_offsets[i_selection] = extrude_corner_size;
+    extrude_corner_size += poly.totloop;
+  }
+  index_offsets.last() = extrude_corner_size;
+
+  const IndexRange new_vert_range{orig_vert_size, extrude_corner_size};
+  /* One edge connects each selected vertex to a new vertex on the extruded polygons. */
+  const IndexRange connect_edge_range{orig_edge_size, extrude_corner_size};
+  /* Each selected edge is duplicated to form a single edge on the extrusion. */
+  const IndexRange duplicate_edge_range{connect_edge_range.one_after_last(), extrude_corner_size};
+  /* Each edge selected for extrusion is extruded into a single face. */
+  const IndexRange side_poly_range{orig_polys.size(), duplicate_edge_range.size()};
+  const IndexRange side_loop_range{orig_loops.size(), side_poly_range.size() * 4};
+
+  expand_mesh_size(mesh,
+                   new_vert_range.size(),
+                   connect_edge_range.size() + duplicate_edge_range.size(),
+                   side_poly_range.size(),
+                   side_loop_range.size());
+
+  MutableSpan<MVert> new_verts = bke::mesh_verts(mesh).slice(new_vert_range);
+  MutableSpan<MEdge> edges{mesh.medge, mesh.totedge};
+  MutableSpan<MEdge> connect_edges = edges.slice(connect_edge_range);
+  MutableSpan<MEdge> duplicate_edges = edges.slice(duplicate_edge_range);
+  MutableSpan<MPoly> polys{mesh.mpoly, mesh.totpoly};
+  MutableSpan<MPoly> new_polys = polys.slice(side_poly_range);
+  MutableSpan<MLoop> loops{mesh.mloop, mesh.totloop};
+
+  for (MVert &vert : new_verts) {
+    vert.flag = 0;
+  }
+
+  // threading::parallel_for(poly_selection.index_range(), 256, [&](const IndexRange range) {
+  //   for (const int i_selection : poly_selection.slice(range)) {
+  //     const int corner_offset = index_offsets[i_selection];
+  //     const int corner_offset_next = index_offsets[i_selection + 1];
+  //     const int poly_totloop = corner_offset_next - corner_offset;
+
+  //     for (const int i : IndexRange(poly_totloop)) {
+  //       const int i_next = (i == poly_totloop - 1) ? 0 : i + 1;
+  //       const int i_extrude = corner_offset + i;
+  //       const int i_extrude_next = corner_offset + i_next;
+
+  //       const int i_duplicate_edge = duplicate_edge_range[i_extrude];
+
+  //       MEdge &duplicate_edge = edges[i_duplicate_edge];
+  //       duplicate_edge.v1 = new_vert_range[i_extrude];
+  //       duplicate_edge.v2 = new_vert_range[i_extrude_next];
+  //       duplicate_edge.flag = (ME_EDGEDRAW | ME_EDGERENDER);
+  //     }
+  //   }
+  // });
+
+  component.attribute_foreach([&](const AttributeIDRef &id, const AttributeMetaData meta_data) {
+    OutputAttribute attribute = component.attribute_try_get_for_output(
+        id, meta_data.domain, meta_data.data_type);
+    if (!attribute) {
+      return true; /* Impossible to write the "normal" attribute. */
+    }
+
+    attribute_math::convert_to_static_type(meta_data.data_type, [&](auto dummy) {
+      using T = decltype(dummy);
+      MutableSpan<T> data = attribute.as_span().typed<T>();
+      switch (attribute.domain()) {
+        case ATTR_DOMAIN_POINT: {
+          MutableSpan<T> new_data = data.slice(new_vert_range);
+
+          threading::parallel_for(poly_selection.index_range(), 1024, [&](const IndexRange range) {
+            for (const int i_selection : range) {
+              const MPoly &poly = polys[poly_selection[i_selection]];
+              Span<MLoop> poly_loops = loops.slice(poly.loopstart, poly.totloop);
+
+              const int corner_offset = index_offsets[i_selection];
+              for (const int i : poly_loops.index_range()) {
+                const int orig_index = poly_loops[i].v;
+                new_data[corner_offset + i] = data[orig_index];
+              }
+            }
+          });
+          break;
+        }
+        case ATTR_DOMAIN_EDGE: {
+          MutableSpan<T> duplicate_data = data.slice(duplicate_edge_range);
+          MutableSpan<T> connect_data = data.slice(connect_edge_range);
+
+          connect_data.fill(T());
+          threading::parallel_for(poly_selection.index_range(), 512, [&](const IndexRange range) {
+            for (const int i_selection : range) {
+              const MPoly &poly = polys[poly_selection[i_selection]];
+              Span<MLoop> poly_loops = loops.slice(poly.loopstart, poly.totloop);
+
+              /* The data for the duplicate edge is simply a copy of the original edge's data. */
+              const int corner_offset = index_offsets[i_selection];
+              for (const int i : poly_loops.index_range()) {
+                const int orig_index = poly_loops[i].e;
+                duplicate_data[corner_offset + i] = data[orig_index];
+              }
+
+              /* For the extruded edges, mix the data from the two neighboring original edges of
+               * the polygon. */
+              for (const int i : poly_loops.index_range()) {
+                const int i_loop_next = (i == poly.totloop - 1) ? 0 : i + 1;
+                const int orig_index = poly_loops[i].e;
+                const int orig_index_next = poly_loops[i_loop_next].e;
+                connect_data[corner_offset + i] = attribute_math::mix2(
+                    0.5f, data[orig_index], data[orig_index_next]);
+              }
+            }
+          });
+          break;
+        }
+        case ATTR_DOMAIN_FACE: {
+          MutableSpan<T> new_data = data.slice(side_poly_range);
+
+          threading::parallel_for(poly_selection.index_range(), 1024, [&](const IndexRange range) {
+            for (const int i_selection : range) {
+              const int poly_index = poly_selection[i_selection];
+
+              const int corner_offset = index_offsets[i_selection];
+              const int corner_offset_next = index_offsets[i_selection + 1];
+
+              MutableSpan<T> side_poly_data = new_data.slice(corner_offset,
+                                                             corner_offset_next - corner_offset);
+              side_poly_data.fill(data[poly_index]);
+            }
+          });
+          break;
+        }
+        case ATTR_DOMAIN_CORNER: {
+          MutableSpan<T> new_data = data.slice(side_loop_range);
+          new_data.fill(T());
+          // threading::parallel_for(poly_selection.index_range(), 1024, [&](const IndexRange
+          // range) {
+          //   for (const int i_selection : range) {
+          //     const int poly_index = poly_selection[i_selection];
+
+          //     const int corner_offset = index_offsets[i_selection] * 4;
+          //     const int corner_offset_next = index_offsets[i_selection + 1] * 4;
+
+          //     MutableSpan<T> side_loop_data = new_data.slice(corner_offset,
+          //                                                    corner_offset_next -
+          //                                                    corner_offset);
+          //     side_loop_data.fill(data[poly_index]);
+          //   }
+          // });
+          break;
+        }
+        default:
+          BLI_assert_unreachable();
+      }
+    });
+
+    attribute.save();
+    return true;
+  });
+
+  /* Some of these loops could be easily split. */
+  threading::parallel_for(poly_selection.index_range(), 256, [&](const IndexRange range) {
+    for (const int i_selection : range) {
+      const MPoly &poly = polys[poly_selection[i_selection]];
+      MutableSpan<MLoop> poly_loops = loops.slice(poly.loopstart, poly.totloop);
+
+      const int corner_offset = index_offsets[i_selection];
+
+      for (const int i : IndexRange(poly.totloop)) {
+        const int i_next = (i == poly.totloop - 1) ? 0 : i + 1;
+        const MLoop &loop = poly_loops[i];
+        const MLoop &loop_next = poly_loops[i_next];
+
+        const int i_extrude = corner_offset + i;
+        const int i_extrude_next = corner_offset + i_next;
+
+        const int i_duplicate_edge = duplicate_edge_range[i_extrude];
+        const int new_vert = new_vert_range[i_extrude];
+        const int new_vert_next = new_vert_range[i_extrude_next];
+
+        const int orig_edge = loop.e;
+
+        const int orig_vert = loop.v;
+        const int orig_vert_next = loop_next.v;
+
+        MEdge &duplicate_edge = duplicate_edges[i_extrude];
+        duplicate_edge.v1 = new_vert_range[i_extrude];
+        duplicate_edge.v2 = new_vert_range[i_extrude_next];
+        duplicate_edge.flag = (ME_EDGEDRAW | ME_EDGERENDER);
+
+        MPoly &side_poly = new_polys[i_extrude];
+        side_poly.loopstart = side_loop_range[i_extrude * 4];
+        side_poly.totloop = 4;
+        side_poly.flag = 0;
+
+        MutableSpan<MLoop> side_loops = loops.slice(side_loop_range[i_extrude * 4], 4);
+        side_loops[0].v = new_vert_next;
+        side_loops[0].e = i_duplicate_edge;
+        side_loops[1].v = new_vert;
+        side_loops[1].e = connect_edge_range[i_extrude];
+        side_loops[2].v = orig_vert;
+        side_loops[2].e = orig_edge;
+        side_loops[3].v = orig_vert_next;
+        side_loops[3].e = connect_edge_range[i_extrude_next];
+
+        MEdge &connect_edge = connect_edges[i_extrude];
+        connect_edge.v1 = orig_vert;
+        connect_edge.v2 = new_vert;
+        connect_edge.flag = (ME_EDGEDRAW | ME_EDGERENDER);
+      }
+
+      for (const int i : IndexRange(poly.totloop)) {
+        MLoop &loop = poly_loops[i];
+        loop.v = new_vert_range[corner_offset + i];
+        loop.e = duplicate_edge_range[corner_offset + i];
+      }
+    }
+  });
+
+  threading::parallel_for(poly_selection.index_range(), 1024, [&](const IndexRange range) {
+    for (const int i_selection : range) {
+      const IndexRange poly_verts{index_offsets[i_selection],
+                                  index_offsets[i_selection + 1] - index_offsets[i_selection]};
+      for (MVert &vert : new_verts.slice(poly_verts)) {
+        add_v3_v3(vert.co, poly_offset[poly_selection[i_selection]]);
+      }
+    }
+  });
+
+  BKE_mesh_runtime_clear_cache(&mesh);
+  BKE_mesh_normals_tag_dirty(&mesh);
+
+  if (attribute_outputs.top_id) {
+    save_selection_as_attribute(
+        component, attribute_outputs.top_id.get(), ATTR_DOMAIN_FACE, poly_selection);
+  }
+  if (attribute_outputs.side_id) {
+    save_selection_as_attribute(
+        component, attribute_outputs.side_id.get(), ATTR_DOMAIN_FACE, side_poly_range);
+  }
+
+  BKE_mesh_calc_normals(component.get_for_write());
+  BLI_assert(BKE_mesh_is_valid(component.get_for_write()));
+}
+
 static void node_geo_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Mesh");
@@ -759,6 +1024,8 @@ static void node_geo_exec(GeoNodeExecParams params)
     attribute_outputs.side_id = StrongAnonymousAttributeID("Side");
   }
 
+  const bool extrude_individual = params.extract_input<bool>("Individual");
+
   geometry_set.modify_geometry_sets([&](GeometrySet &geometry_set) {
     if (geometry_set.has_mesh()) {
       MeshComponent &component = geometry_set.get_component_for_write<MeshComponent>();
@@ -770,7 +1037,12 @@ static void node_geo_exec(GeoNodeExecParams params)
           extrude_mesh_edges(component, selection, offset, attribute_outputs);
           break;
         case GEO_NODE_EXTRUDE_MESH_FACES: {
-          extrude_mesh_faces(component, selection, offset, attribute_outputs);
+          if (extrude_individual) {
+            extrude_individual_mesh_faces(component, selection, offset, attribute_outputs);
+          }
+          else {
+            extrude_mesh_faces(component, selection, offset, attribute_outputs);
+          }
           break;
         }
       }
