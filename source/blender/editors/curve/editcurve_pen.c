@@ -1118,6 +1118,36 @@ static bool make_cyclic_if_endpoints(Nurb *sel_nu,
   return false;
 }
 
+static void select_deselect_bezt(BezTriple *bezt, const short bezt_idx)
+{
+  if (bezt_idx == 1) {
+    if (BEZT_ISSEL_IDX(bezt, 1)) {
+      BEZT_DESEL_ALL(bezt);
+    }
+    else {
+      BEZT_SEL_ALL(bezt);
+    }
+  }
+  else {
+    if (BEZT_ISSEL_IDX(bezt, bezt_idx)) {
+      BEZT_DESEL_IDX(bezt, bezt_idx);
+    }
+    else {
+      BEZT_SEL_IDX(bezt, bezt_idx);
+    }
+  }
+}
+
+static void select_deselect_bp(BPoint *bp)
+{
+  if (bp->f1 == SELECT) {
+    bp->f1 = ~SELECT;
+  }
+  else {
+    bp->f1 = SELECT;
+  }
+}
+
 static bool is_event_key_equal_to_extra_key(const int event_key, const int extra_key)
 {
   return ((event_key == EVT_LEFTSHIFTKEY || event_key == EVT_RIGHTSHIFTKEY) &&
@@ -1162,6 +1192,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   const bool insert_point = RNA_boolean_get(op->ptr, "insert_point");
   const bool move_seg = RNA_boolean_get(op->ptr, "move_segment");
   const bool select_point = RNA_boolean_get(op->ptr, "select_point");
+  const bool select_multi = RNA_boolean_get(op->ptr, "select_multi");
   const bool move_point = RNA_boolean_get(op->ptr, "move_point");
   const bool close_spline = RNA_boolean_get(op->ptr, "close_spline");
   const bool make_vector = RNA_boolean_get(op->ptr, "make_vector");
@@ -1332,9 +1363,13 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
         if (bezt) {
           if (bezt_idx == 0) {
             bezt->h1 = HD_VECT;
+            bezt->h2 = HD_FREE;
+            cpd->acted = true;
           }
           else if (bezt_idx == 2) {
+            bezt->h1 = HD_FREE;
             bezt->h2 = HD_VECT;
+            cpd->acted = true;
           }
 
           if (nu && nu->type == CU_BEZIER) {
@@ -1343,7 +1378,22 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
         }
       }
 
-      if (!cpd->acted && select_point) {
+      if (!cpd->acted && select_multi) {
+        short bezt_idx;
+        const float mval_fl[2] = {(float)event->mval[0], (float)event->mval[1]};
+        get_closest_vertex_to_point_in_nurbs(
+            &(cu->editnurb->nurbs), &nu, &bezt, &bp, &bezt_idx, mval_fl, sel_dist_mul, &vc);
+        if (bezt) {
+          select_deselect_bezt(bezt, bezt_idx);
+        }
+        else if (bp) {
+          select_deselect_bp(bp);
+        }
+        else {
+          ED_curve_deselect_all(cu->editnurb);
+        }
+      }
+      else if (!cpd->acted && select_point) {
         ED_curve_editnurb_select_pick_thresholded(
             C, event->mval, sel_dist_mul, false, false, false);
       }
@@ -1433,6 +1483,8 @@ void CURVE_OT_pen(wmOperatorType *ot)
       ot->srna, "move_segment", false, "Move Segment", "Delete an existing point");
   prop = RNA_def_boolean(
       ot->srna, "select_point", false, "Select Point", "Select a point or its handles");
+  prop = RNA_def_boolean(
+      ot->srna, "select_multi", false, "Select Multiple", "Select multiple points");
   prop = RNA_def_boolean(
       ot->srna, "move_point", false, "Move Point", "Move a point or its handles");
   prop = RNA_def_boolean(ot->srna,
