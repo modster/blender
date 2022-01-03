@@ -67,7 +67,7 @@ BLI_INLINE bool edgeref_is_init(const EdgeFaceRef *edge_ref)
  * \param poly_nors: Precalculated face normals.
  * \param r_vert_nors: Return vert normals.
  */
-static void mesh_calc_hq_normal(Mesh *mesh, float (*poly_nors)[3], float (*r_vert_nors)[3])
+static void mesh_calc_hq_normal(Mesh *mesh, const float (*poly_nors)[3], float (*r_vert_nors)[3])
 {
   int i, numVerts, numEdges, numPolys;
   MPoly *mpoly, *mp;
@@ -204,7 +204,7 @@ Mesh *MOD_solidify_extrude_modifyMesh(ModifierData *md, const ModifierEvalContex
   int *edge_order = NULL;
 
   float(*vert_nors)[3] = NULL;
-  float(*poly_nors)[3] = NULL;
+  const float(*poly_nors)[3] = NULL;
 
   const bool need_poly_normals = (smd->flag & MOD_SOLIDIFY_NORMAL_CALC) ||
                                  (smd->flag & MOD_SOLIDIFY_EVEN) ||
