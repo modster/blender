@@ -214,7 +214,7 @@ void curves_time(sampler1DArray curve_map,
                  float end_frame,
                  out float result)
 {
-  float normalized_time = (FrameNumber - start_frame) / (end_frame - start_frame);
+  float normalized_time = (compositor_data.frame_number - start_frame) / (end_frame - start_frame);
 
   /* Evaluate the normalized time on the first curve map. */
   float parameter = NORMALIZE_PARAMETER(normalized_time, range_minimum, range_divider);
