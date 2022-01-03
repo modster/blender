@@ -872,24 +872,30 @@ static void extrude_point_from_selected_vertex(const ViewContext *vc,
   BPoint *bp = NULL;
   Curve *cu = vc->obedit->data;
 
-  get_selected_points(cu, vc->v3d, &nu, &bezt, &bp);
+  ED_curve_nurb_vert_selected_find(cu, vc->v3d, &nu, &bezt, &bp);
 
-  if (nu && !extrude_center && nu->pntsu > 2) {
-    int start, end;
-    if (nu->flagu & CU_NURB_CYCLIC) {
-      start = 0;
-      end = nu->pntsu;
-    }
-    else {
-      start = 1;
-      end = nu->pntsu - 1;
-    }
-    for (int i = start; i < end; i++) {
-      if (nu->type == CU_BEZIER) {
-        BEZT_DESEL_ALL(nu->bezt + i);
-      }
-      else {
-        (nu->bp + i)->f1 = ~SELECT;
+  if (!extrude_center) {
+    ListBase *nurbs = BKE_curve_editNurbs_get(cu);
+
+    LISTBASE_FOREACH (Nurb *, nu1, nurbs) {
+      if (nu1->pntsu > 2) {
+        int start, end;
+        if (nu1->flagu & CU_NURB_CYCLIC) {
+          start = 0;
+          end = nu1->pntsu;
+        }
+        else {
+          start = 1;
+          end = nu1->pntsu - 1;
+        }
+        for (int i = start; i < end; i++) {
+          if (nu1->type == CU_BEZIER) {
+            BEZT_DESEL_ALL(nu1->bezt + i);
+          }
+          else {
+            (nu1->bp + i)->f1 = ~SELECT;
+          }
+        }
       }
     }
   }
