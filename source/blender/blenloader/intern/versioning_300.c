@@ -58,6 +58,7 @@
 #include "BKE_fcurve.h"
 #include "BKE_fcurve_driver.h"
 #include "BKE_idprop.h"
+#include "BKE_image.h"
 #include "BKE_lib_id.h"
 #include "BKE_lib_override.h"
 #include "BKE_main.h"
@@ -816,6 +817,13 @@ void do_versions_after_linking_300(Main *bmain, ReportList *UNUSED(reports))
         }
       }
       FOREACH_MAIN_ID_END;
+    }
+
+    /* Ensure tiled image sources contain a UDIM token. */
+    LISTBASE_FOREACH (Image *, ima, &bmain->images) {
+      if (ima->source == IMA_SRC_TILED) {
+        BKE_image_ensure_tile_token(ima->filepath);
+      }
     }
   }
 }
@@ -2062,7 +2070,7 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
               SpaceFile *sfile = (SpaceFile *)sl;
               if (sfile->params) {
                 sfile->params->flag &= ~(FILE_PARAMS_FLAG_UNUSED_1 | FILE_PARAMS_FLAG_UNUSED_2 |
-                                         FILE_PARAMS_FLAG_UNUSED_3 | FILE_PARAMS_FLAG_UNUSED_4);
+                                         FILE_PARAMS_FLAG_UNUSED_3 | FILE_PATH_TOKENS_ALLOW);
               }
 
               /* New default import type: Append with reuse. */
@@ -2501,5 +2509,22 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
       }
     }
     FOREACH_NODETREE_END;
+
+    /* Update spreadsheet data set region type. */
+    LISTBASE_FOREACH (bScreen *, screen, &bmain->screens) {
+      LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
+        LISTBASE_FOREACH (SpaceLink *, sl, &area->spacedata) {
+          if (sl->spacetype == SPACE_SPREADSHEET) {
+            ListBase *regionbase = (sl == area->spacedata.first) ? &area->regionbase :
+                                                                   &sl->regionbase;
+            LISTBASE_FOREACH (ARegion *, region, regionbase) {
+              if (region->regiontype == RGN_TYPE_CHANNELS) {
+                region->regiontype = RGN_TYPE_TOOLS;
+              }
+            }
+          }
+        }
+      }
+    }
   }
 }
