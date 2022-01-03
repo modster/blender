@@ -633,24 +633,26 @@ static void update_data_for_all_nurbs(const ListBase *nurbs, const ViewContext *
         update_data_if_closest_point_in_segment(bezt + 1, nu->bezt, nu, nu->pntsu - 1, vc, data);
       }
 
-      float point[3], fraction;
-      get_closest_point_on_edge(point, data->mval, data->cut_loc, data->next_loc, vc, &fraction);
-      worldspace_to_screenspace(point, vc, screen_co);
-      const float dist1 = len_manhattan_v2v2(screen_co, data->mval);
-
-      data->min_dist = dist1;
-
-      get_closest_point_on_edge(point, data->mval, data->cut_loc, data->prev_loc, vc, &fraction);
-      worldspace_to_screenspace(point, vc, screen_co);
-      const float dist2 = len_manhattan_v2v2(screen_co, data->mval);
-
-      if (dist2 < dist1) {
-        data->parameter -= fraction / nu->resolu;
-        data->min_dist = dist2;
+      float fraction = 0.0f;
+      float point[3];
+      if (data->has_next) {
+        get_closest_point_on_edge(point, data->mval, data->cut_loc, data->next_loc, vc, &fraction);
+        worldspace_to_screenspace(point, vc, screen_co);
+        const float dist1 = len_manhattan_v2v2(screen_co, data->mval);
+        data->min_dist = dist1;
       }
-      else {
-        data->parameter += fraction / nu->resolu;
+
+      if (data->has_prev) {
+        get_closest_point_on_edge(point, data->mval, data->cut_loc, data->prev_loc, vc, &fraction);
+        worldspace_to_screenspace(point, vc, screen_co);
+        const float dist2 = len_manhattan_v2v2(screen_co, data->mval);
+        if (dist2 < data->min_dist) {
+          data->min_dist = dist2;
+          fraction = -fraction;
+        }
       }
+
+      data->parameter += fraction / nu->resolu;
     }
     else {
       float screen_co[2];
@@ -1339,9 +1341,11 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
         MoveSegmentData *seg_data = cpd->msd;
         nu = seg_data->nu;
         move_segment(seg_data, event, &vc);
+        cpd->acted = true;
       }
       else if (cpd->extra_pressed && extra_func == ADJ_HANDLE) {
         move_adjacent_handle(&vc, event);
+        cpd->acted = true;
       }
       /* If dragging a new control point, move handle point with mouse cursor. Else move entire
        * control point. */
@@ -1353,6 +1357,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
                                !(nu->flagu & CU_NURB_CYCLIC)) ||
                               (nu->bezt == bezt && (nu->flagu & CU_NURB_CYCLIC));
           move_bezt_handles_to_mouse(bezt, invert, event, &vc);
+          cpd->acted = true;
         }
       }
       else if ((select_point || move_point) && !cpd->spline_nearby) {
@@ -1380,7 +1385,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
     }
   }
   else if (ELEM(event->type, LEFTMOUSE)) {
-    if (event->val == KM_PRESS) {
+    if (ELEM(event->val, KM_PRESS, KM_DBL_CLICK)) {
       get_selected_points(cu, vc.v3d, &nu, &bezt, &bp);
       cpd->nu = nu;
       cpd->bezt = bezt;
@@ -1446,7 +1451,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
 
       if (!cpd->acted && (insert_point || extrude_point) && cpd->spline_nearby) {
         if (!cpd->dragging) {
-          if (insert_point && move_seg) {
+          if (insert_point) {
             insert_point_to_segment(event, vc.obedit->data, &nu, sel_dist_mul, &vc);
             cpd->new_point = true;
             cpd->acted = true;
