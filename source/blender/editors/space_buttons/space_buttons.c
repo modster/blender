@@ -868,7 +868,7 @@ static void buttons_id_remap(ScrArea *UNUSED(area),
   SpaceProperties *sbuts = (SpaceProperties *)slink;
 
   if (BKE_id_remapper_apply(mappings, &sbuts->pinid, ID_REMAP_APPLY_DEFAULT) ==
-      ID_REMAP_SOURCE_UNASSIGNED) {
+      ID_REMAP_RESULT_SOURCE_UNASSIGNED) {
     sbuts->flag &= ~SB_PIN_CONTEXT;
   }
 
@@ -877,7 +877,7 @@ static void buttons_id_remap(ScrArea *UNUSED(area),
 
     for (int i = 0; i < path->len; i++) {
       switch (BKE_id_remapper_apply(mappings, &path->ptr[i].owner_id, ID_REMAP_APPLY_DEFAULT)) {
-        case ID_REMAP_SOURCE_UNASSIGNED: {
+        case ID_REMAP_RESULT_SOURCE_UNASSIGNED: {
           if (i == 0) {
             MEM_SAFE_FREE(sbuts->path);
           }
@@ -887,7 +887,7 @@ static void buttons_id_remap(ScrArea *UNUSED(area),
           }
           break;
         }
-        case ID_REMAP_SOURCE_REMAPPED: {
+        case ID_REMAP_RESULT_SOURCE_REMAPPED: {
           RNA_id_pointer_create(path->ptr[i].owner_id, &path->ptr[i]);
           /* There is no easy way to check/make path downwards valid, just nullify it.
            * Next redraw will rebuild this anyway. */
@@ -897,8 +897,8 @@ static void buttons_id_remap(ScrArea *UNUSED(area),
           break;
         }
 
-        case ID_REMAP_SOURCE_NOT_MAPPABLE:
-        case ID_REMAP_SOURCE_UNAVAILABLE: {
+        case ID_REMAP_RESULT_SOURCE_NOT_MAPPABLE:
+        case ID_REMAP_RESULT_SOURCE_UNAVAILABLE: {
           /* Nothing to do. */
           break;
         }

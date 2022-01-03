@@ -417,15 +417,15 @@ static void outliner_id_remap(ScrArea *area, SpaceLink *slink, const struct IDRe
   BLI_mempool_iternew(space_outliner->treestore, &iter);
   while ((tselem = BLI_mempool_iterstep(&iter))) {
     switch (BKE_id_remapper_apply(mappings, &tselem->id, ID_REMAP_APPLY_DEFAULT)) {
-      case ID_REMAP_SOURCE_REMAPPED:
+      case ID_REMAP_RESULT_SOURCE_REMAPPED:
         changed = true;
         break;
-      case ID_REMAP_SOURCE_UNASSIGNED:
+      case ID_REMAP_RESULT_SOURCE_UNASSIGNED:
         changed = true;
         unassigned = true;
         break;
-      case ID_REMAP_SOURCE_UNAVAILABLE:
-      case ID_REMAP_SOURCE_NOT_MAPPABLE:
+      case ID_REMAP_RESULT_SOURCE_UNAVAILABLE:
+      case ID_REMAP_RESULT_SOURCE_NOT_MAPPABLE:
         break;
     }
   }

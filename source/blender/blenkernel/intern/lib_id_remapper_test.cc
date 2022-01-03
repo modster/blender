@@ -30,7 +30,7 @@ TEST(lib_id_remapper, unavailable)
 
   IDRemapper *remapper = BKE_id_remapper_create();
   IDRemapperApplyResult result = BKE_id_remapper_apply(remapper, &idp, ID_REMAP_APPLY_DEFAULT);
-  EXPECT_EQ(result, ID_REMAP_SOURCE_UNAVAILABLE);
+  EXPECT_EQ(result, ID_REMAP_RESULT_SOURCE_UNAVAILABLE);
 
   BKE_id_remapper_free(remapper);
 }
@@ -41,7 +41,7 @@ TEST(lib_id_remapper, not_mappable)
 
   IDRemapper *remapper = BKE_id_remapper_create();
   IDRemapperApplyResult result = BKE_id_remapper_apply(remapper, &idp, ID_REMAP_APPLY_DEFAULT);
-  EXPECT_EQ(result, ID_REMAP_SOURCE_NOT_MAPPABLE);
+  EXPECT_EQ(result, ID_REMAP_RESULT_SOURCE_NOT_MAPPABLE);
 
   BKE_id_remapper_free(remapper);
 }
@@ -55,7 +55,7 @@ TEST(lib_id_remapper, mapped)
   IDRemapper *remapper = BKE_id_remapper_create();
   BKE_id_remapper_add(remapper, &id1, &id2);
   IDRemapperApplyResult result = BKE_id_remapper_apply(remapper, &idp, ID_REMAP_APPLY_DEFAULT);
-  EXPECT_EQ(result, ID_REMAP_SOURCE_REMAPPED);
+  EXPECT_EQ(result, ID_REMAP_RESULT_SOURCE_REMAPPED);
   EXPECT_EQ(idp, &id2);
 
   BKE_id_remapper_free(remapper);
@@ -69,7 +69,7 @@ TEST(lib_id_remapper, unassigned)
   IDRemapper *remapper = BKE_id_remapper_create();
   BKE_id_remapper_add(remapper, &id1, nullptr);
   IDRemapperApplyResult result = BKE_id_remapper_apply(remapper, &idp, ID_REMAP_APPLY_DEFAULT);
-  EXPECT_EQ(result, ID_REMAP_SOURCE_UNASSIGNED);
+  EXPECT_EQ(result, ID_REMAP_RESULT_SOURCE_UNASSIGNED);
   EXPECT_EQ(idp, nullptr);
 
   BKE_id_remapper_free(remapper);

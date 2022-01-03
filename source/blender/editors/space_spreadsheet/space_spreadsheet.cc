@@ -184,7 +184,7 @@ static void spreadsheet_id_remap(ScrArea *UNUSED(area),
     SpreadsheetContextObject *object_context = (SpreadsheetContextObject *)context;
     if (BKE_id_remapper_apply(mappings,
                               ((ID **)&object_context->object),
-                              ID_REMAP_APPLY_DEFAULT) == ID_REMAP_SOURCE_REMAPPED) {
+                              ID_REMAP_APPLY_DEFAULT) == ID_REMAP_RESULT_SOURCE_REMAPPED) {
       if (object_context->object != nullptr && GS(object_context->object->id.name) != ID_OB) {
         object_context->object = nullptr;
       }

@@ -45,11 +45,11 @@ struct IDRemapper {
   {
     BLI_assert(id_ptr_ptr != nullptr);
     if (*id_ptr_ptr == nullptr) {
-      return ID_REMAP_SOURCE_NOT_MAPPABLE;
+      return ID_REMAP_RESULT_SOURCE_NOT_MAPPABLE;
     }
 
     if (!mappings.contains(*id_ptr_ptr)) {
-      return ID_REMAP_SOURCE_UNAVAILABLE;
+      return ID_REMAP_RESULT_SOURCE_UNAVAILABLE;
     }
 
     if (options & ID_REMAP_APPLY_UPDATE_REFCOUNT) {
@@ -58,7 +58,7 @@ struct IDRemapper {
 
     *id_ptr_ptr = mappings.lookup(*id_ptr_ptr);
     if (*id_ptr_ptr == nullptr) {
-      return ID_REMAP_SOURCE_UNASSIGNED;
+      return ID_REMAP_RESULT_SOURCE_UNASSIGNED;
     }
 
     if (options & ID_REMAP_APPLY_UPDATE_REFCOUNT) {
@@ -68,7 +68,7 @@ struct IDRemapper {
     if (options & ID_REMAP_APPLY_ENSURE_REAL) {
       id_us_ensure_real(*id_ptr_ptr);
     }
-    return ID_REMAP_SOURCE_REMAPPED;
+    return ID_REMAP_RESULT_SOURCE_REMAPPED;
   }
 
   void iter(IDRemapperIterFunction func, void *user_data) const

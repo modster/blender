@@ -899,8 +899,8 @@ static void node_id_remap(ScrArea *UNUSED(area),
   SpaceNode *snode = (SpaceNode *)slink;
 
   if (ELEM(BKE_id_remapper_apply(mappings, &snode->id, ID_REMAP_APPLY_DEFAULT),
-           ID_REMAP_SOURCE_REMAPPED,
-           ID_REMAP_SOURCE_UNASSIGNED)) {
+           ID_REMAP_RESULT_SOURCE_REMAPPED,
+           ID_REMAP_RESULT_SOURCE_UNASSIGNED)) {
     /* nasty DNA logic for SpaceNode:
      * ideally should be handled by editor code, but would be bad level call
      */
@@ -912,7 +912,7 @@ static void node_id_remap(ScrArea *UNUSED(area),
     snode->edittree = nullptr;
   }
   if (BKE_id_remapper_apply(mappings, &snode->from, ID_REMAP_APPLY_DEFAULT) ==
-      ID_REMAP_SOURCE_UNASSIGNED) {
+      ID_REMAP_RESULT_SOURCE_UNASSIGNED) {
     snode->flag &= ~SNODE_PIN;
   }
   BKE_id_remapper_apply(mappings, (ID **)&snode->gpd, ID_REMAP_APPLY_UPDATE_REFCOUNT);

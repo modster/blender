@@ -173,19 +173,20 @@ void BKE_library_callback_remap_editor_id_reference_set(
 struct IDRemapper;
 typedef enum IDRemapperApplyResult {
   /** No remapping rules available for the source. */
-  ID_REMAP_SOURCE_UNAVAILABLE,
+  ID_REMAP_RESULT_SOURCE_UNAVAILABLE,
   /** Source isn't mappable (fe NULL). */
-  ID_REMAP_SOURCE_NOT_MAPPABLE,
+  ID_REMAP_RESULT_SOURCE_NOT_MAPPABLE,
   /** Source has been remapped to a new pointer. */
-  ID_REMAP_SOURCE_REMAPPED,
+  ID_REMAP_RESULT_SOURCE_REMAPPED,
   /** Source has been set to NULL. */
-  ID_REMAP_SOURCE_UNASSIGNED,
+  ID_REMAP_RESULT_SOURCE_UNASSIGNED,
 } IDRemapperApplyResult;
 
 typedef enum IDRemapperApplyOptions {
-  ID_REMAP_APPLY_DEFAULT = 0,
   ID_REMAP_APPLY_UPDATE_REFCOUNT = (1 << 0),
   ID_REMAP_APPLY_ENSURE_REAL = (1 << 1),
+
+  ID_REMAP_APPLY_DEFAULT = 0,
 } IDRemapperApplyOptions;
 
 typedef void (*IDRemapperIterFunction)(struct ID *old_id, struct ID *new_id, void *user_data);
