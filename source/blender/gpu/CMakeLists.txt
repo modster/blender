@@ -382,6 +382,8 @@ set(GLSL_SRC
   shaders/gpu_shader_colorspace_lib.glsl
 
   shaders/gpu_shader_common_obinfos_lib.glsl
+
+  intern/gpu_shader_shared_utils.h
 )
 
 set(GLSL_C)

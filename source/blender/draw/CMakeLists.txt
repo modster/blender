@@ -208,6 +208,7 @@ set(SRC
   intern/draw_manager_profiling.h
   intern/draw_manager_testing.h
   intern/draw_manager_text.h
+  intern/draw_shader_shared.h
   intern/draw_shader.h
   intern/draw_texture_pool.h
   intern/draw_view.h
@@ -228,6 +229,7 @@ set(SRC
   engines/image/image_space_node.hh
   engines/workbench/workbench_engine.h
   engines/workbench/workbench_private.h
+  engines/workbench/workbench_shader_shared.h
   engines/select/select_engine.h
   engines/select/select_private.h
   engines/overlay/overlay_engine.h
@@ -361,6 +363,8 @@ set(GLSL_SRC
   engines/workbench/shaders/workbench_volume_vert.glsl
   engines/workbench/shaders/workbench_world_light_lib.glsl
 
+  engines/workbench/workbench_shader_shared.h
+
   intern/shaders/common_colormanagement_lib.glsl
   intern/shaders/common_globals_lib.glsl
   intern/shaders/common_pointcloud_lib.glsl
@@ -373,6 +377,8 @@ set(GLSL_SRC
   intern/shaders/common_fxaa_lib.glsl
   intern/shaders/common_smaa_lib.glsl
   intern/shaders/common_fullscreen_vert.glsl
+
+  intern/draw_shader_shared.h
 
   engines/gpencil/shaders/gpencil_frag.glsl
   engines/gpencil/shaders/gpencil_vert.glsl

@@ -1,6 +1,11 @@
+
 #ifndef GPU_SHADER
 #  include "gpu_shader_shared_utils.h"
 #endif
+
+#define DRW_SHADER_SHARED_H
+
+#define DRW_RESOURCE_CHUNK_LEN 512
 
 struct ViewInfos {
   /* View matrices */
@@ -16,6 +21,7 @@ struct ViewInfos {
   /* Should not be here. Not view dependent (only main view). */
   float4 viewcamtexcofac;
 };
+BLI_STATIC_ASSERT_ALIGN(ViewInfos, 16)
 
 /* TODO(fclem) Mass rename. */
 #define ViewProjectionMatrix drw_view.persmat
@@ -32,3 +38,4 @@ struct ObjectMatrices {
   float4x4 drw_modelMatrix;
   float4x4 drw_modelMatrixInverse;
 };
+BLI_STATIC_ASSERT_ALIGN(ViewInfos, 16)

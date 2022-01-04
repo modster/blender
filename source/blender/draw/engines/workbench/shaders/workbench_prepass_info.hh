@@ -10,20 +10,18 @@ GPU_SHADER_CREATE_INFO(workbench_mesh)
     .vertex_in(1, Type::VEC3, "nor")
     .vertex_in(2, Type::VEC4, "ac")
     .vertex_in(3, Type::VEC2, "au")
-    .vertex_source("workbench_prepass_vert.glsl");
+    .vertex_source("workbench_prepass_vert.glsl")
+    .additional_info("draw_mesh");
 
 GPU_SHADER_CREATE_INFO(workbench_hair)
     .sampler(0, ImageType::FLOAT_BUFFER, "ac", Frequency::BATCH)
     .sampler(1, ImageType::FLOAT_BUFFER, "au", Frequency::BATCH)
-    .vertex_source("workbench_prepass_hair_vert.glsl");
-// .additional_info("draw_hair");
+    .vertex_source("workbench_prepass_hair_vert.glsl")
+    .additional_info("draw_hair");
 
 GPU_SHADER_CREATE_INFO(workbench_pointcloud)
-    .vertex_in(0, Type::VEC4, "pos")
-    .vertex_in(1, Type::VEC3, "pos_inst")
-    .vertex_in(2, Type::VEC3, "nor")
-    .vertex_source("workbench_prepass_pointcloud_vert.glsl");
-// .additional_info("draw_pointcloud");
+    .vertex_source("workbench_prepass_pointcloud_vert.glsl")
+    .additional_info("draw_pointcloud");
 
 /** \} */
 
@@ -35,11 +33,15 @@ GPU_SHADER_CREATE_INFO(workbench_texture_none).define("TEXTURE_NONE");
 
 GPU_SHADER_CREATE_INFO(workbench_texture_single)
     .sampler(2, ImageType::FLOAT_2D, "imageTexture", Frequency::BATCH)
+    .push_constant(0, Type::FLOAT, "imageTransparencyCutoff")
+    .push_constant(1, Type::BOOL, "imagePremult")
     .define("V3D_SHADING_TEXTURE_COLOR");
 
 GPU_SHADER_CREATE_INFO(workbench_texture_tile)
     .sampler(2, ImageType::FLOAT_2D_ARRAY, "imageTileArray", Frequency::BATCH)
     .sampler(3, ImageType::FLOAT_1D_ARRAY, "imageTileData", Frequency::BATCH)
+    .push_constant(0, Type::FLOAT, "imageTransparencyCutoff")
+    .push_constant(1, Type::BOOL, "imagePremult")
     .define("TEXTURE_IMAGE_ARRAY");
 
 /** \} */
@@ -67,9 +69,7 @@ GPU_SHADER_INTERFACE_INFO(workbench_material_iface, "")
     .flat(Type::FLOAT, "roughness")
     .flat(Type::FLOAT, "metallic");
 
-GPU_SHADER_CREATE_INFO(workbench_material)
-    .vertex_out(workbench_material_iface)
-    .additional_info("draw_view");
+GPU_SHADER_CREATE_INFO(workbench_material).vertex_out(workbench_material_iface);
 
 /** \} */
 
@@ -83,6 +83,8 @@ GPU_SHADER_CREATE_INFO(workbench_transparent_accum)
     .fragment_out(0, Type::VEC4, "transparentAccum")
     .fragment_out(1, Type::VEC4, "revealageAccum")
     .fragment_out(2, Type::UINT, "objectId")
+    .uniform_buf(4, "WorldData", "world_data", Frequency::PASS)
+    .typedef_source("workbench_shader_shared.h")
     .fragment_source("workbench_transparent_accum_frag.glsl")
     .additional_info("workbench_material");
 
@@ -91,6 +93,7 @@ GPU_SHADER_CREATE_INFO(workbench_opaque)
     .fragment_out(1, Type::VEC2, "normalData")
     .fragment_out(2, Type::UINT, "objectId")
     .uniform_buf(4, "WorldData", "world_data", Frequency::PASS)
+    .typedef_source("workbench_shader_shared.h")
     .fragment_source("workbench_prepass_frag.glsl")
     .additional_info("workbench_material");
 

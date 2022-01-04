@@ -1,5 +1,7 @@
 
+#ifndef WORKBENCH_SHADER_SHARED_H
 out vec4 uvcoordsvar;
+#endif
 
 void main()
 {
