@@ -128,6 +128,16 @@ static void expand_mesh_size(Mesh &mesh,
   }
 }
 
+static Array<Vector<int>> create_vert_to_edge_map(const int vert_size, Span<MEdge> edges)
+{
+  Array<Vector<int>> vert_to_edge_map(vert_size);
+  for (const int i : edges.index_range()) {
+    vert_to_edge_map[edges[i].v1].append(i);
+    vert_to_edge_map[edges[i].v2].append(i);
+  }
+  return vert_to_edge_map;
+}
+
 static void extrude_mesh_vertices(MeshComponent &component,
                                   const Field<bool> &selection_field,
                                   const Field<float3> &offset_field,
@@ -160,6 +170,9 @@ static void extrude_mesh_vertices(MeshComponent &component,
     edge.flag = ME_LOOSEEDGE;
   }
 
+  Array<Vector<int>> vert_to_edge_map = create_vert_to_edge_map(
+      orig_vert_size, bke::mesh_edges(mesh).take_front(orig_edge_size));
+
   component.attribute_foreach([&](const AttributeIDRef &id, const AttributeMetaData meta_data) {
     if (!ELEM(meta_data.domain, ATTR_DOMAIN_POINT, ATTR_DOMAIN_EDGE)) {
       return true;
@@ -172,14 +185,31 @@ static void extrude_mesh_vertices(MeshComponent &component,
       switch (attribute.domain()) {
         case ATTR_DOMAIN_POINT: {
           MutableSpan<T> new_data = data.slice(new_vert_range);
-          for (const int i : selection.index_range()) {
-            new_data[i] = data[selection[i]];
-          }
+          threading::parallel_for(selection.index_range(), 512, [&](const IndexRange range) {
+            for (const int i : range) {
+              new_data[i] = data[selection[i]];
+            }
+          });
           break;
         }
         case ATTR_DOMAIN_EDGE: {
-          MutableSpan<T> new_edges = data.slice(new_edge_range);
-          new_edges.fill(T());
+          MutableSpan<T> new_data = data.slice(new_edge_range);
+          threading::parallel_for(selection.index_range(), 512, [&](const IndexRange range) {
+            for (const int i : range) {
+              /* Create a separate mixer for every point to avoid allocating temporary buffers
+               * in the mixer the size of the result point cloud and to allow multi-threading. */
+              attribute_math::DefaultMixer<T> mixer{new_data.slice(i, 1)};
+
+              const int i_src_vert = selection[i];
+              Span<int> connected_edges = vert_to_edge_map[i_src_vert];
+
+              for (const int i_connected_edge : connected_edges) {
+                mixer.mix_in(0, data[i_connected_edge]);
+              }
+
+              mixer.finalize();
+            }
+          });
           break;
         }
         default:
