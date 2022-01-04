@@ -82,8 +82,8 @@ typedef struct CurvePenData {
   bool new_point;
   /* Whether a segment is being altered by click and drag. */
   bool spline_nearby;
-  /* Whether the extra key was pressed before. */
-  bool extra_pressed;
+  /* Whether shortcut for toggling free handles was pressed. */
+  bool free_toggle_pressed;
   /* Whether some action was done. Used for select. */
   bool acted;
   /* Whether a point was found underneath the mouse. */
@@ -98,22 +98,10 @@ typedef struct CurvePenData {
   BPoint *bp;
 } CurvePenData;
 
-/* Enum to choose between the extra functionalities. */
-typedef enum eExtra_func { FREE_TOGGLE = 0, ADJ_HANDLE = 1, NO_EXTRA = 2 } eExtra_func;
-static const EnumPropertyItem prop_extra_func_types[] = {
-    {FREE_TOGGLE, "FREE_TOGGLE", 0, "Free-Align Toggle", "Toggle between free and align handles."},
-    {ADJ_HANDLE,
-     "ADJ_HANDLE",
-     0,
-     "Move Adjacent Handle",
-     "Move the closer handle of the adjacent vertex."},
-    {NO_EXTRA, "NO_EXTRA", 0, "None", "No extra functionality."},
-    {0, NULL, 0, NULL, NULL},
-};
-
-/* Enum to choose between shortcuts for the extra functionality. */
-typedef enum eExtra_key { SHIFT = 0, CTRL = 1, ALT = 2 } eExtra_key;
+/* Enum to choose between shortcuts for the extra functionalities. */
+typedef enum eExtra_key { NONE = 0, SHIFT = 1, CTRL = 2, ALT = 3 } eExtra_key;
 static const EnumPropertyItem prop_extra_key_types[] = {
+    {NONE, "None", 0, "None", ""},
     {SHIFT, "Shift", 0, "Shift", ""},
     {CTRL, "Ctrl", 0, "Ctrl", ""},
     {ALT, "Alt", 0, "Alt", ""},
@@ -271,6 +259,7 @@ static void move_bp_to_location(BPoint *bp, const int mval[2], const ViewContext
 
 /* Move all selected points by an amount equivalent to the distance moved by mouse. */
 static void move_all_selected_points(ListBase *editnurb,
+                                     const bool move_entire,
                                      const wmEvent *event,
                                      const ViewContext *vc)
 {
@@ -1147,6 +1136,7 @@ static void move_adjacent_handle(ViewContext *vc, const wmEvent *event)
     adj_bezt = BKE_nurb_bezt_get_next(nu, bezt);
     cp_index = 0;
   }
+  adj_bezt->h1 = adj_bezt->h2 = HD_FREE;
 
   float screen_co_fl[2];
   int displacement[2], screen_co_int[2];
@@ -1288,10 +1278,6 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   Nurb *nu = NULL;
 
   int ret = OPERATOR_RUNNING_MODAL;
-  /* Key binding set for the extra functionality. */
-  const int extra_key = RNA_enum_get(op->ptr, "extra_key");
-  /* The chosen extra functionality. */
-  const int extra_func = RNA_enum_get(op->ptr, "extra_func");
   /* Distance threshold for mouse clicks to affect the spline or its points */
   const float sel_dist_mul = RNA_float_get(op->ptr, "sel_dist_mul");
 
@@ -1315,27 +1301,19 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   const bool move_point = RNA_boolean_get(op->ptr, "move_point");
   const bool close_spline = RNA_boolean_get(op->ptr, "close_spline");
   const bool toggle_vector = RNA_boolean_get(op->ptr, "toggle_vector");
+  const int free_toggle = RNA_enum_get(op->ptr, "free_toggle");
+  const int adj_handle = RNA_enum_get(op->ptr, "adj_handle");
+  const int move_entire = RNA_enum_get(op->ptr, "move_entire");
 
-  if (!cpd->extra_pressed && is_event_key_equal_to_extra_key(event->type, extra_key)) {
+  if (!cpd->free_toggle_pressed && is_event_key_equal_to_extra_key(event->type, free_toggle)) {
     get_selected_points(vc.obedit->data, vc.v3d, &nu, &bezt, &bp);
     if (bezt) {
-      if (extra_func == FREE_TOGGLE) {
-        toggle_bezt_free_align_handles(bezt);
-        BKE_nurb_handles_calc(nu);
-        cpd->dragging = true;
-      }
-      else if (extra_func == ADJ_HANDLE) {
-        BezTriple *adj_bezt = BKE_nurb_bezt_get_prev(nu, bezt);
-        if (!adj_bezt) {
-          adj_bezt = BKE_nurb_bezt_get_next(nu, bezt);
-        }
-        if (adj_bezt) {
-          adj_bezt->h1 = adj_bezt->h2 = HD_FREE;
-        }
-      }
+      toggle_bezt_free_align_handles(bezt);
+      BKE_nurb_handles_calc(nu);
+      cpd->dragging = true;
     }
   }
-  cpd->extra_pressed = is_extra_key_pressed(event, extra_key);
+  cpd->free_toggle_pressed = is_extra_key_pressed(event, free_toggle);
 
   if (ELEM(event->type, MOUSEMOVE, INBETWEEN_MOUSEMOVE)) {
     if (!cpd->dragging && WM_event_drag_test(event, event->prev_click_xy) &&
@@ -1349,7 +1327,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
         move_segment(seg_data, event, &vc);
         cpd->acted = true;
       }
-      else if (cpd->extra_pressed && extra_func == ADJ_HANDLE) {
+      else if (is_extra_key_pressed(event, adj_handle)) {
         move_adjacent_handle(&vc, event);
         cpd->acted = true;
       }
@@ -1369,7 +1347,8 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
       else if ((select_point || move_point) && !cpd->spline_nearby) {
         if (cpd->found_point) {
           if (move_point) {
-            move_all_selected_points(&cu->editnurb->nurbs, event, &vc);
+            move_all_selected_points(
+                &cu->editnurb->nurbs, is_extra_key_pressed(event, move_entire), event, &vc);
             cpd->acted = true;
           }
         }
@@ -1543,17 +1522,23 @@ void CURVE_OT_pen(wmOperatorType *ot)
                        0.2f,
                        1.5f);
   prop = RNA_def_enum(ot->srna,
-                      "extra_func",
-                      prop_extra_func_types,
-                      NO_EXTRA,
-                      "Extra",
-                      "Additional functionality assignable to a specified key");
-  prop = RNA_def_enum(ot->srna,
-                      "extra_key",
+                      "free_toggle",
                       prop_extra_key_types,
-                      SHIFT,
-                      "Extra Key",
-                      "Key used by the extra functionality");
+                      NONE,
+                      "Free-Align Toggle",
+                      "Toggle between free and align handles");
+  prop = RNA_def_enum(ot->srna,
+                      "adj_handle",
+                      prop_extra_key_types,
+                      NONE,
+                      "Move Adjacent Handle",
+                      "Move the closer handle of the adjacent vertex");
+  prop = RNA_def_enum(ot->srna,
+                      "move_entire",
+                      prop_extra_key_types,
+                      NONE,
+                      "Move Entire",
+                      "Move the whole point using handles");
   prop = RNA_def_boolean(ot->srna,
                          "extrude_point",
                          false,
