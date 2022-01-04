@@ -11307,10 +11307,10 @@ static void def_geo_scale_elements(StructRNA *srna)
   };
 
   prop = RNA_def_property(srna, "mode", PROP_ENUM, PROP_NONE);
-  RNA_def_property_enum_items(prop, rna_enum_attribute_type_items);
-  RNA_def_property_enum_funcs(prop, NULL, NULL, "rna_GeometryNodeAttributeFill_type_itemf");
-  RNA_def_property_enum_default(prop, CD_PROP_FLOAT);
-  RNA_def_property_ui_text(prop, "Data Type", "");
+  RNA_def_property_enum_sdna(prop, NULL, "custom1");
+  RNA_def_property_enum_items(prop, scale_elements_mode_items);
+  RNA_def_property_enum_default(prop, GEO_NODE_SCALE_ELEMENTS_MODE_FACE);
+  RNA_def_property_ui_text(prop, "Mode", "Element type to transform");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_GeometryNode_socket_update");
 }
 
