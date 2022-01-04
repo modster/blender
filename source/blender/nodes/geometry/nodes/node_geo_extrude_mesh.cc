@@ -128,9 +128,10 @@ static void expand_mesh_size(Mesh &mesh,
   }
 }
 
-static Array<Vector<int>> create_vert_to_edge_map(const int vert_size, Span<MEdge> edges)
+static Array<Vector<int>> create_vert_to_edge_map(const Mesh &mesh)
 {
-  Array<Vector<int>> vert_to_edge_map(vert_size);
+  Span<MEdge> edges = bke::mesh_edges(mesh);
+  Array<Vector<int>> vert_to_edge_map(mesh.totvert);
   for (const int i : edges.index_range()) {
     vert_to_edge_map[edges[i].v1].append(i);
     vert_to_edge_map[edges[i].v2].append(i);
@@ -155,6 +156,8 @@ static void extrude_mesh_vertices(MeshComponent &component,
   const IndexMask selection = evaluator.get_evaluated_selection_as_mask();
   const VArray<float3> offsets = evaluator.get_evaluated<float3>(0);
 
+  Array<Vector<int>> vert_to_edge_map = create_vert_to_edge_map(mesh);
+
   expand_mesh_size(mesh, selection.size(), selection.size(), 0, 0);
 
   const IndexRange new_vert_range{orig_vert_size, selection.size()};
@@ -169,9 +172,6 @@ static void extrude_mesh_vertices(MeshComponent &component,
     edge.v2 = orig_vert_size + i_selection;
     edge.flag = ME_LOOSEEDGE;
   }
-
-  Array<Vector<int>> vert_to_edge_map = create_vert_to_edge_map(
-      orig_vert_size, bke::mesh_edges(mesh).take_front(orig_edge_size));
 
   component.attribute_foreach([&](const AttributeIDRef &id, const AttributeMetaData meta_data) {
     if (!ELEM(meta_data.domain, ATTR_DOMAIN_POINT, ATTR_DOMAIN_EDGE)) {
@@ -246,6 +246,63 @@ static void extrude_mesh_vertices(MeshComponent &component,
   BLI_assert(BKE_mesh_is_valid(component.get_for_write()));
 }
 
+static Array<Vector<int, 2>> mesh_calculate_polys_of_edge(const Mesh &mesh)
+{
+  Span<MPoly> polys = bke::mesh_polys(mesh);
+  Span<MLoop> loops = bke::mesh_loops(mesh);
+  Array<Vector<int, 2>> polys_of_edge(mesh.totedge);
+
+  for (const int poly_index : polys.index_range()) {
+    const MPoly &poly = polys[poly_index];
+    for (const MLoop &loop : loops.slice(poly.loopstart, poly.totloop)) {
+      polys_of_edge[loop.e].append(poly_index);
+    }
+  }
+
+  return polys_of_edge;
+}
+
+static void fill_quad_consistent_direction(Span<MLoop> other_poly_loops,
+                                           MutableSpan<MLoop> new_loops,
+                                           const int vert_connected_to_poly_1,
+                                           const int vert_connected_to_poly_2,
+                                           const int vert_across_from_poly_1,
+                                           const int vert_across_from_poly_2,
+                                           const int edge_connected_to_poly,
+                                           const int connecting_edge_1,
+                                           const int edge_across_from_poly,
+                                           const int connecting_edge_2)
+{
+  /* Find the loop on the polygon connected to the new quad that uses the duplicate edge. */
+  bool start_with_connecting_edge = true;
+  for (const MLoop &loop : other_poly_loops) {
+    if (loop.e == edge_connected_to_poly) {
+      start_with_connecting_edge = loop.v == vert_connected_to_poly_1;
+      break;
+    }
+  }
+  if (start_with_connecting_edge) {
+    new_loops[0].v = vert_connected_to_poly_1;
+    new_loops[0].e = connecting_edge_1;
+    new_loops[1].v = vert_across_from_poly_1;
+    new_loops[1].e = edge_across_from_poly;
+    new_loops[2].v = vert_across_from_poly_2;
+    new_loops[2].e = connecting_edge_2;
+    new_loops[3].v = vert_connected_to_poly_2;
+    new_loops[3].e = edge_connected_to_poly;
+  }
+  else {
+    new_loops[0].v = vert_connected_to_poly_1;
+    new_loops[0].e = edge_connected_to_poly;
+    new_loops[1].v = vert_connected_to_poly_2;
+    new_loops[1].e = connecting_edge_2;
+    new_loops[2].v = vert_across_from_poly_2;
+    new_loops[2].e = edge_across_from_poly;
+    new_loops[3].v = vert_across_from_poly_1;
+    new_loops[3].e = connecting_edge_1;
+  }
+}
+
 /**
  * The resulting vector maps from the index in the added vertices to the original vertex they were
  * extruded from.
@@ -310,6 +367,8 @@ static void extrude_mesh_edges(MeshComponent &component,
   /* Every new polygon is a quad with four corners. */
   const IndexRange new_loop_range{orig_loop_size, new_poly_range.size() * 4};
 
+  Array<Vector<int, 2>> edge_to_poly_map = mesh_calculate_polys_of_edge(mesh);
+
   expand_mesh_size(mesh,
                    new_vert_range.size(),
                    connect_edge_range.size() + duplicate_edge_range.size(),
@@ -319,8 +378,10 @@ static void extrude_mesh_edges(MeshComponent &component,
   MutableSpan<MVert> new_verts = bke::mesh_verts(mesh).slice(new_vert_range);
   MutableSpan<MEdge> connect_edges = bke::mesh_edges(mesh).slice(connect_edge_range);
   MutableSpan<MEdge> duplicate_edges = bke::mesh_edges(mesh).slice(duplicate_edge_range);
-  MutableSpan<MPoly> new_polys = bke::mesh_polys(mesh).slice(new_poly_range);
-  MutableSpan<MLoop> new_loops = bke::mesh_loops(mesh).slice(new_loop_range);
+  MutableSpan<MPoly> polys = bke::mesh_polys(mesh);
+  MutableSpan<MPoly> new_polys = polys.slice(new_poly_range);
+  MutableSpan<MLoop> loops = bke::mesh_loops(mesh);
+  MutableSpan<MLoop> new_loops = loops.slice(new_loop_range);
 
   for (const int i : connect_edges.index_range()) {
     MEdge &edge = connect_edges[i];
@@ -345,31 +406,35 @@ static void extrude_mesh_edges(MeshComponent &component,
     poly.flag = 0;
   }
 
-  /* TODO: Figure out winding order for new faces. */
   for (const int i : edge_selection.index_range()) {
-    MutableSpan<MLoop> poly_loops = new_loops.slice(4 * i, 4);
     const int orig_edge_index = edge_selection[i];
-    const MEdge &duplicate_edge = duplicate_edges[i];
 
+    const MEdge &duplicate_edge = duplicate_edges[i];
     const int new_vert_1 = duplicate_edge.v1;
     const int new_vert_2 = duplicate_edge.v2;
     const int extrude_index_1 = new_vert_1 - orig_vert_size;
     const int extrude_index_2 = new_vert_2 - orig_vert_size;
-    const int orig_vert_index_1 = new_vert_orig_indices[extrude_index_1];
-    const int orig_vert_index_2 = new_vert_orig_indices[extrude_index_2];
 
-    /* Add the start vertex and edge along the original edge. */
-    poly_loops[0].v = orig_vert_index_1;
-    poly_loops[0].e = orig_edge_index;
-    /* Add the other vertex of the original edge and the first extrusion edge. */
-    poly_loops[1].v = orig_vert_index_2;
-    poly_loops[1].e = connect_edge_range[extrude_index_2];
-    /* Add the first new vertex and the duplicated edge. */
-    poly_loops[2].v = new_vert_2;
-    poly_loops[2].e = duplicate_edge_range[i];
-    /* Add the second duplicate edge vertex, and the second extruded edge to complete the face. */
-    poly_loops[3].v = new_vert_1;
-    poly_loops[3].e = connect_edge_range[extrude_index_1];
+    Span<int> connected_polys = edge_to_poly_map[orig_edge_index];
+
+    /* When there was a single polygon connected to the new polygon, we can use the old one to keep
+     * the face direction consistent. When there is more than one connected edge, the new face
+     * direction is totally arbitrary and the only goal for the behavior is to be deterministic. */
+    Span<MLoop> connected_poly_loops = {};
+    if (connected_polys.size() == 1) {
+      const MPoly &connected_poly = polys[connected_polys.first()];
+      connected_poly_loops = loops.slice(connected_poly.loopstart, connected_poly.totloop);
+    }
+    fill_quad_consistent_direction(connected_poly_loops,
+                                   new_loops.slice(4 * i, 4),
+                                   new_vert_orig_indices[extrude_index_1],
+                                   new_vert_orig_indices[extrude_index_2],
+                                   new_vert_1,
+                                   new_vert_2,
+                                   orig_edge_index,
+                                   connect_edge_range[extrude_index_1],
+                                   duplicate_edge_range[i],
+                                   connect_edge_range[extrude_index_2]);
   }
 
   component.attribute_foreach([&](const AttributeIDRef &id, const AttributeMetaData meta_data) {
@@ -614,49 +679,24 @@ static void extrude_mesh_faces(MeshComponent &component,
   }
 
   for (const int i : edge_selection.index_range()) {
-    MutableSpan<MLoop> poly_loops = new_loops.slice(4 * i, 4);
-    const int orig_edge_index = edge_selection[i];
-    const int duplicate_edge_index = duplicate_edge_range[i];
     const MEdge &duplicate_edge = duplicate_edges[i];
-
     const int new_vert_1 = duplicate_edge.v1;
     const int new_vert_2 = duplicate_edge.v2;
     const int extrude_index_1 = new_vert_1 - orig_vert_size;
     const int extrude_index_2 = new_vert_2 - orig_vert_size;
-    const int orig_vert_index_1 = new_vert_orig_indices[extrude_index_1];
-    const int orig_vert_index_2 = new_vert_orig_indices[extrude_index_2];
 
-    /* Find the loop on the extruded polygon that uses the duplicate edge. */
-    bool direction = true;
     const MPoly &extrude_poly = polys[edge_orig_face_indices[i]];
-    for (const MLoop &loop : loops.slice(extrude_poly.loopstart, extrude_poly.totloop)) {
-      if (loop.e == duplicate_edge_index) {
-        direction = loop.v == new_vert_1;
-        break;
-      }
-    }
 
-    /* The side faces of this extruded polygon must have the same winding order. */
-    if (direction) {
-      poly_loops[0].v = new_vert_1;
-      poly_loops[0].e = connect_edge_range[extrude_index_1];
-      poly_loops[1].v = orig_vert_index_1;
-      poly_loops[1].e = orig_edge_index;
-      poly_loops[2].v = orig_vert_index_2;
-      poly_loops[2].e = connect_edge_range[extrude_index_2];
-      poly_loops[3].v = new_vert_2;
-      poly_loops[3].e = duplicate_edge_index;
-    }
-    else {
-      poly_loops[0].v = new_vert_1;
-      poly_loops[0].e = duplicate_edge_index;
-      poly_loops[1].v = new_vert_2;
-      poly_loops[1].e = connect_edge_range[extrude_index_2];
-      poly_loops[2].v = orig_vert_index_2;
-      poly_loops[2].e = orig_edge_index;
-      poly_loops[3].v = orig_vert_index_1;
-      poly_loops[3].e = connect_edge_range[extrude_index_1];
-    }
+    fill_quad_consistent_direction(loops.slice(extrude_poly.loopstart, extrude_poly.totloop),
+                                   new_loops.slice(4 * i, 4),
+                                   new_vert_1,
+                                   new_vert_2,
+                                   new_vert_orig_indices[extrude_index_1],
+                                   new_vert_orig_indices[extrude_index_2],
+                                   duplicate_edge_range[i],
+                                   connect_edge_range[extrude_index_1],
+                                   edge_selection[i],
+                                   connect_edge_range[extrude_index_2]);
   }
 
   component.attribute_foreach([&](const AttributeIDRef &id, const AttributeMetaData meta_data) {
