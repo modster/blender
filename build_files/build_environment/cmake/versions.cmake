@@ -171,11 +171,27 @@ set(OPENMP_URI https://github.com/llvm/llvm-project/releases/download/llvmorg-${
 set(OPENMP_HASH_TYPE MD5)
 set(OPENMP_FILE openmp-${OPENMP_VERSION}.src.tar.xz)
 
-set(OPENIMAGEIO_VERSION 2.2.15.1)
-set(OPENIMAGEIO_URI https://github.com/OpenImageIO/oiio/archive/Release-${OPENIMAGEIO_VERSION}.tar.gz)
-set(OPENIMAGEIO_HASH 3db5c5f0b3dc91597c75e5df09eb9072)
+set(OPENIMAGEIO_VERSION v2.3.11.0)
+set(OPENIMAGEIO_URI https://github.com/OpenImageIO/oiio/archive/refs/tags/${OPENIMAGEIO_VERSION}.tar.gz)
+set(OPENIMAGEIO_HASH 04dfc101095929e5da6ffc1aeeb06ab8)
 set(OPENIMAGEIO_HASH_TYPE MD5)
 set(OPENIMAGEIO_FILE OpenImageIO-${OPENIMAGEIO_VERSION}.tar.gz)
+
+# 7.1.3 is currently oiio's preferred vesion although never versions are available.
+# the preferred version can be found in oiio's externalpackages.cmake
+set(FMT_VERSION 7.1.3)
+set(FMT_URI https://github.com/fmtlib/fmt/archive/refs/tags/${FMT_VERSION}.tar.gz)
+set(FMT_HASH 5cae7072042b3043e12d53d50ef404bbb76949dad1de368d7f993a15c8c05ecc)
+set(FMT_HASH_TYPE SHA256)
+set(FMT_FILE fmt-${FMT_VERSION}.tar.gz)
+
+# 0.6.2 is currently oiio's preferred vesion although never versions are available.
+# the preferred version can be found in oiio's externalpackages.cmake
+set(ROBINMAP_VERSION v0.6.2)
+set(ROBINMAP_URI https://github.com/Tessil/robin-map/archive/refs/tags/${ROBINMAP_VERSION}.tar.gz)
+set(ROBINMAP_HASH c08ec4b1bf1c85eb0d6432244a6a89862229da1cb834f3f90fba8dc35d8c8ef1)
+set(ROBINMAP_HASH_TYPE SHA256)
+set(ROBINMAP_FILE robinmap-${ROBINMAP_VERSION}.tar.gz)
 
 set(TIFF_VERSION 4.1.0)
 set(TIFF_URI http://download.osgeo.org/libtiff/tiff-${TIFF_VERSION}.tar.gz)

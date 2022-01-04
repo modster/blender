@@ -114,6 +114,10 @@ set(OPENIMAGEIO_EXTRA_ARGS
   -DUSE_EXTERNAL_PUGIXML=ON
   -DPUGIXML_LIBRARY=${LIBDIR}/pugixml/lib/${LIBPREFIX}pugixml${LIBEXT}
   -DPUGIXML_INCLUDE_DIR=${LIBDIR}/pugixml/include/
+  -DBUILD_MISSING_ROBINMAP=OFF
+  -DBUILD_MISSING_FMT=OFF
+  -DFMT_INCLUDE_DIR=${LIBDIR}/fmt/include/
+  -DRobinmap_ROOT=${LIBDIR}/robinmap
   ${WEBP_FLAGS}
   ${OIIO_SIMD_FLAGS}
 )
@@ -153,8 +157,8 @@ if(WIN32)
   endif()
   if(BUILD_MODE STREQUAL Debug)
     ExternalProject_Add_Step(external_openimageio after_install
-      COMMAND ${CMAKE_COMMAND} -E copy ${LIBDIR}/openimageio/lib/OpenImageIO.lib ${HARVEST_TARGET}/openimageio/lib/OpenImageIO_d.lib
-      COMMAND ${CMAKE_COMMAND} -E copy ${LIBDIR}/openimageio/lib/OpenImageIO_Util.lib ${HARVEST_TARGET}/openimageio/lib/OpenImageIO_Util_d.lib
+      COMMAND ${CMAKE_COMMAND} -E copy ${LIBDIR}/openimageio/lib/OpenImageIO_d.lib ${HARVEST_TARGET}/openimageio/lib/OpenImageIO_d.lib
+      COMMAND ${CMAKE_COMMAND} -E copy ${LIBDIR}/openimageio/lib/OpenImageIO_Util_d.lib ${HARVEST_TARGET}/openimageio/lib/OpenImageIO_Util_d.lib
       DEPENDEES install
     )
   endif()
