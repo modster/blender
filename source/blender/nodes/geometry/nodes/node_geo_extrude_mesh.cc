@@ -128,13 +128,14 @@ static void expand_mesh_size(Mesh &mesh,
   }
 }
 
-static Array<Vector<int>> create_vert_to_edge_map(const Mesh &mesh)
+static Array<Vector<int>> create_vert_to_edge_map(const int vert_size,
+                                                  Span<MEdge> edges,
+                                                  const int vert_offset = 0)
 {
-  Span<MEdge> edges = bke::mesh_edges(mesh);
-  Array<Vector<int>> vert_to_edge_map(mesh.totvert);
+  Array<Vector<int>> vert_to_edge_map(vert_size);
   for (const int i : edges.index_range()) {
-    vert_to_edge_map[edges[i].v1].append(i);
-    vert_to_edge_map[edges[i].v2].append(i);
+    vert_to_edge_map[edges[i].v1 - vert_offset].append(i);
+    vert_to_edge_map[edges[i].v2 - vert_offset].append(i);
   }
   return vert_to_edge_map;
 }
@@ -156,7 +157,8 @@ static void extrude_mesh_vertices(MeshComponent &component,
   const IndexMask selection = evaluator.get_evaluated_selection_as_mask();
   const VArray<float3> offsets = evaluator.get_evaluated<float3>(0);
 
-  Array<Vector<int>> vert_to_edge_map = create_vert_to_edge_map(mesh);
+  Array<Vector<int>> vert_to_edge_map = create_vert_to_edge_map(orig_vert_size,
+                                                                bke::mesh_edges(mesh));
 
   expand_mesh_size(mesh, selection.size(), selection.size(), 0, 0);
 
@@ -196,8 +198,8 @@ static void extrude_mesh_vertices(MeshComponent &component,
           MutableSpan<T> new_data = data.slice(new_edge_range);
           threading::parallel_for(selection.index_range(), 512, [&](const IndexRange range) {
             for (const int i : range) {
-              /* Create a separate mixer for every point to avoid allocating temporary buffers
-               * in the mixer the size of the result point cloud and to allow multi-threading. */
+              /* Create a separate mixer for every point to avoid allocating temporary
+               * buffers in the mixer the size of the result and to allow multi-threading. */
               attribute_math::DefaultMixer<T> mixer{new_data.slice(i, 1)};
 
               const int i_src_vert = selection[i];
@@ -437,6 +439,12 @@ static void extrude_mesh_edges(MeshComponent &component,
                                    connect_edge_range[extrude_index_2]);
   }
 
+  /* Create a map of all of an index in the extruded vertices array to all of the indices of edges
+   * in the duplicate edges array that connect to that vertex. This can be used to simplify the
+   * mixing of attribute data for the connecting edges. */
+  Array<Vector<int>> new_vert_to_duplicate_edge_map = create_vert_to_edge_map(
+      new_vert_range.size(), duplicate_edges, orig_vert_size);
+
   component.attribute_foreach([&](const AttributeIDRef &id, const AttributeMetaData meta_data) {
     OutputAttribute attribute = component.attribute_try_get_for_output(
         id, meta_data.domain, meta_data.data_type);
@@ -457,25 +465,37 @@ static void extrude_mesh_edges(MeshComponent &component,
         }
         case ATTR_DOMAIN_EDGE: {
           MutableSpan<T> duplicate_data = data.slice(duplicate_edge_range);
-          MutableSpan<T> connect_data = data.slice(connect_edge_range);
-          connect_data.fill(T());
           for (const int i : edge_selection.index_range()) {
             duplicate_data[i] = data[edge_selection[i]];
           }
+          MutableSpan<T> connect_data = data.slice(connect_edge_range);
+          threading::parallel_for(connect_data.index_range(), 512, [&](const IndexRange range) {
+            for (const int i : range) {
+              /* Create a separate mixer for every point to avoid allocating temporary
+               * buffers in the mixer the size of the result and to allow multi-threading. */
+              attribute_math::DefaultMixer<T> mixer{connect_data.slice(i, 1)};
+
+              for (const int i_connected_duplicate_edge : new_vert_to_duplicate_edge_map[i]) {
+                /* Use the duplicate data because it's slightly simpler to access and was just
+                 * filled in the previous loop. */
+                mixer.mix_in(0, duplicate_data[i_connected_duplicate_edge]);
+              }
+
+              mixer.finalize();
+            }
+          });
           break;
         }
         case ATTR_DOMAIN_FACE: {
           MutableSpan<T> new_data = data.slice(new_poly_range);
           threading::parallel_for(edge_selection.index_range(), 512, [&](const IndexRange range) {
             for (const int i : range) {
-              /* Create a separate mixer for every point to avoid allocating temporary buffers
-               * in the mixer the size of the result point cloud and to allow multi-threading. */
+              /* Create a separate mixer for every point to avoid allocating temporary
+               * buffers in the mixer the size of the result and to allow multi-threading. */
               attribute_math::DefaultMixer<T> mixer{new_data.slice(i, 1)};
 
               const int i_src_edge = edge_selection[i];
-              Span<int> connected_polys = edge_to_poly_map[i_src_edge];
-
-              for (const int i_connected_poly : connected_polys) {
+              for (const int i_connected_poly : edge_to_poly_map[i_src_edge]) {
                 mixer.mix_in(0, data[i_connected_poly]);
               }
 
@@ -486,7 +506,60 @@ static void extrude_mesh_edges(MeshComponent &component,
         }
         case ATTR_DOMAIN_CORNER: {
           MutableSpan<T> new_data = data.slice(new_loop_range);
-          new_data.fill(T());
+          threading::parallel_for(edge_selection.index_range(), 256, [&](const IndexRange range) {
+            for (const int i_edge_selection : range) {
+              const int orig_edge_index = edge_selection[i_edge_selection];
+
+              Span<int> connected_polys = edge_to_poly_map[orig_edge_index];
+              if (connected_polys.is_empty()) {
+                /* If there are no connected polygons, there is no corner data to
+                 * interpolate. */
+                new_data.slice(4 * i_edge_selection, 4).fill(T());
+                continue;
+              }
+
+              /* Each corner at the same location if the offset is zero gets the same value,
+               * so there are two separate values for the corner data of this new polygon. */
+              Array<T> side_poly_corner_data(2);
+              attribute_math::DefaultMixer<T> mixer{side_poly_corner_data};
+
+              const MEdge &duplicate_edge = duplicate_edges[i_edge_selection];
+              const int new_vert_1 = duplicate_edge.v1;
+              const int new_vert_2 = duplicate_edge.v2;
+              const int orig_vert_1 = new_vert_orig_indices[new_vert_1 - orig_vert_size];
+              const int orig_vert_2 = new_vert_orig_indices[new_vert_2 - orig_vert_size];
+
+              /* Average the corner data from the corners that share a vertex from the
+               * polygons that share an edge with the extruded edge. */
+              for (const int i_connected_poly : connected_polys.index_range()) {
+                const MPoly &connected_poly = polys[connected_polys[i_connected_poly]];
+                for (const int i_loop :
+                     IndexRange(connected_poly.loopstart, connected_poly.totloop)) {
+                  const MLoop &loop = loops[i_loop];
+                  if (loop.v == orig_vert_1) {
+                    mixer.mix_in(0, data[i_loop]);
+                  }
+                  if (loop.v == orig_vert_2) {
+                    mixer.mix_in(1, data[i_loop]);
+                  }
+                }
+              }
+
+              mixer.finalize();
+
+              /* Instead of replicating the order in #fill_quad_consistent_direction here, it's
+               * simpler (though probably not faster) to just match the corner data based on the
+               * vertex indices. */
+              for (const int i : IndexRange(4 * i_edge_selection, 4)) {
+                if (ELEM(new_loops[i].v, new_vert_1, orig_vert_1)) {
+                  new_data[i] = side_poly_corner_data.first();
+                }
+                else if (ELEM(new_loops[i].v, new_vert_2, orig_vert_2)) {
+                  new_data[i] = side_poly_corner_data.last();
+                }
+              }
+            }
+          });
           break;
         }
         default:
@@ -947,7 +1020,6 @@ static void extrude_individual_mesh_faces(MeshComponent &component,
               }
             }
           });
-
           break;
         }
         default:
