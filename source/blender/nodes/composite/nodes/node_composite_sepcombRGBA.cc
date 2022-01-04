@@ -37,11 +37,11 @@ static void cmp_node_seprgba_declare(NodeDeclarationBuilder &b)
 
 }  // namespace blender::nodes
 
-void register_node_type_cmp_seprgba(void)
+void register_node_type_cmp_seprgba()
 {
   static bNodeType ntype;
 
-  cmp_node_type_base(&ntype, CMP_NODE_SEPRGBA, "Separate RGBA", NODE_CLASS_CONVERTER, 0);
+  cmp_node_type_base(&ntype, CMP_NODE_SEPRGBA, "Separate RGBA", NODE_CLASS_CONVERTER);
   ntype.declare = blender::nodes::cmp_node_seprgba_declare;
 
   nodeRegisterType(&ntype);
@@ -62,11 +62,11 @@ static void cmp_node_combrgba_declare(NodeDeclarationBuilder &b)
 
 }  // namespace blender::nodes
 
-void register_node_type_cmp_combrgba(void)
+void register_node_type_cmp_combrgba()
 {
   static bNodeType ntype;
 
-  cmp_node_type_base(&ntype, CMP_NODE_COMBRGBA, "Combine RGBA", NODE_CLASS_CONVERTER, 0);
+  cmp_node_type_base(&ntype, CMP_NODE_COMBRGBA, "Combine RGBA", NODE_CLASS_CONVERTER);
   ntype.declare = blender::nodes::cmp_node_combrgba_declare;
 
   nodeRegisterType(&ntype);

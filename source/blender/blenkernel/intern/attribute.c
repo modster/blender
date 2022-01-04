@@ -688,3 +688,22 @@ AttributeRef *BKE_id_attributes_render_color_ref_p(ID *id)
       return NULL;
   }
 }
+
+bool BKE_id_attribute_ref_layer_equals(const struct AttributeRef *ref,
+                                       const struct CustomDataLayer *layer,
+                                       const AttributeDomain domain)
+{
+  bool ok = ref->domain == domain;
+  ok = ok && ref->type == layer->type;
+  ok = ok && STREQ(ref->name, layer->name);
+
+  return ok;
+}
+
+bool BKE_id_attribute_ref_equals(const struct AttributeRef *ref1, const struct AttributeRef *ref2)
+{
+  bool ok = ref1->type == ref2->type && ref1->domain == ref2->domain;
+
+  return ok && STREQ(ref1->name, ref2->name);
+}
+

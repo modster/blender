@@ -25,6 +25,7 @@
 #include <string.h>
 
 #include "DNA_action_types.h"
+#include "DNA_anim_types.h"
 #include "DNA_collection_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
@@ -35,6 +36,7 @@
 #include "BLI_utildefines.h"
 
 #include "BKE_context.h"
+#include "BKE_nla.h"
 #include "BKE_screen.h"
 
 #include "RNA_access.h"
@@ -203,6 +205,13 @@ static void action_main_region_draw(const bContext *C, ARegion *region)
 
   /* start and end frame */
   ANIM_draw_framerange(scene, v2d);
+
+  /* Draw the manually set intended playback frame range highlight in the Action editor. */
+  if (ELEM(saction->mode, SACTCONT_ACTION, SACTCONT_SHAPEKEY) && saction->action) {
+    AnimData *adt = ED_actedit_animdata_from_context(C, NULL);
+
+    ANIM_draw_action_framerange(adt, saction->action, v2d, -FLT_MAX, FLT_MAX);
+  }
 
   /* data */
   if (ANIM_animdata_get_context(C, &ac)) {
@@ -853,7 +862,6 @@ static void action_space_subtype_item_extend(bContext *UNUSED(C),
   RNA_enum_items_add(item, totitem, rna_enum_space_action_mode_items);
 }
 
-/* only called once, from space/spacetypes.c */
 void ED_spacetype_action(void)
 {
   SpaceType *st = MEM_callocN(sizeof(SpaceType), "spacetype action");

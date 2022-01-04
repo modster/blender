@@ -53,6 +53,8 @@ class GLTexture : public Texture {
   /** True if this texture is bound to at least one texture unit. */
   /* TODO(fclem): How do we ensure thread safety here? */
   bool is_bound_ = false;
+  /** True if pixels in the texture have been initialized. */
+  bool has_pixels_ = false;
 
  public:
   GLTexture(const char *name);
@@ -61,6 +63,12 @@ class GLTexture : public Texture {
   void update_sub(
       int mip, int offset[3], int extent[3], eGPUDataFormat type, const void *data) override;
 
+  /**
+   * This will create the mipmap images and populate them with filtered data from base level.
+   *
+   * \warning Depth textures are not populated but they have their mips correctly defined.
+   * \warning This resets the mipmap range.
+   */
   void generate_mipmap(void) override;
   void copy_to(Texture *dst) override;
   void clear(eGPUDataFormat format, const void *data) override;
@@ -78,11 +86,14 @@ class GLTexture : public Texture {
   static void samplers_update(void);
 
  protected:
+  /** Return true on success. */
   bool init_internal(void) override;
+  /** Return true on success. */
   bool init_internal(GPUVertBuf *vbo) override;
 
  private:
   bool proxy_check(int mip);
+  /** Will create enough mipmaps up to get to the given level. */
   void ensure_mipmaps(int mip);
   void update_sub_direct_state_access(
       int mip, int offset[3], int extent[3], GLenum gl_format, GLenum gl_type, const void *data);
@@ -292,7 +303,9 @@ inline GLenum to_gl(eGPUDataFormat format)
   }
 }
 
-/* Definitely not complete, edit according to the gl specification. */
+/**
+ * Definitely not complete, edit according to the OpenGL specification.
+ */
 inline GLenum to_gl_data_format(eGPUTextureFormat format)
 {
   /* You can add any of the available type to this list
@@ -364,7 +377,9 @@ inline GLenum to_gl_data_format(eGPUTextureFormat format)
   }
 }
 
-/* Assume Unorm / Float target. Used with glReadPixels. */
+/**
+ * Assume Unorm / Float target. Used with #glReadPixels.
+ */
 inline GLenum channel_len_to_gl(int channel_len)
 {
   switch (channel_len) {

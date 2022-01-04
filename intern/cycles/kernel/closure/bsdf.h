@@ -124,7 +124,7 @@ ccl_device_inline int bsdf_sample(KernelGlobals kg,
   /* For curves use the smooth normal, particularly for ribbons the geometric
    * normal gives too much darkening otherwise. */
   int label;
-  const float3 Ng = (sd->type & PRIMITIVE_ALL_CURVE) ? sc->N : sd->Ng;
+  const float3 Ng = (sd->type & PRIMITIVE_CURVE) ? sc->N : sd->Ng;
 
   switch (sc->type) {
     case CLOSURE_BSDF_DIFFUSE_ID:
@@ -438,7 +438,7 @@ ccl_device_inline int bsdf_sample(KernelGlobals kg,
   if (label & LABEL_TRANSMIT) {
     float threshold_squared = kernel_data.background.transparent_roughness_squared_threshold;
 
-    if (threshold_squared >= 0.0f) {
+    if (threshold_squared >= 0.0f && !(label & LABEL_DIFFUSE)) {
       if (bsdf_get_specular_roughness_squared(sc) <= threshold_squared) {
         label |= LABEL_TRANSMIT_TRANSPARENT;
       }

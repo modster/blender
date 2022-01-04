@@ -122,7 +122,7 @@ void EEVEE_cache_populate(void *vedata, Object *ob)
   }
 
   if (DRW_object_is_renderable(ob) && (ob_visibility & OB_VISIBLE_SELF)) {
-    if (ELEM(ob->type, OB_MESH, OB_CURVE, OB_SURF, OB_FONT, OB_MBALL)) {
+    if (ELEM(ob->type, OB_MESH, OB_SURF, OB_MBALL)) {
       EEVEE_materials_cache_populate(vedata, sldata, ob, &cast_shadow);
     }
     else if (ob->type == OB_HAIR) {
@@ -629,6 +629,7 @@ DrawEngineType draw_engine_eevee_type = {
     &eevee_data_size,
     &eevee_engine_init,
     &eevee_engine_free,
+    NULL, /* instance_free */
     &eevee_cache_init,
     &EEVEE_cache_populate,
     &eevee_cache_finish,

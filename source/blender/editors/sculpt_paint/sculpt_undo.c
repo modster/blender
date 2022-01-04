@@ -1707,7 +1707,6 @@ void ED_sculpt_undo_geometry_end(struct Object *ob)
   SCULPT_undo_push_end(ob);
 }
 
-/* Export for ED_undo_sys. */
 void ED_sculpt_undosys_type(UndoType *ut)
 {
   ut->name = "Sculpt";
