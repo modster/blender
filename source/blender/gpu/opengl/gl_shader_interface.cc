@@ -434,7 +434,7 @@ GLShaderInterface::GLShaderInterface(GLuint program, const shader::ShaderCreateI
 
   this->sort_inputs();
 
-  this->debug_print();
+  // this->debug_print();
 }
 
 GLShaderInterface::~GLShaderInterface()

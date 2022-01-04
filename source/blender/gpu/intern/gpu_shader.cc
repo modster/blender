@@ -81,6 +81,8 @@ static void standard_defines(Vector<const char *> &sources)
   BLI_assert(sources.size() == 0);
   /* Version needs to be first. Exact values will be added by implementation. */
   sources.append("version");
+  /* Define to identify code usage in shading language. */
+  sources.append("#define GPU_SHADER\n");
   /* some useful defines to detect GPU type */
   if (GPU_type_matches(GPU_DEVICE_ATI, GPU_OS_ANY, GPU_DRIVER_ANY)) {
     sources.append("#define GPU_ATI\n");
@@ -282,18 +284,20 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
 
   std::string defines = shader->defines_declare(info);
   std::string resources = shader->resources_declare(info);
+  char *shader_shared_utils = nullptr;
 
-  Vector<std::string> typedefs;
-  uint32_t builtins = 0;
+  Vector<char *> typedefs;
   for (auto filename : info.typedef_sources_) {
-    typedefs.append(gpu_shader_dependency_get_resolved_source(filename.c_str(), &builtins));
+    typedefs.append(gpu_shader_dependency_get_source(filename.c_str()));
+  }
+  if (!typedefs.is_empty()) {
+    shader_shared_utils = gpu_shader_dependency_get_source("gpu_shader_shared_utils.h");
   }
 
   if (!info.vertex_source_.is_empty()) {
-    uint32_t vertex_builtins = builtins;
+    uint32_t builtins = 0;
     std::string interface = shader->vertex_interface_declare(info);
-    std::string code = gpu_shader_dependency_get_resolved_source(info.vertex_source_.c_str(),
-                                                                 &vertex_builtins);
+    char *code = gpu_shader_dependency_get_resolved_source(info.vertex_source_.c_str(), &builtins);
 
     Vector<const char *> sources;
     standard_defines(sources);
@@ -302,21 +306,26 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
       sources.append("#define USE_GEOMETRY_SHADER\n");
     }
     sources.append(defines.c_str());
-    for (auto &types : typedefs) {
-      sources.append(types.c_str());
+    if (!typedefs.is_empty()) {
+      sources.append(shader_shared_utils);
+    }
+    for (auto types : typedefs) {
+      sources.append(types);
     }
     sources.append(resources.c_str());
     sources.append(interface.c_str());
-    sources.append(code.c_str());
+    sources.append(code);
 
     shader->vertex_shader_from_glsl(sources);
+
+    free(code);
   }
 
   if (!info.fragment_source_.is_empty()) {
-    uint32_t fragment_builtins = builtins;
+    uint32_t builtins = 0;
     std::string interface = shader->fragment_interface_declare(info);
-    std::string code = gpu_shader_dependency_get_resolved_source(info.fragment_source_.c_str(),
-                                                                 &fragment_builtins);
+    char *code = gpu_shader_dependency_get_resolved_source(info.fragment_source_.c_str(),
+                                                           &builtins);
 
     Vector<const char *> sources;
     standard_defines(sources);
@@ -325,52 +334,75 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
       sources.append("#define USE_GEOMETRY_SHADER\n");
     }
     sources.append(defines.c_str());
-    for (auto &types : typedefs) {
-      sources.append(types.c_str());
+    if (!typedefs.is_empty()) {
+      sources.append(shader_shared_utils);
+    }
+    for (auto types : typedefs) {
+      sources.append(types);
     }
     sources.append(resources.c_str());
     sources.append(interface.c_str());
-    sources.append(code.c_str());
+    sources.append(code);
 
     shader->fragment_shader_from_glsl(sources);
+
+    free(code);
   }
 
   if (!info.geometry_source_.is_empty()) {
-    uint32_t geometry_builtins = builtins;
+    uint32_t builtins = 0;
     std::string interface = shader->geometry_interface_declare(info);
-    std::string code = gpu_shader_dependency_get_resolved_source(info.geometry_source_.c_str(),
-                                                                 &geometry_builtins);
+    char *code = gpu_shader_dependency_get_resolved_source(info.geometry_source_.c_str(),
+                                                           &builtins);
 
     Vector<const char *> sources;
     standard_defines(sources);
     sources.append("#define GPU_GEOMETRY_SHADER\n");
     sources.append(defines.c_str());
-    for (auto &types : typedefs) {
-      sources.append(types.c_str());
+    if (!typedefs.is_empty()) {
+      sources.append(shader_shared_utils);
+    }
+    for (auto types : typedefs) {
+      sources.append(types);
     }
     sources.append(resources.c_str());
     sources.append(interface.c_str());
-    sources.append(code.c_str());
+    sources.append(code);
 
     shader->geometry_shader_from_glsl(sources);
+
+    free(code);
   }
 
   if (!info.compute_source_.is_empty()) {
-    uint32_t compute_builtins = builtins;
-    std::string code = gpu_shader_dependency_get_resolved_source(info.compute_source_.c_str(),
-                                                                 &compute_builtins);
+    uint32_t builtins = 0;
+    char *code = gpu_shader_dependency_get_resolved_source(info.compute_source_.c_str(),
+                                                           &builtins);
 
     Vector<const char *> sources;
     standard_defines(sources);
     sources.append("#define GPU_COMPUTE_SHADER\n");
     sources.append(defines.c_str());
-    for (auto &types : typedefs) {
-      sources.append(types.c_str());
+    if (!typedefs.is_empty()) {
+      sources.append(shader_shared_utils);
+    }
+    for (auto types : typedefs) {
+      sources.append(types);
     }
     sources.append(resources.c_str());
-    sources.append(code.c_str());
+    sources.append(code);
 
     shader->compute_shader_from_glsl(sources);
+
+    free(code);
+  }
+
+  for (auto types : typedefs) {
+    free(types);
+  }
+
+  if (shader_shared_utils) {
+    free(shader_shared_utils);
   }
 
   shader->finalize(&info);

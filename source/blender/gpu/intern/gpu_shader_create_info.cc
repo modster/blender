@@ -57,6 +57,8 @@ void ShaderCreateInfo::finalize()
     /* Recursive. */
     const_cast<ShaderCreateInfo &>(info).finalize();
 
+    interface_names_size_ += info.interface_names_size_;
+
     vertex_inputs_.extend(info.vertex_inputs_);
     fragment_outputs_.extend(info.fragment_outputs_);
     vertex_out_interfaces_.extend(info.vertex_out_interfaces_);
@@ -67,7 +69,14 @@ void ShaderCreateInfo::finalize()
 
     batch_resources_.extend(info.batch_resources_);
     pass_resources_.extend(info.pass_resources_);
+    typedef_sources_.extend(info.typedef_sources_);
 
+    if (info.local_group_size_[0] != 0) {
+      BLI_assert(local_group_size_[0] == 0);
+      for (int i = 0; i < 3; i++) {
+        local_group_size_[i] = info.local_group_size_[i];
+      }
+    }
     if (!info.vertex_source_.is_empty()) {
       BLI_assert(vertex_source_.is_empty());
       vertex_source_ = info.vertex_source_;

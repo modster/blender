@@ -440,6 +440,7 @@ struct ShaderCreateInfo {
    * [16] = PUSH_CONSTANT(VEC4, "color"),
    * ---- 4 slots occupied by color ----
    * [20] = PUSH_CONSTANT(BOOL, "srgbToggle"),
+   * The maximum slot is 31.
    * \{ */
 
   Self &push_constant(int slot, Type type, StringRefNull name)

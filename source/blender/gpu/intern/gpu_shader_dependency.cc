@@ -47,7 +47,7 @@ using GPUSourceDictionnary = Map<StringRef, struct GPUSource *>;
 struct GPUSource {
   StringRefNull filename;
   StringRefNull source;
-  Set<GPUSource *> dependencies;
+  Vector<GPUSource *> dependencies;
   bool dependencies_init = false;
   shader::BuiltinBits builtins = (shader::BuiltinBits)0;
 
@@ -109,7 +109,7 @@ struct GPUSource {
     dependencies_init = true;
     int64_t pos = 0;
     while (1) {
-      pos = source.find("#pragma BLENDER_REQUIRE(", pos);
+      pos = source.find("pragma BLENDER_REQUIRE(", pos);
       if (pos == -1) {
         return;
       }
@@ -122,20 +122,20 @@ struct GPUSource {
         return;
       }
       StringRef dependency_name = source.substr(start, end - start);
-      GPUSource *source = dict.lookup_default(dependency_name, nullptr);
-      if (source == nullptr) {
+      GPUSource *dependency_source = dict.lookup_default(dependency_name, nullptr);
+      if (dependency_source == nullptr) {
         /* TODO Use clog. */
         std::cout << "Error: " << filename << " : Dependency not found \"" << dependency_name
                   << "\"." << std::endl;
         return;
       }
       /* Recursive. */
-      source->init_dependencies(dict);
+      dependency_source->init_dependencies(dict);
 
-      for (auto dep : source->dependencies) {
-        dependencies.add(dep);
+      for (auto dep : dependency_source->dependencies) {
+        dependencies.append_non_duplicates(dep);
       }
-      dependencies.add(source);
+      dependencies.append_non_duplicates(dependency_source);
       pos++;
     };
   }
@@ -188,4 +188,10 @@ char *gpu_shader_dependency_get_resolved_source(const char *shader_source_name, 
   source->build(str, out_builtins);
   *builtins |= (uint32_t)out_builtins;
   return strdup(str.c_str());
+}
+
+char *gpu_shader_dependency_get_source(const char *shader_source_name)
+{
+  GPUSource *src = g_sources->lookup(shader_source_name);
+  return strdup(src->source.c_str());
 }
