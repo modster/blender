@@ -250,23 +250,17 @@ static std::ostream &print_qualifier(std::ostream &os, const Qualifier &qualifie
 
 static void print_resource(std::ostream &os, const ShaderCreateInfo::Resource &res)
 {
-  os << "layout(";
-
-  switch (res.bind_type) {
-    case ShaderCreateInfo::Resource::BindType::IMAGE:
-      os << res.image.format << ", ";
-      break;
-    case ShaderCreateInfo::Resource::BindType::UNIFORM_BUFFER:
-      os << "std140, ";
-      break;
-    case ShaderCreateInfo::Resource::BindType::STORAGE_BUFFER:
-      os << "std430, ";
-      break;
-    default:
-      break;
+  os << "layout(binding = " << res.slot;
+  if (res.bind_type == ShaderCreateInfo::Resource::BindType::IMAGE) {
+    os << ", " << res.image.format;
   }
-
-  os << "binding = " << res.slot << ") ";
+  else if (res.bind_type == ShaderCreateInfo::Resource::BindType::UNIFORM_BUFFER) {
+    os << ", std140";
+  }
+  else if (res.bind_type == ShaderCreateInfo::Resource::BindType::STORAGE_BUFFER) {
+    os << ", std430";
+  }
+  os << ") ";
 
   int64_t array_offset;
   StringRef name_no_array;
