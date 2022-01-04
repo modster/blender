@@ -260,6 +260,7 @@ static void move_bp_to_location(BPoint *bp, const int mval[2], const ViewContext
 /* Move all selected points by an amount equivalent to the distance moved by mouse. */
 static void move_all_selected_points(ListBase *editnurb,
                                      const bool move_entire,
+                                     const bool link_handles,
                                      const wmEvent *event,
                                      const ViewContext *vc)
 {
@@ -269,7 +270,7 @@ static void move_all_selected_points(ListBase *editnurb,
     if (nu->type == CU_BEZIER) {
       for (int i = 0; i < nu->pntsu; i++) {
         BezTriple *bezt = nu->bezt + i;
-        if (BEZT_ISSEL_IDX(bezt, 1) || (event->alt == true && BEZT_ISSEL_ANY(bezt))) {
+        if (BEZT_ISSEL_IDX(bezt, 1) || (move_entire && BEZT_ISSEL_ANY(bezt))) {
           int pos[2], dst[2];
           worldspace_to_screenspace_int(bezt->vec[1], vc, pos);
           add_v2_v2v2_int(dst, pos, change);
@@ -282,12 +283,22 @@ static void move_all_selected_points(ListBase *editnurb,
             worldspace_to_screenspace_int(bezt->vec[0], vc, pos);
             add_v2_v2v2_int(dst, pos, change);
             move_bezt_handle_or_vertex_to_location(bezt, dst, 0, vc);
+            if (link_handles) {
+              float handle[3];
+              sub_v3_v3v3(handle, bezt->vec[1], bezt->vec[0]);
+              add_v3_v3v3(bezt->vec[2], bezt->vec[1], handle);
+            }
           }
           else if (BEZT_ISSEL_IDX(bezt, 2)) {
             int pos[2], dst[2];
             worldspace_to_screenspace_int(bezt->vec[2], vc, pos);
             add_v2_v2v2_int(dst, pos, change);
             move_bezt_handle_or_vertex_to_location(bezt, dst, 2, vc);
+            if (link_handles) {
+              float handle[3];
+              sub_v3_v3v3(handle, bezt->vec[1], bezt->vec[2]);
+              add_v3_v3v3(bezt->vec[0], bezt->vec[1], handle);
+            }
           }
         }
       }
@@ -1304,6 +1315,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   const int free_toggle = RNA_enum_get(op->ptr, "free_toggle");
   const int adj_handle = RNA_enum_get(op->ptr, "adj_handle");
   const int move_entire = RNA_enum_get(op->ptr, "move_entire");
+  const int link_handles = RNA_enum_get(op->ptr, "link_handles");
 
   if (!cpd->free_toggle_pressed && is_event_key_equal_to_extra_key(event->type, free_toggle)) {
     get_selected_points(vc.obedit->data, vc.v3d, &nu, &bezt, &bp);
@@ -1347,8 +1359,11 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
       else if ((select_point || move_point) && !cpd->spline_nearby) {
         if (cpd->found_point) {
           if (move_point) {
-            move_all_selected_points(
-                &cu->editnurb->nurbs, is_extra_key_pressed(event, move_entire), event, &vc);
+            move_all_selected_points(&cu->editnurb->nurbs,
+                                     is_extra_key_pressed(event, move_entire),
+                                     is_extra_key_pressed(event, link_handles),
+                                     event,
+                                     &vc);
             cpd->acted = true;
           }
         }
@@ -1539,6 +1554,12 @@ void CURVE_OT_pen(wmOperatorType *ot)
                       NONE,
                       "Move Entire",
                       "Move the whole point using handles");
+  prop = RNA_def_enum(ot->srna,
+                      "link_handles",
+                      prop_extra_key_types,
+                      NONE,
+                      "Link Handles",
+                      "Mirror the movement of one handle onto the other");
   prop = RNA_def_boolean(ot->srna,
                          "extrude_point",
                          false,
