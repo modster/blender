@@ -98,8 +98,8 @@ static void expand_mesh_size(Mesh &mesh,
                              const int loop_expand)
 {
   if (vert_expand != 0) {
-    mesh.totvert += vert_expand;
     CustomData_duplicate_referenced_layers(&mesh.vdata, mesh.totvert);
+    mesh.totvert += vert_expand;
     CustomData_realloc(&mesh.vdata, mesh.totvert);
   }
   else {
@@ -107,18 +107,18 @@ static void expand_mesh_size(Mesh &mesh,
     CustomData_duplicate_referenced_layer(&mesh.vdata, CD_MVERT, mesh.totvert);
   }
   if (edge_expand != 0) {
-    mesh.totedge += edge_expand;
     CustomData_duplicate_referenced_layers(&mesh.edata, mesh.totedge);
+    mesh.totedge += edge_expand;
     CustomData_realloc(&mesh.edata, mesh.totedge);
   }
   if (poly_expand != 0) {
-    mesh.totpoly += poly_expand;
     CustomData_duplicate_referenced_layers(&mesh.pdata, mesh.totpoly);
+    mesh.totpoly += poly_expand;
     CustomData_realloc(&mesh.pdata, mesh.totpoly);
   }
   if (loop_expand != 0) {
-    mesh.totloop += loop_expand;
     CustomData_duplicate_referenced_layers(&mesh.ldata, mesh.totloop);
+    mesh.totloop += loop_expand;
     CustomData_realloc(&mesh.ldata, mesh.totloop);
   }
   BKE_mesh_update_customdata_pointers(&mesh, false);
