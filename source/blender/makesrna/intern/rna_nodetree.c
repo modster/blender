@@ -11287,6 +11287,33 @@ static void def_geo_realize_instances(StructRNA *srna)
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_GeometryNode_socket_update");
 }
 
+static void def_geo_scale_elements(StructRNA *srna)
+{
+  PropertyRNA *prop;
+
+  static const EnumPropertyItem scale_elements_mode_items[] = {
+      {GEO_NODE_SCALE_ELEMENTS_MODE_FACE,
+       "FACE",
+       ICON_NONE,
+       "Face",
+       "Scale individual faces or neighbouring face islands"},
+      {GEO_NODE_SCALE_ELEMENTS_MODE_EDGE,
+       "EDGE",
+       ICON_NONE,
+       "Edge",
+       "Scale individual edges or neighbouring edge islands"},
+      {GEO_NODE_SCALE_ELEMENTS_MODE_CURVE, "CURVE", ICON_NONE, "Curve", "Scale individual curves"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  prop = RNA_def_property(srna, "mode", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, rna_enum_attribute_type_items);
+  RNA_def_property_enum_funcs(prop, NULL, NULL, "rna_GeometryNodeAttributeFill_type_itemf");
+  RNA_def_property_enum_default(prop, CD_PROP_FLOAT);
+  RNA_def_property_ui_text(prop, "Data Type", "");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_GeometryNode_socket_update");
+}
+
 /* -------------------------------------------------------------------------- */
 
 static void rna_def_shader_node(BlenderRNA *brna)
