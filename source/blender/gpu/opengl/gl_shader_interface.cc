@@ -327,10 +327,10 @@ GLShaderInterface::GLShaderInterface(GLuint program, const shader::ShaderCreateI
 {
   using namespace blender::gpu::shader;
 
-  int attr_len = info.vertex_inputs_.size();
-  int ubo_len = 0;
-  int uniform_len = info.push_constants_.size();
-  int ssbo_len = 0;
+  attr_len_ = info.vertex_inputs_.size();
+  uniform_len_ = info.push_constants_.size();
+  ubo_len_ = 0;
+  ssbo_len_ = 0;
 
   Vector<ShaderCreateInfo::Resource> all_resources;
   all_resources.extend(info.pass_resources_);
@@ -339,23 +339,23 @@ GLShaderInterface::GLShaderInterface(GLuint program, const shader::ShaderCreateI
   for (ShaderCreateInfo::Resource &res : all_resources) {
     switch (res.bind_type) {
       case ShaderCreateInfo::Resource::BindType::UNIFORM_BUFFER:
-        ubo_len++;
+        ubo_len_++;
         break;
       case ShaderCreateInfo::Resource::BindType::STORAGE_BUFFER:
-        ssbo_len++;
+        ssbo_len_++;
         break;
       case ShaderCreateInfo::Resource::BindType::SAMPLER:
-        uniform_len++;
+        uniform_len_++;
         break;
       case ShaderCreateInfo::Resource::BindType::IMAGE:
-        uniform_len++;
+        uniform_len_++;
         break;
     }
   }
 
-  BLI_assert_msg(ubo_len <= 16, "enabled_ubo_mask_ is uint16_t");
+  BLI_assert_msg(ubo_len_ <= 16, "enabled_ubo_mask_ is uint16_t");
 
-  int input_tot_len = attr_len + ubo_len + uniform_len + ssbo_len;
+  int input_tot_len = attr_len_ + ubo_len_ + uniform_len_ + ssbo_len_;
   inputs_ = (ShaderInput *)MEM_callocN(sizeof(ShaderInput) * input_tot_len, __func__);
   ShaderInput *input = inputs_;
 
@@ -403,7 +403,8 @@ GLShaderInterface::GLShaderInterface(GLuint program, const shader::ShaderCreateI
   for (const ShaderCreateInfo::PushConst &uni : info.push_constants_) {
     copy_input_name(input, uni.name, name_buffer_, name_buffer_offset);
     /* Until we make use of explicit uniform location. */
-    input->location = input->binding = glGetUniformLocation(program, uni.name.c_str());
+    input->location = glGetUniformLocation(program, uni.name.c_str());
+    input->binding = -1;
     input++;
   }
 

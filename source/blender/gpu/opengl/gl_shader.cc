@@ -232,6 +232,7 @@ static void print_image_type(std::ostream &os,
     default:
       break;
   }
+  os << " ";
 }
 
 static std::ostream &print_qualifier(std::ostream &os, const Qualifier &qualifiers)
@@ -281,7 +282,7 @@ static void print_resource(std::ostream &os, const ShaderCreateInfo::Resource &r
       array_offset = res.uniformbuf.name.find_first_of("[");
       name_no_array = (array_offset == -1) ? res.uniformbuf.name :
                                              StringRef(res.uniformbuf.name.c_str(), array_offset);
-      os << "uniform " << name_no_array << " { " << res.uniformbuf.type_name << " "
+      os << "uniform " << name_no_array << " { " << res.uniformbuf.type_name << " _"
          << res.uniformbuf.name << "; };\n";
       break;
     case ShaderCreateInfo::Resource::BindType::STORAGE_BUFFER:
@@ -290,8 +291,31 @@ static void print_resource(std::ostream &os, const ShaderCreateInfo::Resource &r
                                              StringRef(res.storagebuf.name.c_str(), array_offset);
       os << "buffer ";
       print_qualifier(os, res.storagebuf.qualifiers);
-      os << name_no_array << " { " << res.storagebuf.type_name << " " << res.storagebuf.name
+      os << name_no_array << " { " << res.storagebuf.type_name << " _" << res.storagebuf.name
          << "; };\n";
+      break;
+  }
+}
+
+static void print_resource_alias(std::ostream &os, const ShaderCreateInfo::Resource &res)
+{
+  int64_t array_offset;
+  StringRef name_no_array;
+
+  switch (res.bind_type) {
+    case ShaderCreateInfo::Resource::BindType::UNIFORM_BUFFER:
+      array_offset = res.uniformbuf.name.find_first_of("[");
+      name_no_array = (array_offset == -1) ? res.uniformbuf.name :
+                                             StringRef(res.uniformbuf.name.c_str(), array_offset);
+      os << "#define " << name_no_array << " _" << name_no_array << " \n";
+      break;
+    case ShaderCreateInfo::Resource::BindType::STORAGE_BUFFER:
+      array_offset = res.storagebuf.name.find_first_of("[");
+      name_no_array = (array_offset == -1) ? res.storagebuf.name :
+                                             StringRef(res.storagebuf.name.c_str(), array_offset);
+      os << "#define " << name_no_array << " _" << name_no_array << " \n";
+      break;
+    default:
       break;
   }
 }
@@ -324,9 +348,15 @@ std::string GLShader::resources_declare(const ShaderCreateInfo &info) const
   for (const ShaderCreateInfo::Resource &res : info.pass_resources_) {
     print_resource(ss, res);
   }
+  for (const ShaderCreateInfo::Resource &res : info.pass_resources_) {
+    print_resource_alias(ss, res);
+  }
   ss << "\n/* Batch Resources. */\n";
   for (const ShaderCreateInfo::Resource &res : info.batch_resources_) {
     print_resource(ss, res);
+  }
+  for (const ShaderCreateInfo::Resource &res : info.batch_resources_) {
+    print_resource_alias(ss, res);
   }
   ss << "\n/* Push Constants. */\n";
   for (const ShaderCreateInfo::PushConst &uniform : info.push_constants_) {

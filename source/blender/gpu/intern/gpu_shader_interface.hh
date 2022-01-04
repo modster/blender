@@ -241,8 +241,9 @@ inline void ShaderInterface::copy_input_name(ShaderInput *input,
                                              char *name_buffer,
                                              uint32_t &name_buffer_offset) const
 {
-  uint32_t name_len = name.size() + 1;
-  memcpy(name_buffer + name_buffer_offset, name.c_str(), name_len);
+  uint32_t name_len = name.size();
+  /* Copy include NULL terminator. */
+  memcpy(name_buffer + name_buffer_offset, name.c_str(), name_len + 1);
   name_buffer_offset += set_input_name(input, name_buffer + name_buffer_offset, name_len);
 }
 
