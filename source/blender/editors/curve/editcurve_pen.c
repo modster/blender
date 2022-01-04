@@ -280,7 +280,7 @@ static void move_all_selected_points(ListBase *editnurb,
     if (nu->type == CU_BEZIER) {
       for (int i = 0; i < nu->pntsu; i++) {
         BezTriple *bezt = nu->bezt + i;
-        if (BEZT_ISSEL_IDX(bezt, 1)) {
+        if (BEZT_ISSEL_IDX(bezt, 1) || (event->alt == true && BEZT_ISSEL_ANY(bezt))) {
           int pos[2], dst[2];
           worldspace_to_screenspace_int(bezt->vec[1], vc, pos);
           add_v2_v2v2_int(dst, pos, change);
@@ -1369,18 +1369,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
       else if ((select_point || move_point) && !cpd->spline_nearby) {
         if (cpd->found_point) {
           if (move_point) {
-            if (cpd->multi_point) {
-              move_all_selected_points(&cu->editnurb->nurbs, event, &vc);
-            }
-            else {
-              get_selected_points(vc.obedit->data, vc.v3d, &nu, &bezt, &bp);
-              if (bezt) {
-                move_selected_bezt_to_location(bezt, &vc, event->mval);
-              }
-              else if (bp) {
-                move_bp_to_location(bp, event->mval, &vc);
-              }
-            }
+            move_all_selected_points(&cu->editnurb->nurbs, event, &vc);
             cpd->acted = true;
           }
         }
@@ -1407,10 +1396,6 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
           short bezt_idx = 0;
           cpd->found_point = get_closest_vertex_to_point_in_nurbs(
               &(cu->editnurb->nurbs), &nu, &bezt, &bp, &bezt_idx, mval_fl, sel_dist_mul, &vc);
-          /* If point under mouse is selected, set cpd->multi_point to true. */
-          if ((bezt && BEZT_ISSEL_IDX(bezt, bezt_idx)) || bp) {
-            cpd->multi_point = true;
-          }
         }
       }
       if (!cpd->found_point) {
