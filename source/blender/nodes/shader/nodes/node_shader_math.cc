@@ -71,14 +71,21 @@ static void sh_node_math_gather_link_searches(GatherLinkSearchOpParams &params)
   if (params.node_tree().typeinfo->validate_link(
           static_cast<eNodeSocketDatatype>(params.other_socket().type), SOCK_FLOAT)) {
 
+    const bool is_geometry_node_tree = params.node_tree().type == NTREE_GEOMETRY;
     const int weight = ELEM(params.other_socket().type, SOCK_FLOAT, SOCK_BOOLEAN, SOCK_INT) ? 0 :
                                                                                               -1;
 
     for (const EnumPropertyItem *item = rna_enum_node_math_items; item->identifier != nullptr;
          item++) {
       if (item->name != nullptr && item->identifier[0] != '\0') {
-        params.add_item(
-            IFACE_(item->name), SocketSearchOp{"Value", (NodeMathOperation)item->value}, weight);
+        const int gn_weight =
+            (is_geometry_node_tree &&
+             ELEM(item->value, NODE_MATH_COMPARE, NODE_MATH_GREATER_THAN, NODE_MATH_LESS_THAN)) ?
+                -1 :
+                weight;
+        params.add_item(IFACE_(item->name),
+                        SocketSearchOp{"Value", (NodeMathOperation)item->value},
+                        gn_weight);
       }
     }
   }
@@ -207,7 +214,7 @@ void register_node_type_sh_math()
 
   static bNodeType ntype;
 
-  sh_fn_node_type_base(&ntype, SH_NODE_MATH, "Math", NODE_CLASS_CONVERTER, 0);
+  sh_fn_node_type_base(&ntype, SH_NODE_MATH, "Math", NODE_CLASS_CONVERTER);
   ntype.declare = file_ns::sh_node_math_declare;
   ntype.labelfunc = node_math_label;
   node_type_gpu(&ntype, file_ns::gpu_shader_math);

@@ -12,29 +12,23 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2005 Blender Foundation.
- * All rights reserved.
  */
 
-#include "../node_shader_util.h"
+/** \file
+ * \ingroup obj
+ */
 
-/* **************** OUTPUT ******************** */
+#include "BLI_timeit.hh"
 
-static bNodeSocketTemplate sh_node_output_light_in[] = {
-    {SOCK_SHADER, N_("Surface"), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f},
-    {-1, ""},
-};
+#include "IO_wavefront_obj.h"
 
-/* node type definition */
-void register_node_type_sh_output_light(void)
+#include "obj_exporter.hh"
+
+/**
+ * C-interface for the exporter.
+ */
+void OBJ_export(bContext *C, const OBJExportParams *export_params)
 {
-  static bNodeType ntype;
-
-  sh_node_type_base(&ntype, SH_NODE_OUTPUT_LIGHT, "Light Output", NODE_CLASS_OUTPUT, 0);
-  node_type_socket_templates(&ntype, sh_node_output_light_in, NULL);
-
-  ntype.no_muting = true;
-
-  nodeRegisterType(&ntype);
+  SCOPED_TIMER("OBJ export");
+  blender::io::obj::exporter_main(C, *export_params);
 }
