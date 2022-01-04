@@ -466,7 +466,22 @@ static void extrude_mesh_edges(MeshComponent &component,
         }
         case ATTR_DOMAIN_FACE: {
           MutableSpan<T> new_data = data.slice(new_poly_range);
-          new_data.fill(T());
+          threading::parallel_for(edge_selection.index_range(), 512, [&](const IndexRange range) {
+            for (const int i : range) {
+              /* Create a separate mixer for every point to avoid allocating temporary buffers
+               * in the mixer the size of the result point cloud and to allow multi-threading. */
+              attribute_math::DefaultMixer<T> mixer{new_data.slice(i, 1)};
+
+              const int i_src_edge = edge_selection[i];
+              Span<int> connected_polys = edge_to_poly_map[i_src_edge];
+
+              for (const int i_connected_poly : connected_polys) {
+                mixer.mix_in(0, data[i_connected_poly]);
+              }
+
+              mixer.finalize();
+            }
+          });
           break;
         }
         case ATTR_DOMAIN_CORNER: {
