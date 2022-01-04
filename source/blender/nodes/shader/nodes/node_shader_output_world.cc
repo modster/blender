@@ -19,6 +19,8 @@
 
 #include "../node_shader_util.h"
 
+namespace blender::nodes::node_shader_output_world_cc {
+
 /* **************** OUTPUT ******************** */
 
 static bNodeSocketTemplate sh_node_output_world_in[] = {
@@ -41,14 +43,18 @@ static int node_shader_gpu_output_world(GPUMaterial *mat,
   return true;
 }
 
+}  // namespace blender::nodes::node_shader_output_world_cc
+
 /* node type definition */
-void register_node_type_sh_output_world(void)
+void register_node_type_sh_output_world()
 {
+  namespace file_ns = blender::nodes::node_shader_output_world_cc;
+
   static bNodeType ntype;
 
-  sh_node_type_base(&ntype, SH_NODE_OUTPUT_WORLD, "World Output", NODE_CLASS_OUTPUT, 0);
-  node_type_socket_templates(&ntype, sh_node_output_world_in, NULL);
-  node_type_gpu(&ntype, node_shader_gpu_output_world);
+  sh_node_type_base(&ntype, SH_NODE_OUTPUT_WORLD, "World Output", NODE_CLASS_OUTPUT);
+  node_type_socket_templates(&ntype, file_ns::sh_node_output_world_in, nullptr);
+  node_type_gpu(&ntype, file_ns::node_shader_gpu_output_world);
 
   ntype.no_muting = true;
 
