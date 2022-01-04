@@ -90,7 +90,7 @@ GPU_SHADER_CREATE_INFO(workbench_opaque)
     .fragment_out(0, Type::VEC4, "materialData")
     .fragment_out(1, Type::VEC2, "normalData")
     .fragment_out(2, Type::UINT, "objectId")
-    .uniform_buf(4, "WB_Scene", "scene", Frequency::PASS)
+    .uniform_buf(4, "WorldData", "world_data", Frequency::PASS)
     .fragment_source("workbench_prepass_frag.glsl")
     .additional_info("workbench_material");
 
