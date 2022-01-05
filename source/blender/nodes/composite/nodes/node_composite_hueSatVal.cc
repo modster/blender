@@ -47,11 +47,11 @@ static void cmp_node_huesatval_declare(NodeDeclarationBuilder &b)
 
 }  // namespace blender::nodes
 
-void register_node_type_cmp_hue_sat(void)
+void register_node_type_cmp_hue_sat()
 {
   static bNodeType ntype;
 
-  cmp_node_type_base(&ntype, CMP_NODE_HUE_SAT, "Hue Saturation Value", NODE_CLASS_OP_COLOR, 0);
+  cmp_node_type_base(&ntype, CMP_NODE_HUE_SAT, "Hue Saturation Value", NODE_CLASS_OP_COLOR);
   ntype.declare = blender::nodes::cmp_node_huesatval_declare;
 
   nodeRegisterType(&ntype);

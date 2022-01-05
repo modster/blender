@@ -24,6 +24,7 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "BLI_fileops.h"
 #include "BLI_listbase.h"
 #include "BLI_path_util.h"
 #include "BLI_string.h"
@@ -61,10 +62,6 @@ bUserAssetLibrary *BKE_preferences_asset_library_add(UserDef *userdef,
   return library;
 }
 
-/**
- * Unlink and free a library preference member.
- * \note Free's \a library itself.
- */
 void BKE_preferences_asset_library_remove(UserDef *userdef, bUserAssetLibrary *library)
 {
   BLI_freelinkN(&userdef->asset_libraries, library);
@@ -81,6 +78,14 @@ void BKE_preferences_asset_library_name_set(UserDef *userdef,
                  '.',
                  offsetof(bUserAssetLibrary, name),
                  sizeof(library->name));
+}
+
+void BKE_preferences_asset_library_path_set(bUserAssetLibrary *library, const char *path)
+{
+  BLI_strncpy(library->path, path, sizeof(library->path));
+  if (BLI_is_file(library->path)) {
+    BLI_path_parent_dir(library->path);
+  }
 }
 
 bUserAssetLibrary *BKE_preferences_asset_library_find_from_index(const UserDef *userdef, int index)

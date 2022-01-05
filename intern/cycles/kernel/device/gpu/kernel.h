@@ -19,11 +19,17 @@
 #include "kernel/device/gpu/parallel_active_index.h"
 #include "kernel/device/gpu/parallel_prefix_sum.h"
 #include "kernel/device/gpu/parallel_sorted_index.h"
-#include "kernel/device/gpu/work_stealing.h"
+
+#include "kernel/sample/lcg.h"
+
+/* Include constant tables before entering Metal's context class scope (context_begin.h) */
+#include "kernel/tables.h"
 
 #ifdef __KERNEL_METAL__
 #  include "kernel/device/metal/context_begin.h"
 #endif
+
+#include "kernel/device/gpu/work_stealing.h"
 
 #include "kernel/integrator/state.h"
 #include "kernel/integrator/state_flow.h"
@@ -91,7 +97,7 @@ ccl_gpu_kernel(GPU_KERNEL_BLOCK_NUM_THREADS, GPU_KERNEL_MAX_REGISTERS)
   const int state = tile->path_index_offset + tile_work_index;
 
   uint x, y, sample;
-  get_work_pixel(tile, tile_work_index, &x, &y, &sample);
+  ccl_gpu_kernel_call(get_work_pixel(tile, tile_work_index, &x, &y, &sample));
 
   ccl_gpu_kernel_call(
       integrator_init_from_camera(nullptr, state, tile, render_buffer, x, y, sample));
@@ -122,7 +128,7 @@ ccl_gpu_kernel(GPU_KERNEL_BLOCK_NUM_THREADS, GPU_KERNEL_MAX_REGISTERS)
   const int state = tile->path_index_offset + tile_work_index;
 
   uint x, y, sample;
-  get_work_pixel(tile, tile_work_index, &x, &y, &sample);
+  ccl_gpu_kernel_call(get_work_pixel(tile, tile_work_index, &x, &y, &sample));
 
   ccl_gpu_kernel_call(
       integrator_init_from_bake(nullptr, state, tile, render_buffer, x, y, sample));
@@ -464,7 +470,7 @@ ccl_gpu_kernel(GPU_KERNEL_BLOCK_NUM_THREADS, GPU_KERNEL_MAX_REGISTERS)
   const auto num_active_pixels_mask = ccl_gpu_ballot(!converged);
   const int lane_id = ccl_gpu_thread_idx_x % ccl_gpu_warp_size;
   if (lane_id == 0) {
-    atomic_fetch_and_add_uint32(num_active_pixels, ccl_gpu_popc(num_active_pixels_mask));
+    atomic_fetch_and_add_uint32(num_active_pixels, popcount(num_active_pixels_mask));
   }
 }
 
@@ -544,6 +550,33 @@ ccl_device_inline void kernel_gpu_film_convert_half_write(ccl_global uchar4 *rgb
 #endif
 }
 
+#ifdef __KERNEL_METAL__
+
+/* Fetch into a local variable on Metal - there is minimal overhead. Templating the
+ * film_get_pass_pixel_... functions works on MSL, but not on other compilers. */
+#  define FILM_GET_PASS_PIXEL_F32(variant, input_channel_count) \
+    float local_pixel[4]; \
+    film_get_pass_pixel_##variant(&kfilm_convert, buffer, local_pixel); \
+    if (input_channel_count >= 1) { \
+      pixel[0] = local_pixel[0]; \
+    } \
+    if (input_channel_count >= 2) { \
+      pixel[1] = local_pixel[1]; \
+    } \
+    if (input_channel_count >= 3) { \
+      pixel[2] = local_pixel[2]; \
+    } \
+    if (input_channel_count >= 4) { \
+      pixel[3] = local_pixel[3]; \
+    }
+
+#else
+
+#  define FILM_GET_PASS_PIXEL_F32(variant, input_channel_count) \
+    film_get_pass_pixel_##variant(&kfilm_convert, buffer, pixel);
+
+#endif
+
 #define KERNEL_FILM_CONVERT_VARIANT(variant, input_channel_count) \
   ccl_gpu_kernel(GPU_KERNEL_BLOCK_NUM_THREADS, GPU_KERNEL_MAX_REGISTERS) \
       ccl_gpu_kernel_signature(film_convert_##variant, \
@@ -571,7 +604,7 @@ ccl_device_inline void kernel_gpu_film_convert_half_write(ccl_global uchar4 *rgb
     ccl_global float *pixel = pixels + \
                               (render_pixel_index + rgba_offset) * kfilm_convert.pixel_stride; \
 \
-    film_get_pass_pixel_##variant(&kfilm_convert, buffer, pixel); \
+    FILM_GET_PASS_PIXEL_F32(variant, input_channel_count); \
   } \
 \
   ccl_gpu_kernel(GPU_KERNEL_BLOCK_NUM_THREADS, GPU_KERNEL_MAX_REGISTERS) \
@@ -723,6 +756,7 @@ ccl_gpu_kernel(GPU_KERNEL_BLOCK_NUM_THREADS, GPU_KERNEL_MAX_REGISTERS)
                              int guiding_pass_stride,
                              int guiding_pass_albedo,
                              int guiding_pass_normal,
+                             int guiding_pass_flow,
                              ccl_global const float *render_buffer,
                              int render_offset,
                              int render_stride,
@@ -730,6 +764,7 @@ ccl_gpu_kernel(GPU_KERNEL_BLOCK_NUM_THREADS, GPU_KERNEL_MAX_REGISTERS)
                              int render_pass_sample_count,
                              int render_pass_denoising_albedo,
                              int render_pass_denoising_normal,
+                             int render_pass_motion,
                              int full_x,
                              int full_y,
                              int width,
@@ -780,6 +815,17 @@ ccl_gpu_kernel(GPU_KERNEL_BLOCK_NUM_THREADS, GPU_KERNEL_MAX_REGISTERS)
     normal_out[0] = normal_in[0] * pixel_scale;
     normal_out[1] = normal_in[1] * pixel_scale;
     normal_out[2] = normal_in[2] * pixel_scale;
+  }
+
+  /* Flow pass. */
+  if (guiding_pass_flow != PASS_UNUSED) {
+    kernel_assert(render_pass_motion != PASS_UNUSED);
+
+    const float *motion_in = buffer + render_pass_motion;
+    float *flow_out = guiding_pixel + guiding_pass_flow;
+
+    flow_out[0] = -motion_in[0] * pixel_scale;
+    flow_out[1] = -motion_in[1] * pixel_scale;
   }
 }
 
@@ -866,7 +912,6 @@ ccl_gpu_kernel(GPU_KERNEL_BLOCK_NUM_THREADS, GPU_KERNEL_MAX_REGISTERS)
   else {
     /* Assigning to zero since this is a default alpha value for 3-component passes, and it
      * is an opaque pixel for 4 component passes. */
-
     denoised_pixel[3] = 0;
   }
 }
@@ -892,6 +937,6 @@ ccl_gpu_kernel(GPU_KERNEL_BLOCK_NUM_THREADS, GPU_KERNEL_MAX_REGISTERS)
   const auto can_split_mask = ccl_gpu_ballot(can_split);
   const int lane_id = ccl_gpu_thread_idx_x % ccl_gpu_warp_size;
   if (lane_id == 0) {
-    atomic_fetch_and_add_uint32(num_possible_splits, ccl_gpu_popc(can_split_mask));
+    atomic_fetch_and_add_uint32(num_possible_splits, popcount(can_split_mask));
   }
 }
