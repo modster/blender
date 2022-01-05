@@ -1144,6 +1144,10 @@ static void move_adjacent_handle(ViewContext *vc, const wmEvent *event)
   BPoint *bp;
   get_selected_points(vc->obedit->data, vc->v3d, &nu, &bezt, &bp);
 
+  if (!bezt) {
+    return;
+  }
+
   /* Get the adjacent `BezTriple` */
   BezTriple *adj_bezt = BKE_nurb_bezt_get_prev(nu, bezt);
   int cp_index = 2;
