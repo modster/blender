@@ -17,7 +17,7 @@
  * All rights reserved.
  */
 
-#include "../node_shader_util.h"
+#include "node_shader_util.hh"
 
 namespace blender::nodes::node_shader_blackbody_cc {
 
@@ -58,7 +58,7 @@ void register_node_type_sh_blackbody()
 
   static bNodeType ntype;
 
-  sh_node_type_base(&ntype, SH_NODE_BLACKBODY, "Blackbody", NODE_CLASS_CONVERTER, 0);
+  sh_node_type_base(&ntype, SH_NODE_BLACKBODY, "Blackbody", NODE_CLASS_CONVERTER);
   node_type_size_preset(&ntype, NODE_SIZE_MIDDLE);
   node_type_socket_templates(
       &ntype, file_ns::sh_node_blackbody_in, file_ns::sh_node_blackbody_out);

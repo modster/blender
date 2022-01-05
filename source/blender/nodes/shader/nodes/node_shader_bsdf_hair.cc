@@ -17,7 +17,7 @@
  * All rights reserved.
  */
 
-#include "../node_shader_util.h"
+#include "node_shader_util.hh"
 
 namespace blender::nodes::node_shader_bsdf_hair_cc {
 
@@ -55,7 +55,7 @@ void register_node_type_sh_bsdf_hair()
 
   static bNodeType ntype;
 
-  sh_node_type_base(&ntype, SH_NODE_BSDF_HAIR, "Hair BSDF", NODE_CLASS_SHADER, 0);
+  sh_node_type_base(&ntype, SH_NODE_BSDF_HAIR, "Hair BSDF", NODE_CLASS_SHADER);
   node_type_socket_templates(
       &ntype, file_ns::sh_node_bsdf_hair_in, file_ns::sh_node_bsdf_hair_out);
   node_type_size(&ntype, 150, 60, 200);

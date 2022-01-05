@@ -17,7 +17,7 @@
  * All rights reserved.
  */
 
-#include "../node_shader_util.h"
+#include "node_shader_util.hh"
 
 namespace blender::nodes::node_shader_displacement_cc {
 
@@ -79,7 +79,7 @@ void register_node_type_sh_displacement()
 
   static bNodeType ntype;
 
-  sh_node_type_base(&ntype, SH_NODE_DISPLACEMENT, "Displacement", NODE_CLASS_OP_VECTOR, 0);
+  sh_node_type_base(&ntype, SH_NODE_DISPLACEMENT, "Displacement", NODE_CLASS_OP_VECTOR);
   node_type_socket_templates(
       &ntype, file_ns::sh_node_displacement_in, file_ns::sh_node_displacement_out);
   node_type_init(&ntype, file_ns::node_shader_init_displacement);

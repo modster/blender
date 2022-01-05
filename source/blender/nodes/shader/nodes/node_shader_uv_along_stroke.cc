@@ -17,7 +17,7 @@
  * All rights reserved.
  */
 
-#include "../node_shader_util.h"
+#include "node_shader_util.hh"
 
 namespace blender::nodes::node_shader_uv_along_stroke_cc {
 
@@ -37,7 +37,7 @@ void register_node_type_sh_uvalongstroke()
 
   static bNodeType ntype;
 
-  sh_node_type_base(&ntype, SH_NODE_UVALONGSTROKE, "UV Along Stroke", NODE_CLASS_INPUT, 0);
+  sh_node_type_base(&ntype, SH_NODE_UVALONGSTROKE, "UV Along Stroke", NODE_CLASS_INPUT);
   node_type_socket_templates(&ntype, nullptr, file_ns::sh_node_uvalongstroke_out);
 
   nodeRegisterType(&ntype);

@@ -17,7 +17,7 @@
  * All rights reserved.
  */
 
-#include "../node_shader_util.h"
+#include "node_shader_util.hh"
 
 namespace blender::nodes::node_shader_light_path_cc {
 
@@ -58,7 +58,7 @@ void register_node_type_sh_light_path()
 
   static bNodeType ntype;
 
-  sh_node_type_base(&ntype, SH_NODE_LIGHT_PATH, "Light Path", NODE_CLASS_INPUT, 0);
+  sh_node_type_base(&ntype, SH_NODE_LIGHT_PATH, "Light Path", NODE_CLASS_INPUT);
   node_type_socket_templates(&ntype, nullptr, file_ns::sh_node_light_path_out);
   node_type_gpu(&ntype, file_ns::node_shader_gpu_light_path);
 

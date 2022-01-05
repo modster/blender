@@ -17,7 +17,7 @@
  * All rights reserved.
  */
 
-#include "../node_shader_util.h"
+#include "node_shader_util.hh"
 
 namespace blender::nodes::node_shader_output_light_cc {
 
@@ -37,7 +37,7 @@ void register_node_type_sh_output_light()
 
   static bNodeType ntype;
 
-  sh_node_type_base(&ntype, SH_NODE_OUTPUT_LIGHT, "Light Output", NODE_CLASS_OUTPUT, 0);
+  sh_node_type_base(&ntype, SH_NODE_OUTPUT_LIGHT, "Light Output", NODE_CLASS_OUTPUT);
   node_type_socket_templates(&ntype, file_ns::sh_node_output_light_in, nullptr);
 
   ntype.no_muting = true;

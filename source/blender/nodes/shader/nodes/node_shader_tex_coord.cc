@@ -17,7 +17,7 @@
  * All rights reserved.
  */
 
-#include "../node_shader_util.h"
+#include "node_shader_util.hh"
 
 #include "DNA_customdata_types.h"
 
@@ -94,7 +94,7 @@ void register_node_type_sh_tex_coord()
 
   static bNodeType ntype;
 
-  sh_node_type_base(&ntype, SH_NODE_TEX_COORD, "Texture Coordinate", NODE_CLASS_INPUT, 0);
+  sh_node_type_base(&ntype, SH_NODE_TEX_COORD, "Texture Coordinate", NODE_CLASS_INPUT);
   node_type_socket_templates(&ntype, nullptr, file_ns::sh_node_tex_coord_out);
   node_type_gpu(&ntype, file_ns::node_shader_gpu_tex_coord);
 

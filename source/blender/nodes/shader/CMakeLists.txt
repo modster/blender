@@ -63,7 +63,7 @@ set(SRC
   nodes/node_shader_camera.cc
   nodes/node_shader_clamp.cc
   nodes/node_shader_color_ramp.cc
-  nodes/node_shader_common.c
+  nodes/node_shader_common.cc
   nodes/node_shader_curves.cc
   nodes/node_shader_displacement.cc
   nodes/node_shader_eevee_specular.cc
@@ -132,10 +132,10 @@ set(SRC
   nodes/node_shader_wavelength.cc
   nodes/node_shader_wireframe.cc
 
-  node_shader_tree.c
+  node_shader_tree.cc
   node_shader_util.cc
 
-  node_shader_util.h
+  node_shader_util.hh
 )
 
 set(LIB
@@ -166,3 +166,8 @@ if(WITH_FREESTYLE)
 endif()
 
 blender_add_lib(bf_nodes_shader "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
+
+if(WITH_UNITY_BUILD)
+  set_target_properties(bf_nodes_shader PROPERTIES UNITY_BUILD ON)
+  set_target_properties(bf_nodes_shader PROPERTIES UNITY_BUILD_BATCH_SIZE 10)
+endif()

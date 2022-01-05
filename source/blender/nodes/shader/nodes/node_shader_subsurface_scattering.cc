@@ -17,7 +17,7 @@
  * All rights reserved.
  */
 
-#include "../node_shader_util.h"
+#include "node_shader_util.hh"
 
 namespace blender::nodes::node_shader_subsurface_scattering_cc {
 
@@ -90,7 +90,7 @@ void register_node_type_sh_subsurface_scattering()
   static bNodeType ntype;
 
   sh_node_type_base(
-      &ntype, SH_NODE_SUBSURFACE_SCATTERING, "Subsurface Scattering", NODE_CLASS_SHADER, 0);
+      &ntype, SH_NODE_SUBSURFACE_SCATTERING, "Subsurface Scattering", NODE_CLASS_SHADER);
   node_type_socket_templates(&ntype,
                              file_ns::sh_node_subsurface_scattering_in,
                              file_ns::sh_node_subsurface_scattering_out);
