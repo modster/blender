@@ -5052,7 +5052,7 @@ static void sculpt_brush_stroke_init(bContext *C, wmOperator *op)
   sculpt_brush_init_tex(scene, sd, ss);
 
   is_smooth = sculpt_needs_connectivity_info(sd, brush, ss, mode);
-  needs_colors = ELEM(brush->sculpt_tool, SCULPT_TOOL_PAINT, SCULPT_TOOL_SMEAR);
+  needs_colors = SCULPT_TOOL_NEEDS_COLOR(brush->sculpt_tool);
 
   if (needs_colors) {
     BKE_sculpt_color_layer_create_if_needed(ob);
@@ -5260,6 +5260,14 @@ static bool sculpt_stroke_test_start(bContext *C, struct wmOperator *op, const f
     Object *ob = CTX_data_active_object(C);
     SculptSession *ss = ob->sculpt;
     Sculpt *sd = CTX_data_tool_settings(C)->sculpt;
+    Brush *brush = BKE_paint_brush(&sd->paint);
+
+    if (brush && SCULPT_TOOL_NEEDS_COLOR(brush->sculpt_tool)) {
+      View3D *v3d = CTX_wm_view3d(C);
+      if (v3d) {
+        v3d->shading.color_type = V3D_SHADING_VERTEX_COLOR;
+      }
+    }
 
     ED_view3d_init_mats_rv3d(ob, CTX_wm_region_view3d(C));
 

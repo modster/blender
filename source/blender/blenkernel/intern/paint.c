@@ -1815,39 +1815,18 @@ void BKE_sculpt_color_layer_create_if_needed(struct Object *object)
     }
   }
 
-  CustomDataLayer *cl;
   if (has_color) {
-    cl = BKE_id_attributes_active_get(&orig_me->id);
-    if (!ELEM(cl->type, CD_PROP_COLOR, CD_MLOOPCOL)) {
-      cl = NULL;
-
-      /* find a color layer */
-      for (int step = 0; !cl && step < 2; step++) {
-        CustomData *cdata = step ? &orig_me->ldata : &orig_me->vdata;
-
-        for (int i = 0; i < cdata->totlayer; i++) {
-          if (ELEM(cdata->layers[i].type, CD_PROP_COLOR, CD_MLOOPCOL)) {
-            cl = cdata->layers + i;
-            break;
-          }
-        }
-      }
-    }
-    else {
-      cl = NULL; /* no need to update active layer */
-    }
-  }
-  else {
-    CustomData_add_layer(&orig_me->vdata, CD_PROP_COLOR, CD_DEFAULT, NULL, orig_me->totvert);
-    cl = orig_me->vdata.layers + CustomData_get_layer_index(&orig_me->vdata, CD_PROP_COLOR);
-
-    BKE_mesh_update_customdata_pointers(orig_me, true);
+    return;
   }
 
-  if (cl) {
-    BKE_id_attributes_active_set(&orig_me->id, cl);
-    DEG_id_tag_update(&orig_me->id, ID_RECALC_GEOMETRY_ALL_MODES);
-  }
+  CustomData_add_layer(&orig_me->vdata, CD_PROP_COLOR, CD_DEFAULT, NULL, orig_me->totvert);
+  CustomDataLayer *cl = orig_me->vdata.layers +
+                        CustomData_get_layer_index(&orig_me->vdata, CD_PROP_COLOR);
+
+  BKE_mesh_update_customdata_pointers(orig_me, true);
+
+  BKE_id_attributes_active_color_set(&orig_me->id, cl);
+  DEG_id_tag_update(&orig_me->id, ID_RECALC_GEOMETRY_ALL_MODES);
 }
 
 void BKE_sculpt_update_object_for_edit(
