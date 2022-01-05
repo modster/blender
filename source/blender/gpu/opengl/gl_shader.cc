@@ -360,6 +360,7 @@ std::string GLShader::resources_declare(const ShaderCreateInfo &info) const
   }
   ss << "\n/* Push Constants. */\n";
   for (const ShaderCreateInfo::PushConst &uniform : info.push_constants_) {
+    ss << "layout(location = " << uniform.index << ") ";
     ss << "uniform " << to_string(uniform.type) << " " << uniform.name << ";\n";
   }
   ss << "\n";
@@ -374,9 +375,7 @@ std::string GLShader::vertex_interface_declare(const ShaderCreateInfo &info) con
 
   ss << "\n/* Inputs. */\n";
   for (const ShaderCreateInfo::VertIn &attr : info.vertex_inputs_) {
-#if 0 /* If using layout. */
     ss << "layout(location = " << attr.index << ") ";
-#endif
     ss << "in " << to_string(attr.type) << " " << attr.name << ";\n";
   }
   ss << "\n/* Interfaces. */\n";
@@ -452,7 +451,7 @@ static char *glsl_patch_default_get()
 
   size_t slen = 0;
   /* Version need to go first. */
-  STR_CONCAT(patch, slen, "#version 420\n");
+  STR_CONCAT(patch, slen, "#version 430\n");
 
   /* Enable extensions for features that are not part of our base GLSL version
    * don't use an extension for something already available! */
