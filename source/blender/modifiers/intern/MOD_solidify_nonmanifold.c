@@ -214,8 +214,9 @@ Mesh *MOD_solidify_nonmanifold_modifyMesh(ModifierData *md,
 
 #define MOD_SOLIDIFY_EMPTY_TAG ((uint)-1)
 
-  /* Calculate only face normals. */
-  float(*poly_nors)[3] = BKE_mesh_poly_normals_ensure(mesh);
+  /* Calculate only face normals. Copied because they are modified directly below. */
+  float(*poly_nors)[3] = MEM_malloc_arrayN(numPolys, sizeof(float[3]), __func__);
+  memcpy(poly_nors, BKE_mesh_poly_normals_ensure(mesh), sizeof(float[3]) * numPolys);
 
   NewFaceRef *face_sides_arr = MEM_malloc_arrayN(
       numPolys * 2, sizeof(*face_sides_arr), "face_sides_arr in solidify");
@@ -2560,6 +2561,7 @@ Mesh *MOD_solidify_nonmanifold_modifyMesh(ModifierData *md,
       MEM_freeN(p->link_edges);
     }
     MEM_freeN(face_sides_arr);
+    MEM_freeN(poly_nors);
   }
 
 #undef MOD_SOLIDIFY_EMPTY_TAG
