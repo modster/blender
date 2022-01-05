@@ -20,9 +20,9 @@
 
 #include "node_geometry_util.hh"
 
-namespace blender::nodes {
+namespace blender::nodes::node_geo_input_tangent_cc {
 
-static void geo_node_input_tangent_declare(NodeDeclarationBuilder &b)
+static void node_declare(NodeDeclarationBuilder &b)
 {
   b.add_output<decl::Vector>(N_("Tangent")).field_source();
 }
@@ -85,8 +85,7 @@ static Array<float3> curve_tangent_point_domain(const CurveEval &curve)
 }
 
 static VArray<float3> construct_curve_tangent_gvarray(const CurveComponent &component,
-                                                      const AttributeDomain domain,
-                                                      ResourceScope &UNUSED(scope))
+                                                      const AttributeDomain domain)
 {
   const CurveEval *curve = component.get_for_read();
   if (curve == nullptr) {
@@ -118,27 +117,20 @@ static VArray<float3> construct_curve_tangent_gvarray(const CurveComponent &comp
   return nullptr;
 }
 
-class TangentFieldInput final : public fn::FieldInput {
+class TangentFieldInput final : public GeometryFieldInput {
  public:
-  TangentFieldInput() : fn::FieldInput(CPPType::get<float3>(), "Tangent node")
+  TangentFieldInput() : GeometryFieldInput(CPPType::get<float3>(), "Tangent node")
   {
     category_ = Category::Generated;
   }
 
-  GVArray get_varray_for_context(const fn::FieldContext &context,
-                                 IndexMask UNUSED(mask),
-                                 ResourceScope &scope) const final
+  GVArray get_varray_for_context(const GeometryComponent &component,
+                                 const AttributeDomain domain,
+                                 IndexMask UNUSED(mask)) const final
   {
-    if (const GeometryComponentFieldContext *geometry_context =
-            dynamic_cast<const GeometryComponentFieldContext *>(&context)) {
-
-      const GeometryComponent &component = geometry_context->geometry_component();
-      const AttributeDomain domain = geometry_context->domain();
-
-      if (component.type() == GEO_COMPONENT_TYPE_CURVE) {
-        const CurveComponent &curve_component = static_cast<const CurveComponent &>(component);
-        return construct_curve_tangent_gvarray(curve_component, domain, scope);
-      }
+    if (component.type() == GEO_COMPONENT_TYPE_CURVE) {
+      const CurveComponent &curve_component = static_cast<const CurveComponent &>(component);
+      return construct_curve_tangent_gvarray(curve_component, domain);
     }
     return {};
   }
@@ -155,20 +147,22 @@ class TangentFieldInput final : public fn::FieldInput {
   }
 };
 
-static void geo_node_input_tangent_exec(GeoNodeExecParams params)
+static void node_geo_exec(GeoNodeExecParams params)
 {
   Field<float3> tangent_field{std::make_shared<TangentFieldInput>()};
   params.set_output("Tangent", std::move(tangent_field));
 }
 
-}  // namespace blender::nodes
+}  // namespace blender::nodes::node_geo_input_tangent_cc
 
 void register_node_type_geo_input_tangent()
 {
+  namespace file_ns = blender::nodes::node_geo_input_tangent_cc;
+
   static bNodeType ntype;
 
-  geo_node_type_base(&ntype, GEO_NODE_INPUT_TANGENT, "Curve Tangent", NODE_CLASS_INPUT, 0);
-  ntype.geometry_node_execute = blender::nodes::geo_node_input_tangent_exec;
-  ntype.declare = blender::nodes::geo_node_input_tangent_declare;
+  geo_node_type_base(&ntype, GEO_NODE_INPUT_TANGENT, "Curve Tangent", NODE_CLASS_INPUT);
+  ntype.geometry_node_execute = file_ns::node_geo_exec;
+  ntype.declare = file_ns::node_declare;
   nodeRegisterType(&ntype);
 }

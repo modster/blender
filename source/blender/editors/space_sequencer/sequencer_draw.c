@@ -668,7 +668,6 @@ static void drawmeta_contents(Scene *scene,
   GPU_blend(GPU_BLEND_NONE);
 }
 
-/* Get handle width in 2d-View space. */
 float sequence_handle_size_get_clamped(Sequence *seq, const float pixelx)
 {
   const float maxhandle = (pixelx * SEQ_HANDLE_SIZE) * U.pixelsize;
@@ -1389,7 +1388,8 @@ static void draw_seq_strip(const bContext *C,
   if ((sseq->flag & SEQ_SHOW_OVERLAY) &&
       (sseq->timeline_overlay.flag & SEQ_TIMELINE_SHOW_THUMBNAILS) &&
       (ELEM(seq->type, SEQ_TYPE_MOVIE, SEQ_TYPE_IMAGE))) {
-    draw_seq_strip_thumbnail(v2d, C, scene, seq, y1, y2, pixelx, pixely);
+    draw_seq_strip_thumbnail(
+        v2d, C, scene, seq, y1, y_threshold ? text_margin_y : y2, pixelx, pixely);
   }
 
   if ((sseq->flag & SEQ_SHOW_OVERLAY) &&
@@ -1516,13 +1516,6 @@ void ED_sequencer_special_preview_clear(void)
   sequencer_special_update_set(NULL);
 }
 
-/**
- * Rendering using opengl will change the current viewport/context.
- * This is why we need the \a region, to set back the render area.
- *
- * TODO: do not rely on such hack and just update the \a ibuf outside of
- * the UI drawing code.
- */
 ImBuf *sequencer_ibuf_get(struct Main *bmain,
                           ARegion *region,
                           struct Depsgraph *depsgraph,
@@ -2096,6 +2089,10 @@ static int sequencer_draw_get_transform_preview_frame(Scene *scene)
 static void seq_draw_image_origin_and_outline(const bContext *C, Sequence *seq, bool is_active_seq)
 {
   SpaceSeq *sseq = CTX_wm_space_seq(C);
+  const ARegion *region = CTX_wm_region(C);
+  if (region->regiontype == RGN_TYPE_PREVIEW && !sequencer_view_preview_only_poll(C)) {
+    return;
+  }
   if ((seq->flag & SELECT) == 0) {
     return;
   }

@@ -24,7 +24,7 @@
 #include "BKE_asset_catalog.hh"
 #include "BKE_asset_library.h"
 
-#include "BLI_fileops.h"
+#include "BLI_fileops.hh"
 #include "BLI_path_util.h"
 
 /* For S_ISREG() and S_ISDIR() on Windows. */
@@ -32,16 +32,15 @@
 #  include "BLI_winstuff.h"
 #endif
 
+#include "CLG_log.h"
+
+static CLG_LogRef LOG = {"bke.asset_service"};
+
 namespace blender::bke {
 
 const CatalogFilePath AssetCatalogService::DEFAULT_CATALOG_FILENAME = "blender_assets.cats.txt";
 
-/* For now this is the only version of the catalog definition files that is supported.
- * Later versioning code may be added to handle older files. */
 const int AssetCatalogDefinitionFile::SUPPORTED_VERSION = 1;
-/* String that's matched in the catalog definition file to know that the line is the version
- * declaration. It has to start with a space to ensure it won't match any hypothetical future field
- * that starts with "VERSION". */
 const std::string AssetCatalogDefinitionFile::VERSION_MARKER = "VERSION ";
 
 const std::string AssetCatalogDefinitionFile::HEADER =
@@ -96,6 +95,14 @@ bool AssetCatalogService::has_unsaved_changes() const
 {
   BLI_assert(catalog_collection_);
   return catalog_collection_->has_unsaved_changes_;
+}
+
+void AssetCatalogService::tag_all_catalogs_as_unsaved_changes()
+{
+  for (auto &catalog : catalog_collection_->catalogs_.values()) {
+    catalog->flags.has_unsaved_changes = true;
+  }
+  catalog_collection_->has_unsaved_changes_ = true;
 }
 
 bool AssetCatalogService::is_empty() const
@@ -308,6 +315,7 @@ void AssetCatalogService::load_from_disk(const CatalogFilePath &file_or_director
   BLI_stat_t status;
   if (BLI_stat(file_or_directory_path.data(), &status) == -1) {
     /* TODO(@sybren): throw an appropriate exception. */
+    CLOG_WARN(&LOG, "path not found: %s", file_or_directory_path.data());
     return;
   }
 
@@ -334,6 +342,7 @@ void AssetCatalogService::load_directory_recursive(const CatalogFilePath &direct
 
   if (!BLI_exists(file_path.data())) {
     /* No file to be loaded is perfectly fine. */
+    CLOG_INFO(&LOG, 2, "path not found: %s", file_path.data());
     return;
   }
 
@@ -484,6 +493,24 @@ bool AssetCatalogService::write_to_disk_ex(const CatalogFilePath &blend_file_pat
   catalog_collection_->catalog_definition_file_ = construct_cdf_in_memory(cdf_path_to_write);
   reload_catalogs();
   return catalog_collection_->catalog_definition_file_->write_to_disk();
+}
+
+void AssetCatalogService::prepare_to_merge_on_write()
+{
+  /* TODO(Sybren): expand to support multiple CDFs. */
+
+  if (!catalog_collection_->catalog_definition_file_) {
+    /* There is no CDF connected, so it's a no-op. */
+    return;
+  }
+
+  /* Remove any association with the CDF, so that a new location will be chosen
+   * when the blend file is saved. */
+  catalog_collection_->catalog_definition_file_.reset();
+
+  /* Mark all in-memory catalogs as "dirty", to force them to be kept around on
+   * the next "load-merge-write" cycle. */
+  tag_all_catalogs_as_unsaved_changes();
 }
 
 CatalogFilePath AssetCatalogService::find_suitable_cdf_path_for_writing(
@@ -803,8 +830,12 @@ void AssetCatalogDefinitionFile::parse_catalog_file(
     const CatalogFilePath &catalog_definition_file_path,
     AssetCatalogParsedFn catalog_loaded_callback)
 {
-  std::fstream infile(catalog_definition_file_path);
+  fstream infile(catalog_definition_file_path, std::ios::in);
 
+  if (!infile.is_open()) {
+    CLOG_ERROR(&LOG, "%s: unable to open file", catalog_definition_file_path.c_str());
+    return;
+  }
   bool seen_version_number = false;
   std::string line;
   while (std::getline(infile, line)) {
@@ -935,7 +966,7 @@ bool AssetCatalogDefinitionFile::write_to_disk_unsafe(const CatalogFilePath &des
     return false;
   }
 
-  std::ofstream output(dest_file_path);
+  fstream output(dest_file_path, std::ios::out);
 
   /* TODO(@sybren): remember the line ending style that was originally read, then use that to write
    * the file again. */

@@ -18,9 +18,9 @@
 
 #include "node_geometry_util.hh"
 
-namespace blender::nodes {
+namespace blender::nodes::node_geo_curve_primitive_star_cc {
 
-static void geo_node_curve_primitive_star_declare(NodeDeclarationBuilder &b)
+static void node_declare(NodeDeclarationBuilder &b)
 {
   b.add_input<decl::Int>(N_("Points"))
       .default_value(8)
@@ -54,19 +54,24 @@ static std::unique_ptr<CurveEval> create_star_curve(const float inner_radius,
 {
   std::unique_ptr<CurveEval> curve = std::make_unique<CurveEval>();
   std::unique_ptr<PolySpline> spline = std::make_unique<PolySpline>();
+  spline->set_cyclic(true);
+
+  spline->resize(points * 2);
+  MutableSpan<float3> positions = spline->positions();
+  spline->radii().fill(1.0f);
+  spline->tilts().fill(0.0f);
 
   const float theta_step = (2.0f * M_PI) / float(points);
-  for (int i : IndexRange(points)) {
+  for (const int i : IndexRange(points)) {
     const float x = outer_radius * cos(theta_step * i);
     const float y = outer_radius * sin(theta_step * i);
-    spline->add_point(float3(x, y, 0.0f), 1.0f, 0.0f);
+    positions[i * 2] = {x, y, 0.0f};
 
     const float inner_x = inner_radius * cos(theta_step * i + theta_step * 0.5f + twist);
     const float inner_y = inner_radius * sin(theta_step * i + theta_step * 0.5f + twist);
-    spline->add_point(float3(inner_x, inner_y, 0.0f), 1.0f, 0.0f);
+    positions[i * 2 + 1] = {inner_x, inner_y, 0.0f};
   }
-  spline->set_cyclic(true);
-  spline->attributes.reallocate(spline->size());
+
   curve->add_spline(std::move(spline));
   curve->attributes.reallocate(curve->splines().size());
 
@@ -85,7 +90,7 @@ static void create_selection_output(CurveComponent &component,
   attribute.save();
 }
 
-static void geo_node_curve_primitive_star_exec(GeoNodeExecParams params)
+static void node_geo_exec(GeoNodeExecParams params)
 {
   std::unique_ptr<CurveEval> curve = create_star_curve(
       std::max(params.extract_input<float>("Inner Radius"), 0.0f),
@@ -103,13 +108,15 @@ static void geo_node_curve_primitive_star_exec(GeoNodeExecParams params)
   }
   params.set_output("Curve", std::move(output));
 }
-}  // namespace blender::nodes
+}  // namespace blender::nodes::node_geo_curve_primitive_star_cc
 
 void register_node_type_geo_curve_primitive_star()
 {
+  namespace file_ns = blender::nodes::node_geo_curve_primitive_star_cc;
+
   static bNodeType ntype;
-  geo_node_type_base(&ntype, GEO_NODE_CURVE_PRIMITIVE_STAR, "Star", NODE_CLASS_GEOMETRY, 0);
-  ntype.declare = blender::nodes::geo_node_curve_primitive_star_declare;
-  ntype.geometry_node_execute = blender::nodes::geo_node_curve_primitive_star_exec;
+  geo_node_type_base(&ntype, GEO_NODE_CURVE_PRIMITIVE_STAR, "Star", NODE_CLASS_GEOMETRY);
+  ntype.declare = file_ns::node_declare;
+  ntype.geometry_node_execute = file_ns::node_geo_exec;
   nodeRegisterType(&ntype);
 }

@@ -334,6 +334,9 @@ static void do_versions_theme(const UserDef *userdef, bTheme *btheme)
     memcpy(btheme, &U_theme_default, sizeof(*btheme));
   }
 
+  if (!USER_VERSION_ATLEAST(301, 2)) {
+    FROM_DEFAULT_V4_UCHAR(space_sequencer.mask);
+  }
   /**
    * Versioning code until next subversion bump goes here.
    *
@@ -396,7 +399,6 @@ static bool keymap_item_has_invalid_wm_context_data_path(wmKeyMapItem *kmi,
   return false;
 }
 
-/* patching UserDef struct and Themes */
 void blo_do_versions_userdef(UserDef *userdef)
 {
   /* #UserDef & #Main happen to have the same struct member. */
