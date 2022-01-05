@@ -10,8 +10,10 @@ GPU_SHADER_CREATE_INFO(gpu_shader_3D_flat_color)
     .fragment_out(0, Type::VEC4, "fragColor")
     .push_constant(1, Type::BOOL, "srgbTarget")
     .vertex_source("gpu_shader_3D_flat_color_vert.glsl")
-    .fragment_source("gpu_shader_flat_color_frag.glsl");
+    .fragment_source("gpu_shader_flat_color_frag.glsl")
+    .do_static_compilation(true);
 
 GPU_SHADER_CREATE_INFO(gpu_shader_3D_flat_color_clipped)
     .additional_info("gpu_shader_3D_flat_color")
-    .additional_info("gpu_clip_planes");
+    .additional_info("gpu_clip_planes")
+    .do_static_compilation(true);
