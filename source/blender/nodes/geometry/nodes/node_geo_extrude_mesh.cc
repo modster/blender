@@ -344,19 +344,15 @@ static void extrude_mesh_edges(MeshComponent &component,
 
   GeometryComponentFieldContext edge_context{component, ATTR_DOMAIN_EDGE};
   FieldEvaluator edge_evaluator{edge_context, mesh.totedge};
-  edge_evaluator.add(selection_field);
+  edge_evaluator.set_selection(selection_field);
+  edge_evaluator.add(offset_field);
   edge_evaluator.evaluate();
-  const IndexMask edge_selection = edge_evaluator.get_evaluated_as_mask(0);
+  const IndexMask edge_selection = edge_evaluator.get_evaluated_selection_as_mask();
+  const VArray<float3> &edge_offsets = edge_evaluator.get_evaluated<float3>(0);
 
   Array<int> new_vert_indices(orig_vert_size, -1);
   Vector<int> new_vert_orig_indices = extrude_vert_orig_indices_from_edges(
       edge_selection, mesh, new_vert_indices);
-
-  Array<float3> offsets(orig_vert_size);
-  GeometryComponentFieldContext point_context{component, ATTR_DOMAIN_POINT};
-  FieldEvaluator point_evaluator{point_context, orig_vert_size}; /* TODO: Better edge_selection. */
-  point_evaluator.add_with_destination(offset_field, offsets.as_mutable_span());
-  point_evaluator.evaluate();
 
   const IndexRange new_vert_range{orig_vert_size, new_vert_orig_indices.size()};
   /* The extruded edges connect the original and duplicate edges. */
@@ -570,12 +566,31 @@ static void extrude_mesh_edges(MeshComponent &component,
     return true;
   });
 
-  threading::parallel_for(new_verts.index_range(), 1024, [&](const IndexRange range) {
-    for (const int i : range) {
-      const float3 offset = offsets[new_vert_orig_indices[i]];
-      add_v3_v3(new_verts[i].co, offset);
+  if (edge_offsets.is_single()) {
+    const float3 offset = edge_offsets.get_internal_single();
+    threading::parallel_for(new_verts.index_range(), 1024, [&](const IndexRange range) {
+      for (const int i : range) {
+        add_v3_v3(new_verts[i].co, offset);
+      }
+    });
+  }
+  else {
+    Array<float3> vert_offsets(new_verts.size());
+    attribute_math::DefaultMixer<float3> mixer(vert_offsets);
+    for (const int i : edge_selection.index_range()) {
+      const MEdge &edge = duplicate_edges[i];
+      const float3 offset = edge_offsets[edge_selection[i]];
+      mixer.mix_in(edge.v1 - orig_vert_size, offset);
+      mixer.mix_in(edge.v2 - orig_vert_size, offset);
     }
-  });
+    mixer.finalize();
+
+    threading::parallel_for(new_verts.index_range(), 1024, [&](const IndexRange range) {
+      for (const int i : range) {
+        add_v3_v3(new_verts[i].co, vert_offsets[i]);
+      }
+    });
+  }
 
   if (attribute_outputs.top_id) {
     save_selection_as_attribute(
@@ -593,38 +608,6 @@ static void extrude_mesh_edges(MeshComponent &component,
   BLI_assert(BKE_mesh_is_valid(component.get_for_write()));
 }
 
-static IndexMask index_mask_from_selection(const VArray<bool> &selection,
-                                           Vector<int64_t> &r_indices)
-{
-  if (!selection) {
-    return IndexMask(0);
-  }
-  if (selection.is_single()) {
-    if (selection.get_internal_single()) {
-      return IndexMask(selection.size());
-    }
-    return IndexMask(0);
-  }
-
-  if (selection.is_span()) {
-    Span<bool> span = selection.get_internal_span();
-    for (const int i : span.index_range()) {
-      if (span[i]) {
-        r_indices.append(i);
-      }
-    }
-  }
-  else {
-    for (const int i : selection.index_range()) {
-      if (selection[i]) {
-        r_indices.append(i);
-      }
-    }
-  }
-
-  return IndexMask(r_indices);
-}
-
 static void extrude_mesh_faces(MeshComponent &component,
                                const Field<bool> &selection_field,
                                const Field<float3> &offset_field,
@@ -638,22 +621,11 @@ static void extrude_mesh_faces(MeshComponent &component,
 
   GeometryComponentFieldContext poly_context{component, ATTR_DOMAIN_FACE};
   FieldEvaluator poly_evaluator{poly_context, mesh.totpoly};
-  poly_evaluator.add(selection_field);
+  poly_evaluator.set_selection(selection_field);
+  poly_evaluator.add(offset_field);
   poly_evaluator.evaluate();
-  const VArray<bool> &poly_selection_varray = poly_evaluator.get_evaluated<bool>(0);
-  const IndexMask poly_selection = poly_evaluator.get_evaluated_as_mask(0);
-
-  Vector<int64_t> vert_selection_indices;
-  const VArray<bool> vert_selection_varray = component.attribute_try_adapt_domain(
-      poly_selection_varray, ATTR_DOMAIN_FACE, ATTR_DOMAIN_POINT);
-  const IndexMask vert_selection = index_mask_from_selection(vert_selection_varray,
-                                                             vert_selection_indices);
-
-  Array<float3> offsets(orig_vert_size);
-  GeometryComponentFieldContext vert_context{component, ATTR_DOMAIN_POINT};
-  FieldEvaluator vert_evaluator{vert_context, &vert_selection};
-  vert_evaluator.add_with_destination(offset_field, offsets.as_mutable_span());
-  vert_evaluator.evaluate();
+  const IndexMask poly_selection = poly_evaluator.get_evaluated_selection_as_mask();
+  const VArray<float3> &poly_offsets = poly_evaluator.get_evaluated<float3>(0);
 
   /* Keep track of the selected face that each edge corresponds to. Only edges with one selected
    * face will have a single associated face. However, we need to keep track of a value for every
@@ -893,18 +865,43 @@ static void extrude_mesh_faces(MeshComponent &component,
     return true;
   });
 
-  threading::parallel_for(vert_selection.index_range(), 1024, [&](const IndexRange range) {
-    for (const int i : range) {
-      const int i_orig = vert_selection[i];
-      const int i_new = new_vert_indices[i_orig];
-      const float3 offset = offsets[i_orig];
-      /* If the vertex is used by a selected edge, it will have been duplicated and only the new
-       * vertex should use the offset. Otherwise the vertex might still need an offset, but it was
-       * reused on the inside of a group of extruded faces. */
-      MVert &vert = bke::mesh_verts(mesh)[(i_new != -1) ? i_new : i_orig];
-      add_v3_v3(vert.co, offset);
+  if (poly_offsets.is_single()) {
+    const float3 offset = poly_offsets.get_internal_single();
+    threading::parallel_for(IndexRange(orig_vert_size), 1024, [&](const IndexRange range) {
+      for (const int i_orig : range) {
+        const int i_new = new_vert_indices[i_orig];
+        /* If the vertex is used by a selected edge, it will have been duplicated and only the new
+         * vertex should use the offset. Otherwise the vertex might still need an offset, but it
+         * was reused on the inside of a group of extruded faces. */
+        MVert &vert = bke::mesh_verts(mesh)[(i_new != -1) ? i_new : i_orig];
+        add_v3_v3(vert.co, offset);
+      }
+    });
+  }
+  else {
+    Array<float3> vert_offsets(orig_vert_size);
+    attribute_math::DefaultMixer<float3> mixer(vert_offsets);
+    for (const int i_poly : poly_selection) {
+      const MPoly &poly = orig_polys[i_poly];
+      const float3 offset = poly_offsets[i_poly];
+      for (const MLoop &loop : orig_loops.slice(poly.loopstart, poly.totloop)) {
+        mixer.mix_in(loop.v, offset);
+      }
     }
-  });
+    mixer.finalize();
+
+    threading::parallel_for(IndexRange(orig_vert_size), 1024, [&](const IndexRange range) {
+      for (const int i_orig : range) {
+        const int i_new = new_vert_indices[i_orig];
+        const float3 offset = vert_offsets[i_orig];
+        /* If the vertex is used by a selected edge, it will have been duplicated and only the new
+         * vertex should use the offset. Otherwise the vertex might still need an offset, but it
+         * was reused on the inside of a group of extruded faces. */
+        MVert &vert = bke::mesh_verts(mesh)[(i_new != -1) ? i_new : i_orig];
+        add_v3_v3(vert.co, offset);
+      }
+    });
+  }
 
   BKE_mesh_runtime_clear_cache(&mesh);
   BKE_mesh_normals_tag_dirty(&mesh);
