@@ -3645,11 +3645,6 @@ void SCULPT_flush_stroke_deform(Sculpt *sd, Object *ob, bool is_proxy_used)
     }
 
     MEM_SAFE_FREE(nodes);
-
-    /* Modifiers could depend on mesh normals, so we should update them.
-     * NOTE: then if sculpting happens on locked key, normals should be re-calculate after applying
-     * coords from key-block on base mesh. */
-    BKE_mesh_calc_normals(me);
   }
   else if (ss->shapekey_active) {
     sculpt_update_keyblock(ob);
