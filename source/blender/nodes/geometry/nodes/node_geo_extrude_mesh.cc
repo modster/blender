@@ -392,7 +392,6 @@ static void extrude_mesh_edges(MeshComponent &component,
     edge.flag = (ME_EDGEDRAW | ME_EDGERENDER);
   }
 
-  /* TODO: Combine with poly loop? */
   for (const int i : duplicate_edges.index_range()) {
     const MEdge &orig_edge = mesh.medge[edge_selection[i]];
     MEdge &edge = duplicate_edges[i];
@@ -597,6 +596,9 @@ static void extrude_mesh_edges(MeshComponent &component,
 static IndexMask index_mask_from_selection(const VArray<bool> &selection,
                                            Vector<int64_t> &r_indices)
 {
+  if (!selection) {
+    return IndexMask(0);
+  }
   if (selection.is_single()) {
     if (selection.get_internal_single()) {
       return IndexMask(selection.size());
@@ -668,7 +670,7 @@ static void extrude_mesh_faces(MeshComponent &component,
   }
 
   Vector<int> in_between_edges;
-  /* The extruded face corresponding to each extruded edge. */
+  /* The extruded face corresponding to each extruded edge (and each extruded face). */
   Vector<int> edge_orig_face_indices;
   Vector<int64_t> selected_edges_orig_indices;
   for (const int i_edge : IndexRange(orig_edges.size())) {
@@ -787,6 +789,12 @@ static void extrude_mesh_faces(MeshComponent &component,
                                    connect_edge_range[extrude_index_2]);
   }
 
+  /* Create a map of all of an index in the extruded vertices array to all of the indices of edges
+   * in the duplicate edges array that connect to that vertex. This can be used to simplify the
+   * mixing of attribute data for the connecting edges. */
+  Array<Vector<int>> new_vert_to_duplicate_edge_map = create_vert_to_edge_map(
+      new_vert_range.size(), duplicate_edges, orig_vert_size);
+
   component.attribute_foreach([&](const AttributeIDRef &id, const AttributeMetaData meta_data) {
     OutputAttribute attribute = component.attribute_try_get_for_output(
         id, meta_data.domain, meta_data.data_type);
@@ -808,10 +816,24 @@ static void extrude_mesh_faces(MeshComponent &component,
         case ATTR_DOMAIN_EDGE: {
           MutableSpan<T> duplicate_data = data.slice(duplicate_edge_range);
           MutableSpan<T> connect_data = data.slice(connect_edge_range);
-          connect_data.fill(T());
           for (const int i : edge_selection.index_range()) {
             duplicate_data[i] = data[edge_selection[i]];
           }
+          threading::parallel_for(connect_data.index_range(), 512, [&](const IndexRange range) {
+            for (const int i : range) {
+              /* Create a separate mixer for every point to avoid allocating temporary
+               * buffers in the mixer the size of the result and to allow multi-threading. */
+              attribute_math::DefaultMixer<T> mixer{connect_data.slice(i, 1)};
+
+              for (const int i_connected_duplicate_edge : new_vert_to_duplicate_edge_map[i]) {
+                /* Use the duplicate data because it's slightly simpler to access and was just
+                 * filled in the previous loop. */
+                mixer.mix_in(0, duplicate_data[i_connected_duplicate_edge]);
+              }
+
+              mixer.finalize();
+            }
+          });
           break;
         }
         case ATTR_DOMAIN_FACE: {
@@ -823,7 +845,43 @@ static void extrude_mesh_faces(MeshComponent &component,
         }
         case ATTR_DOMAIN_CORNER: {
           MutableSpan<T> new_data = data.slice(side_loop_range);
-          new_data.fill(T());
+          threading::parallel_for(edge_selection.index_range(), 256, [&](const IndexRange range) {
+            for (const int i_edge_selection : range) {
+              const MPoly &poly = polys[edge_orig_face_indices[i_edge_selection]];
+
+              const MEdge &duplicate_edge = duplicate_edges[i_edge_selection];
+              const int new_vert_1 = duplicate_edge.v1;
+              const int new_vert_2 = duplicate_edge.v2;
+              const int orig_vert_1 = new_vert_orig_indices[new_vert_1 - orig_vert_size];
+              const int orig_vert_2 = new_vert_orig_indices[new_vert_2 - orig_vert_size];
+
+              /* Retrieve the data for the first two sides of the quad from the extruded polygon,
+               * which we generally expect to have just a small amount of sides. This loop could be
+               * eliminated by adding a cache of connected loops. */
+              T data_1;
+              T data_2;
+              for (const int i_loop : IndexRange(poly.loopstart, poly.totloop)) {
+                if (loops[i_loop].v == new_vert_1) {
+                  data_1 = data[i_loop];
+                }
+                if (loops[i_loop].v == new_vert_2) {
+                  data_2 = data[i_loop];
+                }
+              }
+
+              /* Instead of replicating the order in #fill_quad_consistent_direction here, it's
+               * simpler (though probably not faster) to just match the corner data based on the
+               * vertex indices. */
+              for (const int i : IndexRange(4 * i_edge_selection, 4)) {
+                if (ELEM(new_loops[i].v, new_vert_1, orig_vert_1)) {
+                  new_data[i] = data_1;
+                }
+                else if (ELEM(new_loops[i].v, new_vert_2, orig_vert_2)) {
+                  new_data[i] = data_2;
+                }
+              }
+            }
+          });
           break;
         }
         default:
@@ -1010,9 +1068,9 @@ static void extrude_individual_mesh_faces(MeshComponent &component,
                 MutableSpan<T> side_loop_data = new_data.slice(i_extrude * 4, 4);
 
                 /* The two corners on each side of the side polygon get the data from the matching
-                 * corners of the extruded polygon. (All the corners that would be in the same
-                 * location if the extrude offset is 0). This order depends on the following loop
-                 * filling the loop indices. */
+                 * corners of the extruded polygon. (Matching values for the corners that would be
+                 * in the same location if the extrude offset is 0). This order depends on the
+                 * following loop filling the loop indices. */
                 side_loop_data[0] = poly_loop_data[i_next];
                 side_loop_data[1] = poly_loop_data[i];
                 side_loop_data[2] = poly_loop_data[i];
