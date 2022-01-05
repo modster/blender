@@ -25,8 +25,6 @@
 
 #include <iostream>
 
-#include "gpu_shader_builder.hh"
-
 #include "GHOST_C-api.h"
 
 #include "GPU_context.h"
@@ -48,24 +46,6 @@ class ShaderBuilder {
   void bake_create_infos();
   void exit();
 };
-
-int main(int argc, const char *argv[])
-{
-  printf("shader-builder started\n");
-  if (argc < 2) {
-    printf("Usage: shader_builder <data_file_to>\n");
-    exit(1);
-  }
-
-  (void)argv;
-
-  ShaderBuilder builder;
-  builder.init();
-  builder.bake_create_infos();
-  builder.exit();
-
-  return 0;
-}
 
 void ShaderBuilder::bake_create_infos()
 {
@@ -99,3 +79,19 @@ void ShaderBuilder::exit()
 }
 
 }  // namespace blender::gpu::shader_builder
+
+/** \brief Entry point for the shader_builder. */
+int main(int argc, const char *argv[])
+{
+  if (argc < 2) {
+    printf("Usage: %s <data_file_to>\n", argv[0]);
+    exit(1);
+  }
+
+  blender::gpu::shader_builder::ShaderBuilder builder;
+  builder.init();
+  builder.bake_create_infos();
+  builder.exit();
+
+  return 0;
+}

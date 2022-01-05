@@ -454,8 +454,8 @@ set(GPU_SHADER_INFO_SRC
 
 if(WITH_GPU_SHADER_BUILDER)
   add_executable(shader_builder
-    intern/gpu_shader_builder_main.cc
     intern/gpu_shader_builder.cc
+    intern/gpu_shader_builder_stubs.cc
     intern/gpu_shader_info_baked_stub.cc
     ${shader_create_info_list_file}
   )
