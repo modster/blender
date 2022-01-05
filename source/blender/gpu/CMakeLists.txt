@@ -453,25 +453,16 @@ set(GPU_SHADER_INFO_SRC
 )
 
 if(WITH_GPU_SHADER_BUILDER)
-  set(GPU_SHADER_BUILDER_SRC
+  add_executable(shader_builder
+    intern/gpu_shader_builder_main.cc
     intern/gpu_shader_builder.cc
     intern/gpu_shader_info_baked_stub.cc
     ${shader_create_info_list_file}
   )
 
-  add_library(bf_gpu_shader_builder "${GPU_SHADER_BUILDER_SRC}")
-
-  add_executable(shader_builder
-    intern/gpu_shader_builder_main.cc
-  )
-
   target_link_libraries(shader_builder PUBLIC
-  ${PLATFORM_LINKLIBS}
-  bf_gpu
-  bf_blenlib
-  bf_blenkernel
-  bf_gpu_shader_builder
-  bf_intern_clog
+    bf_blenkernel
+    ${PLATFORM_LINKLIBS}
   )
   target_include_directories(shader_builder PRIVATE ${INC} ${CMAKE_CURRENT_BINARY_DIR})
 
