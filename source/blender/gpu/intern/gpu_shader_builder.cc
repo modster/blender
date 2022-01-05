@@ -37,7 +37,7 @@
 
 int main(int argc, char const *argv[])
 {
-  if (argc < 1) {
+  if (argc < 2) {
     printf("Usage: shader_builder <data_file_to>\n");
     exit(1);
   }
