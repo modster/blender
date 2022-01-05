@@ -314,6 +314,10 @@ static void move_all_selected_points(ListBase *editnurb,
         }
       }
     }
+
+    if (nu && nu->type == CU_BEZIER) {
+      BKE_nurb_handles_calc(nu);
+    }
   }
 }
 
