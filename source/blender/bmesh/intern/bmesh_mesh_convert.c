@@ -192,7 +192,6 @@ void BM_mesh_bm_from_me(BMesh *bm, const Mesh *me, const struct BMeshFromMeshPar
   int totloops, i;
   CustomData_MeshMasks mask = CD_MASK_BMESH;
   CustomData_MeshMasks_update(&mask, &params->cd_mask_extra);
-  const float(*vert_normals)[3] = BKE_mesh_vertex_normals_ensure(me);
 
   if (!me || !me->totvert) {
     if (me && is_new) { /* No verts? still copy custom-data layout. */
@@ -207,6 +206,14 @@ void BM_mesh_bm_from_me(BMesh *bm, const Mesh *me, const struct BMeshFromMeshPar
       CustomData_bmesh_init_pool(&bm->pdata, me->totpoly, BM_FACE);
     }
     return; /* Sanity check. */
+  }
+
+  /* Only copy normals to the new BMesh if they are not already dirty. This avoids unnecessary
+   * work, but also accessing normals on an incomplete mesh, for example when restoring undo steps
+   * in edit mode. */
+  const float(*vert_normals)[3] = NULL;
+  if (!BKE_mesh_vertex_normals_are_dirty(me)) {
+    vert_normals = BKE_mesh_vertex_normals_ensure(me);
   }
 
   if (is_new) {
@@ -335,7 +342,9 @@ void BM_mesh_bm_from_me(BMesh *bm, const Mesh *me, const struct BMeshFromMeshPar
       BM_vert_select_set(bm, v, true);
     }
 
-    copy_v3_v3(v->no, vert_normals[i]);
+    if (vert_normals) {
+      copy_v3_v3(v->no, vert_normals[i]);
+    }
 
     /* Copy Custom Data */
     CustomData_to_bmesh_block(&me->vdata, &bm->vdata, i, &v->head.data, true);
@@ -640,6 +649,8 @@ void BM_mesh_bm_to_me(Main *bmain, BMesh *bm, Mesh *me, const struct BMeshToMesh
   CustomData_add_layer(&me->ldata, CD_MLOOP, CD_ASSIGN, mloop, me->totloop);
   CustomData_add_layer(&me->pdata, CD_MPOLY, CD_ASSIGN, mpoly, me->totpoly);
 
+  /* There is no way to tell if BMesh normals are dirty or not. Instead of calculating the normals
+   * on the BMesh possibly unnecessarily, just tag them dirty on the resulting mesh. */
   BKE_mesh_normals_tag_dirty(me);
 
   me->cd_flag = BM_mesh_cd_flag_from_bmesh(bm);

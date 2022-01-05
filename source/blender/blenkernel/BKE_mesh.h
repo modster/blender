@@ -374,6 +374,20 @@ void BKE_mesh_recalc_looptri_with_normals(const struct MLoop *mloop,
 /* *** mesh_normals.cc *** */
 
 /**
+ * Returns the normals for each vertex, which is defined as the weighted average of the normals
+ * from a vertices surrounding faces, or the normalized position of vertices connected to no faces.
+ * \warning May still return null if the mesh is empty.
+ */
+const float (*BKE_mesh_vertex_normals_ensure(const struct Mesh *mesh))[3];
+
+/**
+ * Return the normal direction of every polygon, which is defined by the winding direction of its
+ * corners.
+ * \warning May still return null if the mesh is empty or has no polygons.
+ */
+const float (*BKE_mesh_poly_normals_ensure(const struct Mesh *mesh))[3];
+
+/**
  * Tag mesh vertex and face normals to be recalculated when/if they are needed later.
  *
  * \note Dirty tagged normals are the default state of a new mesh, so tagging them
@@ -417,6 +431,18 @@ void BKE_mesh_vertex_normals_clear_dirty(struct Mesh *mesh);
 void BKE_mesh_poly_normals_clear_dirty(struct Mesh *mesh);
 
 /**
+ * Return true if the mesh vertex normals either are not stored or are dirty.
+ * This can be used to help decide whether to transfer them when copying a mesh.
+ */
+bool BKE_mesh_vertex_normals_are_dirty(const struct Mesh *mesh);
+
+/**
+ * Return true if the mesh polygon normals either are not stored or are dirty.
+ * This can be used to help decide whether to transfer them when copying a mesh.
+ */
+bool BKE_mesh_poly_normals_are_dirty(const struct Mesh *mesh);
+
+/**
  * Calculate face normals directly into a result array.
  *
  * \note Usually #BKE_mesh_poly_normals_ensure is the preferred way to access face normals,
@@ -438,20 +464,6 @@ void BKE_mesh_calc_normals_poly(const struct MVert *mvert,
  * can also calculate them eagerly.
  */
 void BKE_mesh_calc_normals(struct Mesh *me);
-
-/**
- * Returns the normals for each vertex, which is defined as the weighted average of the normals
- * from a vertices surrounding faces, or the normalized position of vertices connected to no faces.
- * \warning May still return null if the mesh is empty.
- */
-const float (*BKE_mesh_vertex_normals_ensure(const struct Mesh *mesh))[3];
-
-/**
- * Return the normal direction of every polygon, which is defined by the winding direction of its
- * corners.
- * \warning May still return null if the mesh is empty or has no polygons.
- */
-const float (*BKE_mesh_poly_normals_ensure(const struct Mesh *mesh))[3];
 
 /**
  * Called after calculating all modifiers.

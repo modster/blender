@@ -146,6 +146,16 @@ void BKE_mesh_poly_normals_clear_dirty(Mesh *mesh)
   BKE_mesh_assert_normals_dirty_or_calculated(mesh);
 }
 
+bool BKE_mesh_vertex_normals_are_dirty(const Mesh *mesh)
+{
+  return mesh->runtime.cd_dirty_vert & CD_MASK_NORMAL;
+}
+
+bool BKE_mesh_poly_normals_are_dirty(const Mesh *mesh)
+{
+  return mesh->runtime.cd_dirty_poly & CD_MASK_NORMAL;
+}
+
 void BKE_mesh_assert_normals_dirty_or_calculated(const Mesh *mesh)
 {
   if (!(mesh->runtime.cd_dirty_vert & CD_MASK_NORMAL)) {
