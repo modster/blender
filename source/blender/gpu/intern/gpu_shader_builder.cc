@@ -25,18 +25,33 @@
 
 #include <iostream>
 
-#include "gpu_shader_create_info.hh"
-#include "gpu_shader_create_info_private.hh"
-#include "gpu_shader_dependency_private.h"
-
-#include "CLG_log.h"
-#include "GPU_context.h"
-#include "GPU_init_exit.h"
+#include "gpu_shader_builder.hh"
 
 #include "GHOST_C-api.h"
 
-int main(int argc, char const *argv[])
+#include "GPU_context.h"
+#include "GPU_init_exit.h"
+#include "gpu_shader_create_info_private.hh"
+
+#include "CLG_log.h"
+
+namespace blender::gpu::shader_builder {
+
+class ShaderBuilder {
+ private:
+  GHOST_SystemHandle ghost_system_;
+  GHOST_ContextHandle ghost_context_;
+  GPUContext *gpu_context_ = nullptr;
+
+ public:
+  void init();
+  void bake_create_infos();
+  void exit();
+};
+
+int main(int argc, const char *argv[])
 {
+  printf("shader-builder started\n");
   if (argc < 2) {
     printf("Usage: shader_builder <data_file_to>\n");
     exit(1);
@@ -44,22 +59,43 @@ int main(int argc, char const *argv[])
 
   (void)argv;
 
-#if 0 /* Make it compile. Somehow... (dependency with GPU module is hard). */
-  GHOST_GLSettings glSettings = {0};
-  GHOST_SystemHandle ghost_system = GHOST_CreateSystem();
-  GHOST_ContextHandle ghost_context = GHOST_CreateOpenGLContext(ghost_system, glSettings);
-  GHOST_ActivateOpenGLContext(ghost_context);
-  struct GPUContext *context = GPU_context_create(nullptr);
-  GPU_init();
-
-  gpu_shader_create_info_compile_all();
-
-  GPU_exit();
-  GPU_backend_exit();
-  GPU_context_discard(context);
-  GHOST_DisposeOpenGLContext(ghost_system, ghost_context);
-  GHOST_DisposeSystem(ghost_system);
-#endif
+  ShaderBuilder builder;
+  builder.init();
+  builder.bake_create_infos();
+  builder.exit();
 
   return 0;
 }
+
+void ShaderBuilder::bake_create_infos()
+{
+  gpu_shader_create_info_compile_all();
+}
+
+void ShaderBuilder::init()
+{
+  CLG_init();
+
+  GHOST_GLSettings glSettings = {0};
+  ghost_system_ = GHOST_CreateSystem();
+  ghost_context_ = GHOST_CreateOpenGLContext(ghost_system_, glSettings);
+  GHOST_ActivateOpenGLContext(ghost_context_);
+
+  gpu_context_ = GPU_context_create(nullptr);
+  GPU_init();
+}
+
+void ShaderBuilder::exit()
+{
+  GPU_backend_exit();
+  GPU_exit();
+
+  GPU_context_discard(gpu_context_);
+
+  GHOST_DisposeOpenGLContext(ghost_system_, ghost_context_);
+  GHOST_DisposeSystem(ghost_system_);
+
+  CLG_exit();
+}
+
+}  // namespace blender::gpu::shader_builder

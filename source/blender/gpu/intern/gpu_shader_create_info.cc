@@ -32,6 +32,8 @@
 
 #include "gpu_shader_create_info.hh"
 #include "gpu_shader_create_info_private.hh"
+#include "gpu_shader_info_baked.hh"
+
 #undef GPU_SHADER_INTERFACE_INFO
 #undef GPU_SHADER_CREATE_INFO
 
@@ -123,12 +125,14 @@ void gpu_shader_create_info_init()
 #include "gpu_shader_create_info_list.hh"
 
 /* Baked shader data appended to create infos. */
+/* TODO(jbakker): should call a function with a callback. so we could switch implementations. We
+ * cannot compile bf_gpu twice.*/
 #ifdef GPU_RUNTIME
 #  include "gpu_shader_baked.hh"
 #endif
 
   /* TEST */
-  gpu_shader_create_info_compile_all();
+  // gpu_shader_create_info_compile_all();
 }
 
 void gpu_shader_create_info_exit()

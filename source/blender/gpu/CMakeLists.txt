@@ -410,49 +410,22 @@ list(APPEND SRC ${glsl_source_list_file})
 list(APPEND INC ${CMAKE_CURRENT_BINARY_DIR})
 
 set(SHADER_CREATE_INFOS
-  ../draw/engines/workbench/shaders/workbench_effect_cavity_info.hh
-  ../draw/engines/workbench/shaders/workbench_prepass_info.hh
-  ../draw/intern/shaders/draw_fullscreen_info.hh
-  ../draw/intern/shaders/draw_view_info.hh
-  ../draw/intern/shaders/draw_object_infos_info.hh
-  shaders/gpu_shader_3D_flat_color_info.hh
-  shaders/gpu_clip_planes_info.hh
+../draw/engines/workbench/shaders/workbench_effect_cavity_info.hh
+../draw/engines/workbench/shaders/workbench_prepass_info.hh
+../draw/intern/shaders/draw_fullscreen_info.hh
+../draw/intern/shaders/draw_view_info.hh
+../draw/intern/shaders/draw_object_infos_info.hh
+shaders/gpu_shader_3D_flat_color_info.hh
+shaders/gpu_clip_planes_info.hh
 )
 
 set(SHADER_CREATE_INFOS_CONTENT "")
 foreach(DESCRIPTOR_FILE ${SHADER_CREATE_INFOS})
-  string(APPEND SHADER_CREATE_INFOS_CONTENT "#include \"${DESCRIPTOR_FILE}\"\n")
+string(APPEND SHADER_CREATE_INFOS_CONTENT "#include \"${DESCRIPTOR_FILE}\"\n")
 endforeach()
 
 set(shader_create_info_list_file "${CMAKE_CURRENT_BINARY_DIR}/gpu_shader_create_info_list.hh")
 file(GENERATE OUTPUT ${shader_create_info_list_file} CONTENT "${SHADER_CREATE_INFOS_CONTENT}")
-
-# add_executable(shader_builder
-#   intern/gpu_shader_builder.cc
-#   intern/gpu_shader_create_info.cc
-#   intern/gpu_shader_dependency.cc
-#   ${shader_create_info_list_file}
-# )
-# target_link_libraries(shader_builder PRIVATE
-#   bf_intern_guardedalloc
-#   bf_blenlib
-#   bf_gpu_shaders
-#   bf_draw_shaders
-#   ${PLATFORM_LINKLIBS})
-# target_include_directories(shader_builder PRIVATE ${INC} ${CMAKE_CURRENT_BINARY_DIR})
-
-# set(BAKED_CREATE_INFOS_FILE ${CMAKE_CURRENT_BINARY_DIR}/shader_baked.hh)
-
-# add_custom_command(
-#   OUTPUT
-#     ${BAKED_CREATE_INFOS_FILE}
-#   COMMAND
-#     "$<TARGET_FILE:shader_builder>" ${BAKED_CREATE_INFOS_FILE}
-#   DEPENDS shader_builder
-# )
-
-# list(APPEND SRC ${BAKED_CREATE_INFOS_FILE})
-
 
 if(WITH_MOD_FLUID)
   add_definitions(-DWITH_FLUID)
@@ -473,6 +446,50 @@ target_link_libraries(bf_gpu PUBLIC
 if(CXX_WARN_NO_SUGGEST_OVERRIDE)
   target_compile_options(bf_gpu PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-Wsuggest-override>)
 endif()
+
+
+set(GPU_SHADER_INFO_SRC
+  intern/gpu_shader_info_baked.cc
+)
+
+if(WITH_GPU_SHADER_BUILDER)
+  set(GPU_SHADER_BUILDER_SRC
+    intern/gpu_shader_builder.cc
+    intern/gpu_shader_info_baked_stub.cc
+    ${shader_create_info_list_file}
+  )
+
+  add_library(bf_gpu_shader_builder "${GPU_SHADER_BUILDER_SRC}")
+
+  add_executable(shader_builder
+    intern/gpu_shader_builder_main.cc
+  )
+
+  target_link_libraries(shader_builder PUBLIC
+  ${PLATFORM_LINKLIBS}
+  bf_gpu
+  bf_blenlib
+  bf_blenkernel
+  bf_gpu_shader_builder
+  bf_intern_clog
+  )
+  target_include_directories(shader_builder PRIVATE ${INC} ${CMAKE_CURRENT_BINARY_DIR})
+
+  set(BAKED_CREATE_INFOS_FILE ${CMAKE_CURRENT_BINARY_DIR}/shader_baked.hh)
+
+  add_custom_command(
+    OUTPUT
+      ${BAKED_CREATE_INFOS_FILE}
+    COMMAND
+      "$<TARGET_FILE:shader_builder>" ${BAKED_CREATE_INFOS_FILE}
+    DEPENDS shader_builder
+  )
+
+  list(APPEND GPU_SHADER_INFO_SRC ${BAKED_CREATE_INFOS_FILE})
+endif()
+
+blender_add_lib(bf_gpu_shader_infos "${GPU_SHADER_INFO_SRC}" "" "" "")
+#add_dependencies(blender bf_gpu_shader_infos)
 
 if(WITH_GTESTS)
   if(WITH_OPENGL_DRAW_TESTS)
