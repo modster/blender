@@ -1471,8 +1471,6 @@ void BKE_mesh_nomain_to_mesh(Mesh *mesh_src,
   CustomData_reset(&tmp.ldata);
   CustomData_reset(&tmp.pdata);
 
-  BKE_mesh_vertex_normals_ensure(mesh_src);
-
   totvert = tmp.totvert = mesh_src->totvert;
   totedge = tmp.totedge = mesh_src->totedge;
   totloop = tmp.totloop = mesh_src->totloop;
@@ -1485,6 +1483,18 @@ void BKE_mesh_nomain_to_mesh(Mesh *mesh_src,
   CustomData_copy(&mesh_src->pdata, &tmp.pdata, mask->pmask, alloctype, totpoly);
   tmp.cd_flag = mesh_src->cd_flag;
   tmp.runtime.deformed_only = mesh_src->runtime.deformed_only;
+
+  tmp.runtime.cd_dirty_poly = mesh_src->runtime.cd_dirty_poly;
+  tmp.runtime.cd_dirty_vert = mesh_src->runtime.cd_dirty_vert;
+
+  /* Ensure that when no normal layers exist, they are marked dirty, because
+   * normals might not have been included in the mask of copied layers. */
+  if (!CustomData_has_layer(&tmp.vdata, CD_NORMAL)) {
+    tmp.runtime.cd_dirty_vert |= CD_MASK_NORMAL;
+  }
+  if (!CustomData_has_layer(&tmp.pdata, CD_NORMAL)) {
+    tmp.runtime.cd_dirty_poly |= CD_MASK_NORMAL;
+  }
 
   if (CustomData_has_layer(&mesh_src->vdata, CD_SHAPEKEY)) {
     KeyBlock *kb;
