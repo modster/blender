@@ -94,9 +94,8 @@ static void mesh_init_data(ID *id)
 
   BKE_mesh_runtime_init_data(mesh);
 
-  /* A newly created mesh does not have normals, so tag them dirty. This will be cleared by
-   * retrieving the normal layer for manually writing to it, or calling functions like
-   * #BKE_mesh_poly_normals_ensure. */
+  /* A newly created mesh does not have normals, so tag them dirty. This will be cleared
+   * by #BKE_mesh_vertex_normals_clear_dirty or #BKE_mesh_poly_normals_ensure. */
   BKE_mesh_normals_tag_dirty(mesh);
 
   mesh->face_sets_color_seed = BLI_hash_int(PIL_check_seconds_timer_i() & UINT_MAX);
@@ -158,8 +157,8 @@ static void mesh_copy_data(Main *bmain, ID *id_dst, const ID *id_src, const int 
   /* Set normal layers dirty, since they aren't included in CD_MASK_MESH and are therefore not
    * copied to the destination mesh. Alternatively normal layers could be copied if they aren't
    * dirty, avoiding recomputation in some cases. However, a copied mesh is often changed anyway,
-   * so that idea is not clearly better. With proper reference counting of custom data layers could
-   * be copied as the cost would be much lower. */
+   * so that idea is not clearly better. With proper reference counting, all custom data layers
+   * could be copied as the cost would be much lower. */
   BKE_mesh_normals_tag_dirty(mesh_dst);
 
   /* TODO: Do we want to add flag to prevent this? */
@@ -350,12 +349,8 @@ static void mesh_blend_read_data(BlendDataReader *reader, ID *id)
     }
   }
 
-  /* Note: Theoretically we could avoid storing normal layers in files. */
-  if (!CustomData_has_layer(&mesh->vdata, CD_NORMAL) ||
-      !CustomData_has_layer(&mesh->pdata, CD_NORMAL)) {
-    BKE_mesh_normals_tag_dirty(mesh);
-  }
-
+  /* We don't expect to load normals from files, since they are derived data. */
+  BKE_mesh_normals_tag_dirty(mesh);
   BKE_mesh_assert_normals_dirty_or_calculated(mesh);
 }
 
@@ -1110,8 +1105,8 @@ Mesh *BKE_mesh_new_nomain_from_template_ex(const Mesh *me_src,
   me_dst->runtime.cd_dirty_poly = me_src->runtime.cd_dirty_poly;
   me_dst->runtime.cd_dirty_vert = me_src->runtime.cd_dirty_vert;
 
-  /* Ensure that when no normal layers exist, they are marked dirty,
-   * because normals might not have been included in the mask. */
+  /* Ensure that when no normal layers exist, they are marked dirty, because
+   * normals might not have been included in the mask of copied layers. */
   if (!CustomData_has_layer(&me_dst->vdata, CD_NORMAL)) {
     me_dst->runtime.cd_dirty_vert |= CD_MASK_NORMAL;
   }
@@ -1987,7 +1982,7 @@ struct SplitFaceNewEdge {
 
 /* Detect needed new vertices, and update accordingly loops' vertex indices.
  * WARNING! Leaves mesh in invalid state. */
-static int split_faces_prepare_new_verts(const Mesh *mesh,
+static int split_faces_prepare_new_verts(Mesh *mesh,
                                          MLoopNorSpaceArray *lnors_spacearr,
                                          SplitFaceNewVert **new_verts,
                                          MemArena *memarena)
@@ -2000,7 +1995,8 @@ static int split_faces_prepare_new_verts(const Mesh *mesh,
   const int loops_len = mesh->totloop;
   int verts_len = mesh->totvert;
   MLoop *mloop = mesh->mloop;
-  float(*vert_normals)[3] = (float(*)[3])BKE_mesh_vertex_normals_ensure(mesh);
+  BKE_mesh_vertex_normals_ensure(mesh);
+  float(*vert_normals)[3] = BKE_mesh_vertex_normals_for_write(mesh);
 
   BLI_bitmap *verts_used = BLI_BITMAP_NEW(verts_len, __func__);
   BLI_bitmap *done_loops = BLI_BITMAP_NEW(loops_len, __func__);

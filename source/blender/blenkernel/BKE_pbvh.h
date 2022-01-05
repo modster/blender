@@ -110,7 +110,7 @@ PBVH *BKE_pbvh_new(void);
  * (which means it may rewrite it if needed, see #BKE_pbvh_vert_coords_apply().
  */
 void BKE_pbvh_build_mesh(PBVH *pbvh,
-                         const struct Mesh *mesh,
+                         struct Mesh *mesh,
                          const struct MPoly *mpoly,
                          const struct MLoop *mloop,
                          struct MVert *verts,

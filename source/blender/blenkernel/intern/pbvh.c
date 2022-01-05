@@ -32,7 +32,7 @@
 #include "DNA_meshdata_types.h"
 
 #include "BKE_ccg.h"
-#include "BKE_mesh.h" /* for BKE_mesh_calc_normals */
+#include "BKE_mesh.h"
 #include "BKE_paint.h"
 #include "BKE_pbvh.h"
 #include "BKE_subdiv_ccg.h"
@@ -552,7 +552,7 @@ static void pbvh_build(PBVH *pbvh, BB *cb, BBC *prim_bbc, int totprim)
 }
 
 void BKE_pbvh_build_mesh(PBVH *pbvh,
-                         const Mesh *mesh,
+                         Mesh *mesh,
                          const MPoly *mpoly,
                          const MLoop *mloop,
                          MVert *verts,
@@ -572,7 +572,8 @@ void BKE_pbvh_build_mesh(PBVH *pbvh,
   pbvh->mloop = mloop;
   pbvh->looptri = looptri;
   pbvh->verts = verts;
-  pbvh->vert_normals = (float(*)[3])BKE_mesh_vertex_normals_ensure(mesh);
+  BKE_mesh_vertex_normals_ensure(mesh);
+  pbvh->vert_normals = BKE_mesh_vertex_normals_for_write(mesh);
   pbvh->vert_bitmap = BLI_BITMAP_NEW(totvert, "bvh->vert_bitmap");
   pbvh->totvert = totvert;
   pbvh->leaf_limit = LEAF_LIMIT;
@@ -2960,7 +2961,7 @@ void pbvh_vertex_iter_init(PBVH *pbvh, PBVHNode *node, PBVHVertexIter *vi, int m
   vi->mask = NULL;
   if (pbvh->type == PBVH_FACES) {
     /* Cast away const because sculpt/paint code can adjust normals when restoring mesh data. */
-    vi->vert_normals = (float(*)[3])BKE_mesh_vertex_normals_ensure(pbvh->mesh);
+    vi->vert_normals = pbvh->vert_normals;
 
     vi->vmask = CustomData_get_layer(pbvh->vdata, CD_PAINT_MASK);
     vi->vcol = CustomData_get_layer(pbvh->vdata, CD_PROP_COLOR);
