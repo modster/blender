@@ -977,6 +977,61 @@ static void extrude_individual_mesh_faces(MeshComponent &component,
   MutableSpan<MPoly> new_polys = polys.slice(side_poly_range);
   MutableSpan<MLoop> loops{mesh.mloop, mesh.totloop};
 
+  /* For every selected polygon, build the faces that form the sides of the extrusion. Note that
+   * filling some of this data like the new edges or polygons could be easily split into separate
+   * loops, which may or may not be faster, and would involve more duplication. */
+  threading::parallel_for(poly_selection.index_range(), 256, [&](const IndexRange range) {
+    for (const int i_selection : range) {
+      const IndexRange poly_corner_range = selected_corner_range(index_offsets, i_selection);
+
+      const MPoly &poly = polys[poly_selection[i_selection]];
+      Span<MLoop> poly_loops = loops.slice(poly.loopstart, poly.totloop);
+
+      for (const int i : IndexRange(poly.totloop)) {
+        const int i_next = (i == poly.totloop - 1) ? 0 : i + 1;
+        const MLoop &orig_loop = poly_loops[i];
+        const MLoop &orig_loop_next = poly_loops[i_next];
+
+        const int i_extrude = poly_corner_range[i];
+        const int i_extrude_next = poly_corner_range[i_next];
+
+        const int i_duplicate_edge = duplicate_edge_range[i_extrude];
+        const int new_vert = new_vert_range[i_extrude];
+        const int new_vert_next = new_vert_range[i_extrude_next];
+
+        const int orig_edge = orig_loop.e;
+
+        const int orig_vert = orig_loop.v;
+        const int orig_vert_next = orig_loop_next.v;
+
+        MEdge &duplicate_edge = duplicate_edges[i_extrude];
+        duplicate_edge.v1 = new_vert_range[i_extrude];
+        duplicate_edge.v2 = new_vert_range[i_extrude_next];
+        duplicate_edge.flag = (ME_EDGEDRAW | ME_EDGERENDER);
+
+        MPoly &side_poly = new_polys[i_extrude];
+        side_poly.loopstart = side_loop_range[i_extrude * 4];
+        side_poly.totloop = 4;
+        side_poly.flag = 0;
+
+        MutableSpan<MLoop> side_loops = loops.slice(side_loop_range[i_extrude * 4], 4);
+        side_loops[0].v = new_vert_next;
+        side_loops[0].e = i_duplicate_edge;
+        side_loops[1].v = new_vert;
+        side_loops[1].e = connect_edge_range[i_extrude];
+        side_loops[2].v = orig_vert;
+        side_loops[2].e = orig_edge;
+        side_loops[3].v = orig_vert_next;
+        side_loops[3].e = connect_edge_range[i_extrude_next];
+
+        MEdge &connect_edge = connect_edges[i_extrude];
+        connect_edge.v1 = orig_vert;
+        connect_edge.v2 = new_vert;
+        connect_edge.flag = (ME_EDGEDRAW | ME_EDGERENDER);
+      }
+    }
+  });
+
   component.attribute_foreach([&](const AttributeIDRef &id, const AttributeMetaData meta_data) {
     OutputAttribute attribute = component.attribute_try_get_for_output(
         id, meta_data.domain, meta_data.data_type);
@@ -1086,9 +1141,19 @@ static void extrude_individual_mesh_faces(MeshComponent &component,
     return true;
   });
 
-  /* For every selected polygons, build the faces that form the sides of the extrusion. Note that
-   * filling some of this data like teh new edges or polygons could be easily split into separate
-   * loops, which may or may not be faster, and would involve more duplication. */
+  /* Offset the new vertices. */
+  threading::parallel_for(poly_selection.index_range(), 1024, [&](const IndexRange range) {
+    for (const int i_selection : range) {
+      const IndexRange poly_corner_range = selected_corner_range(index_offsets, i_selection);
+      for (MVert &vert : new_verts.slice(poly_corner_range)) {
+        add_v3_v3(vert.co, poly_offset[poly_selection[i_selection]]);
+      }
+    }
+  });
+
+  /* Finally update each extruded polygon's loops to point to the new edges and vertices.
+   * This must be done last, because they were used to find original indices for attribute
+   * interpolation before. Alternatively an original index array could be built for each domain. */
   threading::parallel_for(poly_selection.index_range(), 256, [&](const IndexRange range) {
     for (const int i_selection : range) {
       const IndexRange poly_corner_range = selected_corner_range(index_offsets, i_selection);
@@ -1097,63 +1162,9 @@ static void extrude_individual_mesh_faces(MeshComponent &component,
       MutableSpan<MLoop> poly_loops = loops.slice(poly.loopstart, poly.totloop);
 
       for (const int i : IndexRange(poly.totloop)) {
-        const int i_next = (i == poly.totloop - 1) ? 0 : i + 1;
-        const MLoop &loop = poly_loops[i];
-        const MLoop &loop_next = poly_loops[i_next];
-
-        const int i_extrude = poly_corner_range[i];
-        const int i_extrude_next = poly_corner_range[i_next];
-
-        const int i_duplicate_edge = duplicate_edge_range[i_extrude];
-        const int new_vert = new_vert_range[i_extrude];
-        const int new_vert_next = new_vert_range[i_extrude_next];
-
-        const int orig_edge = loop.e;
-
-        const int orig_vert = loop.v;
-        const int orig_vert_next = loop_next.v;
-
-        MEdge &duplicate_edge = duplicate_edges[i_extrude];
-        duplicate_edge.v1 = new_vert_range[i_extrude];
-        duplicate_edge.v2 = new_vert_range[i_extrude_next];
-        duplicate_edge.flag = (ME_EDGEDRAW | ME_EDGERENDER);
-
-        MPoly &side_poly = new_polys[i_extrude];
-        side_poly.loopstart = side_loop_range[i_extrude * 4];
-        side_poly.totloop = 4;
-        side_poly.flag = 0;
-
-        MutableSpan<MLoop> side_loops = loops.slice(side_loop_range[i_extrude * 4], 4);
-        side_loops[0].v = new_vert_next;
-        side_loops[0].e = i_duplicate_edge;
-        side_loops[1].v = new_vert;
-        side_loops[1].e = connect_edge_range[i_extrude];
-        side_loops[2].v = orig_vert;
-        side_loops[2].e = orig_edge;
-        side_loops[3].v = orig_vert_next;
-        side_loops[3].e = connect_edge_range[i_extrude_next];
-
-        MEdge &connect_edge = connect_edges[i_extrude];
-        connect_edge.v1 = orig_vert;
-        connect_edge.v2 = new_vert;
-        connect_edge.flag = (ME_EDGEDRAW | ME_EDGERENDER);
-      }
-
-      /* Finally updated the extruded polygon's loops to point to the new edges and vertices.
-       * This must be done last, because they were used as original indices before. */
-      for (const int i : IndexRange(poly.totloop)) {
         MLoop &loop = poly_loops[i];
         loop.v = new_vert_range[poly_corner_range[i]];
         loop.e = duplicate_edge_range[poly_corner_range[i]];
-      }
-    }
-  });
-
-  threading::parallel_for(poly_selection.index_range(), 1024, [&](const IndexRange range) {
-    for (const int i_selection : range) {
-      const IndexRange poly_corner_range = selected_corner_range(index_offsets, i_selection);
-      for (MVert &vert : new_verts.slice(poly_corner_range)) {
-        add_v3_v3(vert.co, poly_offset[poly_selection[i_selection]]);
       }
     }
   });
