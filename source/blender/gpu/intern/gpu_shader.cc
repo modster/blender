@@ -286,6 +286,8 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
   std::string resources = shader->resources_declare(info);
   char *shader_shared_utils = nullptr;
 
+  defines += "#define USE_GPU_SHADER_CREATE_INFO\n";
+
   Vector<char *> typedefs;
   for (auto filename : info.typedef_sources_) {
     typedefs.append(gpu_shader_dependency_get_source(filename.c_str()));
