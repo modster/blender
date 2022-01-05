@@ -303,7 +303,10 @@ bool BKE_mesh_validate_arrays(Mesh *mesh,
     recalc_flag.edges = do_fixes;
   }
 
-  const float(*vert_normals)[3] = BKE_mesh_vertex_normals_ensure(mesh);
+  const float(*vert_normals)[3] = NULL;
+  if (!BKE_mesh_vertex_normals_are_dirty(mesh)) {
+    vert_normals = BKE_mesh_vertex_normals_ensure(mesh);
+  }
 
   for (i = 0; i < totvert; i++, mv++) {
     bool fix_normal = true;
@@ -319,13 +322,13 @@ bool BKE_mesh_validate_arrays(Mesh *mesh,
         }
       }
 
-      if (vert_normals[i][j] != 0.0f) {
+      if (vert_normals && vert_normals[i][j] != 0.0f) {
         fix_normal = false;
         break;
       }
     }
 
-    if (fix_normal) {
+    if (vert_normals && fix_normal) {
       /* If the vertex normal accumulates to zero or isn't part of a face, the location is used.
        * When the location is also zero, a zero normal warning should not be raised.
        * since this is the expected behavior of normal calculation.
