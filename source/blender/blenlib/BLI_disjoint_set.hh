@@ -30,6 +30,7 @@ class DisjointSet {
  private:
   Array<int64_t> parents_;
   Array<int64_t> ranks_;
+  bool all_roots_ensured_ = false;
 
  public:
   /**
@@ -49,6 +50,8 @@ class DisjointSet {
    */
   void join(int64_t x, int64_t y)
   {
+    BLI_assert_msg(!all_roots_ensured_, "Cannot join after `ensure_all_roots` has been called.");
+
     int64_t root1 = this->find_root(x);
     int64_t root2 = this->find_root(y);
 
@@ -97,6 +100,16 @@ class DisjointSet {
     }
 
     return root;
+  }
+
+  Span<int64_t> ensure_all_roots()
+  {
+    for (const int64_t i : parents_.index_range()) {
+      /* Updates `parents_` when doing path compression. */
+      this->find_root(i);
+    }
+    all_roots_ensured_ = true;
+    return parents_;
   }
 };
 

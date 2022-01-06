@@ -28,14 +28,14 @@ static void node_declare(NodeDeclarationBuilder &b)
 {
   b.add_input<decl::Geometry>(N_("Geometry")).supported_type(GEO_COMPONENT_TYPE_MESH);
   b.add_input<decl::Bool>(N_("Selection")).default_value(true).hide_value().supports_field();
-  b.add_input<decl::Float>(N_("Scale")).default_value(1.0f).supports_field();
+  b.add_input<decl::Vector>(N_("Scale")).default_value({1.0f, 1.0f, 1.0f}).supports_field();
   b.add_input<decl::Vector>(N_("Pivot")).subtype(PROP_TRANSLATION).implicit_field();
   b.add_output<decl::Geometry>(N_("Geometry"));
 };
 
 static void scale_faces(MeshComponent &mesh_component,
                         const Field<bool> &selection_field,
-                        const Field<float> &scale_field,
+                        const Field<float3> &scale_field,
                         const Field<float3> &pivot_field)
 {
   Mesh *mesh = mesh_component.get_for_write();
@@ -49,7 +49,7 @@ static void scale_faces(MeshComponent &mesh_component,
   evaluator.add(pivot_field);
   evaluator.evaluate();
   const IndexMask selection = evaluator.get_evaluated_selection_as_mask();
-  const VArray<float> scales = evaluator.get_evaluated<float>(0);
+  const VArray<float3> scales = evaluator.get_evaluated<float3>(0);
   const VArray<float3> pivots = evaluator.get_evaluated<float3>(1);
 
   DisjointSet disjoint_set(mesh->totvert);
@@ -64,8 +64,10 @@ static void scale_faces(MeshComponent &mesh_component,
     disjoint_set.join(poly_loops.first().v, poly_loops.last().v);
   }
 
+  const Span<int64_t> group_by_vertex_index = disjoint_set.ensure_all_roots();
+
   struct GroupData {
-    float scale = 0.0f;
+    float3 scale = {0.0f, 0.0f, 0.0f};
     float3 pivot = {0.0f, 0.0f, 0.0f};
     int tot_faces = 0;
   };
@@ -75,8 +77,8 @@ static void scale_faces(MeshComponent &mesh_component,
   for (const int poly_index : selection) {
     const MPoly &poly = mesh->mpoly[poly_index];
     const int first_vertex = mesh->mloop[poly.loopstart].v;
-    const int group_index = disjoint_set.find_root(first_vertex);
-    const float scale = scales[poly_index];
+    const int group_index = group_by_vertex_index[first_vertex];
+    const float3 scale = scales[poly_index];
     const float3 pivot = pivots[poly_index];
     GroupData &group_info = groups_data[group_index];
     group_info.pivot += pivot;
@@ -92,17 +94,19 @@ static void scale_faces(MeshComponent &mesh_component,
     }
   }
 
-  for (const int vert_index : IndexRange(mesh->totvert)) {
-    const int group_index = disjoint_set.find_root(vert_index);
-    const GroupData &group_data = groups_data[group_index];
-    if (group_data.tot_faces == 0) {
-      continue;
+  threading::parallel_for(IndexRange(mesh->totvert), 1024, [&](const IndexRange range) {
+    for (const int vert_index : range) {
+      const int group_index = group_by_vertex_index[vert_index];
+      const GroupData &group_data = groups_data[group_index];
+      if (group_data.tot_faces == 0) {
+        continue;
+      }
+      MVert &vert = mesh->mvert[vert_index];
+      const float3 diff = float3(vert.co) - group_data.pivot;
+      const float3 new_diff = diff * group_data.scale;
+      copy_v3_v3(vert.co, group_data.pivot + new_diff);
     }
-    MVert &vert = mesh->mvert[vert_index];
-    const float3 diff = float3(vert.co) - group_data.pivot;
-    const float3 new_diff = diff * group_data.scale;
-    copy_v3_v3(vert.co, group_data.pivot + new_diff);
-  }
+  });
 }
 
 static void node_geo_exec(GeoNodeExecParams params)
@@ -112,7 +116,7 @@ static void node_geo_exec(GeoNodeExecParams params)
 
   GeometrySet geometry = params.extract_input<GeometrySet>("Geometry");
   const Field<bool> &selection_field = params.get_input<Field<bool>>("Selection");
-  const Field<float> &scale_field = params.get_input<Field<float>>("Scale");
+  const Field<float3> &scale_field = params.get_input<Field<float3>>("Scale");
   const Field<float3> &pivot_field = params.get_input<Field<float3>>("Pivot");
 
   geometry.modify_geometry_sets([&](GeometrySet &geometry) {
