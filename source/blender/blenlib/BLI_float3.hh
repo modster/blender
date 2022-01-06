@@ -19,7 +19,7 @@
 #include <iostream>
 
 #include "BLI_float2.hh"
-#include "BLI_math_vector.h"
+#include "BLI_math_vector.hh"
 
 namespace blender {
 
@@ -410,3 +410,35 @@ struct float3 {
 };
 
 }  // namespace blender
+
+/** Declare functions outside of namespace to avoid them taking predecence over
+ *  the standard functions. */
+
+#define float3 blender::float3
+
+inline float3 abs(const float3 &a)
+{
+  return blender::abs_impl<float3, 3>(a);
+}
+
+inline float3 floor(const float3 &a)
+{
+  return blender::floor_impl<float3, 3>(a);
+}
+
+inline float dot(const float3 &a, const float3 &b)
+{
+  return blender::dot_impl<float3, 3>(a, b);
+}
+
+inline float3 reflect(const float3 &incident, const float3 &normal)
+{
+  return blender::reflect_impl<float3, 3>(incident, normal);
+}
+
+inline float3 refract(const float3 &incident, const float3 &normal, const float eta)
+{
+  return blender::refract_impl<float3, 3>(incident, normal, eta);
+}
+
+#undef float3
