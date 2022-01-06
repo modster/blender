@@ -18,6 +18,7 @@
 
 #include <iostream>
 
+#include "BLI_float2.hh"
 #include "BLI_math_vector.h"
 
 namespace blender {
@@ -47,6 +48,21 @@ struct float3 {
   {
   }
 
+  float3(float2 xy, float z) : x(xy.x), y(xy.y), z(z)
+  {
+  }
+
+  float3(float x, float2 yz) : x(x), y(yz.x), z(yz.y)
+  {
+  }
+
+  /** Conversions. */
+
+  explicit operator float2() const
+  {
+    return float2(x, y);
+  }
+
   operator const float *() const
   {
     return &x;
@@ -56,6 +72,22 @@ struct float3 {
   {
     return &x;
   }
+
+  /** Array access. */
+
+  const float &operator[](int64_t index) const
+  {
+    BLI_assert(index < 3);
+    return (&x)[index];
+  }
+
+  float &operator[](int64_t index)
+  {
+    BLI_assert(index < 3);
+    return (&x)[index];
+  }
+
+  /** Arithmetic. */
 
   friend float3 operator+(const float3 &a, const float3 &b)
   {
@@ -67,17 +99,25 @@ struct float3 {
     return {a.x + b, a.y + b, a.z + b};
   }
 
+  friend float3 operator+(const float &a, const float3 &b)
+  {
+    return b + a;
+  }
+
   float3 &operator+=(const float3 &b)
   {
-    this->x += b.x;
-    this->y += b.y;
-    this->z += b.z;
+    x += b.x;
+    y += b.y;
+    z += b.z;
     return *this;
   }
 
-  friend float3 operator-(const float3 &a, const float3 &b)
+  float3 &operator+=(const float &b)
   {
-    return {a.x - b.x, a.y - b.y, a.z - b.z};
+    x += b;
+    y += b;
+    z += b;
+    return *this;
   }
 
   friend float3 operator-(const float3 &a)
@@ -85,32 +125,34 @@ struct float3 {
     return {-a.x, -a.y, -a.z};
   }
 
+  friend float3 operator-(const float3 &a, const float3 &b)
+  {
+    return {a.x - b.x, a.y - b.y, a.z - b.z};
+  }
+
   friend float3 operator-(const float3 &a, const float &b)
   {
     return {a.x - b, a.y - b, a.z - b};
   }
 
+  friend float3 operator-(const float &a, const float3 &b)
+  {
+    return {a - b.x, a - b.y, a - b.z};
+  }
+
   float3 &operator-=(const float3 &b)
   {
-    this->x -= b.x;
-    this->y -= b.y;
-    this->z -= b.z;
+    x -= b.x;
+    y -= b.y;
+    z -= b.z;
     return *this;
   }
 
-  float3 &operator*=(float scalar)
+  float3 &operator-=(const float &b)
   {
-    this->x *= scalar;
-    this->y *= scalar;
-    this->z *= scalar;
-    return *this;
-  }
-
-  float3 &operator*=(const float3 &other)
-  {
-    this->x *= other.x;
-    this->y *= other.y;
-    this->z *= other.z;
+    x -= b;
+    y -= b;
+    z -= b;
     return *this;
   }
 
@@ -129,17 +171,59 @@ struct float3 {
     return b * a;
   }
 
+  float3 &operator*=(float b)
+  {
+    x *= b;
+    y *= b;
+    z *= b;
+    return *this;
+  }
+
+  float3 &operator*=(const float3 &b)
+  {
+    x *= b.x;
+    y *= b.y;
+    z *= b.z;
+    return *this;
+  }
+
+  friend float3 operator/(const float3 &a, const float3 &b)
+  {
+    BLI_assert(b.x != 0.0f && b.y != 0.0f && b.z != 0.0f);
+    return {a.x / b.x, a.y / b.y, a.z / b.z};
+  }
+
   friend float3 operator/(const float3 &a, float b)
   {
     BLI_assert(b != 0.0f);
     return {a.x / b, a.y / b, a.z / b};
   }
 
-  friend std::ostream &operator<<(std::ostream &stream, const float3 &v)
+  friend float3 operator/(float a, const float3 &b)
   {
-    stream << "(" << v.x << ", " << v.y << ", " << v.z << ")";
-    return stream;
+    BLI_assert(b.x != 0.0f && b.y != 0.0f && b.z != 0.0f);
+    return {a / b.x, a / b.y, a / b.z};
   }
+
+  float3 &operator/=(float b)
+  {
+    BLI_assert(b != 0.0f);
+    x /= b;
+    y /= b;
+    z /= b;
+    return *this;
+  }
+
+  float3 &operator/=(const float3 &b)
+  {
+    BLI_assert(b.x != 0.0f && b.y != 0.0f && b.z != 0.0f);
+    x /= b.x;
+    y /= b.y;
+    z /= b.z;
+    return *this;
+  }
+
+  /** Compare. */
 
   friend bool operator==(const float3 &a, const float3 &b)
   {
@@ -149,6 +233,14 @@ struct float3 {
   friend bool operator!=(const float3 &a, const float3 &b)
   {
     return !(a == b);
+  }
+
+  /** Print. */
+
+  friend std::ostream &operator<<(std::ostream &stream, const float3 &v)
+  {
+    stream << "(" << v.x << ", " << v.y << ", " << v.z << ")";
+    return stream;
   }
 
   float normalize_and_get_length()
