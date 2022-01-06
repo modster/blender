@@ -42,8 +42,7 @@ static void cmp_node_dilate_declare(NodeDeclarationBuilder &b)
 
 static void node_composit_init_dilateerode(bNodeTree *UNUSED(ntree), bNode *node)
 {
-  NodeDilateErode *data = (NodeDilateErode *)MEM_callocN(sizeof(NodeDilateErode),
-                                                         "NodeDilateErode");
+  NodeDilateErode *data = MEM_cnew<NodeDilateErode>(__func__);
   data->falloff = PROP_SMOOTH;
   node->storage = data;
 }
@@ -66,7 +65,7 @@ void register_node_type_cmp_dilateerode()
 {
   static bNodeType ntype;
 
-  cmp_node_type_base(&ntype, CMP_NODE_DILATEERODE, "Dilate/Erode", NODE_CLASS_OP_FILTER, 0);
+  cmp_node_type_base(&ntype, CMP_NODE_DILATEERODE, "Dilate/Erode", NODE_CLASS_OP_FILTER);
   ntype.draw_buttons = node_composit_buts_dilateerode;
   ntype.declare = blender::nodes::cmp_node_dilate_declare;
   node_type_init(&ntype, node_composit_init_dilateerode);

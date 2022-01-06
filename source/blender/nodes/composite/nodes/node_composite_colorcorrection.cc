@@ -41,8 +41,7 @@ static void cmp_node_colorcorrection_declare(NodeDeclarationBuilder &b)
 
 static void node_composit_init_colorcorrection(bNodeTree *UNUSED(ntree), bNode *node)
 {
-  NodeColorCorrection *n = (NodeColorCorrection *)MEM_callocN(sizeof(NodeColorCorrection),
-                                                              "node colorcorrection");
+  NodeColorCorrection *n = MEM_cnew<NodeColorCorrection>(__func__);
   n->startmidtones = 0.2f;
   n->endmidtones = 0.7f;
   n->master.contrast = 1.0f;
@@ -289,7 +288,7 @@ void register_node_type_cmp_colorcorrection()
 {
   static bNodeType ntype;
 
-  cmp_node_type_base(&ntype, CMP_NODE_COLORCORRECTION, "Color Correction", NODE_CLASS_OP_COLOR, 0);
+  cmp_node_type_base(&ntype, CMP_NODE_COLORCORRECTION, "Color Correction", NODE_CLASS_OP_COLOR);
   ntype.declare = blender::nodes::cmp_node_colorcorrection_declare;
   ntype.draw_buttons = node_composit_buts_colorcorrection;
   ntype.draw_buttons_ex = node_composit_buts_colorcorrection_ex;

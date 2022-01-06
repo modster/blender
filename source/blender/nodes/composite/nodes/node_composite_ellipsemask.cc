@@ -24,7 +24,7 @@
 #include "UI_interface.h"
 #include "UI_resources.h"
 
-#include "../node_composite_util.hh"
+#include "node_composite_util.hh"
 
 /* **************** SCALAR MATH ******************** */
 
@@ -41,8 +41,7 @@ static void cmp_node_ellipsemask_declare(NodeDeclarationBuilder &b)
 
 static void node_composit_init_ellipsemask(bNodeTree *UNUSED(ntree), bNode *node)
 {
-  NodeEllipseMask *data = (NodeEllipseMask *)MEM_callocN(sizeof(NodeEllipseMask),
-                                                         "NodeEllipseMask");
+  NodeEllipseMask *data = MEM_cnew<NodeEllipseMask>(__func__);
   data->x = 0.5;
   data->y = 0.5;
   data->width = 0.2;
@@ -69,7 +68,7 @@ void register_node_type_cmp_ellipsemask()
 {
   static bNodeType ntype;
 
-  cmp_node_type_base(&ntype, CMP_NODE_MASK_ELLIPSE, "Ellipse Mask", NODE_CLASS_MATTE, 0);
+  cmp_node_type_base(&ntype, CMP_NODE_MASK_ELLIPSE, "Ellipse Mask", NODE_CLASS_MATTE);
   ntype.declare = blender::nodes::cmp_node_ellipsemask_declare;
   ntype.draw_buttons = node_composit_buts_ellipsemask;
   node_type_size(&ntype, 260, 110, 320);

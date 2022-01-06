@@ -41,8 +41,7 @@ static void cmp_node_planetrackdeform_declare(NodeDeclarationBuilder &b)
 
 static void init(bNodeTree *UNUSED(ntree), bNode *node)
 {
-  NodePlaneTrackDeformData *data = (NodePlaneTrackDeformData *)MEM_callocN(
-      sizeof(NodePlaneTrackDeformData), "node plane track deform data");
+  NodePlaneTrackDeformData *data = MEM_cnew<NodePlaneTrackDeformData>(__func__);
   data->motion_blur_samples = 16;
   data->motion_blur_shutter = 0.5f;
   node->storage = data;
@@ -101,8 +100,7 @@ void register_node_type_cmp_planetrackdeform()
 {
   static bNodeType ntype;
 
-  cmp_node_type_base(
-      &ntype, CMP_NODE_PLANETRACKDEFORM, "Plane Track Deform", NODE_CLASS_DISTORT, 0);
+  cmp_node_type_base(&ntype, CMP_NODE_PLANETRACKDEFORM, "Plane Track Deform", NODE_CLASS_DISTORT);
   ntype.declare = blender::nodes::cmp_node_planetrackdeform_declare;
   ntype.draw_buttons = node_composit_buts_planetrackdeform;
   node_type_init(&ntype, init);

@@ -51,8 +51,7 @@ static void node_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 
 static void node_init(bNodeTree *UNUSED(ntree), bNode *node)
 {
-  NodeGeometryPointsToVolume *data = (NodeGeometryPointsToVolume *)MEM_callocN(
-      sizeof(NodeGeometryPointsToVolume), __func__);
+  NodeGeometryPointsToVolume *data = MEM_cnew<NodeGeometryPointsToVolume>(__func__);
   data->resolution_mode = GEO_NODE_POINTS_TO_VOLUME_RESOLUTION_MODE_AMOUNT;
   data->input_type_radius = GEO_NODE_ATTRIBUTE_INPUT_FLOAT;
   node->storage = data;
@@ -266,7 +265,7 @@ void register_node_type_geo_legacy_points_to_volume()
   static bNodeType ntype;
 
   geo_node_type_base(
-      &ntype, GEO_NODE_LEGACY_POINTS_TO_VOLUME, "Points to Volume", NODE_CLASS_GEOMETRY, 0);
+      &ntype, GEO_NODE_LEGACY_POINTS_TO_VOLUME, "Points to Volume", NODE_CLASS_GEOMETRY);
   node_type_storage(&ntype,
                     "NodeGeometryPointsToVolume",
                     node_free_standard_storage,

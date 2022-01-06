@@ -42,7 +42,7 @@ static void cmp_node_crop_declare(NodeDeclarationBuilder &b)
 
 static void node_composit_init_crop(bNodeTree *UNUSED(ntree), bNode *node)
 {
-  NodeTwoXYs *nxy = (NodeTwoXYs *)MEM_callocN(sizeof(NodeTwoXYs), "node xy data");
+  NodeTwoXYs *nxy = MEM_cnew<NodeTwoXYs>(__func__);
   node->storage = nxy;
   nxy->x1 = 0;
   nxy->x2 = 0;
@@ -76,7 +76,7 @@ void register_node_type_cmp_crop()
 {
   static bNodeType ntype;
 
-  cmp_node_type_base(&ntype, CMP_NODE_CROP, "Crop", NODE_CLASS_DISTORT, 0);
+  cmp_node_type_base(&ntype, CMP_NODE_CROP, "Crop", NODE_CLASS_DISTORT);
   ntype.declare = blender::nodes::cmp_node_crop_declare;
   ntype.draw_buttons = node_composit_buts_crop;
   node_type_init(&ntype, node_composit_init_crop);

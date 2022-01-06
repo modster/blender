@@ -46,8 +46,7 @@ static void node_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 
 static void node_init(bNodeTree *UNUSED(tree), bNode *node)
 {
-  NodeGeometryPointInstance *data = (NodeGeometryPointInstance *)MEM_callocN(
-      sizeof(NodeGeometryPointInstance), __func__);
+  NodeGeometryPointInstance *data = MEM_cnew<NodeGeometryPointInstance>(__func__);
   data->instance_type = GEO_NODE_POINT_INSTANCE_TYPE_OBJECT;
   data->flag |= GEO_NODE_POINT_INSTANCE_WHOLE_COLLECTION;
   node->storage = data;
@@ -271,7 +270,7 @@ void register_node_type_geo_point_instance()
   static bNodeType ntype;
 
   geo_node_type_base(
-      &ntype, GEO_NODE_LEGACY_POINT_INSTANCE, "Point Instance", NODE_CLASS_GEOMETRY, 0);
+      &ntype, GEO_NODE_LEGACY_POINT_INSTANCE, "Point Instance", NODE_CLASS_GEOMETRY);
   node_type_init(&ntype, file_ns::node_init);
   node_type_storage(
       &ntype, "NodeGeometryPointInstance", node_free_standard_storage, node_copy_standard_storage);

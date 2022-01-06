@@ -42,8 +42,7 @@ static void cmp_node_translate_declare(NodeDeclarationBuilder &b)
 
 static void node_composit_init_translate(bNodeTree *UNUSED(ntree), bNode *node)
 {
-  NodeTranslateData *data = (NodeTranslateData *)MEM_callocN(sizeof(NodeTranslateData),
-                                                             "node translate data");
+  NodeTranslateData *data = MEM_cnew<NodeTranslateData>(__func__);
   node->storage = data;
 }
 
@@ -57,7 +56,7 @@ void register_node_type_cmp_translate()
 {
   static bNodeType ntype;
 
-  cmp_node_type_base(&ntype, CMP_NODE_TRANSLATE, "Translate", NODE_CLASS_DISTORT, 0);
+  cmp_node_type_base(&ntype, CMP_NODE_TRANSLATE, "Translate", NODE_CLASS_DISTORT);
   ntype.declare = blender::nodes::cmp_node_translate_declare;
   ntype.draw_buttons = node_composit_buts_translate;
   node_type_init(&ntype, node_composit_init_translate);

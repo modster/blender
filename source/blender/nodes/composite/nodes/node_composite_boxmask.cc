@@ -24,7 +24,7 @@
 #include "UI_interface.h"
 #include "UI_resources.h"
 
-#include "../node_composite_util.hh"
+#include "node_composite_util.hh"
 
 /* **************** SCALAR MATH ******************** */
 
@@ -41,7 +41,7 @@ static void cmp_node_boxmask_declare(NodeDeclarationBuilder &b)
 
 static void node_composit_init_boxmask(bNodeTree *UNUSED(ntree), bNode *node)
 {
-  NodeBoxMask *data = (NodeBoxMask *)MEM_callocN(sizeof(NodeBoxMask), "NodeBoxMask");
+  NodeBoxMask *data = MEM_cnew<NodeBoxMask>(__func__);
   data->x = 0.5;
   data->y = 0.5;
   data->width = 0.2;
@@ -70,7 +70,7 @@ void register_node_type_cmp_boxmask()
 {
   static bNodeType ntype;
 
-  cmp_node_type_base(&ntype, CMP_NODE_MASK_BOX, "Box Mask", NODE_CLASS_MATTE, 0);
+  cmp_node_type_base(&ntype, CMP_NODE_MASK_BOX, "Box Mask", NODE_CLASS_MATTE);
   ntype.declare = blender::nodes::cmp_node_boxmask_declare;
   ntype.draw_buttons = node_composit_buts_boxmask;
   node_type_init(&ntype, node_composit_init_boxmask);

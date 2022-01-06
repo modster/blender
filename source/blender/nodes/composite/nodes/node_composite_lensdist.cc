@@ -42,7 +42,7 @@ static void cmp_node_lensdist_declare(NodeDeclarationBuilder &b)
 
 static void node_composit_init_lensdist(bNodeTree *UNUSED(ntree), bNode *node)
 {
-  NodeLensDist *nld = (NodeLensDist *)MEM_callocN(sizeof(NodeLensDist), "node lensdist data");
+  NodeLensDist *nld = MEM_cnew<NodeLensDist>(__func__);
   nld->jit = nld->proj = nld->fit = 0;
   node->storage = nld;
 }
@@ -64,7 +64,7 @@ void register_node_type_cmp_lensdist()
 {
   static bNodeType ntype;
 
-  cmp_node_type_base(&ntype, CMP_NODE_LENSDIST, "Lens Distortion", NODE_CLASS_DISTORT, 0);
+  cmp_node_type_base(&ntype, CMP_NODE_LENSDIST, "Lens Distortion", NODE_CLASS_DISTORT);
   ntype.declare = blender::nodes::cmp_node_lensdist_declare;
   ntype.draw_buttons = node_composit_buts_lensdist;
   node_type_init(&ntype, node_composit_init_lensdist);

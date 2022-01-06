@@ -46,7 +46,7 @@ static void cmp_node_viewer_declare(NodeDeclarationBuilder &b)
 
 static void node_composit_init_viewer(bNodeTree *UNUSED(ntree), bNode *node)
 {
-  ImageUser *iuser = (ImageUser *)MEM_callocN(sizeof(ImageUser), "node image user");
+  ImageUser *iuser = MEM_cnew<ImageUser>(__func__);
   node->storage = iuser;
   iuser->sfra = 1;
   node->custom3 = 0.5f;
@@ -77,10 +77,11 @@ void register_node_type_cmp_viewer()
 {
   static bNodeType ntype;
 
-  cmp_node_type_base(&ntype, CMP_NODE_VIEWER, "Viewer", NODE_CLASS_OUTPUT, NODE_PREVIEW);
+  cmp_node_type_base(&ntype, CMP_NODE_VIEWER, "Viewer", NODE_CLASS_OUTPUT);
   ntype.declare = blender::nodes::cmp_node_viewer_declare;
   ntype.draw_buttons = node_composit_buts_viewer;
   ntype.draw_buttons_ex = node_composit_buts_viewer_ex;
+  ntype.flag |= NODE_PREVIEW;
   node_type_init(&ntype, node_composit_init_viewer);
   node_type_storage(&ntype, "ImageUser", node_free_standard_storage, node_copy_standard_storage);
 

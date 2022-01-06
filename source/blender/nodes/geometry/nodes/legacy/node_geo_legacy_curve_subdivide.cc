@@ -44,8 +44,7 @@ static void node_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 
 static void node_init(bNodeTree *UNUSED(tree), bNode *node)
 {
-  NodeGeometryCurveSubdivide *data = (NodeGeometryCurveSubdivide *)MEM_callocN(
-      sizeof(NodeGeometryCurveSubdivide), __func__);
+  NodeGeometryCurveSubdivide *data = MEM_cnew<NodeGeometryCurveSubdivide>(__func__);
 
   data->cuts_type = GEO_NODE_ATTRIBUTE_INPUT_INTEGER;
   node->storage = data;
@@ -379,7 +378,7 @@ void register_node_type_geo_legacy_curve_subdivide()
   static bNodeType ntype;
 
   geo_node_type_base(
-      &ntype, GEO_NODE_LEGACY_CURVE_SUBDIVIDE, "Curve Subdivide", NODE_CLASS_GEOMETRY, 0);
+      &ntype, GEO_NODE_LEGACY_CURVE_SUBDIVIDE, "Curve Subdivide", NODE_CLASS_GEOMETRY);
   ntype.declare = file_ns::node_declare;
   ntype.draw_buttons = file_ns::node_layout;
   node_type_storage(&ntype,

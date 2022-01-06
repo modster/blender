@@ -49,8 +49,7 @@ static void init(const bContext *C, PointerRNA *ptr)
 {
   bNode *node = (bNode *)ptr->data;
   Scene *scene = CTX_data_scene(C);
-  MovieClipUser *user = (MovieClipUser *)MEM_callocN(sizeof(MovieClipUser),
-                                                     "node movie clip user");
+  MovieClipUser *user = MEM_cnew<MovieClipUser>(__func__);
 
   node->id = (ID *)scene->clip;
   id_us_plus(node->id);
@@ -101,11 +100,12 @@ void register_node_type_cmp_movieclip()
 {
   static bNodeType ntype;
 
-  cmp_node_type_base(&ntype, CMP_NODE_MOVIECLIP, "Movie Clip", NODE_CLASS_INPUT, NODE_PREVIEW);
+  cmp_node_type_base(&ntype, CMP_NODE_MOVIECLIP, "Movie Clip", NODE_CLASS_INPUT);
   ntype.declare = blender::nodes::cmp_node_movieclip_declare;
   ntype.draw_buttons = node_composit_buts_movieclip;
   ntype.draw_buttons_ex = node_composit_buts_movieclip_ex;
   ntype.initfunc_api = init;
+  ntype.flag |= NODE_PREVIEW;
   node_type_storage(
       &ntype, "MovieClipUser", node_free_standard_storage, node_copy_standard_storage);
 

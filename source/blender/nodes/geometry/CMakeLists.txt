@@ -80,6 +80,7 @@ set(SRC
   nodes/legacy/node_geo_legacy_subdivision_surface.cc
   nodes/legacy/node_geo_legacy_volume_to_mesh.cc
 
+  nodes/node_geo_accumulate_field.cc
   nodes/node_geo_attribute_capture.cc
   nodes/node_geo_attribute_domain_size.cc
   nodes/node_geo_attribute_remove.cc
@@ -105,8 +106,8 @@ set(SRC
   nodes/node_geo_curve_reverse.cc
   nodes/node_geo_curve_sample.cc
   nodes/node_geo_curve_set_handles.cc
-  nodes/node_geo_curve_spline_type.cc
   nodes/node_geo_curve_spline_parameter.cc
+  nodes/node_geo_curve_spline_type.cc
   nodes/node_geo_curve_subdivide.cc
   nodes/node_geo_curve_to_mesh.cc
   nodes/node_geo_curve_to_points.cc
@@ -123,6 +124,7 @@ set(SRC
   nodes/node_geo_input_index.cc
   nodes/node_geo_input_material_index.cc
   nodes/node_geo_input_material.cc
+  nodes/node_geo_input_mesh_edge_angle.cc
   nodes/node_geo_input_mesh_edge_neighbors.cc
   nodes/node_geo_input_mesh_edge_vertices.cc
   nodes/node_geo_input_mesh_face_area.cc
