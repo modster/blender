@@ -37,7 +37,8 @@ static void node_declare(NodeDeclarationBuilder &b)
 {
   b.add_input<decl::Geometry>("Mesh").supported_type(GEO_COMPONENT_TYPE_MESH);
   b.add_input<decl::Bool>(N_("Selection")).default_value(true).supports_field().hide_value();
-  b.add_input<decl::Vector>(N_("Offset")).supports_field().subtype(PROP_TRANSLATION);
+  b.add_input<decl::Vector>(N_("Offset")).subtype(PROP_TRANSLATION).implicit_field().hide_value();
+  b.add_input<decl::Float>(N_("Strength")).default_value(1.0f).supports_field();
   b.add_input<decl::Bool>(N_("Individual"));
   b.add_output<decl::Geometry>("Mesh");
   b.add_output<decl::Bool>(N_("Top")).field_source();
@@ -1202,8 +1203,17 @@ static void node_geo_exec(GeoNodeExecParams params)
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Mesh");
   Field<bool> selection = params.extract_input<Field<bool>>("Selection");
   Field<float3> offset = params.extract_input<Field<float3>>("Offset");
+  Field<float> strength = params.extract_input<Field<float>>("Strength");
   const NodeGeometryExtrudeMesh &storage = node_storage(params.node());
   GeometryNodeExtrudeMeshMode mode = static_cast<GeometryNodeExtrudeMeshMode>(storage.mode);
+
+  /* Create a combined field from the offset and the strength so the field evaluator
+   * can take care of the multiplication and to simplify each extrude function. */
+  static fn::CustomMF_SI_SI_SO<float3, float, float3> multiply_fn{
+      "Scale", [](const float3 &offset, const float strength) { return offset * strength; }};
+  std::shared_ptr<FieldOperation> multiply_op = std::make_shared<FieldOperation>(
+      FieldOperation(multiply_fn, {std::move(offset), std::move(strength)}));
+  const Field<float3> final_offset{std::move(multiply_op)};
 
   AttributeOutputs attribute_outputs;
   if (params.output_is_required("Top")) {
@@ -1221,17 +1231,17 @@ static void node_geo_exec(GeoNodeExecParams params)
       MeshComponent &component = geometry_set.get_component_for_write<MeshComponent>();
       switch (mode) {
         case GEO_NODE_EXTRUDE_MESH_VERTICES:
-          extrude_mesh_vertices(component, selection, offset, attribute_outputs);
+          extrude_mesh_vertices(component, selection, final_offset, attribute_outputs);
           break;
         case GEO_NODE_EXTRUDE_MESH_EDGES:
-          extrude_mesh_edges(component, selection, offset, attribute_outputs);
+          extrude_mesh_edges(component, selection, final_offset, attribute_outputs);
           break;
         case GEO_NODE_EXTRUDE_MESH_FACES: {
           if (extrude_individual) {
-            extrude_individual_mesh_faces(component, selection, offset, attribute_outputs);
+            extrude_individual_mesh_faces(component, selection, final_offset, attribute_outputs);
           }
           else {
-            extrude_mesh_faces(component, selection, offset, attribute_outputs);
+            extrude_mesh_faces(component, selection, final_offset, attribute_outputs);
           }
           break;
         }
