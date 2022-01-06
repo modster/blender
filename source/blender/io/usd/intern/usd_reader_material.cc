@@ -41,10 +41,6 @@
 #include <optional>
 #include <vector>
 
-/* The result of querying UDIM information for a texture,
- * the path to the first tile and a list of tile indices. */
-typedef std::pair<std::string, blender::Vector<int>> UDIMQueryResult;
-
 namespace usdtokens {
 
 /* Parameter names. */
@@ -137,83 +133,38 @@ static bool is_udim_path(const std::string &path)
   return path.find("<UDIM>") != std::string::npos;
 }
 
-/* For the given UDIM path (assumed to contain the UDIM token), examine files
- * on disk to determine the indices of the UDIM tiles that are available
- * to load.  Returns a pair representing the path to the file corresponding
- * to the lowest tile index and an array containing valid tile indices.
+/* For the given UDIM path (assumed to contain the UDIM token), returns an array
+ * containing valid tile indices.
  * Returns std::nullopt if no tiles were found. */
-static std::optional<UDIMQueryResult> get_udim_tiles(const std::string &file_path)
+static std::optional<blender::Vector<int>> get_udim_tiles(const std::string &file_path)
 {
   /* Check if we have a UDIM path. */
   std::size_t udim_token_offset = file_path.find("<UDIM>");
-
   BLI_assert(udim_token_offset != std::string::npos);
 
-  /* Create a dummy UDIM path by replacing the '<UDIM>' token
-   * with an arbitrary index, since this is the format expected
-   * as input to the call BLI_path_sequence_decode().  We use the
-   * index 1001, but this will be replaced by the actual index
-   * of the first tile found on disk. */
-  std::string base_udim_path(file_path);
-  base_udim_path.replace(udim_token_offset, 6, "1001");
+  char base_udim_path[FILE_MAX];
+  BLI_strncpy(base_udim_path, file_path.c_str(), sizeof(base_udim_path));
 
-  /* Extract the file and directory names from the path. */
-  char filename[FILE_MAX], dirname[FILE_MAXDIR];
-  BLI_split_dirfile(base_udim_path.c_str(), dirname, filename, sizeof(dirname), sizeof(filename));
+  blender::Vector<int> udim_tiles;
 
-  /* Split the base and head portions of the file name. */
-  ushort digits = 0;
-  char base_head[FILE_MAX], base_tail[FILE_MAX];
-  BLI_path_sequence_decode(filename, base_head, base_tail, &digits);
+  /* Extract the tile numbers from all files on disk. */
+  ListBase tiles = {nullptr, nullptr};
+  int tile_start, tile_range;
+  bool result = BKE_image_get_tile_info(base_udim_path, &tiles, &tile_start, &tile_range);
+  if (result) {
+    LISTBASE_FOREACH (LinkData *, tile, &tiles) {
+      int tile_number = POINTER_AS_INT(tile->data);
+      udim_tiles.append(tile_number);
+    }
+  }
 
-  /* Iterate over the directory contents to find files
-   * with matching names and with the expected index format
-   * for UDIMS. */
-  struct direntry *dir = nullptr;
-  uint totfile = BLI_filelist_dir_contents(dirname, &dir);
+  BLI_freelistN(&tiles);
 
-  if (!dir) {
+  if (udim_tiles.is_empty()) {
     return std::nullopt;
   }
 
-  /* Keep track of the lowest tile index. */
-  int min_id = IMA_UDIM_MAX;
-  std::pair<std::string, blender::Vector<int>> result;
-
-  for (int i = 0; i < totfile; ++i) {
-    if (!(dir[i].type & S_IFREG)) {
-      continue;
-    }
-
-    char head[FILE_MAX], tail[FILE_MAX];
-    int id = BLI_path_sequence_decode(dir[i].relname, head, tail, &digits);
-
-    if (digits == 0 || digits > 4 || !(STREQLEN(base_head, head, FILE_MAX)) ||
-        !(STREQLEN(base_tail, tail, FILE_MAX))) {
-      continue;
-    }
-
-    if (id < 1001 || id >= IMA_UDIM_MAX) {
-      continue;
-    }
-
-    if (id < min_id) {
-      min_id = id;
-    }
-    result.second.append(id);
-  }
-
-  BLI_filelist_free(dir, totfile);
-
-  if (result.second.is_empty()) {
-    return std::nullopt;
-  }
-
-  /* Finally, use the lowest index we found to create the first tile path. */
-  result.first = file_path;
-  result.first.replace(udim_token_offset, 6, std::to_string(min_id));
-
-  return result;
+  return udim_tiles;
 }
 
 /* Add tiles with the given indices to the given image. */
@@ -746,14 +697,10 @@ void USDMaterialReader::load_tex_image(const pxr::UsdShadeShader &usd_shader,
 
   /* If this is a UDIM texture, this will store the
    * UDIM tile indices. */
-  std::optional<UDIMQueryResult> udim_result;
+  std::optional<blender::Vector<int>> udim_tiles;
 
   if (is_udim_path(file_path)) {
-    udim_result = get_udim_tiles(file_path);
-
-    if (udim_result) {
-      file_path = udim_result->first;
-    }
+    udim_tiles = get_udim_tiles(file_path);
   }
 
   if (file_path.empty()) {
@@ -770,8 +717,8 @@ void USDMaterialReader::load_tex_image(const pxr::UsdShadeShader &usd_shader,
     return;
   }
 
-  if (udim_result) {
-    add_udim_tiles(image, udim_result->second);
+  if (udim_tiles) {
+    add_udim_tiles(image, udim_tiles.value());
   }
 
   tex_image->id = &image->id;
