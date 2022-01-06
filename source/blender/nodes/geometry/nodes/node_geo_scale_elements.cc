@@ -30,13 +30,20 @@ static void node_declare(NodeDeclarationBuilder &b)
   b.add_input<decl::Bool>(N_("Selection")).default_value(true).hide_value().supports_field();
   b.add_input<decl::Vector>(N_("Scale")).default_value({1.0f, 1.0f, 1.0f}).supports_field();
   b.add_input<decl::Vector>(N_("Pivot")).subtype(PROP_TRANSLATION).implicit_field();
+  b.add_input<decl::Vector>(N_("X Axis")).default_value({1.0f, 0.0f, 0.0f}).supports_field();
+  b.add_input<decl::Vector>(N_("Up")).default_value({0.0f, 0.0f, 1.0f}).supports_field();
   b.add_output<decl::Geometry>(N_("Geometry"));
 };
 
-static void scale_faces(MeshComponent &mesh_component,
-                        const Field<bool> &selection_field,
-                        const Field<float3> &scale_field,
-                        const Field<float3> &pivot_field)
+struct InputFields {
+  Field<bool> selection;
+  Field<float3> scale;
+  Field<float3> pivot;
+  Field<float3> x_axis;
+  Field<float3> up;
+};
+
+static void scale_faces(MeshComponent &mesh_component, const InputFields &input_fields)
 {
   Mesh *mesh = mesh_component.get_for_write();
   mesh->mvert = static_cast<MVert *>(
@@ -44,13 +51,17 @@ static void scale_faces(MeshComponent &mesh_component,
 
   GeometryComponentFieldContext field_context{mesh_component, ATTR_DOMAIN_FACE};
   FieldEvaluator evaluator{field_context, mesh->totpoly};
-  evaluator.set_selection(selection_field);
-  evaluator.add(scale_field);
-  evaluator.add(pivot_field);
+  evaluator.set_selection(input_fields.selection);
+  VArray<float3> scales;
+  VArray<float3> pivots;
+  VArray<float3> x_axis_vectors;
+  VArray<float3> up_vectors;
+  evaluator.add(input_fields.scale, &scales);
+  evaluator.add(input_fields.pivot, &pivots);
+  evaluator.add(input_fields.x_axis, &x_axis_vectors);
+  evaluator.add(input_fields.up, &up_vectors);
   evaluator.evaluate();
   const IndexMask selection = evaluator.get_evaluated_selection_as_mask();
-  const VArray<float3> scales = evaluator.get_evaluated<float3>(0);
-  const VArray<float3> pivots = evaluator.get_evaluated<float3>(1);
 
   DisjointSet disjoint_set(mesh->totvert);
   for (const int poly_index : selection) {
@@ -69,20 +80,21 @@ static void scale_faces(MeshComponent &mesh_component,
   struct GroupData {
     float3 scale = {0.0f, 0.0f, 0.0f};
     float3 pivot = {0.0f, 0.0f, 0.0f};
+    float3 x_axis = {0.0f, 0.0f, 0.0f};
+    float3 up = {0.0f, 0.0f, 0.0f};
     int tot_faces = 0;
   };
 
-  const int max_group_index = mesh->totvert;
-  Array<GroupData> groups_data(max_group_index);
+  Array<GroupData> groups_data(mesh->totvert);
   for (const int poly_index : selection) {
     const MPoly &poly = mesh->mpoly[poly_index];
     const int first_vertex = mesh->mloop[poly.loopstart].v;
     const int group_index = group_by_vertex_index[first_vertex];
-    const float3 scale = scales[poly_index];
-    const float3 pivot = pivots[poly_index];
     GroupData &group_info = groups_data[group_index];
-    group_info.pivot += pivot;
-    group_info.scale += scale;
+    group_info.pivot += pivots[poly_index];
+    group_info.scale += scales[poly_index];
+    group_info.x_axis += x_axis_vectors[poly_index];
+    group_info.up += up_vectors[poly_index];
     group_info.tot_faces++;
   }
 
@@ -102,9 +114,27 @@ static void scale_faces(MeshComponent &mesh_component,
         continue;
       }
       MVert &vert = mesh->mvert[vert_index];
-      const float3 diff = float3(vert.co) - group_data.pivot;
-      const float3 new_diff = diff * group_data.scale;
-      copy_v3_v3(vert.co, group_data.pivot + new_diff);
+
+      const float3 up = group_data.up.normalized();
+      /* TODO: Check if axis make sense, also see #from_normalized_axis_data. */
+      const float3 x_axis = group_data.x_axis.normalized();
+      const float3 y_axis = -float3::cross(x_axis, up);
+      const float3 z_axis = float3::cross(x_axis, y_axis);
+
+      float mat[3][3];
+      copy_v3_v3(mat[0], x_axis);
+      copy_v3_v3(mat[1], y_axis);
+      copy_v3_v3(mat[2], z_axis);
+
+      float mat_inv[3][3];
+      transpose_m3_m3(mat_inv, mat);
+
+      float3 diff = float3(vert.co) - group_data.pivot;
+      mul_m3_v3(mat, diff);
+      diff *= group_data.scale;
+      mul_m3_v3(mat_inv, diff);
+
+      copy_v3_v3(vert.co, group_data.pivot + diff);
     }
   });
 }
@@ -115,16 +145,19 @@ static void node_geo_exec(GeoNodeExecParams params)
       params.node().custom1);
 
   GeometrySet geometry = params.extract_input<GeometrySet>("Geometry");
-  const Field<bool> &selection_field = params.get_input<Field<bool>>("Selection");
-  const Field<float3> &scale_field = params.get_input<Field<float3>>("Scale");
-  const Field<float3> &pivot_field = params.get_input<Field<float3>>("Pivot");
+  InputFields input_fields;
+  input_fields.selection = params.get_input<Field<bool>>("Selection");
+  input_fields.scale = params.get_input<Field<float3>>("Scale");
+  input_fields.pivot = params.get_input<Field<float3>>("Pivot");
+  input_fields.x_axis = params.get_input<Field<float3>>("X Axis");
+  input_fields.up = params.get_input<Field<float3>>("Up");
 
   geometry.modify_geometry_sets([&](GeometrySet &geometry) {
     switch (mode) {
       case GEO_NODE_SCALE_ELEMENTS_MODE_FACE: {
         if (geometry.has_mesh()) {
           MeshComponent &mesh_component = geometry.get_component_for_write<MeshComponent>();
-          scale_faces(mesh_component, selection_field, scale_field, pivot_field);
+          scale_faces(mesh_component, input_fields);
         }
         break;
       }
