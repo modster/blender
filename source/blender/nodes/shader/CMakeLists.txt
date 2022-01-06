@@ -20,7 +20,7 @@
 
 set(INC
   .
-  ../
+  ..
   ../intern
   ../../blenkernel
   ../../blenlib
@@ -63,7 +63,7 @@ set(SRC
   nodes/node_shader_camera.cc
   nodes/node_shader_clamp.cc
   nodes/node_shader_color_ramp.cc
-  nodes/node_shader_common.c
+  nodes/node_shader_common.cc
   nodes/node_shader_curves.cc
   nodes/node_shader_displacement.cc
   nodes/node_shader_eevee_specular.cc
@@ -93,8 +93,8 @@ set(SRC
   nodes/node_shader_output_material.cc
   nodes/node_shader_output_world.cc
   nodes/node_shader_particle_info.cc
-  nodes/node_shader_rgb_to_bw.cc
   nodes/node_shader_rgb.cc
+  nodes/node_shader_rgb_to_bw.cc
   nodes/node_shader_script.cc
   nodes/node_shader_sepcomb_hsv.cc
   nodes/node_shader_sepcomb_rgb.cc
@@ -132,10 +132,10 @@ set(SRC
   nodes/node_shader_wavelength.cc
   nodes/node_shader_wireframe.cc
 
-  node_shader_tree.c
+  node_shader_tree.cc
   node_shader_util.cc
 
-  node_shader_util.h
+  node_shader_util.hh
 )
 
 set(LIB
