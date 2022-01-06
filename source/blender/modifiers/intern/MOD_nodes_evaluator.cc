@@ -16,6 +16,9 @@
 
 #include "MOD_nodes_evaluator.hh"
 
+#include "DNA_meshdata_types.h"
+
+#include "BKE_mesh.h"
 #include "BKE_type_conversions.hh"
 
 #include "NOD_geometry_exec.hh"
@@ -379,6 +382,75 @@ static bool get_implicit_socket_input(const SocketRef &socket, void *r_value)
                              "handle_left" :
                              "handle_right";
         new (r_value) ValueOrField<float3>(bke::AttributeFieldInput::Create<float3>(side));
+        return true;
+      }
+      if (bnode.type == GEO_NODE_EXTRUDE_MESH) {
+        /* TODO: Simplify this when D12770 is committed. */
+        class MeshNormalFieldInput final : public bke::GeometryFieldInput {
+         public:
+          MeshNormalFieldInput() : bke::GeometryFieldInput(CPPType::get<float3>(), "Normal")
+          {
+            category_ = Category::Generated;
+          }
+
+          GVArray get_varray_for_context(const GeometryComponent &component,
+                                         const AttributeDomain domain,
+                                         IndexMask mask) const final
+          {
+            if (component.type() != GEO_COMPONENT_TYPE_MESH) {
+              return {};
+            }
+            const MeshComponent &mesh_component = static_cast<const MeshComponent &>(component);
+            const Mesh *mesh = mesh_component.get_for_read();
+            if (mesh == nullptr) {
+              return {};
+            }
+            if (domain == ATTR_DOMAIN_FACE) {
+              auto normal_fn = [mesh](const int i) -> float3 {
+                float3 normal;
+                const MPoly &poly = mesh->mpoly[i];
+                BKE_mesh_calc_poly_normal(
+                    &poly, &mesh->mloop[poly.loopstart], mesh->mvert, normal);
+                return normal;
+              };
+              return VArray<float3>::ForFunc(mask.min_array_size(), normal_fn);
+            }
+            if (ELEM(domain, ATTR_DOMAIN_POINT, ATTR_DOMAIN_EDGE)) {
+              Array<MVert> temp_verts(bke::mesh_verts(*mesh));
+              Array<float3> normals(mesh->totvert);
+              BKE_mesh_calc_normals_poly_and_vertex(temp_verts.data(),
+                                                    mesh->totvert,
+                                                    mesh->mloop,
+                                                    mesh->totloop,
+                                                    mesh->mpoly,
+                                                    mesh->totpoly,
+                                                    nullptr,
+                                                    (float(*)[3])normals.data());
+              Array<float3> edge_normals(mask.min_array_size());
+              if (domain == ATTR_DOMAIN_EDGE) {
+                for (const int i : mask) {
+                  const MEdge &edge = mesh->medge[i];
+                  edge_normals[i] =
+                      float3::interpolate(normals[edge.v1], normals[edge.v2], 0.5f).normalized();
+                }
+
+                return VArray<float3>::ForContainer(std::move(edge_normals));
+              }
+              return VArray<float3>::ForContainer(std::move(normals));
+            }
+            return {};
+          }
+          uint64_t hash() const override
+          {
+            return 9243875643;
+          }
+          bool is_equal_to(const fn::FieldNode &other) const override
+          {
+            return dynamic_cast<const MeshNormalFieldInput *>(&other) != nullptr;
+          }
+        };
+        new (r_value)
+            ValueOrField<float3>(Field<float3>(std::make_shared<MeshNormalFieldInput>()));
         return true;
       }
       new (r_value) ValueOrField<float3>(bke::AttributeFieldInput::Create<float3>("position"));
