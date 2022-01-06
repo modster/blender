@@ -42,7 +42,7 @@ static void cmp_node_color_matte_declare(NodeDeclarationBuilder &b)
 
 static void node_composit_init_color_matte(bNodeTree *UNUSED(ntree), bNode *node)
 {
-  NodeChroma *c = (NodeChroma *)MEM_callocN(sizeof(NodeChroma), "node color");
+  NodeChroma *c = MEM_cnew<NodeChroma>(__func__);
   node->storage = c;
   c->t1 = 0.01f;
   c->t2 = 0.1f;
@@ -72,9 +72,10 @@ void register_node_type_cmp_color_matte()
 {
   static bNodeType ntype;
 
-  cmp_node_type_base(&ntype, CMP_NODE_COLOR_MATTE, "Color Key", NODE_CLASS_MATTE, NODE_PREVIEW);
+  cmp_node_type_base(&ntype, CMP_NODE_COLOR_MATTE, "Color Key", NODE_CLASS_MATTE);
   ntype.declare = blender::nodes::cmp_node_color_matte_declare;
   ntype.draw_buttons = node_composit_buts_color_matte;
+  ntype.flag |= NODE_PREVIEW;
   node_type_init(&ntype, node_composit_init_color_matte);
   node_type_storage(&ntype, "NodeChroma", node_free_standard_storage, node_copy_standard_storage);
 

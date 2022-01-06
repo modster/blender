@@ -1002,10 +1002,10 @@ void GeometryManager::device_update_attributes(Device *device,
 
   /* After mesh attributes and patch tables have been copied to device memory,
    * we need to update offsets in the objects. */
-  scene->object_manager->device_update_mesh_offsets(device, dscene, scene);
+  scene->object_manager->device_update_geom_offsets(device, dscene, scene);
 }
 
-void GeometryManager::mesh_calc_offset(Scene *scene, BVHLayout bvh_layout)
+void GeometryManager::geom_calc_offset(Scene *scene, BVHLayout bvh_layout)
 {
   size_t vert_size = 0;
   size_t tri_size = 0;
@@ -1370,22 +1370,22 @@ enum {
   DEVICE_MESH_DATA_MODIFIED = (1 << 1),
   DEVICE_POINT_DATA_MODIFIED = (1 << 2),
 
-  ATTR_FLOAT_MODIFIED = (1 << 2),
-  ATTR_FLOAT2_MODIFIED = (1 << 3),
-  ATTR_FLOAT3_MODIFIED = (1 << 4),
-  ATTR_FLOAT4_MODIFIED = (1 << 5),
-  ATTR_UCHAR4_MODIFIED = (1 << 6),
+  ATTR_FLOAT_MODIFIED = (1 << 3),
+  ATTR_FLOAT2_MODIFIED = (1 << 4),
+  ATTR_FLOAT3_MODIFIED = (1 << 5),
+  ATTR_FLOAT4_MODIFIED = (1 << 6),
+  ATTR_UCHAR4_MODIFIED = (1 << 7),
 
-  CURVE_DATA_NEED_REALLOC = (1 << 7),
-  MESH_DATA_NEED_REALLOC = (1 << 8),
-  POINT_DATA_NEED_REALLOC = (1 << 9),
+  CURVE_DATA_NEED_REALLOC = (1 << 8),
+  MESH_DATA_NEED_REALLOC = (1 << 9),
+  POINT_DATA_NEED_REALLOC = (1 << 10),
 
-  ATTR_FLOAT_NEEDS_REALLOC = (1 << 10),
-  ATTR_FLOAT2_NEEDS_REALLOC = (1 << 11),
-  ATTR_FLOAT3_NEEDS_REALLOC = (1 << 12),
-  ATTR_FLOAT4_NEEDS_REALLOC = (1 << 13),
+  ATTR_FLOAT_NEEDS_REALLOC = (1 << 11),
+  ATTR_FLOAT2_NEEDS_REALLOC = (1 << 12),
+  ATTR_FLOAT3_NEEDS_REALLOC = (1 << 13),
+  ATTR_FLOAT4_NEEDS_REALLOC = (1 << 14),
 
-  ATTR_UCHAR4_NEEDS_REALLOC = (1 << 14),
+  ATTR_UCHAR4_NEEDS_REALLOC = (1 << 15),
 
   ATTRS_NEED_REALLOC = (ATTR_FLOAT_NEEDS_REALLOC | ATTR_FLOAT2_NEEDS_REALLOC |
                         ATTR_FLOAT3_NEEDS_REALLOC | ATTR_FLOAT4_NEEDS_REALLOC |
@@ -1922,7 +1922,7 @@ void GeometryManager::device_update(Device *device,
 
   const BVHLayout bvh_layout = BVHParams::best_bvh_layout(scene->params.bvh_layout,
                                                           device->get_bvh_layout_mask());
-  mesh_calc_offset(scene, bvh_layout);
+  geom_calc_offset(scene, bvh_layout);
   if (true_displacement_used || curve_shadow_transparency_used) {
     scoped_callback_timer timer([scene](double time) {
       if (scene->update_stats) {

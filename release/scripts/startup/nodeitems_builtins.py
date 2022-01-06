@@ -150,6 +150,7 @@ def mesh_node_items(context):
     yield NodeItem("GeometryNodeSubdivisionSurface")
     yield NodeItem("GeometryNodeTriangulate")
     yield NodeItemCustom(draw=lambda self, layout, context: layout.separator())
+    yield NodeItem("GeometryNodeInputMeshEdgeAngle")
     yield NodeItem("GeometryNodeInputMeshEdgeNeighbors")
     yield NodeItem("GeometryNodeInputMeshEdgeVertices")
     yield NodeItem("GeometryNodeInputMeshFaceArea")
@@ -753,6 +754,7 @@ geometry_node_categories = [
         NodeItem("GeometryNodeImageTexture"),
     ]),
     GeometryNodeCategory("GEO_UTILITIES", "Utilities", items=[
+        NodeItem("GeometryNodeAccumulateField"),
         NodeItem("ShaderNodeMapRange"),
         NodeItem("ShaderNodeFloatCurve"),
         NodeItem("ShaderNodeClamp"),

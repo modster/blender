@@ -345,6 +345,71 @@ static bool find_fcurve_segment(FCurve *fcu,
   return in_segment;
 }
 
+/* Return a list of FCurveSegment with a start index and a length.
+ * A segment is a continuous selection of keyframes.
+ * Keys that have BEZT_FLAG_IGNORE_TAG set are treated as unselected.
+ * The caller is responsible for freeing the memory. */
+ListBase find_fcurve_segments(FCurve *fcu)
+{
+  ListBase segments = {NULL, NULL};
+  int segment_start_idx = 0;
+  int segment_len = 0;
+  int current_index = 0;
+
+  while (find_fcurve_segment(fcu, current_index, &segment_start_idx, &segment_len)) {
+    FCurveSegment *segment;
+    segment = MEM_callocN(sizeof(*segment), "FCurveSegment");
+    segment->start_index = segment_start_idx;
+    segment->length = segment_len;
+    BLI_addtail(&segments, segment);
+    current_index = segment_start_idx + segment_len;
+  }
+  return segments;
+}
+
+static BezTriple fcurve_segment_start_get(FCurve *fcu, int index)
+{
+  BezTriple start_bezt = index - 1 >= 0 ? fcu->bezt[index - 1] : fcu->bezt[index];
+  return start_bezt;
+}
+
+static BezTriple fcurve_segment_end_get(FCurve *fcu, int index)
+{
+  BezTriple end_bezt = index < fcu->totvert ? fcu->bezt[index] : fcu->bezt[index - 1];
+  return end_bezt;
+}
+
+/* ---------------- */
+
+void blend_to_neighbor_fcurve_segment(FCurve *fcu, FCurveSegment *segment, const float factor)
+{
+  const float blend_factor = fabs(factor * 2 - 1);
+  BezTriple target_bezt;
+  /* Find which key to blend towards. */
+  if (factor < 0.5f) {
+    target_bezt = fcurve_segment_start_get(fcu, segment->start_index);
+  }
+  else {
+    target_bezt = fcurve_segment_end_get(fcu, segment->start_index + segment->length);
+  }
+  /* Blend each key individually. */
+  for (int i = segment->start_index; i < segment->start_index + segment->length; i++) {
+    fcu->bezt[i].vec[1][1] = interpf(target_bezt.vec[1][1], fcu->bezt[i].vec[1][1], blend_factor);
+  }
+}
+
+/* ---------------- */
+
+void breakdown_fcurve_segment(FCurve *fcu, FCurveSegment *segment, const float factor)
+{
+  BezTriple left_bezt = fcurve_segment_start_get(fcu, segment->start_index);
+  BezTriple right_bezt = fcurve_segment_end_get(fcu, segment->start_index + segment->length);
+
+  for (int i = segment->start_index; i < segment->start_index + segment->length; i++) {
+    fcu->bezt[i].vec[1][1] = interpf(right_bezt.vec[1][1], left_bezt.vec[1][1], factor);
+  }
+}
+
 /* ---------------- */
 
 /* Check if the keyframe interpolation type is supported */
@@ -440,15 +505,12 @@ bool decimate_fcurve(bAnimListElem *ale, float remove_ratio, float error_sq_max)
     fcu->bezt[i].f2 &= ~BEZT_FLAG_TEMP_TAG;
   }
 
-  /* Only decimate the individual selected curve segments. */
-  int segment_start_idx = 0;
-  int segment_len = 0;
-  int current_index = 0;
-
-  while (find_fcurve_segment(fcu, current_index, &segment_start_idx, &segment_len)) {
-    decimate_fcurve_segment(fcu, segment_start_idx, segment_len, remove_ratio, error_sq_max);
-    current_index = segment_start_idx + segment_len;
+  ListBase segments = find_fcurve_segments(fcu);
+  LISTBASE_FOREACH (FCurveSegment *, segment, &segments) {
+    decimate_fcurve_segment(
+        fcu, segment->start_index, segment->length, remove_ratio, error_sq_max);
   }
+  BLI_freelistN(&segments);
 
   uint old_totvert = fcu->totvert;
   fcu->bezt = NULL;

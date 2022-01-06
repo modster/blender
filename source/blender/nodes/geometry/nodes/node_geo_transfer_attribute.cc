@@ -88,8 +88,7 @@ static void node_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 
 static void node_init(bNodeTree *UNUSED(tree), bNode *node)
 {
-  NodeGeometryTransferAttribute *data = (NodeGeometryTransferAttribute *)MEM_callocN(
-      sizeof(NodeGeometryTransferAttribute), __func__);
+  NodeGeometryTransferAttribute *data = MEM_cnew<NodeGeometryTransferAttribute>(__func__);
   data->data_type = CD_PROP_FLOAT;
   data->mode = GEO_NODE_ATTRIBUTE_TRANSFER_NEAREST_FACE_INTERPOLATED;
   node->storage = data;
@@ -828,7 +827,7 @@ void register_node_type_geo_transfer_attribute()
   static bNodeType ntype;
 
   geo_node_type_base(
-      &ntype, GEO_NODE_TRANSFER_ATTRIBUTE, "Transfer Attribute", NODE_CLASS_ATTRIBUTE, 0);
+      &ntype, GEO_NODE_TRANSFER_ATTRIBUTE, "Transfer Attribute", NODE_CLASS_ATTRIBUTE);
   node_type_init(&ntype, file_ns::node_init);
   node_type_update(&ntype, file_ns::node_update);
   node_type_storage(&ntype,

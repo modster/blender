@@ -54,8 +54,7 @@ static void node_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 
 static void node_init(bNodeTree *UNUSED(tree), bNode *node)
 {
-  NodeGeometryAttributeCapture *data = (NodeGeometryAttributeCapture *)MEM_callocN(
-      sizeof(NodeGeometryAttributeCapture), __func__);
+  NodeGeometryAttributeCapture *data = MEM_cnew<NodeGeometryAttributeCapture>(__func__);
   data->data_type = CD_PROP_FLOAT;
   data->domain = ATTR_DOMAIN_POINT;
 
@@ -235,7 +234,7 @@ void register_node_type_geo_attribute_capture()
   static bNodeType ntype;
 
   geo_node_type_base(
-      &ntype, GEO_NODE_CAPTURE_ATTRIBUTE, "Capture Attribute", NODE_CLASS_ATTRIBUTE, 0);
+      &ntype, GEO_NODE_CAPTURE_ATTRIBUTE, "Capture Attribute", NODE_CLASS_ATTRIBUTE);
   node_type_storage(&ntype,
                     "NodeGeometryAttributeCapture",
                     node_free_standard_storage,

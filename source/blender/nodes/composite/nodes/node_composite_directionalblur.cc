@@ -38,7 +38,7 @@ static void cmp_node_directional_blur_declare(NodeDeclarationBuilder &b)
 
 static void node_composit_init_dblur(bNodeTree *UNUSED(ntree), bNode *node)
 {
-  NodeDBlurData *ndbd = (NodeDBlurData *)MEM_callocN(sizeof(NodeDBlurData), "node dblur data");
+  NodeDBlurData *ndbd = MEM_cnew<NodeDBlurData>(__func__);
   node->storage = ndbd;
   ndbd->iter = 1;
   ndbd->center_x = 0.5;
@@ -73,7 +73,7 @@ void register_node_type_cmp_dblur()
 {
   static bNodeType ntype;
 
-  cmp_node_type_base(&ntype, CMP_NODE_DBLUR, "Directional Blur", NODE_CLASS_OP_FILTER, 0);
+  cmp_node_type_base(&ntype, CMP_NODE_DBLUR, "Directional Blur", NODE_CLASS_OP_FILTER);
   ntype.declare = blender::nodes::cmp_node_directional_blur_declare;
   ntype.draw_buttons = node_composit_buts_dblur;
   node_type_init(&ntype, node_composit_init_dblur);

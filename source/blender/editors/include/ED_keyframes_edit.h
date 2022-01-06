@@ -380,10 +380,21 @@ bool delete_fcurve_keys(struct FCurve *fcu);
 void clear_fcurve_keys(struct FCurve *fcu);
 void duplicate_fcurve_keys(struct FCurve *fcu);
 
+typedef struct FCurveSegment {
+  struct FCurveSegment *next, *prev;
+  int start_index, length;
+} FCurveSegment;
+ListBase find_fcurve_segments(struct FCurve *fcu);
 void clean_fcurve(struct bAnimContext *ac,
                   struct bAnimListElem *ale,
                   float thresh,
                   bool cleardefault);
+void blend_to_neighbor_fcurve_segment(struct FCurve *fcu,
+                                      struct FCurveSegment *segment,
+                                      const float factor);
+void breakdown_fcurve_segment(struct FCurve *fcu,
+                              struct FCurveSegment *segment,
+                              const float factor);
 bool decimate_fcurve(struct bAnimListElem *ale, float remove_ratio, float error_sq_max);
 /**
  * Use a weighted moving-means method to reduce intensity of fluctuations.

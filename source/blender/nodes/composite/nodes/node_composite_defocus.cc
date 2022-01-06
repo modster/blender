@@ -46,7 +46,7 @@ static void cmp_node_defocus_declare(NodeDeclarationBuilder &b)
 static void node_composit_init_defocus(bNodeTree *UNUSED(ntree), bNode *node)
 {
   /* defocus node */
-  NodeDefocus *nbd = (NodeDefocus *)MEM_callocN(sizeof(NodeDefocus), "node defocus data");
+  NodeDefocus *nbd = MEM_cnew<NodeDefocus>(__func__);
   nbd->bktype = 0;
   nbd->rotation = 0.0f;
   nbd->preview = 1;
@@ -103,7 +103,7 @@ void register_node_type_cmp_defocus()
 {
   static bNodeType ntype;
 
-  cmp_node_type_base(&ntype, CMP_NODE_DEFOCUS, "Defocus", NODE_CLASS_OP_FILTER, 0);
+  cmp_node_type_base(&ntype, CMP_NODE_DEFOCUS, "Defocus", NODE_CLASS_OP_FILTER);
   ntype.declare = blender::nodes::cmp_node_defocus_declare;
   ntype.draw_buttons = node_composit_buts_defocus;
   node_type_init(&ntype, node_composit_init_defocus);

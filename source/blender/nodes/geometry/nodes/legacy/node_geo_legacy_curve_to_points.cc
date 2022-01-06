@@ -95,8 +95,7 @@ static void node_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 
 static void node_init(bNodeTree *UNUSED(tree), bNode *node)
 {
-  NodeGeometryCurveToPoints *data = (NodeGeometryCurveToPoints *)MEM_callocN(
-      sizeof(NodeGeometryCurveToPoints), __func__);
+  NodeGeometryCurveToPoints *data = MEM_cnew<NodeGeometryCurveToPoints>(__func__);
 
   data->mode = GEO_NODE_CURVE_RESAMPLE_COUNT;
   node->storage = data;
@@ -353,7 +352,7 @@ void register_node_type_geo_legacy_curve_to_points()
   static bNodeType ntype;
 
   geo_node_type_base(
-      &ntype, GEO_NODE_LEGACY_CURVE_TO_POINTS, "Curve to Points", NODE_CLASS_GEOMETRY, 0);
+      &ntype, GEO_NODE_LEGACY_CURVE_TO_POINTS, "Curve to Points", NODE_CLASS_GEOMETRY);
   ntype.declare = file_ns::node_declare;
   ntype.geometry_node_execute = file_ns::node_geo_exec;
   ntype.draw_buttons = file_ns::node_layout;

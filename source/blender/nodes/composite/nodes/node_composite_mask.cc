@@ -41,7 +41,7 @@ static void cmp_node_mask_declare(NodeDeclarationBuilder &b)
 
 static void node_composit_init_mask(bNodeTree *UNUSED(ntree), bNode *node)
 {
-  NodeMask *data = (NodeMask *)MEM_callocN(sizeof(NodeMask), "NodeMask");
+  NodeMask *data = MEM_cnew<NodeMask>(__func__);
   data->size_x = data->size_y = 256;
   node->storage = data;
 
@@ -96,7 +96,7 @@ void register_node_type_cmp_mask()
 {
   static bNodeType ntype;
 
-  cmp_node_type_base(&ntype, CMP_NODE_MASK, "Mask", NODE_CLASS_INPUT, 0);
+  cmp_node_type_base(&ntype, CMP_NODE_MASK, "Mask", NODE_CLASS_INPUT);
   ntype.declare = blender::nodes::cmp_node_mask_declare;
   ntype.draw_buttons = node_composit_buts_mask;
   node_type_init(&ntype, node_composit_init_mask);

@@ -51,7 +51,7 @@ static void cmp_node_keying_declare(NodeDeclarationBuilder &b)
 
 static void node_composit_init_keying(bNodeTree *UNUSED(ntree), bNode *node)
 {
-  NodeKeyingData *data = (NodeKeyingData *)MEM_callocN(sizeof(NodeKeyingData), "node keying data");
+  NodeKeyingData *data = MEM_cnew<NodeKeyingData>(__func__);
 
   data->screen_balance = 0.5f;
   data->despill_balance = 0.5f;
@@ -85,7 +85,7 @@ void register_node_type_cmp_keying()
 {
   static bNodeType ntype;
 
-  cmp_node_type_base(&ntype, CMP_NODE_KEYING, "Keying", NODE_CLASS_MATTE, 0);
+  cmp_node_type_base(&ntype, CMP_NODE_KEYING, "Keying", NODE_CLASS_MATTE);
   ntype.declare = blender::nodes::cmp_node_keying_declare;
   ntype.draw_buttons = node_composit_buts_keying;
   node_type_init(&ntype, node_composit_init_keying);
