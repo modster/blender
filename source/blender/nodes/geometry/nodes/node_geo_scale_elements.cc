@@ -99,14 +99,6 @@ static void scale_faces(MeshComponent &mesh_component, const InputFields &input_
     group_info.tot_faces++;
   }
 
-  for (GroupData &group_data : groups_data) {
-    if (group_data.tot_faces >= 2) {
-      const float f = 1.0f / group_data.tot_faces;
-      group_data.scale *= f;
-      group_data.pivot *= f;
-    }
-  }
-
   Array<float4x4> transforms(group_amount);
   threading::parallel_for(IndexRange(mesh->totvert), 1024, [&](const IndexRange range) {
     for (const int vert_index : range) {
@@ -115,6 +107,10 @@ static void scale_faces(MeshComponent &mesh_component, const InputFields &input_
         transforms[vert_index] = float4x4::identity();
         continue;
       }
+
+      const float f = 1.0f / group_data.tot_faces;
+      group_data.scale *= f;
+      group_data.pivot *= f;
 
       const float3 x_axis = group_data.x_axis.normalized();
       const float3 y_axis = -float3::cross(x_axis, group_data.up).normalized();
