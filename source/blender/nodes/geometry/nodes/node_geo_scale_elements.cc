@@ -85,7 +85,8 @@ static void scale_faces(MeshComponent &mesh_component, const InputFields &input_
     int tot_faces = 0;
   };
 
-  Array<GroupData> groups_data(mesh->totvert);
+  const int group_amount = mesh->totvert;
+  Array<GroupData> groups_data(group_amount);
   for (const int poly_index : selection) {
     const MPoly &poly = mesh->mpoly[poly_index];
     const int first_vertex = mesh->mloop[poly.loopstart].v;
@@ -106,35 +107,51 @@ static void scale_faces(MeshComponent &mesh_component, const InputFields &input_
     }
   }
 
+  Array<float4x4> transforms(group_amount);
+  threading::parallel_for(IndexRange(mesh->totvert), 1024, [&](const IndexRange range) {
+    for (const int vert_index : range) {
+      GroupData &group_data = groups_data[vert_index];
+      if (group_data.tot_faces == 0) {
+        transforms[vert_index] = float4x4::identity();
+        continue;
+      }
+
+      const float3 x_axis = group_data.x_axis.normalized();
+      const float3 y_axis = -float3::cross(x_axis, group_data.up).normalized();
+      const float3 z_axis = float3::cross(x_axis, y_axis);
+
+      const float3 pivot = group_data.pivot;
+
+      float4x4 &transform = transforms[vert_index];
+      unit_m4(transform.values);
+      sub_v3_v3(transform.values[3], pivot);
+
+      float4x4 axis_transform;
+      unit_m4(axis_transform.values);
+      copy_v3_v3(axis_transform.values[0], x_axis);
+      copy_v3_v3(axis_transform.values[1], y_axis);
+      copy_v3_v3(axis_transform.values[2], z_axis);
+
+      float4x4 axis_transform_inv = axis_transform.transposed();
+
+      float4x4 scale_transform;
+      unit_m4(scale_transform.values);
+      scale_transform.values[0][0] = group_data.scale.x;
+      scale_transform.values[1][1] = group_data.scale.y;
+      scale_transform.values[2][2] = group_data.scale.z;
+
+      transform = axis_transform * scale_transform * axis_transform_inv * transform;
+      add_v3_v3(transform.values[3], pivot);
+    }
+  });
+
   threading::parallel_for(IndexRange(mesh->totvert), 1024, [&](const IndexRange range) {
     for (const int vert_index : range) {
       const int group_index = group_by_vertex_index[vert_index];
-      const GroupData &group_data = groups_data[group_index];
-      if (group_data.tot_faces == 0) {
-        continue;
-      }
       MVert &vert = mesh->mvert[vert_index];
-
-      const float3 up = group_data.up.normalized();
-      /* TODO: Check if axis make sense, also see #from_normalized_axis_data. */
-      const float3 x_axis = group_data.x_axis.normalized();
-      const float3 y_axis = -float3::cross(x_axis, up);
-      const float3 z_axis = float3::cross(x_axis, y_axis);
-
-      float mat[3][3];
-      copy_v3_v3(mat[0], x_axis);
-      copy_v3_v3(mat[1], y_axis);
-      copy_v3_v3(mat[2], z_axis);
-
-      float mat_inv[3][3];
-      transpose_m3_m3(mat_inv, mat);
-
-      float3 diff = float3(vert.co) - group_data.pivot;
-      mul_m3_v3(mat, diff);
-      diff *= group_data.scale;
-      mul_m3_v3(mat_inv, diff);
-
-      copy_v3_v3(vert.co, group_data.pivot + diff);
+      const float3 old_position = vert.co;
+      const float3 new_position = transforms[group_index] * old_position;
+      copy_v3_v3(vert.co, new_position);
     }
   });
 }
