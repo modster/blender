@@ -540,7 +540,7 @@ static void evaluate_vertex_and_apply_displacement_copy(const SubdivMeshContext 
   /* Copy custom data and evaluate position. */
   subdiv_vertex_data_copy(ctx, coarse_vert, subdiv_vert);
   BKE_subdiv_eval_limit_point(ctx->subdiv, ptex_face_index, u, v, subdiv_vert->co);
-  /* Apply displacement. The normals have already been accumulated. */
+  /* Apply displacement. */
   add_v3_v3(subdiv_vert->co, D);
   /* Remove facedot flag. This can happen if there is more than one subsurf modifier. */
   subdiv_vert->flag &= ~ME_VERT_FACEDOT;
@@ -1091,7 +1091,7 @@ static void setup_foreach_callbacks(const SubdivMeshContext *subdiv_context,
   memset(foreach_context, 0, sizeof(*foreach_context));
   /* General information. */
   foreach_context->topology_info = subdiv_mesh_topology_info;
-  /* Every boundary geometry. Used for displacement and normals averaging. */
+  /* Every boundary geometry. Used for displacement averaging. */
   if (subdiv_context->have_displacement) {
     foreach_context->vertex_every_corner = subdiv_mesh_vertex_every_corner;
     foreach_context->vertex_every_edge = subdiv_mesh_vertex_every_edge;
