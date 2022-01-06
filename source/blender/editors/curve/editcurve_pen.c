@@ -190,9 +190,9 @@ static void get_displacement_to_avg_selected_point(const ListBase *editnurb,
 }
 
 /* Move the handle of the newly added #BezTriple to mouse. */
-static void move_bezt_handles_to_mouse(const wmEvent *event,
-                                       const ViewContext *vc,
-                                       ListBase *editnurb)
+static void move_new_bezt_handles_to_mouse(const wmEvent *event,
+                                           const ViewContext *vc,
+                                           ListBase *editnurb)
 {
   float change[2];
   get_displacement_to_avg_selected_point(editnurb, change, event, vc);
@@ -267,13 +267,35 @@ static void remove_handle_movement_constraints(BezTriple *bezt, const bool f1, c
   }
 }
 
+static void move_bezt_handle_or_vertex_to_location_int(BezTriple *bezt,
+                                                       const int mval[2],
+                                                       const short cp_index,
+                                                       const ViewContext *vc)
+{
+  float location[3];
+  screenspace_to_worldspace_int(mval, bezt->vec[cp_index], vc, location);
+  if (cp_index == 1) {
+    move_bezt_to_location(bezt, location);
+  }
+  else {
+    copy_v3_v3(bezt->vec[cp_index], location);
+    if (bezt->h1 == HD_ALIGN && bezt->h2 == HD_ALIGN) {
+      float handle_vec[3];
+      sub_v3_v3v3(handle_vec, bezt->vec[1], location);
+      const short other_handle = cp_index == 2 ? 0 : 2;
+      normalize_v3_length(handle_vec, len_v3v3(bezt->vec[1], bezt->vec[other_handle]));
+      add_v3_v3v3(bezt->vec[other_handle], bezt->vec[1], handle_vec);
+    }
+  }
+}
+
 static void move_bezt_handle_or_vertex_to_location(BezTriple *bezt,
-                                                   const int mval[2],
+                                                   const float mval[2],
                                                    const short cp_index,
                                                    const ViewContext *vc)
 {
   float location[3];
-  screenspace_to_worldspace_int(mval, bezt->vec[cp_index], vc, location);
+  screenspace_to_worldspace(mval, bezt->vec[cp_index], vc, location);
   if (cp_index == 1) {
     move_bezt_to_location(bezt, location);
   }
@@ -295,23 +317,23 @@ static void move_selected_bezt_to_location(BezTriple *bezt,
                                            const int mval[2])
 {
   if (BEZT_ISSEL_IDX(bezt, 1)) {
-    move_bezt_handle_or_vertex_to_location(bezt, mval, 1, vc);
+    move_bezt_handle_or_vertex_to_location_int(bezt, mval, 1, vc);
   }
   else {
     remove_handle_movement_constraints(bezt, BEZT_ISSEL_IDX(bezt, 0), BEZT_ISSEL_IDX(bezt, 2));
     if (BEZT_ISSEL_IDX(bezt, 0)) {
-      move_bezt_handle_or_vertex_to_location(bezt, mval, 0, vc);
+      move_bezt_handle_or_vertex_to_location_int(bezt, mval, 0, vc);
     }
     else {
-      move_bezt_handle_or_vertex_to_location(bezt, mval, 2, vc);
+      move_bezt_handle_or_vertex_to_location_int(bezt, mval, 2, vc);
     }
   }
 }
 
-static void move_bp_to_location(BPoint *bp, const int mval[2], const ViewContext *vc)
+static void move_bp_to_location(BPoint *bp, const float mval[2], const ViewContext *vc)
 {
   float location[3];
-  screenspace_to_worldspace_int(mval, bp->vec, vc, location);
+  screenspace_to_worldspace(mval, bp->vec, vc, location);
 
   copy_v3_v3(bp->vec, location);
 }
@@ -323,25 +345,27 @@ static void move_all_selected_points(ListBase *editnurb,
                                      const wmEvent *event,
                                      const ViewContext *vc)
 {
-  int change[2];
-  sub_v2_v2v2_int(change, event->xy, event->prev_xy);
+  int change_int[2];
+  sub_v2_v2v2_int(change_int, event->xy, event->prev_xy);
+  float change[2] = {(float)change_int[0], (float)change_int[1]};
+
   LISTBASE_FOREACH (Nurb *, nu, editnurb) {
     if (nu->type == CU_BEZIER) {
       for (int i = 0; i < nu->pntsu; i++) {
         BezTriple *bezt = nu->bezt + i;
         if (BEZT_ISSEL_IDX(bezt, 1) || (move_entire && BEZT_ISSEL_ANY(bezt))) {
-          int pos[2], dst[2];
-          worldspace_to_screenspace_int(bezt->vec[1], vc, pos);
-          add_v2_v2v2_int(dst, pos, change);
+          float pos[2], dst[2];
+          worldspace_to_screenspace(bezt->vec[1], vc, pos);
+          add_v2_v2v2(dst, pos, change);
           move_bezt_handle_or_vertex_to_location(bezt, dst, 1, vc);
         }
         else {
           remove_handle_movement_constraints(
               bezt, BEZT_ISSEL_IDX(bezt, 0), BEZT_ISSEL_IDX(bezt, 2));
           if (BEZT_ISSEL_IDX(bezt, 0)) {
-            int pos[2], dst[2];
-            worldspace_to_screenspace_int(bezt->vec[0], vc, pos);
-            add_v2_v2v2_int(dst, pos, change);
+            float pos[2], dst[2];
+            worldspace_to_screenspace(bezt->vec[0], vc, pos);
+            add_v2_v2v2(dst, pos, change);
             move_bezt_handle_or_vertex_to_location(bezt, dst, 0, vc);
             if (link_handles) {
               float handle[3];
@@ -350,9 +374,9 @@ static void move_all_selected_points(ListBase *editnurb,
             }
           }
           else if (BEZT_ISSEL_IDX(bezt, 2)) {
-            int pos[2], dst[2];
-            worldspace_to_screenspace_int(bezt->vec[2], vc, pos);
-            add_v2_v2v2_int(dst, pos, change);
+            float pos[2], dst[2];
+            worldspace_to_screenspace(bezt->vec[2], vc, pos);
+            add_v2_v2v2(dst, pos, change);
             move_bezt_handle_or_vertex_to_location(bezt, dst, 2, vc);
             if (link_handles) {
               float handle[3];
@@ -368,9 +392,9 @@ static void move_all_selected_points(ListBase *editnurb,
       for (int i = 0; i < nu->pntsu; i++) {
         BPoint *bp = nu->bp + i;
         if (bp->f1 & SELECT) {
-          int pos[2], dst[2];
-          worldspace_to_screenspace_int(bp->vec, vc, pos);
-          add_v2_v2v2_int(dst, pos, change);
+          float pos[2], dst[2];
+          worldspace_to_screenspace(bp->vec, vc, pos);
+          add_v2_v2v2(dst, pos, change);
           move_bp_to_location(bp, dst, vc);
         }
       }
@@ -1247,7 +1271,7 @@ static void move_adjacent_handle(ViewContext *vc, const wmEvent *event, ListBase
 
   /* Add the displacement of the mouse to the handle position. */
   add_v2_v2v2_int(screen_co_int, screen_co_int, displacement);
-  move_bezt_handle_or_vertex_to_location(adj_bezt, screen_co_int, cp_index, vc);
+  move_bezt_handle_or_vertex_to_location_int(adj_bezt, screen_co_int, cp_index, vc);
   BKE_nurb_handles_calc(nu);
   FOREACH_SELECTED_BEZT_END
 }
@@ -1408,6 +1432,8 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
     cpd->dragging = true;
   }
   cpd->free_toggle_pressed = is_extra_key_pressed(event, free_toggle);
+  const bool move_entire_pressed = is_extra_key_pressed(event, move_entire);
+  const bool link_handles_pressed = is_extra_key_pressed(event, link_handles);
 
   if (ELEM(event->type, MOUSEMOVE, INBETWEEN_MOUSEMOVE)) {
     if (!cpd->dragging && WM_event_drag_test(event, event->prev_click_xy) &&
@@ -1428,25 +1454,28 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
       /* If dragging a new control point, move handle point with mouse cursor. Else move entire
        * control point. */
       else if (cpd->new_point) {
-        move_bezt_handles_to_mouse(event, &vc, &cu->editnurb->nurbs);
-        /* get_selected_points(vc.obedit->data, vc.v3d, &nu, &bezt, &bp);
-        if (bezt) {
-          /* Move opposite handle if last vertex.
-          const bool invert = (nu->bezt + nu->pntsu - 1 == bezt &&
-                               !(nu->flagu & CU_NURB_CYCLIC)) ||
-                              (nu->bezt == bezt && (nu->flagu & CU_NURB_CYCLIC));
-          move_bezt_handles_to_mouse(bezt, invert, event, &vc);
-          cpd->acted = true;
-        }*/
+        if (is_extra_key_pressed(event, move_entire)) {
+          move_all_selected_points(
+              &cu->editnurb->nurbs, move_entire_pressed, link_handles_pressed, event, &vc);
+        }
+        else {
+          move_new_bezt_handles_to_mouse(event, &vc, &cu->editnurb->nurbs);
+        }
+        cpd->acted = true;
       }
       else if ((select_point || move_point) && !cpd->spline_nearby) {
         if (cpd->found_point) {
           if (move_point) {
-            move_all_selected_points(&cu->editnurb->nurbs,
-                                     is_extra_key_pressed(event, move_entire),
-                                     is_extra_key_pressed(event, link_handles),
-                                     event,
-                                     &vc);
+            short bezt_idx;
+            float mval[2] = {(float)event->mval[0], (float)event->mval[1]};
+            get_closest_vertex_to_point_in_nurbs(
+                &cu->editnurb->nurbs, &nu, &bezt, &bp, &bezt_idx, mval, sel_dist_mul, &vc);
+            if (bezt && !BEZT_ISSEL_IDX(bezt, bezt_idx)) {
+              ED_curve_editnurb_select_pick_thresholded(
+                  C, event->mval, sel_dist_mul, false, false, false);
+            }
+            move_all_selected_points(
+                &cu->editnurb->nurbs, move_entire_pressed, link_handles_pressed, event, &vc);
             cpd->acted = true;
           }
         }
