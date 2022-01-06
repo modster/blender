@@ -341,13 +341,13 @@ static void print_resource_alias(std::ostream &os, const ShaderCreateInfo::Resou
       array_offset = res.uniformbuf.name.find_first_of("[");
       name_no_array = (array_offset == -1) ? res.uniformbuf.name :
                                              StringRef(res.uniformbuf.name.c_str(), array_offset);
-      os << "#define " << name_no_array << " _" << name_no_array << " \n";
+      os << "#define " << name_no_array << " (_" << name_no_array << ")\n";
       break;
     case ShaderCreateInfo::Resource::BindType::STORAGE_BUFFER:
       array_offset = res.storagebuf.name.find_first_of("[");
       name_no_array = (array_offset == -1) ? res.storagebuf.name :
                                              StringRef(res.storagebuf.name.c_str(), array_offset);
-      os << "#define " << name_no_array << " _" << name_no_array << " \n";
+      os << "#define " << name_no_array << " (_" << name_no_array << ")\n";
       break;
     default:
       break;
@@ -378,6 +378,10 @@ std::string GLShader::resources_declare(const ShaderCreateInfo &info) const
 {
   std::stringstream ss;
 
+  /* NOTE: We define macros in GLSL to trigger compilation error if the resource names
+   * are reused for local variables. This is to match other backend behavior which needs accessors
+   * macros. */
+
   ss << "\n/* Pass Resources. */\n";
   for (const ShaderCreateInfo::Resource &res : info.pass_resources_) {
     print_resource(ss, res);
@@ -395,7 +399,14 @@ std::string GLShader::resources_declare(const ShaderCreateInfo &info) const
   ss << "\n/* Push Constants. */\n";
   for (const ShaderCreateInfo::PushConst &uniform : info.push_constants_) {
     ss << "layout(location = " << uniform.index << ") ";
-    ss << "uniform " << to_string(uniform.type) << " " << uniform.name << ";\n";
+    ss << "uniform " << to_string(uniform.type) << " " << uniform.name;
+    if (uniform.array_size > 0) {
+      ss << "[" << uniform.array_size << "]";
+    }
+    ss << ";\n";
+  }
+  for (const ShaderCreateInfo::PushConst &uniform : info.push_constants_) {
+    ss << "#define " << uniform.name << " (" << uniform.name << ")\n";
   }
   ss << "\n";
   return ss.str();
