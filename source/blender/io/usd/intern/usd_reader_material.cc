@@ -138,10 +138,6 @@ static bool is_udim_path(const std::string &path)
  * Returns std::nullopt if no tiles were found. */
 static std::optional<blender::Vector<int>> get_udim_tiles(const std::string &file_path)
 {
-  /* Check if we have a UDIM path. */
-  std::size_t udim_token_offset = file_path.find("<UDIM>");
-  BLI_assert(udim_token_offset != std::string::npos);
-
   char base_udim_path[FILE_MAX];
   BLI_strncpy(base_udim_path, file_path.c_str(), sizeof(base_udim_path));
 
@@ -718,7 +714,9 @@ void USDMaterialReader::load_tex_image(const pxr::UsdShadeShader &usd_shader,
   }
 
   if (udim_tiles) {
-    add_udim_tiles(image, udim_tiles.value());
+    /* Not calling udim_tiles.value(), which is not
+     * supported in macOS versions prior to 10.14.1. */
+    add_udim_tiles(image, *udim_tiles);
   }
 
   tex_image->id = &image->id;
