@@ -298,7 +298,7 @@ static void move_selected_bezt_to_location(BezTriple *bezt,
     move_bezt_handle_or_vertex_to_location(bezt, mval, 1, vc);
   }
   else {
-    remove_handle_movement_constraints(bezt, bezt->f1, bezt->f3);
+    remove_handle_movement_constraints(bezt, BEZT_ISSEL_IDX(bezt, 0), BEZT_ISSEL_IDX(bezt, 2));
     if (BEZT_ISSEL_IDX(bezt, 0)) {
       move_bezt_handle_or_vertex_to_location(bezt, mval, 0, vc);
     }
@@ -336,7 +336,8 @@ static void move_all_selected_points(ListBase *editnurb,
           move_bezt_handle_or_vertex_to_location(bezt, dst, 1, vc);
         }
         else {
-          remove_handle_movement_constraints(bezt, bezt->f1, bezt->f3);
+          remove_handle_movement_constraints(
+              bezt, BEZT_ISSEL_IDX(bezt, 0), BEZT_ISSEL_IDX(bezt, 2));
           if (BEZT_ISSEL_IDX(bezt, 0)) {
             int pos[2], dst[2];
             worldspace_to_screenspace_int(bezt->vec[0], vc, pos);
@@ -361,21 +362,18 @@ static void move_all_selected_points(ListBase *editnurb,
           }
         }
       }
+      BKE_nurb_handles_calc(nu);
     }
     else {
       for (int i = 0; i < nu->pntsu; i++) {
         BPoint *bp = nu->bp + i;
-        if (bp->f1) {
+        if (bp->f1 & SELECT) {
           int pos[2], dst[2];
           worldspace_to_screenspace_int(bp->vec, vc, pos);
           add_v2_v2v2_int(dst, pos, change);
           move_bp_to_location(bp, dst, vc);
         }
       }
-    }
-
-    if (nu && nu->type == CU_BEZIER) {
-      BKE_nurb_handles_calc(nu);
     }
   }
 }
@@ -387,12 +385,14 @@ static void select_all_next_handles(ListBase *editnurb)
                       (nu->bezt == bezt && (nu->flagu & CU_NURB_CYCLIC));
 
   if (invert) {
-    bezt->f3 = SELECT;
-    bezt->f1 = bezt->f2 = ~SELECT;
+    BEZT_DESEL_IDX(bezt, 0);
+    BEZT_DESEL_IDX(bezt, 1);
+    BEZT_SEL_IDX(bezt, 2);
   }
   else {
-    bezt->f1 = SELECT;
-    bezt->f2 = bezt->f3 = ~SELECT;
+    BEZT_SEL_IDX(bezt, 0);
+    BEZT_DESEL_IDX(bezt, 1);
+    BEZT_DESEL_IDX(bezt, 2);
   }
   FOREACH_SELECTED_BEZT_END
 }
@@ -973,7 +973,7 @@ static void extrude_point_from_selected_vertex(const ViewContext *vc,
             BEZT_DESEL_ALL(nu1->bezt + i);
           }
           else {
-            (nu1->bp + i)->f1 = ~SELECT;
+            (nu1->bp + i)->f1 &= ~SELECT;
           }
         }
       }
@@ -1317,11 +1317,11 @@ static void toggle_select_bezt(BezTriple *bezt, const short bezt_idx)
 
 static void toggle_select_bp(BPoint *bp)
 {
-  if (bp->f1 == SELECT) {
-    bp->f1 = ~SELECT;
+  if (bp->f1 & SELECT) {
+    bp->f1 &= ~SELECT;
   }
   else {
-    bp->f1 = SELECT;
+    bp->f1 |= SELECT;
   }
 }
 
