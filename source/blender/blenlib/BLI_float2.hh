@@ -16,7 +16,9 @@
 
 #pragma once
 
-#include "BLI_float3.hh"
+#include <iostream>
+
+#include "BLI_math_vector.h"
 
 namespace blender {
 
@@ -26,6 +28,10 @@ struct float2 {
   float2() = default;
 
   float2(const float *ptr) : x{ptr[0]}, y{ptr[1]}
+  {
+  }
+
+  float2(const float (*ptr)[2]) : float2(static_cast<const float *>(ptr[0]))
   {
   }
 
@@ -41,8 +47,11 @@ struct float2 {
   {
   }
 
-  float2(const float3 &other) : x(other.x), y(other.y)
+  /** Conversions. */
+
+  operator const float *() const
   {
+    return &x;
   }
 
   operator float *()
@@ -50,9 +59,183 @@ struct float2 {
     return &x;
   }
 
-  operator const float *() const
+  /** Array access. */
+
+  const float &operator[](int64_t index) const
   {
-    return &x;
+    BLI_assert(index < 2);
+    return (&x)[index];
+  }
+
+  float &operator[](int64_t index)
+  {
+    BLI_assert(index < 2);
+    return (&x)[index];
+  }
+
+  /** Arithmetic. */
+
+  friend float2 operator+(const float2 &a, const float2 &b)
+  {
+    return {a.x + b.x, a.y + b.y};
+  }
+
+  friend float2 operator+(const float2 &a, const float &b)
+  {
+    return {a.x + b, a.y + b};
+  }
+
+  friend float2 operator+(const float &a, const float2 &b)
+  {
+    return b + a;
+  }
+
+  float2 &operator+=(const float2 &b)
+  {
+    x += b.x;
+    y += b.y;
+    return *this;
+  }
+
+  float2 &operator+=(const float &b)
+  {
+    x += b;
+    y += b;
+    return *this;
+  }
+
+  friend float2 operator-(const float2 &a)
+  {
+    return {-a.x, -a.y};
+  }
+
+  friend float2 operator-(const float2 &a, const float2 &b)
+  {
+    return {a.x - b.x, a.y - b.y};
+  }
+
+  friend float2 operator-(const float2 &a, const float &b)
+  {
+    return {a.x - b, a.y - b};
+  }
+
+  friend float2 operator-(const float &a, const float2 &b)
+  {
+    return {a - b.x, a - b.y};
+  }
+
+  float2 &operator-=(const float2 &b)
+  {
+    x -= b.x;
+    y -= b.y;
+    return *this;
+  }
+
+  float2 &operator-=(const float &b)
+  {
+    x -= b;
+    y -= b;
+    return *this;
+  }
+
+  friend float2 operator*(const float2 &a, const float2 &b)
+  {
+    return {a.x * b.x, a.y * b.y};
+  }
+
+  friend float2 operator*(const float2 &a, float b)
+  {
+    return {a.x * b, a.y * b};
+  }
+
+  friend float2 operator*(float a, const float2 &b)
+  {
+    return b * a;
+  }
+
+  float2 &operator*=(float b)
+  {
+    x *= b;
+    y *= b;
+    return *this;
+  }
+
+  float2 &operator*=(const float2 &b)
+  {
+    x *= b.x;
+    y *= b.y;
+    return *this;
+  }
+
+  friend float2 operator/(const float2 &a, const float2 &b)
+  {
+    BLI_assert(b.x != 0.0f && b.y != 0.0f);
+    return {a.x / b.x, a.y / b.y};
+  }
+
+  friend float2 operator/(const float2 &a, float b)
+  {
+    BLI_assert(b != 0.0f);
+    return {a.x / b, a.y / b};
+  }
+
+  friend float2 operator/(float a, const float2 &b)
+  {
+    BLI_assert(b.x != 0.0f && b.y != 0.0f);
+    return {a / b.x, a / b.y};
+  }
+
+  float2 &operator/=(float b)
+  {
+    BLI_assert(b != 0.0f);
+    x /= b;
+    y /= b;
+    return *this;
+  }
+
+  float2 &operator/=(const float2 &b)
+  {
+    BLI_assert(b.x != 0.0f && b.y != 0.0f);
+    x /= b.x;
+    y /= b.y;
+    return *this;
+  }
+
+  /** Compare. */
+
+  friend bool operator==(const float2 &a, const float2 &b)
+  {
+    return a.x == b.x && a.y == b.y;
+  }
+
+  friend bool operator!=(const float2 &a, const float2 &b)
+  {
+    return !(a == b);
+  }
+
+  /** Print. */
+
+  friend std::ostream &operator<<(std::ostream &stream, const float2 &v)
+  {
+    stream << "(" << v.x << ", " << v.y << ")";
+    return stream;
+  }
+
+  uint64_t hash() const
+  {
+    uint64_t x1 = *reinterpret_cast<const uint32_t *>(&x);
+    uint64_t x2 = *reinterpret_cast<const uint32_t *>(&y);
+    return (x1 * 812519) ^ (x2 * 707951);
+  }
+
+  static float2 safe_divide(const float2 &a, const float b)
+  {
+    return (b != 0.0f) ? a / b : float2(0.0f);
+  }
+
+  static float2 floor(const float2 &a)
+  {
+    return float2(floorf(a.x), floorf(a.y));
   }
 
   float length() const
@@ -68,88 +251,6 @@ struct float2 {
   bool is_zero() const
   {
     return this->x == 0.0f && this->y == 0.0f;
-  }
-
-  float2 &operator+=(const float2 &other)
-  {
-    x += other.x;
-    y += other.y;
-    return *this;
-  }
-
-  float2 &operator-=(const float2 &other)
-  {
-    x -= other.x;
-    y -= other.y;
-    return *this;
-  }
-
-  float2 &operator*=(float factor)
-  {
-    x *= factor;
-    y *= factor;
-    return *this;
-  }
-
-  float2 &operator/=(float divisor)
-  {
-    x /= divisor;
-    y /= divisor;
-    return *this;
-  }
-
-  uint64_t hash() const
-  {
-    uint64_t x1 = *reinterpret_cast<const uint32_t *>(&x);
-    uint64_t x2 = *reinterpret_cast<const uint32_t *>(&y);
-    return (x1 * 812519) ^ (x2 * 707951);
-  }
-
-  friend float2 operator+(const float2 &a, const float2 &b)
-  {
-    return {a.x + b.x, a.y + b.y};
-  }
-
-  friend float2 operator-(const float2 &a, const float2 &b)
-  {
-    return {a.x - b.x, a.y - b.y};
-  }
-
-  friend float2 operator-(const float2 &a, const float &b)
-  {
-    return {a.x - b, a.y - b};
-  }
-
-  friend float2 operator*(const float2 &a, float b)
-  {
-    return {a.x * b, a.y * b};
-  }
-
-  friend float2 operator/(const float2 &a, float b)
-  {
-    BLI_assert(b != 0.0f);
-    return {a.x / b, a.y / b};
-  }
-
-  friend float2 operator*(float a, const float2 &b)
-  {
-    return b * a;
-  }
-
-  friend std::ostream &operator<<(std::ostream &stream, const float2 &v)
-  {
-    stream << "(" << v.x << ", " << v.y << ")";
-    return stream;
-  }
-
-  static float2 safe_divide(const float2 &a, const float b)
-  {
-    return (b != 0.0f) ? a / b : float2(0.0f);
-  }
-
-  static float2 floor(const float2 &a)
-  {
-    return float2(floorf(a.x), floorf(a.y));
   }
 
   /**
@@ -203,16 +304,6 @@ struct float2 {
                                     const float2 &v2,
                                     const float2 &v3,
                                     const float2 &v4);
-
-  friend bool operator==(const float2 &a, const float2 &b)
-  {
-    return a.x == b.x && a.y == b.y;
-  }
-
-  friend bool operator!=(const float2 &a, const float2 &b)
-  {
-    return !(a == b);
-  }
 };
 
 }  // namespace blender
