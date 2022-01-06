@@ -306,8 +306,12 @@ struct ShaderCreateInfo {
   Vector<StageInterfaceInfo *> vertex_out_interfaces_;
   Vector<StageInterfaceInfo *> geometry_out_interfaces_;
 
-  /* Push constants needs are the same as vertex input. */
-  using PushConst = VertIn;
+  struct PushConst {
+    int index;
+    Type type;
+    StringRefNull name;
+    int array_size;
+  };
 
   Vector<PushConst> push_constants_;
 
@@ -479,9 +483,12 @@ struct ShaderCreateInfo {
    * The maximum slot is 31.
    * \{ */
 
-  Self &push_constant(int slot, Type type, StringRefNull name)
+  Self &push_constant(int slot, Type type, StringRefNull name, int array_size = 0)
   {
-    push_constants_.append({slot, type, name});
+    BLI_assert_msg(name.find("[") == -1,
+                   "Array syntax is forbidden for push constants."
+                   "Use the array_size parameter instead.");
+    push_constants_.append({slot, type, name, array_size});
     interface_names_size_ += name.size() + 1;
     return *(Self *)this;
   }
