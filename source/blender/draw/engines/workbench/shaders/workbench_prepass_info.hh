@@ -33,15 +33,15 @@ GPU_SHADER_CREATE_INFO(workbench_texture_none).define("TEXTURE_NONE");
 
 GPU_SHADER_CREATE_INFO(workbench_texture_single)
     .sampler(2, ImageType::FLOAT_2D, "imageTexture", Frequency::BATCH)
-    .push_constant(0, Type::FLOAT, "imageTransparencyCutoff")
     .push_constant(1, Type::BOOL, "imagePremult")
+    .push_constant(2, Type::FLOAT, "imageTransparencyCutoff")
     .define("V3D_SHADING_TEXTURE_COLOR");
 
 GPU_SHADER_CREATE_INFO(workbench_texture_tile)
     .sampler(2, ImageType::FLOAT_2D_ARRAY, "imageTileArray", Frequency::BATCH)
     .sampler(3, ImageType::FLOAT_1D_ARRAY, "imageTileData", Frequency::BATCH)
-    .push_constant(0, Type::FLOAT, "imageTransparencyCutoff")
     .push_constant(1, Type::BOOL, "imagePremult")
+    .push_constant(2, Type::FLOAT, "imageTransparencyCutoff")
     .define("TEXTURE_IMAGE_ARRAY");
 
 /** \} */
