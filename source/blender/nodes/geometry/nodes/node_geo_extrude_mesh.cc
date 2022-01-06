@@ -15,6 +15,7 @@
  */
 
 #include "BLI_task.hh"
+#include "BLI_vector_set.hh"
 
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
@@ -627,25 +628,46 @@ static void extrude_mesh_faces(MeshComponent &component,
   const IndexMask poly_selection = poly_evaluator.get_evaluated_selection_as_mask();
   const VArray<float3> &poly_offsets = poly_evaluator.get_evaluated<float3>(0);
 
+  Array<float3> vert_offsets;
+  if (!poly_offsets.is_single()) {
+    vert_offsets.reinitialize(orig_vert_size);
+    attribute_math::DefaultMixer<float3> mixer(vert_offsets);
+    for (const int i_poly : poly_selection) {
+      const MPoly &poly = orig_polys[i_poly];
+      const float3 offset = poly_offsets[i_poly];
+      for (const MLoop &loop : orig_loops.slice(poly.loopstart, poly.totloop)) {
+        mixer.mix_in(loop.v, offset);
+      }
+    }
+    mixer.finalize();
+  }
+
+  /* All vertices that are connected to the selected polygons. */
+  VectorSet<int> all_selected_verts;
   /* Keep track of the selected face that each edge corresponds to. Only edges with one selected
    * face will have a single associated face. However, we need to keep track of a value for every
    * face in the mesh at this point, because we don't know how many edges will be selected for
-   * extrusion in the end. */
+   * extrusion in the end. Alternatively, #mesh_calculate_polys_of_edge could be used, possibly
+   * simplifying the rest of this algorithm slightly, but at a higher up-front cost. */
   Array<int> edge_face_indices(orig_edges.size(), -1);
+  /* The number of connected faces for every edge, just to tell which should be extruded. */
   Array<int> edge_neighbor_count(orig_edges.size(), 0);
   for (const int i_poly : poly_selection) {
     const MPoly &poly = orig_polys[i_poly];
     for (const MLoop &loop : orig_loops.slice(poly.loopstart, poly.totloop)) {
       edge_neighbor_count[loop.e]++;
       edge_face_indices[loop.e] = i_poly;
+      all_selected_verts.add(loop.v);
     }
   }
 
+  /* These edges are on top of an extruded region. Their vertices should be moved, but the edges
+   * themselves should not be duplicated. */
   Vector<int> in_between_edges;
   /* The extruded face corresponding to each extruded edge (and each extruded face). */
   Vector<int> edge_orig_face_indices;
   Vector<int64_t> selected_edges_orig_indices;
-  for (const int i_edge : IndexRange(orig_edges.size())) {
+  for (const int i_edge : orig_edges.index_range()) {
     if (edge_neighbor_count[i_edge] == 1) {
       selected_edges_orig_indices.append(i_edge);
       edge_orig_face_indices.append(edge_face_indices[i_edge]);
@@ -715,8 +737,7 @@ static void extrude_mesh_faces(MeshComponent &component,
     poly.flag = 0;
   }
 
-  /* Connect original edges that are in between two selected faces to the new vertices.
-   * The edge's vertices may have been extruded even though the edge itself was not. */
+  /* Connect original edges that are in between two selected faces to the new vertices. */
   for (const int i : in_between_edges) {
     MEdge &edge = edges[i];
     if (new_vert_indices[edge.v1] != -1) {
@@ -867,40 +888,31 @@ static void extrude_mesh_faces(MeshComponent &component,
 
   if (poly_offsets.is_single()) {
     const float3 offset = poly_offsets.get_internal_single();
-    threading::parallel_for(IndexRange(orig_vert_size), 1024, [&](const IndexRange range) {
-      for (const int i_orig : range) {
-        const int i_new = new_vert_indices[i_orig];
-        /* If the vertex is used by a selected edge, it will have been duplicated and only the new
-         * vertex should use the offset. Otherwise the vertex might still need an offset, but it
-         * was reused on the inside of a group of extruded faces. */
-        MVert &vert = bke::mesh_verts(mesh)[(i_new != -1) ? i_new : i_orig];
-        add_v3_v3(vert.co, offset);
-      }
-    });
+    threading::parallel_for(
+        IndexRange(all_selected_verts.size()), 1024, [&](const IndexRange range) {
+          for (const int i_orig : all_selected_verts.as_span().slice(range)) {
+            const int i_new = new_vert_indices[i_orig];
+            /* If the vertex is used by a selected edge, it will have been duplicated and only the
+             * new vertex should use the offset. Otherwise the vertex might still need an offset,
+             * but it was reused on the inside of a group of extruded faces. */
+            MVert &vert = bke::mesh_verts(mesh)[(i_new == -1) ? i_orig : i_new];
+            add_v3_v3(vert.co, offset);
+          }
+        });
   }
   else {
-    Array<float3> vert_offsets(orig_vert_size);
-    attribute_math::DefaultMixer<float3> mixer(vert_offsets);
-    for (const int i_poly : poly_selection) {
-      const MPoly &poly = orig_polys[i_poly];
-      const float3 offset = poly_offsets[i_poly];
-      for (const MLoop &loop : orig_loops.slice(poly.loopstart, poly.totloop)) {
-        mixer.mix_in(loop.v, offset);
-      }
-    }
-    mixer.finalize();
-
-    threading::parallel_for(IndexRange(orig_vert_size), 1024, [&](const IndexRange range) {
-      for (const int i_orig : range) {
-        const int i_new = new_vert_indices[i_orig];
-        const float3 offset = vert_offsets[i_orig];
-        /* If the vertex is used by a selected edge, it will have been duplicated and only the new
-         * vertex should use the offset. Otherwise the vertex might still need an offset, but it
-         * was reused on the inside of a group of extruded faces. */
-        MVert &vert = bke::mesh_verts(mesh)[(i_new != -1) ? i_new : i_orig];
-        add_v3_v3(vert.co, offset);
-      }
-    });
+    threading::parallel_for(
+        IndexRange(all_selected_verts.size()), 1024, [&](const IndexRange range) {
+          for (const int i_orig : all_selected_verts.as_span().slice(range)) {
+            const int i_new = new_vert_indices[i_orig];
+            const float3 offset = vert_offsets[i_orig];
+            /* If the vertex is used by a selected edge, it will have been duplicated and only the
+             * new vertex should use the offset. Otherwise the vertex might still need an offset,
+             * but it was reused on the inside of a group of extruded faces. */
+            MVert &vert = bke::mesh_verts(mesh)[(i_new == -1) ? i_orig : i_new];
+            add_v3_v3(vert.co, offset);
+          }
+        });
   }
 
   BKE_mesh_runtime_clear_cache(&mesh);
