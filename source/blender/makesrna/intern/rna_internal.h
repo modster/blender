@@ -690,3 +690,9 @@ void rna_RenderPass_rect_set(PointerRNA *ptr, const float *values);
              : -FLT_MAX, double \
              : -DBL_MAX)
 #endif
+
+void rna_AttributeGroup_color_iterator_begin(CollectionPropertyIterator *iter, PointerRNA *ptr);
+void rna_AttributeGroup_color_iterator_next(CollectionPropertyIterator *iter);
+PointerRNA rna_AttributeGroup_color_iterator_get(CollectionPropertyIterator *iter);
+int rna_AttributeGroup_color_length(PointerRNA *ptr);
+

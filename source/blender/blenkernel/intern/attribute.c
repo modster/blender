@@ -495,6 +495,10 @@ CustomDataLayer *BKE_id_attributes_active_color_get(ID *id)
     return NULL;
   }
 
+  if (!ref->name[0]) {
+    return NULL;
+  }
+
   DomainInfo info[ATTR_DOMAIN_NUM];
   get_domains(id, info);
 
@@ -558,6 +562,10 @@ CustomDataLayer *BKE_id_attributes_render_color_get(ID *id)
 
   if (!ref) {
     fprintf(stderr, "%s: vertex colors not supported for this type\n", __func__);
+    return NULL;
+  }
+
+  if (!ref->name[0]) {
     return NULL;
   }
 

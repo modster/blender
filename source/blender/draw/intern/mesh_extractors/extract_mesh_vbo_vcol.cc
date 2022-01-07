@@ -145,8 +145,11 @@ static void init_vcol_format(GPUVertFormat *format,
 
     /* Gather number of auto layers. */
     /* We only do `vcols` that are not overridden by `uvs`. */
-    if (ref.domain == ATTR_DOMAIN_CORNER &&
-        CustomData_get_named_layer_index(cd_ldata, CD_MLOOPUV, ref.name) == -1) {
+
+    bool bad = ref.domain == ATTR_DOMAIN_CORNER;
+    bad = bad && CustomData_get_named_layer_index(cd_ldata, CD_MLOOPUV, ref.name) != -1;
+
+    if (!bad) {
       BLI_snprintf(attr_name, sizeof(attr_name), "a%s", attr_safe_name);
       GPU_vertformat_alias_add(format, attr_name);
     }
@@ -264,89 +267,38 @@ static void extract_vcol_init(const MeshRenderData *mr,
       }
     }
     else {
-      if (ref.domain == ATTR_DOMAIN_CORNER) {
-        if (ref.type == CD_MLOOPCOL) {
-          int totloop = mr->loop_len;
-          int idx = CustomData_get_named_layer_index(cdata, ref.type, ref.name);
+      int totloop = mr->loop_len;
+      int idx = CustomData_get_named_layer_index(cdata, ref.type, ref.name);
 
-          if (idx == -1) {
-            vcol_data += totloop;
-            continue;
-          }
+      MLoopCol *mcol = NULL;
+      MPropCol *pcol = NULL;
+      const MLoop *mloop = mr->mloop;
 
-          MLoopCol *mloopcol = (MLoopCol *)cdata->layers[idx].data;
-
-          for (int i = 0; i < totloop; i++, mloopcol++) {
-            vcol_data->r = unit_float_to_ushort_clamp(BLI_color_from_srgb_table[mloopcol->r]);
-            vcol_data->g = unit_float_to_ushort_clamp(BLI_color_from_srgb_table[mloopcol->g]);
-            vcol_data->b = unit_float_to_ushort_clamp(BLI_color_from_srgb_table[mloopcol->b]);
-            vcol_data->a = unit_float_to_ushort_clamp(mloopcol->a * (1.0f / 255.0f));
-            vcol_data++;
-          }
-        }
-        else {
-          int totloop = mr->loop_len;
-          int idx = CustomData_get_named_layer_index(cdata, ref.type, ref.name);
-
-          if (idx == -1) {
-            vcol_data += totloop;
-            continue;
-          }
-
-          MPropCol *pcol = (MPropCol *)cdata->layers[idx].data;
-
-          for (int i = 0; i < totloop; i++, pcol++) {
-            vcol_data->r = unit_float_to_ushort_clamp(pcol->color[0]);
-            vcol_data->g = unit_float_to_ushort_clamp(pcol->color[1]);
-            vcol_data->b = unit_float_to_ushort_clamp(pcol->color[2]);
-            vcol_data->a = unit_float_to_ushort_clamp(pcol->color[3]);
-            vcol_data++;
-          }
-        }
+      if (ref.type == CD_PROP_COLOR) {
+        pcol = static_cast<MPropCol*>(cdata->layers[idx].data);
       }
-      else if (ref.domain == ATTR_DOMAIN_POINT) {
-        if (ref.type == CD_MLOOPCOL) {
-          int totloop = mr->loop_len;
-          int idx = CustomData_get_named_layer_index(cdata, ref.type, ref.name);
+      else {
+        mcol = static_cast<MLoopCol *>(cdata->layers[idx].data);
+      }
 
-          if (idx == -1) {
-            vcol_data += totloop;
-            continue;
-          }
+      const bool is_corner = ref.domain == ATTR_DOMAIN_CORNER;
+      
+      for (int i = 0; i < totloop; i++, mloop++) {
+        const int v_i = is_corner ? i : mloop->v;
 
-          const MLoop *ml = mr->mloop;
-          MLoopCol *mloopcol = (MLoopCol *)cdata->layers[idx].data;
-
-          for (int i = 0; i < totloop; i++, ml++) {
-            vcol_data->r = unit_float_to_ushort_clamp(
-                BLI_color_from_srgb_table[mloopcol[ml->v].r]);
-            vcol_data->g = unit_float_to_ushort_clamp(
-                BLI_color_from_srgb_table[mloopcol[ml->v].g]);
-            vcol_data->b = unit_float_to_ushort_clamp(
-                BLI_color_from_srgb_table[mloopcol[ml->v].b]);
-            vcol_data->a = unit_float_to_ushort_clamp(mloopcol[ml->v].a * (1.0f / 255.0f));
-            vcol_data++;
-          }
+        if (mcol) {
+          vcol_data->r = unit_float_to_ushort_clamp(BLI_color_from_srgb_table[mcol[v_i].r]);
+          vcol_data->g = unit_float_to_ushort_clamp(BLI_color_from_srgb_table[mcol[v_i].g]);
+          vcol_data->b = unit_float_to_ushort_clamp(BLI_color_from_srgb_table[mcol[v_i].b]);
+          vcol_data->a = unit_float_to_ushort_clamp(mcol[v_i].a * (1.0f / 255.0f));
+          vcol_data++;
         }
-        else {
-          int totloop = mr->loop_len;
-          int idx = CustomData_get_named_layer_index(cdata, ref.type, ref.name);
-          const MLoop *ml = mr->mloop;
-
-          if (idx == -1) {
-            vcol_data += totloop;
-            continue;
-          }
-
-          MPropCol *pcol = (MPropCol *)cdata->layers[idx].data;
-
-          for (int i = 0; i < totloop; i++, ml++) {
-            vcol_data->r = unit_float_to_ushort_clamp(pcol[ml->v].color[0]);
-            vcol_data->g = unit_float_to_ushort_clamp(pcol[ml->v].color[1]);
-            vcol_data->b = unit_float_to_ushort_clamp(pcol[ml->v].color[2]);
-            vcol_data->a = unit_float_to_ushort_clamp(pcol[ml->v].color[3]);
-            vcol_data++;
-          }
+        else if (pcol) {
+          vcol_data->r = unit_float_to_ushort_clamp(pcol[v_i].color[0]);
+          vcol_data->g = unit_float_to_ushort_clamp(pcol[v_i].color[1]);
+          vcol_data->b = unit_float_to_ushort_clamp(pcol[v_i].color[2]);
+          vcol_data->a = unit_float_to_ushort_clamp(pcol[v_i].color[3]);
+          vcol_data++;
         }
       }
     }

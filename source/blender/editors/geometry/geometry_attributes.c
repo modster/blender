@@ -236,6 +236,10 @@ static int geometry_color_attribute_add_exec(bContext *C, wmOperator *op)
 
   BKE_id_attributes_active_color_set(id, layer);
 
+  if (!BKE_id_attributes_render_color_get(id)) {
+    BKE_id_attributes_render_color_set(id, layer);
+  }
+
   DEG_id_tag_update(id, ID_RECALC_GEOMETRY);
   WM_main_add_notifier(NC_GEOM | ND_DATA, id);
 
