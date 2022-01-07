@@ -46,8 +46,8 @@
 
 #include "float.h"
 
-#define FOREACH_SELECTED_BEZT_BEGIN(bezt, editnurb) \
-  LISTBASE_FOREACH (Nurb *, nu, editnurb) { \
+#define FOREACH_SELECTED_BEZT_BEGIN(bezt, nurbs) \
+  LISTBASE_FOREACH (Nurb *, nu, nurbs) { \
     if (nu->type == CU_BEZIER) { \
       for (int i = 0; i < nu->pntsu; i++) { \
         BezTriple *bezt = nu->bezt + i; \
@@ -168,14 +168,14 @@ static bool worldspace_to_screenspace_int(const float pos_3d[3],
   return check;
 }
 
-static void get_displacement_to_avg_selected_point(const ListBase *editnurb,
+static void get_displacement_to_avg_selected_point(const ListBase *nurbs,
                                                    float change[2],
                                                    const wmEvent *event,
                                                    const ViewContext *vc)
 {
   float total[3] = {0.0f, 0.0f, 0.0f};
   int count = 0;
-  FOREACH_SELECTED_BEZT_BEGIN(bezt, editnurb)
+  FOREACH_SELECTED_BEZT_BEGIN(bezt, nurbs)
   add_v3_v3(total, bezt->vec[1]);
   count++;
   FOREACH_SELECTED_BEZT_END
@@ -192,12 +192,12 @@ static void get_displacement_to_avg_selected_point(const ListBase *editnurb,
 /* Move the handle of the newly added #BezTriple to mouse. */
 static void move_new_bezt_handles_to_mouse(const wmEvent *event,
                                            const ViewContext *vc,
-                                           ListBase *editnurb)
+                                           ListBase *nurbs)
 {
   float change[2];
-  get_displacement_to_avg_selected_point(editnurb, change, event, vc);
+  get_displacement_to_avg_selected_point(nurbs, change, event, vc);
 
-  FOREACH_SELECTED_BEZT_BEGIN(bezt, editnurb)
+  FOREACH_SELECTED_BEZT_BEGIN(bezt, nurbs)
   if (bezt->h1 == HD_VECT && bezt->h2 == HD_VECT) {
     bezt->h1 = HD_ALIGN;
     bezt->h2 = HD_ALIGN;
@@ -339,7 +339,7 @@ static void move_bp_to_location(BPoint *bp, const float mval[2], const ViewConte
 }
 
 /* Move all selected points by an amount equivalent to the distance moved by mouse. */
-static void move_all_selected_points(ListBase *editnurb,
+static void move_all_selected_points(ListBase *nurbs,
                                      const bool move_entire,
                                      const bool link_handles,
                                      const wmEvent *event,
@@ -349,7 +349,7 @@ static void move_all_selected_points(ListBase *editnurb,
   sub_v2_v2v2_int(change_int, event->xy, event->prev_xy);
   float change[2] = {(float)change_int[0], (float)change_int[1]};
 
-  LISTBASE_FOREACH (Nurb *, nu, editnurb) {
+  LISTBASE_FOREACH (Nurb *, nu, nurbs) {
     if (nu->type == CU_BEZIER) {
       for (int i = 0; i < nu->pntsu; i++) {
         BezTriple *bezt = nu->bezt + i;
@@ -402,9 +402,9 @@ static void move_all_selected_points(ListBase *editnurb,
   }
 }
 
-static void select_all_next_handles(ListBase *editnurb)
+static void select_all_next_handles(ListBase *nurbs)
 {
-  FOREACH_SELECTED_BEZT_BEGIN(bezt, editnurb)
+  FOREACH_SELECTED_BEZT_BEGIN(bezt, nurbs)
   const bool invert = (nu->bezt + nu->pntsu - 1 == bezt && !(nu->flagu & CU_NURB_CYCLIC)) ||
                       (nu->bezt == bezt && (nu->flagu & CU_NURB_CYCLIC));
 
@@ -920,7 +920,7 @@ static void get_selected_points(
 {
   /* In nu and (bezt or bp) selected are written if there's 1 sel. */
   /* If more points selected in 1 spline: return only nu, bezt and bp are 0. */
-  ListBase *editnurb = &cu->editnurb->nurbs;
+  ListBase *nurbs = &cu->editnurb->nurbs;
   BezTriple *bezt1;
   BPoint *bp1;
   int a;
@@ -929,7 +929,7 @@ static void get_selected_points(
   *r_bezt = NULL;
   *r_bp = NULL;
 
-  LISTBASE_FOREACH (Nurb *, nu1, editnurb) {
+  LISTBASE_FOREACH (Nurb *, nu1, nurbs) {
     if (nu1->type == CU_BEZIER) {
       bezt1 = nu1->bezt;
       a = nu1->pntsu;
@@ -1178,9 +1178,9 @@ static void move_segment(MoveSegmentData *seg_data, const wmEvent *event, ViewCo
 }
 
 /* Toggle between `free` and `align` handles of the given `BezTriple` */
-static void toggle_bezt_free_align_handles(ListBase *editnurb)
+static void toggle_bezt_free_align_handles(ListBase *nurbs)
 {
-  FOREACH_SELECTED_BEZT_BEGIN(bezt, editnurb)
+  FOREACH_SELECTED_BEZT_BEGIN(bezt, nurbs)
   if (bezt->h1 != HD_FREE || bezt->h2 != HD_FREE) {
     bezt->h1 = bezt->h2 = HD_FREE;
   }
@@ -1242,9 +1242,9 @@ static bool delete_point_under_mouse(ViewContext *vc,
   return deleted;
 }
 
-static void move_adjacent_handle(ViewContext *vc, const wmEvent *event, ListBase *editnurb)
+static void move_adjacent_handle(ViewContext *vc, const wmEvent *event, ListBase *nurbs)
 {
-  FOREACH_SELECTED_BEZT_BEGIN(bezt, editnurb)
+  FOREACH_SELECTED_BEZT_BEGIN(bezt, nurbs)
   /* Get the adjacent `BezTriple` */
   BezTriple *adj_bezt = BKE_nurb_bezt_get_prev(nu, bezt);
   int cp_index = 2;
@@ -1311,8 +1311,8 @@ static bool make_cyclic_if_endpoints(Nurb *sel_nu,
          (nu->type != CU_BEZIER && bp != sel_bp &&
           (bp == nu->bp || bp == nu->bp + nu->pntsu - 1)))) {
       View3D *v3d = CTX_wm_view3d(C);
-      ListBase *editnurb = object_editcurve_get(vc->obedit);
-      ed_curve_toggle_cyclic(v3d, editnurb, 0);
+      ListBase *nurbs = object_editcurve_get(vc->obedit);
+      ed_curve_toggle_cyclic(v3d, nurbs, 0);
       return true;
     }
   }
@@ -1393,6 +1393,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
 
   ED_view3d_viewcontext_init(C, &vc, depsgraph);
   Curve *cu = vc.obedit->data;
+  ListBase *nurbs = &cu->editnurb->nurbs;
 
   BezTriple *bezt = NULL;
   BPoint *bp = NULL;
@@ -1428,7 +1429,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   const int link_handles = RNA_enum_get(op->ptr, "link_handles");
 
   if (!cpd->free_toggle_pressed && is_event_key_equal_to_extra_key(event->type, free_toggle)) {
-    toggle_bezt_free_align_handles(&cu->editnurb->nurbs);
+    toggle_bezt_free_align_handles(nurbs);
     cpd->dragging = true;
   }
   cpd->free_toggle_pressed = is_extra_key_pressed(event, free_toggle);
@@ -1448,28 +1449,24 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
         cpd->acted = true;
       }
       else if (is_extra_key_pressed(event, adj_handle)) {
-        move_adjacent_handle(&vc, event, &cu->editnurb->nurbs);
+        move_adjacent_handle(&vc, event, nurbs);
         cpd->acted = true;
       }
       /* If dragging a new control point, move handle point with mouse cursor. Else move entire
        * control point. */
       else if (cpd->new_point) {
         if (is_extra_key_pressed(event, move_entire)) {
-          move_all_selected_points(
-              &cu->editnurb->nurbs, move_entire_pressed, link_handles_pressed, event, &vc);
+          move_all_selected_points(nurbs, move_entire_pressed, link_handles_pressed, event, &vc);
         }
         else {
-          move_new_bezt_handles_to_mouse(event, &vc, &cu->editnurb->nurbs);
+          move_new_bezt_handles_to_mouse(event, &vc, nurbs);
         }
         cpd->acted = true;
       }
       else if ((select_point || move_point) && !cpd->spline_nearby) {
         if (cpd->found_point) {
           if (move_point) {
-            short bezt_idx;
-            float mval[2] = {(float)event->mval[0], (float)event->mval[1]};
-            move_all_selected_points(
-                &cu->editnurb->nurbs, move_entire_pressed, link_handles_pressed, event, &vc);
+            move_all_selected_points(nurbs, move_entire_pressed, link_handles_pressed, event, &vc);
             cpd->acted = true;
           }
         }
@@ -1491,7 +1488,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
       BPoint *bp1;
       short bezt_idx = 0;
       cpd->found_point = get_closest_vertex_to_point_in_nurbs(
-          &(cu->editnurb->nurbs), &nu1, &bezt1, &bp1, &bezt_idx, mval_fl, sel_dist_mul, &vc);
+          nurbs, &nu1, &bezt1, &bp1, &bezt_idx, mval_fl, sel_dist_mul, &vc);
 
       if (move_point && nu1 &&
           (bezt || (bezt1 && !BEZT_ISSEL_IDX(bezt1, bezt_idx)) || (bp1 && !(bp1->f1 & SELECT)))) {
@@ -1564,7 +1561,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
       if (!cpd->acted && toggle_vector) {
         short bezt_idx;
         get_closest_vertex_to_point_in_nurbs(
-            &(cu->editnurb->nurbs), &nu, &bezt, &bp, &bezt_idx, mval_fl, sel_dist_mul, &vc);
+            nurbs, &nu, &bezt, &bp, &bezt_idx, mval_fl, sel_dist_mul, &vc);
         if (bezt) {
           toggle_vector_auto(bezt, bezt_idx, cpd);
 
@@ -1578,7 +1575,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
         if (!cpd->acted && select_multi) {
           short bezt_idx;
           get_closest_vertex_to_point_in_nurbs(
-              &(cu->editnurb->nurbs), &nu, &bezt, &bp, &bezt_idx, mval_fl, sel_dist_mul, &vc);
+              nurbs, &nu, &bezt, &bp, &bezt_idx, mval_fl, sel_dist_mul, &vc);
           if (bezt) {
             toggle_select_bezt(bezt, bezt_idx);
           }
