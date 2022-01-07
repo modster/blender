@@ -5,7 +5,7 @@ GPU_SHADER_CREATE_INFO(gpu_shader_2D_point_varying_size_varying_color)
     .fragment_source("gpu_shader_point_varying_color_frag.glsl")
     .do_static_compilation(true);
 
-GPU_SHADER_CREATE_INFO(gpu_shader_2d_point_uniform_size_uniform_color_aa)
+GPU_SHADER_CREATE_INFO(gpu_shader_2D_point_uniform_size_uniform_color_aa)
     .vertex_source("gpu_shader_2D_point_uniform_size_aa_vert.glsl")
     .fragment_source("gpu_shader_point_uniform_color_aa_frag.glsl")
     .do_static_compilation(true);
@@ -17,7 +17,7 @@ GPU_SHADER_CREATE_INFO(gpu_shader_2d_point_uniform_size_uniform_color_aa)
             .frag = datatoc_gpu_shader_point_uniform_color_aa_frag_glsl,
 },
 */
-GPU_SHADER_CREATE_INFO(gpu_shader_2d_point_uniform_size_uniform_color_outline_aa)
+GPU_SHADER_CREATE_INFO(gpu_shader_2D_point_uniform_size_uniform_color_outline_aa)
     .vertex_source("gpu_shader_2D_point_uniform_size_outline_aa_vert.glsl")
     .fragment_source("gpu_shader_point_uniform_color_outline_aa_frag.glsl")
     .do_static_compilation(true);
@@ -29,7 +29,7 @@ GPU_SHADER_CREATE_INFO(gpu_shader_2d_point_uniform_size_uniform_color_outline_aa
             .frag = datatoc_gpu_shader_point_uniform_color_outline_aa_frag_glsl,
 },
 */
-GPU_SHADER_CREATE_INFO(gpu_shader_2d_point_uniform_size_varying_color_outline_aa)
+GPU_SHADER_CREATE_INFO(gpu_shader_2D_point_uniform_size_varying_color_outline_aa)
     .vertex_source("gpu_shader_2D_point_uniform_size_varying_color_outline_aa_vert.glsl")
     .fragment_source("gpu_shader_point_varying_color_outline_aa_frag.glsl")
     .do_static_compilation(true);
@@ -231,83 +231,6 @@ GPU_SHADER_CREATE_INFO(gpu_shader_2D_uv_verts)
             .vert = datatoc_gpu_shader_2D_edituvs_points_vert_glsl,
             .frag = datatoc_gpu_shader_point_varying_color_varying_outline_aa_frag_glsl,
 },
-*/
-GPU_SHADER_CREATE_INFO(gpu_shader_2D_uv_facedots)
-    .vertex_source("gpu_shader_2D_edituvs_facedots_vert.glsl")
-    .fragment_source("gpu_shader_point_varying_color_frag.glsl")
-    .do_static_compilation(true);
-/*
-    [GPU_SHADER_2D_UV_FACEDOTS] =
-        {
-            .name = "GPU_SHADER_2D_UV_FACEDOTS",
-            .vert = datatoc_gpu_shader_2D_edituvs_facedots_vert_glsl,
-            .frag = datatoc_gpu_shader_point_varying_color_frag_glsl,
-},
-*/
-GPU_SHADER_CREATE_INFO(gpu_shader_2D_uv_edges)
-    .vertex_source("gpu_shader_2D_edituvs_edges_vert.glsl")
-    .fragment_source("gpu_shader_2D_edituvs_edges_frag.glsl")
-    .do_static_compilation(true);
-/*
-    [GPU_SHADER_2D_UV_EDGES] =
-        {
-            .name = "GPU_SHADER_2D_UV_EDGES",
-            .vert = datatoc_gpu_shader_2D_edituvs_edges_vert_glsl,
-            .frag = datatoc_gpu_shader_2D_edituvs_edges_frag_glsl,
-},
-*/
-GPU_SHADER_CREATE_INFO(gpu_shader_2D_uv_edges_smooth)
-    .vertex_source("gpu_shader_2D_edituvs_edges_vert.glsl")
-    .fragment_source("gpu_shader_2D_edituvs_edges_frag.glsl")
-    .define("SMOOTH_COLOR")
-    .do_static_compilation(true);
-/*
-    [GPU_SHADER_2D_UV_EDGES_SMOOTH] =
-        {
-            .name = "GPU_SHADER_2D_UV_EDGES_SMOOTH",
-            .vert = datatoc_gpu_shader_2D_edituvs_edges_vert_glsl,
-            .frag = datatoc_gpu_shader_2D_edituvs_edges_frag_glsl,
-            .defs = "#define SMOOTH_COLOR\n",
-},
-*/
-GPU_SHADER_CREATE_INFO(gpu_shader_2D_uv_faces)
-    .vertex_source("gpu_shader_2D_edituvs_faces_vert.glsl")
-    .fragment_source("gpu_shader_flat_color_frag.glsl")
-    .do_static_compilation(true);
-/*
-    [GPU_SHADER_2D_UV_FACES] =
-        {
-            .name = "GPU_SHADER_2D_UV_FACES",
-            .vert = datatoc_gpu_shader_2D_edituvs_faces_vert_glsl,
-            .frag = datatoc_gpu_shader_flat_color_frag_glsl,
-},
-*/
-GPU_SHADER_CREATE_INFO(gpu_shader_2D_uv_faces_stretch_area)
-    .vertex_source("gpu_shader_2D_edituvs_stretch_vert.glsl")
-    .fragment_source("gpu_shader_2D_smooth_color_frag.glsl")
-    .do_static_compilation(true);
-/*
-    [GPU_SHADER_2D_UV_FACES_STRETCH_AREA] =
-        {
-            .name = "GPU_SHADER_2D_UV_FACES_STRETCH_AREA",
-            .vert = datatoc_gpu_shader_2D_edituvs_stretch_vert_glsl,
-            .frag = datatoc_gpu_shader_2D_smooth_color_frag_glsl,
-},
-*/
-GPU_SHADER_CREATE_INFO(gpu_shader_2D_uv_faces_stretch_angle)
-    .vertex_source("gpu_shader_2D_edituvs_stretch_vert.glsl")
-    .fragment_source("gpu_shader_2D_smooth_color_frag.glsl")
-    .define("STRETCH_ANGLE")
-    .do_static_compilation(true);
-/*
-    [GPU_SHADER_2D_UV_FACES_STRETCH_ANGLE] =
-        {
-            .name = "GPU_SHADER_2D_UV_FACES_STRETCH_ANGLE",
-            .vert = datatoc_gpu_shader_2D_edituvs_stretch_vert_glsl,
-            .frag = datatoc_gpu_shader_2D_smooth_color_frag_glsl,
-            .defs = "#define STRETCH_ANGLE\n",
-},
-
 */
 GPU_SHADER_CREATE_INFO(gpu_shader_gpencil_stroke)
     .vertex_source("gpu_shader_gpencil_stroke_vert.glsl")
