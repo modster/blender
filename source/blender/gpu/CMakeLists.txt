@@ -443,8 +443,7 @@ shaders/infos/gpu_shader_3D_depth_only_info.hh
 #shaders/infos/gpu_shader_2D_line_dashed_uniform_color_info.hh
 #shaders/infos/gpu_shader_3D_line_dashed_uniform_color_info.hh
 shaders/infos/gpu_shader_2D_point_fixed_size_uniform_color_info.hh
-
-
+#shaders/infos/gpu_shader_todo_info.hh
 )
 
 set(SHADER_CREATE_INFOS_CONTENT "")
