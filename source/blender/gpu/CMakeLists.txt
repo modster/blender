@@ -418,10 +418,20 @@ set(SHADER_CREATE_INFOS
 
 shaders/infos/gpu_clip_planes_info.hh
 shaders/infos/gpu_srgb_to_framebuffer_space_info.hh
-#shaders/infos/gpu_shader_3D_flat_color_info.hh
+#shaders/infos/gpu_shader_3D_flat_color_info.hh !Disabled due to failing compilation.
 shaders/infos/gpu_shader_3D_image_modulate_alpha_info.hh
+#shaders/infos/gpu_shader_simple_lighting_info.hh !TODO
 shaders/infos/gpu_shader_2D_checker_info.hh
-#shaders/infos/gpu_shader_simple_lighting_info.hh
+shaders/infos/gpu_shader_2D_diag_stripes_info.hh
+shaders/infos/gpu_shader_2D_uniform_color_info.hh
+shaders/infos/gpu_shader_2D_flat_color_info.hh
+shaders/infos/gpu_shader_2D_smooth_color_info.hh
+shaders/infos/gpu_shader_2D_image_overlays_merge_info.hh
+shaders/infos/gpu_shader_2D_image_overlays_stereo_merge_info.hh
+shaders/infos/gpu_shader_2D_image_info.hh
+shaders/infos/gpu_shader_2D_image_color_info.hh
+shaders/infos/gpu_shader_2D_image_desaturate_info.hh
+shaders/infos/gpu_shader_2D_image_shuffle_color_info.hh
 shaders/infos/gpu_shader_text_info.hh
 shaders/infos/gpu_shader_keyframe_shape_info.hh
 )

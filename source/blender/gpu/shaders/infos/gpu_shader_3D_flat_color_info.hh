@@ -1,7 +1,6 @@
 
+#include "gpu_interface_info.hh"
 #include "gpu_shader_create_info.hh"
-
-GPU_SHADER_INTERFACE_INFO(flat_color_iface, "").flat(Type::VEC4, "finalColor");
 
 GPU_SHADER_CREATE_INFO(gpu_shader_3D_flat_color)
     .vertex_in(0, Type::VEC3, "pos")

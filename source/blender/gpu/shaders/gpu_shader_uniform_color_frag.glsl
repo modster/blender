@@ -1,11 +1,13 @@
 
-#if defined(USE_COLOR_U32)
+#ifndef USE_GPU_SHADER_CREATE_INFO
+#  if defined(USE_COLOR_U32)
 uniform uint color;
-#else
+#  else
 uniform vec4 color;
-#endif
+#  endif
 
 out vec4 fragColor;
+#endif
 
 void main()
 {
