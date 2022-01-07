@@ -148,18 +148,22 @@ void gpu_shader_create_info_exit()
   delete g_interfaces;
 }
 
-void gpu_shader_create_info_compile_all()
+bool gpu_shader_create_info_compile_all()
 {
   for (ShaderCreateInfo *info : g_create_infos->values()) {
     if (info->do_static_compilation_) {
-      printf("Compiling %s: ... ", info->name_.c_str());
-      GPU_shader_create_from_info(reinterpret_cast<const GPUShaderCreateInfo *>(info));
-      printf("Success\n");
-    }
-    else {
-      printf("Skipping non static %s\n", info->name_.c_str());
+      // printf("Compiling %s: ... \n", info->name_.c_str());
+      GPUShader *shader = GPU_shader_create_from_info(
+          reinterpret_cast<const GPUShaderCreateInfo *>(info));
+      if (shader == nullptr) {
+        printf("Compilation %s Failed\n", info->name_.c_str());
+        return false;
+      }
+      GPU_shader_free(shader);
+      // printf("Success\n");
     }
   }
+  return true;
 }
 
 /* Runtime create infos are not registered in the dictionnary and cannot be searched. */

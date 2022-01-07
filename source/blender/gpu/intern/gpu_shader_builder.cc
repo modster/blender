@@ -43,13 +43,13 @@ class ShaderBuilder {
 
  public:
   void init();
-  void bake_create_infos();
+  bool bake_create_infos();
   void exit();
 };
 
-void ShaderBuilder::bake_create_infos()
+bool ShaderBuilder::bake_create_infos()
 {
-  gpu_shader_create_info_compile_all();
+  return gpu_shader_create_info_compile_all();
 }
 
 void ShaderBuilder::init()
@@ -88,10 +88,15 @@ int main(int argc, const char *argv[])
     exit(1);
   }
 
+  int exit_code = 0;
+
   blender::gpu::shader_builder::ShaderBuilder builder;
   builder.init();
-  builder.bake_create_infos();
+  if (!builder.bake_create_infos()) {
+    exit_code = 1;
+  }
   builder.exit();
+  exit(exit_code);
 
-  return 0;
+  return exit_code;
 }

@@ -409,12 +409,10 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
 
   shader->finalize(&info);
 
-  delete shader;
-  return nullptr;
-  // if (!shader->finalize()) {
-  //   delete shader;
-  //   return nullptr;
-  // }
+  if (!shader->finalize()) {
+    delete shader;
+    return nullptr;
+  }
 
   return wrap(shader);
 }
