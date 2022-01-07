@@ -1466,8 +1466,11 @@ void DepsgraphRelationBuilder::build_animdata_drivers(ID *id)
 
 void DepsgraphRelationBuilder::build_animation_images(ID *id)
 {
+  /* See #DepsgraphNodeBuilder::build_animation_images. */
+  const bool can_have_gpu_material = ELEM(GS(id->name), ID_MA, ID_WO);
+
   /* TODO: can we check for existence of node for performance? */
-  if (BKE_image_user_id_has_animation(id)) {
+  if (BKE_image_user_id_has_animation(id) || can_have_gpu_material) {
     OperationKey image_animation_key(
         id, NodeType::IMAGE_ANIMATION, OperationCode::IMAGE_ANIMATION);
     TimeSourceKey time_src_key;
@@ -1726,8 +1729,17 @@ void DepsgraphRelationBuilder::build_driver_id_property(ID *id, const char *rna_
     return;
   }
   const char *prop_identifier = RNA_property_identifier((PropertyRNA *)prop);
-  OperationKey id_property_key(
-      id, NodeType::PARAMETERS, OperationCode::ID_PROPERTY, prop_identifier);
+  /* Custom properties of bones are placed in their components to improve granularity. */
+  OperationKey id_property_key;
+  if (RNA_struct_is_a(ptr.type, &RNA_PoseBone)) {
+    const bPoseChannel *pchan = static_cast<const bPoseChannel *>(ptr.data);
+    id_property_key = OperationKey(
+        id, NodeType::BONE, pchan->name, OperationCode::ID_PROPERTY, prop_identifier);
+  }
+  else {
+    id_property_key = OperationKey(
+        id, NodeType::PARAMETERS, OperationCode::ID_PROPERTY, prop_identifier);
+  }
   OperationKey parameters_exit_key(id, NodeType::PARAMETERS, OperationCode::PARAMETERS_EXIT);
   add_relation(
       id_property_key, parameters_exit_key, "ID Property -> Done", RELATION_CHECK_BEFORE_ADD);

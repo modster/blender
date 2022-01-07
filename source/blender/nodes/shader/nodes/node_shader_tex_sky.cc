@@ -17,7 +17,7 @@
  * All rights reserved.
  */
 
-#include "../node_shader_util.h"
+#include "node_shader_util.hh"
 #include "sky_model.h"
 
 namespace blender::nodes::node_shader_tex_sky_cc {
@@ -214,13 +214,13 @@ void register_node_type_sh_tex_sky()
 
   static bNodeType ntype;
 
-  sh_node_type_base(&ntype, SH_NODE_TEX_SKY, "Sky Texture", NODE_CLASS_TEXTURE, 0);
+  sh_node_type_base(&ntype, SH_NODE_TEX_SKY, "Sky Texture", NODE_CLASS_TEXTURE);
   node_type_socket_templates(&ntype, file_ns::sh_node_tex_sky_in, file_ns::sh_node_tex_sky_out);
   node_type_size_preset(&ntype, NODE_SIZE_MIDDLE);
   node_type_init(&ntype, file_ns::node_shader_init_tex_sky);
   node_type_storage(&ntype, "NodeTexSky", node_free_standard_storage, node_copy_standard_storage);
   node_type_gpu(&ntype, file_ns::node_shader_gpu_tex_sky);
-  /* remove Vector input for Nishita */
+  /* Remove vector input for Nishita sky model. */
   node_type_update(&ntype, file_ns::node_shader_update_sky);
 
   nodeRegisterType(&ntype);
