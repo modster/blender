@@ -415,10 +415,9 @@ set(SHADER_CREATE_INFOS
 ../draw/intern/shaders/draw_fullscreen_info.hh
 ../draw/intern/shaders/draw_view_info.hh
 ../draw/intern/shaders/draw_object_infos_info.hh
-shaders/gpu_shader_3D_flat_color_info.hh
-shaders/gpu_shader_3D_image_modulate_alpha_info.hh
-
-shaders/gpu_clip_planes_info.hh
+shaders/infos/gpu_shader_3D_flat_color_info.hh
+shaders/infos/gpu_shader_3D_image_modulate_alpha_info.hh
+shaders/infos/gpu_clip_planes_info.hh
 )
 
 set(SHADER_CREATE_INFOS_CONTENT "")

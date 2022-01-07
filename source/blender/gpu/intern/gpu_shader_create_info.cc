@@ -152,9 +152,12 @@ void gpu_shader_create_info_compile_all()
 {
   for (ShaderCreateInfo *info : g_create_infos->values()) {
     if (info->do_static_compilation_) {
-      // printf("Compiling %s: ... ", info->name_.c_str());
+      printf("Compiling %s: ... ", info->name_.c_str());
       GPU_shader_create_from_info(reinterpret_cast<const GPUShaderCreateInfo *>(info));
-      // printf("Success\n");
+      printf("Success\n");
+    }
+    else {
+      printf("Skipping non static %s\n", info->name_.c_str());
     }
   }
 }
