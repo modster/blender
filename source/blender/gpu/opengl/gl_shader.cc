@@ -83,7 +83,7 @@ static const char *to_string(const Interpolation &interp)
     case Interpolation::FLAT:
       return "flat";
     case Interpolation::NO_PERSPECTIVE:
-      return "no_perspective";
+      return "noperspective";
     default:
       return "unkown";
   }
