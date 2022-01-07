@@ -418,7 +418,7 @@ set(SHADER_CREATE_INFOS
 
 shaders/infos/gpu_clip_planes_info.hh
 shaders/infos/gpu_srgb_to_framebuffer_space_info.hh
-#shaders/infos/gpu_shader_3D_flat_color_info.hh !Disabled due to failing compilation.
+#shaders/infos/gpu_shader_3D_flat_color_info.hh !Disabled due to world_clipping
 shaders/infos/gpu_shader_3D_image_modulate_alpha_info.hh
 #shaders/infos/gpu_shader_simple_lighting_info.hh !TODO
 shaders/infos/gpu_shader_2D_checker_info.hh
@@ -432,8 +432,19 @@ shaders/infos/gpu_shader_2D_image_info.hh
 shaders/infos/gpu_shader_2D_image_color_info.hh
 shaders/infos/gpu_shader_2D_image_desaturate_info.hh
 shaders/infos/gpu_shader_2D_image_shuffle_color_info.hh
+shaders/infos/gpu_shader_2D_image_rect_color_info.hh
 shaders/infos/gpu_shader_text_info.hh
 shaders/infos/gpu_shader_keyframe_shape_info.hh
+#shaders/infos/gpu_shader_2D_image_multi_rect_color_info.hh !TODO
+#shaders/infos/gpu_shader_3D_uniform_color_info.hh !Disabled due to world clipping
+shaders/infos/gpu_shader_3D_smooth_color_info.hh
+shaders/infos/gpu_shader_3D_depth_only_info.hh
+#shaders/infos/gpu_shader_3D_polyline_info.hh !TODO
+#shaders/infos/gpu_shader_2D_line_dashed_uniform_color_info.hh
+#shaders/infos/gpu_shader_3D_line_dashed_uniform_color_info.hh
+shaders/infos/gpu_shader_2D_point_fixed_size_uniform_color_info.hh
+
+
 )
 
 set(SHADER_CREATE_INFOS_CONTENT "")

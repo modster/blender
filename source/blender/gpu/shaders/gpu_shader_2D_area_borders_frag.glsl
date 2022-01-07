@@ -1,4 +1,3 @@
-
 uniform vec4 color;
 uniform float scale;
 
