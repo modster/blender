@@ -1,9 +1,10 @@
-
+#ifndef USE_GPU_SHADER_CREATE_INFO
 uniform vec4 outlineColor;
 
 in vec4 radii;
 in vec4 fillColor;
 out vec4 fragColor;
+#endif
 
 void main()
 {

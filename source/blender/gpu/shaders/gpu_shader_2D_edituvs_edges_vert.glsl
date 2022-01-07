@@ -1,4 +1,4 @@
-
+#ifndef USE_GPU_SHADER_CREATE_INFO
 uniform mat4 ModelViewProjectionMatrix;
 uniform vec4 edgeColor;
 uniform vec4 selectColor;
@@ -6,14 +6,15 @@ uniform vec4 selectColor;
 in vec2 pos;
 in int flag;
 
-#ifdef SMOOTH_COLOR
+#  ifdef SMOOTH_COLOR
 noperspective out vec4 finalColor;
-#else
+#  else
 flat out vec4 finalColor;
-#endif
+#  endif
 
 noperspective out vec2 stipple_pos;
 flat out vec2 stipple_start;
+#endif
 
 /* TODO: Port drawing to draw manager and
  * remove constants duplications. */

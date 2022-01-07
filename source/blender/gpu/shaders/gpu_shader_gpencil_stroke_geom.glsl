@@ -1,3 +1,4 @@
+#ifndef USE_GPU_SHADER_CREATE_INFO
 uniform mat4 ModelViewProjectionMatrix;
 uniform vec2 Viewport;
 uniform int xraymode;
@@ -13,6 +14,7 @@ in float finalThickness[4];
 
 out vec4 mColor;
 out vec2 mTexCoord;
+#endif
 
 #define GP_XRAY_FRONT 0
 #define GP_XRAY_3DSPACE 1

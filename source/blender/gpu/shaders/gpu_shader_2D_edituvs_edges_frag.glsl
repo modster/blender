@@ -1,17 +1,18 @@
-
+#ifndef USE_GPU_SHADER_CREATE_INFO
 
 uniform float dashWidth;
 
-#ifdef SMOOTH_COLOR
+#  ifdef SMOOTH_COLOR
 noperspective in vec4 finalColor;
-#else
+#  else
 flat in vec4 finalColor;
-#endif
+#  endif
 
 noperspective in vec2 stipple_pos;
 flat in vec2 stipple_start;
 
 out vec4 fragColor;
+#endif
 
 void main()
 {

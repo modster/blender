@@ -1,4 +1,4 @@
-
+#ifndef USE_GPU_SHADER_CREATE_INFO
 uniform mat4 ModelViewProjectionMatrix;
 uniform vec4 vertColor;
 uniform vec4 selectColor;
@@ -7,6 +7,7 @@ in vec2 pos;
 in int flag;
 
 out vec4 finalColor;
+#endif
 
 /* TODO: Port drawing to draw manager and
  * remove constants duplications. */

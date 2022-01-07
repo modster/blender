@@ -4,13 +4,15 @@
 
 #define MID_VERTEX 65
 
+#ifndef USE_GPU_SHADER_CREATE_INFO
+
 /* u is position along the curve, defining the tangent space.
  * v is "signed" distance (compressed to [0..1] range) from the pos in expand direction */
 in vec2 uv;
 in vec2 pos; /* verts position in the curve tangent space */
 in vec2 expand;
 
-#ifdef USE_INSTANCE
+#  ifdef USE_INSTANCE
 /* Instance attrs. */
 in vec2 P0;
 in vec2 P1;
@@ -27,20 +29,20 @@ in float dash_alpha;
 
 uniform vec4 colors[6];
 
-#  define colStart (colid_doarrow[0] < 3 ? start_color : colors[colid_doarrow[0]])
-#  define colEnd (colid_doarrow[1] < 3 ? end_color : colors[colid_doarrow[1]])
-#  define colShadow colors[colid_doarrow[2]]
-#  define doArrow (colid_doarrow[3] != 0)
-#  define doMuted (domuted[0] != 0)
+#    define colStart (colid_doarrow[0] < 3 ? start_color : colors[colid_doarrow[0]])
+#    define colEnd (colid_doarrow[1] < 3 ? end_color : colors[colid_doarrow[1]])
+#    define colShadow colors[colid_doarrow[2]]
+#    define doArrow (colid_doarrow[3] != 0)
+#    define doMuted (domuted[0] != 0)
 
-#else
+#  else
 /* Single curve drawcall, use uniform. */
 uniform vec2 bezierPts[4];
 
-#  define P0 bezierPts[0]
-#  define P1 bezierPts[1]
-#  define P2 bezierPts[2]
-#  define P3 bezierPts[3]
+#    define P0 bezierPts[0]
+#    define P1 bezierPts[1]
+#    define P2 bezierPts[2]
+#    define P3 bezierPts[3]
 
 uniform vec4 colors[3];
 uniform bool doArrow;
@@ -50,11 +52,11 @@ uniform float thickness;
 uniform float dash_factor;
 uniform float dash_alpha;
 
-#  define colShadow colors[0]
-#  define colStart colors[1]
-#  define colEnd colors[2]
+#    define colShadow colors[0]
+#    define colStart colors[1]
+#    define colEnd colors[2]
 
-#endif
+#  endif
 
 uniform float expandSize;
 uniform float arrowSize;
@@ -67,6 +69,7 @@ flat out float lineLength;
 flat out float dashFactor;
 flat out float dashAlpha;
 flat out int isMainLine;
+#endif
 
 /* Define where along the noodle the gradient will starts and ends.
  * Use 0.25 instead of 0.35-0.65, because of a visual shift issue. */

@@ -1,3 +1,4 @@
+#ifndef USE_GPU_SHADER_CREATE_INFO
 uniform mat4 ModelViewProjectionMatrix;
 uniform mat4 ProjectionMatrix;
 
@@ -12,6 +13,7 @@ in float thickness;
 
 out vec4 finalColor;
 out float finalThickness;
+#endif
 
 #define TRUE 1
 

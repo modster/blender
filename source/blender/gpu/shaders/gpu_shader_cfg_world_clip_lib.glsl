@@ -1,7 +1,8 @@
 #ifdef USE_WORLD_CLIP_PLANES
 #  if defined(GPU_VERTEX_SHADER) || defined(GPU_GEOMETRY_SHADER)
-
+#    ifndef USE_GPU_SHADER_CREATE_INFO
 uniform vec4 WorldClipPlanes[6];
+#    endif
 
 #    define _world_clip_planes_calc_clip_distance(wpos, _clipplanes) \
       { \

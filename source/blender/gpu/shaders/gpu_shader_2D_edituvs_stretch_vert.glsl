@@ -1,21 +1,22 @@
-
+#ifndef USE_GPU_SHADER_CREATE_INFO
 uniform mat4 ModelViewProjectionMatrix;
 uniform vec2 aspect;
 
 in vec2 pos;
 
-#ifdef STRETCH_ANGLE
+#  ifdef STRETCH_ANGLE
 in vec2 uv_angles;
 in float angle;
 
-#else
+#  else
 in float ratio;
 uniform float totalAreaRatio;
 uniform float totalAreaRatioInv;
 
-#endif
+#  endif
 
 noperspective out vec4 finalColor;
+#endif
 
 vec3 weight_to_rgb(float weight)
 {
