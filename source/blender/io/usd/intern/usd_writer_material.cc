@@ -446,30 +446,31 @@ static void copy_tiled_textures(Image *ima,
   char src_path[FILE_MAX];
   get_absolute_path(ima, src_path);
 
-  char src_dir[FILE_MAX];
-  char src_file[FILE_MAX];
-  BLI_split_dirfile(src_path, src_dir, src_file, FILE_MAX, FILE_MAX);
+  eUDIM_TILE_FORMAT tile_format;
+  char *udim_pattern = BKE_image_get_tile_strformat(src_path, &tile_format);
 
-  char head[FILE_MAX], tail[FILE_MAX];
-  unsigned short numlen;
-  BLI_path_sequence_decode(src_file, head, tail, &numlen);
+  /* Only <UDIM> tile formats are supported by USD right now. */
+  if (tile_format != UDIM_TILE_FORMAT_UDIM) {
+    std::cout << "WARNING: unsupported tile format for `" << src_path << "`" << std::endl;
+    MEM_SAFE_FREE(udim_pattern);
+    return;
+  }
 
   /* Copy all tiles. */
   LISTBASE_FOREACH (ImageTile *, tile, &ima->tiles) {
-    char tile_file[FILE_MAX];
+    char src_tile_path[FILE_MAX];
+    BKE_image_set_filepath_from_tile_number(
+        src_tile_path, udim_pattern, tile_format, tile->tile_number);
 
-    /* Build filepath of the tile. */
-    BLI_path_sequence_encode(tile_file, head, tail, numlen, tile->tile_number);
+    char dest_filename[FILE_MAXFILE];
+    BLI_split_file_part(src_tile_path, dest_filename, sizeof(dest_filename));
 
     char dest_tile_path[FILE_MAX];
-    BLI_path_join(dest_tile_path, FILE_MAX, dest_dir.c_str(), tile_file, NULL);
+    BLI_path_join(dest_tile_path, FILE_MAX, dest_dir.c_str(), dest_filename, nullptr);
 
     if (!allow_overwrite && BLI_exists(dest_tile_path)) {
       continue;
     }
-
-    char src_tile_path[FILE_MAX];
-    BLI_path_join(src_tile_path, FILE_MAX, src_dir, tile_file, NULL);
 
     if (paths_equal(src_tile_path, dest_tile_path)) {
       /* Source and destination paths are the same, don't copy. */
@@ -487,6 +488,7 @@ static void copy_tiled_textures(Image *ima,
                  dest_tile_path);
     }
   }
+  MEM_SAFE_FREE(udim_pattern);
 }
 
 /* Copy the given image to the destination directory. */
@@ -656,14 +658,6 @@ static std::string get_tex_image_asset_path(Image *ima)
 
   char filepath[FILE_MAX];
   get_absolute_path(ima, filepath);
-
-  if (ima->source == IMA_SRC_TILED) {
-    char head[FILE_MAX], tail[FILE_MAX];
-    unsigned short numlen;
-
-    BLI_path_sequence_decode(filepath, head, tail, &numlen);
-    return (std::string(head) + "<UDIM>" + std::string(tail));
-  }
 
   return std::string(filepath);
 }
