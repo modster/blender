@@ -1468,12 +1468,6 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
           if (move_point) {
             short bezt_idx;
             float mval[2] = {(float)event->mval[0], (float)event->mval[1]};
-            get_closest_vertex_to_point_in_nurbs(
-                &cu->editnurb->nurbs, &nu, &bezt, &bp, &bezt_idx, mval, sel_dist_mul, &vc);
-            if (bezt && !BEZT_ISSEL_IDX(bezt, bezt_idx)) {
-              ED_curve_editnurb_select_pick_thresholded(
-                  C, event->mval, sel_dist_mul, false, false, false);
-            }
             move_all_selected_points(
                 &cu->editnurb->nurbs, move_entire_pressed, link_handles_pressed, event, &vc);
             cpd->acted = true;
@@ -1492,17 +1486,24 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
       cpd->bezt = bezt;
       cpd->bp = bp;
 
-      if (select_point || move_point || select_multi) {
-        if (move_point && (!nu || bezt || bp)) {
-          cpd->found_point = ED_curve_editnurb_select_pick_thresholded(
-              C, event->mval, sel_dist_mul, false, false, false);
-          cpd->selection_made = true;
+      Nurb *nu1;
+      BezTriple *bezt1;
+      BPoint *bp1;
+      short bezt_idx = 0;
+      cpd->found_point = get_closest_vertex_to_point_in_nurbs(
+          &(cu->editnurb->nurbs), &nu1, &bezt1, &bp1, &bezt_idx, mval_fl, sel_dist_mul, &vc);
+
+      if (move_point && nu1 &&
+          (bezt || (bezt1 && !BEZT_ISSEL_IDX(bezt1, bezt_idx)) || (bp1 && !(bp1->f1 & SELECT)))) {
+        ED_curve_deselect_all(cu->editnurb);
+        if (bezt1) {
+          BEZT_SEL_IDX(bezt1, bezt_idx);
         }
-        else {
-          short bezt_idx = 0;
-          cpd->found_point = get_closest_vertex_to_point_in_nurbs(
-              &(cu->editnurb->nurbs), &nu, &bezt, &bp, &bezt_idx, mval_fl, sel_dist_mul, &vc);
+        else if (bp1) {
+          bp1->f1 |= SELECT;
         }
+
+        cpd->selection_made = true;
       }
       if (!cpd->found_point) {
         if (is_spline_nearby(&vc, op, event)) {
