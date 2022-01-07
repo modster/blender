@@ -410,14 +410,18 @@ list(APPEND SRC ${glsl_source_list_file})
 list(APPEND INC ${CMAKE_CURRENT_BINARY_DIR})
 
 set(SHADER_CREATE_INFOS
-../draw/engines/workbench/shaders/workbench_effect_cavity_info.hh
-../draw/engines/workbench/shaders/workbench_prepass_info.hh
+#../draw/engines/workbench/shaders/workbench_effect_cavity_info.hh
+#../draw/engines/workbench/shaders/workbench_prepass_info.hh
 ../draw/intern/shaders/draw_fullscreen_info.hh
 ../draw/intern/shaders/draw_view_info.hh
 ../draw/intern/shaders/draw_object_infos_info.hh
-shaders/infos/gpu_shader_3D_flat_color_info.hh
-shaders/infos/gpu_shader_3D_image_modulate_alpha_info.hh
+
 shaders/infos/gpu_clip_planes_info.hh
+shaders/infos/gpu_srgb_to_framebuffer_space_info.hh
+#shaders/infos/gpu_shader_3D_flat_color_info.hh
+shaders/infos/gpu_shader_3D_image_modulate_alpha_info.hh
+shaders/infos/gpu_shader_text_info.hh
+shaders/infos/gpu_shader_keyframe_shape_info.hh
 )
 
 set(SHADER_CREATE_INFOS_CONTENT "")
