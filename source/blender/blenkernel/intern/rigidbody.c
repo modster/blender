@@ -2532,9 +2532,9 @@ void BKE_rigidbody_do_simulation(Depsgraph *depsgraph, Scene *scene, float ctime
 
     const float interp_step = 1.0f / rbw->substeps_per_frame;
     float cur_interp_val = interp_step;
-    printf("woo\n");
+
     GHash *norm_forces_magnitudes = BLI_ghash_ptr_new(__func__);
-    printf("woo1\n");
+
     /* Set all contact forces and their locations to zero. (for drawing debug info) */
     for (int i = 0; i < rbw->numbodies; i++) {
         Object *ob = rbw->objects[i];
@@ -2547,10 +2547,10 @@ void BKE_rigidbody_do_simulation(Depsgraph *depsgraph, Scene *scene, float ctime
         if((ob->rigidbody_object->display_force_types & RB_SIM_NORMAL) ||
             (ob->rigidbody_object->display_force_types & RB_SIM_FRICTION) ||
                (ob->rigidbody_object->sim_display_options & RB_SIM_COLLISIONS)) {
-          printf("woo2\n");
+
           float *arr = MEM_callocN(sizeof(float) * 3 ,__func__);
           BLI_ghash_insert(norm_forces_magnitudes, ob, arr);
-          printf("w003\n");
+
         }
     }
 
