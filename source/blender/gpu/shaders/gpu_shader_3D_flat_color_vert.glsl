@@ -1,17 +1,18 @@
-
+#ifndef USE_GPU_SHADER_CREATE_INFO
 uniform mat4 ModelViewProjectionMatrix;
-#ifdef USE_WORLD_CLIP_PLANES
+#  ifdef USE_WORLD_CLIP_PLANES
 uniform mat4 ModelMatrix;
-#endif
+#  endif
 
 in vec3 pos;
-#if defined(USE_COLOR_U32)
+#  if defined(USE_COLOR_U32)
 in uint color;
-#else
+#  else
 in vec4 color;
-#endif
+#  endif
 
 flat out vec4 finalColor;
+#endif
 
 void main()
 {
