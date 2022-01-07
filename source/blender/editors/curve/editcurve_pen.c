@@ -112,12 +112,23 @@ typedef struct CurvePenData {
 } CurvePenData;
 
 /* Enum to choose between shortcuts for the extra functionalities. */
-typedef enum eExtra_key { NONE = 0, SHIFT = 1, CTRL = 2, ALT = 3 } eExtra_key;
+typedef enum eExtra_key {
+  NONE = 0,
+  SHIFT = 1,
+  CTRL = 2,
+  ALT = 3,
+  CTRL_SHIFT = 4,
+  CTRL_ALT = 5,
+  SHIFT_ALT = 6
+} eExtra_key;
 static const EnumPropertyItem prop_extra_key_types[] = {
     {NONE, "None", 0, "None", ""},
     {SHIFT, "Shift", 0, "Shift", ""},
     {CTRL, "Ctrl", 0, "Ctrl", ""},
     {ALT, "Alt", 0, "Alt", ""},
+    {CTRL_SHIFT, "Ctrl-Shift", 0, "Ctrl-Shift", ""},
+    {CTRL_ALT, "Ctrl-Alt", 0, "Ctrl-Alt", ""},
+    {SHIFT_ALT, "Shift-Alt", 0, "Shift-Alt", ""},
     {0, NULL, 0, NULL, NULL},
 };
 
@@ -1104,8 +1115,12 @@ static bool is_spline_nearby(ViewContext *vc, struct wmOperator *op, const wmEve
 
 static bool is_extra_key_pressed(const wmEvent *event, int key)
 {
-  return (key == SHIFT && event->shift) || (key == CTRL && event->ctrl) ||
-         (key == ALT && event->alt);
+  return (key == SHIFT && event->shift && !event->ctrl && !event->alt) ||
+         (key == CTRL && !event->shift && event->ctrl && !event->alt) ||
+         (key == ALT && !event->shift && !event->ctrl && event->alt) ||
+         (key == CTRL_SHIFT && event->shift && event->ctrl && !event->alt) ||
+         (key == CTRL_ALT && !event->shift && event->ctrl && event->alt) ||
+         (key == SHIFT_ALT && event->shift && !event->ctrl && event->alt);
 }
 
 /* Move segment to mouse pointer. */
@@ -1377,14 +1392,6 @@ static void toggle_vector_auto(BezTriple *bezt, short bezt_idx, CurvePenData *cp
   }
 }
 
-static bool is_event_key_equal_to_extra_key(const int event_key, const int extra_key)
-{
-  return ((event_key == EVT_LEFTSHIFTKEY || event_key == EVT_RIGHTSHIFTKEY) &&
-          extra_key == SHIFT) ||
-         ((event_key == EVT_LEFTCTRLKEY || event_key == EVT_RIGHTCTRLKEY) && extra_key == CTRL) ||
-         ((event_key == EVT_LEFTALTKEY || event_key == EVT_RIGHTALTKEY) && extra_key == ALT);
-}
-
 static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
 {
   Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
@@ -1428,7 +1435,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   const int move_entire = RNA_enum_get(op->ptr, "move_entire");
   const int link_handles = RNA_enum_get(op->ptr, "link_handles");
 
-  if (!cpd->free_toggle_pressed && is_event_key_equal_to_extra_key(event->type, free_toggle)) {
+  if (!cpd->free_toggle_pressed && is_extra_key_pressed(event, free_toggle)) {
     toggle_bezt_free_align_handles(nurbs);
     cpd->dragging = true;
   }

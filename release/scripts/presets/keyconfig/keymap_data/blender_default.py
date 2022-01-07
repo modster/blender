@@ -7001,6 +7001,7 @@ def km_3d_view_tool_edit_curve_pen(params):
                  ("free_toggle", "Shift"),
                  ("adj_handle", "Ctrl"),
                  ("move_entire", "Alt"),
+                 ("link_handles", "Ctrl-Shift")
                 ]}),
             ("curve.pen", {"type": params.tool_mouse, "value": 'PRESS', "ctrl": True},
              {"properties": [("delete_point", True),]}),
