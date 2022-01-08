@@ -263,6 +263,13 @@ struct float2 {
     return result;
   }
 
+  static float2 normalize(const float2 &vec)
+  {
+    float2 result;
+    normalize_v2_v2(result, vec);
+    return result;
+  }
+
   static float dot(const float2 &a, const float2 &b)
   {
     return a.x * b.x + a.y * b.y;

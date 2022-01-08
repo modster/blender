@@ -67,6 +67,13 @@ struct double3 {
     return normalize_v3_db(*this);
   }
 
+  static double3 normalize(const double3 &vec)
+  {
+    double3 result;
+    normalize_v3_v3_db(result, vec);
+    return result;
+  }
+
   double3 normalized() const
   {
     double3 result;
