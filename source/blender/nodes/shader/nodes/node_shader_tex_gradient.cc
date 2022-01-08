@@ -122,7 +122,7 @@ class GradientFunction : public fn::MultiFunction {
           /* Bias a little bit for the case where input is a unit length vector,
            * to get exactly zero instead of a small random value depending
            * on float precision. */
-          const float r = std::max(0.999999f - vector[i].length(), 0.0f);
+          const float r = std::max(0.999999f - float3::length(vector[i]), 0.0f);
           fac[i] = r * r;
         }
         break;
@@ -132,7 +132,7 @@ class GradientFunction : public fn::MultiFunction {
           /* Bias a little bit for the case where input is a unit length vector,
            * to get exactly zero instead of a small random value depending
            * on float precision. */
-          fac[i] = std::max(0.999999f - vector[i].length(), 0.0f);
+          fac[i] = std::max(0.999999f - float3::length(vector[i]), 0.0f);
         }
         break;
       }

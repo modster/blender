@@ -155,7 +155,7 @@ static void node_geo_exec(GeoNodeExecParams params)
     if (count_mode == GEO_NODE_MESH_LINE_COUNT_RESOLUTION) {
       /* Don't allow asymptotic count increase for low resolution values. */
       const float resolution = std::max(params.extract_input<float>("Resolution"), 0.0001f);
-      const int count = total_delta.length() / resolution + 1;
+      const int count = float3::length(total_delta) / resolution + 1;
       const float3 delta = total_delta.normalized() * resolution;
       mesh = create_line_mesh(start, delta, count);
     }

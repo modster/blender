@@ -2204,7 +2204,7 @@ static bool face_is_degenerate(const Face *f)
   double3 da = v2->co - v0->co;
   double3 db = v2->co - v1->co;
   double3 dab = double3::cross_high_precision(da, db);
-  double dab_length_squared = dab.length_squared();
+  double dab_length_squared = double3::length_squared(dab);
   double err_bound = supremum_dot_cross(dab, dab) * index_dot_cross * DBL_EPSILON;
   if (dab_length_squared > err_bound) {
     return false;
@@ -2231,8 +2231,8 @@ static bool any_degenerate_tris_fast(const Array<Face *> triangulation)
     }
     double3 da = v2->co - v0->co;
     double3 db = v2->co - v1->co;
-    double da_length_squared = da.length_squared();
-    double db_length_squared = db.length_squared();
+    double da_length_squared = double3::length_squared(da);
+    double db_length_squared = double3::length_squared(db);
     if (da_length_squared == 0.0 || db_length_squared == 0.0) {
       return true;
     }
@@ -2241,7 +2241,7 @@ static bool any_degenerate_tris_fast(const Array<Face *> triangulation)
      * sin^2 t = |da x db|^2 / (|da|^2 |db|^2)
      */
     double3 dab = double3::cross_high_precision(da, db);
-    double dab_length_squared = dab.length_squared();
+    double dab_length_squared = double3::length_squared(dab);
     double sin_squared_t = dab_length_squared / (da_length_squared * db_length_squared);
     if (sin_squared_t < 1e-8) {
       return true;

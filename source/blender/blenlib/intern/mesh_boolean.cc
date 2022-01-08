@@ -3027,7 +3027,7 @@ static void init_face_merge_state(FaceMergeState *fms,
       }
       if (me_index == -1) {
         double3 vec = new_me.v2->co - new_me.v1->co;
-        new_me.len_squared = vec.length_squared();
+        new_me.len_squared = double3::length_squared(vec);
         new_me.orig = tri.edge_orig[i];
         new_me.is_intersect = tri.is_intersect[i];
         new_me.dissolvable = (new_me.orig == NO_INDEX && !new_me.is_intersect);

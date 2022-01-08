@@ -409,7 +409,7 @@ inline bool try_dispatch_float_math_fl3_to_fl(const NodeVectorMathOperation oper
 
   switch (operation) {
     case NODE_VECTOR_MATH_LENGTH:
-      return dispatch([](float3 in) { return in.length(); });
+      return dispatch([](float3 in) { return float3::length(in); });
     default:
       return false;
   }

@@ -283,7 +283,7 @@ static const fn::MultiFunction *get_multi_function(bNode &node)
             case NODE_COMPARE_MODE_LENGTH: {
               static fn::CustomMF_SI_SI_SO<float3, float3, bool> fn{
                   "Less Than - Length",
-                  [](float3 a, float3 b) { return a.length() < b.length(); }};
+                  [](float3 a, float3 b) { return float3::length(a) < float3::length(b); }};
               return &fn;
             }
           }
@@ -317,7 +317,7 @@ static const fn::MultiFunction *get_multi_function(bNode &node)
             case NODE_COMPARE_MODE_LENGTH: {
               static fn::CustomMF_SI_SI_SO<float3, float3, bool> fn{
                   "Less Equal - Length",
-                  [](float3 a, float3 b) { return a.length() <= b.length(); }};
+                  [](float3 a, float3 b) { return float3::length(a) <= float3::length(b); }};
               return &fn;
             }
           }
@@ -351,7 +351,7 @@ static const fn::MultiFunction *get_multi_function(bNode &node)
             case NODE_COMPARE_MODE_LENGTH: {
               static fn::CustomMF_SI_SI_SO<float3, float3, bool> fn{
                   "Greater Than - Length",
-                  [](float3 a, float3 b) { return a.length() > b.length(); }};
+                  [](float3 a, float3 b) { return float3::length(a) > float3::length(b); }};
               return &fn;
             }
           }
@@ -385,7 +385,7 @@ static const fn::MultiFunction *get_multi_function(bNode &node)
             case NODE_COMPARE_MODE_LENGTH: {
               static fn::CustomMF_SI_SI_SO<float3, float3, bool> fn{
                   "Greater Equal - Length",
-                  [](float3 a, float3 b) { return a.length() >= b.length(); }};
+                  [](float3 a, float3 b) { return float3::length(a) >= float3::length(b); }};
               return &fn;
             }
           }
@@ -424,7 +424,7 @@ static const fn::MultiFunction *get_multi_function(bNode &node)
             case NODE_COMPARE_MODE_LENGTH: {
               static fn::CustomMF_SI_SI_SI_SO<float3, float3, float, bool> fn{
                   "Equal - Length", [](float3 a, float3 b, float epsilon) {
-                    return abs(a.length() - b.length()) <= epsilon;
+                    return abs(float3::length(a) - float3::length(b)) <= epsilon;
                   }};
               return &fn;
             }
@@ -464,7 +464,7 @@ static const fn::MultiFunction *get_multi_function(bNode &node)
             case NODE_COMPARE_MODE_LENGTH: {
               static fn::CustomMF_SI_SI_SI_SO<float3, float3, float, bool> fn{
                   "Not Equal - Length", [](float3 a, float3 b, float epsilon) {
-                    return abs(a.length() - b.length()) > epsilon;
+                    return abs(float3::length(a) - float3::length(b)) > epsilon;
                   }};
               return &fn;
             }
