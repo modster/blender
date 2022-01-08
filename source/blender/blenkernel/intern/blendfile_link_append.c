@@ -693,9 +693,12 @@ static void loose_data_instantiate_collection_process(
     loose_data_instantiate_ensure_active_collection(instantiate_context);
     Collection *active_collection = instantiate_context->active_collection;
 
+    if ((item->tag & LINK_APPEND_TAG_INDIRECT) != 0) {
+      /* Pass */
+    }
     /* In case user requested instantiation of collections as empties, do so for the one they
      * explicitly selected (originally directly linked IDs) only. */
-    if (do_instantiate_as_empty && (item->tag & LINK_APPEND_TAG_INDIRECT) == 0) {
+    else if (do_instantiate_as_empty) {
       /* BKE_object_add(...) messes with the selection. */
       Object *ob = BKE_object_add_only_object(bmain, OB_EMPTY, collection->id.name + 2);
       ob->type = OB_EMPTY;
