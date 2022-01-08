@@ -19,6 +19,7 @@
 #include <iostream>
 
 #include "BLI_float2.hh"
+#include "BLI_math_base_safe.h"
 #include "BLI_math_vector.hh"
 
 namespace blender {
@@ -248,6 +249,13 @@ struct float3 {
     return normalize_v3(*this);
   }
 
+  static float3 normalize_and_get_length(const float3 &vec, float &out_len)
+  {
+    float3 result;
+    out_len = normalize_v3_v3(result, vec);
+    return result;
+  }
+
   /**
    * Normalizes the vector in place.
    */
@@ -266,9 +274,21 @@ struct float3 {
     return result;
   }
 
+  static float3 normalize(const float3 &vec)
+  {
+    float3 result;
+    normalize_v3_v3(result, vec);
+    return result;
+  }
+
   float length() const
   {
     return len_v3(*this);
+  }
+
+  static float length(const float3 &vec)
+  {
+    return len_v3(vec);
   }
 
   float length_squared() const
@@ -276,20 +296,20 @@ struct float3 {
     return len_squared_v3(*this);
   }
 
+  static float length_squared(const float3 &vec)
+  {
+    return len_squared_v3(vec);
+  }
+
   bool is_zero() const
   {
     return this->x == 0.0f && this->y == 0.0f && this->z == 0.0f;
   }
 
-  void reflect(const float3 &normal)
-  {
-    *this = this->reflected(normal);
-  }
-
-  float3 reflected(const float3 &normal) const
+  static float3 reflect(const float3 &incident, const float3 &normal)
   {
     float3 result;
-    reflect_v3_v3v3(result, *this, normal);
+    reflect_v3_v3v3(result, incident, normal);
     return result;
   }
 
@@ -346,11 +366,9 @@ struct float3 {
     return float3(floorf(a.x), floorf(a.y), floorf(a.z));
   }
 
-  void invert()
+  static float3 ceil(const float3 &a)
   {
-    x = -x;
-    y = -y;
-    z = -z;
+    return float3(ceilf(a.x), ceilf(a.y), ceilf(a.z));
   }
 
   uint64_t hash() const
@@ -358,6 +376,14 @@ struct float3 {
     uint64_t x1 = *reinterpret_cast<const uint32_t *>(&x);
     uint64_t x2 = *reinterpret_cast<const uint32_t *>(&y);
     uint64_t x3 = *reinterpret_cast<const uint32_t *>(&z);
+    return (x1 * 435109) ^ (x2 * 380867) ^ (x3 * 1059217);
+  }
+
+  static uint64_t hash(const float3 &vec)
+  {
+    uint64_t x1 = *reinterpret_cast<const uint32_t *>(&vec.x);
+    uint64_t x2 = *reinterpret_cast<const uint32_t *>(&vec.y);
+    uint64_t x3 = *reinterpret_cast<const uint32_t *>(&vec.z);
     return (x1 * 435109) ^ (x2 * 380867) ^ (x3 * 1059217);
   }
 
@@ -406,6 +432,16 @@ struct float3 {
   static float3 abs(const float3 &a)
   {
     return float3(fabsf(a.x), fabsf(a.y), fabsf(a.z));
+  }
+
+  static float3 mod(const float3 &a, const float3 &b)
+  {
+    return float3(safe_modf(a.x, b.x), safe_modf(a.y, b.y), safe_modf(a.z, b.z));
+  }
+
+  static float3 fract(const float3 &a)
+  {
+    return a - float3(floorf(a.x), floorf(a.y), floorf(a.z));
   }
 };
 

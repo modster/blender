@@ -84,6 +84,11 @@ struct double3 {
     return len_squared_v3_db(*this);
   }
 
+  static double length_squared(const double3 &vec)
+  {
+    return len_squared_v3_db(vec);
+  }
+
   void reflect(const double3 &normal)
   {
     *this = this->reflected(normal);
