@@ -538,11 +538,16 @@ struct AssetMetaData *WM_drag_get_asset_meta_data(const wmDrag *drag, int idcode
   return NULL;
 }
 
-ID *WM_drag_asset_id_import(wmDragAsset *asset_drag, const int flag_extra)
+ID *WM_drag_asset_id_import_ex(wmDragAsset *asset_drag,
+                               const int flag_extra,
+                               const bool collection_instance)
 {
   /* Only support passing in limited flags. */
   BLI_assert(flag_extra == (flag_extra & FILE_AUTOSELECT));
   eFileSel_Params_Flag flag = flag_extra | FILE_ACTIVE_COLLECTION;
+  if (collection_instance) {
+    flag |= BLO_LIBLINK_COLLECTION_INSTANCE;
+  }
 
   const char *name = asset_drag->name;
   ID_Type idtype = asset_drag->id_type;
@@ -584,6 +589,11 @@ ID *WM_drag_asset_id_import(wmDragAsset *asset_drag, const int flag_extra)
 
   BLI_assert_unreachable();
   return NULL;
+}
+
+ID *WM_drag_asset_id_import(wmDragAsset *asset_drag, const int flag_extra)
+{
+  return WM_drag_asset_id_import_ex(asset_drag, flag_extra, false);
 }
 
 bool WM_drag_asset_will_import_linked(const wmDrag *drag)

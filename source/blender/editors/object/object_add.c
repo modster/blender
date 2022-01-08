@@ -3679,7 +3679,7 @@ static int object_transform_to_mouse_exec(bContext *C, wmOperator *op)
 void OBJECT_OT_transform_to_mouse(wmOperatorType *ot)
 {
   /* identifiers */
-  ot->name = "Place Object Under Mouse";
+  ot->name = "Place Object or Collection Under Mouse";
   ot->description = "Snap selected item(s) to the mouse location";
   ot->idname = "OBJECT_OT_transform_to_mouse";
 

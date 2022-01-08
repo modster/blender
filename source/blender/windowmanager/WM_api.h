@@ -1174,6 +1174,9 @@ ListBase *WM_dropboxmap_find(const char *idname, int spaceid, int regionid);
 
 /* ID drag and drop */
 
+ID *WM_drag_asset_id_import_ex(wmDragAsset *asset_drag,
+                               const int flag_extra,
+                               const bool collection_instance);
 /**
  * \param flag_extra: Additional linking flags (from #eFileSel_Params_Flag).
  */

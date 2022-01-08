@@ -589,6 +589,28 @@ static bool view3d_collection_drop_poll(bContext *C, wmDrag *drag, const wmEvent
   return view3d_drop_id_in_main_region_poll(C, drag, event, ID_GR);
 }
 
+/**
+ * \note the term local here refers to not being an external asset,
+ * poll will succeed for linked library objects.
+ */
+static bool view3d_collection_drop_poll_local_id(bContext *C, wmDrag *drag, const wmEvent *event)
+{
+  if (!view3d_collection_drop_poll(C, drag, event) || (drag->type != WM_DRAG_ID)) {
+    return false;
+  }
+  return true;
+}
+
+static bool view3d_collection_drop_poll_external_asset(bContext *C,
+                                                       wmDrag *drag,
+                                                       const wmEvent *event)
+{
+  if (!view3d_collection_drop_poll(C, drag, event) || (drag->type != WM_DRAG_ASSET)) {
+    return false;
+  }
+  return true;
+}
+
 static bool view3d_mat_drop_poll(bContext *C, wmDrag *drag, const wmEvent *event)
 {
   return view3d_drop_id_in_main_region_poll(C, drag, event, ID_MA);
@@ -783,21 +805,50 @@ static void view3d_ob_drop_copy_external_asset(wmDrag *drag, wmDropBox *drop)
   }
 }
 
-static void view3d_collection_drop_copy(wmDrag *drag, wmDropBox *drop)
+static void view3d_collection_drop_matrix_get(const Collection *collection,
+                                              float r_mat_final[4][4])
 {
-  ID *id = WM_drag_get_local_ID_or_import_from_asset(drag, ID_GR);
-
   V3DSnapCursorState *snap_state = ED_view3d_cursor_snap_state_get();
   const float unit_mat[4][4];
   unit_m4((float(*)[])unit_mat);
-  float mat_final[4][4];
 
   BoundBox boundbox;
-  BKE_collection_boundbox_calc((Collection *)id, &boundbox);
-  view3d_drop_matrix_from_snap(snap_state, &boundbox, unit_mat, mat_final);
+  BKE_collection_boundbox_calc(collection, &boundbox);
+  view3d_drop_matrix_from_snap(snap_state, &boundbox, unit_mat, r_mat_final);
+}
+
+static void view3d_collection_instance_drop_copy_external_asset(wmDrag *drag, wmDropBox *drop)
+{
+  wmDragAsset *asset_drag = WM_drag_get_asset_data(drag, 0);
+  bContext *C = asset_drag->evil_C;
+  Scene *scene = CTX_data_scene(C);
+  ViewLayer *view_layer = CTX_data_view_layer(C);
+
+  BKE_view_layer_base_deselect_all(view_layer);
+
+  ID *id = WM_drag_asset_id_import_ex(asset_drag, FILE_AUTOSELECT, true);
+  /* `FILE_AUTOSELECT` causes the collection instance to be both selected and active. */
+
+  /* TODO(sergey): Only update relations for the current scene. */
+  DEG_relations_tag_update(CTX_data_main(C));
+  DEG_id_tag_update(&scene->id, ID_RECALC_SELECT);
+  WM_event_add_notifier(C, NC_SCENE | ND_LAYER_CONTENT, scene);
+  ED_outliner_select_sync_from_object_tag(C);
+
+  float mat[4][4];
+  view3d_collection_drop_matrix_get((Collection *)id, mat);
+  RNA_float_set_array(drop->ptr, "matrix", &mat[0][0]);
+}
+
+static void view3d_collection_drop_copy_local_id(wmDrag *drag, wmDropBox *drop)
+{
+  ID *id = WM_drag_get_local_ID_or_import_from_asset(drag, ID_GR);
+
+  float mat[4][4];
+  view3d_collection_drop_matrix_get((Collection *)id, mat);
 
   float loc[3], rot_quat[4], rot_eul[3], scale[3];
-  mat4_decompose(loc, rot_quat, scale, mat_final);
+  mat4_decompose(loc, rot_quat, scale, mat);
   quat_to_eul(rot_eul, rot_quat);
   RNA_float_set_array(drop->ptr, "location", loc);
   RNA_float_set_array(drop->ptr, "rotation", rot_eul);
@@ -868,7 +919,6 @@ static void view3d_dropboxes(void)
                         view3d_ob_drop_copy_local_id,
                         WM_drag_free_imported_drag_ID,
                         NULL);
-
   drop->draw = WM_drag_draw_item_name_fn;
   drop->draw_activate = view3d_boundbox_drop_draw_activate;
   drop->draw_deactivate = view3d_boundbox_drop_draw_deactivate;
@@ -879,7 +929,28 @@ static void view3d_dropboxes(void)
                         view3d_ob_drop_copy_external_asset,
                         WM_drag_free_imported_drag_ID,
                         NULL);
+  drop->draw = WM_drag_draw_item_name_fn;
+  drop->draw_activate = view3d_boundbox_drop_draw_activate;
+  drop->draw_deactivate = view3d_boundbox_drop_draw_deactivate;
 
+  drop = WM_dropbox_add(lb,
+                        "OBJECT_OT_collection_instance_add",
+                        view3d_collection_drop_poll_local_id,
+                        view3d_collection_drop_copy_local_id,
+                        WM_drag_free_imported_drag_ID,
+                        NULL);
+  drop->draw = WM_drag_draw_item_name_fn;
+  drop->draw_activate = view3d_boundbox_drop_draw_activate;
+  drop->draw_deactivate = view3d_boundbox_drop_draw_deactivate;
+
+  /* Use OBJECT_OT_transform_to_mouse for collection instances as well, to transform the instance
+   * empty. Just needs different callbacks than objects. */
+  drop = WM_dropbox_add(lb,
+                        "OBJECT_OT_transform_to_mouse",
+                        view3d_collection_drop_poll_external_asset,
+                        view3d_collection_instance_drop_copy_external_asset,
+                        WM_drag_free_imported_drag_ID,
+                        NULL);
   drop->draw = WM_drag_draw_item_name_fn;
   drop->draw_activate = view3d_boundbox_drop_draw_activate;
   drop->draw_deactivate = view3d_boundbox_drop_draw_deactivate;
@@ -908,16 +979,6 @@ static void view3d_dropboxes(void)
                  view3d_id_path_drop_copy,
                  WM_drag_free_imported_drag_ID,
                  NULL);
-
-  drop = WM_dropbox_add(lb,
-                        "OBJECT_OT_collection_instance_add",
-                        view3d_collection_drop_poll,
-                        view3d_collection_drop_copy,
-                        WM_drag_free_imported_drag_ID,
-                        NULL);
-  drop->draw = WM_drag_draw_item_name_fn;
-  drop->draw_activate = view3d_boundbox_drop_draw_activate;
-  drop->draw_deactivate = view3d_boundbox_drop_draw_deactivate;
 
   WM_dropbox_add(lb,
                  "OBJECT_OT_data_instance_add",
