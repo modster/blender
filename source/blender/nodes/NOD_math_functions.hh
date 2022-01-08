@@ -463,11 +463,7 @@ inline bool try_dispatch_float_math_fl3_to_fl3(const NodeVectorMathOperation ope
 
   switch (operation) {
     case NODE_VECTOR_MATH_NORMALIZE:
-      return dispatch([](float3 in) {
-        float3 out = in;
-        out.normalize();
-        return out;
-      }); /* Should be safe. */
+      return dispatch([](float3 in) { return float3::normalize(in); }); /* Should be safe. */
     case NODE_VECTOR_MATH_FLOOR:
       return dispatch([](float3 in) { return float3(floor(in.x), floor(in.y), floor(in.z)); });
     case NODE_VECTOR_MATH_CEIL:
