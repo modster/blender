@@ -476,6 +476,21 @@ bool WM_drag_is_ID_type(const wmDrag *drag, int idcode)
   return WM_drag_get_local_ID(drag, idcode) || WM_drag_get_asset_data(drag, idcode);
 }
 
+int WM_drag_get_ID_type(const wmDrag *drag)
+{
+  const ID *local_id = WM_drag_get_local_ID(drag, 0);
+  if (local_id) {
+    return GS(local_id->name);
+  }
+
+  const wmDragAsset *asset_drag = WM_drag_get_asset_data(drag, 0);
+  if (asset_drag) {
+    return asset_drag->id_type;
+  }
+
+  return 0;
+}
+
 wmDragAsset *WM_drag_create_asset_data(const AssetHandle *asset,
                                        AssetMetaData *metadata,
                                        const char *path,

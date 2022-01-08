@@ -39,6 +39,7 @@ struct BlendDataReader;
 struct BlendExpander;
 struct BlendLibReader;
 struct BlendWriter;
+struct BoundBox;
 struct Collection;
 struct Library;
 struct Main;
@@ -210,6 +211,20 @@ void BKE_collection_object_cache_free(struct Collection *collection);
 
 struct Base *BKE_collection_or_layer_objects(const struct ViewLayer *view_layer,
                                              struct Collection *collection);
+
+/* Dimensions. */
+
+/**
+ * Calculate the axis-aligned bounding box (in global space) of all objects in this collection,
+ * excluding empties (but including lamps, cameras, curves, etc.).
+ */
+void BKE_collection_boundbox_calc(const struct Collection *collection,
+                                  struct BoundBox *r_boundbox);
+/**
+ * Calculate the axis-aligned dimensions of all objects in this collection, excluding
+ * empties (but including lamps, cameras, curves, etc.).
+ */
+void BKE_collection_dimensions_calc(const struct Collection *collection, float r_vec[3]);
 
 /* Editing. */
 

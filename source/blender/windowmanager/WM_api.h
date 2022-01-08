@@ -1186,6 +1186,7 @@ struct ID *WM_drag_get_local_ID_from_event(const struct wmEvent *event, short id
  * Check if the drag data is either a local ID or an external ID asset of type \a idcode.
  */
 bool WM_drag_is_ID_type(const struct wmDrag *drag, int idcode);
+int WM_drag_get_ID_type(const struct wmDrag *drag);
 
 /**
  * \note: Does not store \a asset in any way, so it's fine to pass a temporary.

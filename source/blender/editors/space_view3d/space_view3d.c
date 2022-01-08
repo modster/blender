@@ -24,6 +24,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "DNA_collection_types.h"
 #include "DNA_defaults.h"
 #include "DNA_gpencil_types.h"
 #include "DNA_lightprobe_types.h"
@@ -500,7 +501,7 @@ static bool view3d_drop_id_in_main_region_poll(bContext *C,
   return WM_drag_is_ID_type(drag, id_type);
 }
 
-static void view3d_ob_drop_draw_activate(struct wmDropBox *drop, wmDrag *drag)
+static void view3d_boundbox_drop_draw_activate(struct wmDropBox *drop, wmDrag *drag)
 {
   V3DSnapCursorState *state = drop->draw_data;
   if (state) {
@@ -513,16 +514,30 @@ static void view3d_ob_drop_draw_activate(struct wmDropBox *drop, wmDrag *drag)
     return;
   }
 
+  const int drag_id_type = WM_drag_get_ID_type(drag);
+  if (!ELEM(drag_id_type, ID_OB, ID_GR)) {
+    return;
+  }
+
   state = drop->draw_data = ED_view3d_cursor_snap_active();
   state->draw_plane = true;
 
   float dimensions[3] = {0.0f};
   if (drag->type == WM_DRAG_ID) {
-    Object *ob = (Object *)WM_drag_get_local_ID(drag, ID_OB);
-    BKE_object_dimensions_get(ob, dimensions);
+    if (drag_id_type == ID_OB) {
+      Object *ob = (Object *)WM_drag_get_local_ID(drag, ID_OB);
+      BKE_object_dimensions_get(ob, dimensions);
+    }
+    else if (drag_id_type == ID_GR) {
+      struct Collection *collection = (struct Collection *)WM_drag_get_local_ID(drag, ID_GR);
+      BKE_collection_dimensions_calc(collection, dimensions);
+    }
+    else {
+      BLI_assert_unreachable();
+    }
   }
   else {
-    struct AssetMetaData *meta_data = WM_drag_get_asset_meta_data(drag, ID_OB);
+    struct AssetMetaData *meta_data = WM_drag_get_asset_meta_data(drag, drag_id_type);
     IDProperty *dimensions_prop = BKE_asset_metadata_idprop_find(meta_data, "dimensions");
     if (dimensions_prop) {
       copy_v3_v3(dimensions, IDP_Array(dimensions_prop));
@@ -536,7 +551,7 @@ static void view3d_ob_drop_draw_activate(struct wmDropBox *drop, wmDrag *drag)
   }
 }
 
-static void view3d_ob_drop_draw_deactivate(struct wmDropBox *drop, wmDrag *UNUSED(drag))
+static void view3d_boundbox_drop_draw_deactivate(struct wmDropBox *drop, wmDrag *UNUSED(drag))
 {
   V3DSnapCursorState *state = drop->draw_data;
   if (state) {
@@ -680,28 +695,35 @@ static bool view3d_volume_drop_poll(bContext *UNUSED(C),
   return (drag->type == WM_DRAG_PATH) && (drag->icon == ICON_FILE_VOLUME);
 }
 
-static void view3d_ob_drop_matrix_from_snap(V3DSnapCursorState *snap_state,
-                                            Object *ob,
-                                            float obmat_final[4][4])
+static void view3d_drop_matrix_from_snap(V3DSnapCursorState *snap_state,
+                                         const BoundBox *bb,
+                                         const float base_mat[4][4],
+                                         float r_mat_final[4][4])
 {
   V3DSnapCursorData *snap_data;
   snap_data = ED_view3d_cursor_snap_data_get(snap_state, NULL, 0, 0);
   BLI_assert(snap_state->draw_box || snap_state->draw_plane);
-  copy_m4_m3(obmat_final, snap_data->plane_omat);
-  copy_v3_v3(obmat_final[3], snap_data->loc);
+  copy_m4_m3(r_mat_final, snap_data->plane_omat);
+  copy_v3_v3(r_mat_final[3], snap_data->loc);
 
   float scale[3];
-  mat4_to_size(scale, ob->obmat);
-  rescale_m4(obmat_final, scale);
+  mat4_to_size(scale, base_mat);
+  rescale_m4(r_mat_final, scale);
 
-  BoundBox *bb = BKE_object_boundbox_get(ob);
   if (bb) {
     float offset[3];
     BKE_boundbox_calc_center_aabb(bb, offset);
     offset[2] = bb->vec[0][2];
-    mul_mat3_m4_v3(obmat_final, offset);
-    sub_v3_v3(obmat_final[3], offset);
+    mul_mat3_m4_v3(r_mat_final, offset);
+    sub_v3_v3(r_mat_final[3], offset);
   }
+}
+
+static void view3d_ob_drop_matrix_from_snap(V3DSnapCursorState *snap_state,
+                                            Object *ob,
+                                            float r_obmat_final[4][4])
+{
+  view3d_drop_matrix_from_snap(snap_state, BKE_object_boundbox_get(ob), ob->obmat, r_obmat_final);
 }
 
 static void view3d_ob_drop_copy_local_id(wmDrag *drag, wmDropBox *drop)
@@ -764,6 +786,22 @@ static void view3d_ob_drop_copy_external_asset(wmDrag *drag, wmDropBox *drop)
 static void view3d_collection_drop_copy(wmDrag *drag, wmDropBox *drop)
 {
   ID *id = WM_drag_get_local_ID_or_import_from_asset(drag, ID_GR);
+
+  V3DSnapCursorState *snap_state = ED_view3d_cursor_snap_state_get();
+  const float unit_mat[4][4];
+  unit_m4((float(*)[])unit_mat);
+  float mat_final[4][4];
+
+  BoundBox boundbox;
+  BKE_collection_boundbox_calc((Collection *)id, &boundbox);
+  view3d_drop_matrix_from_snap(snap_state, &boundbox, unit_mat, mat_final);
+
+  float loc[3], rot_quat[4], rot_eul[3], scale[3];
+  mat4_decompose(loc, rot_quat, scale, mat_final);
+  quat_to_eul(rot_eul, rot_quat);
+  RNA_float_set_array(drop->ptr, "location", loc);
+  RNA_float_set_array(drop->ptr, "rotation", rot_eul);
+  RNA_float_set_array(drop->ptr, "scale", scale);
 
   RNA_int_set(drop->ptr, "session_uuid", (int)id->session_uuid);
 }
@@ -832,8 +870,8 @@ static void view3d_dropboxes(void)
                         NULL);
 
   drop->draw = WM_drag_draw_item_name_fn;
-  drop->draw_activate = view3d_ob_drop_draw_activate;
-  drop->draw_deactivate = view3d_ob_drop_draw_deactivate;
+  drop->draw_activate = view3d_boundbox_drop_draw_activate;
+  drop->draw_deactivate = view3d_boundbox_drop_draw_deactivate;
 
   drop = WM_dropbox_add(lb,
                         "OBJECT_OT_transform_to_mouse",
@@ -843,8 +881,8 @@ static void view3d_dropboxes(void)
                         NULL);
 
   drop->draw = WM_drag_draw_item_name_fn;
-  drop->draw_activate = view3d_ob_drop_draw_activate;
-  drop->draw_deactivate = view3d_ob_drop_draw_deactivate;
+  drop->draw_activate = view3d_boundbox_drop_draw_activate;
+  drop->draw_deactivate = view3d_boundbox_drop_draw_deactivate;
 
   WM_dropbox_add(lb,
                  "OBJECT_OT_drop_named_material",
@@ -870,12 +908,17 @@ static void view3d_dropboxes(void)
                  view3d_id_path_drop_copy,
                  WM_drag_free_imported_drag_ID,
                  NULL);
-  WM_dropbox_add(lb,
-                 "OBJECT_OT_collection_instance_add",
-                 view3d_collection_drop_poll,
-                 view3d_collection_drop_copy,
-                 WM_drag_free_imported_drag_ID,
-                 NULL);
+
+  drop = WM_dropbox_add(lb,
+                        "OBJECT_OT_collection_instance_add",
+                        view3d_collection_drop_poll,
+                        view3d_collection_drop_copy,
+                        WM_drag_free_imported_drag_ID,
+                        NULL);
+  drop->draw = WM_drag_draw_item_name_fn;
+  drop->draw_activate = view3d_boundbox_drop_draw_activate;
+  drop->draw_deactivate = view3d_boundbox_drop_draw_deactivate;
+
   WM_dropbox_add(lb,
                  "OBJECT_OT_data_instance_add",
                  view3d_object_data_drop_poll,

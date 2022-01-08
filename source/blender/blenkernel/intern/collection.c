@@ -26,11 +26,13 @@
 #include "BLI_blenlib.h"
 #include "BLI_iterator.h"
 #include "BLI_listbase.h"
+#include "BLI_math.h"
 #include "BLI_math_base.h"
 #include "BLI_threads.h"
 #include "BLT_translation.h"
 
 #include "BKE_anim_data.h"
+#include "BKE_asset.h"
 #include "BKE_collection.h"
 #include "BKE_icons.h"
 #include "BKE_idprop.h"
@@ -366,6 +368,40 @@ static void collection_blend_read_expand(BlendExpander *expander, ID *id)
   BKE_collection_blend_read_expand(expander, collection);
 }
 
+static IDProperty *collection_asset_dimensions_property(Collection *collection)
+{
+  float dimensions[3];
+  BKE_collection_dimensions_calc(collection, dimensions);
+  if (is_zero_v3(dimensions)) {
+    return NULL;
+  }
+
+  IDPropertyTemplate idprop = {0};
+  idprop.array.len = ARRAY_SIZE(dimensions);
+  idprop.array.type = IDP_FLOAT;
+
+  IDProperty *property = IDP_New(IDP_ARRAY, &idprop, "dimensions");
+  memcpy(IDP_Array(property), dimensions, sizeof(dimensions));
+
+  return property;
+}
+
+static void collection_asset_pre_save(void *asset_ptr, struct AssetMetaData *asset_data)
+{
+  Collection *collection = (Collection *)asset_ptr;
+  BLI_assert(GS(collection->id.name) == ID_GR);
+
+  /* Update dimensions hint for the asset. */
+  IDProperty *dimensions_prop = collection_asset_dimensions_property(collection);
+  if (dimensions_prop) {
+    BKE_asset_metadata_idprop_ensure(asset_data, dimensions_prop);
+  }
+}
+
+AssetTypeInfo AssetType_GR = {
+    /* pre_save_fn */ collection_asset_pre_save,
+};
+
 IDTypeInfo IDType_ID_GR = {
     .id_code = ID_GR,
     .id_filter = FILTER_ID_GR,
@@ -375,7 +411,7 @@ IDTypeInfo IDType_ID_GR = {
     .name_plural = "collections",
     .translation_context = BLT_I18NCONTEXT_ID_COLLECTION,
     .flags = IDTYPE_FLAGS_NO_ANIMDATA,
-    .asset_type_info = NULL,
+    .asset_type_info = &AssetType_GR,
 
     .init_data = collection_init_data,
     .copy_data = collection_copy_data,
@@ -847,6 +883,92 @@ Base *BKE_collection_or_layer_objects(const ViewLayer *view_layer, Collection *c
   }
 
   return FIRSTBASE(view_layer);
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Collection Dimensions
+ * \{ */
+
+/**
+ * \param with_instances: Include the objects of instance collections.
+ * \param with_empties: Include the location of empties in the bounding box.
+ * \param instance_mat: The transform matrix of the object instancing this collection. Pass the
+ *                      unit matrix if the collection is not an instance.
+ */
+static void collection_geometry_boundbox_calc_recursive(const Collection *collection,
+                                                        const bool with_instances,
+                                                        const bool with_empties,
+                                                        float instance_mat[4][4],
+                                                        float r_min[3],
+                                                        float r_max[3])
+{
+  LISTBASE_FOREACH (CollectionObject *, cob, &collection->gobject) {
+    if (with_instances && cob->ob->instance_collection) {
+      float this_instance_collection_mat[4][4];
+      unit_m4(this_instance_collection_mat);
+      sub_v3_v3(this_instance_collection_mat[3], cob->ob->instance_collection->instance_offset);
+      mul_m4_m4m4(this_instance_collection_mat, cob->ob->obmat, instance_mat);
+
+      collection_geometry_boundbox_calc_recursive(cob->ob->instance_collection,
+                                                  with_instances,
+                                                  with_empties,
+                                                  this_instance_collection_mat,
+                                                  r_min,
+                                                  r_max);
+    }
+
+    /* Empties don't contribute to the dimensions. */
+    if (!with_empties && (cob->ob->type == OB_EMPTY)) {
+      continue;
+    }
+
+    BoundBox *bb_object = BKE_object_boundbox_get(cob->ob);
+    if (bb_object) {
+      float obmat[4][4];
+      mul_m4_m4m4(obmat, cob->ob->obmat, instance_mat);
+
+      BKE_boundbox_minmax(bb_object, obmat, r_min, r_max);
+    }
+    else {
+      minmax_v3v3_v3(r_min, r_max, cob->ob->obmat[3]);
+    }
+  }
+
+  LISTBASE_FOREACH (CollectionChild *, child, &collection->children) {
+    collection_geometry_boundbox_calc_recursive(
+        child->collection, with_instances, with_empties, instance_mat, r_min, r_max);
+  }
+}
+
+static void collection_boundbox_min_max(const Collection *collection,
+                                        float r_min[3],
+                                        float r_max[3])
+{
+  INIT_MINMAX(r_min, r_max);
+
+  /* The matrix of the  */
+  float instance_collection_mat[4][4];
+  unit_m4(instance_collection_mat);
+
+  collection_geometry_boundbox_calc_recursive(
+      collection, true, false, instance_collection_mat, r_min, r_max);
+}
+
+void BKE_collection_boundbox_calc(const Collection *collection, BoundBox *r_boundbox)
+{
+  float min[3], max[3];
+  collection_boundbox_min_max(collection, min, max);
+  BKE_boundbox_init_from_minmax(r_boundbox, min, max);
+}
+
+/* TODO invisible objects (either in scene or in viewport)? */
+void BKE_collection_dimensions_calc(const Collection *collection, float r_vec[3])
+{
+  float min[3], max[3];
+  collection_boundbox_min_max(collection, min, max);
+  sub_v3_v3v3(r_vec, max, min);
 }
 
 /** \} */
