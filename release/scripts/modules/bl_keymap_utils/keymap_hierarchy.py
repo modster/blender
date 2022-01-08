@@ -116,7 +116,6 @@ _km_hierarchy = [
         ('Paint Stroke Modal', 'EMPTY', 'WINDOW', []),
         ('Sculpt Expand Modal', 'EMPTY', 'WINDOW', []),
         ('Paint Curve', 'EMPTY', 'WINDOW', []),
-        ('Curve Pen Modal Map', 'EMPTY', 'WINDOW', []),
 
         ('Object Non-modal', 'EMPTY', 'WINDOW', []),  # mode change
 
