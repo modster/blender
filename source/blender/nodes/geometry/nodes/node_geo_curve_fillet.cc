@@ -122,9 +122,9 @@ static Array<float3> calculate_directions(const Span<float3> positions)
   Array<float3> directions(size);
 
   for (const int i : IndexRange(size - 1)) {
-    directions[i] = (positions[i + 1] - positions[i]).normalized();
+    directions[i] = float3::normalize(positions[i + 1] - positions[i]);
   }
-  directions[size - 1] = (positions[0] - positions[size - 1]).normalized();
+  directions[size - 1] = float3::normalize(positions[0] - positions[size - 1]);
 
   return directions;
 }
@@ -135,9 +135,9 @@ static Array<float3> calculate_axes(const Span<float3> directions)
   const int size = directions.size();
   Array<float3> axes(size);
 
-  axes[0] = float3::cross(-directions[size - 1], directions[0]).normalized();
+  axes[0] = float3::normalize(float3::cross(-directions[size - 1], directions[0]));
   for (const int i : IndexRange(1, size - 1)) {
-    axes[i] = float3::cross(-directions[i - 1], directions[i]).normalized();
+    axes[i] = float3::normalize(float3::cross(-directions[i - 1], directions[i]));
   }
 
   return axes;
@@ -415,7 +415,8 @@ static void update_bezier_positions(const FilletData &fd,
     const float3 center = get_center(dst_spline.positions()[i_dst] - positions[i_src], fd, i_src);
     /* Calculate the vector of the radius formed by the first vertex. */
     float3 radius_vec = dst_spline.positions()[i_dst] - center;
-    const float radius = radius_vec.normalize_and_get_length();
+    float radius;
+    radius_vec = float3::normalize_and_get_length(radius_vec, radius);
 
     dst_spline.handle_types_right().slice(1, count - 2).fill(BezierSpline::HandleType::Align);
     dst_spline.handle_types_left().slice(1, count - 2).fill(BezierSpline::HandleType::Align);

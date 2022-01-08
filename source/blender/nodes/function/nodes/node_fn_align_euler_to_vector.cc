@@ -69,7 +69,7 @@ static void align_rotations_auto_pivot(IndexMask mask,
       float3 old_axis;
       mul_v3_m3v3(old_axis, old_rotation, local_main_axis);
 
-      const float3 new_axis = vector.normalized();
+      const float3 new_axis = float3::normalize(vector);
       float3 rotation_axis = float3::cross_high_precision(old_axis, new_axis);
       if (is_zero_v3(rotation_axis)) {
         /* The vectors are linearly dependent, so we fall back to another axis. */

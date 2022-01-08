@@ -101,8 +101,8 @@ static void node_update(bNodeTree *ntree, bNode *node)
 
 static bool colinear_f3_f3_f3(const float3 p1, const float3 p2, const float3 p3)
 {
-  const float3 a = (p2 - p1).normalized();
-  const float3 b = (p3 - p1).normalized();
+  const float3 a = float3::normalize(p2 - p1);
+  const float3 b = float3::normalize(p3 - p1);
   return (ELEM(a, b, b * -1.0f));
 }
 
@@ -126,14 +126,14 @@ static std::unique_ptr<CurveEval> create_point_circle_curve(
   const float3 q2 = float3::interpolate(p2, p3, 0.5f);
 
   /* Normal Vectors of `P1->P2` and `P2->P3` */
-  const float3 v1 = (p2 - p1).normalized();
-  const float3 v2 = (p3 - p2).normalized();
+  const float3 v1 = float3::normalize(p2 - p1);
+  const float3 v2 = float3::normalize(p3 - p2);
 
   /* Normal of plane of main 2 segments P1->P2 and `P2->P3`. */
-  const float3 v3 = float3::cross(v1, v2).normalized();
+  const float3 v3 = float3::normalize(float3::cross(v1, v2));
 
   /* Normal of plane of first perpendicular bisector and `P1->P2`. */
-  const float3 v4 = float3::cross(v3, v1).normalized();
+  const float3 v4 = float3::normalize(float3::cross(v3, v1));
 
   /* Determine Center-point from the intersection of 3 planes. */
   float plane_1[4], plane_2[4], plane_3[4];

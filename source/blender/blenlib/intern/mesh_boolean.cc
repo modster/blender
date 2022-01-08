@@ -2610,7 +2610,7 @@ static void test_tri_inside_shapes(const IMesh &tm,
   double3 test_point = calc_point_inside_tri_db(tri_test);
   /* Offset the test point a tiny bit in the tri_test normal direction. */
   tri_test.populate_plane(false);
-  double3 norm = tri_test.plane->norm.normalized();
+  double3 norm = double3::normalize(tri_test.plane->norm);
   const double offset_amount = 1e-5;
   double3 offset_test_point = test_point + offset_amount * norm;
   if (dbg_level > 0) {
@@ -3332,7 +3332,7 @@ static bool approx_in_line(const double3 &a, const double3 &b, const double3 &c)
 {
   double3 vec1 = b - a;
   double3 vec2 = c - b;
-  double cos_ang = double3::dot(vec1.normalized(), vec2.normalized());
+  double cos_ang = double3::dot(double3::normalize(vec1), double3::normalize(vec2));
   return fabs(cos_ang - 1.0) < 1e-4;
 }
 

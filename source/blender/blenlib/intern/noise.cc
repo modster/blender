@@ -1777,7 +1777,7 @@ void voronoi_distance_to_edge(const float2 coord, const float randomness, float 
       const float2 perpendicularToEdge = vectorToPoint - vectorToClosest;
       if (dot_v2v2(perpendicularToEdge, perpendicularToEdge) > 0.0001f) {
         const float distanceToEdge = dot_v2v2((vectorToClosest + vectorToPoint) / 2.0f,
-                                              perpendicularToEdge.normalized());
+                                              float2::normalize(perpendicularToEdge));
         minDistance = std::min(minDistance, distanceToEdge);
       }
     }
@@ -2032,7 +2032,7 @@ void voronoi_distance_to_edge(const float3 coord, const float randomness, float 
         const float3 perpendicularToEdge = vectorToPoint - vectorToClosest;
         if (dot_v3v3(perpendicularToEdge, perpendicularToEdge) > 0.0001f) {
           const float distanceToEdge = dot_v3v3((vectorToClosest + vectorToPoint) / 2.0f,
-                                                perpendicularToEdge.normalized());
+                                                float3::normalize(perpendicularToEdge));
           minDistance = std::min(minDistance, distanceToEdge);
         }
       }

@@ -200,10 +200,10 @@ Span<float> Spline::evaluated_lengths() const
 
 static float3 direction_bisect(const float3 &prev, const float3 &middle, const float3 &next)
 {
-  const float3 dir_prev = (middle - prev).normalized();
-  const float3 dir_next = (next - middle).normalized();
+  const float3 dir_prev = float3::normalize(middle - prev);
+  const float3 dir_next = float3::normalize(next - middle);
 
-  const float3 result = (dir_prev + dir_next).normalized();
+  const float3 result = float3::normalize(dir_prev + dir_next);
   if (UNLIKELY(result.is_zero())) {
     return float3(0.0f, 0.0f, 1.0f);
   }
@@ -232,8 +232,8 @@ static void calculate_tangents(Span<float3> positions,
     tangents.last() = direction_bisect(second_to_last, last, first);
   }
   else {
-    tangents.first() = (positions[1] - positions[0]).normalized();
-    tangents.last() = (positions.last() - positions[positions.size() - 2]).normalized();
+    tangents.first() = float3::normalize(positions[1] - positions[0]);
+    tangents.last() = float3::normalize(positions.last() - positions[positions.size() - 2]);
   }
 }
 
@@ -286,7 +286,7 @@ static void calculate_normals_z_up(Span<float3> tangents, MutableSpan<float3> r_
       r_normals[i] = {1.0f, 0.0f, 0.0f};
     }
     else {
-      r_normals[i] = float3(tangent.y, -tangent.x, 0.0f).normalized();
+      r_normals[i] = float3::normalize(float3(tangent.y, -tangent.x, 0.0f));
     }
   }
 }
@@ -303,7 +303,7 @@ static float3 calculate_next_normal(const float3 &last_normal,
   }
   const float angle = angle_normalized_v3v3(last_tangent, current_tangent);
   if (angle != 0.0) {
-    const float3 axis = float3::cross(last_tangent, current_tangent).normalized();
+    const float3 axis = float3::normalize(float3::cross(last_tangent, current_tangent));
     return rotate_direction_around_axis(last_normal, axis, angle);
   }
   return last_normal;
@@ -327,7 +327,7 @@ static void calculate_normals_minimum(Span<float3> tangents,
     r_normals[0] = {1.0f, 0.0f, 0.0f};
   }
   else {
-    r_normals[0] = float3(first_tangent.y, -first_tangent.x, 0.0f).normalized();
+    r_normals[0] = float3::normalize(float3(first_tangent.y, -first_tangent.x, 0.0f));
   }
 
   /* Forward normal with minimum twist along the entire spline. */

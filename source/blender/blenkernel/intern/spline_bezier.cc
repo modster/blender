@@ -285,7 +285,7 @@ static void set_handle_position(const float3 &position,
     /* Keep track of the old length of the opposite handle. */
     const float length = float3::distance(handle_other, position);
     /* Set the other handle to directly opposite from the current handle. */
-    const float3 dir = (handle - position).normalized();
+    const float3 dir = float3::normalize(handle - position);
     handle_other = position - dir * length;
   }
 }
@@ -360,10 +360,10 @@ void BezierSpline::correct_end_tangents() const
   MutableSpan<float3> tangents(evaluated_tangents_cache_);
 
   if (handle_positions_right_.first() != positions_.first()) {
-    tangents.first() = (handle_positions_right_.first() - positions_.first()).normalized();
+    tangents.first() = float3::normalize(handle_positions_right_.first() - positions_.first());
   }
   if (handle_positions_left_.last() != positions_.last()) {
-    tangents.last() = (positions_.last() - handle_positions_left_.last()).normalized();
+    tangents.last() = float3::normalize(positions_.last() - handle_positions_left_.last());
   }
 }
 
