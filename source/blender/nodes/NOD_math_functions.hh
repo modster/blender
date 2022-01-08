@@ -259,40 +259,22 @@ inline bool try_dispatch_float_math_fl3_fl3_to_fl3(const NodeVectorMathOperation
     case NODE_VECTOR_MATH_MULTIPLY:
       return dispatch([](float3 a, float3 b) { return a * b; });
     case NODE_VECTOR_MATH_DIVIDE:
-      return dispatch([](float3 a, float3 b) {
-        return float3(safe_divide(a.x, b.x), safe_divide(a.y, b.y), safe_divide(a.z, b.z));
-      });
+      return dispatch([](float3 a, float3 b) { return float3::safe_divide(a, b); });
     case NODE_VECTOR_MATH_CROSS_PRODUCT:
       return dispatch([](float3 a, float3 b) { return float3::cross_high_precision(a, b); });
     case NODE_VECTOR_MATH_PROJECT:
-      return dispatch([](float3 a, float3 b) {
-        float length_squared = b.length_squared();
-        return (length_squared != 0.0) ? (float3::dot(a, b) / length_squared) * b : float3(0.0f);
-      });
+      return dispatch([](float3 a, float3 b) { return float3::project(a, b); });
     case NODE_VECTOR_MATH_REFLECT:
-      return dispatch([](float3 a, float3 b) {
-        b.normalize();
-        return a.reflected(b);
-      });
+      return dispatch([](float3 a, float3 b) { return float3::reflect(a, float3::normalize(b)); });
     case NODE_VECTOR_MATH_SNAP:
-      return dispatch([](float3 a, float3 b) {
-        return float3(floor(safe_divide(a.x, b.x)),
-                      floor(safe_divide(a.y, b.y)),
-                      floor(safe_divide(a.z, b.z))) *
-               b;
-      });
+      return dispatch(
+          [](float3 a, float3 b) { return float3::floor(float3::safe_divide(a, b)) * b; });
     case NODE_VECTOR_MATH_MODULO:
-      return dispatch([](float3 a, float3 b) {
-        return float3(safe_modf(a.x, b.x), safe_modf(a.y, b.y), safe_modf(a.z, b.z));
-      });
+      return dispatch([](float3 a, float3 b) { return float3::mod(a, b); });
     case NODE_VECTOR_MATH_MINIMUM:
-      return dispatch([](float3 a, float3 b) {
-        return float3(min_ff(a.x, b.x), min_ff(a.y, b.y), min_ff(a.z, b.z));
-      });
+      return dispatch([](float3 a, float3 b) { return float3::min(a, b); });
     case NODE_VECTOR_MATH_MAXIMUM:
-      return dispatch([](float3 a, float3 b) {
-        return float3(max_ff(a.x, b.x), max_ff(a.y, b.y), max_ff(a.z, b.z));
-      });
+      return dispatch([](float3 a, float3 b) { return float3::max(a, b); });
     default:
       return false;
   }
@@ -465,12 +447,11 @@ inline bool try_dispatch_float_math_fl3_to_fl3(const NodeVectorMathOperation ope
     case NODE_VECTOR_MATH_NORMALIZE:
       return dispatch([](float3 in) { return float3::normalize(in); }); /* Should be safe. */
     case NODE_VECTOR_MATH_FLOOR:
-      return dispatch([](float3 in) { return float3(floor(in.x), floor(in.y), floor(in.z)); });
+      return dispatch([](float3 in) { return float3::floor(in); });
     case NODE_VECTOR_MATH_CEIL:
-      return dispatch([](float3 in) { return float3(ceil(in.x), ceil(in.y), ceil(in.z)); });
+      return dispatch([](float3 in) { return float3::ceil(in); });
     case NODE_VECTOR_MATH_FRACTION:
-      return dispatch(
-          [](float3 in) { return in - float3(floor(in.x), floor(in.y), floor(in.z)); });
+      return dispatch([](float3 in) { return float3::fract(in); });
     case NODE_VECTOR_MATH_ABSOLUTE:
       return dispatch([](float3 in) { return float3::abs(in); });
     case NODE_VECTOR_MATH_SINE:
