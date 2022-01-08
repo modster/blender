@@ -232,12 +232,14 @@ template<typename T, IS_FLOATING_POINT> inline T normalize(const T &v)
 
 template<typename T, IS_FLOATING_POINT> inline T cross(const T &a, const T &b)
 {
+  BLI_STATIC_ASSERT(T::type_length == 3, "");
   return {a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x};
 }
 
 template<typename T, typename std::enable_if_t<std::is_same<bT, float>::value> * = nullptr>
 inline T cross_high_precision(const T &a, const T &b)
 {
+  BLI_STATIC_ASSERT(T::type_length == 3, "");
   return {(float)((double)a.y * b.z - (double)a.z * b.y),
           (float)((double)a.z * b.x - (double)a.x * b.z),
           (float)((double)a.x * b.y - (double)a.y * b.x)};
@@ -284,7 +286,19 @@ template<typename bT> struct vec2_base {
 
   vec2_base() = default;
 
-  vec2_base(bT value) : x(value), y(value)
+  explicit vec2_base(uint value) : x(value), y(value)
+  {
+  }
+
+  explicit vec2_base(int value) : x(value), y(value)
+  {
+  }
+
+  explicit vec2_base(float value) : x(value), y(value)
+  {
+  }
+
+  explicit vec2_base(double value) : x(value), y(value)
   {
   }
 
@@ -617,11 +631,15 @@ template<typename bT> struct vec3_base {
 
   vec3_base() = default;
 
-  explicit vec3_base(bT value) : x(value), y(value), z(value)
+  explicit vec3_base(uint value) : x(value), y(value), z(value)
   {
   }
 
   explicit vec3_base(int value) : x(value), y(value), z(value)
+  {
+  }
+
+  explicit vec3_base(float value) : x(value), y(value), z(value)
   {
   }
 
@@ -993,7 +1011,19 @@ template<typename bT> struct vec4_base {
 
   vec4_base() = default;
 
-  vec4_base(bT value) : x(value), y(value), z(value), w(value)
+  explicit vec4_base(uint value) : x(value), y(value), z(value), w(value)
+  {
+  }
+
+  explicit vec4_base(int value) : x(value), y(value), z(value), w(value)
+  {
+  }
+
+  explicit vec4_base(float value) : x(value), y(value), z(value), w(value)
+  {
+  }
+
+  explicit vec4_base(double value) : x(value), y(value), z(value), w(value)
   {
   }
 
