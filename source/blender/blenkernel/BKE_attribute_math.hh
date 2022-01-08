@@ -165,7 +165,7 @@ template<> inline float2 mix2(const float factor, const float2 &a, const float2 
 
 template<> inline float3 mix2(const float factor, const float3 &a, const float3 &b)
 {
-  return float3::interpolate(a, b, factor);
+  return math::interpolate(a, b, factor);
 }
 
 template<>

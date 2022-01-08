@@ -240,6 +240,8 @@ template<typename Callback>
 inline bool try_dispatch_float_math_fl3_fl3_to_fl3(const NodeVectorMathOperation operation,
                                                    Callback &&callback)
 {
+  using namespace blender::math;
+
   const FloatMathOperationInfo *info = get_float3_math_operation_info(operation);
   if (info == nullptr) {
     return false;
@@ -259,22 +261,21 @@ inline bool try_dispatch_float_math_fl3_fl3_to_fl3(const NodeVectorMathOperation
     case NODE_VECTOR_MATH_MULTIPLY:
       return dispatch([](float3 a, float3 b) { return a * b; });
     case NODE_VECTOR_MATH_DIVIDE:
-      return dispatch([](float3 a, float3 b) { return float3::safe_divide(a, b); });
+      return dispatch([](float3 a, float3 b) { return safe_divide(a, b); });
     case NODE_VECTOR_MATH_CROSS_PRODUCT:
-      return dispatch([](float3 a, float3 b) { return float3::cross_high_precision(a, b); });
+      return dispatch([](float3 a, float3 b) { return cross_high_precision(a, b); });
     case NODE_VECTOR_MATH_PROJECT:
-      return dispatch([](float3 a, float3 b) { return float3::project(a, b); });
+      return dispatch([](float3 a, float3 b) { return project(a, b); });
     case NODE_VECTOR_MATH_REFLECT:
-      return dispatch([](float3 a, float3 b) { return float3::reflect(a, float3::normalize(b)); });
+      return dispatch([](float3 a, float3 b) { return reflect(a, normalize(b)); });
     case NODE_VECTOR_MATH_SNAP:
-      return dispatch(
-          [](float3 a, float3 b) { return float3::floor(float3::safe_divide(a, b)) * b; });
+      return dispatch([](float3 a, float3 b) { return floor(safe_divide(a, b)) * b; });
     case NODE_VECTOR_MATH_MODULO:
-      return dispatch([](float3 a, float3 b) { return float3::mod(a, b); });
+      return dispatch([](float3 a, float3 b) { return mod(a, b); });
     case NODE_VECTOR_MATH_MINIMUM:
-      return dispatch([](float3 a, float3 b) { return float3::min(a, b); });
+      return dispatch([](float3 a, float3 b) { return min(a, b); });
     case NODE_VECTOR_MATH_MAXIMUM:
-      return dispatch([](float3 a, float3 b) { return float3::max(a, b); });
+      return dispatch([](float3 a, float3 b) { return max(a, b); });
     default:
       return false;
   }
@@ -288,6 +289,8 @@ template<typename Callback>
 inline bool try_dispatch_float_math_fl3_fl3_to_fl(const NodeVectorMathOperation operation,
                                                   Callback &&callback)
 {
+  using namespace blender::math;
+
   const FloatMathOperationInfo *info = get_float3_math_operation_info(operation);
   if (info == nullptr) {
     return false;
@@ -301,9 +304,9 @@ inline bool try_dispatch_float_math_fl3_fl3_to_fl(const NodeVectorMathOperation 
 
   switch (operation) {
     case NODE_VECTOR_MATH_DOT_PRODUCT:
-      return dispatch([](float3 a, float3 b) { return float3::dot(a, b); });
+      return dispatch([](float3 a, float3 b) { return dot(a, b); });
     case NODE_VECTOR_MATH_DISTANCE:
-      return dispatch([](float3 a, float3 b) { return float3::distance(a, b); });
+      return dispatch([](float3 a, float3 b) { return distance(a, b); });
     default:
       return false;
   }
@@ -317,6 +320,8 @@ template<typename Callback>
 inline bool try_dispatch_float_math_fl3_fl3_fl3_to_fl3(const NodeVectorMathOperation operation,
                                                        Callback &&callback)
 {
+  using namespace blender::math;
+
   const FloatMathOperationInfo *info = get_float3_math_operation_info(operation);
   if (info == nullptr) {
     return false;
@@ -336,7 +341,7 @@ inline bool try_dispatch_float_math_fl3_fl3_fl3_to_fl3(const NodeVectorMathOpera
         return float3(wrapf(a.x, b.x, c.x), wrapf(a.y, b.y, c.y), wrapf(a.z, b.z, c.z));
       });
     case NODE_VECTOR_MATH_FACEFORWARD:
-      return dispatch([](float3 a, float3 b, float3 c) { return float3::faceforward(a, b, c); });
+      return dispatch([](float3 a, float3 b, float3 c) { return faceforward(a, b, c); });
     default:
       return false;
   }
@@ -350,6 +355,8 @@ template<typename Callback>
 inline bool try_dispatch_float_math_fl3_fl3_fl_to_fl3(const NodeVectorMathOperation operation,
                                                       Callback &&callback)
 {
+  using namespace blender::math;
+
   const FloatMathOperationInfo *info = get_float3_math_operation_info(operation);
   if (info == nullptr) {
     return false;
@@ -363,8 +370,7 @@ inline bool try_dispatch_float_math_fl3_fl3_fl_to_fl3(const NodeVectorMathOperat
 
   switch (operation) {
     case NODE_VECTOR_MATH_REFRACT:
-      return dispatch(
-          [](float3 a, float3 b, float c) { return float3::refract(a, float3::normalize(b), c); });
+      return dispatch([](float3 a, float3 b, float c) { return refract(a, normalize(b), c); });
     default:
       return false;
   }
@@ -378,6 +384,8 @@ template<typename Callback>
 inline bool try_dispatch_float_math_fl3_to_fl(const NodeVectorMathOperation operation,
                                               Callback &&callback)
 {
+  using namespace blender::math;
+
   const FloatMathOperationInfo *info = get_float3_math_operation_info(operation);
   if (info == nullptr) {
     return false;
@@ -391,7 +399,7 @@ inline bool try_dispatch_float_math_fl3_to_fl(const NodeVectorMathOperation oper
 
   switch (operation) {
     case NODE_VECTOR_MATH_LENGTH:
-      return dispatch([](float3 in) { return float3::length(in); });
+      return dispatch([](float3 in) { return length(in); });
     default:
       return false;
   }
@@ -432,6 +440,8 @@ template<typename Callback>
 inline bool try_dispatch_float_math_fl3_to_fl3(const NodeVectorMathOperation operation,
                                                Callback &&callback)
 {
+  using namespace blender::math;
+
   const FloatMathOperationInfo *info = get_float3_math_operation_info(operation);
   if (info == nullptr) {
     return false;
@@ -445,15 +455,15 @@ inline bool try_dispatch_float_math_fl3_to_fl3(const NodeVectorMathOperation ope
 
   switch (operation) {
     case NODE_VECTOR_MATH_NORMALIZE:
-      return dispatch([](float3 in) { return float3::normalize(in); }); /* Should be safe. */
+      return dispatch([](float3 in) { return normalize(in); }); /* Should be safe. */
     case NODE_VECTOR_MATH_FLOOR:
-      return dispatch([](float3 in) { return float3::floor(in); });
+      return dispatch([](float3 in) { return floor(in); });
     case NODE_VECTOR_MATH_CEIL:
-      return dispatch([](float3 in) { return float3::ceil(in); });
+      return dispatch([](float3 in) { return ceil(in); });
     case NODE_VECTOR_MATH_FRACTION:
-      return dispatch([](float3 in) { return float3::fract(in); });
+      return dispatch([](float3 in) { return fract(in); });
     case NODE_VECTOR_MATH_ABSOLUTE:
-      return dispatch([](float3 in) { return float3::abs(in); });
+      return dispatch([](float3 in) { return abs(in); });
     case NODE_VECTOR_MATH_SINE:
       return dispatch([](float3 in) { return float3(sinf(in.x), sinf(in.y), sinf(in.z)); });
     case NODE_VECTOR_MATH_COSINE:

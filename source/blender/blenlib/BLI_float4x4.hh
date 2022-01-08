@@ -63,7 +63,7 @@ struct float4x4 {
      * Without the negation, the result would be a so called improper rotation. That means it
      * contains a reflection. Such an improper rotation matrix could not be converted to another
      * representation of a rotation such as euler angles. */
-    const float3 cross = -float3::cross(forward, up);
+    const float3 cross = -math::cross(forward, up);
 
     float4x4 matrix;
     matrix.values[0][0] = forward.x;

@@ -57,6 +57,7 @@
 using blender::float3;
 using blender::IndexRange;
 using blender::Span;
+using namespace blender;
 
 /* PointCloud datablock */
 
@@ -282,12 +283,12 @@ static MinMaxResult min_max_no_radii(Span<float3> positions)
       [&](IndexRange range, const MinMaxResult &init) {
         MinMaxResult result = init;
         for (const int i : range) {
-          float3::min_max(positions[i], result.min, result.max);
+          math::min_max(positions[i], result.min, result.max);
         }
         return result;
       },
       [](const MinMaxResult &a, const MinMaxResult &b) {
-        return MinMaxResult{float3::min(a.min, b.min), float3::max(a.max, b.max)};
+        return MinMaxResult{math::min(a.min, b.min), math::max(a.max, b.max)};
       });
 }
 
@@ -300,13 +301,13 @@ static MinMaxResult min_max_with_radii(Span<float3> positions, Span<float> radii
       [&](IndexRange range, const MinMaxResult &init) {
         MinMaxResult result = init;
         for (const int i : range) {
-          result.min = float3::min(positions[i] - radii[i], result.min);
-          result.max = float3::max(positions[i] + radii[i], result.max);
+          result.min = math::min(positions[i] - radii[i], result.min);
+          result.max = math::max(positions[i] + radii[i], result.max);
         }
         return result;
       },
       [](const MinMaxResult &a, const MinMaxResult &b) {
-        return MinMaxResult{float3::min(a.min, b.min), float3::max(a.max, b.max)};
+        return MinMaxResult{math::min(a.min, b.min), math::max(a.max, b.max)};
       });
 }
 
@@ -322,8 +323,8 @@ bool BKE_pointcloud_minmax(const PointCloud *pointcloud, float r_min[3], float r
                                                       {pointcloud->radius, pointcloud->totpoint}) :
                                    min_max_no_radii(positions);
 
-  copy_v3_v3(r_min, float3::min(min_max.min, r_min));
-  copy_v3_v3(r_max, float3::max(min_max.max, r_max));
+  copy_v3_v3(r_min, math::min(min_max.min, float3(r_min)));
+  copy_v3_v3(r_max, math::max(min_max.max, float3(r_max)));
 
   return true;
 }

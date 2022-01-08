@@ -120,8 +120,8 @@ static VArray<float3> construct_mesh_normals_gvarray(const MeshComponent &mesh_c
        * calculating unnecessary values and to allow normalizing the result much more simply. */
       for (const int i : mask) {
         const MEdge &edge = edges[i];
-        edge_normals[i] = float3::normalize(
-            float3::interpolate(vert_normals_span[edge.v1], vert_normals_span[edge.v2], 0.5f));
+        edge_normals[i] = math::normalize(
+            math::interpolate(vert_normals_span[edge.v1], vert_normals_span[edge.v2], 0.5f));
       }
 
       return VArray<float3>::ForContainer(std::move(edge_normals));
