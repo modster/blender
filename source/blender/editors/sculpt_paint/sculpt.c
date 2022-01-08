@@ -1331,8 +1331,6 @@ static void sculpt_rake_data_update(struct SculptRakeData *srd, const float co[3
 
 /** \} */
 
-/** \} */
-
 /* -------------------------------------------------------------------- */
 /** \name Sculpt Dynamic Topology
  * \{ */
