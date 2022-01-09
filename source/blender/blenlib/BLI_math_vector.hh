@@ -229,7 +229,7 @@ inline T normalize_and_get_length(const T &v, bT &out_length)
 
 template<typename T, IS_FLOATING_POINT> inline T normalize(const T &v)
 {
-  float len;
+  bT len;
   return normalize_and_get_length(v, len);
 }
 
@@ -257,6 +257,12 @@ template<typename T, IS_FLOATING_POINT>
 inline T faceforward(const T &vector, const T &incident, const T &reference)
 {
   return (dot(reference, incident) < 0) ? vector : -vector;
+}
+
+template<typename T, IS_FLOATING_POINT> inline int dominant_axis(const T &a)
+{
+  T b = abs(a);
+  return ((b.x > b.y) ? ((b.x > b.z) ? 0 : 2) : ((b.y > b.z) ? 1 : 2));
 }
 
 #undef ASSERT_UNIT_VECTOR
@@ -634,6 +640,7 @@ template<typename bT> struct vec2_base {
     bT lambda;
   };
 
+  /* TODO(fclem) Should be moved to math namespace once mpq2 is using the template. */
   static isect_result isect_seg_seg(const vec2_base &v1,
                                     const vec2_base &v2,
                                     const vec2_base &v3,

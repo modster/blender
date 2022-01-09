@@ -215,14 +215,14 @@ void Face::populate_plane(bool need_exact)
       for (int i : index_range()) {
         co[i] = vert[i]->co;
       }
-      normal = double3::cross_poly(co);
+      normal = math::cross_poly(co);
     }
     else {
       double3 tr02 = vert[0]->co - vert[2]->co;
       double3 tr12 = vert[1]->co - vert[2]->co;
-      normal = double3::cross_high_precision(tr02, tr12);
+      normal = math::cross(tr02, tr12);
     }
-    double d = -double3::dot(normal, vert[0]->co);
+    double d = -math::dot(normal, vert[0]->co);
     plane = new Plane(normal, d);
   }
 }
@@ -1098,15 +1098,15 @@ static mpq2 project_3d_to_2d(const mpq3 &p3d, int proj_axis)
  */
 static double supremum_dot_cross(const double3 &a, const double3 &b)
 {
-  double3 abs_a = double3::abs(a);
-  double3 abs_b = double3::abs(b);
+  double3 abs_a = math::abs(a);
+  double3 abs_b = math::abs(b);
   double3 c;
   /* This is dot(cross(a, b), cross(a,b)) but using absolute values for a and b
    * and always using + when operation is + or -. */
   c[0] = abs_a[1] * abs_b[2] + abs_a[2] * abs_b[1];
   c[1] = abs_a[2] * abs_b[0] + abs_a[0] * abs_b[2];
   c[2] = abs_a[0] * abs_b[1] + abs_a[1] * abs_b[0];
-  return double3::dot(c, c);
+  return math::dot(c, c);
 }
 
 /* The index of dot when inputs are plane_coords with index 1 is much higher.
@@ -1143,11 +1143,11 @@ static int filter_plane_side(const double3 &p,
                              const double3 &abs_plane_p,
                              const double3 &abs_plane_no)
 {
-  double d = double3::dot(p - plane_p, plane_no);
+  double d = math::dot(p - plane_p, plane_no);
   if (d == 0.0) {
     return 0;
   }
-  double supremum = double3::dot(abs_p + abs_plane_p, abs_plane_no);
+  double supremum = math::dot(abs_p + abs_plane_p, abs_plane_no);
   double err_bound = supremum * index_plane_side * DBL_EPSILON;
   if (fabs(d) > err_bound) {
     return d > 0 ? 1 : -1;
@@ -1428,11 +1428,11 @@ static ITT_value intersect_tri_tri(const IMesh &tm, int t1, int t2)
   const double3 &d_r2 = vr2->co;
   const double3 &d_n2 = tri2.plane->norm;
 
-  const double3 &abs_d_p1 = double3::abs(d_p1);
-  const double3 &abs_d_q1 = double3::abs(d_q1);
-  const double3 &abs_d_r1 = double3::abs(d_r1);
-  const double3 &abs_d_r2 = double3::abs(d_r2);
-  const double3 &abs_d_n2 = double3::abs(d_n2);
+  const double3 &abs_d_p1 = math::abs(d_p1);
+  const double3 &abs_d_q1 = math::abs(d_q1);
+  const double3 &abs_d_r1 = math::abs(d_r1);
+  const double3 &abs_d_r2 = math::abs(d_r2);
+  const double3 &abs_d_n2 = math::abs(d_n2);
 
   int sp1 = filter_plane_side(d_p1, d_r2, d_n2, abs_d_p1, abs_d_r2, abs_d_n2);
   int sq1 = filter_plane_side(d_q1, d_r2, d_n2, abs_d_q1, abs_d_r2, abs_d_n2);
@@ -1448,9 +1448,9 @@ static ITT_value intersect_tri_tri(const IMesh &tm, int t1, int t2)
   }
 
   const double3 &d_n1 = tri1.plane->norm;
-  const double3 &abs_d_p2 = double3::abs(d_p2);
-  const double3 &abs_d_q2 = double3::abs(d_q2);
-  const double3 &abs_d_n1 = double3::abs(d_n1);
+  const double3 &abs_d_p2 = math::abs(d_p2);
+  const double3 &abs_d_q2 = math::abs(d_q2);
+  const double3 &abs_d_n1 = math::abs(d_n1);
 
   int sp2 = filter_plane_side(d_p2, d_r1, d_n1, abs_d_p2, abs_d_r1, abs_d_n1);
   int sq2 = filter_plane_side(d_q2, d_r1, d_n1, abs_d_q2, abs_d_r1, abs_d_n1);
@@ -2004,9 +2004,9 @@ static bool is_quad_flip_first_third(const double3 &v1,
                                      const double3 &normal)
 {
   double3 dir_v3v1 = v3 - v1;
-  double3 tangent = double3::cross_high_precision(dir_v3v1, normal);
-  double dot = double3::dot(v1, tangent);
-  return (double3::dot(v4, tangent) >= dot) || (double3::dot(v2, tangent) <= dot);
+  double3 tangent = math::cross(dir_v3v1, normal);
+  double dot = math::dot(v1, tangent);
+  return (math::dot(v4, tangent) >= dot) || (math::dot(v2, tangent) <= dot);
 }
 
 /**
@@ -2124,7 +2124,7 @@ static Array<Face *> exact_triangulate_poly(Face *f, IMeshArena *arena)
     f->populate_plane(false);
   }
   const double3 &poly_normal = f->plane->norm;
-  int axis = double3::dominant_axis(poly_normal);
+  int axis = math::dominant_axis(poly_normal);
   /* If project down y axis as opposed to x or z, the orientation
    * of the polygon will be reversed.
    * Yet another reversal happens if the poly normal in the dominant
@@ -2203,8 +2203,8 @@ static bool face_is_degenerate(const Face *f)
   }
   double3 da = v2->co - v0->co;
   double3 db = v2->co - v1->co;
-  double3 dab = double3::cross_high_precision(da, db);
-  double dab_length_squared = double3::length_squared(dab);
+  double3 dab = math::cross(da, db);
+  double dab_length_squared = math::length_squared(dab);
   double err_bound = supremum_dot_cross(dab, dab) * index_dot_cross * DBL_EPSILON;
   if (dab_length_squared > err_bound) {
     return false;
@@ -2231,8 +2231,8 @@ static bool any_degenerate_tris_fast(const Array<Face *> triangulation)
     }
     double3 da = v2->co - v0->co;
     double3 db = v2->co - v1->co;
-    double da_length_squared = double3::length_squared(da);
-    double db_length_squared = double3::length_squared(db);
+    double da_length_squared = math::length_squared(da);
+    double db_length_squared = math::length_squared(db);
     if (da_length_squared == 0.0 || db_length_squared == 0.0) {
       return true;
     }
@@ -2240,8 +2240,8 @@ static bool any_degenerate_tris_fast(const Array<Face *> triangulation)
      * The triangle is almost degenerate if sin t is almost 0.
      * sin^2 t = |da x db|^2 / (|da|^2 |db|^2)
      */
-    double3 dab = double3::cross_high_precision(da, db);
-    double dab_length_squared = double3::length_squared(dab);
+    double3 dab = math::cross(da, db);
+    double dab_length_squared = math::length_squared(dab);
     double sin_squared_t = dab_length_squared / (da_length_squared * db_length_squared);
     if (sin_squared_t < 1e-8) {
       return true;

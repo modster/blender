@@ -2610,7 +2610,7 @@ static void test_tri_inside_shapes(const IMesh &tm,
   double3 test_point = calc_point_inside_tri_db(tri_test);
   /* Offset the test point a tiny bit in the tri_test normal direction. */
   tri_test.populate_plane(false);
-  double3 norm = double3::normalize(tri_test.plane->norm);
+  double3 norm = math::normalize(tri_test.plane->norm);
   const double offset_amount = 1e-5;
   double3 offset_test_point = test_point + offset_amount * norm;
   if (dbg_level > 0) {
@@ -3002,7 +3002,7 @@ static void init_face_merge_state(FaceMergeState *fms,
       std::cout << "process tri = " << &tri << "\n";
     }
     BLI_assert(tri.plane_populated());
-    if (double3::dot(norm, tri.plane->norm) <= 0.0) {
+    if (math::dot(norm, tri.plane->norm) <= 0.0) {
       if (dbg_level > 0) {
         std::cout << "triangle has wrong orientation, skipping\n";
       }
@@ -3027,7 +3027,7 @@ static void init_face_merge_state(FaceMergeState *fms,
       }
       if (me_index == -1) {
         double3 vec = new_me.v2->co - new_me.v1->co;
-        new_me.len_squared = double3::length_squared(vec);
+        new_me.len_squared = math::length_squared(vec);
         new_me.orig = tri.edge_orig[i];
         new_me.is_intersect = tri.is_intersect[i];
         new_me.dissolvable = (new_me.orig == NO_INDEX && !new_me.is_intersect);
@@ -3267,7 +3267,7 @@ static Vector<Face *> merge_tris_for_face(Vector<int> tris,
   bool done = false;
   double3 first_tri_normal = tm.face(tris[0])->plane->norm;
   double3 second_tri_normal = tm.face(tris[1])->plane->norm;
-  if (tris.size() == 2 && double3::dot(first_tri_normal, second_tri_normal) > 0.0) {
+  if (tris.size() == 2 && math::dot(first_tri_normal, second_tri_normal) > 0.0) {
     /* Is this a case where quad with one diagonal remained unchanged?
      * Worth special handling because this case will be very common. */
     Face &tri1 = *tm.face(tris[0]);
@@ -3332,7 +3332,7 @@ static bool approx_in_line(const double3 &a, const double3 &b, const double3 &c)
 {
   double3 vec1 = b - a;
   double3 vec2 = c - b;
-  double cos_ang = double3::dot(double3::normalize(vec1), double3::normalize(vec2));
+  double cos_ang = math::dot(math::normalize(vec1), math::normalize(vec2));
   return fabs(cos_ang - 1.0) < 1e-4;
 }
 

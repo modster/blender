@@ -124,7 +124,7 @@ mpq2::isect_result mpq2::isect_seg_seg(const mpq2 &v1,
 }
 #endif
 
-double3 double3::cross_poly(Span<double3> poly)
+double3 math::cross_poly(Span<double3> poly)
 {
   /* Newell's Method. */
   int nv = static_cast<int>(poly.size());
