@@ -25,12 +25,6 @@
 #include "BKE_mesh_types.h"
 #include "BLI_utildefines.h"
 
-#ifdef __cplusplus
-#  include "BLI_span.hh"
-#  include "DNA_mesh_types.h"
-#  include "DNA_meshdata_types.h"
-#endif
-
 struct BLI_Stack;
 struct BMesh;
 struct BMeshCreateParams;
@@ -984,48 +978,4 @@ BLI_INLINE int BKE_mesh_origindex_mface_mpoly(const int *index_mf_to_mpoly,
 
 #ifdef __cplusplus
 }
-#endif
-
-#ifdef __cplusplus
-
-namespace blender::bke {
-
-inline Span<MVert> mesh_verts(const Mesh &mesh)
-{
-  return {mesh.mvert, mesh.totvert};
-}
-inline MutableSpan<MVert> mesh_verts(Mesh &mesh)
-{
-  return {mesh.mvert, mesh.totvert};
-}
-
-inline Span<MEdge> mesh_edges(const Mesh &mesh)
-{
-  return {mesh.medge, mesh.totedge};
-}
-inline MutableSpan<MEdge> mesh_edges(Mesh &mesh)
-{
-  return {mesh.medge, mesh.totedge};
-}
-
-inline Span<MPoly> mesh_polys(const Mesh &mesh)
-{
-  return {mesh.mpoly, mesh.totpoly};
-}
-inline MutableSpan<MPoly> mesh_polys(Mesh &mesh)
-{
-  return {mesh.mpoly, mesh.totpoly};
-}
-
-inline Span<MLoop> mesh_loops(const Mesh &mesh)
-{
-  return {mesh.mloop, mesh.totloop};
-}
-inline MutableSpan<MLoop> mesh_loops(Mesh &mesh)
-{
-  return {mesh.mloop, mesh.totloop};
-}
-
-}  // namespace blender::bke
-
 #endif
