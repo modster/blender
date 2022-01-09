@@ -594,7 +594,7 @@ GVArray NormalFieldInput::get_varray_for_context(const GeometryComponent &compon
 
 std::string NormalFieldInput::socket_inspection_name() const
 {
-  return TIP_("ID / Index");
+  return TIP_("Normal");
 }
 
 uint64_t NormalFieldInput::hash() const
