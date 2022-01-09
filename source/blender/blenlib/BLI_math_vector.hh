@@ -360,12 +360,12 @@ template<typename bT> struct vec2_base {
     return {a.x + b.x, a.y + b.y};
   }
 
-  friend vec2_base operator+(const vec2_base &a, const int &b)
+  friend vec2_base operator+(const vec2_base &a, const bT &b)
   {
     return {a.x + b, a.y + b};
   }
 
-  friend vec2_base operator+(const int &a, const vec2_base &b)
+  friend vec2_base operator+(const bT &a, const vec2_base &b)
   {
     return b + a;
   }
@@ -377,7 +377,7 @@ template<typename bT> struct vec2_base {
     return *this;
   }
 
-  vec2_base &operator+=(const int &b)
+  vec2_base &operator+=(const bT &b)
   {
     x += b;
     y += b;
@@ -394,12 +394,12 @@ template<typename bT> struct vec2_base {
     return {a.x - b.x, a.y - b.y};
   }
 
-  friend vec2_base operator-(const vec2_base &a, const int &b)
+  friend vec2_base operator-(const vec2_base &a, const bT &b)
   {
     return {a.x - b, a.y - b};
   }
 
-  friend vec2_base operator-(const int &a, const vec2_base &b)
+  friend vec2_base operator-(const bT &a, const vec2_base &b)
   {
     return {a - b.x, a - b.y};
   }
@@ -411,7 +411,7 @@ template<typename bT> struct vec2_base {
     return *this;
   }
 
-  vec2_base &operator-=(const int &b)
+  vec2_base &operator-=(const bT &b)
   {
     x -= b;
     y -= b;
@@ -423,17 +423,17 @@ template<typename bT> struct vec2_base {
     return {a.x * b.x, a.y * b.y};
   }
 
-  friend vec2_base operator*(const vec2_base &a, int b)
+  friend vec2_base operator*(const vec2_base &a, bT b)
   {
     return {a.x * b, a.y * b};
   }
 
-  friend vec2_base operator*(int a, const vec2_base &b)
+  friend vec2_base operator*(bT a, const vec2_base &b)
   {
     return b * a;
   }
 
-  vec2_base &operator*=(int b)
+  vec2_base &operator*=(bT b)
   {
     x *= b;
     y *= b;
@@ -453,19 +453,19 @@ template<typename bT> struct vec2_base {
     return {a.x / b.x, a.y / b.y};
   }
 
-  friend vec2_base operator/(const vec2_base &a, int b)
+  friend vec2_base operator/(const vec2_base &a, bT b)
   {
     BLI_assert(b != bT(0));
     return {a.x / b, a.y / b};
   }
 
-  friend vec2_base operator/(int a, const vec2_base &b)
+  friend vec2_base operator/(bT a, const vec2_base &b)
   {
     BLI_assert(b.x != bT(0) && b.y != bT(0));
     return {a / b.x, a / b.y};
   }
 
-  vec2_base &operator/=(int b)
+  vec2_base &operator/=(bT b)
   {
     BLI_assert(b != bT(0));
     x /= b;
