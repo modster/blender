@@ -40,14 +40,13 @@ float2::isect_result float2::isect_seg_seg(const float2 &v1,
   float div = (v2[0] - v1[0]) * (v4[1] - v3[1]) - (v2[1] - v1[1]) * (v4[0] - v3[0]);
   if (div == 0.0f) {
     ans.lambda = 0.0f;
-    ans.mu = 0.0f;
     ans.kind = float2::isect_result::LINE_LINE_COLINEAR;
   }
   else {
     ans.lambda = ((v1[1] - v3[1]) * (v4[0] - v3[0]) - (v1[0] - v3[0]) * (v4[1] - v3[1])) / div;
-    ans.mu = ((v1[1] - v3[1]) * (v2[0] - v1[0]) - (v1[0] - v3[0]) * (v2[1] - v1[1])) / div;
-    if (ans.lambda >= 0.0f && ans.lambda <= 1.0f && ans.mu >= 0.0f && ans.mu <= 1.0f) {
-      if (ans.lambda == 0.0f || ans.lambda == 1.0f || ans.mu == 0.0f || ans.mu == 1.0f) {
+    float mu = ((v1[1] - v3[1]) * (v2[0] - v1[0]) - (v1[0] - v3[0]) * (v2[1] - v1[1])) / div;
+    if (ans.lambda >= 0.0f && ans.lambda <= 1.0f && mu >= 0.0f && mu <= 1.0f) {
+      if (ans.lambda == 0.0f || ans.lambda == 1.0f || mu == 0.0f || mu == 1.0f) {
         ans.kind = float2::isect_result::LINE_LINE_EXACT;
       }
       else {
