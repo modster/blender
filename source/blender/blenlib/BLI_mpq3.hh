@@ -33,11 +33,11 @@ namespace blender {
 
 using mpq3 = vec3_base<mpq_class>;
 
-uint64_t hash_mpq_class(const mpq_class &value);
-
 namespace math {
 
 mpq3 cross_poly(Span<mpq3> poly);
+
+uint64_t hash_mpq_class(const mpq_class &value);
 
 template<> inline uint64_t vector_hash(const mpq3 &vec)
 {

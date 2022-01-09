@@ -38,6 +38,8 @@
 
 namespace blender::meshintersect {
 
+using namespace blender::math;
+
 /* Throughout this file, template argument T will be an
  * arithmetic-like type, like float, double, or mpq_class. */
 
@@ -788,11 +790,11 @@ bool in_line<mpq_class>(const FatCo<mpq_class> &a,
   }
   vec2<mpq_class> exact_ab = b.exact - a.exact;
   vec2<mpq_class> exact_ac = c.exact - a.exact;
-  if (math::dot(exact_ab, exact_ac) < 0) {
+  if (dot(exact_ab, exact_ac) < 0) {
     return false;
   }
   vec2<mpq_class> exact_bc = c.exact - b.exact;
-  return math::dot(exact_bc, exact_ac) >= 0;
+  return dot(exact_bc, exact_ac) >= 0;
 }
 #endif
 
@@ -801,11 +803,11 @@ bool in_line<double>(const FatCo<double> &a, const FatCo<double> &b, const FatCo
 {
   vec2<double> ab = b.approx - a.approx;
   vec2<double> ac = c.approx - a.approx;
-  if (math::dot(ab, ac) < 0) {
+  if (dot(ab, ac) < 0) {
     return false;
   }
   vec2<double> bc = c.approx - b.approx;
-  return math::dot(bc, ac) >= 0;
+  return dot(bc, ac) >= 0;
 }
 
 template<> CDTVert<double>::CDTVert(const vec2<double> &pt)
@@ -1081,7 +1083,7 @@ template<typename T> CDTEdge<T> *CDTArrangement<T>::split_edge(SymEdge<T> *se, T
   SymEdge<T> *sesymprev = prev(sesym);
   SymEdge<T> *sesymprevsym = sym(sesymprev);
   SymEdge<T> *senext = se->next;
-  CDTVert<T> *v = this->add_vert(math::interpolate(*a, *b, lambda));
+  CDTVert<T> *v = this->add_vert(interpolate(*a, *b, lambda));
   CDTEdge<T> *e = this->add_edge(v, se->next->vert, se->face, sesym->face);
   sesym->vert = v;
   SymEdge<T> *newse = &e->symedges[0];
@@ -1704,16 +1706,16 @@ void fill_crossdata_for_intersect(const FatCo<T> &curco,
   BLI_assert(se_vcva->vert == vc && se_vcva->next->vert == va);
   BLI_assert(se_vcvb->vert == vc && se_vcvb->next->vert == vb);
   UNUSED_VARS_NDEBUG(vc);
-  auto isect = vec2<T>::isect_seg_seg(va->co.exact, vb->co.exact, curco.exact, v2->co.exact);
+  auto isect = isect_seg_seg<vec2<T>>(va->co.exact, vb->co.exact, curco.exact, v2->co.exact);
   T &lambda = isect.lambda;
   switch (isect.kind) {
-    case vec2<T>::isect_result::LINE_LINE_CROSS: {
+    case isect_result<vec2<T>>::LINE_LINE_CROSS: {
 #ifdef WITH_GMP
       if (!std::is_same<T, mpq_class>::value) {
 #else
       if (true) {
 #endif
-        double len_ab = math::distance(va->co.approx, vb->co.approx);
+        double len_ab = distance(va->co.approx, vb->co.approx);
         if (lambda * len_ab <= epsilon) {
           fill_crossdata_for_through_vert(va, se_vcva, cd, cd_next);
         }
@@ -1735,7 +1737,7 @@ void fill_crossdata_for_intersect(const FatCo<T> &curco,
       }
       break;
     }
-    case vec2<T>::isect_result::LINE_LINE_EXACT: {
+    case isect_result<vec2<T>>::LINE_LINE_EXACT: {
       if (lambda == 0) {
         fill_crossdata_for_through_vert(va, se_vcva, cd, cd_next);
       }
@@ -1750,7 +1752,7 @@ void fill_crossdata_for_intersect(const FatCo<T> &curco,
       }
       break;
     }
-    case vec2<T>::isect_result::LINE_LINE_NONE: {
+    case isect_result<vec2<T>>::LINE_LINE_NONE: {
 #ifdef WITH_GMP
       if (std::is_same<T, mpq_class>::value) {
         BLI_assert(false);
@@ -1766,9 +1768,9 @@ void fill_crossdata_for_intersect(const FatCo<T> &curco,
       }
       break;
     }
-    case vec2<T>::isect_result::LINE_LINE_COLINEAR: {
-      if (math::distance_squared(va->co.approx, v2->co.approx) <=
-          math::distance_squared(vb->co.approx, v2->co.approx)) {
+    case isect_result<vec2<T>>::LINE_LINE_COLINEAR: {
+      if (distance_squared(va->co.approx, v2->co.approx) <=
+          distance_squared(vb->co.approx, v2->co.approx)) {
         fill_crossdata_for_through_vert(va, se_vcva, cd, cd_next);
       }
       else {
@@ -1845,7 +1847,7 @@ void get_next_crossing_from_edge(CrossData<T> *cd,
 {
   CDTVert<T> *va = cd->in->vert;
   CDTVert<T> *vb = cd->in->next->vert;
-  vec2<T> curco = math::interpolate(va->co.exact, vb->co.exact, cd->lambda);
+  vec2<T> curco = interpolate(va->co.exact, vb->co.exact, cd->lambda);
   FatCo<T> fat_curco(curco);
   SymEdge<T> *se_ac = sym(cd->in)->next;
   CDTVert<T> *vc = se_ac->next->vert;
@@ -2386,7 +2388,7 @@ template<typename T> void remove_non_constraint_edges_leave_valid_bmesh(CDT_stat
       dissolvable_edges[i].e = e;
       const vec2<double> &co1 = e->symedges[0].vert->co.approx;
       const vec2<double> &co2 = e->symedges[1].vert->co.approx;
-      dissolvable_edges[i].len_squared = math::distance_squared(co1, co2);
+      dissolvable_edges[i].len_squared = distance_squared(co1, co2);
       i++;
     }
   }
@@ -2569,18 +2571,18 @@ template<typename T> void detect_holes(CDT_state<T> *cdt_state)
           if (e->symedges[0].face->visit_index == e->symedges[1].face->visit_index) {
             continue; /* Don't count hits on edges between faces in same region. */
           }
-          auto isect = vec2<T>::isect_seg_seg(ray_end.exact,
+          auto isect = isect_seg_seg<vec2<T>>(ray_end.exact,
                                               mid.exact,
                                               e->symedges[0].vert->co.exact,
                                               e->symedges[1].vert->co.exact);
           switch (isect.kind) {
-            case vec2<T>::isect_result::LINE_LINE_CROSS: {
+            case isect_result<vec2<T>>::LINE_LINE_CROSS: {
               hits++;
               break;
             }
-            case vec2<T>::isect_result::LINE_LINE_EXACT:
-            case vec2<T>::isect_result::LINE_LINE_NONE:
-            case vec2<T>::isect_result::LINE_LINE_COLINEAR:
+            case isect_result<vec2<T>>::LINE_LINE_EXACT:
+            case isect_result<vec2<T>>::LINE_LINE_NONE:
+            case isect_result<vec2<T>>::LINE_LINE_COLINEAR:
               break;
           }
         }

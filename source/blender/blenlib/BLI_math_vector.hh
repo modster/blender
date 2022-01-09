@@ -278,6 +278,22 @@ template<typename T, IS_FLOATING_POINT> inline int dominant_axis(const T &a)
   return ((b.x > b.y) ? ((b.x > b.z) ? 0 : 2) : ((b.y > b.z) ? 1 : 2));
 }
 
+/** Intersections. */
+
+template<typename T, IS_FLOATING_POINT> struct isect_result {
+  enum {
+    LINE_LINE_COLINEAR = -1,
+    LINE_LINE_NONE = 0,
+    LINE_LINE_EXACT = 1,
+    LINE_LINE_CROSS = 2,
+  } kind;
+  bT lambda;
+};
+
+/* TODO(fclem) Should be moved to math namespace once mpq2 is using the template. */
+template<typename T, IS_FLOATING_POINT>
+isect_result<T> isect_seg_seg(const T &v1, const T &v2, const T &v3, const T &v4);
+
 #undef ASSERT_UNIT_VECTOR
 #undef IS_FLOATING_POINT
 #undef IS_INTEGRAL
@@ -640,24 +656,6 @@ template<typename bT> struct vec2_base {
     stream << "(" << v.x << ", " << v.y << ")";
     return stream;
   }
-
-  /** Intersections. */
-
-  struct isect_result {
-    enum {
-      LINE_LINE_COLINEAR = -1,
-      LINE_LINE_NONE = 0,
-      LINE_LINE_EXACT = 1,
-      LINE_LINE_CROSS = 2,
-    } kind;
-    bT lambda;
-  };
-
-  /* TODO(fclem) Should be moved to math namespace once mpq2 is using the template. */
-  static isect_result isect_seg_seg(const vec2_base &v1,
-                                    const vec2_base &v2,
-                                    const vec2_base &v3,
-                                    const vec2_base &v4);
 };
 
 template<typename bT> struct vec3_base {
