@@ -21,9 +21,9 @@
 #include "BLI_double2.hh"
 #include "BLI_double3.hh"
 #include "BLI_float2.hh"
-#include "BLI_float3.hh"
 #include "BLI_hash.hh"
 #include "BLI_math_mpq.hh"
+#include "BLI_math_vector.hh"
 #include "BLI_mpq2.hh"
 #include "BLI_mpq3.hh"
 #include "BLI_span.hh"
@@ -31,6 +31,7 @@
 
 namespace blender {
 
+template<>
 float2::isect_result float2::isect_seg_seg(const float2 &v1,
                                            const float2 &v2,
                                            const float2 &v3,
@@ -60,6 +61,7 @@ float2::isect_result float2::isect_seg_seg(const float2 &v1,
   return ans;
 }
 
+template<>
 double2::isect_result double2::isect_seg_seg(const double2 &v1,
                                              const double2 &v2,
                                              const double2 &v3,

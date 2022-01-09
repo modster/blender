@@ -26,6 +26,9 @@
 #include <iostream>
 #include <type_traits>
 
+#include "BLI_math_base_safe.h"
+#include "BLI_math_vector.h"
+
 #define ASSERT_UNIT_VECTOR(v) \
   { \
     const float _test_unit = length_squared(v); \
@@ -618,6 +621,23 @@ template<typename bT> struct vec2_base {
     stream << "(" << v.x << ", " << v.y << ")";
     return stream;
   }
+
+  /** Intersections. */
+
+  struct isect_result {
+    enum {
+      LINE_LINE_COLINEAR = -1,
+      LINE_LINE_NONE = 0,
+      LINE_LINE_EXACT = 1,
+      LINE_LINE_CROSS = 2,
+    } kind;
+    bT lambda;
+  };
+
+  static isect_result isect_seg_seg(const vec2_base &v1,
+                                    const vec2_base &v2,
+                                    const vec2_base &v3,
+                                    const vec2_base &v4);
 };
 
 template<typename bT> struct vec3_base {

@@ -137,11 +137,6 @@ struct mpq2 {
     return a.x * b.x + a.y * b.y;
   }
 
-  static mpq2 interpolate(const mpq2 &a, const mpq2 &b, mpq_class t)
-  {
-    return a * (1 - t) + b * t;
-  }
-
   static mpq2 abs(const mpq2 &a)
   {
     mpq_class abs_x = (a.x >= 0) ? a.x : -a.x;
@@ -178,6 +173,15 @@ struct mpq2 {
   /** There is a sensible use for hashing on exact arithmetic types. */
   uint64_t hash() const;
 };
+
+namespace math {
+
+MINLINE mpq2 interpolate(const mpq2 &a, const mpq2 &b, mpq_class t)
+{
+  return a * (1 - t) + b * t;
+}
+
+}  // namespace math
 
 }  // namespace blender
 

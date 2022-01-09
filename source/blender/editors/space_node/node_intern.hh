@@ -43,9 +43,6 @@ struct bNodeLink;
 struct bNodeSocket;
 struct wmGizmoGroupType;
 struct wmKeyConfig;
-namespace blender {
-struct float2;
-}
 struct wmWindow;
 
 /** Temporary data used in node link drag modal operator. */

@@ -16,10 +16,6 @@
 
 #pragma once
 
-#include <iostream>
-
-#include "BLI_float2.hh"
-#include "BLI_math_base_safe.h"
 #include "BLI_math_vector.hh"
 
 namespace blender {
