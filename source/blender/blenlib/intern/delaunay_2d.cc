@@ -788,11 +788,11 @@ bool in_line<mpq_class>(const FatCo<mpq_class> &a,
   }
   vec2<mpq_class> exact_ab = b.exact - a.exact;
   vec2<mpq_class> exact_ac = c.exact - a.exact;
-  if (vec2<mpq_class>::dot(exact_ab, exact_ac) < 0) {
+  if (math::dot(exact_ab, exact_ac) < 0) {
     return false;
   }
   vec2<mpq_class> exact_bc = c.exact - b.exact;
-  return vec2<mpq_class>::dot(exact_bc, exact_ac) >= 0;
+  return math::dot(exact_bc, exact_ac) >= 0;
 }
 #endif
 

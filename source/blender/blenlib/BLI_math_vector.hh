@@ -29,6 +29,10 @@
 #include "BLI_math_base_safe.h"
 #include "BLI_math_vector.h"
 
+#ifdef WITH_GMP
+#  include "BLI_math_mpq.hh"
+#endif
+
 #define ASSERT_UNIT_VECTOR(v) \
   { \
     const float _test_unit = length_squared(v); \
@@ -40,14 +44,23 @@
 namespace blender::math {
 
 #define bT typename T::base_type
-#define IS_FLOATING_POINT typename std::enable_if_t<std::is_floating_point<bT>::value> * = nullptr
+
+#ifdef WITH_GMP
+#  define IS_FLOATING_POINT \
+    typename std::enable_if_t< \
+        std::disjunction_v<std::is_floating_point<bT>, std::is_same<bT, mpq_class>>> * = nullptr
+#else
+#  define IS_FLOATING_POINT \
+    typename std::enable_if_t<std::is_floating_point<bT>::value> * = nullptr
+#endif
+
 #define IS_INTEGRAL typename std::enable_if_t<std::is_integral<bT>::value> * = nullptr
 
 template<typename T> inline T abs(const T &a)
 {
   T result;
   for (int i = 0; i < T::type_length; i++) {
-    result[i] = std::abs(a[i]);
+    result[i] = a[i] >= 0 ? a[i] : -a[i];
   }
   return result;
 }

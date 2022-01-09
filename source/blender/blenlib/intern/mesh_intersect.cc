@@ -198,14 +198,14 @@ void Face::populate_plane(bool need_exact)
       for (int i : index_range()) {
         co[i] = vert[i]->co_exact;
       }
-      normal_exact = mpq3::cross_poly(co);
+      normal_exact = math::cross_poly(co);
     }
     else {
       mpq3 tr02 = vert[0]->co_exact - vert[2]->co_exact;
       mpq3 tr12 = vert[1]->co_exact - vert[2]->co_exact;
-      normal_exact = mpq3::cross(tr02, tr12);
+      normal_exact = math::cross(tr02, tr12);
     }
-    mpq_class d_exact = -mpq3::dot(normal_exact, vert[0]->co_exact);
+    mpq_class d_exact = -math::dot(normal_exact, vert[0]->co_exact);
     plane = new Plane(normal_exact, d_exact);
   }
   else {
@@ -1178,9 +1178,9 @@ static inline mpq3 tti_interp(
   ab -= b;
   ac = a;
   ac -= c;
-  mpq_class den = mpq3::dot_with_buffer(ab, n, dotbuf);
+  mpq_class den = math::dot_with_buffer(ab, n, dotbuf);
   BLI_assert(den != 0);
-  mpq_class alpha = mpq3::dot_with_buffer(ac, n, dotbuf) / den;
+  mpq_class alpha = math::dot_with_buffer(ac, n, dotbuf) / den;
   return a - alpha * ab;
 }
 
@@ -1209,7 +1209,7 @@ static inline int tti_above(const mpq3 &a,
   n.y = ba.z * ca.x - ba.x * ca.z;
   n.z = ba.x * ca.y - ba.y * ca.x;
 
-  return sgn(mpq3::dot_with_buffer(ad, n, dotbuf));
+  return sgn(math::dot_with_buffer(ad, n, dotbuf));
 }
 
 /**
@@ -1477,17 +1477,17 @@ static ITT_value intersect_tri_tri(const IMesh &tm, int t1, int t2)
   if (sp1 == 0) {
     buf[0] = p1;
     buf[0] -= r2;
-    sp1 = sgn(mpq3::dot_with_buffer(buf[0], n2, buf[1]));
+    sp1 = sgn(math::dot_with_buffer(buf[0], n2, buf[1]));
   }
   if (sq1 == 0) {
     buf[0] = q1;
     buf[0] -= r2;
-    sq1 = sgn(mpq3::dot_with_buffer(buf[0], n2, buf[1]));
+    sq1 = sgn(math::dot_with_buffer(buf[0], n2, buf[1]));
   }
   if (sr1 == 0) {
     buf[0] = r1;
     buf[0] -= r2;
-    sr1 = sgn(mpq3::dot_with_buffer(buf[0], n2, buf[1]));
+    sr1 = sgn(math::dot_with_buffer(buf[0], n2, buf[1]));
   }
 
   if (dbg_level > 1) {
@@ -1509,17 +1509,17 @@ static ITT_value intersect_tri_tri(const IMesh &tm, int t1, int t2)
   if (sp2 == 0) {
     buf[0] = p2;
     buf[0] -= r1;
-    sp2 = sgn(mpq3::dot_with_buffer(buf[0], n1, buf[1]));
+    sp2 = sgn(math::dot_with_buffer(buf[0], n1, buf[1]));
   }
   if (sq2 == 0) {
     buf[0] = q2;
     buf[0] -= r1;
-    sq2 = sgn(mpq3::dot_with_buffer(buf[0], n1, buf[1]));
+    sq2 = sgn(math::dot_with_buffer(buf[0], n1, buf[1]));
   }
   if (sr2 == 0) {
     buf[0] = r2;
     buf[0] -= r1;
-    sr2 = sgn(mpq3::dot_with_buffer(buf[0], n1, buf[1]));
+    sr2 = sgn(math::dot_with_buffer(buf[0], n1, buf[1]));
   }
 
   if (dbg_level > 1) {
@@ -1721,7 +1721,7 @@ static CDT_data prepare_cdt_input(const IMesh &tm, int t, const Vector<ITT_value
   BLI_assert(tm.face(t)->plane_populated());
   ans.t_plane = tm.face(t)->plane;
   BLI_assert(ans.t_plane->exact_populated());
-  ans.proj_axis = mpq3::dominant_axis(ans.t_plane->norm_exact);
+  ans.proj_axis = math::dominant_axis(ans.t_plane->norm_exact);
   prepare_need_tri(ans, tm, t);
   for (const ITT_value &itt : itts) {
     switch (itt.kind) {
@@ -1757,7 +1757,7 @@ static CDT_data prepare_cdt_input_for_cluster(const IMesh &tm,
   BLI_assert(tm.face(t0)->plane_populated());
   ans.t_plane = tm.face(t0)->plane;
   BLI_assert(ans.t_plane->exact_populated());
-  ans.proj_axis = mpq3::dominant_axis(ans.t_plane->norm_exact);
+  ans.proj_axis = math::dominant_axis(ans.t_plane->norm_exact);
   for (const int t : cl) {
     prepare_need_tri(ans, tm, t);
   }
@@ -2211,7 +2211,7 @@ static bool face_is_degenerate(const Face *f)
   }
   mpq3 a = v2->co_exact - v0->co_exact;
   mpq3 b = v2->co_exact - v1->co_exact;
-  mpq3 ab = mpq3::cross(a, b);
+  mpq3 ab = math::cross(a, b);
   if (ab.x == 0 && ab.y == 0 && ab.z == 0) {
     return true;
   }

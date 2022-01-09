@@ -1633,13 +1633,13 @@ static Edge find_good_sorting_edge(const Vert *testp,
   ordinate[axis_next] = -abscissa[axis];
   ordinate[axis_next_next] = 0;
   /* By construction, dot(abscissa, ordinate) == 0, so they are perpendicular. */
-  mpq3 normal = mpq3::cross(abscissa, ordinate);
+  mpq3 normal = math::cross(abscissa, ordinate);
   if (dbg_level > 0) {
     std::cout << "abscissa = " << abscissa << "\n";
     std::cout << "ordinate = " << ordinate << "\n";
     std::cout << "normal = " << normal << "\n";
   }
-  mpq_class nlen2 = normal.length_squared();
+  mpq_class nlen2 = math::length_squared(normal);
   mpq_class max_abs_slope = -1;
   Edge esort;
   const Vector<Edge> &edges = tmtopo.vert_edges(closestp);
@@ -1648,12 +1648,12 @@ static Edge find_good_sorting_edge(const Vert *testp,
     const mpq3 &co_other = v_other->co_exact;
     mpq3 evec = co_other - co_closest;
     /* Get projection of evec onto plane of abscissa and ordinate. */
-    mpq3 proj_evec = evec - (mpq3::dot(evec, normal) / nlen2) * normal;
+    mpq3 proj_evec = evec - (math::dot(evec, normal) / nlen2) * normal;
     /* The projection calculations along the abscissa and ordinate should
      * be scaled by 1/abscissa and 1/ordinate respectively,
      * but we can skip: it won't affect which `evec` has the maximum slope. */
-    mpq_class evec_a = mpq3::dot(proj_evec, abscissa);
-    mpq_class evec_o = mpq3::dot(proj_evec, ordinate);
+    mpq_class evec_a = math::dot(proj_evec, abscissa);
+    mpq_class evec_o = math::dot(proj_evec, ordinate);
     if (dbg_level > 0) {
       std::cout << "e = " << e << "\n";
       std::cout << "v_other = " << v_other << "\n";
@@ -1791,8 +1791,8 @@ static mpq_class closest_on_tri_to_point(const mpq3 &p,
   ap = p;
   ap -= a;
 
-  mpq_class d1 = mpq3::dot_with_buffer(ab, ap, m);
-  mpq_class d2 = mpq3::dot_with_buffer(ac, ap, m);
+  mpq_class d1 = math::dot_with_buffer(ab, ap, m);
+  mpq_class d2 = math::dot_with_buffer(ac, ap, m);
   if (d1 <= 0 && d2 <= 0) {
     /* Barycentric coordinates (1,0,0). */
     *r_edge = -1;
@@ -1800,13 +1800,13 @@ static mpq_class closest_on_tri_to_point(const mpq3 &p,
     if (dbg_level > 0) {
       std::cout << "  answer = a\n";
     }
-    return mpq3::distance_squared_with_buffer(p, a, m);
+    return math::distance_squared_with_buffer(p, a, m);
   }
   /* Check if p in vertex region outside b. */
   bp = p;
   bp -= b;
-  mpq_class d3 = mpq3::dot_with_buffer(ab, bp, m);
-  mpq_class d4 = mpq3::dot_with_buffer(ac, bp, m);
+  mpq_class d3 = math::dot_with_buffer(ab, bp, m);
+  mpq_class d4 = math::dot_with_buffer(ac, bp, m);
   if (d3 >= 0 && d4 <= d3) {
     /* Barycentric coordinates (0,1,0). */
     *r_edge = -1;
@@ -1814,7 +1814,7 @@ static mpq_class closest_on_tri_to_point(const mpq3 &p,
     if (dbg_level > 0) {
       std::cout << "  answer = b\n";
     }
-    return mpq3::distance_squared_with_buffer(p, b, m);
+    return math::distance_squared_with_buffer(p, b, m);
   }
   /* Check if p in region of ab. */
   mpq_class vc = d1 * d4 - d3 * d2;
@@ -1829,13 +1829,13 @@ static mpq_class closest_on_tri_to_point(const mpq3 &p,
     if (dbg_level > 0) {
       std::cout << "  answer = on ab at " << r << "\n";
     }
-    return mpq3::distance_squared_with_buffer(p, r, m);
+    return math::distance_squared_with_buffer(p, r, m);
   }
   /* Check if p in vertex region outside c. */
   cp = p;
   cp -= c;
-  mpq_class d5 = mpq3::dot_with_buffer(ab, cp, m);
-  mpq_class d6 = mpq3::dot_with_buffer(ac, cp, m);
+  mpq_class d5 = math::dot_with_buffer(ab, cp, m);
+  mpq_class d6 = math::dot_with_buffer(ac, cp, m);
   if (d6 >= 0 && d5 <= d6) {
     /* Barycentric coordinates (0,0,1). */
     *r_edge = -1;
@@ -1843,7 +1843,7 @@ static mpq_class closest_on_tri_to_point(const mpq3 &p,
     if (dbg_level > 0) {
       std::cout << "  answer = c\n";
     }
-    return mpq3::distance_squared_with_buffer(p, c, m);
+    return math::distance_squared_with_buffer(p, c, m);
   }
   /* Check if p in edge region of ac. */
   mpq_class vb = d5 * d2 - d1 * d6;
@@ -1858,7 +1858,7 @@ static mpq_class closest_on_tri_to_point(const mpq3 &p,
     if (dbg_level > 0) {
       std::cout << "  answer = on ac at " << r << "\n";
     }
-    return mpq3::distance_squared_with_buffer(p, r, m);
+    return math::distance_squared_with_buffer(p, r, m);
   }
   /* Check if p in edge region of bc. */
   mpq_class va = d3 * d6 - d5 * d4;
@@ -1874,7 +1874,7 @@ static mpq_class closest_on_tri_to_point(const mpq3 &p,
     if (dbg_level > 0) {
       std::cout << "  answer = on bc at " << r << "\n";
     }
-    return mpq3::distance_squared_with_buffer(p, r, m);
+    return math::distance_squared_with_buffer(p, r, m);
   }
   /* p inside face region. Compute barycentric coordinates (u,v,w). */
   mpq_class denom = 1 / (va + vb + vc);
@@ -1890,7 +1890,7 @@ static mpq_class closest_on_tri_to_point(const mpq3 &p,
   if (dbg_level > 0) {
     std::cout << "  answer = inside at " << r << "\n";
   }
-  return mpq3::distance_squared_with_buffer(p, r, m);
+  return math::distance_squared_with_buffer(p, r, m);
 }
 
 static float closest_on_tri_to_point_float_dist_squared(const float3 &p,

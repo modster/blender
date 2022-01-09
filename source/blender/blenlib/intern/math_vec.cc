@@ -92,6 +92,7 @@ double2::isect_result double2::isect_seg_seg(const double2 &v1,
 }
 
 #ifdef WITH_GMP
+template<>
 mpq2::isect_result mpq2::isect_seg_seg(const mpq2 &v1,
                                        const mpq2 &v2,
                                        const mpq2 &v3,
@@ -148,7 +149,7 @@ double3 math::cross_poly(Span<double3> poly)
 }
 
 #ifdef WITH_GMP
-mpq3 mpq3::cross_poly(Span<mpq3> poly)
+mpq3 math::cross_poly(Span<mpq3> poly)
 {
   /* Newell's Method. */
   int nv = static_cast<int>(poly.size());
@@ -177,20 +178,6 @@ uint64_t hash_mpq_class(const mpq_class &value)
   return get_default_hash(static_cast<float>(value.get_d()));
 }
 
-uint64_t mpq2::hash() const
-{
-  uint64_t hashx = hash_mpq_class(this->x);
-  uint64_t hashy = hash_mpq_class(this->y);
-  return hashx ^ (hashy * 33);
-}
-
-uint64_t mpq3::hash() const
-{
-  uint64_t hashx = hash_mpq_class(this->x);
-  uint64_t hashy = hash_mpq_class(this->y);
-  uint64_t hashz = hash_mpq_class(this->z);
-  return hashx ^ (hashy * 33) ^ (hashz * 33 * 37);
-}
 #endif
 
 }  // namespace blender

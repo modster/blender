@@ -27,158 +27,24 @@
 
 namespace blender {
 
-struct mpq2 {
-  mpq_class x, y;
-
-  mpq2() = default;
-
-  mpq2(const mpq_class *ptr) : x{ptr[0]}, y{ptr[1]}
-  {
-  }
-
-  mpq2(mpq_class x, mpq_class y) : x(x), y(y)
-  {
-  }
-
-  mpq2(const mpq2 &other) : x(other.x), y(other.y)
-  {
-  }
-
-  mpq2(mpq2 &&other) noexcept : x(std::move(other.x)), y(std::move(other.y))
-  {
-  }
-
-  ~mpq2() = default;
-
-  mpq2 &operator=(const mpq2 &other)
-  {
-    if (this != &other) {
-      x = other.x;
-      y = other.y;
-    }
-    return *this;
-  }
-
-  mpq2 &operator=(mpq2 &&other) noexcept
-  {
-    x = std::move(other.x);
-    y = std::move(other.y);
-    return *this;
-  }
-
-  mpq2(const mpq3 &other) : x(other.x), y(other.y)
-  {
-  }
-
-  operator mpq_class *()
-  {
-    return &x;
-  }
-
-  operator const mpq_class *() const
-  {
-    return &x;
-  }
-
-  /**
-   * Cannot do this exactly in rational arithmetic!
-   * Approximate by going in and out of doubles.
-   */
-  mpq_class length() const
-  {
-    mpq_class lsquared = dot(*this, *this);
-    return mpq_class(sqrt(lsquared.get_d()));
-  }
-
-  friend mpq2 operator+(const mpq2 &a, const mpq2 &b)
-  {
-    return {a.x + b.x, a.y + b.y};
-  }
-
-  friend mpq2 operator-(const mpq2 &a, const mpq2 &b)
-  {
-    return {a.x - b.x, a.y - b.y};
-  }
-
-  friend mpq2 operator*(const mpq2 &a, mpq_class b)
-  {
-    return {a.x * b, a.y * b};
-  }
-
-  friend mpq2 operator/(const mpq2 &a, mpq_class b)
-  {
-    BLI_assert(b != 0);
-    return {a.x / b, a.y / b};
-  }
-
-  friend mpq2 operator*(mpq_class a, const mpq2 &b)
-  {
-    return b * a;
-  }
-
-  friend bool operator==(const mpq2 &a, const mpq2 &b)
-  {
-    return a.x == b.x && a.y == b.y;
-  }
-
-  friend bool operator!=(const mpq2 &a, const mpq2 &b)
-  {
-    return a.x != b.x || a.y != b.y;
-  }
-
-  friend std::ostream &operator<<(std::ostream &stream, const mpq2 &v)
-  {
-    stream << "(" << v.x << ", " << v.y << ")";
-    return stream;
-  }
-
-  static mpq_class dot(const mpq2 &a, const mpq2 &b)
-  {
-    return a.x * b.x + a.y * b.y;
-  }
-
-  static mpq2 abs(const mpq2 &a)
-  {
-    mpq_class abs_x = (a.x >= 0) ? a.x : -a.x;
-    mpq_class abs_y = (a.y >= 0) ? a.y : -a.y;
-    return mpq2(abs_x, abs_y);
-  }
-
-  static mpq_class distance(const mpq2 &a, const mpq2 &b)
-  {
-    return (a - b).length();
-  }
-
-  static mpq_class distance_squared(const mpq2 &a, const mpq2 &b)
-  {
-    mpq2 diff = a - b;
-    return dot(diff, diff);
-  }
-
-  struct isect_result {
-    enum {
-      LINE_LINE_COLINEAR = -1,
-      LINE_LINE_NONE = 0,
-      LINE_LINE_EXACT = 1,
-      LINE_LINE_CROSS = 2,
-    } kind;
-    mpq_class lambda;
-  };
-
-  static isect_result isect_seg_seg(const mpq2 &v1,
-                                    const mpq2 &v2,
-                                    const mpq2 &v3,
-                                    const mpq2 &v4);
-
-  /** There is a sensible use for hashing on exact arithmetic types. */
-  uint64_t hash() const;
-};
+using mpq2 = vec2_base<mpq_class>;
 
 namespace math {
 
-MINLINE mpq2 interpolate(const mpq2 &a, const mpq2 &b, mpq_class t)
+template<> inline uint64_t vector_hash(const mpq2 &vec)
 {
-  return a * (1 - t) + b * t;
+  uint64_t hashx = hash_mpq_class(vec.x);
+  uint64_t hashy = hash_mpq_class(vec.y);
+  return hashx ^ (hashy * 33);
+}
+
+/**
+ * Cannot do this exactly in rational arithmetic!
+ * Approximate by going in and out of doubles.
+ */
+template<> inline mpq_class length(const mpq2 &a)
+{
+  return mpq_class(sqrt(length_squared(a).get_d()));
 }
 
 }  // namespace math
