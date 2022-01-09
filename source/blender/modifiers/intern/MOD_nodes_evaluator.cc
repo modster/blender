@@ -16,9 +16,6 @@
 
 #include "MOD_nodes_evaluator.hh"
 
-#include "DNA_meshdata_types.h"
-
-#include "BKE_mesh.h"
 #include "BKE_type_conversions.hh"
 
 #include "NOD_geometry_exec.hh"
