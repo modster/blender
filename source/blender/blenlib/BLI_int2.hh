@@ -16,14 +16,11 @@
 
 #pragma once
 
-#include <iostream>
-
-#include "BLI_float2.hh"
-#include "BLI_math_base_safe.h"
 #include "BLI_math_vector.hh"
 
 namespace blender {
 
-using float3 = vec3_base<float>;
+using int2 = vec2_base<int32_t>;
+using uint2 = vec2_base<uint32_t>;
 
 }  // namespace blender
