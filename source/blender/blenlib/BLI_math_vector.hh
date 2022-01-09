@@ -1174,13 +1174,13 @@ template<typename bT> struct vec4_base {
 
   const bT &operator[](int64_t index) const
   {
-    BLI_assert(index < 4);
+    BLI_assert(index < type_length);
     return (&x)[index];
   }
 
   bT &operator[](int64_t index)
   {
-    BLI_assert(index < 4);
+    BLI_assert(index < type_length);
     return (&x)[index];
   }
 
