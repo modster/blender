@@ -801,11 +801,11 @@ bool in_line<double>(const FatCo<double> &a, const FatCo<double> &b, const FatCo
 {
   vec2<double> ab = b.approx - a.approx;
   vec2<double> ac = c.approx - a.approx;
-  if (vec2<double>::dot(ab, ac) < 0) {
+  if (math::dot(ab, ac) < 0) {
     return false;
   }
   vec2<double> bc = c.approx - b.approx;
-  return vec2<double>::dot(bc, ac) >= 0;
+  return math::dot(bc, ac) >= 0;
 }
 
 template<> CDTVert<double>::CDTVert(const vec2<double> &pt)
@@ -1081,7 +1081,7 @@ template<typename T> CDTEdge<T> *CDTArrangement<T>::split_edge(SymEdge<T> *se, T
   SymEdge<T> *sesymprev = prev(sesym);
   SymEdge<T> *sesymprevsym = sym(sesymprev);
   SymEdge<T> *senext = se->next;
-  CDTVert<T> *v = this->add_vert(vec2<T>::interpolate(*a, *b, lambda));
+  CDTVert<T> *v = this->add_vert(math::interpolate(*a, *b, lambda));
   CDTEdge<T> *e = this->add_edge(v, se->next->vert, se->face, sesym->face);
   sesym->vert = v;
   SymEdge<T> *newse = &e->symedges[0];
@@ -1713,7 +1713,7 @@ void fill_crossdata_for_intersect(const FatCo<T> &curco,
 #else
       if (true) {
 #endif
-        double len_ab = vec2<double>::distance(va->co.approx, vb->co.approx);
+        double len_ab = math::distance(va->co.approx, vb->co.approx);
         if (lambda * len_ab <= epsilon) {
           fill_crossdata_for_through_vert(va, se_vcva, cd, cd_next);
         }
@@ -1767,8 +1767,8 @@ void fill_crossdata_for_intersect(const FatCo<T> &curco,
       break;
     }
     case vec2<T>::isect_result::LINE_LINE_COLINEAR: {
-      if (vec2<double>::distance_squared(va->co.approx, v2->co.approx) <=
-          vec2<double>::distance_squared(vb->co.approx, v2->co.approx)) {
+      if (math::distance_squared(va->co.approx, v2->co.approx) <=
+          math::distance_squared(vb->co.approx, v2->co.approx)) {
         fill_crossdata_for_through_vert(va, se_vcva, cd, cd_next);
       }
       else {
@@ -1845,7 +1845,7 @@ void get_next_crossing_from_edge(CrossData<T> *cd,
 {
   CDTVert<T> *va = cd->in->vert;
   CDTVert<T> *vb = cd->in->next->vert;
-  vec2<T> curco = vec2<T>::interpolate(va->co.exact, vb->co.exact, cd->lambda);
+  vec2<T> curco = math::interpolate(va->co.exact, vb->co.exact, cd->lambda);
   FatCo<T> fat_curco(curco);
   SymEdge<T> *se_ac = sym(cd->in)->next;
   CDTVert<T> *vc = se_ac->next->vert;
@@ -2386,7 +2386,7 @@ template<typename T> void remove_non_constraint_edges_leave_valid_bmesh(CDT_stat
       dissolvable_edges[i].e = e;
       const vec2<double> &co1 = e->symedges[0].vert->co.approx;
       const vec2<double> &co2 = e->symedges[1].vert->co.approx;
-      dissolvable_edges[i].len_squared = vec2<double>::distance_squared(co1, co2);
+      dissolvable_edges[i].len_squared = math::distance_squared(co1, co2);
       i++;
     }
   }
