@@ -448,6 +448,7 @@ shaders/infos/gpu_shader_2D_uv_edges_info.hh
 shaders/infos/gpu_shader_2D_point_varying_size_varying_color_info.hh
 shaders/infos/gpu_shader_2D_point_uniform_size_uniform_color_aa_info.hh
 shaders/infos/gpu_shader_2D_point_uniform_size_uniform_color_outline_aa_info.hh
+shaders/infos/gpu_shader_2D_point_uniform_size_varying_color_outline_aa_info.hh
 #shaders/infos/gpu_shader_todo_info.hh
 )
 
