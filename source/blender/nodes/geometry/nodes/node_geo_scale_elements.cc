@@ -20,6 +20,11 @@
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
 
+#include "UI_interface.h"
+#include "UI_resources.h"
+
+#include "BKE_mesh.h"
+
 #include "node_geometry_util.hh"
 
 namespace blender::nodes::node_geo_scale_elements_cc {
@@ -35,6 +40,11 @@ static void node_declare(NodeDeclarationBuilder &b)
   b.add_output<decl::Geometry>(N_("Geometry"));
 };
 
+static void node_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
+{
+  uiItemR(layout, ptr, "mode", 0, nullptr, ICON_NONE);
+}
+
 struct InputFields {
   Field<bool> selection;
   Field<float3> scale;
@@ -42,6 +52,47 @@ struct InputFields {
   Field<float3> x_axis;
   Field<float3> up;
 };
+
+struct GroupData {
+  float3 scale = {0.0f, 0.0f, 0.0f};
+  float3 pivot = {0.0f, 0.0f, 0.0f};
+  float3 x_axis = {0.0f, 0.0f, 0.0f};
+  float3 up = {0.0f, 0.0f, 0.0f};
+  int tot_elements = 0;
+};
+
+static float4x4 create_transform(const float3 &pivot,
+                                 float3 x_axis,
+                                 const float3 &up,
+                                 const float3 &scale)
+{
+  x_axis = x_axis.normalized();
+  const float3 y_axis = -float3::cross(x_axis, up).normalized();
+  const float3 z_axis = float3::cross(x_axis, y_axis);
+
+  float4x4 transform;
+  unit_m4(transform.values);
+  sub_v3_v3(transform.values[3], pivot);
+
+  float4x4 axis_transform;
+  unit_m4(axis_transform.values);
+  copy_v3_v3(axis_transform.values[0], x_axis);
+  copy_v3_v3(axis_transform.values[1], y_axis);
+  copy_v3_v3(axis_transform.values[2], z_axis);
+
+  float4x4 axis_transform_inv = axis_transform.transposed();
+
+  float4x4 scale_transform;
+  unit_m4(scale_transform.values);
+  scale_transform.values[0][0] = scale.x;
+  scale_transform.values[1][1] = scale.y;
+  scale_transform.values[2][2] = scale.z;
+
+  transform = axis_transform * scale_transform * axis_transform_inv * transform;
+  add_v3_v3(transform.values[3], pivot);
+
+  return transform;
+}
 
 static void scale_faces(MeshComponent &mesh_component, const InputFields &input_fields)
 {
@@ -77,14 +128,6 @@ static void scale_faces(MeshComponent &mesh_component, const InputFields &input_
 
   const Span<int64_t> group_by_vertex_index = disjoint_set.ensure_all_roots();
 
-  struct GroupData {
-    float3 scale = {0.0f, 0.0f, 0.0f};
-    float3 pivot = {0.0f, 0.0f, 0.0f};
-    float3 x_axis = {0.0f, 0.0f, 0.0f};
-    float3 up = {0.0f, 0.0f, 0.0f};
-    int tot_faces = 0;
-  };
-
   const int group_amount = mesh->totvert;
   Array<GroupData> groups_data(group_amount);
   for (const int poly_index : selection) {
@@ -96,48 +139,26 @@ static void scale_faces(MeshComponent &mesh_component, const InputFields &input_
     group_info.scale += scales[poly_index];
     group_info.x_axis += x_axis_vectors[poly_index];
     group_info.up += up_vectors[poly_index];
-    group_info.tot_faces++;
+    group_info.tot_elements++;
   }
 
   Array<float4x4> transforms(group_amount);
   threading::parallel_for(IndexRange(mesh->totvert), 1024, [&](const IndexRange range) {
     for (const int vert_index : range) {
       GroupData &group_data = groups_data[vert_index];
-      if (group_data.tot_faces == 0) {
+      if (group_data.tot_elements == 0) {
         transforms[vert_index] = float4x4::identity();
         continue;
       }
 
-      const float f = 1.0f / group_data.tot_faces;
+      const float f = 1.0f / group_data.tot_elements;
       group_data.scale *= f;
       group_data.pivot *= f;
+      group_data.x_axis *= f;
+      group_data.up *= f;
 
-      const float3 x_axis = group_data.x_axis.normalized();
-      const float3 y_axis = -float3::cross(x_axis, group_data.up).normalized();
-      const float3 z_axis = float3::cross(x_axis, y_axis);
-
-      const float3 pivot = group_data.pivot;
-
-      float4x4 &transform = transforms[vert_index];
-      unit_m4(transform.values);
-      sub_v3_v3(transform.values[3], pivot);
-
-      float4x4 axis_transform;
-      unit_m4(axis_transform.values);
-      copy_v3_v3(axis_transform.values[0], x_axis);
-      copy_v3_v3(axis_transform.values[1], y_axis);
-      copy_v3_v3(axis_transform.values[2], z_axis);
-
-      float4x4 axis_transform_inv = axis_transform.transposed();
-
-      float4x4 scale_transform;
-      unit_m4(scale_transform.values);
-      scale_transform.values[0][0] = group_data.scale.x;
-      scale_transform.values[1][1] = group_data.scale.y;
-      scale_transform.values[2][2] = group_data.scale.z;
-
-      transform = axis_transform * scale_transform * axis_transform_inv * transform;
-      add_v3_v3(transform.values[3], pivot);
+      transforms[vert_index] = create_transform(
+          group_data.pivot, group_data.x_axis, group_data.up, group_data.scale);
     }
   });
 
@@ -150,6 +171,82 @@ static void scale_faces(MeshComponent &mesh_component, const InputFields &input_
       copy_v3_v3(vert.co, new_position);
     }
   });
+
+  BKE_mesh_normals_tag_dirty(mesh);
+}
+
+static void scale_edges(MeshComponent &mesh_component, const InputFields &input_fields)
+{
+  Mesh *mesh = mesh_component.get_for_write();
+  mesh->mvert = static_cast<MVert *>(
+      CustomData_duplicate_referenced_layer(&mesh->vdata, CD_MVERT, mesh->totvert));
+
+  GeometryComponentFieldContext field_context{mesh_component, ATTR_DOMAIN_EDGE};
+  FieldEvaluator evaluator{field_context, mesh->totedge};
+  evaluator.set_selection(input_fields.selection);
+  VArray<float3> scales;
+  VArray<float3> pivots;
+  VArray<float3> x_axis_vectors;
+  VArray<float3> up_vectors;
+  evaluator.add(input_fields.scale, &scales);
+  evaluator.add(input_fields.pivot, &pivots);
+  evaluator.add(input_fields.x_axis, &x_axis_vectors);
+  evaluator.add(input_fields.up, &up_vectors);
+  evaluator.evaluate();
+  const IndexMask selection = evaluator.get_evaluated_selection_as_mask();
+
+  DisjointSet disjoint_set(mesh->totvert);
+  for (const int edge_index : selection) {
+    const MEdge &edge = mesh->medge[edge_index];
+    disjoint_set.join(edge.v1, edge.v2);
+  }
+
+  const Span<int64_t> group_by_vertex_index = disjoint_set.ensure_all_roots();
+
+  const int group_amount = mesh->totvert;
+  Array<GroupData> groups_data(group_amount);
+  for (const int edge_index : selection) {
+    const MEdge &edge = mesh->medge[edge_index];
+    const int group_index = group_by_vertex_index[edge.v1];
+    GroupData &group_info = groups_data[group_index];
+    group_info.pivot += pivots[edge_index];
+    group_info.scale += scales[edge_index];
+    group_info.x_axis += x_axis_vectors[edge_index];
+    group_info.up += up_vectors[edge_index];
+    group_info.tot_elements++;
+  }
+
+  Array<float4x4> transforms(group_amount);
+  threading::parallel_for(IndexRange(mesh->totvert), 1024, [&](const IndexRange range) {
+    for (const int vert_index : range) {
+      GroupData &group_data = groups_data[vert_index];
+      if (group_data.tot_elements == 0) {
+        transforms[vert_index] = float4x4::identity();
+        continue;
+      }
+
+      const float f = 1.0f / group_data.tot_elements;
+      group_data.scale *= f;
+      group_data.pivot *= f;
+      group_data.x_axis *= f;
+      group_data.up *= f;
+
+      transforms[vert_index] = create_transform(
+          group_data.pivot, group_data.x_axis, group_data.up, group_data.scale);
+    }
+  });
+
+  threading::parallel_for(IndexRange(mesh->totvert), 1024, [&](const IndexRange range) {
+    for (const int vert_index : range) {
+      const int group_index = group_by_vertex_index[vert_index];
+      MVert &vert = mesh->mvert[vert_index];
+      const float3 old_position = vert.co;
+      const float3 new_position = transforms[group_index] * old_position;
+      copy_v3_v3(vert.co, new_position);
+    }
+  });
+
+  BKE_mesh_normals_tag_dirty(mesh);
 }
 
 static void node_geo_exec(GeoNodeExecParams params)
@@ -175,6 +272,10 @@ static void node_geo_exec(GeoNodeExecParams params)
         break;
       }
       case GEO_NODE_SCALE_ELEMENTS_MODE_EDGE: {
+        if (geometry.has_mesh()) {
+          MeshComponent &mesh_component = geometry.get_component_for_write<MeshComponent>();
+          scale_edges(mesh_component, input_fields);
+        }
         break;
       }
       case GEO_NODE_SCALE_ELEMENTS_MODE_CURVE: {
@@ -197,5 +298,6 @@ void register_node_type_geo_scale_elements()
   geo_node_type_base(&ntype, GEO_NODE_SCALE_ELEMENTS, "Scale Elements", NODE_CLASS_GEOMETRY);
   ntype.geometry_node_execute = file_ns::node_geo_exec;
   ntype.declare = file_ns::node_declare;
+  ntype.draw_buttons = file_ns::node_layout;
   nodeRegisterType(&ntype);
 }
