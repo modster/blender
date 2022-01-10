@@ -444,6 +444,48 @@ template<typename T, int Size> struct vec_base : public vec_struct_base<T, Size>
     BLI_VEC_OP_IMPL(ret, i, ret[i] = ~a[i]);
   }
 
+  /** Bit-shift operators. */
+
+  BLI_INT_OP(T) friend vec_base operator<<(const vec_base &a, const vec_base &b)
+  {
+    BLI_VEC_OP_IMPL(ret, i, ret[i] = a[i] << b[i]);
+  }
+
+  BLI_INT_OP(T) friend vec_base operator<<(const vec_base &a, T b)
+  {
+    BLI_VEC_OP_IMPL(ret, i, ret[i] = a[i] << b);
+  }
+
+  BLI_INT_OP(T) vec_base &operator<<=(T b)
+  {
+    BLI_VEC_OP_IMPL_SELF(i, (*this)[i] <<= b);
+  }
+
+  BLI_INT_OP(T) vec_base &operator<<=(const vec_base &b)
+  {
+    BLI_VEC_OP_IMPL_SELF(i, (*this)[i] <<= b[i]);
+  }
+
+  BLI_INT_OP(T) friend vec_base operator>>(const vec_base &a, const vec_base &b)
+  {
+    BLI_VEC_OP_IMPL(ret, i, ret[i] = a[i] >> b[i]);
+  }
+
+  BLI_INT_OP(T) friend vec_base operator>>(const vec_base &a, T b)
+  {
+    BLI_VEC_OP_IMPL(ret, i, ret[i] = a[i] >> b);
+  }
+
+  BLI_INT_OP(T) vec_base &operator>>=(T b)
+  {
+    BLI_VEC_OP_IMPL_SELF(i, (*this)[i] >>= b);
+  }
+
+  BLI_INT_OP(T) vec_base &operator>>=(const vec_base &b)
+  {
+    BLI_VEC_OP_IMPL_SELF(i, (*this)[i] >>= b[i]);
+  }
+
   /** Modulo operators. */
 
   BLI_INT_OP(T) friend vec_base operator%(const vec_base &a, const vec_base &b)
