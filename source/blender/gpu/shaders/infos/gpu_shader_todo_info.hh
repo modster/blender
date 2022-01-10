@@ -98,18 +98,6 @@ GPU_SHADER_CREATE_INFO(gpu_shader_instance_varying_color_varying_size)
 },
 
 */
-GPU_SHADER_CREATE_INFO(gpu_shader_2D_area_edges)
-    .vertex_source("gpu_shader_2D_area_borders_vert.glsl")
-    .fragment_source("gpu_shader_2D_area_borders_frag.glsl")
-    .do_static_compilation(true);
-/*
-    [GPU_SHADER_2D_AREA_EDGES] =
-        {
-            .name = "GPU_SHADER_2D_AREA_EDGES",
-            .vert = datatoc_gpu_shader_2D_area_borders_vert_glsl,
-            .frag = datatoc_gpu_shader_2D_area_borders_frag_glsl,
-},
-*/
 GPU_SHADER_CREATE_INFO(gpu_shader_2D_widget_base)
     .vertex_source("gpu_shader_2D_widget_base_vert.glsl")
     .fragment_source("gpu_shader_2D_widget_base_frag.glsl")
