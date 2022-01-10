@@ -1,5 +1,15 @@
 #include "gpu_shader_create_info.hh"
 
+GPU_SHADER_CREATE_INFO(gpu_shader_simple_lighting)
+    .vertex_source("gpu_shader_3D_normal_vert.glsl")
+    .fragment_source("gpu_shader_simple_lighting_frag.glsl")
+    .do_static_compilation(true);
+
+GPU_SHADER_CREATE_INFO(gpu_shader_2D_image_multi_rect_color)
+    .vertex_source("datatoc_gpu_shader_2D_image_multi_rect_vert.glsl")
+    .fragment_source("datatoc_gpu_shader_image_varying_color_frag.glsl")
+    .do_static_compilation(true);
+
 GPU_SHADER_CREATE_INFO(gpu_shader_2D_point_varying_size_varying_color)
     .vertex_source("gpu_shader_2D_point_varying_size_varying_color_vert.glsl")
     .fragment_source("gpu_shader_point_varying_color_frag.glsl")
