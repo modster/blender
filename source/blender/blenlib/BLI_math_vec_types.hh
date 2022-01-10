@@ -36,7 +36,8 @@ namespace blender {
 template<typename T>
 using as_uint_type = std::conditional_t<sizeof(T) == sizeof(uint8_t), uint8_t,
                      std::conditional_t<sizeof(T) == sizeof(uint16_t), uint16_t,
-                     std::conditional_t<sizeof(T) == sizeof(uint32_t), uint32_t, uint64_t>>>;
+                     std::conditional_t<sizeof(T) == sizeof(uint32_t), uint32_t,
+                     std::conditional_t<sizeof(T) == sizeof(uint64_t), uint64_t, void>>>>;
 /* clang-format on */
 
 template<typename T, int Size> struct vec_struct_base {
