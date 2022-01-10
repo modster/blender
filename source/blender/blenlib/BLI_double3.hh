@@ -20,7 +20,7 @@
  * \ingroup bli
  */
 
-#include "BLI_math_vector.hh"
+#include "BLI_math_vec_types.hh"
 #include "BLI_span.hh"
 
 namespace blender {

@@ -261,6 +261,7 @@ set(SRC
   BLI_math_statistics.h
   BLI_math_time.h
   BLI_math_vector.h
+  BLI_math_vec_types.hh
   BLI_memarena.h
   BLI_memblock.h
   BLI_memiter.h
