@@ -62,7 +62,7 @@
 
 #include "node_intern.hh" /* own include */
 
-using blender::float2;
+using namespace blender;
 
 /**
  * Function to detect if there is a visible view3d that uses workbench in texture mode.
@@ -115,7 +115,7 @@ static bNode *node_under_mouse_tweak(bNodeTree &ntree, const float2 &mouse)
     if (node->type == NODE_REROUTE) {
       bNodeSocket *socket = (bNodeSocket *)node->inputs.first;
       const float2 location{socket->locx, socket->locy};
-      if (float2::distance(mouse, location) < 24.0f) {
+      if (math::distance(mouse, location) < 24.0f) {
         return node;
       }
     }

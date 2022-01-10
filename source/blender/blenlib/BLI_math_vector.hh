@@ -26,6 +26,13 @@
 #include <iostream>
 #include <type_traits>
 
+#include "BLI_math_base_safe.h"
+#include "BLI_math_vector.h"
+
+#ifdef WITH_GMP
+#  include "BLI_math_mpq.hh"
+#endif
+
 #define ASSERT_UNIT_VECTOR(v) \
   { \
     const float _test_unit = length_squared(v); \
@@ -37,14 +44,23 @@
 namespace blender::math {
 
 #define bT typename T::base_type
-#define IS_FLOATING_POINT typename std::enable_if_t<std::is_floating_point<bT>::value> * = nullptr
+
+#ifdef WITH_GMP
+#  define IS_FLOATING_POINT \
+    typename std::enable_if_t< \
+        std::disjunction_v<std::is_floating_point<bT>, std::is_same<bT, mpq_class>>> * = nullptr
+#else
+#  define IS_FLOATING_POINT \
+    typename std::enable_if_t<std::is_floating_point<bT>::value> * = nullptr
+#endif
+
 #define IS_INTEGRAL typename std::enable_if_t<std::is_integral<bT>::value> * = nullptr
 
 template<typename T> inline T abs(const T &a)
 {
   T result;
   for (int i = 0; i < T::type_length; i++) {
-    result[i] = std::abs(a[i]);
+    result[i] = a[i] >= 0 ? a[i] : -a[i];
   }
   return result;
 }
@@ -226,7 +242,7 @@ inline T normalize_and_get_length(const T &v, bT &out_length)
 
 template<typename T, IS_FLOATING_POINT> inline T normalize(const T &v)
 {
-  float len;
+  bT len;
   return normalize_and_get_length(v, len);
 }
 
@@ -255,6 +271,28 @@ inline T faceforward(const T &vector, const T &incident, const T &reference)
 {
   return (dot(reference, incident) < 0) ? vector : -vector;
 }
+
+template<typename T, IS_FLOATING_POINT> inline int dominant_axis(const T &a)
+{
+  T b = abs(a);
+  return ((b.x > b.y) ? ((b.x > b.z) ? 0 : 2) : ((b.y > b.z) ? 1 : 2));
+}
+
+/** Intersections. */
+
+template<typename T, IS_FLOATING_POINT> struct isect_result {
+  enum {
+    LINE_LINE_COLINEAR = -1,
+    LINE_LINE_NONE = 0,
+    LINE_LINE_EXACT = 1,
+    LINE_LINE_CROSS = 2,
+  } kind;
+  bT lambda;
+};
+
+/* TODO(fclem) Should be moved to math namespace once mpq2 is using the template. */
+template<typename T, IS_FLOATING_POINT>
+isect_result<T> isect_seg_seg(const T &v1, const T &v2, const T &v3, const T &v4);
 
 #undef ASSERT_UNIT_VECTOR
 #undef IS_FLOATING_POINT
@@ -357,12 +395,12 @@ template<typename bT> struct vec2_base {
     return {a.x + b.x, a.y + b.y};
   }
 
-  friend vec2_base operator+(const vec2_base &a, const int &b)
+  friend vec2_base operator+(const vec2_base &a, const bT &b)
   {
     return {a.x + b, a.y + b};
   }
 
-  friend vec2_base operator+(const int &a, const vec2_base &b)
+  friend vec2_base operator+(const bT &a, const vec2_base &b)
   {
     return b + a;
   }
@@ -374,7 +412,7 @@ template<typename bT> struct vec2_base {
     return *this;
   }
 
-  vec2_base &operator+=(const int &b)
+  vec2_base &operator+=(const bT &b)
   {
     x += b;
     y += b;
@@ -391,12 +429,12 @@ template<typename bT> struct vec2_base {
     return {a.x - b.x, a.y - b.y};
   }
 
-  friend vec2_base operator-(const vec2_base &a, const int &b)
+  friend vec2_base operator-(const vec2_base &a, const bT &b)
   {
     return {a.x - b, a.y - b};
   }
 
-  friend vec2_base operator-(const int &a, const vec2_base &b)
+  friend vec2_base operator-(const bT &a, const vec2_base &b)
   {
     return {a - b.x, a - b.y};
   }
@@ -408,7 +446,7 @@ template<typename bT> struct vec2_base {
     return *this;
   }
 
-  vec2_base &operator-=(const int &b)
+  vec2_base &operator-=(const bT &b)
   {
     x -= b;
     y -= b;
@@ -420,17 +458,17 @@ template<typename bT> struct vec2_base {
     return {a.x * b.x, a.y * b.y};
   }
 
-  friend vec2_base operator*(const vec2_base &a, int b)
+  friend vec2_base operator*(const vec2_base &a, bT b)
   {
     return {a.x * b, a.y * b};
   }
 
-  friend vec2_base operator*(int a, const vec2_base &b)
+  friend vec2_base operator*(bT a, const vec2_base &b)
   {
     return b * a;
   }
 
-  vec2_base &operator*=(int b)
+  vec2_base &operator*=(bT b)
   {
     x *= b;
     y *= b;
@@ -450,19 +488,19 @@ template<typename bT> struct vec2_base {
     return {a.x / b.x, a.y / b.y};
   }
 
-  friend vec2_base operator/(const vec2_base &a, int b)
+  friend vec2_base operator/(const vec2_base &a, bT b)
   {
     BLI_assert(b != bT(0));
     return {a.x / b, a.y / b};
   }
 
-  friend vec2_base operator/(int a, const vec2_base &b)
+  friend vec2_base operator/(bT a, const vec2_base &b)
   {
     BLI_assert(b.x != bT(0) && b.y != bT(0));
     return {a / b.x, a / b.y};
   }
 
-  vec2_base &operator/=(int b)
+  vec2_base &operator/=(bT b)
   {
     BLI_assert(b != bT(0));
     x /= b;
@@ -1136,13 +1174,13 @@ template<typename bT> struct vec4_base {
 
   const bT &operator[](int64_t index) const
   {
-    BLI_assert(index < 4);
+    BLI_assert(index < type_length);
     return (&x)[index];
   }
 
   bT &operator[](int64_t index)
   {
-    BLI_assert(index < 4);
+    BLI_assert(index < type_length);
     return (&x)[index];
   }
 

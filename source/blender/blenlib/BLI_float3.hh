@@ -16,10 +16,6 @@
 
 #pragma once
 
-#include <iostream>
-
-#include "BLI_float2.hh"
-#include "BLI_math_base_safe.h"
 #include "BLI_math_vector.hh"
 
 namespace blender {
@@ -27,22 +23,3 @@ namespace blender {
 using float3 = vec3_base<float>;
 
 }  // namespace blender
-
-namespace blender::math {
-
-// using int2_ = vec2_base<int32_t>;
-// using int3_ = vec3_base<int32_t>;
-// using int4_ = vec4_base<int32_t>;
-
-// using uint2_ = vec2_base<uint32_t>;
-// using uint3_ = vec3_base<uint32_t>;
-// using uint4_ = vec4_base<uint32_t>;
-
-// using float2_ = vec2_base<float>;
-// using float4_ = vec4_base<float>;
-
-// using double2_ = vec2_base<double>;
-// using double3_ = vec3_base<double>;
-// using double4_ = vec4_base<double>;
-
-}  // namespace blender::math

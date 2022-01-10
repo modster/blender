@@ -20,6 +20,7 @@
 
 namespace blender {
 
-using float2 = vec2_base<float>;
+using int2 = vec2_base<int32_t>;
+using uint2 = vec2_base<uint32_t>;
 
 }  // namespace blender
