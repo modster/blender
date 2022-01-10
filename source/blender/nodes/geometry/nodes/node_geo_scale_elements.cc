@@ -14,8 +14,11 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
+#include "BLI_array.hh"
 #include "BLI_disjoint_set.hh"
 #include "BLI_task.hh"
+#include "BLI_vector.hh"
+#include "BLI_vector_set.hh"
 
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
@@ -83,12 +86,11 @@ struct InputFields {
   Field<float3> up;
 };
 
-struct GroupData {
-  float3 scale = {0.0f, 0.0f, 0.0f};
-  float3 pivot = {0.0f, 0.0f, 0.0f};
-  float3 x_axis = {0.0f, 0.0f, 0.0f};
-  float3 up = {0.0f, 0.0f, 0.0f};
-  int tot_elements = 0;
+struct ScaleGroup {
+  /* May contain duplicates. */
+  Vector<int> vertex_indices;
+  /* Either face or edge. */
+  Vector<int> element_indices;
 };
 
 static float4x4 create_transform(const float3 &pivot,
@@ -162,56 +164,65 @@ static void scale_faces(MeshComponent &mesh_component, const InputFields &input_
     disjoint_set.join(poly_loops.first().v, poly_loops.last().v);
   }
 
-  const Span<int64_t> group_by_vertex_index = disjoint_set.ensure_all_roots();
-
-  const int group_amount = mesh->totvert;
-  Array<GroupData> groups_data(group_amount);
+  VectorSet<int> group_ids;
+  Vector<ScaleGroup> scale_groups;
+  scale_groups.reserve(selection.size());
   for (const int poly_index : selection) {
     const MPoly &poly = mesh->mpoly[poly_index];
-    const int first_vertex = mesh->mloop[poly.loopstart].v;
-    const int group_index = group_by_vertex_index[first_vertex];
-    GroupData &group_info = groups_data[group_index];
-    group_info.pivot += pivots[poly_index];
-    if (input_fields.use_uniform_scale) {
-      group_info.scale += float3(uniform_scales[poly_index]);
-      group_info.x_axis += float3(1, 0, 0);
-      group_info.up += float3(0, 0, 1);
+    const Span<MLoop> poly_loops{mesh->mloop + poly.loopstart, poly.totloop};
+    const int group_id = disjoint_set.find_root(poly_loops[0].v);
+    const int group_index = group_ids.index_of_or_add(group_id);
+    if (group_index == scale_groups.size()) {
+      scale_groups.append({});
     }
-    else {
-      group_info.scale += vector_scales[poly_index];
-      group_info.x_axis += x_axis_vectors[poly_index];
-      group_info.up += up_vectors[poly_index];
+    ScaleGroup &group = scale_groups[group_index];
+    for (const MLoop &loop : poly_loops) {
+      group.vertex_indices.append(loop.v);
     }
-    group_info.tot_elements++;
+    group.element_indices.append(poly_index);
   }
 
-  Array<float4x4> transforms(group_amount);
-  threading::parallel_for(IndexRange(mesh->totvert), 1024, [&](const IndexRange range) {
-    for (const int vert_index : range) {
-      GroupData &group_data = groups_data[vert_index];
-      if (group_data.tot_elements == 0) {
-        transforms[vert_index] = float4x4::identity();
-        continue;
+  threading::parallel_for(scale_groups.index_range(), 256, [&](const IndexRange range) {
+    Set<int> handled_vertices;
+    for (const int group_index : range) {
+      const ScaleGroup &group = scale_groups[group_index];
+
+      float3 scale = {0.0f, 0.0f, 0.0f};
+      float3 pivot = {0.0f, 0.0f, 0.0f};
+      float3 x_axis = {0.0f, 0.0f, 0.0f};
+      float3 up = {0.0f, 0.0f, 0.0f};
+
+      for (const int poly_index : group.element_indices) {
+        pivot += pivots[poly_index];
+        if (input_fields.use_uniform_scale) {
+          scale += float3(uniform_scales[poly_index]);
+          x_axis += float3(1, 0, 0);
+          up += float3(0, 0, 1);
+        }
+        else {
+          scale += vector_scales[poly_index];
+          x_axis += x_axis_vectors[poly_index];
+          up += up_vectors[poly_index];
+        }
       }
 
-      const float f = 1.0f / group_data.tot_elements;
-      group_data.scale *= f;
-      group_data.pivot *= f;
-      group_data.x_axis *= f;
-      group_data.up *= f;
+      const float f = 1.0f / group.element_indices.size();
+      scale *= f;
+      pivot *= f;
+      x_axis *= f;
+      up *= f;
 
-      transforms[vert_index] = create_transform(
-          group_data.pivot, group_data.x_axis, group_data.up, group_data.scale);
-    }
-  });
-
-  threading::parallel_for(IndexRange(mesh->totvert), 1024, [&](const IndexRange range) {
-    for (const int vert_index : range) {
-      const int group_index = group_by_vertex_index[vert_index];
-      MVert &vert = mesh->mvert[vert_index];
-      const float3 old_position = vert.co;
-      const float3 new_position = transforms[group_index] * old_position;
-      copy_v3_v3(vert.co, new_position);
+      const float4x4 transform = create_transform(pivot, x_axis, up, scale);
+      handled_vertices.clear();
+      for (const int vert_index : group.vertex_indices) {
+        if (!handled_vertices.add(vert_index)) {
+          continue;
+        }
+        MVert &vert = mesh->mvert[vert_index];
+        const float3 old_position = vert.co;
+        const float3 new_position = transform * old_position;
+        copy_v3_v3(vert.co, new_position);
+      }
     }
   });
 
@@ -250,55 +261,63 @@ static void scale_edges(MeshComponent &mesh_component, const InputFields &input_
     disjoint_set.join(edge.v1, edge.v2);
   }
 
-  const Span<int64_t> group_by_vertex_index = disjoint_set.ensure_all_roots();
-
-  const int group_amount = mesh->totvert;
-  Array<GroupData> groups_data(group_amount);
+  VectorSet<int> group_ids;
+  Vector<ScaleGroup> scale_groups;
+  scale_groups.reserve(selection.size());
   for (const int edge_index : selection) {
     const MEdge &edge = mesh->medge[edge_index];
-    const int group_index = group_by_vertex_index[edge.v1];
-    GroupData &group_info = groups_data[group_index];
-    group_info.pivot += pivots[edge_index];
-    if (input_fields.use_uniform_scale) {
-      group_info.scale += float3(uniform_scales[edge_index]);
-      group_info.x_axis += float3(1, 0, 0);
-      group_info.up += float3(0, 0, 1);
+    const int group_id = disjoint_set.find_root(edge.v1);
+    const int group_index = group_ids.index_of_or_add(group_id);
+    if (group_index == scale_groups.size()) {
+      scale_groups.append({});
     }
-    else {
-      group_info.scale += vector_scales[edge_index];
-      group_info.x_axis += x_axis_vectors[edge_index];
-      group_info.up += up_vectors[edge_index];
-    }
-    group_info.tot_elements++;
+    ScaleGroup &group = scale_groups[group_index];
+    group.vertex_indices.append(edge.v1);
+    group.vertex_indices.append(edge.v2);
+    group.element_indices.append(edge_index);
   }
 
-  Array<float4x4> transforms(group_amount);
-  threading::parallel_for(IndexRange(mesh->totvert), 1024, [&](const IndexRange range) {
-    for (const int vert_index : range) {
-      GroupData &group_data = groups_data[vert_index];
-      if (group_data.tot_elements == 0) {
-        transforms[vert_index] = float4x4::identity();
-        continue;
+  threading::parallel_for(scale_groups.index_range(), 256, [&](const IndexRange range) {
+    Set<int> handled_vertices;
+    for (const int group_index : range) {
+      const ScaleGroup &group = scale_groups[group_index];
+
+      float3 scale = {0.0f, 0.0f, 0.0f};
+      float3 pivot = {0.0f, 0.0f, 0.0f};
+      float3 x_axis = {0.0f, 0.0f, 0.0f};
+      float3 up = {0.0f, 0.0f, 0.0f};
+
+      for (const int edge_index : group.element_indices) {
+        pivot += pivots[edge_index];
+        if (input_fields.use_uniform_scale) {
+          scale += float3(uniform_scales[edge_index]);
+          x_axis += float3(1, 0, 0);
+          up += float3(0, 0, 1);
+        }
+        else {
+          scale += vector_scales[edge_index];
+          x_axis += x_axis_vectors[edge_index];
+          up += up_vectors[edge_index];
+        }
       }
 
-      const float f = 1.0f / group_data.tot_elements;
-      group_data.scale *= f;
-      group_data.pivot *= f;
-      group_data.x_axis *= f;
-      group_data.up *= f;
+      const float f = 1.0f / group.element_indices.size();
+      scale *= f;
+      pivot *= f;
+      x_axis *= f;
+      up *= f;
 
-      transforms[vert_index] = create_transform(
-          group_data.pivot, group_data.x_axis, group_data.up, group_data.scale);
-    }
-  });
-
-  threading::parallel_for(IndexRange(mesh->totvert), 1024, [&](const IndexRange range) {
-    for (const int vert_index : range) {
-      const int group_index = group_by_vertex_index[vert_index];
-      MVert &vert = mesh->mvert[vert_index];
-      const float3 old_position = vert.co;
-      const float3 new_position = transforms[group_index] * old_position;
-      copy_v3_v3(vert.co, new_position);
+      const float4x4 transform = create_transform(pivot, x_axis, up, scale);
+      handled_vertices.clear();
+      for (const int vert_index : group.vertex_indices) {
+        if (!handled_vertices.add(vert_index)) {
+          continue;
+        }
+        MVert &vert = mesh->mvert[vert_index];
+        const float3 old_position = vert.co;
+        const float3 new_position = transform * old_position;
+        copy_v3_v3(vert.co, new_position);
+      }
     }
   });
 
