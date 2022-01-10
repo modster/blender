@@ -86,6 +86,15 @@ struct InputFields {
   Field<float3> up;
 };
 
+struct EvaluatedFields {
+  IndexMask selection;
+  VArray<float> uniform_scales;
+  VArray<float3> vector_scales;
+  VArray<float3> pivots;
+  VArray<float3> x_axis_vectors;
+  VArray<float3> up_vectors;
+};
+
 struct ScaleGroup {
   /* May contain duplicates. */
   Vector<int> vertex_indices;
@@ -126,6 +135,24 @@ static float4x4 create_transform(const float3 &pivot,
   return transform;
 }
 
+static EvaluatedFields evaluate_fields(FieldEvaluator &evaluator, const InputFields &input_fields)
+{
+  EvaluatedFields evaluated;
+  evaluator.set_selection(input_fields.selection);
+  if (input_fields.use_uniform_scale) {
+    evaluator.add(input_fields.uniform_scale, &evaluated.uniform_scales);
+  }
+  else {
+    evaluator.add(input_fields.vector_scale, &evaluated.vector_scales);
+    evaluator.add(input_fields.x_axis, &evaluated.x_axis_vectors);
+    evaluator.add(input_fields.up, &evaluated.up_vectors);
+  }
+  evaluator.add(input_fields.pivot, &evaluated.pivots);
+  evaluator.evaluate();
+  evaluated.selection = evaluator.get_evaluated_selection_as_mask();
+  return evaluated;
+}
+
 static void scale_faces(MeshComponent &mesh_component, const InputFields &input_fields)
 {
   Mesh *mesh = mesh_component.get_for_write();
@@ -134,26 +161,10 @@ static void scale_faces(MeshComponent &mesh_component, const InputFields &input_
 
   GeometryComponentFieldContext field_context{mesh_component, ATTR_DOMAIN_FACE};
   FieldEvaluator evaluator{field_context, mesh->totpoly};
-  evaluator.set_selection(input_fields.selection);
-  VArray<float3> vector_scales;
-  VArray<float> uniform_scales;
-  VArray<float3> pivots;
-  VArray<float3> x_axis_vectors;
-  VArray<float3> up_vectors;
-  if (input_fields.use_uniform_scale) {
-    evaluator.add(input_fields.uniform_scale, &uniform_scales);
-  }
-  else {
-    evaluator.add(input_fields.vector_scale, &vector_scales);
-    evaluator.add(input_fields.x_axis, &x_axis_vectors);
-    evaluator.add(input_fields.up, &up_vectors);
-  }
-  evaluator.add(input_fields.pivot, &pivots);
-  evaluator.evaluate();
-  const IndexMask selection = evaluator.get_evaluated_selection_as_mask();
+  EvaluatedFields evaluated = evaluate_fields(evaluator, input_fields);
 
   DisjointSet disjoint_set(mesh->totvert);
-  for (const int poly_index : selection) {
+  for (const int poly_index : evaluated.selection) {
     const MPoly &poly = mesh->mpoly[poly_index];
     const Span<MLoop> poly_loops{mesh->mloop + poly.loopstart, poly.totloop};
     for (const int loop_index : IndexRange(poly.totloop - 1)) {
@@ -166,8 +177,8 @@ static void scale_faces(MeshComponent &mesh_component, const InputFields &input_
 
   VectorSet<int> group_ids;
   Vector<ScaleGroup> scale_groups;
-  scale_groups.reserve(selection.size());
-  for (const int poly_index : selection) {
+  scale_groups.reserve(evaluated.selection.size());
+  for (const int poly_index : evaluated.selection) {
     const MPoly &poly = mesh->mpoly[poly_index];
     const Span<MLoop> poly_loops{mesh->mloop + poly.loopstart, poly.totloop};
     const int group_id = disjoint_set.find_root(poly_loops[0].v);
@@ -193,16 +204,16 @@ static void scale_faces(MeshComponent &mesh_component, const InputFields &input_
       float3 up = {0.0f, 0.0f, 0.0f};
 
       for (const int poly_index : group.element_indices) {
-        pivot += pivots[poly_index];
+        pivot += evaluated.pivots[poly_index];
         if (input_fields.use_uniform_scale) {
-          scale += float3(uniform_scales[poly_index]);
+          scale += float3(evaluated.uniform_scales[poly_index]);
           x_axis += float3(1, 0, 0);
           up += float3(0, 0, 1);
         }
         else {
-          scale += vector_scales[poly_index];
-          x_axis += x_axis_vectors[poly_index];
-          up += up_vectors[poly_index];
+          scale += evaluated.vector_scales[poly_index];
+          x_axis += evaluated.x_axis_vectors[poly_index];
+          up += evaluated.up_vectors[poly_index];
         }
       }
 
@@ -237,34 +248,18 @@ static void scale_edges(MeshComponent &mesh_component, const InputFields &input_
 
   GeometryComponentFieldContext field_context{mesh_component, ATTR_DOMAIN_EDGE};
   FieldEvaluator evaluator{field_context, mesh->totedge};
-  evaluator.set_selection(input_fields.selection);
-  VArray<float3> vector_scales;
-  VArray<float> uniform_scales;
-  VArray<float3> pivots;
-  VArray<float3> x_axis_vectors;
-  VArray<float3> up_vectors;
-  if (input_fields.use_uniform_scale) {
-    evaluator.add(input_fields.uniform_scale, &uniform_scales);
-  }
-  else {
-    evaluator.add(input_fields.vector_scale, &vector_scales);
-    evaluator.add(input_fields.x_axis, &x_axis_vectors);
-    evaluator.add(input_fields.up, &up_vectors);
-  }
-  evaluator.add(input_fields.pivot, &pivots);
-  evaluator.evaluate();
-  const IndexMask selection = evaluator.get_evaluated_selection_as_mask();
+  EvaluatedFields evaluated = evaluate_fields(evaluator, input_fields);
 
   DisjointSet disjoint_set(mesh->totvert);
-  for (const int edge_index : selection) {
+  for (const int edge_index : evaluated.selection) {
     const MEdge &edge = mesh->medge[edge_index];
     disjoint_set.join(edge.v1, edge.v2);
   }
 
   VectorSet<int> group_ids;
   Vector<ScaleGroup> scale_groups;
-  scale_groups.reserve(selection.size());
-  for (const int edge_index : selection) {
+  scale_groups.reserve(evaluated.selection.size());
+  for (const int edge_index : evaluated.selection) {
     const MEdge &edge = mesh->medge[edge_index];
     const int group_id = disjoint_set.find_root(edge.v1);
     const int group_index = group_ids.index_of_or_add(group_id);
@@ -288,16 +283,16 @@ static void scale_edges(MeshComponent &mesh_component, const InputFields &input_
       float3 up = {0.0f, 0.0f, 0.0f};
 
       for (const int edge_index : group.element_indices) {
-        pivot += pivots[edge_index];
+        pivot += evaluated.pivots[edge_index];
         if (input_fields.use_uniform_scale) {
-          scale += float3(uniform_scales[edge_index]);
+          scale += float3(evaluated.uniform_scales[edge_index]);
           x_axis += float3(1, 0, 0);
           up += float3(0, 0, 1);
         }
         else {
-          scale += vector_scales[edge_index];
-          x_axis += x_axis_vectors[edge_index];
-          up += up_vectors[edge_index];
+          scale += evaluated.vector_scales[edge_index];
+          x_axis += evaluated.x_axis_vectors[edge_index];
+          up += evaluated.up_vectors[edge_index];
         }
       }
 
