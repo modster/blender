@@ -21,3 +21,14 @@ GPU_SHADER_CREATE_INFO(gpu_shader_2D_uv_verts)
     .fragment_source("gpu_shader_point_varying_color_varying_outline_aa_frag.glsl")
     .additional_info("gpu_srgb_to_framebuffer_space")
     .do_static_compilation(true);
+
+GPU_SHADER_CREATE_INFO(gpu_shader_2D_uv_uniform_color)
+    .vertex_in(0, Type::VEC2, "u")
+    .fragment_out(0, Type::VEC4, "fragColor")
+    .vertex_source("gpu_shader_2D_vert.glsl")
+    .fragment_source("gpu_shader_uniform_color_frag.glsl")
+    .push_constant(0, Type::MAT4, "ModelViewProjectionMatrix")
+    .push_constant(16, Type::VEC4, "color")
+    .define("pos u")
+    .additional_info("gpu_srgb_to_framebuffer_space")
+    .do_static_compilation(true);

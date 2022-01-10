@@ -175,20 +175,6 @@ GPU_SHADER_CREATE_INFO(gpu_shader_2D_nodelink_inst)
 },
 
 */
-GPU_SHADER_CREATE_INFO(gpu_shader_2D_uv_uniform_color)
-    .vertex_source("gpu_shader_2D_vert.glsl")
-    .fragment_source("gpu_shader_uniform_color_frag.glsl")
-    .define("UV_POS")
-    .do_static_compilation(true);
-/*
-    [GPU_SHADER_2D_UV_UNIFORM_COLOR] =
-        {
-            .name = "GPU_SHADER_2D_UV_UNIFORM_COLOR",
-            .vert = datatoc_gpu_shader_2D_vert_glsl,
-            .frag = datatoc_gpu_shader_uniform_color_frag_glsl,
-            .defs = "#define UV_POS\n",
-},
-*/
 GPU_SHADER_CREATE_INFO(gpu_shader_gpencil_stroke)
     .vertex_source("gpu_shader_gpencil_stroke_vert.glsl")
     .geometry_source("gpu_shader_gpencil_stroke_geom.glsl")
