@@ -73,6 +73,7 @@
 #include "draw_texture_pool.h"
 
 #include "BLI_float4.hh"
+#include "BLI_int2.hh"
 #include "BLI_int3.hh"
 #include "BLI_int4.hh"
 #include "BLI_span.hh"
@@ -385,17 +386,51 @@ class Texture : NonCopyable {
   }
 
   Texture(const char *name,
-          int w,
-          int h = 0,
-          int d = 0,
-          int mips = 1,
-          eGPUTextureFormat format = GPU_RGBA8,
+          eGPUTextureFormat format,
+          int extent,
           float *data = nullptr,
-          bool layered = false,
-          bool cubemap = false)
+          bool cubemap = false,
+          int mips = 1)
       : name_(name)
   {
-    tx_ = create(w, h, d, mips, format, data, layered, cubemap);
+    tx_ = create(extent, 0, 0, mips, format, data, false, cubemap);
+  }
+
+  Texture(const char *name,
+          eGPUTextureFormat format,
+          int extent,
+          int layers,
+          float *data = nullptr,
+          bool cubemap = false,
+          int mips = 1)
+      : name_(name)
+  {
+    tx_ = create(extent, layers, 0, mips, format, data, true, cubemap);
+  }
+
+  Texture(
+      const char *name, eGPUTextureFormat format, int2 extent, float *data = nullptr, int mips = 1)
+      : name_(name)
+  {
+    tx_ = create(UNPACK2(extent), 0, mips, format, data, false, false);
+  }
+
+  Texture(const char *name,
+          eGPUTextureFormat format,
+          int2 extent,
+          int layers,
+          float *data = nullptr,
+          int mips = 1)
+      : name_(name)
+  {
+    tx_ = create(UNPACK2(extent), layers, mips, format, data, true, false);
+  }
+
+  Texture(
+      const char *name, eGPUTextureFormat format, int3 extent, float *data = nullptr, int mips = 1)
+      : name_(name)
+  {
+    tx_ = create(UNPACK3(extent), mips, format, data, false, false);
   }
 
   ~Texture()
@@ -429,49 +464,39 @@ class Texture : NonCopyable {
    * Ensure the texture has the correct properties. Recreating it if needed.
    * Return true if a texture has been created.
    */
-  bool ensure_1d(int w, int mips = 1, eGPUTextureFormat format = GPU_RGBA8, float *data = nullptr)
+  bool ensure_1d(eGPUTextureFormat format, int extent, int mips = 1, float *data = nullptr)
   {
-    return ensure(w, 0, 0, mips, format, data, false, false);
+    return ensure_impl(extent, 0, 0, mips, format, data, false, false);
   }
   bool ensure_1d_array(
-      int w, int layers, int mips = 1, eGPUTextureFormat format = GPU_RGBA8, float *data = nullptr)
+      eGPUTextureFormat format, int extent, int layers, int mips = 1, float *data = nullptr)
   {
-    return ensure(w, layers, 0, mips, format, data, true, false);
+    return ensure_impl(extent, layers, 0, mips, format, data, true, false);
   }
-  bool ensure_2d(
-      int w, int h, int mips = 1, eGPUTextureFormat format = GPU_RGBA8, float *data = nullptr)
+  bool ensure_2d(eGPUTextureFormat format, const int2 &extent, int mips = 1, float *data = nullptr)
   {
-    return ensure(w, h, 0, mips, format, data, false, false);
+    return ensure_impl(UNPACK2(extent), 0, mips, format, data, false, false);
   }
-  bool ensure_2d_array(int w,
-                       int h,
+  bool ensure_2d_array(eGPUTextureFormat format,
+                       const int2 &extent,
                        int layers,
                        int mips = 1,
-                       eGPUTextureFormat format = GPU_RGBA8,
                        float *data = nullptr)
   {
-    return ensure(w, h, layers, mips, format, data, true, false);
+    return ensure_impl(UNPACK2(extent), layers, mips, format, data, true, false);
   }
-  bool ensure_3d(int w,
-                 int h,
-                 int d,
-                 int mips = 1,
-                 eGPUTextureFormat format = GPU_RGBA8,
-                 float *data = nullptr)
+  bool ensure_3d(eGPUTextureFormat format, const int3 &extent, int mips = 1, float *data = nullptr)
   {
-    return ensure(w, h, d, mips, format, data, false, false);
+    return ensure_impl(UNPACK3(extent), mips, format, data, false, false);
   }
-  bool ensure_cube(int w,
-                   int mips = 1,
-                   eGPUTextureFormat format = GPU_RGBA8,
-                   float *data = nullptr)
+  bool ensure_cube(eGPUTextureFormat format, int extent, int mips = 1, float *data = nullptr)
   {
-    return ensure(w, w, 0, mips, format, data, false, true);
+    return ensure_impl(extent, extent, 0, mips, format, data, false, true);
   }
   bool ensure_cube_array(
-      int w, int layers, int mips = 1, eGPUTextureFormat format = GPU_RGBA8, float *data = nullptr)
+      eGPUTextureFormat format, int extent, int layers, int mips = 1, float *data = nullptr)
   {
-    return ensure(w, w, layers, mips, format, data, false, true);
+    return ensure_impl(extent, extent, layers, mips, format, data, false, true);
   }
 
   bool is_valid(void) const
@@ -534,14 +559,14 @@ class Texture : NonCopyable {
   }
 
  private:
-  bool ensure(int w,
-              int h = 0,
-              int d = 0,
-              int mips = 1,
-              eGPUTextureFormat format = GPU_RGBA8,
-              float *data = nullptr,
-              bool layered = false,
-              bool cubemap = false)
+  bool ensure_impl(int w,
+                   int h = 0,
+                   int d = 0,
+                   int mips = 1,
+                   eGPUTextureFormat format = GPU_RGBA8,
+                   float *data = nullptr,
+                   bool layered = false,
+                   bool cubemap = false)
 
   {
     /* TODO(fclem) In the future, we need to check if mip_count did not change.
