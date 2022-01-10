@@ -317,7 +317,7 @@ template<typename T> inline int dominant_axis(const T &a)
 
 /** Intersections. */
 
-template<typename T, BLI_ENABLE_IF_FLT_VEC(T)> struct isect_result {
+template<typename T> struct isect_result {
   enum {
     LINE_LINE_COLINEAR = -1,
     LINE_LINE_NONE = 0,
