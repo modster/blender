@@ -95,7 +95,7 @@ struct EvaluatedFields {
   VArray<float3> up_vectors;
 };
 
-struct ScaleGroup {
+struct ScaleIsland {
   /* May contain duplicates. */
   Vector<int> vertex_indices;
   /* Either face or edge. */
@@ -153,21 +153,21 @@ static EvaluatedFields evaluate_fields(FieldEvaluator &evaluator, const InputFie
   return evaluated;
 }
 
-static void scale_separate_groups(Mesh &mesh,
-                                  const Span<ScaleGroup> scale_groups,
-                                  const EvaluatedFields &evaluated)
+static void scale_vertex_islands(Mesh &mesh,
+                                 const Span<ScaleIsland> islands,
+                                 const EvaluatedFields &evaluated)
 {
-  threading::parallel_for(scale_groups.index_range(), 256, [&](const IndexRange range) {
+  threading::parallel_for(islands.index_range(), 256, [&](const IndexRange range) {
     Set<int> handled_vertices;
-    for (const int group_index : range) {
-      const ScaleGroup &group = scale_groups[group_index];
+    for (const int island_index : range) {
+      const ScaleIsland &island = islands[island_index];
 
       float3 scale = {0.0f, 0.0f, 0.0f};
       float3 pivot = {0.0f, 0.0f, 0.0f};
       float3 x_axis = {0.0f, 0.0f, 0.0f};
       float3 up = {0.0f, 0.0f, 0.0f};
 
-      for (const int poly_index : group.element_indices) {
+      for (const int poly_index : island.element_indices) {
         pivot += evaluated.pivots[poly_index];
         if (evaluated.uniform_scales) {
           scale += float3(evaluated.uniform_scales[poly_index]);
@@ -181,7 +181,7 @@ static void scale_separate_groups(Mesh &mesh,
         }
       }
 
-      const float f = 1.0f / group.element_indices.size();
+      const float f = 1.0f / island.element_indices.size();
       scale *= f;
       pivot *= f;
       x_axis *= f;
@@ -189,7 +189,7 @@ static void scale_separate_groups(Mesh &mesh,
 
       const float4x4 transform = create_transform(pivot, x_axis, up, scale);
       handled_vertices.clear();
-      for (const int vert_index : group.vertex_indices) {
+      for (const int vert_index : island.vertex_indices) {
         if (!handled_vertices.add(vert_index)) {
           continue;
         }
@@ -204,18 +204,10 @@ static void scale_separate_groups(Mesh &mesh,
   BKE_mesh_normals_tag_dirty(&mesh);
 }
 
-static void scale_faces(MeshComponent &mesh_component, const InputFields &input_fields)
+static Vector<ScaleIsland> prepare_face_islands(const Mesh &mesh, const IndexMask face_selection)
 {
-  Mesh &mesh = *mesh_component.get_for_write();
-  mesh.mvert = static_cast<MVert *>(
-      CustomData_duplicate_referenced_layer(&mesh.vdata, CD_MVERT, mesh.totvert));
-
-  GeometryComponentFieldContext field_context{mesh_component, ATTR_DOMAIN_FACE};
-  FieldEvaluator evaluator{field_context, mesh.totpoly};
-  EvaluatedFields evaluated = evaluate_fields(evaluator, input_fields);
-
   DisjointSet disjoint_set(mesh.totvert);
-  for (const int poly_index : evaluated.selection) {
+  for (const int poly_index : face_selection) {
     const MPoly &poly = mesh.mpoly[poly_index];
     const Span<MLoop> poly_loops{mesh.mloop + poly.loopstart, poly.totloop};
     for (const int loop_index : IndexRange(poly.totloop - 1)) {
@@ -226,25 +218,66 @@ static void scale_faces(MeshComponent &mesh_component, const InputFields &input_
     disjoint_set.join(poly_loops.first().v, poly_loops.last().v);
   }
 
-  VectorSet<int> group_ids;
-  Vector<ScaleGroup> scale_groups;
-  scale_groups.reserve(evaluated.selection.size());
-  for (const int poly_index : evaluated.selection) {
+  VectorSet<int> island_ids;
+  Vector<ScaleIsland> islands;
+  islands.reserve(face_selection.size());
+  for (const int poly_index : face_selection) {
     const MPoly &poly = mesh.mpoly[poly_index];
     const Span<MLoop> poly_loops{mesh.mloop + poly.loopstart, poly.totloop};
-    const int group_id = disjoint_set.find_root(poly_loops[0].v);
-    const int group_index = group_ids.index_of_or_add(group_id);
-    if (group_index == scale_groups.size()) {
-      scale_groups.append({});
+    const int island_id = disjoint_set.find_root(poly_loops[0].v);
+    const int island_index = island_ids.index_of_or_add(island_id);
+    if (island_index == islands.size()) {
+      islands.append({});
     }
-    ScaleGroup &group = scale_groups[group_index];
+    ScaleIsland &island = islands[island_index];
     for (const MLoop &loop : poly_loops) {
-      group.vertex_indices.append(loop.v);
+      island.vertex_indices.append(loop.v);
     }
-    group.element_indices.append(poly_index);
+    island.element_indices.append(poly_index);
   }
 
-  scale_separate_groups(mesh, scale_groups, evaluated);
+  return islands;
+}
+
+static void scale_faces(MeshComponent &mesh_component, const InputFields &input_fields)
+{
+  Mesh &mesh = *mesh_component.get_for_write();
+  mesh.mvert = static_cast<MVert *>(
+      CustomData_duplicate_referenced_layer(&mesh.vdata, CD_MVERT, mesh.totvert));
+
+  GeometryComponentFieldContext field_context{mesh_component, ATTR_DOMAIN_FACE};
+  FieldEvaluator evaluator{field_context, mesh.totpoly};
+  EvaluatedFields evaluated = evaluate_fields(evaluator, input_fields);
+
+  Vector<ScaleIsland> island = prepare_face_islands(mesh, evaluated.selection);
+  scale_vertex_islands(mesh, island, evaluated);
+}
+
+static Vector<ScaleIsland> prepare_edge_islands(const Mesh &mesh, const IndexMask edge_selection)
+{
+  DisjointSet disjoint_set(mesh.totvert);
+  for (const int edge_index : edge_selection) {
+    const MEdge &edge = mesh.medge[edge_index];
+    disjoint_set.join(edge.v1, edge.v2);
+  }
+
+  VectorSet<int> island_ids;
+  Vector<ScaleIsland> islands;
+  islands.reserve(edge_selection.size());
+  for (const int edge_index : edge_selection) {
+    const MEdge &edge = mesh.medge[edge_index];
+    const int island_id = disjoint_set.find_root(edge.v1);
+    const int island_index = island_ids.index_of_or_add(island_id);
+    if (island_index == islands.size()) {
+      islands.append({});
+    }
+    ScaleIsland &island = islands[island_index];
+    island.vertex_indices.append(edge.v1);
+    island.vertex_indices.append(edge.v2);
+    island.element_indices.append(edge_index);
+  }
+
+  return islands;
 }
 
 static void scale_edges(MeshComponent &mesh_component, const InputFields &input_fields)
@@ -257,29 +290,8 @@ static void scale_edges(MeshComponent &mesh_component, const InputFields &input_
   FieldEvaluator evaluator{field_context, mesh.totedge};
   EvaluatedFields evaluated = evaluate_fields(evaluator, input_fields);
 
-  DisjointSet disjoint_set(mesh.totvert);
-  for (const int edge_index : evaluated.selection) {
-    const MEdge &edge = mesh.medge[edge_index];
-    disjoint_set.join(edge.v1, edge.v2);
-  }
-
-  VectorSet<int> group_ids;
-  Vector<ScaleGroup> scale_groups;
-  scale_groups.reserve(evaluated.selection.size());
-  for (const int edge_index : evaluated.selection) {
-    const MEdge &edge = mesh.medge[edge_index];
-    const int group_id = disjoint_set.find_root(edge.v1);
-    const int group_index = group_ids.index_of_or_add(group_id);
-    if (group_index == scale_groups.size()) {
-      scale_groups.append({});
-    }
-    ScaleGroup &group = scale_groups[group_index];
-    group.vertex_indices.append(edge.v1);
-    group.vertex_indices.append(edge.v2);
-    group.element_indices.append(edge_index);
-  }
-
-  scale_separate_groups(mesh, scale_groups, evaluated);
+  Vector<ScaleIsland> island = prepare_edge_islands(mesh, evaluated.selection);
+  scale_vertex_islands(mesh, island, evaluated);
 }
 
 static void node_geo_exec(GeoNodeExecParams params)
