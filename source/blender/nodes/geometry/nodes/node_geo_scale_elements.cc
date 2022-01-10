@@ -229,7 +229,7 @@ static Vector<ScaleIsland> prepare_face_islands(const Mesh &mesh, const IndexMas
     const int island_id = disjoint_set.find_root(poly_loops[0].v);
     const int island_index = island_ids.index_of_or_add(island_id);
     if (island_index == islands.size()) {
-      islands.append({});
+      islands.append_as();
     }
     ScaleIsland &island = islands[island_index];
     island.element_indices.append(poly_index);
@@ -275,7 +275,7 @@ static Vector<ScaleIsland> prepare_edge_islands(const Mesh &mesh, const IndexMas
     const int island_id = disjoint_set.find_root(edge.v1);
     const int island_index = island_ids.index_of_or_add(island_id);
     if (island_index == islands.size()) {
-      islands.append({});
+      islands.append_as();
     }
     ScaleIsland &island = islands[island_index];
     island.element_indices.append(edge_index);
