@@ -464,37 +464,37 @@ class Texture : NonCopyable {
    * Ensure the texture has the correct properties. Recreating it if needed.
    * Return true if a texture has been created.
    */
-  bool ensure_1d(eGPUTextureFormat format, int extent, int mips = 1, float *data = nullptr)
+  bool ensure_1d(eGPUTextureFormat format, int extent, float *data = nullptr, int mips = 1)
   {
     return ensure_impl(extent, 0, 0, mips, format, data, false, false);
   }
   bool ensure_1d_array(
-      eGPUTextureFormat format, int extent, int layers, int mips = 1, float *data = nullptr)
+      eGPUTextureFormat format, int extent, int layers, float *data = nullptr, int mips = 1)
   {
     return ensure_impl(extent, layers, 0, mips, format, data, true, false);
   }
-  bool ensure_2d(eGPUTextureFormat format, const int2 &extent, int mips = 1, float *data = nullptr)
+  bool ensure_2d(eGPUTextureFormat format, const int2 &extent, float *data = nullptr, int mips = 1)
   {
     return ensure_impl(UNPACK2(extent), 0, mips, format, data, false, false);
   }
   bool ensure_2d_array(eGPUTextureFormat format,
                        const int2 &extent,
                        int layers,
-                       int mips = 1,
-                       float *data = nullptr)
+                       float *data = nullptr,
+                       int mips = 1)
   {
     return ensure_impl(UNPACK2(extent), layers, mips, format, data, true, false);
   }
-  bool ensure_3d(eGPUTextureFormat format, const int3 &extent, int mips = 1, float *data = nullptr)
+  bool ensure_3d(eGPUTextureFormat format, const int3 &extent, float *data = nullptr, int mips = 1)
   {
     return ensure_impl(UNPACK3(extent), mips, format, data, false, false);
   }
-  bool ensure_cube(eGPUTextureFormat format, int extent, int mips = 1, float *data = nullptr)
+  bool ensure_cube(eGPUTextureFormat format, int extent, float *data = nullptr, int mips = 1)
   {
     return ensure_impl(extent, extent, 0, mips, format, data, false, true);
   }
   bool ensure_cube_array(
-      eGPUTextureFormat format, int extent, int layers, int mips = 1, float *data = nullptr)
+      eGPUTextureFormat format, int extent, int layers, float *data = nullptr, int mips = 1)
   {
     return ensure_impl(extent, extent, layers, mips, format, data, false, true);
   }
