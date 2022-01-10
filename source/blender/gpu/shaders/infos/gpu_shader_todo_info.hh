@@ -83,21 +83,6 @@ GPU_SHADER_CREATE_INFO(gpu_shader_3D_point_uniform_size_uniform_color_outline_aa
 },
 
 */
-GPU_SHADER_CREATE_INFO(gpu_shader_instance_varying_color_varying_size)
-    .vertex_source("gpu_shader_instance_varying_size_varying_color_vert.glsl")
-    .fragment_source("gpu_shader_flat_color_frag.glsl")
-    .define("UNIFORM_SCALED")
-    .do_static_compilation(true);
-/*
-    [GPU_SHADER_INSTANCE_VARIYING_COLOR_VARIYING_SIZE] =
-        {
-            .name = "GPU_SHADER_INSTANCE_VARIYING_COLOR_VARIYING_SIZE",
-            .vert = datatoc_gpu_shader_instance_variying_size_variying_color_vert_glsl,
-            .frag = datatoc_gpu_shader_flat_color_frag_glsl,
-            .defs = "#define UNIFORM_SCALE\n",
-},
-
-*/
 GPU_SHADER_CREATE_INFO(gpu_shader_2D_widget_base)
     .vertex_source("gpu_shader_2D_widget_base_vert.glsl")
     .fragment_source("gpu_shader_2D_widget_base_frag.glsl")
