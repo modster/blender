@@ -235,9 +235,9 @@ void BKE_pose_free_ex(struct bPose *pose, bool do_id_user);
  */
 void BKE_pose_copy_data_ex(struct bPose **dst,
                            const struct bPose *src,
-                           const int flag,
-                           const bool copy_constraints);
-void BKE_pose_copy_data(struct bPose **dst, const struct bPose *src, const bool copy_constraints);
+                           int flag,
+                           bool copy_constraints);
+void BKE_pose_copy_data(struct bPose **dst, const struct bPose *src, bool copy_constraints);
 /**
  * Copy the internal members of each pose channel including constraints
  * and ID-Props, used when duplicating bones in edit-mode.
@@ -253,12 +253,28 @@ void BKE_pose_channel_session_uuid_generate(struct bPoseChannel *pchan);
  */
 struct bPoseChannel *BKE_pose_channel_find_name(const struct bPose *pose, const char *name);
 /**
- * Find the active pose-channel for an object
- * (we can't just use pose, as layer info is in armature)
+ * Checks if the bone is on a visible armature layer
  *
- * \note #Object, not #bPose is used here, as we need layer info from Armature.
+ * \return true if on a visible layer, false otherwise.
  */
-struct bPoseChannel *BKE_pose_channel_active(struct Object *ob);
+bool BKE_pose_is_layer_visible(const struct bArmature *arm, const struct bPoseChannel *pchan);
+/**
+ * Find the active pose-channel for an object
+ *
+ * \param check_arm_layer: checks if the bone is on a visible armature layer (this might be skipped
+ * (e.g. for "Show Active" from the Outliner).
+ * \return #bPoseChannel if found or NULL.
+ * \note #Object, not #bPose is used here, as we need info (layer/active bone) from Armature.
+ */
+struct bPoseChannel *BKE_pose_channel_active(struct Object *ob, bool check_arm_layer);
+/**
+ * Find the active pose-channel for an object if it is on a visible armature layer
+ * (calls #BKE_pose_channel_active with check_arm_layer set to true)
+ *
+ * \return #bPoseChannel if found or NULL.
+ * \note #Object, not #bPose is used here, as we need info (layer/active bone) from Armature.
+ */
+struct bPoseChannel *BKE_pose_channel_active_if_layer_visible(struct Object *ob);
 /**
  * Use this when detecting the "other selected bone",
  * when we have multiple armatures in pose mode.
@@ -330,11 +346,11 @@ struct bActionGroup *BKE_pose_add_group(struct bPose *pose, const char *name);
  * Remove the given bone-group (expects 'virtual' index (+1 one, used by active_group etc.))
  * index might be invalid ( < 1), in which case it will be find from grp.
  */
-void BKE_pose_remove_group(struct bPose *pose, struct bActionGroup *grp, const int index);
+void BKE_pose_remove_group(struct bPose *pose, struct bActionGroup *grp, int index);
 /**
  * Remove the indexed bone-group (expects 'virtual' index (+1 one, used by active_group etc.)).
  */
-void BKE_pose_remove_group_index(struct bPose *pose, const int index);
+void BKE_pose_remove_group_index(struct bPose *pose, int index);
 
 /* Assorted Evaluation ----------------- */
 

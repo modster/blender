@@ -1787,7 +1787,7 @@ static bool ui_but_is_drag_toggle(const uiBut *but)
 
 static bool ui_selectcontext_begin(bContext *C, uiBut *but, uiSelectContextStore *selctx_data)
 {
-  PointerRNA lptr, idptr;
+  PointerRNA lptr;
   PropertyRNA *lprop;
   bool success = false;
 
@@ -1821,68 +1821,48 @@ static bool ui_selectcontext_begin(bContext *C, uiBut *but, uiSelectContextStore
         if (i >= selctx_data->elems_len) {
           break;
         }
-        uiSelectContextElem *other = &selctx_data->elems[i];
-        /* TODO: de-duplicate copy_to_selected_button. */
-        if (link->ptr.data != ptr.data) {
-          if (use_path_from_id) {
-            /* Path relative to ID. */
-            lprop = NULL;
-            RNA_id_pointer_create(link->ptr.owner_id, &idptr);
-            RNA_path_resolve_property(&idptr, path, &lptr, &lprop);
-          }
-          else if (path) {
-            /* Path relative to elements from list. */
-            lprop = NULL;
-            RNA_path_resolve_property(&link->ptr, path, &lptr, &lprop);
-          }
-          else {
-            lptr = link->ptr;
-            lprop = prop;
-          }
 
-          /* lptr might not be the same as link->ptr! */
-          if ((lptr.data != ptr.data) && (lprop == prop) && RNA_property_editable(&lptr, lprop)) {
-            other->ptr = lptr;
-            if (is_array) {
-              if (rna_type == PROP_FLOAT) {
-                other->val_f = RNA_property_float_get_index(&lptr, lprop, index);
-              }
-              else if (rna_type == PROP_INT) {
-                other->val_i = RNA_property_int_get_index(&lptr, lprop, index);
-              }
-              /* ignored for now */
-#  if 0
-              else if (rna_type == PROP_BOOLEAN) {
-                other->val_b = RNA_property_boolean_get_index(&lptr, lprop, index);
-              }
-#  endif
-            }
-            else {
-              if (rna_type == PROP_FLOAT) {
-                other->val_f = RNA_property_float_get(&lptr, lprop);
-              }
-              else if (rna_type == PROP_INT) {
-                other->val_i = RNA_property_int_get(&lptr, lprop);
-              }
-              /* ignored for now */
-#  if 0
-              else if (rna_type == PROP_BOOLEAN) {
-                other->val_b = RNA_property_boolean_get(&lptr, lprop);
-              }
-              else if (rna_type == PROP_ENUM) {
-                other->val_i = RNA_property_enum_get(&lptr, lprop);
-              }
-#  endif
-            }
-
-            continue;
-          }
+        if (!UI_context_copy_to_selected_check(
+                &ptr, &link->ptr, prop, path, use_path_from_id, &lptr, &lprop)) {
+          selctx_data->elems_len -= 1;
+          i -= 1;
+          continue;
         }
 
-        selctx_data->elems_len -= 1;
-        i -= 1;
+        uiSelectContextElem *other = &selctx_data->elems[i];
+        other->ptr = lptr;
+        if (is_array) {
+          if (rna_type == PROP_FLOAT) {
+            other->val_f = RNA_property_float_get_index(&lptr, lprop, index);
+          }
+          else if (rna_type == PROP_INT) {
+            other->val_i = RNA_property_int_get_index(&lptr, lprop, index);
+          }
+          /* ignored for now */
+#  if 0
+            else if (rna_type == PROP_BOOLEAN) {
+              other->val_b = RNA_property_boolean_get_index(&lptr, lprop, index);
+            }
+#  endif
+        }
+        else {
+          if (rna_type == PROP_FLOAT) {
+            other->val_f = RNA_property_float_get(&lptr, lprop);
+          }
+          else if (rna_type == PROP_INT) {
+            other->val_i = RNA_property_int_get(&lptr, lprop);
+          }
+          /* ignored for now */
+#  if 0
+            else if (rna_type == PROP_BOOLEAN) {
+              other->val_b = RNA_property_boolean_get(&lptr, lprop);
+            }
+            else if (rna_type == PROP_ENUM) {
+              other->val_i = RNA_property_enum_get(&lptr, lprop);
+            }
+#  endif
+        }
       }
-
       success = (selctx_data->elems_len != 0);
     }
   }
@@ -3515,8 +3495,17 @@ static void ui_textedit_begin(bContext *C, uiBut *but, uiHandleButtonData *data)
 
   ui_but_update(but);
 
-  /* Popup blocks don't support moving after creation, so don't change the view for them. */
-  if (!data->searchbox) {
+  /* Make sure the edited button is in view. */
+  if (data->searchbox) {
+    /* Popup blocks don't support moving after creation, so don't change the view for them. */
+  }
+  else if (UI_block_layout_needs_resolving(but->block)) {
+    /* Layout isn't resolved yet (may happen when activating while drawing through
+     * #UI_but_active_only()), so can't move it into view yet. This causes
+     * #ui_but_update_view_for_active() to run after the layout is resolved. */
+    but->changed = true;
+  }
+  else {
     UI_but_ensure_in_view(C, data->region, but);
   }
 
@@ -7938,7 +7927,7 @@ static int ui_do_button(bContext *C, uiBlock *block, uiBut *but, const wmEvent *
     const bool do_copy = event->type == EVT_CKEY && is_press_ctrl_but_no_shift;
     const bool do_paste = event->type == EVT_VKEY && is_press_ctrl_but_no_shift;
 
-    /* Specific handling for listrows, we try to find their overlapping tex button. */
+    /* Specific handling for list-rows, we try to find their overlapping text button. */
     if ((do_copy || do_paste) && but->type == UI_BTYPE_LISTROW) {
       uiBut *labelbut = ui_but_list_row_text_activate(C, but, data, event, BUTTON_ACTIVATE_OVER);
       if (labelbut) {

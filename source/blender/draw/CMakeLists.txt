@@ -44,9 +44,11 @@ set(INC
   ../../../intern/atomic
   ../../../intern/glew-mx
   ../../../intern/guardedalloc
+  ../../../intern/opensubdiv
 
   # dna_type_offsets.h
   ${CMAKE_CURRENT_BINARY_DIR}/../makesdna/intern
+  ${OPENSUBDIV_INCLUDE_DIRS}
 )
 
 set(SRC
@@ -85,12 +87,13 @@ set(SRC
   intern/draw_cache_impl_curve.cc
   intern/draw_cache_impl_displist.c
   intern/draw_cache_impl_gpencil.c
-  intern/draw_cache_impl_hair.c
+  intern/draw_cache_impl_hair.cc
   intern/draw_cache_impl_lattice.c
   intern/draw_cache_impl_mesh.c
   intern/draw_cache_impl_metaball.c
   intern/draw_cache_impl_particles.c
   intern/draw_cache_impl_pointcloud.c
+  intern/draw_cache_impl_subdivision.cc
   intern/draw_cache_impl_volume.c
   intern/draw_color_management.cc
   intern/draw_common.c
@@ -210,6 +213,7 @@ set(SRC
   intern/draw_manager_text.h
   intern/draw_shader_shared.h
   intern/draw_shader.h
+  intern/draw_subdivision.h
   intern/draw_texture_pool.h
   intern/draw_view.h
   intern/draw_view_data.h
@@ -222,9 +226,9 @@ set(SRC
   engines/eevee/eevee_lut.h
   engines/eevee/eevee_private.h
   engines/external/external_engine.h
+  engines/image/image_drawing_mode_image_space.hh
   engines/image/image_engine.h
   engines/image/image_private.hh
-  engines/image/image_drawing_mode_image_space.hh
   engines/image/image_space_image.hh
   engines/image/image_space_node.hh
   engines/workbench/workbench_engine.h
@@ -377,6 +381,19 @@ set(GLSL_SRC
   intern/shaders/common_fxaa_lib.glsl
   intern/shaders/common_smaa_lib.glsl
   intern/shaders/common_fullscreen_vert.glsl
+
+  intern/shaders/common_subdiv_custom_data_interp_comp.glsl
+  intern/shaders/common_subdiv_ibo_lines_comp.glsl
+  intern/shaders/common_subdiv_ibo_tris_comp.glsl
+  intern/shaders/common_subdiv_lib.glsl
+  intern/shaders/common_subdiv_normals_accumulate_comp.glsl
+  intern/shaders/common_subdiv_normals_finalize_comp.glsl
+  intern/shaders/common_subdiv_patch_evaluation_comp.glsl
+  intern/shaders/common_subdiv_vbo_edge_fac_comp.glsl
+  intern/shaders/common_subdiv_vbo_edituv_strech_angle_comp.glsl
+  intern/shaders/common_subdiv_vbo_edituv_strech_area_comp.glsl
+  intern/shaders/common_subdiv_vbo_lnor_comp.glsl
+  intern/shaders/common_subdiv_vbo_sculpt_data_comp.glsl
 
   intern/draw_shader_shared.h
 
@@ -570,8 +587,8 @@ if(WITH_GTESTS)
       tests/draw_testing.hh
     )
     set(TEST_INC
-      "../../../intern/ghost/"
-      "../gpu/tests/"
+      ../../../intern/ghost
+      ../gpu/tests
     )
     set(TEST_LIB
     )

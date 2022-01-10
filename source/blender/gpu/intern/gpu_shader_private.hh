@@ -59,12 +59,12 @@ class Shader {
   virtual bool finalize(const shader::ShaderCreateInfo *info = nullptr) = 0;
 
   virtual void transform_feedback_names_set(Span<const char *> name_list,
-                                            const eGPUShaderTFBType geom_type) = 0;
+                                            eGPUShaderTFBType geom_type) = 0;
   virtual bool transform_feedback_enable(GPUVertBuf *) = 0;
-  virtual void transform_feedback_disable(void) = 0;
+  virtual void transform_feedback_disable() = 0;
 
-  virtual void bind(void) = 0;
-  virtual void unbind(void) = 0;
+  virtual void bind() = 0;
+  virtual void unbind() = 0;
 
   virtual void uniform_float(int location, int comp_len, int array_size, const float *data) = 0;
   virtual void uniform_int(int location, int comp_len, int array_size, const int *data) = 0;
@@ -78,19 +78,16 @@ class Shader {
   virtual std::string geometry_interface_declare(const shader::ShaderCreateInfo &info) const = 0;
 
   /* DEPRECATED: Kept only because of BGL API. */
-  virtual int program_handle_get(void) const = 0;
+  virtual int program_handle_get() const = 0;
 
-  inline const char *const name_get(void) const
+  inline const char *const name_get() const
   {
     return name;
   };
 
  protected:
-  void print_log(Span<const char *> sources,
-                 char *log,
-                 const char *stage,
-                 const bool error,
-                 GPULogParser *parser);
+  void print_log(
+      Span<const char *> sources, char *log, const char *stage, bool error, GPULogParser *parser);
 };
 
 /* Syntactic sugar. */
@@ -146,4 +143,4 @@ class GPULogParser {
 }  // namespace blender
 
 /* XXX do not use it. Special hack to use OCIO with batch API. */
-GPUShader *immGetShader(void);
+GPUShader *immGetShader();

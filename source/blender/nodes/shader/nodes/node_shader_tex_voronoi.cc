@@ -17,26 +17,37 @@
  * All rights reserved.
  */
 
-#include "../node_shader_util.h"
+#include "node_shader_util.hh"
 
 #include "BLI_noise.hh"
 
-NODE_STORAGE_FUNCS(NodeTexVoronoi)
+#include "UI_interface.h"
+#include "UI_resources.h"
 
-namespace blender::nodes {
+namespace blender::nodes::node_shader_tex_voronoi_cc {
+
+NODE_STORAGE_FUNCS(NodeTexVoronoi)
 
 static void sh_node_tex_voronoi_declare(NodeDeclarationBuilder &b)
 {
   b.is_function_node();
   b.add_input<decl::Vector>(N_("Vector")).hide_value().implicit_field();
-  b.add_input<decl::Float>(N_("W")).min(-1000.0f).max(1000.0f);
+  b.add_input<decl::Float>(N_("W")).min(-1000.0f).max(1000.0f).make_available([](bNode &node) {
+    /* Default to 1 instead of 4, because it is much faster. */
+    node_storage(node).dimensions = 1;
+  });
   b.add_input<decl::Float>(N_("Scale")).min(-1000.0f).max(1000.0f).default_value(5.0f);
   b.add_input<decl::Float>(N_("Smoothness"))
       .min(0.0f)
       .max(1.0f)
       .default_value(1.0f)
-      .subtype(PROP_FACTOR);
-  b.add_input<decl::Float>(N_("Exponent")).min(0.0f).max(32.0f).default_value(0.5f);
+      .subtype(PROP_FACTOR)
+      .make_available([](bNode &node) { node_storage(node).feature = SHD_VORONOI_SMOOTH_F1; });
+  b.add_input<decl::Float>(N_("Exponent"))
+      .min(0.0f)
+      .max(32.0f)
+      .default_value(0.5f)
+      .make_available([](bNode &node) { node_storage(node).distance = SHD_VORONOI_MINKOWSKI; });
   b.add_input<decl::Float>(N_("Randomness"))
       .min(0.0f)
       .max(1.0f)
@@ -45,15 +56,29 @@ static void sh_node_tex_voronoi_declare(NodeDeclarationBuilder &b)
   b.add_output<decl::Float>(N_("Distance")).no_muted_links();
   b.add_output<decl::Color>(N_("Color")).no_muted_links();
   b.add_output<decl::Vector>(N_("Position")).no_muted_links();
-  b.add_output<decl::Float>(N_("W")).no_muted_links();
-  b.add_output<decl::Float>(N_("Radius")).no_muted_links();
-};
+  b.add_output<decl::Float>(N_("W")).no_muted_links().make_available([](bNode &node) {
+    /* Default to 1 instead of 4, because it is much faster. */
+    node_storage(node).dimensions = 1;
+  });
+  b.add_output<decl::Float>(N_("Radius")).no_muted_links().make_available([](bNode &node) {
+    node_storage(node).feature = SHD_VORONOI_N_SPHERE_RADIUS;
+  });
+}
 
-}  // namespace blender::nodes
+static void node_shader_buts_tex_voronoi(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
+{
+  uiItemR(layout, ptr, "voronoi_dimensions", UI_ITEM_R_SPLIT_EMPTY_NAME, "", ICON_NONE);
+  uiItemR(layout, ptr, "feature", UI_ITEM_R_SPLIT_EMPTY_NAME, "", ICON_NONE);
+  int feature = RNA_enum_get(ptr, "feature");
+  if (!ELEM(feature, SHD_VORONOI_DISTANCE_TO_EDGE, SHD_VORONOI_N_SPHERE_RADIUS) &&
+      RNA_enum_get(ptr, "voronoi_dimensions") != 1) {
+    uiItemR(layout, ptr, "distance", UI_ITEM_R_SPLIT_EMPTY_NAME, "", ICON_NONE);
+  }
+}
 
 static void node_shader_init_tex_voronoi(bNodeTree *UNUSED(ntree), bNode *node)
 {
-  NodeTexVoronoi *tex = (NodeTexVoronoi *)MEM_callocN(sizeof(NodeTexVoronoi), "NodeTexVoronoi");
+  NodeTexVoronoi *tex = MEM_cnew<NodeTexVoronoi>(__func__);
   BKE_texture_mapping_default(&tex->base.tex_mapping, TEXMAP_TYPE_POINT);
   BKE_texture_colormapping_default(&tex->base.color_mapping);
   tex->dimensions = 3;
@@ -167,8 +192,6 @@ static void node_shader_update_tex_voronoi(bNodeTree *ntree, bNode *node)
                                 (ELEM(storage.dimensions, 1, 4)));
   nodeSetSocketAvailability(ntree, outRadiusSock, storage.feature == SHD_VORONOI_N_SPHERE_RADIUS);
 }
-
-namespace blender::nodes {
 
 static MultiFunction::ExecutionHints voronoi_execution_hints{50, false};
 
@@ -1327,20 +1350,23 @@ static void sh_node_voronoi_build_multi_function(blender::nodes::NodeMultiFuncti
   }
 }
 
-}  // namespace blender::nodes
+}  // namespace blender::nodes::node_shader_tex_voronoi_cc
 
 void register_node_type_sh_tex_voronoi()
 {
+  namespace file_ns = blender::nodes::node_shader_tex_voronoi_cc;
+
   static bNodeType ntype;
 
-  sh_fn_node_type_base(&ntype, SH_NODE_TEX_VORONOI, "Voronoi Texture", NODE_CLASS_TEXTURE, 0);
-  ntype.declare = blender::nodes::sh_node_tex_voronoi_declare;
-  node_type_init(&ntype, node_shader_init_tex_voronoi);
+  sh_fn_node_type_base(&ntype, SH_NODE_TEX_VORONOI, "Voronoi Texture", NODE_CLASS_TEXTURE);
+  ntype.declare = file_ns::sh_node_tex_voronoi_declare;
+  ntype.draw_buttons = file_ns::node_shader_buts_tex_voronoi;
+  node_type_init(&ntype, file_ns::node_shader_init_tex_voronoi);
   node_type_storage(
       &ntype, "NodeTexVoronoi", node_free_standard_storage, node_copy_standard_storage);
-  node_type_gpu(&ntype, node_shader_gpu_tex_voronoi);
-  node_type_update(&ntype, node_shader_update_tex_voronoi);
-  ntype.build_multi_function = blender::nodes::sh_node_voronoi_build_multi_function;
+  node_type_gpu(&ntype, file_ns::node_shader_gpu_tex_voronoi);
+  node_type_update(&ntype, file_ns::node_shader_update_tex_voronoi);
+  ntype.build_multi_function = file_ns::sh_node_voronoi_build_multi_function;
 
   nodeRegisterType(&ntype);
 }

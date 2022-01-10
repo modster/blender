@@ -52,6 +52,7 @@
 #include "BKE_pointcache.h"
 #include "BKE_pointcloud.h"
 #include "BKE_screen.h"
+#include "BKE_subdiv_modifier.h"
 #include "BKE_volume.h"
 
 #include "DNA_camera_types.h"
@@ -90,6 +91,7 @@
 #include "draw_manager_testing.h"
 #include "draw_manager_text.h"
 #include "draw_shader.h"
+#include "draw_subdivision.h"
 #include "draw_texture_pool.h"
 
 /* only for callbacks */
@@ -755,8 +757,11 @@ static void duplidata_key_free(void *key)
   }
   else {
     Object temp_object = *dupli_key->ob;
+    /* Do not modify the original bound-box. */
+    temp_object.runtime.bb = NULL;
     BKE_object_replace_data_on_shallow_copy(&temp_object, dupli_key->ob_data);
     drw_batch_cache_generate_requested(&temp_object);
+    MEM_SAFE_FREE(temp_object.runtime.bb);
   }
   MEM_freeN(key);
 }
@@ -1794,12 +1799,12 @@ void DRW_draw_render_loop_offscreen(struct Depsgraph *depsgraph,
   DRW_draw_render_loop_ex(depsgraph, engine_type, region, v3d, render_viewport, NULL);
 
   if (draw_background) {
-    /* HACK(fclem): In this case we need to make sure the final alpha is 1.
+    /* HACK(@fclem): In this case we need to make sure the final alpha is 1.
      * We use the blend mode to ensure that. A better way to fix that would
      * be to do that in the color-management shader. */
     GPU_offscreen_bind(ofs, false);
     GPU_clear_color(0.0f, 0.0f, 0.0f, 1.0f);
-    /* Premult Alpha over black background. */
+    /* Pre-multiply alpha over black background. */
     GPU_blend(GPU_BLEND_ALPHA_PREMULT);
   }
 
@@ -2975,6 +2980,8 @@ void DRW_engines_register(void)
 
     BKE_volume_batch_cache_dirty_tag_cb = DRW_volume_batch_cache_dirty_tag;
     BKE_volume_batch_cache_free_cb = DRW_volume_batch_cache_free;
+
+    BKE_subsurf_modifier_free_gpu_cache_cb = DRW_subdiv_cache_free;
   }
 }
 

@@ -250,28 +250,16 @@ set(GLSL_SRC
 
   shaders/gpu_shader_instance_variying_size_variying_color_vert.glsl
 
-  shaders/gpu_shader_point_uniform_color_frag.glsl
   shaders/gpu_shader_point_uniform_color_aa_frag.glsl
   shaders/gpu_shader_point_uniform_color_outline_aa_frag.glsl
-  shaders/gpu_shader_point_varying_color_outline_aa_frag.glsl
   shaders/gpu_shader_point_varying_color_varying_outline_aa_frag.glsl
   shaders/gpu_shader_point_varying_color_frag.glsl
   shaders/gpu_shader_3D_point_fixed_size_varying_color_vert.glsl
-  shaders/gpu_shader_3D_point_varying_size_vert.glsl
   shaders/gpu_shader_3D_point_varying_size_varying_color_vert.glsl
   shaders/gpu_shader_3D_point_uniform_size_aa_vert.glsl
-  shaders/gpu_shader_3D_point_uniform_size_outline_aa_vert.glsl
   shaders/gpu_shader_2D_point_varying_size_varying_color_vert.glsl
   shaders/gpu_shader_2D_point_uniform_size_aa_vert.glsl
   shaders/gpu_shader_2D_point_uniform_size_outline_aa_vert.glsl
-  shaders/gpu_shader_2D_point_uniform_size_varying_color_outline_aa_vert.glsl
-
-  shaders/gpu_shader_2D_edituvs_points_vert.glsl
-  shaders/gpu_shader_2D_edituvs_facedots_vert.glsl
-  shaders/gpu_shader_2D_edituvs_edges_vert.glsl
-  shaders/gpu_shader_2D_edituvs_edges_frag.glsl
-  shaders/gpu_shader_2D_edituvs_faces_vert.glsl
-  shaders/gpu_shader_2D_edituvs_stretch_vert.glsl
 
   shaders/gpu_shader_text_vert.glsl
   shaders/gpu_shader_text_frag.glsl
@@ -440,16 +428,9 @@ shaders/infos/gpu_shader_3D_depth_only_info.hh
 #shaders/infos/gpu_shader_3D_polyline_info.hh !TODO
 #shaders/infos/gpu_shader_2D_line_dashed_uniform_color_info.hh
 #shaders/infos/gpu_shader_3D_line_dashed_uniform_color_info.hh
-shaders/infos/gpu_shader_2D_point_fixed_size_uniform_color_info.hh
-shaders/infos/gpu_shader_2D_uv_faces_stretch_info.hh
-shaders/infos/gpu_shader_2D_uv_faces_info.hh
-shaders/infos/gpu_shader_2D_uv_facedots_info.hh
-shaders/infos/gpu_shader_2D_uv_edges_info.hh
-shaders/infos/gpu_shader_2D_uv_verts_info.hh
 shaders/infos/gpu_shader_2D_point_varying_size_varying_color_info.hh
 shaders/infos/gpu_shader_2D_point_uniform_size_uniform_color_aa_info.hh
 shaders/infos/gpu_shader_2D_point_uniform_size_uniform_color_outline_aa_info.hh
-shaders/infos/gpu_shader_2D_point_uniform_size_varying_color_outline_aa_info.hh
 shaders/infos/gpu_shader_2D_area_edges_info.hh
 shaders/infos/gpu_shader_instance_varying_color_varying_size_info.hh
 shaders/infos/gpu_shader_3D_point_info.hh
@@ -531,10 +512,8 @@ if(WITH_GTESTS)
       tests/gpu_testing.hh
     )
     set(TEST_INC
-      "../../../intern/ghost/"
     )
     set(TEST_LIB
-
     )
     include(GTestTesting)
     blender_add_test_lib(bf_gpu_tests "${TEST_SRC}" "${INC};${TEST_INC}" "${INC_SYS}" "${LIB};${TEST_LIB}")

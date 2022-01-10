@@ -109,8 +109,8 @@ void get_graph_keyframe_extents(struct bAnimContext *ac,
                                 float *xmax,
                                 float *ymin,
                                 float *ymax,
-                                const bool do_sel_only,
-                                const bool include_handles);
+                                bool do_sel_only,
+                                bool include_handles);
 
 void GRAPH_OT_previewrange_set(struct wmOperatorType *ot);
 void GRAPH_OT_view_all(struct wmOperatorType *ot);
@@ -126,6 +126,8 @@ void GRAPH_OT_paste(struct wmOperatorType *ot);
 void GRAPH_OT_duplicate(struct wmOperatorType *ot);
 void GRAPH_OT_delete(struct wmOperatorType *ot);
 void GRAPH_OT_clean(struct wmOperatorType *ot);
+void GRAPH_OT_blend_to_neighbor(struct wmOperatorType *ot);
+void GRAPH_OT_breakdown(struct wmOperatorType *ot);
 void GRAPH_OT_decimate(struct wmOperatorType *ot);
 void GRAPH_OT_sample(struct wmOperatorType *ot);
 void GRAPH_OT_bake(struct wmOperatorType *ot);

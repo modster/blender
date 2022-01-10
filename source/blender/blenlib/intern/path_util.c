@@ -144,8 +144,6 @@ void BLI_path_sequence_encode(
 
 static int BLI_path_unc_prefix_len(const char *path); /* defined below in same file */
 
-/* ******************** string encoding ***************** */
-
 void BLI_path_normalize(const char *relabase, char *path)
 {
   ptrdiff_t a;
@@ -247,12 +245,19 @@ void BLI_path_normalize_dir(const char *relabase, char *dir)
   BLI_path_slash_ensure(dir);
 }
 
-bool BLI_filename_make_safe(char *fname)
+bool BLI_filename_make_safe_ex(char *fname, bool allow_tokens)
 {
-  const char *invalid =
-      "\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f"
-      "\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f"
-      "/\\?*:|\"<>";
+#define INVALID_CHARS \
+  "\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f" \
+  "\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f" \
+  "/\\?*:|\""
+#define INVALID_TOKENS "<>"
+
+  const char *invalid = allow_tokens ? INVALID_CHARS : INVALID_CHARS INVALID_TOKENS;
+
+#undef INVALID_CHARS
+#undef INVALID_TOKENS
+
   char *fn;
   bool changed = false;
 
@@ -315,6 +320,11 @@ bool BLI_filename_make_safe(char *fname)
 #endif
 
   return changed;
+}
+
+bool BLI_filename_make_safe(char *fname)
+{
+  return BLI_filename_make_safe_ex(fname, false);
 }
 
 bool BLI_path_make_safe(char *path)
@@ -947,15 +957,15 @@ bool BLI_path_abs(char *path, const char *basepath)
 
 #endif
 
-  /* push slashes into unix mode - strings entering this part are
+  /* NOTE(@jesterKing): push slashes into unix mode - strings entering this part are
    * potentially messed up: having both back- and forward slashes.
    * Here we push into one conform direction, and at the end we
    * push them into the system specific dir. This ensures uniformity
-   * of paths and solving some problems (and prevent potential future
-   * ones) -jesterKing.
-   * For UNC paths the first characters containing the UNC prefix
+   * of paths and solving some problems (and prevent potential future ones).
+   *
+   * NOTE(@elubie): For UNC paths the first characters containing the UNC prefix
    * shouldn't be switched as we need to distinguish them from
-   * paths relative to the .blend file -elubie */
+   * paths relative to the `.blend` file. */
   BLI_str_replace_char(tmp + BLI_path_unc_prefix_len(tmp), '\\', '/');
 
   /* Paths starting with `//` will get the blend file as their base,
@@ -1002,25 +1012,30 @@ bool BLI_path_abs(char *path, const char *basepath)
   return wasrelative;
 }
 
+bool BLI_path_is_abs_from_cwd(const char *path)
+{
+  bool is_abs = false;
+  const int path_len_clamp = BLI_strnlen(path, 3);
+
+#ifdef WIN32
+  if ((path_len_clamp >= 3 && BLI_path_is_abs(path)) || BLI_path_is_unc(path)) {
+    is_abs = true;
+  }
+#else
+  if (path_len_clamp >= 2 && path[0] == '/') {
+    is_abs = true;
+  }
+#endif
+  return is_abs;
+}
+
 bool BLI_path_abs_from_cwd(char *path, const size_t maxlen)
 {
 #ifdef DEBUG_STRSIZE
   memset(path, 0xff, sizeof(*path) * maxlen);
 #endif
-  bool wasrelative = true;
-  const int filelen = strlen(path);
 
-#ifdef WIN32
-  if ((filelen >= 3 && BLI_path_is_abs(path)) || BLI_path_is_unc(path)) {
-    wasrelative = false;
-  }
-#else
-  if (filelen >= 2 && path[0] == '/') {
-    wasrelative = false;
-  }
-#endif
-
-  if (wasrelative) {
+  if (!BLI_path_is_abs_from_cwd(path)) {
     char cwd[FILE_MAX];
     /* in case the full path to the blend isn't used */
     if (BLI_current_working_dir(cwd, sizeof(cwd))) {
@@ -1031,9 +1046,10 @@ bool BLI_path_abs_from_cwd(char *path, const size_t maxlen)
     else {
       printf("Could not get the current working directory - $PWD for an unknown reason.\n");
     }
+    return true;
   }
 
-  return wasrelative;
+  return false;
 }
 
 #ifdef _WIN32

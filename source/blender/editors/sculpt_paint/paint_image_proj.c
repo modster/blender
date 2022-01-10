@@ -6567,7 +6567,7 @@ static bool proj_paint_add_slot(bContext *C, wmOperator *op)
 
     nodeSetActive(ntree, imanode);
 
-    /* Connect to first available principled bsdf node. */
+    /* Connect to first available principled BSDF node. */
     bNode *in_node = ntreeFindType(ntree, SH_NODE_BSDF_PRINCIPLED);
     bNode *out_node = imanode;
 
@@ -6623,7 +6623,7 @@ static bool proj_paint_add_slot(bContext *C, wmOperator *op)
       }
     }
 
-    ntreeUpdateTree(CTX_data_main(C), ntree);
+    ED_node_tree_propagate_change(C, bmain, ntree);
     /* In case we added more than one node, position them too. */
     nodePositionPropagate(out_node);
 

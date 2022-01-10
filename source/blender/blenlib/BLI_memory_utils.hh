@@ -498,6 +498,12 @@ inline constexpr bool is_span_convertible_pointer_v =
      std::is_same_v<To, const void *>);
 
 /**
+ * Same as #std::is_same_v but allows for checking multiple types at the same time.
+ */
+template<typename T, typename... Args>
+inline constexpr bool is_same_any_v = (std::is_same_v<T, Args> || ...);
+
+/**
  * Inline buffers for small-object-optimization should be disable by default. Otherwise we might
  * get large unexpected allocations on the stack.
  */
@@ -550,5 +556,14 @@ Container &move_assign_container(Container &dst, Container &&src) noexcept(
   }
   return dst;
 }
+
+/**
+ * Utility macro that wraps `std::enable_if` to make it a bit easier to use and less verbose for
+ * SFINAE in common cases.
+ *
+ * \note Often one has to invoke this macro with double parenthesis. That's because the condition
+ * often contains a comma and angle brackets are not recognized as parenthesis by the preprocessor.
+ */
+#define BLI_ENABLE_IF(condition) typename std::enable_if_t<condition> * = nullptr
 
 }  // namespace blender

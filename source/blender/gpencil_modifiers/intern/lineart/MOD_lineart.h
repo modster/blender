@@ -450,10 +450,10 @@ typedef struct LineartBoundingArea {
   ListBase up;
   ListBase bp;
 
-  int16_t triangle_count;
-  int16_t max_triangle_count;
-  int16_t line_count;
-  int16_t max_line_count;
+  uint16_t triangle_count;
+  uint16_t max_triangle_count;
+  uint16_t line_count;
+  uint16_t max_line_count;
 
   /* Use array for speeding up multiple accesses. */
   struct LineartTriangle **linked_triangles;
@@ -655,7 +655,7 @@ void MOD_lineart_chain_split_for_fixed_occlusion(LineartRenderBuffer *rb);
  * implemented yet.
  */
 void MOD_lineart_chain_connect(LineartRenderBuffer *rb);
-void MOD_lineart_chain_discard_short(LineartRenderBuffer *rb, const float threshold);
+void MOD_lineart_chain_discard_short(LineartRenderBuffer *rb, float threshold);
 void MOD_lineart_chain_clip_at_border(LineartRenderBuffer *rb);
 /**
  * This should always be the last stage!, see the end of

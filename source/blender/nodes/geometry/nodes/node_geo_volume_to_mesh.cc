@@ -42,8 +42,19 @@ NODE_STORAGE_FUNCS(NodeGeometryVolumeToMesh)
 static void node_declare(NodeDeclarationBuilder &b)
 {
   b.add_input<decl::Geometry>(N_("Volume")).supported_type(GEO_COMPONENT_TYPE_VOLUME);
-  b.add_input<decl::Float>(N_("Voxel Size")).default_value(0.3f).min(0.01f).subtype(PROP_DISTANCE);
-  b.add_input<decl::Float>(N_("Voxel Amount")).default_value(64.0f).min(0.0f);
+  b.add_input<decl::Float>(N_("Voxel Size"))
+      .default_value(0.3f)
+      .min(0.01f)
+      .subtype(PROP_DISTANCE)
+      .make_available([](bNode &node) {
+        node_storage(node).resolution_mode = VOLUME_TO_MESH_RESOLUTION_MODE_VOXEL_SIZE;
+      });
+  b.add_input<decl::Float>(N_("Voxel Amount"))
+      .default_value(64.0f)
+      .min(0.0f)
+      .make_available([](bNode &node) {
+        node_storage(node).resolution_mode = VOLUME_TO_MESH_RESOLUTION_MODE_VOXEL_AMOUNT;
+      });
   b.add_input<decl::Float>(N_("Threshold")).default_value(0.1f).min(0.0f);
   b.add_input<decl::Float>(N_("Adaptivity")).min(0.0f).max(1.0f).subtype(PROP_FACTOR);
   b.add_output<decl::Geometry>(N_("Mesh"));
@@ -58,8 +69,7 @@ static void node_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 
 static void node_init(bNodeTree *UNUSED(ntree), bNode *node)
 {
-  NodeGeometryVolumeToMesh *data = (NodeGeometryVolumeToMesh *)MEM_callocN(
-      sizeof(NodeGeometryVolumeToMesh), __func__);
+  NodeGeometryVolumeToMesh *data = MEM_cnew<NodeGeometryVolumeToMesh>(__func__);
   data->resolution_mode = VOLUME_TO_MESH_RESOLUTION_MODE_GRID;
   node->storage = data;
 }
@@ -204,7 +214,7 @@ void register_node_type_geo_volume_to_mesh()
 
   static bNodeType ntype;
 
-  geo_node_type_base(&ntype, GEO_NODE_VOLUME_TO_MESH, "Volume to Mesh", NODE_CLASS_GEOMETRY, 0);
+  geo_node_type_base(&ntype, GEO_NODE_VOLUME_TO_MESH, "Volume to Mesh", NODE_CLASS_GEOMETRY);
   ntype.declare = file_ns::node_declare;
   node_type_storage(
       &ntype, "NodeGeometryVolumeToMesh", node_free_standard_storage, node_copy_standard_storage);

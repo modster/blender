@@ -39,16 +39,17 @@ class Float : public SocketDeclaration {
  public:
   using Builder = FloatBuilder;
 
-  bNodeSocket &build(bNodeTree &ntree, bNode &node, eNodeSocketInOut in_out) const override;
+  bNodeSocket &build(bNodeTree &ntree, bNode &node) const override;
   bool matches(const bNodeSocket &socket) const override;
   bNodeSocket &update_or_build(bNodeTree &ntree, bNode &node, bNodeSocket &socket) const override;
+  bool can_connect(const bNodeSocket &socket) const override;
 };
 
 class FloatBuilder : public SocketDeclarationBuilder<Float> {
  public:
-  FloatBuilder &min(const float value);
-  FloatBuilder &max(const float value);
-  FloatBuilder &default_value(const float value);
+  FloatBuilder &min(float value);
+  FloatBuilder &max(float value);
+  FloatBuilder &default_value(float value);
   FloatBuilder &subtype(PropertySubType subtype);
 };
 
@@ -66,16 +67,17 @@ class Int : public SocketDeclaration {
  public:
   using Builder = IntBuilder;
 
-  bNodeSocket &build(bNodeTree &ntree, bNode &node, eNodeSocketInOut in_out) const override;
+  bNodeSocket &build(bNodeTree &ntree, bNode &node) const override;
   bool matches(const bNodeSocket &socket) const override;
   bNodeSocket &update_or_build(bNodeTree &ntree, bNode &node, bNodeSocket &socket) const override;
+  bool can_connect(const bNodeSocket &socket) const override;
 };
 
 class IntBuilder : public SocketDeclarationBuilder<Int> {
  public:
-  IntBuilder &min(const int value);
-  IntBuilder &max(const int value);
-  IntBuilder &default_value(const int value);
+  IntBuilder &min(int value);
+  IntBuilder &max(int value);
+  IntBuilder &default_value(int value);
   IntBuilder &subtype(PropertySubType subtype);
 };
 
@@ -93,17 +95,18 @@ class Vector : public SocketDeclaration {
  public:
   using Builder = VectorBuilder;
 
-  bNodeSocket &build(bNodeTree &ntree, bNode &node, eNodeSocketInOut in_out) const override;
+  bNodeSocket &build(bNodeTree &ntree, bNode &node) const override;
   bool matches(const bNodeSocket &socket) const override;
   bNodeSocket &update_or_build(bNodeTree &ntree, bNode &node, bNodeSocket &socket) const override;
+  bool can_connect(const bNodeSocket &socket) const override;
 };
 
 class VectorBuilder : public SocketDeclarationBuilder<Vector> {
  public:
   VectorBuilder &default_value(const float3 value);
   VectorBuilder &subtype(PropertySubType subtype);
-  VectorBuilder &min(const float min);
-  VectorBuilder &max(const float max);
+  VectorBuilder &min(float min);
+  VectorBuilder &max(float max);
   VectorBuilder &compact();
 };
 
@@ -117,13 +120,14 @@ class Bool : public SocketDeclaration {
  public:
   using Builder = BoolBuilder;
 
-  bNodeSocket &build(bNodeTree &ntree, bNode &node, eNodeSocketInOut in_out) const override;
+  bNodeSocket &build(bNodeTree &ntree, bNode &node) const override;
   bool matches(const bNodeSocket &socket) const override;
+  bool can_connect(const bNodeSocket &socket) const override;
 };
 
 class BoolBuilder : public SocketDeclarationBuilder<Bool> {
  public:
-  BoolBuilder &default_value(const bool value);
+  BoolBuilder &default_value(bool value);
 };
 
 class ColorBuilder;
@@ -137,8 +141,9 @@ class Color : public SocketDeclaration {
  public:
   using Builder = ColorBuilder;
 
-  bNodeSocket &build(bNodeTree &ntree, bNode &node, eNodeSocketInOut in_out) const override;
+  bNodeSocket &build(bNodeTree &ntree, bNode &node) const override;
   bool matches(const bNodeSocket &socket) const override;
+  bool can_connect(const bNodeSocket &socket) const override;
 };
 
 class ColorBuilder : public SocketDeclarationBuilder<Color> {
@@ -157,8 +162,9 @@ class String : public SocketDeclaration {
  public:
   using Builder = StringBuilder;
 
-  bNodeSocket &build(bNodeTree &ntree, bNode &node, eNodeSocketInOut in_out) const override;
+  bNodeSocket &build(bNodeTree &ntree, bNode &node) const override;
   bool matches(const bNodeSocket &socket) const override;
+  bool can_connect(const bNodeSocket &socket) const override;
 };
 
 class StringBuilder : public SocketDeclarationBuilder<String> {
@@ -173,9 +179,10 @@ class IDSocketDeclaration : public SocketDeclaration {
  public:
   IDSocketDeclaration(const char *idname);
 
-  bNodeSocket &build(bNodeTree &ntree, bNode &node, eNodeSocketInOut in_out) const override;
+  bNodeSocket &build(bNodeTree &ntree, bNode &node) const override;
   bool matches(const bNodeSocket &socket) const override;
   bNodeSocket &update_or_build(bNodeTree &ntree, bNode &node, bNodeSocket &socket) const override;
+  bool can_connect(const bNodeSocket &socket) const override;
 };
 
 class Object : public IDSocketDeclaration {
@@ -222,8 +229,9 @@ class Shader : public SocketDeclaration {
  public:
   using Builder = ShaderBuilder;
 
-  bNodeSocket &build(bNodeTree &ntree, bNode &node, eNodeSocketInOut in_out) const override;
+  bNodeSocket &build(bNodeTree &ntree, bNode &node) const override;
   bool matches(const bNodeSocket &socket) const override;
+  bool can_connect(const bNodeSocket &socket) const override;
 };
 
 class ShaderBuilder : public SocketDeclarationBuilder<Shader> {

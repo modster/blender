@@ -56,7 +56,7 @@ void BLI_mempool_free(BLI_mempool *pool, void *addr) ATTR_NONNULL(1, 2);
  * \param pool: The pool to clear.
  * \param totelem_reserve: Optionally reserve how many items should be kept from clearing.
  */
-void BLI_mempool_clear_ex(BLI_mempool *pool, const int totelem_reserve) ATTR_NONNULL(1);
+void BLI_mempool_clear_ex(BLI_mempool *pool, int totelem_reserve) ATTR_NONNULL(1);
 /**
  * Wrap #BLI_mempool_clear_ex with no reserve set.
  */
@@ -103,14 +103,14 @@ void BLI_mempool_set_memory_debug(void);
  * \note this may easy to produce bugs with.
  */
 
-/* Private structure. */
+/**  \note Private structure. */
 typedef struct BLI_mempool_iter {
   BLI_mempool *pool;
   struct BLI_mempool_chunk *curchunk;
   unsigned int curindex;
 } BLI_mempool_iter;
 
-/* flag */
+/** #BLI_mempool.flag */
 enum {
   BLI_MEMPOOL_NOP = 0,
   /** allow iterating on this mempool.

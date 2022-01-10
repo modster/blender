@@ -57,9 +57,14 @@ static void node_declare(NodeDeclarationBuilder &b)
   b.add_input<decl::Float>(N_("Text Box Height"))
       .default_value(0.0f)
       .min(0.0f)
-      .subtype(PROP_DISTANCE);
+      .subtype(PROP_DISTANCE)
+      .make_available([](bNode &node) {
+        node_storage(node).overflow = GEO_NODE_STRING_TO_CURVES_MODE_SCALE_TO_FIT;
+      });
   b.add_output<decl::Geometry>(N_("Curves"));
-  b.add_output<decl::String>(N_("Remainder"));
+  b.add_output<decl::String>(N_("Remainder")).make_available([](bNode &node) {
+    node_storage(node).overflow = GEO_NODE_STRING_TO_CURVES_MODE_TRUNCATE;
+  });
 }
 
 static void node_layout(uiLayout *layout, struct bContext *C, PointerRNA *ptr)
@@ -83,8 +88,7 @@ static void node_layout(uiLayout *layout, struct bContext *C, PointerRNA *ptr)
 
 static void node_init(bNodeTree *UNUSED(ntree), bNode *node)
 {
-  NodeGeometryStringToCurves *data = (NodeGeometryStringToCurves *)MEM_callocN(
-      sizeof(NodeGeometryStringToCurves), __func__);
+  NodeGeometryStringToCurves *data = MEM_cnew<NodeGeometryStringToCurves>(__func__);
 
   data->overflow = GEO_NODE_STRING_TO_CURVES_MODE_OVERFLOW;
   data->align_x = GEO_NODE_STRING_TO_CURVES_ALIGN_X_LEFT;
@@ -306,8 +310,7 @@ void register_node_type_geo_string_to_curves()
 
   static bNodeType ntype;
 
-  geo_node_type_base(
-      &ntype, GEO_NODE_STRING_TO_CURVES, "String to Curves", NODE_CLASS_GEOMETRY, 0);
+  geo_node_type_base(&ntype, GEO_NODE_STRING_TO_CURVES, "String to Curves", NODE_CLASS_GEOMETRY);
   ntype.declare = file_ns::node_declare;
   ntype.geometry_node_execute = file_ns::node_geo_exec;
   node_type_init(&ntype, file_ns::node_init);

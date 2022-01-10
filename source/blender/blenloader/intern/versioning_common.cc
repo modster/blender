@@ -223,3 +223,19 @@ void version_node_socket_index_animdata(Main *bmain,
     FOREACH_NODETREE_END;
   }
 }
+
+void version_socket_update_is_used(bNodeTree *ntree)
+{
+  LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
+    LISTBASE_FOREACH (bNodeSocket *, socket, &node->inputs) {
+      socket->flag &= ~SOCK_IN_USE;
+    }
+    LISTBASE_FOREACH (bNodeSocket *, socket, &node->outputs) {
+      socket->flag &= ~SOCK_IN_USE;
+    }
+  }
+  LISTBASE_FOREACH (bNodeLink *, link, &ntree->links) {
+    link->fromsock->flag |= SOCK_IN_USE;
+    link->tosock->flag |= SOCK_IN_USE;
+  }
+}
