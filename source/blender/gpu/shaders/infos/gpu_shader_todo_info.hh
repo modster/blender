@@ -189,18 +189,6 @@ GPU_SHADER_CREATE_INFO(gpu_shader_2D_uv_uniform_color)
             .defs = "#define UV_POS\n",
 },
 */
-GPU_SHADER_CREATE_INFO(gpu_shader_2D_uv_verts)
-    .vertex_source("gpu_shader_2D_edituvs_points_vert.glsl")
-    .fragment_source("gpu_shader_point_varying_color_varying_outline_aa_frag.glsl")
-    .do_static_compilation(true);
-/*
-    [GPU_SHADER_2D_UV_VERTS] =
-        {
-            .name = "GPU_SHADER_2D_UV_VERTS",
-            .vert = datatoc_gpu_shader_2D_edituvs_points_vert_glsl,
-            .frag = datatoc_gpu_shader_point_varying_color_varying_outline_aa_frag_glsl,
-},
-*/
 GPU_SHADER_CREATE_INFO(gpu_shader_gpencil_stroke)
     .vertex_source("gpu_shader_gpencil_stroke_vert.glsl")
     .geometry_source("gpu_shader_gpencil_stroke_geom.glsl")
