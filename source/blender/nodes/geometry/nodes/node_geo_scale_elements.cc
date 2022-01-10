@@ -153,46 +153,10 @@ static EvaluatedFields evaluate_fields(FieldEvaluator &evaluator, const InputFie
   return evaluated;
 }
 
-static void scale_faces(MeshComponent &mesh_component, const InputFields &input_fields)
+static void scale_separate_groups(Mesh &mesh,
+                                  const Span<ScaleGroup> scale_groups,
+                                  const EvaluatedFields &evaluated)
 {
-  Mesh *mesh = mesh_component.get_for_write();
-  mesh->mvert = static_cast<MVert *>(
-      CustomData_duplicate_referenced_layer(&mesh->vdata, CD_MVERT, mesh->totvert));
-
-  GeometryComponentFieldContext field_context{mesh_component, ATTR_DOMAIN_FACE};
-  FieldEvaluator evaluator{field_context, mesh->totpoly};
-  EvaluatedFields evaluated = evaluate_fields(evaluator, input_fields);
-
-  DisjointSet disjoint_set(mesh->totvert);
-  for (const int poly_index : evaluated.selection) {
-    const MPoly &poly = mesh->mpoly[poly_index];
-    const Span<MLoop> poly_loops{mesh->mloop + poly.loopstart, poly.totloop};
-    for (const int loop_index : IndexRange(poly.totloop - 1)) {
-      const int v1 = poly_loops[loop_index].v;
-      const int v2 = poly_loops[loop_index + 1].v;
-      disjoint_set.join(v1, v2);
-    }
-    disjoint_set.join(poly_loops.first().v, poly_loops.last().v);
-  }
-
-  VectorSet<int> group_ids;
-  Vector<ScaleGroup> scale_groups;
-  scale_groups.reserve(evaluated.selection.size());
-  for (const int poly_index : evaluated.selection) {
-    const MPoly &poly = mesh->mpoly[poly_index];
-    const Span<MLoop> poly_loops{mesh->mloop + poly.loopstart, poly.totloop};
-    const int group_id = disjoint_set.find_root(poly_loops[0].v);
-    const int group_index = group_ids.index_of_or_add(group_id);
-    if (group_index == scale_groups.size()) {
-      scale_groups.append({});
-    }
-    ScaleGroup &group = scale_groups[group_index];
-    for (const MLoop &loop : poly_loops) {
-      group.vertex_indices.append(loop.v);
-    }
-    group.element_indices.append(poly_index);
-  }
-
   threading::parallel_for(scale_groups.index_range(), 256, [&](const IndexRange range) {
     Set<int> handled_vertices;
     for (const int group_index : range) {
@@ -205,7 +169,7 @@ static void scale_faces(MeshComponent &mesh_component, const InputFields &input_
 
       for (const int poly_index : group.element_indices) {
         pivot += evaluated.pivots[poly_index];
-        if (input_fields.use_uniform_scale) {
+        if (evaluated.uniform_scales) {
           scale += float3(evaluated.uniform_scales[poly_index]);
           x_axis += float3(1, 0, 0);
           up += float3(0, 0, 1);
@@ -229,7 +193,7 @@ static void scale_faces(MeshComponent &mesh_component, const InputFields &input_
         if (!handled_vertices.add(vert_index)) {
           continue;
         }
-        MVert &vert = mesh->mvert[vert_index];
+        MVert &vert = mesh.mvert[vert_index];
         const float3 old_position = vert.co;
         const float3 new_position = transform * old_position;
         copy_v3_v3(vert.co, new_position);
@@ -237,22 +201,65 @@ static void scale_faces(MeshComponent &mesh_component, const InputFields &input_
     }
   });
 
-  BKE_mesh_normals_tag_dirty(mesh);
+  BKE_mesh_normals_tag_dirty(&mesh);
+}
+
+static void scale_faces(MeshComponent &mesh_component, const InputFields &input_fields)
+{
+  Mesh &mesh = *mesh_component.get_for_write();
+  mesh.mvert = static_cast<MVert *>(
+      CustomData_duplicate_referenced_layer(&mesh.vdata, CD_MVERT, mesh.totvert));
+
+  GeometryComponentFieldContext field_context{mesh_component, ATTR_DOMAIN_FACE};
+  FieldEvaluator evaluator{field_context, mesh.totpoly};
+  EvaluatedFields evaluated = evaluate_fields(evaluator, input_fields);
+
+  DisjointSet disjoint_set(mesh.totvert);
+  for (const int poly_index : evaluated.selection) {
+    const MPoly &poly = mesh.mpoly[poly_index];
+    const Span<MLoop> poly_loops{mesh.mloop + poly.loopstart, poly.totloop};
+    for (const int loop_index : IndexRange(poly.totloop - 1)) {
+      const int v1 = poly_loops[loop_index].v;
+      const int v2 = poly_loops[loop_index + 1].v;
+      disjoint_set.join(v1, v2);
+    }
+    disjoint_set.join(poly_loops.first().v, poly_loops.last().v);
+  }
+
+  VectorSet<int> group_ids;
+  Vector<ScaleGroup> scale_groups;
+  scale_groups.reserve(evaluated.selection.size());
+  for (const int poly_index : evaluated.selection) {
+    const MPoly &poly = mesh.mpoly[poly_index];
+    const Span<MLoop> poly_loops{mesh.mloop + poly.loopstart, poly.totloop};
+    const int group_id = disjoint_set.find_root(poly_loops[0].v);
+    const int group_index = group_ids.index_of_or_add(group_id);
+    if (group_index == scale_groups.size()) {
+      scale_groups.append({});
+    }
+    ScaleGroup &group = scale_groups[group_index];
+    for (const MLoop &loop : poly_loops) {
+      group.vertex_indices.append(loop.v);
+    }
+    group.element_indices.append(poly_index);
+  }
+
+  scale_separate_groups(mesh, scale_groups, evaluated);
 }
 
 static void scale_edges(MeshComponent &mesh_component, const InputFields &input_fields)
 {
-  Mesh *mesh = mesh_component.get_for_write();
-  mesh->mvert = static_cast<MVert *>(
-      CustomData_duplicate_referenced_layer(&mesh->vdata, CD_MVERT, mesh->totvert));
+  Mesh &mesh = *mesh_component.get_for_write();
+  mesh.mvert = static_cast<MVert *>(
+      CustomData_duplicate_referenced_layer(&mesh.vdata, CD_MVERT, mesh.totvert));
 
   GeometryComponentFieldContext field_context{mesh_component, ATTR_DOMAIN_EDGE};
-  FieldEvaluator evaluator{field_context, mesh->totedge};
+  FieldEvaluator evaluator{field_context, mesh.totedge};
   EvaluatedFields evaluated = evaluate_fields(evaluator, input_fields);
 
-  DisjointSet disjoint_set(mesh->totvert);
+  DisjointSet disjoint_set(mesh.totvert);
   for (const int edge_index : evaluated.selection) {
-    const MEdge &edge = mesh->medge[edge_index];
+    const MEdge &edge = mesh.medge[edge_index];
     disjoint_set.join(edge.v1, edge.v2);
   }
 
@@ -260,7 +267,7 @@ static void scale_edges(MeshComponent &mesh_component, const InputFields &input_
   Vector<ScaleGroup> scale_groups;
   scale_groups.reserve(evaluated.selection.size());
   for (const int edge_index : evaluated.selection) {
-    const MEdge &edge = mesh->medge[edge_index];
+    const MEdge &edge = mesh.medge[edge_index];
     const int group_id = disjoint_set.find_root(edge.v1);
     const int group_index = group_ids.index_of_or_add(group_id);
     if (group_index == scale_groups.size()) {
@@ -272,51 +279,7 @@ static void scale_edges(MeshComponent &mesh_component, const InputFields &input_
     group.element_indices.append(edge_index);
   }
 
-  threading::parallel_for(scale_groups.index_range(), 256, [&](const IndexRange range) {
-    Set<int> handled_vertices;
-    for (const int group_index : range) {
-      const ScaleGroup &group = scale_groups[group_index];
-
-      float3 scale = {0.0f, 0.0f, 0.0f};
-      float3 pivot = {0.0f, 0.0f, 0.0f};
-      float3 x_axis = {0.0f, 0.0f, 0.0f};
-      float3 up = {0.0f, 0.0f, 0.0f};
-
-      for (const int edge_index : group.element_indices) {
-        pivot += evaluated.pivots[edge_index];
-        if (input_fields.use_uniform_scale) {
-          scale += float3(evaluated.uniform_scales[edge_index]);
-          x_axis += float3(1, 0, 0);
-          up += float3(0, 0, 1);
-        }
-        else {
-          scale += evaluated.vector_scales[edge_index];
-          x_axis += evaluated.x_axis_vectors[edge_index];
-          up += evaluated.up_vectors[edge_index];
-        }
-      }
-
-      const float f = 1.0f / group.element_indices.size();
-      scale *= f;
-      pivot *= f;
-      x_axis *= f;
-      up *= f;
-
-      const float4x4 transform = create_transform(pivot, x_axis, up, scale);
-      handled_vertices.clear();
-      for (const int vert_index : group.vertex_indices) {
-        if (!handled_vertices.add(vert_index)) {
-          continue;
-        }
-        MVert &vert = mesh->mvert[vert_index];
-        const float3 old_position = vert.co;
-        const float3 new_position = transform * old_position;
-        copy_v3_v3(vert.co, new_position);
-      }
-    }
-  });
-
-  BKE_mesh_normals_tag_dirty(mesh);
+  scale_separate_groups(mesh, scale_groups, evaluated);
 }
 
 static void node_geo_exec(GeoNodeExecParams params)
