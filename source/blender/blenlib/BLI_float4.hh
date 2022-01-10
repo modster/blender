@@ -20,6 +20,6 @@
 
 namespace blender {
 
-using float4 = vec4_base<float>;
+using float4 = vec_base<float, 4>;
 
 }  // namespace blender

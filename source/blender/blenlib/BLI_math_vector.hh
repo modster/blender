@@ -22,12 +22,14 @@
  * \ingroup bli
  */
 
+#include <array>
 #include <cmath>
 #include <iostream>
 #include <type_traits>
 
 #include "BLI_math_base_safe.h"
 #include "BLI_math_vector.h"
+#include "BLI_utildefines.h"
 
 #ifdef WITH_GMP
 #  include "BLI_math_mpq.hh"
@@ -312,6 +314,482 @@ using as_uint_type = std::conditional_t<sizeof(T) == sizeof(uint8_t), uint8_t,
 
 /* FIXME(fclem): This does not works. */
 #define INTEGRAL_OP /* template<typename std::enable_if_t<std::is_integral_v<bT>> * = nullptr> */
+
+template<typename T, int Size> struct vec_struct_base {
+  std::array<T, Size> values;
+};
+
+template<typename T> struct vec_struct_base<T, 2> {
+  T x, y;
+};
+
+template<typename T> struct vec_struct_base<T, 3> {
+  T x, y, z;
+};
+
+template<typename T> struct vec_struct_base<T, 4> {
+  T x, y, z, w;
+};
+
+template<typename T, int Size> struct vec_base : public vec_struct_base<T, Size> {
+
+  static constexpr int type_length = Size;
+
+  typedef T base_type;
+  typedef vec_base<as_uint_type<T>, Size> uint_type;
+
+  vec_base() = default;
+
+  explicit vec_base(uint value)
+  {
+    for (int i = 0; i < Size; i++) {
+      (*this)[i] = static_cast<T>(value);
+    }
+  }
+
+  explicit vec_base(int value)
+  {
+    for (int i = 0; i < Size; i++) {
+      (*this)[i] = static_cast<T>(value);
+    }
+  }
+
+  explicit vec_base(float value)
+  {
+    for (int i = 0; i < Size; i++) {
+      (*this)[i] = static_cast<T>(value);
+    }
+  }
+
+  explicit vec_base(double value)
+  {
+    for (int i = 0; i < Size; i++) {
+      (*this)[i] = static_cast<T>(value);
+    }
+  }
+
+#define VECTOR_ENABLE_IF_SIZE_IS(_test) \
+  int S = Size, typename std::enable_if_t<S _test> * = nullptr
+
+  template<VECTOR_ENABLE_IF_SIZE_IS(== 2)> vec_base(T _x, T _y)
+  {
+    (*this)[0] = _x;
+    (*this)[1] = _y;
+  }
+
+  template<VECTOR_ENABLE_IF_SIZE_IS(== 3)> vec_base(T _x, T _y, T _z)
+  {
+    (*this)[0] = _x;
+    (*this)[1] = _y;
+    (*this)[2] = _z;
+  }
+
+  template<VECTOR_ENABLE_IF_SIZE_IS(== 4)> vec_base(T _x, T _y, T _z, T _w)
+  {
+    (*this)[0] = _x;
+    (*this)[1] = _y;
+    (*this)[2] = _z;
+    (*this)[3] = _w;
+  }
+
+  /** Mixed scalar-vector constructors. */
+
+  template<typename U, VECTOR_ENABLE_IF_SIZE_IS(== 3)>
+  constexpr vec_base(const vec_base<U, 2> &xy, T z)
+      : vec_base(static_cast<T>(xy.x), static_cast<T>(xy.y), z)
+  {
+  }
+
+  template<typename U, VECTOR_ENABLE_IF_SIZE_IS(== 3)>
+  constexpr vec_base(T x, const vec_base<U, 2> &yz)
+      : vec_base(x, static_cast<T>(yz.x), static_cast<T>(yz.y))
+  {
+  }
+
+  template<typename U, VECTOR_ENABLE_IF_SIZE_IS(== 4)>
+  vec_base(vec_base<U, 3> xyz, T w)
+      : vec_base(
+            static_cast<T>(xyz.x), static_cast<T>(xyz.y), static_cast<T>(xyz.z), static_cast<T>(w))
+  {
+  }
+
+  template<typename U, VECTOR_ENABLE_IF_SIZE_IS(== 4)>
+  vec_base(T x, vec_base<U, 3> yzw)
+      : vec_base(
+            static_cast<T>(x), static_cast<T>(yzw.x), static_cast<T>(yzw.y), static_cast<T>(yzw.z))
+  {
+  }
+
+  template<typename U, VECTOR_ENABLE_IF_SIZE_IS(== 4)>
+  vec_base(vec_base<U, 2> xy, vec_base<U, 2> zw)
+      : vec_base(
+            static_cast<T>(xy.x), static_cast<T>(xy.y), static_cast<T>(zw.x), static_cast<T>(zw.y))
+  {
+  }
+
+  template<typename U, VECTOR_ENABLE_IF_SIZE_IS(== 4)>
+  vec_base(vec_base<U, 2> xy, T z, T w)
+      : vec_base(static_cast<T>(xy.x), static_cast<T>(xy.y), static_cast<T>(z), static_cast<T>(w))
+  {
+  }
+
+  template<typename U, VECTOR_ENABLE_IF_SIZE_IS(== 4)>
+  vec_base(T x, vec_base<U, 2> yz, T w)
+      : vec_base(static_cast<T>(x), static_cast<T>(yz.x), static_cast<T>(yz.y), static_cast<T>(w))
+  {
+  }
+
+  template<typename U, VECTOR_ENABLE_IF_SIZE_IS(== 4)>
+  vec_base(T x, T y, vec_base<U, 2> zw)
+      : vec_base(static_cast<T>(x), static_cast<T>(y), static_cast<T>(zw.x), static_cast<T>(zw.y))
+  {
+  }
+
+  /** Masking. */
+
+  template<VECTOR_ENABLE_IF_SIZE_IS(>= 3)> explicit operator vec_base<T, 2>() const
+  {
+    return vec_base<T, 2>(UNPACK2(*this));
+  }
+
+  template<VECTOR_ENABLE_IF_SIZE_IS(>= 4)> explicit operator vec_base<T, 3>() const
+  {
+    return vec_base<T, 3>(UNPACK3(*this));
+  }
+
+#undef VECTOR_ENABLE_IF_SIZE_IS
+
+  /** Conversion from pointers (from C-style vectors). */
+
+  vec_base(const T *ptr)
+  {
+    for (int i = 0; i < Size; i++) {
+      (*this)[i] = ptr[i];
+    }
+  }
+
+  vec_base(const T (*ptr)[Size]) : vec_base(static_cast<const T *>(ptr[0]))
+  {
+  }
+
+  /** Conversion from other vector types. */
+
+  template<typename U> explicit vec_base(const vec_base<U, Size> &vec)
+  {
+    for (int i = 0; i < Size; i++) {
+      (*this)[i] = static_cast<T>(vec[i]);
+    }
+  }
+
+  /** C-style pointer dereference. */
+
+  operator const T *() const
+  {
+    return reinterpret_cast<const T *>(this);
+  }
+
+  operator T *()
+  {
+    return reinterpret_cast<T *>(this);
+  }
+
+  /** Array access. */
+
+  const T &operator[](int index) const
+  {
+    BLI_assert(index >= 0);
+    BLI_assert(index < Size);
+    return reinterpret_cast<const T *>(this)[index];
+  }
+
+  T &operator[](int index)
+  {
+    BLI_assert(index >= 0);
+    BLI_assert(index < Size);
+    return reinterpret_cast<T *>(this)[index];
+  }
+
+  /** Arithmetic operators. */
+
+#define VECTOR_OP(_op) \
+  vec_base result; \
+  for (int i = 0; i < Size; i++) { \
+    _op; \
+  } \
+  return result;
+
+#define VECTOR_SELF_OP(_op) \
+  for (int i = 0; i < Size; i++) { \
+    _op; \
+  } \
+  return *this;
+
+  friend vec_base operator+(const vec_base &a, const vec_base &b)
+  {
+    VECTOR_OP(result[i] = a[i] + b[i]);
+  }
+
+  friend vec_base operator+(const vec_base &a, const T &b)
+  {
+    VECTOR_OP(result[i] = a[i] + b);
+  }
+
+  friend vec_base operator+(const T &a, const vec_base &b)
+  {
+    return b + a;
+  }
+
+  vec_base &operator+=(const vec_base &b)
+  {
+    VECTOR_SELF_OP((*this)[i] += b[i]);
+  }
+
+  vec_base &operator+=(const T &b)
+  {
+    VECTOR_SELF_OP((*this)[i] += b);
+  }
+
+  friend vec_base operator-(const vec_base &a)
+  {
+    VECTOR_OP(result[i] = -a[i]);
+  }
+
+  friend vec_base operator-(const vec_base &a, const vec_base &b)
+  {
+    VECTOR_OP(result[i] = a[i] - b[i]);
+  }
+
+  friend vec_base operator-(const vec_base &a, const T &b)
+  {
+    VECTOR_OP(result[i] = a[i] - b);
+  }
+
+  friend vec_base operator-(const T &a, const vec_base &b)
+  {
+    VECTOR_OP(result[i] = a - b[i]);
+  }
+
+  vec_base &operator-=(const vec_base &b)
+  {
+    VECTOR_SELF_OP((*this)[i] -= b[i]);
+  }
+
+  vec_base &operator-=(const T &b)
+  {
+    VECTOR_SELF_OP((*this)[i] -= b);
+  }
+
+  friend vec_base operator*(const vec_base &a, const vec_base &b)
+  {
+    VECTOR_OP(result[i] = a[i] * b[i]);
+  }
+
+  friend vec_base operator*(const vec_base &a, T b)
+  {
+    VECTOR_OP(result[i] = a[i] * b);
+  }
+
+  friend vec_base operator*(T a, const vec_base &b)
+  {
+    return b * a;
+  }
+
+  vec_base &operator*=(T b)
+  {
+    VECTOR_SELF_OP((*this)[i] *= b);
+  }
+
+  vec_base &operator*=(const vec_base &b)
+  {
+    VECTOR_SELF_OP((*this)[i] *= b[i]);
+  }
+
+  friend vec_base operator/(const vec_base &a, const vec_base &b)
+  {
+    BLI_assert(!b.is_any_zero());
+    VECTOR_OP(result[i] = a[i] / b[i]);
+  }
+
+  friend vec_base operator/(const vec_base &a, T b)
+  {
+    BLI_assert(b != T(0));
+    VECTOR_OP(result[i] = a[i] / b);
+  }
+
+  friend vec_base operator/(T a, const vec_base &b)
+  {
+    BLI_assert(!b.is_any_zero());
+    VECTOR_OP(result[i] = a / b[i]);
+  }
+
+  vec_base &operator/=(T b)
+  {
+    BLI_assert(b != T(0));
+    VECTOR_SELF_OP((*this)[i] /= b);
+  }
+
+  vec_base &operator/=(const vec_base &b)
+  {
+    BLI_assert(!b.is_any_zero());
+    VECTOR_SELF_OP((*this)[i] /= b[i]);
+  }
+
+  /** Binary operators. */
+
+  INTEGRAL_OP friend vec_base operator&(const vec_base &a, const vec_base &b)
+  {
+    VECTOR_OP(result[i] = a[i] & b[i]);
+  }
+
+  INTEGRAL_OP friend vec_base operator&(const vec_base &a, T b)
+  {
+    VECTOR_OP(result[i] = a[i] & b);
+  }
+
+  INTEGRAL_OP friend vec_base operator&(T a, const vec_base &b)
+  {
+    return b & a;
+  }
+
+  INTEGRAL_OP vec_base &operator&=(T b)
+  {
+    VECTOR_SELF_OP((*this)[i] &= b);
+  }
+
+  INTEGRAL_OP vec_base &operator&=(const vec_base &b)
+  {
+    VECTOR_SELF_OP((*this)[i] &= b[i]);
+  }
+
+  INTEGRAL_OP friend vec_base operator|(const vec_base &a, const vec_base &b)
+  {
+    VECTOR_OP(result[i] = a[i] | b[i]);
+  }
+
+  INTEGRAL_OP friend vec_base operator|(const vec_base &a, T b)
+  {
+    VECTOR_OP(result[i] = a[i] | b);
+  }
+
+  INTEGRAL_OP friend vec_base operator|(T a, const vec_base &b)
+  {
+    return b | a;
+  }
+
+  INTEGRAL_OP vec_base &operator|=(T b)
+  {
+    VECTOR_SELF_OP((*this)[i] |= b);
+  }
+
+  INTEGRAL_OP vec_base &operator|=(const vec_base &b)
+  {
+    VECTOR_SELF_OP((*this)[i] |= b[i]);
+  }
+
+  INTEGRAL_OP friend vec_base operator^(const vec_base &a, const vec_base &b)
+  {
+    VECTOR_OP(result[i] = a[i] ^ b[i]);
+  }
+
+  INTEGRAL_OP friend vec_base operator^(const vec_base &a, T b)
+  {
+    VECTOR_OP(result[i] = a[i] ^ b);
+  }
+
+  INTEGRAL_OP friend vec_base operator^(T a, const vec_base &b)
+  {
+    return b ^ a;
+  }
+
+  INTEGRAL_OP vec_base &operator^=(T b)
+  {
+    VECTOR_SELF_OP((*this)[i] ^= b);
+  }
+
+  INTEGRAL_OP vec_base &operator^=(const vec_base &b)
+  {
+    VECTOR_SELF_OP((*this)[i] ^= b[i]);
+  }
+
+  INTEGRAL_OP friend vec_base operator~(const vec_base &a)
+  {
+    VECTOR_OP(result[i] = ~a[i]);
+  }
+
+  /** Modulo operators. */
+
+  INTEGRAL_OP friend vec_base operator%(const vec_base &a, const vec_base &b)
+  {
+    VECTOR_OP(result[i] = a[i] % b[i]);
+  }
+
+  INTEGRAL_OP friend vec_base operator%(const vec_base &a, T b)
+  {
+    VECTOR_OP(result[i] = a[i] % b);
+  }
+
+  INTEGRAL_OP friend vec_base operator%(T a, const vec_base &b)
+  {
+    VECTOR_OP(result[i] = a % b[i]);
+  }
+
+#undef VECTOR_OP
+#undef VECTOR_SELF_OP
+
+  /** Compare. */
+
+  friend bool operator==(const vec_base &a, const vec_base &b)
+  {
+    bool result = true;
+    for (int i = 0; i < Size; i++) {
+      result = result && (a[i] == b[i]);
+    }
+    return result;
+  }
+
+  friend bool operator!=(const vec_base &a, const vec_base &b)
+  {
+    return !(a == b);
+  }
+
+  bool is_zero() const
+  {
+    bool result = true;
+    for (int i = 0; i < Size; i++) {
+      result = result && ((*this)[i] == T(0));
+    }
+    return result;
+  }
+
+  bool is_any_zero() const
+  {
+    bool result = false;
+    for (int i = 0; i < Size && result; i++) {
+      result = result || ((*this)[i] == T(0));
+    }
+    return result;
+  }
+
+  /** Misc. */
+
+  uint64_t hash() const
+  {
+    return math::vector_hash(*this);
+  }
+
+  friend std::ostream &operator<<(std::ostream &stream, const vec_base &v)
+  {
+    stream << "(";
+    for (int i = 0; i < Size; i++) {
+      stream << v[i];
+      if (i != Size - 1) {
+        stream << ", ";
+      }
+    }
+    stream << ")";
+    return stream;
+  }
+};
 
 template<typename bT> struct vec2_base {
 

@@ -24,6 +24,6 @@
 
 namespace blender {
 
-using double2 = vec2_base<double>;
+using double2 = vec_base<double, 2>;
 
 }  // namespace blender

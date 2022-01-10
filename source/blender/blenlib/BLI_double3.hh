@@ -25,7 +25,7 @@
 
 namespace blender {
 
-using double3 = vec3_base<double>;
+using double3 = vec_base<double, 3>;
 
 namespace math {
 

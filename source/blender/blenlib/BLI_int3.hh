@@ -16,11 +16,15 @@
 
 #pragma once
 
+/** \file
+ * \ingroup bli
+ */
+
 #include "BLI_math_vector.hh"
 
 namespace blender {
 
-using int3 = vec3_base<int32_t>;
-using uint3 = vec3_base<uint32_t>;
+using int3 = vec_base<int32_t, 3>;
+using uint3 = vec_base<uint32_t, 3>;
 
 }  // namespace blender

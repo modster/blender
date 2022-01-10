@@ -27,7 +27,7 @@
 
 namespace blender {
 
-using mpq2 = vec2_base<mpq_class>;
+using mpq2 = vec_base<mpq_class, 2>;
 
 namespace math {
 
