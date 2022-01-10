@@ -51,6 +51,7 @@ set(SRC
   nodes/node_composite_color_spill.cc
   nodes/node_composite_colorbalance.cc
   nodes/node_composite_colorcorrection.cc
+  nodes/node_composite_convert_color_space.cc
   nodes/node_composite_common.cc
   nodes/node_composite_composite.cc
   nodes/node_composite_cornerpin.cc
@@ -82,7 +83,7 @@ set(SRC
   nodes/node_composite_keyingscreen.cc
   nodes/node_composite_lensdist.cc
   nodes/node_composite_levels.cc
-  nodes/node_composite_lumma_matte.cc
+  nodes/node_composite_luma_matte.cc
   nodes/node_composite_map_range.cc
   nodes/node_composite_map_uv.cc
   nodes/node_composite_map_value.cc
