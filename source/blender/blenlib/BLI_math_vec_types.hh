@@ -59,8 +59,8 @@ template<typename T, int Size> struct vec_base : public vec_struct_base<T, Size>
 
   static constexpr int type_length = Size;
 
-  typedef T base_type;
-  typedef vec_base<as_uint_type<T>, Size> uint_type;
+  using base_type = T;
+  using uint_type = vec_base<as_uint_type<T>, Size>;
 
   vec_base() = default;
 
