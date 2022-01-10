@@ -16,9 +16,7 @@
 
 #pragma once
 
-#include <iostream>
-
-#include "BLI_math_vector.h"
+#include "BLI_math_vector.hh"
 
 namespace blender {
 
