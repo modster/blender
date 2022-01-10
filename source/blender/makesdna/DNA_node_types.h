@@ -2323,7 +2323,6 @@ typedef enum GeometryNodeRealizeInstancesFlag {
 typedef enum GeometryNodeScaleElementsMode {
   GEO_NODE_SCALE_ELEMENTS_MODE_FACE = 0,
   GEO_NODE_SCALE_ELEMENTS_MODE_EDGE = 1,
-  GEO_NODE_SCALE_ELEMENTS_MODE_CURVE = 2,
 } GeometryNodeScaleElementsMode;
 
 #define GEO_NODE_SCALE_ELEMENTS_UNIFORM 1

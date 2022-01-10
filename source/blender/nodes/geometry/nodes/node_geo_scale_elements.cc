@@ -341,9 +341,6 @@ static void node_geo_exec(GeoNodeExecParams params)
         }
         break;
       }
-      case GEO_NODE_SCALE_ELEMENTS_MODE_CURVE: {
-        break;
-      }
     }
   });
 

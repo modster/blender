@@ -11388,7 +11388,6 @@ static void def_geo_scale_elements(StructRNA *srna)
        ICON_NONE,
        "Edge",
        "Scale individual edges or neighbouring edge islands"},
-      {GEO_NODE_SCALE_ELEMENTS_MODE_CURVE, "CURVE", ICON_NONE, "Curve", "Scale individual curves"},
       {0, NULL, 0, NULL, NULL},
   };
 
