@@ -73,7 +73,6 @@ static MutableSpan<MVert> mesh_verts(Mesh &mesh)
 {
   return {mesh.mvert, mesh.totvert};
 }
-
 static Span<MEdge> mesh_edges(const Mesh &mesh)
 {
   return {mesh.medge, mesh.totedge};
@@ -82,7 +81,6 @@ static MutableSpan<MEdge> mesh_edges(Mesh &mesh)
 {
   return {mesh.medge, mesh.totedge};
 }
-
 static Span<MPoly> mesh_polys(const Mesh &mesh)
 {
   return {mesh.mpoly, mesh.totpoly};
@@ -91,7 +89,6 @@ static MutableSpan<MPoly> mesh_polys(Mesh &mesh)
 {
   return {mesh.mpoly, mesh.totpoly};
 }
-
 static Span<MLoop> mesh_loops(const Mesh &mesh)
 {
   return {mesh.mloop, mesh.totloop};
@@ -191,6 +188,7 @@ static void extrude_mesh_vertices(MeshComponent &component,
   const IndexMask selection = evaluator.get_evaluated_selection_as_mask();
   const VArray<float3> offsets = evaluator.get_evaluated<float3>(0);
 
+  /* This allows parallelizing attribute mixing for new edges. */
   Array<Vector<int>> vert_to_edge_map = create_vert_to_edge_map(orig_vert_size, mesh_edges(mesh));
 
   expand_mesh_size(mesh, selection.size(), selection.size(), 0, 0);
@@ -219,6 +217,7 @@ static void extrude_mesh_vertices(MeshComponent &component,
       MutableSpan<T> data = attribute.as_span().typed<T>();
       switch (attribute.domain()) {
         case ATTR_DOMAIN_POINT: {
+          /* New vertices copy the attribute values from their source vertex. */
           MutableSpan<T> new_data = data.slice(new_vert_range);
           threading::parallel_for(selection.index_range(), 512, [&](const IndexRange range) {
             for (const int i : range) {
@@ -228,22 +227,17 @@ static void extrude_mesh_vertices(MeshComponent &component,
           break;
         }
         case ATTR_DOMAIN_EDGE: {
+          /* New edge values are mixed from of all the edges connected to the source vertex. */
           MutableSpan<T> new_data = data.slice(new_edge_range);
           threading::parallel_for(selection.index_range(), 512, [&](const IndexRange range) {
-            for (const int i : range) {
-              /* Create a separate mixer for every point to avoid allocating temporary
-               * buffers in the mixer the size of the result and to allow multi-threading. */
-              attribute_math::DefaultMixer<T> mixer{new_data.slice(i, 1)};
-
-              const int i_src_vert = selection[i];
-              Span<int> connected_edges = vert_to_edge_map[i_src_vert];
-
-              for (const int i_connected_edge : connected_edges) {
-                mixer.mix_in(0, data[i_connected_edge]);
+            attribute_math::DefaultMixer<T> mixer{new_data.slice(range)};
+            for (const int i : IndexRange(range.size())) {
+              const int i_src_vert = selection[range[i]];
+              for (const int i_connected_edge : vert_to_edge_map[i_src_vert]) {
+                mixer.mix_in(i, data[i_connected_edge]);
               }
-
-              mixer.finalize();
             }
+            mixer.finalize();
           });
           break;
         }
@@ -467,7 +461,7 @@ static void extrude_mesh_edges(MeshComponent &component,
                                    connect_edge_range[extrude_index_2]);
   }
 
-  /* Create a map of all of an index in the extruded vertices array to all of the indices of edges
+  /* Create a map of indices in the extruded vertices array to all of the indices of edges
    * in the duplicate edges array that connect to that vertex. This can be used to simplify the
    * mixing of attribute data for the connecting edges. */
   Array<Vector<int>> new_vert_to_duplicate_edge_map = create_vert_to_edge_map(
@@ -498,41 +492,38 @@ static void extrude_mesh_edges(MeshComponent &component,
           }
           MutableSpan<T> connect_data = data.slice(connect_edge_range);
           threading::parallel_for(connect_data.index_range(), 512, [&](const IndexRange range) {
-            for (const int i : range) {
-              /* Create a separate mixer for every point to avoid allocating temporary
-               * buffers in the mixer the size of the result and to allow multi-threading. */
-              attribute_math::DefaultMixer<T> mixer{connect_data.slice(i, 1)};
-
-              for (const int i_connected_duplicate_edge : new_vert_to_duplicate_edge_map[i]) {
-                /* Use the duplicate data because it's slightly simpler to access and was just
-                 * filled in the previous loop. */
-                mixer.mix_in(0, duplicate_data[i_connected_duplicate_edge]);
+            attribute_math::DefaultMixer<T> mixer{connect_data.slice(range)};
+            for (const int i : IndexRange(range.size())) {
+              const int i_new_vert = range[i];
+              for (const int i_duplicate_edge : new_vert_to_duplicate_edge_map[i_new_vert]) {
+                /* Use the duplicate data rather than the original edge's data because it's
+                 * slightly simpler to access and was just filled in the previous loop. */
+                mixer.mix_in(i, duplicate_data[i_duplicate_edge]);
               }
-
-              mixer.finalize();
             }
+            mixer.finalize();
           });
           break;
         }
         case ATTR_DOMAIN_FACE: {
+          /* Attribute values for new faces are a mix of the values of faces connected to the its
+           * original edge.  */
           MutableSpan<T> new_data = data.slice(new_poly_range);
           threading::parallel_for(edge_selection.index_range(), 512, [&](const IndexRange range) {
-            for (const int i : range) {
-              /* Create a separate mixer for every point to avoid allocating temporary
-               * buffers in the mixer the size of the result and to allow multi-threading. */
-              attribute_math::DefaultMixer<T> mixer{new_data.slice(i, 1)};
-
-              const int i_src_edge = edge_selection[i];
+            attribute_math::DefaultMixer<T> mixer{new_data.slice(range)};
+            for (const int i : IndexRange(range.size())) {
+              const int i_src_edge = edge_selection[range[i]];
               for (const int i_connected_poly : edge_to_poly_map[i_src_edge]) {
-                mixer.mix_in(0, data[i_connected_poly]);
+                mixer.mix_in(i, data[i_connected_poly]);
               }
-
-              mixer.finalize();
             }
+            mixer.finalize();
           });
           break;
         }
         case ATTR_DOMAIN_CORNER: {
+          /* New corners get the average value of all adjacent corners on original faces connected
+           * to the original edge. */
           MutableSpan<T> new_data = data.slice(new_loop_range);
           threading::parallel_for(edge_selection.index_range(), 256, [&](const IndexRange range) {
             for (const int i_edge_selection : range) {
@@ -546,8 +537,8 @@ static void extrude_mesh_edges(MeshComponent &component,
                 continue;
               }
 
-              /* Each corner at the same location if the offset is zero gets the same value,
-               * so there are two separate values for the corner data of this new polygon. */
+              /* Both corners on each vertical edge of the side polygon get the same value,
+               * so there are only two unique values to mix. */
               Array<T> side_poly_corner_data(2);
               attribute_math::DefaultMixer<T> mixer{side_poly_corner_data};
 
@@ -641,10 +632,10 @@ static void extrude_mesh_edges(MeshComponent &component,
   BLI_assert(BKE_mesh_is_valid(component.get_for_write()));
 }
 
-static void extrude_mesh_faces(MeshComponent &component,
-                               const Field<bool> &selection_field,
-                               const Field<float3> &offset_field,
-                               const AttributeOutputs &attribute_outputs)
+static void extrude_mesh_face_regions(MeshComponent &component,
+                                      const Field<bool> &selection_field,
+                                      const Field<float3> &offset_field,
+                                      const AttributeOutputs &attribute_outputs)
 {
   Mesh &mesh = *component.get_for_write();
   const int orig_vert_size = mesh.totvert;
@@ -814,7 +805,7 @@ static void extrude_mesh_faces(MeshComponent &component,
                                    connect_edge_range[extrude_index_2]);
   }
 
-  /* Create a map of all of an index in the extruded vertices array to all of the indices of edges
+  /* Create a map of indices in the extruded vertices array to all of the indices of edges
    * in the duplicate edges array that connect to that vertex. This can be used to simplify the
    * mixing of attribute data for the connecting edges. */
   Array<Vector<int>> new_vert_to_duplicate_edge_map = create_vert_to_edge_map(
@@ -832,6 +823,7 @@ static void extrude_mesh_faces(MeshComponent &component,
       MutableSpan<T> data = attribute.as_span().typed<T>();
       switch (attribute.domain()) {
         case ATTR_DOMAIN_POINT: {
+          /* New vertices copy the attributes from their original vertices. */
           MutableSpan<T> new_data = data.slice(new_vert_range);
           for (const int i : new_vert_orig_indices.index_range()) {
             new_data[i] = data[new_vert_orig_indices[i]];
@@ -839,29 +831,33 @@ static void extrude_mesh_faces(MeshComponent &component,
           break;
         }
         case ATTR_DOMAIN_EDGE: {
+          /* Two cases:
+           * - Edges parallel to original edges: Copy the edge attributes from the original edges.
+           * - Edges connected to original vertices: Mix values of selected edges that are
+           *   connected to the original vertex.
+           */
           MutableSpan<T> duplicate_data = data.slice(duplicate_edge_range);
           MutableSpan<T> connect_data = data.slice(connect_edge_range);
           for (const int i : edge_selection.index_range()) {
             duplicate_data[i] = data[edge_selection[i]];
           }
           threading::parallel_for(connect_data.index_range(), 512, [&](const IndexRange range) {
-            for (const int i : range) {
-              /* Create a separate mixer for every point to avoid allocating temporary
-               * buffers in the mixer the size of the result and to allow multi-threading. */
-              attribute_math::DefaultMixer<T> mixer{connect_data.slice(i, 1)};
-
-              for (const int i_connected_duplicate_edge : new_vert_to_duplicate_edge_map[i]) {
-                /* Use the duplicate data because it's slightly simpler to access and was just
-                 * filled in the previous loop. */
-                mixer.mix_in(0, duplicate_data[i_connected_duplicate_edge]);
+            attribute_math::DefaultMixer<T> mixer{connect_data.slice(range)};
+            for (const int i : IndexRange(range.size())) {
+              const int i_new_vert = range[i];
+              for (const int i_duplicate_edge : new_vert_to_duplicate_edge_map[i_new_vert]) {
+                /* Use the duplicate data rather than the original edge's data because it's
+                 * slightly simpler to access and was just filled in the previous loop. */
+                mixer.mix_in(i, duplicate_data[i_duplicate_edge]);
               }
-
-              mixer.finalize();
             }
+            mixer.finalize();
           });
           break;
         }
         case ATTR_DOMAIN_FACE: {
+          /* New faces on the side of extrusions get the values from the corresponding selected
+           * face. */
           MutableSpan<T> new_data = data.slice(side_poly_range);
           for (const int i : new_data.index_range()) {
             new_data[i] = data[edge_orig_face_indices[i]];
@@ -869,6 +865,7 @@ static void extrude_mesh_faces(MeshComponent &component,
           break;
         }
         case ATTR_DOMAIN_CORNER: {
+          /* New corners get the values for the corresponding corner on the extruded face. */
           MutableSpan<T> new_data = data.slice(side_loop_range);
           threading::parallel_for(edge_selection.index_range(), 256, [&](const IndexRange range) {
             for (const int i_edge_selection : range) {
@@ -1088,6 +1085,7 @@ static void extrude_individual_mesh_faces(MeshComponent &component,
       MutableSpan<T> data = attribute.as_span().typed<T>();
       switch (attribute.domain()) {
         case ATTR_DOMAIN_POINT: {
+          /* New vertices copy the attributes from their original vertices. */
           MutableSpan<T> new_data = data.slice(new_vert_range);
 
           threading::parallel_for(poly_selection.index_range(), 1024, [&](const IndexRange range) {
@@ -1105,6 +1103,11 @@ static void extrude_individual_mesh_faces(MeshComponent &component,
           break;
         }
         case ATTR_DOMAIN_EDGE: {
+          /* Two cases:
+           * - Edges parallel to original edges: Copy the edge attributes from the original edges.
+           * - Edges connected to original vertices: Mix values of the two edges on either side of
+           *   the edge's original vertex.
+           */
           MutableSpan<T> duplicate_data = data.slice(duplicate_edge_range);
           MutableSpan<T> connect_data = data.slice(connect_edge_range);
 
@@ -1136,8 +1139,8 @@ static void extrude_individual_mesh_faces(MeshComponent &component,
           break;
         }
         case ATTR_DOMAIN_FACE: {
+          /* Each side face gets the values from the correspoinding new face. */
           MutableSpan<T> new_data = data.slice(side_poly_range);
-
           threading::parallel_for(poly_selection.index_range(), 1024, [&](const IndexRange range) {
             for (const int i_selection : range) {
               const int poly_index = poly_selection[i_selection];
@@ -1149,6 +1152,8 @@ static void extrude_individual_mesh_faces(MeshComponent &component,
           break;
         }
         case ATTR_DOMAIN_CORNER: {
+          /* Each corner on a side face gets its value from the matching corner on an extruded
+           * face. */
           MutableSpan<T> new_data = data.slice(side_loop_range);
           threading::parallel_for(poly_selection.index_range(), 256, [&](const IndexRange range) {
             for (const int i_selection : range) {
@@ -1164,9 +1169,8 @@ static void extrude_individual_mesh_faces(MeshComponent &component,
                 MutableSpan<T> side_loop_data = new_data.slice(i_extrude * 4, 4);
 
                 /* The two corners on each side of the side polygon get the data from the matching
-                 * corners of the extruded polygon. (Matching values for the corners that would be
-                 * in the same location if the extrude offset is 0). This order depends on the
-                 * following loop filling the loop indices. */
+                 * corners of the extruded polygon. This order depends on the loop filling the loop
+                 * indices. */
                 side_loop_data[0] = poly_loop_data[i_next];
                 side_loop_data[1] = poly_loop_data[i];
                 side_loop_data[2] = poly_loop_data[i];
@@ -1272,7 +1276,7 @@ static void node_geo_exec(GeoNodeExecParams params)
             extrude_individual_mesh_faces(component, selection, final_offset, attribute_outputs);
           }
           else {
-            extrude_mesh_faces(component, selection, final_offset, attribute_outputs);
+            extrude_mesh_face_regions(component, selection, final_offset, attribute_outputs);
           }
           break;
         }
