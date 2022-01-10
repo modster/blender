@@ -96,9 +96,7 @@ struct EvaluatedFields {
 };
 
 struct ScaleIsland {
-  /* May contain duplicates. */
-  Vector<int> vertex_indices;
-  /* Either face or edge. */
+  /* Either face or edge indices. */
   Vector<int> element_indices;
 };
 
@@ -153,9 +151,11 @@ static EvaluatedFields evaluate_fields(FieldEvaluator &evaluator, const InputFie
   return evaluated;
 }
 
-static void scale_vertex_islands(Mesh &mesh,
-                                 const Span<ScaleIsland> islands,
-                                 const EvaluatedFields &evaluated)
+static void scale_vertex_islands(
+    Mesh &mesh,
+    const Span<ScaleIsland> islands,
+    const EvaluatedFields &evaluated,
+    const FunctionRef<void(int element_index, Vector<int> &r_vertex_indices)> get_vertex_indices)
 {
   threading::parallel_for(islands.index_range(), 256, [&](const IndexRange range) {
     Set<int> handled_vertices;
@@ -167,7 +167,9 @@ static void scale_vertex_islands(Mesh &mesh,
       float3 x_axis = {0.0f, 0.0f, 0.0f};
       float3 up = {0.0f, 0.0f, 0.0f};
 
+      Vector<int> vertex_indices;
       for (const int poly_index : island.element_indices) {
+        get_vertex_indices(poly_index, vertex_indices);
         pivot += evaluated.pivots[poly_index];
         if (evaluated.uniform_scales) {
           scale += float3(evaluated.uniform_scales[poly_index]);
@@ -189,7 +191,7 @@ static void scale_vertex_islands(Mesh &mesh,
 
       const float4x4 transform = create_transform(pivot, x_axis, up, scale);
       handled_vertices.clear();
-      for (const int vert_index : island.vertex_indices) {
+      for (const int vert_index : vertex_indices) {
         if (!handled_vertices.add(vert_index)) {
           continue;
         }
@@ -230,9 +232,6 @@ static Vector<ScaleIsland> prepare_face_islands(const Mesh &mesh, const IndexMas
       islands.append({});
     }
     ScaleIsland &island = islands[island_index];
-    for (const MLoop &loop : poly_loops) {
-      island.vertex_indices.append(loop.v);
-    }
     island.element_indices.append(poly_index);
   }
 
@@ -250,7 +249,14 @@ static void scale_faces(MeshComponent &mesh_component, const InputFields &input_
   EvaluatedFields evaluated = evaluate_fields(evaluator, input_fields);
 
   Vector<ScaleIsland> island = prepare_face_islands(mesh, evaluated.selection);
-  scale_vertex_islands(mesh, island, evaluated);
+  scale_vertex_islands(
+      mesh, island, evaluated, [&](int face_index, Vector<int> &r_vertex_indices) {
+        const MPoly &poly = mesh.mpoly[face_index];
+        const Span<MLoop> poly_loops{mesh.mloop + poly.loopstart, poly.totloop};
+        for (const MLoop &loop : poly_loops) {
+          r_vertex_indices.append(loop.v);
+        }
+      });
 }
 
 static Vector<ScaleIsland> prepare_edge_islands(const Mesh &mesh, const IndexMask edge_selection)
@@ -272,8 +278,6 @@ static Vector<ScaleIsland> prepare_edge_islands(const Mesh &mesh, const IndexMas
       islands.append({});
     }
     ScaleIsland &island = islands[island_index];
-    island.vertex_indices.append(edge.v1);
-    island.vertex_indices.append(edge.v2);
     island.element_indices.append(edge_index);
   }
 
@@ -291,7 +295,12 @@ static void scale_edges(MeshComponent &mesh_component, const InputFields &input_
   EvaluatedFields evaluated = evaluate_fields(evaluator, input_fields);
 
   Vector<ScaleIsland> island = prepare_edge_islands(mesh, evaluated.selection);
-  scale_vertex_islands(mesh, island, evaluated);
+  scale_vertex_islands(
+      mesh, island, evaluated, [&](const int edge_index, Vector<int> &r_vertex_indices) {
+        const MEdge &edge = mesh.medge[edge_index];
+        r_vertex_indices.append(edge.v1);
+        r_vertex_indices.append(edge.v2);
+      });
 }
 
 static void node_geo_exec(GeoNodeExecParams params)
