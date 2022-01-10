@@ -11398,6 +11398,11 @@ static void def_geo_scale_elements(StructRNA *srna)
   RNA_def_property_enum_default(prop, GEO_NODE_SCALE_ELEMENTS_MODE_FACE);
   RNA_def_property_ui_text(prop, "Mode", "Element type to transform");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_GeometryNode_socket_update");
+
+  prop = RNA_def_property(srna, "uniform", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "custom2", GEO_NODE_SCALE_ELEMENTS_UNIFORM);
+  RNA_def_property_ui_text(prop, "Uniform", "Scale element by the same factor in every direction");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_GeometryNode_socket_update");
 }
 
 /* -------------------------------------------------------------------------- */

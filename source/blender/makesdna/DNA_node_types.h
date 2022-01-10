@@ -2326,6 +2326,8 @@ typedef enum GeometryNodeScaleElementsMode {
   GEO_NODE_SCALE_ELEMENTS_MODE_CURVE = 2,
 } GeometryNodeScaleElementsMode;
 
+#define GEO_NODE_SCALE_ELEMENTS_UNIFORM 1
+
 #ifdef __cplusplus
 }
 #endif

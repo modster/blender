@@ -33,7 +33,10 @@ static void node_declare(NodeDeclarationBuilder &b)
 {
   b.add_input<decl::Geometry>(N_("Geometry")).supported_type(GEO_COMPONENT_TYPE_MESH);
   b.add_input<decl::Bool>(N_("Selection")).default_value(true).hide_value().supports_field();
-  b.add_input<decl::Vector>(N_("Scale")).default_value({1.0f, 1.0f, 1.0f}).supports_field();
+  b.add_input<decl::Float>(N_("Scale"), "Scale_Float").default_value(1.0f).supports_field();
+  b.add_input<decl::Vector>(N_("Scale"), "Scale_Vector")
+      .default_value({1.0f, 1.0f, 1.0f})
+      .supports_field();
   b.add_input<decl::Vector>(N_("Pivot")).subtype(PROP_TRANSLATION).implicit_field();
   b.add_input<decl::Vector>(N_("X Axis")).default_value({1.0f, 0.0f, 0.0f}).supports_field();
   b.add_input<decl::Vector>(N_("Up")).default_value({0.0f, 0.0f, 1.0f}).supports_field();
@@ -43,11 +46,38 @@ static void node_declare(NodeDeclarationBuilder &b)
 static void node_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 {
   uiItemR(layout, ptr, "mode", 0, nullptr, ICON_NONE);
+  uiItemR(layout, ptr, "uniform", 0, nullptr, ICON_NONE);
+}
+
+static void node_init(bNodeTree *UNUSED(tree), bNode *node)
+{
+  node->custom1 = GEO_NODE_SCALE_ELEMENTS_MODE_FACE;
+  node->custom2 = GEO_NODE_SCALE_ELEMENTS_UNIFORM;
+}
+
+static void node_update(bNodeTree *ntree, bNode *node)
+{
+  bNodeSocket *geometry_socket = static_cast<bNodeSocket *>(node->inputs.first);
+  bNodeSocket *selection_socket = geometry_socket->next;
+  bNodeSocket *scale_float_socket = selection_socket->next;
+  bNodeSocket *scale_vector_socket = scale_float_socket->next;
+  bNodeSocket *pivot_socket = scale_vector_socket->next;
+  bNodeSocket *x_axis_socket = pivot_socket->next;
+  bNodeSocket *up_socket = x_axis_socket->next;
+
+  const bool use_uniform_scale = node->custom2 & GEO_NODE_SCALE_ELEMENTS_UNIFORM;
+
+  nodeSetSocketAvailability(ntree, scale_float_socket, use_uniform_scale);
+  nodeSetSocketAvailability(ntree, scale_vector_socket, !use_uniform_scale);
+  nodeSetSocketAvailability(ntree, x_axis_socket, !use_uniform_scale);
+  nodeSetSocketAvailability(ntree, up_socket, !use_uniform_scale);
 }
 
 struct InputFields {
+  bool use_uniform_scale;
   Field<bool> selection;
-  Field<float3> scale;
+  Field<float> uniform_scale;
+  Field<float3> vector_scale;
   Field<float3> pivot;
   Field<float3> x_axis;
   Field<float3> up;
@@ -103,14 +133,20 @@ static void scale_faces(MeshComponent &mesh_component, const InputFields &input_
   GeometryComponentFieldContext field_context{mesh_component, ATTR_DOMAIN_FACE};
   FieldEvaluator evaluator{field_context, mesh->totpoly};
   evaluator.set_selection(input_fields.selection);
-  VArray<float3> scales;
+  VArray<float3> vector_scales;
+  VArray<float> uniform_scales;
   VArray<float3> pivots;
   VArray<float3> x_axis_vectors;
   VArray<float3> up_vectors;
-  evaluator.add(input_fields.scale, &scales);
+  if (input_fields.use_uniform_scale) {
+    evaluator.add(input_fields.uniform_scale, &uniform_scales);
+  }
+  else {
+    evaluator.add(input_fields.vector_scale, &vector_scales);
+    evaluator.add(input_fields.x_axis, &x_axis_vectors);
+    evaluator.add(input_fields.up, &up_vectors);
+  }
   evaluator.add(input_fields.pivot, &pivots);
-  evaluator.add(input_fields.x_axis, &x_axis_vectors);
-  evaluator.add(input_fields.up, &up_vectors);
   evaluator.evaluate();
   const IndexMask selection = evaluator.get_evaluated_selection_as_mask();
 
@@ -136,9 +172,16 @@ static void scale_faces(MeshComponent &mesh_component, const InputFields &input_
     const int group_index = group_by_vertex_index[first_vertex];
     GroupData &group_info = groups_data[group_index];
     group_info.pivot += pivots[poly_index];
-    group_info.scale += scales[poly_index];
-    group_info.x_axis += x_axis_vectors[poly_index];
-    group_info.up += up_vectors[poly_index];
+    if (input_fields.use_uniform_scale) {
+      group_info.scale += float3(uniform_scales[poly_index]);
+      group_info.x_axis += float3(1, 0, 0);
+      group_info.up += float3(0, 0, 1);
+    }
+    else {
+      group_info.scale += vector_scales[poly_index];
+      group_info.x_axis += x_axis_vectors[poly_index];
+      group_info.up += up_vectors[poly_index];
+    }
     group_info.tot_elements++;
   }
 
@@ -184,14 +227,20 @@ static void scale_edges(MeshComponent &mesh_component, const InputFields &input_
   GeometryComponentFieldContext field_context{mesh_component, ATTR_DOMAIN_EDGE};
   FieldEvaluator evaluator{field_context, mesh->totedge};
   evaluator.set_selection(input_fields.selection);
-  VArray<float3> scales;
+  VArray<float3> vector_scales;
+  VArray<float> uniform_scales;
   VArray<float3> pivots;
   VArray<float3> x_axis_vectors;
   VArray<float3> up_vectors;
-  evaluator.add(input_fields.scale, &scales);
+  if (input_fields.use_uniform_scale) {
+    evaluator.add(input_fields.uniform_scale, &uniform_scales);
+  }
+  else {
+    evaluator.add(input_fields.vector_scale, &vector_scales);
+    evaluator.add(input_fields.x_axis, &x_axis_vectors);
+    evaluator.add(input_fields.up, &up_vectors);
+  }
   evaluator.add(input_fields.pivot, &pivots);
-  evaluator.add(input_fields.x_axis, &x_axis_vectors);
-  evaluator.add(input_fields.up, &up_vectors);
   evaluator.evaluate();
   const IndexMask selection = evaluator.get_evaluated_selection_as_mask();
 
@@ -210,9 +259,16 @@ static void scale_edges(MeshComponent &mesh_component, const InputFields &input_
     const int group_index = group_by_vertex_index[edge.v1];
     GroupData &group_info = groups_data[group_index];
     group_info.pivot += pivots[edge_index];
-    group_info.scale += scales[edge_index];
-    group_info.x_axis += x_axis_vectors[edge_index];
-    group_info.up += up_vectors[edge_index];
+    if (input_fields.use_uniform_scale) {
+      group_info.scale += float3(uniform_scales[edge_index]);
+      group_info.x_axis += float3(1, 0, 0);
+      group_info.up += float3(0, 0, 1);
+    }
+    else {
+      group_info.scale += vector_scales[edge_index];
+      group_info.x_axis += x_axis_vectors[edge_index];
+      group_info.up += up_vectors[edge_index];
+    }
     group_info.tot_elements++;
   }
 
@@ -251,16 +307,23 @@ static void scale_edges(MeshComponent &mesh_component, const InputFields &input_
 
 static void node_geo_exec(GeoNodeExecParams params)
 {
+  const bNode &node = params.node();
   const GeometryNodeScaleElementsMode mode = static_cast<GeometryNodeScaleElementsMode>(
-      params.node().custom1);
+      node.custom1);
 
   GeometrySet geometry = params.extract_input<GeometrySet>("Geometry");
   InputFields input_fields;
+  input_fields.use_uniform_scale = node.custom2 & GEO_NODE_SCALE_ELEMENTS_UNIFORM;
   input_fields.selection = params.get_input<Field<bool>>("Selection");
-  input_fields.scale = params.get_input<Field<float3>>("Scale");
+  if (input_fields.use_uniform_scale) {
+    input_fields.uniform_scale = params.get_input<Field<float>>("Scale_Float");
+  }
+  else {
+    input_fields.vector_scale = params.get_input<Field<float3>>("Scale_Vector");
+    input_fields.x_axis = params.get_input<Field<float3>>("X Axis");
+    input_fields.up = params.get_input<Field<float3>>("Up");
+  }
   input_fields.pivot = params.get_input<Field<float3>>("Pivot");
-  input_fields.x_axis = params.get_input<Field<float3>>("X Axis");
-  input_fields.up = params.get_input<Field<float3>>("Up");
 
   geometry.modify_geometry_sets([&](GeometrySet &geometry) {
     switch (mode) {
@@ -299,5 +362,7 @@ void register_node_type_geo_scale_elements()
   ntype.geometry_node_execute = file_ns::node_geo_exec;
   ntype.declare = file_ns::node_declare;
   ntype.draw_buttons = file_ns::node_layout;
+  ntype.initfunc = file_ns::node_init;
+  ntype.updatefunc = file_ns::node_update;
   nodeRegisterType(&ntype);
 }
