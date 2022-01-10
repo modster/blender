@@ -445,6 +445,7 @@ shaders/infos/gpu_shader_2D_uv_faces_stretch_info.hh
 shaders/infos/gpu_shader_2D_uv_faces_info.hh
 shaders/infos/gpu_shader_2D_uv_facedots_info.hh
 shaders/infos/gpu_shader_2D_uv_edges_info.hh
+shaders/infos/gpu_shader_2D_point_varying_size_varying_color_info.hh
 #shaders/infos/gpu_shader_todo_info.hh
 )
 
