@@ -40,9 +40,21 @@ static void node_declare(NodeDeclarationBuilder &b)
   b.add_input<decl::Vector>(N_("Scale"), "Scale_Vector")
       .default_value({1.0f, 1.0f, 1.0f})
       .supports_field();
-  b.add_input<decl::Vector>(N_("Pivot")).subtype(PROP_TRANSLATION).implicit_field();
-  b.add_input<decl::Vector>(N_("X Axis")).default_value({1.0f, 0.0f, 0.0f}).supports_field();
-  b.add_input<decl::Vector>(N_("Up")).default_value({0.0f, 0.0f, 1.0f}).supports_field();
+  b.add_input<decl::Vector>(N_("Pivot"))
+      .subtype(PROP_TRANSLATION)
+      .implicit_field()
+      .description(
+          N_("Origin of the scaling for each element. If multiple elements are scaled together, "
+             "their pivot is averaged"));
+  b.add_input<decl::Vector>(N_("X Axis"))
+      .default_value({1.0f, 0.0f, 0.0f})
+      .supports_field()
+      .description(N_("Direction which the x component of the scale input changes the element"));
+  b.add_input<decl::Vector>(N_("Up"))
+      .default_value({0.0f, 0.0f, 1.0f})
+      .supports_field()
+      .description(N_("Direction which the z component of the scale input changes the element (or "
+                      "approximate direction when not orthogonal to x axis)"));
   b.add_output<decl::Geometry>(N_("Geometry"));
 };
 
