@@ -74,6 +74,8 @@
 
 #include "BLI_float4.hh"
 #include "BLI_int3.hh"
+#include "BLI_int4.hh"
+#include "BLI_span.hh"
 #include "BLI_utildefines.h"
 #include "BLI_utility_mixins.hh"
 
@@ -287,7 +289,7 @@ template<
     /** True if the buffer only resides on GPU memory and cannot be accessed. */
     /* TODO(fclem): Currently unsupported. */
     /* bool device_only = false */>
-class UniformArrayBuffer : UniformCommon<T, len, false> {
+class UniformArrayBuffer : public detail::UniformCommon<T, len, false> {
  public:
   UniformArrayBuffer()
   {
@@ -302,7 +304,7 @@ template<
     /** True if the buffer only resides on GPU memory and cannot be accessed. */
     /* TODO(fclem): Currently unsupported. */
     /* bool device_only = false */>
-class UniformBuffer : T, UniformCommon<T, 1, false> {
+class UniformBuffer : public T, public detail::UniformCommon<T, 1, false> {
  public:
   UniformBuffer()
   {
@@ -330,7 +332,7 @@ template<
     int64_t len,
     /** True if created on device and no memory host memory is allocated. */
     bool device_only = false>
-class StorageArrayBuffer : StorageCommon<T, len, device_only> {
+class StorageArrayBuffer : public detail::StorageCommon<T, len, device_only> {
  public:
   void push_update(void)
   {
@@ -347,7 +349,7 @@ template<
     typename T,
     /** True if created on device and no memory host memory is allocated. */
     bool device_only = false>
-class StorageBuffer : T, StorageCommon<T, 1, device_only> {
+class StorageBuffer : public T, public detail::StorageCommon<T, 1, device_only> {
  public:
   void push_update(void)
   {
@@ -498,29 +500,21 @@ class Texture : NonCopyable {
    * Ensure the texture has the correct properties. Recreating it if needed.
    * Return true if a texture has been created.
    */
-  void clear(float4 color)
+  void clear(float4 values)
   {
-    GPU_texture_clear(tx_, GPU_DATA_FLOAT, &color[0]);
+    GPU_texture_clear(tx_, GPU_DATA_FLOAT, &values[0]);
   }
-  void clear(float val)
+  void clear(uint4 values)
   {
-    float color[4] = {val, val, val, val};
-    GPU_texture_clear(tx_, GPU_DATA_FLOAT, &color[0]);
+    GPU_texture_clear(tx_, GPU_DATA_UINT, &values[0]);
   }
-  void clear(uint val)
+  void clear(uchar4 values)
   {
-    uint color[4] = {val, val, val, val};
-    GPU_texture_clear(tx_, GPU_DATA_UINT, &color[0]);
+    GPU_texture_clear(tx_, GPU_DATA_UBYTE, &values[0]);
   }
-  void clear(uchar val)
+  void clear(int4 values)
   {
-    uchar color[4] = {val, val, val, val};
-    GPU_texture_clear(tx_, GPU_DATA_UBYTE, &color[0]);
-  }
-  void clear(int val)
-  {
-    int color[4] = {val, val, val, val};
-    GPU_texture_clear(tx_, GPU_DATA_INT, &color[0]);
+    GPU_texture_clear(tx_, GPU_DATA_INT, &values[0]);
   }
 
   /* Returns a memory block that needs to be manually freed by MEM_freeN(). */
