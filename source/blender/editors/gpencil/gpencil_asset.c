@@ -181,10 +181,6 @@ enum eGP_CageCorners {
 
 static bool gpencil_asset_generic_poll(bContext *C)
 {
-  if (U.experimental.use_extended_asset_browser == false) {
-    return false;
-  }
-
   Object *ob = CTX_data_active_object(C);
   if ((ob == NULL) || (ob->type != OB_GPENCIL)) {
     return false;
