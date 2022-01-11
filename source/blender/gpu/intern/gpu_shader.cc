@@ -407,9 +407,7 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
     free(shader_shared_utils);
   }
 
-  shader->finalize(&info);
-
-  if (!shader->finalize()) {
+  if (!shader->finalize(&info)) {
     delete shader;
     return nullptr;
   }
