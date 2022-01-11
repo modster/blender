@@ -48,33 +48,6 @@ GPU_SHADER_CREATE_INFO(gpu_shader_2D_widget_shadow)
             .frag = datatoc_gpu_shader_2D_widget_shadow_frag_glsl,
 },
 */
-GPU_SHADER_CREATE_INFO(gpu_shader_2D_nodelink)
-    .vertex_source("gpu_shader_2D_nodelink_vert.glsl")
-    .fragment_source("gpu_shader_2D_nodelink_frag.glsl")
-    .do_static_compilation(true);
-/*
-    [GPU_SHADER_2D_NODELINK] =
-        {
-            .name = "GPU_SHADER_2D_NODELINK",
-            .vert = datatoc_gpu_shader_2D_nodelink_vert_glsl,
-            .frag = datatoc_gpu_shader_2D_nodelink_frag_glsl,
-},
-*/
-GPU_SHADER_CREATE_INFO(gpu_shader_2D_nodelink_inst)
-    .vertex_source("gpu_shader_2D_nodelink_vert.glsl")
-    .fragment_source("gpu_shader_2D_nodelink_frag.glsl")
-    .define("USE_INSTANCE")
-    .do_static_compilation(true);
-/*
-    [GPU_SHADER_2D_NODELINK_INST] =
-        {
-            .name = "GPU_SHADER_2D_NODELINK_INST",
-            .vert = datatoc_gpu_shader_2D_nodelink_vert_glsl,
-            .frag = datatoc_gpu_shader_2D_nodelink_frag_glsl,
-            .defs = "#define USE_INSTANCE\n",
-},
-
-*/
 GPU_SHADER_CREATE_INFO(gpu_shader_gpencil_stroke)
     .vertex_source("gpu_shader_gpencil_stroke_vert.glsl")
     .geometry_source("gpu_shader_gpencil_stroke_geom.glsl")

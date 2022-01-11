@@ -41,6 +41,9 @@
 #include "GPU_texture.h"
 #include "GPU_uniform_buffer.h"
 
+/* TODO(jbakker): Need a better way to retrieve create_infos. */
+#include "gpu_shader_create_info_private.hh"
+
 /* Adjust these constants as needed. */
 #define MAX_DEFINE_LENGTH 256
 #define MAX_EXT_DEFINE_LENGTH 512
@@ -145,6 +148,8 @@ typedef struct {
   const char *frag;
   /** Optional. */
   const char *defs;
+
+  const char *create_info;
 } GPUShaderStages;
 
 static const GPUShaderStages builtin_shader_stages[GPU_SHADER_BUILTIN_LEN] = {
@@ -394,19 +399,11 @@ static const GPUShaderStages builtin_shader_stages[GPU_SHADER_BUILTIN_LEN] = {
             .vert = datatoc_gpu_shader_2D_widget_shadow_vert_glsl,
             .frag = datatoc_gpu_shader_2D_widget_shadow_frag_glsl,
         },
-    [GPU_SHADER_2D_NODELINK] =
-        {
-            .name = "GPU_SHADER_2D_NODELINK",
-            .vert = datatoc_gpu_shader_2D_nodelink_vert_glsl,
-            .frag = datatoc_gpu_shader_2D_nodelink_frag_glsl,
-        },
-    [GPU_SHADER_2D_NODELINK_INST] =
-        {
-            .name = "GPU_SHADER_2D_NODELINK_INST",
-            .vert = datatoc_gpu_shader_2D_nodelink_vert_glsl,
-            .frag = datatoc_gpu_shader_2D_nodelink_frag_glsl,
-            .defs = "#define USE_INSTANCE\n",
-        },
+    [GPU_SHADER_2D_NODELINK] = {.name = "GPU_SHADER_2D_NODELINK",
+                                .create_info = "gpu_shader_2D_nodelink"},
+
+    [GPU_SHADER_2D_NODELINK_INST] = {.name = "GPU_SHADER_2D_NODELINK_INST",
+                                     .create_info = "gpu_shader_2D_nodelink_inst"},
 
     [GPU_SHADER_GPENCIL_STROKE] =
         {
@@ -429,14 +426,20 @@ GPUShader *GPU_shader_get_builtin_shader_with_config(eGPUBuiltinShader shader,
 
     /* common case */
     if (sh_cfg == GPU_SHADER_CFG_DEFAULT) {
-      *sh_p = GPU_shader_create_from_arrays_named(
-          stages->name,
-          {
-              .vert = (const char *[]){stages->vert, NULL},
-              .geom = (const char *[]){stages->geom, NULL},
-              .frag = (const char *[]){datatoc_gpu_shader_colorspace_lib_glsl, stages->frag, NULL},
-              .defs = (const char *[]){stages->defs, NULL},
-          });
+      if (stages->create_info != NULL) {
+        *sh_p = GPU_shader_create_from_info(gpu_shader_create_info_get(stages->create_info));
+      }
+      else {
+        *sh_p = GPU_shader_create_from_arrays_named(
+            stages->name,
+            {
+                .vert = (const char *[]){stages->vert, NULL},
+                .geom = (const char *[]){stages->geom, NULL},
+                .frag =
+                    (const char *[]){datatoc_gpu_shader_colorspace_lib_glsl, stages->frag, NULL},
+                .defs = (const char *[]){stages->defs, NULL},
+            });
+      }
     }
     else if (sh_cfg == GPU_SHADER_CFG_CLIPPED) {
       /* Remove eventually, for now ensure support for each shader has been added. */
@@ -451,14 +454,20 @@ GPUShader *GPU_shader_get_builtin_shader_with_config(eGPUBuiltinShader shader,
       const char *world_clip_lib = datatoc_gpu_shader_cfg_world_clip_lib_glsl;
       const char *world_clip_def = "#define USE_WORLD_CLIP_PLANES\n";
       /* In rare cases geometry shaders calculate clipping themselves. */
-      *sh_p = GPU_shader_create_from_arrays_named(
-          stages->name,
-          {
-              .vert = (const char *[]){world_clip_lib, stages->vert, NULL},
-              .geom = (const char *[]){stages->geom ? world_clip_lib : NULL, stages->geom, NULL},
-              .frag = (const char *[]){datatoc_gpu_shader_colorspace_lib_glsl, stages->frag, NULL},
-              .defs = (const char *[]){world_clip_def, stages->defs, NULL},
-          });
+      if (stages->create_info != NULL) {
+        *sh_p = GPU_shader_create_from_info(gpu_shader_create_info_get(stages->create_info));
+      }
+      else {
+        *sh_p = GPU_shader_create_from_arrays_named(
+            stages->name,
+            {
+                .vert = (const char *[]){world_clip_lib, stages->vert, NULL},
+                .geom = (const char *[]){stages->geom ? world_clip_lib : NULL, stages->geom, NULL},
+                .frag =
+                    (const char *[]){datatoc_gpu_shader_colorspace_lib_glsl, stages->frag, NULL},
+                .defs = (const char *[]){world_clip_def, stages->defs, NULL},
+            });
+      }
     }
     else {
       BLI_assert(0);

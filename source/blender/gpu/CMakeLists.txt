@@ -137,6 +137,7 @@ set(SRC
   GPU_primitive.h
   GPU_select.h
   GPU_shader.h
+  GPU_shader_shared.h
   GPU_state.h
   GPU_texture.h
   GPU_uniform_buffer.h
@@ -202,6 +203,8 @@ if(NOT WITH_SYSTEM_GLEW)
 endif()
 
 set(GLSL_SRC
+  GPU_shader_shared.h
+
   shaders/gpu_shader_depth_only_frag.glsl
   shaders/gpu_shader_uniform_color_frag.glsl
   shaders/gpu_shader_checker_frag.glsl
@@ -434,6 +437,7 @@ shaders/infos/gpu_shader_2D_point_uniform_size_uniform_color_outline_aa_info.hh
 shaders/infos/gpu_shader_2D_area_edges_info.hh
 shaders/infos/gpu_shader_instance_varying_color_varying_size_info.hh
 shaders/infos/gpu_shader_3D_point_info.hh
+shaders/infos/gpu_shader_2D_nodelink_info.hh
 #shaders/infos/gpu_shader_todo_info.hh
 )
 
