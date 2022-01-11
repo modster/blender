@@ -39,7 +39,7 @@ static void node_declare(NodeDeclarationBuilder &b)
   b.add_input<decl::Bool>(N_("Selection")).default_value(true).supports_field().hide_value();
   b.add_input<decl::Vector>(N_("Offset")).subtype(PROP_TRANSLATION).implicit_field().hide_value();
   b.add_input<decl::Float>(N_("Strength")).default_value(1.0f).supports_field();
-  b.add_input<decl::Bool>(N_("Individual"));
+  b.add_input<decl::Bool>(N_("Individual")).default_value(true);
   b.add_output<decl::Geometry>("Mesh");
   b.add_output<decl::Bool>(N_("Top")).field_source();
   b.add_output<decl::Bool>(N_("Side")).field_source();
@@ -261,9 +261,8 @@ static void extrude_mesh_vertices(MeshComponent &component,
         }
         case ATTR_DOMAIN_EDGE: {
           /* New edge values are mixed from of all the edges connected to the source vertex. */
-          copy_with_mixing(data.slice(new_edge_range), data.as_span(), [&](const int index) {
-            const int i_src_vert = selection[index];
-            return vert_to_edge_map[i_src_vert];
+          copy_with_mixing(data.slice(new_edge_range), data.as_span(), [&](const int i) {
+            return vert_to_edge_map[selection[i]];
           });
           break;
         }
@@ -525,8 +524,7 @@ static void extrude_mesh_edges(MeshComponent &component,
           /* Attribute values for new faces are a mix of the values of faces connected to the its
            * original edge.  */
           copy_with_mixing(data.slice(new_poly_range), data.as_span(), [&](const int i) {
-            const int i_src_edge = edge_selection[i];
-            return edge_to_poly_map[i_src_edge];
+            return edge_to_poly_map[edge_selection[i]];
           });
 
           break;
@@ -844,8 +842,8 @@ static void extrude_mesh_face_regions(MeshComponent &component,
 
           /* Edges connected to original vertices mix values of selected connected edges. */
           MutableSpan<T> connect_data = data.slice(connect_edge_range);
-          copy_with_mixing(connect_data, duplicate_data.as_span(), [&](const int i_new_vert) {
-            return new_vert_to_duplicate_edge_map[i_new_vert];
+          copy_with_mixing(connect_data, duplicate_data.as_span(), [&](const int i) {
+            return new_vert_to_duplicate_edge_map[i];
           });
           break;
         }
@@ -1009,9 +1007,9 @@ static void extrude_individual_mesh_faces(MeshComponent &component,
   MutableSpan<MPoly> new_polys = polys.slice(side_poly_range);
   MutableSpan<MLoop> loops{mesh.mloop, mesh.totloop};
 
-  /* For every selected polygon, build the faces that form the sides of the extrusion. Note that
-   * filling some of this data like the new edges or polygons could be easily split into separate
-   * loops, which may or may not be faster, and would involve more duplication. */
+  /* For every selected polygon, build the faces that form the sides of the extrusion. Filling some
+   * of this data like the new edges or polygons could be easily split into separate loops, which
+   * may or may not be faster, and would involve more duplication. */
   threading::parallel_for(poly_selection.index_range(), 256, [&](const IndexRange range) {
     for (const int i_selection : range) {
       const IndexRange poly_corner_range = selected_corner_range(index_offsets, i_selection);
@@ -1094,11 +1092,6 @@ static void extrude_individual_mesh_faces(MeshComponent &component,
           break;
         }
         case ATTR_DOMAIN_EDGE: {
-          /* Two cases:
-           * - Edges parallel to original edges: Copy the edge attributes from the original edges.
-           * - Edges connected to original vertices: Mix values of the two edges on either side of
-           *   the edge's original vertex.
-           */
           MutableSpan<T> duplicate_data = data.slice(duplicate_edge_range);
           MutableSpan<T> connect_data = data.slice(connect_edge_range);
 
