@@ -145,8 +145,8 @@ template<typename T, int Size> struct vec_base : public vec_struct_base<T, Size>
   {
   }
 
-  template<typename U, BLI_ENABLE_IF_VEC(Size, == 4)>
-  vec_base(vec_base<U, 2> xy, vec_base<U, 2> zw)
+  template<typename U, typename V, BLI_ENABLE_IF_VEC(Size, == 4)>
+  vec_base(vec_base<U, 2> xy, vec_base<V, 2> zw)
       : vec_base(
             static_cast<T>(xy.x), static_cast<T>(xy.y), static_cast<T>(zw.x), static_cast<T>(zw.y))
   {
