@@ -107,6 +107,24 @@ template<typename T> inline T max(const T &a, const T &b)
   return result;
 }
 
+template<typename T> inline T clamp(const T &a, const T &min_v, const T &max_v)
+{
+  T result = a;
+  for (int i = 0; i < T::type_length; i++) {
+    CLAMP(result[i], min_v[i], max_v[i]);
+  }
+  return result;
+}
+
+template<typename T> inline T clamp(const T &a, const bT &min_v, const bT &max_v)
+{
+  T result = a;
+  for (int i = 0; i < T::type_length; i++) {
+    CLAMP(result[i], min_v, max_v);
+  }
+  return result;
+}
+
 template<typename T, BLI_ENABLE_IF_FLT_VEC(T)> inline T mod(const T &a, const T &b)
 {
   T result;
