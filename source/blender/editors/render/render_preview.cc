@@ -725,7 +725,7 @@ void ED_preview_draw(const bContext *C, void *idp, void *parentp, void *slotp, r
     SpaceProperties *sbuts = CTX_wm_space_properties(C);
     ShaderPreview *sp = static_cast<ShaderPreview *>(WM_jobs_customdata(wm, area));
     rcti newrect;
-    int ok;
+    bool ok;
     int newx = BLI_rcti_size_x(rect);
     int newy = BLI_rcti_size_y(rect);
 
@@ -772,7 +772,7 @@ struct ObjectPreviewData {
   /* Copy of the object to create the preview for. The copy is for thread safety (and to insert
    * it into an own main). */
   Object *object;
-  /* Datablock copy. Can be NULL. */
+  /* Datablock copy. Can be nullptr. */
   ID *datablock;
   /* Current frame. */
   int cfra;
@@ -1024,7 +1024,7 @@ static Scene *gpencil_preview_scene_create(const struct ObjectPreviewData *previ
                                             "preview_object",
                                             preview_data->datablock,
                                             true);
-  BLI_assert(ob_temp != NULL);
+  BLI_assert(ob_temp != nullptr);
   /* Copy the materials to get full color previews. */
   const short *materials_len_p = BKE_id_material_len_p(preview_data->datablock);
   if (materials_len_p && *materials_len_p > 0) {
@@ -1099,8 +1099,8 @@ static void gpencil_preview_render(IconPreview *preview, IconPreviewSize *previe
       IB_rect,
       V3D_OFSDRAW_OVERRIDE_SCENE_SETTINGS,
       R_ALPHAPREMUL,
-      NULL,
-      NULL,
+      nullptr,
+      nullptr,
       err_out);
 
   U.pixelsize = pixelsize_old;
