@@ -53,6 +53,19 @@ typedef struct CollectionParent {
   struct Collection *collection;
 } CollectionParent;
 
+/**
+ * Options to control how object visibility flags should affect operations. Used for bounding-box
+ * calculations, for example.
+ */
+typedef enum CollectionObjectVisibility {
+  /** Include all objects linked to the scene, regardless of visibility flags. */
+  COLLECTION_VISIBILITY_ALL_OBJECTS,
+  /** Exclude objects hidden with the render visibility flag. */
+  COLLECTION_VISIBILITY_RENDER,
+  /** Exclude objects hidden with the viewport visibility flag. */
+  COLLECTION_VISIBILITY_VIEWPORT
+} CollectionObjectVisibility;
+
 /* Collections */
 
 /**
@@ -216,15 +229,20 @@ struct Base *BKE_collection_or_layer_objects(const struct ViewLayer *view_layer,
 
 /**
  * Calculate the axis-aligned bounding box (in global space) of all objects in this collection,
- * excluding empties (but including lamps, cameras, curves, etc.).
+ * excluding empties (but including lamps, cameras, curves, etc.). Nested collections and
+ * collection instances are included.
  */
 void BKE_collection_boundbox_calc(const struct Collection *collection,
+                                  CollectionObjectVisibility object_visibility,
                                   struct BoundBox *r_boundbox);
 /**
  * Calculate the axis-aligned dimensions of all objects in this collection, excluding
- * empties (but including lamps, cameras, curves, etc.).
+ * empties (but including lamps, cameras, curves, etc.). Nested collections and collection
+ * instances are included.
  */
-void BKE_collection_dimensions_calc(const struct Collection *collection, float r_vec[3]);
+void BKE_collection_dimensions_calc(const struct Collection *collection,
+                                    CollectionObjectVisibility object_visibility,
+                                    float r_vec[3]);
 
 /* Editing. */
 

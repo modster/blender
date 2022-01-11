@@ -530,7 +530,7 @@ static void view3d_boundbox_drop_draw_activate(struct wmDropBox *drop, wmDrag *d
     }
     else if (drag_id_type == ID_GR) {
       struct Collection *collection = (struct Collection *)WM_drag_get_local_ID(drag, ID_GR);
-      BKE_collection_dimensions_calc(collection, dimensions);
+      BKE_collection_dimensions_calc(collection, COLLECTION_VISIBILITY_VIEWPORT, dimensions);
     }
     else {
       BLI_assert_unreachable();
@@ -813,7 +813,9 @@ static void view3d_collection_drop_matrix_get(const Collection *collection,
   unit_m4((float(*)[])unit_mat);
 
   BoundBox boundbox;
-  BKE_collection_boundbox_calc(collection, &boundbox);
+  /* Use the bounding-box for what the user will see, i.e. use viewport visibility. */
+  const CollectionObjectVisibility visibility = COLLECTION_VISIBILITY_VIEWPORT;
+  BKE_collection_boundbox_calc(collection, visibility, &boundbox);
   view3d_drop_matrix_from_snap(snap_state, &boundbox, unit_mat, r_mat_final);
 }
 

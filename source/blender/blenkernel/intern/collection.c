@@ -371,7 +371,8 @@ static void collection_blend_read_expand(BlendExpander *expander, ID *id)
 static IDProperty *collection_asset_dimensions_property(Collection *collection)
 {
   float dimensions[3];
-  BKE_collection_dimensions_calc(collection, dimensions);
+  /* Use the bounding-box for what the user sees, i.e. use viewport visibility. */
+  BKE_collection_dimensions_calc(collection, COLLECTION_VISIBILITY_VIEWPORT, dimensions);
   if (is_zero_v3(dimensions)) {
     return NULL;
   }
@@ -892,57 +893,68 @@ Base *BKE_collection_or_layer_objects(const ViewLayer *view_layer, Collection *c
  * \{ */
 
 /**
- * \param with_instances: Include the objects of instance collections.
  * \param with_empties: Include the location of empties in the bounding box.
  * \param instance_mat: The transform matrix of the object instancing this collection. Pass the
  *                      unit matrix if the collection is not an instance.
  */
-static void collection_geometry_boundbox_calc_recursive(const Collection *collection,
-                                                        const bool with_instances,
-                                                        const bool with_empties,
-                                                        float instance_mat[4][4],
-                                                        float r_min[3],
-                                                        float r_max[3])
+static void collection_geometry_boundbox_calc_recursive(
+    const Collection *parent_collection,
+    const CollectionObjectVisibility object_visibility,
+    const bool with_empties,
+    float parent_instance_mat[4][4],
+    float r_min[3],
+    float r_max[3])
 {
-  LISTBASE_FOREACH (CollectionObject *, cob, &collection->gobject) {
-    if (with_instances && cob->ob->instance_collection) {
-      float this_instance_collection_mat[4][4];
-      unit_m4(this_instance_collection_mat);
-      sub_v3_v3(this_instance_collection_mat[3], cob->ob->instance_collection->instance_offset);
-      mul_m4_m4m4(this_instance_collection_mat, cob->ob->obmat, instance_mat);
+  LISTBASE_FOREACH (const CollectionObject *, cob, &parent_collection->gobject) {
+    Object *ob = cob->ob;
 
-      collection_geometry_boundbox_calc_recursive(cob->ob->instance_collection,
-                                                  with_instances,
+    if (ob->instance_collection) {
+      float child_collection_mat[4][4];
+      unit_m4(child_collection_mat);
+      sub_v3_v3(child_collection_mat[3], ob->instance_collection->instance_offset);
+      mul_m4_m4m4(child_collection_mat, ob->obmat, parent_instance_mat);
+
+      collection_geometry_boundbox_calc_recursive(ob->instance_collection,
+                                                  object_visibility,
                                                   with_empties,
-                                                  this_instance_collection_mat,
+                                                  child_collection_mat,
                                                   r_min,
                                                   r_max);
     }
 
-    /* Empties don't contribute to the dimensions. */
-    if (!with_empties && (cob->ob->type == OB_EMPTY)) {
+    if ((object_visibility == COLLECTION_VISIBILITY_RENDER) &&
+        (ob->visibility_flag & OB_HIDE_RENDER)) {
+      continue;
+    }
+    if ((object_visibility == COLLECTION_VISIBILITY_VIEWPORT) &&
+        (ob->visibility_flag & OB_HIDE_VIEWPORT)) {
       continue;
     }
 
-    BoundBox *bb_object = BKE_object_boundbox_get(cob->ob);
+    /* Empties don't contribute to the dimensions. */
+    if (!with_empties && (ob->type == OB_EMPTY)) {
+      continue;
+    }
+
+    BoundBox *bb_object = BKE_object_boundbox_get(ob);
     if (bb_object) {
       float obmat[4][4];
-      mul_m4_m4m4(obmat, cob->ob->obmat, instance_mat);
-
+      mul_m4_m4m4(obmat, ob->obmat, parent_instance_mat);
       BKE_boundbox_minmax(bb_object, obmat, r_min, r_max);
     }
     else {
-      minmax_v3v3_v3(r_min, r_max, cob->ob->obmat[3]);
+      minmax_v3v3_v3(r_min, r_max, ob->obmat[3]);
     }
   }
 
-  LISTBASE_FOREACH (CollectionChild *, child, &collection->children) {
+  LISTBASE_FOREACH (CollectionChild *, child, &parent_collection->children) {
     collection_geometry_boundbox_calc_recursive(
-        child->collection, with_instances, with_empties, instance_mat, r_min, r_max);
+        child->collection, object_visibility, with_empties, parent_instance_mat, r_min, r_max);
   }
 }
 
 static void collection_boundbox_min_max(const Collection *collection,
+                                        const CollectionObjectVisibility object_visibility,
                                         float r_min[3],
                                         float r_max[3])
 {
@@ -953,21 +965,24 @@ static void collection_boundbox_min_max(const Collection *collection,
   unit_m4(instance_collection_mat);
 
   collection_geometry_boundbox_calc_recursive(
-      collection, true, false, instance_collection_mat, r_min, r_max);
+      collection, object_visibility, false, instance_collection_mat, r_min, r_max);
 }
 
-void BKE_collection_boundbox_calc(const Collection *collection, BoundBox *r_boundbox)
+void BKE_collection_boundbox_calc(const Collection *collection,
+                                  const CollectionObjectVisibility object_visibility,
+                                  BoundBox *r_boundbox)
 {
   float min[3], max[3];
-  collection_boundbox_min_max(collection, min, max);
+  collection_boundbox_min_max(collection, object_visibility, min, max);
   BKE_boundbox_init_from_minmax(r_boundbox, min, max);
 }
 
-/* TODO invisible objects (either in scene or in viewport)? */
-void BKE_collection_dimensions_calc(const Collection *collection, float r_vec[3])
+void BKE_collection_dimensions_calc(const Collection *collection,
+                                    const CollectionObjectVisibility object_visibility,
+                                    float r_vec[3])
 {
   float min[3], max[3];
-  collection_boundbox_min_max(collection, min, max);
+  collection_boundbox_min_max(collection, object_visibility, min, max);
   sub_v3_v3v3(r_vec, max, min);
 }
 
