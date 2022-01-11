@@ -491,16 +491,19 @@ template<typename T, int Size> struct vec_base : public vec_struct_base<T, Size>
 
   BLI_INT_OP(T) friend vec_base operator%(const vec_base &a, const vec_base &b)
   {
+    BLI_assert(!math::is_any_zero(b));
     BLI_VEC_OP_IMPL(ret, i, ret[i] = a[i] % b[i]);
   }
 
   BLI_INT_OP(T) friend vec_base operator%(const vec_base &a, T b)
   {
+    BLI_assert(b != 0);
     BLI_VEC_OP_IMPL(ret, i, ret[i] = a[i] % b);
   }
 
   BLI_INT_OP(T) friend vec_base operator%(T a, const vec_base &b)
   {
+    BLI_assert(!math::is_any_zero(b));
     BLI_VEC_OP_IMPL(ret, i, ret[i] = a % b[i]);
   }
 
