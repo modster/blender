@@ -36,7 +36,6 @@ using blender::bke::AttributeIDRef;
 using blender::fn::GMutableSpan;
 using blender::fn::GSpan;
 using blender::fn::GVArray;
-using namespace blender;
 
 Spline::Type Spline::type() const
 {
@@ -278,7 +277,7 @@ static float3 rotate_direction_around_axis(const float3 &direction,
 
   const float3 axis_scaled = axis * dot(direction, axis);
   const float3 diff = direction - axis_scaled;
-  const float3 cross = math::cross(axis, diff);
+  const float3 cross = blender::math::cross(axis, diff);
 
   return axis_scaled + diff * std::cos(angle) + cross * std::sin(angle);
 }
