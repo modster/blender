@@ -512,11 +512,12 @@ template<typename T, int Size> struct vec_base : public vec_struct_base<T, Size>
 
   friend bool operator==(const vec_base &a, const vec_base &b)
   {
-    bool result = true;
     for (int i = 0; i < Size; i++) {
-      result = result && (a[i] == b[i]);
+      if (a[i] != b[i]) {
+        return false;
+      }
     }
-    return result;
+    return true;
   }
 
   friend bool operator!=(const vec_base &a, const vec_base &b)
@@ -526,20 +527,22 @@ template<typename T, int Size> struct vec_base : public vec_struct_base<T, Size>
 
   bool is_zero() const
   {
-    bool result = true;
     for (int i = 0; i < Size; i++) {
-      result = result && ((*this)[i] == T(0));
+      if ((*this)[i] != T(0)) {
+        return false;
+      }
     }
-    return result;
+    return true;
   }
 
   bool is_any_zero() const
   {
-    bool result = false;
-    for (int i = 0; i < Size && result; i++) {
-      result = result || ((*this)[i] == T(0));
+    for (int i = 0; i < Size; i++) {
+      if ((*this)[i] == T(0)) {
+        return true;
+      }
     }
-    return result;
+    return false;
   }
 
   /** Misc. */
