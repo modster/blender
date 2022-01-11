@@ -51,14 +51,13 @@ namespace blender::math {
 
 #ifdef WITH_GMP
 #  define BLI_ENABLE_IF_FLT_VEC(T) \
-    BLI_ENABLE_IF((std::disjunction_v<std::is_floating_point<typename T::base_type>, \
-                                      std::is_same<typename T::base_type, mpq_class>>))
+    BLI_ENABLE_IF((std::is_floating_point_v<typename T::base_type> || \
+                   std::is_same_v<typename T::base_type, mpq_class>))
 #else
-#  define BLI_ENABLE_IF_FLT_VEC(T) \
-    BLI_ENABLE_IF((std::is_floating_point<typename T::base_type>::value))
+#  define BLI_ENABLE_IF_FLT_VEC(T) BLI_ENABLE_IF((std::is_floating_point_v<typename T::base_type>))
 #endif
 
-#define BLI_ENABLE_IF_INT_VEC(T) BLI_ENABLE_IF((std::is_integral<typename T::base_type>::value))
+#define BLI_ENABLE_IF_INT_VEC(T) BLI_ENABLE_IF((std::is_integral_v<typename T::base_type>))
 
 template<typename T> inline bool is_zero(const T &a)
 {
