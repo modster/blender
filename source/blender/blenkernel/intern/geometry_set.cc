@@ -604,7 +604,6 @@ uint64_t NormalFieldInput::hash() const
 
 bool NormalFieldInput::is_equal_to(const fn::FieldNode &other) const
 {
-  /* All random ID attribute inputs are the same within the same evaluation context. */
   return dynamic_cast<const NormalFieldInput *>(&other) != nullptr;
 }
 
