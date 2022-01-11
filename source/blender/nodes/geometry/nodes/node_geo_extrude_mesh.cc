@@ -159,6 +159,44 @@ static void expand_mesh_size(Mesh &mesh,
   }
 }
 
+template<typename T> void copy_with_indices(MutableSpan<T> dst, Span<T> src, Span<int> indices)
+{
+  BLI_assert(dst.size() == indices.size());
+  for (const int i : dst.index_range()) {
+    dst[i] = src[indices[i]];
+  }
+}
+
+template<typename T> void copy_with_mask(MutableSpan<T> dst, Span<T> src, IndexMask mask)
+{
+  BLI_assert(dst.size() == mask.size());
+  threading::parallel_for(mask.index_range(), 512, [&](const IndexRange range) {
+    for (const int i : range) {
+      dst[i] = src[mask[i]];
+    }
+  });
+}
+
+/**
+ * \param get_mix_indices_fn: Returns a Span of indices of the source points to mix for every
+ * result point.
+ */
+template<typename T, typename GetMixIndicesFn>
+void copy_with_mixing(MutableSpan<T> dst, Span<T> src, GetMixIndicesFn get_mix_indices_fn)
+{
+  BLI_assert(dst.size() == mask.size());
+  threading::parallel_for(dst.index_range(), 512, [&](const IndexRange range) {
+    attribute_math::DefaultMixer<T> mixer{dst.slice(range)};
+    for (const int i_dst : IndexRange(range.size())) {
+      Span<int> src_indices = get_mix_indices_fn(range[i_dst]);
+      for (const int i_src : src_indices) {
+        mixer.mix_in(i_dst, src[i_src]);
+      }
+    }
+    mixer.finalize();
+  });
+}
+
 static Array<Vector<int>> create_vert_to_edge_map(const int vert_size,
                                                   Span<MEdge> edges,
                                                   const int vert_offset = 0)
@@ -218,26 +256,14 @@ static void extrude_mesh_vertices(MeshComponent &component,
       switch (attribute.domain()) {
         case ATTR_DOMAIN_POINT: {
           /* New vertices copy the attribute values from their source vertex. */
-          MutableSpan<T> new_data = data.slice(new_vert_range);
-          threading::parallel_for(selection.index_range(), 512, [&](const IndexRange range) {
-            for (const int i : range) {
-              new_data[i] = data[selection[i]];
-            }
-          });
+          copy_with_mask(data.slice(new_vert_range), data.as_span(), selection);
           break;
         }
         case ATTR_DOMAIN_EDGE: {
           /* New edge values are mixed from of all the edges connected to the source vertex. */
-          MutableSpan<T> new_data = data.slice(new_edge_range);
-          threading::parallel_for(selection.index_range(), 512, [&](const IndexRange range) {
-            attribute_math::DefaultMixer<T> mixer{new_data.slice(range)};
-            for (const int i : IndexRange(range.size())) {
-              const int i_src_vert = selection[range[i]];
-              for (const int i_connected_edge : vert_to_edge_map[i_src_vert]) {
-                mixer.mix_in(i, data[i_connected_edge]);
-              }
-            }
-            mixer.finalize();
+          copy_with_mixing(data.slice(new_edge_range), data.as_span(), [&](const int index) {
+            const int i_src_vert = selection[index];
+            return vert_to_edge_map[i_src_vert];
           });
           break;
         }
@@ -479,46 +505,30 @@ static void extrude_mesh_edges(MeshComponent &component,
       MutableSpan<T> data = attribute.as_span().typed<T>();
       switch (attribute.domain()) {
         case ATTR_DOMAIN_POINT: {
-          MutableSpan<T> new_data = data.slice(new_vert_range);
-          for (const int i : new_vert_orig_indices.index_range()) {
-            new_data[i] = data[new_vert_orig_indices[i]];
-          }
+          /* New vertices copy the attribute values from their source vertex. */
+          copy_with_indices(data.slice(new_vert_range), data.as_span(), new_vert_orig_indices);
           break;
         }
         case ATTR_DOMAIN_EDGE: {
+          /* Edges parallel to original edges copy the edge attributes from the original edges. */
           MutableSpan<T> duplicate_data = data.slice(duplicate_edge_range);
-          for (const int i : edge_selection.index_range()) {
-            duplicate_data[i] = data[edge_selection[i]];
-          }
+          copy_with_mask(duplicate_data, data.as_span(), edge_selection);
+
+          /* Edges connected to original vertices mix values of selected connected edges. */
           MutableSpan<T> connect_data = data.slice(connect_edge_range);
-          threading::parallel_for(connect_data.index_range(), 512, [&](const IndexRange range) {
-            attribute_math::DefaultMixer<T> mixer{connect_data.slice(range)};
-            for (const int i : IndexRange(range.size())) {
-              const int i_new_vert = range[i];
-              for (const int i_duplicate_edge : new_vert_to_duplicate_edge_map[i_new_vert]) {
-                /* Use the duplicate data rather than the original edge's data because it's
-                 * slightly simpler to access and was just filled in the previous loop. */
-                mixer.mix_in(i, duplicate_data[i_duplicate_edge]);
-              }
-            }
-            mixer.finalize();
+          copy_with_mixing(connect_data, duplicate_data.as_span(), [&](const int i_new_vert) {
+            return new_vert_to_duplicate_edge_map[i_new_vert];
           });
           break;
         }
         case ATTR_DOMAIN_FACE: {
           /* Attribute values for new faces are a mix of the values of faces connected to the its
            * original edge.  */
-          MutableSpan<T> new_data = data.slice(new_poly_range);
-          threading::parallel_for(edge_selection.index_range(), 512, [&](const IndexRange range) {
-            attribute_math::DefaultMixer<T> mixer{new_data.slice(range)};
-            for (const int i : IndexRange(range.size())) {
-              const int i_src_edge = edge_selection[range[i]];
-              for (const int i_connected_poly : edge_to_poly_map[i_src_edge]) {
-                mixer.mix_in(i, data[i_connected_poly]);
-              }
-            }
-            mixer.finalize();
+          copy_with_mixing(data.slice(new_poly_range), data.as_span(), [&](const int i) {
+            const int i_src_edge = edge_selection[i];
+            return edge_to_poly_map[i_src_edge];
           });
+
           break;
         }
         case ATTR_DOMAIN_CORNER: {
@@ -824,44 +834,25 @@ static void extrude_mesh_face_regions(MeshComponent &component,
       switch (attribute.domain()) {
         case ATTR_DOMAIN_POINT: {
           /* New vertices copy the attributes from their original vertices. */
-          MutableSpan<T> new_data = data.slice(new_vert_range);
-          for (const int i : new_vert_orig_indices.index_range()) {
-            new_data[i] = data[new_vert_orig_indices[i]];
-          }
+          copy_with_indices(data.slice(new_vert_range), data.as_span(), new_vert_orig_indices);
           break;
         }
         case ATTR_DOMAIN_EDGE: {
-          /* Two cases:
-           * - Edges parallel to original edges: Copy the edge attributes from the original edges.
-           * - Edges connected to original vertices: Mix values of selected edges that are
-           *   connected to the original vertex.
-           */
+          /* Edges parallel to original edges copy the edge attributes from the original edges. */
           MutableSpan<T> duplicate_data = data.slice(duplicate_edge_range);
+          copy_with_mask(duplicate_data, data.as_span(), edge_selection);
+
+          /* Edges connected to original vertices mix values of selected connected edges. */
           MutableSpan<T> connect_data = data.slice(connect_edge_range);
-          for (const int i : edge_selection.index_range()) {
-            duplicate_data[i] = data[edge_selection[i]];
-          }
-          threading::parallel_for(connect_data.index_range(), 512, [&](const IndexRange range) {
-            attribute_math::DefaultMixer<T> mixer{connect_data.slice(range)};
-            for (const int i : IndexRange(range.size())) {
-              const int i_new_vert = range[i];
-              for (const int i_duplicate_edge : new_vert_to_duplicate_edge_map[i_new_vert]) {
-                /* Use the duplicate data rather than the original edge's data because it's
-                 * slightly simpler to access and was just filled in the previous loop. */
-                mixer.mix_in(i, duplicate_data[i_duplicate_edge]);
-              }
-            }
-            mixer.finalize();
+          copy_with_mixing(connect_data, duplicate_data.as_span(), [&](const int i_new_vert) {
+            return new_vert_to_duplicate_edge_map[i_new_vert];
           });
           break;
         }
         case ATTR_DOMAIN_FACE: {
           /* New faces on the side of extrusions get the values from the corresponding selected
            * face. */
-          MutableSpan<T> new_data = data.slice(side_poly_range);
-          for (const int i : new_data.index_range()) {
-            new_data[i] = data[edge_orig_face_indices[i]];
-          }
+          copy_with_indices(data.slice(side_poly_range), data.as_span(), edge_orig_face_indices);
           break;
         }
         case ATTR_DOMAIN_CORNER: {
