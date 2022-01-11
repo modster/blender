@@ -27,7 +27,6 @@ using blender::MutableSpan;
 using blender::Span;
 using blender::VArray;
 using blender::fn::GVArray;
-using namespace blender;
 
 void BezierSpline::copy_settings(Spline &dst) const
 {
@@ -200,6 +199,8 @@ void BezierSpline::ensure_auto_handles() const
   }
 
   for (const int i : IndexRange(this->size())) {
+    using namespace blender;
+
     if (ELEM(HandleType::Auto, handle_types_left_[i], handle_types_right_[i])) {
       const float3 prev_diff = positions_[i] - previous_position(positions_, is_cyclic_, i);
       const float3 next_diff = next_position(positions_, is_cyclic_, i) - positions_[i];
@@ -276,6 +277,8 @@ static void set_handle_position(const float3 &position,
                                 float3 &handle,
                                 float3 &handle_other)
 {
+  using namespace blender::math;
+
   /* Don't bother when the handle positions are calculated automatically anyway. */
   if (ELEM(type, BezierSpline::HandleType::Auto, BezierSpline::HandleType::Vector)) {
     return;
@@ -284,9 +287,9 @@ static void set_handle_position(const float3 &position,
   handle = new_value;
   if (type_other == BezierSpline::HandleType::Align) {
     /* Keep track of the old length of the opposite handle. */
-    const float length = math::distance(handle_other, position);
+    const float length = distance(handle_other, position);
     /* Set the other handle to directly opposite from the current handle. */
-    const float3 dir = math::normalize(handle - position);
+    const float3 dir = normalize(handle - position);
     handle_other = position - dir * length;
   }
 }

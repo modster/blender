@@ -25,11 +25,10 @@
 #include <sstream>
 
 #include "BLI_array.hh"
-#include "BLI_double2.hh"
 #include "BLI_linklist.h"
 #include "BLI_math_boolean.hh"
 #include "BLI_math_mpq.hh"
-#include "BLI_mpq2.hh"
+#include "BLI_math_vec_mpq_types.hh"
 #include "BLI_set.hh"
 #include "BLI_task.hh"
 #include "BLI_vector.hh"

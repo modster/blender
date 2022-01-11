@@ -18,9 +18,9 @@
 
 #include "DNA_node_types.h"
 
-#include "BLI_float3.hh"
 #include "BLI_math_base_safe.h"
 #include "BLI_math_rotation.h"
+#include "BLI_math_vec_types.hh"
 #include "BLI_string_ref.hh"
 
 namespace blender::nodes {
@@ -36,9 +36,9 @@ struct FloatMathOperationInfo {
   }
 };
 
-const FloatMathOperationInfo *get_float_math_operation_info(const int operation);
-const FloatMathOperationInfo *get_float3_math_operation_info(const int operation);
-const FloatMathOperationInfo *get_float_compare_operation_info(const int operation);
+const FloatMathOperationInfo *get_float_math_operation_info(int operation);
+const FloatMathOperationInfo *get_float3_math_operation_info(int operation);
+const FloatMathOperationInfo *get_float_compare_operation_info(int operation);
 
 /**
  * This calls the `callback` with two arguments:

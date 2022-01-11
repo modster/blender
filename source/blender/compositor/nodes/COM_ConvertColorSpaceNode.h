@@ -12,15 +12,35 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ *
+ * Copyright 2021, Blender Foundation.
  */
 
 #pragma once
 
-#include "BLI_math_vector.hh"
+#include "COM_Node.h"
+#include "COM_defines.h"
+#include "DNA_image_types.h"
+#include "DNA_node_types.h"
 
-namespace blender {
+#include "RE_engine.h"
+#include "RE_pipeline.h"
 
-using int4 = vec4_base<int32_t>;
-using uint4 = vec4_base<uint32_t>;
+namespace blender::compositor {
 
-}  // namespace blender
+/**
+ * \brief ImageNode
+ * \ingroup Node
+ */
+class ConvertColorSpaceNode : public Node {
+ public:
+  ConvertColorSpaceNode(bNode *editorNode);
+  void convert_to_operations(NodeConverter &converter,
+                             const CompositorContext &context) const override;
+
+ private:
+  /** \brief check if the given settings changes color space. */
+  bool performs_conversion(NodeConvertColorSpace &settings) const;
+};
+
+}  // namespace blender::compositor

@@ -36,7 +36,6 @@ using blender::bke::AttributeIDRef;
 using blender::fn::GMutableSpan;
 using blender::fn::GSpan;
 using blender::fn::GVArray;
-using namespace blender;
 
 Spline::Type Spline::type() const
 {
@@ -209,7 +208,7 @@ static float3 direction_bisect(const float3 &prev, const float3 &middle, const f
   const float3 dir_next = normalize(next - middle);
 
   const float3 result = normalize(dir_prev + dir_next);
-  if (UNLIKELY(result.is_zero())) {
+  if (UNLIKELY(is_zero(result))) {
     return float3(0.0f, 0.0f, 1.0f);
   }
   return result;
@@ -278,7 +277,7 @@ static float3 rotate_direction_around_axis(const float3 &direction,
 
   const float3 axis_scaled = axis * dot(direction, axis);
   const float3 diff = direction - axis_scaled;
-  const float3 cross = math::cross(axis, diff);
+  const float3 cross = blender::math::cross(axis, diff);
 
   return axis_scaled + diff * std::cos(angle) + cross * std::sin(angle);
 }
@@ -311,7 +310,7 @@ static float3 calculate_next_normal(const float3 &last_normal,
 {
   using namespace blender::math;
 
-  if (last_tangent.is_zero() || current_tangent.is_zero()) {
+  if (is_zero(last_tangent) || is_zero(current_tangent)) {
     return last_normal;
   }
   const float angle = angle_normalized_v3v3(last_tangent, current_tangent);

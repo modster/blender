@@ -30,15 +30,13 @@
 #  include "BLI_array.hh"
 #  include "BLI_assert.h"
 #  include "BLI_delaunay_2d.h"
-#  include "BLI_double3.hh"
-#  include "BLI_float3.hh"
 #  include "BLI_hash.hh"
 #  include "BLI_kdopbvh.h"
 #  include "BLI_map.hh"
 #  include "BLI_math_boolean.hh"
 #  include "BLI_math_mpq.hh"
-#  include "BLI_mpq2.hh"
-#  include "BLI_mpq3.hh"
+#  include "BLI_math_vec_mpq_types.hh"
+#  include "BLI_math_vec_types.hh"
 #  include "BLI_polyfill_2d.h"
 #  include "BLI_set.hh"
 #  include "BLI_span.hh"
@@ -198,7 +196,7 @@ void Face::populate_plane(bool need_exact)
       for (int i : index_range()) {
         co[i] = vert[i]->co_exact;
       }
-      normal_exact = math::cross_poly(co);
+      normal_exact = math::cross_poly(co.as_span());
     }
     else {
       mpq3 tr02 = vert[0]->co_exact - vert[2]->co_exact;
@@ -215,7 +213,7 @@ void Face::populate_plane(bool need_exact)
       for (int i : index_range()) {
         co[i] = vert[i]->co;
       }
-      normal = math::cross_poly(co);
+      normal = math::cross_poly(co.as_span());
     }
     else {
       double3 tr02 = vert[0]->co - vert[2]->co;

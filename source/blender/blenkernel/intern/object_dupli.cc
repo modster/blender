@@ -31,9 +31,9 @@
 #include "BLI_string_utf8.h"
 
 #include "BLI_array.hh"
-#include "BLI_float3.hh"
 #include "BLI_float4x4.hh"
 #include "BLI_math.h"
+#include "BLI_math_vec_types.hh"
 #include "BLI_rand.h"
 #include "BLI_span.hh"
 #include "BLI_vector.hh"
@@ -75,7 +75,6 @@ using blender::float3;
 using blender::float4x4;
 using blender::Span;
 using blender::Vector;
-using namespace blender;
 
 /* -------------------------------------------------------------------- */
 /** \name Internal Duplicate Context
@@ -1027,6 +1026,8 @@ static void get_dupliface_transform_from_coords(Span<float3> coords,
                                                 const float scale_fac,
                                                 float r_mat[4][4])
 {
+  using namespace blender::math;
+
   /* Location. */
   float3 location(0);
   for (const float3 &coord : coords) {
@@ -1037,9 +1038,7 @@ static void get_dupliface_transform_from_coords(Span<float3> coords,
   /* Rotation. */
   float quat[4];
 
-  float3 f_no;
-  cross_poly_v3(f_no, (const float(*)[3])coords.data(), (uint)coords.size());
-  f_no = math::normalize(f_no);
+  float3 f_no = normalize(cross_poly(coords));
   tri_to_quat_ex(quat, coords[0], coords[1], coords[2], f_no);
 
   /* Scale. */
