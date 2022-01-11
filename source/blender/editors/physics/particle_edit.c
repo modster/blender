@@ -1475,16 +1475,16 @@ void recalc_emitter_field(Depsgraph *UNUSED(depsgraph), Object *UNUSED(ob), Part
 
     mvert = &mesh->mvert[mface->v2];
     add_v3_v3v3(vec, vec, mvert->co);
-    copy_v3_v3(nor, vert_normals[mface->v2]);
+    add_v3_v3(nor, vert_normals[mface->v2]);
 
     mvert = &mesh->mvert[mface->v3];
     add_v3_v3v3(vec, vec, mvert->co);
-    copy_v3_v3(nor, vert_normals[mface->v3]);
+    add_v3_v3(nor, vert_normals[mface->v3]);
 
     if (mface->v4) {
       mvert = &mesh->mvert[mface->v4];
       add_v3_v3v3(vec, vec, mvert->co);
-      copy_v3_v3(nor, vert_normals[mface->v4]);
+      add_v3_v3(nor, vert_normals[mface->v4]);
 
       mul_v3_fl(vec, 0.25);
     }
