@@ -85,7 +85,7 @@
 #include "GPU_uniform_buffer.h"
 #include "GPU_vertex_buffer.h"
 
-namespace blender::drw {
+namespace blender::draw {
 
 /* -------------------------------------------------------------------- */
 /** \name Implementation Details
@@ -468,15 +468,30 @@ class Texture : NonCopyable {
   {
     return ensure_impl(extent, 0, 0, mips, format, data, false, false);
   }
+
+  /**
+   * Ensure the texture has the correct properties. Recreating it if needed.
+   * Return true if a texture has been created.
+   */
   bool ensure_1d_array(
       eGPUTextureFormat format, int extent, int layers, float *data = nullptr, int mips = 1)
   {
     return ensure_impl(extent, layers, 0, mips, format, data, true, false);
   }
+
+  /**
+   * Ensure the texture has the correct properties. Recreating it if needed.
+   * Return true if a texture has been created.
+   */
   bool ensure_2d(eGPUTextureFormat format, const int2 &extent, float *data = nullptr, int mips = 1)
   {
     return ensure_impl(UNPACK2(extent), 0, mips, format, data, false, false);
   }
+
+  /**
+   * Ensure the texture has the correct properties. Recreating it if needed.
+   * Return true if a texture has been created.
+   */
   bool ensure_2d_array(eGPUTextureFormat format,
                        const int2 &extent,
                        int layers,
@@ -485,23 +500,41 @@ class Texture : NonCopyable {
   {
     return ensure_impl(UNPACK2(extent), layers, mips, format, data, true, false);
   }
+
+  /**
+   * Ensure the texture has the correct properties. Recreating it if needed.
+   * Return true if a texture has been created.
+   */
   bool ensure_3d(eGPUTextureFormat format, const int3 &extent, float *data = nullptr, int mips = 1)
   {
     return ensure_impl(UNPACK3(extent), mips, format, data, false, false);
   }
+
+  /**
+   * Ensure the texture has the correct properties. Recreating it if needed.
+   * Return true if a texture has been created.
+   */
   bool ensure_cube(eGPUTextureFormat format, int extent, float *data = nullptr, int mips = 1)
   {
     return ensure_impl(extent, extent, 0, mips, format, data, false, true);
   }
+
+  /**
+   * Ensure the texture has the correct properties. Recreating it if needed.
+   * Return true if a texture has been created.
+   */
   bool ensure_cube_array(
       eGPUTextureFormat format, int extent, int layers, float *data = nullptr, int mips = 1)
   {
     return ensure_impl(extent, extent, layers, mips, format, data, false, true);
   }
 
+  /**
+   * Returns true if the texture has been allocated or acquired from the pool.
+   */
   bool is_valid(void) const
   {
-    return !!tx_;
+    return tx_ != nullptr;
   }
 
   int width(void) const
@@ -522,27 +555,41 @@ class Texture : NonCopyable {
   }
 
   /**
-   * Ensure the texture has the correct properties. Recreating it if needed.
-   * Return true if a texture has been created.
+   * Clear the entirety of the texture using one pixel worth of data.
    */
   void clear(float4 values)
   {
     GPU_texture_clear(tx_, GPU_DATA_FLOAT, &values[0]);
   }
+
+  /**
+   * Clear the entirety of the texture using one pixel worth of data.
+   */
   void clear(uint4 values)
   {
     GPU_texture_clear(tx_, GPU_DATA_UINT, &values[0]);
   }
+
+  /**
+   * Clear the entirety of the texture using one pixel worth of data.
+   */
   void clear(uchar4 values)
   {
     GPU_texture_clear(tx_, GPU_DATA_UBYTE, &values[0]);
   }
+
+  /**
+   * Clear the entirety of the texture using one pixel worth of data.
+   */
   void clear(int4 values)
   {
     GPU_texture_clear(tx_, GPU_DATA_INT, &values[0]);
   }
 
-  /* Returns a memory block that needs to be manually freed by MEM_freeN(). */
+  /**
+   * Returns a buffer containing the texture data for the specified miplvl.
+   * The memory block needs to be manually freed by MEM_freeN().
+   */
   template<typename T> T *read(eGPUDataFormat format, int miplvl = 0)
   {
     return reinterpret_cast<T *>(GPU_texture_read(tx_, format, miplvl));
@@ -553,6 +600,9 @@ class Texture : NonCopyable {
     GPU_texture_filter_mode(tx_, do_filter);
   }
 
+  /**
+   * Free the internal texture but not the drw::Texture itself.
+   */
   void free()
   {
     GPU_TEXTURE_FREE_SAFE(tx_);
@@ -733,4 +783,4 @@ class Framebuffer : NonCopyable {
 
 /** \} */
 
-}  // namespace blender::drw
+}  // namespace blender::draw
