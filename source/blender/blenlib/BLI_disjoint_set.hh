@@ -101,16 +101,6 @@ class DisjointSet {
 
     return root;
   }
-
-  Span<int64_t> ensure_all_roots()
-  {
-    for (const int64_t i : parents_.index_range()) {
-      /* Updates `parents_` when doing path compression. */
-      this->find_root(i);
-    }
-    all_roots_ensured_ = true;
-    return parents_;
-  }
 };
 
 }  // namespace blender

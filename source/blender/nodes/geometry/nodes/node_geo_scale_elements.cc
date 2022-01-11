@@ -107,22 +107,31 @@ struct EvaluatedFields {
   VArray<float3> up_vectors;
 };
 
-struct ScaleIsland {
+/**
+ * When multiple elements share the same vertices, they are scaled together.
+ */
+struct ElementIsland {
   /* Either face or edge indices. */
   Vector<int> element_indices;
 };
 
+/**
+ * Prepares a matrix that can be used to transform every point in an island.
+ */
 static float4x4 create_transform(const float3 &pivot,
                                  float3 x_axis,
                                  const float3 &up,
                                  const float3 &scale)
 {
+  /* Compute main scale axis. */
   x_axis = x_axis.normalized();
   const float3 y_axis = -float3::cross(x_axis, up).normalized();
   const float3 z_axis = float3::cross(x_axis, y_axis);
 
   float4x4 transform;
   unit_m4(transform.values);
+
+  /* Move pivot to origin. */
   sub_v3_v3(transform.values[3], pivot);
 
   float4x4 axis_transform;
@@ -131,15 +140,20 @@ static float4x4 create_transform(const float3 &pivot,
   copy_v3_v3(axis_transform.values[1], y_axis);
   copy_v3_v3(axis_transform.values[2], z_axis);
 
+  /* Can invert by transposing, because the matrix is orthonormal. */
   float4x4 axis_transform_inv = axis_transform.transposed();
 
+  /* Prepare scale matrix. */
   float4x4 scale_transform;
   unit_m4(scale_transform.values);
   scale_transform.values[0][0] = scale.x;
   scale_transform.values[1][1] = scale.y;
   scale_transform.values[2][2] = scale.z;
 
+  /* Do the scaling in the right space. */
   transform = axis_transform * scale_transform * axis_transform_inv * transform;
+
+  /* Move pivot back to where it was. */
   add_v3_v3(transform.values[3], pivot);
 
   return transform;
@@ -165,14 +179,14 @@ static EvaluatedFields evaluate_fields(FieldEvaluator &evaluator, const InputFie
 
 static void scale_vertex_islands(
     Mesh &mesh,
-    const Span<ScaleIsland> islands,
+    const Span<ElementIsland> islands,
     const EvaluatedFields &evaluated,
     const FunctionRef<void(int element_index, Vector<int> &r_vertex_indices)> get_vertex_indices)
 {
   threading::parallel_for(islands.index_range(), 256, [&](const IndexRange range) {
     Set<int> handled_vertices;
     for (const int island_index : range) {
-      const ScaleIsland &island = islands[island_index];
+      const ElementIsland &island = islands[island_index];
 
       float3 scale = {0.0f, 0.0f, 0.0f};
       float3 pivot = {0.0f, 0.0f, 0.0f};
@@ -195,6 +209,7 @@ static void scale_vertex_islands(
         }
       }
 
+      /* Divide by number of elements to get the average. */
       const float f = 1.0f / island.element_indices.size();
       scale *= f;
       pivot *= f;
@@ -205,6 +220,7 @@ static void scale_vertex_islands(
       handled_vertices.clear();
       for (const int vert_index : vertex_indices) {
         if (!handled_vertices.add(vert_index)) {
+          /* This vertex has been transformed already. */
           continue;
         }
         MVert &vert = mesh.mvert[vert_index];
@@ -215,11 +231,13 @@ static void scale_vertex_islands(
     }
   });
 
+  /* Positions have changed, so the normals will have to be recomputed. */
   BKE_mesh_normals_tag_dirty(&mesh);
 }
 
-static Vector<ScaleIsland> prepare_face_islands(const Mesh &mesh, const IndexMask face_selection)
+static Vector<ElementIsland> prepare_face_islands(const Mesh &mesh, const IndexMask face_selection)
 {
+  /* Use the disjoing set data structure to determine which vertices have to be scaled together. */
   DisjointSet disjoint_set(mesh.totvert);
   for (const int poly_index : face_selection) {
     const MPoly &poly = mesh.mpoly[poly_index];
@@ -233,7 +251,8 @@ static Vector<ScaleIsland> prepare_face_islands(const Mesh &mesh, const IndexMas
   }
 
   VectorSet<int> island_ids;
-  Vector<ScaleIsland> islands;
+  Vector<ElementIsland> islands;
+  /* There are at most as many islands as there are selected faces. */
   islands.reserve(face_selection.size());
   for (const int poly_index : face_selection) {
     const MPoly &poly = mesh.mpoly[poly_index];
@@ -243,7 +262,7 @@ static Vector<ScaleIsland> prepare_face_islands(const Mesh &mesh, const IndexMas
     if (island_index == islands.size()) {
       islands.append_as();
     }
-    ScaleIsland &island = islands[island_index];
+    ElementIsland &island = islands[island_index];
     island.element_indices.append(poly_index);
   }
 
@@ -260,7 +279,7 @@ static void scale_faces(MeshComponent &mesh_component, const InputFields &input_
   FieldEvaluator evaluator{field_context, mesh.totpoly};
   EvaluatedFields evaluated = evaluate_fields(evaluator, input_fields);
 
-  Vector<ScaleIsland> island = prepare_face_islands(mesh, evaluated.selection);
+  Vector<ElementIsland> island = prepare_face_islands(mesh, evaluated.selection);
   scale_vertex_islands(
       mesh, island, evaluated, [&](int face_index, Vector<int> &r_vertex_indices) {
         const MPoly &poly = mesh.mpoly[face_index];
@@ -271,8 +290,9 @@ static void scale_faces(MeshComponent &mesh_component, const InputFields &input_
       });
 }
 
-static Vector<ScaleIsland> prepare_edge_islands(const Mesh &mesh, const IndexMask edge_selection)
+static Vector<ElementIsland> prepare_edge_islands(const Mesh &mesh, const IndexMask edge_selection)
 {
+  /* Use the disjoing set data structure to determine which vertices have to be scaled together. */
   DisjointSet disjoint_set(mesh.totvert);
   for (const int edge_index : edge_selection) {
     const MEdge &edge = mesh.medge[edge_index];
@@ -280,7 +300,8 @@ static Vector<ScaleIsland> prepare_edge_islands(const Mesh &mesh, const IndexMas
   }
 
   VectorSet<int> island_ids;
-  Vector<ScaleIsland> islands;
+  Vector<ElementIsland> islands;
+  /* There are at most as many islands as there are selected edges. */
   islands.reserve(edge_selection.size());
   for (const int edge_index : edge_selection) {
     const MEdge &edge = mesh.medge[edge_index];
@@ -289,7 +310,7 @@ static Vector<ScaleIsland> prepare_edge_islands(const Mesh &mesh, const IndexMas
     if (island_index == islands.size()) {
       islands.append_as();
     }
-    ScaleIsland &island = islands[island_index];
+    ElementIsland &island = islands[island_index];
     island.element_indices.append(edge_index);
   }
 
@@ -306,7 +327,7 @@ static void scale_edges(MeshComponent &mesh_component, const InputFields &input_
   FieldEvaluator evaluator{field_context, mesh.totedge};
   EvaluatedFields evaluated = evaluate_fields(evaluator, input_fields);
 
-  Vector<ScaleIsland> island = prepare_edge_islands(mesh, evaluated.selection);
+  Vector<ElementIsland> island = prepare_edge_islands(mesh, evaluated.selection);
   scale_vertex_islands(
       mesh, island, evaluated, [&](const int edge_index, Vector<int> &r_vertex_indices) {
         const MEdge &edge = mesh.medge[edge_index];
