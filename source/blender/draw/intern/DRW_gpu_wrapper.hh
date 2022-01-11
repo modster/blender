@@ -547,10 +547,35 @@ class Texture : NonCopyable {
     return GPU_texture_height(tx_);
   }
 
-  int3 size(void) const
+  bool depth(void) const
+  {
+    return GPU_texture_depth(tx_);
+  }
+
+  bool is_stencil(void) const
+  {
+    return GPU_texture_stencil(tx_);
+  }
+
+  bool is_integer(void) const
+  {
+    return GPU_texture_integer(tx_);
+  }
+
+  bool is_cube(void) const
+  {
+    return GPU_texture_cube(tx_);
+  }
+
+  bool is_array(void) const
+  {
+    return GPU_texture_array(tx_);
+  }
+
+  int3 size(int miplvl = 0) const
   {
     int3 size(0);
-    GPU_texture_get_mipmap_size(tx_, 0, size);
+    GPU_texture_get_mipmap_size(tx_, miplvl, size);
     return size;
   }
 
