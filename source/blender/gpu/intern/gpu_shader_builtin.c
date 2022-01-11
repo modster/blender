@@ -156,14 +156,12 @@ static const GPUShaderStages builtin_shader_stages[GPU_SHADER_BUILTIN_LEN] = {
     [GPU_SHADER_TEXT] =
         {
             .name = "GPU_SHADER_TEXT",
-            .vert = datatoc_gpu_shader_text_vert_glsl,
-            .frag = datatoc_gpu_shader_text_frag_glsl,
+            .create_info = "gpu_shader_text",
         },
     [GPU_SHADER_KEYFRAME_SHAPE] =
         {
             .name = "GPU_SHADER_KEYFRAME_SHAPE",
-            .vert = datatoc_gpu_shader_keyframe_shape_vert_glsl,
-            .frag = datatoc_gpu_shader_keyframe_shape_frag_glsl,
+            .create_info = "gpu_shader_keyframe_shape",
         },
     [GPU_SHADER_SIMPLE_LIGHTING] =
         {
@@ -173,21 +171,19 @@ static const GPUShaderStages builtin_shader_stages[GPU_SHADER_BUILTIN_LEN] = {
         },
     [GPU_SHADER_3D_IMAGE_MODULATE_ALPHA] =
         {
-            .vert = datatoc_gpu_shader_3D_image_vert_glsl,
-            .frag = datatoc_gpu_shader_image_modulate_alpha_frag_glsl,
+            .name = "GPU_SHADER_3D_IMAGE_MODULATE_ALPHA",
+            .create_info = "gpu_shader_3D_image_modulate_alpha",
         },
     [GPU_SHADER_2D_CHECKER] =
         {
             .name = "GPU_SHADER_2D_CHECKER",
-            .vert = datatoc_gpu_shader_2D_vert_glsl,
-            .frag = datatoc_gpu_shader_checker_frag_glsl,
+            .create_info = "gpu_shader_2D_checker",
         },
 
     [GPU_SHADER_2D_DIAG_STRIPES] =
         {
             .name = "GPU_SHADER_2D_DIAG_STRIPES",
-            .vert = datatoc_gpu_shader_2D_vert_glsl,
-            .frag = datatoc_gpu_shader_diag_stripes_frag_glsl,
+            .create_info = "gpu_shader_2D_diag_stripes",
         },
 
     [GPU_SHADER_2D_UNIFORM_COLOR] =
@@ -196,60 +192,28 @@ static const GPUShaderStages builtin_shader_stages[GPU_SHADER_BUILTIN_LEN] = {
             .vert = datatoc_gpu_shader_2D_vert_glsl,
             .frag = datatoc_gpu_shader_uniform_color_frag_glsl,
         },
-    [GPU_SHADER_2D_FLAT_COLOR] =
-        {
-            .name = "GPU_SHADER_2D_FLAT_COLOR",
-            .vert = datatoc_gpu_shader_2D_flat_color_vert_glsl,
-            .frag = datatoc_gpu_shader_flat_color_frag_glsl,
-        },
-    [GPU_SHADER_2D_SMOOTH_COLOR] =
-        {
-            .name = "GPU_SHADER_2D_SMOOTH_COLOR",
-            .vert = datatoc_gpu_shader_2D_smooth_color_vert_glsl,
-            .frag = datatoc_gpu_shader_2D_smooth_color_frag_glsl,
-        },
-    [GPU_SHADER_2D_IMAGE_OVERLAYS_MERGE] =
-        {
-            .name = "GPU_SHADER_2D_IMAGE_OVERLAYS_MERGE",
-            .vert = datatoc_gpu_shader_2D_image_vert_glsl,
-            .frag = datatoc_gpu_shader_image_overlays_merge_frag_glsl,
-        },
+    [GPU_SHADER_2D_FLAT_COLOR] = {.name = "GPU_SHADER_2D_FLAT_COLOR",
+                                  .create_info = "gpu_shader_2D_uniform_color"},
+    [GPU_SHADER_2D_SMOOTH_COLOR] = {.name = "GPU_SHADER_2D_SMOOTH_COLOR",
+                                    .create_info = "gpu_shader_2D_smooth_color"},
+    [GPU_SHADER_2D_IMAGE_OVERLAYS_MERGE] = {.name = "GPU_SHADER_2D_IMAGE_OVERLAYS_MERGE",
+                                            .create_info = "gpu_shader_2D_image_overlays_merge"},
     [GPU_SHADER_2D_IMAGE_OVERLAYS_STEREO_MERGE] =
-        {
-            .name = "GPU_SHADER_2D_IMAGE_OVERLAYS_STEREO_MERGE",
-            .vert = datatoc_gpu_shader_2D_vert_glsl,
-            .frag = datatoc_gpu_shader_image_overlays_stereo_merge_frag_glsl,
-        },
-    [GPU_SHADER_2D_IMAGE] =
-        {
-            .name = "GPU_SHADER_2D_IMAGE",
-            .vert = datatoc_gpu_shader_2D_image_vert_glsl,
-            .frag = datatoc_gpu_shader_image_frag_glsl,
-        },
-    [GPU_SHADER_2D_IMAGE_COLOR] =
-        {
-            .name = "GPU_SHADER_2D_IMAGE_COLOR",
-            .vert = datatoc_gpu_shader_2D_image_vert_glsl,
-            .frag = datatoc_gpu_shader_image_color_frag_glsl,
-        },
-    [GPU_SHADER_2D_IMAGE_DESATURATE_COLOR] =
-        {
-            .name = "GPU_SHADER_2D_IMAGE_DESATURATE_COLOR",
-            .vert = datatoc_gpu_shader_2D_image_vert_glsl,
-            .frag = datatoc_gpu_shader_image_desaturate_frag_glsl,
-        },
+        {.name = "GPU_SHADER_2D_IMAGE_OVERLAYS_STEREO_MERGE",
+         .create_info = "gpu_shader_2D_image_overlays_stereo_merge"},
+    [GPU_SHADER_2D_IMAGE] = {.name = "GPU_SHADER_2D_IMAGE", .create_info = "gpu_shader_2D_image"},
+    [GPU_SHADER_2D_IMAGE_COLOR] = {.name = "GPU_SHADER_2D_IMAGE_COLOR",
+                                   .create_info = "gpu_shader_2D_image_color"},
+    [GPU_SHADER_2D_IMAGE_DESATURATE_COLOR] = {.name = "GPU_SHADER_2D_IMAGE_DESATURATE_COLOR",
+                                              .create_info =
+                                                  "gpu_shader_2D_image_desaturate_color"},
     [GPU_SHADER_2D_IMAGE_SHUFFLE_COLOR] =
         {
             .name = "GPU_SHADER_2D_IMAGE_SHUFFLE_COLOR",
-            .vert = datatoc_gpu_shader_2D_image_vert_glsl,
-            .frag = datatoc_gpu_shader_image_shuffle_color_frag_glsl,
+            .create_info = "gpu_shader_2D_image_shuffle_color",
         },
-    [GPU_SHADER_2D_IMAGE_RECT_COLOR] =
-        {
-            .name = "GPU_SHADER_2D_IMAGE_RECT_COLOR",
-            .vert = datatoc_gpu_shader_2D_image_rect_vert_glsl,
-            .frag = datatoc_gpu_shader_image_color_frag_glsl,
-        },
+    [GPU_SHADER_2D_IMAGE_RECT_COLOR] = {.name = "GPU_SHADER_2D_IMAGE_RECT_COLOR",
+                                        .create_info = "gpu_shader_2D_image_rect_color"},
     [GPU_SHADER_2D_IMAGE_MULTI_RECT_COLOR] =
         {
             .name = "GPU_SHADER_2D_IMAGE_MULTI_RECT_COLOR",
@@ -377,8 +341,7 @@ static const GPUShaderStages builtin_shader_stages[GPU_SHADER_BUILTIN_LEN] = {
     [GPU_SHADER_2D_AREA_BORDERS] =
         {
             .name = "GPU_SHADER_2D_AREA_BORDERS",
-            .vert = datatoc_gpu_shader_2D_area_borders_vert_glsl,
-            .frag = datatoc_gpu_shader_2D_area_borders_frag_glsl,
+            .create_info = "gpu_shader_2D_area_borders"
         },
     [GPU_SHADER_2D_WIDGET_BASE] =
         {

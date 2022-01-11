@@ -2,7 +2,7 @@
 
 GPU_SHADER_INTERFACE_INFO(smooth_uv_iface, "").smooth(Type::VEC2, "uv");
 
-GPU_SHADER_CREATE_INFO(gpu_shader_2D_area_edges)
+GPU_SHADER_CREATE_INFO(gpu_shader_2D_area_borders)
     .vertex_in(0, Type::VEC2, "pos")
     .vertex_out(smooth_uv_iface)
     .fragment_out(0, Type::VEC4, "fragColor")

@@ -5,15 +5,7 @@ uniform mat4 ModelMatrix;
 #  endif
 
 in vec3 pos;
-<<<<<<< HEAD
-#  if defined(USE_COLOR_U32)
-in uint color;
-#  else
 in vec4 color;
-#  endif
-=======
-in vec4 color;
->>>>>>> master
 
 flat out vec4 finalColor;
 #endif

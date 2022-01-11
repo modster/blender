@@ -1,6 +1,6 @@
 #include "gpu_shader_create_info.hh"
 
-GPU_SHADER_CREATE_INFO(gpu_shader_2D_image_desaturate)
+GPU_SHADER_CREATE_INFO(gpu_shader_2D_image_desaturate_color)
     .additional_info("gpu_shader_2D_image_common")
     .push_constant(16, Type::VEC4, "color")
     .push_constant(20, Type::FLOAT, "factor")
