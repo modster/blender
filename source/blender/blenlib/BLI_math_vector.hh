@@ -27,6 +27,7 @@
 
 #include "BLI_math_base_safe.h"
 #include "BLI_math_vector.h"
+#include "BLI_span.hh"
 #include "BLI_utildefines.h"
 
 #ifdef WITH_GMP
@@ -315,6 +316,30 @@ inline T cross_high_precision(const T &a, const T &b)
   return {(float)((double)a.y * b.z - (double)a.z * b.y),
           (float)((double)a.z * b.x - (double)a.x * b.z),
           (float)((double)a.x * b.y - (double)a.y * b.x)};
+}
+
+template<typename T, BLI_ENABLE_IF_FLT_VEC(T), BLI_ENABLE_IF((T::type_length == 3))>
+inline T cross_poly(Span<T> poly)
+{
+  /* Newell's Method. */
+  int nv = static_cast<int>(poly.size());
+  if (nv < 3) {
+    return T(0, 0, 0);
+  }
+  const T *v_prev = &poly[nv - 1];
+  const T *v_curr = &poly[0];
+  T n(0, 0, 0);
+  for (int i = 0; i < nv;) {
+    n[0] = n[0] + ((*v_prev)[1] - (*v_curr)[1]) * ((*v_prev)[2] + (*v_curr)[2]);
+    n[1] = n[1] + ((*v_prev)[2] - (*v_curr)[2]) * ((*v_prev)[0] + (*v_curr)[0]);
+    n[2] = n[2] + ((*v_prev)[0] - (*v_curr)[0]) * ((*v_prev)[1] + (*v_curr)[1]);
+    v_prev = v_curr;
+    ++i;
+    if (i < nv) {
+      v_curr = &poly[i];
+    }
+  }
+  return n;
 }
 
 template<typename T, BLI_ENABLE_IF_FLT_VEC(T)> inline T interpolate(const T &a, const T &b, bT t)

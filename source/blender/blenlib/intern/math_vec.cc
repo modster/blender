@@ -122,52 +122,7 @@ isect_result<mpq2> isect_seg_seg(const mpq2 &v1, const mpq2 &v2, const mpq2 &v3,
 }
 #endif
 
-double3 cross_poly(Span<double3> poly)
-{
-  /* Newell's Method. */
-  int nv = static_cast<int>(poly.size());
-  if (nv < 3) {
-    return double3(0, 0, 0);
-  }
-  const double3 *v_prev = &poly[nv - 1];
-  const double3 *v_curr = &poly[0];
-  double3 n(0, 0, 0);
-  for (int i = 0; i < nv;) {
-    n[0] = n[0] + ((*v_prev)[1] - (*v_curr)[1]) * ((*v_prev)[2] + (*v_curr)[2]);
-    n[1] = n[1] + ((*v_prev)[2] - (*v_curr)[2]) * ((*v_prev)[0] + (*v_curr)[0]);
-    n[2] = n[2] + ((*v_prev)[0] - (*v_curr)[0]) * ((*v_prev)[1] + (*v_curr)[1]);
-    v_prev = v_curr;
-    ++i;
-    if (i < nv) {
-      v_curr = &poly[i];
-    }
-  }
-  return n;
-}
-
 #ifdef WITH_GMP
-mpq3 cross_poly(Span<mpq3> poly)
-{
-  /* Newell's Method. */
-  int nv = static_cast<int>(poly.size());
-  if (nv < 3) {
-    return mpq3(0);
-  }
-  const mpq3 *v_prev = &poly[nv - 1];
-  const mpq3 *v_curr = &poly[0];
-  mpq3 n(0);
-  for (int i = 0; i < nv;) {
-    n[0] = n[0] + ((*v_prev)[1] - (*v_curr)[1]) * ((*v_prev)[2] + (*v_curr)[2]);
-    n[1] = n[1] + ((*v_prev)[2] - (*v_curr)[2]) * ((*v_prev)[0] + (*v_curr)[0]);
-    n[2] = n[2] + ((*v_prev)[0] - (*v_curr)[0]) * ((*v_prev)[1] + (*v_curr)[1]);
-    v_prev = v_curr;
-    ++i;
-    if (i < nv) {
-      v_curr = &poly[i];
-    }
-  }
-  return n;
-}
 
 uint64_t hash_mpq_class(const mpq_class &value)
 {

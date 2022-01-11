@@ -27,10 +27,4 @@ namespace blender {
 
 using double3 = vec_base<double, 3>;
 
-namespace math {
-
-double3 cross_poly(Span<double3> poly);
-
-}  // namespace math
-
 }  // namespace blender
