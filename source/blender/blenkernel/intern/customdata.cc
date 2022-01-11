@@ -2227,7 +2227,7 @@ void CustomData_realloc(CustomData *data, int totelem)
       continue;
     }
     typeInfo = layerType_getInfo(layer->type);
-    layer->data = MEM_reallocN(layer->data, (size_t)totelem * typeInfo->size);
+    layer->data = MEM_recallocN(layer->data, (size_t)totelem * typeInfo->size);
   }
 }
 

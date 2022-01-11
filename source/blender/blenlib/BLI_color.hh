@@ -96,7 +96,7 @@ std::ostream &operator<<(std::ostream &stream, const eSpace &space);
 /** Template class to store RGBA values with different precision, space and alpha association. */
 template<typename ChannelStorageType, eSpace Space, eAlpha Alpha> class ColorRGBA {
  public:
-  ChannelStorageType r, g, b, a;
+  ChannelStorageType r = 0, g = 0, b = 0, a = 1;
   constexpr ColorRGBA() = default;
 
   constexpr ColorRGBA(const ChannelStorageType rgba[4])

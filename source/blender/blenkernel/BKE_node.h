@@ -1634,6 +1634,7 @@ int ntreeTexExecTree(struct bNodeTree *ntree,
 #define GEO_NODE_ACCUMULATE_FIELD 1146
 #define GEO_NODE_INPUT_MESH_EDGE_ANGLE 1147
 #define GEO_NODE_SCALE_ELEMENTS 1148
+#define GEO_NODE_EXTRUDE_MESH 1149
 
 /** \} */
 

@@ -16,6 +16,9 @@
 
 #include "MOD_nodes_evaluator.hh"
 
+#include "DNA_meshdata_types.h"
+
+#include "BKE_mesh.h"
 #include "BKE_type_conversions.hh"
 
 #include "NOD_geometry_exec.hh"
@@ -379,6 +382,11 @@ static bool get_implicit_socket_input(const SocketRef &socket, void *r_value)
                              "handle_left" :
                              "handle_right";
         new (r_value) ValueOrField<float3>(bke::AttributeFieldInput::Create<float3>(side));
+        return true;
+      }
+      if (bnode.type == GEO_NODE_EXTRUDE_MESH) {
+        new (r_value)
+            ValueOrField<float3>(Field<float3>(std::make_shared<bke::NormalFieldInput>()));
         return true;
       }
       new (r_value) ValueOrField<float3>(bke::AttributeFieldInput::Create<float3>("position"));

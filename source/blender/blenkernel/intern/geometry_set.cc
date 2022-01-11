@@ -30,6 +30,8 @@
 #include "BKE_spline.hh"
 #include "BKE_volume.h"
 
+#include "BLT_translation.h"
+
 #include "DNA_collection_types.h"
 #include "DNA_object_types.h"
 
@@ -608,6 +610,8 @@ bool NormalFieldInput::is_equal_to(const fn::FieldNode &other) const
 }
 
 }  // namespace blender::bke
+
+/** \} */
 
 /** \} */
 
