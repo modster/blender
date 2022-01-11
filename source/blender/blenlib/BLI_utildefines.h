@@ -847,7 +847,7 @@ extern bool BLI_memory_is_zero(const void *arr, const size_t arr_size);
  * \note Often one has to invoke this macro with double parenthesis. That's because the condition
  * often contains a comma and angle brackets are not recognized as parenthesis by the preprocessor.
  */
-#define BLI_ENABLE_IF(condition) typename std::enable_if_t<condition> * = nullptr
+#define BLI_ENABLE_IF(condition) typename std::enable_if_t<(condition)> * = nullptr
 
 /** \} */
 

@@ -172,14 +172,12 @@ template<typename T, int Size> struct vec_base : public vec_struct_base<T, Size>
 
   /** Masking. */
 
-  template<BLI_ENABLE_IF_VEC(Size, >= 3)> explicit operator vec_base<T, 2>() const
+  template<typename U, int OtherSize, BLI_ENABLE_IF(OtherSize > Size)>
+  explicit vec_base(const vec_base<U, OtherSize> &other)
   {
-    return vec_base<T, 2>(UNPACK2(*this));
-  }
-
-  template<BLI_ENABLE_IF_VEC(Size, >= 4)> explicit operator vec_base<T, 3>() const
-  {
-    return vec_base<T, 3>(UNPACK3(*this));
+    for (int i = 0; i < Size; i++) {
+      (*this)[i] = static_cast<T>(other[i]);
+    }
   }
 
 #undef BLI_ENABLE_IF_VEC
