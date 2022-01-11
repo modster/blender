@@ -123,6 +123,61 @@ void MeshComponent::ensure_owns_direct_data()
 /** \} */
 
 /* -------------------------------------------------------------------- */
+/** \name Mesh Normals Field Input
+ * \{ */
+
+namespace blender::bke {
+
+VArray<float3> mesh_normals_varray(const MeshComponent &mesh_component,
+                                   const Mesh &mesh,
+                                   const IndexMask mask,
+                                   const AttributeDomain domain)
+{
+  switch (domain) {
+    case ATTR_DOMAIN_FACE: {
+      return VArray<float3>::ForSpan(
+          {(float3 *)BKE_mesh_poly_normals_ensure(&mesh), mesh.totpoly});
+    }
+    case ATTR_DOMAIN_POINT: {
+      return VArray<float3>::ForSpan(
+          {(float3 *)BKE_mesh_vertex_normals_ensure(&mesh), mesh.totvert});
+    }
+    case ATTR_DOMAIN_EDGE: {
+      /* In this case, start with vertex normals and convert to the edge domain, since the
+       * conversion from edges to vertices is very simple. Use "manual" domain interpolation
+       * instead of the GeometryComponent API to avoid calculating unnecessary values and to
+       * allow normalizing the result more simply. */
+      Span<float3> vert_normals{(float3 *)BKE_mesh_vertex_normals_ensure(&mesh), mesh.totvert};
+      Array<float3> edge_normals(mask.min_array_size());
+      Span<MEdge> edges{mesh.medge, mesh.totedge};
+      for (const int i : mask) {
+        const MEdge &edge = edges[i];
+        edge_normals[i] =
+            float3::interpolate(vert_normals[edge.v1], vert_normals[edge.v2], 0.5f).normalized();
+      }
+
+      return VArray<float3>::ForContainer(std::move(edge_normals));
+    }
+    case ATTR_DOMAIN_CORNER: {
+      /* The normals on corners are just the mesh's face normals, so start with the face normal
+       * array and copy the face normal for each of its corners. In this case using the mesh
+       * component's generic domain interpolation is fine, the data will still be normalized,
+       * since the face normal is just copied to every corner. */
+      return mesh_component.attribute_try_adapt_domain(
+          VArray<float3>::ForSpan({(float3 *)BKE_mesh_poly_normals_ensure(&mesh), mesh.totpoly}),
+          ATTR_DOMAIN_FACE,
+          ATTR_DOMAIN_CORNER);
+    }
+    default:
+      return {};
+  }
+}
+
+}  // namespace blender::bke
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
 /** \name Attribute Access
  * \{ */
 
