@@ -22,27 +22,35 @@
 
 #ifdef WITH_GMP
 
-#  include <iostream>
-
-#  include "BLI_math.h"
 #  include "BLI_math_mpq.hh"
 #  include "BLI_math_vec_types.hh"
-#  include "BLI_span.hh"
 
 namespace blender {
 
+using mpq2 = vec_base<mpq_class, 2>;
 using mpq3 = vec_base<mpq_class, 3>;
 
 namespace math {
 
 uint64_t hash_mpq_class(const mpq_class &value);
 
+template<> inline uint64_t vector_hash(const mpq2 &vec)
+{
+  return hash_mpq_class(vec.x) ^ (hash_mpq_class(vec.y) * 33);
+}
+
 template<> inline uint64_t vector_hash(const mpq3 &vec)
 {
-  uint64_t hashx = hash_mpq_class(vec.x);
-  uint64_t hashy = hash_mpq_class(vec.y);
-  uint64_t hashz = hash_mpq_class(vec.z);
-  return hashx ^ (hashy * 33) ^ (hashz * 33 * 37);
+  return hash_mpq_class(vec.x) ^ (hash_mpq_class(vec.y) * 33) ^ (hash_mpq_class(vec.z) * 33 * 37);
+}
+
+/**
+ * Cannot do this exactly in rational arithmetic!
+ * Approximate by going in and out of doubles.
+ */
+template<> inline mpq_class length(const mpq2 &a)
+{
+  return mpq_class(sqrt(length_squared(a).get_d()));
 }
 
 /**

@@ -549,4 +549,20 @@ template<typename T, int Size> struct vec_base : public vec_struct_base<T, Size>
   }
 };
 
+using int2 = vec_base<int32_t, 2>;
+using int3 = vec_base<int32_t, 3>;
+using int4 = vec_base<int32_t, 4>;
+
+using uint2 = vec_base<uint32_t, 2>;
+using uint3 = vec_base<uint32_t, 3>;
+using uint4 = vec_base<uint32_t, 4>;
+
+using float2 = vec_base<float, 2>;
+using float3 = vec_base<float, 3>;
+using float4 = vec_base<float, 4>;
+
+using double2 = vec_base<double, 2>;
+using double3 = vec_base<double, 3>;
+using double4 = vec_base<double, 4>;
+
 }  // namespace blender

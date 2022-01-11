@@ -18,8 +18,7 @@
 
 #include "BLI_array.hh"
 #include "BLI_color.hh"
-#include "BLI_float2.hh"
-#include "BLI_float3.hh"
+#include "BLI_math_vec_types.hh"
 
 #include "DNA_customdata_types.h"
 

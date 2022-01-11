@@ -192,8 +192,6 @@ set(SRC
   BLI_dlrbTree.h
   BLI_dot_export.hh
   BLI_dot_export_attribute_enums.hh
-  BLI_double2.hh
-  BLI_double3.hh
   BLI_dynlib.h
   BLI_dynstr.h
   BLI_easing.h
@@ -207,9 +205,6 @@ set(SRC
   BLI_fileops.hh
   BLI_fileops_types.h
   BLI_filereader.h
-  BLI_float2.hh
-  BLI_float3.hh
-  BLI_float4.hh
   BLI_float4x4.hh
   BLI_fnmatch.h
   BLI_function_ref.hh
@@ -226,9 +221,6 @@ set(SRC
   BLI_index_mask.hh
   BLI_index_range.hh
   BLI_inplace_priority_queue.hh
-  BLI_int2.hh
-  BLI_int3.hh
-  BLI_int4.hh
   BLI_iterator.h
   BLI_jitter_2d.h
   BLI_kdopbvh.h
@@ -262,6 +254,7 @@ set(SRC
   BLI_math_time.h
   BLI_math_vector.h
   BLI_math_vec_types.hh
+  BLI_math_vec_mpq_types.hh
   BLI_memarena.h
   BLI_memblock.h
   BLI_memiter.h
@@ -271,8 +264,6 @@ set(SRC
   BLI_mesh_boolean.hh
   BLI_mesh_intersect.hh
   BLI_mmap.h
-  BLI_mpq2.hh
-  BLI_mpq3.hh
   BLI_multi_value_map.hh
   BLI_noise.h
   BLI_noise.hh

@@ -23,7 +23,7 @@
 
 #pragma once
 
-#include "BLI_float2.hh"
+#include "BLI_math_vec_types.hh"
 #include "BLI_vector.hh"
 
 #include "BKE_node.h"
