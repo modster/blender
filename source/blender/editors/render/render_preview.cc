@@ -861,7 +861,7 @@ static void object_preview_render(IconPreview *preview, IconPreviewSize *preview
   preview_data.pr_main = preview_main;
   /* Act on a copy. */
   preview_data.object = (Object *)preview->id_copy;
-  preview_data.cfra = preview->scene->r.cfra;
+  preview_data.datablock = nullptr;
   preview_data.sizex = preview_sized->sizex;
   preview_data.sizey = preview_sized->sizey;
 
@@ -1013,7 +1013,7 @@ static Scene *gpencil_preview_scene_create(const struct ObjectPreviewData *previ
   /* Grease pencil needs to set the scene to the current frame or the strokes
    * will not be visible in the preview.  */
   CFRA = preview_data->cfra;
-  ViewLayer *view_layer = scene->view_layers.first;
+  ViewLayer *view_layer = (ViewLayer *)scene->view_layers.first;
   Depsgraph *depsgraph = DEG_graph_new(
       preview_data->pr_main, scene, view_layer, DAG_EVAL_VIEWPORT);
 
@@ -1071,15 +1071,15 @@ static void gpencil_preview_render(IconPreview *preview, IconPreviewSize *previe
                            f_min :
                            preview->scene->r.cfra;
 
-  struct ObjectPreviewData preview_data = {
-      .pr_main = preview_main,
-      /* Act on a copy. */
-      .object = NULL,
-      .datablock = (ID *)preview->id_copy,
-      .cfra = framenum,
-      .sizex = preview_sized->sizex,
-      .sizey = preview_sized->sizey,
-  };
+  struct ObjectPreviewData preview_data = {};
+  preview_data.pr_main = preview_main;
+  /* Act on a copy. */
+  preview_data.object = nullptr;
+  preview_data.datablock = (ID *)preview->id_copy;
+  preview_data.cfra = framenum;
+  preview_data.sizex = preview_sized->sizex;
+  preview_data.sizey = preview_sized->sizey;
+
   Depsgraph *depsgraph;
   Scene *scene = gpencil_preview_scene_create(&preview_data, &depsgraph);
 
