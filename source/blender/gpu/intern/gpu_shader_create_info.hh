@@ -147,6 +147,22 @@ enum class Interpolation {
   NO_PERSPECTIVE,
 };
 
+/** Input layout for geometry shader. */
+enum class InputLayout {
+  POINTS = 0,
+  LINES,
+  LINES_ADJACENCY,
+  TRIANGLES,
+  TRIANGLES_ADJACENCY,
+};
+
+/** Output layout for geometry shader. */
+enum class OutputLayout {
+  POINTS = 0,
+  LINE_STRIP,
+  TRIANGLE_STRIP,
+};
+
 struct StageInterfaceInfo {
   struct InOut {
     Interpolation interp;
@@ -215,6 +231,17 @@ struct ShaderCreateInfo {
     StringRefNull name;
   };
   Vector<VertIn> vertex_inputs_;
+
+  struct GeomIn {
+    InputLayout layout;
+  };
+  GeomIn geom_in_;
+
+  struct GeomOut {
+    OutputLayout layout;
+    int max_vertices;
+  };
+  GeomOut geom_out_;
 
   struct FragOut {
     int index;
@@ -315,6 +342,14 @@ struct ShaderCreateInfo {
   Self &vertex_out(StageInterfaceInfo &interface)
   {
     vertex_out_interfaces_.append(&interface);
+    return *(Self *)this;
+  }
+
+  Self &geometry_layout(InputLayout layout_in, OutputLayout layout_out, int max_vertices)
+  {
+    geom_in_.layout = layout_in;
+    geom_out_.layout = layout_out;
+    geom_out_.max_vertices = max_vertices;
     return *(Self *)this;
   }
 

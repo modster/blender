@@ -68,6 +68,7 @@ class GLShader : public Shader {
   std::string vertex_interface_declare(const shader::ShaderCreateInfo &info) const override;
   std::string fragment_interface_declare(const shader::ShaderCreateInfo &info) const override;
   std::string geometry_interface_declare(const shader::ShaderCreateInfo &info) const override;
+  std::string geometry_layout_declare(const shader::ShaderCreateInfo &info) const override;
 
   /** Should be called before linking. */
   void transform_feedback_names_set(Span<const char *> name_list,

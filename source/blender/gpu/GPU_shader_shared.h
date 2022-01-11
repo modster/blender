@@ -22,3 +22,16 @@ struct NodeLinkInstanceData {
   float arrowSize;
   float2 pad;
 };
+
+struct GPencilStrokeData {
+  float2 viewport;
+  float pixsize;
+  float objscale;
+  float pixfactor;
+  int xraymode;
+  int caps_start;
+  int caps_end;
+  bool1 keep_size;
+  bool1 fill_stroke;
+  float2 pad;
+};

@@ -438,6 +438,7 @@ shaders/infos/gpu_shader_2D_area_borders_info.hh
 shaders/infos/gpu_shader_instance_varying_color_varying_size_info.hh
 shaders/infos/gpu_shader_3D_point_info.hh
 shaders/infos/gpu_shader_2D_nodelink_info.hh
+shaders/infos/gpu_shader_gpencil_stroke_info.hh
 #shaders/infos/gpu_shader_todo_info.hh
 )
 

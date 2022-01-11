@@ -48,16 +48,3 @@ GPU_SHADER_CREATE_INFO(gpu_shader_2D_widget_shadow)
             .frag = datatoc_gpu_shader_2D_widget_shadow_frag_glsl,
 },
 */
-GPU_SHADER_CREATE_INFO(gpu_shader_gpencil_stroke)
-    .vertex_source("gpu_shader_gpencil_stroke_vert.glsl")
-    .geometry_source("gpu_shader_gpencil_stroke_geom.glsl")
-    .fragment_source("gpu_shader_gpencil_stroke_frag.glsl")
-    .do_static_compilation(true);
-/*
-    [GPU_SHADER_GPENCIL_STROKE] = {
-        .name = "GPU_SHADER_GPENCIL_STROKE",
-        .vert = datatoc_gpu_shader_gpencil_stroke_vert_glsl,
-        .geom = datatoc_gpu_shader_gpencil_stroke_geom_glsl,
-        .frag = datatoc_gpu_shader_gpencil_stroke_frag_glsl,
-},
-*/

@@ -354,6 +354,7 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
   if (!info.geometry_source_.is_empty()) {
     uint32_t builtins = 0;
     std::string interface = shader->geometry_interface_declare(info);
+    std::string layout = shader->geometry_layout_declare(info);
     char *code = gpu_shader_dependency_get_resolved_source(info.geometry_source_.c_str(),
                                                            &builtins);
 
@@ -368,6 +369,7 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
       sources.append(types);
     }
     sources.append(resources.c_str());
+    sources.append(layout.c_str());
     sources.append(interface.c_str());
     sources.append(code);
 

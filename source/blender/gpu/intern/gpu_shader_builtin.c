@@ -338,11 +338,8 @@ static const GPUShaderStages builtin_shader_stages[GPU_SHADER_BUILTIN_LEN] = {
             .defs = "#define UNIFORM_SCALE\n",
         },
 
-    [GPU_SHADER_2D_AREA_BORDERS] =
-        {
-            .name = "GPU_SHADER_2D_AREA_BORDERS",
-            .create_info = "gpu_shader_2D_area_borders"
-        },
+    [GPU_SHADER_2D_AREA_BORDERS] = {.name = "GPU_SHADER_2D_AREA_BORDERS",
+                                    .create_info = "gpu_shader_2D_area_borders"},
     [GPU_SHADER_2D_WIDGET_BASE] =
         {
             .name = "GPU_SHADER_2D_WIDGET_BASE",
@@ -368,13 +365,8 @@ static const GPUShaderStages builtin_shader_stages[GPU_SHADER_BUILTIN_LEN] = {
     [GPU_SHADER_2D_NODELINK_INST] = {.name = "GPU_SHADER_2D_NODELINK_INST",
                                      .create_info = "gpu_shader_2D_nodelink_inst"},
 
-    [GPU_SHADER_GPENCIL_STROKE] =
-        {
-            .name = "GPU_SHADER_GPENCIL_STROKE",
-            .vert = datatoc_gpu_shader_gpencil_stroke_vert_glsl,
-            .geom = datatoc_gpu_shader_gpencil_stroke_geom_glsl,
-            .frag = datatoc_gpu_shader_gpencil_stroke_frag_glsl,
-        },
+    [GPU_SHADER_GPENCIL_STROKE] = {.name = "GPU_SHADER_GPENCIL_STROKE",
+                                   .create_info = "gpu_shader_gpencil_stroke"},
 };
 
 GPUShader *GPU_shader_get_builtin_shader_with_config(eGPUBuiltinShader shader,

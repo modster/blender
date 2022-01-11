@@ -125,6 +125,38 @@ static const char *to_string(const Type &type)
   }
 }
 
+static const char *to_string(const InputLayout &layout)
+{
+  switch (layout) {
+    case InputLayout::POINTS:
+      return "points";
+    case InputLayout::LINES:
+      return "lines";
+    case InputLayout::LINES_ADJACENCY:
+      return "lines_adjacency";
+    case InputLayout::TRIANGLES:
+      return "triangles";
+    case InputLayout::TRIANGLES_ADJACENCY:
+      return "triangles_adjacency";
+    default:
+      return "unknown";
+  }
+}
+
+static const char *to_string(const OutputLayout &layout)
+{
+  switch (layout) {
+    case OutputLayout::POINTS:
+      return "points";
+    case OutputLayout::LINE_STRIP:
+      return "line_strip";
+    case OutputLayout::TRIANGLE_STRIP:
+      return "triangle_strip";
+    default:
+      return "unknown";
+  }
+}
+
 static void print_image_type(std::ostream &os,
                              const ImageType &type,
                              const ShaderCreateInfo::Resource::BindType bind_type)
@@ -417,6 +449,17 @@ std::string GLShader::fragment_interface_declare(const ShaderCreateInfo &info) c
   ss << "\n";
   std::cout << "------------- fragment_interface_declare -------------\n";
   std::cout << ss.str();
+  return ss.str();
+}
+
+std::string GLShader::geometry_layout_declare(const ShaderCreateInfo &info) const
+{
+  std::stringstream ss;
+  ss << "\n/* Layout. */\n";
+  ss << "layout(" << to_string(info.geom_in_.layout) << ") in;\n";
+  ss << "layout(" << to_string(info.geom_out_.layout)
+     << ", max_vertices = " << info.geom_out_.max_vertices << ") out;\n";
+  ss << "\n";
   return ss.str();
 }
 
