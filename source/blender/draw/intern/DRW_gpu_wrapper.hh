@@ -441,6 +441,7 @@ class Texture : NonCopyable {
   /* To be able to use it with DRW_shgroup_uniform_texture(). */
   operator GPUTexture *() const
   {
+    BLI_assert(tx_ != nullptr);
     return tx_;
   }
 
