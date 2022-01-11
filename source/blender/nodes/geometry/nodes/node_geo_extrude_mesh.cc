@@ -14,6 +14,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
+#include "BLI_disjoint_set.hh"
 #include "BLI_task.hh"
 #include "BLI_vector_set.hh"
 
@@ -184,12 +185,10 @@ template<typename T> void copy_with_mask(MutableSpan<T> dst, Span<T> src, IndexM
 template<typename T, typename GetMixIndicesFn>
 void copy_with_mixing(MutableSpan<T> dst, Span<T> src, GetMixIndicesFn get_mix_indices_fn)
 {
-  BLI_assert(dst.size() == mask.size());
   threading::parallel_for(dst.index_range(), 512, [&](const IndexRange range) {
     attribute_math::DefaultMixer<T> mixer{dst.slice(range)};
     for (const int i_dst : IndexRange(range.size())) {
-      Span<int> src_indices = get_mix_indices_fn(range[i_dst]);
-      for (const int i_src : src_indices) {
+      for (const int i_src : get_mix_indices_fn(range[i_dst])) {
         mixer.mix_in(i_dst, src[i_src]);
       }
     }
@@ -261,9 +260,10 @@ static void extrude_mesh_vertices(MeshComponent &component,
         }
         case ATTR_DOMAIN_EDGE: {
           /* New edge values are mixed from of all the edges connected to the source vertex. */
-          copy_with_mixing(data.slice(new_edge_range), data.as_span(), [&](const int i) {
-            return vert_to_edge_map[selection[i]];
-          });
+          copy_with_mixing(
+              data.slice(new_edge_range), data.as_span(), [&](const int i) -> Span<int> {
+                return vert_to_edge_map[selection[i]];
+              });
           break;
         }
         default:
@@ -515,17 +515,19 @@ static void extrude_mesh_edges(MeshComponent &component,
 
           /* Edges connected to original vertices mix values of selected connected edges. */
           MutableSpan<T> connect_data = data.slice(connect_edge_range);
-          copy_with_mixing(connect_data, duplicate_data.as_span(), [&](const int i_new_vert) {
-            return new_vert_to_duplicate_edge_map[i_new_vert];
-          });
+          copy_with_mixing(
+              connect_data, duplicate_data.as_span(), [&](const int i_new_vert) -> Span<int> {
+                return new_vert_to_duplicate_edge_map[i_new_vert];
+              });
           break;
         }
         case ATTR_DOMAIN_FACE: {
           /* Attribute values for new faces are a mix of the values of faces connected to the its
            * original edge.  */
-          copy_with_mixing(data.slice(new_poly_range), data.as_span(), [&](const int i) {
-            return edge_to_poly_map[edge_selection[i]];
-          });
+          copy_with_mixing(
+              data.slice(new_poly_range), data.as_span(), [&](const int i) -> Span<int> {
+                return edge_to_poly_map[edge_selection[i]];
+              });
 
           break;
         }
@@ -659,6 +661,7 @@ static void extrude_mesh_face_regions(MeshComponent &component,
   const IndexMask poly_selection = poly_evaluator.get_evaluated_selection_as_mask();
   const VArray<float3> &poly_offsets = poly_evaluator.get_evaluated<float3>(0);
 
+  /* Mix the offsets from the face domain to the vertex domain. */
   Array<float3> vert_offsets;
   if (!poly_offsets.is_single()) {
     vert_offsets.reinitialize(orig_vert_size);
@@ -672,6 +675,8 @@ static void extrude_mesh_face_regions(MeshComponent &component,
     }
     mixer.finalize();
   }
+
+  DisjointSet regions(poly_selection.size());
 
   /* All vertices that are connected to the selected polygons. */
   VectorSet<int> all_selected_verts;
@@ -842,7 +847,7 @@ static void extrude_mesh_face_regions(MeshComponent &component,
 
           /* Edges connected to original vertices mix values of selected connected edges. */
           MutableSpan<T> connect_data = data.slice(connect_edge_range);
-          copy_with_mixing(connect_data, duplicate_data.as_span(), [&](const int i) {
+          copy_with_mixing(connect_data, duplicate_data.as_span(), [&](const int i) -> Span<int> {
             return new_vert_to_duplicate_edge_map[i];
           });
           break;
