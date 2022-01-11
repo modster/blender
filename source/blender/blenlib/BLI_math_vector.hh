@@ -60,6 +60,26 @@ namespace blender::math {
 
 #define BLI_ENABLE_IF_INT_VEC(T) BLI_ENABLE_IF((std::is_integral<typename T::base_type>::value))
 
+template<typename T> inline bool is_zero(const T &a)
+{
+  for (int i = 0; i < T::type_length; i++) {
+    if (a[i] != bT(0)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+template<typename T> inline bool is_any_zero(const T &a)
+{
+  for (int i = 0; i < T::type_length; i++) {
+    if (a[i] == bT(0)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 template<typename T> inline T abs(const T &a)
 {
   T result;
@@ -255,7 +275,7 @@ inline T refract(const T &incident, const T &normal, const bT eta)
 
 template<typename T, BLI_ENABLE_IF_FLT_VEC(T)> inline T project(const T &p, const T &v_proj)
 {
-  if (UNLIKELY(v_proj.is_zero())) {
+  if (UNLIKELY(is_zero(v_proj))) {
     return T(0.0f);
   }
   return v_proj * (dot(p, v_proj) / dot(v_proj, v_proj));

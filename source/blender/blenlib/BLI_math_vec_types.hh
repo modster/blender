@@ -335,7 +335,7 @@ template<typename T, int Size> struct vec_base : public vec_struct_base<T, Size>
 
   friend vec_base operator/(const vec_base &a, const vec_base &b)
   {
-    BLI_assert(!b.is_any_zero());
+    BLI_assert(!math::is_any_zero(b));
     BLI_VEC_OP_IMPL(ret, i, ret[i] = a[i] / b[i]);
   }
 
@@ -347,7 +347,7 @@ template<typename T, int Size> struct vec_base : public vec_struct_base<T, Size>
 
   friend vec_base operator/(T a, const vec_base &b)
   {
-    BLI_assert(!b.is_any_zero());
+    BLI_assert(!math::is_any_zero(b));
     BLI_VEC_OP_IMPL(ret, i, ret[i] = a / b[i]);
   }
 
@@ -359,7 +359,7 @@ template<typename T, int Size> struct vec_base : public vec_struct_base<T, Size>
 
   vec_base &operator/=(const vec_base &b)
   {
-    BLI_assert(!b.is_any_zero());
+    BLI_assert(!math::is_any_zero(b));
     BLI_VEC_OP_IMPL_SELF(i, (*this)[i] /= b[i]);
   }
 
@@ -523,26 +523,6 @@ template<typename T, int Size> struct vec_base : public vec_struct_base<T, Size>
   friend bool operator!=(const vec_base &a, const vec_base &b)
   {
     return !(a == b);
-  }
-
-  bool is_zero() const
-  {
-    for (int i = 0; i < Size; i++) {
-      if ((*this)[i] != T(0)) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  bool is_any_zero() const
-  {
-    for (int i = 0; i < Size; i++) {
-      if ((*this)[i] == T(0)) {
-        return true;
-      }
-    }
-    return false;
   }
 
   /** Misc. */

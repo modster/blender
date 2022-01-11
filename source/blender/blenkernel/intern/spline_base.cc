@@ -209,7 +209,7 @@ static float3 direction_bisect(const float3 &prev, const float3 &middle, const f
   const float3 dir_next = normalize(next - middle);
 
   const float3 result = normalize(dir_prev + dir_next);
-  if (UNLIKELY(result.is_zero())) {
+  if (UNLIKELY(is_zero(result))) {
     return float3(0.0f, 0.0f, 1.0f);
   }
   return result;
@@ -311,7 +311,7 @@ static float3 calculate_next_normal(const float3 &last_normal,
 {
   using namespace blender::math;
 
-  if (last_tangent.is_zero() || current_tangent.is_zero()) {
+  if (is_zero(last_tangent) || is_zero(current_tangent)) {
     return last_normal;
   }
   const float angle = angle_normalized_v3v3(last_tangent, current_tangent);

@@ -49,7 +49,7 @@ static bool use_translate(const float3 rotation, const float3 scale)
 
 static void translate_mesh(Mesh &mesh, const float3 translation)
 {
-  if (!translation.is_zero()) {
+  if (!math::is_zero(translation)) {
     BKE_mesh_translate(&mesh, translation, false);
   }
 }
