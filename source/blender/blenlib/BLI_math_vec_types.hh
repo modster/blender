@@ -93,7 +93,7 @@ template<typename T, int Size> struct vec_base : public vec_struct_base<T, Size>
     }
   }
 
-/* Workaround issue with template. */
+/* Workaround issue with template BLI_ENABLE_IF((Size == 2)) not working. */
 #define BLI_ENABLE_IF_VEC(_size, _test) int S = _size, BLI_ENABLE_IF((S _test))
 
   template<BLI_ENABLE_IF_VEC(Size, == 2)> vec_base(T _x, T _y)
