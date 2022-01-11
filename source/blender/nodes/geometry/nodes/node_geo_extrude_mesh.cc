@@ -515,19 +515,17 @@ static void extrude_mesh_edges(MeshComponent &component,
 
           /* Edges connected to original vertices mix values of selected connected edges. */
           MutableSpan<T> connect_data = data.slice(connect_edge_range);
-          copy_with_mixing(
-              connect_data, duplicate_data.as_span(), [&](const int i_new_vert) -> Span<int> {
-                return new_vert_to_duplicate_edge_map[i_new_vert];
-              });
+          copy_with_mixing(connect_data, duplicate_data.as_span(), [&](const int i_new_vert) {
+            return new_vert_to_duplicate_edge_map[i_new_vert].as_span();
+          });
           break;
         }
         case ATTR_DOMAIN_FACE: {
           /* Attribute values for new faces are a mix of the values of faces connected to the its
            * original edge.  */
-          copy_with_mixing(
-              data.slice(new_poly_range), data.as_span(), [&](const int i) -> Span<int> {
-                return edge_to_poly_map[edge_selection[i]];
-              });
+          copy_with_mixing(data.slice(new_poly_range), data.as_span(), [&](const int i) {
+            return edge_to_poly_map[edge_selection[i]].as_span();
+          });
 
           break;
         }
@@ -577,8 +575,8 @@ static void extrude_mesh_edges(MeshComponent &component,
               mixer.finalize();
 
               /* Instead of replicating the order in #fill_quad_consistent_direction here, it's
-               * simpler (though probably not faster) to just match the corner data based on the
-               * vertex indices. */
+               * simpler (though probably slower) to just match the corner data based on the vertex
+               * indices. */
               for (const int i : IndexRange(4 * i_edge_selection, 4)) {
                 if (ELEM(new_loops[i].v, new_vert_1, orig_vert_1)) {
                   new_data[i] = side_poly_corner_data.first();
@@ -847,8 +845,8 @@ static void extrude_mesh_face_regions(MeshComponent &component,
 
           /* Edges connected to original vertices mix values of selected connected edges. */
           MutableSpan<T> connect_data = data.slice(connect_edge_range);
-          copy_with_mixing(connect_data, duplicate_data.as_span(), [&](const int i) -> Span<int> {
-            return new_vert_to_duplicate_edge_map[i];
+          copy_with_mixing(connect_data, duplicate_data.as_span(), [&](const int i) {
+            return new_vert_to_duplicate_edge_map[i].as_span();
           });
           break;
         }
@@ -886,8 +884,8 @@ static void extrude_mesh_face_regions(MeshComponent &component,
               }
 
               /* Instead of replicating the order in #fill_quad_consistent_direction here, it's
-               * simpler (though probably not faster) to just match the corner data based on the
-               * vertex indices. */
+               * simpler (though probably slower) to just match the corner data based on the vertex
+               * indices. */
               for (const int i : IndexRange(4 * i_edge_selection, 4)) {
                 if (ELEM(new_loops[i].v, new_vert_1, orig_vert_1)) {
                   new_data[i] = data_1;
