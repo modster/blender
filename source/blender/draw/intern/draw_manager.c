@@ -2793,7 +2793,6 @@ void DRW_draw_depth_object(
 
       GPUUniformBuf *ubo = NULL;
       if (use_clipping_planes) {
-        GPU_batch_uniform_4fv_array(batch, "WorldClipPlanes", 6, planes.world);
         ubo = GPU_uniformbuf_create_ex(sizeof(struct GPUClipPlanes), &planes, __func__);
         GPU_batch_uniformbuf_bind(batch, "clipPlanes", ubo);
       }

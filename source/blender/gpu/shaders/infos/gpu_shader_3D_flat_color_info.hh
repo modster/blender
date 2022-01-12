@@ -16,5 +16,4 @@ GPU_SHADER_CREATE_INFO(gpu_shader_3D_flat_color)
 
 GPU_SHADER_CREATE_INFO(gpu_shader_3D_flat_color_clipped)
     .additional_info("gpu_shader_3D_flat_color")
-    .additional_info("gpu_clip_planes")
-    .do_static_compilation(true);
+    .additional_info("gpu_clip_planes");

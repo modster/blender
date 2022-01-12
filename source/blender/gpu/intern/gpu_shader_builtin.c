@@ -237,12 +237,9 @@ static const GPUShaderStages builtin_shader_stages[GPU_SHADER_BUILTIN_LEN] = {
             .vert = datatoc_gpu_shader_3D_smooth_color_vert_glsl,
             .frag = datatoc_gpu_shader_3D_smooth_color_frag_glsl,
         },
-    [GPU_SHADER_3D_DEPTH_ONLY] =
-        {
-            .name = "GPU_SHADER_3D_DEPTH_ONLY",
-            .vert = datatoc_gpu_shader_3D_vert_glsl,
-            .frag = datatoc_gpu_shader_depth_only_frag_glsl,
-        },
+    [GPU_SHADER_3D_DEPTH_ONLY] = {.name = "GPU_SHADER_3D_DEPTH_ONLY",
+                                  .create_info = "gpu_shader_3d_depth_only",
+                                  .clipped_create_info = "gpu_shader_3d_depth_only_clipped"},
     [GPU_SHADER_3D_CLIPPED_UNIFORM_COLOR] =
         {
             .name = "GPU_SHADER_3D_CLIPPED_UNIFORM_COLOR",

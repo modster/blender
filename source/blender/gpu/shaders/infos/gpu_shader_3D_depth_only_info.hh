@@ -9,3 +9,7 @@ GPU_SHADER_CREATE_INFO(gpu_shader_3D_depth_only)
     .vertex_source("gpu_shader_3D_vert.glsl")
     .fragment_source("gpu_shader_depth_only_frag.glsl")
     .do_static_compilation(true);
+
+GPU_SHADER_CREATE_INFO(gpu_shader_3D_depth_only_clipped)
+    .additional_info("gpu_shader_3D_depth_only")
+    .additional_info("gpu_clip_planes");
