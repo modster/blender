@@ -47,6 +47,10 @@ GPU_SHADER_CREATE_INFO(gpu_shader_3D_point_uniform_size_uniform_color_aa)
     .vertex_source("gpu_shader_3D_point_uniform_size_aa_vert.glsl")
     .fragment_source("gpu_shader_point_uniform_color_aa_frag.glsl")
     .do_static_compilation(true);
+
+GPU_SHADER_CREATE_INFO(gpu_shader_3D_point_uniform_size_uniform_color_aa_clipped)
+    .additional_info("gpu_shader_3D_point_uniform_size_uniform_color_aa")
+    .additional_info("gpu_clip_planes");
 /*
     [GPU_SHADER_3D_POINT_UNIFORM_SIZE_UNIFORM_COLOR_AA] =
         {

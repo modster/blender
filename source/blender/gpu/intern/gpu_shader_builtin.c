@@ -290,33 +290,23 @@ static const GPUShaderStages builtin_shader_stages[GPU_SHADER_BUILTIN_LEN] = {
     [GPU_SHADER_2D_POINT_UNIFORM_SIZE_UNIFORM_COLOR_AA] =
         {
             .name = "GPU_SHADER_2D_POINT_UNIFORM_SIZE_UNIFORM_COLOR_AA",
-            .vert = datatoc_gpu_shader_2D_point_uniform_size_aa_vert_glsl,
-            .frag = datatoc_gpu_shader_point_uniform_color_aa_frag_glsl,
+            .create_info = "gpu_shader_2D_point_uniform_size_uniform_color_aa",
         },
     [GPU_SHADER_2D_POINT_UNIFORM_SIZE_UNIFORM_COLOR_OUTLINE_AA] =
         {
             .name = "GPU_SHADER_2D_POINT_UNIFORM_SIZE_UNIFORM_COLOR_OUTLINE_AA",
-            .vert = datatoc_gpu_shader_2D_point_uniform_size_outline_aa_vert_glsl,
-            .frag = datatoc_gpu_shader_point_uniform_color_outline_aa_frag_glsl,
+            .create_info = "gpu_shader_2D_point_uniform_size_uniform_color_outline_aa",
         },
     [GPU_SHADER_3D_POINT_FIXED_SIZE_VARYING_COLOR] =
-        {
-            .name = "GPU_SHADER_3D_POINT_FIXED_SIZE_VARYING_COLOR",
-            .vert = datatoc_gpu_shader_3D_point_fixed_size_varying_color_vert_glsl,
-            .frag = datatoc_gpu_shader_point_varying_color_frag_glsl,
-        },
+        {.name = "GPU_SHADER_3D_POINT_FIXED_SIZE_VARYING_COLOR",
+         .create_info = "gpu_shader_3D_point_fixed_size_varying_color"},
     [GPU_SHADER_3D_POINT_VARYING_SIZE_VARYING_COLOR] =
-        {
-            .name = "GPU_SHADER_3D_POINT_VARYING_SIZE_VARYING_COLOR",
-            .vert = datatoc_gpu_shader_3D_point_varying_size_varying_color_vert_glsl,
-            .frag = datatoc_gpu_shader_point_varying_color_frag_glsl,
-        },
+        {.name = "GPU_SHADER_3D_POINT_VARYING_SIZE_VARYING_COLOR",
+         .create_info = "gpu_shader_3D_point_varying_size_varying_color"},
     [GPU_SHADER_3D_POINT_UNIFORM_SIZE_UNIFORM_COLOR_AA] =
-        {
-            .name = "GPU_SHADER_3D_POINT_UNIFORM_SIZE_UNIFORM_COLOR_AA",
-            .vert = datatoc_gpu_shader_3D_point_uniform_size_aa_vert_glsl,
-            .frag = datatoc_gpu_shader_point_uniform_color_aa_frag_glsl,
-        },
+        {.name = "GPU_SHADER_3D_POINT_UNIFORM_SIZE_UNIFORM_COLOR_AA",
+         .create_info = "gpu_shader_3D_point_uniform_size_uniform_color_aa",
+         .clipped_create_info = "gpu_shader_3D_point_uniform_size_uniform_color_aa_clipped"},
 
     [GPU_SHADER_INSTANCE_VARIYING_COLOR_VARIYING_SIZE] =
         {
