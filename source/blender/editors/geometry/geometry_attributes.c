@@ -21,6 +21,8 @@
  * \ingroup edgeometry
  */
 
+#include "BLI_math.h"
+
 #include "BKE_attribute.h"
 #include "BKE_context.h"
 
@@ -121,12 +123,7 @@ static void next_color_attr(struct ID *id, CustomDataLayer *layer, bool is_rende
   int length = BKE_id_attributes_length(id, domain_mask, type_mask);
   int idx = BKE_id_attribute_index_from_ref(id, ref, domain_mask, type_mask);
 
-  if (idx == length - 1) {
-    idx = MAX2(idx - 1, 0);
-  }
-  else {
-    idx++;
-  }
+  idx = mod_i(idx + 1, length);
 
   BKE_id_attribute_ref_from_index(id, idx, domain_mask, type_mask, ref);
 }
@@ -181,10 +178,6 @@ static int geometry_attribute_remove_exec(bContext *C, wmOperator *op)
   Object *ob = ED_object_context(C);
   ID *id = ob->data;
   CustomDataLayer *layer = BKE_id_attributes_active_get(id);
-
-  if (layer == NULL) {
-    return OPERATOR_CANCELLED;
-  }
 
   next_color_attrs(id, layer);
 
