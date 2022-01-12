@@ -30,6 +30,7 @@
 #include "BKE_context.h"
 #include "BKE_global.h"
 #include "BKE_idtype.h"
+#include "BKE_lib_id.h"
 #include "BKE_lib_remap.h"
 #include "BKE_main.h"
 #include "BKE_node.h"
@@ -103,17 +104,32 @@ struct Context {
 TEST(lib_remap, embedded_ids_can_not_be_remapped)
 {
   Context context;
-  bNodeTree other_tree = {nullptr};
-  IDType_ID_NT.init_data(&other_tree.id);
+  bNodeTree *other_tree = static_cast<bNodeTree *>(BKE_id_new_nomain(ID_NT, nullptr));
 
   EXPECT_NE(context.scene, nullptr);
   EXPECT_NE(context.composite_nodetree, nullptr);
   EXPECT_EQ(context.composite_nodetree, context.scene->nodetree);
 
-  BKE_libblock_remap(context.bmain, context.composite_nodetree, &other_tree, 0);
+  BKE_libblock_remap(context.bmain, context.composite_nodetree, other_tree, 0);
 
   EXPECT_EQ(context.composite_nodetree, context.scene->nodetree);
-  EXPECT_NE(context.scene->nodetree, &other_tree);
+  EXPECT_NE(context.scene->nodetree, other_tree);
+
+  BKE_id_free(nullptr, other_tree);
+}
+
+TEST(lib_remap, embedded_ids_can_not_be_deleted)
+{
+  Context context;
+
+  EXPECT_NE(context.scene, nullptr);
+  EXPECT_NE(context.composite_nodetree, nullptr);
+  EXPECT_EQ(context.composite_nodetree, context.scene->nodetree);
+
+  BKE_libblock_remap(context.bmain, context.composite_nodetree, nullptr, 0);
+
+  EXPECT_EQ(context.composite_nodetree, context.scene->nodetree);
+  EXPECT_NE(context.scene->nodetree, nullptr);
 }
 
 }  // namespace blender::bke::tests
