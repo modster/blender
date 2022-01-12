@@ -187,14 +187,10 @@ static const GPUShaderStages builtin_shader_stages[GPU_SHADER_BUILTIN_LEN] = {
             .create_info = "gpu_shader_2D_diag_stripes",
         },
 
-    [GPU_SHADER_2D_UNIFORM_COLOR] =
-        {
-            .name = "GPU_SHADER_2D_UNIFORM_COLOR",
-            .vert = datatoc_gpu_shader_2D_vert_glsl,
-            .frag = datatoc_gpu_shader_uniform_color_frag_glsl,
-        },
+    [GPU_SHADER_2D_UNIFORM_COLOR] = {.name = "GPU_SHADER_2D_UNIFORM_COLOR",
+                                     .create_info = "gpu_shader_2D_uniform_color"},
     [GPU_SHADER_2D_FLAT_COLOR] = {.name = "GPU_SHADER_2D_FLAT_COLOR",
-                                  .create_info = "gpu_shader_2D_uniform_color"},
+                                  .create_info = "gpu_shader_2D_flat_color"},
     [GPU_SHADER_2D_SMOOTH_COLOR] = {.name = "GPU_SHADER_2D_SMOOTH_COLOR",
                                     .create_info = "gpu_shader_2D_smooth_color"},
     [GPU_SHADER_2D_IMAGE_OVERLAYS_MERGE] = {.name = "GPU_SHADER_2D_IMAGE_OVERLAYS_MERGE",
