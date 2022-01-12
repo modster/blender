@@ -3070,7 +3070,6 @@ static bool rna_NodeSocket_is_output_get(PointerRNA *ptr)
 
 static void rna_NodeSocket_link_limit_set(PointerRNA *ptr, int value)
 {
-  /* Does not have any effect if the link limit is defined in the socket type. */
   bNodeSocket *sock = ptr->data;
   sock->limit = (value == 0 ? 0xFFF : value);
 }
@@ -9489,7 +9488,12 @@ static void def_geo_triangulate(StructRNA *srna)
        "SHORTEST_DIAGONAL",
        0,
        "Shortest Diagonal",
-       "Split the quads based on the distance between the vertices"},
+       "Split the quads along their shortest diagonal"},
+      {GEO_NODE_TRIANGULATE_QUAD_LONGEDGE,
+       "LONGEST_DIAGONAL",
+       0,
+       "Longest Diagonal",
+       "Split the quads along their longest diagonal"},
       {0, NULL, 0, NULL, NULL},
   };
 
