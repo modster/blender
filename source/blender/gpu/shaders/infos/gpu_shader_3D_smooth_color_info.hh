@@ -12,3 +12,7 @@ GPU_SHADER_CREATE_INFO(gpu_shader_3D_smooth_color)
     .fragment_source("gpu_shader_3D_smooth_color_frag.glsl")
     .additional_info("gpu_srgb_to_framebuffer_space")
     .do_static_compilation(true);
+
+GPU_SHADER_CREATE_INFO(gpu_shader_3D_smooth_color_clipped)
+    .additional_info("gpu_shader_3D_smooth_color")
+    .additional_info("gpu_clip_planes");

@@ -426,7 +426,7 @@ shaders/infos/gpu_shader_text_info.hh
 shaders/infos/gpu_shader_keyframe_shape_info.hh
 shaders/infos/gpu_shader_3D_flat_color_info.hh
 shaders/infos/gpu_shader_3D_uniform_color_info.hh
-#shaders/infos/gpu_shader_3D_smooth_color_info.hh
+shaders/infos/gpu_shader_3D_smooth_color_info.hh
 shaders/infos/gpu_shader_3D_depth_only_info.hh
 #shaders/infos/gpu_shader_3D_polyline_info.hh !TODO
 #shaders/infos/gpu_shader_2D_line_dashed_uniform_color_info.hh
