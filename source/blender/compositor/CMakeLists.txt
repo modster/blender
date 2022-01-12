@@ -39,6 +39,7 @@ set(INC
   ../../../extern/clew/include
   ../../../intern/atomic
   ../../../intern/guardedalloc
+  ../../../intern/clog
 )
 
 set(INC_SYS
@@ -242,6 +243,8 @@ set(SRC
   nodes/COM_ColorToBWNode.h
   nodes/COM_ConvertAlphaNode.cc
   nodes/COM_ConvertAlphaNode.h
+  nodes/COM_ConvertColorSpaceNode.cc
+  nodes/COM_ConvertColorSpaceNode.h
   nodes/COM_GammaNode.cc
   nodes/COM_GammaNode.h
   nodes/COM_HueSaturationValueCorrectNode.cc
@@ -567,6 +570,8 @@ set(SRC
 
   operations/COM_DotproductOperation.cc
   operations/COM_DotproductOperation.h
+  operations/COM_ConvertColorSpaceOperation.cc
+  operations/COM_ConvertColorSpaceOperation.h
 
   # Matte operation
   operations/COM_BoxMaskOperation.cc
@@ -639,6 +644,15 @@ if(WITH_OPENIMAGEDENOISE)
 endif()
 
 blender_add_lib(bf_compositor "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
+
+if(WITH_UNITY_BUILD)
+  set_target_properties(bf_compositor PROPERTIES UNITY_BUILD ON)
+  set_target_properties(bf_compositor PROPERTIES UNITY_BUILD_BATCH_SIZE 10)
+endif()
+
+if(COMMAND target_precompile_headers)
+  target_precompile_headers(bf_compositor PRIVATE COM_precomp.h)
+endif()
 
 if(CXX_WARN_NO_SUGGEST_OVERRIDE)
   target_compile_options(bf_compositor PRIVATE "-Wsuggest-override")
