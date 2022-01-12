@@ -221,12 +221,12 @@ static const GPUShaderStages builtin_shader_stages[GPU_SHADER_BUILTIN_LEN] = {
     [GPU_SHADER_3D_UNIFORM_COLOR] =
         {
             .name = "GPU_SHADER_3D_UNIFORM_COLOR",
-            .vert = datatoc_gpu_shader_3D_vert_glsl,
-            .frag = datatoc_gpu_shader_uniform_color_frag_glsl,
+            .create_info = "gpu_shader_3D_uniform_color",
+            .clipped_create_info = "gpu_shader_3D_uniform_color_clipped",
         },
     [GPU_SHADER_3D_FLAT_COLOR] = {.name = "GPU_SHADER_3D_FLAT_COLOR",
-                                  .create_info = "gpu_shader_3d_flat_color",
-                                  .clipped_create_info = "gpu_shader_3d_flat_color_clipped"},
+                                  .create_info = "gpu_shader_3D_flat_color",
+                                  .clipped_create_info = "gpu_shader_3D_flat_color_clipped"},
     [GPU_SHADER_3D_SMOOTH_COLOR] =
         {
             .name = "GPU_SHADER_3D_SMOOTH_COLOR",
@@ -234,8 +234,8 @@ static const GPUShaderStages builtin_shader_stages[GPU_SHADER_BUILTIN_LEN] = {
             .frag = datatoc_gpu_shader_3D_smooth_color_frag_glsl,
         },
     [GPU_SHADER_3D_DEPTH_ONLY] = {.name = "GPU_SHADER_3D_DEPTH_ONLY",
-                                  .create_info = "gpu_shader_3d_depth_only",
-                                  .clipped_create_info = "gpu_shader_3d_depth_only_clipped"},
+                                  .create_info = "gpu_shader_3D_depth_only",
+                                  .clipped_create_info = "gpu_shader_3D_depth_only_clipped"},
     [GPU_SHADER_3D_CLIPPED_UNIFORM_COLOR] =
         {
             .name = "GPU_SHADER_3D_CLIPPED_UNIFORM_COLOR",

@@ -11,7 +11,6 @@ GPU_SHADER_CREATE_INFO(gpu_shader_3D_uniform_color)
     .additional_info("gpu_srgb_to_framebuffer_space")
     .do_static_compilation(true);
 
-GPU_SHADER_CREATE_INFO(gpu_shader_3D_flat_color_clipped)
+GPU_SHADER_CREATE_INFO(gpu_shader_3D_uniform_color_clipped)
     .additional_info("gpu_shader_3D_uniform_color")
-    .additional_info("gpu_clip_planes")
-    .do_static_compilation(true);
+    .additional_info("gpu_clip_planes");

@@ -396,8 +396,6 @@ std::string GLShader::resources_declare(const ShaderCreateInfo &info) const
     ss << "uniform " << to_string(uniform.type) << " " << uniform.name << ";\n";
   }
   ss << "\n";
-  std::cout << "------------- resources_declare -------------\n";
-  std::cout << ss.str();
   return ss.str();
 }
 
@@ -415,8 +413,6 @@ std::string GLShader::vertex_interface_declare(const ShaderCreateInfo &info) con
     print_interface(ss, "out", *iface);
   }
   ss << "\n";
-  std::cout << "------------- vertex_interface_declare -------------\n";
-  std::cout << ss.str();
   return ss.str();
 }
 
@@ -447,8 +443,6 @@ std::string GLShader::fragment_interface_declare(const ShaderCreateInfo &info) c
     ss << "out " << to_string(output.type) << " " << output.name << ";\n";
   }
   ss << "\n";
-  std::cout << "------------- fragment_interface_declare -------------\n";
-  std::cout << ss.str();
   return ss.str();
 }
 
