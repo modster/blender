@@ -59,6 +59,11 @@ static std::vector<AttributeRef> get_vcol_refs(const CustomData *cd_vdata,
       AttributeDomain domain = domains[step2];
 
       int i = cdata->typemap[(int)type];
+
+      if (i == -1) {
+        continue;
+      }
+
       for (; i < cdata->totlayer && (CustomDataType)cdata->layers[i].type == type; i++, layeri++) {
         const CustomDataLayer *layer = cdata->layers + i;
 
@@ -275,14 +280,14 @@ static void extract_vcol_init(const MeshRenderData *mr,
       const MLoop *mloop = mr->mloop;
 
       if (ref.type == CD_PROP_COLOR) {
-        pcol = static_cast<MPropCol*>(cdata->layers[idx].data);
+        pcol = static_cast<MPropCol *>(cdata->layers[idx].data);
       }
       else {
         mcol = static_cast<MLoopCol *>(cdata->layers[idx].data);
       }
 
       const bool is_corner = ref.domain == ATTR_DOMAIN_CORNER;
-      
+
       for (int i = 0; i < totloop; i++, mloop++) {
         const int v_i = is_corner ? i : mloop->v;
 
