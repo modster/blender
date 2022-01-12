@@ -5,6 +5,7 @@
 
 #ifdef __cplusplus
 using blender::float2;
+using blender::float3;
 using blender::float4;
 using blender::float4x4;
 #endif
@@ -26,7 +27,7 @@ struct NodeLinkInstanceData {
   float4 colors[6];
   float expandSize;
   float arrowSize;
-  float2 pad;
+  float2 _pad;
 };
 
 struct GPencilStrokeData {
@@ -39,10 +40,16 @@ struct GPencilStrokeData {
   int caps_end;
   bool1 keep_size;
   bool1 fill_stroke;
-  float2 pad;
+  float2 _pad;
 };
 
 struct GPUClipPlanes {
   float4x4 ModelMatrix;
   float4 world[6];
+};
+
+struct SimpleLightingData {
+  float4 color;
+  float3 light;
+  float _pad;
 };

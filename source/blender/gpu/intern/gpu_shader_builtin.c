@@ -167,6 +167,7 @@ static const GPUShaderStages builtin_shader_stages[GPU_SHADER_BUILTIN_LEN] = {
     [GPU_SHADER_SIMPLE_LIGHTING] =
         {
             .name = "GPU_SHADER_SIMPLE_LIGHTING",
+            .create_info = "gpu_shader_simple_lighting",
             .vert = datatoc_gpu_shader_3D_normal_vert_glsl,
             .frag = datatoc_gpu_shader_simple_lighting_frag_glsl,
         },

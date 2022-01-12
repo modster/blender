@@ -100,6 +100,8 @@ static const char *to_string(const Type &type)
       return "vec3";
     case Type::VEC4:
       return "vec4";
+    case Type::MAT3:
+      return "mat3";
     case Type::MAT4:
       return "mat4";
     case Type::UINT:
