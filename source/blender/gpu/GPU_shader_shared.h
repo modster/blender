@@ -3,6 +3,12 @@
 #  include "intern/gpu_shader_shared_utils.h"
 #endif
 
+#ifdef __cplusplus
+using blender::float2;
+using blender::float4;
+using blender::float4x4;
+#endif
+
 struct NodeLinkData {
   float4 colors[3];
   float2 bezierPts[4];
@@ -34,4 +40,9 @@ struct GPencilStrokeData {
   bool1 keep_size;
   bool1 fill_stroke;
   float2 pad;
+};
+
+struct GPUClipPlanes {
+  float4x4 ModelMatrix;
+  float4 world[6];
 };

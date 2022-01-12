@@ -424,7 +424,7 @@ shaders/infos/gpu_shader_2D_image_shuffle_color_info.hh
 shaders/infos/gpu_shader_2D_image_rect_color_info.hh
 shaders/infos/gpu_shader_text_info.hh
 shaders/infos/gpu_shader_keyframe_shape_info.hh
-#shaders/infos/gpu_shader_3D_flat_color_info.hh !Disabled due to world_clipping
+shaders/infos/gpu_shader_3D_flat_color_info.hh
 #shaders/infos/gpu_shader_3D_uniform_color_info.hh !Disabled due to world clipping
 #shaders/infos/gpu_shader_3D_smooth_color_info.hh
 #shaders/infos/gpu_shader_3D_depth_only_info.hh

@@ -84,9 +84,6 @@
 #    include "BLI_float3.hh"
 #    include "BLI_float4.hh"
 #    include "BLI_float4x4.hh"
-
-using blender::float2;
-using blender::float4;
 /* TODO */
 // #    include "BLI_int2.hh"
 // #    include "BLI_int3.hh"

@@ -150,6 +150,7 @@ typedef struct {
   const char *defs;
 
   const char *create_info;
+  const char *clipped_create_info;
 } GPUShaderStages;
 
 static const GPUShaderStages builtin_shader_stages[GPU_SHADER_BUILTIN_LEN] = {
@@ -227,12 +228,9 @@ static const GPUShaderStages builtin_shader_stages[GPU_SHADER_BUILTIN_LEN] = {
             .vert = datatoc_gpu_shader_3D_vert_glsl,
             .frag = datatoc_gpu_shader_uniform_color_frag_glsl,
         },
-    [GPU_SHADER_3D_FLAT_COLOR] =
-        {
-            .name = "GPU_SHADER_3D_FLAT_COLOR",
-            .vert = datatoc_gpu_shader_3D_flat_color_vert_glsl,
-            .frag = datatoc_gpu_shader_flat_color_frag_glsl,
-        },
+    [GPU_SHADER_3D_FLAT_COLOR] = {.name = "GPU_SHADER_3D_FLAT_COLOR",
+                                  .create_info = "gpu_shader_3d_flat_color",
+                                  .clipped_create_info = "gpu_shader_3d_flat_color_clipped"},
     [GPU_SHADER_3D_SMOOTH_COLOR] =
         {
             .name = "GPU_SHADER_3D_SMOOTH_COLOR",
@@ -406,13 +404,14 @@ GPUShader *GPU_shader_get_builtin_shader_with_config(eGPUBuiltinShader shader,
                       GPU_SHADER_3D_POINT_UNIFORM_SIZE_UNIFORM_COLOR_AA,
                       GPU_SHADER_3D_FLAT_COLOR,
                       GPU_SHADER_3D_LINE_DASHED_UNIFORM_COLOR));
-      const char *world_clip_lib = datatoc_gpu_shader_cfg_world_clip_lib_glsl;
-      const char *world_clip_def = "#define USE_WORLD_CLIP_PLANES\n";
       /* In rare cases geometry shaders calculate clipping themselves. */
-      if (stages->create_info != NULL) {
-        *sh_p = GPU_shader_create_from_info(gpu_shader_create_info_get(stages->create_info));
+      if (stages->clipped_create_info != NULL) {
+        *sh_p = GPU_shader_create_from_info(
+            gpu_shader_create_info_get(stages->clipped_create_info));
       }
       else {
+        const char *world_clip_lib = datatoc_gpu_shader_cfg_world_clip_lib_glsl;
+        const char *world_clip_def = "#define USE_WORLD_CLIP_PLANES\n";
         *sh_p = GPU_shader_create_from_arrays_named(
             stages->name,
             {
