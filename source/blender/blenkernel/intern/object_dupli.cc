@@ -31,9 +31,9 @@
 #include "BLI_string_utf8.h"
 
 #include "BLI_array.hh"
-#include "BLI_float3.hh"
 #include "BLI_float4x4.hh"
 #include "BLI_math.h"
+#include "BLI_math_vec_types.hh"
 #include "BLI_rand.h"
 #include "BLI_span.hh"
 #include "BLI_vector.hh"
@@ -1025,6 +1025,8 @@ static void get_dupliface_transform_from_coords(Span<float3> coords,
                                                 const float scale_fac,
                                                 float r_mat[4][4])
 {
+  using namespace blender::math;
+
   /* Location. */
   float3 location(0);
   for (const float3 &coord : coords) {
@@ -1035,9 +1037,7 @@ static void get_dupliface_transform_from_coords(Span<float3> coords,
   /* Rotation. */
   float quat[4];
 
-  float3 f_no;
-  cross_poly_v3(f_no, (const float(*)[3])coords.data(), (uint)coords.size());
-  f_no.normalize();
+  float3 f_no = normalize(cross_poly(coords));
   tri_to_quat_ex(quat, coords[0], coords[1], coords[2], f_no);
 
   /* Scale. */
@@ -1649,6 +1649,14 @@ static const DupliGenerator *get_dupli_generator(const DupliContext *ctx)
     return nullptr;
   }
 
+  /* Give "Object as Font" instances higher priority than geometry set instances, to retain
+   * the behavior from before curve object meshes were processed as instances internally. */
+  if (transflag & OB_DUPLIVERTS) {
+    if (ctx->object->type == OB_FONT) {
+      return &gen_dupli_verts_font;
+    }
+  }
+
   if (ctx->object->runtime.geometry_set_eval != nullptr) {
     if (BKE_object_has_geometry_set_instances(ctx->object)) {
       return &gen_dupli_geometry_set;
@@ -1661,9 +1669,6 @@ static const DupliGenerator *get_dupli_generator(const DupliContext *ctx)
   if (transflag & OB_DUPLIVERTS) {
     if (ctx->object->type == OB_MESH) {
       return &gen_dupli_verts;
-    }
-    if (ctx->object->type == OB_FONT) {
-      return &gen_dupli_verts_font;
     }
     if (ctx->object->type == OB_POINTCLOUD) {
       return &gen_dupli_verts_pointcloud;

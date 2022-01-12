@@ -152,8 +152,8 @@ VArray<float3> mesh_normals_varray(const MeshComponent &mesh_component,
       Span<MEdge> edges{mesh.medge, mesh.totedge};
       for (const int i : mask) {
         const MEdge &edge = edges[i];
-        edge_normals[i] =
-            float3::interpolate(vert_normals[edge.v1], vert_normals[edge.v2], 0.5f).normalized();
+        edge_normals[i] = math::normalize(
+            math::interpolate(vert_normals[edge.v1], vert_normals[edge.v2], 0.5f));
       }
 
       return VArray<float3>::ForContainer(std::move(edge_normals));
