@@ -32,7 +32,6 @@
 
 #include "gpu_shader_create_info.hh"
 #include "gpu_shader_create_info_private.hh"
-#include "gpu_shader_info_baked.hh"
 
 #undef GPU_SHADER_INTERFACE_INFO
 #undef GPU_SHADER_CREATE_INFO

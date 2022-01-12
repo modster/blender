@@ -428,9 +428,6 @@ shaders/infos/gpu_shader_3D_flat_color_info.hh
 shaders/infos/gpu_shader_3D_uniform_color_info.hh
 shaders/infos/gpu_shader_3D_smooth_color_info.hh
 shaders/infos/gpu_shader_3D_depth_only_info.hh
-#shaders/infos/gpu_shader_3D_polyline_info.hh !TODO
-#shaders/infos/gpu_shader_2D_line_dashed_uniform_color_info.hh
-#shaders/infos/gpu_shader_3D_line_dashed_uniform_color_info.hh
 shaders/infos/gpu_shader_2D_point_varying_size_varying_color_info.hh
 shaders/infos/gpu_shader_2D_point_uniform_size_uniform_color_aa_info.hh
 shaders/infos/gpu_shader_2D_point_uniform_size_uniform_color_outline_aa_info.hh
@@ -440,7 +437,6 @@ shaders/infos/gpu_shader_3D_point_info.hh
 shaders/infos/gpu_shader_2D_nodelink_info.hh
 shaders/infos/gpu_shader_gpencil_stroke_info.hh
 shaders/infos/gpu_shader_simple_lighting_info.hh
-#shaders/infos/gpu_shader_todo_info.hh
 )
 
 set(SHADER_CREATE_INFOS_CONTENT "")
@@ -472,15 +468,11 @@ if(CXX_WARN_NO_SUGGEST_OVERRIDE)
 endif()
 
 
-set(GPU_SHADER_INFO_SRC
-  intern/gpu_shader_info_baked.cc
-)
 
 if(WITH_GPU_SHADER_BUILDER)
   add_executable(shader_builder
     intern/gpu_shader_builder.cc
     intern/gpu_shader_builder_stubs.cc
-    intern/gpu_shader_info_baked_stub.cc
     ${shader_create_info_list_file}
   )
 
@@ -489,22 +481,24 @@ if(WITH_GPU_SHADER_BUILDER)
     ${PLATFORM_LINKLIBS}
   )
   target_include_directories(shader_builder PRIVATE ${INC} ${CMAKE_CURRENT_BINARY_DIR})
-
+  
   set(BAKED_CREATE_INFOS_FILE ${CMAKE_CURRENT_BINARY_DIR}/shader_baked.hh)
-
+  
   add_custom_command(
     OUTPUT
-      ${BAKED_CREATE_INFOS_FILE}
+    ${BAKED_CREATE_INFOS_FILE}
     COMMAND
       "$<TARGET_FILE:shader_builder>" ${BAKED_CREATE_INFOS_FILE}
     DEPENDS shader_builder
   )
+  set(GPU_SHADER_INFO_SRC
+    intern/gpu_shader_info_baked.cc
+    ${BAKED_CREATE_INFOS_FILE}
+  )
 
-  list(APPEND GPU_SHADER_INFO_SRC ${BAKED_CREATE_INFOS_FILE})
+  blender_add_lib(bf_gpu_shader_infos "${GPU_SHADER_INFO_SRC}" "" "" "")
 endif()
 
-blender_add_lib(bf_gpu_shader_infos "${GPU_SHADER_INFO_SRC}" "" "" "")
-#add_dependencies(blender bf_gpu_shader_infos)
 
 if(WITH_GTESTS)
   if(WITH_OPENGL_DRAW_TESTS)
