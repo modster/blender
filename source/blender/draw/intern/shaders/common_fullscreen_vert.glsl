@@ -1,5 +1,5 @@
 
-#ifndef WORKBENCH_SHADER_SHARED_H
+#ifndef USE_GPU_SHADER_CREATE_INFO
 out vec4 uvcoordsvar;
 #endif
 
