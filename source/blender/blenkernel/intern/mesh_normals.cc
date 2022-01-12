@@ -35,7 +35,6 @@
 #include "BLI_alloca.h"
 #include "BLI_bitmap.h"
 
-#include "BLI_array.hh"
 #include "BLI_linklist.h"
 #include "BLI_linklist_stack.h"
 #include "BLI_math.h"
@@ -44,7 +43,6 @@
 #include "BLI_span.hh"
 #include "BLI_stack.h"
 #include "BLI_task.h"
-#include "BLI_task.hh"
 #include "BLI_utildefines.h"
 
 #include "BKE_customdata.h"
@@ -54,12 +52,7 @@
 
 #include "atomic_ops.h"
 
-using blender::Array;
-using blender::float3;
-using blender::IndexRange;
-using blender::MutableSpan;
 using blender::Span;
-using namespace blender::threading;
 
 // #define DEBUG_TIME
 
