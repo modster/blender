@@ -166,49 +166,57 @@ void create_usd_preview_surface_material(const USDExporterContext &usd_export_co
 
     bNode *input_node = traverse_channel(sock, SH_NODE_TEX_IMAGE);
 
+    const InputSpec &input_spec = it->second;
+
     if (input_node) {
       /* Create connection. */
       created_shader = create_usd_preview_shader(usd_export_context, usd_material, input_node);
 
-      preview_surface.CreateInput(it->second.input_name, it->second.input_type)
-          .ConnectToSource(created_shader, it->second.source_name);
+      preview_surface.CreateInput(input_spec.input_name, input_spec.input_type)
+          .ConnectToSource(created_shader, input_spec.source_name);
     }
-    else if (it->second.set_default_value) {
+    else if (input_spec.set_default_value) {
       /* Set hardcoded value. */
-      if (sock->type == SOCK_FLOAT) {
-        bNodeSocketValueFloat *float_value = static_cast<bNodeSocketValueFloat *>(
-            sock->default_value);
-        preview_surface.CreateInput(it->second.input_name, it->second.input_type)
-            .Set(pxr::VtValue(float_value->value));
-      }
-      else if (sock->type == SOCK_VECTOR) {
-        bNodeSocketValueVector *vec_data = static_cast<bNodeSocketValueVector *>(
-            sock->default_value);
-        preview_surface.CreateInput(it->second.input_name, it->second.input_type)
-            .Set(pxr::VtValue(
-                pxr::GfVec3f(vec_data->value[0], vec_data->value[1], vec_data->value[2])));
-      }
-      else if (sock->type == SOCK_RGBA) {
-        bNodeSocketValueRGBA *rgba_data = static_cast<bNodeSocketValueRGBA *>(sock->default_value);
-        preview_surface.CreateInput(it->second.input_name, it->second.input_type)
-            .Set(pxr::VtValue(
-                pxr::GfVec3f(rgba_data->value[0], rgba_data->value[1], rgba_data->value[2])));
+      switch (sock->type) {
+        case SOCK_FLOAT: {
+          bNodeSocketValueFloat *float_value = static_cast<bNodeSocketValueFloat *>(
+              sock->default_value);
+          preview_surface.CreateInput(input_spec.input_name, input_spec.input_type)
+              .Set(pxr::VtValue(float_value->value));
+        } break;
+        case SOCK_VECTOR: {
+          bNodeSocketValueVector *vec_data = static_cast<bNodeSocketValueVector *>(
+              sock->default_value);
+          preview_surface.CreateInput(input_spec.input_name, input_spec.input_type)
+              .Set(pxr::VtValue(
+                  pxr::GfVec3f(vec_data->value[0], vec_data->value[1], vec_data->value[2])));
+        } break;
+        case SOCK_RGBA: {
+          bNodeSocketValueRGBA *rgba_data = static_cast<bNodeSocketValueRGBA *>(
+              sock->default_value);
+          preview_surface.CreateInput(input_spec.input_name, input_spec.input_type)
+              .Set(pxr::VtValue(
+                  pxr::GfVec3f(rgba_data->value[0], rgba_data->value[1], rgba_data->value[2])));
+        } break;
+        default:
+          break;
       }
     }
 
     /* If any input texture node has been found, export the texture, if necessary,
      * and look for a connected uv node. */
-    if (created_shader && input_node && input_node->type == SH_NODE_TEX_IMAGE) {
-
-      if (usd_export_context.export_params.export_textures) {
-        export_texture(input_node,
-                       usd_export_context.stage,
-                       usd_export_context.export_params.overwrite_textures);
-      }
-
-      create_uvmap_shader(
-          usd_export_context, input_node, usd_material, created_shader, default_uv_sampler);
+    if (!(created_shader && input_node && input_node->type == SH_NODE_TEX_IMAGE)) {
+      continue;
     }
+
+    if (usd_export_context.export_params.export_textures) {
+      export_texture(input_node,
+                     usd_export_context.stage,
+                     usd_export_context.export_params.overwrite_textures);
+    }
+
+    create_uvmap_shader(
+        usd_export_context, input_node, usd_material, created_shader, default_uv_sampler);
   }
 }
 
@@ -317,26 +325,6 @@ static void create_uvmap_shader(const USDExporterContext &usd_export_context,
   }
 }
 
-/* Returns true if the given paths are equal,
- * returns false otherwise. */
-static bool paths_equal(const char *p1, const char *p2)
-{
-  /* Normalize the paths so we can compare them. */
-  char norm_p1[FILE_MAX];
-  char norm_p2[FILE_MAX];
-
-  BLI_strncpy(norm_p1, p1, sizeof(norm_p1));
-  BLI_strncpy(norm_p2, p2, sizeof(norm_p2));
-
-  BLI_path_slash_native(norm_p1);
-  BLI_path_slash_native(norm_p2);
-
-  BLI_path_normalize(nullptr, norm_p1);
-  BLI_path_normalize(nullptr, norm_p2);
-
-  return BLI_path_cmp(norm_p1, norm_p2) == 0;
-}
-
 /* Generate a file name for an in-memory image that doesn't have a
  * filepath already defined. */
 static std::string get_in_memory_texture_filename(Image *ima)
@@ -370,10 +358,6 @@ static void export_in_memory_texture(Image *ima,
                                      const std::string &export_dir,
                                      const bool allow_overwrite)
 {
-  if (export_dir.empty()) {
-    return;
-  }
-
   char image_abs_path[FILE_MAX];
 
   char file_name[FILE_MAX];
@@ -407,7 +391,7 @@ static void export_in_memory_texture(Image *ima,
     return;
   }
 
-  if (BLI_exists(image_abs_path) && paths_equal(export_path, image_abs_path)) {
+  if (BLI_paths_equal(export_path, image_abs_path) && BLI_exists(image_abs_path)) {
     /* As a precaution, don't overwrite the original path. */
     return;
   }
@@ -429,109 +413,10 @@ static void get_absolute_path(Image *ima, char *r_path)
   BLI_path_normalize(nullptr, r_path);
 }
 
-/* If the given image is tiled, copy the image tiles to the given
- * destination directory. */
-static void copy_tiled_textures(Image *ima,
-                                const std::string &dest_dir,
-                                const bool allow_overwrite)
-{
-  if (dest_dir.empty()) {
-    return;
-  }
-
-  if (ima->source != IMA_SRC_TILED) {
-    return;
-  }
-
-  char src_path[FILE_MAX];
-  get_absolute_path(ima, src_path);
-
-  eUDIM_TILE_FORMAT tile_format;
-  char *udim_pattern = BKE_image_get_tile_strformat(src_path, &tile_format);
-
-  /* Only <UDIM> tile formats are supported by USD right now. */
-  if (tile_format != UDIM_TILE_FORMAT_UDIM) {
-    std::cout << "WARNING: unsupported tile format for `" << src_path << "`" << std::endl;
-    MEM_SAFE_FREE(udim_pattern);
-    return;
-  }
-
-  /* Copy all tiles. */
-  LISTBASE_FOREACH (ImageTile *, tile, &ima->tiles) {
-    char src_tile_path[FILE_MAX];
-    BKE_image_set_filepath_from_tile_number(
-        src_tile_path, udim_pattern, tile_format, tile->tile_number);
-
-    char dest_filename[FILE_MAXFILE];
-    BLI_split_file_part(src_tile_path, dest_filename, sizeof(dest_filename));
-
-    char dest_tile_path[FILE_MAX];
-    BLI_path_join(dest_tile_path, FILE_MAX, dest_dir.c_str(), dest_filename, nullptr);
-
-    if (!allow_overwrite && BLI_exists(dest_tile_path)) {
-      continue;
-    }
-
-    if (paths_equal(src_tile_path, dest_tile_path)) {
-      /* Source and destination paths are the same, don't copy. */
-      continue;
-    }
-
-    std::cout << "Copying texture tile from " << src_tile_path << " to " << dest_tile_path
-              << std::endl;
-
-    /* Copy the file. */
-    if (BLI_copy(src_tile_path, dest_tile_path) != 0) {
-      WM_reportf(RPT_WARNING,
-                 "USD export:  couldn't copy texture tile from %s to %s",
-                 src_tile_path,
-                 dest_tile_path);
-    }
-  }
-  MEM_SAFE_FREE(udim_pattern);
-}
-
-/* Copy the given image to the destination directory. */
-static void copy_single_file(Image *ima, const std::string &dest_dir, const bool allow_overwrite)
-{
-  if (dest_dir.empty()) {
-    return;
-  }
-
-  char source_path[FILE_MAX];
-  get_absolute_path(ima, source_path);
-
-  char file_name[FILE_MAX];
-  BLI_split_file_part(source_path, file_name, FILE_MAX);
-
-  char dest_path[FILE_MAX];
-  BLI_path_join(dest_path, FILE_MAX, dest_dir.c_str(), file_name, NULL);
-
-  if (!allow_overwrite && BLI_exists(dest_path)) {
-    return;
-  }
-
-  if (paths_equal(source_path, dest_path)) {
-    /* Source and destination paths are the same, don't copy. */
-    return;
-  }
-
-  std::cout << "Copying texture from " << source_path << " to " << dest_path << std::endl;
-
-  /* Copy the file. */
-  if (BLI_copy(source_path, dest_path) != 0) {
-    WM_reportf(
-        RPT_WARNING, "USD export:  couldn't copy texture from %s to %s", source_path, dest_path);
-  }
-}
 
 static pxr::TfToken get_node_tex_image_color_space(bNode *node)
 {
-  if (node->type != SH_NODE_TEX_IMAGE) {
-    return pxr::TfToken();
-  }
-
-  if (node->id == nullptr) {
+  if (!node->id) {
     return pxr::TfToken();
   }
 
@@ -719,7 +604,8 @@ static std::string get_tex_image_asset_path(bNode *node,
     }
     return exp_path;
   }
-  else if (export_params.relative_texture_paths) {
+
+  if (export_params.relative_texture_paths) {
     /* Get the path relative to the USD. */
     pxr::SdfLayerHandle layer = stage->GetRootLayer();
     std::string stage_path = layer->GetRealPath();
@@ -743,6 +629,90 @@ static std::string get_tex_image_asset_path(bNode *node,
   }
 
   return path;
+}
+
+/* If the given image is tiled, copy the image tiles to the given
+ * destination directory. */
+static void copy_tiled_textures(Image *ima,
+                                const std::string &dest_dir,
+                                const bool allow_overwrite)
+{
+  char src_path[FILE_MAX];
+  get_absolute_path(ima, src_path);
+
+  eUDIM_TILE_FORMAT tile_format;
+  char *udim_pattern = BKE_image_get_tile_strformat(src_path, &tile_format);
+
+  /* Only <UDIM> tile formats are supported by USD right now. */
+  if (tile_format != UDIM_TILE_FORMAT_UDIM) {
+    std::cout << "WARNING: unsupported tile format for `" << src_path << "`" << std::endl;
+    MEM_SAFE_FREE(udim_pattern);
+    return;
+  }
+
+  /* Copy all tiles. */
+  LISTBASE_FOREACH (ImageTile *, tile, &ima->tiles) {
+    char src_tile_path[FILE_MAX];
+    BKE_image_set_filepath_from_tile_number(
+        src_tile_path, udim_pattern, tile_format, tile->tile_number);
+
+    char dest_filename[FILE_MAXFILE];
+    BLI_split_file_part(src_tile_path, dest_filename, sizeof(dest_filename));
+
+    char dest_tile_path[FILE_MAX];
+    BLI_path_join(dest_tile_path, FILE_MAX, dest_dir.c_str(), dest_filename, nullptr);
+
+    if (!allow_overwrite && BLI_exists(dest_tile_path)) {
+      continue;
+    }
+
+    if (BLI_paths_equal(src_tile_path, dest_tile_path)) {
+      /* Source and destination paths are the same, don't copy. */
+      continue;
+    }
+
+    std::cout << "Copying texture tile from " << src_tile_path << " to " << dest_tile_path
+              << std::endl;
+
+    /* Copy the file. */
+    if (BLI_copy(src_tile_path, dest_tile_path) != 0) {
+      WM_reportf(RPT_WARNING,
+                 "USD export:  couldn't copy texture tile from %s to %s",
+                 src_tile_path,
+                 dest_tile_path);
+    }
+  }
+  MEM_SAFE_FREE(udim_pattern);
+}
+
+/* Copy the given image to the destination directory. */
+static void copy_single_file(Image *ima, const std::string &dest_dir, const bool allow_overwrite)
+{
+  char source_path[FILE_MAX];
+  get_absolute_path(ima, source_path);
+
+  char file_name[FILE_MAX];
+  BLI_split_file_part(source_path, file_name, FILE_MAX);
+
+  char dest_path[FILE_MAX];
+  BLI_path_join(dest_path, FILE_MAX, dest_dir.c_str(), file_name, NULL);
+
+  if (!allow_overwrite && BLI_exists(dest_path)) {
+    return;
+  }
+
+  if (BLI_paths_equal(source_path, dest_path)) {
+    /* Source and destination paths are the same, don't copy. */
+    return;
+  }
+
+  std::cout << "Copying texture from " << source_path << " to " << dest_path << std::endl;
+
+  /* Copy the file. */
+  if (BLI_copy(source_path, dest_path) != 0) {
+    WM_reportf(
+        RPT_WARNING, "USD export:  couldn't copy texture from %s to %s", source_path, dest_path);
+  }
 }
 
 /* Export the given texture node's image to a 'textures' directory
@@ -775,9 +745,9 @@ static void export_texture(bNode *node,
 
   BLI_dir_create_recursive(tex_dir_path);
 
-  bool is_dirty = BKE_image_is_dirty(ima);
-  bool is_generated = ima->source == IMA_SRC_GENERATED;
-  bool is_packed = BKE_image_has_packedfile(ima);
+  const bool is_dirty = BKE_image_is_dirty(ima);
+  const bool is_generated = ima->source == IMA_SRC_GENERATED;
+  const bool is_packed = BKE_image_has_packedfile(ima);
 
   std::string dest_dir(tex_dir_path);
 
