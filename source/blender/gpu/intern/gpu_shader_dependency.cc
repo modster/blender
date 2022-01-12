@@ -108,7 +108,7 @@ struct GPUSource {
     }
     dependencies_init = true;
     int64_t pos = 0;
-    while (1) {
+    while (true) {
       pos = source.find("pragma BLENDER_REQUIRE(", pos);
       if (pos == -1) {
         return;
@@ -132,7 +132,7 @@ struct GPUSource {
       /* Recursive. */
       dependency_source->init_dependencies(dict);
 
-      for (auto dep : dependency_source->dependencies) {
+      for (auto *dep : dependency_source->dependencies) {
         dependencies.append_non_duplicates(dep);
       }
       dependencies.append_non_duplicates(dependency_source);
@@ -143,7 +143,7 @@ struct GPUSource {
   /* Returns the final string with all inlcudes done. */
   void build(std::string &str, shader::BuiltinBits &out_builtins)
   {
-    for (auto dep : dependencies) {
+    for (auto *dep : dependencies) {
       out_builtins |= builtins;
       str += dep->source;
     }
@@ -167,14 +167,14 @@ void gpu_shader_dependency_init()
 #include "glsl_gpu_source_list.h"
 #undef SHADER_SOURCE
 
-  for (auto value : g_sources->values()) {
+  for (auto *value : g_sources->values()) {
     value->init_dependencies(*g_sources);
   }
 }
 
 void gpu_shader_dependency_exit()
 {
-  for (auto value : g_sources->values()) {
+  for (auto *value : g_sources->values()) {
     delete value;
   }
   delete g_sources;

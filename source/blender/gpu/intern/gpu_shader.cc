@@ -44,7 +44,7 @@ namespace blender::gpu {
 
 std::string Shader::defines_declare(const shader::ShaderCreateInfo &info) const
 {
-  std::string defines("");
+  std::string defines;
   for (const auto &def : info.defines_) {
     defines += "#define ";
     defines += def[0];
@@ -311,7 +311,7 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
     if (!typedefs.is_empty()) {
       sources.append(shader_shared_utils);
     }
-    for (auto types : typedefs) {
+    for (auto *types : typedefs) {
       sources.append(types);
     }
     sources.append(resources.c_str());
@@ -339,7 +339,7 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
     if (!typedefs.is_empty()) {
       sources.append(shader_shared_utils);
     }
-    for (auto types : typedefs) {
+    for (auto *types : typedefs) {
       sources.append(types);
     }
     sources.append(resources.c_str());
@@ -365,7 +365,7 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
     if (!typedefs.is_empty()) {
       sources.append(shader_shared_utils);
     }
-    for (auto types : typedefs) {
+    for (auto *types : typedefs) {
       sources.append(types);
     }
     sources.append(resources.c_str());
@@ -390,7 +390,7 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
     if (!typedefs.is_empty()) {
       sources.append(shader_shared_utils);
     }
-    for (auto types : typedefs) {
+    for (auto *types : typedefs) {
       sources.append(types);
     }
     sources.append(resources.c_str());
@@ -401,7 +401,7 @@ GPUShader *GPU_shader_create_from_info(const GPUShaderCreateInfo *_info)
     free(code);
   }
 
-  for (auto types : typedefs) {
+  for (auto *types : typedefs) {
     free(types);
   }
 

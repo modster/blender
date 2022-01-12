@@ -54,7 +54,7 @@ UserDef U;
 /** \name Stubs of BLI_imbuf_types.h
  * \{ */
 
-void IMB_freeImBuf(ImBuf *UNUSED(buffer))
+void IMB_freeImBuf(ImBuf *UNUSED(ibuf))
 {
   BLI_assert_unreachable();
 }
@@ -218,7 +218,7 @@ int BKE_subdiv_ccg_grid_to_face_index(const SubdivCCG *UNUSED(subdiv_ccg),
  * \{ */
 void ntreeGPUMaterialNodes(struct bNodeTree *UNUSED(localtree),
                            struct GPUMaterial *UNUSED(mat),
-                           bool *UNUSED(as_surface_output),
+                           bool *UNUSED(has_surface_output),
                            bool *UNUSED(has_volume_output))
 {
   BLI_assert_unreachable();

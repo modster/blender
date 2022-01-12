@@ -137,12 +137,12 @@ void gpu_shader_create_info_init()
 
 void gpu_shader_create_info_exit()
 {
-  for (auto value : g_create_infos->values()) {
+  for (auto *value : g_create_infos->values()) {
     delete value;
   }
   delete g_create_infos;
 
-  for (auto value : g_interfaces->values()) {
+  for (auto *value : g_interfaces->values()) {
     delete value;
   }
   delete g_interfaces;
