@@ -22,6 +22,7 @@ struct NodeLinkData {
   float expandSize;
   float arrowSize;
 };
+BLI_STATIC_ASSERT_ALIGN(struct NodeLinkData, 16)
 
 struct NodeLinkInstanceData {
   float4 colors[6];
@@ -29,6 +30,7 @@ struct NodeLinkInstanceData {
   float arrowSize;
   float2 _pad;
 };
+BLI_STATIC_ASSERT_ALIGN(struct NodeLinkInstanceData, 16)
 
 struct GPencilStrokeData {
   float2 viewport;
@@ -42,14 +44,17 @@ struct GPencilStrokeData {
   bool1 fill_stroke;
   float2 _pad;
 };
+BLI_STATIC_ASSERT_ALIGN(struct GPencilStrokeData, 16)
 
 struct GPUClipPlanes {
   float4x4 ModelMatrix;
   float4 world[6];
 };
+BLI_STATIC_ASSERT_ALIGN(struct GPUClipPlanes, 16)
 
 struct SimpleLightingData {
   float4 color;
   float3 light;
   float _pad;
 };
+BLI_STATIC_ASSERT_ALIGN(struct SimpleLightingData, 16)
