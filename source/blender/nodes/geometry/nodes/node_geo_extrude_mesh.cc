@@ -300,20 +300,26 @@ static void extrude_mesh_vertices(MeshComponent &component,
   BLI_assert(BKE_mesh_is_valid(component.get_for_write()));
 }
 
-static Array<Vector<int, 2>> mesh_calculate_polys_of_edge(const Mesh &mesh)
+static Array<Vector<int, 2>> mesh_calculate_polys_of_edge(const Mesh &mesh,
+                                                          const IndexMask poly_mask)
 {
   Span<MPoly> polys = mesh_polys(mesh);
   Span<MLoop> loops = mesh_loops(mesh);
   Array<Vector<int, 2>> polys_of_edge(mesh.totedge);
 
-  for (const int poly_index : polys.index_range()) {
-    const MPoly &poly = polys[poly_index];
+  poly_mask.foreach_index([&](const int64_t i_poly) {
+    const MPoly &poly = polys[i_poly];
     for (const MLoop &loop : loops.slice(poly.loopstart, poly.totloop)) {
-      polys_of_edge[loop.e].append(poly_index);
+      polys_of_edge[loop.e].append(i_poly);
     }
-  }
+  });
 
   return polys_of_edge;
+}
+
+static Array<Vector<int, 2>> mesh_calculate_polys_of_edge(const Mesh &mesh)
+{
+  return mesh_calculate_polys_of_edge(mesh, IndexMask(mesh.totpoly));
 }
 
 static void fill_quad_consistent_direction(Span<MLoop> other_poly_loops,
@@ -401,6 +407,9 @@ static void extrude_mesh_edges(MeshComponent &component,
   edge_evaluator.evaluate();
   const IndexMask edge_selection = edge_evaluator.get_evaluated_selection_as_mask();
   const VArray<float3> &edge_offsets = edge_evaluator.get_evaluated<float3>(0);
+  if (edge_selection.is_empty()) {
+    return;
+  }
 
   Array<int> new_vert_indices(orig_vert_size, -1);
   Vector<int> new_vert_orig_indices = extrude_vert_orig_indices_from_edges(
@@ -640,6 +649,10 @@ static void extrude_mesh_edges(MeshComponent &component,
   BLI_assert(BKE_mesh_is_valid(component.get_for_write()));
 }
 
+/**
+ * Edges connected to one selected face are on the boundary of a region and will be duplicated into
+ * a "side face".
+ */
 static void extrude_mesh_face_regions(MeshComponent &component,
                                       const Field<bool> &selection_field,
                                       const Field<float3> &offset_field,
@@ -658,8 +671,13 @@ static void extrude_mesh_face_regions(MeshComponent &component,
   poly_evaluator.evaluate();
   const IndexMask poly_selection = poly_evaluator.get_evaluated_selection_as_mask();
   const VArray<float3> &poly_offsets = poly_evaluator.get_evaluated<float3>(0);
+  if (poly_selection.is_empty()) {
+    return;
+  }
 
-  /* Mix the offsets from the face domain to the vertex domain. */
+  /* Mix the offsets from the face domain to the vertex domain. Evaluate on the face domain above
+   * in order to be consistent with the selection, and to use the face normals rather than vertex
+   * normals as an offset, for example. */
   Array<float3> vert_offsets;
   if (!poly_offsets.is_single()) {
     vert_offsets.reinitialize(orig_vert_size);
@@ -674,23 +692,20 @@ static void extrude_mesh_face_regions(MeshComponent &component,
     mixer.finalize();
   }
 
-  DisjointSet regions(poly_selection.size());
+  /* Build a map that contains all of the selected faces connected to each edge. */
+  Array<Vector<int, 2>> edge_to_selected_poly_map = mesh_calculate_polys_of_edge(mesh,
+                                                                                 poly_selection);
 
-  /* All vertices that are connected to the selected polygons. */
+  /* All of the faces (selected and unselected) connected to each edge. */
+  // Array<Vector<int, 2>> edge_to_poly_map = mesh_calculate_polys_of_edge(mesh);
+
+  /* All vertices that are connected to the selected polygons.
+   * Start the size at one vert per poly to reduce reallocations. */
   VectorSet<int> all_selected_verts;
-  /* Keep track of the selected face that each edge corresponds to. Only edges with one selected
-   * face will have a single associated face. However, we need to keep track of a value for every
-   * face in the mesh at this point, because we don't know how many edges will be selected for
-   * extrusion in the end. Alternatively, #mesh_calculate_polys_of_edge could be used, possibly
-   * simplifying the rest of this algorithm slightly, but at a higher up-front cost. */
-  Array<int> edge_face_indices(orig_edges.size(), -1);
-  /* The number of connected faces for every edge, just to tell which should be extruded. */
-  Array<int> edge_neighbor_count(orig_edges.size(), 0);
+  all_selected_verts.reserve(orig_polys.size());
   for (const int i_poly : poly_selection) {
     const MPoly &poly = orig_polys[i_poly];
     for (const MLoop &loop : orig_loops.slice(poly.loopstart, poly.totloop)) {
-      edge_neighbor_count[loop.e]++;
-      edge_face_indices[loop.e] = i_poly;
       all_selected_verts.add(loop.v);
     }
   }
@@ -700,17 +715,18 @@ static void extrude_mesh_face_regions(MeshComponent &component,
   Vector<int> in_between_edges;
   /* The extruded face corresponding to each extruded edge (and each extruded face). */
   Vector<int> edge_orig_face_indices;
-  Vector<int64_t> selected_edges_orig_indices;
+  Vector<int64_t> selected_edge_orig_indices;
   for (const int i_edge : orig_edges.index_range()) {
-    if (edge_neighbor_count[i_edge] == 1) {
-      selected_edges_orig_indices.append(i_edge);
-      edge_orig_face_indices.append(edge_face_indices[i_edge]);
+    Span<int> selected_polys = edge_to_selected_poly_map[i_edge];
+    if (selected_polys.size() == 1) {
+      selected_edge_orig_indices.append(i_edge);
+      edge_orig_face_indices.append(selected_polys.first());
     }
-    else if (edge_neighbor_count[i_edge] > 1) {
+    else if (selected_polys.size() > 1) {
       in_between_edges.append(i_edge);
     }
   }
-  const IndexMask edge_selection{selected_edges_orig_indices};
+  const IndexMask edge_selection{selected_edge_orig_indices};
 
   /* Indices into the `duplicate_edges` span for each original selected edge. */
   Array<int> duplicate_edge_indices(orig_edges.size(), -1);
