@@ -695,4 +695,3 @@ void rna_AttributeGroup_color_iterator_begin(CollectionPropertyIterator *iter, P
 void rna_AttributeGroup_color_iterator_next(CollectionPropertyIterator *iter);
 PointerRNA rna_AttributeGroup_color_iterator_get(CollectionPropertyIterator *iter);
 int rna_AttributeGroup_color_length(PointerRNA *ptr);
-

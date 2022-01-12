@@ -714,4 +714,3 @@ bool BKE_id_attribute_ref_equals(const struct AttributeRef *ref1, const struct A
 
   return ok && STREQ(ref1->name, ref2->name);
 }
-

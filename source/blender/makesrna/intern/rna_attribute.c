@@ -372,7 +372,6 @@ PointerRNA rna_AttributeGroup_iterator_get(CollectionPropertyIterator *iter)
   return rna_pointer_inherit_refine(&iter->parent, type, layer);
 }
 
-
 void rna_AttributeGroup_color_iterator_begin(CollectionPropertyIterator *iter, PointerRNA *ptr)
 {
   memset(&iter->internal.array, 0, sizeof(iter->internal.array));
