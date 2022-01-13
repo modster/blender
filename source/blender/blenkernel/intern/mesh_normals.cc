@@ -356,8 +356,7 @@ static void mesh_calc_normals_poly_and_vertex(MVert *mvert,
 
 const float (*BKE_mesh_vertex_normals_ensure(const Mesh *mesh))[3]
 {
-  if (!(mesh->runtime.cd_dirty_vert & CD_MASK_NORMAL ||
-        mesh->runtime.cd_dirty_poly & CD_MASK_NORMAL)) {
+  if (!(BKE_mesh_vertex_normals_are_dirty(mesh) || BKE_mesh_poly_normals_are_dirty(mesh))) {
     BLI_assert(CustomData_has_layer(&mesh->vdata, CD_NORMAL) || mesh->totvert == 0);
     return (const float(*)[3])CustomData_get_layer(&mesh->vdata, CD_NORMAL);
   }
@@ -368,8 +367,7 @@ const float (*BKE_mesh_vertex_normals_ensure(const Mesh *mesh))[3]
 
   ThreadMutex *normals_mutex = (ThreadMutex *)mesh->runtime.normals_mutex;
   BLI_mutex_lock(normals_mutex);
-  if (!(mesh->runtime.cd_dirty_vert & CD_MASK_NORMAL ||
-        mesh->runtime.cd_dirty_poly & CD_MASK_NORMAL)) {
+  if (!(BKE_mesh_vertex_normals_are_dirty(mesh) || BKE_mesh_poly_normals_are_dirty(mesh))) {
     BLI_assert(CustomData_has_layer(&mesh->vdata, CD_NORMAL));
     BLI_mutex_unlock(normals_mutex);
     return (const float(*)[3])CustomData_get_layer(&mesh->vdata, CD_NORMAL);
@@ -398,7 +396,7 @@ const float (*BKE_mesh_vertex_normals_ensure(const Mesh *mesh))[3]
 
 const float (*BKE_mesh_poly_normals_ensure(const Mesh *mesh))[3]
 {
-  if (!(mesh->runtime.cd_dirty_poly & CD_MASK_NORMAL)) {
+  if (!BKE_mesh_poly_normals_are_dirty(mesh)) {
     BLI_assert(CustomData_has_layer(&mesh->pdata, CD_NORMAL) || mesh->totpoly == 0);
     return (const float(*)[3])CustomData_get_layer(&mesh->pdata, CD_NORMAL);
   }
@@ -409,7 +407,7 @@ const float (*BKE_mesh_poly_normals_ensure(const Mesh *mesh))[3]
 
   ThreadMutex *normals_mutex = (ThreadMutex *)mesh->runtime.normals_mutex;
   BLI_mutex_lock(normals_mutex);
-  if (!(mesh->runtime.cd_dirty_poly & CD_MASK_NORMAL)) {
+  if (!BKE_mesh_poly_normals_are_dirty(mesh)) {
     BLI_assert(CustomData_has_layer(&mesh->pdata, CD_NORMAL));
     BLI_mutex_unlock(normals_mutex);
     return (const float(*)[3])CustomData_get_layer(&mesh->pdata, CD_NORMAL);
