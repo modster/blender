@@ -933,7 +933,7 @@ typedef struct {
   float radius_squared;
   bool original;
   bool ignore_fully_ineffective;
-  struct DistRayAconstABB_Precalc *dist_ray_to_aabb_precalc;
+  struct DistRayAABB_Precalc *dist_ray_to_aabb_precalc;
 } SculptSearchCircleData;
 
 void SCULPT_brush_test_init(struct SculptSession *ss, SculptBrushTest *test);
