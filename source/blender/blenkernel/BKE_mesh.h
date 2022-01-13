@@ -397,6 +397,8 @@ void BKE_mesh_normals_tag_dirty(struct Mesh *mesh);
 
 /**
  * Check that a mesh with non-dirty normals has vertex and face custom data layers.
+ * If these asserts fail, it means some area cleared the dirty flag but didn't copy or add the
+ * normal layers, or removed normals but didn't set the dirty flag.
  */
 void BKE_mesh_assert_normals_dirty_or_calculated(const struct Mesh *mesh);
 
