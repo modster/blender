@@ -28,9 +28,9 @@
 #include "BKE_mesh.h"
 #include "BKE_object.h"
 
-#include "BLI_float3.hh"
 #include "BLI_math.h"
 #include "BLI_math_geom.h"
+#include "BLI_math_vec_types.hh"
 #include "BLI_span.hh"
 #include "BLI_string.h"
 
