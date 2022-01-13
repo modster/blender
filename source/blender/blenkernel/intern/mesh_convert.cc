@@ -1619,6 +1619,8 @@ void BKE_mesh_nomain_to_mesh(Mesh *mesh_src,
     }
     BKE_id_free(nullptr, mesh_src);
   }
+
+  BKE_mesh_assert_normals_dirty_or_calculated(mesh_dst);
 }
 
 void BKE_mesh_nomain_to_meshkey(Mesh *mesh_src, Mesh *mesh_dst, KeyBlock *kb)

@@ -1955,6 +1955,8 @@ void BKE_mesh_calc_normals_split_ex(Mesh *mesh, MLoopNorSpaceArray *r_lnors_spac
                               clnors,
                               nullptr);
 
+  BKE_mesh_assert_normals_dirty_or_calculated(mesh);
+
   mesh->runtime.cd_dirty_loop &= ~CD_MASK_NORMAL;
 }
 
@@ -2231,6 +2233,7 @@ void BKE_mesh_split_faces(Mesh *mesh, bool free_loop_normals)
   /* Also frees new_verts/edges temp data, since we used its memarena to allocate them. */
   BKE_lnor_spacearr_free(&lnors_spacearr);
 
+  BKE_mesh_assert_normals_dirty_or_calculated(mesh);
 #ifdef VALIDATE_MESH
   BKE_mesh_validate(mesh, true, true);
 #endif
