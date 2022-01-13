@@ -25,7 +25,9 @@
 
 #include "BLI_bitmap.h"
 
+#include "gl_backend.hh"
 #include "gl_batch.hh"
+#include "gl_context.hh"
 
 #include "gl_shader_interface.hh"
 
@@ -365,7 +367,12 @@ GLShaderInterface::GLShaderInterface(GLuint program, const shader::ShaderCreateI
   /* Attributes */
   for (const ShaderCreateInfo::VertIn &attr : info.vertex_inputs_) {
     copy_input_name(input, attr.name, name_buffer_, name_buffer_offset);
-    input->location = input->binding = attr.index;
+    if (true || !GLContext::explicit_location_support) {
+      input->location = input->binding = glGetAttribLocation(program, attr.name.c_str());
+    }
+    else {
+      input->location = input->binding = attr.index;
+    }
     enabled_attr_mask_ |= (1 << input->location);
     input++;
   }
@@ -374,7 +381,11 @@ GLShaderInterface::GLShaderInterface(GLuint program, const shader::ShaderCreateI
   for (const ShaderCreateInfo::Resource &res : all_resources) {
     if (res.bind_type == ShaderCreateInfo::Resource::BindType::UNIFORM_BUFFER) {
       copy_input_name(input, res.uniformbuf.name, name_buffer_, name_buffer_offset);
-      input->location = input->binding = res.slot;
+      if (true || !GLContext::explicit_location_support) {
+        input->location = glGetUniformBlockIndex(program, res.uniformbuf.name.c_str());
+        glUniformBlockBinding(program, input->location, res.slot);
+      }
+      input->binding = res.slot;
       enabled_ubo_mask_ |= (1 << input->binding);
       input++;
     }
@@ -386,7 +397,10 @@ GLShaderInterface::GLShaderInterface(GLuint program, const shader::ShaderCreateI
       copy_input_name(input, res.sampler.name, name_buffer_, name_buffer_offset);
       /* Until we make use of explicit uniform location or eliminate all
        * sampler manually changing. */
-      input->location = glGetUniformLocation(program, res.sampler.name.c_str());
+      if (true || !GLContext::explicit_location_support) {
+        input->location = glGetUniformLocation(program, res.sampler.name.c_str());
+        glUniform1i(input->location, res.slot);
+      }
       input->binding = res.slot;
       enabled_tex_mask_ |= (1 << input->binding);
       input++;
@@ -394,7 +408,10 @@ GLShaderInterface::GLShaderInterface(GLuint program, const shader::ShaderCreateI
     else if (res.bind_type == ShaderCreateInfo::Resource::BindType::IMAGE) {
       copy_input_name(input, res.image.name, name_buffer_, name_buffer_offset);
       /* Until we make use of explicit uniform location. */
-      input->location = glGetUniformLocation(program, res.image.name.c_str());
+      if (true || !GLContext::explicit_location_support) {
+        input->location = glGetUniformLocation(program, res.image.name.c_str());
+        glUniform1i(input->location, res.slot);
+      }
       input->binding = res.slot;
       enabled_ima_mask_ |= (1 << input->binding);
       input++;
@@ -403,7 +420,9 @@ GLShaderInterface::GLShaderInterface(GLuint program, const shader::ShaderCreateI
   for (const ShaderCreateInfo::PushConst &uni : info.push_constants_) {
     copy_input_name(input, uni.name, name_buffer_, name_buffer_offset);
     /* Until we make use of explicit uniform location. */
-    input->location = glGetUniformLocation(program, uni.name.c_str());
+    if (true || !GLContext::explicit_location_support) {
+      input->location = glGetUniformLocation(program, uni.name.c_str());
+    }
     input->binding = -1;
     input++;
   }

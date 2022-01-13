@@ -285,17 +285,20 @@ static std::ostream &print_qualifier(std::ostream &os, const Qualifier &qualifie
 
 static void print_resource(std::ostream &os, const ShaderCreateInfo::Resource &res)
 {
-  os << "layout(binding = " << res.slot;
-  if (res.bind_type == ShaderCreateInfo::Resource::BindType::IMAGE) {
-    os << ", " << res.image.format;
+  if (res.bind_type != ShaderCreateInfo::Resource::BindType::SAMPLER ||
+      GLContext::explicit_location_support) {
+    os << "layout(binding = " << res.slot;
+    if (res.bind_type == ShaderCreateInfo::Resource::BindType::IMAGE) {
+      os << ", " << res.image.format;
+    }
+    else if (res.bind_type == ShaderCreateInfo::Resource::BindType::UNIFORM_BUFFER) {
+      os << ", std140";
+    }
+    else if (res.bind_type == ShaderCreateInfo::Resource::BindType::STORAGE_BUFFER) {
+      os << ", std430";
+    }
+    os << ") ";
   }
-  else if (res.bind_type == ShaderCreateInfo::Resource::BindType::UNIFORM_BUFFER) {
-    os << ", std140";
-  }
-  else if (res.bind_type == ShaderCreateInfo::Resource::BindType::STORAGE_BUFFER) {
-    os << ", std430";
-  }
-  os << ") ";
 
   int64_t array_offset;
   StringRef name_no_array;
@@ -398,7 +401,9 @@ std::string GLShader::resources_declare(const ShaderCreateInfo &info) const
   }
   ss << "\n/* Push Constants. */\n";
   for (const ShaderCreateInfo::PushConst &uniform : info.push_constants_) {
-    ss << "layout(location = " << uniform.index << ") ";
+    if (GLContext::explicit_location_support) {
+      ss << "layout(location = " << uniform.index << ") ";
+    }
     ss << "uniform " << to_string(uniform.type) << " " << uniform.name;
     if (uniform.array_size > 0) {
       ss << "[" << uniform.array_size << "]";
@@ -418,7 +423,9 @@ std::string GLShader::vertex_interface_declare(const ShaderCreateInfo &info) con
 
   ss << "\n/* Inputs. */\n";
   for (const ShaderCreateInfo::VertIn &attr : info.vertex_inputs_) {
-    ss << "layout(location = " << attr.index << ") ";
+    if (GLContext::explicit_location_support) {
+      ss << "layout(location = " << attr.index << ") ";
+    }
     ss << "in " << to_string(attr.type) << " " << attr.name << ";\n";
   }
   ss << "\n/* Interfaces. */\n";
@@ -501,7 +508,12 @@ static char *glsl_patch_default_get()
 
   size_t slen = 0;
   /* Version need to go first. */
-  STR_CONCAT(patch, slen, "#version 430\n");
+  if (GLEW_VERSION_4_3) {
+    STR_CONCAT(patch, slen, "#version 430\n");
+  }
+  else {
+    STR_CONCAT(patch, slen, "#version 330\n");
+  }
 
   /* Enable extensions for features that are not part of our base GLSL version
    * don't use an extension for something already available! */
