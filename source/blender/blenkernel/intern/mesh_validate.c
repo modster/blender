@@ -304,6 +304,7 @@ bool BKE_mesh_validate_arrays(Mesh *mesh,
   }
 
   const float(*vert_normals)[3] = NULL;
+  BKE_mesh_assert_normals_dirty_or_calculated(mesh);
   if (!BKE_mesh_vertex_normals_are_dirty(mesh)) {
     vert_normals = BKE_mesh_vertex_normals_ensure(mesh);
   }
@@ -1008,6 +1009,11 @@ bool BKE_mesh_validate_all_customdata(CustomData *vdata,
   if (check_meshmask) {
     mask = CD_MASK_MESH;
   }
+
+  /* Normal data isn't in the mask since it is derived data,
+   * but it is valid and should not be removed. */
+  mask.vmask |= CD_MASK_NORMAL;
+  mask.pmask |= CD_MASK_NORMAL;
 
   is_valid &= mesh_validate_customdata(
       vdata, mask.vmask, totvert, do_verbose, do_fixes, &is_change_v);
