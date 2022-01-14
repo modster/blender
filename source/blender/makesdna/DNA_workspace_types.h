@@ -29,6 +29,15 @@
 extern "C" {
 #endif
 
+/** #bToolRef_Runtime.flag */
+enum {
+  /**
+   * This tool should use the fallback key-map.
+   * Typically gizmos handle this but some tools (such as the knife tool) don't use a gizmo.
+   */
+  TOOLREF_FLAG_FALLBACK_KEYMAP = (1 << 0),
+};
+
 #
 #
 typedef struct bToolRef_Runtime {
@@ -47,9 +56,13 @@ typedef struct bToolRef_Runtime {
 
   /** Index when a tool is a member of a group. */
   int index;
+  /** Options: `TOOLREF_FLAG_*`. */
+  int flag;
 } bToolRef_Runtime;
 
-/* Stored per mode. */
+/**
+ * \note Stored per mode.
+ */
 typedef struct bToolRef {
   struct bToolRef *next, *prev;
   char idname[64];

@@ -468,7 +468,7 @@ typedef enum eRotationModes {
 typedef struct bPose {
   /** List of pose channels, PoseBones in RNA. */
   ListBase chanbase;
-  /** Ghash for quicker string lookups. */
+  /** Use a hash-table for quicker string lookups. */
   struct GHash *chanhash;
 
   /* Flat array of pose channels. It references pointers from
@@ -682,6 +682,10 @@ typedef struct bAction {
   int idroot;
   char _pad[4];
 
+  /** Start and end of the manually set intended playback frame range. Used by UI and
+   *  some editing tools, but doesn't directly affect animation evaluation in any way. */
+  float frame_start, frame_end;
+
   PreviewImage *preview;
 } bAction;
 
@@ -695,6 +699,10 @@ typedef enum eAction_Flags {
   ACT_MUTED = (1 << 9),
   /* ACT_PROTECTED = (1 << 10), */ /* UNUSED */
   /* ACT_DISABLED = (1 << 11), */  /* UNUSED */
+  /** The action has a manually set intended playback frame range. */
+  ACT_FRAME_RANGE = (1 << 12),
+  /** The action is intended to be a cycle (requires ACT_FRAME_RANGE). */
+  ACT_CYCLIC = (1 << 13),
 } eAction_Flags;
 
 /* ************************************************ */
@@ -856,11 +864,11 @@ typedef enum eSAction_Flag {
   /* draw time in seconds instead of time in frames */
   SACTION_DRAWTIME = (1 << 2),
   /* don't filter action channels according to visibility */
-  // SACTION_NOHIDE = (1 << 3), /* XXX deprecated... old animation systems. */
+  // SACTION_NOHIDE = (1 << 3), /* Deprecated, old animation systems. */
   /* don't kill overlapping keyframes after transform */
   SACTION_NOTRANSKEYCULL = (1 << 4),
   /* don't include keyframes that are out of view */
-  // SACTION_HORIZOPTIMISEON = (1 << 5), // XXX deprecated... old irrelevant trick
+  // SACTION_HORIZOPTIMISEON = (1 << 5), /* Deprecated, old irrelevant trick. */
   /* show pose-markers (local to action) in Action Editor mode. */
   SACTION_POSEMARKERS_SHOW = (1 << 6),
   /* don't draw action channels using group colors (where applicable) */

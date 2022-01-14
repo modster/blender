@@ -16,6 +16,11 @@
 
 /** \file
  * \ingroup edasset
+ *
+ * API to abstract away details for temporary loading of an ID from an asset. If the ID is stored
+ * in the current file (or more precisely, in the #Main given when requesting an ID) no loading is
+ * performed and the ID is returned. Otherwise it's imported for temporary access using the
+ * `BLO_library_temp` API.
  */
 
 #pragma once
@@ -30,9 +35,9 @@ typedef struct AssetTempIDConsumer AssetTempIDConsumer;
 
 struct AssetHandle;
 struct AssetLibraryReference;
-struct bContext;
 struct Main;
 struct ReportList;
+struct bContext;
 
 AssetTempIDConsumer *ED_asset_temp_id_consumer_create(const struct AssetHandle *handle);
 void ED_asset_temp_id_consumer_free(AssetTempIDConsumer **consumer);

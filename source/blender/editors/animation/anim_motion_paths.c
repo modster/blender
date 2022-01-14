@@ -84,7 +84,7 @@ Depsgraph *animviz_depsgraph_build(Main *bmain,
 
   /* Make a flat array of IDs for the DEG API. */
   const int num_ids = BLI_listbase_count(targets);
-  ID **ids = MEM_malloc_arrayN(sizeof(ID *), num_ids, "animviz IDS");
+  ID **ids = MEM_malloc_arrayN(num_ids, sizeof(ID *), "animviz IDS");
   int current_id_index = 0;
   for (MPathTarget *mpt = targets->first; mpt != NULL; mpt = mpt->next) {
     ids[current_id_index++] = &mpt->ob->id;
@@ -99,12 +99,10 @@ Depsgraph *animviz_depsgraph_build(Main *bmain,
   return depsgraph;
 }
 
-/* get list of motion paths to be baked for the given object
- * - assumes the given list is ready to be used
- */
-/* TODO: it would be nice in future to be able to update objects dependent on these bones too? */
 void animviz_get_object_motionpaths(Object *ob, ListBase *targets)
 {
+  /* TODO: it would be nice in future to be able to update objects dependent on these bones too? */
+
   MPathTarget *mpt;
 
   /* object itself first */
@@ -176,11 +174,11 @@ static void motionpaths_calc_bake_targets(ListBase *targets, int cframe)
         copy_v3_v3(mpv->co, pchan_eval->pose_tail);
       }
 
-      /* result must be in worldspace */
+      /* Result must be in world-space. */
       mul_m4_v3(ob_eval->obmat, mpv->co);
     }
     else {
-      /* worldspace object location */
+      /* World-space object location. */
       copy_v3_v3(mpv->co, ob_eval->obmat[3]);
     }
 
@@ -329,6 +327,7 @@ static void motionpath_calculate_update_range(MPathTarget *mpt,
   for (FCurve *fcu = fcurve_list->first; fcu != NULL; fcu = fcu->next) {
     struct AnimKeylist *keylist = ED_keylist_create();
     fcurve_to_keylist(adt, fcu, keylist, 0);
+    ED_keylist_prepare_for_direct_access(keylist);
 
     int fcu_sfra = motionpath_get_prev_prev_keyframe(mpt, keylist, current_frame);
     int fcu_efra = motionpath_get_next_next_keyframe(mpt, keylist, current_frame);
@@ -355,12 +354,6 @@ static void motionpath_free_free_tree_data(ListBase *targets)
   }
 }
 
-/* Perform baking of the given object's and/or its bones' transforms to motion paths
- * - scene: current scene
- * - ob: object whose flagged motion-paths should get calculated
- * - recalc: whether we need to
- */
-/* TODO: include reports pointer? */
 void animviz_calc_motionpaths(Depsgraph *depsgraph,
                               Main *bmain,
                               Scene *scene,
@@ -368,6 +361,8 @@ void animviz_calc_motionpaths(Depsgraph *depsgraph,
                               eAnimvizCalcRange range,
                               bool restore)
 {
+  /* TODO: include reports pointer? */
+
   /* Sanity check. */
   if (ELEM(NULL, targets, targets->first)) {
     return;
@@ -443,6 +438,7 @@ void animviz_calc_motionpaths(Depsgraph *depsgraph,
         action_to_keylist(adt, adt->action, mpt->keylist, 0);
       }
     }
+    ED_keylist_prepare_for_direct_access(mpt->keylist);
 
     if (range == ANIMVIZ_CALC_RANGE_CHANGED) {
       int mpt_sfra, mpt_efra;

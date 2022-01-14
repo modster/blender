@@ -175,6 +175,7 @@ set(SRC_RNA_INC
   ../RNA_access.h
   ../RNA_define.h
   ../RNA_documentation.h
+  ../RNA_enum_items.h
   ../RNA_enum_types.h
   ../RNA_types.h
 )
@@ -202,6 +203,9 @@ set(INC
   ../../blenloader
 
   ${CMAKE_BINARY_DIR}/source/blender/makesdna/intern
+
+  # dna_type_offsets.h
+  ${CMAKE_CURRENT_BINARY_DIR}/../../makesdna/intern
 )
 
 set(INC_SYS

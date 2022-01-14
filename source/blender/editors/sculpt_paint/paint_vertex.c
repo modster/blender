@@ -199,9 +199,6 @@ static void paint_last_stroke_update(Scene *scene, const float location[3])
   ups->last_stroke_valid = true;
 }
 
-/* polling - retrieve whether cursor should be set or operator should be done */
-
-/* Returns true if vertex paint mode is active */
 bool vertex_paint_mode_poll(bContext *C)
 {
   Object *ob = CTX_data_active_object(C);
@@ -295,7 +292,7 @@ static uint vpaint_blend(const VPaint *vp,
 
   uint color_blend = ED_vpaint_blend_tool(blend, color_curr, color_paint, alpha_i);
 
-  /* if no accumulate, clip color adding with colorig & orig alpha */
+  /* If no accumulate, clip color adding with `color_orig` & `color_test`. */
   if (!brush_use_accumulate(vp)) {
     uint color_test, a;
     char *cp, *ct, *co;
@@ -1738,13 +1735,6 @@ static bool wpaint_stroke_test_start(bContext *C, wmOperator *op, const float mo
   return true;
 }
 
-static float dot_vf3vs3(const float brushNormal[3], const short vertexNormal[3])
-{
-  float normal[3];
-  normal_short_to_float_v3(normal, vertexNormal);
-  return dot_v3v3(brushNormal, normal);
-}
-
 static void get_brush_alpha_data(const Scene *scene,
                                  const SculptSession *ss,
                                  const Brush *brush,
@@ -1871,7 +1861,7 @@ static void do_wpaint_brush_blur_task_cb_ex(void *__restrict userdata,
         if (total_hit_loops != 0) {
           float brush_strength = cache->bstrength;
           const float angle_cos = (use_normal && vd.no) ?
-                                      dot_vf3vs3(sculpt_normal_frontface, vd.no) :
+                                      dot_v3v3(sculpt_normal_frontface, vd.no) :
                                       1.0f;
           if (((brush->flag & BRUSH_FRONTFACE) == 0 || (angle_cos > 0.0f)) &&
               ((brush->flag & BRUSH_FRONTFACE_FALLOFF) == 0 ||
@@ -1951,7 +1941,7 @@ static void do_wpaint_brush_smear_task_cb_ex(void *__restrict userdata,
         if (!(use_face_sel || use_vert_sel) || mv_curr->flag & SELECT) {
           float brush_strength = cache->bstrength;
           const float angle_cos = (use_normal && vd.no) ?
-                                      dot_vf3vs3(sculpt_normal_frontface, vd.no) :
+                                      dot_v3v3(sculpt_normal_frontface, vd.no) :
                                       1.0f;
           if (((brush->flag & BRUSH_FRONTFACE) == 0 || (angle_cos > 0.0f)) &&
               ((brush->flag & BRUSH_FRONTFACE_FALLOFF) == 0 ||
@@ -2057,9 +2047,8 @@ static void do_wpaint_brush_draw_task_cb_ex(void *__restrict userdata,
       /* If the vertex is selected */
       if (!(use_face_sel || use_vert_sel) || v_flag & SELECT) {
         float brush_strength = cache->bstrength;
-        const float angle_cos = (use_normal && vd.no) ?
-                                    dot_vf3vs3(sculpt_normal_frontface, vd.no) :
-                                    1.0f;
+        const float angle_cos = (use_normal && vd.no) ? dot_v3v3(sculpt_normal_frontface, vd.no) :
+                                                        1.0f;
         if (((brush->flag & BRUSH_FRONTFACE) == 0 || (angle_cos > 0.0f)) &&
             ((brush->flag & BRUSH_FRONTFACE_FALLOFF) == 0 ||
              view_angle_limits_apply_falloff(
@@ -2114,7 +2103,7 @@ static void do_wpaint_brush_calc_average_weight_cb_ex(
   BKE_pbvh_vertex_iter_begin (ss->pbvh, data->nodes[n], vd, PBVH_ITER_UNIQUE) {
     /* Test to see if the vertex coordinates are within the spherical brush region. */
     if (sculpt_brush_test_sq_fn(&test, vd.co)) {
-      const float angle_cos = (use_normal && vd.no) ? dot_vf3vs3(sculpt_normal_frontface, vd.no) :
+      const float angle_cos = (use_normal && vd.no) ? dot_v3v3(sculpt_normal_frontface, vd.no) :
                                                       1.0f;
       if (angle_cos > 0.0 &&
           BKE_brush_curve_strength(data->brush, sqrtf(test.dist), cache->radius) > 0.0) {
@@ -2332,7 +2321,7 @@ static void wpaint_do_symmetrical_brush_actions(
   /* symm is a bit combination of XYZ - 1 is mirror
    * X; 2 is Y; 3 is XY; 4 is Z; 5 is XZ; 6 is YZ; 7 is XYZ */
   for (i = 1; i <= symm; i++) {
-    if ((symm & i && (symm != 5 || i != 3) && (symm != 6 || (i != 3 && i != 5)))) {
+    if ((symm & i && (symm != 5 || i != 3) && (symm != 6 || (!ELEM(i, 3, 5))))) {
       cache->mirror_symmetry_pass = i;
       cache->radial_symmetry_pass = 0;
       SCULPT_cache_calc_brushdata_symm(cache, i, 0, 0);
@@ -2898,9 +2887,8 @@ static void do_vpaint_brush_draw_task_cb_ex(void *__restrict userdata,
         /* Calc the dot prod. between ray norm on surf and current vert
          * (ie splash prevention factor), and only paint front facing verts. */
         float brush_strength = cache->bstrength;
-        const float angle_cos = (use_normal && vd.no) ?
-                                    dot_vf3vs3(sculpt_normal_frontface, vd.no) :
-                                    1.0f;
+        const float angle_cos = (use_normal && vd.no) ? dot_v3v3(sculpt_normal_frontface, vd.no) :
+                                                        1.0f;
         if (((brush->flag & BRUSH_FRONTFACE) == 0 || (angle_cos > 0.0f)) &&
             ((brush->flag & BRUSH_FRONTFACE_FALLOFF) == 0 ||
              view_angle_limits_apply_falloff(
@@ -2993,9 +2981,8 @@ static void do_vpaint_brush_blur_task_cb_ex(void *__restrict userdata,
       /* If the vertex is selected for painting. */
       if (!use_vert_sel || mv->flag & SELECT) {
         float brush_strength = cache->bstrength;
-        const float angle_cos = (use_normal && vd.no) ?
-                                    dot_vf3vs3(sculpt_normal_frontface, vd.no) :
-                                    1.0f;
+        const float angle_cos = (use_normal && vd.no) ? dot_v3v3(sculpt_normal_frontface, vd.no) :
+                                                        1.0f;
         if (((brush->flag & BRUSH_FRONTFACE) == 0 || (angle_cos > 0.0f)) &&
             ((brush->flag & BRUSH_FRONTFACE_FALLOFF) == 0 ||
              view_angle_limits_apply_falloff(
@@ -3119,7 +3106,7 @@ static void do_vpaint_brush_smear_task_cb_ex(void *__restrict userdata,
            * (ie splash prevention factor), and only paint front facing verts. */
           float brush_strength = cache->bstrength;
           const float angle_cos = (use_normal && vd.no) ?
-                                      dot_vf3vs3(sculpt_normal_frontface, vd.no) :
+                                      dot_v3v3(sculpt_normal_frontface, vd.no) :
                                       1.0f;
           if (((brush->flag & BRUSH_FRONTFACE) == 0 || (angle_cos > 0.0f)) &&
               ((brush->flag & BRUSH_FRONTFACE_FALLOFF) == 0 ||
@@ -3350,7 +3337,7 @@ static void vpaint_do_symmetrical_brush_actions(
   /* symm is a bit combination of XYZ - 1 is mirror
    * X; 2 is Y; 3 is XY; 4 is Z; 5 is XZ; 6 is YZ; 7 is XYZ */
   for (i = 1; i <= symm; i++) {
-    if (symm & i && (symm != 5 || i != 3) && (symm != 6 || (i != 3 && i != 5))) {
+    if (symm & i && (symm != 5 || i != 3) && (symm != 6 || (!ELEM(i, 3, 5)))) {
       cache->mirror_symmetry_pass = i;
       cache->radial_symmetry_pass = 0;
       SCULPT_cache_calc_brushdata_symm(cache, i, 0, 0);

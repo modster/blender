@@ -22,7 +22,7 @@
  *
  * GPU Capabilities & workarounds
  * This module expose the reported implementation limits & enabled
- * workaround for drivers that needs specific codepaths.
+ * workaround for drivers that needs specific code-paths.
  */
 
 #pragma once
@@ -64,6 +64,9 @@ bool GPU_shader_image_load_store_support(void);
 bool GPU_mem_stats_supported(void);
 void GPU_mem_stats_get(int *totalmem, int *freemem);
 
+/**
+ * Return support for the active context + window.
+ */
 bool GPU_stereo_quadbuffer_support(void);
 
 #ifdef __cplusplus

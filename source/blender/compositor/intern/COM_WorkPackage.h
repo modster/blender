@@ -24,13 +24,13 @@
 
 #include "COM_Enums.h"
 
-#include "BLI_rect.h"
+#include "DNA_vec_types.h"
 
 #include <functional>
 #include <ostream>
 
 namespace blender::compositor {
-// Forward Declarations.
+/* Forward Declarations. */
 class ExecutionGroup;
 
 /**
@@ -43,7 +43,7 @@ struct WorkPackage {
   eWorkPackageState state = eWorkPackageState::NotScheduled;
 
   /**
-   * \brief executionGroup with the operations-setup to be evaluated
+   * \brief execution_group with the operations-setup to be evaluated
    */
   ExecutionGroup *execution_group;
 

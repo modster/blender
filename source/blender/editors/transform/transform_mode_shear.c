@@ -41,8 +41,10 @@
 #include "BLT_translation.h"
 
 #include "transform.h"
-#include "transform_mode.h"
+#include "transform_convert.h"
 #include "transform_snap.h"
+
+#include "transform_mode.h"
 
 /* -------------------------------------------------------------------- */
 /** \name Transform (Shear) Element
@@ -197,7 +199,7 @@ static void applyShear(TransInfo *t, const int UNUSED(mval[2]))
   char str[UI_MAX_DRAW_STR];
   const bool is_local_center = transdata_check_local_center(t, t->around);
 
-  value = t->values[0];
+  value = t->values[0] + t->values_modal_offset[0];
 
   transform_snap_increment(t, &value);
 
@@ -287,4 +289,5 @@ void initShear(TransInfo *t)
 
   transform_mode_default_modal_orientation_set(t, V3D_ORIENT_VIEW);
 }
+
 /** \} */

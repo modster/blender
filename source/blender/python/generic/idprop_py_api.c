@@ -25,6 +25,7 @@
 #include "BLI_utildefines.h"
 
 #include "idprop_py_api.h"
+#include "idprop_py_ui_api.h"
 
 #include "BKE_idprop.h"
 
@@ -532,6 +533,7 @@ static IDProperty *idp_from_PySequence_Fast(const char *name, PyObject *ob)
       for (i = 0; i < val.array.len; i++) {
         item = ob_seq_fast_items[i];
         if (((prop_data[i] = PyFloat_AsDouble(item)) == -1.0) && PyErr_Occurred()) {
+          IDP_FreeProperty(prop);
           return NULL;
         }
       }
@@ -544,6 +546,7 @@ static IDProperty *idp_from_PySequence_Fast(const char *name, PyObject *ob)
       for (i = 0; i < val.array.len; i++) {
         item = ob_seq_fast_items[i];
         if (((prop_data[i] = PyC_Long_AsI32(item)) == -1) && PyErr_Occurred()) {
+          IDP_FreeProperty(prop);
           return NULL;
         }
       }
@@ -554,6 +557,7 @@ static IDProperty *idp_from_PySequence_Fast(const char *name, PyObject *ob)
       for (i = 0; i < val.array.len; i++) {
         item = ob_seq_fast_items[i];
         if (BPy_IDProperty_Map_ValidateAndCreate(NULL, prop, item) == false) {
+          IDP_FreeProperty(prop);
           return NULL;
         }
       }
@@ -682,12 +686,6 @@ static IDProperty *idp_from_PyObject(PyObject *name_obj, PyObject *ob)
 /** \name Mapping Get/Set (Internal Access)
  * \{ */
 
-/**
- * \note group can be a pointer array or a group.
- * assume we already checked key is a string.
- *
- * \return success.
- */
 bool BPy_IDProperty_Map_ValidateAndCreate(PyObject *name_obj, IDProperty *group, PyObject *ob)
 {
   IDProperty *prop = idp_from_PyObject(name_obj, ob);
@@ -713,8 +711,12 @@ bool BPy_IDProperty_Map_ValidateAndCreate(PyObject *name_obj, IDProperty *group,
       prop->next = prop_exist->next;
       prop->flag = prop_exist->flag;
 
+      /* Don't free and reset the existing property's UI data, since this only assigns a value. */
+      IDPropertyUIData *ui_data = prop_exist->ui_data;
+      prop_exist->ui_data = NULL;
       IDP_FreePropertyContent(prop_exist);
       *prop_exist = *prop;
+      prop_exist->ui_data = ui_data;
       MEM_freeN(prop);
     }
     else {
@@ -771,7 +773,6 @@ static PyObject *BPy_IDGroup_iter(BPy_IDProperty *self)
   return BPy_IDGroup_ViewKeys_CreatePyObject(self);
 }
 
-/* for simple, non nested types this is the same as BPy_IDGroup_WrapData */
 PyObject *BPy_IDGroup_MapDataToPy(IDProperty *prop)
 {
   switch (prop->type) {
@@ -1967,6 +1968,8 @@ static PyBufferProcs BPy_IDArray_Buffer = {
     (releasebufferproc)BPy_IDArray_releasebuffer,
 };
 
+/** \} */
+
 /* -------------------------------------------------------------------- */
 /** \name ID Array Type
  * \{ */
@@ -2135,6 +2138,7 @@ static PyObject *BPyInit_idprop_types(void)
   submodule = PyModule_Create(&IDProp_types_module_def);
 
   IDProp_Init_Types();
+  IDPropertyUIData_Init_Types();
 
   /* bmesh_py_types.c */
   PyModule_AddType(submodule, &BPy_IDGroup_Type);

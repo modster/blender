@@ -75,10 +75,9 @@ bool transdata_check_local_center(const TransInfo *t, short around)
            /* implicit: (t->flag & T_EDIT) */
            (ELEM(t->obedit_type, OB_MESH, OB_CURVE, OB_MBALL, OB_ARMATURE, OB_GPENCIL)) ||
            (t->spacetype == SPACE_GRAPH) ||
-           (t->options & (CTX_MOVIECLIP | CTX_MASK | CTX_PAINT_CURVE))));
+           (t->options & (CTX_MOVIECLIP | CTX_MASK | CTX_PAINT_CURVE | CTX_SEQUENCER_IMAGE))));
 }
 
-/* Informs if the mode can be switched during modal. */
 bool transform_mode_is_changeable(const int mode)
 {
   return ELEM(mode,
@@ -520,10 +519,12 @@ void constraintSizeLim(const TransInfo *t, TransData *td)
   }
 }
 
+/** \} */
+
 /* -------------------------------------------------------------------- */
 /** \name Transform (Rotation Utils)
  * \{ */
-/* Used by Transform Rotation and Transform Normal Rotation */
+
 void headerRotation(TransInfo *t, char *str, const int str_size, float final)
 {
   size_t ofs = 0;
@@ -551,12 +552,6 @@ void headerRotation(TransInfo *t, char *str, const int str_size, float final)
   }
 }
 
-/**
- * Applies values of rotation to `td->loc` and `td->ext->quat`
- * based on a rotation matrix (mat) and a pivot (center).
- *
- * Protected axis and other transform settings are taken into account.
- */
 void ElementRotation_ex(const TransInfo *t,
                         const TransDataContainer *tc,
                         TransData *td,
@@ -828,11 +823,13 @@ void ElementRotation(const TransInfo *t,
 
   ElementRotation_ex(t, tc, td, mat, center);
 }
+
 /** \} */
 
 /* -------------------------------------------------------------------- */
 /** \name Transform (Resize Utils)
  * \{ */
+
 void headerResize(TransInfo *t, const float vec[3], char *str, const int str_size)
 {
   char tvec[NUM_STR_REP_LEN * 3];
@@ -1045,7 +1042,7 @@ void ElementResize(const TransInfo *t,
       applyNumInput(&num_evil, values_final_evil);
 
       float ratio = values_final_evil[0];
-      *td->val = td->ival * ratio * gps->runtime.multi_frame_falloff;
+      *td->val = td->ival * fabs(ratio) * gps->runtime.multi_frame_falloff;
       CLAMP_MIN(*td->val, 0.001f);
     }
   }
@@ -1054,6 +1051,11 @@ void ElementResize(const TransInfo *t,
   }
 
   if (t->options & (CTX_OBJECT | CTX_POSE_BONE)) {
+    if (t->options & CTX_POSE_BONE) {
+      /* Without this, the resulting location of scaled bones aren't correct,
+       * especially noticeable scaling root or disconnected bones around the cursor, see T92515. */
+      mul_mat3_m4_v3(tc->poseobj->obmat, vec);
+    }
     mul_m3_v3(td->smtx, vec);
   }
 
@@ -1065,102 +1067,6 @@ void ElementResize(const TransInfo *t,
   constraintTransLim(t, td);
 }
 
-/** \} */
-
-/* -------------------------------------------------------------------- */
-/** \name Transform (Frame Utils)
- * \{ */
-
-/**
- * This function returns the snapping 'mode' for Animation Editors only.
- * We cannot use the standard snapping due to NLA-strip scaling complexities.
- *
- * TODO: these modifier checks should be key-mappable.
- */
-short getAnimEdit_SnapMode(TransInfo *t)
-{
-  short autosnap = SACTSNAP_OFF;
-
-  if (t->spacetype == SPACE_ACTION) {
-    SpaceAction *saction = (SpaceAction *)t->area->spacedata.first;
-
-    if (saction) {
-      autosnap = saction->autosnap;
-    }
-  }
-  else if (t->spacetype == SPACE_GRAPH) {
-    SpaceGraph *sipo = (SpaceGraph *)t->area->spacedata.first;
-
-    if (sipo) {
-      autosnap = sipo->autosnap;
-    }
-  }
-  else if (t->spacetype == SPACE_NLA) {
-    SpaceNla *snla = (SpaceNla *)t->area->spacedata.first;
-
-    if (snla) {
-      autosnap = snla->autosnap;
-    }
-  }
-  else {
-    autosnap = SACTSNAP_OFF;
-  }
-
-  /* toggle autosnap on/off
-   * - when toggling on, prefer nearest frame over 1.0 frame increments
-   */
-  if (t->modifiers & MOD_SNAP_INVERT) {
-    if (autosnap) {
-      autosnap = SACTSNAP_OFF;
-    }
-    else {
-      autosnap = SACTSNAP_FRAME;
-    }
-  }
-
-  return autosnap;
-}
-
-/* This function is used by Animation Editor specific transform functions to do
- * the Snap Keyframe to Nearest Frame/Marker
- */
-void doAnimEdit_SnapFrame(
-    TransInfo *t, TransData *td, TransData2D *td2d, AnimData *adt, short autosnap)
-{
-  if (autosnap != SACTSNAP_OFF) {
-    float val;
-
-    /* convert frame to nla-action time (if needed) */
-    if (adt && (t->spacetype != SPACE_SEQ)) {
-      val = BKE_nla_tweakedit_remap(adt, *(td->val), NLATIME_CONVERT_MAP);
-    }
-    else {
-      val = *(td->val);
-    }
-
-    snapFrameTransform(t, autosnap, true, val, &val);
-
-    /* convert frame out of nla-action time */
-    if (adt && (t->spacetype != SPACE_SEQ)) {
-      *(td->val) = BKE_nla_tweakedit_remap(adt, val, NLATIME_CONVERT_UNMAP);
-    }
-    else {
-      *(td->val) = val;
-    }
-  }
-
-  /* If the handles are to be moved too
-   * (as side-effect of keyframes moving, to keep the general effect)
-   * offset them by the same amount so that the general angles are maintained
-   * (i.e. won't change while handles are free-to-roam and keyframes are snap-locked).
-   */
-  if ((td->flag & TD_MOVEHANDLE1) && td2d->h1) {
-    td2d->h1[0] = td2d->ih1[0] + *td->val - td->ival;
-  }
-  if ((td->flag & TD_MOVEHANDLE2) && td2d->h2) {
-    td2d->h2[0] = td2d->ih2[0] + *td->val - td->ival;
-  }
-}
 /** \} */
 
 /* -------------------------------------------------------------------- */
@@ -1178,9 +1084,24 @@ void transform_mode_init(TransInfo *t, wmOperator *op, const int mode)
     case TFM_ROTATION:
       initRotation(t);
       break;
-    case TFM_RESIZE:
-      initResize(t);
+    case TFM_RESIZE: {
+      float mouse_dir_constraint[3];
+      if (op) {
+        PropertyRNA *prop = RNA_struct_find_property(op->ptr, "mouse_dir_constraint");
+        if (prop) {
+          RNA_property_float_get_array(op->ptr, prop, mouse_dir_constraint);
+        }
+        else {
+          /* Resize is expected to have this property. */
+          BLI_assert(!STREQ(op->idname, "TRANSFORM_OT_resize"));
+        }
+      }
+      else {
+        zero_v3(mouse_dir_constraint);
+      }
+      initResize(t, mouse_dir_constraint);
       break;
+    }
     case TFM_SKIN_RESIZE:
       initSkinResize(t);
       break;
@@ -1308,15 +1229,12 @@ void transform_mode_init(TransInfo *t, wmOperator *op, const int mode)
    * BLI_assert(t->mode == mode); */
 }
 
-/**
- * When in modal and not set, initializes a default orientation for the mode.
- */
 void transform_mode_default_modal_orientation_set(TransInfo *t, int type)
 {
   /* Currently only these types are supported. */
   BLI_assert(ELEM(type, V3D_ORIENT_GLOBAL, V3D_ORIENT_VIEW));
 
-  if (t->is_orient_set) {
+  if (t->is_orient_default_overwrite) {
     return;
   }
 
@@ -1328,18 +1246,29 @@ void transform_mode_default_modal_orientation_set(TransInfo *t, int type)
     return;
   }
 
+  View3D *v3d = NULL;
   RegionView3D *rv3d = NULL;
   if ((type == V3D_ORIENT_VIEW) && (t->spacetype == SPACE_VIEW3D) && t->region &&
       (t->region->regiontype == RGN_TYPE_WINDOW)) {
+    v3d = t->view;
     rv3d = t->region->regiondata;
   }
 
   t->orient[O_DEFAULT].type = ED_transform_calc_orientation_from_type_ex(
-      NULL, t->orient[O_DEFAULT].matrix, NULL, rv3d, NULL, NULL, type, 0);
+      t->scene,
+      t->view_layer,
+      v3d,
+      rv3d,
+      NULL,
+      NULL,
+      type,
+      V3D_AROUND_CENTER_BOUNDS,
+      t->orient[O_DEFAULT].matrix);
 
   if (t->orient_curr == O_DEFAULT) {
     /* Update Orientation. */
     transform_orientations_current_set(t, O_DEFAULT);
   }
 }
+
 /** \} */

@@ -23,30 +23,25 @@
 
 #include "node_geometry_util.hh"
 
-static bNodeSocketTemplate geo_node_curve_spline_type_in[] = {
-    {SOCK_GEOMETRY, N_("Curve")},
-    {SOCK_STRING, N_("Selection")},
-    {-1, ""},
-};
+namespace blender::nodes::node_geo_curve_spline_type_cc {
 
-static bNodeSocketTemplate geo_node_curve_spline_type_out[] = {
-    {SOCK_GEOMETRY, N_("Curve")},
-    {-1, ""},
-};
+NODE_STORAGE_FUNCS(NodeGeometryCurveSplineType)
 
-static void geo_node_curve_spline_type_layout(uiLayout *layout,
-                                              bContext *UNUSED(C),
-                                              PointerRNA *ptr)
+static void node_declare(NodeDeclarationBuilder &b)
+{
+  b.add_input<decl::Geometry>(N_("Curve")).supported_type(GEO_COMPONENT_TYPE_CURVE);
+  b.add_input<decl::Bool>(N_("Selection")).default_value(true).hide_value().supports_field();
+  b.add_output<decl::Geometry>(N_("Curve"));
+}
+
+static void node_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 {
   uiItemR(layout, ptr, "spline_type", 0, "", ICON_NONE);
 }
 
-namespace blender::nodes {
-
-static void geo_node_curve_spline_type_init(bNodeTree *UNUSED(tree), bNode *node)
+static void node_init(bNodeTree *UNUSED(tree), bNode *node)
 {
-  NodeGeometryCurveSplineType *data = (NodeGeometryCurveSplineType *)MEM_callocN(
-      sizeof(NodeGeometryCurveSplineType), __func__);
+  NodeGeometryCurveSplineType *data = MEM_cnew<NodeGeometryCurveSplineType>(__func__);
 
   data->spline_type = GEO_NODE_SPLINE_TYPE_POLY;
   node->storage = data;
@@ -78,14 +73,14 @@ template<typename CopyFn>
 static void copy_attributes(const Spline &input_spline, Spline &output_spline, CopyFn copy_fn)
 {
   input_spline.attributes.foreach_attribute(
-      [&](StringRefNull name, const AttributeMetaData &meta_data) {
-        std::optional<GSpan> src = input_spline.attributes.get_for_read(name);
+      [&](const AttributeIDRef &attribute_id, const AttributeMetaData &meta_data) {
+        std::optional<GSpan> src = input_spline.attributes.get_for_read(attribute_id);
         BLI_assert(src);
-        if (!output_spline.attributes.create(name, meta_data.data_type)) {
+        if (!output_spline.attributes.create(attribute_id, meta_data.data_type)) {
           BLI_assert_unreachable();
           return false;
         }
-        std::optional<GMutableSpan> dst = output_spline.attributes.get_for_write(name);
+        std::optional<GMutableSpan> dst = output_spline.attributes.get_for_write(attribute_id);
         if (!dst) {
           BLI_assert_unreachable();
           return false;
@@ -242,66 +237,75 @@ static SplinePtr convert_to_nurbs(const Spline &input)
   return {};
 }
 
-static void geo_node_curve_spline_type_exec(GeoNodeExecParams params)
+static void node_geo_exec(GeoNodeExecParams params)
 {
-  const NodeGeometryCurveSplineType *storage =
-      (const NodeGeometryCurveSplineType *)params.node().storage;
-  const GeometryNodeSplineType output_type = (const GeometryNodeSplineType)storage->spline_type;
+  const NodeGeometryCurveSplineType &storage = node_storage(params.node());
+  const GeometryNodeSplineType output_type = (const GeometryNodeSplineType)storage.spline_type;
 
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Curve");
-  geometry_set = bke::geometry_set_realize_instances(geometry_set);
-  if (!geometry_set.has_curve()) {
-    params.set_output("Curve", geometry_set);
-    return;
-  }
+  Field<bool> selection_field = params.extract_input<Field<bool>>("Selection");
 
-  const CurveComponent *curve_component = geometry_set.get_component_for_read<CurveComponent>();
-  const CurveEval &curve = *curve_component->get_for_read();
+  geometry_set.modify_geometry_sets([&](GeometrySet &geometry_set) {
+    if (!geometry_set.has_curve()) {
+      return;
+    }
 
-  const std::string selection_name = params.extract_input<std::string>("Selection");
-  GVArray_Typed<bool> selection = curve_component->attribute_get_for_read(
-      selection_name, ATTR_DOMAIN_CURVE, true);
+    const CurveComponent *curve_component = geometry_set.get_component_for_read<CurveComponent>();
+    const CurveEval &curve = *curve_component->get_for_read();
+    GeometryComponentFieldContext field_context{*curve_component, ATTR_DOMAIN_CURVE};
+    const int domain_size = curve_component->attribute_domain_size(ATTR_DOMAIN_CURVE);
 
-  std::unique_ptr<CurveEval> new_curve = std::make_unique<CurveEval>();
-  for (const int i : curve.splines().index_range()) {
-    if (selection[i]) {
-      switch (output_type) {
-        case GEO_NODE_SPLINE_TYPE_POLY:
-          new_curve->add_spline(convert_to_poly_spline(*curve.splines()[i]));
-          break;
-        case GEO_NODE_SPLINE_TYPE_BEZIER:
-          new_curve->add_spline(convert_to_bezier(*curve.splines()[i], params));
-          break;
-        case GEO_NODE_SPLINE_TYPE_NURBS:
-          new_curve->add_spline(convert_to_nurbs(*curve.splines()[i]));
-          break;
+    fn::FieldEvaluator selection_evaluator{field_context, domain_size};
+    selection_evaluator.add(selection_field);
+    selection_evaluator.evaluate();
+    const VArray<bool> &selection = selection_evaluator.get_evaluated<bool>(0);
+
+    std::unique_ptr<CurveEval> new_curve = std::make_unique<CurveEval>();
+    new_curve->resize(curve.splines().size());
+
+    threading::parallel_for(curve.splines().index_range(), 512, [&](IndexRange range) {
+      for (const int i : range) {
+        if (selection[i]) {
+          switch (output_type) {
+            case GEO_NODE_SPLINE_TYPE_POLY:
+              new_curve->splines()[i] = convert_to_poly_spline(*curve.splines()[i]);
+              break;
+            case GEO_NODE_SPLINE_TYPE_BEZIER:
+              new_curve->splines()[i] = convert_to_bezier(*curve.splines()[i], params);
+              break;
+            case GEO_NODE_SPLINE_TYPE_NURBS:
+              new_curve->splines()[i] = convert_to_nurbs(*curve.splines()[i]);
+              break;
+          }
+        }
+        else {
+          new_curve->splines()[i] = curve.splines()[i]->copy();
+        }
       }
-    }
-    else {
-      new_curve->add_spline(curve.splines()[i]->copy());
-    }
-  }
+    });
+    new_curve->attributes = curve.attributes;
+    geometry_set.replace_curve(new_curve.release());
+  });
 
-  new_curve->attributes = curve.attributes;
-  params.set_output("Curve", GeometrySet::create_with_curve(new_curve.release()));
+  params.set_output("Curve", std::move(geometry_set));
 }
 
-}  // namespace blender::nodes
+}  // namespace blender::nodes::node_geo_curve_spline_type_cc
 
 void register_node_type_geo_curve_spline_type()
 {
+  namespace file_ns = blender::nodes::node_geo_curve_spline_type_cc;
+
   static bNodeType ntype;
-  geo_node_type_base(
-      &ntype, GEO_NODE_CURVE_SPLINE_TYPE, "Set Spline Type", NODE_CLASS_GEOMETRY, 0);
-  node_type_socket_templates(
-      &ntype, geo_node_curve_spline_type_in, geo_node_curve_spline_type_out);
-  ntype.geometry_node_execute = blender::nodes::geo_node_curve_spline_type_exec;
-  node_type_init(&ntype, blender::nodes::geo_node_curve_spline_type_init);
+  geo_node_type_base(&ntype, GEO_NODE_CURVE_SPLINE_TYPE, "Set Spline Type", NODE_CLASS_GEOMETRY);
+  ntype.declare = file_ns::node_declare;
+  ntype.geometry_node_execute = file_ns::node_geo_exec;
+  node_type_init(&ntype, file_ns::node_init);
   node_type_storage(&ntype,
                     "NodeGeometryCurveSplineType",
                     node_free_standard_storage,
                     node_copy_standard_storage);
-  ntype.draw_buttons = geo_node_curve_spline_type_layout;
+  ntype.draw_buttons = file_ns::node_layout;
 
   nodeRegisterType(&ntype);
 }

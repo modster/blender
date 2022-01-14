@@ -38,8 +38,10 @@
 
 #include "transform.h"
 #include "transform_constraints.h"
-#include "transform_mode.h"
+#include "transform_convert.h"
 #include "transform_snap.h"
+
+#include "transform_mode.h"
 
 /* -------------------------------------------------------------------- */
 /** \name Transform (Push/Pull) Element
@@ -122,7 +124,7 @@ static void applyPushPull(TransInfo *t, const int UNUSED(mval[2]))
   int i;
   char str[UI_MAX_DRAW_STR];
 
-  distance = t->values[0];
+  distance = t->values[0] + t->values_modal_offset[0];
 
   transform_snap_increment(t, &distance);
 
@@ -197,4 +199,5 @@ void initPushPull(TransInfo *t)
   t->num.unit_sys = t->scene->unit.system;
   t->num.unit_type[0] = B_UNIT_LENGTH;
 }
+
 /** \} */

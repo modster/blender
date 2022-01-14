@@ -33,6 +33,7 @@
 #include "BKE_customdata.h"
 #include "BKE_editmesh.h"
 #include "BKE_layer.h"
+#include "BKE_lib_id.h"
 #include "BKE_mesh.h"
 #include "BKE_mesh_runtime.h"
 #include "BKE_object.h"
@@ -115,7 +116,7 @@ static LinkNode *knifeproject_poly_from_object(const bContext *C,
     BKE_nurbList_free(&nurbslist);
 
     if (me_eval_needs_free) {
-      BKE_mesh_free((struct Mesh *)me_eval);
+      BKE_id_free(NULL, (ID *)me_eval);
     }
   }
 
@@ -157,7 +158,7 @@ static int knifeproject_exec(bContext *C, wmOperator *op)
     ED_view3d_viewcontext_init_object(&vc, obedit);
     BMEditMesh *em = BKE_editmesh_from_object(obedit);
 
-    EDBM_mesh_knife(&vc, polys, true, cut_through);
+    EDBM_mesh_knife(C, &vc, polys, true, cut_through);
 
     /* select only tagged faces */
     BM_mesh_elem_hflag_disable_all(em->bm, BM_VERT | BM_EDGE | BM_FACE, BM_ELEM_SELECT, false);

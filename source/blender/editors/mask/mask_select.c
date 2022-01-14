@@ -52,7 +52,6 @@
 /** \name Public Mask Selection API
  * \{ */
 
-/* 'check' select */
 bool ED_mask_spline_select_check(const MaskSpline *spline)
 {
   for (int i = 0; i < spline->tot_point; i++) {
@@ -629,7 +628,7 @@ void MASK_OT_select_lasso(wmOperatorType *ot)
   ot->cancel = WM_gesture_lasso_cancel;
 
   /* flags */
-  ot->flag = OPTYPE_UNDO;
+  ot->flag = OPTYPE_UNDO | OPTYPE_DEPENDS_ON_CURSOR;
 
   /* properties */
   WM_operator_properties_gesture_lasso(ot);
