@@ -40,6 +40,9 @@ set(INC
   ../../../intern/atomic
   ../../../intern/guardedalloc
   ../../../intern/clog
+
+  # dna_type_offsets.h
+  ${CMAKE_CURRENT_BINARY_DIR}/../makesdna/intern
 )
 
 set(INC_SYS
@@ -677,3 +680,6 @@ if(WITH_GTESTS)
   include(GTestTesting)
   blender_add_test_lib(bf_compositor_tests "${TEST_SRC}" "${INC};${TEST_INC}" "${INC_SYS}" "${LIB};${TEST_LIB}")
 endif()
+
+# Needed so we can use dna_type_offsets.h for defaults initialization.
+add_dependencies(bf_compositor bf_dna)

@@ -158,6 +158,8 @@ enum {
   /* Child elements of the same type in the icon-row are drawn merged as one icon.
    * This flag is set for an element that is part of these merged child icons. */
   TE_ICONROW_MERGED = (1 << 7),
+  /* This element has some warning to be displayed. */
+  TE_HAS_WARNING = (1 << 8),
 };
 
 /* button events */
@@ -592,7 +594,7 @@ TreeElement *outliner_find_item_at_x_in_row(const SpaceOutliner *space_outliner,
                                             bool *r_is_merged_icon,
                                             bool *r_is_over_icon);
 /**
- * `tse` is not in the treestore, we use its contents to find a match.
+ * `tse` is not in the tree-store, we use its contents to find a match.
  */
 TreeElement *outliner_find_tse(struct SpaceOutliner *space_outliner, const TreeStoreElem *tse);
 /**
@@ -606,7 +608,7 @@ TreeElement *outliner_find_parent_element(ListBase *lb,
                                           TreeElement *parent_te,
                                           const TreeElement *child_te);
 /**
- * Find treestore that refers to given ID.
+ * Find tree-store that refers to given ID.
  */
 TreeElement *outliner_find_id(struct SpaceOutliner *space_outliner,
                               ListBase *lb,
@@ -631,7 +633,7 @@ bool outliner_tree_traverse(const SpaceOutliner *space_outliner,
                             void *customdata);
 float outliner_restrict_columns_width(const struct SpaceOutliner *space_outliner);
 /**
- * Find first tree element in tree with matching treestore flag.
+ * Find first tree element in tree with matching tree-store flag.
  */
 TreeElement *outliner_find_element_with_flag(const ListBase *lb, short flag);
 /**
