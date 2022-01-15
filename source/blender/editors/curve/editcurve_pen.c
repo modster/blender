@@ -246,14 +246,19 @@ static void move_new_bezt_handles_to_mouse(const wmEvent *event,
   FOREACH_SELECTED_BEZT_END
 }
 
+static void move_bezt_by_change(BezTriple *bezt, const float change[3])
+{
+  add_v3_v3(bezt->vec[0], change);
+  add_v3_v3(bezt->vec[1], change);
+  add_v3_v3(bezt->vec[2], change);
+}
+
 /* Move entire control point to given worldspace location. */
 static void move_bezt_to_location(BezTriple *bezt, const float location[3])
 {
   float change[3];
   sub_v3_v3v3(change, location, bezt->vec[1]);
-  add_v3_v3(bezt->vec[0], change);
-  copy_v3_v3(bezt->vec[1], location);
-  add_v3_v3(bezt->vec[2], change);
+  move_bezt_by_change(bezt, change);
 }
 
 /* Alter handle types to allow free movement (Set handles to #FREE or #ALIGN). */
@@ -797,7 +802,7 @@ static void update_data_for_all_nurbs(const ListBase *nurbs, const ViewContext *
 }
 
 /* Insert a #BezTriple to a nurb at the location specified by `op_data`. */
-static void add_bezt_to_nurb(Nurb *nu, const CutData *data, Curve *cu)
+static void insert_bezt_to_nurb(Nurb *nu, const CutData *data, Curve *cu)
 {
   EditNurb *editnurb = cu->editnurb;
 
@@ -850,7 +855,7 @@ static void add_bezt_to_nurb(Nurb *nu, const CutData *data, Curve *cu)
 }
 
 /* Insert a #BPoint to a nurb at the location specified by `op_data`. */
-static void add_bp_to_nurb(Nurb *nu, const CutData *data, Curve *cu)
+static void insert_bp_to_nurb(Nurb *nu, const CutData *data, Curve *cu)
 {
   EditNurb *editnurb = cu->editnurb;
 
@@ -914,13 +919,13 @@ static bool insert_point_to_segment(
     if (nu->type == CU_BEZIER) {
       update_cut_loc_in_data(&data, vc);
       if (data.min_dist < threshold_distance) {
-        add_bezt_to_nurb(nu, &data, cu);
+        insert_bezt_to_nurb(nu, &data, cu);
         *r_nu = nu;
         return true;
       }
     }
     else if (data.min_dist < threshold_distance) {
-      add_bp_to_nurb(nu, &data, cu);
+      insert_bp_to_nurb(nu, &data, cu);
       return true;
     }
   }
@@ -977,23 +982,128 @@ static void get_selected_points(
   }
 }
 
-/* Add a new vertex connected to the selected vertex. */
-static void extrude_point_from_selected_vertex(const ViewContext *vc,
-                                               Object *obedit,
-                                               const wmEvent *event,
-                                               const bool extrude_center)
+static int extrude_vertex_from_selected_endpoint(EditNurb *editnurb,
+                                                 Curve *cu,
+                                                 const float location[3])
 {
-  Nurb *nu = NULL;
-  BezTriple *bezt = NULL;
-  BPoint *bp = NULL;
-  Curve *cu = vc->obedit->data;
+  int point_count = 0;
+  ListBase *nurbs = BKE_curve_editNurbs_get(cu);
 
-  ED_curve_nurb_vert_selected_find(cu, vc->v3d, &nu, &bezt, &bp);
+  float center[3] = {0.0f, 0.0f, 0.0f};
 
-  if (!extrude_center) {
-    ListBase *nurbs = BKE_curve_editNurbs_get(cu);
+  LISTBASE_FOREACH (Nurb *, nu1, nurbs) {
+    if (nu1->flagu & CU_NURB_CYCLIC) {
+      continue;
+    }
+    if (nu1->type == CU_BEZIER) {
+      BezTriple *last_bezt = nu1->bezt + nu1->pntsu - 1;
+      if (BEZT_ISSEL_ANY(nu1->bezt)) {
+        add_v3_v3(center, nu1->bezt->vec[1]);
+        point_count++;
+      }
+      else if (BEZT_ISSEL_ANY(last_bezt)) {
+        add_v3_v3(center, last_bezt->vec[1]);
+        point_count++;
+      }
+    }
+    else {
+      BPoint *last_bp = nu1->bp + nu1->pntsu - 1;
+      if (nu1->bp->f1 & SELECT) {
+        add_v3_v3(center, nu1->bp->vec);
+        point_count++;
+      }
+      else if (last_bp->f1 & SELECT) {
+        add_v3_v3(center, last_bp->vec);
+        point_count++;
+      }
+    }
+  }
+
+  if (point_count) {
+    mul_v3_fl(center, 1.0f / point_count);
+    float change[3];
+    sub_v3_v3v3(change, location, center);
 
     LISTBASE_FOREACH (Nurb *, nu1, nurbs) {
+      if (nu1->type == CU_BEZIER) {
+        BezTriple *last_bezt = nu1->bezt + nu1->pntsu - 1;
+        const bool first_sel = BEZT_ISSEL_ANY(nu1->bezt);
+        const bool last_sel = BEZT_ISSEL_ANY(last_bezt);
+        if (first_sel) {
+          if (last_sel) {
+            BezTriple *new_bezt = (BezTriple *)MEM_mallocN((nu1->pntsu + 2) * sizeof(BezTriple),
+                                                           __func__);
+            ED_curve_beztcpy(editnurb, new_bezt, nu1->bezt, 1);
+            ED_curve_beztcpy(editnurb, new_bezt + 1, nu1->bezt, nu1->pntsu);
+            ED_curve_beztcpy(editnurb, new_bezt + nu1->pntsu + 1, last_bezt, 1);
+            move_bezt_by_change(new_bezt, change);
+            move_bezt_by_change(new_bezt + nu1->pntsu + 1, change);
+            MEM_freeN(nu1->bezt);
+            nu1->bezt = new_bezt;
+            nu1->pntsu += 2;
+          }
+          else {
+            BezTriple *new_bezt = (BezTriple *)MEM_mallocN((nu1->pntsu + 1) * sizeof(BezTriple),
+                                                           __func__);
+            ED_curve_beztcpy(editnurb, new_bezt, nu1->bezt, 1);
+            ED_curve_beztcpy(editnurb, new_bezt + 1, nu1->bezt, nu1->pntsu);
+            move_bezt_by_change(new_bezt, change);
+            MEM_freeN(nu1->bezt);
+            nu1->bezt = new_bezt;
+            nu1->pntsu++;
+          }
+        }
+        else if (last_sel) {
+          BezTriple *new_bezt = (BezTriple *)MEM_mallocN((nu1->pntsu + 1) * sizeof(BezTriple),
+                                                         __func__);
+          ED_curve_beztcpy(editnurb, new_bezt, nu1->bezt, nu1->pntsu);
+          ED_curve_beztcpy(editnurb, new_bezt + nu1->pntsu, last_bezt, 1);
+          move_bezt_by_change(new_bezt + nu1->pntsu, change);
+          MEM_freeN(nu1->bezt);
+          nu1->bezt = new_bezt;
+          nu1->pntsu++;
+        }
+      }
+      else {
+        BPoint *last_bp = nu1->bp + nu1->pntsu - 1;
+        const bool first_sel = nu1->bp->f1 & SELECT;
+        const bool last_sel = last_bp->f1 & SELECT;
+        if (first_sel) {
+          if (last_sel) {
+            BPoint *new_bp = (BPoint *)MEM_mallocN((nu1->pntsu + 2) * sizeof(BPoint), __func__);
+            ED_curve_bpcpy(editnurb, new_bp, nu1->bp, 1);
+            ED_curve_bpcpy(editnurb, new_bp + 1, nu1->bp, nu1->pntsu);
+            ED_curve_bpcpy(editnurb, new_bp + nu1->pntsu + 1, last_bp, 1);
+            add_v3_v3(new_bp->vec, change);
+            add_v3_v3((new_bp + nu1->pntsu + 1)->vec, change);
+            MEM_freeN(nu1->bp);
+            nu1->bp = new_bp;
+            nu1->pntsu += 2;
+          }
+          else {
+            BPoint *new_bp = (BPoint *)MEM_mallocN((nu1->pntsu + 1) * sizeof(BPoint), __func__);
+            ED_curve_bpcpy(editnurb, new_bp, nu1->bp, 1);
+            ED_curve_bpcpy(editnurb, new_bp + 1, nu1->bp, nu1->pntsu);
+            add_v3_v3(new_bp->vec, change);
+            MEM_freeN(nu1->bp);
+            nu1->bp = new_bp;
+            nu1->pntsu++;
+          }
+        }
+        else if (last_sel) {
+          BPoint *new_bp = (BPoint *)MEM_mallocN((nu1->pntsu + 1) * sizeof(BPoint), __func__);
+          ED_curve_bpcpy(editnurb, new_bp, nu1->bp, nu1->pntsu);
+          ED_curve_bpcpy(editnurb, new_bp + nu1->pntsu, last_bp, 1);
+          add_v3_v3((new_bp + nu1->pntsu)->vec, change);
+          MEM_freeN(nu1->bp);
+          nu1->bp = new_bp;
+          nu1->pntsu++;
+        }
+      }
+
+      cu->actvert = CU_ACT_NONE;
+      BKE_nurb_knot_calc_u(nu1);
+
       if (nu1->pntsu > 2) {
         int start, end;
         if (nu1->flagu & CU_NURB_CYCLIC) {
@@ -1015,6 +1125,21 @@ static void extrude_point_from_selected_vertex(const ViewContext *vc,
       }
     }
   }
+  return point_count;
+}
+
+/* Add new vertices connected to the selected vertices. */
+static void extrude_points_from_selected_vertices(const ViewContext *vc,
+                                                  Object *obedit,
+                                                  const wmEvent *event,
+                                                  const bool extrude_center)
+{
+  Nurb *nu = NULL;
+  BezTriple *bezt = NULL;
+  BPoint *bp = NULL;
+  Curve *cu = vc->obedit->data;
+
+  ED_curve_nurb_vert_selected_find(cu, vc->v3d, &nu, &bezt, &bp);
 
   float location[3];
 
@@ -1065,12 +1190,20 @@ static void extrude_point_from_selected_vertex(const ViewContext *vc,
   invert_m4_m4(imat, obedit->obmat);
   mul_m4_v3(imat, location);
 
-  Nurb *old_last_nu = editnurb->nurbs.last;
-  ed_editcurve_addvert(cu, editnurb, vc->v3d, location);
-  Nurb *new_last_nu = editnurb->nurbs.last;
+  int point_count = 0;
 
-  if (old_last_nu != new_last_nu) {
-    new_last_nu->flagu = ~CU_NURB_CYCLIC;
+  if (!extrude_center) {
+    point_count = extrude_vertex_from_selected_endpoint(editnurb, cu, location);
+  }
+
+  if (!point_count) {
+    Nurb *old_last_nu = editnurb->nurbs.last;
+    ed_editcurve_addvert(cu, editnurb, vc->v3d, location);
+    Nurb *new_last_nu = editnurb->nurbs.last;
+
+    if (old_last_nu != new_last_nu) {
+      new_last_nu->flagu = ~CU_NURB_CYCLIC;
+    }
   }
 
   FOREACH_SELECTED_BEZT_BEGIN(bezt, &cu->editnurb->nurbs)
@@ -1529,12 +1662,12 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
         }
         else if (new_spline) {
           ED_curve_deselect_all(((Curve *)(vc.obedit->data))->editnurb);
-          extrude_point_from_selected_vertex(&vc, obedit, event, extrude_center);
+          extrude_points_from_selected_vertices(&vc, obedit, event, extrude_center);
           cpd->new_point = true;
           cpd->acted = true;
         }
         else if (extrude_point) {
-          extrude_point_from_selected_vertex(&vc, obedit, event, extrude_center);
+          extrude_points_from_selected_vertices(&vc, obedit, event, extrude_center);
           cpd->new_point = true;
           cpd->acted = true;
         }
@@ -1565,7 +1698,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
             cpd->acted = true;
           }
           else if (extrude_point) {
-            extrude_point_from_selected_vertex(&vc, obedit, event, extrude_center);
+            extrude_points_from_selected_vertices(&vc, obedit, event, extrude_center);
             cpd->acted = true;
           }
         }
