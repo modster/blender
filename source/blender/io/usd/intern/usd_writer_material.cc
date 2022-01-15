@@ -122,9 +122,8 @@ static std::string get_tex_image_asset_path(bNode *node,
 static InputSpecMap &preview_surface_input_map();
 static bNode *traverse_channel(bNodeSocket *input, short target_type);
 
-template<typename T1, typename T2> void create_input(pxr::UsdShadeShader &shader,
-                                                     const InputSpec &spec,
-                                                     const void *value);
+template<typename T1, typename T2>
+void create_input(pxr::UsdShadeShader &shader, const InputSpec &spec, const void *value);
 
 void create_usd_preview_surface_material(const USDExporterContext &usd_export_context,
                                          Material *material,
@@ -260,9 +259,8 @@ static InputSpecMap &preview_surface_input_map()
  * provided by the InputSpec and assign the given value to the
  * input.  Parameters T1 and T2 indicate the Blender and USD
  * value types, respectively. */
-template<typename T1, typename T2> void create_input(pxr::UsdShadeShader &shader,
-                                                     const InputSpec &spec,
-                                                     const void *value)
+template<typename T1, typename T2>
+void create_input(pxr::UsdShadeShader &shader, const InputSpec &spec, const void *value)
 {
   const T1 *cast_value = static_cast<const T1 *>(value);
   shader.CreateInput(spec.input_name, spec.input_type).Set(T2(cast_value->value));
@@ -420,7 +418,6 @@ static void get_absolute_path(Image *ima, char *r_path)
   BLI_path_abs(r_path, ID_BLEND_PATH_FROM_GLOBAL(&ima->id));
   BLI_path_normalize(nullptr, r_path);
 }
-
 
 static pxr::TfToken get_node_tex_image_color_space(bNode *node)
 {
