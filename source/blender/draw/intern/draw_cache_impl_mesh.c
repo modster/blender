@@ -746,7 +746,6 @@ static DRW_MeshCDMask mesh_cd_calc_used_gpu_layers(const Mesh *me,
             break;
           }
 
-            /* fallthrough */
           case CD_PROP_FLOAT3:
           case CD_PROP_BOOL:
           case CD_PROP_INT32:

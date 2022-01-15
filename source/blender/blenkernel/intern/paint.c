@@ -1806,8 +1806,8 @@ void BKE_sculpt_color_layer_create_if_needed(struct Object *object)
   bool has_color = false;
 
   for (int i = 0; i < ARRAY_SIZE(types); i++) {
-    bool ok = CustomData_has_layer(&orig_me->vdata, types[i]);
-    ok = ok || CustomData_has_layer(&orig_me->ldata, types[i]);
+    bool ok = CustomData_has_layer(&orig_me->vdata, types[i]) ||
+              CustomData_has_layer(&orig_me->ldata, types[i]);
 
     if (ok) {
       has_color = true;
@@ -2082,8 +2082,8 @@ void BKE_sculpt_ensure_orig_mesh_data(Scene *scene, Object *object)
   BKE_mesh_tessface_clear(mesh);
 
   /* We always need to flush updates from depsgraph here, since at the very least
-   * `BKE_sculpt_face_sets_ensure_from_base_mesh_visibility()` will have updated some data layer
-   * of the mesh.
+   * `BKE_sculpt_face_sets_ensure_from_base_mesh_visibility()` will have updated some data layer of
+   * the mesh.
    *
    * All known potential sources of updates:
    *   - Addition of, or changes to, the `CD_SCULPT_FACE_SETS` data layer

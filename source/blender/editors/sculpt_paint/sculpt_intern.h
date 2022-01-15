@@ -120,7 +120,7 @@ const float *SCULPT_vertex_co_get(struct SculptSession *ss, int index);
 void SCULPT_vertex_normal_get(SculptSession *ss, int index, float no[3]);
 float SCULPT_vertex_mask_get(struct SculptSession *ss, int index);
 
-bool SCULPT_vertex_color_get(SculptSession *ss, int index, float out[4]);
+void SCULPT_vertex_color_get(SculptSession *ss, int index, float out[4]);
 void SCULPT_vertex_color_set(SculptSession *ss, int index, float color[4]);
 bool SCULPT_has_colors(const SculptSession *ss);
 

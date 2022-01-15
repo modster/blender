@@ -767,9 +767,11 @@ static int sculpt_sample_color_invoke(bContext *C,
   int active_vertex = SCULPT_active_vertex_get(ss);
   float active_vertex_color[4];
 
-  if (!SCULPT_vertex_color_get(ss, active_vertex, active_vertex_color)) {
+  if (!SCULPT_has_colors(ss)) {
     return OPERATOR_CANCELLED;
   }
+
+  SCULPT_vertex_color_get(ss, active_vertex, active_vertex_color);
 
   float color_srgb[3];
   copy_v3_v3(color_srgb, active_vertex_color);
@@ -887,7 +889,7 @@ static bool sculpt_mask_by_color_contiguous_floodfill_cb(
     SculptSession *ss, int from_v, int to_v, bool is_duplicate, void *userdata)
 {
   MaskByColorContiguousFloodFillData *data = userdata;
-  const float current_color[4];
+  float current_color[4];
 
   SCULPT_vertex_color_get(ss, to_v, current_color);
 

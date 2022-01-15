@@ -1243,29 +1243,29 @@ static int pbvh_get_buffers_update_flags(PBVH *UNUSED(pbvh))
   return update_flags;
 }
 
-bool BKE_pbvh_get_color_layer(const Mesh *me, CustomDataLayer **r_cl, AttributeDomain *r_attr)
+bool BKE_pbvh_get_color_layer(const Mesh *me, CustomDataLayer **r_layer, AttributeDomain *r_attr)
 {
-  CustomDataLayer *cl = BKE_id_attributes_active_color_get((ID *)me);
+  CustomDataLayer *layer = BKE_id_attributes_active_color_get((ID *)me);
   AttributeDomain domain;
 
-  if (!cl || !ELEM(cl->type, CD_PROP_COLOR, CD_MLOOPCOL)) {
+  if (!layer || !ELEM(layer->type, CD_PROP_COLOR, CD_MLOOPCOL)) {
     return false;
   }
 
-  domain = BKE_id_attribute_domain((ID *)me, cl);
+  domain = BKE_id_attribute_domain((ID *)me, layer);
 
   if (!ELEM(domain, ATTR_DOMAIN_POINT, ATTR_DOMAIN_CORNER)) {
     return false;
   }
 
-  if (cl) {
-    *r_cl = cl;
+  if (layer) {
+    *r_layer = layer;
     *r_attr = domain;
 
     return true;
   }
   else {
-    *r_cl = NULL;
+    *r_layer = NULL;
     return false;
   }
 }
@@ -1321,18 +1321,18 @@ static void pbvh_update_draw_buffer_cb(void *__restrict userdata,
                                      update_flags);
         break;
       case PBVH_FACES: {
-        CustomDataLayer *cl = NULL;
+        CustomDataLayer *layer = NULL;
         AttributeDomain domain;
 
-        BKE_pbvh_get_color_layer(pbvh->mesh, &cl, &domain);
+        BKE_pbvh_get_color_layer(pbvh->mesh, &layer, &domain);
 
         GPU_pbvh_mesh_buffers_update(node->draw_buffers,
                                      pbvh->verts,
                                      pbvh->vert_normals,
                                      CustomData_get_layer(pbvh->vdata, CD_PAINT_MASK),
-                                     cl ? cl->data : NULL,
-                                     cl ? cl->type : -1,
-                                     cl ? domain : ATTR_DOMAIN_AUTO,
+                                     layer ? layer->data : NULL,
+                                     layer ? layer->type : -1,
+                                     layer ? domain : ATTR_DOMAIN_AUTO,
                                      CustomData_get_layer(pbvh->pdata, CD_SCULPT_FACE_SETS),
                                      pbvh->face_sets_color_seed,
                                      pbvh->face_sets_color_default,

@@ -163,15 +163,10 @@ bool SCULPT_has_colors(const SculptSession *ss)
   return ss->vcol || ss->mcol;
 }
 
-bool SCULPT_vertex_color_get(SculptSession *ss, int index, float out[4])
+void SCULPT_vertex_color_get(SculptSession *ss, int index, float out[4])
 {
   switch (BKE_pbvh_type(ss->pbvh)) {
     case PBVH_FACES:
-      if (!(ss->vcol || ss->mcol)) {
-        zero_v4(out);
-        return false;
-      }
-
       if (ss->vcol_domain == ATTR_DOMAIN_CORNER) {
         zero_v4(out);
 
@@ -234,10 +229,6 @@ void SCULPT_vertex_color_set(SculptSession *ss, int index, float color[4])
 {
   switch (BKE_pbvh_type(ss->pbvh)) {
     case PBVH_FACES:
-      if (!(ss->vcol || ss->mcol)) {
-        return;
-      }
-
       if (ss->vcol_domain == ATTR_DOMAIN_CORNER) {
         int count = ss->pmap[index].count;
         for (int i = 0; i < count; i++) {

@@ -31,11 +31,6 @@
 
 #include <vector>
 
-namespace blender::draw {
-
-/* ---------------------------------------------------------------------- */
-/** \name Extract VCol
- * \{ */
 
 /* get all vcol layers as AttributeRefs, filtered by vcol_layers.
  *  the casual use of std::vector should be okay here.
@@ -45,49 +40,43 @@ static std::vector<AttributeRef> get_vcol_refs(const CustomData *cd_vdata,
                                                const uint vcol_layers)
 {
   std::vector<AttributeRef> refs;
-
-  const CustomDataType vcol_types[2] = {CD_PROP_COLOR, CD_MLOOPCOL};
-  const AttributeDomain domains[2] = {ATTR_DOMAIN_POINT, ATTR_DOMAIN_CORNER};
-
   uint layeri = 0;
 
-  for (int step1 = 0; step1 < ARRAY_SIZE(vcol_types); step1++) {
-    CustomDataType type = vcol_types[step1];
+  auto buildList = [&](const CustomData *cdata, CustomDataType type, AttributeDomain domain) {
+    int i = cdata->typemap[(int)type];
 
-    for (int step2 = 0; step2 < 2; step2++) {
-      const CustomData *cdata = step2 ? cd_ldata : cd_vdata;
-      AttributeDomain domain = domains[step2];
+    if (i == -1) {
+      return;
+    }
 
-      int i = cdata->typemap[(int)type];
+    for (; i < cdata->totlayer && (CustomDataType)cdata->layers[i].type == type; i++, layeri++) {
+      const CustomDataLayer *layer = cdata->layers + i;
 
-      if (i == -1) {
+      if (!(vcol_layers & (1UL << layeri)) || (layer->flag & CD_FLAG_TEMPORARY)) {
         continue;
       }
 
-      for (; i < cdata->totlayer && (CustomDataType)cdata->layers[i].type == type; i++, layeri++) {
-        const CustomDataLayer *layer = cdata->layers + i;
+      AttributeRef ref;
+      ref.domain = domain;
+      ref.type = layer->type;
+      BLI_strncpy(ref.name, layer->name, sizeof(ref.name));
 
-        if (!(vcol_layers & (1UL << layeri)) || (layer->flag & CD_FLAG_TEMPORARY)) {
-          continue;
-        }
-
-        AttributeRef ref;
-        ref.domain = domain;
-        ref.type = layer->type;
-        BLI_strncpy(ref.name, layer->name, sizeof(ref.name));
-
-        refs.push_back(ref);
-      }
+      refs.push_back(ref);
     }
-  }
+  };
+
+  buildList(cd_vdata, CD_PROP_COLOR, ATTR_DOMAIN_POINT);
+  buildList(cd_vdata, CD_MLOOPCOL, ATTR_DOMAIN_POINT);
+  buildList(cd_ldata, CD_PROP_COLOR, ATTR_DOMAIN_CORNER);
+  buildList(cd_ldata, CD_MLOOPCOL, ATTR_DOMAIN_CORNER);
 
   return refs;
 }
 
-extern "C" int mesh_cd_get_vcol_i(const Mesh *me,
-                                  const CustomData *cd_vdata,
-                                  const CustomData *cd_ldata,
-                                  const struct AttributeRef *ref)
+int mesh_cd_get_vcol_i(const Mesh *me,
+                       const CustomData *cd_vdata,
+                       const CustomData *cd_ldata,
+                       const struct AttributeRef *ref)
 {
   auto refs = get_vcol_refs(cd_vdata, cd_ldata, UINT_MAX);
   int i = 0;
@@ -101,19 +90,27 @@ extern "C" int mesh_cd_get_vcol_i(const Mesh *me,
 
   return -1;
 }
-extern "C" int mesh_cd_get_active_color_i(const Mesh *me,
-                                          const CustomData *cd_vdata,
-                                          const CustomData *cd_ldata)
+int mesh_cd_get_active_color_i(const Mesh *me,
+                               const CustomData *cd_vdata,
+                               const CustomData *cd_ldata)
 {
   return mesh_cd_get_vcol_i(me, cd_vdata, cd_ldata, &me->attr_color_active);
 }
 
-extern "C" int mesh_cd_get_render_color_i(const Mesh *me,
-                                          const CustomData *cd_vdata,
-                                          const CustomData *cd_ldata)
+int mesh_cd_get_render_color_i(const Mesh *me,
+                               const CustomData *cd_vdata,
+                               const CustomData *cd_ldata)
 {
   return mesh_cd_get_vcol_i(me, cd_vdata, cd_ldata, &me->attr_color_render);
 }
+
+
+namespace blender::draw {
+
+/* ---------------------------------------------------------------------- */
+/** \name Extract VCol
+ * \{ */
+
 
 /* Initialize the common vertex format for vcol for coarse and subdivided meshes. */
 static void init_vcol_format(GPUVertFormat *format,

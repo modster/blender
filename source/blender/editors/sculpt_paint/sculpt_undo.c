@@ -139,8 +139,8 @@ typedef struct SculptUndoStep {
 } SculptUndoStep;
 
 static UndoSculpt *sculpt_undo_get_nodes(void);
-static bool sculpt_attr_ref_equals(SculptAttrRef *a, SculptAttrRef *b);
-static void sculpt_save_active_attr(Object *ob, SculptAttrRef *attr);
+static bool sculpt_attribute_ref_equals(SculptAttrRef *a, SculptAttrRef *b);
+static void sculpt_save_active_attribute(Object *ob, SculptAttrRef *attr);
 
 static void update_cb(PBVHNode *node, void *rebuild)
 {
@@ -353,6 +353,7 @@ static bool sculpt_undo_restore_color(bContext *C, SculptUndoNode *unode)
   Object *ob = OBACT(view_layer);
   SculptSession *ss = ob->sculpt;
 
+  /* ensure pmap exists for SCULPT_vertex_color_get/set */
   if (!ss->pmap) {
     Mesh *me = BKE_object_get_original_mesh(ob);
 
@@ -1420,20 +1421,20 @@ SculptUndoNode *SCULPT_undo_push_node(Object *ob, PBVHNode *node, SculptUndoType
   return unode;
 }
 
-static bool sculpt_attr_ref_equals(SculptAttrRef *a, SculptAttrRef *b)
+static bool sculpt_attribute_ref_equals(SculptAttrRef *a, SculptAttrRef *b)
 {
   return a->domain == b->domain && a->type == b->type && STREQ(a->name, b->name);
 }
 
-static void sculpt_save_active_attr(Object *ob, SculptAttrRef *attr)
+static void sculpt_save_active_attribute(Object *ob, SculptAttrRef *attr)
 {
   Mesh *me = BKE_object_get_original_mesh(ob);
-  CustomDataLayer *cl;
+  CustomDataLayer *layer;
 
-  if (ob && me && (cl = BKE_id_attributes_active_get((ID *)me))) {
-    attr->domain = BKE_id_attribute_domain((ID *)me, cl);
-    BLI_strncpy(attr->name, cl->name, sizeof(attr->name));
-    attr->type = cl->type;
+  if (ob && me && (layer = BKE_id_attributes_active_color_get((ID *)me))) {
+    attr->domain = BKE_id_attribute_domain((ID *)me, layer);
+    BLI_strncpy(attr->name, layer->name, sizeof(attr->name));
+    attr->type = layer->type;
   }
   else {
     attr->domain = NO_ACTIVE_LAYER;
@@ -1464,7 +1465,7 @@ void SCULPT_undo_push_begin(Object *ob, const char *name)
       ustack, C, name, BKE_UNDOSYS_TYPE_SCULPT);
 
   if (!us->active_attr_start.was_set) {
-    sculpt_save_active_attr(ob, &us->active_attr_start);
+    sculpt_save_active_attribute(ob, &us->active_attr_start);
   }
 }
 
@@ -1502,7 +1503,7 @@ void SCULPT_undo_push_end_ex(struct Object *ob, const bool use_nested_undo)
   SculptUndoStep *us = (SculptUndoStep *)BKE_undosys_stack_init_or_active_with_type(
       ustack, BKE_UNDOSYS_TYPE_SCULPT);
 
-  sculpt_save_active_attr(ob, &us->active_attr_end);
+  sculpt_save_active_attribute(ob, &us->active_attr_end);
 }
 
 /* -------------------------------------------------------------------- */
@@ -1514,25 +1515,18 @@ static void sculpt_undo_set_active_layer(struct bContext *C, SculptAttrRef *attr
   Object *ob = CTX_data_active_object(C);
   Mesh *me = BKE_object_get_original_mesh(ob);
 
-  if (attr->domain == NO_ACTIVE_LAYER) {
-    // from reading the code, it appears you cannot set
-    // the active layer to NULL, so don't worry about it.
-    // BKE_id_attributes_active_set(&me->id, NULL);
-    return;
-  }
-
   SculptAttrRef existing;
-  sculpt_save_active_attr(ob, &existing);
+  sculpt_save_active_attribute(ob, &existing);
 
-  if (!sculpt_attr_ref_equals(&existing, attr) && ob->sculpt && ob->sculpt->pbvh) {
+  if (!sculpt_attribute_ref_equals(&existing, attr) && ob->sculpt && ob->sculpt->pbvh) {
     BKE_pbvh_update_vertex_data(ob->sculpt->pbvh, PBVH_UpdateColor);
   }
 
-  CustomDataLayer *cl;
-  cl = BKE_id_attribute_find(&me->id, attr->name, attr->type, attr->domain);
+  CustomDataLayer *layer;
+  layer = BKE_id_attribute_find(&me->id, attr->name, attr->type, attr->domain);
 
-  if (cl) {
-    BKE_id_attributes_active_set(&me->id, cl);
+  if (layer) {
+    BKE_id_attributes_active_color_set(&me->id, layer);
   }
 }
 
@@ -1601,8 +1595,7 @@ static void sculpt_undosys_step_decode_undo(struct bContext *C,
 
     sculpt_undo_set_active_layer(C, &((SculptUndoStep *)us_iter)->active_attr_start);
     sculpt_undosys_step_decode_undo_impl(C, depsgraph, us_iter);
-    // sculpt_undo_set_active_layer(C, &((SculptUndoStep *)us_iter)->active_attr_start);
-
+    
     if (us_iter == us) {
       if (us_iter->step.prev && us_iter->step.prev->type == BKE_UNDOSYS_TYPE_SCULPT) {
         sculpt_undo_set_active_layer(C, &((SculptUndoStep *)us_iter->step.prev)->active_attr_end);
