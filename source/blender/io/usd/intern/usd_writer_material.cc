@@ -122,6 +122,9 @@ static std::string get_tex_image_asset_path(bNode *node,
 static InputSpecMap &preview_surface_input_map();
 static bNode *traverse_channel(bNodeSocket *input, short target_type);
 
+template<typename T1, typename T2>
+void create_input(pxr::UsdShadeShader &shader, const InputSpec &spec, const void *value);
+
 void create_usd_preview_surface_material(const USDExporterContext &usd_export_context,
                                          Material *material,
                                          pxr::UsdShadeMaterial &usd_material,
@@ -179,24 +182,16 @@ void create_usd_preview_surface_material(const USDExporterContext &usd_export_co
       /* Set hardcoded value. */
       switch (sock->type) {
         case SOCK_FLOAT: {
-          bNodeSocketValueFloat *float_value = static_cast<bNodeSocketValueFloat *>(
-              sock->default_value);
-          preview_surface.CreateInput(input_spec.input_name, input_spec.input_type)
-              .Set(pxr::VtValue(float_value->value));
+          create_input<bNodeSocketValueFloat, float>(
+              preview_surface, input_spec, sock->default_value);
         } break;
         case SOCK_VECTOR: {
-          bNodeSocketValueVector *vec_data = static_cast<bNodeSocketValueVector *>(
-              sock->default_value);
-          preview_surface.CreateInput(input_spec.input_name, input_spec.input_type)
-              .Set(pxr::VtValue(
-                  pxr::GfVec3f(vec_data->value[0], vec_data->value[1], vec_data->value[2])));
+          create_input<bNodeSocketValueVector, pxr::GfVec3f>(
+              preview_surface, input_spec, sock->default_value);
         } break;
         case SOCK_RGBA: {
-          bNodeSocketValueRGBA *rgba_data = static_cast<bNodeSocketValueRGBA *>(
-              sock->default_value);
-          preview_surface.CreateInput(input_spec.input_name, input_spec.input_type)
-              .Set(pxr::VtValue(
-                  pxr::GfVec3f(rgba_data->value[0], rgba_data->value[1], rgba_data->value[2])));
+          create_input<bNodeSocketValueRGBA, pxr::GfVec3f>(
+              preview_surface, input_spec, sock->default_value);
         } break;
         default:
           break;
@@ -258,6 +253,17 @@ static InputSpecMap &preview_surface_input_map()
   };
 
   return input_map;
+}
+
+/* Create an input on the given shader with name and type
+ * provided by the InputSpec and assign the given value to the
+ * input.  Parameters T1 and T2 indicate the Blender and USD
+ * value types, respectively. */
+template<typename T1, typename T2>
+void create_input(pxr::UsdShadeShader &shader, const InputSpec &spec, const void *value)
+{
+  const T1 *cast_value = static_cast<const T1 *>(value);
+  shader.CreateInput(spec.input_name, spec.input_type).Set(T2(cast_value->value));
 }
 
 /* Find the UVMAP node input to the given texture image node and convert it
@@ -413,7 +419,6 @@ static void get_absolute_path(Image *ima, char *r_path)
   BLI_path_normalize(nullptr, r_path);
 }
 
-
 static pxr::TfToken get_node_tex_image_color_space(bNode *node)
 {
   if (!node->id) {
@@ -537,10 +542,6 @@ static pxr::UsdShadeShader create_usd_preview_shader(const USDExporterContext &u
 
 static std::string get_tex_image_asset_path(Image *ima)
 {
-  if (strlen(ima->filepath) == 0) {
-    return "";
-  }
-
   char filepath[FILE_MAX];
   get_absolute_path(ima, filepath);
 
@@ -552,7 +553,8 @@ static std::string get_tex_image_asset_path(Image *ima)
  * in the same directory as the USD file, depending on the export parameters.
  * The filename is typically the image filepath but might also be automatically
  * generated based on the image name for in-memory textures when exporting textures.
- * This function may return an empty string if no asset path could be determined. */
+ * This function may return an empty string if the image does not have a filepath
+ * assigned and no asset path could be determined. */
 static std::string get_tex_image_asset_path(bNode *node,
                                             const pxr::UsdStageRefPtr stage,
                                             const USDExportParams &export_params)
