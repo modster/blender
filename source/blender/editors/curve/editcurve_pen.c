@@ -195,7 +195,7 @@ static void get_displacement_to_avg_selected_point(const ListBase *nurbs,
   if (count) {
     mul_v3_fl(total, 1.0f / count);
     worldspace_to_screenspace(total, vc, change);
-    float mval[2] = {(float)(event->mval[0]), (float)(event->mval[1])};
+    float mval[2] = {UNPACK2(event->mval)};
     negate_v2(change);
     add_v2_v2(change, mval);
   }
@@ -359,7 +359,7 @@ static void move_all_selected_points(ListBase *nurbs,
 {
   int change_int[2];
   sub_v2_v2v2_int(change_int, event->xy, event->prev_xy);
-  float change[2] = {(float)change_int[0], (float)change_int[1]};
+  float change[2] = {UNPACK2(change_int)};
 
   LISTBASE_FOREACH (Nurb *, nu, nurbs) {
     if (nu->type == CU_BEZIER) {
@@ -1219,7 +1219,7 @@ static bool delete_point_under_mouse(ViewContext *vc,
   short temp = 0;
   Curve *cu = vc->obedit->data;
   ListBase *nurbs = BKE_curve_editNurbs_get(cu);
-  float mouse_point[2] = {(float)event->mval[0], (float)event->mval[1]};
+  float mouse_point[2] = {UNPACK2(event->mval)};
 
   get_closest_vertex_to_point_in_nurbs(
       nurbs, &nu, &bezt, &bp, &temp, mouse_point, sel_dist_mul, vc);
@@ -1316,7 +1316,7 @@ static bool make_cyclic_if_endpoints(Nurb *sel_nu,
     BPoint *bp = NULL;
     Curve *cu = vc->obedit->data;
     short bezt_idx;
-    const float mval_fl[2] = {(float)vc->mval[0], (float)vc->mval[1]};
+    const float mval_fl[2] = {UNPACK2(vc->mval)};
 
     get_closest_vertex_to_point_in_nurbs(
         &(cu->editnurb->nurbs), &nu, &bezt, &bp, &bezt_idx, mval_fl, sel_dist_mul, vc);
@@ -1418,7 +1418,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   else {
     cpd = (CurvePenData *)(op->customdata);
   }
-  const float mval_fl[2] = {(float)event->mval[0], (float)event->mval[1]};
+  const float mval_fl[2] = {UNPACK2(event->mval)};
 
   const bool extrude_point = RNA_boolean_get(op->ptr, "extrude_point");
   const bool extrude_center = RNA_boolean_get(op->ptr, "extrude_center");
