@@ -542,10 +542,6 @@ static pxr::UsdShadeShader create_usd_preview_shader(const USDExporterContext &u
 
 static std::string get_tex_image_asset_path(Image *ima)
 {
-  if (strlen(ima->filepath) == 0) {
-    return "";
-  }
-
   char filepath[FILE_MAX];
   get_absolute_path(ima, filepath);
 
@@ -557,7 +553,8 @@ static std::string get_tex_image_asset_path(Image *ima)
  * in the same directory as the USD file, depending on the export parameters.
  * The filename is typically the image filepath but might also be automatically
  * generated based on the image name for in-memory textures when exporting textures.
- * This function may return an empty string if no asset path could be determined. */
+ * This function may return an empty string if the image does not have a filepath
+ * assigned and no asset path could be determined. */
 static std::string get_tex_image_asset_path(bNode *node,
                                             const pxr::UsdStageRefPtr stage,
                                             const USDExportParams &export_params)
