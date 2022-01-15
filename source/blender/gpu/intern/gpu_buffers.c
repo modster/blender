@@ -212,6 +212,7 @@ static bool gpu_pbvh_is_looptri_visible(const MLoopTri *lt,
 
 void GPU_pbvh_mesh_buffers_update(GPU_PBVH_Buffers *buffers,
                                   const MVert *mvert,
+                                  const float (*vert_normals)[3],
                                   const float *vmask,
                                   const void *vcol_data,
                                   const int vcol_type,
@@ -301,7 +302,7 @@ void GPU_pbvh_mesh_buffers_update(GPU_PBVH_Buffers *buffers,
           copy_v3_v3(GPU_vertbuf_raw_step(&pos_step), v->co);
 
           if (buffers->smooth) {
-            copy_v3_v3_short(no, v->no);
+            normal_float_to_short_v3(no, vert_normals[vtri[j]]);
           }
           copy_v3_v3_short(GPU_vertbuf_raw_step(&nor_step), no);
 

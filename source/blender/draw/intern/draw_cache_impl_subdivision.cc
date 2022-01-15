@@ -23,6 +23,7 @@
 #include "DNA_scene_types.h"
 
 #include "BKE_editmesh.h"
+#include "BKE_mesh.h"
 #include "BKE_modifier.h"
 #include "BKE_object.h"
 #include "BKE_scene.h"
@@ -954,7 +955,8 @@ static bool draw_subdiv_build_cache(DRWSubdivCache *cache,
                                     const SubsurfModifierData *smd,
                                     const bool is_final_render)
 {
-  const int level = get_render_subsurf_level(&scene->r, smd->levels, is_final_render);
+  const int requested_levels = (is_final_render) ? smd->renderLevels : smd->levels;
+  const int level = get_render_subsurf_level(&scene->r, requested_levels, is_final_render);
   SubdivToMeshSettings to_mesh_settings;
   to_mesh_settings.resolution = (1 << level) + 1;
   to_mesh_settings.use_optimal_display = false;
@@ -1668,6 +1670,7 @@ void draw_subdiv_init_mesh_render_data(DRWSubdivCache *cache,
   mr->mvert = mesh->mvert;
   mr->mpoly = mesh->mpoly;
   mr->mloop = mesh->mloop;
+  mr->vert_normals = BKE_mesh_vertex_normals_ensure(mesh);
   mr->vert_len = mesh->totvert;
   mr->edge_len = mesh->totedge;
   mr->poly_len = mesh->totpoly;

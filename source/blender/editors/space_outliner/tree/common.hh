@@ -12,21 +12,17 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2020 Blender Foundation.
- * All rights reserved.
  */
 
 /** \file
- * \ingroup edgeometry
+ * \ingroup spoutliner
  */
 
 #pragma once
 
-struct wmOperatorType;
+struct ListBase;
 
-/* *** geometry_attributes.c *** */
-void GEOMETRY_OT_attribute_add(struct wmOperatorType *ot);
-void GEOMETRY_OT_attribute_remove(struct wmOperatorType *ot);
-void GEOMETRY_OT_color_attribute_add(struct wmOperatorType *ot);
-void GEOMETRY_OT_color_attribute_remove(struct wmOperatorType *ot);
+const char *outliner_idcode_to_plural(short idcode);
+
+void outliner_make_object_parent_hierarchy(ListBase *lb);
+bool outliner_animdata_test(const struct AnimData *adt);

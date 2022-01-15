@@ -98,6 +98,7 @@ enum {
  */
 void GPU_pbvh_mesh_buffers_update(GPU_PBVH_Buffers *buffers,
                                   const struct MVert *mvert,
+                                  const float (*vert_normals)[3],
                                   const float *vmask,
                                   const void *vcol_data,
                                   const int vcol_type,

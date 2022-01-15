@@ -13,26 +13,24 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * The Original Code is Copyright (C) 2020 Blender Foundation.
- * All rights reserved.
+ * Copyright 2022, Blender Foundation.
  */
 
-/** \file
- * \ingroup edgeometry
+#pragma once
+
+#include "COM_Node.h"
+
+namespace blender::compositor {
+
+/**
+ * \brief SceneTimeNode
+ * \ingroup Node
  */
+class SceneTimeNode : public Node {
+ public:
+  SceneTimeNode(bNode *editor_node);
+  void convert_to_operations(NodeConverter &converter,
+                             const CompositorContext &context) const override;
+};
 
-#include "WM_api.h"
-
-#include "ED_geometry.h"
-
-#include "geometry_intern.h"
-
-/**************************** registration **********************************/
-
-void ED_operatortypes_geometry(void)
-{
-  WM_operatortype_append(GEOMETRY_OT_attribute_add);
-  WM_operatortype_append(GEOMETRY_OT_attribute_remove);
-  WM_operatortype_append(GEOMETRY_OT_color_attribute_add);
-  WM_operatortype_append(GEOMETRY_OT_color_attribute_remove);
-}
+}  // namespace blender::compositor

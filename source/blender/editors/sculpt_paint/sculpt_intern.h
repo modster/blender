@@ -266,13 +266,13 @@ typedef struct {
 
   struct SculptUndoNode *unode;
   float (*coords)[3];
-  short (*normals)[3];
+  float (*normals)[3];
   const float *vmasks;
   float (*colors)[4];
 
   /* Original coordinate, normal, and mask. */
   const float *co;
-  const short *no;
+  const float *no;
   float mask;
   const float *col;
 } SculptOrigVertData;
@@ -727,7 +727,7 @@ typedef struct SculptUndoNode {
 
   float (*co)[3];
   float (*orig_co)[3];
-  short (*no)[3];
+  float (*no)[3];
   float (*col)[4];
   float *mask;
   int totvert;
@@ -971,7 +971,7 @@ float SCULPT_brush_strength_factor(struct SculptSession *ss,
                                    const struct Brush *br,
                                    const float point[3],
                                    float len,
-                                   const short vno[3],
+                                   const float vno[3],
                                    const float fno[3],
                                    float mask,
                                    int vertex_index,

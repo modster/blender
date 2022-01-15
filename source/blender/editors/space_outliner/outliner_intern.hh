@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include <memory>
+
 #include "RNA_types.h"
 
 #ifdef __cplusplus
@@ -47,15 +49,25 @@ struct bPoseChannel;
 struct wmKeyConfig;
 struct wmOperatorType;
 
-typedef struct SpaceOutliner_Runtime {
-  /** Internal C++ object to create and manage the tree for a specific display type (View Layers,
-   *  Scenes, Blender File, etc.). */
-  struct TreeDisplay *tree_display;
+namespace blender::ed::outliner {
+class AbstractTreeDisplay;
+class AbstractTreeElement;
+}  // namespace blender::ed::outliner
+
+struct SpaceOutliner_Runtime {
+  /** Object to create and manage the tree for a specific display type (View Layers, Scenes,
+   * Blender File, etc.). */
+  std::unique_ptr<blender::ed::outliner::AbstractTreeDisplay> tree_display;
 
   /** Pointers to tree-store elements, grouped by `(id, type, nr)`
    *  in hash-table for faster searching. */
   struct GHash *treehash;
-} SpaceOutliner_Runtime;
+
+  SpaceOutliner_Runtime() = default;
+  /** Used for copying runtime data to a duplicated space. */
+  SpaceOutliner_Runtime(const SpaceOutliner_Runtime &);
+  ~SpaceOutliner_Runtime();
+};
 
 typedef enum TreeElementInsertType {
   TE_INSERT_BEFORE,
@@ -82,7 +94,7 @@ typedef struct TreeElement {
    * #TreeElement. Step by step, data should be moved to it and operations based on the type should
    * become virtual methods of the class hierarchy.
    */
-  struct TreeElementType *type;
+  std::unique_ptr<blender::ed::outliner::AbstractTreeElement> type;
 
   ListBase subtree;
   int xs, ys;                /* Do selection. */
@@ -158,6 +170,8 @@ enum {
   /* Child elements of the same type in the icon-row are drawn merged as one icon.
    * This flag is set for an element that is part of these merged child icons. */
   TE_ICONROW_MERGED = (1 << 7),
+  /* This element has some warning to be displayed. */
+  TE_HAS_WARNING = (1 << 8),
 };
 
 /* button events */
@@ -266,6 +280,10 @@ void outliner_build_tree(struct Main *mainvar,
                          struct ViewLayer *view_layer,
                          struct SpaceOutliner *space_outliner,
                          struct ARegion *region);
+
+struct TreeElement *outliner_add_collection_recursive(SpaceOutliner *space_outliner,
+                                                      struct Collection *collection,
+                                                      TreeElement *ten);
 
 bool outliner_requires_rebuild_on_select_or_active_change(
     const struct SpaceOutliner *space_outliner);
@@ -592,7 +610,7 @@ TreeElement *outliner_find_item_at_x_in_row(const SpaceOutliner *space_outliner,
                                             bool *r_is_merged_icon,
                                             bool *r_is_over_icon);
 /**
- * `tse` is not in the treestore, we use its contents to find a match.
+ * `tse` is not in the tree-store, we use its contents to find a match.
  */
 TreeElement *outliner_find_tse(struct SpaceOutliner *space_outliner, const TreeStoreElem *tse);
 /**
@@ -606,7 +624,7 @@ TreeElement *outliner_find_parent_element(ListBase *lb,
                                           TreeElement *parent_te,
                                           const TreeElement *child_te);
 /**
- * Find treestore that refers to given ID.
+ * Find tree-store that refers to given ID.
  */
 TreeElement *outliner_find_id(struct SpaceOutliner *space_outliner,
                               ListBase *lb,
@@ -631,7 +649,7 @@ bool outliner_tree_traverse(const SpaceOutliner *space_outliner,
                             void *customdata);
 float outliner_restrict_columns_width(const struct SpaceOutliner *space_outliner);
 /**
- * Find first tree element in tree with matching treestore flag.
+ * Find first tree element in tree with matching tree-store flag.
  */
 TreeElement *outliner_find_element_with_flag(const ListBase *lb, short flag);
 /**
