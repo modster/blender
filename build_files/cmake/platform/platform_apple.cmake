@@ -173,6 +173,7 @@ if(WITH_IMAGE_OPENEXR)
 endif()
 
 if(WITH_CODEC_FFMPEG)
+  set(FFMPEG_ROOT_DIR ${LIBDIR}/ffmpeg)
   set(FFMPEG_FIND_COMPONENTS
     avcodec avdevice avformat avutil
     mp3lame ogg opus swresample swscale
@@ -507,3 +508,6 @@ list(APPEND CMAKE_BUILD_RPATH "${OpenMP_LIBRARY_DIR}")
 
 set(CMAKE_SKIP_INSTALL_RPATH FALSE)
 list(APPEND CMAKE_INSTALL_RPATH "@loader_path/../Resources/${BLENDER_VERSION}/lib")
+
+# Same as `CFBundleIdentifier` in Info.plist.
+set(CMAKE_XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "org.blenderfoundation.blender")
