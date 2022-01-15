@@ -57,6 +57,7 @@
   } \
   } \
   } \
+  BKE_nurb_handles_calc(nu); \
   }
 
 /* Data structure to keep track of details about the cut location */
@@ -1501,7 +1502,12 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
           (bezt || (bezt1 && !BEZT_ISSEL_IDX(bezt1, bezt_idx)) || (bp1 && !(bp1->f1 & SELECT)))) {
         ED_curve_deselect_all(cu->editnurb);
         if (bezt1) {
-          BEZT_SEL_IDX(bezt1, bezt_idx);
+          if (bezt_idx == 1) {
+            BEZT_SEL_ALL(bezt1);
+          }
+          else {
+            BEZT_SEL_IDX(bezt1, bezt_idx);
+          }
         }
         else if (bp1) {
           bp1->f1 |= SELECT;
