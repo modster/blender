@@ -163,6 +163,7 @@ set(SRC
   nodes/node_geo_proximity.cc
   nodes/node_geo_raycast.cc
   nodes/node_geo_realize_instances.cc
+  nodes/node_geo_remesh_voxel.cc
   nodes/node_geo_rotate_instances.cc
   nodes/node_geo_scale_instances.cc
   nodes/node_geo_separate_components.cc
@@ -188,7 +189,6 @@ set(SRC
   nodes/node_geo_triangulate.cc
   nodes/node_geo_viewer.cc
   nodes/node_geo_volume_to_mesh.cc
-
   node_geometry_exec.cc
   node_geometry_tree.cc
   node_geometry_util.cc
