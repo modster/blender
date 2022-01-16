@@ -28,6 +28,8 @@
 #include "BLI_math.h" /* Needed here for inline functions. */
 #include "BLI_threads.h"
 
+#include <embree3/rtcore.h>
+
 #include <math.h>
 
 typedef struct LineartStaticMemPoolNode {
@@ -216,6 +218,25 @@ enum eLineArtTileRecursiveLimit {
 #define LRT_TILE_SPLITTING_TRIANGLE_LIMIT 100
 #define LRT_TILE_EDGE_COUNT_INITIAL 32
 
+struct MLoopTri;
+struct MLoop;
+typedef struct LineartPointArrayFinal {
+  float *points;
+  int numpoints;
+  struct MLoopTri *looptri; /* Refernce to original_me->runtime->looptri; */
+  struct MLoop *loop;       /* Refernce to original_me->mloop; */
+} LineartPointArrayFinal;
+
+typedef struct LineartMeshRecord {
+  LineartPointArrayFinal *array;
+  uint32_t next;
+  uint32_t max_length;
+
+  float *intersection_record;
+  uint32_t intersection_pair_max;
+  uint32_t intersection_pair_next;
+} LineartMeshRecord;
+
 typedef struct LineartRenderBuffer {
   struct LineartRenderBuffer *prev, *next;
 
@@ -259,6 +280,15 @@ typedef struct LineartRenderBuffer {
   double view_vector[3];
 
   int triangle_size;
+
+  RTCDevice rtcdevice;
+  /* According to embree manual, geometries and buffers are destroyed when their reference count
+   * drops to 0, so in principle we don't need to retain pointers to them if we destroy the scene
+   * at once. */
+  RTCScene rtcscene_geom;
+  RTCScene rtcscene_view;
+
+  LineartMeshRecord mesh_record;
 
   /* Although using ListBase here, LineartEdge is single linked list.
    * list.last is used to store worker progress along the list.

@@ -44,6 +44,15 @@ set(INC_SYS
   ${ZLIB_INCLUDE_DIRS}
 )
 
+if(WITH_CYCLES_EMBREE)
+  add_definitions(-DWITH_EMBREE)
+  add_definitions(-DEMBREE_STATIC_LIB)
+  include_directories(
+    SYSTEM
+    ${EMBREE_INCLUDE_DIRS}
+  )
+endif()
+
 set(SRC
   intern/MOD_gpencil_ui_common.c
 
