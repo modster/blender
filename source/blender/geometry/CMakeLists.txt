@@ -35,7 +35,6 @@ set(SRC
   intern/realize_instances.cc
 
   GEO_mesh_to_curve.hh
-  GEO_mesh_remesh_blocks.h
   GEO_realize_instances.hh
 )
 
@@ -54,6 +53,7 @@ if(WITH_TBB)
   list(APPEND LIB
     ${TBB_LIBRARIES}
   )
+endif()
 
 if(WITH_REMESH_DUALCON)
   list(APPEND INC

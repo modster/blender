@@ -96,6 +96,7 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *UNUSED(ctx)
 static void panel_draw(const bContext *UNUSED(C), Panel *panel)
 {
   uiLayout *layout = panel->layout;
+#ifdef WITH_MOD_REMESH
   uiLayout *row, *col;
 
   PointerRNA ob_ptr;

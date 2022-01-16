@@ -27,20 +27,17 @@
 
 #include "node_geometry_util.hh"
 
-static bNodeSocketTemplate geo_node_remesh_blocks_in[] = {
-    {SOCK_GEOMETRY, N_("Geometry")},
-    {SOCK_INT, N_("Depth"), 4, 0, 0, 0, 2, 64},
-    {SOCK_FLOAT, N_("Scale"), 0.9f, 0, 0, 0, 0.0f, 0.99f},
-    {SOCK_FLOAT, N_("Threshold"), 1.0f, 0, 0, 0, 0.01f, FLT_MAX},
-    {-1, ""},
-};
+namespace blender::nodes::node_geo_remesh_cc {
+static void node_declare(NodeDeclarationBuilder &b)
+{
+  b.add_input<decl::Geometry>(N_("Mesh")).supported_type(GEO_COMPONENT_TYPE_MESH);
+  b.add_input<decl::Int>(N_("Depth")).default_value(4).min(2).max(64);
+  b.add_input<decl::Float>(N_("Scale")).default_value(0.9f).min(0.0f).max(0.99f);
+  b.add_input<decl::Float>(N_("Threshold")).default_value(1.0f).min(0.01f).max(FLT_MAX);
+  b.add_output<decl::Geometry>(N_("Mesh"));
+}
 
-static bNodeSocketTemplate geo_node_remesh_blocks_out[] = {
-    {SOCK_GEOMETRY, N_("Geometry")},
-    {-1, ""},
-};
-
-static void geo_node_remesh_blocks_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
+static void node_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 {
   uiItemR(layout, ptr, "remesh_blocks_mode", 0, "", ICON_NONE);
 }
@@ -50,10 +47,9 @@ static void geo_remesh_blocks_init(bNodeTree *UNUSED(ntree), bNode *node)
   node->custom1 = 0;
 }
 
-namespace blender::nodes {
-static void geo_node_remesh_blocks_exec(GeoNodeExecParams params)
+static void node_geo_exec(GeoNodeExecParams params)
 {
-  GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
+  GeometrySet geometry_set = params.extract_input<GeometrySet>("Mesh");
   const char flag = 0;
   const char mode = params.node().custom1;
   const int hermite_num = 1;
@@ -73,18 +69,21 @@ static void geo_node_remesh_blocks_exec(GeoNodeExecParams params)
 
     geometry_set.replace_mesh(output_mesh);
   }
-  params.set_output("Geometry", std::move(geometry_set));
+  params.set_output("Mesh", std::move(geometry_set));
 }
-}  // namespace blender::nodes
+}  // namespace blender::nodes::node_geo_remesh_cc
 
 void register_node_type_geo_remesh_blocks()
 {
+
+  namespace file_ns = blender::nodes::node_geo_remesh_cc;
+
   static bNodeType ntype;
 
-  geo_node_type_base(&ntype, GEO_NODE_REMESH_BLOCKS, "Remesh Blocks", NODE_CLASS_GEOMETRY, 0);
-  node_type_socket_templates(&ntype, geo_node_remesh_blocks_in, geo_node_remesh_blocks_out);
-  node_type_init(&ntype, geo_remesh_blocks_init);
-  ntype.geometry_node_execute = blender::nodes::geo_node_remesh_blocks_exec;
-  ntype.draw_buttons = geo_node_remesh_blocks_layout;
+  geo_node_type_base(&ntype, GEO_NODE_REMESH_BLOCKS, "Remesh Blocks", NODE_CLASS_GEOMETRY);
+  ntype.declare = file_ns::node_declare;
+  node_type_init(&ntype, file_ns::geo_remesh_blocks_init);
+  ntype.geometry_node_execute = file_ns::node_geo_exec;
+  ntype.draw_buttons = file_ns::node_layout;
   nodeRegisterType(&ntype);
 }

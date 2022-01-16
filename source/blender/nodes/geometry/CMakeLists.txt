@@ -162,6 +162,7 @@ set(SRC
   nodes/node_geo_points_to_volume.cc
   nodes/node_geo_proximity.cc
   nodes/node_geo_raycast.cc
+  nodes/node_geo_remesh_blocks.cc
   nodes/node_geo_realize_instances.cc
   nodes/node_geo_rotate_instances.cc
   nodes/node_geo_scale_instances.cc
