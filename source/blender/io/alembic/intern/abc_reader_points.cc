@@ -112,34 +112,58 @@ void AbcPointsReader::readObjectData(Main *bmain,
   }
 }
 
-void read_points_sample(const IPointsSchema &schema,
-                        const ISampleSelector &selector,
-                        CDStreamConfig &config)
+static void read_points_interp(const P3fArraySamplePtr positions,
+                               const P3fArraySamplePtr ceil_positions,
+                               const float weight,
+                               float3 *r_points)
+{
+  float3 tmp;
+  for (size_t i = 0; i < positions->size(); i++) {
+    const Imath::V3f &floor_pos = (*positions)[i];
+    const Imath::V3f &ceil_pos = (*ceil_positions)[i];
+    interp_v3_v3v3(tmp, floor_pos.getValue(), ceil_pos.getValue(), weight);
+    copy_zup_from_yup(r_points[i], (*positions)[i].getValue());
+  }
+}
+
+static void read_points(const P3fArraySamplePtr positions, float3 *r_points)
+{
+  for (size_t i = 0; i < positions->size(); i++) {
+    copy_zup_from_yup(r_points[i], (*positions)[i].getValue());
+  }
+}
+
+static void read_points_sample(const IPointsSchema &schema,
+                               const ISampleSelector &selector,
+                               CDStreamConfig &config,
+                               float3 *r_points)
 {
   Alembic::AbcGeom::IPointsSchema::Sample sample = schema.getValue(selector);
 
   const P3fArraySamplePtr &positions = sample.getPositions();
 
   ICompoundProperty prop = schema.getArbGeomParams();
-  N3fArraySamplePtr vnormals;
 
-  if (has_property(prop, "N")) {
-    const Alembic::Util::uint32_t itime = static_cast<Alembic::Util::uint32_t>(
-        selector.getRequestedTime());
-    const IN3fArrayProperty &normals_prop = IN3fArrayProperty(prop, "N", itime);
+  Alembic::AbcGeom::index_t i0, i1;
+  const float weight = get_weight_and_index(
+      config.time, schema.getTimeSampling(), schema.getNumSamples(), i0, i1);
 
-    if (normals_prop) {
-      vnormals = normals_prop.getValue(selector);
-    }
+  if (config.use_vertex_interpolation && weight != 0.0f) {
+    Alembic::AbcGeom::IPointsSchema::Sample ceil_sample;
+    schema.get(ceil_sample, Alembic::Abc::ISampleSelector(i1));
+    P3fArraySamplePtr ceil_positions = ceil_sample.getPositions();
+
+    read_points_interp(positions, ceil_positions, weight, r_points);
+    return;
   }
 
-  read_mverts(*config.mesh, positions, vnormals);
+  read_points(positions, r_points);
 }
 
 void AbcPointsReader::read_geometry(GeometrySet &geometry_set,
                                     const Alembic::Abc::ISampleSelector &sample_sel,
                                     const AttributeSelector *attribute_selector,
-                                    int UNUSED(read_flag),
+                                    int read_flag,
                                     const float velocity_scale,
                                     const char **err_str)
 {
@@ -176,9 +200,17 @@ void AbcPointsReader::read_geometry(GeometrySet &geometry_set,
     point_cloud = BKE_pointcloud_new_nomain(positions->size());
   }
 
-  for (size_t i = 0; i < positions->size(); i++) {
-    copy_zup_from_yup(point_cloud->co[i], (*positions)[i].getValue());
-  }
+  ScopeCustomDataPointers custom_data_pointers = {&point_cloud->pdata, nullptr, nullptr};
+  ScopeSizeInfo scope_sizes = {point_cloud->totpoint, 0, 0};
+  CDStreamConfig config;
+  config.custom_data_pointers = custom_data_pointers;
+  config.scope_sizes = scope_sizes;
+  config.id = &point_cloud->id;
+  config.attr_selector = attribute_selector;
+  config.time = sample_sel.getRequestedTime();
+  config.use_vertex_interpolation = (read_flag & MOD_MESHSEQ_INTERPOLATE_VERTICES) != 0;
+
+  read_points_sample(m_schema, sample_sel, config, reinterpret_cast<float3 *>(point_cloud->co));
 
   if (radiuses) {
     for (size_t i = 0; i < radiuses->size(); i++) {
@@ -190,14 +222,6 @@ void AbcPointsReader::read_geometry(GeometrySet &geometry_set,
       point_cloud->radius[i] = 0.01f;
     }
   }
-
-  ScopeCustomDataPointers custom_data_pointers = {&point_cloud->pdata, nullptr, nullptr};
-  ScopeSizeInfo scope_sizes = {point_cloud->totpoint, 0, 0};
-  CDStreamConfig config;
-  config.custom_data_pointers = custom_data_pointers;
-  config.scope_sizes = scope_sizes;
-  config.id = &point_cloud->id;
-  config.attr_selector = attribute_selector;
 
   /* Attributes */
   read_arbitrary_attributes(config, m_schema, {}, sample_sel, velocity_scale);

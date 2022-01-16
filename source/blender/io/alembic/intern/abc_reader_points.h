@@ -51,8 +51,4 @@ class AbcPointsReader final : public AbcObjectReader {
                      const char **err_str) override;
 };
 
-void read_points_sample(const Alembic::AbcGeom::IPointsSchema &schema,
-                        const Alembic::AbcGeom::ISampleSelector &selector,
-                        CDStreamConfig &config);
-
 }  // namespace blender::io::alembic
