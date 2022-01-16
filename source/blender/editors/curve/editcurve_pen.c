@@ -982,45 +982,49 @@ static void get_selected_points(
   }
 }
 
-static int extrude_vertex_from_selected_endpoint(EditNurb *editnurb,
-                                                 Curve *cu,
-                                                 const float location[3])
+/* Extrude points only from endpoints. Returns whether endpoints were selected */
+static bool extrude_vertices_from_selected_endpoints(EditNurb *editnurb,
+                                                     Curve *cu,
+                                                     const float location[3])
 {
-  int point_count = 0;
+  int end_count = 0;
   ListBase *nurbs = BKE_curve_editNurbs_get(cu);
 
   float center[3] = {0.0f, 0.0f, 0.0f};
 
   LISTBASE_FOREACH (Nurb *, nu1, nurbs) {
+    /* No extrusions if cyclic. */
     if (nu1->flagu & CU_NURB_CYCLIC) {
       continue;
     }
+
+    /* Get average center of all selected endpoints. */
     if (nu1->type == CU_BEZIER) {
       BezTriple *last_bezt = nu1->bezt + nu1->pntsu - 1;
       if (BEZT_ISSEL_ANY(nu1->bezt)) {
         add_v3_v3(center, nu1->bezt->vec[1]);
-        point_count++;
+        end_count++;
       }
-      else if (BEZT_ISSEL_ANY(last_bezt)) {
+      if (BEZT_ISSEL_ANY(last_bezt)) {
         add_v3_v3(center, last_bezt->vec[1]);
-        point_count++;
+        end_count++;
       }
     }
     else {
       BPoint *last_bp = nu1->bp + nu1->pntsu - 1;
       if (nu1->bp->f1 & SELECT) {
         add_v3_v3(center, nu1->bp->vec);
-        point_count++;
+        end_count++;
       }
-      else if (last_bp->f1 & SELECT) {
+      if (last_bp->f1 & SELECT) {
         add_v3_v3(center, last_bp->vec);
-        point_count++;
+        end_count++;
       }
     }
   }
 
-  if (point_count) {
-    mul_v3_fl(center, 1.0f / point_count);
+  if (end_count) {
+    mul_v3_fl(center, 1.0f / end_count);
     float change[3];
     sub_v3_v3v3(change, location, center);
 
@@ -1028,14 +1032,17 @@ static int extrude_vertex_from_selected_endpoint(EditNurb *editnurb,
       if (nu1->type == CU_BEZIER) {
         BezTriple *last_bezt = nu1->bezt + nu1->pntsu - 1;
         const bool first_sel = BEZT_ISSEL_ANY(nu1->bezt);
-        const bool last_sel = BEZT_ISSEL_ANY(last_bezt);
+        const bool last_sel = BEZT_ISSEL_ANY(last_bezt) && nu1->pntsu > 1;
         if (first_sel) {
           if (last_sel) {
             BezTriple *new_bezt = (BezTriple *)MEM_mallocN((nu1->pntsu + 2) * sizeof(BezTriple),
                                                            __func__);
             ED_curve_beztcpy(editnurb, new_bezt, nu1->bezt, 1);
-            ED_curve_beztcpy(editnurb, new_bezt + 1, nu1->bezt, nu1->pntsu);
             ED_curve_beztcpy(editnurb, new_bezt + nu1->pntsu + 1, last_bezt, 1);
+            BEZT_DESEL_ALL(nu1->bezt);
+            BEZT_DESEL_ALL(last_bezt);
+            ED_curve_beztcpy(editnurb, new_bezt + 1, nu1->bezt, nu1->pntsu);
+
             move_bezt_by_change(new_bezt, change);
             move_bezt_by_change(new_bezt + nu1->pntsu + 1, change);
             MEM_freeN(nu1->bezt);
@@ -1046,6 +1053,7 @@ static int extrude_vertex_from_selected_endpoint(EditNurb *editnurb,
             BezTriple *new_bezt = (BezTriple *)MEM_mallocN((nu1->pntsu + 1) * sizeof(BezTriple),
                                                            __func__);
             ED_curve_beztcpy(editnurb, new_bezt, nu1->bezt, 1);
+            BEZT_DESEL_ALL(nu1->bezt);
             ED_curve_beztcpy(editnurb, new_bezt + 1, nu1->bezt, nu1->pntsu);
             move_bezt_by_change(new_bezt, change);
             MEM_freeN(nu1->bezt);
@@ -1056,8 +1064,9 @@ static int extrude_vertex_from_selected_endpoint(EditNurb *editnurb,
         else if (last_sel) {
           BezTriple *new_bezt = (BezTriple *)MEM_mallocN((nu1->pntsu + 1) * sizeof(BezTriple),
                                                          __func__);
-          ED_curve_beztcpy(editnurb, new_bezt, nu1->bezt, nu1->pntsu);
           ED_curve_beztcpy(editnurb, new_bezt + nu1->pntsu, last_bezt, 1);
+          BEZT_DESEL_ALL(last_bezt);
+          ED_curve_beztcpy(editnurb, new_bezt, nu1->bezt, nu1->pntsu);
           move_bezt_by_change(new_bezt + nu1->pntsu, change);
           MEM_freeN(nu1->bezt);
           nu1->bezt = new_bezt;
@@ -1072,8 +1081,10 @@ static int extrude_vertex_from_selected_endpoint(EditNurb *editnurb,
           if (last_sel) {
             BPoint *new_bp = (BPoint *)MEM_mallocN((nu1->pntsu + 2) * sizeof(BPoint), __func__);
             ED_curve_bpcpy(editnurb, new_bp, nu1->bp, 1);
-            ED_curve_bpcpy(editnurb, new_bp + 1, nu1->bp, nu1->pntsu);
             ED_curve_bpcpy(editnurb, new_bp + nu1->pntsu + 1, last_bp, 1);
+            new_bp->f1 &= ~SELECT;
+            last_bp->f1 &= ~SELECT;
+            ED_curve_bpcpy(editnurb, new_bp + 1, nu1->bp, nu1->pntsu);
             add_v3_v3(new_bp->vec, change);
             add_v3_v3((new_bp + nu1->pntsu + 1)->vec, change);
             MEM_freeN(nu1->bp);
@@ -1083,6 +1094,7 @@ static int extrude_vertex_from_selected_endpoint(EditNurb *editnurb,
           else {
             BPoint *new_bp = (BPoint *)MEM_mallocN((nu1->pntsu + 1) * sizeof(BPoint), __func__);
             ED_curve_bpcpy(editnurb, new_bp, nu1->bp, 1);
+            new_bp->f1 &= ~SELECT;
             ED_curve_bpcpy(editnurb, new_bp + 1, nu1->bp, nu1->pntsu);
             add_v3_v3(new_bp->vec, change);
             MEM_freeN(nu1->bp);
@@ -1094,38 +1106,40 @@ static int extrude_vertex_from_selected_endpoint(EditNurb *editnurb,
           BPoint *new_bp = (BPoint *)MEM_mallocN((nu1->pntsu + 1) * sizeof(BPoint), __func__);
           ED_curve_bpcpy(editnurb, new_bp, nu1->bp, nu1->pntsu);
           ED_curve_bpcpy(editnurb, new_bp + nu1->pntsu, last_bp, 1);
+          last_bp->f1 &= ~SELECT;
+          ED_curve_bpcpy(editnurb, new_bp, nu1->bp, nu1->pntsu);
           add_v3_v3((new_bp + nu1->pntsu)->vec, change);
           MEM_freeN(nu1->bp);
           nu1->bp = new_bp;
           nu1->pntsu++;
         }
       }
+    }
+  }
 
-      cu->actvert = CU_ACT_NONE;
-      BKE_nurb_knot_calc_u(nu1);
-
-      if (nu1->pntsu > 2) {
-        int start, end;
-        if (nu1->flagu & CU_NURB_CYCLIC) {
-          start = 0;
-          end = nu1->pntsu;
+  LISTBASE_FOREACH (Nurb *, nu1, nurbs) {
+    if (nu1->pntsu > 2) {
+      int start, end;
+      if (nu1->flagu & CU_NURB_CYCLIC) {
+        start = 0;
+        end = nu1->pntsu;
+      }
+      else {
+        start = 1;
+        end = nu1->pntsu - 1;
+      }
+      for (int i = start; i < end; i++) {
+        if (nu1->type == CU_BEZIER) {
+          BEZT_DESEL_ALL(nu1->bezt + i);
         }
         else {
-          start = 1;
-          end = nu1->pntsu - 1;
-        }
-        for (int i = start; i < end; i++) {
-          if (nu1->type == CU_BEZIER) {
-            BEZT_DESEL_ALL(nu1->bezt + i);
-          }
-          else {
-            (nu1->bp + i)->f1 &= ~SELECT;
-          }
+          (nu1->bp + i)->f1 &= ~SELECT;
         }
       }
     }
   }
-  return point_count;
+
+  return end_count > 0;
 }
 
 /* Add new vertices connected to the selected vertices. */
@@ -1190,13 +1204,13 @@ static void extrude_points_from_selected_vertices(const ViewContext *vc,
   invert_m4_m4(imat, obedit->obmat);
   mul_m4_v3(imat, location);
 
-  int point_count = 0;
+  bool extruded = false;
 
   if (!extrude_center) {
-    point_count = extrude_vertex_from_selected_endpoint(editnurb, cu, location);
+    extruded = extrude_vertices_from_selected_endpoints(editnurb, cu, location);
   }
 
-  if (!point_count) {
+  if (!extruded) {
     Nurb *old_last_nu = editnurb->nurbs.last;
     ed_editcurve_addvert(cu, editnurb, vc->v3d, location);
     Nurb *new_last_nu = editnurb->nurbs.last;
