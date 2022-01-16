@@ -223,6 +223,17 @@ void AbcPointsReader::read_geometry(GeometrySet &geometry_set,
     }
   }
 
+  UInt64ArraySamplePtr ids = sample.getIds();
+  if (ids && ids->size() == positions->size()) {
+    CustomDataLayer *ids_layer = BKE_id_attribute_ensure(
+        &point_cloud->id, "ids", CD_PROP_INT32, ATTR_DOMAIN_POINT, nullptr);
+    int *ids_layer_data = static_cast<int *>(ids_layer->data);
+
+    for (size_t i = 0; i < ids->size(); i++) {
+      ids_layer_data[i] = static_cast<int>((*ids)[i]);
+    }
+  }
+
   /* Attributes */
   read_arbitrary_attributes(config, m_schema, {}, sample_sel, velocity_scale);
 
