@@ -809,16 +809,16 @@ static void insert_bezt_to_nurb(Nurb *nu, const CutData *data, Curve *cu)
   BezTriple *bezt1 = (BezTriple *)MEM_mallocN((nu->pntsu + 1) * sizeof(BezTriple), __func__);
   const int index = data->bezt_index + 1;
   /* Copy all control points before the cut to the new memory. */
-  memcpy(bezt1, nu->bezt, index * sizeof(BezTriple));
+  ED_curve_beztcpy(editnurb, bezt1, nu->bezt, index);
   BezTriple *new_bezt = bezt1 + index;
 
   /* Duplicate control point after the cut. */
-  memcpy(new_bezt, new_bezt - 1, sizeof(BezTriple));
+  ED_curve_beztcpy(editnurb, new_bezt, new_bezt - 1, 1);
   copy_v3_v3(new_bezt->vec[1], data->cut_loc);
 
   if (index < nu->pntsu) {
     /* Copy all control points after the cut to the new memory. */
-    memcpy(bezt1 + index + 1, nu->bezt + index, (nu->pntsu - index) * sizeof(BezTriple));
+    ED_curve_beztcpy(editnurb, bezt1 + index + 1, nu->bezt + index, (nu->pntsu - index));
   }
 
   nu->pntsu += 1;
@@ -862,16 +862,16 @@ static void insert_bp_to_nurb(Nurb *nu, const CutData *data, Curve *cu)
   BPoint *bp1 = (BPoint *)MEM_mallocN((nu->pntsu + 1) * sizeof(BPoint), __func__);
   const int index = data->bp_index + 1;
   /* Copy all control points before the cut to the new memory. */
-  memcpy(bp1, nu->bp, index * sizeof(BPoint));
+  ED_curve_bpcpy(editnurb, bp1, nu->bp, index);
   BPoint *new_bp = bp1 + index;
 
   /* Duplicate control point after the cut. */
-  memcpy(new_bp, new_bp - 1, sizeof(BPoint));
+  ED_curve_bpcpy(editnurb, new_bp, new_bp - 1, 1);
   copy_v3_v3(new_bp->vec, data->cut_loc);
 
   if (index < nu->pntsu) {
     /* Copy all control points after the cut to the new memory. */
-    memcpy(bp1 + index + 1, nu->bp + index, (nu->pntsu - index) * sizeof(BPoint));
+    ED_curve_bpcpy(editnurb, bp1 + index + 1, nu->bp + index, (nu->pntsu - index));
   }
 
   nu->pntsu += 1;
