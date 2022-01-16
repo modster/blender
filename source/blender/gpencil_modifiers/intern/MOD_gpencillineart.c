@@ -317,7 +317,6 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
   }
   else if (source_type == LRT_SOURCE_COLLECTION) {
     uiLayout *sub = uiLayoutRow(layout, true);
-    uiLayoutSetPropDecorate(sub, false);
     uiItemR(sub, ptr, "source_collection", 0, NULL, ICON_OUTLINER_COLLECTION);
     uiItemR(sub, ptr, "use_invert_collection", 0, "", ICON_ARROW_LEFTRIGHT);
   }
