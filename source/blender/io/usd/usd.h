@@ -116,7 +116,7 @@ void USD_read_geometry(CacheReader *reader,
 bool USD_mesh_topology_changed(struct CacheReader *reader,
                                struct Object *ob,
                                struct Mesh *existing_mesh,
-                               const float time,
+                               float time,
                                const char **err_str);
 
 struct CacheReader *CacheReader_open_usd_object(struct CacheArchiveHandle *handle,

@@ -163,7 +163,7 @@ class AbcObjectReader {
                              const char **err_str);
 
   /** Reads the object matrix and sets up an object transform if animated. */
-  void setupObjectTransform(const float time);
+  void setupObjectTransform(float time);
 
   void addCacheModifier();
 
@@ -174,7 +174,7 @@ class AbcObjectReader {
   void incref();
   void decref();
 
-  void read_matrix(float r_mat[4][4], const float time, const float scale, bool &is_constant);
+  void read_matrix(float r_mat[4][4], float time, float scale, bool &is_constant);
 
  protected:
   /** Determine whether we can inherit our parent's XForm. */
@@ -184,6 +184,6 @@ class AbcObjectReader {
   bTransformCacheConstraint *getOrCreateConstraint();
 };
 
-Imath::M44d get_matrix(const Alembic::AbcGeom::IXformSchema &schema, const float time);
+Imath::M44d get_matrix(const Alembic::AbcGeom::IXformSchema &schema, float time);
 
 }  // namespace blender::io::alembic

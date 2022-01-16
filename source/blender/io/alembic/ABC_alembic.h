@@ -135,7 +135,7 @@ void ABC_read_geometry(CacheReader *reader,
 bool ABC_mesh_topology_changed(struct CacheReader *reader,
                                struct Object *ob,
                                struct Mesh *existing_mesh,
-                               const float time,
+                               float time,
                                const char **err_str);
 
 void ABC_CacheReader_incref(struct CacheReader *reader);

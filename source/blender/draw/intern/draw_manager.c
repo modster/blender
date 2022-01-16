@@ -52,6 +52,7 @@
 #include "BKE_pointcache.h"
 #include "BKE_pointcloud.h"
 #include "BKE_screen.h"
+#include "BKE_subdiv_modifier.h"
 #include "BKE_volume.h"
 
 #include "DNA_camera_types.h"
@@ -90,6 +91,7 @@
 #include "draw_manager_testing.h"
 #include "draw_manager_text.h"
 #include "draw_shader.h"
+#include "draw_subdivision.h"
 #include "draw_texture_pool.h"
 
 /* only for callbacks */
@@ -755,8 +757,11 @@ static void duplidata_key_free(void *key)
   }
   else {
     Object temp_object = *dupli_key->ob;
+    /* Do not modify the original bound-box. */
+    temp_object.runtime.bb = NULL;
     BKE_object_replace_data_on_shallow_copy(&temp_object, dupli_key->ob_data);
     drw_batch_cache_generate_requested(&temp_object);
+    MEM_SAFE_FREE(temp_object.runtime.bb);
   }
   MEM_freeN(key);
 }
@@ -1794,12 +1799,12 @@ void DRW_draw_render_loop_offscreen(struct Depsgraph *depsgraph,
   DRW_draw_render_loop_ex(depsgraph, engine_type, region, v3d, render_viewport, NULL);
 
   if (draw_background) {
-    /* HACK(fclem): In this case we need to make sure the final alpha is 1.
+    /* HACK(@fclem): In this case we need to make sure the final alpha is 1.
      * We use the blend mode to ensure that. A better way to fix that would
      * be to do that in the color-management shader. */
     GPU_offscreen_bind(ofs, false);
     GPU_clear_color(0.0f, 0.0f, 0.0f, 1.0f);
-    /* Premult Alpha over black background. */
+    /* Pre-multiply alpha over black background. */
     GPU_blend(GPU_BLEND_ALPHA_PREMULT);
   }
 
@@ -2530,16 +2535,17 @@ static void drw_draw_depth_loop_impl(struct Depsgraph *depsgraph,
                                      ARegion *region,
                                      View3D *v3d,
                                      GPUViewport *viewport,
-                                     const bool use_opengl_context)
+                                     const bool use_gpencil,
+                                     const bool use_basic,
+                                     const bool use_overlay)
 {
   Scene *scene = DEG_get_evaluated_scene(depsgraph);
   RenderEngineType *engine_type = ED_view3d_engine_type(scene, v3d->shading.type);
   ViewLayer *view_layer = DEG_get_evaluated_view_layer(depsgraph);
   RegionView3D *rv3d = region->regiondata;
 
-  if (use_opengl_context) {
-    DRW_opengl_context_enable();
-  }
+  /* Reset before using it. */
+  drw_state_prepare_clean_for_draw(&DST);
 
   DST.options.is_depth = true;
 
@@ -2555,6 +2561,18 @@ static void drw_draw_depth_loop_impl(struct Depsgraph *depsgraph,
       .depsgraph = depsgraph,
   };
   drw_context_state_init();
+  drw_manager_init(&DST, viewport, NULL);
+
+  if (use_gpencil) {
+    use_drw_engine(&draw_engine_gpencil_type);
+  }
+  if (use_basic) {
+    drw_engines_enable_basic();
+  }
+  if (use_overlay) {
+    drw_engines_enable_overlays();
+  }
+
   drw_task_graph_init();
 
   /* Setup frame-buffer. */
@@ -2622,11 +2640,6 @@ static void drw_draw_depth_loop_impl(struct Depsgraph *depsgraph,
   drw_engines_disable();
 
   drw_manager_exit(&DST);
-
-  /* Changing context. */
-  if (use_opengl_context) {
-    DRW_opengl_context_disable();
-  }
 }
 
 void DRW_draw_depth_loop(struct Depsgraph *depsgraph,
@@ -2634,26 +2647,8 @@ void DRW_draw_depth_loop(struct Depsgraph *depsgraph,
                          View3D *v3d,
                          GPUViewport *viewport)
 {
-  /* Reset before using it. */
-  drw_state_prepare_clean_for_draw(&DST);
-
-  /* Required by `drw_manager_init()` */
-  DST.draw_ctx.region = region;
-  DST.draw_ctx.rv3d = region->regiondata;
-  drw_manager_init(&DST, viewport, NULL);
-
-  /* Get list of enabled engines */
-  {
-    /* Required by `DRW_state_draw_support()` */
-    DST.draw_ctx.v3d = v3d;
-
-    drw_engines_enable_basic();
-    if (DRW_state_draw_support()) {
-      drw_engines_enable_overlays();
-    }
-  }
-
-  drw_draw_depth_loop_impl(depsgraph, region, v3d, viewport, false);
+  drw_draw_depth_loop_impl(
+      depsgraph, region, v3d, viewport, false, true, DRW_state_draw_support());
 }
 
 void DRW_draw_depth_loop_gpencil(struct Depsgraph *depsgraph,
@@ -2661,17 +2656,7 @@ void DRW_draw_depth_loop_gpencil(struct Depsgraph *depsgraph,
                                  View3D *v3d,
                                  GPUViewport *viewport)
 {
-  /* Reset before using it. */
-  drw_state_prepare_clean_for_draw(&DST);
-
-  /* Required by `drw_manager_init()` */
-  DST.draw_ctx.region = region;
-  DST.draw_ctx.rv3d = region->regiondata;
-  drw_manager_init(&DST, viewport, NULL);
-
-  use_drw_engine(&draw_engine_gpencil_type);
-
-  drw_draw_depth_loop_impl(depsgraph, region, v3d, viewport, false);
+  drw_draw_depth_loop_impl(depsgraph, region, v3d, viewport, true, false, false);
 }
 
 void DRW_draw_select_id(Depsgraph *depsgraph, ARegion *region, View3D *v3d, const rcti *rect)
@@ -2975,6 +2960,8 @@ void DRW_engines_register(void)
 
     BKE_volume_batch_cache_dirty_tag_cb = DRW_volume_batch_cache_dirty_tag;
     BKE_volume_batch_cache_free_cb = DRW_volume_batch_cache_free;
+
+    BKE_subsurf_modifier_free_gpu_cache_cb = DRW_subdiv_cache_free;
   }
 }
 

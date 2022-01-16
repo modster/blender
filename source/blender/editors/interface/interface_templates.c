@@ -6438,16 +6438,6 @@ static void cache_file_attribute_mapping_item(uiList *UNUSED(ui_list),
   uiItemR(row, itemptr, "domain", UI_ITEM_R_NO_BG, "", ICON_NONE);
 }
 
-uiListType *UI_UL_cache_file_attribute_mappings()
-{
-  uiListType *list_type = (uiListType *)MEM_callocN(sizeof(*list_type), __func__);
-
-  BLI_strncpy(list_type->idname, "UI_UL_cache_file_attribute_mappings", sizeof(list_type->idname));
-  list_type->draw_item = cache_file_attribute_mapping_item;
-
-  return list_type;
-}
-
 void uiTemplateCacheFileVelocity(uiLayout *layout, PointerRNA *fileptr)
 {
   /* Ensure that the context has a CacheFile as this may not be set inside of modifiers panels. */
@@ -6455,71 +6445,6 @@ void uiTemplateCacheFileVelocity(uiLayout *layout, PointerRNA *fileptr)
 
   uiItemR(layout, fileptr, "velocity_name", 0, NULL, ICON_NONE);
   uiItemR(layout, fileptr, "velocity_unit", 0, NULL, ICON_NONE);
-}
-
-void uiTemplateCacheFileAttributeRemapping(uiLayout *layout,
-                                           const bContext *C,
-                                           PointerRNA *fileptr)
-{
-  /* Ensure that the context has a CacheFile as this may not be set inside of modifiers panels. */
-  uiLayoutSetContextPointer(layout, "edit_cachefile", fileptr);
-
-  uiLayout *row = uiLayoutRow(layout, false);
-  uiLayout *col = uiLayoutColumn(row, true);
-
-  uiTemplateList(col,
-                 (bContext *)C,
-                 "UI_UL_cache_file_attribute_mappings",
-                 "cache_file_attribute_mappings",
-                 fileptr,
-                 "attribute_mappings",
-                 fileptr,
-                 "active_attribute_mapping_index",
-                 "",
-                 1,
-                 5,
-                 UILST_LAYOUT_DEFAULT,
-                 1,
-                 UI_TEMPLATE_LIST_FLAG_NONE);
-
-  col = uiLayoutColumn(row, true);
-  uiItemO(col, "", ICON_ADD, "cachefile.attribute_mapping_add");
-  uiItemO(col, "", ICON_REMOVE, "cachefile.attribute_mapping_remove");
-}
-
-void uiTemplateCacheFileLayers(uiLayout *layout, const bContext *C, PointerRNA *fileptr)
-{
-  /* Ensure that the context has a CacheFile as this may not be set inside of modifiers panels. */
-  uiLayoutSetContextPointer(layout, "edit_cachefile", fileptr);
-
-  CacheFile *file = fileptr->data;
-  uiLayout *row = uiLayoutRow(layout, false);
-  uiLayout *col = uiLayoutColumn(row, true);
-
-  uiTemplateList(col,
-                 (bContext *)C,
-                 "UI_UL_cache_file_layers",
-                 "cache_file_layers",
-                 fileptr,
-                 "layers",
-                 fileptr,
-                 "active_index",
-                 "",
-                 1,
-                 5,
-                 UILST_LAYOUT_DEFAULT,
-                 1,
-                 UI_TEMPLATE_LIST_FLAG_NONE);
-
-  col = uiLayoutColumn(row, true);
-  uiItemO(col, "", ICON_ADD, "cachefile.layer_add");
-  uiItemO(col, "", ICON_REMOVE, "cachefile.layer_remove");
-
-  if (BLI_listbase_count(&file->layers) > 1) {
-    uiItemS_ex(col, 1.0f);
-    uiItemO(col, "", ICON_TRIA_UP, "cachefile.layer_move");
-    uiItemO(col, "", ICON_TRIA_DOWN, "cachefile.layer_move");
-  }
 }
 
 void uiTemplateCacheFileProcedural(uiLayout *layout, const bContext *C, PointerRNA *fileptr)
@@ -6612,6 +6537,81 @@ bool uiTemplateCacheFilePointer(PointerRNA *ptr, const char *propname, PointerRN
 
   *r_file_ptr = RNA_property_pointer_get(ptr, prop);
   return true;
+}
+
+uiListType *UI_UL_cache_file_attribute_mappings()
+{
+  uiListType *list_type = (uiListType *)MEM_callocN(sizeof(*list_type), __func__);
+
+  BLI_strncpy(list_type->idname, "UI_UL_cache_file_attribute_mappings", sizeof(list_type->idname));
+  list_type->draw_item = cache_file_attribute_mapping_item;
+
+  return list_type;
+}
+
+void uiTemplateCacheFileAttributeRemapping(uiLayout *layout,
+                                           const bContext *C,
+                                           PointerRNA *fileptr)
+{
+  /* Ensure that the context has a CacheFile as this may not be set inside of modifiers panels. */
+  uiLayoutSetContextPointer(layout, "edit_cachefile", fileptr);
+
+  uiLayout *row = uiLayoutRow(layout, false);
+  uiLayout *col = uiLayoutColumn(row, true);
+
+  uiTemplateList(col,
+                 (bContext *)C,
+                 "UI_UL_cache_file_attribute_mappings",
+                 "cache_file_attribute_mappings",
+                 fileptr,
+                 "attribute_mappings",
+                 fileptr,
+                 "active_attribute_mapping_index",
+                 "",
+                 1,
+                 5,
+                 UILST_LAYOUT_DEFAULT,
+                 1,
+                 UI_TEMPLATE_LIST_FLAG_NONE);
+
+  col = uiLayoutColumn(row, true);
+  uiItemO(col, "", ICON_ADD, "cachefile.attribute_mapping_add");
+  uiItemO(col, "", ICON_REMOVE, "cachefile.attribute_mapping_remove");
+}
+
+void uiTemplateCacheFileLayers(uiLayout *layout, const bContext *C, PointerRNA *fileptr)
+{
+  /* Ensure that the context has a CacheFile as this may not be set inside of modifiers panels. */
+  uiLayoutSetContextPointer(layout, "edit_cachefile", fileptr);
+
+  CacheFile *file = fileptr->data;
+  uiLayout *row = uiLayoutRow(layout, false);
+  uiLayout *col = uiLayoutColumn(row, true);
+
+  uiTemplateList(col,
+                 (bContext *)C,
+                 "UI_UL_cache_file_layers",
+                 "cache_file_layers",
+                 fileptr,
+                 "layers",
+                 fileptr,
+                 "active_index",
+                 "",
+                 1,
+                 5,
+                 UILST_LAYOUT_DEFAULT,
+                 1,
+                 UI_TEMPLATE_LIST_FLAG_NONE);
+
+  col = uiLayoutColumn(row, true);
+  uiItemO(col, "", ICON_ADD, "cachefile.layer_add");
+  uiItemO(col, "", ICON_REMOVE, "cachefile.layer_remove");
+
+  if (BLI_listbase_count(&file->layers) > 1) {
+    uiItemS_ex(col, 1.0f);
+    uiItemO(col, "", ICON_TRIA_UP, "cachefile.layer_move");
+    uiItemO(col, "", ICON_TRIA_DOWN, "cachefile.layer_move");
+  }
 }
 
 void uiTemplateCacheFile(uiLayout *layout,

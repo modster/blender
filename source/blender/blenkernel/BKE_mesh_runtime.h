@@ -56,7 +56,7 @@ void BKE_mesh_runtime_free_data(struct Mesh *mesh);
  * However, keep all the flags which defines what the mesh is (for example, that
  * it's deformed only, or that its custom data layers are out of date.)
  */
-void BKE_mesh_runtime_reset_on_copy(struct Mesh *mesh, const int flag);
+void BKE_mesh_runtime_reset_on_copy(struct Mesh *mesh, int flag);
 int BKE_mesh_runtime_looptri_len(const struct Mesh *mesh);
 void BKE_mesh_runtime_looptri_recalc(struct Mesh *mesh);
 /**
@@ -101,12 +101,6 @@ struct Mesh *mesh_create_eval_final(struct Depsgraph *depsgraph,
                                     struct Scene *scene,
                                     struct Object *ob,
                                     const struct CustomData_MeshMasks *dataMask);
-
-struct Mesh *mesh_create_eval_final_index_render(struct Depsgraph *depsgraph,
-                                                 struct Scene *scene,
-                                                 struct Object *ob,
-                                                 const struct CustomData_MeshMasks *dataMask,
-                                                 int index);
 
 struct Mesh *mesh_create_eval_no_deform(struct Depsgraph *depsgraph,
                                         struct Scene *scene,

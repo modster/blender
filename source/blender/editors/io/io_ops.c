@@ -39,6 +39,7 @@
 
 #include "io_cache.h"
 #include "io_gpencil.h"
+#include "io_obj.h"
 
 void ED_operatortypes_io(void)
 {
@@ -75,4 +76,6 @@ void ED_operatortypes_io(void)
 
   WM_operatortype_append(CACHEFILE_OT_attribute_mapping_add);
   WM_operatortype_append(CACHEFILE_OT_attribute_mapping_remove);
+
+  WM_operatortype_append(WM_OT_obj_export);
 }

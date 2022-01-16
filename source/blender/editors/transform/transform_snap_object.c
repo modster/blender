@@ -146,7 +146,7 @@ struct SnapObjectContext {
  * If NULL the BMesh should be used. */
 static Mesh *mesh_for_snap(Object *ob_eval, eSnapEditType edit_mode_type, bool *r_use_hide)
 {
-  Mesh *me_eval = ob_eval->data;
+  Mesh *me_eval = BKE_object_get_evaluated_mesh(ob_eval);
   bool use_hide = false;
   if (BKE_object_is_in_editmode(ob_eval)) {
     if (edit_mode_type == SNAP_GEOM_EDIT) {
@@ -1211,9 +1211,7 @@ static void cb_bvert_co_get(const int index, const void *user_data, const float 
 static void cb_mvert_no_copy(const int index, const void *user_data, float r_no[3])
 {
   const BVHTreeFromMesh *data = user_data;
-  const MVert *vert = data->vert + index;
-
-  normal_short_to_float_v3(r_no, vert->no);
+  copy_v3_v3(r_no, data->vert_normals[index]);
 }
 
 static void cb_bvert_no_copy(const int index, const void *user_data, float r_no[3])

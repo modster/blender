@@ -2489,12 +2489,15 @@ static void make_bevel_list_segment_3D(BevList *bl)
   normalize_v3(bevp1->dir);
 
   vec_to_quat(bevp1->quat, bevp1->dir, 5, 1);
-
   axis_angle_to_quat(q, bevp1->dir, bevp1->tilt);
   mul_qt_qtqt(bevp1->quat, q, bevp1->quat);
   normalize_qt(bevp1->quat);
+
   copy_v3_v3(bevp2->dir, bevp1->dir);
-  copy_qt_qt(bevp2->quat, bevp1->quat);
+  vec_to_quat(bevp2->quat, bevp2->dir, 5, 1);
+  axis_angle_to_quat(q, bevp2->dir, bevp2->tilt);
+  mul_qt_qtqt(bevp2->quat, q, bevp2->quat);
+  normalize_qt(bevp2->quat);
 }
 
 /* only for 2 points */
@@ -2694,7 +2697,7 @@ void BKE_curve_bevelList_make(Object *ob, const ListBase *nurbs, const bool for_
 
     if (nu->type == CU_POLY) {
       len = nu->pntsu;
-      BevList *bl = (BevList *)MEM_callocN(sizeof(BevList), __func__);
+      BevList *bl = MEM_cnew<BevList>(__func__);
       bl->bevpoints = (BevPoint *)MEM_calloc_arrayN(len, sizeof(BevPoint), __func__);
       if (need_seglen && (nu->flagu & CU_NURB_CYCLIC) == 0) {
         bl->seglen = (float *)MEM_malloc_arrayN(segcount, sizeof(float), __func__);
@@ -2744,7 +2747,7 @@ void BKE_curve_bevelList_make(Object *ob, const ListBase *nurbs, const bool for_
       /* in case last point is not cyclic */
       len = segcount * resolu + 1;
 
-      BevList *bl = (BevList *)MEM_callocN(sizeof(BevList), __func__);
+      BevList *bl = MEM_cnew<BevList>(__func__);
       bl->bevpoints = (BevPoint *)MEM_calloc_arrayN(len, sizeof(BevPoint), __func__);
       if (need_seglen && (nu->flagu & CU_NURB_CYCLIC) == 0) {
         bl->seglen = (float *)MEM_malloc_arrayN(segcount, sizeof(float), __func__);
@@ -2880,7 +2883,7 @@ void BKE_curve_bevelList_make(Object *ob, const ListBase *nurbs, const bool for_
       if (nu->pntsv == 1) {
         len = (resolu * segcount);
 
-        BevList *bl = (BevList *)MEM_callocN(sizeof(BevList), __func__);
+        BevList *bl = MEM_cnew<BevList>(__func__);
         bl->bevpoints = (BevPoint *)MEM_calloc_arrayN(len, sizeof(BevPoint), __func__);
         if (need_seglen && (nu->flagu & CU_NURB_CYCLIC) == 0) {
           bl->seglen = (float *)MEM_malloc_arrayN(segcount, sizeof(float), __func__);

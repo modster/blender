@@ -52,9 +52,7 @@ bool BKE_cachefile_filepath_get(const struct Main *bmain,
                                 const struct CacheFile *cache_file,
                                 char r_filename[1024]);
 
-float BKE_cachefile_time_offset(const struct CacheFile *cache_file,
-                                const float time,
-                                const float fps);
+float BKE_cachefile_time_offset(const struct CacheFile *cache_file, float time, float fps);
 
 /* Modifiers and constraints open and free readers through these. */
 void BKE_cachefile_reader_open(struct CacheFile *cache_file,
@@ -71,7 +69,7 @@ void BKE_cachefile_reader_free(struct CacheFile *cache_file, struct CacheReader 
  */
 bool BKE_cache_file_uses_render_procedural(const struct CacheFile *cache_file,
                                            struct Scene *scene,
-                                           const int dag_eval_mode);
+                                           int dag_eval_mode);
 
 bool BKE_cache_file_supports_layers(const struct CacheFile *cache_file);
 

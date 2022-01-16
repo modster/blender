@@ -28,12 +28,12 @@
 
 #include "BLI_compiler_compat.h"
 #include "BLI_fileops.h"
-#include "BLI_float3.hh"
 #include "BLI_float4x4.hh"
 #include "BLI_ghash.h"
 #include "BLI_index_range.hh"
 #include "BLI_map.hh"
 #include "BLI_math.h"
+#include "BLI_math_vec_types.hh"
 #include "BLI_path_util.h"
 #include "BLI_string.h"
 #include "BLI_string_ref.hh"
@@ -955,7 +955,7 @@ BoundBox *BKE_volume_boundbox_get(Object *ob)
   }
 
   if (ob->runtime.bb == nullptr) {
-    ob->runtime.bb = (BoundBox *)MEM_callocN(sizeof(BoundBox), __func__);
+    ob->runtime.bb = MEM_cnew<BoundBox>(__func__);
   }
 
   const Volume *volume = (Volume *)ob->data;

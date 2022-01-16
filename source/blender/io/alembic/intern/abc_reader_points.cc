@@ -133,7 +133,7 @@ void read_points_sample(const IPointsSchema &schema,
     }
   }
 
-  read_mverts(config.mvert, positions, vnormals);
+  read_mverts(*config.mesh, positions, vnormals);
 }
 
 void AbcPointsReader::read_geometry(GeometrySet &geometry_set,
