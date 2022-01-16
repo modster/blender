@@ -13,25 +13,47 @@
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software Foundation,
 # Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-# ***** END GPL LICENSE BLOCK *****
+#
+# The Original Code is Copyright (C) 2006, Blender Foundation
+# All rights reserved.
 
 set(INC
   .
   ../blenkernel
   ../blenlib
+  ../blentranslation
+  ../functions
   ../makesdna
+  ../makesrna
   ../../../intern/guardedalloc
+  ${CMAKE_BINARY_DIR}/source/blender/makesdna/intern
 )
 
 set(SRC
+  intern/mesh_to_curve_convert.cc
   intern/remesh_blocks.c
+  intern/realize_instances.cc
+
+  GEO_mesh_to_curve.hh
   GEO_mesh_remesh_blocks.h
+  GEO_realize_instances.hh
 )
 
 set(LIB
   bf_blenkernel
   bf_blenlib
 )
+
+if(WITH_TBB)
+  add_definitions(-DWITH_TBB)
+
+  list(APPEND INC_SYS
+    ${TBB_INCLUDE_DIRS}
+  )
+
+  list(APPEND LIB
+    ${TBB_LIBRARIES}
+  )
 
 if(WITH_REMESH_DUALCON)
   list(APPEND INC

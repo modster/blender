@@ -62,7 +62,7 @@ void USDNurbsReader::create_object(Main *bmain, const double /* motionSampleTime
 {
   curve_ = BKE_curve_add(bmain, name_.c_str(), OB_CURVE);
 
-  curve_->flag |= CU_DEFORM_FILL | CU_3D;
+  curve_->flag |= CU_3D;
   curve_->actvert = CU_ACT_NONE;
   curve_->resolu = 2;
 
@@ -112,11 +112,11 @@ void USDNurbsReader::read_curve_sample(Curve *cu, const double motionSampleTime)
    * Perhaps to be replaced by Blender USD Schema. */
   if (!usdNormals.empty()) {
     /* Set extrusion to 1. */
-    curve_->ext1 = 1.0f;
+    curve_->extrude = 1.0f;
   }
   else {
     /* Set bevel depth to 1. */
-    curve_->ext2 = 1.0f;
+    curve_->bevel_radius = 1.0f;
   }
 
   size_t idx = 0;

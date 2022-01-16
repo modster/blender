@@ -4,6 +4,7 @@
 import api
 import argparse
 import fnmatch
+import glob
 import pathlib
 import shutil
 import sys
@@ -83,15 +84,20 @@ def match_entry(entry: api.TestEntry, args: argparse.Namespace):
            entry.test.find(args.test) != -1 or \
            entry.category.find(args.test) != -1
 
-def run_entry(env: api.TestEnvironment, config: api.TestConfig, row: List, entry: api.TestEntry):
+def run_entry(env: api.TestEnvironment,
+              config: api.TestConfig,
+              row: List,
+              entry: api.TestEntry,
+              update_only: bool):
     # Check if entry needs to be run.
-    if entry.status not in ('queued', 'outdated'):
+    if update_only and entry.status not in ('queued', 'outdated'):
         print_row(config, row, end='\r')
         return False
 
     # Run test entry.
     revision = entry.revision
     git_hash = entry.git_hash
+    environment = entry.environment
     testname = entry.test
     testcategory = entry.category
     device_type = entry.device_type
@@ -116,13 +122,15 @@ def run_entry(env: api.TestEnvironment, config: api.TestConfig, row: List, entry
     print_row(config, row, end='\r')
     executable_ok = True
     if len(entry.executable):
-        env.set_blender_executable(pathlib.Path(entry.executable))
+        env.set_blender_executable(pathlib.Path(entry.executable), environment)
     else:
         env.checkout(git_hash)
         executable_ok = env.build()
         if not executable_ok:
             entry.status = 'failed'
             entry.error_msg = 'Failed to build'
+        else:
+            env.set_blender_executable(env.blender_executable, environment)
 
     # Run test and update output and status.
     if executable_ok:
@@ -134,6 +142,8 @@ def run_entry(env: api.TestEnvironment, config: api.TestConfig, row: List, entry
             if not entry.output:
                 raise Exception("Test produced no output")
             entry.status = 'done'
+        except KeyboardInterrupt as e:
+            raise e
         except Exception as e:
             entry.status = 'failed'
             entry.error_msg = str(e)
@@ -219,7 +229,10 @@ def cmd_reset(env: api.TestEnvironment, argv: List):
 
         config.queue.write()
 
-def cmd_run(env: api.TestEnvironment, argv: List):
+        if args.test == '*':
+            shutil.rmtree(config.logs_dir)
+
+def cmd_run(env: api.TestEnvironment, argv: List, update_only: bool):
     # Run tests.
     parser = argparse.ArgumentParser()
     parser.add_argument('config', nargs='?', default=None)
@@ -229,16 +242,25 @@ def cmd_run(env: api.TestEnvironment, argv: List):
     configs = env.get_configs(args.config)
     for config in configs:
         updated = False
+        cancel = False
         print_header(config)
         for row in config.queue.rows(use_revision_columns(config)):
             if match_entry(row[0], args):
                 for entry in row:
-                    if run_entry(env, config, row, entry):
-                        updated = True
-                        # Write queue every time in case running gets interrupted,
-                        # so it can be resumed.
-                        config.queue.write()
+                    try:
+                        if run_entry(env, config, row, entry, update_only):
+                            updated = True
+                            # Write queue every time in case running gets interrupted,
+                            # so it can be resumed.
+                            config.queue.write()
+                    except KeyboardInterrupt as e:
+                        cancel = True
+                        break
+
                 print_row(config, row)
+
+            if cancel:
+                break
 
         if updated:
             # Generate graph if test were run.
@@ -256,7 +278,17 @@ def cmd_graph(argv: List):
     parser.add_argument('-o', '--output', type=str, required=True)
     args = parser.parse_args(argv)
 
-    graph = api.TestGraph([pathlib.Path(path) for path in args.json_file])
+    # For directories, use all json files in the directory.
+    json_files = []
+    for path in args.json_file:
+        path = pathlib.Path(path)
+        if path.is_dir():
+            for filepath in glob.iglob(str(path / '*.json')):
+                json_files.append(pathlib.Path(filepath))
+        else:
+            json_files.append(path)
+
+    graph = api.TestGraph(json_files)
     graph.write(pathlib.Path(args.output))
 
 def main():
@@ -268,8 +300,9 @@ def main():
              '  \n'
              '  list                                 List available tests, devices and configurations\n'
              '  \n'
-             '  run [<config>] [<test>]              Execute tests for configuration\n'
-             '  reset [<config>] [<test>]            Clear tests results from config, for re-running\n'
+             '  run [<config>] [<test>]              Execute all tests in configuration\n'
+             '  update [<config>] [<test>]           Execute only queued and outdated tests\n'
+             '  reset [<config>] [<test>]            Clear tests results in configuration\n'
              '  status [<config>] [<test>]           List configurations and their tests\n'
              '  \n'
              '  graph a.json b.json... -o out.html   Create graph from results in JSON files\n')
@@ -304,7 +337,9 @@ def main():
     if args.command == 'list':
         cmd_list(env, argv)
     elif args.command == 'run':
-        cmd_run(env, argv)
+        cmd_run(env, argv, update_only=False)
+    elif args.command == 'update':
+        cmd_run(env, argv, update_only=True)
     elif args.command == 'reset':
         cmd_reset(env, argv)
     elif args.command == 'status':

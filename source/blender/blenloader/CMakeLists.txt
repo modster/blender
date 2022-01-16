@@ -26,6 +26,7 @@ set(INC
   ../blentranslation
   ../depsgraph
   ../draw
+  ../editors/include
   ../imbuf
   ../makesdna
   ../makesrna
@@ -42,7 +43,7 @@ set(INC
 )
 
 set(INC_SYS
-  ${ZLIB_INCLUDE_DIRS}
+  ${ZSTD_INCLUDE_DIRS}
 )
 
 set(SRC
@@ -113,6 +114,7 @@ if(WITH_GTESTS)
     tests/blendfile_loading_base_test.h
   )
   set(TEST_INC
+    ../../../intern/ghost
   )
   set(TEST_LIB
     bf_blenloader

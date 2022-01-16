@@ -362,11 +362,6 @@ static bool nlaedit_get_context(bAnimContext *ac, SpaceNla *snla)
 
 /* ----------- Public API --------------- */
 
-/* Obtain current anim-data context,
- * given that context info from Blender context has already been set:
- * - AnimContext to write to is provided as pointer to var on stack so that we don't have
- *   allocation/freeing costs (which are not that avoidable with channels).
- */
 bool ANIM_animdata_context_getdata(bAnimContext *ac)
 {
   SpaceLink *sl = ac->sl;
@@ -397,11 +392,6 @@ bool ANIM_animdata_context_getdata(bAnimContext *ac)
   return (ok && ac->data);
 }
 
-/* Obtain current anim-data context from Blender Context info
- * - AnimContext to write to is provided as pointer to var on stack so that we don't have
- *   allocation/freeing costs (which are not that avoidable with channels).
- * - Clears data and sets the information from Blender Context which is useful
- */
 bool ANIM_animdata_get_context(const bContext *C, bAnimContext *ac)
 {
   Main *bmain = CTX_data_main(C);
@@ -1061,20 +1051,17 @@ static bool skip_fcurve_selected_data(bDopeSheet *ads, FCurve *fcu, ID *owner_id
 
   if (GS(owner_id->name) == ID_OB) {
     Object *ob = (Object *)owner_id;
+    bPoseChannel *pchan = NULL;
+    char bone_name[sizeof(pchan->name)];
 
-    /* only consider if F-Curve involves pose.bones */
-    if ((fcu->rna_path) && strstr(fcu->rna_path, "pose.bones")) {
-
-      /* get bone-name, and check if this bone is selected */
-      bPoseChannel *pchan = NULL;
-      char *bone_name = BLI_str_quoted_substrN(fcu->rna_path, "pose.bones[");
-      if (bone_name) {
-        pchan = BKE_pose_channel_find_name(ob->pose, bone_name);
-        MEM_freeN(bone_name);
-      }
+    /* Only consider if F-Curve involves `pose.bones`. */
+    if (fcu->rna_path &&
+        BLI_str_quoted_substr(fcu->rna_path, "pose.bones[", bone_name, sizeof(bone_name))) {
+      /* Get bone-name, and check if this bone is selected. */
+      pchan = BKE_pose_channel_find_name(ob->pose, bone_name);
 
       /* check whether to continue or skip */
-      if ((pchan) && (pchan->bone)) {
+      if (pchan && pchan->bone) {
         /* If only visible channels,
          * skip if bone not visible unless user wants channels from hidden data too. */
         if (skip_hidden) {
@@ -1101,24 +1088,41 @@ static bool skip_fcurve_selected_data(bDopeSheet *ads, FCurve *fcu, ID *owner_id
   }
   else if (GS(owner_id->name) == ID_SCE) {
     Scene *scene = (Scene *)owner_id;
+    Sequence *seq = NULL;
+    char seq_name[sizeof(seq->name)];
 
-    /* only consider if F-Curve involves sequence_editor.sequences */
-    if ((fcu->rna_path) && strstr(fcu->rna_path, "sequences_all")) {
-      Editing *ed = SEQ_editing_get(scene, false);
-      Sequence *seq = NULL;
-
+    /* Only consider if F-Curve involves `sequence_editor.sequences`. */
+    if (fcu->rna_path &&
+        BLI_str_quoted_substr(fcu->rna_path, "sequences_all[", seq_name, sizeof(seq_name))) {
+      /* Get strip name, and check if this strip is selected. */
+      Editing *ed = SEQ_editing_get(scene);
       if (ed) {
-        /* get strip name, and check if this strip is selected */
-        char *seq_name = BLI_str_quoted_substrN(fcu->rna_path, "sequences_all[");
-        if (seq_name) {
-          seq = SEQ_get_sequence_by_name(ed->seqbasep, seq_name, false);
-          MEM_freeN(seq_name);
-        }
+        seq = SEQ_get_sequence_by_name(ed->seqbasep, seq_name, false);
       }
 
-      /* can only add this F-Curve if it is selected */
+      /* Can only add this F-Curve if it is selected. */
       if (ads->filterflag & ADS_FILTER_ONLYSEL) {
-        if ((seq == NULL) || (seq->flag & SELECT) == 0) {
+
+        /* NOTE(@campbellbarton): The `seq == NULL` check doesn't look right
+         * (compared to other checks in this function which skip data that can't be found).
+         *
+         * This is done since the search for sequence strips doesn't use a global lookup:
+         * - Nested meta-strips are excluded.
+         * - When inside a meta-strip - strips outside the meta-strip excluded.
+         *
+         * Instead, only the strips directly visible to the user are considered for selection.
+         * The NULL check here means everything else is considered unselected and is not shown.
+         *
+         * There is a subtle difference between nodes, pose-bones ... etc
+         * since data-paths that point to missing strips are not shown.
+         * If this is an important difference, the NULL case could perform a global lookup,
+         * only returning `true` if the sequence strip exists elsewhere
+         * (ignoring it's selection state). */
+        if (seq == NULL) {
+          return true;
+        }
+
+        if ((seq->flag & SELECT) == 0) {
           return true;
         }
       }
@@ -1126,22 +1130,21 @@ static bool skip_fcurve_selected_data(bDopeSheet *ads, FCurve *fcu, ID *owner_id
   }
   else if (GS(owner_id->name) == ID_NT) {
     bNodeTree *ntree = (bNodeTree *)owner_id;
+    bNode *node = NULL;
+    char node_name[sizeof(node->name)];
 
-    /* check for selected nodes */
-    if ((fcu->rna_path) && strstr(fcu->rna_path, "nodes")) {
-      bNode *node = NULL;
+    /* Check for selected nodes. */
+    if (fcu->rna_path &&
+        (BLI_str_quoted_substr(fcu->rna_path, "nodes[", node_name, sizeof(node_name)))) {
+      /* Get strip name, and check if this strip is selected. */
+      node = nodeFindNodebyName(ntree, node_name);
 
-      /* get strip name, and check if this strip is selected */
-      char *node_name = BLI_str_quoted_substrN(fcu->rna_path, "nodes[");
-      if (node_name) {
-        node = nodeFindNodebyName(ntree, node_name);
-        MEM_freeN(node_name);
-      }
-
-      /* can only add this F-Curve if it is selected */
-      if (ads->filterflag & ADS_FILTER_ONLYSEL) {
-        if ((node) && (node->flag & NODE_SELECT) == 0) {
-          return true;
+      /* Can only add this F-Curve if it is selected. */
+      if (node) {
+        if (ads->filterflag & ADS_FILTER_ONLYSEL) {
+          if ((node->flag & NODE_SELECT) == 0) {
+            return true;
+          }
         }
       }
     }
@@ -1887,7 +1890,8 @@ static size_t animdata_filter_gpencil(bAnimContext *ac,
       if ((filter_mode & ANIMFILTER_DATA_VISIBLE) && !(ads->filterflag & ADS_FILTER_INCL_HIDDEN)) {
         /* Layer visibility - we check both object and base,
          * since these may not be in sync yet. */
-        if ((base->flag & BASE_VISIBLE_DEPSGRAPH) == 0) {
+        if ((base->flag & BASE_VISIBLE_DEPSGRAPH) == 0 ||
+            (base->flag & BASE_VISIBLE_VIEWLAYER) == 0) {
           continue;
         }
 
@@ -3074,7 +3078,10 @@ static size_t animdata_filter_dopesheet_movieclips(bAnimContext *ac,
 }
 
 /* Helper for animdata_filter_dopesheet() - For checking if an object should be included or not */
-static bool animdata_filter_base_is_ok(bDopeSheet *ads, Base *base, int filter_mode)
+static bool animdata_filter_base_is_ok(bDopeSheet *ads,
+                                       Base *base,
+                                       const eObjectMode object_mode,
+                                       int filter_mode)
 {
   Object *ob = base->object;
 
@@ -3131,10 +3138,21 @@ static bool animdata_filter_base_is_ok(bDopeSheet *ads, Base *base, int filter_m
   }
 
   /* check selection and object type filters */
-  if ((ads->filterflag & ADS_FILTER_ONLYSEL) &&
-      !((base->flag & BASE_SELECTED) /*|| (base == sce->basact) */)) {
-    /* only selected should be shown */
-    return false;
+  if (ads->filterflag & ADS_FILTER_ONLYSEL) {
+    if (object_mode & OB_MODE_POSE) {
+      /* When in pose-mode handle all pose-mode objects.
+       * This avoids problems with pose-mode where objects may be unselected,
+       * where a selected bone of an unselected object would be hidden. see: T81922. */
+      if (!(base->object->mode & object_mode)) {
+        return false;
+      }
+    }
+    else {
+      /* only selected should be shown (ignore active) */
+      if (!(base->flag & BASE_SELECTED)) {
+        return false;
+      }
+    }
   }
 
   /* check if object belongs to the filtering group if option to filter
@@ -3172,7 +3190,7 @@ static Base **animdata_filter_ds_sorted_bases(bDopeSheet *ads,
 
   Base **sorted_bases = MEM_mallocN(sizeof(Base *) * tot_bases, "Dopesheet Usable Sorted Bases");
   LISTBASE_FOREACH (Base *, base, &view_layer->object_bases) {
-    if (animdata_filter_base_is_ok(ads, base, filter_mode)) {
+    if (animdata_filter_base_is_ok(ads, base, OB_MODE_OBJECT, filter_mode)) {
       sorted_bases[num_bases++] = base;
     }
   }
@@ -3265,8 +3283,10 @@ static size_t animdata_filter_dopesheet(bAnimContext *ac,
     /* Filter and add contents of each base (i.e. object) without them sorting first
      * NOTE: This saves performance in cases where order doesn't matter
      */
+    Object *obact = OBACT(view_layer);
+    const eObjectMode object_mode = obact ? obact->mode : OB_MODE_OBJECT;
     LISTBASE_FOREACH (Base *, base, &view_layer->object_bases) {
-      if (animdata_filter_base_is_ok(ads, base, filter_mode)) {
+      if (animdata_filter_base_is_ok(ads, base, object_mode, filter_mode)) {
         /* since we're still here, this object should be usable */
         items += animdata_filter_dopesheet_ob(ac, anim_data, ads, base, filter_mode);
       }
@@ -3430,14 +3450,6 @@ static size_t animdata_filter_remove_duplis(ListBase *anim_data)
 
 /* ----------- Public API --------------- */
 
-/**
- * This function filters the active data source to leave only animation channels suitable for
- * usage by the caller. It will return the length of the list
- *
- * \param anim_data: Is a pointer to a #ListBase,
- * to which the filtered animation channels will be placed for use.
- * \param filter_mode: how should the data be filtered - bit-mapping accessed flags.
- */
 size_t ANIM_animdata_filter(bAnimContext *ac,
                             ListBase *anim_data,
                             eAnimFilter_Flags filter_mode,

@@ -176,16 +176,6 @@ static BMFace *bm_face_create_from_mpoly(
   return BM_face_create(bm, verts, edges, mp->totloop, NULL, BM_CREATE_SKIP_CD);
 }
 
-/**
- * \brief Mesh -> BMesh
- * \param bm: The mesh to write into, while this is typically a newly created BMesh,
- * merging into existing data is supported.
- * Note the custom-data layout isn't used.
- * If more comprehensive merging is needed we should move this into a separate function
- * since this should be kept fast for edit-mode switching and storing undo steps.
- *
- * \warning This function doesn't calculate face normals.
- */
 void BM_mesh_bm_from_me(BMesh *bm, const Mesh *me, const struct BMeshFromMeshParams *params)
 {
   const bool is_new = !(bm->totvert || (bm->vdata.totlayer || bm->edata.totlayer ||
@@ -216,6 +206,14 @@ void BM_mesh_bm_from_me(BMesh *bm, const Mesh *me, const struct BMeshFromMeshPar
       CustomData_bmesh_init_pool(&bm->pdata, me->totpoly, BM_FACE);
     }
     return; /* Sanity check. */
+  }
+
+  /* Only copy normals to the new BMesh if they are not already dirty. This avoids unnecessary
+   * work, but also accessing normals on an incomplete mesh, for example when restoring undo steps
+   * in edit mode. */
+  const float(*vert_normals)[3] = NULL;
+  if (!BKE_mesh_vertex_normals_are_dirty(me)) {
+    vert_normals = BKE_mesh_vertex_normals_ensure(me);
   }
 
   if (is_new) {
@@ -344,7 +342,9 @@ void BM_mesh_bm_from_me(BMesh *bm, const Mesh *me, const struct BMeshFromMeshPar
       BM_vert_select_set(bm, v, true);
     }
 
-    normal_short_to_float_v3(v->no, mvert->no);
+    if (vert_normals) {
+      copy_v3_v3(v->no, vert_normals[i]);
+    }
 
     /* Copy Custom Data */
     CustomData_to_bmesh_block(&me->vdata, &bm->vdata, i, &v->head.data, true);
@@ -582,10 +582,6 @@ BLI_INLINE void bmesh_quick_edgedraw_flag(MEdge *med, BMEdge *e)
   }
 }
 
-/**
- *
- * \param bmain: May be NULL in case \a calc_object_remap parameter option is not set.
- */
 void BM_mesh_bm_to_me(Main *bmain, BMesh *bm, Mesh *me, const struct BMeshToMeshParams *params)
 {
   MEdge *med;
@@ -653,6 +649,10 @@ void BM_mesh_bm_to_me(Main *bmain, BMesh *bm, Mesh *me, const struct BMeshToMesh
   CustomData_add_layer(&me->ldata, CD_MLOOP, CD_ASSIGN, mloop, me->totloop);
   CustomData_add_layer(&me->pdata, CD_MPOLY, CD_ASSIGN, mpoly, me->totpoly);
 
+  /* There is no way to tell if BMesh normals are dirty or not. Instead of calculating the normals
+   * on the BMesh possibly unnecessarily, just tag them dirty on the resulting mesh. */
+  BKE_mesh_normals_tag_dirty(me);
+
   me->cd_flag = BM_mesh_cd_flag_from_bmesh(bm);
 
   /* This is called again, 'dotess' arg is used there. */
@@ -661,7 +661,6 @@ void BM_mesh_bm_to_me(Main *bmain, BMesh *bm, Mesh *me, const struct BMeshToMesh
   i = 0;
   BM_ITER_MESH (v, &iter, bm, BM_VERTS_OF_MESH) {
     copy_v3_v3(mvert->co, v->co);
-    normal_float_to_short_v3(mvert->no, v->no);
 
     mvert->flag = BM_vert_flag_to_mflag(v);
 
@@ -1005,23 +1004,6 @@ void BM_mesh_bm_to_me(Main *bmain, BMesh *bm, Mesh *me, const struct BMeshToMesh
   BKE_mesh_runtime_clear_geometry(me);
 }
 
-/**
- * A version of #BM_mesh_bm_to_me intended for getting the mesh
- * to pass to the modifier stack for evaluation,
- * instead of mode switching (where we make sure all data is kept
- * and do expensive lookups to maintain shape keys).
- *
- * Key differences:
- *
- * - Don't support merging with existing mesh.
- * - Ignore shape-keys.
- * - Ignore vertex-parents.
- * - Ignore selection history.
- * - Uses simpler method to calculate #ME_EDGEDRAW
- * - Uses #CD_MASK_DERIVEDMESH instead of #CD_MASK_MESH.
- *
- * \note Was `cddm_from_bmesh_ex` in 2.7x, removed `MFace` support.
- */
 void BM_mesh_bm_to_me_for_eval(BMesh *bm, Mesh *me, const CustomData_MeshMasks *cd_mask_extra)
 {
   /* Must be an empty mesh. */
@@ -1072,6 +1054,8 @@ void BM_mesh_bm_to_me_for_eval(BMesh *bm, Mesh *me, const CustomData_MeshMasks *
   const int cd_edge_bweight_offset = CustomData_get_offset(&bm->edata, CD_BWEIGHT);
   const int cd_edge_crease_offset = CustomData_get_offset(&bm->edata, CD_CREASE);
 
+  BKE_mesh_normals_tag_dirty(me);
+
   me->runtime.deformed_only = true;
 
   /* Don't add origindex layer if one already exists. */
@@ -1085,8 +1069,6 @@ void BM_mesh_bm_to_me_for_eval(BMesh *bm, Mesh *me, const CustomData_MeshMasks *
     copy_v3_v3(mv->co, eve->co);
 
     BM_elem_index_set(eve, i); /* set_inline */
-
-    normal_float_to_short_v3(mv->no, eve->no);
 
     mv->flag = BM_vert_flag_to_mflag(eve);
 

@@ -124,7 +124,8 @@ static int particle_system_remove_exec(bContext *C, wmOperator *UNUSED(op))
   }
 
   mode_orig = ob->mode;
-  object_remove_particle_system(bmain, scene, ob);
+  ParticleSystem *psys = psys_get_current(ob);
+  object_remove_particle_system(bmain, scene, ob, psys);
 
   /* possible this isn't the active object
    * object_remove_particle_system() clears the mode on the last psys
@@ -742,8 +743,10 @@ static bool remap_hair_emitter(Depsgraph *depsgraph,
   invert_m4_m4(from_imat, from_mat);
   invert_m4_m4(to_imat, to_mat);
 
-  if (target_psmd->mesh_final->runtime.deformed_only) {
-    /* we don't want to mess up target_psmd->dm when converting to global coordinates below */
+  const bool use_dm_final_indices = (target_psys->part->use_modifier_stack &&
+                                     !target_psmd->mesh_final->runtime.deformed_only);
+
+  if (use_dm_final_indices || !target_psmd->mesh_original) {
     mesh = target_psmd->mesh_final;
   }
   else {
@@ -754,6 +757,7 @@ static bool remap_hair_emitter(Depsgraph *depsgraph,
     return false;
   }
   /* don't modify the original vertices */
+  /* we don't want to mess up target_psmd->dm when converting to global coordinates below */
   mesh = (Mesh *)BKE_id_copy_ex(NULL, &mesh->id, NULL, LIB_ID_COPY_LOCALIZE);
 
   /* BMESH_ONLY, deform dm may not have tessface */
@@ -824,7 +828,13 @@ static bool remap_hair_emitter(Depsgraph *depsgraph,
       tpa->foffset = 0.0f;
 
       tpa->num = nearest.index;
-      tpa->num_dmcache = psys_particle_dm_face_lookup(target_mesh, mesh, tpa->num, tpa->fuv, NULL);
+      if (use_dm_final_indices) {
+        tpa->num_dmcache = DMCACHE_ISCHILD;
+      }
+      else {
+        tpa->num_dmcache = psys_particle_dm_face_lookup(
+            target_psmd->mesh_final, target_psmd->mesh_original, tpa->num, tpa->fuv, NULL);
+      }
     }
     else {
       me = &medge[nearest.index];
@@ -929,7 +939,9 @@ static bool connect_hair(Depsgraph *depsgraph, Scene *scene, Object *ob, Particl
                           ob->obmat,
                           psys->flag & PSYS_GLOBAL_HAIR,
                           false);
-  psys->flag &= ~PSYS_GLOBAL_HAIR;
+  if (ok) {
+    psys->flag &= ~PSYS_GLOBAL_HAIR;
+  }
 
   return ok;
 }
@@ -1234,9 +1246,15 @@ static int copy_particle_systems_exec(bContext *C, wmOperator *op)
   const bool use_active = RNA_boolean_get(op->ptr, "use_active");
   Scene *scene = CTX_data_scene(C);
   Object *ob_from = ED_object_active_context(C);
-  ParticleSystem *psys_from =
-      use_active ? CTX_data_pointer_get_type(C, "particle_system", &RNA_ParticleSystem).data :
-                   NULL;
+
+  ParticleSystem *psys_from = NULL;
+  if (use_active) {
+    psys_from = CTX_data_pointer_get_type(C, "particle_system", &RNA_ParticleSystem).data;
+    if (psys_from == NULL) {
+      /* Particle System context pointer is only valid in the Properties Editor. */
+      psys_from = psys_get_current(ob_from);
+    }
+  }
 
   int changed_tot = 0;
   int fail = 0;

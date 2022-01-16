@@ -92,6 +92,7 @@ set(SRC_DNA_INC
   ${CMAKE_CURRENT_SOURCE_DIR}/makesdna/DNA_texture_types.h
   ${CMAKE_CURRENT_SOURCE_DIR}/makesdna/DNA_tracking_types.h
   ${CMAKE_CURRENT_SOURCE_DIR}/makesdna/DNA_userdef_types.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/makesdna/DNA_uuid_types.h
   ${CMAKE_CURRENT_SOURCE_DIR}/makesdna/DNA_vec_types.h
   ${CMAKE_CURRENT_SOURCE_DIR}/makesdna/DNA_vfont_types.h
   ${CMAKE_CURRENT_SOURCE_DIR}/makesdna/DNA_view2d_types.h
@@ -131,6 +132,10 @@ add_subdirectory(functions)
 add_subdirectory(makesdna)
 add_subdirectory(makesrna)
 
+if(WITH_BLENDER_THUMBNAILER)
+  add_subdirectory(blendthumb)
+endif()
+
 if(WITH_COMPOSITOR)
   add_subdirectory(compositor)
 endif()
@@ -157,8 +162,4 @@ endif()
 
 if(WITH_FREESTYLE)
   add_subdirectory(freestyle)
-endif()
-
-if(WIN32)
-  add_subdirectory(blendthumb)
 endif()

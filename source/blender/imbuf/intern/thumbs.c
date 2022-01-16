@@ -347,7 +347,7 @@ static ImBuf *thumb_create_ex(const char *file_path,
       tsize = PREVIEW_RENDER_DEFAULT_HEIGHT;
       break;
     case THB_LARGE:
-      tsize = PREVIEW_RENDER_DEFAULT_HEIGHT * 2;
+      tsize = PREVIEW_RENDER_LARGE_HEIGHT;
       break;
     case THB_FAIL:
       tsize = 1;
@@ -435,8 +435,9 @@ static ImBuf *thumb_create_ex(const char *file_path,
         scaledy = (float)tsize;
         scaledx = ((float)img->x / (float)img->y) * tsize;
       }
-      ex = (short)scaledx;
-      ey = (short)scaledy;
+      /* Scaling down must never assign zero width/height, see: T89868. */
+      ex = MAX2(1, (short)scaledx);
+      ey = MAX2(1, (short)scaledy);
 
       /* save some time by only scaling byte buf */
       if (img->rect_float) {
@@ -522,7 +523,6 @@ ImBuf *IMB_thumb_create(const char *path, ThumbSize size, ThumbSource source, Im
       path, uri, thumb_name, false, THUMB_DEFAULT_HASH, NULL, NULL, size, source, img);
 }
 
-/* read thumbnail for file and returns new imbuf for thumbnail */
 ImBuf *IMB_thumb_read(const char *path, ThumbSize size)
 {
   char thumb[FILE_MAX];
@@ -539,7 +539,6 @@ ImBuf *IMB_thumb_read(const char *path, ThumbSize size)
   return img;
 }
 
-/* delete all thumbs for the file */
 void IMB_thumb_delete(const char *path, ThumbSize size)
 {
   char thumb[FILE_MAX];
@@ -558,7 +557,6 @@ void IMB_thumb_delete(const char *path, ThumbSize size)
   }
 }
 
-/* create the thumb if necessary and manage failed and old thumbs */
 ImBuf *IMB_thumb_manage(const char *org_path, ThumbSize size, ThumbSource source)
 {
   char thumb_path[FILE_MAX];

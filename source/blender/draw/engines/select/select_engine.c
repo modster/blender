@@ -363,6 +363,7 @@ DrawEngineType draw_engine_select_type = {
     &select_data_size,
     &select_engine_init,
     &select_engine_free,
+    NULL, /* instance_free */
     &select_cache_init,
     &select_cache_populate,
     NULL,
@@ -381,6 +382,8 @@ RenderEngineType DRW_engine_viewport_select_type = {
     SELECT_ENGINE,
     N_("Select ID"),
     RE_INTERNAL | RE_USE_STEREO_VIEWPORT | RE_USE_GPU_CONTEXT,
+    NULL,
+    NULL,
     NULL,
     NULL,
     NULL,

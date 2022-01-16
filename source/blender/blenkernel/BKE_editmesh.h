@@ -19,7 +19,7 @@
 /** \file
  * \ingroup bke
  *
- * The \link edmesh EDBM module\endlink is for editmode bmesh stuff.
+ * The \link edmesh EDBM module \endlink is for editmode bmesh stuff.
  * In contrast, this module is for code shared with blenkernel that's
  * only concerned with low level operations on the #BMEditMesh structure.
  */
@@ -79,6 +79,11 @@ typedef struct BMEditMesh {
   int mirror_cdlayer;
 
   /**
+   * Enable for evaluated copies, causes the edit-mesh to free the memory, not it's contents.
+   */
+  char is_shallow_copy;
+
+  /**
    * ID data is older than edit-mode data.
    * Set #Main.is_memfile_undo_flush_needed when enabling.
    */
@@ -97,12 +102,29 @@ void BKE_editmesh_looptri_calc_with_partial(BMEditMesh *em, struct BMPartialUpda
 void BKE_editmesh_looptri_and_normals_calc_with_partial(BMEditMesh *em,
                                                         struct BMPartialUpdate *bmpinfo);
 
+/**
+ * Performing the face normal calculation at the same time as tessellation
+ * gives a reasonable performance boost (approx ~20% faster).
+ */
 void BKE_editmesh_looptri_and_normals_calc(BMEditMesh *em);
 
+/**
+ * \note The caller is responsible for ensuring triangulation data,
+ * typically by calling #BKE_editmesh_looptri_calc.
+ */
 BMEditMesh *BKE_editmesh_create(BMesh *bm);
 BMEditMesh *BKE_editmesh_copy(BMEditMesh *em);
+/**
+ * \brief Return the #BMEditMesh for a given object
+ *
+ * \note this function assumes this is a mesh object,
+ * don't add NULL data check here. caller must do that
+ */
 BMEditMesh *BKE_editmesh_from_object(struct Object *ob);
 void BKE_editmesh_free_derived_caches(BMEditMesh *em);
+/**
+ * \note Does not free the #BMEditMesh struct itself.
+ */
 void BKE_editmesh_free_data(BMEditMesh *em);
 
 float (*BKE_editmesh_vert_coords_alloc(struct Depsgraph *depsgraph,
@@ -119,6 +141,9 @@ const float (*BKE_editmesh_vert_coords_when_deformed(struct Depsgraph *depsgraph
                                                      bool *r_is_alloc))[3];
 
 void BKE_editmesh_lnorspace_update(BMEditMesh *em, struct Mesh *me);
+/**
+ * If auto-smooth not already set, set it.
+ */
 void BKE_editmesh_ensure_autosmooth(BMEditMesh *em, struct Mesh *me);
 struct BoundBox *BKE_editmesh_cage_boundbox_get(BMEditMesh *em);
 

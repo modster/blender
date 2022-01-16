@@ -82,6 +82,8 @@ class GVectorArray : NonCopyable, NonMovable {
   void extend(IndexMask mask, const GVVectorArray &values);
   void extend(IndexMask mask, const GVectorArray &values);
 
+  void clear(IndexMask mask);
+
   GMutableSpan operator[](int64_t index);
   GSpan operator[](int64_t index) const;
 
@@ -123,8 +125,7 @@ template<typename T> class GVectorArray_TypedMutableRef {
 
   void extend(const int64_t index, const VArray<T> &values)
   {
-    GVArray_For_VArray<T> array{values};
-    this->extend(index, array);
+    vector_array_->extend(index, values);
   }
 
   MutableSpan<T> operator[](const int64_t index)

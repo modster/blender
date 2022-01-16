@@ -89,8 +89,7 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *UNUSED(ctx)
 
   BKE_mesh_copy_parameters_for_eval(result, mesh);
   BKE_mesh_calc_edges(result, true, false);
-  result->runtime.cd_dirty_vert |= CD_MASK_NORMAL;
-
+  BKE_mesh_normals_tag_dirty(result);
   return result;
 }
 
@@ -129,6 +128,10 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiItemR(layout, ptr, "use_smooth_shade", 0, NULL, ICON_NONE);
 
   modifier_panel_end(layout, ptr);
+
+#else  /* WITH_MOD_REMESH */
+  uiItemL(layout, TIP_("Built without Remesh modifier"), ICON_NONE);
+#endif /* WITH_MOD_REMESH */
 }
 
 static void panelRegister(ARegionType *region_type)

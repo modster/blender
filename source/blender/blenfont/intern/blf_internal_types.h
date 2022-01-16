@@ -34,6 +34,9 @@
 /* Number of characters in KerningCacheBLF.table. */
 #define KERNING_CACHE_TABLE_SIZE 128
 
+/* A value in the kerning cache that indicates it is not yet set. */
+#define KERNING_ENTRY_UNSET INT_MAX
+
 typedef struct BatchBLF {
   struct FontBLF *font; /* can only batch glyph from the same font */
   struct GPUBatch *batch;
@@ -50,14 +53,11 @@ typedef struct BatchBLF {
 extern BatchBLF g_batch;
 
 typedef struct KerningCacheBLF {
-  struct KerningCacheBLF *next, *prev;
-
-  /* kerning mode. */
-  FT_UInt mode;
-
-  /* only cache a ascii glyph pairs. Only store the x
-   * offset we are interested in, instead of the full FT_Vector. */
-  int table[KERNING_CACHE_TABLE_SIZE][KERNING_CACHE_TABLE_SIZE];
+  /**
+   * Cache a ascii glyph pairs. Only store the x offset we are interested in,
+   * instead of the full #FT_Vector since it's not used for drawing at the moment.
+   */
+  int ascii_table[KERNING_CACHE_TABLE_SIZE][KERNING_CACHE_TABLE_SIZE];
 } KerningCacheBLF;
 
 typedef struct GlyphCacheBLF {
@@ -65,7 +65,7 @@ typedef struct GlyphCacheBLF {
   struct GlyphCacheBLF *prev;
 
   /* font size. */
-  unsigned int size;
+  float size;
 
   /* and dpi. */
   unsigned int dpi;
@@ -86,13 +86,6 @@ typedef struct GlyphCacheBLF {
   int bitmap_len_landed;
   int bitmap_len_alloc;
 
-  /* and the bigger glyph in the font. */
-  int glyph_width_max;
-  int glyph_height_max;
-
-  /* ascender and descender value. */
-  float ascender;
-  float descender;
 } GlyphCacheBLF;
 
 typedef struct GlyphBLF {
@@ -152,7 +145,7 @@ typedef struct FontBufInfoBLF {
   struct ColorManagedDisplay *display;
 
   /* and the color, the alphas is get from the glyph!
-   * color is srgb space */
+   * color is sRGB space */
   float col_init[4];
   /* cached conversion from 'col_init' */
   unsigned char col_char[4];
@@ -212,7 +205,10 @@ typedef struct FontBLF {
   unsigned int dpi;
 
   /* font size. */
-  unsigned int size;
+  float size;
+
+  /* Column width when printing monospaced. */
+  int fixed_width;
 
   /* max texture size. */
   int tex_size_max;
@@ -225,10 +221,7 @@ typedef struct FontBLF {
    */
   ListBase cache;
 
-  /* list of kerning cache for this font. */
-  ListBase kerning_caches;
-
-  /* current kerning cache for this font and kerning mode. */
+  /* Cache of unscaled kerning values. Will be NULL if font does not have kerning. */
   KerningCacheBLF *kerning_cache;
 
   /* freetype2 lib handle. */
@@ -239,9 +232,6 @@ typedef struct FontBLF {
 
   /* freetype2 face. */
   FT_Face face;
-
-  /* freetype kerning */
-  FT_UInt kerning_mode;
 
   /* data for buffer usage (drawing into a texture buffer) */
   FontBufInfoBLF buf_info;

@@ -42,11 +42,11 @@
 
 #include "BKE_context.h"
 #include "BKE_curve.h"
-#include "BKE_font.h"
 #include "BKE_lib_id.h"
 #include "BKE_main.h"
 #include "BKE_object.h"
 #include "BKE_report.h"
+#include "BKE_vfont.h"
 
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_query.h"
@@ -59,6 +59,7 @@
 
 #include "ED_curve.h"
 #include "ED_object.h"
+#include "ED_outliner.h"
 #include "ED_screen.h"
 #include "ED_view3d.h"
 
@@ -69,8 +70,6 @@
 #define MAXTEXT 32766
 
 static int kill_selection(Object *obedit, int ins);
-
-/** \} */
 
 /* -------------------------------------------------------------------- */
 /** \name Internal Utilities
@@ -576,7 +575,7 @@ static int paste_from_file_exec(bContext *C, wmOperator *op)
   char *path;
   int retval;
 
-  path = RNA_string_get_alloc(op->ptr, "filepath", NULL, 0);
+  path = RNA_string_get_alloc(op->ptr, "filepath", NULL, 0, NULL);
   retval = paste_from_file(C, op->reports, path);
   MEM_freeN(path);
 
@@ -704,6 +703,7 @@ static void txt_add_object(bContext *C,
 
 void ED_text_to_object(bContext *C, const Text *text, const bool split_lines)
 {
+  Main *bmain = CTX_data_main(C);
   RegionView3D *rv3d = CTX_wm_region_view3d(C);
   const TextLine *line;
   float offset[3];
@@ -742,6 +742,9 @@ void ED_text_to_object(bContext *C, const Text *text, const bool split_lines)
 
     txt_add_object(C, text->lines.first, BLI_listbase_count(&text->lines), offset);
   }
+
+  DEG_relations_tag_update(bmain);
+  ED_outliner_select_sync_from_object_tag(C);
 }
 
 /** \} */
@@ -1627,7 +1630,7 @@ static int insert_text_exec(bContext *C, wmOperator *op)
     return OPERATOR_CANCELLED;
   }
 
-  inserted_utf8 = RNA_string_get_alloc(op->ptr, "text", NULL, 0);
+  inserted_utf8 = RNA_string_get_alloc(op->ptr, "text", NULL, 0, NULL);
   len = BLI_strlen_utf8(inserted_utf8);
 
   inserted_text = MEM_callocN(sizeof(char32_t) * (len + 1), "FONT_insert_text");
@@ -2150,8 +2153,8 @@ void FONT_OT_open(wmOperatorType *ot)
                                  FILE_SPECIAL,
                                  FILE_OPENFILE,
                                  WM_FILESEL_FILEPATH | WM_FILESEL_RELPATH,
-                                 FILE_DEFAULTDISPLAY,
-                                 FILE_SORT_DEFAULT);
+                                 FILE_IMGDISPLAY,
+                                 FILE_SORT_ALPHA);
 }
 
 /** \} */
@@ -2194,9 +2197,6 @@ void FONT_OT_unlink(wmOperatorType *ot)
   ot->exec = font_unlink_exec;
 }
 
-/**
- * TextBox selection
- */
 bool ED_curve_editfont_select_pick(
     bContext *C, const int mval[2], bool extend, bool deselect, bool toggle)
 {

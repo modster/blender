@@ -21,6 +21,7 @@
 
 #include <Python.h>
 
+#include "../generic/py_capi_rna.h"
 #include "../generic/py_capi_utils.h"
 #include "../generic/python_utildefines.h"
 #include "../mathutils/mathutils.h"
@@ -207,6 +208,9 @@ static void bpy_msgbus_subscribe_value_free_data(struct wmMsgSubscribeKey *UNUSE
 PyDoc_STRVAR(
     bpy_msgbus_subscribe_rna_doc,
     ".. function:: subscribe_rna(key, owner, args, notify, options=set())\n"
+    "\n"
+    "   Register a message bus subscription. It will be cleared when another blend file is\n"
+    "   loaded, or can be cleared explicitly via :func:`bpy.msgbus.clear_by_owner`.\n"
     "\n" BPY_MSGBUS_RNA_MSGKEY_DOC
     "   :arg owner: Handle for this subscription (compared by identity).\n"
     "   :type owner: Any type.\n"
@@ -214,7 +218,12 @@ PyDoc_STRVAR(
     "\n"
     "      - ``PERSISTENT`` when set, the subscriber will be kept when remapping ID data.\n"
     "\n"
-    "   :type options: set of str.\n");
+    "   :type options: set of str.\n"
+    "\n"
+    ".. note::\n"
+    "\n"
+    "   All subscribers will be cleared on file-load. Subscribers can be re-registered on load,\n"
+    "   see :mod:`bpy.app.handlers.load_post`.\n");
 static PyObject *bpy_msgbus_subscribe_rna(PyObject *UNUSED(self), PyObject *args, PyObject *kw)
 {
   const char *error_prefix = "subscribe_rna";
@@ -260,7 +269,7 @@ static PyObject *bpy_msgbus_subscribe_rna(PyObject *UNUSED(self), PyObject *args
   }
 
   if (py_options &&
-      (pyrna_set_to_enum_bitfield(py_options_enum, py_options, &options, error_prefix)) == -1) {
+      (pyrna_enum_bitfield_from_set(py_options_enum, py_options, &options, error_prefix)) == -1) {
     return NULL;
   }
 

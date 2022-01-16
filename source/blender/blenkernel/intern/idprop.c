@@ -21,6 +21,7 @@
  * \ingroup bke
  */
 
+#include <limits.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -75,10 +76,6 @@ static size_t idp_size_table[] = {
 
 /* --------- property array type -------------*/
 
-/**
- * \note as a start to move away from the stupid IDP_New function, this type
- * has its own allocation function.
- */
 IDProperty *IDP_NewIDPArray(const char *name)
 {
   IDProperty *prop = MEM_callocN(sizeof(IDProperty), "IDProperty prop array");
@@ -126,7 +123,6 @@ static void IDP_FreeIDPArray(IDProperty *prop, const bool do_id_user)
   }
 }
 
-/* shallow copies item */
 void IDP_SetIndexArray(IDProperty *prop, int index, IDProperty *item)
 {
   BLI_assert(prop->type == IDP_IDPARRAY);
@@ -228,7 +224,6 @@ static void idp_resize_group_array(IDProperty *prop, int newlen, void *newarr)
   }
 }
 
-/* This function works for strings too! */
 void IDP_ResizeArray(IDProperty *prop, int newlen)
 {
   const bool is_grow = newlen >= prop->len;
@@ -274,6 +269,43 @@ void IDP_FreeArray(IDProperty *prop)
   }
 }
 
+IDPropertyUIData *IDP_ui_data_copy(const IDProperty *prop)
+{
+  IDPropertyUIData *dst_ui_data = MEM_dupallocN(prop->ui_data);
+
+  /* Copy extra type specific data. */
+  switch (IDP_ui_data_type(prop)) {
+    case IDP_UI_DATA_TYPE_STRING: {
+      const IDPropertyUIDataString *src = (const IDPropertyUIDataString *)prop->ui_data;
+      IDPropertyUIDataString *dst = (IDPropertyUIDataString *)dst_ui_data;
+      dst->default_value = MEM_dupallocN(src->default_value);
+      break;
+    }
+    case IDP_UI_DATA_TYPE_ID: {
+      break;
+    }
+    case IDP_UI_DATA_TYPE_INT: {
+      const IDPropertyUIDataInt *src = (const IDPropertyUIDataInt *)prop->ui_data;
+      IDPropertyUIDataInt *dst = (IDPropertyUIDataInt *)dst_ui_data;
+      dst->default_array = MEM_dupallocN(src->default_array);
+      break;
+    }
+    case IDP_UI_DATA_TYPE_FLOAT: {
+      const IDPropertyUIDataFloat *src = (const IDPropertyUIDataFloat *)prop->ui_data;
+      IDPropertyUIDataFloat *dst = (IDPropertyUIDataFloat *)dst_ui_data;
+      dst->default_array = MEM_dupallocN(src->default_array);
+      break;
+    }
+    case IDP_UI_DATA_TYPE_UNSUPPORTED: {
+      break;
+    }
+  }
+
+  dst_ui_data->description = MEM_dupallocN(prop->ui_data->description);
+
+  return dst_ui_data;
+}
+
 static IDProperty *idp_generic_copy(const IDProperty *prop, const int UNUSED(flag))
 {
   IDProperty *newp = MEM_callocN(sizeof(IDProperty), __func__);
@@ -283,6 +315,10 @@ static IDProperty *idp_generic_copy(const IDProperty *prop, const int UNUSED(fla
   newp->flag = prop->flag;
   newp->data.val = prop->data.val;
   newp->data.val2 = prop->data.val2;
+
+  if (prop->ui_data != NULL) {
+    newp->ui_data = IDP_ui_data_copy(prop);
+  }
 
   return newp;
 }
@@ -309,19 +345,13 @@ static IDProperty *IDP_CopyArray(const IDProperty *prop, const int flag)
 
   return newp;
 }
+
 /** \} */
 
 /* -------------------------------------------------------------------- */
 /** \name String Functions (IDProperty String API)
  * \{ */
 
-/**
- *
- * \param st: The string to assign.
- * \param name: The property name.
- * \param maxlen: The size of the new string (including the \0 terminator).
- * \return The new string property.
- */
 IDProperty *IDP_NewString(const char *st, const char *name, int maxlen)
 {
   IDProperty *prop = MEM_callocN(sizeof(IDProperty), "IDProperty string");
@@ -415,6 +445,7 @@ void IDP_FreeString(IDProperty *prop)
     MEM_freeN(prop->data.pointer);
   }
 }
+
 /** \} */
 
 /* -------------------------------------------------------------------- */
@@ -472,8 +503,6 @@ static IDProperty *IDP_CopyGroup(const IDProperty *prop, const int flag)
   return newp;
 }
 
-/* use for syncing proxies.
- * When values name and types match, copy the values, else ignore */
 void IDP_SyncGroupValues(IDProperty *dest, const IDProperty *src)
 {
   BLI_assert(dest->type == IDP_GROUP);
@@ -523,9 +552,6 @@ void IDP_SyncGroupTypes(IDProperty *dest, const IDProperty *src, const bool do_a
   }
 }
 
-/**
- * Replaces all properties with the same name in a destination group from a source group.
- */
 void IDP_ReplaceGroupInGroup(IDProperty *dest, const IDProperty *src)
 {
   BLI_assert(dest->type == IDP_GROUP);
@@ -550,10 +576,6 @@ void IDP_ReplaceGroupInGroup(IDProperty *dest, const IDProperty *src)
   }
 }
 
-/**
- * Checks if a property with the same name as prop exists, and if so replaces it.
- * Use this to preserve order!
- */
 void IDP_ReplaceInGroup_ex(IDProperty *group, IDProperty *prop, IDProperty *prop_exist)
 {
   BLI_assert(group->type == IDP_GROUP);
@@ -576,10 +598,6 @@ void IDP_ReplaceInGroup(IDProperty *group, IDProperty *prop)
   IDP_ReplaceInGroup_ex(group, prop, prop_exist);
 }
 
-/**
- * If a property is missing in \a dest, add it.
- * Do it recursively.
- */
 void IDP_MergeGroup_ex(IDProperty *dest,
                        const IDProperty *src,
                        const bool do_overwrite,
@@ -621,25 +639,11 @@ void IDP_MergeGroup_ex(IDProperty *dest,
   }
 }
 
-/**
- * If a property is missing in \a dest, add it.
- * Do it recursively.
- */
 void IDP_MergeGroup(IDProperty *dest, const IDProperty *src, const bool do_overwrite)
 {
   IDP_MergeGroup_ex(dest, src, do_overwrite, 0);
 }
 
-/**
- * This function has a sanity check to make sure ID properties with the same name don't
- * get added to the group.
- *
- * The sanity check just means the property is not added to the group if another property
- * exists with the same name; the client code using ID properties then needs to detect this
- * (the function that adds new properties to groups, #IDP_AddToGroup,
- * returns false if a property can't be added to the group, and true if it can)
- * and free the property.
- */
 bool IDP_AddToGroup(IDProperty *group, IDProperty *prop)
 {
   BLI_assert(group->type == IDP_GROUP);
@@ -653,10 +657,6 @@ bool IDP_AddToGroup(IDProperty *group, IDProperty *prop)
   return false;
 }
 
-/**
- * This is the same as IDP_AddToGroup, only you pass an item
- * in the group list to be inserted after.
- */
 bool IDP_InsertToGroup(IDProperty *group, IDProperty *previous, IDProperty *pnew)
 {
   BLI_assert(group->type == IDP_GROUP);
@@ -670,23 +670,15 @@ bool IDP_InsertToGroup(IDProperty *group, IDProperty *previous, IDProperty *pnew
   return false;
 }
 
-/**
- * \note this does not free the property!!
- *
- * To free the property, you have to do:
- * IDP_FreeProperty(prop);
- */
 void IDP_RemoveFromGroup(IDProperty *group, IDProperty *prop)
 {
   BLI_assert(group->type == IDP_GROUP);
+  BLI_assert(BLI_findindex(&group->data.group, prop) != -1);
 
   group->len--;
   BLI_remlink(&group->data.group, prop);
 }
 
-/**
- * Removes the property from the group and frees it.
- */
 void IDP_FreeFromGroup(IDProperty *group, IDProperty *prop)
 {
   IDP_RemoveFromGroup(group, prop);
@@ -699,7 +691,6 @@ IDProperty *IDP_GetPropertyFromGroup(const IDProperty *prop, const char *name)
 
   return (IDProperty *)BLI_findstring(&prop->data.group, name, offsetof(IDProperty, name));
 }
-/** same as above but ensure type match */
 IDProperty *IDP_GetPropertyTypeFromGroup(const IDProperty *prop, const char *name, const char type)
 {
   IDProperty *idprop = IDP_GetPropertyFromGroup(prop, name);
@@ -719,11 +710,54 @@ static void IDP_FreeGroup(IDProperty *prop, const bool do_id_user)
   }
   BLI_freelistN(&prop->data.group);
 }
+
 /** \} */
 
 /* -------------------------------------------------------------------- */
 /** \name Main Functions  (IDProperty Main API)
  * \{ */
+
+int IDP_coerce_to_int_or_zero(const IDProperty *prop)
+{
+  switch (prop->type) {
+    case IDP_INT:
+      return IDP_Int(prop);
+    case IDP_DOUBLE:
+      return (int)IDP_Double(prop);
+    case IDP_FLOAT:
+      return (int)IDP_Float(prop);
+    default:
+      return 0;
+  }
+}
+
+double IDP_coerce_to_double_or_zero(const IDProperty *prop)
+{
+  switch (prop->type) {
+    case IDP_DOUBLE:
+      return IDP_Double(prop);
+    case IDP_FLOAT:
+      return (double)IDP_Float(prop);
+    case IDP_INT:
+      return (double)IDP_Int(prop);
+    default:
+      return 0.0;
+  }
+}
+
+float IDP_coerce_to_float_or_zero(const IDProperty *prop)
+{
+  switch (prop->type) {
+    case IDP_FLOAT:
+      return IDP_Float(prop);
+    case IDP_DOUBLE:
+      return (float)IDP_Double(prop);
+    case IDP_INT:
+      return (float)IDP_Int(prop);
+    default:
+      return 0.0f;
+  }
+}
 
 IDProperty *IDP_CopyProperty_ex(const IDProperty *prop, const int flag)
 {
@@ -748,10 +782,6 @@ IDProperty *IDP_CopyProperty(const IDProperty *prop)
   return IDP_CopyProperty_ex(prop, 0);
 }
 
-/**
- * Copy content from source IDProperty into destination one, freeing destination property's content
- * first.
- */
 void IDP_CopyPropertyContent(IDProperty *dst, IDProperty *src)
 {
   IDProperty *idprop_tmp = IDP_CopyProperty(src);
@@ -761,11 +791,6 @@ void IDP_CopyPropertyContent(IDProperty *dst, IDProperty *src)
   IDP_FreeProperty(idprop_tmp);
 }
 
-/**
- * Get the Group property that contains the id properties for ID id.  Set create_if_needed
- * to create the Group property and attach it to id if it doesn't exist; otherwise
- * the function will return NULL if there's no Group property attached to the ID.
- */
 IDProperty *IDP_GetProperties(ID *id, const bool create_if_needed)
 {
   if (id->properties) {
@@ -783,8 +808,6 @@ IDProperty *IDP_GetProperties(ID *id, const bool create_if_needed)
   return id->properties;
 }
 
-/**
- * \param is_strict: When false treat missing items as a match */
 bool IDP_EqualsProperties_ex(IDProperty *prop1, IDProperty *prop2, const bool is_strict)
 {
   if (prop1 == NULL && prop2 == NULL) {
@@ -877,33 +900,6 @@ bool IDP_EqualsProperties(IDProperty *prop1, IDProperty *prop2)
   return IDP_EqualsProperties_ex(prop1, prop2, true);
 }
 
-/**
- * Allocate a new ID.
- *
- * This function takes three arguments: the ID property type, a union which defines
- * its initial value, and a name.
- *
- * The union is simple to use; see the top of BKE_idprop.h for its definition.
- * An example of using this function:
- *
- * \code{.c}
- * IDPropertyTemplate val;
- * IDProperty *group, *idgroup, *color;
- * group = IDP_New(IDP_GROUP, val, "group1"); // groups don't need a template.
- *
- * val.array.len = 4
- * val.array.type = IDP_FLOAT;
- * color = IDP_New(IDP_ARRAY, val, "color1");
- *
- * idgroup = IDP_GetProperties(some_id, 1);
- * IDP_AddToGroup(idgroup, color);
- * IDP_AddToGroup(idgroup, group);
- * \endcode
- *
- * Note that you MUST either attach the id property to an id property group with
- * IDP_AddToGroup or MEM_freeN the property, doing anything else might result in
- * a memory leak.
- */
 IDProperty *IDP_New(const char type, const IDPropertyTemplate *val, const char *name)
 {
   IDProperty *prop = NULL;
@@ -999,10 +995,80 @@ IDProperty *IDP_New(const char type, const IDPropertyTemplate *val, const char *
   return prop;
 }
 
-/**
- * \note This will free allocated data, all child properties of arrays and groups, and unlink IDs!
- * But it does not free the actual IDProperty struct itself.
- */
+void IDP_ui_data_free_unique_contents(IDPropertyUIData *ui_data,
+                                      const eIDPropertyUIDataType type,
+                                      const IDPropertyUIData *other)
+{
+  if (ui_data->description != other->description) {
+    MEM_SAFE_FREE(ui_data->description);
+  }
+
+  switch (type) {
+    case IDP_UI_DATA_TYPE_STRING: {
+      const IDPropertyUIDataString *other_string = (const IDPropertyUIDataString *)other;
+      IDPropertyUIDataString *ui_data_string = (IDPropertyUIDataString *)ui_data;
+      if (ui_data_string->default_value != other_string->default_value) {
+        MEM_SAFE_FREE(ui_data_string->default_value);
+      }
+      break;
+    }
+    case IDP_UI_DATA_TYPE_ID: {
+      break;
+    }
+    case IDP_UI_DATA_TYPE_INT: {
+      const IDPropertyUIDataInt *other_int = (const IDPropertyUIDataInt *)other;
+      IDPropertyUIDataInt *ui_data_int = (IDPropertyUIDataInt *)ui_data;
+      if (ui_data_int->default_array != other_int->default_array) {
+        MEM_SAFE_FREE(ui_data_int->default_array);
+      }
+      break;
+    }
+    case IDP_UI_DATA_TYPE_FLOAT: {
+      const IDPropertyUIDataFloat *other_float = (const IDPropertyUIDataFloat *)other;
+      IDPropertyUIDataFloat *ui_data_float = (IDPropertyUIDataFloat *)ui_data;
+      if (ui_data_float->default_array != other_float->default_array) {
+        MEM_SAFE_FREE(ui_data_float->default_array);
+      }
+      break;
+    }
+    case IDP_UI_DATA_TYPE_UNSUPPORTED: {
+      break;
+    }
+  }
+}
+
+void IDP_ui_data_free(IDProperty *prop)
+{
+  switch (IDP_ui_data_type(prop)) {
+    case IDP_UI_DATA_TYPE_STRING: {
+      IDPropertyUIDataString *ui_data_string = (IDPropertyUIDataString *)prop->ui_data;
+      MEM_SAFE_FREE(ui_data_string->default_value);
+      break;
+    }
+    case IDP_UI_DATA_TYPE_ID: {
+      break;
+    }
+    case IDP_UI_DATA_TYPE_INT: {
+      IDPropertyUIDataInt *ui_data_int = (IDPropertyUIDataInt *)prop->ui_data;
+      MEM_SAFE_FREE(ui_data_int->default_array);
+      break;
+    }
+    case IDP_UI_DATA_TYPE_FLOAT: {
+      IDPropertyUIDataFloat *ui_data_float = (IDPropertyUIDataFloat *)prop->ui_data;
+      MEM_SAFE_FREE(ui_data_float->default_array);
+      break;
+    }
+    case IDP_UI_DATA_TYPE_UNSUPPORTED: {
+      break;
+    }
+  }
+
+  MEM_SAFE_FREE(prop->ui_data->description);
+
+  MEM_freeN(prop->ui_data);
+  prop->ui_data = NULL;
+}
+
 void IDP_FreePropertyContent_ex(IDProperty *prop, const bool do_id_user)
 {
   switch (prop->type) {
@@ -1023,6 +1089,10 @@ void IDP_FreePropertyContent_ex(IDProperty *prop, const bool do_id_user)
         id_us_min(IDP_Id(prop));
       }
       break;
+  }
+
+  if (prop->ui_data != NULL) {
+    IDP_ui_data_free(prop);
   }
 }
 
@@ -1061,14 +1131,6 @@ void IDP_Reset(IDProperty *prop, const IDProperty *reference)
   }
 }
 
-/**
- * Loop through all ID properties in hierarchy of given \a id_property_root included.
- *
- * \note Container types (groups and arrays) are processed after applying the callback on them.
- *
- * \param type_filter: If not 0, only apply callback on properties of matching types, see
- * IDP_TYPE_FILTER_ enum in DNA_ID.h.
- */
 void IDP_foreach_property(IDProperty *id_property_root,
                           const int type_filter,
                           IDPForeachPropertyCallback callback,
@@ -1103,6 +1165,48 @@ void IDP_foreach_property(IDProperty *id_property_root,
 }
 
 void IDP_WriteProperty_OnlyData(const IDProperty *prop, BlendWriter *writer);
+
+static void write_ui_data(const IDProperty *prop, BlendWriter *writer)
+{
+  IDPropertyUIData *ui_data = prop->ui_data;
+
+  BLO_write_string(writer, ui_data->description);
+
+  switch (IDP_ui_data_type(prop)) {
+    case IDP_UI_DATA_TYPE_STRING: {
+      IDPropertyUIDataString *ui_data_string = (IDPropertyUIDataString *)ui_data;
+      BLO_write_string(writer, ui_data_string->default_value);
+      BLO_write_struct(writer, IDPropertyUIDataString, ui_data);
+      break;
+    }
+    case IDP_UI_DATA_TYPE_ID: {
+      BLO_write_struct(writer, IDPropertyUIDataID, ui_data);
+      break;
+    }
+    case IDP_UI_DATA_TYPE_INT: {
+      IDPropertyUIDataInt *ui_data_int = (IDPropertyUIDataInt *)ui_data;
+      if (prop->type == IDP_ARRAY) {
+        BLO_write_int32_array(
+            writer, (uint)ui_data_int->default_array_len, (int32_t *)ui_data_int->default_array);
+      }
+      BLO_write_struct(writer, IDPropertyUIDataInt, ui_data);
+      break;
+    }
+    case IDP_UI_DATA_TYPE_FLOAT: {
+      IDPropertyUIDataFloat *ui_data_float = (IDPropertyUIDataFloat *)ui_data;
+      if (prop->type == IDP_ARRAY) {
+        BLO_write_double_array(
+            writer, (uint)ui_data_float->default_array_len, ui_data_float->default_array);
+      }
+      BLO_write_struct(writer, IDPropertyUIDataFloat, ui_data);
+      break;
+    }
+    case IDP_UI_DATA_TYPE_UNSUPPORTED: {
+      BLI_assert_unreachable();
+      break;
+    }
+  }
+}
 
 static void IDP_WriteArray(const IDProperty *prop, BlendWriter *writer)
 {
@@ -1165,6 +1269,9 @@ void IDP_WriteProperty_OnlyData(const IDProperty *prop, BlendWriter *writer)
       IDP_WriteIDPArray(prop, writer);
       break;
   }
+  if (prop->ui_data != NULL) {
+    write_ui_data(prop, writer);
+  }
 }
 
 void IDP_BlendWrite(BlendWriter *writer, const IDProperty *prop)
@@ -1174,6 +1281,43 @@ void IDP_BlendWrite(BlendWriter *writer, const IDProperty *prop)
 }
 
 static void IDP_DirectLinkProperty(IDProperty *prop, BlendDataReader *reader);
+
+static void read_ui_data(IDProperty *prop, BlendDataReader *reader)
+{
+  BLO_read_data_address(reader, &prop->ui_data);
+  BLO_read_data_address(reader, &prop->ui_data->description);
+
+  switch (IDP_ui_data_type(prop)) {
+    case IDP_UI_DATA_TYPE_STRING: {
+      IDPropertyUIDataString *ui_data_string = (IDPropertyUIDataString *)prop->ui_data;
+      BLO_read_data_address(reader, &ui_data_string->default_value);
+      break;
+    }
+    case IDP_UI_DATA_TYPE_ID: {
+      break;
+    }
+    case IDP_UI_DATA_TYPE_INT: {
+      IDPropertyUIDataInt *ui_data_int = (IDPropertyUIDataInt *)prop->ui_data;
+      if (prop->type == IDP_ARRAY) {
+        BLO_read_int32_array(
+            reader, ui_data_int->default_array_len, (int **)&ui_data_int->default_array);
+      }
+      break;
+    }
+    case IDP_UI_DATA_TYPE_FLOAT: {
+      IDPropertyUIDataFloat *ui_data_float = (IDPropertyUIDataFloat *)prop->ui_data;
+      if (prop->type == IDP_ARRAY) {
+        BLO_read_double_array(
+            reader, ui_data_float->default_array_len, (double **)&ui_data_float->default_array);
+      }
+      break;
+    }
+    case IDP_UI_DATA_TYPE_UNSUPPORTED: {
+      BLI_assert_unreachable();
+      break;
+    }
+  }
+}
 
 static void IDP_DirectLinkIDPArray(IDProperty *prop, BlendDataReader *reader)
 {
@@ -1279,6 +1423,10 @@ static void IDP_DirectLinkProperty(IDProperty *prop, BlendDataReader *reader)
       prop->subtype = 0;
       IDP_Int(prop) = 0;
   }
+
+  if (prop->ui_data != NULL) {
+    read_ui_data(prop, reader);
+  }
 }
 
 void IDP_BlendReadData_impl(BlendDataReader *reader, IDProperty **prop, const char *caller_func_id)
@@ -1356,6 +1504,76 @@ void IDP_BlendReadExpand(struct BlendExpander *expander, IDProperty *prop)
       }
       break;
   }
+}
+
+eIDPropertyUIDataType IDP_ui_data_type(const IDProperty *prop)
+{
+  if (prop->type == IDP_STRING) {
+    return IDP_UI_DATA_TYPE_STRING;
+  }
+  if (prop->type == IDP_ID) {
+    return IDP_UI_DATA_TYPE_ID;
+  }
+  if (prop->type == IDP_INT || (prop->type == IDP_ARRAY && prop->subtype == IDP_INT)) {
+    return IDP_UI_DATA_TYPE_INT;
+  }
+  if (ELEM(prop->type, IDP_FLOAT, IDP_DOUBLE) ||
+      (prop->type == IDP_ARRAY && ELEM(prop->subtype, IDP_FLOAT, IDP_DOUBLE))) {
+    return IDP_UI_DATA_TYPE_FLOAT;
+  }
+  return IDP_UI_DATA_TYPE_UNSUPPORTED;
+}
+
+bool IDP_ui_data_supported(const IDProperty *prop)
+{
+  return IDP_ui_data_type(prop) != IDP_UI_DATA_TYPE_UNSUPPORTED;
+}
+
+IDPropertyUIData *IDP_ui_data_ensure(IDProperty *prop)
+{
+  if (prop->ui_data != NULL) {
+    return prop->ui_data;
+  }
+
+  switch (IDP_ui_data_type(prop)) {
+    case IDP_UI_DATA_TYPE_STRING: {
+      prop->ui_data = MEM_callocN(sizeof(IDPropertyUIDataString), __func__);
+      break;
+    }
+    case IDP_UI_DATA_TYPE_ID: {
+      IDPropertyUIDataID *ui_data = MEM_callocN(sizeof(IDPropertyUIDataID), __func__);
+      prop->ui_data = (IDPropertyUIData *)ui_data;
+      break;
+    }
+    case IDP_UI_DATA_TYPE_INT: {
+      IDPropertyUIDataInt *ui_data = MEM_callocN(sizeof(IDPropertyUIDataInt), __func__);
+      ui_data->min = INT_MIN;
+      ui_data->max = INT_MAX;
+      ui_data->soft_min = INT_MIN;
+      ui_data->soft_max = INT_MAX;
+      ui_data->step = 1;
+      prop->ui_data = (IDPropertyUIData *)ui_data;
+      break;
+    }
+    case IDP_UI_DATA_TYPE_FLOAT: {
+      IDPropertyUIDataFloat *ui_data = MEM_callocN(sizeof(IDPropertyUIDataFloat), __func__);
+      ui_data->min = -FLT_MAX;
+      ui_data->max = FLT_MAX;
+      ui_data->soft_min = -FLT_MAX;
+      ui_data->soft_max = FLT_MAX;
+      ui_data->step = 1.0f;
+      ui_data->precision = 3;
+      prop->ui_data = (IDPropertyUIData *)ui_data;
+      break;
+    }
+    case IDP_UI_DATA_TYPE_UNSUPPORTED: {
+      /* UI data not supported for remaining types, this shouldn't be called in those cases. */
+      BLI_assert_unreachable();
+      break;
+    }
+  }
+
+  return prop->ui_data;
 }
 
 /** \} */

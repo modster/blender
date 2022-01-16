@@ -131,32 +131,31 @@ static void lattice_free_data(ID *id)
 static void lattice_foreach_id(ID *id, LibraryForeachIDData *data)
 {
   Lattice *lattice = (Lattice *)id;
-  BKE_LIB_FOREACHID_PROCESS(data, lattice->key, IDWALK_CB_USER);
+  BKE_LIB_FOREACHID_PROCESS_IDSUPER(data, lattice->key, IDWALK_CB_USER);
 }
 
 static void lattice_blend_write(BlendWriter *writer, ID *id, const void *id_address)
 {
   Lattice *lt = (Lattice *)id;
-  if (lt->id.us > 0 || BLO_write_is_undo(writer)) {
-    /* Clean up, important in undo case to reduce false detection of changed datablocks. */
-    lt->editlatt = NULL;
-    lt->batch_cache = NULL;
 
-    /* write LibData */
-    BLO_write_id_struct(writer, Lattice, id_address, &lt->id);
-    BKE_id_blend_write(writer, &lt->id);
+  /* Clean up, important in undo case to reduce false detection of changed datablocks. */
+  lt->editlatt = NULL;
+  lt->batch_cache = NULL;
 
-    /* write animdata */
-    if (lt->adt) {
-      BKE_animdata_blend_write(writer, lt->adt);
-    }
+  /* write LibData */
+  BLO_write_id_struct(writer, Lattice, id_address, &lt->id);
+  BKE_id_blend_write(writer, &lt->id);
 
-    /* direct data */
-    BLO_write_struct_array(writer, BPoint, lt->pntsu * lt->pntsv * lt->pntsw, lt->def);
-
-    BKE_defbase_blend_write(writer, &lt->vertex_group_names);
-    BKE_defvert_blend_write(writer, lt->pntsu * lt->pntsv * lt->pntsw, lt->dvert);
+  /* write animdata */
+  if (lt->adt) {
+    BKE_animdata_blend_write(writer, lt->adt);
   }
+
+  /* direct data */
+  BLO_write_struct_array(writer, BPoint, lt->pntsu * lt->pntsv * lt->pntsw, lt->def);
+
+  BKE_defbase_blend_write(writer, &lt->vertex_group_names);
+  BKE_defvert_blend_write(writer, lt->pntsu * lt->pntsv * lt->pntsw, lt->dvert);
 }
 
 static void lattice_blend_read_data(BlendDataReader *reader, ID *id)
@@ -197,7 +196,8 @@ IDTypeInfo IDType_ID_LT = {
     .name = "Lattice",
     .name_plural = "lattices",
     .translation_context = BLT_I18NCONTEXT_ID_LATTICE,
-    .flags = 0,
+    .flags = IDTYPE_FLAGS_APPEND_IS_REUSABLE,
+    .asset_type_info = NULL,
 
     .init_data = lattice_init_data,
     .copy_data = lattice_copy_data,
@@ -205,6 +205,7 @@ IDTypeInfo IDType_ID_LT = {
     .make_local = NULL,
     .foreach_id = lattice_foreach_id,
     .foreach_cache = NULL,
+    .foreach_path = NULL,
     .owner_get = NULL,
 
     .blend_write = lattice_blend_write,
@@ -465,7 +466,7 @@ void outside_lattice(Lattice *lt)
             bp->hide = 1;
             bp->f1 &= ~SELECT;
 
-            /* u extrema */
+            /* U extrema. */
             bp1 = latt_bp(lt, 0, v, w);
             bp2 = latt_bp(lt, lt->pntsu - 1, v, w);
 
@@ -474,7 +475,7 @@ void outside_lattice(Lattice *lt)
             bp->vec[1] = (1.0f - fac1) * bp1->vec[1] + fac1 * bp2->vec[1];
             bp->vec[2] = (1.0f - fac1) * bp1->vec[2] + fac1 * bp2->vec[2];
 
-            /* v extrema */
+            /* V extrema. */
             bp1 = latt_bp(lt, u, 0, w);
             bp2 = latt_bp(lt, u, lt->pntsv - 1, w);
 
@@ -483,7 +484,7 @@ void outside_lattice(Lattice *lt)
             bp->vec[1] += (1.0f - fac1) * bp1->vec[1] + fac1 * bp2->vec[1];
             bp->vec[2] += (1.0f - fac1) * bp1->vec[2] + fac1 * bp2->vec[2];
 
-            /* w extrema */
+            /* W extrema. */
             bp1 = latt_bp(lt, u, v, 0);
             bp2 = latt_bp(lt, u, v, lt->pntsw - 1);
 

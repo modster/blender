@@ -1920,7 +1920,7 @@ static int arg_handle_python_use_system_env_set(int UNUSED(argc),
 
 static const char arg_handle_addons_set_doc[] =
     "<addon(s)>\n"
-    "\tComma separated list of add-ons (no spaces).";
+    "\tComma separated list (no spaces) of add-ons to enable in addition to any default add-ons.";
 static int arg_handle_addons_set(int argc, const char **argv, void *data)
 {
   /* workaround for scripts not getting a bpy.context.scene, causes internal errors elsewhere */
@@ -1994,9 +1994,7 @@ static int arg_handle_load_file(int UNUSED(argc), const char **argv, void *data)
     if (BLO_has_bfile_extension(filename)) {
       /* Just pretend a file was loaded, so the user can press Save and it'll
        * save at the filename from the CLI. */
-      BLI_strncpy(G_MAIN->name, filename, FILE_MAX);
-      G.relbase_valid = true;
-      G.save_over = true;
+      STRNCPY(G_MAIN->filepath, filename);
       printf("... opened default scene instead; saving will write to: %s\n", filename);
     }
     else {
@@ -2007,8 +2005,6 @@ static int arg_handle_load_file(int UNUSED(argc), const char **argv, void *data)
       WM_exit(C);
     }
   }
-
-  G.file_loaded = 1;
 
   return 0;
 }

@@ -35,9 +35,10 @@
 #include "UI_interface.h"
 
 #include "transform.h"
-#include "transform_mode.h"
+#include "transform_convert.h"
 #include "transform_snap.h"
 
+#include "transform_mode.h"
 /* -------------------------------------------------------------------- */
 /** \name Transform (Normal Rotation)
  * \{ */
@@ -94,7 +95,7 @@ static void applyNormalRotation(TransInfo *t, const int UNUSED(mval[2]))
 
     float axis[3];
     float mat[3][3];
-    float angle = t->values[0];
+    float angle = t->values[0] + t->values_modal_offset[0];
     copy_v3_v3(axis, axis_final);
 
     transform_snap_increment(t, &angle);
@@ -151,4 +152,5 @@ void initNormalRotation(TransInfo *t)
 
   transform_mode_default_modal_orientation_set(t, V3D_ORIENT_VIEW);
 }
+
 /** \} */

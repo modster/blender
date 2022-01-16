@@ -54,7 +54,7 @@
 static const EnumPropertyItem gpencil_modesEnumPropertyItem_mode[] = {
     {GPPAINT_MODE_STROKE, "STROKE", 0, "Stroke", ""},
     {GPPAINT_MODE_FILL, "FILL", 0, "Fill", ""},
-    {GPPAINT_MODE_BOTH, "BOTH", 0, "Stroke and Fill", ""},
+    {GPPAINT_MODE_BOTH, "BOTH", 0, "Stroke & Fill", ""},
     {0, NULL, 0, NULL, NULL},
 };
 
@@ -588,6 +588,7 @@ static int gpencil_vertexpaint_set_exec(bContext *C, wmOperator *op)
               changed = true;
               copy_v3_v3(gps->vert_color_fill, brush->rgb);
               gps->vert_color_fill[3] = factor;
+              srgb_to_linearrgb_v4(gps->vert_color_fill, gps->vert_color_fill);
             }
 
             /* Stroke points. */
@@ -596,10 +597,13 @@ static int gpencil_vertexpaint_set_exec(bContext *C, wmOperator *op)
               int i;
               bGPDspoint *pt;
 
+              float color[4];
+              copy_v3_v3(color, brush->rgb);
+              color[3] = factor;
+              srgb_to_linearrgb_v4(color, color);
               for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
                 if ((!any_selected) || (pt->flag & GP_SPOINT_SELECT)) {
-                  copy_v3_v3(pt->vert_color, brush->rgb);
-                  pt->vert_color[3] = factor;
+                  copy_v3_v3(pt->vert_color, color);
                 }
               }
             }
@@ -1138,7 +1142,7 @@ void GPENCIL_OT_stroke_reset_vertex_color(wmOperatorType *ot)
   static EnumPropertyItem mode_types_items[] = {
       {GPPAINT_MODE_STROKE, "STROKE", 0, "Stroke", "Reset Vertex Color to Stroke only"},
       {GPPAINT_MODE_FILL, "FILL", 0, "Fill", "Reset Vertex Color to Fill only"},
-      {GPPAINT_MODE_BOTH, "BOTH", 0, "Stroke and Fill", "Reset Vertex Color to Stroke and Fill"},
+      {GPPAINT_MODE_BOTH, "BOTH", 0, "Stroke & Fill", "Reset Vertex Color to Stroke and Fill"},
       {0, NULL, 0, NULL, NULL},
   };
 
