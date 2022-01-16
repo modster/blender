@@ -3492,6 +3492,13 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
       "Internally rotate the camera slightly to comphensate for the precision of the algorithm");
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
 
+  prop = RNA_def_property(srna, "use_invert_collection", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "flags", LRT_GPENCIL_INVERT_COLLECTION);
+  RNA_def_property_ui_text(prop,
+                           "Invert collection filtering",
+                           "Select everything except lines from specified collection");
+  RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
+
   RNA_define_lib_overridable(false);
 }
 
