@@ -998,6 +998,7 @@ static bool gpencil_asset_append_strokes(tGPDasset *tgpa)
     if (gpl_target == NULL) {
       gpl_target = BKE_gpencil_layer_duplicate(gpl_asset, false, false);
       BLI_assert(gpl_target != NULL);
+      gpl_target->actframe = NULL;
       BLI_listbase_clear(&gpl_target->frames);
       BLI_addtail(&gpd_target->layers, gpl_target);
       is_new_gpl = true;
