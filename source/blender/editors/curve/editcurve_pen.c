@@ -234,8 +234,8 @@ static void move_new_bezt_handles_to_mouse(const wmEvent *event,
     bezt->h2 = HD_ALIGN;
   }
 
-  const bool is_endpoint = (nu->bezt + nu->pntsu - 1 == bezt && !(nu->flagu & CU_NURB_CYCLIC)) ||
-                           (nu->bezt == bezt && (nu->flagu & CU_NURB_CYCLIC));
+  const bool is_last_point = nu->pntsu > 1 && nu->bezt + nu->pntsu - 1 == bezt &&
+                             !(nu->flagu & CU_NURB_CYCLIC);
 
   float bezt_loc[2];
   worldspace_to_screenspace(bezt->vec[1], vc, bezt_loc);
@@ -245,7 +245,7 @@ static void move_new_bezt_handles_to_mouse(const wmEvent *event,
   screenspace_to_worldspace(bezt_loc, bezt->vec[1], vc, location);
 
   /* If the new point is the last point of the curve, move the second handle to the mouse. */
-  if (is_endpoint) {
+  if (is_last_point) {
 
     copy_v3_v3(bezt->vec[2], location);
 
