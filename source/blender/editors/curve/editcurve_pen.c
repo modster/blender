@@ -133,19 +133,6 @@ static const EnumPropertyItem prop_extra_key_types[] = {
     {0, NULL, 0, NULL, NULL},
 };
 
-static void screenspace_to_worldspace_int(const int pos_2d[2],
-                                          const float depth[3],
-                                          const ViewContext *vc,
-                                          float r_pos_3d[3])
-{
-  mul_v3_m4v3(r_pos_3d, vc->obedit->obmat, depth);
-  ED_view3d_win_to_3d_int(vc->v3d, vc->region, r_pos_3d, pos_2d, r_pos_3d);
-
-  float imat[4][4];
-  invert_m4_m4(imat, vc->obedit->obmat);
-  mul_m4_v3(imat, r_pos_3d);
-}
-
 static void screenspace_to_worldspace(const float pos_2d[2],
                                       const float depth[3],
                                       const ViewContext *vc,
@@ -154,9 +141,53 @@ static void screenspace_to_worldspace(const float pos_2d[2],
   mul_v3_m4v3(r_pos_3d, vc->obedit->obmat, depth);
   ED_view3d_win_to_3d(vc->v3d, vc->region, r_pos_3d, pos_2d, r_pos_3d);
 
+  Curve *cu = vc->obedit->data;
+  if (CU_IS_2D(cu)) {
+    const float eps = 1e-6f;
+
+    /* get the view vector to 'location' */
+    float view_dir[3];
+    ED_view3d_global_to_vector(vc->rv3d, r_pos_3d, view_dir);
+
+    /* get the plane */
+    float plane[4];
+    /* only normalize to avoid precision errors */
+    normalize_v3_v3(plane, vc->obedit->obmat[2]);
+    plane[3] = -dot_v3v3(plane, vc->obedit->obmat[3]);
+
+    if (fabsf(dot_v3v3(view_dir, plane)) < eps) {
+      /* can't project on an aligned plane. */
+    }
+    else {
+      float lambda;
+      if (isect_ray_plane_v3(r_pos_3d, view_dir, plane, &lambda, false)) {
+        /* check if we're behind the viewport */
+        float location_test[3];
+        madd_v3_v3v3fl(location_test, r_pos_3d, view_dir, lambda);
+        if ((vc->rv3d->is_persp == false) ||
+            (mul_project_m4_v3_zfac(vc->rv3d->persmat, location_test) > 0.0f)) {
+          copy_v3_v3(r_pos_3d, location_test);
+        }
+      }
+    }
+  }
+
   float imat[4][4];
   invert_m4_m4(imat, vc->obedit->obmat);
   mul_m4_v3(imat, r_pos_3d);
+
+  if (CU_IS_2D(cu)) {
+    r_pos_3d[2] = 0.0f;
+  }
+}
+
+static void screenspace_to_worldspace_int(const int pos_2d[2],
+                                          const float depth[3],
+                                          const ViewContext *vc,
+                                          float r_pos_3d[3])
+{
+  const float pos_2d_fl[2] = {UNPACK2(pos_2d)};
+  screenspace_to_worldspace(pos_2d_fl, depth, vc, r_pos_3d);
 }
 
 static bool worldspace_to_screenspace(const float pos_3d[3],
@@ -166,18 +197,6 @@ static bool worldspace_to_screenspace(const float pos_3d[3],
   return ED_view3d_project_float_object(
              vc->region, pos_3d, r_pos_2d, V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN) ==
          V3D_PROJ_RET_OK;
-}
-
-static bool worldspace_to_screenspace_int(const float pos_3d[3],
-                                          const ViewContext *vc,
-                                          int r_pos_2d[2])
-{
-  float pos_2d_fl[2];
-  const bool check = worldspace_to_screenspace(pos_3d, vc, pos_2d_fl);
-  r_pos_2d[0] = (int)pos_2d_fl[0];
-  r_pos_2d[1] = (int)pos_2d_fl[1];
-
-  return check;
 }
 
 static void get_displacement_to_avg_selected_point(const ListBase *nurbs,
@@ -982,16 +1001,54 @@ static void get_selected_points(
   }
 }
 
-/* Extrude points only from endpoints. Returns whether endpoints were selected */
-static bool extrude_vertices_from_selected_endpoints(EditNurb *editnurb,
-                                                     Curve *cu,
-                                                     const float location[3])
+static bool get_selected_center(const ListBase *nurbs, float r_center[3], bool use_centers)
 {
   int end_count = 0;
-  ListBase *nurbs = BKE_curve_editNurbs_get(cu);
+  LISTBASE_FOREACH (Nurb *, nu1, nurbs) {
+    if (nu1->type == CU_BEZIER) {
+      for (int i = 0; i < nu1->pntsu; i++) {
+        BezTriple *bezt = nu1->bezt + i;
+        if (use_centers) {
+          if (BEZT_ISSEL_ANY(bezt)) {
+            add_v3_v3(r_center, bezt->vec[1]);
+            end_count++;
+          }
+        }
+        else {
+          if (BEZT_ISSEL_IDX(bezt, 1)) {
+            add_v3_v3(r_center, bezt->vec[1]);
+            end_count++;
+          }
+          else if (BEZT_ISSEL_IDX(bezt, 0)) {
+            add_v3_v3(r_center, bezt->vec[0]);
+            end_count++;
+          }
+          else if (BEZT_ISSEL_IDX(bezt, 2)) {
+            add_v3_v3(r_center, bezt->vec[2]);
+            end_count++;
+          }
+        }
+      }
+    }
+    else {
+      for (int i = 0; i < nu1->pntsu; i++) {
+        if ((nu1->bp + i)->f1 & SELECT) {
+          add_v3_v3(r_center, (nu1->bp + i)->vec);
+          end_count++;
+        }
+      }
+    }
+  }
+  if (end_count) {
+    mul_v3_fl(r_center, 1.0f / end_count);
+    return true;
+  }
+  return false;
+}
 
-  float center[3] = {0.0f, 0.0f, 0.0f};
-
+static bool get_selected_endpoint_center(const ListBase *nurbs, float r_center[3])
+{
+  int end_count = 0;
   LISTBASE_FOREACH (Nurb *, nu1, nurbs) {
     /* No extrusions if cyclic. */
     if (nu1->flagu & CU_NURB_CYCLIC) {
@@ -1002,121 +1059,128 @@ static bool extrude_vertices_from_selected_endpoints(EditNurb *editnurb,
     if (nu1->type == CU_BEZIER) {
       BezTriple *last_bezt = nu1->bezt + nu1->pntsu - 1;
       if (BEZT_ISSEL_ANY(nu1->bezt)) {
-        add_v3_v3(center, nu1->bezt->vec[1]);
+        add_v3_v3(r_center, nu1->bezt->vec[1]);
         end_count++;
       }
       if (BEZT_ISSEL_ANY(last_bezt)) {
-        add_v3_v3(center, last_bezt->vec[1]);
+        add_v3_v3(r_center, last_bezt->vec[1]);
         end_count++;
       }
     }
     else {
       BPoint *last_bp = nu1->bp + nu1->pntsu - 1;
       if (nu1->bp->f1 & SELECT) {
-        add_v3_v3(center, nu1->bp->vec);
+        add_v3_v3(r_center, nu1->bp->vec);
         end_count++;
       }
       if (last_bp->f1 & SELECT) {
-        add_v3_v3(center, last_bp->vec);
+        add_v3_v3(r_center, last_bp->vec);
         end_count++;
       }
     }
   }
-
   if (end_count) {
-    mul_v3_fl(center, 1.0f / end_count);
-    float change[3];
-    sub_v3_v3v3(change, location, center);
+    mul_v3_fl(r_center, 1.0f / end_count);
+    return true;
+  }
+  return false;
+}
 
-    LISTBASE_FOREACH (Nurb *, nu1, nurbs) {
-      if (nu1->type == CU_BEZIER) {
-        BezTriple *last_bezt = nu1->bezt + nu1->pntsu - 1;
-        const bool first_sel = BEZT_ISSEL_ANY(nu1->bezt);
-        const bool last_sel = BEZT_ISSEL_ANY(last_bezt) && nu1->pntsu > 1;
-        if (first_sel) {
-          if (last_sel) {
-            BezTriple *new_bezt = (BezTriple *)MEM_mallocN((nu1->pntsu + 2) * sizeof(BezTriple),
-                                                           __func__);
-            ED_curve_beztcpy(editnurb, new_bezt, nu1->bezt, 1);
-            ED_curve_beztcpy(editnurb, new_bezt + nu1->pntsu + 1, last_bezt, 1);
-            BEZT_DESEL_ALL(nu1->bezt);
-            BEZT_DESEL_ALL(last_bezt);
-            ED_curve_beztcpy(editnurb, new_bezt + 1, nu1->bezt, nu1->pntsu);
+static void extrude_vertices_from_selected_endpoints(EditNurb *editnurb,
+                                                     ListBase *nurbs,
+                                                     const float change[3])
+{
+  LISTBASE_FOREACH (Nurb *, nu1, nurbs) {
+    if (nu1->type == CU_BEZIER) {
+      BezTriple *last_bezt = nu1->bezt + nu1->pntsu - 1;
+      const bool first_sel = BEZT_ISSEL_ANY(nu1->bezt);
+      const bool last_sel = BEZT_ISSEL_ANY(last_bezt) && nu1->pntsu > 1;
+      if (first_sel) {
+        if (last_sel) {
+          BezTriple *new_bezt = (BezTriple *)MEM_mallocN((nu1->pntsu + 2) * sizeof(BezTriple),
+                                                         __func__);
+          ED_curve_beztcpy(editnurb, new_bezt, nu1->bezt, 1);
+          ED_curve_beztcpy(editnurb, new_bezt + nu1->pntsu + 1, last_bezt, 1);
+          BEZT_DESEL_ALL(nu1->bezt);
+          BEZT_DESEL_ALL(last_bezt);
+          ED_curve_beztcpy(editnurb, new_bezt + 1, nu1->bezt, nu1->pntsu);
 
-            move_bezt_by_change(new_bezt, change);
-            move_bezt_by_change(new_bezt + nu1->pntsu + 1, change);
-            MEM_freeN(nu1->bezt);
-            nu1->bezt = new_bezt;
-            nu1->pntsu += 2;
-          }
-          else {
-            BezTriple *new_bezt = (BezTriple *)MEM_mallocN((nu1->pntsu + 1) * sizeof(BezTriple),
-                                                           __func__);
-            ED_curve_beztcpy(editnurb, new_bezt, nu1->bezt, 1);
-            BEZT_DESEL_ALL(nu1->bezt);
-            ED_curve_beztcpy(editnurb, new_bezt + 1, nu1->bezt, nu1->pntsu);
-            move_bezt_by_change(new_bezt, change);
-            MEM_freeN(nu1->bezt);
-            nu1->bezt = new_bezt;
-            nu1->pntsu++;
-          }
+          move_bezt_by_change(new_bezt, change);
+          move_bezt_by_change(new_bezt + nu1->pntsu + 1, change);
+          MEM_freeN(nu1->bezt);
+          nu1->bezt = new_bezt;
+          nu1->pntsu += 2;
         }
-        else if (last_sel) {
+        else {
           BezTriple *new_bezt = (BezTriple *)MEM_mallocN((nu1->pntsu + 1) * sizeof(BezTriple),
                                                          __func__);
-          ED_curve_beztcpy(editnurb, new_bezt + nu1->pntsu, last_bezt, 1);
-          BEZT_DESEL_ALL(last_bezt);
-          ED_curve_beztcpy(editnurb, new_bezt, nu1->bezt, nu1->pntsu);
-          move_bezt_by_change(new_bezt + nu1->pntsu, change);
+          ED_curve_beztcpy(editnurb, new_bezt, nu1->bezt, 1);
+          BEZT_DESEL_ALL(nu1->bezt);
+          ED_curve_beztcpy(editnurb, new_bezt + 1, nu1->bezt, nu1->pntsu);
+          move_bezt_by_change(new_bezt, change);
           MEM_freeN(nu1->bezt);
           nu1->bezt = new_bezt;
           nu1->pntsu++;
         }
       }
-      else {
-        BPoint *last_bp = nu1->bp + nu1->pntsu - 1;
-        const bool first_sel = nu1->bp->f1 & SELECT;
-        const bool last_sel = last_bp->f1 & SELECT;
-        if (first_sel) {
-          if (last_sel) {
-            BPoint *new_bp = (BPoint *)MEM_mallocN((nu1->pntsu + 2) * sizeof(BPoint), __func__);
-            ED_curve_bpcpy(editnurb, new_bp, nu1->bp, 1);
-            ED_curve_bpcpy(editnurb, new_bp + nu1->pntsu + 1, last_bp, 1);
-            new_bp->f1 &= ~SELECT;
-            last_bp->f1 &= ~SELECT;
-            ED_curve_bpcpy(editnurb, new_bp + 1, nu1->bp, nu1->pntsu);
-            add_v3_v3(new_bp->vec, change);
-            add_v3_v3((new_bp + nu1->pntsu + 1)->vec, change);
-            MEM_freeN(nu1->bp);
-            nu1->bp = new_bp;
-            nu1->pntsu += 2;
-          }
-          else {
-            BPoint *new_bp = (BPoint *)MEM_mallocN((nu1->pntsu + 1) * sizeof(BPoint), __func__);
-            ED_curve_bpcpy(editnurb, new_bp, nu1->bp, 1);
-            new_bp->f1 &= ~SELECT;
-            ED_curve_bpcpy(editnurb, new_bp + 1, nu1->bp, nu1->pntsu);
-            add_v3_v3(new_bp->vec, change);
-            MEM_freeN(nu1->bp);
-            nu1->bp = new_bp;
-            nu1->pntsu++;
-          }
-        }
-        else if (last_sel) {
-          BPoint *new_bp = (BPoint *)MEM_mallocN((nu1->pntsu + 1) * sizeof(BPoint), __func__);
-          ED_curve_bpcpy(editnurb, new_bp, nu1->bp, nu1->pntsu);
-          ED_curve_bpcpy(editnurb, new_bp + nu1->pntsu, last_bp, 1);
+      else if (last_sel) {
+        BezTriple *new_bezt = (BezTriple *)MEM_mallocN((nu1->pntsu + 1) * sizeof(BezTriple),
+                                                       __func__);
+        ED_curve_beztcpy(editnurb, new_bezt + nu1->pntsu, last_bezt, 1);
+        BEZT_DESEL_ALL(last_bezt);
+        ED_curve_beztcpy(editnurb, new_bezt, nu1->bezt, nu1->pntsu);
+        move_bezt_by_change(new_bezt + nu1->pntsu, change);
+        MEM_freeN(nu1->bezt);
+        nu1->bezt = new_bezt;
+        nu1->pntsu++;
+      }
+    }
+    else {
+      BPoint *last_bp = nu1->bp + nu1->pntsu - 1;
+      const bool first_sel = nu1->bp->f1 & SELECT;
+      const bool last_sel = last_bp->f1 & SELECT;
+      if (first_sel) {
+        if (last_sel) {
+          BPoint *new_bp = (BPoint *)MEM_mallocN((nu1->pntsu + 2) * sizeof(BPoint), __func__);
+          ED_curve_bpcpy(editnurb, new_bp, nu1->bp, 1);
+          ED_curve_bpcpy(editnurb, new_bp + nu1->pntsu + 1, last_bp, 1);
+          new_bp->f1 &= ~SELECT;
           last_bp->f1 &= ~SELECT;
-          ED_curve_bpcpy(editnurb, new_bp, nu1->bp, nu1->pntsu);
-          add_v3_v3((new_bp + nu1->pntsu)->vec, change);
+          ED_curve_bpcpy(editnurb, new_bp + 1, nu1->bp, nu1->pntsu);
+          add_v3_v3(new_bp->vec, change);
+          add_v3_v3((new_bp + nu1->pntsu + 1)->vec, change);
+          MEM_freeN(nu1->bp);
+          nu1->bp = new_bp;
+          nu1->pntsu += 2;
+        }
+        else {
+          BPoint *new_bp = (BPoint *)MEM_mallocN((nu1->pntsu + 1) * sizeof(BPoint), __func__);
+          ED_curve_bpcpy(editnurb, new_bp, nu1->bp, 1);
+          new_bp->f1 &= ~SELECT;
+          ED_curve_bpcpy(editnurb, new_bp + 1, nu1->bp, nu1->pntsu);
+          add_v3_v3(new_bp->vec, change);
           MEM_freeN(nu1->bp);
           nu1->bp = new_bp;
           nu1->pntsu++;
         }
       }
+      else if (last_sel) {
+        BPoint *new_bp = (BPoint *)MEM_mallocN((nu1->pntsu + 1) * sizeof(BPoint), __func__);
+        ED_curve_bpcpy(editnurb, new_bp, nu1->bp, nu1->pntsu);
+        ED_curve_bpcpy(editnurb, new_bp + nu1->pntsu, last_bp, 1);
+        last_bp->f1 &= ~SELECT;
+        ED_curve_bpcpy(editnurb, new_bp, nu1->bp, nu1->pntsu);
+        add_v3_v3((new_bp + nu1->pntsu)->vec, change);
+        MEM_freeN(nu1->bp);
+        nu1->bp = new_bp;
+        nu1->pntsu++;
+      }
     }
   }
+}
 
+static void deselect_all_center_vertices(ListBase *nurbs)
+{
   LISTBASE_FOREACH (Nurb *, nu1, nurbs) {
     if (nu1->pntsu > 2) {
       int start, end;
@@ -1138,8 +1202,6 @@ static bool extrude_vertices_from_selected_endpoints(EditNurb *editnurb,
       }
     }
   }
-
-  return end_count > 0;
 }
 
 /* Add new vertices connected to the selected vertices. */
@@ -1148,20 +1210,17 @@ static void extrude_points_from_selected_vertices(const ViewContext *vc,
                                                   const wmEvent *event,
                                                   const bool extrude_center)
 {
-  Nurb *nu = NULL;
-  BezTriple *bezt = NULL;
-  BPoint *bp = NULL;
   Curve *cu = vc->obedit->data;
-
-  ED_curve_nurb_vert_selected_find(cu, vc->v3d, &nu, &bezt, &bp);
+  ListBase *nurbs = BKE_curve_editNurbs_get(cu);
+  float center[3] = {0.0f, 0.0f, 0.0f};
+  if (!extrude_center) {
+    deselect_all_center_vertices(nurbs);
+  }
+  bool sel_exists = get_selected_center(nurbs, center, true);
 
   float location[3];
-
-  if (bezt) {
-    mul_v3_m4v3(location, vc->obedit->obmat, bezt->vec[1]);
-  }
-  else if (bp) {
-    mul_v3_m4v3(location, vc->obedit->obmat, bp->vec);
+  if (sel_exists) {
+    mul_v3_m4v3(location, vc->obedit->obmat, center);
   }
   else {
     copy_v3_v3(location, vc->scene->cursor.location);
@@ -1204,13 +1263,16 @@ static void extrude_points_from_selected_vertices(const ViewContext *vc,
   invert_m4_m4(imat, obedit->obmat);
   mul_m4_v3(imat, location);
 
-  bool extruded = false;
-
-  if (!extrude_center) {
-    extruded = extrude_vertices_from_selected_endpoints(editnurb, cu, location);
+  if (CU_IS_2D(cu)) {
+    location[2] = 0.0f;
   }
 
-  if (!extruded) {
+  if (!extrude_center && sel_exists) {
+    float change[3];
+    sub_v3_v3v3(change, location, center);
+    extrude_vertices_from_selected_endpoints(editnurb, nurbs, change);
+  }
+  else {
     Nurb *old_last_nu = editnurb->nurbs.last;
     ed_editcurve_addvert(cu, editnurb, vc->v3d, location);
     Nurb *new_last_nu = editnurb->nurbs.last;
