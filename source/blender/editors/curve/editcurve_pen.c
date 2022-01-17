@@ -1761,8 +1761,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
         get_selected_points(cu, vc.v3d, &nu, &bezt, &bp);
         if (cpd->nu && !(cpd->nu->flagu & CU_NURB_CYCLIC)) {
           copy_v2_v2_int(vc.mval, event->mval);
-          cpd->acted = cpd->nu->pntsu > 2 &&
-                       make_cyclic_if_endpoints(cpd->nu, cpd->bezt, cpd->bp, &vc, C, sel_dist_mul);
+          cpd->acted = make_cyclic_if_endpoints(cpd->nu, cpd->bezt, cpd->bp, &vc, C, sel_dist_mul);
         }
       }
 
