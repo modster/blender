@@ -21,7 +21,7 @@
  * \ingroup spoutliner
  */
 
-#include <stdio.h>
+#include <cstdio>
 
 #include "DNA_armature_types.h"
 #include "DNA_layer_types.h"
@@ -50,7 +50,7 @@
 #include "WM_api.h"
 #include "WM_types.h"
 
-#include "outliner_intern.h"
+#include "outliner_intern.hh"
 
 void ED_outliner_select_sync_from_object_tag(bContext *C)
 {
@@ -93,7 +93,8 @@ void ED_outliner_select_sync_flag_outliners(const bContext *C)
   Main *bmain = CTX_data_main(C);
   wmWindowManager *wm = CTX_wm_manager(C);
 
-  for (bScreen *screen = bmain->screens.first; screen; screen = screen->id.next) {
+  for (bScreen *screen = reinterpret_cast<bScreen *>(bmain->screens.first); screen;
+       screen = reinterpret_cast<bScreen *>(screen->id.next)) {
     LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
       LISTBASE_FOREACH (SpaceLink *, sl, &area->spacedata) {
         if (sl->spacetype == SPACE_OUTLINER) {
@@ -114,12 +115,12 @@ void ED_outliner_select_sync_flag_outliners(const bContext *C)
  * outliner display mode also needs to be considered. This stores the types of data
  * to sync to increase code clarity.
  */
-typedef struct SyncSelectTypes {
+struct SyncSelectTypes {
   bool object;
   bool edit_bone;
   bool pose_bone;
   bool sequence;
-} SyncSelectTypes;
+};
 
 /**
  * Set which types of data to sync when syncing selection from the outliner based on object
@@ -173,11 +174,11 @@ static bool outliner_sync_select_to_outliner_set_types(const bContext *C,
  * Stores items selected from a sync from the outliner. Prevents syncing the selection
  * state of the last instance of an object linked in multiple collections.
  */
-typedef struct SelectedItems {
+struct SelectedItems {
   GSet *objects;
   GSet *edit_bones;
   GSet *pose_bones;
-} SelectedItems;
+};
 
 static void selected_items_init(SelectedItems *selected_items)
 {
@@ -188,9 +189,9 @@ static void selected_items_init(SelectedItems *selected_items)
 
 static void selected_items_free(SelectedItems *selected_items)
 {
-  BLI_gset_free(selected_items->objects, NULL);
-  BLI_gset_free(selected_items->edit_bones, NULL);
-  BLI_gset_free(selected_items->pose_bones, NULL);
+  BLI_gset_free(selected_items->objects, nullptr);
+  BLI_gset_free(selected_items->edit_bones, nullptr);
+  BLI_gset_free(selected_items->pose_bones, nullptr);
 }
 
 /* Check if an instance of this object been selected by the sync */
@@ -274,7 +275,7 @@ static void outliner_select_sync_to_pose_bone(TreeElement *te,
                                               GSet *selected_pbones)
 {
   Object *ob = (Object *)tselem->id;
-  bArmature *arm = ob->data;
+  bArmature *arm = reinterpret_cast<bArmature *>(ob->data);
   bPoseChannel *pchan = (bPoseChannel *)te->directdata;
 
   short bone_flag = pchan->bone->flag;
@@ -403,7 +404,7 @@ static void outliner_select_sync_from_object(ViewLayer *view_layer,
   Object *ob = (Object *)tselem->id;
   Base *base = (te->directdata) ? (Base *)te->directdata :
                                   BKE_view_layer_base_find(view_layer, ob);
-  const bool is_selected = (base != NULL) && ((base->flag & BASE_SELECTED) != 0);
+  const bool is_selected = (base != nullptr) && ((base->flag & BASE_SELECTED) != 0);
 
   if (base && (ob == obact)) {
     tselem->flag |= TSE_ACTIVE;
@@ -486,12 +487,12 @@ static void outliner_select_sync_from_sequence(Sequence *sequence_active, TreeSt
  * Contains active object, bones, and sequence for syncing to prevent getting active data
  * repeatedly throughout syncing to the outliner.
  */
-typedef struct SyncSelectActiveData {
+struct SyncSelectActiveData {
   Object *object;
   EditBone *edit_bone;
   bPoseChannel *pose_channel;
   Sequence *sequence;
-} SyncSelectActiveData;
+};
 
 /** Sync select and active flags from active view layer, bones, and sequences to the outliner. */
 static void outliner_sync_selection_to_outliner(ViewLayer *view_layer,
@@ -561,7 +562,7 @@ void outliner_sync_selection(const bContext *C, SpaceOutliner *space_outliner)
     outliner_sync_selection_to_outliner(
         view_layer, space_outliner, &space_outliner->tree, &active_data, &sync_types);
 
-    /* Keep any unsynced data in the dirty flag */
+    /* Keep any un-synced data in the dirty flag. */
     if (sync_types.object) {
       space_outliner->sync_select_dirty &= ~WM_OUTLINER_SYNC_SELECT_FROM_OBJECT;
     }
