@@ -402,7 +402,7 @@ list(APPEND INC ${CMAKE_CURRENT_BINARY_DIR})
 
 set(SHADER_CREATE_INFOS
 #../draw/engines/workbench/shaders/workbench_effect_cavity_info.hh
-#../draw/engines/workbench/shaders/workbench_prepass_info.hh
+../draw/engines/workbench/shaders/workbench_prepass_info.hh
 ../draw/intern/shaders/draw_fullscreen_info.hh
 ../draw/intern/shaders/draw_view_info.hh
 ../draw/intern/shaders/draw_object_infos_info.hh

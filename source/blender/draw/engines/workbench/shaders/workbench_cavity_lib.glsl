@@ -3,12 +3,14 @@
 #pragma BLENDER_REQUIRE(workbench_data_lib.glsl)
 #pragma BLENDER_REQUIRE(workbench_common_lib.glsl)
 
+#ifndef USE_GPU_SHADER_CREATE_INFO
 layout(std140) uniform samples_block
 {
   vec4 samples_coords[512];
 };
 
 uniform sampler2D cavityJitter;
+#endif
 
 /*  From The Alchemy screen-space ambient obscurance algorithm
  * http://graphics.cs.williams.edu/papers/AlchemyHPG11/VV11AlchemyAO.pdf */
