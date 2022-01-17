@@ -3338,6 +3338,8 @@ static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
   rb->force_crease = (lmd->calculation_flags & LRT_USE_CREASE_ON_SMOOTH_SURFACES) != 0;
   rb->sharp_as_crease = (lmd->calculation_flags & LRT_USE_CREASE_ON_SHARP_EDGES) != 0;
 
+  rb->chain_preserve_details = (lmd->calculation_flags & LRT_CHAIN_PRESERVE_DETAILS) != 0;
+
   /* This is used to limit calculation to a certain level to save time, lines who have higher
    * occlusion levels will get ignored. */
   rb->max_occlusion_level = lmd->level_end_override;
@@ -3357,12 +3359,6 @@ static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
                     (lmd->light_contour_object != NULL));
 
   rb->use_back_face_culling = (lmd->calculation_flags & LRT_USE_BACK_FACE_CULLING) != 0;
-  if (rb->max_occlusion_level < 1 && !rb->use_shadow) {
-    rb->use_back_face_culling = true;
-    if (G.debug_value == 4000) {
-      printf("Backface culling enabled automatically.\n");
-    }
-  }
 
   rb->filter_face_mark_invert = (lmd->calculation_flags & LRT_FILTER_FACE_MARK_INVERT) != 0;
   rb->filter_face_mark = (lmd->calculation_flags & LRT_FILTER_FACE_MARK) != 0;
@@ -5516,8 +5512,15 @@ static void lineart_gpencil_generate(LineartCache *cache,
       continue;
     }
     if (orig_col && ec->object_ref) {
-      if (!BKE_collection_has_object_recursive_instanced(orig_col, (Object *)ec->object_ref)) {
-        continue;
+      if (BKE_collection_has_object_recursive_instanced(orig_col, (Object *)ec->object_ref)) {
+        if (modifier_flags & LRT_GPENCIL_INVERT_COLLECTION) {
+          continue;
+        }
+      }
+      else {
+        if (!(modifier_flags & LRT_GPENCIL_INVERT_COLLECTION)) {
+          continue;
+        }
       }
     }
     if (mask_switches & LRT_GPENCIL_MATERIAL_MASK_ENABLE) {

@@ -316,7 +316,9 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
     uiItemR(layout, ptr, "source_object", 0, NULL, ICON_OBJECT_DATA);
   }
   else if (source_type == LRT_SOURCE_COLLECTION) {
-    uiItemR(layout, ptr, "source_collection", 0, NULL, ICON_OUTLINER_COLLECTION);
+    uiLayout *sub = uiLayoutRow(layout, true);
+    uiItemR(sub, ptr, "source_collection", 0, NULL, ICON_OUTLINER_COLLECTION);
+    uiItemR(sub, ptr, "use_invert_collection", 0, "", ICON_ARROW_LEFTRIGHT);
   }
   else {
     /* Source is Scene. */
@@ -665,6 +667,8 @@ static void chaining_panel_draw(const bContext *UNUSED(C), Panel *panel)
 
   uiItemR(col, ptr, "use_loose_edge_chain", 0, IFACE_("Loose Edges"), ICON_NONE);
   uiItemR(col, ptr, "use_loose_as_contour", 0, IFACE_("Loose Edges As Contour"), ICON_NONE);
+
+  uiItemR(col, ptr, "use_detail_preserve", 0, NULL, ICON_NONE);
   uiItemR(col, ptr, "use_geometry_space_chain", 0, IFACE_("Geometry Space"), ICON_NONE);
 
   uiItemR(layout,
