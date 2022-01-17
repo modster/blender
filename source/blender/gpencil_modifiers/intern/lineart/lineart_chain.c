@@ -571,8 +571,10 @@ static void lineart_bounding_area_link_chain(LineartRenderBuffer *rb, LineartEdg
   }
 }
 
-static bool lineart_chain_try_skip_noise(LineartEdgeChainItem *last_matching_eci,
+static bool lineart_chain_try_skip_noise(LineartEdgeChain *ec,
+                                         LineartEdgeChainItem *last_matching_eci,
                                          float distance_threshold,
+                                         bool preserve_details,
                                          LineartEdgeChainItem **r_next_eci)
 {
   float dist_accum = 0;
@@ -598,11 +600,21 @@ static bool lineart_chain_try_skip_noise(LineartEdgeChainItem *last_matching_eci
     }
   }
   if (can_skip_to) {
-    /* Mark all in-between segments with the same occlusion and mask. */
-    for (LineartEdgeChainItem *eci = last_matching_eci->next; eci != can_skip_to;
-         eci = eci->next) {
-      eci->material_mask_bits = fixed_mask;
-      eci->occlusion = fixed_occ;
+    /* Either mark all in-between segments with the same occlusion and mask or delete those
+     * different ones. */
+    LineartEdgeChainItem *next_eci;
+    for (LineartEdgeChainItem *eci = last_matching_eci->next; eci != can_skip_to; eci = next_eci) {
+      next_eci = eci->next;
+      if (eci->material_mask_bits == fixed_mask && eci->occlusion == fixed_occ) {
+        continue;
+      }
+      if (preserve_details) {
+        eci->material_mask_bits = fixed_mask;
+        eci->occlusion = fixed_occ;
+      }
+      else {
+        BLI_remlink(&ec->chain, eci);
+      }
     }
     *r_next_eci = can_skip_to;
     return true;
@@ -641,7 +653,11 @@ void MOD_lineart_chain_split_for_fixed_occlusion(LineartRenderBuffer *rb)
           if (lineart_point_overlapping(next_eci, eci->pos[0], eci->pos[1], 1e-5)) {
             continue;
           }
-          if (lineart_chain_try_skip_noise(eci->prev, rb->chaining_image_threshold, &next_eci)) {
+          if (lineart_chain_try_skip_noise(ec,
+                                           eci->prev,
+                                           rb->chaining_image_threshold,
+                                           rb->chain_preserve_details,
+                                           &next_eci)) {
             continue;
           }
         }
