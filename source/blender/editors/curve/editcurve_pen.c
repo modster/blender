@@ -578,7 +578,13 @@ static bool get_closest_vertex_to_point_in_nurbs(const ListBase *nurbs,
       for (int i = 0; i < nu->pntsu; i++) {
         BezTriple *bezt = &nu->bezt[i];
         float bezt_vec[2];
-        for (short j = 0; j < 3; j++) {
+        int start = 0, end = 3;
+        int handle_display = vc->v3d->overlay.handle_display;
+        if (handle_display == CURVE_HANDLE_NONE ||
+            (handle_display == CURVE_HANDLE_SELECTED && !BEZT_ISSEL_IDX(bezt, 1))) {
+          start = 1, end = 2;
+        }
+        for (short j = start; j < end; j++) {
           if (worldspace_to_screenspace(bezt->vec[j], vc, bezt_vec)) {
             const float distance = len_manhattan_v2v2(bezt_vec, point);
             if (distance < min_distance_bezt) {
