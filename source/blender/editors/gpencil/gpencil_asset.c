@@ -1032,6 +1032,10 @@ static bool gpencil_asset_append_strokes(tGPDasset *tgpa)
 
       /* Loop all strokes and duplicate. */
       LISTBASE_FOREACH (bGPDstroke *, gps_asset, &gpf_asset->strokes) {
+        if (gps_asset->mat_nr == -1) {
+          continue;
+        }
+
         bGPDstroke *gps_target = BKE_gpencil_stroke_duplicate(gps_asset, true, true);
         gps_target->next = gps_target->prev = NULL;
         gps_target->flag &= ~GP_STROKE_SELECT;
@@ -1041,8 +1045,9 @@ static bool gpencil_asset_append_strokes(tGPDasset *tgpa)
         Material *ma_src = gpencil_asset_material_get_from_id(&tgpa->gpd_asset->id,
                                                               gps_asset->mat_nr);
 
-        int mat_index = BKE_gpencil_object_material_index_get_by_name(tgpa->ob,
-                                                                      ma_src->id.name + 2);
+        int mat_index = (ma_src != NULL) ? BKE_gpencil_object_material_index_get_by_name(
+                                               tgpa->ob, ma_src->id.name + 2) :
+                                           -1;
         bool is_new_mat = false;
         if (mat_index == -1) {
           const int totcolors = tgpa->ob->totcol;
