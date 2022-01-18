@@ -915,6 +915,7 @@ static void view3d_dropboxes(void)
   ListBase *lb = WM_dropboxmap_find("View3D", SPACE_VIEW3D, RGN_TYPE_WINDOW);
 
   struct wmDropBox *drop;
+  /* Local object. */
   drop = WM_dropbox_add(lb,
                         "OBJECT_OT_add_named",
                         view3d_ob_drop_poll_local_id,
@@ -925,6 +926,7 @@ static void view3d_dropboxes(void)
   drop->draw_activate = view3d_boundbox_drop_draw_activate;
   drop->draw_deactivate = view3d_boundbox_drop_draw_deactivate;
 
+  /* Object asset from external file. */
   drop = WM_dropbox_add(lb,
                         "OBJECT_OT_transform_to_mouse",
                         view3d_ob_drop_poll_external_asset,
@@ -935,6 +937,7 @@ static void view3d_dropboxes(void)
   drop->draw_activate = view3d_boundbox_drop_draw_activate;
   drop->draw_deactivate = view3d_boundbox_drop_draw_deactivate;
 
+  /* Local collection (adds collection instance). */
   drop = WM_dropbox_add(lb,
                         "OBJECT_OT_collection_instance_add",
                         view3d_collection_drop_poll_local_id,
@@ -945,14 +948,16 @@ static void view3d_dropboxes(void)
   drop->draw_activate = view3d_boundbox_drop_draw_activate;
   drop->draw_deactivate = view3d_boundbox_drop_draw_deactivate;
 
-  /* Use OBJECT_OT_transform_to_mouse for collection instances as well, to transform the instance
-   * empty. Just needs different callbacks than objects. */
-  drop = WM_dropbox_add(lb,
-                        "OBJECT_OT_transform_to_mouse",
-                        view3d_collection_drop_poll_external_asset,
-                        view3d_collection_instance_drop_copy_external_asset,
-                        WM_drag_free_imported_drag_ID,
-                        NULL);
+  /* Collection asset from external file (adds collection instance). */
+  drop = WM_dropbox_add(
+      lb,
+      /* Use OBJECT_OT_transform_to_mouse for collection instances as well, to transform the
+       * instance empty. Just needs different callbacks than objects. */
+      "OBJECT_OT_transform_to_mouse",
+      view3d_collection_drop_poll_external_asset,
+      view3d_collection_instance_drop_copy_external_asset,
+      WM_drag_free_imported_drag_ID,
+      NULL);
   drop->draw = WM_drag_draw_item_name_fn;
   drop->draw_activate = view3d_boundbox_drop_draw_activate;
   drop->draw_deactivate = view3d_boundbox_drop_draw_deactivate;

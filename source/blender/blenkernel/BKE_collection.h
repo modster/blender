@@ -228,17 +228,31 @@ struct Base *BKE_collection_or_layer_objects(const struct ViewLayer *view_layer,
 /* Dimensions. */
 
 /**
- * Calculate the axis-aligned bounding box (in global space) of all objects in this collection,
+ * Calculate an axis-aligned bounding box (in global space) of all objects in this collection,
  * excluding empties (but including lamps, cameras, curves, etc.). Nested collections and
  * collection instances are included.
+ *
+ * \warning This is not a reliable bounding box for things like collision detection. For example,
+ *          it doesn't consider particle instances or grease pencil stroke width.
+ *          Take it as approximation, e.g. for visual feedback.
+ *
+ * \param object_visibility: Sets what object visibility is required (e.g. decide between viewport
+ *                           vs. render visibility).
  */
 void BKE_collection_boundbox_calc(const struct Collection *collection,
                                   CollectionObjectVisibility object_visibility,
                                   struct BoundBox *r_boundbox);
 /**
- * Calculate the axis-aligned dimensions of all objects in this collection, excluding
- * empties (but including lamps, cameras, curves, etc.). Nested collections and collection
- * instances are included.
+ * Calculate axis-aligned dimensions of all objects in this collection, excluding empties (but
+ * including lamps, cameras, curves, etc.). Nested collections and collection instances are
+ * included.
+ *
+ * \warning This is not a reliable bounding box for things like collision detection. For example,
+ *          it doesn't consider particle instances or grease pencil stroke width.
+ *          Take it as approximation, e.g. for visual feedback.
+ *
+ * \param object_visibility: Sets what object visibility is required (e.g. decide between viewport
+ *                           vs. render visibility).
  */
 void BKE_collection_dimensions_calc(const struct Collection *collection,
                                     CollectionObjectVisibility object_visibility,
