@@ -562,7 +562,7 @@ static void view3d_boundbox_drop_draw_activate_collection(struct wmDropBox *drop
   float dimensions[3] = {0.0f};
   if (drag->type == WM_DRAG_ID) {
     Collection *collection = (Collection *)WM_drag_get_local_ID(drag, ID_GR);
-    BKE_collection_dimensions_calc(collection, COLLECTION_VISIBILITY_VIEWPORT, dimensions);
+    BKE_collection_dimensions_hint_calc(collection, COLLECTION_VISIBILITY_VIEWPORT, dimensions);
   }
   else {
     struct AssetMetaData *meta_data = WM_drag_get_asset_meta_data(drag, drag_id_type);
@@ -839,7 +839,7 @@ static void view3d_collection_drop_matrix_get(const Collection *collection,
   BoundBox boundbox;
   /* Use the bounding-box for what the user will see, i.e. use viewport visibility. */
   const CollectionObjectVisibility visibility = COLLECTION_VISIBILITY_VIEWPORT;
-  BKE_collection_boundbox_calc(collection, visibility, &boundbox);
+  BKE_collection_boundbox_hint_calc(collection, visibility, &boundbox);
   view3d_drop_matrix_from_snap(snap_state, &boundbox, unit_mat, r_mat_final);
 }
 

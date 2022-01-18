@@ -236,12 +236,12 @@ struct Base *BKE_collection_or_layer_objects(const struct ViewLayer *view_layer,
  *          it doesn't consider particle instances or grease pencil stroke width.
  *          Take it as approximation, e.g. for visual feedback.
  *
- * \param object_visibility: Sets what object visibility is required (e.g. decide between viewport
+ * \param object_visibility: Define the required object visibility is (e.g. decide between viewport
  *                           vs. render visibility).
  */
-void BKE_collection_boundbox_calc(const struct Collection *collection,
-                                  CollectionObjectVisibility object_visibility,
-                                  struct BoundBox *r_boundbox);
+void BKE_collection_boundbox_hint_calc(const struct Collection *collection,
+                                       CollectionObjectVisibility object_visibility,
+                                       struct BoundBox *r_boundbox);
 /**
  * Calculate axis-aligned dimensions of all objects in this collection, excluding empties (but
  * including lamps, cameras, curves, etc.). Nested collections and collection instances are
@@ -251,12 +251,12 @@ void BKE_collection_boundbox_calc(const struct Collection *collection,
  *          it doesn't consider particle instances or grease pencil stroke width.
  *          Take it as approximation, e.g. for visual feedback.
  *
- * \param object_visibility: Sets what object visibility is required (e.g. decide between viewport
+ * \param object_visibility: Define the required object visibility is (e.g. decide between viewport
  *                           vs. render visibility).
  */
-void BKE_collection_dimensions_calc(const struct Collection *collection,
-                                    CollectionObjectVisibility object_visibility,
-                                    float r_vec[3]);
+void BKE_collection_dimensions_hint_calc(const struct Collection *collection,
+                                         CollectionObjectVisibility object_visibility,
+                                         float r_vec[3]);
 
 /* Editing. */
 
