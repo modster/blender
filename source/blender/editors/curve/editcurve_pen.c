@@ -1580,7 +1580,7 @@ static void toggle_select_bp(BPoint *bp)
   }
 }
 
-static void toggle_vector_auto(BezTriple *bezt, short bezt_idx, CurvePenData *cpd)
+static void toggle_handle_types(BezTriple *bezt, short bezt_idx, CurvePenData *cpd)
 {
   if (bezt_idx == 0) {
     if (bezt->h1 == HD_VECT) {
@@ -1605,6 +1605,22 @@ static void toggle_vector_auto(BezTriple *bezt, short bezt_idx, CurvePenData *cp
       }
     }
     cpd->acted = true;
+  }
+}
+
+static void cycle_handles(BezTriple *bezt)
+{
+  if (bezt->h1 == HD_AUTO) {
+    bezt->h1 = bezt->h2 = HD_VECT;
+  }
+  else if (bezt->h1 == HD_VECT) {
+    bezt->h1 = bezt->h2 = HD_ALIGN;
+  }
+  else if (bezt->h1 == HD_ALIGN) {
+    bezt->h1 = bezt->h2 = HD_FREE;
+  }
+  else {
+    bezt->h1 = bezt->h2 = HD_AUTO;
   }
 }
 
@@ -1646,6 +1662,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   const bool move_point = RNA_boolean_get(op->ptr, "move_point");
   const bool close_spline = RNA_boolean_get(op->ptr, "close_spline");
   const bool toggle_vector = RNA_boolean_get(op->ptr, "toggle_vector");
+  const bool cycle_handle_type = RNA_boolean_get(op->ptr, "cycle_handle_type");
   const int free_toggle = RNA_enum_get(op->ptr, "free_toggle");
   const int adj_handle = RNA_enum_get(op->ptr, "adj_handle");
   const int move_entire = RNA_enum_get(op->ptr, "move_entire");
@@ -1790,7 +1807,13 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
         get_closest_vertex_to_point_in_nurbs(
             nurbs, &nu, &bezt, &bp, &bezt_idx, mval_fl, sel_dist_mul, &vc);
         if (bezt) {
-          toggle_vector_auto(bezt, bezt_idx, cpd);
+          if (bezt_idx == 1 && cycle_handle_type) {
+            cycle_handles(bezt);
+            cpd->acted = true;
+          }
+          else {
+            toggle_handle_types(bezt, bezt_idx, cpd);
+          }
 
           if (nu && nu->type == CU_BEZIER) {
             BKE_nurb_handles_calc(nu);
@@ -1927,4 +1950,9 @@ void CURVE_OT_pen(wmOperatorType *ot)
                          "Make a spline cyclic by clicking endpoints");
   prop = RNA_def_boolean(
       ot->srna, "toggle_vector", false, "Toggle Vector", "Toggle between Vector and Auto handles");
+  prop = RNA_def_boolean(ot->srna,
+                         "cycle_handle_type",
+                         false,
+                         "Cycle Handle Type",
+                         "Cycle between all four handle types");
 }

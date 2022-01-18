@@ -7009,7 +7009,7 @@ def km_3d_view_tool_edit_curve_pen(params):
             ("curve.pen", {"type": params.tool_mouse, "value": 'PRESS', "shift": True},
              {"properties": [("insert_point", True), ("select_multi", True),]}),
             ("curve.pen", {"type": params.tool_mouse, "value": 'DOUBLE_CLICK'},
-             {"properties": [("toggle_vector", True),]}),
+             {"properties": [("toggle_vector", True), ("cycle_handle_type", True),]}),
         ]},
     )
 
