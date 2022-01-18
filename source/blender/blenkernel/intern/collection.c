@@ -381,7 +381,9 @@ static IDProperty *collection_asset_dimensions_property(Collection *collection)
   idprop.array.len = ARRAY_SIZE(dimensions);
   idprop.array.type = IDP_FLOAT;
 
-  IDProperty *property = IDP_New(IDP_ARRAY, &idprop, "dimensions");
+  /* Note that since the dimensions are more of an approximation (e.g. excluding instances), this
+   * is really just a hint for visual feedback! */
+  IDProperty *property = IDP_New(IDP_ARRAY, &idprop, "dimensions_hint");
   memcpy(IDP_Array(property), dimensions, sizeof(dimensions));
 
   return property;

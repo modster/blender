@@ -566,7 +566,7 @@ static void view3d_boundbox_drop_draw_activate_collection(struct wmDropBox *drop
   }
   else {
     struct AssetMetaData *meta_data = WM_drag_get_asset_meta_data(drag, drag_id_type);
-    IDProperty *dimensions_prop = BKE_asset_metadata_idprop_find(meta_data, "dimensions");
+    IDProperty *dimensions_prop = BKE_asset_metadata_idprop_find(meta_data, "dimensions_hint");
     if (dimensions_prop) {
       copy_v3_v3(dimensions, IDP_Array(dimensions_prop));
     }
