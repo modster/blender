@@ -581,7 +581,7 @@ static bool get_closest_vertex_to_point_in_nurbs(const ListBase *nurbs,
         int start = 0, end = 3;
         int handle_display = vc->v3d->overlay.handle_display;
         if (handle_display == CURVE_HANDLE_NONE ||
-            (handle_display == CURVE_HANDLE_SELECTED && !BEZT_ISSEL_IDX(bezt, 1))) {
+            (handle_display == CURVE_HANDLE_SELECTED && !BEZT_ISSEL_ANY(bezt))) {
           start = 1, end = 2;
         }
         for (short j = start; j < end; j++) {
@@ -1188,7 +1188,7 @@ static void extrude_vertices_from_selected_endpoints(EditNurb *editnurb,
 static void deselect_all_center_vertices(ListBase *nurbs)
 {
   LISTBASE_FOREACH (Nurb *, nu1, nurbs) {
-    if (nu1->pntsu > 2) {
+    if (nu1->pntsu > 1) {
       int start, end;
       if (nu1->flagu & CU_NURB_CYCLIC) {
         start = 0;
