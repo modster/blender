@@ -432,6 +432,7 @@ shaders/infos/gpu_shader_2D_point_varying_size_varying_color_info.hh
 shaders/infos/gpu_shader_2D_point_uniform_size_uniform_color_aa_info.hh
 shaders/infos/gpu_shader_2D_point_uniform_size_uniform_color_outline_aa_info.hh
 shaders/infos/gpu_shader_2D_area_borders_info.hh
+shaders/infos/gpu_shader_2D_image_multi_rect_color_info.hh
 shaders/infos/gpu_shader_instance_varying_color_varying_size_info.hh
 shaders/infos/gpu_shader_3D_point_info.hh
 shaders/infos/gpu_shader_2D_nodelink_info.hh
@@ -481,9 +482,9 @@ if(WITH_GPU_SHADER_BUILDER)
     ${PLATFORM_LINKLIBS}
   )
   target_include_directories(shader_builder PRIVATE ${INC} ${CMAKE_CURRENT_BINARY_DIR})
-  
+
   set(BAKED_CREATE_INFOS_FILE ${CMAKE_CURRENT_BINARY_DIR}/shader_baked.hh)
-  
+
   add_custom_command(
     OUTPUT
     ${BAKED_CREATE_INFOS_FILE}
