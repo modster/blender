@@ -501,7 +501,9 @@ static bool view3d_drop_id_in_main_region_poll(bContext *C,
   return WM_drag_is_ID_type(drag, id_type);
 }
 
-static void view3d_boundbox_drop_draw_activate(struct wmDropBox *drop, wmDrag *drag)
+static void view3d_boundbox_drop_draw_activate(struct wmDropBox *drop,
+                                               wmDrag *drag,
+                                               const float dimensions[3])
 {
   V3DSnapCursorState *state = drop->draw_data;
   if (state) {
@@ -522,19 +524,23 @@ static void view3d_boundbox_drop_draw_activate(struct wmDropBox *drop, wmDrag *d
   state = drop->draw_data = ED_view3d_cursor_snap_active();
   state->draw_plane = true;
 
+  if (!is_zero_v3(dimensions)) {
+    mul_v3_v3fl(state->box_dimensions, dimensions, 0.5f);
+    UI_GetThemeColor4ubv(TH_GIZMO_PRIMARY, state->color_box);
+    state->draw_box = true;
+  }
+}
+
+static void view3d_boundbox_drop_draw_activate_object(struct wmDropBox *drop, wmDrag *drag)
+{
+  const int drag_id_type = WM_drag_get_ID_type(drag);
+
+  BLI_assert(drag_id_type == ID_OB);
+
   float dimensions[3] = {0.0f};
   if (drag->type == WM_DRAG_ID) {
-    if (drag_id_type == ID_OB) {
-      Object *ob = (Object *)WM_drag_get_local_ID(drag, ID_OB);
-      BKE_object_dimensions_get(ob, dimensions);
-    }
-    else if (drag_id_type == ID_GR) {
-      struct Collection *collection = (struct Collection *)WM_drag_get_local_ID(drag, ID_GR);
-      BKE_collection_dimensions_calc(collection, COLLECTION_VISIBILITY_VIEWPORT, dimensions);
-    }
-    else {
-      BLI_assert_unreachable();
-    }
+    Object *ob = (Object *)WM_drag_get_local_ID(drag, ID_OB);
+    BKE_object_dimensions_get(ob, dimensions);
   }
   else {
     struct AssetMetaData *meta_data = WM_drag_get_asset_meta_data(drag, drag_id_type);
@@ -544,11 +550,29 @@ static void view3d_boundbox_drop_draw_activate(struct wmDropBox *drop, wmDrag *d
     }
   }
 
-  if (!is_zero_v3(dimensions)) {
-    mul_v3_v3fl(state->box_dimensions, dimensions, 0.5f);
-    UI_GetThemeColor4ubv(TH_GIZMO_PRIMARY, state->color_box);
-    state->draw_box = true;
+  view3d_boundbox_drop_draw_activate(drop, drag, dimensions);
+}
+
+static void view3d_boundbox_drop_draw_activate_collection(struct wmDropBox *drop, wmDrag *drag)
+{
+  const int drag_id_type = WM_drag_get_ID_type(drag);
+
+  BLI_assert(drag_id_type == ID_GR);
+
+  float dimensions[3] = {0.0f};
+  if (drag->type == WM_DRAG_ID) {
+    Collection *collection = (Collection *)WM_drag_get_local_ID(drag, ID_GR);
+    BKE_collection_dimensions_calc(collection, COLLECTION_VISIBILITY_VIEWPORT, dimensions);
   }
+  else {
+    struct AssetMetaData *meta_data = WM_drag_get_asset_meta_data(drag, drag_id_type);
+    IDProperty *dimensions_prop = BKE_asset_metadata_idprop_find(meta_data, "dimensions");
+    if (dimensions_prop) {
+      copy_v3_v3(dimensions, IDP_Array(dimensions_prop));
+    }
+  }
+
+  view3d_boundbox_drop_draw_activate(drop, drag, dimensions);
 }
 
 static void view3d_boundbox_drop_draw_deactivate(struct wmDropBox *drop, wmDrag *UNUSED(drag))
@@ -923,7 +947,7 @@ static void view3d_dropboxes(void)
                         WM_drag_free_imported_drag_ID,
                         NULL);
   drop->draw = WM_drag_draw_item_name_fn;
-  drop->draw_activate = view3d_boundbox_drop_draw_activate;
+  drop->draw_activate = view3d_boundbox_drop_draw_activate_object;
   drop->draw_deactivate = view3d_boundbox_drop_draw_deactivate;
 
   /* Object asset from external file. */
@@ -934,7 +958,7 @@ static void view3d_dropboxes(void)
                         WM_drag_free_imported_drag_ID,
                         NULL);
   drop->draw = WM_drag_draw_item_name_fn;
-  drop->draw_activate = view3d_boundbox_drop_draw_activate;
+  drop->draw_activate = view3d_boundbox_drop_draw_activate_object;
   drop->draw_deactivate = view3d_boundbox_drop_draw_deactivate;
 
   /* Local collection (adds collection instance). */
@@ -945,7 +969,7 @@ static void view3d_dropboxes(void)
                         WM_drag_free_imported_drag_ID,
                         NULL);
   drop->draw = WM_drag_draw_item_name_fn;
-  drop->draw_activate = view3d_boundbox_drop_draw_activate;
+  drop->draw_activate = view3d_boundbox_drop_draw_activate_collection;
   drop->draw_deactivate = view3d_boundbox_drop_draw_deactivate;
 
   /* Collection asset from external file (adds collection instance). */
@@ -959,7 +983,7 @@ static void view3d_dropboxes(void)
       WM_drag_free_imported_drag_ID,
       NULL);
   drop->draw = WM_drag_draw_item_name_fn;
-  drop->draw_activate = view3d_boundbox_drop_draw_activate;
+  drop->draw_activate = view3d_boundbox_drop_draw_activate_collection;
   drop->draw_deactivate = view3d_boundbox_drop_draw_deactivate;
 
   WM_dropbox_add(lb,
