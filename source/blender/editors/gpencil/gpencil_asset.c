@@ -333,8 +333,10 @@ static bool gpencil_asset_create(const bContext *C,
         }
       }
       /* Unselect all strokes and points. */
+      gpd->select_last_index = 0;
       LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
         gps->flag &= ~GP_STROKE_SELECT;
+        BKE_gpencil_stroke_select_index_reset(gps);
         bGPDspoint *pt;
         int i;
         for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
@@ -956,6 +958,16 @@ static void gpencil_asset_set_selection(tGPDasset *tgpa, const bool enable)
         pt->flag &= ~GP_SPOINT_SELECT;
       }
     }
+
+    /* Set selection index. */
+    if (enable) {
+      gps->flag |= GP_STROKE_SELECT;
+      BKE_gpencil_stroke_select_index_set(tgpa->gpd, gps);
+    }
+    else {
+      gps->flag &= ~GP_STROKE_SELECT;
+      BKE_gpencil_stroke_select_index_reset(gps);
+    }
   }
 }
 
@@ -1351,6 +1363,19 @@ static int gpencil_asset_import_invoke(bContext *C, wmOperator *op, const wmEven
   return OPERATOR_RUNNING_MODAL;
 }
 
+static void gpencil_confirm_asset_import(bContext *C,
+                                         wmOperator *op,
+                                         wmWindow *win,
+                                         tGPDasset *tgpa)
+{
+  /* Return to normal cursor and header status. */
+  ED_area_status_text(tgpa->area, NULL);
+  ED_workspace_status_text(C, NULL);
+  WM_cursor_modal_restore(win);
+  /* Select imported strokes. */
+  gpencil_asset_set_selection(tgpa, true);
+}
+
 /* Modal handler: Events handling during interactive part. */
 static int gpencil_asset_import_modal(bContext *C, wmOperator *op, const wmEvent *event)
 {
@@ -1369,16 +1394,15 @@ static int gpencil_asset_import_modal(bContext *C, wmOperator *op, const wmEvent
 
         if (tgpa->flag & GP_ASSET_FLAG_IDLE) {
 
+          /* If click outside cage, confirm the current asset import. */
           if (!BLI_rctf_isect_pt(&rect_big, (float)event->mval[0], (float)event->mval[1])) {
-            ED_area_status_text(tgpa->area, NULL);
-            ED_workspace_status_text(C, NULL);
-            WM_cursor_modal_restore(win);
-            /* Select always the strokes. */
-            gpencil_asset_set_selection(tgpa, true);
-
+            gpencil_confirm_asset_import(C, op, win, tgpa);
+            /* Clean up temp data. */
             gpencil_asset_import_exit(C, op);
+            /* Done! */
             return OPERATOR_FINISHED;
           }
+
           copy_v2_v2_int(tgpa->mouse, event->mval);
 
           /* Distance to asset center. */
@@ -1410,16 +1434,9 @@ static int gpencil_asset_import_modal(bContext *C, wmOperator *op, const wmEvent
       /* Confirm. */
     case EVT_PADENTER:
     case EVT_RETKEY: {
-      /* Return to normal cursor and header status. */
-      ED_area_status_text(tgpa->area, NULL);
-      ED_workspace_status_text(C, NULL);
-      WM_cursor_modal_restore(win);
-      /* Apply selection depending of mode. */
-      gpencil_asset_set_selection(tgpa, GPENCIL_EDIT_MODE(tgpa->gpd));
-
+      gpencil_confirm_asset_import(C, op, win, tgpa);
       /* Clean up temp data. */
       gpencil_asset_import_exit(C, op);
-
       /* Done! */
       return OPERATOR_FINISHED;
     }
