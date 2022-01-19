@@ -1,18 +1,17 @@
 import os
 
-IGNORE = (
+IGNORE_SOURCE = (
     "/test/",
     "/tests/gtests/",
-    "/BSP_GhostTest/",
     "/release/",
-    "/xembed/",
-    "/TerraplayNetwork/",
-    "/ik_glut_test/",
 
     # specific source files
-    "extern/Eigen2/Eigen/src/Cholesky/CholeskyInstantiations.cpp",
-    "extern/Eigen2/Eigen/src/Core/CoreInstantiations.cpp",
-    "extern/Eigen2/Eigen/src/QR/QrInstantiations.cpp",
+    "extern/audaspace/",
+
+    # Use for `WIN32` only.
+    "source/creator/blender_launcher_win32.c",
+
+    # specific source files
     "extern/bullet2/src/BulletCollision/CollisionDispatch/btBox2dBox2dCollisionAlgorithm.cpp",
     "extern/bullet2/src/BulletCollision/CollisionDispatch/btConvex2dConvex2dAlgorithm.cpp",
     "extern/bullet2/src/BulletCollision/CollisionDispatch/btInternalEdgeUtility.cpp",
@@ -21,32 +20,11 @@ IGNORE = (
     "extern/bullet2/src/BulletDynamics/Character/btKinematicCharacterController.cpp",
     "extern/bullet2/src/BulletDynamics/ConstraintSolver/btHinge2Constraint.cpp",
     "extern/bullet2/src/BulletDynamics/ConstraintSolver/btUniversalConstraint.cpp",
-    "extern/eltopo/common/meshes/ObjLoader.cpp",
-    "extern/eltopo/common/meshes/meshloader.cpp",
-    "extern/eltopo/common/openglutils.cpp",
-    "extern/eltopo/eltopo3d/broadphase_blenderbvh.cpp",
-    "source/blender/imbuf/intern/imbuf_cocoa.m",
-    "extern/recastnavigation/Recast/Source/RecastLog.cpp",
-    "extern/recastnavigation/Recast/Source/RecastTimer.cpp",
-    "intern/audaspace/SRC/AUD_SRCResampleFactory.cpp",
-    "intern/audaspace/SRC/AUD_SRCResampleReader.cpp",
-    "intern/cycles/render/film_response.cpp",
-    "extern/libmv/third_party/ceres/internal/ceres/generated/schur_eliminator_2_2_2.cc",
-    "extern/libmv/third_party/ceres/internal/ceres/generated/schur_eliminator_2_2_3.cc",
-    "extern/libmv/third_party/ceres/internal/ceres/generated/schur_eliminator_2_2_4.cc",
-    "extern/libmv/third_party/ceres/internal/ceres/generated/schur_eliminator_2_2_d.cc",
-    "extern/libmv/third_party/ceres/internal/ceres/generated/schur_eliminator_2_3_3.cc",
-    "extern/libmv/third_party/ceres/internal/ceres/generated/schur_eliminator_2_3_4.cc",
-    "extern/libmv/third_party/ceres/internal/ceres/generated/schur_eliminator_2_3_9.cc",
-    "extern/libmv/third_party/ceres/internal/ceres/generated/schur_eliminator_2_3_d.cc",
-    "extern/libmv/third_party/ceres/internal/ceres/generated/schur_eliminator_2_4_3.cc",
-    "extern/libmv/third_party/ceres/internal/ceres/generated/schur_eliminator_2_4_4.cc",
-    "extern/libmv/third_party/ceres/internal/ceres/generated/schur_eliminator_2_4_d.cc",
-    "extern/libmv/third_party/ceres/internal/ceres/generated/schur_eliminator_4_4_2.cc",
-    "extern/libmv/third_party/ceres/internal/ceres/generated/schur_eliminator_4_4_3.cc",
-    "extern/libmv/third_party/ceres/internal/ceres/generated/schur_eliminator_4_4_4.cc",
-    "extern/libmv/third_party/ceres/internal/ceres/generated/schur_eliminator_4_4_d.cc",
 
+    "doc/doxygen/doxygen.extern.h",
+    "doc/doxygen/doxygen.intern.h",
+    "doc/doxygen/doxygen.main.h",
+    "doc/doxygen/doxygen.source.h",
     "extern/bullet2/src/BulletCollision/CollisionDispatch/btBox2dBox2dCollisionAlgorithm.h",
     "extern/bullet2/src/BulletCollision/CollisionDispatch/btConvex2dConvex2dAlgorithm.h",
     "extern/bullet2/src/BulletCollision/CollisionDispatch/btInternalEdgeUtility.h",
@@ -55,21 +33,27 @@ IGNORE = (
     "extern/bullet2/src/BulletDynamics/Character/btKinematicCharacterController.h",
     "extern/bullet2/src/BulletDynamics/ConstraintSolver/btHinge2Constraint.h",
     "extern/bullet2/src/BulletDynamics/ConstraintSolver/btUniversalConstraint.h",
-    "extern/eltopo/common/meshes/Edge.hpp",
-    "extern/eltopo/common/meshes/ObjLoader.hpp",
-    "extern/eltopo/common/meshes/TriangleIndex.hpp",
-    "extern/eltopo/common/meshes/meshloader.h",
-    "extern/eltopo/eltopo3d/broadphase_blenderbvh.h",
-    "extern/recastnavigation/Recast/Include/RecastLog.h",
-    "extern/recastnavigation/Recast/Include/RecastTimer.h",
-    "intern/audaspace/SRC/AUD_SRCResampleFactory.h",
-    "intern/audaspace/SRC/AUD_SRCResampleReader.h",
-    "intern/cycles/render/film_response.h",
-    "extern/carve/include/carve/config.h",
-    "extern/carve/include/carve/external/boost/random.hpp",
-    "extern/carve/patches/files/config.h",
-    "extern/carve/patches/files/random.hpp",
-    )
+)
+
+# Ignore cmake file, path pairs.
+IGNORE_SOURCE_MISSING = (
+    (   # Use for cycles stand-alone.
+        "intern/cycles/util/CMakeLists.txt", (
+            "../../third_party/numaapi/include",
+        )),
+    (   # Use for `WITH_NANOVDB`.
+        "intern/cycles/kernel/CMakeLists.txt", (
+            "nanovdb/util/CSampleFromVoxels.h",
+            "nanovdb/util/SampleFromVoxels.h",
+            "nanovdb/NanoVDB.h",
+            "nanovdb/CNanoVDB.h",
+        ),
+    ),
+)
+
+IGNORE_CMAKE = (
+    "extern/audaspace/CMakeLists.txt",
+)
 
 UTF8_CHECK = True
 

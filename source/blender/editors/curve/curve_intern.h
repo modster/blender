@@ -1,10 +1,8 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version. 
+ * of the License, or (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -17,56 +15,73 @@
  *
  * The Original Code is Copyright (C) 2008 Blender Foundation.
  * All rights reserved.
- *
- * 
- * Contributor(s): Blender Foundation
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file blender/editors/curve/curve_intern.h
- *  \ingroup edcurve
+/** \file
+ * \ingroup edcurve
  */
 
-
-#ifndef __CURVE_INTERN_H__
-#define __CURVE_INTERN_H__
+#pragma once
 
 /* internal exports only */
-struct ListBase;
 struct EditNurb;
+struct GHash;
+struct ListBase;
 struct Object;
-struct wmOperatorType;
 struct ViewContext;
+struct wmOperatorType;
 
 /* editfont.c */
-enum { DEL_ALL, DEL_NEXT_CHAR, DEL_PREV_CHAR, DEL_SELECTION, DEL_NEXT_SEL, DEL_PREV_SEL };
+enum {
+  DEL_NEXT_CHAR,
+  DEL_PREV_CHAR,
+  DEL_NEXT_WORD,
+  DEL_PREV_WORD,
+  DEL_SELECTION,
+  DEL_NEXT_SEL,
+  DEL_PREV_SEL
+};
 enum { CASE_LOWER, CASE_UPPER };
-enum { LINE_BEGIN, LINE_END, PREV_CHAR, NEXT_CHAR, PREV_WORD, NEXT_WORD,
-       PREV_LINE, NEXT_LINE, PREV_PAGE, NEXT_PAGE };
+enum {
+  LINE_BEGIN,
+  LINE_END,
+  PREV_CHAR,
+  NEXT_CHAR,
+  PREV_WORD,
+  NEXT_WORD,
+  PREV_LINE,
+  NEXT_LINE,
+  PREV_PAGE,
+  NEXT_PAGE
+};
 
 typedef enum eVisible_Types {
-	HIDDEN = true,
-	VISIBLE = false,
+  HIDDEN = true,
+  VISIBLE = false,
 } eVisible_Types;
 
 typedef enum eEndPoint_Types {
-	FIRST = true,
-	LAST = false,
+  FIRST = true,
+  LAST = false,
 } eEndPoint_Types;
 
 typedef enum eCurveElem_Types {
-	CURVE_VERTEX = 0,
-	CURVE_SEGMENT,
+  CURVE_VERTEX = 0,
+  CURVE_SEGMENT,
 } eCurveElem_Types;
 
 /* internal select utils */
-bool select_beztriple(BezTriple *bezt, bool selstatus, short flag, eVisible_Types hidden);
-bool select_bpoint(BPoint *bp, bool selstatus, short flag, bool hidden);
+/**
+ * Returns 1 in case (de)selection was successful.
+ */
+bool select_beztriple(BezTriple *bezt, bool selstatus, uint8_t flag, eVisible_Types hidden);
+/**
+ * Returns 1 in case (de)selection was successful.
+ */
+bool select_bpoint(BPoint *bp, bool selstatus, uint8_t flag, bool hidden);
 
 void FONT_OT_text_insert(struct wmOperatorType *ot);
 void FONT_OT_line_break(struct wmOperatorType *ot);
-void FONT_OT_insert_lorem(struct wmOperatorType *ot);
 
 void FONT_OT_case_toggle(struct wmOperatorType *ot);
 void FONT_OT_case_set(struct wmOperatorType *ot);
@@ -79,7 +94,6 @@ void FONT_OT_text_copy(struct wmOperatorType *ot);
 void FONT_OT_text_cut(struct wmOperatorType *ot);
 void FONT_OT_text_paste(struct wmOperatorType *ot);
 void FONT_OT_text_paste_from_file(struct wmOperatorType *ot);
-void FONT_OT_text_paste_from_clipboard(struct wmOperatorType *ot);
 
 void FONT_OT_move(struct wmOperatorType *ot);
 void FONT_OT_move_select(struct wmOperatorType *ot);
@@ -94,7 +108,6 @@ void FONT_OT_unlink(struct wmOperatorType *ot);
 void FONT_OT_textbox_add(struct wmOperatorType *ot);
 void FONT_OT_textbox_remove(struct wmOperatorType *ot);
 
-
 /* editcurve.c */
 void CURVE_OT_hide(struct wmOperatorType *ot);
 void CURVE_OT_reveal(struct wmOperatorType *ot);
@@ -103,12 +116,14 @@ void CURVE_OT_separate(struct wmOperatorType *ot);
 void CURVE_OT_split(struct wmOperatorType *ot);
 void CURVE_OT_duplicate(struct wmOperatorType *ot);
 void CURVE_OT_delete(struct wmOperatorType *ot);
+void CURVE_OT_dissolve_verts(struct wmOperatorType *ot);
 
 void CURVE_OT_spline_type_set(struct wmOperatorType *ot);
 void CURVE_OT_radius_set(struct wmOperatorType *ot);
 void CURVE_OT_spline_weight_set(struct wmOperatorType *ot);
 void CURVE_OT_handle_type_set(struct wmOperatorType *ot);
 void CURVE_OT_normals_make_consistent(struct wmOperatorType *ot);
+void CURVE_OT_decimate(struct wmOperatorType *ot);
 void CURVE_OT_shade_smooth(struct wmOperatorType *ot);
 void CURVE_OT_shade_flat(struct wmOperatorType *ot);
 void CURVE_OT_tilt_clear(struct wmOperatorType *ot);
@@ -128,14 +143,28 @@ void CURVE_OT_cyclic_toggle(struct wmOperatorType *ot);
 
 void CURVE_OT_match_texture_space(struct wmOperatorType *ot);
 
-bool ED_curve_pick_vert(
-        struct ViewContext *vc, short sel, const int mval[2],
-        struct Nurb **r_nurb, struct BezTriple **r_bezt, struct BPoint **r_bp, short *r_handle);
+/* exported for editcurve_undo.c */
+struct GHash *ED_curve_keyindex_hash_duplicate(struct GHash *keyindex);
+void ED_curve_keyindex_update_nurb(struct EditNurb *editnurb, struct Nurb *nu, struct Nurb *newnu);
 
 /* helper functions */
-void ed_editnurb_translate_flag(struct ListBase *editnurb, short flag, const float vec[3]);
-bool ed_editnurb_extrude_flag(struct EditNurb *editnurb, short flag);
-bool ed_editnurb_spin(float viewmat[4][4], struct Object *obedit, const float axis[3], const float cent[3]);
+void ed_editnurb_translate_flag(struct ListBase *editnurb,
+                                uint8_t flag,
+                                const float vec[3],
+                                bool is_2d);
+/**
+ * Only for #OB_SURF.
+ */
+bool ed_editnurb_extrude_flag(struct EditNurb *editnurb, uint8_t flag);
+/**
+ * \param axis: is in world-space.
+ * \param cent: is in object-space.
+ */
+bool ed_editnurb_spin(float viewmat[4][4],
+                      struct View3D *v3d,
+                      struct Object *obedit,
+                      const float axis[3],
+                      const float cent[3]);
 
 /* editcurve_select.c */
 void CURVE_OT_de_select_first(struct wmOperatorType *ot);
@@ -167,4 +196,16 @@ void SURFACE_OT_primitive_nurbs_surface_cylinder_add(struct wmOperatorType *ot);
 void SURFACE_OT_primitive_nurbs_surface_sphere_add(struct wmOperatorType *ot);
 void SURFACE_OT_primitive_nurbs_surface_torus_add(struct wmOperatorType *ot);
 
-#endif /* __CURVE_INTERN_H__ */
+/* editcurve_query.c */
+bool ED_curve_pick_vert(struct ViewContext *vc,
+                        short sel,
+                        struct Nurb **r_nurb,
+                        struct BezTriple **r_bezt,
+                        struct BPoint **r_bp,
+                        short *r_handle,
+                        struct Base **r_base);
+void ED_curve_nurb_vert_selected_find(
+    Curve *cu, View3D *v3d, Nurb **r_nu, BezTriple **r_bezt, BPoint **r_bp);
+
+/* editcurve_paint.c */
+void CURVE_OT_draw(struct wmOperatorType *ot);

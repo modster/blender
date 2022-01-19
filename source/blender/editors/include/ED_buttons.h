@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -16,27 +14,42 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  * The Original Code is Copyright (C) 2013, Blender Foundation
+ */
+
+/** \file
+ * \ingroup editors
+ */
+
+#pragma once
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+struct ScrArea;
+struct SpaceProperties;
+struct bContext;
+
+/**
+ * Fills an array with the tab context values for the properties editor. -1 signals a separator.
  *
- * ***** END GPL LICENSE BLOCK *****
+ * \return The total number of items in the array returned.
  */
+int ED_buttons_tabs_list(struct SpaceProperties *sbuts, short *context_tabs_array);
+bool ED_buttons_tab_has_search_result(struct SpaceProperties *sbuts, int index);
 
-/** \file ED_buttons.h
- *  \ingroup editors
- */
+void ED_buttons_search_string_set(struct SpaceProperties *sbuts, const char *value);
+int ED_buttons_search_string_length(struct SpaceProperties *sbuts);
+const char *ED_buttons_search_string_get(struct SpaceProperties *sbuts);
 
-#ifndef __ED_BUTTONS_H__
-#define __ED_BUTTONS_H__
+bool ED_buttons_should_sync_with_outliner(const struct bContext *C,
+                                          const struct SpaceProperties *sbuts,
+                                          struct ScrArea *area);
+void ED_buttons_set_context(const struct bContext *C,
+                            struct SpaceProperties *sbuts,
+                            PointerRNA *ptr,
+                            int context);
 
-#include "BLI_utildefines.h"
-
-/* Used to check whether a given texture context is valid in current context. */
-bool ED_texture_context_check_world(const struct bContext *C);
-bool ED_texture_context_check_material(const struct bContext *C);
-bool ED_texture_context_check_lamp(const struct bContext *C);
-bool ED_texture_context_check_particles(const struct bContext *C);
-bool ED_texture_context_check_linestyle(const struct bContext *C);
-bool ED_texture_context_check_others(const struct bContext *C);
-
-void ED_buttons_id_unref(struct SpaceButs *sbuts, const struct ID *id);
-
-#endif /*  __ED_BUTTONS_H__ */
+#ifdef __cplusplus
+}
+#endif

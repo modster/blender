@@ -28,6 +28,7 @@ __all__ = (
     "basename",
     "clean_name",
     "display_name",
+    "display_name_to_filepath",
     "display_name_from_filepath",
     "ensure_ext",
     "extensions_image",
@@ -35,26 +36,27 @@ __all__ = (
     "extensions_audio",
     "is_subdir",
     "module_names",
+    "native_pathsep",
     "reduce_dirs",
     "relpath",
     "resolve_ncase",
-    )
+)
 
 import bpy as _bpy
 import os as _os
 
 from _bpy_path import (
-        extensions_audio,
-        extensions_movie,
-        extensions_image,
-        )
+    extensions_audio,
+    extensions_movie,
+    extensions_image,
+)
 
 
 def _getattr_bytes(var, attr):
     return var.path_resolve(attr, False).as_bytes()
 
 
-def abspath(path, start=None, library=None):
+def abspath(path, *, start=None, library=None):
     """
     Returns the absolute path relative to the current blend file
     using the "//" prefix.
@@ -65,28 +67,34 @@ def abspath(path, start=None, library=None):
     :arg library: The library this path is from. This is only included for
        convenience, when the library is not None its path replaces *start*.
     :type library: :class:`bpy.types.Library`
+    :return: The absolute path.
+    :rtype: string
     """
     if isinstance(path, bytes):
         if path.startswith(b"//"):
             if library:
-                start = _os.path.dirname(abspath(_getattr_bytes(library, "filepath")))
-            return _os.path.join(_os.path.dirname(_getattr_bytes(_bpy.data, "filepath"))
-                                 if start is None else start,
-                                 path[2:],
-                                 )
+                start = _os.path.dirname(
+                    abspath(_getattr_bytes(library, "filepath")))
+            return _os.path.join(
+                _os.path.dirname(_getattr_bytes(_bpy.data, "filepath"))
+                if start is None else start,
+                path[2:],
+            )
     else:
         if path.startswith("//"):
             if library:
-                start = _os.path.dirname(abspath(library.filepath))
-            return _os.path.join(_os.path.dirname(_bpy.data.filepath)
-                                 if start is None else start,
-                                 path[2:],
-                                 )
+                start = _os.path.dirname(
+                    abspath(library.filepath))
+            return _os.path.join(
+                _os.path.dirname(_bpy.data.filepath)
+                if start is None else start,
+                path[2:],
+            )
 
     return path
 
 
-def relpath(path, start=None):
+def relpath(path, *, start=None):
     """
     Returns the path relative to the current blend file using the "//" prefix.
 
@@ -95,6 +103,8 @@ def relpath(path, start=None):
     :arg start: Relative to this path,
        when not set the current filename is used.
     :type start: string or bytes
+    :return: The relative path.
+    :rtype: string
     """
     if isinstance(path, bytes):
         if not path.startswith(b"//"):
@@ -117,24 +127,32 @@ def is_subdir(path, directory):
 
     :arg path: An absolute path.
     :type path: string or bytes
+    :return: Whether or not the path is a subdirectory.
+    :rtype: boolean
     """
-    from os.path import normpath, normcase
+    from os.path import normpath, normcase, sep
     path = normpath(normcase(path))
     directory = normpath(normcase(directory))
     if len(path) > len(directory):
-        if path.startswith(directory):
-            sep = ord(_os.sep) if isinstance(directory, bytes) else _os.sep
-            return (path[len(directory)] == sep)
+        sep = sep.encode('ascii') if isinstance(directory, bytes) else sep
+        if path.startswith(directory.rstrip(sep) + sep):
+            return True
     return False
 
 
-def clean_name(name, replace="_"):
+def clean_name(name, *, replace="_"):
     """
     Returns a name with characters replaced that
     may cause problems under various circumstances,
     such as writing to a file.
     All characters besides A-Z/a-z, 0-9 are replaced with "_"
     or the *replace* argument if defined.
+    :arg name: The path name.
+    :type name: string or bytes
+    :arg replace: The replacement for non-valid characters.
+    :type replace: string
+    :return: The cleaned name.
+    :rtype: string
     """
 
     if replace != "_":
@@ -170,41 +188,76 @@ def clean_name(name, replace="_"):
                 0xe8, 0xe9, 0xea, 0xeb, 0xec, 0xed, 0xee, 0xef,
                 0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7,
                 0xf8, 0xf9, 0xfa, 0xfb, 0xfc, 0xfd, 0xfe,
-                )
+            )
             trans = str.maketrans({char: replace for char in bad_chars})
             trans_cache[replace] = trans
         return trans
 
     trans = maketrans_init()
     return name.translate(trans)
+
+
 clean_name._trans_cache = {}
 
 
 def _clean_utf8(name):
-    name = _os.path.splitext(basename(name))[0]
     if type(name) == bytes:
         return name.decode("utf8", "replace")
     else:
         return name.encode("utf8", "replace").decode("utf8")
 
 
-def display_name(name):
+_display_name_literals = {
+    ":": "_colon_",
+    "+": "_plus_",
+    "/": "_slash_",
+}
+
+
+def display_name(name, *, has_ext=True, title_case=True):
     """
     Creates a display string from name to be used menus and the user interface.
-    Capitalize the first letter in all lowercase names,
-    mixed case names are kept as is. Intended for use with
-    filenames and module names.
+    Intended for use with filenames and module names.
+
+    :arg name: The name to be used for displaying the user interface.
+    :type name: string
+    :arg has_ext: Remove file extension from name.
+    :type has_ext: boolean
+    :arg title_case: Convert lowercase names to title case.
+    :type title_case: boolean
+    :return: The display string.
+    :rtype: string
     """
+
+    if has_ext:
+        name = _os.path.splitext(basename(name))[0]
+
     # string replacements
-    name = name.replace("_colon_", ":")
-    name = name.replace("_plus_", "+")
+    for disp_value, file_value in _display_name_literals.items():
+        name = name.replace(file_value, disp_value)
 
-    name = name.replace("_", " ")
+    # strip to allow underscore prefix
+    # (when paths can't start with numbers for eg).
+    name = name.replace("_", " ").lstrip(" ")
 
-    if name.islower():
+    if title_case and name.islower():
         name = name.lower().title()
 
     name = _clean_utf8(name)
+    return name
+
+
+def display_name_to_filepath(name):
+    """
+    Performs the reverse of display_name using literal versions of characters
+    which aren't supported in a filepath.
+    :arg name: The display name to convert.
+    :type name: string
+    :return: The file path.
+    :rtype: string
+    """
+    for disp_value, file_value in _display_name_literals.items():
+        name = name.replace(disp_value, file_value)
     return name
 
 
@@ -212,8 +265,13 @@ def display_name_from_filepath(name):
     """
     Returns the path stripped of directory and extension,
     ensured to be utf8 compatible.
+    :arg name: The file path to convert.
+    :type name: string
+    :return: The display name.
+    :rtype: string
     """
 
+    name = _os.path.splitext(basename(name))[0]
     name = _clean_utf8(name)
     return name
 
@@ -222,6 +280,10 @@ def resolve_ncase(path):
     """
     Resolve a case insensitive path on a case sensitive system,
     returning a string with the path if found else return the original path.
+    :arg path: The path name to resolve.
+    :type path: string
+    :return: The resolved path.
+    :rtype: string
     """
 
     def _ncase_path_found(path):
@@ -272,36 +334,39 @@ def resolve_ncase(path):
         if f_iter_nocase:
             return _os.path.join(dirpath, f_iter_nocase) + suffix, True
         else:
-            # cant find the right one, just return the path as is.
+            # can't find the right one, just return the path as is.
             return path, False
 
     ncase_path, found = _ncase_path_found(path)
     return ncase_path if found else path
 
 
-def ensure_ext(filepath, ext, case_sensitive=False):
+def ensure_ext(filepath, ext, *, case_sensitive=False):
     """
     Return the path with the extension added if it is not already set.
 
-    :arg ext: The extension to check for.
+    :arg filepath: The file path.
+    :type filepath: string
+    :arg ext: The extension to check for, can be a compound extension. Should
+              start with a dot, such as '.blend' or '.tar.gz'.
     :type ext: string
     :arg case_sensitive: Check for matching case when comparing extensions.
-    :type case_sensitive: bool
+    :type case_sensitive: boolean
+    :return: The file path with the given extension.
+    :rtype: string
     """
-    fn_base, fn_ext = _os.path.splitext(filepath)
-    if fn_base and fn_ext:
-        if ((case_sensitive and ext == fn_ext) or
-            (ext.lower() == fn_ext.lower())):
 
+    if case_sensitive:
+        if filepath.endswith(ext):
             return filepath
-        else:
-            return fn_base + ext
-
     else:
-        return filepath + ext
+        if filepath[-len(ext):].lower().endswith(ext.lower()):
+            return filepath
+
+    return filepath + ext
 
 
-def module_names(path, recursive=False):
+def module_names(path, *, recursive=False):
     """
     Return a list of modules which can be imported from *path*.
 
@@ -310,7 +375,7 @@ def module_names(path, recursive=False):
     :arg recursive: Also return submodule names for packages.
     :type recursive: bool
     :return: a list of string pairs (module_name, module_file).
-    :rtype: list
+    :rtype: list of strings
     """
 
     from os.path import join, isfile
@@ -323,13 +388,14 @@ def module_names(path, recursive=False):
         elif filename.endswith(".py") and filename != "__init__.py":
             fullpath = join(path, filename)
             modules.append((filename[0:-3], fullpath))
-        elif "." not in filename:
+        elif not filename.startswith("."):
+            # Skip hidden files since they are used by for version control.
             directory = join(path, filename)
             fullpath = join(directory, "__init__.py")
             if isfile(fullpath):
                 modules.append((filename, fullpath))
                 if recursive:
-                    for mod_name, mod_path in module_names(directory, True):
+                    for mod_name, mod_path in module_names(directory, recursive=True):
                         modules.append(("%s.%s" % (filename, mod_name),
                                         mod_path,
                                         ))
@@ -339,11 +405,39 @@ def module_names(path, recursive=False):
 
 def basename(path):
     """
-    Equivalent to os.path.basename, but skips a "//" prefix.
+    Equivalent to ``os.path.basename``, but skips a "//" prefix.
 
     Use for Windows compatibility.
+    :return: The base name of the given path.
+    :rtype: string
     """
     return _os.path.basename(path[2:] if path[:2] in {"//", b"//"} else path)
+
+
+def native_pathsep(path):
+    """
+    Replace the path separator with the systems native ``os.sep``.
+    :arg path: The path to replace.
+    :type path: string
+    :return: The path with system native separators.
+    :rtype: string
+    """
+    if type(path) is str:
+        if _os.sep == "/":
+            return path.replace("\\", "/")
+        else:
+            if path.startswith("//"):
+                return "//" + path[2:].replace("/", "\\")
+            else:
+                return path.replace("/", "\\")
+    else:  # bytes
+        if _os.sep == "/":
+            return path.replace(b"\\", b"/")
+        else:
+            if path.startswith(b"//"):
+                return b"//" + path[2:].replace(b"/", b"\\")
+            else:
+                return path.replace(b"/", b"\\")
 
 
 def reduce_dirs(dirs):
@@ -353,9 +447,9 @@ def reduce_dirs(dirs):
     (Useful for recursive path searching).
 
     :arg dirs: Sequence of directory paths.
-    :type dirs: sequence
+    :type dirs: sequence of strings
     :return: A unique list of paths.
-    :rtype: list
+    :rtype: list of strings
     """
     dirs = list({_os.path.normpath(_os.path.abspath(d)) for d in dirs})
     dirs.sort(key=lambda d: len(d))

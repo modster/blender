@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,21 +15,11 @@
  *
  * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
  * All rights reserved.
- *
- * The Original Code is: all of this file.
- *
- * Contributor(s): 2008,2009  Joshua Leung (Animation Cleanup, Animation Systme Recode)
- *
- * ***** END GPL LICENSE BLOCK *****
  */
-#ifndef __BKE_IPO_H__
-#define __BKE_IPO_H__
+#pragma once
 
-/** \file BKE_ipo.h
- *  \ingroup bke
- *  \since March 2001
- *  \author nzc
- *  \author Joshua Leung
+/** \file
+ * \ingroup bke
  */
 
 #ifdef __cplusplus
@@ -39,17 +27,24 @@ extern "C" {
 #endif
 
 struct Main;
-struct Ipo;
 
+/**
+ * Called from #do_versions() in `readfile.c` to convert the old 'IPO/adrcode' system
+ * to the new 'Animato/RNA' system.
+ *
+ * The basic method used here, is to loop over data-blocks which have IPO-data,
+ * and add those IPO's to new AnimData blocks as Actions.
+ * Action/NLA data only works well for Objects, so these only need to be checked for there.
+ *
+ * Data that has been converted should be freed immediately, which means that it is immediately
+ * clear which data-blocks have yet to be converted, and also prevent freeing errors when we exit.
+ *
+ * \note Currently done after all file reading.
+ */
 void do_versions_ipos_to_animato(struct Main *main);
 
 /* --------------------- xxx stuff ------------------------ */
 
-void BKE_ipo_free(struct Ipo *ipo);
-
 #ifdef __cplusplus
 };
 #endif
-
-#endif
-

@@ -1,6 +1,4 @@
 /*
- * Copyright 2011, Blender Foundation.
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -15,30 +13,44 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor: 
- *		Jeroen Bakker 
- *		Monique Dewanchand
+ * Copyright 2011, Blender Foundation.
  */
 
-#ifndef _COM_FlipOperation_h_
-#define _COM_FlipOperation_h_
+#pragma once
 
-#include "COM_NodeOperation.h"
+#include "COM_MultiThreadedOperation.h"
 
-class FlipOperation : public NodeOperation {
-private:
-	SocketReader *m_inputOperation;
-	bool m_flipX;
-	bool m_flipY;
-public:
-	FlipOperation();
-	bool determineDependingAreaOfInterest(rcti *input, ReadBufferOperation *readOperation, rcti *output);
-	void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
-	
-	void initExecution();
-	void deinitExecution();
-	void setFlipX(bool flipX) { this->m_flipX = flipX; }
-	void setFlipY(bool flipY) { this->m_flipY = flipY; }
+namespace blender::compositor {
+
+class FlipOperation : public MultiThreadedOperation {
+ private:
+  SocketReader *input_operation_;
+  bool flip_x_;
+  bool flip_y_;
+
+ public:
+  FlipOperation();
+  bool determine_depending_area_of_interest(rcti *input,
+                                            ReadBufferOperation *read_operation,
+                                            rcti *output) override;
+  void execute_pixel_sampled(float output[4], float x, float y, PixelSampler sampler) override;
+
+  void init_execution() override;
+  void deinit_execution() override;
+  void setFlipX(bool flipX)
+  {
+    flip_x_ = flipX;
+  }
+  void setFlipY(bool flipY)
+  {
+    flip_y_ = flipY;
+  }
+
+  void determine_canvas(const rcti &preferred_area, rcti &r_area) override;
+  void get_area_of_interest(int input_idx, const rcti &output_area, rcti &r_input_area) override;
+  void update_memory_buffer_partial(MemoryBuffer *output,
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
 };
 
-#endif
+}  // namespace blender::compositor

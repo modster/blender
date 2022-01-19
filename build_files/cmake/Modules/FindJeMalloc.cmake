@@ -14,12 +14,8 @@
 #=============================================================================
 # Copyright 2011 Blender Foundation.
 #
-# Distributed under the OSI-approved BSD License (the "License");
-# see accompanying file Copyright.txt for details.
-#
-# This software is distributed WITHOUT ANY WARRANTY; without even the
-# implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-# See the License for more information.
+# Distributed under the OSI-approved BSD 3-Clause License,
+# see accompanying file BSD-3-Clause-license.txt for details.
 #=============================================================================
 
 # If JEMALLOC_ROOT_DIR was defined in the environment, use it.
@@ -29,10 +25,6 @@ ENDIF()
 
 SET(_jemalloc_SEARCH_DIRS
   ${JEMALLOC_ROOT_DIR}
-  /usr/local
-  /sw # Fink
-  /opt/local # DarwinPorts
-  /opt/csw # Blastwave
   /opt/lib/jemalloc
 )
 
@@ -54,7 +46,16 @@ FIND_LIBRARY(JEMALLOC_LIBRARY
     lib64 lib
   )
 
-# handle the QUIETLY and REQUIRED arguments and set JEMALLOC_FOUND to TRUE if 
+if(JEMALLOC_INCLUDE_DIR)
+  SET(_version_regex "^#define[ \t]+JEMALLOC_VERSION[ \t]+\"([^\"]+)\".*")
+  file(STRINGS "${JEMALLOC_INCLUDE_DIR}/jemalloc.h"
+    JEMALLOC_VERSION REGEX "${_version_regex}")
+  string(REGEX REPLACE "${_version_regex}" "\\1"
+    JEMALLOC_VERSION "${JEMALLOC_VERSION}")
+  unset(_version_regex)
+endif()
+
+# handle the QUIETLY and REQUIRED arguments and set JEMALLOC_FOUND to TRUE if
 # all listed variables are TRUE
 INCLUDE(FindPackageHandleStandardArgs)
 FIND_PACKAGE_HANDLE_STANDARD_ARGS(JeMalloc DEFAULT_MSG
@@ -63,7 +64,7 @@ FIND_PACKAGE_HANDLE_STANDARD_ARGS(JeMalloc DEFAULT_MSG
 IF(JEMALLOC_FOUND)
   SET(JEMALLOC_LIBRARIES ${JEMALLOC_LIBRARY})
   SET(JEMALLOC_INCLUDE_DIRS ${JEMALLOC_INCLUDE_DIR})
-ENDIF(JEMALLOC_FOUND)
+ENDIF()
 
 MARK_AS_ADVANCED(
   JEMALLOC_INCLUDE_DIR

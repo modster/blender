@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,151 +15,138 @@
  *
  * The Original Code is Copyright (C) 2013 Blender Foundation.
  * All rights reserved.
- *
- * The Original Code is: all of this file.
- *
- * Contributor(s): Jason Wilkins
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file ghost/intern/GHOST_ContextEGL.h
- *  \ingroup GHOST
+/** \file
+ * \ingroup GHOST
  */
 
-#ifndef __GHOST_CONTEXTEGL_H__
-#define __GHOST_CONTEXTEGL_H__
+#pragma once
 
 #include "GHOST_Context.h"
-
-#ifdef WITH_GLEW_MX
-#  define eglewGetContext() eglewContext
-#endif
+#include "GHOST_System.h"
 
 #include <GL/eglew.h>
 
-#ifdef WITH_GLEW_MX
-extern "C" EGLEWContext *eglewContext;
-#endif
-
-
 #ifndef GHOST_OPENGL_EGL_CONTEXT_FLAGS
-#define GHOST_OPENGL_EGL_CONTEXT_FLAGS 0
+#  define GHOST_OPENGL_EGL_CONTEXT_FLAGS 0
 #endif
 
 #ifndef GHOST_OPENGL_EGL_RESET_NOTIFICATION_STRATEGY
-#define GHOST_OPENGL_EGL_RESET_NOTIFICATION_STRATEGY 0
+#  define GHOST_OPENGL_EGL_RESET_NOTIFICATION_STRATEGY 0
 #endif
 
+class GHOST_ContextEGL : public GHOST_Context {
+  /* XR code needs low level graphics data to send to OpenXR. */
+  friend class GHOST_XrGraphicsBindingOpenGL;
 
-class GHOST_ContextEGL : public GHOST_Context
-{
-public:
-	/**
-	 * Constructor.
-	 */
-	GHOST_ContextEGL(
-	        bool stereoVisual,
-	        GHOST_TUns16 numOfAASamples,
-	        EGLNativeWindowType nativeWindow,
-	        EGLNativeDisplayType nativeDisplay,
-	        EGLint contextProfileMask,
-	        EGLint contextMajorVersion,
-	        EGLint contextMinorVersion,
-	        EGLint contextFlags,
-	        EGLint contextResetNotificationStrategy,
-	        EGLenum api);
+ public:
+  /**
+   * Constructor.
+   */
+  GHOST_ContextEGL(const GHOST_System *const system,
+                   bool stereoVisual,
+                   EGLNativeWindowType nativeWindow,
+                   EGLNativeDisplayType nativeDisplay,
+                   EGLint contextProfileMask,
+                   EGLint contextMajorVersion,
+                   EGLint contextMinorVersion,
+                   EGLint contextFlags,
+                   EGLint contextResetNotificationStrategy,
+                   EGLenum api);
 
-	/**
-	 * Destructor.
-	 */
-	~GHOST_ContextEGL();
+  /**
+   * Destructor.
+   */
+  ~GHOST_ContextEGL();
 
-	/**
-	 * Swaps front and back buffers of a window.
-	 * \return  A boolean success indicator.
-	 */
-	GHOST_TSuccess swapBuffers();
+  /**
+   * Swaps front and back buffers of a window.
+   * \return A boolean success indicator.
+   */
+  GHOST_TSuccess swapBuffers();
 
-	/**
-	 * Activates the drawing context of this window.
-	 * \return  A boolean success indicator.
-	 */
-	GHOST_TSuccess activateDrawingContext();
+  /**
+   * Activates the drawing context of this window.
+   * \return A boolean success indicator.
+   */
+  GHOST_TSuccess activateDrawingContext();
 
-	/**
-	 * Call immediately after new to initialize.  If this fails then immediately delete the object.
-	 * \return Indication as to whether initialization has succeeded.
-	 */
-	GHOST_TSuccess initializeDrawingContext();
+  /**
+   * Release the drawing context of the calling thread.
+   * \return A boolean success indicator.
+   */
+  GHOST_TSuccess releaseDrawingContext();
 
-	/**
-	 * Removes references to native handles from this context and then returns
-	 * \return GHOST_kSuccess if it is OK for the parent to release the handles and
-	 * GHOST_kFailure if releasing the handles will interfere with sharing
-	 */
-	GHOST_TSuccess releaseNativeHandles();
+  /**
+   * Call immediately after new to initialize.  If this fails then immediately delete the object.
+   * \return Indication as to whether initialization has succeeded.
+   */
+  GHOST_TSuccess initializeDrawingContext();
 
-	/**
-	 * Sets the swap interval for swapBuffers.
-	 * \param interval The swap interval to use.
-	 * \return A boolean success indicator.
-	 */
-	GHOST_TSuccess setSwapInterval(int interval);
+  /**
+   * Removes references to native handles from this context and then returns
+   * \return GHOST_kSuccess if it is OK for the parent to release the handles and
+   * GHOST_kFailure if releasing the handles will interfere with sharing
+   */
+  GHOST_TSuccess releaseNativeHandles();
 
-	/**
-	 * Gets the current swap interval for swapBuffers.
-	 * \param intervalOut Variable to store the swap interval if it can be read.
-	 * \return Whether the swap interval can be read.
-	 */
-	GHOST_TSuccess getSwapInterval(int &intervalOut);
+  /**
+   * Sets the swap interval for #swapBuffers.
+   * \param interval: The swap interval to use.
+   * \return A boolean success indicator.
+   */
+  GHOST_TSuccess setSwapInterval(int interval);
 
-protected:
-	inline void activateEGLEW() const {
-#ifdef WITH_GLEW_MX
-		eglewContext = m_eglewContext;
-#endif
-	}
+  /**
+   * Gets the current swap interval for #swapBuffers.
+   * \param intervalOut: Variable to store the swap interval if it can be read.
+   * \return Whether the swap interval can be read.
+   */
+  GHOST_TSuccess getSwapInterval(int &intervalOut);
 
-private:
-	void initContextEGLEW();
+  EGLDisplay getDisplay() const;
 
-	EGLNativeDisplayType m_nativeDisplay;
-	EGLNativeWindowType  m_nativeWindow;
+  EGLConfig getConfig() const;
 
-	const EGLint m_contextProfileMask;
-	const EGLint m_contextMajorVersion;
-	const EGLint m_contextMinorVersion;
-	const EGLint m_contextFlags;
-	const EGLint m_contextResetNotificationStrategy;
+  EGLContext getContext() const;
 
-	const EGLenum m_api;
+ private:
+  bool initContextEGLEW();
 
-	EGLContext m_context;
-	EGLSurface m_surface;
-	EGLDisplay m_display;
+  const GHOST_System *const m_system;
 
-	EGLint m_swap_interval;
+  EGLNativeDisplayType m_nativeDisplay;
+  EGLNativeWindowType m_nativeWindow;
 
-#ifdef WITH_GLEW_MX
-	EGLEWContext *m_eglewContext;
-#endif
+  const EGLint m_contextProfileMask;
+  const EGLint m_contextMajorVersion;
+  const EGLint m_contextMinorVersion;
+  const EGLint m_contextFlags;
+  const EGLint m_contextResetNotificationStrategy;
 
-	EGLContext &m_sharedContext;
-	EGLint     &m_sharedCount;
+  const EGLenum m_api;
 
-	static EGLContext s_gl_sharedContext;
-	static EGLint     s_gl_sharedCount;
+  EGLContext m_context;
+  EGLSurface m_surface;
+  EGLDisplay m_display;
+  EGLConfig m_config;
 
-	static EGLContext s_gles_sharedContext;
-	static EGLint     s_gles_sharedCount;
+  EGLint m_swap_interval;
 
-	static EGLContext s_vg_sharedContext;
-	static EGLint     s_vg_sharedCount;
+  EGLContext &m_sharedContext;
+  EGLint &m_sharedCount;
+
+  static EGLContext s_gl_sharedContext;
+  static EGLint s_gl_sharedCount;
+
+  static EGLContext s_gles_sharedContext;
+  static EGLint s_gles_sharedCount;
+
+  static EGLContext s_vg_sharedContext;
+  static EGLint s_vg_sharedCount;
 
 #ifdef WITH_GL_ANGLE
-	static HMODULE s_d3dcompiler;
+  static HMODULE s_d3dcompiler;
 #endif
 };
-
-#endif // __GHOST_CONTEXTEGL_H__

@@ -1,6 +1,4 @@
 /*
- * Copyright 2011, Blender Foundation.
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -15,25 +13,25 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor: 
- *		Jeroen Bakker 
- *		Monique Dewanchand
+ * Copyright 2011, Blender Foundation.
  */
 
-#ifndef __COM_TRANSFORMNODE_H__
-#define __COM_TRANSFORMNODE_H__
+#pragma once
 
 #include "COM_Node.h"
 #include "DNA_node_types.h"
 
+namespace blender::compositor {
+
 /**
- * @brief TransformNode
- * @ingroup Node
+ * \brief TransformNode
+ * \ingroup Node
  */
 class TransformNode : public Node {
-public:
-	TransformNode(bNode *editorNode);
-	void convertToOperations(NodeConverter &converter, const CompositorContext &context) const;
+ public:
+  TransformNode(bNode *editor_node);
+  void convert_to_operations(NodeConverter &converter,
+                             const CompositorContext &context) const override;
 };
 
-#endif  /* __COM_TRANSFORMNODE_H__ */
+}  // namespace blender::compositor

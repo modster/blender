@@ -1,6 +1,4 @@
 /*
- * Copyright 2011, Blender Foundation.
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -15,60 +13,75 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor:
- *		Jeroen Bakker
- *		Monique Dewanchand
+ * Copyright 2011, Blender Foundation.
  */
 
-#ifndef _COM_GlareBaseOperation_h
-#define _COM_GlareBaseOperation_h
+#pragma once
 
 #include "COM_SingleThreadedOperation.h"
 #include "DNA_node_types.h"
 
+namespace blender::compositor {
 
-/* utility functions used by glare, tonemap and lens distortion */
-/* soms macros for color handling */
+/* Utility functions used by glare, tone-map and lens distortion. */
+/* Some macros for color handling. */
 typedef float fRGB[4];
 
-/* TODO - replace with BLI_math_vector */
+/* TODO: replace with BLI_math_vector. */
 /* multiply c2 by color rgb, rgb as separate arguments */
-#define fRGB_rgbmult(c, r, g, b) { c[0] *= (r);  c[1] *= (g);  c[2] *= (b); } (void)0
-
+#define fRGB_rgbmult(c, r, g, b) \
+  { \
+    c[0] *= (r); \
+    c[1] *= (g); \
+    c[2] *= (b); \
+  } \
+  (void)0
 
 class GlareBaseOperation : public SingleThreadedOperation {
-private:
-	/**
-	 * @brief Cached reference to the inputProgram
-	 */
-	SocketReader *m_inputProgram;
+ private:
+  /**
+   * \brief Cached reference to the input_program
+   */
+  SocketReader *input_program_;
 
-	/**
-	 * @brief settings of the glare node.
-	 */
-	NodeGlare *m_settings;
-public:
-	/**
-	 * Initialize the execution
-	 */
-	void initExecution();
+  /**
+   * \brief settings of the glare node.
+   */
+  NodeGlare *settings_;
 
-	/**
-	 * Deinitialize the execution
-	 */
-	void deinitExecution();
+  bool is_output_rendered_;
 
-	void setGlareSettings(NodeGlare *settings) {
-		this->m_settings = settings;
-	}
-	bool determineDependingAreaOfInterest(rcti *input, ReadBufferOperation *readOperation, rcti *output);
+ public:
+  /**
+   * Initialize the execution
+   */
+  void init_execution() override;
 
-protected:
-	GlareBaseOperation();
+  /**
+   * Deinitialize the execution
+   */
+  void deinit_execution() override;
 
-	virtual void generateGlare(float *data, MemoryBuffer *inputTile, NodeGlare *settings) = 0;
+  void set_glare_settings(NodeGlare *settings)
+  {
+    settings_ = settings;
+  }
+  bool determine_depending_area_of_interest(rcti *input,
+                                            ReadBufferOperation *read_operation,
+                                            rcti *output) override;
 
-	MemoryBuffer *createMemoryBuffer(rcti *rect);
+  void get_area_of_interest(int input_idx, const rcti &output_area, rcti &r_input_area) final;
 
+  void update_memory_buffer(MemoryBuffer *output,
+                            const rcti &area,
+                            Span<MemoryBuffer *> inputs) final;
+
+ protected:
+  GlareBaseOperation();
+
+  virtual void generate_glare(float *data, MemoryBuffer *input_tile, NodeGlare *settings) = 0;
+
+  MemoryBuffer *create_memory_buffer(rcti *rect) override;
 };
-#endif
+
+}  // namespace blender::compositor

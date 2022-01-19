@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -14,22 +12,44 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * Contributor(s): Campbell Barton
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file blender/python/intern/bpy_props.h
- *  \ingroup pythonintern
+/** \file
+ * \ingroup pythonintern
  */
 
+#pragma once
 
-#ifndef __BPY_PROPS_H__
-#define __BPY_PROPS_H__
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 PyObject *BPY_rna_props(void);
+/**
+ * Run this on exit, clearing all Python callback users and disable the RNA callback,
+ * as it would be called after Python has already finished.
+ */
+void BPY_rna_props_clear_all(void);
 
-#define PYRNA_STACK_ARRAY 32
+PyObject *BPy_PointerProperty(PyObject *self, PyObject *args, PyObject *kw);
+PyObject *BPy_CollectionProperty(PyObject *self, PyObject *args, PyObject *kw);
+StructRNA *pointer_type_from_py(PyObject *value, const char *error_prefix);
 
+typedef struct {
+  PyObject_HEAD
+  /**
+   * Internally a #PyCFunctionObject type.
+   * \note This isn't GC tracked, it's a function from `bpy.props` so it's not going away.
+   */
+  void *fn;
+  PyObject *kw;
+} BPy_PropDeferred;
+
+extern PyTypeObject bpy_prop_deferred_Type;
+#define BPy_PropDeferred_CheckTypeExact(v) (Py_TYPE(v) == &bpy_prop_deferred_Type)
+
+#define PYRNA_STACK_ARRAY RNA_STACK_ARRAY
+
+#ifdef __cplusplus
+}
 #endif

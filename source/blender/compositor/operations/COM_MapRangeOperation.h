@@ -1,6 +1,4 @@
 /*
- * Copyright 2012, Blender Foundation.
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -15,57 +13,65 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor: 
- *		Dalai Felinto
- *		Daniel Salazar
+ * Copyright 2012, Blender Foundation.
  */
 
-#ifndef _COM_MapRangeOperation_h
-#define _COM_MapRangeOperation_h
-#include "COM_NodeOperation.h"
+#pragma once
+
+#include "COM_MultiThreadedOperation.h"
 #include "DNA_texture_types.h"
+
+namespace blender::compositor {
 
 /**
  * this program converts an input color to an output value.
  * it assumes we are in sRGB color space.
  */
-class MapRangeOperation : public NodeOperation {
-private:
-	/**
-	 * Cached reference to the inputProgram
-	 */
-	SocketReader *m_inputOperation;
-	SocketReader *m_sourceMinOperation;
-	SocketReader *m_sourceMaxOperation;
-	SocketReader *m_destMinOperation;
-	SocketReader *m_destMaxOperation;
+class MapRangeOperation : public MultiThreadedOperation {
+ private:
+  /**
+   * Cached reference to the input_program
+   */
+  SocketReader *input_operation_;
+  SocketReader *source_min_operation_;
+  SocketReader *source_max_operation_;
+  SocketReader *dest_min_operation_;
+  SocketReader *dest_max_operation_;
 
-	bool m_useClamp;
-public:
-	/**
-	 * Default constructor
-	 */
-	MapRangeOperation();
-	
-	/**
-	 * the inner loop of this program
-	 */
-	void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
-	
-	/**
-	 * Initialize the execution
-	 */
-	void initExecution();
-	
-	/**
-	 * Deinitialize the execution
-	 */
-	void deinitExecution();
-	
-	/**
-	 * Clamp the output
-	 */
-	void setUseClamp(bool value) { this->m_useClamp = value; }
-	
+  bool use_clamp_;
+
+ public:
+  /**
+   * Default constructor
+   */
+  MapRangeOperation();
+
+  /**
+   * The inner loop of this operation.
+   */
+  void execute_pixel_sampled(float output[4], float x, float y, PixelSampler sampler) override;
+
+  /**
+   * Initialize the execution
+   */
+  void init_execution() override;
+
+  /**
+   * Deinitialize the execution
+   */
+  void deinit_execution() override;
+
+  /**
+   * Clamp the output
+   */
+  void set_use_clamp(bool value)
+  {
+    use_clamp_ = value;
+  }
+
+  void update_memory_buffer_partial(MemoryBuffer *output,
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
 };
-#endif
+
+}  // namespace blender::compositor

@@ -16,19 +16,18 @@
 # along with this program; if not, write to the Free Software Foundation,
 # Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 #
-# Contributor(s): Campbell Barton, M.G. Kishalmi
-#
 # ***** END GPL LICENSE BLOCK *****
 
 # <pep8 compliant>
 
 """
-Example Win32 usage:
- c:\Python32\python.exe c:\blender_dev\blender\build_files\cmake\cmake_qtcreator_project.py c:\blender_dev\cmake_build
+Module for accessing project file data for Blender.
 
-Example Linux usage:
- python ~/blenderSVN/blender/build_files/cmake/cmake_qtcreator_project.py ~/blenderSVN/cmake
+Before use, call init(cmake_build_dir).
 """
+
+# TODO: Use CMAKE_EXPORT_COMPILE_COMMANDS (compile_commands.json)
+# Instead of Eclipse project format.
 
 __all__ = (
     "SIMPLE_PROJECTFILE",
@@ -41,19 +40,37 @@ __all__ = (
     "is_py",
     "cmake_advanced_info",
     "cmake_compiler_defines",
-    "project_name_get"
+    "project_name_get",
+    "init",
+)
+
+from typing import (
+    Callable,
+    Generator,
+    List,
+    Optional,
+    Union,
+    Tuple,
 )
 
 
 import sys
-if not sys.version.startswith("3"):
+if sys.version_info.major < 3:
     print("\nPython3.x needed, found %s.\nAborting!\n" %
           sys.version.partition(" ")[0])
     sys.exit(1)
 
 
+import subprocess
 import os
-from os.path import join, dirname, normpath, abspath, splitext, exists
+from os.path import (
+    abspath,
+    dirname,
+    exists,
+    join,
+    normpath,
+    splitext,
+)
 
 SOURCE_DIR = join(dirname(__file__), "..", "..")
 SOURCE_DIR = normpath(SOURCE_DIR)
@@ -61,27 +78,36 @@ SOURCE_DIR = abspath(SOURCE_DIR)
 
 SIMPLE_PROJECTFILE = False
 
-# get cmake path
-CMAKE_DIR = sys.argv[-1]
-
-if not exists(join(CMAKE_DIR, "CMakeCache.txt")):
-    CMAKE_DIR = os.getcwd()
-if not exists(join(CMAKE_DIR, "CMakeCache.txt")):
-    print("CMakeCache.txt not found in %r or %r\n    Pass CMake build dir as an argument, or run from that dir, aborting" % (CMAKE_DIR, os.getcwd()))
-    sys.exit(1)
+# must initialize from 'init'
+CMAKE_DIR = ""
+PROJECT_DIR = ""
 
 
-# could be either.
-# PROJECT_DIR = SOURCE_DIR
-PROJECT_DIR = CMAKE_DIR
+def init(cmake_path: str) -> bool:
+    global CMAKE_DIR, PROJECT_DIR
+
+    # get cmake path
+    cmake_path = cmake_path or ""
+
+    if (not cmake_path) or (not exists(join(cmake_path, "CMakeCache.txt"))):
+        cmake_path = os.getcwd()
+    if not exists(join(cmake_path, "CMakeCache.txt")):
+        print("CMakeCache.txt not found in %r or %r\n"
+              "    Pass CMake build dir as an argument, or run from that dir, aborting" %
+              (cmake_path, os.getcwd()))
+        return False
+
+    PROJECT_DIR = CMAKE_DIR = cmake_path
+    return True
 
 
-def source_list(path, filename_check=None):
+def source_list(
+        path: str,
+        filename_check: Optional[Callable[[str], bool]] = None,
+) -> Generator[str, None, None]:
     for dirpath, dirnames, filenames in os.walk(path):
-
-        # skip '.svn'
-        if dirpath.startswith("."):
-            continue
+        # skip '.git'
+        dirnames[:] = [d for d in dirnames if not d.startswith(".")]
 
         for filename in filenames:
             filepath = join(dirpath, filename)
@@ -90,65 +116,69 @@ def source_list(path, filename_check=None):
 
 
 # extension checking
-def is_cmake(filename):
+def is_cmake(filename: str) -> bool:
     ext = splitext(filename)[1]
     return (ext == ".cmake") or (filename.endswith("CMakeLists.txt"))
 
 
-def is_c_header(filename):
+def is_c_header(filename: str) -> bool:
     ext = splitext(filename)[1]
     return (ext in {".h", ".hpp", ".hxx", ".hh"})
 
 
-def is_py(filename):
+def is_py(filename: str) -> bool:
     ext = splitext(filename)[1]
     return (ext == ".py")
 
 
-def is_glsl(filename):
+def is_glsl(filename: str) -> bool:
     ext = splitext(filename)[1]
     return (ext == ".glsl")
 
 
-def is_c(filename):
+def is_c(filename: str) -> bool:
     ext = splitext(filename)[1]
     return (ext in {".c", ".cpp", ".cxx", ".m", ".mm", ".rc", ".cc", ".inl", ".osl"})
 
 
-def is_c_any(filename):
+def is_c_any(filename: str) -> bool:
     return is_c(filename) or is_c_header(filename)
 
 
-def is_svn_file(filename):
+def is_svn_file(filename: str) -> bool:
     dn, fn = os.path.split(filename)
     filename_svn = join(dn, ".svn", "text-base", "%s.svn-base" % fn)
     return exists(filename_svn)
 
 
-def is_project_file(filename):
+def is_project_file(filename: str) -> bool:
     return (is_c_any(filename) or is_cmake(filename) or is_glsl(filename))  # and is_svn_file(filename)
 
 
-def cmake_advanced_info():
+def cmake_advanced_info() -> Union[Tuple[List[str], List[Tuple[str, str]]], Tuple[None, None]]:
     """ Extract includes and defines from cmake.
     """
 
     make_exe = cmake_cache_var("CMAKE_MAKE_PROGRAM")
+    if make_exe is None:
+        print("Make command not found in: %r not found" % project_path)
+        return None, None
+
     make_exe_basename = os.path.basename(make_exe)
 
-    def create_eclipse_project():
+    def create_eclipse_project() -> str:
         print("CMAKE_DIR %r" % CMAKE_DIR)
         if sys.platform == "win32":
-            cmd = 'cmake "%s" -G"Eclipse CDT4 - MinGW Makefiles"' % CMAKE_DIR
+            raise Exception("Error: win32 is not supported")
         else:
             if make_exe_basename.startswith(("make", "gmake")):
-                cmd = 'cmake "%s" -G"Eclipse CDT4 - Unix Makefiles"' % CMAKE_DIR
+                cmd = ("cmake", CMAKE_DIR, "-GEclipse CDT4 - Unix Makefiles")
             elif make_exe_basename.startswith("ninja"):
-                cmd = 'cmake "%s" -G"Eclipse CDT4 - Ninja"' % CMAKE_DIR
+                cmd = ("cmake", CMAKE_DIR, "-GEclipse CDT4 - Ninja")
             else:
                 raise Exception("Unknown make program %r" % make_exe)
 
-        os.system(cmd)
+        subprocess.check_call(cmd)
         return join(CMAKE_DIR, ".cproject")
 
     includes = []
@@ -206,10 +236,13 @@ def cmake_advanced_info():
     return includes, defines
 
 
-def cmake_cache_var(var):
-    cache_file = open(join(CMAKE_DIR, "CMakeCache.txt"), encoding='utf-8')
-    lines = [l_strip for l in cache_file for l_strip in (l.strip(),) if l_strip if not l_strip.startswith("//") if not l_strip.startswith("#")]
-    cache_file.close()
+def cmake_cache_var(var: str) -> Optional[str]:
+    with open(os.path.join(CMAKE_DIR, "CMakeCache.txt"), encoding='utf-8') as cache_file:
+        lines = [
+            l_strip for l in cache_file
+            if (l_strip := l.strip())
+            if not l_strip.startswith(("//", "#"))
+        ]
 
     for l in lines:
         if l.split(":")[0] == var:
@@ -217,12 +250,12 @@ def cmake_cache_var(var):
     return None
 
 
-def cmake_compiler_defines():
+def cmake_compiler_defines() -> Optional[List[str]]:
     compiler = cmake_cache_var("CMAKE_C_COMPILER")  # could do CXX too
 
     if compiler is None:
         print("Couldn't find the compiler, os defines will be omitted...")
-        return
+        return None
 
     import tempfile
     temp_c = tempfile.mkstemp(suffix=".c")[1]
@@ -239,5 +272,5 @@ def cmake_compiler_defines():
     return lines
 
 
-def project_name_get():
+def project_name_get() -> Optional[str]:
     return cmake_cache_var("CMAKE_PROJECT_NAME")

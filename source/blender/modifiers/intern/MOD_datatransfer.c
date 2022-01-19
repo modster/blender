@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -12,254 +10,494 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software  Foundation,
+ * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  * The Original Code is Copyright (C) 2014 Blender Foundation.
  * All rights reserved.
- *
- * Contributor(s): None yet.
- *
- * ***** END GPL LICENSE BLOCK *****
- *
  */
 
-/** \file blender/modifiers/intern/MOD_datatransfer.c
- *  \ingroup modifiers
+/** \file
+ * \ingroup modifiers
  */
 
 #include "BLI_utildefines.h"
+
 #include "BLI_math.h"
+
+#include "BLT_translation.h"
 
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
 #include "DNA_modifier_types.h"
 #include "DNA_object_types.h"
+#include "DNA_screen_types.h"
 
+#include "BKE_context.h"
 #include "BKE_customdata.h"
-#include "BKE_cdderivedmesh.h"
 #include "BKE_data_transfer.h"
-#include "BKE_DerivedMesh.h"
-#include "BKE_library.h"
+#include "BKE_lib_id.h"
+#include "BKE_lib_query.h"
 #include "BKE_mesh_mapping.h"
 #include "BKE_mesh_remap.h"
 #include "BKE_modifier.h"
 #include "BKE_report.h"
+#include "BKE_screen.h"
+
+#include "UI_interface.h"
+#include "UI_resources.h"
+
+#include "RNA_access.h"
+
+#include "DEG_depsgraph_query.h"
 
 #include "MEM_guardedalloc.h"
-#include "MOD_util.h"
 
-#include "depsgraph_private.h"
+#include "MOD_ui_common.h"
+#include "MOD_util.h"
 
 /**************************************
  * Modifiers functions.               *
  **************************************/
 static void initData(ModifierData *md)
 {
-	DataTransferModifierData *dtmd = (DataTransferModifierData *) md;
-	int i;
+  DataTransferModifierData *dtmd = (DataTransferModifierData *)md;
+  int i;
 
-	dtmd->ob_source          = NULL;
-	dtmd->data_types         = 0;
+  dtmd->ob_source = NULL;
+  dtmd->data_types = 0;
 
-	dtmd->vmap_mode          = MREMAP_MODE_VERT_NEAREST;
-	dtmd->emap_mode          = MREMAP_MODE_EDGE_NEAREST;
-	dtmd->lmap_mode          = MREMAP_MODE_LOOP_NEAREST_POLYNOR;
-	dtmd->pmap_mode          = MREMAP_MODE_POLY_NEAREST;
+  dtmd->vmap_mode = MREMAP_MODE_VERT_NEAREST;
+  dtmd->emap_mode = MREMAP_MODE_EDGE_NEAREST;
+  dtmd->lmap_mode = MREMAP_MODE_LOOP_NEAREST_POLYNOR;
+  dtmd->pmap_mode = MREMAP_MODE_POLY_NEAREST;
 
-	dtmd->map_max_distance   = 1.0f;
-	dtmd->map_ray_radius     = 0.0f;
+  dtmd->map_max_distance = 1.0f;
+  dtmd->map_ray_radius = 0.0f;
 
-	for (i = 0; i < DT_MULTILAYER_INDEX_MAX; i++) {
-		dtmd->layers_select_src[i] = DT_LAYERS_ALL_SRC;
-		dtmd->layers_select_dst[i]   = DT_LAYERS_NAME_DST;
-	}
+  for (i = 0; i < DT_MULTILAYER_INDEX_MAX; i++) {
+    dtmd->layers_select_src[i] = DT_LAYERS_ALL_SRC;
+    dtmd->layers_select_dst[i] = DT_LAYERS_NAME_DST;
+  }
 
-	dtmd->mix_mode           = CDT_MIX_TRANSFER;
-	dtmd->mix_factor         = 1.0f;
-	dtmd->defgrp_name[0]     = '\0';
+  dtmd->mix_mode = CDT_MIX_TRANSFER;
+  dtmd->mix_factor = 1.0f;
+  dtmd->defgrp_name[0] = '\0';
 
-	dtmd->flags              = MOD_DATATRANSFER_OBSRC_TRANSFORM;
+  dtmd->flags = MOD_DATATRANSFER_OBSRC_TRANSFORM;
 }
 
-static CustomDataMask requiredDataMask(Object *UNUSED(ob), ModifierData *md)
+static void requiredDataMask(Object *UNUSED(ob),
+                             ModifierData *md,
+                             CustomData_MeshMasks *r_cddata_masks)
 {
-	DataTransferModifierData *dtmd = (DataTransferModifierData *) md;
-	CustomDataMask dataMask = 0;
+  DataTransferModifierData *dtmd = (DataTransferModifierData *)md;
 
-	if (dtmd->defgrp_name[0]) {
-		/* We need vertex groups! */
-		dataMask |= CD_MASK_MDEFORMVERT;
-	}
+  if (dtmd->defgrp_name[0] != '\0') {
+    /* We need vertex groups! */
+    r_cddata_masks->vmask |= CD_MASK_MDEFORMVERT;
+  }
 
-	dataMask |= BKE_object_data_transfer_dttypes_to_cdmask(dtmd->data_types);
-
-	return dataMask;
+  BKE_object_data_transfer_dttypes_to_cdmask(dtmd->data_types, r_cddata_masks);
 }
 
 static bool dependsOnNormals(ModifierData *md)
 {
-	DataTransferModifierData *dtmd = (DataTransferModifierData *) md;
-	int item_types = BKE_object_data_transfer_get_dttypes_item_types(dtmd->data_types);
+  DataTransferModifierData *dtmd = (DataTransferModifierData *)md;
+  int item_types = BKE_object_data_transfer_get_dttypes_item_types(dtmd->data_types);
 
-	if ((item_types & ME_VERT) && (dtmd->vmap_mode & (MREMAP_USE_NORPROJ | MREMAP_USE_NORMAL))) {
-		return true;
-	}
-	if ((item_types & ME_EDGE) && (dtmd->emap_mode & (MREMAP_USE_NORPROJ | MREMAP_USE_NORMAL))) {
-		return true;
-	}
-	if ((item_types & ME_LOOP) && (dtmd->lmap_mode & (MREMAP_USE_NORPROJ | MREMAP_USE_NORMAL))) {
-		return true;
-	}
-	if ((item_types & ME_POLY) && (dtmd->pmap_mode & (MREMAP_USE_NORPROJ | MREMAP_USE_NORMAL))) {
-		return true;
-	}
+  if ((item_types & ME_VERT) && (dtmd->vmap_mode & (MREMAP_USE_NORPROJ | MREMAP_USE_NORMAL))) {
+    return true;
+  }
+  if ((item_types & ME_EDGE) && (dtmd->emap_mode & (MREMAP_USE_NORPROJ | MREMAP_USE_NORMAL))) {
+    return true;
+  }
+  if ((item_types & ME_LOOP) && (dtmd->lmap_mode & (MREMAP_USE_NORPROJ | MREMAP_USE_NORMAL))) {
+    return true;
+  }
+  if ((item_types & ME_POLY) && (dtmd->pmap_mode & (MREMAP_USE_NORPROJ | MREMAP_USE_NORMAL))) {
+    return true;
+  }
 
-	return false;
-}
-
-static void foreachObjectLink(ModifierData *md, Object *ob,
-                              void (*walk)(void *userData, Object *ob, Object **obpoin),
-                              void *userData)
-{
-	DataTransferModifierData *dtmd = (DataTransferModifierData *) md;
-	walk(userData, ob, &dtmd->ob_source);
+  return false;
 }
 
 static void foreachIDLink(ModifierData *md, Object *ob, IDWalkFunc walk, void *userData)
 {
-	foreachObjectLink(md, ob, (ObjectWalkFunc)walk, userData);
+  DataTransferModifierData *dtmd = (DataTransferModifierData *)md;
+  walk(userData, ob, (ID **)&dtmd->ob_source, IDWALK_CB_NOP);
 }
 
-static void updateDepgraph(ModifierData *md, DagForest *forest,
-                           struct Main *UNUSED(bmain),
-                           struct Scene *UNUSED(scene),
-                           Object *UNUSED(ob), DagNode *obNode)
+static void updateDepsgraph(ModifierData *md, const ModifierUpdateDepsgraphContext *ctx)
 {
-	DataTransferModifierData *dtmd = (DataTransferModifierData *) md;
-	DagNode *curNode;
+  DataTransferModifierData *dtmd = (DataTransferModifierData *)md;
+  if (dtmd->ob_source != NULL) {
+    CustomData_MeshMasks cddata_masks = {0};
+    BKE_object_data_transfer_dttypes_to_cdmask(dtmd->data_types, &cddata_masks);
+    BKE_mesh_remap_calc_source_cddata_masks_from_map_modes(
+        dtmd->vmap_mode, dtmd->emap_mode, dtmd->lmap_mode, dtmd->pmap_mode, &cddata_masks);
 
-	if (dtmd->ob_source) {
-		curNode = dag_get_node(forest, dtmd->ob_source);
+    DEG_add_object_relation(
+        ctx->node, dtmd->ob_source, DEG_OB_COMP_GEOMETRY, "DataTransfer Modifier");
+    DEG_add_customdata_mask(ctx->node, dtmd->ob_source, &cddata_masks);
 
-		dag_add_relation(forest, curNode, obNode, DAG_RL_DATA_DATA | DAG_RL_OB_DATA,
-		                 "DataTransfer Modifier");
-	}
+    if (dtmd->flags & MOD_DATATRANSFER_OBSRC_TRANSFORM) {
+      DEG_add_object_relation(
+          ctx->node, dtmd->ob_source, DEG_OB_COMP_TRANSFORM, "DataTransfer Modifier");
+      DEG_add_modifier_to_transform_relation(ctx->node, "DataTransfer Modifier");
+    }
+  }
 }
 
-static void updateDepsgraph(ModifierData *md,
-                            struct Main *UNUSED(bmain),
-                            struct Scene *UNUSED(scene),
-                            Object *UNUSED(ob),
-                            struct DepsNodeHandle *node)
+static bool isDisabled(const struct Scene *UNUSED(scene),
+                       ModifierData *md,
+                       bool UNUSED(useRenderParams))
 {
-	DataTransferModifierData *dtmd = (DataTransferModifierData *) md;
-	if (dtmd->ob_source != NULL) {
-		DEG_add_object_relation(node, dtmd->ob_source, DEG_OB_COMP_GEOMETRY, "DataTransfer Modifier");
-	}
+  /* If no source object, bypass. */
+  DataTransferModifierData *dtmd = (DataTransferModifierData *)md;
+  /* The object type check is only needed here in case we have a placeholder
+   * object assigned (because the library containing the mesh is missing).
+   *
+   * In other cases it should be impossible to have a type mismatch.
+   */
+  return !dtmd->ob_source || dtmd->ob_source->type != OB_MESH;
 }
 
-static bool isDisabled(ModifierData *md, int UNUSED(useRenderParams))
+#define DT_TYPES_AFFECT_MESH \
+  (DT_TYPE_BWEIGHT_VERT | DT_TYPE_BWEIGHT_EDGE | DT_TYPE_CREASE | DT_TYPE_SHARP_EDGE | \
+   DT_TYPE_LNOR | DT_TYPE_SHARP_FACE)
+
+static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *me_mod)
 {
-	DataTransferModifierData *dtmd = (DataTransferModifierData *) md;
-	/* If no source object, bypass. */
-	return (dtmd->ob_source == NULL);
+  DataTransferModifierData *dtmd = (DataTransferModifierData *)md;
+  struct Scene *scene = DEG_get_evaluated_scene(ctx->depsgraph);
+  Mesh *result = me_mod;
+  ReportList reports;
+
+  /* Only used to check whether we are operating on org data or not... */
+  Mesh *me = ctx->object->data;
+
+  Object *ob_source = dtmd->ob_source;
+
+  const bool invert_vgroup = (dtmd->flags & MOD_DATATRANSFER_INVERT_VGROUP) != 0;
+
+  const float max_dist = (dtmd->flags & MOD_DATATRANSFER_MAP_MAXDIST) ? dtmd->map_max_distance :
+                                                                        FLT_MAX;
+
+  SpaceTransform space_transform_data;
+  SpaceTransform *space_transform = (dtmd->flags & MOD_DATATRANSFER_OBSRC_TRANSFORM) ?
+                                        &space_transform_data :
+                                        NULL;
+
+  if (space_transform) {
+    BLI_SPACE_TRANSFORM_SETUP(space_transform, ctx->object, ob_source);
+  }
+
+  if (((result == me) || (me->mvert == result->mvert) || (me->medge == result->medge)) &&
+      (dtmd->data_types & DT_TYPES_AFFECT_MESH)) {
+    /* We need to duplicate data here, otherwise setting custom normals, edges' sharpness, etc.,
+     * could modify org mesh, see T43671. */
+    result = (Mesh *)BKE_id_copy_ex(NULL, &me_mod->id, NULL, LIB_ID_COPY_LOCALIZE);
+  }
+
+  BKE_reports_init(&reports, RPT_STORE);
+
+  /* NOTE: no islands precision for now here. */
+  if (BKE_object_data_transfer_ex(ctx->depsgraph,
+                                  scene,
+                                  ob_source,
+                                  ctx->object,
+                                  result,
+                                  dtmd->data_types,
+                                  false,
+                                  dtmd->vmap_mode,
+                                  dtmd->emap_mode,
+                                  dtmd->lmap_mode,
+                                  dtmd->pmap_mode,
+                                  space_transform,
+                                  false,
+                                  max_dist,
+                                  dtmd->map_ray_radius,
+                                  0.0f,
+                                  dtmd->layers_select_src,
+                                  dtmd->layers_select_dst,
+                                  dtmd->mix_mode,
+                                  dtmd->mix_factor,
+                                  dtmd->defgrp_name,
+                                  invert_vgroup,
+                                  &reports)) {
+    result->runtime.is_original = false;
+  }
+
+  if (BKE_reports_contain(&reports, RPT_ERROR)) {
+    const char *report_str = BKE_reports_string(&reports, RPT_ERROR);
+    BKE_modifier_set_error(ctx->object, md, "%s", report_str);
+    MEM_freeN((void *)report_str);
+  }
+  else if ((dtmd->data_types & DT_TYPE_LNOR) && !(me->flag & ME_AUTOSMOOTH)) {
+    BKE_modifier_set_error(
+        ctx->object, (ModifierData *)dtmd, "Enable 'Auto Smooth' in Object Data Properties");
+  }
+
+  return result;
 }
 
-#define HIGH_POLY_WARNING 10000
-#define DT_TYPES_AFFECT_MESH ( \
-	DT_TYPE_BWEIGHT_VERT | \
-	DT_TYPE_BWEIGHT_EDGE | DT_TYPE_CREASE | DT_TYPE_SHARP_EDGE | \
-	DT_TYPE_LNOR | \
-	DT_TYPE_SHARP_FACE \
-)
-
-static DerivedMesh *applyModifier(ModifierData *md, Object *ob, DerivedMesh *derivedData,
-                                  ModifierApplyFlag UNUSED(flag))
+static void panel_draw(const bContext *UNUSED(C), Panel *panel)
 {
-	DataTransferModifierData *dtmd = (DataTransferModifierData *) md;
-	DerivedMesh *dm = derivedData;
-	ReportList reports;
+  uiLayout *sub, *row;
+  uiLayout *layout = panel->layout;
 
-	/* Only used to check wehther we are operating on org data or not... */
-	Mesh *me = ob->data;
-	MVert *mvert;
+  PointerRNA ob_ptr;
+  PointerRNA *ptr = modifier_panel_get_property_pointers(panel, &ob_ptr);
 
-	const bool invert_vgroup = (dtmd->flags & MOD_DATATRANSFER_INVERT_VGROUP) != 0;
+  uiLayoutSetPropSep(layout, true);
 
-	const float max_dist = (dtmd->flags & MOD_DATATRANSFER_MAP_MAXDIST) ? dtmd->map_max_distance : FLT_MAX;
+  row = uiLayoutRow(layout, true);
+  uiItemR(row, ptr, "object", 0, IFACE_("Source"), ICON_NONE);
+  sub = uiLayoutRow(row, true);
+  uiLayoutSetPropDecorate(sub, false);
+  uiItemR(sub, ptr, "use_object_transform", 0, "", ICON_ORIENTATION_GLOBAL);
 
-	SpaceTransform space_transform_data;
-	SpaceTransform *space_transform = (dtmd->flags & MOD_DATATRANSFER_OBSRC_TRANSFORM) ? &space_transform_data : NULL;
+  uiItemR(layout, ptr, "mix_mode", 0, NULL, ICON_NONE);
 
-	if (space_transform) {
-		BLI_SPACE_TRANSFORM_SETUP(space_transform, ob, dtmd->ob_source);
-	}
+  row = uiLayoutRow(layout, false);
+  uiLayoutSetActive(row,
+                    !ELEM(RNA_enum_get(ptr, "mix_mode"),
+                          CDT_MIX_NOMIX,
+                          CDT_MIX_REPLACE_ABOVE_THRESHOLD,
+                          CDT_MIX_REPLACE_BELOW_THRESHOLD));
+  uiItemR(row, ptr, "mix_factor", 0, NULL, ICON_NONE);
 
-	mvert = dm->getVertArray(dm);
-	if ((me->mvert == mvert) && (dtmd->data_types & DT_TYPES_AFFECT_MESH)) {
-		/* We need to duplicate data here, otherwise setting custom normals, edges' shaprness, etc., could
-		 * modify org mesh, see T43671. */
-		dm = CDDM_copy(dm);
-	}
+  modifier_vgroup_ui(layout, ptr, &ob_ptr, "vertex_group", "invert_vertex_group", NULL);
 
-	BKE_reports_init(&reports, RPT_STORE);
+  uiItemO(layout, IFACE_("Generate Data Layers"), ICON_NONE, "OBJECT_OT_datalayout_transfer");
 
-	/* Note: no islands precision for now here. */
-	BKE_object_data_transfer_dm(md->scene, dtmd->ob_source, ob, dm, dtmd->data_types, false,
-	                     dtmd->vmap_mode, dtmd->emap_mode, dtmd->lmap_mode, dtmd->pmap_mode,
-	                     space_transform, false, max_dist, dtmd->map_ray_radius, 0.0f,
-	                     dtmd->layers_select_src, dtmd->layers_select_dst,
-	                     dtmd->mix_mode, dtmd->mix_factor, dtmd->defgrp_name, invert_vgroup, &reports);
-
-	if (BKE_reports_contain(&reports, RPT_ERROR)) {
-		modifier_setError(md, "%s", BKE_reports_string(&reports, RPT_ERROR));
-	}
-	else if (dm->getNumVerts(dm) > HIGH_POLY_WARNING || ((Mesh *)(dtmd->ob_source->data))->totvert > HIGH_POLY_WARNING) {
-		modifier_setError(md, "You are using a rather high poly as source or destination, computation might be slow");
-	}
-
-	return dm;
+  modifier_panel_end(layout, ptr);
 }
 
-#undef HIGH_POLY_WARNING
+static void vertex_panel_draw_header(const bContext *UNUSED(C), Panel *panel)
+{
+  PointerRNA *ptr = modifier_panel_get_property_pointers(panel, NULL);
+  uiLayout *layout = panel->layout;
+
+  uiItemR(layout, ptr, "use_vert_data", 0, NULL, ICON_NONE);
+}
+
+static void vertex_panel_draw(const bContext *UNUSED(C), Panel *panel)
+{
+  uiLayout *layout = panel->layout;
+
+  PointerRNA *ptr = modifier_panel_get_property_pointers(panel, NULL);
+
+  bool use_vert_data = RNA_boolean_get(ptr, "use_vert_data");
+  uiLayoutSetActive(layout, use_vert_data);
+
+  uiItemR(layout, ptr, "data_types_verts", UI_ITEM_R_EXPAND, NULL, ICON_NONE);
+
+  uiLayoutSetPropSep(layout, true);
+
+  uiItemR(layout, ptr, "vert_mapping", 0, IFACE_("Mapping"), ICON_NONE);
+}
+
+static void vertex_vgroup_panel_draw(const bContext *UNUSED(C), Panel *panel)
+{
+  uiLayout *layout = panel->layout;
+
+  PointerRNA *ptr = modifier_panel_get_property_pointers(panel, NULL);
+
+  uiLayoutSetActive(layout, RNA_enum_get(ptr, "data_types_verts") & DT_TYPE_MDEFORMVERT);
+
+  uiLayoutSetPropSep(layout, true);
+
+  uiItemR(layout, ptr, "layers_vgroup_select_src", 0, IFACE_("Layer Selection"), ICON_NONE);
+  uiItemR(layout, ptr, "layers_vgroup_select_dst", 0, IFACE_("Layer Mapping"), ICON_NONE);
+}
+
+static void edge_panel_draw_header(const bContext *UNUSED(C), Panel *panel)
+{
+  uiLayout *layout = panel->layout;
+
+  PointerRNA *ptr = modifier_panel_get_property_pointers(panel, NULL);
+
+  uiItemR(layout, ptr, "use_edge_data", 0, NULL, ICON_NONE);
+}
+
+static void edge_panel_draw(const bContext *UNUSED(C), Panel *panel)
+{
+  uiLayout *layout = panel->layout;
+
+  PointerRNA *ptr = modifier_panel_get_property_pointers(panel, NULL);
+
+  uiLayoutSetActive(layout, RNA_boolean_get(ptr, "use_edge_data"));
+
+  uiItemR(layout, ptr, "data_types_edges", UI_ITEM_R_EXPAND, NULL, ICON_NONE);
+
+  uiLayoutSetPropSep(layout, true);
+
+  uiItemR(layout, ptr, "edge_mapping", 0, IFACE_("Mapping"), ICON_NONE);
+}
+
+static void face_corner_panel_draw_header(const bContext *UNUSED(C), Panel *panel)
+{
+  uiLayout *layout = panel->layout;
+
+  PointerRNA *ptr = modifier_panel_get_property_pointers(panel, NULL);
+
+  uiItemR(layout, ptr, "use_loop_data", 0, NULL, ICON_NONE);
+}
+
+static void face_corner_panel_draw(const bContext *UNUSED(C), Panel *panel)
+{
+  uiLayout *layout = panel->layout;
+
+  PointerRNA *ptr = modifier_panel_get_property_pointers(panel, NULL);
+
+  uiLayoutSetActive(layout, RNA_boolean_get(ptr, "use_loop_data"));
+
+  uiItemR(layout, ptr, "data_types_loops", UI_ITEM_R_EXPAND, NULL, ICON_NONE);
+
+  uiLayoutSetPropSep(layout, true);
+
+  uiItemR(layout, ptr, "loop_mapping", 0, IFACE_("Mapping"), ICON_NONE);
+}
+
+static void face_corner_vcol_panel_draw(const bContext *UNUSED(C), Panel *panel)
+{
+  uiLayout *layout = panel->layout;
+
+  PointerRNA *ptr = modifier_panel_get_property_pointers(panel, NULL);
+
+  uiLayoutSetPropSep(layout, true);
+
+  uiLayoutSetActive(layout, RNA_enum_get(ptr, "data_types_loops") & DT_TYPE_VCOL);
+
+  uiItemR(layout, ptr, "layers_vcol_select_src", 0, IFACE_("Layer Selection"), ICON_NONE);
+  uiItemR(layout, ptr, "layers_vcol_select_dst", 0, IFACE_("Layer Mapping"), ICON_NONE);
+}
+
+static void face_corner_uv_panel_draw(const bContext *UNUSED(C), Panel *panel)
+{
+  uiLayout *layout = panel->layout;
+
+  PointerRNA *ptr = modifier_panel_get_property_pointers(panel, NULL);
+
+  uiLayoutSetPropSep(layout, true);
+
+  uiLayoutSetActive(layout, RNA_enum_get(ptr, "data_types_loops") & DT_TYPE_UV);
+
+  uiItemR(layout, ptr, "layers_uv_select_src", 0, IFACE_("Layer Selection"), ICON_NONE);
+  uiItemR(layout, ptr, "layers_uv_select_dst", 0, IFACE_("Layer Mapping"), ICON_NONE);
+  uiItemR(layout, ptr, "islands_precision", 0, NULL, ICON_NONE);
+}
+
+static void face_panel_draw_header(const bContext *UNUSED(C), Panel *panel)
+{
+  uiLayout *layout = panel->layout;
+
+  PointerRNA *ptr = modifier_panel_get_property_pointers(panel, NULL);
+
+  uiItemR(layout, ptr, "use_poly_data", 0, NULL, ICON_NONE);
+}
+
+static void face_panel_draw(const bContext *UNUSED(C), Panel *panel)
+{
+  uiLayout *layout = panel->layout;
+
+  PointerRNA *ptr = modifier_panel_get_property_pointers(panel, NULL);
+
+  uiLayoutSetActive(layout, RNA_boolean_get(ptr, "use_poly_data"));
+
+  uiItemR(layout, ptr, "data_types_polys", 0, NULL, ICON_NONE);
+
+  uiLayoutSetPropSep(layout, true);
+
+  uiItemR(layout, ptr, "poly_mapping", 0, IFACE_("Mapping"), ICON_NONE);
+}
+
+static void advanced_panel_draw(const bContext *UNUSED(C), Panel *panel)
+{
+  uiLayout *row, *sub;
+  uiLayout *layout = panel->layout;
+
+  PointerRNA *ptr = modifier_panel_get_property_pointers(panel, NULL);
+
+  uiLayoutSetPropSep(layout, true);
+
+  row = uiLayoutRowWithHeading(layout, true, IFACE_("Max Distance"));
+  uiItemR(row, ptr, "use_max_distance", 0, "", ICON_NONE);
+  sub = uiLayoutRow(row, true);
+  uiLayoutSetActive(sub, RNA_boolean_get(ptr, "use_max_distance"));
+  uiItemR(sub, ptr, "max_distance", 0, "", ICON_NONE);
+
+  uiItemR(layout, ptr, "ray_radius", 0, NULL, ICON_NONE);
+}
+
+static void panelRegister(ARegionType *region_type)
+{
+  PanelType *panel_type = modifier_panel_register(
+      region_type, eModifierType_DataTransfer, panel_draw);
+  PanelType *vertex_panel = modifier_subpanel_register(
+      region_type, "vertex", "", vertex_panel_draw_header, vertex_panel_draw, panel_type);
+  modifier_subpanel_register(
+      region_type, "vertex_vgroup", "Vertex Groups", NULL, vertex_vgroup_panel_draw, vertex_panel);
+
+  modifier_subpanel_register(
+      region_type, "edge", "", edge_panel_draw_header, edge_panel_draw, panel_type);
+
+  PanelType *face_corner_panel = modifier_subpanel_register(region_type,
+                                                            "face_corner",
+                                                            "",
+                                                            face_corner_panel_draw_header,
+                                                            face_corner_panel_draw,
+                                                            panel_type);
+  modifier_subpanel_register(region_type,
+                             "face_corner_vcol",
+                             "Vertex Colors",
+                             NULL,
+                             face_corner_vcol_panel_draw,
+                             face_corner_panel);
+  modifier_subpanel_register(
+      region_type, "face_corner_uv", "UVs", NULL, face_corner_uv_panel_draw, face_corner_panel);
+
+  modifier_subpanel_register(
+      region_type, "face", "", face_panel_draw_header, face_panel_draw, panel_type);
+  modifier_subpanel_register(
+      region_type, "advanced", "Topology Mapping", NULL, advanced_panel_draw, panel_type);
+}
+
 #undef DT_TYPES_AFFECT_MESH
 
-static void copyData(ModifierData *md, ModifierData *target)
-{
-#if 0
-	DataTransferModifierData *dtmd = (DecimateModifierData *) md;
-	DataTransferModifierData *tdtmd = (DecimateModifierData *) target;
-#endif
-	modifier_copyData_generic(md, target);
-}
-
 ModifierTypeInfo modifierType_DataTransfer = {
-	/* name */              "DataTransfer",
-	/* structName */        "DataTransferModifierData",
-	/* structSize */        sizeof(DataTransferModifierData),
-	/* type */              eModifierTypeType_NonGeometrical,
-	/* flags */             eModifierTypeFlag_AcceptsMesh |
-	                        eModifierTypeFlag_SupportsMapping |
-	                        eModifierTypeFlag_SupportsEditmode |
-	                        eModifierTypeFlag_UsesPreview,
+    /* name */ "DataTransfer",
+    /* structName */ "DataTransferModifierData",
+    /* structSize */ sizeof(DataTransferModifierData),
+    /* srna */ &RNA_DataTransferModifier,
+    /* type */ eModifierTypeType_NonGeometrical,
+    /* flags */ eModifierTypeFlag_AcceptsMesh | eModifierTypeFlag_SupportsMapping |
+        eModifierTypeFlag_SupportsEditmode | eModifierTypeFlag_UsesPreview,
+    /* icon */ ICON_MOD_DATA_TRANSFER,
 
-	/* copyData */          copyData,
-	/* deformVerts */       NULL,
-	/* deformMatrices */    NULL,
-	/* deformVertsEM */     NULL,
-	/* deformMatricesEM */  NULL,
-	/* applyModifier */     applyModifier,
-	/* applyModifierEM */   NULL,
-	/* initData */          initData,
-	/* requiredDataMask */  requiredDataMask,
-	/* freeData */          NULL,
-	/* isDisabled */        isDisabled,
-	/* updateDepgraph */    updateDepgraph,
-	/* updateDepsgraph */   updateDepsgraph,
-	/* dependsOnTime */     NULL,
-	/* dependsOnNormals */  dependsOnNormals,
-	/* foreachObjectLink */ foreachObjectLink,
-	/* foreachIDLink */     foreachIDLink,
-	/* foreachTexLink */    NULL,
+    /* copyData */ BKE_modifier_copydata_generic,
+
+    /* deformVerts */ NULL,
+    /* deformMatrices */ NULL,
+    /* deformVertsEM */ NULL,
+    /* deformMatricesEM */ NULL,
+    /* modifyMesh */ modifyMesh,
+    /* modifyHair */ NULL,
+    /* modifyGeometrySet */ NULL,
+
+    /* initData */ initData,
+    /* requiredDataMask */ requiredDataMask,
+    /* freeData */ NULL,
+    /* isDisabled */ isDisabled,
+    /* updateDepsgraph */ updateDepsgraph,
+    /* dependsOnTime */ NULL,
+    /* dependsOnNormals */ dependsOnNormals,
+    /* foreachIDLink */ foreachIDLink,
+    /* foreachTexLink */ NULL,
+    /* freeRuntimeData */ NULL,
+    /* panelRegister */ panelRegister,
+    /* blendWrite */ NULL,
+    /* blendRead */ NULL,
 };

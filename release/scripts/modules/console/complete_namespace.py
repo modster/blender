@@ -26,7 +26,7 @@ import re
 import rlcompleter
 
 
-RE_INCOMPLETE_INDEX = re.compile('(.*?)\[[^\]]+$')
+RE_INCOMPLETE_INDEX = re.compile(r'(.*?)\[[^\]]+$')
 
 TEMP = '__tEmP__'  # only \w characters are allowed!
 TEMP_N = len(TEMP)
@@ -62,7 +62,7 @@ def complete_names(word, namespace):
     return sorted(set(completer.matches))
 
 
-def complete_indices(word, namespace, obj=None, base=None):
+def complete_indices(word, namespace, *, obj=None, base=None):
     """Complete a list or dictionary with its indices:
 
     * integer numbers for list
@@ -73,7 +73,7 @@ def complete_indices(word, namespace, obj=None, base=None):
     :param namespace: namespace
     :type namespace: dict
     :param obj: object evaluated from base
-    :param base: substring which can be evaluated into an object
+    :param base: sub-string which can be evaluated into an object.
     :type base: str
     :returns: completion matches
     :rtype: list of str
@@ -85,7 +85,7 @@ def complete_indices(word, namespace, obj=None, base=None):
     >>> complete_indices("foo['b", {'foo': {'bar':0, 1:2}}, base='foo')
     ["foo['bar']"]
     """
-    #FIXME: 'foo["b'
+    # FIXME: 'foo["b'
     if base is None:
         base = word
     if obj is None:
@@ -117,7 +117,7 @@ def complete_indices(word, namespace, obj=None, base=None):
     return matches
 
 
-def complete(word, namespace, private=True):
+def complete(word, namespace, *, private=True):
     """Complete word within a namespace with the standard rlcompleter
     module. Also supports index or key access [].
 
@@ -148,7 +148,7 @@ def complete(word, namespace, private=True):
     if re_incomplete_index:
         # ignore incomplete index at the end, e.g 'a[1' -> 'a'
         matches = complete_indices(word, namespace,
-                    base=re_incomplete_index.group(1))
+                                   base=re_incomplete_index.group(1))
 
     elif not('[' in word):
         matches = complete_names(word, namespace)
@@ -191,7 +191,7 @@ def complete(word, namespace, private=True):
         # an extra char '[', '(' or '.' will be added
         if hasattr(obj, '__getitem__') and not is_struct_seq(obj):
             # list or dictionary
-            matches = complete_indices(word, namespace, obj)
+            matches = complete_indices(word, namespace, obj=obj)
         elif hasattr(obj, '__call__'):
             # callables
             matches = [word + '(']

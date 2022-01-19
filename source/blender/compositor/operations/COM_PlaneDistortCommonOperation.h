@@ -1,7 +1,4 @@
-
 /*
- * Copyright 2013, Blender Foundation.
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -16,16 +13,14 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor:
- *		Sergey Sharybin
+ * Copyright 2013, Blender Foundation.
  */
 
-#ifndef _COM_PlaneTrackCommonOperation_h
-#define _COM_PlaneTrackCommonOperation_h
+#pragma once
 
 #include <string.h>
 
-#include "COM_NodeOperation.h"
+#include "COM_MultiThreadedOperation.h"
 
 #include "DNA_movieclip_types.h"
 #include "DNA_tracking_types.h"
@@ -33,72 +28,81 @@
 #include "BLI_listbase.h"
 #include "BLI_string.h"
 
+namespace blender::compositor {
+
 #define PLANE_DISTORT_MAX_SAMPLES 64
 
-class PlaneDistortWarpImageOperation : public NodeOperation {
-protected:
-	struct MotionSample {
-		float frameSpaceCorners[4][2];  /* Corners coordinates in pixel space. */
-		float perspectiveMatrix[3][3];
-	};
-	SocketReader *m_pixelReader;
-	MotionSample m_samples[PLANE_DISTORT_MAX_SAMPLES];
-	int m_motion_blur_samples;
-	float m_motion_blur_shutter;
+class PlaneDistortBaseOperation : public MultiThreadedOperation {
+ protected:
+  struct MotionSample {
+    float frame_space_corners[4][2]; /* Corners coordinates in pixel space. */
+    float perspective_matrix[3][3];
+  };
+  MotionSample samples_[PLANE_DISTORT_MAX_SAMPLES];
+  int motion_blur_samples_;
+  float motion_blur_shutter_;
 
-public:
-	PlaneDistortWarpImageOperation();
+ public:
+  PlaneDistortBaseOperation();
 
-	void calculateCorners(const float corners[4][2],
-	                      bool normalized,
-	                      int sample);
+  void set_motion_blur_samples(int samples)
+  {
+    BLI_assert(samples <= PLANE_DISTORT_MAX_SAMPLES);
+    motion_blur_samples_ = samples;
+  }
+  void set_motion_blur_shutter(float shutter)
+  {
+    motion_blur_shutter_ = shutter;
+  }
 
-	void initExecution();
-	void deinitExecution();
+  virtual void calculate_corners(const float corners[4][2], bool normalized, int sample);
 
-	void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
-
-	bool determineDependingAreaOfInterest(rcti *input, ReadBufferOperation *readOperation, rcti *output);
-
-	void setMotionBlurSamples(int samples) {
-		BLI_assert(samples <= PLANE_DISTORT_MAX_SAMPLES);
-		this->m_motion_blur_samples = samples;
-	}
-	void setMotionBlurShutter(float shutter) {
-		this->m_motion_blur_shutter = shutter;
-	}
+ private:
+  friend class PlaneTrackCommon;
 };
 
+class PlaneDistortWarpImageOperation : public PlaneDistortBaseOperation {
+ protected:
+  SocketReader *pixel_reader_;
 
-class PlaneDistortMaskOperation : public NodeOperation {
-protected:
-	struct MotionSample {
-		float frameSpaceCorners[4][2];  /* Corners coordinates in pixel space. */
-	};
-	int m_osa;
-	MotionSample m_samples[PLANE_DISTORT_MAX_SAMPLES];
-	float m_jitter[32][2];
-	int m_motion_blur_samples;
-	float m_motion_blur_shutter;
+ public:
+  PlaneDistortWarpImageOperation();
 
-public:
-	PlaneDistortMaskOperation();
+  void calculate_corners(const float corners[4][2], bool normalized, int sample) override;
 
-	void calculateCorners(const float corners[4][2],
-	                      bool normalized,
-	                      int sample);
+  void init_execution() override;
+  void deinit_execution() override;
 
-	void initExecution();
+  void execute_pixel_sampled(float output[4], float x, float y, PixelSampler sampler) override;
 
-	void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
+  bool determine_depending_area_of_interest(rcti *input,
+                                            ReadBufferOperation *read_operation,
+                                            rcti *output) override;
 
-	void setMotionBlurSamples(int samples) {
-		BLI_assert(samples <= PLANE_DISTORT_MAX_SAMPLES);
-		this->m_motion_blur_samples = samples;
-	}
-	void setMotionBlurShutter(float shutter) {
-		this->m_motion_blur_shutter = shutter;
-	}
+  void get_area_of_interest(int input_idx, const rcti &output_area, rcti &r_input_area) override;
+  void update_memory_buffer_partial(MemoryBuffer *output,
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
 };
 
-#endif
+class PlaneDistortMaskOperation : public PlaneDistortBaseOperation {
+ protected:
+  int osa_;
+  float jitter_[32][2];
+
+ public:
+  PlaneDistortMaskOperation();
+
+  void init_execution() override;
+
+  void execute_pixel_sampled(float output[4], float x, float y, PixelSampler sampler) override;
+
+  void update_memory_buffer_partial(MemoryBuffer *output,
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
+
+ private:
+  int get_jitter_samples_inside_count(int x, int y, MotionSample &sample_data);
+};
+
+}  // namespace blender::compositor

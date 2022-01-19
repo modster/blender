@@ -568,7 +568,7 @@ class pyRandomColorShader(StrokeShader):
 
 class py2DCurvatureColorShader(StrokeShader):
     """
-    Assigns a color (greyscale) to the stroke based on the curvature.
+    Assigns a color (grayscale) to the stroke based on the curvature.
     A higher curvature will yield a brighter color.
     """
     def shade(self, stroke):
@@ -584,7 +584,7 @@ class py2DCurvatureColorShader(StrokeShader):
 
 class pyTimeColorShader(StrokeShader):
     """
-    Assigns a greyscale value that increases for every vertex.
+    Assigns a grayscale value that increases for every vertex.
     The brightness will increase along the stroke.
     """
     def __init__(self, step=0.01):
@@ -881,7 +881,7 @@ class pyBluePrintCirclesShader(StrokeShader):
         # times as possible.
         #
         # This works because the phases and directions are only
-        # dependant on the stroke length, and the chance that
+        # dependent on the stroke length, and the chance that
         # stroke.resample() above produces strokes of the same length
         # is quite high.
         #
@@ -1153,11 +1153,9 @@ class RoundCapShader(StrokeShader):
             return
         # calculate the number of additional vertices to form caps
         thickness_beg = sum(stroke[0].attribute.thickness)
-        caplen_beg = thickness_beg / 2.0
         nverts_beg = max(5, int(thickness_beg))
 
         thickness_end = sum(stroke[-1].attribute.thickness)
-        caplen_end = (thickness_end) / 2.0
         nverts_end = max(5, int(thickness_end))
 
         # adjust the total number of stroke vertices
@@ -1169,7 +1167,7 @@ class RoundCapShader(StrokeShader):
         # reshape the cap at the beginning of the stroke
         q, attr = buffer[1]
         p, attr = buffer[0]
-        direction = (p - q).normalized() * caplen_beg
+        direction = (p - q).normalized() * thickness_beg
         n = 1.0 / nverts_beg
         R, L = attr.thickness
         for t, svert in zip(range(nverts_beg, 0, -1), stroke):
@@ -1180,7 +1178,7 @@ class RoundCapShader(StrokeShader):
         # reshape the cap at the end of the stroke
         q, attr = buffer[-2]
         p, attr = buffer[-1]
-        direction = (p - q).normalized() * caplen_beg
+        direction = (p - q).normalized() * thickness_end
         n = 1.0 / nverts_end
         R, L = attr.thickness
         for t, svert in zip(range(nverts_end, 0, -1), reversed(stroke)):

@@ -1,6 +1,4 @@
 /*
- * Copyright 2011, Blender Foundation.
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -15,54 +13,65 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor: 
- *		Jeroen Bakker 
- *		Monique Dewanchand
+ * Copyright 2011, Blender Foundation.
  */
 
-class WorkPackage;
-
-#ifndef _COM_WorkPackage_h_
-#define _COM_WorkPackage_h_
-class ExecutionGroup;
-#include "COM_ExecutionGroup.h"
-
-/**
- * @brief contains data about work that can be scheduled
- * @see WorkScheduler
- */
-class WorkPackage {
-private:
-	/**
-	 * @brief executionGroup with the operations-setup to be evaluated
-	 */
-	ExecutionGroup *m_executionGroup;
-
-	/**
-	 * @brief number of the chunk to be executed
-	 */
-	unsigned int m_chunkNumber;
-public:
-	/**
-	 * constructor
-	 * @param group the ExecutionGroup
-	 * @param chunkNumber the number of the chunk
-	 */
-	WorkPackage(ExecutionGroup *group, unsigned int chunkNumber);
-
-	/**
-	 * @brief get the ExecutionGroup
-	 */
-	ExecutionGroup *getExecutionGroup() const { return this->m_executionGroup; }
-
-	/**
-	 * @brief get the number of the chunk
-	 */
-	unsigned int getChunkNumber() const { return this->m_chunkNumber; }
+#pragma once
 
 #ifdef WITH_CXX_GUARDEDALLOC
-	MEM_CXX_CLASS_ALLOC_FUNCS("COM:WorkPackage")
+#  include "MEM_guardedalloc.h"
+#endif
+
+#include "COM_Enums.h"
+
+#include "DNA_vec_types.h"
+
+#include <functional>
+#include <ostream>
+
+namespace blender::compositor {
+/* Forward Declarations. */
+class ExecutionGroup;
+
+/**
+ * \brief contains data about work that can be scheduled
+ * \see WorkScheduler
+ */
+struct WorkPackage {
+  eWorkPackageType type;
+
+  eWorkPackageState state = eWorkPackageState::NotScheduled;
+
+  /**
+   * \brief execution_group with the operations-setup to be evaluated
+   */
+  ExecutionGroup *execution_group;
+
+  /**
+   * \brief number of the chunk to be executed
+   */
+  unsigned int chunk_number;
+
+  /**
+   * Area of the execution group that the work package calculates.
+   */
+  rcti rect;
+
+  /**
+   * Custom function to execute when work package type is CustomFunction.
+   */
+  std::function<void()> execute_fn;
+
+  /**
+   * Called when work execution is finished.
+   */
+  std::function<void()> executed_fn;
+
+#ifdef WITH_CXX_GUARDEDALLOC
+  MEM_CXX_CLASS_ALLOC_FUNCS("COM:WorkPackage")
 #endif
 };
 
-#endif
+std::ostream &operator<<(std::ostream &os, const WorkPackage &work_package);
+
+}  // namespace blender::compositor

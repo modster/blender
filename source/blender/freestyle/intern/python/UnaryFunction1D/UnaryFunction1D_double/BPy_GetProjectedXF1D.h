@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -14,16 +12,13 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file source/blender/freestyle/intern/python/UnaryFunction1D/UnaryFunction1D_double/BPy_GetProjectedXF1D.h
- *  \ingroup freestyle
+/** \file
+ * \ingroup freestyle
  */
 
-#ifndef __FREESTYLE_PYTHON_GETPROJECTEDXF1D_H__
-#define __FREESTYLE_PYTHON_GETPROJECTEDXF1D_H__
+#pragma once
 
 #include "../BPy_UnaryFunction1DDouble.h"
 
@@ -35,18 +30,16 @@ extern "C" {
 
 extern PyTypeObject GetProjectedXF1D_Type;
 
-#define BPy_GetProjectedXF1D_Check(v) (PyObject_IsInstance((PyObject *)v, (PyObject *)&GetProjectedXF1D_Type))
+#define BPy_GetProjectedXF1D_Check(v) \
+  (PyObject_IsInstance((PyObject *)v, (PyObject *)&GetProjectedXF1D_Type))
 
 /*---------------------------Python BPy_GetProjectedXF1D structure definition----------*/
 typedef struct {
-	BPy_UnaryFunction1DDouble py_uf1D_double;
+  BPy_UnaryFunction1DDouble py_uf1D_double;
 } BPy_GetProjectedXF1D;
-
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __FREESTYLE_PYTHON_GETPROJECTEDXF1D_H__ */

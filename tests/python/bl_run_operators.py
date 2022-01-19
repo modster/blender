@@ -36,7 +36,7 @@ RANDOM_MULTIPLY = 10
 
 STATE = {
     "counter": 0,
-    }
+}
 
 
 op_blacklist = (
@@ -60,11 +60,13 @@ op_blacklist = (
     "*.*_import",
     "ed.undo",
     "ed.undo_push",
+    "preferences.studiolight_new",
     "script.autoexec_warn_clear",
     "screen.delete",           # already used for random screens
     "wm.blenderplayer_start",
     "wm.recover_auto_save",
     "wm.quit_blender",
+    "wm.window_close",
     "wm.url_open",
     "wm.doc_view",
     "wm.doc_edit",
@@ -80,7 +82,6 @@ op_blacklist = (
     "wm.operator_cheat_sheet",
     "wm.interface_theme_*",
     "wm.previews_ensure",       # slow - but harmless
-    "wm.appconfig_*",           # just annoying - but harmless
     "wm.keyitem_add",           # just annoying - but harmless
     "wm.keyconfig_activate",    # just annoying - but harmless
     "wm.keyconfig_preset_add",  # just annoying - but harmless
@@ -88,9 +89,24 @@ op_blacklist = (
     "wm.memory_statistics",     # another annoying one
     "wm.dependency_relations",  # another annoying one
     "wm.keymap_restore",        # another annoying one
-    "wm.addon_*",               # harmless, but dont change state
+    "wm.addon_*",               # harmless, but don't change state
     "console.*",                # just annoying - but harmless
-    )
+    "wm.url_open_preset",       # Annoying but harmless (opens web pages).
+
+    # FIXME:
+    # Crashes with non-trivial fixes.
+    #
+
+    # Expects undo stack.
+    "object.voxel_remesh",
+    "mesh.paint_mask_slice",
+    "paint.mask_flood_fill",
+    "sculpt.dirty_mask",
+    # TODO: use empty temp dir to avoid behavior depending on local setup.
+    "view3d.pastebuffer",
+    # Needs active window.
+    "scene.new",
+)
 
 
 def blend_list(mainpath):
@@ -99,10 +115,8 @@ def blend_list(mainpath):
 
     def file_list(path, filename_check=None):
         for dirpath, dirnames, filenames in os.walk(path):
-
-            # skip '.svn'
-            if dirpath.startswith("."):
-                continue
+            # skip '.git'
+            dirnames[:] = [d for d in dirnames if not d.startswith(".")]
 
             for filename in filenames:
                 filepath = join(dirpath, filename)
@@ -114,6 +128,7 @@ def blend_list(mainpath):
         return (ext in {".blend", })
 
     return list(sorted(file_list(mainpath, is_blend)))
+
 
 if USE_FILES:
     USE_FILES_LS = blend_list(USE_FILES)
@@ -136,13 +151,13 @@ def filter_op_list(operators):
 def reset_blend():
     bpy.ops.wm.read_factory_settings()
     for scene in bpy.data.scenes:
-        # reduce range so any bake action doesnt take too long
+        # reduce range so any bake action doesn't take too long
         scene.frame_start = 1
         scene.frame_end = 5
 
     if USE_RANDOM_SCREEN:
         import random
-        for i in range(random.randint(0, len(bpy.data.screens))):
+        for _ in range(random.randint(0, len(bpy.data.screens))):
             bpy.ops.screen.delete()
         print("Scree IS", bpy.context.screen)
 
@@ -163,7 +178,7 @@ if USE_ATTRSET:
             if issubclass(cls, skip_classes):
                 continue
 
-            # # to support skip-save we cant get all props
+            # # to support skip-save we can't get all props
             # properties = cls.bl_rna.properties.keys()
             properties = []
             for prop_id, prop in cls.bl_rna.properties.items():
@@ -177,7 +192,7 @@ if USE_ATTRSET:
     CLS_BLACKLIST = (
         bpy.types.BrushTextureSlot,
         bpy.types.Brush,
-        )
+    )
     property_typemap = build_property_typemap(CLS_BLACKLIST)
     bpy_struct_type = bpy.types.Struct.__base__
 
@@ -229,7 +244,7 @@ if USE_ATTRSET:
         {0: "", 1: "hello", 2: "test"}, {"": 0, "hello": 1, "test": 2},
         set(), {"", "test", "."}, {None, ..., type},
         range(10), (" " * i for i in range(10)),
-        )
+    )
 
     def attrset_data():
         for attr in dir(bpy.data):
@@ -238,7 +253,7 @@ if USE_ATTRSET:
             seq = getattr(bpy.data, attr)
             if seq.__class__.__name__ == 'bpy_prop_collection':
                 for id_data in seq:
-                    for val, prop, tp in id_walk(id_data, bpy.data):
+                    for val, prop, _tp in id_walk(id_data, bpy.data):
                         # print(id_data)
                         for val_rnd in _random_values:
                             try:
@@ -285,8 +300,8 @@ def run_ops(operators, setup_func=None, reset=True):
                 try:
                     op(mode)
                 except:
-                    #import traceback
-                    #traceback.print_exc()
+                    # import traceback
+                    # traceback.print_exc()
                     pass
 
                 if USE_ATTRSET:
@@ -308,16 +323,7 @@ def run_ops(operators, setup_func=None, reset=True):
 
 # contexts
 def ctx_clear_scene():  # copied from batch_import.py
-    unique_obs = set()
-    for scene in bpy.data.scenes:
-        for obj in scene.objects[:]:
-            scene.objects.unlink(obj)
-            unique_obs.add(obj)
-
-    # remove obdata, for now only worry about the startup scene
-    for bpy_data_iter in (bpy.data.objects, bpy.data.meshes, bpy.data.lamps, bpy.data.cameras):
-        for id_data in bpy_data_iter:
-            bpy_data_iter.remove(id_data)
+    bpy.ops.wm.read_factory_settings(use_empty=True)
 
 
 def ctx_editmode_mesh():
@@ -396,6 +402,10 @@ def ctx_object_pose():
     bpy.ops.pose.select_all(action='SELECT')
 
 
+def ctx_object_volume():
+    bpy.ops.object.add(type='VOLUME')
+
+
 def ctx_object_paint_weight():
     bpy.ops.object.mode_set(mode='WEIGHT_PAINT')
 
@@ -445,7 +455,7 @@ def main():
     filter_op_list(operators)
 
     # for testing, mix the list up.
-    #operators.reverse()
+    # operators.reverse()
 
     if USE_RANDOM:
         import random
@@ -484,14 +494,16 @@ def main():
         run_ops(operators_test, setup_func=ctx_editmode_mball)
         run_ops(operators_test, setup_func=ctx_editmode_text)
         run_ops(operators_test, setup_func=ctx_editmode_lattice)
+        run_ops(operators_test, setup_func=ctx_object_volume)
 
         if not operators_test:
             print("All setup functions run fine!")
 
     print("Finished %r" % __file__)
 
+
 if __name__ == "__main__":
-    #~ for i in range(200):
-        #~ RANDOM_SEED[0] += 1
-        #~ main()
+    # for i in range(200):
+    #     RANDOM_SEED[0] += 1
+    #     main()
     main()

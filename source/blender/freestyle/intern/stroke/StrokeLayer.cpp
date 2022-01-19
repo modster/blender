@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -14,54 +12,57 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file blender/freestyle/intern/stroke/StrokeLayer.cpp
- *  \ingroup freestyle
- *  \brief Class to define a layer of strokes.
- *  \author Stephane Grabli
- *  \date 18/12/2002
+/** \file
+ * \ingroup freestyle
+ * \brief Class to define a layer of strokes.
  */
 
+#include "StrokeLayer.h"
 #include "Canvas.h"
 #include "Stroke.h"
-#include "StrokeLayer.h"
 
 namespace Freestyle {
 
 StrokeLayer::~StrokeLayer()
 {
-	clear();
+  clear();
 }
 
 void StrokeLayer::ScaleThickness(float iFactor)
 {
-	for (StrokeLayer::stroke_container::iterator s = _strokes.begin(), send = _strokes.end(); s != send; ++s) {
-		(*s)->ScaleThickness(iFactor);
-	}
+  for (StrokeLayer::stroke_container::iterator s = _strokes.begin(), send = _strokes.end();
+       s != send;
+       ++s) {
+    (*s)->ScaleThickness(iFactor);
+  }
 }
 
 void StrokeLayer::Render(const StrokeRenderer *iRenderer)
 {
-	for (StrokeLayer::stroke_container::iterator s = _strokes.begin(), send = _strokes.end(); s != send; ++s) {
-		(*s)->Render(iRenderer);
-	}
+  for (StrokeLayer::stroke_container::iterator s = _strokes.begin(), send = _strokes.end();
+       s != send;
+       ++s) {
+    (*s)->Render(iRenderer);
+  }
 }
 
 void StrokeLayer::RenderBasic(const StrokeRenderer *iRenderer)
 {
-	for (StrokeLayer::stroke_container::iterator s = _strokes.begin(), send = _strokes.end(); s != send; ++s) {
-		(*s)->RenderBasic(iRenderer);
-	}
+  for (StrokeLayer::stroke_container::iterator s = _strokes.begin(), send = _strokes.end();
+       s != send;
+       ++s) {
+    (*s)->RenderBasic(iRenderer);
+  }
 }
 
 void StrokeLayer::clear()
 {
-	for (stroke_container::iterator s = _strokes.begin(), send = _strokes.end(); s != send; ++s)
-		delete *s;
-	_strokes.clear();
+  for (stroke_container::iterator s = _strokes.begin(), send = _strokes.end(); s != send; ++s) {
+    delete *s;
+  }
+  _strokes.clear();
 }
 
 } /* namespace Freestyle */

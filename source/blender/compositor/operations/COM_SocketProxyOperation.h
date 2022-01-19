@@ -1,6 +1,4 @@
 /*
- * Copyright 2011, Blender Foundation.
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -15,28 +13,20 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor: 
- *		Jeroen Bakker 
- *		Monique Dewanchand
+ * Copyright 2011, Blender Foundation.
  */
 
-#ifndef _COM_SocketProxyOperation_h_
-#define _COM_SocketProxyOperation_h_
+#pragma once
 
 #include "COM_NodeOperation.h"
 
+namespace blender::compositor {
+
 class SocketProxyOperation : public NodeOperation {
-public:
-	SocketProxyOperation(DataType type, bool use_conversion);
-	
-	bool isProxyOperation() const { return true; }
-	bool useDatatypeConversion() const { return m_use_conversion; }
-	
-	bool getUseConversion() const { return m_use_conversion; }
-	void setUseConversion(bool use_conversion) { m_use_conversion = use_conversion; }
-	
-private:
-	bool m_use_conversion;
+ public:
+  SocketProxyOperation(DataType type, bool use_conversion);
+
+  std::unique_ptr<MetaData> get_meta_data() override;
 };
 
-#endif
+}  // namespace blender::compositor

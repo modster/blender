@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,57 +15,55 @@
  *
  * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
  * All rights reserved.
- *
- * The Original Code is: all of this file.
- *
- * Contributor(s): none yet.
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file DNA_vfont_types.h
- *  \ingroup DNA
- *  \since mar-2001
- *  \author nzc
+/** \file
+ * \ingroup DNA
  *
- * Vector Fonts used for text in the 3D view-port
+ * Vector Fonts used for text in the 3D Viewport
  * (unrelated to text used to render the GUI).
  */
 
-#ifndef __DNA_VFONT_TYPES_H__
-#define __DNA_VFONT_TYPES_H__
+#pragma once
 
 #include "DNA_ID.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 struct PackedFile;
 struct VFontData;
 
 typedef struct VFont {
-	ID id;
-	
-	char name[1024]; /* 1024 = FILE_MAX */
-	
-	struct VFontData *data;
-	struct PackedFile *packedfile;
+  ID id;
 
-	/* runtime only, holds memory for freetype to read from
-	 * TODO, replace this with blf_font_new() style loading */
-	struct PackedFile *temp_pf;
+  /** 1024 = FILE_MAX. */
+  char filepath[1024];
+
+  struct VFontData *data;
+  struct PackedFile *packedfile;
+
+  /* runtime only, holds memory for freetype to read from
+   * TODO: replace this with #blf_font_new() style loading. */
+  struct PackedFile *temp_pf;
 } VFont;
 
 /* *************** FONT ****************** */
-#define FO_EDIT			0
-#define FO_CURS			1
-#define FO_CURSUP		2
-#define FO_CURSDOWN		3
-#define FO_DUPLI		4
-#define FO_PAGEUP		8
-#define FO_PAGEDOWN		9
-#define FO_SELCHANGE	10
+#define FO_EDIT 0
+#define FO_CURS 1
+#define FO_CURSUP 2
+#define FO_CURSDOWN 3
+#define FO_DUPLI 4
+#define FO_PAGEUP 8
+#define FO_PAGEDOWN 9
+#define FO_SELCHANGE 10
 
 /* BKE_vfont_to_curve will move the cursor in these cases */
 #define FO_CURS_IS_MOTION(mode) (ELEM(mode, FO_CURSUP, FO_CURSDOWN, FO_PAGEUP, FO_PAGEDOWN))
 
 #define FO_BUILTIN_NAME "<builtin>"
 
-#endif  /* __DNA_VFONT_TYPES_H__ */
+#ifdef __cplusplus
+}
+#endif

@@ -1,6 +1,5 @@
 /*
- * Adapted from code Copyright 2009-2010 NVIDIA Corporation
- * Modifications Copyright 2011, Blender Foundation.
+ * Copyright 2011-2013 Blender Foundation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,35 +14,27 @@
  * limitations under the License.
  */
 
-/* bottom-most stack entry, indicating the end of traversal */
-#define ENTRYPOINT_SENTINEL 0x76543210
+#pragma once
 
-/* 64 object BVH + 64 mesh BVH + 64 object node splitting */
-#define BVH_STACK_SIZE 192
-#define BVH_QSTACK_SIZE 384
-#define BVH_NODE_SIZE 4
-#define BVH_NODE_LEAF_SIZE 1
-#define BVH_QNODE_SIZE 7
-#define BVH_QNODE_LEAF_SIZE 1
-#define TRI_NODE_SIZE 3
-
-/* silly workaround for float extended precision that happens when compiling
- * without sse support on x86, it results in different results for float ops
- * that you would otherwise expect to compare correctly */
-#if !defined(__i386__) || defined(__SSE__)
-#define NO_EXTENDED_PRECISION
-#else
-#define NO_EXTENDED_PRECISION volatile
+// clang-format off
+#include "kernel/geom/attribute.h"
+#include "kernel/geom/object.h"
+#ifdef __PATCH_EVAL__
+#  include "kernel/geom/patch.h"
 #endif
-
-#include "geom_attribute.h"
-#include "geom_object.h"
-#include "geom_triangle.h"
-#include "geom_triangle_intersect.h"
-#include "geom_motion_triangle.h"
-#include "geom_motion_curve.h"
-#include "geom_curve.h"
-#include "geom_volume.h"
-#include "geom_primitive.h"
-#include "geom_bvh.h"
-
+#include "kernel/geom/triangle.h"
+#include "kernel/geom/subd_triangle.h"
+#include "kernel/geom/triangle_intersect.h"
+#include "kernel/geom/motion_triangle.h"
+#include "kernel/geom/motion_triangle_intersect.h"
+#include "kernel/geom/motion_triangle_shader.h"
+#include "kernel/geom/motion_curve.h"
+#include "kernel/geom/motion_point.h"
+#include "kernel/geom/point.h"
+#include "kernel/geom/point_intersect.h"
+#include "kernel/geom/curve.h"
+#include "kernel/geom/curve_intersect.h"
+#include "kernel/geom/volume.h"
+#include "kernel/geom/primitive.h"
+#include "kernel/geom/shader_data.h"
+// clang-format on

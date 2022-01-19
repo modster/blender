@@ -1,6 +1,4 @@
 /*
- * Copyright 2012, Blender Foundation.
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -15,37 +13,45 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor:
- *		Jeroen Bakker
- *		Monique Dewanchand
- *		Sergey Sharybin
+ * Copyright 2012, Blender Foundation.
  */
 
-#ifndef _COM_KeyingDespillOperation_h
-#define _COM_KeyingDespillOperation_h
+#pragma once
 
-#include "COM_NodeOperation.h"
+#include "COM_MultiThreadedOperation.h"
+
+namespace blender::compositor {
 
 /**
  * Class with implementation of keying despill node
  */
-class KeyingDespillOperation : public NodeOperation {
-protected:
-	SocketReader *m_pixelReader;
-	SocketReader *m_screenReader;
-	float m_despillFactor;
-	float m_colorBalance;
+class KeyingDespillOperation : public MultiThreadedOperation {
+ protected:
+  SocketReader *pixel_reader_;
+  SocketReader *screen_reader_;
+  float despill_factor_;
+  float color_balance_;
 
-public:
-	KeyingDespillOperation();
+ public:
+  KeyingDespillOperation();
 
-	void initExecution();
-	void deinitExecution();
+  void init_execution() override;
+  void deinit_execution() override;
 
-	void setDespillFactor(float value) {this->m_despillFactor = value;}
-	void setColorBalance(float value) {this->m_colorBalance = value;}
+  void set_despill_factor(float value)
+  {
+    despill_factor_ = value;
+  }
+  void set_color_balance(float value)
+  {
+    color_balance_ = value;
+  }
 
-	void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
+  void execute_pixel_sampled(float output[4], float x, float y, PixelSampler sampler) override;
+
+  void update_memory_buffer_partial(MemoryBuffer *output,
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
 };
 
-#endif
+}  // namespace blender::compositor

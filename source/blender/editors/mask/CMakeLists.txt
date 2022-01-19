@@ -15,41 +15,37 @@
 # Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 #
 # The Original Code is Copyright (C) 2012 Blender Foundation.
-#
-# Contributor(s): Blender Foundation,
-#                 Sergey Sharybin
-#
 # ***** END GPL LICENSE BLOCK *****
 
 set(INC
-	../include
-	../../blenkernel
-	../../blenlib
-	../../gpu
-	../../makesdna
-	../../makesrna
-	../../windowmanager
-	../../../../intern/guardedalloc
-	../../../../intern/glew-mx
-)
-
-set(INC_SYS
-	${GLEW_INCLUDE_PATH}
+  ../include
+  ../../blenkernel
+  ../../blenlib
+  ../../depsgraph
+  ../../gpu
+  ../../makesdna
+  ../../makesrna
+  ../../windowmanager
+  ../../../../intern/glew-mx
+  ../../../../intern/guardedalloc
 )
 
 set(SRC
-	mask_add.c
-	mask_draw.c
-	mask_edit.c
-	mask_editaction.c
-	mask_ops.c
-	mask_relationships.c
-	mask_select.c
-	mask_shapekey.c
+  mask_add.c
+  mask_draw.c
+  mask_edit.c
+  mask_editaction.c
+  mask_ops.c
+  mask_query.c
+  mask_relationships.c
+  mask_select.c
+  mask_shapekey.c
 
-	mask_intern.h
+  mask_intern.h
 )
 
-add_definitions(${GL_DEFINITIONS})
+set(LIB
+)
 
-blender_add_lib(bf_editor_mask "${SRC}" "${INC}" "${INC_SYS}")
+
+blender_add_lib(bf_editor_mask "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")

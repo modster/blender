@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -14,16 +12,13 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file source/blender/freestyle/intern/python/Interface0D/BPy_ViewVertex.h
- *  \ingroup freestyle
+/** \file
+ * \ingroup freestyle
  */
 
-#ifndef __FREESTYLE_PYTHON_VIEWVERTEX_H__
-#define __FREESTYLE_PYTHON_VIEWVERTEX_H__
+#pragma once
 
 #include "../BPy_Interface0D.h"
 
@@ -41,8 +36,8 @@ extern PyTypeObject ViewVertex_Type;
 
 /*---------------------------Python BPy_ViewVertex structure definition----------*/
 typedef struct {
-	BPy_Interface0D py_if0D;
-	ViewVertex *vv;
+  BPy_Interface0D py_if0D;
+  Freestyle::ViewVertex *vv;
 } BPy_ViewVertex;
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -50,5 +45,3 @@ typedef struct {
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __FREESTYLE_PYTHON_VIEWVERTEX_H__ */

@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -15,22 +13,19 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * ***** END GPL LICENSE BLOCK *****
  * BIF_meshlaplacian.h: Algorithms using the mesh laplacian.
  */
 
-/** \file blender/editors/armature/meshlaplacian.h
- *  \ingroup edarmature
+/** \file
+ * \ingroup edarmature
  */
 
-
-#ifndef __MESHLAPLACIAN_H__
-#define __MESHLAPLACIAN_H__
+#pragma once
 
 //#define RIGID_DEFORM
 
-struct Object;
 struct Mesh;
+struct Object;
 struct bDeformGroup;
 
 #ifdef RIGID_DEFORM
@@ -48,14 +43,20 @@ void laplacian_add_triangle(LaplacianSystem *sys, int v1, int v2, int v3);
 void laplacian_begin_solve(LaplacianSystem *sys, int index);
 void laplacian_add_right_hand_side(LaplacianSystem *sys, int v, float value);
 int laplacian_system_solve(LaplacianSystem *sys);
-float laplacian_system_get_solution(int v);
+float laplacian_system_get_solution(LaplacianSystem *sys, int v);
 
 /* Heat Weighting */
 
-void heat_bone_weighting(struct Object *ob, struct Mesh *me, float (*verts)[3],
-                         int numbones, struct bDeformGroup **dgrouplist,
-                         struct bDeformGroup **dgroupflip, float (*root)[3], float (*tip)[3],
-                         int *selected, const char **error);
+void heat_bone_weighting(struct Object *ob,
+                         struct Mesh *me,
+                         float (*verts)[3],
+                         int numbones,
+                         struct bDeformGroup **dgrouplist,
+                         struct bDeformGroup **dgroupflip,
+                         float (*root)[3],
+                         float (*tip)[3],
+                         const int *selected,
+                         const char **error_str);
 
 #ifdef RIGID_DEFORM
 /* As-Rigid-As-Possible Deformation */
@@ -67,7 +68,4 @@ void rigid_deform_end(int cancel);
 
 /* Harmonic Coordinates */
 
-/* mesh_deform_bind(...) defined in ED_armature.h */
-
-#endif
-
+/* ED_mesh_deform_bind_callback(...) defined in ED_armature.h */

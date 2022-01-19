@@ -1,6 +1,4 @@
 /*
- * Copyright 2011, Blender Foundation.
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -15,45 +13,43 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor: 
- *		Jeroen Bakker 
- *		Monique Dewanchand
+ * Copyright 2011, Blender Foundation.
  */
 
-#ifndef _COM_ChangeHSVOperation_h
-#define _COM_ChangeHSVOperation_h
-#include "COM_MixOperation.h"
+#pragma once
 
+#include "COM_MultiThreadedOperation.h"
+
+namespace blender::compositor {
 
 /**
  * this program converts an input color to an output value.
  * it assumes we are in sRGB color space.
  */
-class ChangeHSVOperation : public NodeOperation {
-private:
-	SocketReader *m_inputOperation;
+class ChangeHSVOperation : public MultiThreadedOperation {
+ private:
+  SocketReader *input_operation_;
+  SocketReader *hue_operation_;
+  SocketReader *saturation_operation_;
+  SocketReader *value_operation_;
 
-	float m_hue;
-	float m_saturation;
-	float m_value;
+ public:
+  /**
+   * Default constructor
+   */
+  ChangeHSVOperation();
 
-public:
-	/**
-	 * Default constructor
-	 */
-	ChangeHSVOperation();
-	
-	void initExecution();
-	void deinitExecution();
-	
-	/**
-	 * the inner loop of this program
-	 */
-	void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
+  void init_execution() override;
+  void deinit_execution() override;
 
-	void setHue(float hue) { this->m_hue = hue; }
-	void setSaturation(float saturation) { this->m_saturation = saturation; }
-	void setValue(float value) { this->m_value = value; }
+  /**
+   * The inner loop of this operation.
+   */
+  void execute_pixel_sampled(float output[4], float x, float y, PixelSampler sampler) override;
 
+  void update_memory_buffer_partial(MemoryBuffer *output,
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
 };
-#endif
+
+}  // namespace blender::compositor

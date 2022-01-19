@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,35 +15,27 @@
  *
  * The Original Code is Copyright (C) 2013 Blender Foundation
  * All rights reserved.
- *
- * The Original Code is: all of this file.
- *
- * Contributor(s):
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file blender/imbuf/intern/oiio/openimageio_api.h
- *  \ingroup openimageio
+/** \file
+ * \ingroup openimageio
  */
 
+#pragma once
 
-#ifndef __OPENIMAGEIO_API_H__
-#define __OPENIMAGEIO_API_H__
+#include <stdio.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include <stdio.h>
-
 struct ImBuf;
 
-int		imb_is_a_photoshop			(const char *name);
+bool imb_is_a_photoshop(const unsigned char *mem, size_t size);
 
-int		imb_save_photoshop			(struct ImBuf *ibuf, const char *name, int flags);
+int imb_save_photoshop(struct ImBuf *ibuf, const char *name, int flags);
 
-struct ImBuf *imb_load_photoshop (const char *name, int flags, char *colorspace);
+struct ImBuf *imb_load_photoshop(const char *name, int flags, char *colorspace);
 
 int OIIO_getVersionHex(void);
 
@@ -53,5 +43,3 @@ int OIIO_getVersionHex(void);
 }
 
 #endif
-
-#endif  /* __OPENIMAGEIO_API_H__ */

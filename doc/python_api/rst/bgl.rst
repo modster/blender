@@ -12,72 +12,24 @@ contents: dir(bgl).  A simple search on the web can point to more
 than enough material to teach OpenGL programming, from books to many
 collections of tutorials.
 
-Here is a comprehensive `list of books <http://www.opengl.org/documentation/books/>`_ (non free). The `arcsynthesis tutorials  <http://www.arcsynthesis.org/gltut/>`_ is one of the best resources to learn modern OpenGL and `g-truc <http://www.g-truc.net/post-tech-content-sample.html>`_ offers a set of extensive examples, including advanced features.
-    
+Here is a comprehensive `list of books <https://www.khronos.org/developers/books/>`__ (non free).
+`Learn OpenGL <https://learnopengl.com/>`__ is one of the best resources to learn modern OpenGL and
+`opengl-tutorial.org <http://www.opengl-tutorial.org/>`__ offers a set of extensive examples,
+including advanced features.
+
 
 .. note::
-   You can use the :class:`Image` type to load and set textures.
-   See :class:`Image.gl_load` and :class:`Image.gl_load`,
+
+   You can use the :class:`bpy.types.Image` type to load and set textures.
+   See :class:`bpy.types.Image.gl_load` and :class:`bpy.types.Image.gl_free`,
    for example.
-
-
-.. function:: glAccum(op, value):
-
-   Operate on the accumulation buffer.
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glAccum.xml>`_
-
-   :type op: Enumerated constant
-   :arg op: The accumulation buffer operation.
-   :type value: float
-   :arg value: a value used in the accumulation buffer operation.
-
-
-.. function:: glAlphaFunc(func, ref):
-
-   Specify the alpha test function.
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glAlphaFunc.xml>`_
-
-   :type func: Enumerated constant
-   :arg func: Specifies the alpha comparison function.
-   :type ref: float
-   :arg ref: The reference value that incoming alpha values are compared to.
-      Clamped between 0 and 1.
-
-
-.. function:: glAreTexturesResident(n, textures, residences):
-
-   Determine if textures are loaded in texture memory
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glAreTexturesResident.xml>`_
-
-   :type n: int
-   :arg n: Specifies the number of textures to be queried.
-   :type textures: :class:`bgl.Buffer` object I{type GL_INT}
-   :arg textures: Specifies an array containing the names of the textures to be queried
-   :type residences: :class:`bgl.Buffer` object I{type GL_INT}(boolean)
-   :arg residences: An array in which the texture residence status in returned.
-      The residence status of a texture named by an element of textures is
-      returned in the corresponding element of residences.
-
-
-.. function:: glBegin(mode):
-
-   Delimit the vertices of a primitive or a group of like primatives
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glBegin.xml>`_
-
-   :type mode: Enumerated constant
-   :arg mode: Specifies the primitive that will be create from vertices between
-      glBegin and glEnd.
 
 
 .. function:: glBindTexture(target, texture):
 
    Bind a named texture to a texturing target
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glBindTexture.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glBindTexture.xhtml>`__
 
    :type target: Enumerated constant
    :arg target: Specifies the target to which the texture is bound.
@@ -85,29 +37,11 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
    :arg texture: Specifies the name of a texture.
 
 
-.. function:: glBitmap(width, height, xorig, yorig, xmove, ymove, bitmap):
-
-   Draw a bitmap
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glBitmap.xml>`_
-
-   :type width, height: int
-   :arg width, height: Specify the pixel width and height of the bitmap image.
-   :type xorig, yorig: float
-   :arg xorig, yorig: Specify the location of the origin in the bitmap image. The origin is measured
-      from the lower left corner of the bitmap, with right and up being the positive axes.
-   :type xmove, ymove: float
-   :arg xmove, ymove: Specify the x and y offsets to be added to the current raster position after
-      the bitmap is drawn.
-   :type bitmap: :class:`bgl.Buffer` object I{type GL_BYTE}
-   :arg bitmap: Specifies the address of the bitmap image.
-
-
 .. function:: glBlendFunc(sfactor, dfactor):
 
    Specify pixel arithmetic
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glBlendFunc.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glBlendFunc.xhtml>`__
 
    :type sfactor: Enumerated constant
    :arg sfactor: Specifies how the red, green, blue, and alpha source blending factors are
@@ -117,58 +51,21 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
       blending factors are computed.
 
 
-.. function:: glCallList(list):
-
-   Execute a display list
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glCallList.xml>`_
-
-   :type list: unsigned int
-   :arg list: Specifies the integer name of the display list to be executed.
-
-
-.. function:: glCallLists(n, type, lists):
-
-   Execute a list of display lists
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glCallLists.xml>`_
-
-   :type n: int
-   :arg n: Specifies the number of display lists to be executed.
-   :type type: Enumerated constant
-   :arg type: Specifies the type of values in lists.
-   :type lists: :class:`bgl.Buffer` object
-   :arg lists: Specifies the address of an array of name offsets in the display list.
-      The pointer type is void because the offsets can be bytes, shorts, ints, or floats,
-      depending on the value of type.
-
-
 .. function:: glClear(mask):
 
    Clear buffers to preset values
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glClear.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glClear.xhtml>`__
 
    :type mask: Enumerated constant(s)
    :arg mask: Bitwise OR of masks that indicate the buffers to be cleared.
-
-
-.. function:: glClearAccum(red, green, blue, alpha):
-
-   Specify clear values for the accumulation buffer
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glClearAccum.xml>`_
-
-   :type red, green, blue, alpha: float
-   :arg red, green, blue, alpha: Specify the red, green, blue, and alpha values used when the
-      accumulation buffer is cleared. The initial values are all 0.
 
 
 .. function:: glClearColor(red, green, blue, alpha):
 
    Specify clear values for the color buffers
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glClearColor.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glClearColor.xhtml>`__
 
    :type red, green, blue, alpha: float
    :arg red, green, blue, alpha: Specify the red, green, blue, and alpha values used when the
@@ -179,29 +76,18 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Specify the clear value for the depth buffer
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glClearDepth.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glClearDepth.xhtml>`__
 
    :type depth: int
    :arg depth: Specifies the depth value used when the depth buffer is cleared.
       The initial value is 1.
 
 
-.. function:: glClearIndex(c):
-
-   Specify the clear value for the color index buffers
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glClearIndex.xml>`_
-
-   :type c: float
-   :arg c: Specifies the index used when the color index buffers are cleared.
-      The initial value is 0.
-
-
 .. function:: glClearStencil(s):
 
    Specify the clear value for the stencil buffer
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glClearStencil.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glClearStencil.xhtml>`__
 
    :type s: int
    :arg s: Specifies the index used when the stencil buffer is cleared. The initial value is 0.
@@ -211,7 +97,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Specify a plane against which all geometry is clipped
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glClipPlane.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glClipPlane.xhtml>`__
 
    :type plane: Enumerated constant
    :arg plane: Specifies which clipping plane is being positioned.
@@ -220,29 +106,11 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
       floating-point values. These values are interpreted as a plane equation.
 
 
-.. function:: glColor (red, green, blue, alpha):
-
-   B{glColor3b, glColor3d, glColor3f, glColor3i, glColor3s, glColor3ub, glColor3ui, glColor3us,
-   glColor4b, glColor4d, glColor4f, glColor4i, glColor4s, glColor4ub, glColor4ui, glColor4us,
-   glColor3bv, glColor3dv, glColor3fv, glColor3iv, glColor3sv, glColor3ubv, glColor3uiv,
-   glColor3usv, glColor4bv, glColor4dv, glColor4fv, glColor4iv, glColor4sv, glColor4ubv,
-   glColor4uiv, glColor4usv}
-
-   Set a new color.
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glColor.xml>`_
-
-   :type red, green, blue, alpha: Depends on function prototype.
-   :arg red, green, blue: Specify new red, green, and blue values for the current color.
-   :arg alpha: Specifies a new alpha value for the current color. Included only in the
-      four-argument glColor4 commands. (With '4' colors only)
-
-
 .. function:: glColorMask(red, green, blue, alpha):
 
    Enable and disable writing of frame buffer color components
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glColorMask.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glColorMask.xhtml>`__
 
    :type red, green, blue, alpha: int (boolean)
    :arg red, green, blue, alpha: Specify whether red, green, blue, and alpha can or cannot be
@@ -250,40 +118,11 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
       color components can be written.
 
 
-.. function:: glColorMaterial(face, mode):
-
-   Cause a material color to track the current color
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glColorMaterial.xml>`_
-
-   :type face: Enumerated constant
-   :arg face: Specifies whether front, back, or both front and back material parameters should
-      track the current color.
-   :type mode: Enumerated constant
-   :arg mode: Specifies which of several material parameters track the current color.
-
-
-.. function:: glCopyPixels(x, y, width, height, type):
-
-   Copy pixels in the frame buffer
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glCopyPixels.xml>`_
-
-   :type x, y: int
-   :arg x, y: Specify the window coordinates of the lower left corner of the rectangular
-      region of pixels to be copied.
-   :type width, height: int
-   :arg width,height: Specify the dimensions of the rectangular region of pixels to be copied.
-      Both must be non-negative.
-   :type type: Enumerated constant
-   :arg type: Specifies whether color values, depth values, or stencil values are to be copied.
-
-
-   def glCopyTexImage2D(target, level, internalformat, x, y, width, height, border):
+.. function:: glCopyTexImage2D(target, level, internalformat, x, y, width, height, border):
 
    Copy pixels into a 2D texture image
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glCopyTexImage2D.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glCopyTexImage2D.xhtml>`__
 
    :type target: Enumerated constant
    :arg target: Specifies the target texture.
@@ -312,29 +151,17 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Specify whether front- or back-facing facets can be culled
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glCullFace.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glCullFace.xhtml>`__
 
    :type mode: Enumerated constant
    :arg mode: Specifies whether front- or back-facing facets are candidates for culling.
-
-
-.. function:: glDeleteLists(list, range):
-
-   Delete a contiguous group of display lists
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glDeleteLists.xml>`_
-
-   :type list: unsigned int
-   :arg list: Specifies the integer name of the first display list to delete
-   :type range: int
-   :arg range: Specifies the number of display lists to delete
 
 
 .. function:: glDeleteTextures(n, textures):
 
    Delete named textures
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glDeleteTextures.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glDeleteTextures.xhtml>`__
 
    :type n: int
    :arg n: Specifies the number of textures to be deleted
@@ -346,7 +173,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Specify the value used for depth buffer comparisons
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glDepthFunc.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glDepthFunc.xhtml>`__
 
    :type func: Enumerated constant
    :arg func: Specifies the depth comparison function.
@@ -356,7 +183,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Enable or disable writing into the depth buffer
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glDepthMask.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glDepthMask.xhtml>`__
 
    :type flag: int (boolean)
    :arg flag: Specifies whether the depth buffer is enabled for writing. If flag is GL_FALSE,
@@ -368,7 +195,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Specify mapping of depth values from normalized device coordinates to window coordinates
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glDepthRange.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glDepthRange.xhtml>`__
 
    :type zNear: int
    :arg zNear: Specifies the mapping of the near clipping plane to window coordinates.
@@ -382,7 +209,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Disable server-side GL capabilities
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glEnable.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glEnable.xhtml>`__
 
    :type cap: Enumerated constant
    :arg cap: Specifies a symbolic constant indicating a GL capability.
@@ -392,27 +219,10 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Specify which color buffers are to be drawn into
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glDrawBuffer.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glDrawBuffer.xhtml>`__
 
    :type mode: Enumerated constant
    :arg mode: Specifies up to four color buffers to be drawn into.
-
-
-.. function:: glDrawPixels(width, height, format, type, pixels):
-
-   Write a block of pixels to the frame buffer
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glDrawPixels.xml>`_
-
-   :type width, height: int
-   :arg width, height: Specify the dimensions of the pixel rectangle to be
-      written into the frame buffer.
-   :type format: Enumerated constant
-   :arg format: Specifies the format of the pixel data.
-   :type type: Enumerated constant
-   :arg type: Specifies the data type for pixels.
-   :type pixels: :class:`bgl.Buffer` object
-   :arg pixels: Specifies a pointer to the pixel data.
 
 
 .. function:: glEdgeFlag (flag):
@@ -421,7 +231,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Flag edges as either boundary or non-boundary
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glEdgeFlag.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glEdgeFlag.xhtml>`__
 
    :type flag: Depends of function prototype
    :arg flag: Specifies the current edge flag value.The initial value is GL_TRUE.
@@ -431,24 +241,10 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Enable server-side GL capabilities
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glEnable.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glEnable.xhtml>`__
 
    :type cap: Enumerated constant
    :arg cap: Specifies a symbolic constant indicating a GL capability.
-
-
-.. function:: glEnd():
-
-   Delimit the vertices of a primitive or group of like primitives
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glBegin.xml>`_
-
-
-.. function:: glEndList():
-
-   Create or replace a display list
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glNewList.xml>`_
 
 
 .. function:: glEvalCoord (u,v):
@@ -458,7 +254,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Evaluate enabled one- and two-dimensional maps
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glEvalCoord.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glEvalCoord.xhtml>`__
 
    :type u: Depends on function prototype.
    :arg u: Specifies a value that is the domain coordinate u to the basis function defined
@@ -476,7 +272,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Compute a one- or two-dimensional grid of points or lines
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glEvalMesh.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glEvalMesh.xhtml>`__
 
    :type mode: Enumerated constant
    :arg mode: In glEvalMesh1, specifies whether to compute a one-dimensional
@@ -491,7 +287,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Generate and evaluate a single point in a mesh
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glEvalPoint.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glEvalPoint.xhtml>`__
 
    :type i: int
    :arg i: Specifies the integer value for grid domain variable i.
@@ -503,7 +299,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Controls feedback mode
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glFeedbackBuffer.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glFeedbackBuffer.xhtml>`__
 
    :type size: int
    :arg size: Specifies the maximum number of values that can be written into buffer.
@@ -518,14 +314,14 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Block until all GL execution is complete
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glFinish.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glFinish.xhtml>`__
 
 
 .. function:: glFlush():
 
    Force Execution of GL commands in finite time
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glFlush.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glFlush.xhtml>`__
 
 
 .. function:: glFog (pname, param):
@@ -534,7 +330,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Specify fog parameters
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glFog.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glFog.xhtml>`__
 
    :type pname: Enumerated constant
    :arg pname: Specifies a single-valued fog parameter. If the function prototype
@@ -549,44 +345,17 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Define front- and back-facing polygons
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glFrontFace.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glFrontFace.xhtml>`__
 
    :type mode: Enumerated constant
    :arg mode: Specifies the orientation of front-facing polygons.
-
-
-.. function:: glFrustum(left, right, bottom, top, zNear, zFar):
-
-   Multiply the current matrix by a perspective matrix
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glFrustum.xml>`_
-
-   :type left, right: double (float)
-   :arg left, right: Specify the coordinates for the left and right vertical
-      clipping planes.
-   :type top, bottom: double (float)
-   :arg top, bottom: Specify the coordinates for the bottom and top horizontal
-      clipping planes.
-   :type zNear, zFar: double (float)
-   :arg zNear, zFar: Specify the distances to the near and far depth clipping planes.
-      Both distances must be positive.
-
-
-.. function:: glGenLists(range):
-
-   Generate a contiguous set of empty display lists
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glGenLists.xml>`_
-
-   :type range: int
-   :arg range: Specifies the number of contiguous empty display lists to be generated.
 
 
 .. function:: glGenTextures(n, textures):
 
    Generate texture names
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glGenTextures.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glGenTextures.xhtml>`__
 
    :type n: int
    :arg n: Specifies the number of textures name to be generated.
@@ -600,7 +369,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Return the value or values of a selected parameter
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glGet.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glGet.xhtml>`__
 
    :type pname: Enumerated constant
    :arg pname: Specifies the parameter value to be returned.
@@ -608,26 +377,11 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
    :arg param: Returns the value or values of the specified parameter.
 
 
-.. function:: glGetClipPlane(plane, equation):
-
-   Return the coefficients of the specified clipping plane
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glGetClipPlane.xml>`_
-
-   :type plane: Enumerated constant
-   :arg plane: Specifies a clipping plane. The number of clipping planes depends on the
-      implementation, but at least six clipping planes are supported. They are identified by
-      symbolic names of the form GL_CLIP_PLANEi where 0 < i < GL_MAX_CLIP_PLANES.
-   :type equation:  :class:`bgl.Buffer` object I{type GL_FLOAT}
-   :arg equation:  Returns four float (double)-precision values that are the coefficients of the
-      plane equation of plane in eye coordinates. The initial value is (0, 0, 0, 0).
-
-
 .. function:: glGetError():
 
    Return error information
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glGetError.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glGetError.xhtml>`__
 
 
 .. function:: glGetLight (light, pname, params):
@@ -636,7 +390,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Return light source parameter values
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glGetLight.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glGetLight.xhtml>`__
 
    :type light: Enumerated constant
    :arg light: Specifies a light source. The number of possible lights depends on the
@@ -654,7 +408,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Return evaluator parameters
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glGetMap.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glGetMap.xhtml>`__
 
    :type target: Enumerated constant
    :arg target: Specifies the symbolic name of a map.
@@ -670,7 +424,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Return material parameters
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glGetMaterial.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glGetMaterial.xhtml>`__
 
    :type face: Enumerated constant
    :arg face: Specifies which of the two materials is being queried.
@@ -687,7 +441,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Return the specified pixel map
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glGetPixelMap.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glGetPixelMap.xhtml>`__
 
    :type map:  Enumerated constant
    :arg map: Specifies the name of the pixel map to return.
@@ -695,21 +449,11 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
    :arg values: Returns the pixel map contents.
 
 
-.. function:: glGetPolygonStipple(mask):
-
-   Return the polygon stipple pattern
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glGetPolygonStipple.xml>`_
-
-   :type mask: :class:`bgl.Buffer` object I{type GL_BYTE}
-   :arg mask: Returns the stipple pattern. The initial value is all 1's.
-
-
 .. function:: glGetString(name):
 
    Return a string describing the current GL connection
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glGetString.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glGetString.xhtml>`__
 
    :type name: Enumerated constant
    :arg name: Specifies a symbolic constant.
@@ -722,7 +466,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Return texture environment parameters
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glGetTexEnv.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glGetTexEnv.xhtml>`__
 
    :type target: Enumerated constant
    :arg target: Specifies a texture environment. Must be GL_TEXTURE_ENV.
@@ -738,7 +482,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Return texture coordinate generation parameters
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glGetTexGen.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glGetTexGen.xhtml>`__
 
    :type coord: Enumerated constant
    :arg coord: Specifies a texture coordinate.
@@ -752,7 +496,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Return a texture image
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glGetTexImage.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glGetTexImage.xhtml>`__
 
    :type target: Enumerated constant
    :arg target: Specifies which texture is to be obtained.
@@ -774,7 +518,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    return texture parameter values for a specific level of detail
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glGetTexLevelParameter.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glGetTexLevelParameter.xhtml>`__
 
    :type target: Enumerated constant
    :arg target: Specifies the symbolic name of the target texture.
@@ -793,7 +537,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Return texture parameter values
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glGetTexParameter.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glGetTexParameter.xhtml>`__
 
    :type target: Enumerated constant
    :arg target: Specifies the symbolic name of the target texture.
@@ -807,7 +551,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Specify implementation-specific hints
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glHint.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glHint.xhtml>`__
 
    :type target: Enumerated constant
    :arg target: Specifies a symbolic constant indicating the behavior to be
@@ -816,63 +560,21 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
    :arg mode: Specifies a symbolic constant indicating the desired behavior.
 
 
-.. function:: glIndex(c):
-
-   B{glIndexd, glIndexf, glIndexi, glIndexs,  glIndexdv, glIndexfv, glIndexiv, glIndexsv}
-
-   Set the current color index
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glIndex.xml>`_
-
-   :type c: :class:`bgl.Buffer` object. Depends on function prototype.
-   :arg c: Specifies a pointer to a one element array that contains the new value for
-      the current color index.
-
-
-.. function:: glIndexMask(mask):
-
-   Control the writing of individual bits in the color index buffers
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glIndexMask.xml>`_
-
-   :type mask: int
-   :arg mask: Specifies a bit mask to enable and disable the writing of individual bits
-      in the color index buffers.
-      Initially, the mask is all 1's.
-
-
-.. function:: glInitNames():
-
-   Initialize the name stack
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glInitNames.xml>`_
-
-
 .. function:: glIsEnabled(cap):
 
    Test whether a capability is enabled
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glIsEnabled.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glIsEnabled.xhtml>`__
 
    :type cap: Enumerated constant
    :arg cap: Specifies a constant representing a GL capability.
-
-
-.. function:: glIsList(list):
-
-   Determine if a name corresponds to a display-list
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glIsList.xml>`_
-
-   :type list: unsigned int
-   :arg list: Specifies a potential display-list name.
 
 
 .. function:: glIsTexture(texture):
 
    Determine if a name corresponds to a texture
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glIsTexture.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glIsTexture.xhtml>`__
 
    :type texture: unsigned int
    :arg texture: Specifies a value that may be the name of a texture.
@@ -884,7 +586,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Set the light source parameters
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glLight.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glLight.xhtml>`__
 
    :type light: Enumerated constant
    :arg light: Specifies a light. The number of lights depends on the implementation,
@@ -904,7 +606,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Set the lighting model parameters
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glLightModel.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glLightModel.xhtml>`__
 
    :type pname:  Enumerated constant
    :arg pname: Specifies a single-value light model parameter.
@@ -913,49 +615,14 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
       specifies a pointer to the value or values that param will be set to.
 
 
-.. function:: glLineStipple(factor, pattern):
-
-   Specify the line stipple pattern
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glLineStipple.xml>`_
-
-   :type factor: int
-   :arg factor: Specifies a multiplier for each bit in the line stipple pattern.
-      If factor is 3, for example, each bit in the pattern is used three times before
-      the next bit in the pattern is used. factor is clamped to the range [1, 256] and
-      defaults to 1.
-   :type pattern: unsigned short int
-   :arg pattern: Specifies a 16-bit integer whose bit pattern determines which fragments
-      of a line will be drawn when the line is rasterized. Bit zero is used first; the default
-      pattern is all 1's.
-
-
 .. function:: glLineWidth(width):
 
    Specify the width of rasterized lines.
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glLineWidth.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glLineWidth.xhtml>`__
 
    :type width: float
    :arg width: Specifies the width of rasterized lines. The initial value is 1.
-
-
-.. function:: glListBase(base):
-
-   Set the display-list base for glCallLists
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glListBase.xml>`_
-
-   :type base: unsigned int
-   :arg base: Specifies an integer offset that will be added to glCallLists
-      offsets to generate display-list names. The initial value is 0.
-
-
-.. function:: glLoadIdentity():
-
-   Replace the current matrix with the identity matrix
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glLoadIdentity.xml>`_
 
 
 .. function:: glLoadMatrix (m):
@@ -964,28 +631,18 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Replace the current matrix with the specified matrix
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glLoadMatrix.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glLoadMatrix.xhtml>`__
 
    :type m: :class:`bgl.Buffer` object. Depends on function prototype.
    :arg m: Specifies a pointer to 16 consecutive values, which are used as the elements
       of a 4x4 column-major matrix.
 
 
-.. function:: glLoadName(name):
-
-   Load a name onto the name stack.
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glLoadName.xml>`_
-
-   :type name: unsigned int
-   :arg name: Specifies a name that will replace the top value on the name stack.
-
-
 .. function:: glLogicOp(opcode):
 
    Specify a logical pixel operation for color index rendering
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glLogicOp.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glLogicOp.xhtml>`__
 
    :type opcode: Enumerated constant
    :arg opcode: Specifies a symbolic constant that selects a logical operation.
@@ -997,7 +654,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Define a one-dimensional evaluator
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glMap1.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glMap1.xhtml>`__
 
    :type target: Enumerated constant
    :arg target: Specifies the kind of values that are generated by the evaluator.
@@ -1022,7 +679,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Define a two-dimensional evaluator
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glMap2.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glMap2.xhtml>`__
 
    :type target: Enumerated constant
    :arg target: Specifies the kind of values that are generated by the evaluator.
@@ -1063,7 +720,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Define a one- or two-dimensional mesh
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glMapGrid.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glMapGrid.xhtml>`__
 
    :type un: int
    :arg un: Specifies the number of partitions in the grid range interval
@@ -1082,7 +739,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Specify material parameters for the lighting model.
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glMaterial.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glMaterial.xhtml>`__
 
    :type face: Enumerated constant
    :arg face: Specifies which face or faces are being updated. Must be one of:
@@ -1095,39 +752,17 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
       pname will be set to.
 
 
-.. function:: glMatrixMode(mode):
-
-   Specify which matrix is the current matrix.
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glMatrixMode.xml>`_
-
-   :type mode: Enumerated constant
-   :arg mode: Specifies which matrix stack is the target for subsequent matrix operations.
-
-
 .. function:: glMultMatrix (m):
 
    B{glMultMatrixd, glMultMatrixf}
 
    Multiply the current matrix with the specified matrix
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glMultMatrix.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glMultMatrix.xhtml>`__
 
    :type m: :class:`bgl.Buffer` object. Depends on function prototype.
    :arg m: Points to 16 consecutive values that are used as the elements of a 4x4 column
       major matrix.
-
-
-.. function:: glNewList(list, mode):
-
-   Create or replace a display list
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glNewList.xml>`_
-
-   :type list: unsigned int
-   :arg list: Specifies the display list name
-   :type mode: Enumerated constant
-   :arg mode: Specifies the compilation mode.
 
 
 .. function:: glNormal3 (nx, ny, nz, v):
@@ -1137,7 +772,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Set the current normal vector
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glNormal.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glNormal.xhtml>`__
 
    :type nx, ny, nz: Depends on function prototype. (non - 'v' prototypes only)
    :arg nx, ny, nz: Specify the x, y, and z coordinates of the new current normal.
@@ -1147,41 +782,13 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
       of the new current normal.
 
 
-.. function:: glOrtho(left, right, bottom, top, zNear, zFar):
-
-   Multiply the current matrix with an orthographic matrix
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glOrtho.xml>`_
-
-   :type left, right: double (float)
-   :arg left, right: Specify the coordinates for the left and
-      right vertical clipping planes.
-   :type bottom, top: double (float)
-   :arg bottom, top: Specify the coordinates for the bottom and top
-      horizontal clipping planes.
-   :type zNear, zFar: double (float)
-   :arg zNear, zFar: Specify the distances to the nearer and farther
-      depth clipping planes. These values are negative if the plane is to be behind the viewer.
-
-
-.. function:: glPassThrough(token):
-
-   Place a marker in the feedback buffer
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glPassThrough.xml>`_
-
-   :type token: float
-   :arg token: Specifies a marker value to be placed in the feedback
-      buffer following a GL_PASS_THROUGH_TOKEN.
-
-
 .. function:: glPixelMap (map, mapsize, values):
 
    B{glPixelMapfv, glPixelMapuiv, glPixelMapusv}
 
    Set up pixel transfer maps
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glPixelMap.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glPixelMap.xhtml>`__
 
    :type map: Enumerated constant
    :arg map: Specifies a symbolic map name.
@@ -1197,7 +804,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Set pixel storage modes
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glPixelStore.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glPixelStore.xhtml>`__
 
    :type pname: Enumerated constant
    :arg pname: Specifies the symbolic name of the parameter to be set.
@@ -1213,7 +820,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Set pixel transfer modes
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glPixelTransfer.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glPixelTransfer.xhtml>`__
 
    :type pname: Enumerated constant
    :arg pname: Specifies the symbolic name of the pixel transfer parameter to be set.
@@ -1221,21 +828,11 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
    :arg param: Specifies the value that pname is set to.
 
 
-.. function:: glPixelZoom(xfactor, yfactor):
-
-   Specify the pixel zoom factors
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glPixelZoom.xml>`_
-
-   :type xfactor, yfactor: float
-   :arg xfactor, yfactor: Specify the x and y zoom factors for pixel write operations.
-
-
 .. function:: glPointSize(size):
 
    Specify the diameter of rasterized points
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glPointSize.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glPointSize.xhtml>`__
 
    :type size: float
    :arg size: Specifies the diameter of rasterized points. The initial value is 1.
@@ -1245,7 +842,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Select a polygon rasterization mode
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glPolygonMode.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glPolygonMode.xhtml>`__
 
    :type face: Enumerated constant
    :arg face: Specifies the polygons that mode applies to.
@@ -1260,7 +857,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Set the scale and units used to calculate depth values
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glPolygonOffset.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glPolygonOffset.xhtml>`__
 
    :type factor: float
    :arg factor: Specifies a scale factor that is used to create a variable depth
@@ -1268,98 +865,6 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
    :type units:  float
    :arg units: Is multiplied by an implementation-specific value to create a
       constant depth offset. The initial value is 0.
-
-
-.. function:: glPolygonStipple(mask):
-
-   Set the polygon stippling pattern
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glPolygonStipple.xml>`_
-
-   :type mask: :class:`bgl.Buffer` object I{type GL_BYTE}
-   :arg mask: Specifies a pointer to a 32x32 stipple pattern that will be unpacked
-      from memory in the same way that glDrawPixels unpacks pixels.
-
-
-.. function:: glPopAttrib():
-
-   Pop the server attribute stack
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glPopAttrib.xml>`_
-
-
-.. function:: glPopClientAttrib():
-
-   Pop the client attribute stack
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glPopClientAttrib.xml>`_
-
-
-.. function:: glPopMatrix():
-
-   Pop the current matrix stack
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glPopMatrix.xml>`_
-
-
-.. function:: glPopName():
-
-   Pop the name stack
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glPopName.xml>`_
-
-
-.. function:: glPrioritizeTextures(n, textures, priorities):
-
-   Set texture residence priority
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glPrioritizeTextures.xml>`_
-
-   :type n: int
-   :arg n: Specifies the number of textures to be prioritized.
-   :type textures: :class:`bgl.Buffer` I{type GL_INT}
-   :arg textures: Specifies an array containing the names of the textures to be prioritized.
-   :type priorities: :class:`bgl.Buffer` I{type GL_FLOAT}
-   :arg priorities: Specifies an array containing the texture priorities.
-      A priority given in an element of priorities applies to the texture named
-      by the corresponding element of textures.
-
-
-.. function:: glPushAttrib(mask):
-
-   Push the server attribute stack
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glPushAttrib.xml>`_
-
-   :type mask: Enumerated constant(s)
-   :arg mask: Specifies a mask that indicates which attributes to save.
-
-
-.. function:: glPushClientAttrib(mask):
-
-   Push the client attribute stack
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glPushClientAttrib.xml>`_
-
-   :type mask: Enumerated constant(s)
-   :arg mask: Specifies a mask that indicates which attributes to save.
-
-
-.. function:: glPushMatrix():
-
-   Push the current matrix stack
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glPushMatrix.xml>`_
-
-
-.. function:: glPushName(name):
-
-   Push the name stack
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glPushName.xml>`_
-
-   :type name: unsigned int
-   :arg name: Specifies a name that will be pushed onto the name stack.
 
 
 .. function:: glRasterPos (x,y,z,w):
@@ -1372,7 +877,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Specify the raster position for pixel operations
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glRasterPos.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glRasterPos.xhtml>`__
 
    :type x, y, z, w: Depends on function prototype. (z and w for '3' and '4' prototypes only)
    :arg x, y, z, w: Specify the x,y,z, and w object coordinates (if present) for the
@@ -1404,7 +909,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Select a color buffer source for pixels.
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glReadBuffer.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glReadBuffer.xhtml>`__
 
    :type mode: Enumerated constant
    :arg mode: Specifies a color buffer.
@@ -1414,7 +919,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Read a block of pixels from the frame buffer
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glReadPixels.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glReadPixels.xhtml>`__
 
    :type x, y: int
    :arg x, y: Specify the window coordinates of the first pixel that is read
@@ -1437,7 +942,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Draw a rectangle
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glRect.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glRect.xhtml>`__
 
    :type x1, y1: Depends on function prototype. (for non 'v' prototypes only)
    :arg x1, y1: Specify one vertex of a rectangle
@@ -1448,23 +953,13 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
       to the opposite vertex of the rectangle
 
 
-.. function:: glRenderMode(mode):
-
-   Set rasterization mode
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glRenderMode.xml>`_
-
-   :type mode: Enumerated constant
-   :arg mode: Specifies the rasterization mode.
-
-
 .. function:: glRotate (angle, x, y, z):
 
    B{glRotated, glRotatef}
 
    Multiply the current matrix by a rotation matrix
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glRotate.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glRotate.xhtml>`__
 
    :type angle:  Depends on function prototype.
    :arg angle:  Specifies the angle of rotation in degrees.
@@ -1478,7 +973,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Multiply the current matrix by a general scaling matrix
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glScale.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glScale.xhtml>`__
 
    :type x, y, z: Depends on function prototype.
    :arg x, y, z: Specify scale factors along the x, y, and z axes, respectively.
@@ -1488,7 +983,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Define the scissor box
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glScissor.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glScissor.xhtml>`__
 
    :type x, y: int
    :arg x, y: Specify the lower left corner of the scissor box. Initially (0, 0).
@@ -1498,33 +993,11 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
       dimensions of that window.
 
 
-.. function:: glSelectBuffer(size, buffer):
-
-   Establish a buffer for selection mode values
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glSelectBuffer.xml>`_
-
-   :type size: int
-   :arg size: Specifies the size of buffer
-   :type buffer: :class:`bgl.Buffer` I{type GL_INT}
-   :arg buffer: Returns the selection data
-
-
-.. function:: glShadeModel(mode):
-
-   Select flat or smooth shading
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glShadeModel.xml>`_
-
-   :type mode: Enumerated constant
-   :arg mode: Specifies a symbolic value representing a shading technique.
-
-
 .. function:: glStencilFunc(func, ref, mask):
 
    Set function and reference value for stencil testing
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glStencilFuc.xml>`_
+   .. seealso:: `OpenGL Docs <https://www.opengl.org/sdk/docs/man/docbook4/xhtml/glStencilFunc.xhtml>`__
 
    :type func: Enumerated constant
    :arg func: Specifies the test function.
@@ -1541,7 +1014,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Control the writing of individual bits in the stencil planes
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glStencilMask.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glStencilMask.xhtml>`__
 
    :type mask: unsigned int
    :arg mask: Specifies a bit mask to enable and disable writing of individual bits
@@ -1552,7 +1025,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Set stencil test actions
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glStencilOp.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glStencilOp.xhtml>`__
 
    :type fail: Enumerated constant
    :arg fail: Specifies the action to take when the stencil test fails.
@@ -1580,7 +1053,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Set the current texture coordinates
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glTexCoord.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glTexCoord.xhtml>`__
 
    :type s, t, r, q: Depends on function prototype. (r and q for '3' and '4' prototypes only)
    :arg s, t, r, q: Specify s, t, r, and q texture coordinates. Not all parameters are
@@ -1596,7 +1069,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Set texture environment parameters
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glTexEnv.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glTexEnv.xhtml>`__
 
    :type target: Enumerated constant
    :arg target: Specifies a texture environment. Must be GL_TEXTURE_ENV.
@@ -1615,7 +1088,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Control the generation of texture coordinates
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glTexGen.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glTexGen.xhtml>`__
 
    :type coord: Enumerated constant
    :arg coord: Specifies a texture coordinate.
@@ -1633,7 +1106,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Specify a one-dimensional texture image
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glTexImage1D.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glTexImage1D.xhtml>`__
 
    :type target: Enumerated constant
    :arg target: Specifies the target texture.
@@ -1660,7 +1133,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Specify a two-dimensional texture image
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glTexImage2D.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glTexImage2D.xhtml>`__
 
    :type target: Enumerated constant
    :arg target: Specifies the target texture.
@@ -1693,7 +1166,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Set texture parameters
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glTexParameter.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glTexParameter.xhtml>`__
 
    :type target: Enumerated constant
    :arg target: Specifies the target texture.
@@ -1710,38 +1183,17 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Multiply the current matrix by a translation matrix
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glTranslate.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glTranslate.xhtml>`__
 
    :type x, y, z: Depends on function prototype.
    :arg x, y, z: Specify the x, y, and z coordinates of a translation vector.
-
-
-.. function:: glVertex (x,y,z,w,v):
-
-   B{glVertex2d, glVertex2f, glVertex2i, glVertex2s, glVertex3d, glVertex3f, glVertex3i,
-   glVertex3s, glVertex4d, glVertex4f, glVertex4i, glVertex4s, glVertex2dv, glVertex2fv,
-   glVertex2iv, glVertex2sv, glVertex3dv, glVertex3fv, glVertex3iv, glVertex3sv, glVertex4dv,
-   glVertex4fv, glVertex4iv, glVertex4sv}
-
-   Specify a vertex
-
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glVertex.xml>`_
-
-   :type x, y, z, w: Depends on function prototype (z and w for '3' and '4' prototypes only)
-   :arg x, y, z, w: Specify x, y, z, and w coordinates of a vertex. Not all parameters
-      are present in all forms of the command.
-   :type v: :class:`bgl.Buffer` object. Depends of function prototype (for 'v'
-      prototypes only)
-   :arg v: Specifies a pointer to an array of two, three, or four elements. The
-      elements of a two-element array are x and y; of a three-element array,
-      x, y, and z; and of a four-element array, x, y, z, and w.
 
 
 .. function:: glViewport(x,y,width,height):
 
    Set the viewport
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glViewport.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glViewport.xhtml>`__
 
    :type x, y: int
    :arg x, y: Specify the lower left corner of the viewport rectangle,
@@ -1752,104 +1204,11 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
       dimensions of that window.
 
 
-.. function:: gluPerspective(fovY, aspect, zNear, zFar):
-
-   Set up a perspective projection matrix.
-
-   .. seealso:: U{http://biology.ncsa.uiuc.edu/cgi-bin/infosrch.cgi?cmd=getdoc&coll=0650&db=bks&fname=/SGI_Developer/OpenGL_RM/ch06.html#id5577288}
-
-   :type fovY: double
-   :arg fovY: Specifies the field of view angle, in degrees, in the y direction.
-   :type aspect: double
-   :arg aspect: Specifies the aspect ratio that determines the field of view in the x direction.
-    The aspect ratio is the ratio of x (width) to y (height).
-   :type zNear: double
-   :arg zNear: Specifies the distance from the viewer to the near clipping plane (always positive).
-   :type zFar: double
-   :arg zFar: Specifies the distance from the viewer to the far clipping plane (always positive).
-
-
-.. function:: gluLookAt(eyex, eyey, eyez, centerx, centery, centerz, upx, upy, upz):
-
-   Define a viewing transformation.
-
-   .. seealso:: U{http://biology.ncsa.uiuc.edu/cgi-bin/infosrch.cgi?cmd=getdoc&coll=0650&db=bks&fname=/SGI_Developer/OpenGL_RM/ch06.html#id5573042}
-
-   :type eyex, eyey, eyez: double
-   :arg eyex, eyey, eyez: Specifies the position of the eye point.
-   :type centerx, centery, centerz: double
-   :arg centerx, centery, centerz: Specifies the position of the reference point.
-   :type upx, upy, upz: double
-   :arg upx, upy, upz: Specifies the direction of the up vector.
-
-
-.. function:: gluOrtho2D(left, right, bottom, top):
-
-   Define a 2-D orthographic projection matrix.
-
-   .. seealso:: U{http://biology.ncsa.uiuc.edu/cgi-bin/infosrch.cgi?cmd=getdoc&coll=0650&db=bks&fname=/SGI_Developer/OpenGL_RM/ch06.html#id5578074}
-
-   :type left, right: double
-   :arg left, right: Specify the coordinates for the left and right vertical clipping planes.
-   :type bottom, top: double
-   :arg bottom, top: Specify the coordinates for the bottom and top horizontal clipping planes.
-
-
-.. function:: gluPickMatrix(x, y, width, height, viewport):
-
-   Define a picking region.
-
-   .. seealso:: U{http://biology.ncsa.uiuc.edu/cgi-bin/infosrch.cgi?cmd=getdoc&coll=0650&db=bks&fname=/SGI_Developer/OpenGL_RM/ch06.html#id5578074}
-
-   :type x, y: double
-   :arg x, y: Specify the center of a picking region in window coordinates.
-   :type width, height: double
-   :arg width, height: Specify the width and height, respectively, of the picking region in window coordinates.
-   :type viewport: :class:`bgl.Buffer` object. [int]
-   :arg viewport: Specifies the current viewport.
-
-
-.. function:: gluProject(objx, objy, objz, modelMatrix, projMatrix, viewport, winx, winy, winz):
-
-   Map object coordinates to window coordinates.
-
-   .. seealso:: U{http://biology.ncsa.uiuc.edu/cgi-bin/infosrch.cgi?cmd=getdoc&coll=0650&db=bks&fname=/SGI_Developer/OpenGL_RM/ch06.html#id5578074}
-
-   :type objx, objy, objz: double
-   :arg objx, objy, objz: Specify the object coordinates.
-   :type modelMatrix: :class:`bgl.Buffer` object. [double]
-   :arg modelMatrix: Specifies the current modelview matrix (as from a glGetDoublev call).
-   :type projMatrix: :class:`bgl.Buffer` object. [double]
-   :arg projMatrix: Specifies the current projection matrix (as from a glGetDoublev call).
-   :type viewport: :class:`bgl.Buffer` object. [int]
-   :arg viewport: Specifies the current viewport (as from a glGetIntegerv call).
-   :type winx, winy, winz: :class:`bgl.Buffer` object. [double]
-   :arg winx, winy, winz: Return the computed window coordinates.
-
-
-.. function:: gluUnProject(winx, winy, winz, modelMatrix, projMatrix, viewport, objx, objy, objz):
-
-   Map object coordinates to window coordinates.
-
-   .. seealso:: U{http://biology.ncsa.uiuc.edu/cgi-bin/infosrch.cgi?cmd=getdoc&coll=0650&db=bks&fname=/SGI_Developer/OpenGL_RM/ch06.html#id5582204}
-
-   :type winx, winy, winz: double
-   :arg winx, winy, winz: Specify the window coordinates to be mapped.
-   :type modelMatrix: :class:`bgl.Buffer` object. [double]
-   :arg modelMatrix: Specifies the current modelview matrix (as from a glGetDoublev call).
-   :type projMatrix: :class:`bgl.Buffer` object. [double]
-   :arg projMatrix: Specifies the current projection matrix (as from a glGetDoublev call).
-   :type viewport: :class:`bgl.Buffer` object. [int]
-   :arg viewport: Specifies the current viewport (as from a glGetIntegerv call).
-   :type objx, objy, objz: :class:`bgl.Buffer` object. [double]
-   :arg objx, objy, objz: Return the computed object coordinates.
-
-
 .. function:: glUseProgram(program):
 
    Installs a program object as part of current rendering state
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glUseProgram.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glUseProgram.xhtml>`__
 
    :type program: int
    :arg program: Specifies the handle of the program object whose executables are to be used as part of current rendering state.
@@ -1859,7 +1218,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Validates a program object
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glValidateProgram.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glValidateProgram.xhtml>`__
 
    :type program: int
    :arg program: Specifies the handle of the program object to be validated.
@@ -1869,7 +1228,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Links a program object.
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glLinkProgram.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glLinkProgram.xhtml>`__
 
    :type program: int
    :arg program: Specifies the handle of the program object to be linked.
@@ -1879,7 +1238,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Select active texture unit.
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glActiveTexture.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glActiveTexture.xhtml>`__
 
    :type texture: int
    :arg texture: Constant in ``GL_TEXTURE0`` 0 - 8
@@ -1889,7 +1248,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Attaches a shader object to a program object.
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glAttachShader.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glAttachShader.xhtml>`__
 
    :type program: int
    :arg program: Specifies the program object to which a shader object will be attached.
@@ -1901,7 +1260,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Compiles a shader object.
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glCompileShader.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glCompileShader.xhtml>`__
 
    :type shader: int
    :arg shader: Specifies the shader object to be compiled.
@@ -1911,7 +1270,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Creates a program object
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glCreateProgram.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glCreateProgram.xhtml>`__
 
    :rtype: int
    :return: The new program or zero if an error occurs.
@@ -1921,7 +1280,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Creates a shader object.
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glCreateShader.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glCreateShader.xhtml>`__
 
    :type shaderType: Specifies the type of shader to be created.
       Must be one of ``GL_VERTEX_SHADER``,
@@ -1938,7 +1297,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Deletes a program object.
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glDeleteProgram.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glDeleteProgram.xhtml>`__
 
    :type program: int
    :arg program: Specifies the program object to be deleted.
@@ -1948,7 +1307,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Deletes a shader object.
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glDeleteShader.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glDeleteShader.xhtml>`__
 
    :type shader: int
    :arg shader: Specifies the shader object to be deleted.
@@ -1958,7 +1317,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Detaches a shader object from a program object to which it is attached.
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glDetachShader.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glDetachShader.xhtml>`__
 
    :type program: int
    :arg program: Specifies the program object from which to detach the shader object.
@@ -1970,7 +1329,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Returns the handles of the shader objects attached to a program object.
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glGetAttachedShaders.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glGetAttachedShaders.xhtml>`__
 
    :type program: int
    :arg program: Specifies the program object to be queried.
@@ -1986,7 +1345,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Returns the information log for a program object.
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glGetProgramInfoLog.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glGetProgramInfoLog.xhtml>`__
 
    :type program: int
    :arg program: Specifies the program object whose information log is to be queried.
@@ -2002,7 +1361,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Returns the information log for a shader object.
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glGetShaderInfoLog.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glGetShaderInfoLog.xhtml>`__
 
    :type shader: int
    :arg shader: Specifies the shader object whose information log is to be queried.
@@ -2018,7 +1377,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Returns a parameter from a program object.
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glGetProgram.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glGetProgram.xhtml>`__
 
    :type program: int
    :arg program: Specifies the program object to be queried.
@@ -2032,7 +1391,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Determines if a name corresponds to a shader object.
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glIsShader.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glIsShader.xhtml>`__
 
    :type shader: int
    :arg shader: Specifies a potential shader object.
@@ -2042,7 +1401,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Determines if a name corresponds to a program object
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glIsProgram.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glIsProgram.xhtml>`__
 
    :type program: int
    :arg program: Specifies a potential program object.
@@ -2052,7 +1411,7 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
 
    Returns the source code string from a shader object
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glGetShaderSource.xml>`_
+   .. seealso:: `OpenGL Docs <https://khronos.org/registry/OpenGL-Refpages/gl4/html/glGetShaderSource.xhtml>`__
 
    :type shader: int
    :arg shader: Specifies the shader object to be queried.
@@ -2062,13 +1421,13 @@ Here is a comprehensive `list of books <http://www.opengl.org/documentation/book
    :arg length: Returns the length of the string returned in source (excluding the null terminator).
    :type source: :class:`bgl.Buffer` char.
    :arg source: Specifies an array of characters that is used to return the source code string.
-   
+
 
 .. function:: glShaderSource(shader, shader_string):
 
    Replaces the source code in a shader object.
 
-   .. seealso:: `OpenGL Docs <http://www.opengl.org/sdk/docs/man2/xhtml/glShaderSource.xml>`_
+   .. seealso:: `OpenGL Docs <https://www.opengl.org/sdk/docs/man/html/glShaderSource.xhtml>`__
 
    :type shader: int
    :arg shader: Specifies the handle of the shader object whose source code is to be replaced.

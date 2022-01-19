@@ -1,17 +1,12 @@
 
-/** \defgroup blenderplayer Blender Player */
-
-/** \defgroup blc bad level calls
- *  \ingroup blenderplayer
- */
-
 /** \defgroup render Rendering
  *  \ingroup blender
  */
 /** \defgroup bmesh BMesh
  *  \ingroup blender
  */
-/** \defgroup compositor Compositing */
+/** \defgroup compositor Compositing
+ *  \ingroup blender */
 
 /** \defgroup python Python
  *  \ingroup blender
@@ -29,70 +24,17 @@
  *  \ingroup python
  */
 
-/** \defgroup blpluginapi Blender pluginapi
- *  \ingroup blender
- *  \attention not in use currently
- */
-
-/* ================================ */
-
-/** \defgroup bge Game Engine */
-/** \defgroup gamelogic Game Logic
- *  \ingroup bge
- */
-/** \defgroup bgeconv Converter
- *  \ingroup bge
- */
-/** \defgroup blroutines Blender Routines
- *  \ingroup bge
- */
-/** \defgroup expressions Expressions
- *  \ingroup bge
- */
-/** \defgroup player Game Player
- *  \ingroup bge
- */
-/** \defgroup ketsji Ketsji
- *  \ingroup bge
- *  \todo check all headers and code files for proper licenses
- */
-/** \defgroup ketsjinet Ketsji Network
- *  \ingroup ketsji
- */
-/** \defgroup bgenet Network
- *  \ingroup bge
- */
-/** \defgroup bgenetlb Loopback Network
- *  \ingroup bgenet
- */
-/** \defgroup phys Physics
- *  \ingroup bge
- */
-/** \defgroup physbullet Bullet Physics
- *  \ingroup phys
- */
-/** \defgroup physdummy Dummy Physics (none)
- *  \ingroup phys
- */
-/** \defgroup bgerast Rasterizer
- *  \ingroup bge
- */
-/** \defgroup bgerastoglfilters OpenGL Filters
- *  \ingroup bgerast
- */
-/** \defgroup bgerastogl OpenGL Rasterizer
- *  \ingroup bgerast
- */
-/** \defgroup bgesg BGE SceneGraph
- *  \ingroup bge
- */
-/** \defgroup bgevideotex BGE Video Texture
- *  \ingroup bge
- */
-
 /* ================================ */
 
 /** \defgroup blender Blender */
+
+/** \defgroup balembic BlenderAlembic
+ *  \ingroup blender
+ */
+
+/** \defgroup blt BlenTranslation
+ *  \ingroup blender
+ */
 
 /** \defgroup blf BlenFont
  *  \ingroup blender
@@ -133,7 +75,12 @@
  *  \ingroup blender
  */
 
-/** \defgroup data DNA, RNA and .blend access*/
+/** \defgroup shader_fx Shader Effects
+ *  \ingroup blender
+ */
+
+/** \defgroup data DNA, RNA and .blend access
+ *  \ingroup blender */
 
 /** \defgroup gpu GPU
  *  \ingroup blender
@@ -156,14 +103,12 @@
  *   merged in docs.
  */
 
-/** \defgroup quicktime QuickTime
- *  \ingroup blender
-
-/** \defgroup gui GUI */
+/**
+ * \defgroup gui GUI
+ * \ingroup blender */
 
 /** \defgroup wm Window Manager
- *  \ingroup blender gui
- */
+ *  \ingroup gui */
 
 /* ================================ */
 
@@ -179,6 +124,10 @@
  *  \ingroup editors
  */
 
+/** \defgroup edasset asset
+ *  \ingroup editors
+ */
+
 /** \defgroup edcurve curve
  *  \ingroup editors
  */
@@ -187,11 +136,19 @@
  *  \ingroup editors
  */
 
+/** \defgroup edgizmolib gizmo library
+ *  \ingroup editors
+ */
+
 /** \defgroup edgpencil gpencil
  *  \ingroup editors
  */
 
 /** \defgroup edinterface interface
+ *  \ingroup editors
+ */
+
+/** \defgroup edlattice lattice
  *  \ingroup editors
  */
 
@@ -216,6 +173,10 @@
  */
 
 /** \defgroup edscr screen
+ *  \ingroup editors
+ */
+
+/** \defgroup edscene scene
  *  \ingroup editors
  */
 
@@ -256,10 +217,6 @@
  */
 
 /** \defgroup spinfo info space
- *  \ingroup editors
- */
-
-/** \defgroup splogic game logic editor
  *  \ingroup editors
  */
 
@@ -311,6 +268,10 @@
  *  \ingroup editors
  */
 
+/** \defgroup edundo undo utilities
+ *  \ingroup editors
+ */
+
 /** \defgroup spuv UV editing
  *  \ingroup editors
  */
@@ -321,7 +282,8 @@
  *  \ingroup gui
  */
 
-/** \defgroup externformats External Formats */
+/** \defgroup externformats External Formats
+ *  \ingroup blender */
 
 /** \defgroup collada COLLADA
  *  \ingroup externformats
@@ -350,4 +312,7 @@
 /* ================================ */
 
 /** \defgroup undoc Undocumented
- *  \brief Modules and libraries that are still undocumented, or lacking proper integration into the doxygen system, are marked in this group. */
+ *
+ * \brief Modules and libraries that are still undocumented,
+ * or lacking proper integration into the doxygen system, are marked in this group.
+ */

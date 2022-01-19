@@ -8,10 +8,10 @@ class ViewOperator(bpy.types.Operator):
     bl_idname = "view3d.modal_operator"
     bl_label = "Simple View Operator"
 
-    offset = FloatVectorProperty(
-            name="Offset",
-            size=3,
-            )
+    offset: FloatVectorProperty(
+        name="Offset",
+        size=3,
+    )
 
     def execute(self, context):
         v3d = context.space_data
@@ -29,12 +29,12 @@ class ViewOperator(bpy.types.Operator):
             context.area.header_text_set("Offset %.4f %.4f %.4f" % tuple(self.offset))
 
         elif event.type == 'LEFTMOUSE':
-            context.area.header_text_set()
+            context.area.header_text_set(None)
             return {'FINISHED'}
 
         elif event.type in {'RIGHTMOUSE', 'ESC'}:
             rv3d.view_location = self._initial_location
-            context.area.header_text_set()
+            context.area.header_text_set(None)
             return {'CANCELLED'}
 
         return {'RUNNING_MODAL'}
@@ -57,13 +57,18 @@ class ViewOperator(bpy.types.Operator):
             self.report({'WARNING'}, "Active space must be a View3d")
             return {'CANCELLED'}
 
+def menu_func(self, context):
+    self.layout.operator(ViewOperator.bl_idname, text = "Simple View Modal Operator")
 
+# Register and add to the "view" menu (required to also use F3 search "Simple View Modal Operator" for quick access)
 def register():
     bpy.utils.register_class(ViewOperator)
+    bpy.types.VIEW3D_MT_view.append(menu_func)
 
 
 def unregister():
     bpy.utils.unregister_class(ViewOperator)
+    bpy.types.VIEW3D_MT_view.remove(menu_func)
 
 
 if __name__ == "__main__":

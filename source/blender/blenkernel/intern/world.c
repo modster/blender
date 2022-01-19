@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,205 +15,215 @@
  *
  * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
  * All rights reserved.
- *
- * The Original Code is: all of this file.
- *
- * Contributor(s): none yet.
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file blender/blenkernel/intern/world.c
- *  \ingroup bke
+/** \file
+ * \ingroup bke
  */
 
-
-#include <string.h>
 #include <math.h>
+#include <stdlib.h>
+#include <string.h>
+
 #include "MEM_guardedalloc.h"
 
-#include "DNA_world_types.h"
+/* Allow using deprecated functionality for .blend file I/O. */
+#define DNA_DEPRECATED_ALLOW
+
+#include "DNA_defaults.h"
 #include "DNA_scene_types.h"
 #include "DNA_texture_types.h"
+#include "DNA_world_types.h"
 
-#include "BLI_utildefines.h"
 #include "BLI_listbase.h"
+#include "BLI_utildefines.h"
 
-#include "BKE_animsys.h"
-#include "BKE_global.h"
+#include "BKE_anim_data.h"
 #include "BKE_icons.h"
-#include "BKE_library.h"
+#include "BKE_idtype.h"
+#include "BKE_lib_id.h"
+#include "BKE_lib_query.h"
 #include "BKE_main.h"
 #include "BKE_node.h"
 #include "BKE_world.h"
 
+#include "BLT_translation.h"
+
+#include "DRW_engine.h"
+
+#include "DEG_depsgraph.h"
+
 #include "GPU_material.h"
 
-void BKE_world_free_ex(World *wrld, bool do_id_user)
+#include "BLO_read_write.h"
+
+/** Free (or release) any data used by this world (does not free the world itself). */
+static void world_free_data(ID *id)
 {
-	MTex *mtex;
-	int a;
-	
-	for (a = 0; a < MAX_MTEX; a++) {
-		mtex = wrld->mtex[a];
-		if (do_id_user && mtex && mtex->tex) mtex->tex->id.us--;
-		if (mtex) MEM_freeN(mtex);
-	}
-	BKE_previewimg_free(&wrld->preview);
+  World *wrld = (World *)id;
 
-	BKE_animdata_free((ID *)wrld);
+  DRW_drawdata_free(id);
 
-	/* is no lib link block, but world extension */
-	if (wrld->nodetree) {
-		ntreeFreeTree_ex(wrld->nodetree, do_id_user);
-		MEM_freeN(wrld->nodetree);
-	}
+  /* is no lib link block, but world extension */
+  if (wrld->nodetree) {
+    ntreeFreeEmbeddedTree(wrld->nodetree);
+    MEM_freeN(wrld->nodetree);
+    wrld->nodetree = NULL;
+  }
 
-	if (wrld->gpumaterial.first)
-		GPU_material_free(&wrld->gpumaterial);
-	
-	BKE_icon_id_delete((struct ID *)wrld);
-	wrld->id.icon_id = 0;
+  GPU_material_free(&wrld->gpumaterial);
+
+  BKE_icon_id_delete((struct ID *)wrld);
+  BKE_previewimg_free(&wrld->preview);
 }
 
-void BKE_world_free(World *wrld)
+static void world_init_data(ID *id)
 {
-	BKE_world_free_ex(wrld, true);
+  World *wrld = (World *)id;
+  BLI_assert(MEMCMP_STRUCT_AFTER_IS_ZERO(wrld, id));
+
+  MEMCPY_STRUCT_AFTER(wrld, DNA_struct_default_get(World), id);
 }
 
-World *add_world(Main *bmain, const char *name)
+/**
+ * Only copy internal data of World ID from source
+ * to already allocated/initialized destination.
+ * You probably never want to use that directly,
+ * use #BKE_id_copy or #BKE_id_copy_ex for typical needs.
+ *
+ * WARNING! This function will not handle ID user count!
+ *
+ * \param flag: Copying options (see BKE_lib_id.h's LIB_ID_COPY_... flags for more).
+ */
+static void world_copy_data(Main *bmain, ID *id_dst, const ID *id_src, const int flag)
 {
-	World *wrld;
+  World *wrld_dst = (World *)id_dst;
+  const World *wrld_src = (const World *)id_src;
 
-	wrld = BKE_libblock_alloc(bmain, ID_WO, name);
-	
-	wrld->horr = 0.05f;
-	wrld->horg = 0.05f;
-	wrld->horb = 0.05f;
-	wrld->zenr = 0.01f;
-	wrld->zeng = 0.01f;
-	wrld->zenb = 0.01f;
-	wrld->skytype = 0;
+  const bool is_localized = (flag & LIB_ID_CREATE_LOCAL) != 0;
+  /* We always need allocation of our private ID data. */
+  const int flag_private_id_data = flag & ~LIB_ID_CREATE_NO_ALLOCATE;
 
-	wrld->exp = 0.0f;
-	wrld->exposure = wrld->range = 1.0f;
+  if (wrld_src->nodetree) {
+    if (is_localized) {
+      wrld_dst->nodetree = ntreeLocalize(wrld_src->nodetree);
+    }
+    else {
+      BKE_id_copy_ex(
+          bmain, (ID *)wrld_src->nodetree, (ID **)&wrld_dst->nodetree, flag_private_id_data);
+    }
+  }
 
-	wrld->aodist = 10.0f;
-	wrld->aosamp = 5;
-	wrld->aoenergy = 1.0f;
-	wrld->ao_env_energy = 1.0f;
-	wrld->ao_indirect_energy = 1.0f;
-	wrld->ao_indirect_bounces = 1;
-	wrld->aobias = 0.05f;
-	wrld->ao_samp_method = WO_AOSAMP_HAMMERSLEY;
-	wrld->ao_approx_error = 0.25f;
-	
-	wrld->preview = NULL;
-	wrld->miststa = 5.0f;
-	wrld->mistdist = 25.0f;
+  BLI_listbase_clear(&wrld_dst->gpumaterial);
+  BLI_listbase_clear((ListBase *)&wrld_dst->drawdata);
 
-	return wrld;
+  if ((flag & LIB_ID_COPY_NO_PREVIEW) == 0) {
+    BKE_previewimg_id_copy(&wrld_dst->id, &wrld_src->id);
+  }
+  else {
+    wrld_dst->preview = NULL;
+  }
 }
 
-World *BKE_world_copy(World *wrld)
+static void world_foreach_id(ID *id, LibraryForeachIDData *data)
 {
-	World *wrldn;
-	int a;
-	
-	wrldn = BKE_libblock_copy(&wrld->id);
-	
-	for (a = 0; a < MAX_MTEX; a++) {
-		if (wrld->mtex[a]) {
-			wrldn->mtex[a] = MEM_mallocN(sizeof(MTex), "BKE_world_copy");
-			memcpy(wrldn->mtex[a], wrld->mtex[a], sizeof(MTex));
-			id_us_plus((ID *)wrldn->mtex[a]->tex);
-		}
-	}
+  World *world = (World *)id;
 
-	if (wrld->nodetree) {
-		wrldn->nodetree = ntreeCopyTree(wrld->nodetree);
-	}
-	
-	if (wrld->preview)
-		wrldn->preview = BKE_previewimg_copy(wrld->preview);
-
-	BLI_listbase_clear(&wrldn->gpumaterial);
-
-	if (wrld->id.lib) {
-		BKE_id_lib_local_paths(G.main, wrld->id.lib, &wrldn->id);
-	}
-
-	return wrldn;
+  if (world->nodetree) {
+    /* nodetree **are owned by IDs**, treat them as mere sub-data and not real ID! */
+    BKE_LIB_FOREACHID_PROCESS_FUNCTION_CALL(
+        data, BKE_library_foreach_ID_embedded(data, (ID **)&world->nodetree));
+  }
 }
 
-World *localize_world(World *wrld)
+static void world_blend_write(BlendWriter *writer, ID *id, const void *id_address)
 {
-	World *wrldn;
-	int a;
-	
-	wrldn = BKE_libblock_copy_nolib(&wrld->id, false);
-	
-	for (a = 0; a < MAX_MTEX; a++) {
-		if (wrld->mtex[a]) {
-			wrldn->mtex[a] = MEM_mallocN(sizeof(MTex), "localize_world");
-			memcpy(wrldn->mtex[a], wrld->mtex[a], sizeof(MTex));
-			/* free world decrements */
-			id_us_plus((ID *)wrldn->mtex[a]->tex);
-		}
-	}
+  World *wrld = (World *)id;
 
-	if (wrld->nodetree)
-		wrldn->nodetree = ntreeLocalize(wrld->nodetree);
-	
-	wrldn->preview = NULL;
-	
-	BLI_listbase_clear(&wrldn->gpumaterial);
-	
-	return wrldn;
+  /* Clean up, important in undo case to reduce false detection of changed datablocks. */
+  BLI_listbase_clear(&wrld->gpumaterial);
+
+  /* write LibData */
+  BLO_write_id_struct(writer, World, id_address, &wrld->id);
+  BKE_id_blend_write(writer, &wrld->id);
+
+  if (wrld->adt) {
+    BKE_animdata_blend_write(writer, wrld->adt);
+  }
+
+  /* nodetree is integral part of world, no libdata */
+  if (wrld->nodetree) {
+    BLO_write_struct(writer, bNodeTree, wrld->nodetree);
+    ntreeBlendWrite(writer, wrld->nodetree);
+  }
+
+  BKE_previewimg_blend_write(writer, wrld->preview);
 }
 
-void BKE_world_make_local(World *wrld)
+static void world_blend_read_data(BlendDataReader *reader, ID *id)
 {
-	Main *bmain = G.main;
-	Scene *sce;
-	bool is_local = false, is_lib = false;
+  World *wrld = (World *)id;
+  BLO_read_data_address(reader, &wrld->adt);
+  BKE_animdata_blend_read_data(reader, wrld->adt);
 
-	/* - only lib users: do nothing
-	 * - only local users: set flag
-	 * - mixed: make copy
-	 */
-	
-	if (wrld->id.lib == NULL) return;
-	if (wrld->id.us == 1) {
-		id_clear_lib_data(bmain, &wrld->id);
-		return;
-	}
-	
-	for (sce = bmain->scene.first; sce && ELEM(false, is_lib, is_local); sce = sce->id.next) {
-		if (sce->world == wrld) {
-			if (sce->id.lib) is_lib = true;
-			else is_local = true;
-		}
-	}
+  BLO_read_data_address(reader, &wrld->preview);
+  BKE_previewimg_blend_read(reader, wrld->preview);
+  BLI_listbase_clear(&wrld->gpumaterial);
+}
 
-	if (is_local && is_lib == false) {
-		id_clear_lib_data(bmain, &wrld->id);
-	}
-	else if (is_local && is_lib) {
-		World *wrld_new = BKE_world_copy(wrld);
-		wrld_new->id.us = 0;
+static void world_blend_read_lib(BlendLibReader *reader, ID *id)
+{
+  World *wrld = (World *)id;
+  BLO_read_id_address(reader, wrld->id.lib, &wrld->ipo); /* XXX deprecated, old animation system */
+}
 
-		/* Remap paths of new ID using old library as base. */
-		BKE_id_lib_local_paths(bmain, wrld->id.lib, &wrld_new->id);
+static void world_blend_read_expand(BlendExpander *expander, ID *id)
+{
+  World *wrld = (World *)id;
+  BLO_expand(expander, wrld->ipo); /* XXX deprecated, old animation system */
+}
 
-		for (sce = bmain->scene.first; sce; sce = sce->id.next) {
-			if (sce->world == wrld) {
-				if (sce->id.lib == NULL) {
-					sce->world = wrld_new;
-					wrld_new->id.us++;
-					wrld->id.us--;
-				}
-			}
-		}
-	}
+IDTypeInfo IDType_ID_WO = {
+    .id_code = ID_WO,
+    .id_filter = FILTER_ID_WO,
+    .main_listbase_index = INDEX_ID_WO,
+    .struct_size = sizeof(World),
+    .name = "World",
+    .name_plural = "worlds",
+    .translation_context = BLT_I18NCONTEXT_ID_WORLD,
+    .flags = IDTYPE_FLAGS_APPEND_IS_REUSABLE,
+    .asset_type_info = NULL,
+
+    .init_data = world_init_data,
+    .copy_data = world_copy_data,
+    .free_data = world_free_data,
+    .make_local = NULL,
+    .foreach_id = world_foreach_id,
+    .foreach_cache = NULL,
+    .foreach_path = NULL,
+    .owner_get = NULL,
+
+    .blend_write = world_blend_write,
+    .blend_read_data = world_blend_read_data,
+    .blend_read_lib = world_blend_read_lib,
+    .blend_read_expand = world_blend_read_expand,
+
+    .blend_read_undo_preserve = NULL,
+
+    .lib_override_apply_post = NULL,
+};
+
+World *BKE_world_add(Main *bmain, const char *name)
+{
+  World *wrld;
+
+  wrld = BKE_id_new(bmain, ID_WO, name);
+
+  return wrld;
+}
+
+void BKE_world_eval(struct Depsgraph *depsgraph, World *world)
+{
+  DEG_debug_print_eval(depsgraph, __func__, world->id.name, world);
+  GPU_material_free(&world->gpumaterial);
 }

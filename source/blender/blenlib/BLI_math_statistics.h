@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,54 +15,68 @@
  *
  * The Original Code is Copyright (C) 2015 by Blender Foundation
  * All rights reserved.
- *
- * The Original Code is: all of this file.
- *
- * ***** END GPL LICENSE BLOCK *****
- * */
-
-#ifndef __BLI_MATH_STATISTICS_H__
-#define __BLI_MATH_STATISTICS_H__
-
-/** \file BLI_math_statistics.h
- *  \ingroup bli
  */
+
+#pragma once
+
+/** \file
+ * \ingroup bli
+ */
+
+#include "BLI_compiler_attrs.h"
+#include "BLI_math_inline.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#include "BLI_compiler_attrs.h"
-#include "BLI_math_inline.h"
 
 #ifdef BLI_MATH_GCC_WARN_PRAGMA
 #  pragma GCC diagnostic push
 #  pragma GCC diagnostic ignored "-Wredundant-decls"
 #endif
 
-/********************************** Covariance Matrices *********************************/
+/* -------------------------------------------------------------------- */
+/** \name Covariance Matrices
+ * \{ */
 
-void BLI_covariance_m_vn_ex(
-        const int n, const float *cos_vn, const int nbr_cos_v3, const float *center, const bool use_sample_correction,
-        float *r_covmat);
-void BLI_covariance_m3_v3n(
-        const float (*cos_v3)[3], const int nbr_cos_v3, const bool use_sample_correction,
-        float r_covmat[3][3], float r_center[3]);
-
-/**************************** Inline Definitions ******************************/
-#if 0  /* None so far. */
-#  if BLI_MATH_DO_INLINE
-#    include "intern/math_geom_inline.c"
-#  endif
-#endif
+/**
+ * \brief Compute the covariance matrix of given set of nD coordinates.
+ *
+ * \param n: the dimension of the vectors (and hence, of the covariance matrix to compute).
+ * \param cos_vn: the nD points to compute covariance from.
+ * \param nbr_cos_vn: the number of nD coordinates in cos_vn.
+ * \param center: the center (or mean point) of cos_vn. If NULL,
+ * it is assumed cos_vn is already centered.
+ * \param use_sample_correction: whether to apply sample correction
+ *                              (i.e. get 'sample variance' instead of 'population variance').
+ * \return r_covmat the computed covariance matrix.
+ */
+void BLI_covariance_m_vn_ex(int n,
+                            const float *cos_vn,
+                            int nbr_cos_vn,
+                            const float *center,
+                            bool use_sample_correction,
+                            float *r_covmat);
+/**
+ * \brief Compute the covariance matrix of given set of 3D coordinates.
+ *
+ * \param cos_v3: the 3D points to compute covariance from.
+ * \param nbr_cos_v3: the number of 3D coordinates in cos_v3.
+ * \return r_covmat the computed covariance matrix.
+ * \return r_center the computed center (mean) of 3D points (may be NULL).
+ */
+void BLI_covariance_m3_v3n(const float (*cos_v3)[3],
+                           int nbr_cos_v3,
+                           bool use_sample_correction,
+                           float r_covmat[3][3],
+                           float r_center[3]);
 
 #ifdef BLI_MATH_GCC_WARN_PRAGMA
 #  pragma GCC diagnostic pop
 #endif
 
+/** \} */
+
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __BLI_MATH_STATISTICS_H__ */
-

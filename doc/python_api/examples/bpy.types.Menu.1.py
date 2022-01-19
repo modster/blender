@@ -1,6 +1,7 @@
 """
 Submenus
 ++++++++
+
 This menu demonstrates some different functions.
 """
 import bpy
@@ -23,7 +24,7 @@ class SubMenu(bpy.types.Menu):
         layout.separator()
 
         # expand each operator option into this menu
-        layout.operator_enum("object.lamp_add", "type")
+        layout.operator_enum("object.light_add", "type")
 
         layout.separator()
 

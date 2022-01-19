@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,65 +15,80 @@
  *
  * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
  * All rights reserved.
- *
- * The Original Code is: all of this file.
- *
- * Contributor(s): none yet.
- *
- * ***** END GPL LICENSE BLOCK *****
  */
-/** \file DNA_text_types.h
- *  \ingroup DNA
- *  \since mar-2001
- *  \author nzc
+/** \file
+ * \ingroup DNA
  *
  * Text blocks used for Python-Scripts, OpenShadingLanguage
  * and arbitrary text data to store in blend files.
  */
 
-#ifndef __DNA_TEXT_TYPES_H__
-#define __DNA_TEXT_TYPES_H__
+#pragma once
 
-#include "DNA_listBase.h"
 #include "DNA_ID.h"
+#include "DNA_listBase.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef struct TextLine {
-	struct TextLine *next, *prev;
+  struct TextLine *next, *prev;
 
-	char *line;
-	char *format; /* may be NULL if syntax is off or not yet formatted */
-	int len, blen; /* blen unused */
+  char *line;
+  /** May be NULL if syntax is off or not yet formatted. */
+  char *format;
+  /** Blen unused. */
+  int len;
+  char _pad0[4];
 } TextLine;
 
 typedef struct Text {
-	ID id;
-	
-	char *name;
+  ID id;
 
-	int flags, nlines;
-	
-	ListBase lines;
-	TextLine *curl, *sell;
-	int curc, selc;
-	
-	char *undo_buf;
-	int undo_pos, undo_len;
-	
-	void *compiled;
-	double mtime;
+  /**
+   * Optional file path, when NULL text is considered internal.
+   * Otherwise this path will be used when saving/reloading.
+   *
+   * When set this is where the file will or has been saved.
+   */
+  char *filepath;
+
+  /**
+   * Python code object for this text (cached result of #Py_CompileStringObject).
+   */
+  void *compiled;
+
+  int flags;
+  char _pad0[4];
+
+  ListBase lines;
+  TextLine *curl, *sell;
+  int curc, selc;
+
+  double mtime;
 } Text;
 
-#define TXT_TABSIZE	4
-#define TXT_INIT_UNDO 1024
-#define TXT_MAX_UNDO	(TXT_INIT_UNDO*TXT_INIT_UNDO)
+#define TXT_TABSIZE 4
 
-/* text flags */
-#define TXT_ISDIRTY             0x0001
-#define TXT_ISMEM               0x0004
-#define TXT_ISEXT               0x0008
-#define TXT_ISSCRIPT            0x0010 /* used by space handler scriptlinks */
-// #define TXT_READONLY            0x0100
-// #define TXT_FOLLOW              0x0200 /* always follow cursor (console) */
-#define TXT_TABSTOSPACES        0x0400 /* use space instead of tabs */
+/** #Text.flags */
+enum {
+  /** Set if the file in run-time differs from the file on disk, or if there is no file on disk. */
+  TXT_ISDIRTY = 1 << 0,
+  /** When the text hasn't been written to a file. #Text.filepath may be NULL or invalid. */
+  TXT_ISMEM = 1 << 2,
+  /** Should always be set if the Text is not to be written into the `.blend`. */
+  TXT_ISEXT = 1 << 3,
+  /** Load the script as a Python module when loading the `.blend` file. */
+  TXT_ISSCRIPT = 1 << 4,
 
-#endif  /* __DNA_TEXT_TYPES_H__ */
+  TXT_FLAG_UNUSED_8 = 1 << 8, /* cleared */
+  TXT_FLAG_UNUSED_9 = 1 << 9, /* cleared */
+
+  /** Use space instead of tabs. */
+  TXT_TABSTOSPACES = 1 << 10,
+};
+
+#ifdef __cplusplus
+}
+#endif

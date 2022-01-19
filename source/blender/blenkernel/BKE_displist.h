@@ -1,6 +1,4 @@
-/* 
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
+/*
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,89 +15,108 @@
  *
  * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
  * All rights reserved.
- *
- * The Original Code is: all of this file.
- *
- * Contributor(s): none yet.
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-#ifndef __BKE_DISPLIST_H__
-#define __BKE_DISPLIST_H__
+#pragma once
 
-/** \file BKE_displist.h
- *  \ingroup bke
- *  \brief display list (or rather multi purpose list) stuff.
+/** \file
+ * \ingroup bke
+ * \brief display list (or rather multi purpose list) stuff.
  */
-#include "DNA_customdata_types.h"
 #include "BKE_customdata.h"
+#include "DNA_customdata_types.h"
 
-/* dl->type */
-#define DL_POLY                 0
-#define DL_SEGM                 1
-#define DL_SURF                 2
-#define DL_INDEX3               4
-#define DL_INDEX4               5
-// #define DL_VERTCOL              6  // UNUSED
-#define DL_VERTS                7
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-/* dl->flag */
-#define DL_CYCL_U       1
-#define DL_CYCL_V       2
-#define DL_FRONT_CURVE  4
-#define DL_BACK_CURVE   8
+/** #DispList.type */
+enum {
+  /** A closed polygon (that can be filled). */
+  DL_POLY = 0,
+  /** An open polygon. */
+  DL_SEGM = 1,
+  /** A grid surface that respects #DL_CYCL_U & #DL_CYCL_V. */
+  DL_SURF = 2,
+  /** Triangles. */
+  DL_INDEX3 = 4,
+  /** Quads, with support for triangles (when values of the 3rd and 4th indices match). */
+  DL_INDEX4 = 5,
+  // DL_VERTCOL = 6, /* UNUSED */
+  /** Isolated points. */
+  DL_VERTS = 7,
+};
 
+/** #DispList.type */
+enum {
+  /** U/V swapped here compared with #Nurb.flagu, #Nurb.flagv and #CU_NURB_CYCLIC */
+  DL_CYCL_U = (1 << 0),
+  DL_CYCL_V = (1 << 1),
+
+  DL_FRONT_CURVE = (1 << 2),
+  DL_BACK_CURVE = (1 << 3),
+};
 
 /* prototypes */
 
-struct Scene;
-struct Object;
+struct Depsgraph;
 struct ListBase;
-struct DerivedMesh;
-struct EvaluationContext;
+struct Mesh;
+struct Object;
+struct Scene;
 
-/* used for curves, nurbs, mball, importing */
+/* Used for curves, nurbs, meta-balls. */
 typedef struct DispList {
-	struct DispList *next, *prev;
-	short type, flag;
-	int parts, nr;
-	short col, rt;              /* rt used by initrenderNurbs */
-	float *verts, *nors;
-	int *index;
-	int charidx;
-	int totindex;               /* indexed array drawing surfaces */
-
-	unsigned int *bevelSplitFlag;
+  struct DispList *next, *prev;
+  short type, flag;
+  int parts, nr;
+  short col, rt; /* Currently only used for smooth flag. */
+  float *verts, *nors;
+  int *index;
+  int charidx;
+  int totindex; /* indexed array drawing surfaces */
 } DispList;
 
-void BKE_displist_copy(struct ListBase *lbn, struct ListBase *lb);
-void BKE_displist_elem_free(DispList *dl);
-DispList *BKE_displist_find_or_create(struct ListBase *lb, int type);
+void BKE_displist_copy(struct ListBase *lbn, const struct ListBase *lb);
 DispList *BKE_displist_find(struct ListBase *lb, int type);
 void BKE_displist_normals_add(struct ListBase *lb);
-void BKE_displist_count(struct ListBase *lb, int *totvert, int *totface, int *tottri);
+void BKE_displist_count(const struct ListBase *lb, int *totvert, int *totface, int *tottri);
 void BKE_displist_free(struct ListBase *lb);
-bool BKE_displist_has_faces(struct ListBase *lb);
 
-void BKE_displist_make_surf(struct Scene *scene, struct Object *ob, struct ListBase *dispbase, struct DerivedMesh **r_dm_final,
-                            const bool for_render, const bool for_orco, const bool use_render_resolution);
-void BKE_displist_make_curveTypes(struct Scene *scene, struct Object *ob, const bool for_orco);
-void BKE_displist_make_curveTypes_forRender(struct Scene *scene, struct Object *ob, struct ListBase *dispbase, struct DerivedMesh **r_dm_final,
-                                            const bool for_orco, const bool use_render_resolution);
-void BKE_displist_make_curveTypes_forOrco(struct Scene *scene, struct Object *ob, struct ListBase *dispbase);
-void BKE_displist_make_mball(struct EvaluationContext *eval_ctx, struct Scene *scene, struct Object *ob);
-void BKE_displist_make_mball_forRender(struct EvaluationContext *eval_ctx, struct Scene *scene, struct Object *ob, struct ListBase *dispbase);
+void BKE_displist_make_curveTypes(struct Depsgraph *depsgraph,
+                                  const struct Scene *scene,
+                                  struct Object *ob,
+                                  bool for_render);
+void BKE_displist_make_mball(struct Depsgraph *depsgraph, struct Scene *scene, struct Object *ob);
 
-bool BKE_displist_surfindex_get(DispList *dl, int a, int *b, int *p1, int *p2, int *p3, int *p4);
-void BKE_displist_fill(struct ListBase *dispbase, struct ListBase *to, const float normal_proj[3], const bool flipnormal);
+void BKE_curve_calc_modifiers_pre(struct Depsgraph *depsgraph,
+                                  const struct Scene *scene,
+                                  struct Object *ob,
+                                  struct ListBase *source_nurb,
+                                  struct ListBase *target_nurb,
+                                  bool for_render);
+bool BKE_displist_surfindex_get(
+    const struct DispList *dl, int a, int *b, int *p1, int *p2, int *p3, int *p4);
 
-float BKE_displist_calc_taper(struct Scene *scene, struct Object *taperobj, int cur, int tot);
+/**
+ * \param normal_proj: Optional normal that's used to project the scan-fill verts into 2D coords.
+ * Pass this along if known since it saves time calculating the normal.
+ * This is also used to initialize #DispList.nors (one normal per display list).
+ * \param flip_normal: Flip the normal (same as passing \a normal_proj negated).
+ */
+void BKE_displist_fill(const struct ListBase *dispbase,
+                       struct ListBase *to,
+                       const float normal_proj[3],
+                       bool flip_normal);
 
-/* add Orco layer to the displist object which has got derived mesh and return orco */
-float *BKE_displist_make_orco(struct Scene *scene, struct Object *ob, struct DerivedMesh *dm_final,
-                              const bool for_render, const bool use_render_resolution);
+float BKE_displist_calc_taper(struct Depsgraph *depsgraph,
+                              const struct Scene *scene,
+                              struct Object *taperobj,
+                              int cur,
+                              int tot);
 
-void BKE_displist_minmax(struct ListBase *dispbase, float min[3], float max[3]);
+void BKE_displist_minmax(const struct ListBase *dispbase, float min[3], float max[3]);
 
+#ifdef __cplusplus
+}
 #endif

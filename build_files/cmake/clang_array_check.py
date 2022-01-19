@@ -13,7 +13,7 @@ Invocation:
    export CLANG_BIND_DIR="/dsk/src/llvm/tools/clang/bindings/python"
    export CLANG_LIB_DIR="/opt/llvm/lib"
 
-   python2 clang_array_check.py somefile.c -DSOME_DEFINE -I/some/include
+   python clang_array_check.py somefile.c -DSOME_DEFINE -I/some/include
 
 ... defines and includes are optional
 
@@ -33,7 +33,7 @@ defs_precalc = {
     "glColor3ubv": {0: 3},
     "glColor4ubv": {0: 4},
 
-    "glColor4usv": {0: 3},
+    "glColor3usv": {0: 3},
     "glColor4usv": {0: 4},
 
     "glColor3fv": {0: 3},
@@ -76,6 +76,32 @@ defs_precalc = {
     "glNormal3bv": {0: 3},
     "glNormal3iv": {0: 3},
     "glNormal3sv": {0: 3},
+
+    # GPU immediate mode.
+    "immVertex2iv": {1: 2},
+
+    "immVertex2fv": {1: 2},
+    "immVertex3fv": {1: 3},
+
+    "immAttr2fv": {1: 2},
+    "immAttr3fv": {1: 3},
+    "immAttr4fv": {1: 4},
+
+    "immAttr3ubv": {1: 3},
+    "immAttr4ubv": {1: 4},
+
+    "immUniform2fv": {1: 2},
+    "immUniform3fv": {1: 3},
+    "immUniform4fv": {1: 4},
+
+    "immUniformColor3fv": {0: 3},
+    "immUniformColor4fv": {0: 4},
+
+    "immUniformColor3ubv": {1: 3},
+    "immUniformColor4ubv": {1: 4},
+
+    "immUniformColor3fvAlpha": {0: 3},
+    "immUniformColor4fvAlpha": {0: 4},
 }
 
 # -----------------------------------------------------------------------------
@@ -100,7 +126,8 @@ else:
     if CLANG_LIB_DIR is None:
         print("$CLANG_LIB_DIR clang lib dir not set")
 
-sys.path.append(CLANG_BIND_DIR)
+if CLANG_BIND_DIR:
+    sys.path.append(CLANG_BIND_DIR)
 
 import clang
 import clang.cindex
@@ -108,7 +135,8 @@ from clang.cindex import (CursorKind,
                           TypeKind,
                           TokenKind)
 
-clang.cindex.Config.set_library_path(CLANG_LIB_DIR)
+if CLANG_LIB_DIR:
+    clang.cindex.Config.set_library_path(CLANG_LIB_DIR)
 
 index = clang.cindex.Index.create()
 
@@ -130,7 +158,7 @@ def function_parm_wash_tokens(parm):
                          )
 
     """
-    Return tolens without trailing commads and 'const'
+    Return tokens without trailing commands and 'const'
     """
 
     tokens = [t for t in parm.get_tokens()]
@@ -140,7 +168,7 @@ def function_parm_wash_tokens(parm):
     # if tokens[-1].kind == To
     # remove trailing char
     if tokens[-1].kind == TokenKind.PUNCTUATION:
-        if tokens[-1].spelling in (",", ")", ";"):
+        if tokens[-1].spelling in {",", ")", ";"}:
             tokens.pop()
         # else:
         #     print(tokens[-1].spelling)
@@ -151,7 +179,7 @@ def function_parm_wash_tokens(parm):
         t_spelling = t.spelling
         ok = True
         if t_kind == TokenKind.KEYWORD:
-            if t_spelling in ("const", "restrict", "volatile"):
+            if t_spelling in {"const", "restrict", "volatile"}:
                 ok = False
             elif t_spelling.startswith("__"):
                 ok = False  # __restrict
@@ -239,8 +267,8 @@ def file_check_arg_sizes(tu):
         if 0:
             print("---",
                   " <~> ".join(
-                  [" ".join([t.spelling for t in C.get_tokens()])
-                  for C in node.get_children()]
+                      [" ".join([t.spelling for t in C.get_tokens()])
+                       for C in node.get_children()]
                   ))
         # print(node.location)
 
@@ -277,7 +305,7 @@ def file_check_arg_sizes(tu):
         for i, node_child in enumerate(children):
             children = list(node_child.get_children())
 
-            # skip if we dont have an index...
+            # skip if we don't have an index...
             size_def = args_size_definition.get(i, -1)
 
             if size_def == -1:
@@ -326,7 +354,7 @@ def file_check_arg_sizes(tu):
                                                    filepath  # always the same but useful when running threaded
                                                    ))
 
-    # we dont really care what we are looking at, just scan entire file for
+    # we don't really care what we are looking at, just scan entire file for
     # function calls.
 
     def recursive_func_call_check(node):
@@ -355,6 +383,8 @@ def recursive_arg_sizes(node, ):
         # print("adding", node.spelling)
     for c in node.get_children():
         recursive_arg_sizes(c)
+
+
 # cache function sizes
 recursive_arg_sizes(tu.cursor)
 _defs.update(defs_precalc)

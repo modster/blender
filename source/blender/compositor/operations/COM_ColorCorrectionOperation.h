@@ -1,6 +1,4 @@
 /*
- * Copyright 2011, Blender Foundation.
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -15,50 +13,64 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor: 
- *		Jeroen Bakker 
- *		Monique Dewanchand
+ * Copyright 2011, Blender Foundation.
  */
 
-#ifndef _COM_ColorCorrectionOperation_h
-#define _COM_ColorCorrectionOperation_h
-#include "COM_NodeOperation.h"
+#pragma once
 
+#include "COM_MultiThreadedRowOperation.h"
 
-class ColorCorrectionOperation : public NodeOperation {
-private:
-	/**
-	 * Cached reference to the inputProgram
-	 */
-	SocketReader *m_inputImage;
-	SocketReader *m_inputMask;
-	NodeColorCorrection *m_data;
-	
-	bool m_redChannelEnabled;
-	bool m_greenChannelEnabled;
-	bool m_blueChannelEnabled;
+namespace blender::compositor {
 
-public:
-	ColorCorrectionOperation();
-	
-	/**
-	 * the inner loop of this program
-	 */
-	void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
-	
-	/**
-	 * Initialize the execution
-	 */
-	void initExecution();
-	
-	/**
-	 * Deinitialize the execution
-	 */
-	void deinitExecution();
-	
-	void setData(NodeColorCorrection *data) { this->m_data = data; }
-	void setRedChannelEnabled(bool enabled) { this->m_redChannelEnabled = enabled; }
-	void setGreenChannelEnabled(bool enabled) { this->m_greenChannelEnabled = enabled; }
-	void setBlueChannelEnabled(bool enabled) { this->m_blueChannelEnabled = enabled; }
+class ColorCorrectionOperation : public MultiThreadedRowOperation {
+ private:
+  /**
+   * Cached reference to the input_program
+   */
+  SocketReader *input_image_;
+  SocketReader *input_mask_;
+  NodeColorCorrection *data_;
+
+  bool red_channel_enabled_;
+  bool green_channel_enabled_;
+  bool blue_channel_enabled_;
+
+ public:
+  ColorCorrectionOperation();
+
+  /**
+   * The inner loop of this operation.
+   */
+  void execute_pixel_sampled(float output[4], float x, float y, PixelSampler sampler) override;
+
+  /**
+   * Initialize the execution
+   */
+  void init_execution() override;
+
+  /**
+   * Deinitialize the execution
+   */
+  void deinit_execution() override;
+
+  void set_data(NodeColorCorrection *data)
+  {
+    data_ = data;
+  }
+  void set_red_channel_enabled(bool enabled)
+  {
+    red_channel_enabled_ = enabled;
+  }
+  void set_green_channel_enabled(bool enabled)
+  {
+    green_channel_enabled_ = enabled;
+  }
+  void set_blue_channel_enabled(bool enabled)
+  {
+    blue_channel_enabled_ = enabled;
+  }
+
+  void update_memory_buffer_row(PixelCursor &p) override;
 };
-#endif
+
+}  // namespace blender::compositor

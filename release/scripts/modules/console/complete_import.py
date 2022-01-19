@@ -19,12 +19,12 @@
 # ##### END GPL LICENSE BLOCK #####
 
 # Original copyright (see docstring):
-#*****************************************************************************
+# ****************************************************************************
 #       Copyright (C) 2001-2006 Fernando Perez <fperez@colorado.edu>
 #
 #  Distributed under the terms of the BSD License.  The full license is in
 #  the file COPYING, distributed as part of this software.
-#*****************************************************************************
+# ****************************************************************************
 
 # <pep8 compliant>
 
@@ -37,7 +37,7 @@ changes have been made:
 - limit list of modules to prefix in case of "from w"
 - sorted modules
 - added sphinx documentation
-- complete() returns a blank list of the module isnt found
+- complete() returns a blank list of the module isn't found
 """
 
 
@@ -112,10 +112,10 @@ def module_list(path):
         folder_list = []
     #folder_list = glob.glob(os.path.join(path,'*'))
     folder_list = [
-            p for p in folder_list
-            if (os.path.exists(os.path.join(path, p, '__init__.py')) or
-                p[-3:] in {'.py', '.so'} or
-                p[-4:] in {'.pyc', '.pyo', '.pyd'})]
+        p for p in folder_list
+        if (os.path.exists(os.path.join(path, p, '__init__.py')) or
+            p[-3:] in {'.py', '.so'} or
+            p[-4:] in {'.pyc', '.pyo', '.pyd'})]
 
     folder_list = [os.path.basename(p).split('.')[0] for p in folder_list]
     return folder_list
@@ -143,7 +143,7 @@ def complete(line):
     """
     import inspect
 
-    def try_import(mod, only_modules=False):
+    def try_import(mod, *, only_modules=False):
 
         def is_importable(module, attr):
             if only_modules:
@@ -161,7 +161,7 @@ def complete(line):
         if (not hasattr(m, '__file__')) or (not only_modules) or\
            (hasattr(m, '__file__') and '__init__' in m.__file__):
             completion_list = [attr for attr in dir(m)
-                if is_importable(m, attr)]
+                               if is_importable(m, attr)]
         else:
             completion_list = []
         completion_list.extend(getattr(m, '__all__', []))
@@ -178,13 +178,13 @@ def complete(line):
     words = line.split(' ')
     if len(words) == 3 and words[0] == 'from':
         return ['import ']
-    if len(words) < 3 and (words[0] in ['import', 'from']):
+    if len(words) < 3 and (words[0] in {'import', 'from'}):
         if len(words) == 1:
             return get_root_modules()
         mod = words[1].split('.')
         if len(mod) < 2:
             return filter_prefix(get_root_modules(), words[-1])
-        completion_list = try_import('.'.join(mod[:-1]), True)
+        completion_list = try_import('.'.join(mod[:-1]), only_modules=True)
         completion_list = ['.'.join(mod[:-1] + [el]) for el in completion_list]
         return filter_prefix(completion_list, words[-1])
     if len(words) >= 3 and words[0] == 'from':

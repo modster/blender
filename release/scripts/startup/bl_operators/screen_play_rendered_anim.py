@@ -22,7 +22,8 @@
 
 import bpy
 from bpy.types import Operator
-import os
+
+from bpy.app.translations import pgettext_tip as tip_
 
 
 def guess_player_path(preset):
@@ -30,25 +31,11 @@ def guess_player_path(preset):
 
     if preset == 'INTERNAL':
         return bpy.app.binary_path
-    elif preset == 'BLENDER24':
-        player_path = "blender"
-
-        if sys.platform == "darwin":
-            test_path = "/Applications/blender 2.49.app/Contents/MacOS/blender"
-        elif sys.platform[:3] == "win":
-            test_path = "/Program Files/Blender Foundation/Blender/blender.exe"
-
-            if os.path.exists(test_path):
-                player_path = test_path
 
     elif preset == 'DJV':
-        player_path = "djv_view"
-
+        player_path = "djv"
         if sys.platform == "darwin":
-            # TODO, crummy supporting only 1 version,
-            # could find the newest installed version
-            test_path = ("/Applications/djv-0.8.2.app"
-                         "/Contents/Resources/bin/djv_view")
+            test_path = "/Applications/DJV2.app/Contents/Resources/bin/djv"
             if os.path.exists(test_path):
                 player_path = test_path
 
@@ -74,19 +61,23 @@ class PlayRenderedAnim(Operator):
     bl_options = {'REGISTER'}
 
     def execute(self, context):
+        import os
         import subprocess
+        from shlex import quote
 
         scene = context.scene
         rd = scene.render
-        prefs = context.user_preferences
+        prefs = context.preferences
+        fps_final = rd.fps / rd.fps_base
 
         preset = prefs.filepaths.animation_player_preset
-        player_path = prefs.filepaths.animation_player
         # file_path = bpy.path.abspath(rd.filepath)  # UNUSED
         is_movie = rd.is_movie_format
 
         # try and guess a command line if it doesn't exist
-        if player_path == "":
+        if preset == 'CUSTOM':
+            player_path = prefs.filepaths.animation_player
+        else:
             player_path = guess_player_path(preset)
 
         if is_movie is False and preset in {'FRAMECYCLER', 'RV', 'MPLAYER'}:
@@ -103,7 +94,7 @@ class PlayRenderedAnim(Operator):
             file_b = rd.frame_path(frame=int(frame_tmp / 10))
 
             file = ("".join((c if file_b[i] == c else "#")
-                    for i, c in enumerate(file_a)))
+                            for i, c in enumerate(file_a)))
             del file_a, file_b, frame_tmp
             file = bpy.path.abspath(file)  # expand '//'
         else:
@@ -112,15 +103,17 @@ class PlayRenderedAnim(Operator):
             file = rd.frame_path(frame=scene.frame_start, preview=scene.use_preview_range)
             file = bpy.path.abspath(file)  # expand '//'
             if not os.path.exists(file):
-                self.report({'WARNING'}, "File %r not found" % file)
+                err_msg = tip_("File %r not found") % file
+                self.report({'WARNING'}, err_msg)
                 path_valid = False
 
-            #one last try for full range if we used preview range
+            # one last try for full range if we used preview range
             if scene.use_preview_range and not path_valid:
                 file = rd.frame_path(frame=scene.frame_start, preview=False)
                 file = bpy.path.abspath(file)  # expand '//'
+                err_msg = tip_("File %r not found") % file
                 if not os.path.exists(file):
-                    self.report({'WARNING'}, "File %r not found" % file)
+                    self.report({'WARNING'}, err_msg)
 
         cmd = [player_path]
         # extra options, fps controls etc.
@@ -131,15 +124,24 @@ class PlayRenderedAnim(Operator):
             frame_start = scene.frame_start
             frame_end = scene.frame_end
         if preset == 'INTERNAL':
-            opts = ["-a",
-                    "-f", str(rd.fps), str(rd.fps_base),
-                    "-s", str(frame_start),
-                    "-e", str(frame_end),
-                    "-j", str(scene.frame_step),
-                    file]
+            opts = [
+                "-a",
+                "-f", str(rd.fps), str(rd.fps_base),
+                "-s", str(frame_start),
+                "-e", str(frame_end),
+                "-j", str(scene.frame_step),
+                "-c", str(prefs.system.memory_cache_limit),
+                file,
+            ]
             cmd.extend(opts)
         elif preset == 'DJV':
-            opts = [file, "-playback_speed", "%d" % int(rd.fps / rd.fps_base)]
+            opts = [
+                file,
+                "-speed", str(fps_final),
+                "-in_out", str(frame_start), str(frame_end),
+                "-frame", str(scene.frame_current),
+                "-time_units", "Frames"
+            ]
             cmd.extend(opts)
         elif preset == 'FRAMECYCLER':
             opts = [file, "%d-%d" % (scene.frame_start, scene.frame_end)]
@@ -152,10 +154,11 @@ class PlayRenderedAnim(Operator):
             if is_movie:
                 opts.append(file)
             else:
-                opts += [("mf://%s" % file.replace("#", "?")),
-                         "-mf",
-                         "fps=%.4f" % (rd.fps / rd.fps_base),
-                         ]
+                opts += [
+                    ("mf://" + file.replace("#", "?")),
+                    "-mf",
+                    "fps=%.4f" % fps_final,
+                ]
 
             opts += ["-loop", "0", "-really-quiet", "-fs"]
             cmd.extend(opts)
@@ -163,20 +166,21 @@ class PlayRenderedAnim(Operator):
             cmd.append(file)
 
         # launch it
-        print("Executing command:\n  %r" % " ".join(cmd))
-
-        # workaround for boost 1.46, can be eventually removed. bug: [#32350]
-        env_copy = os.environ.copy()
-        if preset == 'INTERNAL':
-            env_copy["LC_ALL"] = "C"
-        # end workaround
+        print("Executing command:\n ", " ".join(quote(c) for c in cmd))
 
         try:
-            subprocess.Popen(cmd, env=env_copy)
+            subprocess.Popen(cmd)
         except Exception as e:
-            self.report({'ERROR'},
-                        "Couldn't run external animation player with command "
-                        "%r\n%s" % (" ".join(cmd), str(e)))
+            err_msg = tip_("Couldn't run external animation player with command %r\n%s") % (cmd, e)
+            self.report(
+                {'ERROR'},
+                err_msg,
+            )
             return {'CANCELLED'}
 
         return {'FINISHED'}
+
+
+classes = (
+    PlayRenderedAnim,
+)

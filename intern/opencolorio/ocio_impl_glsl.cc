@@ -28,18 +28,26 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * Modifications Copyright 2013, Blender Foundation.
- *
- * Contributor(s): Sergey Sharybin
- *
  */
 
 #include <limits>
+#include <list>
 #include <sstream>
 #include <string.h>
+#include <vector>
 
-#include "glew-mx.h"
-
+#ifdef _MSC_VER
+#  pragma warning(push)
+#  pragma warning(disable : 4251 4275)
+#endif
 #include <OpenColorIO/OpenColorIO.h>
+#ifdef _MSC_VER
+#  pragma warning(pop)
+#endif
+
+#include "GPU_immediate.h"
+#include "GPU_shader.h"
+#include "GPU_uniform_buffer.h"
 
 using namespace OCIO_NAMESPACE;
 
@@ -47,411 +55,624 @@ using namespace OCIO_NAMESPACE;
 
 #include "ocio_impl.h"
 
-static const int LUT3D_EDGE_SIZE = 64;
-
 extern "C" char datatoc_gpu_shader_display_transform_glsl[];
+extern "C" char datatoc_gpu_shader_display_transform_vertex_glsl[];
 
 /* **** OpenGL drawing routines using GLSL for color space transform ***** */
 
-typedef struct OCIO_GLSLDrawState {
-	bool lut3d_texture_allocated;  /* boolean flag indicating whether
-	                                * lut texture is allocated
-	                                */
-	bool lut3d_texture_valid;
+enum OCIO_GPUTextureSlots {
+  TEXTURE_SLOT_IMAGE = 0,
+  TEXTURE_SLOT_OVERLAY = 1,
+  TEXTURE_SLOT_CURVE_MAPPING = 2,
+  TEXTURE_SLOT_LUTS_OFFSET = 3,
+};
 
-	GLuint lut3d_texture;  /* OGL texture ID for 3D LUT */
+/* Curve mapping parameters
+ *
+ * See documentation for OCIO_CurveMappingSettings to get fields descriptions.
+ * (this ones pretty much copies stuff from C structure.)
+ */
+struct OCIO_GPUCurveMappingParameters {
+  float curve_mapping_mintable[4];
+  float curve_mapping_range[4];
+  float curve_mapping_ext_in_x[4];
+  float curve_mapping_ext_in_y[4];
+  float curve_mapping_ext_out_x[4];
+  float curve_mapping_ext_out_y[4];
+  float curve_mapping_first_x[4];
+  float curve_mapping_first_y[4];
+  float curve_mapping_last_x[4];
+  float curve_mapping_last_y[4];
+  float curve_mapping_black[4];
+  float curve_mapping_bwmul[4];
+  int curve_mapping_lut_size;
+  int curve_mapping_use_extend_extrapolate;
+  int _pad[2];
+  /** WARNING: Needs to be 16byte aligned. Used as UBO data. */
+};
 
-	float *lut3d;  /* 3D LUT table */
+struct OCIO_GPUShader {
+  /* GPU shader. */
+  struct GPUShader *shader = nullptr;
 
-	bool dither_used;
+  /** Uniform locations. */
+  int scale_loc = 0;
+  int exponent_loc = 0;
+  int dither_loc = 0;
+  int overlay_loc = 0;
+  int predivide_loc = 0;
+  int ubo_bind = 0;
 
-	bool curve_mapping_used;
-	bool curve_mapping_texture_allocated;
-	bool curve_mapping_texture_valid;
-	GLuint curve_mapping_texture;
-	size_t curve_mapping_cache_id;
+  /* Destructor. */
+  ~OCIO_GPUShader()
+  {
+    if (shader) {
+      GPU_shader_free(shader);
+    }
+  }
+};
 
-	bool predivide_used;
+struct OCIO_GPULutTexture {
+  GPUTexture *texture = nullptr;
+  std::string sampler_name;
+};
 
-	bool texture_size_used;
+struct OCIO_GPUUniform {
+  GpuShaderDesc::UniformData data;
+  std::string name;
+};
 
-	/* Cache */
-	std::string lut3dcacheid;
-	std::string shadercacheid;
+struct OCIO_GPUTextures {
+  /** LUT Textures */
+  std::vector<OCIO_GPULutTexture> luts;
 
-	/* GLSL stuff */
-	GLuint ocio_shader;
-	GLuint program;
+  /* Dummy in case of no overlay. */
+  GPUTexture *dummy = nullptr;
 
-	/* Previous OpenGL state. */
-	GLint last_texture, last_texture_unit;
-} OCIO_GLSLDrawState;
+  /* Uniforms */
+  std::vector<OCIO_GPUUniform> uniforms;
 
-static GLuint compileShaderText(GLenum shaderType, const char *text)
+  /* Destructor. */
+  ~OCIO_GPUTextures()
+  {
+    for (OCIO_GPULutTexture &lut : luts) {
+      GPU_texture_free(lut.texture);
+    }
+    if (dummy) {
+      GPU_texture_free(dummy);
+    }
+  }
+};
+
+struct OCIO_GPUCurveMappping {
+  /** GPU Uniform Buffer handle. 0 if not allocated. */
+  GPUUniformBuf *buffer = nullptr;
+  /** OpenGL Texture handles. 0 if not allocated. */
+  GPUTexture *texture = nullptr;
+  /* To detect when to update the uniforms and textures. */
+  size_t cache_id = 0;
+
+  /* Destructor. */
+  ~OCIO_GPUCurveMappping()
+  {
+    if (texture) {
+      GPU_texture_free(texture);
+    }
+    if (buffer) {
+      GPU_uniformbuf_free(buffer);
+    }
+  }
+};
+
+struct OCIO_GPUDisplayShader {
+  OCIO_GPUShader shader;
+  OCIO_GPUTextures textures;
+  OCIO_GPUCurveMappping curvemap;
+
+  /* Cache variables. */
+  std::string input;
+  std::string view;
+  std::string display;
+  std::string look;
+  bool use_curve_mapping = false;
+
+  /** Error checking. */
+  bool valid = false;
+};
+
+static const int SHADER_CACHE_MAX_SIZE = 4;
+std::list<OCIO_GPUDisplayShader> SHADER_CACHE;
+
+/* -------------------------------------------------------------------- */
+/** \name Shader
+ * \{ */
+
+static bool createGPUShader(OCIO_GPUShader &shader,
+                            OCIO_GPUTextures &textures,
+                            const GpuShaderDescRcPtr &shaderdesc_to_scene_linear,
+                            const GpuShaderDescRcPtr &shaderdesc_to_display,
+                            const bool use_curve_mapping)
 {
-	GLuint shader;
-	GLint stat;
+  std::ostringstream os;
+  {
+    /* Fragment shader */
 
-	shader = glCreateShader(shaderType);
-	glShaderSource(shader, 1, (const GLchar **) &text, NULL);
-	glCompileShader(shader);
-	glGetShaderiv(shader, GL_COMPILE_STATUS, &stat);
+    /* Work around OpenColorIO not supporting latest GLSL yet. */
+    os << "#define texture2D texture\n";
+    os << "#define texture3D texture\n";
 
-	if (!stat) {
-		GLchar log[1000];
-		GLsizei len;
-		glGetShaderInfoLog(shader, 1000, &len, log);
-		fprintf(stderr, "Shader compile error:\n%s\n", log);
-		return 0;
-	}
+    if (use_curve_mapping) {
+      os << "#define USE_CURVE_MAPPING\n";
+    }
 
-	return shader;
+    os << shaderdesc_to_scene_linear->getShaderText() << "\n";
+    os << shaderdesc_to_display->getShaderText() << "\n";
+
+    os << datatoc_gpu_shader_display_transform_glsl;
+  }
+
+  shader.shader = GPU_shader_create(datatoc_gpu_shader_display_transform_vertex_glsl,
+                                    os.str().c_str(),
+                                    nullptr,
+                                    nullptr,
+                                    nullptr,
+                                    "OCIOShader");
+
+  if (shader.shader == nullptr) {
+    return false;
+  }
+
+  shader.scale_loc = GPU_shader_get_uniform(shader.shader, "scale");
+  shader.exponent_loc = GPU_shader_get_uniform(shader.shader, "exponent");
+  shader.dither_loc = GPU_shader_get_uniform(shader.shader, "dither");
+  shader.overlay_loc = GPU_shader_get_uniform(shader.shader, "overlay");
+  shader.predivide_loc = GPU_shader_get_uniform(shader.shader, "predivide");
+  shader.ubo_bind = GPU_shader_get_uniform_block_binding(shader.shader,
+                                                         "OCIO_GPUCurveMappingParameters");
+
+  GPU_shader_bind(shader.shader);
+
+  /* Set texture bind point uniform once. This is saved by the shader. */
+  GPUShader *sh = shader.shader;
+  GPU_shader_uniform_int(sh, GPU_shader_get_uniform(sh, "image_texture"), TEXTURE_SLOT_IMAGE);
+  GPU_shader_uniform_int(sh, GPU_shader_get_uniform(sh, "overlay_texture"), TEXTURE_SLOT_OVERLAY);
+
+  if (use_curve_mapping) {
+    GPU_shader_uniform_int(
+        sh, GPU_shader_get_uniform(sh, "curve_mapping_texture"), TEXTURE_SLOT_CURVE_MAPPING);
+  }
+
+  /* Set LUT textures. */
+  for (int i = 0; i < textures.luts.size(); i++) {
+    GPU_shader_uniform_int(sh,
+                           GPU_shader_get_uniform(sh, textures.luts[i].sampler_name.c_str()),
+                           TEXTURE_SLOT_LUTS_OFFSET + i);
+  }
+
+  /* Set uniforms. */
+  for (OCIO_GPUUniform &uniform : textures.uniforms) {
+    const GpuShaderDesc::UniformData &data = uniform.data;
+    const char *name = uniform.name.c_str();
+
+    if (data.m_getDouble) {
+      GPU_shader_uniform_1f(sh, name, (float)data.m_getDouble());
+    }
+    else if (data.m_getBool) {
+      GPU_shader_uniform_1f(sh, name, (float)(data.m_getBool() ? 1.0f : 0.0f));
+    }
+    else if (data.m_getFloat3) {
+      GPU_shader_uniform_3f(sh,
+                            name,
+                            (float)data.m_getFloat3()[0],
+                            (float)data.m_getFloat3()[1],
+                            (float)data.m_getFloat3()[2]);
+    }
+    else if (data.m_vectorFloat.m_getSize && data.m_vectorFloat.m_getVector) {
+      GPU_shader_uniform_vector(sh,
+                                GPU_shader_get_uniform(sh, name),
+                                (int)data.m_vectorFloat.m_getSize(),
+                                1,
+                                (float *)data.m_vectorFloat.m_getVector());
+    }
+    else if (data.m_vectorInt.m_getSize && data.m_vectorInt.m_getVector) {
+      GPU_shader_uniform_vector_int(sh,
+                                    GPU_shader_get_uniform(sh, name),
+                                    (int)data.m_vectorInt.m_getSize(),
+                                    1,
+                                    (int *)data.m_vectorInt.m_getVector());
+    }
+  }
+
+  return true;
 }
 
-static GLuint linkShaders(GLuint ocio_shader)
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Textures
+ * \{ */
+
+static bool addGPUUniform(OCIO_GPUTextures &textures,
+                          const GpuShaderDescRcPtr &shader_desc,
+                          int index)
 {
-	if (!ocio_shader)
-		return 0;
+  OCIO_GPUUniform uniform;
+  uniform.name = shader_desc->getUniform(index, uniform.data);
+  if (uniform.data.m_type == UNIFORM_UNKNOWN) {
+    return false;
+  }
 
-	GLuint program = glCreateProgram();
-
-	glAttachShader(program, ocio_shader);
-
-	glLinkProgram(program);
-
-	/* check link */
-	{
-		GLint stat;
-		glGetProgramiv(program, GL_LINK_STATUS, &stat);
-		if (!stat) {
-			GLchar log[1000];
-			GLsizei len;
-			glGetProgramInfoLog(program, 1000, &len, log);
-			fprintf(stderr, "Shader link error:\n%s\n", log);
-			return 0;
-		}
-	}
-
-	return program;
+  textures.uniforms.push_back(uniform);
+  return true;
 }
 
-static OCIO_GLSLDrawState *allocateOpenGLState(void)
+static bool addGPULut2D(OCIO_GPUTextures &textures,
+                        const GpuShaderDescRcPtr &shader_desc,
+                        int index)
 {
-	OCIO_GLSLDrawState *state;
+  const char *texture_name = nullptr;
+  const char *sampler_name = nullptr;
+  unsigned int width = 0;
+  unsigned int height = 0;
+  GpuShaderCreator::TextureType channel = GpuShaderCreator::TEXTURE_RGB_CHANNEL;
+  Interpolation interpolation = INTERP_LINEAR;
+  shader_desc->getTexture(
+      index, texture_name, sampler_name, width, height, channel, interpolation);
 
-	/* Allocate memory for state. */
-	state = (OCIO_GLSLDrawState *) MEM_callocN(sizeof(OCIO_GLSLDrawState),
-	                                           "OCIO OpenGL State struct");
+  const float *values;
+  shader_desc->getTextureValues(index, values);
+  if (texture_name == nullptr || sampler_name == nullptr || width == 0 || height == 0 ||
+      values == nullptr) {
+    return false;
+  }
 
-	/* Call constructors on new memory. */
-	new (&state->lut3dcacheid) std::string("");
-	new (&state->shadercacheid) std::string("");
+  eGPUTextureFormat format = (channel == GpuShaderCreator::TEXTURE_RGB_CHANNEL) ? GPU_RGB16F :
+                                                                                  GPU_R16F;
 
-	return state;
+  OCIO_GPULutTexture lut;
+  lut.texture = GPU_texture_create_2d(texture_name, width, height, 0, format, values);
+  if (lut.texture == nullptr) {
+    return false;
+  }
+
+  GPU_texture_filter_mode(lut.texture, interpolation != INTERP_NEAREST);
+  GPU_texture_wrap_mode(lut.texture, false, true);
+
+  lut.sampler_name = sampler_name;
+
+  textures.luts.push_back(lut);
+  return true;
 }
 
-/* Ensure LUT texture and array are allocated */
-static bool ensureLUT3DAllocated(OCIO_GLSLDrawState *state)
+static bool addGPULut3D(OCIO_GPUTextures &textures,
+                        const GpuShaderDescRcPtr &shader_desc,
+                        int index)
 {
-	int num_3d_entries = 3 * LUT3D_EDGE_SIZE * LUT3D_EDGE_SIZE * LUT3D_EDGE_SIZE;
+  const char *texture_name = nullptr;
+  const char *sampler_name = nullptr;
+  unsigned int edgelen = 0;
+  Interpolation interpolation = INTERP_LINEAR;
+  shader_desc->get3DTexture(index, texture_name, sampler_name, edgelen, interpolation);
 
-	if (state->lut3d_texture_allocated)
-		return state->lut3d_texture_valid;
+  const float *values;
+  shader_desc->get3DTextureValues(index, values);
+  if (texture_name == nullptr || sampler_name == nullptr || edgelen == 0 || values == nullptr) {
+    return false;
+  }
 
-	glGenTextures(1, &state->lut3d_texture);
+  OCIO_GPULutTexture lut;
+  lut.texture = GPU_texture_create_3d(
+      texture_name, edgelen, edgelen, edgelen, 0, GPU_RGB16F, GPU_DATA_FLOAT, values);
+  if (lut.texture == nullptr) {
+    return false;
+  }
 
-	state->lut3d = (float *) MEM_callocN(sizeof(float) * num_3d_entries, "OCIO GPU 3D LUT");
+  GPU_texture_filter_mode(lut.texture, interpolation != INTERP_NEAREST);
+  GPU_texture_wrap_mode(lut.texture, false, true);
 
-	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_3D, state->lut3d_texture);
-	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+  lut.sampler_name = sampler_name;
 
-	/* clean glError buffer */
-	while (glGetError() != GL_NO_ERROR) {}
-
-	glTexImage3D(GL_TEXTURE_3D, 0, GL_RGB16F_ARB,
-	             LUT3D_EDGE_SIZE, LUT3D_EDGE_SIZE, LUT3D_EDGE_SIZE,
-	             0, GL_RGB, GL_FLOAT, state->lut3d);
-
-	state->lut3d_texture_allocated = true;
-
-	/* GL_RGB16F_ARB could be not supported at some drivers
-	 * in this case we could not use GLSL display
-	 */
-	state->lut3d_texture_valid = glGetError() == GL_NO_ERROR;
-
-	return state->lut3d_texture_valid;
+  textures.luts.push_back(lut);
+  return true;
 }
 
-static bool ensureCurveMappingAllocated(OCIO_GLSLDrawState *state, OCIO_CurveMappingSettings *curve_mapping_settings)
+static bool createGPUTextures(OCIO_GPUTextures &textures,
+                              const GpuShaderDescRcPtr &shaderdesc_to_scene_linear,
+                              const GpuShaderDescRcPtr &shaderdesc_to_display)
 {
-	if (state->curve_mapping_texture_allocated)
-		return state->curve_mapping_texture_valid;
+  textures.dummy = GPU_texture_create_error(2, false);
 
-	glGenTextures(1, &state->curve_mapping_texture);
+  textures.luts.clear();
+  textures.uniforms.clear();
 
-	glActiveTexture(GL_TEXTURE2);
-	glBindTexture(GL_TEXTURE_1D, state->curve_mapping_texture);
-	glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+  for (int index = 0; index < shaderdesc_to_scene_linear->getNumUniforms(); index++) {
+    if (!addGPUUniform(textures, shaderdesc_to_scene_linear, index)) {
+      return false;
+    }
+  }
+  for (int index = 0; index < shaderdesc_to_scene_linear->getNumTextures(); index++) {
+    if (!addGPULut2D(textures, shaderdesc_to_scene_linear, index)) {
+      return false;
+    }
+  }
+  for (int index = 0; index < shaderdesc_to_scene_linear->getNum3DTextures(); index++) {
+    if (!addGPULut3D(textures, shaderdesc_to_scene_linear, index)) {
+      return false;
+    }
+  }
+  for (int index = 0; index < shaderdesc_to_display->getNumUniforms(); index++) {
+    if (!addGPUUniform(textures, shaderdesc_to_display, index)) {
+      return false;
+    }
+  }
+  for (int index = 0; index < shaderdesc_to_display->getNumTextures(); index++) {
+    if (!addGPULut2D(textures, shaderdesc_to_display, index)) {
+      return false;
+    }
+  }
+  for (int index = 0; index < shaderdesc_to_display->getNum3DTextures(); index++) {
+    if (!addGPULut3D(textures, shaderdesc_to_display, index)) {
+      return false;
+    }
+  }
 
-	/* clean glError buffer */
-	while (glGetError() != GL_NO_ERROR) {}
-
-	glTexImage1D(GL_TEXTURE_1D, 0, GL_RGBA16F_ARB, curve_mapping_settings->lut_size,
-	             0, GL_RGBA, GL_FLOAT, curve_mapping_settings->lut);
-
-	state->curve_mapping_texture_allocated = true;
-
-	/* GL_RGB16F_ARB could be not supported at some drivers
-	 * in this case we could not use GLSL display
-	 */
-	state->curve_mapping_texture_valid = glGetError() == GL_NO_ERROR;
-
-	return state->curve_mapping_texture_valid;
+  return true;
 }
 
-/* Detect if we can support GLSL drawing */
-bool OCIOImpl::supportGLSLDraw()
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Curve Mapping
+ * \{ */
+
+static bool createGPUCurveMapping(OCIO_GPUCurveMappping &curvemap,
+                                  OCIO_CurveMappingSettings *curve_mapping_settings)
 {
-	/* GLSL and GL_RGB16F_ARB */
-	return GLEW_VERSION_2_0 && (GLEW_VERSION_3_0 || GLEW_ARB_texture_float);
+  if (curve_mapping_settings) {
+    int lut_size = curve_mapping_settings->lut_size;
+
+    curvemap.texture = GPU_texture_create_1d("OCIOCurveMap", lut_size, 1, GPU_RGBA16F, nullptr);
+    GPU_texture_filter_mode(curvemap.texture, false);
+    GPU_texture_wrap_mode(curvemap.texture, false, true);
+
+    curvemap.buffer = GPU_uniformbuf_create(sizeof(OCIO_GPUCurveMappingParameters));
+
+    if (curvemap.texture == nullptr || curvemap.buffer == nullptr) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
-static bool supportGLSL13()
+static void updateGPUCurveMapping(OCIO_GPUCurveMappping &curvemap,
+                                  OCIO_CurveMappingSettings *curve_mapping_settings)
 {
-	const char *version = (const char*)glGetString(GL_SHADING_LANGUAGE_VERSION);
-	int major = 1, minor = 0;
+  /* Test if we need to update. The caller ensures the curve_mapping_settings
+   * changes when its contents changes. */
+  if (curve_mapping_settings == nullptr || curvemap.cache_id == curve_mapping_settings->cache_id) {
+    return;
+  }
 
-	if (version && sscanf(version, "%d.%d", &major, &minor) == 2)
-		return (major > 1 || (major == 1 && minor >= 30));
+  curvemap.cache_id = curve_mapping_settings->cache_id;
 
-	return false;
+  /* Update texture. */
+  int offset[3] = {0, 0, 0};
+  int extent[3] = {curve_mapping_settings->lut_size, 0, 0};
+  const float *pixels = curve_mapping_settings->lut;
+  GPU_texture_update_sub(
+      curvemap.texture, GPU_DATA_FLOAT, pixels, UNPACK3(offset), UNPACK3(extent));
+
+  /* Update uniforms. */
+  OCIO_GPUCurveMappingParameters data;
+  for (int i = 0; i < 4; i++) {
+    data.curve_mapping_range[i] = curve_mapping_settings->range[i];
+    data.curve_mapping_mintable[i] = curve_mapping_settings->mintable[i];
+    data.curve_mapping_ext_in_x[i] = curve_mapping_settings->ext_in_x[i];
+    data.curve_mapping_ext_in_y[i] = curve_mapping_settings->ext_in_y[i];
+    data.curve_mapping_ext_out_x[i] = curve_mapping_settings->ext_out_x[i];
+    data.curve_mapping_ext_out_y[i] = curve_mapping_settings->ext_out_y[i];
+    data.curve_mapping_first_x[i] = curve_mapping_settings->first_x[i];
+    data.curve_mapping_first_y[i] = curve_mapping_settings->first_y[i];
+    data.curve_mapping_last_x[i] = curve_mapping_settings->last_x[i];
+    data.curve_mapping_last_y[i] = curve_mapping_settings->last_y[i];
+  }
+  for (int i = 0; i < 3; i++) {
+    data.curve_mapping_black[i] = curve_mapping_settings->black[i];
+    data.curve_mapping_bwmul[i] = curve_mapping_settings->bwmul[i];
+  }
+  data.curve_mapping_lut_size = curve_mapping_settings->lut_size;
+  data.curve_mapping_use_extend_extrapolate = curve_mapping_settings->use_extend_extrapolate;
+
+  GPU_uniformbuf_update(curvemap.buffer, &data);
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name OCIO GPU Shader Implementation
+ * \{ */
+
+bool OCIOImpl::supportGPUShader()
+{
+  /* Minimum supported version 3.3 does meet all requirements. */
+  return true;
+}
+
+static OCIO_GPUDisplayShader &getGPUDisplayShader(
+    OCIO_ConstConfigRcPtr *config,
+    const char *input,
+    const char *view,
+    const char *display,
+    const char *look,
+    OCIO_CurveMappingSettings *curve_mapping_settings)
+{
+  /* Find existing shader in cache. */
+  const bool use_curve_mapping = (curve_mapping_settings != nullptr);
+  for (std::list<OCIO_GPUDisplayShader>::iterator it = SHADER_CACHE.begin();
+       it != SHADER_CACHE.end();
+       it++) {
+    if (it->input == input && it->view == view && it->display == display && it->look == look &&
+        it->use_curve_mapping == use_curve_mapping) {
+      /* Move to front of the cache to mark as most recently used. */
+      if (it != SHADER_CACHE.begin()) {
+        SHADER_CACHE.splice(SHADER_CACHE.begin(), SHADER_CACHE, it);
+      }
+
+      return *it;
+    }
+  }
+
+  /* Remove least recently used element from cache. */
+  if (SHADER_CACHE.size() >= SHADER_CACHE_MAX_SIZE) {
+    SHADER_CACHE.pop_back();
+  }
+
+  /* Create GPU shader. */
+  SHADER_CACHE.emplace_front();
+  OCIO_GPUDisplayShader &display_shader = SHADER_CACHE.front();
+
+  display_shader.input = input;
+  display_shader.view = view;
+  display_shader.display = display;
+  display_shader.look = look;
+  display_shader.use_curve_mapping = use_curve_mapping;
+  display_shader.valid = false;
+
+  /* Create Processors.
+   *
+   * Scale and exponent are handled outside of OCIO shader so we can handle them
+   * as uniforms at the binding stage. OCIO would otherwise bake them into the
+   * shader code, requiring slow recompiles when interactively adjusting them.
+   *
+   * Note that OCIO does have the concept of dynamic properties, however there
+   * is no dynamic gamma and exposure is part of more expensive operations only.
+   *
+   * Since exposure must happen in scene linear, we use two processors. The input
+   * is usually scene linear already and so that conversion is often a no-op.
+   */
+  OCIO_ConstProcessorRcPtr *processor_to_scene_linear = OCIO_configGetProcessorWithNames(
+      config, input, ROLE_SCENE_LINEAR);
+  OCIO_ConstProcessorRcPtr *processor_to_display = OCIO_createDisplayProcessor(
+      config, ROLE_SCENE_LINEAR, view, display, look, 1.0f, 1.0f);
+
+  /* Create shader descriptions. */
+  if (processor_to_scene_linear && processor_to_display) {
+    GpuShaderDescRcPtr shaderdesc_to_scene_linear = GpuShaderDesc::CreateShaderDesc();
+    shaderdesc_to_scene_linear->setLanguage(GPU_LANGUAGE_GLSL_1_3);
+    shaderdesc_to_scene_linear->setFunctionName("OCIO_to_scene_linear");
+    shaderdesc_to_scene_linear->setResourcePrefix("to_scene");
+    (*(ConstProcessorRcPtr *)processor_to_scene_linear)
+        ->getDefaultGPUProcessor()
+        ->extractGpuShaderInfo(shaderdesc_to_scene_linear);
+    shaderdesc_to_scene_linear->finalize();
+
+    GpuShaderDescRcPtr shaderdesc_to_display = GpuShaderDesc::CreateShaderDesc();
+    shaderdesc_to_display->setLanguage(GPU_LANGUAGE_GLSL_1_3);
+    shaderdesc_to_display->setFunctionName("OCIO_to_display");
+    shaderdesc_to_scene_linear->setResourcePrefix("to_display");
+    (*(ConstProcessorRcPtr *)processor_to_display)
+        ->getDefaultGPUProcessor()
+        ->extractGpuShaderInfo(shaderdesc_to_display);
+    shaderdesc_to_display->finalize();
+
+    /* Create GPU shader and textures. */
+    if (createGPUTextures(
+            display_shader.textures, shaderdesc_to_scene_linear, shaderdesc_to_display) &&
+        createGPUCurveMapping(display_shader.curvemap, curve_mapping_settings) &&
+        createGPUShader(display_shader.shader,
+                        display_shader.textures,
+                        shaderdesc_to_scene_linear,
+                        shaderdesc_to_display,
+                        use_curve_mapping)) {
+      display_shader.valid = true;
+    }
+  }
+
+  /* Free processors. */
+  if (processor_to_scene_linear) {
+    OCIO_processorRelease(processor_to_scene_linear);
+  }
+  if (processor_to_display) {
+    OCIO_processorRelease(processor_to_display);
+  }
+
+  return display_shader;
 }
 
 /**
- * Setup OpenGL contexts for a transform defined by processor using GLSL
+ * Setup GPU contexts for a transform defined by processor using GLSL.
  * All LUT allocating baking and shader compilation happens here.
  *
  * Once this function is called, callee could start drawing images
  * using regular 2D texture.
  *
- * When all drawing is finished, finishGLSLDraw shall be called to
- * restore OpenGL context to it's pre-GLSL draw state.
+ * When all drawing is finished, gpuDisplayShaderUnbind must be called to
+ * restore GPU context to its previous state.
  */
-bool OCIOImpl::setupGLSLDraw(OCIO_GLSLDrawState **state_r, OCIO_ConstProcessorRcPtr *processor,
-                             OCIO_CurveMappingSettings *curve_mapping_settings,
-                             float dither, bool use_predivide)
+bool OCIOImpl::gpuDisplayShaderBind(OCIO_ConstConfigRcPtr *config,
+                                    const char *input,
+                                    const char *view,
+                                    const char *display,
+                                    const char *look,
+                                    OCIO_CurveMappingSettings *curve_mapping_settings,
+                                    const float scale,
+                                    const float exponent,
+                                    const float dither,
+                                    const bool use_predivide,
+                                    const bool use_overlay)
 {
-	ConstProcessorRcPtr ocio_processor = *(ConstProcessorRcPtr *) processor;
-	bool use_curve_mapping = curve_mapping_settings != NULL;
-	bool use_dither = dither > std::numeric_limits<float>::epsilon();
+  /* Get GPU shader from cache or create new one. */
+  OCIO_GPUDisplayShader &display_shader = getGPUDisplayShader(
+      config, input, view, display, look, curve_mapping_settings);
+  if (!display_shader.valid) {
+    return false;
+  }
 
-	/* Create state if needed. */
-	OCIO_GLSLDrawState *state;
-	if (!*state_r)
-		*state_r = allocateOpenGLState();
-	state = *state_r;
+  /* Verify the shader is valid. */
+  OCIO_GPUTextures &textures = display_shader.textures;
+  OCIO_GPUShader &shader = display_shader.shader;
+  OCIO_GPUCurveMappping &curvemap = display_shader.curvemap;
 
-	glGetIntegerv(GL_TEXTURE_BINDING_2D, &state->last_texture);
-	glGetIntegerv(GL_ACTIVE_TEXTURE, &state->last_texture_unit);
+  /* Update and bind curve mapping data. */
+  if (curve_mapping_settings) {
+    updateGPUCurveMapping(curvemap, curve_mapping_settings);
+    GPU_uniformbuf_bind(curvemap.buffer, shader.ubo_bind);
+    GPU_texture_bind(curvemap.texture, TEXTURE_SLOT_CURVE_MAPPING);
+  }
 
-	if (!ensureLUT3DAllocated(state)) {
-		glActiveTexture(state->last_texture_unit);
-		glBindTexture(GL_TEXTURE_2D, state->last_texture);
+  /* Bind textures to sampler units. Texture 0 is set by caller.
+   * Uniforms have already been set for texture bind points. */
+  if (!use_overlay) {
+    /* Avoid missing binds. */
+    GPU_texture_bind(textures.dummy, TEXTURE_SLOT_OVERLAY);
+  }
+  for (int i = 0; i < textures.luts.size(); i++) {
+    GPU_texture_bind(textures.luts[i].texture, TEXTURE_SLOT_LUTS_OFFSET + i);
+  }
 
-		return false;
-	}
+  /* TODO(fclem): remove remains of IMM. */
+  immBindShader(shader.shader);
 
-	if (use_curve_mapping) {
-		if (!ensureCurveMappingAllocated(state, curve_mapping_settings)) {
-			glActiveTexture(state->last_texture_unit);
-			glBindTexture(GL_TEXTURE_2D, state->last_texture);
+  /* Bind Shader and set uniforms. */
+  // GPU_shader_bind(shader.shader);
+  GPU_shader_uniform_float(shader.shader, shader.scale_loc, scale);
+  GPU_shader_uniform_float(shader.shader, shader.exponent_loc, exponent);
+  GPU_shader_uniform_float(shader.shader, shader.dither_loc, dither);
+  GPU_shader_uniform_int(shader.shader, shader.overlay_loc, use_overlay);
+  GPU_shader_uniform_int(shader.shader, shader.predivide_loc, use_predivide);
 
-			return false;
-		}
-	}
-	else {
-		if (state->curve_mapping_texture_allocated) {
-			glDeleteTextures(1, &state->curve_mapping_texture);
-			state->curve_mapping_texture_allocated = false;
-		}
-	}
-
-	/* Step 1: Create a GPU Shader Description */
-	GpuShaderDesc shaderDesc;
-	shaderDesc.setLanguage(GPU_LANGUAGE_GLSL_1_3);
-	shaderDesc.setFunctionName("OCIODisplay");
-	shaderDesc.setLut3DEdgeLen(LUT3D_EDGE_SIZE);
-
-	if (use_curve_mapping) {
-		if (state->curve_mapping_cache_id != curve_mapping_settings->cache_id) {
-			glActiveTexture(GL_TEXTURE2);
-			glBindTexture(GL_TEXTURE_1D, state->curve_mapping_texture);
-			glTexSubImage1D(GL_TEXTURE_1D, 0, 0, curve_mapping_settings->lut_size,
-			                GL_RGBA, GL_FLOAT, curve_mapping_settings->lut);
-		}
-	}
-
-	/* Step 2: Compute the 3D LUT */
-	std::string lut3dCacheID = ocio_processor->getGpuLut3DCacheID(shaderDesc);
-	if (lut3dCacheID != state->lut3dcacheid) {
-		state->lut3dcacheid = lut3dCacheID;
-		ocio_processor->getGpuLut3D(state->lut3d, shaderDesc);
-
-		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_3D, state->lut3d_texture);
-		glTexSubImage3D(GL_TEXTURE_3D, 0, 0, 0, 0,
-		                LUT3D_EDGE_SIZE, LUT3D_EDGE_SIZE, LUT3D_EDGE_SIZE,
-		                GL_RGB, GL_FLOAT, state->lut3d);
-	}
-
-	/* Step 3: Compute the Shader */
-	std::string shaderCacheID = ocio_processor->getGpuShaderTextCacheID(shaderDesc);
-	if (state->program == 0 ||
-	    shaderCacheID != state->shadercacheid ||
-	    use_predivide != state->predivide_used ||
-	    use_curve_mapping != state->curve_mapping_used ||
-	    use_dither != state->dither_used)
-	{
-		state->shadercacheid = shaderCacheID;
-
-		if (state->program) {
-			glDeleteProgram(state->program);
-		}
-
-		if (state->ocio_shader) {
-			glDeleteShader(state->ocio_shader);
-		}
-
-		std::ostringstream os;
-
-		if (supportGLSL13()) {
-			os << "#version 130\n";
-		}
-		else {
-			os << "#define USE_TEXTURE_SIZE\n";
-			state->texture_size_used = use_dither;
-		}
-
-		if (use_predivide) {
-			os << "#define USE_PREDIVIDE\n";
-		}
-
-		if (use_dither) {
-			os << "#define USE_DITHER\n";
-		}
-
-		if (use_curve_mapping) {
-			os << "#define USE_CURVE_MAPPING\n";
-		}
-
-		os << ocio_processor->getGpuShaderText(shaderDesc) << "\n";
-		os << datatoc_gpu_shader_display_transform_glsl;
-
-		state->ocio_shader = compileShaderText(GL_FRAGMENT_SHADER, os.str().c_str());
-
-		if (state->ocio_shader) {
-			state->program = linkShaders(state->ocio_shader);
-		}
-
-		state->curve_mapping_used = use_curve_mapping;
-		state->dither_used = use_dither;
-		state->predivide_used = use_predivide;
-	}
-
-	if (state->program) {
-		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_3D, state->lut3d_texture);
-
-		if (use_curve_mapping) {
-			glActiveTexture(GL_TEXTURE2);
-			glBindTexture(GL_TEXTURE_1D, state->curve_mapping_texture);
-		}
-
-		glActiveTexture(GL_TEXTURE0);
-
-		glUseProgram(state->program);
-
-		glUniform1i(glGetUniformLocation(state->program, "image_texture"), 0);
-		glUniform1i(glGetUniformLocation(state->program, "lut3d_texture"), 1);
-
-		if (state->texture_size_used) {
-			/* we use textureSize() if possible for best performance, if not
-			 * supported we query the size and pass it as uniform variables */
-			GLint width, height;
-
-			glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &width);
-			glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &height);
-
-			glUniform1f(glGetUniformLocation(state->program, "image_texture_width"), (float)width);
-			glUniform1f(glGetUniformLocation(state->program, "image_texture_height"), (float)height);
-		}
-
-		if (use_dither) {
-			glUniform1f(glGetUniformLocation(state->program, "dither"), dither);
-		}
-
-		if (use_curve_mapping) {
-			glUniform1i(glGetUniformLocation(state->program, "curve_mapping_texture"), 2);
-			glUniform1i(glGetUniformLocation(state->program, "curve_mapping_lut_size"), curve_mapping_settings->lut_size);
-			glUniform4iv(glGetUniformLocation(state->program, "use_curve_mapping_extend_extrapolate"), 1, curve_mapping_settings->use_extend_extrapolate);
-			glUniform4fv(glGetUniformLocation(state->program, "curve_mapping_mintable"), 1, curve_mapping_settings->mintable);
-			glUniform4fv(glGetUniformLocation(state->program, "curve_mapping_range"), 1, curve_mapping_settings->range);
-			glUniform4fv(glGetUniformLocation(state->program, "curve_mapping_ext_in_x"), 1, curve_mapping_settings->ext_in_x);
-			glUniform4fv(glGetUniformLocation(state->program, "curve_mapping_ext_in_y"), 1, curve_mapping_settings->ext_in_y);
-			glUniform4fv(glGetUniformLocation(state->program, "curve_mapping_ext_out_x"), 1, curve_mapping_settings->ext_out_x);
-			glUniform4fv(glGetUniformLocation(state->program, "curve_mapping_ext_out_y"), 1, curve_mapping_settings->ext_out_y);
-			glUniform4fv(glGetUniformLocation(state->program, "curve_mapping_first_x"), 1, curve_mapping_settings->first_x);
-			glUniform4fv(glGetUniformLocation(state->program, "curve_mapping_first_y"), 1, curve_mapping_settings->first_y);
-			glUniform4fv(glGetUniformLocation(state->program, "curve_mapping_last_x"), 1, curve_mapping_settings->last_x);
-			glUniform4fv(glGetUniformLocation(state->program, "curve_mapping_last_y"), 1, curve_mapping_settings->last_y);
-			glUniform3fv(glGetUniformLocation(state->program, "curve_mapping_black"), 1, curve_mapping_settings->black);
-			glUniform3fv(glGetUniformLocation(state->program, "curve_mapping_bwmul"), 1, curve_mapping_settings->bwmul);
-		}
-
-		return true;
-	}
-	else {
-		glActiveTexture(state->last_texture_unit);
-		glBindTexture(GL_TEXTURE_2D, state->last_texture);
-
-		return false;
-	}
+  return true;
 }
 
-void OCIOImpl::finishGLSLDraw(OCIO_GLSLDrawState *state)
+void OCIOImpl::gpuDisplayShaderUnbind()
 {
-	glActiveTexture(state->last_texture_unit);
-	glBindTexture(GL_TEXTURE_2D, state->last_texture);
-	glUseProgram(0);
+  immUnbindProgram();
 }
 
-void OCIOImpl::freeGLState(struct OCIO_GLSLDrawState *state)
+void OCIOImpl::gpuCacheFree()
 {
-	using std::string;
-
-	if (state->lut3d_texture_allocated)
-		glDeleteTextures(1, &state->lut3d_texture);
-
-	if (state->lut3d)
-		MEM_freeN(state->lut3d);
-
-	if (state->program)
-		glDeleteProgram(state->program);
-
-	if (state->ocio_shader)
-		glDeleteShader(state->ocio_shader);
-
-	state->lut3dcacheid.~string();
-	state->shadercacheid.~string();
-
-	MEM_freeN(state);
+  SHADER_CACHE.clear();
 }
+
+/** \} */

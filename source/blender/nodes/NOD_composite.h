@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,25 +15,21 @@
  *
  * The Original Code is Copyright (C) 2005 Blender Foundation.
  * All rights reserved.
- *
- * The Original Code is: all of this file.
- *
- * Contributor(s): Bob Holcomb.
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file NOD_composite.h
- *  \ingroup nodes
+/** \file
+ * \ingroup nodes
  */
 
-#ifndef __NOD_COMPOSITE_H__
-#define __NOD_COMPOSITE_H__
+#pragma once
 
 #include "BKE_node.h"
 
-extern struct bNodeTreeType *ntreeType_Composite;
+#ifdef __cplusplus
+extern "C" {
+#endif
 
+extern struct bNodeTreeType *ntreeType_Composite;
 
 /* ****************** types array for all composite nodes ****************** */
 
@@ -49,6 +43,7 @@ void register_node_type_cmp_texture(void);
 void register_node_type_cmp_value(void);
 void register_node_type_cmp_rgb(void);
 void register_node_type_cmp_curve_time(void);
+void register_node_type_cmp_scene_time(void);
 void register_node_type_cmp_movieclip(void);
 
 void register_node_type_cmp_composite(void);
@@ -62,11 +57,13 @@ void register_node_type_cmp_mix_rgb(void);
 void register_node_type_cmp_hue_sat(void);
 void register_node_type_cmp_brightcontrast(void);
 void register_node_type_cmp_gamma(void);
+void register_node_type_cmp_exposure(void);
 void register_node_type_cmp_invert(void);
 void register_node_type_cmp_alphaover(void);
 void register_node_type_cmp_zcombine(void);
 void register_node_type_cmp_colorbalance(void);
 void register_node_type_cmp_huecorrect(void);
+void register_node_type_cmp_convert_color_space(void);
 
 void register_node_type_cmp_normal(void);
 void register_node_type_cmp_curve_vec(void);
@@ -83,6 +80,9 @@ void register_node_type_cmp_dilateerode(void);
 void register_node_type_cmp_inpaint(void);
 void register_node_type_cmp_despeckle(void);
 void register_node_type_cmp_defocus(void);
+void register_node_type_cmp_denoise(void);
+void register_node_type_cmp_antialiasing(void);
+void register_node_type_cmp_posterize(void);
 
 void register_node_type_cmp_valtorgb(void);
 void register_node_type_cmp_rgbtobw(void);
@@ -109,6 +109,8 @@ void register_node_type_cmp_luma_matte(void);
 void register_node_type_cmp_doubleedgemask(void);
 void register_node_type_cmp_keyingscreen(void);
 void register_node_type_cmp_keying(void);
+void register_node_type_cmp_cryptomatte(void);
+void register_node_type_cmp_cryptomatte_legacy(void);
 
 void register_node_type_cmp_translate(void);
 void register_node_type_cmp_rotate(void);
@@ -139,6 +141,17 @@ void register_node_type_cmp_trackpos(void);
 void register_node_type_cmp_planetrackdeform(void);
 void register_node_type_cmp_cornerpin(void);
 
-void node_cmp_rlayers_force_hidden_passes(struct bNode *node);
+void node_cmp_rlayers_outputs(struct bNodeTree *ntree, struct bNode *node);
+void node_cmp_rlayers_register_pass(struct bNodeTree *ntree,
+                                    struct bNode *node,
+                                    struct Scene *scene,
+                                    struct ViewLayer *view_layer,
+                                    const char *name,
+                                    eNodeSocketDatatype type);
+const char *node_cmp_rlayers_sock_to_pass(int sock_index);
 
+void register_node_type_cmp_custom_group(bNodeType *ntype);
+
+#ifdef __cplusplus
+}
 #endif

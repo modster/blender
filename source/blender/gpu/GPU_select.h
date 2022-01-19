@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,45 +15,77 @@
  *
  * The Original Code is Copyright (C) 2014 Blender Foundation.
  * All rights reserved.
- *
- * Contributor(s): Antony Riakiotakis.
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file GPU_select.h
- *  \ingroup gpu
+/** \file
+ * \ingroup gpu
  */
 
-#ifndef __GPU_SELECT_H__
-#define __GPU_SELECT_H__
+#pragma once
 
-#include "DNA_vec_types.h"  /* rcft */
 #include "BLI_sys_types.h"
 
-/* flags for mode of operation */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+struct rcti;
+
+/** Flags for mode of operation. */
 enum {
-	GPU_SELECT_ALL                      = 1,
-	GPU_SELECT_NEAREST_FIRST_PASS       = 2,
-	GPU_SELECT_NEAREST_SECOND_PASS      = 3,
+  GPU_SELECT_ALL = 1,
+  /* gpu_select_query */
+  GPU_SELECT_NEAREST_FIRST_PASS = 2,
+  GPU_SELECT_NEAREST_SECOND_PASS = 3,
+  /* gpu_select_pick */
+  GPU_SELECT_PICK_ALL = 4,
+  GPU_SELECT_PICK_NEAREST = 5,
 };
 
-/* initialize and provide buffer for results */
-void GPU_select_begin(unsigned int *buffer, unsigned int bufsize, rctf *input, char mode, int oldhits);
-
-/* loads a new selection id and ends previous query, if any. In second pass of selection it also returns
- * if id has been hit on the first pass already. Thus we can skip drawing un-hit objects IMPORTANT: We rely on the order of object rendering on passes to be
- * the same for this to work */
+/**
+ * Initialize and provide buffer for results.
+ */
+void GPU_select_begin(
+    unsigned int *buffer, unsigned int bufsize, const struct rcti *input, char mode, int oldhits);
+/**
+ * Loads a new selection id and ends previous query, if any.
+ * In second pass of selection it also returns
+ * if id has been hit on the first pass already.
+ * Thus we can skip drawing un-hit objects.
+ *
+ * \warning We rely on the order of object rendering on passes to be the same for this to work.
+ */
 bool GPU_select_load_id(unsigned int id);
-
-/* cleanup and flush selection results to buffer. Return number of hits and hits in buffer.
- * if dopass is true, we will do a second pass with occlusion queries to get the closest hit */
+void GPU_select_finalize(void);
+/**
+ * Cleanup and flush selection results to buffer.
+ * Return number of hits and hits in buffer.
+ * if \a dopass is true, we will do a second pass with occlusion queries to get the closest hit.
+ */
 unsigned int GPU_select_end(void);
 
-/* does the GPU support occlusion queries? */
-bool GPU_select_query_check_support(void);
+/* Cache selection region. */
 
-/* is occlusion query supported and user activated? */
-bool GPU_select_query_check_active(void);
+bool GPU_select_is_cached(void);
+void GPU_select_cache_begin(void);
+void GPU_select_cache_load_id(void);
+void GPU_select_cache_end(void);
 
+/* Utilities. */
+
+/**
+ * Helper function, nothing special but avoids doing inline since hits aren't sorted by depth
+ * and purpose of 4x buffer indices isn't so clear.
+ *
+ * Note that comparing depth as uint is fine.
+ */
+const uint *GPU_select_buffer_near(const uint *buffer, int hits);
+uint GPU_select_buffer_remove_by_id(uint *buffer, int hits, uint select_id);
+/**
+ * Part of the solution copied from `rect_subregion_stride_calc`.
+ */
+void GPU_select_buffer_stride_realign(const struct rcti *src, const struct rcti *dst, uint *r_buf);
+
+#ifdef __cplusplus
+}
 #endif

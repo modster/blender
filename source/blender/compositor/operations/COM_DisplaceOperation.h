@@ -1,6 +1,4 @@
 /*
- * Copyright 2011, Blender Foundation.
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -15,54 +13,70 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor:
- *		Dalai Felinto
+ * Copyright 2011, Blender Foundation.
  */
 
-#ifndef _COM_DisplaceOperation_h
-#define _COM_DisplaceOperation_h
-#include "COM_NodeOperation.h"
+#pragma once
 
+#include "COM_MultiThreadedOperation.h"
 
-class DisplaceOperation : public NodeOperation {
-private:
-	/**
-	 * Cached reference to the inputProgram
-	 */
-	SocketReader *m_inputColorProgram;
-	SocketReader *m_inputVectorProgram;
-	SocketReader *m_inputScaleXProgram;
-	SocketReader *m_inputScaleYProgram;
+namespace blender::compositor {
 
-	float m_width_x4;
-	float m_height_x4;
+class DisplaceOperation : public MultiThreadedOperation {
+ private:
+  /**
+   * Cached reference to the input_program
+   */
+  SocketReader *input_color_program_;
 
-public:
-	DisplaceOperation();
+  float width_x4_;
+  float height_x4_;
 
-	/**
-	 * we need a 2x2 differential filter for Vector Input and full buffer for the image
-	 */
-	bool determineDependingAreaOfInterest(rcti *input, ReadBufferOperation *readOperation, rcti *output);
+  int input_vector_width_;
+  int input_vector_height_;
 
-	/**
-	 * the inner loop of this program
-	 */
-	void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
-	
-	void pixelTransform(const float xy[2], float r_uv[2], float r_deriv[2][2]);
-	
-	/**
-	 * Initialize the execution
-	 */
-	void initExecution();
-	
-	/**
-	 * Deinitialize the execution
-	 */
-	void deinitExecution();
+  std::function<void(float x, float y, float *out)> vector_read_fn_;
+  std::function<void(float x, float y, float *out)> scale_x_read_fn_;
+  std::function<void(float x, float y, float *out)> scale_y_read_fn_;
 
-private:
-	bool read_displacement(float x, float y, float xscale, float yscale, const float origin[2], float &r_u, float &r_v);
+ public:
+  DisplaceOperation();
+
+  /**
+   * we need a 2x2 differential filter for Vector Input and full buffer for the image
+   */
+  bool determine_depending_area_of_interest(rcti *input,
+                                            ReadBufferOperation *read_operation,
+                                            rcti *output) override;
+
+  /**
+   * The inner loop of this operation.
+   */
+  void execute_pixel_sampled(float output[4], float x, float y, PixelSampler sampler) override;
+
+  void pixel_transform(const float xy[2], float r_uv[2], float r_deriv[2][2]);
+
+  /**
+   * Initialize the execution
+   */
+  void init_execution() override;
+
+  /**
+   * Deinitialize the execution
+   */
+  void deinit_execution() override;
+
+  void get_area_of_interest(int input_idx, const rcti &output_area, rcti &r_input_area) override;
+  void update_memory_buffer_started(MemoryBuffer *output,
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
+  void update_memory_buffer_partial(MemoryBuffer *output,
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
+
+ private:
+  bool read_displacement(
+      float x, float y, float xscale, float yscale, const float origin[2], float &r_u, float &r_v);
 };
-#endif
+
+}  // namespace blender::compositor

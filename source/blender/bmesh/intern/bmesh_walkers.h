@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -14,17 +12,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * Contributor(s): Joseph Eagar.
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-#ifndef __BMESH_WALKERS_H__
-#define __BMESH_WALKERS_H__
+#pragma once
 
-/** \file blender/bmesh/intern/bmesh_walkers.h
- *  \ingroup bmesh
+/** \file
+ * \ingroup bmesh
  */
 
 /*
@@ -32,71 +25,123 @@
  */
 
 typedef enum {
-	BMW_DEPTH_FIRST,
-	BMW_BREADTH_FIRST
+  BMW_DEPTH_FIRST,
+  BMW_BREADTH_FIRST,
 } BMWOrder;
 
 typedef enum {
-	BMW_FLAG_NOP = 0,
-	BMW_FLAG_TEST_HIDDEN = (1 << 0)
+  BMW_FLAG_NOP = 0,
+  BMW_FLAG_TEST_HIDDEN = (1 << 0),
 } BMWFlag;
 
 /*Walkers*/
 typedef struct BMWalker {
-	char    begin_htype;  /* only for validating input */
-	void  (*begin) (struct BMWalker *walker, void *start);
-	void *(*step)  (struct BMWalker *walker);
-	void *(*yield) (struct BMWalker *walker);
-	int structsize;
-	BMWOrder order;
-	int valid_mask;
+  char begin_htype; /* only for validating input */
+  void (*begin)(struct BMWalker *walker, void *start);
+  void *(*step)(struct BMWalker *walker);
+  void *(*yield)(struct BMWalker *walker);
+  int structsize;
+  BMWOrder order;
+  int valid_mask;
 
-	/* runtime */
-	int layer;
+  /* runtime */
+  int layer;
 
-	BMesh *bm;
-	BLI_mempool *worklist;
-	ListBase states;
+  BMesh *bm;
+  BLI_mempool *worklist;
+  ListBase states;
 
-	/* these masks are to be tested against elements BMO_elem_flag_test(),
-	 * should never be accessed directly only through BMW_init() and bmw_mask_check_*() functions */
-	short mask_vert;
-	short mask_edge;
-	short mask_face;
+  /* these masks are to be tested against elements BMO_elem_flag_test(),
+   * should never be accessed directly only through BMW_init() and bmw_mask_check_*() functions */
+  short mask_vert;
+  short mask_edge;
+  short mask_face;
 
-	BMWFlag flag;
+  BMWFlag flag;
 
-	struct GSet *visit_set;
-	struct GSet *visit_set_alt;
-	int depth;
+  struct GSet *visit_set;
+  struct GSet *visit_set_alt;
+  int depth;
 } BMWalker;
 
 /* define to make BMW_init more clear */
 #define BMW_MASK_NOP 0
 
-/* initialize a walker.  searchmask restricts some (not all) walkers to
- * elements with a specific tool flag set.  flags is specific to each walker.*/
-void BMW_init(
-        struct BMWalker *walker, BMesh *bm, int type,
-        short mask_vert, short mask_edge, short mask_face,
-        BMWFlag flag,
-        int layer);
+/**
+ * \brief Init Walker
+ *
+ * Allocates and returns a new mesh walker of a given type.
+ * The elements visited are filtered by the bitmask 'searchmask'.
+ */
+void BMW_init(struct BMWalker *walker,
+              BMesh *bm,
+              int type,
+              short mask_vert,
+              short mask_edge,
+              short mask_face,
+              BMWFlag flag,
+              int layer);
 void *BMW_begin(BMWalker *walker, void *start);
+/**
+ * \brief Step Walker
+ */
 void *BMW_step(struct BMWalker *walker);
-void  BMW_end(struct BMWalker *walker);
-int   BMW_current_depth(BMWalker *walker);
+/**
+ * \brief End Walker
+ *
+ * Frees a walker's worklist.
+ */
+void BMW_end(struct BMWalker *walker);
+/**
+ * \brief Walker Current Depth
+ *
+ * Returns the current depth of the walker.
+ */
+int BMW_current_depth(BMWalker *walker);
 
-/*these are used by custom walkers*/
+/* These are used by custom walkers. */
+/**
+ * \brief Current Walker State
+ *
+ * Returns the first state from the walker state
+ * worklist. This state is the next in the
+ * worklist for processing.
+ */
 void *BMW_current_state(BMWalker *walker);
+/**
+ * \brief Add a new Walker State
+ *
+ * Allocate a new empty state and put it on the worklist.
+ * A pointer to the new state is returned so that the caller
+ * can fill in the state data. The new state will be inserted
+ * at the front for depth-first walks, and at the end for
+ * breadth-first walks.
+ */
 void *BMW_state_add(BMWalker *walker);
-void  BMW_state_remove(BMWalker *walker);
+/**
+ * \brief Remove Current Walker State
+ *
+ * Remove and free an item from the end of the walker state
+ * worklist.
+ */
+void BMW_state_remove(BMWalker *walker);
+/**
+ * \brief Main Walking Function
+ *
+ * Steps a mesh walker forward by one element
+ */
 void *BMW_walk(BMWalker *walker);
-void  BMW_reset(BMWalker *walker);
+/**
+ * \brief Reset Walker
+ *
+ * Frees all states from the worklist, resetting the walker
+ * for reuse in a new walk.
+ */
+void BMW_reset(BMWalker *walker);
 
 #define BMW_ITER(ele, walker, data) \
-	for (BM_CHECK_TYPE_ELEM_ASSIGN(ele) = BMW_begin(walker, (BM_CHECK_TYPE_ELEM(data), data)); \
-	     ele; \
-	     BM_CHECK_TYPE_ELEM_ASSIGN(ele) = BMW_step(walker))
+  for (BM_CHECK_TYPE_ELEM_ASSIGN(ele) = BMW_begin(walker, (BM_CHECK_TYPE_ELEM(data), data)); ele; \
+       BM_CHECK_TYPE_ELEM_ASSIGN(ele) = BMW_step(walker))
 
 /*
  * example of usage, walking over an island of tool flagged faces:
@@ -113,27 +158,27 @@ void  BMW_reset(BMWalker *walker);
  */
 
 enum {
-	BMW_VERT_SHELL,
-	BMW_LOOP_SHELL,
-	BMW_LOOP_SHELL_WIRE,
-	BMW_FACE_SHELL,
-	BMW_EDGELOOP,
-	BMW_FACELOOP,
-	BMW_EDGERING,
-	BMW_EDGEBOUNDARY,
-	/* BMW_RING, */
-	BMW_LOOPDATA_ISLAND,
-	BMW_ISLANDBOUND,
-	BMW_ISLAND,
-	BMW_CONNECTED_VERTEX,
-	/* end of array index enum vals */
+  BMW_VERT_SHELL,
+  BMW_LOOP_SHELL,
+  BMW_LOOP_SHELL_WIRE,
+  BMW_FACE_SHELL,
+  BMW_EDGELOOP,
+  BMW_FACELOOP,
+  BMW_EDGERING,
+  BMW_EDGEBOUNDARY,
+  BMW_EDGELOOP_NONMANIFOLD,
+  /* BMW_RING, */
+  BMW_LOOPDATA_ISLAND,
+  BMW_ISLANDBOUND,
+  BMW_ISLAND,
+  BMW_ISLAND_MANIFOLD,
+  BMW_CONNECTED_VERTEX,
+  /* end of array index enum vals */
 
-	/* do not intitialze function pointers and struct size in BMW_init */
-	BMW_CUSTOM,
-	BMW_MAXWALKERS
+  /* Do not initialize function pointers and struct size in #BMW_init. */
+  BMW_CUSTOM,
+  BMW_MAXWALKERS,
 };
 
 /* use with BMW_init, so as not to confuse with restrict flags */
-#define BMW_NIL_LAY  0
-
-#endif /* __BMESH_WALKERS_H__ */
+#define BMW_NIL_LAY 0

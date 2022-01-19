@@ -1,6 +1,7 @@
 """
 Invoke Function
 +++++++++++++++
+
 :class:`Operator.invoke` is used to initialize the operator from the context
 at the moment the operator is called.
 invoke() is typically used to assign properties which are then used by
@@ -27,8 +28,8 @@ class SimpleMouseOperator(bpy.types.Operator):
     bl_idname = "wm.mouse_position"
     bl_label = "Invoke Mouse Operator"
 
-    x = bpy.props.IntProperty()
-    y = bpy.props.IntProperty()
+    x: bpy.props.IntProperty()
+    y: bpy.props.IntProperty()
 
     def execute(self, context):
         # rather than printing, use the report function,
@@ -41,7 +42,13 @@ class SimpleMouseOperator(bpy.types.Operator):
         self.y = event.mouse_y
         return self.execute(context)
 
+# Only needed if you want to add into a dynamic menu
+def menu_func(self, context):
+    self.layout.operator(SimpleMouseOperator.bl_idname, text="Simple Mouse Operator")
+
+# Register and add to the view menu (required to also use F3 search "Simple Mouse Operator" for quick access)
 bpy.utils.register_class(SimpleMouseOperator)
+bpy.types.VIEW3D_MT_view.append(menu_func)
 
 # Test call to the newly defined operator.
 # Here we call the operator and invoke it, meaning that the settings are taken

@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,16 +15,10 @@
  *
  * The Original Code is Copyright (C) 2014 Blender Foundation.
  * All rights reserved.
- *
- * The Original Code is: all of this file.
- *
- * Contributor(s): Jason Wilkins
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file intern/gl-deprecated.h
- *  \ingroup glew-mx
+/** \file
+ * \ingroup intern_glew-mx
  *  Utility used to check for use of deprecated functions.
  */
 
@@ -832,41 +824,41 @@
 #define GL_SOURCE0_ALPHA DO_NOT_USE_GL_SOURCE0_ALPHA
 #undef GL_SOURCE0_RGB
 #define GL_SOURCE0_RGB DO_NOT_USE_GL_SOURCE0_RGB
-#undef GL_SOURCE1_ALPHA
-#define GL_SOURCE1_ALPHA DO_NOT_USE_GL_SOURCE1_ALPHA
-#undef GL_SOURCE1_RGB
-#define GL_SOURCE1_RGB DO_NOT_USE_GL_SOURCE1_RGB
+#if 0 /* Those are reused as new valid enum! GL_SRC1_COLOR etc... */
+#  undef GL_SOURCE1_ALPHA
+#  define GL_SOURCE1_ALPHA DO_NOT_USE_GL_SOURCE1_ALPHA
+#  undef GL_SOURCE1_RGB
+#  define GL_SOURCE1_RGB DO_NOT_USE_GL_SOURCE1_RGB
+#endif
 #undef GL_SOURCE2_ALPHA
 #define GL_SOURCE2_ALPHA DO_NOT_USE_GL_SOURCE2_ALPHA
 #undef GL_SOURCE2_RGB
 #define GL_SOURCE2_RGB DO_NOT_USE_GL_SOURCE2_RGB
 
+#if 0 /* Those are deprecated but still valid */
 // Old Token Names 3.0
-#undef GL_CLIP_PLANE0
-#define GL_CLIP_PLANE0 USE_GL_CLIP_DISTANCE0
-#undef GL_CLIP_PLANE1
-#define GL_CLIP_PLANE1 USE_GL_CLIP_DISTANCE1
-#undef GL_CLIP_PLANE2
-#define GL_CLIP_PLANE2 USE_GL_CLIP_DISTANCE2
-#undef GL_CLIP_PLANE3
-#define GL_CLIP_PLANE3 USE_GL_CLIP_DISTANCE3
-#undef GL_CLIP_PLANE4
-#define GL_CLIP_PLANE4 USE_GL_CLIP_DISTANCE4
-#undef GL_CLIP_PLANE5
-#define GL_CLIP_PLANE5 USE_GL_CLIP_DISTANCE5
-#undef GL_COMPARE_R_TO_TEXTURE
-#define GL_COMPARE_R_TO_TEXTURE USE_GL_COMPARE_REF_TO_TEXTURE
-#undef GL_MAX_CLIP_PLANES
-#define GL_MAX_CLIP_PLANES USE_GL_MAX_CLIP_DISTANCES
-#undef GL_MAX_VARYING_FLOATS
-#define GL_MAX_VARYING_FLOATS USE__MAX_VARYING_COMPONENTS
+#  undef GL_CLIP_PLANE0
+#  define GL_CLIP_PLANE0 USE_GL_CLIP_DISTANCE0
+#  undef GL_CLIP_PLANE1
+#  define GL_CLIP_PLANE1 USE_GL_CLIP_DISTANCE1
+#  undef GL_CLIP_PLANE2
+#  define GL_CLIP_PLANE2 USE_GL_CLIP_DISTANCE2
+#  undef GL_CLIP_PLANE3
+#  define GL_CLIP_PLANE3 USE_GL_CLIP_DISTANCE3
+#  undef GL_CLIP_PLANE4
+#  define GL_CLIP_PLANE4 USE_GL_CLIP_DISTANCE4
+#  undef GL_CLIP_PLANE5
+#  define GL_CLIP_PLANE5 USE_GL_CLIP_DISTANCE5
+#  undef GL_COMPARE_R_TO_TEXTURE
+#  define GL_COMPARE_R_TO_TEXTURE USE_GL_COMPARE_REF_TO_TEXTURE
+#  undef GL_MAX_CLIP_PLANES
+#  define GL_MAX_CLIP_PLANES USE_GL_MAX_CLIP_DISTANCES
+#  undef GL_MAX_VARYING_FLOATS
+#  define GL_MAX_VARYING_FLOATS USE__MAX_VARYING_COMPONENTS
 
 // Old Token Names 3.2
-#undef GL_VERTEX_PROGRAM_POINT_SIZE
-#define GL_VERTEX_PROGRAM_POINT_SIZE USE_GL_PROGRAM_POINT_SIZE
-
-// Old Token Names 4.1
-#undef GL_CURRENT_PROGRAM
-#define GL_CURRENT_PROGRAM DO_NOT_USE_GL_CURRENT_PROGRAM
+#  undef GL_VERTEX_PROGRAM_POINT_SIZE
+#  define GL_VERTEX_PROGRAM_POINT_SIZE USE_GL_PROGRAM_POINT_SIZE
+#endif
 
 #endif /* __GL_DEPRECATED_H__ */

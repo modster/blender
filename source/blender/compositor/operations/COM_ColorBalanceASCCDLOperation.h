@@ -1,6 +1,4 @@
 /*
- * Copyright 2011, Blender Foundation.
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -15,54 +13,66 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor: 
- *		Jeroen Bakker 
- *		Monique Dewanchand
+ * Copyright 2011, Blender Foundation.
  */
 
-#ifndef _COM_ColorBalanceASCCDLOperation_h
-#define _COM_ColorBalanceASCCDLOperation_h
-#include "COM_NodeOperation.h"
+#pragma once
+
+#include "COM_MultiThreadedRowOperation.h"
+
+namespace blender::compositor {
 
 /**
  * this program converts an input color to an output value.
  * it assumes we are in sRGB color space.
  */
-class ColorBalanceASCCDLOperation : public NodeOperation {
-protected:
-	/**
-	 * Prefetched reference to the inputProgram
-	 */
-	SocketReader *m_inputValueOperation;
-	SocketReader *m_inputColorOperation;
-	
-	float m_offset[3];
-	float m_power[3];
-	float m_slope[3];
+class ColorBalanceASCCDLOperation : public MultiThreadedRowOperation {
+ protected:
+  /**
+   * Prefetched reference to the input_program
+   */
+  SocketReader *input_value_operation_;
+  SocketReader *input_color_operation_;
 
-public:
-	/**
-	 * Default constructor
-	 */
-	ColorBalanceASCCDLOperation();
-	
-	/**
-	 * the inner loop of this program
-	 */
-	void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
-	
-	/**
-	 * Initialize the execution
-	 */
-	void initExecution();
-	
-	/**
-	 * Deinitialize the execution
-	 */
-	void deinitExecution();
-	
-	void setOffset(float offset[3]) { copy_v3_v3(this->m_offset, offset); }
-	void setPower(float power[3]) { copy_v3_v3(this->m_power, power); }
-	void setSlope(float slope[3]) { copy_v3_v3(this->m_slope, slope); }
+  float offset_[3];
+  float power_[3];
+  float slope_[3];
+
+ public:
+  /**
+   * Default constructor
+   */
+  ColorBalanceASCCDLOperation();
+
+  /**
+   * The inner loop of this operation.
+   */
+  void execute_pixel_sampled(float output[4], float x, float y, PixelSampler sampler) override;
+
+  /**
+   * Initialize the execution
+   */
+  void init_execution() override;
+
+  /**
+   * Deinitialize the execution
+   */
+  void deinit_execution() override;
+
+  void set_offset(float offset[3])
+  {
+    copy_v3_v3(offset_, offset);
+  }
+  void set_power(float power[3])
+  {
+    copy_v3_v3(power_, power);
+  }
+  void set_slope(float slope[3])
+  {
+    copy_v3_v3(slope_, slope);
+  }
+
+  void update_memory_buffer_row(PixelCursor &p) override;
 };
-#endif
+
+}  // namespace blender::compositor

@@ -109,7 +109,6 @@
  *  Sometimes the amount of work is given in the documentation
  *  e.g. 6M+3A means 6 multiplications and 3 additions.
  *
- *  \author
  *      Erwin Aertbelien, Div. PMA, Dep. of Mech. Eng., K.U.Leuven
  *
  ****************************************************************************/
@@ -365,7 +364,7 @@ public:
 
     //! Along an arbitrary axes.  It is not necessary to normalize rotaxis.
     //! returns identity rotation matrix in the case that the norm of rotaxis
-    //! is to small to be used.
+    //! is too small to be used.
     // @see Rot2 if you want to handle this error in another way.
     static Rotation Rot(const Vector& rotaxis,double angle);
 

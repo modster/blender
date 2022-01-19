@@ -1,6 +1,4 @@
 /*
- * Copyright 2011, Blender Foundation.
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -15,89 +13,104 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor: 
- *		Jeroen Bakker 
- *		Monique Dewanchand
+ * Copyright 2011, Blender Foundation.
  */
 
-#ifndef _COM_TonemapOperation_h
-#define _COM_TonemapOperation_h
-#include "COM_NodeOperation.h"
+#pragma once
+
+#include "COM_MultiThreadedOperation.h"
 #include "DNA_node_types.h"
 
+namespace blender::compositor {
+
 /**
- * @brief temporarily storage during execution of Tonemap
- * @ingroup operation
+ * \brief temporarily storage during execution of Tone-map
+ * \ingroup operation
  */
 typedef struct AvgLogLum {
-	float al;
-	float auto_key;
-	float lav;
-	float cav[4];
-	float igm;
+  float al;
+  float auto_key;
+  float lav;
+  float cav[4];
+  float igm;
 } AvgLogLum;
 
 /**
- * @brief base class of tonemap, implementing the simple tonemap
- * @ingroup operation
+ * \brief base class of tonemap, implementing the simple tonemap
+ * \ingroup operation
  */
-class TonemapOperation : public NodeOperation {
-protected:
-	/**
-	 * @brief Cached reference to the reader
-	 */
-	SocketReader *m_imageReader;
-	
-	/**
-	 * @brief settings of the Tonemap
-	 */
-	NodeTonemap *m_data;
-	
-	/**
-	 * @brief temporarily cache of the execution storage
-	 */
-	AvgLogLum *m_cachedInstance;
+class TonemapOperation : public MultiThreadedOperation {
+ protected:
+  /**
+   * \brief Cached reference to the reader
+   */
+  SocketReader *image_reader_;
 
-public:
-	TonemapOperation();
-	
-	/**
-	 * the inner loop of this program
-	 */
-	void executePixel(float output[4], int x, int y, void *data);
-	
-	/**
-	 * Initialize the execution
-	 */
-	void initExecution();
-	
-	void *initializeTileData(rcti *rect);
-	void deinitializeTileData(rcti *rect, void *data);
-	
-	/**
-	 * Deinitialize the execution
-	 */
-	void deinitExecution();
-	
-	void setData(NodeTonemap *data) { this->m_data = data; }
-	
-	bool determineDependingAreaOfInterest(rcti *input, ReadBufferOperation *readOperation, rcti *output);
+  /**
+   * \brief settings of the Tonemap
+   */
+  NodeTonemap *data_;
 
+  /**
+   * \brief temporarily cache of the execution storage
+   */
+  AvgLogLum *cached_instance_;
 
+ public:
+  TonemapOperation();
+
+  /**
+   * The inner loop of this operation.
+   */
+  void execute_pixel(float output[4], int x, int y, void *data) override;
+
+  /**
+   * Initialize the execution
+   */
+  void init_execution() override;
+
+  void *initialize_tile_data(rcti *rect) override;
+  void deinitialize_tile_data(rcti *rect, void *data) override;
+
+  /**
+   * Deinitialize the execution
+   */
+  void deinit_execution() override;
+
+  void set_data(NodeTonemap *data)
+  {
+    data_ = data;
+  }
+
+  bool determine_depending_area_of_interest(rcti *input,
+                                            ReadBufferOperation *read_operation,
+                                            rcti *output) override;
+
+  void get_area_of_interest(int input_idx, const rcti &output_area, rcti &r_input_area) override;
+  void update_memory_buffer_started(MemoryBuffer *output,
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
+  virtual void update_memory_buffer_partial(MemoryBuffer *output,
+                                            const rcti &area,
+                                            Span<MemoryBuffer *> inputs) override;
 };
 
 /**
- * @brief class of tonemap, implementing the photoreceptor tonemap
+ * \brief class of tonemap, implementing the photoreceptor tonemap
  * most parts have already been done in TonemapOperation
- * @ingroup operation
+ * \ingroup operation
  */
 
 class PhotoreceptorTonemapOperation : public TonemapOperation {
-public:
-	/**
-	 * the inner loop of this program
-	 */
-	void executePixel(float output[4], int x, int y, void *data);
+ public:
+  /**
+   * The inner loop of this operation.
+   */
+  void execute_pixel(float output[4], int x, int y, void *data) override;
+
+  void update_memory_buffer_partial(MemoryBuffer *output,
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
 };
 
-#endif
+}  // namespace blender::compositor

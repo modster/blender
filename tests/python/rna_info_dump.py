@@ -71,7 +71,7 @@ def api_dump(use_properties=True, use_functions=True):
 
     def dump_funcs():
         data = []
-        for struct_id, v in sorted(struct.items()):
+        for _struct_id, v in sorted(struct.items()):
             struct_id_str = struct_full_id(v)
 
             funcs = [(func.identifier, func) for func in v.functions]
@@ -81,7 +81,10 @@ def api_dump(use_properties=True, use_functions=True):
 
             for prop in v.properties:
                 if prop.collection_type:
-                    funcs = [(prop.identifier + "." + func.identifier, func) for func in prop.collection_type.functions]
+                    funcs = [
+                        (prop.identifier + "." + func.identifier, func)
+                        for func in prop.collection_type.functions
+                    ]
                     for func_id, func in funcs:
                         data.append(func_to_str(struct_id_str, func_id, func))
         data.sort()
@@ -90,7 +93,7 @@ def api_dump(use_properties=True, use_functions=True):
 
     def dump_props():
         data = []
-        for struct_id, v in sorted(struct.items()):
+        for _struct_id, v in sorted(struct.items()):
             struct_id_str = struct_full_id(v)
 
             props = [(prop.identifier, prop) for prop in v.properties]
@@ -100,7 +103,10 @@ def api_dump(use_properties=True, use_functions=True):
 
             for prop in v.properties:
                 if prop.collection_type:
-                    props = [(prop.identifier + "." + prop_sub.identifier, prop_sub) for prop_sub in prop.collection_type.properties]
+                    props = [
+                        (prop.identifier + "." + prop_sub.identifier, prop_sub)
+                        for prop_sub in prop.collection_type.properties
+                    ]
                     for prop_sub_id, prop_sub in props:
                         data.append(prop_to_str(struct_id_str, prop_sub_id, prop_sub))
         data.sort()
@@ -126,6 +132,7 @@ def api_dump(use_properties=True, use_functions=True):
         text.from_string(data)
 
     print("END")
+
 
 if __name__ == "__main__":
     api_dump()

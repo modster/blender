@@ -1,6 +1,4 @@
 /*
- * Copyright 2012, Blender Foundation.
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -15,41 +13,45 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor:
- *		Jeroen Bakker
- *		Monique Dewanchand
- *		Sergey Sharybin
+ * Copyright 2012, Blender Foundation.
  */
 
-
-#ifndef _COM_KeyingOperation_h
-#define _COM_KeyingOperation_h
+#pragma once
 
 #include <string.h>
 
-#include "COM_NodeOperation.h"
+#include "COM_MultiThreadedOperation.h"
 
 #include "BLI_listbase.h"
+
+namespace blender::compositor {
 
 /**
  * Class with implementation of keying node
  */
-class KeyingOperation : public NodeOperation {
-protected:
-	SocketReader *m_pixelReader;
-	SocketReader *m_screenReader;
+class KeyingOperation : public MultiThreadedOperation {
+ protected:
+  SocketReader *pixel_reader_;
+  SocketReader *screen_reader_;
 
-	float m_screenBalance;
+  float screen_balance_;
 
-public:
-	KeyingOperation();
+ public:
+  KeyingOperation();
 
-	void initExecution();
-	void deinitExecution();
+  void init_execution() override;
+  void deinit_execution() override;
 
-	void setScreenBalance(float value) {this->m_screenBalance = value;}
+  void set_screen_balance(float value)
+  {
+    screen_balance_ = value;
+  }
 
-	void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
+  void execute_pixel_sampled(float output[4], float x, float y, PixelSampler sampler) override;
+
+  void update_memory_buffer_partial(MemoryBuffer *output,
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
 };
 
-#endif
+}  // namespace blender::compositor

@@ -1,6 +1,4 @@
 /*
- * Copyright 2011, Blender Foundation.
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -15,54 +13,85 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor: 
- *		Jeroen Bakker 
- *		Monique Dewanchand
+ * Copyright 2011, Blender Foundation.
  */
 
-#ifndef _COM_SetVectorOperation_h
-#define _COM_SetVectorOperation_h
-#include "COM_NodeOperation.h"
+#pragma once
 
+#include "COM_ConstantOperation.h"
+
+namespace blender::compositor {
 
 /**
  * this program converts an input color to an output value.
  * it assumes we are in sRGB color space.
  */
-class SetVectorOperation : public NodeOperation {
-private:
-	float m_x;
-	float m_y;
-	float m_z;
-	float m_w;
+class SetVectorOperation : public ConstantOperation {
+ private:
+  struct {
+    float x;
+    float y;
+    float z;
+    float w;
+  } vector_;
 
-public:
-	/**
-	 * Default constructor
-	 */
-	SetVectorOperation();
-	
-	const float getX() { return this->m_x; }
-	void setX(float value) { this->m_x = value; }
-	const float getY() { return this->m_y; }
-	void setY(float value) { this->m_y = value; }
-	const float getZ() { return this->m_z; }
-	void setZ(float value) { this->m_z = value; }
-	const float getW() { return this->m_w; }
-	void setW(float value) { this->m_w = value; }
-	
-	/**
-	 * the inner loop of this program
-	 */
-	void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
+ public:
+  /**
+   * Default constructor
+   */
+  SetVectorOperation();
 
-	void determineResolution(unsigned int resolution[2], unsigned int preferredResolution[2]);
-	bool isSetOperation() const { return true; }
+  const float *get_constant_elem() override
+  {
+    return reinterpret_cast<float *>(&vector_);
+  }
 
-	void setVector(const float vector[3]) {
-		setX(vector[0]);
-		setY(vector[1]);
-		setZ(vector[2]);
-	}
+  float getX()
+  {
+    return vector_.x;
+  }
+  void setX(float value)
+  {
+    vector_.x = value;
+  }
+  float getY()
+  {
+    return vector_.y;
+  }
+  void setY(float value)
+  {
+    vector_.y = value;
+  }
+  float getZ()
+  {
+    return vector_.z;
+  }
+  void setZ(float value)
+  {
+    vector_.z = value;
+  }
+  float getW()
+  {
+    return vector_.w;
+  }
+  void setW(float value)
+  {
+    vector_.w = value;
+  }
+
+  /**
+   * The inner loop of this operation.
+   */
+  void execute_pixel_sampled(float output[4], float x, float y, PixelSampler sampler) override;
+
+  void determine_canvas(const rcti &preferred_area, rcti &r_area) override;
+
+  void set_vector(const float vector[3])
+  {
+    setX(vector[0]);
+    setY(vector[1]);
+    setZ(vector[2]);
+  }
 };
-#endif
+
+}  // namespace blender::compositor

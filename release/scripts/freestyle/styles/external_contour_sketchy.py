@@ -19,8 +19,8 @@
 #  Filename : external_contour_sketchy.py
 #  Author   : Stephane Grabli
 #  Date     : 04/08/2005
-#  Purpose  : Draws the external contour of the scene using a sketchy 
-#             chaining iterator (in particular each ViewEdge can be drawn 
+#  Purpose  : Draws the external contour of the scene using a sketchy
+#             chaining iterator (in particular each ViewEdge can be drawn
 #             several times
 
 from freestyle.chainingiterators import pySketchyChainingIterator
@@ -30,18 +30,18 @@ from freestyle.predicates import (
     NotUP1D,
     QuantitativeInvisibilityUP1D,
     TrueUP1D,
-    )
+)
 from freestyle.shaders import (
     IncreasingColorShader,
     IncreasingThicknessShader,
     SamplingShader,
     SmoothingShader,
     SpatialNoiseShader,
-    )
+)
 from freestyle.types import Operators
 
 
-upred = AndUP1D(QuantitativeInvisibilityUP1D(0), ExternalContourUP1D()) 
+upred = AndUP1D(QuantitativeInvisibilityUP1D(0), ExternalContourUP1D())
 Operators.select(upred)
 Operators.bidirectional_chain(pySketchyChainingIterator(), NotUP1D(upred))
 shaders_list = [
@@ -50,5 +50,5 @@ shaders_list = [
     IncreasingThicknessShader(4, 10),
     SmoothingShader(400, 0.1, 0, 0.2, 0, 0, 0, 1),
     IncreasingColorShader(1, 0, 0, 1, 0, 1, 0, 1),
-    ]
+]
 Operators.create(TrueUP1D(), shaders_list)

@@ -16,8 +16,6 @@
 # along with this program; if not, write to the Free Software Foundation,
 # Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 #
-# Contributor(s): Campbell Barton
-#
 # ***** END GPL LICENSE BLOCK *****
 
 # <pep8 compliant>
@@ -26,14 +24,19 @@ import project_source_info
 import subprocess
 import sys
 import os
+import tempfile
+
+from typing import (
+    Any,
+    List,
+)
+
 
 USE_QUIET = (os.environ.get("QUIET", None) is not None)
 
 CHECKER_IGNORE_PREFIX = [
     "extern",
-    "intern/moto",
-    "blender/intern/opennl",
-    ]
+]
 
 CHECKER_BIN = "cppcheck"
 
@@ -44,37 +47,47 @@ CHECKER_ARGS = [
     "--max-configs=1",  # speeds up execution
     #  "--check-config", # when includes are missing
     "--enable=all",  # if you want sixty hundred pedantic suggestions
-    ]
+
+    # Quiet output, otherwise all defines/includes are printed (overly verbose).
+    # Only enable this for troubleshooting (if defines are not set as expected for example).
+    "--quiet",
+
+    # NOTE: `--cppcheck-build-dir=<dir>` is added later as a temporary directory.
+]
 
 if USE_QUIET:
     CHECKER_ARGS.append("--quiet")
 
 
-def main():
+def cppcheck() -> None:
     source_info = project_source_info.build_info(ignore_prefix_list=CHECKER_IGNORE_PREFIX)
     source_defines = project_source_info.build_defines_as_args()
 
     check_commands = []
     for c, inc_dirs, defs in source_info:
-        cmd = ([CHECKER_BIN] +
-               CHECKER_ARGS +
-               [c] +
-               [("-I%s" % i) for i in inc_dirs] +
-               [("-D%s" % d) for d in defs] +
-               source_defines
-               )
+        cmd = (
+            [CHECKER_BIN] +
+            CHECKER_ARGS +
+            [c] +
+            [("-I%s" % i) for i in inc_dirs] +
+            [("-D%s" % d) for d in defs] +
+            source_defines
+        )
 
         check_commands.append((c, cmd))
 
     process_functions = []
 
-    def my_process(i, c, cmd):
+    def my_process(i: int, c: str, cmd: List[str]) -> subprocess.Popen[Any]:
         if not USE_QUIET:
             percent = 100.0 * (i / len(check_commands))
             percent_str = "[" + ("%.2f]" % percent).rjust(7) + " %:"
 
             sys.stdout.flush()
-            sys.stdout.write("%s " % percent_str)
+            sys.stdout.write("%s %s\n" % (
+                percent_str,
+                os.path.relpath(c, project_source_info.SOURCE_DIR)
+            ))
 
         return subprocess.Popen(cmd)
 
@@ -84,6 +97,12 @@ def main():
     project_source_info.queue_processes(process_functions)
 
     print("Finished!")
+
+
+def main() -> None:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        CHECKER_ARGS.append("--cppcheck-build-dir=" + temp_dir)
+        cppcheck()
 
 
 if __name__ == "__main__":

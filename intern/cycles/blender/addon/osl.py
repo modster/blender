@@ -15,6 +15,7 @@
 #
 
 # <pep8 compliant>
+from __future__ import annotations
 
 import bpy
 import _cycles
@@ -41,6 +42,8 @@ def update_script_node(node, report):
     import shutil
     import tempfile
 
+    oso_file_remove = False
+
     if node.mode == 'EXTERNAL':
         # compile external script file
         script_path = bpy.path.abspath(node.filepath, library=node.id_data.library)
@@ -49,7 +52,6 @@ def update_script_node(node, report):
         if script_ext == ".oso":
             # it's a .oso file, no need to compile
             ok, oso_path = True, script_path
-            oso_file_remove = False
         elif script_ext == ".osl":
             # compile .osl file
             ok, oso_path = osl_compile(script_path, report)
@@ -65,7 +67,6 @@ def update_script_node(node, report):
         elif os.path.dirname(node.filepath) == "":
             # module in search path
             oso_path = node.filepath
-            oso_file_remove = False
             ok = True
         else:
             # unknown
@@ -85,15 +86,14 @@ def update_script_node(node, report):
             # write text datablock contents to temporary file
             osl_file = tempfile.NamedTemporaryFile(mode='w', suffix=".osl", delete=False)
             osl_file.write(script.as_string())
+            osl_file.write("\n")
             osl_file.close()
 
             ok, oso_path = osl_compile(osl_file.name, report)
-            oso_file_remove = False
             os.remove(osl_file.name)
         else:
             # compile text datablock from disk directly
             ok, oso_path = osl_compile(osl_path, report)
-            oso_file_remove = False
 
         if ok:
             # read bytecode
@@ -114,7 +114,8 @@ def update_script_node(node, report):
 
     if ok:
         # now update node with new sockets
-        ok = _cycles.osl_update_node(node.id_data.as_pointer(), node.as_pointer(), oso_path)
+        data = bpy.data.as_pointer()
+        ok = _cycles.osl_update_node(data, node.id_data.as_pointer(), node.as_pointer(), oso_path)
 
         if not ok:
             report({'ERROR'}, "OSL query failed to open " + oso_path)

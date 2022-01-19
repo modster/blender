@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,19 +15,12 @@
  *
  * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
  * All rights reserved.
- *
- * The Original Code is: all of this file.
- *
- * Contributor(s): none yet.
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-#ifndef __BKE_WRITEAVI_H__
-#define __BKE_WRITEAVI_H__
+#pragma once
 
-/** \file BKE_writeavi.h
- *  \ingroup bke
+/** \file
+ * \ingroup bke
  */
 
 #ifdef __cplusplus
@@ -38,29 +29,50 @@ extern "C" {
 
 /* generic blender movie support, could move to own module */
 
-struct RenderData;	
+struct RenderData;
 struct ReportList;
 struct Scene;
 
 typedef struct bMovieHandle {
-	int (*start_movie)(void *context_v, struct Scene *scene, struct RenderData *rd, int rectx, int recty,
-	                   struct ReportList *reports, bool preview, const char *suffix);
-	int (*append_movie)(void *context_v, struct RenderData *rd, int start_frame, int frame, int *pixels,
-	                    int rectx, int recty, const char *suffix, struct ReportList *reports);
-	void (*end_movie)(void *context_v);
-	int (*get_next_frame)(void *context_v, struct RenderData *rd, struct ReportList *reports); /* optional */
-	void (*get_movie_path)(char *string, struct RenderData *rd, bool preview, const char *suffix); /* optional */
-	void *(*context_create)(void);
-	void (*context_free)(void *context_v);
+  int (*start_movie)(void *context_v,
+                     const struct Scene *scene,
+                     struct RenderData *rd,
+                     int rectx,
+                     int recty,
+                     struct ReportList *reports,
+                     bool preview,
+                     const char *suffix);
+  int (*append_movie)(void *context_v,
+                      struct RenderData *rd,
+                      int start_frame,
+                      int frame,
+                      int *pixels,
+                      int rectx,
+                      int recty,
+                      const char *suffix,
+                      struct ReportList *reports);
+  void (*end_movie)(void *context_v);
+
+  /* Optional function. */
+  void (*get_movie_path)(char *string,
+                         const struct RenderData *rd,
+                         bool preview,
+                         const char *suffix);
+
+  void *(*context_create)(void);
+  void (*context_free)(void *context_v);
 } bMovieHandle;
 
-bMovieHandle *BKE_movie_handle_get(const char imtype);
-void BKE_movie_filepath_get(char *string, struct RenderData *rd, bool preview, const char *suffix);
-void BKE_context_create(bMovieHandle *mh);
+bMovieHandle *BKE_movie_handle_get(char imtype);
+
+/**
+ * \note Similar to #BKE_image_path_from_imformat()
+ */
+void BKE_movie_filepath_get(char *string,
+                            const struct RenderData *rd,
+                            bool preview,
+                            const char *suffix);
 
 #ifdef __cplusplus
 }
 #endif
-
-#endif
-

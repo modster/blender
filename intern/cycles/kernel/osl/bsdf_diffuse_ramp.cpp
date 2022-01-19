@@ -5,7 +5,7 @@
  * All Rights Reserved.
  *
  * Modifications Copyright 2011, Blender Foundation.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
  * met:
@@ -34,72 +34,51 @@
 
 #include <OSL/genclosure.h>
 
-#include "kernel_compat_cpu.h"
-#include "osl_closures.h"
+#include "kernel/device/cpu/compat.h"
+#include "kernel/osl/closures.h"
 
-#include "kernel_types.h"
-#include "kernel_montecarlo.h"
-#include "closure/bsdf_diffuse_ramp.h"
+// clang-format off
+#include "kernel/types.h"
+#include "kernel/closure/alloc.h"
+#include "kernel/closure/bsdf_diffuse_ramp.h"
+// clang-format on
 
 CCL_NAMESPACE_BEGIN
 
 using namespace OSL;
 
 class DiffuseRampClosure : public CBSDFClosure {
-public:
-	Color3 colors[8];
-	float3 fcolors[8];
+ public:
+  DiffuseRampBsdf params;
+  Color3 colors[8];
 
-	DiffuseRampClosure() : CBSDFClosure(LABEL_DIFFUSE)
-	{}
+  void setup(ShaderData *sd, uint32_t /* path_flag */, float3 weight)
+  {
+    DiffuseRampBsdf *bsdf = (DiffuseRampBsdf *)bsdf_alloc_osl(
+        sd, sizeof(DiffuseRampBsdf), weight, &params);
 
-	void setup()
-	{
-		sc.prim = this;
-		m_shaderdata_flag = bsdf_diffuse_ramp_setup(&sc);
+    if (bsdf) {
+      bsdf->colors = (float3 *)closure_alloc_extra(sd, sizeof(float3) * 8);
 
-		for(int i = 0; i < 8; i++)
-			fcolors[i] = TO_FLOAT3(colors[i]);
-	}
+      if (bsdf->colors) {
+        for (int i = 0; i < 8; i++)
+          bsdf->colors[i] = TO_FLOAT3(colors[i]);
 
-	void blur(float roughness)
-	{
-		bsdf_diffuse_ramp_blur(&sc, roughness);
-	}
-
-	float3 eval_reflect(const float3 &omega_out, const float3 &omega_in, float& pdf) const
-	{
-		return bsdf_diffuse_ramp_eval_reflect(&sc, fcolors, omega_out, omega_in, &pdf);
-	}
-
-	float3 eval_transmit(const float3 &omega_out, const float3 &omega_in, float& pdf) const
-	{
-		return bsdf_diffuse_ramp_eval_transmit(&sc, fcolors, omega_out, omega_in, &pdf);
-	}
-
-	int sample(const float3 &Ng,
-	           const float3 &omega_out, const float3 &domega_out_dx, const float3 &domega_out_dy,
-	           float randu, float randv,
-	           float3 &omega_in, float3 &domega_in_dx, float3 &domega_in_dy,
-	           float &pdf, float3 &eval) const
-	{
-		return bsdf_diffuse_ramp_sample(&sc, fcolors, Ng, omega_out, domega_out_dx, domega_out_dy,
-			randu, randv, &eval, &omega_in, &domega_in_dx, &domega_in_dy, &pdf);
-	}
+        sd->flag |= bsdf_diffuse_ramp_setup(bsdf);
+      }
+    }
+  }
 };
 
 ClosureParam *closure_bsdf_diffuse_ramp_params()
 {
-	static ClosureParam params[] = {
-		CLOSURE_FLOAT3_PARAM(DiffuseRampClosure, sc.N),
-		CLOSURE_COLOR_ARRAY_PARAM(DiffuseRampClosure, colors, 8),
-		CLOSURE_STRING_KEYPARAM("label"),
-	    CLOSURE_FINISH_PARAM(DiffuseRampClosure)
-	};
-	return params;
+  static ClosureParam params[] = {CLOSURE_FLOAT3_PARAM(DiffuseRampClosure, params.N),
+                                  CLOSURE_COLOR_ARRAY_PARAM(DiffuseRampClosure, colors, 8),
+                                  CLOSURE_STRING_KEYPARAM(DiffuseRampClosure, label, "label"),
+                                  CLOSURE_FINISH_PARAM(DiffuseRampClosure)};
+  return params;
 }
 
 CCLOSURE_PREPARE(closure_bsdf_diffuse_ramp_prepare, DiffuseRampClosure)
 
 CCL_NAMESPACE_END
-

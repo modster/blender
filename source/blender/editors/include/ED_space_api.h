@@ -1,10 +1,8 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version. 
+ * of the License, or (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -17,31 +15,34 @@
  *
  * The Original Code is Copyright (C) 2008 Blender Foundation.
  * All rights reserved.
- *
- * 
- * Contributor(s): Blender Foundation
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file ED_space_api.h
- *  \ingroup editors
+/** \file
+ * \ingroup editors
  */
 
-#ifndef __ED_SPACE_API_H__
-#define __ED_SPACE_API_H__
+#pragma once
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 struct ARegionType;
 struct bContext;
 
+/* Only called once on startup. storage is global in BKE kernel listbase. */
 void ED_spacetypes_init(void);
 void ED_spacemacros_init(void);
 
 /* the pluginnable API for export to editors */
 
-/* calls for registering default spaces */
+/* -------------------------------------------------------------------- */
+/** \name Calls for registering default spaces
+ *
+ * Calls for registering default spaces, only called once, from #ED_spacetypes_init
+ * \{ */
+
 void ED_spacetype_outliner(void);
-void ED_spacetype_time(void);
 void ED_spacetype_view3d(void);
 void ED_spacetype_ipo(void);
 void ED_spacetype_image(void);
@@ -58,25 +59,38 @@ void ED_spacetype_logic(void);
 void ED_spacetype_console(void);
 void ED_spacetype_userpref(void);
 void ED_spacetype_clip(void);
+void ED_spacetype_statusbar(void);
+void ED_spacetype_topbar(void);
+void ED_spacetype_spreadsheet(void);
 
-/* calls for instancing and freeing spacetype static data 
- * called in WM_init_exit */
-/* in space_file.c */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Spacetype Static Data
+ * Calls for instancing and freeing space-type static data called in #WM_init_exit
+ * \{ */
+
 void ED_file_init(void);
 void ED_file_exit(void);
 
-#define REGION_DRAW_POST_VIEW   0
-#define REGION_DRAW_POST_PIXEL  1
-#define REGION_DRAW_PRE_VIEW    2
+/** \} */
 
-void *ED_region_draw_cb_activate(struct ARegionType *, 
+#define REGION_DRAW_POST_VIEW 0
+#define REGION_DRAW_POST_PIXEL 1
+#define REGION_DRAW_PRE_VIEW 2
+#define REGION_DRAW_BACKDROP 3
+
+void *ED_region_draw_cb_activate(struct ARegionType *art,
                                  void (*draw)(const struct bContext *, struct ARegion *, void *),
-                                 void *custumdata, int type);
-void ED_region_draw_cb_draw(const struct bContext *, struct ARegion *, int);
-void ED_region_draw_cb_exit(struct ARegionType *, void *);
-void *ED_region_draw_cb_customdata(void *handle);
-/* generic callbacks */
-/* ed_util.c */
-void ED_region_draw_mouse_line_cb(const struct bContext *C, struct ARegion *ar, void *arg_info);
+                                 void *customdata,
+                                 int type);
+void ED_region_draw_cb_draw(const struct bContext *C, struct ARegion *region, int type);
+void ED_region_surface_draw_cb_draw(struct ARegionType *art, int type);
+bool ED_region_draw_cb_exit(struct ARegionType *art, void *handle);
+void ED_region_draw_cb_remove_by_type(struct ARegionType *art,
+                                      void *draw_fn,
+                                      void (*free)(void *));
 
-#endif /* __ED_SPACE_API_H__ */
+#ifdef __cplusplus
+}
+#endif

@@ -1,6 +1,4 @@
 /*
- * Copyright 2011, Blender Foundation.
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -15,51 +13,69 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor: 
- *		Jeroen Bakker 
- *		Monique Dewanchand
+ * Copyright 2011, Blender Foundation.
  */
 
-#ifndef _COM_BoxMaskOperation_h
-#define _COM_BoxMaskOperation_h
-#include "COM_NodeOperation.h"
+#pragma once
 
+#include "COM_MultiThreadedOperation.h"
 
-class BoxMaskOperation : public NodeOperation {
-private:
-	/**
-	 * Cached reference to the inputProgram
-	 */
-	SocketReader *m_inputMask;
-	SocketReader *m_inputValue;
-	
-	float m_sine;
-	float m_cosine;
-	float m_aspectRatio;
-	int m_maskType;
-	
-	NodeBoxMask *m_data;
-public:
-	BoxMaskOperation();
-	
-	/**
-	 * the inner loop of this program
-	 */
-	void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
-	
-	/**
-	 * Initialize the execution
-	 */
-	void initExecution();
-	
-	/**
-	 * Deinitialize the execution
-	 */
-	void deinitExecution();
-	
-	void setData(NodeBoxMask *data) { this->m_data = data; }
+namespace blender::compositor {
 
-	void setMaskType(int maskType) { this->m_maskType = maskType; }
+class BoxMaskOperation : public MultiThreadedOperation {
+ private:
+  using MaskFunc = std::function<float(bool is_inside, const float *mask, const float *value)>;
 
+  /**
+   * Cached reference to the input_program
+   */
+  SocketReader *input_mask_;
+  SocketReader *input_value_;
+
+  float sine_;
+  float cosine_;
+  float aspect_ratio_;
+  int mask_type_;
+
+  NodeBoxMask *data_;
+
+ public:
+  BoxMaskOperation();
+
+  /**
+   * The inner loop of this operation.
+   */
+  void execute_pixel_sampled(float output[4], float x, float y, PixelSampler sampler) override;
+
+  /**
+   * Initialize the execution
+   */
+  void init_execution() override;
+
+  /**
+   * Deinitialize the execution
+   */
+  void deinit_execution() override;
+
+  void set_data(NodeBoxMask *data)
+  {
+    data_ = data;
+  }
+
+  void set_mask_type(int mask_type)
+  {
+    mask_type_ = mask_type;
+  }
+
+  void update_memory_buffer_partial(MemoryBuffer *output,
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
+
+ private:
+  void apply_mask(MemoryBuffer *output,
+                  const rcti &area,
+                  Span<MemoryBuffer *> inputs,
+                  MaskFunc mask_func);
 };
-#endif
+
+}  // namespace blender::compositor

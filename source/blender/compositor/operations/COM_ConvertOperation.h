@@ -1,6 +1,4 @@
 /*
- * Copyright 2011, Blender Foundation.
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -15,188 +13,239 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor: 
- *		Jeroen Bakker 
- *		Monique Dewanchand
+ * Copyright 2011, Blender Foundation.
  */
 
-#ifndef _COM_ConvertOperation_h
-#define _COM_ConvertOperation_h
+#pragma once
 
-#include "COM_NodeOperation.h"
+#include "COM_MultiThreadedOperation.h"
 
+namespace blender::compositor {
 
-class ConvertBaseOperation : public NodeOperation {
-protected:
-	SocketReader *m_inputOperation;
-	
-public:
-	ConvertBaseOperation();
-	
-	void initExecution();
-	void deinitExecution();
+class ConvertBaseOperation : public MultiThreadedOperation {
+ protected:
+  SocketReader *input_operation_;
+
+ public:
+  ConvertBaseOperation();
+
+  void init_execution() override;
+  void deinit_execution() override;
+
+  void update_memory_buffer_partial(MemoryBuffer *output,
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) final;
+
+ protected:
+  virtual void hash_output_params() override;
+  virtual void update_memory_buffer_partial(BuffersIterator<float> &it) = 0;
 };
-
 
 class ConvertValueToColorOperation : public ConvertBaseOperation {
-public:
-	ConvertValueToColorOperation();
-	
-	void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
-};
+ public:
+  ConvertValueToColorOperation();
 
+  void execute_pixel_sampled(float output[4], float x, float y, PixelSampler sampler) override;
+
+ protected:
+  void update_memory_buffer_partial(BuffersIterator<float> &it) override;
+};
 
 class ConvertColorToValueOperation : public ConvertBaseOperation {
-public:
-	ConvertColorToValueOperation();
-	
-	void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
-};
+ public:
+  ConvertColorToValueOperation();
 
+  void execute_pixel_sampled(float output[4], float x, float y, PixelSampler sampler) override;
+
+ protected:
+  void update_memory_buffer_partial(BuffersIterator<float> &it) override;
+};
 
 class ConvertColorToBWOperation : public ConvertBaseOperation {
-public:
-	ConvertColorToBWOperation();
-	
-	void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
-};
+ public:
+  ConvertColorToBWOperation();
 
+  void execute_pixel_sampled(float output[4], float x, float y, PixelSampler sampler) override;
+
+ protected:
+  void update_memory_buffer_partial(BuffersIterator<float> &it) override;
+};
 
 class ConvertColorToVectorOperation : public ConvertBaseOperation {
-public:
-	ConvertColorToVectorOperation();
-	
-	void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
-};
+ public:
+  ConvertColorToVectorOperation();
 
+  void execute_pixel_sampled(float output[4], float x, float y, PixelSampler sampler) override;
+
+ protected:
+  void update_memory_buffer_partial(BuffersIterator<float> &it) override;
+};
 
 class ConvertValueToVectorOperation : public ConvertBaseOperation {
-public:
-	ConvertValueToVectorOperation();
-	
-	void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
-};
+ public:
+  ConvertValueToVectorOperation();
 
+  void execute_pixel_sampled(float output[4], float x, float y, PixelSampler sampler) override;
+
+ protected:
+  void update_memory_buffer_partial(BuffersIterator<float> &it) override;
+};
 
 class ConvertVectorToColorOperation : public ConvertBaseOperation {
-public:
-	ConvertVectorToColorOperation();
-	
-	void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
-};
+ public:
+  ConvertVectorToColorOperation();
 
+  void execute_pixel_sampled(float output[4], float x, float y, PixelSampler sampler) override;
+
+ protected:
+  void update_memory_buffer_partial(BuffersIterator<float> &it) override;
+};
 
 class ConvertVectorToValueOperation : public ConvertBaseOperation {
-public:
-	ConvertVectorToValueOperation();
-	
-	void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
-};
+ public:
+  ConvertVectorToValueOperation();
 
+  void execute_pixel_sampled(float output[4], float x, float y, PixelSampler sampler) override;
+
+ protected:
+  void update_memory_buffer_partial(BuffersIterator<float> &it) override;
+};
 
 class ConvertRGBToYCCOperation : public ConvertBaseOperation {
-private:
-	/** YCbCr mode (Jpeg, ITU601, ITU709) */
-	int m_mode;
-public:
-	ConvertRGBToYCCOperation();
+ private:
+  /** YCbCr mode (Jpeg, ITU601, ITU709) */
+  int mode_;
 
-	void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
+ public:
+  ConvertRGBToYCCOperation();
 
-	/** Set the YCC mode */
-	void setMode(int mode);
+  void execute_pixel_sampled(float output[4], float x, float y, PixelSampler sampler) override;
+
+  /** Set the YCC mode */
+  void set_mode(int mode);
+
+ protected:
+  void hash_output_params() override;
+  void update_memory_buffer_partial(BuffersIterator<float> &it) override;
 };
-
 
 class ConvertYCCToRGBOperation : public ConvertBaseOperation {
-private:
-	/** YCbCr mode (Jpeg, ITU601, ITU709) */
-	int m_mode;
-public:
-	ConvertYCCToRGBOperation();
-	
-	void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
-	
-	/** Set the YCC mode */
-	void setMode(int mode);
-};
+ private:
+  /** YCbCr mode (Jpeg, ITU601, ITU709) */
+  int mode_;
 
+ public:
+  ConvertYCCToRGBOperation();
+
+  void execute_pixel_sampled(float output[4], float x, float y, PixelSampler sampler) override;
+
+  /** Set the YCC mode */
+  void set_mode(int mode);
+
+ protected:
+  void hash_output_params() override;
+  void update_memory_buffer_partial(BuffersIterator<float> &it) override;
+};
 
 class ConvertRGBToYUVOperation : public ConvertBaseOperation {
-public:
-	ConvertRGBToYUVOperation();
-	
-	void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
-};
+ public:
+  ConvertRGBToYUVOperation();
 
+  void execute_pixel_sampled(float output[4], float x, float y, PixelSampler sampler) override;
+
+ protected:
+  void update_memory_buffer_partial(BuffersIterator<float> &it) override;
+};
 
 class ConvertYUVToRGBOperation : public ConvertBaseOperation {
-public:
-	ConvertYUVToRGBOperation();
-	
-	void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
-};
+ public:
+  ConvertYUVToRGBOperation();
 
+  void execute_pixel_sampled(float output[4], float x, float y, PixelSampler sampler) override;
+
+ protected:
+  void update_memory_buffer_partial(BuffersIterator<float> &it) override;
+};
 
 class ConvertRGBToHSVOperation : public ConvertBaseOperation {
-public:
-	ConvertRGBToHSVOperation();
-	
-	void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
-};
+ public:
+  ConvertRGBToHSVOperation();
 
+  void execute_pixel_sampled(float output[4], float x, float y, PixelSampler sampler) override;
+
+ protected:
+  void update_memory_buffer_partial(BuffersIterator<float> &it) override;
+};
 
 class ConvertHSVToRGBOperation : public ConvertBaseOperation {
-public:
-	ConvertHSVToRGBOperation();
-	
-	void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
-};
+ public:
+  ConvertHSVToRGBOperation();
 
+  void execute_pixel_sampled(float output[4], float x, float y, PixelSampler sampler) override;
+
+ protected:
+  void update_memory_buffer_partial(BuffersIterator<float> &it) override;
+};
 
 class ConvertPremulToStraightOperation : public ConvertBaseOperation {
-public:
-	ConvertPremulToStraightOperation();
+ public:
+  ConvertPremulToStraightOperation();
 
-	void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
+  void execute_pixel_sampled(float output[4], float x, float y, PixelSampler sampler) override;
+
+ protected:
+  void update_memory_buffer_partial(BuffersIterator<float> &it) override;
 };
-
 
 class ConvertStraightToPremulOperation : public ConvertBaseOperation {
-public:
-	ConvertStraightToPremulOperation();
+ public:
+  ConvertStraightToPremulOperation();
 
-	void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
+  void execute_pixel_sampled(float output[4], float x, float y, PixelSampler sampler) override;
+
+ protected:
+  void update_memory_buffer_partial(BuffersIterator<float> &it) override;
 };
 
+class SeparateChannelOperation : public MultiThreadedOperation {
+ private:
+  SocketReader *input_operation_;
+  int channel_;
 
-class SeparateChannelOperation : public NodeOperation {
-private:
-	SocketReader *m_inputOperation;
-	int m_channel;
-public:
-	SeparateChannelOperation();
-	void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
-	
-	void initExecution();
-	void deinitExecution();
-	
-	void setChannel(int channel) { this->m_channel = channel; }
+ public:
+  SeparateChannelOperation();
+  void execute_pixel_sampled(float output[4], float x, float y, PixelSampler sampler) override;
+
+  void init_execution() override;
+  void deinit_execution() override;
+
+  void set_channel(int channel)
+  {
+    channel_ = channel;
+  }
+
+  void update_memory_buffer_partial(MemoryBuffer *output,
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
 };
 
+class CombineChannelsOperation : public MultiThreadedOperation {
+ private:
+  SocketReader *input_channel1_operation_;
+  SocketReader *input_channel2_operation_;
+  SocketReader *input_channel3_operation_;
+  SocketReader *input_channel4_operation_;
 
-class CombineChannelsOperation : public NodeOperation {
-private:
-	SocketReader *m_inputChannel1Operation;
-	SocketReader *m_inputChannel2Operation;
-	SocketReader *m_inputChannel3Operation;
-	SocketReader *m_inputChannel4Operation;
-public:
-	CombineChannelsOperation();
-	void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
-	
-	void initExecution();
-	void deinitExecution();
+ public:
+  CombineChannelsOperation();
+  void execute_pixel_sampled(float output[4], float x, float y, PixelSampler sampler) override;
+
+  void init_execution() override;
+  void deinit_execution() override;
+
+  void update_memory_buffer_partial(MemoryBuffer *output,
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
 };
 
-#endif
+}  // namespace blender::compositor

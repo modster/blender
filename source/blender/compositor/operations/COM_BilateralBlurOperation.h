@@ -1,6 +1,4 @@
 /*
- * Copyright 2011, Blender Foundation.
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -15,43 +13,56 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor: 
- *		Jeroen Bakker 
- *		Monique Dewanchand
+ * Copyright 2011, Blender Foundation.
  */
 
-#ifndef __COM_BILATERALBLUROPERATION_H__
-#define __COM_BILATERALBLUROPERATION_H__
-#include "COM_NodeOperation.h"
+#pragma once
+
+#include "COM_MultiThreadedOperation.h"
 #include "COM_QualityStepHelper.h"
 
-class BilateralBlurOperation : public NodeOperation, public QualityStepHelper {
-private:
-	SocketReader *m_inputColorProgram;
-	SocketReader *m_inputDeterminatorProgram;
-	NodeBilateralBlurData *m_data;
-	float m_space;
+namespace blender::compositor {
 
-public:
-	BilateralBlurOperation();
+class BilateralBlurOperation : public MultiThreadedOperation, public QualityStepHelper {
+ private:
+  SocketReader *input_color_program_;
+  SocketReader *input_determinator_program_;
+  NodeBilateralBlurData *data_;
+  float space_;
 
-	/**
-	 * the inner loop of this program
-	 */
-	void executePixel(float output[4], int x, int y, void *data);
-	
-	/**
-	 * Initialize the execution
-	 */
-	void initExecution();
-	
-	/**
-	 * Deinitialize the execution
-	 */
-	void deinitExecution();
-	
-	bool determineDependingAreaOfInterest(rcti *input, ReadBufferOperation *readOperation, rcti *output);
-	
-	void setData(NodeBilateralBlurData *data) { this->m_data = data; }
+ public:
+  BilateralBlurOperation();
+
+  /**
+   * The inner loop of this operation.
+   */
+  void execute_pixel(float output[4], int x, int y, void *data) override;
+
+  /**
+   * Initialize the execution
+   */
+  void init_execution() override;
+
+  /**
+   * Deinitialize the execution
+   */
+  void deinit_execution() override;
+
+  bool determine_depending_area_of_interest(rcti *input,
+                                            ReadBufferOperation *read_operation,
+                                            rcti *output) override;
+
+  void set_data(NodeBilateralBlurData *data)
+  {
+    data_ = data;
+    space_ = data->sigma_space + data->iter;
+  }
+
+  void get_area_of_interest(int input_idx, const rcti &output_area, rcti &r_input_area) override;
+
+  void update_memory_buffer_partial(MemoryBuffer *output,
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
 };
-#endif
+
+}  // namespace blender::compositor

@@ -13,52 +13,57 @@
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software Foundation,
 # Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# Contributor(s): Jacques Beaurain.
-#
 # ***** END GPL LICENSE BLOCK *****
 
 set(INC
-	../include
-	../../blenfont
-	../../blenkernel
-	../../blenlib
-	../../gpu
-	../../makesdna
-	../../makesrna
-	../../windowmanager
-	../../../../intern/guardedalloc
-	../../../../intern/glew-mx
-)
-
-set(INC_SYS
-	${GLEW_INCLUDE_PATH}
+  ../include
+  ../../blenkernel
+  ../../blenlib
+  ../../blentranslation
+  ../../depsgraph
+  ../../gpu
+  ../../makesdna
+  ../../makesrna
+  ../../windowmanager
+  ../../../../intern/glew-mx
+  ../../../../intern/guardedalloc
 )
 
 set(SRC
-	graph_buttons.c
-	graph_draw.c
-	graph_edit.c
-	graph_ops.c
-	graph_select.c
-	graph_utils.c
-	space_graph.c
+  graph_buttons.c
+  graph_draw.c
+  graph_edit.c
+  graph_ops.c
+  graph_select.c
+  graph_slider_ops.c
+  graph_utils.c
+  graph_view.c
+  space_graph.c
 
-	graph_intern.h
+  graph_intern.h
+)
+
+set(LIB
+  bf_blenkernel
+  bf_blenlib
 )
 
 if(WITH_AUDASPACE)
-	add_definitions(${AUDASPACE_DEFINITIONS})
+  list(APPEND INC_SYS
+    ${AUDASPACE_C_INCLUDE_DIRS}
+  )
+  list(APPEND LIB
+    bf_intern_audaspace
 
-	list(APPEND INC_SYS
-		${AUDASPACE_C_INCLUDE_DIRS}
-	)
+    ${AUDASPACE_C_LIBRARIES}
+    ${AUDASPACE_PY_LIBRARIES}
+  )
+  add_definitions(-DWITH_AUDASPACE)
 endif()
 
 if(WITH_INTERNATIONAL)
-	add_definitions(-DWITH_INTERNATIONAL)
+  add_definitions(-DWITH_INTERNATIONAL)
 endif()
 
-add_definitions(${GL_DEFINITIONS})
 
-blender_add_lib(bf_editor_space_graph "${SRC}" "${INC}" "${INC_SYS}")
+blender_add_lib(bf_editor_space_graph "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")

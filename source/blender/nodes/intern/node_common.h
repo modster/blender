@@ -1,10 +1,8 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version. 
+ * of the License, or (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -17,29 +15,37 @@
  *
  * The Original Code is Copyright (C) 2007 Blender Foundation.
  * All rights reserved.
- *
- * The Original Code is: all of this file.
- *
- * Contributor(s): Lukas Toenne.
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file blender/nodes/intern/node_common.h
- *  \ingroup nodes
+/** \file
+ * \ingroup nodes
  */
 
-
-#ifndef __NODE_COMMON_H__
-#define __NODE_COMMON_H__
+#pragma once
 
 #include "DNA_listBase.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct bNodeTree;
 
-void node_group_label(struct bNodeTree *ntree, struct bNode *node, char *label, int maxlen);
-int node_group_poll_instance(struct bNode *node, struct bNodeTree *nodetree);
+/** Groups display their internal tree name as label. */
+void node_group_label(const struct bNodeTree *ntree,
+                      const struct bNode *node,
+                      char *label,
+                      int maxlen);
+bool node_group_poll_instance(struct bNode *node,
+                              struct bNodeTree *nodetree,
+                              const char **r_disabled_hint);
 
+/**
+ * Global update function for Reroute node types.
+ * This depends on connected nodes, so must be done as a tree-wide update.
+ */
 void ntree_update_reroute_nodes(struct bNodeTree *ntree);
 
+#ifdef __cplusplus
+}
 #endif

@@ -13,52 +13,48 @@
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software Foundation,
 # Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# Contributor(s): Jacques Beaurain.
-#
 # ***** END GPL LICENSE BLOCK *****
 
 set(INC
-	../include
-	../../blenkernel
-	../../blenlib
-	../../blenfont
-	../../bmesh
-	../../gpu
-	../../makesdna
-	../../makesrna
-	../../windowmanager
-	../../../../intern/guardedalloc
-	../../../../intern/glew-mx
+  ../include
+  ../../blenkernel
+  ../../blenlib
+  ../../blentranslation
+  ../../bmesh
+  ../../depsgraph
+  ../../gpu
+  ../../makesdna
+  ../../makesrna
+  ../../windowmanager
+  ../../../../intern/eigen
+  ../../../../intern/glew-mx
+  ../../../../intern/guardedalloc
 )
 
-set(INC_SYS
-	${GLEW_INCLUDE_PATH}
-)
 
 set(SRC
-	uvedit_buttons.c
-	uvedit_draw.c
-	uvedit_ops.c
-	uvedit_parametrizer.c
-	uvedit_smart_stitch.c
-	uvedit_unwrap_ops.c
+  uvedit_buttons.c
+  uvedit_draw.c
+  uvedit_islands.c
+  uvedit_ops.c
+  uvedit_parametrizer.c
+  uvedit_path.c
+  uvedit_rip.c
+  uvedit_select.c
+  uvedit_smart_stitch.c
+  uvedit_unwrap_ops.c
 
-	uvedit_intern.h
-	uvedit_parametrizer.h
+  uvedit_intern.h
+  uvedit_parametrizer.h
+)
+
+set(LIB
+  bf_bmesh
 )
 
 if(WITH_INTERNATIONAL)
-	add_definitions(-DWITH_INTERNATIONAL)
+  add_definitions(-DWITH_INTERNATIONAL)
 endif()
 
-if(WITH_OPENNL)
-	add_definitions(-DWITH_OPENNL)
-	list(APPEND INC_SYS
-		../../../../intern/opennl/extern
-	)
-endif()
 
-add_definitions(${GL_DEFINITIONS})
-
-blender_add_lib(bf_editor_uvedit "${SRC}" "${INC}" "${INC_SYS}")
+blender_add_lib(bf_editor_uvedit "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")

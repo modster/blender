@@ -1,6 +1,4 @@
 /*
- * Copyright 2011, Blender Foundation.
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -15,63 +13,92 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor: 
- *		Jeroen Bakker 
- *		Monique Dewanchand
+ * Copyright 2011, Blender Foundation.
  */
 
-#ifndef _COM_FastGaussianBlurOperation_h
-#define _COM_FastGaussianBlurOperation_h
+#pragma once
 
 #include "COM_BlurBaseOperation.h"
 #include "DNA_node_types.h"
 
+namespace blender::compositor {
+
 class FastGaussianBlurOperation : public BlurBaseOperation {
-private:
-	float m_sx;
-	float m_sy;
-	MemoryBuffer *m_iirgaus;
-public:
-	FastGaussianBlurOperation();
-	bool determineDependingAreaOfInterest(rcti *input, ReadBufferOperation *readOperation, rcti *output);
-	void executePixel(float output[4], int x, int y, void *data);
-	
-	static void IIR_gauss(MemoryBuffer *src, float sigma, unsigned int channel, unsigned int xy);
-	void *initializeTileData(rcti *rect);
-	void deinitExecution();
-	void initExecution();
+ private:
+  float sx_;
+  float sy_;
+  MemoryBuffer *iirgaus_;
+
+ public:
+  FastGaussianBlurOperation();
+  bool determine_depending_area_of_interest(rcti *input,
+                                            ReadBufferOperation *read_operation,
+                                            rcti *output) override;
+  void execute_pixel(float output[4], int x, int y, void *data) override;
+
+  static void IIR_gauss(MemoryBuffer *src, float sigma, unsigned int channel, unsigned int xy);
+  void *initialize_tile_data(rcti *rect) override;
+  void init_data() override;
+  void deinit_execution() override;
+  void init_execution() override;
+
+  void get_area_of_interest(int input_idx, const rcti &output_area, rcti &r_input_area) override;
+  void update_memory_buffer_started(MemoryBuffer *output,
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
+  void update_memory_buffer_partial(MemoryBuffer *UNUSED(output),
+                                    const rcti &UNUSED(area),
+                                    Span<MemoryBuffer *> UNUSED(inputs)) override
+  {
+  }
 };
 
 enum {
-	FAST_GAUSS_OVERLAY_MIN  = -1,
-	FAST_GAUSS_OVERLAY_NONE =  0,
-	FAST_GAUSS_OVERLAY_MAX  =  1
+  FAST_GAUSS_OVERLAY_MIN = -1,
+  FAST_GAUSS_OVERLAY_NONE = 0,
+  FAST_GAUSS_OVERLAY_MAX = 1,
 };
 
-class FastGaussianBlurValueOperation : public NodeOperation {
-private:
-	float m_sigma;
-	MemoryBuffer *m_iirgaus;
-	SocketReader *m_inputprogram;
+class FastGaussianBlurValueOperation : public MultiThreadedOperation {
+ private:
+  float sigma_;
+  MemoryBuffer *iirgaus_;
+  SocketReader *inputprogram_;
 
-	/**
-	 * -1: re-mix with darker
-	 *  0: do nothing
-	 *  1 re-mix with lighter */
-	int m_overlay;
-public:
-	FastGaussianBlurValueOperation();
-	bool determineDependingAreaOfInterest(rcti *input, ReadBufferOperation *readOperation, rcti *output);
-	void executePixel(float output[4], int x, int y, void *data);
-	
-	void *initializeTileData(rcti *rect);
-	void deinitExecution();
-	void initExecution();
-	void setSigma(float sigma) { this->m_sigma = sigma; }
+  /**
+   * -1: re-mix with darker
+   *  0: do nothing
+   *  1 re-mix with lighter */
+  int overlay_;
 
-	/* used for DOF blurring ZBuffer */
-	void setOverlay(int overlay) { this->m_overlay = overlay; }
+ public:
+  FastGaussianBlurValueOperation();
+  bool determine_depending_area_of_interest(rcti *input,
+                                            ReadBufferOperation *read_operation,
+                                            rcti *output) override;
+  void execute_pixel(float output[4], int x, int y, void *data) override;
+
+  void *initialize_tile_data(rcti *rect) override;
+  void deinit_execution() override;
+  void init_execution() override;
+  void set_sigma(float sigma)
+  {
+    sigma_ = sigma;
+  }
+
+  /* used for DOF blurring ZBuffer */
+  void set_overlay(int overlay)
+  {
+    overlay_ = overlay;
+  }
+
+  void get_area_of_interest(int input_idx, const rcti &output_area, rcti &r_input_area) override;
+  void update_memory_buffer_started(MemoryBuffer *output,
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
+  void update_memory_buffer_partial(MemoryBuffer *output,
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
 };
 
-#endif
-
+}  // namespace blender::compositor

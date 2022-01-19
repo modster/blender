@@ -1,6 +1,4 @@
 /*
- * Copyright 2012, Blender Foundation.
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -15,49 +13,57 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor:
- *		Dalai Felinto
+ * Copyright 2012, Blender Foundation.
  */
 
-#ifndef _COM_DisplaceSimpleOperation_h
-#define _COM_DisplaceSimpleOperation_h
-#include "COM_NodeOperation.h"
+#pragma once
 
+#include "COM_MultiThreadedOperation.h"
 
-class DisplaceSimpleOperation : public NodeOperation {
-private:
-	/**
-	 * Cached reference to the inputProgram
-	 */
-	SocketReader *m_inputColorProgram;
-	SocketReader *m_inputVectorProgram;
-	SocketReader *m_inputScaleXProgram;
-	SocketReader *m_inputScaleYProgram;
+namespace blender::compositor {
 
-	float m_width_x4;
-	float m_height_x4;
+class DisplaceSimpleOperation : public MultiThreadedOperation {
+ private:
+  /**
+   * Cached reference to the input_program
+   */
+  SocketReader *input_color_program_;
+  SocketReader *input_vector_program_;
+  SocketReader *input_scale_xprogram_;
+  SocketReader *input_scale_yprogram_;
 
-public:
-	DisplaceSimpleOperation();
+  float width_x4_;
+  float height_x4_;
 
-	/**
-	 * we need a full buffer for the image
-	 */
-	bool determineDependingAreaOfInterest(rcti *input, ReadBufferOperation *readOperation, rcti *output);
+ public:
+  DisplaceSimpleOperation();
 
-	/**
-	 * the inner loop of this program
-	 */
-	void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
-	
-	/**
-	 * Initialize the execution
-	 */
-	void initExecution();
-	
-	/**
-	 * Deinitialize the execution
-	 */
-	void deinitExecution();
+  /**
+   * we need a full buffer for the image
+   */
+  bool determine_depending_area_of_interest(rcti *input,
+                                            ReadBufferOperation *read_operation,
+                                            rcti *output) override;
+
+  /**
+   * The inner loop of this operation.
+   */
+  void execute_pixel_sampled(float output[4], float x, float y, PixelSampler sampler) override;
+
+  /**
+   * Initialize the execution
+   */
+  void init_execution() override;
+
+  /**
+   * Deinitialize the execution
+   */
+  void deinit_execution() override;
+
+  void get_area_of_interest(int input_idx, const rcti &output_area, rcti &r_input_area) override;
+  void update_memory_buffer_partial(MemoryBuffer *output,
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
 };
-#endif
+
+}  // namespace blender::compositor

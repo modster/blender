@@ -1,18 +1,20 @@
 """
 Modal Execution
 +++++++++++++++
-This operator defines a :class:`Operator.modal` function which running,
-handling events until it returns {'FINISHED'} or {'CANCELLED'}.
 
-Grab, Rotate, Scale and Fly-Mode are examples of modal operators.
-They are especially useful for interactive tools,
-your operator can have its own state where keys toggle options as the operator
-runs.
+This operator defines a :class:`Operator.modal` function that will keep being
+run to handle events until it returns ``{'FINISHED'}`` or ``{'CANCELLED'}``.
 
-:class:`Operator.invoke` is used to initialize the operator as being by
-returning {'RUNNING_MODAL'}, initializing the modal loop.
+Modal operators run every time a new event is detected, such as a mouse click
+or key press. Conversely, when no new events are detected, the modal operator
+will not run. Modal operators are especially useful for interactive tools, an
+operator can have its own state where keys toggle options as the operator runs.
+Grab, Rotate, Scale, and Fly-Mode are examples of modal operators.
 
-Notice __init__() and __del__() are declared.
+:class:`Operator.invoke` is used to initialize the operator as being active
+by returning ``{'RUNNING_MODAL'}``, initializing the modal loop.
+
+Notice ``__init__()`` and ``__del__()`` are declared.
 For other operator types they are not useful but for modal operators they will
 be called before the :class:`Operator.invoke` and after the operator finishes.
 """
@@ -53,8 +55,13 @@ class ModalOperator(bpy.types.Operator):
         context.window_manager.modal_handler_add(self)
         return {'RUNNING_MODAL'}
 
+# Only needed if you want to add into a dynamic menu
+def menu_func(self, context):
+    self.layout.operator(ModalOperator.bl_idname, text="Modal Operator")
 
+# Register and add to the object menu (required to also use F3 search "Modal Operator" for quick access)
 bpy.utils.register_class(ModalOperator)
+bpy.types.VIEW3D_MT_object.append(menu_func)
 
 # test call
 bpy.ops.object.modal_operator('INVOKE_DEFAULT')

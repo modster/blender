@@ -1,6 +1,4 @@
 /*
- * Copyright 2011, Blender Foundation.
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -15,24 +13,24 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor: 
- *		Jeroen Bakker 
- *		Monique Dewanchand
+ * Copyright 2011, Blender Foundation.
  */
 
-#ifndef _COM_FlipNode_h_
-#define _COM_FlipNode_h_
+#pragma once
 
 #include "COM_Node.h"
 
+namespace blender::compositor {
+
 /**
- * @brief FlipNode
- * @ingroup Node
+ * \brief FlipNode
+ * \ingroup Node
  */
 class FlipNode : public Node {
-public:
-	FlipNode(bNode *editorNode);
-	void convertToOperations(NodeConverter &converter, const CompositorContext &context) const;
+ public:
+  FlipNode(bNode *editor_node);
+  void convert_to_operations(NodeConverter &converter,
+                             const CompositorContext &context) const override;
 };
 
-#endif
+}  // namespace blender::compositor

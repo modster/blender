@@ -1,6 +1,4 @@
 /*
- * Copyright 2011, Blender Foundation.
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -15,24 +13,26 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor: 
- *		Jeroen Bakker 
- *		Monique Dewanchand
+ * Copyright 2011, Blender Foundation.
  */
 
-#ifndef _COM_SwitchNode_h_
-#define _COM_SwitchNode_h_
+#pragma once
 
 #include "COM_Node.h"
 #include "COM_NodeOperation.h"
 #include "DNA_node_types.h"
+
+namespace blender::compositor {
+
 /**
- * @brief SwitchNode
- * @ingroup Node
+ * \brief SwitchNode
+ * \ingroup Node
  */
 class SwitchNode : public Node {
-public:
-	SwitchNode(bNode *editorNode);
-	void convertToOperations(NodeConverter &converter, const CompositorContext &context) const;
+ public:
+  SwitchNode(bNode *editor_node);
+  void convert_to_operations(NodeConverter &converter,
+                             const CompositorContext &context) const override;
 };
-#endif
+
+}  // namespace blender::compositor

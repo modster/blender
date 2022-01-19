@@ -1,5 +1,5 @@
 /** \file itasc/kdl/utilities/utility.cpp
- *  \ingroup itasc
+ * \ingroup intern_itasc
  */
 /** @file   utility.cpp
  *  @author Erwin Aertbelien, Div. PMA, Dep. of Mech. Eng., K.U.Leuven
@@ -7,7 +7,7 @@
  *      ORO_Geometry V0.2
  *   
  *  @par history
- *   - changed layout of the comments to accomodate doxygen
+ *   - changed layout of the comments to accommodate doxygen
  */
  
 #include "utility.h"

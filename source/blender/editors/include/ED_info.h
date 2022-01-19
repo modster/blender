@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -16,19 +14,44 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  * The Original Code is Copyright (C) 2009, Blender Foundation
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file ED_info.h
- *  \ingroup editors
+/** \file
+ * \ingroup editors
  */
 
-#ifndef __ED_INFO_H__
-#define __ED_INFO_H__
+#pragma once
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+struct Main;
+struct wmWindowManager;
 
 /* info_stats.c */
-void ED_info_stats_clear(struct Scene *scene);
-const char *ED_info_stats_string(struct Scene *scene);
+void ED_info_stats_clear(struct wmWindowManager *wm, struct ViewLayer *view_layer);
+const char *ED_info_statusbar_string(struct Main *bmain,
+                                     struct Scene *scene,
+                                     struct ViewLayer *view_layer);
 
-#endif /*  __ED_INFO_H__ */
+const char *ED_info_statistics_string(struct Main *bmain,
+                                      struct Scene *scene,
+                                      struct ViewLayer *view_layer);
+
+/**
+ * \param v3d_local: Pass this argument to calculate view-port local statistics.
+ * Note that this must only be used for local-view, otherwise report specific statistics
+ * will be written into the global scene statistics giving incorrect results.
+ */
+void ED_info_draw_stats(struct Main *bmain,
+                        struct Scene *scene,
+                        struct ViewLayer *view_layer,
+                        struct View3D *v3d_local,
+                        int x,
+                        int *y,
+                        int height);
+
+#ifdef __cplusplus
+}
+#endif

@@ -1,6 +1,4 @@
 /*
- * Copyright 2011, Blender Foundation.
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -15,83 +13,110 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor: 
- *		Jeroen Bakker 
- *		Monique Dewanchand
+ * Copyright 2011, Blender Foundation.
  */
 
+#pragma once
 
-#ifndef _COM_ImageOperation_h
-#define _COM_ImageOperation_h
-
-#include "COM_NodeOperation.h"
-#include "BLI_listbase.h"
 #include "BKE_image.h"
-extern "C" {
-#  include "RE_pipeline.h"
-#  include "RE_shader_ext.h"
-#  include "RE_render_ext.h"
-#  include "MEM_guardedalloc.h"
-}
+#include "BLI_listbase.h"
+#include "BLI_utildefines.h"
+#include "COM_MultiThreadedOperation.h"
+#include "MEM_guardedalloc.h"
+
+#include "RE_pipeline.h"
+#include "RE_texture.h"
+
+namespace blender::compositor {
 
 /**
- * @brief Base class for all image operations
+ * \brief Base class for all image operations
  */
-class BaseImageOperation : public NodeOperation {
-protected:
-	ImBuf *m_buffer;
-	Image *m_image;
-	ImageUser *m_imageUser;
-	float *m_imageFloatBuffer;
-	unsigned int *m_imageByteBuffer;
-	float *m_depthBuffer;
-	int m_imageheight;
-	int m_imagewidth;
-	int m_framenumber;
-	int m_numberOfChannels;
-	const RenderData *m_rd;
-	const char *m_viewName;
+class BaseImageOperation : public MultiThreadedOperation {
+ protected:
+  ImBuf *buffer_;
+  Image *image_;
+  ImageUser *image_user_;
+  /* TODO: Remove raw buffers when removing Tiled implementation. */
+  float *image_float_buffer_;
+  unsigned int *image_byte_buffer_;
+  float *image_depth_buffer_;
 
-	BaseImageOperation();
-	/**
-	 * Determine the output resolution. The resolution is retrieved from the Renderer
-	 */
-	void determineResolution(unsigned int resolution[2], unsigned int preferredResolution[2]);
-	
-	virtual ImBuf *getImBuf();
+  MemoryBuffer *depth_buffer_;
+  int imageheight_;
+  int imagewidth_;
+  int framenumber_;
+  int number_of_channels_;
+  const RenderData *rd_;
+  const char *view_name_;
 
-public:
-	
-	void initExecution();
-	void deinitExecution();
-	void setImage(Image *image) { this->m_image = image; }
-	void setImageUser(ImageUser *imageuser) { this->m_imageUser = imageuser; }
-	void setRenderData(const RenderData *rd) { this->m_rd = rd; }
-	void setViewName(const char *viewName) { this->m_viewName = viewName; }
-	void setFramenumber(int framenumber) { this->m_framenumber = framenumber; }
+  BaseImageOperation();
+  /**
+   * Determine the output resolution. The resolution is retrieved from the Renderer
+   */
+  void determine_canvas(const rcti &preferred_area, rcti &r_area) override;
+
+  virtual ImBuf *get_im_buf();
+
+ public:
+  void init_execution() override;
+  void deinit_execution() override;
+  void set_image(Image *image)
+  {
+    image_ = image;
+  }
+  void set_image_user(ImageUser *imageuser)
+  {
+    image_user_ = imageuser;
+  }
+  void set_render_data(const RenderData *rd)
+  {
+    rd_ = rd;
+  }
+  void set_view_name(const char *view_name)
+  {
+    view_name_ = view_name;
+  }
+  void set_framenumber(int framenumber)
+  {
+    framenumber_ = framenumber;
+  }
 };
 class ImageOperation : public BaseImageOperation {
-public:
-	/**
-	 * Constructor
-	 */
-	ImageOperation();
-	void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
+ public:
+  /**
+   * Constructor
+   */
+  ImageOperation();
+  void execute_pixel_sampled(float output[4], float x, float y, PixelSampler sampler) override;
+
+  void update_memory_buffer_partial(MemoryBuffer *output,
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
 };
 class ImageAlphaOperation : public BaseImageOperation {
-public:
-	/**
-	 * Constructor
-	 */
-	ImageAlphaOperation();
-	void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
+ public:
+  /**
+   * Constructor
+   */
+  ImageAlphaOperation();
+  void execute_pixel_sampled(float output[4], float x, float y, PixelSampler sampler) override;
+
+  void update_memory_buffer_partial(MemoryBuffer *output,
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
 };
 class ImageDepthOperation : public BaseImageOperation {
-public:
-	/**
-	 * Constructor
-	 */
-	ImageDepthOperation();
-	void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
+ public:
+  /**
+   * Constructor
+   */
+  ImageDepthOperation();
+  void execute_pixel_sampled(float output[4], float x, float y, PixelSampler sampler) override;
+
+  void update_memory_buffer_partial(MemoryBuffer *output,
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
 };
-#endif
+
+}  // namespace blender::compositor

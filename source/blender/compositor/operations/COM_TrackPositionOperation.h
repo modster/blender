@@ -1,6 +1,4 @@
 /*
- * Copyright 2012, Blender Foundation.
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -15,19 +13,14 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor:
- *		Jeroen Bakker
- *		Monique Dewanchand
- *		Sergey Sharybin
+ * Copyright 2012, Blender Foundation.
  */
 
-
-#ifndef _COM_TrackPositionOperation_h
-#define _COM_TrackPositionOperation_h
+#pragma once
 
 #include <string.h>
 
-#include "COM_NodeOperation.h"
+#include "COM_ConstantOperation.h"
 
 #include "DNA_movieclip_types.h"
 #include "DNA_tracking_types.h"
@@ -35,44 +28,77 @@
 #include "BLI_listbase.h"
 #include "BLI_string.h"
 
+namespace blender::compositor {
+
 /**
  * Class with implementation of green screen gradient rasterization
  */
-class TrackPositionOperation : public NodeOperation {
-protected:
-	MovieClip *m_movieClip;
-	int m_framenumber;
-	char m_trackingObjectName[64];
-	char m_trackName[64];
-	int m_axis;
-	int m_position;
-	int m_relativeFrame;
+class TrackPositionOperation : public ConstantOperation {
+ protected:
+  MovieClip *movie_clip_;
+  int framenumber_;
+  char tracking_object_name_[64];
+  char track_name_[64];
+  int axis_;
+  int position_;
+  int relative_frame_;
+  bool speed_output_;
 
-	int m_width, m_height;
-	float m_markerPos[2];
-	float m_relativePos[2];
+  int width_, height_;
+  float marker_pos_[2];
+  float relative_pos_[2];
+  float track_position_;
+  bool is_track_position_calculated_;
 
-	/**
-	 * Determine the output resolution. The resolution is retrieved from the Renderer
-	 */
-	void determineResolution(unsigned int resolution[2], unsigned int preferredResolution[2]);
+  /**
+   * Determine the output resolution. The resolution is retrieved from the Renderer
+   */
+  void determine_canvas(const rcti &preferred_area, rcti &r_area) override;
 
-public:
-	TrackPositionOperation();
+ public:
+  TrackPositionOperation();
 
-	void setMovieClip(MovieClip *clip) {this->m_movieClip = clip;}
-	void setTrackingObject(char *object) { BLI_strncpy(this->m_trackingObjectName, object, sizeof(this->m_trackingObjectName)); }
-	void setTrackName(char *track) { BLI_strncpy(this->m_trackName, track, sizeof(this->m_trackName)); }
-	void setFramenumber(int framenumber) {this->m_framenumber = framenumber;}
-	void setAxis(int value) {this->m_axis = value;}
-	void setPosition(int value) {this->m_position = value;}
-	void setRelativeFrame(int value) {this->m_relativeFrame = value;}
+  void set_movie_clip(MovieClip *clip)
+  {
+    movie_clip_ = clip;
+  }
+  void set_tracking_object(char *object)
+  {
+    BLI_strncpy(tracking_object_name_, object, sizeof(tracking_object_name_));
+  }
+  void set_track_name(char *track)
+  {
+    BLI_strncpy(track_name_, track, sizeof(track_name_));
+  }
+  void set_framenumber(int framenumber)
+  {
+    framenumber_ = framenumber;
+  }
+  void set_axis(int value)
+  {
+    axis_ = value;
+  }
+  void set_position(int value)
+  {
+    position_ = value;
+  }
+  void set_relative_frame(int value)
+  {
+    relative_frame_ = value;
+  }
+  void set_speed_output(bool speed_output)
+  {
+    speed_output_ = speed_output;
+  }
 
-	void initExecution();
+  void init_execution() override;
 
-	void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
+  void execute_pixel_sampled(float output[4], float x, float y, PixelSampler sampler) override;
 
-	bool isSetOperation() const { return true; }
+  const float *get_constant_elem() override;
+
+ private:
+  void calc_track_position();
 };
 
-#endif
+}  // namespace blender::compositor

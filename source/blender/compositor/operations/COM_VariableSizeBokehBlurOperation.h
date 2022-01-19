@@ -1,6 +1,4 @@
 /*
- * Copyright 2011, Blender Foundation.
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -15,94 +13,130 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor: 
- *		Jeroen Bakker 
- *		Monique Dewanchand
+ * Copyright 2011, Blender Foundation.
  */
 
-#ifndef __COM_VARIABLESIZEBOKEHBLUROPERATION_H__
-#define __COM_VARIABLESIZEBOKEHBLUROPERATION_H__
-#include "COM_NodeOperation.h"
+#pragma once
+
+#include "COM_MultiThreadedOperation.h"
 #include "COM_QualityStepHelper.h"
+
+namespace blender::compositor {
 
 //#define COM_DEFOCUS_SEARCH
 
-class VariableSizeBokehBlurOperation : public NodeOperation, public QualityStepHelper {
-private:
-	int m_maxBlur;
-	float m_threshold;
-	bool m_do_size_scale;  /* scale size, matching 'BokehBlurNode' */
-	SocketReader *m_inputProgram;
-	SocketReader *m_inputBokehProgram;
-	SocketReader *m_inputSizeProgram;
+class VariableSizeBokehBlurOperation : public MultiThreadedOperation, public QualityStepHelper {
+ private:
+  static constexpr int IMAGE_INPUT_INDEX = 0;
+  static constexpr int BOKEH_INPUT_INDEX = 1;
+  static constexpr int SIZE_INPUT_INDEX = 2;
 #ifdef COM_DEFOCUS_SEARCH
-	SocketReader *m_inputSearchProgram;
+  static constexpr int DEFOCUS_INPUT_INDEX = 3;
 #endif
 
-public:
-	VariableSizeBokehBlurOperation();
+  int max_blur_;
+  float threshold_;
+  bool do_size_scale_; /* scale size, matching 'BokehBlurNode' */
+  SocketReader *input_program_;
+  SocketReader *input_bokeh_program_;
+  SocketReader *input_size_program_;
+#ifdef COM_DEFOCUS_SEARCH
+  SocketReader *input_search_program_;
+#endif
 
-	/**
-	 * the inner loop of this program
-	 */
-	void executePixel(float output[4], int x, int y, void *data);
-	
-	/**
-	 * Initialize the execution
-	 */
-	void initExecution();
-	
-	void *initializeTileData(rcti *rect);
-	
-	void deinitializeTileData(rcti *rect, void *data);
-	
-	/**
-	 * Deinitialize the execution
-	 */
-	void deinitExecution();
-	
-	bool determineDependingAreaOfInterest(rcti *input, ReadBufferOperation *readOperation, rcti *output);
-	
-	void setMaxBlur(int maxRadius) { this->m_maxBlur = maxRadius; }
+ public:
+  VariableSizeBokehBlurOperation();
 
-	void setThreshold(float threshold) { this->m_threshold = threshold; }
+  /**
+   * The inner loop of this operation.
+   */
+  void execute_pixel(float output[4], int x, int y, void *data) override;
 
-	void setDoScaleSize(bool scale_size) { this->m_do_size_scale = scale_size; }
+  /**
+   * Initialize the execution
+   */
+  void init_execution() override;
 
-	void executeOpenCL(OpenCLDevice *device, MemoryBuffer *outputMemoryBuffer, cl_mem clOutputBuffer, MemoryBuffer **inputMemoryBuffers, list<cl_mem> *clMemToCleanUp, list<cl_kernel> *clKernelsToCleanUp);
+  void *initialize_tile_data(rcti *rect) override;
+
+  void deinitialize_tile_data(rcti *rect, void *data) override;
+
+  /**
+   * Deinitialize the execution
+   */
+  void deinit_execution() override;
+
+  bool determine_depending_area_of_interest(rcti *input,
+                                            ReadBufferOperation *read_operation,
+                                            rcti *output) override;
+
+  void set_max_blur(int max_radius)
+  {
+    max_blur_ = max_radius;
+  }
+
+  void set_threshold(float threshold)
+  {
+    threshold_ = threshold;
+  }
+
+  void set_do_scale_size(bool scale_size)
+  {
+    do_size_scale_ = scale_size;
+  }
+
+  void execute_opencl(OpenCLDevice *device,
+                      MemoryBuffer *output_memory_buffer,
+                      cl_mem cl_output_buffer,
+                      MemoryBuffer **input_memory_buffers,
+                      std::list<cl_mem> *cl_mem_to_clean_up,
+                      std::list<cl_kernel> *cl_kernels_to_clean_up) override;
+
+  void get_area_of_interest(int input_idx, const rcti &output_area, rcti &r_input_area) override;
+  void update_memory_buffer_partial(MemoryBuffer *output,
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
 };
 
+/* Currently unused. If ever used, it needs full-frame implementation. */
 #ifdef COM_DEFOCUS_SEARCH
 class InverseSearchRadiusOperation : public NodeOperation {
-private:
-	int m_maxBlur;
-	SocketReader *m_inputRadius;
-public:
-	static const int DIVIDER = 4;
-	
-	InverseSearchRadiusOperation();
+ private:
+  int max_blur_;
+  SocketReader *input_radius_;
 
-	/**
-	 * the inner loop of this program
-	 */
-	void executePixelChunk(float output[4], int x, int y, void *data);
-	
-	/**
-	 * Initialize the execution
-	 */
-	void initExecution();
-	void *initializeTileData(rcti *rect);
-	void deinitializeTileData(rcti *rect, void *data);
-	
-	/**
-	 * Deinitialize the execution
-	 */
-	void deinitExecution();
-	
-	bool determineDependingAreaOfInterest(rcti *input, ReadBufferOperation *readOperation, rcti *output);
-	void determineResolution(unsigned int resolution[2], unsigned int preferredResolution[2]);
-	
-	void setMaxBlur(int maxRadius) { this->m_maxBlur = maxRadius; }
+ public:
+  static const int DIVIDER = 4;
+
+  InverseSearchRadiusOperation();
+
+  /**
+   * The inner loop of this operation.
+   */
+  void execute_pixel_chunk(float output[4], int x, int y, void *data);
+
+  /**
+   * Initialize the execution
+   */
+  void init_execution() override;
+  void *initialize_tile_data(rcti *rect) override;
+  void deinitialize_tile_data(rcti *rect, void *data) override;
+
+  /**
+   * Deinitialize the execution
+   */
+  void deinit_execution() override;
+
+  bool determine_depending_area_of_interest(rcti *input,
+                                            ReadBufferOperation *read_operation,
+                                            rcti *output) override;
+  void determine_canvas(const rcti &preferred_area, rcti &r_area) override;
+
+  void set_max_blur(int max_radius)
+  {
+    max_blur_ = max_radius;
+  }
 };
 #endif
-#endif
+
+}  // namespace blender::compositor

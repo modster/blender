@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,469 +15,336 @@
  *
  * The Original Code is Copyright (C) 2013 Blender Foundation.
  * All rights reserved.
- *
- * Original Author: Joshua Leung
- * Contributor(s): Sergey Sharybin
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file blender/depsgraph/intern/depsgraph.cc
- *  \ingroup depsgraph
+/** \file
+ * \ingroup depsgraph
  *
  * Core routines for how the Depsgraph works.
  */
 
-#include <string.h>
+#include "intern/depsgraph.h" /* own include */
+
+#include <algorithm>
+#include <cstring>
 
 #include "MEM_guardedalloc.h"
 
-#include "BLI_listbase.h"
+#include "BLI_console.h"
+#include "BLI_hash.h"
+#include "BLI_utildefines.h"
 
-extern "C" {
-#include "DNA_action_types.h"
-#include "DNA_armature_types.h"
-#include "DNA_constraint_types.h"
-#include "DNA_key_types.h"
-#include "DNA_object_types.h"
-#include "DNA_sequence_types.h"
-
-#include "BKE_depsgraph.h"
-
-#include "RNA_access.h"
-}
+#include "BKE_global.h"
+#include "BKE_idtype.h"
+#include "BKE_scene.h"
 
 #include "DEG_depsgraph.h"
-#include "depsgraph.h" /* own include */
-#include "depsnode.h"
-#include "depsnode_operation.h"
-#include "depsnode_component.h"
-#include "depsgraph_intern.h"
+#include "DEG_depsgraph_debug.h"
 
-static DEG_EditorUpdateIDCb deg_editor_update_id_cb = NULL;
-static DEG_EditorUpdateSceneCb deg_editor_update_scene_cb = NULL;
+#include "intern/depsgraph_physics.h"
+#include "intern/depsgraph_registry.h"
+#include "intern/depsgraph_relation.h"
+#include "intern/depsgraph_update.h"
 
-Depsgraph::Depsgraph()
-  : root_node(NULL),
-    need_update(false),
-    layers((1 << 20) - 1)
+#include "intern/eval/deg_eval_copy_on_write.h"
+
+#include "intern/node/deg_node.h"
+#include "intern/node/deg_node_component.h"
+#include "intern/node/deg_node_factory.h"
+#include "intern/node/deg_node_id.h"
+#include "intern/node/deg_node_operation.h"
+#include "intern/node/deg_node_time.h"
+
+namespace deg = blender::deg;
+
+namespace blender::deg {
+
+Depsgraph::Depsgraph(Main *bmain, Scene *scene, ViewLayer *view_layer, eEvaluationMode mode)
+    : time_source(nullptr),
+      need_update(true),
+      need_visibility_update(true),
+      need_visibility_time_update(false),
+      bmain(bmain),
+      scene(scene),
+      view_layer(view_layer),
+      mode(mode),
+      frame(BKE_scene_frame_get(scene)),
+      ctime(BKE_scene_ctime_get(scene)),
+      scene_cow(nullptr),
+      is_active(false),
+      is_evaluating(false),
+      is_render_pipeline_depsgraph(false),
+      use_editors_update(false)
 {
-	BLI_spin_init(&lock);
+  BLI_spin_init(&lock);
+  memset(id_type_updated, 0, sizeof(id_type_updated));
+  memset(id_type_exist, 0, sizeof(id_type_exist));
+  memset(physics_relations, 0, sizeof(physics_relations));
+
+  add_time_source();
 }
 
 Depsgraph::~Depsgraph()
 {
-	/* Free root node - it won't have been freed yet... */
-	clear_id_nodes();
-	clear_subgraph_nodes();
-	if (this->root_node != NULL) {
-		OBJECT_GUARDED_DELETE(this->root_node, RootDepsNode);
-	}
-	BLI_spin_end(&lock);
-}
-
-/* Query Conditions from RNA ----------------------- */
-
-static bool pointer_to_id_node_criteria(const PointerRNA *ptr,
-                                        const PropertyRNA *prop,
-                                        ID **id)
-{
-	if (!ptr->type)
-		return false;
-
-	if (!prop) {
-		if (RNA_struct_is_ID(ptr->type)) {
-			*id = (ID *)ptr->data;
-			return true;
-		}
-	}
-
-	return false;
-}
-
-static bool pointer_to_component_node_criteria(const PointerRNA *ptr,
-                                               const PropertyRNA *prop,
-                                               ID **id,
-                                               eDepsNode_Type *type,
-                                               string *subdata)
-{
-	if (!ptr->type)
-		return false;
-
-	/* Set default values for returns. */
-	*id      = (ID *)ptr->id.data;  /* For obvious reasons... */
-	*subdata = "";                 /* Default to no subdata (e.g. bone) name
-	                                * lookup in most cases. */
-
-	/* Handling of commonly known scenarios... */
-	if (ptr->type == &RNA_PoseBone) {
-		bPoseChannel *pchan = (bPoseChannel *)ptr->data;
-
-		/* Bone - generally, we just want the bone component... */
-		*type = DEPSNODE_TYPE_BONE;
-		*subdata = pchan->name;
-
-		return true;
-	}
-	else if (ptr->type == &RNA_Bone) {
-		Bone *bone = (Bone *)ptr->data;
-
-		/* armature-level bone, but it ends up going to bone component anyway */
-		// TODO: the ID in thise case will end up being bArmature, not Object as needed!
-		*type = DEPSNODE_TYPE_BONE;
-		*subdata = bone->name;
-		//*id = ...
-
-		return true;
-	}
-	else if (RNA_struct_is_a(ptr->type, &RNA_Constraint)) {
-		Object *ob = (Object *)ptr->id.data;
-		bConstraint *con = (bConstraint *)ptr->data;
-
-		/* object or bone? */
-		if (BLI_findindex(&ob->constraints, con) != -1) {
-			/* object transform */
-			// XXX: for now, we can't address the specific constraint or the constraint stack...
-			*type = DEPSNODE_TYPE_TRANSFORM;
-			return true;
-		}
-		else if (ob->pose) {
-			bPoseChannel *pchan;
-			for (pchan = (bPoseChannel *)ob->pose->chanbase.first; pchan; pchan = pchan->next) {
-				if (BLI_findindex(&pchan->constraints, con) != -1) {
-					/* bone transforms */
-					*type = DEPSNODE_TYPE_BONE;
-					*subdata = pchan->name;
-					return true;
-				}
-			}
-		}
-	}
-	else if (RNA_struct_is_a(ptr->type, &RNA_Modifier)) {
-		//ModifierData *md = (ModifierData *)ptr->data;
-
-		/* Modifier */
-		/* NOTE: subdata is not the same as "operation name",
-		 * so although we have unique ops for modifiers,
-		 * we can't lump them together
-		 */
-		*type = DEPSNODE_TYPE_BONE;
-		//*subdata = md->name;
-
-		return true;
-	}
-	else if (ptr->type == &RNA_Object) {
-		//Object *ob = (Object *)ptr->data;
-
-		/* Transforms props? */
-		if (prop) {
-			const char *prop_identifier = RNA_property_identifier((PropertyRNA *)prop);
-
-			if (strstr(prop_identifier, "location") ||
-			    strstr(prop_identifier, "rotation") ||
-			    strstr(prop_identifier, "scale"))
-			{
-				*type = DEPSNODE_TYPE_TRANSFORM;
-				return true;
-			}
-		}
-		// ...
-	}
-	else if (ptr->type == &RNA_ShapeKey) {
-		Key *key = (Key *)ptr->id.data;
-
-		/* ShapeKeys are currently handled as geometry on the geometry that owns it */
-		*id = key->from; // XXX
-		*type = DEPSNODE_TYPE_PARAMETERS;
-
-		return true;
-	}
-	else if (RNA_struct_is_a(ptr->type, &RNA_Sequence)) {
-		Sequence *seq = (Sequence *)ptr->data;
-		/* Sequencer strip */
-		*type = DEPSNODE_TYPE_SEQUENCER;
-		*subdata = seq->name; // xxx?
-		return true;
-	}
-
-	if (prop) {
-		/* All unknown data effectively falls under "parameter evaluation" */
-		*type = DEPSNODE_TYPE_PARAMETERS;
-		return true;
-	}
-
-	return false;
-}
-
-/* Convenience wrapper to find node given just pointer + property. */
-DepsNode *Depsgraph::find_node_from_pointer(const PointerRNA *ptr,
-                                            const PropertyRNA *prop) const
-{
-	ID *id;
-	eDepsNode_Type type;
-	string name;
-
-	/* Get querying conditions. */
-	if (pointer_to_id_node_criteria(ptr, prop, &id)) {
-		return find_id_node(id);
-	}
-	else if (pointer_to_component_node_criteria(ptr, prop, &id, &type, &name)) {
-		IDDepsNode *id_node = find_id_node(id);
-		if (id_node)
-			return id_node->find_component(type, name);
-	}
-
-	return NULL;
+  clear_id_nodes();
+  delete time_source;
+  BLI_spin_end(&lock);
 }
 
 /* Node Management ---------------------------- */
 
-RootDepsNode *Depsgraph::add_root_node()
+TimeSourceNode *Depsgraph::add_time_source()
 {
-	if (!root_node) {
-		DepsNodeFactory *factory = DEG_get_node_factory(DEPSNODE_TYPE_ROOT);
-		root_node = (RootDepsNode *)factory->create_node(NULL, "", "Root (Scene)");
-	}
-	return root_node;
+  if (time_source == nullptr) {
+    DepsNodeFactory *factory = type_get_factory(NodeType::TIMESOURCE);
+    time_source = (TimeSourceNode *)factory->create_node(nullptr, "", "Time Source");
+  }
+  return time_source;
 }
 
-TimeSourceDepsNode *Depsgraph::find_time_source(const ID *id) const
+TimeSourceNode *Depsgraph::find_time_source() const
 {
-	/* Search for one attached to a particular ID? */
-	if (id) {
-		/* Check if it was added as a component
-		 * (as may be done for subgraphs needing timeoffset).
-		 */
-		IDDepsNode *id_node = find_id_node(id);
-		if (id_node) {
-			// XXX: review this
-//			return id_node->find_component(DEPSNODE_TYPE_TIMESOURCE);
-		}
-		BLI_assert(!"Not implemented yet");
-	}
-	else {
-		/* Use "official" timesource. */
-		return root_node->time_source;
-	}
-	return NULL;
+  return time_source;
 }
 
-SubgraphDepsNode *Depsgraph::add_subgraph_node(const ID *id)
+void Depsgraph::tag_time_source()
 {
-	DepsNodeFactory *factory = DEG_get_node_factory(DEPSNODE_TYPE_SUBGRAPH);
-	SubgraphDepsNode *subgraph_node =
-		(SubgraphDepsNode *)factory->create_node(id, "", id->name + 2);
-
-	/* Add to subnodes list. */
-	this->subgraphs.insert(subgraph_node);
-
-	/* if there's an ID associated, add to ID-nodes lookup too */
-	if (id) {
-#if 0
-		/* XXX subgraph node is NOT a true IDDepsNode - what is this supposed to do? */
-		// TODO: what to do if subgraph's ID has already been added?
-		BLI_assert(!graph->find_id_node(id));
-		graph->id_hash[id] = this;
-#endif
-	}
-
-	return subgraph_node;
+  time_source->tag_update(this, DEG_UPDATE_SOURCE_TIME);
 }
 
-void Depsgraph::remove_subgraph_node(SubgraphDepsNode *subgraph_node)
+IDNode *Depsgraph::find_id_node(const ID *id) const
 {
-	subgraphs.erase(subgraph_node);
-	OBJECT_GUARDED_DELETE(subgraph_node, SubgraphDepsNode);
+  return id_hash.lookup_default(id, nullptr);
 }
 
-void Depsgraph::clear_subgraph_nodes()
+IDNode *Depsgraph::add_id_node(ID *id, ID *id_cow_hint)
 {
-	for (Subgraphs::iterator it = subgraphs.begin();
-	     it != subgraphs.end();
-	     ++it)
-	{
-		SubgraphDepsNode *subgraph_node = *it;
-		OBJECT_GUARDED_DELETE(subgraph_node, SubgraphDepsNode);
-	}
-	subgraphs.clear();
+  BLI_assert((id->tag & LIB_TAG_COPIED_ON_WRITE) == 0);
+  IDNode *id_node = find_id_node(id);
+  if (!id_node) {
+    DepsNodeFactory *factory = type_get_factory(NodeType::ID_REF);
+    id_node = (IDNode *)factory->create_node(id, "", id->name);
+    id_node->init_copy_on_write(id_cow_hint);
+    /* Register node in ID hash.
+     *
+     * NOTE: We address ID nodes by the original ID pointer they are
+     * referencing to. */
+    id_hash.add_new(id, id_node);
+    id_nodes.append(id_node);
+
+    id_type_exist[BKE_idtype_idcode_to_index(GS(id->name))] = 1;
+  }
+  return id_node;
 }
 
-IDDepsNode *Depsgraph::find_id_node(const ID *id) const
+template<typename FilterFunc>
+static void clear_id_nodes_conditional(Depsgraph::IDDepsNodes *id_nodes, const FilterFunc &filter)
 {
-	IDNodeMap::const_iterator it = this->id_hash.find(id);
-	return it != this->id_hash.end() ? it->second : NULL;
-}
-
-IDDepsNode *Depsgraph::add_id_node(ID *id, const string &name)
-{
-	IDDepsNode *id_node = find_id_node(id);
-	if (!id_node) {
-		DepsNodeFactory *factory = DEG_get_node_factory(DEPSNODE_TYPE_ID_REF);
-		id_node = (IDDepsNode *)factory->create_node(id, "", name);
-		id->flag |= LIB_DOIT;
-		/* register */
-		this->id_hash[id] = id_node;
-	}
-	return id_node;
-}
-
-void Depsgraph::remove_id_node(const ID *id)
-{
-	IDDepsNode *id_node = find_id_node(id);
-	if (id_node) {
-		/* unregister */
-		this->id_hash.erase(id);
-		OBJECT_GUARDED_DELETE(id_node, IDDepsNode);
-	}
+  for (IDNode *id_node : *id_nodes) {
+    if (id_node->id_cow == nullptr) {
+      /* This means builder "stole" ownership of the copy-on-written
+       * datablock for her own dirty needs. */
+      continue;
+    }
+    if (id_node->id_cow == id_node->id_orig) {
+      /* Copy-on-write version is not needed for this ID type.
+       *
+       * NOTE: Is important to not de-reference the original datablock here because it might be
+       * freed already (happens during main database free when some IDs are freed prior to a
+       * scene). */
+      continue;
+    }
+    if (!deg_copy_on_write_is_expanded(id_node->id_cow)) {
+      continue;
+    }
+    const ID_Type id_type = GS(id_node->id_cow->name);
+    if (filter(id_type)) {
+      id_node->destroy();
+    }
+  }
 }
 
 void Depsgraph::clear_id_nodes()
 {
-	for (IDNodeMap::const_iterator it = id_hash.begin();
-	     it != id_hash.end();
-	     ++it)
-	{
-		IDDepsNode *id_node = it->second;
-		OBJECT_GUARDED_DELETE(id_node, IDDepsNode);
-	}
-	id_hash.clear();
+  /* Free memory used by ID nodes. */
+
+  /* Stupid workaround to ensure we free IDs in a proper order. */
+  clear_id_nodes_conditional(&id_nodes, [](ID_Type id_type) { return id_type == ID_SCE; });
+  clear_id_nodes_conditional(&id_nodes, [](ID_Type id_type) { return id_type != ID_PA; });
+
+  for (IDNode *id_node : id_nodes) {
+    delete id_node;
+  }
+  /* Clear containers. */
+  id_hash.clear();
+  id_nodes.clear();
+  /* Clear physics relation caches. */
+  clear_physics_relations(this);
 }
 
-/* Add new relationship between two nodes. */
-DepsRelation *Depsgraph::add_new_relation(OperationDepsNode *from,
-                                          OperationDepsNode *to,
-                                          eDepsRelation_Type type,
-                                          const char *description)
+Relation *Depsgraph::add_new_relation(Node *from, Node *to, const char *description, int flags)
 {
-	/* Create new relation, and add it to the graph. */
-	DepsRelation *rel = OBJECT_GUARDED_NEW(DepsRelation, from, to, type, description);
-	/* TODO(sergey): Find a better place for this. */
-#ifdef WITH_OPENSUBDIV
-	if (type == DEPSREL_TYPE_GEOMETRY_EVAL) {
-		IDDepsNode *id_to = to->owner->owner;
-		if ((id_to->eval_flags & DAG_EVAL_NEED_CPU) == 0) {
-			id_to->tag_update(this);
-			id_to->eval_flags |= DAG_EVAL_NEED_CPU;
-		}
-	}
-#endif
-	return rel;
-}
+  Relation *rel = nullptr;
+  if (flags & RELATION_CHECK_BEFORE_ADD) {
+    rel = check_nodes_connected(from, to, description);
+  }
+  if (rel != nullptr) {
+    rel->flag |= flags;
+    return rel;
+  }
 
-/* Add new relation between two nodes */
-DepsRelation *Depsgraph::add_new_relation(DepsNode *from, DepsNode *to,
-                                          eDepsRelation_Type type,
-                                          const char *description)
-{
-	/* Create new relation, and add it to the graph. */
-	DepsRelation *rel = OBJECT_GUARDED_NEW(DepsRelation, from, to, type, description);
-	return rel;
-}
-
-/* ************************ */
-/* Relationships Management */
-
-DepsRelation::DepsRelation(DepsNode *from,
-                           DepsNode *to,
-                           eDepsRelation_Type type,
-                           const char *description)
-  : from(from),
-    to(to),
-    name(description),
-    type(type),
-    flag(0)
-{
 #ifndef NDEBUG
-/*
-	for (OperationDepsNode::Relations::const_iterator it = from->outlinks.begin();
-	     it != from->outlinks.end();
-	     ++it)
-	{
-		DepsRelation *rel = *it;
-		if (rel->from == from &&
-		    rel->to == to &&
-		    rel->type == type &&
-		    rel->name == description)
-		{
-			BLI_assert(!"Duplicated relation, should not happen!");
-		}
-	}
-*/
+  if (from->type == NodeType::OPERATION && to->type == NodeType::OPERATION) {
+    OperationNode *operation_from = static_cast<OperationNode *>(from);
+    OperationNode *operation_to = static_cast<OperationNode *>(to);
+    BLI_assert(operation_to->owner->type != NodeType::COPY_ON_WRITE ||
+               operation_from->owner->type == NodeType::COPY_ON_WRITE);
+  }
 #endif
 
-	/* Hook it up to the nodes which use it. */
-	from->outlinks.insert(this);
-	to->inlinks.insert(this);
+  /* Create new relation, and add it to the graph. */
+  rel = new Relation(from, to, description);
+  rel->flag |= flags;
+  return rel;
 }
 
-DepsRelation::~DepsRelation()
+Relation *Depsgraph::check_nodes_connected(const Node *from,
+                                           const Node *to,
+                                           const char *description)
 {
-	/* Sanity check. */
-	BLI_assert(this->from && this->to);
-	/* Remove it from the nodes that use it. */
-	this->from->outlinks.erase(this);
-	this->to->inlinks.erase(this);
+  for (Relation *rel : from->outlinks) {
+    BLI_assert(rel->from == from);
+    if (rel->to != to) {
+      continue;
+    }
+    if (description != nullptr && !STREQ(rel->name, description)) {
+      continue;
+    }
+    return rel;
+  }
+  return nullptr;
 }
 
 /* Low level tagging -------------------------------------- */
 
-/* Tag a specific node as needing updates. */
-void Depsgraph::add_entry_tag(OperationDepsNode *node)
+void Depsgraph::add_entry_tag(OperationNode *node)
 {
-	/* Sanity check. */
-	if (!node)
-		return;
-
-	/* Add to graph-level set of directly modified nodes to start searching from.
-	 * NOTE: this is necessary since we have several thousand nodes to play with...
-	 */
-	this->entry_tags.insert(node);
+  /* Sanity check. */
+  if (node == nullptr) {
+    return;
+  }
+  /* Add to graph-level set of directly modified nodes to start searching
+   * from.
+   * NOTE: this is necessary since we have several thousand nodes to play
+   * with. */
+  entry_tags.add(node);
 }
 
 void Depsgraph::clear_all_nodes()
 {
-	clear_id_nodes();
-	clear_subgraph_nodes();
-	id_hash.clear();
-	if (this->root_node) {
-		OBJECT_GUARDED_DELETE(this->root_node, RootDepsNode);
-		root_node = NULL;
-	}
+  clear_id_nodes();
+  delete time_source;
+  time_source = nullptr;
 }
+
+ID *Depsgraph::get_cow_id(const ID *id_orig) const
+{
+  IDNode *id_node = find_id_node(id_orig);
+  if (id_node == nullptr) {
+    /* This function is used from places where we expect ID to be either
+     * already a copy-on-write version or have a corresponding copy-on-write
+     * version.
+     *
+     * We try to enforce that in debug builds, for release we play a bit
+     * safer game here. */
+    if ((id_orig->tag & LIB_TAG_COPIED_ON_WRITE) == 0) {
+      /* TODO(sergey): This is nice sanity check to have, but it fails
+       * in following situations:
+       *
+       * - Material has link to texture, which is not needed by new
+       *   shading system and hence can be ignored at construction.
+       * - Object or mesh has material at a slot which is not used (for
+       *   example, object has material slot by materials are set to
+       *   object data). */
+      // BLI_assert_msg(0, "Request for non-existing copy-on-write ID");
+    }
+    return (ID *)id_orig;
+  }
+  return id_node->id_cow;
+}
+
+}  // namespace blender::deg
 
 /* **************** */
 /* Public Graph API */
 
-/* Initialize a new Depsgraph */
-Depsgraph *DEG_graph_new()
+Depsgraph *DEG_graph_new(Main *bmain, Scene *scene, ViewLayer *view_layer, eEvaluationMode mode)
 {
-	return OBJECT_GUARDED_NEW(Depsgraph);
+  deg::Depsgraph *deg_depsgraph = new deg::Depsgraph(bmain, scene, view_layer, mode);
+  deg::register_graph(deg_depsgraph);
+  return reinterpret_cast<Depsgraph *>(deg_depsgraph);
 }
 
-/* Free graph's contents and graph itself */
+void DEG_graph_replace_owners(struct Depsgraph *depsgraph,
+                              Main *bmain,
+                              Scene *scene,
+                              ViewLayer *view_layer)
+{
+  deg::Depsgraph *deg_graph = reinterpret_cast<deg::Depsgraph *>(depsgraph);
+
+  const bool do_update_register = deg_graph->bmain != bmain;
+  if (do_update_register && deg_graph->bmain != nullptr) {
+    deg::unregister_graph(deg_graph);
+  }
+
+  deg_graph->bmain = bmain;
+  deg_graph->scene = scene;
+  deg_graph->view_layer = view_layer;
+
+  if (do_update_register) {
+    deg::register_graph(deg_graph);
+  }
+}
+
 void DEG_graph_free(Depsgraph *graph)
 {
-	OBJECT_GUARDED_DELETE(graph, Depsgraph);
+  if (graph == nullptr) {
+    return;
+  }
+  using deg::Depsgraph;
+  deg::Depsgraph *deg_depsgraph = reinterpret_cast<deg::Depsgraph *>(graph);
+  deg::unregister_graph(deg_depsgraph);
+  delete deg_depsgraph;
 }
 
-/* Set callbacks which are being called when depsgraph changes. */
-void DEG_editors_set_update_cb(DEG_EditorUpdateIDCb id_func,
-                               DEG_EditorUpdateSceneCb scene_func)
+bool DEG_is_evaluating(const struct Depsgraph *depsgraph)
 {
-	deg_editor_update_id_cb = id_func;
-	deg_editor_update_scene_cb = scene_func;
+  const deg::Depsgraph *deg_graph = reinterpret_cast<const deg::Depsgraph *>(depsgraph);
+  return deg_graph->is_evaluating;
 }
 
-void deg_editors_id_update(Main *bmain, ID *id)
+bool DEG_is_active(const struct Depsgraph *depsgraph)
 {
-	if (deg_editor_update_id_cb != NULL) {
-		deg_editor_update_id_cb(bmain, id);
-	}
+  if (depsgraph == nullptr) {
+    /* Happens for such cases as work object in what_does_obaction(),
+     * and sine render pipeline parts. Shouldn't really be accepting
+     * nullptr depsgraph, but is quite hard to get proper one in those
+     * cases. */
+    return false;
+  }
+  const deg::Depsgraph *deg_graph = reinterpret_cast<const deg::Depsgraph *>(depsgraph);
+  return deg_graph->is_active;
 }
 
-void deg_editors_scene_update(Main *bmain, Scene *scene, bool updated)
+void DEG_make_active(struct Depsgraph *depsgraph)
 {
-	if (deg_editor_update_scene_cb != NULL) {
-		deg_editor_update_scene_cb(bmain, scene, updated);
-	}
+  deg::Depsgraph *deg_graph = reinterpret_cast<deg::Depsgraph *>(depsgraph);
+  deg_graph->is_active = true;
+  /* TODO(sergey): Copy data from evaluated state to original. */
+}
+
+void DEG_make_inactive(struct Depsgraph *depsgraph)
+{
+  deg::Depsgraph *deg_graph = reinterpret_cast<deg::Depsgraph *>(depsgraph);
+  deg_graph->is_active = false;
 }

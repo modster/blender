@@ -1,6 +1,4 @@
 /*
- * Copyright 2011, Blender Foundation.
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -15,55 +13,65 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor: 
- *		Jeroen Bakker 
- *		Monique Dewanchand
- *		Lukas Tönne
+ * Copyright 2011, Blender Foundation.
  */
 
-
-#ifndef _COM_MultilayerImageOperation_h
-#define _COM_MultilayerImageOperation_h
+#pragma once
 
 #include "COM_ImageOperation.h"
 
+namespace blender::compositor {
+
 class MultilayerBaseOperation : public BaseImageOperation {
-private:
-	int m_passtype;
-	int m_view;
-	RenderLayer *m_renderlayer;
-protected:
-	ImBuf *getImBuf();
-public:
-	/**
-	 * Constructor
-	 */
-	MultilayerBaseOperation(int passtype, int view);
-	void setRenderLayer(RenderLayer *renderlayer) { this->m_renderlayer = renderlayer; }
+ private:
+  int pass_id_;
+  int view_;
+
+ protected:
+  RenderLayer *render_layer_;
+  RenderPass *render_pass_;
+  ImBuf *get_im_buf() override;
+
+ public:
+  /**
+   * Constructor
+   */
+  MultilayerBaseOperation(RenderLayer *render_layer, RenderPass *render_pass, int view);
+
+  void update_memory_buffer_partial(MemoryBuffer *output,
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
 };
 
 class MultilayerColorOperation : public MultilayerBaseOperation {
-public:
-	MultilayerColorOperation(int passtype, int view) : MultilayerBaseOperation(passtype, view) {
-		this->addOutputSocket(COM_DT_COLOR);
-	}
-	void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
+ public:
+  MultilayerColorOperation(RenderLayer *render_layer, RenderPass *render_pass, int view)
+      : MultilayerBaseOperation(render_layer, render_pass, view)
+  {
+    this->add_output_socket(DataType::Color);
+  }
+  void execute_pixel_sampled(float output[4], float x, float y, PixelSampler sampler) override;
+  std::unique_ptr<MetaData> get_meta_data() override;
 };
 
 class MultilayerValueOperation : public MultilayerBaseOperation {
-public:
-	MultilayerValueOperation(int passtype, int view) : MultilayerBaseOperation(passtype, view) {
-		this->addOutputSocket(COM_DT_VALUE);
-	}
-	void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
+ public:
+  MultilayerValueOperation(RenderLayer *render_layer, RenderPass *render_pass, int view)
+      : MultilayerBaseOperation(render_layer, render_pass, view)
+  {
+    this->add_output_socket(DataType::Value);
+  }
+  void execute_pixel_sampled(float output[4], float x, float y, PixelSampler sampler) override;
 };
 
 class MultilayerVectorOperation : public MultilayerBaseOperation {
-public:
-	MultilayerVectorOperation(int passtype, int view) : MultilayerBaseOperation(passtype, view) {
-		this->addOutputSocket(COM_DT_VECTOR);
-	}
-	void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
+ public:
+  MultilayerVectorOperation(RenderLayer *render_layer, RenderPass *render_pass, int view)
+      : MultilayerBaseOperation(render_layer, render_pass, view)
+  {
+    this->add_output_socket(DataType::Vector);
+  }
+  void execute_pixel_sampled(float output[4], float x, float y, PixelSampler sampler) override;
 };
 
-#endif
+}  // namespace blender::compositor

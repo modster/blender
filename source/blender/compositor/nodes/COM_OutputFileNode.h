@@ -1,6 +1,4 @@
 /*
- * Copyright 2011, Blender Foundation.
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -15,26 +13,33 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor: 
- *		Jeroen Bakker 
- *		Monique Dewanchand
- *		Lukas Tönne
+ * Copyright 2011, Blender Foundation.
  */
 
-#ifndef _COM_OutputFileNode_h_
-#define _COM_OutputFileNode_h_
+#pragma once
 
 #include "COM_Node.h"
+
+#include "COM_OutputFileMultiViewOperation.h"
+
 #include "DNA_node_types.h"
 
+namespace blender::compositor {
+
 /**
- * @brief OutputFileNode
- * @ingroup Node
+ * \brief OutputFileNode
+ * \ingroup Node
  */
 class OutputFileNode : public Node {
-public:
-	OutputFileNode(bNode *editorNode);
-	void convertToOperations(NodeConverter &converter, const CompositorContext &context) const;
+ public:
+  OutputFileNode(bNode *editor_node);
+  void convert_to_operations(NodeConverter &converter,
+                             const CompositorContext &context) const override;
+
+ private:
+  void add_input_sockets(OutputOpenExrMultiLayerOperation &operation) const;
+  void map_input_sockets(NodeConverter &converter,
+                         OutputOpenExrMultiLayerOperation &operation) const;
 };
 
-#endif
+}  // namespace blender::compositor

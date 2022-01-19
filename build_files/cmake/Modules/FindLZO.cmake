@@ -14,12 +14,8 @@
 #=============================================================================
 # Copyright 2015 Blender Foundation.
 #
-# Distributed under the OSI-approved BSD License (the "License");
-# see accompanying file Copyright.txt for details.
-#
-# This software is distributed WITHOUT ANY WARRANTY; without even the
-# implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-# See the License for more information.
+# Distributed under the OSI-approved BSD 3-Clause License,
+# see accompanying file BSD-3-Clause-license.txt for details.
 #=============================================================================
 
 # If LZO_ROOT_DIR was defined in the environment, use it.
@@ -29,10 +25,6 @@ ENDIF()
 
 SET(_lzo_SEARCH_DIRS
   ${LZO_ROOT_DIR}
-  /usr/local
-  /sw # Fink
-  /opt/local # DarwinPorts
-  /opt/csw # Blastwave
 )
 
 FIND_PATH(LZO_INCLUDE_DIR lzo/lzo1x.h
@@ -51,7 +43,7 @@ FIND_LIBRARY(LZO_LIBRARY
     lib64 lib
   )
 
-# handle the QUIETLY and REQUIRED arguments and set LZO_FOUND to TRUE if 
+# handle the QUIETLY and REQUIRED arguments and set LZO_FOUND to TRUE if
 # all listed variables are TRUE
 INCLUDE(FindPackageHandleStandardArgs)
 FIND_PACKAGE_HANDLE_STANDARD_ARGS(LZO DEFAULT_MSG
@@ -60,7 +52,7 @@ FIND_PACKAGE_HANDLE_STANDARD_ARGS(LZO DEFAULT_MSG
 IF(LZO_FOUND)
   SET(LZO_LIBRARIES ${LZO_LIBRARY})
   SET(LZO_INCLUDE_DIRS ${LZO_INCLUDE_DIR})
-ENDIF(LZO_FOUND)
+ENDIF()
 
 MARK_AS_ADVANCED(
   LZO_INCLUDE_DIR

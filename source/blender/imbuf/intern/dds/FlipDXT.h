@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -14,19 +12,21 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * Contributors: Amorilia (amorilia@users.sourceforge.net)
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-#ifndef __FLIPDXT_H__
-#define __FLIPDXT_H__
+#pragma once
 
 #include "BLI_sys_types.h"
 
-/* flip compressed DXT image vertically to fit OpenGL convention */
-int FlipDXTCImage(unsigned int width, unsigned int height, unsigned int levels, int fourcc, uint8_t *data);
-
-#endif
-
+/**
+ * Flips a DXTC image, by flipping and swapping DXTC blocks as appropriate.
+ *
+ * Use to flip vertically to fit OpenGL convention.
+ */
+int FlipDXTCImage(unsigned int width,
+                  unsigned int height,
+                  unsigned int levels,
+                  int fourcc,
+                  uint8_t *data,
+                  int data_size,
+                  unsigned int *r_num_valid_levels);

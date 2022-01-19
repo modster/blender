@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,22 +15,14 @@
  *
  * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
  * All rights reserved.
- *
- * The Original Code is: all of this file.
- *
  * Original author: Benoit Bolsee
- * Contributor(s): 
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file blender/ikplugin/intern/iksolver_plugin.h
- *  \ingroup ikplugin
+/** \file
+ * \ingroup ikplugin
  */
 
-
-#ifndef __IKSOLVER_PLUGIN_H__
-#define __IKSOLVER_PLUGIN_H__
+#pragma once
 
 #include "ikplugin_api.h"
 
@@ -40,11 +30,18 @@
 extern "C" {
 #endif
 
-void iksolver_initialize_tree(struct Scene *scene, struct Object *ob, float ctime);
-void iksolver_execute_tree(struct Scene *scene, struct Object *ob,  struct bPoseChannel *pchan, float ctime);
+void iksolver_initialize_tree(struct Depsgraph *depsgraph,
+                              struct Scene *scene,
+                              struct Object *ob,
+                              float ctime);
+void iksolver_execute_tree(struct Depsgraph *depsgraph,
+                           struct Scene *scene,
+                           struct Object *ob,
+                           struct bPoseChannel *pchan_root,
+                           float ctime);
+void iksolver_release_tree(struct Scene *scene, struct Object *ob, float ctime);
+void iksolver_clear_data(struct bPose *pose);
 
 #ifdef __cplusplus
 }
 #endif
-
-#endif  /* __IKSOLVER_PLUGIN_H__ */

@@ -28,8 +28,13 @@
 import json
 import os
 import sys
+import types
 
-import bpy
+try:
+    import bpy
+except ModuleNotFoundError:
+    print("Could not import bpy, some features are not available when not run from Blender.")
+    bpy = None
 
 ###############################################################################
 # MISC
@@ -38,22 +43,22 @@ import bpy
 # The languages defined in Blender.
 LANGUAGES_CATEGORIES = (
     # Min completeness level, UI english label.
-    ( 0.95, "Complete"),
-    ( 0.33, "In Progress"),
-    ( -1.0, "Starting"),
+    (0.95, "Complete"),
+    (0.33, "In Progress"),
+    (-1.0, "Starting"),
 )
 LANGUAGES = (
     # ID, UI english label, ISO code.
-    ( 0, "Default (Default)", "DEFAULT"),
-    ( 1, "English (English)", "en_US"),
-    ( 2, "Japanese (日本語)", "ja_JP"),
-    ( 3, "Dutch (Nederlandse taal)", "nl_NL"),
-    ( 4, "Italian (Italiano)", "it_IT"),
-    ( 5, "German (Deutsch)", "de_DE"),
-    ( 6, "Finnish (Suomi)", "fi_FI"),
-    ( 7, "Swedish (Svenska)", "sv_SE"),
-    ( 8, "French (Français)", "fr_FR"),
-    ( 9, "Spanish (Español)", "es"),
+    (0, "Automatic (Automatic)", "DEFAULT"),
+    (1, "English (English)", "en_US"),
+    (2, "Japanese (日本語)", "ja_JP"),
+    (3, "Dutch (Nederlandse taal)", "nl_NL"),
+    (4, "Italian (Italiano)", "it_IT"),
+    (5, "German (Deutsch)", "de_DE"),
+    (6, "Finnish (Suomi)", "fi_FI"),
+    (7, "Swedish (Svenska)", "sv_SE"),
+    (8, "French (Français)", "fr_FR"),
+    (9, "Spanish (Español)", "es"),
     (10, "Catalan (Català)", "ca_AD"),
     (11, "Czech (Český)", "cs_CZ"),
     (12, "Portuguese (Português)", "pt_PT"),
@@ -89,10 +94,19 @@ LANGUAGES = (
     (39, "Uzbek Cyrillic (Ўзбек)", "uz_UZ@cyrillic"),
     (40, "Hindi (मानक हिन्दी)", "hi_IN"),
     (41, "Vietnamese (tiếng Việt)", "vi_VN"),
+    (42, "Basque (Euskara)", "eu_EU"),
+    (43, "Hausa (Hausa)", "ha"),
+    (44, "Kazakh (қазақша)", "kk_KZ"),
+    (45, "Abkhaz (Аԥсуа бызшәа)", "ab"),
+    (46, "Thai (ภาษาไทย)", "th_TH"),
+    (47, "Slovak (Slovenčina)", "sk_SK"),
+    (48, "Georgian (ქართული)", "ka"),
 )
 
-# Default context, in py!
-DEFAULT_CONTEXT = bpy.app.translations.contexts.default
+# Default context, in py (keep in sync with `BLT_translation.h`)!
+if bpy is not None:
+    assert(bpy.app.translations.contexts.default == "*")
+DEFAULT_CONTEXT = "*"
 
 # Name of language file used by Blender to generate translations' menu.
 LANGUAGES_FILE = "languages"
@@ -102,7 +116,7 @@ IMPORT_MIN_LEVEL = 0.0
 
 # Languages in /branches we do not want to import in /trunk currently...
 IMPORT_LANGUAGES_SKIP = {
-    'am_ET', 'bg_BG', 'fi_FI', 'el_GR', 'et_EE', 'ne_NP', 'ro_RO', 'uz_UZ', 'uz_UZ@cyrillic',
+    'am_ET', 'bg_BG', 'fi_FI', 'el_GR', 'et_EE', 'ne_NP', 'ro_RO', 'uz_UZ', 'uz_UZ@cyrillic', 'kk_KZ', 'es_ES',
 }
 
 # Languages that need RTL pre-processing.
@@ -117,7 +131,7 @@ MSG_COMMENT_PREFIX = "#~ "
 MSG_CONTEXT_PREFIX = "MSGCTXT:"
 
 # The default comment prefix used in po's.
-PO_COMMENT_PREFIX= "# "
+PO_COMMENT_PREFIX = "# "
 
 # The comment prefix used to mark sources of msgids, in po's.
 PO_COMMENT_PREFIX_SOURCE = "#: "
@@ -129,7 +143,7 @@ PO_COMMENT_PREFIX_SOURCE_CUSTOM = "#. :src: "
 PO_COMMENT_PREFIX_GENERATED = "#. "
 
 # The comment prefix used to comment entries in po's.
-PO_COMMENT_PREFIX_MSG= "#~ "
+PO_COMMENT_PREFIX_MSG = "#~ "
 
 # The comment prefix used to mark fuzzy msgids, in po's.
 PO_COMMENT_FUZZY = "#, fuzzy"
@@ -182,17 +196,17 @@ DOMAIN = "blender"
 
 # Our own "gettext" stuff.
 # File type (ext) to parse.
-PYGETTEXT_ALLOWED_EXTS = {".c", ".cpp", ".cxx", ".hpp", ".hxx", ".h"}
+PYGETTEXT_ALLOWED_EXTS = {".c", ".cc", ".cpp", ".cxx", ".hh", ".hpp", ".hxx", ".h"}
 
-# Max number of contexts into a BLF_I18N_MSGID_MULTI_CTXT macro...
+# Max number of contexts into a BLT_I18N_MSGID_MULTI_CTXT macro...
 PYGETTEXT_MAX_MULTI_CTXT = 16
 
 # Where to search contexts definitions, relative to SOURCE_DIR (defined below).
-PYGETTEXT_CONTEXTS_DEFSRC = os.path.join("source", "blender", "blenfont", "BLF_translation.h")
+PYGETTEXT_CONTEXTS_DEFSRC = os.path.join("source", "blender", "blentranslation", "BLT_translation.h")
 
-# Regex to extract contexts defined in BLF_translation.h
+# Regex to extract contexts defined in BLT_translation.h
 # XXX Not full-proof, but should be enough here!
-PYGETTEXT_CONTEXTS = "#define\\s+(BLF_I18NCONTEXT_[A-Z_0-9]+)\\s+\"([^\"]*)\""
+PYGETTEXT_CONTEXTS = "#define\\s+(BLT_I18NCONTEXT_[A-Z_0-9]+)\\s+\"([^\"]*)\""
 
 # Keywords' regex.
 # XXX Most unfortunately, we can't use named backreferences inside character sets,
@@ -251,16 +265,16 @@ PYGETTEXT_KEYWORDS = (() +
           for it in ("BMO_error_raise",)) +
 
     tuple(("{}\\((?:[^\"',]+,)\\s*" + _msg_re + r"\s*(?:\)|,)").format(it)
-          for it in ("modifier_setError",)) +
+          for it in ("BKE_modifier_set_error",)) +
 
     tuple((r"{}\(\s*" + _msg_re + r"\s*,\s*(?:" +
            r"\s*,\s*)?(?:".join(_ctxt_re_gen(i) for i in range(PYGETTEXT_MAX_MULTI_CTXT)) + r")?\s*\)").format(it)
-          for it in ("BLF_I18N_MSGID_MULTI_CTXT",))
+          for it in ("BLT_I18N_MSGID_MULTI_CTXT",))
 )
 
 # Check printf mismatches between msgid and msgstr.
 CHECK_PRINTF_FORMAT = (
-    r"(?!<%)(?:%%)*%"          # Begining, with handling for crazy things like '%%%%%s'
+    r"(?!<%)(?:%%)*%"          # Beginning, with handling for crazy things like '%%%%%s'
     r"[-+#0]?"                 # Flags (note: do not add the ' ' (space) flag here, generates too much false positives!)
     r"(?:\*|[0-9]+)?"          # Width
     r"(?:\.(?:\*|[0-9]+))?"    # Precision
@@ -282,9 +296,14 @@ WARN_MSGID_NOT_CAPITALIZED_ALLOWED = {
     "along %s Y",
     "along %s Z",
     "along local Z",
+    "arccos(A)",
+    "arcsin(A)",
+    "arctan(A)",
     "ascii",
     "author",                        # Addons' field. :/
     "bItasc",
+    "cos(A)",
+    "cosh(A)",
     "dbl-",                          # Compacted for 'double', for keymap items.
     "description",                   # Addons' field. :/
     "dx",
@@ -294,6 +313,11 @@ WARN_MSGID_NOT_CAPITALIZED_ALLOWED = {
     "fps: %i",
     "gimbal",
     "global",
+    "glTF 2.0 (.glb/.gltf)",
+    "glTF Binary (.glb)",
+    "glTF Embedded (.gltf)",
+    "glTF Separate (.gltf + .bin + textures)",
+    "invoke() needs to be called before execute()",
     "iScale",
     "iso-8859-15",
     "iTaSC",
@@ -315,27 +339,53 @@ WARN_MSGID_NOT_CAPITALIZED_ALLOWED = {
     "re",
     "res",
     "rv",
+    "sin(A)",
     "sin(x) / x",
+    "sinh(A)",
     "sqrt(x*x+y*y+z*z)",
     "sRGB",
+    "tan(A)",
+    "tanh(A)",
     "utf-8",
+    "uv_on_emitter() requires a modifier from an evaluated object",
     "var",
     "vBVH",
     "view",
     "wav",
+    "wmOwnerID '%s' not in workspace '%s'",
     "y",
+    "y = (Ax + B)",
     # Sub-strings.
     "available with",
     "brown fox",
     "can't save image while rendering",
+    "constructive modifier",
+    "cursor",
+    "custom",
+    "custom matrix",
+    "custom orientation",
+    "edge data",
+    "exp(A)",
     "expected a timeline/animation area to be active",
     "expected a view3d region",
     "expected a view3d region & editcurve",
     "expected a view3d region & editmesh",
+    "face data",
+    "gimbal",
+    "global",
     "image file not found",
+    "image format is read-only",
     "image path can't be written to",
     "in memory to enable editing!",
+    "insufficient content",
     "jumps over",
+    "left",
+    "local",
+    "multi-res modifier",
+    "non-triangle face",
+    "normal",
+    "performance impact!",
+    "right",
     "the lazy dog",
     "unable to load movie clip",
     "unable to load text",
@@ -347,8 +397,12 @@ WARN_MSGID_NOT_CAPITALIZED_ALLOWED = {
     "unsupported format",
     "unsupported image format",
     "unsupported movie clip format",
+    "vertex data",
     "verts only",
+    "view",
     "virtual parents",
+    "and NVIDIA driver version 470 or newer",
+    "and AMD driver version ??? or newer",
 }
 WARN_MSGID_NOT_CAPITALIZED_ALLOWED |= set(lng[2] for lng in LANGUAGES)
 
@@ -356,10 +410,15 @@ WARN_MSGID_END_POINT_ALLOWED = {
     "Circle|Alt .",
     "Float Neg. Exp.",
     "Max Ext.",
+    "Newer graphics drivers may be available to improve Blender support.",
     "Numpad .",
     "Pad.",
     "    RNA Path: bpy.types.",
     "Temp. Diff.",
+    "Temperature Diff.",
+    "The program will now close.",
+    "Your graphics card or driver has limited support. It may work, but with issues.",
+    "Your graphics card or driver is not supported.",
 }
 
 PARSER_CACHE_HASH = 'sha1'
@@ -449,6 +508,7 @@ MO_FILE_NAME = DOMAIN + ".mo"
 # Where to search for py files that may contain ui strings (relative to one of the 'resource_path' of Blender).
 CUSTOM_PY_UI_FILES = [
     os.path.join("scripts", "startup", "bl_ui"),
+    os.path.join("scripts", "startup", "bl_operators"),
     os.path.join("scripts", "modules", "rna_prop_ui.py"),
 ]
 
@@ -503,9 +563,14 @@ def _do_set(ref, path):
 def _gen_get_set_path(ref, name):
     def _get(self):
         return _do_get(getattr(self, ref), getattr(self, name))
+
     def _set(self, value):
         setattr(self, name, _do_set(getattr(self, ref), value))
     return _get, _set
+
+
+def _check_valid_data(uid, val):
+    return not uid.startswith("_") and type(val) not in tuple(types.__dict__.values()) + (type,)
 
 
 class I18nSettings:
@@ -519,29 +584,46 @@ class I18nSettings:
         # Addon preferences are singleton by definition, so is this class!
         if not I18nSettings._settings:
             cls._settings = super(I18nSettings, cls).__new__(cls)
-            cls._settings.__dict__ = {uid: data for uid, data in globals().items() if not uid.startswith("_")}
+            cls._settings.__dict__ = {uid: val for uid, val in globals().items() if _check_valid_data(uid, val)}
         return I18nSettings._settings
 
-    def from_json(self, string):
-        data = dict(json.loads(string))
+    def __getstate__(self):
+        return self.to_dict()
+
+    def __setstate__(self, mapping):
+        return self.from_dict(mapping)
+
+    def from_dict(self, mapping):
         # Special case... :/
-        if "INTERN_PY_SYS_PATHS" in data:
-            self.PY_SYS_PATHS = data["INTERN_PY_SYS_PATHS"]
-        self.__dict__.update(data)
+        if "INTERN_PY_SYS_PATHS" in mapping:
+            self.PY_SYS_PATHS = mapping["INTERN_PY_SYS_PATHS"]
+        self.__dict__.update(mapping)
+
+    def to_dict(self):
+        glob = globals()
+        return {uid: val for uid, val in self.__dict__.items() if _check_valid_data(uid, val) and uid in glob}
+
+    def from_json(self, string):
+        self.from_dict(dict(json.loads(string)))
 
     def to_json(self):
         # Only save the diff from default i18n_settings!
         glob = globals()
-        export_dict = {uid: val for uid, val in self.__dict__.items() if glob.get(uid) != val}
+        export_dict = {uid: val for uid, val in self.__dict__.items() if _check_valid_data(uid, val) and glob.get(uid) != val}
         return json.dumps(export_dict)
 
     def load(self, fname, reset=False):
+        reset = reset or fname is None
         if reset:
             self.__dict__ = {uid: data for uid, data in globals().items() if not uid.startswith("_")}
+        if fname is None:
+            return
         if isinstance(fname, str):
             if not os.path.isfile(fname):
+                # Assume it is already real JSon string...
+                self.from_json(fname)
                 return
-            with open(fname) as f:
+            with open(fname, encoding="utf8") as f:
                 self.from_json(f.read())
         # Else assume fname is already a file(like) object!
         else:
@@ -549,7 +631,7 @@ class I18nSettings:
 
     def save(self, fname):
         if isinstance(fname, str):
-            with open(fname, 'w') as f:
+            with open(fname, 'w', encoding="utf8") as f:
                 f.write(self.to_json())
         # Else assume fname is already a file(like) object!
         else:
@@ -568,6 +650,7 @@ class I18nSettings:
 
     def _get_py_sys_paths(self):
         return self.INTERN_PY_SYS_PATHS
+
     def _set_py_sys_paths(self, val):
         old_paths = set(self.INTERN_PY_SYS_PATHS.split(";")) - {""}
         new_paths = set(val.split(";")) - {""}

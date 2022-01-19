@@ -1,6 +1,4 @@
 /*
- * Copyright 2012, Blender Foundation.
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -15,45 +13,66 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor:
- *		Jeroen Bakker
- *		Monique Dewanchand
- *		Sergey Sharybin
+ * Copyright 2012, Blender Foundation.
  */
 
-#ifndef _COM_KeyingClipOperation_h
-#define _COM_KeyingClipOperation_h
+#pragma once
 
-#include "COM_NodeOperation.h"
+#include "COM_MultiThreadedOperation.h"
+
+namespace blender::compositor {
 
 /**
  * Class with implementation of black/white clipping for keying node
  */
-class KeyingClipOperation : public NodeOperation {
-protected:
-	float m_clipBlack;
-	float m_clipWhite;
+class KeyingClipOperation : public MultiThreadedOperation {
+ protected:
+  float clip_black_;
+  float clip_white_;
 
-	int m_kernelRadius;
-	float m_kernelTolerance;
+  int kernel_radius_;
+  float kernel_tolerance_;
 
-	bool m_isEdgeMatte;
-public:
-	KeyingClipOperation();
+  bool is_edge_matte_;
 
-	void setClipBlack(float value) {this->m_clipBlack = value;}
-	void setClipWhite(float value) {this->m_clipWhite = value;}
+ public:
+  KeyingClipOperation();
 
-	void setKernelRadius(int value) {this->m_kernelRadius = value;}
-	void setKernelTolerance(float value) {this->m_kernelTolerance = value;}
+  void set_clip_black(float value)
+  {
+    clip_black_ = value;
+  }
+  void set_clip_white(float value)
+  {
+    clip_white_ = value;
+  }
 
-	void setIsEdgeMatte(bool value) {this->m_isEdgeMatte = value;}
+  void set_kernel_radius(int value)
+  {
+    kernel_radius_ = value;
+  }
+  void set_kernel_tolerance(float value)
+  {
+    kernel_tolerance_ = value;
+  }
 
-	void *initializeTileData(rcti *rect);
+  void set_is_edge_matte(bool value)
+  {
+    is_edge_matte_ = value;
+  }
 
-	void executePixel(float output[4], int x, int y, void *data);
+  void *initialize_tile_data(rcti *rect) override;
 
-	bool determineDependingAreaOfInterest(rcti *input, ReadBufferOperation *readOperation, rcti *output);
+  void execute_pixel(float output[4], int x, int y, void *data) override;
+
+  bool determine_depending_area_of_interest(rcti *input,
+                                            ReadBufferOperation *read_operation,
+                                            rcti *output) override;
+
+  void get_area_of_interest(int input_idx, const rcti &output_area, rcti &r_input_area) override;
+  void update_memory_buffer_partial(MemoryBuffer *output,
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
 };
 
-#endif
+}  // namespace blender::compositor

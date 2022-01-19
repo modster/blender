@@ -12,12 +12,8 @@
 #=============================================================================
 # Copyright 2012 Blender Foundation.
 #
-# Distributed under the OSI-approved BSD License (the "License");
-# see accompanying file Copyright.txt for details.
-#
-# This software is distributed WITHOUT ANY WARRANTY; without even the
-# implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-# See the License for more information.
+# Distributed under the OSI-approved BSD 3-Clause License,
+# see accompanying file BSD-3-Clause-license.txt for details.
 #=============================================================================
 
 # If ICU_ROOT_DIR was defined in the environment, use it.
@@ -32,21 +28,17 @@ endif()
 
 SET(_icu_SEARCH_DIRS
   ${ICU_ROOT_DIR}
-  /usr/local
-  /sw # Fink
-  /opt/local # DarwinPorts
-  /opt/csw # Blastwave
 )
 
 # We don't need includes, only libs to link against...
-#FIND_PATH(ICU_INCLUDE_DIR
-#  NAMES
-#    utf.h
-#  HINTS
-#    ${_icu_SEARCH_DIRS}
-#  PATH_SUFFIXES
-#    include/unicode
-#)
+# FIND_PATH(ICU_INCLUDE_DIR
+#   NAMES
+#     utf.h
+#   HINTS
+#     ${_icu_SEARCH_DIRS}
+#   PATH_SUFFIXES
+#     include/unicode
+# )
 
 FIND_LIBRARY(ICU_LIBRARY_DATA
   NAMES
@@ -116,7 +108,7 @@ if(Boost_USE_STATIC_LIBS)
   set(CMAKE_FIND_LIBRARY_SUFFIXES ${_icu_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES})
 endif()
 
-# handle the QUIETLY and REQUIRED arguments and set ICU_FOUND to TRUE if 
+# handle the QUIETLY and REQUIRED arguments and set ICU_FOUND to TRUE if
 # all listed variables are TRUE
 INCLUDE(FindPackageHandleStandardArgs)
 FIND_PACKAGE_HANDLE_STANDARD_ARGS(Icu DEFAULT_MSG
@@ -132,7 +124,7 @@ FIND_PACKAGE_HANDLE_STANDARD_ARGS(Icu DEFAULT_MSG
 IF(ICU_FOUND)
   SET(ICU_LIBRARIES ${ICU_LIBRARY_DATA} ${ICU_LIBRARY_I18N} ${ICU_LIBRARY_IO} ${ICU_LIBRARY_LE} ${ICU_LIBRARY_LX} ${ICU_LIBRARY_TU} ${ICU_LIBRARY_UC})
   SET(ICU_INCLUDE_DIRS ${ICU_INCLUDE_DIR})
-ENDIF(ICU_FOUND)
+ENDIF()
 
 MARK_AS_ADVANCED(
   ICU_INCLUDE_DIR

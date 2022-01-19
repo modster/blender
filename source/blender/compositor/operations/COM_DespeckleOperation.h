@@ -1,6 +1,4 @@
 /*
- * Copyright 2011, Blender Foundation.
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -15,35 +13,53 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor: Campbell Barton
+ * Copyright 2011, Blender Foundation.
  */
 
-#ifndef _COM_DespeckleOperation_h
-#define _COM_DespeckleOperation_h
-#include "COM_NodeOperation.h"
+#pragma once
 
-class DespeckleOperation : public NodeOperation {
-private:
-	float m_threshold;
-	float m_threshold_neighbor;
+#include "COM_MultiThreadedOperation.h"
 
-	// int m_filterWidth;
-	// int m_filterHeight;
+namespace blender::compositor {
 
-protected:
-	SocketReader *m_inputOperation;
-	SocketReader *m_inputValueOperation;
+class DespeckleOperation : public MultiThreadedOperation {
+ private:
+  constexpr static int IMAGE_INPUT_INDEX = 0;
+  constexpr static int FACTOR_INPUT_INDEX = 1;
 
-public:
-	DespeckleOperation();
-	bool determineDependingAreaOfInterest(rcti *input, ReadBufferOperation *readOperation, rcti *output);
-	void executePixel(float output[4], int x, int y, void *data);
+  float threshold_;
+  float threshold_neighbor_;
 
-	void setThreshold(float threshold) { this->m_threshold = threshold; }
-	void setThresholdNeighbor(float threshold) { this->m_threshold_neighbor = threshold; }
+  // int filter_width_;
+  // int filter_height_;
 
-	void initExecution();
-	void deinitExecution();
+ protected:
+  SocketReader *input_operation_;
+  SocketReader *input_value_operation_;
+
+ public:
+  DespeckleOperation();
+  bool determine_depending_area_of_interest(rcti *input,
+                                            ReadBufferOperation *read_operation,
+                                            rcti *output) override;
+  void execute_pixel(float output[4], int x, int y, void *data) override;
+
+  void set_threshold(float threshold)
+  {
+    threshold_ = threshold;
+  }
+  void set_threshold_neighbor(float threshold)
+  {
+    threshold_neighbor_ = threshold;
+  }
+
+  void init_execution() override;
+  void deinit_execution() override;
+
+  void get_area_of_interest(int input_idx, const rcti &output_area, rcti &r_input_area) override;
+  void update_memory_buffer_partial(MemoryBuffer *output,
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
 };
 
-#endif
+}  // namespace blender::compositor

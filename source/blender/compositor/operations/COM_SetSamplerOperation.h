@@ -1,6 +1,4 @@
 /*
- * Copyright 2011, Blender Foundation.
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -15,37 +13,41 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor: 
- *		Jeroen Bakker 
- *		Monique Dewanchand
+ * Copyright 2011, Blender Foundation.
  */
 
-#ifndef _COM_SetSamplerOperation_h
-#define _COM_SetSamplerOperation_h
+#pragma once
+
 #include "COM_NodeOperation.h"
 
+namespace blender::compositor {
 
 /**
  * this program converts an input color to an output Sampler.
  * it assumes we are in sRGB color space.
  */
 class SetSamplerOperation : public NodeOperation {
-private:
-	PixelSampler m_sampler;
-	SocketReader *m_reader;
-public:
-	/**
-	 * Default constructor
-	 */
-	SetSamplerOperation();
-	
-	void setSampler(PixelSampler sampler) { this->m_sampler = sampler; }
-	
-	/**
-	 * the inner loop of this program
-	 */
-	void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
-	void initExecution();
-	void deinitExecution();
+ private:
+  PixelSampler sampler_;
+  SocketReader *reader_;
+
+ public:
+  /**
+   * Default constructor
+   */
+  SetSamplerOperation();
+
+  void set_sampler(PixelSampler sampler)
+  {
+    sampler_ = sampler;
+  }
+
+  /**
+   * The inner loop of this operation.
+   */
+  void execute_pixel_sampled(float output[4], float x, float y, PixelSampler sampler) override;
+  void init_execution() override;
+  void deinit_execution() override;
 };
-#endif
+
+}  // namespace blender::compositor

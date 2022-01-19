@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,572 +15,746 @@
  *
  * The Original Code is Copyright (C) Blender Foundation
  * All rights reserved.
- *
- * The Original Code is: all of this file.
- *
- * Contributor(s): Matt Ebb
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file blender/modifiers/intern/MOD_ocean.c
- *  \ingroup modifiers
+/** \file
+ * \ingroup modifiers
  */
 
-#include "DNA_customdata_types.h"
-#include "DNA_object_types.h"
-#include "DNA_meshdata_types.h"
-#include "DNA_modifier_types.h"
-#include "DNA_scene_types.h"
+#include "BLI_utildefines.h"
 
 #include "BLI_math.h"
 #include "BLI_math_inline.h"
-#include "BLI_utildefines.h"
+#include "BLI_task.h"
 
-#include "BKE_cdderivedmesh.h"
+#include "BLT_translation.h"
+
+#include "DNA_customdata_types.h"
+#include "DNA_defaults.h"
+#include "DNA_mesh_types.h"
+#include "DNA_meshdata_types.h"
+#include "DNA_modifier_types.h"
+#include "DNA_object_types.h"
+#include "DNA_scene_types.h"
+#include "DNA_screen_types.h"
+
+#include "BKE_context.h"
+#include "BKE_lib_id.h"
+#include "BKE_mesh.h"
 #include "BKE_modifier.h"
 #include "BKE_ocean.h"
+#include "BKE_screen.h"
+
+#include "UI_interface.h"
+#include "UI_resources.h"
+
+#include "RNA_access.h"
+
+#include "BLO_read_write.h"
+
+#include "WM_types.h" /* For UI free bake operator. */
+
+#include "DEG_depsgraph_query.h"
+
+#include "MOD_modifiertypes.h"
+#include "MOD_ui_common.h"
 
 #ifdef WITH_OCEANSIM
-static void init_cache_data(Object *ob, struct OceanModifierData *omd)
+static void init_cache_data(Object *ob, struct OceanModifierData *omd, const int resolution)
 {
-	const char *relbase = modifier_path_relbase(ob);
+  const char *relbase = BKE_modifier_path_relbase_from_global(ob);
 
-	omd->oceancache = BKE_ocean_init_cache(omd->cachepath, relbase,
-	                                       omd->bakestart, omd->bakeend, omd->wave_scale,
-	                                       omd->chop_amount, omd->foam_coverage, omd->foam_fade, omd->resolution);
-}
-
-static void clear_cache_data(struct OceanModifierData *omd)
-{
-	BKE_ocean_free_cache(omd->oceancache);
-	omd->oceancache = NULL;
-	omd->cached = false;
-}
-
-/* keep in sync with init_ocean_modifier_bake(), object_modifier.c */
-static void init_ocean_modifier(struct OceanModifierData *omd)
-{
-	int do_heightfield, do_chop, do_normals, do_jacobian;
-
-	if (!omd || !omd->ocean) return;
-
-	do_heightfield = true;
-	do_chop = (omd->chop_amount > 0);
-	do_normals = (omd->flag & MOD_OCEAN_GENERATE_NORMALS);
-	do_jacobian = (omd->flag & MOD_OCEAN_GENERATE_FOAM);
-
-	BKE_ocean_free_data(omd->ocean);
-	BKE_ocean_init(omd->ocean, omd->resolution * omd->resolution, omd->resolution * omd->resolution,
-	               omd->spatial_size, omd->spatial_size,
-	               omd->wind_velocity, omd->smallest_wave, 1.0, omd->wave_direction, omd->damp, omd->wave_alignment,
-	               omd->depth, omd->time,
-	               do_heightfield, do_chop, do_normals, do_jacobian,
-	               omd->seed);
+  omd->oceancache = BKE_ocean_init_cache(omd->cachepath,
+                                         relbase,
+                                         omd->bakestart,
+                                         omd->bakeend,
+                                         omd->wave_scale,
+                                         omd->chop_amount,
+                                         omd->foam_coverage,
+                                         omd->foam_fade,
+                                         resolution);
 }
 
 static void simulate_ocean_modifier(struct OceanModifierData *omd)
 {
-	if (!omd || !omd->ocean) return;
-
-	BKE_ocean_simulate(omd->ocean, omd->time, omd->wave_scale, omd->chop_amount);
+  BKE_ocean_simulate(omd->ocean, omd->time, omd->wave_scale, omd->chop_amount);
 }
 #endif /* WITH_OCEANSIM */
-
-
 
 /* Modifier Code */
 
 static void initData(ModifierData *md)
 {
 #ifdef WITH_OCEANSIM
-	OceanModifierData *omd = (OceanModifierData *) md;
+  OceanModifierData *omd = (OceanModifierData *)md;
 
-	omd->resolution = 7;
-	omd->spatial_size = 50;
+  BLI_assert(MEMCMP_STRUCT_AFTER_IS_ZERO(omd, modifier));
 
-	omd->wave_alignment = 0.0;
-	omd->wind_velocity = 30.0;
+  MEMCPY_STRUCT_AFTER(omd, DNA_struct_default_get(OceanModifierData), modifier);
 
-	omd->damp = 0.5;
-	omd->smallest_wave = 0.01;
-	omd->wave_direction = 0.0;
-	omd->depth = 200.0;
+  BKE_modifier_path_init(omd->cachepath, sizeof(omd->cachepath), "cache_ocean");
 
-	omd->wave_scale = 1.0;
-
-	omd->chop_amount = 1.0;
-
-	omd->foam_coverage = 0.0;
-
-	omd->seed = 0;
-	omd->time = 1.0;
-
-	omd->refresh = 0;
-
-	omd->size = 1.0;
-	omd->repeat_x = 1;
-	omd->repeat_y = 1;
-
-	modifier_path_init(omd->cachepath, sizeof(omd->cachepath), "cache_ocean");
-
-	omd->cached = 0;
-	omd->bakestart = 1;
-	omd->bakeend = 250;
-	omd->oceancache = NULL;
-	omd->foam_fade = 0.98;
-	omd->foamlayername[0] = '\0';   /* layer name empty by default */
-
-	omd->ocean = BKE_ocean_add();
-	init_ocean_modifier(omd);
-	simulate_ocean_modifier(omd);
+  omd->ocean = BKE_ocean_add();
+  if (BKE_ocean_init_from_modifier(omd->ocean, omd, omd->viewport_resolution)) {
+    simulate_ocean_modifier(omd);
+  }
 #else  /* WITH_OCEANSIM */
-	   /* unused */
-	(void)md;
+  UNUSED_VARS(md);
 #endif /* WITH_OCEANSIM */
 }
 
 static void freeData(ModifierData *md)
 {
 #ifdef WITH_OCEANSIM
-	OceanModifierData *omd = (OceanModifierData *) md;
+  OceanModifierData *omd = (OceanModifierData *)md;
 
-	BKE_ocean_free(omd->ocean);
-	if (omd->oceancache)
-		BKE_ocean_free_cache(omd->oceancache);
-#else /* WITH_OCEANSIM */
-	/* unused */
-	(void)md;
+  BKE_ocean_free(omd->ocean);
+  if (omd->oceancache) {
+    BKE_ocean_free_cache(omd->oceancache);
+  }
+#else  /* WITH_OCEANSIM */
+  /* unused */
+  (void)md;
 #endif /* WITH_OCEANSIM */
 }
 
-static void copyData(ModifierData *md, ModifierData *target)
+static void copyData(const ModifierData *md, ModifierData *target, const int flag)
 {
 #ifdef WITH_OCEANSIM
-	OceanModifierData *omd = (OceanModifierData *) md;
-	OceanModifierData *tomd = (OceanModifierData *) target;
+#  if 0
+  const OceanModifierData *omd = (const OceanModifierData *)md;
+#  endif
+  OceanModifierData *tomd = (OceanModifierData *)target;
 
-	tomd->geometry_mode = omd->geometry_mode;
-	tomd->resolution = omd->resolution;
-	tomd->spatial_size = omd->spatial_size;
+  BKE_modifier_copydata_generic(md, target, flag);
 
-	tomd->wind_velocity = omd->wind_velocity;
+  /* The oceancache object will be recreated for this copy
+   * automatically when cached=true */
+  tomd->oceancache = NULL;
 
-	tomd->damp = omd->damp;
-	tomd->smallest_wave = omd->smallest_wave;
-	tomd->depth = omd->depth;
-
-	tomd->wave_alignment = omd->wave_alignment;
-	tomd->wave_direction = omd->wave_direction;
-	tomd->wave_scale = omd->wave_scale;
-
-	tomd->chop_amount = omd->chop_amount;
-	tomd->foam_coverage = omd->foam_coverage;
-	tomd->time = omd->time;
-
-	tomd->seed = omd->seed;
-	tomd->flag = omd->flag;
-
-	tomd->refresh = 0;
-
-	tomd->size = omd->size;
-	tomd->repeat_x = omd->repeat_x;
-	tomd->repeat_y = omd->repeat_y;
-
-	/* XXX todo: copy cache runtime too */
-	tomd->cached = 0;
-	tomd->bakestart = omd->bakestart;
-	tomd->bakeend = omd->bakeend;
-	tomd->oceancache = NULL;
-
-	tomd->ocean = BKE_ocean_add();
-	init_ocean_modifier(tomd);
-	simulate_ocean_modifier(tomd);
-#else /* WITH_OCEANSIM */
-	/* unused */
-	(void)md;
-	(void)target;
+  tomd->ocean = BKE_ocean_add();
+  if (BKE_ocean_init_from_modifier(tomd->ocean, tomd, tomd->viewport_resolution)) {
+    simulate_ocean_modifier(tomd);
+  }
+#else  /* WITH_OCEANSIM */
+  /* unused */
+  (void)md;
+  (void)target;
+  (void)flag;
 #endif /* WITH_OCEANSIM */
 }
 
 #ifdef WITH_OCEANSIM
-static CustomDataMask requiredDataMask(Object *UNUSED(ob), ModifierData *md)
+static void requiredDataMask(Object *UNUSED(ob),
+                             ModifierData *md,
+                             CustomData_MeshMasks *r_cddata_masks)
 {
-	OceanModifierData *omd = (OceanModifierData *)md;
-	CustomDataMask dataMask = 0;
+  OceanModifierData *omd = (OceanModifierData *)md;
 
-	if (omd->flag & MOD_OCEAN_GENERATE_FOAM)
-		dataMask |= CD_MASK_MCOL;
-
-	return dataMask;
+  if (omd->flag & MOD_OCEAN_GENERATE_FOAM) {
+    r_cddata_masks->fmask |= CD_MASK_MCOL; /* XXX Should be loop cddata I guess? */
+  }
 }
-#else /* WITH_OCEANSIM */
-static CustomDataMask requiredDataMask(Object *UNUSED(ob), ModifierData *md)
+#else  /* WITH_OCEANSIM */
+static void requiredDataMask(Object *UNUSED(ob),
+                             ModifierData *UNUSED(md),
+                             CustomData_MeshMasks *UNUSED(r_cddata_masks))
 {
-	/* unused */
-	(void)md;
-	return 0;
 }
 #endif /* WITH_OCEANSIM */
 
 static bool dependsOnNormals(ModifierData *md)
 {
-	OceanModifierData *omd = (OceanModifierData *)md;
-	return (omd->geometry_mode != MOD_OCEAN_GEOM_GENERATE);
+  OceanModifierData *omd = (OceanModifierData *)md;
+  return (omd->geometry_mode != MOD_OCEAN_GEOM_GENERATE);
 }
-
-#if 0
-static void dm_get_bounds(DerivedMesh *dm, float *sx, float *sy, float *ox, float *oy)
-{
-	/* get bounding box of underlying dm */
-	int v, totvert = dm->getNumVerts(dm);
-	float min[3], max[3], delta[3];
-
-	MVert *mvert = dm->getVertDataArray(dm, 0);
-
-	copy_v3_v3(min, mvert->co);
-	copy_v3_v3(max, mvert->co);
-
-	for (v = 1; v < totvert; v++, mvert++) {
-		min[0] = min_ff(min[0], mvert->co[0]);
-		min[1] = min_ff(min[1], mvert->co[1]);
-		min[2] = min_ff(min[2], mvert->co[2]);
-
-		max[0] = max_ff(max[0], mvert->co[0]);
-		max[1] = max_ff(max[1], mvert->co[1]);
-		max[2] = max_ff(max[2], mvert->co[2]);
-	}
-
-	sub_v3_v3v3(delta, max, min);
-
-	*sx = delta[0];
-	*sy = delta[1];
-
-	*ox = min[0];
-	*oy = min[1];
-}
-#endif
 
 #ifdef WITH_OCEANSIM
 
-#ifdef _OPENMP
-#define OMP_MIN_RES 18
-#endif
+typedef struct GenerateOceanGeometryData {
+  MVert *mverts;
+  MPoly *mpolys;
+  MLoop *mloops;
+  MLoopUV *mloopuvs;
 
-static DerivedMesh *generate_ocean_geometry(OceanModifierData *omd)
+  int res_x, res_y;
+  int rx, ry;
+  float ox, oy;
+  float sx, sy;
+  float ix, iy;
+} GenerateOceanGeometryData;
+
+static void generate_ocean_geometry_vertices(void *__restrict userdata,
+                                             const int y,
+                                             const TaskParallelTLS *__restrict UNUSED(tls))
 {
-	DerivedMesh *result;
+  GenerateOceanGeometryData *gogd = userdata;
+  int x;
 
-	MVert *mverts;
-	MPoly *mpolys;
-	MLoop *mloops;
-	int *origindex;
-
-	int cdlayer;
-
-	const int rx = omd->resolution * omd->resolution;
-	const int ry = omd->resolution * omd->resolution;
-	const int res_x = rx * omd->repeat_x;
-	const int res_y = ry * omd->repeat_y;
-
-	const int num_verts = (res_x + 1) * (res_y + 1);
-	/* const int num_edges = (res_x * res_y * 2) + res_x + res_y; */ /* UNUSED BMESH */
-	const int num_faces = res_x * res_y;
-
-	float sx = omd->size * omd->spatial_size;
-	float sy = omd->size * omd->spatial_size;
-	const float ox = -sx / 2.0f;
-	const float oy = -sy / 2.0f;
-
-	float ix, iy;
-
-	int x, y;
-
-	sx /= rx;
-	sy /= ry;
-
-	result = CDDM_new(num_verts, 0, 0, num_faces * 4, num_faces);
-
-	mverts = CDDM_get_verts(result);
-	mpolys = CDDM_get_polys(result);
-	mloops = CDDM_get_loops(result);
-
-	origindex = CustomData_get_layer(&result->polyData, CD_ORIGINDEX);
-
-	/* create vertices */
-#pragma omp parallel for private(x, y) if (rx > OMP_MIN_RES)
-	for (y = 0; y <= res_y; y++) {
-		for (x = 0; x <= res_x; x++) {
-			const int i = y * (res_x + 1) + x;
-			float *co = mverts[i].co;
-			co[0] = ox + (x * sx);
-			co[1] = oy + (y * sy);
-			co[2] = 0;
-		}
-	}
-
-	/* create faces */
-#pragma omp parallel for private(x, y) if (rx > OMP_MIN_RES)
-	for (y = 0; y < res_y; y++) {
-		for (x = 0; x < res_x; x++) {
-			const int fi = y * res_x + x;
-			const int vi = y * (res_x + 1) + x;
-			MPoly *mp = &mpolys[fi];
-			MLoop *ml = &mloops[fi * 4];
-
-			ml->v = vi;
-			ml++;
-			ml->v = vi + 1;
-			ml++;
-			ml->v = vi + 1 + res_x + 1;
-			ml++;
-			ml->v = vi + res_x + 1;
-			ml++;
-
-			mp->loopstart = fi * 4;
-			mp->totloop = 4;
-
-			mp->flag |= ME_SMOOTH;
-
-			/* generated geometry does not map to original faces */
-			origindex[fi] = ORIGINDEX_NONE;
-		}
-	}
-
-	CDDM_calc_edges(result);
-
-	/* add uvs */
-	cdlayer = CustomData_number_of_layers(&result->loopData, CD_MLOOPUV);
-	if (cdlayer < MAX_MTFACE) {
-		MLoopUV *mloopuvs = CustomData_add_layer(&result->loopData, CD_MLOOPUV, CD_CALLOC, NULL, num_faces * 4);
-		CustomData_add_layer(&result->polyData, CD_MTEXPOLY, CD_CALLOC, NULL, num_faces);
-
-		if (mloopuvs) { /* unlikely to fail */
-			ix = 1.0 / rx;
-			iy = 1.0 / ry;
-#pragma omp parallel for private(x, y) if (rx > OMP_MIN_RES)
-			for (y = 0; y < res_y; y++) {
-				for (x = 0; x < res_x; x++) {
-					const int i = y * res_x + x;
-					MLoopUV *luv = &mloopuvs[i * 4];
-
-					luv->uv[0] = x * ix;
-					luv->uv[1] = y * iy;
-					luv++;
-
-					luv->uv[0] = (x + 1) * ix;
-					luv->uv[1] = y * iy;
-					luv++;
-
-					luv->uv[0] = (x + 1) * ix;
-					luv->uv[1] = (y + 1) * iy;
-					luv++;
-
-					luv->uv[0] = x * ix;
-					luv->uv[1] = (y + 1) * iy;
-					luv++;
-
-				}
-			}
-		}
-	}
-
-	result->dirty |= DM_DIRTY_NORMALS;
-
-	return result;
+  for (x = 0; x <= gogd->res_x; x++) {
+    const int i = y * (gogd->res_x + 1) + x;
+    float *co = gogd->mverts[i].co;
+    co[0] = gogd->ox + (x * gogd->sx);
+    co[1] = gogd->oy + (y * gogd->sy);
+    co[2] = 0.0f;
+  }
 }
 
-static DerivedMesh *doOcean(ModifierData *md, Object *ob,
-                            DerivedMesh *derivedData,
-                            int UNUSED(useRenderParams))
+static void generate_ocean_geometry_polygons(void *__restrict userdata,
+                                             const int y,
+                                             const TaskParallelTLS *__restrict UNUSED(tls))
 {
-	OceanModifierData *omd = (OceanModifierData *) md;
+  GenerateOceanGeometryData *gogd = userdata;
+  int x;
 
-	DerivedMesh *dm = NULL;
-	OceanResult ocr;
+  for (x = 0; x < gogd->res_x; x++) {
+    const int fi = y * gogd->res_x + x;
+    const int vi = y * (gogd->res_x + 1) + x;
+    MPoly *mp = &gogd->mpolys[fi];
+    MLoop *ml = &gogd->mloops[fi * 4];
 
-	MVert *mverts, *mv;
-	MLoop *mloops;
+    ml->v = vi;
+    ml++;
+    ml->v = vi + 1;
+    ml++;
+    ml->v = vi + 1 + gogd->res_x + 1;
+    ml++;
+    ml->v = vi + gogd->res_x + 1;
+    ml++;
 
-	int i, j;
+    mp->loopstart = fi * 4;
+    mp->totloop = 4;
 
-	int num_verts;
-	int num_faces;
+    mp->flag |= ME_SMOOTH;
+  }
+}
 
-	int cfra;
+static void generate_ocean_geometry_uvs(void *__restrict userdata,
+                                        const int y,
+                                        const TaskParallelTLS *__restrict UNUSED(tls))
+{
+  GenerateOceanGeometryData *gogd = userdata;
+  int x;
 
-	/* use cached & inverted value for speed
-	 * expanded this would read...
-	 *
-	 * (axis / (omd->size * omd->spatial_size)) + 0.5f) */
-#define OCEAN_CO(_size_co_inv, _v) ((_v * _size_co_inv) + 0.5f)
+  for (x = 0; x < gogd->res_x; x++) {
+    const int i = y * gogd->res_x + x;
+    MLoopUV *luv = &gogd->mloopuvs[i * 4];
 
-	const float size_co_inv = 1.0f / (omd->size * omd->spatial_size);
+    luv->uv[0] = x * gogd->ix;
+    luv->uv[1] = y * gogd->iy;
+    luv++;
 
-	/* can happen in when size is small, avoid bad array lookups later and quit now */
-	if (!finite(size_co_inv)) {
-		return derivedData;
-	}
+    luv->uv[0] = (x + 1) * gogd->ix;
+    luv->uv[1] = y * gogd->iy;
+    luv++;
 
-	/* update modifier */
-	if (omd->refresh & MOD_OCEAN_REFRESH_ADD)
-		omd->ocean = BKE_ocean_add();
-	if (omd->refresh & MOD_OCEAN_REFRESH_RESET)
-		init_ocean_modifier(omd);
-	if (omd->refresh & MOD_OCEAN_REFRESH_CLEAR_CACHE)
-		clear_cache_data(omd);
+    luv->uv[0] = (x + 1) * gogd->ix;
+    luv->uv[1] = (y + 1) * gogd->iy;
+    luv++;
 
-	omd->refresh = 0;
+    luv->uv[0] = x * gogd->ix;
+    luv->uv[1] = (y + 1) * gogd->iy;
+    luv++;
+  }
+}
 
-	/* do ocean simulation */
-	if (omd->cached == true) {
-		if (!omd->oceancache) init_cache_data(ob, omd);
-		BKE_ocean_simulate_cache(omd->oceancache, md->scene->r.cfra);
-	}
-	else {
-		simulate_ocean_modifier(omd);
-	}
+static Mesh *generate_ocean_geometry(OceanModifierData *omd, Mesh *mesh_orig, const int resolution)
+{
+  Mesh *result;
 
-	if (omd->geometry_mode == MOD_OCEAN_GEOM_GENERATE) {
-		dm = generate_ocean_geometry(omd);
-		DM_ensure_normals(dm);
-	}
-	else if (omd->geometry_mode == MOD_OCEAN_GEOM_DISPLACE) {
-		dm = CDDM_copy(derivedData);
-	}
+  GenerateOceanGeometryData gogd;
 
-	cfra = md->scene->r.cfra;
-	CLAMP(cfra, omd->bakestart, omd->bakeend);
-	cfra -= omd->bakestart; /* shift to 0 based */
+  int num_verts;
+  int num_polys;
 
-	num_verts = dm->getNumVerts(dm);
-	num_faces = dm->getNumPolys(dm);
+  const bool use_threading = resolution > 4;
 
-	mverts = dm->getVertArray(dm);
-	mloops = dm->getLoopArray(dm);
+  gogd.rx = resolution * resolution;
+  gogd.ry = resolution * resolution;
+  gogd.res_x = gogd.rx * omd->repeat_x;
+  gogd.res_y = gogd.ry * omd->repeat_y;
 
-	/* add vcols before displacement - allows lookup based on position */
+  num_verts = (gogd.res_x + 1) * (gogd.res_y + 1);
+  num_polys = gogd.res_x * gogd.res_y;
 
-	if (omd->flag & MOD_OCEAN_GENERATE_FOAM) {
-		int cdlayer = CustomData_number_of_layers(&dm->loopData, CD_MLOOPCOL);
+  gogd.sx = omd->size * omd->spatial_size;
+  gogd.sy = omd->size * omd->spatial_size;
+  gogd.ox = -gogd.sx / 2.0f;
+  gogd.oy = -gogd.sy / 2.0f;
 
-		if (cdlayer < MAX_MCOL) {
-			MLoopCol *mloopcols = CustomData_add_layer_named(&dm->loopData, CD_MLOOPCOL, CD_CALLOC, NULL,
-			                                                 num_faces * 4, omd->foamlayername);
+  gogd.sx /= gogd.rx;
+  gogd.sy /= gogd.ry;
 
-			if (mloopcols) { /* unlikely to fail */
-				MLoopCol *mlcol;
-				MPoly *mpolys = dm->getPolyArray(dm);
-				MPoly *mp;
+  result = BKE_mesh_new_nomain(num_verts, 0, 0, num_polys * 4, num_polys);
+  BKE_mesh_copy_parameters_for_eval(result, mesh_orig);
 
-				float foam;
+  gogd.mverts = result->mvert;
+  gogd.mpolys = result->mpoly;
+  gogd.mloops = result->mloop;
 
-				for (i = 0, mp = mpolys; i < num_faces; i++, mp++) {
-					j = mp->totloop - 1;
+  TaskParallelSettings settings;
+  BLI_parallel_range_settings_defaults(&settings);
+  settings.use_threading = use_threading;
 
-					/* highly unlikely */
-					if (j <= 0) continue;
+  /* create vertices */
+  BLI_task_parallel_range(0, gogd.res_y + 1, &gogd, generate_ocean_geometry_vertices, &settings);
 
-					do {
-						const float *co = mverts[mloops[mp->loopstart + j].v].co;
-						const float u = OCEAN_CO(size_co_inv, co[0]);
-						const float v = OCEAN_CO(size_co_inv, co[1]);
+  /* create faces */
+  BLI_task_parallel_range(0, gogd.res_y, &gogd, generate_ocean_geometry_polygons, &settings);
 
-						if (omd->oceancache && omd->cached == true) {
-							BKE_ocean_cache_eval_uv(omd->oceancache, &ocr, cfra, u, v);
-							foam = ocr.foam;
-							CLAMP(foam, 0.0f, 1.0f);
-						}
-						else {
-							BKE_ocean_eval_uv(omd->ocean, &ocr, u, v);
-							foam = BKE_ocean_jminus_to_foam(ocr.Jminus, omd->foam_coverage);
-						}
+  BKE_mesh_calc_edges(result, false, false);
 
-						mlcol = &mloopcols[mp->loopstart + j];
-						mlcol->r = mlcol->g = mlcol->b = (char)(foam * 255);
-						/* This needs to be set (render engine uses) */
-						mlcol->a = 255;
-					} while (j--);
-				}
-			}
-		}
-	}
+  /* add uvs */
+  if (CustomData_number_of_layers(&result->ldata, CD_MLOOPUV) < MAX_MTFACE) {
+    gogd.mloopuvs = CustomData_add_layer(
+        &result->ldata, CD_MLOOPUV, CD_CALLOC, NULL, num_polys * 4);
 
+    if (gogd.mloopuvs) { /* unlikely to fail */
+      gogd.ix = 1.0 / gogd.rx;
+      gogd.iy = 1.0 / gogd.ry;
 
-	/* displace the geometry */
+      BLI_task_parallel_range(0, gogd.res_y, &gogd, generate_ocean_geometry_uvs, &settings);
+    }
+  }
 
-	/* #pragma omp parallel for private(i, ocr) if (omd->resolution > OMP_MIN_RES) */
-	for (i = 0, mv = mverts; i < num_verts; i++, mv++) {
-		const float u = OCEAN_CO(size_co_inv, mv->co[0]);
-		const float v = OCEAN_CO(size_co_inv, mv->co[1]);
+  BKE_mesh_normals_tag_dirty(result);
 
-		if (omd->oceancache && omd->cached == true)
-			BKE_ocean_cache_eval_uv(omd->oceancache, &ocr, cfra, u, v);
-		else
-			BKE_ocean_eval_uv(omd->ocean, &ocr, u, v);
+  return result;
+}
 
-		mv->co[2] += ocr.disp[1];
+static Mesh *doOcean(ModifierData *md, const ModifierEvalContext *ctx, Mesh *mesh)
+{
+  OceanModifierData *omd = (OceanModifierData *)md;
+  if (omd->ocean && !BKE_ocean_is_valid(omd->ocean)) {
+    BKE_modifier_set_error(ctx->object, md, "Failed to allocate memory");
+    return mesh;
+  }
+  int cfra_scene = (int)DEG_get_ctime(ctx->depsgraph);
+  Object *ob = ctx->object;
+  bool allocated_ocean = false;
 
-		if (omd->chop_amount > 0.0f) {
-			mv->co[0] += ocr.disp[0];
-			mv->co[1] += ocr.disp[2];
-		}
-	}
+  Mesh *result = NULL;
+  OceanResult ocr;
 
-#undef OCEAN_CO
+  const int resolution = (ctx->flag & MOD_APPLY_RENDER) ? omd->resolution :
+                                                          omd->viewport_resolution;
 
-	return dm;
+  MVert *mverts;
+
+  int cfra_for_cache;
+  int i, j;
+
+  /* use cached & inverted value for speed
+   * expanded this would read...
+   *
+   * (axis / (omd->size * omd->spatial_size)) + 0.5f) */
+#  define OCEAN_CO(_size_co_inv, _v) ((_v * _size_co_inv) + 0.5f)
+
+  const float size_co_inv = 1.0f / (omd->size * omd->spatial_size);
+
+  /* can happen in when size is small, avoid bad array lookups later and quit now */
+  if (!isfinite(size_co_inv)) {
+    return mesh;
+  }
+
+  /* do ocean simulation */
+  if (omd->cached == true) {
+    if (!omd->oceancache) {
+      init_cache_data(ob, omd, resolution);
+    }
+    BKE_ocean_simulate_cache(omd->oceancache, cfra_scene);
+  }
+  else {
+    /* omd->ocean is NULL on an original object (in contrast to an evaluated one).
+     * We can create a new one, but we have to free it as well once we're done.
+     * This function is only called on an original object when applying the modifier
+     * using the 'Apply Modifier' button, and thus it is not called frequently for
+     * simulation. */
+    allocated_ocean |= BKE_ocean_ensure(omd, resolution);
+    simulate_ocean_modifier(omd);
+  }
+
+  if (omd->geometry_mode == MOD_OCEAN_GEOM_GENERATE) {
+    result = generate_ocean_geometry(omd, mesh, resolution);
+    BKE_mesh_normals_tag_dirty(result);
+  }
+  else if (omd->geometry_mode == MOD_OCEAN_GEOM_DISPLACE) {
+    result = (Mesh *)BKE_id_copy_ex(NULL, &mesh->id, NULL, LIB_ID_COPY_LOCALIZE);
+  }
+
+  cfra_for_cache = cfra_scene;
+  CLAMP(cfra_for_cache, omd->bakestart, omd->bakeend);
+  cfra_for_cache -= omd->bakestart; /* shift to 0 based */
+
+  mverts = result->mvert;
+
+  /* add vcols before displacement - allows lookup based on position */
+
+  if (omd->flag & MOD_OCEAN_GENERATE_FOAM) {
+    if (CustomData_number_of_layers(&result->ldata, CD_MLOOPCOL) < MAX_MCOL) {
+      const int num_polys = result->totpoly;
+      const int num_loops = result->totloop;
+      MLoop *mloops = result->mloop;
+      MLoopCol *mloopcols = CustomData_add_layer_named(
+          &result->ldata, CD_MLOOPCOL, CD_CALLOC, NULL, num_loops, omd->foamlayername);
+
+      MLoopCol *mloopcols_spray = NULL;
+      if (omd->flag & MOD_OCEAN_GENERATE_SPRAY) {
+        mloopcols_spray = CustomData_add_layer_named(
+            &result->ldata, CD_MLOOPCOL, CD_CALLOC, NULL, num_loops, omd->spraylayername);
+      }
+
+      if (mloopcols) { /* unlikely to fail */
+        MPoly *mpolys = result->mpoly;
+        MPoly *mp;
+
+        for (i = 0, mp = mpolys; i < num_polys; i++, mp++) {
+          MLoop *ml = &mloops[mp->loopstart];
+          MLoopCol *mlcol = &mloopcols[mp->loopstart];
+
+          MLoopCol *mlcolspray = NULL;
+          if (omd->flag & MOD_OCEAN_GENERATE_SPRAY) {
+            mlcolspray = &mloopcols_spray[mp->loopstart];
+          }
+
+          for (j = mp->totloop; j--; ml++, mlcol++) {
+            const float *vco = mverts[ml->v].co;
+            const float u = OCEAN_CO(size_co_inv, vco[0]);
+            const float v = OCEAN_CO(size_co_inv, vco[1]);
+            float foam;
+
+            if (omd->oceancache && omd->cached == true) {
+              BKE_ocean_cache_eval_uv(omd->oceancache, &ocr, cfra_for_cache, u, v);
+              foam = ocr.foam;
+              CLAMP(foam, 0.0f, 1.0f);
+            }
+            else {
+              BKE_ocean_eval_uv(omd->ocean, &ocr, u, v);
+              foam = BKE_ocean_jminus_to_foam(ocr.Jminus, omd->foam_coverage);
+            }
+
+            mlcol->r = mlcol->g = mlcol->b = (char)(foam * 255);
+            /* This needs to be set (render engine uses) */
+            mlcol->a = 255;
+
+            if (omd->flag & MOD_OCEAN_GENERATE_SPRAY) {
+              if (omd->flag & MOD_OCEAN_INVERT_SPRAY) {
+                mlcolspray->r = ocr.Eminus[0] * 255;
+              }
+              else {
+                mlcolspray->r = ocr.Eplus[0] * 255;
+              }
+              mlcolspray->g = 0;
+              if (omd->flag & MOD_OCEAN_INVERT_SPRAY) {
+                mlcolspray->b = ocr.Eminus[2] * 255;
+              }
+              else {
+                mlcolspray->b = ocr.Eplus[2] * 255;
+              }
+              mlcolspray->a = 255;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  /* displace the geometry */
+
+  /* NOTE: tried to parallelized that one and previous foam loop,
+   * but gives 20% slower results... odd. */
+  {
+    const int num_verts = result->totvert;
+
+    for (i = 0; i < num_verts; i++) {
+      float *vco = mverts[i].co;
+      const float u = OCEAN_CO(size_co_inv, vco[0]);
+      const float v = OCEAN_CO(size_co_inv, vco[1]);
+
+      if (omd->oceancache && omd->cached == true) {
+        BKE_ocean_cache_eval_uv(omd->oceancache, &ocr, cfra_for_cache, u, v);
+      }
+      else {
+        BKE_ocean_eval_uv(omd->ocean, &ocr, u, v);
+      }
+
+      vco[2] += ocr.disp[1];
+
+      if (omd->chop_amount > 0.0f) {
+        vco[0] += ocr.disp[0];
+        vco[1] += ocr.disp[2];
+      }
+    }
+  }
+
+  if (allocated_ocean) {
+    BKE_ocean_free(omd->ocean);
+    omd->ocean = NULL;
+  }
+
+#  undef OCEAN_CO
+
+  return result;
 }
 #else  /* WITH_OCEANSIM */
-static DerivedMesh *doOcean(ModifierData *md, Object *UNUSED(ob),
-                            DerivedMesh *derivedData,
-                            int UNUSED(useRenderParams))
+static Mesh *doOcean(ModifierData *UNUSED(md), const ModifierEvalContext *UNUSED(ctx), Mesh *mesh)
 {
-	/* unused */
-	(void)md;
-	return derivedData;
+  return mesh;
 }
 #endif /* WITH_OCEANSIM */
 
-static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
-                                  DerivedMesh *derivedData,
-                                  ModifierApplyFlag UNUSED(flag))
+static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *mesh)
 {
-	DerivedMesh *result;
+  Mesh *result;
 
-	result = doOcean(md, ob, derivedData, 0);
+  result = doOcean(md, ctx, mesh);
 
-	if (result != derivedData)
-		result->dirty |= DM_DIRTY_NORMALS;
+  if (result != mesh) {
+    BKE_mesh_normals_tag_dirty(result);
+  }
 
-	return result;
+  return result;
+}
+// #define WITH_OCEANSIM
+static void panel_draw(const bContext *UNUSED(C), Panel *panel)
+{
+  uiLayout *layout = panel->layout;
+#ifdef WITH_OCEANSIM
+  uiLayout *col, *sub;
+
+  PointerRNA ob_ptr;
+  PointerRNA *ptr = modifier_panel_get_property_pointers(panel, &ob_ptr);
+
+  uiLayoutSetPropSep(layout, true);
+
+  col = uiLayoutColumn(layout, false);
+  uiItemR(col, ptr, "geometry_mode", 0, NULL, ICON_NONE);
+  if (RNA_enum_get(ptr, "geometry_mode") == MOD_OCEAN_GEOM_GENERATE) {
+    sub = uiLayoutColumn(col, true);
+    uiItemR(sub, ptr, "repeat_x", 0, IFACE_("Repeat X"), ICON_NONE);
+    uiItemR(sub, ptr, "repeat_y", 0, IFACE_("Y"), ICON_NONE);
+  }
+
+  sub = uiLayoutColumn(col, true);
+  uiItemR(sub, ptr, "viewport_resolution", 0, IFACE_("Resolution Viewport"), ICON_NONE);
+  uiItemR(sub, ptr, "resolution", 0, IFACE_("Render"), ICON_NONE);
+
+  uiItemR(col, ptr, "time", 0, NULL, ICON_NONE);
+
+  uiItemR(col, ptr, "depth", 0, NULL, ICON_NONE);
+  uiItemR(col, ptr, "size", 0, NULL, ICON_NONE);
+  uiItemR(col, ptr, "spatial_size", 0, NULL, ICON_NONE);
+
+  uiItemR(col, ptr, "random_seed", 0, NULL, ICON_NONE);
+
+  uiItemR(col, ptr, "use_normals", 0, NULL, ICON_NONE);
+
+  modifier_panel_end(layout, ptr);
+
+#else  /* WITH_OCEANSIM */
+  uiItemL(layout, TIP_("Built without Ocean modifier"), ICON_NONE);
+#endif /* WITH_OCEANSIM */
 }
 
+#ifdef WITH_OCEANSIM
+static void waves_panel_draw(const bContext *UNUSED(C), Panel *panel)
+{
+  uiLayout *col, *sub;
+  uiLayout *layout = panel->layout;
+
+  PointerRNA *ptr = modifier_panel_get_property_pointers(panel, NULL);
+
+  uiLayoutSetPropSep(layout, true);
+
+  col = uiLayoutColumn(layout, false);
+  uiItemR(col, ptr, "wave_scale", 0, IFACE_("Scale"), ICON_NONE);
+  uiItemR(col, ptr, "wave_scale_min", 0, NULL, ICON_NONE);
+  uiItemR(col, ptr, "choppiness", 0, NULL, ICON_NONE);
+  uiItemR(col, ptr, "wind_velocity", 0, NULL, ICON_NONE);
+
+  uiItemS(layout);
+
+  col = uiLayoutColumn(layout, false);
+  uiItemR(col, ptr, "wave_alignment", UI_ITEM_R_SLIDER, IFACE_("Alignment"), ICON_NONE);
+  sub = uiLayoutColumn(col, false);
+  uiLayoutSetActive(sub, RNA_float_get(ptr, "wave_alignment") > 0.0f);
+  uiItemR(sub, ptr, "wave_direction", 0, IFACE_("Direction"), ICON_NONE);
+  uiItemR(sub, ptr, "damping", 0, NULL, ICON_NONE);
+}
+
+static void foam_panel_draw_header(const bContext *UNUSED(C), Panel *panel)
+{
+  uiLayout *layout = panel->layout;
+
+  PointerRNA *ptr = modifier_panel_get_property_pointers(panel, NULL);
+
+  uiItemR(layout, ptr, "use_foam", 0, IFACE_("Foam"), ICON_NONE);
+}
+
+static void foam_panel_draw(const bContext *UNUSED(C), Panel *panel)
+{
+  uiLayout *col;
+  uiLayout *layout = panel->layout;
+
+  PointerRNA *ptr = modifier_panel_get_property_pointers(panel, NULL);
+
+  bool use_foam = RNA_boolean_get(ptr, "use_foam");
+
+  uiLayoutSetPropSep(layout, true);
+
+  col = uiLayoutColumn(layout, false);
+  uiLayoutSetActive(col, use_foam);
+  uiItemR(col, ptr, "foam_layer_name", 0, IFACE_("Data Layer"), ICON_NONE);
+  uiItemR(col, ptr, "foam_coverage", 0, IFACE_("Coverage"), ICON_NONE);
+}
+
+static void spray_panel_draw_header(const bContext *UNUSED(C), Panel *panel)
+{
+  uiLayout *row;
+  uiLayout *layout = panel->layout;
+
+  PointerRNA *ptr = modifier_panel_get_property_pointers(panel, NULL);
+
+  bool use_foam = RNA_boolean_get(ptr, "use_foam");
+
+  row = uiLayoutRow(layout, false);
+  uiLayoutSetActive(row, use_foam);
+  uiItemR(row, ptr, "use_spray", 0, IFACE_("Spray"), ICON_NONE);
+}
+
+static void spray_panel_draw(const bContext *UNUSED(C), Panel *panel)
+{
+  uiLayout *col;
+  uiLayout *layout = panel->layout;
+
+  PointerRNA *ptr = modifier_panel_get_property_pointers(panel, NULL);
+
+  bool use_foam = RNA_boolean_get(ptr, "use_foam");
+  bool use_spray = RNA_boolean_get(ptr, "use_spray");
+
+  uiLayoutSetPropSep(layout, true);
+
+  col = uiLayoutColumn(layout, false);
+  uiLayoutSetActive(col, use_foam && use_spray);
+  uiItemR(col, ptr, "spray_layer_name", 0, IFACE_("Data Layer"), ICON_NONE);
+  uiItemR(col, ptr, "invert_spray", 0, IFACE_("Invert"), ICON_NONE);
+}
+
+static void spectrum_panel_draw(const bContext *UNUSED(C), Panel *panel)
+{
+  uiLayout *col;
+  uiLayout *layout = panel->layout;
+
+  PointerRNA *ptr = modifier_panel_get_property_pointers(panel, NULL);
+
+  int spectrum = RNA_enum_get(ptr, "spectrum");
+
+  uiLayoutSetPropSep(layout, true);
+
+  col = uiLayoutColumn(layout, false);
+  uiItemR(col, ptr, "spectrum", 0, NULL, ICON_NONE);
+  if (ELEM(spectrum, MOD_OCEAN_SPECTRUM_TEXEL_MARSEN_ARSLOE, MOD_OCEAN_SPECTRUM_JONSWAP)) {
+    uiItemR(col, ptr, "sharpen_peak_jonswap", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
+    uiItemR(col, ptr, "fetch_jonswap", 0, NULL, ICON_NONE);
+  }
+}
+
+static void bake_panel_draw(const bContext *UNUSED(C), Panel *panel)
+{
+  uiLayout *col;
+  uiLayout *layout = panel->layout;
+
+  PointerRNA *ptr = modifier_panel_get_property_pointers(panel, NULL);
+
+  uiLayoutSetPropSep(layout, true);
+
+  bool is_cached = RNA_boolean_get(ptr, "is_cached");
+  bool use_foam = RNA_boolean_get(ptr, "use_foam");
+
+  if (is_cached) {
+    PointerRNA op_ptr;
+    uiItemFullO(layout,
+                "OBJECT_OT_ocean_bake",
+                IFACE_("Delete Bake"),
+                ICON_NONE,
+                NULL,
+                WM_OP_EXEC_DEFAULT,
+                0,
+                &op_ptr);
+    RNA_boolean_set(&op_ptr, "free", true);
+  }
+  else {
+    uiItemO(layout, NULL, ICON_NONE, "OBJECT_OT_ocean_bake");
+  }
+
+  uiItemR(layout, ptr, "filepath", 0, NULL, ICON_NONE);
+
+  col = uiLayoutColumn(layout, true);
+  uiLayoutSetEnabled(col, !is_cached);
+  uiItemR(col, ptr, "frame_start", 0, IFACE_("Frame Start"), ICON_NONE);
+  uiItemR(col, ptr, "frame_end", 0, IFACE_("End"), ICON_NONE);
+
+  col = uiLayoutColumn(layout, false);
+  uiLayoutSetActive(col, use_foam);
+  uiItemR(col, ptr, "bake_foam_fade", 0, NULL, ICON_NONE);
+}
+#endif /* WITH_OCEANSIM */
+
+static void panelRegister(ARegionType *region_type)
+{
+  PanelType *panel_type = modifier_panel_register(region_type, eModifierType_Ocean, panel_draw);
+#ifdef WITH_OCEANSIM
+  modifier_subpanel_register(region_type, "waves", "Waves", NULL, waves_panel_draw, panel_type);
+  PanelType *foam_panel = modifier_subpanel_register(
+      region_type, "foam", "", foam_panel_draw_header, foam_panel_draw, panel_type);
+  modifier_subpanel_register(
+      region_type, "spray", "", spray_panel_draw_header, spray_panel_draw, foam_panel);
+  modifier_subpanel_register(
+      region_type, "spectrum", "Spectrum", NULL, spectrum_panel_draw, panel_type);
+  modifier_subpanel_register(region_type, "bake", "Bake", NULL, bake_panel_draw, panel_type);
+#else
+  UNUSED_VARS(panel_type);
+#endif /* WITH_OCEANSIM */
+}
+
+static void blendRead(BlendDataReader *UNUSED(reader), ModifierData *md)
+{
+  OceanModifierData *omd = (OceanModifierData *)md;
+  omd->oceancache = NULL;
+  omd->ocean = NULL;
+}
 
 ModifierTypeInfo modifierType_Ocean = {
-	/* name */              "Ocean",
-	/* structName */        "OceanModifierData",
-	/* structSize */        sizeof(OceanModifierData),
-	/* type */              eModifierTypeType_Constructive,
-	/* flags */             eModifierTypeFlag_AcceptsMesh |
-	                        eModifierTypeFlag_SupportsEditmode |
-	                        eModifierTypeFlag_EnableInEditmode,
+    /* name */ "Ocean",
+    /* structName */ "OceanModifierData",
+    /* structSize */ sizeof(OceanModifierData),
+    /* srna */ &RNA_OceanModifier,
+    /* type */ eModifierTypeType_Constructive,
+    /* flags */ eModifierTypeFlag_AcceptsMesh | eModifierTypeFlag_SupportsEditmode |
+        eModifierTypeFlag_EnableInEditmode,
+    /* icon */ ICON_MOD_OCEAN,
 
-	/* copyData */          copyData,
-	/* deformMatrices */    NULL,
-	/* deformVerts */       NULL,
-	/* deformVertsEM */     NULL,
-	/* deformMatricesEM */  NULL,
-	/* applyModifier */     applyModifier,
-	/* applyModifierEM */   NULL,
-	/* initData */          initData,
-	/* requiredDataMask */  requiredDataMask,
-	/* freeData */          freeData,
-	/* isDisabled */        NULL,
-	/* updateDepgraph */    NULL,
-	/* updateDepsgraph */   NULL,
-	/* dependsOnTime */     NULL,
-	/* dependsOnNormals */	dependsOnNormals,
-	/* foreachObjectLink */ NULL,
-	/* foreachIDLink */     NULL,
+    /* copyData */ copyData,
+    /* deformMatrices_DM */ NULL,
+
+    /* deformMatrices */ NULL,
+    /* deformVertsEM */ NULL,
+    /* deformMatricesEM */ NULL,
+    /* modifyMesh */ modifyMesh,
+    /* modifyHair */ NULL,
+    /* modifyGeometrySet */ NULL,
+
+    /* initData */ initData,
+    /* requiredDataMask */ requiredDataMask,
+    /* freeData */ freeData,
+    /* isDisabled */ NULL,
+    /* updateDepsgraph */ NULL,
+    /* dependsOnTime */ NULL,
+    /* dependsOnNormals */ dependsOnNormals,
+    /* foreachIDLink */ NULL,
+    /* foreachTexLink */ NULL,
+    /* freeRuntimeData */ NULL,
+    /* panelRegister */ panelRegister,
+    /* blendWrite */ NULL,
+    /* blendRead */ blendRead,
 };

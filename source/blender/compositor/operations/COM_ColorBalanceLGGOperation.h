@@ -1,6 +1,4 @@
 /*
- * Copyright 2011, Blender Foundation.
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -15,55 +13,66 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor: 
- *		Jeroen Bakker 
- *		Monique Dewanchand
+ * Copyright 2011, Blender Foundation.
  */
 
-#ifndef _COM_ColorBalanceLGGOperation_h
-#define _COM_ColorBalanceLGGOperation_h
-#include "COM_NodeOperation.h"
+#pragma once
 
+#include "COM_MultiThreadedRowOperation.h"
+
+namespace blender::compositor {
 
 /**
  * this program converts an input color to an output value.
  * it assumes we are in sRGB color space.
  */
-class ColorBalanceLGGOperation : public NodeOperation {
-protected:
-	/**
-	 * Prefetched reference to the inputProgram
-	 */
-	SocketReader *m_inputValueOperation;
-	SocketReader *m_inputColorOperation;
-	
-	float m_gain[3];
-	float m_lift[3];
-	float m_gamma_inv[3];
+class ColorBalanceLGGOperation : public MultiThreadedRowOperation {
+ protected:
+  /**
+   * Prefetched reference to the input_program
+   */
+  SocketReader *input_value_operation_;
+  SocketReader *input_color_operation_;
 
-public:
-	/**
-	 * Default constructor
-	 */
-	ColorBalanceLGGOperation();
-	
-	/**
-	 * the inner loop of this program
-	 */
-	void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
-	
-	/**
-	 * Initialize the execution
-	 */
-	void initExecution();
-	
-	/**
-	 * Deinitialize the execution
-	 */
-	void deinitExecution();
-	
-	void setGain(const float gain[3]) { copy_v3_v3(this->m_gain, gain); }
-	void setLift(const float lift[3]) { copy_v3_v3(this->m_lift, lift); }
-	void setGammaInv(const float gamma_inv[3]) { copy_v3_v3(this->m_gamma_inv, gamma_inv); }
+  float gain_[3];
+  float lift_[3];
+  float gamma_inv_[3];
+
+ public:
+  /**
+   * Default constructor
+   */
+  ColorBalanceLGGOperation();
+
+  /**
+   * The inner loop of this operation.
+   */
+  void execute_pixel_sampled(float output[4], float x, float y, PixelSampler sampler) override;
+
+  /**
+   * Initialize the execution
+   */
+  void init_execution() override;
+
+  /**
+   * Deinitialize the execution
+   */
+  void deinit_execution() override;
+
+  void set_gain(const float gain[3])
+  {
+    copy_v3_v3(gain_, gain);
+  }
+  void set_lift(const float lift[3])
+  {
+    copy_v3_v3(lift_, lift);
+  }
+  void set_gamma_inv(const float gamma_inv[3])
+  {
+    copy_v3_v3(gamma_inv_, gamma_inv);
+  }
+
+  void update_memory_buffer_row(PixelCursor &p) override;
 };
-#endif
+
+}  // namespace blender::compositor

@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,19 +15,18 @@
  *
  * The Original Code is Copyright (C) 2012 Blender Foundation.
  * All rights reserved.
- *
- * Contributor(s): Campbell Barton
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-#ifndef __BMESH_MESH_VALIDATE_H__
-#define __BMESH_MESH_VALIDATE_H__
+#pragma once
 
-/** \file blender/bmesh/intern/bmesh_mesh_validate.h
- *  \ingroup bmesh
+/** \file
+ * \ingroup bmesh
  */
 
+/**
+ * Check of this #BMesh is valid,
+ * this function can be slow since its intended to help with debugging.
+ *
+ * \return true when the mesh is valid.
+ */
 bool BM_mesh_validate(BMesh *bm);
-
-#endif /* __BMESH_MESH_VALIDATE_H__ */

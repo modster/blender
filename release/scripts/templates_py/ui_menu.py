@@ -18,7 +18,7 @@ class CustomMenu(bpy.types.Menu):
         # use an operator enum property to populate a sub-menu
         layout.operator_menu_enum("object.select_by_type",
                                   property="type",
-                                  text="Select All by Type...",
+                                  text="Select All by Type",
                                   )
 
         # call another menu
@@ -41,6 +41,7 @@ def unregister():
     bpy.utils.unregister_class(CustomMenu)
 
     bpy.types.INFO_HT_header.remove(draw_item)
+
 
 if __name__ == "__main__":
     register()

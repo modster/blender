@@ -1,6 +1,4 @@
 /*
- * Copyright 2011, Blender Foundation.
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -15,39 +13,48 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor: 
- *		Jeroen Bakker 
- *		Monique Dewanchand
+ * Copyright 2011, Blender Foundation.
  */
 
-#ifndef _COM_QualityStepHelper_h
-#define _COM_QualityStepHelper_h
-#include "COM_defines.h"
+#pragma once
+
+#include "COM_Enums.h"
+
+namespace blender::compositor {
 
 typedef enum QualityHelper {
-	COM_QH_INCREASE,
-	COM_QH_MULTIPLY
+  COM_QH_INCREASE,
+  COM_QH_MULTIPLY,
 } QualityHelper;
 
-class QualityStepHelper  {
-private:
-	CompositorQuality m_quality;
-	int m_step;
-	int m_offsetadd;
+class QualityStepHelper {
+ private:
+  eCompositorQuality quality_;
+  int step_;
+  int offsetadd_;
 
-protected:
-	/**
-	 * Initialize the execution
-	 */
-	void initExecution(QualityHelper helper);
+ protected:
+  /**
+   * Initialize the execution
+   */
+  void init_execution(QualityHelper helper);
 
-	inline int getStep() const { return this->m_step; }
-	inline int getOffsetAdd() const { return this->m_offsetadd; }
+  inline int get_step() const
+  {
+    return step_;
+  }
+  inline int get_offset_add() const
+  {
+    return offsetadd_;
+  }
 
-public:
-	QualityStepHelper();
+ public:
+  QualityStepHelper();
 
-
-	void setQuality(CompositorQuality quality) { this->m_quality = quality; }
+  void set_quality(eCompositorQuality quality)
+  {
+    quality_ = quality;
+  }
 };
-#endif
+
+}  // namespace blender::compositor

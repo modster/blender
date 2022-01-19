@@ -1,6 +1,4 @@
 /*
- * Copyright 2011, Blender Foundation.
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -15,41 +13,49 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor:
- *		Dalai Felinto
+ * Copyright 2011, Blender Foundation.
  */
 
-#ifndef _COM_DistanceRGBMatteOperation_h
-#define _COM_DistanceRGBMatteOperation_h
-#include "COM_MixOperation.h"
+#pragma once
 
+#include "COM_MultiThreadedOperation.h"
+
+namespace blender::compositor {
 
 /**
  * this program converts an input color to an output value.
  * it assumes we are in sRGB color space.
  */
-class DistanceRGBMatteOperation : public NodeOperation {
-protected:
-	NodeChroma *m_settings;
-	SocketReader *m_inputImageProgram;
-	SocketReader *m_inputKeyProgram;
+class DistanceRGBMatteOperation : public MultiThreadedOperation {
+ protected:
+  NodeChroma *settings_;
+  SocketReader *input_image_program_;
+  SocketReader *input_key_program_;
 
-	virtual float calculateDistance(float key[4], float image[4]);
+  virtual float calculate_distance(const float key[4], const float image[4]);
 
-public:
-	/**
-	 * Default constructor
-	 */
-	DistanceRGBMatteOperation();
-	
-	/**
-	 * the inner loop of this program
-	 */
-	void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
-	
-	void initExecution();
-	void deinitExecution();
-	
-	void setSettings(NodeChroma *nodeChroma) { this->m_settings = nodeChroma; }
+ public:
+  /**
+   * Default constructor
+   */
+  DistanceRGBMatteOperation();
+
+  /**
+   * The inner loop of this operation.
+   */
+  void execute_pixel_sampled(float output[4], float x, float y, PixelSampler sampler) override;
+
+  void init_execution() override;
+  void deinit_execution() override;
+
+  void set_settings(NodeChroma *node_chroma)
+  {
+    settings_ = node_chroma;
+  }
+
+  void update_memory_buffer_partial(MemoryBuffer *output,
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
 };
-#endif
+
+}  // namespace blender::compositor

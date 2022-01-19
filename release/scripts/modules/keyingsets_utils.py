@@ -28,12 +28,15 @@ __all__ = (
     "RKS_POLL_selected_objects",
     "RKS_POLL_selected_bones",
     "RKS_POLL_selected_items",
+    "RKS_ITER_selected_objects",
+    "RKS_ITER_selected_bones",
     "RKS_ITER_selected_item",
     "RKS_GEN_available",
     "RKS_GEN_location",
     "RKS_GEN_rotation",
     "RKS_GEN_scaling",
-    )
+    "RKS_GEN_bendy_bones",
+)
 
 import bpy
 
@@ -53,7 +56,7 @@ def path_add_property(path, prop):
 
 
 # selected objects (active object must be in object mode)
-def RKS_POLL_selected_objects(ksi, context):
+def RKS_POLL_selected_objects(_ksi, context):
     ob = context.active_object
     if ob:
         return ob.mode == 'OBJECT'
@@ -62,7 +65,7 @@ def RKS_POLL_selected_objects(ksi, context):
 
 
 # selected bones
-def RKS_POLL_selected_bones(ksi, context):
+def RKS_POLL_selected_bones(_ksi, context):
     # we must be in Pose Mode, and there must be some bones selected
     ob = context.active_object
     if ob and ob.mode == 'POSE':
@@ -82,7 +85,7 @@ def RKS_POLL_selected_items(ksi, context):
 # Iterator Callbacks
 
 
-# all selected objects or pose bones, depending on which we've got
+# All selected objects or pose bones, depending on which we've got.
 def RKS_ITER_selected_item(ksi, context, ks):
     ob = context.active_object
     if ob and ob.mode == 'POSE':
@@ -93,17 +96,23 @@ def RKS_ITER_selected_item(ksi, context, ks):
             ksi.generate(context, ks, ob)
 
 
-# all select objects only
+# All selected objects only.
 def RKS_ITER_selected_objects(ksi, context, ks):
     for ob in context.selected_objects:
         ksi.generate(context, ks, ob)
+
+
+# All selected bones only.
+def RKS_ITER_selected_bones(ksi, context, ks):
+    for bone in context.selected_pose_bones:
+        ksi.generate(context, ks, bone)
 
 ###########################
 # Generate Callbacks
 
 
 # 'Available' F-Curves
-def RKS_GEN_available(ksi, context, ks, data):
+def RKS_GEN_available(_ksi, _context, ks, data):
     # try to get the animation data associated with the closest
     # ID-block to the data (neither of which may exist/be easy to find)
     id_block = data.id_data
@@ -144,8 +153,10 @@ def get_transform_generators_base_info(data):
         # no path in this case
         path = ""
 
-        # data on ID-blocks directly should get grouped by the KeyingSet
-        grouping = None
+        # transform data on ID-blocks directly should get grouped under a
+        # hardcoded label ("Object Transforms") so that they get grouped
+        # consistently when keyframed directly
+        grouping = "Object Transforms"
     else:
         # get the path to the ID-block
         path = data.path_from_id()
@@ -159,7 +170,7 @@ def get_transform_generators_base_info(data):
 
 
 # Location
-def RKS_GEN_location(ksi, context, ks, data):
+def RKS_GEN_location(_ksi, _context, ks, data):
     # get id-block and path info
     id_block, base_path, grouping = get_transform_generators_base_info(data)
 
@@ -174,7 +185,7 @@ def RKS_GEN_location(ksi, context, ks, data):
 
 
 # Rotation
-def RKS_GEN_rotation(ksi, context, ks, data):
+def RKS_GEN_rotation(_ksi, _context, ks, data):
     # get id-block and path info
     id_block, base_path, grouping = get_transform_generators_base_info(data)
 
@@ -195,7 +206,7 @@ def RKS_GEN_rotation(ksi, context, ks, data):
 
 
 # Scaling
-def RKS_GEN_scaling(ksi, context, ks, data):
+def RKS_GEN_scaling(_ksi, _context, ks, data):
     # get id-block and path info
     id_block, base_path, grouping = get_transform_generators_base_info(data)
 
@@ -207,3 +218,82 @@ def RKS_GEN_scaling(ksi, context, ks, data):
         ks.paths.add(id_block, path, group_method='NAMED', group_name=grouping)
     else:
         ks.paths.add(id_block, path)
+
+
+# Custom Properties
+def RKS_GEN_custom_props(_ksi, _context, ks, data):
+    # get id-block and path info
+    id_block, base_path, grouping = get_transform_generators_base_info(data)
+
+    # Only some RNA types can be animated.
+    prop_type_compat = {bpy.types.BoolProperty,
+                        bpy.types.IntProperty,
+                        bpy.types.FloatProperty}
+
+    # When working with a pose, 'id_block' is the armature object (which should
+    # get the animation data), whereas 'data' is the bone being keyed.
+    for cprop_name in data.keys():
+        # ignore special "_RNA_UI" used for UI editing
+        if cprop_name == "_RNA_UI":
+            continue
+
+        prop_path = '["%s"]' % bpy.utils.escape_identifier(cprop_name)
+
+        try:
+            rna_property = data.path_resolve(prop_path, False)
+        except ValueError:
+            # Can technically happen, but there is no known case.
+            continue
+        if rna_property is None:
+            # In this case the property cannot be converted to an
+            # FCurve-compatible value, so we can't keyframe it anyways.
+            continue
+        if rna_property.rna_type not in prop_type_compat:
+            continue
+
+        path = "%s%s" % (base_path, prop_path)
+        if grouping:
+            ks.paths.add(id_block, path, group_method='NAMED', group_name=grouping)
+        else:
+            ks.paths.add(id_block, path)
+
+# ------
+
+
+# Property identifiers for Bendy Bones
+bbone_property_ids = (
+    "bbone_curveinx",
+    "bbone_curveiny",
+    "bbone_curveoutx",
+    "bbone_curveouty",
+
+    "bbone_rollin",
+    "bbone_rollout",
+
+    "bbone_scalein",
+    "bbone_scaleout",
+
+    # NOTE: These are in the nested bone struct
+    # Do it this way to force them to be included
+    # in whatever actions are being keyed here
+    "bone.bbone_in",
+    "bone.bbone_out",
+)
+
+
+# Add Keying Set entries for bendy bones
+def RKS_GEN_bendy_bones(_ksi, _context, ks, data):
+    # get id-block and path info
+    # NOTE: This assumes that we're dealing with a bone here...
+    id_block, base_path, grouping = get_transform_generators_base_info(data)
+
+    # for each of the bendy bone properties, add a Keying Set entry for it...
+    for propname in bbone_property_ids:
+        # add the property name to the base path
+        path = path_add_property(base_path, propname)
+
+        # add Keying Set entry for this...
+        if grouping:
+            ks.paths.add(id_block, path, group_method='NAMED', group_name=grouping)
+        else:
+            ks.paths.add(id_block, path)

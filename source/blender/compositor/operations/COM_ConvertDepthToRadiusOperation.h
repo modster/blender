@@ -1,6 +1,4 @@
 /*
- * Copyright 2011, Blender Foundation.
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -15,62 +13,80 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor: 
- *		Jeroen Bakker 
- *		Monique Dewanchand
+ * Copyright 2011, Blender Foundation.
  */
 
-#ifndef _COM_ConvertDepthToRadiusOperation_h
-#define _COM_ConvertDepthToRadiusOperation_h
-#include "COM_NodeOperation.h"
-#include "DNA_object_types.h"
+#pragma once
+
 #include "COM_FastGaussianBlurOperation.h"
+#include "COM_MultiThreadedOperation.h"
+#include "DNA_object_types.h"
+
+namespace blender::compositor {
+
 /**
  * this program converts an input color to an output value.
  * it assumes we are in sRGB color space.
  */
-class ConvertDepthToRadiusOperation : public NodeOperation {
-private:
-	/**
-	 * Cached reference to the inputProgram
-	 */
-	SocketReader *m_inputOperation;
-	float m_fStop;
-	float m_aspect;
-	float m_maxRadius;
-	float m_inverseFocalDistance;
-	float m_aperture;
-	float m_cam_lens;
-	float m_dof_sp;
-	Object *m_cameraObject;
-	
-	FastGaussianBlurValueOperation *m_blurPostOperation;
-public:
-	/**
-	 * Default constructor
-	 */
-	ConvertDepthToRadiusOperation();
-	
-	/**
-	 * the inner loop of this program
-	 */
-	void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
-	
-	/**
-	 * Initialize the execution
-	 */
-	void initExecution();
-	
-	/**
-	 * Deinitialize the execution
-	 */
-	void deinitExecution();
-	
-	void setfStop(float fStop) { this->m_fStop = fStop; }
-	void setMaxRadius(float maxRadius) { this->m_maxRadius = maxRadius; }
-	void setCameraObject(Object *camera) { this->m_cameraObject = camera; }
-	float determineFocalDistance();
-	void setPostBlur(FastGaussianBlurValueOperation *operation) {this->m_blurPostOperation = operation;}
-	
+class ConvertDepthToRadiusOperation : public MultiThreadedOperation {
+ private:
+  /**
+   * Cached reference to the input_program
+   */
+  SocketReader *input_operation_;
+  float f_stop_;
+  float aspect_;
+  float max_radius_;
+  float inverse_focal_distance_;
+  float aperture_;
+  float cam_lens_;
+  float dof_sp_;
+  Object *camera_object_;
+
+  FastGaussianBlurValueOperation *blur_post_operation_;
+
+ public:
+  /**
+   * Default constructor
+   */
+  ConvertDepthToRadiusOperation();
+
+  /**
+   * The inner loop of this operation.
+   */
+  void execute_pixel_sampled(float output[4], float x, float y, PixelSampler sampler) override;
+
+  /**
+   * Initialize the execution
+   */
+  void init_execution() override;
+
+  /**
+   * Deinitialize the execution
+   */
+  void deinit_execution() override;
+
+  void setf_stop(float f_stop)
+  {
+    f_stop_ = f_stop;
+  }
+  void set_max_radius(float max_radius)
+  {
+    max_radius_ = max_radius;
+  }
+  void set_camera_object(Object *camera)
+  {
+    camera_object_ = camera;
+  }
+  float determine_focal_distance();
+  void set_post_blur(FastGaussianBlurValueOperation *operation)
+  {
+    blur_post_operation_ = operation;
+  }
+
+  void update_memory_buffer_partial(MemoryBuffer *output,
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
 };
-#endif
+
+}  // namespace blender::compositor

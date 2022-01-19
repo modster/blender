@@ -14,8 +14,6 @@
 # along with this program; if not, write to the Free Software Foundation,
 # Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 #
-# Contributor(s): Campbell Barton
-#
 # ***** END GPL LICENSE BLOCK *****
 
 # <pep8 compliant>
@@ -28,14 +26,21 @@ def build_property_typemap(skip_classes, skip_typemap):
     property_typemap = {}
 
     for attr in dir(bpy.types):
+        # Skip internal methods.
+        if attr.startswith("_"):
+            continue
         cls = getattr(bpy.types, attr)
         if issubclass(cls, skip_classes):
             continue
+        bl_rna = getattr(cls, "bl_rna", None)
+        # Needed to skip classes added to the modules `__dict__`.
+        if bl_rna is None:
+            continue
 
-        # # to support skip-save we cant get all props
-        # properties = cls.bl_rna.properties.keys()
+        # # to support skip-save we can't get all props
+        # properties = bl_rna.properties.keys()
         properties = []
-        for prop_id, prop in cls.bl_rna.properties.items():
+        for prop_id, prop in bl_rna.properties.items():
             if not prop.is_skip_save:
                 properties.append(prop_id)
 
@@ -61,22 +66,24 @@ def print_ln(data):
     print(data, end="")
 
 
-def rna2xml(fw=print_ln,
-            root_node="",
-            root_rna=None,  # must be set
-            root_rna_skip=set(),
-            root_ident="",
-            ident_val="  ",
-            skip_classes=(bpy.types.Operator,
-                          bpy.types.Panel,
-                          bpy.types.KeyingSet,
-                          bpy.types.Header,
-                          bpy.types.PropertyGroup,
-                          ),
-            skip_typemap=None,
-            pretty_format=True,
-            method='DATA'):
-
+def rna2xml(
+        fw=print_ln,
+        root_node="",
+        root_rna=None,  # must be set
+        root_rna_skip=set(),
+        root_ident="",
+        ident_val="  ",
+        skip_classes=(
+            bpy.types.Operator,
+            bpy.types.Panel,
+            bpy.types.KeyingSet,
+            bpy.types.Header,
+            bpy.types.PropertyGroup,
+        ),
+        skip_typemap=None,
+        pretty_format=True,
+        method='DATA',
+):
     from xml.sax.saxutils import quoteattr
     property_typemap = build_property_typemap(skip_classes, skip_typemap)
 
@@ -90,7 +97,7 @@ def rna2xml(fw=print_ln,
         bpy.types.PoseBone,
         bpy.types.Node,
         bpy.types.Sequence,
-        )
+    )
 
     def number_to_str(val, val_type):
         if val_type == int:
@@ -100,7 +107,7 @@ def rna2xml(fw=print_ln,
         elif val_type == bool:
             return "TRUE" if val else "FALSE"
         else:
-            raise NotImplemented("this type is not a number %s" % val_type)
+            raise NotImplementedError("this type is not a number %s" % val_type)
 
     def rna2xml_node(ident, value, parent):
         ident_next = ident + ident_val
@@ -149,7 +156,7 @@ def rna2xml(fw=print_ln,
                     subvalue_rna = value.path_resolve(prop, False)
                     if type(subvalue_rna).__name__ == "bpy_prop_array":
                         # check if this is a 0-1 color (rgb, rgba)
-                        # in that case write as a hexidecimal
+                        # in that case write as a hexadecimal
                         prop_rna = value.bl_rna.properties[prop]
                         if (prop_rna.subtype == 'COLOR_GAMMA' and
                                 prop_rna.hard_min == 0.0 and
@@ -177,11 +184,10 @@ def rna2xml(fw=print_ln,
         # declare + attributes
         if pretty_format:
             if node_attrs:
-                tmp_str = "<%s " % value_type_name
-                tmp_ident = "\n" + ident + (" " * len(tmp_str))
-                fw("%s%s%s>\n" % (ident, tmp_str, tmp_ident.join(node_attrs)))
-                del tmp_str
-                del tmp_ident
+                fw("%s<%s\n" % (ident, value_type_name))
+                for node_attr in node_attrs:
+                    fw("%s%s\n" % (ident_next, node_attr))
+                fw("%s>\n" % (ident_next,))
             else:
                 fw("%s<%s>\n" % (ident, value_type_name))
         else:
@@ -239,9 +245,10 @@ def rna2xml(fw=print_ln,
         fw("%s</%s>\n" % (root_ident, root_node))
 
 
-def xml2rna(root_xml,
-            root_rna=None,  # must be set
-            ):
+def xml2rna(
+        root_xml, *,
+        root_rna=None,  # must be set
+):
 
     def rna2xml_node(xml_node, value):
         # print("evaluating:", xml_node.nodeName)
@@ -274,9 +281,10 @@ def xml2rna(root_xml,
                     tp_name = 'STR'
                 elif hasattr(subvalue, "__len__"):
                     if value_xml.startswith("#"):
-                        # read hexidecimal value as float array
+                        # read hexadecimal value as float array
                         value_xml_split = value_xml[1:]
-                        value_xml_coerce = [int(value_xml_split[i:i + 2], 16) / 255 for i in range(0, len(value_xml_split), 2)]
+                        value_xml_coerce = [int(value_xml_split[i:i + 2], 16) /
+                                            255 for i in range(0, len(value_xml_split), 2)]
                         del value_xml_split
                     else:
                         value_xml_split = value_xml.split()
@@ -387,14 +395,14 @@ def xml_file_run(context, filepath, rna_map):
             xml2rna(xml_node, root_rna=value)
 
 
-def xml_file_write(context, filepath, rna_map, skip_typemap=None):
+def xml_file_write(context, filepath, rna_map, *, skip_typemap=None):
 
     file = open(filepath, "w", encoding="utf-8")
     fw = file.write
 
     fw("<bpy>\n")
 
-    for rna_path, xml_tag in rna_map:
+    for rna_path, _xml_tag in rna_map:
         # xml_tag is ignored, we get this from the rna
         value = _get_context_val(context, rna_path)
         rna2xml(fw,

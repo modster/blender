@@ -16,35 +16,32 @@
 #
 # The Original Code is Copyright (C) 2014, Blender Foundation
 # All rights reserved.
-#
-# Contributor(s): Sergey Sharybin
-#
 # ***** END GPL LICENSE BLOCK *****
 
-set(INC
-	.
-	..
-	../../../extern/libmv/third_party/gflags
-	../../../extern/gtest/include
-)
+add_definitions(${GFLAGS_DEFINES})
+add_definitions(${GLOG_DEFINES})
+add_definitions(-DBLENDER_GFLAGS_NAMESPACE=${GFLAGS_NAMESPACE})
 
-if(WIN32)
-	list(APPEND INC
-		../../../extern/libmv/third_party/glog/src/windows
-	)
-else()
-	list(APPEND INC
-		../../../extern/libmv/third_party/glog/src
-	)
-endif()
+set(INC
+  .
+  ..
+  ${GLOG_INCLUDE_DIRS}
+  ${GFLAGS_INCLUDE_DIRS}
+  ../../../extern/gtest/include
+  ../../../intern/guardedalloc
+)
 
 set(INC_SYS
 )
 
 set(SRC
-	testing_main.cc
+  testing_main.cc
 
-	testing.h
+  testing.h
 )
 
-blender_add_lib(bf_testing_main "${SRC}" "${INC}" "${INC_SYS}")
+set(LIB
+  bf_intern_guardedalloc
+)
+
+blender_add_lib(bf_testing_main "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")

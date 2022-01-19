@@ -19,7 +19,7 @@
 #  Filename : sketchy_multiple_parameterization.py
 #  Author   : Stephane Grabli
 #  Date     : 04/08/2005
-#  Purpose  : Builds sketchy strokes whose topology relies on a 
+#  Purpose  : Builds sketchy strokes whose topology relies on a
 #             parameterization that covers the complete lines (visible+invisible)
 #             whereas only the visible portions are actually drawn
 
@@ -27,7 +27,7 @@ from freestyle.chainingiterators import pySketchyChainSilhouetteIterator
 from freestyle.predicates import (
     QuantitativeInvisibilityUP1D,
     TrueUP1D,
-    )
+)
 from freestyle.shaders import (
     IncreasingColorShader,
     IncreasingThicknessShader,
@@ -35,7 +35,7 @@ from freestyle.shaders import (
     SmoothingShader,
     SpatialNoiseShader,
     pyHLRShader,
-    )
+)
 from freestyle.types import Operators
 
 
@@ -48,5 +48,5 @@ shaders_list = [
     SmoothingShader(100, 0.05, 0, 0.2, 0, 0, 0, 1),
     IncreasingColorShader(0, 0.2, 0, 1, 0.2, 0.7, 0.2, 1),
     pyHLRShader(),
-    ]
+]
 Operators.create(TrueUP1D(), shaders_list)

@@ -45,28 +45,16 @@
 #include <string.h>
 #include <stdlib.h>
 
+#include "GL/glew.h"
+
 static char KTX_HEAD[] = {0xAB, 0x4B, 0x54, 0x58, 0x20, 0x31, 0x31, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A};
 
 
-void imb_initktx(void)
+bool check_ktx(const unsigned char *mem, size_t size)
 {
-
+  return memcmp(KTX_HEAD, mem, sizeof(KTX_HEAD)) ? 0 : 1;
 }
 
-int check_ktx(const unsigned char *mem)
-{
-	return memcmp(KTX_HEAD, mem, sizeof(KTX_HEAD)) ? 0 : 1;
-}
-
-int imb_is_a_ktx(const char *filename)
-{
-	const char *ctx_extension[] = {
-		".ktx",
-		NULL
-	};
-
-	return BLI_testextensie_array(filename, ctx_extension);
-}
 struct ImBuf *imb_loadktx(const unsigned char *mem, size_t size, int flags, char * UNUSED(colorspace))
 {
 	GLuint texture = 0;
@@ -156,7 +144,7 @@ struct ImBuf *imb_loadktx(const unsigned char *mem, size_t size, int flags, char
 }
 
 
-int imb_savektx(struct ImBuf *ibuf, const char *name, int UNUSED(flags))
+bool imb_savektx(struct ImBuf *ibuf, const char *name, int UNUSED(flags))
 {
 	KTX_texture_info tinfo;
 	KTX_image_info info;

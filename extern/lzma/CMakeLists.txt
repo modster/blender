@@ -16,15 +16,17 @@
 #
 # The Original Code is Copyright (C) 2006, Blender Foundation
 # All rights reserved.
-#
-# The Original Code is: all of this file.
-#
-# Contributor(s): Daniel Genrich
-#
 # ***** END GPL LICENSE BLOCK *****
 
+# avoid noisy warnings
+if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_C_COMPILER_ID MATCHES "Clang")
+  add_c_flag(
+    "-Wno-self-assign"
+  )
+endif()
+
 set(INC
-	.
+  .
 )
 
 set(INC_SYS
@@ -32,19 +34,22 @@ set(INC_SYS
 )
 
 set(SRC
-	Alloc.c
-	LzFind.c
-	LzmaDec.c
-	LzmaEnc.c
-	LzmaLib.c
+  Alloc.c
+  LzFind.c
+  LzmaDec.c
+  LzmaEnc.c
+  LzmaLib.c
 
-	Alloc.h
-	LzFind.h
-	LzHash.h
-	LzmaDec.h
-	LzmaEnc.h
-	LzmaLib.h
-	Types.h
+  Alloc.h
+  LzFind.h
+  LzHash.h
+  LzmaDec.h
+  LzmaEnc.h
+  LzmaLib.h
+  Types.h
 )
 
-blender_add_lib(extern_lzma "${SRC}" "${INC}" "${INC_SYS}")
+set(LIB
+)
+
+blender_add_lib(extern_lzma "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")

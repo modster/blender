@@ -16,8 +16,6 @@
 # along with this program; if not, write to the Free Software Foundation,
 # Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 #
-# Contributor(s): Campbell Barton
-#
 # ***** END GPL LICENSE BLOCK *****
 
 # <pep8 compliant>
@@ -27,15 +25,22 @@ import subprocess
 import sys
 import os
 
+from typing import (
+    Any,
+    Callable,
+    List,
+    Tuple,
+)
+
+
 USE_QUIET = (os.environ.get("QUIET", None) is not None)
 
 CHECKER_IGNORE_PREFIX = [
     "extern",
     "intern/moto",
-    "blender/intern/opennl",
-    ]
+]
 
-CHECKER_BIN = "python2"
+CHECKER_BIN = "python3"
 
 CHECKER_ARGS = [
     os.path.join(os.path.dirname(__file__), "clang_array_check.py"),
@@ -43,30 +48,31 @@ CHECKER_ARGS = [
     "-I" + os.path.join(project_source_info.SOURCE_DIR, "extern", "glew", "include"),
     # stupid but needed
     "-Dbool=char"
-    ]
+]
 
 
-def main():
+def main() -> None:
     source_info = project_source_info.build_info(ignore_prefix_list=CHECKER_IGNORE_PREFIX)
 
     check_commands = []
     for c, inc_dirs, defs in source_info:
 
-        #~if "source/blender" not in c:
-        #~    continue
+        # ~if "source/blender" not in c:
+        # ~    continue
 
-        cmd = ([CHECKER_BIN] +
-               CHECKER_ARGS +
-               [c] +
-               [("-I%s" % i) for i in inc_dirs] +
-               [("-D%s" % d) for d in defs]
-               )
+        cmd = (
+            [CHECKER_BIN] +
+            CHECKER_ARGS +
+            [c] +
+            [("-I%s" % i) for i in inc_dirs] +
+            [("-D%s" % d) for d in defs]
+        )
 
         check_commands.append((c, cmd))
 
     process_functions = []
 
-    def my_process(i, c, cmd):
+    def my_process(i: int, c: str, cmd: str) -> subprocess.Popen[Any]:
         if not USE_QUIET:
             percent = 100.0 * (i / (len(check_commands) - 1))
             percent_str = "[" + ("%.2f]" % percent).rjust(7) + " %:"

@@ -16,8 +16,6 @@
 # along with this program; if not, write to the Free Software Foundation,
 # Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 #
-# Contributor(s): Campbell Barton
-#
 # ***** END GPL LICENSE BLOCK *****
 
 # <pep8 compliant>
@@ -25,8 +23,7 @@
 CHECKER_IGNORE_PREFIX = [
     "extern",
     "intern/moto",
-    "blender/intern/opennl",
-    ]
+]
 
 CHECKER_BIN = "splint"
 
@@ -62,7 +59,7 @@ CHECKER_ARGS = [
     # dummy, witjout this splint complains with:
     #  /usr/include/bits/confname.h:31:27: *** Internal Bug at cscannerHelp.c:2428: Unexpanded macro not function or constant: int _PC_MAX_CANON
     "-D_PC_MAX_CANON=0",
-    ]
+]
 
 
 import project_source_info

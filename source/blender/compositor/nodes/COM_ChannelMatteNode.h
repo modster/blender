@@ -1,6 +1,4 @@
 /*
- * Copyright 2012, Blender Foundation.
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -15,23 +13,24 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor:
- *		Dalai Felinto
+ * Copyright 2012, Blender Foundation.
  */
 
-#ifndef _COM_ChannelMatteNode_h_
-#define _COM_ChannelMatteNode_h_
+#pragma once
 
 #include "COM_Node.h"
 
+namespace blender::compositor {
+
 /**
- * @brief ChannelMatteNode
- * @ingroup Node
+ * \brief ChannelMatteNode
+ * \ingroup Node
  */
 class ChannelMatteNode : public Node {
-public:
-	ChannelMatteNode(bNode *editorNode);
-	void convertToOperations(NodeConverter &converter, const CompositorContext &context) const;
+ public:
+  ChannelMatteNode(bNode *editor_node);
+  void convert_to_operations(NodeConverter &converter,
+                             const CompositorContext &context) const override;
 };
 
-#endif  /* COM_ChannelMatteNODE_H */
+}  // namespace blender::compositor

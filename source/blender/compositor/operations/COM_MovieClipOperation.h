@@ -1,6 +1,4 @@
 /*
- * Copyright 2011, Blender Foundation.
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -15,60 +13,78 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor: 
- *		Jeroen Bakker 
- *		Monique Dewanchand
+ * Copyright 2011, Blender Foundation.
  */
 
+#pragma once
 
-#ifndef _COM_ImageOperation_h
-#define _COM_ImageOperation_h
-
-#include "COM_NodeOperation.h"
-#include "DNA_movieclip_types.h"
 #include "BLI_listbase.h"
+#include "COM_MultiThreadedOperation.h"
+#include "DNA_movieclip_types.h"
 #include "IMB_imbuf_types.h"
+
+namespace blender::compositor {
 
 /**
  * Base class for movie clip
  */
-class MovieClipBaseOperation : public NodeOperation {
-protected:
-	MovieClip *m_movieClip;
-	MovieClipUser *m_movieClipUser;
-	ImBuf *m_movieClipBuffer;
-	int m_movieClipheight;
-	int m_movieClipwidth;
-	int m_framenumber;
-	bool m_cacheFrame;
-	
-	/**
-	 * Determine the output resolution. The resolution is retrieved from the Renderer
-	 */
-	void determineResolution(unsigned int resolution[2], unsigned int preferredResolution[2]);
+class MovieClipBaseOperation : public MultiThreadedOperation {
+ protected:
+  MovieClip *movie_clip_;
+  MovieClipUser *movie_clip_user_;
+  ImBuf *movie_clip_buffer_;
+  int movie_clipheight_;
+  int movie_clipwidth_;
+  int framenumber_;
+  bool cache_frame_;
 
-public:
-	MovieClipBaseOperation();
-	
-	void initExecution();
-	void deinitExecution();
-	void setMovieClip(MovieClip *image) { this->m_movieClip = image; }
-	void setMovieClipUser(MovieClipUser *imageuser) { this->m_movieClipUser = imageuser; }
-	void setCacheFrame(bool value) { this->m_cacheFrame = value; }
+  /**
+   * Determine the output resolution. The resolution is retrieved from the Renderer
+   */
+  void determine_canvas(const rcti &preferred_area, rcti &r_area) override;
 
-	void setFramenumber(int framenumber) { this->m_framenumber = framenumber; }
-	void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
+ public:
+  MovieClipBaseOperation();
+
+  void init_execution() override;
+  void deinit_execution() override;
+  void set_movie_clip(MovieClip *image)
+  {
+    movie_clip_ = image;
+  }
+  void set_movie_clip_user(MovieClipUser *imageuser)
+  {
+    movie_clip_user_ = imageuser;
+  }
+  void set_cache_frame(bool value)
+  {
+    cache_frame_ = value;
+  }
+
+  void set_framenumber(int framenumber)
+  {
+    framenumber_ = framenumber;
+  }
+  void execute_pixel_sampled(float output[4], float x, float y, PixelSampler sampler) override;
+
+  void update_memory_buffer_partial(MemoryBuffer *output,
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
 };
 
 class MovieClipOperation : public MovieClipBaseOperation {
-public:
-	MovieClipOperation();
+ public:
+  MovieClipOperation();
 };
 
 class MovieClipAlphaOperation : public MovieClipBaseOperation {
-public:
-	MovieClipAlphaOperation();
-	void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
+ public:
+  MovieClipAlphaOperation();
+  void execute_pixel_sampled(float output[4], float x, float y, PixelSampler sampler) override;
+
+  void update_memory_buffer_partial(MemoryBuffer *output,
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
 };
 
-#endif
+}  // namespace blender::compositor

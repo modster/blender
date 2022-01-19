@@ -1,10 +1,8 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version. 
+ * of the License, or (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -17,226 +15,235 @@
  *
  * The Original Code is Copyright (C) 2008 Blender Foundation.
  * All rights reserved.
- * 
- * Contributor(s): Blender Foundation.
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file blender/blenfont/intern/blf_internal_types.h
- *  \ingroup blf
+/** \file
+ * \ingroup blf
  */
 
+#pragma once
 
-#ifndef __BLF_INTERNAL_TYPES_H__
-#define __BLF_INTERNAL_TYPES_H__
+#include "GPU_texture.h"
+#include "GPU_vertex_buffer.h"
+
+#define BLF_BATCH_DRAW_LEN_MAX 2048 /* in glyph */
+
+/* Number of characters in GlyphCacheBLF.glyph_ascii_table. */
+#define GLYPH_ASCII_TABLE_SIZE 128
+
+/* Number of characters in KerningCacheBLF.table. */
+#define KERNING_CACHE_TABLE_SIZE 128
+
+/* A value in the kerning cache that indicates it is not yet set. */
+#define KERNING_ENTRY_UNSET INT_MAX
+
+typedef struct BatchBLF {
+  struct FontBLF *font; /* can only batch glyph from the same font */
+  struct GPUBatch *batch;
+  struct GPUVertBuf *verts;
+  struct GPUVertBufRaw pos_step, col_step, offset_step, glyph_size_step;
+  unsigned int pos_loc, col_loc, offset_loc, glyph_size_loc;
+  unsigned int glyph_len;
+  float ofs[2];    /* copy of font->pos */
+  float mat[4][4]; /* previous call modelmatrix. */
+  bool enabled, active, simple_shader;
+  struct GlyphCacheBLF *glyph_cache;
+} BatchBLF;
+
+extern BatchBLF g_batch;
+
+typedef struct KerningCacheBLF {
+  /**
+   * Cache a ascii glyph pairs. Only store the x offset we are interested in,
+   * instead of the full #FT_Vector since it's not used for drawing at the moment.
+   */
+  int ascii_table[KERNING_CACHE_TABLE_SIZE][KERNING_CACHE_TABLE_SIZE];
+} KerningCacheBLF;
 
 typedef struct GlyphCacheBLF {
-	struct GlyphCacheBLF *next;
-	struct GlyphCacheBLF *prev;
+  struct GlyphCacheBLF *next;
+  struct GlyphCacheBLF *prev;
 
-	/* font size. */
-	unsigned int size;
+  /* font size. */
+  float size;
 
-	/* and dpi. */
-	unsigned int dpi;
+  /* and dpi. */
+  unsigned int dpi;
 
-	/* and the glyphs. */
-	ListBase bucket[257];
+  bool bold;
+  bool italic;
 
-	/* fast ascii lookup */
-	struct GlyphBLF *glyph_ascii_table[256];
+  /* and the glyphs. */
+  ListBase bucket[257];
 
-	/* texture array, to draw the glyphs. */
-	unsigned int *textures;
+  /* fast ascii lookup */
+  struct GlyphBLF *glyph_ascii_table[GLYPH_ASCII_TABLE_SIZE];
 
-	/* size of the array. */
-	unsigned int ntex;
+  /* texture array, to draw the glyphs. */
+  GPUTexture *texture;
+  char *bitmap_result;
+  int bitmap_len;
+  int bitmap_len_landed;
+  int bitmap_len_alloc;
 
-	/* and the last texture, aka. the current texture. */
-	unsigned int cur_tex;
-
-	/* like bftgl, we draw every glyph in a big texture, so this is the
-	 * current position inside the texture.
-	 */
-	int x_offs;
-	int y_offs;
-
-	/* and the space from one to other. */
-	int pad;
-
-	/* and the bigger glyph in the font. */
-	int max_glyph_width;
-	int max_glyph_height;
-
-	/* next two integer power of two, to build the texture. */
-	int p2_width;
-	int p2_height;
-
-	/* number of glyphs in the font. */
-	int num_glyphs;
-
-	/* number of glyphs that we load here. */
-	int rem_glyphs;
-
-	/* ascender and descender value. */
-	float ascender;
-	float descender;
 } GlyphCacheBLF;
 
 typedef struct GlyphBLF {
-	struct GlyphBLF *next;
-	struct GlyphBLF *prev;
+  struct GlyphBLF *next;
+  struct GlyphBLF *prev;
 
-	/* and the character, as UTF8 */
-	unsigned int c;
+  /* and the character, as UTF-32 */
+  unsigned int c;
 
-	/* freetype2 index, to speed-up the search. */
-	FT_UInt idx;
+  /* freetype2 index, to speed-up the search. */
+  FT_UInt idx;
 
-	/* glyph box. */
-	rctf box;
+  /* glyph box. */
+  rctf box;
 
-	/* advance size. */
-	float advance;
-	/* avoid conversion to int while drawing */
-	int advance_i;
+  /* advance size. */
+  float advance;
+  /* avoid conversion to int while drawing */
+  int advance_i;
 
-	/* texture id where this glyph is store. */
-	unsigned int tex;
+  /* position inside the texture where this glyph is store. */
+  int offset;
 
-	/* position inside the texture where this glyph is store. */
-	int xoff;
-	int yoff;
+  /* Bitmap data, from freetype. Take care that this
+   * can be NULL.
+   */
+  unsigned char *bitmap;
 
-	/* Bitmap data, from freetype. Take care that this
-	 * can be NULL.
-	 */
-	unsigned char *bitmap;
+  /* Glyph width and height. */
+  int dims[2];
+  int pitch;
 
-	/* glyph width and height. */
-	int width;
-	int height;
-	int pitch;
+  /**
+   * X and Y bearing of the glyph.
+   * The X bearing is from the origin to the glyph left bbox edge.
+   * The Y bearing is from the baseline to the top of the glyph edge.
+   */
+  int pos[2];
 
-	/* uv coords. */
-	float uv[2][2];
-
-	/* X and Y bearing of the glyph.
-	 * The X bearing is from the origin to the glyph left bbox edge.
-	 * The Y bearing is from the baseline to the top of the glyph edge.
-	 */
-	float pos_x;
-	float pos_y;
-
-	/* with value of zero mean that we need build the texture. */
-	short build_tex;
+  struct GlyphCacheBLF *glyph_cache;
 } GlyphBLF;
 
 typedef struct FontBufInfoBLF {
-	/* for draw to buffer, always set this to NULL after finish! */
-	float *fbuf;
+  /* for draw to buffer, always set this to NULL after finish! */
+  float *fbuf;
 
-	/* the same but unsigned char */
-	unsigned char *cbuf;
+  /* the same but unsigned char */
+  unsigned char *cbuf;
 
-	/* buffer size, keep signed so comparisons with negative values work */
-	int w;
-	int h;
+  /** Buffer size, keep signed so comparisons with negative values work. */
+  int dims[2];
 
-	/* number of channels. */
-	int ch;
+  /* number of channels. */
+  int ch;
 
-	/* display device used for color management */
-	struct ColorManagedDisplay *display;
+  /* display device used for color management */
+  struct ColorManagedDisplay *display;
 
-	/* and the color, the alphas is get from the glyph!
-	 * color is srgb space */
-	float col[4];
+  /* and the color, the alphas is get from the glyph!
+   * color is sRGB space */
+  float col_init[4];
+  /* cached conversion from 'col_init' */
+  unsigned char col_char[4];
+  float col_float[4];
+
 } FontBufInfoBLF;
 
 typedef struct FontBLF {
-	/* font name. */
-	char *name;
+  /* font name. */
+  char *name;
 
-	/* filename or NULL. */
-	char *filename;
+  /* # of times this font was loaded */
+  unsigned int reference_count;
 
-	/* aspect ratio or scale. */
-	float aspect[3];
+  /* filename or NULL. */
+  char *filename;
 
-	/* initial position for draw the text. */
-	float pos[3];
+  /* aspect ratio or scale. */
+  float aspect[3];
 
-	/* angle in radians. */
-	float angle;
-	
-	/* blur: 3 or 5 large kernel */
-	int blur;
+  /* initial position for draw the text. */
+  float pos[3];
 
-	/* shadow level. */
-	int shadow;
+  /* angle in radians. */
+  float angle;
 
-	/* and shadow offset. */
-	int shadow_x;
-	int shadow_y;
+#if 0 /* BLF_BLUR_ENABLE */
+  /* blur: 3 or 5 large kernel */
+  int blur;
+#endif
 
-	/* shadow color. */
-	float shadow_col[4];
+  /* shadow level. */
+  int shadow;
 
-	/* store color here when drawing shadow or blur. */
-	float orig_col[4];
+  /* and shadow offset. */
+  int shadow_x;
+  int shadow_y;
 
-	/* Multiplied this matrix with the current one before
-	 * draw the text! see blf_draw__start.
-	 */
-	double m[16];
+  /* shadow color. */
+  unsigned char shadow_color[4];
 
-	/* clipping rectangle. */
-	rctf clip_rec;
+  /* main text color. */
+  unsigned char color[4];
 
-	/* font dpi (default 72). */
-	unsigned int dpi;
+  /* Multiplied this matrix with the current one before
+   * draw the text! see blf_draw__start.
+   */
+  float m[16];
 
-	/* font size. */
-	unsigned int size;
+  /* clipping rectangle. */
+  rctf clip_rec;
 
-	/* max texture size. */
-	int max_tex_size;
+  /* the width to wrap the text, see BLF_WORD_WRAP */
+  int wrap_width;
 
-	/* cache current OpenGL texture to save calls into the API */
-	unsigned int tex_bind_state;
+  /* font dpi (default 72). */
+  unsigned int dpi;
 
-	/* font options. */
-	int flags;
+  /* font size. */
+  float size;
 
-	/* list of glyph cache for this font. */
-	ListBase cache;
+  /* Column width when printing monospaced. */
+  int fixed_width;
 
-	/* current glyph cache, size and dpi. */
-	GlyphCacheBLF *glyph_cache;
+  /* max texture size. */
+  int tex_size_max;
 
-	/* freetype2 lib handle. */
-	FT_Library ft_lib;
+  /* font options. */
+  int flags;
 
-	/* Mutex lock for library */
-	SpinLock *ft_lib_mutex;
+  /* List of glyph caches (GlyphCacheBLF) for this font for size, dpi, bold, italic.
+   * Use blf_glyph_cache_acquire(font) and blf_glyph_cache_release(font) to access cache!
+   */
+  ListBase cache;
 
-	/* freetype2 face. */
-	FT_Face face;
+  /* Cache of unscaled kerning values. Will be NULL if font does not have kerning. */
+  KerningCacheBLF *kerning_cache;
 
-	/* data for buffer usage (drawing into a texture buffer) */
-	FontBufInfoBLF buf_info;
+  /* freetype2 lib handle. */
+  FT_Library ft_lib;
+
+  /* Mutex lock for library */
+  SpinLock *ft_lib_mutex;
+
+  /* freetype2 face. */
+  FT_Face face;
+
+  /* data for buffer usage (drawing into a texture buffer) */
+  FontBufInfoBLF buf_info;
+
+  /* Mutex lock for glyph cache. */
+  SpinLock *glyph_cache_mutex;
 } FontBLF;
 
 typedef struct DirBLF {
-	struct DirBLF *next;
-	struct DirBLF *prev;
+  struct DirBLF *next;
+  struct DirBLF *prev;
 
-	/* full path where search fonts. */
-	char *path;
+  /* full path where search fonts. */
+  char *path;
 } DirBLF;
-
-#define BLF_CURTEX_UNSET ((unsigned int)-1)
-
-#endif /* __BLF_INTERNAL_TYPES_H__ */

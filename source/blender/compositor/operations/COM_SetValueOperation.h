@@ -1,6 +1,4 @@
 /*
- * Copyright 2011, Blender Foundation.
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -15,40 +13,49 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor: 
- *		Jeroen Bakker 
- *		Monique Dewanchand
+ * Copyright 2011, Blender Foundation.
  */
 
-#ifndef _COM_SetValueOperation_h
-#define _COM_SetValueOperation_h
-#include "COM_NodeOperation.h"
+#pragma once
 
+#include "COM_ConstantOperation.h"
+
+namespace blender::compositor {
 
 /**
  * this program converts an input color to an output value.
  * it assumes we are in sRGB color space.
  */
-class SetValueOperation : public NodeOperation {
-private:
-	float m_value;
+class SetValueOperation : public ConstantOperation {
+ private:
+  float value_;
 
-public:
-	/**
-	 * Default constructor
-	 */
-	SetValueOperation();
-	
-	const float getValue() { return this->m_value; }
-	void setValue(float value) { this->m_value = value; }
-	
-	
-	/**
-	 * the inner loop of this program
-	 */
-	void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
-	void determineResolution(unsigned int resolution[2], unsigned int preferredResolution[2]);
-	
-	bool isSetOperation() const { return true; }
+ public:
+  /**
+   * Default constructor
+   */
+  SetValueOperation();
+
+  const float *get_constant_elem() override
+  {
+    return &value_;
+  }
+
+  float get_value()
+  {
+    return value_;
+  }
+  void set_value(float value)
+  {
+    value_ = value;
+  }
+
+  /**
+   * The inner loop of this operation.
+   */
+  void execute_pixel_sampled(float output[4], float x, float y, PixelSampler sampler) override;
+
+  void determine_canvas(const rcti &preferred_area, rcti &r_area) override;
 };
-#endif
+
+}  // namespace blender::compositor

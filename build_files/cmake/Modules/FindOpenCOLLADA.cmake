@@ -1,25 +1,18 @@
 # - Find OpenCOLLADA library
 # Find the native OpenCOLLADA includes and library
 # This module defines
-#  OPENCOLLADA_INCLUDE_DIRS, where to find COLLADABaseUtils/ and 
+#  OPENCOLLADA_INCLUDE_DIRS, where to find COLLADABaseUtils/ and
 #                 COLLADAFramework/, Set when OPENCOLLADA_INCLUDE_DIR is found.
 #  OPENCOLLADA_LIBRARIES, libraries to link against to use OpenCOLLADA.
 #  OPENCOLLADA_ROOT_DIR, The base directory to search for OpenCOLLADA.
 #                    This can also be an environment variable.
 #  OPENCOLLADA_FOUND, If false, do not try to use OpenCOLLADA.
-#
-# also defined, but not for general use are
-#  OPENCOLLADA_LIBRARY, where to find the OpenCOLLADA library.
 
 #=============================================================================
 # Copyright 2011 Blender Foundation.
 #
-# Distributed under the OSI-approved BSD License (the "License");
-# see accompanying file Copyright.txt for details.
-#
-# This software is distributed WITHOUT ANY WARRANTY; without even the
-# implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-# See the License for more information.
+# Distributed under the OSI-approved BSD 3-Clause License,
+# see accompanying file BSD-3-Clause-license.txt for details.
 #=============================================================================
 
 # note about include paths, there are 2 ways includes are set
@@ -53,7 +46,7 @@ SET(_opencollada_FIND_COMPONENTS
 )
 
 # Fedora openCOLLADA package links these statically
-# note that order is important here ot it wont link
+# note that order is important here or it won't link
 SET(_opencollada_FIND_STATIC_COMPONENTS
   buffer
   ftoa
@@ -62,10 +55,6 @@ SET(_opencollada_FIND_STATIC_COMPONENTS
 
 SET(_opencollada_SEARCH_DIRS
   ${OPENCOLLADA_ROOT_DIR}
-  /usr/local
-  /sw # Fink
-  /opt/local # DarwinPorts
-  /opt/csw # Blastwave
   /opt/lib/opencollada
 )
 
@@ -83,6 +72,7 @@ FOREACH(COMPONENT ${_opencollada_FIND_INCLUDES})
       # but this is less trouble, just looks strange.
       include/opencollada/${COMPONENT}
       include/${COMPONENT}/include
+      include/${COMPONENT}
     HINTS
       ${_opencollada_SEARCH_DIRS}
     )
@@ -129,7 +119,7 @@ FOREACH(COMPONENT ${_opencollada_FIND_STATIC_COMPONENTS})
 ENDFOREACH()
 
 
-# handle the QUIETLY and REQUIRED arguments and set OPENCOLLADA_FOUND to TRUE if 
+# handle the QUIETLY and REQUIRED arguments and set OPENCOLLADA_FOUND to TRUE if
 # all listed variables are TRUE
 INCLUDE(FindPackageHandleStandardArgs)
 FIND_PACKAGE_HANDLE_STANDARD_ARGS(OpenCOLLADA  DEFAULT_MSG
@@ -139,7 +129,7 @@ FIND_PACKAGE_HANDLE_STANDARD_ARGS(OpenCOLLADA  DEFAULT_MSG
 IF(OPENCOLLADA_FOUND)
   SET(OPENCOLLADA_LIBRARIES ${_opencollada_LIBRARIES})
   SET(OPENCOLLADA_INCLUDE_DIRS ${_opencollada_INCLUDES})
-ENDIF(OPENCOLLADA_FOUND)
+ENDIF()
 
 UNSET(COMPONENT)
 UNSET(UPPERCOMPONENT)

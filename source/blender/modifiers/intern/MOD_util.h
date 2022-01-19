@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -14,59 +12,56 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * Contributor(s): Ben Batt
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file blender/modifiers/intern/MOD_util.h
- *  \ingroup modifiers
+/** \file
+ * \ingroup modifiers
  */
 
-
-#ifndef __MOD_UTIL_H__
-#define __MOD_UTIL_H__
+#pragma once
 
 /* so modifier types match their defines */
 #include "MOD_modifiertypes.h"
 
 #include "DEG_depsgraph_build.h"
 
-struct DerivedMesh;
 struct MDeformVert;
+struct Mesh;
 struct ModifierData;
+struct ModifierEvalContext;
 struct Object;
-struct Scene;
-struct Tex;
 
-void modifier_init_texture(const struct Scene *scene, struct Tex *texture);
-void get_texture_coords(struct MappingInfoModifierData *dmd, struct Object *ob, struct DerivedMesh *dm,
-                        float (*co)[3], float (*texco)[3], int numVerts);
-void modifier_vgroup_cache(struct ModifierData *md, float (*vertexCos)[3]);
-struct DerivedMesh *get_cddm(struct Object *ob, struct BMEditMesh *em, struct DerivedMesh *dm,
-                             float (*vertexCos)[3], bool use_normals);
-struct DerivedMesh *get_dm(struct Object *ob, struct BMEditMesh *em, struct DerivedMesh *dm,
-                           float (*vertexCos)[3], bool use_normals, bool use_orco);
-struct DerivedMesh *get_dm_for_modifier(struct Object *ob, ModifierApplyFlag flag);
-void modifier_get_vgroup(struct Object *ob, struct DerivedMesh *dm,
-                         const char *name, struct MDeformVert **dvert, int *defgrp_index);
-
-/* XXX workaround for non-threadsafe context in OpenNL (T38403)
- * OpenNL uses global pointer for "current context", which causes
- * conflict when multiple modifiers get evaluated in threaded depgraph.
- * This is just a stupid hack to prevent assert failure / crash,
- * otherwise we'd have to modify OpenNL on a large scale.
- * OpenNL should be replaced eventually, there are other options (eigen, ceres).
- * - lukas_t
+void MOD_init_texture(struct MappingInfoModifierData *dmd, const struct ModifierEvalContext *ctx);
+/**
+ * \param cos: may be NULL, in which case we use directly mesh vertices' coordinates.
  */
-#ifdef WITH_OPENNL
-#define OPENNL_THREADING_HACK
-#endif
+void MOD_get_texture_coords(struct MappingInfoModifierData *dmd,
+                            const struct ModifierEvalContext *ctx,
+                            struct Object *ob,
+                            struct Mesh *mesh,
+                            float (*cos)[3],
+                            float (*r_texco)[3]);
 
-#ifdef OPENNL_THREADING_HACK
-void modifier_opennl_lock(void);
-void modifier_opennl_unlock(void);
-#endif
+void MOD_previous_vcos_store(struct ModifierData *md, const float (*vert_coords)[3]);
 
-#endif /* __MOD_UTIL_H__ */
+/**
+ * \returns a mesh if mesh == NULL, for deforming modifiers that need it.
+ */
+struct Mesh *MOD_deform_mesh_eval_get(struct Object *ob,
+                                      struct BMEditMesh *em,
+                                      struct Mesh *mesh,
+                                      const float (*vertexCos)[3],
+                                      int num_verts,
+                                      bool use_normals,
+                                      bool use_orco);
+
+void MOD_get_vgroup(struct Object *ob,
+                    struct Mesh *mesh,
+                    const char *name,
+                    struct MDeformVert **dvert,
+                    int *defgrp_index);
+
+void MOD_depsgraph_update_object_bone_relation(struct DepsNodeHandle *node,
+                                               struct Object *object,
+                                               const char *bonename,
+                                               const char *description);

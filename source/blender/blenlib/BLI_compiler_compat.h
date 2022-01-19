@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -14,39 +12,46 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-#ifndef __BLI_COMPILER_COMPAT_H__
-#define __BLI_COMPILER_COMPAT_H__
+/* clang-format off */
 
-/** \file BLI_compiler_compat.h
- *  \ingroup bli
+/* #define typeof() triggers a bug in some clang-format versions, disable format
+ * for entire file to keep results consistent. */
+
+#pragma once
+
+
+/** \file
+ * \ingroup bli
  *
  * Use to help with cross platform portability.
  */
 
 #if defined(_MSC_VER)
-#  define __func__ __FUNCTION__
 #  define alloca _alloca
 #endif
 
-/* alloca is defined here for MinGW32 */
-#ifdef __MINGW32__
-#  include <malloc.h>
-#endif
-
-#if defined(__cplusplus) && ((__cplusplus >= 201103L) || defined(_MSC_VER))
-#  define HAS_CPP11_FEATURES
-#endif
-
-#if (defined(__GNUC__) || defined(__clang__)) && defined(HAS_CPP11_FEATURES)
+#if (defined(__GNUC__) || defined(__clang__)) && defined(__cplusplus)
 extern "C++" {
-	/* Some magic to be sure we don't have reference in the type. */
-	template<typename T> static inline T decltype_helper(T x) { return x; }
-#  define typeof(x) decltype(decltype_helper(x))
+/** Some magic to be sure we don't have reference in the type. */
+template<typename T> static inline T decltype_helper(T x)
+{
+  return x;
+}
+#define typeof(x) decltype(decltype_helper(x))
 }
 #endif
 
-#endif  /* __BLI_COMPILER_COMPAT_H__ */
+/* little macro so inline keyword works */
+#if defined(_MSC_VER)
+#  define BLI_INLINE static __forceinline
+#else
+#  define BLI_INLINE static inline __attribute__((always_inline)) __attribute__((__unused__))
+#endif
+
+#if defined(__GNUC__)
+#  define BLI_NOINLINE __attribute__((noinline))
+#else
+#  define BLI_NOINLINE
+#endif

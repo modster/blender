@@ -5,7 +5,7 @@
  * All Rights Reserved.
  *
  * Modifications Copyright 2011, Blender Foundation.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
  * met:
@@ -34,10 +34,14 @@
 
 #include <OSL/genclosure.h>
 
-#include "osl_closures.h"
+#include "kernel/osl/closures.h"
 
-#include "kernel_types.h"
-#include "closure/emissive.h"
+// clang-format off
+#include "kernel/device/cpu/compat.h"
+#include "kernel/types.h"
+#include "kernel/closure/alloc.h"
+#include "kernel/closure/emissive.h"
+// clang-format on
 
 CCL_NAMESPACE_BEGIN
 
@@ -51,39 +55,20 @@ using namespace OSL;
 /// if the provided angles are PI/2, which is the default
 ///
 class GenericEmissiveClosure : public CClosurePrimitive {
-public:
-	GenericEmissiveClosure() : CClosurePrimitive(Emissive) { }
-
-	Color3 eval(const Vec3 &Ng, const Vec3 &omega_out) const
-	{
-		float3 result = emissive_simple_eval(TO_FLOAT3(Ng), TO_FLOAT3(omega_out));
-		return TO_COLOR3(result);
-	}
-
-	void sample(const Vec3 &Ng, float randu, float randv,
-	            Vec3 &omega_out, float &pdf) const
-	{
-		float3 omega_out_;
-		emissive_sample(TO_FLOAT3(Ng), randu, randv, &omega_out_, &pdf);
-		omega_out = TO_VEC3(omega_out_);
-	}
-
-	float pdf(const Vec3 &Ng, const Vec3 &omega_out) const
-	{
-		return emissive_pdf(TO_FLOAT3(Ng), TO_FLOAT3(omega_out));
-	}
+ public:
+  void setup(ShaderData *sd, uint32_t /* path_flag */, float3 weight)
+  {
+    emission_setup(sd, weight);
+  }
 };
 
 ClosureParam *closure_emission_params()
 {
-	static ClosureParam params[] = {
-	    CLOSURE_STRING_KEYPARAM("label"),
-	    CLOSURE_FINISH_PARAM(GenericEmissiveClosure)
-	};
-	return params;
+  static ClosureParam params[] = {CLOSURE_STRING_KEYPARAM(GenericEmissiveClosure, label, "label"),
+                                  CLOSURE_FINISH_PARAM(GenericEmissiveClosure)};
+  return params;
 }
 
 CCLOSURE_PREPARE(closure_emission_prepare, GenericEmissiveClosure)
 
 CCL_NAMESPACE_END
-

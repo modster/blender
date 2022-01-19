@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,108 +15,74 @@
  *
  * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
  * All rights reserved.
- *
- * The Original Code is: all of this file.
- *
- * Contributor(s): none yet.
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file blender/windowmanager/wm_cursors.h
- *  \ingroup wm
+/** \file
+ * \ingroup wm
  */
 
+#pragma once
 
+struct wmEvent;
+struct wmWindow;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-#ifndef __WM_CURSORS_H__
-#define __WM_CURSORS_H__
+typedef enum WMCursorType {
+  WM_CURSOR_DEFAULT = 1,
+  WM_CURSOR_TEXT_EDIT,
+  WM_CURSOR_WAIT,
+  WM_CURSOR_STOP,
+  WM_CURSOR_EDIT,
+  WM_CURSOR_COPY,
+  WM_CURSOR_HAND,
+
+  WM_CURSOR_CROSS,
+  WM_CURSOR_PAINT,
+  WM_CURSOR_DOT,
+  WM_CURSOR_CROSSC,
+
+  WM_CURSOR_KNIFE,
+  WM_CURSOR_VERTEX_LOOP,
+  WM_CURSOR_PAINT_BRUSH,
+  WM_CURSOR_ERASER,
+  WM_CURSOR_EYEDROPPER,
+
+  WM_CURSOR_SWAP_AREA,
+  WM_CURSOR_X_MOVE,
+  WM_CURSOR_Y_MOVE,
+  WM_CURSOR_H_SPLIT,
+  WM_CURSOR_V_SPLIT,
+
+  WM_CURSOR_NW_ARROW,
+  WM_CURSOR_NS_ARROW,
+  WM_CURSOR_EW_ARROW,
+  WM_CURSOR_N_ARROW,
+  WM_CURSOR_S_ARROW,
+  WM_CURSOR_E_ARROW,
+  WM_CURSOR_W_ARROW,
+
+  WM_CURSOR_NSEW_SCROLL,
+  WM_CURSOR_NS_SCROLL,
+  WM_CURSOR_EW_SCROLL,
+
+  WM_CURSOR_ZOOM_IN,
+  WM_CURSOR_ZOOM_OUT,
+
+  WM_CURSOR_NONE,
+  WM_CURSOR_MUTE,
+
+  WM_CURSOR_PICK_AREA,
+
+  /* --- ALWAYS LAST ----- */
+  WM_CURSOR_NUM,
+} WMCursorType;
 
 void wm_init_cursor_data(void);
+bool wm_cursor_arrow_move(struct wmWindow *win, const struct wmEvent *event);
 
-#define BC_GHOST_CURSORS 1000
-
-/* old cursors */
-enum {
-	CURSOR_FACESEL = BC_GHOST_CURSORS,
-	CURSOR_WAIT, 
-	CURSOR_EDIT, 
-	CURSOR_X_MOVE, 
-	CURSOR_Y_MOVE, 
-	CURSOR_HELP, 
-	CURSOR_STD, 
-	CURSOR_NONE,
-	CURSOR_PENCIL,
-	CURSOR_COPY
-};
-
-
-//typedef struct BCursor_s BCursor;
-typedef struct BCursor {
-
-	char *small_bm;
-	char *small_mask;
-
-	char small_sizex; 
-	char small_sizey; 
-	char small_hotx; 
-	char small_hoty; 
-
-	char *big_bm; 
-	char *big_mask;
-
-	char big_sizex; 
-	char big_sizey; 
-	char big_hotx; 
-	char big_hoty; 
-
-	char fg_color; 
-	char bg_color; 
-
-} BCursor;
-
-#define SYSCURSOR 1
-enum {
-	BC_NW_ARROWCURSOR = 2,
-	BC_NS_ARROWCURSOR,
-	BC_EW_ARROWCURSOR,
-	BC_WAITCURSOR,
-	BC_CROSSCURSOR,
-	BC_EDITCROSSCURSOR,
-	BC_BOXSELCURSOR,
-	BC_KNIFECURSOR,
-	BC_VLOOPCURSOR,
-	BC_TEXTEDITCURSOR,
-	BC_PAINTBRUSHCURSOR,
-	BC_HANDCURSOR,
-	BC_NSEW_SCROLLCURSOR,
-	BC_NS_SCROLLCURSOR,
-	BC_EW_SCROLLCURSOR,
-	BC_EYEDROPPER_CURSOR,
-	BC_SWAPAREA_CURSOR,
-/* --- ALWAYS LAST ----- */
-	BC_NUMCURSORS,
-};
-
-
-enum {
-	BC_BLACK = 0,
-	BC_WHITE, 
-	BC_RED,
-	BC_BLUE,
-	BC_GREEN,
-	BC_YELLOW
-};
-
-#define SMALL_CURSOR    0
-#define BIG_CURSOR      1
-
-struct wmWindow;
-struct wmEvent;
-
-int wm_cursor_arrow_move(struct wmWindow *win, struct wmEvent *event);
-
-
-#endif /* __WM_CURSORS_H__ */
-
+#ifdef __cplusplus
+}
+#endif

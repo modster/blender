@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -12,206 +10,231 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software  Foundation,
+ * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * Contributor(s): Miika Hämäläinen
- *
- * ***** END GPL LICENSE BLOCK *****
- *
  */
 
-/** \file blender/modifiers/intern/MOD_dynamicpaint.c
- *  \ingroup modifiers
+/** \file
+ * \ingroup modifiers
  */
 
 #include <stddef.h>
+#include <string.h>
 
-#include "DNA_dynamicpaint_types.h"
-#include "DNA_object_types.h"
-#include "DNA_scene_types.h"
-
+#include "BLI_listbase.h"
 #include "BLI_utildefines.h"
 
-#include "BKE_cdderivedmesh.h"
+#include "BLT_translation.h"
+
+#include "DNA_defaults.h"
+#include "DNA_dynamicpaint_types.h"
+#include "DNA_mesh_types.h"
+#include "DNA_object_force_types.h"
+#include "DNA_object_types.h"
+#include "DNA_scene_types.h"
+#include "DNA_screen_types.h"
+
+#include "BKE_context.h"
 #include "BKE_dynamicpaint.h"
+#include "BKE_layer.h"
+#include "BKE_lib_query.h"
+#include "BKE_mesh.h"
 #include "BKE_modifier.h"
+#include "BKE_screen.h"
 
-#include "depsgraph_private.h"
+#include "UI_interface.h"
+#include "UI_resources.h"
+
+#include "RNA_access.h"
+
+#include "DEG_depsgraph.h"
 #include "DEG_depsgraph_build.h"
+#include "DEG_depsgraph_physics.h"
+#include "DEG_depsgraph_query.h"
 
+#include "MOD_modifiertypes.h"
+#include "MOD_ui_common.h"
 
-static void initData(ModifierData *md) 
+static void initData(ModifierData *md)
 {
-	DynamicPaintModifierData *pmd = (DynamicPaintModifierData *) md;
-	
-	pmd->canvas = NULL;
-	pmd->brush = NULL;
-	pmd->type = MOD_DYNAMICPAINT_TYPE_CANVAS;
+  DynamicPaintModifierData *pmd = (DynamicPaintModifierData *)md;
+
+  BLI_assert(MEMCMP_STRUCT_AFTER_IS_ZERO(pmd, modifier));
+
+  MEMCPY_STRUCT_AFTER(pmd, DNA_struct_default_get(DynamicPaintModifierData), modifier);
 }
 
-static void copyData(ModifierData *md, ModifierData *target)
+static void copyData(const ModifierData *md, ModifierData *target, const int flag)
 {
-	DynamicPaintModifierData *pmd  = (DynamicPaintModifierData *)md;
-	DynamicPaintModifierData *tpmd = (DynamicPaintModifierData *)target;
-	
-	dynamicPaint_Modifier_copy(pmd, tpmd);
+  const DynamicPaintModifierData *pmd = (const DynamicPaintModifierData *)md;
+  DynamicPaintModifierData *tpmd = (DynamicPaintModifierData *)target;
+
+  dynamicPaint_Modifier_copy(pmd, tpmd, flag);
+}
+
+static void freeRuntimeData(void *runtime_data_v)
+{
+  if (runtime_data_v == NULL) {
+    return;
+  }
+  DynamicPaintRuntime *runtime_data = (DynamicPaintRuntime *)runtime_data_v;
+  dynamicPaint_Modifier_free_runtime(runtime_data);
 }
 
 static void freeData(ModifierData *md)
 {
-	DynamicPaintModifierData *pmd = (DynamicPaintModifierData *) md;
-	dynamicPaint_Modifier_free(pmd);
+  DynamicPaintModifierData *pmd = (DynamicPaintModifierData *)md;
+  dynamicPaint_Modifier_free(pmd);
 }
 
-static CustomDataMask requiredDataMask(Object *UNUSED(ob), ModifierData *md)
+static void requiredDataMask(Object *UNUSED(ob),
+                             ModifierData *md,
+                             CustomData_MeshMasks *r_cddata_masks)
 {
-	DynamicPaintModifierData *pmd = (DynamicPaintModifierData *)md;
-	CustomDataMask dataMask = 0;
+  DynamicPaintModifierData *pmd = (DynamicPaintModifierData *)md;
 
-	if (pmd->canvas) {
-		DynamicPaintSurface *surface = pmd->canvas->surfaces.first;
-		for (; surface; surface = surface->next) {
-			/* tface */
-			if (surface->format == MOD_DPAINT_SURFACE_F_IMAGESEQ || 
-			    surface->init_color_type == MOD_DPAINT_INITIAL_TEXTURE)
-			{
-				dataMask |= CD_MASK_MLOOPUV | CD_MASK_MTEXPOLY;
-			}
-			/* mcol */
-			if (surface->type == MOD_DPAINT_SURFACE_T_PAINT ||
-			    surface->init_color_type == MOD_DPAINT_INITIAL_VERTEXCOLOR)
-			{
-				dataMask |= CD_MASK_MLOOPCOL;
-			}
-			/* CD_MDEFORMVERT */
-			if (surface->type == MOD_DPAINT_SURFACE_T_WEIGHT) {
-				dataMask |= CD_MASK_MDEFORMVERT;
-			}
-		}
-	}
-
-	if (pmd->brush) {
-		if (pmd->brush->flags & MOD_DPAINT_USE_MATERIAL) {
-			dataMask |= CD_MASK_MLOOPUV | CD_MASK_MTEXPOLY;
-		}
-	}
-	return dataMask;
+  if (pmd->canvas) {
+    DynamicPaintSurface *surface = pmd->canvas->surfaces.first;
+    for (; surface; surface = surface->next) {
+      /* tface */
+      if (surface->format == MOD_DPAINT_SURFACE_F_IMAGESEQ ||
+          surface->init_color_type == MOD_DPAINT_INITIAL_TEXTURE) {
+        r_cddata_masks->lmask |= CD_MASK_MLOOPUV;
+      }
+      /* mcol */
+      if (surface->type == MOD_DPAINT_SURFACE_T_PAINT ||
+          surface->init_color_type == MOD_DPAINT_INITIAL_VERTEXCOLOR) {
+        r_cddata_masks->lmask |= CD_MASK_MLOOPCOL;
+      }
+      /* CD_MDEFORMVERT */
+      if (surface->type == MOD_DPAINT_SURFACE_T_WEIGHT) {
+        r_cddata_masks->vmask |= CD_MASK_MDEFORMVERT;
+      }
+    }
+  }
 }
 
-static DerivedMesh *applyModifier(ModifierData *md, Object *ob, 
-                                  DerivedMesh *dm,
-                                  ModifierApplyFlag flag)
+static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *mesh)
 {
-	DynamicPaintModifierData *pmd = (DynamicPaintModifierData *) md;
+  DynamicPaintModifierData *pmd = (DynamicPaintModifierData *)md;
 
-	/* dont apply dynamic paint on orco dm stack */
-	if (!(flag & MOD_APPLY_ORCO)) {
-		return dynamicPaint_Modifier_do(pmd, md->scene, ob, dm);
-	}
-	return dm;
+  /* Don't apply dynamic paint on ORCO mesh stack. */
+  if (!(ctx->flag & MOD_APPLY_ORCO)) {
+    Scene *scene = DEG_get_evaluated_scene(ctx->depsgraph);
+    return dynamicPaint_Modifier_do(pmd, ctx->depsgraph, scene, ctx->object, mesh);
+  }
+  return mesh;
 }
 
-static void updateDepgraph(ModifierData *md, DagForest *forest,
-                           struct Main *UNUSED(bmain),
-                           struct Scene *scene,
-                           Object *ob,
-                           DagNode *obNode)
+static bool is_brush_cb(Object *UNUSED(ob), ModifierData *md)
 {
-	DynamicPaintModifierData *pmd = (DynamicPaintModifierData *) md;
-
-	/* add relation from canvases to all brush objects */
-	if (pmd && pmd->canvas) {
-		Base *base = scene->base.first;
-
-		for (; base; base = base->next) {
-			DynamicPaintModifierData *pmd2 =
-			        (DynamicPaintModifierData *)modifiers_findByType(base->object, eModifierType_DynamicPaint);
-
-			if (pmd2 && pmd2->brush && ob != base->object) {
-				DagNode *brushNode = dag_get_node(forest, base->object);
-				dag_add_relation(forest, brushNode, obNode, DAG_RL_DATA_DATA | DAG_RL_OB_DATA, "Dynamic Paint Brush");
-			}
-		}
-	}
+  DynamicPaintModifierData *pmd = (DynamicPaintModifierData *)md;
+  return (pmd->brush != NULL && pmd->type == MOD_DYNAMICPAINT_TYPE_BRUSH);
 }
 
-static void updateDepsgraph(ModifierData *md,
-                            struct Main *UNUSED(bmain),
-                            struct Scene *scene,
-                            Object *ob,
-                            struct DepsNodeHandle *node)
+static void updateDepsgraph(ModifierData *md, const ModifierUpdateDepsgraphContext *ctx)
 {
-	DynamicPaintModifierData *pmd = (DynamicPaintModifierData *)md;
-	/* Add relation from canvases to all brush objects. */
-	if (pmd->canvas != NULL) {
-		Base *base = scene->base.first;
-		for (; base; base = base->next) {
-			DynamicPaintModifierData *pmd2 =
-			        (DynamicPaintModifierData *)modifiers_findByType(base->object, eModifierType_DynamicPaint);
-			if (pmd2 && pmd2->brush && ob != base->object) {
-				DEG_add_object_relation(node, base->object, DEG_OB_COMP_TRANSFORM, "Dynamic Paint Brush");
-			}
-		}
-	}
+  DynamicPaintModifierData *pmd = (DynamicPaintModifierData *)md;
+  /* Add relation from canvases to all brush objects. */
+  if (pmd->canvas != NULL && pmd->type == MOD_DYNAMICPAINT_TYPE_CANVAS) {
+    LISTBASE_FOREACH (DynamicPaintSurface *, surface, &pmd->canvas->surfaces) {
+      if (surface->effect & MOD_DPAINT_EFFECT_DO_DRIP) {
+        DEG_add_forcefield_relations(
+            ctx->node, ctx->object, surface->effector_weights, true, 0, "Dynamic Paint Field");
+      }
+
+      /* Actual code uses custom loop over group/scene
+       * without layer checks in dynamicPaint_doStep. */
+      DEG_add_collision_relations(ctx->node,
+                                  ctx->object,
+                                  surface->brush_group,
+                                  eModifierType_DynamicPaint,
+                                  is_brush_cb,
+                                  "Dynamic Paint Brush");
+    }
+  }
 }
 
-static bool dependsOnTime(ModifierData *UNUSED(md))
+static bool dependsOnTime(struct Scene *UNUSED(scene),
+                          ModifierData *UNUSED(md),
+                          const int UNUSED(dag_eval_mode))
 {
-	return true;
+  return true;
 }
 
-static void foreachIDLink(ModifierData *md, Object *ob,
-                          IDWalkFunc walk, void *userData)
+static void foreachIDLink(ModifierData *md, Object *ob, IDWalkFunc walk, void *userData)
 {
-	DynamicPaintModifierData *pmd = (DynamicPaintModifierData *) md;
+  DynamicPaintModifierData *pmd = (DynamicPaintModifierData *)md;
 
-	if (pmd->canvas) {
-		DynamicPaintSurface *surface = pmd->canvas->surfaces.first;
+  if (pmd->canvas) {
+    DynamicPaintSurface *surface = pmd->canvas->surfaces.first;
 
-		for (; surface; surface = surface->next) {
-			walk(userData, ob, (ID **)&surface->brush_group);
-			walk(userData, ob, (ID **)&surface->init_texture);
-		}
-	}
-	if (pmd->brush) {
-		walk(userData, ob, (ID **)&pmd->brush->mat);
-	}
+    for (; surface; surface = surface->next) {
+      walk(userData, ob, (ID **)&surface->brush_group, IDWALK_CB_NOP);
+      walk(userData, ob, (ID **)&surface->init_texture, IDWALK_CB_USER);
+      if (surface->effector_weights) {
+        walk(userData, ob, (ID **)&surface->effector_weights->group, IDWALK_CB_NOP);
+      }
+    }
+  }
 }
 
-static void foreachTexLink(ModifierData *UNUSED(md), Object *UNUSED(ob),
-                           TexWalkFunc UNUSED(walk), void *UNUSED(userData))
+static void foreachTexLink(ModifierData *UNUSED(md),
+                           Object *UNUSED(ob),
+                           TexWalkFunc UNUSED(walk),
+                           void *UNUSED(userData))
 {
-	//walk(userData, ob, md, ""); /* re-enable when possible */
+  // walk(userData, ob, md, ""); /* re-enable when possible */
+}
+
+static void panel_draw(const bContext *UNUSED(C), Panel *panel)
+{
+  uiLayout *layout = panel->layout;
+
+  PointerRNA *ptr = modifier_panel_get_property_pointers(panel, NULL);
+
+  uiItemL(layout, TIP_("Settings are inside the Physics tab"), ICON_NONE);
+
+  modifier_panel_end(layout, ptr);
+}
+
+static void panelRegister(ARegionType *region_type)
+{
+  modifier_panel_register(region_type, eModifierType_DynamicPaint, panel_draw);
 }
 
 ModifierTypeInfo modifierType_DynamicPaint = {
-	/* name */              "Dynamic Paint",
-	/* structName */        "DynamicPaintModifierData",
-	/* structSize */        sizeof(DynamicPaintModifierData),
-	/* type */              eModifierTypeType_Constructive,
-	/* flags */             eModifierTypeFlag_AcceptsMesh |
-/*	                        eModifierTypeFlag_SupportsMapping |*/
-	                        eModifierTypeFlag_UsesPointCache |
-	                        eModifierTypeFlag_Single |
-	                        eModifierTypeFlag_UsesPreview,
+    /* name */ "Dynamic Paint",
+    /* structName */ "DynamicPaintModifierData",
+    /* structSize */ sizeof(DynamicPaintModifierData),
+    /* srna */ &RNA_DynamicPaintModifier,
+    /* type */ eModifierTypeType_Constructive,
+    /* flags */ eModifierTypeFlag_AcceptsMesh | eModifierTypeFlag_SupportsMapping |
+        eModifierTypeFlag_UsesPointCache | eModifierTypeFlag_Single |
+        eModifierTypeFlag_UsesPreview,
+    /* icon */ ICON_MOD_DYNAMICPAINT,
 
-	/* copyData */          copyData,
-	/* deformVerts */       NULL,
-	/* deformMatrices */    NULL,
-	/* deformVertsEM */     NULL,
-	/* deformMatricesEM */  NULL,
-	/* applyModifier */     applyModifier,
-	/* applyModifierEM */   NULL,
-	/* initData */          initData,
-	/* requiredDataMask */  requiredDataMask,
-	/* freeData */          freeData,
-	/* isDisabled */        NULL,
-	/* updateDepgraph */    updateDepgraph,
-	/* updateDepsgraph */   updateDepsgraph,
-	/* dependsOnTime */     dependsOnTime,
-	/* dependsOnNormals */  NULL,
-	/* foreachObjectLink */ NULL,
-	/* foreachIDLink */     foreachIDLink,
-	/* foreachTexLink */    foreachTexLink,
+    /* copyData */ copyData,
+
+    /* deformVerts */ NULL,
+    /* deformMatrices */ NULL,
+    /* deformVertsEM */ NULL,
+    /* deformMatricesEM */ NULL,
+    /* modifyMesh */ modifyMesh,
+    /* modifyHair */ NULL,
+    /* modifyGeometrySet */ NULL,
+
+    /* initData */ initData,
+    /* requiredDataMask */ requiredDataMask,
+    /* freeData */ freeData,
+    /* isDisabled */ NULL,
+    /* updateDepsgraph */ updateDepsgraph,
+    /* dependsOnTime */ dependsOnTime,
+    /* dependsOnNormals */ NULL,
+    /* foreachIDLink */ foreachIDLink,
+    /* foreachTexLink */ foreachTexLink,
+    /* freeRuntimeData */ freeRuntimeData,
+    /* panelRegister */ panelRegister,
+    /* blendWrite */ NULL,
+    /* blendRead */ NULL,
 };

@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,214 +15,218 @@
  *
  * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
  * All rights reserved.
- *
- * Contributor(s): Blender Foundation 2002-2008
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file BIF_glutil.h
- *  \ingroup editorui
+/** \file
+ * \ingroup editorui
  */
 
-#ifndef __BIF_GLUTIL_H__
-#define __BIF_GLUTIL_H__
+#pragma once
+
+#include "GPU_texture.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 struct rcti;
-struct rctf;
 
+struct ColorManagedDisplaySettings;
+struct ColorManagedViewSettings;
 struct ImBuf;
 struct bContext;
-struct ColorManagedViewSettings;
-struct ColorManagedDisplaySettings;
 
-void fdrawbezier(float vec[4][3]);
-void fdrawline(float x1, float y1, float x2, float y2);
-void fdrawbox(float x1, float y1, float x2, float y2);
-void sdrawline(int x1, int y1, int x2, int y2);
-#if 0
-void sdrawtri(int x1, int y1, int x2, int y2);
-void sdrawtrifill(int x1, int y1, int x2, int y2);
-#endif
-void sdrawbox(int x1, int y1, int x2, int y2);
+typedef struct IMMDrawPixelsTexState {
+  struct GPUShader *shader;
+  unsigned int pos;
+  unsigned int texco;
+  bool do_shader_unbind;
+} IMMDrawPixelsTexState;
 
-void sdrawXORline(int x0, int y0, int x1, int y1);
-void sdrawXORline4(int nr, int x0, int y0, int x1, int y1);
-
-void fdrawXORellipse(float xofs, float yofs, float hw, float hh);
-void fdrawXORcirc(float xofs, float yofs, float rad);
-
-void fdrawcheckerboard(float x1, float y1, float x2, float y2);
-
-/* OpenGL stipple defines */
-extern const unsigned char stipple_halftone[128];
-extern const unsigned char stipple_quarttone[128];
-extern const unsigned char stipple_diag_stripes_pos[128];
-extern const unsigned char stipple_diag_stripes_neg[128];
-extern const unsigned char stipple_checker_8px[128];
+/* To be used before calling immDrawPixelsTex
+ * Default shader is GPU_SHADER_2D_IMAGE_COLOR
+ * Returns a shader to be able to set uniforms */
+/**
+ * To be used before calling #immDrawPixelsTex
+ * Default shader is #GPU_SHADER_2D_IMAGE_COLOR
+ * You can still set uniforms with:
+ * `GPU_shader_uniform_int(shader, GPU_shader_get_uniform(shader, "name"), 0);`
+ */
+IMMDrawPixelsTexState immDrawPixelsTexSetup(int builtin);
 
 /**
- * Draw a lined (non-looping) arc with the given
- * \a radius, starting at angle \a start and arcing
- * through \a angle. The arc is centered at the origin
- * and drawn in the XY plane.
+ * Unlike the `immDrawPixelsTexTiled` functions, this doesn't do tiled drawing, but draws into a
+ * full texture.
  *
- * \param start The initial angle (in radians).
- * \param angle The length of the arc (in radians).
- * \param radius The arc radius.
- * \param nsegments The number of segments to use in drawing the arc.
- */
-void glutil_draw_lined_arc(float start, float angle, float radius, int nsegments);
-
-/**
- * Draw a filled arc with the given \a radius,
- * starting at angle \a start and arcing through
- * \a angle. The arc is centered at the origin
- * and drawn in the XY plane.
+ * Use the currently bound shader.
  *
- * \param start The initial angle (in radians).
- * \param angle The length of the arc (in radians).
- * \param radius The arc radius.
- * \param nsegments The number of segments to use in drawing the arc.
- */
-void glutil_draw_filled_arc(float start, float angle, float radius, int nsegments);
-
-/**
- * Returns an integer value as obtained by glGetIntegerv.
- * The param must cause only one value to be gotten from GL.
- */
-int glaGetOneInteger(int param);
-
-/**
- * Returns a float value as obtained by glGetFloatv.
- * The param must cause only one value to be gotten from GL.
- */
-float glaGetOneFloat(int param);
-
-/**
- * Functions like glRasterPos2i, except ensures that the resulting
- * raster position is valid. \a known_good_x and \a known_good_y
- * should be coordinates of a point known to be within the current
- * view frustum.
- * \attention This routine should be used when the distance of \a x
- * and \a y away from the known good point is small (ie. for small icons
- * and for bitmap characters), when drawing large+zoomed images it is
- * possible for overflow to occur, the glaDrawPixelsSafe routine should
- * be used instead.
- */
-void glaRasterPosSafe2f(float x, float y, float known_good_x, float known_good_y);
-
-/**
- * Functions like a limited glDrawPixels, except ensures that
- * the image is displayed onscreen even if the \a x and \a y
- * coordinates for would be clipped. The routine respects the
- * glPixelZoom values, pixel unpacking parameters are _not_
- * respected.
+ * Use #immDrawPixelsTexSetup to bind the shader you want before calling #immDrawPixelsTex.
  *
- * \attention This routine makes many assumptions: the rect data
- * is expected to be in RGBA unsigned byte format, the coordinate
- * (GLA_PIXEL_OFS, GLA_PIXEL_OFS) is assumed to be within the view frustum,
- * and the modelview and projection matrices are assumed to define a
- * 1-to-1 mapping to screen space.
- * \attention Furthermore, in the case of zoomed or unpixel aligned
- * images extending outside the view frustum, but still within the
- * window, some portion of the image may be visible left and/or
- * below of the given \a x and \a y coordinates. It is recommended
- * to use the glScissor functionality if images are to be drawn
- * with an inset view matrix.
+ * If using a special shader double check it uses the same attributes "pos" "texCoord" and uniform
+ * "image".
+ *
+ * If color is NULL then use white by default
+ *
+ * Unless <em>state->do_shader_unbind<em> is explicitly set to `false`, the shader is unbound when
+ * finished.
  */
-void glaDrawPixelsSafe(float x, float y, int img_w, int img_h, int row_w, int format, int type, void *rect);
+void immDrawPixelsTexScaledFullSize(const IMMDrawPixelsTexState *state,
+                                    const float x,
+                                    const float y,
+                                    const int img_w,
+                                    const int img_h,
+                                    const eGPUTextureFormat gpu_format,
+                                    const bool use_filter,
+                                    const void *rect,
+                                    const float scaleX,
+                                    const float scaleY,
+                                    const float xzoom,
+                                    const float yzoom,
+                                    const float color[4]);
 
 /**
- * glaDrawPixelsTex - Functions like a limited glDrawPixels, but actually draws the
+ * #immDrawPixelsTex - Functions like a limited #glDrawPixels, but actually draws the
  * image using textures, which can be tremendously faster on low-end
  * cards, and also avoids problems with the raster position being
- * clipped when offscreen. The routine respects the glPixelZoom values,
- * pixel unpacking parameters are _not_ respected.
+ * clipped when off-screen. Pixel unpacking parameters and
+ * the #glPixelZoom values are _not_ respected.
  *
- * \attention This routine makes many assumptions: the rect data
+ * \attention Use #immDrawPixelsTexSetup before calling this function.
+ *
+ * \attention This routine makes many assumptions: the `rect` data
  * is expected to be in RGBA byte or float format, and the
- * modelview and projection matrices are assumed to define a
+ * model-view and projection matrices are assumed to define a
  * 1-to-1 mapping to screen space.
  */
+void immDrawPixelsTexTiled(IMMDrawPixelsTexState *state,
+                           float x,
+                           float y,
+                           int img_w,
+                           int img_h,
+                           eGPUTextureFormat gpu_format,
+                           bool use_filter,
+                           void *rect,
+                           float xzoom,
+                           float yzoom,
+                           const float color[4]);
+void immDrawPixelsTexTiled_clipping(IMMDrawPixelsTexState *state,
+                                    float x,
+                                    float y,
+                                    int img_w,
+                                    int img_h,
+                                    eGPUTextureFormat gpu_format,
+                                    bool use_filter,
+                                    void *rect,
+                                    float clip_min_x,
+                                    float clip_min_y,
+                                    float clip_max_x,
+                                    float clip_max_y,
+                                    float xzoom,
+                                    float yzoom,
+                                    const float color[4]);
+void immDrawPixelsTexTiled_scaling(IMMDrawPixelsTexState *state,
+                                   float x,
+                                   float y,
+                                   int img_w,
+                                   int img_h,
+                                   eGPUTextureFormat gpu_format,
+                                   bool use_filter,
+                                   void *rect,
+                                   float scaleX,
+                                   float scaleY,
+                                   float xzoom,
+                                   float yzoom,
+                                   const float color[4]);
+/**
+ * Use the currently bound shader.
+ *
+ * Use #immDrawPixelsTexSetup to bind the shader you
+ * want before calling #immDrawPixelsTex.
+ *
+ * If using a special shader double check it uses the same
+ * attributes "pos" "texCoord" and uniform "image".
+ *
+ * If color is NULL then use white by default
+ *
+ * Unless <em>state->do_shader_unbind<em> is explicitly set to `false`, the shader is unbound when
+ * finished.
+ */
+void immDrawPixelsTexTiled_scaling_clipping(IMMDrawPixelsTexState *state,
+                                            float x,
+                                            float y,
+                                            int img_w,
+                                            int img_h,
+                                            eGPUTextureFormat gpu_format,
+                                            bool use_filter,
+                                            void *rect,
+                                            float scaleX,
+                                            float scaleY,
+                                            float clip_min_x,
+                                            float clip_min_y,
+                                            float clip_max_x,
+                                            float clip_max_y,
+                                            float xzoom,
+                                            float yzoom,
+                                            const float color[4]);
 
-void glaDrawPixelsTex(float x, float y, int img_w, int img_h, int format, int type, int zoomfilter, void *rect);
+/* Image buffer drawing functions, with display transform
+ *
+ * The view and display settings can either be specified manually,
+ * or retrieved from the context with the '_ctx' variations.
+ *
+ * For better performance clipping coordinates can be specified so parts of the
+ * image outside the view are skipped. */
+
+void ED_draw_imbuf(struct ImBuf *ibuf,
+                   float x,
+                   float y,
+                   bool use_filter,
+                   struct ColorManagedViewSettings *view_settings,
+                   struct ColorManagedDisplaySettings *display_settings,
+                   float zoom_x,
+                   float zoom_y);
+/**
+ * Draw given image buffer on a screen using GLSL for display transform.
+ */
+void ED_draw_imbuf_clipping(struct ImBuf *ibuf,
+                            float x,
+                            float y,
+                            bool use_filter,
+                            struct ColorManagedViewSettings *view_settings,
+                            struct ColorManagedDisplaySettings *display_settings,
+                            float clip_min_x,
+                            float clip_min_y,
+                            float clip_max_x,
+                            float clip_max_y,
+                            float zoom_x,
+                            float zoom_y);
+
+void ED_draw_imbuf_ctx(const struct bContext *C,
+                       struct ImBuf *ibuf,
+                       float x,
+                       float y,
+                       bool use_filter,
+                       float zoom_x,
+                       float zoom_y);
+void ED_draw_imbuf_ctx_clipping(const struct bContext *C,
+                                struct ImBuf *ibuf,
+                                float x,
+                                float y,
+                                bool use_filter,
+                                float clip_min_x,
+                                float clip_min_y,
+                                float clip_max_x,
+                                float clip_max_y,
+                                float zoom_x,
+                                float zoom_y);
+
+int ED_draw_imbuf_method(struct ImBuf *ibuf);
 
 /**
- * glaDrawPixelsAuto - Switches between texture or pixel drawing using UserDef.
- * only RGBA
- * needs glaDefine2DArea to be set.
+ * Don't move to `GPU_immediate_util.h` because this uses user-prefs and isn't very low level.
  */
-void glaDrawPixelsAuto(float x, float y, int img_w, int img_h, int format, int type, int zoomfilter, void *rect);
+void immDrawBorderCorners(unsigned int pos, const struct rcti *border, float zoomx, float zoomy);
 
-
-void glaDrawPixelsTexScaled(float x, float y, int img_w, int img_h, int format, int type, int zoomfilter, void *rect, float scaleX, float scaleY);
-
-/* 2D Drawing Assistance */
-
-/** Define a 2D area (viewport, scissor, matrices) for OpenGL rendering.
- *
- * glaDefine2DArea and glaBegin2DDraw set up an OpenGL state appropriate
- * for drawing using both vertex (Vertex, etc) and raster (RasterPos, Rect)
- * commands. All coordinates should be at integer positions. There is little
- * to no reason to use glVertex2f etc. functions during 2D rendering, and
- * thus no reason to +-0.5 the coordinates or perform other silly
- * tricks.
- *
- * \param screen_rect The screen rectangle to be defined for 2D drawing.
- */
-void glaDefine2DArea(struct rcti *screen_rect);
-
-typedef struct gla2DDrawInfo gla2DDrawInfo;
-
-/* UNUSED */
-#if 0
-
-gla2DDrawInfo  *glaBegin2DDraw(struct rcti *screen_rect, struct rctf *world_rect);
-void gla2DDrawTranslatePt(gla2DDrawInfo *di, float wo_x, float wo_y, int *r_sc_x, int *r_sc_y);
-void gla2DDrawTranslatePtv(gla2DDrawInfo *di, float world[2], int r_screen[2]);
-
-void glaEnd2DDraw(gla2DDrawInfo *di);
-
-/** Adjust the transformation mapping of a 2d area */
-void gla2DGetMap(gla2DDrawInfo *di, struct rctf *rect);
-void gla2DSetMap(gla2DDrawInfo *di, struct rctf *rect);
+#ifdef __cplusplus
+}
 #endif
-
-/* use this for platform hacks. glPointSize is solved here */
-void bglBegin(int mode);
-void bglEnd(void);
-// int bglPointHack(void); /* UNUSED */
-void bglVertex3fv(const float vec[3]);
-void bglVertex3f(float x, float y, float z);
-void bglVertex2fv(const float vec[2]);
-/* intel gfx cards frontbuffer problem */
-// void bglFlush(void); /* UNUSED */
-void set_inverted_drawing(int enable);
-void setlinestyle(int nr);
-
-/* own working polygon offset */
-void bglPolygonOffset(float viewdist, float dist);
-
-/* For caching opengl matrices (gluProject/gluUnProject) */
-typedef struct bglMats {
-	double modelview[16];
-	double projection[16];
-	int viewport[4];
-} bglMats;
-void bgl_get_mats(bglMats *mats);
-
-/* **** Color management helper functions for GLSL display/transform ***** */
-
-/* Draw imbuf on a screen, preferably using GLSL display transform */
-void glaDrawImBuf_glsl(struct ImBuf *ibuf, float x, float y, int zoomfilter,
-                       struct ColorManagedViewSettings *view_settings,
-                       struct ColorManagedDisplaySettings *display_settings);
-
-/* Draw imbuf on a screen, preferably using GLSL display transform */
-void glaDrawImBuf_glsl_ctx(const struct bContext *C, struct ImBuf *ibuf, float x, float y, int zoomfilter);
-
-void glaDrawBorderCorners(const struct rcti *border, float zoomx, float zoomy);
-
-#endif /* __BIF_GLUTIL_H__ */
-

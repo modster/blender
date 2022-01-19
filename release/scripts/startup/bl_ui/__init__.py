@@ -20,11 +20,12 @@
 
 # note, properties_animviz is a helper module only.
 
+# support reloading sub-modules
 if "bpy" in locals():
     from importlib import reload
-    for val in _modules_loaded.values():
-        reload(val)
+    _modules_loaded[:] = [reload(val) for val in _modules_loaded]
     del reload
+
 _modules = [
     "properties_animviz",
     "properties_constraint",
@@ -33,15 +34,21 @@ _modules = [
     "properties_data_camera",
     "properties_data_curve",
     "properties_data_empty",
-    "properties_data_lamp",
+    "properties_data_gpencil",
+    "properties_data_hair",
+    "properties_data_light",
     "properties_data_lattice",
     "properties_data_mesh",
     "properties_data_metaball",
     "properties_data_modifier",
+    "properties_data_pointcloud",
+    "properties_data_shaderfx",
+    "properties_data_lightprobe",
     "properties_data_speaker",
-    "properties_game",
+    "properties_data_volume",
     "properties_mask_common",
     "properties_material",
+    "properties_material_gpencil",
     "properties_object",
     "properties_paint_common",
     "properties_grease_pencil_common",
@@ -50,16 +57,24 @@ _modules = [
     "properties_physics_common",
     "properties_physics_dynamicpaint",
     "properties_physics_field",
-    "properties_physics_fluid",
     "properties_physics_rigidbody",
     "properties_physics_rigidbody_constraint",
-    "properties_physics_smoke",
+    "properties_physics_fluid",
     "properties_physics_softbody",
     "properties_render",
-    "properties_render_layer",
+    "properties_output",
+    "properties_view_layer",
     "properties_scene",
     "properties_texture",
     "properties_world",
+    "properties_collection",
+
+    # Generic Space Modules
+    #
+    # Depends on DNA_WORKSPACE_TOOL (C define).
+    "space_toolsystem_common",
+    "space_toolsystem_toolbar",
+
     "space_clip",
     "space_console",
     "space_dopesheet",
@@ -67,44 +82,59 @@ _modules = [
     "space_graph",
     "space_image",
     "space_info",
-    "space_logic",
     "space_nla",
     "space_node",
     "space_outliner",
     "space_properties",
     "space_sequencer",
+    "space_spreadsheet",
+    "space_statusbar",
     "space_text",
     "space_time",
+    "space_topbar",
     "space_userpref",
     "space_view3d",
     "space_view3d_toolbar",
+
+    # XXX, keep last so panels show after all other tool options.
+    "properties_workspace",
 ]
 
 import bpy
 
 if bpy.app.build_options.freestyle:
     _modules.append("properties_freestyle")
+
 __import__(name=__name__, fromlist=_modules)
 _namespace = globals()
-_modules_loaded = {name: _namespace[name] for name in _modules if name != "bpy"}
+_modules_loaded = [_namespace[name] for name in _modules]
 del _namespace
 
 
 def register():
-    bpy.utils.register_module(__name__)
+    from bpy.utils import register_class
+    for mod in _modules_loaded:
+        for cls in mod.classes:
+            register_class(cls)
+
+    space_filebrowser.register_props()
+
+    from bpy.props import (
+        EnumProperty,
+        StringProperty,
+    )
+    from bpy.types import (
+        WindowManager,
+    )
 
     # space_userprefs.py
-    from bpy.props import StringProperty, EnumProperty
-    from bpy.types import WindowManager
-
-    def addon_filter_items(self, context):
+    def addon_filter_items(_self, _context):
         import addon_utils
 
-        items = [('All', "All", "All Add-ons"),
-                 ('User', "User", "All Add-ons Installed by User"),
-                 ('Enabled', "Enabled", "All Enabled Add-ons"),
-                 ('Disabled', "Disabled", "All Disabled Add-ons"),
-                 ]
+        items = [
+            ('All', "All", "All Add-ons"),
+            ('User', "User", "All Add-ons Installed by User"),
+        ]
 
         items_unique = set()
 
@@ -116,35 +146,41 @@ def register():
         return items
 
     WindowManager.addon_search = StringProperty(
-            name="Search",
-            description="Search within the selected filter",
-            options={'TEXTEDIT_UPDATE'},
-            )
+        name="Search",
+        description="Search within the selected filter",
+        options={'TEXTEDIT_UPDATE'},
+    )
     WindowManager.addon_filter = EnumProperty(
-            items=addon_filter_items,
-            name="Category",
-            description="Filter addons by category",
-            )
+        items=addon_filter_items,
+        name="Category",
+        description="Filter add-ons by category",
+    )
 
     WindowManager.addon_support = EnumProperty(
-            items=[('OFFICIAL', "Official", "Officially supported"),
-                   ('COMMUNITY', "Community", "Maintained by community developers"),
-                   ('TESTING', "Testing", "Newly contributed scripts (excluded from release builds)")
-                   ],
-            name="Support",
-            description="Display support level",
-            default={'OFFICIAL', 'COMMUNITY'},
-            options={'ENUM_FLAG'},
-            )
+        items=[
+            ('OFFICIAL', "Official", "Officially supported"),
+            ('COMMUNITY', "Community", "Maintained by community developers"),
+            ('TESTING', "Testing", "Newly contributed scripts (excluded from release builds)")
+        ],
+        name="Support",
+        description="Display support level",
+        default={'OFFICIAL', 'COMMUNITY'},
+        options={'ENUM_FLAG'},
+    )
     # done...
 
 
 def unregister():
-    bpy.utils.unregister_module(__name__)
-
+    from bpy.utils import unregister_class
+    for mod in reversed(_modules_loaded):
+        for cls in reversed(mod.classes):
+            if cls.is_registered:
+                unregister_class(cls)
 
 # Define a default UIList, when a list does not need any custom drawing...
 # Keep in sync with its #defined name in UI_interface.h
+
+
 class UI_UL_list(bpy.types.UIList):
     # These are common filtering or ordering operations (same as the default C ones!).
     @staticmethod
@@ -171,7 +207,7 @@ class UI_UL_list(bpy.types.UIList):
         for i, item in enumerate(items):
             name = getattr(item, propname, None)
             # This is similar to a logical xor
-            if bool(name and fnmatch.fnmatchcase(name, pattern)) is not bool(reverse):
+            if bool(name and fnmatch.fnmatch(name, pattern)) is not bool(reverse):
                 flags[i] |= bitflag
         return flags
 
@@ -202,3 +238,21 @@ class UI_UL_list(bpy.types.UIList):
 
 
 bpy.utils.register_class(UI_UL_list)
+
+
+class UI_MT_list_item_context_menu(bpy.types.Menu):
+    """
+    UI List item context menu definition. Scripts can append/prepend this to
+    add own operators to the context menu. They must check context though, so
+    their items only draw in a valid context and for the correct UI list.
+    """
+
+    bl_label = "List Item"
+    bl_idname = "UI_MT_list_item_context_menu"
+
+    def draw(self, context):
+        # Dummy function. This type is just for scripts to append their own
+        # context menu items.
+        pass
+
+bpy.utils.register_class(UI_MT_list_item_context_menu)

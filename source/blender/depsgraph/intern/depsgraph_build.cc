@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,354 +15,304 @@
  *
  * The Original Code is Copyright (C) 2013 Blender Foundation.
  * All rights reserved.
- *
- * Original Author: Joshua Leung
- * Contributor(s): Based on original depsgraph.c code - Blender Foundation (2005-2013)
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file blender/depsgraph/intern/depsgraph_build.cc
- *  \ingroup depsgraph
+/** \file
+ * \ingroup depsgraph
  *
  * Methods for constructing depsgraph.
  */
 
-#include <stack>
-
 #include "MEM_guardedalloc.h"
 
-extern "C" {
-#include "BLI_blenlib.h"
-#include "BLI_string.h"
+#include "BLI_listbase.h"
 #include "BLI_utildefines.h"
 
-#include "DNA_action_types.h"
-#include "DNA_anim_types.h"
-#include "DNA_armature_types.h"
-#include "DNA_camera_types.h"
-#include "DNA_constraint_types.h"
-#include "DNA_curve_types.h"
-#include "DNA_effect_types.h"
-#include "DNA_group_types.h"
-#include "DNA_key_types.h"
-#include "DNA_lamp_types.h"
-#include "DNA_material_types.h"
-#include "DNA_mesh_types.h"
-#include "DNA_meta_types.h"
-#include "DNA_node_types.h"
-#include "DNA_particle_types.h"
-#include "DNA_object_types.h"
-#include "DNA_rigidbody_types.h"
-#include "DNA_scene_types.h"
-#include "DNA_texture_types.h"
-#include "DNA_world_types.h"
+#include "PIL_time.h"
+#include "PIL_time_utildefines.h"
 
-#include "BKE_action.h"
-#include "BKE_armature.h"
-#include "BKE_animsys.h"
-#include "BKE_constraint.h"
-#include "BKE_curve.h"
-#include "BKE_effect.h"
-#include "BKE_fcurve.h"
-#include "BKE_group.h"
-#include "BKE_key.h"
-#include "BKE_library.h"
+#include "DNA_cachefile_types.h"
+#include "DNA_collection_types.h"
+#include "DNA_node_types.h"
+#include "DNA_object_types.h"
+#include "DNA_scene_types.h"
+#include "DNA_simulation_types.h"
+
+#include "BKE_collection.h"
 #include "BKE_main.h"
-#include "BKE_material.h"
-#include "BKE_mball.h"
-#include "BKE_modifier.h"
-#include "BKE_node.h"
-#include "BKE_object.h"
-#include "BKE_particle.h"
-#include "BKE_rigidbody.h"
-#include "BKE_sound.h"
-#include "BKE_texture.h"
-#include "BKE_tracking.h"
-#include "BKE_world.h"
+#include "BKE_scene.h"
 
 #include "DEG_depsgraph.h"
-#include "DEG_depsgraph_debug.h"
 #include "DEG_depsgraph_build.h"
+#include "DEG_depsgraph_debug.h"
 
-#include "RNA_access.h"
-#include "RNA_types.h"
-} /* extern "C" */
+#include "builder/deg_builder_relations.h"
+#include "builder/pipeline_all_objects.h"
+#include "builder/pipeline_compositor.h"
+#include "builder/pipeline_from_ids.h"
+#include "builder/pipeline_render.h"
+#include "builder/pipeline_view_layer.h"
 
-#include "depsnode.h"
-#include "depsnode_component.h"
-#include "depsgraph_debug.h"
-#include "depsnode_operation.h"
-#include "depsgraph_types.h"
-#include "depsgraph_build.h"
-#include "depsgraph_intern.h"
+#include "intern/debug/deg_debug.h"
 
-#include "depsgraph_util_cycle.h"
-#include "depsgraph_util_transitive.h"
+#include "intern/node/deg_node.h"
+#include "intern/node/deg_node_component.h"
+#include "intern/node/deg_node_id.h"
+#include "intern/node/deg_node_operation.h"
+
+#include "intern/depsgraph_registry.h"
+#include "intern/depsgraph_relation.h"
+#include "intern/depsgraph_tag.h"
+#include "intern/depsgraph_type.h"
 
 /* ****************** */
 /* External Build API */
 
-static eDepsNode_Type deg_build_scene_component_type(eDepsSceneComponentType component)
+namespace deg = blender::deg;
+
+static deg::NodeType deg_build_scene_component_type(eDepsSceneComponentType component)
 {
-	switch (component) {
-		case DEG_SCENE_COMP_PARAMETERS:     return DEPSNODE_TYPE_PARAMETERS;
-		case DEG_SCENE_COMP_ANIMATION:      return DEPSNODE_TYPE_ANIMATION;
-		case DEG_SCENE_COMP_SEQUENCER:      return DEPSNODE_TYPE_SEQUENCER;
-	}
-	return DEPSNODE_TYPE_UNDEFINED;
+  switch (component) {
+    case DEG_SCENE_COMP_PARAMETERS:
+      return deg::NodeType::PARAMETERS;
+    case DEG_SCENE_COMP_ANIMATION:
+      return deg::NodeType::ANIMATION;
+    case DEG_SCENE_COMP_SEQUENCER:
+      return deg::NodeType::SEQUENCER;
+  }
+  return deg::NodeType::UNDEFINED;
 }
 
-static eDepsNode_Type deg_build_object_component_type(eDepsObjectComponentType component)
+static deg::DepsNodeHandle *get_node_handle(DepsNodeHandle *node_handle)
 {
-	switch (component) {
-		case DEG_OB_COMP_PARAMETERS:        return DEPSNODE_TYPE_PARAMETERS;
-		case DEG_OB_COMP_PROXY:             return DEPSNODE_TYPE_PROXY;
-		case DEG_OB_COMP_ANIMATION:         return DEPSNODE_TYPE_ANIMATION;
-		case DEG_OB_COMP_TRANSFORM:         return DEPSNODE_TYPE_TRANSFORM;
-		case DEG_OB_COMP_GEOMETRY:          return DEPSNODE_TYPE_GEOMETRY;
-		case DEG_OB_COMP_EVAL_POSE:         return DEPSNODE_TYPE_EVAL_POSE;
-		case DEG_OB_COMP_BONE:              return DEPSNODE_TYPE_BONE;
-		case DEG_OB_COMP_EVAL_PARTICLES:    return DEPSNODE_TYPE_EVAL_PARTICLES;
-		case DEG_OB_COMP_SHADING:           return DEPSNODE_TYPE_SHADING;
-	}
-	return DEPSNODE_TYPE_UNDEFINED;
+  return reinterpret_cast<deg::DepsNodeHandle *>(node_handle);
 }
 
-void DEG_add_scene_relation(DepsNodeHandle *handle, struct Scene *scene, eDepsSceneComponentType component, const char *description)
+void DEG_add_scene_relation(DepsNodeHandle *node_handle,
+                            Scene *scene,
+                            eDepsSceneComponentType component,
+                            const char *description)
 {
-	eDepsNode_Type type = deg_build_scene_component_type(component);
-	ComponentKey comp_key(&scene->id, type);
-	handle->builder->add_node_handle_relation(comp_key, handle, DEPSREL_TYPE_GEOMETRY_EVAL, description);
+  deg::NodeType type = deg_build_scene_component_type(component);
+  deg::ComponentKey comp_key(&scene->id, type);
+  deg::DepsNodeHandle *deg_node_handle = get_node_handle(node_handle);
+  deg_node_handle->builder->add_node_handle_relation(comp_key, deg_node_handle, description);
 }
 
-void DEG_add_object_relation(DepsNodeHandle *handle, struct Object *ob, eDepsObjectComponentType component, const char *description)
+void DEG_add_object_relation(DepsNodeHandle *node_handle,
+                             Object *object,
+                             eDepsObjectComponentType component,
+                             const char *description)
 {
-	eDepsNode_Type type = deg_build_object_component_type(component);
-	ComponentKey comp_key(&ob->id, type);
-	handle->builder->add_node_handle_relation(comp_key, handle, DEPSREL_TYPE_GEOMETRY_EVAL, description);
+  deg::NodeType type = deg::nodeTypeFromObjectComponent(component);
+  deg::ComponentKey comp_key(&object->id, type);
+  deg::DepsNodeHandle *deg_node_handle = get_node_handle(node_handle);
+  deg_node_handle->builder->add_node_handle_relation(comp_key, deg_node_handle, description);
 }
 
-void DEG_add_bone_relation(DepsNodeHandle *handle, struct Object *ob, const char *bone_name, eDepsObjectComponentType component, const char *description)
+bool DEG_object_has_geometry_component(Object *object)
 {
-	eDepsNode_Type type = deg_build_object_component_type(component);
-	ComponentKey comp_key(&ob->id, type, bone_name);
-
-	// XXX: "Geometry Eval" might not always be true, but this only gets called from modifier building now
-	handle->builder->add_node_handle_relation(comp_key, handle, DEPSREL_TYPE_GEOMETRY_EVAL, description);
+  return deg::geometry_tag_to_component(&object->id) != deg::NodeType::UNDEFINED;
 }
 
-void DEG_add_special_eval_flag(Depsgraph *graph, ID *id, short flag)
+void DEG_add_collection_geometry_relation(DepsNodeHandle *node_handle,
+                                          Collection *collection,
+                                          const char *description)
 {
-	if (graph == NULL) {
-		BLI_assert(!"Graph should always be valid");
-		return;
-	}
-	IDDepsNode *id_node = graph->find_id_node(id);
-	if (id_node == NULL) {
-		BLI_assert(!"ID should always be valid");
-		return;
-	}
-	id_node->eval_flags |= flag;
+  deg::OperationKey operation_key{
+      &collection->id, deg::NodeType::GEOMETRY, deg::OperationCode::GEOMETRY_EVAL_DONE};
+  deg::DepsNodeHandle *deg_node_handle = get_node_handle(node_handle);
+  deg_node_handle->builder->add_node_handle_relation(operation_key, deg_node_handle, description);
 }
 
-/* ********************** */
-/* Utilities for Builders */
-
-/* Get unique identifier for FCurves and Drivers */
-string deg_fcurve_id_name(const FCurve *fcu)
+void DEG_add_collection_geometry_customdata_mask(DepsNodeHandle *node_handle,
+                                                 Collection *collection,
+                                                 const CustomData_MeshMasks *masks)
 {
-	char index_buf[32];
-	sprintf(index_buf, "[%d]", fcu->array_index);
-
-	return string(fcu->rna_path) + index_buf;
+  FOREACH_COLLECTION_OBJECT_RECURSIVE_BEGIN (collection, ob) {
+    DEG_add_customdata_mask(node_handle, ob, masks);
+    if (ob->type == OB_EMPTY && ob->instance_collection != nullptr) {
+      DEG_add_collection_geometry_customdata_mask(node_handle, ob->instance_collection, masks);
+    }
+  }
+  FOREACH_COLLECTION_OBJECT_RECURSIVE_END;
 }
 
-static void deg_graph_build_finalize(Depsgraph *graph)
+void DEG_add_simulation_relation(DepsNodeHandle *node_handle,
+                                 Simulation *simulation,
+                                 const char *description)
 {
-	std::stack<OperationDepsNode *> stack;
+  deg::OperationKey operation_key(
+      &simulation->id, deg::NodeType::SIMULATION, deg::OperationCode::SIMULATION_EVAL);
+  deg::DepsNodeHandle *deg_node_handle = get_node_handle(node_handle);
+  deg_node_handle->builder->add_node_handle_relation(operation_key, deg_node_handle, description);
+}
 
-	for (Depsgraph::OperationNodes::const_iterator it_op = graph->operations.begin();
-	     it_op != graph->operations.end();
-	     ++it_op)
-	{
-		OperationDepsNode *node = *it_op;
-		node->done = 0;
-		node->num_links_pending = 0;
-		for (OperationDepsNode::Relations::const_iterator it_rel = node->inlinks.begin();
-		     it_rel != node->inlinks.end();
-		     ++it_rel)
-		{
-			DepsRelation *rel = *it_rel;
-			if ((rel->from->type == DEPSNODE_TYPE_OPERATION) &&
-			    (rel->flag & DEPSREL_FLAG_CYCLIC) == 0)
-			{
-				++node->num_links_pending;
-			}
-		}
-		if (node->num_links_pending == 0) {
-			stack.push(node);
-		}
-		IDDepsNode *id_node = node->owner->owner;
-		id_node->id->flag |= LIB_DOIT;
-	}
+void DEG_add_node_tree_output_relation(DepsNodeHandle *node_handle,
+                                       bNodeTree *node_tree,
+                                       const char *description)
+{
+  deg::OperationKey ntree_output_key(
+      &node_tree->id, deg::NodeType::NTREE_OUTPUT, deg::OperationCode::NTREE_OUTPUT);
+  deg::DepsNodeHandle *deg_node_handle = get_node_handle(node_handle);
+  deg_node_handle->builder->add_node_handle_relation(
+      ntree_output_key, deg_node_handle, description);
+}
 
-	while (!stack.empty()) {
-		OperationDepsNode *node = stack.top();
-		if (node->done == 0 && node->outlinks.size() != 0) {
-			for (OperationDepsNode::Relations::const_iterator it_rel = node->outlinks.begin();
-			     it_rel != node->outlinks.end();
-			     ++it_rel)
-			{
-				DepsRelation *rel = *it_rel;
-				if (rel->to->type == DEPSNODE_TYPE_OPERATION) {
-					OperationDepsNode *to = (OperationDepsNode *)rel->to;
-					if ((rel->flag & DEPSREL_FLAG_CYCLIC) == 0) {
-						BLI_assert(to->num_links_pending > 0);
-						--to->num_links_pending;
-					}
-					if (to->num_links_pending == 0) {
-						stack.push(to);
-					}
-				}
-			}
-			node->done = 1;
-		}
-		else {
-			stack.pop();
-			IDDepsNode *id_node = node->owner->owner;
-			for (OperationDepsNode::Relations::const_iterator it_rel = node->outlinks.begin();
-			     it_rel != node->outlinks.end();
-			     ++it_rel)
-			{
-				DepsRelation *rel = *it_rel;
-				if (rel->to->type == DEPSNODE_TYPE_OPERATION) {
-					OperationDepsNode *to = (OperationDepsNode *)rel->to;
-					IDDepsNode *id_to = to->owner->owner;
-					id_node->layers |= id_to->layers;
-				}
-			}
+void DEG_add_object_cache_relation(DepsNodeHandle *node_handle,
+                                   CacheFile *cache_file,
+                                   eDepsObjectComponentType component,
+                                   const char *description)
+{
+  deg::NodeType type = deg::nodeTypeFromObjectComponent(component);
+  deg::ComponentKey comp_key(&cache_file->id, type);
+  deg::DepsNodeHandle *deg_node_handle = get_node_handle(node_handle);
+  deg_node_handle->builder->add_node_handle_relation(comp_key, deg_node_handle, description);
+}
 
-			/* Re-tag ID for update if it was tagged before the relations
-			 * update tag.
-			 */
-			ID *id = id_node->id;
-			if (id->flag & LIB_ID_RECALC_ALL &&
-			    id->flag & LIB_DOIT)
-			{
-				id_node->tag_update(graph);
-				id->flag &= ~LIB_DOIT;
-			}
-		}
-	}
+void DEG_add_bone_relation(DepsNodeHandle *node_handle,
+                           Object *object,
+                           const char *bone_name,
+                           eDepsObjectComponentType component,
+                           const char *description)
+{
+  deg::NodeType type = deg::nodeTypeFromObjectComponent(component);
+  deg::ComponentKey comp_key(&object->id, type, bone_name);
+  deg::DepsNodeHandle *deg_node_handle = get_node_handle(node_handle);
+  deg_node_handle->builder->add_node_handle_relation(comp_key, deg_node_handle, description);
+}
+
+void DEG_add_object_pointcache_relation(struct DepsNodeHandle *node_handle,
+                                        struct Object *object,
+                                        eDepsObjectComponentType component,
+                                        const char *description)
+{
+  deg::NodeType type = deg::nodeTypeFromObjectComponent(component);
+  deg::ComponentKey comp_key(&object->id, type);
+  deg::DepsNodeHandle *deg_node_handle = get_node_handle(node_handle);
+  deg::DepsgraphRelationBuilder *relation_builder = deg_node_handle->builder;
+  /* Add relation from source to the node handle. */
+  relation_builder->add_node_handle_relation(comp_key, deg_node_handle, description);
+  /* Node deduct point cache component and connect source to it. */
+  ID *id = DEG_get_id_from_handle(node_handle);
+  deg::ComponentKey point_cache_key(id, deg::NodeType::POINT_CACHE);
+  deg::Relation *rel = relation_builder->add_relation(comp_key, point_cache_key, "Point Cache");
+  if (rel != nullptr) {
+    rel->flag |= deg::RELATION_FLAG_FLUSH_USER_EDIT_ONLY;
+  }
+  else {
+    fprintf(stderr, "Error in point cache relation from %s to ^%s.\n", object->id.name, id->name);
+  }
+}
+
+void DEG_add_generic_id_relation(struct DepsNodeHandle *node_handle,
+                                 struct ID *id,
+                                 const char *description)
+{
+  deg::OperationKey operation_key(
+      id, deg::NodeType::GENERIC_DATABLOCK, deg::OperationCode::GENERIC_DATABLOCK_UPDATE);
+  deg::DepsNodeHandle *deg_node_handle = get_node_handle(node_handle);
+  deg_node_handle->builder->add_node_handle_relation(operation_key, deg_node_handle, description);
+}
+
+void DEG_add_modifier_to_transform_relation(struct DepsNodeHandle *node_handle,
+                                            const char *description)
+{
+  deg::DepsNodeHandle *deg_node_handle = get_node_handle(node_handle);
+  deg_node_handle->builder->add_modifier_to_transform_relation(deg_node_handle, description);
+}
+
+void DEG_add_special_eval_flag(struct DepsNodeHandle *node_handle, ID *id, uint32_t flag)
+{
+  deg::DepsNodeHandle *deg_node_handle = get_node_handle(node_handle);
+  deg_node_handle->builder->add_special_eval_flag(id, flag);
+}
+
+void DEG_add_customdata_mask(struct DepsNodeHandle *node_handle,
+                             struct Object *object,
+                             const CustomData_MeshMasks *masks)
+{
+  deg::DepsNodeHandle *deg_node_handle = get_node_handle(node_handle);
+  deg_node_handle->builder->add_customdata_mask(object, deg::DEGCustomDataMeshMasks(masks));
+}
+
+struct ID *DEG_get_id_from_handle(struct DepsNodeHandle *node_handle)
+{
+  deg::DepsNodeHandle *deg_handle = get_node_handle(node_handle);
+  return deg_handle->node->owner->owner->id_orig;
+}
+
+struct Depsgraph *DEG_get_graph_from_handle(struct DepsNodeHandle *node_handle)
+{
+  deg::DepsNodeHandle *deg_node_handle = get_node_handle(node_handle);
+  deg::DepsgraphRelationBuilder *relation_builder = deg_node_handle->builder;
+  return reinterpret_cast<Depsgraph *>(relation_builder->getGraph());
 }
 
 /* ******************** */
 /* Graph Building API's */
 
-/* Build depsgraph for the given scene, and dump results in given graph container */
-// XXX: assume that this is called from outside, given the current scene as the "main" scene
-void DEG_graph_build_from_scene(Depsgraph *graph, Main *bmain, Scene *scene)
+void DEG_graph_build_from_view_layer(Depsgraph *graph)
 {
-	/* 1) Generate all the nodes in the graph first */
-	DepsgraphNodeBuilder node_builder(bmain, graph);
-	/* create root node for scene first
-	 * - this way it should be the first in the graph,
-	 *   reflecting its role as the entrypoint
-	 */
-	node_builder.add_root_node();
-	node_builder.build_scene(bmain, scene);
-
-	/* 2) Hook up relationships between operations - to determine evaluation order */
-	DepsgraphRelationBuilder relation_builder(graph);
-	/* hook scene up to the root node as entrypoint to graph */
-	/* XXX what does this relation actually mean?
-	 * it doesnt add any operations anyway and is not clear what part of the scene is to be connected.
-	 */
-	//relation_builder.add_relation(RootKey(), IDKey(scene), DEPSREL_TYPE_ROOT_TO_ACTIVE, "Root to Active Scene");
-	relation_builder.build_scene(bmain, scene);
-
-	/* Detect and solve cycles. */
-	deg_graph_detect_cycles(graph);
-
-	/* 3) Simplify the graph by removing redundant relations (to optimise traversal later) */
-	// TODO: it would be useful to have an option to disable this in cases where it is causing trouble
-	if (G.debug_value == 799) {
-		deg_graph_transitive_reduction(graph);
-	}
-
-	/* 4) Flush visibility layer and re-schedule nodes for update. */
-	deg_graph_build_finalize(graph);
-
-#if 0
-	if (!DEG_debug_consistency_check(graph)) {
-		printf("Consistency validation failed, ABORTING!\n");
-		abort();
-	}
-#endif
+  deg::ViewLayerBuilderPipeline builder(graph);
+  builder.build();
 }
 
-/* Tag graph relations for update. */
+void DEG_graph_build_for_all_objects(struct Depsgraph *graph)
+{
+  deg::AllObjectsBuilderPipeline builder(graph);
+  builder.build();
+}
+
+void DEG_graph_build_for_render_pipeline(Depsgraph *graph)
+{
+  deg::RenderBuilderPipeline builder(graph);
+  builder.build();
+}
+
+void DEG_graph_build_for_compositor_preview(Depsgraph *graph, bNodeTree *nodetree)
+{
+  deg::CompositorBuilderPipeline builder(graph, nodetree);
+  builder.build();
+}
+
+void DEG_graph_build_from_ids(Depsgraph *graph, ID **ids, const int num_ids)
+{
+  deg::FromIDsBuilderPipeline builder(graph, blender::Span(ids, num_ids));
+  builder.build();
+}
+
 void DEG_graph_tag_relations_update(Depsgraph *graph)
 {
-	graph->need_update = true;
+  DEG_DEBUG_PRINTF(graph, TAG, "%s: Tagging relations for update.\n", __func__);
+  deg::Depsgraph *deg_graph = reinterpret_cast<deg::Depsgraph *>(graph);
+  deg_graph->need_update = true;
+  /* NOTE: When relations are updated, it's quite possible that
+   * we've got new bases in the scene. This means, we need to
+   * re-create flat array of bases in view layer.
+   *
+   * TODO(sergey): Try to make it so we don't flush updates
+   * to the whole depsgraph. */
+  deg::IDNode *id_node = deg_graph->find_id_node(&deg_graph->scene->id);
+  if (id_node != nullptr) {
+    id_node->tag_update(deg_graph, deg::DEG_UPDATE_SOURCE_RELATIONS);
+  }
 }
 
-/* Tag all relations for update. */
+void DEG_graph_relations_update(Depsgraph *graph)
+{
+  deg::Depsgraph *deg_graph = (deg::Depsgraph *)graph;
+  if (!deg_graph->need_update) {
+    /* Graph is up to date, nothing to do. */
+    return;
+  }
+  DEG_graph_build_from_view_layer(graph);
+}
+
 void DEG_relations_tag_update(Main *bmain)
 {
-	for (Scene *scene = (Scene *)bmain->scene.first;
-	     scene != NULL;
-	     scene = (Scene *)scene->id.next)
-	{
-		if (scene->depsgraph != NULL) {
-			DEG_graph_tag_relations_update(scene->depsgraph);
-		}
-	}
-}
-
-/* Create new graph if didn't exist yet,
- * or update relations if graph was tagged for update.
- */
-void DEG_scene_relations_update(Main *bmain, Scene *scene)
-{
-	if (scene->depsgraph == NULL) {
-		/* Rebuild graph from scratch and exit. */
-		scene->depsgraph = DEG_graph_new();
-		DEG_graph_build_from_scene(scene->depsgraph, bmain, scene);
-		return;
-	}
-
-	Depsgraph *graph = scene->depsgraph;
-	if (!graph->need_update) {
-		/* Graph is up to date, nothing to do. */
-		return;
-	}
-
-	/* Clear all previous nodes and operations. */
-	graph->clear_all_nodes();
-	graph->operations.clear();
-	graph->entry_tags.clear();
-
-	/* Build new nodes and relations. */
-	DEG_graph_build_from_scene(graph, bmain, scene);
-
-	graph->need_update = false;
-}
-
-/* Rebuild dependency graph only for a given scene. */
-void DEG_scene_relations_rebuild(Main *bmain, Scene *scene)
-{
-	if (scene->depsgraph != NULL) {
-		DEG_graph_tag_relations_update(scene->depsgraph);
-	}
-	DEG_scene_relations_update(bmain, scene);
-}
-
-void DEG_scene_graph_free(Scene *scene)
-{
-	if (scene->depsgraph) {
-		DEG_graph_free(scene->depsgraph);
-		scene->depsgraph = NULL;
-	}
+  DEG_GLOBAL_DEBUG_PRINTF(TAG, "%s: Tagging relations for update.\n", __func__);
+  for (deg::Depsgraph *depsgraph : deg::get_all_registered_graphs(bmain)) {
+    DEG_graph_tag_relations_update(reinterpret_cast<Depsgraph *>(depsgraph));
+  }
 }

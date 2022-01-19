@@ -1,10 +1,8 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version. 
+ * of the License, or (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -17,52 +15,42 @@
  *
  * The Original Code is Copyright (C) 2007 Blender Foundation.
  * All rights reserved.
- *
- * 
- * Contributor(s): Blender Foundation
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file blender/windowmanager/wm_draw.h
- *  \ingroup wm
+/** \file
+ * \ingroup wm
  */
 
+#pragma once
 
-#ifndef __WM_DRAW_H__
-#define __WM_DRAW_H__
+struct GPUOffScreen;
+struct GPUTexture;
+struct GPUViewport;
 
-#include "GPU_glew.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
 
+typedef struct wmDrawBuffer {
+  struct GPUOffScreen *offscreen;
+  struct GPUViewport *viewport;
+  bool stereo;
+  int bound_view;
+} wmDrawBuffer;
 
-#define MAX_N_TEX 3
-
-typedef struct wmDrawTriple {
-	GLuint bind[MAX_N_TEX * MAX_N_TEX];
-	int x[MAX_N_TEX], y[MAX_N_TEX];
-	int nx, ny;
-	GLenum target;
-} wmDrawTriple;
-
-typedef struct wmDrawData {
-	struct wmDrawData *next, *prev;
-	wmDrawTriple *triple;
-} wmDrawData;
-
+struct ARegion;
+struct ScrArea;
 struct bContext;
 struct wmWindow;
-struct ARegion;
 
 /* wm_draw.c */
-void		wm_draw_update			(struct bContext *C);
-void		wm_draw_window_clear	(struct wmWindow *win);
-void		wm_draw_region_clear	(struct wmWindow *win, struct ARegion *ar);
+void wm_draw_update(struct bContext *C);
+void wm_draw_region_clear(struct wmWindow *win, struct ARegion *region);
+void wm_draw_region_blend(struct ARegion *region, int view, bool blend);
+void wm_draw_region_test(struct bContext *C, struct ScrArea *area, struct ARegion *region);
 
-void		wm_tag_redraw_overlay	(struct wmWindow *win, struct ARegion *ar);
+struct GPUTexture *wm_draw_region_texture(struct ARegion *region, int view);
 
-void		wm_triple_draw_textures	(struct wmWindow *win, struct wmDrawTriple *triple, float alpha);
-
-void		wm_draw_data_free		(struct wmWindow *win);
-
-#endif /* __WM_DRAW_H__ */
-
+#ifdef __cplusplus
+}
+#endif

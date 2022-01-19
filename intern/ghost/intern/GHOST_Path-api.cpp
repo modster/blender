@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,57 +15,57 @@
  *
  * The Original Code is Copyright (C) 2010 by Blender Foundation.
  * All rights reserved.
- *
- * The Original Code is: all of this file.
- *
- * Contributor(s): none yet.
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file ghost/intern/GHOST_Path-api.cpp
- *  \ingroup GHOST
+/** \file
+ * \ingroup GHOST
  */
 
 #include <cstdio>
 
-#include "intern/GHOST_Debug.h"
-#include "GHOST_Types.h"
-#include "GHOST_Path-api.h"
 #include "GHOST_ISystemPaths.h"
+#include "GHOST_Path-api.h"
+#include "GHOST_Types.h"
+#include "intern/GHOST_Debug.h"
 
 GHOST_TSuccess GHOST_CreateSystemPaths(void)
 {
-	return GHOST_ISystemPaths::create();
+  return GHOST_ISystemPaths::create();
 }
 
 GHOST_TSuccess GHOST_DisposeSystemPaths(void)
 {
-	return GHOST_ISystemPaths::dispose();
+  return GHOST_ISystemPaths::dispose();
 }
 
-const GHOST_TUns8 *GHOST_getSystemDir(int version, const char *versionstr)
+const char *GHOST_getSystemDir(int version, const char *versionstr)
 {
-	GHOST_ISystemPaths *systemPaths = GHOST_ISystemPaths::get();
-	return systemPaths ? systemPaths->getSystemDir(version, versionstr) : NULL;
+  GHOST_ISystemPaths *systemPaths = GHOST_ISystemPaths::get();
+  return systemPaths ? systemPaths->getSystemDir(version, versionstr) : NULL;
 }
 
-const GHOST_TUns8 *GHOST_getUserDir(int version, const char *versionstr)
+const char *GHOST_getUserDir(int version, const char *versionstr)
 {
-	GHOST_ISystemPaths *systemPaths = GHOST_ISystemPaths::get();
-	return systemPaths ? systemPaths->getUserDir(version, versionstr) : NULL; /* shouldn't be NULL */
+  GHOST_ISystemPaths *systemPaths = GHOST_ISystemPaths::get();
+  return systemPaths ? systemPaths->getUserDir(version, versionstr) : NULL; /* shouldn't be NULL */
 }
 
-const GHOST_TUns8 *GHOST_getBinaryDir()
+const char *GHOST_getUserSpecialDir(GHOST_TUserSpecialDirTypes type)
 {
-	GHOST_ISystemPaths *systemPaths = GHOST_ISystemPaths::get();
-	return systemPaths ? systemPaths->getBinaryDir() : NULL;  /* shouldn't be NULL */
+  GHOST_ISystemPaths *systemPaths = GHOST_ISystemPaths::get();
+  return systemPaths ? systemPaths->getUserSpecialDir(type) : NULL; /* shouldn't be NULL */
+}
+
+const char *GHOST_getBinaryDir()
+{
+  GHOST_ISystemPaths *systemPaths = GHOST_ISystemPaths::get();
+  return systemPaths ? systemPaths->getBinaryDir() : NULL; /* shouldn't be NULL */
 }
 
 void GHOST_addToSystemRecentFiles(const char *filename)
 {
-	GHOST_ISystemPaths *systemPaths = GHOST_ISystemPaths::get();
-	if (systemPaths) {
-		systemPaths->addToSystemRecentFiles(filename);
-	}
+  GHOST_ISystemPaths *systemPaths = GHOST_ISystemPaths::get();
+  if (systemPaths) {
+    systemPaths->addToSystemRecentFiles(filename);
+  }
 }

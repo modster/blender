@@ -14,12 +14,8 @@
 #=============================================================================
 # Copyright 2011 Blender Foundation.
 #
-# Distributed under the OSI-approved BSD License (the "License");
-# see accompanying file Copyright.txt for details.
-#
-# This software is distributed WITHOUT ANY WARRANTY; without even the
-# implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-# See the License for more information.
+# Distributed under the OSI-approved BSD 3-Clause License,
+# see accompanying file BSD-3-Clause-license.txt for details.
 #=============================================================================
 
 # If OPENJPEG_ROOT_DIR was defined in the environment, use it.
@@ -29,10 +25,6 @@ ENDIF()
 
 SET(_openjpeg_SEARCH_DIRS
   ${OPENJPEG_ROOT_DIR}
-  /usr/local
-  /sw # Fink
-  /opt/local # DarwinPorts
-  /opt/csw # Blastwave
 )
 
 FIND_PATH(OPENJPEG_INCLUDE_DIR
@@ -42,19 +34,29 @@ FIND_PATH(OPENJPEG_INCLUDE_DIR
     ${_openjpeg_SEARCH_DIRS}
   PATH_SUFFIXES
     include
-    include/openjpeg-1.5
+    # Support future versions
+    openjpeg-2.9
+    openjpeg-2.8
+    openjpeg-2.7
+    openjpeg-2.6
+    openjpeg-2.5
+    openjpeg-2.4
+    openjpeg-2.3
+    openjpeg-2.2
+    openjpeg-2.1
+    openjpeg-2.0
 )
 
 FIND_LIBRARY(OPENJPEG_LIBRARY
   NAMES
-    openjpeg
+    openjp2
   HINTS
     ${_openjpeg_SEARCH_DIRS}
   PATH_SUFFIXES
     lib64 lib
   )
 
-# handle the QUIETLY and REQUIRED arguments and set OPENJPEG_FOUND to TRUE if 
+# handle the QUIETLY and REQUIRED arguments and set OPENJPEG_FOUND to TRUE if
 # all listed variables are TRUE
 INCLUDE(FindPackageHandleStandardArgs)
 FIND_PACKAGE_HANDLE_STANDARD_ARGS(OpenJPEG DEFAULT_MSG
@@ -63,7 +65,7 @@ FIND_PACKAGE_HANDLE_STANDARD_ARGS(OpenJPEG DEFAULT_MSG
 IF(OPENJPEG_FOUND)
   SET(OPENJPEG_LIBRARIES ${OPENJPEG_LIBRARY})
   SET(OPENJPEG_INCLUDE_DIRS ${OPENJPEG_INCLUDE_DIR})
-ENDIF(OPENJPEG_FOUND)
+ENDIF()
 
 MARK_AS_ADVANCED(
   OPENJPEG_INCLUDE_DIR

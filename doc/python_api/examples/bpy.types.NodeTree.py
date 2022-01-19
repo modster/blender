@@ -1,6 +1,7 @@
 """
 Poll Function
 +++++++++++++++
+
 The :class:`NodeTree.poll` function determines if a node tree is visible
 in the given context (similar to how :class:`Panel.poll`
 and :class:`Menu.poll` define visibility). If it returns False,
@@ -15,9 +16,11 @@ import bpy
 class CyclesNodeTree(bpy.types.NodeTree):
     """ This operator is only visible when Cycles is the selected render engine"""
     bl_label = "Cycles Node Tree"
+    bl_icon = 'NONE'
 
     @classmethod
     def poll(cls, context):
         return context.scene.render.engine == 'CYCLES'
+
 
 bpy.utils.register_class(CyclesNodeTree)

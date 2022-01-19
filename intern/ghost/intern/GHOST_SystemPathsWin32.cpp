@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -17,49 +15,20 @@
  *
  * The Original Code is Copyright (C) 2011 Blender Foundation.
  * All rights reserved.
- * 
- * Contributor(s): Blender Foundation
- *                 Andrea Weikert
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file ghost/intern/GHOST_SystemPathsWin32.cpp
- *  \ingroup GHOST
+/** \file
+ * \ingroup GHOST
  */
-
 
 #include "GHOST_SystemPathsWin32.h"
+#include "GHOST_Debug.h"
 
 #ifndef _WIN32_IE
-#define _WIN32_IE 0x0501
+#  define _WIN32_IE 0x0501
 #endif
-#include <shlobj.h>
 #include "utfconv.h"
-
-#ifdef __MINGW32__
-
-#if !defined(SHARD_PIDL)
-#define SHARD_PIDL      0x00000001L
-#endif
-
-#if !defined(SHARD_PATHA)
-#define SHARD_PATHA     0x00000002L
-#endif
-
-#if !defined(SHARD_PATHW)
-#define SHARD_PATHW     0x00000003L
-#endif
-
-#if !defined(SHARD_PATH)
-#ifdef UNICODE
-#define SHARD_PATH  SHARD_PATHW
-#else
-#define SHARD_PATH  SHARD_PATHA
-#endif
-#endif
-
-#endif
+#include <shlobj.h>
 
 GHOST_SystemPathsWin32::GHOST_SystemPathsWin32()
 {
@@ -69,59 +38,109 @@ GHOST_SystemPathsWin32::~GHOST_SystemPathsWin32()
 {
 }
 
-const GHOST_TUns8 *GHOST_SystemPathsWin32::getSystemDir(int, const char *versionstr) const
+const char *GHOST_SystemPathsWin32::getSystemDir(int, const char *versionstr) const
 {
-	static char knownpath[MAX_PATH * 3 + 128] = {0}; /* 1 utf-16 might translante into 3 utf-8. 2 utf-16 translates into 4 utf-8*/
-	wchar_t knownpath_16[MAX_PATH];
+  /* 1 utf-16 might translate into 3 utf-8. 2 utf-16 translates into 4 utf-8. */
+  static char knownpath[MAX_PATH * 3 + 128] = {0};
+  PWSTR knownpath_16 = NULL;
 
-	HRESULT hResult = SHGetFolderPathW(NULL, CSIDL_COMMON_APPDATA, NULL, SHGFP_TYPE_CURRENT, knownpath_16);
+  HRESULT hResult = SHGetKnownFolderPath(
+      FOLDERID_ProgramData, KF_FLAG_DEFAULT, NULL, &knownpath_16);
 
-	if (hResult == S_OK)
-	{
-		conv_utf_16_to_8(knownpath_16, knownpath, MAX_PATH * 3);
-		strcat(knownpath, "\\Blender Foundation\\Blender\\");
-		strcat(knownpath, versionstr);
-		return (GHOST_TUns8*)knownpath;
-	}
+  if (hResult == S_OK) {
+    conv_utf_16_to_8(knownpath_16, knownpath, MAX_PATH * 3);
+    CoTaskMemFree(knownpath_16);
+    strcat(knownpath, "\\Blender Foundation\\Blender\\");
+    strcat(knownpath, versionstr);
+    return knownpath;
+  }
 
-	return NULL;
+  return NULL;
 }
 
-const GHOST_TUns8 *GHOST_SystemPathsWin32::getUserDir(int, const char *versionstr) const
+const char *GHOST_SystemPathsWin32::getUserDir(int, const char *versionstr) const
 {
-	static char knownpath[MAX_PATH * 3 + 128] = {0};
-	wchar_t knownpath_16[MAX_PATH];
+  static char knownpath[MAX_PATH * 3 + 128] = {0};
+  PWSTR knownpath_16 = NULL;
 
-	HRESULT hResult = SHGetFolderPathW(NULL, CSIDL_APPDATA, NULL, SHGFP_TYPE_CURRENT, knownpath_16);
+  HRESULT hResult = SHGetKnownFolderPath(
+      FOLDERID_RoamingAppData, KF_FLAG_DEFAULT, NULL, &knownpath_16);
 
-	if (hResult == S_OK)
-	{
-		conv_utf_16_to_8(knownpath_16, knownpath, MAX_PATH * 3);
-		strcat(knownpath, "\\Blender Foundation\\Blender\\");
-		strcat(knownpath, versionstr);
-		return (GHOST_TUns8*)knownpath;
-	}
+  if (hResult == S_OK) {
+    conv_utf_16_to_8(knownpath_16, knownpath, MAX_PATH * 3);
+    CoTaskMemFree(knownpath_16);
+    strcat(knownpath, "\\Blender Foundation\\Blender\\");
+    strcat(knownpath, versionstr);
+    return knownpath;
+  }
 
-	return NULL;
+  return NULL;
 }
 
-const GHOST_TUns8 *GHOST_SystemPathsWin32::getBinaryDir() const
+const char *GHOST_SystemPathsWin32::getUserSpecialDir(GHOST_TUserSpecialDirTypes type) const
 {
-	static char fullname[MAX_PATH * 3] = {0};
-	wchar_t fullname_16[MAX_PATH * 3];
+  GUID folderid;
 
-	if (GetModuleFileNameW(0, fullname_16, MAX_PATH)) {
-		conv_utf_16_to_8(fullname_16, fullname, MAX_PATH * 3);
-		return (GHOST_TUns8 *)fullname;
-	}
+  switch (type) {
+    case GHOST_kUserSpecialDirDesktop:
+      folderid = FOLDERID_Desktop;
+      break;
+    case GHOST_kUserSpecialDirDocuments:
+      folderid = FOLDERID_Documents;
+      break;
+    case GHOST_kUserSpecialDirDownloads:
+      folderid = FOLDERID_Downloads;
+      break;
+    case GHOST_kUserSpecialDirMusic:
+      folderid = FOLDERID_Music;
+      break;
+    case GHOST_kUserSpecialDirPictures:
+      folderid = FOLDERID_Pictures;
+      break;
+    case GHOST_kUserSpecialDirVideos:
+      folderid = FOLDERID_Videos;
+      break;
+    case GHOST_kUserSpecialDirCaches:
+      folderid = FOLDERID_LocalAppData;
+      break;
+    default:
+      GHOST_ASSERT(
+          false,
+          "GHOST_SystemPathsWin32::getUserSpecialDir(): Invalid enum value for type parameter");
+      return NULL;
+  }
 
-	return NULL;
+  static char knownpath[MAX_PATH * 3] = {0};
+  PWSTR knownpath_16 = NULL;
+  HRESULT hResult = SHGetKnownFolderPath(folderid, KF_FLAG_DEFAULT, NULL, &knownpath_16);
+
+  if (hResult == S_OK) {
+    conv_utf_16_to_8(knownpath_16, knownpath, MAX_PATH * 3);
+    CoTaskMemFree(knownpath_16);
+    return knownpath;
+  }
+
+  CoTaskMemFree(knownpath_16);
+  return NULL;
+}
+
+const char *GHOST_SystemPathsWin32::getBinaryDir() const
+{
+  static char fullname[MAX_PATH * 3] = {0};
+  wchar_t fullname_16[MAX_PATH * 3];
+
+  if (GetModuleFileNameW(0, fullname_16, MAX_PATH)) {
+    conv_utf_16_to_8(fullname_16, fullname, MAX_PATH * 3);
+    return fullname;
+  }
+
+  return NULL;
 }
 
 void GHOST_SystemPathsWin32::addToSystemRecentFiles(const char *filename) const
 {
-	/* SHARD_PATH resolves to SHARD_PATHA for non-UNICODE build */
-	UTF16_ENCODE(filename);
-	SHAddToRecentDocs(SHARD_PATHW, filename_16);
-	UTF16_UN_ENCODE(filename);
+  /* SHARD_PATH resolves to SHARD_PATHA for non-UNICODE build */
+  UTF16_ENCODE(filename);
+  SHAddToRecentDocs(SHARD_PATHW, filename_16);
+  UTF16_UN_ENCODE(filename);
 }

@@ -1,129 +1,118 @@
+# Copyright 2011-2020 Blender Foundation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+#####################################################################
+# Cycles standalone executable
+#####################################################################
 
 set(INC
-	.
-	../device
-	../kernel
-	../kernel/svm
-	../bvh
-	../util
-	../render
-	../subd
+  ..
 )
 set(INC_SYS
 )
 
-# NOTE: LIBRARIES contains all the libraries which are common
-# across release and debug build types, stored in a linking order.
 set(LIBRARIES
-	cycles_device
-	cycles_kernel
-	cycles_render
-	cycles_bvh
-	cycles_subd
-	cycles_util
-	${BLENDER_GL_LIBRARIES}
-	${CYCLES_APP_GLEW_LIBRARY}
-	${PNG_LIBRARIES}
-	${JPEG_LIBRARIES}
-	${ZLIB_LIBRARIES}
-	${TIFF_LIBRARY}
-	${PTHREADS_LIBRARIES}
-	extern_clew
-	extern_cuew
+  cycles_device
+  cycles_kernel
+  cycles_scene
+  cycles_session
+  cycles_bvh
+  cycles_subd
+  cycles_graph
+  cycles_util
 )
 
 if(WITH_CYCLES_OSL)
-	list(APPEND LIBRARIES cycles_kernel_osl)
+  list(APPEND LIBRARIES cycles_kernel_osl)
 endif()
 
 if(CYCLES_STANDALONE_REPOSITORY)
-	if(WITH_CYCLES_LOGGING)
-		list(APPEND LIBRARIES
-			${GLOG_LIBRARIES}
-			${GFLAGS_LIBRARIES}
-		)
-	endif()
+  list(APPEND LIBRARIES extern_sky)
 else()
-	list(APPEND LIBRARIES bf_intern_glew_mx)
-	if(WITH_CYCLES_LOGGING)
-		list(APPEND LIBRARIES extern_glog)
-	endif()
+  list(APPEND LIBRARIES bf_intern_sky)
 endif()
 
 if(WITH_CYCLES_STANDALONE AND WITH_CYCLES_STANDALONE_GUI)
-	list(APPEND LIBRARIES ${GLUT_LIBRARIES})
+  list(APPEND LIBRARIES ${GLUT_LIBRARIES})
 endif()
 
-# Common configuration.
+list(APPEND LIBRARIES ${CYCLES_GL_LIBRARIES})
 
-link_directories(${OPENIMAGEIO_LIBPATH}
-                 ${BOOST_LIBPATH}
-                 ${PNG_LIBPATH}
-                 ${JPEG_LIBPATH}
-                 ${ZLIB_LIBPATH}
-                 ${TIFF_LIBPATH}
-                 ${OPENEXR_LIBPATH})
+# Common configuration.
 
 add_definitions(${GL_DEFINITIONS})
 
 include_directories(${INC})
 include_directories(SYSTEM ${INC_SYS})
 
-# Make sure given target is linked against proper libraries
-# which varies across debug and release build types.
-#
-# This will also make sure dependencies of that libraries
-# are sent to the linker after them.
-#
-# TODO(sergey): Think of a better place for this?
-macro(cycles_target_link_libraries target)
-	target_link_libraries(${target} ${LIBRARIES})
-	if(WITH_CYCLES_OSL)
-		target_link_libraries_decoupled(${target} OSL_LIBRARIES)
-		if(MSVC)
-			target_link_libraries_debug(${target} "${LLVM_LIBRARIES_DEBUG}")
-			target_link_libraries_optimized(${target} "${LLVM_LIBRARIES}")
-		else()
-			target_link_libraries(${target} ${LLVM_LIBRARIES})
-		endif()
-	endif()
-	target_link_libraries_decoupled(${target} OPENIMAGEIO_LIBRARIES)
-	target_link_libraries_decoupled(${target} OPENEXR_LIBRARIES)
-	target_link_libraries(
-		${target}
-		${PUGIXML_LIBRARIES}
-		${BOOST_LIBRARIES}
-		${CMAKE_DL_LIBS}
-		${PLATFORM_LINKLIBS}
-	)
-endmacro()
-
 # Application build targets
 
 if(WITH_CYCLES_STANDALONE)
-	set(SRC
-		cycles_standalone.cpp
-		cycles_xml.cpp
-		cycles_xml.h
-	)
-	add_executable(cycles ${SRC})
-	cycles_target_link_libraries(cycles)
+  set(SRC
+    cycles_standalone.cpp
+    cycles_xml.cpp
+    cycles_xml.h
+    oiio_output_driver.cpp
+    oiio_output_driver.h
+  )
+  add_executable(cycles ${SRC} ${INC} ${INC_SYS})
+  unset(SRC)
 
-	if(UNIX AND NOT APPLE)
-		set_target_properties(cycles PROPERTIES INSTALL_RPATH $ORIGIN/lib)
-	endif()
-	unset(SRC)
+  target_link_libraries(cycles ${LIBRARIES})
+  cycles_target_link_libraries(cycles)
+
+  if(APPLE)
+    if(WITH_OPENCOLORIO)
+      set_property(TARGET cycles APPEND_STRING PROPERTY LINK_FLAGS " -framework IOKit -framework Carbon")
+    endif()
+    if(WITH_OPENIMAGEDENOISE AND "${CMAKE_OSX_ARCHITECTURES}" STREQUAL "arm64")
+      # OpenImageDenoise uses BNNS from the Accelerate framework.
+      set_property(TARGET cycles APPEND_STRING PROPERTY LINK_FLAGS " -framework Accelerate")
+    endif()
+  endif()
+
+  if(UNIX AND NOT APPLE)
+    set_target_properties(cycles PROPERTIES INSTALL_RPATH $ORIGIN/lib)
+  endif()
+
+  if(CYCLES_STANDALONE_REPOSITORY)
+    cycles_install_libraries(cycles)
+  endif()
 endif()
 
-if(WITH_CYCLES_NETWORK)
-	set(SRC
-		cycles_server.cpp
-	)
-	add_executable(cycles_server ${SRC})
-	cycles_target_link_libraries(cycles_server)
+#####################################################################
+# Cycles cubin compiler executable
+#####################################################################
 
-	if(UNIX AND NOT APPLE)
-		set_target_properties(cycles_server PROPERTIES INSTALL_RPATH $ORIGIN/lib)
-	endif()
-	unset(SRC)
+if(WITH_CYCLES_CUBIN_COMPILER)
+  # 32 bit windows is special, nvrtc is not supported on x86, so even
+  # though we are building 32 bit blender a 64 bit cubin_cc will have
+  # to be build to compile the cubins.
+  if(MSVC AND NOT CMAKE_CL_64)
+    message("Building with CUDA not supported on 32 bit, skipped")
+    set(WITH_CYCLES_CUDA_BINARIES OFF CACHE BOOL "" FORCE)
+  else()
+    set(SRC
+      cycles_cubin_cc.cpp
+    )
+    set(INC
+      ../../../extern/cuew/include
+    )
+    add_executable(cycles_cubin_cc ${SRC})
+    include_directories(${INC})
+    cycles_target_link_libraries(cycles_cubin_cc)
+    unset(SRC)
+    unset(INC)
+  endif()
 endif()

@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -14,175 +12,165 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- *
- * The Original Code is: all of this file.
- *
- * Contributor(s): none yet.
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file blender/blenlib/intern/gsqueue.c
- *  \ingroup bli
+/** \file
+ * \ingroup bli
  *
  * \brief A generic structure queue
  * (a queue for fixed length generally small) structures.
- *
- * \note Only use this if you need (first-in-first-out),
- * otherwise #BLI_Stack is more efficient (first-in-last-out).
  */
 
 #include <string.h>
 
 #include "MEM_guardedalloc.h"
 
-#include "BLI_utildefines.h"
 #include "BLI_gsqueue.h"
 #include "BLI_strict_flags.h"
+#include "BLI_utildefines.h"
 
-typedef struct _GSQueueElem GSQueueElem;
-struct _GSQueueElem {
-	GSQueueElem *next;
-	char data[0];
+/* target chunk size: 64kb */
+#define CHUNK_SIZE_DEFAULT (1 << 16)
+/* ensure we get at least this many elems per chunk */
+#define CHUNK_ELEM_MIN 32
+
+struct QueueChunk {
+  struct QueueChunk *next;
+  char data[0];
 };
 
 struct _GSQueue {
-	GSQueueElem *head;
-	GSQueueElem *tail;
-	size_t elem_size;
+  struct QueueChunk *chunk_first; /* first active chunk to pop from */
+  struct QueueChunk *chunk_last;  /* last active chunk to push onto */
+  struct QueueChunk *chunk_free;  /* free chunks to reuse */
+  size_t chunk_first_index;       /* index into 'chunk_first' */
+  size_t chunk_last_index;        /* index into 'chunk_last' */
+  size_t chunk_elem_max;          /* number of elements per chunk */
+  size_t elem_size;               /* memory size of elements */
+  size_t totelem;                 /* total number of elements */
 };
 
-/**
- * Create a new GSQueue.
- *
- * \param elem_size The size of the structures in the queue.
- * \retval The new queue
- */
-GSQueue *BLI_gsqueue_new(size_t elem_size)
+static void *queue_get_first_elem(GSQueue *queue)
 {
-	GSQueue *gq = MEM_mallocN(sizeof(*gq), "gqueue_new");
-	gq->head = gq->tail = NULL;
-	gq->elem_size = elem_size;
-	
-	return gq;
+  return ((char *)(queue)->chunk_first->data) + ((queue)->elem_size * (queue)->chunk_first_index);
+}
+
+static void *queue_get_last_elem(GSQueue *queue)
+{
+  return ((char *)(queue)->chunk_last->data) + ((queue)->elem_size * (queue)->chunk_last_index);
 }
 
 /**
- * Query if the queue is empty
+ * \return number of elements per chunk, optimized for slop-space.
  */
-bool BLI_gsqueue_is_empty(GSQueue *gq)
+static size_t queue_chunk_elem_max_calc(const size_t elem_size, size_t chunk_size)
 {
-	return (gq->head == NULL);
+  /* get at least this number of elems per chunk */
+  const size_t elem_size_min = elem_size * CHUNK_ELEM_MIN;
+
+  BLI_assert((elem_size != 0) && (chunk_size != 0));
+
+  while (UNLIKELY(chunk_size <= elem_size_min)) {
+    chunk_size <<= 1;
+  }
+
+  /* account for slop-space */
+  chunk_size -= (sizeof(struct QueueChunk) + MEM_SIZE_OVERHEAD);
+
+  return chunk_size / elem_size;
 }
 
-/**
- * Query number elements in the queue
- */
-int BLI_gsqueue_size(GSQueue *gq)
-{ 
-	GSQueueElem *elem;
-	int size = 0;
+GSQueue *BLI_gsqueue_new(const size_t elem_size)
+{
+  GSQueue *queue = MEM_callocN(sizeof(*queue), "BLI_gsqueue_new");
 
-	for (elem = gq->head; elem; elem = elem->next)
-		size++;
-	
-	return size;
+  queue->chunk_elem_max = queue_chunk_elem_max_calc(elem_size, CHUNK_SIZE_DEFAULT);
+  queue->elem_size = elem_size;
+  /* force init */
+  queue->chunk_last_index = queue->chunk_elem_max - 1;
+
+  return queue;
 }
 
-/**
- * Access the item at the head of the queue
- * without removing it.
- *
- * \param r_item: A pointer to an appropriately
- * sized structure (the size passed to #BLI_gsqueue_new)
- */
-void BLI_gsqueue_peek(GSQueue *gq, void *r_item)
+static void queue_free_chunk(struct QueueChunk *data)
 {
-	memcpy(r_item, &gq->head->data, gq->elem_size);
+  while (data) {
+    struct QueueChunk *data_next = data->next;
+    MEM_freeN(data);
+    data = data_next;
+  }
 }
 
-/**
- * Access the item at the head of the queue
- * and remove it.
- *
- * \param r_item: A pointer to an appropriately
- * sized structure (the size passed to #BLI_gsqueue_new).
- * Can be NULL if desired.
- */
-void BLI_gsqueue_pop(GSQueue *gq, void *r_item)
+void BLI_gsqueue_free(GSQueue *queue)
 {
-	GSQueueElem *elem = gq->head;
-	if (elem == gq->tail) {
-		gq->head = gq->tail = NULL;
-	}
-	else {
-		gq->head = gq->head->next;
-	}
-	
-	if (r_item) {
-		memcpy(r_item, elem->data, gq->elem_size);
-	}
-	MEM_freeN(elem);
+  queue_free_chunk(queue->chunk_first);
+  queue_free_chunk(queue->chunk_free);
+  MEM_freeN(queue);
 }
 
-/**
- * Push an element onto the tail of the queue.
- *
- * \param item A pointer to an appropriately
- * sized structure (the size passed to BLI_gsqueue_new).
- */
-void BLI_gsqueue_push(GSQueue *gq, const void *item)
+void BLI_gsqueue_push(GSQueue *queue, const void *item)
 {
-	GSQueueElem *elem;
-	
-	/* compare: prevent events added double in row */
-	if (!BLI_gsqueue_is_empty(gq)) {
-		if (0 == memcmp(item, gq->head->data, gq->elem_size))
-			return;
-	}
-	elem = MEM_mallocN(sizeof(*elem) + gq->elem_size, "gqueue_push");
-	memcpy(elem->data, item, gq->elem_size);
-	elem->next = NULL;
-	
-	if (BLI_gsqueue_is_empty(gq)) {
-		gq->tail = gq->head = elem;
-	}
-	else {
-		gq->tail = gq->tail->next = elem;
-	}
+  queue->chunk_last_index++;
+  queue->totelem++;
+
+  if (UNLIKELY(queue->chunk_last_index == queue->chunk_elem_max)) {
+    struct QueueChunk *chunk;
+    if (queue->chunk_free) {
+      chunk = queue->chunk_free;
+      queue->chunk_free = chunk->next;
+    }
+    else {
+      chunk = MEM_mallocN(sizeof(*chunk) + (queue->elem_size * queue->chunk_elem_max), __func__);
+    }
+
+    chunk->next = NULL;
+
+    if (queue->chunk_last == NULL) {
+      queue->chunk_first = chunk;
+    }
+    else {
+      queue->chunk_last->next = chunk;
+    }
+
+    queue->chunk_last = chunk;
+    queue->chunk_last_index = 0;
+  }
+
+  BLI_assert(queue->chunk_last_index < queue->chunk_elem_max);
+
+  /* Return last of queue */
+  memcpy(queue_get_last_elem(queue), item, queue->elem_size);
 }
 
-/**
- * Push an element back onto the head of the queue (so
- * it would be returned from the next call to BLI_gsqueue_pop).
- *
- * \param item A pointer to an appropriately
- * sized structure (the size passed to BLI_gsqueue_new).
- */
-void BLI_gsqueue_pushback(GSQueue *gq, const void *item)
+void BLI_gsqueue_pop(GSQueue *queue, void *r_item)
 {
-	GSQueueElem *elem = MEM_mallocN(sizeof(*elem) + gq->elem_size, "gqueue_push");
-	memcpy(elem->data, item, gq->elem_size);
-	elem->next = gq->head;
+  BLI_assert(BLI_gsqueue_is_empty(queue) == false);
 
-	if (BLI_gsqueue_is_empty(gq)) {
-		gq->head = gq->tail = elem;
-	}
-	else {
-		gq->head = elem;
-	}
+  memcpy(r_item, queue_get_first_elem(queue), queue->elem_size);
+  queue->chunk_first_index++;
+  queue->totelem--;
+
+  if (UNLIKELY(queue->chunk_first_index == queue->chunk_elem_max || queue->totelem == 0)) {
+    struct QueueChunk *chunk_free = queue->chunk_first;
+
+    queue->chunk_first = queue->chunk_first->next;
+    queue->chunk_first_index = 0;
+    if (queue->chunk_first == NULL) {
+      queue->chunk_last = NULL;
+      queue->chunk_last_index = queue->chunk_elem_max - 1;
+    }
+
+    chunk_free->next = queue->chunk_free;
+    queue->chunk_free = chunk_free;
+  }
 }
 
-/**
- * Free the queue
- */
-void BLI_gsqueue_free(GSQueue *gq)
+size_t BLI_gsqueue_len(const GSQueue *queue)
 {
-	while (gq->head) {
-		BLI_gsqueue_pop(gq, NULL);
-	}
-	MEM_freeN(gq);
+  return queue->totelem;
+}
+
+bool BLI_gsqueue_is_empty(const GSQueue *queue)
+{
+  return (queue->chunk_first == NULL);
 }

@@ -1,6 +1,4 @@
 /*
- * Copyright 2011, Blender Foundation.
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -15,52 +13,54 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor: 
- *		Jeroen Bakker 
- *		Monique Dewanchand
+ * Copyright 2011, Blender Foundation.
  */
 
-#ifndef _COM_GaussianXBlurOperation_h
-#define _COM_GaussianXBlurOperation_h
-#include "COM_NodeOperation.h"
-#include "COM_BlurBaseOperation.h"
+#pragma once
 
-class GaussianXBlurOperation : public BlurBaseOperation {
-private:
-	float *m_gausstab;
-#ifdef __SSE2__
-	__m128 *m_gausstab_sse;
-#endif
-	int m_filtersize;
-	void updateGauss();
-public:
-	GaussianXBlurOperation();
+#include "COM_GaussianBlurBaseOperation.h"
 
-	/**
-	 * @brief the inner loop of this program
-	 */
-	void executePixel(float output[4], int x, int y, void *data);
+namespace blender::compositor {
 
-	void executeOpenCL(OpenCLDevice *device,
-	                   MemoryBuffer *outputMemoryBuffer, cl_mem clOutputBuffer,
-	                   MemoryBuffer **inputMemoryBuffers, list<cl_mem> *clMemToCleanUp,
-	                   list<cl_kernel> *clKernelsToCleanUp);
+/* TODO(manzanilla): everything to be removed with tiled implementation except the constructor. */
+class GaussianXBlurOperation : public GaussianBlurBaseOperation {
+ private:
+  void update_gauss();
 
-	/**
-	 * @brief initialize the execution
-	 */
-	void initExecution();
+ public:
+  GaussianXBlurOperation();
 
-	/**
-	 * @brief Deinitialize the execution
-	 */
-	void deinitExecution();
-	
-	void *initializeTileData(rcti *rect);
-	bool determineDependingAreaOfInterest(rcti *input, ReadBufferOperation *readOperation, rcti *output);
+  /**
+   * \brief The inner loop of this operation.
+   */
+  void execute_pixel(float output[4], int x, int y, void *data) override;
 
-	void checkOpenCL() {
-		this->setOpenCL(m_data.sizex >= 128);
-	}
+  void execute_opencl(OpenCLDevice *device,
+                      MemoryBuffer *output_memory_buffer,
+                      cl_mem cl_output_buffer,
+                      MemoryBuffer **input_memory_buffers,
+                      std::list<cl_mem> *cl_mem_to_clean_up,
+                      std::list<cl_kernel> *cl_kernels_to_clean_up) override;
+
+  /**
+   * \brief initialize the execution
+   */
+  void init_execution() override;
+
+  /**
+   * \brief Deinitialize the execution
+   */
+  void deinit_execution() override;
+
+  void *initialize_tile_data(rcti *rect) override;
+  bool determine_depending_area_of_interest(rcti *input,
+                                            ReadBufferOperation *read_operation,
+                                            rcti *output) override;
+
+  void check_opencl()
+  {
+    flags_.open_cl = (data_.sizex >= 128);
+  }
 };
-#endif
+
+}  // namespace blender::compositor

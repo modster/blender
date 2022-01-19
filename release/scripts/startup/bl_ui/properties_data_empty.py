@@ -17,7 +17,6 @@
 # ##### END GPL LICENSE BLOCK #####
 
 # <pep8 compliant>
-import bpy
 from bpy.types import Panel
 
 
@@ -28,7 +27,8 @@ class DataButtonsPanel:
 
     @classmethod
     def poll(cls, context):
-        return (context.object and context.object.type == 'EMPTY')
+        ob = context.object
+        return (ob and ob.type == 'EMPTY')
 
 
 class DATA_PT_empty(DataButtonsPanel, Panel):
@@ -36,24 +36,62 @@ class DATA_PT_empty(DataButtonsPanel, Panel):
 
     def draw(self, context):
         layout = self.layout
+        layout.use_property_split = True
 
         ob = context.object
 
-        layout.prop(ob, "empty_draw_type", text="Display")
+        layout.prop(ob, "empty_display_type", text="Display As")
+        layout.prop(ob, "empty_display_size", text="Size")
 
-        if ob.empty_draw_type == 'IMAGE':
-            layout.template_ID(ob, "data", open="image.open", unlink="object.unlink_data")
-            layout.template_image(ob, "data", ob.image_user, compact=True)
+        if ob.empty_display_type == 'IMAGE':
+            col = layout.column(align=True)
+            col.prop(ob, "empty_image_offset", text="Offset X", index=0)
+            col.prop(ob, "empty_image_offset", text="Y", index=1)
 
-            row = layout.row(align=True)
-            row = layout.row(align=True)
+            col = layout.column()
+            depth_row = col.row()
+            depth_row.enabled = not ob.show_in_front
+            depth_row.prop(ob, "empty_image_depth", text="Depth", expand=True)
+            col.row().prop(ob, "empty_image_side", text="Side", expand=True)
 
-            layout.prop(ob, "color", text="Transparency", index=3, slider=True)
-            row = layout.row(align=True)
-            row.prop(ob, "empty_image_offset", text="Offset X", index=0)
-            row.prop(ob, "empty_image_offset", text="Offset Y", index=1)
+            col = layout.column(heading="Show In", align=True)
+            col.prop(ob, "show_empty_image_orthographic", text="Orthographic")
+            col.prop(ob, "show_empty_image_perspective", text="Perspective")
+            col.prop(ob, "show_empty_image_only_axis_aligned", text="Only Axis Aligned")
 
-        layout.prop(ob, "empty_draw_size", text="Size")
+            col = layout.column(align=False, heading="Opacity")
+            col.use_property_decorate = False
+            row = col.row(align=True)
+            sub = row.row(align=True)
+            sub.prop(ob, "use_empty_image_alpha", text="")
+            sub = sub.row(align=True)
+            sub.active = ob.use_empty_image_alpha
+            sub.prop(ob, "color", text="", index=3, slider=True)
+            row.prop_decorator(ob, "color", index=3)
+
+
+class DATA_PT_empty_image(DataButtonsPanel, Panel):
+    bl_label = "Image"
+
+    @classmethod
+    def poll(cls, context):
+        ob = context.object
+        return (ob and ob.type == 'EMPTY' and ob.empty_display_type == 'IMAGE')
+
+    def draw(self, context):
+        layout = self.layout
+        ob = context.object
+        layout.template_ID(ob, "data", open="image.open", unlink="object.unlink_data")
+        layout.separator()
+        layout.template_image(ob, "data", ob.image_user, compact=True)
+
+
+classes = (
+    DATA_PT_empty,
+    DATA_PT_empty_image,
+)
 
 if __name__ == "__main__":  # only for live edit.
-    bpy.utils.register_module(__name__)
+    from bpy.utils import register_class
+    for cls in classes:
+        register_class(cls)

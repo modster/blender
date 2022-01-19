@@ -1,15 +1,11 @@
 
-# GTest
 if(WITH_GTESTS)
+  # Otherwise we get warnings here that we can't fix in external projects
+  remove_strict_flags()
 
-	Include(GTestTesting)
+  # Build common test executable used by most tests
+  add_subdirectory(runner)
 
-	# Otherwise we get warnings here that we cant fix in external projects
-	remove_strict_flags()
-
-	add_subdirectory(testing)
-	add_subdirectory(blenlib)
-	add_subdirectory(guardedalloc)
-	add_subdirectory(bmesh)
+  # Build utility library used by test executables
+  add_subdirectory(testing)
 endif()
-

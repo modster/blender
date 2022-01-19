@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -14,24 +12,19 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file source/blender/freestyle/intern/python/BPy_MediumType.h
- *  \ingroup freestyle
+/** \file
+ * \ingroup freestyle
  */
 
-#ifndef __FREESTYLE_PYTHON_MEDIUMTYPE_H__
-#define __FREESTYLE_PYTHON_MEDIUMTYPE_H__
+#pragma once
 
 extern "C" {
 #include <Python.h>
 }
 
 #include "../stroke/Stroke.h"
-
-using namespace Freestyle;
 
 #ifdef __cplusplus
 extern "C" {
@@ -45,7 +38,7 @@ extern PyTypeObject MediumType_Type;
 
 /*---------------------------Python BPy_MediumType structure definition----------*/
 typedef struct {
-	PyLongObject i;
+  PyLongObject i;
 } BPy_MediumType;
 
 /*---------------------------Python BPy_MediumType visible prototypes-----------*/
@@ -57,14 +50,12 @@ extern PyLongObject _BPy_MediumType_DRY_MEDIUM;
 extern PyLongObject _BPy_MediumType_HUMID_MEDIUM;
 extern PyLongObject _BPy_MediumType_OPAQUE_MEDIUM;
 // public constants
-#define BPy_MediumType_DRY_MEDIUM     ((PyObject *)&_BPy_MediumType_DRY_MEDIUM)
-#define BPy_MediumType_HUMID_MEDIUM   ((PyObject *)&_BPy_MediumType_HUMID_MEDIUM)
-#define BPy_MediumType_OPAQUE_MEDIUM  ((PyObject *)&_BPy_MediumType_OPAQUE_MEDIUM)
+#define BPy_MediumType_DRY_MEDIUM ((PyObject *)&_BPy_MediumType_DRY_MEDIUM)
+#define BPy_MediumType_HUMID_MEDIUM ((PyObject *)&_BPy_MediumType_HUMID_MEDIUM)
+#define BPy_MediumType_OPAQUE_MEDIUM ((PyObject *)&_BPy_MediumType_OPAQUE_MEDIUM)
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __FREESTYLE_PYTHON_MEDIUMTYPE_H__ */

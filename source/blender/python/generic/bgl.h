@@ -1,6 +1,4 @@
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -14,21 +12,23 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * Contributor(s): Willian P. Germano
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file blender/python/generic/bgl.h
- *  \ingroup pygen
+/** \file
+ * \ingroup pygen
  */
 
-#ifndef __BGL_H__
-#define __BGL_H__
+#pragma once
 
 PyObject *BPyInit_bgl(void);
 
+/**
+ * Create a buffer object
+ *
+ * \param dimensions: An array of ndimensions integers representing the size of each dimension.
+ * \param initbuffer: When not NULL holds a contiguous buffer
+ * with the correct format from which the buffer will be initialized
+ */
 struct _Buffer *BGL_MakeBuffer(int type, int ndimensions, int *dimensions, void *initbuffer);
 
 int BGL_typeSize(int type);
@@ -39,25 +39,23 @@ int BGL_typeSize(int type);
  * For Python access to OpenGL functions requiring a pointer.
  */
 typedef struct _Buffer {
-	PyObject_VAR_HEAD 
-	PyObject *parent;
+  PyObject_VAR_HEAD
+  PyObject *parent;
 
-	int type;		/* GL_BYTE, GL_SHORT, GL_INT, GL_FLOAT */
-	int ndimensions;
-	int *dimensions;
+  int type; /* GL_BYTE, GL_SHORT, GL_INT, GL_FLOAT */
+  int ndimensions;
+  int *dimensions;
 
-	union {
-		char *asbyte;
-		short *asshort;
-		int *asint;
-		float *asfloat;
-		double *asdouble;
+  union {
+    char *asbyte;
+    short *asshort;
+    int *asint;
+    float *asfloat;
+    double *asdouble;
 
-		void *asvoid;
-	} buf;
+    void *asvoid;
+  } buf;
 } Buffer;
 
-/** The type object */
+/** The type object. */
 extern PyTypeObject BGL_bufferType;
-
-#endif /* __BGL_H__ */

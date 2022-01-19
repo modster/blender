@@ -26,7 +26,10 @@ def write_png(buf, width, height):
     import struct
     # reverse the vertical line order and add null bytes at the start
     width_byte_4 = width * 4
-    raw_data = b"".join(b'\x00' + buf[span:span + width_byte_4] for span in range((height - 1) * width * 4, -1, - width_byte_4))
+    raw_data = b"".join(
+        b'\x00' + buf[span:span + width_byte_4]
+        for span in range((height - 1) * width * 4, -1, - width_byte_4)
+    )
 
     def png_pack(png_tag, data):
         chunk_head = png_tag + data
@@ -66,6 +69,7 @@ def main():
         file_dst = os.path.splitext(arg)[0] + ".png"
 
         icondata_to_png(file_src, file_dst)
+
 
 if __name__ == "__main__":
     main()

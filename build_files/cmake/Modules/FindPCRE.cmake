@@ -14,12 +14,8 @@
 #=============================================================================
 # Copyright 2011 Blender Foundation.
 #
-# Distributed under the OSI-approved BSD License (the "License");
-# see accompanying file Copyright.txt for details.
-#
-# This software is distributed WITHOUT ANY WARRANTY; without even the
-# implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-# See the License for more information.
+# Distributed under the OSI-approved BSD 3-Clause License,
+# see accompanying file BSD-3-Clause-license.txt for details.
 #=============================================================================
 
 # If PCRE_ROOT_DIR was defined in the environment, use it.
@@ -29,10 +25,6 @@ ENDIF()
 
 SET(_pcre_SEARCH_DIRS
   ${PCRE_ROOT_DIR}
-  /usr/local
-  /sw # Fink
-  /opt/local # DarwinPorts
-  /opt/csw # Blastwave
 )
 
 FIND_PATH(PCRE_INCLUDE_DIR pcre.h
@@ -51,16 +43,21 @@ FIND_LIBRARY(PCRE_LIBRARY
     lib64 lib
   )
 
-# handle the QUIETLY and REQUIRED arguments and set PCRE_FOUND to TRUE if 
+# handle the QUIETLY and REQUIRED arguments and set PCRE_FOUND to TRUE if
 # all listed variables are TRUE
 INCLUDE(FindPackageHandleStandardArgs)
 FIND_PACKAGE_HANDLE_STANDARD_ARGS(PCRE DEFAULT_MSG
     PCRE_LIBRARY PCRE_INCLUDE_DIR)
 
+# With 'make deps' precompiled libs, opencollada ships with a copy of libpcre
+# but not the headers, ${PCRE_LIBRARY} will be valid in this case
+# but PCRE_FOUND will be FALSE. So we set this variable outside of
+# the IF(PCRE_FOUND) below to allow blender to successfully link.
+SET(PCRE_LIBRARIES ${PCRE_LIBRARY})
+
 IF(PCRE_FOUND)
-  SET(PCRE_LIBRARIES ${PCRE_LIBRARY})
   SET(PCRE_INCLUDE_DIRS ${PCRE_INCLUDE_DIR})
-ENDIF(PCRE_FOUND)
+ENDIF()
 
 MARK_AS_ADVANCED(
   PCRE_INCLUDE_DIR

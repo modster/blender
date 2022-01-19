@@ -4,7 +4,7 @@ Calling a File Selector
 This example shows how an operator can use the file selector.
 
 Notice the invoke function calls a window manager method and returns
-RUNNING_MODAL, this means the file selector stays open and the operator does not
+``{'RUNNING_MODAL'}``, this means the file selector stays open and the operator does not
 exit immediately after invoke finishes.
 
 The file selector runs the operator, calling :class:`Operator.execute` when the
@@ -21,7 +21,7 @@ class ExportSomeData(bpy.types.Operator):
     bl_idname = "export.some_data"
     bl_label = "Export Some Data"
 
-    filepath = bpy.props.StringProperty(subtype="FILE_PATH")
+    filepath: bpy.props.StringProperty(subtype="FILE_PATH")
 
     @classmethod
     def poll(cls, context):
@@ -42,9 +42,10 @@ def menu_func(self, context):
     self.layout.operator_context = 'INVOKE_DEFAULT'
     self.layout.operator(ExportSomeData.bl_idname, text="Text Export Operator")
 
-# Register and add to the file selector
+
+# Register and add to the file selector (required to also use F3 search "Text Export Operator" for quick access)
 bpy.utils.register_class(ExportSomeData)
-bpy.types.INFO_MT_file_export.append(menu_func)
+bpy.types.TOPBAR_MT_file_export.append(menu_func)
 
 
 # test call

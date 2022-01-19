@@ -1,6 +1,4 @@
 /*
- * Copyright 2011, Blender Foundation.
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -15,46 +13,46 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor: 
- *		Jeroen Bakker 
- *		Monique Dewanchand
+ * Copyright 2011, Blender Foundation.
  */
 
-#ifndef _COM_SingleThreadedOperation_h
-#define _COM_SingleThreadedOperation_h
+#pragma once
+
 #include "COM_NodeOperation.h"
 
+namespace blender::compositor {
+
 class SingleThreadedOperation : public NodeOperation {
-private:
-	MemoryBuffer *m_cachedInstance;
-	
-protected:
-	inline bool isCached() {
-		return this->m_cachedInstance != NULL;
-	}
+ private:
+  MemoryBuffer *cached_instance_;
 
-public:
-	SingleThreadedOperation();
-	
-	/**
-	 * the inner loop of this program
-	 */
-	void executePixel(float output[4], int x, int y, void *data);
-	
-	/**
-	 * Initialize the execution
-	 */
-	void initExecution();
-	
-	/**
-	 * Deinitialize the execution
-	 */
-	void deinitExecution();
+ protected:
+  inline bool is_cached()
+  {
+    return cached_instance_ != nullptr;
+  }
 
-	void *initializeTileData(rcti *rect);
+ public:
+  SingleThreadedOperation();
 
-	virtual MemoryBuffer *createMemoryBuffer(rcti *rect) = 0;
-	
-	int isSingleThreaded() { return true; }
+  /**
+   * The inner loop of this operation.
+   */
+  void execute_pixel(float output[4], int x, int y, void *data) override;
+
+  /**
+   * Initialize the execution
+   */
+  void init_execution() override;
+
+  /**
+   * Deinitialize the execution
+   */
+  void deinit_execution() override;
+
+  void *initialize_tile_data(rcti *rect) override;
+
+  virtual MemoryBuffer *create_memory_buffer(rcti *rect) = 0;
 };
-#endif
+
+}  // namespace blender::compositor

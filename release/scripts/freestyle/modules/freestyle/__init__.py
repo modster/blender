@@ -19,17 +19,8 @@
 """
 This module provides data types of view map components (0D and 1D
 elements), base classes for defining line stylization rules
-(predicates, functions, chaining iterators, and stroke shaders), as
-well as helper functions for style module writing.
-
-Submodules:
-
-* :mod:`freestyle.types`
-* :mod:`freestyle.predicates`
-* :mod:`freestyle.functions`
-* :mod:`freestyle.chainingiterators`
-* :mod:`freestyle.shaders`
-* :mod:`freestyle.utils`
+(predicates, functions, chaining iterators, and stroke shaders),
+as well as helper functions for style module writing.
 """
 
 

@@ -34,20 +34,20 @@ from freestyle.types import (
     TVertex,
     Material,
     ViewEdge,
-    )
+)
 from freestyle.chainingiterators import (
     ChainPredicateIterator,
     ChainSilhouetteIterator,
     pySketchyChainSilhouetteIterator,
     pySketchyChainingIterator,
-    )
+)
 from freestyle.functions import (
     Curvature2DAngleF0D,
     Normal2DF0D,
     QuantitativeInvisibilityF1D,
     VertexOrientation2DF0D,
     CurveMaterialF0D,
-    )
+)
 from freestyle.predicates import (
     AndUP1D,
     ContourUP1D,
@@ -67,7 +67,7 @@ from freestyle.predicates import (
     pyProjectedXBP1D,
     pyProjectedYBP1D,
     pyZBP1D,
-    )
+)
 from freestyle.shaders import (
     BackboneStretcherShader,
     BezierCurveShader,
@@ -86,7 +86,7 @@ from freestyle.shaders import (
     StrokeTextureStepShader,
     ThicknessNoiseShader as thickness_noise,
     TipRemoverShader,
-    )
+)
 from freestyle.utils import (
     angle_x_normal,
     bound,
@@ -103,12 +103,12 @@ from freestyle.utils import (
     pairwise,
     simplify,
     stroke_normal,
-    )
+)
 from _freestyle import (
     blendRamp,
     evaluateColorRamp,
     evaluateCurveMappingF,
-    )
+)
 
 import time
 import bpy
@@ -128,6 +128,7 @@ callbacks_lineset_post = []
 
 class ColorRampModifier(StrokeShader):
     """Primitive for the color modifiers."""
+
     def __init__(self, blend, influence, ramp):
         StrokeShader.__init__(self)
         self.blend = blend
@@ -144,6 +145,7 @@ class ColorRampModifier(StrokeShader):
 
 class ScalarBlendModifier(StrokeShader):
     """Primitive for alpha and thickness modifiers."""
+
     def __init__(self, blend_type, influence):
         StrokeShader.__init__(self)
         self.blend_type = blend_type
@@ -164,7 +166,7 @@ class ScalarBlendModifier(StrokeShader):
             v1 = facm * v1 + fac * v1 / v2 if v2 != 0.0 else v1
         elif self.blend_type == 'DIFFERENCE':
             v1 = facm * v1 + fac * abs(v1 - v2)
-        elif self.blend_type == 'MININUM':
+        elif self.blend_type == 'MINIMUM':
             v1 = min(fac * v2, v1)
         elif self.blend_type == 'MAXIMUM':
             v1 = max(fac * v2, v1)
@@ -188,7 +190,7 @@ class CurveMappingModifier(ScalarBlendModifier):
         # deprecated: return evaluateCurveMappingF(self.curve, 0, t)
         curve = self.curve
         curve.initialize()
-        result = curve.curves[0].evaluate(t)
+        result = curve.evaluate(curve=curve.curves[0], position=t)
         # float precision errors in t can give a very weird result for evaluate.
         # therefore, bound the result by the curve's min and max values
         return bound(curve.clip_min_y, result, curve.clip_max_y)
@@ -304,6 +306,7 @@ class BaseThicknessShader(StrokeShader, ThicknessModifierMixIn):
 
 class ColorAlongStrokeShader(ColorRampModifier):
     """Maps a ramp to the color of the stroke, using the curvilinear abscissa (t)."""
+
     def shade(self, stroke):
         for svert, t in zip(stroke, iter_t2d_along_stroke(stroke)):
             a = svert.attribute.color
@@ -313,6 +316,7 @@ class ColorAlongStrokeShader(ColorRampModifier):
 
 class AlphaAlongStrokeShader(CurveMappingModifier):
     """Maps a curve to the alpha/transparency of the stroke, using the curvilinear abscissa (t)."""
+
     def shade(self, stroke):
         for svert, t in zip(stroke, iter_t2d_along_stroke(stroke)):
             a = svert.attribute.alpha
@@ -322,6 +326,7 @@ class AlphaAlongStrokeShader(CurveMappingModifier):
 
 class ThicknessAlongStrokeShader(ThicknessBlenderMixIn, CurveMappingModifier):
     """Maps a curve to the thickness of the stroke, using the curvilinear abscissa (t)."""
+
     def __init__(self, thickness_position, thickness_ratio,
                  blend, influence, mapping, invert, curve, value_min, value_max):
         ThicknessBlenderMixIn.__init__(self, thickness_position, thickness_ratio)
@@ -338,6 +343,7 @@ class ThicknessAlongStrokeShader(ThicknessBlenderMixIn, CurveMappingModifier):
 
 class ColorDistanceFromCameraShader(ColorRampModifier):
     """Picks a color value from a ramp based on the vertex' distance from the camera."""
+
     def __init__(self, blend, influence, ramp, range_min, range_max):
         ColorRampModifier.__init__(self, blend, influence, ramp)
         self.range = BoundedProperty(range_min, range_max)
@@ -352,6 +358,7 @@ class ColorDistanceFromCameraShader(ColorRampModifier):
 
 class AlphaDistanceFromCameraShader(CurveMappingModifier):
     """Picks an alpha value from a curve based on the vertex' distance from the camera"""
+
     def __init__(self, blend, influence, mapping, invert, curve, range_min, range_max):
         CurveMappingModifier.__init__(self, blend, influence, mapping, invert, curve)
         self.range = BoundedProperty(range_min, range_max)
@@ -366,6 +373,7 @@ class AlphaDistanceFromCameraShader(CurveMappingModifier):
 
 class ThicknessDistanceFromCameraShader(ThicknessBlenderMixIn, CurveMappingModifier):
     """Picks a thickness value from a curve based on the vertex' distance from the camera."""
+
     def __init__(self, thickness_position, thickness_ratio,
                  blend, influence, mapping, invert, curve, range_min, range_max, value_min, value_max):
         ThicknessBlenderMixIn.__init__(self, thickness_position, thickness_ratio)
@@ -383,6 +391,7 @@ class ThicknessDistanceFromCameraShader(ThicknessBlenderMixIn, CurveMappingModif
 
 class ColorDistanceFromObjectShader(ColorRampModifier):
     """Picks a color value from a ramp based on the vertex' distance from a given object."""
+
     def __init__(self, blend, influence, ramp, target, range_min, range_max):
         ColorRampModifier.__init__(self, blend, influence, ramp)
         if target is None:
@@ -391,7 +400,7 @@ class ColorDistanceFromObjectShader(ColorRampModifier):
         # construct a model-view matrix
         matrix = getCurrentScene().camera.matrix_world.inverted()
         # get the object location in the camera coordinate
-        self.loc = matrix * target.location
+        self.loc = matrix @ target.location
 
     def shade(self, stroke):
         it = iter_distance_from_object(stroke, self.loc, *self.range)
@@ -403,6 +412,7 @@ class ColorDistanceFromObjectShader(ColorRampModifier):
 
 class AlphaDistanceFromObjectShader(CurveMappingModifier):
     """Picks an alpha value from a curve based on the vertex' distance from a given object."""
+
     def __init__(self, blend, influence, mapping, invert, curve, target, range_min, range_max):
         CurveMappingModifier.__init__(self, blend, influence, mapping, invert, curve)
         if target is None:
@@ -411,7 +421,7 @@ class AlphaDistanceFromObjectShader(CurveMappingModifier):
         # construct a model-view matrix
         matrix = getCurrentScene().camera.matrix_world.inverted()
         # get the object location in the camera coordinate
-        self.loc = matrix * target.location
+        self.loc = matrix @ target.location
 
     def shade(self, stroke):
         it = iter_distance_from_object(stroke, self.loc, *self.range)
@@ -423,6 +433,7 @@ class AlphaDistanceFromObjectShader(CurveMappingModifier):
 
 class ThicknessDistanceFromObjectShader(ThicknessBlenderMixIn, CurveMappingModifier):
     """Picks a thickness value from a curve based on the vertex' distance from a given object."""
+
     def __init__(self, thickness_position, thickness_ratio,
                  blend, influence, mapping, invert, curve, target, range_min, range_max, value_min, value_max):
         ThicknessBlenderMixIn.__init__(self, thickness_position, thickness_ratio)
@@ -434,7 +445,7 @@ class ThicknessDistanceFromObjectShader(ThicknessBlenderMixIn, CurveMappingModif
         # construct a model-view matrix
         matrix = getCurrentScene().camera.matrix_world.inverted()
         # get the object location in the camera coordinate
-        self.loc = matrix * target.location
+        self.loc = matrix @ target.location
 
     def shade(self, stroke):
         it = iter_distance_from_object(stroke, self.loc, *self.range)
@@ -446,6 +457,7 @@ class ThicknessDistanceFromObjectShader(ThicknessBlenderMixIn, CurveMappingModif
 # Material modifiers
 class ColorMaterialShader(ColorRampModifier):
     """Assigns a color to the vertices based on their underlying material."""
+
     def __init__(self, blend, influence, ramp, material_attribute, use_ramp):
         ColorRampModifier.__init__(self, blend, influence, ramp)
         self.attribute = material_attribute
@@ -474,6 +486,7 @@ class ColorMaterialShader(ColorRampModifier):
 
 class AlphaMaterialShader(CurveMappingModifier):
     """Assigns an alpha value to the vertices based on their underlying material."""
+
     def __init__(self, blend, influence, mapping, invert, curve, material_attribute):
         CurveMappingModifier.__init__(self, blend, influence, mapping, invert, curve)
         self.attribute = material_attribute
@@ -488,6 +501,7 @@ class AlphaMaterialShader(CurveMappingModifier):
 
 class ThicknessMaterialShader(ThicknessBlenderMixIn, CurveMappingModifier):
     """Assigns a thickness value to the vertices based on their underlying material."""
+
     def __init__(self, thickness_position, thickness_ratio,
                  blend, influence, mapping, invert, curve, material_attribute, value_min, value_max):
         ThicknessBlenderMixIn.__init__(self, thickness_position, thickness_ratio)
@@ -506,6 +520,7 @@ class ThicknessMaterialShader(ThicknessBlenderMixIn, CurveMappingModifier):
 
 class CalligraphicThicknessShader(ThicknessBlenderMixIn, ScalarBlendModifier):
     """Thickness modifier for achieving a calligraphy-like effect."""
+
     def __init__(self, thickness_position, thickness_ratio,
                  blend_type, influence, orientation, thickness_min, thickness_max):
         ThicknessBlenderMixIn.__init__(self, thickness_position, thickness_ratio)
@@ -520,7 +535,7 @@ class CalligraphicThicknessShader(ThicknessBlenderMixIn, ScalarBlendModifier):
             dir = self.func(it)
             if dir.length != 0.0:
                 dir.normalize()
-                fac = abs(dir.orthogonal() * self.orientation)
+                fac = abs(dir.orthogonal() @ self.orientation)
                 b = self.thickness.min + fac * self.thickness.delta
             else:
                 b = self.thickness.min
@@ -531,6 +546,7 @@ class CalligraphicThicknessShader(ThicknessBlenderMixIn, ScalarBlendModifier):
 
 class TangentColorShader(ColorRampModifier):
     """Color based on the direction of the stroke"""
+
     def shade(self, stroke):
         it = Interface0DIterator(stroke)
         for svert in it:
@@ -542,6 +558,7 @@ class TangentColorShader(ColorRampModifier):
 
 class TangentAlphaShader(CurveMappingModifier):
     """Alpha transparency based on the direction of the stroke"""
+
     def shade(self, stroke):
         it = Interface0DIterator(stroke)
         for svert in it:
@@ -553,6 +570,7 @@ class TangentAlphaShader(CurveMappingModifier):
 
 class TangentThicknessShader(ThicknessBlenderMixIn, CurveMappingModifier):
     """Thickness based on the direction of the stroke"""
+
     def __init__(self, thickness_position, thickness_ratio, blend, influence, mapping, invert, curve,
                  thickness_min, thickness_max):
         ThicknessBlenderMixIn.__init__(self, thickness_position, thickness_ratio)
@@ -571,6 +589,7 @@ class TangentThicknessShader(ThicknessBlenderMixIn, CurveMappingModifier):
 
 class NoiseShader:
     """Base class for noise shaders"""
+
     def __init__(self, amplitude, period, seed=512):
         self.amplitude = amplitude
         self.scale = 1 / period / seed
@@ -589,7 +608,9 @@ class NoiseShader:
 
 class ThicknessNoiseShader(ThicknessBlenderMixIn, ScalarBlendModifier, NoiseShader):
     """Thickness based on pseudo-noise"""
-    def __init__(self, thickness_position, thickness_ratio, blend_type, influence, amplitude, period, seed=512, asymmetric=True):
+
+    def __init__(self, thickness_position, thickness_ratio, blend_type,
+                 influence, amplitude, period, seed=512, asymmetric=True):
         ScalarBlendModifier.__init__(self, blend_type, influence)
         ThicknessBlenderMixIn.__init__(self, thickness_position, thickness_ratio)
         NoiseShader.__init__(self, amplitude, period, seed)
@@ -605,6 +626,7 @@ class ThicknessNoiseShader(ThicknessBlenderMixIn, ScalarBlendModifier, NoiseShad
 
 class ColorNoiseShader(ColorRampModifier, NoiseShader):
     """Color based on pseudo-noise"""
+
     def __init__(self, blend, influence, ramp, amplitude, period, seed=512):
         ColorRampModifier.__init__(self, blend, influence, ramp)
         NoiseShader.__init__(self, amplitude, period, seed)
@@ -617,6 +639,7 @@ class ColorNoiseShader(ColorRampModifier, NoiseShader):
 
 class AlphaNoiseShader(CurveMappingModifier, NoiseShader):
     """Alpha transparency on based pseudo-noise"""
+
     def __init__(self, blend, influence, mapping, invert, curve, amplitude, period, seed=512):
         CurveMappingModifier.__init__(self, blend, influence, mapping, invert, curve)
         NoiseShader.__init__(self, amplitude, period, seed)
@@ -641,6 +664,7 @@ def crease_angle(svert):
 
 class CreaseAngleColorShader(ColorRampModifier):
     """Color based on the crease angle between two adjacent faces on the underlying geometry"""
+
     def __init__(self, blend, influence, ramp, angle_min, angle_max):
         ColorRampModifier.__init__(self, blend, influence, ramp)
         # angles are (already) in radians
@@ -657,6 +681,7 @@ class CreaseAngleColorShader(ColorRampModifier):
 
 class CreaseAngleAlphaShader(CurveMappingModifier):
     """Alpha transparency based on the crease angle between two adjacent faces on the underlying geometry"""
+
     def __init__(self, blend, influence, mapping, invert, curve, angle_min, angle_max):
         CurveMappingModifier.__init__(self, blend, influence, mapping, invert, curve)
         # angles are (already) in radians
@@ -673,6 +698,7 @@ class CreaseAngleAlphaShader(CurveMappingModifier):
 
 class CreaseAngleThicknessShader(ThicknessBlenderMixIn, CurveMappingModifier):
     """Thickness based on the crease angle between two adjacent faces on the underlying geometry"""
+
     def __init__(self, thickness_position, thickness_ratio, blend, influence, mapping, invert, curve,
                  angle_min, angle_max, thickness_min, thickness_max):
         ThicknessBlenderMixIn.__init__(self, thickness_position, thickness_ratio)
@@ -709,6 +735,7 @@ def normalized_absolute_curvature(svert, bounded_curvature):
 
 class Curvature3DColorShader(ColorRampModifier):
     """Color based on the 3D curvature of the underlying geometry"""
+
     def __init__(self, blend, influence, ramp, curvature_min, curvature_max):
         ColorRampModifier.__init__(self, blend, influence, ramp)
         self.curvature = BoundedProperty(curvature_min, curvature_max)
@@ -723,6 +750,7 @@ class Curvature3DColorShader(ColorRampModifier):
 
 class Curvature3DAlphaShader(CurveMappingModifier):
     """Alpha based on the 3D curvature of the underlying geometry"""
+
     def __init__(self, blend, influence, mapping, invert, curve, curvature_min, curvature_max):
         CurveMappingModifier.__init__(self, blend, influence, mapping, invert, curve)
         self.curvature = BoundedProperty(curvature_min, curvature_max)
@@ -737,13 +765,13 @@ class Curvature3DAlphaShader(CurveMappingModifier):
 
 class Curvature3DThicknessShader(ThicknessBlenderMixIn, CurveMappingModifier):
     """Alpha based on the 3D curvature of the underlying geometry"""
+
     def __init__(self, thickness_position, thickness_ratio, blend, influence, mapping, invert, curve,
                  curvature_min, curvature_max, thickness_min, thickness_max):
         ThicknessBlenderMixIn.__init__(self, thickness_position, thickness_ratio)
         CurveMappingModifier.__init__(self, blend, influence, mapping, invert, curve)
         self.curvature = BoundedProperty(curvature_min, curvature_max)
         self.thickness = BoundedProperty(thickness_min, thickness_max)
-
 
     def shade(self, stroke):
         for svert in stroke:
@@ -756,6 +784,7 @@ class Curvature3DThicknessShader(ThicknessBlenderMixIn, CurveMappingModifier):
 
 class SimplificationShader(StrokeShader):
     """Simplifies a stroke by merging points together"""
+
     def __init__(self, tolerance):
         StrokeShader.__init__(self)
         self.tolerance = tolerance
@@ -774,6 +803,7 @@ class SimplificationShader(StrokeShader):
 
 class SinusDisplacementShader(StrokeShader):
     """Displaces the stroke in a sine wave-like shape."""
+
     def __init__(self, wavelength, amplitude, phase):
         StrokeShader.__init__(self)
         self.wavelength = wavelength
@@ -797,6 +827,7 @@ class PerlinNoise1DShader(StrokeShader):
     that lines with the same length and sampling interval will be
     identically distorded.
     """
+
     def __init__(self, freq=10, amp=10, oct=4, angle=radians(45), seed=-1):
         StrokeShader.__init__(self)
         self.noise = Noise(seed)
@@ -821,6 +852,7 @@ class PerlinNoise2DShader(StrokeShader):
     More information on the noise shaders can be found at:
     freestyleintegration.wordpress.com/2011/09/25/development-updates-on-september-25/
     """
+
     def __init__(self, freq=10, amp=10, oct=4, angle=radians(45), seed=-1):
         StrokeShader.__init__(self)
         self.noise = Noise(seed)
@@ -839,6 +871,7 @@ class PerlinNoise2DShader(StrokeShader):
 
 class Offset2DShader(StrokeShader):
     """Offsets the stroke by a given amount."""
+
     def __init__(self, start, end, x, y):
         StrokeShader.__init__(self)
         self.start = start
@@ -856,6 +889,7 @@ class Offset2DShader(StrokeShader):
 
 class Transform2DShader(StrokeShader):
     """Transforms the stroke (scale, rotation, location) around a given pivot point """
+
     def __init__(self, pivot, scale_x, scale_y, angle, pivot_u, pivot_x, pivot_y):
         StrokeShader.__init__(self)
         self.pivot = pivot
@@ -914,14 +948,25 @@ class QuantitativeInvisibilityRangeUP1D(UnaryPredicate1D):
         return self.qi_start <= qi <= self.qi_end
 
 
+def getQualifiedObjectName(ob):
+    if ob.library is not None:
+        return ob.library.filepath + '/' + ob.name
+    return ob.name
+
+
 class ObjectNamesUP1D(UnaryPredicate1D):
     def __init__(self, names, negative):
         UnaryPredicate1D.__init__(self)
         self.names = names
         self.negative = negative
 
+    def getViewShapeName(self, vs):
+        if vs.library_path is not None and len(vs.library_path):
+            return vs.library_path + '/' + vs.name
+        return vs.name
+
     def __call__(self, viewEdge):
-        found = viewEdge.viewshape.name in self.names
+        found = self.getViewShapeName(viewEdge.viewshape) in self.names
         if self.negative:
             return not found
         return found
@@ -1157,7 +1202,9 @@ class Seed:
             return self.t
         return seed
 
+
 _seed = Seed()
+
 
 def get_dashed_pattern(linestyle):
     """Extracts the dashed pattern from the various UI options """
@@ -1174,6 +1221,15 @@ def get_dashed_pattern(linestyle):
     return pattern
 
 
+def get_grouped_objects(group):
+    for ob in group.objects:
+        if ob.instance_type == 'COLLECTION' and ob.instance_collection is not None:
+            for dupli in get_grouped_objects(ob.instance_collection):
+                yield dupli
+        else:
+            yield ob
+
+
 integration_types = {
     'MEAN': IntegrationType.MEAN,
     'MIN': IntegrationType.MIN,
@@ -1185,7 +1241,7 @@ integration_types = {
 # main function for parameter processing
 def process(layer_name, lineset_name):
     scene = getCurrentScene()
-    layer = scene.render.layers[layer_name]
+    layer = scene.view_layers[layer_name]
     lineset = layer.freestyle_settings.linesets[lineset_name]
     linestyle = lineset.linestyle
 
@@ -1254,10 +1310,10 @@ def process(layer_name, lineset_name):
             upred = NotUP1D(upred)
         selection_criteria.append(upred)
     # prepare selection criteria by group of objects
-    if lineset.select_by_group:
-        if lineset.group is not None:
-            names = {ob.name: True for ob in lineset.group.objects}
-            upred = ObjectNamesUP1D(names, lineset.group_negation == 'EXCLUSIVE')
+    if lineset.select_by_collection:
+        if lineset.collection is not None:
+            names = {getQualifiedObjectName(ob): True for ob in get_grouped_objects(lineset.collection)}
+            upred = ObjectNamesUP1D(names, lineset.collection_negation == 'EXCLUSIVE')
             selection_criteria.append(upred)
     # prepare selection criteria by image border
     if lineset.select_by_image_border:
@@ -1406,10 +1462,11 @@ def process(layer_name, lineset_name):
             shaders_list.append(ColorDistanceFromCameraShader(
                 m.blend, m.influence, m.color_ramp,
                 m.range_min, m.range_max))
-        elif m.type == 'DISTANCE_FROM_OBJECT' and m.target is not None:
-            shaders_list.append(ColorDistanceFromObjectShader(
-                m.blend, m.influence, m.color_ramp, m.target,
-                m.range_min, m.range_max))
+        elif m.type == 'DISTANCE_FROM_OBJECT':
+            if m.target is not None:
+                shaders_list.append(ColorDistanceFromObjectShader(
+                    m.blend, m.influence, m.color_ramp, m.target,
+                    m.range_min, m.range_max))
         elif m.type == 'MATERIAL':
             shaders_list.append(ColorMaterialShader(
                 m.blend, m.influence, m.color_ramp, m.material_attribute,
@@ -1439,10 +1496,11 @@ def process(layer_name, lineset_name):
             shaders_list.append(AlphaDistanceFromCameraShader(
                 m.blend, m.influence, m.mapping, m.invert, m.curve,
                 m.range_min, m.range_max))
-        elif m.type == 'DISTANCE_FROM_OBJECT' and m.target is not None:
-            shaders_list.append(AlphaDistanceFromObjectShader(
-                m.blend, m.influence, m.mapping, m.invert, m.curve, m.target,
-                m.range_min, m.range_max))
+        elif m.type == 'DISTANCE_FROM_OBJECT':
+            if m.target is not None:
+                shaders_list.append(AlphaDistanceFromObjectShader(
+                    m.blend, m.influence, m.mapping, m.invert, m.curve, m.target,
+                    m.range_min, m.range_max))
         elif m.type == 'MATERIAL':
             shaders_list.append(AlphaMaterialShader(
                 m.blend, m.influence, m.mapping, m.invert, m.curve,
@@ -1475,11 +1533,12 @@ def process(layer_name, lineset_name):
                 thickness_position, linestyle.thickness_ratio,
                 m.blend, m.influence, m.mapping, m.invert, m.curve,
                 m.range_min, m.range_max, m.value_min, m.value_max))
-        elif m.type == 'DISTANCE_FROM_OBJECT' and m.target is not None:
-            shaders_list.append(ThicknessDistanceFromObjectShader(
-                thickness_position, linestyle.thickness_ratio,
-                m.blend, m.influence, m.mapping, m.invert, m.curve, m.target,
-                m.range_min, m.range_max, m.value_min, m.value_max))
+        elif m.type == 'DISTANCE_FROM_OBJECT':
+            if m.target is not None:
+                shaders_list.append(ThicknessDistanceFromObjectShader(
+                    thickness_position, linestyle.thickness_ratio,
+                    m.blend, m.influence, m.mapping, m.invert, m.curve, m.target,
+                    m.range_min, m.range_max, m.value_min, m.value_max))
         elif m.type == 'MATERIAL':
             shaders_list.append(ThicknessMaterialShader(
                 thickness_position, linestyle.thickness_ratio,
@@ -1514,16 +1573,9 @@ def process(layer_name, lineset_name):
             raise RuntimeError("No Thickness modifier with type", type(m), m)
     # -- Textures -- #
     has_tex = False
-    if scene.render.use_shading_nodes:
-        if linestyle.use_nodes and linestyle.node_tree:
-            shaders_list.append(BlenderTextureShader(linestyle.node_tree))
-            has_tex = True
-    else:
-        if linestyle.use_texture:
-            textures = tuple(BlenderTextureShader(slot) for slot in linestyle.texture_slots if slot is not None)
-            if textures:
-                shaders_list.extend(textures)
-                has_tex = True
+    if linestyle.use_nodes and linestyle.node_tree:
+        shaders_list.append(BlenderTextureShader(linestyle.node_tree))
+        has_tex = True
     if has_tex:
         shaders_list.append(StrokeTextureStepShader(linestyle.texture_spacing))
 

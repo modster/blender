@@ -17,48 +17,49 @@
 # ##### END GPL LICENSE BLOCK #####
 
 # <pep8-80 compliant>
+from __future__ import annotations
 
 import bpy
-import nodeitems_utils
 from bpy.types import (
-        Operator,
-        PropertyGroup,
-        )
+    Operator,
+    PropertyGroup,
+)
 from bpy.props import (
-        BoolProperty,
-        CollectionProperty,
-        EnumProperty,
-        IntProperty,
-        StringProperty,
-        )
+    BoolProperty,
+    CollectionProperty,
+    EnumProperty,
+    IntProperty,
+    StringProperty,
+)
 
 
 class NodeSetting(PropertyGroup):
-    value = StringProperty(
-            name="Value",
-            description="Python expression to be evaluated as the initial node setting",
-            default="",
-            )
+    value: StringProperty(
+        name="Value",
+        description="Python expression to be evaluated "
+        "as the initial node setting",
+        default="",
+    )
 
 
 # Base class for node 'Add' operators
 class NodeAddOperator:
 
-    type = StringProperty(
-            name="Node Type",
-            description="Node type",
-            )
-    use_transform = BoolProperty(
-            name="Use Transform",
-            description="Start transform operator after inserting the node",
-            default=False,
-            )
-    settings = CollectionProperty(
-            name="Settings",
-            description="Settings to be applied on the newly created node",
-            type=NodeSetting,
-            options={'SKIP_SAVE'},
-            )
+    type: StringProperty(
+        name="Node Type",
+        description="Node type",
+    )
+    use_transform: BoolProperty(
+        name="Use Transform",
+        description="Start transform operator after inserting the node",
+        default=False,
+    )
+    settings: CollectionProperty(
+        name="Settings",
+        description="Settings to be applied on the newly created node",
+        type=NodeSetting,
+        options={'SKIP_SAVE'},
+    )
 
     @staticmethod
     def store_mouse_cursor(context, event):
@@ -68,12 +69,15 @@ class NodeAddOperator:
         # convert mouse position to the View2D for later node placement
         if context.region.type == 'WINDOW':
             # convert mouse position to the View2D for later node placement
-            space.cursor_location_from_region(event.mouse_region_x, event.mouse_region_y)
+            space.cursor_location_from_region(
+                event.mouse_region_x, event.mouse_region_y)
         else:
             space.cursor_location = tree.view_center
 
-    # XXX explicit node_type argument is usually not necessary, but required to make search operator work:
-    # add_search has to override the 'type' property since it's hardcoded in bpy_operator_wrap.c ...
+    # XXX explicit node_type argument is usually not necessary,
+    # but required to make search operator work:
+    # add_search has to override the 'type' property
+    # since it's hardcoded in bpy_operator_wrap.c ...
     def create_node(self, context, node_type=None):
         space = context.space_data
         tree = space.edit_tree
@@ -90,11 +94,20 @@ class NodeAddOperator:
         for setting in self.settings:
             # XXX catch exceptions here?
             value = eval(setting.value)
+            node_data = node
+            node_attr_name = setting.name
+
+            # Support path to nested data.
+            if '.' in node_attr_name:
+                node_data_path, node_attr_name = node_attr_name.rsplit(".", 1)
+                node_data = node.path_resolve(node_data_path)
 
             try:
-                setattr(node, setting.name, value)
+                setattr(node_data, node_attr_name, value)
             except AttributeError as e:
-                self.report({'ERROR_INVALID_INPUT'}, "Node has no attribute " + setting.name)
+                self.report(
+                    {'ERROR_INVALID_INPUT'},
+                    "Node has no attribute " + setting.name)
                 print(str(e))
                 # Continue despite invalid attribute
 
@@ -107,7 +120,8 @@ class NodeAddOperator:
     def poll(cls, context):
         space = context.space_data
         # needs active node editor and a tree to add nodes to
-        return (space.type == 'NODE_EDITOR' and space.edit_tree and not space.edit_tree.library)
+        return (space and (space.type == 'NODE_EDITOR') and
+                space.edit_tree and not space.edit_tree.library)
 
     # Default execute simply adds a node
     def execute(self, context):
@@ -145,10 +159,10 @@ class NODE_OT_add_and_link_node(NodeAddOperator, Operator):
     bl_label = "Add and Link Node"
     bl_options = {'REGISTER', 'UNDO'}
 
-    link_socket_index = IntProperty(
-            name="Link Socket Index",
-            description="Index of the socket to link",
-            )
+    link_socket_index: IntProperty(
+        name="Link Socket Index",
+        description="Index of the socket to link",
+    )
 
     def execute(self, context):
         space = context.space_data
@@ -180,29 +194,36 @@ class NODE_OT_add_search(NodeAddOperator, Operator):
 
     # Create an enum list from node items
     def node_enum_items(self, context):
+        import nodeitems_utils
+
         enum_items = NODE_OT_add_search._enum_item_hack
         enum_items.clear()
 
         for index, item in enumerate(nodeitems_utils.node_items_iter(context)):
             if isinstance(item, nodeitems_utils.NodeItem):
-                nodetype = getattr(bpy.types, item.nodetype, None)
-                if nodetype:
-                    enum_items.append((str(index), item.label, nodetype.bl_rna.description, index))
+                enum_items.append(
+                    (str(index),
+                     item.label,
+                     "",
+                     index,
+                     ))
         return enum_items
 
     # Look up the item based on index
     def find_node_item(self, context):
+        import nodeitems_utils
+
         node_item = int(self.node_item)
         for index, item in enumerate(nodeitems_utils.node_items_iter(context)):
             if index == node_item:
                 return item
         return None
 
-    node_item = EnumProperty(
-            name="Node Type",
-            description="Node type",
-            items=node_enum_items,
-            )
+    node_item: EnumProperty(
+        name="Node Type",
+        description="Node type",
+        items=NODE_OT_add_search.node_enum_items,
+    )
 
     def execute(self, context):
         item = self.find_node_item(context)
@@ -220,7 +241,8 @@ class NODE_OT_add_search(NodeAddOperator, Operator):
             self.create_node(context, item.nodetype)
 
             if self.use_transform:
-                bpy.ops.node.translate_attach_remove_on_cancel('INVOKE_DEFAULT')
+                bpy.ops.node.translate_attach_remove_on_cancel(
+                    'INVOKE_DEFAULT')
 
             return {'FINISHED'}
         else:
@@ -243,7 +265,8 @@ class NODE_OT_collapse_hide_unused_toggle(Operator):
     def poll(cls, context):
         space = context.space_data
         # needs active node editor and a tree
-        return (space.type == 'NODE_EDITOR' and space.edit_tree and not space.edit_tree.library)
+        return (space and (space.type == 'NODE_EDITOR') and
+                (space.edit_tree and not space.edit_tree.library))
 
     def execute(self, context):
         space = context.space_data
@@ -273,7 +296,7 @@ class NODE_OT_tree_path_parent(Operator):
     def poll(cls, context):
         space = context.space_data
         # needs active node editor and a tree
-        return (space.type == 'NODE_EDITOR' and len(space.path) > 1)
+        return (space and (space.type == 'NODE_EDITOR') and len(space.path) > 1)
 
     def execute(self, context):
         space = context.space_data
@@ -281,3 +304,14 @@ class NODE_OT_tree_path_parent(Operator):
         space.path.pop()
 
         return {'FINISHED'}
+
+
+classes = (
+    NodeSetting,
+
+    NODE_OT_add_and_link_node,
+    NODE_OT_add_node,
+    NODE_OT_add_search,
+    NODE_OT_collapse_hide_unused_toggle,
+    NODE_OT_tree_path_parent,
+)

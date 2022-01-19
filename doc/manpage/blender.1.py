@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # ##### BEGIN GPL LICENSE BLOCK #####
 #
@@ -22,7 +22,7 @@
 This script generates the blender.1 man page, embedding the help text
 from the Blender executable itself. Invoke it as follows:
 
-    blender.1.py <path-to-blender> <output-filename>
+    blender.1.py --blender <path-to-blender> --output <output-filename>
 
 where <path-to-blender> is the path to the Blender executable,
 and <output-filename> is where to write the generated man page.
@@ -30,99 +30,147 @@ and <output-filename> is where to write the generated man page.
 
 # <pep8 compliant>
 
+import argparse
+import os
 import subprocess
 import sys
-
 import time
-import datetime
+
+from typing import (
+    Dict,
+    TextIO,
+)
 
 
-def man_format(data):
+def man_format(data: str) -> str:
     data = data.replace("-", "\\-")
     data = data.replace("\t", "  ")
     return data
 
-if len(sys.argv) != 3:
-    import getopt
-    raise getopt.GetoptError("Usage: %s <path-to-blender> <output-filename>" % sys.argv[0])
 
-blender_bin = sys.argv[1]
-outfilename = sys.argv[2]
+def blender_extract_info(blender_bin: str) -> Dict[str, str]:
 
-cmd = [blender_bin, "--help"]
-print("  executing:", " ".join(cmd))
-blender_help = subprocess.check_output(cmd).decode(encoding="utf-8")
-blender_version = subprocess.check_output([blender_bin, "--version"]).decode(encoding="utf-8").strip()
-blender_version = blender_version.split("build")[0].rstrip()
-blender_version = blender_version.partition(" ")[2]  # remove 'Blender' prefix.
-date_string = datetime.date.fromtimestamp(time.time()).strftime("%B %d, %Y")
+    blender_env = {
+        "ASAN_OPTIONS": "exitcode=0:" + os.environ.get("ASAN_OPTIONS", ""),
+    }
 
-outfile = open(outfilename, "w")
-fw = outfile.write
+    blender_help = subprocess.run(
+        [blender_bin, "--help"],
+        env=blender_env,
+        check=True,
+        stdout=subprocess.PIPE,
+    ).stdout.decode(encoding="utf-8")
 
-fw('.TH "BLENDER" "1" "%s" "Blender %s"\n' % (date_string, blender_version.replace(".", "\\&.")))
+    blender_version_output = subprocess.run(
+        [blender_bin, "--version"],
+        env=blender_env,
+        check=True,
+        stdout=subprocess.PIPE,
+    ).stdout.decode(encoding="utf-8")
 
-fw('''
+    # Extract information from the version string.
+    # Note that some internal modules may print errors (e.g. color management),
+    # check for each lines prefix to ensure these aren't included.
+    blender_version = ""
+    blender_date = ""
+    for l in blender_version_output.split("\n"):
+        if l.startswith("Blender "):
+            # Remove 'Blender' prefix.
+            blender_version = l.split(" ", 1)[1].strip()
+        elif l.lstrip().startswith("build date:"):
+            # Remove 'build date:' prefix.
+            blender_date = l.split(":", 1)[1].strip()
+        if blender_version and blender_date:
+            break
+
+    if not blender_date:
+        # Happens when built without WITH_BUILD_INFO e.g.
+        date_string = time.strftime("%B %d, %Y", time.gmtime(int(os.environ.get('SOURCE_DATE_EPOCH', time.time()))))
+    else:
+        date_string = time.strftime("%B %d, %Y", time.strptime(blender_date, "%Y-%m-%d"))
+
+    return {
+        "help": blender_help,
+        "version": blender_version,
+        "date": date_string,
+    }
+
+
+def man_page_from_blender_help(fh: TextIO, blender_bin: str) -> None:
+    blender_info = blender_extract_info(blender_bin)
+
+    # Header Content.
+    fh.write(
+        '.TH "BLENDER" "1" "%s" "Blender %s"\n' %
+        (blender_info["date"], blender_info["version"].replace(".", "\\&."))
+    )
+
+    fh.write(r'''
 .SH NAME
-blender \- a 3D modelling and rendering package''')
+blender \- a full-featured 3D application''')
 
-fw('''
+    fh.write(r'''
 .SH SYNOPSIS
 .B blender [args ...] [file] [args ...]''')
 
-fw('''
+    fh.write(r'''
 .br
 .SH DESCRIPTION
 .PP
 .B blender
-is a 3D modelling and rendering package. Originating as the in-house software of a high quality animation studio, Blender has proven to be an extremely fast and versatile design instrument. The software has a personal touch, offering a unique approach to the world of Three Dimensions.
+is a full-featured 3D application. It supports the entirety of the 3D pipeline - '''
+'''modeling, rigging, animation, simulation, rendering, compositing, motion tracking, and video editing.
 
-Use Blender to create TV commercials, to make technical visualizations, business graphics, to create content for games, or design user interfaces. You can easy build and manage complex environments. The renderer is versatile and extremely fast. All basic animation principles (curves & keys) are well implemented.
+Use Blender to create 3D images and animations, films and commercials, content for games, '''
+r'''architectural and industrial visualizations, and scientific visualizations.
 
-http://www.blender.org''')
+https://www.blender.org''')
 
-fw('''
+    fh.write(r'''
 .SH OPTIONS''')
 
-fw("\n\n")
+    fh.write("\n\n")
 
-lines = [line.rstrip() for line in blender_help.split("\n")]
+    # Body Content.
 
-while lines:
-    l = lines.pop(0)
-    if l.startswith("Environment Variables:"):
-        fw('.SH "ENVIRONMENT VARIABLES"\n')
-    elif l.endswith(":"):  # one line
-        fw('.SS "%s"\n\n' % l)
-    elif l.startswith("-") or l.startswith("/"):  # can be multi line
+    lines = [line.rstrip() for line in blender_info["help"].split("\n")]
 
-        fw('.TP\n')
-        fw('.B %s\n' % man_format(l))
+    while lines:
+        l = lines.pop(0)
+        if l.startswith("Environment Variables:"):
+            fh.write('.SH "ENVIRONMENT VARIABLES"\n')
+        elif l.endswith(":"):  # One line.
+            fh.write('.SS "%s"\n\n' % l)
+        elif l.startswith("-") or l.startswith("/"):  # Can be multi line.
+            fh.write('.TP\n')
+            fh.write('.B %s\n' % man_format(l))
 
-        while lines:
-            # line with no
-            if lines[0].strip() and len(lines[0].lstrip()) == len(lines[0]):  # no white space
-                break
+            while lines:
+                # line with no
+                if lines[0].strip() and len(lines[0].lstrip()) == len(lines[0]):  # No white space.
+                    break
 
-            if not l:  # second blank line
-                fw('.IP\n')
-            else:
-                fw('.br\n')
+                if not l:  # Second blank line.
+                    fh.write('.IP\n')
+                else:
+                    fh.write('.br\n')
 
-            l = lines.pop(0)
-            l = l[1:]  # remove first whitespace (tab)
+                l = lines.pop(0)
+                if l:
+                    assert(l.startswith('\t'))
+                    l = l[1:]  # Remove first white-space (tab).
 
-            fw('%s\n' % man_format(l))
+                fh.write('%s\n' % man_format(l))
 
-    else:
-        if not l.strip():
-            fw('.br\n')
         else:
-            fw('%s\n' % man_format(l))
+            if not l.strip():
+                fh.write('.br\n')
+            else:
+                fh.write('%s\n' % man_format(l))
 
-# footer
+    # Footer Content.
 
-fw('''
+    fh.write(r'''
 .br
 .SH SEE ALSO
 .B luxrender(1)
@@ -134,5 +182,33 @@ This manpage was written for a Debian GNU/Linux system by Daniel Mester
 <cyril.brulebois@enst-bretagne.fr> and Dan Eicher <dan@trollwerks.org>.
 ''')
 
-outfile.close()
-print("written:", outfilename)
+
+def create_argparse() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--output",
+        required=True,
+        help="The man page to write to."
+    )
+    parser.add_argument(
+        "--blender",
+        required=True,
+        help="Path to the blender binary."
+    )
+
+    return parser
+
+
+def main() -> None:
+    parser = create_argparse()
+    args = parser.parse_args()
+
+    blender_bin = args.blender
+    output_filename = args.output
+
+    with open(output_filename, "w", encoding="utf-8") as fh:
+        man_page_from_blender_help(fh, blender_bin)
+
+
+if __name__ == "__main__":
+    main()

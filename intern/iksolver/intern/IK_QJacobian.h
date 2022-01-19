@@ -1,7 +1,5 @@
 
 /*
- * ***** BEGIN GPL LICENSE BLOCK *****
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -18,103 +16,79 @@
  *
  * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
  * All rights reserved.
- *
- * The Original Code is: all of this file.
- *
- * Original Author: Laurence
- * Contributor(s): Brecht
- *
- * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file iksolver/intern/IK_QJacobian.h
- *  \ingroup iksolver
+/** \file
+ * \ingroup intern_iksolver
  */
 
+#pragma once
 
-#ifndef __IK_QJACOBIAN_H__
+#include "IK_Math.h"
 
-#define __IK_QJACOBIAN_H__
+class IK_QJacobian {
+ public:
+  IK_QJacobian();
+  ~IK_QJacobian();
 
-#include "TNT/cmat.h"
-#include <vector>
-#include "MT_Vector3.h"
+  // Call once to initialize
+  void ArmMatrices(int dof, int task_size);
+  void SetDoFWeight(int dof, double weight);
 
-class IK_QJacobian
-{
-public:
-	typedef TNT::Matrix<MT_Scalar> TMatrix;
-	typedef TNT::Vector<MT_Scalar> TVector;
+  // Iteratively called
+  void SetBetas(int id, int size, const Vector3d &v);
+  void SetDerivatives(int id, int dof_id, const Vector3d &v, double norm_weight);
 
-	IK_QJacobian();
-	~IK_QJacobian();
+  void Invert();
 
-	// Call once to initialize
-	void ArmMatrices(int dof, int task_size);
-	void SetDoFWeight(int dof, MT_Scalar weight);
+  double AngleUpdate(int dof_id) const;
+  double AngleUpdateNorm() const;
 
-	// Iteratively called
-	void SetBetas(int id, int size, const MT_Vector3& v);
-	void SetDerivatives(int id, int dof_id, const MT_Vector3& v, MT_Scalar norm_weight);
+  // DoF locking for inner clamping loop
+  void Lock(int dof_id, double delta);
 
-	void Invert();
+  // Secondary task
+  bool ComputeNullProjection();
 
-	MT_Scalar AngleUpdate(int dof_id) const;
-	MT_Scalar AngleUpdateNorm() const;
+  void Restrict(VectorXd &d_theta, MatrixXd &nullspace);
+  void SubTask(IK_QJacobian &jacobian);
 
-	// DoF locking for inner clamping loop
-	void Lock(int dof_id, MT_Scalar delta);
+ private:
+  void InvertSDLS();
+  void InvertDLS();
 
-	// Secondary task
-	bool ComputeNullProjection();
+  int m_dof, m_task_size;
+  bool m_transpose;
 
-	void Restrict(TVector& d_theta, TMatrix& null);
-	void SubTask(IK_QJacobian& jacobian);
+  // the jacobian matrix and its null space projector
+  MatrixXd m_jacobian, m_jacobian_tmp;
+  MatrixXd m_nullspace;
 
-private:
-	
-	void InvertSDLS();
-	void InvertDLS();
+  /// the vector of intermediate betas
+  VectorXd m_beta;
 
-	int m_dof, m_task_size;
-	bool m_transpose;
+  /// the vector of computed angle changes
+  VectorXd m_d_theta;
+  VectorXd m_d_norm_weight;
 
-	// the jacobian matrix and it's null space projector
-	TMatrix m_jacobian, m_jacobian_tmp;
-	TMatrix m_null;
+  /// space required for SVD computation
+  VectorXd m_svd_w;
+  MatrixXd m_svd_v;
+  MatrixXd m_svd_u;
 
-	/// the vector of intermediate betas
-	TVector m_beta;
+  VectorXd m_svd_u_beta;
 
-	/// the vector of computed angle changes
-	TVector m_d_theta;
-	TVector m_d_norm_weight;
+  // space required for SDLS
 
-	/// space required for SVD computation
+  bool m_sdls;
+  VectorXd m_norm;
+  VectorXd m_d_theta_tmp;
+  double m_min_damp;
 
-	TVector m_svd_w;
-	TMatrix m_svd_v;
-	TMatrix m_svd_u;
-    TVector m_work1;
-    TVector m_work2;
+  // null space task vector
+  VectorXd m_alpha;
 
-	TMatrix m_svd_u_t;
-	TVector m_svd_u_beta;
-
-	// space required for SDLS
-
-	bool m_sdls;
-	TVector m_norm;
-	TVector m_d_theta_tmp;
-	MT_Scalar m_min_damp;
-
-	// null space task vector
-	TVector m_alpha;
-
-	// dof weighting
-	TVector m_weight;
-	TVector m_weight_sqrt;
+  // dof weighting
+  VectorXd m_weight;
+  VectorXd m_weight_sqrt;
 };
-
-#endif
-

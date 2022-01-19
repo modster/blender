@@ -21,19 +21,39 @@
 
 # <pep8 compliant>
 
-# Contributor(s): Keith "Wahooney" Boshoff, Campbell Barton
+
+def get_vcolor_layer_data(me):
+    for lay in me.vertex_colors:
+        if lay.active:
+            return lay.data
+
+    lay = me.vertex_colors.new()
+    lay.active = True
+    return lay.data
 
 
-def applyVertexDirt(me, blur_iterations, blur_strength, clamp_dirt, clamp_clean, dirt_only):
+def applyVertexDirt(me, blur_iterations, blur_strength, clamp_dirt, clamp_clean, dirt_only, normalize):
     from mathutils import Vector
     from math import acos
     import array
 
+    # We simulate the accumulation of dirt in the creases of geometric surfaces
+    # by comparing the vertex normal to the average direction of all vertices
+    # connected to that vertex. We can also simulate surfaces being buffed or
+    # worn by testing protruding surfaces.
+    #
+    # So if the angle between the normal and geometric direction is:
+    # < 90 - dirt has accumulated in the crease
+    # > 90 - surface has been worn or buffed
+    # ~ 90 - surface is flat and is generally unworn and clean
+    #
+    # This method is limited by the complexity or lack there of in the geometry.
+    #
+    # Original code and method by Keith "Wahooney" Boshoff.
+
     vert_tone = array.array("f", [0.0]) * len(me.vertices)
 
     # create lookup table for each vertex's connected vertices (via edges)
-    con = []
-
     con = [[] for i in range(len(me.vertices))]
 
     # add connected verts
@@ -50,16 +70,18 @@ def applyVertexDirt(me, blur_iterations, blur_strength, clamp_dirt, clamp_clean,
         for c in con[i]:
             vec += (me.vertices[c].co - co).normalized()
 
-        # normalize the vector by dividing by the number of connected verts
+        # average the vector by dividing by the number of connected verts
         tot_con = len(con[i])
 
         if tot_con == 0:
-            continue
+            ang = pi / 2.0  # assume 90°, i. e. flat
+        else:
+            vec /= tot_con
 
-        vec /= tot_con
-
-        # angle is the acos() of the dot product between vert and connected verts normals
-        ang = acos(no.dot(vec))
+            # angle is the acos() of the dot product between normal and connected verts.
+            # > 90 degrees: convex
+            # < 90 degrees: concave
+            ang = acos(no.dot(vec))
 
         # enforce min/max
         ang = max(clamp_dirt, ang)
@@ -82,8 +104,12 @@ def applyVertexDirt(me, blur_iterations, blur_strength, clamp_dirt, clamp_clean,
             vert_tone[j] /= len(c) * blur_strength + 1
         del orig_vert_tone
 
-    min_tone = min(vert_tone)
-    max_tone = max(vert_tone)
+    if normalize:
+        min_tone = min(vert_tone)
+        max_tone = max(vert_tone)
+    else:
+        min_tone = clamp_dirt
+        max_tone = clamp_clean
 
     tone_range = max_tone - min_tone
 
@@ -93,17 +119,7 @@ def applyVertexDirt(me, blur_iterations, blur_strength, clamp_dirt, clamp_clean,
     else:
         tone_range = 1.0 / tone_range
 
-    active_col_layer = None
-
-    if me.vertex_colors:
-        for lay in me.vertex_colors:
-            if lay.active:
-                active_col_layer = lay.data
-    else:
-        bpy.ops.mesh.vertex_color_add()
-        me.vertex_colors[0].active = True
-        active_col_layer = me.vertex_colors[0].data
-
+    active_col_layer = get_vcolor_layer_data(me)
     if not active_col_layer:
         return {'CANCELLED'}
 
@@ -127,48 +143,53 @@ def applyVertexDirt(me, blur_iterations, blur_strength, clamp_dirt, clamp_clean,
     return {'FINISHED'}
 
 
-import bpy
 from bpy.types import Operator
 from bpy.props import FloatProperty, IntProperty, BoolProperty
 from math import pi
 
 
 class VertexPaintDirt(Operator):
+    '''Generate a dirt map gradient based on cavity'''
     bl_idname = "paint.vertex_color_dirt"
     bl_label = "Dirty Vertex Colors"
     bl_options = {'REGISTER', 'UNDO'}
 
-    blur_strength = FloatProperty(
-            name="Blur Strength",
-            description="Blur strength per iteration",
-            min=0.01, max=1.0,
-            default=1.0,
-            )
-    blur_iterations = IntProperty(
-            name="Blur Iterations",
-            description="Number of times to blur the colors (higher blurs more)",
-            min=0, max=40,
-            default=1,
-            )
-    clean_angle = FloatProperty(
-            name="Highlight Angle",
-            description="Less than 90 limits the angle used in the tonal range",
-            min=0.0, max=pi,
-            default=pi,
-            unit="ROTATION",
-            )
-    dirt_angle = FloatProperty(
-            name="Dirt Angle",
-            description="Less than 90 limits the angle used in the tonal range",
-            min=0.0, max=pi,
-            default=0.0,
-            unit="ROTATION",
-            )
-    dirt_only = BoolProperty(
-            name="Dirt Only",
-            description="Don't calculate cleans for convex areas",
-            default=False,
-            )
+    blur_strength: FloatProperty(
+        name="Blur Strength",
+        description="Blur strength per iteration",
+        min=0.01, max=1.0,
+        default=1.0,
+    )
+    blur_iterations: IntProperty(
+        name="Blur Iterations",
+        description="Number of times to blur the colors (higher blurs more)",
+        min=0, max=40,
+        default=1,
+    )
+    clean_angle: FloatProperty(
+        name="Highlight Angle",
+        description="Less than 90 limits the angle used in the tonal range",
+        min=0.0, max=pi,
+        default=pi,
+        unit='ROTATION',
+    )
+    dirt_angle: FloatProperty(
+        name="Dirt Angle",
+        description="Less than 90 limits the angle used in the tonal range",
+        min=0.0, max=pi,
+        default=0.0,
+        unit='ROTATION',
+    )
+    dirt_only: BoolProperty(
+        name="Dirt Only",
+        description="Don't calculate cleans for convex areas",
+        default=False,
+    )
+    normalize: BoolProperty(
+        name="Normalize",
+        description="Normalize the colors, increasing the contrast",
+        default=True,
+    )
 
     @classmethod
     def poll(cls, context):
@@ -179,6 +200,19 @@ class VertexPaintDirt(Operator):
         obj = context.object
         mesh = obj.data
 
-        ret = applyVertexDirt(mesh, self.blur_iterations, self.blur_strength, self.dirt_angle, self.clean_angle, self.dirt_only)
+        ret = applyVertexDirt(
+            mesh,
+            self.blur_iterations,
+            self.blur_strength,
+            self.dirt_angle,
+            self.clean_angle,
+            self.dirt_only,
+            self.normalize,
+        )
 
         return ret
+
+
+classes = (
+    VertexPaintDirt,
+)

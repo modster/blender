@@ -14,8 +14,6 @@
 #  along with this program; if not, write to the Free Software Foundation,
 #  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 #
-# Contributor(s): Campbell Barton
-#
 # ##### END GPL LICENSE BLOCK #####
 
 # <pep8 compliant>
@@ -64,7 +62,7 @@ def seek(r, txt, recurs):
     # print(dir(r))
 
     # basic types
-    if type_r in (float, int, bool, type(None)):
+    if type_r in {float, int, bool, type(None)}:
         if PRINT_DATA:
             print(txt + ' -> ' + str(r))
         return
@@ -129,19 +127,22 @@ def seek(r, txt, recurs):
                     newtxt = txt + '[' + str(i) + ']'
                 seek(r[i], newtxt, recurs + 1)
 
+
 seek(bpy.data, 'bpy.data', 0)
 # seek(bpy.types, 'bpy.types', 0)
 '''
 for d in dir(bpy.types):
     t = getattr(bpy.types, d)
-    try:	r = t.bl_rna
-    except:	r = None
+    try:
+        r = t.bl_rna
+    except:
+        r = None
     if r:
         seek(r, 'bpy.types.' + d + '.bl_rna', 0)
 '''
 
-#print dir(bpy)
+# print dir(bpy)
 #import sys
-#sys.exit()
+# sys.exit()
 
 print("iter over ", seek_count, "rna items")

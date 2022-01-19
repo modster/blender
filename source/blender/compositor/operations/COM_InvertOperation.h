@@ -1,6 +1,4 @@
 /*
- * Copyright 2011, Blender Foundation.
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -15,46 +13,56 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor: 
- *		Jeroen Bakker 
- *		Monique Dewanchand
+ * Copyright 2011, Blender Foundation.
  */
 
-#ifndef _COM_InvertOperation_h
-#define _COM_InvertOperation_h
-#include "COM_NodeOperation.h"
+#pragma once
 
+#include "COM_MultiThreadedOperation.h"
 
-class InvertOperation : public NodeOperation {
-private:
-	/**
-	 * Cached reference to the inputProgram
-	 */
-	SocketReader *m_inputValueProgram;
-	SocketReader *m_inputColorProgram;
-	
-	bool m_alpha;
-	bool m_color;
+namespace blender::compositor {
 
-public:
-	InvertOperation();
-	
-	/**
-	 * the inner loop of this program
-	 */
-	void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
-	
-	/**
-	 * Initialize the execution
-	 */
-	void initExecution();
-	
-	/**
-	 * Deinitialize the execution
-	 */
-	void deinitExecution();
-	
-	void setColor(bool color) { this->m_color = color; }
-	void setAlpha(bool alpha) { this->m_alpha = alpha; }
+class InvertOperation : public MultiThreadedOperation {
+ private:
+  /**
+   * Cached reference to the input_program
+   */
+  SocketReader *input_value_program_;
+  SocketReader *input_color_program_;
+
+  bool alpha_;
+  bool color_;
+
+ public:
+  InvertOperation();
+
+  /**
+   * The inner loop of this operation.
+   */
+  void execute_pixel_sampled(float output[4], float x, float y, PixelSampler sampler) override;
+
+  /**
+   * Initialize the execution
+   */
+  void init_execution() override;
+
+  /**
+   * Deinitialize the execution
+   */
+  void deinit_execution() override;
+
+  void set_color(bool color)
+  {
+    color_ = color;
+  }
+  void set_alpha(bool alpha)
+  {
+    alpha_ = alpha;
+  }
+
+  void update_memory_buffer_partial(MemoryBuffer *output,
+                                    const rcti &area,
+                                    Span<MemoryBuffer *> inputs) override;
 };
-#endif
+
+}  // namespace blender::compositor

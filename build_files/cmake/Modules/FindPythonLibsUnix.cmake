@@ -25,12 +25,8 @@
 #=============================================================================
 # Copyright 2011 Blender Foundation.
 #
-# Distributed under the OSI-approved BSD License (the "License");
-# see accompanying file Copyright.txt for details.
-#
-# This software is distributed WITHOUT ANY WARRANTY; without even the
-# implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-# See the License for more information.
+# Distributed under the OSI-approved BSD 3-Clause License,
+# see accompanying file BSD-3-Clause-license.txt for details.
 #=============================================================================
 
 # If PYTHON_ROOT_DIR was defined in the environment, use it.
@@ -38,7 +34,7 @@ IF(NOT PYTHON_ROOT_DIR AND NOT $ENV{PYTHON_ROOT_DIR} STREQUAL "")
   SET(PYTHON_ROOT_DIR $ENV{PYTHON_ROOT_DIR})
 ENDIF()
 
-SET(PYTHON_VERSION 3.4 CACHE STRING "Python Version (major and minor only)")
+SET(PYTHON_VERSION 3.9 CACHE STRING "Python Version (major and minor only)")
 MARK_AS_ADVANCED(PYTHON_VERSION)
 
 
@@ -48,7 +44,7 @@ SET(PYTHON_LINKFLAGS "-Xlinker -export-dynamic" CACHE STRING "Linker flags for p
 MARK_AS_ADVANCED(PYTHON_LINKFLAGS)
 
 
-# if the user passes these defines as args, we dont want to overwrite
+# if the user passes these defines as args, we don't want to overwrite
 SET(_IS_INC_DEF OFF)
 SET(_IS_INC_CONF_DEF OFF)
 SET(_IS_LIB_DEF OFF)
@@ -71,24 +67,20 @@ STRING(REPLACE "." "" _PYTHON_VERSION_NO_DOTS ${PYTHON_VERSION})
 SET(_python_SEARCH_DIRS
   ${PYTHON_ROOT_DIR}
   "$ENV{HOME}/py${_PYTHON_VERSION_NO_DOTS}"
-  "/opt/py${_PYTHON_VERSION_NO_DOTS}"
   "/opt/lib/python-${PYTHON_VERSION}"
 )
 
-# only search for the dirs if we havn't already
+# only search for the dirs if we haven't already
 IF((NOT _IS_INC_DEF) OR (NOT _IS_INC_CONF_DEF) OR (NOT _IS_LIB_DEF) OR (NOT _IS_LIB_PATH_DEF))
-
-  SET(_python_ABI_FLAGS
-    "m;mu;u; "    # release
-    "dm;dmu;du;d" # debug
+  SET(_PYTHON_ABI_FLAGS_TEST
+    "u; "  # release
+    "du;d" # debug
   )
 
-
-
-  FOREACH(_CURRENT_ABI_FLAGS ${_python_ABI_FLAGS})
-    #IF(CMAKE_BUILD_TYPE STREQUAL Debug)
-    #  SET(_CURRENT_ABI_FLAGS "d${_CURRENT_ABI_FLAGS}")
-    #ENDIF()
+  FOREACH(_CURRENT_ABI_FLAGS ${_PYTHON_ABI_FLAGS_TEST})
+    # IF(CMAKE_BUILD_TYPE STREQUAL Debug)
+    #   SET(_CURRENT_ABI_FLAGS "d${_CURRENT_ABI_FLAGS}")
+    # ENDIF()
     STRING(REPLACE " " "" _CURRENT_ABI_FLAGS ${_CURRENT_ABI_FLAGS})
 
     IF(NOT DEFINED PYTHON_INCLUDE_DIR)
@@ -151,7 +143,7 @@ IF((NOT _IS_INC_DEF) OR (NOT _IS_INC_CONF_DEF) OR (NOT _IS_LIB_DEF) OR (NOT _IS_
       SET(_PYTHON_ABI_FLAGS "${_CURRENT_ABI_FLAGS}")
       break()
     ELSE()
-      # ensure we dont find values from 2 different ABI versions
+      # ensure we don't find values from 2 different ABI versions
       IF(NOT _IS_INC_DEF)
         UNSET(PYTHON_INCLUDE_DIR CACHE)
       ENDIF()
@@ -170,7 +162,7 @@ IF((NOT _IS_INC_DEF) OR (NOT _IS_INC_CONF_DEF) OR (NOT _IS_LIB_DEF) OR (NOT _IS_
   UNSET(_CURRENT_ABI_FLAGS)
   UNSET(_CURRENT_PATH)
 
-  UNSET(_python_ABI_FLAGS)
+  UNSET(_PYTHON_ABI_FLAGS_TEST)
 ENDIF()
 
 UNSET(_IS_INC_DEF)
@@ -178,7 +170,7 @@ UNSET(_IS_INC_CONF_DEF)
 UNSET(_IS_LIB_DEF)
 UNSET(_IS_LIB_PATH_DEF)
 
-# handle the QUIETLY and REQUIRED arguments and SET PYTHONLIBSUNIX_FOUND to TRUE IF 
+# handle the QUIETLY and REQUIRED arguments and SET PYTHONLIBSUNIX_FOUND to TRUE IF
 # all listed variables are TRUE
 INCLUDE(FindPackageHandleStandardArgs)
 FIND_PACKAGE_HANDLE_STANDARD_ARGS(PythonLibsUnix  DEFAULT_MSG
@@ -199,7 +191,7 @@ IF(PYTHONLIBSUNIX_FOUND)
   )
 
   # we need this for installation
-  # XXX No more valid with debian-like py3.4 packages...
+  # XXX No more valid with debian-like py3.5 packages...
 #  GET_FILENAME_COMPONENT(PYTHON_LIBPATH ${PYTHON_LIBRARY} PATH)
 
   # not required for build, just used when bundling Python.

@@ -1,6 +1,4 @@
 /*
- * Copyright 2011, Blender Foundation.
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -15,31 +13,33 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor: 
- *		Jeroen Bakker 
- *		Monique Dewanchand
+ * Copyright 2011, Blender Foundation.
  */
 
-#ifndef _COM_ChunkOrder_h_
-#define _COM_ChunkOrder_h_
+#pragma once
+
+#ifdef WITH_CXX_GUARDEDALLOC
+#  include "MEM_guardedalloc.h"
+#endif
 
 #include "COM_ChunkOrderHotspot.h"
-class ChunkOrder {
-private:
-	unsigned int m_number;
-	int m_x;
-	int m_y;
-	double m_distance;
-public:
-	ChunkOrder();
-	void determineDistance(ChunkOrderHotspot **hotspots, unsigned int numberOfHotspots);
-	friend bool operator<(const ChunkOrder &a, const ChunkOrder &b);
-	
-	void setChunkNumber(unsigned int chunknumber) { this->m_number = chunknumber; }
-	void setX(int x) { this->m_x = x; }
-	void setY(int y) { this->m_y = y; }
-	unsigned int getChunkNumber() { return this->m_number; }
-	double getDistance() { return this->m_distance; }
+
+namespace blender::compositor {
+
+/** Helper to determine the order how chunks are prioritized during execution. */
+struct ChunkOrder {
+  unsigned int index = 0;
+  int x = 0;
+  int y = 0;
+  double distance = 0.0;
+
+  friend bool operator<(const ChunkOrder &a, const ChunkOrder &b);
+
+  void update_distance(ChunkOrderHotspot *hotspots, unsigned int len_hotspots);
+
+#ifdef WITH_CXX_GUARDEDALLOC
+  MEM_CXX_CLASS_ALLOC_FUNCS("COM:ChunkOrderHotspot")
+#endif
 };
 
-#endif
+}  // namespace blender::compositor

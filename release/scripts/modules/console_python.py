@@ -68,7 +68,7 @@ def get_console(console_id):
         # check if clearing the namespace is needed to avoid a memory leak.
         # the window manager is normally loaded with new blend files
         # so this is a reasonable way to deal with namespace clearing.
-        # bpy.data hashing is reset by undo so cant be used.
+        # bpy.data hashing is reset by undo so can't be used.
         hash_prev = getattr(get_console, "consoles_namespace_hash", 0)
 
         if hash_prev != hash_next:
@@ -136,33 +136,40 @@ def execute(context, is_interactive):
 
     console, stdout, stderr = get_console(hash(context.region))
 
-    # redirect output
-    sys.stdout = stdout
-    sys.stderr = stderr
-
-    # don't allow the stdin to be used, can lock blender.
-    stdin_backup = sys.stdin
-    sys.stdin = None
-
     if _BPY_MAIN_OWN:
         main_mod_back = sys.modules["__main__"]
         sys.modules["__main__"] = console._bpy_main_mod
 
-    # in case exception happens
-    line = ""  # in case of encoding error
-    is_multiline = False
+    # redirect output
+    from contextlib import (
+        redirect_stdout,
+        redirect_stderr,
+    )
 
-    try:
-        line = line_object.body
+    # not included with Python
+    class redirect_stdin(redirect_stdout.__base__):
+        _stream = "stdin"
 
-        # run the console, "\n" executes a multi line statement
-        line_exec = line if line.strip() else "\n"
+    # don't allow the stdin to be used, can lock blender.
+    with redirect_stdout(stdout), \
+            redirect_stderr(stderr), \
+            redirect_stdin(None):
 
-        is_multiline = console.push(line_exec)
-    except:
-        # unlikely, but this can happen with unicode errors for example.
-        import traceback
-        stderr.write(traceback.format_exc())
+        # in case exception happens
+        line = ""  # in case of encoding error
+        is_multiline = False
+
+        try:
+            line = line_object.body
+
+            # run the console, "\n" executes a multi line statement
+            line_exec = line if line.strip() else "\n"
+
+            is_multiline = console.push(line_exec)
+        except:
+            # unlikely, but this can happen with unicode errors for example.
+            import traceback
+            stderr.write(traceback.format_exc())
 
     if _BPY_MAIN_OWN:
         sys.modules["__main__"] = main_mod_back
@@ -174,8 +181,6 @@ def execute(context, is_interactive):
     output_err = stderr.read()
 
     # cleanup
-    sys.stdout = sys.__stdout__
-    sys.stderr = sys.__stderr__
     sys.last_traceback = None
 
     # So we can reuse, clear all data
@@ -213,21 +218,17 @@ def execute(context, is_interactive):
     if output_err:
         add_scrollback(output_err, 'ERROR')
 
-    # restore the stdin
-    sys.stdin = stdin_backup
-
     # execute any hooks
     for func, args in execute.hooks:
         func(*args)
 
     return {'FINISHED'}
 
+
 execute.hooks = []
 
 
 def autocomplete(context):
-    _readline_bypass()
-
     from console import intellisense
 
     sc = context.space_data
@@ -256,10 +257,10 @@ def autocomplete(context):
         # This function isn't aware of the text editor or being an operator
         # just does the autocomplete then copy its results back
         result = intellisense.expand(
-                line=line,
-                cursor=current_line.current_character,
-                namespace=console.locals,
-                private=bpy.app.debug_python)
+            line=line,
+            cursor=current_line.current_character,
+            namespace=console.locals,
+            private=bpy.app.debug_python)
 
         line_new = result[0]
         current_line.body, current_line.current_character, scrollback = result
@@ -338,34 +339,20 @@ def banner(context):
     sc = context.space_data
     version_string = sys.version.strip().replace('\n', ' ')
 
-    add_scrollback("PYTHON INTERACTIVE CONSOLE %s" % version_string, 'OUTPUT')
-    add_scrollback("", 'OUTPUT')
-    add_scrollback("Command History:     Up/Down Arrow", 'OUTPUT')
-    add_scrollback("Cursor:              Left/Right Home/End", 'OUTPUT')
-    add_scrollback("Remove:              Backspace/Delete", 'OUTPUT')
-    add_scrollback("Execute:             Enter", 'OUTPUT')
-    add_scrollback("Autocomplete:        Ctrl-Space", 'OUTPUT')
-    add_scrollback("Zoom:                Ctrl +/-, Ctrl-Wheel", 'OUTPUT')
-    add_scrollback("Builtin Modules:     bpy, bpy.data, bpy.ops, "
-                   "bpy.props, bpy.types, bpy.context, bpy.utils, "
-                   "bgl, blf, mathutils",
-                   'OUTPUT')
-    add_scrollback("Convenience Imports: from mathutils import *; "
-                   "from math import *", 'OUTPUT')
-    add_scrollback("Convenience Variables: C = bpy.context, D = bpy.data",
-                   'OUTPUT')
-    add_scrollback("", 'OUTPUT')
+    message = (
+        "PYTHON INTERACTIVE CONSOLE %s" % version_string,
+        "",
+        "Builtin Modules:       "
+        "bpy, bpy.data, bpy.ops, bpy.props, bpy.types, bpy.context, bpy.utils, bgl, blf, mathutils",
+
+        "Convenience Imports:   from mathutils import *; from math import *",
+        "Convenience Variables: C = bpy.context, D = bpy.data",
+        "",
+    )
+
+    for line in message:
+        add_scrollback(line, 'OUTPUT')
+
     sc.prompt = PROMPT
 
     return {'FINISHED'}
-
-
-# workaround for readline crashing, see: T43491
-def _readline_bypass():
-    if "rlcompleter" in sys.modules or "readline" in sys.modules:
-        return
-
-    # prevent 'rlcompleter' from loading the real 'readline' module.
-    sys.modules["readline"] = None
-    import rlcompleter
-    del sys.modules["readline"]

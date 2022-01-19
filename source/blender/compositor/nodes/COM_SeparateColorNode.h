@@ -1,6 +1,4 @@
 /*
- * Copyright 2011, Blender Foundation.
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -15,60 +13,59 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor: 
- *		Jeroen Bakker 
- *		Monique Dewanchand
- *		Lukas Toenne
+ * Copyright 2011, Blender Foundation.
  */
 
-#ifndef _COM_SeparateColorNode_h_
-#define _COM_SeparateColorNode_h_
+#pragma once
 
 #include "COM_Node.h"
 
+namespace blender::compositor {
+
 class SeparateColorNode : public Node {
-public:
-	SeparateColorNode(bNode *editorNode);
-	void convertToOperations(NodeConverter &converter, const CompositorContext &context) const;
-	
-protected:
-	virtual NodeOperation *getColorConverter(const CompositorContext &context) const = 0;
+ public:
+  SeparateColorNode(bNode *editor_node);
+  void convert_to_operations(NodeConverter &converter,
+                             const CompositorContext &context) const override;
+
+ protected:
+  virtual NodeOperation *get_color_converter(const CompositorContext &context) const = 0;
 };
 
 class SeparateRGBANode : public SeparateColorNode {
-public:
-	SeparateRGBANode(bNode *editorNode) :
-	    SeparateColorNode(editorNode)
-	{}
-	
-	NodeOperation *getColorConverter(const CompositorContext &context) const;
+ public:
+  SeparateRGBANode(bNode *editor_node) : SeparateColorNode(editor_node)
+  {
+  }
+
+  NodeOperation *get_color_converter(const CompositorContext &context) const override;
 };
 
 class SeparateHSVANode : public SeparateColorNode {
-public:
-	SeparateHSVANode(bNode *editorNode) :
-	    SeparateColorNode(editorNode)
-	{}
-	
-	NodeOperation *getColorConverter(const CompositorContext &context) const;
+ public:
+  SeparateHSVANode(bNode *editor_node) : SeparateColorNode(editor_node)
+  {
+  }
+
+  NodeOperation *get_color_converter(const CompositorContext &context) const override;
 };
 
 class SeparateYCCANode : public SeparateColorNode {
-public:
-	SeparateYCCANode(bNode *editorNode) :
-	    SeparateColorNode(editorNode)
-	{}
-	
-	NodeOperation *getColorConverter(const CompositorContext &context) const;
+ public:
+  SeparateYCCANode(bNode *editor_node) : SeparateColorNode(editor_node)
+  {
+  }
+
+  NodeOperation *get_color_converter(const CompositorContext &context) const override;
 };
 
 class SeparateYUVANode : public SeparateColorNode {
-public:
-	SeparateYUVANode(bNode *editorNode) :
-	    SeparateColorNode(editorNode)
-	{}
-	
-	NodeOperation *getColorConverter(const CompositorContext &context) const;
+ public:
+  SeparateYUVANode(bNode *editor_node) : SeparateColorNode(editor_node)
+  {
+  }
+
+  NodeOperation *get_color_converter(const CompositorContext &context) const override;
 };
 
-#endif
+}  // namespace blender::compositor
