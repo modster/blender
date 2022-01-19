@@ -12,28 +12,19 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2012 Blender Foundation.
- * All rights reserved.
  */
+
+#pragma once
 
 /** \file
- * \ingroup nodes
+ * \ingroup bmesh
  */
 
-#include "BLI_utildefines.h"
+#include "BLI_compiler_attrs.h"
 
-#include "DNA_node_types.h"
+#include "bmesh.h"
 
-#include "BKE_context.h"
-#include "BKE_screen.h"
-
-#include "WM_api.h"
-
-#include "node_intern.hh" /* own include */
-
-/* ******************* node toolbar registration ************** */
-
-void node_toolbar_register(ARegionType *UNUSED(art))
-{
-}
+#ifndef NDEBUG
+char *BM_mesh_debug_info(BMesh *bm) ATTR_NONNULL(1) ATTR_MALLOC ATTR_WARN_UNUSED_RESULT;
+void BM_mesh_debug_print(BMesh *bm) ATTR_NONNULL(1);
+#endif /* NDEBUG */
