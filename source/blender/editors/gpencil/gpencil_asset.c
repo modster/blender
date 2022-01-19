@@ -1373,8 +1373,8 @@ static int gpencil_asset_import_modal(bContext *C, wmOperator *op, const wmEvent
             ED_area_status_text(tgpa->area, NULL);
             ED_workspace_status_text(C, NULL);
             WM_cursor_modal_restore(win);
-            /* Apply selection depending of mode. */
-            gpencil_asset_set_selection(tgpa, GPENCIL_EDIT_MODE(tgpa->gpd));
+            /* Select always the strokes. */
+            gpencil_asset_set_selection(tgpa, true);
 
             gpencil_asset_import_exit(C, op);
             return OPERATOR_FINISHED;
