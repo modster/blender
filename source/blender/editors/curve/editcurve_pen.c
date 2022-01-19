@@ -1169,6 +1169,7 @@ static void extrude_vertices_from_selected_endpoints(EditNurb *editnurb,
           nu1->bp = new_bp;
           nu1->pntsu++;
         }
+        BKE_nurb_knot_calc_u(nu1);
       }
       else if (last_sel) {
         BPoint *new_bp = (BPoint *)MEM_mallocN((nu1->pntsu + 1) * sizeof(BPoint), __func__);
@@ -1180,6 +1181,7 @@ static void extrude_vertices_from_selected_endpoints(EditNurb *editnurb,
         MEM_freeN(nu1->bp);
         nu1->bp = new_bp;
         nu1->pntsu++;
+        BKE_nurb_knot_calc_u(nu1);
       }
     }
   }
