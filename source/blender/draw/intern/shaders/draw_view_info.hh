@@ -25,8 +25,19 @@ GPU_SHADER_CREATE_INFO(draw_mesh)
     .additional_info("draw_view");
 
 GPU_SHADER_CREATE_INFO(draw_hair)
-    /* TODO(fclem) Finish */
     .uniform_buf(8, "ObjectMatrices", "drw_matrices[DRW_RESOURCE_CHUNK_LEN]", Frequency::BATCH)
+    .sampler(15, ImageType::FLOAT_BUFFER, "hairPointBuffer")
+    .sampler(14, ImageType::UINT_BUFFER, "hairStrandBuffer")
+    .sampler(13, ImageType::UINT_BUFFER, "hairStrandSegBuffer")
+    /* TODO(fclem) Pack thoses into one UBO. */
+    .push_constant(9, Type::INT, "hairStrandsRes")
+    .push_constant(10, Type::INT, "hairThicknessRes")
+    .push_constant(11, Type::FLOAT, "hairRadRoot")
+    .push_constant(12, Type::FLOAT, "hairRadTip")
+    .push_constant(13, Type::FLOAT, "hairRadShape")
+    .push_constant(14, Type::BOOL, "hairCloseTip")
+    .push_constant(15, Type::INT, "hairStrandOffset")
+    .push_constant(16, Type::VEC4, "hairDupliMatrix", 4)
     .additional_info("draw_view");
 
 GPU_SHADER_CREATE_INFO(draw_pointcloud)
