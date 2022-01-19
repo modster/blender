@@ -89,3 +89,9 @@ struct MultiRectCallData {
   float4 calls_data[MAX_CALLS * 3];
 };
 BLI_STATIC_ASSERT_ALIGN(struct MultiRectCallData, 16)
+
+struct ClippingData {
+  float4x4 ModelMatrix;
+  float4 clip_plane;
+};
+BLI_STATIC_ASSERT_ALIGN(struct ClippingData, 16)

@@ -20,10 +20,10 @@ void main()
 {
   gl_Position = ModelViewProjectionMatrix * vec4(pos, 1.0);
 #if !defined(UNIFORM)
-  finalColor_g = color;
+  geom_in.finalColor_g = color;
 #endif
 
 #ifdef CLIP
-  clip_g = dot(ModelMatrix * vec4(pos, 1.0), ClipPlane);
+  geom_in.clip_g = dot(clipping_data.ModelMatrix * vec4(pos, 1.0), clipping_data.clip_plane);
 #endif
 }

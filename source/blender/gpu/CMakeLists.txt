@@ -428,6 +428,7 @@ shaders/infos/gpu_shader_3D_flat_color_info.hh
 shaders/infos/gpu_shader_3D_uniform_color_info.hh
 shaders/infos/gpu_shader_3D_smooth_color_info.hh
 shaders/infos/gpu_shader_3D_depth_only_info.hh
+shaders/infos/gpu_shader_3D_polyline_info.hh
 shaders/infos/gpu_shader_2D_point_varying_size_varying_color_info.hh
 shaders/infos/gpu_shader_2D_point_uniform_size_uniform_color_aa_info.hh
 shaders/infos/gpu_shader_2D_point_uniform_size_uniform_color_outline_aa_info.hh

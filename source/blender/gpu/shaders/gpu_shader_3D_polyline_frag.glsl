@@ -16,13 +16,13 @@ out vec4 fragColor;
 void main()
 {
 #ifdef CLIP
-  if (clip < 0.0) {
+  if (geom_out.clip < 0.0) {
     discard;
   }
 #endif
-  fragColor = finalColor;
+  fragColor = geom_out.finalColor;
   if (lineSmooth) {
-    fragColor.a *= clamp((lineWidth + SMOOTH_WIDTH) * 0.5 - abs(smoothline), 0.0, 1.0);
+    fragColor.a *= clamp((lineWidth + SMOOTH_WIDTH) * 0.5 - abs(geom_out.smoothline), 0.0, 1.0);
   }
   fragColor = blender_srgb_to_framebuffer_space(fragColor);
 }

@@ -41,26 +41,26 @@ vec4 clip_line_point_homogeneous_space(vec4 p, vec4 q)
 void do_vertex(const int i, vec4 pos, vec2 ofs)
 {
 #if defined(UNIFORM)
-  finalColor = color;
+  geom_out.finalColor = color;
 
 #elif defined(FLAT)
   /* WATCH: Assuming last provoking vertex. */
-  finalColor = finalColor_g[1];
+  geom_out.finalColor = geom_in[1].finalColor_g;
 
 #elif defined(SMOOTH)
-  finalColor = finalColor_g[i];
+  geom_out.finalColor = geom_in[i].finalColor_g;
 #endif
 
 #ifdef CLIP
-  clip = clip_g[i];
+  geom_out.clip = geom_in[i].clip_g;
 #endif
 
-  smoothline = (lineWidth + SMOOTH_WIDTH * float(lineSmooth)) * 0.5;
+  geom_out.smoothline = (lineWidth + SMOOTH_WIDTH * float(lineSmooth)) * 0.5;
   gl_Position = pos;
   gl_Position.xy += ofs * pos.w;
   EmitVertex();
 
-  smoothline = -(lineWidth + SMOOTH_WIDTH * float(lineSmooth)) * 0.5;
+  geom_out.smoothline = -(lineWidth + SMOOTH_WIDTH * float(lineSmooth)) * 0.5;
   gl_Position = pos;
   gl_Position.xy -= ofs * pos.w;
   EmitVertex();

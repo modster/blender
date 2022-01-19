@@ -42,6 +42,7 @@
 #include "GPU_immediate_util.h"
 #include "GPU_matrix.h"
 #include "GPU_select.h"
+#include "GPU_shader_shared.h"
 #include "GPU_state.h"
 
 #include "RNA_access.h"
@@ -114,11 +115,18 @@ static void dial_geom_draw(const float color[4],
   GPUVertFormat *format = immVertexFormat();
   uint pos = GPU_vertformat_attr_add(format, "pos", GPU_COMP_F32, 2, GPU_FETCH_FLOAT);
 
+  struct ClippingData clipping_data;
+  GPUUniformBuf *ubo = NULL;
+
   if (clip_plane) {
     immBindBuiltinProgram(filled ? GPU_SHADER_3D_CLIPPED_UNIFORM_COLOR :
                                    GPU_SHADER_3D_POLYLINE_CLIPPED_UNIFORM_COLOR);
-    immUniform4fv("ClipPlane", clip_plane);
-    immUniformMatrix4fv("ModelMatrix", axis_modal_mat);
+    copy_v4_v4(clipping_data.clip_plane, clip_plane);
+    copy_m4_m4(clipping_data.ModelMatrix, axis_modal_mat);
+    ubo = GPU_uniformbuf_create_ex(sizeof(struct ClippingData), &clipping_data, __func__);
+    immBindUniformBuf("clipping_data", ubo);
+
+    GPU_uniformbuf_bind(ubo, GPU_shader_uniformbuf_block())
   }
   else {
     immBindBuiltinProgram(filled ? GPU_SHADER_3D_UNIFORM_COLOR :
@@ -174,6 +182,11 @@ static void dial_geom_draw(const float color[4],
   }
 
   immUnbindProgram();
+
+  if (ubo != NULL) {
+    GPU_uniformbuf_free(ubo);
+    ubo = NULL;
+  }
 
   UNUSED_VARS(select);
 #endif
