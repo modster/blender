@@ -39,3 +39,14 @@ struct ObjectMatrices {
   float4x4 drw_modelMatrixInverse;
 };
 BLI_STATIC_ASSERT_ALIGN(ViewInfos, 16)
+
+struct ObjectInfos {
+  vec4 drw_OrcoTexCoFactors[2];
+  vec4 drw_ObjectColor;
+  vec4 drw_Infos;
+};
+BLI_STATIC_ASSERT_ALIGN(ViewInfos, 16)
+
+#  define OrcoTexCoFactors (drw_infos[resource_id].drw_OrcoTexCoFactors)
+#  define ObjectInfo (drw_infos[resource_id].drw_Infos)
+#  define ObjectColor (drw_infos[resource_id].drw_ObjectColor)

@@ -47,12 +47,15 @@ GPU_SHADER_CREATE_INFO(workbench_texture_tile)
 /** \} */
 
 /* -------------------------------------------------------------------- */
-/** \name Lighting Type
+/** \name Lighting Type (only for transparent)
  * \{ */
 
-GPU_SHADER_CREATE_INFO(workbench_lighting_studio).define("V3D_LIGHTING_STUDIO");
-GPU_SHADER_CREATE_INFO(workbench_lighting_matcap).define("V3D_LIGHTING_MATCAP");
 GPU_SHADER_CREATE_INFO(workbench_lighting_flat).define("V3D_LIGHTING_FLAT");
+GPU_SHADER_CREATE_INFO(workbench_lighting_studio).define("V3D_LIGHTING_STUDIO");
+GPU_SHADER_CREATE_INFO(workbench_lighting_matcap)
+    .define("V3D_LIGHTING_MATCAP")
+    .sampler(4, ImageType::FLOAT_2D, "matcap_diffuse_tx", Frequency::PASS)
+    .sampler(5, ImageType::FLOAT_2D, "matcap_specular_tx", Frequency::PASS);
 
 /** \} */
 
@@ -69,7 +72,11 @@ GPU_SHADER_INTERFACE_INFO(workbench_material_iface, "")
     .flat(Type::FLOAT, "roughness")
     .flat(Type::FLOAT, "metallic");
 
-GPU_SHADER_CREATE_INFO(workbench_material).vertex_out(workbench_material_iface);
+GPU_SHADER_CREATE_INFO(workbench_material)
+    .uniform_buf(5, "vec4", "materials_data[4096]", Frequency::PASS)
+    .push_constant(4, Type::INT, "materialIndex")
+    .push_constant(5, Type::BOOL, "useMatcap")
+    .vertex_out(workbench_material_iface);
 
 /** \} */
 
@@ -84,9 +91,9 @@ GPU_SHADER_CREATE_INFO(workbench_transparent_accum)
     .fragment_out(1, Type::VEC4, "revealageAccum")
     .fragment_out(2, Type::UINT, "objectId")
     .uniform_buf(4, "WorldData", "world_data", Frequency::PASS)
+    .push_constant(3, Type::BOOL, "forceShadowing")
     .typedef_source("workbench_shader_shared.h")
-    .fragment_source("workbench_transparent_accum_frag.glsl")
-    .additional_info("workbench_material");
+    .fragment_source("workbench_transparent_accum_frag.glsl");
 
 GPU_SHADER_CREATE_INFO(workbench_opaque)
     .fragment_out(0, Type::VEC4, "materialData")
@@ -94,8 +101,7 @@ GPU_SHADER_CREATE_INFO(workbench_opaque)
     .fragment_out(2, Type::UINT, "objectId")
     .uniform_buf(4, "WorldData", "world_data", Frequency::PASS)
     .typedef_source("workbench_shader_shared.h")
-    .fragment_source("workbench_prepass_frag.glsl")
-    .additional_info("workbench_material");
+    .fragment_source("workbench_prepass_frag.glsl");
 
 /** \} */
 
@@ -103,34 +109,38 @@ GPU_SHADER_CREATE_INFO(workbench_opaque)
 /** \name Variations Declaration
  * \{ */
 
-#define WORKBENCH_SURFACETYPE_VARIATIONS(prefix, ...) \
-  GPU_SHADER_CREATE_INFO(prefix##_mesh) \
-      .additional_info("workbench_mesh", __VA_ARGS__) \
-      .do_static_compilation(true); \
-  GPU_SHADER_CREATE_INFO(prefix##_hair) \
-      .additional_info("workbench_hair", __VA_ARGS__) \
-      .do_static_compilation(true); \
-  GPU_SHADER_CREATE_INFO(prefix##_ptcloud) \
-      .additional_info("workbench_pointcloud", __VA_ARGS__) \
-      .do_static_compilation(true);
+#define WORKBENCH_FINAL_VARIATION(name, ...) \
+  GPU_SHADER_CREATE_INFO(name).additional_info(__VA_ARGS__).do_static_compilation(true);
+
+#define WORKBENCH_CLIPPING_VARIATIONS(prefix, ...) \
+  WORKBENCH_FINAL_VARIATION(prefix##_clip, /* "drw_clipped",*/ __VA_ARGS__) \
+  WORKBENCH_FINAL_VARIATION(prefix##_no_clip, __VA_ARGS__)
+
+#define WORKBENCH_TEXTURE_VARIATIONS(prefix, ...) \
+  WORKBENCH_CLIPPING_VARIATIONS(prefix##_tex_none, "workbench_texture_none", __VA_ARGS__) \
+  WORKBENCH_CLIPPING_VARIATIONS(prefix##_tex_single, "workbench_texture_single", __VA_ARGS__) \
+  WORKBENCH_CLIPPING_VARIATIONS(prefix##_tex_tile, "workbench_texture_tile", __VA_ARGS__)
+
+#define WORKBENCH_DATATYPE_VARIATIONS(prefix, ...) \
+  WORKBENCH_TEXTURE_VARIATIONS(prefix##_mesh, "workbench_mesh", __VA_ARGS__) \
+  WORKBENCH_TEXTURE_VARIATIONS(prefix##_hair, "workbench_hair", __VA_ARGS__) \
+  WORKBENCH_TEXTURE_VARIATIONS(prefix##_ptcloud, "workbench_pointcloud", __VA_ARGS__)
 
 #define WORKBENCH_PIPELINE_VARIATIONS(prefix, ...) \
-  WORKBENCH_SURFACETYPE_VARIATIONS(prefix##_transp_studio, \
-                                   "workbench_transparent_accum", \
-                                   "workbench_lighting_studio", \
-                                   __VA_ARGS__) \
-  WORKBENCH_SURFACETYPE_VARIATIONS(prefix##_transp_matcap, \
-                                   "workbench_transparent_accum", \
-                                   "workbench_lighting_matcap", \
-                                   __VA_ARGS__) \
-  WORKBENCH_SURFACETYPE_VARIATIONS(prefix##_transp_flat, \
-                                   "workbench_transparent_accum", \
-                                   "workbench_lighting_flat", \
-                                   __VA_ARGS__) \
-  WORKBENCH_SURFACETYPE_VARIATIONS(prefix##_opaque, "workbench_opaque", __VA_ARGS__)
+  WORKBENCH_DATATYPE_VARIATIONS(prefix##_transp_studio, \
+                                "workbench_transparent_accum", \
+                                "workbench_lighting_studio", \
+                                __VA_ARGS__) \
+  WORKBENCH_DATATYPE_VARIATIONS(prefix##_transp_matcap, \
+                                "workbench_transparent_accum", \
+                                "workbench_lighting_matcap", \
+                                __VA_ARGS__) \
+  WORKBENCH_DATATYPE_VARIATIONS(prefix##_transp_flat, \
+                                "workbench_transparent_accum", \
+                                "workbench_lighting_flat", \
+                                __VA_ARGS__) \
+  WORKBENCH_DATATYPE_VARIATIONS(prefix##_opaque, "workbench_opaque", __VA_ARGS__)
 
-WORKBENCH_PIPELINE_VARIATIONS(workbench_tex_none, "workbench_texture_none")
-WORKBENCH_PIPELINE_VARIATIONS(workbench_tex_single, "workbench_texture_single")
-WORKBENCH_PIPELINE_VARIATIONS(workbench_tex_tile, "workbench_texture_tile")
+WORKBENCH_PIPELINE_VARIATIONS(workbench, "workbench_material");
 
 /** \} */

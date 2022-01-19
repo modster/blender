@@ -37,4 +37,8 @@ GPU_SHADER_CREATE_INFO(draw_pointcloud)
     .define("INSTANCED_ATTR")
     .additional_info("draw_view_instanced_attr");
 
+GPU_SHADER_CREATE_INFO(draw_volume)
+    .uniform_buf(8, "ObjectMatrices", "drw_matrices[DRW_RESOURCE_CHUNK_LEN]", Frequency::BATCH)
+    .additional_info("draw_view");
+
 /** \} */

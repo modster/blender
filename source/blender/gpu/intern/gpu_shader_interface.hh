@@ -211,6 +211,13 @@ inline const char *ShaderInterface::builtin_uniform_block_name(GPUUniformBlockBu
       return "modelBlock";
     case GPU_UNIFORM_BLOCK_INFO:
       return "infoBlock";
+
+    case GPU_UNIFORM_BLOCK_DRW_VIEW:
+      return "drw_view";
+    case GPU_UNIFORM_BLOCK_DRW_MODEL:
+      return "drw_matrices";
+    case GPU_UNIFORM_BLOCK_DRW_INFOS:
+      return "drw_infos";
     default:
       return NULL;
   }
