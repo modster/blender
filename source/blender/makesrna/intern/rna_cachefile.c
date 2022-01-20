@@ -143,6 +143,33 @@ static void rna_CacheFileLayer_hidden_flag_set(PointerRNA *ptr, const bool value
   }
 }
 
+static CacheFileLayer *rna_CacheFile_layer_new(CacheFile *cache_file,
+                                               bContext *C,
+                                               ReportList *reports,
+                                               const char *filepath)
+{
+  CacheFileLayer *layer = BKE_cachefile_add_layer(cache_file, filepath);
+  if (layer == NULL) {
+    BKE_reportf(
+        reports, RPT_ERROR, "Cannot add a layer to CacheFile '%s'", cache_file->id.name + 2);
+    return NULL;
+  }
+
+  Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
+  BKE_cachefile_reload(depsgraph, cache_file);
+  WM_main_add_notifier(NC_OBJECT | ND_DRAW, NULL);
+  return layer;
+}
+
+static void rna_CacheFile_layer_remove(CacheFile *cache_file, bContext *C, PointerRNA *layer_ptr)
+{
+  CacheFileLayer *layer = layer_ptr->data;
+  BKE_cachefile_remove_layer(cache_file, layer);
+  Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
+  BKE_cachefile_reload(depsgraph, cache_file);
+  WM_main_add_notifier(NC_OBJECT | ND_DRAW, NULL);
+}
+
 static PointerRNA rna_CacheFile_active_attribute_mapping_get(PointerRNA *ptr)
 {
   CacheFile *cache_file = (CacheFile *)ptr->owner_id;
@@ -326,7 +353,7 @@ static void rna_def_cachefile_layer(BlenderRNA *brna)
   RNA_def_struct_ui_text(
       srna,
       "Cache Layer",
-      "Layer of the cache, used to load or overwrite data from the first the first layer");
+      "Layer of the cache, used to load or override data from the first the first layer");
 
   PropertyRNA *prop = RNA_def_property(srna, "filepath", PROP_STRING, PROP_FILEPATH);
   RNA_def_property_ui_text(prop, "File Path", "Path to the archive");
@@ -353,6 +380,25 @@ static void rna_def_cachefile_layers(BlenderRNA *brna, PropertyRNA *cprop)
       prop, "rna_CacheFile_active_layer_get", "rna_CacheFile_active_layer_set", NULL, NULL);
   RNA_def_property_flag(prop, PROP_EDITABLE);
   RNA_def_property_ui_text(prop, "Active Layer", "Active layer of the CacheFile");
+
+  /* Add a layer. */
+  FunctionRNA *func = RNA_def_function(srna, "new", "rna_CacheFile_layer_new");
+  RNA_def_function_flag(func, FUNC_USE_REPORTS | FUNC_USE_CONTEXT);
+  RNA_def_function_ui_description(func, "Add a new layer");
+  PropertyRNA *parm = RNA_def_string(
+      func, "filepath", "File Path", 0, "", "File path to the archive used as a layer");
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+  /* Return type. */
+  parm = RNA_def_pointer(func, "layer", "CacheFileLayer", "", "Newly created layer");
+  RNA_def_function_return(func, parm);
+
+  /* Remove a layer. */
+  func = RNA_def_function(srna, "remove", "rna_CacheFile_layer_remove");
+  RNA_def_function_flag(func, FUNC_USE_CONTEXT);
+  RNA_def_function_ui_description(func, "Remove an existing layer from the cache file");
+  parm = RNA_def_pointer(func, "layer", "CacheFileLayer", "", "Layer to remove");
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED | PARM_RNAPTR);
+  RNA_def_parameter_clear_flags(parm, PROP_THICK_WRAP, 0);
 }
 
 static void rna_def_cachefile(BlenderRNA *brna)
@@ -507,7 +553,8 @@ static void rna_def_cachefile(BlenderRNA *brna)
   RNA_def_property_update(prop, 0, "rna_CacheFile_update");
   RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 
-  /* vertex groups */
+  /* ----------------- Alembic Layers ----------------- */
+
   prop = RNA_def_property(srna, "layers", PROP_COLLECTION, PROP_NONE);
   RNA_def_property_collection_sdna(prop, NULL, "layers", NULL);
   RNA_def_property_struct_type(prop, "CacheFileLayer");

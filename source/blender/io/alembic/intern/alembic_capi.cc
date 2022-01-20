@@ -463,7 +463,7 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
 
   ArchiveReader *archive = ArchiveReader::get(data->bmain, {data->filename});
 
-  if (!archive->valid()) {
+  if (!archive || !archive->valid()) {
     data->error_code = ABC_ARCHIVE_FAIL;
     delete archive;
     return;

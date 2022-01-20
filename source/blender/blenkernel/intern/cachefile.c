@@ -474,14 +474,7 @@ CacheFileLayer *BKE_cachefile_add_layer(CacheFile *cache_file, const char filena
 
   const int num_layers = BLI_listbase_count(&cache_file->layers);
 
-  /* We store the index in a signed char, and since it is one-based, we only allow up to 126
-   * layers. */
-  if (num_layers == 126) {
-    return NULL;
-  }
-
-  CacheFileLayer *layer = MEM_mallocN(sizeof(CacheFileLayer), "CacheFileLayer");
-  layer->flag = 0;
+  CacheFileLayer *layer = MEM_callocN(sizeof(CacheFileLayer), "CacheFileLayer");
   BLI_strncpy(layer->filepath, filename, sizeof(layer->filepath));
 
   BLI_addtail(&cache_file->layers, layer);

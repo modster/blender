@@ -161,12 +161,12 @@ typedef struct CacheFile {
   int prefetch_cache_size;
 
   /** Index of the currently selected layer in the UI, starts at 1. */
-  char active_layer;
+  int active_layer;
 
   /** Index, starting at 1, of the active attribute mapping in the UI. */
   char active_attribute_mapping;
 
-  char _pad2[5];
+  char _pad2[2];
 
   char velocity_unit;
   /* Name of the velocity property in the archive. */

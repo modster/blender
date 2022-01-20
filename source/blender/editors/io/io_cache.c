@@ -203,7 +203,7 @@ static int cachefile_layer_add_exec(bContext *C, wmOperator *op)
 
   CacheFile *cache_file = op->customdata;
 
-  if (!cache_file /* || !BKE_cache_file_supports_layers(cache_file)*/) {
+  if (!cache_file) {
     return OPERATOR_CANCELLED;
   }
 
@@ -247,7 +247,7 @@ static int cachefile_layer_remove_exec(bContext *C, wmOperator *UNUSED(op))
 {
   CacheFile *cache_file = CTX_data_edit_cachefile(C);
 
-  if (!cache_file /* || !BKE_cache_file_supports_layers(cache_file)*/) {
+  if (!cache_file) {
     return OPERATOR_CANCELLED;
   }
 
@@ -278,7 +278,7 @@ static int cachefile_layer_move_exec(bContext *C, wmOperator *op)
 {
   CacheFile *cache_file = CTX_data_edit_cachefile(C);
 
-  if (!cache_file /* || !BKE_cache_file_supports_layers(cache_file)*/) {
+  if (!cache_file) {
     return OPERATOR_CANCELLED;
   }
 

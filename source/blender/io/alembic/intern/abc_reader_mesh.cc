@@ -45,6 +45,7 @@
 #include "BKE_modifier.h"
 #include "BKE_object.h"
 
+using Alembic::Abc::FloatArraySamplePtr;
 using Alembic::Abc::Int32ArraySamplePtr;
 using Alembic::Abc::IV3fArrayProperty;
 using Alembic::Abc::P3fArraySamplePtr;
@@ -742,6 +743,32 @@ static void read_subd_sample(ImportSettings *settings,
       config, schema, schema.getUVsParam(), selector, settings->velocity_scale);
 }
 
+static void read_vertex_creases(Mesh *mesh,
+                                const Int32ArraySamplePtr &indices,
+                                const FloatArraySamplePtr &sharpnesses)
+{
+  if (!(indices && sharpnesses && indices->size() == sharpnesses->size() &&
+        indices->size() != 0)) {
+    return;
+  }
+
+  float *vertex_crease_data = (float *)CustomData_add_layer(
+      &mesh->vdata, CD_CREASE, CD_DEFAULT, nullptr, mesh->totvert);
+  const int totvert = mesh->totvert;
+
+  for (int i = 0, v = indices->size(); i < v; ++i) {
+    const int idx = (*indices)[i];
+
+    if (idx >= totvert) {
+      continue;
+    }
+
+    vertex_crease_data[idx] = (*sharpnesses)[i];
+  }
+
+  mesh->cd_flag |= ME_CDFLAG_VERT_CREASE;
+}
+
 /* ************************************************************************** */
 
 AbcSubDReader::AbcSubDReader(const IObject &object, ImportSettings &settings)
@@ -814,6 +841,7 @@ void AbcSubDReader::readObjectData(Main *bmain,
     return;
   }
 
+  /* Read egde creases. */
   Int32ArraySamplePtr indices = sample.getCreaseIndices();
   Alembic::Abc::FloatArraySamplePtr sharpnesses = sample.getCreaseSharpnesses();
 
@@ -843,6 +871,8 @@ void AbcSubDReader::readObjectData(Main *bmain,
 
     mesh->cd_flag |= ME_CDFLAG_EDGE_CREASE;
   }
+
+  read_vertex_creases(mesh, sample.getCornerIndices(), sample.getCornerSharpnesses());
 
   if (m_settings->validate_meshes) {
     BKE_mesh_validate(mesh, false, false);

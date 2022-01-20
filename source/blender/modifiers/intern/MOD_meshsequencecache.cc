@@ -534,12 +534,8 @@ static void panelRegister(ARegionType *region_type)
                              nullptr,
                              override_layers_panel_draw,
                              panel_type);
-  modifier_subpanel_register(region_type,
-                             "velocity_parameters",
-                             "Velocity Parameters",
-                             nullptr,
-                             velocity_panel_draw,
-                             panel_type);
+  modifier_subpanel_register(
+      region_type, "velocity", "Velocity", nullptr, velocity_panel_draw, panel_type);
   modifier_subpanel_register(region_type,
                              "attribute_remapping",
                              "Attribute Remapping",
