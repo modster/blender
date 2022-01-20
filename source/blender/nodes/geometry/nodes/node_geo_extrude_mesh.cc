@@ -160,6 +160,33 @@ static void expand_mesh_size(Mesh &mesh,
   }
 }
 
+static MEdge new_edge(const int v1, const int v2)
+{
+  MEdge edge;
+  edge.v1 = v1;
+  edge.v2 = v2;
+  edge.flag = (ME_EDGEDRAW | ME_EDGERENDER);
+  return edge;
+}
+
+static MEdge new_loose_edge(const int v1, const int v2)
+{
+  MEdge edge;
+  edge.v1 = v1;
+  edge.v2 = v2;
+  edge.flag = ME_LOOSEEDGE;
+  return edge;
+}
+
+static MPoly new_poly(const int loopstart, const int totloop)
+{
+  MPoly poly;
+  poly.loopstart = loopstart;
+  poly.totloop = totloop;
+  poly.flag = 0;
+  return poly;
+}
+
 template<typename T> void copy_with_indices(MutableSpan<T> dst, Span<T> src, Span<int> indices)
 {
   BLI_assert(dst.size() == indices.size());
@@ -237,10 +264,7 @@ static void extrude_mesh_vertices(MeshComponent &component,
   MutableSpan<MEdge> new_edges = mesh_edges(mesh).slice(new_edge_range);
 
   for (const int i_selection : selection.index_range()) {
-    MEdge &edge = new_edges[i_selection];
-    edge.v1 = selection[i_selection];
-    edge.v2 = orig_vert_size + i_selection;
-    edge.flag = ME_LOOSEEDGE;
+    new_edges[i_selection] = new_loose_edge(selection[i_selection], new_vert_range[i_selection]);
   }
 
   component.attribute_foreach([&](const AttributeIDRef &id, const AttributeMetaData meta_data) {
@@ -443,25 +467,16 @@ static void extrude_mesh_edges(MeshComponent &component,
   MutableSpan<MLoop> new_loops = loops.slice(new_loop_range);
 
   for (const int i : connect_edges.index_range()) {
-    MEdge &edge = connect_edges[i];
-    edge.v1 = new_vert_orig_indices[i];
-    edge.v2 = orig_vert_size + i;
-    edge.flag = (ME_EDGEDRAW | ME_EDGERENDER);
+    connect_edges[i] = new_edge(new_vert_orig_indices[i], new_vert_range[i]);
   }
 
   for (const int i : duplicate_edges.index_range()) {
     const MEdge &orig_edge = mesh.medge[edge_selection[i]];
-    MEdge &edge = duplicate_edges[i];
-    edge.v1 = new_vert_indices[orig_edge.v1];
-    edge.v2 = new_vert_indices[orig_edge.v2];
-    edge.flag = (ME_EDGEDRAW | ME_EDGERENDER);
+    duplicate_edges[i] = new_edge(new_vert_indices[orig_edge.v1], new_vert_indices[orig_edge.v2]);
   }
 
   for (const int i : new_polys.index_range()) {
-    MPoly &poly = new_polys[i];
-    poly.loopstart = orig_loop_size + i * 4;
-    poly.totloop = 4;
-    poly.flag = 0;
+    new_polys[i] = new_poly(new_loop_range[i * 4], 4);
   }
 
   for (const int i : edge_selection.index_range()) {
@@ -763,27 +778,18 @@ static void extrude_mesh_face_regions(MeshComponent &component,
 
   /* Initialize the edges that form the sides of the extrusion. */
   for (const int i : connect_edges.index_range()) {
-    MEdge &edge = connect_edges[i];
-    edge.v1 = new_vert_orig_indices[i];
-    edge.v2 = new_vert_range[i];
-    edge.flag = (ME_EDGEDRAW | ME_EDGERENDER);
+    connect_edges[i] = new_edge(new_vert_orig_indices[i], new_vert_range[i]);
   }
 
   /* Initialize the edges that form the top of the extrusion. */
   for (const int i : duplicate_edges.index_range()) {
     const MEdge &orig_edge = edges[edge_selection[i]];
-    MEdge &edge = duplicate_edges[i];
-    edge.v1 = new_vert_indices[orig_edge.v1];
-    edge.v2 = new_vert_indices[orig_edge.v2];
-    edge.flag = (ME_EDGEDRAW | ME_EDGERENDER);
+    duplicate_edges[i] = new_edge(new_vert_indices[orig_edge.v1], new_vert_indices[orig_edge.v2]);
   }
 
   /* Initialize the new side polygons. */
   for (const int i : new_polys.index_range()) {
-    MPoly &poly = new_polys[i];
-    poly.loopstart = side_loop_range[i * 4];
-    poly.totloop = 4;
-    poly.flag = 0;
+    new_polys[i] = new_poly(side_loop_range[i * 4], 4);
   }
 
   /* Connect original edges that are in between two selected faces to the new vertices. */
@@ -1051,15 +1057,9 @@ static void extrude_individual_mesh_faces(MeshComponent &component,
         const int orig_vert = orig_loop.v;
         const int orig_vert_next = orig_loop_next.v;
 
-        MEdge &duplicate_edge = duplicate_edges[i_extrude];
-        duplicate_edge.v1 = new_vert_range[i_extrude];
-        duplicate_edge.v2 = new_vert_range[i_extrude_next];
-        duplicate_edge.flag = (ME_EDGEDRAW | ME_EDGERENDER);
+        duplicate_edges[i_extrude] = new_edge(new_vert, new_vert_next);
 
-        MPoly &side_poly = new_polys[i_extrude];
-        side_poly.loopstart = side_loop_range[i_extrude * 4];
-        side_poly.totloop = 4;
-        side_poly.flag = 0;
+        new_polys[i_extrude] = new_poly(side_loop_range[i_extrude * 4], 4);
 
         MutableSpan<MLoop> side_loops = loops.slice(side_loop_range[i_extrude * 4], 4);
         side_loops[0].v = new_vert_next;
@@ -1071,10 +1071,7 @@ static void extrude_individual_mesh_faces(MeshComponent &component,
         side_loops[3].v = orig_vert_next;
         side_loops[3].e = connect_edge_range[i_extrude_next];
 
-        MEdge &connect_edge = connect_edges[i_extrude];
-        connect_edge.v1 = orig_vert;
-        connect_edge.v2 = new_vert;
-        connect_edge.flag = (ME_EDGEDRAW | ME_EDGERENDER);
+        connect_edges[i_extrude] = new_edge(orig_vert, new_vert);
       }
     }
   });
