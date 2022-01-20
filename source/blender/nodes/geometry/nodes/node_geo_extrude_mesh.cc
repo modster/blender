@@ -689,6 +689,11 @@ static void extrude_mesh_face_regions(MeshComponent &component,
     return;
   }
 
+  Array<bool> poly_selection_array(orig_polys.size(), false);
+  for (const int i_poly : poly_selection) {
+    poly_selection_array[i_poly] = true;
+  }
+
   /* Mix the offsets from the face domain to the vertex domain. Evaluate on the face domain above
    * in order to be consistent with the selection, and to use the face normals rather than vertex
    * normals as an offset, for example. */
@@ -706,12 +711,8 @@ static void extrude_mesh_face_regions(MeshComponent &component,
     mixer.finalize();
   }
 
-  /* Build a map that contains all of the selected faces connected to each edge. */
-  Array<Vector<int, 2>> edge_to_selected_poly_map = mesh_calculate_polys_of_edge(mesh,
-                                                                                 poly_selection);
-
-  /* All of the faces (selected and unselected) connected to each edge. */
-  // Array<Vector<int, 2>> edge_to_poly_map = mesh_calculate_polys_of_edge(mesh);
+  /* All of the faces (selected and deselected) connected to each edge. */
+  const Array<Vector<int, 2>> edge_to_poly_map = mesh_calculate_polys_of_edge(mesh);
 
   /* All vertices that are connected to the selected polygons.
    * Start the size at one vert per poly to reduce reallocations. */
@@ -724,6 +725,8 @@ static void extrude_mesh_face_regions(MeshComponent &component,
     }
   }
 
+  /* TODO: Some edges are "in between" but also duplicated. */
+
   /* These edges are on top of an extruded region. Their vertices should be moved, but the edges
    * themselves should not be duplicated. */
   Vector<int> in_between_edges;
@@ -731,12 +734,26 @@ static void extrude_mesh_face_regions(MeshComponent &component,
   Vector<int> edge_orig_face_indices;
   Vector<int64_t> selected_edge_orig_indices;
   for (const int i_edge : orig_edges.index_range()) {
-    Span<int> selected_polys = edge_to_selected_poly_map[i_edge];
-    if (selected_polys.size() == 1) {
-      selected_edge_orig_indices.append(i_edge);
-      edge_orig_face_indices.append(selected_polys.first());
+    Span<int> polys = edge_to_poly_map[i_edge];
+
+    int i_selected_poly = -1;
+    int deselected_poly_count = 0;
+    int selected_poly_count = 0;
+    for (const int i_other_poly : polys) {
+      if (poly_selection_array[i_other_poly]) {
+        selected_poly_count++;
+        i_selected_poly = i_other_poly;
+      }
+      else {
+        deselected_poly_count++;
+      }
     }
-    else if (selected_polys.size() > 1) {
+
+    if (selected_poly_count == 1) {
+      selected_edge_orig_indices.append(i_edge);
+      edge_orig_face_indices.append(i_selected_poly);
+    }
+    else if (selected_poly_count > 1) {
       in_between_edges.append(i_edge);
     }
   }
