@@ -6395,49 +6395,6 @@ void uiTemplateNodeSocket(uiLayout *layout, bContext *UNUSED(C), float color[4])
 /** \name Cache File Template
  * \{ */
 
-static void cache_file_layer_item(uiList *UNUSED(ui_list),
-                                  bContext *UNUSED(C),
-                                  uiLayout *layout,
-                                  PointerRNA *UNUSED(dataptr),
-                                  PointerRNA *itemptr,
-                                  int UNUSED(icon),
-                                  PointerRNA *UNUSED(active_dataptr),
-                                  const char *UNUSED(active_propname),
-                                  int UNUSED(index),
-                                  int UNUSED(flt_flag))
-{
-  uiLayout *row = uiLayoutRow(layout, true);
-  uiItemR(row, itemptr, "hide_layer", UI_ITEM_R_NO_BG, "", ICON_NONE);
-  uiItemR(row, itemptr, "filepath", UI_ITEM_R_NO_BG, "", ICON_NONE);
-}
-
-uiListType *UI_UL_cache_file_layers()
-{
-  uiListType *list_type = (uiListType *)MEM_callocN(sizeof(*list_type), __func__);
-
-  BLI_strncpy(list_type->idname, "UI_UL_cache_file_layers", sizeof(list_type->idname));
-  list_type->draw_item = cache_file_layer_item;
-
-  return list_type;
-}
-
-static void cache_file_attribute_mapping_item(uiList *UNUSED(ui_list),
-                                              bContext *UNUSED(C),
-                                              uiLayout *layout,
-                                              PointerRNA *UNUSED(dataptr),
-                                              PointerRNA *itemptr,
-                                              int UNUSED(icon),
-                                              PointerRNA *UNUSED(active_dataptr),
-                                              const char *UNUSED(active_propname),
-                                              int UNUSED(index),
-                                              int UNUSED(flt_flag))
-{
-  uiLayout *row = uiLayoutRow(layout, true);
-  uiItemR(row, itemptr, "name", UI_ITEM_R_NO_BG, "", ICON_NONE);
-  uiItemR(row, itemptr, "mapping", UI_ITEM_R_NO_BG, "", ICON_NONE);
-  uiItemR(row, itemptr, "domain", UI_ITEM_R_NO_BG, "", ICON_NONE);
-}
-
 void uiTemplateCacheFileVelocity(uiLayout *layout, PointerRNA *fileptr)
 {
   /* Ensure that the context has a CacheFile as this may not be set inside of modifiers panels. */
@@ -6600,6 +6557,23 @@ bool uiTemplateCacheFilePointer(PointerRNA *ptr, const char *propname, PointerRN
   return true;
 }
 
+static void cache_file_attribute_mapping_item(uiList *UNUSED(ui_list),
+                                              bContext *UNUSED(C),
+                                              uiLayout *layout,
+                                              PointerRNA *UNUSED(dataptr),
+                                              PointerRNA *itemptr,
+                                              int UNUSED(icon),
+                                              PointerRNA *UNUSED(active_dataptr),
+                                              const char *UNUSED(active_propname),
+                                              int UNUSED(index),
+                                              int UNUSED(flt_flag))
+{
+  uiLayout *row = uiLayoutRow(layout, true);
+  uiItemR(row, itemptr, "name", UI_ITEM_R_NO_BG, "", ICON_NONE);
+  uiItemR(row, itemptr, "mapping", UI_ITEM_R_NO_BG, "", ICON_NONE);
+  uiItemR(row, itemptr, "domain", UI_ITEM_R_NO_BG, "", ICON_NONE);
+}
+
 uiListType *UI_UL_cache_file_attribute_mappings()
 {
   uiListType *list_type = (uiListType *)MEM_callocN(sizeof(*list_type), __func__);
@@ -6638,41 +6612,6 @@ void uiTemplateCacheFileAttributeRemapping(uiLayout *layout,
   col = uiLayoutColumn(row, true);
   uiItemO(col, "", ICON_ADD, "cachefile.attribute_mapping_add");
   uiItemO(col, "", ICON_REMOVE, "cachefile.attribute_mapping_remove");
-}
-
-void uiTemplateCacheFileLayers(uiLayout *layout, const bContext *C, PointerRNA *fileptr)
-{
-  /* Ensure that the context has a CacheFile as this may not be set inside of modifiers panels. */
-  uiLayoutSetContextPointer(layout, "edit_cachefile", fileptr);
-
-  CacheFile *file = fileptr->data;
-  uiLayout *row = uiLayoutRow(layout, false);
-  uiLayout *col = uiLayoutColumn(row, true);
-
-  uiTemplateList(col,
-                 (bContext *)C,
-                 "UI_UL_cache_file_layers",
-                 "cache_file_layers",
-                 fileptr,
-                 "layers",
-                 fileptr,
-                 "active_index",
-                 "",
-                 1,
-                 5,
-                 UILST_LAYOUT_DEFAULT,
-                 1,
-                 UI_TEMPLATE_LIST_FLAG_NONE);
-
-  col = uiLayoutColumn(row, true);
-  uiItemO(col, "", ICON_ADD, "cachefile.layer_add");
-  uiItemO(col, "", ICON_REMOVE, "cachefile.layer_remove");
-
-  if (BLI_listbase_count(&file->layers) > 1) {
-    uiItemS_ex(col, 1.0f);
-    uiItemO(col, "", ICON_TRIA_UP, "cachefile.layer_move");
-    uiItemO(col, "", ICON_TRIA_DOWN, "cachefile.layer_move");
-  }
 }
 
 void uiTemplateCacheFile(uiLayout *layout,
@@ -6721,15 +6660,7 @@ void uiTemplateCacheFile(uiLayout *layout,
 
   if (sbuts->mainb == BCONTEXT_CONSTRAINT) {
     row = uiLayoutRow(layout, false);
-    uiTemplateCacheFileLayers(row, C, &fileptr);
-
-    uiTemplateCacheFileProcedural(layout, C, &fileptr);
-    uiTemplateCacheFileTimeSettings(layout, &fileptr);
-
-    row = uiLayoutRow(layout, false);
     uiItemR(row, &fileptr, "scale", 0, IFACE_("Manual Scale"), ICON_NONE);
-
-    uiTemplateCacheFileVelocity(layout, &fileptr);
   }
 
   /* TODO: unused for now, so no need to expose. */

@@ -71,8 +71,6 @@ bool BKE_cache_file_uses_render_procedural(const struct CacheFile *cache_file,
                                            struct Scene *scene,
                                            int dag_eval_mode);
 
-bool BKE_cache_file_supports_layers(const struct CacheFile *cache_file);
-
 /* Add a layer to the cache_file. Return NULL if the filename is already that of an existing layer
  * or if the number of layers exceeds the maximum allowed layer count. */
 struct CacheFileLayer *BKE_cachefile_add_layer(struct CacheFile *cache_file,

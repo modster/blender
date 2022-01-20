@@ -138,7 +138,8 @@ typedef struct CacheFile {
   /** The frame offset to subtract. */
   float frame_offset;
 
-  char _pad[4];
+  /** Index of the currently selected attribute mapping in the UI, starts at 1 */
+  int active_attribute_mapping;
 
   /** Animation flag. */
   short flag;
@@ -163,10 +164,7 @@ typedef struct CacheFile {
   /** Index of the currently selected layer in the UI, starts at 1. */
   int active_layer;
 
-  /** Index, starting at 1, of the active attribute mapping in the UI. */
-  char active_attribute_mapping;
-
-  char _pad2[2];
+  char _pad2[3];
 
   char velocity_unit;
   /* Name of the velocity property in the archive. */

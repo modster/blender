@@ -57,6 +57,7 @@ static void reload_cachefile(bContext *C, CacheFile *cache_file)
 static void cachefile_init(bContext *C, wmOperator *op)
 {
   PropertyPointerRNA *pprop;
+
   op->customdata = pprop = MEM_callocN(sizeof(PropertyPointerRNA), "OpenPropertyPointerRNA");
   UI_context_active_but_prop_get_templateID(C, &pprop->ptr, &pprop->prop);
 }
@@ -345,19 +346,12 @@ static int cachefile_attribute_mapping_add_exec(bContext *C, wmOperator *UNUSED(
 
   const int current_mapping_count = BLI_listbase_count(&cache_file->attribute_mappings);
 
-  /* We allow only 254 attributes since we store the active index in a char, and we use a 1 (one)
-   * based index. */
-  if (current_mapping_count >= 254) {
-    WM_report(RPT_ERROR, "Attribute mapping limit reached for the CacheFile");
-    return OPERATOR_CANCELLED;
-  }
-
   CacheAttributeMapping *mapping = MEM_callocN(sizeof(CacheAttributeMapping),
                                                "CacheAttributeMapping");
 
   BLI_addtail(&cache_file->attribute_mappings, mapping);
 
-  cache_file->active_attribute_mapping = (char)(current_mapping_count + 1);
+  cache_file->active_attribute_mapping = current_mapping_count + 1;
 
   /* Since the mapping is not initialized, adding a mapping does not trigger a CacheFile update. */
 
