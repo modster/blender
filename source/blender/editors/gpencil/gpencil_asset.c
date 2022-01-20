@@ -939,6 +939,15 @@ static void gpencil_asset_set_selection(tGPDasset *tgpa, const bool enable)
 
   for (int index = 0; index < tgpa->data_len; index++) {
     tGPDAssetStroke *data = &tgpa->data[index];
+
+    bGPDframe *gpf = data->gpf;
+    if (enable) {
+      gpf->flag |= GP_FRAME_SELECT;
+    }
+    else {
+      gpf->flag &= ~GP_FRAME_SELECT;
+    }
+
     bGPDstroke *gps = data->gps;
     if (enable) {
       gps->flag |= GP_STROKE_SELECT;
@@ -1101,9 +1110,10 @@ static bool gpencil_asset_append_strokes(tGPDasset *tgpa)
     }
   }
 
-  /* Unselect any stroke. */
+  /* Unselect any frame and stroke. */
   LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd_target->layers) {
     LISTBASE_FOREACH (bGPDframe *, gpf, &gpl->frames) {
+      gpf->flag &= ~GP_FRAME_SELECT;
       LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
         gps->flag &= ~GP_STROKE_SELECT;
         bGPDspoint *pt;
