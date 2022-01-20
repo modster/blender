@@ -645,7 +645,6 @@ static void extrude_mesh_edges(MeshComponent &component,
   BKE_mesh_runtime_clear_cache(&mesh);
   BKE_mesh_normals_tag_dirty(&mesh);
 
-  BKE_mesh_calc_normals(component.get_for_write());
   BLI_assert(BKE_mesh_is_valid(component.get_for_write()));
 }
 
@@ -964,7 +963,6 @@ static void extrude_mesh_face_regions(MeshComponent &component,
         component, attribute_outputs.side_id.get(), ATTR_DOMAIN_FACE, side_poly_range);
   }
 
-  BKE_mesh_calc_normals(component.get_for_write());
   BLI_assert(BKE_mesh_is_valid(component.get_for_write()));
 }
 
@@ -1232,7 +1230,6 @@ static void extrude_individual_mesh_faces(MeshComponent &component,
         component, attribute_outputs.side_id.get(), ATTR_DOMAIN_FACE, side_poly_range);
   }
 
-  BKE_mesh_calc_normals(component.get_for_write());
   BLI_assert(BKE_mesh_is_valid(component.get_for_write()));
 }
 
