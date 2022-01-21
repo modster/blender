@@ -477,8 +477,7 @@ static int get_nurb_index(const ListBase *nurbs, const Nurb *nurb)
     }
     index++;
   }
-  /* The Nurb should've been found by now. */
-  BLI_assert(false);
+
   return -1;
 }
 
@@ -854,11 +853,12 @@ static void insert_bezt_to_nurb(Nurb *nu, const CutData *data, Curve *cu)
 
   if (index < nu->pntsu) {
     /* Copy all control points after the cut to the new memory. */
-    ED_curve_beztcpy(editnurb, bezt1 + index + 1, nu->bezt + index, (nu->pntsu - index));
+    ED_curve_beztcpy(editnurb, bezt1 + index + 1, nu->bezt + index, nu->pntsu - index);
   }
 
   nu->pntsu += 1;
-  cu->actvert = CU_ACT_NONE;
+  cu->actvert = index;
+  cu->actnu = get_nurb_index(BKE_curve_editNurbs_get(cu), nu);
 
   BezTriple *next_bezt;
   if ((nu->flagu & CU_NURB_CYCLIC) && (index == nu->pntsu - 1)) {
@@ -911,7 +911,8 @@ static void insert_bp_to_nurb(Nurb *nu, const CutData *data, Curve *cu)
   }
 
   nu->pntsu += 1;
-  cu->actvert = CU_ACT_NONE;
+  cu->actvert = index;
+  cu->actnu = get_nurb_index(BKE_curve_editNurbs_get(cu), nu);
 
   BPoint *next_bp;
   if ((nu->flagu & CU_NURB_CYCLIC) && (index == nu->pntsu - 1)) {
@@ -930,6 +931,7 @@ static void insert_bp_to_nurb(Nurb *nu, const CutData *data, Curve *cu)
   nu->bp = bp1;
   ED_curve_deselect_all(editnurb);
   BKE_nurb_knot_calc_u(nu);
+  new_bp->f1 |= SELECT;
 }
 
 /* Make a cut on the nearest nurb at the closest point. Return true if spline is nearby. */
@@ -962,6 +964,7 @@ static bool insert_point_to_segment(
     }
     else if (data.min_dist < threshold_distance) {
       insert_bp_to_nurb(nu, &data, cu);
+      *r_nu = nu;
       return true;
     }
   }
@@ -1105,8 +1108,10 @@ static bool get_selected_endpoint_center(const ListBase *nurbs, float r_center[3
 
 static void extrude_vertices_from_selected_endpoints(EditNurb *editnurb,
                                                      ListBase *nurbs,
+                                                     Curve *cu,
                                                      const float change[3])
 {
+  int nu_index = 0;
   LISTBASE_FOREACH (Nurb *, nu1, nurbs) {
     if (nu1->type == CU_BEZIER) {
       BezTriple *last_bezt = nu1->bezt + nu1->pntsu - 1;
@@ -1139,6 +1144,7 @@ static void extrude_vertices_from_selected_endpoints(EditNurb *editnurb,
           nu1->bezt = new_bezt;
           nu1->pntsu++;
         }
+        cu->actnu = nu_index;
       }
       else if (last_sel) {
         BezTriple *new_bezt = (BezTriple *)MEM_mallocN((nu1->pntsu + 1) * sizeof(BezTriple),
@@ -1150,6 +1156,7 @@ static void extrude_vertices_from_selected_endpoints(EditNurb *editnurb,
         MEM_freeN(nu1->bezt);
         nu1->bezt = new_bezt;
         nu1->pntsu++;
+        cu->actnu = nu_index;
       }
     }
     else {
@@ -1181,6 +1188,7 @@ static void extrude_vertices_from_selected_endpoints(EditNurb *editnurb,
           nu1->pntsu++;
         }
         BKE_nurb_knot_calc_u(nu1);
+        cu->actnu = nu_index;
       }
       else if (last_sel) {
         BPoint *new_bp = (BPoint *)MEM_mallocN((nu1->pntsu + 1) * sizeof(BPoint), __func__);
@@ -1193,8 +1201,10 @@ static void extrude_vertices_from_selected_endpoints(EditNurb *editnurb,
         nu1->bp = new_bp;
         nu1->pntsu++;
         BKE_nurb_knot_calc_u(nu1);
+        cu->actnu = nu_index;
       }
     }
+    nu_index++;
   }
 }
 
@@ -1290,7 +1300,7 @@ static void extrude_points_from_selected_vertices(const ViewContext *vc,
   if (!extrude_center && sel_exists) {
     float change[3];
     sub_v3_v3v3(change, location, center);
-    extrude_vertices_from_selected_endpoints(editnurb, nurbs, change);
+    extrude_vertices_from_selected_endpoints(editnurb, nurbs, cu, change);
   }
   else {
     Nurb *old_last_nu = editnurb->nurbs.last;
@@ -1759,9 +1769,11 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
           else {
             BEZT_SEL_IDX(bezt1, bezt_idx);
           }
+          cu->actnu = get_nurb_index(nurbs, nu1);
         }
         else if (bp1) {
           bp1->f1 |= SELECT;
+          cu->actnu = get_nurb_index(nurbs, nu1);
         }
 
         cpd->selection_made = true;
@@ -1770,7 +1782,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
         if (is_spline_nearby(&vc, op, event)) {
           cpd->spline_nearby = true;
 
-          /* If move segment is disabled,then insert point on key press and set
+          /* If move segment is disabled, then insert point on key press and set
           "new_point" to true so that the new point's handles can be controlled. */
           if (insert_point && !move_seg) {
             insert_point_to_segment(event, vc.obedit->data, &nu, sel_dist_mul, &vc);
@@ -1849,9 +1861,11 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
               nurbs, &nu, &bezt, &bp, &bezt_idx, mval_fl, sel_dist_mul, &vc);
           if (bezt) {
             toggle_select_bezt(bezt, bezt_idx);
+            cu->actnu = get_nurb_index(nurbs, nu);
           }
           else if (bp) {
             toggle_select_bp(bp);
+            cu->actnu = get_nurb_index(nurbs, nu);
           }
           else {
             ED_curve_deselect_all(cu->editnurb);
