@@ -126,6 +126,7 @@ typedef enum eExtra_key {
   CTRL_ALT = 5,
   SHIFT_ALT = 6
 } eExtra_key;
+
 static const EnumPropertyItem prop_extra_key_types[] = {
     {NONE, "None", 0, "None", ""},
     {SHIFT, "Shift", 0, "Shift", ""},
@@ -134,6 +135,12 @@ static const EnumPropertyItem prop_extra_key_types[] = {
     {CTRL_SHIFT, "Ctrl-Shift", 0, "Ctrl-Shift", ""},
     {CTRL_ALT, "Ctrl-Alt", 0, "Ctrl-Alt", ""},
     {SHIFT_ALT, "Shift-Alt", 0, "Shift-Alt", ""},
+    {0, NULL, 0, NULL, NULL},
+};
+
+static const EnumPropertyItem prop_handle_types[] = {
+    {HD_AUTO, "Auto", 0, "Auto", ""},
+    {HD_VECT, "Vector", 0, "Vector", ""},
     {0, NULL, 0, NULL, NULL},
 };
 
@@ -1220,7 +1227,8 @@ static void deselect_all_center_vertices(ListBase *nurbs)
 static void extrude_points_from_selected_vertices(const ViewContext *vc,
                                                   Object *obedit,
                                                   const wmEvent *event,
-                                                  const bool extrude_center)
+                                                  const bool extrude_center,
+                                                  const int extrude_handle)
 {
   Curve *cu = vc->obedit->data;
   ListBase *nurbs = BKE_curve_editNurbs_get(cu);
@@ -1296,8 +1304,8 @@ static void extrude_points_from_selected_vertices(const ViewContext *vc,
 
   FOREACH_SELECTED_BEZT_BEGIN(bezt, &cu->editnurb->nurbs)
   if (bezt) {
-    bezt->h1 = HD_VECT;
-    bezt->h2 = HD_VECT;
+    bezt->h1 = extrude_handle;
+    bezt->h2 = extrude_handle;
   }
   FOREACH_SELECTED_BEZT_END
 }
@@ -1669,6 +1677,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   const bool close_spline = RNA_boolean_get(op->ptr, "close_spline");
   const bool toggle_vector = RNA_boolean_get(op->ptr, "toggle_vector");
   const bool cycle_handle_type = RNA_boolean_get(op->ptr, "cycle_handle_type");
+  const int extrude_handle = RNA_enum_get(op->ptr, "extrude_handle");
   const int free_toggle = RNA_enum_get(op->ptr, "free_toggle");
   const int adj_handle = RNA_enum_get(op->ptr, "adj_handle");
   const int move_entire = RNA_enum_get(op->ptr, "move_entire");
@@ -1771,12 +1780,14 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
         }
         else if (new_spline) {
           ED_curve_deselect_all(((Curve *)(vc.obedit->data))->editnurb);
-          extrude_points_from_selected_vertices(&vc, obedit, event, extrude_center);
+          extrude_points_from_selected_vertices(
+              &vc, obedit, event, extrude_center, extrude_handle);
           cpd->new_point = true;
           cpd->acted = true;
         }
         else if (extrude_point) {
-          extrude_points_from_selected_vertices(&vc, obedit, event, extrude_center);
+          extrude_points_from_selected_vertices(
+              &vc, obedit, event, extrude_center, extrude_handle);
           cpd->new_point = true;
           cpd->acted = true;
         }
@@ -1805,7 +1816,8 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
             cpd->acted = true;
           }
           else if (extrude_point) {
-            extrude_points_from_selected_vertices(&vc, obedit, event, extrude_center);
+            extrude_points_from_selected_vertices(
+                &vc, obedit, event, extrude_center, extrude_handle);
             cpd->acted = true;
           }
         }
@@ -1939,6 +1951,12 @@ void CURVE_OT_pen(wmOperatorType *ot)
                          false,
                          "Extrude Internal",
                          "Allow extruding points from internal points");
+  prop = RNA_def_enum(ot->srna,
+                      "extrude_handle",
+                      prop_handle_types,
+                      HD_VECT,
+                      "Extrude Handle Type",
+                      "Mirror the movement of one handle onto the other");
   prop = RNA_def_boolean(ot->srna, "new_spline", false, "New Spline", "Create a new spline");
   prop = RNA_def_boolean(
       ot->srna, "delete_point", false, "Delete Point", "Delete an existing point");
