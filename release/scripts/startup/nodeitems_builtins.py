@@ -143,6 +143,7 @@ def mesh_node_items(context):
 
     yield NodeItem("GeometryNodeDualMesh")
     yield NodeItem("GeometryNodeExtrudeMesh")
+    yield NodeItem("GeometryNodeFlipFaces")
     yield NodeItem("GeometryNodeMeshBoolean")
     yield NodeItem("GeometryNodeMeshToCurve")
     yield NodeItem("GeometryNodeMeshToPoints")
