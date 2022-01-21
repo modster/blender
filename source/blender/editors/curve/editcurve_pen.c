@@ -210,10 +210,11 @@ static bool worldspace_to_screenspace(const float pos_3d[3],
          V3D_PROJ_RET_OK;
 }
 
-static void get_displacement_to_avg_selected_point(const ListBase *nurbs,
-                                                   float change[2],
-                                                   const wmEvent *event,
-                                                   const ViewContext *vc)
+/* Get average of centers of all selected #BezTriple. */
+static void get_displacement_to_avg_selected_bezt(const ListBase *nurbs,
+                                                  float r_change[2],
+                                                  const wmEvent *event,
+                                                  const ViewContext *vc)
 {
   float total[3] = {0.0f, 0.0f, 0.0f};
   int count = 0;
@@ -224,10 +225,10 @@ static void get_displacement_to_avg_selected_point(const ListBase *nurbs,
 
   if (count) {
     mul_v3_fl(total, 1.0f / count);
-    worldspace_to_screenspace(total, vc, change);
-    float mval[2] = {UNPACK2(event->mval)};
-    negate_v2(change);
-    add_v2_v2(change, mval);
+    worldspace_to_screenspace(total, vc, r_change);
+    const float mval[2] = {UNPACK2(event->mval)};
+    negate_v2(r_change);
+    add_v2_v2(r_change, mval);
   }
 }
 
@@ -237,7 +238,7 @@ static void move_new_bezt_handles_to_mouse(const wmEvent *event,
                                            ListBase *nurbs)
 {
   float change[2];
-  get_displacement_to_avg_selected_point(nurbs, change, event, vc);
+  get_displacement_to_avg_selected_bezt(nurbs, change, event, vc);
 
   FOREACH_SELECTED_BEZT_BEGIN(bezt, nurbs)
   if (bezt->h1 == HD_VECT && bezt->h2 == HD_VECT) {
@@ -314,28 +315,6 @@ static void remove_handle_movement_constraints(BezTriple *bezt, const bool f1, c
   }
 }
 
-static void move_bezt_handle_or_vertex_to_location_int(BezTriple *bezt,
-                                                       const int mval[2],
-                                                       const short cp_index,
-                                                       const ViewContext *vc)
-{
-  float location[3];
-  screenspace_to_worldspace_int(mval, bezt->vec[cp_index], vc, location);
-  if (cp_index == 1) {
-    move_bezt_to_location(bezt, location);
-  }
-  else {
-    copy_v3_v3(bezt->vec[cp_index], location);
-    if (bezt->h1 == HD_ALIGN && bezt->h2 == HD_ALIGN) {
-      float handle_vec[3];
-      sub_v3_v3v3(handle_vec, bezt->vec[1], location);
-      const short other_handle = cp_index == 2 ? 0 : 2;
-      normalize_v3_length(handle_vec, len_v3v3(bezt->vec[1], bezt->vec[other_handle]));
-      add_v3_v3v3(bezt->vec[other_handle], bezt->vec[1], handle_vec);
-    }
-  }
-}
-
 static void move_bezt_handle_or_vertex_to_location(BezTriple *bezt,
                                                    const float mval[2],
                                                    const short cp_index,
@@ -356,6 +335,15 @@ static void move_bezt_handle_or_vertex_to_location(BezTriple *bezt,
       add_v3_v3v3(bezt->vec[other_handle], bezt->vec[1], handle_vec);
     }
   }
+}
+
+static void move_bezt_handle_or_vertex_to_location_int(BezTriple *bezt,
+                                                       const int mval[2],
+                                                       const short cp_index,
+                                                       const ViewContext *vc)
+{
+  const float mval_fl[2] = {UNPACK2(mval)};
+  move_bezt_handle_or_vertex_to_location(bezt, mval_fl, cp_index, vc);
 }
 
 /* Move handles or entire #BezTriple to mouse based on selection. */
@@ -394,7 +382,7 @@ static void move_all_selected_points(ListBase *nurbs,
 {
   int change_int[2];
   sub_v2_v2v2_int(change_int, event->xy, event->prev_xy);
-  float change[2] = {UNPACK2(change_int)};
+  const float change[2] = {UNPACK2(change_int)};
 
   LISTBASE_FOREACH (Nurb *, nu, nurbs) {
     if (nu->type == CU_BEZIER) {
@@ -447,25 +435,6 @@ static void move_all_selected_points(ListBase *nurbs,
       }
     }
   }
-}
-
-static void select_all_next_handles(ListBase *nurbs)
-{
-  FOREACH_SELECTED_BEZT_BEGIN(bezt, nurbs)
-  const bool invert = (nu->bezt + nu->pntsu - 1 == bezt && !(nu->flagu & CU_NURB_CYCLIC)) ||
-                      (nu->bezt == bezt && (nu->flagu & CU_NURB_CYCLIC));
-
-  if (invert) {
-    BEZT_DESEL_IDX(bezt, 0);
-    BEZT_DESEL_IDX(bezt, 1);
-    BEZT_SEL_IDX(bezt, 2);
-  }
-  else {
-    BEZT_SEL_IDX(bezt, 0);
-    BEZT_DESEL_IDX(bezt, 1);
-    BEZT_DESEL_IDX(bezt, 2);
-  }
-  FOREACH_SELECTED_BEZT_END
 }
 
 static int get_nurb_index(const ListBase *nurbs, const Nurb *nurb)
@@ -1066,46 +1035,6 @@ static bool get_selected_center(const ListBase *nurbs, float r_center[3], bool u
   return false;
 }
 
-static bool get_selected_endpoint_center(const ListBase *nurbs, float r_center[3])
-{
-  int end_count = 0;
-  LISTBASE_FOREACH (Nurb *, nu1, nurbs) {
-    /* No extrusions if cyclic. */
-    if (nu1->flagu & CU_NURB_CYCLIC) {
-      continue;
-    }
-
-    /* Get average center of all selected endpoints. */
-    if (nu1->type == CU_BEZIER) {
-      BezTriple *last_bezt = nu1->bezt + nu1->pntsu - 1;
-      if (BEZT_ISSEL_ANY(nu1->bezt)) {
-        add_v3_v3(r_center, nu1->bezt->vec[1]);
-        end_count++;
-      }
-      if (BEZT_ISSEL_ANY(last_bezt)) {
-        add_v3_v3(r_center, last_bezt->vec[1]);
-        end_count++;
-      }
-    }
-    else {
-      BPoint *last_bp = nu1->bp + nu1->pntsu - 1;
-      if (nu1->bp->f1 & SELECT) {
-        add_v3_v3(r_center, nu1->bp->vec);
-        end_count++;
-      }
-      if (last_bp->f1 & SELECT) {
-        add_v3_v3(r_center, last_bp->vec);
-        end_count++;
-      }
-    }
-  }
-  if (end_count) {
-    mul_v3_fl(r_center, 1.0f / end_count);
-    return true;
-  }
-  return false;
-}
-
 static void extrude_vertices_from_selected_endpoints(EditNurb *editnurb,
                                                      ListBase *nurbs,
                                                      Curve *cu,
@@ -1300,6 +1229,7 @@ static void extrude_points_from_selected_vertices(const ViewContext *vc,
   if (!extrude_center && sel_exists) {
     float change[3];
     sub_v3_v3v3(change, location, center);
+    /* Reimplemenented due to unexpected behavior for extrusion of 2-point spline. */
     extrude_vertices_from_selected_endpoints(editnurb, nurbs, cu, change);
   }
   else {
@@ -1458,7 +1388,7 @@ static bool delete_point_under_mouse(ViewContext *vc,
   short temp = 0;
   Curve *cu = vc->obedit->data;
   ListBase *nurbs = BKE_curve_editNurbs_get(cu);
-  float mouse_point[2] = {UNPACK2(event->mval)};
+  const float mouse_point[2] = {UNPACK2(event->mval)};
 
   get_closest_vertex_to_point_in_nurbs(
       nurbs, &nu, &bezt, &bp, &temp, mouse_point, sel_dist_mul, vc);
@@ -1512,21 +1442,19 @@ static void move_adjacent_handle(ViewContext *vc, const wmEvent *event, ListBase
   }
   adj_bezt->h1 = adj_bezt->h2 = HD_FREE;
 
-  float screen_co_fl[2];
+  float screen_co[2];
   int displacement[2];
-  int screen_co_int[2];
   /* Get the screen space coordinates of moved handle. */
   ED_view3d_project_float_object(vc->region,
                                  adj_bezt->vec[cp_index],
-                                 screen_co_fl,
+                                 screen_co,
                                  V3D_PROJ_RET_CLIP_BB | V3D_PROJ_RET_CLIP_WIN);
   sub_v2_v2v2_int(displacement, event->xy, event->prev_xy);
-  screen_co_int[0] = (int)screen_co_fl[0];
-  screen_co_int[1] = (int)screen_co_fl[1];
+  const float disp_fl[2] = {UNPACK2(displacement)};
 
   /* Add the displacement of the mouse to the handle position. */
-  add_v2_v2v2_int(screen_co_int, screen_co_int, displacement);
-  move_bezt_handle_or_vertex_to_location_int(adj_bezt, screen_co_int, cp_index, vc);
+  add_v2_v2v2(screen_co, screen_co, disp_fl);
+  move_bezt_handle_or_vertex_to_location(adj_bezt, screen_co, cp_index, vc);
   BKE_nurb_handles_calc(nu);
   FOREACH_SELECTED_BEZT_END
 }
