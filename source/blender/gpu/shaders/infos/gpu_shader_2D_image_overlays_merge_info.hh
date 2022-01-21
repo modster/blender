@@ -25,8 +25,8 @@
 #include "gpu_shader_create_info.hh"
 
 GPU_SHADER_CREATE_INFO(gpu_shader_2D_image_overlays_merge)
-    .vertex_in(0, Type::VEC2, "pos")
-    .vertex_in(1, Type::VEC2, "texCoord")
+    .vertex_in(0, Type::VEC2, "texCoord")
+    .vertex_in(1, Type::VEC2, "pos")
     .vertex_out(smooth_tex_coord_interp_iface)
     .fragment_out(0, Type::VEC4, "fragColor")
     .push_constant(0, Type::MAT4, "ModelViewProjectionMatrix")
