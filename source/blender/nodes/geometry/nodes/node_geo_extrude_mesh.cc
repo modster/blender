@@ -39,7 +39,7 @@ static void node_declare(NodeDeclarationBuilder &b)
   b.add_input<decl::Geometry>("Mesh").supported_type(GEO_COMPONENT_TYPE_MESH);
   b.add_input<decl::Bool>(N_("Selection")).default_value(true).supports_field().hide_value();
   b.add_input<decl::Vector>(N_("Offset")).subtype(PROP_TRANSLATION).implicit_field().hide_value();
-  b.add_input<decl::Float>(N_("Strength")).default_value(1.0f).supports_field();
+  b.add_input<decl::Float>(N_("Offset Scale")).default_value(1.0f).supports_field();
   b.add_input<decl::Bool>(N_("Individual")).default_value(true);
   b.add_output<decl::Geometry>("Mesh");
   b.add_output<decl::Bool>(N_("Top")).field_source();
@@ -1270,7 +1270,7 @@ static void node_geo_exec(GeoNodeExecParams params)
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Mesh");
   Field<bool> selection = params.extract_input<Field<bool>>("Selection");
   Field<float3> offset = params.extract_input<Field<float3>>("Offset");
-  Field<float> strength = params.extract_input<Field<float>>("Strength");
+  Field<float> strength = params.extract_input<Field<float>>("Offset Scale");
   const NodeGeometryExtrudeMesh &storage = node_storage(params.node());
   GeometryNodeExtrudeMeshMode mode = static_cast<GeometryNodeExtrudeMeshMode>(storage.mode);
 
