@@ -1852,12 +1852,12 @@ void CURVE_OT_pen(wmOperatorType *ot)
   PropertyRNA *prop;
   prop = RNA_def_float(ot->srna,
                        "sel_dist_mul",
-                       0.4f,
+                       0.2f,
                        0.0f,
                        2.0f,
                        "Select Distance",
                        "A multiplier on the default click distance",
-                       0.2f,
+                       0.1f,
                        1.5f);
   prop = RNA_def_enum(ot->srna,
                       "free_toggle",
