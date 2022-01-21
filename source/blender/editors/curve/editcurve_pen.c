@@ -98,6 +98,10 @@ typedef struct CurvePenData {
   bool spline_nearby;
   /* Whether shortcut for toggling free handles was pressed. */
   bool free_toggle_pressed;
+  /* Whether shortcut for linking handles was pressed. */
+  bool link_handles_pressed;
+  /* Whether the current state of the moved handle is linked. */
+  bool link_handles;
   /* Whether some action was done. Used for select. */
   bool acted;
   /* Whether a point was found underneath the mouse. */
@@ -1675,8 +1679,12 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
     cpd->dragging = true;
   }
   cpd->free_toggle_pressed = is_extra_key_pressed(event, free_toggle);
+  if (!cpd->link_handles_pressed && is_extra_key_pressed(event, link_handles)) {
+    move_all_selected_points(nurbs, false, true, event, &vc);
+    cpd->link_handles = true;
+  }
+  cpd->link_handles_pressed = is_extra_key_pressed(event, link_handles);
   const bool move_entire_pressed = is_extra_key_pressed(event, move_entire);
-  const bool link_handles_pressed = is_extra_key_pressed(event, link_handles);
 
   if (ELEM(event->type, MOUSEMOVE, INBETWEEN_MOUSEMOVE)) {
     if (!cpd->dragging && WM_event_drag_test(event, event->prev_click_xy) &&
@@ -1698,7 +1706,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
        * control point. */
       else if (cpd->new_point) {
         if (is_extra_key_pressed(event, move_entire)) {
-          move_all_selected_points(nurbs, move_entire_pressed, link_handles_pressed, event, &vc);
+          move_all_selected_points(nurbs, move_entire_pressed, cpd->link_handles, event, &vc);
         }
         else {
           move_new_bezt_handles_to_mouse(event, &vc, nurbs);
@@ -1708,7 +1716,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
       else if ((select_point || move_point) && !cpd->spline_nearby) {
         if (cpd->found_point) {
           if (move_point) {
-            move_all_selected_points(nurbs, move_entire_pressed, link_handles_pressed, event, &vc);
+            move_all_selected_points(nurbs, move_entire_pressed, cpd->link_handles, event, &vc);
             cpd->acted = true;
           }
         }
