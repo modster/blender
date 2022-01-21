@@ -387,30 +387,19 @@ static void fill_quad_consistent_direction(Span<MLoop> other_poly_loops,
   }
 }
 
-/**
- * The resulting vector maps from the index in the added vertices to the original vertex they were
- * extruded from.
- */
-static Vector<int> extrude_vert_orig_indices_from_edges(const IndexMask edge_selection,
-                                                        const Mesh &mesh,
-                                                        MutableSpan<int> new_vert_indices)
+template<typename T>
+static VectorSet<int> vert_indices_from_edges(const Mesh &mesh, const Span<T> edge_indices)
 {
-  Vector<int> new_vert_orig_indices;
-  new_vert_orig_indices.reserve(edge_selection.size());
-  for (const int i_edge : edge_selection) {
-    const MEdge &edge = mesh_edges(mesh)[i_edge];
+  static_assert(is_same_any_v<T, int, int64_t>);
 
-    if (new_vert_indices[edge.v1] == -1) {
-      new_vert_indices[edge.v1] = mesh.totvert + new_vert_orig_indices.size();
-      new_vert_orig_indices.append(edge.v1);
-    }
-
-    if (new_vert_indices[edge.v2] == -1) {
-      new_vert_indices[edge.v2] = mesh.totvert + new_vert_orig_indices.size();
-      new_vert_orig_indices.append(edge.v2);
-    }
+  VectorSet<int> vert_indices;
+  vert_indices.reserve(edge_indices.size());
+  for (const T i_edge : edge_indices) {
+    const MEdge &edge = mesh.medge[i_edge];
+    vert_indices.add(edge.v1);
+    vert_indices.add(edge.v2);
   }
-  return new_vert_orig_indices;
+  return vert_indices;
 }
 
 static void extrude_mesh_edges(MeshComponent &component,
@@ -435,9 +424,8 @@ static void extrude_mesh_edges(MeshComponent &component,
     return;
   }
 
-  Array<int> new_vert_indices(orig_vert_size, -1);
-  Vector<int> new_vert_orig_indices = extrude_vert_orig_indices_from_edges(
-      edge_selection, mesh, new_vert_indices);
+  const VectorSet<int> new_vert_orig_indices = vert_indices_from_edges(mesh,
+                                                                       edge_selection.indices());
 
   const IndexRange new_vert_range{orig_vert_size, new_vert_orig_indices.size()};
   /* The extruded edges connect the original and duplicate edges. */
@@ -472,7 +460,9 @@ static void extrude_mesh_edges(MeshComponent &component,
 
   for (const int i : duplicate_edges.index_range()) {
     const MEdge &orig_edge = mesh.medge[edge_selection[i]];
-    duplicate_edges[i] = new_edge(new_vert_indices[orig_edge.v1], new_vert_indices[orig_edge.v2]);
+    const int i_new_vert_1 = new_vert_orig_indices.index_of(orig_edge.v1);
+    const int i_new_vert_2 = new_vert_orig_indices.index_of(orig_edge.v2);
+    duplicate_edges[i] = new_edge(new_vert_range[i_new_vert_1], new_vert_range[i_new_vert_2]);
   }
 
   for (const int i : new_polys.index_range()) {
@@ -726,13 +716,14 @@ static void extrude_mesh_face_regions(MeshComponent &component,
   }
 
   /* TODO: Some edges are "in between" but also duplicated. */
+  // VectorSet<int> in_between_duplicate_edges;
 
-  /* These edges are on top of an extruded region. Their vertices should be moved, but the edges
-   * themselves should not be duplicated. */
+  /* These edges are on top of an extruded region. Their vertices should be translated with the
+   * offset, but the edges themselves should not be duplicated. */
   Vector<int> in_between_edges;
   /* The extruded face corresponding to each extruded edge (and each extruded face). */
   Vector<int> edge_orig_face_indices;
-  Vector<int64_t> selected_edge_orig_indices;
+  VectorSet<int> boundary_edge_orig_indices;
   for (const int i_edge : orig_edges.index_range()) {
     Span<int> polys = edge_to_poly_map[i_edge];
 
@@ -750,33 +741,25 @@ static void extrude_mesh_face_regions(MeshComponent &component,
     }
 
     if (selected_poly_count == 1) {
-      selected_edge_orig_indices.append(i_edge);
+      boundary_edge_orig_indices.add_new(i_edge);
       edge_orig_face_indices.append(i_selected_poly);
     }
     else if (selected_poly_count > 1) {
       in_between_edges.append(i_edge);
     }
   }
-  const IndexMask edge_selection{selected_edge_orig_indices};
 
-  /* Indices into the `duplicate_edges` span for each original selected edge. */
-  Array<int> duplicate_edge_indices(orig_edges.size(), -1);
-  for (const int i : edge_selection.index_range()) {
-    duplicate_edge_indices[edge_selection[i]] = i;
-  }
-
-  Array<int> new_vert_indices(orig_vert_size, -1);
-  Vector<int> new_vert_orig_indices = extrude_vert_orig_indices_from_edges(
-      edge_selection, mesh, new_vert_indices);
+  const VectorSet<int> new_vert_orig_indices = vert_indices_from_edges(
+      mesh, boundary_edge_orig_indices.as_span());
 
   const IndexRange new_vert_range{orig_vert_size, new_vert_orig_indices.size()};
   /* One edge connects each selected vertex to a new vertex on the extruded polygons. */
   const IndexRange connect_edge_range{orig_edges.size(), new_vert_range.size()};
   /* Each selected edge is duplicated to form a single edge on the extrusion. */
   const IndexRange duplicate_edge_range{connect_edge_range.one_after_last(),
-                                        edge_selection.size()};
+                                        boundary_edge_orig_indices.size()};
   /* Each edge selected for extrusion is extruded into a single face. */
-  const IndexRange side_poly_range{orig_polys.size(), edge_selection.size()};
+  const IndexRange side_poly_range{orig_polys.size(), boundary_edge_orig_indices.size()};
   const IndexRange side_loop_range{orig_loops.size(), side_poly_range.size() * 4};
 
   expand_mesh_size(mesh,
@@ -787,7 +770,7 @@ static void extrude_mesh_face_regions(MeshComponent &component,
 
   MutableSpan<MEdge> edges = mesh_edges(mesh);
   MutableSpan<MEdge> connect_edges = edges.slice(connect_edge_range);
-  MutableSpan<MEdge> duplicate_edges = edges.slice(duplicate_edge_range);
+  MutableSpan<MEdge> boundary_edges = edges.slice(duplicate_edge_range);
   MutableSpan<MPoly> polys = mesh_polys(mesh);
   MutableSpan<MPoly> new_polys = polys.slice(side_poly_range);
   MutableSpan<MLoop> loops = mesh_loops(mesh);
@@ -799,9 +782,11 @@ static void extrude_mesh_face_regions(MeshComponent &component,
   }
 
   /* Initialize the edges that form the top of the extrusion. */
-  for (const int i : duplicate_edges.index_range()) {
-    const MEdge &orig_edge = edges[edge_selection[i]];
-    duplicate_edges[i] = new_edge(new_vert_indices[orig_edge.v1], new_vert_indices[orig_edge.v2]);
+  for (const int i : boundary_edges.index_range()) {
+    const MEdge &orig_edge = edges[boundary_edge_orig_indices[i]];
+    const int i_new_vert_1 = new_vert_orig_indices.index_of(orig_edge.v1);
+    const int i_new_vert_2 = new_vert_orig_indices.index_of(orig_edge.v2);
+    boundary_edges[i] = new_edge(new_vert_range[i_new_vert_1], new_vert_range[i_new_vert_2]);
   }
 
   /* Initialize the new side polygons. */
@@ -812,11 +797,13 @@ static void extrude_mesh_face_regions(MeshComponent &component,
   /* Connect original edges that are in between two selected faces to the new vertices. */
   for (const int i : in_between_edges) {
     MEdge &edge = edges[i];
-    if (new_vert_indices[edge.v1] != -1) {
-      edge.v1 = new_vert_indices[edge.v1];
+    const int i_new_vert_1 = new_vert_orig_indices.index_of_try(edge.v1);
+    const int i_new_vert_2 = new_vert_orig_indices.index_of_try(edge.v2);
+    if (i_new_vert_1 != -1) {
+      edge.v1 = new_vert_range[i_new_vert_1];
     }
-    if (new_vert_indices[edge.v2] != -1) {
-      edge.v2 = new_vert_indices[edge.v2];
+    if (i_new_vert_2 != -1) {
+      edge.v2 = new_vert_range[i_new_vert_2];
     }
   }
 
@@ -824,19 +811,21 @@ static void extrude_mesh_face_regions(MeshComponent &component,
   for (const int i_poly : poly_selection) {
     const MPoly &poly = polys[i_poly];
     for (MLoop &loop : loops.slice(poly.loopstart, poly.totloop)) {
-      if (new_vert_indices[loop.v] != -1) {
-        loop.v = new_vert_indices[loop.v];
+      const int i_new_vert = new_vert_orig_indices.index_of_try(loop.v);
+      if (i_new_vert != -1) {
+        loop.v = new_vert_range[i_new_vert];
       }
-      if (duplicate_edge_indices[loop.e] != -1) {
-        loop.e = duplicate_edge_range[duplicate_edge_indices[loop.e]];
+      const int i_boundary_edge = boundary_edge_orig_indices.index_of_try(loop.e);
+      if (i_boundary_edge != -1) {
+        loop.e = duplicate_edge_range[i_boundary_edge];
       }
     }
   }
 
-  for (const int i : edge_selection.index_range()) {
-    const MEdge &duplicate_edge = duplicate_edges[i];
-    const int new_vert_1 = duplicate_edge.v1;
-    const int new_vert_2 = duplicate_edge.v2;
+  for (const int i : boundary_edge_orig_indices.index_range()) {
+    const MEdge &boundary_edge = boundary_edges[i];
+    const int new_vert_1 = boundary_edge.v1;
+    const int new_vert_2 = boundary_edge.v2;
     const int extrude_index_1 = new_vert_1 - orig_vert_size;
     const int extrude_index_2 = new_vert_2 - orig_vert_size;
 
@@ -850,7 +839,7 @@ static void extrude_mesh_face_regions(MeshComponent &component,
                                    new_vert_orig_indices[extrude_index_2],
                                    duplicate_edge_range[i],
                                    connect_edge_range[extrude_index_1],
-                                   edge_selection[i],
+                                   boundary_edge_orig_indices[i],
                                    connect_edge_range[extrude_index_2]);
   }
 
@@ -858,7 +847,7 @@ static void extrude_mesh_face_regions(MeshComponent &component,
    * in the duplicate edges array that connect to that vertex. This can be used to simplify the
    * mixing of attribute data for the connecting edges. */
   Array<Vector<int>> new_vert_to_duplicate_edge_map = create_vert_to_edge_map(
-      new_vert_range.size(), duplicate_edges, orig_vert_size);
+      new_vert_range.size(), boundary_edges, orig_vert_size);
 
   component.attribute_foreach([&](const AttributeIDRef &id, const AttributeMetaData meta_data) {
     OutputAttribute attribute = component.attribute_try_get_for_output(
@@ -879,7 +868,7 @@ static void extrude_mesh_face_regions(MeshComponent &component,
         case ATTR_DOMAIN_EDGE: {
           /* Edges parallel to original edges copy the edge attributes from the original edges. */
           MutableSpan<T> duplicate_data = data.slice(duplicate_edge_range);
-          copy_with_mask(duplicate_data, data.as_span(), edge_selection);
+          copy_with_indices(duplicate_data, data.as_span(), boundary_edge_orig_indices);
 
           /* Edges connected to original vertices mix values of selected connected edges. */
           MutableSpan<T> connect_data = data.slice(connect_edge_range);
@@ -897,43 +886,44 @@ static void extrude_mesh_face_regions(MeshComponent &component,
         case ATTR_DOMAIN_CORNER: {
           /* New corners get the values for the corresponding corner on the extruded face. */
           MutableSpan<T> new_data = data.slice(side_loop_range);
-          threading::parallel_for(edge_selection.index_range(), 256, [&](const IndexRange range) {
-            for (const int i_edge_selection : range) {
-              const MPoly &poly = polys[edge_orig_face_indices[i_edge_selection]];
+          threading::parallel_for(
+              boundary_edge_orig_indices.index_range(), 256, [&](const IndexRange range) {
+                for (const int i_boundary_edge : range) {
+                  const MPoly &poly = polys[edge_orig_face_indices[i_boundary_edge]];
 
-              const MEdge &duplicate_edge = duplicate_edges[i_edge_selection];
-              const int new_vert_1 = duplicate_edge.v1;
-              const int new_vert_2 = duplicate_edge.v2;
-              const int orig_vert_1 = new_vert_orig_indices[new_vert_1 - orig_vert_size];
-              const int orig_vert_2 = new_vert_orig_indices[new_vert_2 - orig_vert_size];
+                  const MEdge &boundary_edge = boundary_edges[i_boundary_edge];
+                  const int new_vert_1 = boundary_edge.v1;
+                  const int new_vert_2 = boundary_edge.v2;
+                  const int orig_vert_1 = new_vert_orig_indices[new_vert_1 - orig_vert_size];
+                  const int orig_vert_2 = new_vert_orig_indices[new_vert_2 - orig_vert_size];
 
-              /* Retrieve the data for the first two sides of the quad from the extruded polygon,
-               * which we generally expect to have just a small amount of sides. This loop could be
-               * eliminated by adding a cache of connected loops. */
-              T data_1;
-              T data_2;
-              for (const int i_loop : IndexRange(poly.loopstart, poly.totloop)) {
-                if (loops[i_loop].v == new_vert_1) {
-                  data_1 = data[i_loop];
-                }
-                if (loops[i_loop].v == new_vert_2) {
-                  data_2 = data[i_loop];
-                }
-              }
+                  /* Retrieve the data for the first two sides of the quad from the extruded
+                   * polygon, which we generally expect to have just a small amount of sides. This
+                   * loop could be eliminated by adding a cache of connected loops. */
+                  T data_1;
+                  T data_2;
+                  for (const int i_loop : IndexRange(poly.loopstart, poly.totloop)) {
+                    if (loops[i_loop].v == new_vert_1) {
+                      data_1 = data[i_loop];
+                    }
+                    if (loops[i_loop].v == new_vert_2) {
+                      data_2 = data[i_loop];
+                    }
+                  }
 
-              /* Instead of replicating the order in #fill_quad_consistent_direction here, it's
-               * simpler (though probably slower) to just match the corner data based on the vertex
-               * indices. */
-              for (const int i : IndexRange(4 * i_edge_selection, 4)) {
-                if (ELEM(new_loops[i].v, new_vert_1, orig_vert_1)) {
-                  new_data[i] = data_1;
+                  /* Instead of replicating the order in #fill_quad_consistent_direction here, it's
+                   * simpler (though probably slower) to just match the corner data based on the
+                   * vertex indices. */
+                  for (const int i : IndexRange(4 * i_boundary_edge, 4)) {
+                    if (ELEM(new_loops[i].v, new_vert_1, orig_vert_1)) {
+                      new_data[i] = data_1;
+                    }
+                    else if (ELEM(new_loops[i].v, new_vert_2, orig_vert_2)) {
+                      new_data[i] = data_2;
+                    }
+                  }
                 }
-                else if (ELEM(new_loops[i].v, new_vert_2, orig_vert_2)) {
-                  new_data[i] = data_2;
-                }
-              }
-            }
-          });
+              });
           break;
         }
         default:
@@ -950,11 +940,11 @@ static void extrude_mesh_face_regions(MeshComponent &component,
     threading::parallel_for(
         IndexRange(all_selected_verts.size()), 1024, [&](const IndexRange range) {
           for (const int i_orig : all_selected_verts.as_span().slice(range)) {
-            const int i_new = new_vert_indices[i_orig];
+            const int i_new = new_vert_orig_indices.index_of_try(i_orig);
             /* If the vertex is used by a selected edge, it will have been duplicated and only the
              * new vertex should use the offset. Otherwise the vertex might still need an offset,
              * but it was reused on the inside of a group of extruded faces. */
-            MVert &vert = mesh_verts(mesh)[(i_new == -1) ? i_orig : i_new];
+            MVert &vert = mesh_verts(mesh)[(i_new == -1) ? i_orig : new_vert_range[i_new]];
             add_v3_v3(vert.co, offset);
           }
         });
@@ -963,12 +953,12 @@ static void extrude_mesh_face_regions(MeshComponent &component,
     threading::parallel_for(
         IndexRange(all_selected_verts.size()), 1024, [&](const IndexRange range) {
           for (const int i_orig : all_selected_verts.as_span().slice(range)) {
-            const int i_new = new_vert_indices[i_orig];
+            const int i_new = new_vert_orig_indices.index_of_try(i_orig);
             const float3 offset = vert_offsets[i_orig];
             /* If the vertex is used by a selected edge, it will have been duplicated and only the
              * new vertex should use the offset. Otherwise the vertex might still need an offset,
              * but it was reused on the inside of a group of extruded faces. */
-            MVert &vert = mesh_verts(mesh)[(i_new == -1) ? i_orig : i_new];
+            MVert &vert = mesh_verts(mesh)[(i_new == -1) ? i_orig : new_vert_range[i_new]];
             add_v3_v3(vert.co, offset);
           }
         });
