@@ -197,6 +197,7 @@ set(SRC
   intern/mesh.cc
   intern/mesh_boolean_convert.cc
   intern/mesh_convert.cc
+  intern/mesh_debug.cc
   intern/mesh_evaluate.cc
   intern/mesh_fair.cc
   intern/mesh_iterators.c
@@ -521,7 +522,7 @@ set(LIB
   bf_simulation
 
   # For `vfontdata_freetype.c`.
-  ${FREETYPE_LIBRARY}
+  ${FREETYPE_LIBRARIES}
 )
 
 if(WITH_BINRELOC)
