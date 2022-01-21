@@ -714,12 +714,11 @@ static void extrude_mesh_face_regions(MeshComponent &component,
   }
 
   /* TODO: Some edges are "in between" but also duplicated. */
-  // VectorSet<int> in_between_duplicate_edges;
-
+  // Vector<int> duplicate_inner_edge_indices;
   /* These edges are on top of an extruded region. Their vertices should be translated with the
    * offset, but the edges themselves should not be duplicated. */
   Vector<int> inner_edge_indices;
-  /* The extruded face corresponding to each extruded edge (and each extruded face). */
+  /* The extruded face corresponding to each boundary edge (and each boundary face). */
   Vector<int> edge_extruded_face_indices;
   /* Edges on the outside of selected regions, either because there are no
    * other connected faces, or because all of the other faces aren't selected. */
@@ -756,21 +755,21 @@ static void extrude_mesh_face_regions(MeshComponent &component,
   /* One edge connects each selected vertex to a new vertex on the extruded polygons. */
   const IndexRange connect_edge_range{orig_edges.size(), new_vert_range.size()};
   /* Each selected edge is duplicated to form a single edge on the extrusion. */
-  const IndexRange duplicate_edge_range{connect_edge_range.one_after_last(),
-                                        boundary_edge_indices.size()};
+  const IndexRange boundary_edge_range{connect_edge_range.one_after_last(),
+                                       boundary_edge_indices.size()};
   /* Each edge selected for extrusion is extruded into a single face. */
   const IndexRange side_poly_range{orig_polys.size(), boundary_edge_indices.size()};
   const IndexRange side_loop_range{orig_loops.size(), side_poly_range.size() * 4};
 
   expand_mesh_size(mesh,
                    new_vert_range.size(),
-                   connect_edge_range.size() + duplicate_edge_range.size(),
+                   connect_edge_range.size() + boundary_edge_range.size(),
                    side_poly_range.size(),
                    side_loop_range.size());
 
   MutableSpan<MEdge> edges = mesh_edges(mesh);
   MutableSpan<MEdge> connect_edges = edges.slice(connect_edge_range);
-  MutableSpan<MEdge> boundary_edges = edges.slice(duplicate_edge_range);
+  MutableSpan<MEdge> boundary_edges = edges.slice(boundary_edge_range);
   MutableSpan<MPoly> polys = mesh_polys(mesh);
   MutableSpan<MPoly> new_polys = polys.slice(side_poly_range);
   MutableSpan<MLoop> loops = mesh_loops(mesh);
@@ -817,7 +816,7 @@ static void extrude_mesh_face_regions(MeshComponent &component,
       }
       const int i_boundary_edge = boundary_edge_indices.index_of_try(loop.e);
       if (i_boundary_edge != -1) {
-        loop.e = duplicate_edge_range[i_boundary_edge];
+        loop.e = boundary_edge_range[i_boundary_edge];
       }
     }
   }
@@ -837,7 +836,7 @@ static void extrude_mesh_face_regions(MeshComponent &component,
                                    new_vert_2,
                                    new_vert_indices[extrude_index_1],
                                    new_vert_indices[extrude_index_2],
-                                   duplicate_edge_range[i],
+                                   boundary_edge_range[i],
                                    connect_edge_range[extrude_index_1],
                                    boundary_edge_indices[i],
                                    connect_edge_range[extrude_index_2]);
@@ -867,12 +866,12 @@ static void extrude_mesh_face_regions(MeshComponent &component,
         }
         case ATTR_DOMAIN_EDGE: {
           /* Edges parallel to original edges copy the edge attributes from the original edges. */
-          MutableSpan<T> duplicate_data = data.slice(duplicate_edge_range);
-          copy_with_indices(duplicate_data, data.as_span(), boundary_edge_indices);
+          MutableSpan<T> boundary_data = data.slice(boundary_edge_range);
+          copy_with_indices(boundary_data, data.as_span(), boundary_edge_indices);
 
           /* Edges connected to original vertices mix values of selected connected edges. */
           MutableSpan<T> connect_data = data.slice(connect_edge_range);
-          copy_with_mixing(connect_data, duplicate_data.as_span(), [&](const int i) {
+          copy_with_mixing(connect_data, boundary_data.as_span(), [&](const int i) {
             return new_vert_to_duplicate_edge_map[i].as_span();
           });
           break;
