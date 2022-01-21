@@ -1521,7 +1521,7 @@ static bool make_cyclic_if_endpoints(Nurb *sel_nu,
                                      bContext *C,
                                      const float sel_dist_mul)
 {
-  if (sel_bezt || sel_bp) {
+  if (sel_bezt || (sel_bp && sel_nu->pntsu > 2)) {
     const bool is_bezt_endpoint = (sel_nu->type == CU_BEZIER &&
                                    (sel_bezt == sel_nu->bezt ||
                                     sel_bezt == sel_nu->bezt + sel_nu->pntsu - 1));
@@ -1791,7 +1791,6 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
       }
 
       if (!cpd->acted && close_spline && cpd->found_point && !cpd->dragging) {
-        get_selected_points(cu, vc.v3d, &nu, &bezt, &bp);
         if (cpd->nu && !(cpd->nu->flagu & CU_NURB_CYCLIC)) {
           copy_v2_v2_int(vc.mval, event->mval);
           cpd->acted = make_cyclic_if_endpoints(cpd->nu, cpd->bezt, cpd->bp, &vc, C, sel_dist_mul);
