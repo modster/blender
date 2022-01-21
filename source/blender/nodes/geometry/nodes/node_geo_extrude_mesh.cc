@@ -216,7 +216,7 @@ template<typename T, typename GetMixIndicesFn>
 void copy_with_mixing(MutableSpan<T> dst, Span<T> src, GetMixIndicesFn get_mix_indices_fn)
 {
   threading::parallel_for(dst.index_range(), 512, [&](const IndexRange range) {
-    attribute_math::DefaultMixer<T> mixer{dst.slice(range)};
+    attribute_math::DefaultPropatationMixer<T> mixer{dst.slice(range)};
     for (const int i_dst : IndexRange(range.size())) {
       for (const int i_src : get_mix_indices_fn(range[i_dst])) {
         mixer.mix_in(i_dst, src[i_src]);
@@ -424,7 +424,7 @@ static void extrude_mesh_edges(MeshComponent &component,
   Array<float3> vert_offsets;
   if (!edge_offsets.is_single()) {
     vert_offsets.reinitialize(orig_vert_size);
-    attribute_math::DefaultMixer<float3> mixer(vert_offsets);
+    attribute_math::DefaultPropatationMixer<float3> mixer(vert_offsets);
     for (const int i_edge : edge_selection) {
       const MEdge &edge = orig_edges[i_edge];
       const float3 offset = edge_offsets[i_edge];
@@ -568,7 +568,7 @@ static void extrude_mesh_edges(MeshComponent &component,
               /* Both corners on each vertical edge of the side polygon get the same value,
                * so there are only two unique values to mix. */
               Array<T> side_poly_corner_data(2);
-              attribute_math::DefaultMixer<T> mixer{side_poly_corner_data};
+              attribute_math::DefaultPropatationMixer<T> mixer{side_poly_corner_data};
 
               const MEdge &duplicate_edge = duplicate_edges[i_edge_selection];
               const int new_vert_1 = duplicate_edge.v1;
@@ -684,7 +684,7 @@ static void extrude_mesh_face_regions(MeshComponent &component,
   Array<float3> vert_offsets;
   if (!poly_offsets.is_single()) {
     vert_offsets.reinitialize(orig_vert_size);
-    attribute_math::DefaultMixer<float3> mixer(vert_offsets);
+    attribute_math::DefaultPropatationMixer<float3> mixer(vert_offsets);
     for (const int i_poly : poly_selection) {
       const MPoly &poly = orig_polys[i_poly];
       const float3 offset = poly_offsets[i_poly];
@@ -1177,8 +1177,14 @@ static void extrude_individual_mesh_faces(MeshComponent &component,
                 const int i_loop_prev = (i == 0) ? poly.totloop - 1 : i - 1;
                 const int orig_index = poly_loops[i].e;
                 const int orig_index_prev = poly_loops[i_loop_prev].e;
-                connect_data[poly_corner_range[i]] = attribute_math::mix2(
-                    0.5f, data[orig_index], data[orig_index_prev]);
+                if constexpr (std::is_same_v<T, bool>) {
+                  /* Propagate selections with "or" instead of "at least half". */
+                  connect_data[poly_corner_range[i]] = data[orig_index] || data[orig_index_prev];
+                }
+                else {
+                  connect_data[poly_corner_range[i]] = attribute_math::mix2(
+                      0.5f, data[orig_index], data[orig_index_prev]);
+                }
               }
             }
           });
