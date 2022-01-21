@@ -84,6 +84,9 @@ static void save_selection_as_attribute(MeshComponent &component,
 
   OutputAttribute_Typed<bool> attribute = component.attribute_try_get_for_output_only<bool>(
       id, domain);
+  /* Rely on the new attribute being zeroed by default. */
+  BLI_assert(!attribute.as_span().as_span().contains(true));
+
   if (selection.is_range()) {
     attribute.as_span().slice(selection.as_range()).fill(true);
   }
@@ -119,6 +122,10 @@ static MutableSpan<MLoop> mesh_loops(Mesh &mesh)
   return {mesh.mloop, mesh.totloop};
 }
 
+/**
+ * \note: Some areas in this file rely on the new sections of attributes in #CustomData_realloc to
+ * be zeroed.
+ */
 static void expand_mesh(Mesh &mesh,
                         const int vert_expand,
                         const int edge_expand,
