@@ -1276,17 +1276,17 @@ static void node_geo_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Mesh");
   Field<bool> selection = params.extract_input<Field<bool>>("Selection");
-  Field<float3> offset = params.extract_input<Field<float3>>("Offset");
-  Field<float> strength = params.extract_input<Field<float>>("Offset Scale");
+  Field<float3> offset_field = params.extract_input<Field<float3>>("Offset");
+  Field<float> scale_field = params.extract_input<Field<float>>("Offset Scale");
   const NodeGeometryExtrudeMesh &storage = node_storage(params.node());
   GeometryNodeExtrudeMeshMode mode = static_cast<GeometryNodeExtrudeMeshMode>(storage.mode);
 
-  /* Create a combined field from the offset and the strength so the field evaluator
+  /* Create a combined field from the offset and the scale so the field evaluator
    * can take care of the multiplication and to simplify each extrude function. */
   static fn::CustomMF_SI_SI_SO<float3, float, float3> multiply_fn{
-      "Scale", [](const float3 &offset, const float strength) { return offset * strength; }};
+      "Scale", [](const float3 &offset, const float scale) { return offset * scale; }};
   std::shared_ptr<FieldOperation> multiply_op = std::make_shared<FieldOperation>(
-      FieldOperation(multiply_fn, {std::move(offset), std::move(strength)}));
+      FieldOperation(multiply_fn, {std::move(offset_field), std::move(scale_field)}));
   const Field<float3> final_offset{std::move(multiply_op)};
 
   AttributeOutputs attribute_outputs;
