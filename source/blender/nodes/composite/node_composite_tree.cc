@@ -125,11 +125,6 @@ static void localize(bNodeTree *localtree, bNodeTree *ntree)
   }
 }
 
-static void local_sync(bNodeTree *localtree, bNodeTree *ntree)
-{
-  BKE_node_preview_sync_tree(ntree, localtree);
-}
-
 static void local_merge(Main *bmain, bNodeTree *localtree, bNodeTree *ntree)
 {
   bNode *lnode;
@@ -210,7 +205,6 @@ void register_node_tree_type_cmp()
   tt->free_node_cache = free_node_cache;
   tt->foreach_nodeclass = foreach_nodeclass;
   tt->localize = localize;
-  tt->local_sync = local_sync;
   tt->local_merge = local_merge;
   tt->update = update;
   tt->get_from_context = composite_get_from_context;
@@ -251,23 +245,6 @@ void ntreeCompositUpdateRLayers(bNodeTree *ntree)
   LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
     if (node->type == CMP_NODE_R_LAYERS) {
       node_cmp_rlayers_outputs(ntree, node);
-    }
-  }
-}
-
-void ntreeCompositRegisterPass(bNodeTree *ntree,
-                               Scene *scene,
-                               ViewLayer *view_layer,
-                               const char *name,
-                               eNodeSocketDatatype type)
-{
-  if (ntree == nullptr) {
-    return;
-  }
-
-  LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
-    if (node->type == CMP_NODE_R_LAYERS) {
-      node_cmp_rlayers_register_pass(ntree, node, scene, view_layer, name, type);
     }
   }
 }

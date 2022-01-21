@@ -148,8 +148,8 @@ static void node_gather_link_searches(GatherLinkSearchOpParams &params)
     });
   }
   else {
-    for (const SocketDeclarationPtr &socket_decl : declaration.outputs()) {
-      StringRefNull name = socket_decl->name();
+    for (const StringRefNull name :
+         {"Mean", "Median", "Sum", "Min", "Max", "Range", "Standard Deviation", "Variance"}) {
       params.add_item(IFACE_(name.c_str()), [node_type, name, type](LinkSearchOpParams &params) {
         bNode &node = params.add_node(node_type);
         node.custom1 = *type;
@@ -399,7 +399,7 @@ void register_node_type_geo_attribute_statistic()
   static bNodeType ntype;
 
   geo_node_type_base(
-      &ntype, GEO_NODE_ATTRIBUTE_STATISTIC, "Attribute Statistic", NODE_CLASS_ATTRIBUTE, 0);
+      &ntype, GEO_NODE_ATTRIBUTE_STATISTIC, "Attribute Statistic", NODE_CLASS_ATTRIBUTE);
 
   ntype.declare = file_ns::node_declare;
   node_type_init(&ntype, file_ns::node_init);

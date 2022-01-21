@@ -100,6 +100,8 @@ set(SRC
   intern/bmesh_mesh.h
   intern/bmesh_mesh_convert.c
   intern/bmesh_mesh_convert.h
+  intern/bmesh_mesh_debug.c
+  intern/bmesh_mesh_debug.h
   intern/bmesh_mesh_duplicate.c
   intern/bmesh_mesh_duplicate.h
   intern/bmesh_mesh_normals.c
@@ -191,7 +193,7 @@ set(LIB
 if(WITH_BULLET)
   list(APPEND INC_SYS
     ${BULLET_INCLUDE_DIRS}
-    "../../../intern/rigidbody/"
+    ../../../intern/rigidbody
   )
   if(NOT WITH_SYSTEM_BULLET)
   list(APPEND LIB

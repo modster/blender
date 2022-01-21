@@ -34,6 +34,7 @@
 #include "BLI_utildefines.h"
 
 #include "GPU_shader.h"
+#include "gpu_shader_create_info.hh"
 
 namespace blender::gpu {
 
@@ -50,6 +51,7 @@ typedef struct ShaderInput {
  * Base class which is then specialized for each implementation (GL, VK, ...).
  */
 class ShaderInterface {
+  friend shader::ShaderCreateInfo;
   /* TODO(fclem): should be protected. */
  public:
   /** Flat array. In this order: Attributes, Ubos, Uniforms. */
@@ -72,9 +74,10 @@ class ShaderInterface {
 
  public:
   ShaderInterface();
+  ShaderInterface(const shader::ShaderCreateInfo &info);
   virtual ~ShaderInterface();
 
-  void debug_print(void);
+  void debug_print();
 
   inline const ShaderInput *attr_get(const char *name) const
   {
@@ -129,20 +132,24 @@ class ShaderInterface {
   static inline const char *builtin_uniform_block_name(GPUUniformBlockBuiltin u);
 
   inline uint32_t set_input_name(ShaderInput *input, char *name, uint32_t name_len) const;
+  inline void copy_input_name(ShaderInput *input,
+                              const StringRefNull &name,
+                              char *name_buffer,
+                              uint32_t &name_buffer_offset) const;
 
   /**
    * Finalize interface construction by sorting the #ShaderInputs for faster lookups.
    */
-  void sort_inputs(void);
+  void sort_inputs();
 
  private:
   inline const ShaderInput *input_lookup(const ShaderInput *const inputs,
-                                         const uint inputs_len,
+                                         uint inputs_len,
                                          const char *name) const;
 
   inline const ShaderInput *input_lookup(const ShaderInput *const inputs,
-                                         const uint inputs_len,
-                                         const int binding) const;
+                                         uint inputs_len,
+                                         int binding) const;
 };
 
 inline const char *ShaderInterface::builtin_uniform_name(GPUUniformBuiltin u)
@@ -216,13 +223,28 @@ inline uint32_t ShaderInterface::set_input_name(ShaderInput *input,
 {
   /* remove "[0]" from array name */
   if (name[name_len - 1] == ']') {
-    name[name_len - 3] = '\0';
-    name_len -= 3;
+    for (; name_len > 1; name_len--) {
+      if (name[name_len] == '[') {
+        name[name_len] = '\0';
+        break;
+      }
+    }
   }
 
   input->name_offset = (uint32_t)(name - name_buffer_);
   input->name_hash = BLI_hash_string(name);
   return name_len + 1; /* include NULL terminator */
+}
+
+inline void ShaderInterface::copy_input_name(ShaderInput *input,
+                                             const StringRefNull &name,
+                                             char *name_buffer,
+                                             uint32_t &name_buffer_offset) const
+{
+  uint32_t name_len = name.size();
+  /* Copy include NULL terminator. */
+  memcpy(name_buffer + name_buffer_offset, name.c_str(), name_len + 1);
+  name_buffer_offset += set_input_name(input, name_buffer + name_buffer_offset, name_len);
 }
 
 inline const ShaderInput *ShaderInterface::input_lookup(const ShaderInput *const inputs,
