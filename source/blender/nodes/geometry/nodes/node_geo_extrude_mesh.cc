@@ -438,8 +438,7 @@ static void extrude_mesh_edges(MeshComponent &component,
   /* The extruded edges connect the original and duplicate edges. */
   const IndexRange connect_edge_range{orig_edges.size(), new_vert_range.size()};
   /* The duplicate edges are extruded copies of the selected edges. */
-  const IndexRange duplicate_edge_range{connect_edge_range.one_after_last(),
-                                        edge_selection.size()};
+  const IndexRange duplicate_edge_range = connect_edge_range.after(edge_selection.size());
   /* There is a new polygon for every selected edge. */
   const IndexRange new_poly_range{orig_polys.size(), edge_selection.size()};
   /* Every new polygon is a quad with four corners. */
@@ -772,11 +771,9 @@ static void extrude_mesh_face_regions(MeshComponent &component,
   /* One edge connects each selected vertex to a new vertex on the extruded polygons. */
   const IndexRange connect_edge_range{orig_edges.size(), extruded_vert_size};
   /* Each selected edge is duplicated to form a single edge on the extrusion. */
-  const IndexRange boundary_edge_range{connect_edge_range.one_after_last(),
-                                       boundary_edge_indices.size()};
+  const IndexRange boundary_edge_range = connect_edge_range.after(boundary_edge_indices.size());
   /* Duplicated edges inside regions that were connected to deselected faces. */
-  const IndexRange new_inner_edge_range{boundary_edge_range.one_after_last(),
-                                        new_inner_edge_indices.size()};
+  const IndexRange new_inner_edge_range = boundary_edge_range.after(new_inner_edge_indices.size());
   /* Each edge selected for extrusion is extruded into a single face. */
   const IndexRange side_poly_range{orig_polys.size(), boundary_edge_indices.size()};
   /* The loops that form the new side faces. */
@@ -1055,7 +1052,7 @@ static void extrude_individual_mesh_faces(MeshComponent &component,
   /* One edge connects each selected vertex to a new vertex on the extruded polygons. */
   const IndexRange connect_edge_range{orig_edge_size, extrude_corner_size};
   /* Each selected edge is duplicated to form a single edge on the extrusion. */
-  const IndexRange duplicate_edge_range{connect_edge_range.one_after_last(), extrude_corner_size};
+  const IndexRange duplicate_edge_range = connect_edge_range.after(extrude_corner_size);
   /* Each edge selected for extrusion is extruded into a single face. */
   const IndexRange side_poly_range{orig_polys.size(), duplicate_edge_range.size()};
   const IndexRange side_loop_range{orig_loops.size(), side_poly_range.size() * 4};
@@ -1170,11 +1167,11 @@ static void extrude_individual_mesh_faces(MeshComponent &component,
               /* For the extruded edges, mix the data from the two neighboring original edges of
                * the polygon. */
               for (const int i : poly_loops.index_range()) {
-                const int i_loop_next = (i == poly.totloop - 1) ? 0 : i + 1;
+                const int i_loop_prev = (i == 0) ? poly.totloop - 1 : i - 1;
                 const int orig_index = poly_loops[i].e;
-                const int orig_index_next = poly_loops[i_loop_next].e;
+                const int orig_index_prev = poly_loops[i_loop_prev].e;
                 connect_data[poly_corner_range[i]] = attribute_math::mix2(
-                    0.5f, data[orig_index], data[orig_index_next]);
+                    0.5f, data[orig_index], data[orig_index_prev]);
               }
             }
           });
