@@ -123,8 +123,8 @@ static MutableSpan<MLoop> mesh_loops(Mesh &mesh)
 }
 
 /**
- * \note: Some areas in this file rely on the new sections of attributes in #CustomData_realloc to
- * be zeroed.
+ * \note: Some areas in this file rely on the new sections of attributes from #CustomData_realloc
+ * to be zeroed.
  */
 static void expand_mesh(Mesh &mesh,
                         const int vert_expand,
@@ -419,6 +419,8 @@ static void extrude_mesh_edges(MeshComponent &component,
 
   const Array<Vector<int, 2>> edge_to_poly_map = mesh_calculate_polys_of_edge(mesh);
 
+  /* Find the offsets on the vertex domain for translation. This must be done before the mesh's
+   * custom data layers are reallocated, in case the virtual array references on of them. */
   Array<float3> vert_offsets;
   if (!edge_offsets.is_single()) {
     vert_offsets.reinitialize(orig_vert_size);
@@ -854,6 +856,7 @@ static void extrude_mesh_face_regions(MeshComponent &component,
     }
   }
 
+  /* Create the faces on the sides of extruded regions. */
   for (const int i : boundary_edge_indices.index_range()) {
     const MEdge &boundary_edge = boundary_edges[i];
     const int new_vert_1 = boundary_edge.v1;
@@ -1013,6 +1016,7 @@ static void extrude_mesh_face_regions(MeshComponent &component,
   BKE_mesh_normals_tag_dirty(&mesh);
 }
 
+/* Get the range into an array of extruded corners, edges, or vertices for a particular polygon. */
 static IndexRange selected_corner_range(Span<int> offsets, const int index)
 {
   const int offset = offsets[index];
@@ -1039,6 +1043,9 @@ static void extrude_individual_mesh_faces(MeshComponent &component,
   poly_evaluator.evaluate();
   const IndexMask poly_selection = poly_evaluator.get_evaluated_selection_as_mask();
 
+  /* Build an array of offsets into the new data for each polygon. This is used to facilitate
+   * parallelism later on by avoiding the need to keep track of an offset when iterating through
+   * all polygons. */
   int extrude_corner_size = 0;
   Array<int> index_offsets(poly_selection.size() + 1);
   for (const int i_selection : poly_selection.index_range()) {
@@ -1165,7 +1172,7 @@ static void extrude_individual_mesh_faces(MeshComponent &component,
               }
 
               /* For the extruded edges, mix the data from the two neighboring original edges of
-               * the polygon. */
+               * the extruded polygon. */
               for (const int i : poly_loops.index_range()) {
                 const int i_loop_prev = (i == 0) ? poly.totloop - 1 : i - 1;
                 const int orig_index = poly_loops[i].e;
