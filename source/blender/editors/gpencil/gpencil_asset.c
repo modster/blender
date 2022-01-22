@@ -177,6 +177,8 @@ enum eGP_CageCorners {
   CAGE_CORNER_ROT_NE = 9,
   CAGE_CORNER_ROT_SW = 10,
   CAGE_CORNER_ROT_SE = 11,
+  CAGE_FLIP_HORZ = 12,
+  CAGE_FLIP_VERT = 13,
 };
 
 static bool gpencil_asset_generic_poll(bContext *C)
@@ -831,7 +833,7 @@ static void gpencil_asset_transform_strokes(tGPDasset *tgpa,
   /* Determine pivot point. */
   float pivot[3];
   gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->transform_center, pivot);
-  if (!shift_key) {
+  if ((!shift_key) || (ELEM(tgpa->manipulator_index, CAGE_FLIP_HORZ, CAGE_FLIP_VERT))) {
     if (tgpa->manipulator_index == CAGE_CORNER_N) {
       gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_S], pivot);
     }
@@ -843,6 +845,19 @@ static void gpencil_asset_transform_strokes(tGPDasset *tgpa,
     }
     else if (tgpa->manipulator_index == CAGE_CORNER_W) {
       gpencil_point_xy_to_3d(&tgpa->gsc, tgpa->scene, tgpa->manipulator[CAGE_CORNER_E], pivot);
+    }
+    else if (ELEM(tgpa->manipulator_index, CAGE_FLIP_HORZ, CAGE_FLIP_VERT)) {
+      copy_v3_v3(pivot, tgpa->asset_center);
+      scale_factor = 1.0f;
+      zero_v3(scale_vector);
+      add_v3_fl(scale_vector, 1.0f);
+
+      if (tgpa->manipulator_index == CAGE_FLIP_HORZ) {
+        scale_vector[0] = -1.0f;
+      }
+      else {
+        scale_vector[2] = -1.0f;
+      }
     }
   }
   sub_v3_v3v3(pivot, pivot, tgpa->ob->loc);
@@ -1188,8 +1203,9 @@ static void gpencil_asset_import_status_indicators(bContext *C, const tGPDasset 
                mode_txt[tgpa->mode]);
 
   ED_area_status_text(tgpa->area, status_str);
-  ED_workspace_status_text(
-      C, TIP_("ESC/RMB to cancel, Enter/LMB(outside cage) to confirm, Shift to Scale uniform"));
+  ED_workspace_status_text(C,
+                           TIP_("ESC/RMB to cancel, Enter/LMB(outside cage) to confirm, Shift to "
+                                "Scale uniform, F: Flip Horiz. (Shift Vert.)"));
 }
 
 /* Update screen and stroke. */
@@ -1479,6 +1495,27 @@ static int gpencil_asset_import_modal(bContext *C, wmOperator *op, const wmEvent
       }
       /* Update screen. */
       gpencil_asset_import_update(C, op, tgpa);
+      break;
+    }
+    case EVT_FKEY: {
+      if (event->val == KM_PRESS) {
+        /* Flip Horizontal. */
+        tgpa->flag &= ~GP_ASSET_FLAG_IDLE;
+        tgpa->flag |= GP_ASSET_FLAG_TRANSFORMING;
+        tgpa->manipulator_index = (event->shift) ? CAGE_FLIP_VERT : CAGE_FLIP_HORZ;
+        tgpa->mode = GP_ASSET_TRANSFORM_SCALE;
+
+        gpencil_asset_transform_strokes(tgpa, event->mval, event->shift);
+        gpencil_2d_cage_calc(tgpa);
+        ED_area_tag_redraw(tgpa->area);
+
+        tgpa->flag |= GP_ASSET_FLAG_IDLE;
+        tgpa->flag &= ~GP_ASSET_FLAG_TRANSFORMING;
+        tgpa->mode = GP_ASSET_TRANSFORM_NONE;
+
+        /* Update screen. */
+        gpencil_asset_import_update(C, op, tgpa);
+      }
       break;
     }
     default: {
