@@ -1499,7 +1499,7 @@ static int gpencil_asset_import_modal(bContext *C, wmOperator *op, const wmEvent
     }
     case EVT_FKEY: {
       if (event->val == KM_PRESS) {
-        /* Flip Horizontal. */
+        /* Flip. */
         tgpa->flag &= ~GP_ASSET_FLAG_IDLE;
         tgpa->flag |= GP_ASSET_FLAG_TRANSFORMING;
         tgpa->manipulator_index = (event->shift) ? CAGE_FLIP_VERT : CAGE_FLIP_HORZ;
