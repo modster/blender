@@ -1628,7 +1628,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   cpd->free_toggle_pressed = is_extra_key_pressed(event, free_toggle);
   if (!cpd->link_handles_pressed && is_extra_key_pressed(event, link_handles)) {
     move_all_selected_points(nurbs, false, true, event, &vc);
-    cpd->link_handles = true;
+    cpd->link_handles = !cpd->link_handles;
   }
   cpd->link_handles_pressed = is_extra_key_pressed(event, link_handles);
   const bool move_entire_pressed = is_extra_key_pressed(event, move_entire);
