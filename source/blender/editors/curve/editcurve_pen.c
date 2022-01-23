@@ -428,10 +428,6 @@ static void move_all_selected_points(ListBase *nurbs,
                                      const wmEvent *event,
                                      const ViewContext *vc)
 {
-  /* int change_int[2];
-  sub_v2_v2v2_int(change_int, event->xy, event->prev_xy);
-  const float change[2] = {UNPACK2(change_int)}; */
-
   float center[3] = {0.0f, 0.0f, 0.0f};
   float change[2], center_2d[2];
   get_selected_center(nurbs, center, false);
