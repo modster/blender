@@ -110,6 +110,9 @@ typedef struct CurvePenData {
   bool multi_point;
   /* Whether a point has already been selected. */
   bool selection_made;
+  /* Offset between center of selected points and mouse. */
+  bool offset_calc;
+  float move_offset[2];
   /* Data about found point. Used for closing splines. */
   Nurb *nu;
   BezTriple *bezt;
@@ -373,16 +376,76 @@ static void move_bp_to_location(BPoint *bp, const float mval[2], const ViewConte
   copy_v3_v3(bp->vec, location);
 }
 
+static bool get_selected_center(const ListBase *nurbs, float r_center[3], bool use_centers)
+{
+  int end_count = 0;
+  LISTBASE_FOREACH (Nurb *, nu1, nurbs) {
+    if (nu1->type == CU_BEZIER) {
+      for (int i = 0; i < nu1->pntsu; i++) {
+        BezTriple *bezt = nu1->bezt + i;
+        if (use_centers) {
+          if (BEZT_ISSEL_ANY(bezt)) {
+            add_v3_v3(r_center, bezt->vec[1]);
+            end_count++;
+          }
+        }
+        else {
+          if (BEZT_ISSEL_IDX(bezt, 1)) {
+            add_v3_v3(r_center, bezt->vec[1]);
+            end_count++;
+          }
+          else if (BEZT_ISSEL_IDX(bezt, 0)) {
+            add_v3_v3(r_center, bezt->vec[0]);
+            end_count++;
+          }
+          else if (BEZT_ISSEL_IDX(bezt, 2)) {
+            add_v3_v3(r_center, bezt->vec[2]);
+            end_count++;
+          }
+        }
+      }
+    }
+    else {
+      for (int i = 0; i < nu1->pntsu; i++) {
+        if ((nu1->bp + i)->f1 & SELECT) {
+          add_v3_v3(r_center, (nu1->bp + i)->vec);
+          end_count++;
+        }
+      }
+    }
+  }
+  if (end_count) {
+    mul_v3_fl(r_center, 1.0f / end_count);
+    return true;
+  }
+  return false;
+}
+
 /* Move all selected points by an amount equivalent to the distance moved by mouse. */
 static void move_all_selected_points(ListBase *nurbs,
                                      const bool move_entire,
-                                     const bool link_handles,
+                                     CurvePenData *cpd,
                                      const wmEvent *event,
                                      const ViewContext *vc)
 {
-  int change_int[2];
+  /* int change_int[2];
   sub_v2_v2v2_int(change_int, event->xy, event->prev_xy);
-  const float change[2] = {UNPACK2(change_int)};
+  const float change[2] = {UNPACK2(change_int)}; */
+
+  float center[3] = {0.0f, 0.0f, 0.0f};
+  float change[2], center_2d[2];
+  get_selected_center(nurbs, center, false);
+  worldspace_to_screenspace(center, vc, center_2d);
+  float mval[2] = {UNPACK2(event->xy)};
+  sub_v2_v2v2(change, mval, center_2d);
+  if (!cpd->offset_calc) {
+    float prev_mval[2] = {UNPACK2(event->prev_xy)};
+    sub_v2_v2v2(cpd->move_offset, center_2d, prev_mval);
+    cpd->offset_calc = true;
+  }
+  add_v2_v2(change, cpd->move_offset);
+
+  const bool link_handles = cpd->link_handles;
 
   LISTBASE_FOREACH (Nurb *, nu, nurbs) {
     if (nu->type == CU_BEZIER) {
@@ -990,51 +1053,6 @@ static void get_selected_points(
   }
 }
 
-static bool get_selected_center(const ListBase *nurbs, float r_center[3], bool use_centers)
-{
-  int end_count = 0;
-  LISTBASE_FOREACH (Nurb *, nu1, nurbs) {
-    if (nu1->type == CU_BEZIER) {
-      for (int i = 0; i < nu1->pntsu; i++) {
-        BezTriple *bezt = nu1->bezt + i;
-        if (use_centers) {
-          if (BEZT_ISSEL_ANY(bezt)) {
-            add_v3_v3(r_center, bezt->vec[1]);
-            end_count++;
-          }
-        }
-        else {
-          if (BEZT_ISSEL_IDX(bezt, 1)) {
-            add_v3_v3(r_center, bezt->vec[1]);
-            end_count++;
-          }
-          else if (BEZT_ISSEL_IDX(bezt, 0)) {
-            add_v3_v3(r_center, bezt->vec[0]);
-            end_count++;
-          }
-          else if (BEZT_ISSEL_IDX(bezt, 2)) {
-            add_v3_v3(r_center, bezt->vec[2]);
-            end_count++;
-          }
-        }
-      }
-    }
-    else {
-      for (int i = 0; i < nu1->pntsu; i++) {
-        if ((nu1->bp + i)->f1 & SELECT) {
-          add_v3_v3(r_center, (nu1->bp + i)->vec);
-          end_count++;
-        }
-      }
-    }
-  }
-  if (end_count) {
-    mul_v3_fl(r_center, 1.0f / end_count);
-    return true;
-  }
-  return false;
-}
-
 static void extrude_vertices_from_selected_endpoints(EditNurb *editnurb,
                                                      ListBase *nurbs,
                                                      Curve *cu,
@@ -1627,7 +1645,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   }
   cpd->free_toggle_pressed = is_extra_key_pressed(event, free_toggle);
   if (!cpd->link_handles_pressed && is_extra_key_pressed(event, link_handles)) {
-    move_all_selected_points(nurbs, false, true, event, &vc);
+    move_all_selected_points(nurbs, false, cpd, event, &vc);
     cpd->link_handles = !cpd->link_handles;
   }
   cpd->link_handles_pressed = is_extra_key_pressed(event, link_handles);
@@ -1653,7 +1671,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
        * control point. */
       else if (cpd->new_point) {
         if (is_extra_key_pressed(event, move_entire)) {
-          move_all_selected_points(nurbs, move_entire_pressed, cpd->link_handles, event, &vc);
+          move_all_selected_points(nurbs, move_entire_pressed, cpd, event, &vc);
         }
         else {
           move_new_bezt_handles_to_mouse(event, &vc, nurbs);
@@ -1663,7 +1681,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
       else if ((select_point || move_point) && !cpd->spline_nearby) {
         if (cpd->found_point) {
           if (move_point) {
-            move_all_selected_points(nurbs, move_entire_pressed, cpd->link_handles, event, &vc);
+            move_all_selected_points(nurbs, move_entire_pressed, cpd, event, &vc);
             cpd->acted = true;
           }
         }
