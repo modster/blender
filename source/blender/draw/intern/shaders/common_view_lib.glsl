@@ -143,7 +143,7 @@ flat in int resourceIDFrag;
 
 /* Breaking this across multiple lines causes issues for some older GLSL compilers. */
 /* clang-format off */
-#if !defined(GPU_INTEL) && !defined(GPU_DEPRECATED_AMD_DRIVER) && !defined(OS_MAC) && !defined(INSTANCED_ATTR)
+#if !defined(GPU_INTEL) && !defined(GPU_DEPRECATED_AMD_DRIVER) && !defined(OS_MAC) && !defined(INSTANCED_ATTR) && !defined(DRW_LEGACY_MODEL_MATRIX)
 /* clang-format on */
 
 /* Temporary until we fully make the switch. */

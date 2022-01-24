@@ -27,6 +27,7 @@
 #include "BLI_set.hh"
 #include "BLI_string_ref.hh"
 
+#include "GPU_platform.h"
 #include "GPU_shader.h"
 #include "GPU_texture.h"
 
@@ -198,6 +199,13 @@ void gpu_shader_create_info_init()
 #ifdef GPU_RUNTIME
 #  include "gpu_shader_baked.hh"
 #endif
+
+  /* WORKAROUND: Replace draw_mesh info with the legacy one for systems that have problems with UBO
+   * indexing. */
+  if (GPU_type_matches(GPU_DEVICE_INTEL | GPU_DEVICE_INTEL_UHD, GPU_OS_ANY, GPU_DRIVER_ANY) ||
+      GPU_type_matches(GPU_DEVICE_ANY, GPU_OS_MAC, GPU_DRIVER_ANY) || GPU_crappy_amd_driver()) {
+    draw_modelmat = draw_modelmat_legacy;
+  }
 
   /* TEST */
   // gpu_shader_create_info_compile_all();
