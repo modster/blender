@@ -34,7 +34,9 @@ using blender::float4x4;
 
 struct NodeLinkData {
   float4 colors[3];
-  float2 bezierPts[4];
+  /* bezierPts Is actually a float2, but due to std140 each element needs to be aligned to 16
+   * bytes. */
+  float4 bezierPts[4];
   bool1 doArrow;
   bool1 doMuted;
   float dim_factor;
@@ -80,3 +82,10 @@ struct SimpleLightingData {
   float _pad;
 };
 BLI_STATIC_ASSERT_ALIGN(struct SimpleLightingData, 16)
+
+#define MAX_CALLS 16
+
+struct MultiRectCallData {
+  float4 calls_data[MAX_CALLS * 3];
+};
+BLI_STATIC_ASSERT_ALIGN(struct MultiRectCallData, 16)

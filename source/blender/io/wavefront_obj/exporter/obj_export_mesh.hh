@@ -32,6 +32,7 @@
 #include "DNA_material_types.h"
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
+#include "DNA_object_types.h"
 
 #include "IO_wavefront_obj.h"
 
@@ -57,7 +58,11 @@ using unique_bmesh_ptr = std::unique_ptr<BMesh, CustomBMeshDeleter>;
 
 class OBJMesh : NonCopyable {
  private:
-  Object *export_object_eval_;
+  /**
+   * We need to copy the entire Object structure here because the dependency graph iterator
+   * sometimes builds an Object in a temporary space that doesn't persist.
+   */
+  Object export_object_eval_;
   Mesh *export_mesh_eval_;
   /**
    * For curves which are converted to mesh, and triangulated meshes, a new mesh is allocated.
@@ -85,7 +90,7 @@ class OBJMesh : NonCopyable {
    * Total number of normal indices (maximum entry, plus 1, in
    * the loop_to_norm_index_ vector).
    */
-  int tot_normal_indices_ = NEGATIVE_INIT;
+  int tot_normal_indices_ = 0;
   /**
    * Total smooth groups in an object.
    */
@@ -172,8 +177,8 @@ class OBJMesh : NonCopyable {
    */
   float3 calc_poly_normal(int poly_index) const;
   /**
-   * Find the unqique normals of the mesh and return them in \a r_normal_coords.
-   * Store the indices into that vector with for each loop in this OBJMesh.
+   * Find the unique normals of the mesh and return them in \a r_normal_coords.
+   * Store the indices into that vector with for each loop in this #OBJMesh.
    */
   void store_normal_coords_and_indices(Vector<float3> &r_normal_coords);
   /**
