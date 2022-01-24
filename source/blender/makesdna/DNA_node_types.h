@@ -38,6 +38,7 @@ struct ID;
 struct Image;
 struct ListBase;
 struct Material;
+struct PreviewImage;
 struct Tex;
 struct bGPdata;
 struct bNodeInstanceHash;
@@ -46,7 +47,6 @@ struct bNodePreview;
 struct bNodeTreeExec;
 struct bNodeType;
 struct uiBlock;
-struct PreviewImage;
 
 #define NODE_MAXSTR 64
 
@@ -1385,6 +1385,11 @@ typedef struct NodeGeometryPointTranslate {
   uint8_t input_type;
 } NodeGeometryPointTranslate;
 
+typedef struct NodeGeometryExtrudeMesh {
+  /* GeometryNodeExtrudeMeshMode */
+  uint8_t mode;
+} NodeGeometryExtrudeMesh;
+
 typedef struct NodeGeometryObjectInfo {
   /* GeometryNodeTransformSpace. */
   uint8_t transform_space;
@@ -1502,6 +1507,11 @@ typedef struct NodeGeometryCurveSelectHandles {
   /* GeometryNodeCurveHandleMode. */
   uint8_t mode;
 } NodeGeometryCurveSelectHandles;
+
+typedef struct NodeGeometryCurvePrimitiveArc {
+  /* GeometryNodeCurvePrimitiveArcMode. */
+  uint8_t mode;
+} NodeGeometryCurvePrimitiveArc;
 
 typedef struct NodeGeometryCurvePrimitiveLine {
   /* GeometryNodeCurvePrimitiveLineMode. */
@@ -2150,6 +2160,12 @@ typedef enum GeometryNodeDistributePointsOnFacesMode {
   GEO_NODE_POINT_DISTRIBUTE_POINTS_ON_FACES_POISSON = 1,
 } GeometryNodeDistributePointsOnFacesMode;
 
+typedef enum GeometryNodeExtrudeMeshMode {
+  GEO_NODE_EXTRUDE_MESH_VERTICES = 0,
+  GEO_NODE_EXTRUDE_MESH_EDGES = 1,
+  GEO_NODE_EXTRUDE_MESH_FACES = 2,
+} GeometryNodeExtrudeMeshMode;
+
 typedef enum GeometryNodeRotatePointsType {
   GEO_NODE_POINT_ROTATE_TYPE_EULER = 0,
   GEO_NODE_POINT_ROTATE_TYPE_AXIS_ANGLE = 1,
@@ -2236,6 +2252,11 @@ typedef enum GeometryNodeMeshLineCountMode {
   GEO_NODE_MESH_LINE_COUNT_TOTAL = 0,
   GEO_NODE_MESH_LINE_COUNT_RESOLUTION = 1,
 } GeometryNodeMeshLineCountMode;
+
+typedef enum GeometryNodeCurvePrimitiveArcMode {
+  GEO_NODE_CURVE_PRIMITIVE_ARC_TYPE_POINTS = 0,
+  GEO_NODE_CURVE_PRIMITIVE_ARC_TYPE_RADIUS = 1,
+} GeometryNodeCurvePrimitiveArcMode;
 
 typedef enum GeometryNodeCurvePrimitiveLineMode {
   GEO_NODE_CURVE_PRIMITIVE_LINE_MODE_POINTS = 0,
@@ -2330,6 +2351,11 @@ typedef enum GeometryNodeDeleteGeometryMode {
 typedef enum GeometryNodeRealizeInstancesFlag {
   GEO_NODE_REALIZE_INSTANCES_LEGACY_BEHAVIOR = (1 << 0),
 } GeometryNodeRealizeInstancesFlag;
+
+typedef enum GeometryNodeScaleElementsMode {
+  GEO_NODE_SCALE_ELEMENTS_UNIFORM = 0,
+  GEO_NODE_SCALE_ELEMENTS_SINGLE_AXIS = 1,
+} GeometryNodeScaleElementsMode;
 
 #ifdef __cplusplus
 }
