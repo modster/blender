@@ -100,15 +100,15 @@ GPU_SHADER_CREATE_INFO(workbench_volume_slice)
   WORKBENCH_VOLUME_SLICE_VARIATIONS(prefix##_coba, "workbench_volume_coba", __VA_ARGS__) \
   WORKBENCH_VOLUME_SLICE_VARIATIONS(prefix##_no_coba, "workbench_volume_no_coba", __VA_ARGS__)
 
-#define WORKBENCH_VOLUME_SMOKE_VARIATIONS(prefix, ...) \
-  WORKBENCH_VOLUME_COBA_VARIATIONS(prefix##_smoke, "workbench_volume_smoke", __VA_ARGS__) \
-  WORKBENCH_VOLUME_COBA_VARIATIONS(prefix##_object, "workbench_volume_object", __VA_ARGS__)
-
 #define WORKBENCH_VOLUME_INTERP_VARIATIONS(prefix, ...) \
-  WORKBENCH_VOLUME_SMOKE_VARIATIONS(prefix##_linear, "workbench_volume_linear", __VA_ARGS__) \
-  WORKBENCH_VOLUME_SMOKE_VARIATIONS(prefix##_cubic, "workbench_volume_cubic", __VA_ARGS__) \
-  WORKBENCH_VOLUME_SMOKE_VARIATIONS(prefix##_closest, "workbench_volume_closest", __VA_ARGS__)
+  WORKBENCH_VOLUME_COBA_VARIATIONS(prefix##_linear, "workbench_volume_linear", __VA_ARGS__) \
+  WORKBENCH_VOLUME_COBA_VARIATIONS(prefix##_cubic, "workbench_volume_cubic", __VA_ARGS__) \
+  WORKBENCH_VOLUME_COBA_VARIATIONS(prefix##_closest, "workbench_volume_closest", __VA_ARGS__)
 
-WORKBENCH_VOLUME_INTERP_VARIATIONS(workbench_volume, "workbench_volume")
+#define WORKBENCH_VOLUME_SMOKE_VARIATIONS(prefix, ...) \
+  WORKBENCH_VOLUME_INTERP_VARIATIONS(prefix##_smoke, "workbench_volume_smoke", __VA_ARGS__) \
+  WORKBENCH_VOLUME_INTERP_VARIATIONS(prefix##_object, "workbench_volume_object", __VA_ARGS__)
+
+WORKBENCH_VOLUME_SMOKE_VARIATIONS(workbench_volume, "workbench_volume")
 
 /** \} */

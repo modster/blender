@@ -42,6 +42,7 @@ GPU_SHADER_CREATE_INFO(workbench_texture_tile)
     .sampler(3, ImageType::FLOAT_1D_ARRAY, "imageTileData", Frequency::BATCH)
     .push_constant(1, Type::BOOL, "imagePremult")
     .push_constant(2, Type::FLOAT, "imageTransparencyCutoff")
+    .define("V3D_SHADING_TEXTURE_COLOR")
     .define("TEXTURE_IMAGE_ARRAY");
 
 /** \} */

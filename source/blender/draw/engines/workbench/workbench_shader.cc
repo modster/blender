@@ -331,14 +331,10 @@ void workbench_shader_depth_of_field_get(GPUShader **prepare_sh,
     e_data.dof_prepare_sh = GPU_shader_create_from_info_name("workbench_effect_dof_prepare");
     e_data.dof_downsample_sh = GPU_shader_create_from_info_name("workbench_effect_dof_downsample");
 #if 0 /* TODO(fclem): finish COC min_max optimization */
-    e_data.dof_flatten_v_sh = GPU_shader_create_from_info_name(
-        "workbench_effect_dof_flatten_v");
-    e_data.dof_flatten_h_sh = GPU_shader_create_from_info_name(
-        "workbench_effect_dof_flatten_h");
-    e_data.dof_dilate_v_sh = GPU_shader_create_from_info_name(
-        "workbench_effect_dof_dilate_v");
-    e_data.dof_dilate_h_sh = GPU_shader_create_from_info_name(
-        "workbench_effect_dof_dilate_h");
+    e_data.dof_flatten_v_sh = GPU_shader_create_from_info_name("workbench_effect_dof_flatten_v");
+    e_data.dof_flatten_h_sh = GPU_shader_create_from_info_name("workbench_effect_dof_flatten_h");
+    e_data.dof_dilate_v_sh = GPU_shader_create_from_info_name("workbench_effect_dof_dilate_v");
+    e_data.dof_dilate_h_sh = GPU_shader_create_from_info_name("workbench_effect_dof_dilate_h");
 #endif
     e_data.dof_blur1_sh = GPU_shader_create_from_info_name("workbench_effect_dof_blur1");
     e_data.dof_blur2_sh = GPU_shader_create_from_info_name("workbench_effect_dof_blur2");
@@ -382,10 +378,10 @@ GPUShader *workbench_shader_volume_get(bool slice,
 
   if (*shader == nullptr) {
     std::string create_info_name = "workbench_volume";
-    create_info_name += (slice) ? "_slice" : "_no_slice";
-    create_info_name += (coba) ? "_coba" : "_no_coba";
     create_info_name += (smoke) ? "_smoke" : "_object";
     create_info_name += workbench_volume_interp_to_str(interp_type);
+    create_info_name += (coba) ? "_coba" : "_no_coba";
+    create_info_name += (slice) ? "_slice" : "_no_slice";
     *shader = GPU_shader_create_from_info_name(create_info_name.c_str());
   }
   return *shader;
