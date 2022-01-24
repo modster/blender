@@ -39,7 +39,7 @@ static void node_declare(NodeDeclarationBuilder &b)
   b.add_input<decl::Geometry>("Mesh").supported_type(GEO_COMPONENT_TYPE_MESH);
   b.add_input<decl::Bool>(N_("Selection")).default_value(true).supports_field().hide_value();
   b.add_input<decl::Vector>(N_("Offset")).subtype(PROP_TRANSLATION).implicit_field().hide_value();
-  b.add_input<decl::Float>(N_("Offset Scale")).default_value(1.0f).supports_field();
+  b.add_input<decl::Float>(N_("Offset Scale")).default_value(1.0f).min(0.0f).supports_field();
   b.add_input<decl::Bool>(N_("Individual")).default_value(true);
   b.add_output<decl::Geometry>("Mesh");
   b.add_output<decl::Bool>(N_("Top")).field_source();
@@ -157,10 +157,6 @@ static void expand_mesh(Mesh &mesh,
     CustomData_realloc(&mesh.ldata, mesh.totloop);
   }
   BKE_mesh_update_customdata_pointers(&mesh, false);
-
-  for (MVert &vert : mesh_verts(mesh).take_back(vert_expand)) {
-    vert.flag = 0;
-  }
 }
 
 static MEdge new_edge(const int v1, const int v2)
@@ -1035,6 +1031,8 @@ static void extrude_individual_mesh_faces(MeshComponent &component,
   Span<MPoly> orig_polys = mesh_polys(mesh);
   Span<MLoop> orig_loops = mesh_loops(mesh);
 
+  /* Use a mesh for the result of the evaluation because the mesh is reallocated before
+   * the vertices are moved, and the evaluated result might reference an attribute. */
   Array<float3> poly_offset(orig_polys.size());
   GeometryComponentFieldContext poly_context{component, ATTR_DOMAIN_FACE};
   FieldEvaluator poly_evaluator{poly_context, mesh.totpoly};
