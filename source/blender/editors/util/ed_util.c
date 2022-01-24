@@ -445,7 +445,10 @@ void ED_spacedata_id_remap(struct ScrArea *area,
   }
 }
 
-void ED_spacedata_id_remap_old(struct ScrArea *area, struct SpaceLink *sl, ID *old_id, ID *new_id)
+void ED_spacedata_id_remap_single(struct ScrArea *area,
+                                  struct SpaceLink *sl,
+                                  ID *old_id,
+                                  ID *new_id)
 {
   SpaceType *st = BKE_spacetype_from_id(sl->spacetype);
 
