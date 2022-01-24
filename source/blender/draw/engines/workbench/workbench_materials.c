@@ -293,5 +293,6 @@ DRWShadingGroup *workbench_image_setup_ex(WORKBENCH_PrivateData *wpd,
     DRW_shgroup_uniform_texture_ex(grp, "imageTexture", tex, sampler);
   }
   DRW_shgroup_uniform_bool_copy(grp, "imagePremult", (ima && ima->alpha_mode == IMA_ALPHA_PREMUL));
+  DRW_shgroup_uniform_float_copy(grp, "imageTransparencyCutoff", 0.1f);
   return grp;
 }
