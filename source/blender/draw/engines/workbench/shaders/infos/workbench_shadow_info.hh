@@ -64,35 +64,35 @@ GPU_SHADER_CREATE_INFO(workbench_shadow_debug)
  * \{ */
 
 #define WORKBENCH_SHADOW_VARIATIONS(suffix, ...) \
-  GPU_SHADER_CREATE_INFO(workbench_shadow_pass_manifold_no_caps_##suffix) \
+  GPU_SHADER_CREATE_INFO(workbench_shadow_pass_manifold_no_caps##suffix) \
       .define("SHADOW_PASS") \
       .additional_info("workbench_shadow_common", "workbench_shadow_manifold", __VA_ARGS__) \
       .do_static_compilation(true); \
-  GPU_SHADER_CREATE_INFO(workbench_shadow_pass_no_manifold_no_caps_##suffix) \
+  GPU_SHADER_CREATE_INFO(workbench_shadow_pass_no_manifold_no_caps##suffix) \
       .define("SHADOW_PASS") \
       .define("DOUBLE_MANIFOLD") \
       .additional_info("workbench_shadow_common", "workbench_shadow_no_manifold", __VA_ARGS__) \
       .do_static_compilation(true); \
-  GPU_SHADER_CREATE_INFO(workbench_shadow_fail_manifold_caps_##suffix) \
+  GPU_SHADER_CREATE_INFO(workbench_shadow_fail_manifold_caps##suffix) \
       .define("SHADOW_FAIL") \
       .additional_info("workbench_shadow_common", "workbench_shadow_caps", __VA_ARGS__) \
       .do_static_compilation(true); \
-  GPU_SHADER_CREATE_INFO(workbench_shadow_fail_manifold_no_caps_##suffix) \
+  GPU_SHADER_CREATE_INFO(workbench_shadow_fail_manifold_no_caps##suffix) \
       .define("SHADOW_FAIL") \
       .additional_info("workbench_shadow_common", "workbench_shadow_manifold", __VA_ARGS__) \
       .do_static_compilation(true); \
-  GPU_SHADER_CREATE_INFO(workbench_shadow_fail_no_manifold_caps_##suffix) \
+  GPU_SHADER_CREATE_INFO(workbench_shadow_fail_no_manifold_caps##suffix) \
       .define("SHADOW_FAIL") \
       .define("DOUBLE_MANIFOLD") \
       .additional_info("workbench_shadow_common", "workbench_shadow_caps", __VA_ARGS__) \
       .do_static_compilation(true); \
-  GPU_SHADER_CREATE_INFO(workbench_shadow_fail_no_manifold_no_caps_##suffix) \
+  GPU_SHADER_CREATE_INFO(workbench_shadow_fail_no_manifold_no_caps##suffix) \
       .define("SHADOW_FAIL") \
       .define("DOUBLE_MANIFOLD") \
       .additional_info("workbench_shadow_common", "workbench_shadow_no_manifold", __VA_ARGS__) \
       .do_static_compilation(true);
 
 WORKBENCH_SHADOW_VARIATIONS(, "workbench_shadow_no_debug")
-WORKBENCH_SHADOW_VARIATIONS(debug, "workbench_shadow_debug")
+WORKBENCH_SHADOW_VARIATIONS(_debug, "workbench_shadow_debug")
 
 /** \} */
