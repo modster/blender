@@ -14,7 +14,7 @@ GPU_SHADER_CREATE_INFO(draw_modelmat)
     .additional_info("draw_view");
 
 GPU_SHADER_CREATE_INFO(draw_modelmat_legacy)
-    .define("LEGACY_MODEL_MATRIX")
+    .define("DRW_LEGACY_MODEL_MATRIX")
     .push_constant(38, Type::MAT4, "ModelMatrix")
     .push_constant(54, Type::MAT4, "ModelMatrixInverse")
     .additional_info("draw_view");

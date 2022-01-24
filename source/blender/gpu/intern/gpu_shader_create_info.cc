@@ -27,6 +27,7 @@
 #include "BLI_set.hh"
 #include "BLI_string_ref.hh"
 
+#include "GPU_capabilities.h"
 #include "GPU_platform.h"
 #include "GPU_shader.h"
 #include "GPU_texture.h"
