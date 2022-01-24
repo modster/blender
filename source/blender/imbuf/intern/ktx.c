@@ -53,52 +53,57 @@ bool check_ktx(const unsigned char *mem, size_t size)
 struct ImBuf *imb_loadktx(const unsigned char *mem, size_t size, int flags, char * UNUSED(colorspace))
 {
   ktxTexture *tex;
-  KTX_error_code ktxerror = ktxTexture_CreateFromMemory(mem, size, 0, &tex);
+  KTX_error_code ktx_error = ktxTexture_CreateFromMemory(
+      mem, size, KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, &tex);
 
-  if (ktxerror != KTX_SUCCESS) {
+  if (ktx_error != KTX_SUCCESS) {
     return NULL;
   }
 
   ktx_size_t offset;
-  ktxerror = ktxTexture_GetImageOffset(tex, 0, 0, 0, &offset);
+  ktx_error = ktxTexture_GetImageOffset(tex, 0, 0, 0, &offset);
 
-  if (ktxerror != KTX_SUCCESS) {
+  if (ktx_error != KTX_SUCCESS) {
     ktxTexture_Destroy(tex);
     return NULL;
   }
 
-  ktx_uint8_t *image = ktxTexture_GetData(tex) + offset;
+  const ktx_uint8_t *image = ktxTexture_GetData(tex) + offset;
 
-  ktx_uint32_t xsize = tex->baseWidth;
-  ktx_uint32_t ysize = tex->baseHeight;
+  ktx_uint32_t x_size = tex->baseWidth;
+  ktx_uint32_t y_size = tex->baseHeight;
 
-  ImBuf *ibuf = IMB_allocImBuf(xsize, ysize, 32, (int)IB_rect);
+  ImBuf *ibuf = IMB_allocImBuf(x_size, y_size, 32, (int)IB_rect);
 
-  bool flipx = false, flipy = false;
+  bool flip_x = false, flip_y = false;
 
-  for (ktx_uint32_t i = 0; i < xsize + ysize; ++i)
-    ibuf->rect[i] = image[i];
+  size_t num_pixels = (size_t)x_size * (size_t)y_size;
+  for (size_t i = 0; i < num_pixels; ++i) {
+    ktx_uint8_t *c_out = (ktx_uint8_t *)(ibuf->rect + i);
+    const ktx_uint8_t *c_in = image + i * 4;
 
-  char *pValue;
+    for (size_t c = 0; c < 4; ++c) {
+      c_out[c] = c_in[c];
+    }
+  }
+
+  const char *pValue;
   uint32_t valueLen;
-  ktxerror = ktxHashList_FindValue(&tex->kvDataHead, KTX_ORIENTATION_KEY, &valueLen, (void **)&pValue);
-  if (ktxerror != KTX_SUCCESS) {
+  ktx_error = ktxHashList_FindValue(&tex->kvDataHead, KTX_ORIENTATION_KEY, &valueLen, (void **)&pValue);
+  if (ktx_error == KTX_SUCCESS) {
     char cx, cy;
     if (sscanf(pValue, KTX_ORIENTATION2_FMT, &cx, &cy) == 2) {
-      flipx = (cx == 'd');
-      flipy = (cy == 'd');
+      flip_x = (cx == 'd');
+      flip_y = (cy == 'd');
     }
   }
 
-  if (flipx && flipy) {
-    int i;
-    size_t imbuf_size = ibuf->x * ibuf->y;
-
-    for (i = 0; i < imbuf_size / 2; i++) {
-      SWAP(unsigned int, ibuf->rect[i], ibuf->rect[imbuf_size - i - 1]);
+  if (flip_x && flip_y) {
+    for (size_t i = 0; i < num_pixels / 2; i++) {
+      SWAP(unsigned int, ibuf->rect[i], ibuf->rect[num_pixels - i - 1]);
     }
   }
-  else if (flipy) {
+  else if (flip_y) {
     size_t i, j;
     for (j = 0; j < ibuf->y / 2; j++) {
       for (i = 0; i < ibuf->x; i++) {
@@ -117,33 +122,33 @@ struct ImBuf *imb_loadktx(const unsigned char *mem, size_t size, int flags, char
 
 bool imb_savektx(struct ImBuf *ibuf, const char *name, int UNUSED(flags))
 {
-  ktxTextureCreateInfo createInfo;
-  createInfo.glInternalformat = 0x8058; // GL_RGBA8
-  createInfo.baseWidth = ibuf->x;
-  createInfo.baseHeight = ibuf->y;
-  createInfo.baseDepth = 0;
-  createInfo.numDimensions = 2;
+  ktxTextureCreateInfo create_info;
+  create_info.glInternalformat = 0x8058; // GL_RGBA8
+  create_info.baseWidth = ibuf->x;
+  create_info.baseHeight = ibuf->y;
+  create_info.baseDepth = 1;
+  create_info.numDimensions = 2;
   // Note: it is not necessary to provide a full mipmap pyramid.
-  createInfo.numLevels = 1;
-  createInfo.numLayers = 1;
-  createInfo.numFaces = 1;
-  createInfo.isArray = KTX_FALSE;
-  createInfo.generateMipmaps = KTX_FALSE;
+  create_info.numLevels = 1;
+  create_info.numLayers = 1;
+  create_info.numFaces = 1;
+  create_info.isArray = KTX_FALSE;
+  create_info.generateMipmaps = KTX_TRUE;
   KTX_error_code result;
-  ktxTexture2 *tex;
-  result = ktxTexture2_Create(&createInfo, KTX_TEXTURE_CREATE_ALLOC_STORAGE, &tex);
+  ktxTexture1 *tex;
+  result = ktxTexture1_Create(&create_info, KTX_TEXTURE_CREATE_ALLOC_STORAGE, &tex);
   if (KTX_SUCCESS != result) {
     return false;
   }
 
   ktxTexture *texture = ktxTexture(tex);
 
-  ktx_uint32_t level, layer, faceSlice;
+  ktx_uint32_t level, layer, face_slice;
   level = 0;
   layer = 0;
-  faceSlice = 0;
+  face_slice = 0;
   result = ktxTexture_SetImageFromMemory(
-      texture, level, layer, faceSlice, (ktx_uint8_t*)ibuf->rect, (size_t)ibuf->x * (size_t)ibuf->y * (size_t) 4);
+      texture, level, layer, face_slice, (ktx_uint8_t*)ibuf->rect, (size_t)ibuf->x * (size_t)ibuf->y * (size_t) 4);
 
   if (KTX_SUCCESS != result) {
     ktxTexture_Destroy(texture);
