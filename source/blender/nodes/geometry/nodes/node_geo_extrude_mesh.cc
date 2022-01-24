@@ -1191,7 +1191,7 @@ static void extrude_individual_mesh_faces(MeshComponent &component,
           break;
         }
         case ATTR_DOMAIN_FACE: {
-          /* Each side face gets the values from the correspoinding new face. */
+          /* Each side face gets the values from the corresponding new face. */
           MutableSpan<T> new_data = data.slice(side_poly_range);
           threading::parallel_for(poly_selection.index_range(), 1024, [&](const IndexRange range) {
             for (const int i_selection : range) {

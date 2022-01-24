@@ -373,8 +373,11 @@ template<> struct DefaultPropatationMixerStruct<bool> {
   using type = BooleanPropagationMixer;
 };
 
-/* This mixer is meant for propagating attributes when creating new geometry. A key difference
- * with the default mixer is that booleans are mixed with "or" instead of "at least half". */
+/**
+ * This mixer is meant for propagating attributes when creating new geometry. A key difference
+ * with the default mixer is that booleans are mixed with "or" instead of "at least half"
+ * (the default mixing for booleans).
+ */
 template<typename T>
 using DefaultPropatationMixer = typename DefaultPropatationMixerStruct<T>::type;
 
