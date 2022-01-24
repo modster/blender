@@ -456,6 +456,12 @@ if(WITH_IMAGE_TIFF)
   endif()
 endif()
 
+if(WITH_IMAGE_KTX)
+  set(KTX_INCLUDE ${LIBDIR}/ktx2/include)
+  set(KTX_LIBRARY ${LIBDIR}/ktx2/lib/ktx.lib)
+  set(KTX_LIBRARY_DLL ${LIBDIR}/ktx2/lib/ktx.dll)
+endif()
+
 if(WITH_JACK)
   set(JACK_INCLUDE_DIRS
     ${LIBDIR}/jack/include/jack

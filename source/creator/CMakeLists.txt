@@ -730,6 +730,14 @@ elseif(WIN32)
     )
   endif()
 
+  if(WITH_IMAGE_KTX AND WIN32)
+    install(
+          FILES ${KTX_LIBRARY_DLL}
+          DESTINATION "."
+    )
+  endif()
+
+
   if(WITH_FFTW3)
     install(
           FILES ${LIBDIR}/fftw3/lib/libfftw3-3.dll

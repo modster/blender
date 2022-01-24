@@ -29,9 +29,6 @@
  *  \ingroup imbuf
  */
 
-#define KTX_OPENGL 1
-#define KTX_USE_GETPROC 1
-
 #include "ktx.h"
 
 #include "IMB_imbuf.h"
@@ -45,131 +42,115 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include "GL/glew.h"
-
 static char KTX_HEAD[] = {0xAB, 0x4B, 0x54, 0x58, 0x20, 0x31, 0x31, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A};
 
 
 bool check_ktx(const unsigned char *mem, size_t size)
 {
-  return memcmp(KTX_HEAD, mem, sizeof(KTX_HEAD)) ? 0 : 1;
+  return memcmp(KTX_HEAD, mem, sizeof(KTX_HEAD)) == 0;
 }
 
 struct ImBuf *imb_loadktx(const unsigned char *mem, size_t size, int flags, char * UNUSED(colorspace))
 {
-	GLuint texture = 0;
-	GLenum target;
-	GLenum glerror;
-	GLboolean isMipmapped;
-	KTX_error_code ktxerror;
-	unsigned int numKeys;
-	unsigned char *keys;
+  ktxTexture *tex;
+  KTX_error_code ktxerror = ktxTexture_CreateFromMemory(mem, size, 0, &tex);
 
-	/* thumbnails are run from a thread so opengl generation below will fail */
-	if (flags & IB_thumbnail) {
-		return NULL;
-	}
+  if (ktxerror != KTX_SUCCESS) {
+    return NULL;
+  }
 
-	ktxerror = ktxLoadTextureM(mem, size, &texture, &target, NULL, &isMipmapped, &glerror, &numKeys, &keys);
+  ktx_size_t offset;
+  ktxerror = ktxTexture_GetImageOffset(tex, 0, 0, 0, &offset);
 
-	if (ktxerror == KTX_SUCCESS) {
-		ImBuf *ibuf;
-		int xsize, ysize;
-		int internal_format;
-		bool flipx = false, flipy = false;
-		glEnable(target);
+  if (ktxerror != KTX_SUCCESS) {
+    ktxTexture_Destroy(tex);
+    return NULL;
+  }
 
-		if (isMipmapped)
-			/* Enable bilinear mipmapping */
-			glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
-		else
-			glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &xsize);
-		glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &ysize);
+  ktx_uint8_t *image = ktxTexture_GetData(tex) + offset;
 
-		ibuf = IMB_allocImBuf(xsize, ysize, 32, (int)IB_rect);
+  ktx_uint32_t xsize = tex->baseWidth;
+  ktx_uint32_t ysize = tex->baseHeight;
 
-		glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, ibuf->rect);
-		glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_COMPRESSED, &internal_format);
+  ImBuf *ibuf = IMB_allocImBuf(xsize, ysize, 32, (int)IB_rect);
 
-		glDeleteTextures(1, &texture);
+  bool flipx = false, flipy = false;
 
-		if (internal_format) {
-			flipx = flipy = true;
-		}
-		else {
-			if (keys) {
-				KTX_hash_table table;
-				ktxerror = ktxHashTable_Deserialize(numKeys, keys, &table);
-				if (ktxerror == KTX_SUCCESS) {
-					unsigned int valLength;
-					unsigned char *value;
-					ktxerror = ktxHashTable_FindValue(table, KTX_ORIENTATION_KEY, &valLength, (void **)&value);
+  for (ktx_uint32_t i = 0; i < xsize + ysize; ++i)
+    ibuf->rect[i] = image[i];
 
-					if (ktxerror == KTX_SUCCESS) {
-						if (value[6] == 'd')
-							flipy = true;
-					}
-				}
-			}
-		}
+  char *pValue;
+  uint32_t valueLen;
+  ktxerror = ktxHashList_FindValue(&tex->kvDataHead, KTX_ORIENTATION_KEY, &valueLen, (void **)&pValue);
+  if (ktxerror != KTX_SUCCESS) {
+    char cx, cy;
+    if (sscanf(pValue, KTX_ORIENTATION2_FMT, &cx, &cy) == 2) {
+      flipx = (cx == 'd');
+      flipy = (cy == 'd');
+    }
+  }
 
-		if (flipx && flipy) {
-			int i;
-			size_t imbuf_size = ibuf->x * ibuf->y;
+  if (flipx && flipy) {
+    int i;
+    size_t imbuf_size = ibuf->x * ibuf->y;
 
-			for (i = 0; i < imbuf_size / 2; i++) {
-				SWAP(unsigned int, ibuf->rect[i], ibuf->rect[imbuf_size - i -1]);
-			}
-		}
-		else if (flipy) {
-			size_t i, j;
-			for (j = 0; j < ibuf->y / 2; j++) {
-				for (i = 0; i < ibuf->x; i++) {
-					SWAP(unsigned int, ibuf->rect[i + j * ibuf->x], ibuf->rect[i + (ibuf->y - j - 1) * ibuf->x]);
-				}
-			}
-		}
+    for (i = 0; i < imbuf_size / 2; i++) {
+      SWAP(unsigned int, ibuf->rect[i], ibuf->rect[imbuf_size - i - 1]);
+    }
+  }
+  else if (flipy) {
+    size_t i, j;
+    for (j = 0; j < ibuf->y / 2; j++) {
+      for (i = 0; i < ibuf->x; i++) {
+        SWAP(unsigned int,
+             ibuf->rect[i + j * ibuf->x],
+             ibuf->rect[i + (ibuf->y - j - 1) * ibuf->x]);
+      }
+    }
+  }
 
-		if (keys)
-			free(keys);
+  ktxTexture_Destroy(tex);
 
-		return ibuf;
-	}
-
-	if (keys)
-		free(keys);
-
-	return NULL;
+  return ibuf;
 }
 
 
 bool imb_savektx(struct ImBuf *ibuf, const char *name, int UNUSED(flags))
 {
-	KTX_texture_info tinfo;
-	KTX_image_info info;
-	KTX_error_code ktxerror;
+  ktxTextureCreateInfo createInfo;
+  createInfo.glInternalformat = 0x8058; // GL_RGBA8
+  createInfo.baseWidth = ibuf->x;
+  createInfo.baseHeight = ibuf->y;
+  createInfo.baseDepth = 0;
+  createInfo.numDimensions = 2;
+  // Note: it is not necessary to provide a full mipmap pyramid.
+  createInfo.numLevels = 1;
+  createInfo.numLayers = 1;
+  createInfo.numFaces = 1;
+  createInfo.isArray = KTX_FALSE;
+  createInfo.generateMipmaps = KTX_FALSE;
+  KTX_error_code result;
+  ktxTexture2 *tex;
+  result = ktxTexture2_Create(&createInfo, KTX_TEXTURE_CREATE_ALLOC_STORAGE, &tex);
+  if (KTX_SUCCESS != result) {
+    return false;
+  }
 
-	tinfo.glType = GL_UNSIGNED_BYTE;
-	/* compression type, expose as option later */
-	tinfo.glTypeSize = 1;
-	tinfo.glFormat = GL_RGBA;
-	tinfo.glInternalFormat = GL_RGBA;
-	tinfo.glBaseInternalFormat = GL_RGBA;
-	tinfo.pixelWidth = ibuf->x;
- 	tinfo.pixelHeight = ibuf->y;
-	tinfo.pixelDepth = 0;
-	tinfo.numberOfArrayElements = 0;
-	tinfo.numberOfFaces = 1;
-	tinfo.numberOfMipmapLevels = 1;
+  ktxTexture *texture = ktxTexture(tex);
 
-	info.data = (GLubyte *) ibuf->rect;
-	info.size = ((size_t)ibuf->x) * ibuf->y * 4 * sizeof(char);
+  ktx_uint32_t level, layer, faceSlice;
+  level = 0;
+  layer = 0;
+  faceSlice = 0;
+  result = ktxTexture_SetImageFromMemory(
+      texture, level, layer, faceSlice, (ktx_uint8_t*)ibuf->rect, (size_t)ibuf->x * (size_t)ibuf->y * (size_t) 4);
 
-	ktxerror = ktxWriteKTXN(name, &tinfo, 0, NULL, 1, &info);
+  if (KTX_SUCCESS != result) {
+    ktxTexture_Destroy(texture);
+    return false;
+  }
+  result = ktxTexture_WriteToNamedFile(texture, name);
+  ktxTexture_Destroy(texture);
 
-	if (KTX_SUCCESS == ktxerror) {
-		return 1;
-	}
-	else return 0;
+  return KTX_SUCCESS == result;
 }

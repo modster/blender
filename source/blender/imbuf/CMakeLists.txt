@@ -193,9 +193,6 @@ if(WITH_IMAGE_KTX)
 	list(APPEND INC
 		${KTX_INCLUDE}
 	)
-	list(APPEND INC_SYS
-		${GLEW_INCLUDE_PATH}
-	)
 	list(APPEND SRC
 		intern/ktx.c
 	)
