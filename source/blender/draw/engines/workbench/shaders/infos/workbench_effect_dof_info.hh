@@ -36,7 +36,7 @@ GPU_SHADER_CREATE_INFO(workbench_effect_dof_downsample)
 GPU_SHADER_CREATE_INFO(workbench_effect_dof_blur1)
     .define("BLUR1")
     .define("NUM_SAMPLES", "49")
-    .uniform_buf(0, "vec4", "samples[49]")
+    .uniform_buf(1, "vec4", "samples[49]")
     .fragment_out(0, Type::VEC4, "blurColor")
     .additional_info("workbench_effect_dof")
     .do_static_compilation(true);

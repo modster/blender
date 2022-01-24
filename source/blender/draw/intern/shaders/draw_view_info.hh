@@ -17,6 +17,14 @@ GPU_SHADER_CREATE_INFO(draw_view_instanced_attr)
 /** \} */
 
 /* -------------------------------------------------------------------- */
+/** \name Draw View
+ * \{ */
+
+GPU_SHADER_CREATE_INFO(drw_clipped).define("USE_WORLD_CLIP_PLANES");
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
 /** \name Geometry Type
  * \{ */
 

@@ -1,4 +1,5 @@
 
+#pragma BLENDER_REQUIRE(common_view_clipping_lib.glsl)
 #pragma BLENDER_REQUIRE(common_view_lib.glsl)
 #pragma BLENDER_REQUIRE(common_pointcloud_lib.glsl)
 #pragma BLENDER_REQUIRE(workbench_common_lib.glsl)
@@ -14,9 +15,7 @@ void main()
 
   gl_Position = point_world_to_ndc(world_pos);
 
-#ifdef USE_WORLD_CLIP_PLANES
-  world_clip_planes_calc_clip_distance(world_pos);
-#endif
+  view_clipping_distances(world_pos);
 
   uv_interp = vec2(0.0);
 

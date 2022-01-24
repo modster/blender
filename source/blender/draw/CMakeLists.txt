@@ -376,6 +376,7 @@ set(GLSL_SRC
   intern/shaders/common_hair_refine_comp.glsl
   intern/shaders/common_math_lib.glsl
   intern/shaders/common_math_geom_lib.glsl
+  intern/shaders/common_view_clipping_lib.glsl
   intern/shaders/common_view_lib.glsl
   intern/shaders/common_fxaa_lib.glsl
   intern/shaders/common_smaa_lib.glsl

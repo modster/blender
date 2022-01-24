@@ -114,7 +114,7 @@ GPU_SHADER_CREATE_INFO(workbench_opaque)
   GPU_SHADER_CREATE_INFO(name).additional_info(__VA_ARGS__).do_static_compilation(true);
 
 #define WORKBENCH_CLIPPING_VARIATIONS(prefix, ...) \
-  WORKBENCH_FINAL_VARIATION(prefix##_clip, /* "drw_clipped",*/ __VA_ARGS__) \
+  WORKBENCH_FINAL_VARIATION(prefix##_clip, "drw_clipped", __VA_ARGS__) \
   WORKBENCH_FINAL_VARIATION(prefix##_no_clip, __VA_ARGS__)
 
 #define WORKBENCH_TEXTURE_VARIATIONS(prefix, ...) \
