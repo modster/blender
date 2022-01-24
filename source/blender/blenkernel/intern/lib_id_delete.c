@@ -326,6 +326,7 @@ static size_t id_delete(Main *bmain, const bool do_tagged_deletion)
                                           ID_REMAP_FORCE_NEVER_NULL_USAGE |
                                           ID_REMAP_FORCE_INTERNAL_RUNTIME_POINTERS));
     }
+    BKE_id_remapper_free(remapper);
   }
 
   BKE_main_unlock(bmain);
