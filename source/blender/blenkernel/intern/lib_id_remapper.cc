@@ -49,7 +49,7 @@ struct IDRemapper {
   void add(ID *old_id, ID *new_id)
   {
     BLI_assert(old_id != nullptr);
-    BLI_assert(new_id != nullptr && GS(old_id) == GS(new_id));
+    BLI_assert(new_id == nullptr || (GS(old_id->name) == GS(new_id->name)));
     mappings.add(old_id, new_id);
     source_types |= BKE_idtype_idcode_to_idfilter(GS(old_id->name));
   }

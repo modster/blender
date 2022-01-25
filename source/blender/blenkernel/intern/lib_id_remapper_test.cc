@@ -20,6 +20,8 @@
 
 #include "BKE_lib_remap.h"
 
+#include "BLI_string.h"
+
 #include "DNA_ID.h"
 
 namespace blender::bke::id::remapper::tests {
@@ -52,6 +54,8 @@ TEST(lib_id_remapper, mapped)
   ID id1;
   ID id2;
   ID *idp = &id1;
+  BLI_strncpy(id1.name, "OB1", sizeof(id1.name));
+  BLI_strncpy(id2.name, "OB2", sizeof(id2.name));
 
   IDRemapper *remapper = BKE_id_remapper_create();
   BKE_id_remapper_add(remapper, &id1, &id2);
