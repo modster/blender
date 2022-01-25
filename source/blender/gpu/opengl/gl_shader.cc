@@ -585,10 +585,6 @@ static char *glsl_patch_default_get()
     STR_CONCAT(patch, slen, "#define GPU_ARB_shader_draw_parameters\n");
     STR_CONCAT(patch, slen, "#define gpu_BaseInstance gl_BaseInstanceARB\n");
   }
-  else {
-    /* Fallback: Emulate base instance using a uniform. */
-    STR_CONCAT(patch, slen, "uniform int gpu_BaseInstance\n");
-  }
   if (GLContext::geometry_shader_invocations) {
     STR_CONCAT(patch, slen, "#extension GL_ARB_gpu_shader5 : enable\n");
     STR_CONCAT(patch, slen, "#define GPU_ARB_gpu_shader5\n");
@@ -596,6 +592,23 @@ static char *glsl_patch_default_get()
   if (GLContext::texture_cube_map_array_support) {
     STR_CONCAT(patch, slen, "#extension GL_ARB_texture_cube_map_array : enable\n");
     STR_CONCAT(patch, slen, "#define GPU_ARB_texture_cube_map_array\n");
+  }
+  if (GLEW_ARB_conservative_depth) {
+    STR_CONCAT(patch, slen, "#extension GL_ARB_conservative_depth : enable\n");
+  }
+  if (GPU_shader_image_load_store_support()) {
+    STR_CONCAT(patch, slen, "#extension GL_ARB_shader_image_load_store: enable\n");
+    STR_CONCAT(patch, slen, "#extension GL_ARB_shading_language_420pack: enable\n");
+  }
+
+  if (!GLContext::shader_draw_parameters_support) {
+    /* Fallback: Emulate base instance using a uniform. */
+    STR_CONCAT(patch, slen, "uniform int gpu_BaseInstance;\n");
+  }
+
+  /* Fallbacks. */
+  if (!GLContext::shader_draw_parameters_support) {
+    STR_CONCAT(patch, slen, "uniform int gpu_BaseInstance;\n");
   }
 
   /* Vulkan GLSL compat. */

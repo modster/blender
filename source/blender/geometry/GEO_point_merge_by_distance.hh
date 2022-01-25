@@ -12,31 +12,27 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2004 Blender Foundation.
- * All rights reserved.
  */
+
+#include "BLI_index_mask.hh"
 
 #pragma once
 
+struct PointCloud;
+class PointCloudComponent;
+
 /** \file
- * \ingroup sequencer
+ * \ingroup geo
  */
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+namespace blender::geometry {
 
-struct Scene;
-struct Sequence;
-struct StripProxy;
 /**
- * Cache must be freed before calling this function
- * since it leaves the seqbase in an invalid state.
+ * Merge selected points into other selected points within the \a merge_distance. The merged
+ * indices favor speed over accuracy, since the results will depend on the order of the points.
  */
-void seq_free_sequence_recurse(struct Scene *scene, struct Sequence *seq, bool do_id_user);
-struct StripProxy *seq_strip_proxy_alloc(void);
+PointCloud *point_merge_by_distance(const PointCloudComponent &src_points,
+                                    const float merge_distance,
+                                    const IndexMask selection);
 
-#ifdef __cplusplus
-}
-#endif
+}  // namespace blender::geometry

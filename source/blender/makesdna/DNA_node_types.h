@@ -1927,11 +1927,19 @@ typedef enum NodeVectorMathOperation {
 } NodeVectorMathOperation;
 
 /** Boolean math node operations. */
-enum {
+typedef enum NodeBooleanMathOperation {
   NODE_BOOLEAN_MATH_AND = 0,
   NODE_BOOLEAN_MATH_OR = 1,
   NODE_BOOLEAN_MATH_NOT = 2,
-};
+
+  NODE_BOOLEAN_MATH_NAND = 3,
+  NODE_BOOLEAN_MATH_NOR = 4,
+  NODE_BOOLEAN_MATH_XNOR = 5,
+  NODE_BOOLEAN_MATH_XOR = 6,
+
+  NODE_BOOLEAN_MATH_IMPLY = 7,
+  NODE_BOOLEAN_MATH_NIMPLY = 8,
+} NodeBooleanMathOperation;
 
 /** Float compare node operations. */
 typedef enum NodeCompareMode {
