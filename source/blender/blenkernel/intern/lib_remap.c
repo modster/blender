@@ -515,7 +515,7 @@ typedef struct LibblockRemapMultipleUserData {
   short remap_flags;
 } LibBlockRemapMultipleUserData;
 
-static void libblock_remap_locked_ex(ID *old_id, ID *new_id, void *user_data)
+static void libblock_remap_foreach_idpair_cb(ID *old_id, ID *new_id, void *user_data)
 {
   LibBlockRemapMultipleUserData *data = user_data;
   Main *bmain = data->bmain;
@@ -618,7 +618,7 @@ void BKE_libblock_remap_multiple_locked(Main *bmain,
   LibBlockRemapMultipleUserData user_data;
   user_data.bmain = bmain;
   user_data.remap_flags = remap_flags;
-  BKE_id_remapper_iter(mappings, libblock_remap_locked_ex, &user_data);
+  BKE_id_remapper_iter(mappings, libblock_remap_foreach_idpair_cb, &user_data);
 
   /* We assume editors do not hold references to their IDs... This is false in some cases
    * (Image is especially tricky here),

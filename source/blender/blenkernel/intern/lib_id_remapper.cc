@@ -49,6 +49,7 @@ struct IDRemapper {
   void add(ID *old_id, ID *new_id)
   {
     BLI_assert(old_id != nullptr);
+    BLI_assert(new_id != nullptr && GS(old_id) == GS(new_id));
     mappings.add(old_id, new_id);
     source_types |= BKE_idtype_idcode_to_idfilter(GS(old_id->name));
   }
@@ -58,32 +59,32 @@ struct IDRemapper {
     return (source_types & filter) != 0;
   }
 
-  IDRemapperApplyResult apply(ID **id_ptr_ptr, IDRemapperApplyOptions options) const
+  IDRemapperApplyResult apply(ID **r_id_ptr, IDRemapperApplyOptions options) const
   {
-    BLI_assert(id_ptr_ptr != nullptr);
-    if (*id_ptr_ptr == nullptr) {
+    BLI_assert(r_id_ptr != nullptr);
+    if (*r_id_ptr == nullptr) {
       return ID_REMAP_RESULT_SOURCE_NOT_MAPPABLE;
     }
 
-    if (!mappings.contains(*id_ptr_ptr)) {
+    if (!mappings.contains(*r_id_ptr)) {
       return ID_REMAP_RESULT_SOURCE_UNAVAILABLE;
     }
 
     if (options & ID_REMAP_APPLY_UPDATE_REFCOUNT) {
-      id_us_min(*id_ptr_ptr);
+      id_us_min(*r_id_ptr);
     }
 
-    *id_ptr_ptr = mappings.lookup(*id_ptr_ptr);
-    if (*id_ptr_ptr == nullptr) {
+    *r_id_ptr = mappings.lookup(*r_id_ptr);
+    if (*r_id_ptr == nullptr) {
       return ID_REMAP_RESULT_SOURCE_UNASSIGNED;
     }
 
     if (options & ID_REMAP_APPLY_UPDATE_REFCOUNT) {
-      id_us_plus(*id_ptr_ptr);
+      id_us_plus(*r_id_ptr);
     }
 
     if (options & ID_REMAP_APPLY_ENSURE_REAL) {
-      id_us_ensure_real(*id_ptr_ptr);
+      id_us_ensure_real(*r_id_ptr);
     }
     return ID_REMAP_RESULT_SOURCE_REMAPPED;
   }
@@ -157,11 +158,11 @@ bool BKE_id_remapper_has_mapping_for(const struct IDRemapper *id_remapper, uint6
 }
 
 IDRemapperApplyResult BKE_id_remapper_apply(const IDRemapper *id_remapper,
-                                            ID **id_ptr_ptr,
+                                            ID **r_id_ptr,
                                             const IDRemapperApplyOptions options)
 {
   const blender::bke::id::remapper::IDRemapper *remapper = unwrap(id_remapper);
-  return remapper->apply(id_ptr_ptr, options);
+  return remapper->apply(r_id_ptr, options);
 }
 
 void BKE_id_remapper_iter(const struct IDRemapper *id_remapper,

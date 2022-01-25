@@ -173,7 +173,7 @@ struct IDRemapper;
 typedef enum IDRemapperApplyResult {
   /** No remapping rules available for the source. */
   ID_REMAP_RESULT_SOURCE_UNAVAILABLE,
-  /** Source isn't mappable (fe NULL). */
+  /** Source isn't mappable (e.g. NULL). */
   ID_REMAP_RESULT_SOURCE_NOT_MAPPABLE,
   /** Source has been remapped to a new pointer. */
   ID_REMAP_RESULT_SOURCE_REMAPPED,
@@ -207,10 +207,10 @@ void BKE_id_remapper_add(struct IDRemapper *id_remapper, struct ID *old_id, stru
 /**
  * Apply a remapping.
  *
- * Update the id pointer stored in the given id_ptr_ptr id a remapping rule exists.
+ * Update the id pointer stored in the given r_id_ptr if a remapping rule exists.
  */
 IDRemapperApplyResult BKE_id_remapper_apply(const struct IDRemapper *id_remapper,
-                                            struct ID **id_ptr_ptr,
+                                            struct ID **r_id_ptr,
                                             IDRemapperApplyOptions options);
 bool BKE_id_remapper_has_mapping_for(const struct IDRemapper *id_remapper, uint64_t type_filter);
 void BKE_id_remapper_iter(const struct IDRemapper *id_remapper,
