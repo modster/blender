@@ -11,17 +11,20 @@ GPU_SHADER_CREATE_INFO(workbench_mesh)
     .vertex_in(2, Type::VEC4, "ac")
     .vertex_in(3, Type::VEC2, "au")
     .vertex_source("workbench_prepass_vert.glsl")
-    .additional_info("draw_mesh");
+    .additional_info("draw_mesh")
+    .additional_info("draw_resource_handle");
 
 GPU_SHADER_CREATE_INFO(workbench_hair)
     .sampler(0, ImageType::FLOAT_BUFFER, "ac", Frequency::BATCH)
     .sampler(1, ImageType::FLOAT_BUFFER, "au", Frequency::BATCH)
     .vertex_source("workbench_prepass_hair_vert.glsl")
-    .additional_info("draw_hair");
+    .additional_info("draw_hair")
+    .additional_info("draw_resource_handle");
 
 GPU_SHADER_CREATE_INFO(workbench_pointcloud)
     .vertex_source("workbench_prepass_pointcloud_vert.glsl")
-    .additional_info("draw_pointcloud");
+    .additional_info("draw_pointcloud")
+    .additional_info("draw_resource_handle");
 
 /** \} */
 

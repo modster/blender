@@ -28,14 +28,14 @@ GPU_SHADER_CREATE_INFO(workbench_volume_smoke)
     .define("VOLUME_SMOKE")
     .sampler(2, ImageType::FLOAT_3D, "flameTexture")
     .sampler(3, ImageType::FLOAT_1D, "flameColorTexture")
-    .additional_info("draw_mesh");
+    .additional_info("draw_mesh", "draw_resource_id_varying");
 
 GPU_SHADER_CREATE_INFO(workbench_volume_object)
     .define("VOLUME_OBJECT")
     .push_constant(0, Type::MAT4, "volumeTextureToObject")
     /* FIXME(fclem): This overflow the push_constant limit. */
     .push_constant(16, Type::MAT4, "volumeObjectToTexture")
-    .additional_info("draw_volume");
+    .additional_info("draw_volume", "draw_resource_id_varying");
 
 /** \} */
 

@@ -189,7 +189,7 @@ inline const char *ShaderInterface::builtin_uniform_name(GPUUniformBuiltin u)
     case GPU_UNIFORM_COLOR:
       return "color";
     case GPU_UNIFORM_BASE_INSTANCE:
-      return "baseInstance";
+      return "gpu_BaseInstance";
     case GPU_UNIFORM_RESOURCE_CHUNK:
       return "resourceChunk";
     case GPU_UNIFORM_RESOURCE_ID:
