@@ -238,6 +238,7 @@ static void get_displacement_to_avg_selected_bezt(const ListBase *nurbs,
 /* Move the handle of the newly added #BezTriple to mouse. */
 static void move_new_bezt_handles_to_mouse(const wmEvent *event,
                                            const ViewContext *vc,
+                                           const bool link_handles,
                                            ListBase *nurbs)
 {
   float change[2];
@@ -265,16 +266,26 @@ static void move_new_bezt_handles_to_mouse(const wmEvent *event,
     copy_v3_v3(bezt->vec[2], location);
 
     if (bezt->h2 != HD_FREE) {
-      negate_v3(location);
-      madd_v3_v3v3fl(bezt->vec[0], location, bezt->vec[1], 2.0f);
+      float handle_vec[3];
+      sub_v3_v3v3(handle_vec, bezt->vec[1], location);
+      if (!link_handles) {
+        float handle_len = len_v3v3(bezt->vec[0], bezt->vec[1]);
+        normalize_v3_length(handle_vec, handle_len);
+      }
+      add_v3_v3v3(bezt->vec[0], bezt->vec[1], handle_vec);
     }
   }
   else {
     copy_v3_v3(bezt->vec[0], location);
 
     if (bezt->h1 != HD_FREE) {
-      negate_v3(location);
-      madd_v3_v3v3fl(bezt->vec[2], location, bezt->vec[1], 2.0f);
+      float handle_vec[3];
+      sub_v3_v3v3(handle_vec, bezt->vec[1], location);
+      if (!link_handles) {
+        float handle_len = len_v3v3(bezt->vec[2], bezt->vec[1]);
+        normalize_v3_length(handle_vec, handle_len);
+      }
+      add_v3_v3v3(bezt->vec[2], bezt->vec[1], handle_vec);
     }
   }
   FOREACH_SELECTED_BEZT_END
@@ -1641,8 +1652,14 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   }
   cpd->free_toggle_pressed = is_extra_key_pressed(event, free_toggle);
   if (!cpd->link_handles_pressed && is_extra_key_pressed(event, link_handles)) {
-    move_all_selected_points(nurbs, false, cpd, event, &vc);
     cpd->link_handles = !cpd->link_handles;
+    if (cpd->link_handles) {
+      move_all_selected_points(nurbs, false, cpd, event, &vc);
+    }
+    else {
+      // Recalculate offset after link handles is turned off
+      cpd->offset_calc = false;
+    }
   }
   cpd->link_handles_pressed = is_extra_key_pressed(event, link_handles);
   const bool move_entire_pressed = is_extra_key_pressed(event, move_entire);
@@ -1670,7 +1687,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
           move_all_selected_points(nurbs, move_entire_pressed, cpd, event, &vc);
         }
         else {
-          move_new_bezt_handles_to_mouse(event, &vc, nurbs);
+          move_new_bezt_handles_to_mouse(event, &vc, cpd->link_handles, nurbs);
         }
         cpd->acted = true;
       }
@@ -1728,22 +1745,19 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
           "new_point" to true so that the new point's handles can be controlled. */
           if (insert_point && !move_seg) {
             insert_point_to_segment(event, vc.obedit->data, &nu, sel_dist_mul, &vc);
-            cpd->new_point = true;
-            cpd->acted = true;
+            cpd->new_point = cpd->acted = cpd->link_handles = true;
           }
         }
         else if (new_spline) {
           ED_curve_deselect_all(((Curve *)(vc.obedit->data))->editnurb);
           extrude_points_from_selected_vertices(
               &vc, obedit, event, extrude_center, extrude_handle);
-          cpd->new_point = true;
-          cpd->acted = true;
+          cpd->new_point = cpd->acted = cpd->link_handles = true;
         }
         else if (extrude_point) {
           extrude_points_from_selected_vertices(
               &vc, obedit, event, extrude_center, extrude_handle);
-          cpd->new_point = true;
-          cpd->acted = true;
+          cpd->new_point = cpd->acted = cpd->link_handles = true;
         }
       }
     }
