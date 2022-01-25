@@ -100,7 +100,10 @@ find_package_wrapper(JPEG REQUIRED)
 find_package_wrapper(PNG REQUIRED)
 find_package_wrapper(ZLIB REQUIRED)
 find_package_wrapper(Zstd REQUIRED)
+
+# FreeType compiled with Brotli compression for woff2.
 find_package_wrapper(Freetype REQUIRED)
+find_package_wrapper(Brotli REQUIRED)
 
 if(WITH_PYTHON)
   # No way to set py35, remove for now.
