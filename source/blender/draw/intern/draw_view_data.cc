@@ -50,8 +50,7 @@ struct DRWViewData {
   Vector<ViewportEngineData *> enabled_engines;
 };
 
-/* Creates a view data with all possible engines type for this view. */
-DRWViewData *DRW_view_data_create(ListBase * /* DRWRegisteredDrawEngine */ engine_types)
+DRWViewData *DRW_view_data_create(ListBase *engine_types)
 {
   DRWViewData *view_data = new DRWViewData();
   LISTBASE_FOREACH (DRWRegisteredDrawEngine *, type, engine_types) {
@@ -114,6 +113,12 @@ static void draw_viewport_engines_data_clear(ViewportEngineData *data)
   }
   for (int i = 0; data->stl && i < data_size->stl_len; i++) {
     MEM_SAFE_FREE(data->stl->storage[i]);
+  }
+
+  if (data->instance_data) {
+    BLI_assert(engine_type->instance_free != nullptr);
+    engine_type->instance_free(data->instance_data);
+    data->instance_data = nullptr;
   }
 
   MEM_SAFE_FREE(data->fbl);

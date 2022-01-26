@@ -544,7 +544,7 @@ void GHOST_WindowX11::refreshXInputDevices()
     std::vector<XEventClass> xevents;
 
     for (GHOST_SystemX11::GHOST_TabletX11 &xtablet : m_system->GetXTablets()) {
-      /* With modern XInput (xlib 1.6.2 at least and/or evdev 2.9.0) and some 'no-name' tablets
+      /* With modern XInput (XLIB 1.6.2 at least and/or EVDEV 2.9.0) and some 'no-name' tablets
        * like 'UC-LOGIC Tablet WP5540U', we also need to 'select' ButtonPress for motion event,
        * otherwise we do not get any tablet motion event once pen is pressed... See T43367.
        */
@@ -1092,9 +1092,9 @@ GHOST_TSuccess GHOST_WindowX11::setOrder(GHOST_TWindowOrder order)
     XWindowAttributes attr;
     Atom atom;
 
-    /* We use both XRaiseWindow and _NET_ACTIVE_WINDOW, since some
-     * window managers ignore the former (e.g. kwin from kde) and others
-     * don't implement the latter (e.g. fluxbox pre 0.9.9) */
+    /* We use both #XRaiseWindow and #_NET_ACTIVE_WINDOW, since some
+     * window managers ignore the former (e.g. KWIN from KDE) and others
+     * don't implement the latter (e.g. FLUXBOX before 0.9.9). */
 
     XRaiseWindow(m_display, m_window);
 

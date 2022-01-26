@@ -581,7 +581,7 @@ class WM_OT_context_cycle_enum(Operator):
 
         # Have the info we need, advance to the next item.
         #
-        # When wrap's disabled we may set the value to its self,
+        # When wrap's disabled we may set the value to itself,
         # this is done to ensure update callbacks run.
         if self.reverse:
             if orig_index == 0:
@@ -979,6 +979,12 @@ class WM_OT_url_open(Operator):
         return {'FINISHED'}
 
 
+# NOTE: needed for Python 3.10 since there are name-space issues with annotations.
+# This can be moved into the class as a static-method once Python 3.9x is dropped.
+def _wm_url_open_preset_type_items(_self, _context):
+    return [item for (item, _) in WM_OT_url_open_preset.preset_items]
+
+
 class WM_OT_url_open_preset(Operator):
     """Open a preset website in the web browser"""
     bl_idname = "wm.url_open_preset"
@@ -987,9 +993,7 @@ class WM_OT_url_open_preset(Operator):
 
     type: EnumProperty(
         name="Site",
-        items=lambda self, _context: (
-            item for (item, _) in WM_OT_url_open_preset.preset_items
-        ),
+        items=_wm_url_open_preset_type_items,
     )
 
     id: StringProperty(
@@ -1026,7 +1030,7 @@ class WM_OT_url_open_preset(Operator):
           "Report a bug in an add-on"),
          _url_from_bug_addon),
         (('RELEASE_NOTES', "Release Notes",
-          "Read about whats new in this version of Blender"),
+          "Read about what's new in this version of Blender"),
          _url_from_release_notes),
         (('MANUAL', "Manual",
           "The reference manual for this version of Blender"),
@@ -1294,6 +1298,13 @@ rna_vector_subtype_items = (
     ('QUATERNION', "Quaternion Rotation", "Quaternion rotation (affects NLA blending)"),
 )
 
+
+# NOTE: needed for Python 3.10 since there are name-space issues with annotations.
+# This can be moved into the class as a static-method once Python 3.9x is dropped.
+def _wm_properties_edit_subtype_items(_self, _context):
+    return WM_OT_properties_edit.subtype_items
+
+
 class WM_OT_properties_edit(Operator):
     """Change a custom property's type, or adjust how it is displayed in the interface"""
     bl_idname = "wm.properties_edit"
@@ -1308,7 +1319,7 @@ class WM_OT_properties_edit(Operator):
     property_name: rna_custom_property_name
     property_type: EnumProperty(
         name="Type",
-        items=lambda self, _context: WM_OT_properties_edit.type_items,
+        items=rna_custom_property_type_items,
     )
     is_overridable_library: BoolProperty(
         name="Is Library Overridable",
@@ -1323,7 +1334,10 @@ class WM_OT_properties_edit(Operator):
 
     use_soft_limits: BoolProperty(
         name="Use Soft Limits",
-        description="Limits the Property Value slider to a range, values outside the range must be inputted numerically",
+        description=(
+            "Limits the Property Value slider to a range, "
+            "values outside the range must be inputted numerically"
+        ),
     )
     array_length: IntProperty(
         name="Array Length",
@@ -1397,7 +1411,7 @@ class WM_OT_properties_edit(Operator):
     )
     subtype: EnumProperty(
         name="Subtype",
-        items=lambda self, _context: WM_OT_properties_edit.subtype_items,
+        items=_wm_properties_edit_subtype_items,
     )
 
     # String properties.
@@ -1416,10 +1430,10 @@ class WM_OT_properties_edit(Operator):
     type_items = rna_custom_property_type_items
     subtype_items = rna_vector_subtype_items
 
-    # Helper method to avoid repetative code to retrieve a single value from sequences and non-sequences.
+    # Helper method to avoid repetitive code to retrieve a single value from sequences and non-sequences.
     @staticmethod
     def _convert_new_value_single(old_value, new_type):
-        if hasattr(old_value, "__len__"):
+        if hasattr(old_value, "__len__") and len(old_value) > 0:
             return new_type(old_value[0])
         return new_type(old_value)
 
@@ -1435,7 +1449,7 @@ class WM_OT_properties_edit(Operator):
 
     # Convert an old property for a string, avoiding unhelpful string representations for custom list types.
     @staticmethod
-    def _convert_old_property_to_string(item, name):
+    def convert_custom_property_to_string(item, name):
         # The IDProperty group view API currently doesn't have a "lookup" method.
         for key, value in item.items():
             if key == name:
@@ -1454,7 +1468,8 @@ class WM_OT_properties_edit(Operator):
 
     # Retrieve the current type of the custom property on the RNA struct. Some properties like group properties
     # can be created in the UI, but editing their meta-data isn't supported. In that case, return 'PYTHON'.
-    def _get_property_type(self, item, property_name):
+    @staticmethod
+    def get_property_type(item, property_name):
         from rna_prop_ui import (
             rna_idprop_value_item_type,
         )
@@ -1542,17 +1557,17 @@ class WM_OT_properties_edit(Operator):
             return self._convert_new_value_single(item[name_old], float)
 
         if prop_type_new == 'INT_ARRAY':
-            prop_type_old = self._get_property_type(item, name_old)
+            prop_type_old = self.get_property_type(item, name_old)
             if prop_type_old in {'INT', 'FLOAT', 'INT_ARRAY', 'FLOAT_ARRAY'}:
                 return self._convert_new_value_array(item[name_old], int, self.array_length)
 
         if prop_type_new == 'FLOAT_ARRAY':
-            prop_type_old = self._get_property_type(item, name_old)
+            prop_type_old = self.get_property_type(item, name_old)
             if prop_type_old in {'INT', 'FLOAT', 'FLOAT_ARRAY', 'INT_ARRAY'}:
                 return self._convert_new_value_array(item[name_old], float, self.array_length)
 
         if prop_type_new == 'STRING':
-            return self._convert_old_property_to_string(item, name_old)
+            return self.convert_custom_property_to_string(item, name_old)
 
         # If all else fails, create an empty string property. That should avoid errors later on anyway.
         return ""
@@ -1582,7 +1597,7 @@ class WM_OT_properties_edit(Operator):
                 min=self.min_int,
                 max=self.max_int,
                 soft_min=self.soft_min_int if self.use_soft_limits else self.min_int,
-                soft_max=self.soft_max_int if self.use_soft_limits else self.min_int,
+                soft_max=self.soft_max_int if self.use_soft_limits else self.max_int,
                 step=self.step_int,
                 default=self.default_int[0] if prop_type_new == 'INT' else self.default_int[:self.array_length],
                 description=self.description,
@@ -1665,7 +1680,7 @@ class WM_OT_properties_edit(Operator):
             self.report({'ERROR'}, "Cannot edit properties from override data")
             return {'CANCELLED'}
 
-        prop_type_old = self._get_property_type(item, name_old)
+        prop_type_old = self.get_property_type(item, name_old)
         prop_type_new = self.property_type
         self._old_prop_name[:] = [name]
 
@@ -1702,7 +1717,6 @@ class WM_OT_properties_edit(Operator):
         name = self.property_name
 
         self._old_prop_name = [name]
-        self.last_property_type = self.property_type
 
         item = eval("context.%s" % data_path)
         if (item.id_data and item.id_data.override_library and item.id_data.override_library.reference):
@@ -1710,13 +1724,14 @@ class WM_OT_properties_edit(Operator):
             return {'CANCELLED'}
 
         # Set operator's property type with the type of the existing property, to display the right settings.
-        old_type = self._get_property_type(item, name)
+        old_type = self.get_property_type(item, name)
         self.property_type = old_type
+        self.last_property_type = old_type
 
         # So that the operator can do something for unsupported properties, change the property into
         # a string, just for editing in the dialog. When the operator executes, it will be converted back
         # into a python value. Always do this conversion, in case the Python property edit type is selected.
-        self.eval_string = self._convert_old_property_to_string(item, name)
+        self.eval_string = self.convert_custom_property_to_string(item, name)
 
         if old_type != 'PYTHON':
             self._fill_old_ui_data(item, name)
@@ -1738,10 +1753,10 @@ class WM_OT_properties_edit(Operator):
             if self.min_float > self.max_float:
                 self.min_float, self.max_float = self.max_float, self.min_float
                 changed = True
-            if self.soft_min_float > self.soft_max_float:
-                self.soft_min_float, self.soft_max_float = self.soft_max_float, self.soft_min_float
-                changed = True
             if self.use_soft_limits:
+                if self.soft_min_float > self.soft_max_float:
+                    self.soft_min_float, self.soft_max_float = self.soft_max_float, self.soft_min_float
+                    changed = True
                 if self.soft_max_float > self.max_float:
                     self.soft_max_float = self.max_float
                     changed = True
@@ -1752,10 +1767,10 @@ class WM_OT_properties_edit(Operator):
             if self.min_int > self.max_int:
                 self.min_int, self.max_int = self.max_int, self.min_int
                 changed = True
-            if self.soft_min_int > self.soft_max_int:
-                self.soft_min_int, self.soft_max_int = self.soft_max_int, self.soft_min_int
-                changed = True
             if self.use_soft_limits:
+                if self.soft_min_int > self.soft_max_int:
+                    self.soft_min_int, self.soft_max_int = self.soft_max_int, self.soft_min_int
+                    changed = True
                 if self.soft_max_int > self.max_int:
                     self.soft_max_int = self.max_int
                     changed = True
@@ -1836,6 +1851,62 @@ class WM_OT_properties_edit(Operator):
             layout.prop(self, "eval_string")
         else:
             layout.prop(self, "description")
+
+
+# Edit the value of a custom property with the given name on the RNA struct at the given data path.
+# For supported types, this simply acts as a convenient way to create a popup for a specific property
+# and draws the custom property value directly in the popup. For types like groups which can't be edited
+# directly with buttons, instead convert the value to a string, evaluate the changed string when executing.
+class WM_OT_properties_edit_value(Operator):
+    """Edit the value of a custom property"""
+    bl_idname = "wm.properties_edit_value"
+    bl_label = "Edit Property Value"
+    # register only because invoke_props_popup requires.
+    bl_options = {'REGISTER', 'INTERNAL'}
+
+    data_path: rna_path
+    property_name: rna_custom_property_name
+
+    # Store the value converted to a string as a fallback for otherwise unsupported types.
+    eval_string: StringProperty(
+        name="Value",
+        description="Value for custom property types that can only be edited as a Python expression"
+    )
+
+    def execute(self, context):
+        if self.eval_string:
+            rna_item = eval("context.%s" % self.data_path)
+            try:
+                new_value = eval(self.eval_string)
+            except Exception as ex:
+                self.report({'WARNING'}, "Python evaluation failed: " + str(ex))
+                return {'CANCELLED'}
+            rna_item[self.property_name] = new_value
+        return {'FINISHED'}
+
+    def invoke(self, context, _event):
+        rna_item = eval("context.%s" % self.data_path)
+
+        if WM_OT_properties_edit.get_property_type(rna_item, self.property_name) == 'PYTHON':
+            self.eval_string = WM_OT_properties_edit.convert_custom_property_to_string(rna_item,
+                                                                                       self.property_name)
+        else:
+            self.eval_string = ""
+
+        wm = context.window_manager
+        return wm.invoke_props_dialog(self)
+
+    def draw(self, context):
+        from bpy.utils import escape_identifier
+
+        rna_item = eval("context.%s" % self.data_path)
+
+        layout = self.layout
+        if WM_OT_properties_edit.get_property_type(rna_item, self.property_name) == 'PYTHON':
+            layout.prop(self, "eval_string")
+        else:
+            col = layout.column(align=True)
+            col.prop(rna_item, '["%s"]' % escape_identifier(self.property_name), text="")
 
 
 class WM_OT_properties_add(Operator):
@@ -2396,18 +2467,22 @@ class WM_OT_batch_rename(Operator):
         name="Type",
         items=(
             ('OBJECT', "Objects", ""),
+            ('COLLECTION', "Collections", ""),
             ('MATERIAL', "Materials", ""),
             None,
             # Enum identifiers are compared with 'object.type'.
+            # Follow order in "Add" menu.
             ('MESH', "Meshes", ""),
             ('CURVE', "Curves", ""),
             ('META', "Metaballs", ""),
+            ('VOLUME', "Volumes", ""),
+            ('GPENCIL', "Grease Pencils", ""),
             ('ARMATURE', "Armatures", ""),
             ('LATTICE', "Lattices", ""),
-            ('GPENCIL', "Grease Pencils", ""),
+            ('LIGHT', "Light", ""),
+            ('LIGHT_PROBE', "Light Probes", ""),
             ('CAMERA', "Cameras", ""),
             ('SPEAKER', "Speakers", ""),
-            ('LIGHT_PROBE', "Light Probes", ""),
             None,
             ('BONE', "Bones", ""),
             ('NODE', "Nodes", ""),
@@ -2427,7 +2502,26 @@ class WM_OT_batch_rename(Operator):
     actions: CollectionProperty(type=BatchRenameAction)
 
     @staticmethod
-    def _data_from_context(context, data_type, only_selected, *, check_context=False):
+    def _selected_ids_from_outliner_by_type(context, ty):
+        return [
+            id for id in context.selected_ids
+            if isinstance(id, ty)
+            if id.library is None
+        ]
+
+    @staticmethod
+    def _selected_ids_from_outliner_by_type_for_object_data(context, ty):
+        # Include selected object-data as well as the selected ID's.
+        from bpy.types import Object
+        # De-duplicate the result as object-data may cause duplicates.
+        return tuple(set([
+            id for id_base in context.selected_ids
+            if isinstance(id := id_base.data if isinstance(id_base, Object) else id_base, ty)
+            if id.library is None
+        ]))
+
+    @classmethod
+    def _data_from_context(cls, context, data_type, only_selected, *, check_context=False):
 
         mode = context.mode
         scene = context.scene
@@ -2441,10 +2535,9 @@ class WM_OT_batch_rename(Operator):
                 return data_type_test
             if data_type == data_type_test:
                 data = (
-                    # TODO, we don't have access to seqbasep, this won't work when inside metas.
-                    [seq for seq in context.scene.sequence_editor.sequences_all if seq.select]
+                    context.selected_sequences
                     if only_selected else
-                    context.scene.sequence_editor.sequences_all,
+                    scene.sequence_editor.sequences_all,
                     "name",
                     "Strip(s)",
                 )
@@ -2459,6 +2552,18 @@ class WM_OT_batch_rename(Operator):
                     list(space.node_tree.nodes),
                     "name",
                     "Node(s)",
+                )
+        elif space_type == 'OUTLINER':
+            data_type_test = 'COLLECTION'
+            if check_context:
+                return data_type_test
+            if data_type == data_type_test:
+                data = (
+                    cls._selected_ids_from_outliner_by_type(context, bpy.types.Collection)
+                    if only_selected else
+                    scene.collection.children_recursive,
+                    "name",
+                    "Collection(s)",
                 )
         else:
             if mode == 'POSE' or (mode == 'WEIGHT_PAINT' and context.pose_object):
@@ -2490,15 +2595,17 @@ class WM_OT_batch_rename(Operator):
             return 'OBJECT'
 
         object_data_type_attrs_map = {
-            'MESH': ("meshes", "Mesh(es)"),
-            'CURVE': ("curves", "Curve(s)"),
-            'META': ("metaballs", "Metaball(s)"),
-            'ARMATURE': ("armatures", "Armature(s)"),
-            'LATTICE': ("lattices", "Lattice(s)"),
-            'GPENCIL': ("grease_pencils", "Grease Pencil(s)"),
-            'CAMERA': ("cameras", "Camera(s)"),
-            'SPEAKER': ("speakers", "Speaker(s)"),
-            'LIGHT_PROBE': ("light_probes", "Light Probe(s)"),
+            'MESH': ("meshes", "Mesh(es)", bpy.types.Mesh),
+            'CURVE': ("curves", "Curve(s)", bpy.types.Curve),
+            'META': ("metaballs", "Metaball(s)", bpy.types.MetaBall),
+            'VOLUME': ("volumes", "Volume(s)", bpy.types.Volume),
+            'GPENCIL': ("grease_pencils", "Grease Pencil(s)", bpy.types.GreasePencil),
+            'ARMATURE': ("armatures", "Armature(s)", bpy.types.Armature),
+            'LATTICE': ("lattices", "Lattice(s)", bpy.types.Lattice),
+            'LIGHT': ("lights", "Light(s)", bpy.types.Light),
+            'LIGHT_PROBE': ("light_probes", "Light Probe(s)", bpy.types.LightProbe),
+            'CAMERA': ("cameras", "Camera(s)", bpy.types.Camera),
+            'SPEAKER': ("speakers", "Speaker(s)", bpy.types.Speaker),
         }
 
         # Finish with space types.
@@ -2506,34 +2613,67 @@ class WM_OT_batch_rename(Operator):
 
             if data_type == 'OBJECT':
                 data = (
-                    context.selected_editable_objects
+                    (
+                        # Outliner.
+                        cls._selected_ids_from_outliner_by_type(context, bpy.types.Object)
+                        if space_type == 'OUTLINER' else
+                        # 3D View (default).
+                        context.selected_editable_objects
+                    )
                     if only_selected else
                     [id for id in bpy.data.objects if id.library is None],
                     "name",
                     "Object(s)",
                 )
+            elif data_type == 'COLLECTION':
+                data = (
+                    # Outliner case is handled already.
+                    tuple(set(
+                        ob.instance_collection
+                        for ob in context.selected_objects
+                        if ((ob.instance_type == 'COLLECTION') and
+                            (collection := ob.instance_collection) is not None and
+                            (collection.library is None))
+                    ))
+                    if only_selected else
+                    [id for id in bpy.data.collections if id.library is None],
+                    "name",
+                    "Collection(s)",
+                )
             elif data_type == 'MATERIAL':
                 data = (
-                    tuple(set(
-                        slot.material
-                        for ob in context.selected_objects
-                        for slot in ob.material_slots
-                        if slot.material is not None
-                    ))
+                    (
+                        # Outliner.
+                        cls._selected_ids_from_outliner_by_type(context, bpy.types.Material)
+                        if space_type == 'OUTLINER' else
+                        # 3D View (default).
+                        tuple(set(
+                            id
+                            for ob in context.selected_objects
+                            for slot in ob.material_slots
+                            if (id := slot.material) is not None and id.library is None
+                        ))
+                    )
                     if only_selected else
                     [id for id in bpy.data.materials if id.library is None],
                     "name",
                     "Material(s)",
                 )
             elif data_type in object_data_type_attrs_map.keys():
-                attr, descr = object_data_type_attrs_map[data_type]
+                attr, descr, ty = object_data_type_attrs_map[data_type]
                 data = (
-                    tuple(set(
-                        id
-                        for ob in context.selected_objects
-                        if ob.type == data_type
-                        if (id := ob.data) is not None and id.library is None
-                    ))
+                    (
+                        # Outliner.
+                        cls._selected_ids_from_outliner_by_type_for_object_data(context, ty)
+                        if space_type == 'OUTLINER' else
+                        # 3D View (default).
+                        tuple(set(
+                            id
+                            for ob in context.selected_objects
+                            if ob.type == data_type
+                            if (id := ob.data) is not None and id.library is None
+                        ))
+                    )
                     if only_selected else
                     [id for id in getattr(bpy.data, attr) if id.library is None],
                     "name",
@@ -2836,12 +2976,13 @@ class WM_MT_splash_quick_setup(Menu):
 
         col = split.column()
 
-        sub = col.split(factor=0.35)
-        row = sub.row()
-        row.alignment = 'RIGHT'
-        row.label(text="Language")
-        prefs = context.preferences
-        sub.prop(prefs.view, "language", text="")
+        if bpy.app.build_options.international:
+            sub = col.split(factor=0.35)
+            row = sub.row()
+            row.alignment = 'RIGHT'
+            row.label(text="Language")
+            prefs = context.preferences
+            sub.prop(prefs.view, "language", text="")
 
         col.separator()
 
@@ -2898,7 +3039,7 @@ class WM_MT_splash_quick_setup(Menu):
         sub = row.row()
         old_version = bpy.types.PREFERENCES_OT_copy_prev.previous_version()
         if bpy.types.PREFERENCES_OT_copy_prev.poll(context) and old_version:
-            sub.operator("preferences.copy_prev", text="Load %d.%d Settings" % old_version)
+            sub.operator("preferences.copy_prev", text=iface_("Load %d.%d Settings", "Operator") % old_version)
             sub.operator("wm.save_userpref", text="Save New Settings")
         else:
             sub.label()
@@ -3048,6 +3189,7 @@ classes = (
     WM_OT_properties_add,
     WM_OT_properties_context_change,
     WM_OT_properties_edit,
+    WM_OT_properties_edit_value,
     WM_OT_properties_remove,
     WM_OT_sysinfo,
     WM_OT_owner_disable,

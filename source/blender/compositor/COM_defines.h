@@ -18,9 +18,9 @@
 
 #pragma once
 
-#include "BLI_float2.hh"
-#include "BLI_index_range.hh"
-#include "BLI_rect.h"
+#include "BLI_math_vec_types.hh"
+
+#include "DNA_vec_types.h"
 
 namespace blender::compositor {
 

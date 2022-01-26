@@ -46,6 +46,7 @@ set(INC_SYS
 
 set(SRC
   SEQ_add.h
+  SEQ_animation.h
   SEQ_clipboard.h
   SEQ_edit.h
   SEQ_effects.h
@@ -62,7 +63,10 @@ set(SRC
   SEQ_transform.h
   SEQ_utils.h
 
+  intern/animation.c
   intern/clipboard.c
+  intern/disk_cache.c
+  intern/disk_cache.h
   intern/effects.c
   intern/effects.h
   intern/image_cache.c

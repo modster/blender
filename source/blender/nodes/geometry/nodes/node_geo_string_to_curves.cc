@@ -18,8 +18,8 @@
 #include "DNA_vfont_types.h"
 
 #include "BKE_curve.h"
-#include "BKE_font.h"
 #include "BKE_spline.hh"
+#include "BKE_vfont.h"
 
 #include "BLI_hash.h"
 #include "BLI_string_utf8.h"
@@ -30,25 +30,44 @@
 
 #include "node_geometry_util.hh"
 
-namespace blender::nodes {
+namespace blender::nodes::node_geo_string_to_curves_cc {
 
-static void geo_node_string_to_curves_declare(NodeDeclarationBuilder &b)
+NODE_STORAGE_FUNCS(NodeGeometryStringToCurves)
+
+static void node_declare(NodeDeclarationBuilder &b)
 {
-  b.add_input<decl::String>("String");
-  b.add_input<decl::Float>("Size").default_value(1.0f).min(0.0f).subtype(PROP_DISTANCE);
-  b.add_input<decl::Float>("Character Spacing")
+  b.add_input<decl::String>(N_("String"));
+  b.add_input<decl::Float>(N_("Size")).default_value(1.0f).min(0.0f).subtype(PROP_DISTANCE);
+  b.add_input<decl::Float>(N_("Character Spacing"))
       .default_value(1.0f)
       .min(0.0f)
       .subtype(PROP_DISTANCE);
-  b.add_input<decl::Float>("Word Spacing").default_value(1.0f).min(0.0f).subtype(PROP_DISTANCE);
-  b.add_input<decl::Float>("Line Spacing").default_value(1.0f).min(0.0f).subtype(PROP_DISTANCE);
-  b.add_input<decl::Float>("Text Box Width").default_value(0.0f).min(0.0f).subtype(PROP_DISTANCE);
-  b.add_input<decl::Float>("Text Box Height").default_value(0.0f).min(0.0f).subtype(PROP_DISTANCE);
-  b.add_output<decl::Geometry>("Curves");
-  b.add_output<decl::String>("Remainder");
+  b.add_input<decl::Float>(N_("Word Spacing"))
+      .default_value(1.0f)
+      .min(0.0f)
+      .subtype(PROP_DISTANCE);
+  b.add_input<decl::Float>(N_("Line Spacing"))
+      .default_value(1.0f)
+      .min(0.0f)
+      .subtype(PROP_DISTANCE);
+  b.add_input<decl::Float>(N_("Text Box Width"))
+      .default_value(0.0f)
+      .min(0.0f)
+      .subtype(PROP_DISTANCE);
+  b.add_input<decl::Float>(N_("Text Box Height"))
+      .default_value(0.0f)
+      .min(0.0f)
+      .subtype(PROP_DISTANCE)
+      .make_available([](bNode &node) {
+        node_storage(node).overflow = GEO_NODE_STRING_TO_CURVES_MODE_SCALE_TO_FIT;
+      });
+  b.add_output<decl::Geometry>(N_("Curve Instances"));
+  b.add_output<decl::String>(N_("Remainder")).make_available([](bNode &node) {
+    node_storage(node).overflow = GEO_NODE_STRING_TO_CURVES_MODE_TRUNCATE;
+  });
 }
 
-static void geo_node_string_to_curves_layout(uiLayout *layout, struct bContext *C, PointerRNA *ptr)
+static void node_layout(uiLayout *layout, struct bContext *C, PointerRNA *ptr)
 {
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetPropDecorate(layout, false);
@@ -67,10 +86,9 @@ static void geo_node_string_to_curves_layout(uiLayout *layout, struct bContext *
   uiItemR(layout, ptr, "align_y", 0, "", ICON_NONE);
 }
 
-static void geo_node_string_to_curves_init(bNodeTree *UNUSED(ntree), bNode *node)
+static void node_init(bNodeTree *UNUSED(ntree), bNode *node)
 {
-  NodeGeometryStringToCurves *data = (NodeGeometryStringToCurves *)MEM_callocN(
-      sizeof(NodeGeometryStringToCurves), __func__);
+  NodeGeometryStringToCurves *data = MEM_cnew<NodeGeometryStringToCurves>(__func__);
 
   data->overflow = GEO_NODE_STRING_TO_CURVES_MODE_OVERFLOW;
   data->align_x = GEO_NODE_STRING_TO_CURVES_ALIGN_X_LEFT;
@@ -79,17 +97,19 @@ static void geo_node_string_to_curves_init(bNodeTree *UNUSED(ntree), bNode *node
   node->id = (ID *)BKE_vfont_builtin_get();
 }
 
-static void geo_node_string_to_curves_update(bNodeTree *UNUSED(ntree), bNode *node)
+static void node_update(bNodeTree *ntree, bNode *node)
 {
-  const NodeGeometryStringToCurves *storage = (const NodeGeometryStringToCurves *)node->storage;
+  const NodeGeometryStringToCurves &storage = node_storage(*node);
   const GeometryNodeStringToCurvesOverflowMode overflow = (GeometryNodeStringToCurvesOverflowMode)
-                                                              storage->overflow;
+                                                              storage.overflow;
   bNodeSocket *socket_remainder = ((bNodeSocket *)node->outputs.first)->next;
-  nodeSetSocketAvailability(socket_remainder, overflow == GEO_NODE_STRING_TO_CURVES_MODE_TRUNCATE);
+  nodeSetSocketAvailability(
+      ntree, socket_remainder, overflow == GEO_NODE_STRING_TO_CURVES_MODE_TRUNCATE);
 
   bNodeSocket *height_socket = (bNodeSocket *)node->inputs.last;
   bNodeSocket *width_socket = height_socket->prev;
-  nodeSetSocketAvailability(height_socket, overflow != GEO_NODE_STRING_TO_CURVES_MODE_OVERFLOW);
+  nodeSetSocketAvailability(
+      ntree, height_socket, overflow != GEO_NODE_STRING_TO_CURVES_MODE_OVERFLOW);
   node_sock_label(width_socket,
                   overflow == GEO_NODE_STRING_TO_CURVES_MODE_OVERFLOW ? N_("Max Width") :
                                                                         N_("Text Box Width"));
@@ -117,8 +137,7 @@ static TextLayout get_text_layout(GeoNodeExecParams &params)
     return {};
   }
 
-  const NodeGeometryStringToCurves &storage =
-      *(const NodeGeometryStringToCurves *)params.node().storage;
+  const NodeGeometryStringToCurves &storage = node_storage(params.node());
   const GeometryNodeStringToCurvesOverflowMode overflow = (GeometryNodeStringToCurvesOverflowMode)
                                                               storage.overflow;
   const GeometryNodeStringToCurvesAlignXMode align_x = (GeometryNodeStringToCurvesAlignXMode)
@@ -136,7 +155,7 @@ static TextLayout get_text_layout(GeoNodeExecParams &params)
                               params.extract_input<float>("Text Box Height");
   VFont *vfont = (VFont *)params.node().id;
 
-  Curve cu = {nullptr};
+  Curve cu = {{nullptr}};
   cu.type = OB_FONT;
   /* Set defaults */
   cu.resolu = 12;
@@ -214,7 +233,7 @@ static Map<int, int> create_curve_instances(GeoNodeExecParams &params,
     if (handles.contains(charcodes[i])) {
       continue;
     }
-    Curve cu = {nullptr};
+    Curve cu = {{nullptr}};
     cu.type = OB_FONT;
     cu.resolu = 12;
     cu.vfont = vfont;
@@ -242,18 +261,16 @@ static void add_instances_from_handles(InstancesComponent &instances,
   instances.resize(positions.size());
   MutableSpan<int> handles = instances.instance_reference_handles();
   MutableSpan<float4x4> transforms = instances.instance_transforms();
-  MutableSpan<int> instance_ids = instances.instance_ids();
 
   threading::parallel_for(IndexRange(positions.size()), 256, [&](IndexRange range) {
     for (const int i : range) {
       handles[i] = char_handles.lookup(charcodes[i]);
       transforms[i] = float4x4::from_location({positions[i].x, positions[i].y, 0});
-      instance_ids[i] = i;
     }
   });
 }
 
-static void geo_node_string_to_curves_exec(GeoNodeExecParams params)
+static void node_geo_exec(GeoNodeExecParams params)
 {
   TextLayout layout = get_text_layout(params);
 
@@ -264,15 +281,16 @@ static void geo_node_string_to_curves_exec(GeoNodeExecParams params)
   }
 
   if (layout.positions.size() == 0) {
-    params.set_output("Curves", GeometrySet());
+    params.set_output("Curve Instances", GeometrySet());
     return;
   }
 
   /* Convert UTF-8 encoded string to UTF-32. */
   size_t len_bytes;
   size_t len_chars = BLI_strlen_utf8_ex(layout.text.c_str(), &len_bytes);
-  Array<char32_t> char_codes(len_chars + 1);
-  BLI_str_utf8_as_utf32(char_codes.data(), layout.text.c_str(), len_chars + 1);
+  Array<char32_t> char_codes_with_null(len_chars + 1);
+  BLI_str_utf8_as_utf32(char_codes_with_null.data(), layout.text.c_str(), len_chars + 1);
+  const Span<char32_t> char_codes = char_codes_with_null.as_span().drop_back(1);
 
   /* Create and add instances. */
   GeometrySet geometry_set_out;
@@ -281,26 +299,27 @@ static void geo_node_string_to_curves_exec(GeoNodeExecParams params)
       params, layout.final_font_size, char_codes, instances);
   add_instances_from_handles(instances, char_handles, char_codes, layout.positions);
 
-  params.set_output("Curves", std::move(geometry_set_out));
+  params.set_output("Curve Instances", std::move(geometry_set_out));
 }
 
-}  // namespace blender::nodes
+}  // namespace blender::nodes::node_geo_string_to_curves_cc
 
 void register_node_type_geo_string_to_curves()
 {
+  namespace file_ns = blender::nodes::node_geo_string_to_curves_cc;
+
   static bNodeType ntype;
 
-  geo_node_type_base(
-      &ntype, GEO_NODE_STRING_TO_CURVES, "String to Curves", NODE_CLASS_GEOMETRY, 0);
-  ntype.declare = blender::nodes::geo_node_string_to_curves_declare;
-  ntype.geometry_node_execute = blender::nodes::geo_node_string_to_curves_exec;
-  node_type_init(&ntype, blender::nodes::geo_node_string_to_curves_init);
-  node_type_update(&ntype, blender::nodes::geo_node_string_to_curves_update);
+  geo_node_type_base(&ntype, GEO_NODE_STRING_TO_CURVES, "String to Curves", NODE_CLASS_GEOMETRY);
+  ntype.declare = file_ns::node_declare;
+  ntype.geometry_node_execute = file_ns::node_geo_exec;
+  node_type_init(&ntype, file_ns::node_init);
+  node_type_update(&ntype, file_ns::node_update);
   node_type_size(&ntype, 190, 120, 700);
   node_type_storage(&ntype,
                     "NodeGeometryStringToCurves",
                     node_free_standard_storage,
                     node_copy_standard_storage);
-  ntype.draw_buttons = blender::nodes::geo_node_string_to_curves_layout;
+  ntype.draw_buttons = file_ns::node_layout;
   nodeRegisterType(&ntype);
 }

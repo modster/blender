@@ -81,9 +81,9 @@ bUUID BLI_uuid_generate_random()
   return uuid;
 }
 
-bUUID BLI_uuid_nil(void)
+bUUID BLI_uuid_nil()
 {
-  const bUUID nil = {0, 0, 0, 0, 0, 0};
+  const bUUID nil = {0, 0, 0, 0, 0, {0}};
   return nil;
 }
 

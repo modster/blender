@@ -17,22 +17,19 @@
  */
 
 #include "COM_TransformOperation.h"
-#include "COM_ConstantOperation.h"
 #include "COM_RotateOperation.h"
 #include "COM_ScaleOperation.h"
-
-#include "BLI_math.h"
 
 namespace blender::compositor {
 
 TransformOperation::TransformOperation()
 {
-  addInputSocket(DataType::Color, ResizeMode::None);
-  addInputSocket(DataType::Value, ResizeMode::None);
-  addInputSocket(DataType::Value, ResizeMode::None);
-  addInputSocket(DataType::Value, ResizeMode::None);
-  addInputSocket(DataType::Value, ResizeMode::None);
-  addOutputSocket(DataType::Color);
+  add_input_socket(DataType::Color, ResizeMode::None);
+  add_input_socket(DataType::Value, ResizeMode::None);
+  add_input_socket(DataType::Value, ResizeMode::None);
+  add_input_socket(DataType::Value, ResizeMode::None);
+  add_input_socket(DataType::Value, ResizeMode::None);
+  add_output_socket(DataType::Color);
   translate_factor_x_ = 1.0f;
   translate_factor_y_ = 1.0f;
   convert_degree_to_rad_ = false;
@@ -126,14 +123,14 @@ void TransformOperation::update_memory_buffer_partial(MemoryBuffer *output,
 void TransformOperation::determine_canvas(const rcti &preferred_area, rcti &r_area)
 {
   const bool image_determined =
-      getInputSocket(IMAGE_INPUT_INDEX)->determine_canvas(preferred_area, r_area);
+      get_input_socket(IMAGE_INPUT_INDEX)->determine_canvas(preferred_area, r_area);
   if (image_determined) {
     rcti image_canvas = r_area;
-    rcti unused;
-    getInputSocket(X_INPUT_INDEX)->determine_canvas(image_canvas, unused);
-    getInputSocket(Y_INPUT_INDEX)->determine_canvas(image_canvas, unused);
-    getInputSocket(DEGREE_INPUT_INDEX)->determine_canvas(image_canvas, unused);
-    getInputSocket(SCALE_INPUT_INDEX)->determine_canvas(image_canvas, unused);
+    rcti unused = COM_AREA_NONE;
+    get_input_socket(X_INPUT_INDEX)->determine_canvas(image_canvas, unused);
+    get_input_socket(Y_INPUT_INDEX)->determine_canvas(image_canvas, unused);
+    get_input_socket(DEGREE_INPUT_INDEX)->determine_canvas(image_canvas, unused);
+    get_input_socket(SCALE_INPUT_INDEX)->determine_canvas(image_canvas, unused);
 
     init_data();
     if (invert_) {
@@ -174,7 +171,6 @@ void TransformOperation::determine_canvas(const rcti &preferred_area, rcti &r_ar
   }
 }
 
-/** Translate -> Rotate -> Scale. */
 void TransformOperation::transform(BuffersIterator<float> &it, const MemoryBuffer *input_img)
 {
   float rotate_center_x, rotate_center_y;
@@ -201,7 +197,6 @@ void TransformOperation::transform(BuffersIterator<float> &it, const MemoryBuffe
   }
 }
 
-/** Scale -> Rotate -> Translate. */
 void TransformOperation::transform_inverted(BuffersIterator<float> &it,
                                             const MemoryBuffer *input_img)
 {

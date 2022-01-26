@@ -25,23 +25,25 @@
 
 /* **************** Exposure ******************** */
 
-namespace blender::nodes {
+namespace blender::nodes::node_composite_exposure_cc {
 
 static void cmp_node_exposure_declare(NodeDeclarationBuilder &b)
 {
-  b.add_input<decl::Color>("Image").default_value({1.0f, 1.0f, 1.0f, 1.0f});
-  b.add_input<decl::Float>("Exposure").min(-10.0f).max(10.0f);
-  b.add_output<decl::Color>("Image");
+  b.add_input<decl::Color>(N_("Image")).default_value({1.0f, 1.0f, 1.0f, 1.0f});
+  b.add_input<decl::Float>(N_("Exposure")).min(-10.0f).max(10.0f);
+  b.add_output<decl::Color>(N_("Image"));
 }
 
-}  // namespace blender::nodes
+}  // namespace blender::nodes::node_composite_exposure_cc
 
-void register_node_type_cmp_exposure(void)
+void register_node_type_cmp_exposure()
 {
+  namespace file_ns = blender::nodes::node_composite_exposure_cc;
+
   static bNodeType ntype;
 
-  cmp_node_type_base(&ntype, CMP_NODE_EXPOSURE, "Exposure", NODE_CLASS_OP_COLOR, 0);
-  ntype.declare = blender::nodes::cmp_node_exposure_declare;
+  cmp_node_type_base(&ntype, CMP_NODE_EXPOSURE, "Exposure", NODE_CLASS_OP_COLOR);
+  ntype.declare = file_ns::cmp_node_exposure_declare;
 
   nodeRegisterType(&ntype);
 }

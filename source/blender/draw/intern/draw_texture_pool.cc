@@ -28,10 +28,10 @@
 
 using namespace blender;
 
-typedef struct DRWTexturePoolHandle {
+struct DRWTexturePoolHandle {
   uint64_t users_bits;
   GPUTexture *texture;
-} DRWTexturePoolHandle;
+};
 
 struct DRWTexturePool {
   Vector<void *, 16> users;
@@ -40,23 +40,19 @@ struct DRWTexturePool {
   int last_user_id = -1;
 };
 
-DRWTexturePool *DRW_texture_pool_create(void)
+DRWTexturePool *DRW_texture_pool_create()
 {
   return new DRWTexturePool();
 }
 
 void DRW_texture_pool_free(DRWTexturePool *pool)
 {
-  /* Reseting the pool twice will effectively free all textures. */
+  /* Resetting the pool twice will effectively free all textures. */
   DRW_texture_pool_reset(pool);
   DRW_texture_pool_reset(pool);
   delete pool;
 }
 
-/**
- * Try to find a texture corresponding to params into the texture pool.
- * If no texture was found, create one and add it to the pool.
- */
 GPUTexture *DRW_texture_pool_query(
     DRWTexturePool *pool, int width, int height, eGPUTextureFormat format, void *user)
 {
@@ -86,7 +82,7 @@ GPUTexture *DRW_texture_pool_query(
     if (user_bit & handle.users_bits) {
       continue;
     }
-    /* If everthing matches reuse the texture. */
+    /* If everything matches reuse the texture. */
     if ((GPU_texture_format(handle.texture) == format) &&
         (GPU_texture_width(handle.texture) == width) &&
         (GPU_texture_height(handle.texture) == height)) {
@@ -113,7 +109,6 @@ GPUTexture *DRW_texture_pool_query(
   return handle.texture;
 }
 
-/* Resets the user bits for each texture in the pool and delete unused ones. */
 void DRW_texture_pool_reset(DRWTexturePool *pool)
 {
   pool->last_user_id = -1;

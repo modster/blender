@@ -26,8 +26,8 @@
 #include "MEM_guardedalloc.h"
 
 #include "BLI_array.hh"
-#include "BLI_float3.hh"
 #include "BLI_listbase.h"
+#include "BLI_math_vec_types.hh"
 #include "BLI_math_vector.h"
 #include "BLI_span.hh"
 #include "BLI_utildefines.h"
@@ -36,9 +36,9 @@
 
 #include "BKE_curve.h"
 #include "BKE_displist.h"
-#include "BKE_font.h"
 #include "BKE_geometry_set.hh"
 #include "BKE_spline.hh"
+#include "BKE_vfont.h"
 
 #include "GPU_batch.h"
 #include "GPU_capabilities.h"
