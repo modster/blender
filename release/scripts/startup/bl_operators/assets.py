@@ -51,7 +51,7 @@ class ASSET_OT_tag_add(AssetBrowserMetadataOperator, Operator):
 
     def execute(self, context):
         active_asset = SpaceAssetInfo.get_active_asset(context)
-        active_asset.tags.new("Unnamed Tag")
+        active_asset.tags.new("Tag")
 
         return {'FINISHED'}
 
@@ -142,12 +142,8 @@ class ASSET_OT_open_containing_blend_file(Operator):
         if returncode:
             self.report({'WARNING'}, "Blender sub-process exited with error code %d" % returncode)
 
-        # TODO(Sybren): Replace this with a generic "reload assets" operator
-        # that can run outside of the Asset Browser context.
-        if bpy.ops.file.refresh.poll():
-            bpy.ops.file.refresh()
-        if bpy.ops.asset.list_refresh.poll():
-            bpy.ops.asset.list_refresh()
+        if bpy.ops.asset.library_refresh.poll():
+            bpy.ops.asset.library_refresh()
 
         self.cancel(context)
         return {'FINISHED'}

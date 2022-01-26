@@ -31,8 +31,9 @@
 extern "C" {
 #endif
 
-struct GPUViewport;
+struct DRWRegisteredDrawEngine;
 struct DrawEngineType;
+struct GPUViewport;
 
 /* NOTE these structs are only here for reading the actual lists from the engine.
  * The actual length of them is stored in a ViewportEngineData_Info.
@@ -55,13 +56,17 @@ typedef struct StorageList {
 } StorageList;
 
 typedef struct ViewportEngineData {
-  void *engine_type;
+  /* Not owning pointer to the draw engine. */
+  struct DRWRegisteredDrawEngine *engine_type;
 
   FramebufferList *fbl;
   TextureList *txl;
   PassList *psl;
   StorageList *stl;
-  /** Memory block that will be free using  */
+  /**
+   * \brief Memory block that can be freely used by the draw engine.
+   * When used the draw engine must implement #DrawEngineType.instance_free callback.
+   */
   void *instance_data;
 
   char info[GPU_INFO_SIZE];
@@ -101,6 +106,11 @@ typedef struct DefaultTextureList {
 
 typedef struct DRWViewData DRWViewData;
 
+/**
+ * Creates a view data with all possible engines type for this view.
+ *
+ * `engine_types` contains #DRWRegisteredDrawEngine.
+ */
 DRWViewData *DRW_view_data_create(ListBase *engine_types);
 void DRW_view_data_free(DRWViewData *view_data);
 
@@ -132,7 +142,8 @@ ViewportEngineData *DRW_view_data_enabled_engine_iter_step(DRWEngineIterator *it
   DRW_view_data_enabled_engine_iter_begin(&iterator, view_data_); \
   /* WATCH Comma operator trickery ahead! This tests engine_ == NULL. */ \
   while ((data_ = DRW_view_data_enabled_engine_iter_step(&iterator), \
-          engine_ = (data_ != NULL) ? (struct DrawEngineType *)data_->engine_type : NULL))
+          engine_ = (data_ != NULL) ? (struct DrawEngineType *)data_->engine_type->draw_engine : \
+                                      NULL))
 
 #ifdef __cplusplus
 }

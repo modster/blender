@@ -1,15 +1,18 @@
-
+#ifndef USE_GPU_SHADER_CREATE_INFO
 in float colorGradient;
 in vec4 finalColor;
 in float lineU;
 flat in float lineLength;
 flat in float dashFactor;
+flat in float dashAlpha;
 flat in int isMainLine;
 
 out vec4 fragColor;
+#endif
 
-#define DASH_WIDTH 20.0
+#define DASH_WIDTH 10.0
 #define ANTIALIAS 1.0
+#define MINIMUM_ALPHA 0.5
 
 void main()
 {
@@ -28,13 +31,10 @@ void main()
     float t = ANTIALIAS / DASH_WIDTH;
     float slope = 1.0 / (2.0 * t);
 
-    float alpha = min(1.0, max(0.0, slope * (normalized_distance_triangle - dashFactor + t)));
+    float unclamped_alpha = 1.0 - slope * (normalized_distance_triangle - dashFactor + t);
+    float alpha = max(dashAlpha, min(unclamped_alpha, 1.0));
 
-    if (alpha < 0.0) {
-      discard;
-    }
-
-    fragColor.a *= 1.0 - alpha;
+    fragColor.a *= alpha;
   }
 
   fragColor.a *= smoothstep(1.0, 0.1, abs(colorGradient));

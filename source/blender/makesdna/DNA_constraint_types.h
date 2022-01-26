@@ -728,7 +728,7 @@ typedef enum eBConstraint_Flags {
 
 /* bConstraint->ownspace/tarspace */
 typedef enum eBConstraint_SpaceTypes {
-  /** Default for all - worldspace. */
+  /** Default for all - world-space. */
   CONSTRAINT_SPACE_WORLD = 0,
   /** For all - custom space. */
   CONSTRAINT_SPACE_CUSTOM = 5,
@@ -939,7 +939,7 @@ typedef enum eTrackToAxis_Modes {
 
 /* Shrinkwrap flags */
 typedef enum eShrinkwrap_Flags {
-  /* Also raycast in the opposite direction. */
+  /* Also ray-cast in the opposite direction. */
   CON_SHRINKWRAP_PROJECT_OPPOSITE = (1 << 0),
   /* Invert the cull mode when projecting opposite. */
   CON_SHRINKWRAP_PROJECT_INVERT_CULL = (1 << 1),

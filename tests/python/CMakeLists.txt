@@ -630,14 +630,17 @@ endif()
 
 if(WITH_CYCLES OR WITH_OPENGL_RENDER_TESTS)
   if(NOT OPENIMAGEIO_IDIFF)
-    MESSAGE(STATUS "Disabling render tests because OIIO idiff does not exist")
+    MESSAGE(STATUS "Disabling Cycles tests because OIIO idiff does not exist")
   elseif(NOT EXISTS "${TEST_SRC_DIR}/render/shader")
-    MESSAGE(STATUS "Disabling render tests because tests folder does not exist at ${TEST_SRC_DIR}")
+    MESSAGE(STATUS "Disabling Cycles tests because tests folder does not exist at ${TEST_SRC_DIR}")
+  elseif(NOT WITH_COMPOSITOR)
+    MESSAGE(STATUS "Disabling Cycles tests because WITH_COMPOSITOR is disabled")
+  elseif(NOT WITH_OPENCOLORIO)
+    MESSAGE(STATUS "Disabling Cycles tests because WITH_OPENCOLORIO is disabled")
   else()
     set(render_tests
+      camera
       bsdf
-      denoise
-      displacement
       hair
       image_colorspace
       image_data_types
@@ -646,19 +649,37 @@ if(WITH_CYCLES OR WITH_OPENGL_RENDER_TESTS)
       integrator
       light
       mesh
-      motion_blur
-      openvdb
-      render_layer
-      reports
+      pointcloud
       shader
       shadow_catcher
       sss
-      volume
     )
+
+    if(WITH_OPENSUBDIV)
+      list(APPEND render_tests displacement)
+    endif()
+
+    if(WITH_FREESTYLE)
+      list(APPEND render_tests render_layer)
+    endif()
+
+    if(WITH_MOD_FLUID)
+      list(APPEND render_tests motion_blur reports volume)
+    endif()
+
+    if(WITH_OPENVDB)
+      list(APPEND render_tests openvdb)
+    endif()
+
+    if(WITH_OPENIMAGEDENOISE)
+      list(APPEND render_tests denoise)
+    endif()
 
     if(WITH_OPENGL_RENDER_TESTS)
       list(APPEND render_tests grease_pencil)
     endif()
+
+    list(SORT render_tests)
 
     # Cycles
     if(WITH_CYCLES)
@@ -670,16 +691,19 @@ if(WITH_CYCLES OR WITH_OPENGL_RENDER_TESTS)
         set(_cycles_render_tests bake;${render_tests};osl)
 
         foreach(render_test ${_cycles_render_tests})
-          add_python_test(
-            cycles_${render_test}_${_cycles_device_lower}
-            ${CMAKE_CURRENT_LIST_DIR}/cycles_render_tests.py
-            -blender "${TEST_BLENDER_EXE}"
-            -testdir "${TEST_SRC_DIR}/render/${render_test}"
-            -idiff "${OPENIMAGEIO_IDIFF}"
-            -outdir "${TEST_OUT_DIR}/cycles"
-            -device ${_cycles_device}
-            -blacklist ${_cycles_blacklist}
-          )
+          # Enable just one simple test for Metal until more tests are passing.
+          if ((NOT (_cycles_device MATCHES "METAL")) OR (render_test MATCHES "camera"))
+            add_python_test(
+              cycles_${render_test}_${_cycles_device_lower}
+              ${CMAKE_CURRENT_LIST_DIR}/cycles_render_tests.py
+              -blender "${TEST_BLENDER_EXE}"
+              -testdir "${TEST_SRC_DIR}/render/${render_test}"
+              -idiff "${OPENIMAGEIO_IDIFF}"
+              -outdir "${TEST_OUT_DIR}/cycles"
+              -device ${_cycles_device}
+              -blacklist ${_cycles_blacklist}
+            )
+          endif()
         endforeach()
       endforeach()
     endif()
@@ -716,15 +740,17 @@ if(WITH_COMPOSITOR)
   set(compositor_tests
     color
     converter
-    distort
     filter
     input
-    matte
     output
     vector
 
     multiple_node_setups
   )
+
+  if(WITH_LIBMV)
+    list(APPEND compositor_tests distort matte)
+  endif()
 
   foreach(comp_test ${compositor_tests})
     add_python_test(
@@ -746,12 +772,23 @@ set(geo_node_tests
   geometry
   mesh_primitives
   mesh
+  mesh/extrude
   points
   utilities
   vector
-  volume
-
 )
+
+if(WITH_GMP)
+  list(APPEND geo_node_tests mesh/boolean)
+endif()
+
+if(WITH_OPENVDB)
+  list(APPEND geo_node_tests volume)
+endif()
+
+if(WITH_OPENSUBDIV)
+  list(APPEND geo_node_tests mesh/subdivision_tests)
+endif()
 
 foreach(geo_node_test ${geo_node_tests})
   if(EXISTS "${TEST_SRC_DIR}/modeling/geometry_nodes/${geo_node_test}/")
@@ -819,6 +856,15 @@ if(WITH_ALEMBIC)
     --python ${CMAKE_CURRENT_LIST_DIR}/bl_alembic_io_test.py
     --
     --testdir "${TEST_SRC_DIR}/alembic"
+  )
+endif()
+
+if(WITH_USD)
+  add_blender_test(
+    usd_import_test
+    --python ${CMAKE_CURRENT_LIST_DIR}/bl_usd_import_test.py
+    --
+    --testdir "${TEST_SRC_DIR}/usd"
   )
 endif()
 

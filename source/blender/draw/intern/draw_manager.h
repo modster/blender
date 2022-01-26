@@ -98,6 +98,17 @@ struct Object;
 
 /* ------------ Data Structure --------------- */
 /**
+ * Data structure to for registered draw engines that can store draw manager
+ * specific data.
+ */
+typedef struct DRWRegisteredDrawEngine {
+  void /*DRWRegisteredDrawEngine*/ *next, *prev;
+  DrawEngineType *draw_engine;
+  /** Index of the type in the lists. Index is used for dupli data. */
+  int index;
+} DRWRegisteredDrawEngine;
+
+/**
  * Data structure containing all drawcalls organized by passes and materials.
  * DRWPass > DRWShadingGroup > DRWCall > DRWCallState
  *                           > DRWUniform
@@ -531,7 +542,7 @@ typedef struct DRWDebugBuffer {
 typedef struct DRWData {
   /** Instance data. */
   DRWInstanceDataList *idatalist;
-  /** Mempools for drawcalls. */
+  /** Memory-pools for draw-calls. */
   struct BLI_memblock *commands;
   struct BLI_memblock *commands_small;
   struct BLI_memblock *callbuffers;
@@ -589,7 +600,7 @@ typedef struct DRWManager {
   struct Object *dupli_origin;
   /** Object-data referenced by the current dupli object. */
   struct ID *dupli_origin_data;
-  /** Ghash: #DupliKey -> void pointer for each enabled engine. */
+  /** Hash-map: #DupliKey -> void pointer for each enabled engine. */
   struct GHash *dupli_ghash;
   /** TODO(fclem): try to remove usage of this. */
   DRWInstanceData *object_instance_data[MAX_INSTANCE_DATA_SIZE];
@@ -684,7 +695,12 @@ eDRWCommandType command_type_get(const uint64_t *command_type_bits, int index);
 
 void drw_batch_cache_validate(Object *ob);
 void drw_batch_cache_generate_requested(struct Object *ob);
+
+/**
+ * \warning Only evaluated mesh data is handled by this delayed generation.
+ */
 void drw_batch_cache_generate_requested_delayed(Object *ob);
+void drw_batch_cache_generate_requested_evaluated_mesh(Object *ob);
 
 void drw_resource_buffer_finish(DRWData *vmempool);
 

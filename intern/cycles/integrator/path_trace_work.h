@@ -17,10 +17,10 @@
 #pragma once
 
 #include "integrator/pass_accessor.h"
-#include "render/buffers.h"
-#include "render/pass.h"
-#include "util/util_types.h"
-#include "util/util_unique_ptr.h"
+#include "scene/pass.h"
+#include "session/buffers.h"
+#include "util/types.h"
+#include "util/unique_ptr.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -28,7 +28,7 @@ class BufferParams;
 class Device;
 class DeviceScene;
 class Film;
-class GPUDisplay;
+class PathTraceDisplay;
 class RenderBuffers;
 
 class PathTraceWork {
@@ -75,7 +75,10 @@ class PathTraceWork {
 
   /* Render given number of samples as a synchronous blocking call.
    * The samples are added to the render buffer associated with this work. */
-  virtual void render_samples(RenderStatistics &statistics, int start_sample, int samples_num) = 0;
+  virtual void render_samples(RenderStatistics &statistics,
+                              int start_sample,
+                              int samples_num,
+                              int sample_offset) = 0;
 
   /* Copy render result from this work to the corresponding place of the GPU display.
    *
@@ -83,11 +86,9 @@ class PathTraceWork {
    * noisy pass mode will be passed here when it is known that the buffer does not have denoised
    * passes yet (because denoiser did not run). If the denoised pass is requested and denoiser is
    * not used then this function will fall-back to the noisy pass instead. */
-  virtual void copy_to_gpu_display(GPUDisplay *gpu_display,
-                                   PassMode pass_mode,
-                                   int num_samples) = 0;
+  virtual void copy_to_display(PathTraceDisplay *display, PassMode pass_mode, int num_samples) = 0;
 
-  virtual void destroy_gpu_resources(GPUDisplay *gpu_display) = 0;
+  virtual void destroy_gpu_resources(PathTraceDisplay *display) = 0;
 
   /* Copy data from/to given render buffers.
    * Will copy pixels from a corresponding place (from multi-device point of view) of the render
@@ -162,8 +163,8 @@ class PathTraceWork {
 
   /* Get destination which offset and stride are configured so that writing to it will write to a
    * proper location of GPU display texture, taking current tile and device slice into account. */
-  PassAccessor::Destination get_gpu_display_destination_template(
-      const GPUDisplay *gpu_display) const;
+  PassAccessor::Destination get_display_destination_template(
+      const PathTraceDisplay *display) const;
 
   /* Device which will be used for path tracing.
    * Note that it is an actual render device (and never is a multi-device). */

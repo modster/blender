@@ -912,7 +912,7 @@ static void feline_eval(TexResult *texr, ImBuf *ibuf, float fx, float fy, afdata
                    (maxn ? (float)maxn : 1.0f);
   float du = maxn ? cosf(AFD->theta) * ll : 0.0f;
   float dv = maxn ? sinf(AFD->theta) * ll : 0.0f;
-  /* const float D = -0.5f*(du*du + dv*dv) / (AFD->majrad*AFD->majrad); */
+  // const float D = -0.5f*(du*du + dv*dv) / (AFD->majrad*AFD->majrad);
   const float D = (EWA_MAXIDX + 1) * 0.25f * (du * du + dv * dv) / (AFD->majrad * AFD->majrad);
   float d; /* TXF alpha: cw = 0.0f; */
   int n;   /* TXF alpha: clip = 0; */
@@ -959,7 +959,7 @@ static void alpha_clip_aniso(
   /* TXF alpha: we're doing the same alpha-clip here as box-sample, but I'm doubting
    * if this is actually correct for the all the filtering algorithms. */
 
-  if (!(extflag == TXC_REPT || extflag == TXC_EXTD)) {
+  if (!(ELEM(extflag, TXC_REPT, TXC_EXTD))) {
     rf.xmin = minx * (ibuf->x);
     rf.xmax = maxx * (ibuf->x);
     rf.ymin = miny * (ibuf->y);

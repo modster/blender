@@ -21,25 +21,37 @@
  * \ingroup cmpnodes
  */
 
+#include "UI_interface.h"
+#include "UI_resources.h"
+
 #include "node_composite_util.hh"
 
 /* **************** Premul and Key Alpha Convert ******************** */
 
-static bNodeSocketTemplate cmp_node_premulkey_in[] = {
-    {SOCK_RGBA, N_("Image"), 1.0f, 1.0f, 1.0f, 1.0f},
-    {-1, ""},
-};
-static bNodeSocketTemplate cmp_node_premulkey_out[] = {
-    {SOCK_RGBA, N_("Image")},
-    {-1, ""},
-};
+namespace blender::nodes::node_composite_premulkey_cc {
 
-void register_node_type_cmp_premulkey(void)
+static void cmp_node_premulkey_declare(NodeDeclarationBuilder &b)
 {
+  b.add_input<decl::Color>(N_("Image")).default_value({1.0f, 1.0f, 1.0f, 1.0f});
+  b.add_output<decl::Color>(N_("Image"));
+}
+
+static void node_composit_buts_premulkey(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
+{
+  uiItemR(layout, ptr, "mapping", UI_ITEM_R_SPLIT_EMPTY_NAME, "", ICON_NONE);
+}
+
+}  // namespace blender::nodes::node_composite_premulkey_cc
+
+void register_node_type_cmp_premulkey()
+{
+  namespace file_ns = blender::nodes::node_composite_premulkey_cc;
+
   static bNodeType ntype;
 
-  cmp_node_type_base(&ntype, CMP_NODE_PREMULKEY, "Alpha Convert", NODE_CLASS_CONVERTER, 0);
-  node_type_socket_templates(&ntype, cmp_node_premulkey_in, cmp_node_premulkey_out);
+  cmp_node_type_base(&ntype, CMP_NODE_PREMULKEY, "Alpha Convert", NODE_CLASS_CONVERTER);
+  ntype.declare = file_ns::cmp_node_premulkey_declare;
+  ntype.draw_buttons = file_ns::node_composit_buts_premulkey;
 
   nodeRegisterType(&ntype);
 }

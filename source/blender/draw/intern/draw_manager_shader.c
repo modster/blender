@@ -618,8 +618,6 @@ void DRW_shader_library_add_file(DRWShaderLibrary *lib, const char *lib_code, co
   }
 }
 
-/* Return an allocN'ed string containing the shader code with its dependencies prepended.
- * Caller must free the string with MEM_freeN after use. */
 char *DRW_shader_library_create_shader_string(const DRWShaderLibrary *lib, const char *shader_code)
 {
   /* TODO(fclem) Could be done in one pass. */

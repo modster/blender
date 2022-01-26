@@ -44,6 +44,8 @@
 #include "BKE_scene.h"
 #include "BKE_world.h"
 
+#include "NOD_shader.h"
+
 #include "GPU_material.h"
 #include "GPU_shader.h"
 #include "GPU_texture.h"
@@ -84,6 +86,7 @@ struct GPUMaterial {
   Material *ma;
   /** 1D Texture array containing all color bands. */
   GPUTexture *coba_tex;
+
   GPUColorBandBuilder *coba_builder;
   /* Low level node graph(s). Also contains resources needed by the material. */
   GPUNodeGraph graph;
@@ -100,7 +103,6 @@ enum {
 
 /* Functions */
 
-/* Returns the address of the future pointer to coba_tex */
 GPUTexture **gpu_material_ramp_texture_row_set(GPUMaterial *mat,
                                                int size,
                                                float *pixels,
@@ -189,7 +191,6 @@ GPUShader *GPU_material_get_shader(GPUMaterial *material)
   return material->pass ? GPU_pass_shader_get(material->pass) : NULL;
 }
 
-/* Return can be NULL if it's a world material. */
 Material *GPU_material_get_material(GPUMaterial *material)
 {
   return material->ma;
@@ -200,11 +201,6 @@ GPUUniformBuf *GPU_material_uniform_buffer_get(GPUMaterial *material)
   return material->ubo;
 }
 
-/**
- * Create dynamic UBO from parameters
- *
- * \param inputs: Items are #LinkData, data is #GPUInput (`BLI_genericNodeN(GPUInput)`).
- */
 void GPU_material_uniform_buffer_create(GPUMaterial *material, ListBase *inputs)
 {
 #ifndef NDEBUG
@@ -332,9 +328,9 @@ GPUMaterial *GPU_material_from_nodetree(Scene *scene,
                                         bNodeTree *ntree,
                                         ListBase *gpumaterials,
                                         const char *name,
-                                        const uint64_t shader_uuid,
-                                        const bool is_volume_shader,
-                                        const bool is_lookdev,
+                                        uint64_t shader_uuid,
+                                        bool is_volume_shader,
+                                        bool is_lookdev,
                                         GPUCodegenCallbackFn callback,
                                         void *thunk)
 {
