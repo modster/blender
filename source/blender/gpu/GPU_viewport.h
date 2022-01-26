@@ -40,6 +40,12 @@ extern "C" {
 typedef struct GHash GHash;
 typedef struct GPUViewport GPUViewport;
 
+typedef enum eGPUViewportLayer {
+  GPU_VIEWPORT_LAYER_COLOR_AND_OVERLAY = 0,
+  GPU_VIEWPORT_LAYER_COLOR = 1,
+  GPU_VIEWPORT_LAYER_OVERLAY = 2
+} eGPUViewportLayer;
+
 struct DRWData;
 struct DefaultFramebufferList;
 struct DefaultTextureList;
@@ -49,6 +55,7 @@ GPUViewport *GPU_viewport_create(void);
 GPUViewport *GPU_viewport_stereo_create(void);
 void GPU_viewport_bind(GPUViewport *viewport, int view, const rcti *rect);
 void GPU_viewport_unbind(GPUViewport *viewport);
+void GPU_viewport_default_layers_set(GPUViewport *viewport, eGPUViewportLayer active_layer);
 /**
  * Merge and draw the buffers of \a viewport into the currently active framebuffer, performing
  * color transform to display space.
@@ -65,7 +72,7 @@ void GPU_viewport_draw_to_screen_ex(GPUViewport *viewport,
                                     int view,
                                     const rcti *rect,
                                     bool display_colorspace,
-                                    bool do_overlay_merge);
+                                    eGPUViewportLayer active_layers);
 /**
  * Must be executed inside Draw-manager OpenGL Context.
  */

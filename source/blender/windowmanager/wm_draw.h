@@ -23,9 +23,7 @@
 
 #pragma once
 
-struct GPUOffScreen;
-struct GPUTexture;
-struct GPUViewport;
+#include "GPU_viewport.h"
 
 #ifdef __cplusplus
 extern "C" {

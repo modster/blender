@@ -136,7 +136,11 @@ static void wm_xr_draw_viewport_buffers_to_active_framebuffer(
   if (is_upside_down) {
     SWAP(int, rect.ymin, rect.ymax);
   }
-  GPU_viewport_draw_to_screen_ex(vp->viewport, 0, &rect, draw_view->expects_srgb_buffer, true);
+  GPU_viewport_draw_to_screen_ex(vp->viewport,
+                                 0,
+                                 &rect,
+                                 draw_view->expects_srgb_buffer,
+                                 GPU_VIEWPORT_LAYER_COLOR_AND_OVERLAY);
 }
 
 void wm_xr_draw_view(const GHOST_XrDrawViewInfo *draw_view, void *customdata)

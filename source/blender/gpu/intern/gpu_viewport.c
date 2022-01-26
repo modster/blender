@@ -93,6 +93,8 @@ struct GPUViewport {
   /* TODO(fclem): the uvimage display use the viewport but do not set any view transform for the
    * moment. The end goal would be to let the GPUViewport do the color management. */
   bool do_color_management;
+  /** The default layers to use when drawing to screen. */
+  eGPUViewportLayer default_layers;
   struct GPUViewportBatch batch;
 };
 
@@ -111,6 +113,11 @@ bool GPU_viewport_do_update(GPUViewport *viewport)
   bool ret = (viewport->flag & DO_UPDATE);
   viewport->flag &= ~DO_UPDATE;
   return ret;
+}
+
+void GPU_viewport_default_layers_set(GPUViewport *viewport, eGPUViewportLayer default_layers)
+{
+  viewport->default_layers = default_layers;
 }
 
 GPUViewport *GPU_viewport_create(void)
@@ -403,10 +410,22 @@ static void gpu_viewport_draw_colormanaged(GPUViewport *viewport,
                                            const rctf *rect_pos,
                                            const rctf *rect_uv,
                                            bool display_colorspace,
-                                           bool do_overlay_merge)
+                                           eGPUViewportLayer active_layers)
 {
   GPUTexture *color = viewport->color_render_tx[view];
   GPUTexture *color_overlay = viewport->color_overlay_tx[view];
+
+  /* When drawing only the overlay it needs to be drawn on top of an empty texture. Some platforms
+   * do not clear textures when allocating what leads to scrambled parts of the display.
+   *
+   * See T94900 for more information. */
+  const bool do_overlay = ELEM(
+      active_layers, GPU_VIEWPORT_LAYER_COLOR_AND_OVERLAY, GPU_VIEWPORT_LAYER_OVERLAY);
+  const bool use_dummy_texture = viewport->default_layers == GPU_VIEWPORT_LAYER_OVERLAY;
+  if (use_dummy_texture) {
+    static float data[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+    color = GPU_texture_create_2d(__func__, 1, 1, 0, GPU_RGBA16F, data);
+  }
 
   bool use_ocio = false;
 
@@ -424,7 +443,7 @@ static void gpu_viewport_draw_colormanaged(GPUViewport *viewport,
                                                               NULL,
                                                               viewport->dither,
                                                               false,
-                                                              do_overlay_merge);
+                                                              do_overlay);
   }
 
   GPUBatch *batch = gpu_viewport_batch_get(viewport, rect_pos, rect_uv);
@@ -433,7 +452,7 @@ static void gpu_viewport_draw_colormanaged(GPUViewport *viewport,
   }
   else {
     GPU_batch_program_set_builtin(batch, GPU_SHADER_2D_IMAGE_OVERLAYS_MERGE);
-    GPU_batch_uniform_1i(batch, "overlay", do_overlay_merge);
+    GPU_batch_uniform_1i(batch, "overlay", do_overlay);
     GPU_batch_uniform_1i(batch, "display_transform", display_colorspace);
     GPU_batch_uniform_1i(batch, "image_texture", 0);
     GPU_batch_uniform_1i(batch, "overlays_texture", 1);
@@ -448,13 +467,18 @@ static void gpu_viewport_draw_colormanaged(GPUViewport *viewport,
   if (use_ocio) {
     IMB_colormanagement_finish_glsl_draw();
   }
+
+  if (use_dummy_texture) {
+    GPU_texture_free(color);
+    color = NULL;
+  }
 }
 
 void GPU_viewport_draw_to_screen_ex(GPUViewport *viewport,
                                     int view,
                                     const rcti *rect,
                                     bool display_colorspace,
-                                    bool do_overlay_merge)
+                                    eGPUViewportLayer active_layers)
 {
   GPUTexture *color = viewport->color_render_tx[view];
 
@@ -499,12 +523,12 @@ void GPU_viewport_draw_to_screen_ex(GPUViewport *viewport,
   }
 
   gpu_viewport_draw_colormanaged(
-      viewport, view, &pos_rect, &uv_rect, display_colorspace, do_overlay_merge);
+      viewport, view, &pos_rect, &uv_rect, display_colorspace, active_layers);
 }
 
 void GPU_viewport_draw_to_screen(GPUViewport *viewport, int view, const rcti *rect)
 {
-  GPU_viewport_draw_to_screen_ex(viewport, view, rect, true, true);
+  GPU_viewport_draw_to_screen_ex(viewport, view, rect, true, viewport->default_layers);
 }
 
 void GPU_viewport_unbind_from_offscreen(GPUViewport *viewport,
@@ -533,8 +557,13 @@ void GPU_viewport_unbind_from_offscreen(GPUViewport *viewport,
       .ymax = 1.0f,
   };
 
-  gpu_viewport_draw_colormanaged(
-      viewport, 0, &pos_rect, &uv_rect, display_colorspace, do_overlay_merge);
+  gpu_viewport_draw_colormanaged(viewport,
+                                 0,
+                                 &pos_rect,
+                                 &uv_rect,
+                                 display_colorspace,
+                                 do_overlay_merge ? GPU_VIEWPORT_LAYER_COLOR_AND_OVERLAY :
+                                                    GPU_VIEWPORT_LAYER_COLOR);
 
   /* This one is from the offscreen. Don't free it with the viewport. */
   viewport->depth_tx = NULL;

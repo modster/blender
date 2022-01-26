@@ -2700,6 +2700,7 @@ void draw_timeline_seq(const bContext *C, ARegion *region)
   seq_prefetch_wm_notify(C, scene);
 
   GPUViewport *viewport = WM_draw_region_get_viewport(region);
+  GPU_viewport_default_layers_set(viewport, GPU_VIEWPORT_LAYER_OVERLAY);
   GPUFrameBuffer *framebuffer_overlay = GPU_viewport_framebuffer_overlay_get(viewport);
   GPU_framebuffer_bind_no_srgb(framebuffer_overlay);
   GPU_depth_test(GPU_DEPTH_NONE);
