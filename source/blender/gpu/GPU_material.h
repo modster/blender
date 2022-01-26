@@ -107,6 +107,8 @@ typedef enum eGPUMaterialFlag {
   GPU_MATFLAG_LOOKDEV_HACK = (1 << 30),
 } eGPUMaterialFlag;
 
+ENUM_OPERATORS(eGPUMaterialFlag, GPU_MATFLAG_LOOKDEV_HACK);
+
 typedef struct GPUNodeStack {
   eGPUType type;
   float vec[4];
@@ -173,6 +175,10 @@ bool GPU_stack_link(GPUMaterial *mat,
                     GPUNodeStack *in,
                     GPUNodeStack *out,
                     ...);
+/**
+ * This is a special function to call the "*_eval" function of a BSDF node.
+ * \note This must be call right after GPU_stack_link() so that out[0] contains a valid link.
+ */
 bool GPU_stack_eval_link(GPUMaterial *material,
                          struct bNode *bnode,
                          const char *name,

@@ -1104,7 +1104,7 @@ void EEVEE_lightbake_job(void *custom_data, short *stop, short *do_update, float
 void EEVEE_lightcache_free(struct LightCache *lcache_)
 {
   eevee::LightCache *lcache = reinterpret_cast<eevee::LightCache *>(lcache_);
-  OBJECT_GUARDED_SAFE_DELETE(lcache, eevee::LightCache);
+  MEM_delete(lcache);
 }
 
 void EEVEE_lightcache_info_update(struct SceneEEVEE *eevee)

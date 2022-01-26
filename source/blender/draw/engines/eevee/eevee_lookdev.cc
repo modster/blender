@@ -314,7 +314,7 @@ void LookDev::sync_overlay(void)
 
     /* Pass 2D scale and bias factor in the last column. */
     vec2 scale = sphere_size_ / vec2(viewport_size);
-    vec2 bias = -1.0f + scale + 2.0f * (anchor_ + offset + jitter) / vec2(viewport_size);
+    vec2 bias = -1.0f + scale + 2.0f * (vec2(anchor_) + offset + jitter) / vec2(viewport_size);
     copy_v4_fl4(sphere_mat[3], UNPACK2(scale), UNPACK2(bias));
     DRW_shgroup_call_obmat(grp, sphere, sphere_mat);
 

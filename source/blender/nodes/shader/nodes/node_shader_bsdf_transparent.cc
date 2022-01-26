@@ -33,6 +33,9 @@ static int node_shader_gpu_bsdf_transparent(GPUMaterial *mat,
                                             GPUNodeStack *in,
                                             GPUNodeStack *out)
 {
+  if (in[0].link || !is_zero_v3(in[0].vec)) {
+    GPU_material_flag_set(mat, GPU_MATFLAG_TRANSPARENT);
+  }
   return GPU_stack_link(mat, node, "node_bsdf_transparent", in, out);
 }
 

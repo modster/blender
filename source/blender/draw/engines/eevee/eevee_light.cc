@@ -76,8 +76,8 @@ void Light::sync(ShadowModule &shadows, const Object *ob, float threshold)
   this->color = vec3(&la->r) * la->energy;
   normalize_m4_m4_ex(this->object_mat, ob->obmat, scale);
   /* Make sure we have consistent handedness (in case of negatively scaled Z axis). */
-  vec3 cross = vec3::cross(this->_right, this->_up);
-  if (vec3::dot(cross, this->_back) < 0.0f) {
+  vec3 cross = math::cross(float3(this->_right), float3(this->_up));
+  if (math::dot(cross, float3(this->_back)) < 0.0f) {
     negate_v3(this->_up);
   }
 

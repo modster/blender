@@ -77,7 +77,7 @@ void ShadowTileMap::sync_clipmap(const float3 &camera_position,
   float4x4 viewinv = object_mat;
   copy_v3_v3(viewinv.values[3], tilemap_center);
 
-  float camera_distance_to_plane = float3::dot(float3(object_mat.values[2]), camera_position);
+  float camera_distance_to_plane = math::dot(float3(object_mat.values[2]), camera_position);
   float visible_near = camera_distance_to_plane - half_size;
   float visible_far = camera_distance_to_plane + half_size;
 
@@ -444,7 +444,7 @@ void ShadowDirectional::end_sync(int min_level,
   far_ = -1.0e30f;
   BoundBox bbox = casters_bounds;
   for (auto i : IndexRange(8)) {
-    float dist = -float3::dot(z_axis, float3(bbox.vec[i]));
+    float dist = -math::dot(z_axis, float3(bbox.vec[i]));
     near_ = min_ff(near_, dist);
     far_ = max_ff(far_, dist);
   }
@@ -471,8 +471,8 @@ void ShadowDirectional::end_sync(int min_level,
   /* Compute full offset from origin to the smallest clipmap tile size. */
   float tile_size = first_clipmap.tile_size_get();
   base_offset_ = int2(
-      roundf(float3::dot(float3(object_mat_.values[0]), camera_position) / tile_size),
-      roundf(float3::dot(float3(object_mat_.values[1]), camera_position) / tile_size));
+      roundf(math::dot(float3(object_mat_.values[0]), camera_position) / tile_size),
+      roundf(math::dot(float3(object_mat_.values[1]), camera_position) / tile_size));
 
   int level = min_level;
   int divisor = 1;
@@ -653,7 +653,7 @@ void ShadowModule::end_sync(void)
     /* Get the farthest point from camera to know what distance to cover. */
     float3 farthest_point = float3(1.0f, 1.0f, 1.0f);
     mul_project_m4_v3(inst_.camera.data_get().wininv, farthest_point);
-    float far_dist = farthest_point.length();
+    float far_dist = math::length(farthest_point);
     float near_dist = fabsf(inst_.camera.data_get().clip_near);
     float3 cam_position = inst_.camera.position();
 
@@ -1041,7 +1041,7 @@ void ShadowModule::set_view(const DRWView *view, GPUTexture *depth_tx)
       p0 = p0 / p0.z;
       p1 = p1 / p1.z;
     }
-    screen_pixel_radius_inv_ = min_dim / float3::distance(p0, p1);
+    screen_pixel_radius_inv_ = min_dim / math::distance(p0, p1);
   }
 
 #ifdef SHADOW_DEBUG_FREEZE_CAMERA

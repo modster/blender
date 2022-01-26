@@ -92,9 +92,9 @@ void Film::init(const ivec2 &full_extent, const rcti *output_rect)
   }
 
   data_.opacity = 1.0f;
-  data_.uv_scale = 1.0f / vec2(full_extent);
-  data_.uv_scale_inv = full_extent;
-  data_.uv_bias = data_.offset / vec2(full_extent);
+  data_.uv_scale_inv = vec2(full_extent);
+  data_.uv_scale = 1.0f / data_.uv_scale_inv;
+  data_.uv_bias = vec2(data_.offset) * data_.uv_scale;
 }
 
 void Film::sync(void)

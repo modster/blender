@@ -89,8 +89,8 @@ class LightProbeModule {
 
   ~LightProbeModule()
   {
-    OBJECT_GUARDED_SAFE_DELETE(lightcache_lookdev_, LightCache);
-    OBJECT_GUARDED_SAFE_DELETE(lightcache_baking_, LightCache);
+    MEM_delete(lightcache_lookdev_);
+    MEM_delete(lightcache_baking_);
   }
 
   void init();

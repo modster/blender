@@ -38,7 +38,7 @@ void LightProbeModule::init()
 
   bool use_lookdev = inst_.use_studio_light();
   if (!use_lookdev && lightcache_ && lightcache_->load()) {
-    OBJECT_GUARDED_SAFE_DELETE(lightcache_lookdev_, LightCache);
+    MEM_delete(lightcache_lookdev_);
   }
   else {
     if (lightcache_ && (lightcache_->flag & LIGHTCACHE_NOT_USABLE)) {

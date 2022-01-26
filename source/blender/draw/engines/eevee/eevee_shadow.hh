@@ -107,7 +107,7 @@ struct AABB {
 
   float radius(void) const
   {
-    return (max - min).length() / 2.0f;
+    return math::length(max - min) / 2.0f;
   }
 
   operator BoundBox() const

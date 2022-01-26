@@ -647,27 +647,25 @@ bool GPU_link(GPUMaterial *mat, const char *name, ...)
   }
   va_end(params);
 
-  GPUNodeGraph *graph = gpu_material_node_graph(mat);
   BLI_addtail(&graph->nodes, node);
 
   return true;
 }
 
-bool GPU_stack_link(GPUMaterial *material,
-                    bNode *bnode,
-                    const char *name,
-                    GPUNodeStack *in,
-                    GPUNodeStack *out,
-                    ...)
+static bool gpu_stack_link_v(GPUMaterial *material,
+                             bNode *bnode,
+                             const char *name,
+                             GPUNodeStack *in,
+                             GPUNodeStack *out,
+                             va_list params)
 {
-  GSet *used_libraries = gpu_material_used_libraries(material);
+  GPUNodeGraph *graph = gpu_material_node_graph(material);
   GPUNode *node;
   GPUFunction *function;
   GPUNodeLink *link, **linkptr;
-  va_list params;
   int i, totin, totout;
 
-  function = gpu_material_library_use_function(used_libraries, name);
+  function = gpu_material_library_use_function(graph->used_libraries, name);
   if (!function) {
     fprintf(stderr, "GPU failed to find function %s\n", name);
     return false;
@@ -695,7 +693,6 @@ bool GPU_stack_link(GPUMaterial *material,
     }
   }
 
-  va_start(params, out);
   for (i = 0; i < function->totparam; i++) {
     if (function->paramqual[i] != FUNCTION_QUAL_IN) {
       if (totout == 0) {
@@ -721,12 +718,49 @@ bool GPU_stack_link(GPUMaterial *material,
       }
     }
   }
-  va_end(params);
 
-  GPUNodeGraph *graph = gpu_material_node_graph(material);
   BLI_addtail(&graph->nodes, node);
 
   return true;
+}
+
+bool GPU_stack_link(GPUMaterial *material,
+                    bNode *bnode,
+                    const char *name,
+                    GPUNodeStack *in,
+                    GPUNodeStack *out,
+                    ...)
+{
+  va_list params;
+  va_start(params, out);
+  bool valid = gpu_stack_link_v(material, bnode, name, in, out, params);
+  va_end(params);
+
+  return valid;
+}
+
+bool GPU_stack_eval_link(GPUMaterial *material,
+                         bNode *bnode,
+                         const char *name,
+                         GPUNodeStack *in,
+                         GPUNodeStack *out,
+                         ...)
+{
+  /* Save the closure link to replace the one created by the eval function call. Avoiding
+   * dependency to the eval call before the end of the graph. */
+  GPUNodeLink *closure_out = out[0].link;
+
+  va_list params;
+  va_start(params, out);
+  bool valid = gpu_stack_link_v(material, bnode, name, in, out, params);
+  va_end(params);
+
+  /* Save both nodes for graph amendment. */
+  GPU_material_add_closure_eval(material, closure_out, out[0].link);
+  /* Restore original link. */
+  out[0].link = closure_out;
+
+  return valid;
 }
 
 GPUNodeLink *GPU_uniformbuf_link_out(GPUMaterial *mat,
@@ -790,7 +824,11 @@ void gpu_node_graph_free_nodes(GPUNodeGraph *graph)
     gpu_node_free(node);
   }
 
-  graph->outlink = NULL;
+  BLI_freelistN(&graph->eval_nodes);
+  graph->outlink_surface = NULL;
+  graph->outlink_volume = NULL;
+  graph->outlink_displacement = NULL;
+  graph->outlink_thickness = NULL;
 }
 
 void gpu_node_graph_free(GPUNodeGraph *graph)
@@ -805,28 +843,32 @@ void gpu_node_graph_free(GPUNodeGraph *graph)
   BLI_freelistN(&graph->textures);
   BLI_freelistN(&graph->attributes);
   GPU_uniform_attr_list_free(&graph->uniform_attrs);
+
+  if (graph->used_libraries) {
+    BLI_gset_free(graph->used_libraries, NULL);
+    graph->used_libraries = NULL;
+  }
 }
 
 /* Prune Unused Nodes */
 
-static void gpu_nodes_tag(GPUNodeLink *link)
+static void gpu_nodes_tag(GPUNodeLink *link, eGPUNodeTag tag)
 {
   GPUNode *node;
-  GPUInput *input;
 
-  if (!link->output) {
+  if (!link || !link->output) {
     return;
   }
 
   node = link->output->node;
-  if (node->tag) {
+  if (node->tag & tag) {
     return;
   }
 
-  node->tag = true;
-  for (input = node->inputs.first; input; input = input->next) {
+  node->tag |= tag;
+  LISTBASE_FOREACH (GPUInput *, input, &node->inputs) {
     if (input->link) {
-      gpu_nodes_tag(input->link);
+      gpu_nodes_tag(input->link, tag);
     }
   }
 }
@@ -834,18 +876,30 @@ static void gpu_nodes_tag(GPUNodeLink *link)
 void gpu_node_graph_prune_unused(GPUNodeGraph *graph)
 {
   LISTBASE_FOREACH (GPUNode *, node, &graph->nodes) {
-    node->tag = false;
+    node->tag = GPU_NODE_TAG_NONE;
   }
 
-  gpu_nodes_tag(graph->outlink);
+  gpu_nodes_tag(graph->outlink_surface, GPU_NODE_TAG_SURFACE);
+  gpu_nodes_tag(graph->outlink_volume, GPU_NODE_TAG_VOLUME);
+  gpu_nodes_tag(graph->outlink_displacement, GPU_NODE_TAG_DISPLACEMENT);
+  gpu_nodes_tag(graph->outlink_thickness, GPU_NODE_TAG_THICKNESS);
+
   LISTBASE_FOREACH (GPUNodeGraphOutputLink *, aovlink, &graph->outlink_aovs) {
-    gpu_nodes_tag(aovlink->outlink);
+    gpu_nodes_tag(aovlink->outlink, GPU_NODE_TAG_AOV);
+  }
+
+  LISTBASE_FOREACH (GPUNodeGraphEvalNode *, node, &graph->eval_nodes) {
+    /* Copy weight node tag to avoid pruning of eval node since they are node connected to
+     * output. */
+    if (node->weight_node->tag != GPU_NODE_TAG_NONE) {
+      node->eval_node->tag = GPU_NODE_TAG_EVAL | node->weight_node->tag;
+    }
   }
 
   for (GPUNode *node = graph->nodes.first, *next = NULL; node; node = next) {
     next = node->next;
 
-    if (!node->tag) {
+    if (node->tag == GPU_NODE_TAG_NONE) {
       BLI_remlink(&graph->nodes, node);
       gpu_node_free(node);
     }

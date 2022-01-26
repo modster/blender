@@ -262,13 +262,13 @@ static bNodeSocket *ntree_shader_node_find_output(bNode *node, const char *ident
 /* Find input socket at a specific position. */
 static bNodeSocket *ntree_shader_node_input_get(bNode *node, int n)
 {
-  return BLI_findlink(&node->inputs, n);
+  return reinterpret_cast<bNodeSocket *>(BLI_findlink(&node->inputs, n));
 }
 
 /* Find output socket at a specific position. */
 static bNodeSocket *ntree_shader_node_output_get(bNode *node, int n)
 {
-  return BLI_findlink(&node->outputs, n);
+  return reinterpret_cast<bNodeSocket *>(BLI_findlink(&node->outputs, n));
 }
 
 /* Return true on success. */
@@ -940,7 +940,7 @@ static void ntree_shader_weight_tree_invert(bNodeTree *ntree, bNode *output_node
   int node_count = 1;
   nodeChainIterBackwards(ntree, output_node, ntree_weight_tree_tag_nodes, &node_count, 0);
   /* Make a mirror copy of the weight tree. */
-  bNode **nodes_copy = MEM_mallocN(sizeof(bNode *) * node_count, __func__);
+  bNode **nodes_copy = static_cast<bNode **>(MEM_mallocN(sizeof(bNode *) * node_count, __func__));
   LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
     if (node->tmp_flag >= 0) {
       int id = node->tmp_flag;

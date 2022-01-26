@@ -43,12 +43,7 @@
 #else /* C++ */
 #  pragma once
 
-#  include "BLI_float2.hh"
-#  include "BLI_float3.hh"
-#  include "BLI_float4.hh"
 #  include "BLI_float4x4.hh"
-#  include "BLI_int2.hh"
-#  include "BLI_int3.hh"
 
 typedef float mat4[4][4];
 using vec4 = blender::float4;
