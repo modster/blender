@@ -190,18 +190,27 @@ class LightProbeView {
  */
 class MainView {
  private:
-  ShadingView shading_views_[6];
+  /* WORKAROUND: Defining this as an array does not seems to work on GCC < 9.4.
+   * It tries to use the copy constructor and fails because ShadingView is non-copyable and
+   * non-movable. */
+  ShadingView shading_views_0;
+  ShadingView shading_views_1;
+  ShadingView shading_views_2;
+  ShadingView shading_views_3;
+  ShadingView shading_views_4;
+  ShadingView shading_views_5;
+#define shading_views_ (&shading_views_0)
   /** Internal render size. */
   int render_extent_[2];
 
  public:
   MainView(Instance &inst)
-      : shading_views_{{inst, "posX_view", cubeface_mat[0]},
-                       {inst, "negX_view", cubeface_mat[1]},
-                       {inst, "posY_view", cubeface_mat[2]},
-                       {inst, "negY_view", cubeface_mat[3]},
-                       {inst, "posZ_view", cubeface_mat[4]},
-                       {inst, "negZ_view", cubeface_mat[5]}}
+      : shading_views_0(inst, "posX_view", cubeface_mat[0]),
+        shading_views_1(inst, "negX_view", cubeface_mat[1]),
+        shading_views_2(inst, "posY_view", cubeface_mat[2]),
+        shading_views_3(inst, "negY_view", cubeface_mat[3]),
+        shading_views_4(inst, "posZ_view", cubeface_mat[4]),
+        shading_views_5(inst, "negZ_view", cubeface_mat[5])
   {
   }
 
@@ -214,24 +223,26 @@ class MainView {
       render_extent_[i] = max_ii(1, roundf(full_extent_[i] * resolution_scale));
     }
 
-    for (auto i : IndexRange(ARRAY_SIZE(shading_views_))) {
+    for (auto i : IndexRange(6)) {
       shading_views_[i].init();
     }
   }
 
   void sync(void)
   {
-    for (auto i : IndexRange(ARRAY_SIZE(shading_views_))) {
+    for (auto i : IndexRange(6)) {
       shading_views_[i].sync(render_extent_);
     }
   }
 
   void render(void)
   {
-    for (auto i : IndexRange(ARRAY_SIZE(shading_views_))) {
+    for (auto i : IndexRange(6)) {
       shading_views_[i].render();
     }
   }
+
+#undef shading_views_
 };
 
 /** \} */
