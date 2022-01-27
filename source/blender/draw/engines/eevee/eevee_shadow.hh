@@ -176,7 +176,7 @@ struct ShadowTileMap : public ShadowTileMapData {
    * Maximum "bounding" angle of a tile inside a cubemap.
    * Half the diagonal of tile since we test using the tile center.
    */
-  static constexpr float tile_cone_half_angle = atan(0.5 * M_SQRT2 / (SHADOW_TILEMAP_RES / 2));
+  static float tile_cone_half_angle;
 
   /** Level of detail for clipmap. */
   int level = INT_MAX;

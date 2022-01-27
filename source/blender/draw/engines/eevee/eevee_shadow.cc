@@ -33,6 +33,8 @@
 
 namespace blender::eevee {
 
+float ShadowTileMap::tile_cone_half_angle = atan(0.5 * M_SQRT2 / (SHADOW_TILEMAP_RES / 2));
+
 /* -------------------------------------------------------------------- */
 /** \name Tile map
  *
