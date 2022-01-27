@@ -88,6 +88,7 @@
 #include "BKE_main.h"
 #include "BKE_mesh.h"
 #include "BKE_node.h"
+#include "BKE_node_tree_update.h"
 #include "BKE_paint.h"
 #include "BKE_pointcache.h"
 #include "BKE_report.h"
@@ -400,6 +401,8 @@ static void do_version_scene_collection_to_collection(Main *bmain, Scene *scene)
 
     do_version_layer_collection_pre(
         view_layer, &view_layer->layer_collections, enabled_set, selectable_set);
+
+    BKE_layer_collection_doversion_2_80(scene, view_layer);
 
     BKE_layer_collection_sync(scene, view_layer);
 
@@ -896,7 +899,7 @@ static void do_versions_material_convert_legacy_blend_mode(bNodeTree *ntree, cha
   }
 
   if (need_update) {
-    ntreeUpdateTree(NULL, ntree);
+    version_socket_update_is_used(ntree);
   }
 }
 

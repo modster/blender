@@ -193,7 +193,6 @@ bool wm_file_or_session_data_has_unsaved_changes(const Main *bmain, const wmWind
 static void wm_window_match_init(bContext *C, ListBase *wmlist)
 {
   *wmlist = G_MAIN->wm;
-  BLI_listbase_clear(&G_MAIN->wm);
 
   wmWindow *active_win = CTX_wm_window(C);
 
@@ -219,6 +218,8 @@ static void wm_window_match_init(bContext *C, ListBase *wmlist)
       wm->message_bus = NULL;
     }
   }
+
+  BLI_listbase_clear(&G_MAIN->wm);
 
   /* reset active window */
   CTX_wm_window_set(C, active_win);
@@ -263,7 +264,7 @@ static void wm_window_substitute_old(wmWindowManager *oldwm,
   win->eventstate = oldwin->eventstate;
   oldwin->eventstate = NULL;
 
-  /* ensure proper screen rescaling */
+  /* Ensure proper screen re-scaling. */
   win->sizex = oldwin->sizex;
   win->sizey = oldwin->sizey;
   win->posx = oldwin->posx;
@@ -955,14 +956,6 @@ bool WM_file_read(bContext *C, const char *filepath, ReportList *reports)
       /* #BKE_blendfile_read_result_setup sets new Main into context. */
       Main *bmain = CTX_data_main(C);
 
-      /* When recovering a session from an unsaved file, this can have a blank path. */
-      if (BKE_main_blendfile_path(bmain)[0] != '\0') {
-        G.relbase_valid = 1;
-      }
-      else {
-        G.relbase_valid = 0;
-      }
-
       /* match the read WM with current WM */
       wm_window_match_do(C, &wmbase, &bmain->wm, &bmain->wm);
       WM_check(C); /* opens window(s), checks keymaps */
@@ -1149,8 +1142,6 @@ void wm_homefile_read_ex(bContext *C,
   wm_file_read_pre(C, use_data, use_userdef);
 
   if (use_data) {
-    G.relbase_valid = 0;
-
     /* put aside screens to match with persistent windows later */
     wm_window_match_init(C, &wmbase);
   }
@@ -1530,11 +1521,29 @@ static void wm_history_file_update(void)
 /** \} */
 
 /* -------------------------------------------------------------------- */
-/** \name Save Main Blend-File (internal) Screen-Shot
+/** \name Thumbnail Generation: Screen-Shot / Camera View
  *
- * Screen-shot the active window.
+ * Thumbnail Sizes
+ * ===============
+ *
+ * - `PREVIEW_RENDER_LARGE_HEIGHT * 2` is used to render a large thumbnail,
+ *   giving some over-sampling when scaled down:
+ *
+ * - There are two outputs for this thumbnail:
+ *
+ *   - An image is saved to the thumbnail cache, sized at #PREVIEW_RENDER_LARGE_HEIGHT.
+ *
+ *   - A smaller thumbnail is stored in the `.blend` file it's self, sized at #BLEN_THUMB_SIZE.
+ *     The size is kept small to prevent thumbnails bloating the size of `.blend` files.
+ *
+ *     The this thumbnail will be extracted if the file is shared or the local thumbnail cache
+ *     is cleared. see: `blendthumb_extract.cc` for logic that extracts the thumbnail.
+ *
  * \{ */
 
+/**
+ * Screen-shot the active window.
+ */
 static ImBuf *blend_file_thumb_from_screenshot(bContext *C, BlendThumbnail **r_thumb)
 {
   *r_thumb = NULL;
@@ -1580,15 +1589,11 @@ static ImBuf *blend_file_thumb_from_screenshot(bContext *C, BlendThumbnail **r_t
   return ibuf;
 }
 
-/** \} */
-
-/* -------------------------------------------------------------------- */
-/** \name Save Main Blend-File (internal) Camera View
- *
+/**
  * Render the current scene with the active camera.
- * \{ */
-
-/* screen can be NULL */
+ *
+ * \param screen: can be NULL.
+ */
 static ImBuf *blend_file_thumb_from_camera(const bContext *C,
                                            Scene *scene,
                                            bScreen *screen,
@@ -1626,7 +1631,6 @@ static ImBuf *blend_file_thumb_from_camera(const bContext *C,
     return NULL;
   }
 
-  /* gets scaled to BLEN_THUMB_SIZE */
   Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
 
   /* Note that with scaling, this ends up being 0.5,
@@ -1697,6 +1701,12 @@ static ImBuf *blend_file_thumb_from_camera(const bContext *C,
 
   return ibuf;
 }
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Write Main Blend-File (internal)
+ * \{ */
 
 bool write_crash_blend(void)
 {
@@ -1823,16 +1833,10 @@ static bool wm_file_write(bContext *C,
 
   ED_editors_flush_edits(bmain);
 
-  /* First time saving. */
-  /* XXX(ton): temp solution to solve bug, real fix coming. */
-  if ((BKE_main_blendfile_path(bmain)[0] == '\0') && (use_save_as_copy == false)) {
-    STRNCPY(bmain->filepath, filepath);
-  }
-
   /* XXX(ton): temp solution to solve bug, real fix coming. */
   bmain->recovered = 0;
 
-  if (BLO_write_file(CTX_data_main(C),
+  if (BLO_write_file(bmain,
                      filepath,
                      fileflags,
                      &(const struct BlendFileWriteParams){
@@ -1846,7 +1850,6 @@ static bool wm_file_write(bContext *C,
                                         (CTX_wm_manager(C)->op_undo_depth == 0);
 
     if (use_save_as_copy == false) {
-      G.relbase_valid = 1;
       STRNCPY(bmain->filepath, filepath); /* is guaranteed current file */
     }
 
@@ -1898,8 +1901,13 @@ static void wm_autosave_location(char *filepath)
   const char *savedir;
 #endif
 
-  if (G_MAIN && G.relbase_valid) {
-    const char *basename = BLI_path_basename(BKE_main_blendfile_path_from_global());
+  /* Normally there is no need to check for this to be NULL,
+   * however this runs on exit when it may be cleared. */
+  Main *bmain = G_MAIN;
+  const char *blendfile_path = bmain ? BKE_main_blendfile_path(bmain) : NULL;
+
+  if (blendfile_path && (blendfile_path[0] != '\0')) {
+    const char *basename = BLI_path_basename(blendfile_path);
     int len = strlen(basename) - 6;
     BLI_snprintf(path, sizeof(path), "%.*s_%d_autosave.blend", len, basename, pid);
   }
@@ -2028,7 +2036,7 @@ void wm_autosave_delete(void)
 /** \} */
 
 /* -------------------------------------------------------------------- */
-/** \name Initialize WM_OT_open_xxx properties
+/** \name Initialize `WM_OT_open_*` Properties
  *
  * Check if load_ui was set by the caller.
  * Fall back to user preference when file flags not specified.
@@ -2109,7 +2117,7 @@ static int wm_homefile_write_exec(bContext *C, wmOperator *op)
                      fileflags,
                      &(const struct BlendFileWriteParams){
                          /* Make all paths absolute when saving the startup file.
-                          * On load the `G.relbase_valid` will be false so the paths
+                          * On load the `G.main->filepath` will be empty so the paths
                           * won't have a base for resolving the relative paths. */
                          .remap_mode = BLO_WRITE_PATH_REMAP_ABSOLUTE,
                          /* Don't apply any path changes to the current blend file. */
@@ -2847,7 +2855,8 @@ static int wm_revert_mainfile_exec(bContext *C, wmOperator *op)
 
 static bool wm_revert_mainfile_poll(bContext *UNUSED(C))
 {
-  return G.relbase_valid;
+  const char *blendfile_path = BKE_main_blendfile_path_from_global();
+  return (blendfile_path[0] != '\0');
 }
 
 void WM_OT_revert_mainfile(wmOperatorType *ot)
@@ -3004,9 +3013,9 @@ void WM_OT_recover_auto_save(wmOperatorType *ot)
  * Both #WM_OT_save_as_mainfile & #WM_OT_save_mainfile.
  * \{ */
 
-static void wm_filepath_default(char *filepath)
+static void wm_filepath_default(const Main *bmain, char *filepath)
 {
-  if (G.relbase_valid == false) {
+  if (bmain->filepath[0] == '\0') {
     BLI_path_filename_ensure(filepath, FILE_MAX, "untitled.blend");
   }
 }
@@ -3017,7 +3026,8 @@ static void save_set_compress(wmOperator *op)
 
   prop = RNA_struct_find_property(op->ptr, "compress");
   if (!RNA_property_is_set(op->ptr, prop)) {
-    if (G.relbase_valid) { /* keep flag for existing file */
+    const char *blendfile_path = BKE_main_blendfile_path_from_global();
+    if (blendfile_path[0] != '\0') { /* Keep flag for existing file. */
       RNA_property_boolean_set(op->ptr, prop, (G.fileflags & G_FILE_COMPRESS) != 0);
     }
     else { /* use userdef for new file */
@@ -3034,16 +3044,17 @@ static void save_set_filepath(bContext *C, wmOperator *op)
 
   prop = RNA_struct_find_property(op->ptr, "filepath");
   if (!RNA_property_is_set(op->ptr, prop)) {
+    const char *blendfile_path = BKE_main_blendfile_path(bmain);
     /* if not saved before, get the name of the most recently used .blend file */
-    if (BKE_main_blendfile_path(bmain)[0] == '\0' && G.recent_files.first) {
+    if ((blendfile_path[0] == '\0') && G.recent_files.first) {
       struct RecentFile *recent = G.recent_files.first;
       STRNCPY(filepath, recent->filepath);
     }
     else {
-      STRNCPY(filepath, bmain->filepath);
+      STRNCPY(filepath, blendfile_path);
     }
 
-    wm_filepath_default(filepath);
+    wm_filepath_default(bmain, filepath);
     RNA_property_string_set(op->ptr, prop, filepath);
   }
 }
@@ -3076,12 +3087,32 @@ static int wm_save_as_mainfile_exec(bContext *C, wmOperator *op)
                                              BLO_WRITE_PATH_REMAP_NONE;
   save_set_compress(op);
 
-  if (RNA_struct_property_is_set(op->ptr, "filepath")) {
+  const bool is_filepath_set = RNA_struct_property_is_set(op->ptr, "filepath");
+  if (is_filepath_set) {
     RNA_string_get(op->ptr, "filepath", path);
   }
   else {
-    BLI_strncpy(path, BKE_main_blendfile_path(bmain), FILE_MAX);
-    wm_filepath_default(path);
+    STRNCPY(path, BKE_main_blendfile_path(bmain));
+  }
+
+  if (path[0] == '\0') {
+    BKE_report(op->reports,
+               RPT_ERROR,
+               "Unable to save an unsaved file with an empty or unset \"filepath\" property");
+    return OPERATOR_CANCELLED;
+  }
+
+  /* NOTE(@campbellbarton): only check this for file-path properties so saving an already
+   * saved file never fails with an error.
+   * Even though this should never happen, there may be some corner case where a malformed
+   * path is stored in `G.main->filepath`: when the file path is initialized from recovering
+   * a blend file - for example, so in this case failing to save isn't ideal. */
+  if (is_filepath_set && !BLI_path_is_abs_from_cwd(path)) {
+    BKE_reportf(op->reports,
+                RPT_ERROR,
+                "The \"filepath\" property was not an absolute path: \"%s\"",
+                path);
+    return OPERATOR_CANCELLED;
   }
 
   const int fileflags_orig = G.fileflags;
@@ -3198,14 +3229,15 @@ static int wm_save_mainfile_invoke(bContext *C, wmOperator *op, const wmEvent *U
   /* if we're saving for the first time and prefer relative paths -
    * any existing paths will be absolute,
    * enable the option to remap paths to avoid confusion T37240. */
-  if ((G.relbase_valid == false) && (U.flag & USER_RELPATHS)) {
+  const char *blendfile_path = BKE_main_blendfile_path_from_global();
+  if ((blendfile_path[0] == '\0') && (U.flag & USER_RELPATHS)) {
     PropertyRNA *prop = RNA_struct_find_property(op->ptr, "relative_remap");
     if (!RNA_property_is_set(op->ptr, prop)) {
       RNA_property_boolean_set(op->ptr, prop, true);
     }
   }
 
-  if (G.relbase_valid) {
+  if (blendfile_path[0] != '\0') {
     char path[FILE_MAX];
 
     RNA_string_get(op->ptr, "filepath", path);
@@ -3307,6 +3339,7 @@ static uiBlock *block_create_autorun_warning(struct bContext *C,
                                              struct ARegion *region,
                                              void *UNUSED(arg1))
 {
+  const char *blendfile_path = BKE_main_blendfile_path_from_global();
   wmWindowManager *wm = CTX_wm_manager(C);
 
   uiBlock *block = UI_block_begin(C, region, "autorun_warning_popup", UI_EMBOSS);
@@ -3354,7 +3387,7 @@ static uiBlock *block_create_autorun_warning(struct bContext *C,
 
   /* Allow reload if we have a saved file.
    * Otherwise just enable scripts and reset the depsgraphs. */
-  if (G.relbase_valid && wm->file_saved) {
+  if ((blendfile_path[0] != '\0') && wm->file_saved) {
     but = uiDefIconTextBut(block,
                            UI_BTYPE_BUT,
                            0,

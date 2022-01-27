@@ -46,8 +46,7 @@ static void node_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 
 static void node_init(bNodeTree *UNUSED(tree), bNode *node)
 {
-  NodeAttributeCombineXYZ *data = (NodeAttributeCombineXYZ *)MEM_callocN(
-      sizeof(NodeAttributeCombineXYZ), __func__);
+  NodeAttributeCombineXYZ *data = MEM_cnew<NodeAttributeCombineXYZ>(__func__);
 
   data->input_type_x = GEO_NODE_ATTRIBUTE_INPUT_FLOAT;
   data->input_type_y = GEO_NODE_ATTRIBUTE_INPUT_FLOAT;
@@ -139,8 +138,7 @@ void register_node_type_geo_attribute_combine_xyz()
   geo_node_type_base(&ntype,
                      GEO_NODE_LEGACY_ATTRIBUTE_COMBINE_XYZ,
                      "Attribute Combine XYZ",
-                     NODE_CLASS_ATTRIBUTE,
-                     0);
+                     NODE_CLASS_ATTRIBUTE);
   node_type_init(&ntype, file_ns::node_init);
   node_type_update(&ntype, file_ns::node_update);
   node_type_storage(

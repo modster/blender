@@ -205,14 +205,14 @@ ccl_device float curve_thickness(KernelGlobals kg, ccl_private const ShaderData 
 {
   float r = 0.0f;
 
-  if (sd->type & PRIMITIVE_ALL_CURVE) {
+  if (sd->type & PRIMITIVE_CURVE) {
     KernelCurve curve = kernel_tex_fetch(__curves, sd->prim);
     int k0 = curve.first_key + PRIMITIVE_UNPACK_SEGMENT(sd->type);
     int k1 = k0 + 1;
 
     float4 P_curve[2];
 
-    if (!(sd->type & PRIMITIVE_ALL_MOTION)) {
+    if (!(sd->type & PRIMITIVE_MOTION)) {
       P_curve[0] = kernel_tex_fetch(__curve_keys, k0);
       P_curve[1] = kernel_tex_fetch(__curve_keys, k1);
     }
@@ -224,6 +224,18 @@ ccl_device float curve_thickness(KernelGlobals kg, ccl_private const ShaderData 
   }
 
   return r * 2.0f;
+}
+
+/* Curve random */
+
+ccl_device float curve_random(KernelGlobals kg, ccl_private const ShaderData *sd)
+{
+  if (sd->type & PRIMITIVE_CURVE) {
+    const AttributeDescriptor desc = find_attribute(kg, sd, ATTR_STD_CURVE_RANDOM);
+    return (desc.offset != ATTR_STD_NOT_FOUND) ? curve_attribute_float(kg, sd, desc, NULL, NULL) :
+                                                 0.0f;
+  }
+  return 0.0f;
 }
 
 /* Curve location for motion pass, linear interpolation between keys and
@@ -249,7 +261,7 @@ ccl_device float3 curve_tangent_normal(KernelGlobals kg, ccl_private const Shade
 {
   float3 tgN = make_float3(0.0f, 0.0f, 0.0f);
 
-  if (sd->type & PRIMITIVE_ALL_CURVE) {
+  if (sd->type & PRIMITIVE_CURVE) {
 
     tgN = -(-sd->I - sd->dPdu * (dot(sd->dPdu, -sd->I) / len_squared(sd->dPdu)));
     tgN = normalize(tgN);

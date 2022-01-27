@@ -748,19 +748,19 @@ static void wm_drag_draw_icon(bContext *UNUSED(C),
 
     float col[4] = {1.0f, 1.0f, 1.0f, 0.65f}; /* this blends texture */
     IMMDrawPixelsTexState state = immDrawPixelsTexSetup(GPU_SHADER_2D_IMAGE_COLOR);
-    immDrawPixelsTexScaled(&state,
-                           x,
-                           y,
-                           drag->imb->x,
-                           drag->imb->y,
-                           GPU_RGBA8,
-                           false,
-                           drag->imb->rect,
-                           drag->scale,
-                           drag->scale,
-                           1.0f,
-                           1.0f,
-                           col);
+    immDrawPixelsTexTiled_scaling(&state,
+                                  x,
+                                  y,
+                                  drag->imb->x,
+                                  drag->imb->y,
+                                  GPU_RGBA8,
+                                  false,
+                                  drag->imb->rect,
+                                  drag->scale,
+                                  drag->scale,
+                                  1.0f,
+                                  1.0f,
+                                  col);
   }
   else {
     int padding = 4 * UI_DPI_FAC;
@@ -884,7 +884,7 @@ void wm_drags_draw(bContext *C, wmWindow *win)
   bScreen *screen = CTX_wm_screen(C);
   /* To start with, use the area and region under the mouse cursor, just like event handling. The
    * operator context may still override it. */
-  ScrArea *area = BKE_screen_find_area_xy(screen, SPACE_TYPE_ANY, UNPACK2(xy));
+  ScrArea *area = BKE_screen_find_area_xy(screen, SPACE_TYPE_ANY, xy);
   ARegion *region = ED_area_find_region_xy_visual(area, RGN_TYPE_ANY, xy);
   /* Will be overridden and unset eventually. */
   BLI_assert(!CTX_wm_area(C) && !CTX_wm_region(C));

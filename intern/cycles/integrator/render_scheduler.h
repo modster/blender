@@ -283,7 +283,7 @@ class RenderScheduler {
   /* Check whether timing report about the given work need to reset accumulated average time. */
   bool work_report_reset_average(const RenderWork &render_work);
 
-  /* CHeck whether render time limit has been reached (or exceeded), and if so store related
+  /* Check whether render time limit has been reached (or exceeded), and if so store related
    * information in the state so that rendering is considered finished, and is possible to report
    * average render time information. */
   void check_time_limit_reached();
@@ -462,9 +462,7 @@ class RenderScheduler {
    * desired one. This call assumes linear dependency of render time from number of pixels
    * (quadratic dependency from the resolution divider): resolution divider of 2 brings render time
    * down by a factor of 4. */
-  int calculate_resolution_divider_for_time(double desired_time,
-                                            double actual_time,
-                                            int previous_resolution_divider);
+  int calculate_resolution_divider_for_time(double desired_time, double actual_time);
 };
 
 int calculate_resolution_divider_for_resolution(int width, int height, int resolution);

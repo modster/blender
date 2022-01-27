@@ -325,7 +325,7 @@ void AssetCatalogTreeViewItem::build_context_menu(bContext &C, uiLayout &column)
 
   /* Doesn't actually exist right now, but could be defined in Python. Reason that this isn't done
    * in Python yet is that catalogs are not exposed in BPY, and we'd somehow pass the clicked on
-   * catalog to the menu draw callback (via context probably).*/
+   * catalog to the menu draw callback (via context probably). */
   MenuType *mt = WM_menutype_find("ASSETBROWSER_MT_catalog_context_menu", true);
   if (!mt) {
     return;
@@ -679,7 +679,7 @@ using namespace blender::ed::asset_browser;
 
 FileAssetCatalogFilterSettingsHandle *file_create_asset_catalog_filter_settings()
 {
-  AssetCatalogFilterSettings *filter_settings = OBJECT_GUARDED_NEW(AssetCatalogFilterSettings);
+  AssetCatalogFilterSettings *filter_settings = MEM_new<AssetCatalogFilterSettings>(__func__);
   return reinterpret_cast<FileAssetCatalogFilterSettingsHandle *>(filter_settings);
 }
 
@@ -688,7 +688,8 @@ void file_delete_asset_catalog_filter_settings(
 {
   AssetCatalogFilterSettings **filter_settings = reinterpret_cast<AssetCatalogFilterSettings **>(
       filter_settings_handle);
-  OBJECT_GUARDED_SAFE_DELETE(*filter_settings, AssetCatalogFilterSettings);
+  MEM_delete(*filter_settings);
+  *filter_settings = nullptr;
 }
 
 bool file_set_asset_catalog_filter_settings(

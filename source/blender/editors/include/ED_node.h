@@ -100,12 +100,7 @@ void ED_node_socket_draw(struct bNodeSocket *sock,
                          float scale);
 void ED_node_tree_update(const struct bContext *C);
 void ED_node_tag_update_id(struct ID *id);
-void ED_node_tag_update_nodetree(struct Main *bmain, struct bNodeTree *ntree, struct bNode *node);
-/**
- * Sort nodes by selection: unselected nodes first, then selected,
- * then the active node at the very end. Relative order is kept intact.
- */
-void ED_node_sort(struct bNodeTree *ntree);
+
 float ED_node_grid_size(void);
 
 /* node_relationships.c */
@@ -142,14 +137,32 @@ void ED_node_composit_default(const struct bContext *C, struct Scene *scene);
  * Called from shading buttons or header.
  */
 void ED_node_texture_default(const struct bContext *C, struct Tex *tex);
-bool ED_node_select_check(const ListBase *lb);
-void ED_node_select_all(ListBase *lb, int action);
 void ED_node_post_apply_transform(struct bContext *C, struct bNodeTree *ntree);
 void ED_node_set_active(struct Main *bmain,
                         struct SpaceNode *snode,
                         struct bNodeTree *ntree,
                         struct bNode *node,
                         bool *r_active_texture_changed);
+
+/**
+ * Call after one or more node trees have been changed and tagged accordingly.
+ *
+ * This function will make sure that other parts of Blender update accordingly. For example, if the
+ * node group interface changed, parent node groups have to be updated as well.
+ *
+ * Additionally, this will send notifiers and tag the depsgraph based on the changes. Depsgraph
+ * relation updates have to be triggered by the caller.
+ *
+ * \param C: Context if available. This can be null.
+ * \param bmain: Main whose data-blocks should be updated based on the changes.
+ * \param ntree: Under some circumstances the caller knows that only one node tree has
+ *   changed since the last update. In this case the function may be able to skip scanning #bmain
+ *   for other things that have to be changed. It may still scan #bmain if the interface of the
+ *   node tree has changed.
+ */
+void ED_node_tree_propagate_change(const struct bContext *C,
+                                   struct Main *bmain,
+                                   struct bNodeTree *ntree);
 
 /**
  * \param scene_owner: is the owner of the job,

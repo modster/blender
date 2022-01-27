@@ -831,31 +831,23 @@ static void ptcache_rigidbody_interpolate(int index,
     RigidBodyOb *rbo = ob->rigidbody_object;
 
     if (rbo->type == RBO_TYPE_ACTIVE) {
-      ParticleKey keys[4];
-      ParticleKey result;
-      float dfra;
-
-      memset(keys, 0, sizeof(keys));
-
-      copy_v3_v3(keys[1].co, rbo->pos);
-      copy_qt_qt(keys[1].rot, rbo->orn);
+      /* It may be possible to improve results by taking into account velocity
+       * for interpolation using psys_interpolate_particle, however this is
+       * not currently cached. */
+      float pos[3], orn[4];
 
       if (old_data) {
-        memcpy(keys[2].co, data, sizeof(float[3]));
-        memcpy(keys[2].rot, data + 3, sizeof(float[4]));
+        memcpy(pos, data, sizeof(float[3]));
+        memcpy(orn, data + 3, sizeof(float[4]));
       }
       else {
-        BKE_ptcache_make_particle_key(&keys[2], 0, data, cfra2);
+        PTCACHE_DATA_TO(data, BPHYS_DATA_LOCATION, index, pos);
+        PTCACHE_DATA_TO(data, BPHYS_DATA_ROTATION, index, orn);
       }
 
-      dfra = cfra2 - cfra1;
-
-      /* NOTE: keys[0] and keys[3] unused for type < 1 (crappy). */
-      psys_interpolate_particle(-1, keys, (cfra - cfra1) / dfra, &result, true);
-      interp_qt_qtqt(result.rot, keys[1].rot, keys[2].rot, (cfra - cfra1) / dfra);
-
-      copy_v3_v3(rbo->pos, result.co);
-      copy_qt_qt(rbo->orn, result.rot);
+      const float t = (cfra - cfra1) / (cfra2 - cfra1);
+      interp_v3_v3v3(rbo->pos, rbo->pos, pos, t);
+      interp_qt_qtqt(rbo->orn, rbo->orn, orn, t);
     }
   }
 }
@@ -1322,10 +1314,11 @@ static int ptcache_frame_from_filename(const char *filename, const char *ext)
 
 static int ptcache_path(PTCacheID *pid, char *filename)
 {
+  const char *blendfile_path = BKE_main_blendfile_path_from_global();
   Library *lib = (pid->owner_id) ? pid->owner_id->lib : NULL;
   const char *blendfilename = (lib && (pid->cache->flag & PTCACHE_IGNORE_LIBPATH) == 0) ?
                                   lib->filepath_abs :
-                                  BKE_main_blendfile_path_from_global();
+                                  blendfile_path;
   size_t i;
 
   if (pid->cache->flag & PTCACHE_EXTERNAL) {
@@ -1337,7 +1330,7 @@ static int ptcache_path(PTCacheID *pid, char *filename)
 
     return BLI_path_slash_ensure(filename); /* new strlen() */
   }
-  if (G.relbase_valid || lib) {
+  if ((blendfile_path[0] != '\0') || lib) {
     char file[MAX_PTCACHE_PATH]; /* we don't want the dir, only the file */
 
     BLI_split_file_part(blendfilename, file, sizeof(file));
@@ -1422,8 +1415,11 @@ static int ptcache_filename(PTCacheID *pid, char *filename, int cfra, short do_p
   filename[0] = '\0';
   newname = filename;
 
-  if (!G.relbase_valid && (pid->cache->flag & PTCACHE_EXTERNAL) == 0) {
-    return 0; /* save blend file before using disk pointcache */
+  if ((pid->cache->flag & PTCACHE_EXTERNAL) == 0) {
+    const char *blendfile_path = BKE_main_blendfile_path_from_global();
+    if (blendfile_path[0] == '\0') {
+      return 0; /* save blend file before using disk pointcache */
+    }
   }
 
   /* start with temp dir */
@@ -1469,8 +1465,11 @@ static PTCacheFile *ptcache_file_open(PTCacheID *pid, int mode, int cfra)
     return NULL;
   }
 #endif
-  if (!G.relbase_valid && (pid->cache->flag & PTCACHE_EXTERNAL) == 0) {
-    return NULL; /* save blend file before using disk pointcache */
+  if ((pid->cache->flag & PTCACHE_EXTERNAL) == 0) {
+    const char *blendfile_path = BKE_main_blendfile_path_from_global();
+    if (blendfile_path[0] == '\0') {
+      return NULL; /* save blend file before using disk pointcache */
+    }
   }
 
   ptcache_filename(pid, filename, cfra, 1, 1);
@@ -3444,8 +3443,9 @@ void BKE_ptcache_toggle_disk_cache(PTCacheID *pid)
 {
   PointCache *cache = pid->cache;
   int last_exact = cache->last_exact;
+  const char *blendfile_path = BKE_main_blendfile_path_from_global();
 
-  if (!G.relbase_valid) {
+  if (blendfile_path[0] == '\0') {
     cache->flag &= ~PTCACHE_DISK_CACHE;
     if (G.debug & G_DEBUG) {
       printf("File must be saved before using disk cache!\n");
@@ -3496,6 +3496,11 @@ void BKE_ptcache_disk_cache_rename(PTCacheID *pid, const char *name_src, const c
   char new_path_full[MAX_PTCACHE_FILE];
   char old_path_full[MAX_PTCACHE_FILE];
   char ext[MAX_PTCACHE_PATH];
+
+  /* If both names are the same, there is nothing to do. */
+  if (STREQ(name_src, name_dst)) {
+    return;
+  }
 
   /* save old name */
   BLI_strncpy(old_name, pid->cache->name, sizeof(old_name));

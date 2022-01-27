@@ -75,8 +75,7 @@ static void node_copy_storage(bNodeTree *UNUSED(dest_ntree),
 
 static void node_init(bNodeTree *UNUSED(ntree), bNode *node)
 {
-  NodeAttributeCurveMap *data = (NodeAttributeCurveMap *)MEM_callocN(sizeof(NodeAttributeCurveMap),
-                                                                     __func__);
+  NodeAttributeCurveMap *data = MEM_cnew<NodeAttributeCurveMap>(__func__);
 
   data->data_type = CD_PROP_FLOAT;
   data->curve_vec = BKE_curvemapping_add(4, -1.0f, -1.0f, 1.0f, 1.0f);
@@ -210,7 +209,7 @@ void register_node_type_geo_attribute_curve_map()
   static bNodeType ntype;
 
   geo_node_type_base(
-      &ntype, GEO_NODE_LEGACY_ATTRIBUTE_CURVE_MAP, "Attribute Curve Map", NODE_CLASS_ATTRIBUTE, 0);
+      &ntype, GEO_NODE_LEGACY_ATTRIBUTE_CURVE_MAP, "Attribute Curve Map", NODE_CLASS_ATTRIBUTE);
   node_type_update(&ntype, file_ns::node_update);
   node_type_init(&ntype, file_ns::node_init);
   node_type_size_preset(&ntype, NODE_SIZE_LARGE);

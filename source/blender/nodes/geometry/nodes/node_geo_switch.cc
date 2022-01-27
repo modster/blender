@@ -24,6 +24,8 @@
 
 #include "BKE_material.h"
 
+#include "NOD_socket_search_link.hh"
+
 #include "FN_multi_function_signature.hh"
 
 namespace blender::nodes::node_geo_switch_cc {
@@ -92,7 +94,7 @@ static void node_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 
 static void node_init(bNodeTree *UNUSED(tree), bNode *node)
 {
-  NodeSwitch *data = (NodeSwitch *)MEM_callocN(sizeof(NodeSwitch), __func__);
+  NodeSwitch *data = MEM_cnew<NodeSwitch>(__func__);
   data->input_type = SOCK_GEOMETRY;
   node->storage = data;
 }
@@ -119,6 +121,35 @@ static void node_update(bNodeTree *ntree, bNode *node)
 
   LISTBASE_FOREACH (bNodeSocket *, socket, &node->outputs) {
     nodeSetSocketAvailability(ntree, socket, socket->type == storage.input_type);
+  }
+}
+
+static void node_gather_link_searches(GatherLinkSearchOpParams &params)
+{
+  if (params.in_out() == SOCK_OUT) {
+    params.add_item(IFACE_("Output"), [](LinkSearchOpParams &params) {
+      bNode &node = params.add_node("GeometryNodeSwitch");
+      node_storage(node).input_type = params.socket.type;
+      params.update_and_connect_available_socket(node, "Output");
+    });
+  }
+  else {
+    if (params.other_socket().type == SOCK_BOOLEAN) {
+      params.add_item(IFACE_("Switch"), [](LinkSearchOpParams &params) {
+        bNode &node = params.add_node("GeometryNodeSwitch");
+        params.connect_available_socket(node, "Start");
+      });
+    }
+    params.add_item(IFACE_("False"), [](LinkSearchOpParams &params) {
+      bNode &node = params.add_node("GeometryNodeSwitch");
+      node_storage(node).input_type = params.socket.type;
+      params.update_and_connect_available_socket(node, "False");
+    });
+    params.add_item(IFACE_("True"), [](LinkSearchOpParams &params) {
+      bNode &node = params.add_node("GeometryNodeSwitch");
+      node_storage(node).input_type = params.socket.type;
+      params.update_and_connect_available_socket(node, "True");
+    });
   }
 }
 
@@ -296,13 +327,14 @@ void register_node_type_geo_switch()
 
   static bNodeType ntype;
 
-  geo_node_type_base(&ntype, GEO_NODE_SWITCH, "Switch", NODE_CLASS_CONVERTER, 0);
+  geo_node_type_base(&ntype, GEO_NODE_SWITCH, "Switch", NODE_CLASS_CONVERTER);
   ntype.declare = file_ns::node_declare;
   node_type_init(&ntype, file_ns::node_init);
   node_type_update(&ntype, file_ns::node_update);
   node_type_storage(&ntype, "NodeSwitch", node_free_standard_storage, node_copy_standard_storage);
   ntype.geometry_node_execute = file_ns::node_geo_exec;
   ntype.geometry_node_execute_supports_laziness = true;
+  ntype.gather_link_search_ops = file_ns::node_gather_link_searches;
   ntype.draw_buttons = file_ns::node_layout;
   nodeRegisterType(&ntype);
 }

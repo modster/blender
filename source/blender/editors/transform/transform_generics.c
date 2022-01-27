@@ -214,7 +214,8 @@ void initTransInfo(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 
   t->flag = 0;
 
-  if (obact && ELEM(object_mode, OB_MODE_EDIT, OB_MODE_EDIT_GPENCIL)) {
+  if (obact && !(t->options & (CTX_CURSOR | CTX_TEXTURE_SPACE)) &&
+      ELEM(object_mode, OB_MODE_EDIT, OB_MODE_EDIT_GPENCIL)) {
     t->obedit_type = obact->type;
   }
   else {
@@ -259,7 +260,7 @@ void initTransInfo(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
   }
 
   /* Crease needs edge flag */
-  if (ELEM(t->mode, TFM_CREASE, TFM_BWEIGHT)) {
+  if (ELEM(t->mode, TFM_EDGE_CREASE, TFM_BWEIGHT)) {
     t->options |= CTX_EDGE_DATA;
   }
 

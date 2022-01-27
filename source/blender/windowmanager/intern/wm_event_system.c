@@ -51,6 +51,7 @@
 #include "BKE_customdata.h"
 #include "BKE_global.h"
 #include "BKE_idprop.h"
+#include "BKE_lib_remap.h"
 #include "BKE_main.h"
 #include "BKE_report.h"
 #include "BKE_scene.h"
@@ -312,28 +313,39 @@ void WM_main_remove_notifier_reference(const void *reference)
   }
 }
 
-void WM_main_remap_editor_id_reference(ID *old_id, ID *new_id)
+static void wm_main_remap_assetlist(ID *old_id, ID *new_id, void *UNUSED(user_data))
+{
+  ED_assetlist_storage_id_remap(old_id, new_id);
+}
+
+static void wm_main_remap_msgbus_notify(ID *old_id, ID *new_id, void *user_data)
+{
+  struct wmMsgBus *mbus = user_data;
+  if (new_id != NULL) {
+    WM_msg_id_update(mbus, old_id, new_id);
+  }
+  else {
+    WM_msg_id_remove(mbus, old_id);
+  }
+}
+
+void WM_main_remap_editor_id_reference(const struct IDRemapper *mappings)
 {
   Main *bmain = G_MAIN;
 
   LISTBASE_FOREACH (bScreen *, screen, &bmain->screens) {
     LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
       LISTBASE_FOREACH (SpaceLink *, sl, &area->spacedata) {
-        ED_spacedata_id_remap(area, sl, old_id, new_id);
+        ED_spacedata_id_remap(area, sl, mappings);
       }
     }
   }
-  ED_assetlist_storage_id_remap(old_id, new_id);
+
+  BKE_id_remapper_iter(mappings, wm_main_remap_assetlist, NULL);
 
   wmWindowManager *wm = bmain->wm.first;
   if (wm && wm->message_bus) {
-    struct wmMsgBus *mbus = wm->message_bus;
-    if (new_id != NULL) {
-      WM_msg_id_update(mbus, old_id, new_id);
-    }
-    else {
-      WM_msg_id_remove(mbus, old_id);
-    }
+    BKE_id_remapper_iter(mappings, wm_main_remap_msgbus_notify, wm->message_bus);
   }
 }
 
@@ -1861,8 +1873,7 @@ static void wm_handler_op_context(bContext *C, wmEventHandler_Op *handler, const
       CTX_wm_area_set(C, area);
 
       if (op && (op->flag & OP_IS_MODAL_CURSOR_REGION)) {
-        region = BKE_area_find_region_xy(
-            area, handler->context.region_type, event->xy[0], event->xy[1]);
+        region = BKE_area_find_region_xy(area, handler->context.region_type, event->xy);
         if (region) {
           handler->context.region = region;
         }
@@ -2264,7 +2275,7 @@ static int wm_handler_operator_call(bContext *C,
           CTX_wm_region_set(C, NULL);
         }
 
-        /* /update gizmos during modal handlers. */
+        /* Update gizmos during modal handlers. */
         wm_gizmomaps_handled_modal_update(C, event, handler);
 
         /* Remove modal handler, operator itself should have been canceled and freed. */

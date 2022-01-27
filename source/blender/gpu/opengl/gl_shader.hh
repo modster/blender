@@ -27,6 +27,7 @@
 
 #include "glew-mx.h"
 
+#include "gpu_shader_create_info.hh"
 #include "gpu_shader_private.hh"
 
 namespace blender {
@@ -36,6 +37,9 @@ namespace gpu {
  * Implementation of shader compilation and uniforms handling using OpenGL.
  */
 class GLShader : public Shader {
+  friend shader::ShaderCreateInfo;
+  friend shader::StageInterfaceInfo;
+
  private:
   /** Handle for full program (links shader stages below). */
   GLuint shader_program_ = 0;
@@ -58,16 +62,23 @@ class GLShader : public Shader {
   void geometry_shader_from_glsl(MutableSpan<const char *> sources) override;
   void fragment_shader_from_glsl(MutableSpan<const char *> sources) override;
   void compute_shader_from_glsl(MutableSpan<const char *> sources) override;
-  bool finalize(void) override;
+  bool finalize(const shader::ShaderCreateInfo *info = nullptr) override;
+
+  std::string resources_declare(const shader::ShaderCreateInfo &info) const override;
+  std::string vertex_interface_declare(const shader::ShaderCreateInfo &info) const override;
+  std::string fragment_interface_declare(const shader::ShaderCreateInfo &info) const override;
+  std::string geometry_interface_declare(const shader::ShaderCreateInfo &info) const override;
+  std::string geometry_layout_declare(const shader::ShaderCreateInfo &info) const override;
+  std::string compute_layout_declare(const shader::ShaderCreateInfo &info) const override;
 
   /** Should be called before linking. */
   void transform_feedback_names_set(Span<const char *> name_list,
-                                    const eGPUShaderTFBType geom_type) override;
+                                    eGPUShaderTFBType geom_type) override;
   bool transform_feedback_enable(GPUVertBuf *buf) override;
-  void transform_feedback_disable(void) override;
+  void transform_feedback_disable() override;
 
-  void bind(void) override;
-  void unbind(void) override;
+  void bind() override;
+  void unbind() override;
 
   void uniform_float(int location, int comp_len, int array_size, const float *data) override;
   void uniform_int(int location, int comp_len, int array_size, const int *data) override;
@@ -75,7 +86,7 @@ class GLShader : public Shader {
   void vertformat_from_shader(GPUVertFormat *format) const override;
 
   /** DEPRECATED: Kept only because of BGL API. */
-  int program_handle_get(void) const override;
+  int program_handle_get() const override;
 
  private:
   char *glsl_patch_get(GLenum gl_stage);

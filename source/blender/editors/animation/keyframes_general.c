@@ -307,11 +307,13 @@ void clean_fcurve(struct bAnimContext *ac, bAnimListElem *ale, float thresh, boo
   }
 }
 
-/** Find the first segment of consecutive selected curve points, starting from \a start_index.
+/**
+ * Find the first segment of consecutive selected curve points, starting from \a start_index.
  * Keys that have BEZT_FLAG_IGNORE_TAG set are treated as unselected.
  * \param r_segment_start_idx: returns the start index of the segment.
  * \param r_segment_len: returns the number of curve points in the segment.
- * \return whether such a segment was found or not.*/
+ * \return whether such a segment was found or not.
+ */
 static bool find_fcurve_segment(FCurve *fcu,
                                 const int start_index,
                                 int *r_segment_start_idx,
@@ -343,6 +345,67 @@ static bool find_fcurve_segment(FCurve *fcu,
   /* If the last curve point was in the segment, `r_segment_len` and `r_segment_start_idx`
    * are already updated and true is returned. */
   return in_segment;
+}
+
+ListBase find_fcurve_segments(FCurve *fcu)
+{
+  ListBase segments = {NULL, NULL};
+  int segment_start_idx = 0;
+  int segment_len = 0;
+  int current_index = 0;
+
+  while (find_fcurve_segment(fcu, current_index, &segment_start_idx, &segment_len)) {
+    FCurveSegment *segment;
+    segment = MEM_callocN(sizeof(*segment), "FCurveSegment");
+    segment->start_index = segment_start_idx;
+    segment->length = segment_len;
+    BLI_addtail(&segments, segment);
+    current_index = segment_start_idx + segment_len;
+  }
+  return segments;
+}
+
+static BezTriple fcurve_segment_start_get(FCurve *fcu, int index)
+{
+  BezTriple start_bezt = index - 1 >= 0 ? fcu->bezt[index - 1] : fcu->bezt[index];
+  return start_bezt;
+}
+
+static BezTriple fcurve_segment_end_get(FCurve *fcu, int index)
+{
+  BezTriple end_bezt = index < fcu->totvert ? fcu->bezt[index] : fcu->bezt[index - 1];
+  return end_bezt;
+}
+
+/* ---------------- */
+
+void blend_to_neighbor_fcurve_segment(FCurve *fcu, FCurveSegment *segment, const float factor)
+{
+  const float blend_factor = fabs(factor * 2 - 1);
+  BezTriple target_bezt;
+  /* Find which key to blend towards. */
+  if (factor < 0.5f) {
+    target_bezt = fcurve_segment_start_get(fcu, segment->start_index);
+  }
+  else {
+    target_bezt = fcurve_segment_end_get(fcu, segment->start_index + segment->length);
+  }
+  /* Blend each key individually. */
+  for (int i = segment->start_index; i < segment->start_index + segment->length; i++) {
+    fcu->bezt[i].vec[1][1] = interpf(target_bezt.vec[1][1], fcu->bezt[i].vec[1][1], blend_factor);
+  }
+}
+
+/* ---------------- */
+
+void breakdown_fcurve_segment(FCurve *fcu, FCurveSegment *segment, const float factor)
+{
+  BezTriple left_bezt = fcurve_segment_start_get(fcu, segment->start_index);
+  BezTriple right_bezt = fcurve_segment_end_get(fcu, segment->start_index + segment->length);
+
+  for (int i = segment->start_index; i < segment->start_index + segment->length; i++) {
+    fcu->bezt[i].vec[1][1] = interpf(right_bezt.vec[1][1], left_bezt.vec[1][1], factor);
+  }
 }
 
 /* ---------------- */
@@ -440,15 +503,12 @@ bool decimate_fcurve(bAnimListElem *ale, float remove_ratio, float error_sq_max)
     fcu->bezt[i].f2 &= ~BEZT_FLAG_TEMP_TAG;
   }
 
-  /* Only decimate the individual selected curve segments. */
-  int segment_start_idx = 0;
-  int segment_len = 0;
-  int current_index = 0;
-
-  while (find_fcurve_segment(fcu, current_index, &segment_start_idx, &segment_len)) {
-    decimate_fcurve_segment(fcu, segment_start_idx, segment_len, remove_ratio, error_sq_max);
-    current_index = segment_start_idx + segment_len;
+  ListBase segments = find_fcurve_segments(fcu);
+  LISTBASE_FOREACH (FCurveSegment *, segment, &segments) {
+    decimate_fcurve_segment(
+        fcu, segment->start_index, segment->length, remove_ratio, error_sq_max);
   }
+  BLI_freelistN(&segments);
 
   uint old_totvert = fcu->totvert;
   fcu->bezt = NULL;

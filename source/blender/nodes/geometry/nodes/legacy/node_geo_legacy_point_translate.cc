@@ -74,8 +74,7 @@ static void node_geo_exec(GeoNodeExecParams params)
 
 static void node_init(bNodeTree *UNUSED(tree), bNode *node)
 {
-  NodeGeometryPointTranslate *data = (NodeGeometryPointTranslate *)MEM_callocN(
-      sizeof(NodeGeometryPointTranslate), __func__);
+  NodeGeometryPointTranslate *data = MEM_cnew<NodeGeometryPointTranslate>(__func__);
 
   data->input_type = GEO_NODE_ATTRIBUTE_INPUT_VECTOR;
   node->storage = data;
@@ -98,7 +97,7 @@ void register_node_type_geo_point_translate()
   static bNodeType ntype;
 
   geo_node_type_base(
-      &ntype, GEO_NODE_LEGACY_POINT_TRANSLATE, "Point Translate", NODE_CLASS_GEOMETRY, 0);
+      &ntype, GEO_NODE_LEGACY_POINT_TRANSLATE, "Point Translate", NODE_CLASS_GEOMETRY);
   node_type_init(&ntype, file_ns::node_init);
   node_type_update(&ntype, file_ns::node_update);
   node_type_storage(&ntype,

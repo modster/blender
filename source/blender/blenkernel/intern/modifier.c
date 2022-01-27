@@ -933,7 +933,7 @@ const char *BKE_modifier_path_relbase(Main *bmain, Object *ob)
    * - Else if the file has been saved return the blend file path.
    * - Else if the file isn't saved and the ID isn't from a library, return the temp dir.
    */
-  if (G.relbase_valid || ID_IS_LINKED(ob)) {
+  if ((bmain->filepath[0] != '\0') || ID_IS_LINKED(ob)) {
     return ID_BLEND_PATH(bmain, &ob->id);
   }
 
@@ -948,7 +948,8 @@ const char *BKE_modifier_path_relbase_from_global(Object *ob)
 
 void BKE_modifier_path_init(char *path, int path_maxlen, const char *name)
 {
-  BLI_join_dirfile(path, path_maxlen, G.relbase_valid ? "//" : BKE_tempdir_session(), name);
+  const char *blendfile_path = BKE_main_blendfile_path_from_global();
+  BLI_join_dirfile(path, path_maxlen, blendfile_path[0] ? "//" : BKE_tempdir_session(), name);
 }
 
 /**
@@ -969,6 +970,7 @@ static void modwrap_dependsOnNormals(Mesh *me)
       }
       break;
     }
+    case ME_WRAPPER_TYPE_SUBD:
     case ME_WRAPPER_TYPE_MDATA:
       BKE_mesh_calc_normals(me);
       break;
@@ -982,7 +984,6 @@ struct Mesh *BKE_modifier_modify_mesh(ModifierData *md,
                                       struct Mesh *me)
 {
   const ModifierTypeInfo *mti = BKE_modifier_get_info(md->type);
-  BLI_assert(CustomData_has_layer(&me->pdata, CD_NORMAL) == false);
 
   if (me->runtime.wrapper_type == ME_WRAPPER_TYPE_BMESH) {
     if ((mti->flags & eModifierTypeFlag_AcceptsBMesh) == 0) {
@@ -1003,8 +1004,6 @@ void BKE_modifier_deform_verts(ModifierData *md,
                                int numVerts)
 {
   const ModifierTypeInfo *mti = BKE_modifier_get_info(md->type);
-  BLI_assert(!me || CustomData_has_layer(&me->pdata, CD_NORMAL) == false);
-
   if (me && mti->dependsOnNormals && mti->dependsOnNormals(md)) {
     modwrap_dependsOnNormals(me);
   }
@@ -1019,8 +1018,6 @@ void BKE_modifier_deform_vertsEM(ModifierData *md,
                                  int numVerts)
 {
   const ModifierTypeInfo *mti = BKE_modifier_get_info(md->type);
-  BLI_assert(!me || CustomData_has_layer(&me->pdata, CD_NORMAL) == false);
-
   if (me && mti->dependsOnNormals && mti->dependsOnNormals(md)) {
     BKE_mesh_calc_normals(me);
   }
@@ -1039,8 +1036,11 @@ Mesh *BKE_modifier_get_evaluated_mesh_from_evaluated_object(Object *ob_eval,
     BMEditMesh *em = BKE_editmesh_from_object(ob_eval);
     /* 'em' might not exist yet in some cases, just after loading a .blend file, see T57878. */
     if (em != NULL) {
-      me = (get_cage_mesh && em->mesh_eval_cage != NULL) ? em->mesh_eval_cage :
-                                                           em->mesh_eval_final;
+      Mesh *editmesh_eval_final = BKE_object_get_editmesh_eval_final(ob_eval);
+      Mesh *editmesh_eval_cage = BKE_object_get_editmesh_eval_cage(ob_eval);
+
+      me = (get_cage_mesh && editmesh_eval_cage != NULL) ? editmesh_eval_cage :
+                                                           editmesh_eval_final;
     }
   }
   if (me == NULL) {

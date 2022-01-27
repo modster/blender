@@ -70,6 +70,7 @@
 #include "BKE_main.h"
 #include "BKE_movieclip.h"
 #include "BKE_node.h"
+#include "BKE_node_tree_update.h"
 #include "BKE_tracking.h"
 
 #include "IMB_imbuf.h"
@@ -105,7 +106,7 @@ static void movie_clip_copy_data(Main *UNUSED(bmain), ID *id_dst, const ID *id_s
   MovieClip *movie_clip_dst = (MovieClip *)id_dst;
   const MovieClip *movie_clip_src = (const MovieClip *)id_src;
 
-  /* We never handle usercount here for own data. */
+  /* We never handle user-count here for own data. */
   const int flag_subdata = flag | LIB_ID_CREATE_NO_USER_REFCOUNT;
 
   movie_clip_dst->anim = NULL;
@@ -952,7 +953,7 @@ static MovieClip *movieclip_alloc(Main *bmain, const char *name)
 static void movieclip_load_get_size(MovieClip *clip)
 {
   int width, height;
-  MovieClipUser user = {0};
+  MovieClipUser user = *DNA_struct_default_get(MovieClipUser);
 
   user.framenr = BKE_movieclip_remap_clip_to_scene_frame(clip, 1);
   BKE_movieclip_get_size(clip, &user, &width, &height);
@@ -1177,7 +1178,7 @@ static ImBuf *get_postprocessed_cached_frame(const MovieClip *clip,
     return NULL;
   }
 
-  /* postprocessing happened for other frame */
+  /* Postprocessing happened for other frame. */
   if (cache->postprocessed.framenr != framenr) {
     return NULL;
   }
@@ -1695,17 +1696,7 @@ void BKE_movieclip_reload(Main *bmain, MovieClip *clip)
 
   movieclip_calc_length(clip);
 
-  /* same as for image update -- don't use notifiers because they are not 100% sure to succeeded
-   * (node trees which are not currently visible wouldn't be refreshed)
-   */
-  {
-    Scene *scene;
-    for (scene = bmain->scenes.first; scene; scene = scene->id.next) {
-      if (scene->nodetree) {
-        nodeUpdateID(scene->nodetree, &clip->id);
-      }
-    }
-  }
+  BKE_ntree_update_tag_id_changed(bmain, &clip->id);
 }
 
 void BKE_movieclip_update_scopes(MovieClip *clip, MovieClipUser *user, MovieClipScopes *scopes)

@@ -21,6 +21,7 @@
  * \ingroup bke
  */
 
+#include <ctype.h>
 #include <fcntl.h>
 #include <math.h>
 #include <stdio.h>
@@ -84,6 +85,7 @@
 #include "BKE_lib_id.h"
 #include "BKE_main.h"
 #include "BKE_node.h"
+#include "BKE_node_tree_update.h"
 #include "BKE_packedFile.h"
 #include "BKE_report.h"
 #include "BKE_scene.h"
@@ -97,6 +99,7 @@
 
 #include "SEQ_utils.h" /* SEQ_get_topmost_sequence() */
 
+#include "GPU_material.h"
 #include "GPU_texture.h"
 
 #include "BLI_sys_types.h" /* for intptr_t support */
@@ -118,7 +121,7 @@ static void image_init(Image *ima, short source, short type);
 static void image_free_packedfiles(Image *ima);
 static void copy_image_packedfiles(ListBase *lb_dst, const ListBase *lb_src);
 
-/* Reset runtime image fields when datablock is being initialized. */
+/* Reset runtime image fields when data-block is being initialized. */
 static void image_runtime_reset(struct Image *image)
 {
   memset(&image->runtime, 0, sizeof(image->runtime));
@@ -126,7 +129,7 @@ static void image_runtime_reset(struct Image *image)
   BLI_mutex_init(image->runtime.cache_mutex);
 }
 
-/* Reset runtime image fields when datablock is being copied.  */
+/* Reset runtime image fields when data-block is being copied. */
 static void image_runtime_reset_on_copy(struct Image *image)
 {
   image->runtime.cache_mutex = MEM_mallocN(sizeof(ThreadMutex), "image runtime cache_mutex");
@@ -284,7 +287,33 @@ static void image_foreach_path(ID *id, BPathForeachPathData *bpath_data)
     return;
   }
 
-  if (BKE_bpath_foreach_path_fixed_process(bpath_data, ima->filepath)) {
+  /* If this is a tiled image, and we're asked to resolve the tokens in the virtual
+   * filepath, use the first tile to generate a concrete path for use during processing. */
+  bool result = false;
+  if (ima->source == IMA_SRC_TILED && (flag & BKE_BPATH_FOREACH_PATH_RESOLVE_TOKEN) != 0) {
+    char temp_path[FILE_MAX], orig_file[FILE_MAXFILE];
+    BLI_strncpy(temp_path, ima->filepath, sizeof(temp_path));
+    BLI_split_file_part(temp_path, orig_file, sizeof(orig_file));
+
+    eUDIM_TILE_FORMAT tile_format;
+    char *udim_pattern = BKE_image_get_tile_strformat(temp_path, &tile_format);
+    BKE_image_set_filepath_from_tile_number(
+        temp_path, udim_pattern, tile_format, ((ImageTile *)ima->tiles.first)->tile_number);
+    MEM_SAFE_FREE(udim_pattern);
+
+    result = BKE_bpath_foreach_path_fixed_process(bpath_data, temp_path);
+    if (result) {
+      /* Put the filepath back together using the new directory and the original file name. */
+      char new_dir[FILE_MAXDIR];
+      BLI_split_dir_part(temp_path, new_dir, sizeof(new_dir));
+      BLI_join_dirfile(ima->filepath, sizeof(ima->filepath), new_dir, orig_file);
+    }
+  }
+  else {
+    result = BKE_bpath_foreach_path_fixed_process(bpath_data, ima->filepath);
+  }
+
+  if (result) {
     if (flag & BKE_BPATH_FOREACH_PATH_RELOAD_EDITED) {
       if (!BKE_image_has_packedfile(ima) &&
           /* Image may have been painted onto (and not saved, T44543). */
@@ -900,9 +929,13 @@ Image *BKE_image_load(Main *bmain, const char *filepath)
   /* exists? */
   file = BLI_open(str, O_BINARY | O_RDONLY, 0);
   if (file == -1) {
-    return NULL;
+    if (!BKE_image_tile_filepath_exists(str)) {
+      return NULL;
+    }
   }
-  close(file);
+  else {
+    close(file);
+  }
 
   ima = image_alloc(bmain, BLI_path_basename(filepath), IMA_SRC_FILE, IMA_TYPE_IMAGE);
   STRNCPY(ima->filepath, filepath);
@@ -2076,9 +2109,10 @@ static void stampdata(
   time_t t;
 
   if (scene->r.stamp & R_STAMP_FILENAME) {
+    const char *blendfile_path = BKE_main_blendfile_path_from_global();
     SNPRINTF(stamp_data->file,
              do_prefix ? "File %s" : "%s",
-             G.relbase_valid ? BKE_main_blendfile_path_from_global() : "<untitled>");
+             (blendfile_path[0] != '\0') ? blendfile_path : "<untitled>");
   }
   else {
     stamp_data->file[0] = '\0';
@@ -2426,7 +2460,7 @@ void BKE_image_stamp_buf(Scene *scene,
 
     /* and draw the text. */
     BLF_position(mono, x, y + y_ofs, 0.0);
-    BLF_draw_buffer(mono, stamp_data.file, BLF_DRAW_STR_DUMMY_MAX);
+    BLF_draw_buffer(mono, stamp_data.file, sizeof(stamp_data.file));
 
     /* the extra pixel for background. */
     y -= BUFF_MARGIN_Y * 2;
@@ -2449,7 +2483,7 @@ void BKE_image_stamp_buf(Scene *scene,
                       y + h + BUFF_MARGIN_Y);
 
     BLF_position(mono, x, y + y_ofs, 0.0);
-    BLF_draw_buffer(mono, stamp_data.date, BLF_DRAW_STR_DUMMY_MAX);
+    BLF_draw_buffer(mono, stamp_data.date, sizeof(stamp_data.date));
 
     /* the extra pixel for background. */
     y -= BUFF_MARGIN_Y * 2;
@@ -2472,7 +2506,7 @@ void BKE_image_stamp_buf(Scene *scene,
                       y + h + BUFF_MARGIN_Y);
 
     BLF_position(mono, x, y + y_ofs, 0.0);
-    BLF_draw_buffer(mono, stamp_data.rendertime, BLF_DRAW_STR_DUMMY_MAX);
+    BLF_draw_buffer(mono, stamp_data.rendertime, sizeof(stamp_data.rendertime));
 
     /* the extra pixel for background. */
     y -= BUFF_MARGIN_Y * 2;
@@ -2495,7 +2529,7 @@ void BKE_image_stamp_buf(Scene *scene,
                       y + h + BUFF_MARGIN_Y);
 
     BLF_position(mono, x, y + y_ofs, 0.0);
-    BLF_draw_buffer(mono, stamp_data.memory, BLF_DRAW_STR_DUMMY_MAX);
+    BLF_draw_buffer(mono, stamp_data.memory, sizeof(stamp_data.memory));
 
     /* the extra pixel for background. */
     y -= BUFF_MARGIN_Y * 2;
@@ -2518,7 +2552,7 @@ void BKE_image_stamp_buf(Scene *scene,
                       y + h + BUFF_MARGIN_Y);
 
     BLF_position(mono, x, y + y_ofs, 0.0);
-    BLF_draw_buffer(mono, stamp_data.hostname, BLF_DRAW_STR_DUMMY_MAX);
+    BLF_draw_buffer(mono, stamp_data.hostname, sizeof(stamp_data.hostname));
 
     /* the extra pixel for background. */
     y -= BUFF_MARGIN_Y * 2;
@@ -2542,7 +2576,7 @@ void BKE_image_stamp_buf(Scene *scene,
                       y + h + BUFF_MARGIN_Y);
 
     BLF_position(mono, x, y + y_ofs + (h - h_fixed), 0.0);
-    BLF_draw_buffer(mono, stamp_data.note, BLF_DRAW_STR_DUMMY_MAX);
+    BLF_draw_buffer(mono, stamp_data.note, sizeof(stamp_data.note));
   }
   BLF_disable(mono, BLF_WORD_WRAP);
 
@@ -2566,7 +2600,7 @@ void BKE_image_stamp_buf(Scene *scene,
 
     /* and pad the text. */
     BLF_position(mono, x, y + y_ofs, 0.0);
-    BLF_draw_buffer(mono, stamp_data.marker, BLF_DRAW_STR_DUMMY_MAX);
+    BLF_draw_buffer(mono, stamp_data.marker, sizeof(stamp_data.marker));
 
     /* space width. */
     x += w + pad;
@@ -2589,7 +2623,7 @@ void BKE_image_stamp_buf(Scene *scene,
 
     /* and pad the text. */
     BLF_position(mono, x, y + y_ofs, 0.0);
-    BLF_draw_buffer(mono, stamp_data.time, BLF_DRAW_STR_DUMMY_MAX);
+    BLF_draw_buffer(mono, stamp_data.time, sizeof(stamp_data.time));
 
     /* space width. */
     x += w + pad;
@@ -2611,7 +2645,7 @@ void BKE_image_stamp_buf(Scene *scene,
 
     /* and pad the text. */
     BLF_position(mono, x, y + y_ofs, 0.0);
-    BLF_draw_buffer(mono, stamp_data.frame, BLF_DRAW_STR_DUMMY_MAX);
+    BLF_draw_buffer(mono, stamp_data.frame, sizeof(stamp_data.frame));
 
     /* space width. */
     x += w + pad;
@@ -2631,7 +2665,7 @@ void BKE_image_stamp_buf(Scene *scene,
                       x + w + BUFF_MARGIN_X,
                       y + h + BUFF_MARGIN_Y);
     BLF_position(mono, x, y + y_ofs, 0.0);
-    BLF_draw_buffer(mono, stamp_data.camera, BLF_DRAW_STR_DUMMY_MAX);
+    BLF_draw_buffer(mono, stamp_data.camera, sizeof(stamp_data.camera));
 
     /* space width. */
     x += w + pad;
@@ -2651,7 +2685,7 @@ void BKE_image_stamp_buf(Scene *scene,
                       x + w + BUFF_MARGIN_X,
                       y + h + BUFF_MARGIN_Y);
     BLF_position(mono, x, y + y_ofs, 0.0);
-    BLF_draw_buffer(mono, stamp_data.cameralens, BLF_DRAW_STR_DUMMY_MAX);
+    BLF_draw_buffer(mono, stamp_data.cameralens, sizeof(stamp_data.cameralens));
   }
 
   if (TEXT_SIZE_CHECK(stamp_data.scene, w, h)) {
@@ -2673,7 +2707,7 @@ void BKE_image_stamp_buf(Scene *scene,
 
     /* and pad the text. */
     BLF_position(mono, x, y + y_ofs, 0.0);
-    BLF_draw_buffer(mono, stamp_data.scene, BLF_DRAW_STR_DUMMY_MAX);
+    BLF_draw_buffer(mono, stamp_data.scene, sizeof(stamp_data.scene));
   }
 
   if (TEXT_SIZE_CHECK(stamp_data.strip, w, h)) {
@@ -2695,7 +2729,7 @@ void BKE_image_stamp_buf(Scene *scene,
                       y + h + BUFF_MARGIN_Y);
 
     BLF_position(mono, x, y + y_ofs, 0.0);
-    BLF_draw_buffer(mono, stamp_data.strip, BLF_DRAW_STR_DUMMY_MAX);
+    BLF_draw_buffer(mono, stamp_data.strip, sizeof(stamp_data.strip));
   }
 
   /* cleanup the buffer. */
@@ -3376,6 +3410,23 @@ static void image_walk_ntree_all_users(
   }
 }
 
+static void image_walk_gpu_materials(
+    ID *id,
+    ListBase *gpu_materials,
+    void *customdata,
+    void callback(Image *ima, ID *iuser_id, ImageUser *iuser, void *customdata))
+{
+  LISTBASE_FOREACH (LinkData *, link, gpu_materials) {
+    GPUMaterial *gpu_material = (GPUMaterial *)link->data;
+    ListBase textures = GPU_material_textures(gpu_material);
+    LISTBASE_FOREACH (GPUMaterialTexture *, gpu_material_texture, &textures) {
+      if (gpu_material_texture->iuser_available) {
+        callback(gpu_material_texture->ima, id, &gpu_material_texture->iuser, customdata);
+      }
+    }
+  }
+}
+
 static void image_walk_id_all_users(
     ID *id,
     bool skip_nested_nodes,
@@ -3395,6 +3446,7 @@ static void image_walk_id_all_users(
       if (ma->nodetree && ma->use_nodes && !skip_nested_nodes) {
         image_walk_ntree_all_users(ma->nodetree, &ma->id, customdata, callback);
       }
+      image_walk_gpu_materials(id, &ma->gpumaterial, customdata, callback);
       break;
     }
     case ID_LA: {
@@ -3409,6 +3461,7 @@ static void image_walk_id_all_users(
       if (world->nodetree && world->use_nodes && !skip_nested_nodes) {
         image_walk_ntree_all_users(world->nodetree, &world->id, customdata, callback);
       }
+      image_walk_gpu_materials(id, &world->gpumaterial, customdata, callback);
       break;
     }
     case ID_TE: {
@@ -3514,7 +3567,7 @@ static void image_tag_frame_recalc(Image *ima, ID *iuser_id, ImageUser *iuser, v
     iuser->flag |= IMA_NEED_FRAME_RECALC;
 
     if (iuser_id) {
-      /* Must copy image user changes to CoW datablock. */
+      /* Must copy image user changes to CoW data-block. */
       DEG_id_tag_update(iuser_id, ID_RECALC_COPY_ON_WRITE);
     }
   }
@@ -3529,7 +3582,7 @@ static void image_tag_reload(Image *ima, ID *iuser_id, ImageUser *iuser, void *c
       image_update_views_format(ima, iuser);
     }
     if (iuser_id) {
-      /* Must copy image user changes to CoW datablock. */
+      /* Must copy image user changes to CoW data-block. */
       DEG_id_tag_update(iuser_id, ID_RECALC_COPY_ON_WRITE);
     }
   }
@@ -3691,6 +3744,43 @@ void BKE_image_signal(Main *bmain, Image *ima, ImageUser *iuser, int signal)
         BKE_image_free_buffers(ima);
       }
 
+      if (ima->source == IMA_SRC_TILED) {
+        ListBase new_tiles = {NULL, NULL};
+        int new_start, new_range;
+
+        char filepath[FILE_MAX];
+        BLI_strncpy(filepath, ima->filepath, sizeof(filepath));
+        BLI_path_abs(filepath, ID_BLEND_PATH_FROM_GLOBAL(&ima->id));
+        bool result = BKE_image_get_tile_info(filepath, &new_tiles, &new_start, &new_range);
+        if (result) {
+          /* Because the prior and new list of tiles are both sparse sequences, we need to be sure
+           * to account for how the two sets might or might not overlap. To be complete, we start
+           * the refresh process by clearing all existing tiles, stopping when there's only 1 tile
+           * left. */
+          while (BKE_image_remove_tile(ima, ima->tiles.last)) {
+            ;
+          }
+
+          int remaining_tile_number = ((ImageTile *)ima->tiles.first)->tile_number;
+          bool needs_final_cleanup = true;
+
+          /* Add in all the new tiles. */
+          LISTBASE_FOREACH (LinkData *, new_tile, &new_tiles) {
+            int new_tile_number = POINTER_AS_INT(new_tile->data);
+            BKE_image_add_tile(ima, new_tile_number, NULL);
+            if (new_tile_number == remaining_tile_number) {
+              needs_final_cleanup = false;
+            }
+          }
+
+          /* Final cleanup if the prior remaining tile was never encountered in the new list. */
+          if (needs_final_cleanup) {
+            BKE_image_remove_tile(ima, BKE_image_get_tile(ima, remaining_tile_number));
+          }
+        }
+        BLI_freelistN(&new_tiles);
+      }
+
       if (iuser) {
         image_tag_reload(ima, NULL, iuser, ima);
       }
@@ -3712,16 +3802,8 @@ void BKE_image_signal(Main *bmain, Image *ima, ImageUser *iuser, int signal)
 
   BLI_mutex_unlock(ima->runtime.cache_mutex);
 
-  /* don't use notifiers because they are not 100% sure to succeeded
-   * this also makes sure all scenes are accounted for. */
-  {
-    Scene *scene;
-    for (scene = bmain->scenes.first; scene; scene = scene->id.next) {
-      if (scene->nodetree) {
-        nodeUpdateID(scene->nodetree, &ima->id);
-      }
-    }
-  }
+  BKE_ntree_update_tag_id_changed(bmain, &ima->id);
+  BKE_ntree_update_main(bmain, NULL);
 }
 
 /* return renderpass for a given pass index and active view */
@@ -3780,6 +3862,57 @@ void BKE_image_get_tile_label(Image *ima, ImageTile *tile, char *label, int len_
   else {
     BLI_snprintf(label, len_label, "%d", tile->tile_number);
   }
+}
+
+bool BKE_image_get_tile_info(char *filepath,
+                             ListBase *udim_tiles,
+                             int *udim_start,
+                             int *udim_range)
+{
+  char filename[FILE_MAXFILE], dirname[FILE_MAXDIR];
+  BLI_split_dirfile(filepath, dirname, filename, sizeof(dirname), sizeof(filename));
+
+  BKE_image_ensure_tile_token(filename);
+
+  eUDIM_TILE_FORMAT tile_format;
+  char *udim_pattern = BKE_image_get_tile_strformat(filename, &tile_format);
+
+  bool is_udim = true;
+  int min_udim = IMA_UDIM_MAX + 1;
+  int max_udim = 0;
+  int id;
+
+  struct direntry *dir;
+  uint totfile = BLI_filelist_dir_contents(dirname, &dir);
+  for (int i = 0; i < totfile; i++) {
+    if (!(dir[i].type & S_IFREG)) {
+      continue;
+    }
+
+    if (!BKE_image_get_tile_number_from_filepath(dir[i].relname, udim_pattern, tile_format, &id)) {
+      continue;
+    }
+
+    if (id < 1001 || id > IMA_UDIM_MAX) {
+      is_udim = false;
+      break;
+    }
+
+    BLI_addtail(udim_tiles, BLI_genericNodeN(POINTER_FROM_INT(id)));
+    min_udim = min_ii(min_udim, id);
+    max_udim = max_ii(max_udim, id);
+  }
+  BLI_filelist_free(dir, totfile);
+  MEM_SAFE_FREE(udim_pattern);
+
+  if (is_udim && min_udim <= IMA_UDIM_MAX) {
+    BLI_join_dirfile(filepath, FILE_MAX, dirname, filename);
+
+    *udim_start = min_udim;
+    *udim_range = max_udim - min_udim + 1;
+    return true;
+  }
+  return false;
 }
 
 ImageTile *BKE_image_add_tile(struct Image *ima, int tile_number, const char *label)
@@ -3939,6 +4072,184 @@ bool BKE_image_fill_tile(struct Image *ima,
     return true;
   }
   return false;
+}
+
+void BKE_image_ensure_tile_token(char *filename)
+{
+  BLI_assert_msg(BLI_path_slash_find(filename) == NULL,
+                 "Only the file-name component should be used!");
+
+  /* Is there a '<' character in the filename? Assume tokens already present. */
+  if (strstr(filename, "<") != NULL) {
+    return;
+  }
+
+  /* Is there a sequence of digits in the filename? */
+  ushort digits;
+  char head[FILE_MAX], tail[FILE_MAX];
+  BLI_path_sequence_decode(filename, head, tail, &digits);
+  if (digits == 4) {
+    sprintf(filename, "%s<UDIM>%s", head, tail);
+    return;
+  }
+
+  /* Is there a sequence like u##_v#### in the filename? */
+  uint cur = 0;
+  uint name_end = strlen(filename);
+  uint u_digits = 0;
+  uint v_digits = 0;
+  uint u_start = (uint)-1;
+  bool u_found = false;
+  bool v_found = false;
+  bool sep_found = false;
+  while (cur < name_end) {
+    if (filename[cur] == 'u') {
+      u_found = true;
+      u_digits = 0;
+      u_start = cur;
+    }
+    else if (filename[cur] == 'v') {
+      v_found = true;
+      v_digits = 0;
+    }
+    else if (u_found && !v_found) {
+      if (isdigit(filename[cur]) && u_digits < 2) {
+        u_digits++;
+      }
+      else if (filename[cur] == '_') {
+        sep_found = true;
+      }
+      else {
+        u_found = false;
+      }
+    }
+    else if (u_found && u_digits > 0 && v_found) {
+      if (isdigit(filename[cur])) {
+        if (v_digits < 4) {
+          v_digits++;
+        }
+        else {
+          u_found = false;
+          v_found = false;
+        }
+      }
+      else if (v_digits > 0) {
+        break;
+      }
+    }
+
+    cur++;
+  }
+
+  if (u_found && sep_found && v_found && (u_digits + v_digits > 1)) {
+    const char *token = "<UVTILE>";
+    const size_t token_length = strlen(token);
+    memmove(filename + u_start + token_length, filename + cur, name_end - cur);
+    memcpy(filename + u_start, token, token_length);
+    filename[u_start + token_length + (name_end - cur)] = '\0';
+  }
+}
+
+bool BKE_image_tile_filepath_exists(const char *filepath)
+{
+  BLI_assert(!BLI_path_is_rel(filepath));
+
+  char dirname[FILE_MAXDIR];
+  BLI_split_dir_part(filepath, dirname, sizeof(dirname));
+
+  eUDIM_TILE_FORMAT tile_format;
+  char *udim_pattern = BKE_image_get_tile_strformat(filepath, &tile_format);
+
+  bool found = false;
+  struct direntry *dir;
+  uint totfile = BLI_filelist_dir_contents(dirname, &dir);
+  for (int i = 0; i < totfile; i++) {
+    if (!(dir[i].type & S_IFREG)) {
+      continue;
+    }
+
+    int id;
+    if (!BKE_image_get_tile_number_from_filepath(dir[i].path, udim_pattern, tile_format, &id)) {
+      continue;
+    }
+
+    if (id < 1001 || id > IMA_UDIM_MAX) {
+      continue;
+    }
+
+    found = true;
+    break;
+  }
+  BLI_filelist_free(dir, totfile);
+  MEM_SAFE_FREE(udim_pattern);
+
+  return found;
+}
+
+char *BKE_image_get_tile_strformat(const char *filepath, eUDIM_TILE_FORMAT *r_tile_format)
+{
+  if (filepath == NULL || r_tile_format == NULL) {
+    return NULL;
+  }
+
+  if (strstr(filepath, "<UDIM>") != NULL) {
+    *r_tile_format = UDIM_TILE_FORMAT_UDIM;
+    return BLI_str_replaceN(filepath, "<UDIM>", "%d");
+  }
+  if (strstr(filepath, "<UVTILE>") != NULL) {
+    *r_tile_format = UDIM_TILE_FORMAT_UVTILE;
+    return BLI_str_replaceN(filepath, "<UVTILE>", "u%d_v%d");
+  }
+
+  *r_tile_format = UDIM_TILE_FORMAT_NONE;
+  return NULL;
+}
+
+bool BKE_image_get_tile_number_from_filepath(const char *filepath,
+                                             const char *pattern,
+                                             eUDIM_TILE_FORMAT tile_format,
+                                             int *r_tile_number)
+{
+  if (filepath == NULL || pattern == NULL || r_tile_number == NULL) {
+    return false;
+  }
+
+  int u, v;
+  bool result = false;
+
+  if (tile_format == UDIM_TILE_FORMAT_UDIM) {
+    if (sscanf(filepath, pattern, &u) == 1) {
+      *r_tile_number = u;
+      result = true;
+    }
+  }
+  else if (tile_format == UDIM_TILE_FORMAT_UVTILE) {
+    if (sscanf(filepath, pattern, &u, &v) == 2) {
+      *r_tile_number = 1001 + (u - 1) + ((v - 1) * 10);
+      result = true;
+    }
+  }
+
+  return result;
+}
+
+void BKE_image_set_filepath_from_tile_number(char *filepath,
+                                             const char *pattern,
+                                             eUDIM_TILE_FORMAT tile_format,
+                                             int tile_number)
+{
+  if (filepath == NULL || pattern == NULL) {
+    return;
+  }
+
+  if (tile_format == UDIM_TILE_FORMAT_UDIM) {
+    sprintf(filepath, pattern, tile_number);
+  }
+  else if (tile_format == UDIM_TILE_FORMAT_UVTILE) {
+    int u = ((tile_number - 1001) % 10);
+    int v = ((tile_number - 1001) / 10);
+    sprintf(filepath, pattern, u + 1, v + 1);
+  }
 }
 
 /* if layer or pass changes, we need an index for the imbufs list */
@@ -5476,7 +5787,7 @@ static void image_user_id_has_animation(Image *ima,
 bool BKE_image_user_id_has_animation(ID *id)
 {
   /* For the dependency graph, this does not consider nested node
-   * trees as these are handled as their own datablock. */
+   * trees as these are handled as their own data-block. */
   bool has_animation = false;
   bool skip_nested_nodes = true;
   image_walk_id_all_users(id, skip_nested_nodes, &has_animation, image_user_id_has_animation);
@@ -5513,6 +5824,11 @@ void BKE_image_user_id_eval_animation(Depsgraph *depsgraph, ID *id)
 
 void BKE_image_user_file_path(ImageUser *iuser, Image *ima, char *filepath)
 {
+  BKE_image_user_file_path_ex(iuser, ima, filepath, true);
+}
+
+void BKE_image_user_file_path_ex(ImageUser *iuser, Image *ima, char *filepath, bool resolve_udim)
+{
   if (BKE_image_is_multiview(ima)) {
     ImageView *iv = BLI_findlink(&ima->views, iuser->view);
     if (iv->filepath[0]) {
@@ -5533,13 +5849,17 @@ void BKE_image_user_file_path(ImageUser *iuser, Image *ima, char *filepath)
     int index;
     if (ima->source == IMA_SRC_SEQUENCE) {
       index = iuser ? iuser->framenr : ima->lastframe;
+      BLI_path_sequence_decode(filepath, head, tail, &numlen);
+      BLI_path_sequence_encode(filepath, head, tail, numlen, index);
     }
-    else {
+    else if (resolve_udim) {
       index = image_get_tile_number_from_iuser(ima, iuser);
-    }
 
-    BLI_path_sequence_decode(filepath, head, tail, &numlen);
-    BLI_path_sequence_encode(filepath, head, tail, numlen, index);
+      eUDIM_TILE_FORMAT tile_format;
+      char *udim_pattern = BKE_image_get_tile_strformat(filepath, &tile_format);
+      BKE_image_set_filepath_from_tile_number(filepath, udim_pattern, tile_format, index);
+      MEM_SAFE_FREE(udim_pattern);
+    }
   }
 
   BLI_path_abs(filepath, ID_BLEND_PATH_FROM_GLOBAL(&ima->id));

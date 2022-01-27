@@ -73,6 +73,8 @@
 #include "BKE_sound.h"
 #include "BKE_writeavi.h" /* <------ should be replaced once with generic movie module */
 
+#include "NOD_composite.h"
+
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_build.h"
 #include "DEG_depsgraph_debug.h"
@@ -1131,7 +1133,7 @@ static void do_render_compositor_scenes(Render *re)
             render_scene_has_layers_to_render(scene, false)) {
           do_render_compositor_scene(re, scene, cfra);
           BLI_gset_add(scenes_rendered, scene);
-          nodeUpdate(restore_scene->nodetree, node);
+          node->typeinfo->updatefunc(restore_scene->nodetree, node);
         }
       }
     }
@@ -1821,7 +1823,7 @@ void RE_RenderFrame(Render *re,
   render_callback_exec_id(re, re->main, &scene->id, BKE_CB_EVT_RENDER_INIT);
 
   /* Ugly global still...
-   * is to prevent preview events and signal subsurfs etc to make full resol. */
+   * is to prevent preview events and signal subdivision-surface etc to make full resolution. */
   G.is_rendering = true;
 
   scene->r.cfra = frame;
@@ -2331,8 +2333,8 @@ void RE_RenderAnim(Render *re,
     }
   }
 
-  /* Ugly global still... is to prevent renderwin events and signal subsurfs etc to make full resol
-   * is also set by caller renderwin.c */
+  /* Ugly global still... is to prevent renderwin events and signal subdivision-surface etc
+   * to make full resolution is also set by caller renderwin.c */
   G.is_rendering = true;
 
   re->flag |= R_ANIMATION;

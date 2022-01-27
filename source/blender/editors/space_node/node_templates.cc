@@ -37,6 +37,7 @@
 #include "BKE_context.h"
 #include "BKE_lib_id.h"
 #include "BKE_main.h"
+#include "BKE_node_tree_update.h"
 
 #include "RNA_access.h"
 
@@ -52,8 +53,9 @@
 
 #include "ED_undo.h"
 
-using blender::Vector;
 using blender::nodes::NodeDeclaration;
+
+namespace blender::ed::space_node {
 
 /************************* Node Socket Manipulation **************************/
 
@@ -84,7 +86,7 @@ static void node_link_item_apply(Main *bmain, bNode *node, NodeLinkItem *item)
 {
   if (ELEM(node->type, NODE_GROUP, NODE_CUSTOM_GROUP)) {
     node->id = (ID *)item->ngroup;
-    ntreeUpdateTree(bmain, item->ngroup);
+    BKE_ntree_update_main_tree(bmain, item->ngroup, nullptr);
   }
   else {
     /* nothing to do for now */
@@ -179,10 +181,8 @@ static void node_socket_disconnect(Main *bmain,
   nodeRemLink(ntree, sock_to->link);
   sock_to->flag |= SOCK_COLLAPSED;
 
-  nodeUpdate(ntree, node_to);
-  ntreeUpdateTree(bmain, ntree);
-
-  ED_node_tag_update_nodetree(bmain, ntree, node_to);
+  BKE_ntree_update_tag_node_property(ntree, node_to);
+  ED_node_tree_propagate_change(nullptr, bmain, ntree);
 }
 
 /* remove all nodes connected to this socket, if they aren't connected to other nodes */
@@ -195,10 +195,8 @@ static void node_socket_remove(Main *bmain, bNodeTree *ntree, bNode *node_to, bN
   node_remove_linked(bmain, ntree, sock_to->link->fromnode);
   sock_to->flag |= SOCK_COLLAPSED;
 
-  nodeUpdate(ntree, node_to);
-  ntreeUpdateTree(bmain, ntree);
-
-  ED_node_tag_update_nodetree(bmain, ntree, node_to);
+  BKE_ntree_update_tag_node_property(ntree, node_to);
+  ED_node_tree_propagate_change(nullptr, bmain, ntree);
 }
 
 /* add new node connected to this socket, or replace an existing one */
@@ -299,11 +297,9 @@ static void node_socket_add_replace(const bContext *C,
     node_remove_linked(bmain, ntree, node_prev);
   }
 
-  nodeUpdate(ntree, node_from);
-  nodeUpdate(ntree, node_to);
-  ntreeUpdateTree(CTX_data_main(C), ntree);
-
-  ED_node_tag_update_nodetree(CTX_data_main(C), ntree, node_to);
+  BKE_ntree_update_tag_node_property(ntree, node_from);
+  BKE_ntree_update_tag_node_property(ntree, node_to);
+  ED_node_tree_propagate_change(nullptr, bmain, ntree);
 }
 
 /****************************** Node Link Menu *******************************/
@@ -386,16 +382,41 @@ static Vector<NodeLinkItem> ui_node_link_items(NodeLinkArg *arg,
       const SocketDeclaration &socket_decl = *socket_decl_ptr;
       NodeLinkItem item;
       item.socket_index = index++;
-      /* A socket declaration does not necessarily map to exactly one built-in socket type. So only
-       * check for the types that matter here. */
-      if (dynamic_cast<const decl::Color *>(&socket_decl)) {
-        item.socket_type = SOCK_RGBA;
-      }
-      else if (dynamic_cast<const decl::Float *>(&socket_decl)) {
+      if (dynamic_cast<const decl::Float *>(&socket_decl)) {
         item.socket_type = SOCK_FLOAT;
+      }
+      else if (dynamic_cast<const decl::Int *>(&socket_decl)) {
+        item.socket_type = SOCK_INT;
+      }
+      else if (dynamic_cast<const decl::Bool *>(&socket_decl)) {
+        item.socket_type = SOCK_BOOLEAN;
       }
       else if (dynamic_cast<const decl::Vector *>(&socket_decl)) {
         item.socket_type = SOCK_VECTOR;
+      }
+      else if (dynamic_cast<const decl::Color *>(&socket_decl)) {
+        item.socket_type = SOCK_RGBA;
+      }
+      else if (dynamic_cast<const decl::String *>(&socket_decl)) {
+        item.socket_type = SOCK_STRING;
+      }
+      else if (dynamic_cast<const decl::Image *>(&socket_decl)) {
+        item.socket_type = SOCK_IMAGE;
+      }
+      else if (dynamic_cast<const decl::Texture *>(&socket_decl)) {
+        item.socket_type = SOCK_TEXTURE;
+      }
+      else if (dynamic_cast<const decl::Material *>(&socket_decl)) {
+        item.socket_type = SOCK_MATERIAL;
+      }
+      else if (dynamic_cast<const decl::Shader *>(&socket_decl)) {
+        item.socket_type = SOCK_SHADER;
+      }
+      else if (dynamic_cast<const decl::Collection *>(&socket_decl)) {
+        item.socket_type = SOCK_COLLECTION;
+      }
+      else if (dynamic_cast<const decl::Object *>(&socket_decl)) {
+        item.socket_type = SOCK_OBJECT;
       }
       else {
         item.socket_type = SOCK_CUSTOM;
@@ -696,15 +717,19 @@ static void ui_template_node_link_menu(bContext *C, uiLayout *layout, void *but_
   ui_node_menu_column(arg, NODE_CLASS_GROUP, N_("Group"));
 }
 
+}  // namespace blender::ed::space_node
+
 void uiTemplateNodeLink(
     uiLayout *layout, bContext *C, bNodeTree *ntree, bNode *node, bNodeSocket *input)
 {
+  using namespace blender::ed::space_node;
+
   uiBlock *block = uiLayoutGetBlock(layout);
   NodeLinkArg *arg;
   uiBut *but;
   float socket_col[4];
 
-  arg = (NodeLinkArg *)MEM_callocN(sizeof(NodeLinkArg), "NodeLinkArg");
+  arg = MEM_new<NodeLinkArg>("NodeLinkArg");
   arg->ntree = ntree;
   arg->node = node;
   arg->sock = input;
@@ -739,6 +764,8 @@ void uiTemplateNodeLink(
     }
   }
 }
+
+namespace blender::ed::space_node {
 
 /**************************** Node Tree Layout *******************************/
 
@@ -892,9 +919,13 @@ static void ui_node_draw_input(
   node->flag &= ~NODE_TEST;
 }
 
+}  // namespace blender::ed::space_node
+
 void uiTemplateNodeView(
     uiLayout *layout, bContext *C, bNodeTree *ntree, bNode *node, bNodeSocket *input)
 {
+  using namespace blender::ed::space_node;
+
   bNode *tnode;
 
   if (!ntree) {

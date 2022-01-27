@@ -88,13 +88,6 @@
 
 #include "node_intern.hh" /* own include */
 
-using blender::Array;
-using blender::float2;
-using blender::Map;
-using blender::Set;
-using blender::Span;
-using blender::Vector;
-using blender::VectorSet;
 using blender::fn::CPPType;
 using blender::fn::FieldCPPType;
 using blender::fn::FieldInput;
@@ -115,6 +108,8 @@ float ED_node_grid_size()
 
 void ED_node_tree_update(const bContext *C)
 {
+  using namespace blender::ed::space_node;
+
   SpaceNode *snode = CTX_wm_space_node(C);
   if (snode) {
     snode_set_context(*C);
@@ -176,34 +171,7 @@ void ED_node_tag_update_id(ID *id)
   }
 }
 
-void ED_node_tag_update_nodetree(Main *bmain, bNodeTree *ntree, bNode *node)
-{
-  if (!ntree) {
-    return;
-  }
-
-  bool do_tag_update = true;
-  if (node != nullptr) {
-    if (!node_connected_to_output(*bmain, *ntree, *node)) {
-      do_tag_update = false;
-    }
-  }
-
-  /* Look through all datablocks to support groups. */
-  if (do_tag_update) {
-    FOREACH_NODETREE_BEGIN (bmain, tntree, id) {
-      /* Check if nodetree uses the group. */
-      if (ntreeHasTree(tntree, ntree)) {
-        ED_node_tag_update_id(id);
-      }
-    }
-    FOREACH_NODETREE_END;
-  }
-
-  if (ntree->type == NTREE_TEXTURE) {
-    ntreeTexCheckCyclics(ntree);
-  }
-}
+namespace blender::ed::space_node {
 
 static bool compare_nodes(const bNode *a, const bNode *b)
 {
@@ -261,14 +229,14 @@ static bool compare_nodes(const bNode *a, const bNode *b)
   return false;
 }
 
-void ED_node_sort(bNodeTree *ntree)
+void node_sort(bNodeTree &ntree)
 {
   /* Merge sort is the algorithm of choice here. */
-  int totnodes = BLI_listbase_count(&ntree->nodes);
+  int totnodes = BLI_listbase_count(&ntree.nodes);
 
   int k = 1;
   while (k < totnodes) {
-    bNode *first_a = (bNode *)ntree->nodes.first;
+    bNode *first_a = (bNode *)ntree.nodes.first;
     bNode *first_b = first_a;
 
     do {
@@ -295,8 +263,8 @@ void ED_node_sort(bNodeTree *ntree)
           bNode *tmp = node_b;
           node_b = node_b->next;
           b++;
-          BLI_remlink(&ntree->nodes, tmp);
-          BLI_insertlinkbefore(&ntree->nodes, node_a, tmp);
+          BLI_remlink(&ntree.nodes, tmp);
+          BLI_insertlinkbefore(&ntree.nodes, node_a, tmp);
         }
       }
 
@@ -365,6 +333,10 @@ static void node_update_basis(const bContext &C, bNodeTree &ntree, bNode &node, 
   PointerRNA nodeptr;
   RNA_pointer_create(&ntree.id, &RNA_Node, &node, &nodeptr);
 
+  const bool node_options = node.typeinfo->draw_buttons && (node.flag & NODE_OPTIONS);
+  const bool inputs_first = node.inputs.first &&
+                            !(node.outputs.first || (node.flag & NODE_PREVIEW) || node_options);
+
   /* Get "global" coordinates. */
   float2 loc = node_to_view(node, float2(0));
   /* Round the node origin because text contents are always pixel-aligned. */
@@ -377,7 +349,7 @@ static void node_update_basis(const bContext &C, bNodeTree &ntree, bNode &node, 
   dy -= NODE_DY;
 
   /* Add a little bit of padding above the top socket. */
-  if (node.outputs.first || node.inputs.first) {
+  if (node.outputs.first || inputs_first) {
     dy -= NODE_DYS / 2;
   }
 
@@ -478,7 +450,7 @@ static void node_update_basis(const bContext &C, bNodeTree &ntree, bNode &node, 
   }
 
   /* Buttons rect? */
-  if (node.typeinfo->draw_buttons && (node.flag & NODE_OPTIONS)) {
+  if (node_options) {
     dy -= NODE_DYS / 2;
 
     uiLayout *layout = UI_block_layout(&block,
@@ -1096,8 +1068,12 @@ static void node_socket_draw_nested(const bContext &C,
   UI_block_emboss_set(&block, old_emboss);
 }
 
+}  // namespace blender::ed::space_node
+
 void ED_node_socket_draw(bNodeSocket *sock, const rcti *rect, const float color[4], float scale)
 {
+  using namespace blender::ed::space_node;
+
   const float size = 2.25f * NODE_SOCKSIZE * scale;
   rcti draw_rect = *rect;
   float outline_color[4] = {0};
@@ -1143,6 +1119,8 @@ void ED_node_socket_draw(bNodeSocket *sock, const rcti *rect, const float color[
   /* Restore. */
   GPU_blend(state);
 }
+
+namespace blender::ed::space_node {
 
 /* **************  Socket callbacks *********** */
 
@@ -1194,17 +1172,17 @@ static void node_draw_preview(bNodePreview *preview, rctf *prv)
   GPU_blend(GPU_BLEND_ALPHA);
 
   IMMDrawPixelsTexState state = immDrawPixelsTexSetup(GPU_SHADER_2D_IMAGE_COLOR);
-  immDrawPixelsTex(&state,
-                   draw_rect.xmin,
-                   draw_rect.ymin,
-                   preview->xsize,
-                   preview->ysize,
-                   GPU_RGBA8,
-                   true,
-                   preview->rect,
-                   scale,
-                   scale,
-                   nullptr);
+  immDrawPixelsTexTiled(&state,
+                        draw_rect.xmin,
+                        draw_rect.ymin,
+                        preview->xsize,
+                        preview->ysize,
+                        GPU_RGBA8,
+                        true,
+                        preview->rect,
+                        scale,
+                        scale,
+                        nullptr);
 
   GPU_blend(GPU_BLEND_NONE);
 
@@ -2405,7 +2383,6 @@ static void node_update_nodetree(const bContext &C,
 {
   /* Make sure socket "used" tags are correct, for displaying value buttons. */
   SpaceNode *snode = CTX_wm_space_node(&C);
-  ntreeTagUsedSockets(&ntree);
 
   count_multi_input_socket_links(ntree, *snode);
 
@@ -2414,9 +2391,11 @@ static void node_update_nodetree(const bContext &C,
     bNode &node = *nodes[i];
     uiBlock &block = *blocks[i];
     if (node.type == NODE_FRAME) {
-      frame_node_prepare_for_draw(node, nodes);
+      /* Frame sizes are calculated after all other nodes have calculating their #totr. */
+      continue;
     }
-    else if (node.type == NODE_REROUTE) {
+
+    if (node.type == NODE_REROUTE) {
       reroute_node_prepare_for_draw(node);
     }
     else {
@@ -2426,6 +2405,13 @@ static void node_update_nodetree(const bContext &C,
       else {
         node_update_basis(C, ntree, node, block);
       }
+    }
+  }
+
+  /* Now calculate the size of frame nodes, which can depend on the size of other nodes. */
+  for (const int i : nodes.index_range()) {
+    if (nodes[i]->type == NODE_FRAME) {
+      frame_node_prepare_for_draw(*nodes[i], nodes);
     }
   }
 }
@@ -2469,7 +2455,7 @@ static void frame_node_draw_label(const bNodeTree &ntree,
   const bool has_label = node.label[0] != '\0';
   if (has_label) {
     BLF_position(fontid, x, y, 0);
-    BLF_draw(fontid, label, BLF_DRAW_STR_DUMMY_MAX);
+    BLF_draw(fontid, label, sizeof(label));
   }
 
   /* draw text body */
@@ -2896,3 +2882,5 @@ void node_draw_space(const bContext &C, ARegion &region)
   /* Scrollers. */
   UI_view2d_scrollers_draw(&v2d, nullptr);
 }
+
+}  // namespace blender::ed::space_node

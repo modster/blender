@@ -240,9 +240,9 @@ bool rna_AnimaData_override_apply(struct Main *bmain,
                                   struct PropertyRNA *prop_local,
                                   struct PropertyRNA *prop_reference,
                                   struct PropertyRNA *prop_storage,
-                                  const int len_local,
-                                  const int len_reference,
-                                  const int len_storage,
+                                  int len_local,
+                                  int len_reference,
+                                  int len_storage,
                                   struct PointerRNA *ptr_item_local,
                                   struct PointerRNA *ptr_item_reference,
                                   struct PointerRNA *ptr_item_storage,
@@ -268,7 +268,7 @@ void rna_def_mtex_common(struct BlenderRNA *brna,
                          const char *update,
                          const char *update_index);
 void rna_def_texpaint_slots(struct BlenderRNA *brna, struct StructRNA *srna);
-void rna_def_view_layer_common(struct BlenderRNA *brna, struct StructRNA *srna, const bool scene);
+void rna_def_view_layer_common(struct BlenderRNA *brna, struct StructRNA *srna, bool scene);
 
 int rna_AssetMetaData_editable(struct PointerRNA *ptr, const char **r_info);
 /**
@@ -446,7 +446,7 @@ void RNA_api_space_text(struct StructRNA *srna);
 void RNA_api_space_filebrowser(struct StructRNA *srna);
 void RNA_api_region_view3d(struct StructRNA *srna);
 void RNA_api_texture(struct StructRNA *srna);
-void RNA_api_sequences(BlenderRNA *brna, PropertyRNA *cprop, const bool metastrip);
+void RNA_api_sequences(BlenderRNA *brna, PropertyRNA *cprop, bool metastrip);
 void RNA_api_sequence_elements(BlenderRNA *brna, PropertyRNA *cprop);
 void RNA_api_sound(struct StructRNA *srna);
 void RNA_api_vfont(struct StructRNA *srna);
@@ -491,9 +491,7 @@ void RNA_def_main_lightprobes(BlenderRNA *brna, PropertyRNA *cprop);
 #ifdef WITH_HAIR_NODES
 void RNA_def_main_hairs(BlenderRNA *brna, PropertyRNA *cprop);
 #endif
-#ifdef WITH_POINT_CLOUD
 void RNA_def_main_pointclouds(BlenderRNA *brna, PropertyRNA *cprop);
-#endif
 void RNA_def_main_volumes(BlenderRNA *brna, PropertyRNA *cprop);
 #ifdef WITH_SIMULATION_DATABLOCK
 void RNA_def_main_simulations(BlenderRNA *brna, PropertyRNA *cprop);
@@ -541,11 +539,11 @@ struct PropertyRNA *rna_ensure_property(struct PropertyRNA *prop) ATTR_WARN_UNUS
 int rna_property_override_diff_default(struct Main *bmain,
                                        struct PropertyRNAOrID *prop_a,
                                        struct PropertyRNAOrID *prop_b,
-                                       const int mode,
+                                       int mode,
                                        struct IDOverrideLibrary *override,
                                        const char *rna_path,
-                                       const size_t rna_path_len,
-                                       const int flags,
+                                       size_t rna_path_len,
+                                       int flags,
                                        bool *r_override_changed);
 
 bool rna_property_override_store_default(struct Main *bmain,
@@ -555,9 +553,9 @@ bool rna_property_override_store_default(struct Main *bmain,
                                          struct PropertyRNA *prop_local,
                                          struct PropertyRNA *prop_reference,
                                          struct PropertyRNA *prop_storage,
-                                         const int len_local,
-                                         const int len_reference,
-                                         const int len_storage,
+                                         int len_local,
+                                         int len_reference,
+                                         int len_storage,
                                          struct IDOverrideLibraryPropertyOperation *opop);
 
 bool rna_property_override_apply_default(struct Main *bmain,
@@ -567,9 +565,9 @@ bool rna_property_override_apply_default(struct Main *bmain,
                                          struct PropertyRNA *prop_dst,
                                          struct PropertyRNA *prop_src,
                                          struct PropertyRNA *prop_storage,
-                                         const int len_dst,
-                                         const int len_src,
-                                         const int len_storage,
+                                         int len_dst,
+                                         int len_src,
+                                         int len_storage,
                                          struct PointerRNA *ptr_item_dst,
                                          struct PointerRNA *ptr_item_src,
                                          struct PointerRNA *ptr_item_storage,

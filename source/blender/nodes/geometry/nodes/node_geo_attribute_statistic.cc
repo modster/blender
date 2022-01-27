@@ -22,6 +22,8 @@
 
 #include "BLI_math_base_safe.h"
 
+#include "NOD_socket_search_link.hh"
+
 #include "node_geometry_util.hh"
 
 namespace blender::nodes::node_geo_attribute_statistic_cc {
@@ -110,6 +112,51 @@ static void node_update(bNodeTree *ntree, bNode *node)
   nodeSetSocketAvailability(ntree, socket_vector_range, data_type == CD_PROP_FLOAT3);
   nodeSetSocketAvailability(ntree, socket_vector_std, data_type == CD_PROP_FLOAT3);
   nodeSetSocketAvailability(ntree, socket_vector_variance, data_type == CD_PROP_FLOAT3);
+}
+
+static std::optional<CustomDataType> node_type_from_other_socket(const bNodeSocket &socket)
+{
+  switch (socket.type) {
+    case SOCK_FLOAT:
+    case SOCK_BOOLEAN:
+    case SOCK_INT:
+      return CD_PROP_FLOAT;
+    case SOCK_VECTOR:
+    case SOCK_RGBA:
+      return CD_PROP_FLOAT3;
+    default:
+      return {};
+  }
+}
+
+static void node_gather_link_searches(GatherLinkSearchOpParams &params)
+{
+  const bNodeType &node_type = params.node_type();
+  const NodeDeclaration &declaration = *params.node_type().fixed_declaration;
+  search_link_ops_for_declarations(params, declaration.inputs().take_front(2));
+
+  const std::optional<CustomDataType> type = node_type_from_other_socket(params.other_socket());
+  if (!type) {
+    return;
+  }
+
+  if (params.in_out() == SOCK_IN) {
+    params.add_item(IFACE_("Attribute"), [node_type, type](LinkSearchOpParams &params) {
+      bNode &node = params.add_node(node_type);
+      node.custom1 = *type;
+      params.update_and_connect_available_socket(node, "Attribute");
+    });
+  }
+  else {
+    for (const StringRefNull name :
+         {"Mean", "Median", "Sum", "Min", "Max", "Range", "Standard Deviation", "Variance"}) {
+      params.add_item(IFACE_(name.c_str()), [node_type, name, type](LinkSearchOpParams &params) {
+        bNode &node = params.add_node(node_type);
+        node.custom1 = *type;
+        params.update_and_connect_available_socket(node, name);
+      });
+    }
+  }
 }
 
 template<typename T> static T compute_sum(const Span<T> data)
@@ -352,12 +399,13 @@ void register_node_type_geo_attribute_statistic()
   static bNodeType ntype;
 
   geo_node_type_base(
-      &ntype, GEO_NODE_ATTRIBUTE_STATISTIC, "Attribute Statistic", NODE_CLASS_ATTRIBUTE, 0);
+      &ntype, GEO_NODE_ATTRIBUTE_STATISTIC, "Attribute Statistic", NODE_CLASS_ATTRIBUTE);
 
   ntype.declare = file_ns::node_declare;
   node_type_init(&ntype, file_ns::node_init);
   node_type_update(&ntype, file_ns::node_update);
   ntype.geometry_node_execute = file_ns::node_geo_exec;
   ntype.draw_buttons = file_ns::node_layout;
+  ntype.gather_link_search_ops = file_ns::node_gather_link_searches;
   nodeRegisterType(&ntype);
 }

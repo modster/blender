@@ -2463,9 +2463,10 @@ static void file_expand_directory(bContext *C)
   if (params) {
     if (BLI_path_is_rel(params->dir)) {
       /* Use of 'default' folder here is just to avoid an error message on '//' prefix. */
+      const char *blendfile_path = BKE_main_blendfile_path(bmain);
       BLI_path_abs(params->dir,
-                   G.relbase_valid ? BKE_main_blendfile_path(bmain) :
-                                     BKE_appdir_folder_default_or_root());
+                   (blendfile_path[0] != '\0') ? blendfile_path :
+                                                 BKE_appdir_folder_default_or_root());
     }
     else if (params->dir[0] == '~') {
       char tmpstr[sizeof(params->dir) - 1];
@@ -2623,7 +2624,8 @@ void file_filename_enter_handle(bContext *C, void *UNUSED(arg_unused), void *arg
     matches = file_select_match(sfile, params->file, matched_file);
 
     /* *After* file_select_match! */
-    BLI_filename_make_safe(params->file);
+    const bool allow_tokens = (params->flag & FILE_PATH_TOKENS_ALLOW) != 0;
+    BLI_filename_make_safe_ex(params->file, allow_tokens);
 
     if (matches) {
       /* replace the pattern (or filename that the user typed in,
