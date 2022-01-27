@@ -356,8 +356,7 @@ static bool draw_call_is_culled(const DRWResourceHandle *handle, DRWView *view)
 
 void DRW_view_set_active(const DRWView *view)
 {
-  /* TODO(fclem) DST.view_active should be const too. */
-  DST.view_active = (view) ? (DRWView *)view : DST.view_default;
+  DST.view_active = (view != NULL) ? ((DRWView *)view) : DST.view_default;
 }
 
 const DRWView *DRW_view_get_active(void)
