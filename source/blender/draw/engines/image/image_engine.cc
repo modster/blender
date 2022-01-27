@@ -148,7 +148,7 @@ static void IMAGE_engine_init(void *ved)
   IMAGE_shader_library_ensure();
   IMAGE_Data *vedata = (IMAGE_Data *)ved;
   if (vedata->instance_data == nullptr) {
-    vedata->instance_data = OBJECT_GUARDED_NEW(IMAGE_InstanceData);
+    vedata->instance_data = MEM_new<IMAGE_InstanceData>(__func__);
   }
 }
 
@@ -178,9 +178,10 @@ static void IMAGE_engine_free()
   IMAGE_shader_free();
 }
 
-static void IMAGE_instance_free(void *instance_data)
+static void IMAGE_instance_free(void *_instance_data)
 {
-  OBJECT_GUARDED_DELETE(instance_data, IMAGE_InstanceData);
+  IMAGE_InstanceData *instance_data = reinterpret_cast<IMAGE_InstanceData *>(_instance_data);
+  MEM_delete(instance_data);
 }
 
 /** \} */

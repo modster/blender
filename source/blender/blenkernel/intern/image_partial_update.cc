@@ -465,8 +465,8 @@ struct PartialUpdateRegisterImpl {
 static PartialUpdateRegister *image_partial_update_register_ensure(Image *image)
 {
   if (image->runtime.partial_update_register == nullptr) {
-    PartialUpdateRegisterImpl *partial_update_register = OBJECT_GUARDED_NEW(
-        PartialUpdateRegisterImpl);
+    PartialUpdateRegisterImpl *partial_update_register = MEM_new<PartialUpdateRegisterImpl>(
+        __func__);
     image->runtime.partial_update_register = wrap(partial_update_register);
   }
   return image->runtime.partial_update_register;
@@ -551,7 +551,7 @@ using namespace blender::bke::image::partial_update;
 // TODO(jbakker): cleanup parameter.
 struct PartialUpdateUser *BKE_image_partial_update_create(const struct Image *image)
 {
-  PartialUpdateUserImpl *user_impl = OBJECT_GUARDED_NEW(PartialUpdateUserImpl);
+  PartialUpdateUserImpl *user_impl = MEM_new<PartialUpdateUserImpl>(__func__);
 
 #ifdef NDEBUG
   user_impl->debug_image_ = image;
@@ -565,7 +565,7 @@ struct PartialUpdateUser *BKE_image_partial_update_create(const struct Image *im
 void BKE_image_partial_update_free(PartialUpdateUser *user)
 {
   PartialUpdateUserImpl *user_impl = unwrap(user);
-  OBJECT_GUARDED_DELETE(user_impl, PartialUpdateUserImpl);
+  MEM_delete(user_impl);
 }
 
 /* --- Image side --- */
@@ -575,7 +575,7 @@ void BKE_image_partial_update_register_free(Image *image)
   PartialUpdateRegisterImpl *partial_update_register = unwrap(
       image->runtime.partial_update_register);
   if (partial_update_register) {
-    OBJECT_GUARDED_DELETE(partial_update_register, PartialUpdateRegisterImpl);
+    MEM_delete(partial_update_register);
   }
   image->runtime.partial_update_register = nullptr;
 }
