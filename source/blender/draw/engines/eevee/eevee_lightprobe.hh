@@ -98,7 +98,7 @@ class LightProbeModule {
   void begin_sync();
   void end_sync();
 
-  void set_view(const DRWView *view, const ivec2 extent);
+  void set_view(const DRWView *view, const int2 extent);
 
   void set_world_dirty(void)
   {
@@ -152,7 +152,7 @@ class LightProbeModule {
 
   LightCache *baking_cache_get(void);
 
-  void cubemap_prepare(vec3 position, float near, float far, bool background_only);
+  void cubemap_prepare(float3 position, float near, float far, bool background_only);
 
   void filter_glossy(int cube_index, float intensity);
   void filter_diffuse(int sample_index, float intensity);

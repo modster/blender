@@ -36,7 +36,7 @@
 using namespace std;
 
 typedef unsigned char uchar;
-typedef float vec3[3];
+typedef float float3[3];
 
 const int samples_per_pool = 32;
 
@@ -53,11 +53,11 @@ static void raytrace_sample_reuse_table(string &output_name, bool debug)
   };
 
   array<vector<sample>, 4> pools;
-  array<vec3, 4> pools_color = {1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 0};
-  vector<vec3> debug_image(64 * 64);
+  array<float3, 4> pools_color = {1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 0};
+  vector<float3> debug_image(64 * 64);
 
   ofstream ppm;
-  auto ppm_file_out = [&](const char *name, vector<vec3> &debug_image) {
+  auto ppm_file_out = [&](const char *name, vector<float3> &debug_image) {
     ppm.open(name);
     ppm << "P3\n64 64\n255\n";
     for (auto &vec : debug_image) {
@@ -123,11 +123,11 @@ static void raytrace_sample_reuse_table(string &output_name, bool debug)
 
   table_out << "\n/* Sample table generated at build time. */\n";
   table_out << "const int resolve_sample_max = " << samples_per_pool << ";\n";
-  table_out << "const vec2 resolve_sample_offsets[" << total << "] = vec2[" << total << "](\n";
+  table_out << "const float2 resolve_sample_offsets[" << total << "] = float2[" << total << "](\n";
   for (int pool_id = 0; pool_id < 4; pool_id++) {
     auto &pool = pools[poolmap[pool_id]];
     for (int i = 0; i < samples_per_pool; i++) {
-      table_out << "  vec2(" << pool[i].x << ", " << pool[i].y << ")";
+      table_out << "  float2(" << pool[i].x << ", " << pool[i].y << ")";
       if (i < samples_per_pool - 1) {
         table_out << ",\n";
       }

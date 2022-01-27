@@ -78,11 +78,11 @@ inline bool operator!=(const FilmData &a, const FilmData &b)
 /** \name Film
  * \{ */
 
-void Film::init(const ivec2 &full_extent, const rcti *output_rect)
+void Film::init(const int2 &full_extent, const rcti *output_rect)
 {
   FilmData data = data_;
-  data.extent = ivec2(BLI_rcti_size_x(output_rect), BLI_rcti_size_y(output_rect));
-  data.offset = ivec2(output_rect->xmin, output_rect->ymin);
+  data.extent = int2(BLI_rcti_size_x(output_rect), BLI_rcti_size_y(output_rect));
+  data.offset = int2(output_rect->xmin, output_rect->ymin);
 
   has_changed_ = data_ != data;
 
@@ -92,9 +92,9 @@ void Film::init(const ivec2 &full_extent, const rcti *output_rect)
   }
 
   data_.opacity = 1.0f;
-  data_.uv_scale_inv = vec2(full_extent);
+  data_.uv_scale_inv = float2(full_extent);
   data_.uv_scale = 1.0f / data_.uv_scale_inv;
-  data_.uv_bias = vec2(data_.offset) * data_.uv_scale;
+  data_.uv_bias = float2(data_.offset) * data_.uv_scale;
 }
 
 void Film::sync(void)

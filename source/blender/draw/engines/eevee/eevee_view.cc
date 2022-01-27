@@ -48,7 +48,7 @@ void ShadingView::init()
   mb_.init();
 }
 
-void ShadingView::sync(ivec2 render_extent_)
+void ShadingView::sync(int2 render_extent_)
 {
   if (inst_.camera.is_panoramic()) {
     int64_t render_pixel_count = render_extent_.x * (int64_t)render_extent_.y;
@@ -70,20 +70,20 @@ void ShadingView::sync(ivec2 render_extent_)
   /* Create views. */
   const CameraData &data = inst_.camera.data_get();
 
-  float viewmat[4][4], winmat[4][4];
-  const float(*viewmat_p)[4] = viewmat, (*winmat_p)[4] = winmat;
+  float4x4 viewmat, winmat;
+  const float(*viewmat_p)[4] = viewmat.ptr(), (*winmat_p)[4] = winmat.ptr();
   if (inst_.camera.is_panoramic()) {
     /* TODO(fclem) Overscans. */
     /* For now a mandatory 5% overscan for DoF. */
     float side = data.clip_near * 1.05f;
     float near = data.clip_near;
     float far = data.clip_far;
-    perspective_m4(winmat, -side, side, -side, side, near, far);
-    mul_m4_m4m4(viewmat, face_matrix_, data.viewmat);
+    perspective_m4(winmat.ptr(), -side, side, -side, side, near, far);
+    viewmat = face_matrix_ * data.viewmat;
   }
   else {
-    viewmat_p = data.viewmat;
-    winmat_p = data.winmat;
+    viewmat_p = data.viewmat.ptr();
+    winmat_p = data.winmat.ptr();
   }
 
   main_view_ = DRW_view_create(viewmat_p, winmat_p, nullptr, nullptr, nullptr);
@@ -209,16 +209,15 @@ void ShadingView::update_view(void)
 
 void LightProbeView::sync(Texture &color_tx,
                           Texture &depth_tx,
-                          const mat4 winmat,
-                          const mat4 viewmat,
+                          const float4x4 winmat,
+                          const float4x4 viewmat,
                           bool is_only_background)
 {
-  mat4 facemat;
-  mul_m4_m4m4(facemat, face_matrix_, viewmat);
+  float4x4 facemat = face_matrix_ * viewmat;
 
   is_only_background_ = is_only_background;
-  extent_ = ivec2(color_tx.width());
-  view_ = DRW_view_create(facemat, winmat, nullptr, nullptr, nullptr);
+  extent_ = int2(color_tx.width());
+  view_ = DRW_view_create(facemat.ptr(), winmat.ptr(), nullptr, nullptr, nullptr);
   view_fb_.ensure(GPU_ATTACHMENT_TEXTURE_LAYER(depth_tx, layer_),
                   GPU_ATTACHMENT_TEXTURE_LAYER(color_tx, layer_));
 

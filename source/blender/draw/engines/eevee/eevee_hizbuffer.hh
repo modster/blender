@@ -85,7 +85,7 @@ class HiZBufferModule {
   /** References only. */
   GPUTexture *input_depth_tx_ = nullptr;
   /** Pixel size of the render target during hiz downsampling. */
-  vec2 texel_size_;
+  float2 texel_size_;
 
  public:
   HiZBufferModule(Instance &inst) : inst_(inst){};

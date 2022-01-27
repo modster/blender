@@ -116,7 +116,7 @@ struct GBuffer {
 
   void prepare(eClosureBits closures_used)
   {
-    ivec2 extent = {GPU_texture_width(depth_tx), GPU_texture_height(depth_tx)};
+    int2 extent = {GPU_texture_width(depth_tx), GPU_texture_height(depth_tx)};
 
     /* TODO Reuse for different config. */
     if (closures_used & (CLOSURE_DIFFUSE | CLOSURE_SSS | CLOSURE_REFRACTION)) {

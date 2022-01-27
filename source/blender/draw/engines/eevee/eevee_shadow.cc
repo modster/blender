@@ -101,8 +101,8 @@ void ShadowTileMap::sync_clipmap(const float3 &camera_position,
 
   viewmat = viewinv.inverted_affine();
   winmat = winmat_get(nullptr);
-  mul_m4_m4m4(tilemat, tilemat_scale_bias_mat, winmat.ptr());
-  mul_m4_m4m4(tilemat, tilemat, viewmat.ptr());
+  mul_m4_m4m4(tilemat.ptr(), tilemat_scale_bias_mat, winmat.ptr());
+  tilemat = tilemat * viewmat;
 }
 
 void ShadowTileMap::sync_cubeface(
@@ -134,8 +134,8 @@ void ShadowTileMap::sync_cubeface(
 
   viewmat = float4x4(shadow_face_mat[cubeface]) * object_mat.inverted_affine();
   winmat = winmat_get(nullptr);
-  mul_m4_m4m4(tilemat, tilemat_scale_bias_mat, winmat.ptr());
-  mul_m4_m4m4(tilemat, tilemat, viewmat.ptr());
+  mul_m4_m4m4(tilemat.ptr(), tilemat_scale_bias_mat, winmat.ptr());
+  tilemat = tilemat * viewmat;
 
   /* Update corners. */
   float4x4 viewinv = viewmat.inverted();
@@ -351,7 +351,7 @@ void ShadowCommon::free_resources()
  * \{ */
 
 void ShadowPunctual::sync(eLightType light_type,
-                          const mat4 &object_mat,
+                          const float4x4 &object_mat,
                           float cone_aperture,
                           float near_clip,
                           float far_clip,
@@ -399,7 +399,7 @@ ShadowPunctual::operator ShadowData()
 {
   ShadowData data;
   cubeface_winmat_get(data.mat, near_, far_);
-  invert_m4(data.mat);
+  invert_m4(data.mat.ptr());
   data.offset = random_offset_;
   data.bias = bias_;
   data.clip_near = near_;
@@ -416,7 +416,7 @@ ShadowPunctual::operator ShadowData()
  *
  * \{ */
 
-void ShadowDirectional::sync(const mat4 &object_mat, float bias, float min_resolution)
+void ShadowDirectional::sync(const float4x4 &object_mat, float bias, float min_resolution)
 {
   object_mat_ = float4x4(object_mat);
   /* Clear embedded custom data. */
@@ -492,8 +492,8 @@ ShadowDirectional::operator ShadowData()
 {
   ShadowData data;
   ShadowTileMap &last_level = *tilemaps.last();
-  mul_m4_m4m4(data.mat, shadow_clipmap_scale_mat, last_level.winmat.ptr());
-  mul_m4_m4m4(data.mat, data.mat, last_level.viewmat.ptr());
+  mul_m4_m4m4(data.mat.ptr(), shadow_clipmap_scale_mat, last_level.winmat.ptr());
+  mul_m4_m4m4(data.mat.ptr(), data.mat.ptr(), last_level.viewmat.ptr());
   data.bias = bias_;
   data.clip_near = near_;
   data.clip_far = far_;
@@ -654,7 +654,7 @@ void ShadowModule::end_sync(void)
   {
     /* Get the farthest point from camera to know what distance to cover. */
     float3 farthest_point = float3(1.0f, 1.0f, 1.0f);
-    mul_project_m4_v3(inst_.camera.data_get().wininv, farthest_point);
+    mul_project_m4_v3(inst_.camera.data_get().wininv.ptr(), farthest_point);
     float far_dist = math::length(farthest_point);
     float near_dist = fabsf(inst_.camera.data_get().clip_near);
     float3 cam_position = inst_.camera.position();
@@ -1018,7 +1018,7 @@ void ShadowModule::set_view(const DRWView *view, GPUTexture *depth_tx)
   }
 #endif
 
-  ivec2 extent(GPU_texture_width(depth_tx), GPU_texture_height(depth_tx));
+  int2 extent(GPU_texture_width(depth_tx), GPU_texture_height(depth_tx));
   input_depth_tx_ = depth_tx;
 
   scan_dispatch_size_.x = divide_ceil_u(extent.x, SHADOW_DEPTH_SCAN_GROUP_SIZE);

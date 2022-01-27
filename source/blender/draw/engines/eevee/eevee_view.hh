@@ -92,7 +92,7 @@ class ShadingView {
   DRWView *render_view_ = nullptr;
 
   /** Render size of the view. Can change between scene sample eval. */
-  ivec2 extent_ = {-1, -1};
+  int2 extent_ = {-1, -1};
 
   bool is_enabled_ = false;
 
@@ -113,7 +113,7 @@ class ShadingView {
 
   void init(void);
 
-  void sync(ivec2 render_extent_);
+  void sync(int2 render_extent_);
 
   void render(void);
 
@@ -150,7 +150,7 @@ class LightProbeView {
   /** DRWView of this face. */
   DRWView *view_ = nullptr;
   /** Render size of the view. */
-  ivec2 extent_ = {-1, -1};
+  int2 extent_ = {-1, -1};
 
   int layer_ = 0;
   bool is_only_background_ = false;
@@ -170,8 +170,8 @@ class LightProbeView {
 
   void sync(Texture &color_tx,
             Texture &depth_tx,
-            const mat4 winmat,
-            const mat4 viewmat,
+            const float4x4 winmat,
+            const float4x4 viewmat,
             bool is_only_background);
 
   void render(void);
@@ -205,7 +205,7 @@ class MainView {
   {
   }
 
-  void init(const ivec2 full_extent_)
+  void init(const int2 full_extent_)
   {
     /* TODO(fclem) parameter hidden in experimental. We need to figure out mipmap bias to preserve
      * texture crispiness. */

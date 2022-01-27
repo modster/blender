@@ -41,8 +41,8 @@ void BackgroundPass::sync(GPUMaterial *gpumat, GPUTexture *lookdev_tx)
   background_ps_ = DRW_pass_create("Background", state);
 
   /* Push a matrix at the same location as the camera. */
-  mat4 camera_mat;
-  unit_m4(camera_mat);
+  float4x4 camera_mat;
+  camera_mat.identity();
   copy_v3_v3(camera_mat[3], inst_.camera.data_get().viewinv[3]);
 
   DRWShadingGroup *grp = DRW_shgroup_material_create(gpumat, background_ps_);
@@ -50,7 +50,7 @@ void BackgroundPass::sync(GPUMaterial *gpumat, GPUTexture *lookdev_tx)
     /* HACK(fclem) This particular texture has been left without resource to be set here. */
     DRW_shgroup_uniform_texture(grp, "samp0", lookdev_tx);
   }
-  DRW_shgroup_call_obmat(grp, DRW_cache_fullscreen_quad_get(), camera_mat);
+  DRW_shgroup_call_obmat(grp, DRW_cache_fullscreen_quad_get(), camera_mat.ptr());
 }
 
 void BackgroundPass::render(void)
@@ -198,7 +198,7 @@ void ForwardPass::render(const DRWView *view,
                          GPUFrameBuffer *view_fb)
 {
   if (inst_.raytracing.enabled()) {
-    ivec2 extent = {GPU_texture_width(gbuffer.depth_tx), GPU_texture_height(gbuffer.depth_tx)};
+    int2 extent = {GPU_texture_width(gbuffer.depth_tx), GPU_texture_height(gbuffer.depth_tx)};
     /* Reuse texture. */
     gbuffer.ray_radiance_tx.acquire(extent, GPU_RGBA16F, gbuffer.owner);
     /* Copy combined buffer so we can sample from it. */

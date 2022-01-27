@@ -57,8 +57,8 @@ void HiZBufferModule::sync(void)
 void HiZBuffer::prepare(GPUTexture *depth_src_tx)
 {
   int div = 1 << mip_count_;
-  vec2 extent_src(GPU_texture_width(depth_src_tx), GPU_texture_height(depth_src_tx));
-  ivec2 extent_hiz(divide_ceil_u(extent_src.x, div) * div, divide_ceil_u(extent_src.y, div) * div);
+  float2 extent_src(GPU_texture_width(depth_src_tx), GPU_texture_height(depth_src_tx));
+  int2 extent_hiz(divide_ceil_u(extent_src.x, div) * div, divide_ceil_u(extent_src.y, div) * div);
 
   inst_.hiz.data_.pixel_to_ndc = 2.0f / extent_src;
   inst_.hiz.texel_size_ = 1.0f / float2(extent_hiz);
@@ -85,7 +85,7 @@ void HiZBuffer::update(GPUTexture *depth_src_tx)
 {
   DRW_stats_group_start("Hiz");
 
-  inst_.hiz.texel_size_ = 1.0f / vec2(GPU_texture_width(hiz_tx_), GPU_texture_height(hiz_tx_));
+  inst_.hiz.texel_size_ = 1.0f / float2(GPU_texture_width(hiz_tx_), GPU_texture_height(hiz_tx_));
 
   inst_.hiz.input_depth_tx_ = depth_src_tx;
   GPU_framebuffer_bind(hiz_fb_);

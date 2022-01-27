@@ -120,14 +120,14 @@ struct RaytraceBuffer {
 
   RaytraceBufferDataBuf data_;
 
-  ivec2 extent_ = ivec2(0);
-  ivec3 dispatch_size_ = ivec3(1);
+  int2 extent_ = int2(0);
+  int3 dispatch_size_ = int3(1);
 
  public:
   RaytraceBuffer(Instance &inst) : inst_(inst){};
   ~RaytraceBuffer(){};
 
-  void sync(ivec2 extent);
+  void sync(int2 extent);
 
   void trace(eClosureBits closure_type, GBuffer &gbuffer, HiZBuffer &hiz, HiZBuffer &hiz_front);
   void denoise(eClosureBits closure_type);
@@ -200,7 +200,7 @@ struct RaytraceBuffer {
   void render_end(const DRWView *view)
   {
     using draw::Texture;
-    DRW_view_persmat_get(view, data_.history_persmat, false);
+    DRW_view_persmat_get(view, data_.history_persmat.ptr(), false);
     Texture::swap(diffuse_radiance_tx_, diffuse_radiance_history_tx_);
     Texture::swap(diffuse_variance_tx_, diffuse_variance_history_tx_);
     Texture::swap(reflection_radiance_tx_, reflection_radiance_history_tx_);

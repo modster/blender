@@ -73,7 +73,7 @@ void RaytracingModule::sync(void)
  *
  * \{ */
 
-void RaytraceBuffer::sync(ivec2 extent)
+void RaytraceBuffer::sync(int2 extent)
 {
   extent_ = extent;
   dispatch_size_.x = divide_ceil_u(extent.x, 8);

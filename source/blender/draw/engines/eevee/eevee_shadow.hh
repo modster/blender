@@ -79,7 +79,7 @@ struct AABB {
   void debug_draw(void)
   {
     BoundBox bb = *this;
-    vec4 color = {1, 0, 0, 1};
+    float4 color = {1, 0, 0, 1};
     DRW_debug_bbox(&bb, color);
   }
 
@@ -115,14 +115,14 @@ struct AABB {
     float3 middle = center();
     float3 halfdim = max - middle;
     BoundBox bb;
-    *reinterpret_cast<float3 *>(bb.vec[0]) = middle + halfdim * vec3(1, 1, 1);
-    *reinterpret_cast<float3 *>(bb.vec[1]) = middle + halfdim * vec3(-1, 1, 1);
-    *reinterpret_cast<float3 *>(bb.vec[2]) = middle + halfdim * vec3(-1, -1, 1);
-    *reinterpret_cast<float3 *>(bb.vec[3]) = middle + halfdim * vec3(1, -1, 1);
-    *reinterpret_cast<float3 *>(bb.vec[4]) = middle + halfdim * vec3(1, 1, -1);
-    *reinterpret_cast<float3 *>(bb.vec[5]) = middle + halfdim * vec3(-1, 1, -1);
-    *reinterpret_cast<float3 *>(bb.vec[6]) = middle + halfdim * vec3(-1, -1, -1);
-    *reinterpret_cast<float3 *>(bb.vec[7]) = middle + halfdim * vec3(1, -1, -1);
+    *reinterpret_cast<float3 *>(bb.vec[0]) = middle + halfdim * float3(1, 1, 1);
+    *reinterpret_cast<float3 *>(bb.vec[1]) = middle + halfdim * float3(-1, 1, 1);
+    *reinterpret_cast<float3 *>(bb.vec[2]) = middle + halfdim * float3(-1, -1, 1);
+    *reinterpret_cast<float3 *>(bb.vec[3]) = middle + halfdim * float3(1, -1, 1);
+    *reinterpret_cast<float3 *>(bb.vec[4]) = middle + halfdim * float3(1, 1, -1);
+    *reinterpret_cast<float3 *>(bb.vec[5]) = middle + halfdim * float3(-1, 1, -1);
+    *reinterpret_cast<float3 *>(bb.vec[6]) = middle + halfdim * float3(-1, -1, -1);
+    *reinterpret_cast<float3 *>(bb.vec[7]) = middle + halfdim * float3(1, -1, -1);
     return bb;
   }
 };
@@ -268,7 +268,7 @@ class ShadowPunctual : public ShadowCommon {
   /** Shape type. */
   eLightType light_type_;
   /** Random position on the light. In world space. */
-  vec3 random_offset_;
+  float3 random_offset_;
   /** Light position. */
   float3 position_;
   /** Near and far clip distances. */
@@ -280,7 +280,7 @@ class ShadowPunctual : public ShadowCommon {
   ShadowPunctual(ShadowModule *shadows) : ShadowCommon(shadows){};
 
   void sync(eLightType light_type,
-            const mat4 &object_mat,
+            const float4x4 &object_mat,
             float cone_aperture,
             float near_clip,
             float far_clip,
@@ -298,14 +298,14 @@ class ShadowDirectional : public ShadowCommon {
   /** Near and far clip distances. For clipmap, when they are updated after sync. */
   float near_, far_;
   /** Offset of the lowest clipmap relative to the highest one. */
-  ivec2 base_offset_;
+  int2 base_offset_;
   /** Copy of object matrix. */
   float4x4 object_mat_;
 
  public:
   ShadowDirectional(ShadowModule *shadows) : ShadowCommon(shadows){};
 
-  void sync(const mat4 &object_mat, float bias, float min_resolution);
+  void sync(const float4x4 &object_mat, float bias, float min_resolution);
   void end_sync(int min_level,
                 int max_level,
                 const float3 &camera_position,

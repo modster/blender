@@ -333,9 +333,9 @@ class Sampling {
    * projected into any plane, the resulting distribution is (close to)
    * a uniform disc distribution.
    */
-  vec3 sample_ball(const float rand[3])
+  float3 sample_ball(const float rand[3])
   {
-    vec3 sample;
+    float3 sample;
     sample.z = rand[0] * 2.0f - 1.0f; /* cos theta */
 
     float r = sqrtf(fmaxf(0.0f, 1.0f - square_f(sample.z))); /* sin theta */
@@ -348,10 +348,10 @@ class Sampling {
     return sample;
   }
 
-  vec2 sample_disk(const float rand[2])
+  float2 sample_disk(const float rand[2])
   {
     float omega = rand[1] * 2.0f * M_PI;
-    return sqrtf(rand[0]) * vec2(cosf(omega), sinf(omega));
+    return sqrtf(rand[0]) * float2(cosf(omega), sinf(omega));
   }
 };
 

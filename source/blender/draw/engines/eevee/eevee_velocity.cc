@@ -110,10 +110,10 @@ void VelocityModule::step_object_sync(Object *ob, ObjectKey &object_key)
   auto data = objects_steps.lookup_or_add_cb(object_key, add_cb);
 
   if (step_ == STEP_NEXT) {
-    copy_m4_m4(data->next_object_mat, ob->obmat);
+    data->next_object_mat = ob->obmat;
   }
   else if (step_ == STEP_PREVIOUS) {
-    copy_m4_m4(data->prev_object_mat, ob->obmat);
+    data->prev_object_mat = ob->obmat;
   }
 }
 
@@ -121,9 +121,9 @@ void VelocityModule::step_object_sync(Object *ob, ObjectKey &object_key)
 void VelocityModule::step_swap(void)
 {
   for (VelocityObjectBuf *data : objects_steps.values()) {
-    copy_m4_m4(data->prev_object_mat, data->next_object_mat);
+    data->prev_object_mat = data->next_object_mat;
     /* Important: This let us known if object is missing from the next time step. */
-    zero_m4(data->next_object_mat);
+    zero_m4(data->next_object_mat.ptr());
   }
   camera_step.prev = static_cast<CameraData>(camera_step.next);
 }
@@ -142,7 +142,7 @@ void VelocityModule::end_sync(void)
 
   for (auto item : objects_steps.items()) {
     /* Detect object deletion. Only do this on viewport as STEP_NEXT means current step. */
-    if (inst_.is_viewport() && is_zero_m4(item.value->next_object_mat)) {
+    if (inst_.is_viewport() && is_zero_m4(item.value->next_object_mat.ptr())) {
       deleted_keys.append(item.key);
       delete item.value;
     }
@@ -259,23 +259,23 @@ void VelocityPass::mesh_add(Object *ob, ObjectHandle &handle)
 
   if (!inst_.is_viewport()) {
     /* Fill missing matrices if the object was hidden in previous or next frame. */
-    if (is_zero_m4(data->prev_object_mat)) {
-      copy_m4_m4(data->prev_object_mat, ob->obmat);
+    if (is_zero_m4(data->prev_object_mat.ptr())) {
+      copy_m4_m4(data->prev_object_mat.ptr(), ob->obmat);
     }
 
     /* Avoid drawing object that has no motions since object_moves is always true. */
     if (/* !mb_geom->use_deform && */ /* Object deformation can happen without transform.  */
-        equals_m4m4(data->prev_object_mat, ob->obmat)) {
+        equals_m4m4(data->prev_object_mat.ptr(), ob->obmat)) {
       return;
     }
   }
   else {
     /* Fill missing matrices if the object was hidden in previous or next frame. */
-    if (is_zero_m4(data->prev_object_mat)) {
-      copy_m4_m4(data->prev_object_mat, ob->obmat);
+    if (is_zero_m4(data->prev_object_mat.ptr())) {
+      data->prev_object_mat = ob->obmat;
     }
-    if (is_zero_m4(data->next_object_mat)) {
-      copy_m4_m4(data->next_object_mat, ob->obmat);
+    if (is_zero_m4(data->next_object_mat.ptr())) {
+      data->next_object_mat = ob->obmat;
     }
 
     // if (mb_geom->use_deform) {
@@ -285,8 +285,8 @@ void VelocityPass::mesh_add(Object *ob, ObjectHandle &handle)
 
     /* Avoid drawing object that has no motions since object_moves is always true. */
     if (/* !mb_geom->use_deform && */ /* Object deformation can happen without transform.  */
-        equals_m4m4(data->prev_object_mat, ob->obmat) &&
-        equals_m4m4(data->next_object_mat, ob->obmat)) {
+        equals_m4m4(data->prev_object_mat.ptr(), ob->obmat) &&
+        equals_m4m4(data->next_object_mat.ptr(), ob->obmat)) {
       return;
     }
   }

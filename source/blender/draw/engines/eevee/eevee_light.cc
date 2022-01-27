@@ -73,10 +73,10 @@ void Light::sync(ShadowModule &shadows, const Object *ob, float threshold)
                                              (1.0f / square_f(influence_radius_volume)) :
                                              0.0f;
 
-  this->color = vec3(&la->r) * la->energy;
-  normalize_m4_m4_ex(this->object_mat, ob->obmat, scale);
+  this->color = float3(&la->r) * la->energy;
+  normalize_m4_m4_ex(this->object_mat.ptr(), ob->obmat, scale);
   /* Make sure we have consistent handedness (in case of negatively scaled Z axis). */
-  vec3 cross = math::cross(float3(this->_right), float3(this->_up));
+  float3 cross = math::cross(float3(this->_right), float3(this->_up));
   if (math::dot(cross, float3(this->_back)) < 0.0f) {
     negate_v3(this->_up);
   }
@@ -411,7 +411,7 @@ void LightModule::debug_end_sync(void)
 }
 
 /* Compute acceleration structure for the given view. If extent is 0, bind no lights. */
-void LightModule::set_view(const DRWView *view, const ivec2 extent, bool enable_specular)
+void LightModule::set_view(const DRWView *view, const int2 extent, bool enable_specular)
 {
   const bool no_lights = (extent.x == 0);
 

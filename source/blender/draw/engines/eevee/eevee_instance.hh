@@ -125,7 +125,7 @@ class Instance {
         lookdev(*this){};
   ~Instance(){};
 
-  void init(const ivec2 &output_res,
+  void init(const int2 &output_res,
             const rcti *output_rect,
             RenderEngine *render,
             Depsgraph *depsgraph,

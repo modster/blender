@@ -89,7 +89,7 @@ class Film {
 
   ~Film(){};
 
-  void init(const ivec2 &full_extent, const rcti *output_rect);
+  void init(const int2 &full_extent, const rcti *output_rect);
 
   void sync(void);
   void end_sync(void);

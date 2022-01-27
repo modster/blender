@@ -69,7 +69,7 @@ void DepthOfField::init(void)
   jitter_radius_ = 0.0f;
 }
 
-void DepthOfField::sync(const mat4 winmat, ivec2 input_extent)
+void DepthOfField::sync(const float4x4 winmat, int2 input_extent)
 {
   const Object *camera_object_eval = inst_.camera_eval_object;
   const ::Camera *cam = (camera_object_eval) ?
@@ -136,8 +136,8 @@ void DepthOfField::sync(const mat4 winmat, ivec2 input_extent)
     /* OPTI(fclem) Could be optimized. */
     float jitter[3] = {fx_radius_, 0.0f, -focus_distance_};
     float center[3] = {0.0f, 0.0f, -focus_distance_};
-    mul_project_m4_v3(winmat, jitter);
-    mul_project_m4_v3(winmat, center);
+    mul_project_m4_v3(winmat.ptr(), jitter);
+    mul_project_m4_v3(winmat.ptr(), center);
     /* Simplify CoC calculation to a simple MADD. */
     if (data_.camera_type != CAMERA_ORTHO) {
       data_.coc_bias = -(center[0] - jitter[0]) * 0.5f * extent_[0];
@@ -169,7 +169,7 @@ void DepthOfField::sync(const mat4 winmat, ivec2 input_extent)
   }
 }
 
-void DepthOfField::jitter_apply(mat4 winmat, mat4 viewmat)
+void DepthOfField::jitter_apply(float4x4 winmat, float4x4 viewmat)
 {
   if (jitter_radius_ == 0.0f) {
     return;
@@ -185,13 +185,13 @@ void DepthOfField::jitter_apply(mat4 winmat, mat4 viewmat)
   theta += data_.bokeh_rotation;
 
   /* Sample in View Space. */
-  vec2 sample = vec2(radius * cosf(theta), radius * sinf(theta));
+  float2 sample = float2(radius * cosf(theta), radius * sinf(theta));
   sample *= data_.bokeh_anisotropic_scale;
   /* Convert to NDC Space. */
-  vec3 jitter = vec3(UNPACK2(sample), -focus_distance_);
-  vec3 center = vec3(0.0f, 0.0f, -focus_distance_);
-  mul_project_m4_v3(winmat, jitter);
-  mul_project_m4_v3(winmat, center);
+  float3 jitter = float3(UNPACK2(sample), -focus_distance_);
+  float3 center = float3(0.0f, 0.0f, -focus_distance_);
+  mul_project_m4_v3(winmat.ptr(), jitter);
+  mul_project_m4_v3(winmat.ptr(), center);
 
   const bool is_ortho = (winmat[2][3] != -1.0f);
   if (is_ortho) {
@@ -236,7 +236,7 @@ void DepthOfField::render(GPUTexture *depth_tx, GPUTexture **input_tx, GPUTextur
  **/
 void DepthOfField::bokeh_lut_pass_sync(void)
 {
-  const bool has_anisotropy = data_.bokeh_anisotropic_scale != vec2(1.0f);
+  const bool has_anisotropy = data_.bokeh_anisotropic_scale != float2(1.0f);
   if (has_anisotropy && (data_.bokeh_blades == 0.0)) {
     bokeh_gather_lut_tx_ = nullptr;
     bokeh_scatter_lut_tx_ = nullptr;

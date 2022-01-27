@@ -557,7 +557,7 @@ char *ShaderModule::material_shader_code_vert_get(const GPUCodegenOutput *codege
       switch (geometry_type) {
         case MAT_GEOM_MESH:
           /* Example print:
-           * in vec2 u015684; */
+           * in float2 u015684; */
           output += "in ";
           output += sub.substr(0, pos + delimiter.length());
           break;
@@ -570,7 +570,7 @@ char *ShaderModule::material_shader_code_vert_get(const GPUCodegenOutput *codege
           break;
         case MAT_GEOM_GPENCIL:
           /* Example print:
-           * vec2 u015684;
+           * float2 u015684;
            * These are not used and just here to make the attribs_load functions call valids.
            * Only one uv and one color attribute layer is supported by gpencil objects. */
           output += sub.substr(0, pos + delimiter.length());
@@ -611,13 +611,13 @@ char *ShaderModule::material_shader_code_vert_get(const GPUCodegenOutput *codege
       output += "\n";
     }
 
-    output += "vec3 nodetree_displacement(void)\n";
+    output += "float3 nodetree_displacement(void)\n";
     output += "{\n";
     if (codegen->displacement) {
       output += codegen->displacement;
     }
     else {
-      output += "return vec3(0);\n";
+      output += "return float3(0);\n";
     }
     output += "}\n\n";
   }
@@ -722,7 +722,7 @@ char *ShaderModule::material_shader_code_frag_get(const GPUCodegenOutput *codege
       size_t pos = 0;
       while ((pos = sub.find(delimiter)) != std::string::npos) {
         /* Example print:
-         * vec2 u015684;
+         * float2 u015684;
          * These are not used and just here to make the attribs_load functions call valids.
          * Only orco layer is supported by world. */
         output += sub.substr(0, pos + delimiter.length());
