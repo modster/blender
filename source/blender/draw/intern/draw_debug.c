@@ -177,7 +177,7 @@ GPUVertBuf *drw_debug_line_buffer_get()
   float(*fdata)[4] = (float(*)[4])data;
   for (int v = 0; v < DEBUG_VERT_MAX; v++) {
     for (int i = 0; i < 3; i++) {
-      fdata[v][i] = 0.0f / 0.0f;
+      fdata[v][i] = NAN_FLT;
     }
   }
   BLI_LINKS_PREPEND(DST.debug.line_buffers, buf);
