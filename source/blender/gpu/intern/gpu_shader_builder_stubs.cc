@@ -175,6 +175,17 @@ void BKE_material_defaults_free_gpu(void)
 /** \} */
 
 /* -------------------------------------------------------------------- */
+/** \name Stubs of BKE_world.h
+ * \{ */
+
+void BKE_world_defaults_free_gpu(void)
+{
+  /* This function is reachable via GPU_exit. */
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
 /** \name Stubs of BKE_customdata.h
  * \{ */
 
