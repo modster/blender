@@ -271,8 +271,6 @@ set(LIB
 )
 
 set(GLSL_SRC
-  ${EEVEE_BUILD_DIR}/shaders/eevee_raytrace_resolve_lib.glsl
-
   engines/eevee/shaders/eevee_bsdf_lib.glsl
   engines/eevee/shaders/eevee_bsdf_microfacet_lib.glsl
   engines/eevee/shaders/eevee_bsdf_sampling_lib.glsl

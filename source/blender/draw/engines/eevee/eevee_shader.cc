@@ -110,7 +110,7 @@ extern char datatoc_eevee_raytrace_denoise_comp_glsl[];
 extern char datatoc_eevee_raytrace_raygen_frag_glsl[];
 extern char datatoc_eevee_raytrace_raygen_lib_glsl[];
 extern char datatoc_eevee_raytrace_resolve_frag_glsl[];
-extern char datatoc_eevee_raytrace_resolve_lib_glsl[];
+// extern char datatoc_eevee_raytrace_resolve_lib_glsl[];
 extern char datatoc_eevee_raytrace_trace_lib_glsl[];
 extern char datatoc_eevee_sampling_lib_glsl[];
 extern char datatoc_eevee_shadow_debug_frag_glsl[];
@@ -177,7 +177,7 @@ ShaderModule::ShaderModule()
   /* NOTE: These need to be ordered by dependencies. */
   DRW_SHADER_LIB_ADD(shader_lib_, common_debug_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, common_math_lib);
-  DRW_shader_library_add_file(shader_lib_, shared_lib_.c_str(), "eevee_shader_shared.hh");
+  // DRW_shader_library_add_file(shader_lib_, shared_lib_.c_str(), "eevee_shader_shared.hh");
   DRW_SHADER_LIB_ADD(shader_lib_, common_math_geom_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, common_hair_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, common_view_lib);
@@ -219,7 +219,7 @@ ShaderModule::ShaderModule()
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_motion_blur_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_raytrace_trace_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_raytrace_raygen_lib);
-  DRW_SHADER_LIB_ADD(shader_lib_, eevee_raytrace_resolve_lib);
+  // DRW_SHADER_LIB_ADD(shader_lib_, eevee_raytrace_resolve_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_surface_lib);
   DRW_SHADER_LIB_ADD(shader_lib_, eevee_surface_velocity_lib);
 
