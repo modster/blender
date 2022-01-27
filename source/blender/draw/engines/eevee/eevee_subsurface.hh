@@ -60,7 +60,7 @@ struct SubsurfaceModule {
 
   const GPUUniformBuf *ubo_get(void) const
   {
-    return data_.ubo_get();
+    return data_;
   }
 
   GPUTexture **transmittance_ref_get(void)

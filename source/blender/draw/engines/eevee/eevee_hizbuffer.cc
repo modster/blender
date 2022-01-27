@@ -58,17 +58,17 @@ void HiZBuffer::prepare(GPUTexture *depth_src_tx)
 {
   int div = 1 << mip_count_;
   vec2 extent_src(GPU_texture_width(depth_src_tx), GPU_texture_height(depth_src_tx));
-  vec2 extent_hiz(divide_ceil_u(extent_src.x, div) * div, divide_ceil_u(extent_src.y, div) * div);
+  ivec2 extent_hiz(divide_ceil_u(extent_src.x, div) * div, divide_ceil_u(extent_src.y, div) * div);
 
   inst_.hiz.data_.pixel_to_ndc = 2.0f / extent_src;
-  inst_.hiz.texel_size_ = 1.0f / extent_hiz;
-  inst_.hiz.data_.uv_scale = extent_src / extent_hiz;
+  inst_.hiz.texel_size_ = 1.0f / float2(extent_hiz);
+  inst_.hiz.data_.uv_scale = extent_src / float2(extent_hiz);
 
   inst_.hiz.data_.push_update();
 
   /* TODO/OPTI(fclem): Share it between similar views.
    * Not possible right now because request_tmp does not support mipmaps. */
-  hiz_tx_.ensure("HiZ", UNPACK2(extent_hiz), mip_count_, GPU_R32F);
+  hiz_tx_.ensure_2d(GPU_R32F, extent_hiz, nullptr, mip_count_);
   hiz_fb_.ensure(GPU_ATTACHMENT_NONE, GPU_ATTACHMENT_TEXTURE(hiz_tx_));
 
   GPU_texture_mipmap_mode(hiz_tx_, true, false);

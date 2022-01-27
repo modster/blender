@@ -160,7 +160,7 @@ void RaytraceBuffer::sync(ivec2 extent)
       /* Does not matter which raytrace_block we use. */
       DRW_shgroup_uniform_block(grp, "raytrace_block", inst_.raytracing.diffuse_ubo_get());
       DRW_shgroup_uniform_block(grp, "hiz_block", inst_.hiz.ubo_get());
-      DRW_shgroup_uniform_block(grp, "rtbuffer_block", data_.ubo_get());
+      DRW_shgroup_uniform_block(grp, "rtbuffer_block", data_);
       DRW_shgroup_uniform_texture_ref_ex(grp, "ray_data_tx", &input_ray_data_tx_, no_interp);
       DRW_shgroup_uniform_texture_ref_ex(grp, "ray_radiance_tx", &input_ray_color_tx_, no_interp);
       DRW_shgroup_uniform_texture_ref_ex(grp, "hiz_tx", &input_hiz_front_tx_, no_interp);

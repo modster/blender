@@ -64,7 +64,7 @@ class Sampling {
   /** Tag to reset sampling for the next sample. */
   bool reset_ = false;
 
-  StructBuffer<SamplingData> data_;
+  draw::UniformBuffer<SamplingData> data_;
 
  public:
   Sampling(){};
@@ -217,7 +217,7 @@ class Sampling {
   }
   const GPUUniformBuf *ubo_get(void) const
   {
-    return data_.ubo_get();
+    return data_;
   }
   /* Returns a pseudo random number in [0..1] range. Each dimension are uncorrelated. */
   float rng_get(eSamplingDimension dimension) const

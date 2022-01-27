@@ -906,28 +906,28 @@ vec4 utility_tx_sample(vec2 uv, float layer);
 /** \} */
 
 #ifdef __cplusplus
-using CameraDataBuf = StructBuffer<CameraData>;
-using CubemapDataBuf = StructArrayBuffer<CubemapData, CULLING_ITEM_BATCH>;
-using CullingDataBuf = StorageBuffer<CullingData>;
-using CullingKeyBuf = StorageArrayBuffer<uint, CULLING_BATCH_SIZE, true>;
-using CullingLightBuf = StorageArrayBuffer<LightData, CULLING_BATCH_SIZE, true>;
-using CullingTileBuf = StorageArrayBuffer<uint, 16 * 16 * CULLING_MAX_WORD, true>;
-using CullingZbinBuf = StorageArrayBuffer<uint, CULLING_ZBIN_COUNT, true>;
-using DepthOfFieldDataBuf = StructBuffer<DepthOfFieldData>;
-using GridDataBuf = StructArrayBuffer<GridData, GRID_MAX>;
-using HiZDataBuf = StructBuffer<HiZData>;
-using LightDataBuf = StorageArrayBuffer<LightData, CULLING_BATCH_SIZE>;
-using LightProbeFilterDataBuf = StructBuffer<LightProbeFilterData>;
-using LightProbeInfoDataBuf = StructBuffer<LightProbeInfoData>;
-using RaytraceBufferDataBuf = StructBuffer<RaytraceBufferData>;
-using RaytraceDataBuf = StructBuffer<RaytraceData>;
-using ShadowDataBuf = StorageArrayBuffer<ShadowData, CULLING_BATCH_SIZE>;
-using ShadowDebugDataBuf = StructBuffer<ShadowDebugData>;
-using ShadowPagesInfoDataBuf = StorageBuffer<ShadowPagesInfoData, true>;
-using ShadowPageHeapBuf = StorageArrayBuffer<uint, SHADOW_MAX_PAGE, true>;
-using ShadowTileMapDataBuf = StorageArrayBuffer<ShadowTileMapData, SHADOW_MAX_TILEMAP>;
-using SubsurfaceDataBuf = StructBuffer<SubsurfaceData>;
-using VelocityObjectBuf = StructBuffer<VelocityObjectData>;
+using CameraDataBuf = draw::UniformBuffer<CameraData>;
+using CubemapDataBuf = draw::UniformArrayBuffer<CubemapData, CULLING_ITEM_BATCH>;
+using CullingDataBuf = draw::StorageBuffer<CullingData>;
+using CullingKeyBuf = draw::StorageArrayBuffer<uint, CULLING_BATCH_SIZE, true>;
+using CullingLightBuf = draw::StorageArrayBuffer<LightData, CULLING_BATCH_SIZE, true>;
+using CullingTileBuf = draw::StorageArrayBuffer<uint, 16 * 16 * CULLING_MAX_WORD, true>;
+using CullingZbinBuf = draw::StorageArrayBuffer<uint, CULLING_ZBIN_COUNT, true>;
+using DepthOfFieldDataBuf = draw::UniformBuffer<DepthOfFieldData>;
+using GridDataBuf = draw::UniformArrayBuffer<GridData, GRID_MAX>;
+using HiZDataBuf = draw::UniformBuffer<HiZData>;
+using LightDataBuf = draw::StorageArrayBuffer<LightData, CULLING_BATCH_SIZE>;
+using LightProbeFilterDataBuf = draw::UniformBuffer<LightProbeFilterData>;
+using LightProbeInfoDataBuf = draw::UniformBuffer<LightProbeInfoData>;
+using RaytraceBufferDataBuf = draw::UniformBuffer<RaytraceBufferData>;
+using RaytraceDataBuf = draw::UniformBuffer<RaytraceData>;
+using ShadowDataBuf = draw::StorageArrayBuffer<ShadowData, CULLING_BATCH_SIZE>;
+using ShadowDebugDataBuf = draw::UniformBuffer<ShadowDebugData>;
+using ShadowPagesInfoDataBuf = draw::StorageBuffer<ShadowPagesInfoData, true>;
+using ShadowPageHeapBuf = draw::StorageArrayBuffer<uint, SHADOW_MAX_PAGE, true>;
+using ShadowTileMapDataBuf = draw::StorageArrayBuffer<ShadowTileMapData, SHADOW_MAX_TILEMAP>;
+using SubsurfaceDataBuf = draw::UniformBuffer<SubsurfaceData>;
+using VelocityObjectBuf = draw::UniformBuffer<VelocityObjectData>;
 
 #  undef bool
 }  // namespace blender::eevee

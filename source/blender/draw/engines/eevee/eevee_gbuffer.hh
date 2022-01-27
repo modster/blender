@@ -53,36 +53,36 @@ enum eClosureBits {
 };
 
 struct GBuffer {
-  draw::Texture transmit_color_tx = draw::Texture("GbufferTransmitColor");
-  draw::Texture transmit_normal_tx = draw::Texture("GbufferTransmitNormal");
-  draw::Texture transmit_data_tx = draw::Texture("GbufferTransmitData");
-  draw::Texture reflect_color_tx = draw::Texture("GbufferReflectionColor");
-  draw::Texture reflect_normal_tx = draw::Texture("GbufferReflectionNormal");
-  draw::Texture volume_tx = draw::Texture("GbufferVolume");
-  draw::Texture emission_tx = draw::Texture("GbufferEmission");
-  draw::Texture transparency_tx = draw::Texture("GbufferTransparency");
+  TextureFromPool transmit_color_tx = {"GbufferTransmitColor"};
+  TextureFromPool transmit_normal_tx = {"GbufferTransmitNormal"};
+  TextureFromPool transmit_data_tx = {"GbufferTransmitData"};
+  TextureFromPool reflect_color_tx = {"GbufferReflectionColor"};
+  TextureFromPool reflect_normal_tx = {"GbufferReflectionNormal"};
+  TextureFromPool volume_tx = {"GbufferVolume"};
+  TextureFromPool emission_tx = {"GbufferEmission"};
+  TextureFromPool transparency_tx = {"GbufferTransparency"};
 
-  Framebuffer gbuffer_fb = Framebuffer("Gbuffer");
-  Framebuffer volume_fb = Framebuffer("VolumeHeterogeneous");
+  Framebuffer gbuffer_fb = {"Gbuffer"};
+  Framebuffer volume_fb = {"VolumeHeterogeneous"};
 
-  draw::Texture holdout_tx = draw::Texture("HoldoutRadiance");
-  draw::Texture diffuse_tx = draw::Texture("DiffuseRadiance");
+  TextureFromPool holdout_tx = {"HoldoutRadiance"};
+  TextureFromPool diffuse_tx = {"DiffuseRadiance"};
 
-  Framebuffer radiance_fb = Framebuffer("Radiance");
-  Framebuffer radiance_clear_fb = Framebuffer("RadianceClear");
+  Framebuffer radiance_fb = {"Radiance"};
+  Framebuffer radiance_clear_fb = {"RadianceClear"};
 
-  Framebuffer holdout_fb = Framebuffer("Holdout");
+  Framebuffer holdout_fb = {"Holdout"};
 
-  draw::Texture depth_behind_tx = draw::Texture("DepthBehind");
+  TextureFromPool depth_behind_tx = {"DepthBehind"};
 
-  Framebuffer depth_behind_fb = Framebuffer("DepthCopy");
+  Framebuffer depth_behind_fb = {"DepthCopy"};
 
   /** Raytracing. */
-  draw::Texture ray_data_tx = draw::Texture("RayData");
-  draw::Texture ray_radiance_tx = draw::Texture("RayRadiance");
-  draw::Texture ray_variance_tx = draw::Texture("RayVariance");
-  Framebuffer ray_data_fb = Framebuffer("RayData");
-  Framebuffer ray_denoise_fb = Framebuffer("RayDenoise");
+  TextureFromPool ray_data_tx = {"RayData"};
+  TextureFromPool ray_radiance_tx = {"RayRadiance"};
+  TextureFromPool ray_variance_tx = {"RayVariance"};
+  Framebuffer ray_data_fb = {"RayData"};
+  Framebuffer ray_denoise_fb = {"RayDenoise"};
 
   /* Owner of this GBuffer. Used to query temp textures. */
   void *owner;
@@ -98,20 +98,20 @@ struct GBuffer {
     depth_tx = depth_tx_;
     combined_tx = combined_tx_;
     layer = layer_;
-    transmit_color_tx.sync_tmp();
-    transmit_normal_tx.sync_tmp();
-    transmit_data_tx.sync_tmp();
-    reflect_color_tx.sync_tmp();
-    reflect_normal_tx.sync_tmp();
-    volume_tx.sync_tmp();
-    emission_tx.sync_tmp();
-    transparency_tx.sync_tmp();
-    holdout_tx.sync_tmp();
-    diffuse_tx.sync_tmp();
-    depth_behind_tx.sync_tmp();
-    ray_data_tx.sync_tmp();
-    ray_radiance_tx.sync_tmp();
-    ray_variance_tx.sync_tmp();
+    transmit_color_tx.sync();
+    transmit_normal_tx.sync();
+    transmit_data_tx.sync();
+    reflect_color_tx.sync();
+    reflect_normal_tx.sync();
+    volume_tx.sync();
+    emission_tx.sync();
+    transparency_tx.sync();
+    holdout_tx.sync();
+    diffuse_tx.sync();
+    depth_behind_tx.sync();
+    ray_data_tx.sync();
+    ray_radiance_tx.sync();
+    ray_variance_tx.sync();
   }
 
   void prepare(eClosureBits closures_used)
@@ -120,47 +120,47 @@ struct GBuffer {
 
     /* TODO Reuse for different config. */
     if (closures_used & (CLOSURE_DIFFUSE | CLOSURE_SSS | CLOSURE_REFRACTION)) {
-      transmit_color_tx.acquire_tmp(UNPACK2(extent), GPU_R11F_G11F_B10F, owner);
+      transmit_color_tx.acquire(extent, GPU_R11F_G11F_B10F, owner);
     }
     if (closures_used & (CLOSURE_SSS | CLOSURE_REFRACTION)) {
-      transmit_normal_tx.acquire_tmp(UNPACK2(extent), GPU_RGBA16F, owner);
-      transmit_data_tx.acquire_tmp(UNPACK2(extent), GPU_R11F_G11F_B10F, owner);
+      transmit_normal_tx.acquire(extent, GPU_RGBA16F, owner);
+      transmit_data_tx.acquire(extent, GPU_R11F_G11F_B10F, owner);
     }
     else if (closures_used & CLOSURE_DIFFUSE) {
-      transmit_normal_tx.acquire_tmp(UNPACK2(extent), GPU_RG16F, owner);
+      transmit_normal_tx.acquire(extent, GPU_RG16F, owner);
     }
     if (closures_used & CLOSURE_SSS) {
-      diffuse_tx.acquire_tmp(UNPACK2(extent), GPU_RGBA16F, owner);
+      diffuse_tx.acquire(extent, GPU_RGBA16F, owner);
     }
 
     if (closures_used & CLOSURE_REFLECTION) {
-      reflect_color_tx.acquire_tmp(UNPACK2(extent), GPU_R11F_G11F_B10F, owner);
-      reflect_normal_tx.acquire_tmp(UNPACK2(extent), GPU_RGBA16F, owner);
+      reflect_color_tx.acquire(extent, GPU_R11F_G11F_B10F, owner);
+      reflect_normal_tx.acquire(extent, GPU_RGBA16F, owner);
     }
 
     if (closures_used & CLOSURE_VOLUME) {
       /* TODO(fclem): This is killing performance.
        * Idea: use interleaved data pattern to fill only a 32bpp buffer. */
-      volume_tx.acquire_tmp(UNPACK2(extent), GPU_RGBA32UI, owner);
+      volume_tx.acquire(extent, GPU_RGBA32UI, owner);
     }
 
     if (closures_used & CLOSURE_EMISSION) {
-      emission_tx.acquire_tmp(UNPACK2(extent), GPU_R11F_G11F_B10F, owner);
+      emission_tx.acquire(extent, GPU_R11F_G11F_B10F, owner);
     }
 
     if (closures_used & CLOSURE_TRANSPARENCY) {
       /* TODO(fclem): Speedup by using Dithered holdout and GPU_RGB10_A2. */
-      transparency_tx.acquire_tmp(UNPACK2(extent), GPU_RGBA16, owner);
+      transparency_tx.acquire(extent, GPU_RGBA16, owner);
     }
 
     if (closures_used & (CLOSURE_DIFFUSE | CLOSURE_REFLECTION | CLOSURE_REFRACTION)) {
-      ray_data_tx.acquire_tmp(UNPACK2(extent), GPU_RGBA16F, owner);
-      ray_radiance_tx.acquire_tmp(UNPACK2(extent), GPU_RGBA16F, owner);
-      ray_variance_tx.acquire_tmp(UNPACK2(extent), GPU_R8, owner);
+      ray_data_tx.acquire(extent, GPU_RGBA16F, owner);
+      ray_radiance_tx.acquire(extent, GPU_RGBA16F, owner);
+      ray_variance_tx.acquire(extent, GPU_R8, owner);
     }
 
-    holdout_tx.acquire_tmp(UNPACK2(extent), GPU_R11F_G11F_B10F, owner);
-    depth_behind_tx.acquire_tmp(UNPACK2(extent), GPU_DEPTH24_STENCIL8, owner);
+    holdout_tx.acquire(extent, GPU_R11F_G11F_B10F, owner);
+    depth_behind_tx.acquire(extent, GPU_DEPTH24_STENCIL8, owner);
 
     /* Layer attachement also works with cubemap. */
     gbuffer_fb.ensure(GPU_ATTACHMENT_TEXTURE_LAYER(depth_tx, layer),
@@ -236,20 +236,20 @@ struct GBuffer {
 
   void render_end(void)
   {
-    transmit_color_tx.release_tmp();
-    transmit_normal_tx.release_tmp();
-    transmit_data_tx.release_tmp();
-    reflect_color_tx.release_tmp();
-    reflect_normal_tx.release_tmp();
-    volume_tx.release_tmp();
-    emission_tx.release_tmp();
-    transparency_tx.release_tmp();
-    holdout_tx.release_tmp();
-    diffuse_tx.release_tmp();
-    depth_behind_tx.release_tmp();
-    ray_data_tx.release_tmp();
-    ray_radiance_tx.release_tmp();
-    ray_variance_tx.release_tmp();
+    transmit_color_tx.release();
+    transmit_normal_tx.release();
+    transmit_data_tx.release();
+    reflect_color_tx.release();
+    reflect_normal_tx.release();
+    volume_tx.release();
+    emission_tx.release();
+    transparency_tx.release();
+    holdout_tx.release();
+    diffuse_tx.release();
+    depth_behind_tx.release();
+    ray_data_tx.release();
+    ray_radiance_tx.release();
+    ray_variance_tx.release();
   }
 };
 

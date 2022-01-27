@@ -206,7 +206,7 @@ class DeferredPass {
  * 64x64 2D array texture containing LUT tables and blue noises.
  * \{ */
 
-class UtilityTexture : public draw::Texture {
+class UtilityTexture : public Texture {
   struct Layer {
     float data[UTIL_TEX_SIZE * UTIL_TEX_SIZE][4];
   };
@@ -216,8 +216,7 @@ class UtilityTexture : public draw::Texture {
   static constexpr int layer_count = 4 + UTIL_BTDF_LAYER_COUNT;
 
  public:
-  UtilityTexture()
-      : Texture("UtilityTx", lut_size, lut_size, layer_count, 1, GPU_RGBA16F, nullptr, true)
+  UtilityTexture() : Texture("UtilityTx", GPU_RGBA16F, int2(lut_size), layer_count, nullptr)
   {
 #ifdef RUNTIME_LUT_CREATION
     float *bsdf_ggx_lut = EEVEE_lut_update_ggx_brdf(lut_size);

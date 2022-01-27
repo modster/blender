@@ -200,7 +200,7 @@ void ForwardPass::render(const DRWView *view,
   if (inst_.raytracing.enabled()) {
     ivec2 extent = {GPU_texture_width(gbuffer.depth_tx), GPU_texture_height(gbuffer.depth_tx)};
     /* Reuse texture. */
-    gbuffer.ray_radiance_tx.acquire_tmp(UNPACK2(extent), GPU_RGBA16F, gbuffer.owner);
+    gbuffer.ray_radiance_tx.acquire(extent, GPU_RGBA16F, gbuffer.owner);
     /* Copy combined buffer so we can sample from it. */
     GPU_texture_copy(gbuffer.ray_radiance_tx, gbuffer.combined_tx);
 
@@ -230,7 +230,7 @@ void ForwardPass::render(const DRWView *view,
   DRW_stats_group_end();
 
   if (inst_.raytracing.enabled()) {
-    gbuffer.ray_radiance_tx.release_tmp();
+    gbuffer.ray_radiance_tx.release();
   }
 }
 

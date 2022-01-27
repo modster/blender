@@ -249,12 +249,12 @@ ShadowTileAllocator::ShadowTileAllocator()
   /* Add half the height for LODs. */
   extent.y += extent.y / 2;
 
-  tilemap_tx.ensure(UNPACK2(extent), 1, GPU_R32UI);
-  tilemap_tx.clear((uint)0);
+  tilemap_tx.ensure_2d(GPU_R32UI, extent);
+  tilemap_tx.clear(uint4(0));
 
   /* Allocate one pixel for each tilemap and each lod. */
-  tilemap_rects_tx.ensure(SHADOW_TILEMAP_LOD + 1, size, 1, GPU_RGBA32I);
-  tilemap_rects_tx.clear((int)0);
+  tilemap_rects_tx.ensure_2d(GPU_RGBA32I, int2(SHADOW_TILEMAP_LOD + 1, size));
+  tilemap_rects_tx.clear(int4(0));
 }
 
 ShadowTileAllocator::~ShadowTileAllocator()
@@ -542,13 +542,13 @@ void ShadowModule::init(void)
 
     /* TODO(fclem) GPU_DEPTH_COMPONENT16 support in copy shader? */
     /* TODO(fclem) Make allocation safe. */
-    atlas_tx_.ensure(UNPACK2(atlas_extent), 1, GPU_R32F);
+    atlas_tx_.ensure_2d(GPU_R32F, atlas_extent);
     atlas_tx_.filter_mode(false);
 #if DEBUG
-    atlas_tx_.clear(0.0f);
+    atlas_tx_.clear(float4(0.0f));
 #endif
     /* Temporary render buffer. */
-    render_tx_.ensure(UNPACK2(render_extent), 1, GPU_DEPTH_COMPONENT32F);
+    render_tx_.ensure_2d(GPU_DEPTH_COMPONENT32F, render_extent);
     render_fb_.ensure(GPU_ATTACHMENT_TEXTURE(render_tx_));
   }
 
@@ -911,7 +911,7 @@ void ShadowModule::debug_page_map_call(DRWPass *pass)
   if (debug_data_.type == SHADOW_DEBUG_NONE) {
     return;
   }
-  debug_page_tx_.ensure(SHADOW_PAGE_PER_ROW, SHADOW_PAGE_PER_ROW, 0, GPU_R32UI);
+  debug_page_tx_.ensure_2d(GPU_R32UI, int2(SHADOW_PAGE_PER_ROW));
 
   GPUShader *sh = inst_.shaders.static_shader_get(SHADOW_PAGE_DEBUG);
   DRWShadingGroup *grp = DRW_shgroup_create(sh, pass);
@@ -986,7 +986,7 @@ void ShadowModule::debug_end_sync(void)
     DRW_shgroup_uniform_texture(grp, "tilemaps_tx", tilemap_allocator.tilemap_tx);
     DRW_shgroup_uniform_texture_ref(grp, "depth_tx", &input_depth_tx_);
     DRW_shgroup_uniform_texture(grp, "atlas_tx", atlas_tx_);
-    DRW_shgroup_uniform_block(grp, "debug_block", debug_data_.ubo_get());
+    DRW_shgroup_uniform_block(grp, "debug_block", debug_data_);
     if (debug_data_.type == SHADOW_DEBUG_PAGE_ALLOCATION) {
       DRW_shgroup_uniform_texture(grp, "debug_page_tx", debug_page_tx_);
     }
@@ -1074,7 +1074,7 @@ void ShadowModule::set_view(const DRWView *view, GPUTexture *depth_tx)
 #ifndef SHADOW_DEBUG_NO_CACHING
         do_page_init_ = false;
 #endif
-        tilemap_allocator.tilemap_tx.clear((uint)0);
+        tilemap_allocator.tilemap_tx.clear(uint4(0));
         DRW_draw_pass(page_init_ps_);
       }
     }

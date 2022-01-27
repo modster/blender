@@ -43,12 +43,12 @@ class HiZBuffer {
   Instance &inst_;
   /** Framebuffer use for recursive downsampling. */
   /* TODO(fclem) Remove this and use a compute shader instead. */
-  Framebuffer hiz_fb_ = Framebuffer("DepthHiz");
+  Framebuffer hiz_fb_ = draw::Framebuffer("DepthHiz");
   /** Max mip to downsample to. We ensure the hiz has enough padding to never
    * have to compensate the mipmap alignments. */
   constexpr static int mip_count_ = 6;
   /** TODO/OPTI(fclem): Share it between similar views. */
-  draw::Texture hiz_tx_;
+  Texture hiz_tx_ = {"hiz_tx_"};
 
  public:
   HiZBuffer(Instance &inst) : inst_(inst){};
@@ -94,7 +94,7 @@ class HiZBufferModule {
 
   const GPUUniformBuf *ubo_get(void) const
   {
-    return data_.ubo_get();
+    return data_;
   }
 };
 

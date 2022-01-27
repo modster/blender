@@ -98,7 +98,7 @@ void LightProbeModule::begin_sync()
     GPUShader *sh = inst_.shaders.static_shader_get(LIGHTPROBE_FILTER_DOWNSAMPLE_CUBE);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, cube_downsample_ps_);
     DRW_shgroup_uniform_texture_ref(grp, "input_tx", &cube_downsample_input_tx_);
-    DRW_shgroup_uniform_block(grp, "filter_block", filter_data_.ubo_get());
+    DRW_shgroup_uniform_block(grp, "filter_block", filter_data_);
     DRW_shgroup_call_procedural_triangles(grp, nullptr, 6);
   }
   {
@@ -107,7 +107,7 @@ void LightProbeModule::begin_sync()
     GPUShader *sh = inst_.shaders.static_shader_get(LIGHTPROBE_FILTER_GLOSSY);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, filter_glossy_ps_);
     DRW_shgroup_uniform_texture_ref(grp, "radiance_tx", &cube_downsample_input_tx_);
-    DRW_shgroup_uniform_block(grp, "filter_block", filter_data_.ubo_get());
+    DRW_shgroup_uniform_block(grp, "filter_block", filter_data_);
     DRW_shgroup_call_procedural_triangles(grp, nullptr, 6);
   }
   {
@@ -116,7 +116,7 @@ void LightProbeModule::begin_sync()
     GPUShader *sh = inst_.shaders.static_shader_get(LIGHTPROBE_FILTER_DIFFUSE);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, filter_diffuse_ps_);
     DRW_shgroup_uniform_texture_ref(grp, "radiance_tx", &cube_downsample_input_tx_);
-    DRW_shgroup_uniform_block(grp, "filter_block", filter_data_.ubo_get());
+    DRW_shgroup_uniform_block(grp, "filter_block", filter_data_);
     DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
   }
   {
@@ -125,7 +125,7 @@ void LightProbeModule::begin_sync()
     GPUShader *sh = inst_.shaders.static_shader_get(LIGHTPROBE_FILTER_VISIBILITY);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, filter_visibility_ps_);
     DRW_shgroup_uniform_texture_ref(grp, "depth_tx", &cube_downsample_input_tx_);
-    DRW_shgroup_uniform_block(grp, "filter_block", filter_data_.ubo_get());
+    DRW_shgroup_uniform_block(grp, "filter_block", filter_data_);
     DRW_shgroup_call_procedural_triangles(grp, nullptr, 1);
   }
 
@@ -201,8 +201,8 @@ void LightProbeModule::cubemap_prepare(vec3 position, float near, float far, boo
   negate_v3_v3(viewmat[3], position);
 
   /* TODO(fclem) We might want to have theses as temporary textures. */
-  cube_depth_tx_.ensure_cubemap("CubemapDepth", cube_res, cube_mip_count, GPU_DEPTH24_STENCIL8);
-  cube_color_tx_.ensure_cubemap("CubemapColor", cube_res, cube_mip_count, GPU_RGBA16F);
+  cube_depth_tx_.ensure_cube(GPU_DEPTH24_STENCIL8, cube_res, nullptr, cube_mip_count);
+  cube_color_tx_.ensure_cube(GPU_RGBA16F, cube_res, nullptr, cube_mip_count);
   GPU_texture_mipmap_mode(cube_color_tx_, true, true);
 
   cube_downsample_fb_.ensure(GPU_ATTACHMENT_TEXTURE(cube_depth_tx_),

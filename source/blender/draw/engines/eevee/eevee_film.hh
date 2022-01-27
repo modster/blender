@@ -48,12 +48,12 @@ class Film {
   Instance &inst_;
 
   /** Owned resources. */
-  eevee::Framebuffer read_result_fb_;
-  eevee::Framebuffer accumulation_fb_[2];
-  draw::Texture data_tx_[2];
-  draw::Texture weight_tx_[2];
+  Framebuffer read_result_fb_;
+  Framebuffer accumulation_fb_[2];
+  Texture data_tx_[2];
+  Texture weight_tx_[2];
   /** First sample in case we need to blend using it or just reuse it. */
-  draw::Texture first_sample_tx_;
+  Texture first_sample_tx_ = {"first_sample_tx_"};
 
   /** Reference to first_sample_tx_ or data_tx_ depending on the context. */
   GPUTexture *first_sample_ref_;
@@ -69,7 +69,7 @@ class Film {
   /** ViewProjection matrix Inverse used to render the input. */
   // float src_persinv_[4][4];
 
-  StructBuffer<FilmData> data_;
+  draw::UniformBuffer<FilmData> data_;
 
   /** True if offset or size changed. */
   bool has_changed_ = true;
@@ -79,7 +79,8 @@ class Film {
 
  public:
   /* NOTE: name needs to be static. */
-  Film(Instance &inst, eFilmDataType data_type, const char *name) : inst_(inst), name_(name)
+  Film(Instance &inst, eFilmDataType data_type, const char *name)
+      : inst_(inst), data_tx_{{name}, {name}}, weight_tx_{{name}, {name}}, name_(name)
   {
     data_.extent[0] = data_.extent[1] = -1;
     data_.data_type = data_type;

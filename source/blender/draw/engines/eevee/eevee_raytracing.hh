@@ -48,15 +48,15 @@ class RaytracingModule {
 
   const GPUUniformBuf *reflection_ubo_get(void) const
   {
-    return reflection_data_.ubo_get();
+    return reflection_data_;
   }
   const GPUUniformBuf *refraction_ubo_get(void) const
   {
-    return refraction_data_.ubo_get();
+    return refraction_data_;
   }
   const GPUUniformBuf *diffuse_ubo_get(void) const
   {
-    return diffuse_data_.ubo_get();
+    return diffuse_data_;
   }
 
   bool enabled(void) const
@@ -90,18 +90,18 @@ struct RaytraceBuffer {
   Instance &inst_;
 
   /* Only allocated if used. */
-  draw::Texture diffuse_radiance_tx_ = draw::Texture("DiffuseHistory_A");
-  draw::Texture diffuse_radiance_history_tx_ = draw::Texture("DiffuseHistory_B");
-  draw::Texture diffuse_variance_tx_ = draw::Texture("DiffuseVariance_A");
-  draw::Texture diffuse_variance_history_tx_ = draw::Texture("DiffuseVariance_B");
-  draw::Texture reflection_radiance_tx_ = draw::Texture("ReflectionHistory_A");
-  draw::Texture reflection_radiance_history_tx_ = draw::Texture("ReflectionHistory_B");
-  draw::Texture reflection_variance_tx_ = draw::Texture("ReflectionVariance_A");
-  draw::Texture reflection_variance_history_tx_ = draw::Texture("ReflectionVariance_B");
-  draw::Texture refraction_radiance_tx_ = draw::Texture("RefractionHistory_A");
-  draw::Texture refraction_radiance_history_tx_ = draw::Texture("RefractionHistory_B");
-  draw::Texture refraction_variance_tx_ = draw::Texture("RefractionVariance_A");
-  draw::Texture refraction_variance_history_tx_ = draw::Texture("RefractionVariance_B");
+  Texture diffuse_radiance_tx_ = {"DiffuseHistory_A"};
+  Texture diffuse_radiance_history_tx_ = {"DiffuseHistory_B"};
+  Texture diffuse_variance_tx_ = {"DiffuseVariance_A"};
+  Texture diffuse_variance_history_tx_ = {"DiffuseVariance_B"};
+  Texture reflection_radiance_tx_ = {"ReflectionHistory_A"};
+  Texture reflection_radiance_history_tx_ = {"ReflectionHistory_B"};
+  Texture reflection_variance_tx_ = {"ReflectionVariance_A"};
+  Texture reflection_variance_history_tx_ = {"ReflectionVariance_B"};
+  Texture refraction_radiance_tx_ = {"RefractionHistory_A"};
+  Texture refraction_radiance_history_tx_ = {"RefractionHistory_B"};
+  Texture refraction_variance_tx_ = {"RefractionVariance_A"};
+  Texture refraction_variance_history_tx_ = {"RefractionVariance_B"};
 
   /* Reference only. */
   GPUTexture *input_radiance_tx_;
@@ -199,19 +199,20 @@ struct RaytraceBuffer {
 
   void render_end(const DRWView *view)
   {
+    using draw::Texture;
     DRW_view_persmat_get(view, data_.history_persmat, false);
-    SWAP(draw::Texture, diffuse_radiance_tx_, diffuse_radiance_history_tx_);
-    SWAP(draw::Texture, diffuse_variance_tx_, diffuse_variance_history_tx_);
-    SWAP(draw::Texture, reflection_radiance_tx_, reflection_radiance_history_tx_);
-    SWAP(draw::Texture, reflection_variance_tx_, reflection_variance_history_tx_);
-    SWAP(draw::Texture, refraction_radiance_tx_, refraction_radiance_history_tx_);
-    SWAP(draw::Texture, refraction_variance_tx_, refraction_variance_history_tx_);
+    Texture::swap(diffuse_radiance_tx_, diffuse_radiance_history_tx_);
+    Texture::swap(diffuse_variance_tx_, diffuse_variance_history_tx_);
+    Texture::swap(reflection_radiance_tx_, reflection_radiance_history_tx_);
+    Texture::swap(reflection_variance_tx_, reflection_variance_history_tx_);
+    Texture::swap(refraction_radiance_tx_, refraction_radiance_history_tx_);
+    Texture::swap(refraction_variance_tx_, refraction_variance_history_tx_);
   }
 
  private:
-  void ensure_buffer(draw::Texture &texture, int &valid_history, eGPUTextureFormat format)
+  void ensure_buffer(Texture &texture, int &valid_history, eGPUTextureFormat format)
   {
-    bool was_allocated = texture.ensure(UNPACK2(extent_), 1, format);
+    bool was_allocated = texture.ensure_2d(format, extent_);
     if (was_allocated && valid_history) {
       valid_history = false;
       data_.push_update();

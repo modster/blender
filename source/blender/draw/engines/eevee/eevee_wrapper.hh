@@ -28,6 +28,10 @@
 
 namespace blender::eevee {
 
+using draw::Framebuffer;
+using draw::Texture;
+using draw::TextureFromPool;
+
 static inline void shgroup_geometry_call(DRWShadingGroup *grp,
                                          Object *ob,
                                          GPUBatch *geom,

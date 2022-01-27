@@ -77,7 +77,7 @@ class ShadingView {
   RaytraceBuffer rt_buffer_refract_;
 
   /** Owned resources. */
-  eevee::Framebuffer view_fb_;
+  Framebuffer view_fb_;
   /** Draw resources. Not owned. */
   GPUTexture *combined_tx_ = nullptr;
   GPUTexture *depth_tx_ = nullptr;
@@ -168,8 +168,8 @@ class LightProbeView {
 
   ~LightProbeView(){};
 
-  void sync(draw::Texture &color_tx,
-            draw::Texture &depth_tx,
+  void sync(Texture &color_tx,
+            Texture &depth_tx,
             const mat4 winmat,
             const mat4 viewmat,
             bool is_only_background);

@@ -370,10 +370,10 @@ struct ShadowTileAllocator {
    * All shadow tilemaps are packed into one texture.
    * Contains every clipmaps level of all directional light and each cubeface with mipmap.
    */
-  draw::Texture tilemap_tx = draw::Texture("tilemap_tx");
+  Texture tilemap_tx = {"tilemap_tx"};
   /** Very small texture containing the result of the update pass. */
   /** FIXME(fclem): It would be nice to avoid GPU > CPU readback. */
-  draw::Texture tilemap_rects_tx = draw::Texture("tilemap_rects_tx");
+  Texture tilemap_rects_tx = {"tilemap_rects_tx"};
   /** UBO containing the description for every allocated tilemap. */
   ShadowTileMapDataBuf tilemaps_data;
   /** Number of maps inside the tilemaps_data. */
@@ -445,8 +445,8 @@ class ShadowModule {
   /**
    * Separate render buffer. This is meant to be replace by directly rendering inside the atlas.
    */
-  draw::Texture render_tx_ = draw::Texture("shadow_target_tx_");
-  eevee::Framebuffer render_fb_ = Framebuffer("shadow_fb");
+  Texture render_tx_ = {"shadow_target_tx_"};
+  Framebuffer render_fb_ = {"shadow_fb"};
 
   /* -------------------------------------------------------------------- */
   /** \name Tilemap Management
@@ -485,7 +485,7 @@ class ShadowModule {
   /** \name Page Management
    * \{ */
 
-  draw::Texture atlas_tx_ = draw::Texture("shadow_atlas_tx_");
+  Texture atlas_tx_ = {"shadow_atlas_tx_"};
 
   /** Pool of unallocated pages waiting to be assigned to specific tiles in the tilemap atlas. */
   ShadowPageHeapBuf pages_free_data_;
@@ -528,7 +528,7 @@ class ShadowModule {
   /** Debug data sent to GPU. */
   ShadowDebugDataBuf debug_data_;
   /** Debug texture to check page status. */
-  draw::Texture debug_page_tx_ = draw::Texture("debug_page_tx_");
+  Texture debug_page_tx_ = {"debug_page_tx_"};
 
   /** \} */
 

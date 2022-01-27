@@ -128,7 +128,7 @@ class Camera {
   }
   const GPUUniformBuf *ubo_get(void) const
   {
-    return data_[data_id_].ubo_get();
+    return data_[data_id_];
   }
   bool is_panoramic(void) const
   {

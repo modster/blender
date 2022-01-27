@@ -49,13 +49,13 @@ class LightProbeModule {
 
   /* Used for rendering probes. */
   /* OPTI(fclem) Share for the whole scene? Only allocate temporary? */
-  draw::Texture cube_depth_tx_ = draw::Texture("CubemapDepth");
-  draw::Texture cube_color_tx_ = draw::Texture("CubemapColor");
+  Texture cube_depth_tx_ = {"CubemapDepth"};
+  Texture cube_color_tx_ = {"CubemapColor"};
   LightProbeView probe_views_[6];
 
-  Framebuffer cube_downsample_fb_ = Framebuffer("cube_downsample");
-  Framebuffer filter_cube_fb_ = Framebuffer("filter_cube");
-  Framebuffer filter_grid_fb_ = Framebuffer("filter_grid");
+  Framebuffer cube_downsample_fb_ = {"cube_downsample"};
+  Framebuffer filter_cube_fb_ = {"filter_cube"};
+  Framebuffer filter_grid_fb_ = {"filter_grid"};
 
   std::array<DRWView *, 6> face_view_ = {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
 
@@ -114,15 +114,15 @@ class LightProbeModule {
 
   const GPUUniformBuf *grid_ubo_get() const
   {
-    return grid_data_.ubo_get();
+    return grid_data_;
   }
   const GPUUniformBuf *cube_ubo_get() const
   {
-    return cube_data_.ubo_get();
+    return cube_data_;
   }
   const GPUUniformBuf *info_ubo_get() const
   {
-    return info_data_.ubo_get();
+    return info_data_;
   }
   GPUTexture **grid_tx_ref_get()
   {
