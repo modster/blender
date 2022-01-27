@@ -49,8 +49,8 @@ class LightProbeModule {
 
   /* Used for rendering probes. */
   /* OPTI(fclem) Share for the whole scene? Only allocate temporary? */
-  Texture cube_depth_tx_ = Texture("CubemapDepth");
-  Texture cube_color_tx_ = Texture("CubemapColor");
+  draw::Texture cube_depth_tx_ = draw::Texture("CubemapDepth");
+  draw::Texture cube_color_tx_ = draw::Texture("CubemapColor");
   LightProbeView probe_views_[6];
 
   Framebuffer cube_downsample_fb_ = Framebuffer("cube_downsample");

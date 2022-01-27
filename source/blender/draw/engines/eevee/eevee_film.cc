@@ -189,8 +189,8 @@ void Film::accumulate(GPUTexture *input, const DRWView *view)
   DRW_draw_pass(accumulate_ps_);
 
   SWAP(Framebuffer, accumulation_fb_[0], accumulation_fb_[1]);
-  SWAP(Texture, data_tx_[0], data_tx_[1]);
-  SWAP(Texture, weight_tx_[0], weight_tx_[1]);
+  SWAP(draw::Texture, data_tx_[0], data_tx_[1]);
+  SWAP(draw::Texture, weight_tx_[0], weight_tx_[1]);
 
   /* Use history after first sample. */
   if (data_.use_history == 0) {

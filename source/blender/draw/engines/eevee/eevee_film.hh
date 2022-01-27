@@ -50,10 +50,10 @@ class Film {
   /** Owned resources. */
   eevee::Framebuffer read_result_fb_;
   eevee::Framebuffer accumulation_fb_[2];
-  eevee::Texture data_tx_[2];
-  eevee::Texture weight_tx_[2];
+  draw::Texture data_tx_[2];
+  draw::Texture weight_tx_[2];
   /** First sample in case we need to blend using it or just reuse it. */
-  eevee::Texture first_sample_tx_;
+  draw::Texture first_sample_tx_;
 
   /** Reference to first_sample_tx_ or data_tx_ depending on the context. */
   GPUTexture *first_sample_ref_;

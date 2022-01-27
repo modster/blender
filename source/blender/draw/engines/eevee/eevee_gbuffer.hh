@@ -53,34 +53,34 @@ enum eClosureBits {
 };
 
 struct GBuffer {
-  Texture transmit_color_tx = Texture("GbufferTransmitColor");
-  Texture transmit_normal_tx = Texture("GbufferTransmitNormal");
-  Texture transmit_data_tx = Texture("GbufferTransmitData");
-  Texture reflect_color_tx = Texture("GbufferReflectionColor");
-  Texture reflect_normal_tx = Texture("GbufferReflectionNormal");
-  Texture volume_tx = Texture("GbufferVolume");
-  Texture emission_tx = Texture("GbufferEmission");
-  Texture transparency_tx = Texture("GbufferTransparency");
+  draw::Texture transmit_color_tx = draw::Texture("GbufferTransmitColor");
+  draw::Texture transmit_normal_tx = draw::Texture("GbufferTransmitNormal");
+  draw::Texture transmit_data_tx = draw::Texture("GbufferTransmitData");
+  draw::Texture reflect_color_tx = draw::Texture("GbufferReflectionColor");
+  draw::Texture reflect_normal_tx = draw::Texture("GbufferReflectionNormal");
+  draw::Texture volume_tx = draw::Texture("GbufferVolume");
+  draw::Texture emission_tx = draw::Texture("GbufferEmission");
+  draw::Texture transparency_tx = draw::Texture("GbufferTransparency");
 
   Framebuffer gbuffer_fb = Framebuffer("Gbuffer");
   Framebuffer volume_fb = Framebuffer("VolumeHeterogeneous");
 
-  Texture holdout_tx = Texture("HoldoutRadiance");
-  Texture diffuse_tx = Texture("DiffuseRadiance");
+  draw::Texture holdout_tx = draw::Texture("HoldoutRadiance");
+  draw::Texture diffuse_tx = draw::Texture("DiffuseRadiance");
 
   Framebuffer radiance_fb = Framebuffer("Radiance");
   Framebuffer radiance_clear_fb = Framebuffer("RadianceClear");
 
   Framebuffer holdout_fb = Framebuffer("Holdout");
 
-  Texture depth_behind_tx = Texture("DepthBehind");
+  draw::Texture depth_behind_tx = draw::Texture("DepthBehind");
 
   Framebuffer depth_behind_fb = Framebuffer("DepthCopy");
 
   /** Raytracing. */
-  Texture ray_data_tx = Texture("RayData");
-  Texture ray_radiance_tx = Texture("RayRadiance");
-  Texture ray_variance_tx = Texture("RayVariance");
+  draw::Texture ray_data_tx = draw::Texture("RayData");
+  draw::Texture ray_radiance_tx = draw::Texture("RayRadiance");
+  draw::Texture ray_variance_tx = draw::Texture("RayVariance");
   Framebuffer ray_data_fb = Framebuffer("RayData");
   Framebuffer ray_denoise_fb = Framebuffer("RayDenoise");
 

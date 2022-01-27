@@ -48,7 +48,7 @@ class HiZBuffer {
    * have to compensate the mipmap alignments. */
   constexpr static int mip_count_ = 6;
   /** TODO/OPTI(fclem): Share it between similar views. */
-  Texture hiz_tx_;
+  draw::Texture hiz_tx_;
 
  public:
   HiZBuffer(Instance &inst) : inst_(inst){};

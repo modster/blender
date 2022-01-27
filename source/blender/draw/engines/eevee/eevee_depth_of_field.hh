@@ -69,8 +69,8 @@ class DepthOfField {
   GPUTexture *weight_fg_tx_ = nullptr;
   GPUTexture *weight_holefill_tx_ = nullptr;
   /** Allocated textures. Owned. */
-  eevee::Texture reduced_coc_tx_ = Texture("dof_reduced_coc");
-  eevee::Texture reduced_color_tx_ = Texture("dof_reduced_color");
+  draw::Texture reduced_coc_tx_ = draw::Texture("dof_reduced_coc");
+  draw::Texture reduced_color_tx_ = draw::Texture("dof_reduced_color");
   /** Input texture. Not owned. */
   GPUTexture *input_color_tx_;
   GPUTexture *input_depth_tx_;

@@ -206,7 +206,7 @@ class DeferredPass {
  * 64x64 2D array texture containing LUT tables and blue noises.
  * \{ */
 
-class UtilityTexture : public Texture {
+class UtilityTexture : public draw::Texture {
   struct Layer {
     float data[UTIL_TEX_SIZE * UTIL_TEX_SIZE][4];
   };

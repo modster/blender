@@ -207,8 +207,8 @@ void ShadingView::update_view(void)
 /** \name LightProbeView
  * \{ */
 
-void LightProbeView::sync(Texture &color_tx,
-                          Texture &depth_tx,
+void LightProbeView::sync(draw::Texture &color_tx,
+                          draw::Texture &depth_tx,
                           const mat4 winmat,
                           const mat4 viewmat,
                           bool is_only_background)
