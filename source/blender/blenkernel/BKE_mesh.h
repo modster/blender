@@ -23,6 +23,7 @@
  */
 
 #include "BKE_mesh_types.h"
+#include "BLI_compiler_attrs.h"
 #include "BLI_utildefines.h"
 
 struct BLI_Stack;
@@ -118,6 +119,9 @@ void BKE_mesh_looptri_get_real_edges(const struct Mesh *mesh,
 void BKE_mesh_free_data_for_undo(struct Mesh *me);
 void BKE_mesh_clear_geometry(struct Mesh *me);
 struct Mesh *BKE_mesh_add(struct Main *bmain, const char *name);
+
+void BKE_mesh_free_editmesh(struct Mesh *mesh);
+
 /**
  * A version of #BKE_mesh_copy_parameters that is intended for evaluated output
  * (the modifier stack for example).
@@ -1037,6 +1041,13 @@ void BKE_mesh_batch_cache_free(struct Mesh *me);
 
 extern void (*BKE_mesh_batch_cache_dirty_tag_cb)(struct Mesh *me, eMeshBatchDirtyMode mode);
 extern void (*BKE_mesh_batch_cache_free_cb)(struct Mesh *me);
+
+/* mesh_debug.c */
+#ifndef NDEBUG
+char *BKE_mesh_debug_info(const struct Mesh *me)
+    ATTR_NONNULL(1) ATTR_MALLOC ATTR_WARN_UNUSED_RESULT;
+void BKE_mesh_debug_print(const struct Mesh *me) ATTR_NONNULL(1);
+#endif
 
 /* Inlines */
 

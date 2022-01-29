@@ -437,6 +437,12 @@ int CustomData_get_clone_layer(const struct CustomData *data, int type);
 int CustomData_get_stencil_layer(const struct CustomData *data, int type);
 
 /**
+ * Returns name of the active layer of the given type or NULL
+ * if no such active layer is defined.
+ */
+const char *CustomData_get_active_layer_name(const struct CustomData *data, int type);
+
+/**
  * Copies the data from source to the data element at index in the first layer of type
  * no effect if there is no layer of type.
  */
@@ -746,6 +752,14 @@ void CustomData_blend_write(struct BlendWriter *writer,
                             CustomDataMask cddata_mask,
                             struct ID *id);
 void CustomData_blend_read(struct BlendDataReader *reader, struct CustomData *data, int count);
+
+#ifndef NDEBUG
+struct DynStr;
+/** Use to inspect mesh data when debugging. */
+void CustomData_debug_info_from_layers(const struct CustomData *data,
+                                       const char *indent,
+                                       struct DynStr *dynstr);
+#endif /* NDEBUG */
 
 #ifdef __cplusplus
 }

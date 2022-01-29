@@ -92,7 +92,7 @@ bool BKE_subsurf_modifier_can_do_gpu_subdiv_ex(const Scene *scene,
     return false;
   }
 
-  if (!GPU_compute_shader_support()) {
+  if (!(GPU_compute_shader_support() && GPU_shader_storage_buffer_objects_support())) {
     return false;
   }
 
@@ -124,8 +124,6 @@ bool BKE_subsurf_modifier_can_do_gpu_subdiv(const Scene *scene,
 
 void (*BKE_subsurf_modifier_free_gpu_cache_cb)(Subdiv *subdiv) = NULL;
 
-/* Main goal of this function is to give usable subdivision surface descriptor
- * which matches settings and topology. */
 Subdiv *BKE_subsurf_modifier_subdiv_descriptor_ensure(const SubsurfModifierData *smd,
                                                       const SubdivSettings *subdiv_settings,
                                                       const Mesh *mesh,

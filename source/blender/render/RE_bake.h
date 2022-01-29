@@ -25,6 +25,7 @@
 
 struct Depsgraph;
 struct ImBuf;
+struct MLoopUV;
 struct Mesh;
 struct Render;
 
@@ -112,7 +113,12 @@ void RE_bake_pixels_populate(struct Mesh *me,
 
 void RE_bake_mask_fill(const BakePixel pixel_array[], size_t num_pixels, char *mask);
 
-void RE_bake_margin(struct ImBuf *ibuf, char *mask, int margin);
+void RE_bake_margin(struct ImBuf *ibuf,
+                    char *mask,
+                    int margin,
+                    char margin_type,
+                    struct Mesh const *me,
+                    char const *uv_layer);
 
 void RE_bake_normal_world_to_object(const BakePixel pixel_array[],
                                     size_t num_pixels,
