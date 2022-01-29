@@ -102,6 +102,10 @@ typedef struct CurvePenData {
   bool link_handles_pressed;
   /* Whether the current state of the moved handle is linked. */
   bool link_handles;
+  /* Whether shortcut for linking handles was pressed. */
+  bool lock_angle_pressed;
+  /* Whether the current state of the moved handle is linked. */
+  bool lock_angle;
   /* Whether some action was done. Used for select. */
   bool acted;
   /* Whether a point was found underneath the mouse. */
@@ -387,14 +391,15 @@ static void move_bp_to_location(BPoint *bp, const float mval[2], const ViewConte
   copy_v3_v3(bp->vec, location);
 }
 
-static bool get_selected_center(const ListBase *nurbs, float r_center[3], bool use_centers)
+static bool get_selected_center(const ListBase *nurbs, float r_center[3], bool use_mid)
 {
   int end_count = 0;
+  zero_v3(r_center);
   LISTBASE_FOREACH (Nurb *, nu1, nurbs) {
     if (nu1->type == CU_BEZIER) {
       for (int i = 0; i < nu1->pntsu; i++) {
         BezTriple *bezt = nu1->bezt + i;
-        if (use_centers) {
+        if (use_mid) {
           if (BEZT_ISSEL_ANY(bezt)) {
             add_v3_v3(r_center, bezt->vec[1]);
             end_count++;
@@ -453,6 +458,15 @@ static void move_all_selected_points(ListBase *nurbs,
   add_v2_v2(change, cpd->move_offset);
 
   const bool link_handles = cpd->link_handles;
+  const bool lock_angle = cpd->lock_angle;
+
+  float change_len = 0.0f;
+  if (lock_angle) {
+    float mval_3d[3], center_mid[3];
+    get_selected_center(nurbs, center_mid, true);
+    screenspace_to_worldspace_int(event->mval, center_mid, vc, mval_3d);
+    change_len = len_v3v3(center_mid, mval_3d);
+  }
 
   LISTBASE_FOREACH (Nurb *, nu, nurbs) {
     if (nu->type == CU_BEZIER) {
@@ -468,25 +482,41 @@ static void move_all_selected_points(ListBase *nurbs,
           remove_handle_movement_constraints(
               bezt, BEZT_ISSEL_IDX(bezt, 0), BEZT_ISSEL_IDX(bezt, 2));
           if (BEZT_ISSEL_IDX(bezt, 0)) {
-            float pos[2], dst[2];
-            worldspace_to_screenspace(bezt->vec[0], vc, pos);
-            add_v2_v2v2(dst, pos, change);
-            move_bezt_handle_or_vertex_to_location(bezt, dst, 0, vc);
-            if (link_handles) {
-              float handle[3];
-              sub_v3_v3v3(handle, bezt->vec[1], bezt->vec[0]);
-              add_v3_v3v3(bezt->vec[2], bezt->vec[1], handle);
+            if (lock_angle) {
+              float change_3d[3];
+              sub_v3_v3v3(change_3d, bezt->vec[0], bezt->vec[1]);
+              normalize_v3_length(change_3d, change_len);
+              add_v3_v3v3(bezt->vec[0], bezt->vec[1], change_3d);
+            }
+            else {
+              float pos[2], dst[2];
+              worldspace_to_screenspace(bezt->vec[0], vc, pos);
+              add_v2_v2v2(dst, pos, change);
+              move_bezt_handle_or_vertex_to_location(bezt, dst, 0, vc);
+              if (link_handles) {
+                float handle[3];
+                sub_v3_v3v3(handle, bezt->vec[1], bezt->vec[0]);
+                add_v3_v3v3(bezt->vec[2], bezt->vec[1], handle);
+              }
             }
           }
           else if (BEZT_ISSEL_IDX(bezt, 2)) {
-            float pos[2], dst[2];
-            worldspace_to_screenspace(bezt->vec[2], vc, pos);
-            add_v2_v2v2(dst, pos, change);
-            move_bezt_handle_or_vertex_to_location(bezt, dst, 2, vc);
-            if (link_handles) {
-              float handle[3];
-              sub_v3_v3v3(handle, bezt->vec[1], bezt->vec[2]);
-              add_v3_v3v3(bezt->vec[0], bezt->vec[1], handle);
+            if (lock_angle) {
+              float change_3d[3];
+              sub_v3_v3v3(change_3d, bezt->vec[2], bezt->vec[1]);
+              normalize_v3_length(change_3d, change_len);
+              add_v3_v3v3(bezt->vec[2], bezt->vec[1], change_3d);
+            }
+            else {
+              float pos[2], dst[2];
+              worldspace_to_screenspace(bezt->vec[2], vc, pos);
+              add_v2_v2v2(dst, pos, change);
+              move_bezt_handle_or_vertex_to_location(bezt, dst, 2, vc);
+              if (link_handles) {
+                float handle[3];
+                sub_v3_v3v3(handle, bezt->vec[1], bezt->vec[2]);
+                add_v3_v3v3(bezt->vec[0], bezt->vec[1], handle);
+              }
             }
           }
         }
@@ -1645,12 +1675,14 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   const int adj_handle = RNA_enum_get(op->ptr, "adj_handle");
   const int move_entire = RNA_enum_get(op->ptr, "move_entire");
   const int link_handles = RNA_enum_get(op->ptr, "link_handles");
+  const int lock_angle = RNA_enum_get(op->ptr, "lock_angle");
 
   if (!cpd->free_toggle_pressed && is_extra_key_pressed(event, free_toggle)) {
     toggle_bezt_free_align_handles(nurbs);
     cpd->dragging = true;
   }
   cpd->free_toggle_pressed = is_extra_key_pressed(event, free_toggle);
+
   if (!cpd->link_handles_pressed && is_extra_key_pressed(event, link_handles)) {
     cpd->link_handles = !cpd->link_handles;
     if (cpd->link_handles) {
@@ -1662,6 +1694,19 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
     }
   }
   cpd->link_handles_pressed = is_extra_key_pressed(event, link_handles);
+
+  if (!cpd->lock_angle_pressed && is_extra_key_pressed(event, lock_angle)) {
+    cpd->lock_angle = !cpd->lock_angle;
+    if (cpd->lock_angle) {
+      move_all_selected_points(nurbs, false, cpd, event, &vc);
+    }
+    else {
+      // Recalculate offset after lock angle is turned off
+      cpd->offset_calc = false;
+    }
+  }
+  cpd->lock_angle_pressed = is_extra_key_pressed(event, lock_angle);
+
   const bool move_entire_pressed = is_extra_key_pressed(event, move_entire);
 
   if (ELEM(event->type, MOUSEMOVE, INBETWEEN_MOUSEMOVE)) {
@@ -1911,6 +1956,12 @@ void CURVE_OT_pen(wmOperatorType *ot)
                       NONE,
                       "Link Handles",
                       "Mirror the movement of one handle onto the other");
+  prop = RNA_def_enum(ot->srna,
+                      "lock_angle",
+                      prop_extra_key_types,
+                      NONE,
+                      "Lock Handle Angle",
+                      "Move the handle along its current angle");
   prop = RNA_def_boolean(ot->srna,
                          "extrude_point",
                          false,
