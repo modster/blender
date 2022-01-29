@@ -1370,6 +1370,8 @@ uiBut *uiDefIconTextButO_ptr(uiBlock *block,
 /* for passing inputs to ButO buttons */
 struct PointerRNA *UI_but_operator_ptr_get(uiBut *but);
 
+struct bContextStore *UI_but_context_get(const uiBut *but);
+
 void UI_but_unit_type_set(uiBut *but, int unit_type);
 int UI_but_unit_type_get(const uiBut *but);
 
@@ -2425,6 +2427,13 @@ void uiTemplateCacheFileProcedural(uiLayout *layout,
  * Draw the time related properties of the CacheFile.
  */
 void uiTemplateCacheFileTimeSettings(uiLayout *layout, struct PointerRNA *fileptr);
+
+/**
+ * Draw the override layers related properties of the CacheFile.
+ */
+void uiTemplateCacheFileLayers(uiLayout *layout,
+                               const struct bContext *C,
+                               struct PointerRNA *fileptr);
 
 /* Default UIList class name, keep in sync with its declaration in bl_ui/__init__.py */
 #define UI_UL_DEFAULT_CLASS_NAME "UI_UL_list"

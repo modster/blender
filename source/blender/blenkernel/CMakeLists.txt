@@ -160,9 +160,12 @@ set(SRC
   intern/icons.cc
   intern/icons_rasterize.c
   intern/idprop.c
+  intern/idprop_create.cc
+  intern/idprop_serialize.cc
   intern/idprop_utils.c
   intern/idtype.c
   intern/image.c
+  intern/image_partial_update.cc
   intern/image_gen.c
   intern/image_gpu.cc
   intern/image_save.c
@@ -177,6 +180,7 @@ set(SRC
   intern/lib_id.c
   intern/lib_id_delete.c
   intern/lib_id_eval.c
+  intern/lib_id_remapper.cc
   intern/lib_override.c
   intern/lib_query.c
   intern/lib_remap.c
@@ -195,6 +199,7 @@ set(SRC
   intern/mesh.cc
   intern/mesh_boolean_convert.cc
   intern/mesh_convert.cc
+  intern/mesh_debug.cc
   intern/mesh_evaluate.cc
   intern/mesh_fair.cc
   intern/mesh_iterators.c
@@ -381,6 +386,7 @@ set(SRC
   BKE_hair.h
   BKE_icons.h
   BKE_idprop.h
+  BKE_idprop.hh
   BKE_idtype.h
   BKE_image.h
   BKE_image_save.h
@@ -518,7 +524,7 @@ set(LIB
   bf_simulation
 
   # For `vfontdata_freetype.c`.
-  ${FREETYPE_LIBRARY}
+  ${FREETYPE_LIBRARIES} ${BROTLI_LIBRARIES}
 )
 
 if(WITH_BINRELOC)
@@ -816,9 +822,13 @@ if(WITH_GTESTS)
     intern/bpath_test.cc
     intern/cryptomatte_test.cc
     intern/fcurve_test.cc
+    intern/idprop_serialize_test.cc
+    intern/image_partial_update_test.cc
     intern/lattice_deform_test.cc
     intern/layer_test.cc
+    intern/lib_id_remapper_test.cc
     intern/lib_id_test.cc
+    intern/lib_remap_test.cc
     intern/tracking_test.cc
   )
   set(TEST_INC

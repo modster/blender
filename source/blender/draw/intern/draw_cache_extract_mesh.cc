@@ -570,6 +570,7 @@ static struct TaskNode *mesh_extract_render_data_node_create(struct TaskGraph *t
 static void mesh_buffer_cache_create_requested(struct TaskGraph *task_graph,
                                                MeshBatchCache *cache,
                                                MeshBufferCache *mbc,
+                                               Object *object,
                                                Mesh *me,
 
                                                const bool is_editmode,
@@ -615,7 +616,7 @@ static void mesh_buffer_cache_create_requested(struct TaskGraph *task_graph,
    */
   const bool do_hq_normals = (scene->r.perf_flag & SCE_PERF_HQ_NORMALS) != 0 ||
                              GPU_use_hq_normals_workaround();
-  const bool override_single_mat = mesh_render_mat_len_get(me) <= 1;
+  const bool override_single_mat = mesh_render_mat_len_get(object, me) <= 1;
 
   /* Create an array containing all the extractors that needs to be executed. */
   ExtractorRunDatas extractors;
@@ -700,7 +701,7 @@ static void mesh_buffer_cache_create_requested(struct TaskGraph *task_graph,
 #endif
 
   MeshRenderData *mr = mesh_render_data_create(
-      me, is_editmode, is_paint_mode, is_mode_active, obmat, do_final, do_uvedit, ts);
+      object, me, is_editmode, is_paint_mode, is_mode_active, obmat, do_final, do_uvedit, ts);
   mr->use_hide = use_hide;
   mr->use_subsurf_fdots = use_subsurf_fdots;
   mr->use_final_mesh = do_final;
@@ -848,6 +849,7 @@ static void mesh_buffer_cache_create_requested_subdiv(MeshBatchCache *cache,
   }
 
   MeshRenderData mr;
+  memset(&mr, 0, sizeof(MeshRenderData));
   draw_subdiv_init_mesh_render_data(subdiv_cache, &mr, ts);
   mesh_render_data_update_loose_geom(&mr, mbc, MR_ITER_LEDGE | MR_ITER_LVERT, MR_DATA_LOOSE_GEOM);
 
@@ -860,8 +862,26 @@ static void mesh_buffer_cache_create_requested_subdiv(MeshBatchCache *cache,
 
     extractor->init_subdiv(subdiv_cache, &mr, cache, buffer, data);
 
-    if (extractor->iter_subdiv) {
-      extractor->iter_subdiv(subdiv_cache, &mr, data);
+    if (extractor->iter_subdiv_mesh || extractor->iter_subdiv_bm) {
+      int *subdiv_loop_poly_index = subdiv_cache->subdiv_loop_poly_index;
+      if (subdiv_cache->bm) {
+        for (uint i = 0; i < subdiv_cache->num_subdiv_quads; i++) {
+          /* Multiply by 4 to have the start index of the quad's loop, as subdiv_loop_poly_index is
+           * based on the subdivision loops. */
+          const int poly_origindex = subdiv_loop_poly_index[i * 4];
+          const BMFace *efa = bm_original_face_get(&mr, poly_origindex);
+          extractor->iter_subdiv_bm(subdiv_cache, &mr, data, i, efa);
+        }
+      }
+      else {
+        for (uint i = 0; i < subdiv_cache->num_subdiv_quads; i++) {
+          /* Multiply by 4 to have the start index of the quad's loop, as subdiv_loop_poly_index is
+           * based on the subdivision loops. */
+          const int poly_origindex = subdiv_loop_poly_index[i * 4];
+          const MPoly *mp = &mr.mpoly[poly_origindex];
+          extractor->iter_subdiv_mesh(subdiv_cache, &mr, data, i, mp);
+        }
+      }
     }
 
     if (extractor->iter_loose_geom_subdiv) {
@@ -883,6 +903,7 @@ extern "C" {
 void mesh_buffer_cache_create_requested(struct TaskGraph *task_graph,
                                         MeshBatchCache *cache,
                                         MeshBufferCache *mbc,
+                                        Object *object,
                                         Mesh *me,
 
                                         const bool is_editmode,
@@ -899,6 +920,7 @@ void mesh_buffer_cache_create_requested(struct TaskGraph *task_graph,
   blender::draw::mesh_buffer_cache_create_requested(task_graph,
                                                     cache,
                                                     mbc,
+                                                    object,
                                                     me,
                                                     is_editmode,
                                                     is_paint_mode,

@@ -438,7 +438,8 @@ void mesh_render_data_update_normals(MeshRenderData *mr, const eMRDataType data_
   }
 }
 
-MeshRenderData *mesh_render_data_create(Mesh *me,
+MeshRenderData *mesh_render_data_create(Object *object,
+                                        Mesh *me,
                                         const bool is_editmode,
                                         const bool is_paint_mode,
                                         const bool is_mode_active,
@@ -449,17 +450,19 @@ MeshRenderData *mesh_render_data_create(Mesh *me,
 {
   MeshRenderData *mr = MEM_callocN(sizeof(*mr), __func__);
   mr->toolsettings = ts;
-  mr->mat_len = mesh_render_mat_len_get(me);
+  mr->mat_len = mesh_render_mat_len_get(object, me);
 
   copy_m4_m4(mr->obmat, obmat);
 
   if (is_editmode) {
-    BLI_assert(me->edit_mesh->mesh_eval_cage && me->edit_mesh->mesh_eval_final);
+    Mesh *editmesh_eval_final = BKE_object_get_editmesh_eval_final(object);
+    Mesh *editmesh_eval_cage = BKE_object_get_editmesh_eval_cage(object);
+
+    BLI_assert(editmesh_eval_cage && editmesh_eval_final);
     mr->bm = me->edit_mesh->bm;
     mr->edit_bmesh = me->edit_mesh;
-    mr->me = (do_final) ? me->edit_mesh->mesh_eval_final : me->edit_mesh->mesh_eval_cage;
 
-    mr->me->attributes_active_index = me->attributes_active_index;
+    mr->me = (do_final) ? editmesh_eval_final : editmesh_eval_cage;
 
     /* needed so correct vcol layer is shown in edit mode */
     mr->me->attr_color_active = me->attr_color_active;
@@ -494,7 +497,8 @@ MeshRenderData *mesh_render_data_create(Mesh *me,
     mr->eed_act = BM_mesh_active_edge_get(mr->bm);
     mr->eve_act = BM_mesh_active_vert_get(mr->bm);
 
-    mr->crease_ofs = CustomData_get_offset(&mr->bm->edata, CD_CREASE);
+    mr->vert_crease_ofs = CustomData_get_offset(&mr->bm->vdata, CD_CREASE);
+    mr->edge_crease_ofs = CustomData_get_offset(&mr->bm->edata, CD_CREASE);
     mr->bweight_ofs = CustomData_get_offset(&mr->bm->edata, CD_BWEIGHT);
 #ifdef WITH_FREESTYLE
     mr->freestyle_edge_ofs = CustomData_get_offset(&mr->bm->edata, CD_FREESTYLE_EDGE);
@@ -513,7 +517,7 @@ MeshRenderData *mesh_render_data_create(Mesh *me,
 
     /* Seems like the mesh_eval_final do not have the right origin indices.
      * Force not mapped in this case. */
-    if (has_mdata && do_final && me->edit_mesh->mesh_eval_final != me->edit_mesh->mesh_eval_cage) {
+    if (has_mdata && do_final && editmesh_eval_final != editmesh_eval_cage) {
       // mr->edit_bmesh = NULL;
       mr->extract_type = MR_EXTRACT_MESH;
     }
