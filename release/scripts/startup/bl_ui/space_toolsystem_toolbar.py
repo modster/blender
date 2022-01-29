@@ -1222,6 +1222,11 @@ class _defs_edit_curve:
 
     @ToolDef.from_fn
     def pen():
+        def draw_settings(_context, layout, tool):
+            props = tool.operator_properties("curve.pen")
+            layout.prop(props, "sel_dist_mul")
+            layout.prop(props, "extrude_handle")
+            layout.prop(props, "extrude_center")
         return dict(
             idname="builtin.pen",
             label="Curve Pen",
@@ -1229,6 +1234,7 @@ class _defs_edit_curve:
             icon="ops.curve.draw",
             widget=None,
             keymap=(),
+            draw_settings=draw_settings,
         )
 
     @ToolDef.from_fn
