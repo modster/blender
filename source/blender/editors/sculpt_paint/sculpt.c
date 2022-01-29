@@ -4718,6 +4718,7 @@ static bool sculpt_needs_connectivity_info(const Sculpt *sd,
           (brush->sculpt_tool == SCULPT_TOOL_POSE) ||
           (brush->sculpt_tool == SCULPT_TOOL_BOUNDARY) ||
           (brush->sculpt_tool == SCULPT_TOOL_SLIDE_RELAX) ||
+          SCULPT_TOOL_NEEDS_COLOR(brush->sculpt_tool) || 
           (brush->sculpt_tool == SCULPT_TOOL_CLOTH) || (brush->sculpt_tool == SCULPT_TOOL_SMEAR) ||
           (brush->sculpt_tool == SCULPT_TOOL_DRAW_FACE_SETS) ||
           (brush->sculpt_tool == SCULPT_TOOL_DISPLACEMENT_SMEAR));
@@ -5077,7 +5078,7 @@ static void sculpt_brush_stroke_init(bContext *C, wmOperator *op)
   SculptSession *ss = CTX_data_active_object(C)->sculpt;
   Brush *brush = BKE_paint_brush(&sd->paint);
   int mode = RNA_enum_get(op->ptr, "mode");
-  bool is_smooth, needs_colors;
+  bool need_pmap, needs_colors;
   bool need_mask = false;
 
   if (brush->sculpt_tool == SCULPT_TOOL_MASK) {
@@ -5092,7 +5093,7 @@ static void sculpt_brush_stroke_init(bContext *C, wmOperator *op)
   view3d_operator_needs_opengl(C);
   sculpt_brush_init_tex(scene, sd, ss);
 
-  is_smooth = sculpt_needs_connectivity_info(sd, brush, ss, mode);
+  need_pmap = sculpt_needs_connectivity_info(sd, brush, ss, mode);
   needs_colors = SCULPT_TOOL_NEEDS_COLOR(brush->sculpt_tool);
 
   if (needs_colors) {
@@ -5102,7 +5103,7 @@ static void sculpt_brush_stroke_init(bContext *C, wmOperator *op)
   /* CTX_data_ensure_evaluated_depsgraph should be used at the end to include the updates of
    * earlier steps modifying the data. */
   Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
-  BKE_sculpt_update_object_for_edit(depsgraph, ob, is_smooth, need_mask, needs_colors);
+  BKE_sculpt_update_object_for_edit(depsgraph, ob, need_pmap, need_mask, needs_colors);
 }
 
 static void sculpt_restore_mesh(Sculpt *sd, Object *ob)

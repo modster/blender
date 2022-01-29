@@ -1509,6 +1509,10 @@ void SCULPT_undo_push_end_ex(struct Object *ob, const bool use_nested_undo)
 
 static void sculpt_undo_set_active_layer(struct bContext *C, SculptAttrRef *attr)
 {
+  if (attr->domain == ATTR_DOMAIN_AUTO) {
+    return;
+  }
+
   Object *ob = CTX_data_active_object(C);
   Mesh *me = BKE_object_get_original_mesh(ob);
 

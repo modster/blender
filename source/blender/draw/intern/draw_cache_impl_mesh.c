@@ -1248,11 +1248,11 @@ static void sculpt_request_active_vcol(MeshBatchCache *cache, Object *object, Me
   DRW_MeshAttributes attrs_needed;
   drw_mesh_attributes_clear(&attrs_needed);
 
-  const Mesh *me_final = editmesh_final_or_this(me);
+  const Mesh *me_final = editmesh_final_or_this(object, me);
   const CustomData *cd_vdata = mesh_cd_vdata_get_from_mesh(me_final);
   const CustomData *cd_ldata = mesh_cd_ldata_get_from_mesh(me_final);
 
-  if (mesh_cd_calc_active_vcol_layer(me, &attrs_needed)) {
+  if (mesh_cd_calc_active_vcol_layer(object, me, &attrs_needed)) {
     int active = mesh_cd_get_active_color_i(me_final, cd_vdata, cd_ldata);
     int render = mesh_cd_get_render_color_i(me_final, cd_vdata, cd_ldata);
 

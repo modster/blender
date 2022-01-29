@@ -1964,7 +1964,7 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
     }
   }
 
-  if (!MAIN_VERSION_ATLEAST(bmain, 300, 26)) {
+  if (!MAIN_VERSION_ATLEAST(bmain, 302, 0)) {
     LISTBASE_FOREACH (Brush *, br, &bmain->brushes) {
       /* buggy code in wm_toolsystem broke smear in old files,
          reset to defaults*/
@@ -2376,7 +2376,7 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
   }
 
   /* rebuild active/render color attribute references*/
-  if (!MAIN_VERSION_ATLEAST(bmain, 301, 5)) {
+  if (!MAIN_VERSION_ATLEAST(bmain, 302, 0)) {
     LISTBASE_FOREACH (Mesh *, me, &bmain->meshes) {
       for (int step = 0; step < 2; step++) {
         CustomDataLayer *actlayer = NULL;
