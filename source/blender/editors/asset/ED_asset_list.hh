@@ -24,10 +24,10 @@
 
 #include "BLI_function_ref.hh"
 
-struct AssetLibraryReference;
 struct AssetHandle;
-struct bContext;
+struct AssetLibraryReference;
 struct FileDirEntry;
+struct bContext;
 
 std::string ED_assetlist_asset_filepath_get(const bContext *C,
                                             const AssetLibraryReference &library_reference,
@@ -35,4 +35,4 @@ std::string ED_assetlist_asset_filepath_get(const bContext *C,
 
 /* Can return false to stop iterating. */
 using AssetListIterFn = blender::FunctionRef<bool(AssetHandle)>;
-void ED_assetlist_iterate(const AssetLibraryReference *library_reference, AssetListIterFn fn);
+void ED_assetlist_iterate(const AssetLibraryReference &library_reference, AssetListIterFn fn);

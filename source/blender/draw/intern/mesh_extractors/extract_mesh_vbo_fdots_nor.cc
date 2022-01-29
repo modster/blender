@@ -28,6 +28,7 @@ namespace blender::draw {
 /* ---------------------------------------------------------------------- */
 /** \name Extract Face-dots Normal and edit flag
  * \{ */
+
 #define NOR_AND_FLAG_DEFAULT 0
 #define NOR_AND_FLAG_SELECT 1
 #define NOR_AND_FLAG_ACTIVE -1
@@ -105,7 +106,7 @@ constexpr MeshExtract create_extractor_fdots_nor()
   extractor.data_type = MR_DATA_LOOP_NOR;
   extractor.data_size = 0;
   extractor.use_threading = false;
-  extractor.mesh_buffer_offset = offsetof(MeshBufferCache, vbo.fdots_nor);
+  extractor.mesh_buffer_offset = offsetof(MeshBufferList, vbo.fdots_nor);
   return extractor;
 }
 
@@ -114,6 +115,7 @@ constexpr MeshExtract create_extractor_fdots_nor()
 /* ---------------------------------------------------------------------- */
 /** \name Extract Face-dots High Quality Normal and edit flag
  * \{ */
+
 static void extract_fdots_nor_hq_init(const MeshRenderData *mr,
                                       struct MeshBatchCache *UNUSED(cache),
                                       void *buf,
@@ -186,7 +188,7 @@ constexpr MeshExtract create_extractor_fdots_nor_hq()
   extractor.data_type = MR_DATA_LOOP_NOR;
   extractor.data_size = 0;
   extractor.use_threading = false;
-  extractor.mesh_buffer_offset = offsetof(MeshBufferCache, vbo.fdots_nor);
+  extractor.mesh_buffer_offset = offsetof(MeshBufferList, vbo.fdots_nor);
   return extractor;
 }
 

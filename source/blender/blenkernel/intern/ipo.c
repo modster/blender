@@ -184,8 +184,8 @@ IDTypeInfo IDType_ID_IP = {
     .name = "Ipo",
     .name_plural = "ipos",
     .translation_context = "",
-    .flags = IDTYPE_FLAGS_NO_COPY | IDTYPE_FLAGS_NO_LIBLINKING | IDTYPE_FLAGS_NO_MAKELOCAL |
-             IDTYPE_FLAGS_NO_ANIMDATA,
+    .flags = IDTYPE_FLAGS_NO_COPY | IDTYPE_FLAGS_NO_LIBLINKING | IDTYPE_FLAGS_NO_ANIMDATA,
+    .asset_type_info = NULL,
 
     .init_data = NULL,
     .copy_data = NULL,
@@ -193,6 +193,7 @@ IDTypeInfo IDType_ID_IP = {
     .make_local = NULL,
     .foreach_id = NULL,
     .foreach_cache = NULL,
+    .foreach_path = NULL,
     .owner_get = NULL,
 
     .blend_write = NULL,
@@ -2014,7 +2015,8 @@ static void nlastrips_to_animdata(ID *id, ListBase *strips)
         }
       }
 
-      /* try to add this strip to the current NLA-Track (i.e. the 'last' one on the stack atm) */
+      /* Try to add this strip to the current NLA-Track
+       * (i.e. the 'last' one on the stack at the moment). */
       if (BKE_nlatrack_add_strip(nlt, strip, false) == 0) {
         /* trying to add to the current failed (no space),
          * so add a new track to the stack, and add to that...
@@ -2038,20 +2040,61 @@ static void nlastrips_to_animdata(ID *id, ListBase *strips)
   }
 }
 
+typedef struct Seq_callback_data {
+  Main *bmain;
+  Scene *scene;
+  AnimData *adt;
+} Seq_callback_data;
+
+static bool seq_convert_callback(Sequence *seq, void *userdata)
+{
+  IpoCurve *icu = (seq->ipo) ? seq->ipo->curve.first : NULL;
+  short adrcode = SEQ_FAC1;
+
+  if (G.debug & G_DEBUG) {
+    printf("\tconverting sequence strip %s\n", seq->name + 2);
+  }
+
+  if (ELEM(NULL, seq->ipo, icu)) {
+    seq->flag |= SEQ_USE_EFFECT_DEFAULT_FADE;
+    return true;
+  }
+
+  /* patch adrcode, so that we can map
+   * to different DNA variables later
+   * (semi-hack (tm) )
+   */
+  switch (seq->type) {
+    case SEQ_TYPE_IMAGE:
+    case SEQ_TYPE_META:
+    case SEQ_TYPE_SCENE:
+    case SEQ_TYPE_MOVIE:
+    case SEQ_TYPE_COLOR:
+      adrcode = SEQ_FAC_OPACITY;
+      break;
+    case SEQ_TYPE_SPEED:
+      adrcode = SEQ_FAC_SPEED;
+      break;
+  }
+  icu->adrcode = adrcode;
+
+  Seq_callback_data *cd = (Seq_callback_data *)userdata;
+
+  /* convert IPO */
+  ipo_to_animdata(cd->bmain, (ID *)cd->scene, seq->ipo, NULL, NULL, seq);
+
+  if (cd->adt->action) {
+    cd->adt->action->idroot = ID_SCE; /* scene-rooted */
+  }
+
+  id_us_min(&seq->ipo->id);
+  seq->ipo = NULL;
+  return true;
+}
+
 /* *************************************************** */
 /* External API - Only Called from do_versions() */
 
-/* Called from do_versions() in readfile.c to convert the old 'IPO/adrcode' system
- * to the new 'Animato/RNA' system.
- *
- * The basic method used here, is to loop over data-blocks which have IPO-data,
- * and add those IPO's to new AnimData blocks as Actions.
- * Action/NLA data only works well for Objects, so these only need to be checked for there.
- *
- * Data that has been converted should be freed immediately, which means that it is immediately
- * clear which data-blocks have yet to be converted, and also prevent freeing errors when we exit.
- */
-/* XXX currently done after all file reading... */
 void do_versions_ipos_to_animato(Main *bmain)
 {
   ListBase drivers = {NULL, NULL};
@@ -2286,52 +2329,8 @@ void do_versions_ipos_to_animato(Main *bmain)
     Scene *scene = (Scene *)id;
     Editing *ed = scene->ed;
     if (ed && ed->seqbasep) {
-      Sequence *seq;
-
-      AnimData *adt = BKE_animdata_ensure_id(id);
-
-      SEQ_ALL_BEGIN (ed, seq) {
-        IpoCurve *icu = (seq->ipo) ? seq->ipo->curve.first : NULL;
-        short adrcode = SEQ_FAC1;
-
-        if (G.debug & G_DEBUG) {
-          printf("\tconverting sequence strip %s\n", seq->name + 2);
-        }
-
-        if (ELEM(NULL, seq->ipo, icu)) {
-          seq->flag |= SEQ_USE_EFFECT_DEFAULT_FADE;
-          continue;
-        }
-
-        /* patch adrcode, so that we can map
-         * to different DNA variables later
-         * (semi-hack (tm) )
-         */
-        switch (seq->type) {
-          case SEQ_TYPE_IMAGE:
-          case SEQ_TYPE_META:
-          case SEQ_TYPE_SCENE:
-          case SEQ_TYPE_MOVIE:
-          case SEQ_TYPE_COLOR:
-            adrcode = SEQ_FAC_OPACITY;
-            break;
-          case SEQ_TYPE_SPEED:
-            adrcode = SEQ_FAC_SPEED;
-            break;
-        }
-        icu->adrcode = adrcode;
-
-        /* convert IPO */
-        ipo_to_animdata(bmain, (ID *)scene, seq->ipo, NULL, NULL, seq);
-
-        if (adt->action) {
-          adt->action->idroot = ID_SCE; /* scene-rooted */
-        }
-
-        id_us_min(&seq->ipo->id);
-        seq->ipo = NULL;
-      }
-      SEQ_ALL_END;
+      Seq_callback_data cb_data = {bmain, scene, BKE_animdata_ensure_id(id)};
+      SEQ_for_each_callback(&ed->seqbase, seq_convert_callback, &cb_data);
     }
   }
 

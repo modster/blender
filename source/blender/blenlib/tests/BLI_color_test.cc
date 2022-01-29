@@ -6,8 +6,8 @@
 
 namespace blender::tests {
 
-/**
- * \name Conversions
+/* -------------------------------------------------------------------- */
+/** \name Conversions
  * \{ */
 
 TEST(color, ThemeByteToFloat)
@@ -128,6 +128,6 @@ TEST(color, SceneLinearByteDecoding)
   EXPECT_NEAR(0.5f, decoded.a, 0.01f);
 }
 
-/* \} */
+/** \} */
 
 }  // namespace blender::tests

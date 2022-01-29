@@ -30,6 +30,8 @@
 
 #include "DNA_image_types.h"
 
+#include "MEM_guardedalloc.h"
+
 #include "IMB_colormanagement.h"
 #include "IMB_imbuf.h"
 #include "IMB_imbuf_types.h"
@@ -402,12 +404,16 @@ bool BKE_image_save(
 
   bool colorspace_changed = false;
 
+  eUDIM_TILE_FORMAT tile_format;
+  char *udim_pattern = NULL;
+
   if (ima->source == IMA_SRC_TILED) {
-    /* Verify filepath for tiles images. */
-    if (BLI_path_sequence_decode(opts->filepath, NULL, NULL, NULL) != 1001) {
+    /* Verify filepath for tiled images contains a valid UDIM marker. */
+    udim_pattern = BKE_image_get_tile_strformat(opts->filepath, &tile_format);
+    if (tile_format == UDIM_TILE_FORMAT_NONE) {
       BKE_reportf(reports,
                   RPT_ERROR,
-                  "When saving a tiled image, the path '%s' must contain the UDIM tag 1001",
+                  "When saving a tiled image, the path '%s' must contain a valid UDIM marker",
                   opts->filepath);
       return false;
     }
@@ -418,31 +424,29 @@ bool BKE_image_save(
     }
   }
 
-  /* Save image - or, for tiled images, the first tile. */
-  bool ok = image_save_single(reports, ima, iuser, opts, &colorspace_changed);
-
-  if (ok && ima->source == IMA_SRC_TILED) {
+  /* Save images */
+  bool ok = false;
+  if (ima->source != IMA_SRC_TILED) {
+    ok = image_save_single(reports, ima, iuser, opts, &colorspace_changed);
+  }
+  else {
     char filepath[FILE_MAX];
     BLI_strncpy(filepath, opts->filepath, sizeof(filepath));
 
-    char head[FILE_MAX], tail[FILE_MAX];
-    unsigned short numlen;
-    BLI_path_sequence_decode(filepath, head, tail, &numlen);
-
-    /* Save all other tiles. */
+    /* Save all the tiles. */
     LISTBASE_FOREACH (ImageTile *, tile, &ima->tiles) {
-      /* Tile 1001 was already saved before the loop. */
-      if (tile->tile_number == 1001 || !ok) {
-        continue;
-      }
-
-      /* Build filepath of the tile. */
-      BLI_path_sequence_encode(opts->filepath, head, tail, numlen, tile->tile_number);
+      BKE_image_set_filepath_from_tile_number(
+          opts->filepath, udim_pattern, tile_format, tile->tile_number);
 
       iuser->tile = tile->tile_number;
-      ok = ok && image_save_single(reports, ima, iuser, opts, &colorspace_changed);
+      ok = image_save_single(reports, ima, iuser, opts, &colorspace_changed);
+      if (!ok) {
+        break;
+      }
     }
+    BLI_strncpy(ima->filepath, filepath, sizeof(ima->filepath));
     BLI_strncpy(opts->filepath, filepath, sizeof(opts->filepath));
+    MEM_freeN(udim_pattern);
   }
 
   if (colorspace_changed) {

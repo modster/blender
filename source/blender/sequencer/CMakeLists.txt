@@ -33,6 +33,7 @@ set(INC
   ../render
   ../windowmanager
   ../../../intern/atomic
+  ../../../intern/clog
   ../../../intern/guardedalloc
 
   # dna_type_offsets.h
@@ -62,6 +63,8 @@ set(SRC
   SEQ_utils.h
 
   intern/clipboard.c
+  intern/disk_cache.c
+  intern/disk_cache.h
   intern/effects.c
   intern/effects.h
   intern/image_cache.c

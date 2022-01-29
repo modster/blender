@@ -547,12 +547,6 @@ static void data_dir_add(ListBase *lb, const char *member, const bool use_all)
   BLI_addtail(lb, link);
 }
 
-/**
- * \param C: Context
- * \param use_store: Use 'C->wm.store'
- * \param use_rna: Use Include the properties from 'RNA_Context'
- * \param use_all: Don't skip values (currently only "scene")
- */
 ListBase CTX_data_dir_get_ex(const bContext *C,
                              const bool use_store,
                              const bool use_rna,
@@ -655,6 +649,11 @@ void CTX_data_pointer_set(bContextDataResult *result, ID *id, StructRNA *type, v
   RNA_pointer_create(id, type, data, &result->ptr);
 }
 
+void CTX_data_pointer_set_ptr(bContextDataResult *result, const PointerRNA *ptr)
+{
+  result->ptr = *ptr;
+}
+
 void CTX_data_id_list_add(bContextDataResult *result, ID *id)
 {
   CollectionPointerLink *link = MEM_callocN(sizeof(CollectionPointerLink), "CTX_data_id_list_add");
@@ -667,6 +666,14 @@ void CTX_data_list_add(bContextDataResult *result, ID *id, StructRNA *type, void
 {
   CollectionPointerLink *link = MEM_callocN(sizeof(CollectionPointerLink), "CTX_data_list_add");
   RNA_pointer_create(id, type, data, &link->ptr);
+
+  BLI_addtail(&result->list, link);
+}
+
+void CTX_data_list_add_ptr(bContextDataResult *result, const PointerRNA *ptr)
+{
+  CollectionPointerLink *link = MEM_callocN(sizeof(CollectionPointerLink), "CTX_data_list_add");
+  link->ptr = *ptr;
 
   BLI_addtail(&result->list, link);
 }
@@ -1114,13 +1121,6 @@ RenderEngineType *CTX_data_engine_type(const bContext *C)
   return RE_engines_find(scene->r.engine);
 }
 
-/**
- * This is tricky. Sometimes the user overrides the render_layer
- * but not the scene_collection. In this case what to do?
- *
- * If the scene_collection is linked to the ViewLayer we use it.
- * Otherwise we fallback to the active one of the ViewLayer.
- */
 LayerCollection *CTX_data_layer_collection(const bContext *C)
 {
   ViewLayer *view_layer = CTX_data_view_layer(C);

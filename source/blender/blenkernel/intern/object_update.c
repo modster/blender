@@ -67,14 +67,6 @@
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_query.h"
 
-/**
- * Restore the object->data to a non-modifier evaluated state.
- *
- * Some changes done directly in evaluated object require them to be reset
- * before being re-evaluated.
- * For example, we need to call this before #BKE_mesh_new_from_object(),
- * in case we removed/added modifiers in the evaluated object.
- */
 void BKE_object_eval_reset(Object *ob_eval)
 {
   BKE_object_free_derived_caches(ob_eval);
@@ -88,10 +80,10 @@ void BKE_object_eval_local_transform(Depsgraph *depsgraph, Object *ob)
   BKE_object_to_mat4(ob, ob->obmat);
 }
 
-/* Evaluate parent */
-/* NOTE: based on solve_parenting(), but with the cruft stripped out */
 void BKE_object_eval_parent(Depsgraph *depsgraph, Object *ob)
 {
+  /* NOTE: based on `solve_parenting()`, but with the cruft stripped out. */
+
   Object *par = ob->parent;
 
   float totmat[4][4];
@@ -183,6 +175,11 @@ void BKE_object_handle_data_update(Depsgraph *depsgraph, Scene *scene, Object *o
       cddata_masks.fmask |= CD_MASK_PROP_ALL;
       cddata_masks.pmask |= CD_MASK_PROP_ALL;
       cddata_masks.lmask |= CD_MASK_PROP_ALL;
+
+      /* Also copy over normal layers to avoid recomputation. */
+      cddata_masks.pmask |= CD_MASK_NORMAL;
+      cddata_masks.vmask |= CD_MASK_NORMAL;
+
       /* Make sure Freestyle edge/face marks appear in DM for render (see T40315).
        * Due to Line Art implementation, edge marks should also be shown in viewport. */
 #ifdef WITH_FREESTYLE
@@ -282,7 +279,12 @@ void BKE_object_handle_data_update(Depsgraph *depsgraph, Scene *scene, Object *o
 /** Bounding box from evaluated geometry. */
 static void object_sync_boundbox_to_original(Object *object_orig, Object *object_eval)
 {
-  BoundBox *bb = BKE_object_boundbox_get(object_eval);
+  BoundBox *bb = object_eval->runtime.bb;
+  if (!bb || (bb->flag & BOUNDBOX_DIRTY)) {
+    BKE_object_boundbox_calc_from_evaluated_geometry(object_eval);
+  }
+
+  bb = BKE_object_boundbox_get(object_eval);
   if (bb != NULL) {
     if (object_orig->runtime.bb == NULL) {
       object_orig->runtime.bb = MEM_mallocN(sizeof(*object_orig->runtime.bb), __func__);

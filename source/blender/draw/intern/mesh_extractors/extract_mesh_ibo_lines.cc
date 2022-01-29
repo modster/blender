@@ -25,6 +25,8 @@
 
 #include "extract_mesh.h"
 
+#include "draw_subdivision.h"
+
 namespace blender::draw {
 
 /* ---------------------------------------------------------------------- */
@@ -155,6 +157,33 @@ static void extract_lines_finish(const MeshRenderData *UNUSED(mr),
   GPU_indexbuf_build_in_place(elb, ibo);
 }
 
+static void extract_lines_init_subdiv(const DRWSubdivCache *subdiv_cache,
+                                      const MeshRenderData *mr,
+                                      struct MeshBatchCache *UNUSED(cache),
+                                      void *buffer,
+                                      void *UNUSED(data))
+{
+  GPUIndexBuf *ibo = static_cast<GPUIndexBuf *>(buffer);
+  GPU_indexbuf_init_build_on_device(ibo,
+                                    subdiv_cache->num_subdiv_loops * 2 + mr->edge_loose_len * 2);
+
+  draw_subdiv_build_lines_buffer(subdiv_cache, ibo);
+}
+
+static void extract_lines_loose_geom_subdiv(const DRWSubdivCache *subdiv_cache,
+                                            const MeshRenderData *UNUSED(mr),
+                                            const MeshExtractLooseGeom *loose_geom,
+                                            void *buffer,
+                                            void *UNUSED(data))
+{
+  if (loose_geom->edge_len == 0) {
+    return;
+  }
+
+  GPUIndexBuf *ibo = static_cast<GPUIndexBuf *>(buffer);
+  draw_subdiv_build_lines_loose_buffer(subdiv_cache, ibo, static_cast<uint>(loose_geom->edge_len));
+}
+
 constexpr MeshExtract create_extractor_lines()
 {
   MeshExtract extractor = {nullptr};
@@ -163,12 +192,14 @@ constexpr MeshExtract create_extractor_lines()
   extractor.iter_poly_mesh = extract_lines_iter_poly_mesh;
   extractor.iter_ledge_bm = extract_lines_iter_ledge_bm;
   extractor.iter_ledge_mesh = extract_lines_iter_ledge_mesh;
+  extractor.init_subdiv = extract_lines_init_subdiv;
+  extractor.iter_loose_geom_subdiv = extract_lines_loose_geom_subdiv;
   extractor.task_reduce = extract_lines_task_reduce;
   extractor.finish = extract_lines_finish;
   extractor.data_type = MR_DATA_NONE;
   extractor.data_size = sizeof(GPUIndexBufBuilder);
   extractor.use_threading = true;
-  extractor.mesh_buffer_offset = offsetof(MeshBufferCache, ibo.lines);
+  extractor.mesh_buffer_offset = offsetof(MeshBufferList, ibo.lines);
   return extractor;
 }
 
@@ -180,12 +211,12 @@ constexpr MeshExtract create_extractor_lines()
 
 static void extract_lines_loose_subbuffer(const MeshRenderData *mr, struct MeshBatchCache *cache)
 {
-  BLI_assert(cache->final.ibo.lines);
+  BLI_assert(cache->final.buff.ibo.lines);
   /* Multiply by 2 because these are edges indices. */
   const int start = mr->edge_len * 2;
   const int len = mr->edge_loose_len * 2;
   GPU_indexbuf_create_subrange_in_place(
-      cache->final.ibo.lines_loose, cache->final.ibo.lines, start, len);
+      cache->final.buff.ibo.lines_loose, cache->final.buff.ibo.lines, start, len);
   cache->no_loose_wire = (len == 0);
 }
 
@@ -213,7 +244,7 @@ constexpr MeshExtract create_extractor_lines_with_lines_loose()
   extractor.data_type = MR_DATA_NONE;
   extractor.data_size = sizeof(GPUIndexBufBuilder);
   extractor.use_threading = true;
-  extractor.mesh_buffer_offset = offsetof(MeshBufferCache, ibo.lines);
+  extractor.mesh_buffer_offset = offsetof(MeshBufferList, ibo.lines);
   return extractor;
 }
 
@@ -228,7 +259,7 @@ static void extract_lines_loose_only_init(const MeshRenderData *mr,
                                           void *buf,
                                           void *UNUSED(tls_data))
 {
-  BLI_assert(buf == cache->final.ibo.lines_loose);
+  BLI_assert(buf == cache->final.buff.ibo.lines_loose);
   UNUSED_VARS_NDEBUG(buf);
   extract_lines_loose_subbuffer(mr, cache);
 }
@@ -240,7 +271,7 @@ constexpr MeshExtract create_extractor_lines_loose_only()
   extractor.data_type = MR_DATA_LOOSE_GEOM;
   extractor.data_size = 0;
   extractor.use_threading = false;
-  extractor.mesh_buffer_offset = offsetof(MeshBufferCache, ibo.lines_loose);
+  extractor.mesh_buffer_offset = offsetof(MeshBufferList, ibo.lines_loose);
   return extractor;
 }
 

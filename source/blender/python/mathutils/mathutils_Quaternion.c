@@ -320,7 +320,7 @@ static PyObject *Quaternion_rotation_difference(QuaternionObject *self, PyObject
                             QUAT_SIZE,
                             QUAT_SIZE,
                             value,
-                            "Quaternion.difference(other), invalid 'other' arg") == -1) {
+                            "Quaternion.rotation_difference(other), invalid 'other' arg") == -1) {
     return NULL;
   }
 
@@ -1504,6 +1504,11 @@ static PyGetSetDef Quaternion_getseters[] = {
      (getter)BaseMathObject_is_frozen_get,
      (setter)NULL,
      BaseMathObject_is_frozen_doc,
+     NULL},
+    {"is_valid",
+     (getter)BaseMathObject_is_valid_get,
+     (setter)NULL,
+     BaseMathObject_is_valid_doc,
      NULL},
     {"owner", (getter)BaseMathObject_owner_get, (setter)NULL, BaseMathObject_owner_doc, NULL},
     {NULL, NULL, NULL, NULL, NULL} /* Sentinel */

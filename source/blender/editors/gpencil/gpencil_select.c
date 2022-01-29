@@ -248,6 +248,7 @@ static void select_all_curve_points(bGPdata *gpd, bGPDstroke *gps, bGPDcurve *gp
 /* -------------------------------------------------------------------- */
 /** \name Select All Operator
  * \{ */
+
 static bool gpencil_select_all_poll(bContext *C)
 {
   bGPdata *gpd = ED_gpencil_data_get_active(C);
@@ -2347,7 +2348,7 @@ void GPENCIL_OT_select_lasso(wmOperatorType *ot)
   ot->cancel = WM_gesture_lasso_cancel;
 
   /* flags */
-  ot->flag = OPTYPE_UNDO;
+  ot->flag = OPTYPE_UNDO | OPTYPE_DEPENDS_ON_CURSOR;
 
   /* properties */
   WM_operator_properties_select_operation(ot);

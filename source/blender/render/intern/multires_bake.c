@@ -72,6 +72,7 @@ typedef struct MultiresBakeResult {
 
 typedef struct {
   MVert *mvert;
+  const float (*vert_normals)[3];
   MPoly *mpoly;
   MLoop *mloop;
   MLoopUV *mloopuv;
@@ -135,10 +136,7 @@ static void multiresbake_get_normal(const MResolvePixelData *data,
   }
   else {
     const int vi = data->mloop[data->mlooptri[tri_num].tri[vert_index]].v;
-    const short *no = data->mvert[vi].no;
-
-    normal_short_to_float_v3(norm, no);
-    normalize_v3(norm);
+    copy_v3_v3(norm, data->vert_normals[vi]);
   }
 }
 
@@ -978,7 +976,7 @@ static void apply_tangmat_callback(DerivedMesh *lores_dm,
 #if 0
 /* **************** Ambient Occlusion Baker **************** */
 
-// must be a power of two
+/* Must be a power of two. */
 #  define MAX_NUMBER_OF_AO_RAYS 1024
 
 static unsigned short ao_random_table_1[MAX_NUMBER_OF_AO_RAYS];

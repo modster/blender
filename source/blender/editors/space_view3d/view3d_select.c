@@ -119,9 +119,10 @@ float ED_view3d_select_dist_px(void)
   return 75.0f * U.pixelsize;
 }
 
-/* TODO: should return whether there is valid context to continue */
 void ED_view3d_viewcontext_init(bContext *C, ViewContext *vc, Depsgraph *depsgraph)
 {
+  /* TODO: should return whether there is valid context to continue. */
+
   memset(vc, 0, sizeof(ViewContext));
   vc->C = C;
   vc->region = CTX_wm_region(C);
@@ -1279,40 +1280,6 @@ static bool do_lasso_select_paintface(ViewContext *vc,
   return changed;
 }
 
-#if 0
-static void do_lasso_select_node(int mcoords[][2], const int mcoords_len, const eSelectOp sel_op)
-{
-  SpaceNode *snode = area->spacedata.first;
-
-  bNode *node;
-  rcti rect;
-  int node_cent[2];
-  float node_centf[2];
-  bool changed = false;
-
-  BLI_lasso_boundbox(&rect, mcoords, mcoords_len);
-
-  /* store selection in temp test flag */
-  for (node = snode->edittree->nodes.first; node; node = node->next) {
-    node_centf[0] = BLI_RCT_CENTER_X(&node->totr);
-    node_centf[1] = BLI_RCT_CENTER_Y(&node->totr);
-
-    ipoco_to_areaco_noclip(G.v2d, node_centf, node_cent);
-    const bool is_select = node->flag & SELECT;
-    const bool is_inside = (BLI_rcti_isect_pt_v(&rect, node_cent) &&
-                            BLI_lasso_is_point_inside(mcoords, mcoords_len, node_cent[0], node_cent[1]));
-    const int sel_op_result = ED_select_op_action_deselected(sel_op, is_select, is_inside);
-    if (sel_op_result != -1) {
-      SET_FLAG_FROM_TEST(node->flag, sel_op_result, SELECT);
-      changed = true;
-    }
-  }
-  if (changed) {
-    BIF_undo_push("Lasso select nodes");
-  }
-}
-#endif
-
 static bool view3d_lasso_select(bContext *C,
                                 ViewContext *vc,
                                 const int mcoords[][2],
@@ -1438,7 +1405,7 @@ void VIEW3D_OT_select_lasso(wmOperatorType *ot)
   ot->cancel = WM_gesture_lasso_cancel;
 
   /* flags */
-  ot->flag = OPTYPE_UNDO;
+  ot->flag = OPTYPE_UNDO | OPTYPE_DEPENDS_ON_CURSOR;
 
   /* properties */
   WM_operator_properties_gesture_lasso(ot);
@@ -1953,7 +1920,8 @@ static int mixed_bones_object_selectbuffer(ViewContext *vc,
                                            const int mval[2],
                                            eV3DSelectObjectFilter select_filter,
                                            bool do_nearest,
-                                           bool do_nearest_xray_if_supported)
+                                           bool do_nearest_xray_if_supported,
+                                           const bool do_material_slot_selection)
 {
   rcti rect;
   int hits15, hits9 = 0, hits5 = 0;
@@ -1972,7 +1940,8 @@ static int mixed_bones_object_selectbuffer(ViewContext *vc,
   view3d_opengl_select_cache_begin();
 
   BLI_rcti_init_pt_radius(&rect, mval, 14);
-  hits15 = view3d_opengl_select(vc, buffer, MAXPICKBUF, &rect, select_mode, select_filter);
+  hits15 = view3d_opengl_select_ex(
+      vc, buffer, MAXPICKBUF, &rect, select_mode, select_filter, do_material_slot_selection);
   if (hits15 == 1) {
     hits = selectbuffer_ret_hits_15(buffer, hits15);
     goto finally;
@@ -2045,19 +2014,16 @@ static int mixed_bones_object_selectbuffer_extended(ViewContext *vc,
                                                     bool enumerate,
                                                     bool *r_do_nearest)
 {
-  static int last_mval[2] = {-100, -100};
   bool do_nearest = false;
   View3D *v3d = vc->v3d;
 
   /* define if we use solid nearest select or not */
   if (use_cycle) {
+    /* Update the coordinates (even if the return value isn't used). */
+    const bool has_motion = WM_cursor_test_motion_and_update(mval);
     if (!XRAY_ACTIVE(v3d)) {
-      do_nearest = true;
-      if (len_manhattan_v2v2_int(mval, last_mval) <= WM_EVENT_CURSOR_MOTION_THRESHOLD) {
-        do_nearest = false;
-      }
+      do_nearest = has_motion;
     }
-    copy_v2_v2_int(last_mval, mval);
   }
   else {
     if (!XRAY_ACTIVE(v3d)) {
@@ -2071,7 +2037,8 @@ static int mixed_bones_object_selectbuffer_extended(ViewContext *vc,
 
   do_nearest = do_nearest && !enumerate;
 
-  int hits = mixed_bones_object_selectbuffer(vc, buffer, mval, select_filter, do_nearest, true);
+  int hits = mixed_bones_object_selectbuffer(
+      vc, buffer, mval, select_filter, do_nearest, true, false);
 
   return hits;
 }
@@ -2079,7 +2046,7 @@ static int mixed_bones_object_selectbuffer_extended(ViewContext *vc,
 /**
  * \param has_bones: When true, skip non-bone hits, also allow bases to be used
  * that are visible but not select-able,
- * since you may be in pose mode with an unselect-able object.
+ * since you may be in pose mode with an un-selectable object.
  *
  * \return the active base or NULL.
  */
@@ -2088,12 +2055,14 @@ static Base *mouse_select_eval_buffer(ViewContext *vc,
                                       int hits,
                                       Base *startbase,
                                       bool has_bones,
-                                      bool do_nearest)
+                                      bool do_nearest,
+                                      int *r_sub_selection)
 {
   ViewLayer *view_layer = vc->view_layer;
   View3D *v3d = vc->v3d;
   Base *base, *basact = NULL;
   int a;
+  int sub_selection_id = 0;
 
   if (do_nearest) {
     uint min = 0xFFFFFFFF;
@@ -2105,6 +2074,7 @@ static Base *mouse_select_eval_buffer(ViewContext *vc,
         if (min > buffer[4 * a + 1] && (buffer[4 * a + 3] & 0xFFFF0000)) {
           min = buffer[4 * a + 1];
           selcol = buffer[4 * a + 3] & 0xFFFF;
+          sub_selection_id = (buffer[4 * a + 3] & 0xFFFF0000) >> 16;
         }
       }
     }
@@ -2118,6 +2088,7 @@ static Base *mouse_select_eval_buffer(ViewContext *vc,
         if (min > buffer[4 * a + 1] && notcol != (buffer[4 * a + 3] & 0xFFFF)) {
           min = buffer[4 * a + 1];
           selcol = buffer[4 * a + 3] & 0xFFFF;
+          sub_selection_id = (buffer[4 * a + 3] & 0xFFFF0000) >> 16;
         }
       }
     }
@@ -2184,11 +2155,16 @@ static Base *mouse_select_eval_buffer(ViewContext *vc,
     }
   }
 
+  if (basact && r_sub_selection) {
+    *r_sub_selection = sub_selection_id;
+  }
+
   return basact;
 }
 
-/* mval comes from event->mval, only use within region handlers */
-Base *ED_view3d_give_base_under_cursor(bContext *C, const int mval[2])
+static Base *ed_view3d_give_base_under_cursor_ex(bContext *C,
+                                                 const int mval[2],
+                                                 int *r_material_slot)
 {
   Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
   ViewContext vc;
@@ -2202,21 +2178,43 @@ Base *ED_view3d_give_base_under_cursor(bContext *C, const int mval[2])
   ED_view3d_viewcontext_init(C, &vc, depsgraph);
 
   const bool do_nearest = !XRAY_ACTIVE(vc.v3d);
+  const bool do_material_slot_selection = r_material_slot != NULL;
   const int hits = mixed_bones_object_selectbuffer(
-      &vc, buffer, mval, VIEW3D_SELECT_FILTER_NOP, do_nearest, false);
+      &vc, buffer, mval, VIEW3D_SELECT_FILTER_NOP, do_nearest, false, do_material_slot_selection);
 
   if (hits > 0) {
-    const bool has_bones = selectbuffer_has_bones(buffer, hits);
-    basact = mouse_select_eval_buffer(
-        &vc, buffer, hits, vc.view_layer->object_bases.first, has_bones, do_nearest);
+    const bool has_bones = (r_material_slot == NULL) && selectbuffer_has_bones(buffer, hits);
+    basact = mouse_select_eval_buffer(&vc,
+                                      buffer,
+                                      hits,
+                                      vc.view_layer->object_bases.first,
+                                      has_bones,
+                                      do_nearest,
+                                      r_material_slot);
   }
 
   return basact;
 }
 
+Base *ED_view3d_give_base_under_cursor(bContext *C, const int mval[2])
+{
+  return ed_view3d_give_base_under_cursor_ex(C, mval, NULL);
+}
+
 Object *ED_view3d_give_object_under_cursor(bContext *C, const int mval[2])
 {
   Base *base = ED_view3d_give_base_under_cursor(C, mval);
+  if (base) {
+    return base->object;
+  }
+  return NULL;
+}
+
+struct Object *ED_view3d_give_material_slot_under_cursor(struct bContext *C,
+                                                         const int mval[2],
+                                                         int *r_material_slot)
+{
+  Base *base = ed_view3d_give_base_under_cursor_ex(C, mval, r_material_slot);
   if (base) {
     return base->object;
   }
@@ -2374,7 +2372,8 @@ static bool ed_object_select_pick(bContext *C,
         }
       }
       else {
-        basact = mouse_select_eval_buffer(&vc, buffer, hits, startbase, has_bones, do_nearest);
+        basact = mouse_select_eval_buffer(
+            &vc, buffer, hits, startbase, has_bones, do_nearest, NULL);
       }
 
       if (has_bones && basact) {
@@ -2436,7 +2435,7 @@ static bool ed_object_select_pick(bContext *C,
             if (!changed) {
               /* fallback to regular object selection if no new bundles were selected,
                * allows to select object parented to reconstruction object */
-              basact = mouse_select_eval_buffer(&vc, buffer, hits, startbase, 0, do_nearest);
+              basact = mouse_select_eval_buffer(&vc, buffer, hits, startbase, 0, do_nearest, NULL);
             }
           }
         }
@@ -2521,6 +2520,7 @@ static bool ed_object_select_pick(bContext *C,
     }
     /* also prevent making it active on mouse selection */
     else if (BASE_SELECTABLE(v3d, basact)) {
+      const bool use_activate_selected_base = (oldbasact != basact) && (is_obedit == false);
       if (extend) {
         ED_object_base_select(basact, BA_SELECT);
       }
@@ -2529,7 +2529,8 @@ static bool ed_object_select_pick(bContext *C,
       }
       else if (toggle) {
         if (basact->flag & BASE_SELECTED) {
-          if (basact == oldbasact) {
+          /* Keep selected if the base is to be activated. */
+          if (use_activate_selected_base == false) {
             ED_object_base_select(basact, BA_DESELECT);
           }
         }
@@ -2545,7 +2546,7 @@ static bool ed_object_select_pick(bContext *C,
         }
       }
 
-      if ((oldbasact != basact) && (is_obedit == false)) {
+      if (use_activate_selected_base) {
         ED_object_base_activate(C, basact); /* adds notifier */
         if ((scene->toolsettings->object_flag & SCE_OBJECT_MODE_LOCK) == 0) {
           WM_toolsystem_update_from_context_view3d(C);
@@ -2675,7 +2676,7 @@ static int view3d_select_exec(bContext *C, wmOperator *op)
 
         uint buffer[MAXPICKBUF];
         const int hits = mixed_bones_object_selectbuffer(
-            &vc, buffer, location, VIEW3D_SELECT_FILTER_NOP, false, true);
+            &vc, buffer, location, VIEW3D_SELECT_FILTER_NOP, false, true, false);
         retval = bone_mouse_select_menu(C, buffer, hits, true, extend, deselect, toggle);
       }
       if (!retval) {
@@ -2775,7 +2776,9 @@ static int view3d_select_invoke(bContext *C, wmOperator *op, const wmEvent *even
 {
   RNA_int_set_array(op->ptr, "location", event->mval);
 
-  return view3d_select_exec(C, op);
+  const int retval = view3d_select_exec(C, op);
+
+  return WM_operator_flag_only_pass_through_on_press(retval, event);
 }
 
 void VIEW3D_OT_select(wmOperatorType *ot)
@@ -4037,7 +4040,9 @@ static bool lattice_circle_select(ViewContext *vc,
   return data.is_changed;
 }
 
-/* NOTE: pose-bone case is copied from editbone case... */
+/**
+ * \note logic is shared with the edit-bone case, see #armature_circle_doSelectJoint.
+ */
 static bool pchan_circle_doSelectJoint(void *userData,
                                        bPoseChannel *pchan,
                                        const float screen_co[2])
@@ -4134,6 +4139,9 @@ static bool pose_circle_select(ViewContext *vc,
   return data.is_changed;
 }
 
+/**
+ * \note logic is shared with the pose-bone case, see #pchan_circle_doSelectJoint.
+ */
 static bool armature_circle_doSelectJoint(void *userData,
                                           EditBone *ebone,
                                           const float screen_co[2],

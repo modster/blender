@@ -107,6 +107,7 @@ typedef struct TSpace {
 
 typedef struct TriTessFace {
   const MVert *mverts[3];
+  const float *vert_normals[3];
   const TSpace *tspace[3];
   float *loop_normal[3];
   float normal[3]; /* for flat faces */
@@ -241,9 +242,9 @@ static void calc_point_from_barycentric_extrusion(TriTessFace *triangles,
   interp_barycentric_tri_v3(data, u, v, coord);
 
   if (is_smooth) {
-    normal_short_to_float_v3(data[0], triangle->mverts[0]->no);
-    normal_short_to_float_v3(data[1], triangle->mverts[1]->no);
-    normal_short_to_float_v3(data[2], triangle->mverts[2]->no);
+    copy_v3_v3(data[0], triangle->vert_normals[0]);
+    copy_v3_v3(data[1], triangle->vert_normals[1]);
+    copy_v3_v3(data[2], triangle->vert_normals[2]);
 
     interp_barycentric_tri_v3(data, u, v, dir);
     normalize_v3(dir);
@@ -488,6 +489,7 @@ static TriTessFace *mesh_calc_tri_tessface(Mesh *me, bool tangent, Mesh *me_eval
     loop_normals = CustomData_get_layer(&me_eval->ldata, CD_NORMAL);
   }
 
+  const float(*vert_normals)[3] = BKE_mesh_vertex_normals_ensure(me);
   for (i = 0; i < tottri; i++) {
     const MLoopTri *lt = &looptri[i];
     const MPoly *mp = &me->mpoly[lt->poly];
@@ -495,6 +497,9 @@ static TriTessFace *mesh_calc_tri_tessface(Mesh *me, bool tangent, Mesh *me_eval
     triangles[i].mverts[0] = &mvert[me->mloop[lt->tri[0]].v];
     triangles[i].mverts[1] = &mvert[me->mloop[lt->tri[1]].v];
     triangles[i].mverts[2] = &mvert[me->mloop[lt->tri[2]].v];
+    triangles[i].vert_normals[0] = &vert_normals[me->mloop[lt->tri[0]].v][0];
+    triangles[i].vert_normals[1] = &vert_normals[me->mloop[lt->tri[1]].v][1];
+    triangles[i].vert_normals[2] = &vert_normals[me->mloop[lt->tri[2]].v][2];
     triangles[i].is_smooth = (mp->flag & ME_SMOOTH) != 0;
 
     if (tangent) {
@@ -774,18 +779,6 @@ void RE_bake_pixels_populate(Mesh *me,
 
 /* ******************** NORMALS ************************ */
 
-/**
- * convert a normalized normal to the -1.0 1.0 range
- * the input is expected to be POS_X, POS_Y, POS_Z
- */
-static void normal_uncompress(float out[3], const float in[3])
-{
-  int i;
-  for (i = 0; i < 3; i++) {
-    out[i] = 2.0f * in[i] - 1.0f;
-  }
-}
-
 static void normal_compress(float out[3],
                             const float in[3],
                             const eBakeNormalSwizzle normal_swizzle[3])
@@ -826,10 +819,6 @@ static void normal_compress(float out[3],
   }
 }
 
-/**
- * This function converts an object space normal map
- * to a tangent space normal map for a given low poly mesh.
- */
 void RE_bake_normal_world_to_tangent(const BakePixel pixel_array[],
                                      const size_t num_pixels,
                                      const int depth,
@@ -894,7 +883,7 @@ void RE_bake_normal_world_to_tangent(const BakePixel pixel_array[],
           copy_v3_v3(normals[j], triangle->loop_normal[j]);
         }
         else {
-          normal_short_to_float_v3(normals[j], triangle->mverts[j]->no);
+          copy_v3_v3(normals[j], triangle->vert_normals[j]);
         }
       }
 
@@ -934,7 +923,7 @@ void RE_bake_normal_world_to_tangent(const BakePixel pixel_array[],
     copy_v3_v3(tsm[2], normal);
 
     /* texture values */
-    normal_uncompress(nor, &result[offset]);
+    copy_v3_v3(nor, &result[offset]);
 
     /* converts from world space to local space */
     mul_transposed_mat3_m4_v3(mat, nor);
@@ -976,7 +965,7 @@ void RE_bake_normal_world_to_object(const BakePixel pixel_array[],
     }
 
     offset = i * depth;
-    normal_uncompress(nor, &result[offset]);
+    copy_v3_v3(nor, &result[offset]);
 
     /* rotates only without translation */
     mul_mat3_m4_v3(iobmat, nor);
@@ -1004,7 +993,7 @@ void RE_bake_normal_world_to_world(const BakePixel pixel_array[],
     }
 
     offset = i * depth;
-    normal_uncompress(nor, &result[offset]);
+    copy_v3_v3(nor, &result[offset]);
 
     /* save back the values */
     normal_compress(&result[offset], nor, normal_swizzle);
@@ -1053,6 +1042,7 @@ int RE_pass_depth(const eScenePassType pass_type)
     }
     case SCE_PASS_COMBINED:
     case SCE_PASS_SHADOW:
+    case SCE_PASS_POSITION:
     case SCE_PASS_NORMAL:
     case SCE_PASS_VECTOR:
     case SCE_PASS_INDEXOB: /* XXX double check */

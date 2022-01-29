@@ -80,6 +80,7 @@
 #include "../mathutils/mathutils.h"
 
 /* Logging types to use anywhere in the Python modules. */
+
 CLG_LOGREF_DECLARE_GLOBAL(BPY_LOG_CONTEXT, "bpy.context");
 CLG_LOGREF_DECLARE_GLOBAL(BPY_LOG_INTERFACE, "bpy.interface");
 CLG_LOGREF_DECLARE_GLOBAL(BPY_LOG_RNA, "bpy.rna");
@@ -103,7 +104,6 @@ static double bpy_timer_run;     /* time for each python script run */
 static double bpy_timer_run_tot; /* accumulate python runs */
 #endif
 
-/* use for updating while a python script runs - in case of file load */
 void BPY_context_update(bContext *C)
 {
   /* don't do this from a non-main (e.g. render) thread, it can cause a race
@@ -141,7 +141,6 @@ void bpy_context_set(bContext *C, PyGILState_STATE *gilstate)
   }
 }
 
-/* context should be used but not now because it causes some bugs */
 void bpy_context_clear(bContext *UNUSED(C), const PyGILState_STATE *gilstate)
 {
   py_call_level--;
@@ -175,16 +174,6 @@ static void bpy_context_end(bContext *C)
   CTX_wm_operator_poll_msg_clear(C);
 }
 
-/**
- * Use for `CTX_*_set(..)` functions need to set values which are later read back as expected.
- * In this case we don't want the Python context to override the values as it causes problems
- * see T66256.
- *
- * \param dict_p: A pointer to #bContext.data.py_context so we can assign a new value.
- * \param dict_orig: The value of #bContext.data.py_context_orig to check if we need to copy.
- *
- * \note Typically accessed via #BPY_context_dict_clear_members macro.
- */
 void BPY_context_dict_clear_members_array(void **dict_p,
                                           void *dict_orig,
                                           const char *context_members[],
@@ -238,15 +227,12 @@ void BPY_text_free_code(Text *text)
   }
 }
 
-/**
- * Needed so the #Main pointer in `bpy.data` doesn't become out of date.
- */
 void BPY_modules_update(void)
 {
 #if 0 /* slow, this runs all the time poll, draw etc 100's of time a sec. */
   PyObject *mod = PyImport_ImportModuleLevel("bpy", NULL, NULL, NULL, 0);
   PyModule_AddObject(mod, "data", BPY_rna_module());
-  PyModule_AddObject(mod, "types", BPY_rna_types()); /* atm this does not need updating */
+  PyModule_AddObject(mod, "types", BPY_rna_types()); /* This does not need updating. */
 #endif
 
   /* refreshes the main struct */
@@ -333,7 +319,6 @@ static void pystatus_exit_on_error(PyStatus status)
 }
 #endif
 
-/* call BPY_context_set first */
 void BPY_python_start(bContext *C, int argc, const char **argv)
 {
 #ifndef WITH_PYTHON_MODULE
@@ -706,7 +691,7 @@ int BPY_context_member_get(bContext *C, const char *member, bContextDataResult *
     ptr = &(((BPy_StructRNA *)item)->ptr);
 
     // result->ptr = ((BPy_StructRNA *)item)->ptr;
-    CTX_data_pointer_set(result, ptr->owner_id, ptr->type, ptr->data);
+    CTX_data_pointer_set_ptr(result, ptr);
     CTX_data_type_set(result, CTX_DATA_TYPE_POINTER);
     done = true;
   }
@@ -732,7 +717,7 @@ int BPY_context_member_get(bContext *C, const char *member, bContextDataResult *
           BLI_addtail(&result->list, link);
 #endif
           ptr = &(((BPy_StructRNA *)list_item)->ptr);
-          CTX_data_list_add(result, ptr->owner_id, ptr->type, ptr->data);
+          CTX_data_list_add_ptr(result, ptr);
         }
         else {
           CLOG_INFO(BPY_LOG_CONTEXT,
@@ -753,7 +738,7 @@ int BPY_context_member_get(bContext *C, const char *member, bContextDataResult *
       CLOG_INFO(BPY_LOG_CONTEXT, 1, "'%s' not a valid type", member);
     }
     else {
-      CLOG_INFO(BPY_LOG_CONTEXT, 1, "'%s' not found\n", member);
+      CLOG_INFO(BPY_LOG_CONTEXT, 1, "'%s' not found", member);
     }
   }
   else {
@@ -881,9 +866,6 @@ static void bpy_module_free(void *UNUSED(mod))
 
 #endif
 
-/**
- * Avoids duplicating keyword list.
- */
 bool BPY_string_is_keyword(const char *str)
 {
   /* list is from...
@@ -905,8 +887,7 @@ bool BPY_string_is_keyword(const char *str)
   return false;
 }
 
-/* EVIL, define text.c functions here... */
-/* BKE_text.h */
+/* EVIL: define `text.c` functions here (declared in `BKE_text.h`). */
 int text_check_identifier_unicode(const uint ch)
 {
   return (ch < 255 && text_check_identifier((char)ch)) || Py_UNICODE_ISALNUM(ch);

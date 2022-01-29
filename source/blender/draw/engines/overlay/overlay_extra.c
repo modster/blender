@@ -696,7 +696,7 @@ void OVERLAY_light_cache_populate(OVERLAY_Data *vedata, Object *ob)
 /** \} */
 
 /* -------------------------------------------------------------------- */
-/** \name Lightprobe
+/** \name Light-probe
  * \{ */
 
 void OVERLAY_lightprobe_cache_populate(OVERLAY_Data *vedata, Object *ob)
@@ -762,10 +762,7 @@ void OVERLAY_lightprobe_cache_populate(OVERLAY_Data *vedata, Object *ob)
         instdata.mat[1][3] = prb->grid_resolution_y;
         instdata.mat[2][3] = prb->grid_resolution_z;
         /* Put theme id in matrix. */
-        if (UNLIKELY(ob->base_flag & BASE_FROM_DUPLI)) {
-          instdata.mat[3][3] = 0.0;
-        }
-        else if (theme_id == TH_ACTIVE) {
+        if (theme_id == TH_ACTIVE) {
           instdata.mat[3][3] = 1.0;
         }
         else /* TH_SELECT */ {
@@ -861,12 +858,8 @@ typedef union OVERLAY_CameraInstanceData {
   };
 } OVERLAY_CameraInstanceData;
 
-static void camera_view3d_reconstruction(OVERLAY_ExtraCallBuffers *cb,
-                                         Scene *scene,
-                                         View3D *v3d,
-                                         Object *camera_object,
-                                         Object *ob,
-                                         const float color[4])
+static void camera_view3d_reconstruction(
+    OVERLAY_ExtraCallBuffers *cb, Scene *scene, View3D *v3d, Object *ob, const float color[4])
 {
   const DRWContextState *draw_ctx = DRW_context_state_get();
   const bool is_select = DRW_state_is_select();
@@ -943,7 +936,7 @@ static void camera_view3d_reconstruction(OVERLAY_ExtraCallBuffers *cb,
       }
 
       if (is_select) {
-        DRW_select_load_id(camera_object->runtime.select_id | (track_index << 16));
+        DRW_select_load_id(ob->runtime.select_id | (track_index << 16));
         track_index++;
       }
 
@@ -1251,7 +1244,7 @@ void OVERLAY_camera_cache_populate(OVERLAY_Data *vedata, Object *ob)
 
   /* Motion Tracking. */
   if ((v3d->flag2 & V3D_SHOW_RECONSTRUCTION) != 0) {
-    camera_view3d_reconstruction(cb, scene, v3d, camera_object, ob, color_p);
+    camera_view3d_reconstruction(cb, scene, v3d, ob, color_p);
   }
 
   /* Background images. */

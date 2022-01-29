@@ -419,10 +419,6 @@
     .velocity_scale = 1.0f, \
     .reader = NULL, \
     .reader_object_path = "", \
-    .vertex_velocities = NULL, \
-    .num_vertices = 0, \
-    .velocity_delta = 0.0f, \
-    .last_lookup_time = 0.0f, \
   }
 
 #define _DNA_DEFAULT_MirrorModifierData \
@@ -433,6 +429,7 @@
     .uv_offset = {0.0f, 0.0f}, \
     .uv_offset_copy = {0.0f, 0.0f}, \
     .mirror_ob = NULL, \
+    .use_correct_order_on_merge = true, \
   }
 
 #define _DNA_DEFAULT_MultiresModifierData \

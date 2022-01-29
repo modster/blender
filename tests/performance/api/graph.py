@@ -21,8 +21,8 @@ class TestGraph:
             queue = TestQueue(json_filepath)
 
             for entry in queue.entries:
-                if entry.status in ('done', 'outdated'):
-                    device_name = entry.device_name
+                if entry.status in {'done', 'outdated'}:
+                    device_name = entry.device_name + " (" + entry.device_type + ")"
                     if device_name in devices.keys():
                         devices[device_name].append(entry)
                     else:
@@ -42,7 +42,7 @@ class TestGraph:
 
             # Generate one graph for every device x category x result key combination.
             for category, category_entries in categories.items():
-                entries = sorted(category_entries, key=lambda entry: (entry.revision, entry.test))
+                entries = sorted(category_entries, key=lambda entry: (entry.date, entry.revision, entry.test))
 
                 outputs = set()
                 for entry in entries:
@@ -58,8 +58,6 @@ class TestGraph:
         self.json = json.dumps(data, indent=2)
 
     def chart(self, device_name: str, chart_name: str, entries: List, chart_type: str, output: str) -> Dict:
-        entries = sorted(entries, key=lambda entry: entry.date)
-
         # Gather used tests.
         tests = {}
         for entry in entries:
@@ -77,7 +75,7 @@ class TestGraph:
                 revision_dates[revision] = int(entry.date)
 
         # Google Charts JSON data layout is like a spreadsheat table, with
-        # colums, rows and cells. We create one column for revision labels,
+        # columns, rows, and cells. We create one column for revision labels,
         # and one column for each test.
         cols = []
         if chart_type == 'line':
@@ -100,8 +98,15 @@ class TestGraph:
         for entry in entries:
             test_index = tests[entry.test]
             revision_index = revisions[entry.revision]
-            time = entry.output[output] if output in entry.output else -1.0
-            rows[revision_index]['c'][test_index + 1] = {'f': None, 'v': time}
+            output_value = entry.output[output] if output in entry.output else -1.0
+
+            if output.find("memory") != -1:
+                formatted_value = '%.2f MB' % (output_value / (1024 * 1024))
+            else:
+                formatted_value = "%.4f" % output_value
+
+            cell = {'f': formatted_value, 'v': output_value}
+            rows[revision_index]['c'][test_index + 1] = cell
 
         data = {'cols': cols, 'rows': rows}
         return {'device': device_name, 'name': chart_name, 'data': data, 'chart_type': chart_type}

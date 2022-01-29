@@ -86,7 +86,9 @@ static void copyData(const ModifierData *md, ModifierData *target, const int fla
 
   temd->facepa = NULL;
 }
-static bool dependsOnTime(ModifierData *UNUSED(md))
+static bool dependsOnTime(struct Scene *UNUSED(scene),
+                          ModifierData *UNUSED(md),
+                          const int UNUSED(dag_eval_mode))
 {
   return true;
 }
@@ -1116,7 +1118,7 @@ static Mesh *explodeMesh(ExplodeModifierData *emd,
   /* finalization */
   BKE_mesh_calc_edges_tessface(explode);
   BKE_mesh_convert_mfaces_to_mpolys(explode);
-  explode->runtime.cd_dirty_vert |= CD_MASK_NORMAL;
+  BKE_mesh_normals_tag_dirty(explode);
 
   if (psmd->psys->lattice_deform_data) {
     BKE_lattice_deform_data_destroy(psmd->psys->lattice_deform_data);

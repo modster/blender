@@ -71,7 +71,7 @@ void SEQ_clipboard_free(void)
 
   for (seq = seqbase_clipboard.first; seq; seq = nseq) {
     nseq = seq->next;
-    seq_free_sequence_recurse(NULL, seq, false);
+    seq_free_sequence_recurse(NULL, seq, false, true);
   }
   BLI_listbase_clear(&seqbase_clipboard);
 }
@@ -194,13 +194,6 @@ void SEQ_clipboard_active_seq_name_store(Scene *scene)
   }
 }
 
-/**
- * Check if strip was active when it was copied. User should restrict this check to pasted strips
- * before ensuring original name, because strip name comparison is used to check.
- *
- * \param pasted_seq: Strip that is pasted(duplicated) from clipboard
- * \return true if strip was active, false otherwise
- */
 bool SEQ_clipboard_pasted_seq_was_active(Sequence *pasted_seq)
 {
   return STREQ(pasted_seq->name, seq_clipboard_active_seq_name);

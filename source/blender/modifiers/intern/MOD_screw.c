@@ -395,6 +395,8 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
   medge_orig = mesh->medge;
 
   mvert_new = result->mvert;
+  float(*vert_normals_new)[3] = BKE_mesh_vertex_normals_for_write(result);
+  BKE_mesh_vertex_normals_clear_dirty(result);
   mpoly_new = result->mpoly;
   mloop_new = result->mloop;
   medge_new = result->medge;
@@ -835,7 +837,7 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
         }
 
         normalize_v3(vc->no);
-        normal_float_to_short_v3(mvert_new[i].no, vc->no);
+        copy_v3_v3(vert_normals_new[i], vc->no);
 
         /* Done with normals */
       }
@@ -884,7 +886,7 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
         mul_v3_m3v3(nor_tx, mat3, vert_connect[j].no);
 
         /* set the normal now its transformed */
-        normal_float_to_short_v3(mv_new->no, nor_tx);
+        copy_v3_v3(vert_normals_new[mv_new - mvert_new], nor_tx);
       }
 
       /* set location */
@@ -1135,12 +1137,12 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
                                          ob_axis != NULL ? mtx_tx[3] : NULL,
                                          ltmd->merge_dist);
     if (result != result_prev) {
-      result->runtime.cd_dirty_vert |= CD_MASK_NORMAL;
+      BKE_mesh_normals_tag_dirty(result);
     }
   }
 
   if ((ltmd->flag & MOD_SCREW_NORMAL_CALC) == 0) {
-    result->runtime.cd_dirty_vert |= CD_MASK_NORMAL;
+    BKE_mesh_normals_tag_dirty(result);
   }
 
   return result;

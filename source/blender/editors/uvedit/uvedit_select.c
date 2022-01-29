@@ -148,10 +148,6 @@ BMLoop *ED_uvedit_active_edge_loop_get(BMesh *bm)
 /** \name Visibility and Selection Utilities
  * \{ */
 
-/**
- * Intentionally don't return #UV_SELECT_ISLAND as it's not an element type.
- * In this case return #UV_SELECT_VERTEX as a fallback.
- */
 char ED_uvedit_select_mode_get(const Scene *scene)
 {
   const ToolSettings *ts = scene->toolsettings;
@@ -719,15 +715,6 @@ bool uv_find_nearest_edge_multi(
   return found;
 }
 
-/**
- * \param only_in_face: when true, only hit faces which `co` is inside.
- * This gives users a result they might expect, especially when zoomed in.
- *
- * \note Concave faces can cause odd behavior, although in practice this isn't often an issue.
- * The center can be outside the face, in this case the distance to the center
- * could cause the face to be considered too far away.
- * If this becomes an issue we could track the distance to the faces closest edge.
- */
 bool uv_find_nearest_face_ex(
     Scene *scene, Object *obedit, const float co[2], UvNearestHit *hit, const bool only_in_face)
 {
@@ -1542,10 +1529,6 @@ static void uv_select_linked_multi(Scene *scene,
   }
 }
 
-/**
- * \warning This returns first selected UV,
- * not ideal in many cases since there could be multiple.
- */
 const float *uvedit_first_selected_uv_from_vertex(Scene *scene,
                                                   BMVert *eve,
                                                   const int cd_loop_uv_offset)
@@ -2122,7 +2105,9 @@ static int uv_select_invoke(bContext *C, wmOperator *op, const wmEvent *event)
   UI_view2d_region_to_view(&region->v2d, event->mval[0], event->mval[1], &co[0], &co[1]);
   RNA_float_set_array(op->ptr, "location", co);
 
-  return uv_select_exec(C, op);
+  const int retval = uv_select_exec(C, op);
+
+  return WM_operator_flag_only_pass_through_on_press(retval, event);
 }
 
 void UV_OT_select(wmOperatorType *ot)
@@ -2281,7 +2266,9 @@ static int uv_select_loop_invoke(bContext *C, wmOperator *op, const wmEvent *eve
   UI_view2d_region_to_view(&region->v2d, event->mval[0], event->mval[1], &co[0], &co[1]);
   RNA_float_set_array(op->ptr, "location", co);
 
-  return uv_select_loop_exec(C, op);
+  const int retval = uv_select_loop_exec(C, op);
+
+  return WM_operator_flag_only_pass_through_on_press(retval, event);
 }
 
 void UV_OT_select_loop(wmOperatorType *ot)
@@ -2341,7 +2328,9 @@ static int uv_select_edge_ring_invoke(bContext *C, wmOperator *op, const wmEvent
   UI_view2d_region_to_view(&region->v2d, event->mval[0], event->mval[1], &co[0], &co[1]);
   RNA_float_set_array(op->ptr, "location", co);
 
-  return uv_select_edge_ring_exec(C, op);
+  const int retval = uv_select_edge_ring_exec(C, op);
+
+  return WM_operator_flag_only_pass_through_on_press(retval, event);
 }
 
 void UV_OT_select_edge_ring(wmOperatorType *ot)
@@ -3450,7 +3439,7 @@ void UV_OT_select_lasso(wmOperatorType *ot)
   ot->cancel = WM_gesture_lasso_cancel;
 
   /* flags */
-  ot->flag = OPTYPE_UNDO;
+  ot->flag = OPTYPE_UNDO | OPTYPE_DEPENDS_ON_CURSOR;
 
   /* properties */
   WM_operator_properties_gesture_lasso(ot);
