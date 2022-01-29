@@ -216,13 +216,13 @@ void SCULPT_vertex_color_get(SculptSession *ss, int index, float out[4])
         }
       }
 
-      return ss->vcol || ss->mcol;
+      break;
     case PBVH_BMESH:
     case PBVH_GRIDS:
       break;
   }
 
-  return false;
+  return;
 }
 
 void SCULPT_vertex_color_set(SculptSession *ss, int index, float color[4])

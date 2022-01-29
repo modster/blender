@@ -25,21 +25,22 @@
 
 #include "BKE_attribute.h"
 #include "BLI_string.h"
+#include "BLI_vector.hh"
 
 #include "draw_subdivision.h"
 #include "extract_mesh.h"
 
-#include <vector>
-
-
-/* get all vcol layers as AttributeRefs, filtered by vcol_layers.
- *  the casual use of std::vector should be okay here.
+/** Get all vcol layers as AttributeRefs.
+ *
+ * \param vcol_layers bitmask to fitler vcol layers by, each bit
+ *                    corrusponds to the integer position of the attribute
+ *                    within the global color attribute list.
  */
-static std::vector<AttributeRef> get_vcol_refs(const CustomData *cd_vdata,
-                                               const CustomData *cd_ldata,
-                                               const uint vcol_layers)
+static blender::Vector<AttributeRef> get_vcol_refs(const CustomData *cd_vdata,
+                                                   const CustomData *cd_ldata,
+                                                   const uint vcol_layers)
 {
-  std::vector<AttributeRef> refs;
+  blender::Vector<AttributeRef> refs;
   uint layeri = 0;
 
   auto buildList = [&](const CustomData *cdata, CustomDataType type, AttributeDomain domain) {
@@ -61,7 +62,7 @@ static std::vector<AttributeRef> get_vcol_refs(const CustomData *cd_vdata,
       ref.type = layer->type;
       BLI_strncpy(ref.name, layer->name, sizeof(ref.name));
 
-      refs.push_back(ref);
+      refs.append(ref);
     }
   };
 
@@ -73,12 +74,11 @@ static std::vector<AttributeRef> get_vcol_refs(const CustomData *cd_vdata,
   return refs;
 }
 
-int mesh_cd_get_vcol_i(const Mesh *me,
-                       const CustomData *cd_vdata,
+int mesh_cd_get_vcol_i(const CustomData *cd_vdata,
                        const CustomData *cd_ldata,
                        const struct AttributeRef *ref)
 {
-  auto refs = get_vcol_refs(cd_vdata, cd_ldata, UINT_MAX);
+  blender::Vector<AttributeRef> refs = get_vcol_refs(cd_vdata, cd_ldata, UINT_MAX);
   int i = 0;
 
   for (AttributeRef ref2 : refs) {
@@ -94,23 +94,21 @@ int mesh_cd_get_active_color_i(const Mesh *me,
                                const CustomData *cd_vdata,
                                const CustomData *cd_ldata)
 {
-  return mesh_cd_get_vcol_i(me, cd_vdata, cd_ldata, &me->attr_color_active);
+  return mesh_cd_get_vcol_i(cd_vdata, cd_ldata, &me->attr_color_active);
 }
 
 int mesh_cd_get_render_color_i(const Mesh *me,
                                const CustomData *cd_vdata,
                                const CustomData *cd_ldata)
 {
-  return mesh_cd_get_vcol_i(me, cd_vdata, cd_ldata, &me->attr_color_render);
+  return mesh_cd_get_vcol_i(cd_vdata, cd_ldata, &me->attr_color_render);
 }
-
 
 namespace blender::draw {
 
 /* ---------------------------------------------------------------------- */
 /** \name Extract VCol
  * \{ */
-
 
 /* Initialize the common vertex format for vcol for coarse and subdivided meshes. */
 static void init_vcol_format(GPUVertFormat *format,
@@ -126,9 +124,9 @@ static void init_vcol_format(GPUVertFormat *format,
 
   const uint32_t vcol_layers = cache->cd_used.vcol;
 
-  std::vector<AttributeRef> refs = get_vcol_refs(cd_vdata, cd_ldata, vcol_layers);
+  blender::Vector<AttributeRef> refs = get_vcol_refs(cd_vdata, cd_ldata, vcol_layers);
 
-  for (AttributeRef ref : refs) {
+  for (const AttributeRef &ref : refs) {
     char attr_name[32], attr_safe_name[GPU_MAX_SAFE_ATTR_NAME];
 
     GPU_vertformat_safe_attr_name(ref.name, attr_safe_name, GPU_MAX_SAFE_ATTR_NAME);
@@ -223,9 +221,9 @@ static void extract_vcol_init(const MeshRenderData *mr,
 
   gpuMeshVcol *vcol_data = (gpuMeshVcol *)GPU_vertbuf_get_data(vbo);
 
-  std::vector<AttributeRef> refs = get_vcol_refs(cd_vdata, cd_ldata, vcol_layers);
+  blender::Vector<AttributeRef> refs = get_vcol_refs(cd_vdata, cd_ldata, vcol_layers);
 
-  for (auto ref : refs) {
+  for (const AttributeRef &ref : refs) {
     CustomData *cdata = ref.domain == ATTR_DOMAIN_POINT ? cd_vdata : cd_ldata;
 
     if (mr->extract_type == MR_EXTRACT_BMESH) {
@@ -338,14 +336,14 @@ static void extract_vcol_init_subdiv(const DRWSubdivCache *subdiv_cache,
 
   const uint vcol_layers = cache->cd_used.vcol;
 
-  std::vector<AttributeRef> refs = get_vcol_refs(cd_vdata, cd_ldata, vcol_layers);
+  blender::Vector<AttributeRef> refs = get_vcol_refs(cd_vdata, cd_ldata, vcol_layers);
 
   gpuMeshVcol *vcol = mesh_vcol;
 
   /* Index of the vertex color layer in the compact buffer. Used vertex color layers are stored in
    * a single buffer. */
   int pack_layer_index = 0;
-  for (auto ref : refs) {
+  for (const AttributeRef &ref : refs) {
     /* Include stride in offset, we use a stride of 2 since colors are packed into 2 uints. */
     const int dst_offset = (int)subdiv_cache->num_subdiv_loops * 2 * pack_layer_index++;
 

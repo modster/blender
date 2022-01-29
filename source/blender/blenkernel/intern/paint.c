@@ -1806,11 +1806,10 @@ void BKE_sculpt_color_layer_create_if_needed(struct Object *object)
   bool has_color = false;
 
   for (int i = 0; i < ARRAY_SIZE(types); i++) {
-    bool ok = CustomData_has_layer(&orig_me->vdata, types[i]) ||
-              CustomData_has_layer(&orig_me->ldata, types[i]);
+    has_color = CustomData_has_layer(&orig_me->vdata, types[i]) ||
+                CustomData_has_layer(&orig_me->ldata, types[i]);
 
-    if (ok) {
-      has_color = true;
+    if (has_color) {
       break;
     }
   }

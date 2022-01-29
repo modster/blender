@@ -457,9 +457,9 @@ CustomData *BKE_id_attributes_iterator_next_domain(ID *id, CustomDataLayer *laye
   return NULL;
 }
 
-CustomDataLayer *BKE_id_attribute_from_index(const ID *id,
-                                             int lookup_index,
-                                             const AttributeDomainMask domain_mask)
+const CustomDataLayer *BKE_id_attribute_from_index(const ID *id,
+                                                   int lookup_index,
+                                                   const AttributeDomainMask domain_mask)
 {
   DomainInfo info[ATTR_DOMAIN_NUM];
   get_domains(id, info);

@@ -370,8 +370,7 @@ int mesh_cd_get_active_color_i(const Mesh *me,
 int mesh_cd_get_render_color_i(const Mesh *me,
                                const CustomData *cd_vdata,
                                const CustomData *cd_ldata);
-int mesh_cd_get_vcol_i(const Mesh *me,
-                       const CustomData *cd_vdata,
+int mesh_cd_get_vcol_i(const CustomData *cd_vdata,
                        const CustomData *cd_ldata,
                        const struct AttributeRef *ref);
 

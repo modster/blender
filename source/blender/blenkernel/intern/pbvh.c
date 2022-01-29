@@ -1246,28 +1246,21 @@ static int pbvh_get_buffers_update_flags(PBVH *UNUSED(pbvh))
 bool BKE_pbvh_get_color_layer(const Mesh *me, CustomDataLayer **r_layer, AttributeDomain *r_attr)
 {
   CustomDataLayer *layer = BKE_id_attributes_active_color_get((ID *)me);
-  AttributeDomain domain;
 
   if (!layer || !ELEM(layer->type, CD_PROP_COLOR, CD_MLOOPCOL)) {
     return false;
   }
 
-  domain = BKE_id_attribute_domain((ID *)me, layer);
+  AttributeDomain domain = BKE_id_attribute_domain((ID *)me, layer);
 
   if (!ELEM(domain, ATTR_DOMAIN_POINT, ATTR_DOMAIN_CORNER)) {
     return false;
   }
 
-  if (layer) {
-    *r_layer = layer;
-    *r_attr = domain;
+  *r_layer = layer;
+  *r_attr = domain;
 
-    return true;
-  }
-  else {
-    *r_layer = NULL;
-    return false;
-  }
+  return true;
 }
 
 static void pbvh_update_draw_buffer_cb(void *__restrict userdata,
@@ -1337,7 +1330,8 @@ static void pbvh_update_draw_buffer_cb(void *__restrict userdata,
                                      pbvh->face_sets_color_seed,
                                      pbvh->face_sets_color_default,
                                      update_flags);
-      } break;
+        break;
+      }
       case PBVH_BMESH:
         GPU_pbvh_bmesh_buffers_update(node->draw_buffers,
                                       pbvh->bm,

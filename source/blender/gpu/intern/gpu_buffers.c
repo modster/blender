@@ -215,12 +215,12 @@ void GPU_pbvh_mesh_buffers_update(GPU_PBVH_Buffers *buffers,
                                   const float (*vert_normals)[3],
                                   const float *vmask,
                                   const void *vcol_data,
-                                  const int vcol_type,
-                                  const AttributeDomain vcol_domain,
+                                  int vcol_type,
+                                  AttributeDomain vcol_domain,
                                   const int *sculpt_face_sets,
-                                  const int face_sets_color_seed,
-                                  const int face_sets_color_default,
-                                  const int update_flags)
+                                  int face_sets_color_seed,
+                                  int face_sets_color_default,
+                                  int update_flags)
 {
   const MPropCol *vtcol = vcol_type == CD_PROP_COLOR ? vcol_data : NULL;
   const MLoopCol *vcol = vcol_type == CD_MLOOPCOL ? vcol_data : NULL;

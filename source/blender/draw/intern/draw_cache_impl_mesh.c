@@ -471,29 +471,29 @@ static bool mesh_cd_calc_active_vcol_layer(Mesh *me, DRW_MeshAttributes *attrs_u
   const CustomData *cd_vdata = mesh_cd_vdata_get_from_mesh(me_final);
   const CustomData *cd_ldata = mesh_cd_ldata_get_from_mesh(me_final);
 
-  int type, idx = -1;
+  int type, layer_i = -1;
   AttributeDomain domain;
 
   if (layer && ELEM(layer->type, CD_PROP_COLOR, CD_MLOOPCOL)) {
     domain = BKE_id_attribute_domain((ID *)me, layer);
     type = layer->type;
 
-    idx = CustomData_get_named_layer(
+    layer_i = CustomData_get_named_layer(
         domain == ATTR_DOMAIN_POINT ? cd_vdata : cd_ldata, type, layer->name);
   }
   else {
-    idx = CustomData_get_active_layer(cd_vdata, CD_PROP_COLOR);
+    layer_i = CustomData_get_active_layer(cd_vdata, CD_PROP_COLOR);
     type = CD_PROP_COLOR;
     domain = ATTR_DOMAIN_POINT;
   }
 
-  if (idx != -1) {
+  if (layer_i != -1) {
     if (type != CD_MLOOPCOL) {
-      drw_mesh_attributes_add_request(attrs_used, type, idx, domain);
+      drw_mesh_attributes_add_request(attrs_used, type, layer_i, domain);
     }
   }
 
-  return idx != -1;
+  return layer_i != -1;
 }
 
 static void mesh_cd_calc_active_mloopcol_layer(const Mesh *me, DRW_MeshCDMask *cd_used)
@@ -678,7 +678,7 @@ static DRW_MeshCDMask mesh_cd_calc_used_gpu_layers(const Mesh *me,
             break;
           }
 
-          /* note that attr->type will always be CD_PROP_COLOR event for
+          /* note that attr->type will always be CD_PROP_COLOR even for
              CD_MLOOPCOL layers, see node_shader_gpu_vertex_color in
              node_shader_vertex_color.cc
            */
@@ -729,17 +729,17 @@ static DRW_MeshCDMask mesh_cd_calc_used_gpu_layers(const Mesh *me,
               BLI_strncpy(ref.name, clayer->name, sizeof(ref.name));
               ref.type = clayer->type;
 
-              int idx = (uint)mesh_cd_get_vcol_i(me, cd_vdata, cd_ldata, &ref);
+              int layer_i = mesh_cd_get_vcol_i(cd_vdata, cd_ldata, &ref);
 
-              if (idx >= 0) {
-                cd_used.vcol |= 1UL << (uint)idx;
+              if (layer_i >= 0) {
+                cd_used.vcol |= 1UL << (uint)layer_i;
               }
             }
             else {
-              int idx = (uint)mesh_cd_get_vcol_i(me, cd_vdata, cd_ldata, render);
+              int layer_i = mesh_cd_get_vcol_i(cd_vdata, cd_ldata, render);
 
-              if (idx >= 0) {
-                cd_used.vcol |= 1UL << (uint)idx;
+              if (layer_i >= 0) {
+                cd_used.vcol |= 1UL << (uint)layer_i;
               }
             }
 

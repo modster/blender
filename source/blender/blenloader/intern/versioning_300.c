@@ -1,4 +1,4 @@
-/*
+ /*
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -2373,6 +2373,7 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
     }
   }
 
+  /* rebuild active/render color attribute references*/
   if (!MAIN_VERSION_ATLEAST(bmain, 301, 5)) {
     LISTBASE_FOREACH (Mesh *, me, &bmain->meshes) {
       for (int step = 0; step < 2; step++) {

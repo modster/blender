@@ -1447,10 +1447,7 @@ static void sculpt_save_active_attribute(Object *ob, SculptAttrRef *attr)
 void SCULPT_undo_push_begin(Object *ob, const char *name)
 {
   UndoStack *ustack = ED_undo_stack_get();
-  SculptUndoStep *us;
 
-  if (!ob->sculpt->pmap && ob->sculpt->pbvh && BKE_pbvh_type(ob->sculpt->pbvh) == PBVH_FACES) {
-  }
   if (ob != NULL) {
     /* If possible, we need to tag the object and its geometry data as 'changed in the future' in
      * the previous undo step if it's a memfile one. */
@@ -1461,7 +1458,7 @@ void SCULPT_undo_push_begin(Object *ob, const char *name)
   /* Special case, we never read from this. */
   bContext *C = NULL;
 
-  us = (SculptUndoStep *)BKE_undosys_step_push_init_with_type(
+  SculptUndoStep *us = (SculptUndoStep *)BKE_undosys_step_push_init_with_type(
       ustack, C, name, BKE_UNDOSYS_TYPE_SCULPT);
 
   if (!us->active_attr_start.was_set) {
@@ -1530,7 +1527,7 @@ static void sculpt_undo_set_active_layer(struct bContext *C, SculptAttrRef *attr
   }
 }
 
-static void sculpt_undosys_step_encode_init(struct bContext *C, UndoStep *us_p)
+static void sculpt_undosys_step_encode_init(struct bContext *UNUSED(C), UndoStep *us_p)
 {
   SculptUndoStep *us = (SculptUndoStep *)us_p;
   /* Dummy, memory is cleared anyway. */
@@ -1595,7 +1592,7 @@ static void sculpt_undosys_step_decode_undo(struct bContext *C,
 
     sculpt_undo_set_active_layer(C, &((SculptUndoStep *)us_iter)->active_attr_start);
     sculpt_undosys_step_decode_undo_impl(C, depsgraph, us_iter);
-    
+
     if (us_iter == us) {
       if (us_iter->step.prev && us_iter->step.prev->type == BKE_UNDOSYS_TYPE_SCULPT) {
         sculpt_undo_set_active_layer(C, &((SculptUndoStep *)us_iter->step.prev)->active_attr_end);

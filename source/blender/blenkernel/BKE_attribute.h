@@ -50,7 +50,7 @@ typedef enum AttributeDomain {
   ATTR_DOMAIN_NUM
 } AttributeDomain;
 
-typedef enum {
+typedef enum AttributeDomainMask {
   ATTR_DOMAIN_MASK_POINT = (1 << 0),
   ATTR_DOMAIN_MASK_EDGE = (1 << 1),
   ATTR_DOMAIN_MASK_FACE = (1 << 2),
@@ -63,8 +63,11 @@ typedef enum {
 
 bool BKE_id_attributes_supported(struct ID *id);
 
-/* list_mask restricts unique name check to certain customdata types,
-   if in doubt just pass CD_MASK_PROP_ALL */
+/**  Create a new attribute layer
+ *
+ *   \param list_mask restricts unique name check to certain customdata types,
+ *          if in doubt just pass CD_MASK_PROP_ALL
+ */
 struct CustomDataLayer *BKE_id_attribute_new(struct ID *id,
                                              const char *name,
                                              int type,
@@ -97,9 +100,9 @@ void BKE_id_attributes_active_set(struct ID *id, struct CustomDataLayer *layer);
 int *BKE_id_attributes_active_index_p(struct ID *id);
 
 CustomData *BKE_id_attributes_iterator_next_domain(struct ID *id, struct CustomDataLayer *layers);
-CustomDataLayer *BKE_id_attribute_from_index(const struct ID *id,
-                                             int lookup_index,
-                                             const AttributeDomainMask domain_mask);
+const CustomDataLayer *BKE_id_attribute_from_index(const struct ID *id,
+                                                   int lookup_index,
+                                                   const AttributeDomainMask domain_mask);
 
 struct AttributeRef *BKE_id_attributes_active_color_ref_p(struct ID *id);
 void BKE_id_attributes_active_color_set(struct ID *id, struct CustomDataLayer *active_layer);
