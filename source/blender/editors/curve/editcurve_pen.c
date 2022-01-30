@@ -887,10 +887,16 @@ static void update_data_for_all_nurbs(const ListBase *nurbs, const ViewContext *
             data, len_manhattan_v2v2(screen_co, data->mval), nu, -1, 0, 0.0f, nu->bp->vec);
       }
 
-      for (int i = 0; i < nu->pntsu - 1; i++) {
+      int end = nu->pntsu - 1;
+      if (nu->flagu & CU_NURB_CYCLIC) {
+        end = nu->pntsu;
+      }
+
+      for (int i = 0; i < end; i++) {
         float point[3], factor;
+        int next_i = (i + 1) % nu->pntsu;
         bool found_min = get_closest_point_on_edge(
-            point, data->mval, (nu->bp + i)->vec, (nu->bp + i + 1)->vec, vc, &factor);
+            point, data->mval, (nu->bp + i)->vec, (nu->bp + next_i)->vec, vc, &factor);
         if (found_min) {
           float point_2d[2];
           if (worldspace_to_screenspace(point, vc, point_2d)) {
