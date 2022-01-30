@@ -150,6 +150,7 @@ set(SRC
   nodes/node_geo_join_geometry.cc
   nodes/node_geo_material_replace.cc
   nodes/node_geo_material_selection.cc
+  nodes/node_geo_merge_by_distance.cc
   nodes/node_geo_mesh_primitive_circle.cc
   nodes/node_geo_mesh_primitive_cone.cc
   nodes/node_geo_mesh_primitive_cube.cc
@@ -236,10 +237,6 @@ if(WITH_PYTHON)
     ${PYTHON_LIBRARIES}
   )
   add_definitions(-DWITH_PYTHON)
-endif()
-
-if(WITH_INTERNATIONAL)
-  add_definitions(-DWITH_INTERNATIONAL)
 endif()
 
 if(WITH_TBB)

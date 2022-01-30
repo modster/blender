@@ -63,7 +63,10 @@ enum class Type {
 };
 
 enum class BuiltinBits {
-  /** Allow getting barycentic coordinates inside the fragment shader. NOTE: emulated on OpenGL. */
+  /**
+   * Allow getting barycentric coordinates inside the fragment shader.
+   * \note Emulated on OpenGL.
+   */
   BARYCENTRIC_COORD = (1 << 0),
   FRAG_COORD = (1 << 2),
   FRONT_FACING = (1 << 4),
@@ -311,7 +314,6 @@ struct ShaderCreateInfo {
   Vector<StageInterfaceInfo *> geometry_out_interfaces_;
 
   struct PushConst {
-    int index;
     Type type;
     StringRefNull name;
     int array_size;
@@ -500,22 +502,14 @@ struct ShaderCreateInfo {
   /** \name Push constants
    *
    * Data managed by GPUShader. Can be set through uniform functions. Must be less than 128bytes.
-   * One slot represents 4bytes. Each element needs to have enough empty space left after it.
-   * example:
-   * [0] = PUSH_CONSTANT(MAT4, "ModelMatrix"),
-   * ---- 16 slots occupied by ModelMatrix ----
-   * [16] = PUSH_CONSTANT(VEC4, "color"),
-   * ---- 4 slots occupied by color ----
-   * [20] = PUSH_CONSTANT(BOOL, "srgbToggle"),
-   * The maximum slot is 31.
    * \{ */
 
-  Self &push_constant(int slot, Type type, StringRefNull name, int array_size = 0)
+  Self &push_constant(Type type, StringRefNull name, int array_size = 0)
   {
     BLI_assert_msg(name.find("[") == -1,
                    "Array syntax is forbidden for push constants."
                    "Use the array_size parameter instead.");
-    push_constants_.append({slot, type, name, array_size});
+    push_constants_.append({type, name, array_size});
     interface_names_size_ += name.size() + 1;
     return *(Self *)this;
   }
@@ -556,7 +550,9 @@ struct ShaderCreateInfo {
                         StringRefNull info_name1 = "",
                         StringRefNull info_name2 = "",
                         StringRefNull info_name3 = "",
-                        StringRefNull info_name4 = "")
+                        StringRefNull info_name4 = "",
+                        StringRefNull info_name5 = "",
+                        StringRefNull info_name6 = "")
   {
     additional_infos_.append(info_name0);
     if (!info_name1.is_empty()) {
@@ -570,6 +566,12 @@ struct ShaderCreateInfo {
     }
     if (!info_name4.is_empty()) {
       additional_infos_.append(info_name4);
+    }
+    if (!info_name5.is_empty()) {
+      additional_infos_.append(info_name5);
+    }
+    if (!info_name6.is_empty()) {
+      additional_infos_.append(info_name6);
     }
     return *(Self *)this;
   }

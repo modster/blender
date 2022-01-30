@@ -217,6 +217,8 @@ static void print_image_type(std::ostream &os,
     case ImageType::UINT_2D_ARRAY:
     case ImageType::SHADOW_2D:
     case ImageType::SHADOW_2D_ARRAY:
+    case ImageType::DEPTH_2D:
+    case ImageType::DEPTH_2D_ARRAY:
       os << "2D";
       break;
     case ImageType::FLOAT_3D:
@@ -232,6 +234,8 @@ static void print_image_type(std::ostream &os,
     case ImageType::UINT_CUBE_ARRAY:
     case ImageType::SHADOW_CUBE:
     case ImageType::SHADOW_CUBE_ARRAY:
+    case ImageType::DEPTH_CUBE:
+    case ImageType::DEPTH_CUBE_ARRAY:
       os << "Cube";
       break;
     default:
@@ -250,6 +254,8 @@ static void print_image_type(std::ostream &os,
     case ImageType::UINT_CUBE_ARRAY:
     case ImageType::SHADOW_2D_ARRAY:
     case ImageType::SHADOW_CUBE_ARRAY:
+    case ImageType::DEPTH_2D_ARRAY:
+    case ImageType::DEPTH_CUBE_ARRAY:
       os << "Array";
       break;
     default:
@@ -403,9 +409,6 @@ std::string GLShader::resources_declare(const ShaderCreateInfo &info) const
   }
   ss << "\n/* Push Constants. */\n";
   for (const ShaderCreateInfo::PushConst &uniform : info.push_constants_) {
-    if (GLContext::explicit_location_support) {
-      ss << "layout(location = " << uniform.index << ") ";
-    }
     ss << "uniform " << to_string(uniform.type) << " " << uniform.name;
     if (uniform.array_size > 0) {
       ss << "[" << uniform.array_size << "]";
@@ -413,7 +416,9 @@ std::string GLShader::resources_declare(const ShaderCreateInfo &info) const
     ss << ";\n";
   }
   for (const ShaderCreateInfo::PushConst &uniform : info.push_constants_) {
-    ss << "#define " << uniform.name << " (" << uniform.name << ")\n";
+    /* T95278: Double macro to avoid some compilers think it is recursive. */
+    ss << "#define " << uniform.name << "_ " << uniform.name << "\n";
+    ss << "#define " << uniform.name << " (" << uniform.name << "_)\n";
   }
   ss << "\n";
   return ss.str();
@@ -495,7 +500,7 @@ std::string GLShader::geometry_layout_declare(const ShaderCreateInfo &info) cons
 static StageInterfaceInfo *find_interface_by_name(const Vector<StageInterfaceInfo *> &ifaces,
                                                   const StringRefNull &name)
 {
-  for (auto iface : ifaces) {
+  for (auto *iface : ifaces) {
     if (iface->name == name) {
       return iface;
     }
@@ -579,10 +584,6 @@ static char *glsl_patch_default_get()
     STR_CONCAT(patch, slen, "#define GPU_ARB_shader_draw_parameters\n");
     STR_CONCAT(patch, slen, "#define gpu_BaseInstance gl_BaseInstanceARB\n");
   }
-  else {
-    /* Fallback: Emulate base instance using a uniform. */
-    STR_CONCAT(patch, slen, "uniform int gpu_BaseInstance\n");
-  }
   if (GLContext::geometry_shader_invocations) {
     STR_CONCAT(patch, slen, "#extension GL_ARB_gpu_shader5 : enable\n");
     STR_CONCAT(patch, slen, "#define GPU_ARB_gpu_shader5\n");
@@ -590,6 +591,18 @@ static char *glsl_patch_default_get()
   if (GLContext::texture_cube_map_array_support) {
     STR_CONCAT(patch, slen, "#extension GL_ARB_texture_cube_map_array : enable\n");
     STR_CONCAT(patch, slen, "#define GPU_ARB_texture_cube_map_array\n");
+  }
+  if (GLEW_ARB_conservative_depth) {
+    STR_CONCAT(patch, slen, "#extension GL_ARB_conservative_depth : enable\n");
+  }
+  if (GPU_shader_image_load_store_support()) {
+    STR_CONCAT(patch, slen, "#extension GL_ARB_shader_image_load_store: enable\n");
+    STR_CONCAT(patch, slen, "#extension GL_ARB_shading_language_420pack: enable\n");
+  }
+
+  /* Fallbacks. */
+  if (!GLContext::shader_draw_parameters_support) {
+    STR_CONCAT(patch, slen, "uniform int gpu_BaseInstance;\n");
   }
 
   /* Vulkan GLSL compat. */

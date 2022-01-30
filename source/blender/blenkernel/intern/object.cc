@@ -1486,10 +1486,7 @@ bool BKE_object_support_modifier_type_check(const Object *ob, int modifier_type)
   }
 
   /* Only geometry objects should be able to get modifiers T25291. */
-  if (ob->type == OB_HAIR) {
-    return (mti->modifyHair != nullptr) || (mti->flags & eModifierTypeFlag_AcceptsVertexCosOnly);
-  }
-  if (ELEM(ob->type, OB_POINTCLOUD, OB_VOLUME)) {
+  if (ELEM(ob->type, OB_POINTCLOUD, OB_VOLUME, OB_HAIR)) {
     return (mti->modifyGeometrySet != nullptr);
   }
   if (ELEM(ob->type, OB_MESH, OB_CURVE, OB_SURF, OB_FONT, OB_LATTICE)) {
@@ -4572,7 +4569,7 @@ Mesh *BKE_object_get_editmesh_eval_final(const Object *object)
 
   const Mesh *mesh = static_cast<const Mesh *>(object->data);
   if (mesh->edit_mesh == nullptr) {
-    /* Heppens when requesting material of evaluated 3d font obejct: the evaluated object get
+    /* Happens when requesting material of evaluated 3d font object: the evaluated object get
      * converted to mesh, and it does not have edit mesh. */
     return nullptr;
   }
