@@ -151,21 +151,15 @@ static const EnumPropertyItem prop_handle_types[] = {
     {0, NULL, 0, NULL, NULL},
 };
 
-static void screenspace_to_worldspace(const float pos_2d[2],
-                                      const float depth[3],
-                                      const ViewContext *vc,
-                                      float r_pos_3d[3])
+static void update_location_for_2d_curve(const ViewContext *vc, float location[3])
 {
-  mul_v3_m4v3(r_pos_3d, vc->obedit->obmat, depth);
-  ED_view3d_win_to_3d(vc->v3d, vc->region, r_pos_3d, pos_2d, r_pos_3d);
-
   Curve *cu = vc->obedit->data;
   if (CU_IS_2D(cu)) {
     const float eps = 1e-6f;
 
     /* get the view vector to 'location' */
     float view_dir[3];
-    ED_view3d_global_to_vector(vc->rv3d, r_pos_3d, view_dir);
+    ED_view3d_global_to_vector(vc->rv3d, location, view_dir);
 
     /* get the plane */
     float plane[4];
@@ -178,13 +172,13 @@ static void screenspace_to_worldspace(const float pos_2d[2],
     }
     else {
       float lambda;
-      if (isect_ray_plane_v3(r_pos_3d, view_dir, plane, &lambda, false)) {
+      if (isect_ray_plane_v3(location, view_dir, plane, &lambda, false)) {
         /* check if we're behind the viewport */
         float location_test[3];
-        madd_v3_v3v3fl(location_test, r_pos_3d, view_dir, lambda);
+        madd_v3_v3v3fl(location_test, location, view_dir, lambda);
         if ((vc->rv3d->is_persp == false) ||
             (mul_project_m4_v3_zfac(vc->rv3d->persmat, location_test) > 0.0f)) {
-          copy_v3_v3(r_pos_3d, location_test);
+          copy_v3_v3(location, location_test);
         }
       }
     }
@@ -192,11 +186,21 @@ static void screenspace_to_worldspace(const float pos_2d[2],
 
   float imat[4][4];
   invert_m4_m4(imat, vc->obedit->obmat);
-  mul_m4_v3(imat, r_pos_3d);
+  mul_m4_v3(imat, location);
 
   if (CU_IS_2D(cu)) {
-    r_pos_3d[2] = 0.0f;
+    location[2] = 0.0f;
   }
+}
+
+static void screenspace_to_worldspace(const float pos_2d[2],
+                                      const float depth[3],
+                                      const ViewContext *vc,
+                                      float r_pos_3d[3])
+{
+  mul_v3_m4v3(r_pos_3d, vc->obedit->obmat, depth);
+  ED_view3d_win_to_3d(vc->v3d, vc->region, r_pos_3d, pos_2d, r_pos_3d);
+  update_location_for_2d_curve(vc, r_pos_3d);
 }
 
 static void screenspace_to_worldspace_int(const int pos_2d[2],
@@ -277,34 +281,6 @@ static void move_bezt_handle_or_vertex_to_location(BezTriple *bezt,
   }
 }
 
-static void move_bezt_handle_or_vertex_to_location_int(BezTriple *bezt,
-                                                       const int mval[2],
-                                                       const short cp_index,
-                                                       const ViewContext *vc)
-{
-  const float mval_fl[2] = {UNPACK2(mval)};
-  move_bezt_handle_or_vertex_to_location(bezt, mval_fl, cp_index, vc);
-}
-
-/* Move handles or entire #BezTriple to mouse based on selection. */
-static void move_selected_bezt_to_location(BezTriple *bezt,
-                                           const ViewContext *vc,
-                                           const int mval[2])
-{
-  if (BEZT_ISSEL_IDX(bezt, 1)) {
-    move_bezt_handle_or_vertex_to_location_int(bezt, mval, 1, vc);
-  }
-  else {
-    remove_handle_movement_constraints(bezt, BEZT_ISSEL_IDX(bezt, 0), BEZT_ISSEL_IDX(bezt, 2));
-    if (BEZT_ISSEL_IDX(bezt, 0)) {
-      move_bezt_handle_or_vertex_to_location_int(bezt, mval, 0, vc);
-    }
-    else {
-      move_bezt_handle_or_vertex_to_location_int(bezt, mval, 2, vc);
-    }
-  }
-}
-
 static void move_bp_to_location(BPoint *bp, const float mval[2], const ViewContext *vc)
 {
   float location[3];
@@ -366,7 +342,6 @@ static bool get_selected_center(const ListBase *nurbs,
 static void move_all_selected_points(ListBase *nurbs,
                                      const bool bezt_only,
                                      const bool move_entire,
-                                     const bool handles_only,
                                      CurvePenData *cpd,
                                      const wmEvent *event,
                                      const ViewContext *vc)
@@ -399,7 +374,7 @@ static void move_all_selected_points(ListBase *nurbs,
     if (nu->type == CU_BEZIER) {
       for (int i = 0; i < nu->pntsu; i++) {
         BezTriple *bezt = nu->bezt + i;
-        if (!handles_only && (BEZT_ISSEL_IDX(bezt, 1) || (move_entire && BEZT_ISSEL_ANY(bezt)))) {
+        if (BEZT_ISSEL_IDX(bezt, 1) || (move_entire && BEZT_ISSEL_ANY(bezt))) {
           float pos[2], dst[2];
           worldspace_to_screenspace(bezt->vec[1], vc, pos);
           add_v2_v2v2(dst, pos, change);
@@ -1180,44 +1155,8 @@ static void extrude_points_from_selected_vertices(const ViewContext *vc,
 
   ED_view3d_win_to_3d_int(vc->v3d, vc->region, location, event->mval, location);
 
-  if (CU_IS_2D(cu)) {
-    const float eps = 1e-6f;
-
-    /* get the view vector to 'location' */
-    float view_dir[3];
-    ED_view3d_global_to_vector(vc->rv3d, location, view_dir);
-
-    /* get the plane */
-    float plane[4];
-    /* only normalize to avoid precision errors */
-    normalize_v3_v3(plane, vc->obedit->obmat[2]);
-    plane[3] = -dot_v3v3(plane, vc->obedit->obmat[3]);
-
-    if (fabsf(dot_v3v3(view_dir, plane)) < eps) {
-      /* can't project on an aligned plane. */
-    }
-    else {
-      float lambda;
-      if (isect_ray_plane_v3(location, view_dir, plane, &lambda, false)) {
-        /* check if we're behind the viewport */
-        float location_test[3];
-        madd_v3_v3v3fl(location_test, location, view_dir, lambda);
-        if ((vc->rv3d->is_persp == false) ||
-            (mul_project_m4_v3_zfac(vc->rv3d->persmat, location_test) > 0.0f)) {
-          copy_v3_v3(location, location_test);
-        }
-      }
-    }
-  }
+  update_location_for_2d_curve(vc, location);
   EditNurb *editnurb = cu->editnurb;
-
-  float imat[4][4];
-  invert_m4_m4(imat, obedit->obmat);
-  mul_m4_v3(imat, location);
-
-  if (CU_IS_2D(cu)) {
-    location[2] = 0.0f;
-  }
 
   if (!extrude_center && sel_exists) {
     float change[3];
@@ -1628,7 +1567,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   if (!cpd->link_handles_pressed && is_extra_key_pressed(event, link_handles)) {
     cpd->link_handles = !cpd->link_handles;
     if (cpd->link_handles) {
-      move_all_selected_points(nurbs, false, false, true, cpd, event, &vc);
+      move_all_selected_points(nurbs, false, false, cpd, event, &vc);
     }
     else {
       // Recalculate offset after link handles is turned off
@@ -1640,7 +1579,7 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
   if (!cpd->lock_angle_pressed && is_extra_key_pressed(event, lock_angle)) {
     cpd->lock_angle = !cpd->lock_angle;
     if (cpd->lock_angle) {
-      move_all_selected_points(nurbs, false, false, true, cpd, event, &vc);
+      move_all_selected_points(nurbs, false, false, cpd, event, &vc);
     }
     else {
       // Recalculate offset after lock angle is turned off
@@ -1677,13 +1616,13 @@ static int curve_pen_modal(bContext *C, wmOperator *op, const wmEvent *event)
       /* If dragging a new control point, move handle point with mouse cursor. Else move entire
        * control point. */
       else if (cpd->new_point) {
-        move_all_selected_points(nurbs, true, move_entire_pressed, false, cpd, event, &vc);
+        move_all_selected_points(nurbs, true, move_entire_pressed, cpd, event, &vc);
         cpd->acted = true;
       }
       else if ((select_point || move_point) && !cpd->spline_nearby) {
         if (cpd->found_point) {
           if (move_point) {
-            move_all_selected_points(nurbs, false, move_entire_pressed, false, cpd, event, &vc);
+            move_all_selected_points(nurbs, false, move_entire_pressed, cpd, event, &vc);
             cpd->acted = true;
           }
         }
